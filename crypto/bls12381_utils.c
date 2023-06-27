@@ -2,7 +2,7 @@
 
 // this file contains utility functions for the curve BLS 12-381
 // these tools are shared by the BLS signature scheme, the BLS based threshold signature
-// and the BLS distributed key generation protcols
+// and the BLS distributed key generation protocols
 
 #include "bls12381_utils.h"
 #include "bls_include.h"
@@ -189,36 +189,51 @@ void bn_randZr_star(bn_t x) {
     byte seed[seed_len];
     rand_bytes(seed, seed_len);
     bn_map_to_Zr_star(x, seed, seed_len);
+    rand_bytes(seed, seed_len); // overwrite seed
 }
 
 // generates a random number less than the order r
 void bn_randZr(bn_t x) {
-    bn_t r;
-    bn_new(r); 
-    g2_get_ord(r);
     // reduce the modular reduction bias
     bn_new_size(x, BITS_TO_DIGITS(Fr_BITS + SEC_BITS));
     bn_rand(x, RLC_POS, Fr_BITS + SEC_BITS);
-    bn_mod(x, x, r);
-    bn_free(r);
+    bn_mod(x, x, &core_get()->ep_r);
 }
 
-// reads a scalar from an array and maps it to Zr
-// the resulting scalar is in the range 0 < a < r
-// len must be less than BITS_TO_BYTES(RLC_BN_BITS)
+// Reads a scalar from an array and maps it to Zr.
+// The resulting scalar `a` satisfies 0 <= a < r.
+// `len` must be less than BITS_TO_BYTES(RLC_BN_BITS).
+// It returns VALID if scalar is zero and INVALID otherwise
+int bn_map_to_Zr(bn_t a, const uint8_t* bin, int len) {
+    bn_t tmp;
+    bn_new(tmp);
+    bn_new_size(tmp, BYTES_TO_DIGITS(len));
+    bn_read_bin(tmp, bin, len);
+    bn_mod(a, tmp, &core_get()->ep_r);
+    bn_rand(tmp, RLC_POS, len << 3); // overwrite tmp
+    bn_free(tmp);
+    if (bn_cmp_dig(a, 0) == RLC_EQ) {
+        return VALID;
+    }
+    return INVALID;
+}
+
+// Reads a scalar from an array and maps it to Zr*.
+// The resulting scalar `a` satisfies 0 < a < r.
+// `len` must be less than BITS_TO_BYTES(RLC_BN_BITS)
 void bn_map_to_Zr_star(bn_t a, const uint8_t* bin, int len) {
     bn_t tmp;
     bn_new(tmp);
     bn_new_size(tmp, BYTES_TO_DIGITS(len));
     bn_read_bin(tmp, bin, len);
-    bn_t r;
-    bn_new(r); 
-    g2_get_ord(r);
-    bn_sub_dig(r,r,1);
-    bn_mod_basic(a,tmp,r);
+    bn_t r_1;
+    bn_new(r_1); 
+    bn_sub_dig(r_1, &core_get()->ep_r, 1);
+    bn_mod_basic(a,tmp,r_1);
     bn_add_dig(a,a,1);
-    bn_free(r);
+    bn_rand(tmp, RLC_POS, len << 3); // overwrite tmp
     bn_free(tmp);
+    bn_free(r_1);
 }
 
 // returns the sign of y.
@@ -236,8 +251,6 @@ static int fp_get_sign(const fp_t y) {
 // https://www.ietf.org/archive/id/draft-irtf-cfrg-pairing-friendly-curves-08.html#name-zcash-serialization-format-) 
 // The code is a modified version of Relic ep_write_bin
 void ep_write_bin_compact(byte *bin, const ep_t a, const int len) {
-    ep_t t;
-    ep_null(t);
     const int G1_size = (G1_BYTES/(G1_SERIALIZATION+1));
 
     if (len!=G1_size) {
@@ -253,6 +266,8 @@ void ep_write_bin_compact(byte *bin, const ep_t a, const int len) {
     }
 
     RLC_TRY {
+        ep_t t;
+        ep_null(t);
         ep_new(t); 
         ep_norm(t, a);
         fp_write_bin(bin, Fp_BYTES, t->x);
@@ -262,22 +277,62 @@ void ep_write_bin_compact(byte *bin, const ep_t a, const int len) {
         } else {
             fp_write_bin(bin + Fp_BYTES, Fp_BYTES, t->y);
         }
+        ep_free(t);
     } RLC_CATCH_ANY {
         RLC_THROW(ERR_CAUGHT);
     }
 
     bin[0] |= (G1_SERIALIZATION << 7);
-    ep_free(t);
  }
 
+// fp_read_bin_safe is a modified version of Relic's (void fp_read_bin).
+// It reads a field element from a buffer and makes sure the big number read can be 
+// written as a field element (is reduced modulo p). 
+// Unlike Relic's versions, the function does not reduce the read integer modulo p and does
+// not throw an exception for an integer larger than p. The function returns RLC_OK if the input
+// corresponds to a field element, and returns RLC_ERR otherwise. 
+static int fp_read_bin_safe(fp_t a, const uint8_t *bin, int len) {
+    if (len != Fp_BYTES) {
+        return RLC_ERR;
+    }
+
+    int ret = RLC_ERR; 
+    bn_t t;
+    bn_new(t);
+    bn_read_bin(t, bin, Fp_BYTES);
+
+    // make sure read bn is reduced modulo p
+    // first check is sanity check, since current implementation of `bn_read_bin` insures
+    // output bn is positive
+    if (bn_sign(t) == RLC_NEG || bn_cmp(t, &core_get()->prime) != RLC_LT) {
+        goto out;
+    } 
+
+    if (bn_is_zero(t)) {
+        fp_zero(a);
+    } else {
+        if (t->used == 1) {
+            fp_prime_conv_dig(a, t->dp[0]);
+        } else {
+            fp_prime_conv(a, t);
+        }
+    }	
+    ret = RLC_OK;
+out:
+    bn_free(t);
+    return ret;
+}
 
 // ep_read_bin_compact imports a point from a buffer in a compressed or uncompressed form.
 // len is the size of the input buffer.
-// The serialization is following:
+//
+// The resulting point is guaranteed to be on the curve E1.
+// The serialization follows:
 // https://www.ietf.org/archive/id/draft-irtf-cfrg-pairing-friendly-curves-08.html#name-zcash-serialization-format-) 
 // The code is a modified version of Relic ep_read_bin
 //
-// It returns RLC_OK if the inputs are valid and the execution completes, and RLC_ERR otherwise.
+// It returns RLC_OK if the inputs are valid (input buffer lengths are valid and coordinates correspond
+// to a point on curve) and the execution completes, and RLC_ERR otherwise.
 int ep_read_bin_compact(ep_t a, const byte *bin, const int len) {
     // check the length
     const int G1_size = (G1_BYTES/(G1_SERIALIZATION+1));
@@ -315,18 +370,28 @@ int ep_read_bin_compact(ep_t a, const byte *bin, const int len) {
 
 	a->coord = BASIC;
 	fp_set_dig(a->z, 1);
+    // use a temporary buffer to mask the header bits and read a.x 
     byte temp[Fp_BYTES];
     memcpy(temp, bin, Fp_BYTES);
     temp[0] &= 0x1F;
-	fp_read_bin(a->x, temp, Fp_BYTES);
+    if (fp_read_bin_safe(a->x, temp, sizeof(temp)) != RLC_OK) {
+        return RLC_ERR;
+    }
 
-    if (G1_SERIALIZATION == UNCOMPRESSED) {
-        fp_read_bin(a->y, bin + Fp_BYTES, Fp_BYTES);
+    if (G1_SERIALIZATION == UNCOMPRESSED) { 
+        if (fp_read_bin_safe(a->y, bin + Fp_BYTES, Fp_BYTES) != RLC_OK) {
+            return RLC_ERR;
+        }
+        // check read point is on curve
+        if (!ep_on_curve(a)) {
+            return RLC_ERR;
+        }
         return RLC_OK;
     }
     fp_zero(a->y);
     fp_set_bit(a->y, 0, y_sign);
     if (ep_upk(a, a) == 1) {
+        // resulting point is guaranteed to be on curve
         return RLC_OK;
     }
     return RLC_ERR;
@@ -382,9 +447,30 @@ void ep2_write_bin_compact(byte *bin, const ep2_t a, const int len) {
     ep_free(t);
 }
 
+// fp2_read_bin_safe is a modified version of Relic's (void fp2_read_bin).
+// It reads an Fp^2 element from a buffer and makes sure the big numbers read can be 
+// written as field elements (are reduced modulo p). 
+// Unlike Relic's versions, the function does not reduce the read integers modulo p and does
+// not throw an exception for integers larger than p. The function returns RLC_OK if the input
+// corresponds to a field element in Fp^2, and returns RLC_ERR otherwise.
+static int fp2_read_bin_safe(fp2_t a, const uint8_t *bin, int len) {
+    if (len != Fp2_BYTES) {
+        return RLC_ERR;
+    }
+    if (fp_read_bin_safe(a[0], bin, Fp_BYTES) != RLC_OK) {
+        return RLC_ERR;
+    }
+    if (fp_read_bin_safe(a[1], bin + Fp_BYTES, Fp_BYTES) != RLC_OK) {
+        return RLC_ERR;
+    }
+    return RLC_OK;
+}
+
 // ep2_read_bin_compact imports a point from a buffer in a compressed or uncompressed form.
+// The resulting point is guaranteed to be on curve E2.
 //
-// It returns RLC_OK if the inputs are valid and the execution completes and RLC_ERR otherwise.
+// It returns RLC_OK if the inputs are valid (input buffer lengths are valid and read coordinates
+// correspond to a point on curve) and the execution completes and RLC_ERR otherwise.
 // The code is a modified version of Relic ep2_read_bin
 int ep2_read_bin_compact(ep2_t a, const byte *bin, const int len) {
     // check the length
@@ -422,16 +508,23 @@ int ep2_read_bin_compact(ep2_t a, const byte *bin, const int len) {
     } 
     
 	a->coord = BASIC;
-	fp_set_dig(a->z[0], 1);
-	fp_zero(a->z[1]);
+    fp2_set_dig(a->z, 1);   // a.z
+    // use a temporary buffer to mask the header bits and read a.x
     byte temp[Fp2_BYTES];
     memcpy(temp, bin, Fp2_BYTES);
-    // clear the header bits
-    temp[0] &= 0x1F;
-    fp2_read_bin(a->x, temp, Fp2_BYTES);
+    temp[0] &= 0x1F;        // clear the header bits
+    if (fp2_read_bin_safe(a->x, temp, sizeof(temp)) != RLC_OK) {
+        return RLC_ERR;
+    }
 
     if (G2_SERIALIZATION == UNCOMPRESSED) {
-        fp2_read_bin(a->y, bin + Fp2_BYTES, Fp2_BYTES);
+        if (fp2_read_bin_safe(a->y, bin + Fp2_BYTES, Fp2_BYTES) != RLC_OK){ 
+            return RLC_ERR;
+        }
+        // check read point is on curve
+        if (!ep2_on_curve(a)) {
+            return RLC_ERR;
+        }
         return RLC_OK;
     }
     
@@ -439,6 +532,7 @@ int ep2_read_bin_compact(ep2_t a, const byte *bin, const int len) {
     fp_set_bit(a->y[0], 0, y_sign);
     fp_zero(a->y[1]);
     if (ep2_upk(a, a) == 1) {
+        // resulting point is guaranteed to be on curve
         return RLC_OK;
     }
     return RLC_ERR;
@@ -502,7 +596,7 @@ int bls_spock_verify(const ep2_t pk1, const byte* sig1, const ep2_t pk2, const b
     if (read_ret != RLC_OK) 
         return read_ret;
 
-    // check s1 is on curve and in G1
+    // check s1 is in G1
     if (check_membership_G1(elemsG1[0]) != VALID) // only enabled if MEMBERSHIP_CHECK==1
         return INVALID;
 
@@ -512,7 +606,7 @@ int bls_spock_verify(const ep2_t pk1, const byte* sig1, const ep2_t pk2, const b
     if (read_ret != RLC_OK) 
         return read_ret;
 
-    // check s2 is on curve and in G1
+    // check s2 in G1
     if (check_membership_G1(elemsG1[1]) != VALID) // only enabled if MEMBERSHIP_CHECK==1
         return INVALID; 
 
@@ -719,46 +813,36 @@ void ep_rand_G1complement(ep_t p) {
     while (ep_upk(p, p) == 0); // make sure p is in E1
 
     // map the point to E1\G1 by clearing G1 order
-    bn_t order;
-    bn_new(order); 
-    g1_get_ord(order);
-    ep_mul_basic(p, p, order);
+    ep_mul_basic(p, p, &core_get()->ep_r);
+
+    assert(ep_on_curve(p));  // sanity check to make sure p is in E1
 }
 
-int subgroup_check_G1_test(int inG1, int method) {
-    // generate a random p
-    ep_t p;
-	if (inG1) ep_rand_G1(p); // p in G1
-	else ep_rand_G1complement(p); // p in E1\G1
-
-    if (!ep_on_curve(p)) { // sanity check to make sure p is in E1
-        return UNDEFINED; // this should not happen
-    }
-        
-    switch (method) {
-    case EXP_ORDER: 
-        return simple_subgroup_check_G1(p);
-    #if  (MEMBERSHIP_CHECK_G1 == BOWE)
-    case BOWE:
-        return bowe_subgroup_check_G1(p);
-    #endif
-    default:
-        if (inG1) return VALID;
-        else return INVALID;
-    }
+// generates a random point in G2 and stores it in p
+void ep2_rand_G2(ep2_t p) {
+    // multiplies G2 generator by a random scalar
+    ep2_rand(p);
 }
 
-int subgroup_check_G1_bench() {
-    ep_t p;
-	ep_curve_get_gen(p);
-    int res;
-    // check p is in G1
-    #if MEMBERSHIP_CHECK_G1 == EXP_ORDER
-    res = simple_subgroup_check_G1(p);
-    #elif MEMBERSHIP_CHECK_G1 == BOWE
-    res = bowe_subgroup_check_G1(p);
-    #endif
-    return res;
+// generates a random point in E2\G2 and stores it in p
+void ep2_rand_G2complement(ep2_t p) {
+    // generate a random point in E2
+    p->coord = BASIC;
+    fp_set_dig(p->z[0], 1);
+	fp_zero(p->z[1]);
+    do {
+        fp2_rand(p->x); // set x to a random field element
+        byte r;
+        rand_bytes(&r, 1);
+        fp2_zero(p->y);
+        fp_set_bit(p->y[0], 0, r&1); // set y randomly to 0 or 1
+    }
+    while (ep2_upk(p, p) == 0); // make sure p is in E1
+
+    // map the point to E1\G1 by clearing G1 order
+    ep2_mul_basic(p, p, &core_get()->ep_r);
+
+    assert(ep2_on_curve(p));  // sanity check to make sure p is in E1
 }
 
 // This is a testing function.

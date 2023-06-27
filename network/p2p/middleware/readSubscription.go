@@ -2,45 +2,37 @@ package middleware
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"strings"
-	"sync"
 
-	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/libp2p/go-libp2p/core/peer"
 
 	"github.com/rs/zerolog"
 
-	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/network/message"
+	"github.com/onflow/flow-go/network/p2p"
 	validator "github.com/onflow/flow-go/network/validator/pubsub"
+	"github.com/onflow/flow-go/utils/logging"
 )
 
-// readSubscriptionCB the callback called when a new message is received on the read subscription
-type readSubscriptionCB func(msg *message.Message, decodedMsgPayload interface{}, peerID peer.ID)
+// ReadSubscriptionCallBackFunction the callback called when a new message is received on the read subscription
+type ReadSubscriptionCallBackFunction func(msg *message.Message, peerID peer.ID)
 
 // readSubscription reads the messages coming in on the subscription and calls the given callback until
-// the context of the subscription is cancelled. Additionally, it reports metrics
+// the context of the subscription is cancelled.
 type readSubscription struct {
-	ctx      context.Context
 	log      zerolog.Logger
-	sub      *pubsub.Subscription
-	metrics  module.NetworkMetrics
-	callback readSubscriptionCB
+	sub      p2p.Subscription
+	callback ReadSubscriptionCallBackFunction
 }
 
 // newReadSubscription reads the messages coming in on the subscription
-func newReadSubscription(ctx context.Context, sub *pubsub.Subscription, callback readSubscriptionCB, log zerolog.Logger, metrics module.NetworkMetrics) *readSubscription {
-
-	log = log.With().
-		Str("channel", sub.Topic()).
-		Logger()
-
+func newReadSubscription(sub p2p.Subscription, callback ReadSubscriptionCallBackFunction, log zerolog.Logger) *readSubscription {
 	r := readSubscription{
-		ctx:      ctx,
-		log:      log,
+		log:      log.With().Str("channel", sub.Topic()).Logger(),
 		sub:      sub,
 		callback: callback,
-		metrics:  metrics,
 	}
 
 	return &r
@@ -48,20 +40,16 @@ func newReadSubscription(ctx context.Context, sub *pubsub.Subscription, callback
 
 // receiveLoop must be run in a goroutine. It continuously receives
 // messages for the topic and calls the callback synchronously
-func (r *readSubscription) receiveLoop(wg *sync.WaitGroup) {
-
-	defer wg.Done()
+func (r *readSubscription) receiveLoop(ctx context.Context) {
 	defer r.log.Debug().Msg("exiting receive routine")
 
 	for {
-
 		// read the next message from libp2p's subscription (blocking call)
-		rawMsg, err := r.sub.Next(r.ctx)
+		rawMsg, err := r.sub.Next(ctx)
 
 		if err != nil {
-
 			// middleware may have cancelled the context
-			if err == context.Canceled {
+			if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
 				return
 			}
 
@@ -80,16 +68,15 @@ func (r *readSubscription) receiveLoop(wg *sync.WaitGroup) {
 
 		validatorData, ok := rawMsg.ValidatorData.(validator.TopicValidatorData)
 		if !ok {
-			r.log.Error().Str("raw_msg", rawMsg.String()).Msg("[BUG] validator data missing!")
+			r.log.Error().
+				Str("raw_msg", rawMsg.String()).
+				Bool(logging.KeySuspicious, true).
+				Str("received_validator_data_type", fmt.Sprintf("%T", rawMsg.ValidatorData)).
+				Msg("[BUG] validator data missing!")
 			return
 		}
 
-		msg := validatorData.Message
-
-		// log metrics
-		r.metrics.NetworkMessageReceived(msg.Size(), msg.ChannelID, msg.Type)
-
 		// call the callback
-		r.callback(msg, validatorData.DecodedMsgPayload, validatorData.From)
+		r.callback(validatorData.Message, validatorData.From)
 	}
 }

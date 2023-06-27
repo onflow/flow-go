@@ -1,7 +1,6 @@
 package integration_test
 
 import (
-	"context"
 	"testing"
 	"time"
 
@@ -14,7 +13,6 @@ import (
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/model/flow/mapfunc"
 	"github.com/onflow/flow-go/model/flow/order"
-	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/state/protocol/inmem"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -32,7 +30,15 @@ func TestUnweightedNode(t *testing.T) {
 
 	// add a consensus node to next epoch (it will have 0 weight in the current epoch)
 	nextEpochParticipantsData := createConsensusIdentities(t, 1)
-	nextEpochIdentities := unittest.CompleteIdentitySet(nextEpochParticipantsData.Identities()...)
+	// epoch 2 identities includes:
+	// * same collection node from epoch 1, so cluster QCs are consistent
+	// * 1 new consensus node, joining at epoch 2
+	// * random nodes with other roles
+	nextEpochIdentities := unittest.CompleteIdentitySet(
+		append(
+			rootSnapshot.Encodable().Identities.Filter(filter.HasRole(flow.RoleCollection)),
+			nextEpochParticipantsData.Identities()...)...,
+	)
 	rootSnapshot = withNextEpoch(
 		rootSnapshot,
 		nextEpochIdentities,
@@ -41,21 +47,15 @@ func TestUnweightedNode(t *testing.T) {
 		10_000,
 	)
 
-	nodes, hub := createNodes(t, consensusParticipants, rootSnapshot, stopper)
+	nodes, hub, runFor := createNodes(t, consensusParticipants, rootSnapshot, stopper)
 
 	hub.WithFilter(blockNothing)
 
-	ctx, cancel := context.WithCancel(context.Background())
-	signalerCtx, _ := irrecoverable.WithSignaler(ctx)
-
-	runNodes(signalerCtx, nodes)
-
-	unittest.AssertClosesBefore(t, stopper.stopped, 60*time.Second)
+	runFor(60 * time.Second)
 
 	allViews := allFinalizedViews(t, nodes)
 	assertSafety(t, allViews)
 
-	stopNodes(t, cancel, nodes)
 	cleanupNodes(nodes)
 }
 
@@ -81,16 +81,11 @@ func TestStaticEpochTransition(t *testing.T) {
 		4,
 	)
 
-	nodes, hub := createNodes(t, consensusParticipants, rootSnapshot, stopper)
+	nodes, hub, runFor := createNodes(t, consensusParticipants, rootSnapshot, stopper)
 
 	hub.WithFilter(blockNothing)
 
-	ctx, cancel := context.WithCancel(context.Background())
-	signalerCtx, _ := irrecoverable.WithSignaler(ctx)
-
-	runNodes(signalerCtx, nodes)
-
-	unittest.AssertClosesBefore(t, stopper.stopped, 30*time.Second)
+	runFor(30 * time.Second)
 
 	allViews := allFinalizedViews(t, nodes)
 	assertSafety(t, allViews)
@@ -101,7 +96,6 @@ func TestStaticEpochTransition(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, firstEpochCounter+1, afterCounter)
 
-	stopNodes(t, cancel, nodes)
 	cleanupNodes(nodes)
 }
 
@@ -140,16 +134,11 @@ func TestEpochTransition_IdentitiesOverlap(t *testing.T) {
 		4,
 	)
 
-	nodes, hub := createNodes(t, consensusParticipants, rootSnapshot, stopper)
+	nodes, hub, runFor := createNodes(t, consensusParticipants, rootSnapshot, stopper)
 
 	hub.WithFilter(blockNothing)
 
-	ctx, cancel := context.WithCancel(context.Background())
-	signalerCtx, _ := irrecoverable.WithSignaler(ctx)
-
-	runNodes(signalerCtx, nodes)
-
-	unittest.AssertClosesBefore(t, stopper.stopped, 30*time.Second)
+	runFor(30 * time.Second)
 
 	allViews := allFinalizedViews(t, nodes)
 	assertSafety(t, allViews)
@@ -160,7 +149,6 @@ func TestEpochTransition_IdentitiesOverlap(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, firstEpochCounter+1, afterCounter)
 
-	stopNodes(t, cancel, nodes)
 	cleanupNodes(nodes)
 }
 
@@ -195,16 +183,11 @@ func TestEpochTransition_IdentitiesDisjoint(t *testing.T) {
 		4,
 	)
 
-	nodes, hub := createNodes(t, consensusParticipants, rootSnapshot, stopper)
+	nodes, hub, runFor := createNodes(t, consensusParticipants, rootSnapshot, stopper)
 
 	hub.WithFilter(blockNothing)
 
-	ctx, cancel := context.WithCancel(context.Background())
-	signalerCtx, _ := irrecoverable.WithSignaler(ctx)
-
-	runNodes(signalerCtx, nodes)
-
-	unittest.AssertClosesBefore(t, stopper.stopped, 60*time.Second)
+	runFor(60 * time.Second)
 
 	allViews := allFinalizedViews(t, nodes)
 	assertSafety(t, allViews)
@@ -215,7 +198,6 @@ func TestEpochTransition_IdentitiesDisjoint(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, firstEpochCounter+1, afterCounter)
 
-	stopNodes(t, cancel, nodes)
 	cleanupNodes(nodes)
 }
 

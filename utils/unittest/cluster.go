@@ -36,7 +36,7 @@ func AlterTransactionForCluster(tx flow.TransactionBody, clusters flow.ClusterLi
 			panic(fmt.Sprintf("unable to find cluster by txID: %x", tx.ID()))
 		}
 
-		if routed.Fingerprint() == target.Fingerprint() {
+		if routed.ID() == target.ID() {
 			return tx
 		}
 	}

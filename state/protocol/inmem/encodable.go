@@ -8,15 +8,16 @@ import (
 
 // EncodableSnapshot is the encoding format for protocol.Snapshot
 type EncodableSnapshot struct {
-	Head              *flow.Header
-	Identities        flow.IdentityList
-	LatestSeal        *flow.Seal
-	LatestResult      *flow.ExecutionResult
-	SealingSegment    *flow.SealingSegment
-	QuorumCertificate *flow.QuorumCertificate
-	Phase             flow.EpochPhase
-	Epochs            EncodableEpochs
-	Params            EncodableParams
+	Head                *flow.Header
+	Identities          flow.IdentityList
+	LatestSeal          *flow.Seal
+	LatestResult        *flow.ExecutionResult
+	SealingSegment      *flow.SealingSegment
+	QuorumCertificate   *flow.QuorumCertificate
+	Phase               flow.EpochPhase
+	Epochs              EncodableEpochs
+	Params              EncodableParams
+	SealedVersionBeacon *flow.SealedVersionBeacon
 }
 
 // EncodableEpochs is the encoding format for protocol.EpochQuery
@@ -39,6 +40,8 @@ type EncodableEpoch struct {
 	Clustering         flow.ClusterList
 	Clusters           []EncodableCluster
 	DKG                *EncodableDKG
+	FirstHeight        *uint64
+	FinalHeight        *uint64
 }
 
 // EncodableDKG is the encoding format for protocol.DKG
@@ -64,7 +67,9 @@ type EncodableCluster struct {
 
 // EncodableParams is the encoding format for protocol.GlobalParams
 type EncodableParams struct {
-	ChainID         flow.ChainID
-	SporkID         flow.Identifier
-	ProtocolVersion uint
+	ChainID                    flow.ChainID
+	SporkID                    flow.Identifier
+	SporkRootBlockHeight       uint64
+	ProtocolVersion            uint
+	EpochCommitSafetyThreshold uint64
 }

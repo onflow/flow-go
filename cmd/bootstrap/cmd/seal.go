@@ -41,7 +41,7 @@ func constructRootResultAndSeal(
 		DKGPhase3FinalView: firstView + flagNumViewsInStakingAuction + flagNumViewsInDKGPhase*3 - 1,
 		Participants:       participants.Sort(order.Canonical),
 		Assignments:        assignments,
-		RandomSource:       flagBootstrapRandomSeed,
+		RandomSource:       GenerateRandomSeed(flow.EpochSetupRandomSourceLength),
 	}
 
 	qcsWithSignerIDs := make([]*flow.QuorumCertificateWithSignerIDs, 0, len(clusterQCs))

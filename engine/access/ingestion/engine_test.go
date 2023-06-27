@@ -15,10 +15,10 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	hotmodel "github.com/onflow/flow-go/consensus/hotstuff/model"
-	"github.com/onflow/flow-go/engine/access/rpc"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module/component"
+	downloadermock "github.com/onflow/flow-go/module/executiondatasync/execution_data/mock"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/mempool/stdmap"
 	"github.com/onflow/flow-go/module/metrics"
@@ -37,20 +37,24 @@ type Suite struct {
 
 	// protocol state
 	proto struct {
-		state    *protocol.MutableState
+		state    *protocol.FollowerState
 		snapshot *protocol.Snapshot
 		params   *protocol.Params
 	}
 
-	me           *module.Local
-	request      *module.Requester
-	provider     *mocknetwork.Engine
-	blocks       *storage.Blocks
-	headers      *storage.Headers
-	collections  *storage.Collections
-	transactions *storage.Transactions
-	receipts     *storage.ExecutionReceipts
-	results      *storage.ExecutionResults
+	me             *module.Local
+	request        *module.Requester
+	provider       *mocknetwork.Engine
+	blocks         *storage.Blocks
+	headers        *storage.Headers
+	collections    *storage.Collections
+	transactions   *storage.Transactions
+	receipts       *storage.ExecutionReceipts
+	results        *storage.ExecutionResults
+	seals          *storage.Seals
+	downloader     *downloadermock.Downloader
+	sealedBlock    *flow.Header
+	finalizedBlock *flow.Header
 
 	eng    *Engine
 	cancel context.CancelFunc
@@ -70,12 +74,19 @@ func (suite *Suite) SetupTest() {
 	obsIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleAccess))
 
 	// mock out protocol state
-	suite.proto.state = new(protocol.MutableState)
+	suite.proto.state = new(protocol.FollowerState)
 	suite.proto.snapshot = new(protocol.Snapshot)
 	suite.proto.params = new(protocol.Params)
+	suite.finalizedBlock = unittest.BlockHeaderFixture(unittest.WithHeaderHeight(0))
 	suite.proto.state.On("Identity").Return(obsIdentity, nil)
 	suite.proto.state.On("Final").Return(suite.proto.snapshot, nil)
 	suite.proto.state.On("Params").Return(suite.proto.params)
+	suite.proto.snapshot.On("Head").Return(
+		func() *flow.Header {
+			return suite.finalizedBlock
+		},
+		nil,
+	).Maybe()
 
 	suite.me = new(module.Local)
 	suite.me.On("NodeID").Return(obsIdentity.NodeID)
@@ -101,15 +112,9 @@ func (suite *Suite) SetupTest() {
 	blocksToMarkExecuted, err := stdmap.NewTimes(100)
 	require.NoError(suite.T(), err)
 
-	rpcEngBuilder, err := rpc.NewBuilder(log, suite.proto.state, rpc.Config{}, nil, nil, suite.blocks, suite.headers, suite.collections,
-		suite.transactions, suite.receipts, suite.results, flow.Testnet, metrics.NewNoopCollector(), metrics.NewNoopCollector(), 0, 0, false, false, nil, nil)
-	require.NoError(suite.T(), err)
-	rpcEng, err := rpcEngBuilder.WithLegacy().Build()
-	require.NoError(suite.T(), err)
-
 	eng, err := New(log, net, suite.proto.state, suite.me, suite.request, suite.blocks, suite.headers, suite.collections,
 		suite.transactions, suite.results, suite.receipts, metrics.NewNoopCollector(), collectionsToMarkFinalized, collectionsToMarkExecuted,
-		blocksToMarkExecuted, rpcEng)
+		blocksToMarkExecuted)
 	require.NoError(suite.T(), err)
 
 	suite.blocks.On("GetLastFullBlockHeight").Once().Return(uint64(0), errors.New("do nothing"))
@@ -158,7 +163,7 @@ func (suite *Suite) TestOnFinalizedBlock() {
 	}
 
 	// expect that the block storage is indexed with each of the collection guarantee
-	suite.blocks.On("IndexBlockForCollections", block.ID(), flow.GetIDs(block.Payload.Guarantees)).Return(nil).Once()
+	suite.blocks.On("IndexBlockForCollections", block.ID(), []flow.Identifier(flow.GetIDs(block.Payload.Guarantees))).Return(nil).Once()
 
 	cluster := new(protocol.Cluster)
 	cluster.On("Members").Return(clusterCommittee, nil)
@@ -365,7 +370,7 @@ func (suite *Suite) TestRequestMissingCollections() {
 	// consider collections are missing for all blocks
 	suite.blocks.On("GetLastFullBlockHeight").Return(startHeight-1, nil)
 	// consider the last test block as the head
-	suite.proto.snapshot.On("Head").Return(blocks[blkCnt-1].Header, nil)
+	suite.finalizedBlock = blocks[blkCnt-1].Header
 
 	// p is the probability of not receiving the collection before the next poll and it
 	// helps simulate the slow trickle of the requested collections being received
@@ -552,13 +557,13 @@ func (suite *Suite) TestUpdateLastFullBlockReceivedIndex() {
 		})
 
 	// consider the last test block as the head
-	suite.proto.snapshot.On("Head").Return(finalizedBlk.Header, nil)
+	suite.finalizedBlock = finalizedBlk.Header
 
 	suite.Run("full block height index is created and advanced if not present", func() {
 		// simulate the absence of the full block height index
 		lastFullBlockHeight = 0
 		rtnErr = storerr.ErrNotFound
-		suite.proto.params.On("Root").Return(rootBlk.Header, nil)
+		suite.proto.params.On("FinalizedRoot").Return(rootBlk.Header, nil)
 		suite.blocks.On("UpdateLastFullBlockHeight", finalizedHeight).Return(nil).Once()
 
 		suite.eng.updateLastFullBlockReceivedIndex()

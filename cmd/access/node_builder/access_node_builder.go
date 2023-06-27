@@ -12,22 +12,26 @@ import (
 	badger "github.com/ipfs/go-ds-badger2"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/routing"
-	"github.com/onflow/go-bitswap"
 	"github.com/rs/zerolog"
 	"github.com/spf13/pflag"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
+	"google.golang.org/grpc/credentials/insecure"
 
 	"github.com/onflow/flow/protobuf/go/flow/access"
+	"github.com/onflow/go-bitswap"
 
 	"github.com/onflow/flow-go/admin/commands"
+	stateSyncCommands "github.com/onflow/flow-go/admin/commands/state_synchronization"
 	storageCommands "github.com/onflow/flow-go/admin/commands/storage"
 	"github.com/onflow/flow-go/cmd"
 	"github.com/onflow/flow-go/consensus"
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/committees"
+	"github.com/onflow/flow-go/consensus/hotstuff/notifications"
 	consensuspubsub "github.com/onflow/flow-go/consensus/hotstuff/notifications/pubsub"
 	"github.com/onflow/flow-go/consensus/hotstuff/signature"
+	hotstuffvalidator "github.com/onflow/flow-go/consensus/hotstuff/validator"
 	"github.com/onflow/flow-go/consensus/hotstuff/verification"
 	recovery "github.com/onflow/flow-go/consensus/recovery/protocol"
 	"github.com/onflow/flow-go/crypto"
@@ -35,38 +39,44 @@ import (
 	pingeng "github.com/onflow/flow-go/engine/access/ping"
 	"github.com/onflow/flow-go/engine/access/rpc"
 	"github.com/onflow/flow-go/engine/access/rpc/backend"
-	"github.com/onflow/flow-go/engine/common/follower"
+	"github.com/onflow/flow-go/engine/access/state_stream"
 	followereng "github.com/onflow/flow-go/engine/common/follower"
 	"github.com/onflow/flow-go/engine/common/requester"
 	synceng "github.com/onflow/flow-go/engine/common/synchronization"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module"
-	"github.com/onflow/flow-go/module/buffer"
+	"github.com/onflow/flow-go/module/blobs"
 	"github.com/onflow/flow-go/module/chainsync"
-	"github.com/onflow/flow-go/module/compliance"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
+	execdatacache "github.com/onflow/flow-go/module/executiondatasync/execution_data/cache"
 	finalizer "github.com/onflow/flow-go/module/finalizer/consensus"
 	"github.com/onflow/flow-go/module/id"
+	"github.com/onflow/flow-go/module/mempool/herocache"
 	"github.com/onflow/flow-go/module/mempool/stdmap"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/metrics/unstaked"
 	"github.com/onflow/flow-go/module/state_synchronization"
 	edrequester "github.com/onflow/flow-go/module/state_synchronization/requester"
 	"github.com/onflow/flow-go/network"
+	alspmgr "github.com/onflow/flow-go/network/alsp/manager"
 	netcache "github.com/onflow/flow-go/network/cache"
 	"github.com/onflow/flow-go/network/channels"
 	cborcodec "github.com/onflow/flow-go/network/codec/cbor"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/blob"
 	"github.com/onflow/flow-go/network/p2p/cache"
+	"github.com/onflow/flow-go/network/p2p/conduit"
 	"github.com/onflow/flow-go/network/p2p/connection"
 	"github.com/onflow/flow-go/network/p2p/dht"
 	"github.com/onflow/flow-go/network/p2p/middleware"
 	"github.com/onflow/flow-go/network/p2p/p2pbuilder"
+	p2pconfig "github.com/onflow/flow-go/network/p2p/p2pbuilder/config"
+	"github.com/onflow/flow-go/network/p2p/p2pbuilder/inspector"
 	"github.com/onflow/flow-go/network/p2p/subscription"
+	"github.com/onflow/flow-go/network/p2p/tracer"
 	"github.com/onflow/flow-go/network/p2p/translator"
-	"github.com/onflow/flow-go/network/p2p/unicast"
+	"github.com/onflow/flow-go/network/p2p/unicast/protocols"
 	relaynet "github.com/onflow/flow-go/network/relay"
 	"github.com/onflow/flow-go/network/slashing"
 	"github.com/onflow/flow-go/network/topology"
@@ -106,6 +116,8 @@ type AccessNodeConfig struct {
 	apiRatelimits                map[string]int
 	apiBurstlimits               map[string]int
 	rpcConf                      rpc.Config
+	stateStreamConf              state_stream.Config
+	stateStreamFilterConf        map[string]int
 	ExecutionNodeAddress         string // deprecated
 	HistoricalAccessRPCs         []access.AccessAPIClient
 	logTxTimeToFinalized         bool
@@ -117,9 +129,7 @@ type AccessNodeConfig struct {
 	executionDataDir             string
 	executionDataStartHeight     uint64
 	executionDataConfig          edrequester.ExecutionDataConfig
-	baseOptions                  []cmd.Option
-
-	PublicNetworkConfig PublicNetworkConfig
+	PublicNetworkConfig          PublicNetworkConfig
 }
 
 type PublicNetworkConfig struct {
@@ -149,7 +159,19 @@ func DefaultAccessNodeConfig() *AccessNodeConfig {
 			MaxHeightRange:            backend.DefaultMaxHeightRange,
 			PreferredExecutionNodeIDs: nil,
 			FixedExecutionNodeIDs:     nil,
+			ArchiveAddressList:        nil,
+			MaxMsgSize:                grpcutils.DefaultMaxMsgSize,
 		},
+		stateStreamConf: state_stream.Config{
+			MaxExecutionDataMsgSize: grpcutils.DefaultMaxMsgSize,
+			ExecutionDataCacheSize:  state_stream.DefaultCacheSize,
+			ClientSendTimeout:       state_stream.DefaultSendTimeout,
+			ClientSendBufferSize:    state_stream.DefaultSendBufferSize,
+			MaxGlobalStreams:        state_stream.DefaultMaxGlobalStreams,
+			EventFilterConfig:       state_stream.DefaultEventFilterConfig,
+			ResponseLimit:           state_stream.DefaultResponseLimit,
+		},
+		stateStreamFilterConf:        nil,
 		ExecutionNodeAddress:         "localhost:9000",
 		logTxTimeToFinalized:         false,
 		logTxTimeToExecuted:          false,
@@ -164,7 +186,7 @@ func DefaultAccessNodeConfig() *AccessNodeConfig {
 			BindAddress: cmd.NotSet,
 			Metrics:     metrics.NewNoopCollector(),
 		},
-		executionDataSyncEnabled: false,
+		executionDataSyncEnabled: true,
 		executionDataDir:         filepath.Join(homedir, ".flow", "execution_data"),
 		executionDataStartHeight: 0,
 		executionDataConfig: edrequester.ExecutionDataConfig{
@@ -186,26 +208,27 @@ type FlowAccessNodeBuilder struct {
 	*AccessNodeConfig
 
 	// components
-	LibP2PNode                 p2p.LibP2PNode
-	FollowerState              protocol.MutableState
+	FollowerState              protocol.FollowerState
 	SyncCore                   *chainsync.Core
 	RpcEng                     *rpc.Engine
-	FinalizationDistributor    *consensuspubsub.FinalizationDistributor
-	FinalizedHeader            *synceng.FinalizedHeaderCache
+	FollowerDistributor        *consensuspubsub.FollowerDistributor
 	CollectionRPC              access.AccessAPIClient
 	TransactionTimings         *stdmap.TransactionTimings
 	CollectionsToMarkFinalized *stdmap.Times
 	CollectionsToMarkExecuted  *stdmap.Times
 	BlocksToMarkExecuted       *stdmap.Times
-	TransactionMetrics         module.TransactionMetrics
+	TransactionMetrics         *metrics.TransactionCollector
 	AccessMetrics              module.AccessMetrics
 	PingMetrics                module.PingMetrics
-	Committee                  hotstuff.Committee
-	Finalized                  *flow.Header
+	Committee                  hotstuff.DynamicCommittee
+	Finalized                  *flow.Header // latest finalized block that the node knows of at startup time
 	Pending                    []*flow.Header
 	FollowerCore               module.HotStuffFollower
+	Validator                  hotstuff.Validator
 	ExecutionDataDownloader    execution_data.Downloader
 	ExecutionDataRequester     state_synchronization.ExecutionDataRequester
+	ExecutionDataStore         execution_data.ExecutionDataStore
+	ExecutionDataCache         *execdatacache.ExecutionDataCache
 
 	// The sync engine participants provider is the libp2p peer store for the access node
 	// which is not available until after the network has started.
@@ -213,10 +236,11 @@ type FlowAccessNodeBuilder struct {
 	SyncEngineParticipantsProviderFactory func() module.IdentifierProvider
 
 	// engines
-	IngestEng   *ingestion.Engine
-	RequestEng  *requester.Engine
-	FollowerEng *followereng.Engine
-	SyncEng     *synceng.Engine
+	IngestEng      *ingestion.Engine
+	RequestEng     *requester.Engine
+	FollowerEng    *followereng.ComplianceEngine
+	SyncEng        *synceng.Engine
+	StateStreamEng *state_stream.Engine
 }
 
 func (builder *FlowAccessNodeBuilder) buildFollowerState() *FlowAccessNodeBuilder {
@@ -229,11 +253,12 @@ func (builder *FlowAccessNodeBuilder) buildFollowerState() *FlowAccessNodeBuilde
 		}
 
 		followerState, err := badgerState.NewFollowerState(
+			node.Logger,
+			node.Tracer,
+			node.ProtocolEvents,
 			state,
 			node.Storage.Index,
 			node.Storage.Payloads,
-			node.Tracer,
-			node.ProtocolEvents,
 			blocktimer.DefaultBlockTimer,
 		)
 		builder.FollowerState = followerState
@@ -246,7 +271,7 @@ func (builder *FlowAccessNodeBuilder) buildFollowerState() *FlowAccessNodeBuilde
 
 func (builder *FlowAccessNodeBuilder) buildSyncCore() *FlowAccessNodeBuilder {
 	builder.Module("sync core", func(node *cmd.NodeConfig) error {
-		syncCore, err := chainsync.New(node.Logger, node.SyncCoreConfig, metrics.NewChainSyncCollector())
+		syncCore, err := chainsync.New(node.Logger, node.SyncCoreConfig, metrics.NewChainSyncCollector(node.RootChainID), node.RootChainID)
 		builder.SyncCore = syncCore
 
 		return err
@@ -256,14 +281,15 @@ func (builder *FlowAccessNodeBuilder) buildSyncCore() *FlowAccessNodeBuilder {
 }
 
 func (builder *FlowAccessNodeBuilder) buildCommittee() *FlowAccessNodeBuilder {
-	builder.Module("committee", func(node *cmd.NodeConfig) error {
+	builder.Component("committee", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 		// initialize consensus committee's membership state
-		// This committee state is for the HotStuff follower, which follows the MAIN CONSENSUS Committee
+		// This committee state is for the HotStuff follower, which follows the MAIN CONSENSUS committee
 		// Note: node.Me.NodeID() is not part of the consensus committee
 		committee, err := committees.NewConsensusCommittee(node.State, node.Me.NodeID())
+		node.ProtocolEvents.AddConsumer(committee)
 		builder.Committee = committee
 
-		return err
+		return committee, err
 	})
 
 	return builder
@@ -289,15 +315,15 @@ func (builder *FlowAccessNodeBuilder) buildFollowerCore() *FlowAccessNodeBuilder
 		packer := signature.NewConsensusSigDataPacker(builder.Committee)
 		// initialize the verifier for the protocol consensus
 		verifier := verification.NewCombinedVerifier(builder.Committee, packer)
+		builder.Validator = hotstuffvalidator.New(builder.Committee, verifier)
 
 		followerCore, err := consensus.NewFollower(
 			node.Logger,
-			builder.Committee,
+			node.Metrics.Mempool,
 			node.Storage.Headers,
 			final,
-			verifier,
-			builder.FinalizationDistributor,
-			node.RootBlock.Header,
+			builder.FollowerDistributor,
+			node.FinalizedRootBlock.Header,
 			node.RootQC,
 			builder.Finalized,
 			builder.Pending,
@@ -315,46 +341,42 @@ func (builder *FlowAccessNodeBuilder) buildFollowerCore() *FlowAccessNodeBuilder
 
 func (builder *FlowAccessNodeBuilder) buildFollowerEngine() *FlowAccessNodeBuilder {
 	builder.Component("follower engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-		// initialize cleaner for DB
-		cleaner := bstorage.NewCleaner(node.Logger, node.DB, builder.Metrics.CleanCollector, flow.DefaultValueLogGCFrequency)
-		conCache := buffer.NewPendingBlocks()
+		var heroCacheCollector module.HeroCacheMetrics = metrics.NewNoopCollector()
+		if node.HeroCacheMetricsEnable {
+			heroCacheCollector = metrics.FollowerCacheMetrics(node.MetricsRegisterer)
+		}
 
-		followerEng, err := follower.New(
+		core, err := followereng.NewComplianceCore(
+			node.Logger,
+			node.Metrics.Mempool,
+			heroCacheCollector,
+			builder.FollowerDistributor,
+			builder.FollowerState,
+			builder.FollowerCore,
+			builder.Validator,
+			builder.SyncCore,
+			node.Tracer,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("could not create follower core: %w", err)
+		}
+
+		builder.FollowerEng, err = followereng.NewComplianceLayer(
 			node.Logger,
 			node.Network,
 			node.Me,
 			node.Metrics.Engine,
-			node.Metrics.Mempool,
-			cleaner,
 			node.Storage.Headers,
-			node.Storage.Payloads,
-			builder.FollowerState,
-			conCache,
-			builder.FollowerCore,
-			builder.SyncCore,
-			node.Tracer,
-			follower.WithComplianceOptions(compliance.WithSkipNewProposalsThreshold(builder.ComplianceConfig.SkipNewProposalsThreshold)),
+			builder.Finalized,
+			core,
+			node.ComplianceConfig,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("could not create follower engine: %w", err)
 		}
-		builder.FollowerEng = followerEng
+		builder.FollowerDistributor.AddOnBlockFinalizedConsumer(builder.FollowerEng.OnFinalizedBlock)
 
 		return builder.FollowerEng, nil
-	})
-
-	return builder
-}
-
-func (builder *FlowAccessNodeBuilder) buildFinalizedHeader() *FlowAccessNodeBuilder {
-	builder.Component("finalized snapshot", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-		finalizedHeader, err := synceng.NewFinalizedHeaderCache(node.Logger, node.State, builder.FinalizationDistributor)
-		if err != nil {
-			return nil, fmt.Errorf("could not create finalized snapshot cache: %w", err)
-		}
-		builder.FinalizedHeader = finalizedHeader
-
-		return builder.FinalizedHeader, nil
 	})
 
 	return builder
@@ -367,16 +389,17 @@ func (builder *FlowAccessNodeBuilder) buildSyncEngine() *FlowAccessNodeBuilder {
 			node.Metrics.Engine,
 			node.Network,
 			node.Me,
+			node.State,
 			node.Storage.Blocks,
 			builder.FollowerEng,
 			builder.SyncCore,
-			builder.FinalizedHeader,
 			builder.SyncEngineParticipantsProviderFactory(),
 		)
 		if err != nil {
 			return nil, fmt.Errorf("could not create synchronization engine: %w", err)
 		}
 		builder.SyncEng = sync
+		builder.FollowerDistributor.AddFinalizationConsumer(sync)
 
 		return builder.SyncEng, nil
 	})
@@ -392,7 +415,6 @@ func (builder *FlowAccessNodeBuilder) BuildConsensusFollower() *FlowAccessNodeBu
 		buildLatestHeader().
 		buildFollowerCore().
 		buildFollowerEngine().
-		buildFinalizedHeader().
 		buildSyncEngine()
 
 	return builder
@@ -404,8 +426,13 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionDataRequester() *FlowAccessN
 	var processedBlockHeight storage.ConsumerProgress
 	var processedNotifications storage.ConsumerProgress
 	var bsDependable *module.ProxiedReadyDoneAware
+	var execDataDistributor *edrequester.ExecutionDataDistributor
+	var execDataCacheBackend *herocache.BlockExecutionData
 
 	builder.
+		AdminCommand("read-execution-data", func(config *cmd.NodeConfig) commands.AdminCommand {
+			return stateSyncCommands.NewReadExecutionDataCommand(builder.ExecutionDataStore)
+		}).
 		Module("execution data datastore and blobstore", func(node *cmd.NodeConfig) error {
 			datastoreDir := filepath.Join(builder.executionDataDir, "blobstore")
 			err := os.MkdirAll(datastoreDir, 0700)
@@ -442,6 +469,11 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionDataRequester() *FlowAccessN
 			builder.PeerManagerDependencies.Add(bsDependable)
 			return nil
 		}).
+		Module("execution datastore", func(node *cmd.NodeConfig) error {
+			blobstore := blobs.NewBlobstore(ds)
+			builder.ExecutionDataStore = execution_data.NewExecutionDataStore(blobstore, execution_data.DefaultSerializer)
+			return nil
+		}).
 		Component("execution data service", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 
 			opts := []network.BlobServiceOption{
@@ -474,10 +506,10 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionDataRequester() *FlowAccessN
 		Component("execution data requester", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			// Validation of the start block height needs to be done after loading state
 			if builder.executionDataStartHeight > 0 {
-				if builder.executionDataStartHeight <= builder.RootBlock.Header.Height {
+				if builder.executionDataStartHeight <= builder.FinalizedRootBlock.Header.Height {
 					return nil, fmt.Errorf(
 						"execution data start block height (%d) must be greater than the root block height (%d)",
-						builder.executionDataStartHeight, builder.RootBlock.Header.Height)
+						builder.executionDataStartHeight, builder.FinalizedRootBlock.Header.Height)
 				}
 
 				latestSeal, err := builder.State.Sealed().Head()
@@ -499,42 +531,112 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionDataRequester() *FlowAccessN
 				// requester expects the initial last processed height, which is the first height - 1
 				builder.executionDataConfig.InitialBlockHeight = builder.executionDataStartHeight - 1
 			} else {
-				builder.executionDataConfig.InitialBlockHeight = builder.RootBlock.Header.Height
+				builder.executionDataConfig.InitialBlockHeight = builder.FinalizedRootBlock.Header.Height
 			}
+
+			execDataDistributor = edrequester.NewExecutionDataDistributor()
+
+			var heroCacheCollector module.HeroCacheMetrics = metrics.NewNoopCollector()
+			if builder.HeroCacheMetricsEnable {
+				heroCacheCollector = metrics.AccessNodeExecutionDataCacheMetrics(builder.MetricsRegisterer)
+			}
+
+			execDataCacheBackend = herocache.NewBlockExecutionData(builder.stateStreamConf.ExecutionDataCacheSize, builder.Logger, heroCacheCollector)
+			// Execution Data cache with a downloader as the backend. This is used by the requester
+			// to download and cache execution data for each block.
+			executionDataCache := execdatacache.NewExecutionDataCache(
+				builder.ExecutionDataDownloader,
+				builder.Storage.Headers,
+				builder.Storage.Seals,
+				builder.Storage.Results,
+				execDataCacheBackend,
+			)
 
 			builder.ExecutionDataRequester = edrequester.New(
 				builder.Logger,
 				metrics.NewExecutionDataRequesterCollector(),
 				builder.ExecutionDataDownloader,
+				executionDataCache,
 				processedBlockHeight,
 				processedNotifications,
 				builder.State,
 				builder.Storage.Headers,
-				builder.Storage.Results,
-				builder.Storage.Seals,
 				builder.executionDataConfig,
 			)
 
-			builder.FinalizationDistributor.AddOnBlockFinalizedConsumer(builder.ExecutionDataRequester.OnBlockFinalized)
+			builder.FollowerDistributor.AddOnBlockFinalizedConsumer(builder.ExecutionDataRequester.OnBlockFinalized)
+			builder.ExecutionDataRequester.AddOnExecutionDataReceivedConsumer(execDataDistributor.OnExecutionDataReceived)
 
 			return builder.ExecutionDataRequester, nil
 		})
 
+	if builder.stateStreamConf.ListenAddr != "" {
+		builder.Component("exec state stream engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+			for key, value := range builder.stateStreamFilterConf {
+				switch key {
+				case "EventTypes":
+					builder.stateStreamConf.MaxEventTypes = value
+				case "Addresses":
+					builder.stateStreamConf.MaxAddresses = value
+				case "Contracts":
+					builder.stateStreamConf.MaxContracts = value
+				}
+			}
+			builder.stateStreamConf.RpcMetricsEnabled = builder.rpcMetricsEnabled
+
+			// Execution Data cache that uses a blobstore as the backend (instead of a downloader)
+			// This ensures that it simply returns a not found error if the blob doesn't exist
+			// instead of attempting to download it from the network. It shares a cache backend instance
+			// with the requester's implementation.
+			executionDataCache := execdatacache.NewExecutionDataCache(
+				builder.ExecutionDataStore,
+				builder.Storage.Headers,
+				builder.Storage.Seals,
+				builder.Storage.Results,
+				execDataCacheBackend,
+			)
+
+			highestAvailableHeight, err := builder.ExecutionDataRequester.HighestConsecutiveHeight()
+			if err != nil {
+				return nil, fmt.Errorf("could not get highest consecutive height: %w", err)
+			}
+
+			stateStreamEng, err := state_stream.NewEng(
+				node.Logger,
+				builder.stateStreamConf,
+				builder.ExecutionDataStore,
+				executionDataCache,
+				node.State,
+				node.Storage.Headers,
+				node.Storage.Seals,
+				node.Storage.Results,
+				node.RootChainID,
+				builder.executionDataConfig.InitialBlockHeight,
+				highestAvailableHeight,
+				builder.apiRatelimits,
+				builder.apiBurstlimits,
+			)
+			if err != nil {
+				return nil, fmt.Errorf("could not create state stream engine: %w", err)
+			}
+			builder.StateStreamEng = stateStreamEng
+
+			execDataDistributor.AddOnExecutionDataReceivedConsumer(builder.StateStreamEng.OnExecutionData)
+
+			return builder.StateStreamEng, nil
+		})
+	}
+
 	return builder
 }
 
-type Option func(*AccessNodeConfig)
-
-func FlowAccessNode(opts ...Option) *FlowAccessNodeBuilder {
-	config := DefaultAccessNodeConfig()
-	for _, opt := range opts {
-		opt(config)
-	}
-
+func FlowAccessNode(nodeBuilder *cmd.FlowNodeBuilder) *FlowAccessNodeBuilder {
+	dist := consensuspubsub.NewFollowerDistributor()
+	dist.AddProposalViolationConsumer(notifications.NewSlashingViolationsConsumer(nodeBuilder.Logger))
 	return &FlowAccessNodeBuilder{
-		AccessNodeConfig:        config,
-		FlowNodeBuilder:         cmd.FlowNode(flow.RoleAccess.String(), config.baseOptions...),
-		FinalizationDistributor: consensuspubsub.NewFinalizationDistributor(),
+		AccessNodeConfig:    DefaultAccessNodeConfig(),
+		FlowNodeBuilder:     nodeBuilder,
+		FollowerDistributor: dist,
 	}
 }
 
@@ -555,14 +657,17 @@ func (builder *FlowAccessNodeBuilder) extraFlags() {
 		flags.UintVar(&builder.executionGRPCPort, "execution-ingress-port", defaultConfig.executionGRPCPort, "the grpc ingress port for all execution nodes")
 		flags.StringVarP(&builder.rpcConf.UnsecureGRPCListenAddr, "rpc-addr", "r", defaultConfig.rpcConf.UnsecureGRPCListenAddr, "the address the unsecured gRPC server listens on")
 		flags.StringVar(&builder.rpcConf.SecureGRPCListenAddr, "secure-rpc-addr", defaultConfig.rpcConf.SecureGRPCListenAddr, "the address the secure gRPC server listens on")
+		flags.StringVar(&builder.stateStreamConf.ListenAddr, "state-stream-addr", defaultConfig.stateStreamConf.ListenAddr, "the address the state stream server listens on (if empty the server will not be started)")
 		flags.StringVarP(&builder.rpcConf.HTTPListenAddr, "http-addr", "h", defaultConfig.rpcConf.HTTPListenAddr, "the address the http proxy server listens on")
 		flags.StringVar(&builder.rpcConf.RESTListenAddr, "rest-addr", defaultConfig.rpcConf.RESTListenAddr, "the address the REST server listens on (if empty the REST server will not be started)")
 		flags.StringVarP(&builder.rpcConf.CollectionAddr, "static-collection-ingress-addr", "", defaultConfig.rpcConf.CollectionAddr, "the address (of the collection node) to send transactions to")
 		flags.StringVarP(&builder.ExecutionNodeAddress, "script-addr", "s", defaultConfig.ExecutionNodeAddress, "the address (of the execution node) forward the script to")
+		flags.StringSliceVar(&builder.rpcConf.ArchiveAddressList, "archive-address-list", defaultConfig.rpcConf.ArchiveAddressList, "the list of address of the archive node to forward the script queries to")
 		flags.StringVarP(&builder.rpcConf.HistoricalAccessAddrs, "historical-access-addr", "", defaultConfig.rpcConf.HistoricalAccessAddrs, "comma separated rpc addresses for historical access nodes")
 		flags.DurationVar(&builder.rpcConf.CollectionClientTimeout, "collection-client-timeout", defaultConfig.rpcConf.CollectionClientTimeout, "grpc client timeout for a collection node")
 		flags.DurationVar(&builder.rpcConf.ExecutionClientTimeout, "execution-client-timeout", defaultConfig.rpcConf.ExecutionClientTimeout, "grpc client timeout for an execution node")
 		flags.UintVar(&builder.rpcConf.ConnectionPoolSize, "connection-pool-size", defaultConfig.rpcConf.ConnectionPoolSize, "maximum number of connections allowed in the connection pool, size of 0 disables the connection pooling, and anything less than the default size will be overridden to use the default size")
+		flags.UintVar(&builder.rpcConf.MaxMsgSize, "rpc-max-message-size", grpcutils.DefaultMaxMsgSize, "the maximum message size in bytes for messages sent or received over grpc")
 		flags.UintVar(&builder.rpcConf.MaxHeightRange, "rpc-max-height-range", defaultConfig.rpcConf.MaxHeightRange, "maximum size for height range requests")
 		flags.StringSliceVar(&builder.rpcConf.PreferredExecutionNodeIDs, "preferred-execution-node-ids", defaultConfig.rpcConf.PreferredExecutionNodeIDs, "comma separated list of execution nodes ids to choose from when making an upstream call e.g. b4a4dbdcd443d...,fb386a6a... etc.")
 		flags.StringSliceVar(&builder.rpcConf.FixedExecutionNodeIDs, "fixed-execution-node-ids", defaultConfig.rpcConf.FixedExecutionNodeIDs, "comma separated list of execution nodes ids to choose from when making an upstream call if no matching preferred execution id is found e.g. b4a4dbdcd443d...,fb386a6a... etc.")
@@ -587,6 +692,15 @@ func (builder *FlowAccessNodeBuilder) extraFlags() {
 		flags.DurationVar(&builder.executionDataConfig.MaxFetchTimeout, "execution-data-max-fetch-timeout", defaultConfig.executionDataConfig.MaxFetchTimeout, "maximum timeout to use when fetching execution data from the network e.g. 300s")
 		flags.DurationVar(&builder.executionDataConfig.RetryDelay, "execution-data-retry-delay", defaultConfig.executionDataConfig.RetryDelay, "initial delay for exponential backoff when fetching execution data fails e.g. 10s")
 		flags.DurationVar(&builder.executionDataConfig.MaxRetryDelay, "execution-data-max-retry-delay", defaultConfig.executionDataConfig.MaxRetryDelay, "maximum delay for exponential backoff when fetching execution data fails e.g. 5m")
+
+		// Execution State Streaming API
+		flags.Uint32Var(&builder.stateStreamConf.ExecutionDataCacheSize, "execution-data-cache-size", defaultConfig.stateStreamConf.ExecutionDataCacheSize, "block execution data cache size")
+		flags.Uint32Var(&builder.stateStreamConf.MaxGlobalStreams, "state-stream-global-max-streams", defaultConfig.stateStreamConf.MaxGlobalStreams, "global maximum number of concurrent streams")
+		flags.UintVar(&builder.stateStreamConf.MaxExecutionDataMsgSize, "state-stream-max-message-size", defaultConfig.stateStreamConf.MaxExecutionDataMsgSize, "maximum size for a gRPC message containing block execution data")
+		flags.StringToIntVar(&builder.stateStreamFilterConf, "state-stream-event-filter-limits", defaultConfig.stateStreamFilterConf, "event filter limits for ExecutionData SubscribeEvents API e.g. EventTypes=100,Addresses=100,Contracts=100 etc.")
+		flags.DurationVar(&builder.stateStreamConf.ClientSendTimeout, "state-stream-send-timeout", defaultConfig.stateStreamConf.ClientSendTimeout, "maximum wait before timing out while sending a response to a streaming client e.g. 30s")
+		flags.UintVar(&builder.stateStreamConf.ClientSendBufferSize, "state-stream-send-buffer-size", defaultConfig.stateStreamConf.ClientSendBufferSize, "maximum number of responses to buffer within a stream")
+		flags.Float64Var(&builder.stateStreamConf.ResponseLimit, "state-stream-response-limit", defaultConfig.stateStreamConf.ResponseLimit, "max number of responses per second to send over streaming endpoints. this helps manage resources consumed by each client querying data not in the cache e.g. 3 or 0.5. 0 means no limit")
 	}).ValidateFlags(func() error {
 		if builder.supportsObserver && (builder.PublicNetworkConfig.BindAddress == cmd.NotSet || builder.PublicNetworkConfig.BindAddress == "") {
 			return errors.New("public-network-address must be set if supports-observer is true")
@@ -608,6 +722,30 @@ func (builder *FlowAccessNodeBuilder) extraFlags() {
 				return errors.New("execution-data-max-search-ahead must be greater than 0")
 			}
 		}
+		if builder.stateStreamConf.ListenAddr != "" {
+			if builder.stateStreamConf.ExecutionDataCacheSize == 0 {
+				return errors.New("execution-data-cache-size must be greater than 0")
+			}
+			if builder.stateStreamConf.ClientSendBufferSize == 0 {
+				return errors.New("state-stream-send-buffer-size must be greater than 0")
+			}
+			if len(builder.stateStreamFilterConf) > 3 {
+				return errors.New("state-stream-event-filter-limits must have at most 3 keys (EventTypes, Addresses, Contracts)")
+			}
+			for key, value := range builder.stateStreamFilterConf {
+				switch key {
+				case "EventTypes", "Addresses", "Contracts":
+					if value <= 0 {
+						return fmt.Errorf("state-stream-event-filter-limits %s must be greater than 0", key)
+					}
+				default:
+					return errors.New("state-stream-event-filter-limits may only contain the keys EventTypes, Addresses, Contracts")
+				}
+			}
+			if builder.stateStreamConf.ResponseLimit < 0 {
+				return errors.New("state-stream-response-limit must be greater than or equal to 0")
+			}
+		}
 
 		return nil
 	})
@@ -617,14 +755,13 @@ func (builder *FlowAccessNodeBuilder) extraFlags() {
 // participants and topology used to choose peers from the list of participants. The list of participants can later be
 // updated by calling network.SetIDs.
 func (builder *FlowAccessNodeBuilder) initNetwork(nodeID module.Local,
-	networkMetrics module.NetworkMetrics,
+	networkMetrics module.NetworkCoreMetrics,
 	middleware network.Middleware,
 	topology network.Topology,
 	receiveCache *netcache.ReceiveCache,
 ) (*p2p.Network, error) {
-
 	// creates network instance
-	net, err := p2p.NewNetwork(&p2p.NetworkParameters{
+	net, err := p2p.NewNetwork(&p2p.NetworkConfig{
 		Logger:              builder.Logger,
 		Codec:               cborcodec.NewCodec(),
 		Me:                  nodeID,
@@ -634,6 +771,17 @@ func (builder *FlowAccessNodeBuilder) initNetwork(nodeID module.Local,
 		Metrics:             networkMetrics,
 		IdentityProvider:    builder.IdentityProvider,
 		ReceiveCache:        receiveCache,
+		ConduitFactory:      conduit.NewDefaultConduitFactory(),
+		AlspCfg: &alspmgr.MisbehaviorReportManagerConfig{
+			Logger:                  builder.Logger,
+			SpamRecordCacheSize:     builder.FlowConfig.NetworkConfig.AlspConfig.SpamRecordCacheSize,
+			SpamReportQueueSize:     builder.FlowConfig.NetworkConfig.AlspConfig.SpamReportQueueSize,
+			DisablePenalty:          builder.FlowConfig.NetworkConfig.AlspConfig.DisablePenalty,
+			HeartBeatInterval:       builder.FlowConfig.NetworkConfig.AlspConfig.HearBeatInterval,
+			AlspMetrics:             builder.Metrics.Network,
+			NetworkType:             network.PublicNetwork,
+			HeroCacheMetricsFactory: builder.HeroCacheMetricsFactory(),
+		},
 	})
 	if err != nil {
 		return nil, fmt.Errorf("could not initialize network: %w", err)
@@ -665,11 +813,21 @@ func (builder *FlowAccessNodeBuilder) InitIDProviders() {
 		}
 		builder.IDTranslator = translator.NewHierarchicalIDTranslator(idCache, translator.NewPublicNetworkIDTranslator())
 
-		// The following wrapper allows to black-list byzantine nodes via an admin command:
-		// the wrapper overrides the 'Ejected' flag of blocked nodes to true
-		builder.IdentityProvider, err = cache.NewNodeBlocklistWrapper(idCache, node.DB)
+		// The following wrapper allows to disallow-list byzantine nodes via an admin command:
+		// the wrapper overrides the 'Ejected' flag of disallow-listed nodes to true
+		disallowListWrapper, err := cache.NewNodeDisallowListWrapper(idCache, node.DB, func() network.DisallowListNotificationConsumer {
+			return builder.Middleware
+		})
 		if err != nil {
-			return fmt.Errorf("could not initialize NodeBlocklistWrapper: %w", err)
+			return fmt.Errorf("could not initialize NodeBlockListWrapper: %w", err)
+		}
+		builder.IdentityProvider = disallowListWrapper
+
+		// register the wrapper for dynamic configuration via admin command
+		err = node.ConfigManager.RegisterIdentifierListConfig("network-id-provider-blocklist",
+			disallowListWrapper.GetDisallowList, disallowListWrapper.Update)
+		if err != nil {
+			return fmt.Errorf("failed to register disallow-list wrapper with config manager: %w", err)
 		}
 
 		builder.SyncEngineParticipantsProviderFactory = func() module.IdentifierProvider {
@@ -714,6 +872,8 @@ func (builder *FlowAccessNodeBuilder) Initialize() error {
 
 	builder.EnqueueTracer()
 	builder.PreInit(cmd.DynamicStartPreInit)
+	builder.ValidateRootSnapshot(badgerState.ValidRootSnapshotContainsEntityExpiryRange)
+
 	return nil
 }
 
@@ -748,8 +908,8 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 
 			collectionRPCConn, err := grpc.Dial(
 				builder.rpcConf.CollectionAddr,
-				grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(grpcutils.DefaultMaxMsgSize)),
-				grpc.WithInsecure(), //nolint:staticcheck
+				grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(int(builder.rpcConf.MaxMsgSize))),
+				grpc.WithTransportCredentials(insecure.NewCredentials()),
 				backend.WithClientUnaryInterceptor(builder.rpcConf.CollectionClientTimeout))
 			if err != nil {
 				return err
@@ -767,8 +927,8 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 
 				historicalAccessRPCConn, err := grpc.Dial(
 					addr,
-					grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(grpcutils.DefaultMaxMsgSize)),
-					grpc.WithInsecure()) //nolint:staticcheck
+					grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(int(builder.rpcConf.MaxMsgSize))),
+					grpc.WithTransportCredentials(insecure.NewCredentials()))
 				if err != nil {
 					return err
 				}
@@ -797,12 +957,20 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 			return err
 		}).
 		Module("transaction metrics", func(node *cmd.NodeConfig) error {
-			builder.TransactionMetrics = metrics.NewTransactionCollector(builder.TransactionTimings, node.Logger, builder.logTxTimeToFinalized,
-				builder.logTxTimeToExecuted, builder.logTxTimeToFinalizedExecuted)
+			builder.TransactionMetrics = metrics.NewTransactionCollector(
+				node.Logger,
+				builder.TransactionTimings,
+				builder.logTxTimeToFinalized,
+				builder.logTxTimeToExecuted,
+				builder.logTxTimeToFinalizedExecuted,
+			)
 			return nil
 		}).
 		Module("access metrics", func(node *cmd.NodeConfig) error {
-			builder.AccessMetrics = metrics.NewAccessCollector()
+			builder.AccessMetrics = metrics.NewAccessCollector(
+				metrics.WithTransactionMetrics(builder.TransactionMetrics),
+				metrics.WithBackendScriptsMetrics(builder.TransactionMetrics),
+			)
 			return nil
 		}).
 		Module("ping metrics", func(node *cmd.NodeConfig) error {
@@ -833,7 +1001,6 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				node.Storage.Receipts,
 				node.Storage.Results,
 				node.RootChainID,
-				builder.TransactionMetrics,
 				builder.AccessMetrics,
 				builder.collectionGRPCPort,
 				builder.executionGRPCPort,
@@ -841,6 +1008,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				builder.rpcMetricsEnabled,
 				builder.apiRatelimits,
 				builder.apiBurstlimits,
+				builder.Me,
 			)
 			if err != nil {
 				return nil, err
@@ -853,6 +1021,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 			if err != nil {
 				return nil, err
 			}
+			builder.FollowerDistributor.AddOnBlockFinalizedConsumer(builder.RpcEng.OnFinalizedBlock)
 
 			return builder.RpcEng, nil
 		}).
@@ -885,17 +1054,16 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				node.Storage.Transactions,
 				node.Storage.Results,
 				node.Storage.Receipts,
-				builder.TransactionMetrics,
+				builder.AccessMetrics,
 				builder.CollectionsToMarkFinalized,
 				builder.CollectionsToMarkExecuted,
 				builder.BlocksToMarkExecuted,
-				builder.RpcEng,
 			)
 			if err != nil {
 				return nil, err
 			}
 			builder.RequestEng.WithHandle(builder.IngestEng.OnCollection)
-			builder.FinalizationDistributor.AddConsumer(builder.IngestEng)
+			builder.FollowerDistributor.AddOnBlockFinalizedConsumer(builder.IngestEng.OnFinalizedBlock)
 
 			return builder.IngestEng, nil
 		}).
@@ -913,14 +1081,14 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				unstaked.NewUnstakedEngineCollector(node.Metrics.Engine),
 				builder.AccessNodeConfig.PublicNetworkConfig.Network,
 				node.Me,
+				node.State,
 				node.Storage.Blocks,
 				builder.SyncCore,
-				builder.FinalizedHeader,
 			)
-
 			if err != nil {
 				return nil, fmt.Errorf("could not create public sync request handler: %w", err)
 			}
+			builder.FollowerDistributor.AddFinalizationConsumer(syncRequestHandler)
 
 			return syncRequestHandler, nil
 		})
@@ -954,39 +1122,36 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 
 // enqueuePublicNetworkInit enqueues the public network component initialized for the staked node
 func (builder *FlowAccessNodeBuilder) enqueuePublicNetworkInit() {
-	var libp2pNode p2p.LibP2PNode
+	var publicLibp2pNode p2p.LibP2PNode
 	builder.
+		Module("public network metrics", func(node *cmd.NodeConfig) error {
+			builder.PublicNetworkConfig.Metrics = metrics.NewNetworkCollector(builder.Logger, metrics.WithNetworkPrefix("public"))
+			return nil
+		}).
 		Component("public libp2p node", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-
-			libP2PFactory := builder.initLibP2PFactory(builder.NodeConfig.NetworkKey)
-
 			var err error
-			libp2pNode, err = libP2PFactory()
+			publicLibp2pNode, err = builder.initPublicLibp2pNode(
+				builder.NodeConfig.NetworkKey,
+				builder.PublicNetworkConfig.BindAddress,
+				builder.PublicNetworkConfig.Metrics)
 			if err != nil {
 				return nil, fmt.Errorf("could not create public libp2p node: %w", err)
 			}
 
-			return libp2pNode, nil
+			return publicLibp2pNode, nil
 		}).
 		Component("public network", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-			builder.PublicNetworkConfig.Metrics = metrics.NewNetworkCollector(metrics.WithNetworkPrefix("public"))
-
 			msgValidators := publicNetworkMsgValidators(node.Logger.With().Bool("public", true).Logger(), node.IdentityProvider, builder.NodeID)
 
-			middleware := builder.initMiddleware(builder.NodeID, builder.PublicNetworkConfig.Metrics, libp2pNode, msgValidators...)
+			middleware := builder.initMiddleware(builder.NodeID, builder.PublicNetworkConfig.Metrics, publicLibp2pNode, msgValidators...)
 
 			// topology returns empty list since peers are not known upfront
 			top := topology.EmptyTopology{}
-
-			var heroCacheCollector module.HeroCacheMetrics = metrics.NewNoopCollector()
-			if builder.HeroCacheMetricsEnable {
-				heroCacheCollector = metrics.PublicNetworkReceiveCacheMetricsFactory(builder.MetricsRegisterer)
-			}
-			receiveCache := netcache.NewHeroReceiveCache(builder.NetworkReceivedMessageCacheSize,
+			receiveCache := netcache.NewHeroReceiveCache(builder.FlowConfig.NetworkConfig.NetworkReceivedMessageCacheSize,
 				builder.Logger,
-				heroCacheCollector)
+				metrics.NetworkReceiveCacheMetricsFactory(builder.HeroCacheMetricsFactory(), network.PublicNetwork))
 
-			err := node.Metrics.Mempool.Register(metrics.ResourcePublicNetworkingReceiveCache, receiveCache.Size)
+			err := node.Metrics.Mempool.Register(metrics.PrependPublicPrefix(metrics.ResourceNetworkingReceiveCache), receiveCache.Size)
 			if err != nil {
 				return nil, fmt.Errorf("could not register networking receive cache metric: %w", err)
 			}
@@ -1002,79 +1167,114 @@ func (builder *FlowAccessNodeBuilder) enqueuePublicNetworkInit() {
 			return net, nil
 		}).
 		Component("public peer manager", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-			return libp2pNode.PeerManagerComponent(), nil
+			return publicLibp2pNode.PeerManagerComponent(), nil
 		})
 }
 
-// initLibP2PFactory creates the LibP2P factory function for the given node ID and network key.
-// The factory function is later passed into the initMiddleware function to eventually instantiate the p2p.LibP2PNode instance
+// initPublicLibp2pNode initializes the public libp2p node for the public (unstaked) network.
 // The LibP2P host is created with the following options:
 //   - DHT as server
 //   - The address from the node config or the specified bind address as the listen address
 //   - The passed in private key as the libp2p key
 //   - No connection gater
 //   - Default Flow libp2p pubsub options
-func (builder *FlowAccessNodeBuilder) initLibP2PFactory(networkKey crypto.PrivateKey) p2pbuilder.LibP2PFactoryFunc {
-	return func() (p2p.LibP2PNode, error) {
-		connManager := connection.NewConnManager(builder.Logger, builder.PublicNetworkConfig.Metrics)
-
-		libp2pNode, err := p2pbuilder.NewNodeBuilder(builder.Logger, builder.PublicNetworkConfig.BindAddress, networkKey, builder.SporkID).
-			SetBasicResolver(builder.Resolver).
-			SetSubscriptionFilter(
-				subscription.NewRoleBasedFilter(
-					flow.RoleAccess, builder.IdentityProvider,
-				),
-			).
-			SetConnectionManager(connManager).
-			SetRoutingSystem(func(ctx context.Context, h host.Host) (routing.Routing, error) {
-				return dht.NewDHT(
-					ctx,
-					h,
-					unicast.FlowPublicDHTProtocolID(builder.SporkID),
-					builder.Logger,
-					builder.PublicNetworkConfig.Metrics,
-					dht.AsServer(),
-				)
-			}).
-			// disable connection pruning for the access node which supports the observer
-			SetPeerManagerOptions(connection.ConnectionPruningDisabled, builder.PeerUpdateInterval).
-			Build()
-
-		if err != nil {
-			return nil, fmt.Errorf("could not build libp2p node for staked access node: %w", err)
-		}
-
-		builder.LibP2PNode = libp2pNode
-
-		return builder.LibP2PNode, nil
+//
+// Args:
+//   - networkKey: The private key to use for the libp2p node
+//
+// - bindAddress: The address to bind the libp2p node to.
+// - networkMetrics: The metrics collector for the network
+// Returns:
+// - The libp2p node instance for the public network.
+// - Any error encountered during initialization. Any error should be considered fatal.
+func (builder *FlowAccessNodeBuilder) initPublicLibp2pNode(networkKey crypto.PrivateKey, bindAddress string, networkMetrics module.LibP2PMetrics) (p2p.LibP2PNode, error) {
+	connManager, err := connection.NewConnManager(builder.Logger, networkMetrics, &builder.FlowConfig.NetworkConfig.ConnectionManagerConfig)
+	if err != nil {
+		return nil, fmt.Errorf("could not create connection manager: %w", err)
 	}
+
+	meshTracer := tracer.NewGossipSubMeshTracer(
+		builder.Logger,
+		networkMetrics,
+		builder.IdentityProvider,
+		builder.FlowConfig.NetworkConfig.GossipSubConfig.LocalMeshLogInterval)
+
+	// setup RPC inspectors
+	rpcInspectorBuilder := inspector.NewGossipSubInspectorBuilder(builder.Logger, builder.SporkID, &builder.FlowConfig.NetworkConfig.GossipSubConfig.GossipSubRPCInspectorsConfig, builder.IdentityProvider, builder.Metrics.Network)
+	rpcInspectorSuite, err := rpcInspectorBuilder.
+		SetNetworkType(network.PublicNetwork).
+		SetMetrics(&p2pconfig.MetricsConfig{
+			HeroCacheFactory: builder.HeroCacheMetricsFactory(),
+			Metrics:          builder.Metrics.Network,
+		}).Build()
+	if err != nil {
+		return nil, fmt.Errorf("failed to create gossipsub rpc inspectors for access node: %w", err)
+	}
+
+	libp2pNode, err := p2pbuilder.NewNodeBuilder(
+		builder.Logger,
+		networkMetrics,
+		bindAddress,
+		networkKey,
+		builder.SporkID,
+		&builder.FlowConfig.NetworkConfig.ResourceManagerConfig,
+		&p2p.DisallowListCacheConfig{
+			MaxSize: builder.FlowConfig.NetworkConfig.DisallowListNotificationCacheSize,
+			Metrics: metrics.DisallowListCacheMetricsFactory(builder.HeroCacheMetricsFactory(), network.PublicNetwork),
+		}).
+		SetBasicResolver(builder.Resolver).
+		SetSubscriptionFilter(
+			subscription.NewRoleBasedFilter(
+				flow.RoleAccess, builder.IdentityProvider,
+			),
+		).
+		SetConnectionManager(connManager).
+		SetRoutingSystem(func(ctx context.Context, h host.Host) (routing.Routing, error) {
+			return dht.NewDHT(
+				ctx,
+				h,
+				protocols.FlowPublicDHTProtocolID(builder.SporkID),
+				builder.Logger,
+				networkMetrics,
+				dht.AsServer(),
+			)
+		}).
+		// disable connection pruning for the access node which supports the observer
+		SetPeerManagerOptions(connection.PruningDisabled, builder.FlowConfig.NetworkConfig.PeerUpdateInterval).
+		SetStreamCreationRetryInterval(builder.FlowConfig.NetworkConfig.UnicastCreateStreamRetryDelay).
+		SetGossipSubTracer(meshTracer).
+		SetGossipSubScoreTracerInterval(builder.FlowConfig.NetworkConfig.GossipSubConfig.ScoreTracerInterval).
+		SetGossipSubRpcInspectorSuite(rpcInspectorSuite).
+		Build()
+
+	if err != nil {
+		return nil, fmt.Errorf("could not build libp2p node for staked access node: %w", err)
+	}
+
+	return libp2pNode, nil
 }
 
 // initMiddleware creates the network.Middleware implementation with the libp2p factory function, metrics, peer update
 // interval, and validators. The network.Middleware is then passed into the initNetwork function.
 func (builder *FlowAccessNodeBuilder) initMiddleware(nodeID flow.Identifier,
-	networkMetrics module.NetworkMetrics,
+	networkMetrics module.NetworkSecurityMetrics,
 	libp2pNode p2p.LibP2PNode,
-	validators ...network.MessageValidator) network.Middleware {
-
+	validators ...network.MessageValidator,
+) network.Middleware {
 	logger := builder.Logger.With().Bool("staked", false).Logger()
-
-	slashingViolationsConsumer := slashing.NewSlashingViolationsConsumer(logger, builder.Metrics.Network)
-
-	builder.Middleware = middleware.NewMiddleware(
-		logger,
-		libp2pNode,
-		nodeID,
-		networkMetrics,
-		builder.Metrics.Bitswap,
-		builder.SporkID,
-		middleware.DefaultUnicastTimeout,
-		builder.IDTranslator,
-		builder.CodecFactory(),
-		slashingViolationsConsumer,
-		middleware.WithMessageValidators(validators...),
-		// use default identifier provider
+	mw := middleware.NewMiddleware(&middleware.Config{
+		Logger:                     logger,
+		Libp2pNode:                 libp2pNode,
+		FlowId:                     nodeID,
+		BitSwapMetrics:             builder.Metrics.Bitswap,
+		RootBlockID:                builder.SporkID,
+		UnicastMessageTimeout:      middleware.DefaultUnicastTimeout,
+		IdTranslator:               builder.IDTranslator,
+		Codec:                      builder.CodecFactory(),
+		SlashingViolationsConsumer: slashing.NewSlashingViolationsConsumer(logger, networkMetrics),
+	},
+		middleware.WithMessageValidators(validators...), // use default identifier provider
 	)
-
+	builder.Middleware = mw
 	return builder.Middleware
 }

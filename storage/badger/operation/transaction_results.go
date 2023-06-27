@@ -85,3 +85,19 @@ func RemoveTransactionResultsByBlockID(blockID flow.Identifier) func(*badger.Txn
 		return nil
 	}
 }
+
+// BatchRemoveTransactionResultsByBlockID removes transaction results for the given blockID in a provided batch.
+// No errors are expected during normal operation, but it may return generic error
+// if badger fails to process request
+func BatchRemoveTransactionResultsByBlockID(blockID flow.Identifier, batch *badger.WriteBatch) func(*badger.Txn) error {
+	return func(txn *badger.Txn) error {
+
+		prefix := makePrefix(codeTransactionResult, blockID)
+		err := batchRemoveByPrefix(prefix)(txn, batch)
+		if err != nil {
+			return fmt.Errorf("could not remove transaction results for block %v: %w", blockID, err)
+		}
+
+		return nil
+	}
+}

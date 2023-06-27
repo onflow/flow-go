@@ -4,16 +4,17 @@ import (
 	"context"
 	"fmt"
 	"math/rand"
+	"sync/atomic"
 	"testing"
 
 	"github.com/onflow/cadence"
+	"github.com/onflow/cadence/encoding/ccf"
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/onflow/cadence/runtime/interpreter"
 	"github.com/onflow/cadence/runtime/sema"
 	"github.com/onflow/cadence/runtime/stdlib"
 
-	"github.com/ipfs/go-cid"
 	"github.com/ipfs/go-datastore"
 	dssync "github.com/ipfs/go-datastore/sync"
 	blockstore "github.com/ipfs/go-ipfs-blockstore"
@@ -26,20 +27,23 @@ import (
 	"github.com/onflow/flow-go/engine/execution/computation/committer"
 	"github.com/onflow/flow-go/engine/execution/computation/computer"
 	computermock "github.com/onflow/flow-go/engine/execution/computation/computer/mock"
-	"github.com/onflow/flow-go/engine/execution/state/delta"
 	"github.com/onflow/flow-go/engine/execution/testutil"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/environment"
 	fvmErrors "github.com/onflow/flow-go/fvm/errors"
-	"github.com/onflow/flow-go/fvm/programs"
+	fvmmock "github.com/onflow/flow-go/fvm/mock"
 	reusableRuntime "github.com/onflow/flow-go/fvm/runtime"
-	"github.com/onflow/flow-go/fvm/state"
+	"github.com/onflow/flow-go/fvm/storage"
+	"github.com/onflow/flow-go/fvm/storage/derived"
+	"github.com/onflow/flow-go/fvm/storage/logical"
+	"github.com/onflow/flow-go/fvm/storage/snapshot"
+	"github.com/onflow/flow-go/fvm/storage/state"
 	"github.com/onflow/flow-go/fvm/systemcontracts"
+	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/epochs"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	"github.com/onflow/flow-go/module/executiondatasync/provider"
-	"github.com/onflow/flow-go/module/executiondatasync/tracker"
 	mocktracker "github.com/onflow/flow-go/module/executiondatasync/tracker/mock"
 	"github.com/onflow/flow-go/module/mempool/entity"
 	"github.com/onflow/flow-go/module/metrics"
@@ -49,59 +53,106 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
+const (
+	testMaxConcurrency = 2
+)
+
+func incStateCommitment(startState flow.StateCommitment) flow.StateCommitment {
+	endState := flow.StateCommitment(startState)
+	endState[0] += 1
+	return endState
+}
+
+type fakeCommitter struct {
+	callCount int
+}
+
+func (committer *fakeCommitter) CommitView(
+	view *snapshot.ExecutionSnapshot,
+	startState flow.StateCommitment,
+) (
+	flow.StateCommitment,
+	[]byte,
+	*ledger.TrieUpdate,
+	error,
+) {
+	committer.callCount++
+
+	endState := incStateCommitment(startState)
+
+	trieUpdate := &ledger.TrieUpdate{}
+	trieUpdate.RootHash[0] = byte(committer.callCount)
+	return endState,
+		[]byte{byte(committer.callCount)},
+		trieUpdate,
+		nil
+}
+
 func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 
 	rag := &RandomAddressGenerator{}
+
+	executorID := unittest.IdentifierFixture()
+
+	me := new(modulemock.Local)
+	me.On("NodeID").Return(executorID)
+	me.On("Sign", mock.Anything, mock.Anything).Return(nil, nil)
+	me.On("SignFunc", mock.Anything, mock.Anything, mock.Anything).
+		Return(nil, nil)
 
 	t.Run("single collection", func(t *testing.T) {
 
 		execCtx := fvm.NewContext()
 
-		vm := new(computermock.VirtualMachine)
-		vm.On("Run", mock.Anything, mock.Anything, mock.Anything).
-			Return(nil).
-			Run(func(args mock.Arguments) {
-				// ctx := args[0].(fvm.Context)
-				tx := args[1].(*fvm.TransactionProcedure)
+		vm := &testVM{
+			t:                    t,
+			eventsPerTransaction: 1,
+		}
 
-				tx.Events = generateEvents(1, tx.TxIndex)
-			}).
-			Times(2 + 1) // 2 txs in collection + system chunk
-
-		committer := new(computermock.ViewCommitter)
-		committer.On("CommitView", mock.Anything, mock.Anything).
-			Return(nil, nil, nil, nil).
-			Times(2 + 1) // 2 txs in collection + system chunk
+		committer := &fakeCommitter{
+			callCount: 0,
+		}
 
 		exemetrics := new(modulemock.ExecutionMetrics)
+		exemetrics.On("ExecutionBlockExecuted",
+			mock.Anything,  // duration
+			mock.Anything). // stats
+			Return(nil).
+			Times(1)
+
 		exemetrics.On("ExecutionCollectionExecuted",
-			mock.Anything,
-			mock.Anything,
-			mock.Anything,
-			mock.Anything,
-			mock.Anything,
-			mock.Anything,
-			mock.Anything,
-			mock.Anything).
+			mock.Anything,  // duration
+			mock.Anything). // stats
 			Return(nil).
 			Times(2) // 1 collection + system collection
 
 		exemetrics.On("ExecutionTransactionExecuted",
 			mock.Anything, // duration
+			mock.Anything, // conflict retry count
 			mock.Anything, // computation used
 			mock.Anything, // memory used
-			mock.Anything, // actual memory used
 			mock.Anything, // number of events
 			mock.Anything, // size of events
 			false).        // no failure
 			Return(nil).
 			Times(2 + 1) // 2 txs in collection + system chunk tx
 
+		exemetrics.On(
+			"ExecutionChunkDataPackGenerated",
+			mock.Anything,
+			mock.Anything).
+			Return(nil).
+			Times(2) // 1 collection + system collection
+
+		expectedProgramsInCache := 1 // we set one program in the cache
+		exemetrics.On(
+			"ExecutionBlockCachedPrograms",
+			expectedProgramsInCache).
+			Return(nil).
+			Times(1) // 1 block
+
 		bservice := requesterunit.MockBlobService(blockstore.NewBlockstore(dssync.MutexWrap(datastore.NewMapDatastore())))
-		trackerStorage := new(mocktracker.Storage)
-		trackerStorage.On("Update", mock.Anything).Return(func(fn tracker.UpdateFn) error {
-			return fn(func(uint64, ...cid.Cid) error { return nil })
-		})
+		trackerStorage := mocktracker.NewMockStorage()
 
 		prov := provider.NewProvider(
 			zerolog.Nop(),
@@ -111,38 +162,131 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			trackerStorage,
 		)
 
-		exe, err := computer.NewBlockComputer(vm, execCtx, exemetrics, trace.NewNoopTracer(), zerolog.Nop(), committer, prov)
+		exe, err := computer.NewBlockComputer(
+			vm,
+			execCtx,
+			exemetrics,
+			trace.NewNoopTracer(),
+			zerolog.Nop(),
+			committer,
+			me,
+			prov,
+			nil,
+			testMaxConcurrency)
 		require.NoError(t, err)
 
 		// create a block with 1 collection with 2 transactions
 		block := generateBlock(1, 2, rag)
 
-		view := delta.NewView(func(owner, key string) (flow.RegisterValue, error) {
-			return nil, nil
-		})
-
-		result, err := exe.ExecuteBlock(context.Background(), block, view, programs.NewEmptyDerivedBlockData())
+		parentBlockExecutionResultID := unittest.IdentifierFixture()
+		result, err := exe.ExecuteBlock(
+			context.Background(),
+			parentBlockExecutionResultID,
+			block,
+			nil,
+			derived.NewEmptyDerivedBlockData(0))
 		assert.NoError(t, err)
-		assert.Len(t, result.StateSnapshots, 1+1) // +1 system chunk
-		assert.Len(t, result.TrieUpdates, 1+1)    // +1 system chunk
+		assert.Len(t, result.AllExecutionSnapshots(), 1+1) // +1 system chunk
+
+		require.Equal(t, 2, committer.callCount)
+
+		assert.Equal(t, block.ID(), result.BlockExecutionData.BlockID)
+
+		expectedChunk1EndState := incStateCommitment(*block.StartState)
+		expectedChunk2EndState := incStateCommitment(expectedChunk1EndState)
+
+		assert.Equal(t, expectedChunk2EndState, result.CurrentEndState())
 
 		assertEventHashesMatch(t, 1+1, result)
 
-		vm.AssertExpectations(t)
+		// Verify ExecutionReceipt
+		receipt := result.ExecutionReceipt
+
+		assert.Equal(t, executorID, receipt.ExecutorID)
+		assert.Equal(
+			t,
+			parentBlockExecutionResultID,
+			receipt.PreviousResultID)
+		assert.Equal(t, block.ID(), receipt.BlockID)
+		assert.NotEqual(t, flow.ZeroID, receipt.ExecutionDataID)
+
+		assert.Len(t, receipt.Chunks, 1+1) // +1 system chunk
+
+		chunk1 := receipt.Chunks[0]
+
+		eventCommits := result.AllEventCommitments()
+		assert.Equal(t, block.ID(), chunk1.BlockID)
+		assert.Equal(t, uint(0), chunk1.CollectionIndex)
+		assert.Equal(t, uint64(2), chunk1.NumberOfTransactions)
+		assert.Equal(t, eventCommits[0], chunk1.EventCollection)
+
+		assert.Equal(t, *block.StartState, chunk1.StartState)
+
+		assert.NotEqual(t, *block.StartState, chunk1.EndState)
+		assert.NotEqual(t, flow.DummyStateCommitment, chunk1.EndState)
+		assert.Equal(t, expectedChunk1EndState, chunk1.EndState)
+
+		chunk2 := receipt.Chunks[1]
+		assert.Equal(t, block.ID(), chunk2.BlockID)
+		assert.Equal(t, uint(1), chunk2.CollectionIndex)
+		assert.Equal(t, uint64(1), chunk2.NumberOfTransactions)
+		assert.Equal(t, eventCommits[1], chunk2.EventCollection)
+
+		assert.Equal(t, expectedChunk1EndState, chunk2.StartState)
+
+		assert.NotEqual(t, *block.StartState, chunk2.EndState)
+		assert.NotEqual(t, flow.DummyStateCommitment, chunk2.EndState)
+		assert.NotEqual(t, expectedChunk1EndState, chunk2.EndState)
+		assert.Equal(t, expectedChunk2EndState, chunk2.EndState)
+
+		// Verify ChunkDataPacks
+
+		chunkDataPacks := result.AllChunkDataPacks()
+		assert.Len(t, chunkDataPacks, 1+1) // +1 system chunk
+
+		chunkDataPack1 := chunkDataPacks[0]
+
+		assert.Equal(t, chunk1.ID(), chunkDataPack1.ChunkID)
+		assert.Equal(t, *block.StartState, chunkDataPack1.StartState)
+		assert.Equal(t, []byte{1}, chunkDataPack1.Proof)
+		assert.NotNil(t, chunkDataPack1.Collection)
+
+		chunkDataPack2 := chunkDataPacks[1]
+
+		assert.Equal(t, chunk2.ID(), chunkDataPack2.ChunkID)
+		assert.Equal(t, chunk2.StartState, chunkDataPack2.StartState)
+		assert.Equal(t, []byte{2}, chunkDataPack2.Proof)
+		assert.Nil(t, chunkDataPack2.Collection)
+
+		// Verify BlockExecutionData
+
+		assert.Len(t, result.ChunkExecutionDatas, 1+1) // +1 system chunk
+
+		chunkExecutionData1 := result.ChunkExecutionDatas[0]
+		assert.Equal(
+			t,
+			chunkDataPack1.Collection,
+			chunkExecutionData1.Collection)
+		assert.NotNil(t, chunkExecutionData1.TrieUpdate)
+		assert.Equal(t, byte(1), chunkExecutionData1.TrieUpdate.RootHash[0])
+
+		chunkExecutionData2 := result.ChunkExecutionDatas[1]
+		assert.NotNil(t, chunkExecutionData2.Collection)
+		assert.NotNil(t, chunkExecutionData2.TrieUpdate)
+		assert.Equal(t, byte(2), chunkExecutionData2.TrieUpdate.RootHash[0])
+
+		assert.Equal(t, 3, vm.CallCount())
 	})
 
 	t.Run("empty block still computes system chunk", func(t *testing.T) {
 
 		execCtx := fvm.NewContext()
 
-		vm := new(computermock.VirtualMachine)
+		vm := new(fvmmock.VM)
 		committer := new(computermock.ViewCommitter)
 
 		bservice := requesterunit.MockBlobService(blockstore.NewBlockstore(dssync.MutexWrap(datastore.NewMapDatastore())))
-		trackerStorage := new(mocktracker.Storage)
-		trackerStorage.On("Update", mock.Anything).Return(func(fn tracker.UpdateFn) error {
-			return fn(func(uint64, ...cid.Cid) error { return nil })
-		})
+		trackerStorage := mocktracker.NewMockStorage()
 
 		prov := provider.NewProvider(
 			zerolog.Nop(),
@@ -152,30 +296,41 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			trackerStorage,
 		)
 
-		exe, err := computer.NewBlockComputer(vm, execCtx, metrics.NewNoopCollector(), trace.NewNoopTracer(), zerolog.Nop(), committer, prov)
+		exe, err := computer.NewBlockComputer(
+			vm,
+			execCtx,
+			metrics.NewNoopCollector(),
+			trace.NewNoopTracer(),
+			zerolog.Nop(),
+			committer,
+			me,
+			prov,
+			nil,
+			testMaxConcurrency)
 		require.NoError(t, err)
 
 		// create an empty block
 		block := generateBlock(0, 0, rag)
-		derivedBlockData := programs.NewEmptyDerivedBlockData()
+		derivedBlockData := derived.NewEmptyDerivedBlockData(0)
 
-		vm.On("Run", mock.Anything, mock.Anything, mock.Anything).
-			Return(nil).
+		vm.On("NewExecutor", mock.Anything, mock.Anything, mock.Anything).
+			Return(noOpExecutor{}).
 			Once() // just system chunk
 
 		committer.On("CommitView", mock.Anything, mock.Anything).
 			Return(nil, nil, nil, nil).
 			Once() // just system chunk
 
-		view := delta.NewView(func(owner, key string) (flow.RegisterValue, error) {
-			return nil, nil
-		})
-
-		result, err := exe.ExecuteBlock(context.Background(), block, view, derivedBlockData)
+		result, err := exe.ExecuteBlock(
+			context.Background(),
+			unittest.IdentifierFixture(),
+			block,
+			nil,
+			derivedBlockData)
 		assert.NoError(t, err)
-		assert.Len(t, result.StateSnapshots, 1)
-		assert.Len(t, result.TrieUpdates, 1)
-		assert.Len(t, result.TransactionResults, 1)
+		assert.Len(t, result.AllExecutionSnapshots(), 1)
+		assert.Len(t, result.AllTransactionResults(), 1)
+		assert.Len(t, result.ChunkExecutionDatas, 1)
 
 		assertEventHashesMatch(t, 1, result)
 
@@ -203,7 +358,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 
 		chain := flow.Localnet.Chain()
 		vm := fvm.NewVirtualMachine()
-		derivedBlockData := programs.NewEmptyDerivedBlockData()
+		derivedBlockData := derived.NewEmptyDerivedBlockData(0)
 		baseOpts := []fvm.Option{
 			fvm.WithChain(chain),
 			fvm.WithDerivedBlockData(derivedBlockData),
@@ -211,24 +366,24 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 
 		opts := append(baseOpts, contextOptions...)
 		ctx := fvm.NewContext(opts...)
-		view := delta.NewView(func(owner, key string) (flow.RegisterValue, error) {
-			return nil, nil
-		})
+		snapshotTree := snapshot.NewSnapshotTree(nil)
 
 		baseBootstrapOpts := []fvm.BootstrapProcedureOption{
 			fvm.WithInitialTokenSupply(unittest.GenesisTokenSupply),
 		}
 		bootstrapOpts := append(baseBootstrapOpts, bootstrapOptions...)
-		err := vm.Run(ctx, fvm.Bootstrap(unittest.ServiceAccountPublicKey, bootstrapOpts...), view)
+		executionSnapshot, _, err := vm.Run(
+			ctx,
+			fvm.Bootstrap(unittest.ServiceAccountPublicKey, bootstrapOpts...),
+			snapshotTree)
 		require.NoError(t, err)
+
+		snapshotTree = snapshotTree.Append(executionSnapshot)
 
 		comm := new(computermock.ViewCommitter)
 
 		bservice := requesterunit.MockBlobService(blockstore.NewBlockstore(dssync.MutexWrap(datastore.NewMapDatastore())))
-		trackerStorage := new(mocktracker.Storage)
-		trackerStorage.On("Update", mock.Anything).Return(func(fn tracker.UpdateFn) error {
-			return fn(func(uint64, ...cid.Cid) error { return nil })
-		})
+		trackerStorage := mocktracker.NewMockStorage()
 
 		prov := provider.NewProvider(
 			zerolog.Nop(),
@@ -238,7 +393,17 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			trackerStorage,
 		)
 
-		exe, err := computer.NewBlockComputer(vm, ctx, metrics.NewNoopCollector(), trace.NewNoopTracer(), zerolog.Nop(), comm, prov)
+		exe, err := computer.NewBlockComputer(
+			vm,
+			ctx,
+			metrics.NewNoopCollector(),
+			trace.NewNoopTracer(),
+			zerolog.Nop(),
+			comm,
+			me,
+			prov,
+			nil,
+			testMaxConcurrency)
 		require.NoError(t, err)
 
 		// create an empty block
@@ -248,26 +413,27 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			Return(nil, nil, nil, nil).
 			Once() // just system chunk
 
-		result, err := exe.ExecuteBlock(context.Background(), block, view, derivedBlockData)
+		result, err := exe.ExecuteBlock(
+			context.Background(),
+			unittest.IdentifierFixture(),
+			block,
+			snapshotTree,
+			derivedBlockData.NewChildDerivedBlockData())
 		assert.NoError(t, err)
-		assert.Len(t, result.StateSnapshots, 1)
-		assert.Len(t, result.TrieUpdates, 1)
-		assert.Len(t, result.TransactionResults, 1)
+		assert.Len(t, result.AllExecutionSnapshots(), 1)
+		assert.Len(t, result.AllTransactionResults(), 1)
+		assert.Len(t, result.ChunkExecutionDatas, 1)
 
-		assert.Empty(t, result.TransactionResults[0].ErrorMessage)
+		assert.Empty(t, result.AllTransactionResults()[0].ErrorMessage)
 	})
 
 	t.Run("multiple collections", func(t *testing.T) {
 		execCtx := fvm.NewContext()
 
-		vm := new(computermock.VirtualMachine)
 		committer := new(computermock.ViewCommitter)
 
 		bservice := requesterunit.MockBlobService(blockstore.NewBlockstore(dssync.MutexWrap(datastore.NewMapDatastore())))
-		trackerStorage := new(mocktracker.Storage)
-		trackerStorage.On("Update", mock.Anything).Return(func(fn tracker.UpdateFn) error {
-			return fn(func(uint64, ...cid.Cid) error { return nil })
-		})
+		trackerStorage := mocktracker.NewMockStorage()
 
 		prov := provider.NewProvider(
 			zerolog.Nop(),
@@ -277,63 +443,69 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			trackerStorage,
 		)
 
-		exe, err := computer.NewBlockComputer(vm, execCtx, metrics.NewNoopCollector(), trace.NewNoopTracer(), zerolog.Nop(), committer, prov)
+		eventsPerTransaction := 2
+		vm := &testVM{
+			t:                    t,
+			eventsPerTransaction: eventsPerTransaction,
+			err: fvmErrors.NewInvalidAddressErrorf(
+				flow.EmptyAddress,
+				"no payer address provided"),
+		}
+
+		exe, err := computer.NewBlockComputer(
+			vm,
+			execCtx,
+			metrics.NewNoopCollector(),
+			trace.NewNoopTracer(),
+			zerolog.Nop(),
+			committer,
+			me,
+			prov,
+			nil,
+			testMaxConcurrency)
 		require.NoError(t, err)
 
 		collectionCount := 2
 		transactionsPerCollection := 2
-		eventsPerTransaction := 2
 		eventsPerCollection := eventsPerTransaction * transactionsPerCollection
 		totalTransactionCount := (collectionCount * transactionsPerCollection) + 1 // +1 for system chunk
 		// totalEventCount := eventsPerTransaction * totalTransactionCount
 
 		// create a block with 2 collections with 2 transactions each
 		block := generateBlock(collectionCount, transactionsPerCollection, rag)
-		derivedBlockData := programs.NewEmptyDerivedBlockData()
-
-		vm.On("Run", mock.Anything, mock.Anything, mock.Anything).
-			Run(func(args mock.Arguments) {
-				tx := args[1].(*fvm.TransactionProcedure)
-
-				tx.Err = fvmErrors.NewInvalidAddressErrorf(flow.Address{}, "no payer address provided")
-				// create dummy events
-				tx.Events = generateEvents(eventsPerTransaction, tx.TxIndex)
-			}).
-			Return(nil).
-			Times(totalTransactionCount)
+		derivedBlockData := derived.NewEmptyDerivedBlockData(0)
 
 		committer.On("CommitView", mock.Anything, mock.Anything).
 			Return(nil, nil, nil, nil).
 			Times(collectionCount + 1)
 
-		view := delta.NewView(func(owner, key string) (flow.RegisterValue, error) {
-			return nil, nil
-		})
-
-		result, err := exe.ExecuteBlock(context.Background(), block, view, derivedBlockData)
+		result, err := exe.ExecuteBlock(
+			context.Background(),
+			unittest.IdentifierFixture(),
+			block,
+			nil,
+			derivedBlockData)
 		assert.NoError(t, err)
 
 		// chunk count should match collection count
-		assert.Len(t, result.StateSnapshots, collectionCount+1) // system chunk
+		assert.Equal(t, result.BlockExecutionResult.Size(), collectionCount+1) // system chunk
 
 		// all events should have been collected
-		assert.Len(t, result.Events, collectionCount+1)
-
 		for i := 0; i < collectionCount; i++ {
-			assert.Len(t, result.Events[i], eventsPerCollection)
+			events := result.CollectionExecutionResultAt(i).Events()
+			assert.Len(t, events, eventsPerCollection)
 		}
 
-		assert.Len(t, result.Events[len(result.Events)-1], eventsPerTransaction)
+		// system chunk
+		assert.Len(t, result.CollectionExecutionResultAt(collectionCount).Events(), eventsPerTransaction)
+
+		events := result.AllEvents()
 
 		// events should have been indexed by transaction and event
 		k := 0
 		for expectedTxIndex := 0; expectedTxIndex < totalTransactionCount; expectedTxIndex++ {
 			for expectedEventIndex := 0; expectedEventIndex < eventsPerTransaction; expectedEventIndex++ {
-
-				chunkIndex := k / eventsPerCollection
-				eventIndex := k % eventsPerCollection
-
-				e := result.Events[chunkIndex][eventIndex]
+				e := events[k]
 				assert.EqualValues(t, expectedEventIndex, int(e.EventIndex))
 				assert.EqualValues(t, expectedTxIndex, e.TransactionIndex)
 				k++
@@ -345,133 +517,209 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			for _, t := range c.Transactions {
 				txResult := flow.TransactionResult{
 					TransactionID: t.ID(),
-					ErrorMessage:  fvmErrors.NewInvalidAddressErrorf(flow.Address{}, "no payer address provided").Error(),
+					ErrorMessage: fvmErrors.NewInvalidAddressErrorf(
+						flow.EmptyAddress,
+						"no payer address provided").Error(),
 				}
 				expectedResults = append(expectedResults, txResult)
 			}
 		}
-		assert.ElementsMatch(t, expectedResults, result.TransactionResults[0:len(result.TransactionResults)-1]) // strip system chunk
+		txResults := result.AllTransactionResults()
+		assert.ElementsMatch(t, expectedResults, txResults[0:len(txResults)-1]) // strip system chunk
 
 		assertEventHashesMatch(t, collectionCount+1, result)
 
-		vm.AssertExpectations(t)
+		assert.Equal(t, totalTransactionCount, vm.CallCount())
 	})
 
-	t.Run("service events are emitted", func(t *testing.T) {
-		execCtx := fvm.NewContext(
-			fvm.WithServiceEventCollectionEnabled(),
-			fvm.WithAuthorizationChecksEnabled(false),
-			fvm.WithSequenceNumberCheckAndIncrementEnabled(false),
-		)
+	t.Run(
+		"service events are emitted", func(t *testing.T) {
+			execCtx := fvm.NewContext(
+				fvm.WithServiceEventCollectionEnabled(),
+				fvm.WithAuthorizationChecksEnabled(false),
+				fvm.WithSequenceNumberCheckAndIncrementEnabled(false),
+			)
 
-		collectionCount := 2
-		transactionsPerCollection := 2
+			collectionCount := 2
+			transactionsPerCollection := 2
 
-		totalTransactionCount := (collectionCount * transactionsPerCollection) + 1 // +1 for system chunk
+			// create a block with 2 collections with 2 transactions each
+			block := generateBlock(collectionCount, transactionsPerCollection, rag)
 
-		// create a block with 2 collections with 2 transactions each
-		block := generateBlock(collectionCount, transactionsPerCollection, rag)
+			serviceEvents, err := systemcontracts.ServiceEventsForChain(execCtx.Chain.ChainID())
+			require.NoError(t, err)
 
-		ordinaryEvent := cadence.Event{
-			EventType: &cadence.EventType{
-				Location:            stdlib.FlowLocation{},
-				QualifiedIdentifier: "what.ever",
-			},
-		}
+			payload, err := ccf.Decode(nil, unittest.EpochSetupFixtureCCF)
+			require.NoError(t, err)
 
-		serviceEvents, err := systemcontracts.ServiceEventsForChain(execCtx.Chain.ChainID())
-		require.NoError(t, err)
+			serviceEventA, ok := payload.(cadence.Event)
+			require.True(t, ok)
 
-		serviceEventA := cadence.Event{
-			EventType: &cadence.EventType{
-				Location: common.AddressLocation{
-					Address: common.Address(serviceEvents.EpochSetup.Address),
+			serviceEventA.EventType.Location = common.AddressLocation{
+				Address: common.Address(serviceEvents.EpochSetup.Address),
+			}
+			serviceEventA.EventType.QualifiedIdentifier = serviceEvents.EpochSetup.QualifiedIdentifier()
+
+			payload, err = ccf.Decode(nil, unittest.EpochCommitFixtureCCF)
+			require.NoError(t, err)
+
+			serviceEventB, ok := payload.(cadence.Event)
+			require.True(t, ok)
+
+			serviceEventB.EventType.Location = common.AddressLocation{
+				Address: common.Address(serviceEvents.EpochCommit.Address),
+			}
+			serviceEventB.EventType.QualifiedIdentifier = serviceEvents.EpochCommit.QualifiedIdentifier()
+
+			payload, err = ccf.Decode(nil, unittest.VersionBeaconFixtureCCF)
+			require.NoError(t, err)
+
+			serviceEventC, ok := payload.(cadence.Event)
+			require.True(t, ok)
+
+			serviceEventC.EventType.Location = common.AddressLocation{
+				Address: common.Address(serviceEvents.VersionBeacon.Address),
+			}
+			serviceEventC.EventType.QualifiedIdentifier = serviceEvents.VersionBeacon.QualifiedIdentifier()
+
+			transactions := []*flow.TransactionBody{}
+			for _, col := range block.Collections() {
+				transactions = append(transactions, col.Transactions...)
+			}
+
+			// events to emit for each iteration/transaction
+			events := map[common.Location][]cadence.Event{
+				common.TransactionLocation(transactions[0].ID()): nil,
+				common.TransactionLocation(transactions[1].ID()): []cadence.Event{
+					serviceEventA,
+					cadence.Event{
+						EventType: &cadence.EventType{
+							Location:            stdlib.FlowLocation{},
+							QualifiedIdentifier: "what.ever",
+						},
+					},
 				},
-				QualifiedIdentifier: serviceEvents.EpochSetup.QualifiedIdentifier(),
-			},
-		}
-		serviceEventB := cadence.Event{
-			EventType: &cadence.EventType{
-				Location: common.AddressLocation{
-					Address: common.Address(serviceEvents.EpochCommit.Address),
+				common.TransactionLocation(transactions[2].ID()): []cadence.Event{
+					cadence.Event{
+						EventType: &cadence.EventType{
+							Location:            stdlib.FlowLocation{},
+							QualifiedIdentifier: "what.ever",
+						},
+					},
 				},
-				QualifiedIdentifier: serviceEvents.EpochCommit.QualifiedIdentifier(),
-			},
-		}
+				common.TransactionLocation(transactions[3].ID()): nil,
+			}
 
-		// events to emit for each iteration/transaction
-		events := make([][]cadence.Event, totalTransactionCount)
-		events[0] = nil
-		events[1] = []cadence.Event{serviceEventA, ordinaryEvent}
-		events[2] = []cadence.Event{ordinaryEvent}
-		events[3] = nil
-		events[4] = []cadence.Event{serviceEventB}
+			systemTransactionEvents := []cadence.Event{
+				serviceEventB,
+				serviceEventC,
+			}
 
-		emittingRuntime := &testRuntime{
-			executeTransaction: func(script runtime.Script, context runtime.Context) error {
-				for _, e := range events[0] {
-					err := context.Interface.EmitEvent(e)
-					if err != nil {
-						return err
+			emittingRuntime := &testRuntime{
+				executeTransaction: func(
+					script runtime.Script,
+					context runtime.Context,
+				) error {
+					scriptEvents, ok := events[context.Location]
+					if !ok {
+						scriptEvents = systemTransactionEvents
 					}
-				}
-				events = events[1:]
-				return nil
-			},
-			readStored: func(address common.Address, path cadence.Path, r runtime.Context) (cadence.Value, error) {
-				return nil, nil
-			},
-		}
 
-		execCtx = fvm.NewContextFromParent(
-			execCtx,
-			fvm.WithReusableCadenceRuntimePool(
-				reusableRuntime.NewCustomReusableCadenceRuntimePool(
-					0,
-					func() runtime.Runtime {
-						return emittingRuntime
-					})))
+					for _, e := range scriptEvents {
+						err := context.Interface.EmitEvent(e)
+						if err != nil {
+							return err
+						}
+					}
+					return nil
+				},
+				readStored: func(
+					address common.Address,
+					path cadence.Path,
+					r runtime.Context,
+				) (cadence.Value, error) {
+					return nil, nil
+				},
+			}
 
-		vm := fvm.NewVirtualMachine()
+			execCtx = fvm.NewContextFromParent(
+				execCtx,
+				fvm.WithReusableCadenceRuntimePool(
+					reusableRuntime.NewCustomReusableCadenceRuntimePool(
+						0,
+						runtime.Config{},
+						func(_ runtime.Config) runtime.Runtime {
+							return emittingRuntime
+						},
+					),
+				),
+			)
 
-		bservice := requesterunit.MockBlobService(blockstore.NewBlockstore(dssync.MutexWrap(datastore.NewMapDatastore())))
-		trackerStorage := new(mocktracker.Storage)
-		trackerStorage.On("Update", mock.Anything).Return(func(fn tracker.UpdateFn) error {
-			return fn(func(uint64, ...cid.Cid) error { return nil })
-		})
+			vm := fvm.NewVirtualMachine()
 
-		prov := provider.NewProvider(
-			zerolog.Nop(),
-			metrics.NewNoopCollector(),
-			execution_data.DefaultSerializer,
-			bservice,
-			trackerStorage,
-		)
+			bservice := requesterunit.MockBlobService(blockstore.NewBlockstore(dssync.MutexWrap(datastore.NewMapDatastore())))
+			trackerStorage := mocktracker.NewMockStorage()
 
-		exe, err := computer.NewBlockComputer(vm, execCtx, metrics.NewNoopCollector(), trace.NewNoopTracer(), zerolog.Nop(), committer.NewNoopViewCommitter(), prov)
-		require.NoError(t, err)
+			prov := provider.NewProvider(
+				zerolog.Nop(),
+				metrics.NewNoopCollector(),
+				execution_data.DefaultSerializer,
+				bservice,
+				trackerStorage,
+			)
 
-		view := delta.NewView(func(owner, key string) (flow.RegisterValue, error) {
-			return nil, nil
-		})
+			exe, err := computer.NewBlockComputer(
+				vm,
+				execCtx,
+				metrics.NewNoopCollector(),
+				trace.NewNoopTracer(),
+				zerolog.Nop(),
+				committer.NewNoopViewCommitter(),
+				me,
+				prov,
+				nil,
+				testMaxConcurrency)
+			require.NoError(t, err)
 
-		result, err := exe.ExecuteBlock(context.Background(), block, view, programs.NewEmptyDerivedBlockData())
-		require.NoError(t, err)
+			result, err := exe.ExecuteBlock(
+				context.Background(),
+				unittest.IdentifierFixture(),
+				block,
+				nil,
+				derived.NewEmptyDerivedBlockData(0),
+			)
+			require.NoError(t, err)
 
-		// make sure event index sequence are valid
-		for _, eventsList := range result.Events {
-			unittest.EnsureEventsIndexSeq(t, eventsList, execCtx.Chain.ChainID())
-		}
+			// make sure event index sequence are valid
+			for i := 0; i < result.BlockExecutionResult.Size(); i++ {
+				collectionResult := result.CollectionExecutionResultAt(i)
+				unittest.EnsureEventsIndexSeq(t, collectionResult.Events(), execCtx.Chain.ChainID())
+			}
 
-		// all events should have been collected
-		require.Len(t, result.ServiceEvents, 2)
+			sEvents := result.AllServiceEvents() // all events should have been collected
+			require.Len(t, sEvents, 3)
 
-		// events are ordered
-		require.Equal(t, serviceEventA.EventType.ID(), string(result.ServiceEvents[0].Type))
-		require.Equal(t, serviceEventB.EventType.ID(), string(result.ServiceEvents[1].Type))
+			// events are ordered
+			require.Equal(
+				t,
+				serviceEventA.EventType.ID(),
+				string(sEvents[0].Type),
+			)
+			require.Equal(
+				t,
+				serviceEventB.EventType.ID(),
+				string(sEvents[1].Type),
+			)
 
-		assertEventHashesMatch(t, collectionCount+1, result)
-	})
+			require.Equal(
+				t,
+				serviceEventC.EventType.ID(),
+				string(sEvents[2].Type),
+			)
+
+			assertEventHashesMatch(t, collectionCount+1, result)
+		},
+	)
 
 	t.Run("succeeding transactions store programs", func(t *testing.T) {
 
@@ -488,19 +736,21 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		rt := &testRuntime{
 			executeTransaction: func(script runtime.Script, r runtime.Context) error {
 
-				program, err := r.Interface.GetProgram(contractLocation) //nolint:staticcheck
-				require.NoError(t, err)
-				require.Nil(t, program)
-
-				err = r.Interface.SetProgram(
+				_, err := r.Interface.GetOrLoadProgram(
 					contractLocation,
-					contractProgram,
+					func() (*interpreter.Program, error) {
+						return contractProgram, nil
+					},
 				)
 				require.NoError(t, err)
 
 				return nil
 			},
-			readStored: func(address common.Address, path cadence.Path, r runtime.Context) (cadence.Value, error) {
+			readStored: func(
+				address common.Address,
+				path cadence.Path,
+				r runtime.Context,
+			) (cadence.Value, error) {
 				return nil, nil
 			},
 		}
@@ -510,17 +760,15 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			fvm.WithReusableCadenceRuntimePool(
 				reusableRuntime.NewCustomReusableCadenceRuntimePool(
 					0,
-					func() runtime.Runtime {
+					runtime.Config{},
+					func(_ runtime.Config) runtime.Runtime {
 						return rt
 					})))
 
 		vm := fvm.NewVirtualMachine()
 
 		bservice := requesterunit.MockBlobService(blockstore.NewBlockstore(dssync.MutexWrap(datastore.NewMapDatastore())))
-		trackerStorage := new(mocktracker.Storage)
-		trackerStorage.On("Update", mock.Anything).Return(func(fn tracker.UpdateFn) error {
-			return fn(func(uint64, ...cid.Cid) error { return nil })
-		})
+		trackerStorage := mocktracker.NewMockStorage()
 
 		prov := provider.NewProvider(
 			zerolog.Nop(),
@@ -530,23 +778,35 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			trackerStorage,
 		)
 
-		exe, err := computer.NewBlockComputer(vm, execCtx, metrics.NewNoopCollector(), trace.NewNoopTracer(), zerolog.Nop(), committer.NewNoopViewCommitter(), prov)
+		exe, err := computer.NewBlockComputer(
+			vm,
+			execCtx,
+			metrics.NewNoopCollector(),
+			trace.NewNoopTracer(),
+			zerolog.Nop(),
+			committer.NewNoopViewCommitter(),
+			me,
+			prov,
+			nil,
+			testMaxConcurrency)
 		require.NoError(t, err)
 
 		const collectionCount = 2
 		const transactionCount = 2
 		block := generateBlock(collectionCount, transactionCount, rag)
 
-		view := delta.NewView(func(owner, key string) (flow.RegisterValue, error) {
-			return nil, nil
-		})
+		key := flow.AccountStatusRegisterID(
+			flow.BytesToAddress(address.Bytes()))
+		value := environment.NewAccountStatus().ToBytes()
 
-		err = view.Set(string(address.Bytes()), state.AccountStatusKey, environment.NewAccountStatus().ToBytes())
-		require.NoError(t, err)
-
-		result, err := exe.ExecuteBlock(context.Background(), block, view, programs.NewEmptyDerivedBlockData())
+		result, err := exe.ExecuteBlock(
+			context.Background(),
+			unittest.IdentifierFixture(),
+			block,
+			snapshot.MapStorageSnapshot{key: value},
+			derived.NewEmptyDerivedBlockData(0))
 		assert.NoError(t, err)
-		assert.Len(t, result.StateSnapshots, collectionCount+1) // +1 system chunk
+		assert.Len(t, result.AllExecutionSnapshots(), collectionCount+1) // +1 system chunk
 	})
 
 	t.Run("failing transactions do not store programs", func(t *testing.T) {
@@ -566,36 +826,43 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 
 		const collectionCount = 2
 		const transactionCount = 2
+		block := generateBlock(collectionCount, transactionCount, rag)
 
-		var executionCalls int
+		normalTransactions := map[common.Location]struct{}{}
+		for _, col := range block.Collections() {
+			for _, txn := range col.Transactions {
+				loc := common.TransactionLocation(txn.ID())
+				normalTransactions[loc] = struct{}{}
+			}
+		}
 
 		rt := &testRuntime{
 			executeTransaction: func(script runtime.Script, r runtime.Context) error {
 
-				executionCalls++
-
-				// NOTE: set a program and revert all transactions but the system chunk transaction
-
-				program, err := r.Interface.GetProgram(contractLocation) //nolint:staticcheck
+				// NOTE: set a program and revert all transactions but the
+				// system chunk transaction
+				_, err := r.Interface.GetOrLoadProgram(
+					contractLocation,
+					func() (*interpreter.Program, error) {
+						return contractProgram, nil
+					},
+				)
 				require.NoError(t, err)
 
-				if executionCalls > collectionCount*transactionCount {
-					return nil
+				_, ok := normalTransactions[r.Location]
+				if ok {
+					return runtime.Error{
+						Err: fmt.Errorf("TX reverted"),
+					}
 				}
-				if program == nil {
 
-					err = r.Interface.SetProgram(
-						contractLocation,
-						contractProgram,
-					)
-					require.NoError(t, err)
-
-				}
-				return runtime.Error{
-					Err: fmt.Errorf("TX reverted"),
-				}
+				return nil
 			},
-			readStored: func(address common.Address, path cadence.Path, r runtime.Context) (cadence.Value, error) {
+			readStored: func(
+				address common.Address,
+				path cadence.Path,
+				r runtime.Context,
+			) (cadence.Value, error) {
 				return nil, nil
 			},
 		}
@@ -605,17 +872,15 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			fvm.WithReusableCadenceRuntimePool(
 				reusableRuntime.NewCustomReusableCadenceRuntimePool(
 					0,
-					func() runtime.Runtime {
+					runtime.Config{},
+					func(_ runtime.Config) runtime.Runtime {
 						return rt
 					})))
 
 		vm := fvm.NewVirtualMachine()
 
 		bservice := requesterunit.MockBlobService(blockstore.NewBlockstore(dssync.MutexWrap(datastore.NewMapDatastore())))
-		trackerStorage := new(mocktracker.Storage)
-		trackerStorage.On("Update", mock.Anything).Return(func(fn tracker.UpdateFn) error {
-			return fn(func(uint64, ...cid.Cid) error { return nil })
-		})
+		trackerStorage := mocktracker.NewMockStorage()
 
 		prov := provider.NewProvider(
 			zerolog.Nop(),
@@ -625,34 +890,97 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			trackerStorage,
 		)
 
-		exe, err := computer.NewBlockComputer(vm, execCtx, metrics.NewNoopCollector(), trace.NewNoopTracer(), zerolog.Nop(), committer.NewNoopViewCommitter(), prov)
+		exe, err := computer.NewBlockComputer(
+			vm,
+			execCtx,
+			metrics.NewNoopCollector(),
+			trace.NewNoopTracer(),
+			zerolog.Nop(),
+			committer.NewNoopViewCommitter(),
+			me,
+			prov,
+			nil,
+			testMaxConcurrency)
 		require.NoError(t, err)
 
-		block := generateBlock(collectionCount, transactionCount, rag)
+		key := flow.AccountStatusRegisterID(
+			flow.BytesToAddress(address.Bytes()))
+		value := environment.NewAccountStatus().ToBytes()
 
-		view := delta.NewView(func(owner, key string) (flow.RegisterValue, error) {
-			return nil, nil
-		})
-
-		err = view.Set(string(address.Bytes()), state.AccountStatusKey, environment.NewAccountStatus().ToBytes())
+		result, err := exe.ExecuteBlock(
+			context.Background(),
+			unittest.IdentifierFixture(),
+			block,
+			snapshot.MapStorageSnapshot{key: value},
+			derived.NewEmptyDerivedBlockData(0))
 		require.NoError(t, err)
-
-		result, err := exe.ExecuteBlock(context.Background(), block, view, programs.NewEmptyDerivedBlockData())
-		require.NoError(t, err)
-		assert.Len(t, result.StateSnapshots, collectionCount+1) // +1 system chunk
+		assert.Len(t, result.AllExecutionSnapshots(), collectionCount+1) // +1 system chunk
 	})
+
+	t.Run("internal error", func(t *testing.T) {
+		execCtx := fvm.NewContext()
+
+		committer := new(computermock.ViewCommitter)
+
+		bservice := requesterunit.MockBlobService(
+			blockstore.NewBlockstore(
+				dssync.MutexWrap(datastore.NewMapDatastore())))
+		trackerStorage := mocktracker.NewMockStorage()
+
+		prov := provider.NewProvider(
+			zerolog.Nop(),
+			metrics.NewNoopCollector(),
+			execution_data.DefaultSerializer,
+			bservice,
+			trackerStorage)
+
+		exe, err := computer.NewBlockComputer(
+			errorVM{errorAt: 5},
+			execCtx,
+			metrics.NewNoopCollector(),
+			trace.NewNoopTracer(),
+			zerolog.Nop(),
+			committer,
+			me,
+			prov,
+			nil,
+			testMaxConcurrency)
+		require.NoError(t, err)
+
+		collectionCount := 5
+		transactionsPerCollection := 3
+		block := generateBlock(collectionCount, transactionsPerCollection, rag)
+
+		committer.On("CommitView", mock.Anything, mock.Anything).
+			Return(nil, nil, nil, nil).
+			Times(collectionCount + 1)
+
+		_, err = exe.ExecuteBlock(
+			context.Background(),
+			unittest.IdentifierFixture(),
+			block,
+			nil,
+			derived.NewEmptyDerivedBlockData(0))
+		assert.ErrorContains(t, err, "boom - internal error")
+	})
+
 }
 
-func assertEventHashesMatch(t *testing.T, expectedNoOfChunks int, result *execution.ComputationResult) {
-
-	require.Len(t, result.Events, expectedNoOfChunks)
-	require.Len(t, result.EventsHashes, expectedNoOfChunks)
+func assertEventHashesMatch(
+	t *testing.T,
+	expectedNoOfChunks int,
+	result *execution.ComputationResult,
+) {
+	execResSize := result.BlockExecutionResult.Size()
+	attestResSize := result.BlockAttestationResult.Size()
+	require.Equal(t, execResSize, expectedNoOfChunks)
+	require.Equal(t, execResSize, attestResSize)
 
 	for i := 0; i < expectedNoOfChunks; i++ {
-		calculatedHash, err := flow.EventsMerkleRootHash(result.Events[i])
+		events := result.CollectionExecutionResultAt(i).Events()
+		calculatedHash, err := flow.EventsMerkleRootHash(events)
 		require.NoError(t, err)
-
-		require.Equal(t, calculatedHash, result.EventsHashes[i])
+		require.Equal(t, calculatedHash, result.CollectionAttestationResultAt(i).EventCommitment())
 	}
 }
 
@@ -679,14 +1007,29 @@ func (executor *testTransactionExecutor) Result() (cadence.Value, error) {
 type testRuntime struct {
 	executeScript      func(runtime.Script, runtime.Context) (cadence.Value, error)
 	executeTransaction func(runtime.Script, runtime.Context) error
-	readStored         func(common.Address, cadence.Path, runtime.Context) (cadence.Value, error)
+	readStored         func(common.Address, cadence.Path, runtime.Context) (
+		cadence.Value,
+		error,
+	)
 }
 
-func (e *testRuntime) NewScriptExecutor(script runtime.Script, c runtime.Context) runtime.Executor {
+var _ runtime.Runtime = &testRuntime{}
+
+func (e *testRuntime) Config() runtime.Config {
+	panic("Config not expected")
+}
+
+func (e *testRuntime) NewScriptExecutor(
+	script runtime.Script,
+	c runtime.Context,
+) runtime.Executor {
 	panic("NewScriptExecutor not expected")
 }
 
-func (e *testRuntime) NewTransactionExecutor(script runtime.Script, c runtime.Context) runtime.Executor {
+func (e *testRuntime) NewTransactionExecutor(
+	script runtime.Script,
+	c runtime.Context,
+) runtime.Executor {
 	return &testTransactionExecutor{
 		executeTransaction: e.executeTransaction,
 		script:             script,
@@ -694,11 +1037,15 @@ func (e *testRuntime) NewTransactionExecutor(script runtime.Script, c runtime.Co
 	}
 }
 
-func (e *testRuntime) NewContractFunctionExecutor(contractLocation common.AddressLocation, functionName string, arguments []cadence.Value, argumentTypes []sema.Type, context runtime.Context) runtime.Executor {
+func (e *testRuntime) NewContractFunctionExecutor(
+	contractLocation common.AddressLocation,
+	functionName string,
+	arguments []cadence.Value,
+	argumentTypes []sema.Type,
+	context runtime.Context,
+) runtime.Executor {
 	panic("NewContractFunctionExecutor not expected")
 }
-
-var _ runtime.Runtime = &testRuntime{}
 
 func (e *testRuntime) SetInvalidatedResourceValidationEnabled(_ bool) {
 	panic("SetInvalidatedResourceValidationEnabled not expected")
@@ -712,19 +1059,34 @@ func (e *testRuntime) SetResourceOwnerChangeHandlerEnabled(_ bool) {
 	panic("SetResourceOwnerChangeHandlerEnabled not expected")
 }
 
-func (e *testRuntime) InvokeContractFunction(_ common.AddressLocation, _ string, _ []cadence.Value, _ []sema.Type, _ runtime.Context) (cadence.Value, error) {
+func (e *testRuntime) InvokeContractFunction(
+	_ common.AddressLocation,
+	_ string,
+	_ []cadence.Value,
+	_ []sema.Type,
+	_ runtime.Context,
+) (cadence.Value, error) {
 	panic("InvokeContractFunction not expected")
 }
 
-func (e *testRuntime) ExecuteScript(script runtime.Script, context runtime.Context) (cadence.Value, error) {
+func (e *testRuntime) ExecuteScript(
+	script runtime.Script,
+	context runtime.Context,
+) (cadence.Value, error) {
 	return e.executeScript(script, context)
 }
 
-func (e *testRuntime) ExecuteTransaction(script runtime.Script, context runtime.Context) error {
+func (e *testRuntime) ExecuteTransaction(
+	script runtime.Script,
+	context runtime.Context,
+) error {
 	return e.executeTransaction(script, context)
 }
 
-func (*testRuntime) ParseAndCheckProgram(_ []byte, _ runtime.Context) (*interpreter.Program, error) {
+func (*testRuntime) ParseAndCheckProgram(
+	_ []byte,
+	_ runtime.Context,
+) (*interpreter.Program, error) {
 	panic("ParseAndCheckProgram not expected")
 }
 
@@ -740,11 +1102,19 @@ func (*testRuntime) SetAtreeValidationEnabled(_ bool) {
 	panic("SetAtreeValidationEnabled not expected")
 }
 
-func (e *testRuntime) ReadStored(a common.Address, p cadence.Path, c runtime.Context) (cadence.Value, error) {
+func (e *testRuntime) ReadStored(
+	a common.Address,
+	p cadence.Path,
+	c runtime.Context,
+) (cadence.Value, error) {
 	return e.readStored(a, p, c)
 }
 
-func (*testRuntime) ReadLinked(_ common.Address, _ cadence.Path, _ runtime.Context) (cadence.Value, error) {
+func (*testRuntime) ReadLinked(
+	_ common.Address,
+	_ cadence.Path,
+	_ runtime.Context,
+) (cadence.Value, error) {
 	panic("ReadLinked not expected")
 }
 
@@ -770,7 +1140,11 @@ func (r *RandomAddressGenerator) AddressCount() uint64 {
 	panic("not implemented")
 }
 
-func (testRuntime) Storage(runtime.Context) (*runtime.Storage, *interpreter.Interpreter, error) {
+func (testRuntime) Storage(runtime.Context) (
+	*runtime.Storage,
+	*interpreter.Interpreter,
+	error,
+) {
 	panic("Storage not expected")
 }
 
@@ -794,67 +1168,6 @@ func (f *FixedAddressGenerator) AddressCount() uint64 {
 	panic("not implemented")
 }
 
-func Test_AccountStatusRegistersAreIncluded(t *testing.T) {
-
-	address := flow.HexToAddress("1234")
-	fag := &FixedAddressGenerator{Address: address}
-
-	vm := fvm.NewVirtualMachine()
-	execCtx := fvm.NewContext()
-
-	ledger := testutil.RootBootstrappedLedger(vm, execCtx)
-
-	key, err := unittest.AccountKeyDefaultFixture()
-	require.NoError(t, err)
-
-	view := delta.NewView(func(owner, key string) (flow.RegisterValue, error) {
-		return ledger.Get(owner, key)
-	})
-	txnState := state.NewTransactionState(view, state.DefaultParameters())
-	accounts := environment.NewAccounts(txnState)
-
-	// account creation, signing of transaction and bootstrapping ledger should not be required for this test
-	// as freeze check should happen before a transaction signature is checked
-	// but we currently discard all the touches if it fails and any point
-	err = accounts.Create([]flow.AccountPublicKey{key.PublicKey(1000)}, address)
-	require.NoError(t, err)
-
-	bservice := requesterunit.MockBlobService(blockstore.NewBlockstore(dssync.MutexWrap(datastore.NewMapDatastore())))
-	trackerStorage := new(mocktracker.Storage)
-	trackerStorage.On("Update", mock.Anything).Return(func(fn tracker.UpdateFn) error {
-		return fn(func(uint64, ...cid.Cid) error { return nil })
-	})
-
-	prov := provider.NewProvider(
-		zerolog.Nop(),
-		metrics.NewNoopCollector(),
-		execution_data.DefaultSerializer,
-		bservice,
-		trackerStorage,
-	)
-
-	exe, err := computer.NewBlockComputer(vm, execCtx, metrics.NewNoopCollector(), trace.NewNoopTracer(), zerolog.Nop(), committer.NewNoopViewCommitter(), prov)
-	require.NoError(t, err)
-
-	block := generateBlockWithVisitor(1, 1, fag, func(txBody *flow.TransactionBody) {
-		err := testutil.SignTransaction(txBody, txBody.Payer, *key, 0)
-		require.NoError(t, err)
-	})
-
-	_, err = exe.ExecuteBlock(context.Background(), block, view, programs.NewEmptyDerivedBlockData())
-	assert.NoError(t, err)
-
-	registerTouches := view.Interactions().RegisterTouches()
-
-	// make sure check for account status has been registered
-	id := flow.RegisterID{
-		Owner: string(address.Bytes()),
-		Key:   state.AccountStatusKey,
-	}
-
-	require.Contains(t, registerTouches, id)
-}
-
 func Test_ExecutingSystemCollection(t *testing.T) {
 
 	execCtx := fvm.NewContext(
@@ -875,37 +1188,56 @@ func Test_ExecutingSystemCollection(t *testing.T) {
 
 	noopCollector := metrics.NewNoopCollector()
 
+	expectedNumberOfEvents := 3
+	expectedEventSize := 1435
+	// bootstrapping does not cache programs
+	expectedCachedPrograms := 0
+
 	metrics := new(modulemock.ExecutionMetrics)
-	expectedNumberOfEvents := 2
-	expectedEventSize := 912
+	metrics.On("ExecutionBlockExecuted",
+		mock.Anything,  // duration
+		mock.Anything). // stats
+		Return(nil).
+		Times(1)
+
 	metrics.On("ExecutionCollectionExecuted",
-		mock.Anything, // duration
-		mock.Anything, // computation used
-		mock.Anything, // memory used
-		expectedNumberOfEvents,
-		expectedEventSize,
-		49,   // expected number of registers touched
-		3404, // expected number of bytes written
-		1).   // expected number of transactions
+		mock.Anything,  // duration
+		mock.Anything). // stats
 		Return(nil).
 		Times(1) // system collection
 
 	metrics.On("ExecutionTransactionExecuted",
 		mock.Anything, // duration
+		mock.Anything, // conflict retry count
 		mock.Anything, // computation used
 		mock.Anything, // memory used
-		mock.Anything, // actual memory used
 		expectedNumberOfEvents,
 		expectedEventSize,
 		false).
 		Return(nil).
 		Times(1) // system chunk tx
 
+	metrics.On(
+		"ExecutionChunkDataPackGenerated",
+		mock.Anything,
+		mock.Anything).
+		Return(nil).
+		Times(1) // system collection
+
+	metrics.On(
+		"ExecutionBlockCachedPrograms",
+		expectedCachedPrograms).
+		Return(nil).
+		Times(1) // block
+
+	metrics.On(
+		"ExecutionBlockExecutionEffortVectorComponent",
+		mock.Anything,
+		mock.Anything).
+		Return(nil)
+
 	bservice := requesterunit.MockBlobService(blockstore.NewBlockstore(dssync.MutexWrap(datastore.NewMapDatastore())))
-	trackerStorage := new(mocktracker.Storage)
-	trackerStorage.On("Update", mock.Anything).Return(func(fn tracker.UpdateFn) error {
-		return fn(func(uint64, ...cid.Cid) error { return nil })
-	})
+	trackerStorage := mocktracker.NewMockStorage()
 
 	prov := provider.NewProvider(
 		zerolog.Nop(),
@@ -915,29 +1247,55 @@ func Test_ExecutingSystemCollection(t *testing.T) {
 		trackerStorage,
 	)
 
-	exe, err := computer.NewBlockComputer(vm, execCtx, metrics, trace.NewNoopTracer(), zerolog.Nop(), committer, prov)
+	me := new(modulemock.Local)
+	me.On("NodeID").Return(unittest.IdentifierFixture())
+	me.On("Sign", mock.Anything, mock.Anything).Return(nil, nil)
+	me.On("SignFunc", mock.Anything, mock.Anything, mock.Anything).
+		Return(nil, nil)
+
+	exe, err := computer.NewBlockComputer(
+		vm,
+		execCtx,
+		metrics,
+		trace.NewNoopTracer(),
+		zerolog.Nop(),
+		committer,
+		me,
+		prov,
+		nil,
+		testMaxConcurrency)
 	require.NoError(t, err)
 
 	// create empty block, it will have system collection attached while executing
 	block := generateBlock(0, 0, rag)
 
-	view := delta.NewView(ledger.Get)
-
-	result, err := exe.ExecuteBlock(context.Background(), block, view, programs.NewEmptyDerivedBlockData())
+	result, err := exe.ExecuteBlock(
+		context.Background(),
+		unittest.IdentifierFixture(),
+		block,
+		ledger,
+		derived.NewEmptyDerivedBlockData(0))
 	assert.NoError(t, err)
-	assert.Len(t, result.StateSnapshots, 1) // +1 system chunk
-	assert.Len(t, result.TransactionResults, 1)
+	assert.Len(t, result.AllExecutionSnapshots(), 1) // +1 system chunk
+	assert.Len(t, result.AllTransactionResults(), 1)
 
-	assert.Empty(t, result.TransactionResults[0].ErrorMessage)
+	assert.Empty(t, result.AllTransactionResults()[0].ErrorMessage)
 
 	committer.AssertExpectations(t)
 }
 
-func generateBlock(collectionCount, transactionCount int, addressGenerator flow.AddressGenerator) *entity.ExecutableBlock {
+func generateBlock(
+	collectionCount, transactionCount int,
+	addressGenerator flow.AddressGenerator,
+) *entity.ExecutableBlock {
 	return generateBlockWithVisitor(collectionCount, transactionCount, addressGenerator, nil)
 }
 
-func generateBlockWithVisitor(collectionCount, transactionCount int, addressGenerator flow.AddressGenerator, visitor func(body *flow.TransactionBody)) *entity.ExecutableBlock {
+func generateBlockWithVisitor(
+	collectionCount, transactionCount int,
+	addressGenerator flow.AddressGenerator,
+	visitor func(body *flow.TransactionBody),
+) *entity.ExecutableBlock {
 	collections := make([]*entity.CompleteCollection, collectionCount)
 	guarantees := make([]*flow.CollectionGuarantee, collectionCount)
 	completeCollections := make(map[flow.Identifier]*entity.CompleteCollection)
@@ -967,7 +1325,11 @@ func generateBlockWithVisitor(collectionCount, transactionCount int, addressGene
 	}
 }
 
-func generateCollection(transactionCount int, addressGenerator flow.AddressGenerator, visitor func(body *flow.TransactionBody)) *entity.CompleteCollection {
+func generateCollection(
+	transactionCount int,
+	addressGenerator flow.AddressGenerator,
+	visitor func(body *flow.TransactionBody),
+) *entity.CompleteCollection {
 	transactions := make([]*flow.TransactionBody, transactionCount)
 
 	for i := 0; i < transactionCount; i++ {
@@ -995,12 +1357,228 @@ func generateCollection(transactionCount int, addressGenerator flow.AddressGener
 	}
 }
 
+type noOpExecutor struct{}
+
+func (noOpExecutor) Cleanup() {}
+
+func (noOpExecutor) Preprocess() error {
+	return nil
+}
+
+func (noOpExecutor) Execute() error {
+	return nil
+}
+
+func (noOpExecutor) Output() fvm.ProcedureOutput {
+	return fvm.ProcedureOutput{}
+}
+
+type testVM struct {
+	t                    *testing.T
+	eventsPerTransaction int
+
+	callCount int32 // atomic variable
+	err       fvmErrors.CodedError
+}
+
+type testExecutor struct {
+	*testVM
+
+	ctx      fvm.Context
+	proc     fvm.Procedure
+	txnState storage.TransactionPreparer
+}
+
+func (testExecutor) Cleanup() {
+}
+
+func (testExecutor) Preprocess() error {
+	return nil
+}
+
+func (executor *testExecutor) Execute() error {
+	atomic.AddInt32(&executor.callCount, 1)
+
+	getSetAProgram(executor.t, executor.txnState)
+
+	return nil
+}
+
+func (executor *testExecutor) Output() fvm.ProcedureOutput {
+	txn := executor.proc.(*fvm.TransactionProcedure)
+
+	return fvm.ProcedureOutput{
+		Events: generateEvents(executor.eventsPerTransaction, txn.TxIndex),
+		Err:    executor.err,
+	}
+}
+
+func (vm *testVM) NewExecutor(
+	ctx fvm.Context,
+	proc fvm.Procedure,
+	txnState storage.TransactionPreparer,
+) fvm.ProcedureExecutor {
+	return &testExecutor{
+		testVM:   vm,
+		proc:     proc,
+		ctx:      ctx,
+		txnState: txnState,
+	}
+}
+
+func (vm *testVM) CallCount() int {
+	return int(atomic.LoadInt32(&vm.callCount))
+}
+
+func (vm *testVM) Run(
+	ctx fvm.Context,
+	proc fvm.Procedure,
+	storageSnapshot snapshot.StorageSnapshot,
+) (
+	*snapshot.ExecutionSnapshot,
+	fvm.ProcedureOutput,
+	error,
+) {
+	database := storage.NewBlockDatabase(
+		storageSnapshot,
+		proc.ExecutionTime(),
+		ctx.DerivedBlockData)
+
+	txn, err := database.NewTransaction(
+		proc.ExecutionTime(),
+		state.DefaultParameters())
+	require.NoError(vm.t, err)
+
+	executor := vm.NewExecutor(ctx, proc, txn)
+	err = fvm.Run(executor)
+	require.NoError(vm.t, err)
+
+	err = txn.Finalize()
+	require.NoError(vm.t, err)
+
+	executionSnapshot, err := txn.Commit()
+	require.NoError(vm.t, err)
+
+	return executionSnapshot, executor.Output(), nil
+}
+
+func (testVM) GetAccount(
+	_ fvm.Context,
+	_ flow.Address,
+	_ snapshot.StorageSnapshot,
+) (
+	*flow.Account,
+	error,
+) {
+	panic("not implemented")
+}
+
 func generateEvents(eventCount int, txIndex uint32) []flow.Event {
 	events := make([]flow.Event, eventCount)
 	for i := 0; i < eventCount; i++ {
 		// creating some dummy event
-		event := flow.Event{Type: "whatever", EventIndex: uint32(i), TransactionIndex: txIndex}
+		event := flow.Event{
+			Type:             "whatever",
+			EventIndex:       uint32(i),
+			TransactionIndex: txIndex,
+		}
 		events[i] = event
 	}
 	return events
+}
+
+type errorVM struct {
+	errorAt logical.Time
+}
+
+type errorExecutor struct {
+	err error
+}
+
+func (errorExecutor) Cleanup() {}
+
+func (errorExecutor) Preprocess() error {
+	return nil
+}
+
+func (e errorExecutor) Execute() error {
+	return e.err
+}
+
+func (errorExecutor) Output() fvm.ProcedureOutput {
+	return fvm.ProcedureOutput{}
+}
+
+func (vm errorVM) NewExecutor(
+	ctx fvm.Context,
+	proc fvm.Procedure,
+	txn storage.TransactionPreparer,
+) fvm.ProcedureExecutor {
+	var err error
+	if proc.ExecutionTime() == vm.errorAt {
+		err = fmt.Errorf("boom - internal error")
+	}
+
+	return errorExecutor{err: err}
+}
+
+func (vm errorVM) Run(
+	ctx fvm.Context,
+	proc fvm.Procedure,
+	storageSnapshot snapshot.StorageSnapshot,
+) (
+	*snapshot.ExecutionSnapshot,
+	fvm.ProcedureOutput,
+	error,
+) {
+	var err error
+	if proc.ExecutionTime() == vm.errorAt {
+		err = fmt.Errorf("boom - internal error")
+	}
+	return &snapshot.ExecutionSnapshot{}, fvm.ProcedureOutput{}, err
+}
+
+func (errorVM) GetAccount(
+	ctx fvm.Context,
+	addr flow.Address,
+	storageSnapshot snapshot.StorageSnapshot,
+) (
+	*flow.Account,
+	error,
+) {
+	panic("not implemented")
+}
+
+func getSetAProgram(
+	t *testing.T,
+	txnState storage.TransactionPreparer,
+) {
+	loc := common.AddressLocation{
+		Name:    "SomeContract",
+		Address: common.MustBytesToAddress([]byte{0x1}),
+	}
+	_, err := txnState.GetOrComputeProgram(
+		txnState,
+		loc,
+		&programLoader{
+			load: func() (*derived.Program, error) {
+				return &derived.Program{}, nil
+			},
+		},
+	)
+	require.NoError(t, err)
+}
+
+type programLoader struct {
+	load func() (*derived.Program, error)
+}
+
+func (p *programLoader) Compute(
+	_ state.NestedTransactionPreparer,
+	_ common.AddressLocation,
+) (
+	*derived.Program,
+	error,
+) {
+	return p.load()
 }

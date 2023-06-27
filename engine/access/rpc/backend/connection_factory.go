@@ -18,7 +18,6 @@ import (
 	"google.golang.org/grpc/keepalive"
 
 	"github.com/onflow/flow-go/module"
-	"github.com/onflow/flow-go/utils/grpcutils"
 )
 
 // DefaultClientTimeout is used when making a GRPC request to a collection node or an execution node
@@ -58,6 +57,7 @@ type ConnectionFactoryImpl struct {
 	ExecutionNodeGRPCTimeout  time.Duration
 	ConnectionsCache          *lru.Cache
 	CacheSize                 uint
+	MaxMsgSize                uint
 	AccessMetrics             module.AccessMetrics
 	Log                       zerolog.Logger
 	mutex                     sync.Mutex
@@ -90,7 +90,7 @@ func (cf *ConnectionFactoryImpl) createConnection(address string, timeout time.D
 	// https://grpc.io/blog/grpc-on-http2/#keeping-connections-alive
 	conn, err := grpc.Dial(
 		address,
-		grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(grpcutils.DefaultMaxMsgSize)),
+		grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(int(cf.MaxMsgSize))),
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 		grpc.WithKeepaliveParams(keepaliveParams),
 		WithClientUnaryInterceptor(timeout))

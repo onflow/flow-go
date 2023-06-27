@@ -9,6 +9,19 @@ import (
 	"github.com/onflow/flow-go/network/channels"
 )
 
+// NetworkingType is the type of the Flow networking layer. It is used to differentiate between the public (i.e., unstaked)
+// and private (i.e., staked) networks.
+type NetworkingType uint8
+
+const (
+	// PrivateNetwork indicates that the staked private-side of the Flow blockchain that nodes can only join and leave
+	// with a staking requirement.
+	PrivateNetwork NetworkingType = iota + 1
+	// PublicNetwork indicates that the unstaked public-side of the Flow blockchain that nodes can join and leave at will
+	// with no staking requirement.
+	PublicNetwork
+)
+
 // Network represents the network layer of the node. It allows processes that
 // work across the peer-to-peer network to register themselves as an engine with
 // a unique engine ID. The returned conduit allows the process to communicate to
@@ -47,4 +60,14 @@ type Adapter interface {
 	// UnRegisterChannel unregisters the engine for the specified channel. The engine will no longer be able to send or
 	// receive messages from that channel.
 	UnRegisterChannel(channel channels.Channel) error
+
+	// ReportMisbehaviorOnChannel reports the misbehavior of a node on sending a message to the current node that appears
+	// valid based on the networking layer but is considered invalid by the current node based on the Flow protocol.
+	// The misbehavior report is sent to the current node's networking layer on the given channel to be processed.
+	// Args:
+	// - channel: The channel on which the misbehavior report is sent.
+	// - report: The misbehavior report to be sent.
+	// Returns:
+	// none
+	ReportMisbehaviorOnChannel(channels.Channel, MisbehaviorReport)
 }

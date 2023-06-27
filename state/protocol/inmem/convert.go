@@ -16,7 +16,6 @@ import (
 // one that can easily be serialized to disk or to network.
 // TODO error docs
 func FromSnapshot(from protocol.Snapshot) (*Snapshot, error) {
-
 	var (
 		snap EncodableSnapshot
 		err  error
@@ -83,13 +82,20 @@ func FromSnapshot(from protocol.Snapshot) (*Snapshot, error) {
 	}
 	snap.Params = params.enc
 
+	// convert version beacon
+	versionBeacon, err := from.VersionBeacon()
+	if err != nil {
+		return nil, fmt.Errorf("could not get version beacon: %w", err)
+	}
+
+	snap.SealedVersionBeacon = versionBeacon
+
 	return &Snapshot{snap}, nil
 }
 
 // FromParams converts any protocol.GlobalParams to a memory-backed Params.
 // TODO error docs
 func FromParams(from protocol.GlobalParams) (*Params, error) {
-
 	var (
 		params EncodableParams
 		err    error
@@ -103,7 +109,15 @@ func FromParams(from protocol.GlobalParams) (*Params, error) {
 	if err != nil {
 		return nil, fmt.Errorf("could not get spork id: %w", err)
 	}
+	params.SporkRootBlockHeight, err = from.SporkRootBlockHeight()
+	if err != nil {
+		return nil, fmt.Errorf("could not get spork root block height: %w", err)
+	}
 	params.ProtocolVersion, err = from.ProtocolVersion()
+	if err != nil {
+		return nil, fmt.Errorf("could not get protocol version: %w", err)
+	}
+	params.EpochCommitSafetyThreshold, err = from.EpochCommitSafetyThreshold()
 	if err != nil {
 		return nil, fmt.Errorf("could not get protocol version: %w", err)
 	}
@@ -117,7 +131,6 @@ func FromParams(from protocol.GlobalParams) (*Params, error) {
 // * protocol.ErrNextEpochNotSetup - if the epoch represents a next epoch which has not been set up.
 // * state.ErrUnknownSnapshotReference - if the epoch is queried from an unresolvable snapshot.
 func FromEpoch(from protocol.Epoch) (*Epoch, error) {
-
 	var (
 		epoch EncodableEpoch
 		err   error
@@ -157,7 +170,7 @@ func FromEpoch(from protocol.Epoch) (*Epoch, error) {
 	// convert dkg
 	dkg, err := from.DKG()
 	// if this epoch hasn't been committed yet, return the epoch as-is
-	if errors.Is(err, protocol.ErrEpochNotCommitted) {
+	if errors.Is(err, protocol.ErrNextEpochNotCommitted) {
 		return &Epoch{epoch}, nil
 	}
 	if err != nil {
@@ -181,6 +194,26 @@ func FromEpoch(from protocol.Epoch) (*Epoch, error) {
 		}
 		epoch.Clusters = append(epoch.Clusters, convertedCluster.enc)
 	}
+
+	// convert height bounds
+	firstHeight, err := from.FirstHeight()
+	if errors.Is(err, protocol.ErrEpochTransitionNotFinalized) {
+		// if this epoch hasn't been started yet, return the epoch as-is
+		return &Epoch{epoch}, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("could not get first height: %w", err)
+	}
+	epoch.FirstHeight = &firstHeight
+	finalHeight, err := from.FinalHeight()
+	if errors.Is(err, protocol.ErrEpochTransitionNotFinalized) {
+		// if this epoch hasn't ended yet, return the epoch as-is
+		return &Epoch{epoch}, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("could not get final height: %w", err)
+	}
+	epoch.FinalHeight = &finalHeight
 
 	return &Epoch{epoch}, nil
 }
@@ -230,19 +263,24 @@ func ClusterFromEncodable(enc EncodableCluster) (*Cluster, error) {
 // root bootstrap state. This is used to bootstrap the protocol state for
 // genesis or post-spork states.
 func SnapshotFromBootstrapState(root *flow.Block, result *flow.ExecutionResult, seal *flow.Seal, qc *flow.QuorumCertificate) (*Snapshot, error) {
-	return SnapshotFromBootstrapStateWithProtocolVersion(root, result, seal, qc, flow.DefaultProtocolVersion)
+	version := flow.DefaultProtocolVersion
+	threshold, err := protocol.DefaultEpochCommitSafetyThreshold(root.Header.ChainID)
+	if err != nil {
+		return nil, fmt.Errorf("could not get default epoch commit safety threshold: %w", err)
+	}
+	return SnapshotFromBootstrapStateWithParams(root, result, seal, qc, version, threshold)
 }
 
-// SnapshotFromBootstrapStateWithProtocolVersion is SnapshotFromBootstrapState
+// SnapshotFromBootstrapStateWithParams is SnapshotFromBootstrapState
 // with a caller-specified protocol version.
-func SnapshotFromBootstrapStateWithProtocolVersion(
+func SnapshotFromBootstrapStateWithParams(
 	root *flow.Block,
 	result *flow.ExecutionResult,
 	seal *flow.Seal,
 	qc *flow.QuorumCertificate,
-	version uint,
+	protocolVersion uint,
+	epochCommitSafetyThreshold uint64,
 ) (*Snapshot, error) {
-
 	setup, ok := result.ServiceEvents[0].Event.(*flow.EpochSetup)
 	if !ok {
 		return nil, fmt.Errorf("invalid setup event type (%T)", result.ServiceEvents[0].Event)
@@ -272,19 +310,20 @@ func SnapshotFromBootstrapStateWithProtocolVersion(
 			return nil, fmt.Errorf("mismatching cluster and qc: %w", err)
 		}
 	}
-
-	current, err := NewCommittedEpoch(setup, commit)
+	encodable, err := FromEpoch(NewStartedEpoch(setup, commit, root.Header.Height))
 	if err != nil {
 		return nil, fmt.Errorf("could not convert epoch: %w", err)
 	}
 	epochs := EncodableEpochs{
-		Current: current.enc,
+		Current: encodable.enc,
 	}
 
 	params := EncodableParams{
-		ChainID:         root.Header.ChainID, // chain ID must match the root block
-		SporkID:         root.ID(),           // use root block ID as the unique spork identifier
-		ProtocolVersion: version,             // major software version for this spork
+		ChainID:                    root.Header.ChainID,        // chain ID must match the root block
+		SporkID:                    root.ID(),                  // use root block ID as the unique spork identifier
+		SporkRootBlockHeight:       root.Header.Height,         // use root block height as the spork root block height
+		ProtocolVersion:            protocolVersion,            // major software version for this spork
+		EpochCommitSafetyThreshold: epochCommitSafetyThreshold, // see protocol.Params for details
 	}
 
 	snap := SnapshotFromEncodable(EncodableSnapshot{
@@ -297,11 +336,13 @@ func SnapshotFromBootstrapStateWithProtocolVersion(
 			ExecutionResults: flow.ExecutionResultList{result},
 			LatestSeals:      map[flow.Identifier]flow.Identifier{root.ID(): seal.ID()},
 			FirstSeal:        seal,
+			ExtraBlocks:      make([]*flow.Block, 0),
 		},
-		QuorumCertificate: qc,
-		Phase:             flow.EpochPhaseStaking,
-		Epochs:            epochs,
-		Params:            params,
+		QuorumCertificate:   qc,
+		Phase:               flow.EpochPhaseStaking,
+		Epochs:              epochs,
+		Params:              params,
+		SealedVersionBeacon: nil,
 	})
 	return snap, nil
 }

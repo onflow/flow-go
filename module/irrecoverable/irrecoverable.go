@@ -40,8 +40,8 @@ func (s *Signaler) Throw(err error) {
 	}
 }
 
-// We define a constrained interface to provide a drop-in replacement for context.Context
-// including in interfaces that compose it.
+// SignalerContext is a constrained interface to provide a drop-in replacement for
+// context.Context including in interfaces that compose it.
 type SignalerContext interface {
 	context.Context
 	Throw(err error) // delegates to the signaler
@@ -56,15 +56,16 @@ type signalerCtx struct {
 
 func (sc signalerCtx) sealed() {}
 
-// the One True Way of getting a SignalerContext
+// WithSignaler is the One True Way of getting a SignalerContext.
 func WithSignaler(parent context.Context) (SignalerContext, <-chan error) {
 	sig, errChan := NewSignaler()
 	return &signalerCtx{parent, sig}, errChan
 }
 
-// If we have an SignalerContext, we can directly ctx.Throw.
+// Throw enables throwing an irrecoverable error using any context.Context.
 //
-// But a lot of library methods expect context.Context, & we want to pass the same w/o boilerplate
+// If we have an SignalerContext, we can directly ctx.Throw.
+// But a lot of library methods expect context.Context, & we want to pass the same w/o boilerplate.
 // Moreover, we could have built with: context.WithCancel(irrecoverable.WithSignaler(ctx, sig)),
 // "downcasting" to context.Context. Yet, we can still type-assert and recover.
 //
@@ -77,4 +78,12 @@ func Throw(ctx context.Context, err error) {
 	}
 	// Be spectacular on how this does not -but should- handle irrecoverables:
 	log.Fatalf("irrecoverable error signaler not found for context, please implement! Unhandled irrecoverable error %v", err)
+}
+
+// WithSignallerAndCancel returns an irrecoverable context, the cancel
+// function for the context, and the error channel for the context.
+func WithSignallerAndCancel(ctx context.Context) (SignalerContext, context.CancelFunc, <-chan error) {
+	parent, cancel := context.WithCancel(ctx)
+	irrecoverableCtx, errCh := WithSignaler(parent)
+	return irrecoverableCtx, cancel, errCh
 }

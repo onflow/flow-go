@@ -8,7 +8,7 @@ import (
 )
 
 func TestPushAndPull(t *testing.T) {
-	queue, err := NewFifoQueue()
+	queue, err := NewFifoQueue(CapacityUnlimited)
 	require.NoError(t, err)
 	for i := 0; i < 10; i++ {
 		queue.Push(i)
@@ -28,7 +28,7 @@ func TestPushAndPull(t *testing.T) {
 }
 
 func TestConcurrentPushPull(t *testing.T) {
-	queue, err := NewFifoQueue()
+	queue, err := NewFifoQueue(CapacityUnlimited)
 	require.NoError(t, err)
 
 	count := 100

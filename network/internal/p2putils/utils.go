@@ -13,15 +13,14 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/keyutils"
-	"github.com/onflow/flow-go/network/p2p/unicast"
+	"github.com/onflow/flow-go/network/p2p/unicast/protocols"
 )
 
 // FlowStream returns the Flow protocol Stream in the connection if one exist, else it returns nil
 func FlowStream(conn network.Conn) network.Stream {
 	for _, s := range conn.GetStreams() {
-		if unicast.IsFlowProtocolStream(s) {
+		if protocols.IsFlowProtocolStream(s) {
 			return s
 		}
 	}
@@ -163,11 +162,4 @@ func IPPortFromMultiAddress(addrs ...multiaddr.Multiaddr) (string, string, error
 		return ipOrHostname, port, nil
 	}
 	return "", "", fmt.Errorf("ip address or hostname not found")
-}
-
-// AllowAllPeerFilter returns a peer filter that does not do any filtering.
-func AllowAllPeerFilter() p2p.PeerFilter {
-	return func(p peer.ID) error {
-		return nil
-	}
 }

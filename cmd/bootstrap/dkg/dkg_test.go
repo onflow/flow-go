@@ -9,17 +9,20 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-func TestRunDKG(t *testing.T) {
-	seedLen := crypto.SeedMinLenDKG
-	_, err := RunDKG(0, unittest.SeedFixtures(2, seedLen))
-	require.EqualError(t, err, "n needs to match the number of seeds (0 != 2)")
+func TestBeaconKG(t *testing.T) {
+	seed := unittest.SeedFixture(2 * crypto.SeedMinLenDKG)
 
-	_, err = RunDKG(3, unittest.SeedFixtures(2, seedLen))
-	require.EqualError(t, err, "n needs to match the number of seeds (3 != 2)")
+	// n = 0
+	_, err := RandomBeaconKG(0, seed)
+	require.EqualError(t, err, "Beacon KeyGen failed: size should be between 2 and 254, got 0")
 
-	data, err := RunDKG(4, unittest.SeedFixtures(4, seedLen))
+	// should work for case n = 1
+	_, err = RandomBeaconKG(1, seed)
 	require.NoError(t, err)
 
+	// n = 4
+	data, err := RandomBeaconKG(4, seed)
+	require.NoError(t, err)
 	require.Len(t, data.PrivKeyShares, 4)
 	require.Len(t, data.PubKeyShares, 4)
 }

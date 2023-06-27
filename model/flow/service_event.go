@@ -10,9 +10,18 @@ import (
 	cborcodec "github.com/onflow/flow-go/model/encoding/cbor"
 )
 
+type ServiceEventType string
+
+// String returns the string representation of the service event type.
+// TODO: this should not be needed. We should use ServiceEventType directly everywhere.
+func (set ServiceEventType) String() string {
+	return string(set)
+}
+
 const (
-	ServiceEventSetup  = "setup"
-	ServiceEventCommit = "commit"
+	ServiceEventSetup         ServiceEventType = "setup"
+	ServiceEventCommit        ServiceEventType = "commit"
+	ServiceEventVersionBeacon ServiceEventType = "version-beacon"
 )
 
 // ServiceEvent represents a service event, which is a special event that when
@@ -23,7 +32,7 @@ const (
 // This type represents a generic service event and primarily exists to simplify
 // encoding and decoding.
 type ServiceEvent struct {
-	Type  string
+	Type  ServiceEventType
 	Event interface{}
 }
 
@@ -38,7 +47,11 @@ func (sel ServiceEventList) EqualTo(other ServiceEventList) (bool, error) {
 	for i, se := range sel {
 		equalTo, err := se.EqualTo(&other[i])
 		if err != nil {
-			return false, fmt.Errorf("error while comparing service event index %d: %w", i, err)
+			return false, fmt.Errorf(
+				"error while comparing service event index %d: %w",
+				i,
+				err,
+			)
 		}
 		if !equalTo {
 			return false, nil
@@ -48,152 +61,121 @@ func (sel ServiceEventList) EqualTo(other ServiceEventList) (bool, error) {
 	return true, nil
 }
 
-func (se *ServiceEvent) UnmarshalJSON(b []byte) error {
+type ServiceEventMarshaller interface {
+	Unmarshal(b []byte) (ServiceEvent, error)
+	UnmarshalWithType(
+		b []byte,
+		eventType ServiceEventType,
+	) (
+		ServiceEvent,
+		error,
+	)
+}
 
+type marshallerImpl struct {
+	MarshalFunc   func(v interface{}) ([]byte, error)
+	UnmarshalFunc func(data []byte, v interface{}) error
+}
+
+var (
+	ServiceEventJSONMarshaller = marshallerImpl{
+		MarshalFunc:   json.Marshal,
+		UnmarshalFunc: json.Unmarshal,
+	}
+	ServiceEventMSGPACKMarshaller = marshallerImpl{
+		MarshalFunc:   msgpack.Marshal,
+		UnmarshalFunc: msgpack.Unmarshal,
+	}
+	ServiceEventCBORMarshaller = marshallerImpl{
+		MarshalFunc:   cborcodec.EncMode.Marshal,
+		UnmarshalFunc: cbor.Unmarshal,
+	}
+)
+
+func (marshaller marshallerImpl) Unmarshal(b []byte) (
+	ServiceEvent,
+	error,
+) {
 	var enc map[string]interface{}
-	err := json.Unmarshal(b, &enc)
+	err := marshaller.UnmarshalFunc(b, &enc)
 	if err != nil {
-		return err
+		return ServiceEvent{}, err
 	}
 
 	tp, ok := enc["Type"].(string)
 	if !ok {
-		return fmt.Errorf("missing type key")
+		return ServiceEvent{}, fmt.Errorf("missing type key")
 	}
 	ev, ok := enc["Event"]
 	if !ok {
-		return fmt.Errorf("missing event key")
+		return ServiceEvent{}, fmt.Errorf("missing event key")
 	}
 
 	// re-marshal the event, we'll unmarshal it into the appropriate type
-	evb, err := json.Marshal(ev)
+	evb, err := marshaller.MarshalFunc(ev)
+	if err != nil {
+		return ServiceEvent{}, err
+	}
+
+	return marshaller.UnmarshalWithType(evb, ServiceEventType(tp))
+}
+
+func (marshaller marshallerImpl) UnmarshalWithType(
+	b []byte,
+	eventType ServiceEventType,
+) (ServiceEvent, error) {
+	var event interface{}
+	switch eventType {
+	case ServiceEventSetup:
+		event = new(EpochSetup)
+	case ServiceEventCommit:
+		event = new(EpochCommit)
+	case ServiceEventVersionBeacon:
+		event = new(VersionBeacon)
+	default:
+		return ServiceEvent{}, fmt.Errorf("invalid type: %s", eventType)
+	}
+
+	err := marshaller.UnmarshalFunc(b, event)
+	if err != nil {
+		return ServiceEvent{},
+			fmt.Errorf(
+				"failed to unmarshal to service event ot type %s: %w",
+				eventType,
+				err,
+			)
+	}
+
+	return ServiceEvent{
+		Type:  eventType,
+		Event: event,
+	}, nil
+}
+
+func (se *ServiceEvent) UnmarshalJSON(b []byte) error {
+	e, err := ServiceEventJSONMarshaller.Unmarshal(b)
 	if err != nil {
 		return err
 	}
-
-	var event interface{}
-	switch tp {
-	case ServiceEventSetup:
-		setup := new(EpochSetup)
-		err = json.Unmarshal(evb, setup)
-		if err != nil {
-			return err
-		}
-		event = setup
-	case ServiceEventCommit:
-		commit := new(EpochCommit)
-		err = json.Unmarshal(evb, commit)
-		if err != nil {
-			return err
-		}
-		event = commit
-	default:
-		return fmt.Errorf("invalid type: %s", tp)
-	}
-
-	*se = ServiceEvent{
-		Type:  tp,
-		Event: event,
-	}
+	*se = e
 	return nil
 }
 
 func (se *ServiceEvent) UnmarshalMsgpack(b []byte) error {
-
-	var enc map[string]interface{}
-	err := msgpack.Unmarshal(b, &enc)
+	e, err := ServiceEventMSGPACKMarshaller.Unmarshal(b)
 	if err != nil {
 		return err
 	}
-
-	tp, ok := enc["Type"].(string)
-	if !ok {
-		return fmt.Errorf("missing type key")
-	}
-	ev, ok := enc["Event"]
-	if !ok {
-		return fmt.Errorf("missing event key")
-	}
-
-	// re-marshal the event, we'll unmarshal it into the appropriate type
-	evb, err := msgpack.Marshal(ev)
-	if err != nil {
-		return err
-	}
-
-	var event interface{}
-	switch tp {
-	case ServiceEventSetup:
-		setup := new(EpochSetup)
-		err = msgpack.Unmarshal(evb, setup)
-		if err != nil {
-			return err
-		}
-		event = setup
-	case ServiceEventCommit:
-		commit := new(EpochCommit)
-		err = msgpack.Unmarshal(evb, commit)
-		if err != nil {
-			return err
-		}
-		event = commit
-	default:
-		return fmt.Errorf("invalid type: %s", tp)
-	}
-
-	*se = ServiceEvent{
-		Type:  tp,
-		Event: event,
-	}
+	*se = e
 	return nil
 }
 
 func (se *ServiceEvent) UnmarshalCBOR(b []byte) error {
-
-	var enc map[string]interface{}
-	err := cbor.Unmarshal(b, &enc)
+	e, err := ServiceEventCBORMarshaller.Unmarshal(b)
 	if err != nil {
 		return err
 	}
-
-	tp, ok := enc["Type"].(string)
-	if !ok {
-		return fmt.Errorf("missing type key")
-	}
-	ev, ok := enc["Event"]
-	if !ok {
-		return fmt.Errorf("missing event key")
-	}
-
-	evb, err := cborcodec.EncMode.Marshal(ev)
-	if err != nil {
-		return err
-	}
-
-	var event interface{}
-	switch tp {
-	case ServiceEventSetup:
-		setup := new(EpochSetup)
-		err = cbor.Unmarshal(evb, setup)
-		if err != nil {
-			return err
-		}
-		event = setup
-	case ServiceEventCommit:
-		commit := new(EpochCommit)
-		err = cbor.Unmarshal(evb, commit)
-		if err != nil {
-			return err
-		}
-		event = commit
-	default:
-		return fmt.Errorf("invalid type: %s", tp)
-	}
-
-	*se = ServiceEvent{
-		Type:  tp,
-		Event: event,
-	}
+	*se = e
 	return nil
 }
 
@@ -205,24 +187,55 @@ func (se *ServiceEvent) EqualTo(other *ServiceEvent) (bool, error) {
 	case ServiceEventSetup:
 		setup, ok := se.Event.(*EpochSetup)
 		if !ok {
-			return false, fmt.Errorf("internal invalid type for ServiceEventSetup: %T", se.Event)
+			return false, fmt.Errorf(
+				"internal invalid type for ServiceEventSetup: %T",
+				se.Event,
+			)
 		}
 		otherSetup, ok := other.Event.(*EpochSetup)
 		if !ok {
-			return false, fmt.Errorf("internal invalid type for ServiceEventSetup: %T", other.Event)
+			return false, fmt.Errorf(
+				"internal invalid type for ServiceEventSetup: %T",
+				other.Event,
+			)
 		}
 		return setup.EqualTo(otherSetup), nil
 
 	case ServiceEventCommit:
 		commit, ok := se.Event.(*EpochCommit)
 		if !ok {
-			return false, fmt.Errorf("internal invalid type for ServiceEventCommit: %T", se.Event)
+			return false, fmt.Errorf(
+				"internal invalid type for ServiceEventCommit: %T",
+				se.Event,
+			)
 		}
 		otherCommit, ok := other.Event.(*EpochCommit)
 		if !ok {
-			return false, fmt.Errorf("internal invalid type for ServiceEventCommit: %T", other.Event)
+			return false, fmt.Errorf(
+				"internal invalid type for ServiceEventCommit: %T",
+				other.Event,
+			)
 		}
 		return commit.EqualTo(otherCommit), nil
+
+	case ServiceEventVersionBeacon:
+		version, ok := se.Event.(*VersionBeacon)
+		if !ok {
+			return false, fmt.Errorf(
+				"internal invalid type for ServiceEventVersionBeacon: %T",
+				se.Event,
+			)
+		}
+		otherVersion, ok := other.Event.(*VersionBeacon)
+		if !ok {
+			return false,
+				fmt.Errorf(
+					"internal invalid type for ServiceEventVersionBeacon: %T",
+					other.Event,
+				)
+		}
+		return version.EqualTo(otherVersion), nil
+
 	default:
 		return false, fmt.Errorf("unknown serice event type: %s", se.Type)
 	}

@@ -2,13 +2,13 @@ package approvals
 
 import (
 	"fmt"
-	"math/rand"
 	"sync"
 	"time"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/mempool"
 	"github.com/onflow/flow-go/storage"
+	"github.com/onflow/flow-go/utils/rand"
 )
 
 /*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -28,30 +28,45 @@ type RequestTrackerItem struct {
 // NewRequestTrackerItem instantiates a new RequestTrackerItem where the
 // NextTimeout is evaluated to the current time plus a random blackout period
 // contained between min and max.
-func NewRequestTrackerItem(blackoutPeriodMin, blackoutPeriodMax int) RequestTrackerItem {
+func NewRequestTrackerItem(blackoutPeriodMin, blackoutPeriodMax int) (RequestTrackerItem, error) {
 	item := RequestTrackerItem{
 		blackoutPeriodMin: blackoutPeriodMin,
 		blackoutPeriodMax: blackoutPeriodMax,
 	}
-	item.NextTimeout = randBlackout(blackoutPeriodMin, blackoutPeriodMax)
-	return item
+	var err error
+	item.NextTimeout, err = randBlackout(blackoutPeriodMin, blackoutPeriodMax)
+	if err != nil {
+		return RequestTrackerItem{}, err
+	}
+
+	return item, err
 }
 
 // Update creates a _new_ RequestTrackerItem with incremented request number and updated NextTimeout.
-func (i RequestTrackerItem) Update() RequestTrackerItem {
+// No errors are expected during normal operation.
+func (i RequestTrackerItem) Update() (RequestTrackerItem, error) {
 	i.Requests++
-	i.NextTimeout = randBlackout(i.blackoutPeriodMin, i.blackoutPeriodMax)
-	return i
+	var err error
+	i.NextTimeout, err = randBlackout(i.blackoutPeriodMin, i.blackoutPeriodMax)
+	if err != nil {
+		return RequestTrackerItem{}, fmt.Errorf("could not get next timeout: %w", err)
+	}
+	return i, nil
 }
 
 func (i RequestTrackerItem) IsBlackout() bool {
 	return time.Now().Before(i.NextTimeout)
 }
 
-func randBlackout(min int, max int) time.Time {
-	blackoutSeconds := rand.Intn(max-min+1) + min
+// No errors are expected during normal operation.
+func randBlackout(min int, max int) (time.Time, error) {
+	random, err := rand.Uint64n(uint64(max - min + 1))
+	if err != nil {
+		return time.Now(), fmt.Errorf("failed to generate blackout: %w", err)
+	}
+	blackoutSeconds := random + uint64(min)
 	blackout := time.Now().Add(time.Duration(blackoutSeconds) * time.Second)
-	return blackout
+	return blackout, nil
 }
 
 /*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -86,17 +101,21 @@ func NewRequestTracker(headers storage.Headers, blackoutPeriodMin, blackoutPerio
 // TryUpdate tries to update tracker item if it's not in blackout period. Returns the tracker item for a specific chunk
 // (creates it if it doesn't exists) and whenever request item was successfully updated or not.
 // Since RequestTracker prunes items by height it can't accept items for height lower than cached lowest height.
-// If height of executed block pointed by execution result is smaller than the lowest height, sentinel mempool.DecreasingPruningHeightError is returned.
+// If height of executed block pointed by execution result is smaller than the lowest height, sentinel mempool.BelowPrunedThresholdError is returned.
 // In case execution result points to unknown executed block exception will be returned.
 func (rt *RequestTracker) TryUpdate(result *flow.ExecutionResult, incorporatedBlockID flow.Identifier, chunkIndex uint64) (RequestTrackerItem, bool, error) {
 	resultID := result.ID()
 	rt.lock.Lock()
 	defer rt.lock.Unlock()
 	item, ok := rt.index[resultID][incorporatedBlockID][chunkIndex]
+	var err error
 
 	if !ok {
-		item = NewRequestTrackerItem(rt.blackoutPeriodMin, rt.blackoutPeriodMax)
-		err := rt.set(resultID, result.BlockID, incorporatedBlockID, chunkIndex, item)
+		item, err = NewRequestTrackerItem(rt.blackoutPeriodMin, rt.blackoutPeriodMax)
+		if err != nil {
+			return item, false, fmt.Errorf("could not create tracker item: %w", err)
+		}
+		err = rt.set(resultID, result.BlockID, incorporatedBlockID, chunkIndex, item)
 		if err != nil {
 			return item, false, fmt.Errorf("could not set created tracker item: %w", err)
 		}
@@ -104,7 +123,10 @@ func (rt *RequestTracker) TryUpdate(result *flow.ExecutionResult, incorporatedBl
 
 	canUpdate := !item.IsBlackout()
 	if canUpdate {
-		item = item.Update()
+		item, err = item.Update()
+		if err != nil {
+			return item, false, fmt.Errorf("could not update tracker item: %w", err)
+		}
 		rt.index[resultID][incorporatedBlockID][chunkIndex] = item
 	}
 
@@ -119,7 +141,7 @@ func (rt *RequestTracker) set(resultID, executedBlockID, incorporatedBlockID flo
 	}
 
 	if executedBlock.Height < rt.lowestHeight {
-		return mempool.NewDecreasingPruningHeightErrorf(
+		return mempool.NewBelowPrunedThresholdErrorf(
 			"adding height: %d, existing height: %d", executedBlock.Height, rt.lowestHeight)
 	}
 
@@ -171,12 +193,12 @@ func (rt *RequestTracker) Remove(resultIDs ...flow.Identifier) {
 // Monotonicity Requirement:
 // The pruned height cannot decrease, as we cannot recover already pruned elements.
 // If `height` is smaller than the previous value, the previous value is kept
-// and the sentinel mempool.DecreasingPruningHeightError is returned.
+// and the sentinel mempool.BelowPrunedThresholdError is returned.
 func (rt *RequestTracker) PruneUpToHeight(height uint64) error {
 	rt.lock.Lock()
 	defer rt.lock.Unlock()
 	if height < rt.lowestHeight {
-		return mempool.NewDecreasingPruningHeightErrorf(
+		return mempool.NewBelowPrunedThresholdErrorf(
 			"pruning height: %d, existing height: %d", height, rt.lowestHeight)
 	}
 

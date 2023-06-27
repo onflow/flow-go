@@ -4,14 +4,13 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/common"
 
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/errors"
-	"github.com/onflow/flow-go/fvm/programs"
-	"github.com/onflow/flow-go/fvm/state"
+	"github.com/onflow/flow-go/fvm/storage"
+	"github.com/onflow/flow-go/fvm/storage/logical"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/hash"
 )
@@ -21,12 +20,6 @@ type ScriptProcedure struct {
 	Script         []byte
 	Arguments      [][]byte
 	RequestContext context.Context
-	Value          cadence.Value
-	Logs           []string
-	Events         []flow.Event
-	GasUsed        uint64
-	MemoryEstimate uint64
-	Err            errors.CodedError
 }
 
 func Script(code []byte) *ScriptProcedure {
@@ -75,18 +68,9 @@ func NewScriptWithContextAndArgs(
 
 func (proc *ScriptProcedure) NewExecutor(
 	ctx Context,
-	txnState *state.TransactionState,
-	derivedTxnData *programs.DerivedTransactionData,
+	txnState storage.TransactionPreparer,
 ) ProcedureExecutor {
-	return newScriptExecutor(ctx, proc, txnState, derivedTxnData)
-}
-
-func (proc *ScriptProcedure) Run(
-	ctx Context,
-	txnState *state.TransactionState,
-	derivedTxnData *programs.DerivedTransactionData,
-) error {
-	return run(proc.NewExecutor(ctx, txnState, derivedTxnData))
+	return newScriptExecutor(ctx, proc, txnState)
 }
 
 func (proc *ScriptProcedure) ComputationLimit(ctx Context) uint64 {
@@ -117,39 +101,43 @@ func (ScriptProcedure) Type() ProcedureType {
 	return ScriptProcedureType
 }
 
-func (proc *ScriptProcedure) InitialSnapshotTime() programs.LogicalTime {
-	return programs.EndOfBlockExecutionTime
-}
-
-func (proc *ScriptProcedure) ExecutionTime() programs.LogicalTime {
-	return programs.EndOfBlockExecutionTime
+func (proc *ScriptProcedure) ExecutionTime() logical.Time {
+	return logical.EndOfBlockExecutionTime
 }
 
 type scriptExecutor struct {
-	proc *ScriptProcedure
-
-	txnState       *state.TransactionState
-	derivedTxnData *programs.DerivedTransactionData
+	ctx      Context
+	proc     *ScriptProcedure
+	txnState storage.TransactionPreparer
 
 	env environment.Environment
+
+	output ProcedureOutput
 }
 
 func newScriptExecutor(
 	ctx Context,
 	proc *ScriptProcedure,
-	txnState *state.TransactionState,
-	derivedTxnData *programs.DerivedTransactionData,
+	txnState storage.TransactionPreparer,
 ) *scriptExecutor {
 	return &scriptExecutor{
-		proc:           proc,
-		txnState:       txnState,
-		derivedTxnData: derivedTxnData,
-		env:            NewScriptEnv(proc.RequestContext, ctx, txnState, derivedTxnData),
+		ctx:      ctx,
+		proc:     proc,
+		txnState: txnState,
+		env: environment.NewScriptEnv(
+			proc.RequestContext,
+			ctx.TracerSpan,
+			ctx.EnvironmentParams,
+			txnState),
 	}
 }
 
 func (executor *scriptExecutor) Cleanup() {
 	// Do nothing.
+}
+
+func (executor *scriptExecutor) Output() ProcedureOutput {
+	return executor.output
 }
 
 func (executor *scriptExecutor) Preprocess() error {
@@ -161,7 +149,7 @@ func (executor *scriptExecutor) Execute() error {
 	err := executor.execute()
 	txError, failure := errors.SplitErrorTypes(err)
 	if failure != nil {
-		if errors.IsALedgerFailure(failure) {
+		if errors.IsLedgerFailure(failure) {
 			return fmt.Errorf(
 				"cannot execute the script, this error usually happens if "+
 					"the reference block for this script is not set to a "+
@@ -171,13 +159,37 @@ func (executor *scriptExecutor) Execute() error {
 		return failure
 	}
 	if txError != nil {
-		executor.proc.Err = txError
+		executor.output.Err = txError
 	}
 
 	return nil
 }
 
 func (executor *scriptExecutor) execute() error {
+	meterParams, err := getBodyMeterParameters(
+		executor.ctx,
+		executor.proc,
+		executor.txnState)
+	if err != nil {
+		return fmt.Errorf("error getting meter parameters: %w", err)
+	}
+
+	txnId, err := executor.txnState.BeginNestedTransactionWithMeterParams(
+		meterParams)
+	if err != nil {
+		return err
+	}
+
+	errs := errors.NewErrorsCollector()
+	errs.Collect(executor.executeScript())
+
+	_, err = executor.txnState.CommitNestedTransaction(txnId)
+	errs.Collect(err)
+
+	return errs.ErrorOrNil()
+}
+
+func (executor *scriptExecutor) executeScript() error {
 	rt := executor.env.BorrowCadenceRuntime()
 	defer executor.env.ReturnCadenceRuntime(rt)
 
@@ -187,15 +199,10 @@ func (executor *scriptExecutor) execute() error {
 			Arguments: executor.proc.Arguments,
 		},
 		common.ScriptLocation(executor.proc.ID))
-
 	if err != nil {
 		return err
 	}
 
-	executor.proc.Value = value
-	executor.proc.Logs = executor.env.Logs()
-	executor.proc.Events = executor.env.Events()
-	executor.proc.GasUsed = executor.env.ComputationUsed()
-	executor.proc.MemoryEstimate = executor.env.MemoryEstimate()
-	return nil
+	executor.output.Value = value
+	return executor.output.PopulateEnvironmentValues(executor.env)
 }

@@ -2,11 +2,11 @@ package checkpoint_collect_stats
 
 import (
 	"bufio"
-	"bytes"
 	"encoding/json"
 	"math"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/montanaflynn/stats"
 	"github.com/pkg/profile"
@@ -17,11 +17,11 @@ import (
 
 	"github.com/onflow/atree"
 
-	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/pathfinder"
 	"github.com/onflow/flow-go/ledger/complete"
 	"github.com/onflow/flow-go/ledger/complete/wal"
+	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/utils/debug"
 )
@@ -227,9 +227,9 @@ func getType(key ledger.Key) string {
 		return "account's cadence public domain map"
 	case "contract":
 		return "account's cadence contract domain map"
-	case state.ContractNamesKey:
+	case flow.ContractNamesKey:
 		return "contract names"
-	case state.AccountStatusKey:
+	case flow.AccountStatusKey:
 		return "account status"
 	case "uuid":
 		return "uuid generator state"
@@ -237,10 +237,10 @@ func getType(key ledger.Key) string {
 		return "address generator state"
 	}
 	// other fvm registers
-	if bytes.HasPrefix(k, []byte("public_key_")) {
+	if strings.HasPrefix(kstr, "public_key_") {
 		return "public key"
 	}
-	if bytes.HasPrefix(k, []byte(state.CodeKeyPrefix)) {
+	if strings.HasPrefix(kstr, flow.CodeKeyPrefix) {
 		return "contract content"
 	}
 	return "others"

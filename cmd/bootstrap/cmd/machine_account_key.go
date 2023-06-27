@@ -4,8 +4,9 @@ import (
 	"fmt"
 	"path"
 
-	"github.com/onflow/flow-go/cmd/bootstrap/utils"
 	"github.com/onflow/flow-go/crypto"
+
+	"github.com/onflow/flow-go/cmd/bootstrap/utils"
 
 	"github.com/spf13/cobra"
 
@@ -24,7 +25,7 @@ var machineAccountKeyCmd = &cobra.Command{
 func init() {
 	rootCmd.AddCommand(machineAccountKeyCmd)
 
-	machineAccountKeyCmd.Flags().BytesHexVar(&flagMachineSeed, "seed", GenerateRandomSeed(crypto.KeyGenSeedMinLenECDSAP256), fmt.Sprintf("hex encoded machine account seed (min %d bytes)", crypto.KeyGenSeedMinLenECDSAP256))
+	machineAccountKeyCmd.Flags().BytesHexVar(&flagMachineSeed, "seed", GenerateRandomSeed(crypto.KeyGenSeedMinLen), fmt.Sprintf("hex encoded machine account seed (min %d bytes)", crypto.KeyGenSeedMinLen))
 }
 
 // machineAccountKeyRun generate a machine account key and writes it to a default file path.

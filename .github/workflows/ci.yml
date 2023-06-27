@@ -10,7 +10,7 @@ on:
       - 'v[0-9]+.[0-9]+'
   pull_request:
     branches:
-      - master
+      - master*
       - 'auto-cadence-upgrade/**'
       - 'feature/**'
       - 'v[0-9]+.[0-9]+'
@@ -115,19 +115,18 @@ jobs:
       with:
         go-version: ${{ env.GO_VERSION }}
         cache: true
+    - name: Setup tests (${{ matrix.targets.name }}
+      run: VERBOSE=1 make -e GO_TEST_PACKAGES="${{ matrix.targets.packages }}" install-tools
     - name: Run tests (${{ matrix.targets.name }})
-      if: github.actor != 'bors[bot]'
-      run: make -e GO_TEST_PACKAGES="${{ matrix.targets.packages }}" ci
-      # TODO(rbtz): re-enable when we fix exisiting races.
-      #env:
-      #  RACE_DETECTOR: 1
-    - name: Run tests (Bors)
-      if: github.actor == 'bors[bot]'
-      uses: nick-invision/retry@v2
+      uses: nick-fields/retry@v2
       with:
         timeout_minutes: 25
         max_attempts: 3
-        command: make -e GO_TEST_PACKAGES="${{ matrix.targets.packages }}" ci
+        command: VERBOSE=1 make -e GO_TEST_PACKAGES="${{ matrix.targets.packages }}" test
+
+      # TODO(rbtz): re-enable when we fix exisiting races.
+      #env:
+      #  RACE_DETECTOR: 1
     - name: Upload coverage report
       uses: codecov/codecov-action@v3
       with:
@@ -150,7 +149,7 @@ jobs:
             make1: install-tools
             make2: test
             retries: 3
-            race: 1
+            race: 0
           - name: integration
             make1: install-tools
             make2: test
@@ -165,23 +164,17 @@ jobs:
         with:
           go-version: ${{ env.GO_VERSION }}
           cache: true
+      - name: Setup tests (${{ matrix.name }})
+        run: make ${{ matrix.make1 }}
       - name: Run tests (${{ matrix.name }})
-        if: github.actor != 'bors[bot]'
         env:
           RACE_DETECTOR: ${{ matrix.race }}
-        # run `make1` target before running `make2` target inside each module's root
-        run: |
-          make ${{ matrix.make1 }}
-          make -C ${{ matrix.name }} ${{ matrix.make2 }}
-      - name: Run tests (Bors)
-        if: github.actor == 'bors[bot]'
-        uses: nick-invision/retry@v2
+        uses: nick-fields/retry@v2
         with:
           timeout_minutes: 25
           max_attempts: ${{ matrix.retries }}
-          command: |
-            make ${{ matrix.make1 }}
-            make -C ${{ matrix.name }} ${{ matrix.make2 }}
+          # run `make2` target inside each module's root
+          command: VERBOSE=1 make -C ${{ matrix.name }} ${{ matrix.make2 }}
       - name: Upload coverage report
         uses: codecov/codecov-action@v3
         with:
@@ -205,6 +198,7 @@ jobs:
           - make -C integration mvp-tests
           - make -C integration network-tests
           - make -C integration verification-tests
+          - make -C integration upgrades-tests
     runs-on: ubuntu-latest
     steps:
     - name: Checkout repo
@@ -217,20 +211,16 @@ jobs:
     - name: Build relic
       run: make crypto_setup_gopath
     - name: Docker build
-      run: make docker-build-flow
+      run: make docker-build-flow docker-build-flow-corrupt
     - name: Run tests
-      if: github.actor != 'bors[bot]'
-      run: ${{ matrix.make }}
       # TODO(rbtz): re-enable when we fix exisiting races.
       #env:
       #  RACE_DETECTOR: 1
-    - name: Run tests (Bors)
-      if: github.actor == 'bors[bot]'
-      uses: nick-invision/retry@v2
+      uses: nick-fields/retry@v2
       with:
-        timeout_minutes: 15
-        max_attempts: 2
-        command: ${{ matrix.make }}
+        timeout_minutes: 25
+        max_attempts: 3
+        command: VERBOSE=1 ${{ matrix.make }}
 
   localnet-test:
     name: Localnet Compatibility Tests With Flow-CLI Client and Observer
@@ -251,9 +241,9 @@ jobs:
       # This proved to be more reliable than installing it locally.
       run: cd integration/localnet && sh client/client.sh
     - name: Set up Localnet
-      run: bash -c 'cd integration/localnet/ && make -e OBSERVER=2 init && make start'
+      run: bash -c 'cd integration/localnet/ && make -e OBSERVER=2 bootstrap && make start-flow'
     - name: Ensure Observer is started
-      run: docker ps -f name=localnet_observer_1_1 | grep localnet_observer
+      run: docker ps -f name=localnet-observer_1-1 | grep localnet-observer
     - name: Get Client Version ensuring the client is provisioned
       run: docker run --network host localnet-client /go/flow -f /go/flow-localnet.json -n observer version
     - name: Wait for a default waiting period until a clean state

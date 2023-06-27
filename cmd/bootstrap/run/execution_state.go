@@ -32,7 +32,6 @@ func GenerateServiceAccountPrivateKey(seed []byte) (flow.AccountPrivateKey, erro
 	}, nil
 }
 
-// NOTE: this is now unused and should become part of another tool.
 func GenerateExecutionState(
 	dbDir string,
 	accountKey flow.AccountPublicKey,

@@ -18,6 +18,7 @@ func TestGenerateBootstrap_DataTable(t *testing.T) {
 			bootstrapPath:  filepath.Join(BootstrapPath, "root-protocol-state-snapshot1.json"),
 			expectedOutput: filepath.Join(ExpectedOutputPath, "template-data-input1.json"),
 			dockerTag:      "v0.27.6",
+			dockerRegistry: "gcr.io/flow-container-registry/",
 		},
 	}
 
@@ -25,7 +26,7 @@ func TestGenerateBootstrap_DataTable(t *testing.T) {
 		t.Run(i, func(t *testing.T) {
 			// generate template data file from bootstrap file
 			bootstrap := NewBootstrap(testData.bootstrapPath)
-			actualNodeData := bootstrap.GenTemplateData(false, testData.dockerTag)
+			actualNodeData := bootstrap.GenTemplateData(false, testData.dockerTag, testData.dockerRegistry)
 
 			// load expected template data file
 			var expectedNodeData []NodeData
@@ -45,4 +46,5 @@ type testData struct {
 	bootstrapPath  string
 	expectedOutput string
 	dockerTag      string
+	dockerRegistry string
 }

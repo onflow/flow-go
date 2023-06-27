@@ -37,18 +37,25 @@ type State interface {
 	AtBlockID(blockID flow.Identifier) Snapshot
 }
 
-type MutableState interface {
+// FollowerState is a mutable protocol state used by nodes following main consensus (ie. non-consensus nodes).
+// All blocks must have a certifying QC when being added to the state to guarantee they are valid,
+// so there is a one-block lag between block production and incorporation into the FollowerState.
+// However, since all blocks are certified upon insertion, they are immediately processable by other components.
+type FollowerState interface {
 	State
-	// Extend introduces the block with the given ID into the persistent
-	// protocol state without modifying the current finalized state. It allows
-	// us to execute fork-aware queries against ambiguous protocol state, while
-	// still checking that the given block is a valid extension of the protocol
-	// state. Depending on implementation it might be a lighter version that checks only
-	// block header.
-	// Expected errors during normal operations:
-	//  * state.OutdatedExtensionError if the candidate block is outdated (e.g. orphaned)
-	//  * state.InvalidExtensionError if the candidate block is invalid
-	Extend(ctx context.Context, candidate *flow.Block) error
+
+	// ExtendCertified introduces the block with the given ID into the persistent
+	// protocol state without modifying the current finalized state. It allows us
+	// to execute fork-aware queries against the known protocol state. The caller
+	// must pass a QC for candidate block to prove that the candidate block has
+	// been certified, and it's safe to add it to the protocol state. The QC
+	// cannot be nil and must certify candidate block:
+	//   candidate.View == qc.View && candidate.BlockID == qc.BlockID
+	// The `candidate` block and its QC _must be valid_ (otherwise, the state will
+	// be corrupted). ExtendCertified inserts any given block, as long as its
+	// parent is already in the protocol state. Also orphaned blocks are excepted.
+	// No errors are expected during normal operations.
+	ExtendCertified(ctx context.Context, candidate *flow.Block, qc *flow.QuorumCertificate) error
 
 	// Finalize finalizes the block with the given hash.
 	// At this level, we can only finalize one block at a time. This implies
@@ -56,14 +63,22 @@ type MutableState interface {
 	// to be the last finalized block.
 	// It modifies the persistent immutable protocol state accordingly and
 	// forwards the pointer to the latest finalized state.
-	// TODO error docs
+	// No errors are expected during normal operations.
 	Finalize(ctx context.Context, blockID flow.Identifier) error
+}
 
-	// MarkValid marks the block header with the given block hash as valid.
-	// At this level, we can only mark one block at a time as valid. This
-	// implies that the parent of the block to be marked as valid
-	// has to be already valid.
-	// It modifies the persistent immutable protocol state accordingly.
-	// TODO error docs
-	MarkValid(blockID flow.Identifier) error
+// ParticipantState is a mutable protocol state used by active consensus participants (consensus nodes).
+// All blocks are validated in full, including payload validation, prior to insertion. Only valid blocks are inserted.
+type ParticipantState interface {
+	FollowerState
+
+	// Extend introduces the block with the given ID into the persistent
+	// protocol state without modifying the current finalized state. It allows
+	// us to execute fork-aware queries against ambiguous protocol state, while
+	// still checking that the given block is a valid extension of the protocol state.
+	// The candidate block must have passed HotStuff validation before being passed to Extend.
+	// Expected errors during normal operations:
+	//  * state.OutdatedExtensionError if the candidate block is outdated (e.g. orphaned)
+	//  * state.InvalidExtensionError if the candidate block is invalid
+	Extend(ctx context.Context, candidate *flow.Block) error
 }

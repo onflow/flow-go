@@ -29,7 +29,7 @@ type ConduitFactory interface {
 // a network-agnostic way. In the background, the network layer connects all
 // engines with the same ID over a shared bus, accessible through the conduit.
 type Conduit interface {
-
+	MisbehaviorReporter
 	// Publish submits an event to the network layer for unreliable delivery
 	// to subscribers of the given event on the network layer. It uses a
 	// publish-subscribe layer and can thus not guarantee that the specified

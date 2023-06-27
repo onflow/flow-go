@@ -34,32 +34,29 @@ func IsUnknownExecutionResultError(err error) bool {
 	return errors.As(err, &unknownExecutionResultError)
 }
 
-// DecreasingPruningHeightError indicates that we are pruning a mempool by a height that
-// is lower than existing height
-type DecreasingPruningHeightError struct {
+// BelowPrunedThresholdError indicates that we are attempting to query or prune a mempool by a
+// key (typically block height or block view) which is lower than the lowest retained key threshold.
+// In other words, we have already pruned above the specified key value.
+type BelowPrunedThresholdError struct {
 	err error
 }
 
-func NewDecreasingPruningHeightError(msg string) error {
-	return NewDecreasingPruningHeightErrorf(msg)
-}
-
-func NewDecreasingPruningHeightErrorf(msg string, args ...interface{}) error {
-	return DecreasingPruningHeightError{
+func NewBelowPrunedThresholdErrorf(msg string, args ...interface{}) error {
+	return BelowPrunedThresholdError{
 		err: fmt.Errorf(msg, args...),
 	}
 }
 
-func (e DecreasingPruningHeightError) Unwrap() error {
+func (e BelowPrunedThresholdError) Unwrap() error {
 	return e.err
 }
 
-func (e DecreasingPruningHeightError) Error() string {
+func (e BelowPrunedThresholdError) Error() string {
 	return e.err.Error()
 }
 
-// IsDecreasingPruningHeightError returns whether the given error is an DecreasingPruningHeightError error
-func IsDecreasingPruningHeightError(err error) bool {
-	var newIsDecreasingPruningHeightError DecreasingPruningHeightError
-	return errors.As(err, &newIsDecreasingPruningHeightError)
+// IsBelowPrunedThresholdError returns whether the given error is an BelowPrunedThresholdError error
+func IsBelowPrunedThresholdError(err error) bool {
+	var newIsBelowPrunedThresholdError BelowPrunedThresholdError
+	return errors.As(err, &newIsBelowPrunedThresholdError)
 }

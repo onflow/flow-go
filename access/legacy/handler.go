@@ -66,7 +66,7 @@ func (h *Handler) GetLatestBlockHeader(
 	ctx context.Context,
 	req *accessproto.GetLatestBlockHeaderRequest,
 ) (*accessproto.BlockHeaderResponse, error) {
-	header, err := h.api.GetLatestBlockHeader(ctx, req.GetIsSealed())
+	header, _, err := h.api.GetLatestBlockHeader(ctx, req.GetIsSealed())
 	if err != nil {
 		return nil, err
 	}
@@ -79,7 +79,7 @@ func (h *Handler) GetBlockHeaderByHeight(
 	ctx context.Context,
 	req *accessproto.GetBlockHeaderByHeightRequest,
 ) (*accessproto.BlockHeaderResponse, error) {
-	header, err := h.api.GetBlockHeaderByHeight(ctx, req.GetHeight())
+	header, _, err := h.api.GetBlockHeaderByHeight(ctx, req.GetHeight())
 	if err != nil {
 		return nil, err
 	}
@@ -94,7 +94,7 @@ func (h *Handler) GetBlockHeaderByID(
 ) (*accessproto.BlockHeaderResponse, error) {
 	blockID := convert.MessageToIdentifier(req.GetId())
 
-	header, err := h.api.GetBlockHeaderByID(ctx, blockID)
+	header, _, err := h.api.GetBlockHeaderByID(ctx, blockID)
 	if err != nil {
 		return nil, err
 	}
@@ -107,7 +107,7 @@ func (h *Handler) GetLatestBlock(
 	ctx context.Context,
 	req *accessproto.GetLatestBlockRequest,
 ) (*accessproto.BlockResponse, error) {
-	block, err := h.api.GetLatestBlock(ctx, req.GetIsSealed())
+	block, _, err := h.api.GetLatestBlock(ctx, req.GetIsSealed())
 	if err != nil {
 		return nil, err
 	}
@@ -120,7 +120,7 @@ func (h *Handler) GetBlockByHeight(
 	ctx context.Context,
 	req *accessproto.GetBlockByHeightRequest,
 ) (*accessproto.BlockResponse, error) {
-	block, err := h.api.GetBlockByHeight(ctx, req.GetHeight())
+	block, _, err := h.api.GetBlockByHeight(ctx, req.GetHeight())
 	if err != nil {
 		return nil, err
 	}
@@ -135,7 +135,7 @@ func (h *Handler) GetBlockByID(
 ) (*accessproto.BlockResponse, error) {
 	blockID := convert.MessageToIdentifier(req.GetId())
 
-	block, err := h.api.GetBlockByID(ctx, blockID)
+	block, _, err := h.api.GetBlockByID(ctx, blockID)
 	if err != nil {
 		return nil, err
 	}
@@ -189,7 +189,7 @@ func (h *Handler) GetTransactionResult(
 ) (*accessproto.TransactionResultResponse, error) {
 	id := convert.MessageToIdentifier(req.GetId())
 
-	result, err := h.api.GetTransactionResult(ctx, id)
+	result, err := h.api.GetTransactionResult(ctx, id, flow.ZeroID, flow.ZeroID)
 	if err != nil {
 		return nil, err
 	}

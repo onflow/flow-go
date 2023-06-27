@@ -4,7 +4,7 @@
 package crypto
 
 import (
-	"crypto/rand"
+	crand "crypto/rand"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -13,15 +13,15 @@ import (
 
 func TestSPOCKProveVerifyAgainstData(t *testing.T) {
 	// test the consistency with different data
-	seed := make([]byte, KeyGenSeedMinLenBLSBLS12381)
+	seed := make([]byte, KeyGenSeedMinLen)
 	data := make([]byte, 100)
 
-	n, err := rand.Read(seed)
-	require.Equal(t, n, KeyGenSeedMinLenBLSBLS12381)
+	n, err := crand.Read(seed)
+	require.Equal(t, n, KeyGenSeedMinLen)
 	require.NoError(t, err)
 	sk, err := GeneratePrivateKey(BLSBLS12381, seed)
 	require.NoError(t, err)
-	_, err = rand.Read(data)
+	_, err = crand.Read(data)
 	require.NoError(t, err)
 
 	// generate a SPoCK proof
@@ -72,8 +72,7 @@ func TestSPOCKProveVerifyAgainstData(t *testing.T) {
 	t.Run("identity proof", func(t *testing.T) {
 		// verifying with a pair of (proof, publicKey) equal to (identity_signature, identity_key) should
 		// return false
-		identityProof := make([]byte, signatureLengthBLSBLS12381)
-		identityProof[0] = identityBLSSignatureHeader
+		identityProof := identityBLSSignature
 		result, err := SPOCKVerifyAgainstData(IdentityBLSPublicKey(), identityProof, data, kmac)
 		assert.NoError(t, err)
 		assert.False(t, result)
@@ -83,22 +82,22 @@ func TestSPOCKProveVerifyAgainstData(t *testing.T) {
 // tests of happy and unhappy paths of SPOCKVerify
 func TestSPOCKProveVerify(t *testing.T) {
 	// test the consistency with different data
-	seed1 := make([]byte, KeyGenSeedMinLenBLSBLS12381)
-	seed2 := make([]byte, KeyGenSeedMinLenBLSBLS12381)
+	seed1 := make([]byte, KeyGenSeedMinLen)
+	seed2 := make([]byte, KeyGenSeedMinLen)
 	data := make([]byte, 100)
 
 	// data
-	_, err := rand.Read(data)
+	_, err := crand.Read(data)
 	require.NoError(t, err)
 	// sk1
-	n, err := rand.Read(seed1)
-	require.Equal(t, n, KeyGenSeedMinLenBLSBLS12381)
+	n, err := crand.Read(seed1)
+	require.Equal(t, n, KeyGenSeedMinLen)
 	require.NoError(t, err)
 	sk1, err := GeneratePrivateKey(BLSBLS12381, seed1)
 	require.NoError(t, err)
 	// sk2
-	n, err = rand.Read(seed2)
-	require.Equal(t, n, KeyGenSeedMinLenBLSBLS12381)
+	n, err = crand.Read(seed2)
+	require.Equal(t, n, KeyGenSeedMinLen)
 	require.NoError(t, err)
 	sk2, err := GeneratePrivateKey(BLSBLS12381, seed2)
 	require.NoError(t, err)
@@ -170,8 +169,7 @@ func TestSPOCKProveVerify(t *testing.T) {
 	t.Run("identity proof", func(t *testing.T) {
 		// verifying with either pair of (proof, publicKey) equal to (identity_signature, identity_key) should
 		// return falsen with any other (proof, key) pair.
-		identityProof := make([]byte, signatureLengthBLSBLS12381)
-		identityProof[0] = identityBLSSignatureHeader
+		identityProof := identityBLSSignature
 		result, err := SPOCKVerify(IdentityBLSPublicKey(), identityProof, sk2.PublicKey(), pr2)
 		assert.NoError(t, err)
 		assert.False(t, result)

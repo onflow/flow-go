@@ -86,9 +86,3 @@ func (t Transactions) Size() uint {
 func (t *Transactions) Remove(id flow.Identifier) bool {
 	return t.c.Remove(id)
 }
-
-// Hash will return a fingerprint hash representing the contents of the
-// entire memory pool.
-func (t Transactions) Hash() flow.Identifier {
-	return t.c.Hash()
-}

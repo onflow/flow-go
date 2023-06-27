@@ -11,8 +11,8 @@ type Spock []byte
 // ExecutionReceipt is the full execution receipt, as sent by the Execution Node.
 // Specifically, it contains the detailed execution result.
 type ExecutionReceipt struct {
-	ExecutorID        Identifier
-	ExecutionResult   ExecutionResult
+	ExecutorID Identifier
+	ExecutionResult
 	Spocks            []crypto.Signature
 	ExecutorSignature crypto.Signature
 }

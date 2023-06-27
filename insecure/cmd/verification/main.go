@@ -11,15 +11,17 @@ func main() {
 	corruptedVerificationBuilder := cmd.NewVerificationNodeBuilder(corruptedBuilder.FlowNodeBuilder)
 	corruptedVerificationBuilder.LoadFlags()
 
+	corruptedBuilder.LoadCorruptFlags()
+
 	if err := corruptedBuilder.Initialize(); err != nil {
-		corruptedVerificationBuilder.FlowNodeBuilder.Logger.Fatal().Err(err).Send()
+		corruptedVerificationBuilder.Logger.Fatal().Err(err).Send()
 	}
 
 	corruptedVerificationBuilder.LoadComponentsAndModules()
 
 	node, err := corruptedVerificationBuilder.FlowNodeBuilder.Build()
 	if err != nil {
-		corruptedVerificationBuilder.FlowNodeBuilder.Logger.Fatal().Err(err).Send()
+		corruptedVerificationBuilder.Logger.Fatal().Err(err).Send()
 	}
 	node.Run()
 }

@@ -41,32 +41,9 @@ func NewAccountPublicKeyNotFoundError(
 		keyIndex)
 }
 
-// IsAccountAccountPublicKeyNotFoundError returns true if error has this type
-func IsAccountAccountPublicKeyNotFoundError(err error) bool {
+// IsAccountPublicKeyNotFoundError returns true if error has this type
+func IsAccountPublicKeyNotFoundError(err error) bool {
 	return HasErrorCode(err, ErrCodeAccountPublicKeyNotFoundError)
-}
-
-// FrozenAccountError is returned when a frozen account signs a transaction
-type FrozenAccountError struct {
-	address flow.Address
-
-	CodedError
-}
-
-// NewFrozenAccountError constructs a new FrozenAccountError
-func NewFrozenAccountError(address flow.Address) CodedError {
-	return FrozenAccountError{
-		address: address,
-		CodedError: NewCodedError(
-			ErrCodeFrozenAccountError,
-			"account %s is frozen",
-			address),
-	}
-}
-
-// Address returns the address of frozen account
-func (e FrozenAccountError) Address() flow.Address {
-	return e.address
 }
 
 // NewAccountPublicKeyLimitError constructs a new CodedError.  It is returned

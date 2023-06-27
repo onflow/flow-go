@@ -10,13 +10,16 @@ import (
 	"github.com/spf13/pflag"
 
 	"github.com/onflow/flow-go/engine/common/provider"
+	"github.com/onflow/flow-go/engine/execution/computation/query"
 	exeprovider "github.com/onflow/flow-go/engine/execution/provider"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/mempool"
+	"github.com/onflow/flow-go/utils/grpcutils"
 
 	"github.com/onflow/flow-go/engine/execution/computation"
+	"github.com/onflow/flow-go/engine/execution/ingestion/stop"
 	"github.com/onflow/flow-go/engine/execution/rpc"
-	"github.com/onflow/flow-go/fvm/programs"
+	"github.com/onflow/flow-go/fvm/storage/derived"
 	storage "github.com/onflow/flow-go/storage/badger"
 )
 
@@ -29,15 +32,9 @@ type ExecutionConfig struct {
 	transactionResultsCacheSize          uint
 	checkpointDistance                   uint
 	checkpointsToKeep                    uint
-	outputCheckpointV5                   bool
-	stateDeltasLimit                     uint
 	chunkDataPackCacheSize               uint
 	chunkDataPackRequestsCacheSize       uint32
 	requestInterval                      time.Duration
-	preferredExeNodeIDStr                string
-	syncByBlocks                         bool
-	syncFast                             bool
-	syncThreshold                        int
 	extensiveLog                         bool
 	pauseExecution                       bool
 	chunkDataPackQueryTimeout            time.Duration
@@ -53,6 +50,7 @@ type ExecutionConfig struct {
 	blobstoreRateLimit                   int
 	blobstoreBurstLimit                  int
 	chunkDataPackRequestWorkers          uint
+	maxGracefulStopDuration              time.Duration
 
 	computationConfig        computation.ComputationConfig
 	receiptRequestWorkers    uint   // common provider engine workers
@@ -64,34 +62,28 @@ func (exeConf *ExecutionConfig) SetupFlags(flags *pflag.FlagSet) {
 	datadir := filepath.Join(homedir, ".flow", "execution")
 
 	flags.StringVarP(&exeConf.rpcConf.ListenAddr, "rpc-addr", "i", "localhost:9000", "the address the gRPC server listens on")
+	flags.UintVar(&exeConf.rpcConf.MaxMsgSize, "rpc-max-message-size", grpcutils.DefaultMaxMsgSize, "the maximum message size in bytes for messages sent or received over grpc")
 	flags.BoolVar(&exeConf.rpcConf.RpcMetricsEnabled, "rpc-metrics-enabled", false, "whether to enable the rpc metrics")
 	flags.StringVar(&exeConf.triedir, "triedir", datadir, "directory to store the execution State")
 	flags.StringVar(&exeConf.executionDataDir, "execution-data-dir", filepath.Join(homedir, ".flow", "execution_data"), "directory to use for storing Execution Data")
 	flags.Uint32Var(&exeConf.mTrieCacheSize, "mtrie-cache-size", 500, "cache size for MTrie")
 	flags.UintVar(&exeConf.checkpointDistance, "checkpoint-distance", 20, "number of WAL segments between checkpoints")
 	flags.UintVar(&exeConf.checkpointsToKeep, "checkpoints-to-keep", 5, "number of recent checkpoints to keep (0 to keep all)")
-	flags.BoolVar(&exeConf.outputCheckpointV5, "outputCheckpointV5", false, "output checkpoint file in v5")
-	flags.UintVar(&exeConf.stateDeltasLimit, "state-deltas-limit", 100, "maximum number of state deltas in the memory pool")
-	flags.UintVar(&exeConf.computationConfig.DerivedDataCacheSize, "cadence-execution-cache", programs.DefaultDerivedDataCacheSize,
+	flags.UintVar(&exeConf.computationConfig.DerivedDataCacheSize, "cadence-execution-cache", derived.DefaultDerivedDataCacheSize,
 		"cache size for Cadence execution")
 	flags.BoolVar(&exeConf.computationConfig.ExtensiveTracing, "extensive-tracing", false, "adds high-overhead tracing to execution")
 	flags.BoolVar(&exeConf.computationConfig.CadenceTracing, "cadence-tracing", false, "enables cadence runtime level tracing")
+	flags.IntVar(&exeConf.computationConfig.MaxConcurrency, "computer-max-concurrency", 1, "set to greater than 1 to enable concurrent transaction execution")
 	flags.UintVar(&exeConf.chunkDataPackCacheSize, "chdp-cache", storage.DefaultCacheSize, "cache size for chunk data packs")
 	flags.Uint32Var(&exeConf.chunkDataPackRequestsCacheSize, "chdp-request-queue", mempool.DefaultChunkDataPackRequestQueueSize, "queue size for chunk data pack requests")
 	flags.DurationVar(&exeConf.requestInterval, "request-interval", 60*time.Second, "the interval between requests for the requester engine")
 	flags.Uint32Var(&exeConf.receiptRequestsCacheSize, "receipt-request-cache", provider.DefaultEntityRequestCacheSize, "queue size for entity requests at common provider engine")
 	flags.UintVar(&exeConf.receiptRequestWorkers, "receipt-request-workers", provider.DefaultRequestProviderWorkers, "number of workers for entity requests at common provider engine")
-	flags.DurationVar(&exeConf.computationConfig.ScriptLogThreshold, "script-log-threshold", computation.DefaultScriptLogThreshold,
+	flags.DurationVar(&exeConf.computationConfig.QueryConfig.LogTimeThreshold, "script-log-threshold", query.DefaultLogTimeThreshold,
 		"threshold for logging script execution")
-	flags.DurationVar(&exeConf.computationConfig.ScriptExecutionTimeLimit, "script-execution-time-limit", computation.DefaultScriptExecutionTimeLimit,
+	flags.DurationVar(&exeConf.computationConfig.QueryConfig.ExecutionTimeLimit, "script-execution-time-limit", query.DefaultExecutionTimeLimit,
 		"script execution time limit")
-	flags.StringVar(&exeConf.preferredExeNodeIDStr, "preferred-exe-node-id", "", "node ID for preferred execution node used for state sync")
 	flags.UintVar(&exeConf.transactionResultsCacheSize, "transaction-results-cache-size", 10000, "number of transaction results to be cached")
-	flags.BoolVar(&exeConf.syncByBlocks, "sync-by-blocks", true, "deprecated, sync by blocks instead of execution state deltas")
-	flags.BoolVar(&exeConf.syncFast, "sync-fast", false, "fast sync allows execution node to skip fetching collection during state syncing,"+
-		" and rely on state syncing to catch up")
-	flags.IntVar(&exeConf.syncThreshold, "sync-threshold", 100,
-		"the maximum number of sealed and unexecuted blocks before triggering state syncing")
 	flags.BoolVar(&exeConf.extensiveLog, "extensive-logging", false, "extensive logging logs tx contents and block headers")
 	flags.DurationVar(&exeConf.chunkDataPackQueryTimeout, "chunk-data-pack-query-timeout", exeprovider.DefaultChunkDataPackQueryTimeout, "timeout duration to determine a chunk data pack query being slow")
 	flags.DurationVar(&exeConf.chunkDataPackDeliveryTimeout, "chunk-data-pack-delivery-timeout", exeprovider.DefaultChunkDataPackDeliveryTimeout, "timeout duration to determine a chunk data pack response delivery being slow")
@@ -108,6 +100,7 @@ func (exeConf *ExecutionConfig) SetupFlags(flags *pflag.FlagSet) {
 	flags.StringToIntVar(&exeConf.apiBurstlimits, "api-burst-limits", map[string]int{}, "burst limits for gRPC API methods e.g. Ping=100,ExecuteScriptAtBlockID=100 etc. note limits apply globally to all clients.")
 	flags.IntVar(&exeConf.blobstoreRateLimit, "blobstore-rate-limit", 0, "per second outgoing rate limit for Execution Data blobstore")
 	flags.IntVar(&exeConf.blobstoreBurstLimit, "blobstore-burst-limit", 0, "outgoing burst limit for Execution Data blobstore")
+	flags.DurationVar(&exeConf.maxGracefulStopDuration, "max-graceful-stop-duration", stop.DefaultMaxGracefulStopDuration, "the maximum amount of time stop control will wait for ingestion engine to gracefully shutdown before crashing")
 }
 
 func (exeConf *ExecutionConfig) ValidateFlags() error {

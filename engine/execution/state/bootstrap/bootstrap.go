@@ -8,8 +8,8 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/engine/execution/state"
-	"github.com/onflow/flow-go/engine/execution/state/delta"
 	"github.com/onflow/flow-go/fvm"
+	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/storage"
@@ -36,7 +36,9 @@ func (b *Bootstrapper) BootstrapLedger(
 	chain flow.Chain,
 	opts ...fvm.BootstrapProcedureOption,
 ) (flow.StateCommitment, error) {
-	view := delta.NewView(state.LedgerGetRegister(ledger, flow.StateCommitment(ledger.InitialState())))
+	storageSnapshot := state.NewLedgerStorageSnapshot(
+		ledger,
+		flow.StateCommitment(ledger.InitialState()))
 
 	vm := fvm.NewVirtualMachine()
 
@@ -51,12 +53,15 @@ func (b *Bootstrapper) BootstrapLedger(
 		opts...,
 	)
 
-	err := vm.Run(ctx, bootstrap, view)
+	executionSnapshot, _, err := vm.Run(ctx, bootstrap, storageSnapshot)
 	if err != nil {
 		return flow.DummyStateCommitment, err
 	}
 
-	newStateCommitment, _, err := state.CommitDelta(ledger, view.Delta(), flow.StateCommitment(ledger.InitialState()))
+	newStateCommitment, _, err := state.CommitDelta(
+		ledger,
+		executionSnapshot,
+		flow.StateCommitment(ledger.InitialState()))
 	if err != nil {
 		return flow.DummyStateCommitment, err
 	}
@@ -89,13 +94,22 @@ func (b *Bootstrapper) IsBootstrapped(db *badger.DB) (flow.StateCommitment, bool
 	return commit, true, nil
 }
 
-func (b *Bootstrapper) BootstrapExecutionDatabase(db *badger.DB, commit flow.StateCommitment, genesis *flow.Header) error {
+func (b *Bootstrapper) BootstrapExecutionDatabase(
+	db *badger.DB,
+	rootSeal *flow.Seal,
+) error {
 
+	commit := rootSeal.FinalState
 	err := operation.RetryOnConflict(db.Update, func(txn *badger.Txn) error {
 
-		err := operation.InsertExecutedBlock(genesis.ID())(txn)
+		err := operation.InsertExecutedBlock(rootSeal.BlockID)(txn)
 		if err != nil {
 			return fmt.Errorf("could not index initial genesis execution block: %w", err)
+		}
+
+		err = operation.SkipDuplicates(operation.IndexExecutionResult(rootSeal.BlockID, rootSeal.ResultID))(txn)
+		if err != nil {
+			return fmt.Errorf("could not index result for root result: %w", err)
 		}
 
 		err = operation.IndexStateCommitment(flow.ZeroID, commit)(txn)
@@ -103,13 +117,13 @@ func (b *Bootstrapper) BootstrapExecutionDatabase(db *badger.DB, commit flow.Sta
 			return fmt.Errorf("could not index void state commitment: %w", err)
 		}
 
-		err = operation.IndexStateCommitment(genesis.ID(), commit)(txn)
+		err = operation.IndexStateCommitment(rootSeal.BlockID, commit)(txn)
 		if err != nil {
 			return fmt.Errorf("could not index genesis state commitment: %w", err)
 		}
 
-		views := make([]*delta.Snapshot, 0)
-		err = operation.InsertExecutionStateInteractions(genesis.ID(), views)(txn)
+		snapshots := make([]*snapshot.ExecutionSnapshot, 0)
+		err = operation.InsertExecutionStateInteractions(rootSeal.BlockID, snapshots)(txn)
 		if err != nil {
 			return fmt.Errorf("could not bootstrap execution state interactions: %w", err)
 		}

@@ -8,12 +8,14 @@
 /engine/consensus/** @AlexHentschel @durkmurder @jordanschalm
 
 # Execution Stream
-/cmd/execution/** @m4ksio @ramtinms
-/engine/execution/** @m4ksio @ramtinms
+/cmd/execution/** @ramtinms
+/engine/execution/** @ramtinms
 
 # Access Stream
-/cmd/access/** @vishalchangrani
-/engine/access/** @vishalchangrani
+/access/** @peterargue
+/cmd/access/** @peterargue
+/cmd/observer/** @peterargue
+/engine/access/** @peterargue
 
 # Verification Stream
 /cmd/verification/** @ramtinms @yhassanzadeh13
@@ -21,20 +23,20 @@
 /module/chunking/** @ramtinms
 /integration/tests/verification @ramtinms @yhassanzadeh13
 
-# Ledger Stream 
-/ledger/** @ramtinms @m4ksio @AlexHentschel
+# Ledger Stream
+/ledger/** @ramtinms @AlexHentschel
 
-# FVM Stream 
-/fvm/**  @ramtinms @janezpodhostnik @pattyshack
+# FVM Stream
+/fvm/**  @ramtinms @janezpodhostnik
 
 # Networking Stream
-/network/** @yhassanzadeh13 @vishalchangrani
+/network/** @yhassanzadeh13
 
 # Cryptography Stream
 /crypto/** @tarakby
 
 # Bootstrap and transit scripts
-/cmd/bootstrap/** @vishalchangrani
+/cmd/bootstrap/** @zhangchiqing
 
 # Dev Tools Stream
 .github/workflows/** @gomisha
@@ -43,8 +45,8 @@
 /tools/test_monitor/** @gomisha
 
 # Performance Stream
-/integration/benchmark/** @SaveTheRbtz @gomisha
-/integration/localnet/** @SaveTheRbtz
-/module/profiler/** @SaveTheRbtz @pattyshack
-/module/trace/** @SaveTheRbtz @pattyshack
-/module/tracer.go @SaveTheRbtz @pattyshack
+/integration/benchmark/** @gomisha
+
+# Execution Sync
+/module/executiondatasync/** @peterargue
+/module/state_synchronization/** @peterargue

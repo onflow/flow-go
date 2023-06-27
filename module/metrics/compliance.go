@@ -7,6 +7,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promauto"
 
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module"
 )
 
 type ComplianceCollector struct {
@@ -14,12 +15,12 @@ type ComplianceCollector struct {
 	sealedHeight                    prometheus.Gauge
 	finalizedBlocks                 *prometheus.CounterVec
 	sealedBlocks                    prometheus.Counter
-	blockProposalDuration           prometheus.Counter
 	finalizedPayload                *prometheus.CounterVec
 	sealedPayload                   *prometheus.CounterVec
 	lastBlockFinalizedAt            time.Time
 	finalizedBlocksPerSecond        prometheus.Summary
 	committedEpochFinalView         prometheus.Gauge
+	lastEpochTransitionHeight       prometheus.Gauge
 	currentEpochCounter             prometheus.Gauge
 	currentEpochPhase               prometheus.Gauge
 	currentEpochFinalView           prometheus.Gauge
@@ -28,6 +29,8 @@ type ComplianceCollector struct {
 	currentDKGPhase3FinalView       prometheus.Gauge
 	epochEmergencyFallbackTriggered prometheus.Gauge
 }
+
+var _ module.ComplianceMetrics = (*ComplianceCollector)(nil)
 
 func NewComplianceCollector() *ComplianceCollector {
 
@@ -52,6 +55,13 @@ func NewComplianceCollector() *ComplianceCollector {
 			Namespace: namespaceConsensus,
 			Subsystem: subsystemCompliance,
 			Help:      "the final view of the committed epoch with the greatest counter",
+		}),
+
+		lastEpochTransitionHeight: promauto.NewGauge(prometheus.GaugeOpts{
+			Name:      "last_epoch_transition_height",
+			Namespace: namespaceConsensus,
+			Subsystem: subsystemCompliance,
+			Help:      "the height of the most recent finalized epoch transition; in other words the height of the first block of the current epoch",
 		}),
 
 		currentEpochFinalView: promauto.NewGauge(prometheus.GaugeOpts{
@@ -107,13 +117,6 @@ func NewComplianceCollector() *ComplianceCollector {
 			Namespace: namespaceConsensus,
 			Subsystem: subsystemCompliance,
 			Help:      "the number of sealed blocks",
-		}),
-
-		blockProposalDuration: promauto.NewCounter(prometheus.CounterOpts{
-			Name:      "consensus_committee_block_proposal_duration_seconds_total",
-			Namespace: namespaceConsensus,
-			Subsystem: subsystemCompliance,
-			Help:      "time spent processing block proposals in seconds",
 		}),
 
 		finalizedPayload: promauto.NewCounterVec(prometheus.CounterOpts{
@@ -188,12 +191,14 @@ func (cc *ComplianceCollector) BlockSealed(block *flow.Block) {
 	cc.sealedPayload.With(prometheus.Labels{LabelResource: ResourceSeal}).Add(float64(len(block.Payload.Seals)))
 }
 
-func (cc *ComplianceCollector) BlockProposalDuration(duration time.Duration) {
-	cc.blockProposalDuration.Add(duration.Seconds())
-}
-
 func (cc *ComplianceCollector) CommittedEpochFinalView(view uint64) {
 	cc.committedEpochFinalView.Set(float64(view))
+}
+
+func (cc *ComplianceCollector) EpochTransitionHeight(height uint64) {
+	// An epoch transition comprises a block in epoch N followed by a block in epoch N+1.
+	// height here refers to the height of the first block in epoch N+1.
+	cc.lastEpochTransitionHeight.Set(float64(height))
 }
 
 func (cc *ComplianceCollector) CurrentEpochCounter(counter uint64) {

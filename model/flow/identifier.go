@@ -137,20 +137,12 @@ func PublicKeyToID(pk crypto.PublicKey) (Identifier, error) {
 }
 
 // GetIDs gets the IDs for a slice of entities.
-func GetIDs(value interface{}) []Identifier {
-	v := reflect.ValueOf(value)
-	if v.Kind() != reflect.Slice {
-		panic(fmt.Sprintf("non-slice value (%T)", value))
+func GetIDs[T Entity](entities []T) IdentifierList {
+	ids := make([]Identifier, 0, len(entities))
+	for _, entity := range entities {
+		ids = append(ids, entity.ID())
 	}
-	slice := make([]Identifier, 0, v.Len())
-	for i := 0; i < v.Len(); i++ {
-		entity, ok := v.Index(i).Interface().(Entity)
-		if !ok {
-			panic(fmt.Sprintf("slice contains non-entity (%T)", v.Index(i).Interface()))
-		}
-		slice = append(slice, entity.ID())
-	}
-	return slice
+	return ids
 }
 
 func MerkleRoot(ids ...Identifier) Identifier {

@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	libp2ptls "github.com/libp2p/go-libp2p-tls"
+	libp2ptls "github.com/libp2p/go-libp2p/p2p/security/tls"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/network/p2p/keyutils"

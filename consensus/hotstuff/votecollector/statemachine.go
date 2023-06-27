@@ -25,7 +25,7 @@ type VoteCollector struct {
 	sync.Mutex
 	log                      zerolog.Logger
 	workers                  hotstuff.Workers
-	notifier                 hotstuff.Consumer
+	notifier                 hotstuff.VoteAggregationConsumer
 	createVerifyingProcessor VerifyingVoteProcessorFactory
 
 	votesCache     VotesCache
@@ -47,7 +47,7 @@ type atomicValueWrapper struct {
 
 func NewStateMachineFactory(
 	log zerolog.Logger,
-	notifier hotstuff.Consumer,
+	notifier hotstuff.VoteAggregationConsumer,
 	verifyingVoteProcessorFactory VerifyingVoteProcessorFactory,
 ) voteaggregator.NewCollectorFactoryMethod {
 	return func(view uint64, workers hotstuff.Workers) (hotstuff.VoteCollector, error) {
@@ -59,11 +59,11 @@ func NewStateMachine(
 	view uint64,
 	log zerolog.Logger,
 	workers hotstuff.Workers,
-	notifier hotstuff.Consumer,
+	notifier hotstuff.VoteAggregationConsumer,
 	verifyingVoteProcessorFactory VerifyingVoteProcessorFactory,
 ) *VoteCollector {
 	log = log.With().
-		Str("hotstuff", "VoteCollector").
+		Str("component", "hotstuff.vote_collector").
 		Uint64("view", view).
 		Logger()
 	sm := &VoteCollector{
@@ -130,14 +130,15 @@ func (m *VoteCollector) processVote(vote *model.Vote) error {
 		currentState := processor.Status()
 		err := processor.Process(vote)
 		if err != nil {
-			if model.IsInvalidVoteError(err) {
-				m.notifier.OnInvalidVoteDetected(vote)
+			if invalidVoteErr, ok := model.AsInvalidVoteError(err); ok {
+				m.notifier.OnInvalidVoteDetected(*invalidVoteErr)
 				return nil
 			}
 			// ATTENTION: due to how our logic is designed this situation is only possible
 			// where we receive the same vote twice, this is not a case of double voting.
 			// This scenario is possible if leader submits his vote additionally to the vote in proposal.
 			if model.IsDuplicatedSignerError(err) {
+				m.log.Debug().Msgf("duplicated signer %x", vote.SignerID)
 				return nil
 			}
 			return err
@@ -147,6 +148,7 @@ func (m *VoteCollector) processVote(vote *model.Vote) error {
 			continue
 		}
 
+		m.notifier.OnVoteProcessed(vote)
 		return nil
 	}
 }
@@ -274,7 +276,9 @@ func (m *VoteCollector) terminateVoteProcessing() {
 
 // processCachedVotes feeds all cached votes into the VoteProcessor
 func (m *VoteCollector) processCachedVotes(block *model.Block) {
-	for _, vote := range m.votesCache.All() {
+	cachedVotes := m.votesCache.All()
+	m.log.Info().Msgf("processing %d cached votes", len(cachedVotes))
+	for _, vote := range cachedVotes {
 		if vote.BlockID != block.BlockID {
 			continue
 		}

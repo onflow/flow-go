@@ -2,23 +2,17 @@ package debug
 
 import (
 	"context"
-	"fmt"
-
-	"google.golang.org/grpc"
 
 	"github.com/onflow/flow/protobuf/go/flow/execution"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 
-	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
 )
 
-// RemoteView provides a view connected to a live execution node to read the registers
-// writen values are kept inside a map
-//
-// TODO implement register touches
-type RemoteView struct {
-	Parent             *RemoteView
-	Delta              map[string]flow.RegisterValue
+// RemoteStorageSnapshot provides a storage snapshot connected to a live
+// execution node to read the registers.
+type RemoteStorageSnapshot struct {
 	Cache              registerCache
 	BlockID            []byte
 	BlockHeader        *flow.Header
@@ -26,67 +20,78 @@ type RemoteView struct {
 	executionAPIclient execution.ExecutionAPIClient
 }
 
-// A RemoteViewOption sets a configuration parameter for the remote view
-type RemoteViewOption func(view *RemoteView) *RemoteView
+// A RemoteStorageSnapshotOption sets a configuration parameter for the remote
+// snapshot
+type RemoteStorageSnapshotOption func(*RemoteStorageSnapshot) *RemoteStorageSnapshot
 
 // WithFileCache sets the output path to store
 // register values so can be fetched from a file cache
 // it loads the values from the cache upon object construction
-func WithCache(cache registerCache) RemoteViewOption {
-	return func(view *RemoteView) *RemoteView {
-		view.Cache = cache
-		return view
+func WithCache(cache registerCache) RemoteStorageSnapshotOption {
+	return func(snapshot *RemoteStorageSnapshot) *RemoteStorageSnapshot {
+		snapshot.Cache = cache
+		return snapshot
 	}
 }
 
-// WithBlockID sets the blockID for the remote view, if not used
-// remote view will use the latest sealed block
-func WithBlockID(blockID flow.Identifier) RemoteViewOption {
-	return func(view *RemoteView) *RemoteView {
-		view.BlockID = blockID[:]
+// WithBlockID sets the blockID for the remote snapshot, if not used
+// remote snapshot will use the latest sealed block
+func WithBlockID(blockID flow.Identifier) RemoteStorageSnapshotOption {
+	return func(snapshot *RemoteStorageSnapshot) *RemoteStorageSnapshot {
+		snapshot.BlockID = blockID[:]
 		var err error
-		view.BlockHeader, err = view.getBlockHeader(blockID)
+		snapshot.BlockHeader, err = snapshot.getBlockHeader(blockID)
 		if err != nil {
 			panic(err)
 		}
-		return view
+		return snapshot
 	}
 }
 
-func NewRemoteView(grpcAddress string, opts ...RemoteViewOption) *RemoteView {
-	conn, err := grpc.Dial(grpcAddress, grpc.WithInsecure()) //nolint:staticcheck
+func NewRemoteStorageSnapshot(
+	grpcAddress string,
+	opts ...RemoteStorageSnapshotOption,
+) *RemoteStorageSnapshot {
+	conn, err := grpc.Dial(
+		grpcAddress,
+		grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		panic(err)
 	}
 
-	view := &RemoteView{
+	snapshot := &RemoteStorageSnapshot{
 		connection:         conn,
 		executionAPIclient: execution.NewExecutionAPIClient(conn),
-		Delta:              make(map[string]flow.RegisterValue),
 		Cache:              newMemRegisterCache(),
 	}
 
-	view.BlockID, view.BlockHeader, err = view.getLatestBlockID()
+	snapshot.BlockID, snapshot.BlockHeader, err = snapshot.getLatestBlockID()
 	if err != nil {
 		panic(err)
 	}
 
 	for _, applyOption := range opts {
-		view = applyOption(view)
+		snapshot = applyOption(snapshot)
 	}
-	return view
+	return snapshot
 }
 
-func (v *RemoteView) Done() {
-	v.connection.Close()
+func (snapshot *RemoteStorageSnapshot) Close() error {
+	return snapshot.connection.Close()
 }
 
-func (v *RemoteView) getLatestBlockID() ([]byte, *flow.Header, error) {
+func (snapshot *RemoteStorageSnapshot) getLatestBlockID() (
+	[]byte,
+	*flow.Header,
+	error,
+) {
 	req := &execution.GetLatestBlockHeaderRequest{
 		IsSealed: true,
 	}
 
-	resp, err := v.executionAPIclient.GetLatestBlockHeader(context.Background(), req)
+	resp, err := snapshot.executionAPIclient.GetLatestBlockHeader(
+		context.Background(),
+		req)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -100,12 +105,19 @@ func (v *RemoteView) getLatestBlockID() ([]byte, *flow.Header, error) {
 	return resp.Block.Id, header, nil
 }
 
-func (v *RemoteView) getBlockHeader(blockID flow.Identifier) (*flow.Header, error) {
+func (snapshot *RemoteStorageSnapshot) getBlockHeader(
+	blockID flow.Identifier,
+) (
+	*flow.Header,
+	error,
+) {
 	req := &execution.GetBlockHeaderByIDRequest{
 		Id: blockID[:],
 	}
 
-	resp, err := v.executionAPIclient.GetBlockHeaderByID(context.Background(), req)
+	resp, err := snapshot.executionAPIclient.GetBlockHeaderByID(
+		context.Background(),
+		req)
 	if err != nil {
 		return nil, err
 	}
@@ -119,92 +131,36 @@ func (v *RemoteView) getBlockHeader(blockID flow.Identifier) (*flow.Header, erro
 	return header, nil
 }
 
-func (v *RemoteView) NewChild() state.View {
-	return &RemoteView{
-		Parent:             v,
-		executionAPIclient: v.executionAPIclient,
-		connection:         v.connection,
-		Cache:              newMemRegisterCache(),
-		Delta:              make(map[string][]byte),
-	}
-}
-
-func (v *RemoteView) MergeView(o state.View) error {
-	var other *RemoteView
-	var ok bool
-	if other, ok = o.(*RemoteView); !ok {
-		return fmt.Errorf("can not merge: view type mismatch (given: %T, expected:RemoteView)", o)
-	}
-
-	for k, value := range other.Delta {
-		v.Delta[k] = value
-	}
-	return nil
-}
-
-func (v *RemoteView) DropDelta() {
-	v.Delta = make(map[string]flow.RegisterValue)
-}
-
-func (v *RemoteView) Set(owner, key string, value flow.RegisterValue) error {
-	v.Delta[owner+"~"+key] = value
-	return nil
-}
-
-func (v *RemoteView) Get(owner, key string) (flow.RegisterValue, error) {
-
-	// first check the delta
-	value, found := v.Delta[owner+"~"+key]
-	if found {
-		return value, nil
-	}
-
+func (snapshot *RemoteStorageSnapshot) Get(
+	id flow.RegisterID,
+) (
+	flow.RegisterValue,
+	error,
+) {
 	// then check the read cache
-	value, found = v.Cache.Get(owner, key)
+	value, found := snapshot.Cache.Get(id.Owner, id.Key)
 	if found {
 		return value, nil
-	}
-
-	// then call the parent (if exist)
-	if v.Parent != nil {
-		return v.Parent.Get(owner, key)
 	}
 
 	// last use the grpc api the
 	req := &execution.GetRegisterAtBlockIDRequest{
-		BlockId:       []byte(v.BlockID),
-		RegisterOwner: []byte(owner),
-		RegisterKey:   []byte(key),
+		BlockId:       []byte(snapshot.BlockID),
+		RegisterOwner: []byte(id.Owner),
+		RegisterKey:   []byte(id.Key),
 	}
 
 	// TODO use a proper context for timeouts
-	resp, err := v.executionAPIclient.GetRegisterAtBlockID(context.Background(), req)
+	resp, err := snapshot.executionAPIclient.GetRegisterAtBlockID(
+		context.Background(),
+		req)
 	if err != nil {
 		return nil, err
 	}
 
-	v.Cache.Set(owner, key, resp.Value)
+	snapshot.Cache.Set(id.Owner, id.Key, resp.Value)
 
 	// append value to the file cache
 
 	return resp.Value, nil
-}
-
-// returns all the registers that has been touched
-func (v *RemoteView) AllRegisters() []flow.RegisterID {
-	panic("Not implemented yet")
-}
-
-func (v *RemoteView) RegisterUpdates() ([]flow.RegisterID, []flow.RegisterValue) {
-	panic("Not implemented yet")
-}
-
-func (v *RemoteView) Touch(owner, key string) error {
-	// no-op for now
-	return nil
-}
-
-func (v *RemoteView) Delete(owner, key string) error {
-	v.Delta[owner+"~"+key] = nil
-	return nil
 }

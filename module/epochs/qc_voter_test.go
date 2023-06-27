@@ -2,7 +2,6 @@ package epochs_test
 
 import (
 	"context"
-	"fmt"
 	"io"
 	"math/rand"
 	"testing"
@@ -78,7 +77,7 @@ func (suite *Suite) SetupTest() {
 	var err error
 	assignments := unittest.ClusterAssignment(2, suite.nodes)
 	suite.clustering, err = factory.NewClusterList(assignments, suite.nodes)
-	suite.Require().Nil(err)
+	suite.Require().NoError(err)
 
 	suite.epoch.On("Counter").Return(suite.counter, nil)
 	suite.epoch.On("Clustering").Return(suite.clustering, nil)
@@ -97,8 +96,8 @@ func (suite *Suite) TestNonClusterParticipant() {
 	// change our identity so we aren't in the cluster assignment
 	suite.me = unittest.IdentityFixture(unittest.WithRole(flow.RoleCollection))
 	err := suite.voter.Vote(context.Background(), suite.epoch)
-	fmt.Println(err)
 	suite.Assert().Error(err)
+	suite.Assert().True(epochs.IsClusterQCNoVoteError(err))
 }
 
 // should fail if we are not in setup phase
@@ -106,8 +105,8 @@ func (suite *Suite) TestInvalidPhase() {
 
 	suite.phase = flow.EpochPhaseStaking
 	err := suite.voter.Vote(context.Background(), suite.epoch)
-	fmt.Println(err)
 	suite.Assert().Error(err)
+	suite.Assert().True(epochs.IsClusterQCNoVoteError(err))
 }
 
 // should succeed and exit if we've already voted
@@ -115,12 +114,11 @@ func (suite *Suite) TestAlreadyVoted() {
 
 	suite.voted = true
 	err := suite.voter.Vote(context.Background(), suite.epoch)
-	fmt.Println(err)
-	suite.Assert().Nil(err)
+	suite.Assert().NoError(err)
 }
 
 // should succeed and exit if voting succeeds
 func (suite *Suite) TestVoting() {
 	err := suite.voter.Vote(context.Background(), suite.epoch)
-	suite.Assert().Nil(err)
+	suite.Assert().NoError(err)
 }

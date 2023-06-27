@@ -55,6 +55,9 @@ func NewCorruptedNodeConnection(
 // SendMessage sends the message from orchestrator to the corrupted conduit factory.
 func (c *CorruptedNodeConnection) SendMessage(message *insecure.Message) error {
 	err := c.outbound.Send(message)
+	if err == io.EOF {
+		c.logger.Warn().Err(err).Msg("outbound stream to corrupt node is closed")
+	}
 	if err != nil {
 		return fmt.Errorf("could not send message: %w", err)
 	}

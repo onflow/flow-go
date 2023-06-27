@@ -38,11 +38,13 @@ func TestGetBlocks(t *testing.T) {
 	blkCnt := 10
 	blockIDs, heights, blocks, executionResults := generateMocks(backend, blkCnt)
 
-	singleBlockExpandedResponse := expectedBlockResponsesExpanded(blocks[:1], executionResults[:1], true)
-	multipleBlockExpandedResponse := expectedBlockResponsesExpanded(blocks, executionResults, true)
+	singleBlockExpandedResponse := expectedBlockResponsesExpanded(blocks[:1], executionResults[:1], true, flow.BlockStatusUnknown)
+	singleSealedBlockExpandedResponse := expectedBlockResponsesExpanded(blocks[:1], executionResults[:1], true, flow.BlockStatusSealed)
+	multipleBlockExpandedResponse := expectedBlockResponsesExpanded(blocks, executionResults, true, flow.BlockStatusUnknown)
+	multipleSealedBlockExpandedResponse := expectedBlockResponsesExpanded(blocks, executionResults, true, flow.BlockStatusSealed)
 
-	singleBlockCondensedResponse := expectedBlockResponsesExpanded(blocks[:1], executionResults[:1], false)
-	multipleBlockCondensedResponse := expectedBlockResponsesExpanded(blocks, executionResults, false)
+	singleBlockCondensedResponse := expectedBlockResponsesExpanded(blocks[:1], executionResults[:1], false, flow.BlockStatusUnknown)
+	multipleBlockCondensedResponse := expectedBlockResponsesExpanded(blocks, executionResults, false, flow.BlockStatusUnknown)
 
 	invalidID := unittest.IdentifierFixture().String()
 	invalidHeight := fmt.Sprintf("%d", blkCnt+1)
@@ -78,19 +80,19 @@ func TestGetBlocks(t *testing.T) {
 			description:      "Get single expanded block by height",
 			request:          getByHeightsExpandedURL(t, heights[:1]...),
 			expectedStatus:   http.StatusOK,
-			expectedResponse: singleBlockExpandedResponse,
+			expectedResponse: singleSealedBlockExpandedResponse,
 		},
 		{
 			description:      "Get multiple expanded blocks by heights",
 			request:          getByHeightsExpandedURL(t, heights...),
 			expectedStatus:   http.StatusOK,
-			expectedResponse: multipleBlockExpandedResponse,
+			expectedResponse: multipleSealedBlockExpandedResponse,
 		},
 		{
 			description:      "Get multiple expanded blocks by start and end height",
 			request:          getByStartEndHeightExpandedURL(t, heights[0], heights[len(heights)-1]),
 			expectedStatus:   http.StatusOK,
-			expectedResponse: multipleBlockExpandedResponse,
+			expectedResponse: multipleSealedBlockExpandedResponse,
 		},
 		{
 			description:      "Get block by ID not found",
@@ -211,32 +213,33 @@ func generateMocks(backend *mock.API, count int) ([]string, []string, []*flow.Bl
 		executionResult.BlockID = block.ID()
 		executionResults[i] = executionResult
 
-		backend.Mock.On("GetBlockByID", mocks.Anything, block.ID()).Return(&block, nil)
-		backend.Mock.On("GetBlockByHeight", mocks.Anything, block.Header.Height).Return(&block, nil)
+		backend.Mock.On("GetBlockByID", mocks.Anything, block.ID()).Return(&block, flow.BlockStatusSealed, nil)
+		backend.Mock.On("GetBlockByHeight", mocks.Anything, block.Header.Height).Return(&block, flow.BlockStatusSealed, nil)
 		backend.Mock.On("GetExecutionResultForBlockID", mocks.Anything, block.ID()).Return(executionResults[i], nil)
 	}
 
 	// any other call to the backend should return a not found error
-	backend.Mock.On("GetBlockByID", mocks.Anything, mocks.Anything).Return(nil, status.Error(codes.NotFound, "not found"))
-	backend.Mock.On("GetBlockByHeight", mocks.Anything, mocks.Anything).Return(nil, status.Error(codes.NotFound, "not found"))
+	backend.Mock.On("GetBlockByID", mocks.Anything, mocks.Anything).Return(nil, flow.BlockStatusUnknown, status.Error(codes.NotFound, "not found"))
+	backend.Mock.On("GetBlockByHeight", mocks.Anything, mocks.Anything).Return(nil, flow.BlockStatusUnknown, status.Error(codes.NotFound, "not found"))
 
 	return blockIDs, heights, blocks, executionResults
 }
 
-func expectedBlockResponsesExpanded(blocks []*flow.Block, execResult []*flow.ExecutionResult, expanded bool) string {
+func expectedBlockResponsesExpanded(blocks []*flow.Block, execResult []*flow.ExecutionResult, expanded bool, status flow.BlockStatus) string {
 	blockResponses := make([]string, len(blocks))
 	for i, b := range blocks {
-		blockResponses[i] = expectedBlockResponse(b, execResult[i], expanded)
+		blockResponses[i] = expectedBlockResponse(b, execResult[i], expanded, status)
 	}
 	return fmt.Sprintf("[%s]", strings.Join(blockResponses, ","))
 }
 
-func expectedBlockResponse(block *flow.Block, execResult *flow.ExecutionResult, expanded bool) string {
+func expectedBlockResponse(block *flow.Block, execResult *flow.ExecutionResult, expanded bool, status flow.BlockStatus) string {
 	id := block.ID().String()
 	execResultID := execResult.ID().String()
 	execLink := fmt.Sprintf("/v1/execution_results/%s", execResultID)
 	blockLink := fmt.Sprintf("/v1/blocks/%s", id)
 	payloadLink := fmt.Sprintf("/v1/blocks/%s/payload", id)
+	blockStatus := status.String()
 
 	timestamp := block.Header.Timestamp.Format(time.RFC3339Nano)
 
@@ -258,9 +261,10 @@ func expectedBlockResponse(block *flow.Block, execResult *flow.ExecutionResult, 
 		"_expandable": {},
 		"_links": {
 			"_self": "%s"
-		}
+		},
+		"block_status": "%s"
 	}`, id, block.Header.ParentID.String(), block.Header.Height, timestamp,
-			util.ToBase64(block.Header.ParentVoterSigData), executionResultExpectedStr(execResult), blockLink)
+			util.ToBase64(block.Header.ParentVoterSigData), executionResultExpectedStr(execResult), blockLink, blockStatus)
 	}
 
 	return fmt.Sprintf(`
@@ -278,7 +282,8 @@ func expectedBlockResponse(block *flow.Block, execResult *flow.ExecutionResult, 
         },
 		"_links": {
 			"_self": "%s"
-		}
+		},
+		"block_status": "%s"
 	}`, id, block.Header.ParentID.String(), block.Header.Height, timestamp,
-		util.ToBase64(block.Header.ParentVoterSigData), payloadLink, execLink, blockLink)
+		util.ToBase64(block.Header.ParentVoterSigData), payloadLink, execLink, blockLink, blockStatus)
 }

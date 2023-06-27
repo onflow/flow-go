@@ -10,7 +10,7 @@ var GenesisTime = time.Date(2018, time.December, 19, 22, 32, 30, 42, time.UTC)
 
 // DefaultProtocolVersion is the default protocol version, indicating none was
 // explicitly set during bootstrapping.
-const DefaultProtocolVersion = 0
+const DefaultProtocolVersion uint = 0
 
 // DefaultTransactionExpiry is the default expiry for transactions, measured in blocks.
 // The default value is equivalent to 10 minutes for a 1-second block time.
@@ -40,9 +40,8 @@ const DefaultMaxCollectionTotalGas = 10_000_000 // 10M
 // DefaultMaxCollectionSize is the default maximum number of transactions allowed inside a collection.
 const DefaultMaxCollectionSize = 100
 
-// DefaultValueLogGCFrequency is the default frequency in blocks that we call the
-// badger value log GC. Equivalent to 10 mins for a 1 second block time
-const DefaultValueLogGCFrequency = 10 * 60
+// DefaultValueLogGCWaitDuration is the default wait duration before we repeatedly call the badger value log GC.
+const DefaultValueLogGCWaitDuration time.Duration = 10 * time.Minute
 
 // DefaultRequiredApprovalsForSealConstruction is the default number of approvals required to construct a candidate seal
 // for subsequent inclusion in block.

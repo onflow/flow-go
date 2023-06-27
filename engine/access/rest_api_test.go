@@ -23,6 +23,7 @@ import (
 	"github.com/onflow/flow-go/engine/access/rest/request"
 	"github.com/onflow/flow-go/engine/access/rpc"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
 	module "github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/network"
@@ -49,6 +50,8 @@ type RestAPITestSuite struct {
 	chainID           flow.ChainID
 	metrics           *metrics.NoopCollector
 	rpcEng            *rpc.Engine
+	sealedBlock       *flow.Header
+	finalizedBlock    *flow.Header
 
 	// storage
 	blocks           *storagemock.Blocks
@@ -57,6 +60,9 @@ type RestAPITestSuite struct {
 	transactions     *storagemock.Transactions
 	receipts         *storagemock.ExecutionReceipts
 	executionResults *storagemock.ExecutionResults
+
+	ctx    irrecoverable.SignalerContext
+	cancel context.CancelFunc
 }
 
 func (suite *RestAPITestSuite) SetupTest() {
@@ -65,9 +71,23 @@ func (suite *RestAPITestSuite) SetupTest() {
 	suite.state = new(protocol.State)
 	suite.sealedSnaphost = new(protocol.Snapshot)
 	suite.finalizedSnapshot = new(protocol.Snapshot)
+	suite.sealedBlock = unittest.BlockHeaderFixture(unittest.WithHeaderHeight(0))
+	suite.finalizedBlock = unittest.BlockHeaderWithParentFixture(suite.sealedBlock)
 
 	suite.state.On("Sealed").Return(suite.sealedSnaphost, nil)
 	suite.state.On("Final").Return(suite.finalizedSnapshot, nil)
+	suite.sealedSnaphost.On("Head").Return(
+		func() *flow.Header {
+			return suite.sealedBlock
+		},
+		nil,
+	).Maybe()
+	suite.finalizedSnapshot.On("Head").Return(
+		func() *flow.Header {
+			return suite.finalizedBlock
+		},
+		nil,
+	).Maybe()
 	suite.blocks = new(storagemock.Blocks)
 	suite.headers = new(storagemock.Headers)
 	suite.transactions = new(storagemock.Transactions)
@@ -91,25 +111,48 @@ func (suite *RestAPITestSuite) SetupTest() {
 	suite.chainID = flow.Testnet
 	suite.metrics = metrics.NewNoopCollector()
 
-	const anyPort = ":0" // :0 to let the OS pick a free port
 	config := rpc.Config{
-		UnsecureGRPCListenAddr: anyPort,
-		SecureGRPCListenAddr:   anyPort,
-		HTTPListenAddr:         anyPort,
-		RESTListenAddr:         anyPort,
+		UnsecureGRPCListenAddr: unittest.DefaultAddress,
+		SecureGRPCListenAddr:   unittest.DefaultAddress,
+		HTTPListenAddr:         unittest.DefaultAddress,
+		RESTListenAddr:         unittest.DefaultAddress,
 	}
 
-	rpcEngBuilder, err := rpc.NewBuilder(suite.log, suite.state, config, suite.collClient, nil, suite.blocks, suite.headers, suite.collections, suite.transactions,
-		nil, suite.executionResults, suite.chainID, suite.metrics, suite.metrics, 0, 0, false, false, nil, nil)
+	rpcEngBuilder, err := rpc.NewBuilder(
+		suite.log,
+		suite.state,
+		config,
+		suite.collClient,
+		nil,
+		suite.blocks,
+		suite.headers,
+		suite.collections,
+		suite.transactions,
+		nil,
+		suite.executionResults,
+		suite.chainID,
+		suite.metrics,
+		0,
+		0,
+		false,
+		false,
+		nil,
+		nil,
+		suite.me,
+	)
 	assert.NoError(suite.T(), err)
 	suite.rpcEng, err = rpcEngBuilder.WithLegacy().Build()
 	assert.NoError(suite.T(), err)
-	unittest.AssertClosesBefore(suite.T(), suite.rpcEng.Ready(), 2*time.Second)
 
+	suite.ctx, suite.cancel = irrecoverable.NewMockSignalerContextWithCancel(suite.T(), context.Background())
+	suite.rpcEng.Start(suite.ctx)
 	// wait for the server to startup
-	assert.Eventually(suite.T(), func() bool {
-		return suite.rpcEng.RestApiAddress() != nil
-	}, 5*time.Second, 10*time.Millisecond)
+	unittest.AssertClosesBefore(suite.T(), suite.rpcEng.Ready(), 2*time.Second)
+}
+
+func (suite *RestAPITestSuite) TearDownTest() {
+	suite.cancel()
+	unittest.AssertClosesBefore(suite.T(), suite.rpcEng.Done(), 2*time.Second)
 }
 
 func TestRestAPI(t *testing.T) {
@@ -135,10 +178,8 @@ func (suite *RestAPITestSuite) TestGetBlock() {
 		suite.executionResults.On("ByBlockID", block.ID()).Return(execResult, nil)
 	}
 
-	sealedBlock := testBlocks[len(testBlocks)-1]
-	finalizedBlock := testBlocks[len(testBlocks)-2]
-	suite.sealedSnaphost.On("Head").Return(sealedBlock.Header, nil)
-	suite.finalizedSnapshot.On("Head").Return(finalizedBlock.Header, nil)
+	suite.sealedBlock = testBlocks[len(testBlocks)-1].Header
+	suite.finalizedBlock = testBlocks[len(testBlocks)-2].Header
 
 	client := suite.restAPIClient()
 
@@ -226,7 +267,7 @@ func (suite *RestAPITestSuite) TestGetBlock() {
 		require.NoError(suite.T(), err)
 		assert.Equal(suite.T(), http.StatusOK, resp.StatusCode)
 		assert.Len(suite.T(), actualBlocks, 1)
-		assert.Equal(suite.T(), finalizedBlock.ID().String(), actualBlocks[0].Header.Id)
+		assert.Equal(suite.T(), suite.finalizedBlock.ID().String(), actualBlocks[0].Header.Id)
 	})
 
 	suite.Run("GetBlockByHeight for height=sealed happy path", func() {
@@ -238,7 +279,7 @@ func (suite *RestAPITestSuite) TestGetBlock() {
 		require.NoError(suite.T(), err)
 		assert.Equal(suite.T(), http.StatusOK, resp.StatusCode)
 		assert.Len(suite.T(), actualBlocks, 1)
-		assert.Equal(suite.T(), sealedBlock.ID().String(), actualBlocks[0].Header.Id)
+		assert.Equal(suite.T(), suite.sealedBlock.ID().String(), actualBlocks[0].Header.Id)
 	})
 
 	suite.Run("GetBlockByID with a non-existing block ID", func() {
@@ -284,7 +325,6 @@ func (suite *RestAPITestSuite) TestGetBlock() {
 		defer cancel()
 
 		// replace one ID with a block ID for which the storage returns a not found error
-		rand.Seed(time.Now().Unix())
 		invalidBlockIndex := rand.Intn(len(testBlocks))
 		invalidID := unittest.IdentifierFixture()
 		suite.blocks.On("ByID", invalidID).Return(nil, storage.ErrNotFound).Once()
@@ -322,13 +362,6 @@ func (suite *RestAPITestSuite) TestRequestSizeRestriction() {
 	}
 	_, resp, err := client.ScriptsApi.ScriptsPost(ctx, script, nil)
 	assertError(suite.T(), resp, err, http.StatusBadRequest, "request body too large")
-}
-
-func (suite *RestAPITestSuite) TearDownTest() {
-	// close the server
-	if suite.rpcEng != nil {
-		unittest.AssertClosesBefore(suite.T(), suite.rpcEng.Done(), 2*time.Second)
-	}
 }
 
 // restAPIClient creates a REST API client

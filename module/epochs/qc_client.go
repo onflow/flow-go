@@ -3,6 +3,7 @@ package epochs
 import (
 	"context"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"time"
 
@@ -12,6 +13,7 @@ import (
 
 	sdk "github.com/onflow/flow-go-sdk"
 	sdkcrypto "github.com/onflow/flow-go-sdk/crypto"
+	"github.com/onflow/flow-go/network"
 
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	hotstuffver "github.com/onflow/flow-go/consensus/hotstuff/verification"
@@ -70,6 +72,11 @@ func NewQCContractClient(
 // contract. This function returns only once the transaction has been
 // processed by the network. An error is returned if the transaction has
 // failed and should be re-submitted.
+// Error returns:
+//   - network.TransientError for any errors from the underlying client, if the retry period has been exceeded
+//   - errTransactionExpired if the transaction has expired
+//   - errTransactionReverted if the transaction execution reverted
+//   - generic error in case of unexpected critical failure
 func (c *QCContractClient) SubmitVote(ctx context.Context, vote *model.Vote) error {
 
 	// time method was invoked
@@ -82,13 +89,15 @@ func (c *QCContractClient) SubmitVote(ctx context.Context, vote *model.Vote) err
 	// get account for given address and also validates AccountKeyIndex is valid
 	account, err := c.GetAccount(ctx)
 	if err != nil {
-		return fmt.Errorf("could not get account: %w", err)
+		// we consider all errors from client network calls to be transient and non-critical
+		return network.NewTransientErrorf("could not get account: %w", err)
 	}
 
 	// get latest finalized block to execute transaction
 	latestBlock, err := c.FlowClient.GetLatestBlock(ctx, false)
 	if err != nil {
-		return fmt.Errorf("could not get latest block from node: %w", err)
+		// we consider all errors from client network calls to be transient and non-critical
+		return network.NewTransientErrorf("could not get latest block from node: %w", err)
 	}
 
 	// attach submit vote transaction template and build transaction
@@ -132,11 +141,19 @@ func (c *QCContractClient) SubmitVote(ctx context.Context, vote *model.Vote) err
 	c.Log.Info().Str("tx_id", tx.ID().Hex()).Msg("sending SubmitResult transaction")
 	txID, err := c.SendTransaction(ctx, tx)
 	if err != nil {
+		// context expiring is not a critical failure, wrap as transient
+		if errors.Is(err, ctx.Err()) {
+			return network.NewTransientErrorf("failed to submit transaction: context done: %w", err)
+		}
 		return fmt.Errorf("failed to submit transaction: %w", err)
 	}
 
 	err = c.WaitForSealed(ctx, txID, started)
 	if err != nil {
+		// context expiring is not a critical failure, wrap as transient
+		if errors.Is(err, ctx.Err()) {
+			return network.NewTransientErrorf("failed to submit transaction: context done: %w", err)
+		}
 		return fmt.Errorf("failed to wait for transaction seal: %w", err)
 	}
 
@@ -145,19 +162,27 @@ func (c *QCContractClient) SubmitVote(ctx context.Context, vote *model.Vote) err
 
 // Voted returns true if we have successfully submitted a vote to the
 // cluster QC aggregator smart contract for the current epoch.
+// Error returns:
+//   - network.TransientError for any errors from the underlying Flow client
+//   - generic error in case of unexpected critical failures
 func (c *QCContractClient) Voted(ctx context.Context) (bool, error) {
 
 	// execute script to read if voted
 	template := templates.GenerateGetNodeHasVotedScript(c.env)
-	hasVoted, err := c.FlowClient.ExecuteScriptAtLatestBlock(ctx, template, []cadence.Value{cadence.String(c.nodeID.String())})
+	ret, err := c.FlowClient.ExecuteScriptAtLatestBlock(ctx, template, []cadence.Value{cadence.String(c.nodeID.String())})
 	if err != nil {
-		return false, fmt.Errorf("could not execute voted script: %w", err)
+		// we consider all errors from client network calls to be transient and non-critical
+		return false, network.NewTransientErrorf("could not execute voted script: %w", err)
+	}
+
+	voted, ok := ret.(cadence.Bool)
+	if !ok {
+		return false, fmt.Errorf("unexpected cadence type (%T) returned from Voted script", ret)
 	}
 
 	// check if node has voted
-	if !hasVoted.(cadence.Bool) {
+	if !voted {
 		return false, nil
 	}
-
 	return true, nil
 }

@@ -1,7 +1,4 @@
 # from https://github.com/onflow/flow-go/blob/fa60c8f96b4a22f0f252c4b82a5dc4bbf54128c1/integration/localnet/values.yml
-branch: fake-branch
-# Commit must be a string
-commit: "123456"
 
 defaults: {}
 access:
@@ -29,7 +26,7 @@ access:
         - --log-tx-time-to-executed
         - --log-tx-time-to-finalized-executed
       env:{{template "env" .}}
-      image: gcr.io/flow-container-registry/access:{{$val.docker_tag}}
+      image: {{$val.docker_registry}}/access:{{$val.docker_tag}}
       nodeId: {{$val.node_id}}
 {{- end}}{{end}}
 collection:
@@ -48,13 +45,11 @@ collection:
       args:{{template "args" .}}
         - --loglevel=INFO
         - --block-rate-delay=950ms
-        - --hotstuff-timeout=2.15s
-        - --hotstuff-min-timeout=2.15s
         - --ingress-addr=0.0.0.0:9000
         - --insecure-access-api=false
         - --access-node-ids=*
       env:{{template "env" .}}
-      image: gcr.io/flow-container-registry/collection:{{$val.docker_tag}}
+      image: {{$val.docker_registry}}/collection:{{$val.docker_tag}}
       nodeId: {{$val.node_id}}
 {{- end}}{{end}}
 consensus:
@@ -73,14 +68,12 @@ consensus:
       args:{{template "args" .}}
         - --loglevel=DEBUG
         - --block-rate-delay=800ms
-        - --hotstuff-timeout=2s
-        - --hotstuff-min-timeout=2s
         - --chunk-alpha=1
         - --emergency-sealing-active=false
         - --insecure-access-api=false
         - --access-node-ids=*
       env:{{template "env" .}}
-      image: gcr.io/flow-container-registry/consensus:{{$val.docker_tag}}
+      image: {{$val.docker_registry}}/consensus:{{$val.docker_tag}}
       nodeId: {{$val.node_id}}
 {{- end}}{{end}}
 execution:
@@ -88,7 +81,10 @@ execution:
     resources:
       requests:
         cpu: "200m"
-        memory: "512Mi"
+        memory: "1024Mi"
+      limits:
+        cpu: "800m"
+        memory: "10Gi"
     storage: 10G
   nodes:
 {{- range $val := .}}{{if eq ($val.role) ("execution")}}
@@ -100,7 +96,7 @@ execution:
         - --cadence-tracing=false
         - --extensive-tracing=false
       env:{{template "env" .}}
-      image: gcr.io/flow-container-registry/execution:{{$val.docker_tag}}
+      image: {{$val.docker_registry}}/execution:{{$val.docker_tag}}
       nodeId: {{$val.node_id}}
 {{- end}}{{end}}
 verification:
@@ -120,7 +116,7 @@ verification:
         - --loglevel=INFO
         - --chunk-alpha=1
       env:{{template "env" .}}
-      image: gcr.io/flow-container-registry/verification:{{$val.docker_tag}}
+      image: {{$val.docker_registry}}/verification:{{$val.docker_tag}}
       nodeId: {{$val.node_id}}
 {{end}}{{end}}
 
@@ -149,6 +145,8 @@ verification:
 {{define "defaults"}}
     imagePullPolicy: Always
     containerPorts:
+      - name: metrics
+        containerPort: 8080
       - name: ptp
         containerPort: 3569
       - name: grpc

@@ -34,6 +34,10 @@ func genconfigCmdRun(_ *cobra.Command, _ []string) {
 		}
 	}
 
+	if flagWeight != flow.DefaultInitialWeight {
+		log.Warn().Msgf("using non-standard initial weight %d!=%d - make sure this is desired", flagWeight, flow.DefaultInitialWeight)
+	}
+
 	configs := make([]model.NodeConfig, 0)
 
 	for i := 0; i < flagNodesAccess; i++ {
@@ -59,7 +63,7 @@ func genconfigCmdRun(_ *cobra.Command, _ []string) {
 var genconfigCmd = &cobra.Command{
 	Use:   "genconfig",
 	Short: "Generate node-config.json",
-	Long:  "example: go run -tags relic ./cmd/bootstrap genconfig --address-format \"%s-%03d.devnet19.nodes.onflow.org:3569\" --access 2 --collection 3 --consensus 3 --execution 2 --verification 1 --weight 1000",
+	Long:  "example: go run -tags relic ./cmd/bootstrap genconfig --address-format \"%s-%03d.devnet19.nodes.onflow.org:3569\" --access 2 --collection 3 --consensus 3 --execution 2 --verification 1 --weight 100",
 	Run:   genconfigCmdRun,
 }
 

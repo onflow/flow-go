@@ -1,8 +1,8 @@
 package fvm_test
 
 import (
+	"crypto/rand"
 	"fmt"
-	"math/rand"
 	"testing"
 
 	"github.com/onflow/cadence"
@@ -12,11 +12,11 @@ import (
 
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/crypto/hash"
+
 	"github.com/onflow/flow-go/engine/execution/testutil"
 	"github.com/onflow/flow-go/fvm"
 	fvmCrypto "github.com/onflow/flow-go/fvm/crypto"
-	"github.com/onflow/flow-go/fvm/programs"
-	"github.com/onflow/flow-go/fvm/state"
+	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/model/flow"
 	msig "github.com/onflow/flow-go/module/signature"
 )
@@ -38,8 +38,8 @@ func TestKeyListSignature(t *testing.T) {
 	}
 
 	signatureAlgorithms := []signatureAlgorithm{
-		{"ECDSA_P256", crypto.KeyGenSeedMinLenECDSAP256, crypto.ECDSAP256},
-		{"ECDSA_secp256k1", crypto.KeyGenSeedMinLenECDSASecp256k1, crypto.ECDSASecp256k1},
+		{"ECDSA_P256", crypto.KeyGenSeedMinLen, crypto.ECDSAP256},
+		{"ECDSA_secp256k1", crypto.KeyGenSeedMinLen, crypto.ECDSASecp256k1},
 	}
 
 	type hashAlgorithm struct {
@@ -159,11 +159,10 @@ func TestKeyListSignature(t *testing.T) {
 			t.Run("Single key", newVMTest().run(
 				func(
 					t *testing.T,
-					vm *fvm.VirtualMachine,
+					vm fvm.VM,
 					chain flow.Chain,
 					ctx fvm.Context,
-					view state.View,
-					derivedBlockData *programs.DerivedBlockData,
+					snapshotTree snapshot.SnapshotTree,
 				) {
 					privateKey, publicKey := createKey()
 					signableMessage, message := createMessage("foo")
@@ -186,11 +185,11 @@ func TestKeyListSignature(t *testing.T) {
 							jsoncdc.MustEncode(weight),
 						)
 
-						err := vm.Run(ctx, script, view)
+						_, output, err := vm.Run(ctx, script, snapshotTree)
 						assert.NoError(t, err)
-						assert.NoError(t, script.Err)
+						assert.NoError(t, output.Err)
 
-						assert.Equal(t, cadence.NewBool(true), script.Value)
+						assert.Equal(t, cadence.NewBool(true), output.Value)
 					})
 
 					t.Run("Invalid message", func(t *testing.T) {
@@ -203,11 +202,11 @@ func TestKeyListSignature(t *testing.T) {
 							jsoncdc.MustEncode(weight),
 						)
 
-						err := vm.Run(ctx, script, view)
+						_, output, err := vm.Run(ctx, script, snapshotTree)
 						assert.NoError(t, err)
-						assert.NoError(t, script.Err)
+						assert.NoError(t, output.Err)
 
-						assert.Equal(t, cadence.NewBool(false), script.Value)
+						assert.Equal(t, cadence.NewBool(false), output.Value)
 					})
 
 					t.Run("Invalid signature", func(t *testing.T) {
@@ -225,11 +224,11 @@ func TestKeyListSignature(t *testing.T) {
 							jsoncdc.MustEncode(weight),
 						)
 
-						err := vm.Run(ctx, script, view)
+						_, output, err := vm.Run(ctx, script, snapshotTree)
 						assert.NoError(t, err)
-						assert.NoError(t, script.Err)
+						assert.NoError(t, output.Err)
 
-						assert.Equal(t, cadence.NewBool(false), script.Value)
+						assert.Equal(t, cadence.NewBool(false), output.Value)
 					})
 
 					t.Run("Malformed public key", func(t *testing.T) {
@@ -246,9 +245,9 @@ func TestKeyListSignature(t *testing.T) {
 							jsoncdc.MustEncode(weight),
 						)
 
-						err := vm.Run(ctx, script, view)
+						_, output, err := vm.Run(ctx, script, snapshotTree)
 						require.NoError(t, err)
-						require.Error(t, script.Err)
+						require.Error(t, output.Err)
 					})
 				},
 			))
@@ -256,11 +255,10 @@ func TestKeyListSignature(t *testing.T) {
 			t.Run("Multiple keys", newVMTest().run(
 				func(
 					t *testing.T,
-					vm *fvm.VirtualMachine,
+					vm fvm.VM,
 					chain flow.Chain,
 					ctx fvm.Context,
-					view state.View,
-					derivedBlockData *programs.DerivedBlockData,
+					snapshotTree snapshot.SnapshotTree,
 				) {
 					privateKeyA, publicKeyA := createKey()
 					privateKeyB, publicKeyB := createKey()
@@ -294,11 +292,11 @@ func TestKeyListSignature(t *testing.T) {
 							jsoncdc.MustEncode(weight),
 						)
 
-						err := vm.Run(ctx, script, view)
+						_, output, err := vm.Run(ctx, script, snapshotTree)
 						assert.NoError(t, err)
-						assert.NoError(t, script.Err)
+						assert.NoError(t, output.Err)
 
-						assert.Equal(t, cadence.NewBool(true), script.Value)
+						assert.Equal(t, cadence.NewBool(true), output.Value)
 					})
 
 					t.Run("2 of 3", func(t *testing.T) {
@@ -314,11 +312,11 @@ func TestKeyListSignature(t *testing.T) {
 							jsoncdc.MustEncode(weight),
 						)
 
-						err := vm.Run(ctx, script, view)
+						_, output, err := vm.Run(ctx, script, snapshotTree)
 						assert.NoError(t, err)
-						assert.NoError(t, script.Err)
+						assert.NoError(t, output.Err)
 
-						assert.Equal(t, cadence.NewBool(true), script.Value)
+						assert.Equal(t, cadence.NewBool(true), output.Value)
 					})
 
 					t.Run("1 of 3", func(t *testing.T) {
@@ -333,11 +331,11 @@ func TestKeyListSignature(t *testing.T) {
 							jsoncdc.MustEncode(weight),
 						)
 
-						err := vm.Run(ctx, script, view)
+						_, output, err := vm.Run(ctx, script, snapshotTree)
 						assert.NoError(t, err)
-						assert.NoError(t, script.Err)
+						assert.NoError(t, output.Err)
 
-						assert.Equal(t, cadence.NewBool(false), script.Value)
+						assert.Equal(t, cadence.NewBool(false), output.Value)
 					})
 				},
 			))
@@ -352,7 +350,7 @@ func TestKeyListSignature(t *testing.T) {
 
 	testForHash(signatureAlgorithm{
 		"BLS_BLS12_381",
-		crypto.KeyGenSeedMinLenBLSBLS12381,
+		crypto.KeyGenSeedMinLen,
 		crypto.BLSBLS12381,
 	}, hashAlgorithm{
 		"KMAC128_BLS_BLS12_381",
@@ -373,9 +371,9 @@ func TestBLSMultiSignature(t *testing.T) {
 	}
 
 	signatureAlgorithms := []signatureAlgorithm{
-		{"BLS_BLS12_381", crypto.KeyGenSeedMinLenBLSBLS12381, crypto.BLSBLS12381},
-		{"ECDSA_P256", crypto.KeyGenSeedMinLenECDSAP256, crypto.ECDSAP256},
-		{"ECDSA_secp256k1", crypto.KeyGenSeedMinLenECDSASecp256k1, crypto.ECDSASecp256k1},
+		{"BLS_BLS12_381", crypto.KeyGenSeedMinLen, crypto.BLSBLS12381},
+		{"ECDSA_P256", crypto.KeyGenSeedMinLen, crypto.ECDSAP256},
+		{"ECDSA_secp256k1", crypto.KeyGenSeedMinLen, crypto.ECDSASecp256k1},
 	}
 	BLSSignatureAlgorithm := signatureAlgorithms[0]
 
@@ -393,11 +391,10 @@ func TestBLSMultiSignature(t *testing.T) {
 		t.Run("verifyBLSPoP", newVMTest().run(
 			func(
 				t *testing.T,
-				vm *fvm.VirtualMachine,
+				vm fvm.VM,
 				chain flow.Chain,
 				ctx fvm.Context,
-				view state.View,
-				derivedBlockData *programs.DerivedBlockData,
+				snapshotTree snapshot.SnapshotTree,
 			) {
 
 				code := func(signatureAlgorithm signatureAlgorithm) []byte {
@@ -440,10 +437,10 @@ func TestBLSMultiSignature(t *testing.T) {
 						jsoncdc.MustEncode(pop),
 					)
 
-					err = vm.Run(ctx, script, view)
+					_, output, err := vm.Run(ctx, script, snapshotTree)
 					assert.NoError(t, err)
-					assert.NoError(t, script.Err)
-					assert.Equal(t, cadence.NewBool(true), script.Value)
+					assert.NoError(t, output.Err)
+					assert.Equal(t, cadence.NewBool(true), output.Value)
 
 				})
 
@@ -466,10 +463,10 @@ func TestBLSMultiSignature(t *testing.T) {
 						jsoncdc.MustEncode(pop),
 					)
 
-					err = vm.Run(ctx, script, view)
+					_, output, err := vm.Run(ctx, script, snapshotTree)
 					assert.NoError(t, err)
-					assert.NoError(t, script.Err)
-					assert.Equal(t, cadence.NewBool(false), script.Value)
+					assert.NoError(t, output.Err)
+					assert.Equal(t, cadence.NewBool(false), output.Value)
 
 				})
 
@@ -492,8 +489,9 @@ func TestBLSMultiSignature(t *testing.T) {
 							jsoncdc.MustEncode(pop),
 						)
 
-						err = vm.Run(ctx, script, view)
-						assert.Error(t, err)
+						_, output, err := vm.Run(ctx, script, snapshotTree)
+						assert.NoError(t, err)
+						assert.Error(t, output.Err)
 					})
 				}
 			},
@@ -504,11 +502,10 @@ func TestBLSMultiSignature(t *testing.T) {
 		t.Run("aggregateBLSSignatures", newVMTest().run(
 			func(
 				t *testing.T,
-				vm *fvm.VirtualMachine,
+				vm fvm.VM,
 				chain flow.Chain,
 				ctx fvm.Context,
-				view state.View,
-				derivedBlockData *programs.DerivedBlockData,
+				snapshotTree snapshot.SnapshotTree,
 			) {
 
 				code := []byte(
@@ -552,21 +549,21 @@ func TestBLSMultiSignature(t *testing.T) {
 					script := fvm.Script(code).WithArguments(
 						jsoncdc.MustEncode(cadence.Array{
 							Values: signatures,
-							ArrayType: cadence.VariableSizedArrayType{
-								ElementType: cadence.VariableSizedArrayType{
+							ArrayType: &cadence.VariableSizedArrayType{
+								ElementType: &cadence.VariableSizedArrayType{
 									ElementType: cadence.UInt8Type{},
 								},
 							},
 						}),
 					)
 
-					err = vm.Run(ctx, script, view)
+					_, output, err := vm.Run(ctx, script, snapshotTree)
 					assert.NoError(t, err)
-					assert.NoError(t, script.Err)
+					assert.NoError(t, output.Err)
 
 					expectedSig, err := crypto.AggregateBLSSignatures(sigs)
 					require.NoError(t, err)
-					assert.Equal(t, cadence.Optional{Value: testutil.BytesToCadenceArray(expectedSig)}, script.Value)
+					assert.Equal(t, cadence.Optional{Value: testutil.BytesToCadenceArray(expectedSig)}, output.Value)
 				})
 
 				t.Run("at least one invalid BLS signature", func(t *testing.T) {
@@ -584,8 +581,8 @@ func TestBLSMultiSignature(t *testing.T) {
 					script := fvm.Script(code).WithArguments(
 						jsoncdc.MustEncode(cadence.Array{
 							Values: signatures,
-							ArrayType: cadence.VariableSizedArrayType{
-								ElementType: cadence.VariableSizedArrayType{
+							ArrayType: &cadence.VariableSizedArrayType{
+								ElementType: &cadence.VariableSizedArrayType{
 									ElementType: cadence.UInt8Type{},
 								},
 							},
@@ -595,10 +592,10 @@ func TestBLSMultiSignature(t *testing.T) {
 					// revert the change
 					sigs[numSigs/2] = tmp
 
-					err = vm.Run(ctx, script, view)
+					_, output, err := vm.Run(ctx, script, snapshotTree)
 					assert.NoError(t, err)
-					assert.Error(t, script.Err)
-					assert.Equal(t, nil, script.Value)
+					assert.Error(t, output.Err)
+					assert.Equal(t, nil, output.Value)
 				})
 
 				t.Run("empty signature list", func(t *testing.T) {
@@ -607,18 +604,18 @@ func TestBLSMultiSignature(t *testing.T) {
 					script := fvm.Script(code).WithArguments(
 						jsoncdc.MustEncode(cadence.Array{
 							Values: signatures,
-							ArrayType: cadence.VariableSizedArrayType{
-								ElementType: cadence.VariableSizedArrayType{
+							ArrayType: &cadence.VariableSizedArrayType{
+								ElementType: &cadence.VariableSizedArrayType{
 									ElementType: cadence.UInt8Type{},
 								},
 							},
 						}),
 					)
 
-					err = vm.Run(ctx, script, view)
+					_, output, err := vm.Run(ctx, script, snapshotTree)
 					assert.NoError(t, err)
-					assert.Error(t, script.Err)
-					assert.Equal(t, nil, script.Value)
+					assert.Error(t, output.Err)
+					assert.Equal(t, nil, output.Value)
 				})
 			},
 		))
@@ -628,11 +625,10 @@ func TestBLSMultiSignature(t *testing.T) {
 		t.Run("aggregateBLSPublicKeys", newVMTest().run(
 			func(
 				t *testing.T,
-				vm *fvm.VirtualMachine,
+				vm fvm.VM,
 				chain flow.Chain,
 				ctx fvm.Context,
-				view state.View,
-				derivedBlockData *programs.DerivedBlockData,
+				snapshotTree snapshot.SnapshotTree,
 			) {
 
 				code := func(signatureAlgorithm signatureAlgorithm) []byte {
@@ -678,21 +674,21 @@ func TestBLSMultiSignature(t *testing.T) {
 					script := fvm.Script(code(BLSSignatureAlgorithm)).WithArguments(
 						jsoncdc.MustEncode(cadence.Array{
 							Values: publicKeys,
-							ArrayType: cadence.VariableSizedArrayType{
-								ElementType: cadence.VariableSizedArrayType{
+							ArrayType: &cadence.VariableSizedArrayType{
+								ElementType: &cadence.VariableSizedArrayType{
 									ElementType: cadence.UInt8Type{},
 								},
 							},
 						}),
 					)
 
-					err := vm.Run(ctx, script, view)
+					_, output, err := vm.Run(ctx, script, snapshotTree)
 					assert.NoError(t, err)
-					assert.NoError(t, script.Err)
+					assert.NoError(t, output.Err)
 					expectedPk, err := crypto.AggregateBLSPublicKeys(pks)
 					require.NoError(t, err)
 
-					assert.Equal(t, cadence.Optional{Value: testutil.BytesToCadenceArray(expectedPk.Encode())}, script.Value)
+					assert.Equal(t, cadence.Optional{Value: testutil.BytesToCadenceArray(expectedPk.Encode())}, output.Value)
 				})
 
 				for _, signatureAlgorithm := range signatureAlgorithms[1:] {
@@ -712,37 +708,38 @@ func TestBLSMultiSignature(t *testing.T) {
 						script := fvm.Script(code(signatureAlgorithm)).WithArguments(
 							jsoncdc.MustEncode(cadence.Array{
 								Values: publicKeys,
-								ArrayType: cadence.VariableSizedArrayType{
-									ElementType: cadence.VariableSizedArrayType{
+								ArrayType: &cadence.VariableSizedArrayType{
+									ElementType: &cadence.VariableSizedArrayType{
 										ElementType: cadence.UInt8Type{},
 									},
 								},
 							}),
 						)
 
-						err := vm.Run(ctx, script, view)
-						assert.Error(t, err)
+						_, output, err := vm.Run(ctx, script, snapshotTree)
+						assert.NoError(t, err)
+						assert.Error(t, output.Err)
 					})
 				}
 
 				t.Run("empty list", func(t *testing.T) {
 
-					publicKeys := []cadence.Value{}
+					var publicKeys []cadence.Value
 					script := fvm.Script(code(BLSSignatureAlgorithm)).WithArguments(
 						jsoncdc.MustEncode(cadence.Array{
 							Values: publicKeys,
-							ArrayType: cadence.VariableSizedArrayType{
-								ElementType: cadence.VariableSizedArrayType{
+							ArrayType: &cadence.VariableSizedArrayType{
+								ElementType: &cadence.VariableSizedArrayType{
 									ElementType: cadence.UInt8Type{},
 								},
 							},
 						}),
 					)
 
-					err := vm.Run(ctx, script, view)
+					_, output, err := vm.Run(ctx, script, snapshotTree)
 					assert.NoError(t, err)
-					assert.Error(t, script.Err)
-					assert.Equal(t, nil, script.Value)
+					assert.Error(t, output.Err)
+					assert.Equal(t, nil, output.Value)
 				})
 			},
 		))
@@ -752,11 +749,10 @@ func TestBLSMultiSignature(t *testing.T) {
 		t.Run("Combined Aggregations", newVMTest().run(
 			func(
 				t *testing.T,
-				vm *fvm.VirtualMachine,
+				vm fvm.VM,
 				chain flow.Chain,
 				ctx fvm.Context,
-				view state.View,
-				derivedBlockData *programs.DerivedBlockData,
+				snapshotTree snapshot.SnapshotTree,
 			) {
 
 				message, cadenceMessage := createMessage("random_message")
@@ -812,16 +808,16 @@ func TestBLSMultiSignature(t *testing.T) {
 				script := fvm.Script(code).WithArguments(
 					jsoncdc.MustEncode(cadence.Array{ // keys
 						Values: publicKeys,
-						ArrayType: cadence.VariableSizedArrayType{
-							ElementType: cadence.VariableSizedArrayType{
+						ArrayType: &cadence.VariableSizedArrayType{
+							ElementType: &cadence.VariableSizedArrayType{
 								ElementType: cadence.UInt8Type{},
 							},
 						},
 					}),
 					jsoncdc.MustEncode(cadence.Array{ // signatures
 						Values: signatures,
-						ArrayType: cadence.VariableSizedArrayType{
-							ElementType: cadence.VariableSizedArrayType{
+						ArrayType: &cadence.VariableSizedArrayType{
+							ElementType: &cadence.VariableSizedArrayType{
 								ElementType: cadence.UInt8Type{},
 							},
 						},
@@ -830,10 +826,10 @@ func TestBLSMultiSignature(t *testing.T) {
 					jsoncdc.MustEncode(cadence.String(tag)),
 				)
 
-				err := vm.Run(ctx, script, view)
+				_, output, err := vm.Run(ctx, script, snapshotTree)
 				assert.NoError(t, err)
-				assert.NoError(t, script.Err)
-				assert.Equal(t, cadence.NewBool(true), script.Value)
+				assert.NoError(t, output.Err)
+				assert.Equal(t, cadence.NewBool(true), output.Value)
 			},
 		))
 	}

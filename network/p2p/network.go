@@ -3,7 +3,6 @@ package p2p
 import (
 	"errors"
 	"fmt"
-	"strings"
 	"sync"
 	"time"
 
@@ -12,29 +11,19 @@ import (
 	"github.com/libp2p/go-libp2p/core/protocol"
 	"github.com/rs/zerolog"
 
-	"github.com/onflow/flow-go/crypto/hash"
-
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/network"
+	alspmgr "github.com/onflow/flow-go/network/alsp/manager"
 	netcache "github.com/onflow/flow-go/network/cache"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/message"
-	"github.com/onflow/flow-go/network/p2p/conduit"
 	"github.com/onflow/flow-go/network/queue"
 	_ "github.com/onflow/flow-go/utils/binstat"
 	"github.com/onflow/flow-go/utils/logging"
-)
-
-const (
-	// DefaultReceiveCacheSize represents size of receive cache that keeps hash of incoming messages
-	// for sake of deduplication.
-	DefaultReceiveCacheSize = 10e4
-	// eventIDPackingPrefix is used as a salt to generate payload hash for messages.
-	eventIDPackingPrefix = "libp2ppacking"
 )
 
 // NotEjectedFilter is an identity filter that, when applied to the identity
@@ -44,14 +33,6 @@ const (
 // NOTE: The protocol state includes nodes from the previous/next epoch that should
 // be included in network communication. We omit any nodes that have been ejected.
 var NotEjectedFilter = filter.Not(filter.Ejected)
-
-type NetworkOptFunction func(*Network)
-
-func WithConduitFactory(f network.ConduitFactory) NetworkOptFunction {
-	return func(n *Network) {
-		n.conduitFactory = f
-	}
-}
 
 // Network represents the overlay network of our peer-to-peer network, including
 // the protocols for handshakes, authentication, gossiping and heartbeats.
@@ -63,7 +44,7 @@ type Network struct {
 	codec                       network.Codec
 	me                          module.Local
 	mw                          network.Middleware
-	metrics                     module.NetworkMetrics
+	metrics                     module.NetworkCoreMetrics
 	receiveCache                *netcache.ReceiveCache // used to deduplicate incoming messages
 	queue                       network.MessageQueue
 	subscriptionManager         network.SubscriptionManager // used to keep track of subscribed channels
@@ -71,6 +52,7 @@ type Network struct {
 	topology                    network.Topology
 	registerEngineRequests      chan *registerEngineRequest
 	registerBlobServiceRequests chan *registerBlobServiceRequest
+	misbehaviorReportManager    network.MisbehaviorReportManager
 }
 
 var _ network.Network = &Network{}
@@ -101,32 +83,76 @@ type registerBlobServiceResp struct {
 
 var ErrNetworkShutdown = errors.New("network has already shutdown")
 
-type NetworkParameters struct {
+// NetworkConfig is a configuration struct for the network. It contains all the
+// necessary components to create a new network.
+type NetworkConfig struct {
 	Logger              zerolog.Logger
 	Codec               network.Codec
 	Me                  module.Local
 	MiddlewareFactory   func() (network.Middleware, error)
 	Topology            network.Topology
 	SubscriptionManager network.SubscriptionManager
-	Metrics             module.NetworkMetrics
+	Metrics             module.NetworkCoreMetrics
 	IdentityProvider    module.IdentityProvider
 	ReceiveCache        *netcache.ReceiveCache
-	Options             []NetworkOptFunction
+	ConduitFactory      network.ConduitFactory
+	AlspCfg             *alspmgr.MisbehaviorReportManagerConfig
+}
+
+// NetworkConfigOption is a function that can be used to override network config parmeters.
+type NetworkConfigOption func(*NetworkConfig)
+
+// WithAlspConfig overrides the default misbehavior report manager config. It is mostly used for testing purposes.
+// Note: do not override the default misbehavior report manager config in production unless you know what you are doing.
+// Args:
+// cfg: misbehavior report manager config
+// Returns:
+// NetworkConfigOption: network param option
+func WithAlspConfig(cfg *alspmgr.MisbehaviorReportManagerConfig) NetworkConfigOption {
+	return func(params *NetworkConfig) {
+		params.AlspCfg = cfg
+	}
+}
+
+// NetworkOption is a function that can be used to override network attributes.
+// It is mostly used for testing purposes.
+// Note: do not override network attributes in production unless you know what you are doing.
+type NetworkOption func(*Network)
+
+// WithAlspManager sets the misbehavior report manager for the network. It overrides the default
+// misbehavior report manager that is created from the config.
+// Note that this option is mostly used for testing purposes, do not use it in production unless you
+// know what you are doing.
+//
+// Args:
+//
+//	mgr: misbehavior report manager
+//
+// Returns:
+//
+//	NetworkOption: network option
+func WithAlspManager(mgr network.MisbehaviorReportManager) NetworkOption {
+	return func(n *Network) {
+		n.misbehaviorReportManager = mgr
+	}
 }
 
 // NewNetwork creates a new naive overlay network, using the given middleware to
 // communicate to direct peers, using the given codec for serialization, and
 // using the given state & cache interfaces to track volatile information.
 // csize determines the size of the cache dedicated to keep track of received messages
-func NewNetwork(param *NetworkParameters) (*Network, error) {
-
+func NewNetwork(param *NetworkConfig, opts ...NetworkOption) (*Network, error) {
 	mw, err := param.MiddlewareFactory()
 	if err != nil {
 		return nil, fmt.Errorf("could not create middleware: %w", err)
 	}
+	misbehaviorMngr, err := alspmgr.NewMisbehaviorReportManager(param.AlspCfg, mw)
+	if err != nil {
+		return nil, fmt.Errorf("could not create misbehavior report manager: %w", err)
+	}
 
 	n := &Network{
-		logger:                      param.Logger,
+		logger:                      param.Logger.With().Str("component", "network").Logger(),
 		codec:                       param.Codec,
 		me:                          param.Me,
 		mw:                          mw,
@@ -135,12 +161,13 @@ func NewNetwork(param *NetworkParameters) (*Network, error) {
 		metrics:                     param.Metrics,
 		subscriptionManager:         param.SubscriptionManager,
 		identityProvider:            param.IdentityProvider,
-		conduitFactory:              conduit.NewDefaultConduitFactory(),
+		conduitFactory:              param.ConduitFactory,
 		registerEngineRequests:      make(chan *registerEngineRequest),
 		registerBlobServiceRequests: make(chan *registerBlobServiceRequest),
+		misbehaviorReportManager:    misbehaviorMngr,
 	}
 
-	for _, opt := range param.Options {
+	for _, opt := range opts {
 		opt(n)
 	}
 
@@ -151,6 +178,23 @@ func NewNetwork(param *NetworkParameters) (*Network, error) {
 	}
 
 	n.ComponentManager = component.NewComponentManagerBuilder().
+		AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+			n.logger.Debug().Msg("starting misbehavior manager")
+			n.misbehaviorReportManager.Start(ctx)
+
+			select {
+			case <-n.misbehaviorReportManager.Ready():
+				n.logger.Debug().Msg("misbehavior manager is ready")
+				ready()
+			case <-ctx.Done():
+				// jumps to the end of the select statement to let a graceful shutdown.
+			}
+
+			<-ctx.Done()
+			n.logger.Debug().Msg("stopping misbehavior manager")
+			<-n.misbehaviorReportManager.Done()
+			n.logger.Debug().Msg("misbehavior manager stopped")
+		}).
 		AddWorker(n.runMiddleware).
 		AddWorker(n.processRegisterEngineRequests).
 		AddWorker(n.processRegisterBlobServiceRequests).Build()
@@ -327,35 +371,37 @@ func (n *Network) Identity(pid peer.ID) (*flow.Identity, bool) {
 	return n.identityProvider.ByPeerID(pid)
 }
 
-func (n *Network) Receive(nodeID flow.Identifier, msg *message.Message, decodedMsgPayload interface{}) error {
-	err := n.processNetworkMessage(nodeID, msg, decodedMsgPayload)
+func (n *Network) Receive(msg *network.IncomingMessageScope) error {
+	n.metrics.InboundMessageReceived(msg.Size(), msg.Channel().String(), msg.Protocol().String(), msg.PayloadType())
+
+	err := n.processNetworkMessage(msg)
 	if err != nil {
 		return fmt.Errorf("could not process message: %w", err)
 	}
 	return nil
 }
 
-func (n *Network) processNetworkMessage(senderID flow.Identifier, message *message.Message, decodedMsgPayload interface{}) error {
+func (n *Network) processNetworkMessage(msg *network.IncomingMessageScope) error {
 	// checks the cache for deduplication and adds the message if not already present
-	if !n.receiveCache.Add(message.EventID) {
+	if !n.receiveCache.Add(msg.EventID()) {
 		// drops duplicate message
 		n.logger.Debug().
-			Hex("sender_id", senderID[:]).
-			Hex("event_id", message.EventID).
-			Str("channel", message.ChannelID).
+			Hex("sender_id", logging.ID(msg.OriginId())).
+			Hex("event_id", msg.EventID()).
+			Str("channel", msg.Channel().String()).
 			Msg("dropping message due to duplication")
 
-		n.metrics.NetworkDuplicateMessagesDropped(message.ChannelID, message.Type)
+		n.metrics.DuplicateInboundMessagesDropped(msg.Channel().String(), msg.Protocol().String(), msg.PayloadType())
 
 		return nil
 	}
 
 	// create queue message
 	qm := queue.QMessage{
-		Payload:  decodedMsgPayload,
-		Size:     message.Size(),
-		Target:   channels.Channel(message.ChannelID),
-		SenderID: senderID,
+		Payload:  msg.DecodedPayload(),
+		Size:     msg.Size(),
+		Target:   msg.Channel(),
+		SenderID: msg.OriginId(),
 	}
 
 	// insert the message in the queue
@@ -367,52 +413,33 @@ func (n *Network) processNetworkMessage(senderID flow.Identifier, message *messa
 	return nil
 }
 
-// genNetworkMessage uses the codec to encode an event into a NetworkMessage
-func (n *Network) genNetworkMessage(channel channels.Channel, event interface{}, targetIDs ...flow.Identifier) (*message.Message, error) {
-	// encode the payload using the configured codec
-	payload, err := n.codec.Encode(event)
-	if err != nil {
-		return nil, fmt.Errorf("could not encode event: %w", err)
-	}
-
-	//bs := binstat.EnterTimeVal(binstat.BinNet+":wire<3payload2message", int64(len(payload)))
-	//defer binstat.Leave(bs)
-
-	var emTargets [][]byte
-	for _, targetID := range targetIDs {
-		tempID := targetID // avoid capturing loop variable
-		emTargets = append(emTargets, tempID[:])
-	}
-
-	// cast event to a libp2p.Message
-	msg := &message.Message{
-		ChannelID: channel.String(),
-		TargetIDs: emTargets,
-		Payload:   payload,
-	}
-
-	return msg, nil
-}
-
 // UnicastOnChannel sends the message in a reliable way to the given recipient.
 // It uses 1-1 direct messaging over the underlying network to deliver the message.
 // It returns an error if unicasting fails.
-func (n *Network) UnicastOnChannel(channel channels.Channel, message interface{}, targetID flow.Identifier) error {
+func (n *Network) UnicastOnChannel(channel channels.Channel, payload interface{}, targetID flow.Identifier) error {
 	if targetID == n.me.NodeID() {
 		n.logger.Debug().Msg("network skips self unicasting")
 		return nil
 	}
 
-	// generates network message (encoding) based on list of recipients
-	msg, err := n.genNetworkMessage(channel, message, targetID)
+	msg, err := network.NewOutgoingScope(
+		flow.IdentifierList{targetID},
+		channel,
+		payload,
+		n.codec.Encode,
+		message.ProtocolTypeUnicast)
 	if err != nil {
-		return fmt.Errorf("unicast could not generate network message: %w", err)
+		return fmt.Errorf("could not generate outgoing message scope for unicast: %w", err)
 	}
 
-	err = n.mw.SendDirect(msg, targetID)
+	n.metrics.UnicastMessageSendingStarted(msg.Channel().String())
+	defer n.metrics.UnicastMessageSendingCompleted(msg.Channel().String())
+	err = n.mw.SendDirect(msg)
 	if err != nil {
 		return fmt.Errorf("failed to send message to %x: %w", targetID, err)
 	}
+
+	n.metrics.OutboundMessageSent(msg.Size(), msg.Channel().String(), message.ProtocolTypeUnicast.String(), msg.PayloadType())
 
 	return nil
 }
@@ -464,25 +491,27 @@ func (n *Network) removeSelfFilter() flow.IdentifierFilter {
 }
 
 // sendOnChannel sends the message on channel to targets.
-func (n *Network) sendOnChannel(channel channels.Channel, message interface{}, targetIDs []flow.Identifier) error {
+func (n *Network) sendOnChannel(channel channels.Channel, msg interface{}, targetIDs []flow.Identifier) error {
 	n.logger.Debug().
-		Interface("message", message).
+		Interface("message", msg).
 		Str("channel", channel.String()).
 		Str("target_ids", fmt.Sprintf("%v", targetIDs)).
 		Msg("sending new message on channel")
 
 	// generate network message (encoding) based on list of recipients
-	msg, err := n.genNetworkMessage(channel, message, targetIDs...)
+	scope, err := network.NewOutgoingScope(targetIDs, channel, msg, n.codec.Encode, message.ProtocolTypePubSub)
 	if err != nil {
-		return fmt.Errorf("failed to generate network message for channel %s: %w", channel, err)
+		return fmt.Errorf("failed to generate outgoing message scope %s: %w", channel, err)
 	}
 
 	// publish the message through the channel, however, the message
 	// is only restricted to targetIDs (if they subscribed to channel).
-	err = n.mw.Publish(msg, channel)
+	err = n.mw.Publish(scope)
 	if err != nil {
 		return fmt.Errorf("failed to send message on channel %s: %w", channel, err)
 	}
+
+	n.metrics.OutboundMessageSent(scope.Size(), scope.Channel().String(), message.ProtocolTypePubSub.String(), scope.PayloadType())
 
 	return nil
 }
@@ -499,10 +528,10 @@ func (n *Network) queueSubmitFunc(message interface{}) {
 
 	eng, err := n.subscriptionManager.GetEngine(qm.Target)
 	if err != nil {
-		// This means the message was received on a channel that the node has not registered an engine for
-		logger.Err(err).
-			Bool(logging.KeySuspicious, true).
-			Msg("failed to submit message")
+		// This means the message was received on a channel that the node has not registered an
+		// engine for. This may be because the message was received during startup and the node
+		// hasn't subscribed to the channel yet, or there is a bug.
+		logger.Err(err).Msg("failed to submit message")
 		return
 	}
 
@@ -526,22 +555,14 @@ func (n *Network) Topology() flow.IdentityList {
 	return n.topology.Fanout(n.Identities())
 }
 
-func EventId(channel channels.Channel, payload []byte) (hash.Hash, error) {
-	// use a hash with an engine-specific salt to get the payload hash
-	h := hash.NewSHA3_384()
-	_, err := h.Write([]byte(eventIDPackingPrefix + channel))
-	if err != nil {
-		return nil, fmt.Errorf("could not hash channel as salt: %w", err)
-	}
-
-	_, err = h.Write(payload)
-	if err != nil {
-		return nil, fmt.Errorf("could not hash event: %w", err)
-	}
-
-	return h.SumHash(), nil
-}
-
-func MessageType(decodedPayload interface{}) string {
-	return strings.TrimLeft(fmt.Sprintf("%T", decodedPayload), "*")
+// ReportMisbehaviorOnChannel reports the misbehavior of a node on sending a message to the current node that appears
+// valid based on the networking layer but is considered invalid by the current node based on the Flow protocol.
+// The misbehavior report is sent to the current node's networking layer on the given channel to be processed.
+// Args:
+// - channel: The channel on which the misbehavior report is sent.
+// - report: The misbehavior report to be sent.
+// Returns:
+// none
+func (n *Network) ReportMisbehaviorOnChannel(channel channels.Channel, report network.MisbehaviorReport) {
+	n.misbehaviorReportManager.HandleMisbehaviorReport(channel, report)
 }

@@ -74,7 +74,7 @@ func New(
 
 	// FIFO queue for transactions
 	queue, err := fifoqueue.NewFifoQueue(
-		fifoqueue.WithCapacity(int(config.MaxMessageQueueSize)),
+		int(config.MaxMessageQueueSize),
 		fifoqueue.WithLengthObserver(func(len int) {
 			mempoolMetrics.MempoolEntries(metrics.ResourceTransactionIngestQueue, uint(len))
 		}),
@@ -261,8 +261,8 @@ func (e *Engine) onTransaction(originID flow.Identifier, tx *flow.TransactionBod
 		return fmt.Errorf("could not get cluster responsible for tx: %x", txID)
 	}
 
-	localClusterFingerPrint := localCluster.Fingerprint()
-	txClusterFingerPrint := txCluster.Fingerprint()
+	localClusterFingerPrint := localCluster.ID()
+	txClusterFingerPrint := txCluster.ID()
 	log = log.With().
 		Hex("local_cluster", logging.ID(localClusterFingerPrint)).
 		Hex("tx_cluster", logging.ID(txClusterFingerPrint)).

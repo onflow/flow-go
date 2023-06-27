@@ -1,17 +1,9 @@
 package inmem
 
 import (
+	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/state/protocol"
-	"github.com/onflow/flow-go/state/protocol/seed"
-)
-
-var (
-	_ protocol.Snapshot     = new(Snapshot)
-	_ protocol.GlobalParams = new(Params)
-	_ protocol.EpochQuery   = new(Epochs)
-	_ protocol.Epoch        = new(Epoch)
-	_ protocol.Cluster      = new(Cluster)
 )
 
 // Snapshot is a memory-backed implementation of protocol.Snapshot. The snapshot
@@ -20,6 +12,8 @@ var (
 type Snapshot struct {
 	enc EncodableSnapshot
 }
+
+var _ protocol.Snapshot = (*Snapshot)(nil)
 
 func (s Snapshot) Head() (*flow.Header, error) {
 	return s.enc.Head, nil
@@ -58,17 +52,12 @@ func (s Snapshot) Descendants() ([]flow.Identifier, error) {
 	return nil, nil
 }
 
-func (s Snapshot) ValidDescendants() ([]flow.Identifier, error) {
-	// canonical snapshots don't have any descendants
-	return nil, nil
-}
-
 func (s Snapshot) Phase() (flow.EpochPhase, error) {
 	return s.enc.Phase, nil
 }
 
 func (s Snapshot) RandomSource() ([]byte, error) {
-	return seed.FromParentQCSignature(s.enc.QuorumCertificate.SigData)
+	return model.BeaconSignature(s.enc.QuorumCertificate)
 }
 
 func (s Snapshot) Epochs() protocol.EpochQuery {
@@ -81,6 +70,10 @@ func (s Snapshot) Params() protocol.GlobalParams {
 
 func (s Snapshot) Encodable() EncodableSnapshot {
 	return s.enc
+}
+
+func (s Snapshot) VersionBeacon() (*flow.SealedVersionBeacon, error) {
+	return s.enc.SealedVersionBeacon, nil
 }
 
 func SnapshotFromEncodable(enc EncodableSnapshot) *Snapshot {

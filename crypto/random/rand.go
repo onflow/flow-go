@@ -149,11 +149,7 @@ func (p *genericPRG) Shuffle(n int, swap func(i, j int)) error {
 	if n < 0 {
 		return fmt.Errorf("population size cannot be negative")
 	}
-	for i := n - 1; i > 0; i-- {
-		j := p.UintN(uint64(i + 1))
-		swap(i, int(j))
-	}
-	return nil
+	return p.Samples(n, n, swap)
 }
 
 // Samples picks randomly m elements out of n elemnts and places them
@@ -164,7 +160,7 @@ func (p *genericPRG) Shuffle(n int, swap func(i, j int)) error {
 // O(1) space and O(m) time
 func (p *genericPRG) Samples(n int, m int, swap func(i, j int)) error {
 	if m < 0 {
-		return fmt.Errorf("inputs cannot be negative")
+		return fmt.Errorf("sample size cannot be negative")
 	}
 	if n < m {
 		return fmt.Errorf("sample size (%d) cannot be larger than entire population (%d)", m, n)

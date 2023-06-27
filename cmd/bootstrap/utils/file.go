@@ -35,7 +35,7 @@ func ReadRootProtocolSnapshot(bootDir string) (*inmem.Snapshot, error) {
 func ReadRootBlock(rootBlockDataPath string) (*flow.Block, error) {
 	bytes, err := io.ReadFile(rootBlockDataPath)
 	if err != nil {
-		return nil, fmt.Errorf("could not read root block: %w", err)
+		return nil, fmt.Errorf("could not read root block file: %w", err)
 	}
 
 	var encodable flow.Block

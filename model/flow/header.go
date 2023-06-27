@@ -15,30 +15,36 @@ import (
 // the combined payload of the entire block. It is what consensus nodes agree
 // on after validating the contents against the payload hash.
 type Header struct {
-	ChainID ChainID // ChainID is a chain-specific value to prevent replay attacks.
-
-	ParentID Identifier // ParentID is the ID of this block's parent.
-
-	Height uint64 // Height is the height of the parent + 1
-
-	PayloadHash Identifier // PayloadHash is a hash of the payload of this block.
-
-	Timestamp time.Time // Timestamp is the time at which this block was proposed.
+	// ChainID is a chain-specific value to prevent replay attacks.
+	ChainID ChainID
+	// ParentID is the ID of this block's parent.
+	ParentID Identifier
+	// Height is the height of the parent + 1
+	Height uint64
+	// PayloadHash is a hash of the payload of this block.
+	PayloadHash Identifier
+	// Timestamp is the time at which this block was proposed.
 	// The proposer can choose any time, so this should not be trusted as accurate.
-
-	View uint64 // View number at which this block was proposed.
-
-	ParentVoterIndices []byte // a bitvector that represents all the voters for the parent block.
-
-	ParentVoterSigData []byte // aggregated signature over the parent block. Not a single cryptographic
+	Timestamp time.Time
+	// View number at which this block was proposed.
+	View uint64
+	// ParentView number at which parent block was proposed.
+	ParentView uint64
+	// ParentVoterIndices is a bitvector that represents all the voters for the parent block.
+	ParentVoterIndices []byte
+	// ParentVoterSigData is an aggregated signature over the parent block. Not a single cryptographic
 	// signature since the data represents cryptographic signatures serialized in some way (concatenation or other)
 	// A quorum certificate can be extracted from the header.
 	// This field is the SigData field of the extracted quorum certificate.
-
-	ProposerID Identifier // proposer identifier for the block
-
-	ProposerSigData []byte // signature of the proposer over the new block. Not a single cryptographic
+	ParentVoterSigData []byte
+	// ProposerID is a proposer identifier for the block
+	ProposerID Identifier
+	// ProposerSigData is a signature of the proposer over the new block. Not a single cryptographic
 	// signature since the data represents cryptographic signatures serialized in some way (concatenation or other)
+	ProposerSigData []byte
+	// LastViewTC is a timeout certificate for previous view, it can be nil
+	// it has to be present if previous round ended with timeout.
+	LastViewTC *TimeoutCertificate
 }
 
 // Body returns the immutable part of the block header.
@@ -50,9 +56,11 @@ func (h Header) Body() interface{} {
 		PayloadHash        Identifier
 		Timestamp          uint64
 		View               uint64
+		ParentView         uint64
 		ParentVoterIndices []byte
 		ParentVoterSigData []byte
 		ProposerID         Identifier
+		LastViewTCID       Identifier
 	}{
 		ChainID:            h.ChainID,
 		ParentID:           h.ParentID,
@@ -60,9 +68,21 @@ func (h Header) Body() interface{} {
 		PayloadHash:        h.PayloadHash,
 		Timestamp:          uint64(h.Timestamp.UnixNano()),
 		View:               h.View,
+		ParentView:         h.ParentView,
 		ParentVoterIndices: h.ParentVoterIndices,
 		ParentVoterSigData: h.ParentVoterSigData,
 		ProposerID:         h.ProposerID,
+		LastViewTCID:       h.LastViewTC.ID(),
+	}
+}
+
+// QuorumCertificate returns quorum certificate that is incorporated in the block header.
+func (h Header) QuorumCertificate() *QuorumCertificate {
+	return &QuorumCertificate{
+		BlockID:       h.ParentID,
+		View:          h.ParentView,
+		SignerIndices: h.ParentVoterIndices,
+		SigData:       h.ParentVoterSigData,
 	}
 }
 

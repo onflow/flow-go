@@ -16,24 +16,25 @@ const blockStateTimeout = 120 * time.Second
 
 type BlockState struct {
 	sync.RWMutex
-	blocksByID        map[flow.Identifier]*messages.BlockProposal
-	blocksByHeight    map[uint64][]*messages.BlockProposal
-	finalizedByHeight map[uint64]*messages.BlockProposal
+	blocksByID        map[flow.Identifier]*flow.Block
+	blocksByHeight    map[uint64][]*flow.Block
+	finalizedByHeight map[uint64]*flow.Block
 	highestFinalized  uint64
 	highestProposed   uint64
-	highestSealed     *messages.BlockProposal
+	highestSealed     *flow.Block
 }
 
 func NewBlockState() *BlockState {
 	return &BlockState{
 		RWMutex:           sync.RWMutex{},
-		blocksByID:        make(map[flow.Identifier]*messages.BlockProposal),
-		blocksByHeight:    make(map[uint64][]*messages.BlockProposal),
-		finalizedByHeight: make(map[uint64]*messages.BlockProposal),
+		blocksByID:        make(map[flow.Identifier]*flow.Block),
+		blocksByHeight:    make(map[uint64][]*flow.Block),
+		finalizedByHeight: make(map[uint64]*flow.Block),
 	}
 }
 
-func (bs *BlockState) Add(t *testing.T, b *messages.BlockProposal) {
+func (bs *BlockState) Add(t *testing.T, msg *messages.BlockProposal) {
+	b := msg.Block.ToInternal()
 	bs.Lock()
 	defer bs.Unlock()
 
@@ -55,8 +56,8 @@ func (bs *BlockState) Add(t *testing.T, b *messages.BlockProposal) {
 	bs.processAncestors(t, b, confirmsHeight)
 }
 
-func (bs *BlockState) WaitForBlockById(t *testing.T, blockId flow.Identifier) *messages.BlockProposal {
-	var blockProposal *messages.BlockProposal
+func (bs *BlockState) WaitForBlockById(t *testing.T, blockId flow.Identifier) *flow.Block {
+	var blockProposal *flow.Block
 
 	require.Eventually(t, func() bool {
 		bs.RLock()
@@ -77,8 +78,8 @@ func (bs *BlockState) WaitForBlockById(t *testing.T, blockId flow.Identifier) *m
 }
 
 // WaitForBlocksByHeight waits until a block at height is observed, and returns all observed blocks at that height.
-func (bs *BlockState) WaitForBlocksByHeight(t *testing.T, height uint64) []*messages.BlockProposal {
-	var blockProposals []*messages.BlockProposal
+func (bs *BlockState) WaitForBlocksByHeight(t *testing.T, height uint64) []*flow.Block {
+	var blockProposals []*flow.Block
 
 	require.Eventually(t, func() bool {
 		bs.RLock()
@@ -101,7 +102,7 @@ func (bs *BlockState) WaitForBlocksByHeight(t *testing.T, height uint64) []*mess
 // processAncestors checks whether ancestors of block are within the confirming height, and finalizes
 // them if that is the case.
 // It also processes the seals of blocks being finalized.
-func (bs *BlockState) processAncestors(t *testing.T, b *messages.BlockProposal, confirmsHeight uint64) {
+func (bs *BlockState) processAncestors(t *testing.T, b *flow.Block, confirmsHeight uint64) {
 	// puts this block proposal and all ancestors into `finalizedByHeight`
 	t.Logf("%v new height arrived: %d\n", time.Now().UTC(), b.Header.Height)
 	ancestor := b
@@ -160,7 +161,7 @@ func (bs *BlockState) processAncestors(t *testing.T, b *messages.BlockProposal, 
 // WaitForHighestFinalizedProgress waits until last finalized height progresses, e.g., if
 // latest finalized block is 10, this will wait until any block height higher than 10 is finalized, and
 // returns that block.
-func (bs *BlockState) WaitForHighestFinalizedProgress(t *testing.T, currentFinalized uint64) *messages.BlockProposal {
+func (bs *BlockState) WaitForHighestFinalizedProgress(t *testing.T, currentFinalized uint64) *flow.Block {
 	require.Eventually(t, func() bool {
 		bs.RLock()
 		defer bs.RUnlock()
@@ -180,7 +181,7 @@ func (bs *BlockState) WaitForHighestFinalizedProgress(t *testing.T, currentFinal
 
 // WaitUntilNextHeightFinalized waits until the next block height that will be proposed is finalized: If the latest
 // proposed block has height 13, and the latest finalized block is 10, this will wait until block height 14 is finalized
-func (bs *BlockState) WaitUntilNextHeightFinalized(t *testing.T, currentProposed uint64) *messages.BlockProposal {
+func (bs *BlockState) WaitUntilNextHeightFinalized(t *testing.T, currentProposed uint64) *flow.Block {
 	require.Eventually(t, func() bool {
 		bs.RLock()
 		defer bs.RUnlock()
@@ -198,7 +199,7 @@ func (bs *BlockState) WaitUntilNextHeightFinalized(t *testing.T, currentProposed
 // WaitForFinalizedChild waits until any child of the passed parent will be finalized: If the latest proposed block has
 // height 13, and the latest finalized block is 10 and we are waiting for the first finalized child of a parent at
 // height 11, this will wait until block height 12 is finalized
-func (bs *BlockState) WaitForFinalizedChild(t *testing.T, parent *messages.BlockProposal) *messages.BlockProposal {
+func (bs *BlockState) WaitForFinalizedChild(t *testing.T, parent *flow.Block) *flow.Block {
 	require.Eventually(t, func() bool {
 		bs.RLock()
 		defer bs.RUnlock()
@@ -216,7 +217,7 @@ func (bs *BlockState) WaitForFinalizedChild(t *testing.T, parent *messages.Block
 
 // HighestFinalized returns the highest finalized block after genesis and a boolean indicating whether a highest
 // finalized block exists
-func (bs *BlockState) HighestFinalized() (*messages.BlockProposal, bool) {
+func (bs *BlockState) HighestFinalized() (*flow.Block, bool) {
 	bs.RLock()
 	defer bs.RUnlock()
 
@@ -242,7 +243,7 @@ func (bs *BlockState) HighestFinalizedHeight() uint64 {
 }
 
 // WaitForSealed returns the sealed block after a certain height has been sealed.
-func (bs *BlockState) WaitForSealed(t *testing.T, height uint64) *messages.BlockProposal {
+func (bs *BlockState) WaitForSealed(t *testing.T, height uint64) *flow.Block {
 	require.Eventually(t,
 		func() bool {
 			bs.RLock()
@@ -262,7 +263,7 @@ func (bs *BlockState) WaitForSealed(t *testing.T, height uint64) *messages.Block
 	return bs.highestSealed
 }
 
-func (bs *BlockState) HighestSealed() (*messages.BlockProposal, bool) {
+func (bs *BlockState) HighestSealed() (*flow.Block, bool) {
 	bs.RLock()
 	defer bs.RUnlock()
 
@@ -272,28 +273,7 @@ func (bs *BlockState) HighestSealed() (*messages.BlockProposal, bool) {
 	return bs.highestSealed, true
 }
 
-func (bs *BlockState) WaitForSealedView(t *testing.T, view uint64) *messages.BlockProposal {
-	timeout := 3 * blockStateTimeout
-	require.Eventually(t,
-		func() bool {
-			bs.RLock()
-			defer bs.RUnlock()
-
-			if bs.highestSealed != nil {
-				t.Logf("%v waiting for sealed view (%d/%d)", time.Now().UTC(), bs.highestSealed.Header.View, view)
-			}
-			return bs.highestSealed != nil && bs.highestSealed.Header.View >= view
-		},
-		timeout,
-		100*time.Millisecond,
-		fmt.Sprintf("did not receive sealed block for view (%v) within %v seconds", view, timeout))
-
-	bs.RLock()
-	defer bs.RUnlock()
-	return bs.highestSealed
-}
-
-func (bs *BlockState) FinalizedHeight(currentHeight uint64) (*messages.BlockProposal, bool) {
+func (bs *BlockState) FinalizedHeight(currentHeight uint64) (*flow.Block, bool) {
 	bs.RLock()
 	defer bs.RUnlock()
 

@@ -3,8 +3,6 @@ package state
 import (
 	"errors"
 	"fmt"
-
-	"github.com/onflow/flow-go/model/flow"
 )
 
 var (
@@ -88,57 +86,4 @@ func (e UnverifiableExtensionError) Unwrap() error {
 func IsUnverifiableExtensionError(err error) bool {
 	var errUnverifiableExtensionError UnverifiableExtensionError
 	return errors.As(err, &errUnverifiableExtensionError)
-}
-
-// NoValidChildBlockError is a sentinel error when the case where a certain block has
-// no valid child.
-type NoValidChildBlockError struct {
-	error
-}
-
-func NewNoValidChildBlockError(msg string) error {
-	return NoValidChildBlockError{
-		error: fmt.Errorf(msg),
-	}
-}
-
-func NewNoValidChildBlockErrorf(msg string, args ...interface{}) error {
-	return NewNoValidChildBlockError(fmt.Sprintf(msg, args...))
-}
-
-func (e NoValidChildBlockError) Unwrap() error {
-	return e.error
-}
-
-func IsNoValidChildBlockError(err error) bool {
-	return errors.As(err, &NoValidChildBlockError{})
-}
-
-// UnknownBlockError is a sentinel error indicating that a certain block
-// has not been ingested yet.
-type UnknownBlockError struct {
-	blockID flow.Identifier
-	error
-}
-
-// WrapAsUnknownBlockError wraps a given error as UnknownBlockError
-func WrapAsUnknownBlockError(blockID flow.Identifier, err error) error {
-	return UnknownBlockError{
-		blockID: blockID,
-		error:   fmt.Errorf("block %v has not been processed yet: %w", blockID, err),
-	}
-}
-
-func NewUnknownBlockError(blockID flow.Identifier) error {
-	return UnknownBlockError{
-		blockID: blockID,
-		error:   fmt.Errorf("block %v has not been processed yet", blockID),
-	}
-}
-
-func (e UnknownBlockError) Unwrap() error { return e.error }
-
-func IsUnknownBlockError(err error) bool {
-	var e UnknownBlockError
-	return errors.As(err, &e)
 }

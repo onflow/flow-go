@@ -3,19 +3,19 @@ package module
 import (
 	"github.com/onflow/flow-go/model/cluster"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/model/messages"
 )
 
 // PendingBlockBuffer defines an interface for a cache of pending blocks that
 // cannot yet be processed because they do not connect to the rest of the chain
 // state. They are indexed by parent ID to enable processing all of a parent's
 // children once the parent is received.
+// Safe for concurrent use.
 type PendingBlockBuffer interface {
-	Add(originID flow.Identifier, proposal *messages.BlockProposal) bool
+	Add(block flow.Slashable[*flow.Block]) bool
 
-	ByID(blockID flow.Identifier) (*flow.PendingBlock, bool)
+	ByID(blockID flow.Identifier) (flow.Slashable[*flow.Block], bool)
 
-	ByParentID(parentID flow.Identifier) ([]*flow.PendingBlock, bool)
+	ByParentID(parentID flow.Identifier) ([]flow.Slashable[*flow.Block], bool)
 
 	DropForParent(parentID flow.Identifier)
 
@@ -27,12 +27,13 @@ type PendingBlockBuffer interface {
 
 // PendingClusterBlockBuffer is the same thing as PendingBlockBuffer, but for
 // collection node cluster consensus.
+// Safe for concurrent use.
 type PendingClusterBlockBuffer interface {
-	Add(originID flow.Identifier, proposal *messages.ClusterBlockProposal) bool
+	Add(block flow.Slashable[*cluster.Block]) bool
 
-	ByID(blockID flow.Identifier) (*cluster.PendingBlock, bool)
+	ByID(blockID flow.Identifier) (flow.Slashable[*cluster.Block], bool)
 
-	ByParentID(parentID flow.Identifier) ([]*cluster.PendingBlock, bool)
+	ByParentID(parentID flow.Identifier) ([]flow.Slashable[*cluster.Block], bool)
 
 	DropForParent(parentID flow.Identifier)
 

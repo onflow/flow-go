@@ -7,9 +7,9 @@ metadata:
   name: {{ $k }}
   labels:
     app: {{ $k }}
-    branch: {{ $.Values.branch }}
     nodeType: verification
     service: flow
+    networkId: {{ $.Values.networkId }}
 
 spec:
   serviceName: {{ $k }}
@@ -19,13 +19,19 @@ spec:
       app: {{ $k }}
       nodeType: verification
       service: flow
+      networkId: {{ $.Values.networkId }}
 
   template:
     metadata:
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/path: /metrics
+        prometheus.io/port: "8080"
       labels:
         app: {{ $k }}
-        branch: {{ $.Values.branch }}
+        networkId: {{ $.Values.networkId }}
         nodeType: verification
+        owner: {{ $.Values.owner }}
         service: flow
     spec:
       containers:
@@ -90,27 +96,29 @@ spec:
 
         - name: node-info-priv-json
           secret: 
-            secretName: {{ $v.nodeId }}.node-info.priv.json
+            secretName: {{ $.Values.networkId }}.{{ $v.nodeId }}.node-info.priv.json
 
         - name: node-info-pub-json
           secret: 
-            secretName: node-infos.pub.json
+            secretName: {{ $.Values.networkId }}.node-infos.pub.json
 
         - name: root-block-json
           secret: 
-            secretName: root-block.json
+            secretName: {{ $.Values.networkId }}.root-block.json
 
         - name: root-protocol-state-snapshot-json
           secret: 
-            secretName: root-protocol-state-snapshot.json
+            secretName: {{ $.Values.networkId }}.root-protocol-state-snapshot.json
 
         - name: secretsdb-key
           secret: 
-            secretName: {{ $v.nodeId }}.secretsdb-key
+            secretName: {{ $.Values.networkId }}.{{ $v.nodeId }}.secretsdb-key
 
   volumeClaimTemplates:
     - metadata:
         name: data
+        labels:
+          networkId: {{ $.Values.networkId }}
       spec:
         accessModes: ["ReadWriteOnce"]
         resources:
@@ -130,6 +138,8 @@ metadata:
   name: {{ $k }}
   labels:
     app: {{ $k }}
+    networkId: {{ $.Values.networkId }}
+    owner: {{ $.Values.owner }}
 spec:
   {{ if $v.servicePorts }}
   ports: {{ $v.servicePorts | toYaml | nindent 12 }}

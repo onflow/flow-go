@@ -14,9 +14,10 @@ import (
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/irrecoverable"
-	"github.com/onflow/flow-go/network/internal/p2pfixtures"
+	mockmodule "github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/connection"
+	p2ptest "github.com/onflow/flow-go/network/p2p/test"
 	"github.com/onflow/flow-go/network/p2p/translator"
 	"github.com/onflow/flow-go/network/p2p/utils"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -33,10 +34,14 @@ func TestPeerManager_Integration(t *testing.T) {
 	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
 
 	// create nodes
-	nodes, identities := p2pfixtures.NodesFixture(t, unittest.IdentifierFixture(), "test_peer_manager", count)
+	idProvider := mockmodule.NewIdentityProvider(t)
+	nodes, identities := p2ptest.NodesFixture(t, unittest.IdentifierFixture(), "test_peer_manager", count, idProvider)
+	for i, node := range nodes {
+		idProvider.On("ByPeerID", node.Host().ID()).Return(&identities[i], true).Maybe()
 
-	p2pfixtures.StartNodes(t, signalerCtx, nodes, 100*time.Millisecond)
-	defer p2pfixtures.StopNodes(t, nodes, cancel, 100*time.Millisecond)
+	}
+	p2ptest.StartNodes(t, signalerCtx, nodes, 100*time.Millisecond)
+	defer p2ptest.StopNodes(t, nodes, cancel, 100*time.Millisecond)
 
 	thisNode := nodes[0]
 	topologyPeers := identities[1:]
@@ -49,7 +54,12 @@ func TestPeerManager_Integration(t *testing.T) {
 	}
 
 	// setup
-	connector, err := connection.NewLibp2pConnector(unittest.Logger(), thisNode.Host(), connection.ConnectionPruningEnabled)
+	connector, err := connection.NewLibp2pConnector(&connection.ConnectorConfig{
+		PruneConnections:        connection.PruningEnabled,
+		Logger:                  unittest.Logger(),
+		Host:                    connection.NewConnectorHost(thisNode.Host()),
+		BackoffConnectorFactory: connection.DefaultLibp2pBackoffConnectorFactory(thisNode.Host()),
+	})
 	require.NoError(t, err)
 
 	idTranslator, err := translator.NewFixedTableIdentityTranslator(identities)

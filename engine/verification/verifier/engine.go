@@ -188,13 +188,7 @@ func (e *Engine) verify(ctx context.Context, originID flow.Identifier,
 	// execute the assigned chunk
 	span, _ := e.tracer.StartSpanFromContext(ctx, trace.VERVerChunkVerify)
 
-	var spockSecret []byte
-	var chFault chmodels.ChunkFault
-	if vc.IsSystemChunk {
-		spockSecret, chFault, err = e.chVerif.SystemChunkVerify(vc)
-	} else {
-		spockSecret, chFault, err = e.chVerif.Verify(vc)
-	}
+	spockSecret, chFault, err := e.chVerif.Verify(vc)
 	span.End()
 	// Any err means that something went wrong when verify the chunk
 	// the outcome of the verification is captured inside the chFault and not the err
@@ -206,19 +200,31 @@ func (e *Engine) verify(ctx context.Context, originID flow.Identifier,
 	if chFault != nil {
 		switch chFault.(type) {
 		case *chmodels.CFMissingRegisterTouch:
-			e.log.Warn().Msg(chFault.String())
+			e.log.Warn().
+				Str("chunk_fault_type", "missing_register_touch").
+				Str("chunk_fault", chFault.String()).
+				Msg("chunk fault found, could not verify chunk")
 			// still create approvals for this case
 		case *chmodels.CFNonMatchingFinalState:
 			// TODO raise challenge
-			e.log.Warn().Msg(chFault.String())
+			e.log.Warn().
+				Str("chunk_fault_type", "final_state_mismatch").
+				Str("chunk_fault", chFault.String()).
+				Msg("chunk fault found, could not verify chunk")
 			return nil
 		case *chmodels.CFInvalidVerifiableChunk:
 			// TODO raise challenge
-			e.log.Error().Msg(chFault.String())
+			e.log.Error().
+				Str("chunk_fault_type", "invalid_verifiable_chunk").
+				Str("chunk_fault", chFault.String()).
+				Msg("chunk fault found, could not verify chunk")
 			return nil
 		case *chmodels.CFInvalidEventsCollection:
 			// TODO raise challenge
-			e.log.Error().Msg(chFault.String())
+			e.log.Error().
+				Str("chunk_fault_type", "invalid_event_collection").
+				Str("chunk_fault", chFault.String()).
+				Msg("chunk fault found, could not verify chunk")
 			return nil
 		default:
 			return engine.NewInvalidInputErrorf("unknown type of chunk fault is received (type: %T) : %v",
@@ -323,14 +329,12 @@ func GenerateResultApproval(
 // verifiableChunkHandler acts as a wrapper around the verify method that captures its performance-related metrics
 func (e *Engine) verifiableChunkHandler(originID flow.Identifier, ch *verification.VerifiableChunkData) error {
 
-	span, ctx, isSampled := e.tracer.StartBlockSpan(context.Background(), ch.Chunk.BlockID, trace.VERVerVerifyWithMetrics)
-	if isSampled {
-		span.SetAttributes(
-			attribute.Int64("chunk_index", int64(ch.Chunk.Index)),
-			attribute.String("result_id", ch.Result.ID().String()),
-			attribute.String("origin_id", originID.String()),
-		)
-	}
+	span, ctx := e.tracer.StartBlockSpan(context.Background(), ch.Chunk.BlockID, trace.VERVerVerifyWithMetrics)
+	span.SetAttributes(
+		attribute.Int64("chunk_index", int64(ch.Chunk.Index)),
+		attribute.String("result_id", ch.Result.ID().String()),
+		attribute.String("origin_id", originID.String()),
+	)
 	defer span.End()
 
 	// increments number of received verifiable chunks

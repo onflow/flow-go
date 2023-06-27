@@ -2,18 +2,19 @@ package backend
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"time"
 
-	lru "github.com/hashicorp/golang-lru"
-
-	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
-	"github.com/rs/zerolog"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
+	lru "github.com/hashicorp/golang-lru"
+	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
+	"github.com/rs/zerolog"
+
 	"github.com/onflow/flow-go/access"
+	"github.com/onflow/flow-go/cmd/build"
+	"github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
@@ -88,7 +89,7 @@ func New(
 	executionReceipts storage.ExecutionReceipts,
 	executionResults storage.ExecutionResults,
 	chainID flow.ChainID,
-	transactionMetrics module.TransactionMetrics,
+	accessMetrics module.AccessMetrics,
 	connFactory ConnectionFactory,
 	retryEnabled bool,
 	maxHeightRange uint,
@@ -96,15 +97,14 @@ func New(
 	fixedExecutionNodeIDs []string,
 	log zerolog.Logger,
 	snapshotHistoryLimit int,
+	archiveAddressList []string,
 ) *Backend {
 	retry := newRetry()
 	if retryEnabled {
 		retry.Activate()
 	}
 
-	var err error
-
-	loggedScripts, _ := lru.New(DefaultLoggedScriptsCacheSize)
+	loggedScripts, err := lru.New(DefaultLoggedScriptsCacheSize)
 	if err != nil {
 		log.Fatal().Err(err).Msg("failed to initialize script logging cache")
 	}
@@ -113,13 +113,14 @@ func New(
 		state: state,
 		// create the sub-backends
 		backendScripts: backendScripts{
-			headers:           headers,
-			executionReceipts: executionReceipts,
-			connFactory:       connFactory,
-			state:             state,
-			log:               log,
-			metrics:           transactionMetrics,
-			loggedScripts:     loggedScripts,
+			headers:            headers,
+			executionReceipts:  executionReceipts,
+			connFactory:        connFactory,
+			state:              state,
+			log:                log,
+			metrics:            accessMetrics,
+			loggedScripts:      loggedScripts,
+			archiveAddressList: archiveAddressList,
 		},
 		backendTransactions: backendTransactions{
 			staticCollectionRPC:  collectionRPC,
@@ -130,7 +131,7 @@ func New(
 			transactions:         transactions,
 			executionReceipts:    executionReceipts,
 			transactionValidator: configureTransactionValidator(state, chainID),
-			transactionMetrics:   transactionMetrics,
+			transactionMetrics:   accessMetrics,
 			retry:                retry,
 			connFactory:          connFactory,
 			previousAccessNodes:  historicalAccessNodes,
@@ -193,7 +194,7 @@ func identifierList(ids []string) (flow.IdentifierList, error) {
 	for i, idStr := range ids {
 		id, err := flow.HexStringToIdentifier(idStr)
 		if err != nil {
-			return nil, fmt.Errorf("failed to convert node id string %s to Flow Identifier: %v", id, err)
+			return nil, fmt.Errorf("failed to convert node id string %s to Flow Identifier: %w", id, err)
 		}
 		idList[i] = id
 	}
@@ -231,6 +232,27 @@ func (b *Backend) Ping(ctx context.Context) error {
 	return nil
 }
 
+// GetNodeVersionInfo returns node version information such as semver, commit, sporkID, protocolVersion, etc
+func (b *Backend) GetNodeVersionInfo(ctx context.Context) (*access.NodeVersionInfo, error) {
+	stateParams := b.state.Params()
+	sporkId, err := stateParams.SporkID()
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to read spork ID: %v", err)
+	}
+
+	protocolVersion, err := stateParams.ProtocolVersion()
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to read protocol version: %v", err)
+	}
+
+	return &access.NodeVersionInfo{
+		Semver:          build.Semver(),
+		Commit:          build.Commit(),
+		SporkId:         sporkId,
+		ProtocolVersion: uint64(protocolVersion),
+	}, nil
+}
+
 func (b *Backend) GetCollectionByID(_ context.Context, colID flow.Identifier) (*flow.LightCollection, error) {
 	// retrieve the collection from the collection storage
 	col, err := b.collections.LightByID(colID)
@@ -239,7 +261,7 @@ func (b *Backend) GetCollectionByID(_ context.Context, colID flow.Identifier) (*
 		// it is possible for a client to request a finalized block from us
 		// containing some collection, then get a not found error when requesting
 		// that collection. These clients should retry.
-		err = convertStorageError(fmt.Errorf("please retry for collection in finalized block: %w", err))
+		err = rpc.ConvertStorageError(fmt.Errorf("please retry for collection in finalized block: %w", err))
 		return nil, err
 	}
 
@@ -264,21 +286,6 @@ func (b *Backend) GetLatestProtocolStateSnapshot(_ context.Context) ([]byte, err
 	return convert.SnapshotToBytes(validSnapshot)
 }
 
-func convertStorageError(err error) error {
-	if err == nil {
-		return nil
-	}
-	if status.Code(err) == codes.NotFound {
-		// Already converted
-		return err
-	}
-	if errors.Is(err, storage.ErrNotFound) {
-		return status.Errorf(codes.NotFound, "not found: %v", err)
-	}
-
-	return status.Errorf(codes.Internal, "failed to find: %v", err)
-}
-
 // executionNodesForBlockID returns upto maxExecutionNodesCnt number of randomly chosen execution node identities
 // which have executed the given block ID.
 // If no such execution node is found, an InsufficientExecutionReceipts error is returned.
@@ -293,7 +300,7 @@ func executionNodesForBlockID(
 
 	// check if the block ID is of the root block. If it is then don't look for execution receipts since they
 	// will not be present for the root block.
-	rootBlock, err := state.Params().Root()
+	rootBlock, err := state.Params().FinalizedRoot()
 	if err != nil {
 		return nil, fmt.Errorf("failed to retreive execution IDs for block ID %v: %w", blockID, err)
 	}

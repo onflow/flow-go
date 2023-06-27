@@ -2,15 +2,18 @@ package lib
 
 import (
 	"context"
+	"crypto/rand"
 	"fmt"
-	"math/rand"
+	"testing"
+	"time"
 
 	"github.com/onflow/cadence"
+	"github.com/rs/zerolog"
+	"github.com/stretchr/testify/require"
 
 	sdk "github.com/onflow/flow-go-sdk"
 	sdkcrypto "github.com/onflow/flow-go-sdk/crypto"
 
-	"github.com/onflow/flow-go/engine/ghost/client"
 	"github.com/onflow/flow-go/integration/convert"
 	"github.com/onflow/flow-go/integration/testnet"
 	"github.com/onflow/flow-go/model/flow"
@@ -122,22 +125,6 @@ func ReadCounter(ctx context.Context, client *testnet.Client, address sdk.Addres
 	return res.(cadence.Int).Int(), nil
 }
 
-func GetGhostClient(ghostContainer *testnet.Container) (*client.GhostClient, error) {
-
-	if !ghostContainer.Config.Ghost {
-		return nil, fmt.Errorf("container is a not a ghost node container")
-	}
-
-	ghostPort, ok := ghostContainer.Ports[testnet.GhostNodeAPIPort]
-	if !ok {
-		return nil, fmt.Errorf("ghost node API port not found")
-	}
-
-	addr := fmt.Sprintf(":%s", ghostPort)
-
-	return client.NewGhostClient(addr)
-}
-
 // GetAccount returns a new account address, key, and signer.
 func GetAccount(chain flow.Chain) (sdk.Address, *sdk.AccountKey, sdkcrypto.Signer, error) {
 
@@ -222,5 +209,51 @@ func WithChainID(chainID flow.ChainID) func(tx *sdk.Transaction) {
 			sig.Address = service
 			tx.EnvelopeSignatures[i] = sig
 		}
+	}
+}
+
+// LogStatus logs current information about the test network state.
+func LogStatus(t *testing.T, ctx context.Context, log zerolog.Logger, client *testnet.Client) {
+	snapshot, err := client.GetLatestProtocolSnapshot(ctx)
+	if err != nil {
+		log.Err(err).Msg("failed to get sealed snapshot")
+		return
+	}
+	finalized, err := client.GetLatestFinalizedBlockHeader(ctx)
+	if err != nil {
+		log.Err(err).Msg("failed to get finalized header")
+		return
+	}
+
+	sealed, err := snapshot.Head()
+	require.NoError(t, err)
+	phase, err := snapshot.Phase()
+	require.NoError(t, err)
+	epoch := snapshot.Epochs().Current()
+	counter, err := epoch.Counter()
+	require.NoError(t, err)
+
+	log.Info().Uint64("final_height", finalized.Height).
+		Uint64("sealed_height", sealed.Height).
+		Uint64("sealed_view", sealed.View).
+		Str("cur_epoch_phase", phase.String()).
+		Uint64("cur_epoch_counter", counter).
+		Msg("test run status")
+}
+
+// LogStatusPeriodically periodically logs information about the test network state.
+// It can be run as a goroutine at the beginning of a test run to provide period
+func LogStatusPeriodically(t *testing.T, parent context.Context, log zerolog.Logger, client *testnet.Client, period time.Duration) {
+	log = log.With().Str("util", "status_logger").Logger()
+	for {
+		select {
+		case <-parent.Done():
+			return
+		case <-time.After(period):
+		}
+
+		ctx, cancel := context.WithTimeout(parent, 30*time.Second)
+		LogStatus(t, ctx, log, client)
+		cancel()
 	}
 }

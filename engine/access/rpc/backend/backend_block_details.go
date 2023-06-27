@@ -3,6 +3,10 @@ package backend
 import (
 	"context"
 
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
+
+	"github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
@@ -13,7 +17,7 @@ type backendBlockDetails struct {
 	state  protocol.State
 }
 
-func (b *backendBlockDetails) GetLatestBlock(_ context.Context, isSealed bool) (*flow.Block, error) {
+func (b *backendBlockDetails) GetLatestBlock(_ context.Context, isSealed bool) (*flow.Block, flow.BlockStatus, error) {
 	var header *flow.Header
 	var err error
 
@@ -26,35 +30,74 @@ func (b *backendBlockDetails) GetLatestBlock(_ context.Context, isSealed bool) (
 	}
 
 	if err != nil {
-		err = convertStorageError(err)
-		return nil, err
+		// node should always have the latest block
+
+		// In the RPC engine, if we encounter an error from the protocol state indicating state corruption,
+		// we should halt processing requests, but do throw an exception which might cause a crash:
+		// - It is unsafe to process requests if we have an internally bad state.
+		//   TODO: https://github.com/onflow/flow-go/issues/4028
+		// - We would like to avoid throwing an exception as a result of an Access API request by policy
+		//   because this can cause DOS potential
+		// - Since the protocol state is widely shared, we assume that in practice another component will
+		//   observe the protocol state error and throw an exception.
+		return nil, flow.BlockStatusUnknown, status.Errorf(codes.Internal, "could not get latest block: %v", err)
 	}
 
-	block, err := b.blocks.ByID(header.ID())
+	// since we are querying a finalized or sealed block, we can use the height index and save an ID computation
+	block, err := b.blocks.ByHeight(header.Height)
 	if err != nil {
-		err = convertStorageError(err)
-		return nil, err
+		return nil, flow.BlockStatusUnknown, status.Errorf(codes.Internal, "could not get latest block: %v", err)
 	}
 
-	return block, nil
+	status, err := b.getBlockStatus(block)
+	if err != nil {
+		return nil, status, err
+	}
+	return block, status, nil
 }
 
-func (b *backendBlockDetails) GetBlockByID(_ context.Context, id flow.Identifier) (*flow.Block, error) {
+func (b *backendBlockDetails) GetBlockByID(_ context.Context, id flow.Identifier) (*flow.Block, flow.BlockStatus, error) {
 	block, err := b.blocks.ByID(id)
 	if err != nil {
-		err = convertStorageError(err)
-		return nil, err
+		return nil, flow.BlockStatusUnknown, rpc.ConvertStorageError(err)
 	}
 
-	return block, nil
+	status, err := b.getBlockStatus(block)
+	if err != nil {
+		return nil, status, err
+	}
+	return block, status, nil
 }
 
-func (b *backendBlockDetails) GetBlockByHeight(_ context.Context, height uint64) (*flow.Block, error) {
+func (b *backendBlockDetails) GetBlockByHeight(_ context.Context, height uint64) (*flow.Block, flow.BlockStatus, error) {
 	block, err := b.blocks.ByHeight(height)
 	if err != nil {
-		err = convertStorageError(err)
-		return nil, err
+		return nil, flow.BlockStatusUnknown, rpc.ConvertStorageError(err)
 	}
 
-	return block, nil
+	status, err := b.getBlockStatus(block)
+	if err != nil {
+		return nil, status, err
+	}
+	return block, status, nil
+}
+
+func (b *backendBlockDetails) getBlockStatus(block *flow.Block) (flow.BlockStatus, error) {
+	sealed, err := b.state.Sealed().Head()
+	if err != nil {
+		// In the RPC engine, if we encounter an error from the protocol state indicating state corruption,
+		// we should halt processing requests, but do throw an exception which might cause a crash:
+		// - It is unsafe to process requests if we have an internally bad state.
+		//   TODO: https://github.com/onflow/flow-go/issues/4028
+		// - We would like to avoid throwing an exception as a result of an Access API request by policy
+		//   because this can cause DOS potential
+		// - Since the protocol state is widely shared, we assume that in practice another component will
+		//   observe the protocol state error and throw an exception.
+		return flow.BlockStatusUnknown, status.Errorf(codes.Internal, "failed to find latest sealed header: %v", err)
+	}
+
+	if block.Header.Height > sealed.Height {
+		return flow.BlockStatusFinalized, nil
+	}
+	return flow.BlockStatusSealed, nil
 }

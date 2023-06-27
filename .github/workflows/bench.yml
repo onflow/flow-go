@@ -20,11 +20,17 @@ jobs:
   benchstat:
     name: Performance regression check
     runs-on: ubuntu-latest
+    # Check if the event is not triggered by a fork
+    # peter-evans/find-comment@v1 does not work on forks.
+    # see https://github.com/peter-evans/create-pull-request/blob/main/docs/concepts-guidelines.md#restrictions-on-repository-forks for details.
+    # Ideally we would like to still run the benchmark on forks, but we can't do that with the current setup.
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    continue-on-error: true
     steps:
       - name: Set benchmark repetitions
         # reducing repetition will speed up execution,
         # but will be more inaccurate at detecting change
-        run: echo "::set-output name=benchmark_repetitions::10"
+        run: echo "::set-output name=benchmark_repetitions::7"
         id: settings
 
       - name: Checkout
@@ -56,7 +62,7 @@ jobs:
       - name: Use benchstat for comparison
         run: |
           export PATH=$PATH:$(go env GOPATH)/bin
-          go install golang.org/x/perf/cmd/benchstat@latest
+          go install golang.org/x/perf/cmd/benchstat@91a04616dc65ba76dbe9e5cf746b923b1402d303
           echo "BENCHSTAT<<EOF" >> $GITHUB_ENV
           echo "$(benchstat -html -sort delta old.txt new.txt | sed  '/<title/,/<\/style>/d' | sed 's/<!doctype html>//g')" >> $GITHUB_ENV
           echo "EOF" >> $GITHUB_ENV

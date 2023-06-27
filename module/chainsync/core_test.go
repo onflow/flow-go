@@ -30,7 +30,7 @@ type SyncSuite struct {
 func (ss *SyncSuite) SetupTest() {
 	var err error
 
-	ss.core, err = New(zerolog.New(io.Discard), DefaultConfig(), metrics.NewNoopCollector())
+	ss.core, err = New(zerolog.New(io.Discard), DefaultConfig(), metrics.NewNoopCollector(), flow.Localnet)
 	ss.Require().Nil(err)
 }
 

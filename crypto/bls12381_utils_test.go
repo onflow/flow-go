@@ -4,7 +4,7 @@
 package crypto
 
 import (
-	"crypto/rand"
+	crand "crypto/rand"
 	"encoding/hex"
 	"testing"
 
@@ -14,9 +14,9 @@ import (
 
 func TestDeterministicKeyGen(t *testing.T) {
 	// 2 keys generated with the same seed should be equal
-	seed := make([]byte, KeyGenSeedMinLenBLSBLS12381)
-	n, err := rand.Read(seed)
-	require.Equal(t, n, KeyGenSeedMinLenBLSBLS12381)
+	seed := make([]byte, KeyGenSeedMinLen)
+	n, err := crand.Read(seed)
+	require.Equal(t, n, KeyGenSeedMinLen)
 	require.NoError(t, err)
 	sk1, err := GeneratePrivateKey(BLSBLS12381, seed)
 	require.Nil(t, err)
@@ -29,9 +29,9 @@ func TestDeterministicKeyGen(t *testing.T) {
 func TestPRGseeding(t *testing.T) {
 	blsInstance.reInit()
 	// 2 scalars generated with the same seed should be equal
-	seed := make([]byte, KeyGenSeedMinLenBLSBLS12381)
-	n, err := rand.Read(seed)
-	require.Equal(t, n, KeyGenSeedMinLenBLSBLS12381)
+	seed := make([]byte, KeyGenSeedMinLen)
+	n, err := crand.Read(seed)
+	require.Equal(t, n, KeyGenSeedMinLen)
 	require.NoError(t, err)
 	// 1st scalar (wrapped in a private key)
 	err = seedRelic(seed)
@@ -48,10 +48,11 @@ func TestPRGseeding(t *testing.T) {
 }
 
 // G1 and G2 scalar multiplication
-func BenchmarkScalarMult(b *testing.B) {
+func BenchmarkScalarMultG1G2(b *testing.B) {
 	blsInstance.reInit()
 	seed := make([]byte, securityBits/8)
-	_, _ = rand.Read(seed)
+	_, err := crand.Read(seed)
+	require.NoError(b, err)
 	_ = seedRelic(seed)
 	var expo scalar
 	randZr(&expo)
@@ -134,40 +135,57 @@ func BenchmarkMapToG1(b *testing.B) {
 	b.StopTimer()
 }
 
-// test Bowe subgroup check in G1
-// The test compares Bowe's check result to multiplying by the group order
-func TestSubgroupCheckG1(t *testing.T) {
+// test subgroup membership check in G1 and G2
+func TestSubgroupCheck(t *testing.T) {
 	blsInstance.reInit()
 	// seed Relic PRG
 	seed := make([]byte, securityBits/8)
-	_, _ = rand.Read(seed)
+	_, err := crand.Read(seed)
+	require.NoError(t, err)
 	_ = seedRelic(seed)
 
-	// tests for simple membership check
-	t.Run("simple check", func(t *testing.T) {
-		simple := 0
-		check := checkG1Test(1, simple) // point in G1
-		assert.True(t, check)
-		check = checkG1Test(0, simple) // point in E1\G1
-		assert.False(t, check)
+	t.Run("G1", func(t *testing.T) {
+		var p pointG1
+		randPointG1(&p) // point in G1
+		res := checkMembershipG1(&p)
+		assert.Equal(t, res, int(valid))
+		randPointG1Complement(&p) // point in E1\G1
+		res = checkMembershipG1(&p)
+		assert.Equal(t, res, int(invalid))
 	})
 
-	// tests for Bowe membership check
-	t.Run("bowe check", func(t *testing.T) {
-		bowe := 1
-		check := checkG1Test(1, bowe) // point in G1
-		assert.True(t, check)
-		check = checkG1Test(0, bowe) // point in E1\G1
-		assert.False(t, check)
+	t.Run("G2", func(t *testing.T) {
+		var p pointG2
+		randPointG2(&p) // point in G2
+		res := checkMembershipG2(&p)
+		assert.Equal(t, res, int(valid))
+		randPointG2Complement(&p) // point in E2\G2
+		res = checkMembershipG2(&p)
+		assert.Equal(t, res, int(invalid))
 	})
 }
 
-// G1 membership check bench
-func BenchmarkCheckG1(b *testing.B) {
+// subgroup membership check bench
+func BenchmarkSubgroupCheck(b *testing.B) {
 	blsInstance.reInit()
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		benchG1Test()
-	}
-	b.StopTimer()
+
+	b.Run("G1", func(b *testing.B) {
+		var p pointG1
+		randPointG1(&p)
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			_ = checkMembershipG1(&p) // G1
+		}
+		b.StopTimer()
+	})
+
+	b.Run("G2", func(b *testing.B) {
+		var p pointG2
+		randPointG2(&p)
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			_ = checkMembershipG2(&p) // G2
+		}
+		b.StopTimer()
+	})
 }

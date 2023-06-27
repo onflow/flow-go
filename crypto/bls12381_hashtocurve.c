@@ -172,8 +172,7 @@ static inline void map_to_E1_osswu(ep_t p, const fp_t t) {
 // This code is taken from https://github.com/kwantam/bls12-381_hash 
 // and adapted to use Relic modular arithemtic.  
 // Copyright 2019 Riad S. Wahby
-static inline void hornerPolynomial(fp_t accumulator, const fp_t x, 
-        const int start_val, const fp_t* fp_tmp) {
+static inline void hornerPolynomial(fp_t accumulator, const fp_t x, const int start_val, const fp_t fp_tmp[]) {
     for (int i = start_val; i >= 0; --i) {
         fp_mul(accumulator, accumulator, x);            // acc *= x 
         fp_add(accumulator, accumulator, fp_tmp[i]);    // acc += next_val 
@@ -183,10 +182,9 @@ static inline void hornerPolynomial(fp_t accumulator, const fp_t x,
 // This code is taken from https://github.com/kwantam/bls12-381_hash 
 // and adapted to use Relic modular arithemtic.  
 // Copyright 2019 Riad S. Wahby
-static inline void compute_map_zvals(const fp_t inv[], fp_t zv[], 
-        const unsigned len, fp_t* fp_tmp) {
+static inline void compute_map_zvals(fp_t out[], const fp_t inv[], const fp_t zv[], const unsigned len) {
     for (unsigned i = 0; i < len; ++i) {
-        fp_mul(fp_tmp[i], inv[i], zv[i]);
+        fp_mul(out[i], inv[i], zv[i]);
     }
 }
 
@@ -231,20 +229,21 @@ static inline void eval_iso11(ep_t r, const ep_t  p) {
 
     // get isogeny map coefficients
     iso_t iso = ep_curve_get_iso();
-    const int deg_dy = iso->deg_yd;
-    const int deg_dx = iso->deg_xd;
+    // hardcode the constant to avoid warnings of gcc -Wstringop-overread
+    const int deg_dy = 15; // also equal to iso->deg_yd;
+    const int deg_dx = 10; // also equal to iso->deg_xd;
     // TODO: get N coefficient from Relic and update N computations
 
     // y = Ny/Dy
     // compute Dy
-    compute_map_zvals(iso->yd, fp_tmp + 17, deg_dy, fp_tmp);     // k_(15-i) Z^(2i)
-    fp_add(fp_tmp[16], p->x, fp_tmp[deg_dy - 1]);        // X + k_14 Z^2 
+    compute_map_zvals(fp_tmp, iso->yd, fp_tmp + 17, deg_dy);     // k_(15-i) Z^(2i)
+    fp_add(fp_tmp[16], p->x, fp_tmp[deg_dy - 1]);               // X + k_14 Z^2 
     hornerPolynomial(fp_tmp[16], p->x, deg_dy - 2, fp_tmp);    // Horner for the rest
     fp_mul(fp_tmp[15], fp_tmp[16], fp_tmp[31]);                    // Dy * Z^2
     fp_mul(fp_tmp[15], fp_tmp[15], p->z);                           // Dy * Z^3
 
     // compute Ny
-    compute_map_zvals(bls_prec->iso_Ny, fp_tmp + 17, ELLP_Ny_LEN - 1, fp_tmp); // k_(15-i) Z^(2i)
+    compute_map_zvals(fp_tmp, bls_prec->iso_Ny, fp_tmp + 17, ELLP_Ny_LEN - 1); // k_(15-i) Z^(2i)
     fp_mul(fp_tmp[16], p->x, bls_prec->iso_Ny[ELLP_Ny_LEN - 1]);      // k_15 * X
     fp_add(fp_tmp[16], fp_tmp[16], fp_tmp[ELLP_Ny_LEN - 2]);  // k_15 * X + k_14 Z^2
     hornerPolynomial(fp_tmp[16], p->x, ELLP_Ny_LEN - 3, fp_tmp);     // Horner for the rest
@@ -252,13 +251,13 @@ static inline void eval_iso11(ep_t r, const ep_t  p) {
     
     // x = Nx/Dx
     // compute Dx
-    compute_map_zvals(iso->xd, fp_tmp + 22, deg_dx, fp_tmp);         // k_(10-i) Z^(2i)
+    compute_map_zvals(fp_tmp, iso->xd, fp_tmp + 22, deg_dx);         // k_(10-i) Z^(2i)
     fp_add(fp_tmp[14], p->x, fp_tmp[deg_dx - 1]);  // X + k_9 Z^2 
     hornerPolynomial(fp_tmp[14], p->x, deg_dx - 2, fp_tmp);    // Horner for the rest
     fp_mul(fp_tmp[14], fp_tmp[14], fp_tmp[31]);                    // Dx * Z^2
 
     // compute Nx
-    compute_map_zvals(bls_prec->iso_Nx, fp_tmp + 21, ELLP_Nx_LEN - 1, fp_tmp);      // k_(11-i) Z^(2i)
+    compute_map_zvals(fp_tmp, bls_prec->iso_Nx, fp_tmp + 21, ELLP_Nx_LEN - 1);      // k_(11-i) Z^(2i)
     fp_mul(fp_tmp[13], p->x, bls_prec->iso_Nx[ELLP_Nx_LEN - 1]);   // k_11 * X
     fp_add(fp_tmp[13], fp_tmp[13], fp_tmp[ELLP_Nx_LEN - 2]);  // k_11 * X + k_10 * Z^2
     hornerPolynomial(fp_tmp[13], p->x, ELLP_Nx_LEN - 3, fp_tmp);      // Dy: Horner for the rest

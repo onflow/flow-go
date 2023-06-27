@@ -1,24 +1,28 @@
-package test_test
+package p2ptest_test
 
 import (
 	"context"
 	"testing"
 	"time"
 
-	"github.com/onflow/flow-go/network/p2p"
+	"github.com/onflow/flow-go/model/flow"
+	libp2pmessage "github.com/onflow/flow-go/model/libp2p/message"
+	"github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/network/message"
 
-	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/peerstore"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/onflow/flow-go/network/p2p"
+	p2ptest "github.com/onflow/flow-go/network/p2p/test"
+
 	"github.com/onflow/flow-go/network/p2p/utils"
 
 	"github.com/onflow/flow-go/module/irrecoverable"
-	"github.com/onflow/flow-go/module/metrics"
+	mockmodule "github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/network/channels"
-	"github.com/onflow/flow-go/network/internal/messageutils"
 	"github.com/onflow/flow-go/network/internal/p2pfixtures"
 	flowpubsub "github.com/onflow/flow-go/network/validator/pubsub"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -37,7 +41,7 @@ import (
 // TestCrosstalkPreventionOnNetworkKeyChange tests that a node from the old chain cannot talk to a node in the new chain
 // if it's network key is updated while the libp2p protocol ID remains the same
 func TestCrosstalkPreventionOnNetworkKeyChange(t *testing.T) {
-	unittest.SkipUnless(t, unittest.TEST_FLAKY, "flaky test - passing in Flaky Test Monitor but keeps failing in CI and keeps blocking many PRs")
+	idProvider := mockmodule.NewIdentityProvider(t)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -54,26 +58,31 @@ func TestCrosstalkPreventionOnNetworkKeyChange(t *testing.T) {
 	node1key := p2pfixtures.NetworkingKeyFixtures(t)
 	sporkId := unittest.IdentifierFixture()
 
-	node1, id1 := p2pfixtures.NodeFixture(t,
+	node1, id1 := p2ptest.NodeFixture(t,
 		sporkId,
 		"test_crosstalk_prevention_on_network_key_change",
-		p2pfixtures.WithNetworkingPrivateKey(node1key),
+		idProvider,
+		p2ptest.WithNetworkingPrivateKey(node1key),
 	)
+	idProvider.On("ByPeerID", node1.Host().ID()).Return(&id1, true).Maybe()
 
-	p2pfixtures.StartNode(t, signalerCtx1, node1, 100*time.Millisecond)
-	defer p2pfixtures.StopNode(t, node1, cancel1, 100*time.Millisecond)
+	p2ptest.StartNode(t, signalerCtx1, node1, 100*time.Millisecond)
+	defer p2ptest.StopNode(t, node1, cancel1, 100*time.Millisecond)
 
 	t.Logf(" %s node started on %s", id1.NodeID.String(), id1.Address)
 	t.Logf("libp2p ID for %s: %s", id1.NodeID.String(), node1.Host().ID())
 
 	// create and start node 2 on localhost and random port
-	node2key := p2pfixtures.NetworkingKeyFixtures(t)
-	node2, id2 := p2pfixtures.NodeFixture(t,
+	node2key := p2ptest.NetworkingKeyFixtures(t)
+	node2, id2 := p2ptest.NodeFixture(t,
 		sporkId,
 		"test_crosstalk_prevention_on_network_key_change",
-		p2pfixtures.WithNetworkingPrivateKey(node2key),
+		idProvider,
+		p2ptest.WithNetworkingPrivateKey(node2key),
 	)
-	p2pfixtures.StartNode(t, signalerCtx2, node2, 100*time.Millisecond)
+	idProvider.On("ByPeerID", node2.Host().ID()).Return(&id2, true).Maybe()
+
+	p2ptest.StartNode(t, signalerCtx2, node2, 100*time.Millisecond)
 
 	peerInfo2, err := utils.PeerAddressInfo(id2)
 	require.NoError(t, err)
@@ -84,20 +93,22 @@ func TestCrosstalkPreventionOnNetworkKeyChange(t *testing.T) {
 	// Simulate a hard-spoon: node1 is on the old chain, but node2 is moved from the old chain to the new chain
 
 	// stop node 2 and start it again with a different networking key but on the same IP and port
-	p2pfixtures.StopNode(t, node2, cancel2, 100*time.Millisecond)
+	p2ptest.StopNode(t, node2, cancel2, 100*time.Millisecond)
 
 	// start node2 with the same name, ip and port but with the new key
 	node2keyNew := p2pfixtures.NetworkingKeyFixtures(t)
 	assert.False(t, node2key.Equals(node2keyNew))
-	node2, id2New := p2pfixtures.NodeFixture(t,
+	node2, id2New := p2ptest.NodeFixture(t,
 		sporkId,
 		"test_crosstalk_prevention_on_network_key_change",
-		p2pfixtures.WithNetworkingPrivateKey(node2keyNew),
-		p2pfixtures.WithNetworkingAddress(id2.Address),
+		idProvider,
+		p2ptest.WithNetworkingPrivateKey(node2keyNew),
+		p2ptest.WithNetworkingAddress(id2.Address),
 	)
+	idProvider.On("ByPeerID", node2.Host().ID()).Return(&id2New, true).Maybe()
 
-	p2pfixtures.StartNode(t, signalerCtx2a, node2, 100*time.Millisecond)
-	defer p2pfixtures.StopNode(t, node2, cancel2a, 100*time.Millisecond)
+	p2ptest.StartNode(t, signalerCtx2a, node2, 100*time.Millisecond)
+	defer p2ptest.StopNode(t, node2, cancel2a, 100*time.Millisecond)
 
 	// make sure the node2 indeed came up on the old ip and port
 	assert.Equal(t, id2New.Address, id2.Address)
@@ -111,6 +122,7 @@ func TestCrosstalkPreventionOnNetworkKeyChange(t *testing.T) {
 // TestOneToOneCrosstalkPrevention tests that a node from the old chain cannot talk directly to a node in the new chain
 // if the Flow libp2p protocol ID is updated while the network keys are kept the same.
 func TestOneToOneCrosstalkPrevention(t *testing.T) {
+	idProvider := mockmodule.NewIdentityProvider(t)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -126,35 +138,39 @@ func TestOneToOneCrosstalkPrevention(t *testing.T) {
 	sporkId1 := unittest.IdentifierFixture()
 
 	// create and start node 1 on localhost and random port
-	node1, id1 := p2pfixtures.NodeFixture(t, sporkId1, "test_one_to_one_crosstalk_prevention")
+	node1, id1 := p2ptest.NodeFixture(t, sporkId1, "test_one_to_one_crosstalk_prevention", idProvider)
+	idProvider.On("ByPeerID", node1.Host().ID()).Return(&id1, true).Maybe()
 
-	p2pfixtures.StartNode(t, signalerCtx1, node1, 100*time.Millisecond)
-	defer p2pfixtures.StopNode(t, node1, cancel1, 100*time.Millisecond)
+	p2ptest.StartNode(t, signalerCtx1, node1, 100*time.Millisecond)
+	defer p2ptest.StopNode(t, node1, cancel1, 100*time.Millisecond)
 
 	peerInfo1, err := utils.PeerAddressInfo(id1)
 	require.NoError(t, err)
 
 	// create and start node 2 on localhost and random port
-	node2, id2 := p2pfixtures.NodeFixture(t, sporkId1, "test_one_to_one_crosstalk_prevention")
+	node2, id2 := p2ptest.NodeFixture(t, sporkId1, "test_one_to_one_crosstalk_prevention", idProvider)
+	idProvider.On("ByPeerID", node2.Host().ID()).Return(&id2, true).Maybe()
 
-	p2pfixtures.StartNode(t, signalerCtx2, node2, 100*time.Millisecond)
+	p2ptest.StartNode(t, signalerCtx2, node2, 100*time.Millisecond)
 
 	// create stream from node 2 to node 1
 	testOneToOneMessagingSucceeds(t, node2, peerInfo1)
 
 	// Simulate a hard-spoon: node1 is on the old chain, but node2 is moved from the old chain to the new chain
 	// stop node 2 and start it again with a different libp2p protocol id to listen for
-	p2pfixtures.StopNode(t, node2, cancel2, time.Second)
+	p2ptest.StopNode(t, node2, cancel2, time.Second)
 
 	// start node2 with the same address and root key but different root block id
-	node2, id2New := p2pfixtures.NodeFixture(t,
+	node2, id2New := p2ptest.NodeFixture(t,
 		unittest.IdentifierFixture(), // update the flow root id for node 2. node1 is still listening on the old protocol
 		"test_one_to_one_crosstalk_prevention",
-		p2pfixtures.WithNetworkingAddress(id2.Address),
+		idProvider,
+		p2ptest.WithNetworkingAddress(id2.Address),
 	)
+	idProvider.On("ByPeerID", node2.Host().ID()).Return(&id2New, true).Maybe()
 
-	p2pfixtures.StartNode(t, signalerCtx2a, node2, 100*time.Millisecond)
-	defer p2pfixtures.StopNode(t, node2, cancel2a, 100*time.Millisecond)
+	p2ptest.StartNode(t, signalerCtx2a, node2, 100*time.Millisecond)
+	defer p2ptest.StopNode(t, node2, cancel2a, 100*time.Millisecond)
 
 	// make sure the node2 indeed came up on the old ip and port
 	assert.Equal(t, id2New.Address, id2.Address)
@@ -167,6 +183,7 @@ func TestOneToOneCrosstalkPrevention(t *testing.T) {
 // TestOneToKCrosstalkPrevention tests that a node from the old chain cannot talk to a node in the new chain via PubSub
 // if the channel is updated while the network keys are kept the same.
 func TestOneToKCrosstalkPrevention(t *testing.T) {
+	idProvider := mockmodule.NewIdentityProvider(t)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -180,22 +197,24 @@ func TestOneToKCrosstalkPrevention(t *testing.T) {
 	previousSporkId := unittest.IdentifierFixture()
 
 	// create and start node 1 on localhost and random port
-	node1, _ := p2pfixtures.NodeFixture(t,
+	node1, id1 := p2ptest.NodeFixture(t,
 		previousSporkId,
 		"test_one_to_k_crosstalk_prevention",
+		idProvider,
 	)
-
-	p2pfixtures.StartNode(t, signalerCtx1, node1, 100*time.Millisecond)
-	defer p2pfixtures.StopNode(t, node1, cancel1, 100*time.Millisecond)
+	idProvider.On("ByPeerID", node1.Host().ID()).Return(&id1, true).Maybe()
+	p2ptest.StartNode(t, signalerCtx1, node1, 100*time.Millisecond)
+	defer p2ptest.StopNode(t, node1, cancel1, 100*time.Millisecond)
 
 	// create and start node 2 on localhost and random port with the same root block ID
-	node2, id2 := p2pfixtures.NodeFixture(t,
+	node2, id2 := p2ptest.NodeFixture(t,
 		previousSporkId,
 		"test_one_to_k_crosstalk_prevention",
+		idProvider,
 	)
 
-	p2pfixtures.StartNode(t, signalerCtx2, node2, 100*time.Millisecond)
-	defer p2pfixtures.StopNode(t, node2, cancel2, 100*time.Millisecond)
+	p2ptest.StartNode(t, signalerCtx2, node2, 100*time.Millisecond)
+	defer p2ptest.StopNode(t, node2, cancel2, 100*time.Millisecond)
 
 	pInfo2, err := utils.PeerAddressInfo(id2)
 	require.NoError(t, err)
@@ -204,7 +223,7 @@ func TestOneToKCrosstalkPrevention(t *testing.T) {
 	topicBeforeSpork := channels.TopicFromChannel(channels.TestNetworkChannel, previousSporkId)
 
 	logger := unittest.Logger()
-	topicValidator := flowpubsub.TopicValidator(logger, unittest.NetworkCodec(), unittest.NetworkSlashingViolationsConsumer(logger, metrics.NewNoopCollector()), unittest.AllowAllPeerFilter())
+	topicValidator := flowpubsub.TopicValidator(logger, unittest.AllowAllPeerFilter())
 
 	// both nodes are initially on the same spork and subscribed to the same topic
 	_, err = node1.Subscribe(topicBeforeSpork, topicValidator)
@@ -262,20 +281,31 @@ func testOneToOneMessagingFails(t *testing.T, sourceNode p2p.LibP2PNode, peerInf
 func testOneToKMessagingSucceeds(ctx context.Context,
 	t *testing.T,
 	sourceNode p2p.LibP2PNode,
-	dstnSub *pubsub.Subscription,
+	dstnSub p2p.Subscription,
 	topic channels.Topic) {
 
-	payload := createTestMessage(t)
+	sentMsg, err := network.NewOutgoingScope(
+		flow.IdentifierList{unittest.IdentifierFixture()},
+		channels.TestNetworkChannel,
+		&libp2pmessage.TestMessage{
+			Text: string("hello"),
+		},
+		unittest.NetworkCodec().Encode,
+		message.ProtocolTypePubSub)
+	require.NoError(t, err)
+
+	sentData, err := sentMsg.Proto().Marshal()
+	require.NoError(t, err)
 
 	// send a 1-k message from source node to destination node
-	err := sourceNode.Publish(ctx, topic, payload)
+	err = sourceNode.Publish(ctx, topic, sentData)
 	require.NoError(t, err)
 
 	// assert that the message is received by the destination node
 	unittest.AssertReturnsBefore(t, func() {
 		msg, err := dstnSub.Next(ctx)
 		require.NoError(t, err)
-		assert.Equal(t, payload, msg.Data)
+		assert.Equal(t, sentData, msg.Data)
 	},
 		// libp2p hearbeats every second, so at most the message should take 1 second
 		2*time.Second)
@@ -284,13 +314,24 @@ func testOneToKMessagingSucceeds(ctx context.Context,
 func testOneToKMessagingFails(ctx context.Context,
 	t *testing.T,
 	sourceNode p2p.LibP2PNode,
-	dstnSub *pubsub.Subscription,
+	dstnSub p2p.Subscription,
 	topic channels.Topic) {
 
-	payload := createTestMessage(t)
+	sentMsg, err := network.NewOutgoingScope(
+		flow.IdentifierList{unittest.IdentifierFixture()},
+		channels.TestNetworkChannel,
+		&libp2pmessage.TestMessage{
+			Text: string("hello"),
+		},
+		unittest.NetworkCodec().Encode,
+		message.ProtocolTypePubSub)
+	require.NoError(t, err)
+
+	sentData, err := sentMsg.Proto().Marshal()
+	require.NoError(t, err)
 
 	// send a 1-k message from source node to destination node
-	err := sourceNode.Publish(ctx, topic, payload)
+	err = sourceNode.Publish(ctx, topic, sentData)
 	require.NoError(t, err)
 
 	// assert that the message is never received by the destination node
@@ -300,13 +341,4 @@ func testOneToKMessagingFails(ctx context.Context,
 		// libp2p hearbeats every second, so at most the message should take 1 second
 		2*time.Second,
 		"nodes on different sporks were able to communicate")
-}
-
-func createTestMessage(t *testing.T) []byte {
-	msg, _, _ := messageutils.CreateMessage(t, unittest.IdentifierFixture(), unittest.IdentifierFixture(), channels.TestNetworkChannel, "hello")
-
-	payload, err := msg.Marshal()
-	require.NoError(t, err)
-
-	return payload
 }

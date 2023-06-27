@@ -5,6 +5,8 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+
+	"go.uber.org/multierr"
 )
 
 // ReadFile reads the file from path, if not found, it will print the absolute path, instead of
@@ -84,23 +86,24 @@ func CopyDirectory(scrDir, dest string) error {
 	return nil
 }
 
-func Copy(srcFile, dstFile string) error {
-	out, err := os.Create(dstFile)
-	if err != nil {
-		return err
-	}
-
-	defer out.Close()
-
+func Copy(srcFile, dstFile string) (errToReturn error) {
 	in, err := os.Open(srcFile)
 	if err != nil {
-		return err
+		return fmt.Errorf("can not open file %v to copy from: %w", srcFile, err)
 	}
-	defer in.Close()
+
+	defer multierr.AppendInvoke(&errToReturn, multierr.Close(in))
+
+	out, err := os.Create(dstFile)
+	if err != nil {
+		return fmt.Errorf("can not create file %v to copy to: %w", dstFile, err)
+	}
+
+	defer multierr.AppendInvoke(&errToReturn, multierr.Close(out))
 
 	_, err = io.Copy(out, in)
 	if err != nil {
-		return err
+		return fmt.Errorf("can not copy file: %w", err)
 	}
 
 	return nil

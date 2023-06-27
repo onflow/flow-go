@@ -2,13 +2,11 @@ package storage
 
 import (
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/module"
 )
 
 // Ledger takes care of storing registers (key, value pairs) providing proof of correctness
 // we aim to store a state of the order of 10^10 registers with up to 1M historic state versions
 type Ledger interface {
-	module.ReadyDoneAware
 	EmptyStateCommitment() flow.StateCommitment
 
 	// Trusted methods (without proof)

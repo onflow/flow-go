@@ -229,7 +229,24 @@ func SetupMockConsensusNode(t *testing.T,
 				hasher,
 			)
 			assert.NoError(t, err)
-			assert.True(t, valid)
+
+			if !valid {
+				// When chunk verifier returns chunk fault, a placeholder
+				// signature is generated for that chunk.
+				isChunkFaultSignature, err := crypto.SPOCKVerifyAgainstData(
+					pk,
+					resultApproval.Body.Spock,
+					nil, // chunk fault has no spock secret
+					hasher,
+				)
+				assert.NoError(t, err)
+
+				if isChunkFaultSignature {
+					assert.Fail(t, "chunk verifier returned chunk fault")
+				} else {
+					assert.Fail(t, "spock secret mismatch")
+				}
+			}
 
 			wg.Done()
 		}).Return(nil)
@@ -359,7 +376,7 @@ func EvenChunkIndexAssigner(index uint64, chunkNum int) bool {
 // e.g., C1 contains receipts for R1,1, R1,2, etc.
 // Note: for sake of simplicity we do not include guarantees in the container blocks for now.
 func ExtendStateWithFinalizedBlocks(t *testing.T, completeExecutionReceipts CompleteExecutionReceiptList,
-	state protocol.MutableState) []*flow.Block {
+	state protocol.ParticipantState) []*flow.Block {
 	blocks := make([]*flow.Block, 0)
 
 	// tracks of duplicate reference blocks
@@ -458,9 +475,10 @@ func withConsumers(t *testing.T,
 	ops ...CompleteExecutionReceiptBuilderOpt) {
 
 	tracer := trace.NewNoopTracer()
+	log := zerolog.Nop()
 
 	// bootstraps system with one node of each role.
-	s, verID, participants := bootstrapSystem(t, tracer, authorized)
+	s, verID, participants := bootstrapSystem(t, log, tracer, authorized)
 	exeID := participants.Filter(filter.HasRole(flow.RoleExecution))[0]
 	conID := participants.Filter(filter.HasRole(flow.RoleConsensus))[0]
 	// generates a chain of blocks in the form of root <- R1 <- C1 <- R2 <- C2 <- ... where Rs are distinct reference
@@ -584,17 +602,25 @@ func withConsumers(t *testing.T,
 // Otherwise, it bootstraps the verification node as unauthorized in current epoch.
 //
 // As the return values, it returns the state, local module, and list of identities in system.
-func bootstrapSystem(t *testing.T, tracer module.Tracer, authorized bool) (*enginemock.StateFixture, *flow.Identity,
-	flow.IdentityList) {
+func bootstrapSystem(
+	t *testing.T,
+	log zerolog.Logger,
+	tracer module.Tracer,
+	authorized bool,
+) (
+	*enginemock.StateFixture,
+	*flow.Identity,
+	flow.IdentityList,
+) {
 	// creates identities to bootstrap system with
 	verID := unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification))
 	identities := unittest.CompleteIdentitySet(verID)
 	identities = append(identities, unittest.IdentityFixture(unittest.WithRole(flow.RoleExecution))) // adds extra execution node
 
-	// bootstraps the system
 	collector := &metrics.NoopCollector{}
 	rootSnapshot := unittest.RootSnapshotFixture(identities)
-	stateFixture := testutil.CompleteStateFixture(t, collector, tracer, rootSnapshot)
+	stateFixture := testutil.CompleteStateFixture(t, log, collector, tracer, rootSnapshot)
+	// bootstraps the system
 
 	if !authorized {
 		// creates a new verification node identity that is unauthorized for this epoch

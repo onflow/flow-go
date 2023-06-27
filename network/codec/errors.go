@@ -27,7 +27,7 @@ func IsErrInvalidEncoding(err error) bool {
 
 // ErrUnknownMsgCode indicates that the message code byte (first byte of message payload) is unknown.
 type ErrUnknownMsgCode struct {
-	code uint8
+	code MessageCode
 }
 
 func (e ErrUnknownMsgCode) Error() string {
@@ -35,7 +35,7 @@ func (e ErrUnknownMsgCode) Error() string {
 }
 
 // NewUnknownMsgCodeErr returns a new ErrUnknownMsgCode
-func NewUnknownMsgCodeErr(code uint8) ErrUnknownMsgCode {
+func NewUnknownMsgCodeErr(code MessageCode) ErrUnknownMsgCode {
 	return ErrUnknownMsgCode{code}
 }
 

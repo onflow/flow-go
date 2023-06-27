@@ -29,13 +29,17 @@ type LoadCase struct {
 	duration time.Duration
 }
 
+const (
+	defaultMaxMsgSize = 1024 * 1024 * 16 // 16 MB
+)
+
 func main() {
 	sleep := flag.Duration("sleep", 0, "duration to sleep before benchmarking starts")
 	loadTypeFlag := flag.String("load-type", "token-transfer", "type of loads (\"token-transfer\", \"add-keys\", \"computation-heavy\", \"event-heavy\", \"ledger-heavy\", \"const-exec\")")
 	tpsFlag := flag.String("tps", "1", "transactions per second (TPS) to send, accepts a comma separated list of values if used in conjunction with `tps-durations`")
 	tpsDurationsFlag := flag.String("tps-durations", "0", "duration that each load test will run, accepts a comma separted list that will be applied to multiple values of the `tps` flag (defaults to infinite if not provided, meaning only the first tps case will be tested; additional values will be ignored)")
 	chainIDStr := flag.String("chain", string(flowsdk.Emulator), "chain ID")
-	accessNodes := flag.String("access", net.JoinHostPort("127.0.0.1", "3569"), "access node address")
+	accessNodes := flag.String("access", net.JoinHostPort("127.0.0.1", "4001"), "access node address")
 	serviceAccountPrivateKeyHex := flag.String("servPrivHex", unittest.ServiceAccountPrivateKeyHex, "service account private key hex")
 	logLvl := flag.String("log-level", "info", "set log level")
 	metricport := flag.Uint("metricport", 8080, "port for /metrics endpoint")
@@ -86,7 +90,14 @@ func main() {
 	accessNodeAddrs := strings.Split(*accessNodes, ",")
 	clients := make([]access.Client, 0, len(accessNodeAddrs))
 	for _, addr := range accessNodeAddrs {
-		client, err := client.NewClient(addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+		client, err := client.NewClient(
+			addr,
+			grpc.WithDefaultCallOptions(
+				grpc.MaxCallRecvMsgSize(defaultMaxMsgSize),
+				grpc.MaxCallSendMsgSize(defaultMaxMsgSize),
+			),
+			grpc.WithTransportCredentials(insecure.NewCredentials()),
+		)
 		if err != nil {
 			log.Fatal().Str("addr", addr).Err(err).Msgf("unable to initialize flow client")
 		}

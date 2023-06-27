@@ -10,6 +10,7 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
+	"github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/state/protocol"
@@ -56,8 +57,7 @@ func (b *backendAccounts) GetAccountAtBlockHeight(
 	// get header at given height
 	header, err := b.headers.ByHeight(height)
 	if err != nil {
-		err = convertStorageError(err)
-		return nil, err
+		return nil, rpc.ConvertStorageError(err)
 	}
 
 	// get block ID of the header at the given height
@@ -77,21 +77,21 @@ func (b *backendAccounts) getAccountAtBlockID(
 	blockID flow.Identifier,
 ) (*flow.Account, error) {
 
-	exeReq := execproto.GetAccountAtBlockIDRequest{
+	exeReq := &execproto.GetAccountAtBlockIDRequest{
 		Address: address.Bytes(),
 		BlockId: blockID[:],
 	}
 
 	execNodes, err := executionNodesForBlockID(ctx, blockID, b.executionReceipts, b.state, b.log)
 	if err != nil {
-		return nil, getAccountError(err)
+		return nil, rpc.ConvertError(err, "failed to get account from the execution node", codes.Internal)
 	}
 
 	var exeRes *execproto.GetAccountAtBlockIDResponse
 	exeRes, err = b.getAccountFromAnyExeNode(ctx, execNodes, exeReq)
 	if err != nil {
 		b.log.Error().Err(err).Msg("failed to get account from execution nodes")
-		return nil, err
+		return nil, rpc.ConvertError(err, "failed to get account from the execution node", codes.Internal)
 	}
 
 	account, err := convert.MessageToAccount(exeRes.GetAccount())
@@ -102,16 +102,12 @@ func (b *backendAccounts) getAccountAtBlockID(
 	return account, nil
 }
 
-func getAccountError(err error) error {
-	errStatus, _ := status.FromError(err)
-	if errStatus.Code() == codes.NotFound {
-		return err
-	}
-	return status.Errorf(codes.Internal, "failed to get account from the execution node: %v", err)
-}
-
-func (b *backendAccounts) getAccountFromAnyExeNode(ctx context.Context, execNodes flow.IdentityList, req execproto.GetAccountAtBlockIDRequest) (*execproto.GetAccountAtBlockIDResponse, error) {
-	var errors *multierror.Error // captures all error except
+// getAccountFromAnyExeNode retrieves the given account from any EN in `execNodes`.
+// We attempt querying each EN in sequence. If any EN returns a valid response, then errors from
+// other ENs are logged and swallowed. If all ENs fail to return a valid response, then an
+// error aggregating all failures is returned.
+func (b *backendAccounts) getAccountFromAnyExeNode(ctx context.Context, execNodes flow.IdentityList, req *execproto.GetAccountAtBlockIDRequest) (*execproto.GetAccountAtBlockIDResponse, error) {
+	var errors *multierror.Error
 	for _, execNode := range execNodes {
 		// TODO: use the GRPC Client interceptor
 		start := time.Now()
@@ -137,29 +133,18 @@ func (b *backendAccounts) getAccountFromAnyExeNode(ctx context.Context, execNode
 			Msg("failed to execute GetAccount")
 		errors = multierror.Append(errors, err)
 	}
-	// if we made it till here means there was at least one error
-	errToReturn := errors.ErrorOrNil()
 
-	// if there were an any errors other than codes.NotFound, return those
-	for _, err := range errors.Errors {
-		errStatus, _ := status.FromError(err)
-		if errStatus.Code() != codes.NotFound {
-			return nil, status.Errorf(codes.Internal, "failed to get account from the execution node: %v", errToReturn)
-		}
-	}
-
-	// if all errors were codes.NotFound, then return a codes.NotFound error wrapping all those errors
-	return nil, status.Errorf(codes.NotFound, "failed to get account from the execution node: %v", errToReturn)
+	return nil, errors.ErrorOrNil()
 }
 
-func (b *backendAccounts) tryGetAccount(ctx context.Context, execNode *flow.Identity, req execproto.GetAccountAtBlockIDRequest) (*execproto.GetAccountAtBlockIDResponse, error) {
+func (b *backendAccounts) tryGetAccount(ctx context.Context, execNode *flow.Identity, req *execproto.GetAccountAtBlockIDRequest) (*execproto.GetAccountAtBlockIDResponse, error) {
 	execRPCClient, closer, err := b.connFactory.GetExecutionAPIClient(execNode.Address)
 	if err != nil {
 		return nil, err
 	}
 	defer closer.Close()
 
-	resp, err := execRPCClient.GetAccountAtBlockID(ctx, &req)
+	resp, err := execRPCClient.GetAccountAtBlockID(ctx, req)
 	if err != nil {
 		if status.Code(err) == codes.Unavailable {
 			b.connFactory.InvalidateExecutionAPIClient(execNode.Address)

@@ -8,7 +8,6 @@ import (
 )
 
 func TestAddress_InvalidParse(t *testing.T) {
-	var address Address
 	inputs := []string{
 		"0x1",
 		"",
@@ -19,13 +18,12 @@ func TestAddress_InvalidParse(t *testing.T) {
 	}
 
 	for _, input := range inputs {
-		err := address.Parse(input)
+		_, err := ParseAddress(input)
 		assert.EqualError(t, err, "invalid address")
 	}
 }
 
 func TestAddress_ValidParse(t *testing.T) {
-	var address Address
 	inputs := []string{
 		"f8d6e0586b0a20c7",
 		"f3ad66eea58c97d2",
@@ -33,8 +31,8 @@ func TestAddress_ValidParse(t *testing.T) {
 	}
 
 	for _, input := range inputs {
-		err := address.Parse(input)
+		address, err := ParseAddress(input)
 		assert.NoError(t, err)
-		assert.Equal(t, strings.ReplaceAll(input, "0x", ""), address.Flow().String())
+		assert.Equal(t, strings.ReplaceAll(input, "0x", ""), address.String())
 	}
 }

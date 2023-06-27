@@ -8,9 +8,9 @@ import (
 	"time"
 
 	"github.com/onflow/flow-go/network/p2p"
+	p2ptest "github.com/onflow/flow-go/network/p2p/test"
 	flowpubsub "github.com/onflow/flow-go/network/validator/pubsub"
 
-	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/libp2p/go-libp2p/core/peer"
 	mocktestify "github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -19,7 +19,6 @@ import (
 	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module/id"
 	"github.com/onflow/flow-go/module/irrecoverable"
-	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/internal/p2pfixtures"
@@ -34,7 +33,7 @@ func TestSubscriptionValidator_NoSubscribedTopic(t *testing.T) {
 	sp := mockp2p.NewSubscriptionProvider(t)
 
 	sv := scoring.NewSubscriptionValidator()
-	sv.RegisterSubscriptionProvider(sp)
+	require.NoError(t, sv.RegisterSubscriptionProvider(sp))
 
 	// mocks peer 1 not subscribed to any topic.
 	peer1 := p2pfixtures.PeerIdFixture(t)
@@ -52,7 +51,7 @@ func TestSubscriptionValidator_NoSubscribedTopic(t *testing.T) {
 func TestSubscriptionValidator_UnknownChannel(t *testing.T) {
 	sp := mockp2p.NewSubscriptionProvider(t)
 	sv := scoring.NewSubscriptionValidator()
-	sv.RegisterSubscriptionProvider(sp)
+	require.NoError(t, sv.RegisterSubscriptionProvider(sp))
 
 	// mocks peer 1 not subscribed to an unknown topic.
 	peer1 := p2pfixtures.PeerIdFixture(t)
@@ -63,7 +62,7 @@ func TestSubscriptionValidator_UnknownChannel(t *testing.T) {
 	for _, role := range flow.Roles() {
 		err := sv.CheckSubscribedToAllowedTopics(peer1, role)
 		require.Error(t, err)
-		require.True(t, scoring.IsInvalidSubscriptionError(err))
+		require.True(t, p2p.IsInvalidSubscriptionError(err))
 	}
 }
 
@@ -72,7 +71,7 @@ func TestSubscriptionValidator_UnknownChannel(t *testing.T) {
 func TestSubscriptionValidator_ValidSubscriptions(t *testing.T) {
 	sp := mockp2p.NewSubscriptionProvider(t)
 	sv := scoring.NewSubscriptionValidator()
-	sv.RegisterSubscriptionProvider(sp)
+	require.NoError(t, sv.RegisterSubscriptionProvider(sp))
 
 	for _, role := range flow.Roles() {
 		peerId := p2pfixtures.PeerIdFixture(t)
@@ -103,7 +102,7 @@ func TestSubscriptionValidator_ValidSubscriptions(t *testing.T) {
 func TestSubscriptionValidator_SubscribeToAllTopics(t *testing.T) {
 	sp := mockp2p.NewSubscriptionProvider(t)
 	sv := scoring.NewSubscriptionValidator()
-	sv.RegisterSubscriptionProvider(sp)
+	require.NoError(t, sv.RegisterSubscriptionProvider(sp))
 
 	allChannels := channels.Channels().ExcludePattern(regexp.MustCompile("^(test).*"))
 	sporkID := unittest.IdentifierFixture()
@@ -117,7 +116,7 @@ func TestSubscriptionValidator_SubscribeToAllTopics(t *testing.T) {
 		sp.On("GetSubscribedTopics", peerId).Return(allTopics)
 		err := sv.CheckSubscribedToAllowedTopics(peerId, role)
 		require.Error(t, err, role)
-		require.True(t, scoring.IsInvalidSubscriptionError(err), role)
+		require.True(t, p2p.IsInvalidSubscriptionError(err), role)
 	}
 }
 
@@ -126,7 +125,7 @@ func TestSubscriptionValidator_SubscribeToAllTopics(t *testing.T) {
 func TestSubscriptionValidator_InvalidSubscriptions(t *testing.T) {
 	sp := mockp2p.NewSubscriptionProvider(t)
 	sv := scoring.NewSubscriptionValidator()
-	sv.RegisterSubscriptionProvider(sp)
+	require.NoError(t, sv.RegisterSubscriptionProvider(sp))
 
 	for _, role := range flow.Roles() {
 		peerId := p2pfixtures.PeerIdFixture(t)
@@ -145,7 +144,7 @@ func TestSubscriptionValidator_InvalidSubscriptions(t *testing.T) {
 			sp.On("GetSubscribedTopics", peerId).Return(unauthorizedTopics[:i+1])
 			err := sv.CheckSubscribedToAllowedTopics(peerId, role)
 			require.Error(t, err, role)
-			require.True(t, scoring.IsInvalidSubscriptionError(err), role)
+			require.True(t, p2p.IsInvalidSubscriptionError(err), role)
 		}
 	}
 }
@@ -176,21 +175,24 @@ func TestSubscriptionValidator_Integration(t *testing.T) {
 
 	idProvider := mock.NewIdentityProvider(t)
 	// one consensus node.
-	conNode, conId := p2pfixtures.NodeFixture(t, sporkId, t.Name(),
-		p2pfixtures.WithLogger(unittest.Logger()),
-		p2pfixtures.WithPeerScoringEnabled(idProvider),
-		p2pfixtures.WithRole(flow.RoleConsensus))
+	conNode, conId := p2ptest.NodeFixture(t, sporkId, t.Name(),
+		idProvider,
+		p2ptest.WithLogger(unittest.Logger()),
+		p2ptest.WithPeerScoringEnabled(idProvider),
+		p2ptest.WithRole(flow.RoleConsensus))
 
 	// two verification node.
-	verNode1, verId1 := p2pfixtures.NodeFixture(t, sporkId, t.Name(),
-		p2pfixtures.WithLogger(unittest.Logger()),
-		p2pfixtures.WithPeerScoringEnabled(idProvider),
-		p2pfixtures.WithRole(flow.RoleVerification))
+	verNode1, verId1 := p2ptest.NodeFixture(t, sporkId, t.Name(),
+		idProvider,
+		p2ptest.WithLogger(unittest.Logger()),
+		p2ptest.WithPeerScoringEnabled(idProvider),
+		p2ptest.WithRole(flow.RoleVerification))
 
-	verNode2, verId2 := p2pfixtures.NodeFixture(t, sporkId, t.Name(),
-		p2pfixtures.WithLogger(unittest.Logger()),
-		p2pfixtures.WithPeerScoringEnabled(idProvider),
-		p2pfixtures.WithRole(flow.RoleVerification))
+	verNode2, verId2 := p2ptest.NodeFixture(t, sporkId, t.Name(),
+		idProvider,
+		p2ptest.WithLogger(unittest.Logger()),
+		p2ptest.WithPeerScoringEnabled(idProvider),
+		p2ptest.WithRole(flow.RoleVerification))
 
 	ids := flow.IdentityList{&conId, &verId1, &verId2}
 	nodes := []p2p.LibP2PNode{conNode, verNode1, verNode2}
@@ -205,16 +207,15 @@ func TestSubscriptionValidator_Integration(t *testing.T) {
 			return ok
 		})
 
-	p2pfixtures.StartNodes(t, signalerCtx, nodes, 100*time.Millisecond)
-	defer p2pfixtures.StopNodes(t, nodes, cancel, 100*time.Millisecond)
+	p2ptest.StartNodes(t, signalerCtx, nodes, 100*time.Millisecond)
+	defer p2ptest.StopNodes(t, nodes, cancel, 100*time.Millisecond)
 
 	blockTopic := channels.TopicFromChannel(channels.PushBlocks, sporkId)
-	slashingViolationsConsumer := unittest.NetworkSlashingViolationsConsumer(unittest.Logger(), metrics.NewNoopCollector())
 
-	topicValidator := flowpubsub.TopicValidator(unittest.Logger(), unittest.NetworkCodec(), slashingViolationsConsumer, unittest.AllowAllPeerFilter())
+	topicValidator := flowpubsub.TopicValidator(unittest.Logger(), unittest.AllowAllPeerFilter())
 
 	// wait for the subscriptions to be established
-	p2pfixtures.LetNodesDiscoverEachOther(t, ctx, nodes, ids)
+	p2ptest.LetNodesDiscoverEachOther(t, ctx, nodes, ids)
 
 	// consensus node subscribes to the block topic.
 	conSub, err := conNode.Subscribe(blockTopic, topicValidator)
@@ -243,7 +244,7 @@ func TestSubscriptionValidator_Integration(t *testing.T) {
 	// checks that the message is received by all nodes.
 	ctx1s, cancel1s := context.WithTimeout(ctx, 1*time.Second)
 	defer cancel1s()
-	p2pfixtures.SubsMustReceiveMessage(t, ctx1s, proposalMsg, []*pubsub.Subscription{conSub, ver1SubBlocks, ver2SubBlocks})
+	p2pfixtures.SubsMustReceiveMessage(t, ctx1s, proposalMsg, []p2p.Subscription{conSub, ver1SubBlocks, ver2SubBlocks})
 
 	// now consensus node is doing something very bad!
 	// it is subscribing to a channel that it is not supposed to subscribe to.
@@ -262,7 +263,7 @@ func TestSubscriptionValidator_Integration(t *testing.T) {
 
 	ctx5s, cancel5s := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel5s()
-	p2pfixtures.SubsMustNeverReceiveAnyMessage(t, ctx5s, []*pubsub.Subscription{ver1SubBlocks, ver2SubBlocks})
+	p2pfixtures.SubsMustNeverReceiveAnyMessage(t, ctx5s, []p2p.Subscription{ver1SubBlocks, ver2SubBlocks})
 
 	// moreover, a verification node publishing a message to the request chunk topic should not reach consensus node.
 	// however, both verification nodes should receive the message.
@@ -274,9 +275,9 @@ func TestSubscriptionValidator_Integration(t *testing.T) {
 
 	ctx1s, cancel1s = context.WithTimeout(ctx, 1*time.Second)
 	defer cancel1s()
-	p2pfixtures.SubsMustReceiveMessage(t, ctx1s, chunkDataPackRequestMsg, []*pubsub.Subscription{ver1SubChunks, ver2SubChunks})
+	p2pfixtures.SubsMustReceiveMessage(t, ctx1s, chunkDataPackRequestMsg, []p2p.Subscription{ver1SubChunks, ver2SubChunks})
 
 	ctx5s, cancel5s = context.WithTimeout(ctx, 5*time.Second)
 	defer cancel5s()
-	p2pfixtures.SubsMustNeverReceiveAnyMessage(t, ctx5s, []*pubsub.Subscription{conSubChunks})
+	p2pfixtures.SubsMustNeverReceiveAnyMessage(t, ctx5s, []p2p.Subscription{conSubChunks})
 }

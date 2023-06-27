@@ -11,32 +11,28 @@ import (
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
+	"crypto/sha256"
 	"fmt"
 	"math/big"
 
 	"github.com/btcsuite/btcd/btcec/v2"
+	"golang.org/x/crypto/hkdf"
 
 	"github.com/onflow/flow-go/crypto/hash"
 )
 
 const (
-	// ECDSA
-
-	KeyGenSeedMaxLenECDSA = 2048 // large enough constant accepted by the implementation
-
 	// NIST P256
 	SignatureLenECDSAP256 = 64
 	PrKeyLenECDSAP256     = 32
 	// PubKeyLenECDSAP256 is the size of uncompressed points on P256
-	PubKeyLenECDSAP256        = 64
-	KeyGenSeedMinLenECDSAP256 = PrKeyLenECDSAP256 + (securityBits / 8)
+	PubKeyLenECDSAP256 = 64
 
 	// SECG secp256k1
 	SignatureLenECDSASecp256k1 = 64
 	PrKeyLenECDSASecp256k1     = 32
 	// PubKeyLenECDSASecp256k1 is the size of uncompressed points on secp256k1
-	PubKeyLenECDSASecp256k1        = 64
-	KeyGenSeedMinLenECDSASecp256k1 = PrKeyLenECDSASecp256k1 + (securityBits / 8)
+	PubKeyLenECDSASecp256k1 = 64
 )
 
 // ecdsaAlgo embeds SignAlgo
@@ -181,7 +177,7 @@ func (a *ecdsaAlgo) signatureFormatCheck(sig Signature) bool {
 var one = new(big.Int).SetInt64(1)
 
 // goecdsaGenerateKey generates a public and private key pair
-// for the crypto/ecdsa library using the input seed as input
+// for the crypto/ecdsa library using the input seed
 func goecdsaGenerateKey(c elliptic.Curve, seed []byte) *ecdsa.PrivateKey {
 	k := new(big.Int).SetBytes(seed)
 	n := new(big.Int).Sub(c.Params().N, one)
@@ -199,16 +195,34 @@ func goecdsaGenerateKey(c elliptic.Curve, seed []byte) *ecdsa.PrivateKey {
 // deterministically using the input seed.
 //
 // It is recommended to use a secure crypto RNG to generate the seed.
-// The seed must have enough entropy and should be sampled uniformly at random.
+// The seed must have enough entropy.
 func (a *ecdsaAlgo) generatePrivateKey(seed []byte) (PrivateKey, error) {
-	Nlen := bitsToBytes((a.curve.Params().N).BitLen())
-	// use extra 128 bits to reduce the modular reduction bias
-	minSeedLen := Nlen + (securityBits / 8)
-	if len(seed) < minSeedLen || len(seed) > KeyGenSeedMaxLenECDSA {
+	if len(seed) < KeyGenSeedMinLen || len(seed) > KeyGenSeedMaxLen {
 		return nil, invalidInputsErrorf("seed byte length should be between %d and %d",
-			minSeedLen, KeyGenSeedMaxLenECDSA)
+			KeyGenSeedMinLen, KeyGenSeedMaxLen)
 	}
-	sk := goecdsaGenerateKey(a.curve, seed)
+
+	// use HKDF to extract the seed entropy and expand it into key bytes
+
+	// use SHA2-256 as the building block H in HKDF
+	hashFunction := sha256.New
+	salt := []byte("") // HKDF salt
+	info := []byte("") // HKDF info
+	// use extra 128 bits to reduce the modular reduction bias
+	Nlen := bitsToBytes((a.curve.Params().N).BitLen())
+	okmLength := Nlen + (securityBits / 8)
+
+	// instantiate HKDF and extract okm
+	reader := hkdf.New(hashFunction, seed, salt, info)
+	okm := make([]byte, okmLength)
+	n, err := reader.Read(okm)
+	if err != nil || n != okmLength {
+		return nil, fmt.Errorf("key generation failed because of the HKDF reader, %d bytes were read: %w",
+			n, err)
+	}
+	defer overwrite(okm) // overwrite okm
+
+	sk := goecdsaGenerateKey(a.curve, okm)
 	return &prKeyECDSA{
 		alg:     a,
 		goPrKey: sk,

@@ -15,6 +15,7 @@ import (
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/module/trace"
+	"github.com/onflow/flow-go/state/cluster"
 	"github.com/onflow/flow-go/state/protocol"
 	mockprotocol "github.com/onflow/flow-go/state/protocol/mock"
 	mockstorage "github.com/onflow/flow-go/storage/mock"
@@ -37,6 +38,9 @@ type IngestionCoreSuite struct {
 
 	finalIdentities flow.IdentityList // identities at finalized state
 	refIdentities   flow.IdentityList // identities at reference block state
+	epochCounter    uint64            // epoch for the cluster originating the guarantee
+	clusterMembers  flow.IdentityList // members of the cluster originating the guarantee
+	clusterID       flow.ChainID      // chain ID of the cluster originating the guarantee
 
 	final *mockprotocol.Snapshot // finalized state snapshot
 	ref   *mockprotocol.Snapshot // state snapshot w.r.t. reference block
@@ -66,7 +70,9 @@ func (suite *IngestionCoreSuite) SetupTest() {
 	suite.execID = exec.NodeID
 	suite.verifID = verif.NodeID
 
-	clusters := flow.IdentityList{coll}
+	suite.epochCounter = 1
+	suite.clusterMembers = flow.IdentityList{coll}
+	suite.clusterID = cluster.CanonicalClusterID(suite.epochCounter, suite.clusterMembers.NodeIDs())
 
 	identities := flow.IdentityList{access, con, coll, exec, verif}
 	suite.finalIdentities = identities.Copy()
@@ -109,8 +115,20 @@ func (suite *IngestionCoreSuite) SetupTest() {
 	)
 	ref.On("Epochs").Return(suite.query)
 	suite.query.On("Current").Return(suite.epoch)
-	cluster.On("Members").Return(clusters)
-	suite.epoch.On("ClusterByChainID", head.ChainID).Return(cluster, nil)
+	cluster.On("Members").Return(suite.clusterMembers)
+	suite.epoch.On("ClusterByChainID", mock.Anything).Return(
+		func(chainID flow.ChainID) protocol.Cluster {
+			if chainID == suite.clusterID {
+				return cluster
+			}
+			return nil
+		},
+		func(chainID flow.ChainID) error {
+			if chainID == suite.clusterID {
+				return nil
+			}
+			return protocol.ErrClusterNotFound
+		})
 
 	state.On("AtBlockID", mock.Anything).Return(ref)
 	ref.On("Identity", mock.Anything).Return(
@@ -234,7 +252,23 @@ func (suite *IngestionCoreSuite) TestOnGuaranteeExpired() {
 	err := suite.core.OnGuarantee(suite.collID, guarantee)
 	suite.Assert().Error(err, "should error with expired collection")
 	suite.Assert().True(engine.IsOutdatedInputError(err))
+}
 
+// TestOnGuaranteeReferenceBlockFromWrongEpoch validates that guarantees which contain a ChainID
+// that is inconsistent with the reference block (ie. the ChainID either refers to a non-existent
+// cluster, or a cluster for a different epoch) should be considered invalid inputs.
+func (suite *IngestionCoreSuite) TestOnGuaranteeReferenceBlockFromWrongEpoch() {
+	// create a guarantee from a cluster in a different epoch
+	guarantee := suite.validGuarantee()
+	guarantee.ChainID = cluster.CanonicalClusterID(suite.epochCounter+1, suite.clusterMembers.NodeIDs())
+
+	// the guarantee is not part of the memory pool
+	suite.pool.On("Has", guarantee.ID()).Return(false)
+
+	// submit the guarantee as if it was sent by a collection node
+	err := suite.core.OnGuarantee(suite.collID, guarantee)
+	suite.Assert().Error(err, "should error with expired collection")
+	suite.Assert().True(engine.IsInvalidInputError(err))
 }
 
 // TestOnGuaranteeInvalidGuarantor verifiers that collections with any _unknown_
@@ -306,7 +340,7 @@ func (suite *IngestionCoreSuite) TestOnGuaranteeUnknownOrigin() {
 // validGuarantee returns a valid collection guarantee based on the suite state.
 func (suite *IngestionCoreSuite) validGuarantee() *flow.CollectionGuarantee {
 	guarantee := unittest.CollectionGuaranteeFixture()
-	guarantee.ChainID = suite.head.ChainID
+	guarantee.ChainID = suite.clusterID
 
 	signerIndices, err := signature.EncodeSignersToIndices(
 		[]flow.Identifier{suite.collID}, []flow.Identifier{suite.collID})

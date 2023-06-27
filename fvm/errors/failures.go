@@ -33,9 +33,9 @@ func NewLedgerFailure(err error) CodedError {
 		"ledger returns unsuccessful")
 }
 
-// IsALedgerFailure returns true if the error or any of the wrapped errors is
+// IsLedgerFailure returns true if the error or any of the wrapped errors is
 // a ledger failure
-func IsALedgerFailure(err error) bool {
+func IsLedgerFailure(err error) bool {
 	return HasErrorCode(err, FailureCodeLedgerFailure)
 }
 

@@ -5,39 +5,40 @@
 package mocknetwork
 
 import (
+	reflect "reflect"
+
 	gomock "github.com/golang/mock/gomock"
-	go_datastore "github.com/ipfs/go-datastore"
+	datastore "github.com/ipfs/go-datastore"
 	protocol "github.com/libp2p/go-libp2p/core/protocol"
 	irrecoverable "github.com/onflow/flow-go/module/irrecoverable"
 	network "github.com/onflow/flow-go/network"
 	channels "github.com/onflow/flow-go/network/channels"
-	reflect "reflect"
 )
 
-// MockNetwork is a mock of Network interface
+// MockNetwork is a mock of Network interface.
 type MockNetwork struct {
 	ctrl     *gomock.Controller
 	recorder *MockNetworkMockRecorder
 }
 
-// MockNetworkMockRecorder is the mock recorder for MockNetwork
+// MockNetworkMockRecorder is the mock recorder for MockNetwork.
 type MockNetworkMockRecorder struct {
 	mock *MockNetwork
 }
 
-// NewMockNetwork creates a new mock instance
+// NewMockNetwork creates a new mock instance.
 func NewMockNetwork(ctrl *gomock.Controller) *MockNetwork {
 	mock := &MockNetwork{ctrl: ctrl}
 	mock.recorder = &MockNetworkMockRecorder{mock}
 	return mock
 }
 
-// EXPECT returns an object that allows the caller to indicate expected use
+// EXPECT returns an object that allows the caller to indicate expected use.
 func (m *MockNetwork) EXPECT() *MockNetworkMockRecorder {
 	return m.recorder
 }
 
-// Done mocks base method
+// Done mocks base method.
 func (m *MockNetwork) Done() <-chan struct{} {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Done")
@@ -45,13 +46,13 @@ func (m *MockNetwork) Done() <-chan struct{} {
 	return ret0
 }
 
-// Done indicates an expected call of Done
+// Done indicates an expected call of Done.
 func (mr *MockNetworkMockRecorder) Done() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Done", reflect.TypeOf((*MockNetwork)(nil).Done))
 }
 
-// Ready mocks base method
+// Ready mocks base method.
 func (m *MockNetwork) Ready() <-chan struct{} {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Ready")
@@ -59,13 +60,13 @@ func (m *MockNetwork) Ready() <-chan struct{} {
 	return ret0
 }
 
-// Ready indicates an expected call of Ready
+// Ready indicates an expected call of Ready.
 func (mr *MockNetworkMockRecorder) Ready() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Ready", reflect.TypeOf((*MockNetwork)(nil).Ready))
 }
 
-// Register mocks base method
+// Register mocks base method.
 func (m *MockNetwork) Register(arg0 channels.Channel, arg1 network.MessageProcessor) (network.Conduit, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Register", arg0, arg1)
@@ -74,14 +75,14 @@ func (m *MockNetwork) Register(arg0 channels.Channel, arg1 network.MessageProces
 	return ret0, ret1
 }
 
-// Register indicates an expected call of Register
+// Register indicates an expected call of Register.
 func (mr *MockNetworkMockRecorder) Register(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Register", reflect.TypeOf((*MockNetwork)(nil).Register), arg0, arg1)
 }
 
-// RegisterBlobService mocks base method
-func (m *MockNetwork) RegisterBlobService(arg0 channels.Channel, arg1 go_datastore.Batching, arg2 ...network.BlobServiceOption) (network.BlobService, error) {
+// RegisterBlobService mocks base method.
+func (m *MockNetwork) RegisterBlobService(arg0 channels.Channel, arg1 datastore.Batching, arg2 ...network.BlobServiceOption) (network.BlobService, error) {
 	m.ctrl.T.Helper()
 	varargs := []interface{}{arg0, arg1}
 	for _, a := range arg2 {
@@ -93,14 +94,14 @@ func (m *MockNetwork) RegisterBlobService(arg0 channels.Channel, arg1 go_datasto
 	return ret0, ret1
 }
 
-// RegisterBlobService indicates an expected call of RegisterBlobService
+// RegisterBlobService indicates an expected call of RegisterBlobService.
 func (mr *MockNetworkMockRecorder) RegisterBlobService(arg0, arg1 interface{}, arg2 ...interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	varargs := append([]interface{}{arg0, arg1}, arg2...)
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RegisterBlobService", reflect.TypeOf((*MockNetwork)(nil).RegisterBlobService), varargs...)
 }
 
-// RegisterPingService mocks base method
+// RegisterPingService mocks base method.
 func (m *MockNetwork) RegisterPingService(arg0 protocol.ID, arg1 network.PingInfoProvider) (network.PingService, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "RegisterPingService", arg0, arg1)
@@ -109,19 +110,19 @@ func (m *MockNetwork) RegisterPingService(arg0 protocol.ID, arg1 network.PingInf
 	return ret0, ret1
 }
 
-// RegisterPingService indicates an expected call of RegisterPingService
+// RegisterPingService indicates an expected call of RegisterPingService.
 func (mr *MockNetworkMockRecorder) RegisterPingService(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RegisterPingService", reflect.TypeOf((*MockNetwork)(nil).RegisterPingService), arg0, arg1)
 }
 
-// Start mocks base method
+// Start mocks base method.
 func (m *MockNetwork) Start(arg0 irrecoverable.SignalerContext) {
 	m.ctrl.T.Helper()
 	m.ctrl.Call(m, "Start", arg0)
 }
 
-// Start indicates an expected call of Start
+// Start indicates an expected call of Start.
 func (mr *MockNetworkMockRecorder) Start(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Start", reflect.TypeOf((*MockNetwork)(nil).Start), arg0)

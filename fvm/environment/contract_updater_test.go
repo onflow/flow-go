@@ -1,31 +1,26 @@
-package environment
+package environment_test
 
 import (
 	"fmt"
 	"testing"
 
 	"github.com/onflow/cadence"
-	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	"github.com/onflow/flow-go/fvm/programs"
-
 	"github.com/onflow/flow-go/fvm/blueprints"
+	"github.com/onflow/flow-go/fvm/environment"
 	envMock "github.com/onflow/flow-go/fvm/environment/mock"
-	"github.com/onflow/flow-go/fvm/state"
-	"github.com/onflow/flow-go/fvm/utils"
+	"github.com/onflow/flow-go/fvm/storage/testutils"
 	"github.com/onflow/flow-go/model/flow"
 )
 
 type testContractUpdaterStubs struct {
 	deploymentEnabled    bool
 	removalEnabled       bool
-	deploymentAuthorized []common.Address
-	removalAuthorized    []common.Address
-
-	auditFunc func(address runtime.Address, code []byte) (bool, error)
+	deploymentAuthorized []flow.Address
+	removalAuthorized    []flow.Address
 }
 
 func (p testContractUpdaterStubs) RestrictedDeploymentEnabled() bool {
@@ -38,34 +33,21 @@ func (p testContractUpdaterStubs) RestrictedRemovalEnabled() bool {
 
 func (p testContractUpdaterStubs) GetAuthorizedAccounts(
 	path cadence.Path,
-) []common.Address {
+) []flow.Address {
 	if path == blueprints.ContractDeploymentAuthorizedAddressesPath {
 		return p.deploymentAuthorized
 	}
 	return p.removalAuthorized
 }
 
-func (p testContractUpdaterStubs) UseContractAuditVoucher(
-	address runtime.Address,
-	code []byte,
-) (
-	bool,
-	error,
-) {
-	return p.auditFunc(address, code)
-}
-
 func TestContract_ChildMergeFunctionality(t *testing.T) {
-	txnState := state.NewTransactionState(
-		utils.NewSimpleView(),
-		state.DefaultParameters())
-	accounts := NewAccounts(txnState)
+	txnState := testutils.NewSimpleTransaction(nil)
+	accounts := environment.NewAccounts(txnState)
 	address := flow.HexToAddress("01")
-	rAdd := runtime.Address(address)
 	err := accounts.Create(nil, address)
 	require.NoError(t, err)
 
-	contractUpdater := NewContractUpdaterForTesting(
+	contractUpdater := environment.NewContractUpdaterForTesting(
 		accounts,
 		testContractUpdaterStubs{})
 
@@ -75,9 +57,14 @@ func TestContract_ChildMergeFunctionality(t *testing.T) {
 	require.Equal(t, len(names), 0)
 
 	// set contract no need for signing accounts
-	err = contractUpdater.setContract(rAdd, "testContract", []byte("ABC"), nil)
+	err = contractUpdater.SetContract(
+		common.AddressLocation{
+			Name:    "testContract",
+			Address: common.MustBytesToAddress(address.Bytes())},
+		[]byte("ABC"),
+		nil)
 	require.NoError(t, err)
-	require.True(t, contractUpdater.hasUpdates())
+	require.True(t, contractUpdater.HasUpdates())
 
 	// should not be readable from draft
 	cont, err := accounts.GetContract("testContract", address)
@@ -92,10 +79,15 @@ func TestContract_ChildMergeFunctionality(t *testing.T) {
 	require.Equal(t, cont, []byte("ABC"))
 
 	// rollback
-	err = contractUpdater.setContract(rAdd, "testContract2", []byte("ABC"), nil)
+	err = contractUpdater.SetContract(
+		common.AddressLocation{
+			Name:    "testContract2",
+			Address: common.MustBytesToAddress(address.Bytes())},
+		[]byte("ABC"),
+		nil)
 	require.NoError(t, err)
 	contractUpdater.Reset()
-	require.False(t, contractUpdater.hasUpdates())
+	require.False(t, contractUpdater.HasUpdates())
 	_, err = contractUpdater.Commit()
 	require.NoError(t, err)
 
@@ -110,7 +102,9 @@ func TestContract_ChildMergeFunctionality(t *testing.T) {
 	require.Equal(t, cont, []byte("ABC"))
 
 	// remove
-	err = contractUpdater.removeContract(rAdd, "testContract", nil)
+	err = contractUpdater.RemoveContract(common.AddressLocation{
+		Name:    "testContract",
+		Address: common.MustBytesToAddress(address.Bytes())}, nil)
 	require.NoError(t, err)
 
 	// contract still there because no commit yet
@@ -129,40 +123,33 @@ func TestContract_ChildMergeFunctionality(t *testing.T) {
 }
 
 func TestContract_AuthorizationFunctionality(t *testing.T) {
-	txnState := state.NewTransactionState(
-		utils.NewSimpleView(),
-		state.DefaultParameters())
-	accounts := NewAccounts(txnState)
+	txnState := testutils.NewSimpleTransaction(nil)
+	accounts := environment.NewAccounts(txnState)
 
 	authAdd := flow.HexToAddress("01")
-	rAdd := runtime.Address(authAdd)
 	err := accounts.Create(nil, authAdd)
 	require.NoError(t, err)
 
 	authRemove := flow.HexToAddress("02")
-	rRemove := runtime.Address(authRemove)
 	err = accounts.Create(nil, authRemove)
 	require.NoError(t, err)
 
 	authBoth := flow.HexToAddress("03")
-	rBoth := runtime.Address(authBoth)
 	err = accounts.Create(nil, authBoth)
 	require.NoError(t, err)
 
 	unAuth := flow.HexToAddress("04")
-	unAuthR := runtime.Address(unAuth)
 	err = accounts.Create(nil, unAuth)
 	require.NoError(t, err)
 
-	makeUpdater := func() *contractUpdater {
-		return NewContractUpdaterForTesting(
+	makeUpdater := func() *environment.ContractUpdaterImpl {
+		return environment.NewContractUpdaterForTesting(
 			accounts,
 			testContractUpdaterStubs{
 				deploymentEnabled:    true,
 				removalEnabled:       true,
-				deploymentAuthorized: []common.Address{rAdd, rBoth},
-				removalAuthorized:    []common.Address{rRemove, rBoth},
-				auditFunc:            func(address runtime.Address, code []byte) (bool, error) { return false, nil },
+				deploymentAuthorized: []flow.Address{authAdd, authBoth},
+				removalAuthorized:    []flow.Address{authRemove, authBoth},
 			})
 
 	}
@@ -170,208 +157,142 @@ func TestContract_AuthorizationFunctionality(t *testing.T) {
 	t.Run("try to set contract with unauthorized account", func(t *testing.T) {
 		contractUpdater := makeUpdater()
 
-		err = contractUpdater.setContract(rAdd, "testContract1", []byte("ABC"), []common.Address{unAuthR})
+		err = contractUpdater.SetContract(
+			common.AddressLocation{
+				Name:    "testContract1",
+				Address: common.MustBytesToAddress(authAdd.Bytes())},
+			[]byte("ABC"),
+			[]flow.Address{unAuth})
 		require.Error(t, err)
-		require.False(t, contractUpdater.hasUpdates())
+		require.False(t, contractUpdater.HasUpdates())
 	})
 
 	t.Run("try to set contract with account only authorized for removal", func(t *testing.T) {
 		contractUpdater := makeUpdater()
 
-		err = contractUpdater.setContract(rAdd, "testContract1", []byte("ABC"), []common.Address{rRemove})
+		err = contractUpdater.SetContract(
+			common.AddressLocation{
+				Name:    "testContract1",
+				Address: common.MustBytesToAddress(authAdd.Bytes())},
+			[]byte("ABC"),
+			[]flow.Address{authRemove})
 		require.Error(t, err)
-		require.False(t, contractUpdater.hasUpdates())
+		require.False(t, contractUpdater.HasUpdates())
 	})
 
 	t.Run("set contract with account authorized for adding", func(t *testing.T) {
 		contractUpdater := makeUpdater()
 
-		err = contractUpdater.setContract(rAdd, "testContract2", []byte("ABC"), []common.Address{rAdd})
+		err = contractUpdater.SetContract(
+			common.AddressLocation{
+				Name:    "testContract2",
+				Address: common.MustBytesToAddress(authAdd.Bytes())},
+			[]byte("ABC"),
+			[]flow.Address{authAdd})
 		require.NoError(t, err)
-		require.True(t, contractUpdater.hasUpdates())
+		require.True(t, contractUpdater.HasUpdates())
 	})
 
 	t.Run("set contract with account authorized for adding and removing", func(t *testing.T) {
 		contractUpdater := makeUpdater()
 
-		err = contractUpdater.setContract(rAdd, "testContract2", []byte("ABC"), []common.Address{rBoth})
+		err = contractUpdater.SetContract(
+			common.AddressLocation{
+				Name:    "testContract2",
+				Address: common.MustBytesToAddress(authAdd.Bytes())},
+			[]byte("ABC"),
+			[]flow.Address{authBoth})
 		require.NoError(t, err)
-		require.True(t, contractUpdater.hasUpdates())
+		require.True(t, contractUpdater.HasUpdates())
 	})
 
 	t.Run("try to remove contract with unauthorized account", func(t *testing.T) {
 		contractUpdater := makeUpdater()
 
-		err = contractUpdater.setContract(rAdd, "testContract1", []byte("ABC"), []common.Address{rAdd})
+		err = contractUpdater.SetContract(
+			common.AddressLocation{
+				Name:    "testContract1",
+				Address: common.MustBytesToAddress(authAdd.Bytes())},
+			[]byte("ABC"),
+			[]flow.Address{authAdd})
 		require.NoError(t, err)
 		_, err = contractUpdater.Commit()
 		require.NoError(t, err)
 
-		err = contractUpdater.removeContract(unAuthR, "testContract2", []common.Address{unAuthR})
+		err = contractUpdater.RemoveContract(
+			common.AddressLocation{
+				Name:    "testContract2",
+				Address: common.MustBytesToAddress(authAdd.Bytes())},
+			[]flow.Address{unAuth})
 		require.Error(t, err)
-		require.False(t, contractUpdater.hasUpdates())
+		require.False(t, contractUpdater.HasUpdates())
 	})
 
 	t.Run("remove contract account authorized for removal", func(t *testing.T) {
 		contractUpdater := makeUpdater()
 
-		err = contractUpdater.setContract(rAdd, "testContract1", []byte("ABC"), []common.Address{rAdd})
+		err = contractUpdater.SetContract(
+			common.AddressLocation{
+				Name:    "testContract1",
+				Address: common.MustBytesToAddress(authAdd.Bytes())},
+			[]byte("ABC"),
+			[]flow.Address{authAdd})
 		require.NoError(t, err)
 		_, err = contractUpdater.Commit()
 		require.NoError(t, err)
 
-		err = contractUpdater.removeContract(rRemove, "testContract2", []common.Address{rRemove})
+		err = contractUpdater.RemoveContract(
+			common.AddressLocation{
+				Name:    "testContract2",
+				Address: common.MustBytesToAddress(authAdd.Bytes())},
+			[]flow.Address{authRemove})
 		require.NoError(t, err)
-		require.True(t, contractUpdater.hasUpdates())
+		require.True(t, contractUpdater.HasUpdates())
 	})
 
 	t.Run("try to remove contract with account only authorized for adding", func(t *testing.T) {
 		contractUpdater := makeUpdater()
 
-		err = contractUpdater.setContract(rAdd, "testContract1", []byte("ABC"), []common.Address{rAdd})
+		err = contractUpdater.SetContract(
+			common.AddressLocation{
+				Name:    "testContract1",
+				Address: common.MustBytesToAddress(authAdd.Bytes())},
+			[]byte("ABC"),
+			[]flow.Address{authAdd})
 		require.NoError(t, err)
 		_, err = contractUpdater.Commit()
 		require.NoError(t, err)
 
-		err = contractUpdater.removeContract(rAdd, "testContract2", []common.Address{rAdd})
+		err = contractUpdater.RemoveContract(
+			common.AddressLocation{
+				Name:    "testContract2",
+				Address: common.MustBytesToAddress(authAdd.Bytes())},
+			[]flow.Address{authAdd})
 		require.Error(t, err)
-		require.False(t, contractUpdater.hasUpdates())
+		require.False(t, contractUpdater.HasUpdates())
 	})
 
 	t.Run("remove contract with account authorized for adding and removing", func(t *testing.T) {
 		contractUpdater := makeUpdater()
 
-		err = contractUpdater.setContract(rAdd, "testContract1", []byte("ABC"), []common.Address{rAdd})
+		err = contractUpdater.SetContract(
+			common.AddressLocation{
+				Name:    "testContract1",
+				Address: common.MustBytesToAddress(authAdd.Bytes())},
+			[]byte("ABC"),
+			[]flow.Address{authAdd})
 		require.NoError(t, err)
 		_, err = contractUpdater.Commit()
 		require.NoError(t, err)
 
-		err = contractUpdater.removeContract(rBoth, "testContract2", []common.Address{rBoth})
+		err = contractUpdater.RemoveContract(
+			common.AddressLocation{
+				Name:    "testContract2",
+				Address: common.MustBytesToAddress(authAdd.Bytes())},
+			[]flow.Address{authBoth})
 		require.NoError(t, err)
-		require.True(t, contractUpdater.hasUpdates())
+		require.True(t, contractUpdater.HasUpdates())
 	})
-}
-
-func TestContract_DeploymentVouchers(t *testing.T) {
-
-	txnState := state.NewTransactionState(
-		utils.NewSimpleView(),
-		state.DefaultParameters())
-	accounts := NewAccounts(txnState)
-
-	addressWithVoucher := flow.HexToAddress("01")
-	addressWithVoucherRuntime := runtime.Address(addressWithVoucher)
-	err := accounts.Create(nil, addressWithVoucher)
-	require.NoError(t, err)
-
-	addressNoVoucher := flow.HexToAddress("02")
-	addressNoVoucherRuntime := runtime.Address(addressNoVoucher)
-	err = accounts.Create(nil, addressNoVoucher)
-	require.NoError(t, err)
-
-	contractUpdater := NewContractUpdaterForTesting(
-		accounts,
-		testContractUpdaterStubs{
-			deploymentEnabled: true,
-			removalEnabled:    true,
-			auditFunc: func(address runtime.Address, code []byte) (bool, error) {
-				if address.String() == addressWithVoucher.String() {
-					return true, nil
-				}
-				return false, nil
-			},
-		})
-
-	// set contract without voucher
-	err = contractUpdater.setContract(
-		addressNoVoucherRuntime,
-		"TestContract1",
-		[]byte("pub contract TestContract1 {}"),
-		[]common.Address{
-			addressNoVoucherRuntime,
-		},
-	)
-	require.Error(t, err)
-	require.False(t, contractUpdater.hasUpdates())
-
-	// try to set contract with voucher
-	err = contractUpdater.setContract(
-		addressWithVoucherRuntime,
-		"TestContract2",
-		[]byte("pub contract TestContract2 {}"),
-		[]common.Address{
-			addressWithVoucherRuntime,
-		},
-	)
-	require.NoError(t, err)
-	require.True(t, contractUpdater.hasUpdates())
-}
-
-func TestContract_ContractUpdate(t *testing.T) {
-
-	txnState := state.NewTransactionState(
-		utils.NewSimpleView(),
-		state.DefaultParameters())
-	accounts := NewAccounts(txnState)
-
-	flowAddress := flow.HexToAddress("01")
-	runtimeAddress := runtime.Address(flowAddress)
-	err := accounts.Create(nil, flowAddress)
-	require.NoError(t, err)
-
-	var authorizationChecked bool
-
-	contractUpdater := NewContractUpdaterForTesting(
-		accounts,
-		testContractUpdaterStubs{
-			deploymentEnabled: true,
-			removalEnabled:    true,
-			auditFunc: func(address runtime.Address, code []byte) (bool, error) {
-				// Ensure the voucher check is only called once,
-				// for the initial contract deployment,
-				// and not for the subsequent update
-				require.False(t, authorizationChecked)
-				authorizationChecked = true
-				return true, nil
-			},
-		})
-
-	// deploy contract with voucher
-	err = contractUpdater.setContract(
-		runtimeAddress,
-		"TestContract",
-		[]byte("pub contract TestContract {}"),
-		[]common.Address{
-			runtimeAddress,
-		},
-	)
-	require.NoError(t, err)
-	require.True(t, contractUpdater.hasUpdates())
-
-	contractUpdateKeys, err := contractUpdater.Commit()
-	require.NoError(t, err)
-	require.Equal(
-		t,
-		[]programs.ContractUpdateKey{
-			{
-				Address: flowAddress,
-				Name:    "TestContract",
-			},
-		},
-		contractUpdateKeys,
-	)
-
-	// try to update contract without voucher
-	err = contractUpdater.setContract(
-		runtimeAddress,
-		"TestContract",
-		[]byte("pub contract TestContract {}"),
-		[]common.Address{
-			runtimeAddress,
-		},
-	)
-	require.NoError(t, err)
-	require.True(t, contractUpdater.hasUpdates())
 }
 
 func TestContract_DeterministicErrorOnCommit(t *testing.T) {
@@ -385,20 +306,32 @@ func TestContract_DeterministicErrorOnCommit(t *testing.T) {
 			return fmt.Errorf("%s %s", contractName, address.Hex())
 		})
 
-	contractUpdater := NewContractUpdaterForTesting(
+	contractUpdater := environment.NewContractUpdaterForTesting(
 		mockAccounts,
 		testContractUpdaterStubs{})
 
-	address1 := runtime.Address(flow.HexToAddress("0000000000000001"))
-	address2 := runtime.Address(flow.HexToAddress("0000000000000002"))
+	address1 := flow.HexToAddress("0000000000000001")
+	address2 := flow.HexToAddress("0000000000000002")
 
-	err := contractUpdater.setContract(address2, "A", []byte("ABC"), nil)
+	err := contractUpdater.SetContract(
+		common.AddressLocation{
+			Name:    "A",
+			Address: common.MustBytesToAddress(address2.Bytes())},
+		[]byte("ABC"), nil)
 	require.NoError(t, err)
 
-	err = contractUpdater.setContract(address1, "B", []byte("ABC"), nil)
+	err = contractUpdater.SetContract(
+		common.AddressLocation{
+			Name:    "B",
+			Address: common.MustBytesToAddress(address1.Bytes())},
+		[]byte("ABC"), nil)
 	require.NoError(t, err)
 
-	err = contractUpdater.setContract(address1, "A", []byte("ABC"), nil)
+	err = contractUpdater.SetContract(
+		common.AddressLocation{
+			Name:    "A",
+			Address: common.MustBytesToAddress(address1.Bytes())},
+		[]byte("ABC"), nil)
 	require.NoError(t, err)
 
 	_, err = contractUpdater.Commit()
@@ -406,145 +339,138 @@ func TestContract_DeterministicErrorOnCommit(t *testing.T) {
 }
 
 func TestContract_ContractRemoval(t *testing.T) {
-
-	txnState := state.NewTransactionState(
-		utils.NewSimpleView(),
-		state.DefaultParameters())
-	accounts := NewAccounts(txnState)
+	txnState := testutils.NewSimpleTransaction(nil)
+	accounts := environment.NewAccounts(txnState)
 
 	flowAddress := flow.HexToAddress("01")
-	runtimeAddress := runtime.Address(flowAddress)
 	err := accounts.Create(nil, flowAddress)
 	require.NoError(t, err)
 
 	t.Run("contract removal with restriction", func(t *testing.T) {
-		var authorizationChecked bool
-
-		contractUpdater := NewContractUpdaterForTesting(
+		contractUpdater := environment.NewContractUpdaterForTesting(
 			accounts,
 			testContractUpdaterStubs{
 				removalEnabled: true,
-				auditFunc: func(address runtime.Address, code []byte) (bool, error) {
-					// Ensure the voucher check is only called once,
-					// for the initial contract deployment,
-					// and not for the subsequent update
-					require.False(t, authorizationChecked)
-					authorizationChecked = true
-					return true, nil
-				},
 			})
 
+		location := common.AddressLocation{
+			Name:    "TestContract",
+			Address: common.MustBytesToAddress(flowAddress.Bytes())}
+
 		// deploy contract with voucher
-		err = contractUpdater.setContract(
-			runtimeAddress,
-			"TestContract",
+		err = contractUpdater.SetContract(
+			location,
 			[]byte("pub contract TestContract {}"),
-			[]common.Address{
-				runtimeAddress,
+			[]flow.Address{
+				flowAddress,
 			},
 		)
 		require.NoError(t, err)
-		require.True(t, contractUpdater.hasUpdates())
+		require.True(t, contractUpdater.HasUpdates())
 
-		contractUpdateKeys, err := contractUpdater.Commit()
+		contractUpdates, err := contractUpdater.Commit()
 		require.NoError(t, err)
 		require.Equal(
 			t,
-			[]programs.ContractUpdateKey{
-				{
-					Address: flowAddress,
-					Name:    "TestContract",
+			environment.ContractUpdates{
+				Updates: []common.AddressLocation{},
+				Deploys: []common.AddressLocation{
+					location,
 				},
+				Deletions: []common.AddressLocation{},
 			},
-			contractUpdateKeys,
+			contractUpdates,
 		)
 
 		// update should work
-		err = contractUpdater.setContract(
-			runtimeAddress,
-			"TestContract",
+		err = contractUpdater.SetContract(
+			location,
 			[]byte("pub contract TestContract {}"),
-			[]common.Address{
-				runtimeAddress,
+			[]flow.Address{
+				flowAddress,
 			},
 		)
 		require.NoError(t, err)
-		require.True(t, contractUpdater.hasUpdates())
+		require.True(t, contractUpdater.HasUpdates())
 
 		// try remove contract should fail
-		err = contractUpdater.removeContract(
-			runtimeAddress,
-			"TestContract",
-			[]common.Address{
-				runtimeAddress,
+		err = contractUpdater.RemoveContract(
+			location,
+			[]flow.Address{
+				flowAddress,
 			},
 		)
 		require.Error(t, err)
 	})
 
 	t.Run("contract removal without restriction", func(t *testing.T) {
-		var authorizationChecked bool
 
-		contractUpdater := NewContractUpdaterForTesting(
+		contractUpdater := environment.NewContractUpdaterForTesting(
 			accounts,
-			testContractUpdaterStubs{
-				auditFunc: func(address runtime.Address, code []byte) (bool, error) {
-					// Ensure the voucher check is only called once,
-					// for the initial contract deployment,
-					// and not for the subsequent update
-					require.False(t, authorizationChecked)
-					authorizationChecked = true
-					return true, nil
-				},
-			})
+			testContractUpdaterStubs{})
+
+		location := common.AddressLocation{
+			Name:    "TestContract",
+			Address: common.MustBytesToAddress(flowAddress.Bytes())}
 
 		// deploy contract with voucher
-		err = contractUpdater.setContract(
-			runtimeAddress,
-			"TestContract",
+		err = contractUpdater.SetContract(
+			location,
 			[]byte("pub contract TestContract {}"),
-			[]common.Address{
-				runtimeAddress,
+			[]flow.Address{
+				flowAddress,
 			},
 		)
 		require.NoError(t, err)
-		require.True(t, contractUpdater.hasUpdates())
+		require.True(t, contractUpdater.HasUpdates())
 
 		contractUpdateKeys, err := contractUpdater.Commit()
 		require.NoError(t, err)
 		require.Equal(
 			t,
-			[]programs.ContractUpdateKey{
-				{
-					Address: flowAddress,
-					Name:    "TestContract",
+			environment.ContractUpdates{
+				Updates: []common.AddressLocation{
+					location,
 				},
+				Deploys:   []common.AddressLocation{},
+				Deletions: []common.AddressLocation{},
 			},
 			contractUpdateKeys,
 		)
 
 		// update should work
-		err = contractUpdater.setContract(
-			runtimeAddress,
-			"TestContract",
+		err = contractUpdater.SetContract(
+			location,
 			[]byte("pub contract TestContract {}"),
-			[]common.Address{
-				runtimeAddress,
+			[]flow.Address{
+				flowAddress,
 			},
 		)
 		require.NoError(t, err)
-		require.True(t, contractUpdater.hasUpdates())
+		require.True(t, contractUpdater.HasUpdates())
 
 		// try remove contract should fail
-		err = contractUpdater.removeContract(
-			runtimeAddress,
-			"TestContract",
-			[]common.Address{
-				runtimeAddress,
+		err = contractUpdater.RemoveContract(
+			location,
+			[]flow.Address{
+				flowAddress,
 			},
 		)
 		require.NoError(t, err)
-		require.True(t, contractUpdater.hasUpdates())
+		require.True(t, contractUpdater.HasUpdates())
 
+		contractUpdateKeys, err = contractUpdater.Commit()
+		require.NoError(t, err)
+		require.Equal(
+			t,
+			environment.ContractUpdates{
+				Updates: []common.AddressLocation{},
+				Deploys: []common.AddressLocation{},
+				Deletions: []common.AddressLocation{
+					location,
+				},
+			},
+			contractUpdateKeys,
+		)
 	})
 }

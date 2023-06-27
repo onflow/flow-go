@@ -5,12 +5,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"math/rand"
 	"strings"
 	"testing"
-	"time"
 
-	"github.com/ipfs/go-cid"
 	"github.com/ipfs/go-datastore"
 	dssync "github.com/ipfs/go-datastore/sync"
 	blockstore "github.com/ipfs/go-ipfs-blockstore"
@@ -19,6 +16,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/cadence"
+	"github.com/onflow/cadence/encoding/ccf"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
 	"github.com/onflow/cadence/runtime"
 
@@ -31,20 +29,19 @@ import (
 	"github.com/onflow/flow-go/engine/execution/computation/computer"
 	exeState "github.com/onflow/flow-go/engine/execution/state"
 	bootstrapexec "github.com/onflow/flow-go/engine/execution/state/bootstrap"
-	"github.com/onflow/flow-go/engine/execution/state/delta"
 	"github.com/onflow/flow-go/engine/execution/testutil"
 	"github.com/onflow/flow-go/fvm"
-	"github.com/onflow/flow-go/fvm/programs"
 	reusableRuntime "github.com/onflow/flow-go/fvm/runtime"
-	"github.com/onflow/flow-go/fvm/state"
+	"github.com/onflow/flow-go/fvm/storage/derived"
+	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	completeLedger "github.com/onflow/flow-go/ledger/complete"
 	"github.com/onflow/flow-go/ledger/complete/wal/fixtures"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	"github.com/onflow/flow-go/module/executiondatasync/provider"
-	"github.com/onflow/flow-go/module/executiondatasync/tracker"
 	mocktracker "github.com/onflow/flow-go/module/executiondatasync/tracker/mock"
 	"github.com/onflow/flow-go/module/metrics"
+	moduleMock "github.com/onflow/flow-go/module/mock"
 	requesterunit "github.com/onflow/flow-go/module/state_synchronization/requester/unittest"
 	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -92,7 +89,7 @@ func (account *TestBenchAccount) DeployContract(b *testing.B, blockExec TestBenc
 	require.NoError(b, err)
 
 	computationResult := blockExec.ExecuteCollections(b, [][]*flow.TransactionBody{{txBody}})
-	require.Empty(b, computationResult.TransactionResults[0].ErrorMessage)
+	require.Empty(b, computationResult.AllTransactionResults()[0].ErrorMessage)
 }
 
 func (account *TestBenchAccount) AddArrayToStorage(b *testing.B, blockExec TestBenchBlockExecutor, list []string) {
@@ -129,14 +126,14 @@ func (account *TestBenchAccount) AddArrayToStorage(b *testing.B, blockExec TestB
 	require.NoError(b, err)
 
 	computationResult := blockExec.ExecuteCollections(b, [][]*flow.TransactionBody{{txBody}})
-	require.Empty(b, computationResult.TransactionResults[0].ErrorMessage)
+	require.Empty(b, computationResult.AllTransactionResults()[0].ErrorMessage)
 }
 
 // BasicBlockExecutor executes blocks in sequence and applies all changes (not fork aware)
 type BasicBlockExecutor struct {
 	blockComputer         computer.BlockComputer
-	derivedChainData      *programs.DerivedChainData
-	activeView            state.View
+	derivedChainData      *derived.DerivedChainData
+	activeSnapshot        snapshot.SnapshotTree
 	activeStateCommitment flow.StateCommitment
 	chain                 flow.Chain
 	serviceAccount        *TestBenchAccount
@@ -146,11 +143,15 @@ type BasicBlockExecutor struct {
 func NewBasicBlockExecutor(tb testing.TB, chain flow.Chain, logger zerolog.Logger) *BasicBlockExecutor {
 	vm := fvm.NewVirtualMachine()
 
+	// a big interaction limit since that is not what's being tested.
+	interactionLimit := fvm.DefaultMaxInteractionSize * uint64(1000)
+
 	opts := []fvm.Option{
 		fvm.WithTransactionFeesEnabled(true),
 		fvm.WithAccountStorageLimit(true),
 		fvm.WithChain(chain),
 		fvm.WithLogger(logger),
+		fvm.WithMaxStateInteractionSize(interactionLimit),
 		fvm.WithReusableCadenceRuntimePool(
 			reusableRuntime.NewReusableCadenceRuntimePool(
 				computation.ReusableCadenceRuntimePoolSize,
@@ -197,10 +198,7 @@ func NewBasicBlockExecutor(tb testing.TB, chain flow.Chain, logger zerolog.Logge
 	require.NoError(tb, err)
 
 	bservice := requesterunit.MockBlobService(blockstore.NewBlockstore(dssync.MutexWrap(datastore.NewMapDatastore())))
-	trackerStorage := new(mocktracker.Storage)
-	trackerStorage.On("Update", mock.Anything).Return(func(fn tracker.UpdateFn) error {
-		return fn(func(uint64, ...cid.Cid) error { return nil })
-	})
+	trackerStorage := mocktracker.NewMockStorage()
 
 	prov := provider.NewProvider(
 		zerolog.Nop(),
@@ -210,21 +208,38 @@ func NewBasicBlockExecutor(tb testing.TB, chain flow.Chain, logger zerolog.Logge
 		trackerStorage,
 	)
 
+	me := new(moduleMock.Local)
+	me.On("NodeID").Return(unittest.IdentifierFixture())
+	me.On("Sign", mock.Anything, mock.Anything).Return(nil, nil)
+	me.On("SignFunc", mock.Anything, mock.Anything, mock.Anything).
+		Return(nil, nil)
+
 	ledgerCommitter := committer.NewLedgerViewCommitter(ledger, tracer)
-	blockComputer, err := computer.NewBlockComputer(vm, fvmContext, collector, tracer, logger, ledgerCommitter, prov)
+	blockComputer, err := computer.NewBlockComputer(
+		vm,
+		fvmContext,
+		collector,
+		tracer,
+		logger,
+		ledgerCommitter,
+		me,
+		prov,
+		nil,
+		1) // We're interested in fvm's serial execution time
 	require.NoError(tb, err)
 
-	view := delta.NewView(exeState.LedgerGetRegister(ledger, initialCommit))
+	activeSnapshot := snapshot.NewSnapshotTree(
+		exeState.NewLedgerStorageSnapshot(ledger, initialCommit))
 
-	derivedChainData, err := programs.NewDerivedChainData(
-		programs.DefaultDerivedDataCacheSize)
+	derivedChainData, err := derived.NewDerivedChainData(
+		derived.DefaultDerivedDataCacheSize)
 	require.NoError(tb, err)
 
 	return &BasicBlockExecutor{
 		blockComputer:         blockComputer,
 		derivedChainData:      derivedChainData,
 		activeStateCommitment: initialCommit,
-		activeView:            view,
+		activeSnapshot:        activeSnapshot,
 		chain:                 chain,
 		serviceAccount:        serviceAccount,
 		onStopFunc:            onStopFunc,
@@ -247,12 +262,19 @@ func (b *BasicBlockExecutor) ExecuteCollections(tb testing.TB, collections [][]*
 		executableBlock.ID(),
 		executableBlock.ParentID())
 
-	computationResult, err := b.blockComputer.ExecuteBlock(context.Background(), executableBlock, b.activeView, derivedBlockData)
+	computationResult, err := b.blockComputer.ExecuteBlock(
+		context.Background(),
+		unittest.IdentifierFixture(),
+		executableBlock,
+		b.activeSnapshot,
+		derivedBlockData)
 	require.NoError(tb, err)
 
-	endState, _, _, err := execution.GenerateExecutionResultAndChunkDataPacks(metrics.NewNoopCollector(), unittest.IdentifierFixture(), b.activeStateCommitment, computationResult)
-	require.NoError(tb, err)
-	b.activeStateCommitment = endState
+	b.activeStateCommitment = computationResult.CurrentEndState()
+
+	for _, snapshot := range computationResult.AllExecutionSnapshots() {
+		b.activeSnapshot = b.activeSnapshot.Append(snapshot)
+	}
 
 	return computationResult
 }
@@ -282,20 +304,19 @@ func (b *BasicBlockExecutor) SetupAccounts(tb testing.TB, privateKeys []flow.Acc
 		require.NoError(tb, err)
 
 		computationResult := b.ExecuteCollections(tb, [][]*flow.TransactionBody{{txBody}})
-		require.Empty(tb, computationResult.TransactionResults[0].ErrorMessage)
+		require.Empty(tb, computationResult.AllTransactionResults()[0].ErrorMessage)
 
 		var addr flow.Address
 
-		for _, eventList := range computationResult.Events {
-			for _, event := range eventList {
-				if event.Type == flow.EventAccountCreated {
-					data, err := jsoncdc.Decode(nil, event.Payload)
-					if err != nil {
-						tb.Fatal("setup account failed, error decoding events")
-					}
-					addr = flow.Address(data.(cadence.Event).Fields[0].(cadence.Address))
-					break
+		for _, event := range computationResult.AllEvents() {
+			if event.Type == flow.EventAccountCreated {
+				data, err := ccf.Decode(nil, event.Payload)
+				if err != nil {
+					tb.Fatal("setup account failed, error decoding events")
 				}
+				addr = flow.ConvertAddress(
+					data.(cadence.Event).Fields[0].(cadence.Address))
+				break
 			}
 		}
 		if addr == flow.EmptyAddress {
@@ -355,7 +376,6 @@ var _ io.Writer = &logExtractor{}
 // BenchmarkRuntimeEmptyTransaction simulates executing blocks with `transactionsPerBlock`
 // where each transaction is an empty transaction
 func BenchmarkRuntimeTransaction(b *testing.B) {
-	rand.Seed(time.Now().UnixNano())
 
 	transactionsPerBlock := 10
 
@@ -428,10 +448,12 @@ func BenchmarkRuntimeTransaction(b *testing.B) {
 			computationResult := blockExecutor.ExecuteCollections(b, [][]*flow.TransactionBody{transactions})
 			totalInteractionUsed := uint64(0)
 			totalComputationUsed := uint64(0)
-			for j := 0; j < transactionsPerBlock; j++ {
-				require.Empty(b, computationResult.TransactionResults[j].ErrorMessage)
-				totalInteractionUsed += logE.InteractionUsed[computationResult.TransactionResults[j].ID().String()]
-				totalComputationUsed += computationResult.TransactionResults[j].ComputationUsed
+			results := computationResult.AllTransactionResults()
+			// not interested in the system transaction
+			for _, txRes := range results[0 : len(results)-1] {
+				require.Empty(b, txRes.ErrorMessage)
+				totalInteractionUsed += logE.InteractionUsed[txRes.ID().String()]
+				totalComputationUsed += txRes.ComputationUsed
 			}
 			b.ReportMetric(float64(totalInteractionUsed/uint64(transactionsPerBlock)), "interactions")
 			b.ReportMetric(float64(totalComputationUsed/uint64(transactionsPerBlock)), "computation")
@@ -673,8 +695,10 @@ func BenchRunNFTBatchTransfer(b *testing.B,
 		}
 
 		computationResult = blockExecutor.ExecuteCollections(b, [][]*flow.TransactionBody{transactions})
-		for j := 0; j < transactionsPerBlock; j++ {
-			require.Empty(b, computationResult.TransactionResults[j].ErrorMessage)
+		results := computationResult.AllTransactionResults()
+		// not interested in the system transaction
+		for _, txRes := range results[0 : len(results)-1] {
+			require.Empty(b, txRes.ErrorMessage)
 		}
 	}
 }
@@ -714,7 +738,7 @@ func setupReceiver(b *testing.B, be TestBenchBlockExecutor, nftAccount, batchNFT
 	require.NoError(b, err)
 
 	computationResult := be.ExecuteCollections(b, [][]*flow.TransactionBody{{txBody}})
-	require.Empty(b, computationResult.TransactionResults[0].ErrorMessage)
+	require.Empty(b, computationResult.AllTransactionResults()[0].ErrorMessage)
 }
 
 func mintNFTs(b *testing.B, be TestBenchBlockExecutor, batchNFTAccount *TestBenchAccount, size int) {
@@ -750,7 +774,7 @@ func mintNFTs(b *testing.B, be TestBenchBlockExecutor, batchNFTAccount *TestBenc
 	require.NoError(b, err)
 
 	computationResult := be.ExecuteCollections(b, [][]*flow.TransactionBody{{txBody}})
-	require.Empty(b, computationResult.TransactionResults[0].ErrorMessage)
+	require.Empty(b, computationResult.AllTransactionResults()[0].ErrorMessage)
 }
 
 func fundAccounts(b *testing.B, be TestBenchBlockExecutor, value cadence.UFix64, accounts ...flow.Address) {
@@ -767,7 +791,7 @@ func fundAccounts(b *testing.B, be TestBenchBlockExecutor, value cadence.UFix64,
 		require.NoError(b, err)
 
 		computationResult := be.ExecuteCollections(b, [][]*flow.TransactionBody{{txBody}})
-		require.Empty(b, computationResult.TransactionResults[0].ErrorMessage)
+		require.Empty(b, computationResult.AllTransactionResults()[0].ErrorMessage)
 	}
 }
 

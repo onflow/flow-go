@@ -8,7 +8,7 @@ import (
 	"path/filepath"
 
 	"github.com/onflow/flow-go/cmd/util/cmd/common"
-	"github.com/onflow/flow-go/engine/execution/state/delta"
+	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/storage/badger"
@@ -49,7 +49,7 @@ func ExportDeltaSnapshots(blockID flow.Identifier, dbPath string, outputPath str
 			return nil
 		}
 
-		var snap []*delta.Snapshot
+		var snap []*snapshot.ExecutionSnapshot
 		err = db.View(operation.RetrieveExecutionStateInteractions(activeBlockID, &snap))
 		if err != nil {
 			return fmt.Errorf("could not load delta snapshot: %w", err)
@@ -59,13 +59,13 @@ func ExportDeltaSnapshots(blockID flow.Identifier, dbPath string, outputPath str
 			// end of snapshots
 			return nil
 		}
-		m, err := snap[0].Delta.MarshalJSON()
+		m, err := json.Marshal(snap[0].UpdatedRegisters())
 		if err != nil {
 			return fmt.Errorf("could not load delta snapshot: %w", err)
 		}
 
 		reads := make([]string, 0)
-		for _, r := range snap[0].Reads {
+		for _, r := range snap[0].ReadSet {
 
 			json, err := json.Marshal(r)
 			if err != nil {

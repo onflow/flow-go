@@ -7,7 +7,7 @@ import (
 
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/meter"
-	"github.com/onflow/flow-go/fvm/state"
+	"github.com/onflow/flow-go/fvm/storage/state"
 )
 
 const (
@@ -28,15 +28,15 @@ const (
 	ComputationKindGetBlockAtHeight           = 2014
 	ComputationKindGetCode                    = 2015
 	ComputationKindGetCurrentBlockHeight      = 2016
-	ComputationKindGetProgram                 = 2017
+	_                                         = 2017
 	ComputationKindGetStorageCapacity         = 2018
 	ComputationKindGetStorageUsed             = 2019
 	ComputationKindGetValue                   = 2020
 	ComputationKindRemoveAccountContractCode  = 2021
 	ComputationKindResolveLocation            = 2022
 	ComputationKindRevokeAccountKey           = 2023
-	_                                         // removed, DO NOT REUSE
-	ComputationKindSetProgram                 = 2025
+	ComputationKindRevokeEncodedAccountKey    = 2024
+	_                                         = 2025 // removed, DO NOT REUSE
 	ComputationKindSetValue                   = 2026
 	ComputationKindUpdateAccountContractCode  = 2027
 	ComputationKindValidatePublicKey          = 2028
@@ -45,25 +45,29 @@ const (
 	ComputationKindBLSVerifyPOP               = 2031
 	ComputationKindBLSAggregateSignatures     = 2032
 	ComputationKindBLSAggregatePublicKeys     = 2033
+	ComputationKindGetOrLoadProgram           = 2034
+	ComputationKindGenerateAccountLocalID     = 2035
 )
 
 type Meter interface {
 	MeterComputation(common.ComputationKind, uint) error
-	ComputationUsed() uint64
+	ComputationUsed() (uint64, error)
 	ComputationIntensities() meter.MeteredComputationIntensities
 
 	MeterMemory(usage common.MemoryUsage) error
-	MemoryEstimate() uint64
+	MemoryUsed() (uint64, error)
 
 	MeterEmittedEvent(byteSize uint64) error
 	TotalEmittedEventBytes() uint64
+
+	InteractionUsed() (uint64, error)
 }
 
 type meterImpl struct {
-	txnState *state.TransactionState
+	txnState state.NestedTransactionPreparer
 }
 
-func NewMeter(txnState *state.TransactionState) Meter {
+func NewMeter(txnState state.NestedTransactionPreparer) Meter {
 	return &meterImpl{
 		txnState: txnState,
 	}
@@ -73,36 +77,31 @@ func (meter *meterImpl) MeterComputation(
 	kind common.ComputationKind,
 	intensity uint,
 ) error {
-	if meter.txnState.EnforceLimits() {
-		return meter.txnState.MeterComputation(kind, intensity)
-	}
-	return nil
+	return meter.txnState.MeterComputation(kind, intensity)
 }
 
 func (meter *meterImpl) ComputationIntensities() meter.MeteredComputationIntensities {
 	return meter.txnState.ComputationIntensities()
 }
 
-func (meter *meterImpl) ComputationUsed() uint64 {
-	return meter.txnState.TotalComputationUsed()
+func (meter *meterImpl) ComputationUsed() (uint64, error) {
+	return meter.txnState.TotalComputationUsed(), nil
 }
 
 func (meter *meterImpl) MeterMemory(usage common.MemoryUsage) error {
-	if meter.txnState.EnforceLimits() {
-		return meter.txnState.MeterMemory(usage.Kind, uint(usage.Amount))
-	}
-	return nil
+	return meter.txnState.MeterMemory(usage.Kind, uint(usage.Amount))
 }
 
-func (meter *meterImpl) MemoryEstimate() uint64 {
-	return meter.txnState.TotalMemoryEstimate()
+func (meter *meterImpl) MemoryUsed() (uint64, error) {
+	return meter.txnState.TotalMemoryEstimate(), nil
+}
+
+func (meter *meterImpl) InteractionUsed() (uint64, error) {
+	return meter.txnState.InteractionUsed(), nil
 }
 
 func (meter *meterImpl) MeterEmittedEvent(byteSize uint64) error {
-	if meter.txnState.EnforceLimits() {
-		return meter.txnState.MeterEmittedEvent(byteSize)
-	}
-	return nil
+	return meter.txnState.MeterEmittedEvent(byteSize)
 }
 
 func (meter *meterImpl) TotalEmittedEventBytes() uint64 {
@@ -117,7 +116,7 @@ type cancellableMeter struct {
 
 func NewCancellableMeter(
 	ctx context.Context,
-	txnState *state.TransactionState,
+	txnState state.NestedTransactionPreparer,
 ) Meter {
 	return &cancellableMeter{
 		meterImpl: meterImpl{

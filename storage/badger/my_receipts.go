@@ -120,6 +120,10 @@ func (m *MyExecutionReceipts) StoreMyReceipt(receipt *flow.ExecutionReceipt) err
 	return operation.RetryOnConflictTx(m.db, transaction.Update, m.storeMyReceipt(receipt))
 }
 
+// BatchStoreMyReceipt stores blockID-to-my-receipt index entry keyed by blockID in a provided batch.
+// No errors are expected during normal operation
+// If entity fails marshalling, the error is wrapped in a generic error and returned.
+// If Badger unexpectedly fails to process the request, the error is wrapped in a generic error and returned.
 func (m *MyExecutionReceipts) BatchStoreMyReceipt(receipt *flow.ExecutionReceipt, batch storage.BatchStorage) error {
 
 	writeBatch := batch.GetWriter()
@@ -147,4 +151,12 @@ func (m *MyExecutionReceipts) MyReceipt(blockID flow.Identifier) (*flow.Executio
 
 func (m *MyExecutionReceipts) RemoveIndexByBlockID(blockID flow.Identifier) error {
 	return m.db.Update(operation.SkipNonExist(operation.RemoveOwnExecutionReceipt(blockID)))
+}
+
+// BatchRemoveIndexByBlockID removes blockID-to-my-execution-receipt index entry keyed by a blockID in a provided batch
+// No errors are expected during normal operation, even if no entries are matched.
+// If Badger unexpectedly fails to process the request, the error is wrapped in a generic error and returned.
+func (m *MyExecutionReceipts) BatchRemoveIndexByBlockID(blockID flow.Identifier, batch storage.BatchStorage) error {
+	writeBatch := batch.GetWriter()
+	return operation.BatchRemoveOwnExecutionReceipt(blockID)(writeBatch)
 }

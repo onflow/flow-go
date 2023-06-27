@@ -8,7 +8,6 @@ import (
 
 	"github.com/onflow/flow-go/engine"
 	commonsync "github.com/onflow/flow-go/engine/common/synchronization"
-	clustermodel "github.com/onflow/flow-go/model/cluster"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module"
@@ -235,7 +234,7 @@ func (r *RequestHandlerEngine) onRangeRequest(originID flow.Identifier, req *mes
 	}
 
 	// get all of the blocks, one by one
-	blocks := make([]*clustermodel.Block, 0, req.ToHeight-req.FromHeight+1)
+	blocks := make([]messages.UntrustedClusterBlock, 0, req.ToHeight-req.FromHeight+1)
 	for height := req.FromHeight; height <= req.ToHeight; height++ {
 		block, err := r.blocks.ByHeight(height)
 		if errors.Is(err, storage.ErrNotFound) {
@@ -245,7 +244,7 @@ func (r *RequestHandlerEngine) onRangeRequest(originID flow.Identifier, req *mes
 		if err != nil {
 			return fmt.Errorf("could not get block for height (%d): %w", height, err)
 		}
-		blocks = append(blocks, block)
+		blocks = append(blocks, messages.UntrustedClusterBlockFromInternal(block))
 	}
 
 	// if there are no blocks to send, skip network message
@@ -304,7 +303,7 @@ func (r *RequestHandlerEngine) onBatchRequest(originID flow.Identifier, req *mes
 	}
 
 	// try to get all the blocks by ID
-	blocks := make([]*clustermodel.Block, 0, len(blockIDs))
+	blocks := make([]messages.UntrustedClusterBlock, 0, len(blockIDs))
 	for blockID := range blockIDs {
 		block, err := r.blocks.ByID(blockID)
 		if errors.Is(err, storage.ErrNotFound) {
@@ -314,7 +313,7 @@ func (r *RequestHandlerEngine) onBatchRequest(originID flow.Identifier, req *mes
 		if err != nil {
 			return fmt.Errorf("could not get block by ID (%s): %w", blockID, err)
 		}
-		blocks = append(blocks, block)
+		blocks = append(blocks, messages.UntrustedClusterBlockFromInternal(block))
 	}
 
 	// if there are no blocks to send, skip network message

@@ -15,15 +15,15 @@ import (
 )
 
 var TransactionFeesExecutionEffortWeightsPath = cadence.Path{
-	Domain:     common.PathDomainStorage.Identifier(),
+	Domain:     common.PathDomainStorage,
 	Identifier: "executionEffortWeights",
 }
 var TransactionFeesExecutionMemoryWeightsPath = cadence.Path{
-	Domain:     common.PathDomainStorage.Identifier(),
+	Domain:     common.PathDomainStorage,
 	Identifier: "executionMemoryWeights",
 }
 var TransactionFeesExecutionMemoryLimitPath = cadence.Path{
-	Domain:     common.PathDomainStorage.Identifier(),
+	Domain:     common.PathDomainStorage,
 	Identifier: "executionMemoryLimit",
 }
 
@@ -42,10 +42,11 @@ var setupFeesTransactionTemplate string
 //go:embed scripts/setExecutionMemoryLimit.cdc
 var setExecutionMemoryLimit string
 
-func DeployTxFeesContractTransaction(service, fungibleToken, flowToken, flowFees flow.Address) *flow.TransactionBody {
+func DeployTxFeesContractTransaction(service, fungibleToken, flowToken, storageFees, flowFees flow.Address) *flow.TransactionBody {
 	contract := contracts.FlowFees(
 		fungibleToken.HexWithPrefix(),
 		flowToken.HexWithPrefix(),
+		storageFees.HexWithPrefix(),
 	)
 
 	return flow.NewTransactionBody().

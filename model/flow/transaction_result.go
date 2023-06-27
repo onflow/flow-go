@@ -30,3 +30,6 @@ func (t TransactionResult) ID() Identifier {
 func (te *TransactionResult) Checksum() Identifier {
 	return te.ID()
 }
+
+// TODO(ramtin): add canonical encoding and ID
+type TransactionResults []TransactionResult

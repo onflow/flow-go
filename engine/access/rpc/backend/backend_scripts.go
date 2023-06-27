@@ -13,6 +13,7 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
+	"github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/state/protocol"
@@ -23,13 +24,14 @@ import (
 const uniqueScriptLoggingTimeWindow = 10 * time.Minute
 
 type backendScripts struct {
-	headers           storage.Headers
-	executionReceipts storage.ExecutionReceipts
-	state             protocol.State
-	connFactory       ConnectionFactory
-	log               zerolog.Logger
-	metrics           module.BackendScriptsMetrics
-	loggedScripts     *lru.Cache
+	headers            storage.Headers
+	executionReceipts  storage.ExecutionReceipts
+	state              protocol.State
+	connFactory        ConnectionFactory
+	log                zerolog.Logger
+	metrics            module.BackendScriptsMetrics
+	loggedScripts      *lru.Cache
+	archiveAddressList []string
 }
 
 func (b *backendScripts) ExecuteScriptAtLatestBlock(
@@ -70,7 +72,7 @@ func (b *backendScripts) ExecuteScriptAtBlockHeight(
 	// get header at given height
 	header, err := b.headers.ByHeight(blockHeight)
 	if err != nil {
-		err = convertStorageError(err)
+		err = rpc.ConvertStorageError(err)
 		return nil, err
 	}
 
@@ -78,6 +80,27 @@ func (b *backendScripts) ExecuteScriptAtBlockHeight(
 
 	// execute script on the execution node at that block id
 	return b.executeScriptOnExecutionNode(ctx, blockID, script, arguments)
+}
+
+func (b *backendScripts) findScriptExecutors(
+	ctx context.Context,
+	blockID flow.Identifier,
+) ([]string, error) {
+	// send script queries to archive nodes if archive addres is configured
+	if len(b.archiveAddressList) > 0 {
+		return b.archiveAddressList, nil
+	}
+
+	executors, err := executionNodesForBlockID(ctx, blockID, b.executionReceipts, b.state, b.log)
+	if err != nil {
+		return nil, err
+	}
+
+	executorAddrs := make([]string, 0, len(executors))
+	for _, executor := range executors {
+		executorAddrs = append(executorAddrs, executor.Address)
+	}
+	return executorAddrs, nil
 }
 
 // executeScriptOnExecutionNode forwards the request to the execution node using the execution node
@@ -89,16 +112,16 @@ func (b *backendScripts) executeScriptOnExecutionNode(
 	arguments [][]byte,
 ) ([]byte, error) {
 
-	execReq := execproto.ExecuteScriptAtBlockIDRequest{
+	execReq := &execproto.ExecuteScriptAtBlockIDRequest{
 		BlockId:   blockID[:],
 		Script:    script,
 		Arguments: arguments,
 	}
 
 	// find few execution nodes which have executed the block earlier and provided an execution receipt for it
-	execNodes, err := executionNodesForBlockID(ctx, blockID, b.executionReceipts, b.state, b.log)
+	scriptExecutors, err := b.findScriptExecutors(ctx, blockID)
 	if err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to find execution nodes at blockId %v: %v", blockID.String(), err)
+		return nil, status.Errorf(codes.Internal, "failed to find script executors at blockId %v: %v", blockID.String(), err)
 	}
 	// encode to MD5 as low compute/memory lookup key
 	// CAUTION: cryptographically insecure md5 is used here, but only to de-duplicate logs.
@@ -108,15 +131,15 @@ func (b *backendScripts) executeScriptOnExecutionNode(
 	// try each of the execution nodes found
 	var errors *multierror.Error
 	// try to execute the script on one of the execution nodes
-	for _, execNode := range execNodes {
+	for _, executorAddress := range scriptExecutors {
 		execStartTime := time.Now() // record start time
-		result, err := b.tryExecuteScript(ctx, execNode, execReq)
+		result, err := b.tryExecuteScript(ctx, executorAddress, execReq)
 		if err == nil {
 			if b.log.GetLevel() == zerolog.DebugLevel {
 				executionTime := time.Now()
 				if b.shouldLogScript(executionTime, insecureScriptHash) {
 					b.log.Debug().
-						Str("execution_node", execNode.String()).
+						Str("script_executor_addr", executorAddress).
 						Hex("block_id", blockID[:]).
 						Hex("script_hash", insecureScriptHash[:]).
 						Str("script", string(script)).
@@ -136,7 +159,7 @@ func (b *backendScripts) executeScriptOnExecutionNode(
 		// return if it's just a script failure as opposed to an EN failure and skip trying other ENs
 		if status.Code(err) == codes.InvalidArgument {
 			b.log.Debug().Err(err).
-				Str("execution_node", execNode.String()).
+				Str("script_executor_addr", executorAddress).
 				Hex("block_id", blockID[:]).
 				Hex("script_hash", insecureScriptHash[:]).
 				Str("script", string(script)).
@@ -145,11 +168,13 @@ func (b *backendScripts) executeScriptOnExecutionNode(
 		}
 		errors = multierror.Append(errors, err)
 	}
+
 	errToReturn := errors.ErrorOrNil()
 	if errToReturn != nil {
-		b.log.Error().Err(err).Msg("script execution failed for execution node internal reasons")
+		b.log.Error().Err(errToReturn).Msg("script execution failed for execution node internal reasons")
 	}
-	return nil, errToReturn
+
+	return nil, rpc.ConvertMultiError(errors, "failed to execute script on execution nodes", codes.Internal)
 }
 
 // shouldLogScript checks if the script hash is unique in the time window
@@ -164,19 +189,19 @@ func (b *backendScripts) shouldLogScript(execTime time.Time, scriptHash [16]byte
 	}
 }
 
-func (b *backendScripts) tryExecuteScript(ctx context.Context, execNode *flow.Identity, req execproto.ExecuteScriptAtBlockIDRequest) ([]byte, error) {
-	execRPCClient, closer, err := b.connFactory.GetExecutionAPIClient(execNode.Address)
+func (b *backendScripts) tryExecuteScript(ctx context.Context, executorAddress string, req *execproto.ExecuteScriptAtBlockIDRequest) ([]byte, error) {
+	execRPCClient, closer, err := b.connFactory.GetExecutionAPIClient(executorAddress)
 	if err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to create client for execution node %s: %v", execNode.String(), err)
+		return nil, status.Errorf(codes.Internal, "failed to create client for execution node %s: %v", executorAddress, err)
 	}
 	defer closer.Close()
 
-	execResp, err := execRPCClient.ExecuteScriptAtBlockID(ctx, &req)
+	execResp, err := execRPCClient.ExecuteScriptAtBlockID(ctx, req)
 	if err != nil {
 		if status.Code(err) == codes.Unavailable {
-			b.connFactory.InvalidateExecutionAPIClient(execNode.Address)
+			b.connFactory.InvalidateExecutionAPIClient(executorAddress)
 		}
-		return nil, status.Errorf(status.Code(err), "failed to execute the script on the execution node %s: %v", execNode.String(), err)
+		return nil, status.Errorf(status.Code(err), "failed to execute the script on the execution node %s: %v", executorAddress, err)
 	}
 	return execResp.GetValue(), nil
 }

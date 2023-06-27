@@ -4,20 +4,25 @@ import (
 	"context"
 	"fmt"
 	mrand "math/rand"
+	"sync"
 	"time"
 
+	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/network/p2p"
+	"github.com/onflow/flow-go/utils/logging"
 )
 
-// DefaultPeerUpdateInterval is default duration for which the peer manager waits in between attempts to update peer connections
-var DefaultPeerUpdateInterval = 10 * time.Minute
+// DefaultPeerUpdateInterval is default duration for which the peer manager waits in between attempts to update peer connections.
+// We set it to 1 second to be aligned with the heartbeat intervals of libp2p, alsp, and gossipsub.
+var DefaultPeerUpdateInterval = time.Second
 
 var _ p2p.PeerManager = (*PeerManager)(nil)
 var _ component.Component = (*PeerManager)(nil)
+var _ p2p.RateLimiterConsumer = (*PeerManager)(nil)
 
 // PeerManager adds and removes connections to peers periodically and on request
 type PeerManager struct {
@@ -28,6 +33,8 @@ type PeerManager struct {
 	peerRequestQ       chan struct{}     // a channel to queue a peer update request
 	connector          p2p.Connector     // connector to connect or disconnect from peers
 	peerUpdateInterval time.Duration     // interval the peer manager runs on
+
+	peersProviderMu sync.RWMutex
 }
 
 // NewPeerManager creates a new peer manager which calls the peersProvider callback to get a list of peers to connect to
@@ -113,6 +120,9 @@ func (pm *PeerManager) RequestPeerUpdate() {
 // updatePeers updates the peers by connecting to all the nodes provided by the peersProvider callback and disconnecting from
 // previous nodes that are no longer in the new list of nodes.
 func (pm *PeerManager) updatePeers(ctx context.Context) {
+	pm.peersProviderMu.RLock()
+	defer pm.peersProviderMu.RUnlock()
+
 	if pm.peersProvider == nil {
 		pm.logger.Error().Msg("peers provider not set")
 		return
@@ -137,9 +147,26 @@ func (pm *PeerManager) ForceUpdatePeers(ctx context.Context) {
 // SetPeersProvider sets the peers provider
 // SetPeersProvider may be called at most once
 func (pm *PeerManager) SetPeersProvider(peersProvider p2p.PeersProvider) {
+	pm.peersProviderMu.Lock()
+	defer pm.peersProviderMu.Unlock()
+
 	if pm.peersProvider != nil {
 		pm.logger.Fatal().Msg("peers provider already set")
 	}
 
 	pm.peersProvider = peersProvider
+}
+
+// OnRateLimitedPeer rate limiter distributor consumer func that will be called when a peer is rate limited, the rate limited peer
+// is disconnected immediately after being rate limited.
+func (pm *PeerManager) OnRateLimitedPeer(pid peer.ID, role, msgType, topic, reason string) {
+	pm.logger.Warn().
+		Str("peer_id", pid.String()).
+		Str("role", role).
+		Str("message_type", msgType).
+		Str("topic", topic).
+		Str("reason", reason).
+		Bool(logging.KeySuspicious, true).
+		Msg("pruning connection to rate-limited peer")
+	pm.RequestPeerUpdate()
 }

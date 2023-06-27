@@ -20,17 +20,17 @@ import (
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
-	"github.com/onflow/flow-go/engine/execution/ingestion"
+	exeEng "github.com/onflow/flow-go/engine/execution"
+	fvmerrors "github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
-	"github.com/onflow/flow-go/utils/grpcutils"
 )
 
 // Config defines the configurable options for the gRPC server.
 type Config struct {
 	ListenAddr        string
-	MaxMsgSize        int  // In bytes
+	MaxMsgSize        uint // In bytes
 	RpcMetricsEnabled bool // enable GRPC metrics reporting
 }
 
@@ -47,7 +47,7 @@ type Engine struct {
 func New(
 	log zerolog.Logger,
 	config Config,
-	e *ingestion.Engine,
+	scriptsExecutor exeEng.ScriptExecutor,
 	headers storage.Headers,
 	state protocol.State,
 	events storage.Events,
@@ -60,13 +60,9 @@ func New(
 	apiBurstLimits map[string]int, // the api burst limit (max calls at the same time) for each of the gRPC API e.g. Ping->50, ExecuteScriptAtBlockID->10
 ) *Engine {
 	log = log.With().Str("engine", "rpc").Logger()
-	if config.MaxMsgSize == 0 {
-		config.MaxMsgSize = grpcutils.DefaultMaxMsgSize
-	}
-
 	serverOptions := []grpc.ServerOption{
-		grpc.MaxRecvMsgSize(config.MaxMsgSize),
-		grpc.MaxSendMsgSize(config.MaxMsgSize),
+		grpc.MaxRecvMsgSize(int(config.MaxMsgSize)),
+		grpc.MaxSendMsgSize(int(config.MaxMsgSize)),
 	}
 
 	var interceptors []grpc.UnaryServerInterceptor // ordered list of interceptors
@@ -92,7 +88,7 @@ func New(
 		log:  log,
 		unit: engine.NewUnit(),
 		handler: &handler{
-			engine:               e,
+			engine:               scriptsExecutor,
 			chain:                chainID,
 			headers:              headers,
 			state:                state,
@@ -151,7 +147,7 @@ func (e *Engine) serve() {
 
 // handler implements a subset of the Observation API.
 type handler struct {
-	engine               ingestion.IngestRPC
+	engine               exeEng.ScriptExecutor
 	chain                flow.ChainID
 	headers              storage.Headers
 	state                protocol.State
@@ -260,7 +256,8 @@ func (h *handler) GetEventsForBlockIDs(_ context.Context,
 	}
 
 	return &execution.GetEventsForBlockIDsResponse{
-		Results: results,
+		Results:              results,
+		EventEncodingVersion: execution.EventEncodingVersion_CCF_V0,
 	}, nil
 }
 
@@ -272,13 +269,13 @@ func (h *handler) GetTransactionResult(
 	reqBlockID := req.GetBlockId()
 	blockID, err := convert.BlockID(reqBlockID)
 	if err != nil {
-		return nil, err
+		return nil, status.Errorf(codes.InvalidArgument, "invalid blockID: %v", err)
 	}
 
 	reqTxID := req.GetTransactionId()
 	txID, err := convert.TransactionID(reqTxID)
 	if err != nil {
-		return nil, err
+		return nil, status.Errorf(codes.InvalidArgument, "invalid transactionID: %v", err)
 	}
 
 	var statusCode uint32 = 0
@@ -320,9 +317,10 @@ func (h *handler) GetTransactionResult(
 
 	// compose a response with the events and the transaction error
 	return &execution.GetTransactionResultResponse{
-		StatusCode:   statusCode,
-		ErrorMessage: errMsg,
-		Events:       events,
+		StatusCode:           statusCode,
+		ErrorMessage:         errMsg,
+		Events:               events,
+		EventEncodingVersion: execution.EventEncodingVersion_CCF_V0,
 	}, nil
 }
 
@@ -334,7 +332,7 @@ func (h *handler) GetTransactionResultByIndex(
 	reqBlockID := req.GetBlockId()
 	blockID, err := convert.BlockID(reqBlockID)
 	if err != nil {
-		return nil, err
+		return nil, status.Errorf(codes.InvalidArgument, "invalid blockID: %v", err)
 	}
 
 	index := req.GetIndex()
@@ -378,9 +376,10 @@ func (h *handler) GetTransactionResultByIndex(
 
 	// compose a response with the events and the transaction error
 	return &execution.GetTransactionResultResponse{
-		StatusCode:   statusCode,
-		ErrorMessage: errMsg,
-		Events:       events,
+		StatusCode:           statusCode,
+		ErrorMessage:         errMsg,
+		Events:               events,
+		EventEncodingVersion: execution.EventEncodingVersion_CCF_V0,
 	}, nil
 }
 
@@ -392,7 +391,7 @@ func (h *handler) GetTransactionResultsByBlockID(
 	reqBlockID := req.GetBlockId()
 	blockID, err := convert.BlockID(reqBlockID)
 	if err != nil {
-		return nil, err
+		return nil, status.Errorf(codes.InvalidArgument, "invalid blockID: %v", err)
 	}
 
 	// Get all tx results
@@ -456,7 +455,8 @@ func (h *handler) GetTransactionResultsByBlockID(
 
 	// compose a response
 	return &execution.GetTransactionResultsResponse{
-		TransactionResults: responseTxResults,
+		TransactionResults:   responseTxResults,
+		EventEncodingVersion: execution.EventEncodingVersion_CCF_V0,
 	}, nil
 }
 
@@ -488,15 +488,21 @@ func (h *handler) GetAccountAtBlockID(
 	blockID := req.GetBlockId()
 	blockFlowID, err := convert.BlockID(blockID)
 	if err != nil {
-		return nil, err
+		return nil, status.Errorf(codes.InvalidArgument, "invalid blockID: %v", err)
 	}
 
 	flowAddress, err := convert.Address(req.GetAddress(), h.chain.Chain())
 	if err != nil {
-		return nil, err
+		return nil, status.Errorf(codes.InvalidArgument, "invalid address: %v", err)
 	}
 
 	value, err := h.engine.GetAccount(ctx, flowAddress, blockFlowID)
+	if errors.Is(err, storage.ErrNotFound) {
+		return nil, status.Errorf(codes.NotFound, "account with address %s not found", flowAddress)
+	}
+	if fvmerrors.IsAccountNotFoundError(err) {
+		return nil, status.Errorf(codes.NotFound, "account not found")
+	}
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to get account: %v", err)
 	}
@@ -559,6 +565,7 @@ func (h *handler) GetBlockHeaderByID(
 func (h *handler) blockHeaderResponse(header *flow.Header) (*execution.BlockHeaderResponse, error) {
 	signerIDs, err := h.signerIndicesDecoder.DecodeSignerIDs(header)
 	if err != nil {
+		// the block was retrieved from local storage - so no errors are expected
 		return nil, fmt.Errorf("failed to decode signer indices to Identifiers for block %v: %w", header.ID(), err)
 	}
 

@@ -20,7 +20,14 @@ type Conduit struct {
 	egressController insecure.EgressController
 }
 
-var _ network.Conduit = &Conduit{}
+// ReportMisbehavior reports the misbehavior of a node on sending a message to the current node that appears valid
+// based on the networking layer but is considered invalid by the current node based on the Flow protocol.
+// This method is a no-op in the test helper implementation.
+func (c *Conduit) ReportMisbehavior(_ network.MisbehaviorReport) {
+	// no-op
+}
+
+var _ network.Conduit = (*Conduit)(nil)
 
 // Publish sends the incoming events as publish events to the controller of this conduit (i.e., its factory) to handle.
 func (c *Conduit) Publish(event interface{}, targetIDs ...flow.Identifier) error {

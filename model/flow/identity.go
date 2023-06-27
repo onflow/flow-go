@@ -21,7 +21,8 @@ import (
 )
 
 // DefaultInitialWeight is the default initial weight for a node identity.
-const DefaultInitialWeight = 1000
+// It is equal to the default initial weight in the FlowIDTableStaking smart contract.
+const DefaultInitialWeight = 100
 
 // rxid is the regex for parsing node identity entries.
 var rxid = regexp.MustCompile(`^(collection|consensus|execution|verification|access)-([0-9a-fA-F]{64})@([\w\d]+|[\w\d][\w\d\-]*[\w\d](?:\.*[\w\d][\w\d\-]*[\w\d])*|[\w\d][\w\d\-]*[\w\d])(:[\d]+)?=(\d{1,20})$`)
@@ -95,7 +96,8 @@ func (iy Identity) String() string {
 	return fmt.Sprintf("%s-%s@%s=%d", iy.Role, iy.NodeID.String(), iy.Address, iy.Weight)
 }
 
-// ID returns a unique identifier for the identity.
+// ID returns a unique, persistent identifier for the identity.
+// CAUTION: the ID may be chosen by a node operator, so long as it is unique.
 func (iy Identity) ID() Identifier {
 	return iy.NodeID
 }
@@ -396,8 +398,25 @@ func (il IdentityList) PublicStakingKeys() []crypto.PublicKey {
 	return pks
 }
 
-func (il IdentityList) Fingerprint() Identifier {
-	return MerkleRoot(GetIDs(il)...)
+// ID uniquely identifies a list of identities, by node ID. This can be used
+// to perpetually identify a group of nodes, even if mutable fields of some nodes
+// are changed, as node IDs are immutable.
+// CAUTION:
+//   - An IdentityList's ID is a cryptographic commitment to only node IDs. A node operator
+//     can freely choose the ID for their node. There is no relationship whatsoever between
+//     a node's ID and keys.
+//   - To generate a cryptographic commitment for the full IdentityList, use method `Checksum()`.
+//   - The outputs of `IdentityList.ID()` and `IdentityList.Checksum()` are both order-sensitive.
+//     Therefore, the `IdentityList` must be in canonical order, unless explicitly specified
+//     otherwise by the protocol.
+func (il IdentityList) ID() Identifier {
+	return il.NodeIDs().ID()
+}
+
+// Checksum generates a cryptographic commitment to the full IdentityList, including mutable fields.
+// The checksum for the same group of identities (by NodeID) may change from block to block.
+func (il IdentityList) Checksum() Identifier {
+	return MakeID(il)
 }
 
 // TotalWeight returns the total weight of all given identities.

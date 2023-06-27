@@ -21,6 +21,28 @@ type Chunk struct {
 	EndState StateCommitment
 }
 
+func NewChunk(
+	blockID Identifier,
+	collectionIndex int,
+	startState StateCommitment,
+	numberOfTransactions int,
+	eventCollection Identifier,
+	endState StateCommitment,
+) *Chunk {
+	return &Chunk{
+		ChunkBody: ChunkBody{
+			BlockID:              blockID,
+			CollectionIndex:      uint(collectionIndex),
+			StartState:           startState,
+			NumberOfTransactions: uint64(numberOfTransactions),
+			EventCollection:      eventCollection,
+			TotalComputationUsed: 0, // TODO: record gas used
+		},
+		Index:    uint64(collectionIndex),
+		EndState: endState,
+	}
+}
+
 // ID returns a unique id for this entity
 func (ch *Chunk) ID() Identifier {
 	return MakeID(ch.ChunkBody)
@@ -42,6 +64,21 @@ type ChunkDataPack struct {
 	StartState StateCommitment
 	Proof      StorageProof
 	Collection *Collection
+}
+
+// NewChunkDataPack returns an initialized chunk data pack.
+func NewChunkDataPack(
+	chunkID Identifier,
+	startState StateCommitment,
+	proof StorageProof,
+	collection *Collection,
+) *ChunkDataPack {
+	return &ChunkDataPack{
+		ChunkID:    chunkID,
+		StartState: startState,
+		Proof:      proof,
+		Collection: collection,
+	}
 }
 
 // ID returns the unique identifier for the concrete view, which is the ID of

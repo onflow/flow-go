@@ -1,6 +1,7 @@
 package bitutils
 
 import (
+	crand "crypto/rand"
 	"math/big"
 	"math/bits"
 	"math/rand"
@@ -9,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestBitVectorAllocation(t *testing.T) {
@@ -38,7 +40,6 @@ func Test_PaddedByteSliceLength(t *testing.T) {
 func TestBitTools(t *testing.T) {
 	seed := time.Now().UnixNano()
 	t.Logf("rand seed is %d", seed)
-	rand.Seed(seed)
 	r := rand.NewSource(seed)
 
 	const maxBits = 131 * 8 // upper bound of indices to test
@@ -71,7 +72,8 @@ func TestBitTools(t *testing.T) {
 	t.Run("testing WriteBit", func(t *testing.T) {
 		b.SetInt64(0)
 		bytes := MakeBitVector(maxBits)
-		rand.Read(bytes) // fill bytes with random values to verify that writing to each individual bit works
+		_, err := crand.Read(bytes) // fill bytes with random values to verify that writing to each individual bit works
+		require.NoError(t, err)
 
 		// build a random big bit by bit
 		for idx := 0; idx < maxBits; idx++ {
@@ -91,7 +93,8 @@ func TestBitTools(t *testing.T) {
 	t.Run("testing ClearBit and SetBit", func(t *testing.T) {
 		b.SetInt64(0)
 		bytes := MakeBitVector(maxBits)
-		rand.Read(bytes) // fill bytes with random values to verify that writing to each individual bit works
+		_, err := crand.Read(bytes) // fill bytes with random values to verify that writing to each individual bit works
+		require.NoError(t, err)
 
 		// build a random big bit by bit
 		for idx := 0; idx < maxBits; idx++ {

@@ -14,11 +14,12 @@ const (
 	namespaceStateSync         = "state_synchronization"
 	namespaceExecutionDataSync = "execution_data_sync"
 	namespaceChainsync         = "chainsync"
+	namespaceFollowerEngine    = "follower"
 )
 
 // Network subsystems represent the various layers of networking.
 const (
-	// subsystemLibp2p = "libp2p"
+	subsystemLibp2p       = "libp2p"
 	subsystemGossip       = "gossip"
 	subsystemEngine       = "engine"
 	subsystemQueue        = "queue"
@@ -26,6 +27,7 @@ const (
 	subsystemBitswap      = "bitswap"
 	subsystemAuth         = "authorization"
 	subsystemRateLimiting = "ratelimit"
+	subsystemAlsp         = "alsp"
 )
 
 // Storage subsystems represent the various components of the storage layer.
@@ -56,6 +58,7 @@ const (
 const (
 	subsystemCompliance  = "compliance"
 	subsystemHotstuff    = "hotstuff"
+	subsystemCruiseCtl   = "cruisectl"
 	subsystemMatchEngine = "match"
 )
 

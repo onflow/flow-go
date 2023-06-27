@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	prometheusWAL "github.com/m4ksio/wal/wal"
+	prometheusWAL "github.com/onflow/wal/wal"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/stretchr/testify/assert"

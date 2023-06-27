@@ -79,12 +79,6 @@ func getPriorityByType(message interface{}) Priority {
 	case *flow.ResultApproval:
 		return HighPriority
 
-	// execution state synchronization
-	case *messages.ExecutionStateSyncRequest:
-		return MediumPriority
-	case *messages.ExecutionStateDelta:
-		return HighPriority
-
 	// data exchange for execution of blocks
 	case *messages.ChunkDataRequest:
 		return HighPriority

@@ -5,12 +5,19 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/onflow/cadence/encoding/ccf"
+	jsoncdc "github.com/onflow/cadence/encoding/json"
 	"github.com/onflow/flow/protobuf/go/flow/entities"
+	execproto "github.com/onflow/flow/protobuf/go/flow/execution"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/crypto/hash"
+	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/inmem"
 )
@@ -27,7 +34,10 @@ var ValidChainIds = map[string]bool{
 	flow.MonotonicEmulator.String(): true,
 }
 
-func MessageToTransaction(m *entities.Transaction, chain flow.Chain) (flow.TransactionBody, error) {
+func MessageToTransaction(
+	m *entities.Transaction,
+	chain flow.Chain,
+) (flow.TransactionBody, error) {
 	if m == nil {
 		return flow.TransactionBody{}, ErrEmptyMessage
 	}
@@ -137,10 +147,29 @@ func TransactionToMessage(tb flow.TransactionBody) *entities.Transaction {
 	}
 }
 
-func BlockHeaderToMessage(h *flow.Header, signerIDs flow.IdentifierList) (*entities.BlockHeader, error) {
+func BlockHeaderToMessage(
+	h *flow.Header,
+	signerIDs flow.IdentifierList,
+) (*entities.BlockHeader, error) {
 	id := h.ID()
 
 	t := timestamppb.New(h.Timestamp)
+	var lastViewTC *entities.TimeoutCertificate
+	if h.LastViewTC != nil {
+		newestQC := h.LastViewTC.NewestQC
+		lastViewTC = &entities.TimeoutCertificate{
+			View:          h.LastViewTC.View,
+			HighQcViews:   h.LastViewTC.NewestQCViews,
+			SignerIndices: h.LastViewTC.SignerIndices,
+			SigData:       h.LastViewTC.SigData,
+			HighestQc: &entities.QuorumCertificate{
+				View:          newestQC.View,
+				BlockId:       newestQC.BlockID[:],
+				SignerIndices: newestQC.SignerIndices,
+				SigData:       newestQC.SigData,
+			},
+		}
+	}
 	parentVoterIds := IdentifiersToMessages(signerIDs)
 
 	return &entities.BlockHeader{
@@ -150,12 +179,14 @@ func BlockHeaderToMessage(h *flow.Header, signerIDs flow.IdentifierList) (*entit
 		PayloadHash:        h.PayloadHash[:],
 		Timestamp:          t,
 		View:               h.View,
+		ParentView:         h.ParentView,
 		ParentVoterIndices: h.ParentVoterIndices,
 		ParentVoterIds:     parentVoterIds,
 		ParentVoterSigData: h.ParentVoterSigData,
 		ProposerId:         h.ProposerID[:],
 		ProposerSigData:    h.ProposerSigData,
 		ChainId:            h.ChainID.String(),
+		LastViewTc:         lastViewTC,
 	}, nil
 }
 
@@ -164,17 +195,39 @@ func MessageToBlockHeader(m *entities.BlockHeader) (*flow.Header, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to convert ChainId: %w", err)
 	}
+	var lastViewTC *flow.TimeoutCertificate
+	if m.LastViewTc != nil {
+		newestQC := m.LastViewTc.HighestQc
+		if newestQC == nil {
+			return nil, fmt.Errorf("invalid structure newest QC should be present")
+		}
+		lastViewTC = &flow.TimeoutCertificate{
+			View:          m.LastViewTc.View,
+			NewestQCViews: m.LastViewTc.HighQcViews,
+			SignerIndices: m.LastViewTc.SignerIndices,
+			SigData:       m.LastViewTc.SigData,
+			NewestQC: &flow.QuorumCertificate{
+				View:          newestQC.View,
+				BlockID:       MessageToIdentifier(newestQC.BlockId),
+				SignerIndices: newestQC.SignerIndices,
+				SigData:       newestQC.SigData,
+			},
+		}
+	}
+
 	return &flow.Header{
 		ParentID:           MessageToIdentifier(m.ParentId),
 		Height:             m.Height,
 		PayloadHash:        MessageToIdentifier(m.PayloadHash),
 		Timestamp:          m.Timestamp.AsTime(),
 		View:               m.View,
+		ParentView:         m.ParentView,
 		ParentVoterIndices: m.ParentVoterIndices,
 		ParentVoterSigData: m.ParentVoterSigData,
 		ProposerID:         MessageToIdentifier(m.ProposerId),
 		ProposerSigData:    m.ProposerSigData,
 		ChainID:            *chainId,
+		LastViewTC:         lastViewTC,
 	}, nil
 }
 
@@ -223,7 +276,10 @@ func MessagesToBlockSeals(m []*entities.BlockSeal) ([]*flow.Seal, error) {
 	return seals, nil
 }
 
-func ExecutionResultsToMessages(e []*flow.ExecutionResult) ([]*entities.ExecutionResult, error) {
+func ExecutionResultsToMessages(e []*flow.ExecutionResult) (
+	[]*entities.ExecutionResult,
+	error,
+) {
 	execResults := make([]*entities.ExecutionResult, len(e))
 	for i, execRes := range e {
 		parsedExecResult, err := ExecutionResultToMessage(execRes)
@@ -235,7 +291,10 @@ func ExecutionResultsToMessages(e []*flow.ExecutionResult) ([]*entities.Executio
 	return execResults, nil
 }
 
-func MessagesToExecutionResults(m []*entities.ExecutionResult) ([]*flow.ExecutionResult, error) {
+func MessagesToExecutionResults(m []*entities.ExecutionResult) (
+	[]*flow.ExecutionResult,
+	error,
+) {
 	execResults := make([]*flow.ExecutionResult, len(m))
 	for i, e := range m {
 		parsedExecResult, err := MessageToExecutionResult(e)
@@ -247,7 +306,10 @@ func MessagesToExecutionResults(m []*entities.ExecutionResult) ([]*flow.Executio
 	return execResults, nil
 }
 
-func BlockToMessage(h *flow.Block, signerIDs flow.IdentifierList) (*entities.Block, error) {
+func BlockToMessage(h *flow.Block, signerIDs flow.IdentifierList) (
+	*entities.Block,
+	error,
+) {
 
 	id := h.ID()
 
@@ -576,6 +638,16 @@ func AccountKeyToMessage(a flow.AccountPublicKey) (*entities.AccountKey, error) 
 	}, nil
 }
 
+func MessageToEvent(m *entities.Event) flow.Event {
+	return flow.Event{
+		Type:             flow.EventType(m.GetType()),
+		TransactionID:    flow.HashToID(m.GetTransactionId()),
+		TransactionIndex: m.GetTransactionIndex(),
+		EventIndex:       m.GetEventIndex(),
+		Payload:          m.GetPayload(),
+	}
+}
+
 func MessagesToEvents(l []*entities.Event) []flow.Event {
 	events := make([]flow.Event, len(l))
 
@@ -586,14 +658,65 @@ func MessagesToEvents(l []*entities.Event) []flow.Event {
 	return events
 }
 
-func MessageToEvent(m *entities.Event) flow.Event {
-	return flow.Event{
-		Type:             flow.EventType(m.GetType()),
-		TransactionID:    flow.HashToID(m.GetTransactionId()),
-		TransactionIndex: m.GetTransactionIndex(),
-		EventIndex:       m.GetEventIndex(),
-		Payload:          m.GetPayload(),
+func MessagesToEventsFromVersion(l []*entities.Event, version execproto.EventEncodingVersion) ([]flow.Event, error) {
+	events := make([]flow.Event, len(l))
+	for i, m := range l {
+		event, err := MessageToEventFromVersion(m, version)
+		if err != nil {
+			return nil, fmt.Errorf("could not convert event at index %d from format %d: %w",
+				m.EventIndex, version, err)
+		}
+		events[i] = *event
 	}
+	return events, nil
+}
+
+func MessageToEventFromVersion(m *entities.Event, version execproto.EventEncodingVersion) (*flow.Event, error) {
+	switch version {
+	case execproto.EventEncodingVersion_CCF_V0:
+		convertedPayload, err := CcfPayloadToJsonPayload(m.Payload)
+		if err != nil {
+			return nil, fmt.Errorf("could not convert event payload from CCF to Json: %w", err)
+		}
+		return &flow.Event{
+			Type:             flow.EventType(m.GetType()),
+			TransactionID:    flow.HashToID(m.GetTransactionId()),
+			TransactionIndex: m.GetTransactionIndex(),
+			EventIndex:       m.GetEventIndex(),
+			Payload:          convertedPayload,
+		}, nil
+	case execproto.EventEncodingVersion_JSON_CDC_V0:
+		je := MessageToEvent(m)
+		return &je, nil
+	default:
+		return nil, fmt.Errorf("invalid encoding format %d", version)
+	}
+}
+
+func CcfPayloadToJsonPayload(p []byte) ([]byte, error) {
+	val, err := ccf.Decode(nil, p)
+	if err != nil {
+		return nil, fmt.Errorf("unable to decode from ccf format: %w", err)
+	}
+	res, err := jsoncdc.Encode(val)
+	if err != nil {
+		return nil, fmt.Errorf("unable to encode to json-cdc format: %w", err)
+	}
+	return res, nil
+}
+
+func CcfEventToJsonEvent(e flow.Event) (*flow.Event, error) {
+	convertedPayload, err := CcfPayloadToJsonPayload(e.Payload)
+	if err != nil {
+		return nil, err
+	}
+	return &flow.Event{
+		Type:             e.Type,
+		TransactionID:    e.TransactionID,
+		TransactionIndex: e.TransactionIndex,
+		EventIndex:       e.EventIndex,
+		Payload:          convertedPayload,
+	}, nil
 }
 
 func EventsToMessages(flowEvents []flow.Event) []*entities.Event {
@@ -679,7 +802,10 @@ func MessagesToChunkList(m []*entities.Chunk) (flow.ChunkList, error) {
 	return parsedChunks, nil
 }
 
-func MessagesToServiceEventList(m []*entities.ServiceEvent) (flow.ServiceEventList, error) {
+func MessagesToServiceEventList(m []*entities.ServiceEvent) (
+	flow.ServiceEventList,
+	error,
+) {
 	parsedServiceEvents := make(flow.ServiceEventList, len(m))
 	for i, serviceEvent := range m {
 		parsedServiceEvent, err := MessageToServiceEvent(serviceEvent)
@@ -691,7 +817,10 @@ func MessagesToServiceEventList(m []*entities.ServiceEvent) (flow.ServiceEventLi
 	return parsedServiceEvents, nil
 }
 
-func MessageToExecutionResult(m *entities.ExecutionResult) (*flow.ExecutionResult, error) {
+func MessageToExecutionResult(m *entities.ExecutionResult) (
+	*flow.ExecutionResult,
+	error,
+) {
 	// convert Chunks
 	parsedChunks, err := MessagesToChunkList(m.Chunks)
 	if err != nil {
@@ -711,7 +840,10 @@ func MessageToExecutionResult(m *entities.ExecutionResult) (*flow.ExecutionResul
 	}, nil
 }
 
-func ExecutionResultToMessage(er *flow.ExecutionResult) (*entities.ExecutionResult, error) {
+func ExecutionResultToMessage(er *flow.ExecutionResult) (
+	*entities.ExecutionResult,
+	error,
+) {
 
 	chunks := make([]*entities.Chunk, len(er.Chunks))
 
@@ -745,37 +877,17 @@ func ServiceEventToMessage(event flow.ServiceEvent) (*entities.ServiceEvent, err
 	}
 
 	return &entities.ServiceEvent{
-		Type:    event.Type,
+		Type:    event.Type.String(),
 		Payload: bytes,
 	}, nil
 }
 
 func MessageToServiceEvent(m *entities.ServiceEvent) (*flow.ServiceEvent, error) {
-	var event interface{}
 	rawEvent := m.Payload
-	// map keys correctly
-	switch m.Type {
-	case flow.ServiceEventSetup:
-		setup := new(flow.EpochSetup)
-		err := json.Unmarshal(rawEvent, setup)
-		if err != nil {
-			return nil, fmt.Errorf("failed to marshal to EpochSetup event: %w", err)
-		}
-		event = setup
-	case flow.ServiceEventCommit:
-		commit := new(flow.EpochCommit)
-		err := json.Unmarshal(rawEvent, commit)
-		if err != nil {
-			return nil, fmt.Errorf("failed to marshal to EpochCommit event: %w", err)
-		}
-		event = commit
-	default:
-		return nil, fmt.Errorf("invalid event type: %s", m.Type)
-	}
-	return &flow.ServiceEvent{
-		Type:  m.Type,
-		Event: event,
-	}, nil
+	eventType := flow.ServiceEventType(m.Type)
+	se, err := flow.ServiceEventJSONMarshaller.UnmarshalWithType(rawEvent, eventType)
+
+	return &se, err
 }
 
 func ChunkToMessage(chunk *flow.Chunk) *entities.Chunk {
@@ -813,4 +925,255 @@ func MessageToChunk(m *entities.Chunk) (*flow.Chunk, error) {
 		Index:     m.Index,
 		EndState:  endState,
 	}, nil
+}
+
+func BlockExecutionDataToMessage(data *execution_data.BlockExecutionData) (
+	*entities.BlockExecutionData,
+	error,
+) {
+	chunkExecutionDatas := make([]*entities.ChunkExecutionData, len(data.ChunkExecutionDatas))
+	for i, chunk := range data.ChunkExecutionDatas {
+		chunkMessage, err := ChunkExecutionDataToMessage(chunk)
+		if err != nil {
+			return nil, err
+		}
+		chunkExecutionDatas[i] = chunkMessage
+	}
+	return &entities.BlockExecutionData{
+		BlockId:            IdentifierToMessage(data.BlockID),
+		ChunkExecutionData: chunkExecutionDatas,
+	}, nil
+}
+
+func ChunkExecutionDataToMessage(data *execution_data.ChunkExecutionData) (
+	*entities.ChunkExecutionData,
+	error,
+) {
+	collection := &entities.ExecutionDataCollection{}
+	if data.Collection != nil {
+		collection = &entities.ExecutionDataCollection{
+			Transactions: TransactionsToMessages(data.Collection.Transactions),
+		}
+	}
+
+	events := EventsToMessages(data.Events)
+	if len(events) == 0 {
+		events = nil
+	}
+
+	var trieUpdate *entities.TrieUpdate
+	if data.TrieUpdate != nil {
+		paths := make([][]byte, len(data.TrieUpdate.Paths))
+		for i, path := range data.TrieUpdate.Paths {
+			paths[i] = path[:]
+		}
+
+		payloads := make([]*entities.Payload, len(data.TrieUpdate.Payloads))
+		for i, payload := range data.TrieUpdate.Payloads {
+			key, err := payload.Key()
+			if err != nil {
+				return nil, err
+			}
+			keyParts := make([]*entities.KeyPart, len(key.KeyParts))
+			for j, keyPart := range key.KeyParts {
+				keyParts[j] = &entities.KeyPart{
+					Type:  uint32(keyPart.Type),
+					Value: keyPart.Value,
+				}
+			}
+			payloads[i] = &entities.Payload{
+				KeyPart: keyParts,
+				Value:   payload.Value(),
+			}
+		}
+
+		trieUpdate = &entities.TrieUpdate{
+			RootHash: data.TrieUpdate.RootHash[:],
+			Paths:    paths,
+			Payloads: payloads,
+		}
+	}
+
+	return &entities.ChunkExecutionData{
+		Collection: collection,
+		Events:     events,
+		TrieUpdate: trieUpdate,
+	}, nil
+}
+
+func MessageToBlockExecutionData(
+	m *entities.BlockExecutionData,
+	chain flow.Chain,
+) (*execution_data.BlockExecutionData, error) {
+	if m == nil {
+		return nil, ErrEmptyMessage
+	}
+	chunks := make([]*execution_data.ChunkExecutionData, len(m.ChunkExecutionData))
+	for i, chunk := range m.GetChunkExecutionData() {
+		convertedChunk, err := MessageToChunkExecutionData(chunk, chain)
+		if err != nil {
+			return nil, err
+		}
+		chunks[i] = convertedChunk
+	}
+
+	return &execution_data.BlockExecutionData{
+		BlockID:             MessageToIdentifier(m.GetBlockId()),
+		ChunkExecutionDatas: chunks,
+	}, nil
+}
+
+func MessageToChunkExecutionData(
+	m *entities.ChunkExecutionData,
+	chain flow.Chain,
+) (*execution_data.ChunkExecutionData, error) {
+	collection, err := messageToTrustedCollection(m.GetCollection(), chain)
+	if err != nil {
+		return nil, err
+	}
+
+	var trieUpdate *ledger.TrieUpdate
+	if m.GetTrieUpdate() != nil {
+		trieUpdate, err = MessageToTrieUpdate(m.GetTrieUpdate())
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	events := MessagesToEvents(m.GetEvents())
+	if len(events) == 0 {
+		events = nil
+	}
+
+	return &execution_data.ChunkExecutionData{
+		Collection: collection,
+		Events:     events,
+		TrieUpdate: trieUpdate,
+	}, nil
+}
+
+func messageToTrustedCollection(
+	m *entities.ExecutionDataCollection,
+	chain flow.Chain,
+) (*flow.Collection, error) {
+	messages := m.GetTransactions()
+	transactions := make([]*flow.TransactionBody, len(messages))
+	for i, message := range messages {
+		transaction, err := messageToTrustedTransaction(message, chain)
+		if err != nil {
+			return nil, fmt.Errorf("could not convert transaction %d: %w", i, err)
+		}
+		transactions[i] = &transaction
+	}
+
+	if len(transactions) == 0 {
+		return nil, nil
+	}
+
+	return &flow.Collection{Transactions: transactions}, nil
+}
+
+// messageToTrustedTransaction converts a transaction message to a transaction body.
+// This is useful when converting transactions from trusted state like BlockExecutionData which
+// contain service transactions that do not conform to external transaction format.
+func messageToTrustedTransaction(
+	m *entities.Transaction,
+	chain flow.Chain,
+) (flow.TransactionBody, error) {
+	if m == nil {
+		return flow.TransactionBody{}, ErrEmptyMessage
+	}
+
+	t := flow.NewTransactionBody()
+
+	proposalKey := m.GetProposalKey()
+	if proposalKey != nil {
+		proposalAddress, err := insecureAddress(proposalKey.GetAddress(), chain)
+		if err != nil {
+			return *t, fmt.Errorf("could not convert proposer address: %w", err)
+		}
+		t.SetProposalKey(proposalAddress, uint64(proposalKey.GetKeyId()), proposalKey.GetSequenceNumber())
+	}
+
+	payer := m.GetPayer()
+	if payer != nil {
+		payerAddress, err := insecureAddress(payer, chain)
+		if err != nil {
+			return *t, fmt.Errorf("could not convert payer address: %w", err)
+		}
+		t.SetPayer(payerAddress)
+	}
+
+	for _, authorizer := range m.GetAuthorizers() {
+		authorizerAddress, err := Address(authorizer, chain)
+		if err != nil {
+			return *t, fmt.Errorf("could not convert authorizer address: %w", err)
+		}
+		t.AddAuthorizer(authorizerAddress)
+	}
+
+	for _, sig := range m.GetPayloadSignatures() {
+		addr, err := Address(sig.GetAddress(), chain)
+		if err != nil {
+			return *t, fmt.Errorf("could not convert payload signature address: %w", err)
+		}
+		t.AddPayloadSignature(addr, uint64(sig.GetKeyId()), sig.GetSignature())
+	}
+
+	for _, sig := range m.GetEnvelopeSignatures() {
+		addr, err := Address(sig.GetAddress(), chain)
+		if err != nil {
+			return *t, fmt.Errorf("could not convert envelope signature address: %w", err)
+		}
+		t.AddEnvelopeSignature(addr, uint64(sig.GetKeyId()), sig.GetSignature())
+	}
+
+	t.SetScript(m.GetScript())
+	t.SetArguments(m.GetArguments())
+	t.SetReferenceBlockID(flow.HashToID(m.GetReferenceBlockId()))
+	t.SetGasLimit(m.GetGasLimit())
+
+	return *t, nil
+}
+
+func MessageToTrieUpdate(m *entities.TrieUpdate) (*ledger.TrieUpdate, error) {
+	rootHash, err := ledger.ToRootHash(m.GetRootHash())
+	if err != nil {
+		return nil, fmt.Errorf("could not convert root hash: %w", err)
+	}
+
+	paths := make([]ledger.Path, len(m.GetPaths()))
+	for i, path := range m.GetPaths() {
+		convertedPath, err := ledger.ToPath(path)
+		if err != nil {
+			return nil, fmt.Errorf("could not convert path %d: %w", i, err)
+		}
+		paths[i] = convertedPath
+	}
+
+	payloads := make([]*ledger.Payload, len(m.Payloads))
+	for i, payload := range m.GetPayloads() {
+		keyParts := make([]ledger.KeyPart, len(payload.GetKeyPart()))
+		for j, keypart := range payload.GetKeyPart() {
+			keyParts[j] = ledger.NewKeyPart(uint16(keypart.GetType()), keypart.GetValue())
+		}
+		payloads[i] = ledger.NewPayload(ledger.NewKey(keyParts), payload.GetValue())
+	}
+
+	return &ledger.TrieUpdate{
+		RootHash: rootHash,
+		Paths:    paths,
+		Payloads: payloads,
+	}, nil
+}
+
+// insecureAddress converts a raw address to a flow.Address, skipping validation
+// This is useful when converting transactions from trusted state like BlockExecutionData.
+// This should only be used for trusted inputs
+func insecureAddress(rawAddress []byte, chain flow.Chain) (flow.Address, error) {
+	if len(rawAddress) == 0 {
+		return flow.EmptyAddress, status.Error(codes.InvalidArgument, "address cannot be empty")
+	}
+
+	return flow.BytesToAddress(rawAddress), nil
 }

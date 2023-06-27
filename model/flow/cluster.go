@@ -31,9 +31,9 @@ func (al AssignmentList) EqualTo(other AssignmentList) bool {
 }
 
 // Assignments returns the assignment list for a cluster.
-func (clusters ClusterList) Assignments() AssignmentList {
-	assignments := make(AssignmentList, 0, len(clusters))
-	for _, cluster := range clusters {
+func (cl ClusterList) Assignments() AssignmentList {
+	assignments := make(AssignmentList, 0, len(cl))
+	for _, cluster := range cl {
 		assignment := make([]Identifier, 0, len(cluster))
 		for _, collector := range cluster {
 			assignment = append(assignment, collector.NodeID)
@@ -80,8 +80,7 @@ func NewClusterList(assignments AssignmentList, collectors IdentityList) (Cluste
 	return clusters, nil
 }
 
-// ByIndex retrieves the list of identities that are part of the
-// given cluster.
+// ByIndex retrieves the list of identities that are part of the given cluster.
 func (cl ClusterList) ByIndex(index uint) (IdentityList, bool) {
 	if index >= uint(len(cl)) {
 		return nil, false
@@ -117,9 +116,9 @@ func (cl ClusterList) ByNodeID(nodeID Identifier) (IdentityList, uint, bool) {
 
 // IndexOf returns the index of the given cluster.
 func (cl ClusterList) IndexOf(cluster IdentityList) (uint, bool) {
-	clusterFingerprint := cluster.Fingerprint()
+	clusterFingerprint := cluster.ID()
 	for index, other := range cl {
-		if other.Fingerprint() == clusterFingerprint {
+		if other.ID() == clusterFingerprint {
 			return uint(index), true
 		}
 	}

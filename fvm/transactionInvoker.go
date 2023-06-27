@@ -12,41 +12,13 @@ import (
 
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/errors"
-	programsCache "github.com/onflow/flow-go/fvm/programs"
 	reusableRuntime "github.com/onflow/flow-go/fvm/runtime"
-	"github.com/onflow/flow-go/fvm/state"
-	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/fvm/storage"
+	"github.com/onflow/flow-go/fvm/storage/derived"
+	"github.com/onflow/flow-go/fvm/storage/snapshot"
+	"github.com/onflow/flow-go/fvm/storage/state"
 	"github.com/onflow/flow-go/module/trace"
 )
-
-// TODO(patrick): rm.  call proc.Run directly.
-type TransactionInvoker struct {
-}
-
-func NewTransactionInvoker() *TransactionInvoker {
-	return &TransactionInvoker{}
-}
-
-func (i TransactionInvoker) NewExecutor(
-	ctx Context,
-	proc *TransactionProcedure,
-	txnState *state.TransactionState,
-	derivedTxnData *programsCache.DerivedTransactionData,
-) *transactionExecutor {
-	return newTransactionExecutor(ctx, proc, txnState, derivedTxnData)
-}
-
-func (i TransactionInvoker) Process(
-	ctx Context,
-	proc *TransactionProcedure,
-	txnState *state.TransactionState,
-	derivedTxnData *programsCache.DerivedTransactionData,
-) error {
-	// TODO(patrick): switch to run(i.NewExecutor(...))
-	executor := i.NewExecutor(ctx, proc, txnState, derivedTxnData)
-	defer executor.Cleanup()
-	return executor.Execute()
-}
 
 type TransactionExecutorParams struct {
 	AuthorizationChecksEnabled bool
@@ -78,55 +50,56 @@ type transactionExecutor struct {
 	TransactionVerifier
 	TransactionSequenceNumberChecker
 	TransactionStorageLimiter
+	TransactionPayerBalanceChecker
 
-	tracer module.Tracer
-	logger zerolog.Logger
-
-	proc           *TransactionProcedure
-	txnState       *state.TransactionState
-	derivedTxnData *programsCache.DerivedTransactionData
+	ctx      Context
+	proc     *TransactionProcedure
+	txnState storage.TransactionPreparer
 
 	span otelTrace.Span
 	env  environment.Environment
 
 	errs *errors.ErrorsCollector
 
-	nestedTxnId state.NestedTransactionId
+	startedTransactionBodyExecution bool
+	nestedTxnId                     state.NestedTransactionId
 
 	cadenceRuntime  *reusableRuntime.ReusableCadenceRuntime
 	txnBodyExecutor runtime.Executor
+
+	output ProcedureOutput
 }
 
 func newTransactionExecutor(
 	ctx Context,
 	proc *TransactionProcedure,
-	txnState *state.TransactionState,
-	derivedTxnData *programsCache.DerivedTransactionData,
+	txnState storage.TransactionPreparer,
 ) *transactionExecutor {
-	span := proc.StartSpanFromProcTraceSpan(
-		ctx.Tracer,
-		trace.FVMExecuteTransaction)
+	span := ctx.StartChildSpan(trace.FVMExecuteTransaction)
 	span.SetAttributes(attribute.String("transaction_id", proc.ID.String()))
 
-	env := NewTransactionEnvironment(
-		ctx,
-		txnState,
-		derivedTxnData,
-		proc.Transaction,
-		proc.TxIndex,
-		span)
+	ctx.TxIndex = proc.TxIndex
+	ctx.TxId = proc.ID
+	ctx.TxBody = proc.Transaction
+
+	env := environment.NewTransactionEnvironment(
+		span,
+		ctx.EnvironmentParams,
+		txnState)
 
 	return &transactionExecutor{
 		TransactionExecutorParams: ctx.TransactionExecutorParams,
-		tracer:                    ctx.Tracer,
-		logger:                    ctx.Logger,
-		proc:                      proc,
-		txnState:                  txnState,
-		derivedTxnData:            derivedTxnData,
-		span:                      span,
-		env:                       env,
-		errs:                      errors.NewErrorsCollector(),
-		cadenceRuntime:            env.BorrowCadenceRuntime(),
+		TransactionVerifier: TransactionVerifier{
+			VerificationConcurrency: 4,
+		},
+		ctx:                             ctx,
+		proc:                            proc,
+		txnState:                        txnState,
+		span:                            span,
+		env:                             env,
+		errs:                            errors.NewErrorsCollector(),
+		startedTransactionBodyExecution: false,
+		cadenceRuntime:                  env.BorrowCadenceRuntime(),
 	}
 }
 
@@ -135,82 +108,145 @@ func (executor *transactionExecutor) Cleanup() {
 	executor.span.End()
 }
 
-func (executor *transactionExecutor) Preprocess() error {
-	// TODO(patrick): split ExecuteTransactionBody preprocessing.
-	return nil
+func (executor *transactionExecutor) Output() ProcedureOutput {
+	return executor.output
 }
 
-func (executor *transactionExecutor) Execute() error {
-	err := executor.execute()
+func (executor *transactionExecutor) handleError(
+	err error,
+	step string,
+) error {
 	txErr, failure := errors.SplitErrorTypes(err)
 	if failure != nil {
 		// log the full error path
-		executor.logger.Err(err).Msg("fatal error when execution a transaction")
+		executor.ctx.Logger.Err(err).
+			Str("step", step).
+			Msg("fatal error when handling a transaction")
 		return failure
 	}
 
 	if txErr != nil {
-		executor.proc.Err = txErr
+		executor.output.Err = txErr
+	}
+
+	return nil
+}
+
+func (executor *transactionExecutor) Preprocess() error {
+	return executor.handleError(executor.preprocess(), "preprocess")
+}
+
+func (executor *transactionExecutor) Execute() error {
+	return executor.handleError(executor.execute(), "executing")
+}
+
+func (executor *transactionExecutor) preprocess() error {
+	if executor.AuthorizationChecksEnabled {
+		err := executor.CheckAuthorization(
+			executor.ctx.TracerSpan,
+			executor.proc,
+			executor.txnState,
+			executor.AccountKeyWeightThreshold)
+		if err != nil {
+			executor.errs.Collect(err)
+			return executor.errs.ErrorOrNil()
+		}
+	}
+
+	if executor.SequenceNumberCheckAndIncrementEnabled {
+		err := executor.CheckAndIncrementSequenceNumber(
+			executor.ctx.TracerSpan,
+			executor.proc,
+			executor.txnState)
+		if err != nil {
+			executor.errs.Collect(err)
+			return executor.errs.ErrorOrNil()
+		}
+	}
+
+	if !executor.TransactionBodyExecutionEnabled {
+		return nil
+	}
+
+	executor.errs.Collect(executor.preprocessTransactionBody())
+	if executor.errs.CollectedFailure() {
+		return executor.errs.ErrorOrNil()
+	}
+
+	return nil
+}
+
+// preprocessTransactionBody preprocess parts of a transaction body that are
+// infrequently modified and are expensive to compute.  For now this includes
+// reading meter parameter overrides and parsing programs.
+func (executor *transactionExecutor) preprocessTransactionBody() error {
+	meterParams, err := getBodyMeterParameters(
+		executor.ctx,
+		executor.proc,
+		executor.txnState)
+	if err != nil {
+		return fmt.Errorf("error gettng meter parameters: %w", err)
+	}
+
+	txnId, err := executor.txnState.BeginNestedTransactionWithMeterParams(
+		meterParams)
+	if err != nil {
+		return err
+	}
+	executor.startedTransactionBodyExecution = true
+	executor.nestedTxnId = txnId
+
+	executor.txnBodyExecutor = executor.cadenceRuntime.NewTransactionExecutor(
+		runtime.Script{
+			Source:    executor.proc.Transaction.Script,
+			Arguments: executor.proc.Transaction.Arguments,
+		},
+		common.TransactionLocation(executor.proc.ID))
+
+	// This initializes various cadence variables and parses the programs used
+	// by the transaction body.
+	err = executor.txnBodyExecutor.Preprocess()
+	if err != nil {
+		return fmt.Errorf(
+			"transaction preprocess failed: %w",
+			err)
 	}
 
 	return nil
 }
 
 func (executor *transactionExecutor) execute() error {
-	if executor.AuthorizationChecksEnabled {
-		err := executor.CheckAuthorization(
-			executor.tracer,
-			executor.proc,
-			executor.txnState,
-			executor.AccountKeyWeightThreshold)
-		if err != nil {
-			return err
-		}
-	}
-
-	if executor.SequenceNumberCheckAndIncrementEnabled {
-		err := executor.CheckAndIncrementSequenceNumber(
-			executor.tracer,
-			executor.proc,
-			executor.txnState)
-		if err != nil {
-			return err
-		}
-	}
-
-	if executor.TransactionBodyExecutionEnabled {
-		err := executor.ExecuteTransactionBody()
-		if err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
-func (executor *transactionExecutor) ExecuteTransactionBody() error {
-	var beginErr error
-	executor.nestedTxnId, beginErr = executor.txnState.BeginNestedTransaction()
-	if beginErr != nil {
-		return beginErr
-	}
-
-	var modifiedSets programsCache.ModifiedSetsInvalidator
-	var txError error
-	modifiedSets, txError = executor.normalExecution()
-	if executor.errs.Collect(txError).CollectedFailure() {
+	if !executor.startedTransactionBodyExecution {
 		return executor.errs.ErrorOrNil()
 	}
 
+	return executor.ExecuteTransactionBody()
+}
+
+func (executor *transactionExecutor) ExecuteTransactionBody() error {
+	var invalidator derived.TransactionInvalidator
+	if !executor.errs.CollectedError() {
+
+		var txError error
+		invalidator, txError = executor.normalExecution()
+		if executor.errs.Collect(txError).CollectedFailure() {
+			return executor.errs.ErrorOrNil()
+		}
+	}
+
 	if executor.errs.CollectedError() {
-		modifiedSets = programsCache.ModifiedSetsInvalidator{}
-		executor.errorExecution()
+		invalidator = nil
+		executor.txnState.RunWithAllLimitsDisabled(executor.errorExecution)
 		if executor.errs.CollectedFailure() {
 			return executor.errs.ErrorOrNil()
 		}
 	}
 
-	executor.errs.Collect(executor.commit(modifiedSets))
+	// log the execution intensities here, so that they do not contain data
+	// from transaction fee deduction, because the payer is not charged for that.
+	executor.logExecutionIntensities()
+
+	executor.errs.Collect(executor.commit(invalidator))
 
 	return executor.errs.ErrorOrNil()
 }
@@ -220,9 +256,18 @@ func (executor *transactionExecutor) deductTransactionFees() (err error) {
 		return nil
 	}
 
-	computationUsed := executor.env.ComputationUsed()
-	if computationUsed > uint64(executor.txnState.TotalComputationLimit()) {
-		computationUsed = uint64(executor.txnState.TotalComputationLimit())
+	computationLimit := uint64(executor.txnState.TotalComputationLimit())
+
+	computationUsed, err := executor.env.ComputationUsed()
+	if err != nil {
+		return errors.NewTransactionFeeDeductionFailedError(
+			executor.proc.Transaction.Payer,
+			computationLimit,
+			err)
+	}
+
+	if computationUsed > computationLimit {
+		computationUsed = computationLimit
 	}
 
 	_, err = executor.env.DeductTransactionFees(
@@ -253,7 +298,7 @@ func (executor *transactionExecutor) logExecutionIntensities() {
 	for s, u := range executor.txnState.MemoryIntensities() {
 		memory.Uint(strconv.FormatUint(uint64(s), 10), u)
 	}
-	executor.env.Logger().Info().
+	executor.env.Logger().Debug().
 		Uint64("ledgerInteractionUsed", executor.txnState.InteractionUsed()).
 		Uint64("computationUsed", executor.txnState.TotalComputationUsed()).
 		Uint64("memoryEstimate", executor.txnState.TotalMemoryEstimate()).
@@ -263,35 +308,39 @@ func (executor *transactionExecutor) logExecutionIntensities() {
 }
 
 func (executor *transactionExecutor) normalExecution() (
-	modifiedSets programsCache.ModifiedSetsInvalidator,
+	invalidator derived.TransactionInvalidator,
 	err error,
 ) {
-	executor.txnBodyExecutor = executor.cadenceRuntime.NewTransactionExecutor(
-		runtime.Script{
-			Source:    executor.proc.Transaction.Script,
-			Arguments: executor.proc.Transaction.Arguments,
-		},
-		common.TransactionLocation(executor.proc.ID))
+	var maxTxFees uint64
+	// run with limits disabled since this is a static cost check
+	// and should be accounted for in the inclusion cost.
+	executor.txnState.RunWithAllLimitsDisabled(func() {
+		maxTxFees, err = executor.CheckPayerBalanceAndReturnMaxFees(
+			executor.proc,
+			executor.txnState,
+			executor.env)
+	})
 
-	err = executor.txnBodyExecutor.Preprocess()
 	if err != nil {
-		err = fmt.Errorf(
-			"transaction invocation failed when executing transaction: %w",
-			err)
+		return
+	}
+
+	var bodyTxnId state.NestedTransactionId
+	bodyTxnId, err = executor.txnState.BeginNestedTransaction()
+	if err != nil {
 		return
 	}
 
 	err = executor.txnBodyExecutor.Execute()
 	if err != nil {
-		err = fmt.Errorf(
-			"transaction invocation failed when executing transaction: %w",
-			err)
+		err = fmt.Errorf("transaction execute failed: %w", err)
 		return
 	}
 
-	// Before checking storage limits, we must applying all pending changes
+	// Before checking storage limits, we must apply all pending changes
 	// that may modify storage usage.
-	modifiedSets, err = executor.env.FlushPendingUpdates()
+	var contractUpdates environment.ContractUpdates
+	contractUpdates, err = executor.env.FlushPendingUpdates()
 	if err != nil {
 		err = fmt.Errorf(
 			"transaction invocation failed to flush pending changes from "+
@@ -300,27 +349,40 @@ func (executor *transactionExecutor) normalExecution() (
 		return
 	}
 
-	// log the execution intensities here, so that they do not contain data
-	// from storage limit checks and transaction deduction, because the payer
-	// is not charged for those.
-	executor.logExecutionIntensities()
-
-	executor.txnState.RunWithAllLimitsDisabled(func() {
-		err = executor.deductTransactionFees()
-	})
+	var bodySnapshot *snapshot.ExecutionSnapshot
+	bodySnapshot, err = executor.txnState.CommitNestedTransaction(bodyTxnId)
 	if err != nil {
 		return
 	}
+
+	invalidator = environment.NewDerivedDataInvalidator(
+		contractUpdates,
+		executor.ctx.Chain.ServiceAddress(),
+		bodySnapshot)
 
 	// Check if all account storage limits are ok
 	//
 	// disable the computation/memory limit checks on storage checks,
 	// so we don't error from computation/memory limits on this part.
-	// We cannot charge the user for this part, since fee deduction already happened.
+	//
+	// The storage limit check is performed for all accounts that were touched during the transaction.
+	// The storage capacity of an account depends on its balance and should be higher than the accounts storage used.
+	// The payer account is special cased in this check and its balance is considered max_fees lower than its
+	// actual balance, for the purpose of calculating storage capacity, because the payer will have to pay for this tx.
 	executor.txnState.RunWithAllLimitsDisabled(func() {
 		err = executor.CheckStorageLimits(
 			executor.env,
-			executor.txnState.UpdatedAddresses())
+			bodySnapshot,
+			executor.proc.Transaction.Payer,
+			maxTxFees)
+	})
+
+	if err != nil {
+		return
+	}
+
+	executor.txnState.RunWithAllLimitsDisabled(func() {
+		err = executor.deductTransactionFees()
 	})
 
 	return
@@ -328,9 +390,6 @@ func (executor *transactionExecutor) normalExecution() (
 
 // Clear changes and try to deduct fees again.
 func (executor *transactionExecutor) errorExecution() {
-	executor.txnState.DisableAllLimitEnforcements()
-	defer executor.txnState.EnableAllLimitEnforcements()
-
 	// log transaction as failed
 	executor.env.Logger().Info().
 		Err(executor.errs.ErrorOrNil()).
@@ -364,7 +423,7 @@ func (executor *transactionExecutor) errorExecution() {
 }
 
 func (executor *transactionExecutor) commit(
-	modifiedSets programsCache.ModifiedSetsInvalidator,
+	invalidator derived.TransactionInvalidator,
 ) error {
 	if executor.txnState.NumNestedTransactions() > 1 {
 		// This is a fvm internal programming error.  We forgot to call Commit
@@ -374,26 +433,18 @@ func (executor *transactionExecutor) commit(
 				"nested transactions.")
 	}
 
-	// if tx failed this will only contain fee deduction logs
-	executor.proc.Logs = append(executor.proc.Logs, executor.env.Logs()...)
-	executor.proc.ComputationUsed += executor.env.ComputationUsed()
-	executor.proc.MemoryEstimate += executor.env.MemoryEstimate()
-	if executor.proc.IsSampled() {
-		executor.proc.ComputationIntensities = executor.env.ComputationIntensities()
+	err := executor.output.PopulateEnvironmentValues(executor.env)
+	if err != nil {
+		return err
 	}
 
-	// if tx failed this will only contain fee deduction events
-	executor.proc.Events = append(executor.proc.Events, executor.env.Events()...)
-	executor.proc.ServiceEvents = append(
-		executor.proc.ServiceEvents,
-		executor.env.ServiceEvents()...)
-
-	// Based on various (e.g., contract and frozen account) updates, we decide
+	// Based on various (e.g., contract) updates, we decide
 	// how to clean up the derived data.  For failed transactions we also do
 	// the same as a successful transaction without any updates.
-	executor.derivedTxnData.AddInvalidator(modifiedSets)
+	executor.txnState.AddInvalidator(invalidator)
 
-	_, commitErr := executor.txnState.Commit(executor.nestedTxnId)
+	_, commitErr := executor.txnState.CommitNestedTransaction(
+		executor.nestedTxnId)
 	if commitErr != nil {
 		return fmt.Errorf(
 			"transaction invocation failed when merging state: %w",

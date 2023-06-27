@@ -72,7 +72,7 @@ func idsAndPeerInfos(t *testing.T) (flow.IdentityList, []peer.AddrInfo) {
 }
 
 func generateFlowNetworkingKey(s flow.Identifier) (crypto.PrivateKey, error) {
-	seed := make([]byte, crypto.KeyGenSeedMinLenECDSASecp256k1)
+	seed := make([]byte, crypto.KeyGenSeedMinLen)
 	copy(seed, s[:])
 	return crypto.GeneratePrivateKey(crypto.ECDSASecp256k1, seed)
 }

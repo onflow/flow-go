@@ -14,7 +14,7 @@ type attackState struct {
 
 // containsCorruptedChunkId returns true if corrupted result of this attack state contains a chunk with the given chunk id, and otherwise, false.
 func (a attackState) containsCorruptedChunkId(chunkId flow.Identifier) bool {
-	return flow.IdentifierList(flow.GetIDs(a.corruptedResult.Chunks)).Contains(chunkId)
+	return flow.GetIDs(a.corruptedResult.Chunks).Contains(chunkId)
 }
 
 // corruptedChunkIndexOf returns the chunk index of the corresponding corrupted chunk id.

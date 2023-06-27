@@ -1,4 +1,4 @@
-package environment
+package environment_test
 
 import (
 	"fmt"
@@ -12,13 +12,55 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/onflow/flow-go/fvm/errors"
-
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/crypto/hash"
-
+	"github.com/onflow/flow-go/fvm/environment"
+	"github.com/onflow/flow-go/fvm/errors"
+	"github.com/onflow/flow-go/fvm/tracing"
 	"github.com/onflow/flow-go/model/flow"
 )
+
+func TestAddEncodedAccountKey_error_handling_produces_valid_utf8(t *testing.T) {
+
+	akh := environment.NewAccountKeyUpdater(
+		tracing.NewTracerSpan(),
+		nil,
+		FakeAccounts{},
+		nil,
+		nil)
+
+	address := flow.BytesToAddress([]byte{1, 2, 3, 4})
+
+	// emulate encoded public key (which comes as a user input)
+	// containing bytes which are invalid UTF8
+
+	invalidEncodedKey := make([]byte, 64)
+	invalidUTF8 := []byte{0xc3, 0x28}
+	copy(invalidUTF8, invalidEncodedKey)
+	accountPublicKey := FakePublicKey{data: invalidEncodedKey}.toAccountPublicKey()
+
+	encodedPublicKey, err := flow.EncodeRuntimeAccountPublicKey(accountPublicKey)
+	require.NoError(t, err)
+
+	err = akh.InternalAddEncodedAccountKey(address, encodedPublicKey)
+	require.Error(t, err)
+
+	require.True(t, errors.IsValueError(err))
+
+	errorString := err.Error()
+	assert.True(t, utf8.ValidString(errorString))
+
+	// check if they can encoded and decoded using CBOR
+	marshalledBytes, err := cbor.Marshal(errorString)
+	require.NoError(t, err)
+
+	var unmarshalledString string
+
+	err = cbor.Unmarshal(marshalledBytes, &unmarshalledString)
+	require.NoError(t, err)
+
+	require.Equal(t, errorString, unmarshalledString)
+}
 
 func TestNewAccountKey_error_handling_produces_valid_utf8_and_sign_algo(t *testing.T) {
 
@@ -28,7 +70,11 @@ func TestNewAccountKey_error_handling_produces_valid_utf8_and_sign_algo(t *testi
 		SignAlgo:  invalidSignAlgo,
 	}
 
-	_, err := NewAccountPublicKey(publicKey, sema.HashAlgorithmSHA2_384, 0, 0)
+	_, err := environment.NewAccountPublicKey(
+		publicKey,
+		sema.HashAlgorithmSHA2_384,
+		0,
+		0)
 
 	require.True(t, errors.IsValueError(err))
 
@@ -58,7 +104,7 @@ func TestNewAccountKey_error_handling_produces_valid_utf8_and_hash_algo(t *testi
 
 	invalidHashAlgo := sema.HashAlgorithm(112)
 
-	_, err := NewAccountPublicKey(publicKey, invalidHashAlgo, 0, 0)
+	_, err := environment.NewAccountPublicKey(publicKey, invalidHashAlgo, 0, 0)
 
 	require.True(t, errors.IsValueError(err))
 
@@ -86,7 +132,11 @@ func TestNewAccountKey_error_handling_produces_valid_utf8(t *testing.T) {
 		SignAlgo:  runtime.SignatureAlgorithmECDSA_P256,
 	}
 
-	_, err := NewAccountPublicKey(publicKey, runtime.HashAlgorithmSHA2_256, 0, 0)
+	_, err := environment.NewAccountPublicKey(
+		publicKey,
+		runtime.HashAlgorithmSHA2_256,
+		0,
+		0)
 
 	require.True(t, errors.IsValueError(err))
 
@@ -140,7 +190,7 @@ type FakeAccounts struct {
 	keyCount uint64
 }
 
-var _ Accounts = &FakeAccounts{}
+var _ environment.Accounts = &FakeAccounts{}
 
 func (f FakeAccounts) Exists(address flow.Address) (bool, error)       { return true, nil }
 func (f FakeAccounts) Get(address flow.Address) (*flow.Account, error) { return &flow.Account{}, nil }
@@ -158,17 +208,18 @@ func (f FakeAccounts) GetPublicKey(address flow.Address, keyIndex uint64) (flow.
 func (f FakeAccounts) SetPublicKey(_ flow.Address, _ uint64, _ flow.AccountPublicKey) ([]byte, error) {
 	return nil, nil
 }
-func (f FakeAccounts) GetContractNames(_ flow.Address) ([]string, error)             { return nil, nil }
-func (f FakeAccounts) GetContract(_ string, _ flow.Address) ([]byte, error)          { return nil, nil }
-func (f FakeAccounts) ContractExists(_ string, _ flow.Address) (bool, error)         { return false, nil }
-func (f FakeAccounts) SetContract(_ string, _ flow.Address, _ []byte) error          { return nil }
-func (f FakeAccounts) DeleteContract(_ string, _ flow.Address) error                 { return nil }
-func (f FakeAccounts) Create(_ []flow.AccountPublicKey, _ flow.Address) error        { return nil }
-func (f FakeAccounts) GetValue(_ flow.Address, _ string) (flow.RegisterValue, error) { return nil, nil }
-func (f FakeAccounts) CheckAccountNotFrozen(_ flow.Address) error                    { return nil }
-func (f FakeAccounts) GetStorageUsed(_ flow.Address) (uint64, error)                 { return 0, nil }
-func (f FakeAccounts) SetValue(_ flow.Address, _ string, _ []byte) error             { return nil }
+func (f FakeAccounts) GetContractNames(_ flow.Address) ([]string, error)      { return nil, nil }
+func (f FakeAccounts) GetContract(_ string, _ flow.Address) ([]byte, error)   { return nil, nil }
+func (f FakeAccounts) ContractExists(_ string, _ flow.Address) (bool, error)  { return false, nil }
+func (f FakeAccounts) SetContract(_ string, _ flow.Address, _ []byte) error   { return nil }
+func (f FakeAccounts) DeleteContract(_ string, _ flow.Address) error          { return nil }
+func (f FakeAccounts) Create(_ []flow.AccountPublicKey, _ flow.Address) error { return nil }
+func (f FakeAccounts) GetValue(_ flow.RegisterID) (flow.RegisterValue, error) { return nil, nil }
+func (f FakeAccounts) GetStorageUsed(_ flow.Address) (uint64, error)          { return 0, nil }
+func (f FakeAccounts) SetValue(_ flow.RegisterID, _ []byte) error             { return nil }
 func (f FakeAccounts) AllocateStorageIndex(_ flow.Address) (atree.StorageIndex, error) {
 	return atree.StorageIndex{}, nil
 }
-func (f FakeAccounts) SetAccountFrozen(_ flow.Address, _ bool) error { return nil }
+func (f FakeAccounts) GenerateAccountLocalID(address flow.Address) (uint64, error) {
+	return 0, nil
+}

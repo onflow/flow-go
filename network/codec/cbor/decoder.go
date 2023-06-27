@@ -3,8 +3,6 @@
 package cbor
 
 import (
-	"fmt"
-
 	"github.com/fxamacker/cbor/v2"
 
 	"github.com/onflow/flow-go/network/codec"
@@ -32,11 +30,12 @@ func (d *Decoder) Decode() (interface{}, error) {
 		return nil, codec.NewInvalidEncodingErr(err)
 	}
 
-	if len(data) == 0 {
-		return nil, codec.NewInvalidEncodingErr(fmt.Errorf("empty data"))
+	msgCode, err := codec.MessageCodeFromPayload(data)
+	if err != nil {
+		return nil, err
 	}
 
-	msgInterface, what, err := codec.InterfaceFromMessageCode(data[0])
+	msgInterface, what, err := codec.InterfaceFromMessageCode(msgCode)
 	if err != nil {
 		return nil, err
 	}

@@ -7,7 +7,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestReusableCadanceRuntimePoolUnbuffered(t *testing.T) {
+func TestReusableCadenceRuntimePoolUnbuffered(t *testing.T) {
 	pool := NewReusableCadenceRuntimePool(0, runtime.Config{})
 	require.Nil(t, pool.pool)
 
@@ -22,7 +22,7 @@ func TestReusableCadanceRuntimePoolUnbuffered(t *testing.T) {
 	require.NotSame(t, entry, entry2)
 }
 
-func TestReusableCadanceRuntimePoolBuffered(t *testing.T) {
+func TestReusableCadenceRuntimePoolBuffered(t *testing.T) {
 	pool := NewReusableCadenceRuntimePool(100, runtime.Config{})
 	require.NotNil(t, pool.pool)
 
@@ -49,7 +49,7 @@ func TestReusableCadanceRuntimePoolBuffered(t *testing.T) {
 	require.Same(t, entry, entry2)
 }
 
-func TestReusableCadanceRuntimePoolSharing(t *testing.T) {
+func TestReusableCadenceRuntimePoolSharing(t *testing.T) {
 	pool := NewReusableCadenceRuntimePool(100, runtime.Config{})
 	require.NotNil(t, pool.pool)
 

@@ -5,6 +5,7 @@ import (
 )
 
 var (
+	// ErrNotFound is returned when a retrieved key does not exist in the database.
 	// Note: there is another not found error: badger.ErrKeyNotFound. The difference between
 	// badger.ErrKeyNotFound and storage.ErrNotFound is that:
 	// badger.ErrKeyNotFound is the error returned by the badger API.
@@ -12,6 +13,12 @@ var (
 	// return storage.ErrNotFound for not found error
 	ErrNotFound = errors.New("key not found")
 
+	// ErrAlreadyExists is returned when an insert attempts to set the value
+	// for a key that already exists. Inserts may only occur once per key,
+	// updates may overwrite an existing key without returning an error.
 	ErrAlreadyExists = errors.New("key already exists")
-	ErrDataMismatch  = errors.New("data for key is different")
+
+	// ErrDataMismatch is returned when a repeatable insert operation attempts
+	// to insert a different value for the same key.
+	ErrDataMismatch = errors.New("data for key is different")
 )

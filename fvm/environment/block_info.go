@@ -6,10 +6,11 @@ import (
 	"github.com/onflow/cadence/runtime"
 
 	"github.com/onflow/flow-go/fvm/errors"
-	"github.com/onflow/flow-go/fvm/state"
+	"github.com/onflow/flow-go/fvm/storage"
+	"github.com/onflow/flow-go/fvm/tracing"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/trace"
-	"github.com/onflow/flow-go/storage"
+	storageErr "github.com/onflow/flow-go/storage"
 )
 
 type BlockInfo interface {
@@ -27,12 +28,12 @@ type BlockInfo interface {
 }
 
 type ParseRestrictedBlockInfo struct {
-	txnState *state.TransactionState
+	txnState storage.TransactionPreparer
 	impl     BlockInfo
 }
 
 func NewParseRestrictedBlockInfo(
-	txnState *state.TransactionState,
+	txnState storage.TransactionPreparer,
 	impl BlockInfo,
 ) BlockInfo {
 	return ParseRestrictedBlockInfo{
@@ -75,7 +76,7 @@ func DefaultBlockInfoParams() BlockInfoParams {
 }
 
 type blockInfo struct {
-	tracer *Tracer
+	tracer tracing.TracerSpan
 	meter  Meter
 
 	blockHeader *flow.Header
@@ -83,7 +84,7 @@ type blockInfo struct {
 }
 
 func NewBlockInfo(
-	tracer *Tracer,
+	tracer tracing.TracerSpan,
 	meter Meter,
 	blockHeader *flow.Header,
 	blocks Blocks,
@@ -98,7 +99,7 @@ func NewBlockInfo(
 
 // GetCurrentBlockHeight returns the current block height.
 func (info *blockInfo) GetCurrentBlockHeight() (uint64, error) {
-	defer info.tracer.StartExtensiveTracingSpanFromRoot(
+	defer info.tracer.StartExtensiveTracingChildSpan(
 		trace.FVMEnvGetCurrentBlockHeight).End()
 
 	err := info.meter.MeterComputation(
@@ -122,7 +123,7 @@ func (info *blockInfo) GetBlockAtHeight(
 	bool,
 	error,
 ) {
-	defer info.tracer.StartSpanFromRoot(trace.FVMEnvGetBlockAtHeight).End()
+	defer info.tracer.StartChildSpan(trace.FVMEnvGetBlockAtHeight).End()
 
 	err := info.meter.MeterComputation(
 		ComputationKindGetBlockAtHeight,
@@ -144,7 +145,7 @@ func (info *blockInfo) GetBlockAtHeight(
 	header, err := info.blocks.ByHeightFrom(height, info.blockHeader)
 	// TODO (ramtin): remove dependency on storage and move this if condition
 	// to blockfinder
-	if errors.Is(err, storage.ErrNotFound) {
+	if errors.Is(err, storageErr.ErrNotFound) {
 		return runtime.Block{}, false, nil
 	} else if err != nil {
 		return runtime.Block{}, false, fmt.Errorf(

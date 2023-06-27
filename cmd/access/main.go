@@ -1,11 +1,13 @@
 package main
 
 import (
+	"github.com/onflow/flow-go/cmd"
 	nodebuilder "github.com/onflow/flow-go/cmd/access/node_builder"
+	"github.com/onflow/flow-go/model/flow"
 )
 
 func main() {
-	builder := nodebuilder.FlowAccessNode() // use the Access Node builder
+	builder := nodebuilder.FlowAccessNode(cmd.FlowNode(flow.RoleAccess.String()))
 
 	builder.PrintBuildVersionDetails()
 

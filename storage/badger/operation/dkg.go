@@ -15,6 +15,7 @@ import (
 // CAUTION: This method stores confidential information and should only be
 // used in the context of the secrets database. This is enforced in the above
 // layer (see storage.DKGState).
+// Error returns: storage.ErrAlreadyExists
 func InsertMyBeaconPrivateKey(epochCounter uint64, info *encodable.RandomBeaconPrivKey) func(*badger.Txn) error {
 	return insert(makePrefix(codeBeaconPrivateKey, epochCounter), info)
 }
@@ -24,18 +25,21 @@ func InsertMyBeaconPrivateKey(epochCounter uint64, info *encodable.RandomBeaconP
 // CAUTION: This method stores confidential information and should only be
 // used in the context of the secrets database. This is enforced in the above
 // layer (see storage.DKGState).
+// Error returns: storage.ErrNotFound
 func RetrieveMyBeaconPrivateKey(epochCounter uint64, info *encodable.RandomBeaconPrivKey) func(*badger.Txn) error {
 	return retrieve(makePrefix(codeBeaconPrivateKey, epochCounter), info)
 }
 
-// InsertDKGStartedForEpoch stores a flag indicating that the DKG has been started for
-// the given epoch.
+// InsertDKGStartedForEpoch stores a flag indicating that the DKG has been started for the given epoch.
+// Returns: storage.ErrAlreadyExists
+// Error returns: storage.ErrAlreadyExists
 func InsertDKGStartedForEpoch(epochCounter uint64) func(*badger.Txn) error {
 	return insert(makePrefix(codeDKGStarted, epochCounter), true)
 }
 
 // RetrieveDKGStartedForEpoch retrieves the DKG started flag for the given epoch.
-// If no flag is set, started is set to false.
+// If no flag is set, started is set to false and no error is returned.
+// No errors expected during normal operation.
 func RetrieveDKGStartedForEpoch(epochCounter uint64, started *bool) func(*badger.Txn) error {
 	return func(tx *badger.Txn) error {
 		err := retrieve(makePrefix(codeDKGStarted, epochCounter), started)(tx)
@@ -53,11 +57,13 @@ func RetrieveDKGStartedForEpoch(epochCounter uint64, started *bool) func(*badger
 }
 
 // InsertDKGEndStateForEpoch stores the DKG end state for the epoch.
+// Error returns: storage.ErrAlreadyExists
 func InsertDKGEndStateForEpoch(epochCounter uint64, endState flow.DKGEndState) func(*badger.Txn) error {
 	return insert(makePrefix(codeDKGEnded, epochCounter), endState)
 }
 
 // RetrieveDKGEndStateForEpoch retrieves the DKG end state for the epoch.
+// Error returns: storage.ErrNotFound
 func RetrieveDKGEndStateForEpoch(epochCounter uint64, endState *flow.DKGEndState) func(*badger.Txn) error {
 	return retrieve(makePrefix(codeDKGEnded, epochCounter), endState)
 }

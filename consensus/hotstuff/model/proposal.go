@@ -7,8 +7,9 @@ import (
 // Proposal represent a new proposed block within HotStuff (and thus a
 // a header in the bigger picture), signed by the proposer.
 type Proposal struct {
-	Block   *Block
-	SigData []byte
+	Block      *Block
+	SigData    []byte
+	LastViewTC *flow.TimeoutCertificate
 }
 
 // ProposerVote extracts the proposer vote from the proposal
@@ -23,15 +24,12 @@ func (p *Proposal) ProposerVote() *Vote {
 }
 
 // ProposalFromFlow turns a flow header into a hotstuff block type.
-func ProposalFromFlow(header *flow.Header, parentView uint64) *Proposal {
-
-	block := BlockFromFlow(header, parentView)
-
+func ProposalFromFlow(header *flow.Header) *Proposal {
 	proposal := Proposal{
-		Block:   block,
-		SigData: header.ProposerSigData,
+		Block:      BlockFromFlow(header),
+		SigData:    header.ProposerSigData,
+		LastViewTC: header.LastViewTC,
 	}
-
 	return &proposal
 }
 
@@ -44,10 +42,12 @@ func ProposalToFlow(proposal *Proposal) *flow.Header {
 		PayloadHash:        block.PayloadHash,
 		Timestamp:          block.Timestamp,
 		View:               block.View,
+		ParentView:         block.QC.View,
 		ParentVoterIndices: block.QC.SignerIndices,
 		ParentVoterSigData: block.QC.SigData,
 		ProposerID:         block.ProposerID,
 		ProposerSigData:    proposal.SigData,
+		LastViewTC:         proposal.LastViewTC,
 	}
 
 	return header

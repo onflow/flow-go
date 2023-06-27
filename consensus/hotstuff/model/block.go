@@ -1,6 +1,7 @@
 package model
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/onflow/flow-go/model/flow"
@@ -18,19 +19,11 @@ type Block struct {
 }
 
 // BlockFromFlow converts a flow header to a hotstuff block.
-func BlockFromFlow(header *flow.Header, parentView uint64) *Block {
-
-	qc := flow.QuorumCertificate{
-		BlockID:       header.ParentID,
-		View:          parentView,
-		SignerIndices: header.ParentVoterIndices,
-		SigData:       header.ParentVoterSigData,
-	}
-
+func BlockFromFlow(header *flow.Header) *Block {
 	block := Block{
 		BlockID:     header.ID(),
 		View:        header.View,
-		QC:          &qc,
+		QC:          header.QuorumCertificate(),
 		ProposerID:  header.ProposerID,
 		PayloadHash: header.PayloadHash,
 		Timestamp:   header.Timestamp,
@@ -51,4 +44,38 @@ func GenesisBlockFromFlow(header *flow.Header) *Block {
 		Timestamp:   header.Timestamp,
 	}
 	return genesis
+}
+
+// CertifiedBlock holds a certified block, which is a block and a QC that is pointing to
+// the block. A QC is the aggregated form of votes from a supermajority of HotStuff and
+// therefore proves validity of the block. A certified block satisfies:
+// Block.View == QC.View and Block.BlockID == QC.BlockID
+type CertifiedBlock struct {
+	Block        *Block
+	CertifyingQC *flow.QuorumCertificate
+}
+
+// NewCertifiedBlock constructs a new certified block. It checks the consistency
+// requirements and returns an exception otherwise:
+//
+//	Block.View == QC.View and Block.BlockID == QC.BlockID
+func NewCertifiedBlock(block *Block, qc *flow.QuorumCertificate) (CertifiedBlock, error) {
+	if block.View != qc.View {
+		return CertifiedBlock{}, fmt.Errorf("block's view (%d) should equal the qc's view (%d)", block.View, qc.View)
+	}
+	if block.BlockID != qc.BlockID {
+		return CertifiedBlock{}, fmt.Errorf("block's ID (%v) should equal the block referenced by the qc (%d)", block.BlockID, qc.BlockID)
+	}
+	return CertifiedBlock{Block: block, CertifyingQC: qc}, nil
+}
+
+// ID returns unique identifier for the block.
+// To avoid repeated computation, we use value from the QC.
+func (b *CertifiedBlock) ID() flow.Identifier {
+	return b.Block.BlockID
+}
+
+// View returns view where the block was proposed.
+func (b *CertifiedBlock) View() uint64 {
+	return b.Block.View
 }

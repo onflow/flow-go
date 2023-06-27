@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"sync"
+	"time"
 
 	"github.com/rs/zerolog"
 
@@ -11,10 +12,12 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/common/fifoqueue"
-	"github.com/onflow/flow-go/engine/consensus/sealing/counters"
+	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/component"
+	"github.com/onflow/flow-go/module/counters"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/mempool"
+	"github.com/onflow/flow-go/module/metrics"
 )
 
 // defaultVoteAggregatorWorkers number of workers to dispatch events for vote aggregators
@@ -23,19 +26,25 @@ const defaultVoteAggregatorWorkers = 8
 // defaultVoteQueueCapacity maximum capacity of buffering unprocessed votes
 const defaultVoteQueueCapacity = 1000
 
+// defaultBlockQueueCapacity maximum capacity of buffering unprocessed blocks
+const defaultBlockQueueCapacity = 1000
+
 // VoteAggregator stores the votes and aggregates them into a QC when enough votes have been collected
 // VoteAggregator is designed in a way that it can aggregate votes for collection & consensus clusters
 // that is why implementation relies on dependency injection.
 type VoteAggregator struct {
 	*component.ComponentManager
 	log                        zerolog.Logger
-	notifier                   hotstuff.Consumer
+	hotstuffMetrics            module.HotstuffMetrics
+	engineMetrics              module.EngineMetrics
+	notifier                   hotstuff.VoteAggregationViolationConsumer
 	lowestRetainedView         counters.StrictMonotonousCounter // lowest view, for which we still process votes
 	collectors                 hotstuff.VoteCollectors
-	queuedVotesNotifier        engine.Notifier
+	queuedMessagesNotifier     engine.Notifier
 	finalizationEventsNotifier engine.Notifier
 	finalizedView              counters.StrictMonotonousCounter // cache the last finalized view to queue up the pruning work, and unblock the caller who's delivering the finalization event.
 	queuedVotes                *fifoqueue.FifoQueue
+	queuedBlocks               *fifoqueue.FifoQueue
 }
 
 var _ hotstuff.VoteAggregator = (*VoteAggregator)(nil)
@@ -46,24 +55,36 @@ var _ component.Component = (*VoteAggregator)(nil)
 // different voting formats of main Consensus vs Collector consensus.
 func NewVoteAggregator(
 	log zerolog.Logger,
-	notifier hotstuff.Consumer,
+	hotstuffMetrics module.HotstuffMetrics,
+	engineMetrics module.EngineMetrics,
+	mempoolMetrics module.MempoolMetrics,
+	notifier hotstuff.VoteAggregationViolationConsumer,
 	lowestRetainedView uint64,
 	collectors hotstuff.VoteCollectors,
 ) (*VoteAggregator, error) {
 
-	queuedVotes, err := fifoqueue.NewFifoQueue(fifoqueue.WithCapacity(defaultVoteQueueCapacity))
+	queuedVotes, err := fifoqueue.NewFifoQueue(defaultVoteQueueCapacity,
+		fifoqueue.WithLengthObserver(func(len int) { mempoolMetrics.MempoolEntries(metrics.ResourceBlockVoteQueue, uint(len)) }))
 	if err != nil {
 		return nil, fmt.Errorf("could not initialize votes queue")
 	}
 
+	queuedBlocks, err := fifoqueue.NewFifoQueue(defaultBlockQueueCapacity) // TODO metrics
+	if err != nil {
+		return nil, fmt.Errorf("could not initialize blocks queue")
+	}
+
 	aggregator := &VoteAggregator{
-		log:                        log,
+		log:                        log.With().Str("component", "hotstuff.vote_aggregator").Logger(),
+		hotstuffMetrics:            hotstuffMetrics,
+		engineMetrics:              engineMetrics,
 		notifier:                   notifier,
 		lowestRetainedView:         counters.NewMonotonousCounter(lowestRetainedView),
 		finalizedView:              counters.NewMonotonousCounter(lowestRetainedView),
 		collectors:                 collectors,
 		queuedVotes:                queuedVotes,
-		queuedVotesNotifier:        engine.NewNotifier(),
+		queuedBlocks:               queuedBlocks,
+		queuedMessagesNotifier:     engine.NewNotifier(),
 		finalizationEventsNotifier: engine.NewNotifier(),
 	}
 
@@ -71,11 +92,11 @@ func NewVoteAggregator(
 	componentBuilder := component.NewComponentManagerBuilder()
 	var wg sync.WaitGroup
 	wg.Add(defaultVoteAggregatorWorkers)
-	for i := 0; i < defaultVoteAggregatorWorkers; i++ { // manager for worker routines that process inbound votes
+	for i := 0; i < defaultVoteAggregatorWorkers; i++ { // manager for worker routines that process inbound messages
 		componentBuilder.AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+			defer wg.Done()
 			ready()
-			aggregator.queuedVotesProcessingLoop(ctx)
-			wg.Done()
+			aggregator.queuedMessagesProcessingLoop(ctx)
 		})
 	}
 	componentBuilder.AddWorker(func(_ irrecoverable.SignalerContext, ready component.ReadyFunc) {
@@ -106,23 +127,26 @@ func NewVoteAggregator(
 	return aggregator, nil
 }
 
-func (va *VoteAggregator) queuedVotesProcessingLoop(ctx irrecoverable.SignalerContext) {
-	notifier := va.queuedVotesNotifier.Channel()
+func (va *VoteAggregator) queuedMessagesProcessingLoop(ctx irrecoverable.SignalerContext) {
+	notifier := va.queuedMessagesNotifier.Channel()
 	for {
 		select {
 		case <-ctx.Done():
 			return
 		case <-notifier:
-			err := va.processQueuedVoteEvents(ctx)
+			err := va.processQueuedMessages(ctx)
 			if err != nil {
-				ctx.Throw(fmt.Errorf("internal error processing queued vote events: %w", err))
+				ctx.Throw(fmt.Errorf("internal error processing queued messages: %w", err))
 				return
 			}
 		}
 	}
 }
 
-func (va *VoteAggregator) processQueuedVoteEvents(ctx context.Context) error {
+// processQueuedMessages is a function which dispatches previously queued messages on worker thread
+// This function is called whenever we have queued messages ready to be dispatched.
+// No errors are expected during normal operations.
+func (va *VoteAggregator) processQueuedMessages(ctx context.Context) error {
 	for {
 		select {
 		case <-ctx.Done():
@@ -130,19 +154,29 @@ func (va *VoteAggregator) processQueuedVoteEvents(ctx context.Context) error {
 		default:
 		}
 
-		msg, ok := va.queuedVotes.Pop()
+		msg, ok := va.queuedBlocks.Pop()
 		if ok {
-			vote := msg.(*model.Vote)
-			err := va.processQueuedVote(vote)
+			block := msg.(*model.Proposal)
+			err := va.processQueuedBlock(block)
 			if err != nil {
-				return fmt.Errorf("could not process pending vote %v: %w", vote.ID(), err)
+				return fmt.Errorf("could not process pending block %v: %w", block.Block.BlockID, err)
 			}
 
-			va.log.Info().
-				Uint64("view", vote.View).
-				Hex("block_id", vote.BlockID[:]).
-				Str("vote_id", vote.ID().String()).
-				Msg("vote has been processed successfully")
+			continue
+		}
+
+		msg, ok = va.queuedVotes.Pop()
+		if ok {
+			vote := msg.(*model.Vote)
+			startTime := time.Now()
+			err := va.processQueuedVote(vote)
+			// report duration of processing one vote
+			va.hotstuffMetrics.VoteProcessingDuration(time.Since(startTime))
+			va.engineMetrics.MessageHandled(metrics.EngineVoteAggregator, metrics.MessageBlockVote)
+
+			if err != nil {
+				return fmt.Errorf("could not process pending vote %v for block %v: %w", vote.ID(), vote.BlockID, err)
+			}
 
 			continue
 		}
@@ -157,73 +191,52 @@ func (va *VoteAggregator) processQueuedVoteEvents(ctx context.Context) error {
 // concurrent goroutines.
 func (va *VoteAggregator) processQueuedVote(vote *model.Vote) error {
 	collector, created, err := va.collectors.GetOrCreateCollector(vote.View)
-	if created {
-		va.log.Info().Uint64("view", vote.View).Msg("vote collector is created by processing vote")
-	}
-
 	if err != nil {
 		// ignore if our routine is outdated and some other one has pruned collectors
-		if mempool.IsDecreasingPruningHeightError(err) {
+		if mempool.IsBelowPrunedThresholdError(err) {
 			return nil
 		}
 		return fmt.Errorf("could not get collector for view %d: %w",
 			vote.View, err)
 	}
+	if created {
+		va.log.Info().Uint64("view", vote.View).Msg("vote collector is created by processing vote")
+	}
+
 	err = collector.AddVote(vote)
 	if err != nil {
-		if model.IsDoubleVoteError(err) {
-			doubleVoteErr := err.(model.DoubleVoteError)
-			va.notifier.OnDoubleVotingDetected(doubleVoteErr.FirstVote, doubleVoteErr.ConflictingVote)
-			return nil
-		}
-
 		return fmt.Errorf("could not process vote for view %d, blockID %v: %w",
 			vote.View, vote.BlockID, err)
 	}
 
+	va.log.Info().
+		Uint64("view", vote.View).
+		Hex("block_id", vote.BlockID[:]).
+		Str("vote_id", vote.ID().String()).
+		Msg("vote has been processed successfully")
+
 	return nil
 }
 
-// AddVote checks if vote is stale and appends vote into processing queue
-// actual vote processing will be called in other dispatching goroutine.
-func (va *VoteAggregator) AddVote(vote *model.Vote) {
-	// drop stale votes
-	if vote.View < va.lowestRetainedView.Value() {
-
-		va.log.Info().
-			Uint64("block_view", vote.View).
-			Hex("block_id", vote.BlockID[:]).
-			Hex("voter", vote.SignerID[:]).
-			Str("vote_id", vote.ID().String()).
-			Msg("drop stale votes")
-
-		return
-	}
-
-	// It's ok to silently drop votes in case our processing pipeline is full.
-	// It means that we are probably catching up.
-	if ok := va.queuedVotes.Push(vote); ok {
-		va.queuedVotesNotifier.Notify()
-	}
-}
-
-// AddBlock notifies the VoteAggregator about a known block so that it can start processing
-// pending votes whose block was unknown.
-// It also verifies the proposer vote of a block, and return whether the proposer signature is valid.
-// Expected error returns during normal operations:
-// * model.InvalidBlockError if the proposer's vote for its own block is invalid
-// * mempool.DecreasingPruningHeightError if the block's view has already been pruned
-func (va *VoteAggregator) AddBlock(block *model.Proposal) error {
+// processQueuedBlock performs actual processing of queued block proposals, this method is called from multiple
+// concurrent goroutines.
+// CAUTION: we expect that the input block's validity has been confirmed prior to calling AddBlock,
+// including the proposer's signature. Otherwise, VoteAggregator might crash or exhibit undefined
+// behaviour.
+// No errors are expected during normal operation.
+func (va *VoteAggregator) processQueuedBlock(block *model.Proposal) error {
 	// check if the block is for a view that has already been pruned (and is thus stale)
 	if block.Block.View < va.lowestRetainedView.Value() {
-		return mempool.NewDecreasingPruningHeightErrorf("block proposal for view %d is stale, lowestRetainedView is %d", block.Block.View, va.lowestRetainedView.Value())
+		return nil
 	}
 
 	collector, created, err := va.collectors.GetOrCreateCollector(block.Block.View)
 	if err != nil {
+		if mempool.IsBelowPrunedThresholdError(err) {
+			return nil
+		}
 		return fmt.Errorf("could not get or create collector for block %v: %w", block.Block.BlockID, err)
 	}
-
 	if created {
 		va.log.Info().
 			Uint64("view", block.Block.View).
@@ -233,16 +246,66 @@ func (va *VoteAggregator) AddBlock(block *model.Proposal) error {
 
 	err = collector.ProcessBlock(block)
 	if err != nil {
+		if model.IsInvalidProposalError(err) {
+			// We are attempting process a block which is invalid
+			// This should never happen, because any component that feeds blocks into VoteAggregator
+			// needs to make sure that it's submitting for processing ONLY valid blocks.
+			return fmt.Errorf("received invalid block for processing %v at view %d", block.Block.BlockID, block.Block.View)
+		}
 		return fmt.Errorf("could not process block: %v, %w", block.Block.BlockID, err)
 	}
+
+	va.log.Info().
+		Uint64("view", block.Block.View).
+		Hex("block_id", block.Block.BlockID[:]).
+		Msg("block has been processed successfully")
 
 	return nil
 }
 
+// AddVote checks if vote is stale and appends vote into processing queue
+// actual vote processing will be called in other dispatching goroutine.
+func (va *VoteAggregator) AddVote(vote *model.Vote) {
+	log := va.log.With().Uint64("block_view", vote.View).
+		Hex("block_id", vote.BlockID[:]).
+		Hex("voter", vote.SignerID[:]).
+		Str("vote_id", vote.ID().String()).Logger()
+	// drop stale votes
+	if vote.View < va.lowestRetainedView.Value() {
+		log.Debug().Msg("drop stale votes")
+		va.engineMetrics.InboundMessageDropped(metrics.EngineVoteAggregator, metrics.MessageBlockVote)
+		return
+	}
+
+	// It's ok to silently drop votes in case our processing pipeline is full.
+	// It means that we are probably catching up.
+	if ok := va.queuedVotes.Push(vote); ok {
+		va.queuedMessagesNotifier.Notify()
+	} else {
+		log.Info().Msg("no queue capacity, dropping vote")
+		va.engineMetrics.InboundMessageDropped(metrics.EngineVoteAggregator, metrics.MessageBlockVote)
+	}
+}
+
+// AddBlock notifies the VoteAggregator that it should start processing votes for the given block.
+// The input block is queued internally within the `VoteAggregator` and processed _asynchronously_
+// by the VoteAggregator's internal worker routines.
+// CAUTION: we expect that the input block's validity has been confirmed prior to calling AddBlock,
+// including the proposer's signature. Otherwise, VoteAggregator might crash or exhibit undefined
+// behaviour.
+func (va *VoteAggregator) AddBlock(block *model.Proposal) {
+	// It's ok to silently drop blocks in case our processing pipeline is full.
+	// It means that we are probably catching up.
+	if ok := va.queuedBlocks.Push(block); ok {
+		va.queuedMessagesNotifier.Notify()
+	} else {
+		va.log.Debug().Msgf("dropping block %x because queue is full", block.Block.BlockID)
+	}
+}
+
 // InvalidBlock notifies the VoteAggregator about an invalid proposal, so that it
-// can process votes for the invalid block and slash the voters. Expected error
-// returns during normal operations:
-// * mempool.DecreasingPruningHeightError if proposal's view has already been pruned
+// can process votes for the invalid block and slash the voters.
+// No errors are expected during normal operations
 func (va *VoteAggregator) InvalidBlock(proposal *model.Proposal) error {
 	slashingVoteConsumer := func(vote *model.Vote) {
 		if proposal.Block.BlockID == vote.BlockID {
@@ -254,7 +317,7 @@ func (va *VoteAggregator) InvalidBlock(proposal *model.Proposal) error {
 	collector, _, err := va.collectors.GetOrCreateCollector(block.View)
 	if err != nil {
 		// ignore if our routine is outdated and some other one has pruned collectors
-		if mempool.IsDecreasingPruningHeightError(err) {
+		if mempool.IsBelowPrunedThresholdError(err) {
 			return nil
 		}
 		return fmt.Errorf("could not retrieve vote collector for view %d: %w", block.View, err)
@@ -276,8 +339,7 @@ func (va *VoteAggregator) PruneUpToView(lowestRetainedView uint64) {
 }
 
 // OnFinalizedBlock implements the `OnFinalizedBlock` callback from the `hotstuff.FinalizationConsumer`
-//
-// (1) Informs sealing.Core about finalization of respective block.
+// It informs sealing.Core about finalization of respective block.
 //
 // CAUTION: the input to this callback is treated as trusted; precautions should be taken that messages
 // from external nodes cannot be considered as inputs to this function

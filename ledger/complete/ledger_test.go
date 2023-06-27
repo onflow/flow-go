@@ -7,7 +7,6 @@ import (
 	"math"
 	"math/rand"
 	"testing"
-	"time"
 
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
@@ -591,7 +590,6 @@ func TestLedgerFunctionality(t *testing.T) {
 		checkpointsToKeep  = 1
 	)
 
-	rand.Seed(time.Now().UnixNano())
 	// You can manually increase this for more coverage
 	experimentRep := 2
 	metricsCollector := &metrics.NoopCollector{}
@@ -705,182 +703,6 @@ func TestLedgerFunctionality(t *testing.T) {
 	}
 }
 
-func Test_ExportCheckpointAt(t *testing.T) {
-	for _, version := range []int{5, 6} {
-		t.Run(fmt.Sprintf("noop migration version %v", version), func(t *testing.T) {
-			// the exported state has two key/value pairs
-			// (/1/1/22/2, "A") and (/1/3/22/4, "B")
-			// this tests the migration at the specific state
-			// without any special migration so we expect both
-			// register to show up in the new trie and with the same values
-			unittest.RunWithTempDir(t, func(dbDir string) {
-				unittest.RunWithTempDir(t, func(dir2 string) {
-
-					const (
-						capacity           = 100
-						checkpointDistance = math.MaxInt // A large number to prevent checkpoint creation.
-						checkpointsToKeep  = 1
-					)
-
-					diskWal, err := wal.NewDiskWAL(zerolog.Nop(), nil, metrics.NewNoopCollector(), dbDir, capacity, pathfinder.PathByteSize, wal.SegmentSize)
-					require.NoError(t, err)
-					led, err := complete.NewLedger(diskWal, capacity, &metrics.NoopCollector{}, zerolog.Logger{}, complete.DefaultPathFinderVersion)
-					require.NoError(t, err)
-					compactor, err := complete.NewCompactor(led, diskWal, zerolog.Nop(), capacity, checkpointDistance, checkpointsToKeep, atomic.NewBool(false))
-					require.NoError(t, err)
-					<-compactor.Ready()
-
-					state := led.InitialState()
-					u := testutils.UpdateFixture()
-					u.SetState(state)
-
-					state, _, err = led.Set(u)
-					require.NoError(t, err)
-
-					newState, err := led.ExportCheckpointAt(state, []ledger.Migration{noOpMigration}, []ledger.Reporter{}, []ledger.Reporter{}, complete.DefaultPathFinderVersion, dir2, "root.checkpoint", version)
-					require.NoError(t, err)
-					assert.Equal(t, newState, state)
-
-					diskWal2, err := wal.NewDiskWAL(zerolog.Nop(), nil, metrics.NewNoopCollector(), dir2, capacity, pathfinder.PathByteSize, wal.SegmentSize)
-					require.NoError(t, err)
-					led2, err := complete.NewLedger(diskWal2, capacity, &metrics.NoopCollector{}, zerolog.Logger{}, complete.DefaultPathFinderVersion)
-					require.NoError(t, err)
-					compactor2, err := complete.NewCompactor(led2, diskWal2, zerolog.Nop(), capacity, checkpointDistance, checkpointsToKeep, atomic.NewBool(false))
-					require.NoError(t, err)
-					<-compactor2.Ready()
-
-					q, err := ledger.NewQuery(state, u.Keys())
-					require.NoError(t, err)
-
-					retValues, err := led2.Get(q)
-					require.NoError(t, err)
-
-					for i, v := range u.Values() {
-						assert.Equal(t, v, retValues[i])
-					}
-
-					<-led.Done()
-					<-compactor.Done()
-					<-led2.Done()
-					<-compactor2.Done()
-				})
-			})
-		})
-		t.Run(fmt.Sprintf("migration by value: version %v", version), func(t *testing.T) {
-			// the exported state has two key/value pairs
-			// ("/1/1/22/2", "A") and ("/1/3/22/4", "B")
-			// during the migration we change all keys with value "A" to "C"
-			// so in this case the resulting exported trie is ("/1/1/22/2", "C"), ("/1/3/22/4", "B")
-			unittest.RunWithTempDir(t, func(dbDir string) {
-				unittest.RunWithTempDir(t, func(dir2 string) {
-
-					const (
-						capacity           = 100
-						checkpointDistance = math.MaxInt // A large number to prevent checkpoint creation.
-						checkpointsToKeep  = 1
-					)
-
-					diskWal, err := wal.NewDiskWAL(zerolog.Nop(), nil, metrics.NewNoopCollector(), dbDir, capacity, pathfinder.PathByteSize, wal.SegmentSize)
-					require.NoError(t, err)
-					led, err := complete.NewLedger(diskWal, capacity, &metrics.NoopCollector{}, zerolog.Logger{}, complete.DefaultPathFinderVersion)
-					require.NoError(t, err)
-					compactor, err := complete.NewCompactor(led, diskWal, zerolog.Nop(), capacity, checkpointDistance, checkpointsToKeep, atomic.NewBool(false))
-					require.NoError(t, err)
-					<-compactor.Ready()
-
-					state := led.InitialState()
-					u := testutils.UpdateFixture()
-					u.SetState(state)
-
-					state, _, err = led.Set(u)
-					require.NoError(t, err)
-
-					newState, err := led.ExportCheckpointAt(state, []ledger.Migration{migrationByValue}, []ledger.Reporter{}, []ledger.Reporter{}, complete.DefaultPathFinderVersion, dir2, "root.checkpoint", version)
-					require.NoError(t, err)
-
-					diskWal2, err := wal.NewDiskWAL(zerolog.Nop(), nil, metrics.NewNoopCollector(), dir2, capacity, pathfinder.PathByteSize, wal.SegmentSize)
-					require.NoError(t, err)
-					led2, err := complete.NewLedger(diskWal2, capacity, &metrics.NoopCollector{}, zerolog.Logger{}, complete.DefaultPathFinderVersion)
-					require.NoError(t, err)
-					compactor2, err := complete.NewCompactor(led2, diskWal2, zerolog.Nop(), capacity, checkpointDistance, checkpointsToKeep, atomic.NewBool(false))
-					require.NoError(t, err)
-					<-compactor2.Ready()
-
-					q, err := ledger.NewQuery(newState, u.Keys())
-					require.NoError(t, err)
-
-					retValues, err := led2.Get(q)
-					require.NoError(t, err)
-
-					assert.Equal(t, retValues[0], ledger.Value([]byte{'C'}))
-					assert.Equal(t, retValues[1], ledger.Value([]byte{'B'}))
-
-					<-led.Done()
-					<-compactor.Done()
-					<-led2.Done()
-					<-compactor2.Done()
-				})
-			})
-		})
-		t.Run(fmt.Sprintf("migration by key: version %v", version), func(t *testing.T) {
-			// the exported state has two key/value pairs
-			// ("/1/1/22/2", "A") and ("/1/3/22/4", "B")
-			// during the migration we change the value to "D" for key "zero"
-			// so in this case the resulting exported trie is ("/1/1/22/2", "D"), ("/1/3/22/4", "B")
-			unittest.RunWithTempDir(t, func(dbDir string) {
-				unittest.RunWithTempDir(t, func(dir2 string) {
-
-					const (
-						capacity           = 100
-						checkpointDistance = math.MaxInt // A large number to prevent checkpoint creation.
-						checkpointsToKeep  = 1
-					)
-
-					diskWal, err := wal.NewDiskWAL(zerolog.Nop(), nil, metrics.NewNoopCollector(), dbDir, capacity, pathfinder.PathByteSize, wal.SegmentSize)
-					require.NoError(t, err)
-					led, err := complete.NewLedger(diskWal, capacity, &metrics.NoopCollector{}, zerolog.Logger{}, complete.DefaultPathFinderVersion)
-					require.NoError(t, err)
-					compactor, err := complete.NewCompactor(led, diskWal, zerolog.Nop(), capacity, checkpointDistance, checkpointsToKeep, atomic.NewBool(false))
-					require.NoError(t, err)
-					<-compactor.Ready()
-
-					state := led.InitialState()
-					u := testutils.UpdateFixture()
-					u.SetState(state)
-
-					state, _, err = led.Set(u)
-					require.NoError(t, err)
-
-					newState, err := led.ExportCheckpointAt(state, []ledger.Migration{migrationByKey}, []ledger.Reporter{}, []ledger.Reporter{}, complete.DefaultPathFinderVersion, dir2, "root.checkpoint", version)
-					require.NoError(t, err)
-
-					diskWal2, err := wal.NewDiskWAL(zerolog.Nop(), nil, metrics.NewNoopCollector(), dir2, capacity, pathfinder.PathByteSize, wal.SegmentSize)
-					require.NoError(t, err)
-					led2, err := complete.NewLedger(diskWal2, capacity, &metrics.NoopCollector{}, zerolog.Logger{}, complete.DefaultPathFinderVersion)
-					require.NoError(t, err)
-					compactor2, err := complete.NewCompactor(led2, diskWal2, zerolog.Nop(), capacity, checkpointDistance, checkpointsToKeep, atomic.NewBool(false))
-					require.NoError(t, err)
-					<-compactor2.Ready()
-
-					q, err := ledger.NewQuery(newState, u.Keys())
-					require.NoError(t, err)
-
-					retValues, err := led2.Get(q)
-					require.NoError(t, err)
-
-					assert.Equal(t, retValues[0], ledger.Value([]byte{'D'}))
-					assert.Equal(t, retValues[1], ledger.Value([]byte{'B'}))
-
-					<-led.Done()
-					<-compactor.Done()
-					<-led2.Done()
-					<-compactor2.Done()
-				})
-			})
-		})
-	}
-}
-
 func TestWALUpdateFailuresBubbleUp(t *testing.T) {
 	unittest.RunWithTempDir(t, func(dir string) {
 
@@ -989,5 +811,6 @@ func migrationByKey(p []ledger.Payload) ([]ledger.Payload, error) {
 			ret = append(ret, p)
 		}
 	}
+
 	return ret, nil
 }

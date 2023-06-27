@@ -166,19 +166,6 @@ func (b *Backend) Clear() {
 	b.backData.Clear()
 }
 
-// Hash will use a merkle root hash to hash all items.
-func (b *Backend) Hash() flow.Identifier {
-	//bs1 := binstat.EnterTime(binstat.BinStdmap + ".r_lock.(Backend)Hash")
-	b.RLock()
-	//binstat.Leave(bs1)
-
-	//bs2 := binstat.EnterTime(binstat.BinStdmap + ".inlock.(Backend)Hash")
-	//defer binstat.Leave(bs2)
-	defer b.RUnlock()
-	identifier := b.backData.Hash()
-	return identifier
-}
-
 // RegisterEjectionCallbacks adds the provided OnEjection callbacks
 func (b *Backend) RegisterEjectionCallbacks(callbacks ...mempool.OnEjection) {
 	//bs1 := binstat.EnterTime(binstat.BinStdmap + ".r_lock.(Backend)RegisterEjectionCallbacks")

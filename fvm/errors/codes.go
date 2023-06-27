@@ -24,6 +24,8 @@ const (
 	// Deprecated: No longer used.
 	FailureCodeHasherFailure                           ErrorCode = 2005
 	FailureCodeParseRestrictedModeInvalidAccessFailure ErrorCode = 2006
+	FailureCodePayerBalanceCheckFailure                ErrorCode = 2007
+	FailureCodeDerivedDataCacheImplementationFailure   ErrorCode = 2008
 	// Deprecated: No longer used.
 	FailureCodeMetaTransactionFailure ErrorCode = 2100
 )
@@ -78,7 +80,9 @@ const (
 	ErrCodeScriptExecutionCancelledError             ErrorCode = 1114
 	ErrCodeScriptExecutionTimedOutError              ErrorCode = 1113
 	ErrCodeEventEncodingError                        ErrorCode = 1115
-	ErrCodeInvalidFVMStateAccessError                ErrorCode = 1116
+	ErrCodeInvalidInternalStateAccessError           ErrorCode = 1116
+	// 1117 was never deployed and is free to use
+	ErrCodeInsufficientPayerBalance ErrorCode = 1118
 
 	// accounts errors 1200 - 1250
 	// Deprecated: No longer used.
@@ -86,7 +90,8 @@ const (
 	ErrCodeAccountNotFoundError          ErrorCode = 1201
 	ErrCodeAccountPublicKeyNotFoundError ErrorCode = 1202
 	ErrCodeAccountAlreadyExistsError     ErrorCode = 1203
-	ErrCodeFrozenAccountError            ErrorCode = 1204
+	// Deprecated: No longer used.
+	ErrCodeFrozenAccountError ErrorCode = 1204
 	// Deprecated: No longer used.
 	ErrCodeAccountStorageNotInitializedError ErrorCode = 1205
 	ErrCodeAccountPublicKeyLimitError        ErrorCode = 1206

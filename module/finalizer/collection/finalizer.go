@@ -52,6 +52,7 @@ func NewFinalizer(
 // included in a block proposal. Between entering the non-finalized chain state
 // and being finalized, entities should be present in both the volatile memory
 // pools and persistent storage.
+// No errors are expected during normal operation.
 func (f *Finalizer) MakeFinal(blockID flow.Identifier) error {
 	return operation.RetryOnConflict(f.db.Update, func(tx *badger.Txn) error {
 
@@ -172,14 +173,4 @@ func (f *Finalizer) MakeFinal(blockID flow.Identifier) error {
 
 		return nil
 	})
-}
-
-// MakeValid marks a block as having passed HotStuff validation.
-func (f *Finalizer) MakeValid(blockID flow.Identifier) error {
-	return operation.RetryOnConflict(
-		f.db.Update,
-		operation.SkipDuplicates(
-			operation.InsertBlockValidity(blockID, true),
-		),
-	)
 }

@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"google.golang.org/grpc/connectivity"
+	"google.golang.org/grpc/credentials/insecure"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -62,8 +63,8 @@ func (h *FlowAccessAPIForwarder) reconnectingClient(i int) error {
 		if identity.NetworkPubKey == nil {
 			connection, err = grpc.Dial(
 				identity.Address,
-				grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(grpcutils.DefaultMaxMsgSize)),
-				grpc.WithInsecure(), //nolint:staticcheck
+				grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(int(h.maxMsgSize))),
+				grpc.WithTransportCredentials(insecure.NewCredentials()),
 				backend.WithClientUnaryInterceptor(timeout))
 			if err != nil {
 				return err
@@ -76,7 +77,7 @@ func (h *FlowAccessAPIForwarder) reconnectingClient(i int) error {
 
 			connection, err = grpc.Dial(
 				identity.Address,
-				grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(grpcutils.DefaultMaxMsgSize)),
+				grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(int(h.maxMsgSize))),
 				grpc.WithTransportCredentials(credentials.NewTLS(tlsConfig)),
 				backend.WithClientUnaryInterceptor(timeout))
 			if err != nil {
@@ -137,6 +138,12 @@ func (h *FlowAccessAPIForwarder) faultTolerantClient() (access.AccessAPIClient, 
 func (h *FlowAccessAPIRouter) Ping(context context.Context, req *access.PingRequest) (*access.PingResponse, error) {
 	h.log("observer", "Ping", nil)
 	return &access.PingResponse{}, nil
+}
+
+func (h *FlowAccessAPIRouter) GetNodeVersionInfo(ctx context.Context, request *access.GetNodeVersionInfoRequest) (*access.GetNodeVersionInfoResponse, error) {
+	res, err := h.Observer.GetNodeVersionInfo(ctx, request)
+	h.log("observer", "GetNodeVersionInfo", err)
+	return res, err
 }
 
 func (h *FlowAccessAPIRouter) GetLatestBlockHeader(context context.Context, req *access.GetLatestBlockHeaderRequest) (*access.BlockHeaderResponse, error) {
@@ -291,10 +298,11 @@ type FlowAccessAPIForwarder struct {
 	upstream    []access.AccessAPIClient
 	connections []*grpc.ClientConn
 	timeout     time.Duration
+	maxMsgSize  uint
 }
 
-func NewFlowAccessAPIForwarder(identities flow.IdentityList, timeout time.Duration) (*FlowAccessAPIForwarder, error) {
-	forwarder := &FlowAccessAPIForwarder{}
+func NewFlowAccessAPIForwarder(identities flow.IdentityList, timeout time.Duration, maxMsgSize uint) (*FlowAccessAPIForwarder, error) {
+	forwarder := &FlowAccessAPIForwarder{maxMsgSize: maxMsgSize}
 	err := forwarder.setFlowAccessAPI(identities, timeout)
 	return forwarder, err
 }
@@ -334,6 +342,15 @@ func (h *FlowAccessAPIForwarder) Ping(context context.Context, req *access.PingR
 		return nil, err
 	}
 	return upstream.Ping(context, req)
+}
+
+func (h *FlowAccessAPIForwarder) GetNodeVersionInfo(context context.Context, req *access.GetNodeVersionInfoRequest) (*access.GetNodeVersionInfoResponse, error) {
+	// This is a passthrough request
+	upstream, err := h.faultTolerantClient()
+	if err != nil {
+		return nil, err
+	}
+	return upstream.GetNodeVersionInfo(context, req)
 }
 
 func (h *FlowAccessAPIForwarder) GetLatestBlockHeader(context context.Context, req *access.GetLatestBlockHeaderRequest) (*access.BlockHeaderResponse, error) {

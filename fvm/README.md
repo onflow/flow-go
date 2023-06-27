@@ -11,11 +11,11 @@ functionality required by the Flow protocol.
 import (
     "github.com/onflow/cadence/runtime"
     "github.com/onflow/flow-go/fvm"
-    "github.com/onflow/flow-go/fvm/state"
+    "github.com/onflow/flow-go/fvm/storage/state"
     "github.com/onflow/flow-go/model/flow"
 )
 
-vm := fvm.New(runtime.NewInterpreterRuntime())
+vm := fvm.NewVirtualMachine()
 
 tx := flow.NewTransactionBody().
     SetScript([]byte(`transaction { execute { log("Hello, World!") } }`))
@@ -26,7 +26,7 @@ ledger := state.NewMapLedger()
 txIndex := uint32(0)
 txProc := fvm.Transaction(tx, txIndex)
 
-err := vm.Run(ctx, txProc, ledger)
+executionSnapshot, output, err := vm.Run(ctx, txProc, ledger)
 if err != nil {
   panic("fatal error during transaction procedure!")
 }

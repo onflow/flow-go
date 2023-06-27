@@ -6,17 +6,19 @@ import (
 	"math/rand"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/testing/protocmp"
 
 	"github.com/onflow/flow/protobuf/go/flow/entities"
 	"github.com/onflow/flow/protobuf/go/flow/execution"
 
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
-	ingestion "github.com/onflow/flow-go/engine/execution/ingestion/mock"
+	mockEng "github.com/onflow/flow-go/engine/execution/mock"
 	"github.com/onflow/flow-go/model/flow"
 	realstorage "github.com/onflow/flow-go/storage"
 	storage "github.com/onflow/flow-go/storage/mock"
@@ -49,7 +51,7 @@ func (suite *Suite) SetupTest() {
 // TestExecuteScriptAtBlockID tests the ExecuteScriptAtBlockID API call
 func (suite *Suite) TestExecuteScriptAtBlockID() {
 	// setup handler
-	mockEngine := new(ingestion.IngestRPC)
+	mockEngine := new(mockEng.ScriptExecutor)
 	handler := &handler{
 		engine: mockEngine,
 		chain:  flow.Mainnet,
@@ -240,7 +242,7 @@ func (suite *Suite) TestGetAccountAtBlockID() {
 		Address: serviceAddress,
 	}
 
-	mockEngine := new(ingestion.IngestRPC)
+	mockEngine := new(mockEng.ScriptExecutor)
 
 	// create the handler
 	handler := &handler{
@@ -268,7 +270,8 @@ func (suite *Suite) TestGetAccountAtBlockID() {
 		actualAccount := resp.GetAccount()
 		expectedAccount, err := convert.AccountToMessage(&serviceAccount)
 		suite.Require().NoError(err)
-		suite.Require().Equal(*expectedAccount, *actualAccount)
+		suite.Require().Empty(
+			cmp.Diff(expectedAccount, actualAccount, protocmp.Transform()))
 		mockEngine.AssertExpectations(suite.T())
 	})
 
@@ -298,7 +301,7 @@ func (suite *Suite) TestGetRegisterAtBlockID() {
 	serviceAddress := flow.Mainnet.Chain().ServiceAddress()
 	validKey := []byte("exists")
 
-	mockEngine := new(ingestion.IngestRPC)
+	mockEngine := new(mockEng.ScriptExecutor)
 
 	// create the handler
 	handler := &handler{

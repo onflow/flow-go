@@ -1,6 +1,7 @@
 package synchronization
 
 import (
+	"context"
 	"io"
 	"math"
 	"math/rand"
@@ -13,14 +14,13 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
-	"github.com/onflow/flow-go/consensus/hotstuff/notifications/pubsub"
-	"github.com/onflow/flow-go/engine"
-	"github.com/onflow/flow-go/model/events"
+	mockconsensus "github.com/onflow/flow-go/engine/consensus/mock"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/model/messages"
 	synccore "github.com/onflow/flow-go/module/chainsync"
 	"github.com/onflow/flow-go/module/id"
+	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
 	module "github.com/onflow/flow-go/module/mock"
 	netint "github.com/onflow/flow-go/network"
@@ -52,15 +52,12 @@ type SyncSuite struct {
 	state        *protocol.State
 	snapshot     *protocol.Snapshot
 	blocks       *storage.Blocks
-	comp         *mocknetwork.Engine
+	comp         *mockconsensus.Compliance
 	core         *module.SyncCore
 	e            *Engine
 }
 
 func (ss *SyncSuite) SetupTest() {
-	// seed the RNG
-	rand.Seed(time.Now().UnixNano())
-
 	// generate own ID
 	ss.participants = unittest.IdentityListFixture(3, unittest.WithRole(flow.RoleConsensus))
 	keys := unittest.NetworkingKeys(len(ss.participants))
@@ -158,8 +155,8 @@ func (ss *SyncSuite) SetupTest() {
 	)
 
 	// set up compliance engine mock
-	ss.comp = &mocknetwork.Engine{}
-	ss.comp.On("SubmitLocal", mock.Anything).Return()
+	ss.comp = mockconsensus.NewCompliance(ss.T())
+	ss.comp.On("Process", mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
 
 	// set up sync core
 	ss.core = &module.SyncCore{}
@@ -168,12 +165,9 @@ func (ss *SyncSuite) SetupTest() {
 	log := zerolog.New(io.Discard)
 	metrics := metrics.NewNoopCollector()
 
-	finalizedHeader, err := NewFinalizedHeaderCache(log, ss.state, pubsub.NewFinalizationDistributor())
-	require.NoError(ss.T(), err, "could not create finalized snapshot cache")
-
 	idCache, err := cache.NewProtocolStateIDCache(log, ss.state, protocolEvents.NewDistributor())
 	require.NoError(ss.T(), err, "could not create protocol state identity cache")
-	e, err := New(log, metrics, ss.net, ss.me, ss.blocks, ss.comp, ss.core, finalizedHeader,
+	e, err := New(log, metrics, ss.net, ss.me, ss.state, ss.blocks, ss.comp, ss.core,
 		id.NewIdentityFilterIdentifierProvider(
 			filter.And(
 				filter.HasRole(flow.RoleConsensus),
@@ -287,8 +281,9 @@ func (ss *SyncSuite) TestOnRangeRequest() {
 		ss.con.On("Unicast", mock.Anything, mock.Anything).Return(nil).Once().Run(
 			func(args mock.Arguments) {
 				res := args.Get(0).(*messages.BlockResponse)
-				expected := []*flow.Block{ss.heights[ref-1]}
-				assert.ElementsMatch(ss.T(), expected, res.Blocks, "response should contain right blocks")
+				expected := ss.heights[ref-1]
+				actual := res.Blocks[0].ToInternal()
+				assert.Equal(ss.T(), expected, actual, "response should contain right block")
 				assert.Equal(ss.T(), req.Nonce, res.Nonce, "response should contain request nonce")
 				recipientID := args.Get(1).(flow.Identifier)
 				assert.Equal(ss.T(), originID, recipientID, "should send response to original requester")
@@ -306,7 +301,7 @@ func (ss *SyncSuite) TestOnRangeRequest() {
 			func(args mock.Arguments) {
 				res := args.Get(0).(*messages.BlockResponse)
 				expected := []*flow.Block{ss.heights[ref-2], ss.heights[ref-1], ss.heights[ref]}
-				assert.ElementsMatch(ss.T(), expected, res.Blocks, "response should contain right blocks")
+				assert.ElementsMatch(ss.T(), expected, res.BlocksInternal(), "response should contain right blocks")
 				assert.Equal(ss.T(), req.Nonce, res.Nonce, "response should contain request nonce")
 				recipientID := args.Get(1).(flow.Identifier)
 				assert.Equal(ss.T(), originID, recipientID, "should send response to original requester")
@@ -324,7 +319,7 @@ func (ss *SyncSuite) TestOnRangeRequest() {
 			func(args mock.Arguments) {
 				res := args.Get(0).(*messages.BlockResponse)
 				expected := []*flow.Block{ss.heights[ref-2], ss.heights[ref-1], ss.heights[ref]}
-				assert.ElementsMatch(ss.T(), expected, res.Blocks, "response should contain right blocks")
+				assert.ElementsMatch(ss.T(), expected, res.BlocksInternal(), "response should contain right blocks")
 				assert.Equal(ss.T(), req.Nonce, res.Nonce, "response should contain request nonce")
 				recipientID := args.Get(1).(flow.Identifier)
 				assert.Equal(ss.T(), originID, recipientID, "should send response to original requester")
@@ -342,7 +337,7 @@ func (ss *SyncSuite) TestOnRangeRequest() {
 			func(args mock.Arguments) {
 				res := args.Get(0).(*messages.BlockResponse)
 				expected := []*flow.Block{ss.heights[ref-4], ss.heights[ref-3], ss.heights[ref-2]}
-				assert.ElementsMatch(ss.T(), expected, res.Blocks, "response should contain right blocks")
+				assert.ElementsMatch(ss.T(), expected, res.BlocksInternal(), "response should contain right blocks")
 				assert.Equal(ss.T(), req.Nonce, res.Nonce, "response should contain request nonce")
 				recipientID := args.Get(1).(flow.Identifier)
 				assert.Equal(ss.T(), originID, recipientID, "should send response to original requester")
@@ -353,7 +348,7 @@ func (ss *SyncSuite) TestOnRangeRequest() {
 		var err error
 		config := synccore.DefaultConfig()
 		config.MaxSize = 2
-		ss.e.requestHandler.core, err = synccore.New(ss.e.log, config, metrics.NewNoopCollector())
+		ss.e.requestHandler.core, err = synccore.New(ss.e.log, config, metrics.NewNoopCollector(), flow.Localnet)
 		require.NoError(ss.T(), err)
 
 		err = ss.e.requestHandler.onRangeRequest(originID, req)
@@ -395,7 +390,7 @@ func (ss *SyncSuite) TestOnBatchRequest() {
 		ss.con.On("Unicast", mock.Anything, mock.Anything).Return(nil).Run(
 			func(args mock.Arguments) {
 				res := args.Get(0).(*messages.BlockResponse)
-				assert.ElementsMatch(ss.T(), []*flow.Block{&block}, res.Blocks, "response should contain right block")
+				assert.Equal(ss.T(), &block, res.Blocks[0].ToInternal(), "response should contain right block")
 				assert.Equal(ss.T(), req.Nonce, res.Nonce, "response should contain request nonce")
 				recipientID := args.Get(1).(flow.Identifier)
 				assert.Equal(ss.T(), originID, recipientID, "response should be send to original requester")
@@ -419,7 +414,7 @@ func (ss *SyncSuite) TestOnBatchRequest() {
 		ss.con.On("Unicast", mock.Anything, mock.Anything).Return(nil).Run(
 			func(args mock.Arguments) {
 				res := args.Get(0).(*messages.BlockResponse)
-				assert.ElementsMatch(ss.T(), []*flow.Block{ss.blockIDs[req.BlockIDs[0]], ss.blockIDs[req.BlockIDs[1]]}, res.Blocks, "response should contain right block")
+				assert.ElementsMatch(ss.T(), []*flow.Block{ss.blockIDs[req.BlockIDs[0]], ss.blockIDs[req.BlockIDs[1]]}, res.BlocksInternal(), "response should contain right block")
 				assert.Equal(ss.T(), req.Nonce, res.Nonce, "response should contain request nonce")
 				recipientID := args.Get(1).(flow.Identifier)
 				assert.Equal(ss.T(), originID, recipientID, "response should be send to original requester")
@@ -430,7 +425,7 @@ func (ss *SyncSuite) TestOnBatchRequest() {
 		var err error
 		config := synccore.DefaultConfig()
 		config.MaxSize = 2
-		ss.e.requestHandler.core, err = synccore.New(ss.e.log, config, metrics.NewNoopCollector())
+		ss.e.requestHandler.core, err = synccore.New(ss.e.log, config, metrics.NewNoopCollector(), flow.Localnet)
 		require.NoError(ss.T(), err)
 
 		err = ss.e.requestHandler.onBatchRequest(originID, req)
@@ -444,28 +439,28 @@ func (ss *SyncSuite) TestOnBlockResponse() {
 	originID := unittest.IdentifierFixture()
 	res := &messages.BlockResponse{
 		Nonce:  rand.Uint64(),
-		Blocks: []*flow.Block{},
+		Blocks: []messages.UntrustedBlock{},
 	}
 
 	// add one block that should be processed
 	processable := unittest.BlockFixture()
 	ss.core.On("HandleBlock", processable.Header).Return(true)
-	res.Blocks = append(res.Blocks, &processable)
+	res.Blocks = append(res.Blocks, messages.UntrustedBlockFromInternal(&processable))
 
 	// add one block that should not be processed
 	unprocessable := unittest.BlockFixture()
 	ss.core.On("HandleBlock", unprocessable.Header).Return(false)
-	res.Blocks = append(res.Blocks, &unprocessable)
+	res.Blocks = append(res.Blocks, messages.UntrustedBlockFromInternal(&unprocessable))
 
-	ss.comp.On("SubmitLocal", mock.Anything).Run(func(args mock.Arguments) {
-		res := args.Get(0).(*events.SyncedBlock)
-		ss.Assert().Equal(&processable, res.Block)
+	ss.comp.On("OnSyncedBlocks", mock.Anything).Run(func(args mock.Arguments) {
+		res := args.Get(0).(flow.Slashable[[]*messages.BlockProposal])
+		converted := res.Message[0].Block.ToInternal()
+		ss.Assert().Equal(processable.Header, converted.Header)
+		ss.Assert().Equal(processable.Payload, converted.Payload)
 		ss.Assert().Equal(originID, res.OriginID)
-	},
-	)
+	})
 
 	ss.e.onBlockResponse(originID, res)
-	ss.comp.AssertExpectations(ss.T())
 	ss.core.AssertExpectations(ss.T())
 }
 
@@ -514,15 +509,19 @@ func (ss *SyncSuite) TestSendRequests() {
 
 // test a synchronization engine can be started and stopped
 func (ss *SyncSuite) TestStartStop() {
-	unittest.AssertReturnsBefore(ss.T(), func() {
-		<-ss.e.Ready()
-		<-ss.e.Done()
-	}, time.Second)
+	ctx, cancel := irrecoverable.NewMockSignalerContextWithCancel(ss.T(), context.Background())
+	ss.e.Start(ctx)
+	unittest.AssertClosesBefore(ss.T(), ss.e.Ready(), time.Second)
+	cancel()
+	unittest.AssertClosesBefore(ss.T(), ss.e.Done(), time.Second)
 }
 
 // TestProcessingMultipleItems tests that items are processed in async way
 func (ss *SyncSuite) TestProcessingMultipleItems() {
-	<-ss.e.Ready()
+	ctx, cancel := irrecoverable.NewMockSignalerContextWithCancel(ss.T(), context.Background())
+	ss.e.Start(ctx)
+	unittest.AssertClosesBefore(ss.T(), ss.e.Ready(), time.Second)
+	defer cancel()
 
 	originID := unittest.IdentifierFixture()
 	for i := 0; i < 5; i++ {
@@ -555,20 +554,6 @@ func (ss *SyncSuite) TestProcessingMultipleItems() {
 	ss.core.AssertExpectations(ss.T())
 }
 
-// TestOnFinalizedBlock tests that when new finalized block is discovered engine updates cached variables
-// to latest state
-func (ss *SyncSuite) TestOnFinalizedBlock() {
-	finalizedBlock := unittest.BlockHeaderWithParentFixture(ss.head)
-	// change head
-	ss.head = finalizedBlock
-
-	err := ss.e.finalizedHeader.updateHeader()
-	require.NoError(ss.T(), err)
-	actualHeader := ss.e.finalizedHeader.Get()
-	require.ElementsMatch(ss.T(), ss.e.participantsProvider.Identifiers(), ss.participants[1:].NodeIDs())
-	require.Equal(ss.T(), actualHeader, finalizedBlock)
-}
-
 // TestProcessUnsupportedMessageType tests that Process and ProcessLocal correctly handle a case where invalid message type
 // was submitted from network layer.
 func (ss *SyncSuite) TestProcessUnsupportedMessageType() {
@@ -579,9 +564,4 @@ func (ss *SyncSuite) TestProcessUnsupportedMessageType() {
 		// shouldn't result in error since byzantine inputs are expected
 		require.NoError(ss.T(), err)
 	}
-
-	// in case of local processing error cannot be consumed since all inputs are trusted
-	err := ss.e.ProcessLocal(invalidEvent)
-	require.Error(ss.T(), err)
-	require.True(ss.T(), engine.IsIncompatibleInputTypeError(err))
 }

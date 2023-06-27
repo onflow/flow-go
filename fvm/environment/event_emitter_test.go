@@ -7,15 +7,15 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/cadence"
-	jsoncdc "github.com/onflow/cadence/encoding/json"
+	"github.com/onflow/cadence/encoding/ccf"
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/onflow/cadence/runtime/stdlib"
 
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/meter"
-	"github.com/onflow/flow-go/fvm/state"
+	"github.com/onflow/flow-go/fvm/storage/state"
 	"github.com/onflow/flow-go/fvm/systemcontracts"
-	"github.com/onflow/flow-go/fvm/utils"
+	"github.com/onflow/flow-go/fvm/tracing"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -30,7 +30,8 @@ func Test_IsServiceEvent(t *testing.T) {
 			isServiceEvent, err := environment.IsServiceEvent(cadence.Event{
 				EventType: &cadence.EventType{
 					Location: common.AddressLocation{
-						Address: common.Address(event.Address),
+						Address: common.MustBytesToAddress(
+							event.Address.Bytes()),
 					},
 					QualifiedIdentifier: event.QualifiedIdentifier(),
 				},
@@ -44,7 +45,8 @@ func Test_IsServiceEvent(t *testing.T) {
 		isServiceEvent, err := environment.IsServiceEvent(cadence.Event{
 			EventType: &cadence.EventType{
 				Location: common.AddressLocation{
-					Address: common.Address(flow.Testnet.Chain().ServiceAddress()),
+					Address: common.MustBytesToAddress(
+						flow.Testnet.Chain().ServiceAddress().Bytes()),
 				},
 				QualifiedIdentifier: events.EpochCommit.QualifiedIdentifier(),
 			},
@@ -57,7 +59,8 @@ func Test_IsServiceEvent(t *testing.T) {
 		isServiceEvent, err := environment.IsServiceEvent(cadence.Event{
 			EventType: &cadence.EventType{
 				Location: common.AddressLocation{
-					Address: common.Address(chain.Chain().ServiceAddress()),
+					Address: common.MustBytesToAddress(
+						chain.Chain().ServiceAddress().Bytes()),
 				},
 				QualifiedIdentifier: "SomeContract.SomeEvent",
 			},
@@ -150,16 +153,15 @@ func Test_EmitEvent_Limit(t *testing.T) {
 }
 
 func createTestEventEmitterWithLimit(chain flow.ChainID, address flow.Address, eventEmitLimit uint64) environment.EventEmitter {
-	view := utils.NewSimpleView()
-	stTxn := state.NewTransactionState(
-		view,
+	txnState := state.NewTransactionState(
+		nil,
 		state.DefaultParameters().WithMeterParameters(
 			meter.DefaultParameters().WithEventEmitByteLimit(eventEmitLimit),
 		))
 
 	return environment.NewEventEmitter(
-		environment.NewTracer(environment.DefaultTracerParams()),
-		environment.NewMeter(stTxn),
+		tracing.NewTracerSpan(),
+		environment.NewMeter(txnState),
 		chain.Chain(),
 		environment.TransactionInfoParams{
 			TxId:    flow.ZeroID,
@@ -177,7 +179,7 @@ func createTestEventEmitterWithLimit(chain flow.ChainID, address flow.Address, e
 }
 
 func getCadenceEventPayloadByteSize(event cadence.Event) uint64 {
-	payload, err := jsoncdc.Encode(event)
+	payload, err := ccf.Encode(event)
 	if err != nil {
 		panic(err)
 	}

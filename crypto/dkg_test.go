@@ -4,6 +4,7 @@
 package crypto
 
 import (
+	crand "crypto/rand"
 	"fmt"
 	mrand "math/rand"
 	"sync"
@@ -193,9 +194,7 @@ func dkgCommonTest(t *testing.T, dkg int, n int, threshold int, test testCase) {
 	}
 
 	// Update processors depending on the test
-	rand := time.Now().UnixNano()
-	mrand.Seed(rand)
-	t.Logf("math rand seed is %d", rand)
+	//
 	// r1 and r2 is the number of malicious participants, each group with a slight diffrent behavior.
 	// - r1 participants of indices 0 to r1-1 behave maliciously and will get disqualified by honest participants.
 	// - r2 participants of indices r1 to r1+r2-1 will behave maliciously at first but will recover and won't be
@@ -294,9 +293,6 @@ func dkgCommonTest(t *testing.T, dkg int, n int, threshold int, test testCase) {
 	// start DKG in all participants
 	// start listening on the channels
 	seed := make([]byte, SeedMinLenDKG)
-	read, err := mrand.Read(seed)
-	require.Equal(t, read, SeedMinLenDKG)
-	require.NoError(t, err)
 	sync.Add(n)
 
 	log.Info("DKG protocol starts")
@@ -308,11 +304,13 @@ func dkgCommonTest(t *testing.T, dkg int, n int, threshold int, test testCase) {
 
 	for current := 0; current < n; current++ {
 		// start dkg in parallel
-		// ( one common PRG is used for all instances which causes a race
+		// ( one common PRG is used internally for all instances which causes a race
 		//	in generating randoms and leads to non-deterministic keys. If deterministic keys
 		//  are required, switch to sequential calls to dkg.Start()  )
 		go func(current int) {
-			err := processors[current].dkg.Start(seed)
+			_, err := crand.Read(seed)
+			require.NoError(t, err)
+			err = processors[current].dkg.Start(seed)
 			require.Nil(t, err)
 			processors[current].startSync.Done() // avoids reading messages when a dkg instance hasn't started yet
 		}(current)

@@ -3,7 +3,6 @@ package buffer
 import (
 	"github.com/onflow/flow-go/model/cluster"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/model/messages"
 )
 
 type PendingClusterBlocks struct {
@@ -15,37 +14,44 @@ func NewPendingClusterBlocks() *PendingClusterBlocks {
 	return b
 }
 
-func (b *PendingClusterBlocks) Add(originID flow.Identifier, proposal *messages.ClusterBlockProposal) bool {
-	return b.backend.add(originID, proposal.Header, proposal.Payload)
+func (b *PendingClusterBlocks) Add(block flow.Slashable[*cluster.Block]) bool {
+	return b.backend.add(flow.Slashable[*flow.Header]{
+		OriginID: flow.Identifier{},
+		Message:  block.Message.Header,
+	}, block.Message.Payload)
 }
 
-func (b *PendingClusterBlocks) ByID(blockID flow.Identifier) (*cluster.PendingBlock, bool) {
+func (b *PendingClusterBlocks) ByID(blockID flow.Identifier) (flow.Slashable[*cluster.Block], bool) {
 	item, ok := b.backend.byID(blockID)
 	if !ok {
-		return nil, false
+		return flow.Slashable[*cluster.Block]{}, false
 	}
 
-	block := &cluster.PendingBlock{
-		OriginID: item.originID,
-		Header:   item.header,
-		Payload:  item.payload.(*cluster.Payload),
+	block := flow.Slashable[*cluster.Block]{
+		OriginID: item.header.OriginID,
+		Message: &cluster.Block{
+			Header:  item.header.Message,
+			Payload: item.payload.(*cluster.Payload),
+		},
 	}
 
 	return block, true
 }
 
-func (b *PendingClusterBlocks) ByParentID(parentID flow.Identifier) ([]*cluster.PendingBlock, bool) {
+func (b *PendingClusterBlocks) ByParentID(parentID flow.Identifier) ([]flow.Slashable[*cluster.Block], bool) {
 	items, ok := b.backend.byParentID(parentID)
 	if !ok {
 		return nil, false
 	}
 
-	blocks := make([]*cluster.PendingBlock, 0, len(items))
+	blocks := make([]flow.Slashable[*cluster.Block], 0, len(items))
 	for _, item := range items {
-		block := &cluster.PendingBlock{
-			OriginID: item.originID,
-			Header:   item.header,
-			Payload:  item.payload.(*cluster.Payload),
+		block := flow.Slashable[*cluster.Block]{
+			OriginID: item.header.OriginID,
+			Message: &cluster.Block{
+				Header:  item.header.Message,
+				Payload: item.payload.(*cluster.Payload),
+			},
 		}
 		blocks = append(blocks, block)
 	}

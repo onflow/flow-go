@@ -10,7 +10,6 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/network/channels"
-	"github.com/onflow/flow-go/network/message"
 )
 
 // Middleware represents the middleware layer, which manages the connections to
@@ -18,6 +17,7 @@ import (
 // connections, as well as reading & writing to/from the connections.
 type Middleware interface {
 	component.Component
+	DisallowListNotificationConsumer
 
 	// SetOverlay sets the overlay used by the middleware. This must be called before the middleware can be Started.
 	SetOverlay(Overlay)
@@ -29,13 +29,13 @@ type Middleware interface {
 	// Dispatch should be used whenever guaranteed delivery to a specific target is required. Otherwise, Publish is
 	// a more efficient candidate.
 	// All errors returned from this function can be considered benign.
-	SendDirect(msg *message.Message, targetID flow.Identifier) error
+	SendDirect(msg *OutgoingMessageScope) error
 
 	// Publish publishes a message on the channel. It models a distributed broadcast where the message is meant for all or
 	// a many nodes subscribing to the channel. It does not guarantee the delivery though, and operates on a best
 	// effort.
 	// All errors returned from this function can be considered benign.
-	Publish(msg *message.Message, channel channels.Channel) error
+	Publish(msg *OutgoingMessageScope) error
 
 	// Subscribe subscribes the middleware to a channel.
 	// No errors are expected during normal operation.
@@ -70,7 +70,7 @@ type Overlay interface {
 	// Identity returns the Identity associated with the given peer ID, if it exists
 	Identity(peer.ID) (*flow.Identity, bool)
 
-	Receive(nodeID flow.Identifier, msg *message.Message, decodedMsgPayload interface{}) error
+	Receive(*IncomingMessageScope) error
 }
 
 // Connection represents an interface to read from & write to a connection.

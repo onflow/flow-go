@@ -9,6 +9,7 @@ import (
 
 	sdkcrypto "github.com/onflow/flow-go-sdk/crypto"
 	"github.com/onflow/flow-go/crypto"
+
 	"github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -16,12 +17,12 @@ import (
 
 func TestGenerateUnstakedNetworkingKey(t *testing.T) {
 
-	key, err := GeneratePublicNetworkingKey(unittest.SeedFixture(crypto.KeyGenSeedMinLenECDSASecp256k1))
+	key, err := GeneratePublicNetworkingKey(unittest.SeedFixture(crypto.KeyGenSeedMinLen))
 	require.NoError(t, err)
 	assert.Equal(t, crypto.ECDSASecp256k1, key.Algorithm())
 	assert.Equal(t, X962_NO_INVERSION, key.PublicKey().EncodeCompressed()[0])
 
-	keys, err := GenerateUnstakedNetworkingKeys(20, unittest.SeedFixtures(20, crypto.KeyGenSeedMinLenECDSASecp256k1))
+	keys, err := GenerateUnstakedNetworkingKeys(20, unittest.SeedFixtures(20, crypto.KeyGenSeedMinLen))
 	require.NoError(t, err)
 	for _, key := range keys {
 		assert.Equal(t, crypto.ECDSASecp256k1, key.Algorithm())
@@ -31,19 +32,19 @@ func TestGenerateUnstakedNetworkingKey(t *testing.T) {
 }
 
 func TestGenerateKeys(t *testing.T) {
-	_, err := GenerateKeys(crypto.BLSBLS12381, 0, unittest.SeedFixtures(2, crypto.KeyGenSeedMinLenBLSBLS12381))
+	_, err := GenerateKeys(crypto.BLSBLS12381, 0, unittest.SeedFixtures(2, crypto.KeyGenSeedMinLen))
 	require.EqualError(t, err, "n needs to match the number of seeds (0 != 2)")
 
-	_, err = GenerateKeys(crypto.BLSBLS12381, 3, unittest.SeedFixtures(2, crypto.KeyGenSeedMinLenBLSBLS12381))
+	_, err = GenerateKeys(crypto.BLSBLS12381, 3, unittest.SeedFixtures(2, crypto.KeyGenSeedMinLen))
 	require.EqualError(t, err, "n needs to match the number of seeds (3 != 2)")
 
-	keys, err := GenerateKeys(crypto.BLSBLS12381, 2, unittest.SeedFixtures(2, crypto.KeyGenSeedMinLenBLSBLS12381))
+	keys, err := GenerateKeys(crypto.BLSBLS12381, 2, unittest.SeedFixtures(2, crypto.KeyGenSeedMinLen))
 	require.NoError(t, err)
 	require.Len(t, keys, 2)
 }
 
 func TestGenerateStakingKeys(t *testing.T) {
-	keys, err := GenerateStakingKeys(2, unittest.SeedFixtures(2, crypto.KeyGenSeedMinLenBLSBLS12381))
+	keys, err := GenerateStakingKeys(2, unittest.SeedFixtures(2, crypto.KeyGenSeedMinLen))
 	require.NoError(t, err)
 	require.Len(t, keys, 2)
 }

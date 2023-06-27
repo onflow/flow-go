@@ -67,7 +67,7 @@ func (s *MatchingEngineSuite) TestOnFinalizedBlock() {
 	finalizedBlock := unittest.BlockHeaderFixture()
 	s.state.On("Final").Return(unittest.StateSnapshotForKnownBlock(finalizedBlock, nil))
 	s.core.On("OnBlockFinalization").Return(nil).Once()
-	s.engine.OnFinalizedBlock(model.BlockFromFlow(finalizedBlock, finalizedBlock.View-1))
+	s.engine.OnFinalizedBlock(model.BlockFromFlow(finalizedBlock))
 
 	// matching engine has at least 100ms ticks for processing events
 	time.Sleep(1 * time.Second)
@@ -93,7 +93,7 @@ func (s *MatchingEngineSuite) TestOnBlockIncorporated() {
 	}
 	s.index.On("ByBlockID", incorporatedBlockID).Return(index, nil)
 
-	s.engine.OnBlockIncorporated(model.BlockFromFlow(incorporatedBlock, incorporatedBlock.View-1))
+	s.engine.OnBlockIncorporated(model.BlockFromFlow(incorporatedBlock))
 
 	// matching engine has at least 100ms ticks for processing events
 	time.Sleep(1 * time.Second)

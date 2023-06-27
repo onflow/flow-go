@@ -14,12 +14,13 @@ import (
 
 var _ commands.AdminCommand = (*GetTransactionsCommand)(nil)
 
-// max number of block height to query transactions from
-var MAX_HEIGHT_RANGE = uint64(1000)
-
-type getTransactionsReqData struct {
+type heightRangeReqData struct {
 	startHeight uint64
 	endHeight   uint64
+}
+
+func (d heightRangeReqData) Range() uint64 {
+	return d.endHeight - d.startHeight + 1
 }
 
 type GetTransactionsCommand struct {
@@ -37,7 +38,12 @@ func NewGetTransactionsCommand(state protocol.State, payloads storage.Payloads, 
 }
 
 func (c *GetTransactionsCommand) Handler(ctx context.Context, req *admin.CommandRequest) (interface{}, error) {
-	data := req.ValidatorData.(*getTransactionsReqData)
+	data := req.ValidatorData.(*heightRangeReqData)
+
+	limit := uint64(10001)
+	if data.Range() > limit {
+		return nil, admin.NewInvalidAdminReqErrorf("getting transactions for more than %v blocks at a time might have an impact to node's performance and is not allowed", limit)
+	}
 
 	finder := &transactions.Finder{
 		State:       c.state,
@@ -55,50 +61,13 @@ func (c *GetTransactionsCommand) Handler(ctx context.Context, req *admin.Command
 	return commands.ConvertToInterfaceList(blocks)
 }
 
-// Returns admin.InvalidAdminReqError for invalid inputs
-func findUint64(input map[string]interface{}, field string) (uint64, error) {
-	data, ok := input[field]
-	if !ok {
-		return 0, admin.NewInvalidAdminReqErrorf("missing required field '%s'", field)
-	}
-	val, err := parseN(data)
-	if err != nil {
-		return 0, admin.NewInvalidAdminReqErrorf("invalid 'n' field: %w", err)
-	}
-
-	return uint64(val), nil
-}
-
 // Validator validates the request.
 // Returns admin.InvalidAdminReqError for invalid/malformed requests.
 func (c *GetTransactionsCommand) Validator(req *admin.CommandRequest) error {
-	input, ok := req.Data.(map[string]interface{})
-	if !ok {
-		return admin.NewInvalidAdminReqFormatError("expected map[string]any")
-	}
-
-	startHeight, err := findUint64(input, "start-height")
+	data, err := parseHeightRangeRequestData(req)
 	if err != nil {
 		return err
 	}
-
-	endHeight, err := findUint64(input, "end-height")
-	if err != nil {
-		return err
-	}
-
-	if endHeight < startHeight {
-		return admin.NewInvalidAdminReqErrorf("endHeight %v should not be smaller than startHeight %v", endHeight, startHeight)
-	}
-
-	if endHeight-startHeight+1 > MAX_HEIGHT_RANGE {
-		return admin.NewInvalidAdminReqErrorf("getting transactions for more than %v blocks at a time might have an impact to node's performance and is not allowed", MAX_HEIGHT_RANGE)
-	}
-
-	req.ValidatorData = &getTransactionsReqData{
-		startHeight: startHeight,
-		endHeight:   endHeight,
-	}
-
+	req.ValidatorData = data
 	return nil
 }

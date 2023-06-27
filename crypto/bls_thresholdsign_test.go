@@ -4,9 +4,8 @@
 package crypto
 
 import (
-	"crypto/rand"
+	crand "crypto/rand"
 	"fmt"
-	mrand "math/rand"
 	"sync"
 	"testing"
 	"time"
@@ -34,9 +33,9 @@ func testCentralizedStatefulAPI(t *testing.T) {
 	n := 10
 	for threshold := MinimumThreshold; threshold < n; threshold++ {
 		// generate threshold keys
-		mrand.Seed(time.Now().UnixNano())
+		rand := getPRG(t)
 		seed := make([]byte, SeedMinLenDKG)
-		_, err := mrand.Read(seed)
+		_, err := rand.Read(seed)
 		require.NoError(t, err)
 		skShares, pkShares, pkGroup, err := BLSThresholdKeyGen(n, threshold, seed)
 		require.NoError(t, err)
@@ -48,7 +47,7 @@ func testCentralizedStatefulAPI(t *testing.T) {
 		for i := 0; i < n; i++ {
 			signers = append(signers, i)
 		}
-		mrand.Shuffle(n, func(i, j int) {
+		rand.Shuffle(n, func(i, j int) {
 			signers[i], signers[j] = signers[j], signers[i]
 		})
 
@@ -138,7 +137,7 @@ func testCentralizedStatefulAPI(t *testing.T) {
 			require.NoError(t, err)
 
 			// Create a share and add it
-			i := mrand.Intn(n)
+			i := rand.Intn(n)
 			share, err := skShares[i].Sign(thresholdSignatureMessage, kmac)
 			require.NoError(t, err)
 			enough, err := ts.TrustedAdd(i, share)
@@ -261,14 +260,14 @@ func testCentralizedStatefulAPI(t *testing.T) {
 
 		t.Run("constructor errors", func(t *testing.T) {
 			// invalid keys size
-			index := mrand.Intn(n)
+			index := rand.Intn(n)
 			pkSharesInvalid := make([]PublicKey, ThresholdSignMaxSize+1)
 			tsFollower, err := NewBLSThresholdSignatureInspector(pkGroup, pkSharesInvalid, threshold, thresholdSignatureMessage, thresholdSignatureTag)
 			assert.Error(t, err)
 			assert.True(t, IsInvalidInputsError(err))
 			assert.Nil(t, tsFollower)
 			// non BLS key share
-			seed := make([]byte, KeyGenSeedMinLenECDSAP256)
+			seed := make([]byte, KeyGenSeedMinLen)
 			_, err = rand.Read(seed)
 			require.NoError(t, err)
 			skEcdsa, err := GeneratePrivateKey(ECDSAP256, seed)
@@ -318,9 +317,10 @@ func testDistributedStatefulAPI_FeldmanVSS(t *testing.T) {
 	log.SetLevel(log.ErrorLevel)
 	log.Info("DKG starts")
 	gt = t
+	rand := getPRG(t)
 	// number of participants to test
 	n := 5
-	lead := mrand.Intn(n) // random
+	lead := rand.Intn(n) // random
 	var sync sync.WaitGroup
 	chans := make([]chan *message, n)
 	processors := make([]testDKGProcessor, 0, n)
@@ -377,6 +377,7 @@ func testDistributedStatefulAPI_JointFeldman(t *testing.T) {
 	log.SetLevel(log.ErrorLevel)
 	log.Info("DKG starts")
 	gt = t
+	rand := getPRG(t)
 	// number of participants to test
 	n := 5
 	for threshold := MinimumThreshold; threshold < n; threshold++ {
@@ -543,12 +544,12 @@ type statelessKeys struct {
 
 // Centralized test of threshold signature protocol using the threshold key generation.
 func testCentralizedStatelessAPI(t *testing.T) {
+	rand := getPRG(t)
 	n := 10
 	for threshold := MinimumThreshold; threshold < n; threshold++ {
 		// generate threshold keys
-		mrand.Seed(time.Now().UnixNano())
 		seed := make([]byte, SeedMinLenDKG)
-		_, err := mrand.Read(seed)
+		_, err := rand.Read(seed)
 		require.NoError(t, err)
 		skShares, pkShares, pkGroup, err := BLSThresholdKeyGen(n, threshold, seed)
 		require.NoError(t, err)
@@ -561,7 +562,7 @@ func testCentralizedStatelessAPI(t *testing.T) {
 		for i := 0; i < n; i++ {
 			signers = append(signers, i)
 		}
-		mrand.Shuffle(n, func(i, j int) {
+		rand.Shuffle(n, func(i, j int) {
 			signers[i], signers[j] = signers[j], signers[i]
 		})
 		// create (t+1) signatures of the first randomly chosen signers
@@ -585,7 +586,7 @@ func testCentralizedStatelessAPI(t *testing.T) {
 
 		// check failure with a random redundant signer
 		if threshold > 1 {
-			randomDuplicate := mrand.Intn(int(threshold)) + 1 // 1 <= duplicate <= threshold
+			randomDuplicate := rand.Intn(int(threshold)) + 1 // 1 <= duplicate <= threshold
 			tmp := signers[randomDuplicate]
 			signers[randomDuplicate] = signers[0]
 			thresholdSignature, err = BLSReconstructThresholdSignature(n, threshold, signShares, signers[:threshold+1])
@@ -608,7 +609,8 @@ func testCentralizedStatelessAPI(t *testing.T) {
 func BenchmarkSimpleKeyGen(b *testing.B) {
 	n := 60
 	seed := make([]byte, SeedMinLenDKG)
-	_, _ = rand.Read(seed)
+	_, err := crand.Read(seed)
+	require.NoError(b, err)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		_, _, _, _ = BLSThresholdKeyGen(n, optimalThreshold(n), seed)

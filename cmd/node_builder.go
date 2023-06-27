@@ -13,6 +13,7 @@ import (
 	"github.com/spf13/pflag"
 
 	"github.com/onflow/flow-go/admin/commands"
+	"github.com/onflow/flow-go/config"
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/model/flow"
@@ -25,12 +26,10 @@ import (
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/codec/cbor"
 	"github.com/onflow/flow-go/network/p2p"
-	"github.com/onflow/flow-go/network/p2p/connection"
-	"github.com/onflow/flow-go/network/p2p/middleware"
-	"github.com/onflow/flow-go/network/p2p/scoring"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/events"
 	bstorage "github.com/onflow/flow-go/storage/badger"
+	"github.com/onflow/flow-go/utils/grpcutils"
 )
 
 const NotSet = "not set"
@@ -107,11 +106,6 @@ type NodeBuilder interface {
 	// AdminCommand registers a new admin command with the admin server
 	AdminCommand(command string, f func(config *NodeConfig) commands.AdminCommand) NodeBuilder
 
-	// MustNot asserts that the given error must not occur.
-	// If the error is nil, returns a nil log event (which acts as a no-op).
-	// If the error is not nil, returns a fatal log event containing the error.
-	MustNot(err error) *zerolog.Event
-
 	// Build finalizes the node configuration in preparation for start and returns a Node
 	// object that can be run
 	Build() (Node, error)
@@ -131,18 +125,22 @@ type NodeBuilder interface {
 	// ValidateFlags sets any custom validation rules for the command line flags,
 	// for example where certain combinations aren't allowed
 	ValidateFlags(func() error) NodeBuilder
+
+	// ValidateRootSnapshot sets any custom validation rules for the root snapshot.
+	// This check is executed after other checks but before applying any data from root snapshot.
+	ValidateRootSnapshot(f func(protocol.Snapshot) error) NodeBuilder
 }
 
 // BaseConfig is the general config for the NodeBuilder and the command line params
 // For a node running as a standalone process, the config fields will be populated from the command line params,
 // while for a node running as a library, the config fields are expected to be initialized by the caller.
 type BaseConfig struct {
-	NetworkConfig
 	nodeIDHex                   string
 	AdminAddr                   string
 	AdminCert                   string
 	AdminKey                    string
 	AdminClientCAs              string
+	AdminMaxMsgSize             uint
 	BindAddr                    string
 	NodeRole                    string
 	DynamicStartupANAddress     string
@@ -155,6 +153,7 @@ type BaseConfig struct {
 	secretsDBEnabled            bool
 	InsecureSecretsDB           bool
 	level                       string
+	debugLogLimit               uint32
 	metricsPort                 uint
 	BootstrapDir                string
 	profilerConfig              profiler.ProfilerConfig
@@ -171,31 +170,9 @@ type BaseConfig struct {
 	// ComplianceConfig configures either the compliance engine (consensus nodes)
 	// or the follower engine (all other node roles)
 	ComplianceConfig compliance.Config
-}
 
-type NetworkConfig struct {
-	// NetworkConnectionPruning determines whether connections to nodes
-	// that are not part of protocol state should be trimmed
-	// TODO: solely a fallback mechanism, can be removed upon reliable behavior in production.
-	NetworkConnectionPruning bool
-
-	PeerScoringEnabled              bool // enables peer scoring on pubsub
-	PreferredUnicastProtocols       []string
-	NetworkReceivedMessageCacheSize uint32
-	// UnicastRateLimitDryRun will disable connection disconnects and gating when unicast rate limiters are configured
-	UnicastRateLimitDryRun bool
-	//UnicastRateLimitLockoutDuration the number of seconds a peer will be forced to wait before being allowed to successful reconnect to the node
-	// after being rate limited.
-	UnicastRateLimitLockoutDuration time.Duration
-	// UnicastMessageRateLimit amount of unicast messages that can be sent by a peer per second.
-	UnicastMessageRateLimit int
-	// UnicastBandwidthRateLimit bandwidth size in bytes a peer is allowed to send via unicast streams per second.
-	UnicastBandwidthRateLimit int
-	// UnicastBandwidthBurstLimit bandwidth size in bytes a peer is allowed to send via unicast streams at once.
-	UnicastBandwidthBurstLimit int
-	PeerUpdateInterval         time.Duration
-	UnicastMessageTimeout      time.Duration
-	DNSCacheTTL                time.Duration
+	// FlowConfig Flow configuration.
+	FlowConfig config.FlowConfig
 }
 
 // NodeConfig contains all the derived parameters such the NodeID, private keys etc. and initialized instances of
@@ -219,6 +196,7 @@ type NodeConfig struct {
 	Resolver          madns.BasicResolver
 	Middleware        network.Middleware
 	Network           network.Network
+	ConduitFactory    network.ConduitFactory
 	PingService       network.PingService
 	MsgValidators     []network.MessageValidator
 	FvmOptions        []fvm.Option
@@ -237,16 +215,34 @@ type NodeConfig struct {
 
 	// root state information
 	RootSnapshot protocol.Snapshot
-	// cached properties of RootSnapshot for convenience
-	RootBlock   *flow.Block
-	RootQC      *flow.QuorumCertificate
-	RootResult  *flow.ExecutionResult
-	RootSeal    *flow.Seal
-	RootChainID flow.ChainID
-	SporkID     flow.Identifier
+	// excerpt of root snapshot and latest finalized snapshot, when we boot up
+	StateExcerptAtBoot
 
 	// bootstrapping options
 	SkipNwAddressBasedValidations bool
+
+	// UnicastRateLimiterDistributor notifies consumers when a peer's unicast message is rate limited.
+	UnicastRateLimiterDistributor p2p.UnicastRateLimiterDistributor
+
+	// GossipSubRpcInspectorSuite rpc inspector suite.
+	GossipSubRpcInspectorSuite p2p.GossipSubInspectorSuite
+}
+
+// StateExcerptAtBoot stores information about the root snapshot and latest finalized block for use in bootstrapping.
+type StateExcerptAtBoot struct {
+	// properties of RootSnapshot for convenience
+	// For node bootstrapped with a root snapshot for the first block of a spork,
+	// 		FinalizedRootBlock and SealedRootBlock are the same block (special case of self-sealing block)
+	// For node bootstrapped with a root snapshot for a block above the first block of a spork (dynamically bootstrapped),
+	// 		FinalizedRootBlock.Height > SealedRootBlock.Height
+	FinalizedRootBlock  *flow.Block             // The last finalized block when bootstrapped.
+	SealedRootBlock     *flow.Block             // The last sealed block when bootstrapped.
+	RootQC              *flow.QuorumCertificate // QC for Finalized Root Block
+	RootResult          *flow.ExecutionResult   // Result for SealedRootBlock
+	RootSeal            *flow.Seal              //Seal for RootResult
+	RootChainID         flow.ChainID
+	SporkID             flow.Identifier
+	LastFinalizedHeader *flow.Header // last finalized header when the node boots up
 }
 
 func DefaultBaseConfig() *BaseConfig {
@@ -258,31 +254,19 @@ func DefaultBaseConfig() *BaseConfig {
 	codecFactory := func() network.Codec { return cbor.NewCodec() }
 
 	return &BaseConfig{
-		NetworkConfig: NetworkConfig{
-			PeerUpdateInterval:              connection.DefaultPeerUpdateInterval,
-			UnicastMessageTimeout:           middleware.DefaultUnicastTimeout,
-			NetworkReceivedMessageCacheSize: p2p.DefaultReceiveCacheSize,
-			// By default we let networking layer trim connections to all nodes that
-			// are no longer part of protocol state.
-			NetworkConnectionPruning:        connection.ConnectionPruningEnabled,
-			PeerScoringEnabled:              scoring.DefaultPeerScoringEnabled,
-			UnicastMessageRateLimit:         0,
-			UnicastBandwidthRateLimit:       0,
-			UnicastBandwidthBurstLimit:      middleware.LargeMsgMaxUnicastMsgSize,
-			UnicastRateLimitLockoutDuration: 10,
-			UnicastRateLimitDryRun:          true,
-		},
 		nodeIDHex:        NotSet,
 		AdminAddr:        NotSet,
 		AdminCert:        NotSet,
 		AdminKey:         NotSet,
 		AdminClientCAs:   NotSet,
+		AdminMaxMsgSize:  grpcutils.DefaultMaxMsgSize,
 		BindAddr:         NotSet,
 		BootstrapDir:     "bootstrap",
 		datadir:          datadir,
 		secretsdir:       NotSet,
 		secretsDBEnabled: true,
 		level:            "info",
+		debugLogLimit:    2000,
 
 		metricsPort:         8080,
 		tracerEnabled:       false,
@@ -308,9 +292,15 @@ func DefaultBaseConfig() *BaseConfig {
 }
 
 // DependencyList is a slice of ReadyDoneAware implementations that are used by DependableComponent
-// to define the list of depenencies that must be ready before starting the component.
+// to define the list of dependencies that must be ready before starting the component.
 type DependencyList struct {
 	components []module.ReadyDoneAware
+}
+
+func NewDependencyList(components ...module.ReadyDoneAware) *DependencyList {
+	return &DependencyList{
+		components: components,
+	}
 }
 
 // Add adds a new ReadyDoneAware implementation to the list of dependencies.

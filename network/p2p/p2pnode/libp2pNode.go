@@ -8,12 +8,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/onflow/flow-go/module/irrecoverable"
-
 	"github.com/hashicorp/go-multierror"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
 	kbucket "github.com/libp2p/go-libp2p-kbucket"
-	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/libp2p/go-libp2p/core/host"
 	libp2pnet "github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/peer"
@@ -22,12 +19,14 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/module/component"
+	"github.com/onflow/flow-go/module/irrecoverable"
 	flownet "github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/internal/p2putils"
 	"github.com/onflow/flow-go/network/p2p"
-	"github.com/onflow/flow-go/network/p2p/connection"
-	"github.com/onflow/flow-go/network/p2p/unicast"
+	"github.com/onflow/flow-go/network/p2p/p2pnode/internal"
+	"github.com/onflow/flow-go/network/p2p/unicast/protocols"
+	"github.com/onflow/flow-go/utils/logging"
 )
 
 const (
@@ -48,37 +47,47 @@ const (
 	findPeerQueryTimeout = 10 * time.Second
 )
 
+var _ p2p.LibP2PNode = (*Node)(nil)
+
 // Node is a wrapper around the LibP2P host.
 type Node struct {
 	component.Component
 	sync.RWMutex
-	uniMgr      *unicast.Manager
-	host        host.Host                               // reference to the libp2p host (https://godoc.org/github.com/libp2p/go-libp2p/core/host)
-	pubSub      *pubsub.PubSub                          // reference to the libp2p PubSub component
-	logger      zerolog.Logger                          // used to provide logging
-	topics      map[channels.Topic]*pubsub.Topic        // map of a topic string to an actual topic instance
-	subs        map[channels.Topic]*pubsub.Subscription // map of a topic string to an actual subscription
-	routing     routing.Routing
-	pCache      *ProtocolPeerCache
-	peerManager *connection.PeerManager
+	uniMgr           p2p.UnicastManager
+	host             host.Host // reference to the libp2p host (https://godoc.org/github.com/libp2p/go-libp2p/core/host)
+	pubSub           p2p.PubSubAdapter
+	logger           zerolog.Logger                      // used to provide logging
+	topics           map[channels.Topic]p2p.Topic        // map of a topic string to an actual topic instance
+	subs             map[channels.Topic]p2p.Subscription // map of a topic string to an actual subscription
+	routing          routing.Routing
+	pCache           p2p.ProtocolPeerCache
+	peerManager      p2p.PeerManager
+	peerScoreExposer p2p.PeerScoreExposer
+	// Cache of temporary disallow-listed peers, when a peer is disallow-listed, the connections to that peer
+	// are closed and further connections are not allowed till the peer is removed from the disallow-list.
+	disallowListedCache p2p.DisallowListCache
 }
 
 // NewNode creates a new libp2p node and sets its parameters.
 func NewNode(
 	logger zerolog.Logger,
 	host host.Host,
-	pCache *ProtocolPeerCache,
-	uniMgr *unicast.Manager,
-	peerManager *connection.PeerManager,
+	pCache p2p.ProtocolPeerCache,
+	peerManager p2p.PeerManager,
+	disallowLstCacheCfg *p2p.DisallowListCacheConfig,
 ) *Node {
+	lg := logger.With().Str("component", "libp2p-node").Logger()
 	return &Node{
-		uniMgr:      uniMgr,
 		host:        host,
-		logger:      logger.With().Str("component", "libp2p-node").Logger(),
-		topics:      make(map[channels.Topic]*pubsub.Topic),
-		subs:        make(map[channels.Topic]*pubsub.Subscription),
+		logger:      lg,
+		topics:      make(map[channels.Topic]p2p.Topic),
+		subs:        make(map[channels.Topic]p2p.Subscription),
 		pCache:      pCache,
 		peerManager: peerManager,
+		disallowListedCache: internal.NewDisallowListCache(
+			disallowLstCacheCfg.MaxSize,
+			logger.With().Str("module", "disallow-list-cache").Logger(),
+			disallowLstCacheCfg.Metrics),
 	}
 }
 
@@ -151,6 +160,13 @@ func (n *Node) RemovePeer(peerID peer.ID) error {
 	if err != nil {
 		return fmt.Errorf("failed to remove peer %s: %w", peerID, err)
 	}
+	// logging with suspicious level as we only expect to disconnect from a peer if it is not part of the
+	// protocol state.
+	n.logger.Warn().
+		Str("peer_id", peerID.String()).
+		Bool(logging.KeySuspicious, true).
+		Msg("disconnected from peer")
+
 	return nil
 }
 
@@ -189,6 +205,7 @@ func (n *Node) CreateStream(ctx context.Context, peerID peer.ID) (libp2pnet.Stre
 			lg.Debug().Msg("address not found in peer store, but found in routing system search")
 		}
 	}
+
 	stream, dialAddrs, err := n.uniMgr.CreateStream(ctx, peerID, MaxConnectAttempt)
 	if err != nil {
 		return nil, flownet.NewPeerUnreachableError(fmt.Errorf("could not create stream (peer_id: %s, dialing address(s): %v): %w", peerID,
@@ -220,7 +237,7 @@ func (n *Node) ListPeers(topic string) []peer.ID {
 
 // Subscribe subscribes the node to the given topic and returns the subscription
 // All errors returned from this function can be considered benign.
-func (n *Node) Subscribe(topic channels.Topic, topicValidator pubsub.ValidatorEx) (*pubsub.Subscription, error) {
+func (n *Node) Subscribe(topic channels.Topic, topicValidator p2p.TopicValidatorFunc) (p2p.Subscription, error) {
 	n.Lock()
 	defer n.Unlock()
 
@@ -229,9 +246,7 @@ func (n *Node) Subscribe(topic channels.Topic, topicValidator pubsub.ValidatorEx
 	tp, found := n.topics[topic]
 	var err error
 	if !found {
-		if err := n.pubSub.RegisterTopicValidator(
-			topic.String(), topicValidator, pubsub.WithValidatorInline(true),
-		); err != nil {
+		if err := n.pubSub.RegisterTopicValidator(topic.String(), topicValidator); err != nil {
 			n.logger.Err(err).Str("topic", topic.String()).Msg("failed to register topic validator, aborting subscription")
 			return nil, fmt.Errorf("failed to register topic validator: %w", err)
 		}
@@ -328,7 +343,7 @@ func (n *Node) Host() host.Host {
 }
 
 // WithDefaultUnicastProtocol overrides the default handler of the unicast manager and registers all preferred protocols.
-func (n *Node) WithDefaultUnicastProtocol(defaultHandler libp2pnet.StreamHandler, preferred []unicast.ProtocolName) error {
+func (n *Node) WithDefaultUnicastProtocol(defaultHandler libp2pnet.StreamHandler, preferred []protocols.ProtocolName) error {
 	n.uniMgr.WithDefaultHandler(defaultHandler)
 	for _, p := range preferred {
 		err := n.uniMgr.Register(p)
@@ -343,8 +358,29 @@ func (n *Node) WithDefaultUnicastProtocol(defaultHandler libp2pnet.StreamHandler
 // WithPeersProvider sets the PeersProvider for the peer manager.
 // If a peer manager factory is set, this method will set the peer manager's PeersProvider.
 func (n *Node) WithPeersProvider(peersProvider p2p.PeersProvider) {
+	// TODO: chore: we should not allow overriding the peers provider if one is already set.
 	if n.peerManager != nil {
-		n.peerManager.SetPeersProvider(peersProvider)
+		n.peerManager.SetPeersProvider(
+			func() peer.IDSlice {
+				authorizedPeersIds := peersProvider()
+				allowListedPeerIds := peer.IDSlice{} // subset of authorizedPeersIds that are not disallowed
+				for _, peerId := range authorizedPeersIds {
+					// exclude the disallowed peers from the authorized peers list
+					causes, disallowListed := n.disallowListedCache.IsDisallowListed(peerId)
+					if disallowListed {
+						n.logger.Warn().
+							Str("peer_id", peerId.String()).
+							Str("causes", fmt.Sprintf("%v", causes)).
+							Msg("peer is disallowed for a cause, removing from authorized peers of peer manager")
+
+						// exclude the peer from the authorized peers list
+						continue
+					}
+					allowListedPeerIds = append(allowListedPeerIds, peerId)
+				}
+
+				return allowListedPeerIds
+			})
 	}
 }
 
@@ -360,10 +396,21 @@ func (n *Node) RequestPeerUpdate() {
 	}
 }
 
-// IsConnected returns true is address is a direct peer of this node else false
+// IsConnected returns true if address is a direct peer of this node else false.
+// Peers are considered not connected if the underlying libp2p host reports the
+// peers as not connected and there are no connections in the connection list.
+// error returns:
+//   - network.ErrIllegalConnectionState if the underlying libp2p host reports connectedness as NotConnected but the connections list
+//     to the peer is not empty. This would normally indicate a bug within libp2p. Although the network.ErrIllegalConnectionState a bug in libp2p there is a small chance that this error will be returned due
+//     to a race condition between the time we check Connectedness and ConnsToPeer. There is a chance that a connection could be established
+//     after we check Connectedness but right before we check ConnsToPeer.
 func (n *Node) IsConnected(peerID peer.ID) (bool, error) {
-	isConnected := n.host.Network().Connectedness(peerID) == libp2pnet.Connected
-	return isConnected, nil
+	isConnected := n.host.Network().Connectedness(peerID)
+	numOfConns := len(n.host.Network().ConnsToPeer(peerID))
+	if isConnected == libp2pnet.NotConnected && numOfConns > 0 {
+		return true, flownet.NewConnectionStatusErr(peerID, numOfConns)
+	}
+	return isConnected == libp2pnet.Connected && numOfConns > 0, nil
 }
 
 // SetRouting sets the node's routing implementation.
@@ -381,9 +428,30 @@ func (n *Node) Routing() routing.Routing {
 	return n.routing
 }
 
+// SetPeerScoreExposer sets the node's peer score exposer implementation.
+// SetPeerScoreExposer may be called at most once. It is an irrecoverable error to call this
+// method if the node's peer score exposer has already been set.
+func (n *Node) SetPeerScoreExposer(e p2p.PeerScoreExposer) {
+	if n.peerScoreExposer != nil {
+		n.logger.Fatal().Msg("peer score exposer already set")
+	}
+
+	n.peerScoreExposer = e
+}
+
+// PeerScoreExposer returns the node's peer score exposer implementation.
+// If the node's peer score exposer has not been set, the second return value will be false.
+func (n *Node) PeerScoreExposer() (p2p.PeerScoreExposer, bool) {
+	if n.peerScoreExposer == nil {
+		return nil, false
+	}
+
+	return n.peerScoreExposer, true
+}
+
 // SetPubSub sets the node's pubsub implementation.
 // SetPubSub may be called at most once.
-func (n *Node) SetPubSub(ps *pubsub.PubSub) {
+func (n *Node) SetPubSub(ps p2p.PubSubAdapter) {
 	if n.pubSub != nil {
 		n.logger.Fatal().Msg("pubSub already set")
 	}
@@ -399,4 +467,71 @@ func (n *Node) SetComponentManager(cm *component.ComponentManager) {
 	}
 
 	n.Component = cm
+}
+
+// SetUnicastManager sets the unicast manager for the node.
+// SetUnicastManager may be called at most once.
+func (n *Node) SetUnicastManager(uniMgr p2p.UnicastManager) {
+	if n.uniMgr != nil {
+		n.logger.Fatal().Msg("unicast manager already set")
+	}
+	n.uniMgr = uniMgr
+}
+
+// OnDisallowListNotification is called when a new disallow list update notification is distributed.
+// Any error on consuming event must handle internally.
+// The implementation must be concurrency safe.
+// Args:
+//
+//	id: peer ID of the peer being disallow-listed.
+//	cause: cause of the peer being disallow-listed (only this cause is added to the peer's disallow-listed causes).
+//
+// Returns:
+//
+//	none
+func (n *Node) OnDisallowListNotification(peerId peer.ID, cause flownet.DisallowListedCause) {
+	causes, err := n.disallowListedCache.DisallowFor(peerId, cause)
+	if err != nil {
+		// returned error is fatal.
+		n.logger.Fatal().Err(err).Str("peer_id", peerId.String()).Msg("failed to add peer to disallow list")
+	}
+
+	// TODO: this code should further be refactored to also log the Flow id.
+	n.logger.Warn().
+		Str("peer_id", peerId.String()).
+		Str("notification_cause", cause.String()).
+		Str("causes", fmt.Sprintf("%v", causes)).
+		Msg("peer added to disallow list cache")
+}
+
+// OnAllowListNotification is called when a new allow list update notification is distributed.
+// Any error on consuming event must handle internally.
+// The implementation must be concurrency safe.
+// Args:
+//
+//	id: peer ID of the peer being allow-listed.
+//	cause: cause of the peer being allow-listed (only this cause is removed from the peer's disallow-listed causes).
+//
+// Returns:
+//
+//	none
+func (n *Node) OnAllowListNotification(peerId peer.ID, cause flownet.DisallowListedCause) {
+	remainingCauses := n.disallowListedCache.AllowFor(peerId, cause)
+
+	n.logger.Info().
+		Str("peer_id", peerId.String()).
+		Str("causes", fmt.Sprintf("%v", cause)).
+		Str("remaining_causes", fmt.Sprintf("%v", remainingCauses)).
+		Msg("peer is allow-listed for cause")
+}
+
+// IsDisallowListed determines whether the given peer is disallow-listed for any reason.
+// Args:
+// - peerID: the peer to check.
+// Returns:
+// - []network.DisallowListedCause: the list of causes for which the given peer is disallow-listed. If the peer is not disallow-listed for any reason,
+// a nil slice is returned.
+// - bool: true if the peer is disallow-listed for any reason, false otherwise.
+func (n *Node) IsDisallowListed(peerId peer.ID) ([]flownet.DisallowListedCause, bool) {
+	return n.disallowListedCache.IsDisallowListed(peerId)
 }

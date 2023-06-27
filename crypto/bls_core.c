@@ -22,24 +22,16 @@ int get_sk_len() {
 // checks an input scalar a satisfies 0 < a < r
 // where (r) is the order of G1/G2
 int check_membership_Zr_star(const bn_t a){
-    int ret; // return value
-    bn_t r;
-    bn_new(r); 
-    g2_get_ord(r);
-    if (bn_cmp(a,r) != RLC_LT || bn_cmp_dig(a, 0) != RLC_GT) ret = INVALID; 
-    else ret = VALID;
-    bn_free(r);
-    return ret;
+    if (bn_cmp(a, &core_get()->ep_r) != RLC_LT || bn_cmp_dig(a, 0) != RLC_GT) {
+        return INVALID; 
+    }
+    return VALID;
 }
 
-// checks if input point s is on the curve E1
-// and is in the subgroup G1. 
+// Checks if input point p is in the subgroup G1. 
+// The function assumes the input is known to be on the curve E1.
 int check_membership_G1(const ep_t p){
 #if MEMBERSHIP_CHECK
-    // check p is on curve
-    if (!ep_on_curve(p))
-        return INVALID;
-    // check p is in G1
     #if MEMBERSHIP_CHECK_G1 == EXP_ORDER
     return simple_subgroup_check_G1(p);
     #elif MEMBERSHIP_CHECK_G1 == BOWE
@@ -117,11 +109,13 @@ static int bls_verify_ep(const ep2_t pk, const ep_t s, const byte* data, const i
     // elemsG2[1] = pk
     ep2_new(elemsG2[1]);
     ep2_copy(elemsG2[1], (ep2_st*)pk);
+    ep2_new(&elemsG2[0]);
+
+    int ret = UNDEFINED;
 
 #if DOUBLE_PAIRING  
     // elemsG2[0] = -g2
-    ep2_new(&elemsG2[0]);
-    ep2_neg(elemsG2[0], core_get()->ep2_g); // could be hardcoded 
+    ep2_neg(elemsG2[0], core_get()->ep2_g); // could be hardcoded
 
     fp12_t pair;
     fp12_new(&pair);
@@ -138,17 +132,24 @@ static int bls_verify_ep(const ep2_t pk, const ep_t s, const byte* data, const i
     pp_map_oatep_k12(pair2, elemsG1[1], elemsG2[1]);
 
     int res = fp12_cmp(pair1, pair2);
-#endif
+#endif   
+    if (core_get()->code == RLC_OK) {
+        if (res == RLC_EQ) {
+            ret = VALID;
+            goto out;
+        } else {
+            ret = INVALID;
+            goto out;
+        }
+    }
+    
+out:
     ep_free(elemsG1[0]);
     ep_free(elemsG1[1]);
     ep2_free(elemsG2[0]);
     ep2_free(elemsG2[1]);
-    
-    if (core_get()->code == RLC_OK) {
-        if (res == RLC_EQ) return VALID;
-        return INVALID;
-    }
-    return UNDEFINED;
+
+    return ret;
 }
 
 
@@ -185,7 +186,7 @@ int bls_verifyPerDistinctMessage(const byte* sig,
     ret = ep_read_bin_compact(elemsG1[0], sig, SIGNATURE_LEN);
     if (ret != RLC_OK) goto out;
 
-    // check s is on curve and in G1
+    // check s is in G1
     ret = check_membership_G1(elemsG1[0]); // only enabled if MEMBERSHIP_CHECK==1
     if (ret != VALID) goto out;
 
@@ -269,7 +270,7 @@ int bls_verifyPerDistinctKey(const byte* sig,
     ret = ep_read_bin_compact(elemsG1[0], sig, SIGNATURE_LEN);
     if (ret != RLC_OK) goto out;
 
-    // check s is on curve and in G1
+    // check s in G1
     ret = check_membership_G1(elemsG1[0]); // only enabled if MEMBERSHIP_CHECK==1
     if (ret != VALID) goto out;
 
@@ -347,12 +348,12 @@ int bls_verify(const ep2_t pk, const byte* sig, const byte* data, const int len)
     ep_t s;
     ep_new(s);
     
-    // deserialize the signature
+    // deserialize the signature into a curve point
     int read_ret = ep_read_bin_compact(s, sig, SIGNATURE_LEN);
     if (read_ret != RLC_OK) 
         return read_ret;
 
-    // check s is on curve and in G1
+    // check s is in G1
     if (check_membership_G1(s) != VALID) // only enabled if MEMBERSHIP_CHECK==1
         return INVALID;
     
@@ -504,9 +505,10 @@ void bls_batchVerify(const int sigs_len, byte* results, const ep2_st* pks_input,
         if ( read_ret != RLC_OK || check_membership_G1(&sigs[i]) != VALID) {
             if (read_ret == UNDEFINED) // unexpected error case 
                 goto out;
-            // set signature as infinity and set result as invald
+            // set signature and key to infinity (no effect on the aggregation tree)
+            // and set result to invalid
             ep_set_infty(&sigs[i]);
-            ep2_copy(&pks[i], (ep2_st*) &pks_input[i]);
+            ep2_set_infty(&pks[i]);
             results[i] = INVALID;
         // multiply signatures and public keys at the same index by random coefficients
         } else {

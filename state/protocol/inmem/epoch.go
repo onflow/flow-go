@@ -18,6 +18,8 @@ type Epoch struct {
 	enc EncodableEpoch
 }
 
+var _ protocol.Epoch = (*Epoch)(nil)
+
 func (e Epoch) Encodable() EncodableEpoch {
 	return e.enc
 }
@@ -43,12 +45,12 @@ func (e Epoch) DKG() (protocol.DKG, error) {
 	if e.enc.DKG != nil {
 		return DKG{*e.enc.DKG}, nil
 	}
-	return nil, protocol.ErrEpochNotCommitted
+	return nil, protocol.ErrNextEpochNotCommitted
 }
 
 func (e Epoch) Cluster(i uint) (protocol.Cluster, error) {
 	if e.enc.Clusters == nil {
-		return nil, protocol.ErrEpochNotCommitted
+		return nil, protocol.ErrNextEpochNotCommitted
 	}
 
 	if i >= uint(len(e.enc.Clusters)) {
@@ -59,7 +61,7 @@ func (e Epoch) Cluster(i uint) (protocol.Cluster, error) {
 
 func (e Epoch) ClusterByChainID(chainID flow.ChainID) (protocol.Cluster, error) {
 	if e.enc.Clusters == nil {
-		return nil, protocol.ErrEpochNotCommitted
+		return nil, protocol.ErrNextEpochNotCommitted
 	}
 
 	for _, cluster := range e.enc.Clusters {
@@ -74,9 +76,25 @@ func (e Epoch) ClusterByChainID(chainID flow.ChainID) (protocol.Cluster, error) 
 	return nil, fmt.Errorf("no cluster with the given chain ID %v, available chainIDs %v: %w", chainID, chainIDs, protocol.ErrClusterNotFound)
 }
 
+func (e Epoch) FinalHeight() (uint64, error) {
+	if e.enc.FinalHeight != nil {
+		return *e.enc.FinalHeight, nil
+	}
+	return 0, protocol.ErrEpochTransitionNotFinalized
+}
+
+func (e Epoch) FirstHeight() (uint64, error) {
+	if e.enc.FirstHeight != nil {
+		return *e.enc.FirstHeight, nil
+	}
+	return 0, protocol.ErrEpochTransitionNotFinalized
+}
+
 type Epochs struct {
 	enc EncodableEpochs
 }
+
+var _ protocol.EpochQuery = (*Epochs)(nil)
 
 func (eq Epochs) Previous() protocol.Epoch {
 	if eq.enc.Previous != nil {
@@ -125,6 +143,10 @@ func (es *setupEpoch) FinalView() (uint64, error) {
 	return es.setupEvent.FinalView, nil
 }
 
+func (es *setupEpoch) RandomSource() ([]byte, error) {
+	return es.setupEvent.RandomSource, nil
+}
+
 func (es *setupEpoch) InitialIdentities() (flow.IdentityList, error) {
 	identities := es.setupEvent.Participants.Filter(filter.Any)
 	return identities, nil
@@ -144,19 +166,23 @@ func ClusteringFromSetupEvent(setupEvent *flow.EpochSetup) (flow.ClusterList, er
 }
 
 func (es *setupEpoch) Cluster(_ uint) (protocol.Cluster, error) {
-	return nil, protocol.ErrEpochNotCommitted
+	return nil, protocol.ErrNextEpochNotCommitted
 }
 
 func (es *setupEpoch) ClusterByChainID(_ flow.ChainID) (protocol.Cluster, error) {
-	return nil, protocol.ErrEpochNotCommitted
+	return nil, protocol.ErrNextEpochNotCommitted
 }
 
 func (es *setupEpoch) DKG() (protocol.DKG, error) {
-	return nil, protocol.ErrEpochNotCommitted
+	return nil, protocol.ErrNextEpochNotCommitted
 }
 
-func (es *setupEpoch) RandomSource() ([]byte, error) {
-	return es.setupEvent.RandomSource, nil
+func (es *setupEpoch) FirstHeight() (uint64, error) {
+	return 0, protocol.ErrEpochTransitionNotFinalized
+}
+
+func (es *setupEpoch) FinalHeight() (uint64, error) {
+	return 0, protocol.ErrEpochTransitionNotFinalized
 }
 
 // committedEpoch is an implementation of protocol.Epoch backed by an EpochSetup
@@ -176,15 +202,15 @@ func (es *committedEpoch) Cluster(index uint) (protocol.Cluster, error) {
 		return nil, fmt.Errorf("failed to generate clustering: %w", err)
 	}
 
-	// TODO: double check ByIndex returns canonical order
 	members, ok := clustering.ByIndex(index)
 	if !ok {
-		return nil, fmt.Errorf("failed to get members of cluster %d: %w", index, err)
+		return nil, fmt.Errorf("no cluster with index %d: %w", index, protocol.ErrClusterNotFound)
 	}
 
 	qcs := es.commitEvent.ClusterQCs
 	if uint(len(qcs)) <= index {
-		return nil, fmt.Errorf("no cluster with index %d", index)
+		return nil, fmt.Errorf("internal data inconsistency: cannot get qc at index %d - epoch has %d clusters and %d cluster QCs",
+			index, len(clustering), len(qcs))
 	}
 	rootQCVoteData := qcs[index]
 
@@ -211,6 +237,24 @@ func (es *committedEpoch) Cluster(index uint) (protocol.Cluster, error) {
 	return cluster, err
 }
 
+func (es *committedEpoch) ClusterByChainID(chainID flow.ChainID) (protocol.Cluster, error) {
+	clustering, err := es.Clustering()
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate clustering: %w", err)
+	}
+
+	for i, cl := range clustering {
+		if cluster.CanonicalClusterID(es.setupEvent.Counter, cl.NodeIDs()) == chainID {
+			cl, err := es.Cluster(uint(i))
+			if err != nil {
+				return nil, fmt.Errorf("could not retrieve known existing cluster (idx=%d, id=%s): %v", i, chainID, err)
+			}
+			return cl, nil
+		}
+	}
+	return nil, protocol.ErrClusterNotFound
+}
+
 func (es *committedEpoch) DKG() (protocol.DKG, error) {
 	// filter initial participants to valid DKG participants
 	participants := es.setupEvent.Participants.Filter(filter.IsValidDKGParticipant)
@@ -228,33 +272,83 @@ func (es *committedEpoch) DKG() (protocol.DKG, error) {
 	return dkg, err
 }
 
+// startedEpoch represents an epoch (with counter N) that has started, but there is no _finalized_ transition
+// to the next epoch yet. Note that nodes can already be in views belonging to the _next_ Epoch, and it is
+// possible that there are already unfinalized blocks in that next epoch. However, without finalized blocks
+// in Epoch N+1, there is no definition of "last block" for Epoch N.
+//
+// startedEpoch has all the information of a committedEpoch, plus the epoch's first block height.
+type startedEpoch struct {
+	committedEpoch
+	firstHeight uint64
+}
+
+func (e *startedEpoch) FirstHeight() (uint64, error) {
+	return e.firstHeight, nil
+}
+
+// endedEpoch is an epoch which has ended (ie. the previous epoch). It has all the
+// information of a startedEpoch, plus the epoch's final block height.
+type endedEpoch struct {
+	startedEpoch
+	finalHeight uint64
+}
+
+func (e *endedEpoch) FinalHeight() (uint64, error) {
+	return e.finalHeight, nil
+}
+
 // NewSetupEpoch returns a memory-backed epoch implementation based on an
 // EpochSetup event. Epoch information available after the setup phase will
 // not be accessible in the resulting epoch instance.
-// Error returns:
-// * protocol.ErrNoPreviousEpoch - if the epoch represents a previous epoch which does not exist.
-// * protocol.ErrNextEpochNotSetup - if the epoch represents a next epoch which has not been set up.
-// * state.ErrUnknownSnapshotReference - if the epoch is queried from an unresolvable snapshot.
-func NewSetupEpoch(setupEvent *flow.EpochSetup) (*Epoch, error) {
-	convertible := &setupEpoch{
+// No errors are expected during normal operations.
+func NewSetupEpoch(setupEvent *flow.EpochSetup) protocol.Epoch {
+	return &setupEpoch{
 		setupEvent: setupEvent,
 	}
-	return FromEpoch(convertible)
 }
 
 // NewCommittedEpoch returns a memory-backed epoch implementation based on an
-// EpochSetup and EpochCommit event.
-// Error returns:
-// * protocol.ErrNoPreviousEpoch - if the epoch represents a previous epoch which does not exist.
-// * protocol.ErrNextEpochNotSetup - if the epoch represents a next epoch which has not been set up.
-// * protocol.ErrEpochNotCommitted - if the epoch has not been committed.
-// * state.ErrUnknownSnapshotReference - if the epoch is queried from an unresolvable snapshot.
-func NewCommittedEpoch(setupEvent *flow.EpochSetup, commitEvent *flow.EpochCommit) (*Epoch, error) {
-	convertible := &committedEpoch{
+// EpochSetup and EpochCommit events.
+// No errors are expected during normal operations.
+func NewCommittedEpoch(setupEvent *flow.EpochSetup, commitEvent *flow.EpochCommit) protocol.Epoch {
+	return &committedEpoch{
 		setupEpoch: setupEpoch{
 			setupEvent: setupEvent,
 		},
 		commitEvent: commitEvent,
 	}
-	return FromEpoch(convertible)
+}
+
+// NewStartedEpoch returns a memory-backed epoch implementation based on an
+// EpochSetup and EpochCommit events, and the epoch's first block height.
+// No errors are expected during normal operations.
+func NewStartedEpoch(setupEvent *flow.EpochSetup, commitEvent *flow.EpochCommit, firstHeight uint64) protocol.Epoch {
+	return &startedEpoch{
+		committedEpoch: committedEpoch{
+			setupEpoch: setupEpoch{
+				setupEvent: setupEvent,
+			},
+			commitEvent: commitEvent,
+		},
+		firstHeight: firstHeight,
+	}
+}
+
+// NewEndedEpoch returns a memory-backed epoch implementation based on an
+// EpochSetup and EpochCommit events, and the epoch's final block height.
+// No errors are expected during normal operations.
+func NewEndedEpoch(setupEvent *flow.EpochSetup, commitEvent *flow.EpochCommit, firstHeight, finalHeight uint64) protocol.Epoch {
+	return &endedEpoch{
+		startedEpoch: startedEpoch{
+			committedEpoch: committedEpoch{
+				setupEpoch: setupEpoch{
+					setupEvent: setupEvent,
+				},
+				commitEvent: commitEvent,
+			},
+			firstHeight: firstHeight,
+		},
+		finalHeight: finalHeight,
+	}
 }

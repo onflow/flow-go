@@ -23,7 +23,6 @@ import (
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/irrecoverable"
-	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/codec"
@@ -33,7 +32,7 @@ import (
 	"github.com/onflow/flow-go/network/p2p/blob"
 	"github.com/onflow/flow-go/network/p2p/p2pnode"
 	"github.com/onflow/flow-go/network/p2p/ping"
-	"github.com/onflow/flow-go/network/p2p/unicast"
+	"github.com/onflow/flow-go/network/p2p/unicast/protocols"
 	"github.com/onflow/flow-go/network/p2p/unicast/ratelimit"
 	"github.com/onflow/flow-go/network/p2p/utils"
 	"github.com/onflow/flow-go/network/slashing"
@@ -63,6 +62,13 @@ const (
 
 	// LargeMsgUnicastTimeout is the maximum time to wait for a unicast request to complete for large message size
 	LargeMsgUnicastTimeout = 1000 * time.Second
+
+	// DisallowListCacheSize is the maximum number of peers that can be disallow-listed at a time. The recommended
+	// size is 100 * number of staked nodes. Note that when the cache is full, there is no eviction policy and
+	// disallow-listing a new peer will fail. Hence, the cache size should be set to a value that is large enough
+	// to accommodate all the peers that can be disallow-listed at a time. Also, note that this cache is only taking
+	// the staked (authorized) peers. Hence, Sybil attacks are not possible.
+	DisallowListCacheSize = 100 * 1000
 )
 
 var (
@@ -78,18 +84,18 @@ var (
 // our neighbours on the peer-to-peer network.
 type Middleware struct {
 	sync.Mutex
+	component.Component
 	ctx context.Context
 	log zerolog.Logger
 	ov  network.Overlay
+
 	// TODO: using a waitgroup here doesn't actually guarantee that we'll wait for all
 	// goroutines to exit, because new goroutines could be started after we've already
 	// returned from wg.Wait(). We need to solve this the right way using ComponentManager
 	// and worker routines.
-	wg                         *sync.WaitGroup
+	wg                         sync.WaitGroup
 	libP2PNode                 p2p.LibP2PNode
-	preferredUnicasts          []unicast.ProtocolName
-	me                         flow.Identifier
-	metrics                    module.NetworkMetrics
+	preferredUnicasts          []protocols.ProtocolName
 	bitswapMetrics             module.BitswapMetrics
 	rootBlockID                flow.Identifier
 	validators                 []network.MessageValidator
@@ -101,18 +107,17 @@ type Middleware struct {
 	slashingViolationsConsumer slashing.ViolationsConsumer
 	unicastRateLimiters        *ratelimit.RateLimiters
 	authorizedSenderValidator  *validator.AuthorizedSenderValidator
-	component.Component
 }
 
-type MiddlewareOption func(*Middleware)
+type OptionFn func(*Middleware)
 
-func WithMessageValidators(validators ...network.MessageValidator) MiddlewareOption {
+func WithMessageValidators(validators ...network.MessageValidator) OptionFn {
 	return func(mw *Middleware) {
 		mw.validators = validators
 	}
 }
 
-func WithPreferredUnicastProtocols(unicasts []unicast.ProtocolName) MiddlewareOption {
+func WithPreferredUnicastProtocols(unicasts []protocols.ProtocolName) OptionFn {
 	return func(mw *Middleware) {
 		mw.preferredUnicasts = unicasts
 	}
@@ -120,16 +125,36 @@ func WithPreferredUnicastProtocols(unicasts []unicast.ProtocolName) MiddlewareOp
 
 // WithPeerManagerFilters sets a list of p2p.PeerFilter funcs that are used to
 // filter out peers provided by the peer manager PeersProvider.
-func WithPeerManagerFilters(peerManagerFilters []p2p.PeerFilter) MiddlewareOption {
+func WithPeerManagerFilters(peerManagerFilters []p2p.PeerFilter) OptionFn {
 	return func(mw *Middleware) {
 		mw.peerManagerFilters = peerManagerFilters
 	}
 }
 
 // WithUnicastRateLimiters sets the unicast rate limiters.
-func WithUnicastRateLimiters(rateLimiters *ratelimit.RateLimiters) MiddlewareOption {
+func WithUnicastRateLimiters(rateLimiters *ratelimit.RateLimiters) OptionFn {
 	return func(mw *Middleware) {
 		mw.unicastRateLimiters = rateLimiters
+	}
+}
+
+// Config is the configuration for the middleware.
+type Config struct {
+	Logger                     zerolog.Logger
+	Libp2pNode                 p2p.LibP2PNode
+	FlowId                     flow.Identifier // This node's Flow ID
+	BitSwapMetrics             module.BitswapMetrics
+	RootBlockID                flow.Identifier
+	UnicastMessageTimeout      time.Duration
+	IdTranslator               p2p.IDTranslator
+	Codec                      network.Codec
+	SlashingViolationsConsumer slashing.ViolationsConsumer
+}
+
+// Validate validates the configuration, and sets default values for any missing fields.
+func (cfg *Config) Validate() {
+	if cfg.UnicastMessageTimeout <= 0 {
+		cfg.UnicastMessageTimeout = DefaultUnicastTimeout
 	}
 }
 
@@ -142,38 +167,20 @@ func WithUnicastRateLimiters(rateLimiters *ratelimit.RateLimiters) MiddlewareOpt
 // validators are the set of the different message validators that each inbound messages is passed through
 // During normal operations any error returned by Middleware.start is considered to be catastrophic
 // and will be thrown by the irrecoverable.SignalerContext causing the node to crash.
-func NewMiddleware(
-	log zerolog.Logger,
-	libP2PNode p2p.LibP2PNode,
-	flowID flow.Identifier,
-	met module.NetworkMetrics,
-	bitswapMet module.BitswapMetrics,
-	rootBlockID flow.Identifier,
-	unicastMessageTimeout time.Duration,
-	idTranslator p2p.IDTranslator,
-	codec network.Codec,
-	slashingViolationsConsumer slashing.ViolationsConsumer,
-	opts ...MiddlewareOption,
-) *Middleware {
-
-	if unicastMessageTimeout <= 0 {
-		unicastMessageTimeout = DefaultUnicastTimeout
-	}
+func NewMiddleware(cfg *Config, opts ...OptionFn) *Middleware {
+	cfg.Validate()
 
 	// create the node entity and inject dependencies & config
 	mw := &Middleware{
-		log:                        log,
-		wg:                         &sync.WaitGroup{},
-		me:                         flowID,
-		libP2PNode:                 libP2PNode,
-		metrics:                    met,
-		bitswapMetrics:             bitswapMet,
-		rootBlockID:                rootBlockID,
-		validators:                 DefaultValidators(log, flowID),
-		unicastMessageTimeout:      unicastMessageTimeout,
-		idTranslator:               idTranslator,
-		codec:                      codec,
-		slashingViolationsConsumer: slashingViolationsConsumer,
+		log:                        cfg.Logger,
+		libP2PNode:                 cfg.Libp2pNode,
+		bitswapMetrics:             cfg.BitSwapMetrics,
+		rootBlockID:                cfg.RootBlockID,
+		validators:                 DefaultValidators(cfg.Logger, cfg.FlowId),
+		unicastMessageTimeout:      cfg.UnicastMessageTimeout,
+		idTranslator:               cfg.IdTranslator,
+		codec:                      cfg.Codec,
+		slashingViolationsConsumer: cfg.SlashingViolationsConsumer,
 		unicastRateLimiters:        ratelimit.NoopRateLimiters(),
 	}
 
@@ -181,33 +188,47 @@ func NewMiddleware(
 		opt(mw)
 	}
 
-	cm := component.NewComponentManagerBuilder().
-		AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
-			// TODO: refactor to avoid storing ctx altogether
-			mw.ctx = ctx
-
-			if err := mw.start(ctx); err != nil {
-				ctx.Throw(err)
-			}
-
+	builder := component.NewComponentManagerBuilder()
+	for _, limiter := range mw.unicastRateLimiters.Limiters() {
+		rateLimiter := limiter
+		builder.AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 			ready()
+			rateLimiter.Start(ctx)
+			<-rateLimiter.Ready()
+			ready()
+			<-rateLimiter.Done()
+		})
+	}
+	builder.AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+		mw.ctx = ctx
+		if mw.ov == nil {
+			ctx.Throw(fmt.Errorf("overlay has not been set"))
+		}
 
-			<-ctx.Done()
-			mw.log.Info().Str("component", "middleware").Msg("stopping subroutines")
+		mw.authorizedSenderValidator = validator.NewAuthorizedSenderValidator(
+			mw.log,
+			mw.slashingViolationsConsumer,
+			mw.ov.Identity)
 
-			// wait for the readConnection and readSubscription routines to stop
-			mw.wg.Wait()
+		err := mw.libP2PNode.WithDefaultUnicastProtocol(mw.handleIncomingStream, mw.preferredUnicasts)
+		if err != nil {
+			ctx.Throw(fmt.Errorf("could not register preferred unicast protocols on libp2p node: %w", err))
+		}
 
-			mw.log.Info().Str("component", "middleware").Msg("stopped subroutines")
+		mw.UpdateNodeAddresses()
+		mw.libP2PNode.WithPeersProvider(mw.authorizedPeers)
 
-			// clean up rate limiter resources
-			mw.unicastRateLimiters.Stop()
-			mw.log.Info().Str("component", "middleware").Msg("cleaned up unicast rate limiter resources")
+		ready()
 
-		}).Build()
+		<-ctx.Done()
+		mw.log.Info().Str("component", "middleware").Msg("stopping subroutines")
 
-	mw.Component = cm
+		// wait for the readConnection and readSubscription routines to stop
+		mw.wg.Wait()
+		mw.log.Info().Str("component", "middleware").Msg("stopped subroutines")
+	})
 
+	mw.Component = builder.Build()
 	return mw
 }
 
@@ -237,7 +258,7 @@ func (m *Middleware) NewPingService(pingProtocol protocol.ID, provider network.P
 }
 
 func (m *Middleware) peerIDs(flowIDs flow.IdentifierList) peer.IDSlice {
-	result := make([]peer.ID, len(flowIDs))
+	result := make([]peer.ID, 0, len(flowIDs))
 
 	for _, fid := range flowIDs {
 		pid, err := m.idTranslator.GetPeerID(fid)
@@ -252,22 +273,6 @@ func (m *Middleware) peerIDs(flowIDs flow.IdentifierList) peer.IDSlice {
 	}
 
 	return result
-}
-
-// Me returns the flow identifier of this middleware
-func (m *Middleware) Me() flow.Identifier {
-	return m.me
-}
-
-// GetIPPort returns the ip address and port number associated with the middleware
-// All errors returned from this function can be considered benign.
-func (m *Middleware) GetIPPort() (string, string, error) {
-	ipOrHostname, port, err := m.libP2PNode.GetIPPort()
-	if err != nil {
-		return "", "", fmt.Errorf("failed to get ip and port from libP2P node: %w", err)
-	}
-
-	return ipOrHostname, port, nil
 }
 
 func (m *Middleware) UpdateNodeAddresses() {
@@ -299,34 +304,18 @@ func (m *Middleware) SetOverlay(ov network.Overlay) {
 	m.ov = ov
 }
 
-// start will start the middleware.
-// No errors are expected during normal operation.
-func (m *Middleware) start(ctx context.Context) error {
-	if m.ov == nil {
-		return fmt.Errorf("could not start middleware: overlay must be configured by calling SetOverlay before middleware can be started")
-	}
-
-	m.authorizedSenderValidator = validator.NewAuthorizedSenderValidator(m.log, m.slashingViolationsConsumer, m.ov.Identity)
-
-	err := m.libP2PNode.WithDefaultUnicastProtocol(m.handleIncomingStream, m.preferredUnicasts)
-	if err != nil {
-		return fmt.Errorf("could not register preferred unicast protocols on libp2p node: %w", err)
-	}
-
-	m.UpdateNodeAddresses()
-
-	m.libP2PNode.WithPeersProvider(m.topologyPeers)
-
-	// starting rate limiters kicks off cleanup loop
-	m.unicastRateLimiters.Start()
-
-	return nil
-}
-
-// topologyPeers callback used by the peer manager to get the list of peer ID's
-// which this node should be directly connected to as peers. The peer ID list
-// returned will be filtered through any configured m.peerManagerFilters.
-func (m *Middleware) topologyPeers() peer.IDSlice {
+// authorizedPeers is a peer manager callback used by the underlying libp2p node that updates who can connect to this node (as
+// well as who this node can connect to).
+// and who is not allowed to connect to this node. This function is called by the peer manager and connection gater components
+// of libp2p.
+//
+// Args:
+// none
+// Returns:
+// - peer.IDSlice: a list of peer IDs that are allowed to connect to this node (and that this node can connect to). Any peer
+// not in this list is assumed to be disconnected from this node (if connected) and not allowed to connect to this node.
+// This is the guarantee that the underlying libp2p node implementation makes.
+func (m *Middleware) authorizedPeers() peer.IDSlice {
 	peerIDs := make([]peer.ID, 0)
 	for _, id := range m.peerIDs(m.ov.Topology().NodeIDs()) {
 		peerAllowed := true
@@ -350,6 +339,18 @@ func (m *Middleware) topologyPeers() peer.IDSlice {
 	return peerIDs
 }
 
+func (m *Middleware) OnDisallowListNotification(notification *network.DisallowListingUpdate) {
+	for _, pid := range m.peerIDs(notification.FlowIds) {
+		m.libP2PNode.OnDisallowListNotification(pid, notification.Cause)
+	}
+}
+
+func (m *Middleware) OnAllowListNotification(notification *network.AllowListingUpdate) {
+	for _, pid := range m.peerIDs(notification.FlowIds) {
+		m.libP2PNode.OnAllowListNotification(pid, notification.Cause)
+	}
+}
+
 // SendDirect sends msg on a 1-1 direct connection to the target ID. It models a guaranteed delivery asynchronous
 // direct one-to-one connection on the underlying network. No intermediate node on the overlay is utilized
 // as the router.
@@ -363,14 +364,14 @@ func (m *Middleware) topologyPeers() peer.IDSlice {
 // - failed to send message to peer.
 //
 // All errors returned from this function can be considered benign.
-func (m *Middleware) SendDirect(msg *message.Message, targetID flow.Identifier) (err error) {
-	// translates identifier to peer id
-	peerID, err := m.idTranslator.GetPeerID(targetID)
+func (m *Middleware) SendDirect(msg *network.OutgoingMessageScope) error {
+	// since it is a unicast, we only need to get the first peer ID.
+	peerID, err := m.idTranslator.GetPeerID(msg.TargetIds()[0])
 	if err != nil {
 		return fmt.Errorf("could not find peer id for target id: %w", err)
 	}
 
-	maxMsgSize := unicastMaxMsgSize(msg)
+	maxMsgSize := unicastMaxMsgSize(msg.PayloadType())
 	if msg.Size() > maxMsgSize {
 		// message size goes beyond maximum size that the serializer can handle.
 		// proceeding with this message results in closing the connection by the target side, and
@@ -378,10 +379,7 @@ func (m *Middleware) SendDirect(msg *message.Message, targetID flow.Identifier) 
 		return fmt.Errorf("message size %d exceeds configured max message size %d", msg.Size(), maxMsgSize)
 	}
 
-	maxTimeout := m.unicastMaxMsgDuration(msg)
-
-	m.metrics.DirectMessageStarted(msg.ChannelID)
-	defer m.metrics.DirectMessageFinished(msg.ChannelID)
+	maxTimeout := m.unicastMaxMsgDuration(msg.PayloadType())
 
 	// pass in a context with timeout to make the unicast call fail fast
 	ctx, cancel := context.WithTimeout(m.ctx, maxTimeout)
@@ -389,7 +387,7 @@ func (m *Middleware) SendDirect(msg *message.Message, targetID flow.Identifier) 
 
 	// protect the underlying connection from being inadvertently pruned by the peer manager while the stream and
 	// connection creation is being attempted, and remove it from protected list once stream created.
-	tag := fmt.Sprintf("%v:%v", msg.ChannelID, msg.Type)
+	tag := fmt.Sprintf("%v:%v", msg.Channel(), msg.PayloadType())
 	m.libP2PNode.Host().ConnManager().Protect(peerID, tag)
 	defer m.libP2PNode.Host().ConnManager().Unprotect(peerID, tag)
 
@@ -399,7 +397,7 @@ func (m *Middleware) SendDirect(msg *message.Message, targetID flow.Identifier) 
 	// sent out the receiver
 	stream, err := m.libP2PNode.CreateStream(ctx, peerID)
 	if err != nil {
-		return fmt.Errorf("failed to create stream for %s: %w", targetID, err)
+		return fmt.Errorf("failed to create stream for %s: %w", msg.TargetIds()[0], err)
 	}
 
 	success := false
@@ -409,11 +407,8 @@ func (m *Middleware) SendDirect(msg *message.Message, targetID flow.Identifier) 
 			// close the stream immediately
 			err = stream.Close()
 			if err != nil {
-				err = fmt.Errorf("failed to close the stream for %s: %w", targetID, err)
+				err = fmt.Errorf("failed to close the stream for %s: %w", msg.TargetIds()[0], err)
 			}
-
-			// OneToOne communication metrics are reported with topic OneToOne
-			m.metrics.NetworkMessageSent(msg.Size(), metrics.ChannelOneToOne, msg.Type)
 		} else {
 			resetErr := stream.Reset()
 			if resetErr != nil {
@@ -432,15 +427,15 @@ func (m *Middleware) SendDirect(msg *message.Message, targetID flow.Identifier) 
 	bufw := bufio.NewWriter(stream)
 	writer := ggio.NewDelimitedWriter(bufw)
 
-	err = writer.WriteMsg(msg)
+	err = writer.WriteMsg(msg.Proto())
 	if err != nil {
-		return fmt.Errorf("failed to send message to %s: %w", targetID, err)
+		return fmt.Errorf("failed to send message to %s: %w", msg.TargetIds()[0], err)
 	}
 
 	// flush the stream
 	err = bufw.Flush()
 	if err != nil {
-		return fmt.Errorf("failed to flush stream for %s: %w", targetID, err)
+		return fmt.Errorf("failed to flush stream for %s: %w", msg.TargetIds()[0], err)
 	}
 
 	success = true
@@ -523,10 +518,19 @@ func (m *Middleware) handleIncomingStream(s libp2pnetwork.Stream) {
 
 		// ignore messages if node does not have subscription to topic
 		if !m.libP2PNode.HasSubscription(topic) {
-			violation := &slashing.Violation{Identity: nil, PeerID: remotePeer.String(), Channel: channel, Protocol: message.ProtocolUnicast}
+			violation := &slashing.Violation{
+				Identity: nil, PeerID: remotePeer.String(), Channel: channel, Protocol: message.ProtocolTypeUnicast,
+			}
+
+			msgCode, err := codec.MessageCodeFromPayload(msg.Payload)
+			if err != nil {
+				violation.Err = err
+				m.slashingViolationsConsumer.OnUnknownMsgTypeError(violation)
+				return
+			}
 
 			// msg type is not guaranteed to be correct since it is set by the client
-			_, what, err := codec.InterfaceFromMessageCode(msg.Payload[0])
+			_, what, err := codec.InterfaceFromMessageCode(msgCode)
 			if err != nil {
 				violation.Err = err
 				m.slashingViolationsConsumer.OnUnknownMsgTypeError(violation)
@@ -553,7 +557,12 @@ func (m *Middleware) handleIncomingStream(s libp2pnetwork.Stream) {
 		}
 
 		// check unicast bandwidth rate limiter for peer
-		if !m.unicastRateLimiters.BandwidthAllowed(remotePeer, role, &msg) {
+		if !m.unicastRateLimiters.BandwidthAllowed(
+			remotePeer,
+			role,
+			msg.Size(),
+			network.MessageType(msg.Payload),
+			channels.Topic(msg.ChannelID)) {
 			return
 		}
 
@@ -578,35 +587,41 @@ func (m *Middleware) Subscribe(channel channels.Channel) error {
 	if channels.IsPublicChannel(channel) {
 		// NOTE: for public channels the callback used to check if a node is staked will
 		// return true for every node.
-		peerFilter = p2putils.AllowAllPeerFilter()
+		peerFilter = p2p.AllowAllPeerFilter()
 	} else {
 		// for channels used by the staked nodes, add the topic validator to filter out messages from non-staked nodes
-		validators = append(validators,
-			m.authorizedSenderValidator.PubSubMessageValidator(channel),
-		)
+		validators = append(validators, m.authorizedSenderValidator.PubSubMessageValidator(channel))
 
 		// NOTE: For non-public channels the libP2P node topic validator will reject
 		// messages from unstaked nodes.
 		peerFilter = m.isProtocolParticipant()
 	}
 
-	topicValidator := flowpubsub.TopicValidator(m.log, m.codec, m.slashingViolationsConsumer, peerFilter, validators...)
+	topicValidator := flowpubsub.TopicValidator(m.log, peerFilter, validators...)
 	s, err := m.libP2PNode.Subscribe(topic, topicValidator)
 	if err != nil {
 		return fmt.Errorf("could not subscribe to topic (%s): %w", topic, err)
 	}
 
 	// create a new readSubscription with the context of the middleware
-	rs := newReadSubscription(m.ctx, s, m.processAuthenticatedMessage, m.log, m.metrics)
+	rs := newReadSubscription(s, m.processPubSubMessages, m.log)
 	m.wg.Add(1)
 
 	// kick off the receive loop to continuously receive messages
-	go rs.receiveLoop(m.wg)
+	go func() {
+		defer m.wg.Done()
+		rs.receiveLoop(m.ctx)
+	}()
 
 	// update peers to add some nodes interested in the same topic as direct peers
 	m.libP2PNode.RequestPeerUpdate()
 
 	return nil
+}
+
+// processPubSubMessages processes messages received from the pubsub subscription.
+func (m *Middleware) processPubSubMessages(msg *message.Message, peerID peer.ID) {
+	m.processAuthenticatedMessage(msg, peerID, message.ProtocolTypePubSub)
 }
 
 // Unsubscribe unsubscribes the middleware from a channel.
@@ -631,38 +646,16 @@ func (m *Middleware) Unsubscribe(channel channels.Channel) error {
 // sent via unicast stream. This func should be invoked in a separate goroutine to avoid creating a message decoding bottleneck.
 func (m *Middleware) processUnicastStreamMessage(remotePeer peer.ID, msg *message.Message) {
 	channel := channels.Channel(msg.ChannelID)
-	decodedMsgPayload, err := m.codec.Decode(msg.Payload)
-	if codec.IsErrUnknownMsgCode(err) {
-		// slash peer if message contains unknown message code byte
-		violation := &slashing.Violation{PeerID: remotePeer.String(), Channel: channel, Protocol: message.ProtocolUnicast, Err: err}
-		m.slashingViolationsConsumer.OnUnknownMsgTypeError(violation)
-		return
-	}
-	if codec.IsErrMsgUnmarshal(err) || codec.IsErrInvalidEncoding(err) {
-		// slash if peer sent a message that could not be marshalled into the message type denoted by the message code byte
-		violation := &slashing.Violation{PeerID: remotePeer.String(), Channel: channel, Protocol: message.ProtocolUnicast, Err: err}
-		m.slashingViolationsConsumer.OnInvalidMsgError(violation)
-		return
-	}
-
-	// unexpected error condition. this indicates there's a bug
-	// don't crash as a result of external inputs since that creates a DoS vector.
-	if err != nil {
-		m.log.
-			Error().
-			Err(fmt.Errorf("unexpected error while decoding message: %w", err)).
-			Str("peer_id", remotePeer.String()).
-			Str("channel", msg.ChannelID).
-			Bool(logging.KeySuspicious, true).
-			Msg("failed to decode message payload")
-		return
-	}
-
-	msg.Type = p2p.MessageType(decodedMsgPayload)
 
 	// TODO: once we've implemented per topic message size limits per the TODO above,
 	// we can remove this check
-	maxSize := unicastMaxMsgSize(msg)
+	maxSize, err := unicastMaxMsgSizeByCode(msg.Payload)
+	if err != nil {
+		m.slashingViolationsConsumer.OnUnknownMsgTypeError(&slashing.Violation{
+			Identity: nil, PeerID: remotePeer.String(), MsgType: "", Channel: channel, Protocol: message.ProtocolTypeUnicast, Err: err,
+		})
+		return
+	}
 	if msg.Size() > maxSize {
 		// message size exceeded
 		m.log.Error().
@@ -677,30 +670,25 @@ func (m *Middleware) processUnicastStreamMessage(remotePeer peer.ID, msg *messag
 
 	// if message channel is not public perform authorized sender validation
 	if !channels.IsPublicChannel(channel) {
-		_, err := m.authorizedSenderValidator.Validate(remotePeer, decodedMsgPayload, channel, message.ProtocolUnicast)
+		messageType, err := m.authorizedSenderValidator.Validate(remotePeer, msg.Payload, channel, message.ProtocolTypeUnicast)
 		if err != nil {
 			m.log.
 				Error().
 				Err(err).
 				Str("peer_id", remotePeer.String()).
-				Str("type", msg.Type).
+				Str("type", messageType).
 				Str("channel", msg.ChannelID).
 				Msg("unicast authorized sender validation failed")
 			return
 		}
 	}
-
-	// message decoding and validation was successful now log metrics with the channel name as OneToOne and process message
-	m.metrics.NetworkMessageReceived(msg.Size(), metrics.ChannelOneToOne, msg.Type)
-	m.processAuthenticatedMessage(msg, decodedMsgPayload, remotePeer)
+	m.processAuthenticatedMessage(msg, remotePeer, message.ProtocolTypeUnicast)
 }
 
 // processAuthenticatedMessage processes a message and a source (indicated by its peer ID) and eventually passes it to the overlay
 // In particular, it populates the `OriginID` field of the message with a Flow ID translated from this source.
-// The assumption is that the message has been authenticated at the network level (libp2p) to originate from the peer with ID `peerID`
-// this requirement is fulfilled by e.g. the output of readConnection and readSubscription
-func (m *Middleware) processAuthenticatedMessage(msg *message.Message, decodedMsgPayload interface{}, peerID peer.ID) {
-	flowID, err := m.idTranslator.GetFlowID(peerID)
+func (m *Middleware) processAuthenticatedMessage(msg *message.Message, peerID peer.ID, protocol message.ProtocolType) {
+	originId, err := m.idTranslator.GetFlowID(peerID)
 	if err != nil {
 		// this error should never happen. by the time the message gets here, the peer should be
 		// authenticated which means it must be known
@@ -713,40 +701,61 @@ func (m *Middleware) processAuthenticatedMessage(msg *message.Message, decodedMs
 	}
 
 	channel := channels.Channel(msg.ChannelID)
-	eventID, err := p2p.EventId(channel, msg.GetPayload())
+	decodedMsgPayload, err := m.codec.Decode(msg.Payload)
+	switch {
+	case codec.IsErrUnknownMsgCode(err):
+		// slash peer if message contains unknown message code byte
+		violation := &slashing.Violation{
+			PeerID: peerID.String(), OriginID: originId, Channel: channel, Protocol: protocol, Err: err,
+		}
+		m.slashingViolationsConsumer.OnUnknownMsgTypeError(violation)
+		return
+	case codec.IsErrMsgUnmarshal(err) || codec.IsErrInvalidEncoding(err):
+		// slash if peer sent a message that could not be marshalled into the message type denoted by the message code byte
+		violation := &slashing.Violation{
+			PeerID: peerID.String(), OriginID: originId, Channel: channel, Protocol: protocol, Err: err,
+		}
+		m.slashingViolationsConsumer.OnInvalidMsgError(violation)
+		return
+	case err != nil:
+		// this condition should never happen and indicates there's a bug
+		// don't crash as a result of external inputs since that creates a DoS vector
+		// collect slashing data because this could potentially lead to slashing
+		err = fmt.Errorf("unexpected error during message validation: %w", err)
+		violation := &slashing.Violation{
+			PeerID: peerID.String(), OriginID: originId, Channel: channel, Protocol: protocol, Err: err,
+		}
+		m.slashingViolationsConsumer.OnUnexpectedError(violation)
+		return
+	}
+
+	scope, err := network.NewIncomingScope(originId, protocol, msg, decodedMsgPayload)
 	if err != nil {
 		m.log.Error().
 			Err(err).
 			Str("peer_id", peerID.String()).
-			Bool(logging.KeySuspicious, true).
-			Msgf("could not generate event ID for message")
+			Str("origin_id", originId.String()).
+			Msg("could not create incoming message scope")
 		return
 	}
 
-	// Override values in message since they can't be trusted as-is
-	// TODO: remove these from the message struct entirely since they must be explicitly validated
-	msg.OriginID = flowID[:]
-	msg.EventID = eventID
-	msg.Type = p2p.MessageType(decodedMsgPayload)
-
-	m.processMessage(msg, decodedMsgPayload)
+	m.processMessage(scope)
 }
 
 // processMessage processes a message and eventually passes it to the overlay
-func (m *Middleware) processMessage(msg *message.Message, decodedMsgPayload interface{}) {
-	originID := flow.HashToID(msg.OriginID)
+func (m *Middleware) processMessage(scope *network.IncomingMessageScope) {
 
 	logger := m.log.With().
-		Str("channel", msg.ChannelID).
-		Str("type", msg.Type).
-		Int("msg_size", msg.Size()).
-		Str("origin_id", originID.String()).
+		Str("channel", scope.Channel().String()).
+		Str("type", scope.Protocol().String()).
+		Int("msg_size", scope.Size()).
+		Hex("origin_id", logging.ID(scope.OriginId())).
 		Logger()
 
 	// run through all the message validators
 	for _, v := range m.validators {
 		// if any one fails, stop message propagation
-		if !v.Validate(*msg) {
+		if !v.Validate(*scope) {
 			logger.Debug().Msg("new message filtered by message validators")
 			return
 		}
@@ -755,7 +764,7 @@ func (m *Middleware) processMessage(msg *message.Message, decodedMsgPayload inte
 	logger.Debug().Msg("processing new message")
 
 	// if validation passed, send the message to the overlay
-	err := m.ov.Receive(originID, msg, decodedMsgPayload)
+	err := m.ov.Receive(scope)
 	if err != nil {
 		m.log.Error().Err(err).Msg("could not deliver payload")
 	}
@@ -770,13 +779,16 @@ func (m *Middleware) processMessage(msg *message.Message, decodedMsgPayload inte
 // - the libP2P node fails to publish the message.
 //
 // All errors returned from this function can be considered benign.
-func (m *Middleware) Publish(msg *message.Message, channel channels.Channel) error {
-	m.log.Debug().Str("channel", channel.String()).Interface("msg", msg).Msg("publishing new message")
+func (m *Middleware) Publish(msg *network.OutgoingMessageScope) error {
+	m.log.Debug().
+		Str("channel", msg.Channel().String()).
+		Interface("msg", msg.Proto()).
+		Str("type", msg.PayloadType()).
+		Int("msg_size", msg.Size()).
+		Msg("publishing new message")
 
 	// convert the message to bytes to be put on the wire.
-	//bs := binstat.EnterTime(binstat.BinNet + ":wire<4message2protobuf")
-	data, err := msg.Marshal()
-	//binstat.LeaveVal(bs, int64(len(data)))
+	data, err := msg.Proto().Marshal()
 	if err != nil {
 		return fmt.Errorf("failed to marshal the message: %w", err)
 	}
@@ -788,15 +800,13 @@ func (m *Middleware) Publish(msg *message.Message, channel channels.Channel) err
 		return fmt.Errorf("message size %d exceeds configured max message size %d", msgSize, p2pnode.DefaultMaxPubSubMsgSize)
 	}
 
-	topic := channels.TopicFromChannel(channel, m.rootBlockID)
+	topic := channels.TopicFromChannel(msg.Channel(), m.rootBlockID)
 
 	// publish the bytes on the topic
 	err = m.libP2PNode.Publish(m.ctx, topic, data)
 	if err != nil {
 		return fmt.Errorf("failed to publish the message: %w", err)
 	}
-
-	m.metrics.NetworkMessageSent(len(data), string(channel), msg.Type)
 
 	return nil
 }
@@ -812,8 +822,8 @@ func (m *Middleware) IsConnected(nodeID flow.Identifier) (bool, error) {
 }
 
 // unicastMaxMsgSize returns the max permissible size for a unicast message
-func unicastMaxMsgSize(msg *message.Message) int {
-	switch msg.Type {
+func unicastMaxMsgSize(messageType string) int {
+	switch messageType {
 	case "messages.ChunkDataResponse":
 		return LargeMsgMaxUnicastMsgSize
 	default:
@@ -821,9 +831,24 @@ func unicastMaxMsgSize(msg *message.Message) int {
 	}
 }
 
+// unicastMaxMsgSizeByCode returns the max permissible size for a unicast message code
+func unicastMaxMsgSizeByCode(payload []byte) (int, error) {
+	msgCode, err := codec.MessageCodeFromPayload(payload)
+	if err != nil {
+		return 0, err
+	}
+	_, messageType, err := codec.InterfaceFromMessageCode(msgCode)
+	if err != nil {
+		return 0, err
+	}
+
+	maxSize := unicastMaxMsgSize(messageType)
+	return maxSize, nil
+}
+
 // unicastMaxMsgDuration returns the max duration to allow for a unicast send to complete
-func (m *Middleware) unicastMaxMsgDuration(msg *message.Message) time.Duration {
-	switch msg.Type {
+func (m *Middleware) unicastMaxMsgDuration(messageType string) time.Duration {
+	switch messageType {
 	case "messages.ChunkDataResponse":
 		if LargeMsgUnicastTimeout > m.unicastMessageTimeout {
 			return LargeMsgUnicastTimeout

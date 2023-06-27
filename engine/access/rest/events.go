@@ -33,7 +33,7 @@ func GetEvents(r *request.Request, backend access.API, _ models.LinkGenerator) (
 
 	// if end height is provided with special values then load the height
 	if req.EndHeight == request.FinalHeight || req.EndHeight == request.SealedHeight {
-		latest, err := backend.GetLatestBlockHeader(r.Context(), req.EndHeight == request.SealedHeight)
+		latest, _, err := backend.GetLatestBlockHeader(r.Context(), req.EndHeight == request.SealedHeight)
 		if err != nil {
 			return nil, err
 		}

@@ -1,7 +1,6 @@
 package test
 
 import (
-	"context"
 	"sync"
 	"testing"
 	"time"
@@ -17,7 +16,6 @@ import (
 	"github.com/onflow/flow-go/model/flow/factory"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module"
-	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/util"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/mocknetwork"
@@ -90,7 +88,7 @@ func NewClusterSwitchoverTestCase(t *testing.T, conf ClusterSwitchoverTestConf) 
 
 	// create a root snapshot with the given number of initial clusters
 	root, result, seal := unittest.BootstrapFixture(tc.identities)
-	qc := unittest.QuorumCertificateFixture(unittest.QCWithBlockID(root.ID()))
+	qc := unittest.QuorumCertificateFixture(unittest.QCWithRootBlockID(root.ID()))
 	setup := result.ServiceEvents[0].Event.(*flow.EpochSetup)
 	commit := result.ServiceEvents[1].Event.(*flow.EpochCommit)
 
@@ -101,14 +99,9 @@ func NewClusterSwitchoverTestCase(t *testing.T, conf ClusterSwitchoverTestConf) 
 	tc.root, err = inmem.SnapshotFromBootstrapState(root, result, seal, qc)
 	require.NoError(t, err)
 
-	cancelCtx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	ctx := irrecoverable.NewMockSignalerContext(t, cancelCtx)
-	defer cancel()
-
 	// create a mock node for each collector identity
 	for _, collector := range nodeInfos {
-		node := testutil.CollectionNode(tc.T(), ctx, tc.hub, collector, tc.root)
+		node := testutil.CollectionNode(tc.T(), tc.hub, collector, tc.root)
 		tc.nodes = append(tc.nodes, node)
 	}
 
@@ -124,7 +117,7 @@ func NewClusterSwitchoverTestCase(t *testing.T, conf ClusterSwitchoverTestConf) 
 	require.NoError(tc.T(), err)
 
 	// create an epoch builder hooked to each collector's protocol state
-	states := make([]protocol.MutableState, 0, len(collectors))
+	states := make([]protocol.FollowerState, 0, len(collectors))
 	for _, node := range tc.nodes {
 		states = append(states, node.State)
 	}
@@ -215,6 +208,7 @@ func (tc *ClusterSwitchoverTestCase) StartNodes() {
 	// start all node components
 	nodes := make([]module.ReadyDoneAware, 0, len(tc.nodes))
 	for _, node := range tc.nodes {
+		node.Start(tc.T())
 		nodes = append(nodes, node)
 	}
 
@@ -273,8 +267,8 @@ func (tc *ClusterSwitchoverTestCase) ExpectTransaction(epochCounter uint64, clus
 }
 
 // ClusterState opens and returns a read-only cluster state for the given node and cluster ID.
-func (tc *ClusterSwitchoverTestCase) ClusterState(node testmock.CollectionNode, clusterID flow.ChainID) cluster.State {
-	state, err := bcluster.OpenState(node.PublicDB, node.Tracer, node.Headers, node.ClusterPayloads, clusterID)
+func (tc *ClusterSwitchoverTestCase) ClusterState(node testmock.CollectionNode, clusterID flow.ChainID, epoch uint64) cluster.State {
+	state, err := bcluster.OpenState(node.PublicDB, node.Tracer, node.Headers, node.ClusterPayloads, clusterID, epoch)
 	require.NoError(tc.T(), err)
 	return state
 }
@@ -370,7 +364,7 @@ func (tc *ClusterSwitchoverTestCase) CheckClusterState(
 	clusterInfo protocol.Cluster,
 ) {
 	node := tc.Collector(identity.NodeID)
-	state := tc.ClusterState(node, clusterInfo.ChainID())
+	state := tc.ClusterState(node, clusterInfo.ChainID(), clusterInfo.EpochCounter())
 	expected := tc.sentTransactions[clusterInfo.EpochCounter()][clusterInfo.Index()]
 	unittest.NewClusterStateChecker(state).
 		ExpectTxCount(len(expected)).

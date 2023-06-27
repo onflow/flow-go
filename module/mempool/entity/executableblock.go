@@ -86,6 +86,25 @@ func (b *ExecutableBlock) Collections() []*CompleteCollection {
 	return collections
 }
 
+// CompleteCollectionAt returns a complete collection at the given index,
+// if index out of range, nil will be returned
+func (b *ExecutableBlock) CompleteCollectionAt(index int) *CompleteCollection {
+	if index < 0 || index >= len(b.Block.Payload.Guarantees) {
+		return nil
+	}
+	return b.CompleteCollections[b.Block.Payload.Guarantees[index].ID()]
+}
+
+// CollectionAt returns a collection at the given index,
+// if index out of range, nil will be returned
+func (b *ExecutableBlock) CollectionAt(index int) *flow.Collection {
+	cc := b.CompleteCollectionAt(index)
+	if cc == nil {
+		return nil
+	}
+	return &flow.Collection{Transactions: cc.Transactions}
+}
+
 // HasAllTransactions returns whether all the transactions for all collections
 // in the block have been received.
 func (b *ExecutableBlock) HasAllTransactions() bool {

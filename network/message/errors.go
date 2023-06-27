@@ -31,3 +31,12 @@ func IsUnknownMsgTypeErr(err error) bool {
 	var e UnknownMsgTypeErr
 	return errors.As(err, &e)
 }
+
+// NewUnauthorizedProtocolError returns ErrUnauthorizedUnicastOnChannel or ErrUnauthorizedPublishOnChannel depending on the protocol provided.
+func NewUnauthorizedProtocolError(p ProtocolType) error {
+	if p == ProtocolTypeUnicast {
+		return ErrUnauthorizedUnicastOnChannel
+	}
+
+	return ErrUnauthorizedPublishOnChannel
+}

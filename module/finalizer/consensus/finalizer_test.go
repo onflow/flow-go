@@ -29,7 +29,7 @@ func LogCleanup(list *[]flow.Identifier) func(flow.Identifier) error {
 func TestNewFinalizer(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		headers := &mockstor.Headers{}
-		state := &mockprot.MutableState{}
+		state := &mockprot.FollowerState{}
 		tracer := trace.NewNoopTracer()
 		fin := NewFinalizer(db, headers, state, tracer)
 		assert.Equal(t, fin.db, db)
@@ -61,7 +61,7 @@ func TestMakeFinalValidChain(t *testing.T) {
 	}
 
 	// create a mock protocol state to check finalize calls
-	state := &mockprot.MutableState{}
+	state := mockprot.NewFollowerState(t)
 
 	// make sure we get a finalize call for the blocks that we want to
 	cutoff := total - 3
@@ -127,7 +127,7 @@ func TestMakeFinalInvalidHeight(t *testing.T) {
 	pending.Height = final.Height
 
 	// create a mock protocol state to check finalize calls
-	state := &mockprot.MutableState{}
+	state := mockprot.NewFollowerState(t)
 
 	// this will hold the IDs of blocks clean up
 	var list []flow.Identifier
@@ -179,7 +179,7 @@ func TestMakeFinalDuplicate(t *testing.T) {
 	final.Height = uint64(rand.Uint32())
 
 	// create a mock protocol state to check finalize calls
-	state := &mockprot.MutableState{}
+	state := mockprot.NewFollowerState(t)
 
 	// this will hold the IDs of blocks clean up
 	var list []flow.Identifier

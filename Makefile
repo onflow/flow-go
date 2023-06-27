@@ -1,5 +1,6 @@
 # The short Git commit hash
 SHORT_COMMIT := $(shell git rev-parse --short HEAD)
+BRANCH_NAME:=$(shell git rev-parse --abbrev-ref HEAD | tr '/' '-')
 # The Git commit hash
 COMMIT := $(shell git rev-parse HEAD)
 # The tag of the current commit, otherwise empty
@@ -18,6 +19,8 @@ ifeq (${IMAGE_TAG},)
 IMAGE_TAG := ${SHORT_COMMIT}
 endif
 
+IMAGE_TAG_NO_NETGO := $(IMAGE_TAG)-without_netgo
+
 # Name of the cover profile
 COVER_PROFILE := coverage.txt
 # Disable go sum database lookup for private repos
@@ -30,6 +33,7 @@ GOARCH := $(shell go env GOARCH)
 
 # The location of the k8s YAML files
 K8S_YAMLS_LOCATION_STAGING=./k8s/staging
+
 
 # docker container registry
 export CONTAINER_REGISTRY := gcr.io/flow-container-registry
@@ -46,23 +50,26 @@ cmd/collection/collection:
 cmd/util/util:
 	go build -o cmd/util/util --tags relic cmd/util/main.go
 
+.PHONY: update-core-contracts-version
+update-core-contracts-version:
+	./scripts/update-core-contracts.sh $(CC_VERSION)
+
 ############################################################################################
 # CAUTION: DO NOT MODIFY THESE TARGETS! DOING SO WILL BREAK THE FLAKY TEST MONITOR
 
 .PHONY: unittest-main
 unittest-main:
 	# test all packages with Relic library enabled
-	go test -coverprofile=$(COVER_PROFILE) -covermode=atomic $(if $(RACE_DETECTOR),-race,) $(if $(JSON_OUTPUT),-json,) $(if $(NUM_RUNS),-count $(NUM_RUNS),) --tags relic $(GO_TEST_PACKAGES)
+	go test $(if $(VERBOSE),-v,) -coverprofile=$(COVER_PROFILE) -covermode=atomic $(if $(RACE_DETECTOR),-race,) $(if $(JSON_OUTPUT),-json,) $(if $(NUM_RUNS),-count $(NUM_RUNS),) --tags relic $(GO_TEST_PACKAGES)
 
 .PHONY: install-mock-generators
 install-mock-generators:
 	cd ${GOPATH}; \
-    go install github.com/vektra/mockery/v2@v2.13.1; \
-    go install github.com/golang/mock/mockgen@v1.3.1;
+    go install github.com/vektra/mockery/v2@v2.21.4; \
+    go install github.com/golang/mock/mockgen@v1.6.0;
 
 .PHONY: install-tools
 install-tools: crypto_setup_gopath check-go-version install-mock-generators
-	curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b ${GOPATH}/bin v1.49.0; \
 	cd ${GOPATH}; \
 	go install github.com/golang/protobuf/protoc-gen-go@v1.3.2; \
 	go install github.com/uber/prototool/cmd/prototool@v1.9.0; \
@@ -70,7 +77,7 @@ install-tools: crypto_setup_gopath check-go-version install-mock-generators
 	go install golang.org/x/tools/cmd/stringer@master;
 
 .PHONY: verify-mocks
-verify-mocks: generate-mocks
+verify-mocks: tidy generate-mocks
 	git diff --exit-code
 
 ############################################################################################
@@ -150,20 +157,26 @@ generate-mocks: install-mock-generators
 	mockery --name '.*' --dir="state/protocol/events" --case=underscore --output="./state/protocol/events/mock" --outpkg="mock"
 	mockery --name '.*' --dir=engine/execution/computation/computer --case=underscore --output="./engine/execution/computation/computer/mock" --outpkg="mock"
 	mockery --name '.*' --dir=engine/execution/state --case=underscore --output="./engine/execution/state/mock" --outpkg="mock"
+	mockery --name '.*' --dir=engine/collection --case=underscore --output="./engine/collection/mock" --outpkg="mock"
+	mockery --name 'complianceCore' --dir=engine/common/follower --exported --case=underscore --output="./engine/common/follower/mock" --outpkg="mock"
+	mockery --name '.*' --dir=engine/common/follower/cache --case=underscore --output="./engine/common/follower/cache/mock" --outpkg="mock"
 	mockery --name '.*' --dir=engine/consensus --case=underscore --output="./engine/consensus/mock" --outpkg="mock"
 	mockery --name '.*' --dir=engine/consensus/approvals --case=underscore --output="./engine/consensus/approvals/mock" --outpkg="mock"
+	rm -rf ./fvm/mock
+	mockery --name '.*' --dir=fvm --case=underscore --output="./fvm/mock" --outpkg="mock"
 	rm -rf ./fvm/environment/mock
 	mockery --name '.*' --dir=fvm/environment --case=underscore --output="./fvm/environment/mock" --outpkg="mock"
 	mockery --name '.*' --dir=ledger --case=underscore --output="./ledger/mock" --outpkg="mock"
 	mockery --name 'ViolationsConsumer' --dir=network/slashing --case=underscore --output="./network/mocknetwork" --outpkg="mocknetwork"
 	mockery --name '.*' --dir=network/p2p/ --case=underscore --output="./network/p2p/mock" --outpkg="mockp2p"
+	mockery --name '.*' --dir=network/alsp --case=underscore --output="./network/alsp/mock" --outpkg="mockalsp"
 	mockery --name 'Vertex' --dir="./module/forest" --case=underscore --output="./module/forest/mock" --outpkg="mock"
 	mockery --name '.*' --dir="./consensus/hotstuff" --case=underscore --output="./consensus/hotstuff/mocks" --outpkg="mocks"
 	mockery --name '.*' --dir="./engine/access/wrapper" --case=underscore --output="./engine/access/mock" --outpkg="mock"
 	mockery --name 'API' --dir="./access" --case=underscore --output="./access/mock" --outpkg="mock"
 	mockery --name 'API' --dir="./engine/protocol" --case=underscore --output="./engine/protocol/mock" --outpkg="mock"
+	mockery --name '.*' --dir="./engine/access/state_stream" --case=underscore --output="./engine/access/state_stream/mock" --outpkg="mock"
 	mockery --name 'ConnectionFactory' --dir="./engine/access/rpc/backend" --case=underscore --output="./engine/access/rpc/backend/mock" --outpkg="mock"
-	mockery --name 'IngestRPC' --dir="./engine/execution/ingestion" --case=underscore --tags relic --output="./engine/execution/ingestion/mock" --outpkg="mock"
 	mockery --name '.*' --dir=model/fingerprint --case=underscore --output="./model/fingerprint/mock" --outpkg="mock"
 	mockery --name 'ExecForkActor' --structname 'ExecForkActorMock' --dir=module/mempool/consensus/mock/ --case=underscore --output="./module/mempool/consensus/mock/" --outpkg="mock"
 	mockery --name '.*' --dir=engine/verification/fetcher/ --case=underscore --output="./engine/verification/fetcher/mock" --outpkg="mockfetcher"
@@ -237,8 +250,16 @@ docker-ci-integration:
 .PHONY: docker-build-collection
 docker-build-collection:
 	docker build -f cmd/Dockerfile  --build-arg TARGET=./cmd/collection --build-arg COMMIT=$(COMMIT)  --build-arg VERSION=$(IMAGE_TAG) --build-arg GOARCH=$(GOARCH) --target production \
+		--secret id=git_creds,env=GITHUB_CREDS --build-arg GOPRIVATE=$(GOPRIVATE) \
 		--label "git_commit=${COMMIT}" --label "git_tag=${IMAGE_TAG}" \
 		-t "$(CONTAINER_REGISTRY)/collection:latest" -t "$(CONTAINER_REGISTRY)/collection:$(SHORT_COMMIT)" -t "$(CONTAINER_REGISTRY)/collection:$(IMAGE_TAG)" .
+
+.PHONY: docker-build-collection-without-netgo
+docker-build-collection-without-netgo:
+	docker build -f cmd/Dockerfile  --build-arg TAGS=relic --build-arg TARGET=./cmd/collection --build-arg COMMIT=$(COMMIT)  --build-arg VERSION=$(IMAGE_TAG_NO_NETGO) --build-arg GOARCH=$(GOARCH) --target production \
+		--secret id=git_creds,env=GITHUB_CREDS --build-arg GOPRIVATE=$(GOPRIVATE) \
+		--label "git_commit=${COMMIT}" --label "git_tag=$(IMAGE_TAG_NO_NETGO)" \
+		-t "$(CONTAINER_REGISTRY)/collection:$(IMAGE_TAG_NO_NETGO)"  .
 
 .PHONY: docker-build-collection-debug
 docker-build-collection-debug:
@@ -248,8 +269,16 @@ docker-build-collection-debug:
 .PHONY: docker-build-consensus
 docker-build-consensus:
 	docker build -f cmd/Dockerfile  --build-arg TARGET=./cmd/consensus --build-arg COMMIT=$(COMMIT)  --build-arg VERSION=$(IMAGE_TAG) --build-arg GOARCH=$(GOARCH) --target production \
+		--secret id=git_creds,env=GITHUB_CREDS --build-arg GOPRIVATE=$(GOPRIVATE) \
 		--label "git_commit=${COMMIT}" --label "git_tag=${IMAGE_TAG}" \
-		-t "$(CONTAINER_REGISTRY)/consensus:latest" -t "$(CONTAINER_REGISTRY)/consensus:$(SHORT_COMMIT)" -t "$(CONTAINER_REGISTRY)/consensus:$(IMAGE_TAG)" .
+		-t "$(CONTAINER_REGISTRY)/consensus:latest" -t "$(CONTAINER_REGISTRY)/consensus:$(SHORT_COMMIT)" -t "$(CONTAINER_REGISTRY)/consensus:$(IMAGE_TAG)"  .
+
+.PHONY: docker-build-consensus-without-netgo
+docker-build-consensus-without-netgo:
+	docker build -f cmd/Dockerfile  --build-arg TAGS=relic --build-arg TARGET=./cmd/consensus --build-arg COMMIT=$(COMMIT)  --build-arg VERSION=$(IMAGE_TAG_NO_NETGO) --build-arg GOARCH=$(GOARCH) --target production \
+		--secret id=git_creds,env=GITHUB_CREDS --build-arg GOPRIVATE=$(GOPRIVATE) \
+		--label "git_commit=${COMMIT}" --label "git_tag=$(IMAGE_TAG_NO_NETGO)" \
+		-t "$(CONTAINER_REGISTRY)/consensus:$(IMAGE_TAG_NO_NETGO)" .
 
 .PHONY: docker-build-consensus-debug
 docker-build-consensus-debug:
@@ -259,61 +288,103 @@ docker-build-consensus-debug:
 .PHONY: docker-build-execution
 docker-build-execution:
 	docker build -f cmd/Dockerfile  --build-arg TARGET=./cmd/execution --build-arg COMMIT=$(COMMIT)  --build-arg VERSION=$(IMAGE_TAG) --build-arg GOARCH=$(GOARCH) --target production \
+		--secret id=git_creds,env=GITHUB_CREDS --build-arg GOPRIVATE=$(GOPRIVATE) \
 		--label "git_commit=${COMMIT}" --label "git_tag=${IMAGE_TAG}" \
 		-t "$(CONTAINER_REGISTRY)/execution:latest" -t "$(CONTAINER_REGISTRY)/execution:$(SHORT_COMMIT)" -t "$(CONTAINER_REGISTRY)/execution:$(IMAGE_TAG)" .
+
+.PHONY: docker-build-execution-without-netgo
+docker-build-execution-without-netgo:
+	docker build -f cmd/Dockerfile  --build-arg TAGS=relic --build-arg TARGET=./cmd/execution --build-arg COMMIT=$(COMMIT)  --build-arg VERSION=$(IMAGE_TAG_NO_NETGO) --build-arg GOARCH=$(GOARCH) --target production \
+		--secret id=git_creds,env=GITHUB_CREDS --build-arg GOPRIVATE=$(GOPRIVATE) \
+		--label "git_commit=${COMMIT}" --label "git_tag=$(IMAGE_TAG_NO_NETGO)" \
+		-t "$(CONTAINER_REGISTRY)/execution:$(IMAGE_TAG_NO_NETGO)" .
 
 .PHONY: docker-build-execution-debug
 docker-build-execution-debug:
 	docker build -f cmd/Dockerfile  --build-arg TARGET=./cmd/execution --build-arg COMMIT=$(COMMIT)  --build-arg VERSION=$(IMAGE_TAG) --build-arg GOARCH=$(GOARCH) --target debug \
 		-t "$(CONTAINER_REGISTRY)/execution-debug:latest" -t "$(CONTAINER_REGISTRY)/execution-debug:$(SHORT_COMMIT)" -t "$(CONTAINER_REGISTRY)/execution-debug:$(IMAGE_TAG)" .
 
-# build corrupted execution node for BFT testing
-.PHONY: docker-build-execution-corrupted
-docker-build-execution-corrupted:
-	#temporarily make insecure/ a non-module to allow Docker to use corrupt builders there
-	mv insecure/go.mod insecure/go2.mod
+# build corrupt execution node for BFT testing
+.PHONY: docker-build-execution-corrupt
+docker-build-execution-corrupt:
+	# temporarily make insecure/ a non-module to allow Docker to use corrupt builders there
+	./insecure/cmd/mods_override.sh
 	docker build -f cmd/Dockerfile  --build-arg TARGET=./insecure/cmd/execution --build-arg COMMIT=$(COMMIT)  --build-arg VERSION=$(IMAGE_TAG) --build-arg GOARCH=$(GOARCH) --target production \
 		--label "git_commit=${COMMIT}" --label "git_tag=${IMAGE_TAG}" \
 		-t "$(CONTAINER_REGISTRY)/execution-corrupted:latest" -t "$(CONTAINER_REGISTRY)/execution-corrupted:$(SHORT_COMMIT)" -t "$(CONTAINER_REGISTRY)/execution-corrupted:$(IMAGE_TAG)" .
-	mv insecure/go2.mod insecure/go.mod
+	./insecure/cmd/mods_restore.sh
 
 .PHONY: docker-build-verification
 docker-build-verification:
 	docker build -f cmd/Dockerfile  --build-arg TARGET=./cmd/verification --build-arg COMMIT=$(COMMIT)  --build-arg VERSION=$(IMAGE_TAG) --build-arg GOARCH=$(GOARCH) --target production \
+		--secret id=git_creds,env=GITHUB_CREDS --build-arg GOPRIVATE=$(GOPRIVATE) \
 		--label "git_commit=${COMMIT}" --label "git_tag=${IMAGE_TAG}" \
 		-t "$(CONTAINER_REGISTRY)/verification:latest" -t "$(CONTAINER_REGISTRY)/verification:$(SHORT_COMMIT)" -t "$(CONTAINER_REGISTRY)/verification:$(IMAGE_TAG)" .
+
+.PHONY: docker-build-verification-without-netgo
+docker-build-verification-without-netgo:
+	docker build -f cmd/Dockerfile  --build-arg TAGS=relic --build-arg TARGET=./cmd/verification --build-arg COMMIT=$(COMMIT)  --build-arg VERSION=$(IMAGE_TAG_NO_NETGO) --build-arg GOARCH=$(GOARCH) --target production \
+		--secret id=git_creds,env=GITHUB_CREDS --build-arg GOPRIVATE=$(GOPRIVATE) \
+		--label "git_commit=${COMMIT}" --label "git_tag=$(IMAGE_TAG_NO_NETGO)" \
+		-t "$(CONTAINER_REGISTRY)/verification:$(IMAGE_TAG_NO_NETGO)" .
 
 .PHONY: docker-build-verification-debug
 docker-build-verification-debug:
 	docker build -f cmd/Dockerfile  --build-arg TARGET=./cmd/verification --build-arg COMMIT=$(COMMIT)  --build-arg VERSION=$(IMAGE_TAG) --build-arg GOARCH=$(GOARCH) --target debug \
 		-t "$(CONTAINER_REGISTRY)/verification-debug:latest" -t "$(CONTAINER_REGISTRY)/verification-debug:$(SHORT_COMMIT)" -t "$(CONTAINER_REGISTRY)/verification-debug:$(IMAGE_TAG)" .
 
-# build corrupted verification node for BFT testing
-.PHONY: docker-build-verification-corrupted
-docker-build-verification-corrupted:
-	#temporarily make insecure/ a non-module to allow Docker to use corrupt builders there
-	mv insecure/go.mod insecure/go2.mod
+# build corrupt verification node for BFT testing
+.PHONY: docker-build-verification-corrupt
+docker-build-verification-corrupt:
+	# temporarily make insecure/ a non-module to allow Docker to use corrupt builders there
+	./insecure/cmd/mods_override.sh
 	docker build -f cmd/Dockerfile  --build-arg TARGET=./insecure/cmd/verification --build-arg COMMIT=$(COMMIT)  --build-arg VERSION=$(IMAGE_TAG) --build-arg GOARCH=$(GOARCH) --target production \
 		--label "git_commit=${COMMIT}" --label "git_tag=${IMAGE_TAG}" \
 		-t "$(CONTAINER_REGISTRY)/verification-corrupted:latest" -t "$(CONTAINER_REGISTRY)/verification-corrupted:$(SHORT_COMMIT)" -t "$(CONTAINER_REGISTRY)/verification-corrupted:$(IMAGE_TAG)" .
-	mv insecure/go2.mod insecure/go.mod
+	./insecure/cmd/mods_restore.sh
 
 .PHONY: docker-build-access
 docker-build-access:
 	docker build -f cmd/Dockerfile  --build-arg TARGET=./cmd/access --build-arg COMMIT=$(COMMIT)  --build-arg VERSION=$(IMAGE_TAG) --build-arg GOARCH=$(GOARCH) --target production \
+		--secret id=git_creds,env=GITHUB_CREDS --build-arg GOPRIVATE=$(GOPRIVATE) \
 		--label "git_commit=${COMMIT}" --label "git_tag=${IMAGE_TAG}" \
 		-t "$(CONTAINER_REGISTRY)/access:latest" -t "$(CONTAINER_REGISTRY)/access:$(SHORT_COMMIT)" -t "$(CONTAINER_REGISTRY)/access:$(IMAGE_TAG)" .
+
+.PHONY: docker-build-access-without-netgo
+docker-build-access-without-netgo:
+	docker build -f cmd/Dockerfile  --build-arg TAGS=relic --build-arg TARGET=./cmd/access --build-arg COMMIT=$(COMMIT)  --build-arg VERSION=$(IMAGE_TAG_NO_NETGO) --build-arg GOARCH=$(GOARCH) --target production \
+		--secret id=git_creds,env=GITHUB_CREDS --build-arg GOPRIVATE=$(GOPRIVATE) \
+		--label "git_commit=${COMMIT}" --label "git_tag=$(IMAGE_TAG_NO_NETGO)" \
+		-t "$(CONTAINER_REGISTRY)/access:$(IMAGE_TAG_NO_NETGO)" .
 
 .PHONY: docker-build-access-debug
 docker-build-access-debug:
 	docker build -f cmd/Dockerfile  --build-arg TARGET=./cmd/access  --build-arg COMMIT=$(COMMIT) --build-arg VERSION=$(IMAGE_TAG) --build-arg GOARCH=$(GOARCH) --target debug \
 		-t "$(CONTAINER_REGISTRY)/access-debug:latest" -t "$(CONTAINER_REGISTRY)/access-debug:$(SHORT_COMMIT)" -t "$(CONTAINER_REGISTRY)/access-debug:$(IMAGE_TAG)" .
 
+# build corrupt access node for BFT testing
+.PHONY: docker-build-access-corrupt
+docker-build-access-corrupt:
+	#temporarily make insecure/ a non-module to allow Docker to use corrupt builders there
+	./insecure/cmd/mods_override.sh
+	docker build -f cmd/Dockerfile  --build-arg TARGET=./insecure/cmd/access --build-arg COMMIT=$(COMMIT)  --build-arg VERSION=$(IMAGE_TAG) --build-arg GOARCH=$(GOARCH) --target production \
+		--label "git_commit=${COMMIT}" --label "git_tag=${IMAGE_TAG}" \
+		-t "$(CONTAINER_REGISTRY)/access-corrupted:latest" -t "$(CONTAINER_REGISTRY)/access-corrupted:$(SHORT_COMMIT)" -t "$(CONTAINER_REGISTRY)/access-corrupted:$(IMAGE_TAG)" .
+	./insecure/cmd/mods_restore.sh
+
 .PHONY: docker-build-observer
 docker-build-observer:
 	docker build -f cmd/Dockerfile --build-arg TARGET=./cmd/observer --build-arg COMMIT=$(COMMIT) --build-arg VERSION=$(IMAGE_TAG) --build-arg GOARCH=$(GOARCH) --target production \
+		--secret id=git_creds,env=GITHUB_CREDS --build-arg GOPRIVATE=$(GOPRIVATE) \
 		--label "git_commit=${COMMIT}" --label "git_tag=${IMAGE_TAG}" \
 		-t "$(CONTAINER_REGISTRY)/observer:latest" -t "$(CONTAINER_REGISTRY)/observer:$(SHORT_COMMIT)" -t "$(CONTAINER_REGISTRY)/observer:$(IMAGE_TAG)" .
+
+.PHONY: docker-build-observer-without-netgo
+docker-build-observer-without-netgo:
+	docker build -f cmd/Dockerfile  --build-arg TAGS=relic --build-arg TARGET=./cmd/observer --build-arg COMMIT=$(COMMIT)  --build-arg VERSION=$(IMAGE_TAG_NO_NETGO) --build-arg GOARCH=$(GOARCH) --target production \
+		--secret id=git_creds,env=GITHUB_CREDS --build-arg GOPRIVATE=$(GOPRIVATE) \
+		--label "git_commit=${COMMIT}" --label "git_tag=$(IMAGE_TAG_NO_NETGO)" \
+		-t "$(CONTAINER_REGISTRY)/observer:$(IMAGE_TAG_NO_NETGO)" .
 
 
 .PHONY: docker-build-ghost
@@ -354,10 +425,13 @@ docker-build-loader:
 		-t "$(CONTAINER_REGISTRY)/loader:latest" -t "$(CONTAINER_REGISTRY)/loader:$(SHORT_COMMIT)" -t "$(CONTAINER_REGISTRY)/loader:$(IMAGE_TAG)" .
 
 .PHONY: docker-build-flow
-docker-build-flow: docker-build-flow-corrupted docker-build-collection docker-build-consensus docker-build-execution docker-build-verification docker-build-access docker-build-observer docker-build-ghost
+docker-build-flow: docker-build-collection docker-build-consensus docker-build-execution docker-build-verification docker-build-access docker-build-observer docker-build-ghost
 
-.PHONY: docker-build-flow-corrupted
-docker-build-flow-corrupted: docker-build-execution-corrupted docker-build-verification-corrupted
+.PHONY: docker-build-flow-without-netgo
+docker-build-flow-without-netgo: docker-build-collection-without-netgo docker-build-consensus-without-netgo docker-build-execution-without-netgo docker-build-verification-without-netgo docker-build-access-without-netgo docker-build-observer-without-netgo
+
+.PHONY: docker-build-flow-corrupt
+docker-build-flow-corrupt: docker-build-execution-corrupt docker-build-verification-corrupt docker-build-access-corrupt
 
 .PHONY: docker-build-benchnet
 docker-build-benchnet: docker-build-flow docker-build-loader
@@ -366,6 +440,10 @@ docker-build-benchnet: docker-build-flow docker-build-loader
 docker-push-collection:
 	docker push "$(CONTAINER_REGISTRY)/collection:$(SHORT_COMMIT)"
 	docker push "$(CONTAINER_REGISTRY)/collection:$(IMAGE_TAG)"
+
+.PHONY: docker-push-collection-without-netgo
+docker-push-collection-without-netgo:
+	docker push "$(CONTAINER_REGISTRY)/collection:$(IMAGE_TAG_NO_NETGO)"
 
 .PHONY: docker-push-collection-latest
 docker-push-collection-latest: docker-push-collection
@@ -376,6 +454,10 @@ docker-push-consensus:
 	docker push "$(CONTAINER_REGISTRY)/consensus:$(SHORT_COMMIT)"
 	docker push "$(CONTAINER_REGISTRY)/consensus:$(IMAGE_TAG)"
 
+.PHONY: docker-push-consensus-without-netgo
+docker-push-consensus-without-netgo:
+	docker push "$(CONTAINER_REGISTRY)/consensus:$(IMAGE_TAG_NO_NETGO)"
+
 .PHONY: docker-push-consensus-latest
 docker-push-consensus-latest: docker-push-consensus
 	docker push "$(CONTAINER_REGISTRY)/consensus:latest"
@@ -384,6 +466,16 @@ docker-push-consensus-latest: docker-push-consensus
 docker-push-execution:
 	docker push "$(CONTAINER_REGISTRY)/execution:$(SHORT_COMMIT)"
 	docker push "$(CONTAINER_REGISTRY)/execution:$(IMAGE_TAG)"
+
+.PHONY: docker-push-execution-corrupt
+docker-push-execution-corrupt:
+	docker push "$(CONTAINER_REGISTRY)/execution-corrupted:$(SHORT_COMMIT)"
+	docker push "$(CONTAINER_REGISTRY)/execution-corrupted:$(IMAGE_TAG)"
+
+
+.PHONY: docker-push-execution-without-netgo
+docker-push-execution-without-netgo:
+	docker push "$(CONTAINER_REGISTRY)/execution:$(IMAGE_TAG_NO_NETGO)"
 
 .PHONY: docker-push-execution-latest
 docker-push-execution-latest: docker-push-execution
@@ -394,6 +486,15 @@ docker-push-verification:
 	docker push "$(CONTAINER_REGISTRY)/verification:$(SHORT_COMMIT)"
 	docker push "$(CONTAINER_REGISTRY)/verification:$(IMAGE_TAG)"
 
+.PHONY: docker-push-verification-corrupt
+docker-push-verification-corrupt:
+	docker push "$(CONTAINER_REGISTRY)/verification-corrupted:$(SHORT_COMMIT)"
+	docker push "$(CONTAINER_REGISTRY)/verification-corrupted:$(IMAGE_TAG)"
+
+.PHONY: docker-push-verification-without-netgo
+docker-push-verification-without-netgo:
+	docker push "$(CONTAINER_REGISTRY)/verification:$(IMAGE_TAG_NO_NETGO)"
+
 .PHONY: docker-push-verification-latest
 docker-push-verification-latest: docker-push-verification
 	docker push "$(CONTAINER_REGISTRY)/verification:latest"
@@ -403,14 +504,28 @@ docker-push-access:
 	docker push "$(CONTAINER_REGISTRY)/access:$(SHORT_COMMIT)"
 	docker push "$(CONTAINER_REGISTRY)/access:$(IMAGE_TAG)"
 
+.PHONY: docker-push-access-corrupt
+docker-push-access-corrupt:
+	docker push "$(CONTAINER_REGISTRY)/access-corrupted:$(SHORT_COMMIT)"
+	docker push "$(CONTAINER_REGISTRY)/access-corrupted:$(IMAGE_TAG)"
+
+.PHONY: docker-push-access-without-netgo
+docker-push-access-without-netgo:
+	docker push "$(CONTAINER_REGISTRY)/access:$(IMAGE_TAG_NO_NETGO)"
+
 .PHONY: docker-push-access-latest
 docker-push-access-latest: docker-push-access
 	docker push "$(CONTAINER_REGISTRY)/access:latest"
+
 
 .PHONY: docker-push-observer
 docker-push-observer:
 	docker push "$(CONTAINER_REGISTRY)/observer:$(SHORT_COMMIT)"
 	docker push "$(CONTAINER_REGISTRY)/observer:$(IMAGE_TAG)"
+
+.PHONY: docker-push-observer-without-netgo
+docker-push-observer-without-netgo:
+	docker push "$(CONTAINER_REGISTRY)/observer:$(IMAGE_TAG_NO_NETGO)"
 
 .PHONY: docker-push-observer-latest
 docker-push-observer-latest: docker-push-observer
@@ -437,8 +552,14 @@ docker-push-loader-latest: docker-push-loader
 .PHONY: docker-push-flow
 docker-push-flow: docker-push-collection docker-push-consensus docker-push-execution docker-push-verification docker-push-access docker-push-observer
 
+.PHONY: docker-push-flow-without-netgo
+docker-push-flow-without-netgo: docker-push-collection-without-netgo docker-push-consensus-without-netgo docker-push-execution-without-netgo docker-push-verification-without-netgo docker-push-access-without-netgo docker-push-observer-without-netgo
+
 .PHONY: docker-push-flow-latest
 docker-push-flow-latest: docker-push-collection-latest docker-push-consensus-latest docker-push-execution-latest docker-push-verification-latest docker-push-access-latest docker-push-observer-latest
+
+.PHONY: docker-push-flow-corrupt
+docker-push-flow-corrupt: docker-push-access-corrupt docker-push-execution-corrupt docker-push-verification-corrupt
 
 .PHONY: docker-push-benchnet
 docker-push-benchnet: docker-push-flow docker-push-loader
@@ -479,7 +600,7 @@ docker-all-tools: tool-util tool-remove-execution-fork
 
 PHONY: docker-build-util
 docker-build-util:
-	docker build -f cmd/Dockerfile --ssh default --build-arg TARGET=./cmd/util --build-arg GOARCH=$(GOARCH) --target production \
+	docker build -f cmd/Dockerfile --build-arg TARGET=./cmd/util --build-arg GOARCH=$(GOARCH) --target production \
 		-t "$(CONTAINER_REGISTRY)/util:latest" -t "$(CONTAINER_REGISTRY)/util:$(SHORT_COMMIT)" -t "$(CONTAINER_REGISTRY)/util:$(IMAGE_TAG)" .
 
 PHONY: tool-util

@@ -51,7 +51,7 @@ func New(
 	logger := log.With().Str("ingestion", "engine").Logger()
 
 	guaranteesQueue, err := fifoqueue.NewFifoQueue(
-		fifoqueue.WithCapacity(defaultGuaranteeQueueCapacity),
+		defaultGuaranteeQueueCapacity,
 		fifoqueue.WithLengthObserver(func(len int) { core.mempool.MempoolEntries(metrics.ResourceCollectionGuaranteesQueue, uint(len)) }),
 	)
 	if err != nil {

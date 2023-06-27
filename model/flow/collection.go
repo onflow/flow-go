@@ -117,8 +117,3 @@ func (cl *CollectionList) ByChecksum(cs Identifier) (*Collection, bool) {
 func (cl *CollectionList) ByIndex(i uint64) *Collection {
 	return cl.collections[i]
 }
-
-// ByIndexWithProof returns an entity from the list by index and proof of membership
-func (cl *CollectionList) ByIndexWithProof(i uint64) (*Collection, Proof) {
-	return cl.collections[i], nil
-}

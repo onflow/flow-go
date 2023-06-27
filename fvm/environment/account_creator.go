@@ -3,11 +3,11 @@ package environment
 import (
 	"fmt"
 
-	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/common"
 
 	"github.com/onflow/flow-go/fvm/errors"
-	"github.com/onflow/flow-go/fvm/state"
+	"github.com/onflow/flow-go/fvm/storage/state"
+	"github.com/onflow/flow-go/fvm/tracing"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/trace"
 )
@@ -37,12 +37,12 @@ type BootstrapAccountCreator interface {
 // This ensures cadence can't access unexpected operations while parsing
 // programs.
 type ParseRestrictedAccountCreator struct {
-	txnState *state.TransactionState
+	txnState state.NestedTransactionPreparer
 	impl     AccountCreator
 }
 
 func NewParseRestrictedAccountCreator(
-	txnState *state.TransactionState,
+	txnState state.NestedTransactionPreparer,
 	creator AccountCreator,
 ) AccountCreator {
 	return ParseRestrictedAccountCreator{
@@ -52,32 +52,32 @@ func NewParseRestrictedAccountCreator(
 }
 
 func (creator ParseRestrictedAccountCreator) CreateAccount(
-	payer runtime.Address,
+	runtimePayer common.Address,
 ) (
-	runtime.Address,
+	common.Address,
 	error,
 ) {
 	return parseRestrict1Arg1Ret(
 		creator.txnState,
 		trace.FVMEnvCreateAccount,
 		creator.impl.CreateAccount,
-		payer)
+		runtimePayer)
 }
 
 type AccountCreator interface {
-	CreateAccount(payer runtime.Address) (runtime.Address, error)
+	CreateAccount(runtimePayer common.Address) (common.Address, error)
 }
 
 type NoAccountCreator struct {
 }
 
 func (NoAccountCreator) CreateAccount(
-	payer runtime.Address,
+	runtimePayer common.Address,
 ) (
-	runtime.Address,
+	common.Address,
 	error,
 ) {
-	return runtime.Address{}, errors.NewOperationNotSupportedError(
+	return common.Address{}, errors.NewOperationNotSupportedError(
 		"CreateAccount")
 }
 
@@ -88,13 +88,13 @@ func (NoAccountCreator) CreateAccount(
 // updates the state when next address is called (This secondary functionality
 // is only used in utility command line).
 type accountCreator struct {
-	txnState *state.TransactionState
+	txnState state.NestedTransactionPreparer
 	chain    flow.Chain
 	accounts Accounts
 
 	isServiceAccountEnabled bool
 
-	tracer  *Tracer
+	tracer  tracing.TracerSpan
 	meter   Meter
 	metrics MetricsReporter
 
@@ -102,7 +102,7 @@ type accountCreator struct {
 }
 
 func NewAddressGenerator(
-	txnState *state.TransactionState,
+	txnState state.NestedTransactionPreparer,
 	chain flow.Chain,
 ) AddressGenerator {
 	return &accountCreator{
@@ -112,7 +112,7 @@ func NewAddressGenerator(
 }
 
 func NewBootstrapAccountCreator(
-	txnState *state.TransactionState,
+	txnState state.NestedTransactionPreparer,
 	chain flow.Chain,
 	accounts Accounts,
 ) BootstrapAccountCreator {
@@ -124,11 +124,11 @@ func NewBootstrapAccountCreator(
 }
 
 func NewAccountCreator(
-	txnState *state.TransactionState,
+	txnState state.NestedTransactionPreparer,
 	chain flow.Chain,
 	accounts Accounts,
 	isServiceAccountEnabled bool,
-	tracer *Tracer,
+	tracer tracing.TracerSpan,
 	meter Meter,
 	metrics MetricsReporter,
 	systemContracts *SystemContracts,
@@ -146,10 +146,7 @@ func NewAccountCreator(
 }
 
 func (creator *accountCreator) bytes() ([]byte, error) {
-	stateBytes, err := creator.txnState.Get(
-		"",
-		state.AddressStateKey,
-		creator.txnState.EnforceLimits())
+	stateBytes, err := creator.txnState.Get(flow.AddressStateRegisterID)
 	if err != nil {
 		return nil, fmt.Errorf(
 			"failed to read address generator state from the state: %w",
@@ -194,10 +191,8 @@ func (creator *accountCreator) NextAddress() (flow.Address, error) {
 
 	// update the ledger state
 	err = creator.txnState.Set(
-		"",
-		state.AddressStateKey,
-		addressGenerator.Bytes(),
-		creator.txnState.EnforceLimits())
+		flow.AddressStateRegisterID,
+		addressGenerator.Bytes())
 	if err != nil {
 		return address, fmt.Errorf(
 			"failed to update the state with address generator state: %w",
@@ -236,12 +231,12 @@ func (creator *accountCreator) createBasicAccount(
 ) {
 	flowAddress, err := creator.NextAddress()
 	if err != nil {
-		return flow.Address{}, err
+		return flow.EmptyAddress, err
 	}
 
 	err = creator.accounts.Create(publicKeys, flowAddress)
 	if err != nil {
-		return flow.Address{}, fmt.Errorf("create account failed: %w", err)
+		return flow.EmptyAddress, fmt.Errorf("create account failed: %w", err)
 	}
 
 	return flowAddress, nil
@@ -257,12 +252,12 @@ func (creator *accountCreator) CreateBootstrapAccount(
 }
 
 func (creator *accountCreator) CreateAccount(
-	payer runtime.Address,
+	runtimePayer common.Address,
 ) (
-	runtime.Address,
+	common.Address,
 	error,
 ) {
-	defer creator.tracer.StartSpanFromRoot(trace.FVMEnvCreateAccount).End()
+	defer creator.tracer.StartChildSpan(trace.FVMEnvCreateAccount).End()
 
 	err := creator.meter.MeterComputation(ComputationKindCreateAccount, 1)
 	if err != nil {
@@ -270,34 +265,34 @@ func (creator *accountCreator) CreateAccount(
 	}
 
 	// don't enforce limit during account creation
-	var addr runtime.Address
+	var address flow.Address
 	creator.txnState.RunWithAllLimitsDisabled(func() {
-		addr, err = creator.createAccount(payer)
+		address, err = creator.createAccount(flow.ConvertAddress(runtimePayer))
 	})
 
-	return addr, err
+	return common.MustBytesToAddress(address.Bytes()), err
 }
 
 func (creator *accountCreator) createAccount(
-	payer runtime.Address,
+	payer flow.Address,
 ) (
-	runtime.Address,
+	flow.Address,
 	error,
 ) {
-	flowAddress, err := creator.createBasicAccount(nil)
+	address, err := creator.createBasicAccount(nil)
 	if err != nil {
-		return common.Address{}, err
+		return flow.EmptyAddress, err
 	}
 
 	if creator.isServiceAccountEnabled {
 		_, invokeErr := creator.systemContracts.SetupNewAccount(
-			flowAddress,
+			address,
 			payer)
 		if invokeErr != nil {
-			return common.Address{}, invokeErr
+			return flow.EmptyAddress, invokeErr
 		}
 	}
 
 	creator.metrics.RuntimeSetNumberOfAccounts(creator.AddressCount())
-	return runtime.Address(flowAddress), nil
+	return address, nil
 }

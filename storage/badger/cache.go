@@ -79,8 +79,16 @@ func newCache(collector module.CacheMetrics, resourceName string, options ...fun
 	return &c
 }
 
+// IsCached returns true if the key exists in the cache.
+// It DOES NOT check whether the key exists in the underlying data store.
+func (c *Cache) IsCached(key any) bool {
+	exists := c.cache.Contains(key)
+	return exists
+}
+
 // Get will try to retrieve the resource from cache first, and then from the
-// injected
+// injected. During normal operations, the following error returns are expected:
+//   - `storage.ErrNotFound` if key is unknown.
 func (c *Cache) Get(key interface{}) func(*badger.Txn) (interface{}, error) {
 	return func(tx *badger.Txn) (interface{}, error) {
 

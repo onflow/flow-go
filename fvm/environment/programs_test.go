@@ -4,121 +4,120 @@ import (
 	"encoding/hex"
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/stretchr/testify/require"
 
-	"github.com/onflow/flow-go/engine/execution/state/delta"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/environment"
-	programsStorage "github.com/onflow/flow-go/fvm/programs"
-	"github.com/onflow/flow-go/fvm/state"
+	"github.com/onflow/flow-go/fvm/storage"
+	"github.com/onflow/flow-go/fvm/storage/derived"
+	"github.com/onflow/flow-go/fvm/storage/snapshot"
+	"github.com/onflow/flow-go/fvm/storage/state"
 	"github.com/onflow/flow-go/model/flow"
 )
 
-func Test_Programs(t *testing.T) {
+var (
+	addressA = flow.HexToAddress("0a")
+	addressB = flow.HexToAddress("0b")
+	addressC = flow.HexToAddress("0c")
 
-	addressA := flow.HexToAddress("0a")
-	addressB := flow.HexToAddress("0b")
-	addressC := flow.HexToAddress("0c")
-
-	contractALocation := common.AddressLocation{
-		Address: common.Address(addressA),
+	contractALocation = common.AddressLocation{
+		Address: common.MustBytesToAddress(addressA.Bytes()),
 		Name:    "A",
 	}
+	contractA2Location = common.AddressLocation{
+		Address: common.MustBytesToAddress(addressA.Bytes()),
+		Name:    "A2",
+	}
 
-	contractBLocation := common.AddressLocation{
-		Address: common.Address(addressB),
+	contractBLocation = common.AddressLocation{
+		Address: common.MustBytesToAddress(addressB.Bytes()),
 		Name:    "B",
 	}
 
-	contractCLocation := common.AddressLocation{
-		Address: common.Address(addressC),
+	contractCLocation = common.AddressLocation{
+		Address: common.MustBytesToAddress(addressC.Bytes()),
 		Name:    "C",
 	}
 
-	contractA0Code := `
+	contractA0Code = `
 		pub contract A {
+			pub struct interface Foo{}
+			
 			pub fun hello(): String {
         		return "bad version"
     		}
 		}
 	`
 
-	contractACode := `
+	contractACode = `
 		pub contract A {
+			pub struct interface Foo{}
+
 			pub fun hello(): String {
         		return "hello from A"
     		}
 		}
 	`
 
-	contractBCode := `
-		import A from 0xa
-	
-		pub contract B {
+	contractA2Code = `
+		pub contract A2 {
+			pub struct interface Foo{}
+
 			pub fun hello(): String {
-       		return "hello from B but also ".concat(A.hello())
+        		return "hello from A2"
     		}
 		}
 	`
 
-	contractCCode := `
-		import B from 0xb
+	contractABreakingCode = `
+		pub contract A {
+			pub struct interface Foo{
+				pub fun hello()
+			}
 	
-		pub contract C {
 			pub fun hello(): String {
-	   		return "hello from C, ".concat(B.hello())
+	  		return "hello from A with breaking change"
 			}
 		}
 	`
 
-	callTx := func(name string, address flow.Address) *flow.TransactionBody {
+	contractBCode = `
+		import 0xa
 
-		return flow.NewTransactionBody().SetScript([]byte(fmt.Sprintf(`
-			import %s from %s
-			transaction {
-              prepare() {
-                log(%s.hello())
-              }
-            }`, name, address.HexWithPrefix(), name)),
-		)
-	}
+		pub contract B {
+			pub struct Bar : A.Foo {}
 
-	contractDeployTx := func(name, code string, address flow.Address) *flow.TransactionBody {
-		encoded := hex.EncodeToString([]byte(code))
+			pub fun hello(): String {
+       			return "hello from B but also ".concat(A.hello())
+    		}
+		}
+	`
 
-		return flow.NewTransactionBody().SetScript([]byte(fmt.Sprintf(`transaction {
-              prepare(signer: AuthAccount) {
-                signer.contracts.add(name: "%s", code: "%s".decodeHex())
-              }
-            }`, name, encoded)),
-		).AddAuthorizer(address)
-	}
+	contractCCode = `
+		import B from 0xb
+		import A from 0xa
 
-	updateContractTx := func(name, code string, address flow.Address) *flow.TransactionBody {
-		encoded := hex.EncodeToString([]byte(code))
+		pub contract C {
+            pub struct Bar : A.Foo {}
 
-		return flow.NewTransactionBody().SetScript([]byte(fmt.Sprintf(`transaction {
-             prepare(signer: AuthAccount) {
-               signer.contracts.update__experimental(name: "%s", code: "%s".decodeHex())
-             }
-           }`, name, encoded)),
-		).AddAuthorizer(address)
-	}
+			pub fun hello(): String {
+	   			return "hello from C, ".concat(B.hello())
+			}
+		}
+	`
+)
 
-	mainView := delta.NewView(func(_, _ string) (flow.RegisterValue, error) {
-		return nil, nil
-	})
-
-	txnState := state.NewTransactionState(mainView, state.DefaultParameters())
-
-	vm := fvm.NewVirtualMachine()
-	derivedBlockData := programsStorage.NewEmptyDerivedBlockData()
+func setupProgramsTest(t *testing.T) snapshot.SnapshotTree {
+	blockDatabase := storage.NewBlockDatabase(nil, 0, nil)
+	txnState, err := blockDatabase.NewTransaction(0, state.DefaultParameters())
+	require.NoError(t, err)
 
 	accounts := environment.NewAccounts(txnState)
 
-	err := accounts.Create(nil, addressA)
+	err = accounts.Create(nil, addressA)
 	require.NoError(t, err)
 
 	err = accounts.Create(nil, addressB)
@@ -127,10 +126,30 @@ func Test_Programs(t *testing.T) {
 	err = accounts.Create(nil, addressC)
 	require.NoError(t, err)
 
-	// err = stm.
+	executionSnapshot, err := txnState.FinalizeMainTransaction()
 	require.NoError(t, err)
 
-	fmt.Printf("Account created\n")
+	return snapshot.NewSnapshotTree(nil).Append(executionSnapshot)
+}
+
+func getTestContract(
+	snapshot snapshot.StorageSnapshot,
+	location common.AddressLocation,
+) (
+	[]byte,
+	error,
+) {
+	env := environment.NewScriptEnvironmentFromStorageSnapshot(
+		environment.DefaultEnvironmentParams(),
+		snapshot)
+	return env.GetAccountContractCode(location)
+}
+
+func Test_Programs(t *testing.T) {
+	vm := fvm.NewVirtualMachine()
+	derivedBlockData := derived.NewEmptyDerivedBlockData(0)
+
+	mainSnapshot := setupProgramsTest(t)
 
 	context := fvm.NewContext(
 		fvm.WithContractDeploymentRestricted(false),
@@ -139,216 +158,345 @@ func Test_Programs(t *testing.T) {
 		fvm.WithCadenceLogging(true),
 		fvm.WithDerivedBlockData(derivedBlockData))
 
-	var contractAView *delta.View = nil
-	var contractBView *delta.View = nil
-	var txAView *delta.View = nil
+	var contractASnapshot *snapshot.ExecutionSnapshot
+	var contractBSnapshot *snapshot.ExecutionSnapshot
+	var txASnapshot *snapshot.ExecutionSnapshot
 
 	t.Run("contracts can be updated", func(t *testing.T) {
-		retrievedContractA, err := accounts.GetContract("A", addressA)
+		retrievedContractA, err := getTestContract(
+			mainSnapshot,
+			contractALocation)
 		require.NoError(t, err)
 		require.Empty(t, retrievedContractA)
 
 		// deploy contract A0
-		procContractA0 := fvm.Transaction(
-			contractDeployTx("A", contractA0Code, addressA),
-			derivedBlockData.NextTxIndexForTestingOnly())
-		err = vm.Run(context, procContractA0, mainView)
+		executionSnapshot, output, err := vm.Run(
+			context,
+			fvm.Transaction(
+				contractDeployTx("A", contractA0Code, addressA),
+				derivedBlockData.NextTxIndexForTestingOnly()),
+			mainSnapshot)
 		require.NoError(t, err)
+		require.NoError(t, output.Err)
 
-		retrievedContractA, err = accounts.GetContract("A", addressA)
+		mainSnapshot = mainSnapshot.Append(executionSnapshot)
+
+		retrievedContractA, err = getTestContract(
+			mainSnapshot,
+			contractALocation)
 		require.NoError(t, err)
 
 		require.Equal(t, contractA0Code, string(retrievedContractA))
 
 		// deploy contract A
-		procContractA := fvm.Transaction(
-			updateContractTx("A", contractACode, addressA),
-			derivedBlockData.NextTxIndexForTestingOnly())
-		err = vm.Run(context, procContractA, mainView)
+		executionSnapshot, output, err = vm.Run(
+			context,
+			fvm.Transaction(
+				updateContractTx("A", contractACode, addressA),
+				derivedBlockData.NextTxIndexForTestingOnly()),
+			mainSnapshot)
 		require.NoError(t, err)
-		require.NoError(t, procContractA.Err)
+		require.NoError(t, output.Err)
 
-		retrievedContractA, err = accounts.GetContract("A", addressA)
+		mainSnapshot = mainSnapshot.Append(executionSnapshot)
+
+		retrievedContractA, err = getTestContract(
+			mainSnapshot,
+			contractALocation)
 		require.NoError(t, err)
 
 		require.Equal(t, contractACode, string(retrievedContractA))
 
 	})
-
 	t.Run("register touches are captured for simple contract A", func(t *testing.T) {
-
-		// deploy contract A
-		procContractA := fvm.Transaction(
-			contractDeployTx("A", contractACode, addressA),
-			derivedBlockData.NextTxIndexForTestingOnly())
-		err := vm.Run(context, procContractA, mainView)
-		require.NoError(t, err)
-
 		fmt.Println("---------- Real transaction here ------------")
 
 		// run a TX using contract A
-		procCallA := fvm.Transaction(
-			callTx("A", addressA),
-			derivedBlockData.NextTxIndexForTestingOnly())
 
 		loadedCode := false
-		viewExecA := delta.NewView(func(owner, key string) (flow.RegisterValue, error) {
-			if key == environment.ContractKey("A") {
-				loadedCode = true
-			}
+		execASnapshot := snapshot.NewReadFuncStorageSnapshot(
+			func(id flow.RegisterID) (flow.RegisterValue, error) {
+				expectedId := flow.ContractRegisterID(
+					flow.BytesToAddress([]byte(id.Owner)),
+					"A")
+				if id == expectedId {
+					loadedCode = true
+				}
 
-			return mainView.Peek(owner, key)
-		})
+				return mainSnapshot.Get(id)
+			})
 
-		err = vm.Run(context, procCallA, viewExecA)
+		executionSnapshotA, output, err := vm.Run(
+			context,
+			fvm.Transaction(
+				callTx("A", addressA),
+				derivedBlockData.NextTxIndexForTestingOnly()),
+			execASnapshot)
 		require.NoError(t, err)
+		require.NoError(t, output.Err)
+
+		mainSnapshot = mainSnapshot.Append(executionSnapshotA)
 
 		// make sure tx was really run
-		require.Contains(t, procCallA.Logs, "\"hello from A\"")
+		require.Contains(t, output.Logs, "\"hello from A\"")
 
 		// Make sure the code has been loaded from storage
 		require.True(t, loadedCode)
 
 		entry := derivedBlockData.GetProgramForTestingOnly(contractALocation)
 		require.NotNil(t, entry)
+		cached := derivedBlockData.CachedPrograms()
+		require.Equal(t, 1, cached)
 
-		// type assertion for further inspections
-		require.IsType(t, entry.State.View(), &delta.View{})
+		// assert dependencies are correct
+		require.Equal(t, 1, entry.Value.Dependencies.Count())
+		require.True(t, entry.Value.Dependencies.ContainsLocation(contractALocation))
 
 		// assert some reads were recorded (at least loading of code)
-		deltaView := entry.State.View().(*delta.View)
-		require.NotEmpty(t, deltaView.Interactions().Reads)
+		require.NotEmpty(t, entry.ExecutionSnapshot.ReadSet)
 
-		contractAView = deltaView
-		txAView = viewExecA
-
-		// merge it back
-		err = mainView.MergeView(viewExecA)
-		require.NoError(t, err)
+		contractASnapshot = entry.ExecutionSnapshot
+		txASnapshot = executionSnapshotA
 
 		// execute transaction again, this time make sure it doesn't load code
-		viewExecA2 := delta.NewView(func(owner, key string) (flow.RegisterValue, error) {
-			// this time we fail if a read of code occurs
-			require.NotEqual(t, key, environment.ContractKey("A"))
+		execA2Snapshot := snapshot.NewReadFuncStorageSnapshot(
+			func(id flow.RegisterID) (flow.RegisterValue, error) {
+				notId := flow.ContractRegisterID(
+					flow.BytesToAddress([]byte(id.Owner)),
+					"A")
+				// this time we fail if a read of code occurs
+				require.NotEqual(t, id, notId)
 
-			return mainView.Peek(owner, key)
-		})
+				return mainSnapshot.Get(id)
+			})
 
-		procCallA = fvm.Transaction(
-			callTx("A", addressA),
-			derivedBlockData.NextTxIndexForTestingOnly())
-
-		err = vm.Run(context, procCallA, viewExecA2)
+		executionSnapshotA2, output, err := vm.Run(
+			context,
+			fvm.Transaction(
+				callTx("A", addressA),
+				derivedBlockData.NextTxIndexForTestingOnly()),
+			execA2Snapshot)
 		require.NoError(t, err)
+		require.NoError(t, output.Err)
 
-		require.Contains(t, procCallA.Logs, "\"hello from A\"")
+		mainSnapshot = mainSnapshot.Append(executionSnapshotA2)
 
-		// same transaction should produce the exact same views
+		require.Contains(t, output.Logs, "\"hello from A\"")
+
+		// same transaction should produce the exact same execution snapshots
 		// but only because we don't do any conditional update in a tx
-		compareViews(t, viewExecA, viewExecA2)
-
-		// merge it back
-		err = mainView.MergeView(viewExecA2)
-		require.NoError(t, err)
+		compareExecutionSnapshots(t, executionSnapshotA, executionSnapshotA2)
 	})
 
-	t.Run("deploying another contract cleans programs storage", func(t *testing.T) {
-
+	t.Run("deploying another contract invalidates dependant programs", func(t *testing.T) {
 		// deploy contract B
-		procContractB := fvm.Transaction(
-			contractDeployTx("B", contractBCode, addressB),
-			derivedBlockData.NextTxIndexForTestingOnly())
-		err := vm.Run(context, procContractB, mainView)
+		executionSnapshot, output, err := vm.Run(
+			context,
+			fvm.Transaction(
+				contractDeployTx("B", contractBCode, addressB),
+				derivedBlockData.NextTxIndexForTestingOnly()),
+			mainSnapshot)
 		require.NoError(t, err)
+		require.NoError(t, output.Err)
 
-		entryA := derivedBlockData.GetProgramForTestingOnly(contractALocation)
+		mainSnapshot = mainSnapshot.Append(executionSnapshot)
+
+		// b and c are invalid
 		entryB := derivedBlockData.GetProgramForTestingOnly(contractBLocation)
+		entryC := derivedBlockData.GetProgramForTestingOnly(contractCLocation)
+		// a is still valid
+		entryA := derivedBlockData.GetProgramForTestingOnly(contractALocation)
 
-		require.Nil(t, entryA)
 		require.Nil(t, entryB)
-	})
+		require.Nil(t, entryC)
+		require.NotNil(t, entryA)
 
-	var viewExecB *delta.View
+		cached := derivedBlockData.CachedPrograms()
+		require.Equal(t, 1, cached)
+	})
 
 	t.Run("contract B imports contract A", func(t *testing.T) {
 
 		// programs should have no entries for A and B, as per previous test
 
 		// run a TX using contract B
-		procCallB := fvm.Transaction(
-			callTx("B", addressB),
-			derivedBlockData.NextTxIndexForTestingOnly())
 
-		viewExecB = delta.NewView(mainView.Peek)
-
-		err = vm.Run(context, procCallB, viewExecB)
+		executionSnapshotB, output, err := vm.Run(
+			context,
+			fvm.Transaction(
+				callTx("B", addressB),
+				derivedBlockData.NextTxIndexForTestingOnly()),
+			mainSnapshot)
 		require.NoError(t, err)
 
-		require.Contains(t, procCallB.Logs, "\"hello from B but also hello from A\"")
+		mainSnapshot = mainSnapshot.Append(executionSnapshotB)
+
+		require.Contains(t, output.Logs, "\"hello from B but also hello from A\"")
 
 		entry := derivedBlockData.GetProgramForTestingOnly(contractALocation)
 		require.NotNil(t, entry)
 
 		// state should be essentially the same as one which we got in tx with contract A
-		require.IsType(t, entry.State.View(), &delta.View{})
-		deltaA := entry.State.View().(*delta.View)
-
-		compareViews(t, contractAView, deltaA)
+		require.Equal(t, contractASnapshot, entry.ExecutionSnapshot)
 
 		entryB := derivedBlockData.GetProgramForTestingOnly(contractBLocation)
 		require.NotNil(t, entryB)
 
+		// assert dependencies are correct
+		require.Equal(t, 2, entryB.Value.Dependencies.Count())
+		require.NotNil(t, entryB.Value.Dependencies.ContainsLocation(contractALocation))
+		require.NotNil(t, entryB.Value.Dependencies.ContainsLocation(contractBLocation))
+
 		// program B should contain all the registers used by program A, as it depends on it
-		require.IsType(t, entryB.State.View(), &delta.View{})
-		deltaB := entryB.State.View().(*delta.View)
+		contractBSnapshot = entryB.ExecutionSnapshot
 
-		idsA, valuesA := deltaA.Delta().RegisterUpdates()
-		for i, id := range idsA {
-			v, has := deltaB.Delta().Get(id.Owner, id.Key)
-			require.True(t, has)
+		require.Empty(t, contractASnapshot.WriteSet)
 
-			require.Equal(t, valuesA[i], v)
+		for id := range contractASnapshot.ReadSet {
+			_, ok := contractBSnapshot.ReadSet[id]
+			require.True(t, ok)
 		}
-
-		for id, registerA := range deltaA.Interactions().Reads {
-
-			registerB, has := deltaB.Interactions().Reads[id]
-			require.True(t, has)
-
-			require.Equal(t, registerA, registerB)
-		}
-
-		contractBView = deltaB
-
-		// merge it back
-		err = mainView.MergeView(viewExecB)
-		require.NoError(t, err)
 
 		// rerun transaction
 
 		// execute transaction again, this time make sure it doesn't load code
-		viewExecB2 := delta.NewView(func(owner, key string) (flow.RegisterValue, error) {
-			// this time we fail if a read of code occurs
-			require.NotEqual(t, key, environment.ContractKey("A"))
-			require.NotEqual(t, key, environment.ContractKey("B"))
+		execB2Snapshot := snapshot.NewReadFuncStorageSnapshot(
+			func(id flow.RegisterID) (flow.RegisterValue, error) {
+				idA := flow.ContractRegisterID(
+					flow.BytesToAddress([]byte(id.Owner)),
+					"A")
+				idB := flow.ContractRegisterID(
+					flow.BytesToAddress([]byte(id.Owner)),
+					"B")
+				// this time we fail if a read of code occurs
+				require.NotEqual(t, id.Key, idA.Key)
+				require.NotEqual(t, id.Key, idB.Key)
 
-			return mainView.Peek(owner, key)
-		})
+				return mainSnapshot.Get(id)
+			})
 
-		procCallB = fvm.Transaction(
-			callTx("B", addressB),
-			derivedBlockData.NextTxIndexForTestingOnly())
-
-		err = vm.Run(context, procCallB, viewExecB2)
+		executionSnapshotB2, output, err := vm.Run(
+			context,
+			fvm.Transaction(
+				callTx("B", addressB),
+				derivedBlockData.NextTxIndexForTestingOnly()),
+			execB2Snapshot)
 		require.NoError(t, err)
+		require.NoError(t, output.Err)
 
-		require.Contains(t, procCallB.Logs, "\"hello from B but also hello from A\"")
+		require.Contains(t, output.Logs, "\"hello from B but also hello from A\"")
 
-		compareViews(t, viewExecB, viewExecB2)
+		mainSnapshot = mainSnapshot.Append(executionSnapshotB2)
 
-		// merge it back
-		err = mainView.MergeView(viewExecB2)
+		compareExecutionSnapshots(t, executionSnapshotB, executionSnapshotB2)
+	})
+
+	t.Run("deploying new contract A2 invalidates B because of * imports", func(t *testing.T) {
+		// deploy contract A2
+		executionSnapshot, output, err := vm.Run(
+			context,
+			fvm.Transaction(
+				contractDeployTx("A2", contractA2Code, addressA),
+				derivedBlockData.NextTxIndexForTestingOnly()),
+			mainSnapshot)
 		require.NoError(t, err)
+		require.NoError(t, output.Err)
+
+		mainSnapshot = mainSnapshot.Append(executionSnapshot)
+
+		// a, b and c are invalid
+		entryB := derivedBlockData.GetProgramForTestingOnly(contractBLocation)
+		entryC := derivedBlockData.GetProgramForTestingOnly(contractCLocation)
+		entryA := derivedBlockData.GetProgramForTestingOnly(contractALocation)
+
+		require.Nil(t, entryB) // B could have star imports to 0xa, so it's invalidated
+		require.Nil(t, entryC) // still invalid
+		require.Nil(t, entryA) // A could have star imports to 0xa, so it's invalidated
+
+		cached := derivedBlockData.CachedPrograms()
+		require.Equal(t, 0, cached)
+	})
+
+	t.Run("contract B imports contract A and A2 because of * import", func(t *testing.T) {
+
+		// programs should have no entries for A and B, as per previous test
+
+		// run a TX using contract B
+
+		executionSnapshotB, output, err := vm.Run(
+			context,
+			fvm.Transaction(
+				callTx("B", addressB),
+				derivedBlockData.NextTxIndexForTestingOnly()),
+			mainSnapshot)
+		require.NoError(t, err)
+		require.NoError(t, output.Err)
+
+		require.Contains(t, output.Logs, "\"hello from B but also hello from A\"")
+
+		mainSnapshot = mainSnapshot.Append(executionSnapshotB)
+
+		entry := derivedBlockData.GetProgramForTestingOnly(contractALocation)
+		require.NotNil(t, entry)
+
+		// state should be essentially the same as one which we got in tx with contract A
+		require.Equal(t, contractASnapshot, entry.ExecutionSnapshot)
+
+		entryB := derivedBlockData.GetProgramForTestingOnly(contractBLocation)
+		require.NotNil(t, entryB)
+
+		// assert dependencies are correct
+		require.Equal(t, 3, entryB.Value.Dependencies.Count())
+		require.NotNil(t, entryB.Value.Dependencies.ContainsLocation(contractALocation))
+		require.NotNil(t, entryB.Value.Dependencies.ContainsLocation(contractBLocation))
+		require.NotNil(t, entryB.Value.Dependencies.ContainsLocation(contractA2Location))
+
+		// program B should contain all the registers used by program A, as it depends on it
+		contractBSnapshot = entryB.ExecutionSnapshot
+
+		require.Empty(t, contractASnapshot.WriteSet)
+
+		for id := range contractASnapshot.ReadSet {
+			_, ok := contractBSnapshot.ReadSet[id]
+			require.True(t, ok)
+		}
+
+		// rerun transaction
+
+		// execute transaction again, this time make sure it doesn't load code
+		execB2Snapshot := snapshot.NewReadFuncStorageSnapshot(
+			func(id flow.RegisterID) (flow.RegisterValue, error) {
+				idA := flow.ContractRegisterID(
+					flow.BytesToAddress([]byte(id.Owner)),
+					"A")
+				idA2 := flow.ContractRegisterID(
+					flow.BytesToAddress([]byte(id.Owner)),
+					"A2")
+				idB := flow.ContractRegisterID(
+					flow.BytesToAddress([]byte(id.Owner)),
+					"B")
+				// this time we fail if a read of code occurs
+				require.NotEqual(t, id.Key, idA.Key)
+				require.NotEqual(t, id.Key, idA2.Key)
+				require.NotEqual(t, id.Key, idB.Key)
+
+				return mainSnapshot.Get(id)
+			})
+
+		executionSnapshotB2, output, err := vm.Run(
+			context,
+			fvm.Transaction(
+				callTx("B", addressB),
+				derivedBlockData.NextTxIndexForTestingOnly()),
+			execB2Snapshot)
+		require.NoError(t, err)
+		require.NoError(t, output.Err)
+
+		require.Contains(t, output.Logs, "\"hello from B but also hello from A\"")
+
+		mainSnapshot = mainSnapshot.Append(executionSnapshotB2)
+
+		compareExecutionSnapshots(t, executionSnapshotB, executionSnapshotB2)
 	})
 
 	t.Run("contract A runs from cache after program B has been loaded", func(t *testing.T) {
@@ -356,37 +504,276 @@ func Test_Programs(t *testing.T) {
 		// at this point programs cache should contain data for contract A
 		// only because contract B has been called
 
-		viewExecA := delta.NewView(func(owner, key string) (flow.RegisterValue, error) {
-			require.NotEqual(t, key, environment.ContractKey("A"))
-			return mainView.Peek(owner, key)
-		})
+		execASnapshot := snapshot.NewReadFuncStorageSnapshot(
+			func(id flow.RegisterID) (flow.RegisterValue, error) {
+				notId := flow.ContractRegisterID(
+					flow.BytesToAddress([]byte(id.Owner)),
+					"A")
+				require.NotEqual(t, id, notId)
+				return mainSnapshot.Get(id)
+			})
 
 		// run a TX using contract A
-		procCallA := fvm.Transaction(
-			callTx("A", addressA),
-			derivedBlockData.NextTxIndexForTestingOnly())
-
-		err = vm.Run(context, procCallA, viewExecA)
+		executionSnapshot, output, err := vm.Run(
+			context,
+			fvm.Transaction(
+				callTx("A", addressA),
+				derivedBlockData.NextTxIndexForTestingOnly()),
+			execASnapshot)
 		require.NoError(t, err)
+		require.NoError(t, output.Err)
 
-		require.Contains(t, procCallA.Logs, "\"hello from A\"")
+		require.Contains(t, output.Logs, "\"hello from A\"")
 
-		compareViews(t, txAView, viewExecA)
+		mainSnapshot = mainSnapshot.Append(executionSnapshot)
 
-		// merge it back
-		err = mainView.MergeView(viewExecA)
-		require.NoError(t, err)
+		compareExecutionSnapshots(t, txASnapshot, executionSnapshot)
 	})
 
-	t.Run("deploying contract C cleans programs", func(t *testing.T) {
-		require.NotNil(t, contractBView)
+	t.Run("deploying contract C invalidates C", func(t *testing.T) {
+		require.NotNil(t, contractBSnapshot)
 
 		// deploy contract C
-		procContractC := fvm.Transaction(
-			contractDeployTx("C", contractCCode, addressC),
-			derivedBlockData.NextTxIndexForTestingOnly())
-		err := vm.Run(context, procContractC, mainView)
+		executionSnapshot, output, err := vm.Run(
+			context,
+			fvm.Transaction(
+				contractDeployTx("C", contractCCode, addressC),
+				derivedBlockData.NextTxIndexForTestingOnly()),
+			mainSnapshot)
 		require.NoError(t, err)
+		require.NoError(t, output.Err)
+
+		mainSnapshot = mainSnapshot.Append(executionSnapshot)
+
+		entryA := derivedBlockData.GetProgramForTestingOnly(contractALocation)
+		entryA2 := derivedBlockData.GetProgramForTestingOnly(contractA2Location)
+		entryB := derivedBlockData.GetProgramForTestingOnly(contractBLocation)
+		entryC := derivedBlockData.GetProgramForTestingOnly(contractCLocation)
+
+		require.NotNil(t, entryA)
+		require.NotNil(t, entryA2)
+		require.NotNil(t, entryB)
+		require.Nil(t, entryC)
+
+		cached := derivedBlockData.CachedPrograms()
+		require.Equal(t, 3, cached)
+	})
+
+	t.Run("importing C should chain-import B and A", func(t *testing.T) {
+		executionSnapshot, output, err := vm.Run(
+			context,
+			fvm.Transaction(
+				callTx("C", addressC),
+				derivedBlockData.NextTxIndexForTestingOnly()),
+			mainSnapshot)
+		require.NoError(t, err)
+		require.NoError(t, output.Err)
+
+		require.Contains(t, output.Logs, "\"hello from C, hello from B but also hello from A\"")
+
+		mainSnapshot = mainSnapshot.Append(executionSnapshot)
+
+		// program A is the same
+		entryA := derivedBlockData.GetProgramForTestingOnly(contractALocation)
+		require.NotNil(t, entryA)
+
+		require.Equal(t, contractASnapshot, entryA.ExecutionSnapshot)
+
+		// program B is the same
+		entryB := derivedBlockData.GetProgramForTestingOnly(contractBLocation)
+		require.NotNil(t, entryB)
+
+		require.Equal(t, contractBSnapshot, entryB.ExecutionSnapshot)
+
+		// program C assertions
+		entryC := derivedBlockData.GetProgramForTestingOnly(contractCLocation)
+		require.NotNil(t, entryC)
+
+		// assert dependencies are correct
+		require.Equal(t, 4, entryC.Value.Dependencies.Count())
+		require.NotNil(t, entryC.Value.Dependencies.ContainsLocation(contractALocation))
+		require.NotNil(t, entryC.Value.Dependencies.ContainsLocation(contractBLocation))
+		require.NotNil(t, entryC.Value.Dependencies.ContainsLocation(contractCLocation))
+
+		cached := derivedBlockData.CachedPrograms()
+		require.Equal(t, 4, cached)
+	})
+}
+
+func Test_ProgramsDoubleCounting(t *testing.T) {
+	snapshotTree := setupProgramsTest(t)
+
+	vm := fvm.NewVirtualMachine()
+	derivedBlockData := derived.NewEmptyDerivedBlockData(0)
+
+	metrics := &metricsReporter{}
+	context := fvm.NewContext(
+		fvm.WithContractDeploymentRestricted(false),
+		fvm.WithAuthorizationChecksEnabled(false),
+		fvm.WithSequenceNumberCheckAndIncrementEnabled(false),
+		fvm.WithCadenceLogging(true),
+		fvm.WithDerivedBlockData(derivedBlockData),
+		fvm.WithMetricsReporter(metrics))
+
+	t.Run("deploy contracts and ensure cache is empty", func(t *testing.T) {
+		// deploy contract A
+		executionSnapshot, output, err := vm.Run(
+			context,
+			fvm.Transaction(
+				contractDeployTx("A", contractACode, addressA),
+				derivedBlockData.NextTxIndexForTestingOnly()),
+			snapshotTree)
+		require.NoError(t, err)
+		require.NoError(t, output.Err)
+
+		snapshotTree = snapshotTree.Append(executionSnapshot)
+
+		// deploy contract B
+		executionSnapshot, output, err = vm.Run(
+			context,
+			fvm.Transaction(
+				contractDeployTx("B", contractBCode, addressB),
+				derivedBlockData.NextTxIndexForTestingOnly()),
+			snapshotTree)
+		require.NoError(t, err)
+		require.NoError(t, output.Err)
+
+		snapshotTree = snapshotTree.Append(executionSnapshot)
+
+		// deploy contract C
+		executionSnapshot, output, err = vm.Run(
+			context,
+			fvm.Transaction(
+				contractDeployTx("C", contractCCode, addressC),
+				derivedBlockData.NextTxIndexForTestingOnly()),
+			snapshotTree)
+		require.NoError(t, err)
+		require.NoError(t, output.Err)
+
+		snapshotTree = snapshotTree.Append(executionSnapshot)
+
+		// deploy contract A2 last to clear any cache so far
+		executionSnapshot, output, err = vm.Run(
+			context,
+			fvm.Transaction(
+				contractDeployTx("A2", contractA2Code, addressA),
+				derivedBlockData.NextTxIndexForTestingOnly()),
+			snapshotTree)
+		require.NoError(t, err)
+		require.NoError(t, output.Err)
+
+		snapshotTree = snapshotTree.Append(executionSnapshot)
+
+		entryA := derivedBlockData.GetProgramForTestingOnly(contractALocation)
+		entryA2 := derivedBlockData.GetProgramForTestingOnly(contractA2Location)
+		entryB := derivedBlockData.GetProgramForTestingOnly(contractBLocation)
+		entryC := derivedBlockData.GetProgramForTestingOnly(contractCLocation)
+
+		require.Nil(t, entryA)
+		require.Nil(t, entryA2)
+		require.Nil(t, entryB)
+		require.Nil(t, entryC)
+
+		cached := derivedBlockData.CachedPrograms()
+		require.Equal(t, 0, cached)
+	})
+
+	callC := func(snapshotTree snapshot.SnapshotTree) snapshot.SnapshotTree {
+		procCallC := fvm.Transaction(
+			flow.NewTransactionBody().SetScript(
+				[]byte(
+					`
+					import A from 0xa
+					import B from 0xb
+					import C from 0xc
+					transaction {
+						prepare() {
+							log(C.hello())
+						}
+					}`,
+				)),
+			derivedBlockData.NextTxIndexForTestingOnly())
+
+		executionSnapshot, output, err := vm.Run(
+			context,
+			procCallC,
+			snapshotTree)
+		require.NoError(t, err)
+		require.NoError(t, output.Err)
+
+		require.Equal(
+			t,
+			uint(
+				1+ // import A
+					3+ // import B (import A, import A2)
+					4, // import C (import B (3), import A (already imported in this scope))
+			),
+			output.ComputationIntensities[environment.ComputationKindGetCode])
+
+		entryA := derivedBlockData.GetProgramForTestingOnly(contractALocation)
+		entryA2 := derivedBlockData.GetProgramForTestingOnly(contractA2Location)
+		entryB := derivedBlockData.GetProgramForTestingOnly(contractBLocation)
+		entryC := derivedBlockData.GetProgramForTestingOnly(contractCLocation)
+
+		require.NotNil(t, entryA)
+		require.NotNil(t, entryA2) // loaded due to "*" import
+		require.NotNil(t, entryB)
+		require.NotNil(t, entryC)
+
+		cached := derivedBlockData.CachedPrograms()
+		require.Equal(t, 4, cached)
+
+		return snapshotTree.Append(executionSnapshot)
+	}
+
+	t.Run("Call C", func(t *testing.T) {
+		metrics.Reset()
+		snapshotTree = callC(snapshotTree)
+
+		// miss A because loading transaction
+		// hit A because loading B because loading transaction
+		// miss A2 because loading B because loading transaction
+		// miss B because loading transaction
+		// hit B because loading C because loading transaction
+		// hit A because loading C because loading transaction
+		// miss C because loading transaction
+		//
+		// hit C because interpreting transaction
+		// hit B because interpreting C because interpreting transaction
+		// hit A because interpreting B because interpreting C because interpreting transaction
+		// hit A2 because interpreting B because interpreting C because interpreting transaction
+		require.Equal(t, 7, metrics.CacheHits)
+		require.Equal(t, 4, metrics.CacheMisses)
+	})
+
+	t.Run("Call C Again", func(t *testing.T) {
+		metrics.Reset()
+		snapshotTree = callC(snapshotTree)
+
+		// hit A because loading transaction
+		// hit B because loading transaction
+		// hit C because loading transaction
+		//
+		// hit C because interpreting transaction
+		// hit B because interpreting C because interpreting transaction
+		// hit A because interpreting B because interpreting C because interpreting transaction
+		// hit A2 because interpreting B because interpreting C because interpreting transaction
+		require.Equal(t, 7, metrics.CacheHits)
+		require.Equal(t, 0, metrics.CacheMisses)
+	})
+
+	t.Run("update A to breaking change and ensure cache state", func(t *testing.T) {
+		// deploy contract A
+		executionSnapshot, output, err := vm.Run(
+			context,
+			fvm.Transaction(
+				updateContractTx("A", contractABreakingCode, addressA),
+				derivedBlockData.NextTxIndexForTestingOnly()),
+			snapshotTree)
+		require.NoError(t, err)
+		require.NoError(t, output.Err)
+
+		snapshotTree = snapshotTree.Append(executionSnapshot)
 
 		entryA := derivedBlockData.GetProgramForTestingOnly(contractALocation)
 		entryB := derivedBlockData.GetProgramForTestingOnly(contractBLocation)
@@ -396,43 +783,127 @@ func Test_Programs(t *testing.T) {
 		require.Nil(t, entryB)
 		require.Nil(t, entryC)
 
+		cached := derivedBlockData.CachedPrograms()
+		require.Equal(t, 1, cached)
 	})
 
-	t.Run("importing C should chain-import B and A", func(t *testing.T) {
+	callCAfterItsBroken := func(snapshotTree snapshot.SnapshotTree) snapshot.SnapshotTree {
 		procCallC := fvm.Transaction(
-			callTx("C", addressC),
+			flow.NewTransactionBody().SetScript(
+				[]byte(
+					`
+					import A from 0xa
+					import B from 0xb
+					import C from 0xc
+					transaction {
+						prepare() {
+							log(C.hello())
+						}
+					}`,
+				)),
 			derivedBlockData.NextTxIndexForTestingOnly())
 
-		viewExecC := delta.NewView(mainView.Peek)
-
-		err = vm.Run(context, procCallC, viewExecC)
+		executionSnapshot, output, err := vm.Run(
+			context,
+			procCallC,
+			snapshotTree)
 		require.NoError(t, err)
+		require.Error(t, output.Err)
 
-		require.Contains(t, procCallC.Logs, "\"hello from C, hello from B but also hello from A\"")
-
-		// program A is the same
 		entryA := derivedBlockData.GetProgramForTestingOnly(contractALocation)
-		require.NotNil(t, entryA)
-
-		require.IsType(t, entryA.State.View(), &delta.View{})
-		deltaA := entryA.State.View().(*delta.View)
-		compareViews(t, contractAView, deltaA)
-
-		// program B is the same
+		entryA2 := derivedBlockData.GetProgramForTestingOnly(contractA2Location)
 		entryB := derivedBlockData.GetProgramForTestingOnly(contractBLocation)
-		require.NotNil(t, entryB)
+		entryC := derivedBlockData.GetProgramForTestingOnly(contractCLocation)
 
-		require.IsType(t, entryB.State.View(), &delta.View{})
-		deltaB := entryB.State.View().(*delta.View)
-		compareViews(t, contractBView, deltaB)
+		require.NotNil(t, entryA)
+		require.NotNil(t, entryA2) // loaded due to "*" import in B
+		require.Nil(t, entryB)     // failed to load
+		require.Nil(t, entryC)     // failed to load
+
+		cached := derivedBlockData.CachedPrograms()
+		require.Equal(t, 2, cached)
+
+		return snapshotTree.Append(executionSnapshot)
+	}
+
+	t.Run("Call C when broken", func(t *testing.T) {
+		metrics.Reset()
+		snapshotTree = callCAfterItsBroken(snapshotTree)
+
+		// miss A, hit A, hit A2, hit A, hit A2, hit A
+		require.Equal(t, 5, metrics.CacheHits)
+		require.Equal(t, 1, metrics.CacheMisses)
 	})
+
 }
 
-// compareViews compares views using only data that matters (ie. two different hasher instances
-// trips the library comparison, even if actual SPoCKs are the same)
-func compareViews(t *testing.T, a, b *delta.View) {
-	require.Equal(t, a.Delta(), b.Delta())
-	require.Equal(t, a.Interactions(), b.Interactions())
-	require.Equal(t, a.ReadsCount(), b.ReadsCount())
-	require.Equal(t, a.SpockSecret(), b.SpockSecret())
+func callTx(name string, address flow.Address) *flow.TransactionBody {
+
+	return flow.NewTransactionBody().SetScript(
+		[]byte(fmt.Sprintf(`
+			import %s from %s
+			transaction {
+              prepare() {
+                log(%s.hello())
+              }
+            }`, name, address.HexWithPrefix(), name)),
+	)
 }
+
+func contractDeployTx(name, code string, address flow.Address) *flow.TransactionBody {
+	encoded := hex.EncodeToString([]byte(code))
+
+	return flow.NewTransactionBody().SetScript(
+		[]byte(fmt.Sprintf(`transaction {
+              prepare(signer: AuthAccount) {
+                signer.contracts.add(name: "%s", code: "%s".decodeHex())
+              }
+            }`, name, encoded)),
+	).AddAuthorizer(address)
+}
+
+func updateContractTx(name, code string, address flow.Address) *flow.TransactionBody {
+	encoded := hex.EncodeToString([]byte(code))
+
+	return flow.NewTransactionBody().SetScript([]byte(
+		fmt.Sprintf(`transaction {
+             prepare(signer: AuthAccount) {
+               signer.contracts.update__experimental(name: "%s", code: "%s".decodeHex())
+             }
+           }`, name, encoded)),
+	).AddAuthorizer(address)
+}
+
+func compareExecutionSnapshots(t *testing.T, a, b *snapshot.ExecutionSnapshot) {
+	require.Equal(t, a.WriteSet, b.WriteSet)
+	require.Equal(t, a.ReadSet, b.ReadSet)
+	require.Equal(t, a.SpockSecret, b.SpockSecret)
+}
+
+type metricsReporter struct {
+	CacheHits   int
+	CacheMisses int
+}
+
+func (m *metricsReporter) RuntimeTransactionParsed(duration time.Duration) {}
+
+func (m *metricsReporter) RuntimeTransactionChecked(duration time.Duration) {}
+
+func (m *metricsReporter) RuntimeTransactionInterpreted(duration time.Duration) {}
+
+func (m *metricsReporter) RuntimeSetNumberOfAccounts(count uint64) {}
+
+func (m *metricsReporter) RuntimeTransactionProgramsCacheMiss() {
+	m.CacheMisses++
+}
+
+func (m *metricsReporter) RuntimeTransactionProgramsCacheHit() {
+	m.CacheHits++
+}
+
+func (m *metricsReporter) Reset() {
+	m.CacheHits = 0
+	m.CacheMisses = 0
+}
+
+var _ environment.MetricsReporter = (*metricsReporter)(nil)

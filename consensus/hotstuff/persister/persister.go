@@ -3,17 +3,22 @@ package persister
 import (
 	"github.com/dgraph-io/badger/v2"
 
+	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/storage/badger/operation"
 )
 
 // Persister can persist relevant information for hotstuff.
+// Persister depends on protocol.State root snapshot bootstrapping to set initial values for
+// SafetyData and LivenessData. These values must be initialized before first use of Persister.
 type Persister struct {
 	db      *badger.DB
 	chainID flow.ChainID
 }
 
-// New creates a nev persister using the injected stores to persist
+var _ hotstuff.Persister = (*Persister)(nil)
+
+// New creates a new Persister using the injected data base to persist
 // relevant hotstuff data.
 func New(db *badger.DB, chainID flow.ChainID) *Persister {
 	p := &Persister{
@@ -23,26 +28,30 @@ func New(db *badger.DB, chainID flow.ChainID) *Persister {
 	return p
 }
 
-// GetStarted returns the last persisted started view.
-func (p *Persister) GetStarted() (uint64, error) {
-	var view uint64
-	err := p.db.View(operation.RetrieveStartedView(p.chainID, &view))
-	return view, err
+// GetSafetyData will retrieve last persisted safety data.
+// During normal operations, no errors are expected.
+func (p *Persister) GetSafetyData() (*hotstuff.SafetyData, error) {
+	var safetyData hotstuff.SafetyData
+	err := p.db.View(operation.RetrieveSafetyData(p.chainID, &safetyData))
+	return &safetyData, err
 }
 
-// GetVoted returns the last persisted started view.
-func (p *Persister) GetVoted() (uint64, error) {
-	var view uint64
-	err := p.db.View(operation.RetrieveVotedView(p.chainID, &view))
-	return view, err
+// GetLivenessData will retrieve last persisted liveness data.
+// During normal operations, no errors are expected.
+func (p *Persister) GetLivenessData() (*hotstuff.LivenessData, error) {
+	var livenessData hotstuff.LivenessData
+	err := p.db.View(operation.RetrieveLivenessData(p.chainID, &livenessData))
+	return &livenessData, err
 }
 
-// PutStarted persists the view when we start it in hotstuff.
-func (p *Persister) PutStarted(view uint64) error {
-	return operation.RetryOnConflict(p.db.Update, operation.UpdateStartedView(p.chainID, view))
+// PutSafetyData persists the last safety data.
+// During normal operations, no errors are expected.
+func (p *Persister) PutSafetyData(safetyData *hotstuff.SafetyData) error {
+	return operation.RetryOnConflict(p.db.Update, operation.UpdateSafetyData(p.chainID, safetyData))
 }
 
-// PutVoted persist the view when we voted in hotstuff.
-func (p *Persister) PutVoted(view uint64) error {
-	return operation.RetryOnConflict(p.db.Update, operation.UpdateVotedView(p.chainID, view))
+// PutLivenessData persists the last liveness data.
+// During normal operations, no errors are expected.
+func (p *Persister) PutLivenessData(livenessData *hotstuff.LivenessData) error {
+	return operation.RetryOnConflict(p.db.Update, operation.UpdateLivenessData(p.chainID, livenessData))
 }

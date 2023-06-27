@@ -17,9 +17,9 @@ import (
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/consensus"
 	"github.com/onflow/flow-go/engine/consensus/approvals"
-	"github.com/onflow/flow-go/engine/consensus/sealing/counters"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/counters"
 	"github.com/onflow/flow-go/module/mempool"
 	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/network"
@@ -137,7 +137,7 @@ func (c *Core) RepopulateAssignmentCollectorTree(payloads storage.Payloads) erro
 
 	// Get the root block of our local state - we allow references to unknown
 	// blocks below the root height
-	rootHeader, err := c.state.Params().Root()
+	rootHeader, err := c.state.Params().FinalizedRoot()
 	if err != nil {
 		return fmt.Errorf("could not retrieve root header: %w", err)
 	}
@@ -197,7 +197,7 @@ func (c *Core) RepopulateAssignmentCollectorTree(payloads storage.Payloads) erro
 
 	// at this point we have processed all results in range (lastSealedBlock, lastFinalizedBlock].
 	// Now, we add all known results for any valid block that descends from the latest finalized block:
-	validPending, err := finalizedSnapshot.ValidDescendants()
+	validPending, err := finalizedSnapshot.Descendants()
 	if err != nil {
 		return fmt.Errorf("could not retrieve valid pending blocks from finalized snapshot: %w", err)
 	}
@@ -303,7 +303,7 @@ func (c *Core) processIncorporatedResult(incRes *flow.IncorporatedResult) error 
 // * nil - successfully processed incorporated result
 func (c *Core) ProcessIncorporatedResult(result *flow.IncorporatedResult) error {
 
-	span, _, _ := c.tracer.StartBlockSpan(context.Background(), result.Result.BlockID, trace.CONSealingProcessIncorporatedResult)
+	span, _ := c.tracer.StartBlockSpan(context.Background(), result.Result.BlockID, trace.CONSealingProcessIncorporatedResult)
 	defer span.End()
 
 	err := c.processIncorporatedResult(result)
@@ -352,13 +352,11 @@ func (c *Core) ProcessApproval(approval *flow.ResultApproval) error {
 		Str("verifier_id", approval.Body.ApproverID.String()).
 		Msg("processing result approval")
 
-	span, _, isSampled := c.tracer.StartBlockSpan(context.Background(), approval.Body.BlockID, trace.CONSealingProcessApproval)
-	if isSampled {
-		span.SetAttributes(
-			attribute.String("approverId", approval.Body.ApproverID.String()),
-			attribute.Int64("chunkIndex", int64(approval.Body.ChunkIndex)),
-		)
-	}
+	span, _ := c.tracer.StartBlockSpan(context.Background(), approval.Body.BlockID, trace.CONSealingProcessApproval)
+	span.SetAttributes(
+		attribute.String("approverId", approval.Body.ApproverID.String()),
+		attribute.Int64("chunkIndex", int64(approval.Body.ChunkIndex)),
+	)
 	defer span.End()
 
 	startTime := time.Now()
@@ -505,7 +503,7 @@ func (c *Core) processPendingApprovals(collector approvals.AssignmentCollectorSt
 // * nil - successfully processed finalized block
 func (c *Core) ProcessFinalizedBlock(finalizedBlockID flow.Identifier) error {
 
-	processFinalizedBlockSpan, _, _ := c.tracer.StartBlockSpan(context.Background(), finalizedBlockID, trace.CONSealingProcessFinalizedBlock)
+	processFinalizedBlockSpan, _ := c.tracer.StartBlockSpan(context.Background(), finalizedBlockID, trace.CONSealingProcessFinalizedBlock)
 	defer processFinalizedBlockSpan.End()
 
 	// STEP 0: Collect auxiliary information
@@ -587,12 +585,12 @@ func (c *Core) prune(parentSpan otelTrace.Span, finalized, lastSealed *flow.Head
 	}
 
 	err = c.requestTracker.PruneUpToHeight(lastSealed.Height)
-	if err != nil && !mempool.IsDecreasingPruningHeightError(err) {
+	if err != nil && !mempool.IsBelowPrunedThresholdError(err) {
 		return fmt.Errorf("could not request tracker at block up to height %d: %w", lastSealed.Height, err)
 	}
 
 	err = c.sealsMempool.PruneUpToHeight(lastSealed.Height) // prune candidate seals mempool
-	if err != nil && !mempool.IsDecreasingPruningHeightError(err) {
+	if err != nil && !mempool.IsBelowPrunedThresholdError(err) {
 		return fmt.Errorf("could not prune seals mempool at block up to height %d: %w", lastSealed.Height, err)
 	}
 

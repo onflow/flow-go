@@ -25,7 +25,7 @@ func ExecuteScript(r *request.Request, backend access.API, _ models.LinkGenerato
 	}
 
 	if req.BlockHeight == request.FinalHeight {
-		finalBlock, err := backend.GetLatestBlockHeader(r.Context(), false)
+		finalBlock, _, err := backend.GetLatestBlockHeader(r.Context(), false)
 		if err != nil {
 			return nil, err
 		}

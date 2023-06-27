@@ -52,12 +52,12 @@ func NewVoteCollectors(logger zerolog.Logger, lowestRetainedView uint64, workerP
 
 // GetOrCreateCollector retrieves the hotstuff.VoteCollector for the specified
 // view or creates one if none exists.
-//   - (collector, true, nil) if no collector can be found by the block ID, and a new collector was created.
-//   - (collector, false, nil) if the collector can be found by the block ID
+//   - (collector, true, nil) if no collector can be found by the view, and a new collector was created.
+//   - (collector, false, nil) if the collector can be found by the view
 //   - (nil, false, error) if running into any exception creating the vote collector state machine
 //
 // Expected error returns during normal operations:
-//   - mempool.DecreasingPruningHeightError - in case view is lower than lowestRetainedView
+//   - mempool.BelowPrunedThresholdError - in case view is lower than lowestRetainedView
 func (v *VoteCollectors) GetOrCreateCollector(view uint64) (hotstuff.VoteCollector, bool, error) {
 	cachedCollector, hasCachedCollector, err := v.getCollector(view)
 	if err != nil {
@@ -91,12 +91,12 @@ func (v *VoteCollectors) GetOrCreateCollector(view uint64) (hotstuff.VoteCollect
 // getCollector retrieves hotstuff.VoteCollector from local cache in concurrent safe way.
 // Performs check for lowestRetainedView.
 // Expected error returns during normal operations:
-//   - mempool.DecreasingPruningHeightError - in case view is lower than lowestRetainedView
+//   - mempool.BelowPrunedThresholdError - in case view is lower than lowestRetainedView
 func (v *VoteCollectors) getCollector(view uint64) (hotstuff.VoteCollector, bool, error) {
 	v.lock.RLock()
 	defer v.lock.RUnlock()
 	if view < v.lowestRetainedView {
-		return nil, false, mempool.NewDecreasingPruningHeightErrorf("cannot retrieve collector for pruned view %d (lowest retained view %d)", view, v.lowestRetainedView)
+		return nil, false, mempool.NewBelowPrunedThresholdErrorf("cannot retrieve collector for pruned view %d (lowest retained view %d)", view, v.lowestRetainedView)
 	}
 
 	clr, found := v.collectors[view]

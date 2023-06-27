@@ -15,6 +15,10 @@ type TestInterpreterRuntime struct {
 	InvokeContractFunc func(a common.AddressLocation, s string, values []cadence.Value, types []sema.Type, ctx runtime.Context) (cadence.Value, error)
 }
 
+func (t *TestInterpreterRuntime) Config() runtime.Config {
+	panic("Config not defined")
+}
+
 func (t *TestInterpreterRuntime) NewScriptExecutor(script runtime.Script, context runtime.Context) runtime.Executor {
 	panic("NewScriptExecutor not defined")
 }

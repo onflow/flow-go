@@ -11,6 +11,7 @@ import (
 	"go.uber.org/atomic"
 
 	"github.com/onflow/flow-go/consensus/hotstuff"
+	"github.com/onflow/flow-go/consensus/hotstuff/committees"
 	"github.com/onflow/flow-go/consensus/hotstuff/helper"
 	mockhotstuff "github.com/onflow/flow-go/consensus/hotstuff/mocks"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
@@ -270,8 +271,10 @@ func TestStakingVoteProcessorV2_BuildVerifyQC(t *testing.T) {
 	block := helper.MakeBlock(helper.WithBlockView(view),
 		helper.WithBlockProposer(leader.NodeID))
 
-	committee := &mockhotstuff.Committee{}
-	committee.On("Identities", block.BlockID, mock.Anything).Return(stakingSigners, nil)
+	committee := &mockhotstuff.DynamicCommittee{}
+	committee.On("IdentitiesByEpoch", block.View).Return(stakingSigners, nil)
+	committee.On("IdentitiesByBlock", block.BlockID).Return(stakingSigners, nil)
+	committee.On("QuorumThresholdForView", mock.Anything).Return(committees.WeightThresholdToBuildQC(stakingSigners.TotalWeight()), nil)
 
 	votes := make([]*model.Vote, 0, len(stakingSigners))
 
@@ -291,11 +294,10 @@ func TestStakingVoteProcessorV2_BuildVerifyQC(t *testing.T) {
 	onQCCreated := func(qc *flow.QuorumCertificate) {
 		// create verifier that will do crypto checks of created QC
 		verifier := verification.NewStakingVerifier()
-		forks := &mockhotstuff.Forks{}
 		// create validator which will do compliance and crypto checked of created QC
-		validator := hotstuffvalidator.New(committee, forks, verifier)
+		validator := hotstuffvalidator.New(committee, verifier)
 		// check if QC is valid against parent
-		err := validator.ValidateQC(qc, block)
+		err := validator.ValidateQC(qc)
 		require.NoError(t, err)
 
 		qcCreated = true

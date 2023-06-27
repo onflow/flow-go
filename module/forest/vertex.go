@@ -1,6 +1,9 @@
 package forest
 
 import (
+	"errors"
+	"fmt"
+
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -9,8 +12,14 @@ type Vertex interface {
 	VertexID() flow.Identifier
 	// Level returns the vertex's level
 	Level() uint64
-	// Parent returns the returns the parents (level, ID)
+	// Parent returns the parent's (level, ID)
 	Parent() (flow.Identifier, uint64)
+}
+
+// VertexToString returns a string representation of the vertex.
+func VertexToString(v Vertex) string {
+	parentID, parentLevel := v.Parent()
+	return fmt.Sprintf("<id=%x level=%d parent_id=%d parent_level=%d>", v.VertexID(), v.Level(), parentID, parentLevel)
 }
 
 // VertexIterator is a stateful iterator for VertexList.
@@ -52,4 +61,28 @@ func newVertexIterator(vertexList VertexList) VertexIterator {
 	}
 	it.preLoad()
 	return it
+}
+
+// InvalidVertexError indicates that a proposed vertex is invalid for insertion to the forest.
+type InvalidVertexError struct {
+	// Vertex is the invalid vertex
+	Vertex Vertex
+	// msg provides additional context
+	msg string
+}
+
+func (err InvalidVertexError) Error() string {
+	return fmt.Sprintf("invalid vertex %s: %s", VertexToString(err.Vertex), err.msg)
+}
+
+func IsInvalidVertexError(err error) bool {
+	var target InvalidVertexError
+	return errors.As(err, &target)
+}
+
+func NewInvalidVertexErrorf(vertex Vertex, msg string, args ...interface{}) InvalidVertexError {
+	return InvalidVertexError{
+		Vertex: vertex,
+		msg:    fmt.Sprintf(msg, args...),
+	}
 }

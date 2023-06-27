@@ -40,7 +40,4 @@ type BackData interface {
 
 	// Clear removes all entities from the backdata.
 	Clear()
-
-	// Hash returns the merkle root hash of all entities.
-	Hash() flow.Identifier
 }

@@ -3,7 +3,7 @@ package epochmgr
 import (
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/module"
-	"github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/state/cluster"
 	"github.com/onflow/flow-go/state/protocol"
 )
@@ -20,10 +20,12 @@ type EpochComponentsFactory interface {
 	// Must return ErrNotAuthorizedForEpoch if this node is not authorized in the epoch.
 	Create(epoch protocol.Epoch) (
 		state cluster.State,
-		proposal network.Engine,
-		sync network.Engine,
+		proposal component.Component,
+		sync module.ReadyDoneAware,
 		hotstuff module.HotStuff,
 		voteAggregator hotstuff.VoteAggregator,
+		timeoutAggregator hotstuff.TimeoutAggregator,
+		messageHub component.Component,
 		err error,
 	)
 }

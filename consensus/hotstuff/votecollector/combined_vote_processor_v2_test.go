@@ -5,7 +5,6 @@ import (
 	"math/rand"
 	"sync"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -15,6 +14,7 @@ import (
 
 	bootstrapDKG "github.com/onflow/flow-go/cmd/bootstrap/dkg"
 	"github.com/onflow/flow-go/consensus/hotstuff"
+	"github.com/onflow/flow-go/consensus/hotstuff/committees"
 	"github.com/onflow/flow-go/consensus/hotstuff/helper"
 	mockhotstuff "github.com/onflow/flow-go/consensus/hotstuff/mocks"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
@@ -29,7 +29,6 @@ import (
 	modulemock "github.com/onflow/flow-go/module/mock"
 	msig "github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/state/protocol/inmem"
-	"github.com/onflow/flow-go/state/protocol/seed"
 	storagemock "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -400,7 +399,7 @@ func (s *CombinedVoteProcessorV2TestSuite) TestProcess_ConcurrentCreatingQC() {
 	s.reconstructor.On("EnoughShares").Return(true)
 
 	// at this point sending any vote should result in creating QC.
-	s.packer.On("Pack", s.proposal.Block.BlockID, mock.Anything).Return(unittest.RandomBytes(100), unittest.RandomBytes(128), nil)
+	s.packer.On("Pack", s.proposal.Block.View, mock.Anything).Return(unittest.RandomBytes(100), unittest.RandomBytes(128), nil)
 	s.onQCCreatedState.On("onQCCreated", mock.Anything).Return(nil).Once()
 
 	var startupWg, shutdownWg sync.WaitGroup
@@ -493,7 +492,7 @@ func TestCombinedVoteProcessorV2_PropertyCreatingQCCorrectness(testifyT *testing
 		mergedSignerIDs := make(flow.IdentifierList, 0)
 		packedSigData := unittest.RandomBytes(128)
 		pcker := &mockhotstuff.Packer{}
-		pcker.On("Pack", block.BlockID, mock.Anything).Run(func(args mock.Arguments) {
+		pcker.On("Pack", block.View, mock.Anything).Run(func(args mock.Arguments) {
 			blockSigData := args.Get(1).(*hotstuff.BlockSignatureData)
 
 			// check that aggregated signers are part of all votes signers
@@ -520,12 +519,12 @@ func TestCombinedVoteProcessorV2_PropertyCreatingQCCorrectness(testifyT *testing
 			// fill merged signers with collected signers
 			mergedSignerIDs = append(expectedBlockSigData.StakingSigners, expectedBlockSigData.RandomBeaconSigners...)
 		}).Return(
-			func(flow.Identifier, *hotstuff.BlockSignatureData) []byte {
+			func(uint64, *hotstuff.BlockSignatureData) []byte {
 				signerIndices, _ := msig.EncodeSignersToIndices(mergedSignerIDs, mergedSignerIDs)
 				return signerIndices
 			},
-			func(flow.Identifier, *hotstuff.BlockSignatureData) []byte { return packedSigData },
-			func(flow.Identifier, *hotstuff.BlockSignatureData) error { return nil }).Once()
+			func(uint64, *hotstuff.BlockSignatureData) []byte { return packedSigData },
+			func(uint64, *hotstuff.BlockSignatureData) error { return nil }).Once()
 
 		// track if QC was created
 		qcCreated := atomic.NewBool(false)
@@ -596,7 +595,6 @@ func TestCombinedVoteProcessorV2_PropertyCreatingQCCorrectness(testifyT *testing
 		}
 
 		// shuffle votes in random order
-		rand.Seed(time.Now().UnixNano())
 		rand.Shuffle(len(votes), func(i, j int) {
 			votes[i], votes[j] = votes[j], votes[i]
 		})
@@ -690,7 +688,7 @@ func TestCombinedVoteProcessorV2_PropertyCreatingQCLiveness(testifyT *testing.T)
 
 		signerIndices, err := msig.EncodeSignersToIndices(mergedSignerIDs, mergedSignerIDs)
 		require.NoError(t, err)
-		pcker.On("Pack", block.BlockID, mock.Anything).Return(signerIndices, packedSigData, nil)
+		pcker.On("Pack", block.View, mock.Anything).Return(signerIndices, packedSigData, nil)
 
 		// track if QC was created
 		qcCreated := atomic.NewBool(false)
@@ -744,7 +742,6 @@ func TestCombinedVoteProcessorV2_PropertyCreatingQCLiveness(testifyT *testing.T)
 		}
 
 		// shuffle votes in random order
-		rand.Seed(time.Now().UnixNano())
 		rand.Shuffle(len(votes), func(i, j int) {
 			votes[i], votes[j] = votes[j], votes[i]
 		})
@@ -788,7 +785,7 @@ func TestCombinedVoteProcessorV2_BuildVerifyQC(t *testing.T) {
 	epochLookup.On("EpochForViewWithFallback", view).Return(epochCounter, nil)
 
 	// all committee members run DKG
-	dkgData, err := bootstrapDKG.RunFastKG(11, unittest.RandomBytes(32))
+	dkgData, err := bootstrapDKG.RandomBeaconKG(11, unittest.RandomBytes(32))
 	require.NoError(t, err)
 
 	// signers hold objects that are created with private key and can sign votes and proposals
@@ -860,9 +857,11 @@ func TestCombinedVoteProcessorV2_BuildVerifyQC(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	committee := &mockhotstuff.Committee{}
-	committee.On("Identities", block.BlockID, mock.Anything).Return(allIdentities, nil)
-	committee.On("DKG", block.BlockID).Return(inmemDKG, nil)
+	committee := &mockhotstuff.DynamicCommittee{}
+	committee.On("QuorumThresholdForView", mock.Anything).Return(committees.WeightThresholdToBuildQC(allIdentities.TotalWeight()), nil)
+	committee.On("IdentitiesByEpoch", block.View).Return(allIdentities, nil)
+	committee.On("IdentitiesByBlock", block.BlockID).Return(allIdentities, nil)
+	committee.On("DKG", block.View).Return(inmemDKG, nil)
 
 	votes := make([]*model.Vote, 0, len(allIdentities))
 
@@ -884,11 +883,10 @@ func TestCombinedVoteProcessorV2_BuildVerifyQC(t *testing.T) {
 
 		// create verifier that will do crypto checks of created QC
 		verifier := verification.NewCombinedVerifier(committee, packer)
-		forks := &mockhotstuff.Forks{}
 		// create validator which will do compliance and crypto checked of created QC
-		validator := hotstuffvalidator.New(committee, forks, verifier)
+		validator := hotstuffvalidator.New(committee, verifier)
 		// check if QC is valid against parent
-		err := validator.ValidateQC(qc, block)
+		err := validator.ValidateQC(qc)
 		require.NoError(t, err)
 
 		qcCreated = true
@@ -935,20 +933,21 @@ func TestReadRandomSourceFromPackedQCV2(t *testing.T) {
 
 	// making a mock block
 	header := unittest.BlockHeaderFixture()
-	block := model.BlockFromFlow(header, header.View-1)
+	block := model.BlockFromFlow(header)
 
 	// create a packer
-	committee := &mockhotstuff.Committee{}
-	committee.On("Identities", block.BlockID, mock.Anything).Return(allSigners, nil)
+	committee := &mockhotstuff.DynamicCommittee{}
+	committee.On("IdentitiesByBlock", block.BlockID).Return(allSigners, nil)
+	committee.On("IdentitiesByEpoch", block.View).Return(allSigners, nil)
 	packer := signature.NewConsensusSigDataPacker(committee)
 
 	qc, err := buildQCWithPackerAndSigData(packer, block, blockSigData)
 	require.NoError(t, err)
 
-	randomSource, err := seed.FromParentQCSignature(qc.SigData)
+	randomSource, err := model.BeaconSignature(qc)
 	require.NoError(t, err)
 
-	randomSourceAgain, err := seed.FromParentQCSignature(qc.SigData)
+	randomSourceAgain, err := model.BeaconSignature(qc)
 	require.NoError(t, err)
 
 	// verify the random source is deterministic

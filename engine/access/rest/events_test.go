@@ -1,6 +1,7 @@
 package rest
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -28,8 +29,16 @@ func TestGetEvents(t *testing.T) {
 	for i, e := range events {
 		allBlockIDs[i] = e.BlockID.String()
 	}
-	startHeight := fmt.Sprintf("%d", events[0].BlockHeight)
-	endHeight := fmt.Sprintf("%d", events[len(events)-1].BlockHeight)
+	startHeight := fmt.Sprint(events[0].BlockHeight)
+	endHeight := fmt.Sprint(events[len(events)-1].BlockHeight)
+
+	// remove events from the last block to test that an empty BlockEvents is returned when the last
+	// block contains no events
+	truncatedEvents := append(events[:len(events)-1], flow.BlockEvents{
+		BlockHeight:    events[len(events)-1].BlockHeight,
+		BlockID:        events[len(events)-1].BlockID,
+		BlockTimestamp: events[len(events)-1].BlockTimestamp,
+	})
 
 	testVectors := []testVector{
 		// valid
@@ -37,25 +46,31 @@ func TestGetEvents(t *testing.T) {
 			description:      "Get events for a single block by ID",
 			request:          getEventReq(t, "A.179b6b1cb6755e31.Foo.Bar", "", "", []string{events[0].BlockID.String()}),
 			expectedStatus:   http.StatusOK,
-			expectedResponse: testBlockEventResponse([]flow.BlockEvents{events[0]}),
+			expectedResponse: testBlockEventResponse(t, []flow.BlockEvents{events[0]}),
 		},
 		{
 			description:      "Get events by all block IDs",
 			request:          getEventReq(t, "A.179b6b1cb6755e31.Foo.Bar", "", "", allBlockIDs),
 			expectedStatus:   http.StatusOK,
-			expectedResponse: testBlockEventResponse(events),
+			expectedResponse: testBlockEventResponse(t, events),
 		},
 		{
 			description:      "Get events for height range",
 			request:          getEventReq(t, "A.179b6b1cb6755e31.Foo.Bar", startHeight, endHeight, nil),
 			expectedStatus:   http.StatusOK,
-			expectedResponse: testBlockEventResponse(events),
+			expectedResponse: testBlockEventResponse(t, events),
 		},
 		{
-			description:      "Get invalid - invalid height format",
+			description:      "Get events range ending at sealed block",
 			request:          getEventReq(t, "A.179b6b1cb6755e31.Foo.Bar", "0", "sealed", nil),
 			expectedStatus:   http.StatusOK,
-			expectedResponse: testBlockEventResponse(events),
+			expectedResponse: testBlockEventResponse(t, events),
+		},
+		{
+			description:      "Get events range ending after last block",
+			request:          getEventReq(t, "A.179b6b1cb6755e31.Foo.Bar", "0", fmt.Sprint(events[len(events)-1].BlockHeight+5), nil),
+			expectedStatus:   http.StatusOK,
+			expectedResponse: testBlockEventResponse(t, truncatedEvents),
 		},
 		// invalid
 		{
@@ -143,6 +158,7 @@ func generateEventsMocks(backend *mock.API, n int) []flow.BlockEvents {
 	events := make([]flow.BlockEvents, n)
 	ids := make([]flow.Identifier, n)
 
+	var lastHeader *flow.Header
 	for i := 0; i < n; i++ {
 		header := unittest.BlockHeaderFixture(unittest.WithHeaderHeight(uint64(i)))
 		ids[i] = header.ID()
@@ -152,12 +168,15 @@ func generateEventsMocks(backend *mock.API, n int) []flow.BlockEvents {
 		backend.Mock.
 			On("GetEventsForBlockIDs", mocks.Anything, mocks.Anything, []flow.Identifier{header.ID()}).
 			Return([]flow.BlockEvents{events[i]}, nil)
+
+		lastHeader = header
 	}
 
 	backend.Mock.
 		On("GetEventsForBlockIDs", mocks.Anything, mocks.Anything, ids).
 		Return(events, nil)
 
+	// range from first to last block
 	backend.Mock.On(
 		"GetEventsForHeightRange",
 		mocks.Anything,
@@ -165,6 +184,15 @@ func generateEventsMocks(backend *mock.API, n int) []flow.BlockEvents {
 		events[0].BlockHeight,
 		events[len(events)-1].BlockHeight,
 	).Return(events, nil)
+
+	// range from first to last block + 5
+	backend.Mock.On(
+		"GetEventsForHeightRange",
+		mocks.Anything,
+		mocks.Anything,
+		events[0].BlockHeight,
+		events[len(events)-1].BlockHeight+5,
+	).Return(append(events[:len(events)-1], unittest.BlockEventsFixture(lastHeader, 0)), nil)
 
 	latestBlock := unittest.BlockHeaderFixture()
 	latestBlock.Height = uint64(n - 1)
@@ -180,39 +208,53 @@ func generateEventsMocks(backend *mock.API, n int) []flow.BlockEvents {
 
 	backend.Mock.
 		On("GetLatestBlockHeader", mocks.Anything, true).
-		Return(latestBlock, nil)
+		Return(latestBlock, flow.BlockStatusSealed, nil)
 
 	return events
 }
 
-func testBlockEventResponse(events []flow.BlockEvents) string {
-	res := make([]string, len(events))
+func testBlockEventResponse(t *testing.T, events []flow.BlockEvents) string {
 
-	for i, e := range events {
-		events := make([]string, len(e.Events))
-
-		for i, ev := range e.Events {
-			events[i] = fmt.Sprintf(`{
-				"type": "%s",
-				"transaction_id": "%s",
-				"transaction_index": "%d",
-				"event_index": "%d",
-				"payload": "%s"
-			}`, ev.Type, ev.TransactionID, ev.TransactionIndex, ev.EventIndex, util.ToBase64(ev.Payload))
-		}
-
-		res[i] = fmt.Sprintf(`{
-			"block_id": "%s",
-			"block_height": "%d",
-			"block_timestamp": "%s",
-			"events": [%s]
-		}`,
-			e.BlockID.String(),
-			e.BlockHeight,
-			e.BlockTimestamp.Format(time.RFC3339Nano),
-			strings.Join(events, ","),
-		)
+	type eventResponse struct {
+		Type             flow.EventType  `json:"type"`
+		TransactionID    flow.Identifier `json:"transaction_id"`
+		TransactionIndex string          `json:"transaction_index"`
+		EventIndex       string          `json:"event_index"`
+		Payload          string          `json:"payload"`
 	}
 
-	return fmt.Sprintf(`[%s]`, strings.Join(res, ","))
+	type blockEventsResponse struct {
+		BlockID        flow.Identifier `json:"block_id"`
+		BlockHeight    string          `json:"block_height"`
+		BlockTimestamp string          `json:"block_timestamp"`
+		Events         []eventResponse `json:"events,omitempty"`
+	}
+
+	res := make([]blockEventsResponse, len(events))
+
+	for i, e := range events {
+		events := make([]eventResponse, len(e.Events))
+
+		for i, ev := range e.Events {
+			events[i] = eventResponse{
+				Type:             ev.Type,
+				TransactionID:    ev.TransactionID,
+				TransactionIndex: fmt.Sprint(ev.TransactionIndex),
+				EventIndex:       fmt.Sprint(ev.EventIndex),
+				Payload:          util.ToBase64(ev.Payload),
+			}
+		}
+
+		res[i] = blockEventsResponse{
+			BlockID:        e.BlockID,
+			BlockHeight:    fmt.Sprint(e.BlockHeight),
+			BlockTimestamp: e.BlockTimestamp.Format(time.RFC3339Nano),
+			Events:         events,
+		}
+	}
+
+	data, err := json.Marshal(res)
+	require.NoError(t, err)
+
+	return string(data)
 }

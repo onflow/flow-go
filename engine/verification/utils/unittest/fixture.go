@@ -5,7 +5,6 @@ import (
 	"math/rand"
 	"testing"
 
-	"github.com/ipfs/go-cid"
 	"github.com/ipfs/go-datastore"
 	dssync "github.com/ipfs/go-datastore/sync"
 	blockstore "github.com/ipfs/go-ipfs-blockstore"
@@ -13,18 +12,15 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	"github.com/onflow/flow-go/engine/execution"
 	"github.com/onflow/flow-go/engine/execution/computation/committer"
 	"github.com/onflow/flow-go/engine/execution/computation/computer"
 	"github.com/onflow/flow-go/engine/execution/state"
 	"github.com/onflow/flow-go/engine/execution/state/bootstrap"
-	"github.com/onflow/flow-go/engine/execution/state/delta"
 	"github.com/onflow/flow-go/engine/execution/testutil"
 	"github.com/onflow/flow-go/fvm"
-	"github.com/onflow/flow-go/fvm/programs"
+	"github.com/onflow/flow-go/fvm/storage/derived"
 	completeLedger "github.com/onflow/flow-go/ledger/complete"
 	"github.com/onflow/flow-go/ledger/complete/wal/fixtures"
-	"github.com/onflow/flow-go/model/convert"
 	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module/epochs"
 	"github.com/onflow/flow-go/module/signature"
@@ -34,13 +30,19 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	"github.com/onflow/flow-go/module/executiondatasync/provider"
-	"github.com/onflow/flow-go/module/executiondatasync/tracker"
 	mocktracker "github.com/onflow/flow-go/module/executiondatasync/tracker/mock"
 	"github.com/onflow/flow-go/module/mempool/entity"
 	"github.com/onflow/flow-go/module/metrics"
+	moduleMock "github.com/onflow/flow-go/module/mock"
 	requesterunit "github.com/onflow/flow-go/module/state_synchronization/requester/unittest"
 	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/utils/unittest"
+)
+
+const (
+	// TODO: enable parallel execution once cadence type equivalence check issue
+	// is resolved.
+	testMaxConcurrency = 1
 )
 
 // ExecutionReceiptData is a test helper struct that represents all data required
@@ -204,7 +206,7 @@ func ExecutionResultFixture(t *testing.T, chunkCount int, chain flow.Chain, refB
 	transactions := []*flow.TransactionBody{tx1, tx2, tx3}
 	collection := flow.Collection{Transactions: transactions}
 	collections := []*flow.Collection{&collection}
-	clusterChainID := cluster.CanonicalClusterID(1, clusterCommittee)
+	clusterChainID := cluster.CanonicalClusterID(1, clusterCommittee.NodeIDs())
 
 	guarantee := unittest.CollectionGuaranteeFixture(unittest.WithCollection(&collection), unittest.WithCollRef(refBlkHeader.ParentID))
 	guarantee.ChainID = clusterChainID
@@ -217,13 +219,10 @@ func ExecutionResultFixture(t *testing.T, chunkCount int, chain flow.Chain, refB
 	log := zerolog.Nop()
 
 	// setups execution outputs:
-	spockSecrets := make([][]byte, 0)
-	chunks := make([]*flow.Chunk, 0)
-	chunkDataPacks := make([]*flow.ChunkDataPack, 0)
-
-	var payload flow.Payload
 	var referenceBlock flow.Block
-	var serviceEvents flow.ServiceEventList
+	var spockSecrets [][]byte
+	var chunkDataPacks []*flow.ChunkDataPack
+	var result *flow.ExecutionResult
 
 	unittest.RunWithTempDir(t, func(dir string) {
 
@@ -263,15 +262,13 @@ func ExecutionResultFixture(t *testing.T, chunkCount int, chain flow.Chain, refB
 		)
 
 		// create state.View
-		view := delta.NewView(state.LedgerGetRegister(led, startStateCommitment))
+		snapshot := state.NewLedgerStorageSnapshot(
+			led,
+			startStateCommitment)
 		committer := committer.NewLedgerViewCommitter(led, trace.NewNoopTracer())
-		derivedBlockData := programs.NewEmptyDerivedBlockData()
 
 		bservice := requesterunit.MockBlobService(blockstore.NewBlockstore(dssync.MutexWrap(datastore.NewMapDatastore())))
-		trackerStorage := new(mocktracker.Storage)
-		trackerStorage.On("Update", mock.Anything).Return(func(fn tracker.UpdateFn) error {
-			return fn(func(uint64, ...cid.Cid) error { return nil })
-		})
+		trackerStorage := mocktracker.NewMockStorage()
 
 		prov := provider.NewProvider(
 			zerolog.Nop(),
@@ -281,8 +278,24 @@ func ExecutionResultFixture(t *testing.T, chunkCount int, chain flow.Chain, refB
 			trackerStorage,
 		)
 
+		me := new(moduleMock.Local)
+		me.On("NodeID").Return(unittest.IdentifierFixture())
+		me.On("Sign", mock.Anything, mock.Anything).Return(nil, nil)
+		me.On("SignFunc", mock.Anything, mock.Anything, mock.Anything).
+			Return(nil, nil)
+
 		// create BlockComputer
-		bc, err := computer.NewBlockComputer(vm, execCtx, metrics.NewNoopCollector(), trace.NewNoopTracer(), log, committer, prov)
+		bc, err := computer.NewBlockComputer(
+			vm,
+			execCtx,
+			metrics.NewNoopCollector(),
+			trace.NewNoopTracer(),
+			log,
+			committer,
+			me,
+			prov,
+			nil,
+			testMaxConcurrency)
 		require.NoError(t, err)
 
 		completeColls := make(map[flow.Identifier]*entity.CompleteCollection)
@@ -310,7 +323,7 @@ func ExecutionResultFixture(t *testing.T, chunkCount int, chain flow.Chain, refB
 			}
 		}
 
-		payload = flow.Payload{
+		payload := flow.Payload{
 			Guarantees: guarantees,
 		}
 		referenceBlock = flow.Block{
@@ -323,62 +336,21 @@ func ExecutionResultFixture(t *testing.T, chunkCount int, chain flow.Chain, refB
 			CompleteCollections: completeColls,
 			StartState:          &startStateCommitment,
 		}
-		computationResult, err := bc.ExecuteBlock(context.Background(), executableBlock, view, derivedBlockData)
+		computationResult, err := bc.ExecuteBlock(
+			context.Background(),
+			unittest.IdentifierFixture(),
+			executableBlock,
+			snapshot,
+			derived.NewEmptyDerivedBlockData(0))
 		require.NoError(t, err)
-		serviceEvents = make([]flow.ServiceEvent, 0, len(computationResult.ServiceEvents))
-		for _, event := range computationResult.ServiceEvents {
-			converted, err := convert.ServiceEvent(referenceBlock.Header.ChainID, event)
-			require.NoError(t, err)
-			serviceEvents = append(serviceEvents, *converted)
+
+		for _, snapshot := range computationResult.AllExecutionSnapshots() {
+			spockSecrets = append(spockSecrets, snapshot.SpockSecret)
 		}
 
-		startState := startStateCommitment
-
-		for i := range computationResult.StateCommitments {
-			endState := computationResult.StateCommitments[i]
-
-			// generates chunk and chunk data pack
-			var chunkDataPack *flow.ChunkDataPack
-			var chunk *flow.Chunk
-			if i < len(computationResult.StateCommitments)-1 {
-				// generates chunk data pack fixture for non-system chunk
-				collectionGuarantee := executableBlock.Block.Payload.Guarantees[i]
-				completeCollection := executableBlock.CompleteCollections[collectionGuarantee.ID()]
-				collection := completeCollection.Collection()
-
-				eventsHash, err := flow.EventsMerkleRootHash(computationResult.Events[i])
-				require.NoError(t, err)
-
-				chunk = execution.GenerateChunk(i, startState, endState, executableBlock.ID(), eventsHash, uint64(len(completeCollection.Transactions)))
-				chunkDataPack = execution.GenerateChunkDataPack(chunk.ID(), chunk.StartState, &collection, computationResult.Proofs[i])
-			} else {
-				// generates chunk data pack fixture for system chunk
-				eventsHash, err := flow.EventsMerkleRootHash(computationResult.Events[i])
-				require.NoError(t, err)
-
-				chunk = execution.GenerateChunk(i, startState, endState, executableBlock.ID(), eventsHash, uint64(1))
-				chunkDataPack = execution.GenerateChunkDataPack(chunk.ID(), chunk.StartState, nil, computationResult.Proofs[i])
-			}
-
-			chunks = append(chunks, chunk)
-			chunkDataPacks = append(chunkDataPacks, chunkDataPack)
-			spockSecrets = append(spockSecrets, computationResult.StateSnapshots[i].SpockSecret)
-			startState = endState
-		}
-
+		chunkDataPacks = computationResult.AllChunkDataPacks()
+		result = &computationResult.ExecutionResult
 	})
-
-	// makes sure all chunks are referencing the correct block id.
-	blockID := referenceBlock.ID()
-	for _, chunk := range chunks {
-		require.Equal(t, blockID, chunk.BlockID, "inconsistent block id in chunk fixture")
-	}
-
-	result := &flow.ExecutionResult{
-		BlockID:       blockID,
-		Chunks:        chunks,
-		ServiceEvents: serviceEvents,
-	}
 
 	return result, &ExecutionReceiptData{
 		ReferenceBlock: &referenceBlock,

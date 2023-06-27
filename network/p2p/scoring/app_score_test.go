@@ -5,7 +5,6 @@ import (
 	"testing"
 	"time"
 
-	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/libp2p/go-libp2p/core/peer"
 	mocktestify "github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -13,12 +12,12 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/id"
 	"github.com/onflow/flow-go/module/irrecoverable"
-	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/internal/p2pfixtures"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/scoring"
+	p2ptest "github.com/onflow/flow-go/network/p2p/test"
 	flowpubsub "github.com/onflow/flow-go/network/validator/pubsub"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -33,15 +32,18 @@ func TestFullGossipSubConnectivity(t *testing.T) {
 	idProvider := mock.NewIdentityProvider(t)
 
 	// two groups of non-access nodes and one group of access nodes.
-	groupOneNodes, groupOneIds := p2pfixtures.NodesFixture(t, sporkId, t.Name(), 5,
-		p2pfixtures.WithRole(flow.RoleConsensus),
-		p2pfixtures.WithPeerScoringEnabled(idProvider))
-	groupTwoNodes, groupTwoIds := p2pfixtures.NodesFixture(t, sporkId, t.Name(), 5,
-		p2pfixtures.WithRole(flow.RoleCollection),
-		p2pfixtures.WithPeerScoringEnabled(idProvider))
-	accessNodeGroup, accessNodeIds := p2pfixtures.NodesFixture(t, sporkId, t.Name(), 5,
-		p2pfixtures.WithRole(flow.RoleAccess),
-		p2pfixtures.WithPeerScoringEnabled(idProvider))
+	groupOneNodes, groupOneIds := p2ptest.NodesFixture(t, sporkId, t.Name(), 5,
+		idProvider,
+		p2ptest.WithRole(flow.RoleConsensus),
+		p2ptest.WithPeerScoringEnabled(idProvider))
+	groupTwoNodes, groupTwoIds := p2ptest.NodesFixture(t, sporkId, t.Name(), 5,
+		idProvider,
+		p2ptest.WithRole(flow.RoleCollection),
+		p2ptest.WithPeerScoringEnabled(idProvider))
+	accessNodeGroup, accessNodeIds := p2ptest.NodesFixture(t, sporkId, t.Name(), 5,
+		idProvider,
+		p2ptest.WithRole(flow.RoleAccess),
+		p2ptest.WithPeerScoringEnabled(idProvider))
 
 	ids := append(append(groupOneIds, groupTwoIds...), accessNodeIds...)
 	nodes := append(append(groupOneNodes, groupTwoNodes...), accessNodeGroup...)
@@ -55,38 +57,38 @@ func TestFullGossipSubConnectivity(t *testing.T) {
 			_, ok := provider.ByPeerID(peerId)
 			return ok
 		})
-	p2pfixtures.StartNodes(t, signalerCtx, nodes, 100*time.Millisecond)
-	defer p2pfixtures.StopNodes(t, nodes, cancel, 2*time.Second)
+	p2ptest.StartNodes(t, signalerCtx, nodes, 100*time.Millisecond)
+	defer p2ptest.StopNodes(t, nodes, cancel, 2*time.Second)
 
 	blockTopic := channels.TopicFromChannel(channels.PushBlocks, sporkId)
-	slashingViolationsConsumer := unittest.NetworkSlashingViolationsConsumer(unittest.Logger(), metrics.NewNoopCollector())
+
 	logger := unittest.Logger()
 
 	// all nodes subscribe to block topic (common topic among all roles)
 	// group one
-	groupOneSubs := make([]*pubsub.Subscription, len(groupOneNodes))
+	groupOneSubs := make([]p2p.Subscription, len(groupOneNodes))
 	var err error
 	for i, node := range groupOneNodes {
-		groupOneSubs[i], err = node.Subscribe(blockTopic, flowpubsub.TopicValidator(logger, unittest.NetworkCodec(), slashingViolationsConsumer, unittest.AllowAllPeerFilter()))
+		groupOneSubs[i], err = node.Subscribe(blockTopic, flowpubsub.TopicValidator(logger, unittest.AllowAllPeerFilter()))
 		require.NoError(t, err)
 	}
 	// group two
-	groupTwoSubs := make([]*pubsub.Subscription, len(groupTwoNodes))
+	groupTwoSubs := make([]p2p.Subscription, len(groupTwoNodes))
 	for i, node := range groupTwoNodes {
-		groupTwoSubs[i], err = node.Subscribe(blockTopic, flowpubsub.TopicValidator(logger, unittest.NetworkCodec(), slashingViolationsConsumer, unittest.AllowAllPeerFilter()))
+		groupTwoSubs[i], err = node.Subscribe(blockTopic, flowpubsub.TopicValidator(logger, unittest.AllowAllPeerFilter()))
 		require.NoError(t, err)
 	}
 	// access node group
-	accessNodeSubs := make([]*pubsub.Subscription, len(accessNodeGroup))
+	accessNodeSubs := make([]p2p.Subscription, len(accessNodeGroup))
 	for i, node := range accessNodeGroup {
-		accessNodeSubs[i], err = node.Subscribe(blockTopic, flowpubsub.TopicValidator(logger, unittest.NetworkCodec(), slashingViolationsConsumer, unittest.AllowAllPeerFilter()))
+		accessNodeSubs[i], err = node.Subscribe(blockTopic, flowpubsub.TopicValidator(logger, unittest.AllowAllPeerFilter()))
 		require.NoError(t, err)
 	}
 
 	// creates a topology as follows:
 	// groupOneNodes <--> accessNodeGroup <--> groupTwoNodes
-	p2pfixtures.LetNodesDiscoverEachOther(t, ctx, append(groupOneNodes, accessNodeGroup...), append(groupOneIds, accessNodeIds...))
-	p2pfixtures.LetNodesDiscoverEachOther(t, ctx, append(groupTwoNodes, accessNodeGroup...), append(groupTwoIds, accessNodeIds...))
+	p2ptest.LetNodesDiscoverEachOther(t, ctx, append(groupOneNodes, accessNodeGroup...), append(groupOneIds, accessNodeIds...))
+	p2ptest.LetNodesDiscoverEachOther(t, ctx, append(groupTwoNodes, accessNodeGroup...), append(groupTwoIds, accessNodeIds...))
 
 	// checks end-to-end message delivery works
 	// each node sends a distinct message to all and checks that all nodes receive it.
@@ -146,22 +148,25 @@ func testGossipSubMessageDeliveryUnderNetworkPartition(t *testing.T, honestPeerS
 
 	idProvider := mock.NewIdentityProvider(t)
 	// two (honest) consensus nodes
-	opts := []p2pfixtures.NodeFixtureParameterOption{p2pfixtures.WithRole(flow.RoleConsensus)}
+	opts := []p2ptest.NodeFixtureParameterOption{p2ptest.WithRole(flow.RoleConsensus)}
 	if honestPeerScoring {
-		opts = append(opts, p2pfixtures.WithPeerScoringEnabled(idProvider))
+		opts = append(opts, p2ptest.WithPeerScoringEnabled(idProvider))
 	}
-	con1Node, con1Id := p2pfixtures.NodeFixture(t, sporkId, t.Name(), opts...)
-	con2Node, con2Id := p2pfixtures.NodeFixture(t, sporkId, t.Name(), opts...)
+	con1Node, con1Id := p2ptest.NodeFixture(t, sporkId, t.Name(), idProvider, opts...)
+	con2Node, con2Id := p2ptest.NodeFixture(t, sporkId, t.Name(), idProvider, opts...)
 
 	// create > 2 * 12 malicious access nodes
 	// 12 is the maximum size of default GossipSub mesh.
 	// We want to make sure that it is unlikely for honest nodes to be in the same mesh (hence messages from
 	// one honest node to the other is routed through the malicious nodes).
-	accessNodeGroup, accessNodeIds := p2pfixtures.NodesFixture(t, sporkId, t.Name(), 30,
-		p2pfixtures.WithRole(flow.RoleAccess),
-		p2pfixtures.WithPeerScoringEnabled(idProvider),
+	accessNodeGroup, accessNodeIds := p2ptest.NodesFixture(t, sporkId, t.Name(), 30,
+		idProvider,
+		p2ptest.WithRole(flow.RoleAccess),
+		p2ptest.WithPeerScoringEnabled(idProvider),
 		// overrides the default peer scoring parameters to mute GossipSub traffic from/to honest nodes.
-		p2pfixtures.WithAppSpecificScore(maliciousAppSpecificScore(flow.IdentityList{&con1Id, &con2Id})))
+		p2ptest.WithPeerScoreParamsOption(&p2p.PeerScoringConfig{
+			AppSpecificScoreParams: maliciousAppSpecificScore(flow.IdentityList{&con1Id, &con2Id}),
+		}))
 
 	allNodes := append([]p2p.LibP2PNode{con1Node, con2Node}, accessNodeGroup...)
 	allIds := append([]*flow.Identity{&con1Id, &con2Id}, accessNodeIds...)
@@ -176,29 +181,30 @@ func testGossipSubMessageDeliveryUnderNetworkPartition(t *testing.T, honestPeerS
 			return ok
 		}).Maybe()
 
-	p2pfixtures.StartNodes(t, signalerCtx, allNodes, 100*time.Millisecond)
-	defer p2pfixtures.StopNodes(t, allNodes, cancel, 2*time.Second)
+	p2ptest.StartNodes(t, signalerCtx, allNodes, 100*time.Millisecond)
+	defer p2ptest.StopNodes(t, allNodes, cancel, 2*time.Second)
 
 	blockTopic := channels.TopicFromChannel(channels.PushBlocks, sporkId)
-	slashingViolationsConsumer := unittest.NetworkSlashingViolationsConsumer(unittest.Logger(), metrics.NewNoopCollector())
+
 	logger := unittest.Logger()
 
 	// all nodes subscribe to block topic (common topic among all roles)
-	_, err := con1Node.Subscribe(blockTopic, flowpubsub.TopicValidator(logger, unittest.NetworkCodec(), slashingViolationsConsumer, unittest.AllowAllPeerFilter()))
+	_, err := con1Node.Subscribe(blockTopic, flowpubsub.TopicValidator(logger, unittest.AllowAllPeerFilter()))
 	require.NoError(t, err)
 
-	con2Sub, err := con2Node.Subscribe(blockTopic, flowpubsub.TopicValidator(logger, unittest.NetworkCodec(), slashingViolationsConsumer, unittest.AllowAllPeerFilter()))
+	con2Sub, err := con2Node.Subscribe(blockTopic, flowpubsub.TopicValidator(logger, unittest.AllowAllPeerFilter()))
 	require.NoError(t, err)
 
 	// access node group
-	accessNodeSubs := make([]*pubsub.Subscription, len(accessNodeGroup))
+	accessNodeSubs := make([]p2p.Subscription, len(accessNodeGroup))
 	for i, node := range accessNodeGroup {
-		accessNodeSubs[i], err = node.Subscribe(blockTopic, flowpubsub.TopicValidator(logger, unittest.NetworkCodec(), slashingViolationsConsumer, unittest.AllowAllPeerFilter()))
+		sub, err := node.Subscribe(blockTopic, flowpubsub.TopicValidator(logger, unittest.AllowAllPeerFilter()))
 		require.NoError(t, err)
+		accessNodeSubs[i] = sub
 	}
 
 	// let nodes reside on a full topology, hence no partition is caused by the topology.
-	p2pfixtures.LetNodesDiscoverEachOther(t, ctx, allNodes, allIds)
+	p2ptest.LetNodesDiscoverEachOther(t, ctx, allNodes, allIds)
 
 	proposalMsg := p2pfixtures.MustEncodeEvent(t, unittest.ProposalFixture(), channels.PushBlocks)
 	require.NoError(t, con1Node.Publish(ctx, blockTopic, proposalMsg))
@@ -215,7 +221,7 @@ func testGossipSubMessageDeliveryUnderNetworkPartition(t *testing.T, honestPeerS
 	return p2pfixtures.HasSubReceivedMessage(t, ctx1s, proposalMsg, con2Sub)
 }
 
-// maliciousAppSpecificScore returns a malicious app specific score function that rewards the malicious node and
+// maliciousAppSpecificScore returns a malicious app specific penalty function that rewards the malicious node and
 // punishes the honest nodes.
 func maliciousAppSpecificScore(honestIds flow.IdentityList) func(peer.ID) float64 {
 	honestIdProvider := id.NewFixedIdentityProvider(honestIds)

@@ -1,10 +1,11 @@
 package hash
 
 import (
+	"crypto/rand"
+	"crypto/sha256"
+	"crypto/sha512"
 	"encoding/hex"
-	"math/rand"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -120,11 +121,9 @@ func TestHashersAPI(t *testing.T) {
 		NewKeccak_256,
 	}
 
-	r := time.Now().UnixNano()
-	rand.Seed(r)
-	t.Logf("math rand seed is %d", r)
 	data := make([]byte, 1801)
-	rand.Read(data)
+	_, err := rand.Read(data)
+	require.NoError(t, err)
 
 	for _, newFunction := range newHasherFunctions {
 		// Reset should empty the state
@@ -160,18 +159,53 @@ func TestHashersAPI(t *testing.T) {
 	}
 }
 
-// TestSHA3 is a specific test of SHA3-256 and SHA3-388.
+// TestSHA2 is a specific test of SHA2-256 and SHA2-384.
+// It compares the hashes of random data of different lengths to
+// the output of standard Go sha2.
+func TestSHA2(t *testing.T) {
+
+	t.Run("SHA2_256", func(t *testing.T) {
+		for i := 0; i < 5000; i++ {
+			value := make([]byte, i)
+			_, err := rand.Read(value)
+			require.NoError(t, err)
+			expected := sha256.Sum256(value)
+
+			// test hash computation using the hasher
+			hasher := NewSHA2_256()
+			h := hasher.ComputeHash(value)
+			assert.Equal(t, expected[:], []byte(h))
+
+			// test hash computation using the light api
+			var res [HashLenSHA2_256]byte
+			ComputeSHA2_256(&res, value)
+			assert.Equal(t, expected[:], res[:])
+		}
+	})
+
+	t.Run("SHA2_384", func(t *testing.T) {
+		for i := 0; i < 5000; i++ {
+			value := make([]byte, i)
+			_, err := rand.Read(value)
+			require.NoError(t, err)
+			expected := sha512.Sum384(value)
+
+			hasher := NewSHA2_384()
+			h := hasher.ComputeHash(value)
+			assert.Equal(t, expected[:], []byte(h))
+		}
+	})
+}
+
+// TestSHA3 is a specific test of SHA3-256 and SHA3-384.
 // It compares the hashes of random data of different lengths to
 // the output of standard Go sha3.
 func TestSHA3(t *testing.T) {
-	r := time.Now().UnixNano()
-	rand.Seed(r)
-	t.Logf("math rand seed is %d", r)
-
 	t.Run("SHA3_256", func(t *testing.T) {
 		for i := 0; i < 5000; i++ {
 			value := make([]byte, i)
-			rand.Read(value)
+			_, err := rand.Read(value)
+			require.NoError(t, err)
 			expected := sha3.Sum256(value)
 
 			// test hash computation using the hasher
@@ -189,7 +223,8 @@ func TestSHA3(t *testing.T) {
 	t.Run("SHA3_384", func(t *testing.T) {
 		for i := 0; i < 5000; i++ {
 			value := make([]byte, i)
-			rand.Read(value)
+			_, err := rand.Read(value)
+			require.NoError(t, err)
 			expected := sha3.Sum384(value)
 
 			hasher := NewSHA3_384()
@@ -203,13 +238,10 @@ func TestSHA3(t *testing.T) {
 // It compares the hashes of random data of different lengths to
 // the output of Go LegacyKeccak.
 func TestKeccak(t *testing.T) {
-	r := time.Now().UnixNano()
-	rand.Seed(r)
-	t.Logf("math rand seed is %d", r)
-
 	for i := 0; i < 5000; i++ {
 		value := make([]byte, i)
-		rand.Read(value)
+		_, err := rand.Read(value)
+		require.NoError(t, err)
 		k := sha3.NewLegacyKeccak256()
 		k.Write(value)
 		expected := k.Sum(nil)
@@ -224,14 +256,24 @@ func TestKeccak(t *testing.T) {
 // Benchmark of all hashers' ComputeHash function
 func BenchmarkComputeHash(b *testing.B) {
 
-	m := make([]byte, 64)
-	rand.Read(m)
+	m := make([]byte, 32)
+	_, err := rand.Read(m)
+	require.NoError(b, err)
 
 	b.Run("SHA2_256", func(b *testing.B) {
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
 			alg := NewSHA2_256()
 			_ = alg.ComputeHash(m)
+		}
+		b.StopTimer()
+	})
+
+	b.Run("SHA2_256_light", func(b *testing.B) {
+		var h [HashLenSHA2_256]byte
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			ComputeSHA2_256(&h, m)
 		}
 		b.StopTimer()
 	})

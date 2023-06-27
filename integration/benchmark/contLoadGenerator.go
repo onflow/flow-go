@@ -10,8 +10,9 @@ import (
 
 	"github.com/onflow/cadence"
 	"github.com/rs/zerolog"
-	"github.com/rs/zerolog/log"
+	"golang.org/x/sync/errgroup"
 
+	"github.com/onflow/flow-go/integration/benchmark/account"
 	"github.com/onflow/flow-go/module/metrics"
 
 	flowsdk "github.com/onflow/flow-go-sdk"
@@ -52,16 +53,17 @@ type ConstExecParams struct {
 // ContLoadGenerator creates a continuous load of transactions to the network
 // by creating many accounts and transfer flow tokens between them
 type ContLoadGenerator struct {
+	ctx context.Context
+
 	log                zerolog.Logger
 	loaderMetrics      *metrics.LoaderCollector
 	loadParams         LoadParams
 	networkParams      NetworkParams
 	constExecParams    ConstExecParams
 	flowClient         access.Client
-	serviceAccount     *flowAccount
+	serviceAccount     *account.FlowAccount
 	favContractAddress *flowsdk.Address
-	accounts           []*flowAccount
-	availableAccounts  chan *flowAccount // queue with accounts available for workers
+	availableAccounts  chan *account.FlowAccount // queue with accounts available for workers
 	workerStatsTracker *WorkerStatsTracker
 	stoppedChannel     chan struct{}
 	follower           TxFollower
@@ -69,6 +71,9 @@ type ContLoadGenerator struct {
 
 	workersMutex sync.Mutex
 	workers      []*Worker
+
+	accountsMutex sync.Mutex
+	accounts      []*account.FlowAccount
 }
 
 type NetworkParams struct {
@@ -88,7 +93,6 @@ type LoadParams struct {
 
 // New returns a new load generator
 func New(
-	// TODO(rbtz): use context
 	ctx context.Context,
 	log zerolog.Logger,
 	workerStatsTracker *WorkerStatsTracker,
@@ -104,16 +108,16 @@ func New(
 	// TODO(rbtz): add loadbalancing between multiple clients
 	flowClient := flowClients[0]
 
-	servAcc, err := loadServiceAccount(flowClient, networkParams.ServiceAccountAddress, networkParams.ServAccPrivKeyHex)
+	servAcc, err := account.LoadServiceAccount(ctx, flowClient, networkParams.ServiceAccountAddress, networkParams.ServAccPrivKeyHex)
 	if err != nil {
 		return nil, fmt.Errorf("error loading service account %w", err)
 	}
 
 	var follower TxFollower
 	if loadParams.FeedbackEnabled {
-		follower, err = NewTxFollower(context.TODO(), flowClient, WithLogger(log), WithMetrics(loaderMetrics))
+		follower, err = NewTxFollower(ctx, flowClient, WithLogger(log), WithMetrics(loaderMetrics))
 	} else {
-		follower, err = NewNopTxFollower(context.TODO(), flowClient)
+		follower, err = NewNopTxFollower(ctx, flowClient)
 	}
 	if err != nil {
 		return nil, err
@@ -150,6 +154,7 @@ func New(
 	}
 
 	lg := &ContLoadGenerator{
+		ctx:                ctx,
 		log:                log,
 		loaderMetrics:      loaderMetrics,
 		loadParams:         loadParams,
@@ -157,12 +162,14 @@ func New(
 		constExecParams:    constExecParams,
 		flowClient:         flowClient,
 		serviceAccount:     servAcc,
-		accounts:           make([]*flowAccount, 0),
-		availableAccounts:  make(chan *flowAccount, loadParams.NumberOfAccounts),
+		accounts:           make([]*account.FlowAccount, 0),
+		availableAccounts:  make(chan *account.FlowAccount, loadParams.NumberOfAccounts),
 		workerStatsTracker: workerStatsTracker,
 		follower:           follower,
 		stoppedChannel:     make(chan struct{}),
 	}
+
+	lg.log.Info().Int("num_keys", lg.serviceAccount.NumKeys()).Msg("service account loaded")
 
 	// TODO(rbtz): hide load implementation behind an interface
 	switch loadParams.LoadType {
@@ -190,23 +197,124 @@ func (lg *ContLoadGenerator) stopped() bool {
 	}
 }
 
+func (lg *ContLoadGenerator) populateServiceAccountKeys(num int) error {
+	if lg.serviceAccount.NumKeys() >= num {
+		return nil
+	}
+
+	key1, _ := lg.serviceAccount.GetKey()
+	lg.log.Info().
+		Stringer("HashAlgo", key1.HashAlgo).
+		Stringer("SigAlgo", key1.SigAlgo).
+		Int("Index", key1.Index).
+		Int("Weight", key1.Weight).
+		Msg("service account info")
+	key1.Done()
+
+	numberOfKeysToAdd := num - lg.serviceAccount.NumKeys()
+
+	lg.log.Info().Int("num_keys_to_add", numberOfKeysToAdd).Msg("adding keys to service account")
+
+	addKeysTx, err := lg.createAddKeyTx(*lg.serviceAccount.Address, uint(numberOfKeysToAdd))
+	if err != nil {
+		return fmt.Errorf("error creating add key tx: %w", err)
+	}
+
+	addKeysTx.SetReferenceBlockID(lg.follower.BlockID())
+
+	key, err := lg.serviceAccount.GetKey()
+	if err != nil {
+		return fmt.Errorf("error getting service account key: %w", err)
+	}
+	defer key.Done()
+
+	err = key.SignTx(addKeysTx)
+	if err != nil {
+		return fmt.Errorf("error signing transaction: %w", err)
+	}
+
+	ch, err := lg.sendTx(0, addKeysTx)
+	if err != nil {
+		return fmt.Errorf("error sending transaction: %w", err)
+	}
+	defer key.IncrementSequenceNumber()
+
+	var result flowsdk.TransactionResult
+	select {
+	case result = <-ch:
+	case <-lg.Done():
+		return fmt.Errorf("load generator stopped")
+	}
+
+	lg.log.Info().Stringer("result", result.Status).Msg("add key tx")
+	if result.Error != nil {
+		return fmt.Errorf("error adding keys to service account: %w", result.Error)
+	}
+
+	// reload service account until it has enough keys
+	timeout := time.After(30 * time.Second)
+	for {
+		select {
+		case <-timeout:
+			return fmt.Errorf("timeout waiting for service account to have %d keys", num)
+		case <-lg.Done():
+			return fmt.Errorf("load generator stopped")
+		default:
+		}
+
+		lg.serviceAccount, err = account.LoadServiceAccount(lg.ctx, lg.flowClient, lg.serviceAccount.Address, lg.networkParams.ServAccPrivKeyHex)
+		if err != nil {
+			return fmt.Errorf("error loading service account %w", err)
+		}
+		lg.log.Info().Int("num_keys", lg.serviceAccount.NumKeys()).Msg("service account reloaded")
+
+		if lg.serviceAccount.NumKeys() >= num {
+			break
+		}
+
+		time.Sleep(1 * time.Second)
+	}
+
+	return nil
+}
+
 // TODO(rbtz): make part of New
 func (lg *ContLoadGenerator) Init() error {
+	err := lg.populateServiceAccountKeys(50)
+	if err != nil {
+		return fmt.Errorf("error populating service account keys: %w", err)
+	}
+
+	g := errgroup.Group{}
 	for i := 0; i < lg.loadParams.NumberOfAccounts; i += accountCreationBatchSize {
-		if lg.stopped() {
-			return nil
-		}
+		i := i
+		g.Go(func() error {
+			if lg.stopped() {
+				return lg.ctx.Err()
+			}
 
-		num := lg.loadParams.NumberOfAccounts - i
-		if num > accountCreationBatchSize {
-			num = accountCreationBatchSize
-		}
+			num := lg.loadParams.NumberOfAccounts - i
+			if num > accountCreationBatchSize {
+				num = accountCreationBatchSize
+			}
 
-		lg.log.Info().Int("cumulative", i).Int("num", num).Int("numberOfAccounts", lg.loadParams.NumberOfAccounts).Msg("creating accounts")
-		err := lg.createAccounts(num)
-		if err != nil {
-			return err
-		}
+			lg.log.Info().Int("cumulative", i).Int("num", num).Int("numberOfAccounts", lg.loadParams.NumberOfAccounts).Msg("creating accounts")
+			for {
+				err := lg.createAccounts(num)
+				if errors.Is(err, account.ErrNoKeysAvailable) {
+					lg.log.Warn().Err(err).Msg("error creating accounts, retrying...")
+					time.Sleep(1 * time.Second)
+					continue
+				}
+				return err
+			}
+		})
+		// This is needed to avoid hitting the gRPC message size limit.
+		time.Sleep(1 * time.Second)
+	}
+
+	if err := g.Wait(); err != nil {
+		return fmt.Errorf("error creating accounts: %w", err)
 	}
 
 	// TODO(rbtz): create an interface for different load types: Setup()
@@ -246,13 +354,18 @@ func (lg *ContLoadGenerator) setupFavContract() error {
 	deploymentTx := flowsdk.NewTransaction().
 		SetReferenceBlockID(lg.follower.BlockID()).
 		SetScript(deployScript).
-		SetGasLimit(9999).
-		SetProposalKey(*acc.address, 0, acc.seqNumber).
-		SetPayer(*acc.address).
-		AddAuthorizer(*acc.address)
+		SetGasLimit(9999)
 
 	lg.log.Trace().Msg("signing transaction")
-	err := acc.signTx(deploymentTx, 0)
+
+	key, err := acc.GetKey()
+	if err != nil {
+		lg.log.Error().Err(err).Msg("error getting key")
+		return err
+	}
+	defer key.Done()
+
+	err = key.SignTx(deploymentTx)
 	if err != nil {
 		lg.log.Error().Err(err).Msg("error signing transaction")
 		return err
@@ -262,16 +375,19 @@ func (lg *ContLoadGenerator) setupFavContract() error {
 	if err != nil {
 		return err
 	}
+	defer key.IncrementSequenceNumber()
+
 	<-ch
 	lg.workerStatsTracker.IncTxExecuted()
 
-	lg.favContractAddress = acc.address
+	lg.favContractAddress = acc.Address
 	return nil
 }
 
 func (lg *ContLoadGenerator) startWorkers(num int) error {
 	for i := 0; i < num; i++ {
 		worker := NewWorker(len(lg.workers), 1*time.Second, lg.workFunc)
+		lg.log.Trace().Int("workerID", worker.workerID).Msg("starting worker")
 		worker.Start()
 		lg.workers = append(lg.workers, worker)
 	}
@@ -284,21 +400,16 @@ func (lg *ContLoadGenerator) stopWorkers(num int) error {
 		return fmt.Errorf("can't stop %d workers, only %d available", num, len(lg.workers))
 	}
 
-	wg := sync.WaitGroup{}
-	wg.Add(num)
-
 	idx := len(lg.workers) - num
 	toRemove := lg.workers[idx:]
 	lg.workers = lg.workers[:idx]
 
 	for _, w := range toRemove {
 		go func(w *Worker) {
-			defer wg.Done()
-			lg.log.Debug().Int("workerID", w.workerID).Msg("stopping worker")
+			lg.log.Trace().Int("workerID", w.workerID).Msg("stopping worker")
 			w.Stop()
 		}(w)
 	}
-	wg.Wait()
 	lg.workerStatsTracker.AddWorkers(-num)
 
 	return nil
@@ -360,7 +471,7 @@ func (lg *ContLoadGenerator) Done() <-chan struct{} {
 }
 
 func (lg *ContLoadGenerator) createAccounts(num int) error {
-	privKey := randomPrivateKey()
+	privKey := account.RandomPrivateKey()
 	accountKey := flowsdk.NewAccountKey().
 		FromPrivateKey(privKey).
 		SetHashAlgo(crypto.SHA3_256).
@@ -370,14 +481,7 @@ func (lg *ContLoadGenerator) createAccounts(num int) error {
 	createAccountTx := flowsdk.NewTransaction().
 		SetScript(CreateAccountsScript(*lg.networkParams.FungibleTokenAddress, *lg.networkParams.FlowTokenAddress)).
 		SetReferenceBlockID(lg.follower.BlockID()).
-		SetGasLimit(999999).
-		SetProposalKey(
-			*lg.serviceAccount.address,
-			lg.serviceAccount.accountKey.Index,
-			lg.serviceAccount.accountKey.SequenceNumber,
-		).
-		AddAuthorizer(*lg.serviceAccount.address).
-		SetPayer(*lg.serviceAccount.address)
+		SetGasLimit(999999)
 
 	publicKey := bytesToCadenceArray(accountKey.PublicKey.Encode())
 	count := cadence.NewInt(num)
@@ -405,22 +509,34 @@ func (lg *ContLoadGenerator) createAccounts(num int) error {
 		return err
 	}
 
-	err = lg.serviceAccount.signCreateAccountTx(createAccountTx)
+	key, err := lg.serviceAccount.GetKey()
+	if err != nil {
+		lg.log.Error().Err(err).Msg("error getting key")
+		return err
+	}
+	defer key.Done()
+
+	err = key.SignTx(createAccountTx)
 	if err != nil {
 		return err
 	}
 
 	// Do not wait for the transaction to be sealed.
-	_, err = lg.sendTx(-1, createAccountTx)
+	ch, err := lg.sendTx(-1, createAccountTx)
 	if err != nil {
 		return err
 	}
+	defer key.IncrementSequenceNumber()
 
-	result, err := WaitForTransactionResult(context.Background(), lg.flowClient, createAccountTx.ID())
-	if err != nil {
-		return fmt.Errorf("failed to get transactions result: %w", err)
+	var result flowsdk.TransactionResult
+	select {
+	case result = <-ch:
+		lg.workerStatsTracker.IncTxExecuted()
+	case <-time.After(60 * time.Second):
+		return fmt.Errorf("timeout waiting for account creation tx to be executed")
+	case <-lg.Done():
+		return fmt.Errorf("loader stopped while waiting for account creation tx to be executed")
 	}
-	lg.workerStatsTracker.IncTxExecuted()
 
 	log := lg.log.With().Str("tx_id", createAccountTx.ID().String()).Logger()
 	log.Trace().Str("status", result.Status.String()).Msg("account creation tx executed")
@@ -438,15 +554,15 @@ func (lg *ContLoadGenerator) createAccounts(num int) error {
 
 			log.Trace().Hex("address", accountAddress.Bytes()).Msg("new account created")
 
-			signer, err := crypto.NewInMemorySigner(privKey, accountKey.HashAlgo)
+			newAcc, err := account.New(accountsCreated, &accountAddress, privKey, []*flowsdk.AccountKey{accountKey})
 			if err != nil {
-				return fmt.Errorf("singer creation failed: %w", err)
+				return fmt.Errorf("failed to create account: %w", err)
 			}
-
-			newAcc := newFlowAccount(accountsCreated, &accountAddress, accountKey, signer)
 			accountsCreated++
 
+			lg.accountsMutex.Lock()
 			lg.accounts = append(lg.accounts, newAcc)
+			lg.accountsMutex.Unlock()
 			lg.availableAccounts <- newAcc
 
 			log.Trace().Hex("address", accountAddress.Bytes()).Msg("new account added")
@@ -460,15 +576,23 @@ func (lg *ContLoadGenerator) createAccounts(num int) error {
 }
 
 func (lg *ContLoadGenerator) createAddKeyTx(accountAddress flowsdk.Address, numberOfKeysToAdd uint) (*flowsdk.Transaction, error) {
+
+	key, err := lg.serviceAccount.GetKey()
+	if err != nil {
+		return nil, err
+	}
+	key.Done() // we don't actually need it
+
 	cadenceKeys := make([]cadence.Value, numberOfKeysToAdd)
 	for i := uint(0); i < numberOfKeysToAdd; i++ {
-		cadenceKeys[i] = bytesToCadenceArray(lg.serviceAccount.accountKey.Encode())
+		accountKey := key.AccountKey
+		cadenceKeys[i] = bytesToCadenceArray(accountKey.PublicKey.Encode())
 	}
 	cadenceKeysArray := cadence.NewArray(cadenceKeys)
 
 	addKeysScript, err := AddKeyToAccountScript()
 	if err != nil {
-		log.Error().Err(err).Msg("error getting add key to account script")
+		lg.log.Error().Err(err).Msg("error getting add key to account script")
 		return nil, err
 	}
 
@@ -476,29 +600,22 @@ func (lg *ContLoadGenerator) createAddKeyTx(accountAddress flowsdk.Address, numb
 		SetScript(addKeysScript).
 		AddAuthorizer(accountAddress).
 		SetReferenceBlockID(lg.follower.BlockID()).
-		SetGasLimit(9999).
-		SetProposalKey(
-			*lg.serviceAccount.address,
-			lg.serviceAccount.accountKey.Index,
-			lg.serviceAccount.accountKey.SequenceNumber,
-		).
-		SetPayer(*lg.serviceAccount.address)
+		SetGasLimit(9999)
 
 	err = addKeysTx.AddArgument(cadenceKeysArray)
 	if err != nil {
-		log.Error().Err(err).Msg("error constructing add keys to account transaction")
+		lg.log.Error().Err(err).Msg("error constructing add keys to account transaction")
 		return nil, err
 	}
 
 	return addKeysTx, nil
-
 }
 
 func (lg *ContLoadGenerator) sendAddKeyTx(workerID int) {
 	log := lg.log.With().Int("workerID", workerID).Logger()
 
 	// TODO move this as a configurable parameter
-	numberOfKeysToAdd := uint(40)
+	numberOfKeysToAdd := uint(50)
 
 	log.Trace().Msg("getting next available account")
 
@@ -507,7 +624,7 @@ func (lg *ContLoadGenerator) sendAddKeyTx(workerID int) {
 
 	log.Trace().Msg("creating add proposer key script")
 
-	addKeysTx, err := lg.createAddKeyTx(*acc.address, numberOfKeysToAdd)
+	addKeysTx, err := lg.createAddKeyTx(*acc.Address, numberOfKeysToAdd)
 	if err != nil {
 		log.Error().Err(err).Msg("error creating AddKey transaction")
 		return
@@ -515,13 +632,18 @@ func (lg *ContLoadGenerator) sendAddKeyTx(workerID int) {
 
 	log.Trace().Msg("creating transaction")
 
-	addKeysTx.SetReferenceBlockID(lg.follower.BlockID()).
-		SetProposalKey(*acc.address, 0, acc.seqNumber).
-		SetPayer(*acc.address).
-		AddAuthorizer(*acc.address)
+	addKeysTx.SetReferenceBlockID(lg.follower.BlockID())
 
 	log.Trace().Msg("signing transaction")
-	err = acc.signTx(addKeysTx, 0)
+
+	key, err := acc.GetKey()
+	if err != nil {
+		log.Error().Err(err).Msg("error getting service account key")
+		return
+	}
+	defer key.Done()
+
+	err = key.SignTx(addKeysTx)
 	if err != nil {
 		log.Error().Err(err).Msg("error signing transaction")
 		return
@@ -531,26 +653,33 @@ func (lg *ContLoadGenerator) sendAddKeyTx(workerID int) {
 	if err != nil {
 		return
 	}
+	defer key.IncrementSequenceNumber()
 	<-ch
 	lg.workerStatsTracker.IncTxExecuted()
 }
 
-func (lg *ContLoadGenerator) addKeysToProposerAccount(proposerPayerAccount *flowAccount) error {
+func (lg *ContLoadGenerator) addKeysToProposerAccount(proposerPayerAccount *account.FlowAccount) error {
 	if proposerPayerAccount == nil {
 		return errors.New("proposerPayerAccount is nil")
 	}
 
-	addKeysToPayerTx, err := lg.createAddKeyTx(*lg.accounts[0].address, lg.constExecParams.PayerKeyCount)
+	addKeysToPayerTx, err := lg.createAddKeyTx(*lg.accounts[0].Address, lg.constExecParams.PayerKeyCount)
 	if err != nil {
 		lg.log.Error().Msg("failed to create add-key transaction for const-exec")
 		return err
 	}
-	addKeysToPayerTx.SetReferenceBlockID(lg.follower.BlockID()).
-		SetProposalKey(*lg.accounts[0].address, 0, lg.accounts[0].seqNumber).
-		SetPayer(*lg.accounts[0].address)
+	addKeysToPayerTx.SetReferenceBlockID(lg.follower.BlockID())
 
 	lg.log.Info().Msg("signing the add-key transaction for const-exec")
-	err = lg.accounts[0].signTx(addKeysToPayerTx, 0)
+
+	key, err := lg.accounts[0].GetKey()
+	if err != nil {
+		lg.log.Error().Err(err).Msg("error getting key")
+		return err
+	}
+	defer key.Done()
+
+	err = key.SignTx(addKeysToPayerTx)
 	if err != nil {
 		lg.log.Error().Err(err).Msg("error signing the add-key transaction for const-exec")
 		return err
@@ -561,6 +690,8 @@ func (lg *ContLoadGenerator) addKeysToProposerAccount(proposerPayerAccount *flow
 	if err != nil {
 		return err
 	}
+	defer key.IncrementSequenceNumber()
+
 	<-ch
 	lg.workerStatsTracker.IncTxExecuted()
 
@@ -573,13 +704,19 @@ func (lg *ContLoadGenerator) sendConstExecCostTx(workerID int) {
 
 	txScriptNoComment := ConstExecCostTransaction(lg.constExecParams.AuthAccountNum, 0)
 
+	proposerKey, err := lg.accounts[0].GetKey()
+	if err != nil {
+		log.Error().Err(err).Msg("error getting key")
+		return
+	}
+	defer proposerKey.Done()
+
 	tx := flowsdk.NewTransaction().
 		SetReferenceBlockID(lg.follower.BlockID()).
 		SetScript(txScriptNoComment).
 		SetGasLimit(10). // const-exec tx has empty transaction
-		SetProposalKey(*lg.accounts[0].address, 0, lg.accounts[0].seqNumber).
-		SetPayer(*lg.accounts[0].address)
-	lg.accounts[0].seqNumber += 1
+		SetProposalKey(*proposerKey.Address, proposerKey.Index, proposerKey.SequenceNumber).
+		SetPayer(*proposerKey.Address)
 
 	txArgStr := generateRandomStringWithLen(lg.constExecParams.ArgSizeInByte)
 	txArg, err := cadence.NewString(txArgStr)
@@ -594,12 +731,20 @@ func (lg *ContLoadGenerator) sendConstExecCostTx(workerID int) {
 	// Add authorizers. lg.accounts[0] used as proposer\payer
 	log.Trace().Msg("Adding tx authorizers")
 	for i := uint(1); i < lg.constExecParams.AuthAccountNum+1; i++ {
-		tx = tx.AddAuthorizer(*lg.accounts[i].address)
+		tx = tx.AddAuthorizer(*lg.accounts[i].Address)
 	}
 
 	log.Trace().Msg("Authorizers signing tx")
 	for i := uint(1); i < lg.constExecParams.AuthAccountNum+1; i++ {
-		err := lg.accounts[i].signPayload(tx, 0)
+		key, err := lg.accounts[i].GetKey()
+		if err != nil {
+			log.Error().Err(err).Msg("error getting key")
+			return
+		}
+
+		err = key.SignPayload(tx)
+		key.Done() // authorizers don't need to increment their sequence number
+
 		if err != nil {
 			log.Error().Err(err).Msg("error signing payload")
 			return
@@ -607,8 +752,16 @@ func (lg *ContLoadGenerator) sendConstExecCostTx(workerID int) {
 	}
 
 	log.Trace().Msg("Payer signing tx")
-	for i := uint(0); i < lg.constExecParams.PayerKeyCount; i++ {
-		err = lg.accounts[0].signTx(tx, int(i))
+	for i := uint(1); i < lg.constExecParams.PayerKeyCount; i++ {
+		key, err := lg.accounts[i].GetKey()
+		if err != nil {
+			log.Error().Err(err).Msg("error getting key")
+			return
+		}
+
+		err = tx.SignEnvelope(*key.Address, key.Index, key.Signer)
+		key.Done() // payers don't need to increment their sequence number
+
 		if err != nil {
 			log.Error().Err(err).Msg("error signing transaction")
 			return
@@ -644,6 +797,8 @@ func (lg *ContLoadGenerator) sendConstExecCostTx(workerID int) {
 		log.Error().Err(err).Msg("const-exec tx failed")
 		return
 	}
+	defer proposerKey.IncrementSequenceNumber()
+
 	<-ch
 	lg.workerStatsTracker.IncTxExecuted()
 
@@ -657,7 +812,8 @@ func (lg *ContLoadGenerator) sendTokenTransferTx(workerID int) {
 		Int("availableAccounts", len(lg.availableAccounts)).
 		Msg("getting next available account")
 
-	var acc *flowAccount
+	var acc *account.FlowAccount
+
 	select {
 	case acc = <-lg.availableAccounts:
 	default:
@@ -665,20 +821,20 @@ func (lg *ContLoadGenerator) sendTokenTransferTx(workerID int) {
 		return
 	}
 	defer func() { lg.availableAccounts <- acc }()
-	nextAcc := lg.accounts[(acc.i+1)%len(lg.accounts)]
+	nextAcc := lg.accounts[(acc.ID+1)%len(lg.accounts)]
 
 	log.Trace().
 		Float64("tokens", tokensPerTransfer).
-		Hex("srcAddress", acc.address.Bytes()).
-		Hex("dstAddress", nextAcc.address.Bytes()).
-		Int("srcAccount", acc.i).
-		Int("dstAccount", nextAcc.i).
+		Hex("srcAddress", acc.Address.Bytes()).
+		Hex("dstAddress", nextAcc.Address.Bytes()).
+		Int("srcAccount", acc.ID).
+		Int("dstAccount", nextAcc.ID).
 		Msg("creating transfer script")
 
 	transferTx, err := TokenTransferTransaction(
 		lg.networkParams.FungibleTokenAddress,
 		lg.networkParams.FlowTokenAddress,
-		nextAcc.address,
+		nextAcc.Address,
 		tokensPerTransfer)
 	if err != nil {
 		log.Error().Err(err).Msg("error creating token transfer script")
@@ -688,13 +844,18 @@ func (lg *ContLoadGenerator) sendTokenTransferTx(workerID int) {
 	log.Trace().Msg("creating token transfer transaction")
 	transferTx = transferTx.
 		SetReferenceBlockID(lg.follower.BlockID()).
-		SetGasLimit(9999).
-		SetProposalKey(*acc.address, 0, acc.seqNumber).
-		SetPayer(*acc.address).
-		AddAuthorizer(*acc.address)
+		SetGasLimit(9999)
 
 	log.Trace().Msg("signing transaction")
-	err = acc.signTx(transferTx, 0)
+
+	key, err := acc.GetKey()
+	if err != nil {
+		log.Error().Err(err).Msg("error getting key")
+		return
+	}
+	defer key.Done()
+
+	err = key.SignTx(transferTx)
 	if err != nil {
 		log.Error().Err(err).Msg("error signing transaction")
 		return
@@ -705,6 +866,7 @@ func (lg *ContLoadGenerator) sendTokenTransferTx(workerID int) {
 	if err != nil {
 		return
 	}
+	defer key.IncrementSequenceNumber()
 
 	log = log.With().Hex("tx_id", transferTx.ID().Bytes()).Logger()
 	log.Trace().Msg("transaction sent")
@@ -713,9 +875,14 @@ func (lg *ContLoadGenerator) sendTokenTransferTx(workerID int) {
 	defer t.Stop()
 
 	select {
-	case <-ch:
+	case result := <-ch:
+		if result.Error != nil {
+			lg.workerStatsTracker.IncTxFailed()
+		}
 		log.Trace().
 			Dur("duration", time.Since(startTime)).
+			Err(result.Error).
+			Str("status", result.Status.String()).
 			Msg("transaction confirmed")
 	case <-t.C:
 		lg.loaderMetrics.TransactionLost()
@@ -724,6 +891,8 @@ func (lg *ContLoadGenerator) sendTokenTransferTx(workerID int) {
 			Int("availableAccounts", len(lg.availableAccounts)).
 			Msg("transaction lost")
 		lg.workerStatsTracker.IncTxTimedout()
+	case <-lg.Done():
+		return
 	}
 	lg.workerStatsTracker.IncTxExecuted()
 }
@@ -753,13 +922,18 @@ func (lg *ContLoadGenerator) sendFavContractTx(workerID int) {
 	tx := flowsdk.NewTransaction().
 		SetReferenceBlockID(lg.follower.BlockID()).
 		SetScript(txScript).
-		SetGasLimit(9999).
-		SetProposalKey(*acc.address, 0, acc.seqNumber).
-		SetPayer(*acc.address).
-		AddAuthorizer(*acc.address)
+		SetGasLimit(9999)
 
 	log.Trace().Msg("signing transaction")
-	err := acc.signTx(tx, 0)
+
+	key, err := acc.GetKey()
+	if err != nil {
+		log.Error().Err(err).Msg("error getting key")
+		return
+	}
+	defer key.Done()
+
+	err = key.SignTx(tx)
 	if err != nil {
 		log.Error().Err(err).Msg("error signing transaction")
 		return
@@ -769,17 +943,18 @@ func (lg *ContLoadGenerator) sendFavContractTx(workerID int) {
 	if err != nil {
 		return
 	}
+	defer key.IncrementSequenceNumber()
 	<-ch
 }
 
-func (lg *ContLoadGenerator) sendTx(workerID int, tx *flowsdk.Transaction) (<-chan struct{}, error) {
+func (lg *ContLoadGenerator) sendTx(workerID int, tx *flowsdk.Transaction) (<-chan flowsdk.TransactionResult, error) {
 	log := lg.log.With().Int("workerID", workerID).Str("tx_id", tx.ID().String()).Logger()
 	log.Trace().Msg("sending transaction")
 
 	// Add watcher before sending the transaction to avoid race condition
 	ch := lg.follower.Follow(tx.ID())
 
-	err := lg.flowClient.SendTransaction(context.Background(), *tx)
+	err := lg.flowClient.SendTransaction(lg.ctx, *tx)
 	if err != nil {
 		log.Error().Err(err).Msg("error sending transaction")
 		return nil, err

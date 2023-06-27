@@ -3,7 +3,6 @@ package keyutils
 import (
 	"crypto/rand"
 	"fmt"
-	"math"
 	"testing"
 
 	"github.com/btcsuite/btcd/btcec/v2"
@@ -171,7 +170,7 @@ func (k *KeyTranslatorTestSuite) TestPeerIDGenerationIsConsistent() {
 }
 
 func (k *KeyTranslatorTestSuite) createSeed() []byte {
-	seedLen := int(math.Max(fcrypto.KeyGenSeedMinLenECDSAP256, fcrypto.KeyGenSeedMinLenECDSASecp256k1))
+	const seedLen = fcrypto.KeyGenSeedMinLen
 	seed := make([]byte, seedLen)
 	n, err := rand.Read(seed)
 	require.NoError(k.T(), err)

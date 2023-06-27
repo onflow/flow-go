@@ -1,6 +1,7 @@
 package crypto
 
 import (
+	"crypto/rand"
 	"errors"
 	"fmt"
 )
@@ -15,13 +16,28 @@ const (
 	// This is used as a reference but it doesn't mean all implemented primitives provide this minimum.
 	securityBits = 128
 
-	// Relic internal constant (related to exported constants above)
-	// max byte length of bn_st set to 2048 bits
-	maxScalarSize = 256
+	// keygen seed length conditions
+	// enforce seed to be at least double the security bits and have enough entropy.
+	// it is still recommened that seed is generated using a secure RNG.
+	KeyGenSeedMinLen = 2 * (securityBits / 8)
+	KeyGenSeedMaxLen = 256
 
 	// max relic PRG seed length in bytes
 	maxRelicPrgSeed = 1 << 32
 )
+
+// TODO: update this code to make sure
+// the function isn't removed by the compiler
+// https://github.com/golang/go/issues/21865
+func overwrite(data []byte) {
+	_, err := rand.Read(data) // checking err is enough
+	if err != nil {
+		// zero the buffer if randomizing failed
+		for i := 0; i < len(data); i++ {
+			data[i] = 0
+		}
+	}
+}
 
 // invalidInputsError is an error returned when a crypto API receives invalid inputs.
 // It allows a function caller differentiate unexpected program errors from errors caused by

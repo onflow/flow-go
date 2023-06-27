@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/cadence"
+	"github.com/onflow/cadence/encoding/ccf"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
 
 	"github.com/onflow/flow-go/engine/execution/testutil"
@@ -15,8 +16,7 @@ import (
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/meter"
-	"github.com/onflow/flow-go/fvm/programs"
-	"github.com/onflow/flow-go/fvm/state"
+	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -33,7 +33,7 @@ func FuzzTransactionComputationLimit(f *testing.F) {
 
 		tt := fuzzTransactionTypes[transactionType]
 
-		vmt.run(func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, derivedBlockData *programs.DerivedBlockData) {
+		vmt.run(func(t *testing.T, vm fvm.VM, chain flow.Chain, ctx fvm.Context, snapshotTree snapshot.SnapshotTree) {
 			// create the transaction
 			txBody := tt.createTxBody(t, tctx)
 			// set the computation limit
@@ -51,24 +51,28 @@ func FuzzTransactionComputationLimit(f *testing.F) {
 			ctx.MemoryLimit = memoryLimit
 			// set the interaction limit
 			ctx.MaxStateInteractionSize = interactionLimit
-			// run the transaction
-			tx := fvm.Transaction(txBody, derivedBlockData.NextTxIndexForTestingOnly())
 
+			var output fvm.ProcedureOutput
+
+			// run the transaction
 			require.NotPanics(t, func() {
-				err = vm.Run(ctx, tx, view)
+				_, output, err = vm.Run(
+					ctx,
+					fvm.Transaction(txBody, 0),
+					snapshotTree)
 			}, "Transaction should never result in a panic.")
 			require.NoError(t, err, "Transaction should never result in an error.")
 
 			// check if results are expected
 			tt.require(t, tctx, fuzzResults{
-				tx: tx,
+				output: output,
 			})
 		})(t)
 	})
 }
 
 type fuzzResults struct {
-	tx *fvm.TransactionProcedure
+	output fvm.ProcedureOutput
 }
 
 type transactionTypeContext struct {
@@ -100,22 +104,22 @@ var fuzzTransactionTypes = []transactionType{
 		},
 		require: func(t *testing.T, tctx transactionTypeContext, results fuzzResults) {
 			// if there is an error, it should be computation exceeded
-			if results.tx.Err != nil {
-				require.Len(t, results.tx.Events, 3)
-				unittest.EnsureEventsIndexSeq(t, results.tx.Events, tctx.chain.ChainID())
+			if results.output.Err != nil {
+				require.Len(t, results.output.Events, 3)
+				unittest.EnsureEventsIndexSeq(t, results.output.Events, tctx.chain.ChainID())
 				codes := []errors.ErrorCode{
 					errors.ErrCodeComputationLimitExceededError,
 					errors.ErrCodeCadenceRunTimeError,
 					errors.ErrCodeLedgerInteractionLimitExceededError,
 				}
-				require.Contains(t, codes, results.tx.Err.Code(), results.tx.Err.Error())
+				require.Contains(t, codes, results.output.Err.Code(), results.output.Err.Error())
 			}
 
 			// fees should be deducted no matter the input
 			fees, deducted := getDeductedFees(t, tctx, results)
 			require.True(t, deducted, "Fees should be deducted.")
 			require.GreaterOrEqual(t, fees.ToGoValue().(uint64), fuzzTestsInclusionFees)
-			unittest.EnsureEventsIndexSeq(t, results.tx.Events, tctx.chain.ChainID())
+			unittest.EnsureEventsIndexSeq(t, results.output.Events, tctx.chain.ChainID())
 		},
 	},
 	{
@@ -133,21 +137,21 @@ var fuzzTransactionTypes = []transactionType{
 			return txBody
 		},
 		require: func(t *testing.T, tctx transactionTypeContext, results fuzzResults) {
-			require.Error(t, results.tx.Err)
-			require.Len(t, results.tx.Events, 3)
-			unittest.EnsureEventsIndexSeq(t, results.tx.Events, tctx.chain.ChainID())
+			require.Error(t, results.output.Err)
+			require.Len(t, results.output.Events, 3)
+			unittest.EnsureEventsIndexSeq(t, results.output.Events, tctx.chain.ChainID())
 			codes := []errors.ErrorCode{
 				errors.ErrCodeComputationLimitExceededError,
 				errors.ErrCodeCadenceRunTimeError, // because of the failed transfer
 				errors.ErrCodeLedgerInteractionLimitExceededError,
 			}
-			require.Contains(t, codes, results.tx.Err.Code(), results.tx.Err.Error())
+			require.Contains(t, codes, results.output.Err.Code(), results.output.Err.Error())
 
 			// fees should be deducted no matter the input
 			fees, deducted := getDeductedFees(t, tctx, results)
 			require.True(t, deducted, "Fees should be deducted.")
 			require.GreaterOrEqual(t, fees.ToGoValue().(uint64), fuzzTestsInclusionFees)
-			unittest.EnsureEventsIndexSeq(t, results.tx.Events, tctx.chain.ChainID())
+			unittest.EnsureEventsIndexSeq(t, results.output.Events, tctx.chain.ChainID())
 		},
 	},
 	{
@@ -162,21 +166,21 @@ var fuzzTransactionTypes = []transactionType{
 			return txBody
 		},
 		require: func(t *testing.T, tctx transactionTypeContext, results fuzzResults) {
-			require.Error(t, results.tx.Err)
-			require.Len(t, results.tx.Events, 3)
-			unittest.EnsureEventsIndexSeq(t, results.tx.Events, tctx.chain.ChainID())
+			require.Error(t, results.output.Err)
+			require.Len(t, results.output.Events, 3)
+			unittest.EnsureEventsIndexSeq(t, results.output.Events, tctx.chain.ChainID())
 			codes := []errors.ErrorCode{
 				errors.ErrCodeComputationLimitExceededError,
 				errors.ErrCodeCadenceRunTimeError, // because of the panic
 				errors.ErrCodeLedgerInteractionLimitExceededError,
 			}
-			require.Contains(t, codes, results.tx.Err.Code(), results.tx.Err.Error())
+			require.Contains(t, codes, results.output.Err.Code(), results.output.Err.Error())
 
 			// fees should be deducted no matter the input
 			fees, deducted := getDeductedFees(t, tctx, results)
 			require.True(t, deducted, "Fees should be deducted.")
 			require.GreaterOrEqual(t, fees.ToGoValue().(uint64), fuzzTestsInclusionFees)
-			unittest.EnsureEventsIndexSeq(t, results.tx.Events, tctx.chain.ChainID())
+			unittest.EnsureEventsIndexSeq(t, results.output.Events, tctx.chain.ChainID())
 		},
 	},
 	{
@@ -190,22 +194,22 @@ var fuzzTransactionTypes = []transactionType{
 		},
 		require: func(t *testing.T, tctx transactionTypeContext, results fuzzResults) {
 			// if there is an error, it should be computation exceeded
-			if results.tx.Err != nil {
-				require.Len(t, results.tx.Events, 3)
-				unittest.EnsureEventsIndexSeq(t, results.tx.Events, tctx.chain.ChainID())
+			if results.output.Err != nil {
+				require.Len(t, results.output.Events, 3)
+				unittest.EnsureEventsIndexSeq(t, results.output.Events, tctx.chain.ChainID())
 				codes := []errors.ErrorCode{
 					errors.ErrCodeComputationLimitExceededError,
 					errors.ErrCodeCadenceRunTimeError,
 					errors.ErrCodeLedgerInteractionLimitExceededError,
 				}
-				require.Contains(t, codes, results.tx.Err.Code(), results.tx.Err.Error())
+				require.Contains(t, codes, results.output.Err.Code(), results.output.Err.Error())
 			}
 
 			// fees should be deducted no matter the input
 			fees, deducted := getDeductedFees(t, tctx, results)
 			require.True(t, deducted, "Fees should be deducted.")
 			require.GreaterOrEqual(t, fees.ToGoValue().(uint64), fuzzTestsInclusionFees)
-			unittest.EnsureEventsIndexSeq(t, results.tx.Events, tctx.chain.ChainID())
+			unittest.EnsureEventsIndexSeq(t, results.output.Events, tctx.chain.ChainID())
 		},
 	},
 }
@@ -218,9 +222,9 @@ func getDeductedFees(tb testing.TB, tctx transactionTypeContext, results fuzzRes
 
 	var ok bool
 	var feesDeductedEvent cadence.Event
-	for _, e := range results.tx.Events {
+	for _, e := range results.output.Events {
 		if string(e.Type) == fmt.Sprintf("A.%s.FlowFees.FeesDeducted", environment.FlowFeesAddress(tctx.chain)) {
-			data, err := jsoncdc.Decode(nil, e.Payload)
+			data, err := ccf.Decode(nil, e.Payload)
 			require.NoError(tb, err)
 			feesDeductedEvent, ok = data.(cadence.Event)
 			require.True(tb, ok, "Event payload should be of type cadence event.")
@@ -229,8 +233,15 @@ func getDeductedFees(tb testing.TB, tctx transactionTypeContext, results fuzzRes
 	if feesDeductedEvent.Type() == nil {
 		return 0, false
 	}
-	fees, ok = feesDeductedEvent.Fields[0].(cadence.UFix64)
-	require.True(tb, ok, "FeesDeducted[0] event should be of type cadence.UFix64.")
+
+	for i, f := range feesDeductedEvent.Type().(*cadence.EventType).Fields {
+		if f.Identifier == "amount" {
+			fees, ok = feesDeductedEvent.Fields[i].(cadence.UFix64)
+			require.True(tb, ok, "FeesDeducted event amount field should be of type cadence.UFix64.")
+			break
+		}
+	}
+
 	return fees, true
 }
 
@@ -251,28 +262,33 @@ func bootstrapFuzzStateAndTxContext(tb testing.TB) (bootstrappedVmTest, transact
 	).withContextOptions(
 		fvm.WithTransactionFeesEnabled(true),
 		fvm.WithAccountStorageLimit(true),
-	).bootstrapWith(func(vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, derivedBlockData *programs.DerivedBlockData) error {
+	).bootstrapWith(func(vm fvm.VM, chain flow.Chain, ctx fvm.Context, snapshotTree snapshot.SnapshotTree) (snapshot.SnapshotTree, error) {
 		// ==== Create an account ====
 		var txBody *flow.TransactionBody
 		privateKey, txBody = testutil.CreateAccountCreationTransaction(tb, chain)
 
 		err := testutil.SignTransactionAsServiceAccount(txBody, 0, chain)
 		if err != nil {
-			return err
+			return snapshotTree, err
 		}
 
-		tx := fvm.Transaction(txBody, derivedBlockData.NextTxIndexForTestingOnly())
-
-		err = vm.Run(ctx, tx, view)
-
+		executionSnapshot, output, err := vm.Run(
+			ctx,
+			fvm.Transaction(txBody, 0),
+			snapshotTree)
 		require.NoError(tb, err)
-		accountCreatedEvents := filterAccountCreatedEvents(tx.Events)
+		require.NoError(tb, output.Err)
+
+		snapshotTree = snapshotTree.Append(executionSnapshot)
+
+		accountCreatedEvents := filterAccountCreatedEvents(output.Events)
 
 		// read the address of the account created (e.g. "0x01" and convert it to flow.address)
-		data, err := jsoncdc.Decode(nil, accountCreatedEvents[0].Payload)
+		data, err := ccf.Decode(nil, accountCreatedEvents[0].Payload)
 		require.NoError(tb, err)
 
-		address = flow.Address(data.(cadence.Event).Fields[0].(cadence.Address))
+		address = flow.ConvertAddress(
+			data.(cadence.Event).Fields[0].(cadence.Address))
 
 		// ==== Transfer tokens to new account ====
 		txBody = transferTokensTx(chain).
@@ -290,14 +306,15 @@ func bootstrapFuzzStateAndTxContext(tb testing.TB) (bootstrappedVmTest, transact
 		)
 		require.NoError(tb, err)
 
-		tx = fvm.Transaction(txBody, derivedBlockData.NextTxIndexForTestingOnly())
-
-		err = vm.Run(ctx, tx, view)
+		executionSnapshot, output, err = vm.Run(
+			ctx,
+			fvm.Transaction(txBody, 0),
+			snapshotTree)
 		if err != nil {
-			return err
+			return snapshotTree, err
 		}
 
-		return tx.Err
+		return snapshotTree.Append(executionSnapshot), output.Err
 	})
 	require.NoError(tb, err)
 

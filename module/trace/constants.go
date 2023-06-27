@@ -52,17 +52,18 @@ const (
 	CONSealingProcessIncorporatedResult       SpanName = "con.sealing.processIncorporatedResult"
 	CONSealingProcessApproval                 SpanName = "con.sealing.processApproval"
 
-	//Follower Engine
-	FollowerOnBlockProposal        SpanName = "follower.onBlockProposal"
-	FollowerProcessBlockProposal   SpanName = "follower.processBlockProposal"
-	FollowerProcessPendingChildren SpanName = "follower.processPendingChildren"
+	// Follower Core
+	FollowerProcessFinalizedBlock  SpanName = "follower.processFinalizedBlock"
+	FollowerProcessCertifiedBlocks SpanName = "follower.processCertifiedBlocks"
+	FollowerExtendPendingTree      SpanName = "follower.extendPendingTree"
+	FollowerExtendProtocolState    SpanName = "follower.extendProtocolState"
 
 	// Collection Node
 	//
 
 	// Builder
 	COLBuildOn                  SpanName = "col.builder"
-	COLBuildOnSetup             SpanName = "col.builder.setup"
+	COLBuildOnGetBuildCtx       SpanName = "col.builder.getBuildCtx"
 	COLBuildOnUnfinalizedLookup SpanName = "col.builder.unfinalizedLookup"
 	COLBuildOnFinalizedLookup   SpanName = "col.builder.finalizedLookup"
 	COLBuildOnCreatePayload     SpanName = "col.builder.createPayload"
@@ -71,42 +72,33 @@ const (
 
 	// Cluster State
 	COLClusterStateMutatorExtend                       SpanName = "col.state.mutator.extend"
-	COLClusterStateMutatorExtendSetup                  SpanName = "col.state.mutator.extend.setup"
-	COLClusterStateMutatorExtendCheckAncestry          SpanName = "col.state.mutator.extend.ancestry"
-	COLClusterStateMutatorExtendCheckTransactionsValid SpanName = "col.state.mutator.extend.transactions.validity"
-	COLClusterStateMutatorExtendCheckTransactionsDupes SpanName = "col.state.mutator.extend.transactions.dupes"
+	COLClusterStateMutatorExtendCheckHeader            SpanName = "col.state.mutator.extend.checkHeader"
+	COLClusterStateMutatorExtendGetExtendCtx           SpanName = "col.state.mutator.extend.getExtendCtx"
+	COLClusterStateMutatorExtendCheckAncestry          SpanName = "col.state.mutator.extend.checkAncestry"
+	COLClusterStateMutatorExtendCheckReferenceBlock    SpanName = "col.state.mutator.extend.checkRefBlock"
+	COLClusterStateMutatorExtendCheckTransactionsValid SpanName = "col.state.mutator.extend.checkTransactionsValid"
 	COLClusterStateMutatorExtendDBInsert               SpanName = "col.state.mutator.extend.dbInsert"
 
 	// Execution Node
 	//
 
-	EXEHandleBlock             SpanName = "exe.ingestion.handleBlock"
-	EXEHandleCollection        SpanName = "exe.ingestion.handleCollection"
-	EXEHandleComputationResult SpanName = "exe.ingestion.handleComputationResult"
-	EXEExecuteBlock            SpanName = "exe.ingestion.executeBlock"
-	EXESaveExecutionResults    SpanName = "exe.ingestion.saveExecutionResults"
+	EXEHandleBlock          SpanName = "exe.ingestion.handleBlock"
+	EXEHandleCollection     SpanName = "exe.ingestion.handleCollection"
+	EXEExecuteBlock         SpanName = "exe.ingestion.executeBlock"
+	EXESaveExecutionResults SpanName = "exe.ingestion.saveExecutionResults"
 
 	EXEUploadCollections         SpanName = "exe.manager.uploadCollections"
 	EXEAddToExecutionDataService SpanName = "exe.manager.addToExecutionDataService"
 
 	EXEBroadcastExecutionReceipt SpanName = "exe.provider.broadcastExecutionReceipt"
 
-	EXEComputeBlock            SpanName = "exe.computer.computeBlock"
-	EXEComputeCollection       SpanName = "exe.computer.computeCollection"
-	EXEMergeCollectionView     SpanName = "exe.computer.mergeCollectionView"
-	EXEComputeSystemCollection SpanName = "exe.computer.computeSystemCollection"
-	EXEComputeTransaction      SpanName = "exe.computer.computeTransaction"
-	EXERunTransaction          SpanName = "exe.computer.runTransaction"
-	EXEPostProcessTransaction  SpanName = "exe.computer.postProcessTransaction"
-	EXEMergeTransactionView    SpanName = "exe.computer.mergeTransactionView"
+	EXEComputeBlock       SpanName = "exe.computer.computeBlock"
+	EXEComputeTransaction SpanName = "exe.computer.computeTransaction"
 
 	EXEStateSaveExecutionResults          SpanName = "exe.state.saveExecutionResults"
 	EXECommitDelta                        SpanName = "exe.state.commitDelta"
-	EXEGetRegisters                       SpanName = "exe.state.getRegisters"
-	EXEGetRegistersWithProofs             SpanName = "exe.state.getRegistersWithProofs"
 	EXEGetExecutionResultID               SpanName = "exe.state.getExecutionResultID"
 	EXEUpdateHighestExecutedBlockIfHigher SpanName = "exe.state.updateHighestExecutedBlockIfHigher"
-	EXEHashEvents                         SpanName = "exe.state.hashEvents"
 
 	// Verification node
 	//
@@ -153,13 +145,12 @@ const (
 	VERVerGenerateResultApproval  SpanName = "ver.verify.GenerateResultApproval"
 
 	// Flow Virtual Machine
-	FVMVerifyTransaction             SpanName = "fvm.verifyTransaction"
-	FVMSeqNumCheckTransaction        SpanName = "fvm.seqNumCheckTransaction"
-	FVMExecuteTransaction            SpanName = "fvm.executeTransaction"
-	FVMDeductTransactionFees         SpanName = "fvm.deductTransactionFees"
-	FVMTransactionStorageUsedCheck   SpanName = "fvm.env.transactionStorageUsedCheck"
-	FVMInvokeContractFunction        SpanName = "fvm.invokeContractFunction"
-	FVMFrozenAccountCheckTransaction SpanName = "fvm.frozenAccountCheckTransaction"
+	FVMVerifyTransaction           SpanName = "fvm.verifyTransaction"
+	FVMSeqNumCheckTransaction      SpanName = "fvm.seqNumCheckTransaction"
+	FVMExecuteTransaction          SpanName = "fvm.executeTransaction"
+	FVMDeductTransactionFees       SpanName = "fvm.deductTransactionFees"
+	FVMTransactionStorageUsedCheck SpanName = "fvm.env.transactionStorageUsedCheck"
+	FVMInvokeContractFunction      SpanName = "fvm.invokeContractFunction"
 
 	FVMEnvValueExists                SpanName = "fvm.env.valueExists"
 	FVMEnvGetValue                   SpanName = "fvm.env.getValue"
@@ -173,11 +164,11 @@ const (
 	FVMEnvResolveLocation            SpanName = "fvm.env.resolveLocation"
 	FVMEnvGetCode                    SpanName = "fvm.env.getCode"
 	FVMEnvGetAccountContractNames    SpanName = "fvm.env.getAccountContractNames"
-	FVMEnvGetProgram                 SpanName = "fvm.env.getCachedProgram"
-	FVMEnvSetProgram                 SpanName = "fvm.env.cacheProgram"
+	FVMEnvGetOrLoadProgram           SpanName = "fvm.env.getOrLoadCachedProgram"
 	FVMEnvProgramLog                 SpanName = "fvm.env.programLog"
 	FVMEnvEmitEvent                  SpanName = "fvm.env.emitEvent"
 	FVMEnvGenerateUUID               SpanName = "fvm.env.generateUUID"
+	FVMEnvGenerateAccountLocalID     SpanName = "fvm.env.generateAccountLocalID"
 	FVMEnvDecodeArgument             SpanName = "fvm.env.decodeArgument"
 	FVMEnvHash                       SpanName = "fvm.env.Hash"
 	FVMEnvVerifySignature            SpanName = "fvm.env.verifySignature"
@@ -189,7 +180,6 @@ const (
 	FVMEnvGetBlockAtHeight           SpanName = "fvm.env.getBlockAtHeight"
 	FVMEnvUnsafeRandom               SpanName = "fvm.env.unsafeRandom"
 	FVMEnvCreateAccount              SpanName = "fvm.env.createAccount"
-	FVMEnvSetAccountFrozen           SpanName = "fvm.env.setAccountFrozen"
 	FVMEnvAddAccountKey              SpanName = "fvm.env.addAccountKey"
 	FVMEnvAccountKeysCount           SpanName = "fvm.env.accountKeysCount"
 	FVMEnvGetAccountKey              SpanName = "fvm.env.getAccountKey"

@@ -45,7 +45,7 @@ func TestGetAccount(t *testing.T) {
 
 		backend.Mock.
 			On("GetLatestBlockHeader", mocktestify.Anything, true).
-			Return(block, nil)
+			Return(block, flow.BlockStatusSealed, nil)
 
 		backend.Mock.
 			On("GetAccountAtBlockHeight", mocktestify.Anything, account.Address, height).
@@ -66,7 +66,7 @@ func TestGetAccount(t *testing.T) {
 		req := getAccountRequest(t, account, finalHeightQueryParam, expandableFieldKeys, expandableFieldContracts)
 		backend.Mock.
 			On("GetLatestBlockHeader", mocktestify.Anything, false).
-			Return(block, nil)
+			Return(block, flow.BlockStatusFinalized, nil)
 		backend.Mock.
 			On("GetAccountAtBlockHeight", mocktestify.Anything, account.Address, height).
 			Return(account, nil)

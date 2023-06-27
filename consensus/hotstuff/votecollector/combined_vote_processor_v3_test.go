@@ -5,7 +5,6 @@ import (
 	"math/rand"
 	"sync"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -15,6 +14,7 @@ import (
 
 	bootstrapDKG "github.com/onflow/flow-go/cmd/bootstrap/dkg"
 	"github.com/onflow/flow-go/consensus/hotstuff"
+	"github.com/onflow/flow-go/consensus/hotstuff/committees"
 	"github.com/onflow/flow-go/consensus/hotstuff/helper"
 	mockhotstuff "github.com/onflow/flow-go/consensus/hotstuff/mocks"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
@@ -399,7 +399,7 @@ func (s *CombinedVoteProcessorV3TestSuite) TestProcess_ConcurrentCreatingQC() {
 	s.reconstructor.On("EnoughShares").Return(true)
 
 	// at this point sending any vote should result in creating QC.
-	s.packer.On("Pack", s.proposal.Block.BlockID, mock.Anything).Return(unittest.RandomBytes(100), unittest.RandomBytes(128), nil)
+	s.packer.On("Pack", s.proposal.Block.View, mock.Anything).Return(unittest.RandomBytes(100), unittest.RandomBytes(128), nil)
 	s.onQCCreatedState.On("onQCCreated", mock.Anything).Return(nil).Once()
 
 	var startupWg, shutdownWg sync.WaitGroup
@@ -514,7 +514,7 @@ func TestCombinedVoteProcessorV3_PropertyCreatingQCCorrectness(testifyT *testing
 		mergedSignerIDs := (flow.IdentifierList)(nil)
 		packedSigData := unittest.RandomBytes(128)
 		pcker := &mockhotstuff.Packer{}
-		pcker.On("Pack", block.BlockID, mock.Anything).Run(func(args mock.Arguments) {
+		pcker.On("Pack", block.View, mock.Anything).Run(func(args mock.Arguments) {
 			blockSigData := args.Get(1).(*hotstuff.BlockSignatureData)
 			// in the following, we check validity for each field of `blockSigData` individually
 
@@ -566,12 +566,12 @@ func TestCombinedVoteProcessorV3_PropertyCreatingQCCorrectness(testifyT *testing
 			// fill merged signers with collected signers
 			mergedSignerIDs = append(blockSigData.StakingSigners, blockSigData.RandomBeaconSigners...)
 		}).Return(
-			func(flow.Identifier, *hotstuff.BlockSignatureData) []byte {
+			func(uint64, *hotstuff.BlockSignatureData) []byte {
 				signerIndices, _ := signature.EncodeSignersToIndices(mergedSignerIDs, mergedSignerIDs)
 				return signerIndices
 			},
-			func(flow.Identifier, *hotstuff.BlockSignatureData) []byte { return packedSigData },
-			func(flow.Identifier, *hotstuff.BlockSignatureData) error { return nil }).Once()
+			func(uint64, *hotstuff.BlockSignatureData) []byte { return packedSigData },
+			func(uint64, *hotstuff.BlockSignatureData) error { return nil }).Once()
 
 		// track if QC was created
 		qcCreated := atomic.NewBool(false)
@@ -646,7 +646,6 @@ func TestCombinedVoteProcessorV3_PropertyCreatingQCCorrectness(testifyT *testing
 		}
 
 		// shuffle votes in random order
-		rand.Seed(time.Now().UnixNano())
 		rand.Shuffle(len(votes), func(i, j int) {
 			votes[i], votes[j] = votes[j], votes[i]
 		})
@@ -727,7 +726,7 @@ func TestCombinedVoteProcessorV3_OnlyRandomBeaconSigners(testifyT *testing.T) {
 
 	// Adding the vote should trigger QC generation. We expect `BlockSignatureData.StakingSigners`
 	// and `BlockSignatureData.AggregatedStakingSig` to be both empty, as there are no staking signatures.
-	packer.On("Pack", block.BlockID, mock.Anything).
+	packer.On("Pack", block.View, mock.Anything).
 		Run(func(args mock.Arguments) {
 			blockSigData := args.Get(1).(*hotstuff.BlockSignatureData)
 			require.Empty(testifyT, blockSigData.StakingSigners)
@@ -824,7 +823,7 @@ func TestCombinedVoteProcessorV3_PropertyCreatingQCLiveness(testifyT *testing.T)
 
 		signerIndices, err := signature.EncodeSignersToIndices(mergedSignerIDs, mergedSignerIDs)
 		require.NoError(t, err)
-		pcker.On("Pack", block.BlockID, mock.Anything).Return(signerIndices, packedSigData, nil)
+		pcker.On("Pack", block.View, mock.Anything).Return(signerIndices, packedSigData, nil)
 
 		// track if QC was created
 		qcCreated := atomic.NewBool(false)
@@ -879,7 +878,6 @@ func TestCombinedVoteProcessorV3_PropertyCreatingQCLiveness(testifyT *testing.T)
 		}
 
 		// shuffle votes in random order
-		rand.Seed(time.Now().UnixNano())
 		rand.Shuffle(len(votes), func(i, j int) {
 			votes[i], votes[j] = votes[j], votes[i]
 		})
@@ -923,7 +921,7 @@ func TestCombinedVoteProcessorV3_BuildVerifyQC(t *testing.T) {
 	view := uint64(20)
 	epochLookup.On("EpochForViewWithFallback", view).Return(epochCounter, nil)
 
-	dkgData, err := bootstrapDKG.RunFastKG(11, unittest.RandomBytes(32))
+	dkgData, err := bootstrapDKG.RandomBeaconKG(11, unittest.RandomBytes(32))
 	require.NoError(t, err)
 
 	// signers hold objects that are created with private key and can sign votes and proposals
@@ -995,9 +993,11 @@ func TestCombinedVoteProcessorV3_BuildVerifyQC(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	committee := &mockhotstuff.Committee{}
-	committee.On("Identities", block.BlockID, mock.Anything).Return(allIdentities, nil)
-	committee.On("DKG", block.BlockID).Return(inmemDKG, nil)
+	committee := &mockhotstuff.DynamicCommittee{}
+	committee.On("IdentitiesByBlock", block.BlockID).Return(allIdentities, nil)
+	committee.On("IdentitiesByEpoch", block.View).Return(allIdentities, nil)
+	committee.On("QuorumThresholdForView", mock.Anything).Return(committees.WeightThresholdToBuildQC(allIdentities.TotalWeight()), nil)
+	committee.On("DKG", block.View).Return(inmemDKG, nil)
 
 	votes := make([]*model.Vote, 0, len(allIdentities))
 
@@ -1019,11 +1019,10 @@ func TestCombinedVoteProcessorV3_BuildVerifyQC(t *testing.T) {
 
 		// create verifier that will do crypto checks of created QC
 		verifier := verification.NewCombinedVerifierV3(committee, packer)
-		forks := &mockhotstuff.Forks{}
 		// create validator which will do compliance and crypto checked of created QC
-		validator := hotstuffvalidator.New(committee, forks, verifier)
+		validator := hotstuffvalidator.New(committee, verifier)
 		// check if QC is valid against parent
-		err := validator.ValidateQC(qc, block)
+		err := validator.ValidateQC(qc)
 		require.NoError(t, err)
 
 		qcCreated = true

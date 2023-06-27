@@ -10,6 +10,8 @@ type DKG struct {
 	enc EncodableDKG
 }
 
+var _ protocol.DKG = (*DKG)(nil)
+
 func (d DKG) Size() uint                 { return uint(len(d.enc.Participants)) }
 func (d DKG) GroupKey() crypto.PublicKey { return d.enc.GroupKey.PublicKey }
 

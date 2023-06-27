@@ -4,13 +4,23 @@ import (
 	"math"
 
 	"github.com/rs/zerolog"
+	otelTrace "go.opentelemetry.io/otel/trace"
 
 	"github.com/onflow/flow-go/fvm/environment"
-	"github.com/onflow/flow-go/fvm/programs"
 	reusableRuntime "github.com/onflow/flow-go/fvm/runtime"
-	"github.com/onflow/flow-go/fvm/state"
+	"github.com/onflow/flow-go/fvm/storage/derived"
+	"github.com/onflow/flow-go/fvm/storage/state"
+	"github.com/onflow/flow-go/fvm/tracing"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
+)
+
+const (
+	AccountKeyWeightThreshold = 1000
+
+	DefaultComputationLimit   = 100_000 // 100K
+	DefaultMemoryLimit        = math.MaxUint64
+	DefaultMaxInteractionSize = 20_000_000 // ~20MB
 )
 
 // A Context defines a set of execution parameters used by the virtual machine.
@@ -26,7 +36,9 @@ type Context struct {
 
 	TransactionExecutorParams
 
-	DerivedBlockData *programs.DerivedBlockData
+	DerivedBlockData *derived.DerivedBlockData
+
+	tracing.TracerSpan
 
 	environment.EnvironmentParams
 }
@@ -49,13 +61,6 @@ func newContext(ctx Context, opts ...Option) Context {
 	return ctx
 }
 
-const AccountKeyWeightThreshold = 1000
-
-const (
-	DefaultComputationLimit = 100_000        // 100K
-	DefaultMemoryLimit      = math.MaxUint64 //
-)
-
 func defaultContext() Context {
 	return Context{
 		DisableMemoryAndInteractionLimits: false,
@@ -63,7 +68,7 @@ func defaultContext() Context {
 		MemoryLimit:                       DefaultMemoryLimit,
 		MaxStateKeySize:                   state.DefaultMaxKeySize,
 		MaxStateValueSize:                 state.DefaultMaxValueSize,
-		MaxStateInteractionSize:           state.DefaultMaxInteractionSize,
+		MaxStateInteractionSize:           DefaultMaxInteractionSize,
 		TransactionExecutorParams:         DefaultTransactionExecutorParams(),
 		EnvironmentParams:                 environment.DefaultEnvironmentParams(),
 	}
@@ -174,14 +179,6 @@ func WithServiceEventCollectionEnabled() Option {
 	}
 }
 
-// WithExtensiveTracing sets the extensive tracing
-func WithExtensiveTracing() Option {
-	return func(ctx Context) Context {
-		ctx.ExtensiveTracing = true
-		return ctx
-	}
-}
-
 // WithBlocks sets the block storage provider for a virtual machine context.
 //
 // The VM uses the block storage provider to provide historical block information to
@@ -213,26 +210,18 @@ func WithTracer(tr module.Tracer) Option {
 	}
 }
 
-// TODO(patrick): remove after emulator has been updated.
-//
-// WithTransactionProcessors sets the transaction processors for a
-// virtual machine context.
-func WithTransactionProcessors(processors ...interface{}) Option {
+// WithSpan sets the trace span for a virtual machine context.
+func WithSpan(span otelTrace.Span) Option {
 	return func(ctx Context) Context {
-		executeBody := false
-		for _, p := range processors {
-			switch p.(type) {
-			case *TransactionInvoker:
-				executeBody = true
-			default:
-				panic("Unexpected transaction processor")
-			}
-		}
+		ctx.Span = span
+		return ctx
+	}
+}
 
-		ctx.AuthorizationChecksEnabled = false
-		ctx.SequenceNumberCheckAndIncrementEnabled = false
-		ctx.AccountKeyWeightThreshold = 0
-		ctx.TransactionBodyExecutionEnabled = executeBody
+// WithExtensiveTracing sets the extensive tracing
+func WithExtensiveTracing() Option {
+	return func(ctx Context) Context {
+		ctx.ExtensiveTracing = true
 		return ctx
 	}
 }
@@ -253,13 +242,6 @@ func WithContractRemovalRestricted(enabled bool) Option {
 		ctx.RestrictContractRemoval = enabled
 		return ctx
 	}
-}
-
-// @Depricated please use WithContractDeploymentRestricted instead of this
-// this has been kept to reduce breaking change on the emulator, but would be
-// removed at some point.
-func WithRestrictedDeployment(restricted bool) Option {
-	return WithContractDeploymentRestricted(restricted)
 }
 
 // WithRestrictedContractDeployment enables or disables restricted contract deployment for a
@@ -352,7 +334,7 @@ func WithReusableCadenceRuntimePool(
 
 // WithDerivedBlockData sets the derived data cache storage to be used by the
 // transaction/script.
-func WithDerivedBlockData(derivedBlockData *programs.DerivedBlockData) Option {
+func WithDerivedBlockData(derivedBlockData *derived.DerivedBlockData) Option {
 	return func(ctx Context) Context {
 		ctx.DerivedBlockData = derivedBlockData
 		return ctx

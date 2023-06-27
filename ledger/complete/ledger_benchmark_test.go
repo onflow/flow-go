@@ -2,7 +2,6 @@ package complete_test
 
 import (
 	"math"
-	"math/rand"
 	"testing"
 	"time"
 
@@ -39,8 +38,6 @@ func benchmarkStorage(steps int, b *testing.B) {
 		checkpointDistance = math.MaxInt // A large number to prevent checkpoint creation.
 		checkpointsToKeep  = 1
 	)
-
-	rand.Seed(time.Now().UnixNano())
 
 	dir := b.TempDir()
 
@@ -155,8 +152,6 @@ func BenchmarkTrieUpdate(b *testing.B) {
 		checkpointsToKeep  = 1
 	)
 
-	rand.Seed(1)
-
 	dir := b.TempDir()
 
 	diskWal, err := wal.NewDiskWAL(zerolog.Nop(), nil, metrics.NewNoopCollector(), dir, capacity, pathfinder.PathByteSize, wal.SegmentSize)
@@ -208,8 +203,6 @@ func BenchmarkTrieRead(b *testing.B) {
 		checkpointDistance = math.MaxInt // A large number to prevent checkpoint creation.
 		checkpointsToKeep  = 1
 	)
-
-	rand.Seed(1)
 
 	dir := b.TempDir()
 
@@ -271,8 +264,6 @@ func BenchmarkLedgerGetOneValue(b *testing.B) {
 		checkpointDistance = math.MaxInt // A large number to prevent checkpoint creation.
 		checkpointsToKeep  = 1
 	)
-
-	rand.Seed(1)
 
 	dir := b.TempDir()
 
@@ -351,8 +342,6 @@ func BenchmarkTrieProve(b *testing.B) {
 		checkpointDistance = math.MaxInt // A large number to prevent checkpoint creation.
 		checkpointsToKeep  = 1
 	)
-
-	rand.Seed(1)
 
 	dir := b.TempDir()
 

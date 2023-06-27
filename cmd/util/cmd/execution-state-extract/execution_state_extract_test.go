@@ -64,10 +64,7 @@ func TestExtractExecutionState(t *testing.T) {
 				unittest.StateCommitmentFixture(),
 				outdir,
 				zerolog.Nop(),
-				flow.Emulator.Chain(),
-				6,
-				false,
-				false,
+				10,
 			)
 			require.Error(t, err)
 		})
@@ -198,7 +195,6 @@ func TestExtractExecutionState(t *testing.T) {
 
 						query.SetState(commitsByBlocks[blocksInOrder[j]])
 						_, err := storage.Get(query)
-						//_, err := storage.GetRegisters(keys, commitsByBlocks[blocksInOrder[j]])
 						require.Error(t, err)
 					}
 

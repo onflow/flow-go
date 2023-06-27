@@ -7,7 +7,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ipfs/go-cid"
 	"github.com/ipfs/go-datastore"
 	dssync "github.com/ipfs/go-datastore/sync"
 	"github.com/rs/zerolog"
@@ -21,7 +20,6 @@ import (
 	"github.com/onflow/flow-go/module/blobs"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	"github.com/onflow/flow-go/module/executiondatasync/provider"
-	"github.com/onflow/flow-go/module/executiondatasync/tracker"
 	mocktracker "github.com/onflow/flow-go/module/executiondatasync/tracker/mock"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network"
@@ -45,10 +43,7 @@ func getBlobservice(ds datastore.Batching) network.BlobService {
 }
 
 func getProvider(blobService network.BlobService) *provider.Provider {
-	trackerStorage := new(mocktracker.Storage)
-	trackerStorage.On("Update", mock.Anything).Return(func(fn tracker.UpdateFn) error {
-		return fn(func(uint64, ...cid.Cid) error { return nil })
-	})
+	trackerStorage := mocktracker.NewMockStorage()
 
 	return provider.NewProvider(
 		zerolog.Nop(),
@@ -123,7 +118,7 @@ func TestHappyPath(t *testing.T) {
 		expected := generateBlockExecutionData(t, numChunks, minSerializedSizePerChunk)
 		executionDataID, err := provider.Provide(context.Background(), 0, expected)
 		require.NoError(t, err)
-		actual, err := store.GetExecutionData(context.Background(), executionDataID)
+		actual, err := store.Get(context.Background(), executionDataID)
 		require.NoError(t, err)
 		deepEqual(t, expected, actual)
 	}

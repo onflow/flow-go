@@ -12,31 +12,19 @@ import (
 )
 
 type EngineProcessFunc func(channels.Channel, flow.Identifier, interface{}) error
-type NetworkPublishFunc func(channels.Channel, interface{}, ...flow.Identifier) error
+type PublishFunc func(channels.Channel, interface{}, ...flow.Identifier) error
 
 // Conduit represents a mock conduit.
-type Conduit struct {
-	mocknetwork.Conduit
-	net     *Network
-	channel channels.Channel
-}
-
-// Publish sends a message on this mock network, invoking any callback that has
-// been specified. This will panic if no callback is found.
-func (c *Conduit) Publish(event interface{}, targetIDs ...flow.Identifier) error {
-	if c.net.publishFunc != nil {
-		return c.net.publishFunc(c.channel, event, targetIDs...)
-	}
-	panic("Publish called but no callback function was found.")
-}
 
 // Network represents a mock network. The implementation is not concurrency-safe.
 type Network struct {
 	mocknetwork.Network
 	conduits    map[channels.Channel]*Conduit
 	engines     map[channels.Channel]network.MessageProcessor
-	publishFunc NetworkPublishFunc
+	publishFunc PublishFunc
 }
+
+var _ network.Network = (*Network)(nil)
 
 // NewNetwork returns a new mock network.
 func NewNetwork() *Network {
@@ -73,7 +61,7 @@ func (n *Network) Send(channel channels.Channel, originID flow.Identifier, event
 
 // OnPublish specifies the callback that should be executed when `Publish` is called on any conduits
 // created by this mock network.
-func (n *Network) OnPublish(publishFunc NetworkPublishFunc) *Network {
+func (n *Network) OnPublish(publishFunc PublishFunc) *Network {
 	n.publishFunc = publishFunc
 	return n
 }

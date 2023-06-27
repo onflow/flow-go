@@ -6,8 +6,10 @@ import (
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/onflow/cadence/runtime/interpreter"
 
-	"github.com/onflow/flow-go/fvm/programs"
-	"github.com/onflow/flow-go/fvm/state"
+	"github.com/onflow/flow-go/fvm/storage"
+	"github.com/onflow/flow-go/fvm/storage/snapshot"
+	"github.com/onflow/flow-go/fvm/storage/state"
+	"github.com/onflow/flow-go/fvm/tracing"
 )
 
 var _ Environment = &facadeEnvironment{}
@@ -16,7 +18,7 @@ var _ Environment = &facadeEnvironment{}
 type facadeEnvironment struct {
 	*Runtime
 
-	*Tracer
+	tracing.TracerSpan
 	Meter
 
 	*ProgramLogger
@@ -34,9 +36,9 @@ type facadeEnvironment struct {
 	*SystemContracts
 
 	UUIDGenerator
+	AccountLocalIDGenerator
 
 	AccountCreator
-	AccountFreezer
 
 	AccountKeyReader
 	AccountKeyUpdater
@@ -46,16 +48,15 @@ type facadeEnvironment struct {
 	*Programs
 
 	accounts Accounts
-	txnState *state.TransactionState
+	txnState storage.TransactionPreparer
 }
 
 func newFacadeEnvironment(
+	tracer tracing.TracerSpan,
 	params EnvironmentParams,
-	txnState *state.TransactionState,
-	derivedTxnData DerivedTransactionData,
+	txnState storage.TransactionPreparer,
 	meter Meter,
 ) *facadeEnvironment {
-	tracer := NewTracer(params.TracerParams)
 	accounts := NewAccounts(txnState)
 	logger := NewProgramLogger(tracer, params.ProgramLoggerParams)
 	runtime := NewRuntime(params.RuntimeParams)
@@ -68,8 +69,8 @@ func newFacadeEnvironment(
 	env := &facadeEnvironment{
 		Runtime: runtime,
 
-		Tracer: tracer,
-		Meter:  meter,
+		TracerSpan: tracer,
+		Meter:      meter,
 
 		ProgramLogger: logger,
 		EventEmitter:  NoEventEmitter{},
@@ -77,6 +78,7 @@ func newFacadeEnvironment(
 		UnsafeRandomGenerator: NewUnsafeRandomGenerator(
 			tracer,
 			params.BlockHeader,
+			params.TxIndex,
 		),
 		CryptoLibrary: NewCryptoLibrary(tracer, meter),
 
@@ -105,11 +107,18 @@ func newFacadeEnvironment(
 
 		UUIDGenerator: NewUUIDGenerator(
 			tracer,
+			params.Logger,
 			meter,
-			txnState),
+			txnState,
+			params.BlockHeader,
+			params.TxIndex),
+		AccountLocalIDGenerator: NewAccountLocalIDGenerator(
+			tracer,
+			meter,
+			accounts,
+		),
 
 		AccountCreator: NoAccountCreator{},
-		AccountFreezer: NoAccountFreezer{},
 
 		AccountKeyReader: NewAccountKeyReader(
 			tracer,
@@ -127,9 +136,9 @@ func newFacadeEnvironment(
 		Programs: NewPrograms(
 			tracer,
 			meter,
+			params.MetricsReporter,
 			txnState,
-			accounts,
-			derivedTxnData),
+			accounts),
 
 		accounts: accounts,
 		txnState: txnState,
@@ -140,16 +149,31 @@ func newFacadeEnvironment(
 	return env
 }
 
-func newScriptFacadeEnvironment(
-	ctx context.Context,
+// This is mainly used by command line tools, the emulator, and cadence tools
+// testing.
+func NewScriptEnvironmentFromStorageSnapshot(
 	params EnvironmentParams,
-	txnState *state.TransactionState,
-	derivedTxnData DerivedTransactionData,
+	storageSnapshot snapshot.StorageSnapshot,
+) *facadeEnvironment {
+	blockDatabase := storage.NewBlockDatabase(storageSnapshot, 0, nil)
+
+	return NewScriptEnv(
+		context.Background(),
+		tracing.NewTracerSpan(),
+		params,
+		blockDatabase.NewSnapshotReadTransaction(state.DefaultParameters()))
+}
+
+func NewScriptEnv(
+	ctx context.Context,
+	tracer tracing.TracerSpan,
+	params EnvironmentParams,
+	txnState storage.TransactionPreparer,
 ) *facadeEnvironment {
 	env := newFacadeEnvironment(
+		tracer,
 		params,
 		txnState,
-		derivedTxnData,
 		NewCancellableMeter(ctx, txnState))
 
 	env.addParseRestrictedChecks()
@@ -157,25 +181,25 @@ func newScriptFacadeEnvironment(
 	return env
 }
 
-func newTransactionFacadeEnvironment(
+func NewTransactionEnvironment(
+	tracer tracing.TracerSpan,
 	params EnvironmentParams,
-	txnState *state.TransactionState,
-	derivedTxnData DerivedTransactionData,
+	txnState storage.TransactionPreparer,
 ) *facadeEnvironment {
 	env := newFacadeEnvironment(
+		tracer,
 		params,
 		txnState,
-		derivedTxnData,
 		NewMeter(txnState),
 	)
 
 	env.TransactionInfo = NewTransactionInfo(
 		params.TransactionInfoParams,
-		env.Tracer,
+		tracer,
 		params.Chain.ServiceAddress(),
 	)
 	env.EventEmitter = NewEventEmitter(
-		env.Tracer,
+		tracer,
 		env.Meter,
 		params.Chain,
 		params.TransactionInfoParams,
@@ -186,19 +210,15 @@ func newTransactionFacadeEnvironment(
 		params.Chain,
 		env.accounts,
 		params.ServiceAccountEnabled,
-		env.Tracer,
+		tracer,
 		env.Meter,
 		params.MetricsReporter,
 		env.SystemContracts)
-	env.AccountFreezer = NewAccountFreezer(
-		params.Chain.ServiceAddress(),
-		env.accounts,
-		env.TransactionInfo)
 	env.ContractUpdater = NewContractUpdater(
-		env.Tracer,
+		tracer,
 		env.Meter,
 		env.accounts,
-		env.TransactionInfo,
+		params.TransactionInfoParams.TxBody.Authorizers,
 		params.Chain,
 		params.ContractUpdaterParams,
 		env.ProgramLogger,
@@ -206,7 +226,7 @@ func newTransactionFacadeEnvironment(
 		env.Runtime)
 
 	env.AccountKeyUpdater = NewAccountKeyUpdater(
-		env.Tracer,
+		tracer,
 		env.Meter,
 		env.accounts,
 		txnState,
@@ -228,9 +248,6 @@ func (env *facadeEnvironment) addParseRestrictedChecks() {
 	env.AccountCreator = NewParseRestrictedAccountCreator(
 		env.txnState,
 		env.AccountCreator)
-	env.AccountFreezer = NewParseRestrictedAccountFreezer(
-		env.txnState,
-		env.AccountFreezer)
 	env.AccountInfo = NewParseRestrictedAccountInfo(
 		env.txnState,
 		env.AccountInfo)
@@ -261,26 +278,25 @@ func (env *facadeEnvironment) addParseRestrictedChecks() {
 	env.UUIDGenerator = NewParseRestrictedUUIDGenerator(
 		env.txnState,
 		env.UUIDGenerator)
+	env.AccountLocalIDGenerator = NewParseRestrictedAccountLocalIDGenerator(
+		env.txnState,
+		env.AccountLocalIDGenerator)
 	env.ValueStore = NewParseRestrictedValueStore(
 		env.txnState,
 		env.ValueStore)
 }
 
 func (env *facadeEnvironment) FlushPendingUpdates() (
-	programs.ModifiedSetsInvalidator,
+	ContractUpdates,
 	error,
 ) {
-	keys, err := env.ContractUpdater.Commit()
-	return programs.ModifiedSetsInvalidator{
-		ContractUpdateKeys: keys,
-		FrozenAccounts:     env.FrozenAccounts(),
-	}, err
+	return env.ContractUpdater.Commit()
 }
 
 func (env *facadeEnvironment) Reset() {
 	env.ContractUpdater.Reset()
 	env.EventEmitter.Reset()
-	env.AccountFreezer.Reset()
+	env.Programs.Reset()
 }
 
 // Miscellaneous cadence runtime.Interface API.

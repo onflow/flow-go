@@ -24,7 +24,6 @@ import (
 )
 
 func TestExecutionStateSync(t *testing.T) {
-	unittest.SkipUnless(t, unittest.TEST_FLAKY, "flaky as it constantly runs into badger errors or blob not found errors")
 	suite.Run(t, new(ExecutionStateSyncSuite))
 }
 
@@ -65,8 +64,7 @@ func (s *ExecutionStateSyncSuite) TearDownTest() {
 }
 
 func (s *ExecutionStateSyncSuite) Ghost() *client.GhostClient {
-	ghost := s.net.ContainerByID(s.ghostID)
-	client, err := lib.GetGhostClient(ghost)
+	client, err := s.net.ContainerByID(s.ghostID).GhostClient()
 	require.NoError(s.T(), err, "could not get ghost client")
 	return client
 }
@@ -77,8 +75,8 @@ func (s *ExecutionStateSyncSuite) buildNetworkConfig() {
 	bridgeANConfig := testnet.NewNodeConfig(
 		flow.RoleAccess,
 		testnet.WithID(s.bridgeID),
-		testnet.SupportsUnstakedNodes(),
 		testnet.WithLogLevel(zerolog.DebugLevel),
+		testnet.WithAdditionalFlag("--supports-observer=true"),
 		testnet.WithAdditionalFlag("--execution-data-sync-enabled=true"),
 		testnet.WithAdditionalFlag(fmt.Sprintf("--execution-data-dir=%s", testnet.DefaultExecutionDataServiceDir)),
 		testnet.WithAdditionalFlag("--execution-data-retry-delay=1s"),
@@ -93,8 +91,7 @@ func (s *ExecutionStateSyncSuite) buildNetworkConfig() {
 		testnet.AsGhost())
 
 	consensusConfigs := []func(config *testnet.NodeConfig){
-		testnet.WithAdditionalFlag("--hotstuff-timeout=12s"),
-		testnet.WithAdditionalFlag("--block-rate-delay=100ms"),
+		testnet.WithAdditionalFlag("--cruise-ctl-fallback-proposal-duration=100ms"),
 		testnet.WithAdditionalFlag(fmt.Sprintf("--required-verification-seal-approvals=%d", 1)),
 		testnet.WithAdditionalFlag(fmt.Sprintf("--required-construction-seal-approvals=%d", 1)),
 		testnet.WithLogLevel(zerolog.FatalLevel),
@@ -160,7 +157,7 @@ func (s *ExecutionStateSyncSuite) TestHappyPath() {
 
 		s.T().Logf("getting execution data for height %d, block %s, execution_data %s", header.Height, header.ID(), result.ExecutionDataID)
 
-		ed, err := eds.GetExecutionData(s.ctx, result.ExecutionDataID)
+		ed, err := eds.Get(s.ctx, result.ExecutionDataID)
 		if assert.NoError(s.T(), err, "could not get execution data for height %v", i) {
 			s.T().Logf("got execution data for height %d", i)
 			assert.Equal(s.T(), header.ID(), ed.BlockID)

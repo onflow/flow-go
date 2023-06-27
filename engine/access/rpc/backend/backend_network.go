@@ -4,8 +4,12 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/onflow/flow-go/access"
+	"github.com/onflow/flow-go/cmd/build"
 
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
+
+	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/state/protocol"
@@ -40,6 +44,26 @@ func (b *backendNetwork) GetNetworkParameters(_ context.Context) access.NetworkP
 	}
 }
 
+func (b *backendNetwork) GetNodeVersionInfo(ctx context.Context) (*access.NodeVersionInfo, error) {
+	stateParams := b.state.Params()
+	sporkId, err := stateParams.SporkID()
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to read spork ID: %v", err)
+	}
+
+	protocolVersion, err := stateParams.ProtocolVersion()
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to read protocol version: %v", err)
+	}
+
+	return &access.NodeVersionInfo{
+		Semver:          build.Semver(),
+		Commit:          build.Commit(),
+		SporkId:         sporkId,
+		ProtocolVersion: uint64(protocolVersion),
+	}, nil
+}
+
 // GetLatestProtocolStateSnapshot returns the latest finalized snapshot
 func (b *backendNetwork) GetLatestProtocolStateSnapshot(_ context.Context) ([]byte, error) {
 	snapshot := b.state.Final()
@@ -49,7 +73,12 @@ func (b *backendNetwork) GetLatestProtocolStateSnapshot(_ context.Context) ([]by
 		return nil, err
 	}
 
-	return convert.SnapshotToBytes(validSnapshot)
+	data, err := convert.SnapshotToBytes(validSnapshot)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to convert snapshot to bytes: %v", err)
+	}
+
+	return data, nil
 }
 
 func (b *backendNetwork) isEpochOrPhaseDifferent(counter1, counter2 uint64, phase1, phase2 flow.EpochPhase) bool {
@@ -73,7 +102,7 @@ func (b *backendNetwork) getValidSnapshot(snapshot protocol.Snapshot, blocksVisi
 		return nil, fmt.Errorf("failed to get counter and phase at highest block in the segment: %w", err)
 	}
 
-	counterAtLowest, phaseAtLowest, err := b.getCounterAndPhase(segment.Lowest().Header.Height)
+	counterAtLowest, phaseAtLowest, err := b.getCounterAndPhase(segment.Sealed().Header.Height)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get counter and phase at lowest block in the segment: %w", err)
 	}

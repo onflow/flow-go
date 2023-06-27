@@ -86,6 +86,8 @@ type Cache struct {
 	// lastTelemetryDump keeps track of the last time telemetry logs dumped.
 	// Its purpose is to manage the speed at which telemetry logs are printed.
 	lastTelemetryDump *atomic.Int64
+	// tracer reports ejection events, initially nil but can be injection using CacheOpt
+	tracer Tracer
 }
 
 // DefaultOversizeFactor determines the default oversizing factor of HeroCache.
@@ -110,11 +112,17 @@ func NewCache(sizeLimit uint32,
 	oversizeFactor uint32,
 	ejectionMode heropool.EjectionMode,
 	logger zerolog.Logger,
-	collector module.HeroCacheMetrics) *Cache {
+	collector module.HeroCacheMetrics,
+	opts ...CacheOpt) *Cache {
 
 	// total buckets.
 	capacity := uint64(sizeLimit * oversizeFactor)
 	bucketNum := capacity / slotsPerBucket
+	if bucketNum == 0 {
+		// we panic here because we don't want to continue with a zero bucketNum (it can cause a DoS attack).
+		panic("bucketNum cannot be zero, choose a bigger sizeLimit or a smaller oversizeFactor")
+	}
+
 	if capacity%slotsPerBucket != 0 {
 		// accounting for remainder.
 		bucketNum++
@@ -133,6 +141,11 @@ func NewCache(sizeLimit uint32,
 		lastTelemetryDump:      atomic.NewInt64(0),
 	}
 
+	// apply extra options
+	for _, opt := range opts {
+		opt(bd)
+	}
+
 	return bd
 }
 
@@ -144,14 +157,15 @@ func (c *Cache) Has(entityID flow.Identifier) bool {
 	return ok
 }
 
-// Add adds the given entity to the backdata.
+// Add adds the given entity to the backdata and returns true if the entity was added or false if
+// a valid entity already exists for the provided ID.
 func (c *Cache) Add(entityID flow.Identifier, entity flow.Entity) bool {
 	defer c.logTelemetry()
-
 	return c.put(entityID, entity)
 }
 
-// Remove removes the entity with the given identifier.
+// Remove removes the entity with the given identifier and returns the removed entity and true if
+// the entity was removed or false if the entity was not found.
 func (c *Cache) Remove(entityID flow.Identifier) (flow.Entity, bool) {
 	defer c.logTelemetry()
 
@@ -196,7 +210,7 @@ func (c *Cache) ByID(entityID flow.Identifier) (flow.Entity, bool) {
 }
 
 // Size returns the size of the backdata, i.e., total number of stored (entityId, entity) pairs.
-func (c Cache) Size() uint {
+func (c *Cache) Size() uint {
 	defer c.logTelemetry()
 
 	return uint(c.entities.Size())
@@ -204,12 +218,12 @@ func (c Cache) Size() uint {
 
 // Head returns the head of queue.
 // Boolean return value determines whether there is a head available.
-func (c Cache) Head() (flow.Entity, bool) {
+func (c *Cache) Head() (flow.Entity, bool) {
 	return c.entities.Head()
 }
 
 // All returns all entities stored in the backdata.
-func (c Cache) All() map[flow.Identifier]flow.Entity {
+func (c *Cache) All() map[flow.Identifier]flow.Entity {
 	defer c.logTelemetry()
 
 	entitiesList := c.entities.All()
@@ -225,7 +239,7 @@ func (c Cache) All() map[flow.Identifier]flow.Entity {
 }
 
 // Identifiers returns the list of identifiers of entities stored in the backdata.
-func (c Cache) Identifiers() flow.IdentifierList {
+func (c *Cache) Identifiers() flow.IdentifierList {
 	defer c.logTelemetry()
 
 	ids := make(flow.IdentifierList, c.entities.Size())
@@ -237,7 +251,7 @@ func (c Cache) Identifiers() flow.IdentifierList {
 }
 
 // Entities returns the list of entities stored in the backdata.
-func (c Cache) Entities() []flow.Entity {
+func (c *Cache) Entities() []flow.Entity {
 	defer c.logTelemetry()
 
 	entities := make([]flow.Entity, c.entities.Size())
@@ -260,13 +274,6 @@ func (c *Cache) Clear() {
 	c.slotCount = 0
 }
 
-// Hash returns the merkle root hash of all entities.
-func (c *Cache) Hash() flow.Identifier {
-	defer c.logTelemetry()
-
-	return flow.MerkleRoot(flow.GetIDs(c.All())...)
-}
-
 // put writes the (entityId, entity) pair into this BackData. Boolean return value
 // determines whether the write operation was successful. A write operation fails when there is already
 // a duplicate entityId exists in the BackData, and that entityId is linked to a valid entity.
@@ -284,7 +291,10 @@ func (c *Cache) put(entityId flow.Identifier, entity flow.Entity) bool {
 	if linkedId, _, ok := c.linkedEntityOf(b, slotToUse); ok {
 		// bucket is full, and we are replacing an already linked (but old) slot that has a valid value, hence
 		// we should remove its value from underlying entities list.
-		c.invalidateEntity(b, slotToUse)
+		ejectedEntity := c.invalidateEntity(b, slotToUse)
+		if c.tracer != nil {
+			c.tracer.EntityEjectionDueToEmergency(ejectedEntity)
+		}
 		c.collector.OnEntityEjectionDueToEmergency()
 		c.logger.Warn().
 			Hex("replaced_entity_id", logging.ID(linkedId)).
@@ -293,14 +303,17 @@ func (c *Cache) put(entityId flow.Identifier, entity flow.Entity) bool {
 	}
 
 	c.slotCount++
-	entityIndex, slotAvailable, ejectionHappened := c.entities.Add(entityId, entity, c.ownerIndexOf(b, slotToUse))
+	entityIndex, slotAvailable, ejectedEntity := c.entities.Add(entityId, entity, c.ownerIndexOf(b, slotToUse))
 	if !slotAvailable {
 		c.collector.OnKeyPutDrop()
 		return false
 	}
 
-	if ejectionHappened {
+	if ejectedEntity != nil {
 		// cache is at its full size and ejection happened to make room for this new entity.
+		if c.tracer != nil {
+			c.tracer.EntityEjectionDueToFullCapacity(ejectedEntity)
+		}
 		c.collector.OnEntityEjectionDueToFullCapacity()
 	}
 
@@ -342,7 +355,7 @@ func (c *Cache) get(entityID flow.Identifier) (flow.Entity, bucketIndex, slotInd
 
 // entityId32of256AndBucketIndex determines the id prefix as well as the bucket index corresponding to the
 // given identifier.
-func (c Cache) entityId32of256AndBucketIndex(id flow.Identifier) (sha32of256, bucketIndex) {
+func (c *Cache) entityId32of256AndBucketIndex(id flow.Identifier) (sha32of256, bucketIndex) {
 	// uint64(id[0:8]) used to compute bucket index for which this identifier belongs to
 	b := binary.LittleEndian.Uint64(id[0:8]) % c.bucketNum
 
@@ -353,7 +366,7 @@ func (c Cache) entityId32of256AndBucketIndex(id flow.Identifier) (sha32of256, bu
 }
 
 // expiryThreshold returns the threshold for which all slots with index below threshold are considered old enough for eviction.
-func (c Cache) expiryThreshold() uint64 {
+func (c *Cache) expiryThreshold() uint64 {
 	var expiryThreshold uint64 = 0
 	if c.slotCount > uint64(c.sizeLimit) {
 		// total number of slots written are above the predefined limit
@@ -417,7 +430,7 @@ func (c *Cache) slotIndexInBucket(b bucketIndex, slotId sha32of256, entityId flo
 // ownerIndexOf maps the (bucketIndex, slotIndex) pair to a canonical unique (scalar) index.
 // This scalar index is used to represent this (bucketIndex, slotIndex) pair in the underlying
 // entities list.
-func (c Cache) ownerIndexOf(b bucketIndex, s slotIndex) uint64 {
+func (c *Cache) ownerIndexOf(b bucketIndex, s slotIndex) uint64 {
 	return (uint64(b) * slotsPerBucket) + uint64(s)
 }
 
@@ -481,6 +494,6 @@ func (c *Cache) unuseSlot(b bucketIndex, s slotIndex) {
 
 // invalidateEntity removes the entity linked to the specified slot from the underlying entities
 // list. So that entity slot is made available to take if needed.
-func (c *Cache) invalidateEntity(b bucketIndex, s slotIndex) {
-	c.entities.Remove(c.buckets[b].slots[s].entityIndex)
+func (c *Cache) invalidateEntity(b bucketIndex, s slotIndex) flow.Entity {
+	return c.entities.Remove(c.buckets[b].slots[s].entityIndex)
 }

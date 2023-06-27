@@ -27,7 +27,9 @@ const (
 	// DefaultRequestProviderWorkers is the default number of workers used to process entity requests.
 	DefaultRequestProviderWorkers = uint(5)
 
-	DefaultEntityRequestCacheSize = 1000
+	// DefaultEntityRequestCacheSize is the default max message queue size for the provider engine.
+	// This equates to ~5GB of memory usage with a full queue (10M*500)
+	DefaultEntityRequestCacheSize = 500
 )
 
 // RetrieveFunc is a function provided to the provider engine upon construction.
@@ -76,7 +78,6 @@ func New(
 	// make sure we don't respond to request sent by self or unauthorized nodes
 	selector = filter.And(
 		selector,
-		filter.HasWeight(true),
 		filter.Not(filter.HasNodeID(me.NodeID())),
 	)
 
@@ -88,13 +89,7 @@ func New(
 			// Provider engine only expects EntityRequest.
 			// Other message types are discarded by Match.
 			Match: func(message *engine.Message) bool {
-				request, ok := message.Payload.(*messages.EntityRequest)
-				if ok {
-					log.Info().
-						Str("entity_ids", fmt.Sprintf("%v", request.EntityIDs)).
-						Hex("origin_id", logging.ID(message.OriginID)).
-						Msg("entity request received")
-				}
+				_, ok := message.Payload.(*messages.EntityRequest)
 				return ok
 			},
 			// Map is called on messages that are Match(ed) successfully, i.e.,
@@ -193,7 +188,8 @@ func (e *Engine) onEntityRequest(request *internal.EntityRequest) error {
 		Strs("entity_ids", flow.IdentifierList(request.EntityIds).Strings()).
 		Logger()
 
-	lg.Debug().
+	lg.Info().
+		Uint64("nonce", request.Nonce).
 		Msg("entity request received")
 
 	// TODO: add reputation system to punish nodes for malicious behaviour (spam / repeated requests)
@@ -267,7 +263,11 @@ func (e *Engine) onEntityRequest(request *internal.EntityRequest) error {
 	}
 
 	e.metrics.MessageSent(e.channel.String(), metrics.MessageEntityResponse)
-	lg.Debug().Msg("entity response sent")
+	e.log.Info().
+		Str("origin_id", request.OriginId.String()).
+		Strs("entity_ids", flow.IdentifierList(entityIDs).Strings()).
+		Uint64("nonce", request.Nonce). // to match with the the entity request received log
+		Msg("entity response sent")
 
 	return nil
 }

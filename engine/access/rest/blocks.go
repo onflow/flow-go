@@ -5,15 +5,13 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/onflow/flow-go/engine/access/rest/models"
-	"github.com/onflow/flow-go/engine/access/rest/request"
-
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
-	"github.com/onflow/flow-go/model/flow"
-
 	"github.com/onflow/flow-go/access"
+	"github.com/onflow/flow-go/engine/access/rest/models"
+	"github.com/onflow/flow-go/engine/access/rest/request"
+	"github.com/onflow/flow-go/model/flow"
 )
 
 // GetBlocksByIDs gets blocks by provided ID or list of IDs.
@@ -66,7 +64,7 @@ func GetBlocksByHeight(r *request.Request, backend access.API, link models.LinkG
 
 	// support providing end height as "sealed" or "final"
 	if req.EndHeight == request.FinalHeight || req.EndHeight == request.SealedHeight {
-		latest, err := backend.GetLatestBlock(r.Context(), req.EndHeight == request.SealedHeight)
+		latest, _, err := backend.GetLatestBlock(r.Context(), req.EndHeight == request.SealedHeight)
 		if err != nil {
 			return nil, err
 		}
@@ -99,7 +97,7 @@ func GetBlockPayloadByID(r *request.Request, backend access.API, _ models.LinkGe
 	}
 
 	blkProvider := NewBlockProvider(backend, forID(&req.ID))
-	blk, statusErr := blkProvider.getBlock(r.Context())
+	blk, _, statusErr := blkProvider.getBlock(r.Context())
 	if statusErr != nil {
 		return nil, statusErr
 	}
@@ -116,7 +114,7 @@ func GetBlockPayloadByID(r *request.Request, backend access.API, _ models.LinkGe
 func getBlock(option blockProviderOption, req *request.Request, backend access.API, link models.LinkGenerator) (*models.Block, error) {
 	// lookup block
 	blkProvider := NewBlockProvider(backend, option)
-	blk, err := blkProvider.getBlock(req.Context())
+	blk, blockStatus, err := blkProvider.getBlock(req.Context())
 	if err != nil {
 		return nil, err
 	}
@@ -129,7 +127,7 @@ func getBlock(option blockProviderOption, req *request.Request, backend access.A
 		// handle case where execution result is not yet available
 		if se, ok := status.FromError(err); ok {
 			if se.Code() == codes.NotFound {
-				err := block.Build(blk, nil, link, req.ExpandFields)
+				err := block.Build(blk, nil, link, blockStatus, req.ExpandFields)
 				if err != nil {
 					return nil, err
 				}
@@ -139,7 +137,7 @@ func getBlock(option blockProviderOption, req *request.Request, backend access.A
 		return nil, err
 	}
 
-	err = block.Build(blk, executionResult, link, req.ExpandFields)
+	err = block.Build(blk, executionResult, link, blockStatus, req.ExpandFields)
 	if err != nil {
 		return nil, err
 	}
@@ -192,31 +190,31 @@ func NewBlockProvider(backend access.API, options ...blockProviderOption) *block
 	return blkProvider
 }
 
-func (blkProvider *blockProvider) getBlock(ctx context.Context) (*flow.Block, error) {
+func (blkProvider *blockProvider) getBlock(ctx context.Context) (*flow.Block, flow.BlockStatus, error) {
 	if blkProvider.id != nil {
-		blk, err := blkProvider.backend.GetBlockByID(ctx, *blkProvider.id)
+		blk, _, err := blkProvider.backend.GetBlockByID(ctx, *blkProvider.id)
 		if err != nil { // unfortunately backend returns internal error status if not found
-			return nil, NewNotFoundError(
+			return nil, flow.BlockStatusUnknown, NewNotFoundError(
 				fmt.Sprintf("error looking up block with ID %s", blkProvider.id.String()), err,
 			)
 		}
-		return blk, nil
+		return blk, flow.BlockStatusUnknown, nil
 	}
 
 	if blkProvider.latest {
-		blk, err := blkProvider.backend.GetLatestBlock(ctx, blkProvider.sealed)
+		blk, status, err := blkProvider.backend.GetLatestBlock(ctx, blkProvider.sealed)
 		if err != nil {
 			// cannot be a 'not found' error since final and sealed block should always be found
-			return nil, NewRestError(http.StatusInternalServerError, "block lookup failed", err)
+			return nil, flow.BlockStatusUnknown, NewRestError(http.StatusInternalServerError, "block lookup failed", err)
 		}
-		return blk, nil
+		return blk, status, nil
 	}
 
-	blk, err := blkProvider.backend.GetBlockByHeight(ctx, blkProvider.height)
+	blk, status, err := blkProvider.backend.GetBlockByHeight(ctx, blkProvider.height)
 	if err != nil { // unfortunately backend returns internal error status if not found
-		return nil, NewNotFoundError(
+		return nil, flow.BlockStatusUnknown, NewNotFoundError(
 			fmt.Sprintf("error looking up block at height %d", blkProvider.height), err,
 		)
 	}
-	return blk, nil
+	return blk, status, nil
 }

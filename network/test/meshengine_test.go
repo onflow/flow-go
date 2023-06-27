@@ -94,8 +94,8 @@ func (suite *MeshEngineTestSuite) SetupTest() {
 // TearDownTest closes the networks within a specified timeout
 func (suite *MeshEngineTestSuite) TearDownTest() {
 	suite.cancel()
-	testutils.StopNetworks(suite.T(), suite.nets, 3*time.Second)
-	testutils.StopMiddlewares(suite.T(), suite.mws, 3*time.Second)
+	testutils.StopComponents(suite.T(), suite.nets, 3*time.Second)
+	testutils.StopComponents(suite.T(), suite.mws, 3*time.Second)
 }
 
 // TestAllToAll_Publish evaluates the network of mesh engines against allToAllScenario scenario.

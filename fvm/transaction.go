@@ -1,68 +1,41 @@
 package fvm
 
 import (
-	otelTrace "go.opentelemetry.io/otel/trace"
-
-	"github.com/onflow/flow-go/fvm/errors"
-	"github.com/onflow/flow-go/fvm/meter"
-	"github.com/onflow/flow-go/fvm/programs"
-	"github.com/onflow/flow-go/fvm/state"
+	"github.com/onflow/flow-go/fvm/storage"
+	"github.com/onflow/flow-go/fvm/storage/logical"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/module"
-	"github.com/onflow/flow-go/module/trace"
 )
 
-// TODO(patrick): pass in initial snapshot time when we start supporting
-// speculative pre-processing / execution.
-func Transaction(tx *flow.TransactionBody, txIndex uint32) *TransactionProcedure {
+func Transaction(
+	txn *flow.TransactionBody,
+	txnIndex uint32,
+) *TransactionProcedure {
+	return NewTransaction(txn.ID(), txnIndex, txn)
+}
+
+func NewTransaction(
+	txnId flow.Identifier,
+	txnIndex uint32,
+	txnBody *flow.TransactionBody,
+) *TransactionProcedure {
 	return &TransactionProcedure{
-		ID:                     tx.ID(),
-		Transaction:            tx,
-		InitialSnapshotTxIndex: txIndex,
-		TxIndex:                txIndex,
-		ComputationIntensities: make(meter.MeteredComputationIntensities),
+		ID:          txnId,
+		Transaction: txnBody,
+		TxIndex:     txnIndex,
 	}
 }
 
 type TransactionProcedure struct {
-	ID                     flow.Identifier
-	Transaction            *flow.TransactionBody
-	InitialSnapshotTxIndex uint32
-	TxIndex                uint32
-
-	Logs                   []string
-	Events                 []flow.Event
-	ServiceEvents          []flow.Event
-	ComputationUsed        uint64
-	ComputationIntensities meter.MeteredComputationIntensities
-	MemoryEstimate         uint64
-	Err                    errors.CodedError
-	TraceSpan              otelTrace.Span
+	ID          flow.Identifier
+	Transaction *flow.TransactionBody
+	TxIndex     uint32
 }
 
-func (proc *TransactionProcedure) SetTraceSpan(traceSpan otelTrace.Span) {
-	proc.TraceSpan = traceSpan
-}
-
-func (proc *TransactionProcedure) IsSampled() bool {
-	return proc.TraceSpan != nil
-}
-
-func (proc *TransactionProcedure) StartSpanFromProcTraceSpan(
-	tracer module.Tracer,
-	spanName trace.SpanName) otelTrace.Span {
-	if tracer != nil && proc.IsSampled() {
-		return tracer.StartSpanFromParent(proc.TraceSpan, spanName)
-	}
-	return trace.NoopSpan
-}
-
-func (proc *TransactionProcedure) Run(
+func (proc *TransactionProcedure) NewExecutor(
 	ctx Context,
-	txnState *state.TransactionState,
-	derivedTxnData *programs.DerivedTransactionData,
-) error {
-	return NewTransactionInvoker().Process(ctx, proc, txnState, derivedTxnData)
+	txnState storage.TransactionPreparer,
+) ProcedureExecutor {
+	return newTransactionExecutor(ctx, proc, txnState)
 }
 
 func (proc *TransactionProcedure) ComputationLimit(ctx Context) uint64 {
@@ -105,10 +78,6 @@ func (TransactionProcedure) Type() ProcedureType {
 	return TransactionProcedureType
 }
 
-func (proc *TransactionProcedure) InitialSnapshotTime() programs.LogicalTime {
-	return programs.LogicalTime(proc.InitialSnapshotTxIndex)
-}
-
-func (proc *TransactionProcedure) ExecutionTime() programs.LogicalTime {
-	return programs.LogicalTime(proc.TxIndex)
+func (proc *TransactionProcedure) ExecutionTime() logical.Time {
+	return logical.Time(proc.TxIndex)
 }

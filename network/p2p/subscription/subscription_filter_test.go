@@ -14,11 +14,11 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/id"
 	"github.com/onflow/flow-go/module/irrecoverable"
-	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/internal/p2pfixtures"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/subscription"
+	p2ptest "github.com/onflow/flow-go/network/p2p/test"
 	flowpubsub "github.com/onflow/flow-go/network/validator/pubsub"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -35,11 +35,11 @@ func TestFilterSubscribe(t *testing.T) {
 	identity2, privateKey2 := unittest.IdentityWithNetworkingKeyFixture(unittest.WithRole(flow.RoleAccess))
 	ids := flow.IdentityList{identity1, identity2}
 
-	node1 := p2pfixtures.CreateNode(t, identity1.NodeID, privateKey1, sporkId, zerolog.Nop(), p2pfixtures.WithSubscriptionFilter(subscriptionFilter(identity1, ids)))
-	node2 := p2pfixtures.CreateNode(t, identity2.NodeID, privateKey2, sporkId, zerolog.Nop(), p2pfixtures.WithSubscriptionFilter(subscriptionFilter(identity2, ids)))
+	node1 := p2pfixtures.CreateNode(t, privateKey1, sporkId, zerolog.Nop(), ids, p2pfixtures.WithSubscriptionFilter(subscriptionFilter(identity1, ids)))
+	node2 := p2pfixtures.CreateNode(t, privateKey2, sporkId, zerolog.Nop(), ids, p2pfixtures.WithSubscriptionFilter(subscriptionFilter(identity2, ids)))
 
 	unstakedKey := unittest.NetworkingPrivKeyFixture()
-	unstakedNode := p2pfixtures.CreateNode(t, flow.ZeroID, unstakedKey, sporkId, zerolog.Nop())
+	unstakedNode := p2pfixtures.CreateNode(t, unstakedKey, sporkId, zerolog.Nop(), ids)
 
 	require.NoError(t, node1.AddPeer(context.TODO(), *host.InfoFromHost(node2.Host())))
 	require.NoError(t, node1.AddPeer(context.TODO(), *host.InfoFromHost(unstakedNode.Host())))
@@ -47,7 +47,7 @@ func TestFilterSubscribe(t *testing.T) {
 	badTopic := channels.TopicFromChannel(channels.SyncCommittee, sporkId)
 
 	logger := unittest.Logger()
-	topicValidator := flowpubsub.TopicValidator(logger, unittest.NetworkCodec(), unittest.NetworkSlashingViolationsConsumer(logger, metrics.NewNoopCollector()), unittest.AllowAllPeerFilter())
+	topicValidator := flowpubsub.TopicValidator(logger, unittest.AllowAllPeerFilter())
 
 	sub1, err := node1.Subscribe(badTopic, topicValidator)
 	require.NoError(t, err)
@@ -77,7 +77,7 @@ func TestFilterSubscribe(t *testing.T) {
 	var wg sync.WaitGroup
 	wg.Add(2)
 
-	testPublish := func(wg *sync.WaitGroup, from p2p.LibP2PNode, sub *pubsub.Subscription) {
+	testPublish := func(wg *sync.WaitGroup, from p2p.LibP2PNode, sub p2p.Subscription) {
 		data := []byte("hello")
 
 		err := from.Publish(context.TODO(), badTopic, data)
@@ -115,13 +115,18 @@ func TestCanSubscribe(t *testing.T) {
 	identity, privateKey := unittest.IdentityWithNetworkingKeyFixture(unittest.WithRole(flow.RoleCollection))
 	sporkId := unittest.IdentifierFixture()
 
-	collectionNode := p2pfixtures.CreateNode(t, identity.NodeID, privateKey, sporkId, zerolog.Nop(), p2pfixtures.WithSubscriptionFilter(subscriptionFilter(identity, flow.IdentityList{identity})))
+	collectionNode := p2pfixtures.CreateNode(t,
+		privateKey,
+		sporkId,
+		zerolog.Nop(),
+		flow.IdentityList{identity},
+		p2pfixtures.WithSubscriptionFilter(subscriptionFilter(identity, flow.IdentityList{identity})))
 
-	p2pfixtures.StartNode(t, signalerCtx, collectionNode, 100*time.Millisecond)
-	defer p2pfixtures.StopNode(t, collectionNode, cancel, 1*time.Second)
+	p2ptest.StartNode(t, signalerCtx, collectionNode, 100*time.Millisecond)
+	defer p2ptest.StopNode(t, collectionNode, cancel, 1*time.Second)
 
 	logger := unittest.Logger()
-	topicValidator := flowpubsub.TopicValidator(logger, unittest.NetworkCodec(), unittest.NetworkSlashingViolationsConsumer(logger, metrics.NewNoopCollector()), unittest.AllowAllPeerFilter())
+	topicValidator := flowpubsub.TopicValidator(logger, unittest.AllowAllPeerFilter())
 
 	goodTopic := channels.TopicFromChannel(channels.ProvideCollections, sporkId)
 	_, err := collectionNode.Subscribe(goodTopic, topicValidator)

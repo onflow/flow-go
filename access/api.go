@@ -14,21 +14,22 @@ import (
 type API interface {
 	Ping(ctx context.Context) error
 	GetNetworkParameters(ctx context.Context) NetworkParameters
+	GetNodeVersionInfo(ctx context.Context) (*NodeVersionInfo, error)
 
-	GetLatestBlockHeader(ctx context.Context, isSealed bool) (*flow.Header, error)
-	GetBlockHeaderByHeight(ctx context.Context, height uint64) (*flow.Header, error)
-	GetBlockHeaderByID(ctx context.Context, id flow.Identifier) (*flow.Header, error)
+	GetLatestBlockHeader(ctx context.Context, isSealed bool) (*flow.Header, flow.BlockStatus, error)
+	GetBlockHeaderByHeight(ctx context.Context, height uint64) (*flow.Header, flow.BlockStatus, error)
+	GetBlockHeaderByID(ctx context.Context, id flow.Identifier) (*flow.Header, flow.BlockStatus, error)
 
-	GetLatestBlock(ctx context.Context, isSealed bool) (*flow.Block, error)
-	GetBlockByHeight(ctx context.Context, height uint64) (*flow.Block, error)
-	GetBlockByID(ctx context.Context, id flow.Identifier) (*flow.Block, error)
+	GetLatestBlock(ctx context.Context, isSealed bool) (*flow.Block, flow.BlockStatus, error)
+	GetBlockByHeight(ctx context.Context, height uint64) (*flow.Block, flow.BlockStatus, error)
+	GetBlockByID(ctx context.Context, id flow.Identifier) (*flow.Block, flow.BlockStatus, error)
 
 	GetCollectionByID(ctx context.Context, id flow.Identifier) (*flow.LightCollection, error)
 
 	SendTransaction(ctx context.Context, tx *flow.TransactionBody) error
 	GetTransaction(ctx context.Context, id flow.Identifier) (*flow.TransactionBody, error)
 	GetTransactionsByBlockID(ctx context.Context, blockID flow.Identifier) ([]*flow.TransactionBody, error)
-	GetTransactionResult(ctx context.Context, id flow.Identifier) (*TransactionResult, error)
+	GetTransactionResult(ctx context.Context, id flow.Identifier, blockID flow.Identifier, collectionID flow.Identifier) (*TransactionResult, error)
 	GetTransactionResultByIndex(ctx context.Context, blockID flow.Identifier, index uint32) (*TransactionResult, error)
 	GetTransactionResultsByBlockID(ctx context.Context, blockID flow.Identifier) ([]*TransactionResult, error)
 
@@ -70,7 +71,7 @@ func TransactionResultToMessage(result *TransactionResult) *access.TransactionRe
 		BlockId:       result.BlockID[:],
 		TransactionId: result.TransactionID[:],
 		CollectionId:  result.CollectionID[:],
-		BlockHeight:   uint64(result.BlockHeight),
+		BlockHeight:   result.BlockHeight,
 	}
 }
 
@@ -102,4 +103,12 @@ func MessageToTransactionResult(message *access.TransactionResultResponse) *Tran
 // NetworkParameters contains the network-wide parameters for the Flow blockchain.
 type NetworkParameters struct {
 	ChainID flow.ChainID
+}
+
+// NodeVersionInfo contains information about node, such as semver, commit, sporkID, protocolVersion, etc
+type NodeVersionInfo struct {
+	Semver          string
+	Commit          string
+	SporkId         flow.Identifier
+	ProtocolVersion uint64
 }

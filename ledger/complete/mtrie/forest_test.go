@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/ledger"
+	"github.com/onflow/flow-go/ledger/common/hash"
 	prf "github.com/onflow/flow-go/ledger/common/proof"
 	"github.com/onflow/flow-go/ledger/common/testutils"
 	"github.com/onflow/flow-go/ledger/complete/mtrie/trie"
@@ -741,6 +742,38 @@ func TestIdenticalUpdateAppliedTwice(t *testing.T) {
 	}
 }
 
+func TestNonExistingInvalidProof(t *testing.T) {
+	forest, err := NewForest(5, &metrics.NoopCollector{}, nil)
+	require.NoError(t, err)
+	paths := testutils.RandomPaths(2)
+	payloads := testutils.RandomPayloads(len(paths), 10, 20)
+
+	existingPaths := paths[1:]
+	existingPayloads := payloads[1:]
+
+	nonExistingPaths := paths[:1]
+
+	activeRoot := forest.GetEmptyRootHash()
+
+	// adding a payload to a path
+	update := &ledger.TrieUpdate{RootHash: activeRoot, Paths: existingPaths, Payloads: existingPayloads}
+	activeRoot, err = forest.Update(update)
+	require.NoError(t, err, "error updating")
+
+	// reading proof for nonExistingPaths
+	read := &ledger.TrieRead{RootHash: activeRoot, Paths: nonExistingPaths}
+	batchProof, err := forest.Proofs(read)
+	require.NoError(t, err, "error generating proofs")
+
+	// now a malicious node modifies the proof to be Inclusion false
+	// and change the proof such that one interim node has invalid hash
+	batchProof.Proofs[0].Inclusion = false
+	batchProof.Proofs[0].Interims[0] = hash.DummyHash
+
+	// expect the VerifyTrieBatchProof should return false
+	require.False(t, prf.VerifyTrieBatchProof(batchProof, ledger.State(activeRoot)))
+}
+
 // TestRandomUpdateReadProofValueSizes repeats a sequence of actions update, read, get value sizes, and proof random paths
 // this simulates the common pattern of actions on flow
 func TestRandomUpdateReadProofValueSizes(t *testing.T) {
@@ -750,7 +783,6 @@ func TestRandomUpdateReadProofValueSizes(t *testing.T) {
 	rep := 10
 	maxNumPathsPerStep := 10
 	seed := time.Now().UnixNano()
-	rand.Seed(seed)
 	t.Log(seed)
 
 	forest, err := NewForest(5, &metrics.NoopCollector{}, nil)

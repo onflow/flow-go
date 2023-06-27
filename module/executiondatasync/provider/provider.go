@@ -127,9 +127,13 @@ func (p *Provider) Provide(ctx context.Context, blockHeight uint64, executionDat
 
 	if ok {
 		return flow.ZeroID, storeErr
-	} else {
-		return rootID, nil
 	}
+
+	if err = p.storage.SetFulfilledHeight(blockHeight); err != nil {
+		return flow.ZeroID, err
+	}
+
+	return rootID, nil
 }
 
 func (p *Provider) provide(ctx context.Context, blockHeight uint64, executionData *execution_data.BlockExecutionData) (flow.Identifier, <-chan error, error) {

@@ -59,14 +59,14 @@ type VoteCollector interface {
 	// ProcessBlock performs validation of block signature and processes block with respected collector.
 	// Calling this function will mark conflicting collector as stale and change state of valid collectors
 	// It returns nil if the block is valid.
-	// It returns model.InvalidBlockError if block is invalid.
+	// It returns model.InvalidProposalError if block is invalid.
 	// It returns other error if there is exception processing the block.
 	ProcessBlock(block *model.Proposal) error
 
 	// AddVote adds a vote to the collector
-	// return error if the signature is invalid
 	// When enough votes have been added to produce a QC, the QC will be created asynchronously, and
 	// passed to EventLoop through a callback.
+	// No errors are expected during normal operations.
 	AddVote(vote *model.Vote) error
 
 	// RegisterVoteConsumer registers a VoteConsumer. Upon registration, the collector
@@ -115,6 +115,6 @@ type VoteProcessorFactory interface {
 	// Create instantiates a VerifyingVoteProcessor for processing votes for a specific proposal.
 	// Caller can be sure that proposal vote was successfully verified and processed.
 	// Expected error returns during normal operations:
-	// * model.InvalidBlockError - proposal has invalid proposer vote
+	// * model.InvalidProposalError - proposal has invalid proposer vote
 	Create(log zerolog.Logger, proposal *model.Proposal) (VerifyingVoteProcessor, error)
 }

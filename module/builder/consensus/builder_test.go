@@ -68,7 +68,7 @@ type BuilderSuite struct {
 	setter   func(*flow.Header) error
 
 	// mocked dependencies
-	state      *protocol.MutableState
+	state      *protocol.ParticipantState
 	headerDB   *storage.Headers
 	sealDB     *storage.Seals
 	indexDB    *storage.Index
@@ -266,7 +266,7 @@ func (bs *BuilderSuite) SetupTest() {
 		return nil
 	}
 
-	bs.state = &protocol.MutableState{}
+	bs.state = &protocol.ParticipantState{}
 	bs.state.On("Extend", mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
 		block := args.Get(1).(*flow.Block)
 		bs.Assert().Equal(bs.sentinel, block.Header.View)
@@ -275,7 +275,7 @@ func (bs *BuilderSuite) SetupTest() {
 	bs.state.On("Final").Return(func() realproto.Snapshot {
 		if block, ok := bs.blocks[bs.finalID]; ok {
 			snapshot := unittest.StateSnapshotForKnownBlock(block.Header, nil)
-			snapshot.On("ValidDescendants").Return(bs.blockChildren[bs.finalID], nil)
+			snapshot.On("Descendants").Return(bs.blockChildren[bs.finalID], nil)
 			return snapshot
 		}
 		return unittest.StateSnapshotForUnknownBlock()
@@ -595,8 +595,7 @@ func (bs *BuilderSuite) TestPayloadSeals_OnlyFork() {
 //
 // SCENARIO:
 //   - block B0 is sealed
-//     Proposer for ░newBlock░:
-//   - Knows block A5. Hence, it knows a QC for block B4, which contains the Source Of Randomness (SOR) for B4.
+//     Proposer for ░newBlock░ knows block A5. Hence, it knows a QC for block B4, which contains the Source Of Randomness (SOR) for B4.
 //     Therefore, the proposer can construct the verifier assignment for [B4{incorporates result R for B1}]
 //   - Assume that verification was fast enough, so the proposer has sufficient approvals for result R.
 //     Therefore, the proposer has a candidate seal, sealing result R for block B4, in its mempool.
@@ -605,8 +604,7 @@ func (bs *BuilderSuite) TestPayloadSeals_OnlyFork() {
 //
 //   - Assume that the replica does _not_ know A5. Therefore, it _cannot_ compute the verifier assignment for B4.
 //
-//     Problem:  If the proposer included the seal for B1, the replica could not check it.
-//
+// Problem:  If the proposer included the seal for B1, the replica could not check it.
 // Solution: There must be a gap between the block incorporating the result (here B4) and
 // the block sealing the result. A gap of one block is sufficient.
 //

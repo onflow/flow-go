@@ -9,6 +9,7 @@ import (
 
 	"github.com/spf13/pflag"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 
 	sdk "github.com/onflow/flow-go-sdk"
 	"github.com/onflow/flow-go-sdk/client"
@@ -26,7 +27,7 @@ func main() {
 
 	pflag.Parse()
 
-	c, err := client.New(targetAddr, grpc.WithInsecure()) //nolint:staticcheck
+	c, err := client.New(targetAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		panic(err)
 	}
@@ -43,12 +44,15 @@ func main() {
 		panic(err)
 	}
 
-	account := sdk.NewAccountKey().
+	accountKey := sdk.NewAccountKey().
 		FromPrivateKey(sk).
 		SetHashAlgo(crypto.SHA3_256).
 		SetWeight(sdk.AccountKeyWeightThreshold)
 
-	signer := crypto.NewInMemorySigner(sk, account.HashAlgo)
+	signer, err := crypto.NewInMemorySigner(sk, accountKey.HashAlgo)
+	if err != nil {
+		panic(err)
+	}
 
 	addr := sdk.NewAddressGenerator(sdk.Testnet).NextAddress()
 
@@ -77,7 +81,7 @@ func main() {
             		}
         		`)).
 				SetGasLimit(100).
-				SetProposalKey(addr, account.ID, nonce).
+				SetProposalKey(addr, accountKey.Index, nonce).
 				SetReferenceBlockID(latest.ID).
 				SetPayer(addr).
 				AddAuthorizer(addr)

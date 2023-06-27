@@ -22,6 +22,16 @@ type EpochHeights struct {
 	CommittedFinal uint64 // final height of the committed phase
 }
 
+// FirstHeight returns the height of the first block in the epoch.
+func (epoch EpochHeights) FirstHeight() uint64 {
+	return epoch.Staking
+}
+
+// FinalHeight returns the height of the first block in the epoch.
+func (epoch EpochHeights) FinalHeight() uint64 {
+	return epoch.CommittedFinal
+}
+
 // Range returns the range of all heights that are in this epoch.
 func (epoch EpochHeights) Range() []uint64 {
 	var heights []uint64
@@ -61,7 +71,7 @@ func (epoch EpochHeights) CommittedRange() []uint64 {
 // EpochBuilder is a testing utility for building epochs into chain state.
 type EpochBuilder struct {
 	t          *testing.T
-	states     []protocol.MutableState
+	states     []protocol.FollowerState
 	blocksByID map[flow.Identifier]*flow.Block
 	blocks     []*flow.Block
 	built      map[uint64]*EpochHeights
@@ -72,7 +82,7 @@ type EpochBuilder struct {
 // NewEpochBuilder returns a new EpochBuilder which will build epochs using the
 // given states. At least one state must be provided. If more than one are
 // provided they must have the same initial state.
-func NewEpochBuilder(t *testing.T, states ...protocol.MutableState) *EpochBuilder {
+func NewEpochBuilder(t *testing.T, states ...protocol.FollowerState) *EpochBuilder {
 	require.True(t, len(states) >= 1, "must provide at least one state")
 
 	builder := &EpochBuilder{
@@ -113,14 +123,14 @@ func (builder *EpochBuilder) EpochHeights(counter uint64) (*EpochHeights, bool) 
 //
 //	                |                                  EPOCH N                                                      |
 //	                |                                                                                               |
-//	P                 A               B               C               D             E             F           G
+//	P                 A               B               C               D             E             F
 //
-//	+------------+  +------------+  +-----------+  +-----------+  +----------+  +----------+  +----------+----------+
-//	| ER(P-1)    |->| ER(P)      |->| ER(A)     |->| ER(B)     |->| ER(C)    |->| ER(D)    |->| ER(E)    | ER(F)    |
-//	| S(ER(P-2)) |  | S(ER(P-1)) |  | S(ER(P))  |  | S(ER(A))  |  | S(ER(B)) |  | S(ER(C)) |  | S(ER(D)) | S(ER(E)) |
-//	+------------+  +------------+  +-----------+  +-----------+  +----------+  +----------+  +----------+----------+
-//	                                                                            |                        |
-//	                                                                          Setup                    Commit
+//	+------------+  +------------+  +-----------+  +-----------+  +----------+  +----------+  +----------+
+//	| ER(P-1)    |->| ER(P)      |->| ER(A)     |->| ER(B)     |->| ER(C)    |->| ER(D)    |->| ER(E)    |
+//	| S(ER(P-2)) |  | S(ER(P-1)) |  | S(ER(P))  |  | S(ER(A))  |  | S(ER(B)) |  | S(ER(C)) |  | S(ER(D)) |
+//	+------------+  +------------+  +-----------+  +-----------+  +----------+  +----------+  +----------+
+//	                                                              |                           |
+//	                                                            Setup                       Commit
 //
 // ER(X)    := ExecutionReceipt for block X
 // S(ER(X)) := Seal for the ExecutionResult contained in ER(X) (seals block X)
@@ -129,14 +139,14 @@ func (builder *EpochBuilder) EpochHeights(counter uint64) (*EpochHeights, bool) 
 // previous block and a seal for the receipt contained in the previous block.
 // The only exception is when A is the root block, in which case block B does
 // not contain a receipt for block A, and block C does not contain a seal for
-// block A. This is because the root block is sealed from genesis and we
+// block A. This is because the root block is sealed from genesis, and we
 // can't insert duplicate seals.
 //
-// D contains a seal for block B containing the EpochSetup service event.
-// E contains a QC for D, which causes the EpochSetup to become activated.
+// D contains a seal for block B containing the EpochSetup service event,
+// processing D causes the EpochSetup to become activated.
 //
 // F contains a seal for block D containing the EpochCommit service event.
-// G contains a QC for F, which causes the EpochCommit to become activated.
+// processing F causes the EpochCommit to become activated.
 //
 // To build a sequence of epochs, we call BuildEpoch, then CompleteEpoch, and so on.
 //
@@ -285,30 +295,14 @@ func (builder *EpochBuilder) BuildEpoch() *EpochBuilder {
 		Seals:    []*flow.Seal{sealForD},
 	})
 	builder.addBlock(F)
-	// create receipt for block F
-	receiptF := ReceiptForBlockFixture(F)
-
-	// build block G
-	// G contains a seal for block E and a receipt for block F
-	G := BlockWithParentFixture(F.Header)
-	sealForE := Seal.Fixture(
-		Seal.WithResult(&receiptE.ExecutionResult),
-	)
-	G.SetPayload(flow.Payload{
-		Receipts: []*flow.ExecutionReceiptMeta{receiptF.Meta()},
-		Results:  []*flow.ExecutionResult{&receiptF.ExecutionResult},
-		Seals:    []*flow.Seal{sealForE},
-	})
-
-	builder.addBlock(G)
 
 	// cache information about the built epoch
 	builder.built[counter] = &EpochHeights{
 		Counter:        counter,
 		Staking:        A.Height,
-		Setup:          E.Header.Height,
-		Committed:      G.Header.Height,
-		CommittedFinal: G.Header.Height,
+		Setup:          D.Header.Height,
+		Committed:      F.Header.Height,
+		CommittedFinal: F.Header.Height,
 	}
 
 	return builder
@@ -374,10 +368,7 @@ func (builder *EpochBuilder) BuildBlocks(n uint) {
 func (builder *EpochBuilder) addBlock(block *flow.Block) {
 	blockID := block.ID()
 	for _, state := range builder.states {
-		err := state.Extend(context.Background(), block)
-		require.NoError(builder.t, err)
-
-		err = state.MarkValid(blockID)
+		err := state.ExtendCertified(context.Background(), block, CertifyBlock(block.Header))
 		require.NoError(builder.t, err)
 
 		err = state.Finalize(context.Background(), blockID)

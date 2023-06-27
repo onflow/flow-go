@@ -15,13 +15,12 @@ import (
 	"github.com/onflow/flow-go/network/channels"
 	cborcodec "github.com/onflow/flow-go/network/codec/cbor"
 	"github.com/onflow/flow-go/state/protocol"
-	"github.com/onflow/flow-go/utils/grpcutils"
 )
 
 // Config defines the configurable options for the gRPC server.
 type Config struct {
 	ListenAddr string
-	MaxMsgSize int // In bytes
+	MaxMsgSize uint // In bytes
 }
 
 // RPC implements a gRPC server for the Ghost node
@@ -50,17 +49,13 @@ func New(net network.Network, log zerolog.Logger, me module.Local, state protoco
 
 	codec := cborcodec.NewCodec()
 
-	if config.MaxMsgSize == 0 {
-		config.MaxMsgSize = grpcutils.DefaultMaxMsgSize
-	}
-
 	eng := &RPC{
 		log:  log,
 		unit: engine.NewUnit(),
 		me:   me,
 		server: grpc.NewServer(
-			grpc.MaxRecvMsgSize(config.MaxMsgSize),
-			grpc.MaxSendMsgSize(config.MaxMsgSize),
+			grpc.MaxRecvMsgSize(int(config.MaxMsgSize)),
+			grpc.MaxSendMsgSize(int(config.MaxMsgSize)),
 		),
 		config:   config,
 		messages: messages,
@@ -87,7 +82,6 @@ func registerConduits(net network.Network, state protocol.State, eng network.Eng
 	channelList := channels.ChannelList{
 		channels.ConsensusCommittee,
 		channels.SyncCommittee,
-		channels.SyncExecution,
 		channels.PushTransactions,
 		channels.PushGuarantees,
 		channels.PushBlocks,

@@ -11,8 +11,7 @@ import (
 type ProposalKey flow.ProposalKey
 
 func (p *ProposalKey) Parse(raw models.ProposalKey) error {
-	var address Address
-	err := address.Parse(raw.Address)
+	address, err := ParseAddress(raw.Address)
 	if err != nil {
 		return err
 	}
@@ -28,7 +27,7 @@ func (p *ProposalKey) Parse(raw models.ProposalKey) error {
 	}
 
 	*p = ProposalKey(flow.ProposalKey{
-		Address:        address.Flow(),
+		Address:        address,
 		KeyIndex:       keyIndex,
 		SequenceNumber: seqNumber,
 	})

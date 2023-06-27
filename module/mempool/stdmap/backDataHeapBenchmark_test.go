@@ -246,8 +246,3 @@ func (b *baselineLRU) Clear() {
 		panic(err)
 	}
 }
-
-// Hash will use a merkle root hash to hash all items.
-func (b *baselineLRU) Hash() flow.Identifier {
-	return flow.MerkleRoot(flow.GetIDs(b.All())...)
-}

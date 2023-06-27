@@ -2,10 +2,9 @@ package validator
 
 import (
 	"github.com/onflow/flow-go/network"
-	"github.com/onflow/flow-go/network/message"
 )
 
-var _ network.MessageValidator = &NotValidator{}
+var _ network.MessageValidator = (*NotValidator)(nil)
 
 // NotValidator returns the opposite result of the given validator for the Validate call
 type NotValidator struct {
@@ -18,6 +17,6 @@ func NewNotValidator(validator network.MessageValidator) network.MessageValidato
 	}
 }
 
-func (n NotValidator) Validate(msg message.Message) bool {
+func (n NotValidator) Validate(msg network.IncomingMessageScope) bool {
 	return !n.validator.Validate(msg)
 }

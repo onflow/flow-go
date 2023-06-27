@@ -24,12 +24,16 @@ const ServiceAccountPrivateKeySignAlgo = crypto.ECDSAP256
 const ServiceAccountPrivateKeyHashAlgo = hash.SHA2_256
 
 // Pre-calculated state commitment with root account with the above private key
+<<<<<<< HEAD
 const GenesisStateCommitmentHex = "d0b0e83b08b4204c4cefc68eee77dac970492182996497a62defac9a658af68c"
+=======
+const GenesisStateCommitmentHex = "30e59679cca50d898cd2d6e6392fff0f11d0088d308a6aaa07682ce3665145ff"
+>>>>>>> b7ce4d8a724bce7182f5e44523c34b6413a31737
 
 var GenesisStateCommitment flow.StateCommitment
 
 var GenesisTokenSupply = func() cadence.UFix64 {
-	//value, err := cadence.NewUFix64("10000000000.0") // 10 billion
+	// value, err := cadence.NewUFix64("10000000000.0") // 10 billion
 	value, err := cadence.NewUFix64("1000000000.0") // 1 billion
 	if err != nil {
 		panic(fmt.Errorf("invalid genesis token supply: %w", err))
@@ -67,4 +71,31 @@ func init() {
 	// Cannot import virtual machine, due to circular dependency. Just use the value of
 	// fvm.AccountKeyWeightThreshold here
 	ServiceAccountPublicKey = ServiceAccountPrivateKey.PublicKey(1000)
+}
+
+// this is done by printing the state commitment in TestBootstrapLedger test with different chain ID
+func GenesisStateCommitmentByChainID(chainID flow.ChainID) flow.StateCommitment {
+	commitString := genesisCommitHexByChainID(chainID)
+	bytes, err := hex.DecodeString(commitString)
+	if err != nil {
+		panic("error while hex decoding hardcoded state commitment")
+	}
+	commit, err := flow.ToStateCommitment(bytes)
+	if err != nil {
+		panic("genesis state commitment size is invalid")
+	}
+	return commit
+}
+
+func genesisCommitHexByChainID(chainID flow.ChainID) string {
+	if chainID == flow.Mainnet {
+		return GenesisStateCommitmentHex
+	}
+	if chainID == flow.Testnet {
+		return "b5e7064526738b1909a082d0bb3eafd6ae4a853c56cd218690c50afa1b2179b6"
+	}
+	if chainID == flow.Sandboxnet {
+		return "e1c08b17f9e5896f03fe28dd37ca396c19b26628161506924fbf785834646ea1"
+	}
+	return "9f58134fe65fba4529e908ec21eba590f8f0e81b34ca810d4b1babc49ffe5a53"
 }

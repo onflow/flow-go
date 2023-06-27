@@ -9,20 +9,19 @@ import (
 	jsoncdc "github.com/onflow/cadence/encoding/json"
 	"github.com/onflow/cadence/runtime/common"
 
-	"github.com/onflow/flow-go/fvm/utils"
 	"github.com/onflow/flow-go/model/flow"
 )
 
 var ContractDeploymentAuthorizedAddressesPath = cadence.Path{
-	Domain:     common.PathDomainStorage.Identifier(),
+	Domain:     common.PathDomainStorage,
 	Identifier: "authorizedAddressesToDeployContracts",
 }
 var ContractRemovalAuthorizedAddressesPath = cadence.Path{
-	Domain:     common.PathDomainStorage.Identifier(),
+	Domain:     common.PathDomainStorage,
 	Identifier: "authorizedAddressesToRemoveContracts",
 }
 var IsContractDeploymentRestrictedPath = cadence.Path{
-	Domain:     common.PathDomainStorage.Identifier(),
+	Domain:     common.PathDomainStorage,
 	Identifier: "isContractDeploymentRestricted",
 }
 
@@ -50,8 +49,14 @@ func setContractAuthorizersTransaction(
 	serviceAccount flow.Address,
 	authorized []flow.Address,
 ) (*flow.TransactionBody, error) {
-	addresses := utils.FlowAddressSliceToCadenceAddressSlice(authorized)
-	addressesArg, err := jsoncdc.Encode(utils.AddressSliceToCadenceValue(addresses))
+	addressValues := make([]cadence.Value, 0, len(authorized))
+	for _, address := range authorized {
+		addressValues = append(
+			addressValues,
+			cadence.BytesToAddress(address.Bytes()))
+	}
+
+	addressesArg, err := jsoncdc.Encode(cadence.NewArray(addressValues))
 	if err != nil {
 		return nil, err
 	}

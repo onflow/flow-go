@@ -161,13 +161,11 @@ func (c *Core) processReceipt(receipt *flow.ExecutionReceipt) (bool, error) {
 		c.metrics.OnReceiptProcessingDuration(time.Since(startTime))
 	}()
 
-	receiptSpan, _, isSampled := c.tracer.StartBlockSpan(context.Background(), receipt.ExecutionResult.BlockID, trace.CONMatchProcessReceipt)
-	if isSampled {
-		receiptSpan.SetAttributes(
-			attribute.String("result_id", receipt.ExecutionResult.ID().String()),
-			attribute.String("executor", receipt.ExecutorID.String()),
-		)
-	}
+	receiptSpan, _ := c.tracer.StartBlockSpan(context.Background(), receipt.ExecutionResult.BlockID, trace.CONMatchProcessReceipt)
+	receiptSpan.SetAttributes(
+		attribute.String("result_id", receipt.ExecutionResult.ID().String()),
+		attribute.String("executor", receipt.ExecutorID.String()),
+	)
 	defer receiptSpan.End()
 
 	initialState, finalState, err := getStartAndEndStates(receipt)

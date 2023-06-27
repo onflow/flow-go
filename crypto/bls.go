@@ -31,14 +31,18 @@ package crypto
 //  - membership checks G2 using Bowe's method (https://eprint.iacr.org/2019/814.pdf)
 //  - implement a G1/G2 swap (signatures on G2 and public keys on G1)
 
-// #cgo CFLAGS: -g -Wall -std=c99 -I${SRCDIR}/ -I${SRCDIR}/relic/build/include
+// #cgo CFLAGS: -g -Wall -std=c99
 // #cgo LDFLAGS: -L${SRCDIR}/relic/build/lib -l relic_s
 // #include "bls_include.h"
 import "C"
 
 import (
+	"bytes"
+	"crypto/sha256"
 	"errors"
 	"fmt"
+
+	"golang.org/x/crypto/hkdf"
 
 	"github.com/onflow/flow-go/crypto/hash"
 )
@@ -59,14 +63,14 @@ const (
 	SignatureLenBLSBLS12381 = fieldSize * (2 - serializationG1) // the length is divided by 2 if compression is on
 	PrKeyLenBLSBLS12381     = 32
 	// PubKeyLenBLSBLS12381 is the size of G2 elements
-	PubKeyLenBLSBLS12381        = 2 * fieldSize * (2 - serializationG2) // the length is divided by 2 if compression is on
-	KeyGenSeedMinLenBLSBLS12381 = PrKeyLenBLSBLS12381 + (securityBits / 8)
-	KeyGenSeedMaxLenBLSBLS12381 = maxScalarSize
+	PubKeyLenBLSBLS12381 = 2 * fieldSize * (2 - serializationG2) // the length is divided by 2 if compression is on
+
+	// Hash to curve params
 	// expandMsgOutput is the output length of the expand_message step as required by the hash_to_curve algorithm
 	expandMsgOutput = 2 * (fieldSize + (securityBits / 8))
 	// hash to curve suite ID of the form : CurveID_ || HashID_ || MapID_ || encodingVariant_
 	h2cSuiteID = "BLS12381G1_XOF:KMAC128_SSWU_RO_"
-	// scheme implemented as a countermasure for Rogue attacks of the form : SchemeTag_
+	// scheme implemented as a countermasure for rogue attacks of the form : SchemeTag_
 	schemeTag = "POP_"
 	// Cipher suite used for BLS signatures of the form : BLS_SIG_ || h2cSuiteID || SchemeTag_
 	blsSigCipherSuite = "BLS_SIG_" + h2cSuiteID + schemeTag
@@ -115,10 +119,6 @@ func NewExpandMsgXOFKMAC128(domainTag string) hash.Hasher {
 // the hash-to-curve function, hashing data to G1 on BLS12 381.
 // The key is used as a customizer rather than a MAC key.
 func internalExpandMsgXOFKMAC128(key string) hash.Hasher {
-	// UTF-8 is used by Go to convert strings into bytes.
-	// UTF-8 is a non-ambiguous encoding as required by draft-irtf-cfrg-hash-to-curve
-	// (similarly to the recommended ASCII).
-
 	// blsKMACFunction is the customizer used for KMAC in BLS
 	const blsKMACFunction = "H2C"
 	// the error is ignored as the parameter lengths are chosen to be in the correct range for kmac
@@ -232,7 +232,10 @@ func (pk *pubKeyBLSBLS12381) Verify(s Signature, data []byte, kmac hash.Hasher) 
 	}
 }
 
-const identityBLSSignatureHeader = byte(0xC0)
+// 0xC0 is the header of the point at infinity serialization (either in G1 or G2)
+const infinityPointHeader = 0xC0
+
+var identityBLSSignature = append([]byte{infinityPointHeader}, make([]byte, signatureLengthBLSBLS12381-1)...)
 
 // IsBLSSignatureIdentity checks whether the input signature is
 // the identity signature (point at infinity in G1).
@@ -243,44 +246,70 @@ const identityBLSSignatureHeader = byte(0xC0)
 // suspected to be equal to identity, which avoids failing the aggregated
 // signature verification.
 func IsBLSSignatureIdentity(s Signature) bool {
-	if len(s) != signatureLengthBLSBLS12381 {
-		return false
-	}
-	if s[0] != identityBLSSignatureHeader {
-		return false
-	}
-	for _, b := range s[1:] {
-		if b != 0 {
-			return false
-		}
-	}
-	return true
+	return bytes.Equal(s, identityBLSSignature)
 }
 
-// generatePrivateKey generates a private key for BLS on BLS12-381 curve.
-// The minimum size of the input seed is 48 bytes.
+// generatePrivateKey deterministically generates a private key for BLS on BLS12-381 curve.
+// The minimum size of the input seed is 32 bytes.
 //
 // It is recommended to use a secure crypto RNG to generate the seed.
-// The seed must have enough entropy and should be sampled uniformly at random.
+// Otherwise, the seed must have enough entropy.
 //
-// The generated private key (resp. its corresponding public key) are guaranteed
-// not to be equal to the identity element of Z_r (resp. G2).
-func (a *blsBLS12381Algo) generatePrivateKey(seed []byte) (PrivateKey, error) {
-	if len(seed) < KeyGenSeedMinLenBLSBLS12381 || len(seed) > KeyGenSeedMaxLenBLSBLS12381 {
+// The generated private key (resp. its corresponding public key) is guaranteed
+// to not be equal to the identity element of Z_r (resp. G2).
+func (a *blsBLS12381Algo) generatePrivateKey(ikm []byte) (PrivateKey, error) {
+	if len(ikm) < KeyGenSeedMinLen || len(ikm) > KeyGenSeedMaxLen {
 		return nil, invalidInputsErrorf(
-			"seed length should be between %d and %d bytes",
-			KeyGenSeedMinLenBLSBLS12381,
-			KeyGenSeedMaxLenBLSBLS12381)
+			"seed length should be at least %d bytes and at most %d bytes",
+			KeyGenSeedMinLen, KeyGenSeedMaxLen)
 	}
+
+	// HKDF parameters
+
+	// use SHA2-256 as the building block H in HKDF
+	hashFunction := sha256.New
+	// salt = H(UTF-8("BLS-SIG-KEYGEN-SALT-")) as per draft-irtf-cfrg-bls-signature-05 section 2.3.
+	saltString := "BLS-SIG-KEYGEN-SALT-"
+	hasher := hashFunction()
+	hasher.Write([]byte(saltString))
+	salt := make([]byte, hasher.Size())
+	hasher.Sum(salt[:0])
+
+	// L is the OKM length
+	// L = ceil((3 * ceil(log2(r))) / 16) which makes L (security_bits/8)-larger than r size
+	okmLength := (3 * PrKeyLenBLSBLS12381) / 2
+
+	// HKDF secret = IKM || I2OSP(0, 1)
+	secret := make([]byte, len(ikm)+1)
+	copy(secret, ikm)
+	defer overwrite(secret) // overwrite secret
+	// HKDF info = key_info || I2OSP(L, 2)
+	keyInfo := "" // use empty key diversifier. TODO: update header to accept input identifier
+	info := append([]byte(keyInfo), byte(okmLength>>8), byte(okmLength))
 
 	sk := newPrKeyBLSBLS12381(nil)
+	for {
+		// instantiate HKDF and extract L bytes
+		reader := hkdf.New(hashFunction, secret, salt, info)
+		okm := make([]byte, okmLength)
+		n, err := reader.Read(okm)
+		if err != nil || n != okmLength {
+			return nil, fmt.Errorf("key generation failed because of the HKDF reader, %d bytes were read: %w",
+				n, err)
+		}
+		defer overwrite(okm) // overwrite okm
 
-	// maps the seed to a private key
-	err := mapToZrStar(&sk.scalar, seed)
-	if err != nil {
-		return nil, invalidInputsErrorf("private key generation failed %w", err)
+		// map the bytes to a private key : SK = OS2IP(OKM) mod r
+		isZero := mapToZr(&sk.scalar, okm)
+		if !isZero {
+			return sk, nil
+		}
+
+		// update salt = H(salt)
+		hasher.Reset()
+		hasher.Write(salt)
+		salt = hasher.Sum(salt[:0])
 	}
-	return sk, nil
 }
 
 const invalidBLSSignatureHeader = byte(0xE0)

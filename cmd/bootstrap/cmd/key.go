@@ -13,6 +13,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/onflow/flow-go/crypto"
+
 	model "github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -47,17 +48,17 @@ func init() {
 		&flagNetworkSeed,
 		"networking-seed",
 		[]byte{},
-		fmt.Sprintf("hex encoded networking seed (min %d bytes)", crypto.KeyGenSeedMinLenECDSAP256))
+		fmt.Sprintf("hex encoded networking seed (min %d bytes)", crypto.KeyGenSeedMinLen))
 	keyCmd.Flags().BytesHexVar(
 		&flagStakingSeed,
 		"staking-seed",
 		[]byte{},
-		fmt.Sprintf("hex encoded staking seed (min %d bytes)", crypto.KeyGenSeedMinLenBLSBLS12381))
+		fmt.Sprintf("hex encoded staking seed (min %d bytes)", crypto.KeyGenSeedMinLen))
 	keyCmd.Flags().BytesHexVar(
 		&flagMachineSeed,
 		"machine-seed",
 		[]byte{},
-		fmt.Sprintf("hex encoded machine account seed (min %d bytes)", crypto.KeyGenSeedMinLenECDSAP256))
+		fmt.Sprintf("hex encoded machine account seed (min %d bytes)", crypto.KeyGenSeedMinLen))
 }
 
 // keyCmdRun generate the node staking key, networking key and node information
@@ -65,13 +66,13 @@ func keyCmdRun(_ *cobra.Command, _ []string) {
 
 	// generate private key seeds if not specified via flag
 	if len(flagNetworkSeed) == 0 {
-		flagNetworkSeed = GenerateRandomSeed(crypto.KeyGenSeedMinLenECDSAP256)
+		flagNetworkSeed = GenerateRandomSeed(crypto.KeyGenSeedMinLen)
 	}
 	if len(flagStakingSeed) == 0 {
-		flagStakingSeed = GenerateRandomSeed(crypto.KeyGenSeedMinLenBLSBLS12381)
+		flagStakingSeed = GenerateRandomSeed(crypto.KeyGenSeedMinLen)
 	}
 	if len(flagMachineSeed) == 0 {
-		flagMachineSeed = GenerateRandomSeed(crypto.KeyGenSeedMinLenECDSAP256)
+		flagMachineSeed = GenerateRandomSeed(crypto.KeyGenSeedMinLen)
 	}
 
 	// validate inputs

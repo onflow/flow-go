@@ -36,15 +36,19 @@ func (p *PassThroughTestSuite) TestSealingAndVerificationPassThrough() {
 		p.exe1ID,
 		p.exe2ID,
 		p.verID,
-		p.net.Root().ID())
+		p.Net.Root().ID())
 
 	// identifier of chunks involved in the sealing and verification test.
 	chunkIds := flow.GetIDs(receipts[0].ExecutionResult.Chunks)
 
 	// as orchestrator controls the corrupted execution and verification nodes, it must see
 	// the execution receipts, chunk data pack requests and responses, as well as result approvals emitted by these nodes.
-	p.Orchestrator.mustSeenFlowProtocolEvent(p.T(), typeExecutionReceipt, flow.GetIDs(receipts)...)
-	p.Orchestrator.mustSeenFlowProtocolEvent(p.T(), typeChunkDataRequest, chunkIds...)
-	p.Orchestrator.mustSeenFlowProtocolEvent(p.T(), typeChunkDataResponse, chunkIds...)
-	p.Orchestrator.mustSeenFlowProtocolEvent(p.T(), typeResultApproval, flow.GetIDs(approvals)...)
+	// egress events
+	p.Orchestrator.mustSeenEgressFlowProtocolEvent(p.T(), typeExecutionReceipt, flow.GetIDs(receipts)...)
+	p.Orchestrator.mustSeenEgressFlowProtocolEvent(p.T(), typeChunkDataRequest, chunkIds...)
+	p.Orchestrator.mustSeenEgressFlowProtocolEvent(p.T(), typeChunkDataResponse, chunkIds...)
+	p.Orchestrator.mustSeenEgressFlowProtocolEvent(p.T(), typeResultApproval, flow.GetIDs(approvals)...)
+	// ingress events
+	p.Orchestrator.mustSeenIngressFlowProtocolEvent(p.T(), typeChunkDataRequest, chunkIds...)
+	p.Orchestrator.mustSeenIngressFlowProtocolEvent(p.T(), typeChunkDataResponse, chunkIds...)
 }

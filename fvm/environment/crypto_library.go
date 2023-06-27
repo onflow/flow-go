@@ -6,7 +6,8 @@ import (
 	"github.com/onflow/cadence/runtime"
 
 	"github.com/onflow/flow-go/fvm/crypto"
-	"github.com/onflow/flow-go/fvm/state"
+	"github.com/onflow/flow-go/fvm/storage/state"
+	"github.com/onflow/flow-go/fvm/tracing"
 	"github.com/onflow/flow-go/module/trace"
 )
 
@@ -53,12 +54,12 @@ type CryptoLibrary interface {
 }
 
 type ParseRestrictedCryptoLibrary struct {
-	txnState *state.TransactionState
+	txnState state.NestedTransactionPreparer
 	impl     CryptoLibrary
 }
 
 func NewParseRestrictedCryptoLibrary(
-	txnState *state.TransactionState,
+	txnState state.NestedTransactionPreparer,
 	impl CryptoLibrary,
 ) CryptoLibrary {
 	return ParseRestrictedCryptoLibrary{
@@ -159,11 +160,11 @@ func (lib ParseRestrictedCryptoLibrary) BLSAggregatePublicKeys(
 }
 
 type cryptoLibrary struct {
-	tracer *Tracer
+	tracer tracing.TracerSpan
 	meter  Meter
 }
 
-func NewCryptoLibrary(tracer *Tracer, meter Meter) CryptoLibrary {
+func NewCryptoLibrary(tracer tracing.TracerSpan, meter Meter) CryptoLibrary {
 	return &cryptoLibrary{
 		tracer: tracer,
 		meter:  meter,
@@ -178,7 +179,7 @@ func (lib *cryptoLibrary) Hash(
 	[]byte,
 	error,
 ) {
-	defer lib.tracer.StartSpanFromRoot(trace.FVMEnvHash).End()
+	defer lib.tracer.StartChildSpan(trace.FVMEnvHash).End()
 
 	err := lib.meter.MeterComputation(ComputationKindHash, 1)
 	if err != nil {
@@ -200,7 +201,7 @@ func (lib *cryptoLibrary) VerifySignature(
 	bool,
 	error,
 ) {
-	defer lib.tracer.StartSpanFromRoot(trace.FVMEnvVerifySignature).End()
+	defer lib.tracer.StartChildSpan(trace.FVMEnvVerifySignature).End()
 
 	err := lib.meter.MeterComputation(ComputationKindVerifySignature, 1)
 	if err != nil {
@@ -224,7 +225,7 @@ func (lib *cryptoLibrary) VerifySignature(
 }
 
 func (lib *cryptoLibrary) ValidatePublicKey(pk *runtime.PublicKey) error {
-	defer lib.tracer.StartSpanFromRoot(trace.FVMEnvValidatePublicKey).End()
+	defer lib.tracer.StartChildSpan(trace.FVMEnvValidatePublicKey).End()
 
 	err := lib.meter.MeterComputation(ComputationKindValidatePublicKey, 1)
 	if err != nil {
@@ -241,7 +242,7 @@ func (lib *cryptoLibrary) BLSVerifyPOP(
 	bool,
 	error,
 ) {
-	defer lib.tracer.StartSpanFromRoot(trace.FVMEnvBLSVerifyPOP).End()
+	defer lib.tracer.StartChildSpan(trace.FVMEnvBLSVerifyPOP).End()
 
 	err := lib.meter.MeterComputation(ComputationKindBLSVerifyPOP, 1)
 	if err != nil {
@@ -257,7 +258,7 @@ func (lib *cryptoLibrary) BLSAggregateSignatures(
 	[]byte,
 	error,
 ) {
-	defer lib.tracer.StartSpanFromRoot(trace.FVMEnvBLSAggregateSignatures).End()
+	defer lib.tracer.StartChildSpan(trace.FVMEnvBLSAggregateSignatures).End()
 
 	err := lib.meter.MeterComputation(ComputationKindBLSAggregateSignatures, 1)
 	if err != nil {
@@ -273,7 +274,7 @@ func (lib *cryptoLibrary) BLSAggregatePublicKeys(
 	*runtime.PublicKey,
 	error,
 ) {
-	defer lib.tracer.StartSpanFromRoot(trace.FVMEnvBLSAggregatePublicKeys).End()
+	defer lib.tracer.StartChildSpan(trace.FVMEnvBLSAggregatePublicKeys).End()
 
 	err := lib.meter.MeterComputation(ComputationKindBLSAggregatePublicKeys, 1)
 	if err != nil {

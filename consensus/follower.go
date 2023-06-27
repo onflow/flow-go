@@ -6,8 +6,6 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/consensus/hotstuff"
-	"github.com/onflow/flow-go/consensus/hotstuff/follower"
-	"github.com/onflow/flow-go/consensus/hotstuff/validator"
 	"github.com/onflow/flow-go/consensus/recovery"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
@@ -16,32 +14,37 @@ import (
 
 // TODO: this needs to be integrated with proper configuration and bootstrapping.
 
-func NewFollower(log zerolog.Logger, committee hotstuff.Committee, headers storage.Headers, updater module.Finalizer,
-	verifier hotstuff.Verifier, notifier hotstuff.FinalizationConsumer, rootHeader *flow.Header,
-	rootQC *flow.QuorumCertificate, finalized *flow.Header, pending []*flow.Header) (*hotstuff.FollowerLoop, error) {
-
-	finalizer, err := newFinalizer(finalized, headers, updater, notifier, rootHeader, rootQC)
+// NewFollower instantiates the consensus follower and recovers its in-memory state of pending blocks.
+// It receives the list `pending` containing _all_ blocks that
+//   - have passed the compliance layer and stored in the protocol state
+//   - descend from the latest finalized block
+//   - are listed in ancestor-first order (i.e. for any block B ∈ pending, B's parent must
+//     be listed before B, unless B's parent is the latest finalized block)
+//
+// CAUTION: all pending blocks are required to be valid (guaranteed if the block passed the compliance layer)
+func NewFollower(log zerolog.Logger,
+	mempoolMetrics module.MempoolMetrics,
+	headers storage.Headers,
+	updater module.Finalizer,
+	notifier hotstuff.FollowerConsumer,
+	rootHeader *flow.Header,
+	rootQC *flow.QuorumCertificate,
+	finalized *flow.Header,
+	pending []*flow.Header,
+) (*hotstuff.FollowerLoop, error) {
+	forks, err := NewForks(finalized, headers, updater, notifier, rootHeader, rootQC)
 	if err != nil {
-		return nil, fmt.Errorf("could not initialize finalizer: %w", err)
+		return nil, fmt.Errorf("could not initialize forks: %w", err)
 	}
 
-	// initialize the Validator
-	validator := validator.New(committee, finalizer, verifier)
-
-	// recover the hotstuff state as a follower
-	err = recovery.Follower(log, finalizer, validator, finalized, pending)
+	// recover forks internal state (inserts all pending blocks)
+	err = recovery.Recover(log, pending, recovery.ForksState(forks))
 	if err != nil {
 		return nil, fmt.Errorf("could not recover hotstuff follower state: %w", err)
 	}
 
-	// initialize the follower logic
-	logic, err := follower.New(log, validator, finalizer)
-	if err != nil {
-		return nil, fmt.Errorf("could not create follower logic: %w", err)
-	}
-
 	// initialize the follower loop
-	loop, err := hotstuff.NewFollowerLoop(log, logic)
+	loop, err := hotstuff.NewFollowerLoop(log, mempoolMetrics, forks)
 	if err != nil {
 		return nil, fmt.Errorf("could not create follower loop: %w", err)
 	}

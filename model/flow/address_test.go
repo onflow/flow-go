@@ -7,12 +7,43 @@ import (
 	"testing"
 	"time"
 
+	"github.com/onflow/cadence"
+	"github.com/onflow/cadence/runtime/common"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 type addressWrapper struct {
 	Address Address
+}
+
+func TestConvertAddress(t *testing.T) {
+	expected := BytesToAddress([]byte{1, 2, 3, 4, 5, 6, 7, 8})
+	cadenceAddress := cadence.BytesToAddress([]byte{1, 2, 3, 4, 5, 6, 7, 8})
+	runtimeAddress := common.MustBytesToAddress([]byte{1, 2, 3, 4, 5, 6, 7, 8})
+
+	assert.NotEqual(t, cadenceAddress, runtimeAddress)
+
+	assert.Equal(t, expected, ConvertAddress(cadenceAddress))
+	assert.Equal(t, expected, ConvertAddress(runtimeAddress))
+}
+
+func TestBytesToAddress(t *testing.T) {
+	type testCase struct {
+		expected string
+		value    string
+	}
+
+	for _, test := range []testCase{
+		{string([]byte{0, 0, 0, 0, 0, 0, 0, 0}), ""},
+		{string([]byte{0, 0, 0, 0}) + "1234", "1234"},
+		{"12345678", "12345678"},
+		{"12345678", "trim12345678"},
+	} {
+		address := BytesToAddress([]byte(test.value))
+		assert.Equal(t, test.expected, string(address[:]))
+	}
 }
 
 func TestHexToAddress(t *testing.T) {

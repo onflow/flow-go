@@ -34,9 +34,8 @@ func NewSHA3_384() Hasher {
 // ComputeSHA3_256 computes the SHA3-256 digest of data
 // and copies the result to the result buffer.
 //
-// The function is not part of the Hasher API. It is a light API
-// that allows a simple computation of a hash and minimizes
-// heap allocations.
+// The function is not part of the Hasher API. It is a pure function
+// for simple computation of a hash with minimal heap allocations.
 func ComputeSHA3_256(result *[HashLenSHA3_256]byte, data []byte) {
 	state := &spongeState{
 		rate:      rateSHA3_256,

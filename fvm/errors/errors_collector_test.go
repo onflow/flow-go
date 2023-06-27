@@ -17,13 +17,11 @@ func TestErrorsCollector(t *testing.T) {
 		require.Nil(t, collector.ErrorOrNil())
 
 		// Collected non-fatal errors
+		err1 := NewOperationNotSupportedError("op1")
 		require.False(
 			t,
-			collector.Collect(
-				fmt.Errorf(
-					"error wrapped: %w",
-					NewOperationNotSupportedError("op1")),
-			).CollectedFailure())
+			collector.Collect(fmt.Errorf("error wrapped: %w", err1)).
+				CollectedFailure())
 
 		require.True(t, collector.CollectedError())
 		err := collector.ErrorOrNil()
@@ -31,16 +29,17 @@ func TestErrorsCollector(t *testing.T) {
 		require.ErrorContains(t, err, "op1")
 		require.False(t, IsFailure(err))
 
+		require.True(t, IsOperationNotSupportedError(err))
+		found := Find(err, ErrCodeOperationNotSupportedError)
+		require.Equal(t, err1, found)
+
 		nonFatal, fatal := SplitErrorTypes(err)
 		require.Nil(t, fatal)
 		require.NotNil(t, nonFatal)
 		require.Equal(t, ErrCodeOperationNotSupportedError, nonFatal.Code())
 
-		require.False(
-			t,
-			collector.Collect(
-				NewInvalidArgumentErrorf("bad arg"),
-			).CollectedFailure())
+		err2 := NewInvalidArgumentErrorf("bad arg")
+		require.False(t, collector.Collect(err2).CollectedFailure())
 
 		require.True(t, collector.CollectedError())
 		err = collector.ErrorOrNil()
@@ -49,6 +48,14 @@ func TestErrorsCollector(t *testing.T) {
 		require.ErrorContains(t, err, "op1")
 		require.ErrorContains(t, err, "bad arg")
 		require.False(t, IsFailure(err))
+
+		require.True(t, IsOperationNotSupportedError(err))
+		found = Find(err, ErrCodeOperationNotSupportedError)
+		require.Equal(t, err1, found)
+
+		require.True(t, IsInvalidArgumentError(err))
+		found = Find(err, ErrCodeInvalidArgumentError)
+		require.Equal(t, err2, found)
 
 		nonFatal, fatal = SplitErrorTypes(err)
 		require.Nil(t, fatal)
@@ -73,6 +80,12 @@ func TestErrorsCollector(t *testing.T) {
 		require.ErrorContains(t, err, "failure wrapped")
 		require.ErrorContains(t, err, "fatal1")
 		require.True(t, IsFailure(err))
+
+		// Note: when a fatal error is collected, the non-fatal errors are no
+		// longer accessible.
+		require.False(t, IsOperationNotSupportedError(err))
+		require.False(t, IsInvalidArgumentError(err))
+		require.True(t, IsLedgerFailure(err))
 
 		nonFatal, fatal = SplitErrorTypes(err)
 		require.Nil(t, nonFatal)

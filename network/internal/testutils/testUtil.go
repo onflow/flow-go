@@ -10,18 +10,17 @@ import (
 	"testing"
 	"time"
 
-	"github.com/libp2p/go-libp2p"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
-	"github.com/libp2p/go-libp2p/core/connmgr"
 	"github.com/libp2p/go-libp2p/core/host"
 	p2pNetwork "github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/peer"
 	pc "github.com/libp2p/go-libp2p/core/protocol"
 	"github.com/libp2p/go-libp2p/core/routing"
-	rcmgr "github.com/libp2p/go-libp2p/p2p/host/resource-manager"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 
+	"github.com/onflow/flow-go/config"
+	netconf "github.com/onflow/flow-go/config/network"
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
@@ -33,17 +32,21 @@ import (
 	"github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/module/observable"
 	"github.com/onflow/flow-go/network"
+	alspmgr "github.com/onflow/flow-go/network/alsp/manager"
 	netcache "github.com/onflow/flow-go/network/cache"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/codec/cbor"
 	"github.com/onflow/flow-go/network/p2p"
+	"github.com/onflow/flow-go/network/p2p/conduit"
 	"github.com/onflow/flow-go/network/p2p/connection"
 	p2pdht "github.com/onflow/flow-go/network/p2p/dht"
 	"github.com/onflow/flow-go/network/p2p/middleware"
 	"github.com/onflow/flow-go/network/p2p/p2pbuilder"
+	inspectorbuilder "github.com/onflow/flow-go/network/p2p/p2pbuilder/inspector"
 	"github.com/onflow/flow-go/network/p2p/subscription"
 	"github.com/onflow/flow-go/network/p2p/translator"
 	"github.com/onflow/flow-go/network/p2p/unicast"
+	"github.com/onflow/flow-go/network/p2p/unicast/protocols"
 	"github.com/onflow/flow-go/network/p2p/unicast/ratelimit"
 	"github.com/onflow/flow-go/network/slashing"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -51,74 +54,100 @@ import (
 
 var sporkID = unittest.IdentifierFixture()
 
+// RateLimitConsumer p2p.RateLimiterConsumer fixture that invokes a callback when rate limit event is consumed.
+type RateLimitConsumer struct {
+	callback func(pid peer.ID, role, msgType, topic, reason string) // callback func that will be invoked on rate limit
+}
+
+func (r *RateLimitConsumer) OnRateLimitedPeer(pid peer.ID, role, msgType, topic, reason string) {
+	r.callback(pid, role, msgType, topic, reason)
+}
+
 type PeerTag struct {
 	Peer peer.ID
 	Tag  string
 }
 
+// TagWatchingConnManager implements connection.ConnManager struct, and manages connections with tags. It
+// also maintains a set of observers that it notifies when a tag is added or removed from a peer.
 type TagWatchingConnManager struct {
 	*connection.ConnManager
 	observers map[observable.Observer]struct{}
 	obsLock   sync.RWMutex
 }
 
-func (cwcm *TagWatchingConnManager) Subscribe(observer observable.Observer) {
-	cwcm.obsLock.Lock()
-	defer cwcm.obsLock.Unlock()
+// Subscribe allows an observer to subscribe to receive notifications when a tag is added or removed from a peer.
+func (tw *TagWatchingConnManager) Subscribe(observer observable.Observer) {
+	tw.obsLock.Lock()
+	defer tw.obsLock.Unlock()
 	var void struct{}
-	cwcm.observers[observer] = void
+	tw.observers[observer] = void
 }
 
-func (cwcm *TagWatchingConnManager) Unsubscribe(observer observable.Observer) {
-	cwcm.obsLock.Lock()
-	defer cwcm.obsLock.Unlock()
-	delete(cwcm.observers, observer)
+// Unsubscribe allows an observer to unsubscribe from receiving notifications.
+func (tw *TagWatchingConnManager) Unsubscribe(observer observable.Observer) {
+	tw.obsLock.Lock()
+	defer tw.obsLock.Unlock()
+	delete(tw.observers, observer)
 }
 
-func (cwcm *TagWatchingConnManager) Protect(id peer.ID, tag string) {
-	cwcm.obsLock.RLock()
-	defer cwcm.obsLock.RUnlock()
-	cwcm.ConnManager.Protect(id, tag)
-	for obs := range cwcm.observers {
+// Protect adds a tag to a peer. It also notifies all observers that a tag has been added to a peer.
+func (tw *TagWatchingConnManager) Protect(id peer.ID, tag string) {
+	tw.obsLock.RLock()
+	defer tw.obsLock.RUnlock()
+	tw.ConnManager.Protect(id, tag)
+	for obs := range tw.observers {
 		go obs.OnNext(PeerTag{Peer: id, Tag: tag})
 	}
 }
 
-func (cwcm *TagWatchingConnManager) Unprotect(id peer.ID, tag string) bool {
-	cwcm.obsLock.RLock()
-	defer cwcm.obsLock.RUnlock()
-	res := cwcm.ConnManager.Unprotect(id, tag)
-	for obs := range cwcm.observers {
+// Unprotect removes a tag from a peer. It also notifies all observers that a tag has been removed from a peer.
+func (tw *TagWatchingConnManager) Unprotect(id peer.ID, tag string) bool {
+	tw.obsLock.RLock()
+	defer tw.obsLock.RUnlock()
+	res := tw.ConnManager.Unprotect(id, tag)
+	for obs := range tw.observers {
 		go obs.OnNext(PeerTag{Peer: id, Tag: tag})
 	}
 	return res
 }
 
-func NewTagWatchingConnManager(log zerolog.Logger, idProvider module.IdentityProvider, metrics module.NetworkMetrics) *TagWatchingConnManager {
-	cm := connection.NewConnManager(log, metrics)
+// NewTagWatchingConnManager creates a new TagWatchingConnManager with the given config. It returns an error if the config is invalid.
+func NewTagWatchingConnManager(log zerolog.Logger, metrics module.LibP2PConnectionMetrics, config *netconf.ConnectionManagerConfig) (*TagWatchingConnManager, error) {
+	cm, err := connection.NewConnManager(log, metrics, config)
+	if err != nil {
+		return nil, fmt.Errorf("could not create connection manager: %w", err)
+	}
+
 	return &TagWatchingConnManager{
 		ConnManager: cm,
 		observers:   make(map[observable.Observer]struct{}),
 		obsLock:     sync.RWMutex{},
-	}
+	}, nil
 }
 
 // GenerateIDs is a test helper that generate flow identities with a valid port and libp2p nodes.
-func GenerateIDs(
-	t *testing.T,
-	logger zerolog.Logger,
-	n int,
-	opts ...func(*optsConfig),
-) (flow.IdentityList, []p2p.LibP2PNode, []observable.Observable) {
+func GenerateIDs(t *testing.T, logger zerolog.Logger, n int, opts ...func(*optsConfig)) (flow.IdentityList,
+	[]p2p.LibP2PNode,
+	[]observable.Observable) {
 	libP2PNodes := make([]p2p.LibP2PNode, n)
 	tagObservables := make([]observable.Observable, n)
 
-	o := &optsConfig{peerUpdateInterval: connection.DefaultPeerUpdateInterval}
+	identities := unittest.IdentityListFixture(n, unittest.WithAllRoles())
+	idProvider := NewUpdatableIDProvider(identities)
+	o := &optsConfig{
+		peerUpdateInterval:            connection.DefaultPeerUpdateInterval,
+		unicastRateLimiterDistributor: ratelimit.NewUnicastRateLimiterDistributor(),
+		connectionGaterFactory: func() p2p.ConnectionGater {
+			return NewConnectionGater(idProvider, func(p peer.ID) error {
+				return nil
+			})
+		},
+		createStreamRetryInterval: unicast.DefaultRetryDelay,
+	}
 	for _, opt := range opts {
 		opt(o)
 	}
-
-	identities := unittest.IdentityListFixture(n, unittest.WithAllRoles())
 
 	for _, identity := range identities {
 		for _, idOpt := range o.idOpts {
@@ -126,25 +155,26 @@ func GenerateIDs(
 		}
 	}
 
-	idProvider := id.NewFixedIdentityProvider(identities)
-
 	// generates keys and address for the node
-	for i, id := range identities {
+	for i, identity := range identities {
 		// generate key
-		key, err := generateNetworkingKey(id.NodeID)
+		key, err := generateNetworkingKey(identity.NodeID)
 		require.NoError(t, err)
 
 		var opts []nodeBuilderOption
 
 		opts = append(opts, withDHT(o.dhtPrefix, o.dhtOpts...))
-		opts = append(opts, withPeerManagerOptions(connection.ConnectionPruningEnabled, o.peerUpdateInterval))
+		opts = append(opts, withPeerManagerOptions(connection.PruningEnabled, o.peerUpdateInterval))
+		opts = append(opts, withRateLimiterDistributor(o.unicastRateLimiterDistributor))
+		opts = append(opts, withConnectionGater(o.connectionGaterFactory()))
+		opts = append(opts, withUnicastManagerOpts(o.createStreamRetryInterval))
 
 		libP2PNodes[i], tagObservables[i] = generateLibP2PNode(t, logger, key, idProvider, opts...)
 
 		_, port, err := libP2PNodes[i].GetIPPort()
 		require.NoError(t, err)
 
-		identities[i].Address = fmt.Sprintf("0.0.0.0:%s", port)
+		identities[i].Address = unittest.IPPort(port)
 		identities[i].NetworkPubKey = key.PublicKey()
 	}
 
@@ -152,7 +182,13 @@ func GenerateIDs(
 }
 
 // GenerateMiddlewares creates and initializes middleware instances for all the identities
-func GenerateMiddlewares(t *testing.T, logger zerolog.Logger, identities flow.IdentityList, libP2PNodes []p2p.LibP2PNode, codec network.Codec, consumer slashing.ViolationsConsumer, opts ...func(*optsConfig)) ([]network.Middleware, []*UpdatableIDProvider) {
+func GenerateMiddlewares(t *testing.T,
+	logger zerolog.Logger,
+	identities flow.IdentityList,
+	libP2PNodes []p2p.LibP2PNode,
+	codec network.Codec,
+	consumer slashing.ViolationsConsumer,
+	opts ...func(*optsConfig)) ([]network.Middleware, []*UpdatableIDProvider) {
 	mws := make([]network.Middleware, len(identities))
 	idProviders := make([]*UpdatableIDProvider, len(identities))
 	bitswapmet := metrics.NewNoopCollector()
@@ -160,6 +196,7 @@ func GenerateMiddlewares(t *testing.T, logger zerolog.Logger, identities flow.Id
 		peerUpdateInterval:  connection.DefaultPeerUpdateInterval,
 		unicastRateLimiters: ratelimit.NoopRateLimiters(),
 		networkMetrics:      metrics.NewNoopCollector(),
+		peerManagerFilters:  []p2p.PeerFilter{},
 	}
 
 	for _, opt := range opts {
@@ -175,57 +212,36 @@ func GenerateMiddlewares(t *testing.T, logger zerolog.Logger, identities flow.Id
 		idProviders[i] = NewUpdatableIDProvider(identities)
 
 		// creating middleware of nodes
-		mws[i] = middleware.NewMiddleware(logger,
-			node,
-			nodeId,
-			o.networkMetrics,
-			bitswapmet,
-			sporkID,
-			middleware.DefaultUnicastTimeout,
-			translator.NewIdentityProviderIDTranslator(idProviders[i]),
-			codec,
-			consumer,
+		mws[i] = middleware.NewMiddleware(&middleware.Config{
+			Logger:                     logger,
+			Libp2pNode:                 node,
+			FlowId:                     nodeId,
+			BitSwapMetrics:             bitswapmet,
+			RootBlockID:                sporkID,
+			UnicastMessageTimeout:      middleware.DefaultUnicastTimeout,
+			IdTranslator:               translator.NewIdentityProviderIDTranslator(idProviders[i]),
+			Codec:                      codec,
+			SlashingViolationsConsumer: consumer,
+		},
 			middleware.WithUnicastRateLimiters(o.unicastRateLimiters),
-		)
+			middleware.WithPeerManagerFilters(o.peerManagerFilters))
 	}
 	return mws, idProviders
 }
 
-// GenerateNetworks generates the network for the given middlewares
-func GenerateNetworks(
-	t *testing.T,
+// NetworksFixture generates the network for the given middlewares
+func NetworksFixture(t *testing.T,
 	log zerolog.Logger,
 	ids flow.IdentityList,
 	mws []network.Middleware,
-	sms []network.SubscriptionManager,
-) []network.Network {
+	sms []network.SubscriptionManager) []network.Network {
+
 	count := len(ids)
 	nets := make([]network.Network, 0)
 
 	for i := 0; i < count; i++ {
-
-		// creates and mocks me
-		me := &mock.Local{}
-		me.On("NodeID").Return(ids[i].NodeID)
-		me.On("NotMeFilter").Return(filter.Not(filter.HasNodeID(me.NodeID())))
-		me.On("Address").Return(ids[i].Address)
-
-		receiveCache := netcache.NewHeroReceiveCache(p2p.DefaultReceiveCacheSize,
-			log,
-			metrics.NewNoopCollector())
-
-		// create the network
-		net, err := p2p.NewNetwork(&p2p.NetworkParameters{
-			Logger:              log,
-			Codec:               cbor.NewCodec(),
-			Me:                  me,
-			MiddlewareFactory:   func() (network.Middleware, error) { return mws[i], nil },
-			Topology:            unittest.NetworkTopology(),
-			SubscriptionManager: sms[i],
-			Metrics:             metrics.NewNoopCollector(),
-			IdentityProvider:    id.NewFixedIdentityProvider(ids),
-			ReceiveCache:        receiveCache,
-		})
+		params := NetworkConfigFixture(t, log, *ids[i], ids, mws[i], sms[i])
+		net, err := p2p.NewNetwork(params)
 		require.NoError(t, err)
 
 		nets = append(nets, net)
@@ -234,14 +250,58 @@ func GenerateNetworks(
 	return nets
 }
 
+func NetworkConfigFixture(
+	t *testing.T,
+	logger zerolog.Logger,
+	myId flow.Identity,
+	allIds flow.IdentityList,
+	mw network.Middleware,
+	subMgr network.SubscriptionManager, opts ...p2p.NetworkConfigOption) *p2p.NetworkConfig {
+
+	me := mock.NewLocal(t)
+	me.On("NodeID").Return(myId.NodeID).Maybe()
+	me.On("NotMeFilter").Return(filter.Not(filter.HasNodeID(me.NodeID()))).Maybe()
+	me.On("Address").Return(myId.Address).Maybe()
+
+	defaultFlowConfig, err := config.DefaultConfig()
+	require.NoError(t, err)
+
+	receiveCache := netcache.NewHeroReceiveCache(defaultFlowConfig.NetworkConfig.NetworkReceivedMessageCacheSize, logger, metrics.NewNoopCollector())
+	params := &p2p.NetworkConfig{
+		Logger:              logger,
+		Codec:               cbor.NewCodec(),
+		Me:                  me,
+		MiddlewareFactory:   func() (network.Middleware, error) { return mw, nil },
+		Topology:            unittest.NetworkTopology(),
+		SubscriptionManager: subMgr,
+		Metrics:             metrics.NewNoopCollector(),
+		IdentityProvider:    id.NewFixedIdentityProvider(allIds),
+		ReceiveCache:        receiveCache,
+		ConduitFactory:      conduit.NewDefaultConduitFactory(),
+		AlspCfg: &alspmgr.MisbehaviorReportManagerConfig{
+			Logger:                  unittest.Logger(),
+			SpamRecordCacheSize:     defaultFlowConfig.NetworkConfig.AlspConfig.SpamRecordCacheSize,
+			SpamReportQueueSize:     defaultFlowConfig.NetworkConfig.AlspConfig.SpamReportQueueSize,
+			HeartBeatInterval:       defaultFlowConfig.NetworkConfig.AlspConfig.HearBeatInterval,
+			AlspMetrics:             metrics.NewNoopCollector(),
+			HeroCacheMetricsFactory: metrics.NewNoopHeroCacheMetricsFactory(),
+		},
+	}
+
+	for _, opt := range opts {
+		opt(params)
+	}
+
+	return params
+}
+
 // GenerateIDsAndMiddlewares returns nodeIDs, libp2pNodes, middlewares, and observables which can be subscirbed to in order to witness protect events from pubsub
 func GenerateIDsAndMiddlewares(t *testing.T,
 	n int,
 	logger zerolog.Logger,
 	codec network.Codec,
 	consumer slashing.ViolationsConsumer,
-	opts ...func(*optsConfig),
-) (flow.IdentityList, []p2p.LibP2PNode, []network.Middleware, []observable.Observable, []*UpdatableIDProvider) {
+	opts ...func(*optsConfig)) (flow.IdentityList, []p2p.LibP2PNode, []network.Middleware, []observable.Observable, []*UpdatableIDProvider) {
 
 	ids, libP2PNodes, protectObservables := GenerateIDs(t, logger, n, opts...)
 	mws, providers := GenerateMiddlewares(t, logger, ids, libP2PNodes, codec, consumer, opts...)
@@ -249,12 +309,28 @@ func GenerateIDsAndMiddlewares(t *testing.T,
 }
 
 type optsConfig struct {
-	idOpts              []func(*flow.Identity)
-	dhtPrefix           string
-	dhtOpts             []dht.Option
-	unicastRateLimiters *ratelimit.RateLimiters
-	peerUpdateInterval  time.Duration
-	networkMetrics      module.NetworkMetrics
+	idOpts                        []func(*flow.Identity)
+	dhtPrefix                     string
+	dhtOpts                       []dht.Option
+	unicastRateLimiters           *ratelimit.RateLimiters
+	peerUpdateInterval            time.Duration
+	networkMetrics                module.NetworkMetrics
+	peerManagerFilters            []p2p.PeerFilter
+	unicastRateLimiterDistributor p2p.UnicastRateLimiterDistributor
+	connectionGaterFactory        func() p2p.ConnectionGater
+	createStreamRetryInterval     time.Duration
+}
+
+func WithCreateStreamRetryInterval(delay time.Duration) func(*optsConfig) {
+	return func(o *optsConfig) {
+		o.createStreamRetryInterval = delay
+	}
+}
+
+func WithUnicastRateLimiterDistributor(distributor p2p.UnicastRateLimiterDistributor) func(*optsConfig) {
+	return func(o *optsConfig) {
+		o.unicastRateLimiterDistributor = distributor
+	}
 }
 
 func WithIdentityOpts(idOpts ...func(*flow.Identity)) func(*optsConfig) {
@@ -276,9 +352,21 @@ func WithPeerUpdateInterval(interval time.Duration) func(*optsConfig) {
 	}
 }
 
+func WithPeerManagerFilters(filters ...p2p.PeerFilter) func(*optsConfig) {
+	return func(o *optsConfig) {
+		o.peerManagerFilters = filters
+	}
+}
+
 func WithUnicastRateLimiters(limiters *ratelimit.RateLimiters) func(*optsConfig) {
 	return func(o *optsConfig) {
 		o.unicastRateLimiters = limiters
+	}
+}
+
+func WithConnectionGaterFactory(connectionGaterFactory func() p2p.ConnectionGater) func(*optsConfig) {
+	return func(o *optsConfig) {
+		o.connectionGaterFactory = connectionGaterFactory
 	}
 }
 
@@ -288,17 +376,15 @@ func WithNetworkMetrics(m module.NetworkMetrics) func(*optsConfig) {
 	}
 }
 
-func GenerateIDsMiddlewaresNetworks(
-	t *testing.T,
+func GenerateIDsMiddlewaresNetworks(t *testing.T,
 	n int,
 	log zerolog.Logger,
 	codec network.Codec,
 	consumer slashing.ViolationsConsumer,
-	opts ...func(*optsConfig),
-) (flow.IdentityList, []p2p.LibP2PNode, []network.Middleware, []network.Network, []observable.Observable) {
+	opts ...func(*optsConfig)) (flow.IdentityList, []p2p.LibP2PNode, []network.Middleware, []network.Network, []observable.Observable) {
 	ids, libp2pNodes, mws, observables, _ := GenerateIDsAndMiddlewares(t, n, log, codec, consumer, opts...)
 	sms := GenerateSubscriptionManagers(t, mws)
-	networks := GenerateNetworks(t, log, ids, mws, sms)
+	networks := NetworksFixture(t, log, ids, mws, sms)
 
 	return ids, libp2pNodes, mws, networks, observables
 }
@@ -314,16 +400,36 @@ func GenerateEngines(t *testing.T, nets []network.Network) []*MeshEngine {
 	return engs
 }
 
-// StartNodesAndNetworks starts the provided networks and libp2p nodes, returning the irrecoverable error channel
-func StartNodesAndNetworks(ctx irrecoverable.SignalerContext, t *testing.T, nodes []p2p.LibP2PNode, nets []network.Network, duration time.Duration) {
+// StartNodesAndNetworks starts the provided networks and libp2p nodes, returning the irrecoverable error channel.
+// Arguments:
+// - ctx: the irrecoverable context to use for starting the nodes and networks.
+// - t: the test object.
+// - nodes: the libp2p nodes to start.
+// - nets: the networks to start.
+// - timeout: the timeout to use for waiting for the nodes and networks to start.
+//
+// This function fails the test if the nodes or networks do not start within the given timeout.
+func StartNodesAndNetworks(ctx irrecoverable.SignalerContext, t *testing.T, nodes []p2p.LibP2PNode, nets []network.Network, timeout time.Duration) {
+	StartNetworks(ctx, t, nets, timeout)
+
+	// start up nodes and Peer managers
+	StartNodes(ctx, t, nodes, timeout)
+}
+
+// StartNetworks starts the provided networks using the provided irrecoverable context
+// Arguments:
+// - ctx: the irrecoverable context to use for starting the networks.
+// - t: the test object.
+// - nets: the networks to start.
+// - duration: the timeout to use for waiting for the networks to start.
+//
+// This function fails the test if the networks do not start within the given timeout.
+func StartNetworks(ctx irrecoverable.SignalerContext, t *testing.T, nets []network.Network, duration time.Duration) {
 	// start up networks (this will implicitly start middlewares)
 	for _, net := range nets {
 		net.Start(ctx)
 		unittest.RequireComponentsReadyBefore(t, duration, net)
 	}
-
-	// start up nodes and Peer managers
-	StartNodes(ctx, t, nodes, duration)
 }
 
 // StartNodes starts the provided nodes and their peer managers using the provided irrecoverable context
@@ -338,43 +444,81 @@ func StartNodes(ctx irrecoverable.SignalerContext, t *testing.T, nodes []p2p.Lib
 	}
 }
 
-type nodeBuilderOption func(p2pbuilder.NodeBuilder)
+// StopComponents stops ReadyDoneAware instances in parallel and fails the test if they could not be stopped within the
+// duration.
+func StopComponents[R module.ReadyDoneAware](t *testing.T, rda []R, duration time.Duration) {
+	comps := make([]module.ReadyDoneAware, 0, len(rda))
+	for _, c := range rda {
+		comps = append(comps, c)
+	}
+
+	unittest.RequireComponentsDoneBefore(t, duration, comps...)
+}
+
+type nodeBuilderOption func(p2p.NodeBuilder)
 
 func withDHT(prefix string, dhtOpts ...dht.Option) nodeBuilderOption {
-	return func(nb p2pbuilder.NodeBuilder) {
+	return func(nb p2p.NodeBuilder) {
 		nb.SetRoutingSystem(func(c context.Context, h host.Host) (routing.Routing, error) {
-			return p2pdht.NewDHT(c, h,
-				pc.ID(unicast.FlowDHTProtocolIDPrefix+prefix),
-				zerolog.Nop(),
-				metrics.NewNoopCollector(),
-				dhtOpts...)
+			return p2pdht.NewDHT(c, h, pc.ID(protocols.FlowDHTProtocolIDPrefix+prefix), zerolog.Nop(), metrics.NewNoopCollector(), dhtOpts...)
 		})
 	}
 }
 
 func withPeerManagerOptions(connectionPruning bool, updateInterval time.Duration) nodeBuilderOption {
-	return func(nb p2pbuilder.NodeBuilder) {
+	return func(nb p2p.NodeBuilder) {
 		nb.SetPeerManagerOptions(connectionPruning, updateInterval)
 	}
 }
 
+func withRateLimiterDistributor(distributor p2p.UnicastRateLimiterDistributor) nodeBuilderOption {
+	return func(nb p2p.NodeBuilder) {
+		nb.SetRateLimiterDistributor(distributor)
+	}
+}
+
+func withConnectionGater(connectionGater p2p.ConnectionGater) nodeBuilderOption {
+	return func(nb p2p.NodeBuilder) {
+		nb.SetConnectionGater(connectionGater)
+	}
+}
+
+func withUnicastManagerOpts(delay time.Duration) nodeBuilderOption {
+	return func(nb p2p.NodeBuilder) {
+		nb.SetStreamCreationRetryInterval(delay)
+	}
+}
+
 // generateLibP2PNode generates a `LibP2PNode` on localhost using a port assigned by the OS
-func generateLibP2PNode(
-	t *testing.T,
-	logger zerolog.Logger,
-	key crypto.PrivateKey,
-	idProvider module.IdentityProvider,
-	opts ...nodeBuilderOption,
-) (p2p.LibP2PNode, observable.Observable) {
+func generateLibP2PNode(t *testing.T, logger zerolog.Logger, key crypto.PrivateKey, provider *UpdatableIDProvider, opts ...nodeBuilderOption) (p2p.LibP2PNode, observable.Observable) {
 
 	noopMetrics := metrics.NewNoopCollector()
+	defaultFlowConfig, err := config.DefaultConfig()
+	require.NoError(t, err)
 
 	// Inject some logic to be able to observe connections of this node
-	connManager := NewTagWatchingConnManager(logger, idProvider, noopMetrics)
+	connManager, err := NewTagWatchingConnManager(logger, noopMetrics, &defaultFlowConfig.NetworkConfig.ConnectionManagerConfig)
+	require.NoError(t, err)
+	met := metrics.NewNoopCollector()
 
-	builder := p2pbuilder.NewNodeBuilder(logger, "0.0.0.0:0", key, sporkID).
+	rpcInspectorSuite, err := inspectorbuilder.NewGossipSubInspectorBuilder(logger, sporkID, &defaultFlowConfig.NetworkConfig.GossipSubConfig.GossipSubRPCInspectorsConfig, provider, met).Build()
+	require.NoError(t, err)
+
+	builder := p2pbuilder.NewNodeBuilder(
+		logger,
+		met,
+		unittest.DefaultAddress,
+		key,
+		sporkID,
+		&defaultFlowConfig.NetworkConfig.ResourceManagerConfig,
+		&p2p.DisallowListCacheConfig{
+			MaxSize: uint32(1000),
+			Metrics: metrics.NewNoopCollector(),
+		}).
 		SetConnectionManager(connManager).
-		SetResourceManager(NewResourceManager(t))
+		SetResourceManager(NewResourceManager(t)).
+		SetStreamCreationRetryInterval(unicast.DefaultRetryDelay).
+		SetGossipSubRpcInspectorSuite(rpcInspectorSuite)
 
 	for _, opt := range opts {
 		opt(builder)
@@ -396,7 +540,7 @@ func OptionalSleep(send ConduitSendWrapperFunc) {
 
 // generateNetworkingKey generates a Flow ECDSA key using the given seed
 func generateNetworkingKey(s flow.Identifier) (crypto.PrivateKey, error) {
-	seed := make([]byte, crypto.KeyGenSeedMinLenECDSASecp256k1)
+	seed := make([]byte, crypto.KeyGenSeedMinLen)
 	copy(seed, s[:])
 	return crypto.GeneratePrivateKey(crypto.ECDSASecp256k1, seed)
 }
@@ -410,28 +554,6 @@ func GenerateSubscriptionManagers(t *testing.T, mws []network.Middleware) []netw
 		sms[i] = subscription.NewChannelSubscriptionManager(mw)
 	}
 	return sms
-}
-
-// StopNetworks stops network instances in parallel and fails the test if they could not be stopped within the
-// duration.
-func StopNetworks(t *testing.T, nets []network.Network, duration time.Duration) {
-	// casts nets instances into ReadyDoneAware components
-	comps := make([]module.ReadyDoneAware, 0, len(nets))
-	for _, net := range nets {
-		comps = append(comps, net)
-	}
-
-	unittest.RequireComponentsDoneBefore(t, duration, comps...)
-}
-
-func StopMiddlewares(t *testing.T, mws []network.Middleware, duration time.Duration) {
-	// casts mws instances into ReadyDoneAware components
-	comps := make([]module.ReadyDoneAware, 0, len(mws))
-	for _, net := range mws {
-		comps = append(comps, net)
-	}
-
-	unittest.RequireComponentsDoneBefore(t, duration, comps...)
 }
 
 // NetworkPayloadFixture creates a blob of random bytes with the given size (in bytes) and returns it.
@@ -471,26 +593,31 @@ func NetworkPayloadFixture(t *testing.T, size uint) []byte {
 	return payload
 }
 
-// NewResourceManager creates a new resource manager for testing with huge limits.
+// NewResourceManager creates a new resource manager for testing with no limits.
 func NewResourceManager(t *testing.T) p2pNetwork.ResourceManager {
-	// Sadly we can not use:
-	//    rcmgr.NewResourceManager(rcmgr.NewFixedLimiter(rcmgr.InfiniteLimits))
-	// Since it is broken due to numeric overflow in the resource manager:
-	// https://github.com/libp2p/go-libp2p/issues/1721
-	scalingLimits := rcmgr.DefaultLimits
-	libp2p.SetDefaultServiceLimits(&scalingLimits)
-	limiter := rcmgr.NewFixedLimiter(scalingLimits.Scale(16<<30, 1048575))
-	rm, err := rcmgr.NewResourceManager(limiter)
-	require.NoError(t, err)
-
-	return rm
+	return &p2pNetwork.NullResourceManager{}
 }
 
 // NewConnectionGater creates a new connection gater for testing with given allow listing filter.
-func NewConnectionGater(allowListFilter p2p.PeerFilter) connmgr.ConnectionGater {
+func NewConnectionGater(idProvider module.IdentityProvider, allowListFilter p2p.PeerFilter) p2p.ConnectionGater {
 	filters := []p2p.PeerFilter{allowListFilter}
-	return connection.NewConnGater(
-		unittest.Logger(),
+	return connection.NewConnGater(unittest.Logger(),
+		idProvider,
 		connection.WithOnInterceptPeerDialFilters(filters),
 		connection.WithOnInterceptSecuredFilters(filters))
+}
+
+// IsRateLimitedPeerFilter returns a p2p.PeerFilter that will return an error if the peer is rate limited.
+func IsRateLimitedPeerFilter(rateLimiter p2p.RateLimiter) p2p.PeerFilter {
+	return func(p peer.ID) error {
+		if rateLimiter.IsRateLimited(p) {
+			return fmt.Errorf("peer is rate limited")
+		}
+		return nil
+	}
+}
+
+// NewRateLimiterConsumer returns a p2p.RateLimiterConsumer fixture that will invoke the callback provided.
+func NewRateLimiterConsumer(callback func(pid peer.ID, role, msgType, topic, reason string)) p2p.RateLimiterConsumer {
+	return &RateLimitConsumer{callback}
 }

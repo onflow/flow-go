@@ -32,24 +32,14 @@ type Suite struct {
 }
 
 func (s *Suite) Ghost() *client.GhostClient {
-	ghost := s.net.ContainerByID(s.ghostID)
-	client, err := lib.GetGhostClient(ghost)
+	client, err := s.net.ContainerByID(s.ghostID).GhostClient()
 	require.NoError(s.T(), err, "could not get ghost client")
 	return client
 }
 
 func (s *Suite) AccessClient() *testnet.Client {
-	chain := s.net.Root().Header.ChainID.Chain()
-	client, err := testnet.NewClient(fmt.Sprintf(":%s", s.net.AccessPorts[testnet.AccessNodeAPIPort]), chain)
+	client, err := s.net.ContainerByName(testnet.PrimaryAN).TestnetClient()
 	require.NoError(s.T(), err, "could not get access client")
-	return client
-}
-
-func (s *Suite) ExecutionClient() *testnet.Client {
-	execNode := s.net.ContainerByID(s.exe1ID)
-	chain := s.net.Root().Header.ChainID.Chain()
-	client, err := testnet.NewClient(fmt.Sprintf(":%s", execNode.Ports[testnet.ExeNodeAPIPort]), chain)
-	require.NoError(s.T(), err, "could not get execution client")
 	return client
 }
 
@@ -79,7 +69,7 @@ func (s *Suite) SendExecutionAdminCommand(ctx context.Context, command string, d
 	}
 
 	req, err := http.NewRequestWithContext(ctx, "POST",
-		fmt.Sprintf("http://localhost:%s/admin/run_command", enContainer.Ports[testnet.ExeNodeAdminPort]),
+		fmt.Sprintf("http://localhost:%s/admin/run_command", enContainer.Port(testnet.AdminPort)),
 		bytes.NewBuffer(marshal),
 	)
 	if err != nil {
@@ -104,18 +94,16 @@ func (s *Suite) SendExecutionAdminCommand(ctx context.Context, command string, d
 }
 
 func (s *Suite) AccessPort() string {
-	return s.net.AccessPorts[testnet.AccessNodeAPIPort]
+	return s.net.ContainerByName(testnet.PrimaryAN).Port(testnet.GRPCPort)
 }
 
 func (s *Suite) MetricsPort() string {
-	return s.net.AccessPorts[testnet.ExeNodeMetricsPort]
+	return s.net.ContainerByName("execution_1").Port(testnet.GRPCPort)
 }
 
 func (s *Suite) SetupTest() {
 	s.log = unittest.LoggerForTest(s.Suite.T(), zerolog.InfoLevel)
 	s.log.Info().Msg("================> SetupTest")
-
-	blockRateFlag := "--block-rate-delay=1ms"
 
 	s.nodeConfigs = append(s.nodeConfigs, testnet.NewNodeConfig(flow.RoleAccess))
 
@@ -124,8 +112,7 @@ func (s *Suite) SetupTest() {
 	for _, nodeID := range s.nodeIDs {
 		nodeConfig := testnet.NewNodeConfig(flow.RoleConsensus, testnet.WithID(nodeID),
 			testnet.WithLogLevel(zerolog.FatalLevel),
-			testnet.WithAdditionalFlag("--hotstuff-timeout=12s"),
-			testnet.WithAdditionalFlag(blockRateFlag),
+			testnet.WithAdditionalFlag("cruise-ctl-fallback-proposal-duration=1ms"),
 		)
 		s.nodeConfigs = append(s.nodeConfigs, nodeConfig)
 	}
@@ -139,11 +126,11 @@ func (s *Suite) SetupTest() {
 	// need two collection node
 	coll1Config := testnet.NewNodeConfig(flow.RoleCollection,
 		testnet.WithLogLevel(zerolog.FatalLevel),
-		testnet.WithAdditionalFlag(blockRateFlag),
+		testnet.WithAdditionalFlag("--hotstuff-proposal-duration=1ms"),
 	)
 	coll2Config := testnet.NewNodeConfig(flow.RoleCollection,
 		testnet.WithLogLevel(zerolog.FatalLevel),
-		testnet.WithAdditionalFlag(blockRateFlag),
+		testnet.WithAdditionalFlag("--hotstuff-proposal-duration=1ms"),
 	)
 	s.nodeConfigs = append(s.nodeConfigs, coll1Config, coll2Config)
 
