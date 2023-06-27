@@ -281,14 +281,11 @@ func TestCreateStream_FallBack(t *testing.T) {
 func TestCreateStreamIsConcurrencySafe(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
-	idProvider := mockmodule.NewIdentityProvider(t)
+	idProvider := testutils.NewUpdatableIDProvider(flow.IdentityList{})
 	// create two nodes
 	nodes, identities := p2ptest.NodesFixture(t, unittest.IdentifierFixture(), "test_create_stream_is_concurrency_safe", 2, idProvider)
 	require.Len(t, identities, 2)
-	for i, node := range nodes {
-		idProvider.On("ByPeerID", node.Host().ID()).Return(&identities[i], true).Maybe()
-
-	}
+	idProvider.SetIdentities(flow.IdentityList{identities[0], identities[1]})
 	p2ptest.StartNodes(t, signalerCtx, nodes, 100*time.Millisecond)
 	defer p2ptest.StopNodes(t, nodes, cancel, 100*time.Millisecond)
 
@@ -332,7 +329,7 @@ func TestNoBackoffWhenCreatingStream(t *testing.T) {
 
 	ctx2, cancel2 := context.WithCancel(ctx)
 	signalerCtx2 := irrecoverable.NewMockSignalerContext(t, ctx2)
-	idProvider := mockmodule.NewIdentityProvider(t)
+	idProvider := testutils.NewUpdatableIDProvider(flow.IdentityList{})
 	count := 2
 	// Creates nodes
 	nodes, identities := p2ptest.NodesFixture(t,
@@ -343,10 +340,7 @@ func TestNoBackoffWhenCreatingStream(t *testing.T) {
 	)
 	node1 := nodes[0]
 	node2 := nodes[1]
-	for i, node := range nodes {
-		idProvider.On("ByPeerID", node.Host().ID()).Return(&identities[i], true).Maybe()
-
-	}
+	idProvider.SetIdentities(flow.IdentityList{identities[0], identities[1]})
 	p2ptest.StartNode(t, signalerCtx1, node1, 100*time.Millisecond)
 	p2ptest.StartNode(t, signalerCtx2, node2, 100*time.Millisecond)
 
