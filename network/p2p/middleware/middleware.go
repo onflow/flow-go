@@ -522,8 +522,7 @@ func (m *Middleware) handleIncomingStream(s libp2pnetwork.Stream) {
 			msgCode, err := codec.MessageCodeFromPayload(msg.Payload)
 			if err != nil {
 				violation.Err = err
-				svcErr := m.slashingViolationsConsumer.OnUnknownMsgTypeError(violation)
-				m.checkSlashingViolationsConsumerErr(svcErr)
+				m.slashingViolationsConsumer.OnUnknownMsgTypeError(violation)
 				return
 			}
 
@@ -531,15 +530,13 @@ func (m *Middleware) handleIncomingStream(s libp2pnetwork.Stream) {
 			_, what, err := codec.InterfaceFromMessageCode(msgCode)
 			if err != nil {
 				violation.Err = err
-				svcErr := m.slashingViolationsConsumer.OnUnknownMsgTypeError(violation)
-				m.checkSlashingViolationsConsumerErr(svcErr)
+				m.slashingViolationsConsumer.OnUnknownMsgTypeError(violation)
 				return
 			}
 
 			violation.MsgType = what
 			violation.Err = ErrUnicastMsgWithoutSub
-			svcErr := m.slashingViolationsConsumer.OnUnauthorizedUnicastOnChannel(violation)
-			m.checkSlashingViolationsConsumerErr(svcErr)
+			m.slashingViolationsConsumer.OnUnauthorizedUnicastOnChannel(violation)
 			return
 		}
 
@@ -651,10 +648,9 @@ func (m *Middleware) processUnicastStreamMessage(remotePeer peer.ID, msg *messag
 	// we can remove this check
 	maxSize, err := unicastMaxMsgSizeByCode(msg.Payload)
 	if err != nil {
-		svcErr := m.slashingViolationsConsumer.OnUnknownMsgTypeError(&network.Violation{
+		m.slashingViolationsConsumer.OnUnknownMsgTypeError(&network.Violation{
 			Identity: nil, PeerID: remotePeer.String(), MsgType: "", Channel: channel, Protocol: message.ProtocolTypeUnicast, Err: err,
 		})
-		m.checkSlashingViolationsConsumerErr(svcErr)
 		return
 	}
 	if msg.Size() > maxSize {
@@ -709,16 +705,14 @@ func (m *Middleware) processAuthenticatedMessage(msg *message.Message, peerID pe
 		violation := &network.Violation{
 			PeerID: peerID.String(), OriginID: originId, Channel: channel, Protocol: protocol, Err: err,
 		}
-		svcErr := m.slashingViolationsConsumer.OnUnknownMsgTypeError(violation)
-		m.checkSlashingViolationsConsumerErr(svcErr)
+		m.slashingViolationsConsumer.OnUnknownMsgTypeError(violation)
 		return
 	case codec.IsErrMsgUnmarshal(err) || codec.IsErrInvalidEncoding(err):
 		// slash if peer sent a message that could not be marshalled into the message type denoted by the message code byte
 		violation := &network.Violation{
 			PeerID: peerID.String(), OriginID: originId, Channel: channel, Protocol: protocol, Err: err,
 		}
-		svcErr := m.slashingViolationsConsumer.OnInvalidMsgError(violation)
-		m.checkSlashingViolationsConsumerErr(svcErr)
+		m.slashingViolationsConsumer.OnInvalidMsgError(violation)
 		return
 	case err != nil:
 		// this condition should never happen and indicates there's a bug
@@ -728,8 +722,7 @@ func (m *Middleware) processAuthenticatedMessage(msg *message.Message, peerID pe
 		violation := &network.Violation{
 			PeerID: peerID.String(), OriginID: originId, Channel: channel, Protocol: protocol, Err: err,
 		}
-		svcErr := m.slashingViolationsConsumer.OnUnexpectedError(violation)
-		m.checkSlashingViolationsConsumerErr(svcErr)
+		m.slashingViolationsConsumer.OnUnexpectedError(violation)
 		return
 	}
 

@@ -62,16 +62,14 @@ func (av *AuthorizedSenderValidator) Validate(from peer.ID, payload []byte, chan
 	identity, ok := av.getIdentity(from)
 	if !ok {
 		violation := &network.Violation{PeerID: from.String(), Channel: channel, Protocol: protocol, Err: ErrIdentityUnverified}
-		err := av.slashingViolationsConsumer.OnUnAuthorizedSenderError(violation)
-		av.checkSlashingViolationsConsumerErr(err)
+		av.slashingViolationsConsumer.OnUnAuthorizedSenderError(violation)
 		return "", ErrIdentityUnverified
 	}
 
 	msgCode, err := codec.MessageCodeFromPayload(payload)
 	if err != nil {
 		violation := &network.Violation{OriginID: identity.NodeID, Identity: identity, PeerID: from.String(), Channel: channel, Protocol: protocol, Err: err}
-		svcErr := av.slashingViolationsConsumer.OnUnknownMsgTypeError(violation)
-		av.checkSlashingViolationsConsumerErr(svcErr)
+		av.slashingViolationsConsumer.OnUnknownMsgTypeError(violation)
 		return "", err
 	}
 
@@ -81,32 +79,23 @@ func (av *AuthorizedSenderValidator) Validate(from peer.ID, payload []byte, chan
 		return msgType, nil
 	case message.IsUnknownMsgTypeErr(err) || codec.IsErrUnknownMsgCode(err):
 		violation := &network.Violation{OriginID: identity.NodeID, Identity: identity, PeerID: from.String(), MsgType: msgType, Channel: channel, Protocol: protocol, Err: err}
-		svcErr := av.slashingViolationsConsumer.OnUnknownMsgTypeError(violation)
-		av.checkSlashingViolationsConsumerErr(svcErr)
+		av.slashingViolationsConsumer.OnUnknownMsgTypeError(violation)
 		return msgType, err
 	case errors.Is(err, message.ErrUnauthorizedMessageOnChannel) || errors.Is(err, message.ErrUnauthorizedRole):
 		violation := &network.Violation{OriginID: identity.NodeID, Identity: identity, PeerID: from.String(), MsgType: msgType, Channel: channel, Protocol: protocol, Err: err}
-		svcErr := av.slashingViolationsConsumer.OnUnAuthorizedSenderError(violation)
-		av.checkSlashingViolationsConsumerErr(svcErr)
-
+		av.slashingViolationsConsumer.OnUnAuthorizedSenderError(violation)
 		return msgType, err
 	case errors.Is(err, ErrSenderEjected):
 		violation := &network.Violation{OriginID: identity.NodeID, Identity: identity, PeerID: from.String(), MsgType: msgType, Channel: channel, Protocol: protocol, Err: err}
-		svcErr := av.slashingViolationsConsumer.OnSenderEjectedError(violation)
-		av.checkSlashingViolationsConsumerErr(svcErr)
-
+		av.slashingViolationsConsumer.OnSenderEjectedError(violation)
 		return msgType, err
 	case errors.Is(err, message.ErrUnauthorizedUnicastOnChannel):
 		violation := &network.Violation{OriginID: identity.NodeID, Identity: identity, PeerID: from.String(), MsgType: msgType, Channel: channel, Protocol: protocol, Err: err}
-		svcErr := av.slashingViolationsConsumer.OnUnauthorizedUnicastOnChannel(violation)
-		av.checkSlashingViolationsConsumerErr(svcErr)
-
+		av.slashingViolationsConsumer.OnUnauthorizedUnicastOnChannel(violation)
 		return msgType, err
 	case errors.Is(err, message.ErrUnauthorizedPublishOnChannel):
 		violation := &network.Violation{OriginID: identity.NodeID, Identity: identity, PeerID: from.String(), MsgType: msgType, Channel: channel, Protocol: protocol, Err: err}
-		svcErr := av.slashingViolationsConsumer.OnUnauthorizedPublishOnChannel(violation)
-		av.checkSlashingViolationsConsumerErr(svcErr)
-
+		av.slashingViolationsConsumer.OnUnauthorizedPublishOnChannel(violation)
 		return msgType, err
 	default:
 		// this condition should never happen and indicates there's a bug
@@ -114,9 +103,7 @@ func (av *AuthorizedSenderValidator) Validate(from peer.ID, payload []byte, chan
 		// collect slashing data because this could potentially lead to slashing
 		err = fmt.Errorf("unexpected error during message validation: %w", err)
 		violation := &network.Violation{OriginID: identity.NodeID, Identity: identity, PeerID: from.String(), MsgType: msgType, Channel: channel, Protocol: protocol, Err: err}
-		svcErr := av.slashingViolationsConsumer.OnUnexpectedError(violation)
-		av.checkSlashingViolationsConsumerErr(svcErr)
-
+		av.slashingViolationsConsumer.OnUnexpectedError(violation)
 		return msgType, err
 	}
 }
@@ -161,10 +148,4 @@ func (av *AuthorizedSenderValidator) isAuthorizedSender(identity *flow.Identity,
 	}
 
 	return what, nil
-}
-
-func (av *AuthorizedSenderValidator) checkSlashingViolationsConsumerErr(err error) {
-	if err != nil {
-		av.log.Error().Err(err).Msg("failed to disseminate slashing violation on slashing violations consumer")
-	}
 }

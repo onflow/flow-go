@@ -67,60 +67,71 @@ func (c *Consumer) logOffense(misbehavior network.Misbehavior, violation *networ
 // reportMisbehavior reports the slashing violation to the alsp misbehavior report manager. When violation identity
 // is nil this indicates the misbehavior occurred either on a public network and the identity of the sender is unknown
 // we can skip reporting the misbehavior.
-func (c *Consumer) reportMisbehavior(misbehavior network.Misbehavior, violation *network.Violation) error {
+// Args:
+// - misbehavior: the network misbehavior.
+// - violation: the slashing violation.
+// Any error encountered while creating the misbehavior report is considered irrecoverable and will result in a fatal log.
+func (c *Consumer) reportMisbehavior(misbehavior network.Misbehavior, violation *network.Violation) {
 	if violation.Identity == nil {
-		c.log.Debug().Bool(logging.KeySuspicious, true).Str("peerID", violation.PeerID).Msg("violation identity unknown (or public) skipping misbehavior reporting")
+		c.log.Debug().
+			Bool(logging.KeySuspicious, true).
+			Str("peerID", violation.PeerID).
+			Msg("violation identity unknown (or public) skipping misbehavior reporting")
 		c.metrics.OnViolationReportSkipped()
-		return nil
+		return
 	}
 	report, err := alsp.NewMisbehaviorReport(violation.Identity.NodeID, misbehavior)
 	if err != nil {
-		return fmt.Errorf("failed to create misbehavior report: %w", err)
+		c.log.Fatal().
+			Err(err).
+			Bool(logging.KeySuspicious, true).
+			Str("peerID", violation.PeerID).
+			Msg("failed to create misbehavior report")
+
 	}
 	c.misbehaviorReportConsumer.ReportMisbehaviorOnChannel(violation.Channel, report)
-	return nil
 }
 
 // OnUnAuthorizedSenderError logs an error for unauthorized sender error and reports a misbehavior to alsp misbehavior report manager.
-func (c *Consumer) OnUnAuthorizedSenderError(violation *network.Violation) error {
+func (c *Consumer) OnUnAuthorizedSenderError(violation *network.Violation) {
 	c.logOffense(alsp.UnAuthorizedSender, violation)
-	return c.reportMisbehavior(alsp.UnAuthorizedSender, violation)
+	c.reportMisbehavior(alsp.UnAuthorizedSender, violation)
 }
 
 // OnUnknownMsgTypeError logs an error for unknown message type error and reports a misbehavior to alsp misbehavior report manager.
-func (c *Consumer) OnUnknownMsgTypeError(violation *network.Violation) error {
+func (c *Consumer) OnUnknownMsgTypeError(violation *network.Violation) {
 	c.logOffense(alsp.UnknownMsgType, violation)
-	return c.reportMisbehavior(alsp.UnknownMsgType, violation)
+	c.reportMisbehavior(alsp.UnknownMsgType, violation)
 }
 
 // OnInvalidMsgError logs an error for messages that contained payloads that could not
 // be unmarshalled into the message type denoted by message code byte and reports a misbehavior to alsp misbehavior report manager.
-func (c *Consumer) OnInvalidMsgError(violation *network.Violation) error {
+func (c *Consumer) OnInvalidMsgError(violation *network.Violation) {
 	c.logOffense(alsp.InvalidMessage, violation)
-	return c.reportMisbehavior(alsp.InvalidMessage, violation)
+	c.reportMisbehavior(alsp.InvalidMessage, violation)
 }
 
 // OnSenderEjectedError logs an error for sender ejected error and reports a misbehavior to alsp misbehavior report manager.
-func (c *Consumer) OnSenderEjectedError(violation *network.Violation) error {
+func (c *Consumer) OnSenderEjectedError(violation *network.Violation) {
 	c.logOffense(alsp.SenderEjected, violation)
-	return c.reportMisbehavior(alsp.SenderEjected, violation)
+	c.reportMisbehavior(alsp.SenderEjected, violation)
 }
 
 // OnUnauthorizedUnicastOnChannel logs an error for messages unauthorized to be sent via unicast and reports a misbehavior to alsp misbehavior report manager.
-func (c *Consumer) OnUnauthorizedUnicastOnChannel(violation *network.Violation) error {
+func (c *Consumer) OnUnauthorizedUnicastOnChannel(violation *network.Violation) {
 	c.logOffense(alsp.UnauthorizedUnicastOnChannel, violation)
-	return c.reportMisbehavior(alsp.UnauthorizedUnicastOnChannel, violation)
+	c.reportMisbehavior(alsp.UnauthorizedUnicastOnChannel, violation)
 }
 
 // OnUnauthorizedPublishOnChannel logs an error for messages unauthorized to be sent via pubsub.
-func (c *Consumer) OnUnauthorizedPublishOnChannel(violation *network.Violation) error {
+func (c *Consumer) OnUnauthorizedPublishOnChannel(violation *network.Violation) {
 	c.logOffense(alsp.UnauthorizedPublishOnChannel, violation)
-	return c.reportMisbehavior(alsp.UnauthorizedPublishOnChannel, violation)
+	c.reportMisbehavior(alsp.UnauthorizedPublishOnChannel, violation)
 }
 
 // OnUnexpectedError logs an error for unexpected errors. This indicates message validation
 // has failed for an unknown reason and could potentially be n slashable offense and reports a misbehavior to alsp misbehavior report manager.
-func (c *Consumer) OnUnexpectedError(violation *network.Violation) error {
+func (c *Consumer) OnUnexpectedError(violation *network.Violation) {
 	c.logOffense(alsp.UnExpectedValidationError, violation)
-	return c.reportMisbehavior(alsp.UnExpectedValidationError, violation)
+	c.reportMisbehavior(alsp.UnExpectedValidationError, violation)
 }
