@@ -81,7 +81,7 @@ func (suite *BlobServiceTestSuite) SetupTest() {
 
 	signalerCtx := irrecoverable.NewMockSignalerContext(suite.T(), ctx)
 
-	ids, nodes, _ := testutils.GenerateIDs(suite.T(),
+	ids, nodes, _ := testutils.LibP2PNodeFixture(suite.T(),
 		suite.numNodes,
 		p2ptest.WithDHTOptions(dht.AsServer()),
 		p2ptest.WithPeerManagerEnabled(&p2pconfig.PeerManagerConfig{

@@ -114,24 +114,18 @@ func NewTagWatchingConnManager(log zerolog.Logger, metrics module.LibP2PConnecti
 	}, nil
 }
 
-// GenerateIDs is a test helper that generate flow identities with a valid port and libp2p nodes.
-func GenerateIDs(t *testing.T, n int, opts ...p2ptest.NodeFixtureParameterOption) (flow.IdentityList, []p2p.LibP2PNode, []observable.Observable) {
+// LibP2PNodeFixture is a test helper that generate flow identities with a valid port and libp2p nodes.
+func LibP2PNodeFixture(t *testing.T, n int, opts ...p2ptest.NodeFixtureParameterOption) (flow.IdentityList, []p2p.LibP2PNode, []observable.Observable) {
 	libP2PNodes := make([]p2p.LibP2PNode, 0)
 	identities := make(flow.IdentityList, 0)
 	tagObservables := make([]observable.Observable, 0)
 	idProvider := NewUpdatableIDProvider(identities)
 	defaultFlowConfig, err := config.DefaultConfig()
 	require.NoError(t, err)
-	//for _, identity := range identities {
-	//	for _, idOpt := range o.idOpts {
-	//		idOpt(identity)
-	//	}
-	//}
 
 	opts = append(opts, p2ptest.WithUnicastHandlerFunc(nil))
 	opts = append(opts, p2ptest.WithPeerManagerEnabled(p2ptest.DefaultPeerManagerConfigFixture(), nil))
 
-	// generates keys and address for the node
 	for i := 0; i < n; i++ {
 		//opts = append(opts, withRateLimiterDistributor(o.unicastRateLimiterDistributor))
 		//opts = append(opts, withUnicastManagerOpts(o.createStreamRetryInterval))
@@ -144,7 +138,9 @@ func GenerateIDs(t *testing.T, n int, opts ...p2ptest.NodeFixtureParameterOption
 			sporkID,
 			t.Name(),
 			idProvider,
-			opts...)
+			append(opts, p2ptest.WithConnectionGater(NewConnectionGater(idProvider, func(p peer.ID) error {
+				return nil
+			})))...)
 		libP2PNodes = append(libP2PNodes, node)
 		identities = append(identities, &nodeId)
 		tagObservables = append(tagObservables, connManager)
