@@ -717,7 +717,7 @@ func ExecutionReceiptFixture(opts ...func(*flow.ExecutionReceipt)) *flow.Executi
 	receipt := &flow.ExecutionReceipt{
 		ExecutorID:        IdentifierFixture(),
 		ExecutionResult:   *ExecutionResultFixture(),
-		Spocks:            nil,
+		Spocks:            SignaturesFixture(5),
 		ExecutorSignature: SignatureFixture(),
 	}
 
@@ -849,6 +849,7 @@ func ExecutionResultFixture(opts ...func(*flow.ExecutionResult)) *flow.Execution
 		PreviousResultID: IdentifierFixture(),
 		BlockID:          IdentifierFixture(),
 		Chunks:           ChunkListFixture(2, blockID),
+		ServiceEvents:    ServiceEventsFixture(3),
 		ExecutionDataID:  IdentifierFixture(),
 	}
 

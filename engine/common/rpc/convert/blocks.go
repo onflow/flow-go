@@ -15,7 +15,6 @@ func BlockToMessage(h *flow.Block, signerIDs flow.IdentifierList) (
 	*entities.Block,
 	error,
 ) {
-
 	id := h.ID()
 
 	parentID := h.Header.ParentID
