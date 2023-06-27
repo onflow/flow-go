@@ -110,6 +110,42 @@ The `NotifyChunkDataPackSealed` function monitors the sealing status.
 If the Consensus Nodes seal a chunk, this function ensures that the `Fetcher` Engine acknowledges this update and discards the respective 
 `ChunkDataPack` from its processing pipeline as it is now sealed (i.e., has been verified by an acceptable quota of Verification Nodes).
 
+## Requester Engine - Retrieving the `ChunkDataPack`
+The `Requester` engine is responsible for handling the request and retrieval of chunk data packs in the Flow blockchain network.
+It acts as an intermediary between the `Fetcher` engine and the Execution Nodes, facilitating the communication and coordination required 
+to obtain the necessary `ChunkDataPack` for verification.
+
+The `Requester` engine receives `ChunkDataPackRequest`s from the `Fetcher`. 
+These requests contain information such as the chunk ID, block height, agree and disagree executors, and other relevant details.
+Upon receiving a `ChunkDataPackRequest`, the `Requester` engine adds it to the pending requests cache for tracking and further processing.
+The Requester engine periodically checks the pending chunk data pack requests and dispatches them to the Execution Nodes for retrieval. 
+It ensures that only qualified requests are dispatched based on certain criteria, such as the chunk ID and request history.
+The dispatching process involves creating a `ChunkDataRequest` message and publishing it to the network. 
+The request is sent to a selected number of Execution Nodes, determined by the `requestTargets` parameter.
+
+When an Execution Node receives a `ChunkDataPackRequest`, it processes the request and generates a `ChunkDataResponse` 
+message containing the requested chunk data pack. The execution node sends this response back to the`Requester` engine.
+The `Requester` engine receives the chunk data pack response, verifies its integrity, and passes it to the registered `ChunkDataPackHandler`, 
+i.e., the `Fetcher` engine.
+
+### Retry and Backoff Mechanism
+In case a `ChunkDataPackRequest` does not receive a response within a certain period, the `Requester` engine retries the request to ensure data retrieval.
+It implements an exponential backoff mechanism for retrying failed requests.
+The retry interval, backoff multiplier, and backoff intervals can be customized using the respective configuration parameters.
+
+### Handling Sealed Blocks
+If a `ChunkDataPackRequest` pertains to a block that has already been sealed, the `Requester` engine recognizes this and 
+removes the corresponding request from the pending requests cache. 
+It notifies the `ChunkDataPackHandler` (i.e., the `Fetcher` engine) about the sealing of the block to ensure proper handling.
+
+### Parallel Chunk Data Pack Retrieval
+The `Requester` processes a number of chunk data pack requests in parallel, 
+dispatching them to execution nodes and handling the received responses. 
+However, it is important to note that if a chunk data pack request does not receive a response from the execution nodes, 
+the `Requester` engine can become stuck in processing, waiting for the missing chunk data pack. 
+To mitigate this, the engine implements a retry and backoff mechanism, ensuring that requests are retried and backed off if necessary. 
+This mechanism helps to prevent prolonged waiting and allows the engine to continue processing other requests while waiting for the missing chunk data pack response.
+
 
 # Notifier
 The Notifier implements the following state machine
