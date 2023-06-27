@@ -3,12 +3,12 @@ package metrics
 import (
 	"time"
 
-	"github.com/onflow/flow-go/module"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/mempool"
 )
 
