@@ -3,7 +3,7 @@
 package mocknetwork
 
 import (
-	slashing "github.com/onflow/flow-go/network/slashing"
+	network "github.com/onflow/flow-go/network"
 	mock "github.com/stretchr/testify/mock"
 )
 
@@ -13,11 +13,11 @@ type ViolationsConsumer struct {
 }
 
 // OnInvalidMsgError provides a mock function with given fields: violation
-func (_m *ViolationsConsumer) OnInvalidMsgError(violation *slashing.Violation) error {
+func (_m *ViolationsConsumer) OnInvalidMsgError(violation *network.Violation) error {
 	ret := _m.Called(violation)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(*slashing.Violation) error); ok {
+	if rf, ok := ret.Get(0).(func(*network.Violation) error); ok {
 		r0 = rf(violation)
 	} else {
 		r0 = ret.Error(0)
@@ -27,11 +27,11 @@ func (_m *ViolationsConsumer) OnInvalidMsgError(violation *slashing.Violation) e
 }
 
 // OnSenderEjectedError provides a mock function with given fields: violation
-func (_m *ViolationsConsumer) OnSenderEjectedError(violation *slashing.Violation) error {
+func (_m *ViolationsConsumer) OnSenderEjectedError(violation *network.Violation) error {
 	ret := _m.Called(violation)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(*slashing.Violation) error); ok {
+	if rf, ok := ret.Get(0).(func(*network.Violation) error); ok {
 		r0 = rf(violation)
 	} else {
 		r0 = ret.Error(0)
@@ -41,11 +41,11 @@ func (_m *ViolationsConsumer) OnSenderEjectedError(violation *slashing.Violation
 }
 
 // OnUnAuthorizedSenderError provides a mock function with given fields: violation
-func (_m *ViolationsConsumer) OnUnAuthorizedSenderError(violation *slashing.Violation) error {
+func (_m *ViolationsConsumer) OnUnAuthorizedSenderError(violation *network.Violation) error {
 	ret := _m.Called(violation)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(*slashing.Violation) error); ok {
+	if rf, ok := ret.Get(0).(func(*network.Violation) error); ok {
 		r0 = rf(violation)
 	} else {
 		r0 = ret.Error(0)
@@ -55,11 +55,11 @@ func (_m *ViolationsConsumer) OnUnAuthorizedSenderError(violation *slashing.Viol
 }
 
 // OnUnauthorizedPublishOnChannel provides a mock function with given fields: violation
-func (_m *ViolationsConsumer) OnUnauthorizedPublishOnChannel(violation *slashing.Violation) error {
+func (_m *ViolationsConsumer) OnUnauthorizedPublishOnChannel(violation *network.Violation) error {
 	ret := _m.Called(violation)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(*slashing.Violation) error); ok {
+	if rf, ok := ret.Get(0).(func(*network.Violation) error); ok {
 		r0 = rf(violation)
 	} else {
 		r0 = ret.Error(0)
@@ -69,11 +69,11 @@ func (_m *ViolationsConsumer) OnUnauthorizedPublishOnChannel(violation *slashing
 }
 
 // OnUnauthorizedUnicastOnChannel provides a mock function with given fields: violation
-func (_m *ViolationsConsumer) OnUnauthorizedUnicastOnChannel(violation *slashing.Violation) error {
+func (_m *ViolationsConsumer) OnUnauthorizedUnicastOnChannel(violation *network.Violation) error {
 	ret := _m.Called(violation)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(*slashing.Violation) error); ok {
+	if rf, ok := ret.Get(0).(func(*network.Violation) error); ok {
 		r0 = rf(violation)
 	} else {
 		r0 = ret.Error(0)
@@ -83,11 +83,11 @@ func (_m *ViolationsConsumer) OnUnauthorizedUnicastOnChannel(violation *slashing
 }
 
 // OnUnexpectedError provides a mock function with given fields: violation
-func (_m *ViolationsConsumer) OnUnexpectedError(violation *slashing.Violation) error {
+func (_m *ViolationsConsumer) OnUnexpectedError(violation *network.Violation) error {
 	ret := _m.Called(violation)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(*slashing.Violation) error); ok {
+	if rf, ok := ret.Get(0).(func(*network.Violation) error); ok {
 		r0 = rf(violation)
 	} else {
 		r0 = ret.Error(0)
@@ -97,11 +97,11 @@ func (_m *ViolationsConsumer) OnUnexpectedError(violation *slashing.Violation) e
 }
 
 // OnUnknownMsgTypeError provides a mock function with given fields: violation
-func (_m *ViolationsConsumer) OnUnknownMsgTypeError(violation *slashing.Violation) error {
+func (_m *ViolationsConsumer) OnUnknownMsgTypeError(violation *network.Violation) error {
 	ret := _m.Called(violation)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(*slashing.Violation) error); ok {
+	if rf, ok := ret.Get(0).(func(*network.Violation) error); ok {
 		r0 = rf(violation)
 	} else {
 		r0 = ret.Error(0)

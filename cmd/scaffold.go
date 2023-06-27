@@ -60,7 +60,6 @@ import (
 	"github.com/onflow/flow-go/network/p2p/unicast/protocols"
 	"github.com/onflow/flow-go/network/p2p/unicast/ratelimit"
 	"github.com/onflow/flow-go/network/p2p/utils/ratelimiter"
-	"github.com/onflow/flow-go/network/slashing"
 	"github.com/onflow/flow-go/network/topology"
 	"github.com/onflow/flow-go/state/protocol"
 	badgerState "github.com/onflow/flow-go/state/protocol/badger"
@@ -456,9 +455,6 @@ func (fnb *FlowNodeBuilder) InitFlowNetworkWithConduitFactory(
 		UnicastMessageTimeout: fnb.FlowConfig.NetworkConfig.UnicastMessageTimeout,
 		IdTranslator:          fnb.IDTranslator,
 		Codec:                 fnb.CodecFactory(),
-		SlashingViolationsConsumer: slashing.NewSlashingViolationsConsumer(fnb.Logger, fnb.Metrics.Network, func() network.MisbehaviorReportConsumer {
-			return fnb.MisbehaviorReportConsumer
-		}),
 	},
 		mwOpts...)
 

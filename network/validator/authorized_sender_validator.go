@@ -8,11 +8,11 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/codec"
 	"github.com/onflow/flow-go/network/message"
 	"github.com/onflow/flow-go/network/p2p"
-	"github.com/onflow/flow-go/network/slashing"
 )
 
 var (
@@ -25,12 +25,12 @@ type GetIdentityFunc func(peer.ID) (*flow.Identity, bool)
 // AuthorizedSenderValidator performs message authorization validation.
 type AuthorizedSenderValidator struct {
 	log                        zerolog.Logger
-	slashingViolationsConsumer slashing.ViolationsConsumer
+	slashingViolationsConsumer network.ViolationsConsumer
 	getIdentity                GetIdentityFunc
 }
 
 // NewAuthorizedSenderValidator returns a new AuthorizedSenderValidator
-func NewAuthorizedSenderValidator(log zerolog.Logger, slashingViolationsConsumer slashing.ViolationsConsumer, getIdentity GetIdentityFunc) *AuthorizedSenderValidator {
+func NewAuthorizedSenderValidator(log zerolog.Logger, slashingViolationsConsumer network.ViolationsConsumer, getIdentity GetIdentityFunc) *AuthorizedSenderValidator {
 	return &AuthorizedSenderValidator{
 		log:                        log.With().Str("component", "authorized_sender_validator").Logger(),
 		slashingViolationsConsumer: slashingViolationsConsumer,
@@ -61,7 +61,7 @@ func (av *AuthorizedSenderValidator) Validate(from peer.ID, payload []byte, chan
 	// something terrible went wrong.
 	identity, ok := av.getIdentity(from)
 	if !ok {
-		violation := &slashing.Violation{PeerID: from.String(), Channel: channel, Protocol: protocol, Err: ErrIdentityUnverified}
+		violation := &network.Violation{PeerID: from.String(), Channel: channel, Protocol: protocol, Err: ErrIdentityUnverified}
 		err := av.slashingViolationsConsumer.OnUnAuthorizedSenderError(violation)
 		av.checkSlashingViolationsConsumerErr(err)
 		return "", ErrIdentityUnverified
@@ -69,7 +69,7 @@ func (av *AuthorizedSenderValidator) Validate(from peer.ID, payload []byte, chan
 
 	msgCode, err := codec.MessageCodeFromPayload(payload)
 	if err != nil {
-		violation := &slashing.Violation{OriginID: identity.NodeID, Identity: identity, PeerID: from.String(), Channel: channel, Protocol: protocol, Err: err}
+		violation := &network.Violation{OriginID: identity.NodeID, Identity: identity, PeerID: from.String(), Channel: channel, Protocol: protocol, Err: err}
 		svcErr := av.slashingViolationsConsumer.OnUnknownMsgTypeError(violation)
 		av.checkSlashingViolationsConsumerErr(svcErr)
 		return "", err
@@ -80,30 +80,30 @@ func (av *AuthorizedSenderValidator) Validate(from peer.ID, payload []byte, chan
 	case err == nil:
 		return msgType, nil
 	case message.IsUnknownMsgTypeErr(err) || codec.IsErrUnknownMsgCode(err):
-		violation := &slashing.Violation{OriginID: identity.NodeID, Identity: identity, PeerID: from.String(), MsgType: msgType, Channel: channel, Protocol: protocol, Err: err}
+		violation := &network.Violation{OriginID: identity.NodeID, Identity: identity, PeerID: from.String(), MsgType: msgType, Channel: channel, Protocol: protocol, Err: err}
 		svcErr := av.slashingViolationsConsumer.OnUnknownMsgTypeError(violation)
 		av.checkSlashingViolationsConsumerErr(svcErr)
 		return msgType, err
 	case errors.Is(err, message.ErrUnauthorizedMessageOnChannel) || errors.Is(err, message.ErrUnauthorizedRole):
-		violation := &slashing.Violation{OriginID: identity.NodeID, Identity: identity, PeerID: from.String(), MsgType: msgType, Channel: channel, Protocol: protocol, Err: err}
+		violation := &network.Violation{OriginID: identity.NodeID, Identity: identity, PeerID: from.String(), MsgType: msgType, Channel: channel, Protocol: protocol, Err: err}
 		svcErr := av.slashingViolationsConsumer.OnUnAuthorizedSenderError(violation)
 		av.checkSlashingViolationsConsumerErr(svcErr)
 
 		return msgType, err
 	case errors.Is(err, ErrSenderEjected):
-		violation := &slashing.Violation{OriginID: identity.NodeID, Identity: identity, PeerID: from.String(), MsgType: msgType, Channel: channel, Protocol: protocol, Err: err}
+		violation := &network.Violation{OriginID: identity.NodeID, Identity: identity, PeerID: from.String(), MsgType: msgType, Channel: channel, Protocol: protocol, Err: err}
 		svcErr := av.slashingViolationsConsumer.OnSenderEjectedError(violation)
 		av.checkSlashingViolationsConsumerErr(svcErr)
 
 		return msgType, err
 	case errors.Is(err, message.ErrUnauthorizedUnicastOnChannel):
-		violation := &slashing.Violation{OriginID: identity.NodeID, Identity: identity, PeerID: from.String(), MsgType: msgType, Channel: channel, Protocol: protocol, Err: err}
+		violation := &network.Violation{OriginID: identity.NodeID, Identity: identity, PeerID: from.String(), MsgType: msgType, Channel: channel, Protocol: protocol, Err: err}
 		svcErr := av.slashingViolationsConsumer.OnUnauthorizedUnicastOnChannel(violation)
 		av.checkSlashingViolationsConsumerErr(svcErr)
 
 		return msgType, err
 	case errors.Is(err, message.ErrUnauthorizedPublishOnChannel):
-		violation := &slashing.Violation{OriginID: identity.NodeID, Identity: identity, PeerID: from.String(), MsgType: msgType, Channel: channel, Protocol: protocol, Err: err}
+		violation := &network.Violation{OriginID: identity.NodeID, Identity: identity, PeerID: from.String(), MsgType: msgType, Channel: channel, Protocol: protocol, Err: err}
 		svcErr := av.slashingViolationsConsumer.OnUnauthorizedPublishOnChannel(violation)
 		av.checkSlashingViolationsConsumerErr(svcErr)
 
@@ -113,7 +113,7 @@ func (av *AuthorizedSenderValidator) Validate(from peer.ID, payload []byte, chan
 		// don't crash as a result of external inputs since that creates a DoS vector
 		// collect slashing data because this could potentially lead to slashing
 		err = fmt.Errorf("unexpected error during message validation: %w", err)
-		violation := &slashing.Violation{OriginID: identity.NodeID, Identity: identity, PeerID: from.String(), MsgType: msgType, Channel: channel, Protocol: protocol, Err: err}
+		violation := &network.Violation{OriginID: identity.NodeID, Identity: identity, PeerID: from.String(), MsgType: msgType, Channel: channel, Protocol: protocol, Err: err}
 		svcErr := av.slashingViolationsConsumer.OnUnexpectedError(violation)
 		av.checkSlashingViolationsConsumerErr(svcErr)
 

@@ -1,4 +1,4 @@
-package slashing
+package network
 
 import (
 	"github.com/onflow/flow-go/model/flow"

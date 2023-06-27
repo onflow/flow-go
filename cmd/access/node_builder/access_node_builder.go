@@ -78,7 +78,6 @@ import (
 	"github.com/onflow/flow-go/network/p2p/translator"
 	"github.com/onflow/flow-go/network/p2p/unicast/protocols"
 	relaynet "github.com/onflow/flow-go/network/relay"
-	"github.com/onflow/flow-go/network/slashing"
 	"github.com/onflow/flow-go/network/topology"
 	"github.com/onflow/flow-go/network/validator"
 	"github.com/onflow/flow-go/state/protocol"
@@ -1271,9 +1270,6 @@ func (builder *FlowAccessNodeBuilder) initMiddleware(nodeID flow.Identifier,
 		UnicastMessageTimeout: middleware.DefaultUnicastTimeout,
 		IdTranslator:          builder.IDTranslator,
 		Codec:                 builder.CodecFactory(),
-		SlashingViolationsConsumer: slashing.NewSlashingViolationsConsumer(logger, networkMetrics, func() network.MisbehaviorReportConsumer {
-			return builder.MisbehaviorReportConsumer
-		}),
 	},
 		middleware.WithMessageValidators(validators...), // use default identifier provider
 	)

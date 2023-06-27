@@ -35,7 +35,6 @@ import (
 	"github.com/onflow/flow-go/network/p2p/unicast/protocols"
 	"github.com/onflow/flow-go/network/p2p/unicast/ratelimit"
 	"github.com/onflow/flow-go/network/p2p/utils"
-	"github.com/onflow/flow-go/network/slashing"
 	"github.com/onflow/flow-go/network/validator"
 	flowpubsub "github.com/onflow/flow-go/network/validator/pubsub"
 	_ "github.com/onflow/flow-go/utils/binstat"
@@ -104,7 +103,7 @@ type Middleware struct {
 	idTranslator               p2p.IDTranslator
 	previousProtocolStatePeers []peer.AddrInfo
 	codec                      network.Codec
-	slashingViolationsConsumer slashing.ViolationsConsumer
+	slashingViolationsConsumer network.ViolationsConsumer
 	unicastRateLimiters        *ratelimit.RateLimiters
 	authorizedSenderValidator  *validator.AuthorizedSenderValidator
 }
@@ -140,15 +139,14 @@ func WithUnicastRateLimiters(rateLimiters *ratelimit.RateLimiters) OptionFn {
 
 // Config is the configuration for the middleware.
 type Config struct {
-	Logger                     zerolog.Logger
-	Libp2pNode                 p2p.LibP2PNode
-	FlowId                     flow.Identifier // This node's Flow ID
-	BitSwapMetrics             module.BitswapMetrics
-	RootBlockID                flow.Identifier
-	UnicastMessageTimeout      time.Duration
-	IdTranslator               p2p.IDTranslator
-	Codec                      network.Codec
-	SlashingViolationsConsumer slashing.ViolationsConsumer
+	Logger                zerolog.Logger
+	Libp2pNode            p2p.LibP2PNode
+	FlowId                flow.Identifier // This node's Flow ID
+	BitSwapMetrics        module.BitswapMetrics
+	RootBlockID           flow.Identifier
+	UnicastMessageTimeout time.Duration
+	IdTranslator          p2p.IDTranslator
+	Codec                 network.Codec
 }
 
 // Validate validates the configuration, and sets default values for any missing fields.
@@ -172,16 +170,15 @@ func NewMiddleware(cfg *Config, opts ...OptionFn) *Middleware {
 
 	// create the node entity and inject dependencies & config
 	mw := &Middleware{
-		log:                        cfg.Logger,
-		libP2PNode:                 cfg.Libp2pNode,
-		bitswapMetrics:             cfg.BitSwapMetrics,
-		rootBlockID:                cfg.RootBlockID,
-		validators:                 DefaultValidators(cfg.Logger, cfg.FlowId),
-		unicastMessageTimeout:      cfg.UnicastMessageTimeout,
-		idTranslator:               cfg.IdTranslator,
-		codec:                      cfg.Codec,
-		slashingViolationsConsumer: cfg.SlashingViolationsConsumer,
-		unicastRateLimiters:        ratelimit.NoopRateLimiters(),
+		log:                   cfg.Logger,
+		libP2PNode:            cfg.Libp2pNode,
+		bitswapMetrics:        cfg.BitSwapMetrics,
+		rootBlockID:           cfg.RootBlockID,
+		validators:            DefaultValidators(cfg.Logger, cfg.FlowId),
+		unicastMessageTimeout: cfg.UnicastMessageTimeout,
+		idTranslator:          cfg.IdTranslator,
+		codec:                 cfg.Codec,
+		unicastRateLimiters:   ratelimit.NoopRateLimiters(),
 	}
 
 	for _, opt := range opts {
@@ -302,6 +299,11 @@ func (m *Middleware) UpdateNodeAddresses() {
 
 func (m *Middleware) SetOverlay(ov network.Overlay) {
 	m.ov = ov
+}
+
+// SetSlashingViolationsConsumer sets the slashing violations consumer.
+func (m *Middleware) SetSlashingViolationsConsumer(consumer network.ViolationsConsumer) {
+	m.slashingViolationsConsumer = consumer
 }
 
 // authorizedPeers is a peer manager callback used by the underlying libp2p node that updates who can connect to this node (as
@@ -518,7 +520,7 @@ func (m *Middleware) handleIncomingStream(s libp2pnetwork.Stream) {
 
 		// ignore messages if node does not have subscription to topic
 		if !m.libP2PNode.HasSubscription(topic) {
-			violation := &slashing.Violation{
+			violation := &network.Violation{
 				Identity: nil, PeerID: remotePeer.String(), Channel: channel, Protocol: message.ProtocolTypeUnicast,
 			}
 
@@ -654,7 +656,7 @@ func (m *Middleware) processUnicastStreamMessage(remotePeer peer.ID, msg *messag
 	// we can remove this check
 	maxSize, err := unicastMaxMsgSizeByCode(msg.Payload)
 	if err != nil {
-		svcErr := m.slashingViolationsConsumer.OnUnknownMsgTypeError(&slashing.Violation{
+		svcErr := m.slashingViolationsConsumer.OnUnknownMsgTypeError(&network.Violation{
 			Identity: nil, PeerID: remotePeer.String(), MsgType: "", Channel: channel, Protocol: message.ProtocolTypeUnicast, Err: err,
 		})
 		m.checkSlashingViolationsConsumerErr(svcErr)
@@ -709,7 +711,7 @@ func (m *Middleware) processAuthenticatedMessage(msg *message.Message, peerID pe
 	switch {
 	case codec.IsErrUnknownMsgCode(err):
 		// slash peer if message contains unknown message code byte
-		violation := &slashing.Violation{
+		violation := &network.Violation{
 			PeerID: peerID.String(), OriginID: originId, Channel: channel, Protocol: protocol, Err: err,
 		}
 		svcErr := m.slashingViolationsConsumer.OnUnknownMsgTypeError(violation)
@@ -717,7 +719,7 @@ func (m *Middleware) processAuthenticatedMessage(msg *message.Message, peerID pe
 		return
 	case codec.IsErrMsgUnmarshal(err) || codec.IsErrInvalidEncoding(err):
 		// slash if peer sent a message that could not be marshalled into the message type denoted by the message code byte
-		violation := &slashing.Violation{
+		violation := &network.Violation{
 			PeerID: peerID.String(), OriginID: originId, Channel: channel, Protocol: protocol, Err: err,
 		}
 		svcErr := m.slashingViolationsConsumer.OnInvalidMsgError(violation)
@@ -728,7 +730,7 @@ func (m *Middleware) processAuthenticatedMessage(msg *message.Message, peerID pe
 		// don't crash as a result of external inputs since that creates a DoS vector
 		// collect slashing data because this could potentially lead to slashing
 		err = fmt.Errorf("unexpected error during message validation: %w", err)
-		violation := &slashing.Violation{
+		violation := &network.Violation{
 			PeerID: peerID.String(), OriginID: originId, Channel: channel, Protocol: protocol, Err: err,
 		}
 		svcErr := m.slashingViolationsConsumer.OnUnexpectedError(violation)

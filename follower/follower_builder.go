@@ -57,7 +57,6 @@ import (
 	"github.com/onflow/flow-go/network/p2p/translator"
 	"github.com/onflow/flow-go/network/p2p/unicast/protocols"
 	"github.com/onflow/flow-go/network/p2p/utils"
-	"github.com/onflow/flow-go/network/slashing"
 	"github.com/onflow/flow-go/network/validator"
 	"github.com/onflow/flow-go/state/protocol"
 	badgerState "github.com/onflow/flow-go/state/protocol/badger"
@@ -761,9 +760,6 @@ func (builder *FollowerServiceBuilder) initMiddleware(nodeID flow.Identifier,
 		UnicastMessageTimeout: middleware.DefaultUnicastTimeout,
 		IdTranslator:          builder.IDTranslator,
 		Codec:                 builder.CodecFactory(),
-		SlashingViolationsConsumer: slashing.NewSlashingViolationsConsumer(builder.Logger, builder.Metrics.Network, func() network.MisbehaviorReportConsumer {
-			return builder.MisbehaviorReportConsumer
-		}),
 	},
 		middleware.WithMessageValidators(validators...),
 	)
