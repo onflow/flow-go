@@ -353,7 +353,9 @@ func WithZeroJitterAndZeroBackoff(t *testing.T) func(*p2pconfig.PeerManagerConfi
 			backoff := discoveryBackoff.NewExponentialBackoff(
 				1*time.Second,
 				1*time.Hour,
-				discoveryBackoff.FullJitter,
+				func(_, _, _ time.Duration, _ *crand.Rand) time.Duration {
+					return 0 // no jitter
+				},
 				time.Second,
 				1,
 				0,
