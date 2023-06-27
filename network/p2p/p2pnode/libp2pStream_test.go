@@ -487,7 +487,7 @@ func TestUnicastOverStream_Fallback(t *testing.T) {
 func TestCreateStreamTimeoutWithUnresponsiveNode(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
-	idProvider := mockmodule.NewIdentityProvider(t)
+	idProvider := testutils.NewUpdatableIDProvider(flow.IdentityList{})
 	// creates a regular node
 	nodes, identities := p2ptest.NodesFixture(t,
 		unittest.IdentifierFixture(),
@@ -496,10 +496,7 @@ func TestCreateStreamTimeoutWithUnresponsiveNode(t *testing.T) {
 		idProvider,
 	)
 	require.Len(t, identities, 1)
-	for i, node := range nodes {
-		idProvider.On("ByPeerID", node.Host().ID()).Return(&identities[i], true).Maybe()
-
-	}
+	idProvider.SetIdentities(identities)
 	p2ptest.StartNodes(t, signalerCtx, nodes, 100*time.Millisecond)
 	defer p2ptest.StopNodes(t, nodes, cancel, 100*time.Millisecond)
 
