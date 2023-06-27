@@ -3,6 +3,7 @@ package backend
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"testing"
 
 	"github.com/dgraph-io/badger/v2"
@@ -2295,6 +2296,7 @@ func (suite *Suite) TestExecuteScriptOnArchiveNode() {
 	connFactory.On("GetAccessAPIClientWithPort", mock.Anything, mockPort).Return(suite.archiveClient, &mockCloser{}, nil)
 	connFactory.On("InvalidateAccessAPIClient", mock.Anything)
 	archiveNode := unittest.IdentityFixture(unittest.WithRole(flow.RoleAccess))
+	fullArchiveAddress := archiveNode.Address + ":" + strconv.FormatUint(uint64(mockPort), 10)
 
 	// create the handler with the mock
 	backend := New(
@@ -2316,7 +2318,7 @@ func (suite *Suite) TestExecuteScriptOnArchiveNode() {
 		nil,
 		suite.log,
 		DefaultSnapshotHistoryLimit,
-		[]string{archiveNode.Address},
+		[]string{fullArchiveAddress},
 	)
 
 	// mock parameters
