@@ -13,7 +13,10 @@ import (
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/atomic"
 
+	"github.com/onflow/flow-go/network/p2p/connection"
 	"github.com/onflow/flow-go/network/p2p/dht"
+	p2pconfig "github.com/onflow/flow-go/network/p2p/p2pbuilder/config"
+	p2ptest "github.com/onflow/flow-go/network/p2p/test"
 	"github.com/onflow/flow-go/utils/unittest"
 
 	"github.com/onflow/flow-go/model/flow"
@@ -80,9 +83,13 @@ func (suite *BlobServiceTestSuite) SetupTest() {
 
 	ids, nodes, _ := testutils.GenerateIDs(suite.T(),
 		suite.numNodes,
-		testutils.WithDHT("blob_service_test", dht.AsServer()),
-		testutils.WithPeerUpdateInterval(time.Second))
-	mws, _ := testutils.GenerateMiddlewares(suite.T(), ids, nodes)
+		p2ptest.WithDHTOptions(dht.AsServer()),
+		p2ptest.WithPeerManagerEnabled(&p2pconfig.PeerManagerConfig{
+			UpdateInterval:    1 * time.Second,
+			ConnectionPruning: true,
+			ConnectorFactory:  connection.DefaultLibp2pBackoffConnectorFactory(),
+		}, nil))
+	mws, _ := testutils.GenerateMiddlewares(suite.T(), ids, nodes, testutils.MiddlewareConfigFixture(suite.T()))
 	suite.networks = testutils.NetworksFixture(suite.T(), ids, mws)
 	testutils.StartNodesAndNetworks(signalerCtx, suite.T(), nodes, suite.networks, 100*time.Millisecond)
 

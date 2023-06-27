@@ -147,6 +147,10 @@ func NodeFixture(
 		builder.SetGossipSubTracer(parameters.PubSubTracer)
 	}
 
+	if parameters.UnicastRateLimitDistributor != nil {
+		builder.SetRateLimiterDistributor(parameters.UnicastRateLimitDistributor)
+	}
+
 	builder.SetGossipSubScoreTracerInterval(parameters.GossipSubPeerScoreTracerInterval)
 
 	n, err := builder.Build()
@@ -194,6 +198,13 @@ type NodeFixtureParameters struct {
 	GossipSubPeerScoreTracerInterval time.Duration // intervals at which the peer score is updated and logged.
 	CreateStreamRetryDelay           time.Duration
 	GossipSubRPCInspector            p2p.GossipSubInspectorSuite
+	UnicastRateLimitDistributor      p2p.UnicastRateLimiterDistributor
+}
+
+func WithUnicastRateLimitDistributor(distributor p2p.UnicastRateLimiterDistributor) NodeFixtureParameterOption {
+	return func(p *NodeFixtureParameters) {
+		p.UnicastRateLimitDistributor = distributor
+	}
 }
 
 func WithGossipSubRpcInspectorSuite(inspectorSuite p2p.GossipSubInspectorSuite) NodeFixtureParameterOption {
@@ -305,6 +316,12 @@ func WithPeerScoreTracerInterval(interval time.Duration) NodeFixtureParameterOpt
 func WithDefaultResourceManager() NodeFixtureParameterOption {
 	return func(p *NodeFixtureParameters) {
 		p.ResourceManager = nil
+	}
+}
+
+func WithUnicastHandlerFunc(handler network.StreamHandler) NodeFixtureParameterOption {
+	return func(p *NodeFixtureParameters) {
+		p.HandlerFunc = handler
 	}
 }
 
