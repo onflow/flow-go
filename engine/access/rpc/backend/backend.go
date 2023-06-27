@@ -111,7 +111,7 @@ func New(
 		log.Fatal().Err(err).Msg("failed to initialize script logging cache")
 	}
 
-	var archivePorts []uint
+	archivePorts := make([]uint, len(archiveAddressList))
 	for idx, addr := range archiveAddressList {
 		port, err := findPortFromAddress(addr)
 		if err != nil {
