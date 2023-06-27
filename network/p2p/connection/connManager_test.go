@@ -13,10 +13,11 @@ import (
 
 	"github.com/onflow/flow-go/config"
 	netconf "github.com/onflow/flow-go/config/network"
+	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
-	mockmodule "github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/network/internal/p2pfixtures"
+	"github.com/onflow/flow-go/network/internal/testutils"
 	"github.com/onflow/flow-go/network/p2p/connection"
 	p2ptest "github.com/onflow/flow-go/network/p2p/test"
 	"github.com/onflow/flow-go/network/p2p/utils"
@@ -117,14 +118,14 @@ func TestConnectionManager_Watermarking(t *testing.T) {
 		metrics.NewNoopCollector(),
 		cfg)
 	require.NoError(t, err)
-	idProvider := mockmodule.NewIdentityProvider(t)
+	idProvider := testutils.NewUpdatableIDProvider(flow.IdentityList{})
 	thisNode, identity := p2ptest.NodeFixture(
 		t,
 		sporkId,
 		t.Name(),
 		idProvider,
 		p2ptest.WithConnectionManager(thisConnMgr))
-	idProvider.On("ByPeerID", thisNode.Host().ID()).Return(&identity, true).Maybe()
+	idProvider.SetIdentities(flow.IdentityList{&identity})
 
 	otherNodes, _ := p2ptest.NodesFixture(t, sporkId, t.Name(), 5, idProvider)
 

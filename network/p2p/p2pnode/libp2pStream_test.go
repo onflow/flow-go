@@ -152,17 +152,14 @@ func testCreateStream(t *testing.T, sporkId flow.Identifier, unicasts []protocol
 	count := 2
 	ctx, cancel := context.WithCancel(context.Background())
 	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
-	idProvider := mockmodule.NewIdentityProvider(t)
+	idProvider := testutils.NewUpdatableIDProvider(flow.IdentityList{})
 	nodes, identities := p2ptest.NodesFixture(t,
 		sporkId,
 		"test_create_stream",
 		count,
 		idProvider,
 		p2ptest.WithPreferredUnicasts(unicasts))
-	for i, node := range nodes {
-		idProvider.On("ByPeerID", node.Host().ID()).Return(&identities[i], true).Maybe()
-
-	}
+	idProvider.SetIdentities(identities)
 	p2ptest.StartNodes(t, signalerCtx, nodes, 100*time.Millisecond)
 	defer p2ptest.StopNodes(t, nodes, cancel, 100*time.Millisecond)
 
