@@ -62,12 +62,7 @@ const (
 	// LargeMsgUnicastTimeout is the maximum time to wait for a unicast request to complete for large message size
 	LargeMsgUnicastTimeout = 1000 * time.Second
 
-	// DisallowListCacheSize is the maximum number of peers that can be disallow-listed at a time. The recommended
-	// size is 100 * number of staked nodes. Note that when the cache is full, there is no eviction policy and
-	// disallow-listing a new peer will fail. Hence, the cache size should be set to a value that is large enough
-	// to accommodate all the peers that can be disallow-listed at a time. Also, note that this cache is only taking
-	// the staked (authorized) peers. Hence, Sybil attacks are not possible.
-	DisallowListCacheSize = 100 * 1000
+	violationDisseminateErr = "failed to disseminate slashing violation on slashing violations consumer"
 )
 
 var (
@@ -831,7 +826,7 @@ func (m *Middleware) IsConnected(nodeID flow.Identifier) (bool, error) {
 
 func (m *Middleware) checkSlashingViolationsConsumerErr(err error) {
 	if err != nil {
-		m.log.Error().Err(err).Msg("failed to disseminate slashing violation on slashing violations consumer")
+		m.log.Error().Err(err).Msg(violationDisseminateErr)
 	}
 }
 
