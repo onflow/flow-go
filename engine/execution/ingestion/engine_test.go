@@ -238,6 +238,7 @@ func runWithEngine(t *testing.T, f func(testingContext)) {
 		nil,
 		uploadMgr,
 		stopControl,
+		false,
 	)
 	require.NoError(t, err)
 
@@ -1591,6 +1592,7 @@ func newIngestionEngine(t *testing.T, ps *mocks.ProtocolState, es *mockExecution
 			false,
 			false,
 		),
+		false,
 	)
 
 	require.NoError(t, err)
