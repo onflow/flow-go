@@ -15,84 +15,200 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
+// TestConvertEventWithoutPayloadConversion tests converting events to and from protobuf messages
+// with no payload modification
+func TestConvertEventWithoutPayloadConversion(t *testing.T) {
+	t.Parallel()
+
+	txID := unittest.IdentifierFixture()
+	cadenceValue, err := cadence.NewValue(2)
+	require.NoError(t, err)
+
+	t.Run("convert empty event", func(t *testing.T) {
+		event := unittest.EventFixture(flow.EventAccountCreated, 2, 3, txID, 0)
+
+		msg := convert.EventToMessage(event)
+		converted := convert.MessageToEvent(msg)
+
+		assert.Equal(t, event, converted)
+	})
+
+	t.Run("convert json cdc encoded event", func(t *testing.T) {
+		ccfPayload, err := ccf.Encode(cadenceValue)
+		require.NoError(t, err)
+
+		event := unittest.EventFixture(flow.EventAccountCreated, 2, 3, txID, 0)
+		event.Payload = ccfPayload
+
+		msg := convert.EventToMessage(event)
+		converted := convert.MessageToEvent(msg)
+
+		assert.Equal(t, event, converted)
+	})
+
+	t.Run("convert json cdc encoded event", func(t *testing.T) {
+		jsonPayload, err := jsoncdc.Encode(cadenceValue)
+		require.NoError(t, err)
+
+		event := unittest.EventFixture(flow.EventAccountCreated, 2, 3, txID, 0)
+		event.Payload = jsonPayload
+
+		msg := convert.EventToMessage(event)
+		converted := convert.MessageToEvent(msg)
+
+		assert.Equal(t, event.Type, converted.Type)
+	})
+}
+
+// TestConvertEventWithPayloadConversion tests converting events to and from protobuf messages
+// with payload modification
+func TestConvertEventWithPayloadConversion(t *testing.T) {
+	t.Parallel()
+
+	txID := unittest.IdentifierFixture()
+	cadenceValue, err := cadence.NewValue(2)
+	require.NoError(t, err)
+
+	ccfEvent := unittest.EventFixture(flow.EventAccountCreated, 2, 3, txID, 0)
+	ccfEvent.Payload, err = ccf.Encode(cadenceValue)
+	require.NoError(t, err)
+
+	jsonEvent := unittest.EventFixture(flow.EventAccountCreated, 2, 3, txID, 0)
+	jsonEvent.Payload, err = jsoncdc.Encode(cadenceValue)
+	require.NoError(t, err)
+
+	t.Run("convert empty ccf payload", func(t *testing.T) {
+		event := unittest.EventFixture(flow.EventAccountCreated, 2, 3, txID, 0)
+
+		msg := convert.EventToMessage(event)
+		convertedEvent, err := convert.MessageToEventFromVersion(msg, execproto.EventEncodingVersion_CCF_V0)
+		assert.NoError(t, err)
+
+		assert.Equal(t, event, *convertedEvent)
+	})
+
+	t.Run("convert empty jsoncdc payload", func(t *testing.T) {
+		event := unittest.EventFixture(flow.EventAccountCreated, 2, 3, txID, 0)
+
+		msg := convert.EventToMessage(event)
+		convertedEvent, err := convert.MessageToEventFromVersion(msg, execproto.EventEncodingVersion_JSON_CDC_V0)
+		assert.NoError(t, err)
+
+		assert.Equal(t, event, *convertedEvent)
+	})
+
+	t.Run("convert payload from ccf to jsoncdc", func(t *testing.T) {
+		message := convert.EventToMessage(ccfEvent)
+		convertedEvent, err := convert.MessageToEventFromVersion(message, execproto.EventEncodingVersion_CCF_V0)
+		assert.NoError(t, err)
+
+		assert.Equal(t, jsonEvent, *convertedEvent)
+	})
+
+	t.Run("convert payload from jsoncdc to jsoncdc", func(t *testing.T) {
+		message := convert.EventToMessage(jsonEvent)
+		convertedEvent, err := convert.MessageToEventFromVersion(message, execproto.EventEncodingVersion_JSON_CDC_V0)
+		assert.NoError(t, err)
+
+		assert.Equal(t, jsonEvent, *convertedEvent)
+	})
+}
+
 func TestConvertEvents(t *testing.T) {
+	t.Parallel()
+
+	eventCount := 3
+	txID := unittest.IdentifierFixture()
+
+	events := make([]flow.Event, eventCount)
+	ccfEvents := make([]flow.Event, eventCount)
+	jsonEvents := make([]flow.Event, eventCount)
+	for i := 0; i < eventCount; i++ {
+		cadenceValue, err := cadence.NewValue(i)
+		require.NoError(t, err)
+
+		eventIndex := 3 + uint32(i)
+
+		event := unittest.EventFixture(flow.EventAccountCreated, 2, eventIndex, txID, 0)
+		ccfEvent := unittest.EventFixture(flow.EventAccountCreated, 2, eventIndex, txID, 0)
+		jsonEvent := unittest.EventFixture(flow.EventAccountCreated, 2, eventIndex, txID, 0)
+
+		ccfEvent.Payload, err = ccf.Encode(cadenceValue)
+		require.NoError(t, err)
+
+		jsonEvent.Payload, err = jsoncdc.Encode(cadenceValue)
+		require.NoError(t, err)
+
+		events[i] = event
+		ccfEvents[i] = ccfEvent
+		jsonEvents[i] = jsonEvent
+	}
+
 	t.Run("empty", func(t *testing.T) {
 		messages := convert.EventsToMessages(nil)
 		assert.Len(t, messages, 0)
 	})
 
-	t.Run("simple", func(t *testing.T) {
+	t.Run("convert with passthrough payload conversion", func(t *testing.T) {
+		messages := convert.EventsToMessages(events)
+		require.Len(t, messages, len(events))
 
-		txID := unittest.IdentifierFixture()
-		event := unittest.EventFixture(flow.EventAccountCreated, 2, 3, txID, 0)
+		for i, message := range messages {
+			event := events[i]
+			require.Equal(t, event.EventIndex, message.EventIndex)
+			require.Equal(t, event.TransactionIndex, message.TransactionIndex)
+			require.Equal(t, event.Payload, message.Payload)
+			require.Equal(t, event.TransactionID[:], message.TransactionId)
+			require.Equal(t, string(event.Type), message.Type)
+		}
 
-		messages := convert.EventsToMessages([]flow.Event{event})
-
-		require.Len(t, messages, 1)
-
-		message := messages[0]
-
-		require.Equal(t, event.EventIndex, message.EventIndex)
-		require.Equal(t, event.TransactionIndex, message.TransactionIndex)
-		require.Equal(t, event.Payload, message.Payload)
-		require.Equal(t, event.TransactionID[:], message.TransactionId)
-		require.Equal(t, string(event.Type), message.Type)
+		converted := convert.MessagesToEvents(messages)
+		assert.Equal(t, events, converted)
 	})
 
-	t.Run("convert event from ccf format", func(t *testing.T) {
-		cadenceValue, err := cadence.NewValue(2)
-		require.NoError(t, err)
-		ccfPayload, err := ccf.Encode(cadenceValue)
-		require.NoError(t, err)
-		jsonPayload, err := jsoncdc.Encode(cadenceValue)
-		require.NoError(t, err)
-		txID := unittest.IdentifierFixture()
-		ccfEvent := unittest.EventFixture(
-			flow.EventAccountCreated, 2, 3, txID, 0)
-		ccfEvent.Payload = ccfPayload
-		jsonEvent := unittest.EventFixture(
-			flow.EventAccountCreated, 2, 3, txID, 0)
-		jsonEvent.Payload = jsonPayload
-		message := convert.EventToMessage(ccfEvent)
-		convertedEvent, err := convert.MessageToEventFromVersion(message, execproto.EventEncodingVersion_CCF_V0)
+	t.Run("convert event from ccf to jsoncdc", func(t *testing.T) {
+		messages := convert.EventsToMessages(ccfEvents)
+		converted, err := convert.MessagesToEventsFromVersion(messages, execproto.EventEncodingVersion_CCF_V0)
 		assert.NoError(t, err)
-		assert.Equal(t, jsonEvent, *convertedEvent)
+
+		assert.Equal(t, jsonEvents, converted)
 	})
 
-	t.Run("convert event from json cdc format", func(t *testing.T) {
-		cadenceValue, err := cadence.NewValue(2)
-		require.NoError(t, err)
-		txID := unittest.IdentifierFixture()
-		jsonEvent := unittest.EventFixture(
-			flow.EventAccountCreated, 2, 3, txID, 0)
-		jsonPayload, err := jsoncdc.Encode(cadenceValue)
-		require.NoError(t, err)
-		jsonEvent.Payload = jsonPayload
-		message := convert.EventToMessage(jsonEvent)
-		convertedEvent, err := convert.MessageToEventFromVersion(message, execproto.EventEncodingVersion_JSON_CDC_V0)
+	t.Run("convert event from jsoncdc", func(t *testing.T) {
+		messages := convert.EventsToMessages(jsonEvents)
+		converted, err := convert.MessagesToEventsFromVersion(messages, execproto.EventEncodingVersion_JSON_CDC_V0)
 		assert.NoError(t, err)
-		assert.Equal(t, jsonEvent, *convertedEvent)
+
+		assert.Equal(t, jsonEvents, converted)
 	})
+}
 
-	t.Run("convert payload from ccf to jsoncdc", func(t *testing.T) {
-		// Round trip conversion check
-		cadenceValue, err := cadence.NewValue(2)
-		require.NoError(t, err)
-		ccfPayload, err := ccf.Encode(cadenceValue)
-		require.NoError(t, err)
-		txID := unittest.IdentifierFixture()
-		ccfEvent := unittest.EventFixture(
-			flow.EventAccountCreated, 2, 3, txID, 0)
-		ccfEvent.Payload = ccfPayload
+func TestConvertServiceEvent(t *testing.T) {
+	t.Parallel()
 
-		jsonEvent := unittest.EventFixture(
-			flow.EventAccountCreated, 2, 3, txID, 0)
-		jsonPayload, err := jsoncdc.Encode(cadenceValue)
-		require.NoError(t, err)
-		jsonEvent.Payload = jsonPayload
+	serviceEvents := unittest.ServiceEventsFixture(1)
+	require.Len(t, serviceEvents, 1)
 
-		res, err := convert.CcfEventToJsonEvent(ccfEvent)
-		require.NoError(t, err)
-		require.Equal(t, jsonEvent, *res)
-	})
+	msg, err := convert.ServiceEventToMessage(serviceEvents[0])
+	require.NoError(t, err)
+
+	converted, err := convert.MessageToServiceEvent(msg)
+	require.NoError(t, err)
+
+	assert.Equal(t, serviceEvents[0], *converted)
+}
+
+func TestConvertServiceEventList(t *testing.T) {
+	t.Parallel()
+
+	serviceEvents := unittest.ServiceEventsFixture(5)
+	require.Len(t, serviceEvents, 5)
+
+	msg, err := convert.ServiceEventListToMessages(serviceEvents)
+	require.NoError(t, err)
+
+	converted, err := convert.MessagesToServiceEventList(msg)
+	require.NoError(t, err)
+
+	assert.Equal(t, serviceEvents, converted)
 }
