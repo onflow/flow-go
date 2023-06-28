@@ -8,15 +8,14 @@ import (
 
 	"github.com/gorilla/mux"
 
-	"github.com/onflow/flow-go/engine/access/rest"
 	"github.com/onflow/flow-go/module"
 )
 
-func MetricsMiddleware(restCollector module.RestMetrics) mux.MiddlewareFunc {
+func MetricsMiddleware(restCollector module.RestMetrics, urlToRoute func(string) (string, error)) mux.MiddlewareFunc {
 	metricsMiddleware := middleware.New(middleware.Config{Recorder: restCollector})
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-			routeName, err := rest.URLToRoute(req.URL.Path)
+			routeName, err := urlToRoute(req.URL.Path)
 			if err != nil {
 				return
 			}

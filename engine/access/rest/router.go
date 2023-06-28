@@ -24,7 +24,7 @@ func newRouter(backend access.API, logger zerolog.Logger, chain flow.Chain, rest
 	v1SubRouter.Use(middleware.LoggingMiddleware(logger))
 	v1SubRouter.Use(middleware.QueryExpandable())
 	v1SubRouter.Use(middleware.QuerySelect())
-	v1SubRouter.Use(middleware.MetricsMiddleware(restCollector))
+	v1SubRouter.Use(middleware.MetricsMiddleware(restCollector, URLToRoute))
 
 	linkGenerator := models.NewLinkGeneratorImpl(v1SubRouter)
 
@@ -119,7 +119,7 @@ var Routes = []route{{
 }}
 
 var routeUrlMap = map[string]string{}
-var routeRE = regexp.MustCompile("/v1/([\\w]+)(/([\\w]+)(/([\\w]+))?)?")
+var routeRE = regexp.MustCompile(`(?i)/v1/(\w+)(/(\w+)(/(\w+))?)?`)
 
 func init() {
 	for _, r := range Routes {
