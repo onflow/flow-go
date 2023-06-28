@@ -47,7 +47,7 @@ type UnicastAuthorizationTestSuite struct {
 	// receiverID the identity on the mw sending the message
 	receiverID *flow.Identity
 	// providers id providers generated at beginning of a test run
-	providers []*testutils.UpdatableIDProvider
+	providers []*unittest.UpdatableIDProvider
 	// cancel is the cancel func from the context that was used to start the middlewares in a test run
 	cancel context.CancelFunc
 	// waitCh is the channel used to wait for the middleware to perform authorization and invoke the slashing

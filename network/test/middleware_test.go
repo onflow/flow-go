@@ -79,7 +79,7 @@ type MiddlewareTestSuite struct {
 	ids       []*flow.Identity
 	metrics   *metrics.NoopCollector // no-op performance monitoring simulation
 	logger    zerolog.Logger
-	providers []*testutils.UpdatableIDProvider
+	providers []*unittest.UpdatableIDProvider
 
 	mwCancel context.CancelFunc
 	mwCtx    irrecoverable.SignalerContext
@@ -238,7 +238,7 @@ func (m *MiddlewareTestSuite) TestUnicastRateLimit_Messages() {
 	opts := []ratelimit.RateLimitersOption{ratelimit.WithMessageRateLimiter(messageRateLimiter), ratelimit.WithNotifier(distributor), ratelimit.WithDisabledRateLimiting(false)}
 	rateLimiters := ratelimit.NewRateLimiters(opts...)
 
-	idProvider := testutils.NewUpdatableIDProvider(m.ids)
+	idProvider := unittest.NewUpdatableIDProvider(m.ids)
 
 	ids, libP2PNodes, _ := testutils.LibP2PNodeForMiddlewareFixture(m.T(),
 		1,
@@ -389,7 +389,7 @@ func (m *MiddlewareTestSuite) TestUnicastRateLimit_Bandwidth() {
 	opts := []ratelimit.RateLimitersOption{ratelimit.WithBandwidthRateLimiter(bandwidthRateLimiter), ratelimit.WithNotifier(distributor), ratelimit.WithDisabledRateLimiting(false)}
 	rateLimiters := ratelimit.NewRateLimiters(opts...)
 
-	idProvider := testutils.NewUpdatableIDProvider(m.ids)
+	idProvider := unittest.NewUpdatableIDProvider(m.ids)
 	// create a new staked identity
 	ids, libP2PNodes, _ := testutils.LibP2PNodeForMiddlewareFixture(m.T(),
 		1,
@@ -501,7 +501,7 @@ func (m *MiddlewareTestSuite) TestUnicastRateLimit_Bandwidth() {
 	require.Equal(m.T(), uint64(1), rateLimits.Load())
 }
 
-func (m *MiddlewareTestSuite) createOverlay(provider *testutils.UpdatableIDProvider) *mocknetwork.Overlay {
+func (m *MiddlewareTestSuite) createOverlay(provider *unittest.UpdatableIDProvider) *mocknetwork.Overlay {
 	overlay := &mocknetwork.Overlay{}
 	overlay.On("Identities").Maybe().Return(func() flow.IdentityList {
 		return provider.Identities(filter.Any)

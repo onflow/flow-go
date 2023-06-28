@@ -11,16 +11,15 @@ import (
 	"testing"
 	"time"
 
-	"github.com/onflow/flow-go/network/internal/testutils"
-	"github.com/onflow/flow-go/network/p2p"
-	p2ptest "github.com/onflow/flow-go/network/p2p/test"
-
 	"github.com/libp2p/go-libp2p/core"
 	"github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/peerstore"
 	"github.com/libp2p/go-libp2p/p2p/net/swarm"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/onflow/flow-go/network/p2p"
+	p2ptest "github.com/onflow/flow-go/network/p2p/test"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/irrecoverable"
@@ -43,7 +42,7 @@ func TestStreamClosing(t *testing.T) {
 	var msgRegex = regexp.MustCompile("^hello[0-9]")
 
 	handler, streamCloseWG := mockStreamHandlerForMessages(t, ctx, count, msgRegex)
-	idProvider := testutils.NewUpdatableIDProvider(flow.IdentityList{})
+	idProvider := unittest.NewUpdatableIDProvider(flow.IdentityList{})
 	// Creates nodes
 	nodes, identities := p2ptest.NodesFixture(t,
 		unittest.IdentifierFixture(),
@@ -152,7 +151,7 @@ func testCreateStream(t *testing.T, sporkId flow.Identifier, unicasts []protocol
 	count := 2
 	ctx, cancel := context.WithCancel(context.Background())
 	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
-	idProvider := testutils.NewUpdatableIDProvider(flow.IdentityList{})
+	idProvider := unittest.NewUpdatableIDProvider(flow.IdentityList{})
 	nodes, identities := p2ptest.NodesFixture(t,
 		sporkId,
 		"test_create_stream",
@@ -281,7 +280,7 @@ func TestCreateStream_FallBack(t *testing.T) {
 func TestCreateStreamIsConcurrencySafe(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
-	idProvider := testutils.NewUpdatableIDProvider(flow.IdentityList{})
+	idProvider := unittest.NewUpdatableIDProvider(flow.IdentityList{})
 	// create two nodes
 	nodes, identities := p2ptest.NodesFixture(t, unittest.IdentifierFixture(), "test_create_stream_is_concurrency_safe", 2, idProvider)
 	require.Len(t, identities, 2)
@@ -329,7 +328,7 @@ func TestNoBackoffWhenCreatingStream(t *testing.T) {
 
 	ctx2, cancel2 := context.WithCancel(ctx)
 	signalerCtx2 := irrecoverable.NewMockSignalerContext(t, ctx2)
-	idProvider := testutils.NewUpdatableIDProvider(flow.IdentityList{})
+	idProvider := unittest.NewUpdatableIDProvider(flow.IdentityList{})
 	count := 2
 	// Creates nodes
 	nodes, identities := p2ptest.NodesFixture(t,
@@ -487,7 +486,7 @@ func TestUnicastOverStream_Fallback(t *testing.T) {
 func TestCreateStreamTimeoutWithUnresponsiveNode(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
-	idProvider := testutils.NewUpdatableIDProvider(flow.IdentityList{})
+	idProvider := unittest.NewUpdatableIDProvider(flow.IdentityList{})
 	// creates a regular node
 	nodes, identities := p2ptest.NodesFixture(t,
 		unittest.IdentifierFixture(),
@@ -529,7 +528,7 @@ func TestCreateStreamTimeoutWithUnresponsiveNode(t *testing.T) {
 func TestCreateStreamIsConcurrent(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
-	idProvider := testutils.NewUpdatableIDProvider(flow.IdentityList{})
+	idProvider := unittest.NewUpdatableIDProvider(flow.IdentityList{})
 	// create two regular node
 	goodNodes, goodNodeIds := p2ptest.NodesFixture(t,
 		unittest.IdentifierFixture(),

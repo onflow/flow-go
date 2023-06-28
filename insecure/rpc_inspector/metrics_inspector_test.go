@@ -15,7 +15,6 @@ import (
 	"github.com/onflow/flow-go/insecure/internal"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/irrecoverable"
-	mockmodule "github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/inspector"
@@ -29,7 +28,8 @@ func TestMetricsInspector_ObserveRPC(t *testing.T) {
 	t.Parallel()
 	role := flow.RoleConsensus
 	sporkID := unittest.IdentifierFixture()
-	spammer := corruptlibp2p.NewGossipSubRouterSpammer(t, sporkID, role, nil)
+	idProvider := unittest.NewUpdatableIDProvider(flow.IdentityList{})
+	spammer := corruptlibp2p.NewGossipSubRouterSpammer(t, sporkID, role, idProvider)
 	ctx, cancel := context.WithCancel(context.Background())
 	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
 
@@ -57,7 +57,6 @@ func TestMetricsInspector_ObserveRPC(t *testing.T) {
 		})
 	metricsInspector := inspector.NewControlMsgMetricsInspector(unittest.Logger(), mockMetricsObserver, 2)
 	corruptInspectorFunc := corruptlibp2p.CorruptInspectorFunc(metricsInspector)
-	idProvider := mockmodule.NewIdentityProvider(t)
 	victimNode, victimIdentity := p2ptest.NodeFixture(
 		t,
 		sporkID,
@@ -67,7 +66,7 @@ func TestMetricsInspector_ObserveRPC(t *testing.T) {
 		internal.WithCorruptGossipSub(corruptlibp2p.CorruptGossipSubFactory(),
 			corruptlibp2p.CorruptGossipSubConfigFactoryWithInspector(corruptInspectorFunc)),
 	)
-	idProvider.On("ByPeerID", victimNode.Host().ID()).Return(&victimIdentity, true).Maybe()
+	idProvider.SetIdentities(flow.IdentityList{&victimIdentity, &spammer.SpammerId})
 	metricsInspector.Start(signalerCtx)
 	nodes := []p2p.LibP2PNode{victimNode, spammer.SpammerNode}
 	startNodesAndEnsureConnected(t, signalerCtx, nodes, sporkID)

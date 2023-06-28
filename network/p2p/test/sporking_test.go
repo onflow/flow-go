@@ -5,16 +5,15 @@ import (
 	"testing"
 	"time"
 
-	"github.com/onflow/flow-go/model/flow"
-	libp2pmessage "github.com/onflow/flow-go/model/libp2p/message"
-	"github.com/onflow/flow-go/network"
-	"github.com/onflow/flow-go/network/internal/testutils"
-	"github.com/onflow/flow-go/network/message"
-
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/peerstore"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/onflow/flow-go/model/flow"
+	libp2pmessage "github.com/onflow/flow-go/model/libp2p/message"
+	"github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/network/message"
 
 	"github.com/onflow/flow-go/network/p2p"
 	p2ptest "github.com/onflow/flow-go/network/p2p/test"
@@ -41,7 +40,7 @@ import (
 // TestCrosstalkPreventionOnNetworkKeyChange tests that a node from the old chain cannot talk to a node in the new chain
 // if it's network key is updated while the libp2p protocol ID remains the same
 func TestCrosstalkPreventionOnNetworkKeyChange(t *testing.T) {
-	idProvider := testutils.NewUpdatableIDProvider(flow.IdentityList{})
+	idProvider := unittest.NewUpdatableIDProvider(flow.IdentityList{})
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -122,7 +121,7 @@ func TestCrosstalkPreventionOnNetworkKeyChange(t *testing.T) {
 // TestOneToOneCrosstalkPrevention tests that a node from the old chain cannot talk directly to a node in the new chain
 // if the Flow libp2p protocol ID is updated while the network keys are kept the same.
 func TestOneToOneCrosstalkPrevention(t *testing.T) {
-	idProvider := testutils.NewUpdatableIDProvider(flow.IdentityList{})
+	idProvider := unittest.NewUpdatableIDProvider(flow.IdentityList{})
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -182,7 +181,7 @@ func TestOneToOneCrosstalkPrevention(t *testing.T) {
 // TestOneToKCrosstalkPrevention tests that a node from the old chain cannot talk to a node in the new chain via PubSub
 // if the channel is updated while the network keys are kept the same.
 func TestOneToKCrosstalkPrevention(t *testing.T) {
-	idProvider := testutils.NewUpdatableIDProvider(flow.IdentityList{})
+	idProvider := unittest.NewUpdatableIDProvider(flow.IdentityList{})
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 

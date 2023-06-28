@@ -16,7 +16,6 @@ import (
 	"github.com/onflow/flow-go/module/irrecoverable"
 	mockmodule "github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/network/channels"
-	"github.com/onflow/flow-go/network/internal/testutils"
 	"github.com/onflow/flow-go/network/message"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/dht"
@@ -38,7 +37,7 @@ func TestFindPeerWithDHT(t *testing.T) {
 	golog.SetAllLoggers(golog.LevelFatal) // change this to Debug if libp2p logs are needed
 
 	sporkId := unittest.IdentifierFixture()
-	idProvider := testutils.NewUpdatableIDProvider(flow.IdentityList{})
+	idProvider := unittest.NewUpdatableIDProvider(flow.IdentityList{})
 	dhtServerNodes, serverIDs := p2ptest.NodesFixture(t, sporkId, "dht_test", 2, idProvider, p2ptest.WithDHTOptions(dht.AsServer()))
 	require.Len(t, dhtServerNodes, 2)
 

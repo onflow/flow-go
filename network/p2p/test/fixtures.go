@@ -68,6 +68,12 @@ func NodeFixture(
 		Build()
 	require.NoError(t, err)
 
+	require.NotNil(t, idProvider)
+	connectionGater := NewConnectionGater(idProvider, func(p peer.ID) error {
+		return nil
+	})
+	require.NotNil(t, connectionGater)
+
 	parameters := &NodeFixtureParameters{
 		HandlerFunc: func(stream network.Stream) {
 
@@ -76,6 +82,7 @@ func NodeFixture(
 		Key:                              NetworkingKeyFixtures(t),
 		Address:                          unittest.DefaultAddress,
 		Logger:                           logger,
+		IdProvider:                       idProvider,
 		Role:                             flow.RoleCollection,
 		CreateStreamRetryDelay:           unicast.DefaultRetryDelay,
 		Metrics:                          metrics.NewNoopCollector(),
@@ -83,9 +90,7 @@ func NodeFixture(
 		GossipSubPeerScoreTracerInterval: 0,                              // disabled by default
 		GossipSubRPCInspector:            rpcInspectorSuite,
 		PeerManagerConfig:                PeerManagerConfigFixture(), // disabled by default
-		ConnGater: NewConnectionGater(idProvider, func(p peer.ID) error {
-			return nil
-		}),
+		ConnGater:                        connectionGater,
 	}
 
 	for _, opt := range opts {
