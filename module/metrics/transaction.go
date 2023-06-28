@@ -8,24 +8,30 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/mempool"
 )
 
 type TransactionCollector struct {
-	transactionTimings         mempool.TransactionTimings
-	log                        zerolog.Logger
-	logTimeToFinalized         bool
-	logTimeToExecuted          bool
-	logTimeToFinalizedExecuted bool
-	timeToFinalized            prometheus.Summary
-	timeToExecuted             prometheus.Summary
-	timeToFinalizedExecuted    prometheus.Summary
-	transactionSubmission      *prometheus.CounterVec
-	scriptExecutedDuration     *prometheus.HistogramVec
-	transactionResultDuration  *prometheus.HistogramVec
-	scriptSize                 prometheus.Histogram
-	transactionSize            prometheus.Histogram
+	transactionTimings             mempool.TransactionTimings
+	log                            zerolog.Logger
+	logTimeToFinalized             bool
+	logTimeToExecuted              bool
+	logTimeToFinalizedExecuted     bool
+	timeToFinalized                prometheus.Summary
+	timeToExecuted                 prometheus.Summary
+	timeToFinalizedExecuted        prometheus.Summary
+	transactionSubmission          *prometheus.CounterVec
+	transactionSize                prometheus.Histogram
+	scriptExecutedDuration         *prometheus.HistogramVec
+	scriptExecutionErrorOnExecutor *prometheus.CounterVec
+	scriptSize                     prometheus.Histogram
+	transactionResultDuration      *prometheus.HistogramVec
 }
+
+// interface check
+var _ module.BackendScriptsMetrics = (*TransactionCollector)(nil)
+var _ module.TransactionMetrics = (*TransactionCollector)(nil)
 
 func NewTransactionCollector(
 	log zerolog.Logger,
@@ -97,6 +103,12 @@ func NewTransactionCollector(
 			Help:      "histogram for the duration in ms of the round trip time for executing a script",
 			Buckets:   []float64{1, 100, 500, 1000, 2000, 5000},
 		}, []string{"script_size"}),
+		scriptExecutionErrorOnExecutor: promauto.NewCounterVec(prometheus.CounterOpts{
+			Name:      "script_execution_error_archive",
+			Namespace: namespaceAccess,
+			Subsystem: subsystemTransactionSubmission,
+			Help:      "histogram for the internal errors for executing a script for a block on the archive node",
+		}, []string{"source"}),
 		transactionResultDuration: promauto.NewHistogramVec(prometheus.HistogramOpts{
 			Name:      "transaction_result_fetched_duration",
 			Namespace: namespaceAccess,
@@ -121,6 +133,8 @@ func NewTransactionCollector(
 	return tc
 }
 
+// Script exec metrics
+
 func (tc *TransactionCollector) ScriptExecuted(dur time.Duration, size int) {
 	// record the execute script duration and script size
 	tc.scriptSize.Observe(float64(size / 1024))
@@ -128,6 +142,18 @@ func (tc *TransactionCollector) ScriptExecuted(dur time.Duration, size int) {
 		"script_size": tc.sizeLabel(size),
 	}).Observe(float64(dur.Milliseconds()))
 }
+
+func (tc *TransactionCollector) ScriptExecutionErrorOnArchiveNode() {
+	// record the execution error along with blockID and scriptHash for Archive node
+	tc.scriptExecutionErrorOnExecutor.WithLabelValues("archive").Inc()
+}
+
+func (tc *TransactionCollector) ScriptExecutionErrorOnExecutionNode() {
+	// record the execution error along with blockID and scriptHash for Execution node
+	tc.scriptExecutionErrorOnExecutor.WithLabelValues("execution").Inc()
+}
+
+// TransactionResult metrics
 
 func (tc *TransactionCollector) TransactionResultFetched(dur time.Duration, size int) {
 	// record the transaction result duration and transaction script/payload size

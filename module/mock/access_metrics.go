@@ -73,6 +73,16 @@ func (_m *AccessMetrics) ScriptExecuted(dur time.Duration, size int) {
 	_m.Called(dur, size)
 }
 
+// ScriptExecutionErrorOnArchiveNode provides a mock function with given fields:
+func (_m *AccessMetrics) ScriptExecutionErrorOnArchiveNode() {
+	_m.Called()
+}
+
+// ScriptExecutionErrorOnExecutionNode provides a mock function with given fields:
+func (_m *AccessMetrics) ScriptExecutionErrorOnExecutionNode() {
+	_m.Called()
+}
+
 // TotalConnectionsInPool provides a mock function with given fields: connectionCount, connectionPoolSize
 func (_m *AccessMetrics) TotalConnectionsInPool(connectionCount uint, connectionPoolSize uint) {
 	_m.Called(connectionCount, connectionPoolSize)
