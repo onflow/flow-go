@@ -264,7 +264,10 @@ func WithAllTheFixins(payload *flow.Payload) {
 	payload.Seals = Seal.Fixtures(3)
 	payload.Guarantees = CollectionGuaranteesFixture(4)
 	for i := 0; i < 10; i++ {
-		receipt := ExecutionReceiptFixture()
+		receipt := ExecutionReceiptFixture(
+			WithResult(ExecutionResultFixture(WithServiceEvents(3))),
+			WithSpocks(SignaturesFixture(3)),
+		)
 		payload.Receipts = flow.ExecutionReceiptMetaList{receipt.Meta()}
 		payload.Results = flow.ExecutionResultList{&receipt.ExecutionResult}
 	}
@@ -713,11 +716,17 @@ func WithResult(result *flow.ExecutionResult) func(*flow.ExecutionReceipt) {
 	}
 }
 
+func WithSpocks(spocks []crypto.Signature) func(*flow.ExecutionReceipt) {
+	return func(receipt *flow.ExecutionReceipt) {
+		receipt.Spocks = spocks
+	}
+}
+
 func ExecutionReceiptFixture(opts ...func(*flow.ExecutionReceipt)) *flow.ExecutionReceipt {
 	receipt := &flow.ExecutionReceipt{
 		ExecutorID:        IdentifierFixture(),
 		ExecutionResult:   *ExecutionResultFixture(),
-		Spocks:            SignaturesFixture(5),
+		Spocks:            nil,
 		ExecutorSignature: SignatureFixture(),
 	}
 
@@ -849,7 +858,6 @@ func ExecutionResultFixture(opts ...func(*flow.ExecutionResult)) *flow.Execution
 		PreviousResultID: IdentifierFixture(),
 		BlockID:          IdentifierFixture(),
 		Chunks:           ChunkListFixture(2, blockID),
-		ServiceEvents:    ServiceEventsFixture(3),
 		ExecutionDataID:  IdentifierFixture(),
 	}
 

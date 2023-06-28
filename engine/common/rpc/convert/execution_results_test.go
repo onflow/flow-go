@@ -13,7 +13,7 @@ import (
 func TestConvertExecutionResult(t *testing.T) {
 	t.Parallel()
 
-	er := unittest.ExecutionResultFixture()
+	er := unittest.ExecutionResultFixture(unittest.WithServiceEvents(3))
 
 	msg, err := convert.ExecutionResultToMessage(er)
 	require.NoError(t, err)
@@ -28,9 +28,9 @@ func TestConvertExecutionResults(t *testing.T) {
 	t.Parallel()
 
 	results := []*flow.ExecutionResult{
-		unittest.ExecutionResultFixture(),
-		unittest.ExecutionResultFixture(),
-		unittest.ExecutionResultFixture(),
+		unittest.ExecutionResultFixture(unittest.WithServiceEvents(3)),
+		unittest.ExecutionResultFixture(unittest.WithServiceEvents(3)),
+		unittest.ExecutionResultFixture(unittest.WithServiceEvents(3)),
 	}
 
 	msg, err := convert.ExecutionResultsToMessages(results)
@@ -46,6 +46,7 @@ func TestConvertExecutionResultMetaList(t *testing.T) {
 	t.Parallel()
 
 	block := unittest.FullBlockFixture()
+	block.SetPayload(unittest.PayloadFixture(unittest.WithAllTheFixins))
 	metaList := block.Payload.Receipts
 
 	msg := convert.ExecutionResultMetaListToMessages(metaList)
