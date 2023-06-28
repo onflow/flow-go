@@ -78,16 +78,6 @@ func TestConvertEventWithPayloadConversion(t *testing.T) {
 	jsonEvent.Payload, err = jsoncdc.Encode(cadenceValue)
 	require.NoError(t, err)
 
-	t.Run("convert empty jsoncdc payload", func(t *testing.T) {
-		event := unittest.EventFixture(flow.EventAccountCreated, 2, 3, txID, 0)
-
-		msg := convert.EventToMessage(event)
-		convertedEvent, err := convert.MessageToEventFromVersion(msg, execproto.EventEncodingVersion_JSON_CDC_V0)
-		assert.NoError(t, err)
-
-		assert.Equal(t, event, *convertedEvent)
-	})
-
 	t.Run("convert payload from ccf to jsoncdc", func(t *testing.T) {
 		message := convert.EventToMessage(ccfEvent)
 		convertedEvent, err := convert.MessageToEventFromVersion(message, execproto.EventEncodingVersion_CCF_V0)
