@@ -50,15 +50,15 @@ func (l *limitConfigLogger) withBaseLimit(prefix string, baseLimit rcmgr.BaseLim
 		Int64(fmt.Sprintf("%s_memory", prefix), baseLimit.Memory).Logger()
 }
 
-func (l *limitConfigLogger) logResourceManagerLimits(config rcmgr.LimitConfig) {
+func (l *limitConfigLogger) logResourceManagerLimits(config rcmgr.ConcreteLimitConfig) {
 	l.logGlobalResourceLimits(config)
-	l.logServiceLimits(config.Service)
+	l.logServiceLimits(config.ToPartialLimitConfig().Service)
 	l.logProtocolLimits(config.Protocol)
 	l.logPeerLimits(config.Peer)
 	l.logPeerProtocolLimits(config.ProtocolPeer)
 }
 
-func (l *limitConfigLogger) logGlobalResourceLimits(config rcmgr.LimitConfig) {
+func (l *limitConfigLogger) logGlobalResourceLimits(config rcmgr.ResourceLimits) {
 	lg := l.withBaseLimit("system", config.System)
 	lg.Info().Msg("system limits set")
 
@@ -93,9 +93,9 @@ func (l *limitConfigLogger) logGlobalResourceLimits(config rcmgr.LimitConfig) {
 	lg.Info().Msg("stream limits set")
 }
 
-func (l *limitConfigLogger) logServiceLimits(s map[string]rcmgr.BaseLimit) {
+func (l *limitConfigLogger) logServiceLimits(s map[string]rcmgr.ResourceLimits) {
 	for sName, sLimits := range s {
-		lg := l.withBaseLimit(fmt.Sprintf("service_%s", sName), sLimits)
+		lg := l.withBaseLimit(fmt.Sprintf("service_%s", sName), sLimits.)
 		lg.Info().Msg("service limits set")
 	}
 }
