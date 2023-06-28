@@ -53,7 +53,7 @@ func TestNetworkPassesReportedMisbehavior(t *testing.T) {
 
 	misbehaviorReportManger.On("Ready").Return(readyDoneChan).Once()
 	misbehaviorReportManger.On("Done").Return(readyDoneChan).Once()
-	ids, nodes, _ := testutils.LibP2PNodeFixture(t, 1)
+	ids, nodes, _ := testutils.LibP2PNodeForMiddlewareFixture(t, 1)
 	mws, _ := testutils.MiddlewareFixtures(t, ids, nodes, testutils.MiddlewareConfigFixture(t))
 
 	networkCfg := testutils.NetworkConfigFixture(t, *ids[0], ids, mws[0])
@@ -110,7 +110,7 @@ func TestHandleReportedMisbehavior_Cache_Integration(t *testing.T) {
 			return cache
 		}),
 	}
-	ids, nodes, _ := testutils.LibP2PNodeFixture(t, 1)
+	ids, nodes, _ := testutils.LibP2PNodeForMiddlewareFixture(t, 1)
 	mws, _ := testutils.MiddlewareFixtures(t, ids, nodes, testutils.MiddlewareConfigFixture(t))
 	networkCfg := testutils.NetworkConfigFixture(t, *ids[0], ids, mws[0], p2p.WithAlspConfig(cfg))
 	net, err := p2p.NewNetwork(networkCfg)
@@ -204,7 +204,7 @@ func TestHandleReportedMisbehavior_And_DisallowListing_Integration(t *testing.T)
 		}),
 	}
 
-	ids, nodes, _ := testutils.LibP2PNodeFixture(t, 3,
+	ids, nodes, _ := testutils.LibP2PNodeForMiddlewareFixture(t, 3,
 		p2ptest.WithPeerManagerEnabled(p2ptest.PeerManagerConfigFixture(), nil))
 	mws, _ := testutils.MiddlewareFixtures(t, ids, nodes, testutils.MiddlewareConfigFixture(t))
 	networkCfg := testutils.NetworkConfigFixture(t, *ids[0], ids, mws[0], p2p.WithAlspConfig(cfg))
@@ -278,7 +278,7 @@ func TestMisbehaviorReportMetrics(t *testing.T) {
 	alspMetrics := mockmodule.NewAlspMetrics(t)
 	cfg.AlspMetrics = alspMetrics
 
-	ids, nodes, _ := testutils.LibP2PNodeFixture(t, 1)
+	ids, nodes, _ := testutils.LibP2PNodeForMiddlewareFixture(t, 1)
 	mws, _ := testutils.MiddlewareFixtures(t, ids, nodes, testutils.MiddlewareConfigFixture(t))
 	networkCfg := testutils.NetworkConfigFixture(t, *ids[0], ids, mws[0], p2p.WithAlspConfig(cfg))
 	net, err := p2p.NewNetwork(networkCfg)

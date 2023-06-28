@@ -106,7 +106,7 @@ func (m *MiddlewareTestSuite) SetupTest() {
 		log:  m.logger,
 	}
 
-	m.ids, m.nodes, obs = testutils.LibP2PNodeFixture(m.T(), m.size)
+	m.ids, m.nodes, obs = testutils.LibP2PNodeForMiddlewareFixture(m.T(), m.size)
 	m.mws, m.providers = testutils.MiddlewareFixtures(m.T(), m.ids, m.nodes, testutils.MiddlewareConfigFixture(m.T()))
 	for _, observableConnMgr := range obs {
 		observableConnMgr.Subscribe(&ob)
@@ -157,7 +157,7 @@ func (m *MiddlewareTestSuite) TestUpdateNodeAddresses() {
 	irrecoverableCtx := irrecoverable.NewMockSignalerContext(m.T(), ctx)
 
 	// create a new staked identity
-	ids, libP2PNodes, _ := testutils.LibP2PNodeFixture(m.T(), 1)
+	ids, libP2PNodes, _ := testutils.LibP2PNodeForMiddlewareFixture(m.T(), 1)
 	mws, providers := testutils.MiddlewareFixtures(m.T(), ids, libP2PNodes, testutils.MiddlewareConfigFixture(m.T()))
 	require.Len(m.T(), ids, 1)
 	require.Len(m.T(), providers, 1)
@@ -240,7 +240,7 @@ func (m *MiddlewareTestSuite) TestUnicastRateLimit_Messages() {
 
 	idProvider := testutils.NewUpdatableIDProvider(m.ids)
 
-	ids, libP2PNodes, _ := testutils.LibP2PNodeFixture(m.T(),
+	ids, libP2PNodes, _ := testutils.LibP2PNodeForMiddlewareFixture(m.T(),
 		1,
 		p2ptest.WithUnicastRateLimitDistributor(distributor),
 		p2ptest.WithConnectionGater(p2ptest.NewConnectionGater(idProvider, func(pid peer.ID) error {
@@ -391,7 +391,7 @@ func (m *MiddlewareTestSuite) TestUnicastRateLimit_Bandwidth() {
 
 	idProvider := testutils.NewUpdatableIDProvider(m.ids)
 	// create a new staked identity
-	ids, libP2PNodes, _ := testutils.LibP2PNodeFixture(m.T(),
+	ids, libP2PNodes, _ := testutils.LibP2PNodeForMiddlewareFixture(m.T(),
 		1,
 		p2ptest.WithUnicastRateLimitDistributor(distributor),
 		p2ptest.WithConnectionGater(p2ptest.NewConnectionGater(idProvider, func(pid peer.ID) error {

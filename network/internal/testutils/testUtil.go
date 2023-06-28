@@ -114,8 +114,8 @@ func NewTagWatchingConnManager(log zerolog.Logger, metrics module.LibP2PConnecti
 	}, nil
 }
 
-// LibP2PNodeFixture is a test helper that generate flow identities with a valid port and libp2p nodes.
-// Note that the LibP2PNode created by this fixture is meant to used with a network and middleware components.
+// LibP2PNodeForMiddlewareFixture is a test helper that generate flow identities with a valid port and libp2p nodes.
+// Note that the LibP2PNode created by this fixture is meant to used with a middleware component.
 // If you want to create a LibP2PNode for testing purpose, please use p2ptest.NodeFixture.
 // Args:
 //
@@ -129,7 +129,7 @@ func NewTagWatchingConnManager(log zerolog.Logger, metrics module.LibP2PConnecti
 //
 // []p2p.LibP2PNode - list of libp2p nodes created.
 // []observable.Observable - list of observables created for each node.
-func LibP2PNodeFixture(t *testing.T, n int, opts ...p2ptest.NodeFixtureParameterOption) (flow.IdentityList, []p2p.LibP2PNode, []observable.Observable) {
+func LibP2PNodeForMiddlewareFixture(t *testing.T, n int, opts ...p2ptest.NodeFixtureParameterOption) (flow.IdentityList, []p2p.LibP2PNode, []observable.Observable) {
 
 	libP2PNodes := make([]p2p.LibP2PNode, 0)
 	identities := make(flow.IdentityList, 0)
