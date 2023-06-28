@@ -731,6 +731,12 @@ type ExecutionMetrics interface {
 type BackendScriptsMetrics interface {
 	// Record the round trip time while executing a script
 	ScriptExecuted(dur time.Duration, size int)
+
+	// ScriptExecutionErrorOnExecutionNode records script execution failures on Execution Nodes
+	ScriptExecutionErrorOnArchiveNode()
+
+	// ScriptExecutionErrorOnArchiveNode records script execution failures in Archive Nodes
+	ScriptExecutionErrorOnExecutionNode()
 }
 
 type TransactionMetrics interface {
