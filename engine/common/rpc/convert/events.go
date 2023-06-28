@@ -147,9 +147,6 @@ func MessagesToServiceEventList(m []*entities.ServiceEvent) (
 
 // CcfPayloadToJsonPayload converts a CCF-encoded payload to a JSON-encoded payload
 func CcfPayloadToJsonPayload(p []byte) ([]byte, error) {
-	if len(p) == 0 {
-		return p, nil
-	}
 	val, err := ccf.Decode(nil, p)
 	if err != nil {
 		return nil, fmt.Errorf("unable to decode from ccf format: %w", err)
