@@ -120,8 +120,8 @@ func CreateNode(t *testing.T, networkKey crypto.PrivateKey, sporkID flow.Identif
 		sporkID,
 		idProvider,
 		&defaultFlowConfig.NetworkConfig.ResourceManagerConfig,
-		p2pconfig.PeerManagerDisableConfig(),
 		&defaultFlowConfig.NetworkConfig.GossipSubRPCInspectorsConfig,
+		p2pconfig.PeerManagerDisableConfig(),
 		&p2p.DisallowListCacheConfig{
 			MaxSize: uint32(1000),
 			Metrics: metrics.NewNoopCollector(),
