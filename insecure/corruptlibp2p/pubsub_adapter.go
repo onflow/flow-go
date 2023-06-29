@@ -33,7 +33,7 @@ type CorruptGossipSubAdapter struct {
 	router                *corrupt.GossipSubRouter
 	logger                zerolog.Logger
 	clusterChangeConsumer p2p.CollectionClusterChangesConsumer
-	peerScoreExposer p2p.PeerScoreExposer
+	peerScoreExposer      p2p.PeerScoreExposer
 }
 
 var _ p2p.PubSubAdapter = (*CorruptGossipSubAdapter)(nil)
@@ -126,7 +126,7 @@ func (c *CorruptGossipSubAdapter) PeerScoreExposer() p2p.PeerScoreExposer {
 	return c.peerScoreExposer
 }
 
-func NewCorruptGossipSubAdapter(ctx context.Context, logger zerolog.Logger, h host.Host, cfg p2p.PubSubAdapterConfig) (p2p.PubSubAdapter, *corrupt.GossipSubRouter, error) {
+func NewCorruptGossipSubAdapter(ctx context.Context, logger zerolog.Logger, h host.Host, cfg p2p.PubSubAdapterConfig, clusterChangeConsumer p2p.CollectionClusterChangesConsumer) (p2p.PubSubAdapter, *corrupt.GossipSubRouter, error) {
 	gossipSubConfig, ok := cfg.(*CorruptPubSubAdapterConfig)
 	if !ok {
 		return nil, nil, fmt.Errorf("invalid gossipsub config type: %T", cfg)
@@ -143,7 +143,6 @@ func NewCorruptGossipSubAdapter(ctx context.Context, logger zerolog.Logger, h ho
 
 	builder := component.NewComponentManagerBuilder()
 	adapter := &CorruptGossipSubAdapter{
-		Component:             builder,
 		gossipSub:             gossipSub,
 		router:                router,
 		logger:                logger,
