@@ -290,7 +290,7 @@ func (g *Builder) Build(ctx irrecoverable.SignalerContext) (p2p.PubSubAdapter, e
 		g.networkType,
 		g.idProvider)
 	if err != nil {
-		return nil, nil, fmt.Errorf("could not create gossipsub inspector suite: %w", err)
+		return nil, fmt.Errorf("could not create gossipsub inspector suite: %w", err)
 	}
 	gossipSubConfigs.WithInspectorSuite(inspectorSuite)
 
