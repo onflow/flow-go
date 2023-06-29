@@ -32,7 +32,6 @@ import (
 	"github.com/onflow/flow-go/engine/access/rpc"
 	"github.com/onflow/flow-go/engine/access/rpc/backend"
 	"github.com/onflow/flow-go/engine/common/follower"
-	"github.com/onflow/flow-go/engine/common/grpc/forwarder"
 	synceng "github.com/onflow/flow-go/engine/common/synchronization"
 	"github.com/onflow/flow-go/engine/protocol"
 	"github.com/onflow/flow-go/model/encodable"
@@ -913,7 +912,7 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 		}
 
 		// upstream access node forwarder
-		rpcForwarder, err := apiproxy.NewFlowAccessAPIForwarder(builder.upstreamIdentities, builder.apiTimeout, config.MaxMsgSize)
+		forwarder, err := apiproxy.NewFlowAccessAPIForwarder(builder.upstreamIdentities, builder.apiTimeout, config.MaxMsgSize)
 		if err != nil {
 			return nil, err
 		}
@@ -923,7 +922,7 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 		rpcHandler := &apiproxy.FlowAccessAPIRouter{
 			Logger:   builder.Logger,
 			Metrics:  observerCollector,
-			Upstream: rpcForwarder,
+			Upstream: forwarder,
 			Observer: protocol.NewHandler(protocol.New(
 				node.State,
 				node.Storage.Blocks,
@@ -931,21 +930,18 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 				backend.NewNetworkAPI(node.State, node.RootChainID, backend.DefaultSnapshotHistoryLimit),
 			)),
 		}
-		frw, err := forwarder.NewForwarder(
+
+		restHandler, err := restapiproxy.NewRestProxyHandler(
+			accessBackend,
 			builder.upstreamIdentities,
 			builder.apiTimeout,
-			config.MaxMsgSize)
+			config.MaxMsgSize,
+			builder.Logger,
+			observerCollector,
+			node.RootChainID.Chain())
 		if err != nil {
 			return nil, err
 		}
-
-		restHandler := &restapiproxy.RestProxyHandler{
-			Logger:  builder.Logger,
-			Metrics: observerCollector,
-			Chain:   node.RootChainID.Chain(),
-		}
-		restHandler.API = accessBackend
-		restHandler.Forwarder = frw
 
 		// build the rpc engine
 		builder.RpcEng, err = engineBuilder.

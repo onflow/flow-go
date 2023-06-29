@@ -418,7 +418,7 @@ func (s *ObserverSuite) getRestEndpoints() []RestEndpointTest {
 		{
 			name:   "getBlocksByHeight",
 			method: http.MethodGet,
-			path:   "/blocks?height=0",
+			path:   "/blocks?height=1",
 		},
 		{
 			name:   "getBlockPayloadByID",
@@ -448,7 +448,7 @@ func (s *ObserverSuite) getRestEndpoints() []RestEndpointTest {
 		{
 			name:   "getAccount",
 			method: http.MethodGet,
-			path:   "/accounts/" + account.Address.HexWithPrefix(),
+			path:   "/accounts/" + account.Address.HexWithPrefix() + "?block_height=1",
 		},
 		{
 			name:   "getEvents",

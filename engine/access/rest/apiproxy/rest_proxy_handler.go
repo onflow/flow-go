@@ -2,6 +2,7 @@ package apiproxy
 
 import (
 	"context"
+	"time"
 
 	"google.golang.org/grpc/status"
 
@@ -27,6 +28,37 @@ type RestProxyHandler struct {
 	Chain   flow.Chain
 }
 
+// NewRestProxyHandler returns a new rest proxy handler for observer node.
+func NewRestProxyHandler(
+	api access.API,
+	identities flow.IdentityList,
+	timeout time.Duration,
+	maxMsgSize uint,
+	log zerolog.Logger,
+	metrics metrics.ObserverMetrics,
+	chain flow.Chain,
+) (*RestProxyHandler, error) {
+
+	forwarder, err := forwarder.NewForwarder(
+		identities,
+		timeout,
+		maxMsgSize)
+	if err != nil {
+		return nil, err
+	}
+
+	restProxyHandler := &RestProxyHandler{
+		Logger:  log,
+		Metrics: metrics,
+		Chain:   chain,
+	}
+
+	restProxyHandler.API = api
+	restProxyHandler.Forwarder = forwarder
+
+	return restProxyHandler, nil
+}
+
 func (r *RestProxyHandler) log(handler, rpc string, err error) {
 	code := status.Code(err)
 	r.Metrics.RecordRPC(handler, rpc, code)
@@ -46,7 +78,7 @@ func (r *RestProxyHandler) log(handler, rpc string, err error) {
 }
 
 // GetLatestBlockHeader returns the latest block header and block status, if isSealed = true - returns the latest seal header.
-func (r *RestProxyHandler) GetLatestBlockHeader(ctx context.Context, isSealed bool) (*flow.Header, flow.BlockStatus, error) { //Uliana getAccount та GetEvents були з Upstream
+func (r *RestProxyHandler) GetLatestBlockHeader(ctx context.Context, isSealed bool) (*flow.Header, flow.BlockStatus, error) {
 	upstream, err := r.FaultTolerantClient()
 	if err != nil {
 		return nil, flow.BlockStatusUnknown, err
