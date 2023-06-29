@@ -69,6 +69,13 @@ func TestGossipSubInvalidMessageDelivery_Integration(t *testing.T) {
 				return p2ptest.PubsubMessageFixture(t, p2ptest.WithoutSignerId(), p2ptest.WithTopic(topic.String()))
 			},
 		},
+		{
+			name: "no sender, missing signature",
+			spamMsgFactory: func(_ peer.ID, victimId peer.ID, topic channels.Topic) *pubsub_pb.Message {
+				return p2ptest.PubsubMessageFixture(t, p2ptest.WithoutSignerId(), p2ptest.WithTopic(topic.String()), p2ptest.WithoutSignature())
+			},
+		},
+		
 	}
 
 	for _, tc := range tt {

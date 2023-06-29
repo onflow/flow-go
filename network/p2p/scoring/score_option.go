@@ -108,7 +108,7 @@ const (
 
 	// defaultTopicSkipAtomicValidation is the default value for the skip atomic validation flag for topics.
 	// We set it to true, which means gossipsub parameter validation will not fail if we leave some of the
-	// topic parameters at their default values, i.e., zero. This decision is since we are not setting all
+	// topic parameters at their default values, i.e., zero. This is because we are not setting all
 	// topic parameters at the current implementation.
 	defaultTopicSkipAtomicValidation = true
 
