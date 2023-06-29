@@ -23,7 +23,7 @@ import (
 	"github.com/onflow/flow-go/network/p2p/inspector"
 	"github.com/onflow/flow-go/network/p2p/inspector/validation"
 	p2pconfig "github.com/onflow/flow-go/network/p2p/p2pbuilder/config"
-	inspector2 "github.com/onflow/flow-go/network/p2p/p2pbuilder/inspector"
+	inspectorbuilder "github.com/onflow/flow-go/network/p2p/p2pbuilder/inspector"
 	"github.com/onflow/flow-go/network/p2p/p2pconf"
 	"github.com/onflow/flow-go/network/p2p/p2pnode"
 	"github.com/onflow/flow-go/network/p2p/scoring"
@@ -252,7 +252,7 @@ func defaultInspectorSuite() p2p.GossipSubRpcInspectorSuiteFactoryFunc {
 			return nil, fmt.Errorf("failed to create new control message valiadation inspector: %w", err)
 		}
 
-		return inspector2.NewGossipSubInspectorSuite([]p2p.GossipSubRPCInspector{metricsInspector, rpcValidationInspector}, notificationDistributor), nil
+		return inspectorbuilder.NewGossipSubInspectorSuite([]p2p.GossipSubRPCInspector{metricsInspector, rpcValidationInspector}, notificationDistributor), nil
 	}
 }
 
