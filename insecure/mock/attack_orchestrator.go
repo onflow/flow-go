@@ -26,6 +26,34 @@ func (_m *AttackOrchestrator) HandleEgressEvent(_a0 *insecure.EgressEvent) error
 	return r0
 }
 
+// HandleGossipSubEgressEvent provides a mock function with given fields: event
+func (_m *AttackOrchestrator) HandleGossipSubEgressEvent(event *insecure.GossipSubEgressEvent) error {
+	ret := _m.Called(event)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(*insecure.GossipSubEgressEvent) error); ok {
+		r0 = rf(event)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// HandleGossipSubIngressEvent provides a mock function with given fields: event
+func (_m *AttackOrchestrator) HandleGossipSubIngressEvent(event *insecure.GossipSubIngressEvent) error {
+	ret := _m.Called(event)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(*insecure.GossipSubIngressEvent) error); ok {
+		r0 = rf(event)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
 // HandleIngressEvent provides a mock function with given fields: _a0
 func (_m *AttackOrchestrator) HandleIngressEvent(_a0 *insecure.IngressEvent) error {
 	ret := _m.Called(_a0)

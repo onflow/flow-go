@@ -27,13 +27,13 @@ func TestGossipSubSignatureRequirement(t *testing.T) {
 // This tests ensures that message signing and message signature verification requirements are working as expected. It does not
 // test for malformed message signatures or impersonation message signatures.
 func (s *GossipSubSignatureRequirementTestSuite) TestGossipSubSignatureRequirement() {
-	s.Orchestrator.sendUnauthorizedMsgs(s.T())
-	s.Orchestrator.sendAuthorizedMsgs(s.T())
-	unittest.RequireReturnsBefore(s.T(), s.Orchestrator.authorizedEventReceivedWg.Wait, 5*time.Second, "could not send authorized messages on time")
+	s.orchestrator.sendUnauthorizedMsgs(s.T())
+	s.orchestrator.sendAuthorizedMsgs(s.T())
+	unittest.RequireReturnsBefore(s.T(), s.orchestrator.authorizedEventReceivedWg.Wait, 5*time.Second, "could not send authorized messages on time")
 
 	// messages without correct signature should have all been rejected at the libp2p level and not be delivered to the victim EN.
-	require.Equal(s.T(), int64(0), s.Orchestrator.unauthorizedEventsReceived.Load(), fmt.Sprintf("expected to not receive any unauthorized messages instead got: %d", s.Orchestrator.unauthorizedEventsReceived.Load()))
+	require.Equal(s.T(), int64(0), s.orchestrator.unauthorizedEventsReceived.Load(), fmt.Sprintf("expected to not receive any unauthorized messages instead got: %d", s.orchestrator.unauthorizedEventsReceived.Load()))
 
 	// messages with correct message signatures are expected to always pass libp2p signature verification and be delivered to the victim EN.
-	require.Equal(s.T(), int64(numOfAuthorizedEvents), s.Orchestrator.authorizedEventsReceived.Load(), fmt.Sprintf("expected to receive %d authorized events got: %d", numOfAuthorizedEvents, s.Orchestrator.unauthorizedEventsReceived.Load()))
+	require.Equal(s.T(), int64(numOfAuthorizedEvents), s.orchestrator.authorizedEventsReceived.Load(), fmt.Sprintf("expected to receive %d authorized events got: %d", numOfAuthorizedEvents, s.orchestrator.unauthorizedEventsReceived.Load()))
 }

@@ -27,6 +27,7 @@ import (
 	"github.com/onflow/flow-go/module/irrecoverable"
 	flownet "github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/channels"
+	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/utils/logging"
 )
 
@@ -48,6 +49,7 @@ type Network struct {
 	mu                    sync.Mutex
 	me                    module.Local
 	flowNetwork           flownet.Network // original flow network of the node.
+	corruptLibp2pNode     *p2p.LibP2PNode // need direct reference to libp2p node that's encapsulated inside Flow network
 	server                *grpc.Server    // touch point of orchestrator network to this factory.
 	gRPCListenAddress     net.Addr
 	conduitFactory        insecure.CorruptConduitFactory
@@ -75,6 +77,7 @@ func NewCorruptNetwork(
 	me module.Local,
 	codec flownet.Codec,
 	flowNetwork flownet.Network,
+	corruptLibp2pNode *p2p.LibP2PNode,
 	conduitFactory insecure.CorruptConduitFactory) (*Network, error) {
 	if chainId != flow.BftTestnet {
 		panic("illegal chain id for using corrupt network")
@@ -85,6 +88,7 @@ func NewCorruptNetwork(
 		me:                        me,
 		conduitFactory:            conduitFactory,
 		flowNetwork:               flowNetwork,
+		corruptLibp2pNode:         corruptLibp2pNode,
 		logger:                    logger.With().Str("component", "corrupt-network").Logger(),
 		receiptHasher:             utils.NewExecutionReceiptHasher(),
 		spockHasher:               utils.NewSPOCKHasher(),

@@ -34,11 +34,11 @@ type orchestrator struct {
 
 var _ insecure.AttackOrchestrator = &orchestrator{}
 
-func NewDummyOrchestrator(t *testing.T, Logger zerolog.Logger) *orchestrator {
+func NewOrchestrator(t *testing.T, Logger zerolog.Logger) *orchestrator {
 	o := &orchestrator{
 		BaseOrchestrator: &bft.BaseOrchestrator{
 			T:      t,
-			Logger: Logger.With().Str("component", "dummy-orchestrator").Logger(),
+			Logger: Logger.With().Str("component", "passthrough-orchestrator").Logger(),
 		},
 		egressEventTracker: map[string]flow.IdentifierList{
 			typeExecutionReceipt:  {},
@@ -102,7 +102,7 @@ func (o *orchestrator) HandleIngressEvent(event *insecure.IngressEvent) error {
 	return nil
 }
 
-// mustSeenEgressFlowProtocolEvent checks the dummy orchestrator has passed through the egress flow protocol events with given ids.
+// mustSeenEgressFlowProtocolEvent checks the passthrough orchestrator has passed through the egress flow protocol events with given ids.
 // It fails if any entity is gone missing from sight of the orchestrator.
 func (o *orchestrator) mustSeenEgressFlowProtocolEvent(t *testing.T, eventType string, ids ...flow.Identifier) {
 	events, ok := o.egressEventTracker[eventType]
@@ -113,7 +113,7 @@ func (o *orchestrator) mustSeenEgressFlowProtocolEvent(t *testing.T, eventType s
 	}
 }
 
-// mustSeenIngressFlowProtocolEvent checks the dummy orchestrator has passed through the ingress flow protocol events with given ids.
+// mustSeenIngressFlowProtocolEvent checks the passthrough orchestrator has passed through the ingress flow protocol events with given ids.
 // It fails if any entity is gone missing from sight of the orchestrator.
 func (o *orchestrator) mustSeenIngressFlowProtocolEvent(t *testing.T, eventType string, ids ...flow.Identifier) {
 	events, ok := o.ingressEventTracker[eventType]

@@ -29,7 +29,7 @@ type Network struct {
 	corruptConnector   insecure.CorruptedNodeConnector                      // connection generator to corrupt nodes.
 }
 
-var _ insecure.OrchestratorNetwork = &Network{}
+var _ insecure.OrchestratorNetwork = (*Network)(nil)
 
 func NewOrchestratorNetwork(
 	logger zerolog.Logger,

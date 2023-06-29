@@ -65,6 +65,34 @@ func (_m *OrchestratorNetwork) SendEgress(_a0 *insecure.EgressEvent) error {
 	return r0
 }
 
+// SendGossipSubEgress provides a mock function with given fields: event
+func (_m *OrchestratorNetwork) SendGossipSubEgress(event *insecure.GossipSubEgressEvent) error {
+	ret := _m.Called(event)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(*insecure.GossipSubEgressEvent) error); ok {
+		r0 = rf(event)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// SendGossipSubIngres provides a mock function with given fields: event
+func (_m *OrchestratorNetwork) SendGossipSubIngres(event *insecure.GossipSubIngressEvent) error {
+	ret := _m.Called(event)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(*insecure.GossipSubIngressEvent) error); ok {
+		r0 = rf(event)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
 // SendIngress provides a mock function with given fields: _a0
 func (_m *OrchestratorNetwork) SendIngress(_a0 *insecure.IngressEvent) error {
 	ret := _m.Called(_a0)

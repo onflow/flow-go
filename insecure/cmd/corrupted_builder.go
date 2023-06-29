@@ -114,6 +114,7 @@ func (cnb *CorruptedNodeBuilder) enqueueNetworkingLayer() {
 		if err != nil {
 			return nil, fmt.Errorf("failed to create libp2p node: %w", err)
 		}
+
 		cnb.LibP2PNode = corruptLibp2pNode
 		cnb.Logger.Info().
 			Hex("node_id", logging.ID(cnb.NodeID)).
@@ -153,6 +154,7 @@ func (cnb *CorruptedNodeBuilder) enqueueNetworkingLayer() {
 			cnb.Me,
 			cnb.CodecFactory(),
 			flowNetwork,
+			&cnb.LibP2PNode,
 			ccf)
 		if err != nil {
 			return nil, fmt.Errorf("could not create corruptible network: %w", err)

@@ -61,3 +61,11 @@ func ProtocolStr(p Protocol) string {
 
 	return ProtocolUnknown
 }
+
+// GossipSubIngressEvent is the incoming libp2p network layer event coming to a corrupt node (from an honest or corrupt node)
+type GossipSubIngressEvent struct {
+}
+
+// GossipSubEgressEvent is the outgoing libp2p network layer event coming from a corrupt node (to an honest or corrupt node)
+type GossipSubEgressEvent struct {
+}

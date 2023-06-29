@@ -27,8 +27,8 @@ const (
 	numOfUnauthorizedEvents = 10
 )
 
-// Orchestrator represents a simple `insecure.AttackOrchestrator` that tracks any unsigned messages received by victim nodes as well as the typically expected messages.
-type Orchestrator struct {
+// orchestrator represents a simple `insecure.AttackOrchestrator` that tracks any unsigned messages received by victim nodes as well as the typically expected messages.
+type orchestrator struct {
 	*bft.BaseOrchestrator
 	codec                      network.Codec
 	unauthorizedEventsReceived *atomic.Int64
@@ -41,10 +41,10 @@ type Orchestrator struct {
 	victimENID                 flow.Identifier
 }
 
-var _ insecure.AttackOrchestrator = &Orchestrator{}
+var _ insecure.AttackOrchestrator = &orchestrator{}
 
-func NewOrchestrator(t *testing.T, logger zerolog.Logger, attackerVNNoMsgSigning, attackerVNWithMsgSigning, victimEN flow.Identifier) *Orchestrator {
-	orchestrator := &Orchestrator{
+func NewOrchestrator(t *testing.T, logger zerolog.Logger, attackerVNNoMsgSigning, attackerVNWithMsgSigning, victimEN flow.Identifier) *orchestrator {
+	orchestrator := &orchestrator{
 		BaseOrchestrator: &bft.BaseOrchestrator{
 			T:      t,
 			Logger: logger.With().Str("component", "bft-test-orchestrator").Logger(),
@@ -67,7 +67,7 @@ func NewOrchestrator(t *testing.T, logger zerolog.Logger, attackerVNNoMsgSigning
 
 // trackIngressEvents callback that will track any unauthorized messages that are expected to be blocked by libp2p for message
 // signature validation failure. It also tracks all the authorized messages that are expected to be delivered to the node.
-func (s *Orchestrator) trackIngressEvents(event *insecure.IngressEvent) error {
+func (s *orchestrator) trackIngressEvents(event *insecure.IngressEvent) error {
 	// Track any unauthorized events that are received by the corrupted node that has disabled message signing.
 	// These messages should have been rejected by libp2p.
 	if _, ok := s.unauthorizedEvents[event.FlowProtocolEventID]; ok {
@@ -88,7 +88,7 @@ func (s *Orchestrator) trackIngressEvents(event *insecure.IngressEvent) error {
 // sendUnauthorizedMsgs publishes a number of unauthorized messages without signatures from one corrupt VN to another (victim) corrupt EN.
 // The sender is corrupt since the attacker needs to take control over what it sends. Moreover, the receiver is also corrupt as the testing
 // framework needs to have an eye on what it receives (i.e., ingress traffic).
-func (s *Orchestrator) sendUnauthorizedMsgs(t *testing.T) {
+func (s *orchestrator) sendUnauthorizedMsgs(t *testing.T) {
 	for i := 0; i < numOfUnauthorizedEvents; i++ {
 		event := bft.RequestChunkDataPackEgressFixture(s.T, s.attackerVNNoMsgSigning, s.victimENID, insecure.Protocol_PUBLISH)
 		err := s.OrchestratorNetwork.SendEgress(event)
@@ -99,7 +99,7 @@ func (s *Orchestrator) sendUnauthorizedMsgs(t *testing.T) {
 
 // sendAuthorizedMsgs publishes a number of authorized messages from one corrupt VN with message signing enabled to another (victim) corrupt EN.
 // This func allows us to ensure that unauthorized messages have been processed.
-func (s *Orchestrator) sendAuthorizedMsgs(t *testing.T) {
+func (s *orchestrator) sendAuthorizedMsgs(t *testing.T) {
 	for i := 0; i < numOfAuthorizedEvents; i++ {
 		event := bft.RequestChunkDataPackEgressFixture(s.T, s.attackerVNWithMsgSigning, s.victimENID, insecure.Protocol_PUBLISH)
 		err := s.OrchestratorNetwork.SendEgress(event)
@@ -111,7 +111,7 @@ func (s *Orchestrator) sendAuthorizedMsgs(t *testing.T) {
 
 // assertEventsEqual checks that an all the fields in an egress event are equal to the given ingress event, this asserts
 // that the event was not tampered with as it passes through from attacker -> victim node.
-func (s *Orchestrator) assertEventsEqual(egressEvent *insecure.EgressEvent, ingressEvent *insecure.IngressEvent) {
+func (s *orchestrator) assertEventsEqual(egressEvent *insecure.EgressEvent, ingressEvent *insecure.IngressEvent) {
 	// ensure event received intact no changes have been made to the underlying message
 	require.Equal(s.T, egressEvent.FlowProtocolEventID, ingressEvent.FlowProtocolEventID)
 	require.Equal(s.T, egressEvent.Channel, ingressEvent.Channel)

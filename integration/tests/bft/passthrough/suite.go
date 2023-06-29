@@ -62,7 +62,7 @@ func (s *Suite) SetupSuite() {
 		10_000,
 		100_000,
 		func() insecure.AttackOrchestrator {
-			s.Orchestrator = NewDummyOrchestrator(s.T(), s.Log)
+			s.Orchestrator = NewOrchestrator(s.T(), s.Log)
 			return s.Orchestrator
 		},
 	)

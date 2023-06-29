@@ -13,6 +13,9 @@ import (
 type OnEgressEvent func(event *insecure.EgressEvent) error
 type OnIngressEvent func(event *insecure.IngressEvent) error
 
+type OnGSIngressEvent func(event *insecure.GossipSubIngressEvent) error
+type OnGSEgressEvent func(event *insecure.GossipSubEgressEvent) error
+
 // BaseOrchestrator represents a simple `insecure.AttackOrchestrator` that tracks messages. This attack orchestrator
 // simply passes through messages without changes to the orchestrator network. This orchestrator reduces boilerplate
 // of BFT tests by implementing common logic. Boilerplate can further be reduced by using the OnEgressEvent and OnIngressEvent
@@ -26,9 +29,12 @@ type BaseOrchestrator struct {
 	OnEgressEvent []OnEgressEvent
 	// OnIngressEvent callbacks invoked on each ingress event received.
 	OnIngressEvent []OnIngressEvent
+
+	OnGSEgressEvent  []OnGSEgressEvent
+	OnGSIngressEvent []OnGSIngressEvent
 }
 
-var _ insecure.AttackOrchestrator = &BaseOrchestrator{}
+var _ insecure.AttackOrchestrator = (*BaseOrchestrator)(nil)
 
 // HandleEgressEvent implements logic of processing the outgoing (egress) events received from a corrupted node.
 func (b *BaseOrchestrator) HandleEgressEvent(event *insecure.EgressEvent) error {
@@ -87,4 +93,18 @@ func (b *BaseOrchestrator) HandleIngressEvent(event *insecure.IngressEvent) erro
 
 func (b *BaseOrchestrator) Register(orchestratorNetwork insecure.OrchestratorNetwork) {
 	b.OrchestratorNetwork = orchestratorNetwork
+}
+
+func (b *BaseOrchestrator) HandleGossipSubEgressEvent(event *insecure.GossipSubEgressEvent) error {
+	for _, f := range b.OnGSEgressEvent {
+		err := f(event)
+		if err != nil {
+			b.Logger.Error().Err(err).Msg("could not pass through gossipsub egress event")
+		}
+	}
+	return nil
+}
+
+func (b *BaseOrchestrator) HandleGossipSubIngressEvent(event *insecure.GossipSubIngressEvent) error {
+	return nil
 }
