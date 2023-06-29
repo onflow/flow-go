@@ -728,6 +728,36 @@ func EventsToMessages(flowEvents []flow.Event) []*entities.Event {
 	return events
 }
 
+func EventsToMessagesFromVersion(flowEvents []flow.Event, version execproto.EventEncodingVersion) ([]*entities.Event, error) {
+	events := make([]*entities.Event, len(flowEvents))
+	for i, e := range flowEvents {
+		event, err := EventToMessageFromVersion(e, version)
+		if err != nil {
+			return nil, fmt.Errorf("could not convert event at index %d from format %d: %w",
+				e.EventIndex, version, err)
+		}
+		events[i] = event
+	}
+	return events, nil
+}
+
+func EventToMessageFromVersion(e flow.Event, version execproto.EventEncodingVersion) (*entities.Event, error) {
+	message := EventToMessage(e)
+	switch version {
+	case execproto.EventEncodingVersion_CCF_V0:
+		convertedPayload, err := CcfPayloadToJsonPayload(e.Payload)
+		if err != nil {
+			return nil, fmt.Errorf("could not convert event payload from CCF to Json: %w", err)
+		}
+		message.Payload = convertedPayload
+	case execproto.EventEncodingVersion_JSON_CDC_V0:
+	default:
+		return nil, fmt.Errorf("invalid encoding format %d", version)
+	}
+
+	return message, nil
+}
+
 func IdentifierToMessage(i flow.Identifier) []byte {
 	return i[:]
 }
@@ -925,6 +955,21 @@ func MessageToChunk(m *entities.Chunk) (*flow.Chunk, error) {
 		Index:     m.Index,
 		EndState:  endState,
 	}, nil
+}
+
+// BlockExecutionDataEventPayloadsToJson converts all event payloads from CCF to JSON-CDC in place
+// This is a temporary workaround until a more robust solution is implemented
+func BlockExecutionDataEventPayloadsToJson(m *entities.BlockExecutionData) error {
+	for i, chunk := range m.ChunkExecutionData {
+		for j, e := range chunk.Events {
+			converted, err := CcfPayloadToJsonPayload(e.Payload)
+			if err != nil {
+				return fmt.Errorf("failed to convert payload for event %d to json: %w", j, err)
+			}
+			m.ChunkExecutionData[i].Events[j].Payload = converted
+		}
+	}
+	return nil
 }
 
 func BlockExecutionDataToMessage(data *execution_data.BlockExecutionData) (
