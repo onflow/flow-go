@@ -101,7 +101,7 @@ func NewNodeBuilder(
 			sporkId,
 			idProvider,
 			rpcInspectorCfg),
-		peerManagerConfig:    peerManagerConfig,
+		peerManagerConfig: peerManagerConfig,
 	}
 }
 
@@ -481,6 +481,7 @@ func DefaultNodeBuilder(
 		idProvider,
 		rCfg,
 		rpcInspectorCfg,
+		peerManagerCfg,
 		disallowListCacheCfg).
 		SetBasicResolver(resolver).
 		SetConnectionManager(connManager).
