@@ -5,26 +5,8 @@ import (
 	"github.com/libp2p/go-libp2p/core/peer"
 
 	"github.com/onflow/flow-go/module/component"
+	p2pmsg "github.com/onflow/flow-go/network/p2p/message"
 )
-
-// ControlMessageType is the type of control message, as defined in the libp2p pubsub spec.
-type ControlMessageType string
-
-func (c ControlMessageType) String() string {
-	return string(c)
-}
-
-const (
-	CtrlMsgIHave ControlMessageType = "IHAVE"
-	CtrlMsgIWant ControlMessageType = "IWANT"
-	CtrlMsgGraft ControlMessageType = "GRAFT"
-	CtrlMsgPrune ControlMessageType = "PRUNE"
-)
-
-// ControlMessageTypes returns list of all libp2p control message types.
-func ControlMessageTypes() []ControlMessageType {
-	return []ControlMessageType{CtrlMsgIHave, CtrlMsgIWant, CtrlMsgGraft, CtrlMsgPrune}
-}
 
 // GossipSubInspectorNotifDistributor is the interface for the distributor that distributes gossip sub inspector notifications.
 // It is used to distribute notifications to the consumers in an asynchronous manner and non-blocking manner.
@@ -48,7 +30,7 @@ type InvCtrlMsgNotif struct {
 	// PeerID is the ID of the peer that sent the invalid control message.
 	PeerID peer.ID
 	// MsgType is the type of control message that was received.
-	MsgType ControlMessageType
+	MsgType p2pmsg.ControlMessageType
 	// Count is the number of invalid control messages received from the peer that is reported in this notification.
 	Count uint64
 	// Err any error associated with the invalid control message.
@@ -56,7 +38,7 @@ type InvCtrlMsgNotif struct {
 }
 
 // NewInvalidControlMessageNotification returns a new *InvCtrlMsgNotif
-func NewInvalidControlMessageNotification(peerID peer.ID, msgType ControlMessageType, count uint64, err error) *InvCtrlMsgNotif {
+func NewInvalidControlMessageNotification(peerID peer.ID, msgType p2pmsg.ControlMessageType, count uint64, err error) *InvCtrlMsgNotif {
 	return &InvCtrlMsgNotif{
 		PeerID:  peerID,
 		MsgType: msgType,
@@ -80,6 +62,7 @@ type GossipSubInvCtrlMsgNotifConsumer interface {
 // It encapsulates the rpc inspectors and the notification distributors.
 type GossipSubInspectorSuite interface {
 	component.Component
+	CollectionClusterChangesConsumer
 	// InspectFunc returns the inspect function that is used to inspect the gossipsub rpc messages.
 	// This function follows a dependency injection pattern, where the inspect function is injected into the gossipsu, and
 	// is called whenever a gossipsub rpc message is received.
@@ -89,7 +72,5 @@ type GossipSubInspectorSuite interface {
 	// This consumer is notified when a misbehaving peer regarding gossipsub control messages is detected. This follows a pub/sub
 	// pattern where the consumer is notified when a new notification is published.
 	// A consumer is only notified once for each notification, and only receives notifications that were published after it was added.
-	AddInvCtrlMsgNotifConsumer(GossipSubInvCtrlMsgNotifConsumer)
-	// Inspectors returns all inspectors in the inspector suite.
-	Inspectors() []GossipSubRPCInspector
+	AddInvalidControlMessageConsumer(GossipSubInvCtrlMsgNotifConsumer)
 }

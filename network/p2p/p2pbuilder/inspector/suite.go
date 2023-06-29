@@ -1,9 +1,10 @@
-package suite
+package inspector
 
 import (
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/libp2p/go-libp2p/core/peer"
 
+	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/network/p2p"
@@ -16,6 +17,8 @@ type GossipSubInspectorSuite struct {
 	aggregatedInspector       *AggregateRPCInspector
 	ctrlMsgInspectDistributor p2p.GossipSubInspectorNotifDistributor
 }
+
+var _ p2p.GossipSubInspectorSuite = (*GossipSubInspectorSuite)(nil)
 
 // NewGossipSubInspectorSuite creates a new GossipSubInspectorSuite.
 // The suite is composed of the aggregated inspector, which is used to inspect the gossipsub rpc messages, and the
@@ -62,15 +65,21 @@ func (s *GossipSubInspectorSuite) InspectFunc() func(peer.ID, *pubsub.RPC) error
 	return s.aggregatedInspector.Inspect
 }
 
-// AddInvalidCtrlMsgNotificationConsumer adds a consumer to the invalid control message notification distributor.
+// AddInvalidControlMessageConsumer adds a consumer to the invalid control message notification distributor.
 // This consumer is notified when a misbehaving peer regarding gossipsub control messages is detected. This follows a pub/sub
 // pattern where the consumer is notified when a new notification is published.
 // A consumer is only notified once for each notification, and only receives notifications that were published after it was added.
-func (s *GossipSubInspectorSuite) AddInvCtrlMsgNotifConsumer(c p2p.GossipSubInvCtrlMsgNotifConsumer) {
+func (s *GossipSubInspectorSuite) AddInvalidControlMessageConsumer(c p2p.GossipSubInvCtrlMsgNotifConsumer) {
 	s.ctrlMsgInspectDistributor.AddConsumer(c)
 }
 
-// Inspectors returns all inspectors in the inspector suite.
-func (s *GossipSubInspectorSuite) Inspectors() []p2p.GossipSubRPCInspector {
-	return s.aggregatedInspector.Inspectors()
+// ActiveClustersChanged is called when the list of active collection nodes cluster is changed.
+// GossipSubInspectorSuite consumes this event and forwards it to all the respective rpc inspectors, that are
+// concerned with this cluster-based topics (i.e., channels), so that they can update their internal state.
+func (s *GossipSubInspectorSuite) ActiveClustersChanged(list flow.ChainIDList) {
+	for _, rpcInspector := range s.aggregatedInspector.Inspectors() {
+		if r, ok := rpcInspector.(p2p.GossipSubMsgValidationRpcInspector); ok {
+			r.ActiveClustersChanged(list)
+		}
+	}
 }

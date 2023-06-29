@@ -3,7 +3,9 @@
 package mockp2p
 
 import (
+	flow "github.com/onflow/flow-go/model/flow"
 	irrecoverable "github.com/onflow/flow-go/module/irrecoverable"
+
 	mock "github.com/stretchr/testify/mock"
 
 	p2p "github.com/onflow/flow-go/network/p2p"
@@ -18,8 +20,13 @@ type GossipSubInspectorSuite struct {
 	mock.Mock
 }
 
-// AddInvCtrlMsgNotifConsumer provides a mock function with given fields: _a0
-func (_m *GossipSubInspectorSuite) AddInvCtrlMsgNotifConsumer(_a0 p2p.GossipSubInvCtrlMsgNotifConsumer) {
+// ActiveClustersChanged provides a mock function with given fields: _a0
+func (_m *GossipSubInspectorSuite) ActiveClustersChanged(_a0 flow.ChainIDList) {
+	_m.Called(_a0)
+}
+
+// AddInvalidControlMessageConsumer provides a mock function with given fields: _a0
+func (_m *GossipSubInspectorSuite) AddInvalidControlMessageConsumer(_a0 p2p.GossipSubInvCtrlMsgNotifConsumer) {
 	_m.Called(_a0)
 }
 
@@ -49,22 +56,6 @@ func (_m *GossipSubInspectorSuite) InspectFunc() func(peer.ID, *pubsub.RPC) erro
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(func(peer.ID, *pubsub.RPC) error)
-		}
-	}
-
-	return r0
-}
-
-// Inspectors provides a mock function with given fields:
-func (_m *GossipSubInspectorSuite) Inspectors() []p2p.GossipSubRPCInspector {
-	ret := _m.Called()
-
-	var r0 []p2p.GossipSubRPCInspector
-	if rf, ok := ret.Get(0).(func() []p2p.GossipSubRPCInspector); ok {
-		r0 = rf()
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]p2p.GossipSubRPCInspector)
 		}
 	}
 
