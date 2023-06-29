@@ -994,7 +994,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 			backendConfig := config.BackendConfig
 			accessMetrics := builder.AccessMetrics
 
-			cache, cacheSize, err := backend.NewCache(node.Logger,
+			backendCache, cacheSize, err := backend.NewCache(node.Logger,
 				accessMetrics,
 				backendConfig.ConnectionPoolSize)
 			if err != nil {
@@ -1006,7 +1006,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				ExecutionGRPCPort:         builder.executionGRPCPort,
 				CollectionNodeGRPCTimeout: backendConfig.CollectionClientTimeout,
 				ExecutionNodeGRPCTimeout:  backendConfig.ExecutionClientTimeout,
-				ConnectionsCache:          cache,
+				ConnectionsCache:          backendCache,
 				CacheSize:                 cacheSize,
 				MaxMsgSize:                config.MaxMsgSize,
 				AccessMetrics:             accessMetrics,

@@ -201,6 +201,7 @@ func New(
 	return b
 }
 
+// NewCache constructs cache and its size.
 func NewCache(
 	log zerolog.Logger,
 	accessMetrics module.AccessMetrics,

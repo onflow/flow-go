@@ -10,7 +10,6 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	restmock "github.com/onflow/flow-go/engine/access/rest/mock"
 	"github.com/onflow/flow-go/engine/access/rest/request"
 	"github.com/onflow/flow-go/engine/access/rest/util"
 
@@ -148,48 +147,9 @@ func TestAccessGetBlocks(t *testing.T) {
 	blkCnt := 10
 	blockIDs, heights, blocks, executionResults := generateMocks(backend, blkCnt)
 	testVectors := prepareTestVectors(t, blockIDs, heights, blocks, executionResults, blkCnt)
-	restHandler := newAccessRestHandler(backend)
 
 	for _, tv := range testVectors {
-		responseRec, err := executeRequest(tv.request, restHandler)
-		assert.NoError(t, err)
-		require.Equal(t, tv.expectedStatus, responseRec.Code, "failed test %s: incorrect response code", tv.description)
-		actualResp := responseRec.Body.String()
-		require.JSONEq(t, tv.expectedResponse, actualResp, "Failed: %s: incorrect response body", tv.description)
-	}
-}
-
-// TestObserverGetBlocks tests requests forwarding for get blocks by ID and get blocks by heights.
-//
-// Check the following cases:
-// 1. Get single expanded block by ID.
-// 2. Get multiple expanded blocks by IDs
-// 3. Get single condensed block by ID.
-// 4. Get multiple condensed blocks by IDs.
-// 5. Get single expanded block by height.
-// 6. Get multiple expanded blocks by heights.
-// 7. Get multiple expanded blocks by start and end height.
-// 8. Get block by ID not found.
-// 9. Get block by height not found.
-// 10. Get block by end height less than start height.
-// 11. Get block by both heights and start and end height.
-// 12. Get block with missing height param.
-// 13. Get block with missing height values.
-// 14. Get block by more than maximum permissible number of IDs.
-func TestObserverGetBlocks(t *testing.T) {
-	backend := &mock.API{}
-	restForwarder := &restmock.RestServerApi{}
-
-	blkCnt := 10
-	blockIDs, heights, blocks, executionResults := generateMocks(backend, blkCnt)
-
-	testVectors := prepareTestVectors(t, blockIDs, heights, blocks, executionResults, blkCnt)
-
-	restHandler, err := newObserverRestHandler(backend, restForwarder)
-	assert.NoError(t, err)
-
-	for _, tv := range testVectors {
-		responseRec, err := executeRequest(tv.request, restHandler)
+		responseRec, err := executeRequest(tv.request, backend)
 		assert.NoError(t, err)
 		require.Equal(t, tv.expectedStatus, responseRec.Code, "failed test %s: incorrect response code", tv.description)
 		actualResp := responseRec.Body.String()

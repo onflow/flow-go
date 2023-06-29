@@ -25,7 +25,6 @@ import (
 
 func TestGetEvents(t *testing.T) {
 	backend := &mock.API{}
-	restHandler := newAccessRestHandler(backend)
 	events := generateEventsMocks(backend, 5)
 
 	allBlockIDs := make([]string, len(events))
@@ -128,7 +127,7 @@ func TestGetEvents(t *testing.T) {
 
 	for _, test := range testVectors {
 		t.Run(test.description, func(t *testing.T) {
-			assertResponse(t, test.request, test.expectedStatus, test.expectedResponse, restHandler)
+			assertResponse(t, test.request, test.expectedStatus, test.expectedResponse, backend)
 		})
 	}
 

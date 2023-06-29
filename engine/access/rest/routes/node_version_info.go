@@ -7,6 +7,13 @@ import (
 )
 
 // GetNodeVersionInfo returns node version information
-func GetNodeVersionInfo(r *request.Request, srv api.RestServerApi, _ models.LinkGenerator) (interface{}, error) {
-	return srv.GetNodeVersionInfo(r)
+func GetNodeVersionInfo(r *request.Request, backend api.RestBackendApi, _ models.LinkGenerator) (interface{}, error) {
+	params, err := backend.GetNodeVersionInfo(r.Context())
+	if err != nil {
+		return nil, err
+	}
+
+	var response models.NodeVersionInfo
+	response.Build(params)
+	return response, nil
 }

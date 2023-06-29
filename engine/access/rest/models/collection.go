@@ -1,14 +1,10 @@
 package models
 
 import (
-	"encoding/hex"
 	"fmt"
 
 	"github.com/onflow/flow-go/engine/access/rest/util"
-	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/model/flow"
-
-	"github.com/onflow/flow/protobuf/go/flow/entities"
 )
 
 const ExpandsTransactions = "transactions"
@@ -39,49 +35,6 @@ func (c *Collection) Build(
 	}
 
 	c.Id = collection.ID().String()
-	c.Transactions = transactions
-	c.Links = self
-	c.Expandable = &expandable
-
-	return nil
-}
-
-func (c *Collection) BuildFromGrpc(
-	collection *entities.Collection,
-	txs []*entities.Transaction,
-	link LinkGenerator,
-	expand map[string]bool,
-	chain flow.Chain) error {
-
-	self, err := SelfLink(convert.MessageToIdentifier(collection.Id), link.CollectionLink)
-	if err != nil {
-		return err
-	}
-
-	transactionsBody := make([]*flow.TransactionBody, 0)
-	for _, tx := range txs {
-		flowTransaction, err := convert.MessageToTransaction(tx, chain)
-		if err != nil {
-			return err
-		}
-		transactionsBody = append(transactionsBody, &flowTransaction)
-	}
-
-	var expandable CollectionExpandable
-	var transactions Transactions
-	if expand[ExpandsTransactions] {
-		transactions.Build(transactionsBody, link)
-	} else {
-		expandable.Transactions = make([]string, len(collection.TransactionIds))
-		for i, id := range collection.TransactionIds {
-			expandable.Transactions[i], err = link.TransactionLink(convert.MessageToIdentifier(id))
-			if err != nil {
-				return err
-			}
-		}
-	}
-
-	c.Id = hex.EncodeToString(collection.Id)
 	c.Transactions = transactions
 	c.Links = self
 	c.Expandable = &expandable

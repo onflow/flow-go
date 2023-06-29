@@ -7,6 +7,10 @@ import (
 )
 
 // GetNetworkParameters returns network-wide parameters of the blockchain
-func GetNetworkParameters(r *request.Request, srv api.RestServerApi, _ models.LinkGenerator) (interface{}, error) {
-	return srv.GetNetworkParameters(r)
+func GetNetworkParameters(r *request.Request, backend api.RestBackendApi, _ models.LinkGenerator) (interface{}, error) {
+	params := backend.GetNetworkParameters(r.Context())
+
+	var response models.NetworkParameters
+	response.Build(&params)
+	return response, nil
 }

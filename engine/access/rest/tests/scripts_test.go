@@ -48,7 +48,6 @@ func TestScripts(t *testing.T) {
 
 	t.Run("get by Latest height", func(t *testing.T) {
 		backend := &mock.API{}
-		restHandler := newAccessRestHandler(backend)
 
 		backend.Mock.
 			On("ExecuteScriptAtLatestBlock", mocks.Anything, validCode, [][]byte{validArgs}).
@@ -58,14 +57,12 @@ func TestScripts(t *testing.T) {
 		assertOKResponse(t, req, fmt.Sprintf(
 			"\"%s\"",
 			base64.StdEncoding.EncodeToString([]byte(`hello world`)),
-		), restHandler)
+		), backend)
 	})
 
 	t.Run("get by height", func(t *testing.T) {
-		height := uint64(1337)
-
 		backend := &mock.API{}
-		restHandler := newAccessRestHandler(backend)
+		height := uint64(1337)
 
 		backend.Mock.
 			On("ExecuteScriptAtBlockHeight", mocks.Anything, height, validCode, [][]byte{validArgs}).
@@ -75,14 +72,12 @@ func TestScripts(t *testing.T) {
 		assertOKResponse(t, req, fmt.Sprintf(
 			"\"%s\"",
 			base64.StdEncoding.EncodeToString([]byte(`hello world`)),
-		), restHandler)
+		), backend)
 	})
 
 	t.Run("get by ID", func(t *testing.T) {
-		id, _ := flow.HexStringToIdentifier("222dc5dd51b9e4910f687e475f892f495f3352362ba318b53e318b4d78131312")
-
 		backend := &mock.API{}
-		restHandler := newAccessRestHandler(backend)
+		id, _ := flow.HexStringToIdentifier("222dc5dd51b9e4910f687e475f892f495f3352362ba318b53e318b4d78131312")
 
 		backend.Mock.
 			On("ExecuteScriptAtBlockID", mocks.Anything, id, validCode, [][]byte{validArgs}).
@@ -92,12 +87,11 @@ func TestScripts(t *testing.T) {
 		assertOKResponse(t, req, fmt.Sprintf(
 			"\"%s\"",
 			base64.StdEncoding.EncodeToString([]byte(`hello world`)),
-		), restHandler)
+		), backend)
 	})
 
 	t.Run("get error", func(t *testing.T) {
 		backend := &mock.API{}
-		restHandler := newAccessRestHandler(backend)
 
 		backend.Mock.
 			On("ExecuteScriptAtBlockHeight", mocks.Anything, uint64(1337), validCode, [][]byte{validArgs}).
@@ -109,13 +103,12 @@ func TestScripts(t *testing.T) {
 			req,
 			http.StatusBadRequest,
 			`{"code":400, "message":"Invalid Flow request: internal server error"}`,
-			restHandler,
+			backend,
 		)
 	})
 
 	t.Run("get invalid", func(t *testing.T) {
 		backend := &mock.API{}
-		restHandler := newAccessRestHandler(backend)
 
 		backend.Mock.
 			On("ExecuteScriptAtBlockHeight", mocks.Anything, mocks.Anything, mocks.Anything, mocks.Anything).
@@ -136,7 +129,7 @@ func TestScripts(t *testing.T) {
 
 		for _, test := range tests {
 			req := scriptReq(test.id, test.height, test.body)
-			assertResponse(t, req, http.StatusBadRequest, test.out, restHandler)
+			assertResponse(t, req, http.StatusBadRequest, test.out, backend)
 		}
 	})
 }

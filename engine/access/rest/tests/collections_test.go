@@ -31,7 +31,6 @@ func getCollectionReq(id string, expandTransactions bool) *http.Request {
 
 func TestGetCollections(t *testing.T) {
 	backend := &mock.API{}
-	restHandler := newAccessRestHandler(backend)
 
 	t.Run("get by ID", func(t *testing.T) {
 		inputs := []flow.LightCollection{
@@ -63,7 +62,7 @@ func TestGetCollections(t *testing.T) {
 			}`, col.ID(), col.ID(), transactionsStr)
 
 			req := getCollectionReq(col.ID().String(), false)
-			assertOKResponse(t, req, expected, restHandler)
+			assertOKResponse(t, req, expected, backend)
 			mocks.AssertExpectationsForObjects(t, backend)
 		}
 	})
@@ -88,7 +87,7 @@ func TestGetCollections(t *testing.T) {
 			Once()
 
 		req := getCollectionReq(col.ID().String(), true)
-		rr, err := executeRequest(req, restHandler)
+		rr, err := executeRequest(req, backend)
 		assert.NoError(t, err)
 
 		assert.Equal(t, http.StatusOK, rr.Code)
@@ -147,7 +146,7 @@ func TestGetCollections(t *testing.T) {
 					Return(test.mockValue, test.mockErr)
 			}
 			req := getCollectionReq(test.id, false)
-			assertResponse(t, req, test.status, test.response, restHandler)
+			assertResponse(t, req, test.status, test.response, backend)
 		}
 	})
 }

@@ -7,11 +7,27 @@ import (
 )
 
 // GetAccount handler retrieves account by address and returns the response
-func GetAccount(r *request.Request, srv api.RestServerApi, link models.LinkGenerator) (interface{}, error) {
+func GetAccount(r *request.Request, backend api.RestBackendApi, link models.LinkGenerator) (interface{}, error) {
 	req, err := r.GetAccountRequest()
 	if err != nil {
 		return nil, models.NewBadRequestError(err)
 	}
 
-	return srv.GetAccount(req, r.Context(), r.ExpandFields, link)
+	// in case we receive special height values 'final' and 'sealed', fetch that height and overwrite request with it
+	if req.Height == request.FinalHeight || req.Height == request.SealedHeight {
+		header, _, err := backend.GetLatestBlockHeader(r.Context(), req.Height == request.SealedHeight)
+		if err != nil {
+			return nil, err
+		}
+		req.Height = header.Height
+	}
+
+	account, err := backend.GetAccountAtBlockHeight(r.Context(), req.Address, req.Height)
+	if err != nil {
+		return nil, err
+	}
+
+	var response models.Account
+	err = response.Build(account, link, r.ExpandFields)
+	return response, err
 }

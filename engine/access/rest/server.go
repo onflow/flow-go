@@ -13,7 +13,7 @@ import (
 )
 
 // NewServer returns an HTTP server initialized with the REST API handler
-func NewServer(serverAPI api.RestServerApi, listenAddress string, logger zerolog.Logger, chain flow.Chain, restCollector module.RestMetrics) (*http.Server, error) {
+func NewServer(serverAPI api.RestBackendApi, listenAddress string, logger zerolog.Logger, chain flow.Chain, restCollector module.RestMetrics) (*http.Server, error) {
 	router, err := NewRouter(serverAPI, logger, chain, restCollector)
 	if err != nil {
 		return nil, err

@@ -12,8 +12,8 @@ available on our [docs site](https://docs.onflow.org/http-api/).
 - `request`: Implementation of API requests that provide validation for input data and build request models.
 - `routes`: The common HTTP handlers for all the requests.
 - `api`: The server API interface for REST service.
-- `apiproxy`: Implementation of proxy router which splits requests for observer node between local and request 
-forwarding to upstream, implementation of handling request forwarding to an upstream access node using gRPC API.
+- `apiproxy`: Implementation of proxy backend handler which includes the local backend and forwards the methods which 
+can't be handled locally to an upstream using gRPC API.
 - `tests`: Test for each request.
 
 ## Request lifecycle
@@ -48,13 +48,12 @@ package that complies with function interfaced defined as:
 ```go
 type ApiHandlerFunc func (
 r *request.Request,
-srv api.RestServerApi,
+backend api.RestBackendApi,
 generator models.LinkGenerator,
 ) (interface{}, error)
 ```
 
 That handler implementation needs to be added to the `router.go` with corresponding API endpoint and method. Then needs 
-to be added new request to `RestServerApi` interface and implemented it for local API service to the `RequestHandler` and for 
-request forwarding to the `RestForwarder`. After that new function needs to be added to the `RestRouter` for representing
-the routing proxy algorithm. Adding a new API endpoint also requires for a new request builder to be implemented and added 
-in request package. Make sure to not forget about adding tests for each of the API handler.
+to be added new request to `RestBackendApi` interface and overrides the method if it should be proxied to the backend 
+handler `RestProxyHandler` for request forwarding. Adding a new API endpoint also requires for a new request builder to 
+be implemented and added in request package. Make sure to not forget about adding tests for each of the API handler.

@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-
 	"strings"
 	"time"
 
@@ -29,11 +28,11 @@ import (
 	recovery "github.com/onflow/flow-go/consensus/recovery/protocol"
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/engine/access/apiproxy"
-	"github.com/onflow/flow-go/engine/access/rest"
 	restapiproxy "github.com/onflow/flow-go/engine/access/rest/apiproxy"
 	"github.com/onflow/flow-go/engine/access/rpc"
 	"github.com/onflow/flow-go/engine/access/rpc/backend"
 	"github.com/onflow/flow-go/engine/common/follower"
+	"github.com/onflow/flow-go/engine/common/grpc/forwarder"
 	synceng "github.com/onflow/flow-go/engine/common/synchronization"
 	"github.com/onflow/flow-go/engine/protocol"
 	"github.com/onflow/flow-go/model/encodable"
@@ -857,7 +856,7 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 		config := builder.rpcConf
 		backendConfig := config.BackendConfig
 
-		cache, cacheSize, err := backend.NewCache(node.Logger,
+		backendCache, cacheSize, err := backend.NewCache(node.Logger,
 			accessMetrics,
 			config.BackendConfig.ConnectionPoolSize)
 		if err != nil {
@@ -869,7 +868,7 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 			ExecutionGRPCPort:         0,
 			CollectionNodeGRPCTimeout: backendConfig.CollectionClientTimeout,
 			ExecutionNodeGRPCTimeout:  backendConfig.ExecutionClientTimeout,
-			ConnectionsCache:          cache,
+			ConnectionsCache:          backendCache,
 			CacheSize:                 cacheSize,
 			MaxMsgSize:                config.MaxMsgSize,
 			AccessMetrics:             accessMetrics,
@@ -914,7 +913,7 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 		}
 
 		// upstream access node forwarder
-		forwarder, err := apiproxy.NewFlowAccessAPIForwarder(builder.upstreamIdentities, builder.apiTimeout, config.MaxMsgSize)
+		rpcForwarder, err := apiproxy.NewFlowAccessAPIForwarder(builder.upstreamIdentities, builder.apiTimeout, config.MaxMsgSize)
 		if err != nil {
 			return nil, err
 		}
@@ -924,7 +923,7 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 		rpcHandler := &apiproxy.FlowAccessAPIRouter{
 			Logger:   builder.Logger,
 			Metrics:  observerCollector,
-			Upstream: forwarder,
+			Upstream: rpcForwarder,
 			Observer: protocol.NewHandler(protocol.New(
 				node.State,
 				node.Storage.Blocks,
@@ -932,8 +931,7 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 				backend.NewNetworkAPI(node.State, node.RootChainID, backend.DefaultSnapshotHistoryLimit),
 			)),
 		}
-
-		restForwarder, err := restapiproxy.NewRestForwarder(builder.Logger,
+		frw, err := forwarder.NewForwarder(
 			builder.upstreamIdentities,
 			builder.apiTimeout,
 			config.MaxMsgSize)
@@ -941,12 +939,13 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 			return nil, err
 		}
 
-		restHandler := &restapiproxy.RestRouter{
-			Logger:   builder.Logger,
-			Metrics:  observerCollector,
-			Upstream: restForwarder,
-			Observer: rest.NewServerRequestHandler(builder.Logger, accessBackend),
+		restHandler := &restapiproxy.RestProxyHandler{
+			Logger:  builder.Logger,
+			Metrics: observerCollector,
+			Chain:   node.RootChainID.Chain(),
 		}
+		restHandler.API = accessBackend
+		restHandler.Forwarder = frw
 
 		// build the rpc engine
 		builder.RpcEng, err = engineBuilder.

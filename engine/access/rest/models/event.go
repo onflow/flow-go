@@ -1,13 +1,8 @@
 package models
 
 import (
-	"encoding/hex"
-
 	"github.com/onflow/flow-go/engine/access/rest/util"
-	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/model/flow"
-
-	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
 )
 
 func (e *Event) Build(event flow.Event) {
@@ -52,27 +47,4 @@ func (b *BlocksEvents) Build(blocksEvents []flow.BlockEvents) {
 	}
 
 	*b = evs
-}
-
-func (b *BlocksEvents) BuildFromGrpc(blocksEvents []*accessproto.EventsResponse_Result) {
-	evs := make([]BlockEvents, 0)
-	for _, ev := range blocksEvents {
-		var blockEvent BlockEvents
-		blockEvent.BuildFromGrpc(ev)
-		evs = append(evs, blockEvent)
-	}
-
-	*b = evs
-}
-
-func (b *BlockEvents) BuildFromGrpc(blockEvents *accessproto.EventsResponse_Result) {
-	b.BlockHeight = util.FromUint64(blockEvents.BlockHeight)
-	b.BlockId = hex.EncodeToString(blockEvents.BlockId)
-	b.BlockTimestamp = blockEvents.BlockTimestamp.AsTime()
-
-	var events Events
-	flowEvents := convert.MessagesToEvents(blockEvents.Events)
-	events.Build(flowEvents)
-	b.Events = events
-
 }

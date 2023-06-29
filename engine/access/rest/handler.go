@@ -25,7 +25,7 @@ const MaxRequestSize = 2 << 20 // 2MB
 // it fetches necessary resources and returns an error or response model.
 type ApiHandlerFunc func(
 	r *request.Request,
-	srv api.RestServerApi,
+	backend api.RestBackendApi,
 	generator models.LinkGenerator,
 ) (interface{}, error)
 
@@ -34,7 +34,7 @@ type ApiHandlerFunc func(
 // wraps functionality for handling error and responses outside of endpoint handling.
 type Handler struct {
 	logger         zerolog.Logger
-	restServerAPI  api.RestServerApi
+	backend        api.RestBackendApi
 	linkGenerator  models.LinkGenerator
 	apiHandlerFunc ApiHandlerFunc
 	chain          flow.Chain
@@ -42,14 +42,14 @@ type Handler struct {
 
 func NewHandler(
 	logger zerolog.Logger,
-	restServerAPI api.RestServerApi,
+	backend api.RestBackendApi,
 	handlerFunc ApiHandlerFunc,
 	generator models.LinkGenerator,
 	chain flow.Chain,
 ) *Handler {
 	return &Handler{
 		logger:         logger,
-		restServerAPI:  restServerAPI,
+		backend:        backend,
 		apiHandlerFunc: handlerFunc,
 		linkGenerator:  generator,
 		chain:          chain,
@@ -74,7 +74,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	decoratedRequest := request.Decorate(r, h.chain)
 
 	// execute handler function and check for error
-	response, err := h.apiHandlerFunc(decoratedRequest, h.restServerAPI, h.linkGenerator)
+	response, err := h.apiHandlerFunc(decoratedRequest, h.backend, h.linkGenerator)
 	if err != nil {
 		h.errorHandler(w, err, errLog)
 		return

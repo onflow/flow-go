@@ -7,8 +7,10 @@ import (
 
 	"github.com/onflow/cadence/encoding/ccf"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
+	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
 	"github.com/onflow/flow/protobuf/go/flow/entities"
 	execproto "github.com/onflow/flow/protobuf/go/flow/execution"
+
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -649,6 +651,26 @@ func AccountKeyToMessage(a flow.AccountPublicKey) (*entities.AccountKey, error) 
 		SequenceNumber: uint32(a.SeqNumber),
 		Revoked:        a.Revoked,
 	}, nil
+}
+
+func MessagesToBlockEvents(blocksEvents []*accessproto.EventsResponse_Result) []flow.BlockEvents {
+	evs := make([]flow.BlockEvents, len(blocksEvents))
+	for _, ev := range blocksEvents {
+		var blockEvent flow.BlockEvents
+		MessageToBlockEvent(ev)
+		evs = append(evs, blockEvent)
+	}
+
+	return evs
+}
+
+func MessageToBlockEvent(blockEvents *accessproto.EventsResponse_Result) flow.BlockEvents {
+	return flow.BlockEvents{
+		BlockHeight:    blockEvents.BlockHeight,
+		BlockID:        MessageToIdentifier(blockEvents.BlockId),
+		BlockTimestamp: blockEvents.BlockTimestamp.AsTime(),
+		Events:         MessagesToEvents(blockEvents.Events),
+	}
 }
 
 func MessageToEvent(m *entities.Event) flow.Event {

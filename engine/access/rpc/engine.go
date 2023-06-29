@@ -69,7 +69,7 @@ type Engine struct {
 	secureGrpcAddress   net.Addr
 	restAPIAddress      net.Addr
 
-	restHandler api.RestServerApi
+	restHandler api.RestBackendApi
 }
 type Option func(*RPCEngineBuilder)
 
