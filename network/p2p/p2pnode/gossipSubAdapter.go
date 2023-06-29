@@ -53,8 +53,8 @@ func NewGossipSubAdapter(ctx context.Context, logger zerolog.Logger, h host.Host
 	builder := component.NewComponentManagerBuilder()
 
 	a := &GossipSubAdapter{
-		gossipSub: gossipSub,
-		logger:    logger.With().Str("component", "gossipsub-adapter").Logger(),
+		gossipSub:             gossipSub,
+		logger:                logger.With().Str("component", "gossipsub-adapter").Logger(),
 		clusterChangeConsumer: clusterChangeConsumer,
 	}
 
