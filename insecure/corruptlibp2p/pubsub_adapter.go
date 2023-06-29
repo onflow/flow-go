@@ -11,6 +11,7 @@ import (
 	corrupt "github.com/yhassanzadeh13/go-libp2p-pubsub"
 
 	"github.com/onflow/flow-go/insecure/internal"
+	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/network/p2p"
@@ -28,9 +29,10 @@ import (
 // totally separated from the rest of the codebase.
 type CorruptGossipSubAdapter struct {
 	component.Component
-	gossipSub *corrupt.PubSub
-	router    *corrupt.GossipSubRouter
-	logger    zerolog.Logger
+	gossipSub             *corrupt.PubSub
+	router                *corrupt.GossipSubRouter
+	logger                zerolog.Logger
+	clusterChangeConsumer p2p.CollectionClusterChangesConsumer
 }
 
 var _ p2p.PubSubAdapter = (*CorruptGossipSubAdapter)(nil)
@@ -104,7 +106,17 @@ func (c *CorruptGossipSubAdapter) ListPeers(topic string) []peer.ID {
 	return c.gossipSub.ListPeers(topic)
 }
 
-func NewCorruptGossipSubAdapter(ctx context.Context, logger zerolog.Logger, h host.Host, cfg p2p.PubSubAdapterConfig) (p2p.PubSubAdapter, *corrupt.GossipSubRouter, error) {
+func (c *CorruptGossipSubAdapter) ActiveClustersChanged(lst flow.ChainIDList) {
+	c.clusterChangeConsumer.ActiveClustersChanged(lst)
+}
+
+func NewCorruptGossipSubAdapter(
+	ctx context.Context,
+	logger zerolog.Logger,
+	h host.Host,
+	cfg p2p.PubSubAdapterConfig,
+	clusterChangeConsumer p2p.CollectionClusterChangesConsumer) (p2p.PubSubAdapter, *corrupt.GossipSubRouter, error) {
+
 	gossipSubConfig, ok := cfg.(*CorruptPubSubAdapterConfig)
 	if !ok {
 		return nil, nil, fmt.Errorf("invalid gossipsub config type: %T", cfg)
@@ -126,10 +138,11 @@ func NewCorruptGossipSubAdapter(ctx context.Context, logger zerolog.Logger, h ho
 		}).Build()
 
 	adapter := &CorruptGossipSubAdapter{
-		Component: builder,
-		gossipSub: gossipSub,
-		router:    router,
-		logger:    logger,
+		Component:             builder,
+		gossipSub:             gossipSub,
+		router:                router,
+		logger:                logger,
+		clusterChangeConsumer: clusterChangeConsumer,
 	}
 
 	return adapter, router, nil

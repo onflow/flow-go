@@ -27,6 +27,12 @@ type TopicValidatorFunc func(context.Context, peer.ID, *pubsub.Message) Validati
 // PubSubAdapter is the abstraction of the underlying pubsub logic that is used by the Flow network.
 type PubSubAdapter interface {
 	component.Component
+	// CollectionClusterChangesConsumer  is the interface for consuming the events of changes in the collection cluster.
+	// This is used to notify the node of changes in the collection cluster.
+	// PubSubAdapter implements this interface and consumes the events to be notified of changes in the clustering channels.
+	// The clustering channels are used by the collection nodes of a cluster to communicate with each other.
+	// As the cluster (and hence their cluster channels) of collection nodes changes over time (per epoch) the node needs to be notified of these changes.
+	CollectionClusterChangesConsumer
 	// RegisterTopicValidator registers a validator for topic.
 	RegisterTopicValidator(topic string, topicValidator TopicValidatorFunc) error
 

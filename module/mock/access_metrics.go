@@ -23,9 +23,9 @@ func (_m *AccessMetrics) AddInflightRequests(ctx context.Context, props metrics.
 	_m.Called(ctx, props, quantity)
 }
 
-// AddTotalRequests provides a mock function with given fields: ctx, service, id
-func (_m *AccessMetrics) AddTotalRequests(ctx context.Context, service string, id string) {
-	_m.Called(ctx, service, id)
+// AddTotalRequests provides a mock function with given fields: ctx, method, routeName
+func (_m *AccessMetrics) AddTotalRequests(ctx context.Context, method string, routeName string) {
+	_m.Called(ctx, method, routeName)
 }
 
 // ConnectionAddedToPool provides a mock function with given fields:
