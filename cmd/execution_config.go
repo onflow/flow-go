@@ -17,6 +17,7 @@ import (
 	"github.com/onflow/flow-go/utils/grpcutils"
 
 	"github.com/onflow/flow-go/engine/execution/computation"
+	"github.com/onflow/flow-go/engine/execution/ingestion/stop"
 	"github.com/onflow/flow-go/engine/execution/rpc"
 	"github.com/onflow/flow-go/fvm/storage/derived"
 	storage "github.com/onflow/flow-go/storage/badger"
@@ -49,10 +50,17 @@ type ExecutionConfig struct {
 	blobstoreRateLimit                   int
 	blobstoreBurstLimit                  int
 	chunkDataPackRequestWorkers          uint
+	maxGracefulStopDuration              time.Duration
 
 	computationConfig        computation.ComputationConfig
 	receiptRequestWorkers    uint   // common provider engine workers
 	receiptRequestsCacheSize uint32 // common provider engine cache size
+
+	// This is included to temporarily work around an issue observed on a small number of ENs.
+	// It works around an issue where some collection nodes are not configured with enough
+	// this works around an issue where some collection nodes are not configured with enough
+	// file descriptors causing connection failures.
+	onflowOnlyLNs bool
 }
 
 func (exeConf *ExecutionConfig) SetupFlags(flags *pflag.FlagSet) {
@@ -71,6 +79,7 @@ func (exeConf *ExecutionConfig) SetupFlags(flags *pflag.FlagSet) {
 		"cache size for Cadence execution")
 	flags.BoolVar(&exeConf.computationConfig.ExtensiveTracing, "extensive-tracing", false, "adds high-overhead tracing to execution")
 	flags.BoolVar(&exeConf.computationConfig.CadenceTracing, "cadence-tracing", false, "enables cadence runtime level tracing")
+	flags.IntVar(&exeConf.computationConfig.MaxConcurrency, "computer-max-concurrency", 1, "set to greater than 1 to enable concurrent transaction execution")
 	flags.UintVar(&exeConf.chunkDataPackCacheSize, "chdp-cache", storage.DefaultCacheSize, "cache size for chunk data packs")
 	flags.Uint32Var(&exeConf.chunkDataPackRequestsCacheSize, "chdp-request-queue", mempool.DefaultChunkDataPackRequestQueueSize, "queue size for chunk data pack requests")
 	flags.DurationVar(&exeConf.requestInterval, "request-interval", 60*time.Second, "the interval between requests for the requester engine")
@@ -97,6 +106,9 @@ func (exeConf *ExecutionConfig) SetupFlags(flags *pflag.FlagSet) {
 	flags.StringToIntVar(&exeConf.apiBurstlimits, "api-burst-limits", map[string]int{}, "burst limits for gRPC API methods e.g. Ping=100,ExecuteScriptAtBlockID=100 etc. note limits apply globally to all clients.")
 	flags.IntVar(&exeConf.blobstoreRateLimit, "blobstore-rate-limit", 0, "per second outgoing rate limit for Execution Data blobstore")
 	flags.IntVar(&exeConf.blobstoreBurstLimit, "blobstore-burst-limit", 0, "outgoing burst limit for Execution Data blobstore")
+	flags.DurationVar(&exeConf.maxGracefulStopDuration, "max-graceful-stop-duration", stop.DefaultMaxGracefulStopDuration, "the maximum amount of time stop control will wait for ingestion engine to gracefully shutdown before crashing")
+
+	flags.BoolVar(&exeConf.onflowOnlyLNs, "temp-onflow-only-lns", false, "do not use unless required. forces node to only request collections from onflow collection nodes")
 }
 
 func (exeConf *ExecutionConfig) ValidateFlags() error {

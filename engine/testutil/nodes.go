@@ -26,6 +26,7 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/notifications"
 	"github.com/onflow/flow-go/consensus/hotstuff/notifications/pubsub"
 	"github.com/onflow/flow-go/crypto"
+	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/collection/epochmgr"
 	"github.com/onflow/flow-go/engine/collection/epochmgr/factories"
 	collectioningest "github.com/onflow/flow-go/engine/collection/ingest"
@@ -672,6 +673,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 		computation.ComputationConfig{
 			QueryConfig:          query.NewDefaultConfig(),
 			DerivedDataCacheSize: derived.DefaultDerivedDataCacheSize,
+			MaxConcurrency:       1,
 		},
 	)
 	require.NoError(t, err)
@@ -691,7 +693,10 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	latestFinalizedBlock, err := node.State.Final().Head()
 	require.NoError(t, err)
 
+	unit := engine.NewUnit()
 	stopControl := stop.NewStopControl(
+		unit,
+		time.Second,
 		node.Log,
 		execState,
 		node.Headers,
@@ -704,6 +709,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 
 	rootHead, rootQC := getRoot(t, &node)
 	ingestionEngine, err := ingestion.New(
+		unit,
 		node.Log,
 		node.Net,
 		node.Me,
@@ -725,6 +731,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 		nil,
 		uploader,
 		stopControl,
+		false,
 	)
 	require.NoError(t, err)
 	requestEngine.WithHandle(ingestionEngine.OnCollection)

@@ -18,6 +18,7 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 
+	"github.com/onflow/flow-go/config"
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
@@ -56,10 +57,12 @@ func NodeFixture(
 	idProvider module.IdentityProvider,
 	opts ...NodeFixtureParameterOption,
 ) (p2p.LibP2PNode, flow.Identity) {
+	defaultFlowConfig, err := config.DefaultConfig()
+	require.NoError(t, err)
 
 	logger := unittest.Logger().Level(zerolog.InfoLevel)
 
-	rpcInspectorSuite, err := inspectorbuilder.NewGossipSubInspectorBuilder(logger, sporkID, inspectorbuilder.DefaultGossipSubRPCInspectorsConfig(), idProvider, metrics.NewNoopCollector()).
+	rpcInspectorSuite, err := inspectorbuilder.NewGossipSubInspectorBuilder(logger, sporkID, &defaultFlowConfig.NetworkConfig.GossipSubConfig.GossipSubRPCInspectorsConfig, idProvider, metrics.NewNoopCollector()).
 		Build()
 	require.NoError(t, err)
 
@@ -88,7 +91,7 @@ func NodeFixture(
 
 	logger = parameters.Logger.With().Hex("node_id", logging.ID(identity.NodeID)).Logger()
 
-	connManager, err := connection.NewConnManager(logger, parameters.Metrics, connection.DefaultConnManagerConfig())
+	connManager, err := connection.NewConnManager(logger, parameters.Metrics, &defaultFlowConfig.NetworkConfig.ConnectionManagerConfig)
 	require.NoError(t, err)
 
 	builder := p2pbuilder.NewNodeBuilder(
@@ -97,7 +100,7 @@ func NodeFixture(
 		parameters.Address,
 		parameters.Key,
 		sporkID,
-		p2pbuilder.DefaultResourceManagerConfig(),
+		&defaultFlowConfig.NetworkConfig.ResourceManagerConfig,
 		&p2p.DisallowListCacheConfig{
 			MaxSize: uint32(1000),
 			Metrics: metrics.NewNoopCollector(),

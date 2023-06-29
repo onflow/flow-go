@@ -224,7 +224,7 @@ func (m *MiddlewareTestSuite) TestUnicastRateLimit_Messages() {
 	// burst per interval
 	burst := 5
 
-	messageRateLimiter := ratelimiter.NewRateLimiter(limit, burst, 3)
+	messageRateLimiter := ratelimiter.NewRateLimiter(limit, burst, 3*time.Second)
 
 	// we only expect messages from the first middleware on the test suite
 	expectedPID, err := unittest.PeerIDFromFlowID(m.ids[0])
@@ -383,7 +383,7 @@ func (m *MiddlewareTestSuite) TestUnicastRateLimit_Bandwidth() {
 	require.NoError(m.T(), err)
 
 	// setup bandwidth rate limiter
-	bandwidthRateLimiter := ratelimit.NewBandWidthRateLimiter(limit, burst, 4)
+	bandwidthRateLimiter := ratelimit.NewBandWidthRateLimiter(limit, burst, 4*time.Second)
 
 	// the onRateLimit call back we will use to keep track of how many times a rate limit happens
 	// after 5 rate limits we will close ch.
