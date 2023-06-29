@@ -15,9 +15,11 @@ func MetricsMiddleware(restCollector module.RestMetrics, urlToRoute func(string)
 	metricsMiddleware := middleware.New(middleware.Config{Recorder: restCollector})
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+			//urlToRoute transforms specific URL to generic url pattern
 			routeName, err := urlToRoute(req.URL.Path)
 			if err != nil {
-				return
+				// In case of an error, an empty route name filled with "unknown"
+				routeName = "unknown"
 			}
 
 			// This is a custom metric being called on every http request
