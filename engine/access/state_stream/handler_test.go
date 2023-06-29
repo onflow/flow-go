@@ -65,10 +65,11 @@ func TestExecutionDataStream(t *testing.T) {
 		),
 	)
 
-	sub.Send(ctx, &state_stream.ExecutionDataResponse{
+	err := sub.Send(ctx, &state_stream.ExecutionDataResponse{
 		Height:        blockHeight,
 		ExecutionData: executionData,
 	}, 100*time.Millisecond)
+	require.NoError(t, err)
 
 	// notify end of data
 	sub.Close()
@@ -143,11 +144,12 @@ func TestEventStream(t *testing.T) {
 	// send a single response
 	blockHeight := uint64(1)
 	blockID := unittest.IdentifierFixture()
-	sub.Send(ctx, &state_stream.EventsResponse{
+	err := sub.Send(ctx, &state_stream.EventsResponse{
 		BlockID: blockID,
 		Height:  blockHeight,
 		Events:  inputEvents,
 	}, 100*time.Millisecond)
+	require.NoError(t, err)
 
 	// notify end of data
 	sub.Close()
