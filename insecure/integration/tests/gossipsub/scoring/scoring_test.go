@@ -75,7 +75,6 @@ func TestGossipSubInvalidMessageDelivery_Integration(t *testing.T) {
 				return p2ptest.PubsubMessageFixture(t, p2ptest.WithoutSignerId(), p2ptest.WithTopic(topic.String()), p2ptest.WithoutSignature())
 			},
 		},
-		
 	}
 
 	for _, tc := range tt {
@@ -133,17 +132,29 @@ func testGossipSubInvalidMessageDeliveryScoring(t *testing.T, spamMsgFactory fun
 			spamMsgFactory(spammer.SpammerNode.Host().ID(), victimNode.Host().ID(), blockTopic))
 	}
 
-	// wait for 3 heartbeats to ensure the score is updated.
-	time.Sleep(3 * time.Second)
+	// wait for at most 3 seconds for the victim node to penalize the spammer node.
+	// Each heartbeat is 1 second, so 3 heartbeats should be enough to penalize the spammer node.
+	// Ideally, we should wait for 1 heartbeat, but the score may not be updated immediately after the heartbeat.
+	require.Eventually(t, func() bool {
+		spammerScore, ok := victimNode.PeerScoreExposer().GetScore(spammer.SpammerNode.Host().ID())
+		if !ok {
+			return false
+		}
+		if spammerScore >= scoring.DefaultGossipThreshold {
+			// ensure the score is low enough so that no gossip is routed by victim node to spammer node.
+			return false
+		}
+		if spammerScore >= scoring.DefaultPublishThreshold {
+			// ensure the score is low enough so that non of the published messages of the victim node are routed to the spammer node.
+			return false
+		}
+		if spammerScore >= scoring.DefaultGraylistThreshold {
+			// ensure the score is low enough so that the victim node does not accept RPC messages from the spammer node.
+			return false
+		}
 
-	spammerScore, ok := victimNode.PeerScoreExposer().GetScore(spammer.SpammerNode.Host().ID())
-	require.True(t, ok)
-	// ensure the score is low enough so that no gossip is routed by victim node to spammer node.
-	require.True(t, spammerScore < scoring.DefaultGossipThreshold, "spammer score must be less than gossip threshold. spammerScore: %d, gossip threshold: %d", spammerScore, scoring.DefaultGossipThreshold)
-	// ensure the score is low enough so that non of the published messages of the victim node are routed to the spammer node.
-	require.True(t, spammerScore < scoring.DefaultPublishThreshold, "spammer score must be less than publish threshold. spammerScore: %d, publish threshold: %d", spammerScore, scoring.DefaultPublishThreshold)
-	// ensure the score is low enough so that the victim node does not accept RPC messages from the spammer node.
-	require.True(t, spammerScore < scoring.DefaultGraylistThreshold, "spammer score must be less than graylist threshold. spammerScore: %d, graylist threshold: %d", spammerScore, scoring.DefaultGraylistThreshold)
+		return true
+	}, 3*time.Second, 100*time.Millisecond)
 
 	topicsSnapshot, ok := victimNode.PeerScoreExposer().GetTopicScores(spammer.SpammerNode.Host().ID())
 	require.True(t, ok)
