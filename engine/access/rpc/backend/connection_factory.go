@@ -6,6 +6,7 @@ import (
 	"io"
 	"net"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	lru "github.com/hashicorp/golang-lru"
@@ -64,10 +65,11 @@ type ConnectionFactoryImpl struct {
 }
 
 type CachedClient struct {
-	ClientConn *grpc.ClientConn
-	Address    string
-	mutex      sync.Mutex
-	timeout    time.Duration
+	ClientConn     *grpc.ClientConn
+	Address        string
+	mutex          sync.Mutex
+	timeout        time.Duration
+	requestCounter int32
 }
 
 // createConnection creates new gRPC connections to remote node
@@ -84,6 +86,17 @@ func (cf *ConnectionFactoryImpl) createConnection(address string, timeout time.D
 		Timeout: timeout,
 	}
 
+	var connInterceptors []grpc.UnaryClientInterceptor
+
+	if cf.ConnectionsCache != nil {
+		if res, ok := cf.ConnectionsCache.Get(address); ok {
+			cachedClient := res.(*CachedClient)
+			connInterceptors = append(connInterceptors, cf.createRequestWatcherInterceptor(cachedClient))
+		}
+	}
+
+	connInterceptors = append(connInterceptors, createClientTimeoutInterceptor(timeout))
+
 	// ClientConn's default KeepAlive on connections is indefinite, assuming the timeout isn't reached
 	// The connections should be safe to be persisted and reused
 	// https://pkg.go.dev/google.golang.org/grpc#WithKeepaliveParams
@@ -93,7 +106,8 @@ func (cf *ConnectionFactoryImpl) createConnection(address string, timeout time.D
 		grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(int(cf.MaxMsgSize))),
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 		grpc.WithKeepaliveParams(keepaliveParams),
-		WithClientUnaryInterceptor(timeout))
+		grpc.WithChainUnaryInterceptor(connInterceptors...),
+	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to address %s: %w", address, err)
 	}
@@ -111,9 +125,10 @@ func (cf *ConnectionFactoryImpl) retrieveConnection(grpcAddress string, timeout 
 		conn = store.ClientConn
 	} else {
 		store = &CachedClient{
-			ClientConn: nil,
-			Address:    grpcAddress,
-			timeout:    timeout,
+			ClientConn:     nil,
+			Address:        grpcAddress,
+			timeout:        timeout,
+			requestCounter: 0,
 		}
 		cf.Log.Debug().Str("cached_client_added", grpcAddress).Msg("adding new cached client to pool")
 		cf.ConnectionsCache.Add(grpcAddress, store)
@@ -230,9 +245,13 @@ func (s *CachedClient) Close() {
 	if conn == nil {
 		return
 	}
-	// allow time for any existing requests to finish before closing the connection
-	time.Sleep(s.timeout + 1*time.Second)
-	conn.Close()
+
+	for {
+		if atomic.LoadInt32(&s.requestCounter) == 0 {
+			conn.Close()
+			return
+		}
+	}
 }
 
 // getExecutionNodeAddress translates flow.Identity address to the GRPC address of the node by switching the port to the
@@ -249,8 +268,31 @@ func getGRPCAddress(address string, grpcPort uint) (string, error) {
 	return grpcAddress, nil
 }
 
-func WithClientUnaryInterceptor(timeout time.Duration) grpc.DialOption {
+// createClientTimeoutInterceptor creates a client interceptor with a context that expires after the timeout.
+func (cf *ConnectionFactoryImpl) createRequestWatcherInterceptor(cachedClient *CachedClient) grpc.UnaryClientInterceptor {
+	requestWatcherInterceptor := func(
+		ctx context.Context,
+		method string,
+		req interface{},
+		reply interface{},
+		cc *grpc.ClientConn,
+		invoker grpc.UnaryInvoker,
+		opts ...grpc.CallOption,
+	) error {
+		atomic.AddInt32(&cachedClient.requestCounter, 1)
 
+		err := invoker(ctx, method, req, reply, cc, opts...)
+
+		atomic.AddInt32(&cachedClient.requestCounter, -1)
+
+		return err
+	}
+
+	return requestWatcherInterceptor
+}
+
+// createClientTimeoutInterceptor creates a client interceptor with a context that expires after the timeout.
+func createClientTimeoutInterceptor(timeout time.Duration) grpc.UnaryClientInterceptor {
 	clientTimeoutInterceptor := func(
 		ctx context.Context,
 		method string,
@@ -260,17 +302,21 @@ func WithClientUnaryInterceptor(timeout time.Duration) grpc.DialOption {
 		invoker grpc.UnaryInvoker,
 		opts ...grpc.CallOption,
 	) error {
-
-		// create a context that expires after timeout
+		// Create a context that expires after the specified timeout.
 		ctxWithTimeout, cancel := context.WithTimeout(ctx, timeout)
-
 		defer cancel()
 
-		// call the remote GRPC using the short context
+		// Call the remote GRPC using the short context.
 		err := invoker(ctxWithTimeout, method, req, reply, cc, opts...)
 
 		return err
 	}
 
-	return grpc.WithUnaryInterceptor(clientTimeoutInterceptor)
+	return clientTimeoutInterceptor
+}
+
+// WithClientTimeoutOption is a helper function to create a GRPC dial option
+// with the specified client timeout interceptor.
+func WithClientTimeoutOption(timeout time.Duration) grpc.DialOption {
+	return grpc.WithUnaryInterceptor(createClientTimeoutInterceptor(timeout))
 }

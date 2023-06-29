@@ -3,6 +3,7 @@ package backend
 import (
 	"context"
 	"fmt"
+	"google.golang.org/grpc/connectivity"
 	"net"
 	"strconv"
 	"strings"
@@ -106,7 +107,7 @@ func TestProxyAccessAPIConnectionReuse(t *testing.T) {
 	// set the collection grpc port
 	connectionFactory.CollectionGRPCPort = cn.port
 	// set the connection pool cache size
-	cacheSize := 5
+	cacheSize := 1
 	cache, _ := lru.NewWithEvict(cacheSize, func(_, evictedValue interface{}) {
 		evictedValue.(*CachedClient).Close()
 	})
@@ -405,6 +406,75 @@ func TestConnectionPoolStale(t *testing.T) {
 	resp, err := accessAPIClient.Ping(ctx, req)
 	assert.NoError(t, err)
 	assert.Equal(t, resp, expected)
+}
+
+// TestExecutionNodeClientClosedGracefully
+func TestExecutionNodeClientClosedGracefully(t *testing.T) {
+
+	timeout := 2 * time.Second
+
+	// create an execution node
+	en := new(executionNode)
+	en.start(t)
+	defer en.stop(t)
+
+	// setup the handler mock to not respond within the timeout
+	req := &execution.PingRequest{}
+	resp := &execution.PingResponse{}
+	en.handler.On("Ping", testifymock.Anything, req).Return(resp, nil)
+
+	// create the factory
+	connectionFactory := new(ConnectionFactoryImpl)
+	// set the execution grpc port
+	connectionFactory.ExecutionGRPCPort = en.port
+	// set the execution grpc client timeout
+	connectionFactory.ExecutionNodeGRPCTimeout = timeout
+	// set the connection pool cache size
+	cacheSize := 1
+	cache, _ := lru.NewWithEvict(cacheSize, func(_, evictedValue interface{}) {
+		evictedValue.(*CachedClient).Close()
+	})
+	connectionFactory.ConnectionsCache = cache
+	connectionFactory.CacheSize = uint(cacheSize)
+	// set metrics reporting
+	connectionFactory.AccessMetrics = metrics.NewNoopCollector()
+
+	clientAddress := en.listener.Addr().String()
+	// create the execution API client
+	client, _, err := connectionFactory.GetExecutionAPIClient(clientAddress)
+	assert.NoError(t, err)
+
+	result, _ := cache.Get(clientAddress)
+	clientConn := result.(*CachedClient).ClientConn
+	clientConn.GetState()
+
+	ctx := context.Background()
+
+	go func() {
+		for {
+			state := clientConn.GetState()
+			fmt.Printf("\t!!! State: %s\n", state.String())
+			if state == connectivity.Shutdown {
+				fmt.Printf("\t\t!!! Was shutdown: %s\n", state.String())
+				return
+			}
+		}
+	}()
+
+	//// Schedule the function to run after the timeout
+	//time.AfterFunc(3*time.Millisecond, func() {
+	//	fmt.Println("InvalidateExecutionAPIClient")
+	//	connectionFactory.InvalidateExecutionAPIClient(clientAddress)
+	//})
+	fmt.Println("Pings` started")
+	for i := 1; i <= 100; i++ {
+		//fmt.Printf("Ping %d %s\n", i, clientConn.GetState().String())
+		fmt.Printf("Ping %d\n", i)
+		_, err = client.Ping(ctx, req)
+		//fmt.Printf("State %s\n", clientConn.GetState().String())
+	}
+	fmt.Println("Pings` finished")
+	connectionFactory.InvalidateExecutionAPIClient(clientAddress)
 }
 
 // node mocks a flow node that runs a GRPC server
