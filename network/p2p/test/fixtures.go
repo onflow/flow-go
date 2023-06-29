@@ -12,7 +12,6 @@ import (
 	"github.com/libp2p/go-libp2p/core/connmgr"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/network"
-	mocknetwork "github.com/libp2p/go-libp2p/core/network/mocks"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/protocol"
 	"github.com/libp2p/go-libp2p/core/routing"
@@ -84,7 +83,7 @@ func NodeFixture(
 			HeroCacheFactory: metrics.NewNoopHeroCacheMetricsFactory(),
 			Metrics:          metrics.NewNoopCollector(),
 		},
-		ResourceManager:                  ,
+		ResourceManager:                  &network.NullResourceManager{},
 		GossipSubPeerScoreTracerInterval: 0, // disabled by default
 		ConnGater:                        connectionGater,
 		PeerManagerConfig:                PeerManagerConfigFixture(), // disabled by default
@@ -114,8 +113,8 @@ func NodeFixture(
 		sporkID,
 		parameters.IdProvider,
 		&defaultFlowConfig.NetworkConfig.ResourceManagerConfig,
-		parameters.PeerManagerConfig,
 		parameters.GossipSubRPCInspectorCfg,
+		parameters.PeerManagerConfig,
 		&p2p.DisallowListCacheConfig{
 			MaxSize: uint32(1000),
 			Metrics: metrics.NewNoopCollector(),

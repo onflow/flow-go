@@ -134,7 +134,7 @@ func LibP2PNodeForMiddlewareFixture(t *testing.T, n int, opts ...p2ptest.NodeFix
 	libP2PNodes := make([]p2p.LibP2PNode, 0)
 	identities := make(flow.IdentityList, 0)
 	tagObservables := make([]observable.Observable, 0)
-	idProvider := NewUpdatableIDProvider(identities)
+	idProvider := unittest.NewUpdatableIDProvider(flow.IdentityList{})
 	defaultFlowConfig, err := config.DefaultConfig()
 	require.NoError(t, err)
 
@@ -186,17 +186,17 @@ func MiddlewareConfigFixture(t *testing.T) *middleware.Config {
 // Returns:
 // - a list of middlewares - one for each identity.
 // - a list of UpdatableIDProvider - one for each identity.
-func MiddlewareFixtures(t *testing.T, identities flow.IdentityList, libP2PNodes []p2p.LibP2PNode, cfg *middleware.Config, opts ...middleware.OptionFn) ([]network.Middleware, []*UpdatableIDProvider) {
+func MiddlewareFixtures(t *testing.T, identities flow.IdentityList, libP2PNodes []p2p.LibP2PNode, cfg *middleware.Config, opts ...middleware.OptionFn) ([]network.Middleware, []*unittest.UpdatableIDProvider) {
 	require.Equal(t, len(identities), len(libP2PNodes))
 
 	mws := make([]network.Middleware, len(identities))
-	idProviders := make([]*UpdatableIDProvider, len(identities))
+	idProviders := make([]*unittest.UpdatableIDProvider, len(identities))
 
 	for i := 0; i < len(identities); i++ {
 		i := i
 		cfg.Libp2pNode = libP2PNodes[i]
 		cfg.FlowId = identities[i].NodeID
-		idProviders[i] = NewUpdatableIDProvider(identities)
+		idProviders[i] = unittest.NewUpdatableIDProvider(identities)
 		cfg.IdTranslator = translator.NewIdentityProviderIDTranslator(idProviders[i])
 
 		mws[i] = middleware.NewMiddleware(cfg, opts...)
