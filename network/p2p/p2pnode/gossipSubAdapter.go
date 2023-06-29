@@ -9,6 +9,7 @@ import (
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/rs/zerolog"
 
+	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/network/p2p"
@@ -30,11 +31,15 @@ type GossipSubAdapter struct {
 	topicScoreParamFunc func(topic *pubsub.Topic) *pubsub.TopicScoreParams
 	logger              zerolog.Logger
 	peerScoreExposer    p2p.PeerScoreExposer
+	// clusterChangeConsumer is a callback that is invoked when the set of active clusters of collection nodes changes.
+	// This callback is implemented by the rpc inspector suite of the GossipSubAdapter, and consumes the cluster changes
+	// to update the rpc inspector state of the recent topics (i.e., channels).
+	clusterChangeConsumer p2p.CollectionClusterChangesConsumer
 }
 
 var _ p2p.PubSubAdapter = (*GossipSubAdapter)(nil)
 
-func NewGossipSubAdapter(ctx context.Context, logger zerolog.Logger, h host.Host, cfg p2p.PubSubAdapterConfig) (p2p.PubSubAdapter, error) {
+func NewGossipSubAdapter(ctx context.Context, logger zerolog.Logger, h host.Host, cfg p2p.PubSubAdapterConfig, clusterChangeConsumer p2p.CollectionClusterChangesConsumer) (p2p.PubSubAdapter, error) {
 	gossipSubConfig, ok := cfg.(*GossipSubAdapterConfig)
 	if !ok {
 		return nil, fmt.Errorf("invalid gossipsub config type: %T", cfg)
@@ -50,6 +55,7 @@ func NewGossipSubAdapter(ctx context.Context, logger zerolog.Logger, h host.Host
 	a := &GossipSubAdapter{
 		gossipSub: gossipSub,
 		logger:    logger.With().Str("component", "gossipsub-adapter").Logger(),
+		clusterChangeConsumer: clusterChangeConsumer,
 	}
 
 	topicScoreParamFunc, ok := gossipSubConfig.TopicScoreParamFunc()
@@ -179,4 +185,15 @@ func (g *GossipSubAdapter) ListPeers(topic string) []peer.ID {
 //	The peer score exposer for the gossipsub adapter.
 func (g *GossipSubAdapter) PeerScoreExposer() p2p.PeerScoreExposer {
 	return g.peerScoreExposer
+}
+
+// ActiveClustersChanged is called when the active clusters of collection nodes changes.
+// GossipSubAdapter implements this method to forward the call to the clusterChangeConsumer (rpc inspector),
+// which will then update the cluster state of the rpc inspector.
+// Args:
+// - lst: the list of active clusters
+// Returns:
+// - void
+func (g *GossipSubAdapter) ActiveClustersChanged(lst flow.ChainIDList) {
+	g.clusterChangeConsumer.ActiveClustersChanged(lst)
 }

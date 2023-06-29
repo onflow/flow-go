@@ -18,6 +18,7 @@ import (
 	"github.com/libp2p/go-libp2p/core/routing"
 	"github.com/rs/zerolog"
 
+	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	flownet "github.com/onflow/flow-go/network"
@@ -518,4 +519,15 @@ func (n *Node) OnAllowListNotification(peerId peer.ID, cause flownet.DisallowLis
 // - bool: true if the peer is disallow-listed for any reason, false otherwise.
 func (n *Node) IsDisallowListed(peerId peer.ID) ([]flownet.DisallowListedCause, bool) {
 	return n.disallowListedCache.IsDisallowListed(peerId)
+}
+
+// ActiveClustersChanged is called when the active clusters list of the collection clusters has changed.
+// The LibP2PNode implementation directly calls the ActiveClustersChanged method of the pubsub implementation, as
+// the pubsub implementation is responsible for the actual handling of the event.
+// Args:
+// - list: the new active clusters list.
+// Returns:
+// - none
+func (n *Node) ActiveClustersChanged(list flow.ChainIDList) {
+	n.pubSub.ActiveClustersChanged(list)
 }

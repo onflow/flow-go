@@ -11,6 +11,7 @@ import (
 	corrupt "github.com/yhassanzadeh13/go-libp2p-pubsub"
 
 	"github.com/onflow/flow-go/insecure/internal"
+	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/network/p2p"
@@ -28,9 +29,10 @@ import (
 // totally separated from the rest of the codebase.
 type CorruptGossipSubAdapter struct {
 	component.Component
-	gossipSub        *corrupt.PubSub
-	router           *corrupt.GossipSubRouter
-	logger           zerolog.Logger
+	gossipSub             *corrupt.PubSub
+	router                *corrupt.GossipSubRouter
+	logger                zerolog.Logger
+	clusterChangeConsumer p2p.CollectionClusterChangesConsumer
 	peerScoreExposer p2p.PeerScoreExposer
 }
 
@@ -105,6 +107,10 @@ func (c *CorruptGossipSubAdapter) ListPeers(topic string) []peer.ID {
 	return c.gossipSub.ListPeers(topic)
 }
 
+func (c *CorruptGossipSubAdapter) ActiveClustersChanged(lst flow.ChainIDList) {
+	c.clusterChangeConsumer.ActiveClustersChanged(lst)
+}
+
 // PeerScoreExposer returns the peer score exposer for the gossipsub adapter. The exposer is a read-only interface
 // for querying peer scores and returns the local scoring table of the underlying gossipsub node.
 // The exposer is only available if the gossipsub adapter was configured with a score tracer.
@@ -137,9 +143,11 @@ func NewCorruptGossipSubAdapter(ctx context.Context, logger zerolog.Logger, h ho
 
 	builder := component.NewComponentManagerBuilder()
 	adapter := &CorruptGossipSubAdapter{
-		gossipSub: gossipSub,
-		router:    router,
-		logger:    logger,
+		Component:             builder,
+		gossipSub:             gossipSub,
+		router:                router,
+		logger:                logger,
+		clusterChangeConsumer: clusterChangeConsumer,
 	}
 
 	if scoreTracer := gossipSubConfig.ScoreTracer(); scoreTracer != nil {

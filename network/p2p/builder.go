@@ -13,12 +13,16 @@ import (
 	madns "github.com/multiformats/go-multiaddr-dns"
 	"github.com/rs/zerolog"
 
+	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/irrecoverable"
+	"github.com/onflow/flow-go/module/metrics"
+	flownet "github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/channels"
+	"github.com/onflow/flow-go/network/p2p/p2pconf"
 )
 
-type GossipSubFactoryFunc func(context.Context, zerolog.Logger, host.Host, PubSubAdapterConfig) (PubSubAdapter, error)
+type GossipSubFactoryFunc func(context.Context, zerolog.Logger, host.Host, PubSubAdapterConfig, CollectionClusterChangesConsumer) (PubSubAdapter, error)
 type CreateNodeFunc func(zerolog.Logger, host.Host, ProtocolPeerCache, PeerManager, *DisallowListCacheConfig) LibP2PNode
 type GossipSubAdapterConfigFunc func(*BasePubSubAdapterConfig) PubSubAdapterConfig
 
@@ -53,18 +57,16 @@ type GossipSubBuilder interface {
 	// If the gossipsub tracer has already been set, a fatal error is logged.
 	SetGossipSubTracer(PubSubTracer)
 
-	// SetIDProvider sets the identity provider of the builder.
-	// If the identity provider has already been set, a fatal error is logged.
-	SetIDProvider(module.IdentityProvider)
-
 	// SetRoutingSystem sets the routing system of the builder.
 	// If the routing system has already been set, a fatal error is logged.
 	SetRoutingSystem(routing.Routing)
 
-	// SetGossipSubRPCInspectorSuite sets the gossipsub rpc inspector suite of the builder. It contains the
-	// inspector function that is injected into the gossipsub rpc layer, as well as the notification distributors that
-	// are used to notify the app specific scoring mechanism of misbehaving peers.
-	SetGossipSubRPCInspectorSuite(GossipSubInspectorSuite)
+	// OverrideDefaultRpcInspectorSuiteFactory overrides the default RPC inspector suite factory of the builder.
+	// A default RPC inspector suite factory is provided by the node. This function overrides the default factory.
+	// The purpose of override is to allow the node to provide a custom RPC inspector suite factory for sake of testing
+	// or experimentation.
+	// It is NOT recommended to override the default RPC inspector suite factory in production unless you know what you are doing.
+	OverrideDefaultRpcInspectorSuiteFactory(GossipSubRpcInspectorSuiteFactoryFunc)
 
 	// Build creates a new GossipSub pubsub system.
 	// It returns the newly created GossipSub pubsub system and any errors encountered during its creation.
@@ -89,6 +91,29 @@ type PeerScoringBuilder interface {
 	SetAppSpecificScoreParams(func(peer.ID) float64)
 }
 
+// GossipSubRpcInspectorSuiteFactoryFunc is a function that creates a new RPC inspector suite. It is used to create
+// RPC inspectors for the gossipsub protocol. The RPC inspectors are used to inspect and validate
+// incoming RPC messages before they are processed by the gossipsub protocol.
+// Args:
+// - logger: logger to use
+// - sporkID: spork ID of the node
+// - cfg: configuration for the RPC inspectors
+// - metrics: metrics to use for the RPC inspectors
+// - heroCacheMetricsFactory: metrics factory for the hero cache
+// - networkingType: networking type of the node, i.e., public or private
+// - identityProvider: identity provider of the node
+// Returns:
+// - p2p.GossipSubInspectorSuite: new RPC inspector suite
+// - error: error if any, any returned error is irrecoverable.
+type GossipSubRpcInspectorSuiteFactoryFunc func(
+	zerolog.Logger,
+	flow.Identifier,
+	*p2pconf.GossipSubRPCInspectorsConfig,
+	module.GossipSubMetrics,
+	metrics.HeroCacheMetricsFactory,
+	flownet.NetworkingType,
+	module.IdentityProvider) (GossipSubInspectorSuite, error)
+
 // NodeBuilder is a builder pattern for creating a libp2p Node instance.
 type NodeBuilder interface {
 	SetBasicResolver(madns.BasicResolver) NodeBuilder
@@ -103,14 +128,14 @@ type NodeBuilder interface {
 	// Arguments:
 	// - module.IdentityProvider: the identity provider for the node (must be set before calling this method).
 	// - *PeerScoringConfig: the peer scoring configuration for the GossipSub pubsub system. If nil, the default configuration is used.
-	EnableGossipSubPeerScoring(module.IdentityProvider, *PeerScoringConfig) NodeBuilder
+	EnableGossipSubPeerScoring(*PeerScoringConfig) NodeBuilder
 	SetCreateNode(CreateNodeFunc) NodeBuilder
 	SetGossipSubFactory(GossipSubFactoryFunc, GossipSubAdapterConfigFunc) NodeBuilder
 	SetStreamCreationRetryInterval(time.Duration) NodeBuilder
 	SetRateLimiterDistributor(UnicastRateLimiterDistributor) NodeBuilder
 	SetGossipSubTracer(PubSubTracer) NodeBuilder
 	SetGossipSubScoreTracerInterval(time.Duration) NodeBuilder
-	SetGossipSubRpcInspectorSuite(GossipSubInspectorSuite) NodeBuilder
+	OverrideDefaultRpcInspectorSuiteFactory(GossipSubRpcInspectorSuiteFactoryFunc) NodeBuilder
 	Build() (LibP2PNode, error)
 }
 
