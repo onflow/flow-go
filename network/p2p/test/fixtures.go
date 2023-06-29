@@ -12,6 +12,7 @@ import (
 	"github.com/libp2p/go-libp2p/core/connmgr"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/network"
+	mocknetwork "github.com/libp2p/go-libp2p/core/network/mocks"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/protocol"
 	"github.com/libp2p/go-libp2p/core/routing"
@@ -78,12 +79,12 @@ func NodeFixture(
 		Logger:                 logger,
 		Role:                   flow.RoleCollection,
 		CreateStreamRetryDelay: unicast.DefaultRetryDelay,
-		IdProvider:                       idProvider,
+		IdProvider:             idProvider,
 		MetricsCfg: &p2pconfig.MetricsConfig{
 			HeroCacheFactory: metrics.NewNoopHeroCacheMetricsFactory(),
 			Metrics:          metrics.NewNoopCollector(),
 		},
-		ResourceManager:                  testutils.NewResourceManager(t),
+		ResourceManager:                  ,
 		GossipSubPeerScoreTracerInterval: 0, // disabled by default
 		ConnGater:                        connectionGater,
 		PeerManagerConfig:                PeerManagerConfigFixture(), // disabled by default
@@ -189,29 +190,29 @@ func NodeFixture(
 type NodeFixtureParameterOption func(*NodeFixtureParameters)
 
 type NodeFixtureParameters struct {
-	HandlerFunc                      network.StreamHandler
+	HandlerFunc                       network.StreamHandler
 	NetworkingType                    flownet.NetworkingType
-	Unicasts                         []protocols.ProtocolName
-	Key                              crypto.PrivateKey
-	Address                          string
-	DhtOptions                       []dht.Option
-	Role                             flow.Role
-	Logger                           zerolog.Logger
-	PeerScoringEnabled               bool
-	IdProvider                       module.IdentityProvider
-	PeerScoreConfig                  *p2p.PeerScoringConfig
-	PeerManagerConfig                *p2pconfig.PeerManagerConfig
-	PeerProvider                     p2p.PeersProvider // peer manager parameter
-	ConnGater                        p2p.ConnectionGater
-	ConnManager                      connmgr.ConnManager
-	GossipSubFactory                 p2p.GossipSubFactoryFunc
-	GossipSubConfig                  p2p.GossipSubAdapterConfigFunc
+	Unicasts                          []protocols.ProtocolName
+	Key                               crypto.PrivateKey
+	Address                           string
+	DhtOptions                        []dht.Option
+	Role                              flow.Role
+	Logger                            zerolog.Logger
+	PeerScoringEnabled                bool
+	IdProvider                        module.IdentityProvider
+	PeerScoreConfig                   *p2p.PeerScoringConfig
+	PeerManagerConfig                 *p2pconfig.PeerManagerConfig
+	PeerProvider                      p2p.PeersProvider // peer manager parameter
+	ConnGater                         p2p.ConnectionGater
+	ConnManager                       connmgr.ConnManager
+	GossipSubFactory                  p2p.GossipSubFactoryFunc
+	GossipSubConfig                   p2p.GossipSubAdapterConfigFunc
 	MetricsCfg                        *p2pconfig.MetricsConfig
-	ResourceManager                  network.ResourceManager
-	PubSubTracer                     p2p.PubSubTracer
-	GossipSubPeerScoreTracerInterval time.Duration // intervals at which the peer score is updated and logged.
-	CreateStreamRetryDelay           time.Duration
-	UnicastRateLimitDistributor      p2p.UnicastRateLimiterDistributor
+	ResourceManager                   network.ResourceManager
+	PubSubTracer                      p2p.PubSubTracer
+	GossipSubPeerScoreTracerInterval  time.Duration // intervals at which the peer score is updated and logged.
+	CreateStreamRetryDelay            time.Duration
+	UnicastRateLimitDistributor       p2p.UnicastRateLimiterDistributor
 	GossipSubRpcInspectorSuiteFactory p2p.GossipSubRpcInspectorSuiteFactoryFunc
 	GossipSubRPCInspectorCfg          *p2pconf.GossipSubRPCInspectorsConfig
 }
