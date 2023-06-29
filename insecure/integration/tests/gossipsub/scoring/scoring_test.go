@@ -22,6 +22,7 @@ import (
 
 // TestGossipSubInvalidMessageDelivery_Integration tests that when a victim peer is spammed with invalid messages from
 // a spammer peer, the victim will eventually penalize the spammer and stop receiving messages from them.
+// Note: the term integration is used here because it requires integrating all components of the libp2p stack.
 func TestGossipSubInvalidMessageDelivery_Integration(t *testing.T) {
 	tt := []struct {
 		name           string
