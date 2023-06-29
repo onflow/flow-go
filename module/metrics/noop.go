@@ -31,6 +31,9 @@ func (nc *NoopCollector) UnicastMessageSendingCompleted(topic string)           
 func (nc *NoopCollector) BlockProposed(*flow.Block)                              {}
 func (nc *NoopCollector) BlockProposalDuration(duration time.Duration)           {}
 
+// interface check
+var _ module.BackendScriptsMetrics = (*NoopCollector)(nil)
+var _ module.TransactionMetrics = (*NoopCollector)(nil)
 var _ module.HotstuffMetrics = (*NoopCollector)(nil)
 var _ module.EngineMetrics = (*NoopCollector)(nil)
 var _ module.HeroCacheMetrics = (*NoopCollector)(nil)
@@ -191,6 +194,8 @@ func (nc *NoopCollector) RuntimeSetNumberOfAccounts(count uint64)               
 func (nc *NoopCollector) RuntimeTransactionProgramsCacheMiss()                             {}
 func (nc *NoopCollector) RuntimeTransactionProgramsCacheHit()                              {}
 func (nc *NoopCollector) ScriptExecuted(dur time.Duration, size int)                       {}
+func (nc *NoopCollector) ScriptExecutionErrorOnArchiveNode()                               {}
+func (nc *NoopCollector) ScriptExecutionErrorOnExecutionNode()                             {}
 func (nc *NoopCollector) TransactionResultFetched(dur time.Duration, size int)             {}
 func (nc *NoopCollector) TransactionReceived(txID flow.Identifier, when time.Time)         {}
 func (nc *NoopCollector) TransactionFinalized(txID flow.Identifier, when time.Time)        {}
