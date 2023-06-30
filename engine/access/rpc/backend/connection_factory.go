@@ -6,8 +6,11 @@ import (
 	"io"
 	"net"
 	"sync"
-	"sync/atomic"
 	"time"
+
+	"go.uber.org/atomic"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 
 	lru "github.com/hashicorp/golang-lru"
 	"github.com/onflow/flow/protobuf/go/flow/access"
@@ -69,7 +72,26 @@ type CachedClient struct {
 	Address        string
 	mutex          sync.Mutex
 	timeout        time.Duration
-	requestCounter int32
+	requestCounter *atomic.Int32
+	closeRequested *atomic.Bool
+	done           chan struct{}
+}
+
+func (s *CachedClient) UpdateConnection(conn *grpc.ClientConn) {
+	s.ClientConn = conn
+	s.closeRequested.Store(false)
+	s.requestCounter.Store(0)
+	s.done = make(chan struct{}, 1)
+}
+
+func NewCachedClient(timeout time.Duration, address string) *CachedClient {
+	return &CachedClient{
+		Address:        address,
+		timeout:        timeout,
+		requestCounter: atomic.NewInt32(0),
+		closeRequested: atomic.NewBool(false),
+		done:           make(chan struct{}, 1),
+	}
 }
 
 // createConnection creates new gRPC connections to remote node
@@ -91,7 +113,7 @@ func (cf *ConnectionFactoryImpl) createConnection(address string, timeout time.D
 	if cf.ConnectionsCache != nil {
 		if res, ok := cf.ConnectionsCache.Get(address); ok {
 			cachedClient := res.(*CachedClient)
-			connInterceptors = append(connInterceptors, cf.createRequestWatcherInterceptor(cachedClient))
+			connInterceptors = append(connInterceptors, createRequestWatcherInterceptor(cachedClient))
 		}
 	}
 
@@ -124,18 +146,15 @@ func (cf *ConnectionFactoryImpl) retrieveConnection(grpcAddress string, timeout 
 		store = res.(*CachedClient)
 		conn = store.ClientConn
 	} else {
-		store = &CachedClient{
-			ClientConn:     nil,
-			Address:        grpcAddress,
-			timeout:        timeout,
-			requestCounter: 0,
-		}
+		store = NewCachedClient(timeout, grpcAddress)
+
 		cf.Log.Debug().Str("cached_client_added", grpcAddress).Msg("adding new cached client to pool")
 		cf.ConnectionsCache.Add(grpcAddress, store)
 		if cf.AccessMetrics != nil {
 			cf.AccessMetrics.ConnectionAddedToPool()
 		}
 	}
+
 	cf.mutex.Unlock()
 	store.mutex.Lock()
 	defer store.mutex.Unlock()
@@ -146,7 +165,7 @@ func (cf *ConnectionFactoryImpl) retrieveConnection(grpcAddress string, timeout 
 		if err != nil {
 			return nil, err
 		}
-		store.ClientConn = conn
+		store.UpdateConnection(conn)
 		if cf.AccessMetrics != nil {
 			if cacheHit {
 				cf.AccessMetrics.ConnectionFromPoolUpdated()
@@ -246,12 +265,12 @@ func (s *CachedClient) Close() {
 		return
 	}
 
-	for {
-		if atomic.LoadInt32(&s.requestCounter) == 0 {
-			conn.Close()
-			return
-		}
+	s.closeRequested.Store(true)
+
+	if s.requestCounter.Load() > 0 {
+		<-s.done
 	}
+	conn.Close()
 }
 
 // getExecutionNodeAddress translates flow.Identity address to the GRPC address of the node by switching the port to the
@@ -269,7 +288,7 @@ func getGRPCAddress(address string, grpcPort uint) (string, error) {
 }
 
 // createClientTimeoutInterceptor creates a client interceptor with a context that expires after the timeout.
-func (cf *ConnectionFactoryImpl) createRequestWatcherInterceptor(cachedClient *CachedClient) grpc.UnaryClientInterceptor {
+func createRequestWatcherInterceptor(cachedClient *CachedClient) grpc.UnaryClientInterceptor {
 	requestWatcherInterceptor := func(
 		ctx context.Context,
 		method string,
@@ -279,11 +298,21 @@ func (cf *ConnectionFactoryImpl) createRequestWatcherInterceptor(cachedClient *C
 		invoker grpc.UnaryInvoker,
 		opts ...grpc.CallOption,
 	) error {
-		atomic.AddInt32(&cachedClient.requestCounter, 1)
+		if cachedClient.closeRequested.Load() {
+			return status.Errorf(codes.Unavailable, "the connection to %s was closed", cachedClient.Address)
+		}
+
+		cachedClient.requestCounter.Add(1)
 
 		err := invoker(ctx, method, req, reply, cc, opts...)
 
-		atomic.AddInt32(&cachedClient.requestCounter, -1)
+		count := cachedClient.requestCounter.Add(-1)
+		if cachedClient.closeRequested.Load() && count == 0 {
+			select {
+			case cachedClient.done <- struct{}{}:
+			default:
+			}
+		}
 
 		return err
 	}

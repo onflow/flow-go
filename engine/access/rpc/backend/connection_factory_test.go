@@ -3,13 +3,15 @@ package backend
 import (
 	"context"
 	"fmt"
-	"google.golang.org/grpc/connectivity"
 	"net"
 	"strconv"
 	"strings"
 	"sync"
 	"testing"
 	"time"
+
+	"go.uber.org/atomic"
+	"pgregory.net/rapid"
 
 	lru "github.com/hashicorp/golang-lru"
 	"github.com/onflow/flow/protobuf/go/flow/access"
@@ -408,73 +410,98 @@ func TestConnectionPoolStale(t *testing.T) {
 	assert.Equal(t, resp, expected)
 }
 
-// TestExecutionNodeClientClosedGracefully
+// TestExecutionNodeClientClosedGracefully tests the scenario where the execution node client is closed gracefully.
+//
+// Test Steps:
+// - Generate a random number of requests and start goroutines to handle each request.
+// - Invalidate the execution API client.
+// - Wait for all goroutines to finish.
+// - Verify that the number of completed requests matches the number of sent responses.
 func TestExecutionNodeClientClosedGracefully(t *testing.T) {
-
-	timeout := 2 * time.Second
-
-	// create an execution node
-	en := new(executionNode)
-	en.start(t)
-	defer en.stop(t)
-
-	// setup the handler mock to not respond within the timeout
-	req := &execution.PingRequest{}
-	resp := &execution.PingResponse{}
-	en.handler.On("Ping", testifymock.Anything, req).Return(resp, nil)
-
-	// create the factory
-	connectionFactory := new(ConnectionFactoryImpl)
-	// set the execution grpc port
-	connectionFactory.ExecutionGRPCPort = en.port
-	// set the execution grpc client timeout
-	connectionFactory.ExecutionNodeGRPCTimeout = timeout
-	// set the connection pool cache size
-	cacheSize := 1
-	cache, _ := lru.NewWithEvict(cacheSize, func(_, evictedValue interface{}) {
-		evictedValue.(*CachedClient).Close()
-	})
-	connectionFactory.ConnectionsCache = cache
-	connectionFactory.CacheSize = uint(cacheSize)
-	// set metrics reporting
-	connectionFactory.AccessMetrics = metrics.NewNoopCollector()
-
-	clientAddress := en.listener.Addr().String()
-	// create the execution API client
-	client, _, err := connectionFactory.GetExecutionAPIClient(clientAddress)
-	assert.NoError(t, err)
-
-	result, _ := cache.Get(clientAddress)
-	clientConn := result.(*CachedClient).ClientConn
-	clientConn.GetState()
-
-	ctx := context.Background()
-
-	go func() {
-		for {
-			state := clientConn.GetState()
-			fmt.Printf("\t!!! State: %s\n", state.String())
-			if state == connectivity.Shutdown {
-				fmt.Printf("\t\t!!! Was shutdown: %s\n", state.String())
-				return
-			}
+	// Add createExecNode function to recreate it each time for rapid test
+	createExecNode := func() (*executionNode, func()) {
+		en := new(executionNode)
+		en.start(t)
+		return en, func() {
+			en.stop(t)
 		}
-	}()
-
-	//// Schedule the function to run after the timeout
-	//time.AfterFunc(3*time.Millisecond, func() {
-	//	fmt.Println("InvalidateExecutionAPIClient")
-	//	connectionFactory.InvalidateExecutionAPIClient(clientAddress)
-	//})
-	fmt.Println("Pings` started")
-	for i := 1; i <= 100; i++ {
-		//fmt.Printf("Ping %d %s\n", i, clientConn.GetState().String())
-		fmt.Printf("Ping %d\n", i)
-		_, err = client.Ping(ctx, req)
-		//fmt.Printf("State %s\n", clientConn.GetState().String())
 	}
-	fmt.Println("Pings` finished")
-	connectionFactory.InvalidateExecutionAPIClient(clientAddress)
+
+	// Add rapid test, to check graceful close on different number of requests
+	rapid.Check(t, func(t *rapid.T) {
+		en, closer := createExecNode()
+		defer closer()
+
+		// setup the handler mock to not respond within the timeout
+		req := &execution.PingRequest{}
+		resp := &execution.PingResponse{}
+		respSent := atomic.NewUint64(0)
+		en.handler.On("Ping", testifymock.Anything, req).Run(func(_ testifymock.Arguments) {
+			respSent.Inc()
+		}).Return(resp, nil)
+
+		// create the factory
+		connectionFactory := new(ConnectionFactoryImpl)
+		// set the execution grpc port
+		connectionFactory.ExecutionGRPCPort = en.port
+		// set the execution grpc client timeout
+		connectionFactory.ExecutionNodeGRPCTimeout = time.Second
+		// set the connection pool cache size
+		cacheSize := 1
+		cache, _ := lru.NewWithEvict(cacheSize, func(_, evictedValue interface{}) {
+			evictedValue.(*CachedClient).Close()
+		})
+		connectionFactory.ConnectionsCache = cache
+		connectionFactory.CacheSize = uint(cacheSize)
+		// set metrics reporting
+		connectionFactory.AccessMetrics = metrics.NewNoopCollector()
+
+		clientAddress := en.listener.Addr().String()
+		// create the execution API client
+		client, _, err := connectionFactory.GetExecutionAPIClient(clientAddress)
+		assert.NoError(t, err)
+
+		result, _ := cache.Get(clientAddress)
+		clientConn := result.(*CachedClient).ClientConn
+		clientConn.GetState()
+
+		ctx := context.Background()
+
+		// Generate random number of requests
+		nofRequests := rapid.IntRange(10, 100).Draw(t, "nofRequests").(int)
+		reqCompleted := atomic.NewUint64(0)
+
+		var waitGroup sync.WaitGroup
+
+		for i := 0; i < nofRequests; i++ {
+			waitGroup.Add(1)
+
+			// call Ping request from different goroutines
+			go func() {
+				defer waitGroup.Done()
+				_, err := client.Ping(ctx, req)
+
+				if err == nil {
+					reqCompleted.Inc()
+				} else {
+					if st, ok := status.FromError(err); ok {
+						if st.Code() == codes.Unavailable {
+							return
+						}
+					}
+					fmt.Println("!!! Failed: ", err)
+					t.Fail()
+				}
+			}()
+		}
+
+		// Close connection
+		connectionFactory.InvalidateExecutionAPIClient(clientAddress)
+
+		waitGroup.Wait()
+
+		assert.Equal(t, reqCompleted.Load(), respSent.Load())
+	})
 }
 
 // node mocks a flow node that runs a GRPC server
