@@ -62,6 +62,7 @@ func (g *GossipSubAdapterConfig) WithSubscriptionFilter(filter p2p.SubscriptionF
 // -None
 func (g *GossipSubAdapterConfig) WithScoreOption(option p2p.ScoreOptionBuilder) {
 	params, thresholds := option.BuildFlowPubSubScoreOption()
+	g.scoreOption = option
 	g.options = append(g.options, pubsub.WithPeerScore(params, thresholds))
 }
 
