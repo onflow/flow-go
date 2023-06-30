@@ -1,4 +1,4 @@
-package network
+package p2pconf
 
 import (
 	"fmt"
@@ -6,12 +6,12 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/onflow/flow-go/network/p2p"
+	p2pmsg "github.com/onflow/flow-go/network/p2p/message"
 )
 
 // TestErrInvalidLimitConfigRoundTrip ensures correct error formatting for ErrInvalidLimitConfig.
 func TestErrInvalidLimitConfigRoundTrip(t *testing.T) {
-	controlMsg := p2p.CtrlMsgGraft
+	controlMsg := p2pmsg.CtrlMsgGraft
 	limit := uint64(500)
 
 	e := fmt.Errorf("invalid rate limit value %d must be greater than 0", limit)

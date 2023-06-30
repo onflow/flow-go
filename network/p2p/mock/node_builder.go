@@ -13,8 +13,6 @@ import (
 
 	mock "github.com/stretchr/testify/mock"
 
-	module "github.com/onflow/flow-go/module"
-
 	network "github.com/libp2p/go-libp2p/core/network"
 
 	p2p "github.com/onflow/flow-go/network/p2p"
@@ -57,13 +55,29 @@ func (_m *NodeBuilder) Build() (p2p.LibP2PNode, error) {
 	return r0, r1
 }
 
-// EnableGossipSubPeerScoring provides a mock function with given fields: _a0, _a1
-func (_m *NodeBuilder) EnableGossipSubPeerScoring(_a0 module.IdentityProvider, _a1 *p2p.PeerScoringConfig) p2p.NodeBuilder {
-	ret := _m.Called(_a0, _a1)
+// EnableGossipSubPeerScoring provides a mock function with given fields: _a0
+func (_m *NodeBuilder) EnableGossipSubPeerScoring(_a0 *p2p.PeerScoringConfig) p2p.NodeBuilder {
+	ret := _m.Called(_a0)
 
 	var r0 p2p.NodeBuilder
-	if rf, ok := ret.Get(0).(func(module.IdentityProvider, *p2p.PeerScoringConfig) p2p.NodeBuilder); ok {
-		r0 = rf(_a0, _a1)
+	if rf, ok := ret.Get(0).(func(*p2p.PeerScoringConfig) p2p.NodeBuilder); ok {
+		r0 = rf(_a0)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(p2p.NodeBuilder)
+		}
+	}
+
+	return r0
+}
+
+// OverrideDefaultRpcInspectorSuiteFactory provides a mock function with given fields: _a0
+func (_m *NodeBuilder) OverrideDefaultRpcInspectorSuiteFactory(_a0 p2p.GossipSubRpcInspectorSuiteFactoryFunc) p2p.NodeBuilder {
+	ret := _m.Called(_a0)
+
+	var r0 p2p.NodeBuilder
+	if rf, ok := ret.Get(0).(func(p2p.GossipSubRpcInspectorSuiteFactoryFunc) p2p.NodeBuilder); ok {
+		r0 = rf(_a0)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(p2p.NodeBuilder)
@@ -144,22 +158,6 @@ func (_m *NodeBuilder) SetGossipSubFactory(_a0 p2p.GossipSubFactoryFunc, _a1 p2p
 	var r0 p2p.NodeBuilder
 	if rf, ok := ret.Get(0).(func(p2p.GossipSubFactoryFunc, p2p.GossipSubAdapterConfigFunc) p2p.NodeBuilder); ok {
 		r0 = rf(_a0, _a1)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(p2p.NodeBuilder)
-		}
-	}
-
-	return r0
-}
-
-// SetGossipSubRpcInspectorSuite provides a mock function with given fields: _a0
-func (_m *NodeBuilder) SetGossipSubRpcInspectorSuite(_a0 p2p.GossipSubInspectorSuite) p2p.NodeBuilder {
-	ret := _m.Called(_a0)
-
-	var r0 p2p.NodeBuilder
-	if rf, ok := ret.Get(0).(func(p2p.GossipSubInspectorSuite) p2p.NodeBuilder); ok {
-		r0 = rf(_a0)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(p2p.NodeBuilder)
