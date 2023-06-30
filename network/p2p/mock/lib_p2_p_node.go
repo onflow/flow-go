@@ -269,14 +269,10 @@ func (_m *LibP2PNode) PeerManagerComponent() component.Component {
 }
 
 // PeerScoreExposer provides a mock function with given fields:
-func (_m *LibP2PNode) PeerScoreExposer() (p2p.PeerScoreExposer, bool) {
+func (_m *LibP2PNode) PeerScoreExposer() p2p.PeerScoreExposer {
 	ret := _m.Called()
 
 	var r0 p2p.PeerScoreExposer
-	var r1 bool
-	if rf, ok := ret.Get(0).(func() (p2p.PeerScoreExposer, bool)); ok {
-		return rf()
-	}
 	if rf, ok := ret.Get(0).(func() p2p.PeerScoreExposer); ok {
 		r0 = rf()
 	} else {
@@ -285,13 +281,7 @@ func (_m *LibP2PNode) PeerScoreExposer() (p2p.PeerScoreExposer, bool) {
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func() bool); ok {
-		r1 = rf()
-	} else {
-		r1 = ret.Get(1).(bool)
-	}
-
-	return r0, r1
+	return r0
 }
 
 // Publish provides a mock function with given fields: ctx, topic, data
@@ -378,11 +368,6 @@ func (_m *LibP2PNode) RoutingTable() *kbucket.RoutingTable {
 // SetComponentManager provides a mock function with given fields: cm
 func (_m *LibP2PNode) SetComponentManager(cm *component.ComponentManager) {
 	_m.Called(cm)
-}
-
-// SetPeerScoreExposer provides a mock function with given fields: e
-func (_m *LibP2PNode) SetPeerScoreExposer(e p2p.PeerScoreExposer) {
-	_m.Called(e)
 }
 
 // SetPubSub provides a mock function with given fields: ps

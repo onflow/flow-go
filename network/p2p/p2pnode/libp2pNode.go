@@ -54,16 +54,15 @@ var _ p2p.LibP2PNode = (*Node)(nil)
 type Node struct {
 	component.Component
 	sync.RWMutex
-	uniMgr           p2p.UnicastManager
-	host             host.Host // reference to the libp2p host (https://godoc.org/github.com/libp2p/go-libp2p/core/host)
-	pubSub           p2p.PubSubAdapter
-	logger           zerolog.Logger                      // used to provide logging
-	topics           map[channels.Topic]p2p.Topic        // map of a topic string to an actual topic instance
-	subs             map[channels.Topic]p2p.Subscription // map of a topic string to an actual subscription
-	routing          routing.Routing
-	pCache           p2p.ProtocolPeerCache
-	peerManager      p2p.PeerManager
-	peerScoreExposer p2p.PeerScoreExposer
+	uniMgr      p2p.UnicastManager
+	host        host.Host // reference to the libp2p host (https://godoc.org/github.com/libp2p/go-libp2p/core/host)
+	pubSub      p2p.PubSubAdapter
+	logger      zerolog.Logger                      // used to provide logging
+	topics      map[channels.Topic]p2p.Topic        // map of a topic string to an actual topic instance
+	subs        map[channels.Topic]p2p.Subscription // map of a topic string to an actual subscription
+	routing     routing.Routing
+	pCache      p2p.ProtocolPeerCache
+	peerManager p2p.PeerManager
 	// Cache of temporary disallow-listed peers, when a peer is disallow-listed, the connections to that peer
 	// are closed and further connections are not allowed till the peer is removed from the disallow-list.
 	disallowListedCache p2p.DisallowListCache
@@ -92,7 +91,7 @@ func NewNode(
 	}
 }
 
-var _ component.Component = (*Node)(nil)
+var _ p2p.LibP2PNode = (*Node)(nil)
 
 func (n *Node) Start(ctx irrecoverable.SignalerContext) {
 	n.Component.Start(ctx)
@@ -429,25 +428,10 @@ func (n *Node) Routing() routing.Routing {
 	return n.routing
 }
 
-// SetPeerScoreExposer sets the node's peer score exposer implementation.
-// SetPeerScoreExposer may be called at most once. It is an irrecoverable error to call this
-// method if the node's peer score exposer has already been set.
-func (n *Node) SetPeerScoreExposer(e p2p.PeerScoreExposer) {
-	if n.peerScoreExposer != nil {
-		n.logger.Fatal().Msg("peer score exposer already set")
-	}
-
-	n.peerScoreExposer = e
-}
-
 // PeerScoreExposer returns the node's peer score exposer implementation.
 // If the node's peer score exposer has not been set, the second return value will be false.
-func (n *Node) PeerScoreExposer() (p2p.PeerScoreExposer, bool) {
-	if n.peerScoreExposer == nil {
-		return nil, false
-	}
-
-	return n.peerScoreExposer, true
+func (n *Node) PeerScoreExposer() p2p.PeerScoreExposer {
+	return n.pubSub.PeerScoreExposer()
 }
 
 // SetPubSub sets the node's pubsub implementation.

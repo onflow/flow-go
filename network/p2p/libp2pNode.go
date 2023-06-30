@@ -112,13 +112,9 @@ type CollectionClusterChangesConsumer interface {
 // PeerScore is the interface for the peer score module. It is used to expose the peer score to other
 // components of the node. It is also used to set the peer score exposer implementation.
 type PeerScore interface {
-	// SetPeerScoreExposer sets the node's peer score exposer implementation.
-	// SetPeerScoreExposer may be called at most once. It is an irrecoverable error to call this
-	// method if the node's peer score exposer has already been set.
-	SetPeerScoreExposer(e PeerScoreExposer)
 	// PeerScoreExposer returns the node's peer score exposer implementation.
 	// If the node's peer score exposer has not been set, the second return value will be false.
-	PeerScoreExposer() (PeerScoreExposer, bool)
+	PeerScoreExposer() PeerScoreExposer
 }
 
 // PeerConnections subset of funcs related to underlying libp2p host connections.
