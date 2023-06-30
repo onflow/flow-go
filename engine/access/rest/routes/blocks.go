@@ -146,7 +146,7 @@ func getBlock(option blockProviderOption, req *request.Request, backend access.A
 	return &block, nil
 }
 
-// blockProvider is a layer of abstraction on top of the backend api.RestBackendApi and provides a uniform way to
+// blockProvider is a layer of abstraction on top of the backend access.API and provides a uniform way to
 // look up a block or a block header either by ID or by height
 type blockProvider struct {
 	id      *flow.Identifier

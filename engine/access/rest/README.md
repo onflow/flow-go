@@ -10,11 +10,9 @@ available on our [docs site](https://docs.onflow.org/http-api/).
 - `middleware`: The common [middlewares](https://github.com/gorilla/mux#middleware) that all request pass through.
 - `models`: The generated models using openapi generators and implementation of model builders.
 - `request`: Implementation of API requests that provide validation for input data and build request models.
-- `routes`: The common HTTP handlers for all the requests.
-- `api`: The server API interface for REST service.
+- `routes`: The common HTTP handlers for all the requests, tests for each request.
 - `apiproxy`: Implementation of proxy backend handler which includes the local backend and forwards the methods which 
 can't be handled locally to an upstream using gRPC API.
-- `tests`: Test for each request.
 
 ## Request lifecycle
 
@@ -48,12 +46,12 @@ package that complies with function interfaced defined as:
 ```go
 type ApiHandlerFunc func (
 r *request.Request,
-backend api.RestBackendApi,
+backend access.API,
 generator models.LinkGenerator,
 ) (interface{}, error)
 ```
 
-That handler implementation needs to be added to the `router.go` with corresponding API endpoint and method. Then needs 
-to be added new request to `RestBackendApi` interface and overrides the method if it should be proxied to the backend 
-handler `RestProxyHandler` for request forwarding. Adding a new API endpoint also requires for a new request builder to 
-be implemented and added in request package. Make sure to not forget about adding tests for each of the API handler.
+That handler implementation needs to be added to the `router.go` with corresponding API endpoint and method. Also needs 
+to override the method if it should be proxied to the backend handler `RestProxyHandler` for request forwarding. Adding 
+a new API endpoint also requires for a new request builder to be implemented and added in request package. Make sure to 
+not forget about adding tests for each of the API handler.
