@@ -38,6 +38,7 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/validator"
 	"github.com/onflow/flow-go/consensus/hotstuff/verification"
 	recovery "github.com/onflow/flow-go/consensus/recovery/protocol"
+	"github.com/onflow/flow-go/engine"
 	followereng "github.com/onflow/flow-go/engine/common/follower"
 	"github.com/onflow/flow-go/engine/common/provider"
 	"github.com/onflow/flow-go/engine/common/requester"
@@ -111,6 +112,8 @@ type ExecutionNode struct {
 	builder *FlowNodeBuilder // This is needed for accessing the ShutdownFunc
 	exeConf *ExecutionConfig
 
+	ingestionUnit *engine.Unit
+
 	collector              module.ExecutionMetrics
 	executionState         state.ExecutionState
 	followerState          protocol.FollowerState
@@ -152,6 +155,7 @@ func (builder *ExecutionNodeBuilder) LoadComponentsAndModules() {
 		builder:             builder.FlowNodeBuilder,
 		exeConf:             builder.exeConf,
 		toTriggerCheckpoint: atomic.NewBool(false),
+		ingestionUnit:       engine.NewUnit(),
 	}
 
 	builder.FlowNodeBuilder.
@@ -679,6 +683,8 @@ func (exeNode *ExecutionNode) LoadStopControl(
 	}
 
 	stopControl := stop.NewStopControl(
+		exeNode.ingestionUnit,
+		exeNode.exeConf.maxGracefulStopDuration,
 		exeNode.builder.Logger,
 		exeNode.executionState,
 		node.Storage.Headers,
@@ -820,6 +826,7 @@ func (exeNode *ExecutionNode) LoadIngestionEngine(
 	}
 
 	exeNode.ingestionEng, err = ingestion.New(
+		exeNode.ingestionUnit,
 		node.Logger,
 		node.Network,
 		node.Me,
@@ -841,6 +848,7 @@ func (exeNode *ExecutionNode) LoadIngestionEngine(
 		exeNode.executionDataPruner,
 		exeNode.blockDataUploader,
 		exeNode.stopControl,
+		exeNode.exeConf.onflowOnlyLNs,
 	)
 
 	// TODO: we should solve these mutual dependencies better

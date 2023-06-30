@@ -141,9 +141,8 @@ func NewBlockComputer(
 	signer module.Local,
 	executionDataProvider *provider.Provider,
 	colResCons []result.ExecutedCollectionConsumer,
+	maxConcurrency int,
 ) (BlockComputer, error) {
-	// TODO(patrick): expose this
-	maxConcurrency := 1
 	if maxConcurrency < 1 {
 		return nil, fmt.Errorf("invalid maxConcurrency: %d", maxConcurrency)
 	}
@@ -390,7 +389,7 @@ func (e *blockComputer) executeTransactions(
 				Msg("executing transaction")
 
 			attempt += 1
-			err := e.executeTransaction(blockSpan, database, request)
+			err := e.executeTransaction(blockSpan, database, request, attempt)
 
 			if errors.IsRetryableConflictError(err) {
 				request.ctx.Logger.Info().
@@ -414,11 +413,13 @@ func (e *blockComputer) executeTransaction(
 	blockSpan otelTrace.Span,
 	database *transactionCoordinator,
 	request TransactionRequest,
+	attempt int,
 ) error {
 	txn, err := e.executeTransactionInternal(
 		blockSpan,
 		database,
-		request)
+		request,
+		attempt)
 	if err != nil {
 		prefix := ""
 		if request.isSystemTransaction {
@@ -449,6 +450,7 @@ func (e *blockComputer) executeTransactionInternal(
 	blockSpan otelTrace.Span,
 	database *transactionCoordinator,
 	request TransactionRequest,
+	attempt int,
 ) (
 	*transaction,
 	error,
@@ -466,7 +468,7 @@ func (e *blockComputer) executeTransactionInternal(
 
 	request.ctx = fvm.NewContextFromParent(request.ctx, fvm.WithSpan(txSpan))
 
-	txn, err := database.NewTransaction(request)
+	txn, err := database.NewTransaction(request, attempt)
 	if err != nil {
 		return nil, err
 	}

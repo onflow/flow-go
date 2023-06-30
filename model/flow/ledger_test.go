@@ -55,12 +55,24 @@ func TestRegisterID_IsInternalState(t *testing.T) {
 		id := NewRegisterID(owner, key)
 		require.False(t, id.IsInternalState())
 	}
-	require.True(t, UUIDRegisterID.IsInternalState())
-	requireFalse("", UUIDKey)
+
+	for i := 0; i < 256; i++ {
+		uuid := UUIDRegisterID(byte(i))
+		if i == 0 {
+			require.Equal(t, uuid.Key, UUIDKeyPrefix)
+		} else {
+			require.Equal(t, uuid.Key, fmt.Sprintf("%s_%d", UUIDKeyPrefix, i))
+		}
+		require.True(t, uuid.IsInternalState())
+	}
+	requireFalse("", UUIDKeyPrefix)
+	for i := 0; i < 256; i++ {
+		requireFalse("", fmt.Sprintf("%s_%d", UUIDKeyPrefix, i))
+	}
 	require.True(t, AddressStateRegisterID.IsInternalState())
 	requireFalse("", AddressStateKey)
 	requireFalse("", "other")
-	requireFalse("Address", UUIDKey)
+	requireFalse("Address", UUIDKeyPrefix)
 	requireFalse("Address", AddressStateKey)
 	requireTrue("Address", "public_key_12")
 	requireTrue("Address", ContractNamesKey)
