@@ -1,7 +1,11 @@
 package heropool
 
 import (
+	"errors"
 	"fmt"
+	"io/ioutil"
+	"strconv"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -11,18 +15,18 @@ import (
 )
 
 // A type of operation to perform on a pool.
-type OperatioType int
+type OperationType int
 
 const (
 	// Add - interpreteded as a command to add an element to a pool.
-	Add OperatioType = iota
+	Add OperationType = iota
 	// Remove - interpreteded as a command to remove an element from a pool.
 	Remove
 )
 
 // OperationAndIndex contains an operation to be perfomed on an entity stored under the specified index of an array of entities.
 type OperationAndIndex struct {
-	operation OperatioType
+	operation OperationType
 	index     uint
 }
 
@@ -231,48 +235,102 @@ func TestInvalidateEntity(t *testing.T) {
 	}
 }
 
+// a helper function that converts an operation encoded as 0 or 1 to Add or Remove.
+func stringToOperationType(s string) (OperationType, error) {
+	switch s {
+	case "0":
+		return Add, nil
+	case "1":
+		return Remove, nil
+	default:
+		return Add, errors.New("Unknown operation")
+	}
+}
+
+// reads random number used as ownerId and operation to perform on flow enitites.
+func readAndParseData() ([]uint, []OperationAndIndex, error) {
+	fileRandomNumbers := "pool_test_random_numbers.txt"
+	contentNumbers, err := ioutil.ReadFile(fileRandomNumbers)
+
+	if err != nil {
+		return nil, nil, err
+	}
+
+	ownerRandomNumbersStr := strings.Fields(string(contentNumbers))
+	ownerRandomNumbersUint := make([]uint, len(ownerRandomNumbersStr), len(ownerRandomNumbersStr))
+	for i, numberStr := range ownerRandomNumbersStr {
+		numberInt, err := strconv.Atoi(numberStr)
+		if err != nil {
+			return nil, nil, err
+		}
+		ownerRandomNumbersUint[i] = uint(numberInt)
+	}
+
+	fileOperations := "pool_test_operations.txt"
+	content_operations, err := ioutil.ReadFile(fileOperations)
+
+	operations := strings.Fields(string(content_operations))
+	operationsOnEntity := make([]OperationAndIndex, len(operations), len(operations))
+	for i, operation := range operations {
+		operationAndIndexSplit := strings.Split(operation, ",")
+		indexEntity, err := strconv.Atoi(operationAndIndexSplit[1])
+		if err != nil {
+			return nil, nil, err
+		}
+		operation, err := stringToOperationType(operationAndIndexSplit[0])
+		if err != nil {
+			return nil, nil, err
+		}
+		operationsOnEntity[i] = OperationAndIndex{operation: operation, index: uint(indexEntity)}
+	}
+	return ownerRandomNumbersUint, operationsOnEntity, nil
+}
+
 // TestAddAndRemoveEntities checks health of heroPool for scenario where entitites are stored and removed in a predetermined order.
 // LRUEjection, NoEjection and RandomEjection are tested. RandomEjection doesn't allow to provide a final state of the pool to check.
 func TestAddAndRemoveEntities(t *testing.T) {
+	ownerIds, operationsAndIndex, err := readAndParseData()
+	require.Nil(t, err)
+
 	for _, tc := range []struct {
-		limit             uint32              // capacity of the pool
-		entityCount       uint32              // total entities to be stored
-		ejectionMode      EjectionMode        // ejection mode
+		limit             uint32       // capacity of the pool
+		entityCount       uint32       // total entities to be stored
+		ejectionMode      EjectionMode // ejection mode
+		ownerIds          []uint
 		operationsIndexes []OperationAndIndex // operation to perform on an entity stored under the given index,
-		// where index ranges from 0 to entityCount
-		finalEntitiesInThePool []uint // indexes of entities residing in the pool at the end of the test
+		// where index ranges from 0 to the entityCount
 	}{
 		{
-			limit:                  2,
-			entityCount:            5,
-			ejectionMode:           LRUEjection,
-			operationsIndexes:      []OperationAndIndex{{Add, 0}, {Add, 0}, {Add, 1}, {Add, 2}, {Add, 3}, {Remove, 2}, {Add, 2}, {Remove, 2}},
-			finalEntitiesInThePool: []uint{3},
+			limit:             500,
+			entityCount:       1000,
+			ejectionMode:      LRUEjection,
+			ownerIds:          ownerIds,
+			operationsIndexes: operationsAndIndex[0:1000],
 		},
 		{
-			limit:                  2,
-			entityCount:            5,
-			ejectionMode:           NoEjection,
-			operationsIndexes:      []OperationAndIndex{{Add, 0}, {Add, 1}, {Add, 2}, {Add, 3}, {Remove, 0}, {Remove, 1}, {Add, 4}, {Add, 3}},
-			finalEntitiesInThePool: []uint{3, 4},
+			limit:             500,
+			entityCount:       1000,
+			ejectionMode:      NoEjection,
+			ownerIds:          ownerIds,
+			operationsIndexes: operationsAndIndex[0:1000],
 		},
 		{
-			limit:                  5,
-			entityCount:            6,
-			ejectionMode:           RandomEjection,
-			operationsIndexes:      []OperationAndIndex{{Add, 0}, {Add, 1}, {Remove, 1}, {Add, 2}, {Remove, 0}, {Add, 5}, {Add, 4}, {Add, 1}, {Add, 3}, {Add, 0}},
-			finalEntitiesInThePool: nil,
+			limit:             500,
+			entityCount:       1000,
+			ejectionMode:      RandomEjection,
+			ownerIds:          ownerIds,
+			operationsIndexes: operationsAndIndex[0:1000],
 		},
 	} {
 		t.Run(fmt.Sprintf("%d-limit-%d-entities", tc.limit, tc.entityCount), func(t *testing.T) {
-			testAddRemoveEntities(t, tc.limit, tc.entityCount, tc.ejectionMode, tc.operationsIndexes, tc.finalEntitiesInThePool)
+			testAddRemoveEntities(t, tc.limit, tc.entityCount, tc.ejectionMode, tc.ownerIds, tc.operationsIndexes)
 		})
 	}
 }
 
 // testAddRemoveEntities allows to add or remove entities in an order given by operationsIndexes. Each OperationAndIndex consists of an operaton to perform
 // on an entity stored under a corresponding index. Index range from 0 to entityCount.
-func testAddRemoveEntities(t *testing.T, limit uint32, entityCount uint32, ejectionMode EjectionMode, operationsAndIndexes []OperationAndIndex, finalEntitiesInThePool []uint) {
+func testAddRemoveEntities(t *testing.T, limit uint32, entityCount uint32, ejectionMode EjectionMode, ownerIds []uint, operationsAndIndexes []OperationAndIndex) {
 
 	pool := NewHeroPool(limit, ejectionMode)
 
@@ -282,43 +340,52 @@ func testAddRemoveEntities(t *testing.T, limit uint32, entityCount uint32, eject
 	var insertedEntities map[flow.Identifier]EIndex
 	insertedEntities = make(map[flow.Identifier]EIndex)
 
+	// this map maps a random owner id to an entity index in an array of entities
+	var ownerIdToIndex map[uint64]uint
+	ownerIdToIndex = make(map[uint64]uint)
+	for i := 0; i < int(entityCount); i++ {
+		ownerIdToIndex[uint64(ownerIds[i])] = uint(i)
+	}
+
 	for _, operationAndIndex := range operationsAndIndexes {
+
 		operation := operationAndIndex.operation
-		index := operationAndIndex.index
+		entityIndex := operationAndIndex.index
+
 		switch operation {
 		case Add:
-			indexInThePool, _, ejectedEntity := pool.Add(entities[index].ID(), entities[index], uint64(index))
-			if indexInThePool != InvalidIndex {
-				insertedEntities[entities[index].ID()] = indexInThePool
-			}
-			if ejectedEntity != nil {
-				delete(insertedEntities, ejectedEntity.ID())
+			_, found := insertedEntities[entities[entityIndex].ID()]
+			if !found {
+				indexInThePool, _, ejectedEntity := pool.Add(entities[entityIndex].ID(), entities[entityIndex], uint64(ownerIds[entityIndex]))
+				if indexInThePool != InvalidIndex {
+					insertedEntities[entities[entityIndex].ID()] = indexInThePool
+				}
+				if ejectedEntity != nil {
+					delete(insertedEntities, ejectedEntity.ID())
+				}
 			}
 		case Remove:
-			indexInPool, found := insertedEntities[entities[index].ID()]
+			indexInPool, found := insertedEntities[entities[entityIndex].ID()]
 			if found {
 				removedEntity := pool.Remove(indexInPool)
-				require.Equal(t, entities[index].ID(), removedEntity.ID(), "Removed wrong entity")
-				delete(insertedEntities, entities[index].ID())
-			} else {
-				panic("Ill constructed test, trying to remove an element that has not been inserted")
+				require.Equal(t, entities[entityIndex].ID(), removedEntity.ID(), "Removed wrong entity")
+				delete(insertedEntities, entities[entityIndex].ID())
 			}
 		default:
-			panic("Unknown pool operation")
+			require.True(t, false, "Unknown pool operation")
 		}
 		checkEachEntityIsInFreeOrUsedState(t, pool)
 	}
+
 	require.Equal(t, uint32(len(insertedEntities)), pool.Size(), "Pool size doesn't correspond to a number of inserted entities")
 	for id, indexInThePool := range insertedEntities {
-		flowIndentifier, _, _ := pool.Get(indexInThePool)
+		flowIndentifier, _, ownerIdActual := pool.Get(indexInThePool)
 		require.Equal(t, flowIndentifier, id, "Pool contains an unexpected entity")
-	}
-	if finalEntitiesInThePool != nil {
-		for _, idInEntities := range finalEntitiesInThePool {
-			flowIndentifier, _, owner := pool.Get(insertedEntities[entities[idInEntities].ID()])
-			require.Equal(t, flowIndentifier, entities[idInEntities].ID(), "Pool contains an unexpected entity")
-			require.Equal(t, uint64(idInEntities), owner, "Entity is stored with a wrong owner")
+		tmp := ownerIdToIndex[ownerIdActual]
+		if entities[tmp].Identifier != id {
+			fmt.Print(" ")
 		}
+		require.Equal(t, entities[ownerIdToIndex[ownerIdActual]].Identifier, id, "Pool contains an entity with an unexpected owner id")
 	}
 }
 
@@ -818,8 +885,8 @@ func checkEachEntityIsInFreeOrUsedState(t *testing.T, pool *Pool) {
 	// check size
 	require.Equal(t, int(pool.free.size+pool.used.size), pool_capacity, "Pool capacity is not equal to the sum of used and free sizes")
 	// check elelments
-	nodesInFree := discoverEntitiesBelongingToStateList(t, pool, &pool.free)
-	nodesInUsed := discoverEntitiesBelongingToStateList(t, pool, &pool.used)
+	nodesInFree := discoverEntitiesBelongingToStateList(t, pool, stateFree)
+	nodesInUsed := discoverEntitiesBelongingToStateList(t, pool, stateUsed)
 	for i := 0; i < pool_capacity; i++ {
 		require.False(t, !nodesInFree[i] && !nodesInUsed[i], "Node is not in any state list")
 		require.False(t, nodesInFree[i] && nodesInUsed[i], "Node is in two state lists at the same time")
@@ -827,7 +894,8 @@ func checkEachEntityIsInFreeOrUsedState(t *testing.T, pool *Pool) {
 }
 
 // discoverEntitiesBelongingToStateList discovers all entities in the pool that belong to the given list.
-func discoverEntitiesBelongingToStateList(t *testing.T, pool *Pool, s *state) []bool {
+func discoverEntitiesBelongingToStateList(t *testing.T, pool *Pool, stateType StateType) []bool {
+	s := pool.getStateFromType(stateType)
 	result := make([]bool, len(pool.poolEntities))
 	for node_index := s.head; node_index != InvalidIndex; {
 		require.False(t, result[node_index], "A node is present two times in the same state list")
