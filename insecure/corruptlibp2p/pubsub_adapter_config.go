@@ -79,8 +79,56 @@ func (c *CorruptPubSubAdapterConfig) WithSubscriptionFilter(filter p2p.Subscript
 	c.options = append(c.options, corrupt.WithSubscriptionFilter(filter))
 }
 
-func (c *CorruptPubSubAdapterConfig) WithScoreOption(_ p2p.ScoreOptionBuilder) {
-	// CorruptPubSub does not support score options. This is a no-op.
+func (c *CorruptPubSubAdapterConfig) WithScoreOption(option p2p.ScoreOptionBuilder) {
+	params, thresholds := option.BuildFlowPubSubScoreOption()
+	// convert flow pubsub score option to corrupt pubsub score option
+	corruptParams := &corrupt.PeerScoreParams{
+		SkipAtomicValidation:        params.SkipAtomicValidation,
+		TopicScoreCap:               params.TopicScoreCap,
+		AppSpecificScore:            params.AppSpecificScore,
+		AppSpecificWeight:           params.AppSpecificWeight,
+		IPColocationFactorWeight:    params.IPColocationFactorWeight,
+		IPColocationFactorThreshold: params.IPColocationFactorThreshold,
+		IPColocationFactorWhitelist: params.IPColocationFactorWhitelist,
+		BehaviourPenaltyWeight:      params.BehaviourPenaltyWeight,
+		BehaviourPenaltyThreshold:   params.BehaviourPenaltyThreshold,
+		BehaviourPenaltyDecay:       params.BehaviourPenaltyDecay,
+		DecayInterval:               params.DecayInterval,
+		DecayToZero:                 params.DecayToZero,
+		RetainScore:                 params.RetainScore,
+		SeenMsgTTL:                  params.SeenMsgTTL,
+	}
+	corruptThresholds := &corrupt.PeerScoreThresholds{
+		SkipAtomicValidation:        thresholds.SkipAtomicValidation,
+		GossipThreshold:             thresholds.GossipThreshold,
+		PublishThreshold:            thresholds.PublishThreshold,
+		GraylistThreshold:           thresholds.GraylistThreshold,
+		AcceptPXThreshold:           thresholds.AcceptPXThreshold,
+		OpportunisticGraftThreshold: thresholds.OpportunisticGraftThreshold,
+	}
+	for topic, topicParams := range params.Topics {
+		corruptParams.Topics[topic] = &corrupt.TopicScoreParams{
+			SkipAtomicValidation:            topicParams.SkipAtomicValidation,
+			TopicWeight:                     topicParams.TopicWeight,
+			TimeInMeshWeight:                topicParams.TimeInMeshWeight,
+			TimeInMeshQuantum:               topicParams.TimeInMeshQuantum,
+			TimeInMeshCap:                   topicParams.TimeInMeshCap,
+			FirstMessageDeliveriesWeight:    topicParams.FirstMessageDeliveriesWeight,
+			FirstMessageDeliveriesDecay:     topicParams.FirstMessageDeliveriesDecay,
+			FirstMessageDeliveriesCap:       topicParams.FirstMessageDeliveriesCap,
+			MeshMessageDeliveriesWeight:     topicParams.MeshMessageDeliveriesWeight,
+			MeshMessageDeliveriesDecay:      topicParams.MeshMessageDeliveriesDecay,
+			MeshMessageDeliveriesCap:        topicParams.MeshMessageDeliveriesCap,
+			MeshMessageDeliveriesThreshold:  topicParams.MeshMessageDeliveriesThreshold,
+			MeshMessageDeliveriesWindow:     topicParams.MeshMessageDeliveriesWindow,
+			MeshMessageDeliveriesActivation: topicParams.MeshMessageDeliveriesActivation,
+			MeshFailurePenaltyWeight:        topicParams.MeshFailurePenaltyWeight,
+			MeshFailurePenaltyDecay:         topicParams.MeshFailurePenaltyDecay,
+			InvalidMessageDeliveriesWeight:  topicParams.InvalidMessageDeliveriesWeight,
+			InvalidMessageDeliveriesDecay:   topicParams.InvalidMessageDeliveriesDecay,
+		}
+	}
+	c.options = append(c.options, corrupt.WithPeerScore(corruptParams, corruptThresholds))
 }
 
 func (c *CorruptPubSubAdapterConfig) WithTracer(_ p2p.PubSubTracer) {

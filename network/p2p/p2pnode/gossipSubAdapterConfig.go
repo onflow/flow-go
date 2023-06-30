@@ -61,8 +61,8 @@ func (g *GossipSubAdapterConfig) WithSubscriptionFilter(filter p2p.SubscriptionF
 // Returns:
 // -None
 func (g *GossipSubAdapterConfig) WithScoreOption(option p2p.ScoreOptionBuilder) {
-	g.scoreOption = option
-	g.options = append(g.options, option.BuildFlowPubSubScoreOption())
+	params, thresholds := option.BuildFlowPubSubScoreOption()
+	g.options = append(g.options, pubsub.WithPeerScore(params, thresholds))
 }
 
 // WithMessageIdFunction adds a message ID function option to the config.

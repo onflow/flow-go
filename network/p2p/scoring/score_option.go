@@ -267,7 +267,7 @@ func (s *ScoreOption) SetSubscriptionProvider(provider *SubscriptionProvider) er
 	return s.validator.RegisterSubscriptionProvider(provider)
 }
 
-func (s *ScoreOption) BuildFlowPubSubScoreOption() pubsub.Option {
+func (s *ScoreOption) BuildFlowPubSubScoreOption() (*pubsub.PeerScoreParams, *pubsub.PeerScoreThresholds) {
 	s.preparePeerScoreThresholds()
 
 	s.logger.Info().
@@ -284,10 +284,7 @@ func (s *ScoreOption) BuildFlowPubSubScoreOption() pubsub.Option {
 			Msg("pubsub score topic parameters are set for topic")
 	}
 
-	return pubsub.WithPeerScore(
-		s.peerScoreParams,
-		s.peerThresholdParams,
-	)
+	return s.peerScoreParams, s.peerThresholdParams
 }
 
 func (s *ScoreOption) preparePeerScoreThresholds() {
