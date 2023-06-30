@@ -68,12 +68,6 @@ func (builder *RPCEngineBuilder) WithRpcHandler(handler accessproto.AccessAPISer
 	return builder
 }
 
-// WithRestHandler specifies that the given `RestBackendApi` should be used for REST.
-func (builder *RPCEngineBuilder) WithRestHandler(handler restapi.RestBackendApi) *RPCEngineBuilder {
-	builder.restHandler = handler
-	return builder
-}
-
 // WithLegacy specifies that a legacy access API should be instantiated
 // Returns self-reference for chaining.
 func (builder *RPCEngineBuilder) WithLegacy() *RPCEngineBuilder {
@@ -113,12 +107,6 @@ func (builder *RPCEngineBuilder) Build() (*Engine, error) {
 	}
 	accessproto.RegisterAccessAPIServer(builder.unsecureGrpcServer, rpcHandler)
 	accessproto.RegisterAccessAPIServer(builder.secureGrpcServer, rpcHandler)
-
-	restHandler := builder.Engine.restHandler
-	if restHandler == nil {
-		restHandler = builder.backend
-	}
-	builder.Engine.restHandler = restHandler
 
 	return builder.Engine, nil
 }

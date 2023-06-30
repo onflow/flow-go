@@ -1045,6 +1045,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				builder.apiBurstlimits,
 				builder.Me,
 				backend,
+				backend,
 			)
 			if err != nil {
 				return nil, err

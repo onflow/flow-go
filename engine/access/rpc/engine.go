@@ -84,6 +84,7 @@ func NewBuilder(log zerolog.Logger,
 	apiBurstLimits map[string]int, // the api burst limit (max calls at the same time) for each of the Access API e.g. Ping->50, GetTransaction->10
 	me module.Local,
 	backend *backend.Backend,
+	restHandler api.RestBackendApi,
 ) (*RPCEngineBuilder, error) {
 	log = log.With().Str("engine", "rpc").Logger()
 
@@ -139,6 +140,7 @@ func NewBuilder(log zerolog.Logger,
 		config:                    config,
 		chain:                     chainID.Chain(),
 		restCollector:             accessMetrics,
+		restHandler:               restHandler,
 	}
 	backendNotifierActor, backendNotifierWorker := events.NewFinalizationActor(eng.notifyBackendOnBlockFinalized)
 	eng.backendNotifierActor = backendNotifierActor

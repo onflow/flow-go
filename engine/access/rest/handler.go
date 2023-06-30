@@ -125,7 +125,7 @@ func (h *Handler) errorHandler(w http.ResponseWriter, err error, errorLogger zer
 			return
 		}
 		if se.Code() == codes.Unavailable {
-			msg := fmt.Sprintf("Invalid Upstream request: %s", se.Message())
+			msg := fmt.Sprintf("Failed to process request: %s", se.Message())
 			h.errorResponse(w, http.StatusServiceUnavailable, msg, errorLogger)
 			return
 		}

@@ -77,33 +77,6 @@ func (r *RestProxyHandler) log(handler, rpc string, err error) {
 	logger.Info().Msg("request succeeded")
 }
 
-// GetLatestBlockHeader returns the latest block header and block status, if isSealed = true - returns the latest seal header.
-func (r *RestProxyHandler) GetLatestBlockHeader(ctx context.Context, isSealed bool) (*flow.Header, flow.BlockStatus, error) {
-	upstream, err := r.FaultTolerantClient()
-	if err != nil {
-		return nil, flow.BlockStatusUnknown, err
-	}
-
-	getLatestBlockHeaderRequest := &accessproto.GetLatestBlockHeaderRequest{
-		IsSealed: isSealed,
-	}
-	latestBlockHeaderResponse, err := upstream.GetLatestBlockHeader(ctx, getLatestBlockHeaderRequest)
-	if err != nil {
-		return nil, flow.BlockStatusUnknown, err
-	}
-	blockHeader, err := convert.MessageToBlockHeader(latestBlockHeaderResponse.Block)
-	if err != nil {
-		return nil, flow.BlockStatusUnknown, err
-	}
-	blockStatus, err := convert.MessagesToBlockStatus(latestBlockHeaderResponse.BlockStatus)
-	if err != nil {
-		return nil, flow.BlockStatusUnknown, err
-	}
-
-	r.log("upstream", "GetLatestBlockHeader", err)
-	return blockHeader, blockStatus, nil
-}
-
 // GetCollectionByID returns a collection by ID.
 func (r *RestProxyHandler) GetCollectionByID(ctx context.Context, id flow.Identifier) (*flow.LightCollection, error) {
 	upstream, err := r.FaultTolerantClient()
@@ -120,15 +93,13 @@ func (r *RestProxyHandler) GetCollectionByID(ctx context.Context, id flow.Identi
 		return nil, err
 	}
 
-	transactions := make([]flow.Identifier, len(collectionResponse.Collection.TransactionIds))
-	for _, txId := range collectionResponse.Collection.TransactionIds {
-		transactions = append(transactions, convert.MessageToIdentifier(txId))
+	transactions, err := convert.MessageToLightCollection(collectionResponse.Collection)
+	if err != nil {
+		return nil, err
 	}
 
 	r.log("upstream", "GetCollectionByID", err)
-	return &flow.LightCollection{
-		Transactions: transactions,
-	}, nil
+	return transactions, nil
 }
 
 // SendTransaction sends already created transaction.
@@ -144,13 +115,9 @@ func (r *RestProxyHandler) SendTransaction(ctx context.Context, tx *flow.Transac
 	}
 
 	_, err = upstream.SendTransaction(ctx, sendTransactionRequest)
-	if err != nil {
-		return err
-	}
 
 	r.log("upstream", "SendTransaction", err)
-	return nil
-
+	return err
 }
 
 // GetTransaction returns transaction by ID.
@@ -310,10 +277,7 @@ func (r *RestProxyHandler) GetEventsForBlockIDs(ctx context.Context, eventType s
 		return nil, err
 	}
 
-	var blockIds [][]byte
-	for _, id := range blockIDs {
-		blockIds = append(blockIds, id[:])
-	}
+	blockIds := convert.IdentifiersToMessages(blockIDs)
 
 	getEventsForBlockIDsRequest := &accessproto.GetEventsForBlockIDsRequest{
 		Type:     eventType,

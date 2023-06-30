@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-
 	"github.com/onflow/cadence/encoding/ccf"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
 	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
@@ -379,17 +378,15 @@ func MessageToBlock(m *entities.Block) (*flow.Block, error) {
 	}, nil
 }
 
-func MessagesToBlockStatus(s entities.BlockStatus) (flow.BlockStatus, error) {
-	switch s {
-	case entities.BlockStatus_BLOCK_UNKNOWN:
-		return flow.BlockStatusUnknown, nil
-	case entities.BlockStatus_BLOCK_FINALIZED:
-		return flow.BlockStatusFinalized, nil
-	case entities.BlockStatus_BLOCK_SEALED:
-		return flow.BlockStatusSealed, nil
+func MessageToLightCollection(m *entities.Collection) (*flow.LightCollection, error) {
+	transactions := make([]flow.Identifier, 0, len(m.TransactionIds))
+	for _, txId := range m.TransactionIds {
+		transactions = append(transactions, MessageToIdentifier(txId))
 	}
 
-	return flow.BlockStatusUnknown, fmt.Errorf("failed to convert block status")
+	return &flow.LightCollection{
+		Transactions: transactions,
+	}, nil
 }
 
 func MessagesToExecutionResultMetaList(m []*entities.ExecutionReceiptMeta) flow.ExecutionReceiptMetaList {
@@ -657,14 +654,14 @@ func MessagesToBlockEvents(blocksEvents []*accessproto.EventsResponse_Result) []
 	evs := make([]flow.BlockEvents, len(blocksEvents))
 	for _, ev := range blocksEvents {
 		var blockEvent flow.BlockEvents
-		MessageToBlockEvent(ev)
+		MessageToBlockEvents(ev)
 		evs = append(evs, blockEvent)
 	}
 
 	return evs
 }
 
-func MessageToBlockEvent(blockEvents *accessproto.EventsResponse_Result) flow.BlockEvents {
+func MessageToBlockEvents(blockEvents *accessproto.EventsResponse_Result) flow.BlockEvents {
 	return flow.BlockEvents{
 		BlockHeight:    blockEvents.BlockHeight,
 		BlockID:        MessageToIdentifier(blockEvents.BlockId),

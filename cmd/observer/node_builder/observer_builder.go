@@ -895,6 +895,19 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 			backend.DefaultSnapshotHistoryLimit,
 			backendConfig.ArchiveAddressList)
 
+		observerCollector := metrics.NewObserverCollector()
+		restHandler, err := restapiproxy.NewRestProxyHandler(
+			accessBackend,
+			builder.upstreamIdentities,
+			builder.apiTimeout,
+			config.MaxMsgSize,
+			builder.Logger,
+			observerCollector,
+			node.RootChainID.Chain())
+		if err != nil {
+			return nil, err
+		}
+
 		engineBuilder, err := rpc.NewBuilder(
 			node.Logger,
 			node.State,
@@ -906,6 +919,7 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 			builder.apiBurstlimits,
 			builder.Me,
 			accessBackend,
+			restHandler,
 		)
 		if err != nil {
 			return nil, err
@@ -916,8 +930,6 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 		if err != nil {
 			return nil, err
 		}
-
-		observerCollector := metrics.NewObserverCollector()
 
 		rpcHandler := &apiproxy.FlowAccessAPIRouter{
 			Logger:   builder.Logger,
@@ -931,22 +943,9 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 			)),
 		}
 
-		restHandler, err := restapiproxy.NewRestProxyHandler(
-			accessBackend,
-			builder.upstreamIdentities,
-			builder.apiTimeout,
-			config.MaxMsgSize,
-			builder.Logger,
-			observerCollector,
-			node.RootChainID.Chain())
-		if err != nil {
-			return nil, err
-		}
-
 		// build the rpc engine
 		builder.RpcEng, err = engineBuilder.
 			WithRpcHandler(rpcHandler).
-			WithRestHandler(restHandler).
 			WithLegacy().
 			Build()
 		if err != nil {
