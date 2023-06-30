@@ -90,6 +90,7 @@ func (r *RestProxyHandler) GetCollectionByID(ctx context.Context, id flow.Identi
 
 	collectionResponse, err := upstream.GetCollectionByID(ctx, getCollectionByIDRequest)
 	if err != nil {
+		r.log("upstream", "GetCollectionByID", err)
 		return nil, err
 	}
 
@@ -98,7 +99,6 @@ func (r *RestProxyHandler) GetCollectionByID(ctx context.Context, id flow.Identi
 		return nil, err
 	}
 
-	r.log("upstream", "GetCollectionByID", err)
 	return transactions, nil
 }
 
@@ -115,8 +115,8 @@ func (r *RestProxyHandler) SendTransaction(ctx context.Context, tx *flow.Transac
 	}
 
 	_, err = upstream.SendTransaction(ctx, sendTransactionRequest)
-
 	r.log("upstream", "SendTransaction", err)
+
 	return err
 }
 
@@ -132,6 +132,7 @@ func (r *RestProxyHandler) GetTransaction(ctx context.Context, id flow.Identifie
 	}
 	transactionResponse, err := upstream.GetTransaction(ctx, getTransactionRequest)
 	if err != nil {
+		r.log("upstream", "GetTransaction", err)
 		return nil, err
 	}
 
@@ -140,7 +141,6 @@ func (r *RestProxyHandler) GetTransaction(ctx context.Context, id flow.Identifie
 		return nil, err
 	}
 
-	r.log("upstream", "GetTransaction", err)
 	return &transactionBody, nil
 }
 
@@ -148,6 +148,7 @@ func (r *RestProxyHandler) GetTransaction(ctx context.Context, id flow.Identifie
 func (r *RestProxyHandler) GetTransactionResult(ctx context.Context, id flow.Identifier, blockID flow.Identifier, collectionID flow.Identifier) (*access.TransactionResult, error) {
 	upstream, err := r.FaultTolerantClient()
 	if err != nil {
+
 		return nil, err
 	}
 
@@ -159,10 +160,10 @@ func (r *RestProxyHandler) GetTransactionResult(ctx context.Context, id flow.Ide
 
 	transactionResultResponse, err := upstream.GetTransactionResult(ctx, getTransactionResultRequest)
 	if err != nil {
+		r.log("upstream", "GetTransactionResult", err)
 		return nil, err
 	}
 
-	r.log("upstream", "GetTransactionResult", err)
 	return access.MessageToTransactionResult(transactionResultResponse), nil
 }
 
@@ -180,10 +181,10 @@ func (r *RestProxyHandler) GetAccountAtBlockHeight(ctx context.Context, address 
 
 	accountResponse, err := upstream.GetAccountAtBlockHeight(ctx, getAccountAtBlockHeightRequest)
 	if err != nil {
+		r.log("upstream", "GetAccountAtBlockHeight", err)
 		return nil, models.NewNotFoundError("not found account at block height", err)
 	}
 
-	r.log("upstream", "GetAccountAtBlockHeight", err)
 	return convert.MessageToAccount(accountResponse.Account)
 }
 
@@ -200,10 +201,10 @@ func (r *RestProxyHandler) ExecuteScriptAtLatestBlock(ctx context.Context, scrip
 	}
 	executeScriptAtLatestBlockResponse, err := upstream.ExecuteScriptAtLatestBlock(ctx, executeScriptAtLatestBlockRequest)
 	if err != nil {
+		r.log("upstream", "ExecuteScriptAtLatestBlock", err)
 		return nil, err
 	}
 
-	r.log("upstream", "ExecuteScriptAtLatestBlock", err)
 	return executeScriptAtLatestBlockResponse.Value, nil
 }
 
@@ -221,10 +222,10 @@ func (r *RestProxyHandler) ExecuteScriptAtBlockHeight(ctx context.Context, block
 	}
 	executeScriptAtBlockHeightResponse, err := upstream.ExecuteScriptAtBlockHeight(ctx, executeScriptAtBlockHeightRequest)
 	if err != nil {
+		r.log("upstream", "ExecuteScriptAtBlockHeight", err)
 		return nil, err
 	}
 
-	r.log("upstream", "ExecuteScriptAtBlockHeight", err)
 	return executeScriptAtBlockHeightResponse.Value, nil
 }
 
@@ -242,10 +243,10 @@ func (r *RestProxyHandler) ExecuteScriptAtBlockID(ctx context.Context, blockID f
 	}
 	executeScriptAtBlockIDResponse, err := upstream.ExecuteScriptAtBlockID(ctx, executeScriptAtBlockIDRequest)
 	if err != nil {
+		r.log("upstream", "ExecuteScriptAtBlockID", err)
 		return nil, err
 	}
 
-	r.log("upstream", "ExecuteScriptAtBlockID", err)
 	return executeScriptAtBlockIDResponse.Value, nil
 }
 
@@ -263,10 +264,10 @@ func (r *RestProxyHandler) GetEventsForHeightRange(ctx context.Context, eventTyp
 	}
 	eventsResponse, err := upstream.GetEventsForHeightRange(ctx, getEventsForHeightRangeRequest)
 	if err != nil {
+		r.log("upstream", "GetEventsForHeightRange", err)
 		return nil, err
 	}
 
-	r.log("upstream", "GetEventsForHeightRange", err)
 	return convert.MessagesToBlockEvents(eventsResponse.Results), nil
 }
 
@@ -285,10 +286,10 @@ func (r *RestProxyHandler) GetEventsForBlockIDs(ctx context.Context, eventType s
 	}
 	eventsResponse, err := upstream.GetEventsForBlockIDs(ctx, getEventsForBlockIDsRequest)
 	if err != nil {
+		r.log("upstream", "GetEventsForBlockIDs", err)
 		return nil, err
 	}
 
-	r.log("upstream", "GetEventsForBlockIDs", err)
 	return convert.MessagesToBlockEvents(eventsResponse.Results), nil
 }
 
@@ -304,10 +305,10 @@ func (r *RestProxyHandler) GetExecutionResultForBlockID(ctx context.Context, blo
 	}
 	executionResultForBlockIDResponse, err := upstream.GetExecutionResultForBlockID(ctx, getExecutionResultForBlockID)
 	if err != nil {
+		r.log("upstream", "GetExecutionResultForBlockID", err)
 		return nil, err
 	}
 
-	r.log("upsteram", "GetExecutionResultForBlockID", err)
 	return convert.MessageToExecutionResult(executionResultForBlockIDResponse.ExecutionResult)
 }
 
@@ -324,9 +325,9 @@ func (r *RestProxyHandler) GetExecutionResultByID(ctx context.Context, id flow.I
 
 	executionResultByIDResponse, err := upstream.GetExecutionResultByID(ctx, executionResultByIDRequest)
 	if err != nil {
+		r.log("upstream", "GetExecutionResultByID", err)
 		return nil, err
 	}
 
-	r.log("upstream", "GetExecutionResultByID", err)
 	return convert.MessageToExecutionResult(executionResultByIDResponse.ExecutionResult)
 }
