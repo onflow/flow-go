@@ -8,7 +8,6 @@ import (
 	"github.com/onflow/flow-go/access"
 	legacyaccess "github.com/onflow/flow-go/access/legacy"
 	"github.com/onflow/flow-go/consensus/hotstuff"
-	restapi "github.com/onflow/flow-go/engine/access/rest/api"
 	"github.com/onflow/flow-go/module"
 
 	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
@@ -37,10 +36,6 @@ func NewRPCEngineBuilder(engine *Engine, me module.Local, finalizedHeaderCache m
 
 func (builder *RPCEngineBuilder) RpcHandler() accessproto.AccessAPIServer {
 	return builder.rpcHandler
-}
-
-func (builder *RPCEngineBuilder) RestHandler() restapi.RestBackendApi {
-	return builder.restHandler
 }
 
 // WithBlockSignerDecoder specifies that signer indices in block headers should be translated

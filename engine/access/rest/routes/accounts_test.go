@@ -1,4 +1,4 @@
-package tests
+package routes
 
 import (
 	"fmt"
@@ -13,7 +13,6 @@ import (
 
 	"github.com/onflow/flow-go/access/mock"
 	"github.com/onflow/flow-go/engine/access/rest/middleware"
-	restmock "github.com/onflow/flow-go/engine/access/rest/mock"
 	"github.com/onflow/flow-go/model/flow"
 
 	"github.com/onflow/flow-go/utils/unittest"
@@ -74,108 +73,6 @@ func TestAccessGetAccount(t *testing.T) {
 		account := accountFixture(t)
 
 		req := getAccountRequest(t, account, finalHeightQueryParam, expandableFieldKeys, expandableFieldContracts)
-		backend.Mock.
-			On("GetLatestBlockHeader", mocktestify.Anything, false).
-			Return(block, flow.BlockStatusFinalized, nil)
-		backend.Mock.
-			On("GetAccountAtBlockHeight", mocktestify.Anything, account.Address, height).
-			Return(account, nil)
-
-		expected := expectedExpandedResponse(account)
-
-		assertOKResponse(t, req, expected, backend)
-		mocktestify.AssertExpectationsForObjects(t, backend)
-	})
-
-	t.Run("get by address at height", func(t *testing.T) {
-		var height uint64 = 1337
-		account := accountFixture(t)
-		req := getAccountRequest(t, account, fmt.Sprintf("%d", height), expandableFieldKeys, expandableFieldContracts)
-
-		backend.Mock.
-			On("GetAccountAtBlockHeight", mocktestify.Anything, account.Address, height).
-			Return(account, nil)
-
-		expected := expectedExpandedResponse(account)
-
-		assertOKResponse(t, req, expected, backend)
-		mocktestify.AssertExpectationsForObjects(t, backend)
-	})
-
-	t.Run("get by address at height condensed", func(t *testing.T) {
-		var height uint64 = 1337
-		account := accountFixture(t)
-		req := getAccountRequest(t, account, fmt.Sprintf("%d", height))
-
-		backend.Mock.
-			On("GetAccountAtBlockHeight", mocktestify.Anything, account.Address, height).
-			Return(account, nil)
-
-		expected := expectedCondensedResponse(account)
-
-		assertOKResponse(t, req, expected, backend)
-		mocktestify.AssertExpectationsForObjects(t, backend)
-	})
-
-	t.Run("get invalid", func(t *testing.T) {
-		tests := []struct {
-			url string
-			out string
-		}{
-			{accountURL(t, "123", ""), `{"code":400, "message":"invalid address"}`},
-			{accountURL(t, unittest.AddressFixture().String(), "foo"), `{"code":400, "message":"invalid height format"}`},
-		}
-
-		for i, test := range tests {
-			req, _ := http.NewRequest("GET", test.url, nil)
-			rr, err := executeRequest(req, backend)
-			assert.NoError(t, err)
-
-			assert.Equal(t, http.StatusBadRequest, rr.Code)
-			assert.JSONEq(t, test.out, rr.Body.String(), fmt.Sprintf("test #%d failed: %v", i, test))
-		}
-	})
-}
-
-// TestObserverGetAccount tests the get account request forwarding to an upstream.
-//
-//	Runs the following tests:
-//	1. Get account by address at latest sealed block.
-//	2. Get account by address at latest finalized block.
-//	3. Get account by address at height.
-//	4. Get account by address at height condensed.
-//	5. Get invalid account.
-func TestObserverGetAccount(t *testing.T) {
-	backend := &restmock.RestBackendApi{}
-
-	t.Run("get by address at latest sealed block", func(t *testing.T) {
-		account := accountFixture(t)
-		var height uint64 = 100
-		block := unittest.BlockHeaderFixture(unittest.WithHeaderHeight(height))
-
-		req := getAccountRequest(t, account, sealedHeightQueryParam, expandableFieldKeys, expandableFieldContracts)
-
-		backend.Mock.
-			On("GetLatestBlockHeader", mocktestify.Anything, true).
-			Return(block, flow.BlockStatusSealed, nil)
-
-		backend.Mock.
-			On("GetAccountAtBlockHeight", mocktestify.Anything, account.Address, height).
-			Return(account, nil)
-
-		expected := expectedExpandedResponse(account)
-
-		assertOKResponse(t, req, expected, backend)
-		mocktestify.AssertExpectationsForObjects(t, backend)
-	})
-
-	t.Run("get by address at latest finalized block", func(t *testing.T) {
-		var height uint64 = 100
-		block := unittest.BlockHeaderFixture(unittest.WithHeaderHeight(height))
-		account := accountFixture(t)
-
-		req := getAccountRequest(t, account, finalHeightQueryParam, expandableFieldKeys, expandableFieldContracts)
-
 		backend.Mock.
 			On("GetLatestBlockHeader", mocktestify.Anything, false).
 			Return(block, flow.BlockStatusFinalized, nil)

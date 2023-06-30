@@ -2,13 +2,12 @@ package routes
 
 import (
 	"github.com/onflow/flow-go/access"
-	"github.com/onflow/flow-go/engine/access/rest/api"
 	"github.com/onflow/flow-go/engine/access/rest/models"
 	"github.com/onflow/flow-go/engine/access/rest/request"
 )
 
 // GetTransactionByID gets a transaction by requested ID.
-func GetTransactionByID(r *request.Request, backend api.RestBackendApi, link models.LinkGenerator) (interface{}, error) {
+func GetTransactionByID(r *request.Request, backend access.API, link models.LinkGenerator) (interface{}, error) {
 	req, err := r.GetTransactionRequest()
 	if err != nil {
 		return nil, models.NewBadRequestError(err)
@@ -34,7 +33,7 @@ func GetTransactionByID(r *request.Request, backend api.RestBackendApi, link mod
 }
 
 // GetTransactionResultByID retrieves transaction result by the transaction ID.
-func GetTransactionResultByID(r *request.Request, backend api.RestBackendApi, link models.LinkGenerator) (interface{}, error) {
+func GetTransactionResultByID(r *request.Request, backend access.API, link models.LinkGenerator) (interface{}, error) {
 	req, err := r.GetTransactionResultRequest()
 	if err != nil {
 		return nil, models.NewBadRequestError(err)
@@ -51,7 +50,7 @@ func GetTransactionResultByID(r *request.Request, backend api.RestBackendApi, li
 }
 
 // CreateTransaction creates a new transaction from provided payload.
-func CreateTransaction(r *request.Request, backend api.RestBackendApi, link models.LinkGenerator) (interface{}, error) {
+func CreateTransaction(r *request.Request, backend access.API, link models.LinkGenerator) (interface{}, error) {
 	req, err := r.CreateTransactionRequest()
 	if err != nil {
 		return nil, models.NewBadRequestError(err)

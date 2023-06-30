@@ -141,6 +141,7 @@ func (suite *SecureGRPCTestSuite) SetupTest() {
 		nil,
 		suite.me,
 		backend,
+		backend,
 	)
 	assert.NoError(suite.T(), err)
 	suite.rpcEng, err = rpcEngBuilder.WithLegacy().Build()

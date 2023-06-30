@@ -1,4 +1,4 @@
-package tests
+package routes
 
 import (
 	"fmt"

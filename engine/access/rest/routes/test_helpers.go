@@ -1,4 +1,4 @@
-package tests
+package routes
 
 import (
 	"bytes"
@@ -11,8 +11,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/onflow/flow-go/engine/access/rest"
-	"github.com/onflow/flow-go/engine/access/rest/api"
+	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
 )
@@ -27,11 +26,11 @@ const (
 	heightQueryParam          = "height"
 )
 
-func executeRequest(req *http.Request, backend api.RestBackendApi) (*httptest.ResponseRecorder, error) {
+func executeRequest(req *http.Request, backend access.API) (*httptest.ResponseRecorder, error) {
 	var b bytes.Buffer
 	logger := zerolog.New(&b)
 
-	router, err := rest.NewRouter(backend, logger, flow.Testnet.Chain(), metrics.NewNoopCollector())
+	router, err := NewRouter(backend, logger, flow.Testnet.Chain(), metrics.NewNoopCollector())
 	if err != nil {
 		return nil, err
 	}
@@ -41,11 +40,11 @@ func executeRequest(req *http.Request, backend api.RestBackendApi) (*httptest.Re
 	return rr, nil
 }
 
-func assertOKResponse(t *testing.T, req *http.Request, expectedRespBody string, backend api.RestBackendApi) {
+func assertOKResponse(t *testing.T, req *http.Request, expectedRespBody string, backend access.API) {
 	assertResponse(t, req, http.StatusOK, expectedRespBody, backend)
 }
 
-func assertResponse(t *testing.T, req *http.Request, status int, expectedRespBody string, backend api.RestBackendApi) {
+func assertResponse(t *testing.T, req *http.Request, status int, expectedRespBody string, backend access.API) {
 	rr, err := executeRequest(req, backend)
 	assert.NoError(t, err)
 	actualResponseBody := rr.Body.String()

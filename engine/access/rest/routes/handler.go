@@ -1,4 +1,4 @@
-package rest
+package routes
 
 import (
 	"encoding/json"
@@ -11,7 +11,7 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
-	"github.com/onflow/flow-go/engine/access/rest/api"
+	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/engine/access/rest/models"
 	"github.com/onflow/flow-go/engine/access/rest/request"
 	"github.com/onflow/flow-go/engine/access/rest/util"
@@ -25,7 +25,7 @@ const MaxRequestSize = 2 << 20 // 2MB
 // it fetches necessary resources and returns an error or response model.
 type ApiHandlerFunc func(
 	r *request.Request,
-	backend api.RestBackendApi,
+	backend access.API,
 	generator models.LinkGenerator,
 ) (interface{}, error)
 
@@ -34,7 +34,7 @@ type ApiHandlerFunc func(
 // wraps functionality for handling error and responses outside of endpoint handling.
 type Handler struct {
 	logger         zerolog.Logger
-	backend        api.RestBackendApi
+	backend        access.API
 	linkGenerator  models.LinkGenerator
 	apiHandlerFunc ApiHandlerFunc
 	chain          flow.Chain
@@ -42,7 +42,7 @@ type Handler struct {
 
 func NewHandler(
 	logger zerolog.Logger,
-	backend api.RestBackendApi,
+	backend access.API,
 	handlerFunc ApiHandlerFunc,
 	generator models.LinkGenerator,
 	chain flow.Chain,

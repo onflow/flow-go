@@ -1,4 +1,4 @@
-package tests
+package routes
 
 import (
 	"encoding/json"
@@ -17,7 +17,6 @@ import (
 	"google.golang.org/grpc/status"
 
 	"github.com/onflow/flow-go/access/mock"
-	"github.com/onflow/flow-go/engine/access/rest/routes"
 	"github.com/onflow/flow-go/engine/access/rest/util"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -138,7 +137,7 @@ func getEventReq(t *testing.T, eventType string, start string, end string, block
 	q := u.Query()
 
 	if len(blockIDs) > 0 {
-		q.Add(routes.BlockQueryParam, strings.Join(blockIDs, ","))
+		q.Add(BlockQueryParam, strings.Join(blockIDs, ","))
 	}
 
 	if start != "" && end != "" {
@@ -146,7 +145,7 @@ func getEventReq(t *testing.T, eventType string, start string, end string, block
 		q.Add(endHeightQueryParam, end)
 	}
 
-	q.Add(routes.EventTypeQuery, eventType)
+	q.Add(EventTypeQuery, eventType)
 
 	u.RawQuery = q.Encode()
 

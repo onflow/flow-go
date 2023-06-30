@@ -13,9 +13,9 @@ import (
 
 	"github.com/rs/zerolog"
 
+	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/engine/access/rest"
-	"github.com/onflow/flow-go/engine/access/rest/api"
 	"github.com/onflow/flow-go/engine/access/rpc/backend"
 	"github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/model/flow"
@@ -69,7 +69,7 @@ type Engine struct {
 	secureGrpcAddress   net.Addr
 	restAPIAddress      net.Addr
 
-	restHandler api.RestBackendApi
+	restHandler access.API
 }
 type Option func(*RPCEngineBuilder)
 
@@ -84,7 +84,7 @@ func NewBuilder(log zerolog.Logger,
 	apiBurstLimits map[string]int, // the api burst limit (max calls at the same time) for each of the Access API e.g. Ping->50, GetTransaction->10
 	me module.Local,
 	backend *backend.Backend,
-	restHandler api.RestBackendApi,
+	restHandler access.API,
 ) (*RPCEngineBuilder, error) {
 	log = log.With().Str("engine", "rpc").Logger()
 

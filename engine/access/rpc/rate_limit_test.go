@@ -150,7 +150,9 @@ func (suite *RateLimitTestSuite) SetupTest() {
 		apiRateLimt,
 		apiBurstLimt,
 		suite.me,
+		backend,
 		backend)
+
 	require.NoError(suite.T(), err)
 	suite.rpcEng, err = rpcEngBuilder.WithLegacy().Build()
 	require.NoError(suite.T(), err)

@@ -8,14 +8,14 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
-	"github.com/onflow/flow-go/engine/access/rest/api"
+	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/engine/access/rest/models"
 	"github.com/onflow/flow-go/engine/access/rest/request"
 	"github.com/onflow/flow-go/model/flow"
 )
 
 // GetBlocksByIDs gets blocks by provided ID or list of IDs.
-func GetBlocksByIDs(r *request.Request, backend api.RestBackendApi, link models.LinkGenerator) (interface{}, error) {
+func GetBlocksByIDs(r *request.Request, backend access.API, link models.LinkGenerator) (interface{}, error) {
 	req, err := r.GetBlockByIDsRequest()
 	if err != nil {
 		return nil, models.NewBadRequestError(err)
@@ -35,7 +35,7 @@ func GetBlocksByIDs(r *request.Request, backend api.RestBackendApi, link models.
 }
 
 // GetBlocksByHeight gets blocks by height.
-func GetBlocksByHeight(r *request.Request, backend api.RestBackendApi, link models.LinkGenerator) (interface{}, error) {
+func GetBlocksByHeight(r *request.Request, backend access.API, link models.LinkGenerator) (interface{}, error) {
 	req, err := r.GetBlockRequest()
 	if err != nil {
 		return nil, models.NewBadRequestError(err)
@@ -92,7 +92,7 @@ func GetBlocksByHeight(r *request.Request, backend api.RestBackendApi, link mode
 }
 
 // GetBlockPayloadByID gets block payload by ID
-func GetBlockPayloadByID(r *request.Request, backend api.RestBackendApi, link models.LinkGenerator) (interface{}, error) {
+func GetBlockPayloadByID(r *request.Request, backend access.API, _ models.LinkGenerator) (interface{}, error) {
 	req, err := r.GetBlockPayloadRequest()
 	if err != nil {
 		return nil, models.NewBadRequestError(err)
@@ -113,7 +113,7 @@ func GetBlockPayloadByID(r *request.Request, backend api.RestBackendApi, link mo
 	return payload, nil
 }
 
-func getBlock(option blockProviderOption, req *request.Request, backend api.RestBackendApi, link models.LinkGenerator) (*models.Block, error) {
+func getBlock(option blockProviderOption, req *request.Request, backend access.API, link models.LinkGenerator) (*models.Block, error) {
 	// lookup block
 	blkProvider := NewBlockProvider(backend, option)
 	blk, blockStatus, err := blkProvider.getBlock(req.Context())
@@ -153,7 +153,7 @@ type blockProvider struct {
 	height  uint64
 	latest  bool
 	sealed  bool
-	backend api.RestBackendApi
+	backend access.API
 }
 
 type blockProviderOption func(blkProvider *blockProvider)
@@ -181,7 +181,7 @@ func forFinalized(queryParam uint64) blockProviderOption {
 	}
 }
 
-func NewBlockProvider(backend api.RestBackendApi, options ...blockProviderOption) *blockProvider {
+func NewBlockProvider(backend access.API, options ...blockProviderOption) *blockProvider {
 	blkProvider := &blockProvider{
 		backend: backend,
 	}

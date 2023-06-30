@@ -3,13 +3,13 @@ package routes
 import (
 	"fmt"
 
-	"github.com/onflow/flow-go/engine/access/rest/api"
+	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/engine/access/rest/models"
 	"github.com/onflow/flow-go/engine/access/rest/request"
 )
 
 // GetExecutionResultsByBlockIDs gets Execution Result payload by block IDs.
-func GetExecutionResultsByBlockIDs(r *request.Request, backend api.RestBackendApi, link models.LinkGenerator) (interface{}, error) {
+func GetExecutionResultsByBlockIDs(r *request.Request, backend access.API, link models.LinkGenerator) (interface{}, error) {
 	req, err := r.GetExecutionResultByBlockIDsRequest()
 	if err != nil {
 		return nil, models.NewBadRequestError(err)
@@ -35,7 +35,7 @@ func GetExecutionResultsByBlockIDs(r *request.Request, backend api.RestBackendAp
 }
 
 // GetExecutionResultByID gets execution result by the ID.
-func GetExecutionResultByID(r *request.Request, backend api.RestBackendApi, link models.LinkGenerator) (interface{}, error) {
+func GetExecutionResultByID(r *request.Request, backend access.API, link models.LinkGenerator) (interface{}, error) {
 	req, err := r.GetExecutionResultRequest()
 	if err != nil {
 		return nil, models.NewBadRequestError(err)

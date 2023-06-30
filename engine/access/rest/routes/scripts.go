@@ -1,14 +1,14 @@
 package routes
 
 import (
-	"github.com/onflow/flow-go/engine/access/rest/api"
+	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/engine/access/rest/models"
 	"github.com/onflow/flow-go/engine/access/rest/request"
 	"github.com/onflow/flow-go/model/flow"
 )
 
 // ExecuteScript handler sends the script from the request to be executed.
-func ExecuteScript(r *request.Request, backend api.RestBackendApi, link models.LinkGenerator) (interface{}, error) {
+func ExecuteScript(r *request.Request, backend access.API, _ models.LinkGenerator) (interface{}, error) {
 	req, err := r.GetScriptRequest()
 	if err != nil {
 		return nil, models.NewBadRequestError(err)
