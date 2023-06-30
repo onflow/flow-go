@@ -82,10 +82,6 @@ func NewGrpcServerBuilder(log zerolog.Logger,
 	return grpcServerBuilder
 }
 
-func (b *GrpcServerBuilder) Server() *grpc.Server {
-	return b.server
-}
-
 func (b *GrpcServerBuilder) Build() (*GrpcServer, error) {
 	return NewGrpcServer(b.log, b.gRPCListenAddr, b.server)
 }

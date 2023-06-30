@@ -111,20 +111,22 @@ func (suite *SecureGRPCTestSuite) SetupTest() {
 	// save the public key to use later in tests later
 	suite.publicKey = networkingKey.PublicKey()
 
-	secureGrpcServer := grpcserver.NewGrpcServerBuilder(suite.log,
+	suite.secureGrpcServer, err = grpcserver.NewGrpcServerBuilder(suite.log,
 		config.SecureGRPCListenAddr,
 		grpcutils.DefaultMaxMsgSize,
 		false,
 		nil,
 		nil,
-		grpcserver.WithTransportCredentials(config.TransportCredentials))
+		grpcserver.WithTransportCredentials(config.TransportCredentials)).Build()
+	assert.NoError(suite.T(), err)
 
-	unsecureGrpcServer := grpcserver.NewGrpcServerBuilder(suite.log,
+	suite.unsecureGrpcServer, err = grpcserver.NewGrpcServerBuilder(suite.log,
 		config.UnsecureGRPCListenAddr,
 		grpcutils.DefaultMaxMsgSize,
 		false,
 		nil,
-		nil)
+		nil).Build()
+	assert.NoError(suite.T(), err)
 
 	block := unittest.BlockHeaderFixture()
 	suite.snapshot.On("Head").Return(block, nil)
@@ -148,18 +150,13 @@ func (suite *SecureGRPCTestSuite) SetupTest() {
 		false,
 		false,
 		suite.me,
-		secureGrpcServer,
-		unsecureGrpcServer,
+		suite.secureGrpcServer,
+		suite.unsecureGrpcServer,
 	)
 	assert.NoError(suite.T(), err)
 	suite.rpcEng, err = rpcEngBuilder.WithLegacy().Build()
 	assert.NoError(suite.T(), err)
 	suite.ctx, suite.cancel = irrecoverable.NewMockSignalerContextWithCancel(suite.T(), context.Background())
-	suite.secureGrpcServer, err = secureGrpcServer.Build()
-	assert.NoError(suite.T(), err)
-
-	suite.unsecureGrpcServer, err = unsecureGrpcServer.Build()
-	assert.NoError(suite.T(), err)
 
 	suite.secureGrpcServer.Start(suite.ctx)
 	suite.unsecureGrpcServer.Start(suite.ctx)

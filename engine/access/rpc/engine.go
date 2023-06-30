@@ -60,9 +60,9 @@ type Engine struct {
 
 	log                zerolog.Logger
 	restCollector      module.RestMetrics
-	backend            *backend.Backend              // the gRPC service implementation
-	unsecureGrpcServer *grpcserver.GrpcServerBuilder // the unsecure gRPC server
-	secureGrpcServer   *grpcserver.GrpcServerBuilder // the secure gRPC server
+	backend            *backend.Backend       // the gRPC service implementation
+	unsecureGrpcServer *grpcserver.GrpcServer // the unsecure gRPC server
+	secureGrpcServer   *grpcserver.GrpcServer // the secure gRPC server
 	httpServer         *http.Server
 	restServer         *http.Server
 	config             Config
@@ -91,14 +91,14 @@ func NewBuilder(log zerolog.Logger,
 	retryEnabled bool,
 	rpcMetricsEnabled bool,
 	me module.Local,
-	secureGrpcServer *grpcserver.GrpcServerBuilder,
-	unsecureGrpcServer *grpcserver.GrpcServerBuilder,
+	secureGrpcServer *grpcserver.GrpcServer,
+	unsecureGrpcServer *grpcserver.GrpcServer,
 ) (*RPCEngineBuilder, error) {
 
 	log = log.With().Str("engine", "rpc").Logger()
 
 	// wrap the unsecured server with an HTTP proxy server to serve HTTP clients
-	httpServer := newHTTPProxyServer(unsecureGrpcServer.Server())
+	httpServer := newHTTPProxyServer(unsecureGrpcServer.Server)
 
 	var cache *lru.Cache
 	cacheSize := config.ConnectionPoolSize

@@ -243,9 +243,9 @@ type FlowAccessNodeBuilder struct {
 	SyncEng        *synceng.Engine
 	StateStreamEng *state_stream.Engine
 
-	// grpc server builders
-	secureGrpcServer   *grpcserver.GrpcServerBuilder
-	unsecureGrpcServer *grpcserver.GrpcServerBuilder
+	// grpc servers
+	secureGrpcServer   *grpcserver.GrpcServer
+	unsecureGrpcServer *grpcserver.GrpcServer
 }
 
 func (builder *FlowAccessNodeBuilder) buildFollowerState() *FlowAccessNodeBuilder {
@@ -992,20 +992,27 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 			return nil
 		}).
 		Module("creating grpc servers", func(node *cmd.NodeConfig) error {
-			builder.secureGrpcServer = grpcserver.NewGrpcServerBuilder(node.Logger,
+			var err error
+			builder.secureGrpcServer, err = grpcserver.NewGrpcServerBuilder(node.Logger,
 				builder.rpcConf.SecureGRPCListenAddr,
 				builder.rpcConf.MaxMsgSize,
 				builder.rpcMetricsEnabled,
 				builder.apiRatelimits,
 				builder.apiBurstlimits,
-				grpcserver.WithTransportCredentials(builder.rpcConf.TransportCredentials))
+				grpcserver.WithTransportCredentials(builder.rpcConf.TransportCredentials)).Build()
+			if err != nil {
+				return err
+			}
 
-			builder.unsecureGrpcServer = grpcserver.NewGrpcServerBuilder(node.Logger,
+			builder.unsecureGrpcServer, err = grpcserver.NewGrpcServerBuilder(node.Logger,
 				builder.rpcConf.UnsecureGRPCListenAddr,
 				builder.rpcConf.MaxMsgSize,
 				builder.rpcMetricsEnabled,
 				builder.apiRatelimits,
-				builder.apiBurstlimits)
+				builder.apiBurstlimits).Build()
+			if err != nil {
+				return err
+			}
 
 			return nil
 		}).
@@ -1121,21 +1128,11 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 	}
 
 	builder.Component("secure grpc server", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-		secureGrpcServer, err := builder.secureGrpcServer.Build()
-		if err != nil {
-			return nil, err
-		}
-
-		return secureGrpcServer, nil
+		return builder.secureGrpcServer, nil
 	})
 
 	builder.Component("unsecure grpc server", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-		unsecureGrpcServer, err := builder.unsecureGrpcServer.Build()
-		if err != nil {
-			return nil, err
-		}
-
-		return unsecureGrpcServer, nil
+		return builder.unsecureGrpcServer, nil
 	})
 
 	builder.Component("ping engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {

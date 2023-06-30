@@ -642,7 +642,9 @@ func (builder *ObserverServiceBuilder) Initialize() error {
 
 	builder.enqueueConnectWithStakedAN()
 
-	builder.enqueueRPCServer()
+	if err := builder.enqueueRPCServer(); err != nil {
+		return err
+	}
 
 	if builder.BaseConfig.MetricsEnabled {
 		builder.EnqueueMetricsServerInit()
@@ -846,21 +848,27 @@ func (builder *ObserverServiceBuilder) enqueueConnectWithStakedAN() {
 	})
 }
 
-func (builder *ObserverServiceBuilder) enqueueRPCServer() {
-	secureGrpcServer := grpcserver.NewGrpcServerBuilder(builder.Logger,
+func (builder *ObserverServiceBuilder) enqueueRPCServer() error {
+	secureGrpcServer, err := grpcserver.NewGrpcServerBuilder(builder.Logger,
 		builder.rpcConf.SecureGRPCListenAddr,
 		builder.rpcConf.MaxMsgSize,
 		builder.rpcMetricsEnabled,
 		builder.apiRatelimits,
 		builder.apiBurstlimits,
-		grpcserver.WithTransportCredentials(builder.rpcConf.TransportCredentials))
+		grpcserver.WithTransportCredentials(builder.rpcConf.TransportCredentials)).Build()
+	if err != nil {
+		return err
+	}
 
-	unsecureGrpcServer := grpcserver.NewGrpcServerBuilder(builder.Logger,
+	unsecureGrpcServer, err := grpcserver.NewGrpcServerBuilder(builder.Logger,
 		builder.rpcConf.UnsecureGRPCListenAddr,
 		builder.rpcConf.MaxMsgSize,
 		builder.rpcMetricsEnabled,
 		builder.apiRatelimits,
-		builder.apiBurstlimits)
+		builder.apiBurstlimits).Build()
+	if err != nil {
+		return err
+	}
 
 	builder.Component("RPC engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 		engineBuilder, err := rpc.NewBuilder(
@@ -921,23 +929,14 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 
 	// build secure grpc server
 	builder.Component("secure grpc server", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-		secureGrpcServer, err := secureGrpcServer.Build()
-		if err != nil {
-			return nil, err
-		}
-
 		return secureGrpcServer, nil
 	})
 
 	// build unsecure grpc server
 	builder.Component("unsecure grpc server", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-		unsecureGrpcServer, err := unsecureGrpcServer.Build()
-		if err != nil {
-			return nil, err
-		}
-
 		return unsecureGrpcServer, nil
 	})
+	return nil
 }
 
 // initMiddleware creates the network.Middleware implementation with the libp2p factory function, metrics, peer update

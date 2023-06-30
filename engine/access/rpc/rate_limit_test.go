@@ -128,35 +128,32 @@ func (suite *RateLimitTestSuite) SetupTest() {
 		"Ping": suite.rateLimit,
 	}
 
-	secureGrpcServer := grpcserver.NewGrpcServerBuilder(suite.log,
+	suite.secureGrpcServer, err = grpcserver.NewGrpcServerBuilder(suite.log,
 		config.SecureGRPCListenAddr,
 		grpcutils.DefaultMaxMsgSize,
 		false,
 		apiRateLimt,
 		apiBurstLimt,
-		grpcserver.WithTransportCredentials(config.TransportCredentials))
+		grpcserver.WithTransportCredentials(config.TransportCredentials)).Build()
+	require.NoError(suite.T(), err)
 
-	unsecureGrpcServer := grpcserver.NewGrpcServerBuilder(suite.log,
+	suite.unsecureGrpcServer, err = grpcserver.NewGrpcServerBuilder(suite.log,
 		config.UnsecureGRPCListenAddr,
 		grpcutils.DefaultMaxMsgSize,
 		false,
 		apiRateLimt,
-		apiBurstLimt)
+		apiBurstLimt).Build()
+	require.NoError(suite.T(), err)
 
 	block := unittest.BlockHeaderFixture()
 	suite.snapshot.On("Head").Return(block, nil)
 
 	rpcEngBuilder, err := NewBuilder(suite.log, suite.state, config, suite.collClient, nil, suite.blocks, suite.headers, suite.collections, suite.transactions, nil,
-		nil, suite.chainID, suite.metrics, 0, 0, false, false, suite.me, secureGrpcServer, unsecureGrpcServer)
+		nil, suite.chainID, suite.metrics, 0, 0, false, false, suite.me, suite.secureGrpcServer, suite.unsecureGrpcServer)
 	require.NoError(suite.T(), err)
 	suite.rpcEng, err = rpcEngBuilder.WithLegacy().Build()
 	require.NoError(suite.T(), err)
 	suite.ctx, suite.cancel = irrecoverable.NewMockSignalerContextWithCancel(suite.T(), context.Background())
-	suite.secureGrpcServer, err = secureGrpcServer.Build()
-	assert.NoError(suite.T(), err)
-
-	suite.unsecureGrpcServer, err = unsecureGrpcServer.Build()
-	assert.NoError(suite.T(), err)
 
 	suite.secureGrpcServer.Start(suite.ctx)
 	suite.unsecureGrpcServer.Start(suite.ctx)

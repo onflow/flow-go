@@ -135,20 +135,22 @@ func (suite *RestAPITestSuite) SetupTest() {
 	// set the transport credentials for the server to use
 	config.TransportCredentials = credentials.NewTLS(tlsConfig)
 
-	secureGrpcServer := grpcserver.NewGrpcServerBuilder(suite.log,
+	suite.secureGrpcServer, err = grpcserver.NewGrpcServerBuilder(suite.log,
 		config.SecureGRPCListenAddr,
 		grpcutils.DefaultMaxMsgSize,
 		false,
 		nil,
 		nil,
-		grpcserver.WithTransportCredentials(config.TransportCredentials))
+		grpcserver.WithTransportCredentials(config.TransportCredentials)).Build()
+	assert.NoError(suite.T(), err)
 
-	unsecureGrpcServer := grpcserver.NewGrpcServerBuilder(suite.log,
+	suite.unsecureGrpcServer, err = grpcserver.NewGrpcServerBuilder(suite.log,
 		config.UnsecureGRPCListenAddr,
 		grpcutils.DefaultMaxMsgSize,
 		false,
 		nil,
-		nil)
+		nil).Build()
+	assert.NoError(suite.T(), err)
 
 	rpcEngBuilder, err := rpc.NewBuilder(
 		suite.log,
@@ -169,20 +171,14 @@ func (suite *RestAPITestSuite) SetupTest() {
 		false,
 		false,
 		suite.me,
-		secureGrpcServer,
-		unsecureGrpcServer,
+		suite.secureGrpcServer,
+		suite.unsecureGrpcServer,
 	)
 	assert.NoError(suite.T(), err)
 	suite.rpcEng, err = rpcEngBuilder.WithLegacy().Build()
 	assert.NoError(suite.T(), err)
 
 	suite.ctx, suite.cancel = irrecoverable.NewMockSignalerContextWithCancel(suite.T(), context.Background())
-
-	suite.secureGrpcServer, err = secureGrpcServer.Build()
-	assert.NoError(suite.T(), err)
-
-	suite.unsecureGrpcServer, err = unsecureGrpcServer.Build()
-	assert.NoError(suite.T(), err)
 
 	suite.secureGrpcServer.Start(suite.ctx)
 	suite.unsecureGrpcServer.Start(suite.ctx)

@@ -6,7 +6,6 @@ import (
 
 	access "github.com/onflow/flow/protobuf/go/flow/executiondata"
 	"github.com/rs/zerolog"
-	"google.golang.org/grpc"
 
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
@@ -58,7 +57,6 @@ type Engine struct {
 	*component.ComponentManager
 	log     zerolog.Logger
 	backend *StateStreamBackend
-	server  *grpc.Server
 	config  Config
 	chain   flow.Chain
 	handler *Handler
@@ -81,7 +79,7 @@ func NewEng(
 	chainID flow.ChainID,
 	initialBlockHeight uint64,
 	highestBlockHeight uint64,
-	server *grpcserver.GrpcServerBuilder,
+	server *grpcserver.GrpcServer,
 ) (*Engine, error) {
 	logger := log.With().Str("engine", "state_stream_rpc").Logger()
 
@@ -107,7 +105,6 @@ func NewEng(
 	e := &Engine{
 		log:                 logger,
 		backend:             backend,
-		server:              server.Server(),
 		headers:             headers,
 		chain:               chainID.Chain(),
 		config:              config,
@@ -119,7 +116,7 @@ func NewEng(
 	e.ComponentManager = component.NewComponentManagerBuilder().
 		Build()
 
-	access.RegisterExecutionDataAPIServer(e.server, e.handler)
+	access.RegisterExecutionDataAPIServer(server.Server, e.handler)
 
 	return e, nil
 }

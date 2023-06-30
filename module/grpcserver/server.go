@@ -16,8 +16,8 @@ import (
 // It makes it easy to configure the node to use the same port for both APIs.
 type GrpcServer struct {
 	component.Component
-	log        zerolog.Logger
-	grpcServer *grpc.Server
+	log    zerolog.Logger
+	Server *grpc.Server
 
 	grpcListenAddr string // the GRPC server address as ip:port
 
@@ -32,7 +32,7 @@ func NewGrpcServer(log zerolog.Logger,
 ) (*GrpcServer, error) {
 	server := &GrpcServer{
 		log:            log,
-		grpcServer:     grpcServer,
+		Server:         grpcServer,
 		grpcListenAddr: grpcListenAddr,
 	}
 	server.Component = component.NewComponentManagerBuilder().
@@ -62,7 +62,7 @@ func (g *GrpcServer) serveGRPCWorker(ctx irrecoverable.SignalerContext, ready co
 	g.log.Debug().Str("grpc_address", g.grpcAddress.String()).Msg("listening on port")
 	ready()
 
-	err = g.grpcServer.Serve(l) // blocking call
+	err = g.Server.Serve(l) // blocking call
 	if err != nil {
 		g.log.Err(err).Msg("fatal error in grpc server")
 		ctx.Throw(err)
@@ -81,5 +81,5 @@ func (g *GrpcServer) GRPCAddress() net.Addr {
 func (g *GrpcServer) shutdownWorker(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 	ready()
 	<-ctx.Done()
-	g.grpcServer.GracefulStop()
+	g.Server.GracefulStop()
 }
