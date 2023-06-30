@@ -256,20 +256,26 @@ func (cf *ConnectionFactoryImpl) invalidateAPIClient(address string, port uint) 
 	}
 }
 
+// Close closes the CachedClient connection
 func (s *CachedClient) Close() {
 	s.mutex.Lock()
 	conn := s.ClientConn
 	s.ClientConn = nil
 	s.mutex.Unlock()
+
 	if conn == nil {
 		return
 	}
 
+	// Mark the connection for closure
 	s.closeRequested.Store(true)
 
+	// If there are ongoing requests, wait for them to complete
 	if s.requestCounter.Load() > 0 {
 		<-s.done
 	}
+
+	// Close the connection
 	conn.Close()
 }
 
@@ -287,7 +293,7 @@ func getGRPCAddress(address string, grpcPort uint) (string, error) {
 	return grpcAddress, nil
 }
 
-// createClientTimeoutInterceptor creates a client interceptor with a context that expires after the timeout.
+// createRequestWatcherInterceptor creates a request watcher interceptor to wait for unfinished request before close
 func createRequestWatcherInterceptor(cachedClient *CachedClient) grpc.UnaryClientInterceptor {
 	requestWatcherInterceptor := func(
 		ctx context.Context,
@@ -298,16 +304,21 @@ func createRequestWatcherInterceptor(cachedClient *CachedClient) grpc.UnaryClien
 		invoker grpc.UnaryInvoker,
 		opts ...grpc.CallOption,
 	) error {
+		// Prevent new request from being sent if the connection is marked for closure
 		if cachedClient.closeRequested.Load() {
 			return status.Errorf(codes.Unavailable, "the connection to %s was closed", cachedClient.Address)
 		}
 
+		// Increment the request counter to track ongoing requests
 		cachedClient.requestCounter.Add(1)
 
+		// Invoke the actual RPC method
 		err := invoker(ctx, method, req, reply, cc, opts...)
 
+		// Decrement the request counter and check if the connection is marked for closure and no more ongoing requests
 		count := cachedClient.requestCounter.Add(-1)
 		if cachedClient.closeRequested.Load() && count == 0 {
+			// Signal that all ongoing requests have completed
 			select {
 			case cachedClient.done <- struct{}{}:
 			default:
