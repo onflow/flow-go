@@ -21,6 +21,15 @@ type EIndex uint32
 // InvalidIndex is used when a link doesnt point anywhere, in other words it is an equivalent of a nil adress.
 const InvalidIndex EIndex = math.MaxUint32
 
+// A type dedicated to describe possible states of placeholders for entities in the pool.
+type StateType string
+
+// A placeholder in a free state can be used to store an entity.
+const stateFree StateType = "free-state"
+
+// A placeholder in a used state stores currently an entity.
+const stateUsed StateType = "used-state"
+
 // poolEntity represents the data type that is maintained by
 type poolEntity struct {
 	PoolEntity
@@ -90,7 +99,7 @@ func (p *Pool) setDefaultNodeLinkValues() {
 // initFreeEntities initializes the free double linked-list with the indices of all cached entity poolEntities.
 func (p *Pool) initFreeEntities() {
 	for i := 0; i < len(p.poolEntities); i++ {
-		p.appendEntity(&p.free, EIndex(i))
+		p.appendEntity(stateFree, EIndex(i))
 	}
 }
 
@@ -107,7 +116,7 @@ func (p *Pool) Add(entityId flow.Identifier, entity flow.Entity, owner uint64) (
 		p.poolEntities[entityIndex].entity = entity
 		p.poolEntities[entityIndex].id = entityId
 		p.poolEntities[entityIndex].owner = owner
-		p.appendEntity(&p.used, entityIndex)
+		p.appendEntity(stateUsed, entityIndex)
 	}
 
 	return entityIndex, slotAvailable, ejectedEntity
@@ -225,7 +234,7 @@ func (p *Pool) invalidateUsedHead() flow.Entity {
 // old free head to host a new entity.
 func (p *Pool) claimFreeHead() EIndex {
 	oldFreeHeadIndex := p.free.head
-	p.removeEntity(&p.free, oldFreeHeadIndex)
+	p.removeEntity(stateFree, oldFreeHeadIndex)
 	return oldFreeHeadIndex
 }
 
@@ -240,10 +249,10 @@ func (p *Pool) Remove(sliceIndex EIndex) flow.Entity {
 func (p *Pool) invalidateEntityAtIndex(sliceIndex EIndex) flow.Entity {
 	poolEntity := p.poolEntities[sliceIndex]
 	invalidatedEntity := poolEntity.entity
-	p.removeEntity(&p.used, sliceIndex)
+	p.removeEntity(stateUsed, sliceIndex)
 	p.poolEntities[sliceIndex].id = flow.ZeroID
 	p.poolEntities[sliceIndex].entity = nil
-	p.appendEntity(&p.free, EIndex(sliceIndex))
+	p.appendEntity(stateFree, EIndex(sliceIndex))
 
 	return invalidatedEntity
 }
@@ -262,9 +271,24 @@ func (p Pool) isInvalidated(sliceIndex EIndex) bool {
 	return true
 }
 
+// a helper method that allows to get an adress fo the state form the state type.
+func (p *Pool) getStateFromType(stateType StateType) *state {
+	var s *state = nil
+	switch stateType {
+	case stateFree:
+		s = &p.free
+	case stateUsed:
+		s = &p.used
+	default:
+		panic("Unknown state type")
+	}
+	return s
+}
+
 // utility method that removes an entity from one of the states.
 // NOTE: a removed entity has to be added to another state.
-func (p *Pool) removeEntity(s *state, entityIndex EIndex) {
+func (p *Pool) removeEntity(stateType StateType, entityIndex EIndex) {
+	var s *state = p.getStateFromType(stateType)
 	if s.size == 0 {
 		panic("Removing an entity from the empty list")
 	}
@@ -302,7 +326,9 @@ func (p *Pool) removeEntity(s *state, entityIndex EIndex) {
 
 // appends an entity to the tail of the state or creates a first element.
 // NOTE: entity should not be in any list before this method is applied
-func (p *Pool) appendEntity(s *state, entityIndex EIndex) {
+func (p *Pool) appendEntity(stateType StateType, entityIndex EIndex) {
+	var s *state = p.getStateFromType(stateType)
+
 	if s.size == 0 {
 		s.head = entityIndex
 		s.tail = entityIndex
