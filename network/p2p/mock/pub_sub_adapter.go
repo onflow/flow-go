@@ -97,6 +97,22 @@ func (_m *PubSubAdapter) ListPeers(topic string) []peer.ID {
 	return r0
 }
 
+// PeerScoreExposer provides a mock function with given fields:
+func (_m *PubSubAdapter) PeerScoreExposer() p2p.PeerScoreExposer {
+	ret := _m.Called()
+
+	var r0 p2p.PeerScoreExposer
+	if rf, ok := ret.Get(0).(func() p2p.PeerScoreExposer); ok {
+		r0 = rf()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(p2p.PeerScoreExposer)
+		}
+	}
+
+	return r0
+}
+
 // Ready provides a mock function with given fields:
 func (_m *PubSubAdapter) Ready() <-chan struct{} {
 	ret := _m.Called()

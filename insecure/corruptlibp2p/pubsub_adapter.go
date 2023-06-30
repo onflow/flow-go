@@ -33,6 +33,7 @@ type CorruptGossipSubAdapter struct {
 	router                *corrupt.GossipSubRouter
 	logger                zerolog.Logger
 	clusterChangeConsumer p2p.CollectionClusterChangesConsumer
+	peerScoreExposer      p2p.PeerScoreExposer
 }
 
 var _ p2p.PubSubAdapter = (*CorruptGossipSubAdapter)(nil)
@@ -110,13 +111,22 @@ func (c *CorruptGossipSubAdapter) ActiveClustersChanged(lst flow.ChainIDList) {
 	c.clusterChangeConsumer.ActiveClustersChanged(lst)
 }
 
-func NewCorruptGossipSubAdapter(
-	ctx context.Context,
-	logger zerolog.Logger,
-	h host.Host,
-	cfg p2p.PubSubAdapterConfig,
-	clusterChangeConsumer p2p.CollectionClusterChangesConsumer) (p2p.PubSubAdapter, *corrupt.GossipSubRouter, error) {
+// PeerScoreExposer returns the peer score exposer for the gossipsub adapter. The exposer is a read-only interface
+// for querying peer scores and returns the local scoring table of the underlying gossipsub node.
+// The exposer is only available if the gossipsub adapter was configured with a score tracer.
+// If the gossipsub adapter was not configured with a score tracer, the exposer will be nil.
+// Args:
+//
+//	None.
+//
+// Returns:
+//
+//	The peer score exposer for the gossipsub adapter.
+func (c *CorruptGossipSubAdapter) PeerScoreExposer() p2p.PeerScoreExposer {
+	return c.peerScoreExposer
+}
 
+func NewCorruptGossipSubAdapter(ctx context.Context, logger zerolog.Logger, h host.Host, cfg p2p.PubSubAdapterConfig, clusterChangeConsumer p2p.CollectionClusterChangesConsumer) (p2p.PubSubAdapter, *corrupt.GossipSubRouter, error) {
 	gossipSubConfig, ok := cfg.(*CorruptPubSubAdapterConfig)
 	if !ok {
 		return nil, nil, fmt.Errorf("invalid gossipsub config type: %T", cfg)
@@ -131,19 +141,34 @@ func NewCorruptGossipSubAdapter(
 		return nil, nil, fmt.Errorf("failed to create corrupt gossipsub: %w", err)
 	}
 
-	builder := component.NewComponentManagerBuilder().
-		AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
-			ready()
-			<-ctx.Done()
-		}).Build()
-
+	builder := component.NewComponentManagerBuilder()
 	adapter := &CorruptGossipSubAdapter{
-		Component:             builder,
 		gossipSub:             gossipSub,
 		router:                router,
 		logger:                logger,
 		clusterChangeConsumer: clusterChangeConsumer,
 	}
+
+	if scoreTracer := gossipSubConfig.ScoreTracer(); scoreTracer != nil {
+		builder.AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+			ready()
+			logger.Debug().Str("component", "corrupt-gossipsub_score_tracer").Msg("starting score tracer")
+			scoreTracer.Start(ctx)
+			logger.Debug().Str("component", "corrupt-gossipsub_score_tracer").Msg("score tracer started")
+
+			<-scoreTracer.Done()
+			logger.Debug().Str("component", "corrupt-gossipsub_score_tracer").Msg("score tracer stopped")
+		})
+		adapter.peerScoreExposer = scoreTracer
+	}
+	builder.AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+		ready()
+		// it is likely that this adapter is configured without a score tracer, so we need to
+		// wait for the context to be done in order to prevent immature shutdown.
+		<-ctx.Done()
+	})
+
+	adapter.Component = builder.Build()
 
 	return adapter, router, nil
 }

@@ -73,6 +73,26 @@ scoreOption := NewScoreOption(config)
 5. `AcceptPXThreshold`: The threshold above which a peer's score will result in accepting PX information with a prune from that peer. PX stands for "Peer Exchange" in the context of libp2p's gossipsub protocol. When a peer sends a PRUNE control message to another peer, it can include a list of other peers as PX information. The purpose of this is to help the pruned peer find new peers to replace the ones that have been pruned from its mesh. When a node receives a PRUNE message containing PX information, it can decide whether to connect to the suggested peers based on its own criteria. In this package, the `DefaultAcceptPXThreshold` is used to determine if the originating peer's penalty score is good enough to accept the PX information. If the originating peer's penalty score exceeds the threshold, the node will consider connecting to the suggested peers.
 6. `OpportunisticGraftThreshold`: The threshold below which the median peer score in the mesh may result in selecting more peers with a higher score for opportunistic grafting.
 
+### Flow Specific Scoring Parameters and Thresholds
+# GossipSub Scoring Parameters Explained
+1. `DefaultAppSpecificScoreWeight = 1`: This is the default weight for application-specific scoring. It basically tells us how important the application-specific score is in comparison to other scores.
+2. `MaxAppSpecificPenalty = -100` and `MinAppSpecificPenalty = -1`: These values define the range for application-specific penalties. A peer can have a maximum penalty of -100 and a minimum penalty of -1.
+3. `MaxAppSpecificReward = 100`: This is the maximum reward a peer can earn for good behavior.
+4. `DefaultStakedIdentityReward = MaxAppSpecificReward`: This reward is given to peers that contribute positively to the network (i.e., no misbehavior). It’s to encourage them and prioritize them in neighbor selection.
+5. `DefaultUnknownIdentityPenalty = MaxAppSpecificPenalty`: This penalty is given to a peer if it's not in the identity list. It's to discourage anonymity.
+6. `DefaultInvalidSubscriptionPenalty = MaxAppSpecificPenalty`: This penalty is for peers that subscribe to topics they are not authorized to subscribe to.
+7. `DefaultGossipThreshold = -99`: If a peer's penalty goes below this threshold, the peer is ignored for gossip. It means no gossip is sent to or received from that peer.
+8. `DefaultPublishThreshold = -99`: If a peer's penalty goes below this threshold, self-published messages will not be sent to this peer.
+9. `DefaultGraylistThreshold = -99`: If a peer's penalty goes below this threshold, it is graylisted. This means all incoming messages from this peer are ignored.
+10. `DefaultAcceptPXThreshold = 99`: This is a threshold for accepting peers. If a peer sends information and its score is above this threshold, the information is accepted.
+11. `DefaultOpportunisticGraftThreshold = MaxAppSpecificReward + 1`: This value is used to selectively connect to new peers if the median score of the current peers drops below this threshold.
+12. `defaultScoreCacheSize = 1000`: Sets the default size of the cache used to store the application-specific penalty of peers.
+13. `defaultDecayInterval = 1 * time.Minute`: Sets the default interval at which the score of a peer will be decayed.
+14. `defaultDecayToZero = 0.01`: This is a threshold below which a decayed score is reset to zero. It prevents the score from decaying to a very small value.
+15. `defaultTopicTimeInMeshQuantum` is a parameter in the GossipSub scoring system that represents a fixed time interval used to count the amount of time a peer stays in a topic mesh. It is set to 1 hour, meaning that for each hour a peer remains in a topic mesh, its time-in-mesh counter increases by 1, contributing to its availability score. This is to reward peers that stay in the mesh for longer durations and discourage those that frequently join and leave.
+16. `defaultTopicInvalidMessageDeliveriesWeight` is set to -1.0 and is used to penalize peers that send invalid messages by applying it to the square of the number of such messages. A message is considered invalid if it is not properly signed. A peer will be disconnected if it sends around 14 invalid messages within a gossipsub heartbeat interval.
+17. `defaultTopicInvalidMessageDeliveriesDecay` is a decay factor set to 0.99. It is used to reduce the number of invalid message deliveries counted against a peer by 1% at each heartbeat interval. This prevents the peer from being disconnected if it stops sending invalid messages. The heartbeat interval in the gossipsub scoring system is set to 1 minute by default.
+
 ## Customization
 The scoring mechanism can be easily customized to suit the needs of the Flow network. This includes changing the scoring parameters, thresholds, and the scoring function itself.
 You can customize the scoring parameters and thresholds by using the various setter methods provided in the `ScoreOptionConfig` object. Additionally, you can provide a custom app-specific scoring function through the `SetAppSpecificScoreFunction` method.

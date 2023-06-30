@@ -341,12 +341,9 @@ func (builder *LibP2PNodeBuilder) Build() (p2p.LibP2PNode, error) {
 			builder.gossipSubBuilder.SetRoutingSystem(routingSystem)
 
 			// gossipsub is created here, because it needs to be created during the node startup.
-			gossipSub, scoreTracer, err := builder.gossipSubBuilder.Build(ctx)
+			gossipSub, err := builder.gossipSubBuilder.Build(ctx)
 			if err != nil {
 				ctx.Throw(fmt.Errorf("could not create gossipsub: %w", err))
-			}
-			if scoreTracer != nil {
-				node.SetPeerScoreExposer(scoreTracer)
 			}
 			node.SetPubSub(gossipSub)
 			gossipSub.Start(ctx)
