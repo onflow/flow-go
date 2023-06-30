@@ -1,7 +1,10 @@
 package routes
 
 import (
+	"fmt"
 	"net/http"
+	"regexp"
+	"strings"
 
 	"github.com/gorilla/mux"
 	"github.com/rs/zerolog"
@@ -21,7 +24,7 @@ func NewRouter(backend access.API, logger zerolog.Logger, chain flow.Chain, rest
 	v1SubRouter.Use(middleware.LoggingMiddleware(logger))
 	v1SubRouter.Use(middleware.QueryExpandable())
 	v1SubRouter.Use(middleware.QuerySelect())
-	v1SubRouter.Use(middleware.MetricsMiddleware(restCollector))
+	v1SubRouter.Use(middleware.MetricsMiddleware(restCollector, URLToRoute))
 
 	linkGenerator := models.NewLinkGeneratorImpl(v1SubRouter)
 
@@ -114,3 +117,59 @@ var Routes = []route{{
 	Name:    "getNodeVersionInfo",
 	Handler: GetNodeVersionInfo,
 }}
+
+var routeUrlMap = map[string]string{}
+var routeRE = regexp.MustCompile(`(?i)/v1/(\w+)(/(\w+)(/(\w+))?)?`)
+
+func init() {
+	for _, r := range Routes {
+		routeUrlMap[r.Pattern] = r.Name
+	}
+}
+
+func URLToRoute(url string) (string, error) {
+	normalized, err := normalizeURL(url)
+	if err != nil {
+		return "", err
+	}
+
+	name, ok := routeUrlMap[normalized]
+	if !ok {
+		return "", fmt.Errorf("invalid url")
+	}
+	return name, nil
+}
+
+func normalizeURL(url string) (string, error) {
+	matches := routeRE.FindAllStringSubmatch(url, -1)
+	if len(matches) != 1 || len(matches[0]) != 6 {
+		return "", fmt.Errorf("invalid url")
+	}
+
+	// given a URL like
+	//      /v1/blocks/1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef/payload
+	// groups  [  1  ] [                                3                             ] [  5  ]
+	// normalized form like /v1/blocks/{id}/payload
+
+	parts := []string{matches[0][1]}
+
+	switch len(matches[0][3]) {
+	case 0:
+		// top level resource. e.g. /v1/blocks
+	case 64:
+		// id based resource. e.g. /v1/blocks/1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef
+		parts = append(parts, "{id}")
+	case 16:
+		// address based resource. e.g. /v1/accounts/1234567890abcdef
+		parts = append(parts, "{address}")
+	default:
+		// named resource. e.g. /v1/network/parameters
+		parts = append(parts, matches[0][3])
+	}
+
+	if matches[0][5] != "" {
+		parts = append(parts, matches[0][5])
+	}
+
+	return "/" + strings.Join(parts, "/"), nil
+}

@@ -7,7 +7,7 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/onflow/flow-go/network/channels"
-	"github.com/onflow/flow-go/network/p2p"
+	p2pmsg "github.com/onflow/flow-go/network/p2p/message"
 )
 
 // TestErrActiveClusterIDsNotSetRoundTrip ensures correct error formatting for ErrActiveClusterIdsNotSet.
@@ -29,7 +29,7 @@ func TestErrActiveClusterIDsNotSetRoundTrip(t *testing.T) {
 
 // TestErrHardThresholdRoundTrip ensures correct error formatting for ErrHardThreshold.
 func TestErrHardThresholdRoundTrip(t *testing.T) {
-	controlMsg := p2p.CtrlMsgGraft
+	controlMsg := p2pmsg.CtrlMsgGraft
 	amount := uint64(100)
 	hardThreshold := uint64(500)
 	err := NewHardThresholdErr(controlMsg, amount, hardThreshold)
@@ -48,7 +48,7 @@ func TestErrHardThresholdRoundTrip(t *testing.T) {
 
 // TestErrRateLimitedControlMsgRoundTrip ensures correct error formatting for ErrRateLimitedControlMsg.
 func TestErrRateLimitedControlMsgRoundTrip(t *testing.T) {
-	controlMsg := p2p.CtrlMsgGraft
+	controlMsg := p2pmsg.CtrlMsgGraft
 	err := NewRateLimitedControlMsgErr(controlMsg)
 
 	// tests the error message formatting.

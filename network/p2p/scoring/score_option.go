@@ -126,21 +126,14 @@ type ScoreOptionConfig struct {
 	registerNotificationConsumerFunc func(p2p.GossipSubInvCtrlMsgNotifConsumer)
 }
 
-func NewScoreOptionConfig(logger zerolog.Logger) *ScoreOptionConfig {
+func NewScoreOptionConfig(logger zerolog.Logger, idProvider module.IdentityProvider) *ScoreOptionConfig {
 	return &ScoreOptionConfig{
 		logger:       logger,
+		provider:     idProvider,
 		cacheSize:    defaultScoreCacheSize,
 		cacheMetrics: metrics.NewNoopCollector(), // no metrics by default
 		topicParams:  make([]func(map[string]*pubsub.TopicScoreParams), 0),
 	}
-}
-
-// SetProvider sets the identity provider for the penalty option.
-// It is used to retrieve the identity of a peer when calculating the app specific penalty.
-// If the provider is not set, the penalty registry will crash. This is a required field.
-// It is safe to call this method multiple times, the last call will be used.
-func (c *ScoreOptionConfig) SetProvider(provider module.IdentityProvider) {
-	c.provider = provider
 }
 
 // SetCacheSize sets the size of the cache used to store the app specific penalty of peers.
