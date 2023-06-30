@@ -381,10 +381,6 @@ func testAddRemoveEntities(t *testing.T, limit uint32, entityCount uint32, eject
 	for id, indexInThePool := range insertedEntities {
 		flowIndentifier, _, ownerIdActual := pool.Get(indexInThePool)
 		require.Equal(t, flowIndentifier, id, "Pool contains an unexpected entity")
-		tmp := ownerIdToIndex[ownerIdActual]
-		if entities[tmp].Identifier != id {
-			fmt.Print(" ")
-		}
 		require.Equal(t, entities[ownerIdToIndex[ownerIdActual]].Identifier, id, "Pool contains an entity with an unexpected owner id")
 	}
 }
