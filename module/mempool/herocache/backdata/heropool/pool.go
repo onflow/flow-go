@@ -68,7 +68,7 @@ type Pool struct {
 func NewHeroPool(sizeLimit uint32, ejectionMode EjectionMode) *Pool {
 	l := &Pool{
 		//constructor for states make them invalid
-		states:       make([]state, numberOfStates),
+		states:       NewStates(numberOfStates),
 		poolEntities: make([]poolEntity, sizeLimit),
 		ejectionMode: ejectionMode,
 	}

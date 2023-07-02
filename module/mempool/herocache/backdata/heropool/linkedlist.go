@@ -15,3 +15,11 @@ type state struct {
 	tail EIndex
 	size uint32
 }
+
+func NewStates(numberOfStates int) []state {
+	result := make([]state, numberOfStates)
+	for i := 1; i < numberOfStates; i++ {
+		result[i] = state{head: InvalidIndex, tail: InvalidIndex, size: 0}
+	}
+	return result
+}
