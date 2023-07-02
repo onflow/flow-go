@@ -15,9 +15,12 @@ const (
 	NoEjection     = EjectionMode("no-ejection")
 )
 
+// StateIndex is a type of a state of a placeholder in a pool.
+type StateIndex uint
+
 const numberOfStates = 2
 const ( // iota is reset to 0
-	stateFree uint32 = iota
+	stateFree StateIndex = iota
 	stateUsed
 )
 
@@ -26,15 +29,6 @@ type EIndex uint32
 
 // InvalidIndex is used when a link doesnt point anywhere, in other words it is an equivalent of a nil adress.
 const InvalidIndex EIndex = math.MaxUint32
-
-// A type dedicated to describe possible states of placeholders for entities in the pool.
-type StateType string
-
-// A placeholder in a free state can be used to store an entity.
-const stateFree StateType = "free-state"
-
-// A placeholder in a used state stores currently an entity.
-const stateUsed StateType = "used-state"
 
 // poolEntity represents the data type that is maintained by
 type poolEntity struct {
@@ -268,74 +262,58 @@ func (p Pool) isInvalidated(sliceIndex EIndex) bool {
 	return true
 }
 
-// a helper method that allows to get an adress fo the state form the state type.
-func (p *Pool) getStateFromType(stateType StateType) *state {
-	var s *state = nil
-	switch stateType {
-	case stateFree:
-		s = &p.free
-	case stateUsed:
-		s = &p.used
-	default:
-		panic("Unknown state type")
-	}
-	return s
-}
-
 // utility method that removes an entity from one of the states.
 // NOTE: a removed entity has to be added to another state.
-func (p *Pool) removeEntity(stateType StateType, entityIndex EIndex) {
-	var s *state = p.getStateFromType(stateType)
-	if s.size == 0 {
+func (p *Pool) removeEntity(stateType StateIndex, entityIndex EIndex) {
+	if p.states[stateType].size == 0 {
 		panic("Removing an entity from an empty list")
 	}
-	if s.size == 1 {
+	if p.states[stateType].size == 1 {
 		// here set to InvalidIndex
-		s.head = InvalidIndex
-		s.tail = InvalidIndex
-		s.size--
+		p.states[stateType].head = InvalidIndex
+		p.states[stateType].tail = InvalidIndex
+		p.states[stateType].size--
 		p.poolEntities[entityIndex].node.next = InvalidIndex
 		p.poolEntities[entityIndex].node.prev = InvalidIndex
 		return
 	}
 	node := p.poolEntities[entityIndex].node
 
-	if entityIndex != s.head && entityIndex != s.tail {
+	if entityIndex != p.states[stateType].head && entityIndex != p.states[stateType].tail {
 		// links next and prev elements for non-head and non-tail element
 		p.connect(node.prev, node.next)
 	}
 
-	if entityIndex == s.head {
+	if entityIndex == p.states[stateType].head {
 		// moves head forward
-		s.head = node.next
-		p.poolEntities[s.head].node.prev = InvalidIndex
+		p.states[stateType].head = node.next
+		p.poolEntities[p.states[stateType].head].node.prev = InvalidIndex
 	}
 
-	if entityIndex == s.tail {
+	if entityIndex == p.states[stateType].tail {
 		// moves tail backwards
-		s.tail = node.prev
-		p.poolEntities[s.tail].node.next = InvalidIndex
+		p.states[stateType].tail = node.prev
+		p.poolEntities[p.states[stateType].tail].node.next = InvalidIndex
 	}
-	s.size--
+	p.states[stateType].size--
 	p.poolEntities[entityIndex].node.next = InvalidIndex
 	p.poolEntities[entityIndex].node.prev = InvalidIndex
 }
 
 // appends an entity to the tail of the state or creates a first element.
 // NOTE: entity should not be in any list before this method is applied
-func (p *Pool) appendEntity(stateType StateType, entityIndex EIndex) {
-	var s *state = p.getStateFromType(stateType)
+func (p *Pool) appendEntity(stateType StateIndex, entityIndex EIndex) {
 
-	if s.size == 0 {
-		s.head = entityIndex
-		s.tail = entityIndex
-		p.poolEntities[s.head].node.prev = InvalidIndex
-		p.poolEntities[s.tail].node.next = InvalidIndex
-		s.size = 1
+	if p.states[stateType].size == 0 {
+		p.states[stateType].head = entityIndex
+		p.states[stateType].tail = entityIndex
+		p.poolEntities[p.states[stateType].head].node.prev = InvalidIndex
+		p.poolEntities[p.states[stateType].tail].node.next = InvalidIndex
+		p.states[stateType].size = 1
 		return
 	}
-	p.connect(s.tail, entityIndex)
-	s.size++
-	s.tail = entityIndex
-	p.poolEntities[s.tail].node.next = InvalidIndex
+	p.connect(p.states[stateType].tail, entityIndex)
+	p.states[stateType].size++
+	p.states[stateType].tail = entityIndex
+	p.poolEntities[p.states[stateType].tail].node.next = InvalidIndex
 }

@@ -470,8 +470,8 @@ func testInvalidatingHead(t *testing.T, pool *Pool, entities []*unittest.MockEnt
 			require.Nil(t, usedHead)
 			require.Nil(t, usedTail)
 			require.True(t, pool.states[stateUsed].size == 0)
-			require.Equal(t, pool.used.tail, InvalidIndex)
-			require.Equal(t, pool.used.head, InvalidIndex)
+			require.Equal(t, pool.states[stateUsed].tail, InvalidIndex)
+			require.Equal(t, pool.states[stateUsed].head, InvalidIndex)
 		}
 		checkEachEntityIsInFreeOrUsedState(t, pool)
 	}
@@ -558,8 +558,8 @@ func testInvalidatingTail(t *testing.T, pool *Pool, entities []*unittest.MockEnt
 			require.Nil(t, usedHead)
 			require.Nil(t, usedTail)
 			require.True(t, pool.states[stateUsed].size == 0)
-			require.Equal(t, pool.used.head, InvalidIndex)
-			require.Equal(t, pool.used.tail, InvalidIndex)
+			require.Equal(t, pool.states[stateUsed].head, InvalidIndex)
+			require.Equal(t, pool.states[stateUsed].tail, InvalidIndex)
 		}
 		checkEachEntityIsInFreeOrUsedState(t, pool)
 	}
@@ -569,8 +569,8 @@ func testInvalidatingTail(t *testing.T, pool *Pool, entities []*unittest.MockEnt
 func testInitialization(t *testing.T, pool *Pool, _ []*unittest.MockEntity) {
 	// "used" linked-list must have a zero size, since we have no elements in the list.
 	require.True(t, pool.states[stateUsed].size == 0)
-	require.Equal(t, pool.used.head, InvalidIndex)
-	require.Equal(t, pool.used.tail, InvalidIndex)
+	require.Equal(t, pool.states[stateUsed].head, InvalidIndex)
+	require.Equal(t, pool.states[stateUsed].tail, InvalidIndex)
 
 	for i := 0; i < len(pool.poolEntities); i++ {
 		if i == 0 {
@@ -879,7 +879,7 @@ func headAccessibleFromTail(t *testing.T, headSliceIndex EIndex, tailSliceIndex 
 func checkEachEntityIsInFreeOrUsedState(t *testing.T, pool *Pool) {
 	pool_capacity := len(pool.poolEntities)
 	// check size
-	require.Equal(t, int(pool.free.size+pool.used.size), pool_capacity, "Pool capacity is not equal to the sum of used and free sizes")
+	require.Equal(t, int(pool.states[stateFree].size+pool.states[stateUsed].size), pool_capacity, "Pool capacity is not equal to the sum of used and free sizes")
 	// check elelments
 	nodesInFree := discoverEntitiesBelongingToStateList(t, pool, stateFree)
 	nodesInUsed := discoverEntitiesBelongingToStateList(t, pool, stateUsed)
@@ -890,10 +890,9 @@ func checkEachEntityIsInFreeOrUsedState(t *testing.T, pool *Pool) {
 }
 
 // discoverEntitiesBelongingToStateList discovers all entities in the pool that belong to the given list.
-func discoverEntitiesBelongingToStateList(t *testing.T, pool *Pool, stateType StateType) []bool {
-	s := pool.getStateFromType(stateType)
+func discoverEntitiesBelongingToStateList(t *testing.T, pool *Pool, stateType StateIndex) []bool {
 	result := make([]bool, len(pool.poolEntities))
-	for node_index := s.head; node_index != InvalidIndex; {
+	for node_index := pool.states[stateType].head; node_index != InvalidIndex; {
 		require.False(t, result[node_index], "A node is present two times in the same state list")
 		result[node_index] = true
 		node_index = pool.poolEntities[node_index].node.next
