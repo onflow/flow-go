@@ -589,9 +589,14 @@ func convertParticipants(cdcParticipants []cadence.Value) (flow.IdentityList, er
 		}
 
 		identity := &flow.Identity{
-			Address: string(address),
-			Weight:  uint64(initialWeight),
-			Role:    flow.Role(role),
+			IdentitySkeleton: flow.IdentitySkeleton{
+				InitialWeight: uint64(initialWeight),
+				Address:       string(address),
+				Role:          flow.Role(role),
+			},
+			DynamicIdentity: flow.DynamicIdentity{
+				Weight: uint64(initialWeight),
+			},
 		}
 
 		// convert nodeID string into identifier
