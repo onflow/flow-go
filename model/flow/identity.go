@@ -27,8 +27,8 @@ const DefaultInitialWeight = 100
 // rxid is the regex for parsing node identity entries.
 var rxid = regexp.MustCompile(`^(collection|consensus|execution|verification|access)-([0-9a-fA-F]{64})@([\w\d]+|[\w\d][\w\d\-]*[\w\d](?:\.*[\w\d][\w\d\-]*[\w\d])*|[\w\d][\w\d\-]*[\w\d])(:[\d]+)?=(\d{1,20})$`)
 
-// Identity represents the public identity of one network participant (node).
-type Identity struct {
+// IdentitySkeleton represents the static part of public identity of one network participant (node).
+type IdentitySkeleton struct {
 	// NodeID uniquely identifies a particular node. A node's ID is fixed for
 	// the duration of that node's participation in the network.
 	NodeID Identifier
@@ -37,9 +37,18 @@ type Identity struct {
 	// Role is the node's role in the network and defines its abilities and
 	// responsibilities.
 	Role Role
+	// InitialWeight is a 'trust score' initially assigned by EpochSetup event after
+	// the staking phase. The initial weights define the supermajority thresholds for
+	// the cluster and security node consensus throughout the Epoch.
+	InitialWeight uint64
+	StakingPubKey crypto.PublicKey
+	NetworkPubKey crypto.PublicKey
+}
+
+// DynamicIdentity represents the dynamic part of public identity of one network participant (node).
+type DynamicIdentity struct {
 	// Weight represents the node's authority to perform certain tasks relative
-	// to other nodes. For example, in the consensus committee, the node's weight
-	// represents the weight assigned to its votes.
+	// to other nodes.
 	//
 	// A node's weight is distinct from its stake. Stake represents the quantity
 	// of FLOW tokens held by the network in escrow during the course of the node's
@@ -48,17 +57,22 @@ type Identity struct {
 	//
 	// Nodes which are registered to join at the next epoch will appear in the
 	// identity table but are considered to have zero weight up until their first
-	// epoch begins. Likewise nodes which were registered in the previous epoch
+	// epoch begins. Likewise, nodes which were registered in the previous epoch
 	// but have left at the most recent epoch boundary will appear in the identity
 	// table with zero weight.
 	Weight uint64
 	// Ejected represents whether a node has been permanently removed from the
 	// network. A node may be ejected for either:
-	// * committing one protocol felony
-	// * committing a series of protocol misdemeanours
-	Ejected       bool
-	StakingPubKey crypto.PublicKey
-	NetworkPubKey crypto.PublicKey
+	// * request self-ejection to protect its stake in case the node operator suspects
+	//   the node's keys to be compromised
+	// * committing a serious protocol violation or multiple smaller misdemeanours
+	Ejected bool
+}
+
+// Identity is combined from static and dynamic part and represents the full public identity of one network participant (node).
+type Identity struct {
+	IdentitySkeleton
+	DynamicIdentity
 }
 
 // ParseIdentity parses a string representation of an identity.
@@ -82,10 +96,15 @@ func ParseIdentity(identity string) (*Identity, error) {
 
 	// create the identity
 	iy := Identity{
-		NodeID:  nodeID,
-		Address: address,
-		Role:    role,
-		Weight:  weight,
+		IdentitySkeleton: IdentitySkeleton{
+			NodeID:        nodeID,
+			Address:       address,
+			Role:          role,
+			InitialWeight: weight,
+		},
+		DynamicIdentity: DynamicIdentity{
+			Weight: weight,
+		},
 	}
 
 	return &iy, nil
@@ -563,7 +582,7 @@ func (il IdentityList) Exists(target *Identity) bool {
 // target:  value to search for
 // CAUTION:  The identity list MUST be sorted prior to calling this method
 func (il IdentityList) IdentifierExists(target Identifier) bool {
-	_, ok := slices.BinarySearchFunc(il, &Identity{NodeID: target}, func(a, b *Identity) int {
+	_, ok := slices.BinarySearchFunc(il, &Identity{IdentitySkeleton: IdentitySkeleton{NodeID: target}}, func(a, b *Identity) int {
 		return bytes.Compare(a.NodeID[:], b.NodeID[:])
 	})
 	return ok
