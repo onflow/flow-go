@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/onflow/flow-go/model/flow"
 	libp2pmsg "github.com/onflow/flow-go/model/libp2p/message"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	mockmodule "github.com/onflow/flow-go/module/mock"
@@ -36,18 +37,14 @@ func TestFindPeerWithDHT(t *testing.T) {
 	golog.SetAllLoggers(golog.LevelFatal) // change this to Debug if libp2p logs are needed
 
 	sporkId := unittest.IdentifierFixture()
-	idProvider := mockmodule.NewIdentityProvider(t)
+	idProvider := unittest.NewUpdatableIDProvider(flow.IdentityList{})
 	dhtServerNodes, serverIDs := p2ptest.NodesFixture(t, sporkId, "dht_test", 2, idProvider, p2ptest.WithDHTOptions(dht.AsServer()))
 	require.Len(t, dhtServerNodes, 2)
 
 	dhtClientNodes, clientIDs := p2ptest.NodesFixture(t, sporkId, "dht_test", count-2, idProvider, p2ptest.WithDHTOptions(dht.AsClient()))
 
-	ids := append(serverIDs, clientIDs...)
 	nodes := append(dhtServerNodes, dhtClientNodes...)
-	for i, node := range nodes {
-		idProvider.On("ByPeerID", node.Host().ID()).Return(&ids[i], true).Maybe()
-
-	}
+	idProvider.SetIdentities(append(serverIDs, clientIDs...))
 	p2ptest.StartNodes(t, signalerCtx, nodes, 100*time.Millisecond)
 	defer p2ptest.StopNodes(t, nodes, cancel, 100*time.Millisecond)
 
