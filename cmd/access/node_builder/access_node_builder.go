@@ -1212,6 +1212,8 @@ func (builder *FlowAccessNodeBuilder) initPublicLibp2pNode(networkKey crypto.Pri
 		&builder.FlowConfig.NetworkConfig.ResourceManagerConfig,
 		&builder.FlowConfig.NetworkConfig.GossipSubConfig.GossipSubRPCInspectorsConfig,
 		&p2pconfig.PeerManagerConfig{
+			// TODO: eventually, we need pruning enabled even on public network. However, it needs a modified version of
+			// the peer manager that also operate on the public identities.
 			ConnectionPruning: connection.PruningDisabled,
 			UpdateInterval:    builder.FlowConfig.NetworkConfig.PeerUpdateInterval,
 			ConnectorFactory:  connection.DefaultLibp2pBackoffConnectorFactory(),
