@@ -11,9 +11,9 @@ import (
 	"github.com/onflow/flow-go/module/irrecoverable"
 	mockmodule "github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/network"
-	"github.com/onflow/flow-go/network/internal/testutils"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/connection"
+	p2pconfig "github.com/onflow/flow-go/network/p2p/p2pbuilder/config"
 	p2ptest "github.com/onflow/flow-go/network/p2p/test"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -35,11 +35,15 @@ func TestDisconnectingFromDisallowListedNode(t *testing.T) {
 		sporkID,
 		t.Name(),
 		idProvider,
-		p2ptest.WithPeerManagerEnabled(true, connection.DefaultPeerUpdateInterval,
+		p2ptest.WithPeerManagerEnabled(&p2pconfig.PeerManagerConfig{
+			ConnectionPruning: true,
+			UpdateInterval:    connection.DefaultPeerUpdateInterval,
+			ConnectorFactory:  connection.DefaultLibp2pBackoffConnectorFactory(),
+		},
 			func() peer.IDSlice {
 				return peerIDSlice
 			}),
-		p2ptest.WithConnectionGater(testutils.NewConnectionGater(idProvider, func(p peer.ID) error {
+		p2ptest.WithConnectionGater(p2ptest.NewConnectionGater(idProvider, func(p peer.ID) error {
 			// allow all the connections, except for the ones that are disallow-listed, which are determined when
 			// this connection gater object queries the disallow listing oracle that will be provided to it by
 			// the libp2p node. So, here, we don't need to do anything except just enabling the connection gater.
