@@ -201,7 +201,6 @@ func TestOneToKCrosstalkPrevention(t *testing.T) {
 		idProvider,
 	)
 
-	// idProvider.On("ByPeerID", node1.Host().ID()).Return(&id1, true).Maybe()
 	p2ptest.StartNode(t, signalerCtx1, node1, 100*time.Millisecond)
 	defer p2ptest.StopNode(t, node1, cancel1, 100*time.Millisecond)
 	idProvider.SetIdentities(flow.IdentityList{&id1})
