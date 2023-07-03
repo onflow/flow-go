@@ -50,7 +50,7 @@ func DeployViewResolverContractTransaction(nonFungibleToken flow.Address) *flow.
 }
 
 func DeployFungibleTokenMetadataViewsContractTransaction(fungibleToken, nonFungibleToken flow.Address) *flow.TransactionBody {
-	contract := contracts.FungibleTokenMetadataViews(fungibleToken.HexWithPrefix(), nonFungibleToken.HexWithPrefix())
+	contract := contracts.FungibleTokenMetadataViews(fungibleToken.Hex(), nonFungibleToken.Hex())
 	contractName := "FungibleTokenMetadataViews"
 	return DeployContractTransaction(
 		fungibleToken,
@@ -68,7 +68,7 @@ var createFlowTokenMinterTransactionTemplate string
 var mintFlowTokenTransactionTemplate string
 
 func DeployFlowTokenContractTransaction(service, fungibleToken, metadataViews, flowToken flow.Address) *flow.TransactionBody {
-	contract := contracts.FlowToken(fungibleToken.HexWithPrefix())
+	contract := contracts.FlowToken(fungibleToken.HexWithPrefix(), metadataViews.HexWithPrefix(), metadataViews.HexWithPrefix())
 
 	return flow.NewTransactionBody().
 		SetScript([]byte(deployFlowTokenTransactionTemplate)).
