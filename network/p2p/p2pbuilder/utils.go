@@ -97,7 +97,7 @@ func (l *limitConfigLogger) logGlobalResourceLimits(config rcmgr.PartialLimitCon
 
 func (l *limitConfigLogger) logServiceLimits(s map[string]rcmgr.ResourceLimits) {
 	for sName, sLimits := range s {
-		lg := l.withBaseLimit(fmt.Sprintf("service_%s", sName), sLimits)
+		lg := l.withBaseLimit(fmt.Sprintf("service_%s", sName), sLimits.)
 		lg.Info().Msg("service limits set")
 	}
 }
