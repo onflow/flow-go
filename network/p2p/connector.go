@@ -3,18 +3,36 @@ package p2p
 import (
 	"context"
 
+	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/peer"
 )
 
-// Connector connects to peer and disconnects from peer using the underlying networking library
-type Connector interface {
+// PeerUpdater connects to the given peer.IDs. It also disconnects from any other peers with which it may have
+// previously established connection.
+type PeerUpdater interface {
 	// UpdatePeers connects to the given peer.IDs. It also disconnects from any other peers with which it may have
 	// previously established connection.
 	// UpdatePeers implementation should be idempotent such that multiple calls to connect to the same peer should not
 	// create multiple connections
 	UpdatePeers(ctx context.Context, peerIDs peer.IDSlice)
 }
+
+// Connector is an interface that allows connecting to a peer.ID.
+type Connector interface {
+	// Connect connects to the given peer.ID.
+	// Note that connection may be established asynchronously. Any error encountered while connecting to the peer.ID
+	// is benign and should not be returned. Also, Connect implementation should not cause any blocking or crash.
+	// Args:
+	// 	ctx: context.Context to be used for the connection
+	// 	peerChan: channel to which the peer.AddrInfo of the connected peer.ID is sent.
+	// Returns:
+	//  none.
+	Connect(ctx context.Context, peerChan <-chan peer.AddrInfo)
+}
+
+// ConnectorFactory is a factory function to create a new Connector.
+type ConnectorFactory func(host host.Host) (Connector, error)
 
 type PeerFilter func(peer.ID) error
 
