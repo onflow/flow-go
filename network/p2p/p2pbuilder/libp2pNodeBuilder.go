@@ -238,7 +238,6 @@ func (builder *LibP2PNodeBuilder) Build() (p2p.LibP2PNode, error) {
 	} else {
 		// setting up default resource manager, by hooking in the resource manager metrics reporter.
 		limits := rcmgr.DefaultLimits
-
 		libp2p.SetDefaultServiceLimits(&limits)
 
 		mem, err := allowedMemory(builder.resourceManagerCfg.MemoryLimitRatio)
