@@ -116,7 +116,7 @@ func NewTagWatchingConnManager(log zerolog.Logger, metrics module.LibP2PConnecti
 
 // LibP2PNodeForMiddlewareFixture is a test helper that generate flow identities with a valid port and libp2p nodes.
 // Note that the LibP2PNode created by this fixture is meant to used with a middleware component.
-// If you want to create a LibP2PNode for testing purpose, please use p2ptest.NodeFixture.
+// If you want to create a standalone LibP2PNode without network and middleware components, please use p2ptest.NodeFixture.
 // Args:
 //
 //	t: testing.T- the test object
