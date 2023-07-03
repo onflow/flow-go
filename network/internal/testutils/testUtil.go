@@ -141,7 +141,8 @@ func LibP2PNodeForMiddlewareFixture(t *testing.T, n int, opts ...p2ptest.NodeFix
 	opts = append(opts, p2ptest.WithUnicastHandlerFunc(nil))
 
 	for i := 0; i < n; i++ {
-		// TODO: this can be moved to a separate function, only a few tests need this.
+		// TODO: generating a tag watching connection manager can be moved to a separate function, as only a few tests need this.
+		// For the rest of tests, the node can run on the default connection manager without setting and option.
 		connManager, err := NewTagWatchingConnManager(unittest.Logger(), metrics.NewNoopCollector(), &defaultFlowConfig.NetworkConfig.ConnectionManagerConfig)
 		require.NoError(t, err)
 
