@@ -190,9 +190,7 @@ func TestGossipSubScoreTracer(t *testing.T) {
 	// IP score, and an existing mesh score.
 	assert.Eventually(t, func() bool {
 		// we expect the tracerNode to have the consensusNodes and accessNodes with the correct app scores.
-		exposer, ok := tracerNode.PeerScoreExposer()
-		require.True(t, ok)
-
+		exposer := tracerNode.PeerScoreExposer()
 		score, ok := exposer.GetAppScore(consensusNode.Host().ID())
 		if !ok || score != consensusScore {
 			return false

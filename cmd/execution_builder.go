@@ -848,6 +848,7 @@ func (exeNode *ExecutionNode) LoadIngestionEngine(
 		exeNode.executionDataPruner,
 		exeNode.blockDataUploader,
 		exeNode.stopControl,
+		exeNode.exeConf.onflowOnlyLNs,
 	)
 
 	// TODO: we should solve these mutual dependencies better
