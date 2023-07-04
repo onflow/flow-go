@@ -93,7 +93,7 @@ func ComputeLeaderSelection(
 	firstView uint64,
 	rng random.Rand,
 	count int,
-	identities flow.IdentityList,
+	identities flow.IdentitySkeletonList,
 ) (*LeaderSelection, error) {
 
 	if count < 1 {
@@ -102,7 +102,7 @@ func ComputeLeaderSelection(
 
 	weights := make([]uint64, 0, len(identities))
 	for _, id := range identities {
-		weights = append(weights, id.Weight)
+		weights = append(weights, id.InitialWeight)
 	}
 
 	leaders, err := weightedRandomSelection(rng, count, weights)

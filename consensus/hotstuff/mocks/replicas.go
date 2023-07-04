@@ -41,7 +41,7 @@ func (_m *Replicas) DKG(view uint64) (hotstuff.DKG, error) {
 }
 
 // IdentitiesByEpoch provides a mock function with given fields: view
-func (_m *Replicas) IdentitiesByEpoch(view uint64) (flow.IdentityList, error) {
+func (_m *Replicas) IdentitiesByEpoch(view uint64) (flow.IdentitySkeletonList, error) {
 	ret := _m.Called(view)
 
 	var r0 flow.IdentityList
@@ -67,7 +67,7 @@ func (_m *Replicas) IdentitiesByEpoch(view uint64) (flow.IdentityList, error) {
 }
 
 // IdentityByEpoch provides a mock function with given fields: view, participantID
-func (_m *Replicas) IdentityByEpoch(view uint64, participantID flow.Identifier) (*flow.Identity, error) {
+func (_m *Replicas) IdentityByEpoch(view uint64, participantID flow.Identifier) (*flow.IdentitySkeleton, error) {
 	ret := _m.Called(view, participantID)
 
 	var r0 *flow.Identity

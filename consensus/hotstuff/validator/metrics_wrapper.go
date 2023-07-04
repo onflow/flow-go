@@ -47,7 +47,7 @@ func (w ValidatorMetricsWrapper) ValidateProposal(proposal *model.Proposal) erro
 	return err
 }
 
-func (w ValidatorMetricsWrapper) ValidateVote(vote *model.Vote) (*flow.Identity, error) {
+func (w ValidatorMetricsWrapper) ValidateVote(vote *model.Vote) (*flow.IdentitySkeleton, error) {
 	processStart := time.Now()
 	identity, err := w.validator.ValidateVote(vote)
 	w.metrics.ValidatorProcessingDuration(time.Since(processStart))

@@ -130,7 +130,7 @@ func (c *Cluster) IdentityByBlock(blockID flow.Identifier, nodeID flow.Identifie
 // IdentitiesByEpoch returns the initial cluster members for this epoch. The view
 // parameter is the view in the cluster consensus. Since clusters only exist for
 // one epoch, we don't need to check the view.
-func (c *Cluster) IdentitiesByEpoch(_ uint64) (flow.IdentityList, error) {
+func (c *Cluster) IdentitiesByEpoch(view uint64) (flow.IdentitySkeletonList, error) {
 	return c.initialClusterMembers, nil
 }
 
@@ -141,7 +141,7 @@ func (c *Cluster) IdentitiesByEpoch(_ uint64) (flow.IdentityList, error) {
 // Returns:
 //   - model.InvalidSignerError if nodeID was not listed by the Epoch Setup event as an
 //     authorized participant in this cluster
-func (c *Cluster) IdentityByEpoch(_ uint64, nodeID flow.Identifier) (*flow.Identity, error) {
+func (c *Cluster) IdentityByEpoch(view uint64, participantID flow.Identifier) (*flow.IdentitySkeleton, error) {
 	identity, ok := c.initialClusterMembers.ByNodeID(nodeID)
 	if !ok {
 		return nil, model.NewInvalidSignerErrorf("node %v is not an authorized hotstuff participant", nodeID)

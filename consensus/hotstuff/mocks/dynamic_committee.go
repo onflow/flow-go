@@ -67,7 +67,7 @@ func (_m *DynamicCommittee) IdentitiesByBlock(blockID flow.Identifier) (flow.Ide
 }
 
 // IdentitiesByEpoch provides a mock function with given fields: view
-func (_m *DynamicCommittee) IdentitiesByEpoch(view uint64) (flow.IdentityList, error) {
+func (_m *DynamicCommittee) IdentitiesByEpoch(view uint64) (flow.IdentitySkeletonList, error) {
 	ret := _m.Called(view)
 
 	var r0 flow.IdentityList
@@ -119,7 +119,7 @@ func (_m *DynamicCommittee) IdentityByBlock(blockID flow.Identifier, participant
 }
 
 // IdentityByEpoch provides a mock function with given fields: view, participantID
-func (_m *DynamicCommittee) IdentityByEpoch(view uint64, participantID flow.Identifier) (*flow.Identity, error) {
+func (_m *DynamicCommittee) IdentityByEpoch(view uint64, participantID flow.Identifier) (*flow.IdentitySkeleton, error) {
 	ret := _m.Called(view, participantID)
 
 	var r0 *flow.Identity

@@ -857,11 +857,11 @@ func (s *RoundRobinLeaderSelection) IdentityByBlock(_ flow.Identifier, participa
 	return id, nil
 }
 
-func (s *RoundRobinLeaderSelection) IdentitiesByEpoch(_ uint64) (flow.IdentityList, error) {
+func (s *RoundRobinLeaderSelection) IdentitiesByEpoch(view uint64) (flow.IdentitySkeletonList, error) {
 	return s.identities, nil
 }
 
-func (s *RoundRobinLeaderSelection) IdentityByEpoch(_ uint64, participantID flow.Identifier) (*flow.Identity, error) {
+func (s *RoundRobinLeaderSelection) IdentityByEpoch(view uint64, participantID flow.Identifier) (*flow.IdentitySkeleton, error) {
 	id, found := s.identities.ByNodeID(participantID)
 	if !found {
 		return nil, model.NewInvalidSignerErrorf("unknown participant %x", participantID)

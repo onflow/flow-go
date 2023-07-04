@@ -58,7 +58,7 @@ func (_m *Validator) ValidateTC(tc *flow.TimeoutCertificate) error {
 }
 
 // ValidateVote provides a mock function with given fields: vote
-func (_m *Validator) ValidateVote(vote *model.Vote) (*flow.Identity, error) {
+func (_m *Validator) ValidateVote(vote *model.Vote) (*flow.IdentitySkeleton, error) {
 	ret := _m.Called(vote)
 
 	var r0 *flow.Identity

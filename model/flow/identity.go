@@ -394,6 +394,14 @@ func (il IdentityList) Selector() IdentityFilter {
 	}
 }
 
+func (il IdentitySkeletonList) Lookup() map[Identifier]*IdentitySkeleton {
+	lookup := make(map[Identifier]*IdentitySkeleton, len(il))
+	for _, identity := range il {
+		lookup[identity.NodeID] = identity
+	}
+	return lookup
+}
+
 func (il IdentityList) Lookup() map[Identifier]*Identity {
 	lookup := make(map[Identifier]*Identity, len(il))
 	for _, identity := range il {
@@ -425,8 +433,17 @@ func (il IdentityList) NodeIDs() IdentifierList {
 	return nodeIDs
 }
 
+// NodeIDs returns the NodeIDs of the nodes in the list.
+func (il IdentitySkeletonList) NodeIDs() IdentifierList {
+	nodeIDs := make([]Identifier, 0, len(il))
+	for _, id := range il {
+		nodeIDs = append(nodeIDs, id.NodeID)
+	}
+	return nodeIDs
+}
+
 // PublicStakingKeys returns a list with the public staking keys (order preserving).
-func (il IdentityList) PublicStakingKeys() []crypto.PublicKey {
+func (il IdentitySkeletonList) PublicStakingKeys() []crypto.PublicKey {
 	pks := make([]crypto.PublicKey, 0, len(il))
 	for _, id := range il {
 		pks = append(pks, id.StakingPubKey)
@@ -456,10 +473,10 @@ func (il IdentityList) Checksum() Identifier {
 }
 
 // TotalWeight returns the total weight of all given identities.
-func (il IdentityList) TotalWeight() uint64 {
+func (il IdentitySkeletonList) TotalWeight() uint64 {
 	var total uint64
 	for _, identity := range il {
-		total += identity.Weight
+		total += identity.InitialWeight
 	}
 	return total
 }
@@ -615,4 +632,13 @@ func (il IdentityList) GetIndex(target Identifier) (uint, bool) {
 		return 0, false
 	}
 	return uint(i), true
+}
+
+// ToSkeleton converts the identity list to a list of identity skeletons.
+func (il IdentityList) ToSkeleton() IdentitySkeletonList {
+	skeletons := make(IdentitySkeletonList, len(il))
+	for i, id := range il {
+		skeletons[i] = &id.IdentitySkeleton
+	}
+	return skeletons
 }

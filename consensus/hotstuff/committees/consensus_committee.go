@@ -26,8 +26,8 @@ type staticEpochInfo struct {
 	randomSource []byte                  // random source of epoch
 	leaders      *leader.LeaderSelection // pre-computed leader selection for the epoch
 	// TODO: should use identity skeleton https://github.com/dapperlabs/flow-go/issues/6232
-	initialCommittee     flow.IdentityList
-	initialCommitteeMap  map[flow.Identifier]*flow.Identity
+	initialCommittee     flow.IdentitySkeletonList
+	initialCommitteeMap  map[flow.Identifier]*flow.IdentitySkeleton
 	weightThresholdForQC uint64 // computed based on initial committee weights
 	weightThresholdForTO uint64 // computed based on initial committee weights
 	dkg                  hotstuff.DKG
@@ -56,7 +56,7 @@ func newStaticEpochInfo(epoch protocol.Epoch) (*staticEpochInfo, error) {
 	if err != nil {
 		return nil, fmt.Errorf("could not initial identities: %w", err)
 	}
-	initialCommittee := initialIdentities.Filter(filter.IsVotingConsensusCommitteeMember)
+	initialCommittee := initialIdentities.Filter(filter.IsVotingConsensusCommitteeMember).ToSkeleton()
 	dkg, err := epoch.DKG()
 	if err != nil {
 		return nil, fmt.Errorf("could not get dkg: %w", err)
@@ -89,7 +89,12 @@ func newEmergencyFallbackEpoch(lastCommittedEpoch *staticEpochInfo) (*staticEpoc
 	if err != nil {
 		return nil, fmt.Errorf("could not create rng from seed: %w", err)
 	}
-	leaders, err := leader.ComputeLeaderSelection(lastCommittedEpoch.finalView+1, rng, leader.EstimatedSixMonthOfViews, lastCommittedEpoch.initialCommittee)
+	leaders, err := leader.ComputeLeaderSelection(
+		lastCommittedEpoch.finalView+1,
+		rng,
+		leader.EstimatedSixMonthOfViews,
+		lastCommittedEpoch.initialCommittee,
+	)
 	if err != nil {
 		return nil, fmt.Errorf("could not compute leader selection for fallback epoch: %w", err)
 	}
@@ -226,7 +231,7 @@ func (c *Consensus) IdentityByBlock(blockID flow.Identifier, nodeID flow.Identif
 //   - model.ErrViewForUnknownEpoch if no committed epoch containing the given view is known.
 //     This is an expected error and must be handled.
 //   - unspecific error in case of unexpected problems and bugs
-func (c *Consensus) IdentitiesByEpoch(view uint64) (flow.IdentityList, error) {
+func (c *Consensus) IdentitiesByEpoch(view uint64) (flow.IdentitySkeletonList, error) {
 	epochInfo, err := c.staticEpochInfoByView(view)
 	if err != nil {
 		return nil, err
@@ -245,14 +250,14 @@ func (c *Consensus) IdentitiesByEpoch(view uint64) (flow.IdentityList, error) {
 //   - model.InvalidSignerError if nodeID was not listed by the Epoch Setup event as an
 //     authorized consensus participants.
 //   - unspecific error in case of unexpected problems and bugs
-func (c *Consensus) IdentityByEpoch(view uint64, nodeID flow.Identifier) (*flow.Identity, error) {
+func (c *Consensus) IdentityByEpoch(view uint64, participantID flow.Identifier) (*flow.IdentitySkeleton, error) {
 	epochInfo, err := c.staticEpochInfoByView(view)
 	if err != nil {
 		return nil, err
 	}
-	identity, ok := epochInfo.initialCommitteeMap[nodeID]
+	identity, ok := epochInfo.initialCommitteeMap[participantID]
 	if !ok {
-		return nil, model.NewInvalidSignerErrorf("id %v is not a valid node id", nodeID)
+		return nil, model.NewInvalidSignerErrorf("id %v is not a valid node id", participantID)
 	}
 	return identity, nil
 }

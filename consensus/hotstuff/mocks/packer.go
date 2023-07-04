@@ -50,7 +50,7 @@ func (_m *Packer) Pack(view uint64, sig *hotstuff.BlockSignatureData) ([]byte, [
 }
 
 // Unpack provides a mock function with given fields: signerIdentities, sigData
-func (_m *Packer) Unpack(signerIdentities flow.IdentityList, sigData []byte) (*hotstuff.BlockSignatureData, error) {
+func (_m *Packer) Unpack(signerIdentities flow.IdentitySkeletonList, sigData []byte) (*hotstuff.BlockSignatureData, error) {
 	ret := _m.Called(signerIdentities, sigData)
 
 	var r0 *hotstuff.BlockSignatureData
