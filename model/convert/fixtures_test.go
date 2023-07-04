@@ -47,7 +47,7 @@ func EpochSetupFixture(chain flow.ChainID) (flow.Event, *flow.EpochSetup) {
 		},
 		Participants: flow.IdentityList{
 			{
-				flow.IdentitySkeleton{
+				IdentitySkeleton: flow.IdentitySkeleton{
 					Role:          flow.RoleCollection,
 					NodeID:        flow.MustHexStringToIdentifier("0000000000000000000000000000000000000000000000000000000000000001"),
 					Address:       "1.flow.com",
@@ -55,13 +55,13 @@ func EpochSetupFixture(chain flow.ChainID) (flow.Event, *flow.EpochSetup) {
 					StakingPubKey: unittest.MustDecodePublicKeyHex(crypto.BLSBLS12381, "af4aade26d76bb2ab15dcc89adcef82a51f6f04b3cb5f4555214b40ec89813c7a5f95776ea4fe449de48166d0bbc59b919b7eabebaac9614cf6f9461fac257765415f4d8ef1376a2365ec9960121888ea5383d88a140c24c29962b0a14e4e4e7"),
 					InitialWeight: 100,
 				},
-				flow.DynamicIdentity{
+				DynamicIdentity: flow.DynamicIdentity{
 					Weight:  100,
 					Ejected: false,
 				},
 			},
 			{
-				flow.IdentitySkeleton{
+				IdentitySkeleton: flow.IdentitySkeleton{
 					Role:          flow.RoleCollection,
 					NodeID:        flow.MustHexStringToIdentifier("0000000000000000000000000000000000000000000000000000000000000002"),
 					Address:       "2.flow.com",
@@ -69,13 +69,13 @@ func EpochSetupFixture(chain flow.ChainID) (flow.Event, *flow.EpochSetup) {
 					StakingPubKey: unittest.MustDecodePublicKeyHex(crypto.BLSBLS12381, "af4aade26d76bb2ab15dcc89adcef82a51f6f04b3cb5f4555214b40ec89813c7a5f95776ea4fe449de48166d0bbc59b919b7eabebaac9614cf6f9461fac257765415f4d8ef1376a2365ec9960121888ea5383d88a140c24c29962b0a14e4e4e7"),
 					InitialWeight: 100,
 				},
-				flow.DynamicIdentity{
+				DynamicIdentity: flow.DynamicIdentity{
 					Weight:  100,
 					Ejected: false,
 				},
 			},
 			{
-				flow.IdentitySkeleton{
+				IdentitySkeleton: flow.IdentitySkeleton{
 					Role:          flow.RoleCollection,
 					NodeID:        flow.MustHexStringToIdentifier("0000000000000000000000000000000000000000000000000000000000000003"),
 					Address:       "3.flow.com",
@@ -83,13 +83,13 @@ func EpochSetupFixture(chain flow.ChainID) (flow.Event, *flow.EpochSetup) {
 					StakingPubKey: unittest.MustDecodePublicKeyHex(crypto.BLSBLS12381, "af4aade26d76bb2ab15dcc89adcef82a51f6f04b3cb5f4555214b40ec89813c7a5f95776ea4fe449de48166d0bbc59b919b7eabebaac9614cf6f9461fac257765415f4d8ef1376a2365ec9960121888ea5383d88a140c24c29962b0a14e4e4e7"),
 					InitialWeight: 100,
 				},
-				flow.DynamicIdentity{
+				DynamicIdentity: flow.DynamicIdentity{
 					Weight:  100,
 					Ejected: false,
 				},
 			},
 			{
-				flow.IdentitySkeleton{
+				IdentitySkeleton: flow.IdentitySkeleton{
 					Role:          flow.RoleCollection,
 					NodeID:        flow.MustHexStringToIdentifier("0000000000000000000000000000000000000000000000000000000000000004"),
 					Address:       "4.flow.com",
@@ -97,13 +97,13 @@ func EpochSetupFixture(chain flow.ChainID) (flow.Event, *flow.EpochSetup) {
 					StakingPubKey: unittest.MustDecodePublicKeyHex(crypto.BLSBLS12381, "af4aade26d76bb2ab15dcc89adcef82a51f6f04b3cb5f4555214b40ec89813c7a5f95776ea4fe449de48166d0bbc59b919b7eabebaac9614cf6f9461fac257765415f4d8ef1376a2365ec9960121888ea5383d88a140c24c29962b0a14e4e4e7"),
 					InitialWeight: 100,
 				},
-				flow.DynamicIdentity{
+				DynamicIdentity: flow.DynamicIdentity{
 					Weight:  100,
 					Ejected: false,
 				},
 			},
 			{
-				flow.IdentitySkeleton{
+				IdentitySkeleton: flow.IdentitySkeleton{
 					Role:          flow.RoleConsensus,
 					NodeID:        flow.MustHexStringToIdentifier("0000000000000000000000000000000000000000000000000000000000000011"),
 					Address:       "11.flow.com",
@@ -111,13 +111,13 @@ func EpochSetupFixture(chain flow.ChainID) (flow.Event, *flow.EpochSetup) {
 					StakingPubKey: unittest.MustDecodePublicKeyHex(crypto.BLSBLS12381, "8207559cd7136af378bba53a8f0196dee3849a3ab02897c1995c3e3f6ca0c4a776c3ae869d1ddbb473090054be2400ad06d7910aa2c5d1780220fdf3765a3c1764bce10c6fe66a5a2be51a422e878518bd750424bb56b8a0ecf0f8ad2057e83f"),
 					InitialWeight: 100,
 				},
-				flow.DynamicIdentity{
+				DynamicIdentity: flow.DynamicIdentity{
 					Weight:  100,
 					Ejected: false,
 				},
 			},
 			{
-				flow.IdentitySkeleton{
+				IdentitySkeleton: flow.IdentitySkeleton{
 					Role:          flow.RoleExecution,
 					NodeID:        flow.MustHexStringToIdentifier("0000000000000000000000000000000000000000000000000000000000000021"),
 					Address:       "21.flow.com",
@@ -125,13 +125,13 @@ func EpochSetupFixture(chain flow.ChainID) (flow.Event, *flow.EpochSetup) {
 					StakingPubKey: unittest.MustDecodePublicKeyHex(crypto.BLSBLS12381, "880b162b7ec138b36af401d07868cb08d25746d905395edbb4625bdf105d4bb2b2f4b0f4ae273a296a6efefa7ce9ccb914e39947ce0e83745125cab05d62516076ff0173ed472d3791ccef937597c9ea12381d76f547a092a4981d77ff3fba83"),
 					InitialWeight: 100,
 				},
-				flow.DynamicIdentity{
+				DynamicIdentity: flow.DynamicIdentity{
 					Weight:  100,
 					Ejected: false,
 				},
 			},
 			{
-				flow.IdentitySkeleton{
+				IdentitySkeleton: flow.IdentitySkeleton{
 					Role:          flow.RoleVerification,
 					NodeID:        flow.MustHexStringToIdentifier("0000000000000000000000000000000000000000000000000000000000000031"),
 					Address:       "31.flow.com",
@@ -139,7 +139,7 @@ func EpochSetupFixture(chain flow.ChainID) (flow.Event, *flow.EpochSetup) {
 					StakingPubKey: unittest.MustDecodePublicKeyHex(crypto.BLSBLS12381, "b1f97d0a06020eca97352e1adde72270ee713c7daf58da7e74bf72235321048b4841bdfc28227964bf18e371e266e32107d238358848bcc5d0977a0db4bda0b4c33d3874ff991e595e0f537c7b87b4ddce92038ebc7b295c9ea20a1492302aa7"),
 					InitialWeight: 100,
 				},
-				flow.DynamicIdentity{
+				DynamicIdentity: flow.DynamicIdentity{
 					Weight:  100,
 					Ejected: false,
 				},
