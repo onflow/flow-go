@@ -17,7 +17,7 @@ queues these blocks for processing. The package employs parallel workers, each a
 to fetch and process blocks from the queue. The `BlockConsumer` diligently coordinates this process by only assigning 
 a new block to a worker once it has completed processing its current block and signaled its availability. 
 This ensures that the processing is not only methodical but also resilient to any node crashes. 
-In case of a crash, the `BlockConsumer` resumes from where it left off, reassigning blocks from the queue to workers,
+In case of a crash, the `BlockConsumer` resumes from where it left off by reading the processed block index from storage, reassigning blocks from the queue to workers,
 thereby guaranteeing no loss of data.
 
 ## Assigner Engine 
