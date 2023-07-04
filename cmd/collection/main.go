@@ -47,7 +47,6 @@ import (
 	"github.com/onflow/flow-go/module/mempool/queue"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network/channels"
-	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/state/protocol"
 	badgerState "github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/blocktimer"
@@ -593,13 +592,7 @@ func main() {
 
 			// register the manager for protocol events
 			node.ProtocolEvents.AddConsumer(manager)
-
-			for _, rpcInspector := range node.GossipSubRpcInspectorSuite.Inspectors() {
-				if r, ok := rpcInspector.(p2p.GossipSubMsgValidationRpcInspector); ok {
-					clusterEvents.AddConsumer(r)
-				}
-			}
-
+			clusterEvents.AddConsumer(node.LibP2PNode)
 			return manager, err
 		})
 

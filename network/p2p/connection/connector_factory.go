@@ -7,6 +7,8 @@ import (
 
 	"github.com/libp2p/go-libp2p/core/host"
 	discoveryBackoff "github.com/libp2p/go-libp2p/p2p/discovery/backoff"
+
+	"github.com/onflow/flow-go/network/p2p"
 )
 
 const (
@@ -35,8 +37,8 @@ const (
 // DefaultLibp2pBackoffConnectorFactory is a factory function to create a new BackoffConnector. It uses the default
 // values for the backoff connector.
 // (https://github.com/libp2p/go-libp2p-pubsub/blob/master/discovery.go#L34)
-func DefaultLibp2pBackoffConnectorFactory(host host.Host) func() (*discoveryBackoff.BackoffConnector, error) {
-	return func() (*discoveryBackoff.BackoffConnector, error) {
+func DefaultLibp2pBackoffConnectorFactory() p2p.ConnectorFactory {
+	return func(host host.Host) (p2p.Connector, error) {
 		rngSrc := rand.NewSource(rand.Int63())
 
 		cacheSize := 100

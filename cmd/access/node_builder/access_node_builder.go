@@ -72,7 +72,6 @@ import (
 	"github.com/onflow/flow-go/network/p2p/middleware"
 	"github.com/onflow/flow-go/network/p2p/p2pbuilder"
 	p2pconfig "github.com/onflow/flow-go/network/p2p/p2pbuilder/config"
-	"github.com/onflow/flow-go/network/p2p/p2pbuilder/inspector"
 	"github.com/onflow/flow-go/network/p2p/subscription"
 	"github.com/onflow/flow-go/network/p2p/tracer"
 	"github.com/onflow/flow-go/network/p2p/translator"
@@ -1216,25 +1215,26 @@ func (builder *FlowAccessNodeBuilder) initPublicLibp2pNode(networkKey crypto.Pri
 		builder.IdentityProvider,
 		builder.FlowConfig.NetworkConfig.GossipSubConfig.LocalMeshLogInterval)
 
-	// setup RPC inspectors
-	rpcInspectorBuilder := inspector.NewGossipSubInspectorBuilder(builder.Logger, builder.SporkID, &builder.FlowConfig.NetworkConfig.GossipSubConfig.GossipSubRPCInspectorsConfig, builder.IdentityProvider, builder.Metrics.Network)
-	rpcInspectorSuite, err := rpcInspectorBuilder.
-		SetNetworkType(network.PublicNetwork).
-		SetMetrics(&p2pconfig.MetricsConfig{
-			HeroCacheFactory: builder.HeroCacheMetricsFactory(),
-			Metrics:          builder.Metrics.Network,
-		}).Build()
-	if err != nil {
-		return nil, fmt.Errorf("failed to create gossipsub rpc inspectors for access node: %w", err)
-	}
-
 	libp2pNode, err := p2pbuilder.NewNodeBuilder(
 		builder.Logger,
-		networkMetrics,
+		&p2pconfig.MetricsConfig{
+			HeroCacheFactory: builder.HeroCacheMetricsFactory(),
+			Metrics:          networkMetrics,
+		},
+		network.PublicNetwork,
 		bindAddress,
 		networkKey,
 		builder.SporkID,
+		builder.IdentityProvider,
 		&builder.FlowConfig.NetworkConfig.ResourceManagerConfig,
+		&builder.FlowConfig.NetworkConfig.GossipSubConfig.GossipSubRPCInspectorsConfig,
+		&p2pconfig.PeerManagerConfig{
+			// TODO: eventually, we need pruning enabled even on public network. However, it needs a modified version of
+			// the peer manager that also operate on the public identities.
+			ConnectionPruning: connection.PruningDisabled,
+			UpdateInterval:    builder.FlowConfig.NetworkConfig.PeerUpdateInterval,
+			ConnectorFactory:  connection.DefaultLibp2pBackoffConnectorFactory(),
+		},
 		&p2p.DisallowListCacheConfig{
 			MaxSize: builder.FlowConfig.NetworkConfig.DisallowListNotificationCacheSize,
 			Metrics: metrics.DisallowListCacheMetricsFactory(builder.HeroCacheMetricsFactory(), network.PublicNetwork),
@@ -1257,11 +1257,9 @@ func (builder *FlowAccessNodeBuilder) initPublicLibp2pNode(networkKey crypto.Pri
 			)
 		}).
 		// disable connection pruning for the access node which supports the observer
-		SetPeerManagerOptions(connection.PruningDisabled, builder.FlowConfig.NetworkConfig.PeerUpdateInterval).
 		SetStreamCreationRetryInterval(builder.FlowConfig.NetworkConfig.UnicastCreateStreamRetryDelay).
 		SetGossipSubTracer(meshTracer).
 		SetGossipSubScoreTracerInterval(builder.FlowConfig.NetworkConfig.GossipSubConfig.ScoreTracerInterval).
-		SetGossipSubRpcInspectorSuite(rpcInspectorSuite).
 		Build()
 
 	if err != nil {
