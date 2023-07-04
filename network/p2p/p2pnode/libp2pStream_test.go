@@ -57,7 +57,7 @@ func TestStreamClosing(t *testing.T) {
 	p2ptest.StartNodes(t, signalerCtx, nodes, 100*time.Millisecond)
 	defer p2ptest.StopNodes(t, nodes, cancel, 100*time.Millisecond)
 
-	nodeInfo1, err := utils.PeerAddressInfo(*identities[1])
+	nodeInfo1, err := utils.PeerAddressInfo(identities[1].IdentitySkeleton)
 	require.NoError(t, err)
 
 	senderWG := sync.WaitGroup{}
@@ -176,7 +176,7 @@ func testCreateStream(t *testing.T, sporkId flow.Identifier, unicasts []protocol
 	streamCount := 100
 	var streams []network.Stream
 	for i := 0; i < streamCount; i++ {
-		pInfo, err := utils.PeerAddressInfo(*id2)
+		pInfo, err := utils.PeerAddressInfo(id2.IdentitySkeleton)
 		require.NoError(t, err)
 		nodes[0].Host().Peerstore().AddAddrs(pInfo.ID, pInfo.Addrs, peerstore.AddressTTL)
 		anotherStream, err := nodes[0].CreateStream(ctx, pInfo.ID)
@@ -243,7 +243,7 @@ func TestCreateStream_FallBack(t *testing.T) {
 	streamCount := 100
 	var streams []network.Stream
 	for i := 0; i < streamCount; i++ {
-		pInfo, err := utils.PeerAddressInfo(otherId)
+		pInfo, err := utils.PeerAddressInfo(otherId.IdentitySkeleton)
 		require.NoError(t, err)
 		thisNode.Host().Peerstore().AddAddrs(pInfo.ID, pInfo.Addrs, peerstore.AddressTTL)
 
@@ -296,7 +296,7 @@ func TestCreateStreamIsConcurrencySafe(t *testing.T) {
 	p2ptest.StartNodes(t, signalerCtx, nodes, 100*time.Millisecond)
 	defer p2ptest.StopNodes(t, nodes, cancel, 100*time.Millisecond)
 
-	nodeInfo1, err := utils.PeerAddressInfo(*identities[1])
+	nodeInfo1, err := utils.PeerAddressInfo(identities[1].IdentitySkeleton)
 	require.NoError(t, err)
 
 	wg := sync.WaitGroup{}
@@ -359,7 +359,7 @@ func TestNoBackoffWhenCreatingStream(t *testing.T) {
 	defer p2ptest.StopNode(t, node1, cancel1, 100*time.Millisecond)
 
 	id2 := identities[1]
-	pInfo, err := utils.PeerAddressInfo(*id2)
+	pInfo, err := utils.PeerAddressInfo(id2.IdentitySkeleton)
 	require.NoError(t, err)
 	nodes[0].Host().Peerstore().AddAddrs(pInfo.ID, pInfo.Addrs, peerstore.AddressTTL)
 	maxTimeToWait := p2pnode.MaxConnectAttempt * unicast.MaxRetryJitter * time.Millisecond
@@ -519,7 +519,7 @@ func TestCreateStreamTimeoutWithUnresponsiveNode(t *testing.T) {
 		require.NoError(t, listener.Close())
 	}()
 
-	silentNodeInfo, err := utils.PeerAddressInfo(silentNodeId)
+	silentNodeInfo, err := utils.PeerAddressInfo(silentNodeId.IdentitySkeleton)
 	require.NoError(t, err)
 
 	timeout := 1 * time.Second
@@ -558,7 +558,7 @@ func TestCreateStreamIsConcurrent(t *testing.T) {
 	p2ptest.StartNodes(t, signalerCtx, goodNodes, 100*time.Millisecond)
 	defer p2ptest.StopNodes(t, goodNodes, cancel, 100*time.Millisecond)
 
-	goodNodeInfo1, err := utils.PeerAddressInfo(*goodNodeIds[1])
+	goodNodeInfo1, err := utils.PeerAddressInfo(goodNodeIds[1].IdentitySkeleton)
 	require.NoError(t, err)
 
 	// create a silent node which never replies
@@ -566,7 +566,7 @@ func TestCreateStreamIsConcurrent(t *testing.T) {
 	defer func() {
 		require.NoError(t, listener.Close())
 	}()
-	silentNodeInfo, err := utils.PeerAddressInfo(silentNodeId)
+	silentNodeInfo, err := utils.PeerAddressInfo(silentNodeId.IdentitySkeleton)
 	require.NoError(t, err)
 
 	// creates a stream to unresponsive node and makes sure that the stream creation is blocked

@@ -84,7 +84,7 @@ func TestCrosstalkPreventionOnNetworkKeyChange(t *testing.T) {
 
 	p2ptest.StartNode(t, signalerCtx2, node2, 100*time.Millisecond)
 
-	peerInfo2, err := utils.PeerAddressInfo(id2)
+	peerInfo2, err := utils.PeerAddressInfo(id2.IdentitySkeleton)
 	require.NoError(t, err)
 
 	// create stream from node 1 to node 2
@@ -144,7 +144,7 @@ func TestOneToOneCrosstalkPrevention(t *testing.T) {
 	p2ptest.StartNode(t, signalerCtx1, node1, 100*time.Millisecond)
 	defer p2ptest.StopNode(t, node1, cancel1, 100*time.Millisecond)
 
-	peerInfo1, err := utils.PeerAddressInfo(id1)
+	peerInfo1, err := utils.PeerAddressInfo(id1.IdentitySkeleton)
 	require.NoError(t, err)
 
 	// create and start node 2 on localhost and random port
@@ -216,7 +216,7 @@ func TestOneToKCrosstalkPrevention(t *testing.T) {
 	p2ptest.StartNode(t, signalerCtx2, node2, 100*time.Millisecond)
 	defer p2ptest.StopNode(t, node2, cancel2, 100*time.Millisecond)
 
-	pInfo2, err := utils.PeerAddressInfo(id2)
+	pInfo2, err := utils.PeerAddressInfo(id2.IdentitySkeleton)
 	require.NoError(t, err)
 
 	// spork topic is derived by suffixing the channel with the root block ID

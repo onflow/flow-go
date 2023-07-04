@@ -68,7 +68,7 @@ func TestTopicValidator_Unstaked(t *testing.T) {
 		return nil
 	}
 
-	pInfo2, err := utils.PeerAddressInfo(identity2)
+	pInfo2, err := utils.PeerAddressInfo(identity2.IdentitySkeleton)
 	require.NoError(t, err)
 
 	// node1 is connected to node2
@@ -123,7 +123,7 @@ func TestTopicValidator_PublicChannel(t *testing.T) {
 	channel := channels.PublicSyncCommittee
 	topic := channels.TopicFromChannel(channel, sporkId)
 
-	pInfo2, err := utils.PeerAddressInfo(identity2)
+	pInfo2, err := utils.PeerAddressInfo(identity2.IdentitySkeleton)
 	require.NoError(t, err)
 
 	// node1 is connected to node2
@@ -183,7 +183,7 @@ func TestTopicValidator_TopicMismatch(t *testing.T) {
 	channel := channels.ConsensusCommittee
 	topic := channels.TopicFromChannel(channel, sporkId)
 
-	pInfo2, err := utils.PeerAddressInfo(identity2)
+	pInfo2, err := utils.PeerAddressInfo(identity2.IdentitySkeleton)
 	require.NoError(t, err)
 
 	// node1 is connected to node2
@@ -235,7 +235,7 @@ func TestTopicValidator_InvalidTopic(t *testing.T) {
 
 	topic := channels.Topic("invalid-topic")
 
-	pInfo2, err := utils.PeerAddressInfo(identity2)
+	pInfo2, err := utils.PeerAddressInfo(identity2.IdentitySkeleton)
 	require.NoError(t, err)
 
 	// node1 is connected to node2
@@ -307,10 +307,10 @@ func TestAuthorizedSenderValidator_Unauthorized(t *testing.T) {
 	authorizedSenderValidator := validator.NewAuthorizedSenderValidator(logger, violationsConsumer, getIdentity)
 	pubsubMessageValidator := authorizedSenderValidator.PubSubMessageValidator(channel)
 
-	pInfo1, err := utils.PeerAddressInfo(identity1)
+	pInfo1, err := utils.PeerAddressInfo(identity1.IdentitySkeleton)
 	require.NoError(t, err)
 
-	pInfo2, err := utils.PeerAddressInfo(identity2)
+	pInfo2, err := utils.PeerAddressInfo(identity2.IdentitySkeleton)
 	require.NoError(t, err)
 
 	// node1 is connected to node2, and the an1 is connected to node1
@@ -416,7 +416,7 @@ func TestAuthorizedSenderValidator_InvalidMsg(t *testing.T) {
 	authorizedSenderValidator := validator.NewAuthorizedSenderValidator(logger, violationsConsumer, getIdentity)
 	pubsubMessageValidator := authorizedSenderValidator.PubSubMessageValidator(channel)
 
-	pInfo2, err := utils.PeerAddressInfo(identity2)
+	pInfo2, err := utils.PeerAddressInfo(identity2.IdentitySkeleton)
 	require.NoError(t, err)
 
 	// node1 is connected to node2
@@ -489,10 +489,10 @@ func TestAuthorizedSenderValidator_Ejected(t *testing.T) {
 	authorizedSenderValidator := validator.NewAuthorizedSenderValidator(logger, violationsConsumer, getIdentity)
 	pubsubMessageValidator := authorizedSenderValidator.PubSubMessageValidator(channel)
 
-	pInfo1, err := utils.PeerAddressInfo(identity1)
+	pInfo1, err := utils.PeerAddressInfo(identity1.IdentitySkeleton)
 	require.NoError(t, err)
 
-	pInfo2, err := utils.PeerAddressInfo(identity2)
+	pInfo2, err := utils.PeerAddressInfo(identity2.IdentitySkeleton)
 	require.NoError(t, err)
 
 	// node1 is connected to node2, and the an1 is connected to node1
@@ -584,10 +584,10 @@ func TestAuthorizedSenderValidator_ClusterChannel(t *testing.T) {
 	authorizedSenderValidator := validator.NewAuthorizedSenderValidator(logger, violationsConsumer, getIdentity)
 	pubsubMessageValidator := authorizedSenderValidator.PubSubMessageValidator(channel)
 
-	pInfo1, err := utils.PeerAddressInfo(identity1)
+	pInfo1, err := utils.PeerAddressInfo(identity1.IdentitySkeleton)
 	require.NoError(t, err)
 
-	pInfo2, err := utils.PeerAddressInfo(identity2)
+	pInfo2, err := utils.PeerAddressInfo(identity2.IdentitySkeleton)
 	require.NoError(t, err)
 
 	// ln3 <-> sn1 <-> sn2
