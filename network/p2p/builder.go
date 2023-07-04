@@ -76,10 +76,9 @@ type GossipSubBuilder interface {
 	//
 	// Returns:
 	// - PubSubAdapter: a GossipSub pubsub system for the libp2p node.
-	// - PeerScoreTracer: a peer score tracer for the GossipSub pubsub system (if enabled, otherwise nil).
 	// - error: if an error occurs during the creation of the GossipSub pubsub system, it is returned. Otherwise, nil is returned.
 	// Note that on happy path, the returned error is nil. Any error returned is unexpected and should be handled as irrecoverable.
-	Build(irrecoverable.SignalerContext) (PubSubAdapter, PeerScoreTracer, error)
+	Build(irrecoverable.SignalerContext) (PubSubAdapter, error)
 }
 
 type PeerScoringBuilder interface {
@@ -123,7 +122,6 @@ type NodeBuilder interface {
 	SetConnectionManager(connmgr.ConnManager) NodeBuilder
 	SetConnectionGater(ConnectionGater) NodeBuilder
 	SetRoutingSystem(func(context.Context, host.Host) (routing.Routing, error)) NodeBuilder
-	SetPeerManagerOptions(bool, time.Duration) NodeBuilder
 
 	// EnableGossipSubPeerScoring enables peer scoring for the GossipSub pubsub system.
 	// Arguments:

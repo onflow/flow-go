@@ -69,11 +69,11 @@ func NewUnicastManager(logger zerolog.Logger,
 // as the core handler for other unicast protocols, e.g., compressions.
 func (m *Manager) WithDefaultHandler(defaultHandler libp2pnet.StreamHandler) {
 	defaultProtocolID := protocols.FlowProtocolID(m.sporkId)
-	m.defaultHandler = defaultHandler
-
 	if len(m.protocols) > 0 {
 		panic("default handler must be set only once before any unicast registration")
 	}
+
+	m.defaultHandler = defaultHandler
 
 	m.protocols = []protocols.Protocol{
 		&PlainStream{

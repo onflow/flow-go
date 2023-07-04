@@ -199,22 +199,6 @@ func (_m *NodeBuilder) SetGossipSubTracer(_a0 p2p.PubSubTracer) p2p.NodeBuilder 
 	return r0
 }
 
-// SetPeerManagerOptions provides a mock function with given fields: _a0, _a1
-func (_m *NodeBuilder) SetPeerManagerOptions(_a0 bool, _a1 time.Duration) p2p.NodeBuilder {
-	ret := _m.Called(_a0, _a1)
-
-	var r0 p2p.NodeBuilder
-	if rf, ok := ret.Get(0).(func(bool, time.Duration) p2p.NodeBuilder); ok {
-		r0 = rf(_a0, _a1)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(p2p.NodeBuilder)
-		}
-	}
-
-	return r0
-}
-
 // SetRateLimiterDistributor provides a mock function with given fields: _a0
 func (_m *NodeBuilder) SetRateLimiterDistributor(_a0 p2p.UnicastRateLimiterDistributor) p2p.NodeBuilder {
 	ret := _m.Called(_a0)
