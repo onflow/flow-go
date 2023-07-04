@@ -29,4 +29,15 @@ type PeerManagerConfig struct {
 	ConnectionPruning bool
 	// UpdateInterval interval used by the libp2p node peer manager component to periodically request peer updates.
 	UpdateInterval time.Duration
+	// ConnectorFactory is a factory function to create a new connector.
+	ConnectorFactory p2p.ConnectorFactory
+}
+
+// PeerManagerDisableConfig returns a configuration that disables the peer manager.
+func PeerManagerDisableConfig() *PeerManagerConfig {
+	return &PeerManagerConfig{
+		ConnectionPruning: false,
+		UpdateInterval:    0,
+		ConnectorFactory:  nil,
+	}
 }

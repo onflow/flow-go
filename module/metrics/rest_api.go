@@ -81,7 +81,7 @@ func NewRestCollector(cfg metricsProm.Config) module.RestMetrics {
 			Subsystem: "http",
 			Name:      "requests_total",
 			Help:      "The number of requests handled over time.",
-		}, []string{cfg.ServiceLabel, cfg.HandlerIDLabel}),
+		}, []string{cfg.MethodLabel, cfg.HandlerIDLabel}),
 	}
 
 	cfg.Registry.MustRegister(
@@ -108,6 +108,6 @@ func (r *RestCollector) AddInflightRequests(_ context.Context, p httpmetrics.HTT
 }
 
 // New custom method to track all requests made for every REST API request
-func (r *RestCollector) AddTotalRequests(_ context.Context, method string, id string) {
-	r.httpRequestsTotal.WithLabelValues(method, id).Inc()
+func (r *RestCollector) AddTotalRequests(_ context.Context, method string, routeName string) {
+	r.httpRequestsTotal.WithLabelValues(method, routeName).Inc()
 }
