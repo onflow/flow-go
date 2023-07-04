@@ -56,7 +56,7 @@ func (s Static) IdentityByBlock(_ flow.Identifier, participantID flow.Identifier
 }
 
 func (s Static) IdentitiesByEpoch(view uint64) (flow.IdentitySkeletonList, error) {
-	return s.participants, nil
+	return s.participants.ToSkeleton(), nil
 }
 
 func (s Static) IdentityByEpoch(view uint64, participantID flow.Identifier) (*flow.IdentitySkeleton, error) {
@@ -64,7 +64,7 @@ func (s Static) IdentityByEpoch(view uint64, participantID flow.Identifier) (*fl
 	if !ok {
 		return nil, model.NewInvalidSignerErrorf("unknown participant %x", participantID)
 	}
-	return identity, nil
+	return &identity.IdentitySkeleton, nil
 }
 
 func (s Static) LeaderForView(_ uint64) (flow.Identifier, error) {
@@ -72,11 +72,11 @@ func (s Static) LeaderForView(_ uint64) (flow.Identifier, error) {
 }
 
 func (s Static) QuorumThresholdForView(_ uint64) (uint64, error) {
-	return WeightThresholdToBuildQC(s.participants.TotalWeight()), nil
+	return WeightThresholdToBuildQC(s.participants.ToSkeleton().TotalWeight()), nil
 }
 
 func (s Static) TimeoutThresholdForView(_ uint64) (uint64, error) {
-	return WeightThresholdToTimeout(s.participants.TotalWeight()), nil
+	return WeightThresholdToTimeout(s.participants.ToSkeleton().TotalWeight()), nil
 }
 
 func (s Static) Self() flow.Identifier {

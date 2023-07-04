@@ -50,7 +50,7 @@ func NewClusterCommittee(
 		return nil, fmt.Errorf("could not compute leader selection for cluster: %w", err)
 	}
 
-	totalWeight := cluster.Members().TotalWeight()
+	totalWeight := cluster.Members().ToSkeleton().TotalWeight()
 	com := &Cluster{
 		state:     state,
 		payloads:  payloads,
@@ -131,7 +131,7 @@ func (c *Cluster) IdentityByBlock(blockID flow.Identifier, nodeID flow.Identifie
 // parameter is the view in the cluster consensus. Since clusters only exist for
 // one epoch, we don't need to check the view.
 func (c *Cluster) IdentitiesByEpoch(view uint64) (flow.IdentitySkeletonList, error) {
-	return c.initialClusterMembers, nil
+	return c.initialClusterMembers.ToSkeleton(), nil
 }
 
 // IdentityByEpoch returns the node from the initial cluster members for this epoch.
@@ -142,11 +142,11 @@ func (c *Cluster) IdentitiesByEpoch(view uint64) (flow.IdentitySkeletonList, err
 //   - model.InvalidSignerError if nodeID was not listed by the Epoch Setup event as an
 //     authorized participant in this cluster
 func (c *Cluster) IdentityByEpoch(view uint64, participantID flow.Identifier) (*flow.IdentitySkeleton, error) {
-	identity, ok := c.initialClusterMembers.ByNodeID(nodeID)
+	identity, ok := c.initialClusterMembers.ByNodeID(participantID)
 	if !ok {
-		return nil, model.NewInvalidSignerErrorf("node %v is not an authorized hotstuff participant", nodeID)
+		return nil, model.NewInvalidSignerErrorf("node %v is not an authorized hotstuff participant", participantID)
 	}
-	return identity, nil
+	return &identity.IdentitySkeleton, nil
 }
 
 func (c *Cluster) LeaderForView(view uint64) (flow.Identifier, error) {
