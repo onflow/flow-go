@@ -436,6 +436,7 @@ func TestCircuitBreakerExecutionNode(t *testing.T) {
 	connectionFactory.CircuitBreakerConfig = &CircuitBreakerConfig{
 		Enabled:        true,
 		MaxFailures:    1,
+		MaxRetries:     1,
 		RestoreTimeout: circuitBreakerRestoreTimeout,
 	}
 
@@ -518,6 +519,7 @@ func TestCircuitBreakerCollectionNode(t *testing.T) {
 	connectionFactory.CircuitBreakerConfig = &CircuitBreakerConfig{
 		Enabled:        true,
 		MaxFailures:    1,
+		MaxRetries:     1,
 		RestoreTimeout: circuitBreakerRestoreTimeout,
 	}
 

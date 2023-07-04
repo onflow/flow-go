@@ -165,6 +165,7 @@ func DefaultAccessNodeConfig() *AccessNodeConfig {
 				Enabled:        false,
 				RestoreTimeout: 60 * time.Second,
 				MaxFailures:    5,
+				MaxRetries:     1,
 			},
 		},
 		stateStreamConf: state_stream.Config{
@@ -690,7 +691,7 @@ func (builder *FlowAccessNodeBuilder) extraFlags() {
 		flags.BoolVar(&builder.rpcConf.CircuitBreakerConfig.Enabled, "circuit-breaker-enabled", defaultConfig.rpcConf.CircuitBreakerConfig.Enabled, "specifies whether the circuit breaker is enabled for collection and execution API clients.")
 		flags.DurationVar(&builder.rpcConf.CircuitBreakerConfig.RestoreTimeout, "circuit-breaker-restore-timeout", defaultConfig.rpcConf.CircuitBreakerConfig.RestoreTimeout, "duration after which the circuit breaker will restore the connection to the client after closing it due to failures. Default value is 60s")
 		flags.Uint32Var(&builder.rpcConf.CircuitBreakerConfig.MaxFailures, "circuit-breaker-max-failures", defaultConfig.rpcConf.CircuitBreakerConfig.MaxFailures, "maximum number of failed calls to the client that will cause the circuit breaker to close the connection. Default value is 5")
-
+		flags.Uint32Var(&builder.rpcConf.CircuitBreakerConfig.MaxRetries, "circuit-breaker-max-retries", defaultConfig.rpcConf.CircuitBreakerConfig.MaxRetries, "maximum number of retries call to check if connection restored after timeout. Default value is 1")
 		// ExecutionDataRequester config
 		flags.BoolVar(&builder.executionDataSyncEnabled, "execution-data-sync-enabled", defaultConfig.executionDataSyncEnabled, "whether to enable the execution data sync protocol")
 		flags.StringVar(&builder.executionDataDir, "execution-data-dir", defaultConfig.executionDataDir, "directory to use for Execution Data database")
@@ -757,6 +758,9 @@ func (builder *FlowAccessNodeBuilder) extraFlags() {
 		if builder.rpcConf.CircuitBreakerConfig.Enabled {
 			if builder.rpcConf.CircuitBreakerConfig.MaxFailures == 0 {
 				return errors.New("circuit-breaker-max-failures must be greater than 0")
+			}
+			if builder.rpcConf.CircuitBreakerConfig.MaxRetries == 0 {
+				return errors.New("circuit-breaker-max-retries must be greater than 0")
 			}
 		}
 
