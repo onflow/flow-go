@@ -130,7 +130,9 @@ type encodableIdentity struct {
 	NodeID        Identifier
 	Address       string `json:",omitempty"`
 	Role          Role
+	InitialWeight uint64
 	Weight        uint64
+	Ejected       bool
 	StakingPubKey []byte
 	NetworkPubKey []byte
 }
@@ -145,7 +147,14 @@ type decodableIdentity struct {
 }
 
 func encodableFromIdentity(iy Identity) (encodableIdentity, error) {
-	ie := encodableIdentity{iy.NodeID, iy.Address, iy.Role, iy.Weight, nil, nil}
+	ie := encodableIdentity{
+		NodeID:        iy.NodeID,
+		Address:       iy.Address,
+		Role:          iy.Role,
+		InitialWeight: iy.InitialWeight,
+		Weight:        iy.Weight,
+		Ejected:       iy.Ejected,
+	}
 	if iy.StakingPubKey != nil {
 		ie.StakingPubKey = iy.StakingPubKey.Encode()
 	}
@@ -208,7 +217,9 @@ func identityFromEncodable(ie encodableIdentity, identity *Identity) error {
 	identity.NodeID = ie.NodeID
 	identity.Address = ie.Address
 	identity.Role = ie.Role
+	identity.InitialWeight = ie.InitialWeight
 	identity.Weight = ie.Weight
+	identity.Ejected = ie.Ejected
 	var err error
 	if ie.StakingPubKey != nil {
 		if identity.StakingPubKey, err = crypto.DecodePublicKey(crypto.BLSBLS12381, ie.StakingPubKey); err != nil {
