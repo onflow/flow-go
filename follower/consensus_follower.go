@@ -107,10 +107,12 @@ func bootstrapIdentities(bootstrapNodes []BootstrapNodeInfo) flow.IdentityList {
 	ids := make(flow.IdentityList, len(bootstrapNodes))
 	for i, b := range bootstrapNodes {
 		ids[i] = &flow.Identity{
-			Role:          flow.RoleAccess,
-			NetworkPubKey: b.NetworkPublicKey,
-			Address:       fmt.Sprintf("%s:%d", b.Host, b.Port),
-			StakingPubKey: nil,
+			IdentitySkeleton: flow.IdentitySkeleton{
+				Role:          flow.RoleAccess,
+				NetworkPubKey: b.NetworkPublicKey,
+				Address:       fmt.Sprintf("%s:%d", b.Host, b.Port),
+				StakingPubKey: nil,
+			},
 		}
 	}
 	return ids

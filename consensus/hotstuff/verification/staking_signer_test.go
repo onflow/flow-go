@@ -47,7 +47,7 @@ func TestStakingSigner_CreateProposal(t *testing.T) {
 		require.Nil(t, proposal)
 	})
 	t.Run("created-proposal", func(t *testing.T) {
-		me, err := local.New(signer, stakingPriv)
+		me, err := local.New(signer.IdentitySkeleton, stakingPriv)
 		require.NoError(t, err)
 
 		signerIdentity := unittest.IdentityFixture(unittest.WithNodeID(signerID),
@@ -88,7 +88,7 @@ func TestStakingSigner_CreateVote(t *testing.T) {
 		require.Nil(t, proposal)
 	})
 	t.Run("created-vote", func(t *testing.T) {
-		me, err := local.New(signer, stakingPriv)
+		me, err := local.New(signer.IdentitySkeleton, stakingPriv)
 		require.NoError(t, err)
 
 		signerIdentity := unittest.IdentityFixture(unittest.WithNodeID(signerID),

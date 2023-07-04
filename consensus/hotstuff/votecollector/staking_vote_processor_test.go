@@ -260,7 +260,7 @@ func TestStakingVoteProcessorV2_BuildVerifyQC(t *testing.T) {
 		stakingPriv := unittest.StakingPrivKeyFixture()
 		identity.StakingPubKey = stakingPriv.PublicKey()
 
-		me, err := local.New(identity, stakingPriv)
+		me, err := local.New(identity.IdentitySkeleton, stakingPriv)
 		require.NoError(t, err)
 
 		signers[identity.NodeID] = verification.NewStakingSigner(me)

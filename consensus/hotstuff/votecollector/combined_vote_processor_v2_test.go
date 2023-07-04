@@ -816,7 +816,7 @@ func TestCombinedVoteProcessorV2_BuildVerifyQC(t *testing.T) {
 
 		beaconSignerStore := hsig.NewEpochAwareRandomBeaconKeyStore(epochLookup, keys)
 
-		me, err := local.New(identity, stakingPriv)
+		me, err := local.New(identity.IdentitySkeleton, stakingPriv)
 		require.NoError(t, err)
 
 		signers[identity.NodeID] = verification.NewCombinedSigner(me, beaconSignerStore)
@@ -838,7 +838,7 @@ func TestCombinedVoteProcessorV2_BuildVerifyQC(t *testing.T) {
 
 		beaconSignerStore := hsig.NewEpochAwareRandomBeaconKeyStore(epochLookup, keys)
 
-		me, err := local.New(identity, stakingPriv)
+		me, err := local.New(identity.IdentitySkeleton, stakingPriv)
 		require.NoError(t, err)
 
 		signers[identity.NodeID] = verification.NewCombinedSigner(me, beaconSignerStore)

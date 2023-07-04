@@ -279,6 +279,9 @@ func (iy *Identity) EqualTo(other *Identity) bool {
 	if iy.Role != other.Role {
 		return false
 	}
+	if iy.InitialWeight != other.InitialWeight {
+		return false
+	}
 	if iy.Weight != other.Weight {
 		return false
 	}
@@ -313,6 +316,9 @@ type IdentityOrder func(*Identity, *Identity) bool
 // IdentityMapFunc is a modifier function for map operations for identities.
 // Identities are COPIED from the source slice.
 type IdentityMapFunc func(Identity) Identity
+
+// IdentitySkeletonList is a list of nodes skeletons.
+type IdentitySkeletonList []*IdentitySkeleton
 
 // IdentityList is a list of nodes.
 type IdentityList []*Identity

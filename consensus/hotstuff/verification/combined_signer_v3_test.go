@@ -44,7 +44,7 @@ func TestCombinedSignWithBeaconKeyV3(t *testing.T) {
 	nodeID.NodeID = signerID
 	nodeID.StakingPubKey = stakingPriv.PublicKey()
 
-	me, err := local.New(nodeID, stakingPriv)
+	me, err := local.New(nodeID.IdentitySkeleton, stakingPriv)
 	require.NoError(t, err)
 	signer := NewCombinedSignerV3(me, beaconKeyStore)
 
@@ -104,7 +104,7 @@ func TestCombinedSignWithNoBeaconKeyV3(t *testing.T) {
 	nodeID.NodeID = signerID
 	nodeID.StakingPubKey = stakingPriv.PublicKey()
 
-	me, err := local.New(nodeID, stakingPriv)
+	me, err := local.New(nodeID.IdentitySkeleton, stakingPriv)
 	require.NoError(t, err)
 	signer := NewCombinedSignerV3(me, beaconKeyStore)
 
@@ -290,7 +290,7 @@ func TestCombinedSign_BeaconKeyStore_ViewForUnknownEpochv3(t *testing.T) {
 	nodeID := unittest.IdentityFixture()
 	nodeID.StakingPubKey = stakingPriv.PublicKey()
 
-	me, err := local.New(nodeID, stakingPriv)
+	me, err := local.New(nodeID.IdentitySkeleton, stakingPriv)
 	require.NoError(t, err)
 	signer := NewCombinedSigner(me, beaconKeyStore)
 

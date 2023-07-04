@@ -442,10 +442,12 @@ func BootstrapIdentities(addresses []string, keys []string) (flow.IdentityList, 
 
 		// create the identity of the peer by setting only the relevant fields
 		ids[i] = &flow.Identity{
-			NodeID:        flow.ZeroID, // the NodeID is the hash of the staking key and for the public network it does not apply
-			Address:       address,
-			Role:          flow.RoleAccess, // the upstream node has to be an access node
-			NetworkPubKey: networkKey,
+			IdentitySkeleton: flow.IdentitySkeleton{
+				NodeID:        flow.ZeroID, // the NodeID is the hash of the staking key and for the public network it does not apply
+				Address:       address,
+				Role:          flow.RoleAccess, // the upstream node has to be an access node
+				NetworkPubKey: networkKey,
+			},
 		}
 	}
 	return ids, nil
@@ -660,7 +662,7 @@ func (builder *FollowerServiceBuilder) initPublicLibp2pNode(networkKey crypto.Pr
 func (builder *FollowerServiceBuilder) initObserverLocal() func(node *cmd.NodeConfig) error {
 	return func(node *cmd.NodeConfig) error {
 		// for an observer, set the identity here explicitly since it will not be found in the protocol state
-		self := &flow.Identity{
+		self := flow.IdentitySkeleton{
 			NodeID:        node.NodeID,
 			NetworkPubKey: node.NetworkKey.PublicKey(),
 			StakingPubKey: nil,             // no staking key needed for the observer

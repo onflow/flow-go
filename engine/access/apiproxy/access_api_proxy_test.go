@@ -135,7 +135,10 @@ func TestNewFlowCachedAccessAPIProxy(t *testing.T) {
 	}
 
 	// Prepare a proxy that fails due to the second connection being idle
-	l := flow.IdentityList{{Address: unittest.IPPort("11634")}, {Address: unittest.IPPort("11635")}}
+	l := flow.IdentitySkeletonList{
+		{Address: unittest.IPPort("11634")},
+		{Address: unittest.IPPort("11635")},
+	}
 	c := FlowAccessAPIForwarder{}
 	err = c.setFlowAccessAPI(l, time.Second)
 	if err == nil {
@@ -151,7 +154,10 @@ func TestNewFlowCachedAccessAPIProxy(t *testing.T) {
 	background := context.Background()
 
 	// Prepare a proxy
-	l = flow.IdentityList{{Address: unittest.IPPort("11634")}, {Address: unittest.IPPort("11635")}}
+	l = flow.IdentitySkeletonList{
+		{Address: unittest.IPPort("11634")},
+		{Address: unittest.IPPort("11635")},
+	}
 	c = FlowAccessAPIForwarder{}
 	err = c.setFlowAccessAPI(l, time.Second)
 	if err != nil {

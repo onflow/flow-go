@@ -258,56 +258,64 @@ func TestIdentity_EqualTo(t *testing.T) {
 	})
 
 	t.Run("NodeID diff", func(t *testing.T) {
-		a := &flow.Identity{NodeID: [32]byte{1, 2, 3}}
-		b := &flow.Identity{NodeID: [32]byte{2, 2, 2}}
+		a := &flow.Identity{IdentitySkeleton: flow.IdentitySkeleton{NodeID: [32]byte{1, 2, 3}}}
+		b := &flow.Identity{IdentitySkeleton: flow.IdentitySkeleton{NodeID: [32]byte{2, 2, 2}}}
 
 		require.False(t, a.EqualTo(b))
 		require.False(t, b.EqualTo(a))
 	})
 
 	t.Run("Address diff", func(t *testing.T) {
-		a := &flow.Identity{Address: "b"}
-		b := &flow.Identity{Address: "c"}
+		a := &flow.Identity{IdentitySkeleton: flow.IdentitySkeleton{Address: "b"}}
+		b := &flow.Identity{IdentitySkeleton: flow.IdentitySkeleton{Address: "c"}}
 
 		require.False(t, a.EqualTo(b))
 		require.False(t, b.EqualTo(a))
 	})
 
 	t.Run("Role diff", func(t *testing.T) {
-		a := &flow.Identity{Role: flow.RoleCollection}
-		b := &flow.Identity{Role: flow.RoleExecution}
+		a := &flow.Identity{IdentitySkeleton: flow.IdentitySkeleton{Role: flow.RoleCollection}}
+		b := &flow.Identity{IdentitySkeleton: flow.IdentitySkeleton{Role: flow.RoleExecution}}
+
+		require.False(t, a.EqualTo(b))
+		require.False(t, b.EqualTo(a))
+	})
+
+	t.Run("Initial weight diff", func(t *testing.T) {
+		a := &flow.Identity{IdentitySkeleton: flow.IdentitySkeleton{InitialWeight: 1}}
+		b := &flow.Identity{IdentitySkeleton: flow.IdentitySkeleton{InitialWeight: 2}}
 
 		require.False(t, a.EqualTo(b))
 		require.False(t, b.EqualTo(a))
 	})
 
 	t.Run("Weight diff", func(t *testing.T) {
-		a := &flow.Identity{Weight: 1}
-		b := &flow.Identity{Weight: 2}
+		a := &flow.Identity{DynamicIdentity: flow.DynamicIdentity{Weight: 1}}
+		b := &flow.Identity{DynamicIdentity: flow.DynamicIdentity{Weight: 2}}
 
 		require.False(t, a.EqualTo(b))
 		require.False(t, b.EqualTo(a))
 	})
 
 	t.Run("Ejected diff", func(t *testing.T) {
-		a := &flow.Identity{Ejected: true}
-		b := &flow.Identity{Ejected: false}
+		a := &flow.Identity{DynamicIdentity: flow.DynamicIdentity{Ejected: true}}
+		b := &flow.Identity{DynamicIdentity: flow.DynamicIdentity{Ejected: false}}
 
 		require.False(t, a.EqualTo(b))
 		require.False(t, b.EqualTo(a))
 	})
 
 	t.Run("StakingPubKey diff", func(t *testing.T) {
-		a := &flow.Identity{StakingPubKey: pks[0]}
-		b := &flow.Identity{StakingPubKey: pks[1]}
+		a := &flow.Identity{IdentitySkeleton: flow.IdentitySkeleton{StakingPubKey: pks[0]}}
+		b := &flow.Identity{IdentitySkeleton: flow.IdentitySkeleton{StakingPubKey: pks[1]}}
 
 		require.False(t, a.EqualTo(b))
 		require.False(t, b.EqualTo(a))
 	})
 
 	t.Run("NetworkPubKey diff", func(t *testing.T) {
-		a := &flow.Identity{NetworkPubKey: pks[0]}
-		b := &flow.Identity{NetworkPubKey: pks[1]}
+		a := &flow.Identity{IdentitySkeleton: flow.IdentitySkeleton{NetworkPubKey: pks[0]}}
+		b := &flow.Identity{IdentitySkeleton: flow.IdentitySkeleton{NetworkPubKey: pks[1]}}
 
 		require.False(t, a.EqualTo(b))
 		require.False(t, b.EqualTo(a))
@@ -315,22 +323,32 @@ func TestIdentity_EqualTo(t *testing.T) {
 
 	t.Run("Same data equals", func(t *testing.T) {
 		a := &flow.Identity{
-			NodeID:        flow.Identifier{1, 2, 3},
-			Address:       "address",
-			Role:          flow.RoleCollection,
-			Weight:        23,
-			Ejected:       false,
-			StakingPubKey: pks[0],
-			NetworkPubKey: pks[1],
+			IdentitySkeleton: flow.IdentitySkeleton{
+				NodeID:        flow.Identifier{1, 2, 3},
+				Address:       "address",
+				Role:          flow.RoleCollection,
+				InitialWeight: 23,
+				StakingPubKey: pks[0],
+				NetworkPubKey: pks[1],
+			},
+			DynamicIdentity: flow.DynamicIdentity{
+				Weight:  23,
+				Ejected: false,
+			},
 		}
 		b := &flow.Identity{
-			NodeID:        flow.Identifier{1, 2, 3},
-			Address:       "address",
-			Role:          flow.RoleCollection,
-			Weight:        23,
-			Ejected:       false,
-			StakingPubKey: pks[0],
-			NetworkPubKey: pks[1],
+			IdentitySkeleton: flow.IdentitySkeleton{
+				NodeID:        flow.Identifier{1, 2, 3},
+				Address:       "address",
+				Role:          flow.RoleCollection,
+				InitialWeight: 23,
+				StakingPubKey: pks[0],
+				NetworkPubKey: pks[1],
+			},
+			DynamicIdentity: flow.DynamicIdentity{
+				Weight:  23,
+				Ejected: false,
+			},
 		}
 
 		require.True(t, a.EqualTo(b))

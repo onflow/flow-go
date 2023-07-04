@@ -216,7 +216,7 @@ func LocalFixture(t testing.TB, identity *flow.Identity) module.Local {
 	// sets staking public key of the node
 	identity.StakingPubKey = sk.PublicKey()
 
-	me, err := local.New(identity, sk)
+	me, err := local.New(identity.IdentitySkeleton, sk)
 	require.NoError(t, err)
 
 	return me
@@ -284,7 +284,7 @@ func CollectionNode(t *testing.T, hub *stub.Hub, identity bootstrap.NodeInfo, ro
 	node := GenericNode(t, hub, identity.Identity(), rootSnapshot)
 	privKeys, err := identity.PrivateKeys()
 	require.NoError(t, err)
-	node.Me, err = local.New(identity.Identity(), privKeys.StakingKey)
+	node.Me, err = local.New(identity.Identity().IdentitySkeleton, privKeys.StakingKey)
 	require.NoError(t, err)
 
 	pools := epochs.NewTransactionPools(
