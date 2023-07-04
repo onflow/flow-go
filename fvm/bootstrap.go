@@ -318,7 +318,7 @@ func (b *bootstrapExecutor) Execute() error {
 	service := b.createServiceAccount()
 
 	fungibleToken := b.deployFungibleToken()
-	nonFungibleToken := b.deployNonFungibleToken()
+	nonFungibleToken := b.deployNonFungibleToken(service)
 	b.deployMetadataViews(fungibleToken, nonFungibleToken)
 	flowToken := b.deployFlowToken(service, fungibleToken, nonFungibleToken)
 	storageFees := b.deployStorageFees(service, fungibleToken, flowToken)
@@ -413,17 +413,16 @@ func (b *bootstrapExecutor) deployFungibleToken() flow.Address {
 	return fungibleToken
 }
 
-func (b *bootstrapExecutor) deployNonFungibleToken() flow.Address {
-	nonFungibleToken := b.createAccount(b.accountKeys.FungibleTokenAccountPublicKeys)
+func (b *bootstrapExecutor) deployNonFungibleToken(deployTo flow.Address) flow.Address {
 
 	txError, err := b.invokeMetaTransaction(
 		b.ctx,
 		Transaction(
-			blueprints.DeployNonFungibleTokenContractTransaction(nonFungibleToken),
+			blueprints.DeployNonFungibleTokenContractTransaction(deployTo),
 			0),
 	)
 	panicOnMetaInvokeErrf("failed to deploy non-fungible token contract: %s", txError, err)
-	return nonFungibleToken
+	return deployTo
 }
 
 func (b *bootstrapExecutor) deployMetadataViews(fungibleToken, nonFungibleToken flow.Address) {
