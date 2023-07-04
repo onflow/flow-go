@@ -55,10 +55,10 @@ func (_m *Packer) Unpack(signerIdentities flow.IdentitySkeletonList, sigData []b
 
 	var r0 *hotstuff.BlockSignatureData
 	var r1 error
-	if rf, ok := ret.Get(0).(func(flow.IdentityList, []byte) (*hotstuff.BlockSignatureData, error)); ok {
+	if rf, ok := ret.Get(0).(func(flow.IdentitySkeletonList, []byte) (*hotstuff.BlockSignatureData, error)); ok {
 		return rf(signerIdentities, sigData)
 	}
-	if rf, ok := ret.Get(0).(func(flow.IdentityList, []byte) *hotstuff.BlockSignatureData); ok {
+	if rf, ok := ret.Get(0).(func(flow.IdentitySkeletonList, []byte) *hotstuff.BlockSignatureData); ok {
 		r0 = rf(signerIdentities, sigData)
 	} else {
 		if ret.Get(0) != nil {
@@ -66,7 +66,7 @@ func (_m *Packer) Unpack(signerIdentities flow.IdentitySkeletonList, sigData []b
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(flow.IdentityList, []byte) error); ok {
+	if rf, ok := ret.Get(1).(func(flow.IdentitySkeletonList, []byte) error); ok {
 		r1 = rf(signerIdentities, sigData)
 	} else {
 		r1 = ret.Error(1)
