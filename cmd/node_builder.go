@@ -13,6 +13,7 @@ import (
 	"github.com/spf13/pflag"
 
 	"github.com/onflow/flow-go/admin/commands"
+	"github.com/onflow/flow-go/config"
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/model/flow"
@@ -23,15 +24,8 @@ import (
 	"github.com/onflow/flow-go/module/profiler"
 	"github.com/onflow/flow-go/module/updatable_configs"
 	"github.com/onflow/flow-go/network"
-	"github.com/onflow/flow-go/network/alsp"
 	"github.com/onflow/flow-go/network/codec/cbor"
 	"github.com/onflow/flow-go/network/p2p"
-	"github.com/onflow/flow-go/network/p2p/connection"
-	"github.com/onflow/flow-go/network/p2p/distributor"
-	"github.com/onflow/flow-go/network/p2p/dns"
-	"github.com/onflow/flow-go/network/p2p/middleware"
-	"github.com/onflow/flow-go/network/p2p/p2pbuilder"
-	"github.com/onflow/flow-go/network/p2p/unicast"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/events"
 	bstorage "github.com/onflow/flow-go/storage/badger"
@@ -141,7 +135,6 @@ type NodeBuilder interface {
 // For a node running as a standalone process, the config fields will be populated from the command line params,
 // while for a node running as a library, the config fields are expected to be initialized by the caller.
 type BaseConfig struct {
-	NetworkConfig
 	nodeIDHex                   string
 	AdminAddr                   string
 	AdminCert                   string
@@ -177,70 +170,9 @@ type BaseConfig struct {
 	// ComplianceConfig configures either the compliance engine (consensus nodes)
 	// or the follower engine (all other node roles)
 	ComplianceConfig compliance.Config
-}
 
-type NetworkConfig struct {
-	// NetworkConnectionPruning determines whether connections to nodes
-	// that are not part of protocol state should be trimmed
-	// TODO: solely a fallback mechanism, can be removed upon reliable behavior in production.
-	NetworkConnectionPruning bool
-	// GossipSubConfig core gossipsub configuration.
-	GossipSubConfig *p2pbuilder.GossipSubConfig
-	// PreferredUnicastProtocols list of unicast protocols in preferred order
-	PreferredUnicastProtocols       []string
-	NetworkReceivedMessageCacheSize uint32
-
-	PeerUpdateInterval          time.Duration
-	UnicastMessageTimeout       time.Duration
-	DNSCacheTTL                 time.Duration
-	LibP2PResourceManagerConfig *p2pbuilder.ResourceManagerConfig
-	ConnectionManagerConfig     *connection.ManagerConfig
-	// UnicastCreateStreamRetryDelay initial delay used in the exponential backoff for create stream retries
-	UnicastCreateStreamRetryDelay time.Duration
-	// size of the queue for notifications about new peers in the disallow list.
-	DisallowListNotificationCacheSize uint32
-	// UnicastRateLimitersConfig configuration for all unicast rate limiters.
-	UnicastRateLimitersConfig *UnicastRateLimitersConfig
-	AlspConfig                *AlspConfig
-	// GossipSubRpcInspectorSuite rpc inspector suite.
-	GossipSubRpcInspectorSuite p2p.GossipSubInspectorSuite
-}
-
-// AlspConfig is the config for the Application Layer Spam Prevention (ALSP) protocol.
-type AlspConfig struct {
-	// Size of the cache for spam records. There is at most one spam record per authorized (i.e., staked) node.
-	// Recommended size is 10 * number of authorized nodes to allow for churn.
-	SpamRecordCacheSize uint32
-
-	// SpamReportQueueSize is the size of the queue for spam records. The queue is used to store spam records
-	// temporarily till they are picked by the workers. When the queue is full, new spam records are dropped.
-	// Recommended size is 100 * number of authorized nodes to allow for churn.
-	SpamReportQueueSize uint32
-
-	// DisablePenalty indicates whether applying the penalty to the misbehaving node is disabled.
-	// When disabled, the ALSP module logs the misbehavior reports and updates the metrics, but does not apply the penalty.
-	// This is useful for managing production incidents.
-	// Note: under normal circumstances, the ALSP module should not be disabled.
-	DisablePenalty bool
-
-	// HeartBeatInterval is the interval between heartbeats sent by the ALSP module. The heartbeats are recurring
-	// events that are used to perform critical ALSP tasks, such as updating the spam records cache.
-	HearBeatInterval time.Duration
-}
-
-// UnicastRateLimitersConfig unicast rate limiter configuration for the message and bandwidth rate limiters.
-type UnicastRateLimitersConfig struct {
-	// DryRun setting this to true will disable connection disconnects and gating when unicast rate limiters are configured
-	DryRun bool
-	// LockoutDuration the number of seconds a peer will be forced to wait before being allowed to successful reconnect to the node
-	// after being rate limited.
-	LockoutDuration time.Duration
-	// MessageRateLimit amount of unicast messages that can be sent by a peer per second.
-	MessageRateLimit int
-	// BandwidthRateLimit bandwidth size in bytes a peer is allowed to send via unicast streams per second.
-	BandwidthRateLimit int
-	// BandwidthBurstLimit bandwidth size in bytes a peer is allowed to send via unicast streams at once.
-	BandwidthBurstLimit int
+	// FlowConfig Flow configuration.
+	FlowConfig config.FlowConfig
 }
 
 // NodeConfig contains all the derived parameters such the NodeID, private keys etc. and initialized instances of
@@ -291,8 +223,6 @@ type NodeConfig struct {
 
 	// UnicastRateLimiterDistributor notifies consumers when a peer's unicast message is rate limited.
 	UnicastRateLimiterDistributor p2p.UnicastRateLimiterDistributor
-	// NodeDisallowListDistributor notifies consumers of updates to disallow listing of nodes.
-	NodeDisallowListDistributor p2p.DisallowListNotificationDistributor
 }
 
 // StateExcerptAtBoot stores information about the root snapshot and latest finalized block for use in bootstrapping.
@@ -321,31 +251,6 @@ func DefaultBaseConfig() *BaseConfig {
 	codecFactory := func() network.Codec { return cbor.NewCodec() }
 
 	return &BaseConfig{
-		NetworkConfig: NetworkConfig{
-			UnicastCreateStreamRetryDelay:   unicast.DefaultRetryDelay,
-			PeerUpdateInterval:              connection.DefaultPeerUpdateInterval,
-			UnicastMessageTimeout:           middleware.DefaultUnicastTimeout,
-			NetworkReceivedMessageCacheSize: p2p.DefaultReceiveCacheSize,
-			UnicastRateLimitersConfig: &UnicastRateLimitersConfig{
-				DryRun:              true,
-				LockoutDuration:     10,
-				MessageRateLimit:    0,
-				BandwidthRateLimit:  0,
-				BandwidthBurstLimit: middleware.LargeMsgMaxUnicastMsgSize,
-			},
-			GossipSubConfig:                   p2pbuilder.DefaultGossipSubConfig(),
-			DNSCacheTTL:                       dns.DefaultTimeToLive,
-			LibP2PResourceManagerConfig:       p2pbuilder.DefaultResourceManagerConfig(),
-			ConnectionManagerConfig:           connection.DefaultConnManagerConfig(),
-			NetworkConnectionPruning:          connection.PruningEnabled,
-			DisallowListNotificationCacheSize: distributor.DefaultDisallowListNotificationQueueCacheSize,
-			AlspConfig: &AlspConfig{
-				SpamRecordCacheSize: alsp.DefaultSpamRecordCacheSize,
-				SpamReportQueueSize: alsp.DefaultSpamReportQueueSize,
-				HearBeatInterval:    alsp.DefaultHeartBeatInterval,
-				DisablePenalty:      false, // by default, apply the penalty
-			},
-		},
 		nodeIDHex:        NotSet,
 		AdminAddr:        NotSet,
 		AdminCert:        NotSet,

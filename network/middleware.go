@@ -17,6 +17,7 @@ import (
 // connections, as well as reading & writing to/from the connections.
 type Middleware interface {
 	component.Component
+	DisallowListNotificationConsumer
 
 	// SetOverlay sets the overlay used by the middleware. This must be called before the middleware can be Started.
 	SetOverlay(Overlay)

@@ -10,9 +10,11 @@ import (
 	"github.com/libp2p/go-libp2p/core/protocol"
 	"github.com/libp2p/go-libp2p/core/routing"
 
+	"github.com/onflow/flow-go/engine/collection"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/irrecoverable"
+	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/p2p/unicast/protocols"
 )
@@ -31,6 +33,17 @@ type LibP2PNode interface {
 	PeerConnections
 	// PeerScore exposes the peer score API.
 	PeerScore
+	// DisallowListNotificationConsumer exposes the disallow list notification consumer API for the node so that
+	// it will be notified when a new disallow list update is distributed.
+	DisallowListNotificationConsumer
+	// CollectionClusterChangesConsumer  is the interface for consuming the events of changes in the collection cluster.
+	// This is used to notify the node of changes in the collection cluster.
+	// LibP2PNode implements this interface and consumes the events to be notified of changes in the clustering channels.
+	// The clustering channels are used by the collection nodes of a cluster to communicate with each other.
+	// As the cluster (and hence their cluster channels) of collection nodes changes over time (per epoch) the node needs to be notified of these changes.
+	CollectionClusterChangesConsumer
+	// DisallowListOracle exposes the disallow list oracle API for external consumers to query about the disallow list.
+	DisallowListOracle
 	// Start the libp2p node.
 	Start(ctx irrecoverable.SignalerContext)
 	// Stop terminates the libp2p node.
@@ -87,16 +100,21 @@ type Subscriptions interface {
 	SetUnicastManager(uniMgr UnicastManager)
 }
 
+// CollectionClusterChangesConsumer  is the interface for consuming the events of changes in the collection cluster.
+// This is used to notify the node of changes in the collection cluster.
+// LibP2PNode implements this interface and consumes the events to be notified of changes in the clustering channels.
+// The clustering channels are used by the collection nodes of a cluster to communicate with each other.
+// As the cluster (and hence their cluster channels) of collection nodes changes over time (per epoch) the node needs to be notified of these changes.
+type CollectionClusterChangesConsumer interface {
+	collection.ClusterEvents
+}
+
 // PeerScore is the interface for the peer score module. It is used to expose the peer score to other
 // components of the node. It is also used to set the peer score exposer implementation.
 type PeerScore interface {
-	// SetPeerScoreExposer sets the node's peer score exposer implementation.
-	// SetPeerScoreExposer may be called at most once. It is an irrecoverable error to call this
-	// method if the node's peer score exposer has already been set.
-	SetPeerScoreExposer(e PeerScoreExposer)
 	// PeerScoreExposer returns the node's peer score exposer implementation.
 	// If the node's peer score exposer has not been set, the second return value will be false.
-	PeerScoreExposer() (PeerScoreExposer, bool)
+	PeerScoreExposer() PeerScoreExposer
 }
 
 // PeerConnections subset of funcs related to underlying libp2p host connections.
@@ -108,4 +126,39 @@ type PeerConnections interface {
 	//  * network.ErrIllegalConnectionState if the underlying libp2p host reports connectedness as NotConnected but the connections list
 	// 	  to the peer is not empty. This indicates a bug within libp2p.
 	IsConnected(peerID peer.ID) (bool, error)
+}
+
+// DisallowListNotificationConsumer is an interface for consuming disallow/allow list update notifications.
+type DisallowListNotificationConsumer interface {
+	// OnDisallowListNotification is called when a new disallow list update notification is distributed.
+	// Any error on consuming event must handle internally.
+	// The implementation must be concurrency safe.
+	// Args:
+	// 	id: peer ID of the peer being disallow-listed.
+	// 	cause: cause of the peer being disallow-listed (only this cause is added to the peer's disallow-listed causes).
+	// Returns:
+	// 	none
+	OnDisallowListNotification(id peer.ID, cause network.DisallowListedCause)
+
+	// OnAllowListNotification is called when a new allow list update notification is distributed.
+	// Any error on consuming event must handle internally.
+	// The implementation must be concurrency safe.
+	// Args:
+	// 	id: peer ID of the peer being allow-listed.
+	// 	cause: cause of the peer being allow-listed (only this cause is removed from the peer's disallow-listed causes).
+	// Returns:
+	// 	none
+	OnAllowListNotification(id peer.ID, cause network.DisallowListedCause)
+}
+
+// DisallowListOracle is an interface for querying disallow-listed peers.
+type DisallowListOracle interface {
+	// IsDisallowListed determines whether the given peer is disallow-listed for any reason.
+	// Args:
+	// - peerID: the peer to check.
+	// Returns:
+	// - []network.DisallowListedCause: the list of causes for which the given peer is disallow-listed. If the peer is not disallow-listed for any reason,
+	// a nil slice is returned.
+	// - bool: true if the peer is disallow-listed for any reason, false otherwise.
+	IsDisallowListed(peerId peer.ID) ([]network.DisallowListedCause, bool)
 }

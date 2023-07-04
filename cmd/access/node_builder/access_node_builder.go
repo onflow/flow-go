@@ -72,7 +72,6 @@ import (
 	"github.com/onflow/flow-go/network/p2p/middleware"
 	"github.com/onflow/flow-go/network/p2p/p2pbuilder"
 	p2pconfig "github.com/onflow/flow-go/network/p2p/p2pbuilder/config"
-	"github.com/onflow/flow-go/network/p2p/p2pbuilder/inspector"
 	"github.com/onflow/flow-go/network/p2p/subscription"
 	"github.com/onflow/flow-go/network/p2p/tracer"
 	"github.com/onflow/flow-go/network/p2p/translator"
@@ -319,6 +318,7 @@ func (builder *FlowAccessNodeBuilder) buildFollowerCore() *FlowAccessNodeBuilder
 
 		followerCore, err := consensus.NewFollower(
 			node.Logger,
+			node.Metrics.Mempool,
 			node.Storage.Headers,
 			final,
 			builder.FollowerDistributor,
@@ -759,6 +759,7 @@ func (builder *FlowAccessNodeBuilder) initNetwork(nodeID module.Local,
 	topology network.Topology,
 	receiveCache *netcache.ReceiveCache,
 ) (*p2p.Network, error) {
+	// creates network instance
 	net, err := p2p.NewNetwork(&p2p.NetworkConfig{
 		Logger:              builder.Logger,
 		Codec:               cborcodec.NewCodec(),
@@ -772,10 +773,10 @@ func (builder *FlowAccessNodeBuilder) initNetwork(nodeID module.Local,
 		ConduitFactory:      conduit.NewDefaultConduitFactory(),
 		AlspCfg: &alspmgr.MisbehaviorReportManagerConfig{
 			Logger:                  builder.Logger,
-			SpamRecordCacheSize:     builder.AlspConfig.SpamRecordCacheSize,
-			SpamReportQueueSize:     builder.AlspConfig.SpamReportQueueSize,
-			DisablePenalty:          builder.AlspConfig.DisablePenalty,
-			HeartBeatInterval:       builder.AlspConfig.HearBeatInterval,
+			SpamRecordCacheSize:     builder.FlowConfig.NetworkConfig.AlspConfig.SpamRecordCacheSize,
+			SpamReportQueueSize:     builder.FlowConfig.NetworkConfig.AlspConfig.SpamReportQueueSize,
+			DisablePenalty:          builder.FlowConfig.NetworkConfig.AlspConfig.DisablePenalty,
+			HeartBeatInterval:       builder.FlowConfig.NetworkConfig.AlspConfig.HearBeatInterval,
 			AlspMetrics:             builder.Metrics.Network,
 			NetworkType:             network.PublicNetwork,
 			HeroCacheMetricsFactory: builder.HeroCacheMetricsFactory(),
@@ -811,11 +812,11 @@ func (builder *FlowAccessNodeBuilder) InitIDProviders() {
 		}
 		builder.IDTranslator = translator.NewHierarchicalIDTranslator(idCache, translator.NewPublicNetworkIDTranslator())
 
-		builder.NodeDisallowListDistributor = cmd.BuildDisallowListNotificationDisseminator(builder.DisallowListNotificationCacheSize, builder.MetricsRegisterer, builder.Logger, builder.MetricsEnabled)
-
 		// The following wrapper allows to disallow-list byzantine nodes via an admin command:
 		// the wrapper overrides the 'Ejected' flag of disallow-listed nodes to true
-		disallowListWrapper, err := cache.NewNodeBlocklistWrapper(idCache, node.DB, builder.NodeDisallowListDistributor)
+		disallowListWrapper, err := cache.NewNodeDisallowListWrapper(idCache, node.DB, func() network.DisallowListNotificationConsumer {
+			return builder.Middleware
+		})
 		if err != nil {
 			return fmt.Errorf("could not initialize NodeBlockListWrapper: %w", err)
 		}
@@ -823,9 +824,9 @@ func (builder *FlowAccessNodeBuilder) InitIDProviders() {
 
 		// register the wrapper for dynamic configuration via admin command
 		err = node.ConfigManager.RegisterIdentifierListConfig("network-id-provider-blocklist",
-			disallowListWrapper.GetBlocklist, disallowListWrapper.Update)
+			disallowListWrapper.GetDisallowList, disallowListWrapper.Update)
 		if err != nil {
-			return fmt.Errorf("failed to register blocklist with config manager: %w", err)
+			return fmt.Errorf("failed to register disallow-list wrapper with config manager: %w", err)
 		}
 
 		builder.SyncEngineParticipantsProviderFactory = func() module.IdentifierProvider {
@@ -839,11 +840,6 @@ func (builder *FlowAccessNodeBuilder) InitIDProviders() {
 			)
 		}
 		return nil
-	})
-
-	builder.Component("disallow list notification distributor", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-		// distributor is returned as a component to be started and stopped.
-		return builder.NodeDisallowListDistributor, nil
 	})
 }
 
@@ -1150,7 +1146,7 @@ func (builder *FlowAccessNodeBuilder) enqueuePublicNetworkInit() {
 
 			// topology returns empty list since peers are not known upfront
 			top := topology.EmptyTopology{}
-			receiveCache := netcache.NewHeroReceiveCache(builder.NetworkReceivedMessageCacheSize,
+			receiveCache := netcache.NewHeroReceiveCache(builder.FlowConfig.NetworkConfig.NetworkReceivedMessageCacheSize,
 				builder.Logger,
 				metrics.NetworkReceiveCacheMetricsFactory(builder.HeroCacheMetricsFactory(), network.PublicNetwork))
 
@@ -1191,7 +1187,7 @@ func (builder *FlowAccessNodeBuilder) enqueuePublicNetworkInit() {
 // - The libp2p node instance for the public network.
 // - Any error encountered during initialization. Any error should be considered fatal.
 func (builder *FlowAccessNodeBuilder) initPublicLibp2pNode(networkKey crypto.PrivateKey, bindAddress string, networkMetrics module.LibP2PMetrics) (p2p.LibP2PNode, error) {
-	connManager, err := connection.NewConnManager(builder.Logger, networkMetrics, builder.ConnectionManagerConfig)
+	connManager, err := connection.NewConnManager(builder.Logger, networkMetrics, &builder.FlowConfig.NetworkConfig.ConnectionManagerConfig)
 	if err != nil {
 		return nil, fmt.Errorf("could not create connection manager: %w", err)
 	}
@@ -1200,27 +1196,32 @@ func (builder *FlowAccessNodeBuilder) initPublicLibp2pNode(networkKey crypto.Pri
 		builder.Logger,
 		networkMetrics,
 		builder.IdentityProvider,
-		builder.GossipSubConfig.LocalMeshLogInterval)
-
-	// setup RPC inspectors
-	rpcInspectorBuilder := inspector.NewGossipSubInspectorBuilder(builder.Logger, builder.SporkID, builder.GossipSubConfig.RpcInspector, builder.IdentityProvider, builder.Metrics.Network)
-	rpcInspectorSuite, err := rpcInspectorBuilder.
-		SetNetworkType(network.PublicNetwork).
-		SetMetrics(&p2pconfig.MetricsConfig{
-			HeroCacheFactory: builder.HeroCacheMetricsFactory(),
-			Metrics:          builder.Metrics.Network,
-		}).Build()
-	if err != nil {
-		return nil, fmt.Errorf("failed to create gossipsub rpc inspectors for access node: %w", err)
-	}
+		builder.FlowConfig.NetworkConfig.GossipSubConfig.LocalMeshLogInterval)
 
 	libp2pNode, err := p2pbuilder.NewNodeBuilder(
 		builder.Logger,
-		networkMetrics,
+		&p2pconfig.MetricsConfig{
+			HeroCacheFactory: builder.HeroCacheMetricsFactory(),
+			Metrics:          networkMetrics,
+		},
+		network.PublicNetwork,
 		bindAddress,
 		networkKey,
 		builder.SporkID,
-		builder.LibP2PResourceManagerConfig).
+		builder.IdentityProvider,
+		&builder.FlowConfig.NetworkConfig.ResourceManagerConfig,
+		&builder.FlowConfig.NetworkConfig.GossipSubConfig.GossipSubRPCInspectorsConfig,
+		&p2pconfig.PeerManagerConfig{
+			// TODO: eventually, we need pruning enabled even on public network. However, it needs a modified version of
+			// the peer manager that also operate on the public identities.
+			ConnectionPruning: connection.PruningDisabled,
+			UpdateInterval:    builder.FlowConfig.NetworkConfig.PeerUpdateInterval,
+			ConnectorFactory:  connection.DefaultLibp2pBackoffConnectorFactory(),
+		},
+		&p2p.DisallowListCacheConfig{
+			MaxSize: builder.FlowConfig.NetworkConfig.DisallowListNotificationCacheSize,
+			Metrics: metrics.DisallowListCacheMetricsFactory(builder.HeroCacheMetricsFactory(), network.PublicNetwork),
+		}).
 		SetBasicResolver(builder.Resolver).
 		SetSubscriptionFilter(
 			subscription.NewRoleBasedFilter(
@@ -1239,11 +1240,9 @@ func (builder *FlowAccessNodeBuilder) initPublicLibp2pNode(networkKey crypto.Pri
 			)
 		}).
 		// disable connection pruning for the access node which supports the observer
-		SetPeerManagerOptions(connection.PruningDisabled, builder.PeerUpdateInterval).
-		SetStreamCreationRetryInterval(builder.UnicastCreateStreamRetryDelay).
+		SetStreamCreationRetryInterval(builder.FlowConfig.NetworkConfig.UnicastCreateStreamRetryDelay).
 		SetGossipSubTracer(meshTracer).
-		SetGossipSubScoreTracerInterval(builder.GossipSubConfig.ScoreTracerInterval).
-		SetGossipSubRpcInspectorSuite(rpcInspectorSuite).
+		SetGossipSubScoreTracerInterval(builder.FlowConfig.NetworkConfig.GossipSubConfig.ScoreTracerInterval).
 		Build()
 
 	if err != nil {
@@ -1261,20 +1260,19 @@ func (builder *FlowAccessNodeBuilder) initMiddleware(nodeID flow.Identifier,
 	validators ...network.MessageValidator,
 ) network.Middleware {
 	logger := builder.Logger.With().Bool("staked", false).Logger()
-	slashingViolationsConsumer := slashing.NewSlashingViolationsConsumer(logger, networkMetrics)
-	mw := middleware.NewMiddleware(
-		logger,
-		libp2pNode,
-		nodeID,
-		builder.Metrics.Bitswap,
-		builder.SporkID,
-		middleware.DefaultUnicastTimeout,
-		builder.IDTranslator,
-		builder.CodecFactory(),
-		slashingViolationsConsumer,
+	mw := middleware.NewMiddleware(&middleware.Config{
+		Logger:                     logger,
+		Libp2pNode:                 libp2pNode,
+		FlowId:                     nodeID,
+		BitSwapMetrics:             builder.Metrics.Bitswap,
+		RootBlockID:                builder.SporkID,
+		UnicastMessageTimeout:      middleware.DefaultUnicastTimeout,
+		IdTranslator:               builder.IDTranslator,
+		Codec:                      builder.CodecFactory(),
+		SlashingViolationsConsumer: slashing.NewSlashingViolationsConsumer(logger, networkMetrics),
+	},
 		middleware.WithMessageValidators(validators...), // use default identifier provider
 	)
-	builder.NodeDisallowListDistributor.AddConsumer(mw)
 	builder.Middleware = mw
 	return builder.Middleware
 }

@@ -21,19 +21,20 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 
+	"github.com/onflow/flow-go/config"
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/id"
 	"github.com/onflow/flow-go/module/metrics"
+	flownet "github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/internal/p2putils"
-	"github.com/onflow/flow-go/network/internal/testutils"
 	"github.com/onflow/flow-go/network/message"
 	"github.com/onflow/flow-go/network/p2p"
 	p2pdht "github.com/onflow/flow-go/network/p2p/dht"
 	"github.com/onflow/flow-go/network/p2p/keyutils"
 	"github.com/onflow/flow-go/network/p2p/p2pbuilder"
-	inspectorbuilder "github.com/onflow/flow-go/network/p2p/p2pbuilder/inspector"
+	p2pconfig "github.com/onflow/flow-go/network/p2p/p2pbuilder/config"
 	"github.com/onflow/flow-go/network/p2p/tracer"
 	"github.com/onflow/flow-go/network/p2p/unicast"
 	"github.com/onflow/flow-go/network/p2p/unicast/protocols"
@@ -96,34 +97,42 @@ func WithSubscriptionFilter(filter pubsub.SubscriptionFilter) nodeOpt {
 	}
 }
 
+// TODO: this should be replaced by node fixture: https://github.com/onflow/flow-go/blob/master/network/p2p/test/fixtures.go
 func CreateNode(t *testing.T, networkKey crypto.PrivateKey, sporkID flow.Identifier, logger zerolog.Logger, nodeIds flow.IdentityList, opts ...nodeOpt) p2p.LibP2PNode {
 	idProvider := id.NewFixedIdentityProvider(nodeIds)
-
+	defaultFlowConfig, err := config.DefaultConfig()
+	require.NoError(t, err)
 	meshTracer := tracer.NewGossipSubMeshTracer(
 		logger,
 		metrics.NewNoopCollector(),
 		idProvider,
-		p2pbuilder.DefaultGossipSubConfig().LocalMeshLogInterval)
-
-	met := metrics.NewNoopCollector()
-	rpcInspectorSuite, err := inspectorbuilder.NewGossipSubInspectorBuilder(logger, sporkID, inspectorbuilder.DefaultGossipSubRPCInspectorsConfig(), idProvider, met).Build()
-	require.NoError(t, err)
+		defaultFlowConfig.NetworkConfig.GossipSubConfig.LocalMeshLogInterval)
 
 	builder := p2pbuilder.NewNodeBuilder(
 		logger,
-		met,
+		&p2pconfig.MetricsConfig{
+			HeroCacheFactory: metrics.NewNoopHeroCacheMetricsFactory(),
+			Metrics:          metrics.NewNoopCollector(),
+		},
+		flownet.PrivateNetwork,
 		unittest.DefaultAddress,
 		networkKey,
 		sporkID,
-		p2pbuilder.DefaultResourceManagerConfig()).
+		idProvider,
+		&defaultFlowConfig.NetworkConfig.ResourceManagerConfig,
+		&defaultFlowConfig.NetworkConfig.GossipSubRPCInspectorsConfig,
+		p2pconfig.PeerManagerDisableConfig(),
+		&p2p.DisallowListCacheConfig{
+			MaxSize: uint32(1000),
+			Metrics: metrics.NewNoopCollector(),
+		}).
 		SetRoutingSystem(func(c context.Context, h host.Host) (routing.Routing, error) {
 			return p2pdht.NewDHT(c, h, protocols.FlowDHTProtocolID(sporkID), zerolog.Nop(), metrics.NewNoopCollector())
 		}).
-		SetResourceManager(testutils.NewResourceManager(t)).
+		SetResourceManager(&network.NullResourceManager{}).
 		SetStreamCreationRetryInterval(unicast.DefaultRetryDelay).
 		SetGossipSubTracer(meshTracer).
-		SetGossipSubScoreTracerInterval(p2pbuilder.DefaultGossipSubConfig().ScoreTracerInterval).
-		SetGossipSubRpcInspectorSuite(rpcInspectorSuite)
+		SetGossipSubScoreTracerInterval(defaultFlowConfig.NetworkConfig.GossipSubConfig.ScoreTracerInterval)
 
 	for _, opt := range opts {
 		opt(builder)
@@ -240,7 +249,7 @@ func EnsureNotConnected(t *testing.T, ctx context.Context, from []p2p.LibP2PNode
 			// Hence, we instead check for any trace of the connection being established in the receiver side.
 			_ = this.Host().Connect(ctx, other.Host().Peerstore().PeerInfo(other.Host().ID()))
 			// ensures that other node has never received a connection from this node.
-			require.Equal(t, other.Host().Network().Connectedness(thisId), network.NotConnected)
+			require.Equal(t, network.NotConnected, other.Host().Network().Connectedness(thisId))
 			require.Empty(t, other.Host().Network().ConnsToPeer(thisId))
 		}
 	}

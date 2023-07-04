@@ -16,8 +16,9 @@ import (
 	"github.com/onflow/flow-go/utils/logging"
 )
 
-// DefaultPeerUpdateInterval is default duration for which the peer manager waits in between attempts to update peer connections
-var DefaultPeerUpdateInterval = 10 * time.Minute
+// DefaultPeerUpdateInterval is default duration for which the peer manager waits in between attempts to update peer connections.
+// We set it to 1 second to be aligned with the heartbeat intervals of libp2p, alsp, and gossipsub.
+var DefaultPeerUpdateInterval = time.Second
 
 var _ p2p.PeerManager = (*PeerManager)(nil)
 var _ component.Component = (*PeerManager)(nil)
@@ -30,7 +31,7 @@ type PeerManager struct {
 	logger             zerolog.Logger
 	peersProvider      p2p.PeersProvider // callback to retrieve list of peers to connect to
 	peerRequestQ       chan struct{}     // a channel to queue a peer update request
-	connector          p2p.Connector     // connector to connect or disconnect from peers
+	connector          p2p.PeerUpdater   // connector to connect or disconnect from peers
 	peerUpdateInterval time.Duration     // interval the peer manager runs on
 
 	peersProviderMu sync.RWMutex
@@ -38,7 +39,7 @@ type PeerManager struct {
 
 // NewPeerManager creates a new peer manager which calls the peersProvider callback to get a list of peers to connect to
 // and it uses the connector to actually connect or disconnect from peers.
-func NewPeerManager(logger zerolog.Logger, updateInterval time.Duration, connector p2p.Connector) *PeerManager {
+func NewPeerManager(logger zerolog.Logger, updateInterval time.Duration, connector p2p.PeerUpdater) *PeerManager {
 	pm := &PeerManager{
 		logger:             logger,
 		connector:          connector,

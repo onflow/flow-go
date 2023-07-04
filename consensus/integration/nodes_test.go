@@ -549,7 +549,12 @@ func createNode(
 		timeoutAggregationDistributor,
 		timeoutProcessorFactory,
 	)
-	timeoutCollectors := timeoutaggregator.NewTimeoutCollectors(log, livenessData.CurrentView, timeoutCollectorsFactory)
+	timeoutCollectors := timeoutaggregator.NewTimeoutCollectors(
+		log,
+		metricsCollector,
+		livenessData.CurrentView,
+		timeoutCollectorsFactory,
+	)
 
 	timeoutAggregator, err := timeoutaggregator.NewTimeoutAggregator(
 		log,
@@ -577,6 +582,7 @@ func createNode(
 	// initialize hotstuff
 	hot, err := consensus.NewParticipant(
 		log,
+		metricsCollector,
 		metricsCollector,
 		build,
 		rootHeader,

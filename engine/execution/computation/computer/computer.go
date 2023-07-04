@@ -3,6 +3,7 @@ package computer
 import (
 	"context"
 	"fmt"
+	"sync"
 
 	"github.com/rs/zerolog"
 	"go.opentelemetry.io/otel/attribute"
@@ -15,6 +16,7 @@ import (
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/blueprints"
 	"github.com/onflow/flow-go/fvm/storage/derived"
+	"github.com/onflow/flow-go/fvm/storage/errors"
 	"github.com/onflow/flow-go/fvm/storage/logical"
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/model/flow"
@@ -111,6 +113,7 @@ type blockComputer struct {
 	spockHasher           hash.Hasher
 	receiptHasher         hash.Hasher
 	colResCons            []result.ExecutedCollectionConsumer
+	maxConcurrency        int
 }
 
 func SystemChunkContext(vmCtx fvm.Context, logger zerolog.Logger) fvm.Context {
@@ -138,7 +141,11 @@ func NewBlockComputer(
 	signer module.Local,
 	executionDataProvider *provider.Provider,
 	colResCons []result.ExecutedCollectionConsumer,
+	maxConcurrency int,
 ) (BlockComputer, error) {
+	if maxConcurrency < 1 {
+		return nil, fmt.Errorf("invalid maxConcurrency: %d", maxConcurrency)
+	}
 	systemChunkCtx := SystemChunkContext(vmCtx, logger)
 	vmCtx = fvm.NewContextFromParent(
 		vmCtx,
@@ -157,6 +164,7 @@ func NewBlockComputer(
 		spockHasher:           utils.NewSPOCKHasher(),
 		receiptHasher:         utils.NewExecutionReceiptHasher(),
 		colResCons:            colResCons,
+		maxConcurrency:        maxConcurrency,
 	}, nil
 }
 
@@ -333,15 +341,22 @@ func (e *blockComputer) executeBlock(
 		requestQueue)
 	close(requestQueue)
 
-	for request := range requestQueue {
-		request.ctx.Logger.Info().Msg("executing transaction")
-		err := e.executeTransaction(
+	wg := &sync.WaitGroup{}
+	wg.Add(e.maxConcurrency)
+
+	for i := 0; i < e.maxConcurrency; i++ {
+		go e.executeTransactions(
 			blockSpan,
 			database,
-			request)
-		if err != nil {
-			return nil, err
-		}
+			requestQueue,
+			wg)
+	}
+
+	wg.Wait()
+
+	err = database.Error()
+	if err != nil {
+		return nil, err
 	}
 
 	res, err := collector.Finalize(ctx)
@@ -358,15 +373,53 @@ func (e *blockComputer) executeBlock(
 	return res, nil
 }
 
+func (e *blockComputer) executeTransactions(
+	blockSpan otelTrace.Span,
+	database *transactionCoordinator,
+	requestQueue chan TransactionRequest,
+	wg *sync.WaitGroup,
+) {
+	defer wg.Done()
+
+	for request := range requestQueue {
+		attempt := 0
+		for {
+			request.ctx.Logger.Info().
+				Int("attempt", attempt).
+				Msg("executing transaction")
+
+			attempt += 1
+			err := e.executeTransaction(blockSpan, database, request, attempt)
+
+			if errors.IsRetryableConflictError(err) {
+				request.ctx.Logger.Info().
+					Int("attempt", attempt).
+					Str("conflict_error", err.Error()).
+					Msg("conflict detected. retrying transaction")
+				continue
+			}
+
+			if err != nil {
+				database.AbortAllOutstandingTransactions(err)
+				return
+			}
+
+			break // process next transaction
+		}
+	}
+}
+
 func (e *blockComputer) executeTransaction(
 	blockSpan otelTrace.Span,
 	database *transactionCoordinator,
 	request TransactionRequest,
+	attempt int,
 ) error {
 	txn, err := e.executeTransactionInternal(
 		blockSpan,
 		database,
-		request)
+		request,
+		attempt)
 	if err != nil {
 		prefix := ""
 		if request.isSystemTransaction {
@@ -397,6 +450,7 @@ func (e *blockComputer) executeTransactionInternal(
 	blockSpan otelTrace.Span,
 	database *transactionCoordinator,
 	request TransactionRequest,
+	attempt int,
 ) (
 	*transaction,
 	error,
@@ -414,13 +468,22 @@ func (e *blockComputer) executeTransactionInternal(
 
 	request.ctx = fvm.NewContextFromParent(request.ctx, fvm.WithSpan(txSpan))
 
-	txn, err := database.NewTransaction(request)
+	txn, err := database.NewTransaction(request, attempt)
 	if err != nil {
 		return nil, err
 	}
 	defer txn.Cleanup()
 
 	err = txn.Preprocess()
+	if err != nil {
+		return txn, err
+	}
+
+	// Validating here gives us an opportunity to early abort/retry the
+	// transaction in case the conflict is detectable after preprocessing.
+	// This is strictly an optimization and hence we don't need to wait for
+	// updates (removing this validate call won't impact correctness).
+	err = txn.Validate()
 	if err != nil {
 		return txn, err
 	}
@@ -433,6 +496,21 @@ func (e *blockComputer) executeTransactionInternal(
 	err = txn.Finalize()
 	if err != nil {
 		return txn, err
+	}
+
+	// Snapshot time smaller than execution time indicates there are outstanding
+	// transaction(s) that must be committed before this transaction can be
+	// committed.
+	for txn.SnapshotTime() < request.ExecutionTime() {
+		err = txn.WaitForUpdates()
+		if err != nil {
+			return txn, err
+		}
+
+		err = txn.Validate()
+		if err != nil {
+			return txn, err
+		}
 	}
 
 	return txn, txn.Commit()

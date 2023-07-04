@@ -15,10 +15,10 @@ import (
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/network/netconf"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/p2pbuilder"
 	p2pconfig "github.com/onflow/flow-go/network/p2p/p2pbuilder/config"
-	"github.com/onflow/flow-go/network/p2p/p2pbuilder/inspector"
 )
 
 // InitCorruptLibp2pNode initializes and returns a corrupt libp2p node that should only be used for BFT testing in
@@ -58,7 +58,8 @@ func InitCorruptLibp2pNode(
 	connGaterCfg *p2pconfig.ConnectionGaterConfig,
 	peerManagerCfg *p2pconfig.PeerManagerConfig,
 	uniCfg *p2pconfig.UnicastConfig,
-	gossipSubCfg *p2pbuilder.GossipSubConfig,
+	netConfig *netconf.Config,
+	disallowListCacheCfg *p2p.DisallowListCacheConfig,
 	topicValidatorDisabled,
 	withMessageSigning,
 	withStrictSignatureVerification bool,
@@ -72,17 +73,10 @@ func InitCorruptLibp2pNode(
 		Metrics:          metricsCfg,
 	}
 
-	rpcInspectorSuite, err := inspector.NewGossipSubInspectorBuilder(log, sporkId, gossipSubCfg.RpcInspector, idProvider, metricsCfg).
-		SetNetworkType(network.PrivateNetwork).
-		SetMetrics(metCfg).
-		Build()
-	if err != nil {
-		return nil, fmt.Errorf("failed to create gossipsub rpc inspectors for default libp2p node: %w", err)
-	}
-
 	builder, err := p2pbuilder.DefaultNodeBuilder(
 		log,
 		address,
+		network.PrivateNetwork,
 		flowKey,
 		sporkId,
 		idProvider,
@@ -91,10 +85,12 @@ func InitCorruptLibp2pNode(
 		role,
 		connGaterCfg,
 		peerManagerCfg,
-		gossipSubCfg,
-		rpcInspectorSuite,
-		p2pbuilder.DefaultResourceManagerConfig(),
-		uniCfg)
+		&netConfig.GossipSubConfig,
+		&netConfig.GossipSubRPCInspectorsConfig,
+		&netConfig.ResourceManagerConfig,
+		uniCfg,
+		&netConfig.ConnectionManagerConfig,
+		disallowListCacheCfg)
 
 	if err != nil {
 		return nil, fmt.Errorf("could not create corrupt libp2p node builder: %w", err)
@@ -110,8 +106,8 @@ func InitCorruptLibp2pNode(
 // CorruptGossipSubFactory returns a factory function that creates a new instance of the forked gossipsub module from
 // github.com/yhassanzadeh13/go-libp2p-pubsub for the purpose of BFT testing and attack vector implementation.
 func CorruptGossipSubFactory(routerOpts ...func(*corrupt.GossipSubRouter)) p2p.GossipSubFactoryFunc {
-	factory := func(ctx context.Context, logger zerolog.Logger, host host.Host, cfg p2p.PubSubAdapterConfig) (p2p.PubSubAdapter, error) {
-		adapter, router, err := NewCorruptGossipSubAdapter(ctx, logger, host, cfg)
+	factory := func(ctx context.Context, logger zerolog.Logger, host host.Host, cfg p2p.PubSubAdapterConfig, clusterChangeConsumer p2p.CollectionClusterChangesConsumer) (p2p.PubSubAdapter, error) {
+		adapter, router, err := NewCorruptGossipSubAdapter(ctx, logger, host, cfg, clusterChangeConsumer)
 		for _, opt := range routerOpts {
 			opt(router)
 		}

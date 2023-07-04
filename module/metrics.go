@@ -341,6 +341,11 @@ type HotstuffMetrics interface {
 	// PayloadProductionDuration measures the time which the HotStuff's core logic
 	// spends in the module.Builder component, i.e. the with generating block payloads.
 	PayloadProductionDuration(duration time.Duration)
+
+	// TimeoutCollectorsRange collects information from the node's `TimeoutAggregator` component.
+	// Specifically, it measurers the number of views for which we are currently collecting timeouts
+	// (i.e. the number of `TimeoutCollector` instances we are maintaining) and their lowest/highest view.
+	TimeoutCollectorsRange(lowestRetainedView uint64, newestViewCreatedCollector uint64, activeCollectors int)
 }
 
 type CruiseCtlMetrics interface {
@@ -605,7 +610,7 @@ type RestMetrics interface {
 	// Example recorder taken from:
 	// https://github.com/slok/go-http-metrics/blob/master/metrics/prometheus/prometheus.go
 	httpmetrics.Recorder
-	AddTotalRequests(ctx context.Context, service string, id string)
+	AddTotalRequests(ctx context.Context, method string, routeName string)
 }
 
 type GRPCConnectionPoolMetrics interface {
@@ -699,9 +704,13 @@ type ExecutionMetrics interface {
 	ExecutionCollectionExecuted(dur time.Duration, stats ExecutionResultStats)
 
 	// ExecutionTransactionExecuted reports stats on executing a single transaction
-	ExecutionTransactionExecuted(dur time.Duration,
-		compUsed, memoryUsed uint64,
-		eventCounts, eventSize int,
+	ExecutionTransactionExecuted(
+		dur time.Duration,
+		numTxnConflictRetries int,
+		compUsed uint64,
+		memoryUsed uint64,
+		eventCounts int,
+		eventSize int,
 		failed bool)
 
 	// ExecutionChunkDataPackGenerated reports stats on chunk data pack generation
@@ -731,6 +740,12 @@ type ExecutionMetrics interface {
 type BackendScriptsMetrics interface {
 	// Record the round trip time while executing a script
 	ScriptExecuted(dur time.Duration, size int)
+
+	// ScriptExecutionErrorOnExecutionNode records script execution failures on Execution Nodes
+	ScriptExecutionErrorOnArchiveNode()
+
+	// ScriptExecutionErrorOnArchiveNode records script execution failures in Archive Nodes
+	ScriptExecutionErrorOnExecutionNode()
 }
 
 type TransactionMetrics interface {

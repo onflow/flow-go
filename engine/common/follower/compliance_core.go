@@ -66,10 +66,6 @@ func NewComplianceCore(log zerolog.Logger,
 	sync module.BlockRequester,
 	tracer module.Tracer,
 ) (*ComplianceCore, error) {
-	onEquivocation := func(block, otherBlock *flow.Block) {
-		followerConsumer.OnDoubleProposeDetected(model.BlockFromFlow(block.Header), model.BlockFromFlow(otherBlock.Header))
-	}
-
 	finalizedBlock, err := state.Final().Head()
 	if err != nil {
 		return nil, fmt.Errorf("could not query finalized block: %w", err)
@@ -80,7 +76,7 @@ func NewComplianceCore(log zerolog.Logger,
 		mempoolMetrics:            mempoolMetrics,
 		state:                     state,
 		proposalViolationNotifier: followerConsumer,
-		pendingCache:              cache.NewCache(log, defaultPendingBlocksCacheCapacity, heroCacheCollector, onEquivocation),
+		pendingCache:              cache.NewCache(log, defaultPendingBlocksCacheCapacity, heroCacheCollector, followerConsumer),
 		pendingTree:               pending_tree.NewPendingTree(finalizedBlock),
 		follower:                  follower,
 		validator:                 validator,
@@ -144,7 +140,10 @@ func (c *ComplianceCore) OnBlockRange(originID flow.Identifier, batch []*flow.Bl
 		err := c.validator.ValidateProposal(hotstuffProposal)
 		if err != nil {
 			if invalidBlockError, ok := model.AsInvalidProposalError(err); ok {
-				c.proposalViolationNotifier.OnInvalidBlockDetected(*invalidBlockError)
+				c.proposalViolationNotifier.OnInvalidBlockDetected(flow.Slashable[model.InvalidProposalError]{
+					OriginID: originID,
+					Message:  *invalidBlockError,
+				})
 				return nil
 			}
 			if errors.Is(err, model.ErrViewForUnknownEpoch) {

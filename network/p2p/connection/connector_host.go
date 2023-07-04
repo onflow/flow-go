@@ -27,6 +27,18 @@ func (c *ConnectorHost) Connections() []network.Conn {
 	return c.h.Network().Conns()
 }
 
+// IsConnectedTo returns true if the given peer.ID is connected to the underlying host.
+// Args:
+//
+//	peerID: peer.ID for which the connection status is requested
+//
+// Returns:
+//
+//	true if the given peer.ID is connected to the underlying host.
+func (c *ConnectorHost) IsConnectedTo(peerID peer.ID) bool {
+	return c.h.Network().Connectedness(peerID) == network.Connected && len(c.h.Network().ConnsToPeer(peerID)) > 0
+}
+
 // PeerInfo returns the peer.AddrInfo for the given peer.ID.
 // Args:
 //

@@ -141,8 +141,6 @@ func RegisterEntriesToKeysValues(
 	return keys, values
 }
 
-// TODO(patrick): revisit caching.  readCache needs to be mutex guarded for
-// parallel execution.
 type LedgerStorageSnapshot struct {
 	ledger     ledger.Ledger
 	commitment flow.StateCommitment

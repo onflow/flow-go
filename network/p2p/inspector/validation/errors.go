@@ -5,13 +5,13 @@ import (
 	"fmt"
 
 	"github.com/onflow/flow-go/network/channels"
-	"github.com/onflow/flow-go/network/p2p"
+	p2pmsg "github.com/onflow/flow-go/network/p2p/message"
 )
 
 // ErrHardThreshold indicates that the amount of RPC messages received exceeds hard threshold.
 type ErrHardThreshold struct {
 	// controlMsg the control message type.
-	controlMsg p2p.ControlMessageType
+	controlMsg p2pmsg.ControlMessageType
 	// amount the amount of control messages.
 	amount uint64
 	// hardThreshold configured hard threshold.
@@ -23,7 +23,7 @@ func (e ErrHardThreshold) Error() string {
 }
 
 // NewHardThresholdErr returns a new ErrHardThreshold.
-func NewHardThresholdErr(controlMsg p2p.ControlMessageType, amount, hardThreshold uint64) ErrHardThreshold {
+func NewHardThresholdErr(controlMsg p2pmsg.ControlMessageType, amount, hardThreshold uint64) ErrHardThreshold {
 	return ErrHardThreshold{controlMsg: controlMsg, amount: amount, hardThreshold: hardThreshold}
 }
 
@@ -33,34 +33,9 @@ func IsErrHardThreshold(err error) bool {
 	return errors.As(err, &e)
 }
 
-// ErrInvalidLimitConfig indicates the validation limit is < 0.
-type ErrInvalidLimitConfig struct {
-	// controlMsg the control message type.
-	controlMsg p2p.ControlMessageType
-	// limit the value of the configuration limit.
-	limit uint64
-	// limitStr the string representation of the config limit.
-	limitStr string
-}
-
-func (e ErrInvalidLimitConfig) Error() string {
-	return fmt.Sprintf("invalid rpc control message %s validation limit %s configuration value must be greater than 0:%d", e.controlMsg, e.limitStr, e.limit)
-}
-
-// NewInvalidLimitConfigErr returns a new ErrValidationLimit.
-func NewInvalidLimitConfigErr(controlMsg p2p.ControlMessageType, limitStr string, limit uint64) ErrInvalidLimitConfig {
-	return ErrInvalidLimitConfig{controlMsg: controlMsg, limit: limit, limitStr: limitStr}
-}
-
-// IsErrInvalidLimitConfig returns whether an error is ErrInvalidLimitConfig.
-func IsErrInvalidLimitConfig(err error) bool {
-	var e ErrInvalidLimitConfig
-	return errors.As(err, &e)
-}
-
 // ErrRateLimitedControlMsg indicates the specified RPC control message is rate limited for the specified peer.
 type ErrRateLimitedControlMsg struct {
-	controlMsg p2p.ControlMessageType
+	controlMsg p2pmsg.ControlMessageType
 }
 
 func (e ErrRateLimitedControlMsg) Error() string {
@@ -68,7 +43,7 @@ func (e ErrRateLimitedControlMsg) Error() string {
 }
 
 // NewRateLimitedControlMsgErr returns a new ErrValidationLimit.
-func NewRateLimitedControlMsgErr(controlMsg p2p.ControlMessageType) ErrRateLimitedControlMsg {
+func NewRateLimitedControlMsgErr(controlMsg p2pmsg.ControlMessageType) ErrRateLimitedControlMsg {
 	return ErrRateLimitedControlMsg{controlMsg: controlMsg}
 }
 

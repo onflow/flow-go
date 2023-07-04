@@ -72,6 +72,21 @@ func NetworkReceiveCacheMetricsFactory(f HeroCacheMetricsFactory, networkType ne
 	return f(namespaceNetwork, r)
 }
 
+// DisallowListCacheMetricsFactory is the factory method for creating a new HeroCacheCollector for the disallow list cache.
+// The disallow-list cache is used to keep track of peers that are disallow-listed and the reasons for it.
+// Args:
+// - f: the HeroCacheMetricsFactory to create the collector
+// - networkingType: the networking type of the cache, i.e., whether it is used for the public or the private network
+// Returns:
+// - a HeroCacheMetrics for the disallow list cache
+func DisallowListCacheMetricsFactory(f HeroCacheMetricsFactory, networkingType network.NetworkingType) module.HeroCacheMetrics {
+	r := ResourceNetworkingDisallowListCache
+	if networkingType == network.PublicNetwork {
+		r = PrependPublicPrefix(r)
+	}
+	return f(namespaceNetwork, r)
+}
+
 func NetworkDnsTxtCacheMetricsFactory(registrar prometheus.Registerer) *HeroCacheCollector {
 	return NewHeroCacheCollector(namespaceNetwork, ResourceNetworkingDnsTxtCache, registrar)
 }

@@ -10,6 +10,7 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/engine/common/worker"
+	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/irrecoverable"
@@ -53,11 +54,8 @@ func defaultSpamRecordCacheFactory() SpamRecordCacheFactory {
 	}
 }
 
-// MisbehaviorReportManager is responsible for handling misbehavior reports.
-// The current version is at the minimum viable product stage and only logs the reports.
-// TODO: the mature version should be able to handle the reports and take actions accordingly, i.e., penalize the misbehaving node
-//
-//	and report the node to be disallow-listed if the overall penalty of the misbehaving node drops below the disallow-listing threshold.
+// MisbehaviorReportManager is responsible for handling misbehavior reports, i.e., penalizing the misbehaving node
+// and report the node to be disallow-listed if the overall penalty of the misbehaving node drops below the disallow-listing threshold.
 type MisbehaviorReportManager struct {
 	component.Component
 	logger  zerolog.Logger
@@ -74,6 +72,10 @@ type MisbehaviorReportManager struct {
 	// This is useful for managing production incidents.
 	// Note: under normal circumstances, the ALSP module should not be disabled.
 	disablePenalty bool
+
+	// disallowListingConsumer is the consumer for the disallow-listing notifications.
+	// It is notified when a node is disallow-listed by this manager.
+	disallowListingConsumer network.DisallowListNotificationConsumer
 
 	// workerPool is the worker pool for handling the misbehavior reports in a thread-safe and non-blocking manner.
 	workerPool *worker.Pool[internal.ReportedMisbehaviorWork]
@@ -152,26 +154,28 @@ func WithSpamRecordsCacheFactory(f SpamRecordCacheFactory) MisbehaviorReportMana
 
 // NewMisbehaviorReportManager creates a new instance of the MisbehaviorReportManager.
 // Args:
-//
-//	logger: the logger instance.
-//	metrics: the metrics instance.
-//	cache: the spam record cache instance.
+// cfg: the configuration for the MisbehaviorReportManager.
+// consumer: the consumer for the disallow-listing notifications. When the manager decides to disallow-list a node, it notifies the consumer to
+// perform the lower-level disallow-listing action at the networking layer.
+// All connections to the disallow-listed node are closed and the node is removed from the overlay, and
+// no further connections are established to the disallow-listed node, either inbound or outbound.
 //
 // Returns:
 //
 //		A new instance of the MisbehaviorReportManager.
 //	 An error if the config is invalid. The error is considered irrecoverable.
-func NewMisbehaviorReportManager(cfg *MisbehaviorReportManagerConfig) (*MisbehaviorReportManager, error) {
+func NewMisbehaviorReportManager(cfg *MisbehaviorReportManagerConfig, consumer network.DisallowListNotificationConsumer) (*MisbehaviorReportManager, error) {
 	if err := cfg.validate(); err != nil {
 		return nil, fmt.Errorf("invalid configuration for MisbehaviorReportManager: %w", err)
 	}
 
 	lg := cfg.Logger.With().Str("module", "misbehavior_report_manager").Logger()
 	m := &MisbehaviorReportManager{
-		logger:         lg,
-		metrics:        cfg.AlspMetrics,
-		disablePenalty: cfg.DisablePenalty,
-		cacheFactory:   defaultSpamRecordCacheFactory(),
+		logger:                  lg,
+		metrics:                 cfg.AlspMetrics,
+		disablePenalty:          cfg.DisablePenalty,
+		disallowListingConsumer: consumer,
+		cacheFactory:            defaultSpamRecordCacheFactory(),
 	}
 
 	store := queue.NewHeroStore(
@@ -308,10 +312,56 @@ func (m *MisbehaviorReportManager) onHeartbeat() error {
 				return record, fmt.Errorf("illegal state: spam record %x has non-positive decay %f", id, record.Decay)
 			}
 
+			// TODO: this can be done in batch but at this stage let's send individual notifications.
+			//       (it requires enabling the batch mode end-to-end including the cache in middleware).
+			// as long as record.Penalty is NOT below model.DisallowListingThreshold,
+			// the node is considered allow-listed and can conduct inbound and outbound connections.
+			// Once it falls below model.DisallowListingThreshold, it needs to be disallow listed.
+			if record.Penalty < model.DisallowListingThreshold && !record.DisallowListed {
+				// cutoff counter keeps track of how many times the penalty has been below the threshold.
+				record.CutoffCounter++
+				record.DisallowListed = true
+				m.logger.Warn().
+					Str("key", logging.KeySuspicious).
+					Hex("identifier", logging.ID(id)).
+					Uint64("cutoff_counter", record.CutoffCounter).
+					Float64("decay_speed", record.Decay).
+					Bool("disallow_listed", record.DisallowListed).
+					Msg("node penalty is below threshold, disallow listing")
+				m.disallowListingConsumer.OnDisallowListNotification(&network.DisallowListingUpdate{
+					FlowIds: flow.IdentifierList{id},
+					Cause:   network.DisallowListedCauseAlsp, // sets the ALSP disallow listing cause on node
+				})
+			}
+
 			// each time we decay the penalty by the decay speed, the penalty is a negative number, and the decay speed
 			// is a positive number. So the penalty is getting closer to zero.
 			// We use math.Min() to make sure the penalty is never positive.
 			record.Penalty = math.Min(record.Penalty+record.Decay, 0)
+
+			// TODO: this can be done in batch but at this stage let's send individual notifications.
+			//       (it requires enabling the batch mode end-to-end including the cache in middleware).
+			if record.Penalty == float64(0) && record.DisallowListed {
+				record.DisallowListed = false
+				m.logger.Info().
+					Hex("identifier", logging.ID(id)).
+					Uint64("cutoff_counter", record.CutoffCounter).
+					Float64("decay_speed", record.Decay).
+					Bool("disallow_listed", record.DisallowListed).
+					Msg("allow-listing a node that was disallow listed")
+				// Penalty has fully decayed to zero and the node can be back in the allow list.
+				m.disallowListingConsumer.OnAllowListNotification(&network.AllowListingUpdate{
+					FlowIds: flow.IdentifierList{id},
+					Cause:   network.DisallowListedCauseAlsp, // clears the ALSP disallow listing cause from node
+				})
+			}
+
+			m.logger.Trace().
+				Hex("identifier", logging.ID(id)).
+				Uint64("cutoff_counter", record.CutoffCounter).
+				Float64("decay_speed", record.Decay).
+				Bool("disallow_listed", record.DisallowListed).
+				Msg("spam record decayed successfully")
 			return record, nil
 		})
 

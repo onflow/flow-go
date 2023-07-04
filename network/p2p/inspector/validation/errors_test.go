@@ -7,7 +7,7 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/onflow/flow-go/network/channels"
-	"github.com/onflow/flow-go/network/p2p"
+	p2pmsg "github.com/onflow/flow-go/network/p2p/message"
 )
 
 // TestErrActiveClusterIDsNotSetRoundTrip ensures correct error formatting for ErrActiveClusterIdsNotSet.
@@ -29,7 +29,7 @@ func TestErrActiveClusterIDsNotSetRoundTrip(t *testing.T) {
 
 // TestErrHardThresholdRoundTrip ensures correct error formatting for ErrHardThreshold.
 func TestErrHardThresholdRoundTrip(t *testing.T) {
-	controlMsg := p2p.CtrlMsgGraft
+	controlMsg := p2pmsg.CtrlMsgGraft
 	amount := uint64(100)
 	hardThreshold := uint64(500)
 	err := NewHardThresholdErr(controlMsg, amount, hardThreshold)
@@ -46,28 +46,9 @@ func TestErrHardThresholdRoundTrip(t *testing.T) {
 	assert.False(t, IsErrHardThreshold(dummyErr), "IsErrHardThreshold should return false for non-ErrHardThreshold error")
 }
 
-// TestErrInvalidLimitConfigRoundTrip ensures correct error formatting for ErrInvalidLimitConfig.
-func TestErrInvalidLimitConfigRoundTrip(t *testing.T) {
-	controlMsg := p2p.CtrlMsgGraft
-	limitStr := HardThresholdMapKey
-	limit := uint64(500)
-	err := NewInvalidLimitConfigErr(controlMsg, limitStr, limit)
-
-	// tests the error message formatting.
-	expectedErrMsg := fmt.Sprintf("invalid rpc control message %s validation limit %s configuration value must be greater than 0:%d", controlMsg, limitStr, limit)
-	assert.Equal(t, expectedErrMsg, err.Error(), "the error message should be correctly formatted")
-
-	// tests the IsErrInvalidLimitConfig function.
-	assert.True(t, IsErrInvalidLimitConfig(err), "IsErrInvalidLimitConfig should return true for ErrInvalidLimitConfig error")
-
-	// test IsErrInvalidLimitConfig with a different error type.
-	dummyErr := fmt.Errorf("dummy error")
-	assert.False(t, IsErrInvalidLimitConfig(dummyErr), "IsErrInvalidLimitConfig should return false for non-ErrInvalidLimitConfig error")
-}
-
 // TestErrRateLimitedControlMsgRoundTrip ensures correct error formatting for ErrRateLimitedControlMsg.
 func TestErrRateLimitedControlMsgRoundTrip(t *testing.T) {
-	controlMsg := p2p.CtrlMsgGraft
+	controlMsg := p2pmsg.CtrlMsgGraft
 	err := NewRateLimitedControlMsgErr(controlMsg)
 
 	// tests the error message formatting.

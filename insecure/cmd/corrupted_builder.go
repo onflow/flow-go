@@ -11,7 +11,10 @@ import (
 	"github.com/onflow/flow-go/insecure/corruptnet"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/metrics"
+	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/p2p"
+	"github.com/onflow/flow-go/network/p2p/connection"
 	p2pconfig "github.com/onflow/flow-go/network/p2p/p2pbuilder/config"
 	"github.com/onflow/flow-go/network/p2p/unicast/ratelimit"
 	"github.com/onflow/flow-go/utils/logging"
@@ -71,7 +74,7 @@ func (cnb *CorruptedNodeBuilder) enqueueNetworkingLayer() {
 		}
 
 		uniCfg := &p2pconfig.UnicastConfig{
-			StreamRetryInterval:    cnb.UnicastCreateStreamRetryDelay,
+			StreamRetryInterval:    cnb.FlowConfig.NetworkConfig.UnicastCreateStreamRetryDelay,
 			RateLimiterDistributor: cnb.UnicastRateLimiterDistributor,
 		}
 
@@ -81,8 +84,9 @@ func (cnb *CorruptedNodeBuilder) enqueueNetworkingLayer() {
 		}
 
 		peerManagerCfg := &p2pconfig.PeerManagerConfig{
-			ConnectionPruning: cnb.NetworkConnectionPruning,
-			UpdateInterval:    cnb.PeerUpdateInterval,
+			ConnectionPruning: cnb.FlowConfig.NetworkConfig.NetworkConnectionPruning,
+			UpdateInterval:    cnb.FlowConfig.NetworkConfig.PeerUpdateInterval,
+			ConnectorFactory:  connection.DefaultLibp2pBackoffConnectorFactory(),
 		}
 
 		// create default libp2p factory if corrupt node should enable the topic validator
@@ -100,7 +104,11 @@ func (cnb *CorruptedNodeBuilder) enqueueNetworkingLayer() {
 			// run peer manager with the specified interval and let it also prune connections
 			peerManagerCfg,
 			uniCfg,
-			cnb.GossipSubConfig,
+			cnb.FlowConfig.NetworkConfig,
+			&p2p.DisallowListCacheConfig{
+				MaxSize: cnb.FlowConfig.NetworkConfig.DisallowListNotificationCacheSize,
+				Metrics: metrics.DisallowListCacheMetricsFactory(cnb.HeroCacheMetricsFactory(), network.PrivateNetwork),
+			},
 			cnb.TopicValidatorDisabled,
 			cnb.WithPubSubMessageSigning,
 			cnb.WithPubSubStrictSignatureVerification,

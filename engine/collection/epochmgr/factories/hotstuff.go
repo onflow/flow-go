@@ -191,6 +191,7 @@ func (f *HotStuffFactory) Create(
 	participant, err := consensus.NewParticipant(
 		log,
 		metrics,
+		f.mempoolMetrics,
 		builder,
 		finalizedBlock,
 		pendingBlocks,
