@@ -223,9 +223,6 @@ type NodeConfig struct {
 
 	// UnicastRateLimiterDistributor notifies consumers when a peer's unicast message is rate limited.
 	UnicastRateLimiterDistributor p2p.UnicastRateLimiterDistributor
-
-	// GossipSubRpcInspectorSuite rpc inspector suite.
-	GossipSubRpcInspectorSuite p2p.GossipSubInspectorSuite
 }
 
 // StateExcerptAtBoot stores information about the root snapshot and latest finalized block for use in bootstrapping.

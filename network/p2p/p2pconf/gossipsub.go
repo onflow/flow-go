@@ -1,4 +1,4 @@
-package network
+package p2pconf
 
 import (
 	"time"
