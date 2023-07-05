@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/access/mock"
+	"github.com/onflow/flow-go/engine/common/state_stream"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
 )
@@ -30,7 +31,14 @@ func executeRequest(req *http.Request, backend *mock.API) (*httptest.ResponseRec
 	var b bytes.Buffer
 	logger := zerolog.New(&b)
 	restCollector := metrics.NewNoopCollector()
-	router, err := newRouter(backend, logger, flow.Testnet.Chain(), restCollector)
+	stateStreamConfig := state_stream.Config{} //Uliana: TODO: add test for subscribe_events, provide state_stream backend
+	router, err := newRouter(backend,
+		logger,
+		flow.Testnet.Chain(),
+		restCollector,
+		nil,
+		stateStreamConfig.EventFilterConfig,
+		stateStreamConfig.MaxGlobalStreams)
 	if err != nil {
 		return nil, err
 	}

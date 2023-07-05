@@ -12,11 +12,19 @@ import (
 	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/engine/access/rest/middleware"
 	"github.com/onflow/flow-go/engine/access/rest/models"
+	"github.com/onflow/flow-go/engine/common/state_stream"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 )
 
-func newRouter(backend access.API, logger zerolog.Logger, chain flow.Chain, restCollector module.RestMetrics) (*mux.Router, error) {
+func newRouter(backend access.API,
+	logger zerolog.Logger,
+	chain flow.Chain,
+	restCollector module.RestMetrics,
+	stateStreamApi state_stream.API,
+	conf state_stream.EventFilterConfig,
+	maxGlobalStreams uint32,
+) (*mux.Router, error) {
 	router := mux.NewRouter().StrictSlash(true)
 	v1SubRouter := router.PathPrefix("/v1").Subrouter()
 
@@ -36,6 +44,16 @@ func newRouter(backend access.API, logger zerolog.Logger, chain flow.Chain, rest
 			Name(r.Name).
 			Handler(h)
 	}
+
+	for _, r := range WSRoutes {
+		h := NewWSHandler(logger, r.Handler, chain, stateStreamApi, conf, maxGlobalStreams)
+		v1SubRouter.
+			Methods(r.Method).
+			Path(r.Pattern).
+			Name(r.Name).
+			Handler(h)
+	}
+
 	return router, nil
 }
 
@@ -44,6 +62,13 @@ type route struct {
 	Method  string
 	Pattern string
 	Handler ApiHandlerFunc
+}
+
+type wsroute struct {
+	Name    string
+	Method  string
+	Pattern string
+	Handler SubscribeHandlerFunc
 }
 
 var Routes = []route{{
@@ -116,6 +141,13 @@ var Routes = []route{{
 	Pattern: "/node_version_info",
 	Name:    "getNodeVersionInfo",
 	Handler: GetNodeVersionInfo,
+}}
+
+var WSRoutes = []wsroute{{
+	Method:  http.MethodPost,
+	Pattern: "/subscribe_events",
+	Name:    "subscribeEvents",
+	Handler: SubscribeEvents,
 }}
 
 var routeUrlMap = map[string]string{}

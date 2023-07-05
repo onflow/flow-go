@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/onflow/flow-go/engine/common/state_stream"
 	"net"
 	"net/http"
 	"sync"
@@ -74,6 +75,9 @@ type Engine struct {
 	unsecureGrpcAddress net.Addr
 	secureGrpcAddress   net.Addr
 	restAPIAddress      net.Addr
+
+	stateStreamBackend state_stream.API
+	stateStreamConfig  state_stream.Config
 }
 
 // NewBuilder returns a new RPC engine builder.
@@ -97,6 +101,8 @@ func NewBuilder(log zerolog.Logger,
 	apiRatelimits map[string]int, // the api rate limit (max calls per second) for each of the Access API e.g. Ping->100, GetTransaction->300
 	apiBurstLimits map[string]int, // the api burst limit (max calls at the same time) for each of the Access API e.g. Ping->50, GetTransaction->10
 	me module.Local,
+	stateStreamBackend state_stream.API,
+	stateStreamConfig state_stream.Config,
 ) (*RPCEngineBuilder, error) {
 
 	log = log.With().Str("engine", "rpc").Logger()
@@ -210,6 +216,8 @@ func NewBuilder(log zerolog.Logger,
 		config:                    config,
 		chain:                     chainID.Chain(),
 		restCollector:             accessMetrics,
+		stateStreamBackend:        stateStreamBackend,
+		stateStreamConfig:         stateStreamConfig,
 	}
 	backendNotifierActor, backendNotifierWorker := events.NewFinalizationActor(eng.notifyBackendOnBlockFinalized)
 	eng.backendNotifierActor = backendNotifierActor
@@ -384,7 +392,14 @@ func (e *Engine) serveREST(ctx irrecoverable.SignalerContext, ready component.Re
 
 	e.log.Info().Str("rest_api_address", e.config.RESTListenAddr).Msg("starting REST server on address")
 
-	r, err := rest.NewServer(e.backend, e.config.RESTListenAddr, e.log, e.chain, e.restCollector)
+	r, err := rest.NewServer(e.backend,
+		e.config.RESTListenAddr,
+		e.log,
+		e.chain,
+		e.restCollector,
+		e.stateStreamBackend,
+		e.stateStreamConfig.EventFilterConfig,
+		e.stateStreamConfig.MaxGlobalStreams)
 	if err != nil {
 		e.log.Err(err).Msg("failed to initialize the REST server")
 		ctx.Throw(err)

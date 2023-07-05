@@ -35,6 +35,7 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/verification"
 	recovery "github.com/onflow/flow-go/consensus/recovery/protocol"
 	"github.com/onflow/flow-go/crypto"
+	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/access/ingestion"
 	pingeng "github.com/onflow/flow-go/engine/access/ping"
 	"github.com/onflow/flow-go/engine/access/rpc"
@@ -42,6 +43,7 @@ import (
 	"github.com/onflow/flow-go/engine/access/state_stream"
 	followereng "github.com/onflow/flow-go/engine/common/follower"
 	"github.com/onflow/flow-go/engine/common/requester"
+	common_state_stream "github.com/onflow/flow-go/engine/common/state_stream"
 	synceng "github.com/onflow/flow-go/engine/common/synchronization"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
@@ -115,7 +117,8 @@ type AccessNodeConfig struct {
 	apiRatelimits                map[string]int
 	apiBurstlimits               map[string]int
 	rpcConf                      rpc.Config
-	stateStreamConf              state_stream.Config
+	stateStreamConf              common_state_stream.Config
+	stateStreamBackend           common_state_stream.API
 	stateStreamFilterConf        map[string]int
 	ExecutionNodeAddress         string // deprecated
 	HistoricalAccessRPCs         []access.AccessAPIClient
@@ -161,15 +164,16 @@ func DefaultAccessNodeConfig() *AccessNodeConfig {
 			ArchiveAddressList:        nil,
 			MaxMsgSize:                grpcutils.DefaultMaxMsgSize,
 		},
-		stateStreamConf: state_stream.Config{
+		stateStreamConf: common_state_stream.Config{
 			MaxExecutionDataMsgSize: grpcutils.DefaultMaxMsgSize,
-			ExecutionDataCacheSize:  state_stream.DefaultCacheSize,
-			ClientSendTimeout:       state_stream.DefaultSendTimeout,
-			ClientSendBufferSize:    state_stream.DefaultSendBufferSize,
-			MaxGlobalStreams:        state_stream.DefaultMaxGlobalStreams,
-			EventFilterConfig:       state_stream.DefaultEventFilterConfig,
-			ResponseLimit:           state_stream.DefaultResponseLimit,
+			ExecutionDataCacheSize:  common_state_stream.DefaultCacheSize,
+			ClientSendTimeout:       common_state_stream.DefaultSendTimeout,
+			ClientSendBufferSize:    common_state_stream.DefaultSendBufferSize,
+			MaxGlobalStreams:        common_state_stream.DefaultMaxGlobalStreams,
+			EventFilterConfig:       common_state_stream.DefaultEventFilterConfig,
+			ResponseLimit:           common_state_stream.DefaultResponseLimit,
 		},
+		stateStreamBackend:           nil,
 		stateStreamFilterConf:        nil,
 		ExecutionNodeAddress:         "localhost:9000",
 		logTxTimeToFinalized:         false,
@@ -600,20 +604,35 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionDataRequester() *FlowAccessN
 				return nil, fmt.Errorf("could not get highest consecutive height: %w", err)
 			}
 
-			stateStreamEng, err := state_stream.NewEng(
+			broadcaster := engine.NewBroadcaster()
+
+			backend, err := common_state_stream.New(
 				node.Logger,
 				builder.stateStreamConf,
-				builder.ExecutionDataStore,
-				executionDataCache,
 				node.State,
 				node.Storage.Headers,
 				node.Storage.Seals,
 				node.Storage.Results,
-				node.RootChainID,
+				builder.ExecutionDataStore,
+				executionDataCache,
+				broadcaster,
 				builder.executionDataConfig.InitialBlockHeight,
 				highestAvailableHeight,
+			)
+			if err != nil {
+				return nil, fmt.Errorf("could not create state stream backend: %w", err)
+			}
+
+			stateStreamEng, err := state_stream.NewEng(
+				node.Logger,
+				builder.stateStreamConf,
+				executionDataCache,
+				node.Storage.Headers,
+				node.RootChainID,
 				builder.apiRatelimits,
 				builder.apiBurstlimits,
+				backend,
+				broadcaster,
 			)
 			if err != nil {
 				return nil, fmt.Errorf("could not create state stream engine: %w", err)
@@ -656,7 +675,7 @@ func (builder *FlowAccessNodeBuilder) extraFlags() {
 		flags.UintVar(&builder.executionGRPCPort, "execution-ingress-port", defaultConfig.executionGRPCPort, "the grpc ingress port for all execution nodes")
 		flags.StringVarP(&builder.rpcConf.UnsecureGRPCListenAddr, "rpc-addr", "r", defaultConfig.rpcConf.UnsecureGRPCListenAddr, "the address the unsecured gRPC server listens on")
 		flags.StringVar(&builder.rpcConf.SecureGRPCListenAddr, "secure-rpc-addr", defaultConfig.rpcConf.SecureGRPCListenAddr, "the address the secure gRPC server listens on")
-		flags.StringVar(&builder.stateStreamConf.ListenAddr, "state-stream-addr", defaultConfig.stateStreamConf.ListenAddr, "the address the state stream server listens on (if empty the server will not be started)")
+		flags.StringVar(&builder.stateStreamConf.ListenAddr, "state_stream-addr", defaultConfig.stateStreamConf.ListenAddr, "the address the state stream server listens on (if empty the server will not be started)")
 		flags.StringVarP(&builder.rpcConf.HTTPListenAddr, "http-addr", "h", defaultConfig.rpcConf.HTTPListenAddr, "the address the http proxy server listens on")
 		flags.StringVar(&builder.rpcConf.RESTListenAddr, "rest-addr", defaultConfig.rpcConf.RESTListenAddr, "the address the REST server listens on (if empty the REST server will not be started)")
 		flags.StringVarP(&builder.rpcConf.CollectionAddr, "static-collection-ingress-addr", "", defaultConfig.rpcConf.CollectionAddr, "the address (of the collection node) to send transactions to")
@@ -694,12 +713,12 @@ func (builder *FlowAccessNodeBuilder) extraFlags() {
 
 		// Execution State Streaming API
 		flags.Uint32Var(&builder.stateStreamConf.ExecutionDataCacheSize, "execution-data-cache-size", defaultConfig.stateStreamConf.ExecutionDataCacheSize, "block execution data cache size")
-		flags.Uint32Var(&builder.stateStreamConf.MaxGlobalStreams, "state-stream-global-max-streams", defaultConfig.stateStreamConf.MaxGlobalStreams, "global maximum number of concurrent streams")
-		flags.UintVar(&builder.stateStreamConf.MaxExecutionDataMsgSize, "state-stream-max-message-size", defaultConfig.stateStreamConf.MaxExecutionDataMsgSize, "maximum size for a gRPC message containing block execution data")
-		flags.StringToIntVar(&builder.stateStreamFilterConf, "state-stream-event-filter-limits", defaultConfig.stateStreamFilterConf, "event filter limits for ExecutionData SubscribeEvents API e.g. EventTypes=100,Addresses=100,Contracts=100 etc.")
-		flags.DurationVar(&builder.stateStreamConf.ClientSendTimeout, "state-stream-send-timeout", defaultConfig.stateStreamConf.ClientSendTimeout, "maximum wait before timing out while sending a response to a streaming client e.g. 30s")
-		flags.UintVar(&builder.stateStreamConf.ClientSendBufferSize, "state-stream-send-buffer-size", defaultConfig.stateStreamConf.ClientSendBufferSize, "maximum number of responses to buffer within a stream")
-		flags.Float64Var(&builder.stateStreamConf.ResponseLimit, "state-stream-response-limit", defaultConfig.stateStreamConf.ResponseLimit, "max number of responses per second to send over streaming endpoints. this helps manage resources consumed by each client querying data not in the cache e.g. 3 or 0.5. 0 means no limit")
+		flags.Uint32Var(&builder.stateStreamConf.MaxGlobalStreams, "state_stream-global-max-streams", defaultConfig.stateStreamConf.MaxGlobalStreams, "global maximum number of concurrent streams")
+		flags.UintVar(&builder.stateStreamConf.MaxExecutionDataMsgSize, "state_stream-max-message-size", defaultConfig.stateStreamConf.MaxExecutionDataMsgSize, "maximum size for a gRPC message containing block execution data")
+		flags.StringToIntVar(&builder.stateStreamFilterConf, "state_stream-event-filter-limits", defaultConfig.stateStreamFilterConf, "event filter limits for ExecutionData SubscribeEvents API e.g. EventTypes=100,Addresses=100,Contracts=100 etc.")
+		flags.DurationVar(&builder.stateStreamConf.ClientSendTimeout, "state_stream-send-timeout", defaultConfig.stateStreamConf.ClientSendTimeout, "maximum wait before timing out while sending a response to a streaming client e.g. 30s")
+		flags.UintVar(&builder.stateStreamConf.ClientSendBufferSize, "state_stream-send-buffer-size", defaultConfig.stateStreamConf.ClientSendBufferSize, "maximum number of responses to buffer within a stream")
+		flags.Float64Var(&builder.stateStreamConf.ResponseLimit, "state_stream-response-limit", defaultConfig.stateStreamConf.ResponseLimit, "max number of responses per second to send over streaming endpoints. this helps manage resources consumed by each client querying data not in the cache e.g. 3 or 0.5. 0 means no limit")
 	}).ValidateFlags(func() error {
 		if builder.supportsObserver && (builder.PublicNetworkConfig.BindAddress == cmd.NotSet || builder.PublicNetworkConfig.BindAddress == "") {
 			return errors.New("public-network-address must be set if supports-observer is true")
@@ -726,23 +745,23 @@ func (builder *FlowAccessNodeBuilder) extraFlags() {
 				return errors.New("execution-data-cache-size must be greater than 0")
 			}
 			if builder.stateStreamConf.ClientSendBufferSize == 0 {
-				return errors.New("state-stream-send-buffer-size must be greater than 0")
+				return errors.New("state_stream-send-buffer-size must be greater than 0")
 			}
 			if len(builder.stateStreamFilterConf) > 3 {
-				return errors.New("state-stream-event-filter-limits must have at most 3 keys (EventTypes, Addresses, Contracts)")
+				return errors.New("state_stream-event-filter-limits must have at most 3 keys (EventTypes, Addresses, Contracts)")
 			}
 			for key, value := range builder.stateStreamFilterConf {
 				switch key {
 				case "EventTypes", "Addresses", "Contracts":
 					if value <= 0 {
-						return fmt.Errorf("state-stream-event-filter-limits %s must be greater than 0", key)
+						return fmt.Errorf("state_stream-event-filter-limits %s must be greater than 0", key)
 					}
 				default:
-					return errors.New("state-stream-event-filter-limits may only contain the keys EventTypes, Addresses, Contracts")
+					return errors.New("state_stream-event-filter-limits may only contain the keys EventTypes, Addresses, Contracts")
 				}
 			}
 			if builder.stateStreamConf.ResponseLimit < 0 {
-				return errors.New("state-stream-response-limit must be greater than or equal to 0")
+				return errors.New("state_stream-response-limit must be greater than or equal to 0")
 			}
 		}
 
@@ -892,6 +911,10 @@ func (builder *FlowAccessNodeBuilder) enqueueRelayNetwork() {
 }
 
 func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
+	if builder.executionDataSyncEnabled {
+		builder.BuildExecutionDataRequester()
+	}
+
 	builder.
 		BuildConsensusFollower().
 		Module("collection node client", func(node *cmd.NodeConfig) error {
@@ -1008,6 +1031,8 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				builder.apiRatelimits,
 				builder.apiBurstlimits,
 				builder.Me,
+				builder.stateStreamBackend,
+				builder.stateStreamConf,
 			)
 			if err != nil {
 				return nil, err
@@ -1091,10 +1116,6 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 
 			return syncRequestHandler, nil
 		})
-	}
-
-	if builder.executionDataSyncEnabled {
-		builder.BuildExecutionDataRequester()
 	}
 
 	builder.Component("ping engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {

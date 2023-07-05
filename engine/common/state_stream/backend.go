@@ -35,6 +35,38 @@ const (
 	DefaultResponseLimit = float64(0)
 )
 
+// Config defines the configurable options for the ingress server.
+type Config struct {
+	EventFilterConfig
+
+	// ListenAddr is the address the GRPC server will listen on as host:port
+	ListenAddr string
+
+	// MaxExecutionDataMsgSize is the max message size for block execution data API
+	MaxExecutionDataMsgSize uint
+
+	// RpcMetricsEnabled specifies whether to enable the GRPC metrics
+	RpcMetricsEnabled bool
+
+	// MaxGlobalStreams defines the global max number of streams that can be open at the same time.
+	MaxGlobalStreams uint32
+
+	// ExecutionDataCacheSize is the max number of objects for the execution data cache.
+	ExecutionDataCacheSize uint32
+
+	// ClientSendTimeout is the timeout for sending a message to the client. After the timeout,
+	// the stream is closed with an error.
+	ClientSendTimeout time.Duration
+
+	// ClientSendBufferSize is the size of the response buffer for sending messages to the client.
+	ClientSendBufferSize uint
+
+	// ResponseLimit is the max responses per second allowed on a stream. After exceeding the limit,
+	// the stream is paused until more capacity is available. Searches of past data can be CPU
+	// intensive, so this helps manage the impact.
+	ResponseLimit float64
+}
+
 type GetExecutionDataFunc func(context.Context, uint64) (*execution_data.BlockExecutionDataEntity, error)
 type GetStartHeightFunc func(flow.Identifier, uint64) (uint64, error)
 
@@ -190,6 +222,6 @@ func (b *StateStreamBackend) getStartHeight(startBlockID flow.Identifier, startH
 }
 
 // SetHighestHeight sets the highest height for which execution data is available.
-func (b *StateStreamBackend) setHighestHeight(height uint64) bool {
+func (b *StateStreamBackend) SetHighestHeight(height uint64) bool {
 	return b.highestHeight.Set(height)
 }

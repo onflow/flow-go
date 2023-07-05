@@ -31,6 +31,7 @@ import (
 	"github.com/onflow/flow-go/engine/access/rpc"
 	"github.com/onflow/flow-go/engine/access/rpc/backend"
 	"github.com/onflow/flow-go/engine/common/follower"
+	"github.com/onflow/flow-go/engine/common/state_stream"
 	synceng "github.com/onflow/flow-go/engine/common/synchronization"
 	"github.com/onflow/flow-go/engine/protocol"
 	"github.com/onflow/flow-go/model/encodable"
@@ -862,6 +863,8 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 			builder.apiRatelimits,
 			builder.apiBurstlimits,
 			builder.Me,
+			nil,
+			state_stream.Config{},
 		)
 		if err != nil {
 			return nil, err

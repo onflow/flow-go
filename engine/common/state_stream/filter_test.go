@@ -5,7 +5,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/onflow/flow-go/engine/access/state_stream"
+	state_stream "github.com/onflow/flow-go/engine/common/state_stream"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
 )

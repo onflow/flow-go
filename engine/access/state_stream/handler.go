@@ -2,36 +2,26 @@ package state_stream
 
 import (
 	"context"
-	"sync/atomic"
 
 	access "github.com/onflow/flow/protobuf/go/flow/executiondata"
 	executiondata "github.com/onflow/flow/protobuf/go/flow/executiondata"
+
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
 	"github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
+	"github.com/onflow/flow-go/engine/common/state_stream"
 	"github.com/onflow/flow-go/model/flow"
 )
 
 type Handler struct {
-	api   API
-	chain flow.Chain
-
-	eventFilterConfig EventFilterConfig
-
-	maxStreams  int32
-	streamCount atomic.Int32
+	*state_stream.SubscribeHandler
 }
 
-func NewHandler(api API, chain flow.Chain, conf EventFilterConfig, maxGlobalStreams uint32) *Handler {
-	h := &Handler{
-		api:               api,
-		chain:             chain,
-		eventFilterConfig: conf,
-		maxStreams:        int32(maxGlobalStreams),
-		streamCount:       atomic.Int32{},
-	}
+func NewHandler(api state_stream.API, chain flow.Chain, conf state_stream.EventFilterConfig, maxGlobalStreams uint32) *Handler {
+	h := &Handler{}
+	h.SubscribeHandler = state_stream.NewSubscribeHandler(api, chain, conf, maxGlobalStreams)
 	return h
 }
 
@@ -41,7 +31,7 @@ func (h *Handler) GetExecutionDataByBlockID(ctx context.Context, request *access
 		return nil, status.Errorf(codes.InvalidArgument, "could not convert block ID: %v", err)
 	}
 
-	execData, err := h.api.GetExecutionDataByBlockID(ctx, blockID)
+	execData, err := h.Api.GetExecutionDataByBlockID(ctx, blockID)
 	if err != nil {
 		return nil, rpc.ConvertError(err, "could no get execution data", codes.Internal)
 	}
@@ -56,11 +46,11 @@ func (h *Handler) GetExecutionDataByBlockID(ctx context.Context, request *access
 
 func (h *Handler) SubscribeExecutionData(request *access.SubscribeExecutionDataRequest, stream access.ExecutionDataAPI_SubscribeExecutionDataServer) error {
 	// check if the maximum number of streams is reached
-	if h.streamCount.Load() >= h.maxStreams {
+	if h.StreamCount.Load() >= h.MaxStreams {
 		return status.Errorf(codes.ResourceExhausted, "maximum number of streams reached")
 	}
-	h.streamCount.Add(1)
-	defer h.streamCount.Add(-1)
+	h.StreamCount.Add(1)
+	defer h.StreamCount.Add(-1)
 
 	startBlockID := flow.ZeroID
 	if request.GetStartBlockId() != nil {
@@ -71,7 +61,7 @@ func (h *Handler) SubscribeExecutionData(request *access.SubscribeExecutionDataR
 		startBlockID = blockID
 	}
 
-	sub := h.api.SubscribeExecutionData(stream.Context(), startBlockID, request.GetStartBlockHeight())
+	sub := h.Api.SubscribeExecutionData(stream.Context(), startBlockID, request.GetStartBlockHeight())
 
 	for {
 		v, ok := <-sub.Channel()
@@ -82,7 +72,7 @@ func (h *Handler) SubscribeExecutionData(request *access.SubscribeExecutionDataR
 			return nil
 		}
 
-		resp, ok := v.(*ExecutionDataResponse)
+		resp, ok := v.(*state_stream.ExecutionDataResponse)
 		if !ok {
 			return status.Errorf(codes.Internal, "unexpected response type: %T", v)
 		}
@@ -103,13 +93,6 @@ func (h *Handler) SubscribeExecutionData(request *access.SubscribeExecutionDataR
 }
 
 func (h *Handler) SubscribeEvents(request *access.SubscribeEventsRequest, stream access.ExecutionDataAPI_SubscribeEventsServer) error {
-	// check if the maximum number of streams is reached
-	if h.streamCount.Load() >= h.maxStreams {
-		return status.Errorf(codes.ResourceExhausted, "maximum number of streams reached")
-	}
-	h.streamCount.Add(1)
-	defer h.streamCount.Add(-1)
-
 	startBlockID := flow.ZeroID
 	if request.GetStartBlockId() != nil {
 		blockID, err := convert.BlockID(request.GetStartBlockId())
@@ -119,13 +102,13 @@ func (h *Handler) SubscribeEvents(request *access.SubscribeEventsRequest, stream
 		startBlockID = blockID
 	}
 
-	filter := EventFilter{}
+	filter := state_stream.EventFilter{}
 	if request.GetFilter() != nil {
 		var err error
 		reqFilter := request.GetFilter()
-		filter, err = NewEventFilter(
-			h.eventFilterConfig,
-			h.chain,
+		filter, err = state_stream.NewEventFilter(
+			h.EventFilterConfig,
+			h.Chain,
 			reqFilter.GetEventType(),
 			reqFilter.GetAddress(),
 			reqFilter.GetContract(),
@@ -135,7 +118,10 @@ func (h *Handler) SubscribeEvents(request *access.SubscribeEventsRequest, stream
 		}
 	}
 
-	sub := h.api.SubscribeEvents(stream.Context(), startBlockID, request.GetStartBlockHeight(), filter)
+	sub, err := h.SubscribeHandler.SubscribeEvents(stream.Context(), startBlockID, request.GetStartBlockHeight(), filter)
+	if err != nil {
+		return err
+	}
 
 	for {
 		v, ok := <-sub.Channel()
@@ -146,7 +132,7 @@ func (h *Handler) SubscribeEvents(request *access.SubscribeEventsRequest, stream
 			return nil
 		}
 
-		resp, ok := v.(*EventsResponse)
+		resp, ok := v.(*state_stream.EventsResponse)
 		if !ok {
 			return status.Errorf(codes.Internal, "unexpected response type: %T", v)
 		}

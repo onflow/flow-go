@@ -100,6 +100,7 @@ require (
 require (
 	github.com/coreos/go-semver v0.3.0
 	github.com/go-playground/validator/v10 v10.14.1
+	github.com/gorilla/websocket v1.5.0
 	github.com/mitchellh/mapstructure v1.5.0
 	github.com/onflow/wal v0.0.0-20230529184820-bc9f8244608d
 	github.com/slok/go-http-metrics v0.10.0
@@ -166,7 +167,6 @@ require (
 	github.com/google/gopacket v1.1.19 // indirect
 	github.com/googleapis/enterprise-certificate-proxy v0.2.3 // indirect
 	github.com/googleapis/gax-go/v2 v2.7.1 // indirect
-	github.com/gorilla/websocket v1.5.0 // indirect
 	github.com/hashicorp/errwrap v1.1.0 // indirect
 	github.com/hashicorp/hcl v1.0.0 // indirect
 	github.com/huin/goupnp v1.0.3 // indirect

@@ -108,7 +108,7 @@ func (s *BackendEventsSuite) TestSubscribeEvents() {
 			// this simulates a subscription on a past block
 			for i := 0; i <= test.highestBackfill; i++ {
 				s.T().Logf("backfilling block %d", i)
-				s.backend.setHighestHeight(s.blocks[i].Header.Height)
+				s.backend.SetHighestHeight(s.blocks[i].Header.Height)
 			}
 
 			subCtx, subCancel := context.WithCancel(ctx)
@@ -121,7 +121,7 @@ func (s *BackendEventsSuite) TestSubscribeEvents() {
 				// simulate new exec data received.
 				// exec data for all blocks with index <= highestBackfill were already received
 				if i > test.highestBackfill {
-					s.backend.setHighestHeight(b.Header.Height)
+					s.backend.SetHighestHeight(b.Header.Height)
 					s.broadcaster.Publish()
 				}
 

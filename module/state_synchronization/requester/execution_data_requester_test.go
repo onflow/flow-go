@@ -3,6 +3,7 @@ package requester_test
 import (
 	"context"
 	"fmt"
+
 	"math/rand"
 	"sync"
 	"testing"
@@ -18,7 +19,7 @@ import (
 
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/consensus/hotstuff/notifications/pubsub"
-	"github.com/onflow/flow-go/engine/access/state_stream"
+	"github.com/onflow/flow-go/engine/common/state_stream"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/blobs"

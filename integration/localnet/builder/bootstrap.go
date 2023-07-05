@@ -414,7 +414,7 @@ func prepareAccessService(container testnet.ContainerConfig, i int, n int) Servi
 		fmt.Sprintf("--secure-rpc-addr=%s:%s", container.ContainerName, testnet.GRPCSecurePort),
 		fmt.Sprintf("--http-addr=%s:%s", container.ContainerName, testnet.GRPCWebPort),
 		fmt.Sprintf("--rest-addr=%s:%s", container.ContainerName, testnet.RESTPort),
-		fmt.Sprintf("--state-stream-addr=%s:%s", container.ContainerName, testnet.ExecutionStatePort),
+		fmt.Sprintf("--state_stream-addr=%s:%s", container.ContainerName, testnet.ExecutionStatePort),
 		fmt.Sprintf("--collection-ingress-port=%s", testnet.GRPCPort),
 		"--supports-observer=true",
 		fmt.Sprintf("--public-network-address=%s:%s", container.ContainerName, testnet.PublicNetworkPort),
@@ -423,7 +423,7 @@ func prepareAccessService(container testnet.ContainerConfig, i int, n int) Servi
 		"--log-tx-time-to-finalized-executed",
 		"--execution-data-sync-enabled=true",
 		"--execution-data-dir=/data/execution-data",
-		fmt.Sprintf("--state-stream-addr=%s:%s", container.ContainerName, testnet.ExecutionStatePort),
+		fmt.Sprintf("--state_stream-addr=%s:%s", container.ContainerName, testnet.ExecutionStatePort),
 	)
 
 	service.AddExposedPorts(

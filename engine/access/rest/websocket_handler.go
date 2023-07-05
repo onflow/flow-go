@@ -5,50 +5,48 @@ import (
 
 	"github.com/rs/zerolog"
 
-	"github.com/onflow/flow-go/access"
-	"github.com/onflow/flow-go/engine/access/rest/models"
 	"github.com/onflow/flow-go/engine/access/rest/request"
 	"github.com/onflow/flow-go/engine/access/rest/util"
+	"github.com/onflow/flow-go/engine/common/state_stream"
 	"github.com/onflow/flow-go/model/flow"
 )
 
-// ApiHandlerFunc is a function that contains endpoint handling logic,
-// it fetches necessary resources and returns an error or response model.
-type ApiHandlerFunc func(
+// SubscribeHandlerFunc is a function that contains endpoint handling logic for subscribes,
+// it fetches necessary resources and returns an error.
+type SubscribeHandlerFunc func(
 	r *request.Request,
-	backend access.API,
-	generator models.LinkGenerator,
+	w http.ResponseWriter,
+	h *state_stream.SubscribeHandler,
 ) (interface{}, error)
 
-// Handler is custom http handler implementing custom handler function.
+// WSHandler is custom http handler implementing custom handler function.
 // Handler function allows easier handling of errors and responses as it
 // wraps functionality for handling error and responses outside of endpoint handling.
-type Handler struct {
+type WSHandler struct {
 	*HttpHandler
-	backend        access.API
-	linkGenerator  models.LinkGenerator
-	apiHandlerFunc ApiHandlerFunc
+	*state_stream.SubscribeHandler
+	subscribeFunc SubscribeHandlerFunc
 }
 
-func NewHandler(
+func NewWSHandler(
 	logger zerolog.Logger,
-	backend access.API,
-	handlerFunc ApiHandlerFunc,
-	generator models.LinkGenerator,
+	subscribeFunc SubscribeHandlerFunc,
 	chain flow.Chain,
-) *Handler {
-	handler := &Handler{
-		backend:        backend,
-		apiHandlerFunc: handlerFunc,
-		linkGenerator:  generator,
+	api state_stream.API,
+	conf state_stream.EventFilterConfig,
+	maxGlobalStreams uint32,
+) *WSHandler {
+	handler := &WSHandler{
+		subscribeFunc: subscribeFunc,
 	}
 	handler.HttpHandler = NewHttpHandler(logger, chain)
+	handler.SubscribeHandler = state_stream.NewSubscribeHandler(api, chain, conf, maxGlobalStreams)
 	return handler
 }
 
 // ServerHTTP function acts as a wrapper to each request providing common handling functionality
 // such as logging, error handling, request decorators
-func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+func (h *WSHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// create a logger
 	errLog := h.Logger.With().Str("request_url", r.URL.String()).Logger()
 
@@ -56,10 +54,9 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		return
 	}
-	decoratedRequest := request.Decorate(r, h.Chain)
+	decoratedRequest := request.Decorate(r, h.HttpHandler.Chain)
 
-	// execute handler function and check for error
-	response, err := h.apiHandlerFunc(decoratedRequest, h.backend, h.linkGenerator)
+	response, err := h.subscribeFunc(decoratedRequest, w, h.SubscribeHandler)
 	if err != nil {
 		h.errorHandler(w, err, errLog)
 		return
