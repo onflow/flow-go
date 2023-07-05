@@ -65,8 +65,7 @@ type LibP2PNodeBuilder struct {
 	connManager               connmgr.ConnManager
 	connGater                 p2p.ConnectionGater
 	routingFactory            func(context.Context, host.Host) (routing.Routing, error)
-	peerManagerEnablePruning  bool
-	peerManagerUpdateInterval time.Duration
+	peerManagerConfig         *p2pconfig.PeerManagerConfig
 	createNode                p2p.CreateNodeFunc
 	createStreamRetryInterval time.Duration
 	rateLimiterDistributor    p2p.UnicastRateLimiterDistributor
@@ -84,6 +83,7 @@ func NewNodeBuilder(
 	idProvider module.IdentityProvider,
 	rCfg *p2pconf.ResourceManagerConfig,
 	rpcInspectorCfg *p2pconf.GossipSubRPCInspectorsConfig,
+	peerManagerConfig *p2pconfig.PeerManagerConfig,
 	disallowListCacheCfg *p2p.DisallowListCacheConfig) *LibP2PNodeBuilder {
 	return &LibP2PNodeBuilder{
 		logger:               logger,
@@ -101,6 +101,7 @@ func NewNodeBuilder(
 			sporkId,
 			idProvider,
 			rpcInspectorCfg),
+		peerManagerConfig: peerManagerConfig,
 	}
 }
 
@@ -164,13 +165,6 @@ func (builder *LibP2PNodeBuilder) EnableGossipSubPeerScoring(config *p2p.PeerSco
 		}
 	}
 
-	return builder
-}
-
-// SetPeerManagerOptions sets the peer manager options.
-func (builder *LibP2PNodeBuilder) SetPeerManagerOptions(connectionPruning bool, updateInterval time.Duration) p2p.NodeBuilder {
-	builder.peerManagerEnablePruning = connectionPruning
-	builder.peerManagerUpdateInterval = updateInterval
 	return builder
 }
 
@@ -250,7 +244,6 @@ func (builder *LibP2PNodeBuilder) Build() (p2p.LibP2PNode, error) {
 	} else {
 		// setting up default resource manager, by hooking in the resource manager metrics reporter.
 		limits := rcmgr.DefaultLimits
-
 		libp2p.SetDefaultServiceLimits(&limits)
 
 		mem, err := allowedMemory(builder.resourceManagerCfg.MemoryLimitRatio)
@@ -298,18 +291,22 @@ func (builder *LibP2PNodeBuilder) Build() (p2p.LibP2PNode, error) {
 	}
 
 	var peerManager p2p.PeerManager
-	if builder.peerManagerUpdateInterval > 0 {
-		connector, err := connection.NewLibp2pConnector(&connection.ConnectorConfig{
-			PruneConnections:        builder.peerManagerEnablePruning,
-			Logger:                  builder.logger,
-			Host:                    connection.NewConnectorHost(h),
-			BackoffConnectorFactory: connection.DefaultLibp2pBackoffConnectorFactory(h),
+	if builder.peerManagerConfig.UpdateInterval > 0 {
+		connector, err := builder.peerManagerConfig.ConnectorFactory(h)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create libp2p connector: %w", err)
+		}
+		peerUpdater, err := connection.NewPeerUpdater(&connection.PeerUpdaterConfig{
+			PruneConnections: builder.peerManagerConfig.ConnectionPruning,
+			Logger:           builder.logger,
+			Host:             connection.NewConnectorHost(h),
+			Connector:        connector,
 		})
 		if err != nil {
 			return nil, fmt.Errorf("failed to create libp2p connector: %w", err)
 		}
 
-		peerManager = connection.NewPeerManager(builder.logger, builder.peerManagerUpdateInterval, connector)
+		peerManager = connection.NewPeerManager(builder.logger, builder.peerManagerConfig.UpdateInterval, peerUpdater)
 
 		if builder.rateLimiterDistributor != nil {
 			builder.rateLimiterDistributor.AddConsumer(peerManager)
@@ -480,6 +477,7 @@ func DefaultNodeBuilder(
 		idProvider,
 		rCfg,
 		rpcInspectorCfg,
+		peerManagerCfg,
 		disallowListCacheCfg).
 		SetBasicResolver(resolver).
 		SetConnectionManager(connManager).
@@ -487,7 +485,6 @@ func DefaultNodeBuilder(
 		SetRoutingSystem(func(ctx context.Context, host host.Host) (routing.Routing, error) {
 			return dht.NewDHT(ctx, host, protocols.FlowDHTProtocolID(sporkId), logger, metricsCfg.Metrics, dht.AsServer())
 		}).
-		SetPeerManagerOptions(peerManagerCfg.ConnectionPruning, peerManagerCfg.UpdateInterval).
 		SetStreamCreationRetryInterval(uniCfg.StreamRetryInterval).
 		SetCreateNode(DefaultCreateNodeFunc).
 		SetRateLimiterDistributor(uniCfg.RateLimiterDistributor)

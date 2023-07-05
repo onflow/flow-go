@@ -264,7 +264,10 @@ func WithAllTheFixins(payload *flow.Payload) {
 	payload.Seals = Seal.Fixtures(3)
 	payload.Guarantees = CollectionGuaranteesFixture(4)
 	for i := 0; i < 10; i++ {
-		receipt := ExecutionReceiptFixture()
+		receipt := ExecutionReceiptFixture(
+			WithResult(ExecutionResultFixture(WithServiceEvents(3))),
+			WithSpocks(SignaturesFixture(3)),
+		)
 		payload.Receipts = flow.ExecutionReceiptMetaList{receipt.Meta()}
 		payload.Results = flow.ExecutionResultList{&receipt.ExecutionResult}
 	}
@@ -710,6 +713,12 @@ func WithExecutorID(executorID flow.Identifier) func(*flow.ExecutionReceipt) {
 func WithResult(result *flow.ExecutionResult) func(*flow.ExecutionReceipt) {
 	return func(receipt *flow.ExecutionReceipt) {
 		receipt.ExecutionResult = *result
+	}
+}
+
+func WithSpocks(spocks []crypto.Signature) func(*flow.ExecutionReceipt) {
+	return func(receipt *flow.ExecutionReceipt) {
+		receipt.Spocks = spocks
 	}
 }
 
@@ -1608,6 +1617,18 @@ func BlockEventsFixture(
 	n int,
 	types ...flow.EventType,
 ) flow.BlockEvents {
+	return flow.BlockEvents{
+		BlockID:        header.ID(),
+		BlockHeight:    header.Height,
+		BlockTimestamp: header.Timestamp,
+		Events:         EventsFixture(n, types...),
+	}
+}
+
+func EventsFixture(
+	n int,
+	types ...flow.EventType,
+) []flow.Event {
 	if len(types) == 0 {
 		types = []flow.EventType{"A.0x1.Foo.Bar", "A.0x2.Zoo.Moo", "A.0x3.Goo.Hoo"}
 	}
@@ -1617,12 +1638,7 @@ func BlockEventsFixture(
 		events[i] = EventFixture(types[i%len(types)], 0, uint32(i), IdentifierFixture(), 0)
 	}
 
-	return flow.BlockEvents{
-		BlockID:        header.ID(),
-		BlockHeight:    header.Height,
-		BlockTimestamp: header.Timestamp,
-		Events:         events,
-	}
+	return events
 }
 
 // EventFixture returns an event
@@ -2411,7 +2427,7 @@ func WithChunkEvents(events flow.EventsList) func(*execution_data.ChunkExecution
 }
 
 func ChunkExecutionDataFixture(t *testing.T, minSize int, opts ...func(*execution_data.ChunkExecutionData)) *execution_data.ChunkExecutionData {
-	collection := CollectionFixture(1)
+	collection := CollectionFixture(5)
 	ced := &execution_data.ChunkExecutionData{
 		Collection: &collection,
 		Events:     flow.EventsList{},
@@ -2422,7 +2438,7 @@ func ChunkExecutionDataFixture(t *testing.T, minSize int, opts ...func(*executio
 		opt(ced)
 	}
 
-	if minSize <= 1 {
+	if minSize <= 1 || ced.TrieUpdate == nil {
 		return ced
 	}
 
