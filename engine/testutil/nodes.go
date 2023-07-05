@@ -858,7 +858,7 @@ func (s *RoundRobinLeaderSelection) IdentityByBlock(_ flow.Identifier, participa
 }
 
 func (s *RoundRobinLeaderSelection) IdentitiesByEpoch(view uint64) (flow.IdentitySkeletonList, error) {
-	return s.identities, nil
+	return s.identities.ToSkeleton(), nil
 }
 
 func (s *RoundRobinLeaderSelection) IdentityByEpoch(view uint64, participantID flow.Identifier) (*flow.IdentitySkeleton, error) {
@@ -866,7 +866,7 @@ func (s *RoundRobinLeaderSelection) IdentityByEpoch(view uint64, participantID f
 	if !found {
 		return nil, model.NewInvalidSignerErrorf("unknown participant %x", participantID)
 	}
-	return id, nil
+	return &id.IdentitySkeleton, nil
 }
 
 func (s *RoundRobinLeaderSelection) LeaderForView(view uint64) (flow.Identifier, error) {
@@ -874,11 +874,11 @@ func (s *RoundRobinLeaderSelection) LeaderForView(view uint64) (flow.Identifier,
 }
 
 func (s *RoundRobinLeaderSelection) QuorumThresholdForView(_ uint64) (uint64, error) {
-	return committees.WeightThresholdToBuildQC(s.identities.TotalWeight()), nil
+	return committees.WeightThresholdToBuildQC(s.identities.ToSkeleton().TotalWeight()), nil
 }
 
 func (s *RoundRobinLeaderSelection) TimeoutThresholdForView(_ uint64) (uint64, error) {
-	return committees.WeightThresholdToTimeout(s.identities.TotalWeight()), nil
+	return committees.WeightThresholdToTimeout(s.identities.ToSkeleton().TotalWeight()), nil
 }
 
 func (s *RoundRobinLeaderSelection) Self() flow.Identifier {

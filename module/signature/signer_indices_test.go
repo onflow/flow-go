@@ -166,19 +166,20 @@ func Test_DecodeSigTypeToStakingAndBeaconSigners(t *testing.T) {
 
 		// verify; note that there is a slightly different convention between Filter and the decoding logic:
 		// Filter returns nil for an empty list, while the decoding logic returns an instance of an empty slice
-		sigIdentities := committeeIdentities.Filter(filter.Or(filter.HasNodeID(stakingSigners...), filter.HasNodeID(beaconSigners...))) // signer identities in canonical order
+		sigIdentities := committeeIdentities.Filter(
+			filter.Or(filter.HasNodeID(stakingSigners...), filter.HasNodeID(beaconSigners...))).ToSkeleton() // signer identities in canonical order
 		if len(stakingSigners)+len(decBeaconSigners) > 0 {
 			require.Equal(t, sigIdentities, decSignerIdentites)
 		}
 		if len(stakingSigners) == 0 {
 			require.Empty(t, decStakingSigners)
 		} else {
-			require.Equal(t, committeeIdentities.Filter(filter.HasNodeID(stakingSigners...)), decStakingSigners)
+			require.Equal(t, committeeIdentities.Filter(filter.HasNodeID(stakingSigners...)).ToSkeleton(), decStakingSigners)
 		}
 		if len(decBeaconSigners) == 0 {
 			require.Empty(t, decBeaconSigners)
 		} else {
-			require.Equal(t, committeeIdentities.Filter(filter.HasNodeID(beaconSigners...)), decBeaconSigners)
+			require.Equal(t, committeeIdentities.Filter(filter.HasNodeID(beaconSigners...)).ToSkeleton(), decBeaconSigners)
 		}
 	})
 }

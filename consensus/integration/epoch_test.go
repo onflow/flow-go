@@ -252,7 +252,7 @@ func withNextEpoch(
 		// and all the NEW identities in next epoch, with 0 weight
 		nextEpochIdentities.
 			Filter(filter.Not(filter.In(encodableSnapshot.Identities))).
-			Map(mapfunc.WithInitialWeight(0))...,
+			Map(mapfunc.WithWeight(0))...,
 	).Sort(order.Canonical)
 
 	return inmem.SnapshotFromEncodable(encodableSnapshot)

@@ -166,7 +166,7 @@ func (s *Snapshot) Identities(selector flow.IdentityFilter) (flow.IdentityList, 
 	// add the identities from next/last epoch, with weight set to 0
 	identities = append(
 		identities,
-		otherEpochIdentities.Map(mapfunc.WithInitialWeight(0))...,
+		otherEpochIdentities.Map(mapfunc.WithWeight(0))...,
 	)
 
 	// apply the filter to the participants
