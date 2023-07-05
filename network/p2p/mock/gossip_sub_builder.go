@@ -4,15 +4,11 @@ package mockp2p
 
 import (
 	host "github.com/libp2p/go-libp2p/core/host"
-	channels "github.com/onflow/flow-go/network/channels"
-
 	irrecoverable "github.com/onflow/flow-go/module/irrecoverable"
 
 	mock "github.com/stretchr/testify/mock"
 
 	p2p "github.com/onflow/flow-go/network/p2p"
-
-	peer "github.com/libp2p/go-libp2p/core/peer"
 
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 
@@ -52,13 +48,13 @@ func (_m *GossipSubBuilder) Build(_a0 irrecoverable.SignalerContext) (p2p.PubSub
 	return r0, r1
 }
 
-// OverrideDefaultRpcInspectorSuiteFactory provides a mock function with given fields: _a0
-func (_m *GossipSubBuilder) OverrideDefaultRpcInspectorSuiteFactory(_a0 p2p.GossipSubRpcInspectorSuiteFactoryFunc) {
+// EnableGossipSubScoringWithOverride provides a mock function with given fields: _a0
+func (_m *GossipSubBuilder) EnableGossipSubScoringWithOverride(_a0 *p2p.PeerScoringConfigOverride) {
 	_m.Called(_a0)
 }
 
-// SetAppSpecificScoreParams provides a mock function with given fields: _a0
-func (_m *GossipSubBuilder) SetAppSpecificScoreParams(_a0 func(peer.ID) float64) {
+// OverrideDefaultRpcInspectorSuiteFactory provides a mock function with given fields: _a0
+func (_m *GossipSubBuilder) OverrideDefaultRpcInspectorSuiteFactory(_a0 p2p.GossipSubRpcInspectorSuiteFactoryFunc) {
 	_m.Called(_a0)
 }
 
@@ -69,11 +65,6 @@ func (_m *GossipSubBuilder) SetGossipSubConfigFunc(_a0 p2p.GossipSubAdapterConfi
 
 // SetGossipSubFactory provides a mock function with given fields: _a0
 func (_m *GossipSubBuilder) SetGossipSubFactory(_a0 p2p.GossipSubFactoryFunc) {
-	_m.Called(_a0)
-}
-
-// SetGossipSubPeerScoring provides a mock function with given fields: _a0
-func (_m *GossipSubBuilder) EnableGossipSubScoringWithOverride(_a0 bool) {
 	_m.Called(_a0)
 }
 
@@ -100,11 +91,6 @@ func (_m *GossipSubBuilder) SetRoutingSystem(_a0 routing.Routing) {
 // SetSubscriptionFilter provides a mock function with given fields: _a0
 func (_m *GossipSubBuilder) SetSubscriptionFilter(_a0 pubsub.SubscriptionFilter) {
 	_m.Called(_a0)
-}
-
-// SetTopicScoreParams provides a mock function with given fields: topic, topicScoreParams
-func (_m *GossipSubBuilder) SetTopicScoreParams(topic channels.Topic, topicScoreParams *pubsub.TopicScoreParams) {
-	_m.Called(topic, topicScoreParams)
 }
 
 type mockConstructorTestingTNewGossipSubBuilder interface {

@@ -55,7 +55,7 @@ func (_m *NodeBuilder) Build() (p2p.LibP2PNode, error) {
 	return r0, r1
 }
 
-// EnableGossipSubPeerScoring provides a mock function with given fields: _a0
+// EnableGossipSubScoringWithOverride provides a mock function with given fields: _a0
 func (_m *NodeBuilder) EnableGossipSubScoringWithOverride(_a0 *p2p.PeerScoringConfigOverride) p2p.NodeBuilder {
 	ret := _m.Called(_a0)
 
