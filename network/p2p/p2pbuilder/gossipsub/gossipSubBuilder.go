@@ -92,14 +92,21 @@ func (g *Builder) SetGossipSubConfigFunc(gossipSubConfigFunc p2p.GossipSubAdapte
 	g.gossipSubConfigFunc = gossipSubConfigFunc
 }
 
-// SetGossipSubPeerScoring sets the gossipsub peer scoring of the builder.
-// If the gossipsub peer scoring flag has already been set, a fatal error is logged.
-func (g *Builder) SetGossipSubPeerScoring(gossipSubPeerScoring bool) {
-	if g.gossipSubPeerScoring {
-		g.logger.Fatal().Msg("gossipsub peer scoring has already been set")
+func (g *Builder) EnableGossipSubScoringWithOverride(override *p2p.PeerScoringConfigOverride) {
+	if override != nil {
 		return
 	}
-	g.gossipSubPeerScoring = gossipSubPeerScoring
+	if override.AppSpecificScoreParams != nil {
+		g.scoreOptionConfig.OverrideAppSpecificScoreFunction(override.AppSpecificScoreParams)
+	}
+	if override.TopicScoreParams != nil {
+		for topic, params := range override.TopicScoreParams {
+			g.scoreOptionConfig.OverrideTopicScoreParams(topic, params)
+		}
+	}
+	if override.DecayInterval > 0 {
+		g.scoreOptionConfig.OverrideDecayInterval(override.DecayInterval)
+	}
 }
 
 // SetGossipSubScoreTracerInterval sets the gossipsub score tracer interval of the builder.
@@ -144,7 +151,7 @@ func (g *Builder) SetTopicScoreParams(topic channels.Topic, topicScoreParams *pu
 // SetAppSpecificScoreParams sets the app specific score params of the builder.
 // There is no default app specific score function. However, if this function is called multiple times, the last function will be used.
 func (g *Builder) SetAppSpecificScoreParams(f func(peer.ID) float64) {
-	g.scoreOptionConfig.SetAppSpecificScoreFunction(f)
+	g.scoreOptionConfig.OverrideAppSpecificScoreFunction(f)
 }
 
 // OverrideDefaultRpcInspectorSuiteFactory overrides the default rpc inspector suite factory.

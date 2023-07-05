@@ -217,6 +217,7 @@ type ScoreOptionConfig struct {
 	cacheSize                        uint32
 	cacheMetrics                     module.HeroCacheMetrics
 	appScoreFunc                     func(peer.ID) float64
+	decayInterval                    time.Duration // the decay interval, when is set to 0, the default value will be used.
 	topicParams                      []func(map[string]*pubsub.TopicScoreParams)
 	registerNotificationConsumerFunc func(p2p.GossipSubInvCtrlMsgNotifConsumer)
 }
@@ -246,12 +247,12 @@ func (c *ScoreOptionConfig) SetCacheMetrics(metrics module.HeroCacheMetrics) {
 	c.cacheMetrics = metrics
 }
 
-// SetAppSpecificScoreFunction sets the app specific penalty function for the penalty option.
+// OverrideAppSpecificScoreFunction sets the app specific penalty function for the penalty option.
 // It is used to calculate the app specific penalty of a peer.
 // If the app specific penalty function is not set, the default one is used.
 // Note that it is always safer to use the default one, unless you know what you are doing.
 // It is safe to call this method multiple times, the last call will be used.
-func (c *ScoreOptionConfig) SetAppSpecificScoreFunction(appSpecificScoreFunction func(peer.ID) float64) {
+func (c *ScoreOptionConfig) OverrideAppSpecificScoreFunction(appSpecificScoreFunction func(peer.ID) float64) {
 	c.appScoreFunc = appSpecificScoreFunction
 }
 
@@ -269,6 +270,21 @@ func (c *ScoreOptionConfig) OverrideTopicScoreParams(topic channels.Topic, topic
 // notifications of invalid control messages.
 func (c *ScoreOptionConfig) SetRegisterNotificationConsumerFunc(f func(p2p.GossipSubInvCtrlMsgNotifConsumer)) {
 	c.registerNotificationConsumerFunc = f
+}
+
+// OverrideDecayInterval overrides the decay interval for the penalty option. It is used to override the default
+// decay interval for the penalty option. The decay interval is the time interval that the decay values are applied and
+// peer scores are updated.
+// Note: It is always recommended to use the default value unless you know what you are doing. Hence, calling this method
+// is not recommended in production.
+// Args:
+//
+//	interval: the decay interval.
+//
+// Returns:
+// none
+func (c *ScoreOptionConfig) OverrideDecayInterval(interval time.Duration) {
+	c.decayInterval = interval
 }
 
 // NewScoreOption creates a new penalty option with the given configuration.
@@ -304,6 +320,12 @@ func NewScoreOption(cfg *ScoreOptionConfig) *ScoreOption {
 		s.appScoreFunc = scoreRegistry.AppSpecificScoreFunc()
 	} else {
 		s.appScoreFunc = cfg.appScoreFunc
+	}
+
+	if cfg.decayInterval > 0 {
+		// overrides the default decay interval if the decay interval is set.
+		s.peerScoreParams.DecayInterval = cfg.decayInterval
+		s.logger.Warn().Dur("decay_interval", cfg.decayInterval).Msg("decay interval is overridden")
 	}
 
 	// registers the score registry as the consumer of the invalid control message notifications
@@ -377,7 +399,8 @@ func defaultPeerScoreParams() *pubsub.PeerScoreParams {
 		// atomic validation fails initialization if any parameter is not set.
 		SkipAtomicValidation: true,
 		// DecayInterval is the interval over which we decay the effect of past behavior. So that
-		// a good or bad behavior will not have a permanent effect on the penalty.
+		// a good or bad behavior will not have a permanent effect on the penalty. It is also interval
+		// that GossipSub refreshes the scores of all peers.
 		DecayInterval: defaultDecayInterval,
 		// DecayToZero defines the maximum value below which a peer scoring counter is reset to zero.
 		// This is to prevent the counter from decaying to a very small value.

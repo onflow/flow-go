@@ -149,22 +149,11 @@ func (builder *LibP2PNodeBuilder) SetGossipSubFactory(gf p2p.GossipSubFactoryFun
 	return builder
 }
 
-// EnableGossipSubPeerScoring enables peer scoring for the GossipSub pubsub system.
+// EnableGossipSubScoringWithOverride enables peer scoring for the GossipSub pubsub system.
 // Arguments:
-// - *PeerScoringConfig: the peer scoring configuration for the GossipSub pubsub system. If nil, the default configuration is used.
-func (builder *LibP2PNodeBuilder) EnableGossipSubPeerScoring(config *p2p.PeerScoringConfig) p2p.NodeBuilder {
-	builder.gossipSubBuilder.SetGossipSubPeerScoring(true)
-	if config != nil {
-		if config.AppSpecificScoreParams != nil {
-			builder.gossipSubBuilder.SetAppSpecificScoreParams(config.AppSpecificScoreParams)
-		}
-		if config.TopicScoreParams != nil {
-			for topic, params := range config.TopicScoreParams {
-				builder.gossipSubBuilder.SetTopicScoreParams(topic, params)
-			}
-		}
-	}
-
+// - *PeerScoringConfigOverride: the peer scoring configuration for the GossipSub pubsub system. If nil, the default configuration is used.
+func (builder *LibP2PNodeBuilder) EnableGossipSubScoringWithOverride(config *p2p.PeerScoringConfigOverride) p2p.NodeBuilder {
+	builder.gossipSubBuilder.EnableGossipSubScoringWithOverride(config)
 	return builder
 }
 
@@ -490,8 +479,8 @@ func DefaultNodeBuilder(
 		SetRateLimiterDistributor(uniCfg.RateLimiterDistributor)
 
 	if gossipCfg.PeerScoring {
-		// currently, we only enable peer scoring with default parameters. So, we set the score parameters to nil.
-		builder.EnableGossipSubPeerScoring(nil)
+		// In production, we never override the default scoring config.
+		builder.EnableGossipSubScoringWithOverride(p2p.PeerScoringConfigNoOverride)
 	}
 
 	meshTracer := tracer.NewGossipSubMeshTracer(logger, metricsCfg.Metrics, idProvider, gossipCfg.LocalMeshLogInterval)

@@ -73,7 +73,7 @@ func (_m *GossipSubBuilder) SetGossipSubFactory(_a0 p2p.GossipSubFactoryFunc) {
 }
 
 // SetGossipSubPeerScoring provides a mock function with given fields: _a0
-func (_m *GossipSubBuilder) SetGossipSubPeerScoring(_a0 bool) {
+func (_m *GossipSubBuilder) EnableGossipSubScoringWithOverride(_a0 bool) {
 	_m.Called(_a0)
 }
 

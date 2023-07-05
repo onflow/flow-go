@@ -145,7 +145,7 @@ func NodeFixture(
 	}
 
 	if parameters.PeerScoringEnabled {
-		builder.EnableGossipSubPeerScoring(parameters.PeerScoreConfig)
+		builder.EnableGossipSubScoringWithOverride(parameters.PeerScoreConfig)
 	}
 
 	if parameters.GossipSubFactory != nil && parameters.GossipSubConfig != nil {
@@ -199,7 +199,7 @@ type NodeFixtureParameters struct {
 	Logger                            zerolog.Logger
 	PeerScoringEnabled                bool
 	IdProvider                        module.IdentityProvider
-	PeerScoreConfig                   *p2p.PeerScoringConfig
+	PeerScoreConfig                   *p2p.PeerScoringConfigOverride
 	PeerManagerConfig                 *p2pconfig.PeerManagerConfig
 	PeerProvider                      p2p.PeersProvider // peer manager parameter
 	ConnGater                         p2p.ConnectionGater
@@ -308,7 +308,7 @@ func WithRole(role flow.Role) NodeFixtureParameterOption {
 	}
 }
 
-func WithPeerScoreParamsOption(cfg *p2p.PeerScoringConfig) NodeFixtureParameterOption {
+func WithPeerScoreParamsOption(cfg *p2p.PeerScoringConfigOverride) NodeFixtureParameterOption {
 	return func(p *NodeFixtureParameters) {
 		p.PeerScoreConfig = cfg
 	}
