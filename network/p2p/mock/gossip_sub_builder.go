@@ -10,8 +10,6 @@ import (
 
 	mock "github.com/stretchr/testify/mock"
 
-	module "github.com/onflow/flow-go/module"
-
 	p2p "github.com/onflow/flow-go/network/p2p"
 
 	peer "github.com/libp2p/go-libp2p/core/peer"
@@ -29,13 +27,12 @@ type GossipSubBuilder struct {
 }
 
 // Build provides a mock function with given fields: _a0
-func (_m *GossipSubBuilder) Build(_a0 irrecoverable.SignalerContext) (p2p.PubSubAdapter, p2p.PeerScoreTracer, error) {
+func (_m *GossipSubBuilder) Build(_a0 irrecoverable.SignalerContext) (p2p.PubSubAdapter, error) {
 	ret := _m.Called(_a0)
 
 	var r0 p2p.PubSubAdapter
-	var r1 p2p.PeerScoreTracer
-	var r2 error
-	if rf, ok := ret.Get(0).(func(irrecoverable.SignalerContext) (p2p.PubSubAdapter, p2p.PeerScoreTracer, error)); ok {
+	var r1 error
+	if rf, ok := ret.Get(0).(func(irrecoverable.SignalerContext) (p2p.PubSubAdapter, error)); ok {
 		return rf(_a0)
 	}
 	if rf, ok := ret.Get(0).(func(irrecoverable.SignalerContext) p2p.PubSubAdapter); ok {
@@ -46,21 +43,18 @@ func (_m *GossipSubBuilder) Build(_a0 irrecoverable.SignalerContext) (p2p.PubSub
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(irrecoverable.SignalerContext) p2p.PeerScoreTracer); ok {
+	if rf, ok := ret.Get(1).(func(irrecoverable.SignalerContext) error); ok {
 		r1 = rf(_a0)
 	} else {
-		if ret.Get(1) != nil {
-			r1 = ret.Get(1).(p2p.PeerScoreTracer)
-		}
+		r1 = ret.Error(1)
 	}
 
-	if rf, ok := ret.Get(2).(func(irrecoverable.SignalerContext) error); ok {
-		r2 = rf(_a0)
-	} else {
-		r2 = ret.Error(2)
-	}
+	return r0, r1
+}
 
-	return r0, r1, r2
+// OverrideDefaultRpcInspectorSuiteFactory provides a mock function with given fields: _a0
+func (_m *GossipSubBuilder) OverrideDefaultRpcInspectorSuiteFactory(_a0 p2p.GossipSubRpcInspectorSuiteFactoryFunc) {
+	_m.Called(_a0)
 }
 
 // SetAppSpecificScoreParams provides a mock function with given fields: _a0
@@ -83,11 +77,6 @@ func (_m *GossipSubBuilder) SetGossipSubPeerScoring(_a0 bool) {
 	_m.Called(_a0)
 }
 
-// SetGossipSubRPCInspectorSuite provides a mock function with given fields: _a0
-func (_m *GossipSubBuilder) SetGossipSubRPCInspectorSuite(_a0 p2p.GossipSubInspectorSuite) {
-	_m.Called(_a0)
-}
-
 // SetGossipSubScoreTracerInterval provides a mock function with given fields: _a0
 func (_m *GossipSubBuilder) SetGossipSubScoreTracerInterval(_a0 time.Duration) {
 	_m.Called(_a0)
@@ -100,11 +89,6 @@ func (_m *GossipSubBuilder) SetGossipSubTracer(_a0 p2p.PubSubTracer) {
 
 // SetHost provides a mock function with given fields: _a0
 func (_m *GossipSubBuilder) SetHost(_a0 host.Host) {
-	_m.Called(_a0)
-}
-
-// SetIDProvider provides a mock function with given fields: _a0
-func (_m *GossipSubBuilder) SetIDProvider(_a0 module.IdentityProvider) {
 	_m.Called(_a0)
 }
 

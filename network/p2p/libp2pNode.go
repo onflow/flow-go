@@ -10,6 +10,7 @@ import (
 	"github.com/libp2p/go-libp2p/core/protocol"
 	"github.com/libp2p/go-libp2p/core/routing"
 
+	"github.com/onflow/flow-go/engine/collection"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/irrecoverable"
@@ -35,6 +36,12 @@ type LibP2PNode interface {
 	// DisallowListNotificationConsumer exposes the disallow list notification consumer API for the node so that
 	// it will be notified when a new disallow list update is distributed.
 	DisallowListNotificationConsumer
+	// CollectionClusterChangesConsumer  is the interface for consuming the events of changes in the collection cluster.
+	// This is used to notify the node of changes in the collection cluster.
+	// LibP2PNode implements this interface and consumes the events to be notified of changes in the clustering channels.
+	// The clustering channels are used by the collection nodes of a cluster to communicate with each other.
+	// As the cluster (and hence their cluster channels) of collection nodes changes over time (per epoch) the node needs to be notified of these changes.
+	CollectionClusterChangesConsumer
 	// DisallowListOracle exposes the disallow list oracle API for external consumers to query about the disallow list.
 	DisallowListOracle
 	// Start the libp2p node.
@@ -93,16 +100,21 @@ type Subscriptions interface {
 	SetUnicastManager(uniMgr UnicastManager)
 }
 
+// CollectionClusterChangesConsumer  is the interface for consuming the events of changes in the collection cluster.
+// This is used to notify the node of changes in the collection cluster.
+// LibP2PNode implements this interface and consumes the events to be notified of changes in the clustering channels.
+// The clustering channels are used by the collection nodes of a cluster to communicate with each other.
+// As the cluster (and hence their cluster channels) of collection nodes changes over time (per epoch) the node needs to be notified of these changes.
+type CollectionClusterChangesConsumer interface {
+	collection.ClusterEvents
+}
+
 // PeerScore is the interface for the peer score module. It is used to expose the peer score to other
 // components of the node. It is also used to set the peer score exposer implementation.
 type PeerScore interface {
-	// SetPeerScoreExposer sets the node's peer score exposer implementation.
-	// SetPeerScoreExposer may be called at most once. It is an irrecoverable error to call this
-	// method if the node's peer score exposer has already been set.
-	SetPeerScoreExposer(e PeerScoreExposer)
 	// PeerScoreExposer returns the node's peer score exposer implementation.
 	// If the node's peer score exposer has not been set, the second return value will be false.
-	PeerScoreExposer() (PeerScoreExposer, bool)
+	PeerScoreExposer() PeerScoreExposer
 }
 
 // PeerConnections subset of funcs related to underlying libp2p host connections.
