@@ -62,7 +62,7 @@ func (s *GossipSubInspectorSuite) InspectFunc() func(peer.ID, *pubsub.RPC) error
 	return s.aggregatedInspector.Inspect
 }
 
-// AddInvalidCtrlMsgNotificationConsumer adds a consumer to the invalid control message notification distributor.
+// AddInvCtrlMsgNotifConsumer adds a consumer to the invalid control message notification distributor.
 // This consumer is notified when a misbehaving peer regarding gossipsub control messages is detected. This follows a pub/sub
 // pattern where the consumer is notified when a new notification is published.
 // A consumer is only notified once for each notification, and only receives notifications that were published after it was added.
