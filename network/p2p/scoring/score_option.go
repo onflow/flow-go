@@ -138,10 +138,67 @@ const (
 	// are churners, i.e., peers that join and leave a topic mesh frequently.
 	defaultTopicTimeInMesh = time.Hour
 
-	// defaultTopicWeight is the default weight of a topic in the GossipSub scoring system. The overall score of a peer in a topic mesh is
-	// multiplied by the weight of the topic when calculating the overall score of the peer.
+	// defaultTopicWeight is the default weight of a topic in the GossipSub scoring system.
+	// The overall score of a peer in a topic mesh is multiplied by the weight of the topic when calculating the overall score of the peer.
 	// We set it to 1.0, which means that the overall score of a peer in a topic mesh is not affected by the weight of the topic.
 	defaultTopicWeight = 1.0
+
+	// defaultTopicMeshDeliveriesWeight is the weight for applying penalty when a peer is under-performing in a topic mesh.
+	// Upon every decay interval, if the number of actual message deliveries is less than the topic mesh message deliveries threshold
+	// (i.e., defaultTopicMeshMessageDeliveriesThreshold), the peer will be penalized by square of the difference between the actual
+	// message deliveries and the threshold, multiplied by this weight, i.e., -w * (actual - threshold)^2 where w is the weight, and
+	// `actual` and `threshold` are the actual message deliveries and the threshold, respectively. We set it to -0.1, which means that
+	// with around 40 under-performing message deliveries within a gossipsub heartbeat interval, the peer will be disconnected, i.e.,
+	// -0.1 * 40^2 = -160 < -100 (greylist threshold).
+	defaultTopicMeshMessageDeliveriesWeight = -0.1
+
+	// defaultTopicMeshMessageDeliveriesDecay is applied to the number of actual message deliveries in a topic mesh
+	// at each decay interval (i.e., defaultDecayInterval).
+	// It is used to decay the number of actual message deliveries, and prevents past message
+	// deliveries from affecting the current score of the peer.
+	// As the decay interval is 1 minute, we set it to 0.5, which means that the number of actual message
+	// deliveries will decay by 50% at each decay interval.
+	defaultTopicMeshMessageDeliveriesDecay = .5
+
+	// defaultTopicMeshMessageDeliveriesCap is the maximum number of actual message deliveries in a topic
+	// mesh that is used to calculate the score of a peer in that topic mesh.
+	// We set it to 1000, which means that the maximum number of actual message deliveries in a
+	// topic mesh that is used to calculate the score of a peer in that topic mesh is 1000.
+	// This is to prevent the score of a peer in a topic mesh from being affected by a large number of actual
+	// message deliveries and also affect the score of the peer in other topic meshes.
+	// When the total delivered messages in a topic mesh exceeds this value, the score of the peer in that topic
+	// mesh will not be affected by the actual message deliveries in that topic mesh.
+	// Moreover, this does not allow the peer to accumulate a large number of actual message deliveries in a topic mesh
+	// and then start under-performing in that topic mesh without being penalized.
+	defaultTopicMeshMessageDeliveriesCap = 1000
+
+	// defaultTopicMeshMessageDeliveriesThreshold is the threshold for the number of actual message deliveries in a
+	// topic mesh that is used to calculate the score of a peer in that topic mesh.
+	// If the number of actual message deliveries in a topic mesh is less than this value,
+	// the peer will be penalized by square of the difference between the actual message deliveries and the threshold,
+	// i.e., -w * (actual - threshold)^2 where `actual` and `threshold` are the actual message deliveries and the
+	// threshold, respectively, and `w` is the weight (i.e., defaultTopicMeshMessageDeliveriesWeight).
+	// We set it to 0.2 * defaultTopicMeshMessageDeliveriesCap, which means that with around 200 under-performing
+	// message deliveries within a gossipsub heartbeat interval, the peer will be disconnected.
+	defaultMeshMessageDeliveryThreshold = 0.2 * defaultTopicMeshMessageDeliveriesCap
+
+	// defaultMeshMessageDeliveriesWindow is the window size is time interval that we count a delivery of an already
+	// seen message towards the score of a peer in a topic mesh. The delivery is counted
+	// by GossipSub only if the previous sender of the message is different from the current sender.
+	// We set it to the decay interval of the GossipSub scoring system, which is 1 minute.
+	// It means that if a peer delivers a message that it has already seen less than one minute ago,
+	// the delivery will be counted towards the score of the peer in a topic mesh only if the previous sender of the message.
+	// This also prevents replay attacks of messages that are older than one minute.
+	defaultMeshMessageDeliveriesWindow = defaultDecayInterval
+
+	// defaultMeshMessageDeliveryActivation is the time interval that we wait for a new peer that joins a topic mesh
+	// till start counting the number of actual message deliveries of that peer in that topic mesh.
+	// We set it to 2 * defaultDecayInterval, which means that we wait for 2 decay intervals before start counting
+	// the number of actual message deliveries of a peer in a topic mesh.
+	// With a default decay interval of 1 minute, it means that we wait for 2 minutes before start counting the
+	// number of actual message deliveries of a peer in a topic mesh. This is to account for
+	// the time that it takes for a peer to start up and receive messages from other peers in the topic mesh.
+	defaultMeshMessageDeliveriesActivation = 2 * defaultDecayInterval
 )
 
 // ScoreOption is a functional option for configuring the peer scoring system.
@@ -335,10 +392,16 @@ func defaultPeerScoreParams() *pubsub.PeerScoreParams {
 // defaultTopicScoreParams returns the default score params for topics.
 func defaultTopicScoreParams() *pubsub.TopicScoreParams {
 	return &pubsub.TopicScoreParams{
-		TopicWeight:                    defaultTopicWeight,
-		SkipAtomicValidation:           defaultTopicSkipAtomicValidation,
-		InvalidMessageDeliveriesWeight: defaultTopicInvalidMessageDeliveriesWeight,
-		InvalidMessageDeliveriesDecay:  defaultTopicInvalidMessageDeliveriesDecay,
-		TimeInMeshQuantum:              defaultTopicTimeInMesh,
+		TopicWeight:                     defaultTopicWeight,
+		SkipAtomicValidation:            defaultTopicSkipAtomicValidation,
+		InvalidMessageDeliveriesWeight:  defaultTopicInvalidMessageDeliveriesWeight,
+		InvalidMessageDeliveriesDecay:   defaultTopicInvalidMessageDeliveriesDecay,
+		TimeInMeshQuantum:               defaultTopicTimeInMesh,
+		MeshMessageDeliveriesWeight:     defaultTopicMeshMessageDeliveriesWeight,
+		MeshMessageDeliveriesDecay:      defaultTopicMeshMessageDeliveriesDecay,
+		MeshMessageDeliveriesCap:        defaultTopicMeshMessageDeliveriesCap,
+		MeshMessageDeliveriesThreshold:  defaultMeshMessageDeliveryThreshold,
+		MeshMessageDeliveriesWindow:     defaultMeshMessageDeliveriesWindow,
+		MeshMessageDeliveriesActivation: defaultMeshMessageDeliveriesActivation,
 	}
 }
