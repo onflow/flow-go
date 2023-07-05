@@ -21,8 +21,6 @@ import (
 func TestUnweightedNode(t *testing.T) {
 	// stop after building 2 blocks to ensure we can tolerate 0-weight (joining next
 	// epoch) identities, but don't cross an epoch boundary
-	// stop after building 2 blocks to ensure we can tolerate 0-weight (joining next
-	// epoch) identities, but don't cross an epoch boundary
 	stopper := NewStopper(2, 0)
 	participantsData := createConsensusIdentities(t, 3)
 	rootSnapshot := createRootSnapshot(t, participantsData)
@@ -254,7 +252,7 @@ func withNextEpoch(
 		// and all the NEW identities in next epoch, with 0 weight
 		nextEpochIdentities.
 			Filter(filter.Not(filter.In(encodableSnapshot.Identities))).
-			Map(mapfunc.WithWeight(0))...,
+			Map(mapfunc.WithInitialWeight(0))...,
 	).Sort(order.Canonical)
 
 	return inmem.SnapshotFromEncodable(encodableSnapshot)

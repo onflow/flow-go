@@ -232,6 +232,17 @@ func NewBuilder(log zerolog.Logger,
 	return builder, nil
 }
 
+func WaitForServerStart(server component.Component) component.ComponentWorker {
+	return func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+		select {
+		case <-ctx.Done():
+		case <-server.Ready():
+			ready()
+		}
+		<-server.Done()
+	}
+}
+
 // shutdownWorker is a worker routine which shuts down all servers when the context is cancelled.
 func (e *Engine) shutdownWorker(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 	ready()

@@ -495,6 +495,16 @@ func (il IdentityList) ByIndex(index uint) (*Identity, bool) {
 }
 
 // ByNodeID gets a node from the list by node ID.
+func (il IdentitySkeletonList) ByNodeID(nodeID Identifier) (*IdentitySkeleton, bool) {
+	for _, identity := range il {
+		if identity.NodeID == nodeID {
+			return identity, true
+		}
+	}
+	return nil, false
+}
+
+// ByNodeID gets a node from the list by node ID.
 func (il IdentityList) ByNodeID(nodeID Identifier) (*Identity, bool) {
 	for _, identity := range il {
 		if identity.NodeID == nodeID {

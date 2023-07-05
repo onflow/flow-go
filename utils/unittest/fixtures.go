@@ -977,6 +977,13 @@ func WithRole(role flow.Role) func(*flow.Identity) {
 	}
 }
 
+// WithInitialWeight sets the initial weight on an identity fixture.
+func WithInitialWeight(weight uint64) func(*flow.Identity) {
+	return func(identity *flow.Identity) {
+		identity.InitialWeight = weight
+	}
+}
+
 // WithWeight sets the weight on an identity fixture.
 func WithWeight(weight uint64) func(*flow.Identity) {
 	return func(identity *flow.Identity) {

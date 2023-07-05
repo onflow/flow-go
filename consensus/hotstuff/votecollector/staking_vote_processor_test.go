@@ -2,6 +2,7 @@ package votecollector
 
 import (
 	"errors"
+	"github.com/onflow/flow-go/model/flow/order"
 	"sync"
 	"testing"
 
@@ -264,7 +265,7 @@ func TestStakingVoteProcessorV2_BuildVerifyQC(t *testing.T) {
 		require.NoError(t, err)
 
 		signers[identity.NodeID] = verification.NewStakingSigner(me)
-	})
+	}).Sort(order.Canonical)
 
 	leader := stakingSigners[0]
 
@@ -272,9 +273,9 @@ func TestStakingVoteProcessorV2_BuildVerifyQC(t *testing.T) {
 		helper.WithBlockProposer(leader.NodeID))
 
 	committee := &mockhotstuff.DynamicCommittee{}
-	committee.On("IdentitiesByEpoch", block.View).Return(stakingSigners, nil)
+	committee.On("IdentitiesByEpoch", block.View).Return(stakingSigners.ToSkeleton(), nil)
 	committee.On("IdentitiesByBlock", block.BlockID).Return(stakingSigners, nil)
-	committee.On("QuorumThresholdForView", mock.Anything).Return(committees.WeightThresholdToBuildQC(stakingSigners.TotalWeight()), nil)
+	committee.On("QuorumThresholdForView", mock.Anything).Return(committees.WeightThresholdToBuildQC(stakingSigners.ToSkeleton().TotalWeight()), nil)
 
 	votes := make([]*model.Vote, 0, len(stakingSigners))
 

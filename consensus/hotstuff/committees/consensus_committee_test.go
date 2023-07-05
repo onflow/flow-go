@@ -370,7 +370,7 @@ func (suite *ConsensusSuite) TestIdentitiesByEpoch() {
 		t.Run("should be able to retrieve real identity", func(t *testing.T) {
 			actual, err := suite.committee.IdentityByEpoch(unittest.Uint64InRange(1, 100), realIdentity.NodeID)
 			require.NoError(t, err)
-			require.Equal(t, realIdentity, actual)
+			require.Equal(t, realIdentity.IdentitySkeleton, *actual)
 		})
 
 		t.Run("should return ErrViewForUnknownEpoch for view outside existing epoch", func(t *testing.T) {
@@ -387,7 +387,7 @@ func (suite *ConsensusSuite) TestIdentitiesByEpoch() {
 		t.Run("should be able to retrieve epoch 1 identity in epoch 1", func(t *testing.T) {
 			actual, err := suite.committee.IdentityByEpoch(unittest.Uint64InRange(1, 100), realIdentity.NodeID)
 			require.NoError(t, err)
-			require.Equal(t, realIdentity, actual)
+			require.Equal(t, realIdentity.IdentitySkeleton, *actual)
 		})
 
 		t.Run("should be unable to retrieve epoch 1 identity in epoch 2", func(t *testing.T) {
@@ -405,7 +405,7 @@ func (suite *ConsensusSuite) TestIdentitiesByEpoch() {
 		t.Run("should be able to retrieve epoch 2 identity in epoch 2", func(t *testing.T) {
 			actual, err := suite.committee.IdentityByEpoch(unittest.Uint64InRange(101, 200), epoch2Identity.NodeID)
 			require.NoError(t, err)
-			require.Equal(t, epoch2Identity, actual)
+			require.Equal(t, epoch2Identity.IdentitySkeleton, *actual)
 		})
 
 		t.Run("should return ErrViewForUnknownEpoch for view outside existing epochs", func(t *testing.T) {
@@ -428,8 +428,8 @@ func (suite *ConsensusSuite) TestThresholds() {
 
 	identities := unittest.IdentityListFixture(10)
 
-	prevEpoch := newMockEpoch(suite.currentEpochCounter-1, identities.Map(mapfunc.WithWeight(100)), 1, 100, unittest.SeedFixture(prg.RandomSourceLength), true)
-	currEpoch := newMockEpoch(suite.currentEpochCounter, identities.Map(mapfunc.WithWeight(200)), 101, 200, unittest.SeedFixture(32), true)
+	prevEpoch := newMockEpoch(suite.currentEpochCounter-1, identities.Map(mapfunc.WithInitialWeight(100)), 1, 100, unittest.SeedFixture(prg.RandomSourceLength), true)
+	currEpoch := newMockEpoch(suite.currentEpochCounter, identities.Map(mapfunc.WithInitialWeight(200)), 101, 200, unittest.SeedFixture(32), true)
 	suite.epochs.Add(prevEpoch)
 	suite.epochs.Add(currEpoch)
 
@@ -466,7 +466,7 @@ func (suite *ConsensusSuite) TestThresholds() {
 	})
 
 	// now, add a valid next epoch
-	nextEpoch := newMockEpoch(suite.currentEpochCounter+1, identities.Map(mapfunc.WithWeight(300)), 201, 300, unittest.SeedFixture(prg.RandomSourceLength), true)
+	nextEpoch := newMockEpoch(suite.currentEpochCounter+1, identities.Map(mapfunc.WithInitialWeight(300)), 201, 300, unittest.SeedFixture(prg.RandomSourceLength), true)
 	suite.CommitEpoch(nextEpoch)
 
 	t.Run("next epoch ready", func(t *testing.T) {
