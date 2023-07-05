@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	pubsub_pb "github.com/libp2p/go-libp2p-pubsub/pb"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/stretchr/testify/require"
@@ -168,6 +169,52 @@ func testGossipSubInvalidMessageDeliveryScoring(t *testing.T, spamMsgFactory fun
 	require.True(t, blkTopicSnapshot.InvalidMessageDeliveries > 0.6*float64(totalSpamMessages), "invalid message deliveries must be greater than %f. invalid message deliveries: %f", 0.9*float64(totalSpamMessages), blkTopicSnapshot.InvalidMessageDeliveries)
 
 	p2ptest.EnsureNoPubsubExchangeBetweenGroups(t, ctx, []p2p.LibP2PNode{victimNode}, []p2p.LibP2PNode{spammer.SpammerNode}, func() (interface{}, channels.Topic) {
+		return unittest.ProposalFixture(), blockTopic
+	})
+}
+
+func TestGossipSubMeshDeliveryScoring(t *testing.T) {
+	role := flow.RoleConsensus
+	sporkId := unittest.IdentifierFixture()
+
+	idProvider := mock.NewIdentityProvider(t)
+	spammer := corruptlibp2p.NewGossipSubRouterSpammer(t, sporkId, role, idProvider)
+	ctx, cancel := context.WithCancel(context.Background())
+	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
+
+	blockTopic := channels.TopicFromChannel(channels.PushBlocks, sporkId)
+	blockTopicOverrideParams := scoring.DefaultTopicScoreParams()
+	blockTopicOverrideParams.MeshMessageDeliveriesActivation = 1 * time.Second
+	blockTopicOverrideParams.MeshMessageDeliveriesWindow = 1 * time.Second
+	victimNode, victimIdentity := p2ptest.NodeFixture(
+		t,
+		sporkId,
+		t.Name(),
+		idProvider,
+		p2ptest.WithRole(role),
+		p2ptest.WithPeerScoreTracerInterval(1*time.Second),
+		p2ptest.WithPeerScoreParamsOption(&p2p.PeerScoringConfigOverride{
+			TopicScoreParams: map[channels.Topic]*pubsub.TopicScoreParams{
+				blockTopic: blockTopicOverrideParams,
+			},
+			DecayInterval: 1 * time.Second,
+		}),
+		p2ptest.WithPeerScoringEnabled(idProvider),
+	)
+
+	idProvider.On("ByPeerID", victimNode.Host().ID()).Return(&victimIdentity, true).Maybe()
+	idProvider.On("ByPeerID", spammer.SpammerNode.Host().ID()).Return(&spammer.SpammerId, true).Maybe()
+	ids := flow.IdentityList{&spammer.SpammerId, &victimIdentity}
+	nodes := []p2p.LibP2PNode{spammer.SpammerNode, victimNode}
+
+	p2ptest.StartNodes(t, signalerCtx, nodes, 100*time.Millisecond)
+	defer p2ptest.StopNodes(t, nodes, cancel, 2*time.Second)
+
+	p2ptest.LetNodesDiscoverEachOther(t, ctx, nodes, ids)
+	p2ptest.TryConnectionAndEnsureConnected(t, ctx, nodes)
+
+	// checks end-to-end message delivery works on GossipSub
+	p2ptest.EnsurePubsubMessageExchange(t, ctx, nodes, func() (interface{}, channels.Topic) {
 		return unittest.ProposalFixture(), blockTopic
 	})
 }

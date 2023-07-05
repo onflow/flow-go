@@ -387,7 +387,7 @@ func (s *ScoreOption) preparePeerScoreThresholds() {
 func (s *ScoreOption) TopicScoreParams(topic *pubsub.Topic) *pubsub.TopicScoreParams {
 	params, exists := s.peerScoreParams.Topics[topic.String()]
 	if !exists {
-		return defaultTopicScoreParams()
+		return DefaultTopicScoreParams()
 	}
 	return params
 }
@@ -412,8 +412,8 @@ func defaultPeerScoreParams() *pubsub.PeerScoreParams {
 	}
 }
 
-// defaultTopicScoreParams returns the default score params for topics.
-func defaultTopicScoreParams() *pubsub.TopicScoreParams {
+// DefaultTopicScoreParams returns the default score params for topics.
+func DefaultTopicScoreParams() *pubsub.TopicScoreParams {
 	return &pubsub.TopicScoreParams{
 		TopicWeight:                     defaultTopicWeight,
 		SkipAtomicValidation:            defaultTopicSkipAtomicValidation,
