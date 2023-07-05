@@ -193,13 +193,13 @@ func TestGossipSubMeshDeliveryScoring(t *testing.T) {
 		idProvider,
 		p2ptest.WithRole(role),
 		p2ptest.WithPeerScoreTracerInterval(1*time.Second),
+		p2ptest.WithPeerScoringEnabled(idProvider),
 		p2ptest.WithPeerScoreParamsOption(&p2p.PeerScoringConfigOverride{
 			TopicScoreParams: map[channels.Topic]*pubsub.TopicScoreParams{
 				blockTopic: blockTopicOverrideParams,
 			},
 			DecayInterval: 1 * time.Second,
 		}),
-		p2ptest.WithPeerScoringEnabled(idProvider),
 	)
 
 	idProvider.On("ByPeerID", victimNode.Host().ID()).Return(&victimIdentity, true).Maybe()

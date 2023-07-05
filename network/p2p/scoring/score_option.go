@@ -325,7 +325,7 @@ func NewScoreOption(cfg *ScoreOptionConfig) *ScoreOption {
 	if cfg.decayInterval > 0 {
 		// overrides the default decay interval if the decay interval is set.
 		s.peerScoreParams.DecayInterval = cfg.decayInterval
-		s.logger.Warn().Dur("decay_interval", cfg.decayInterval).Msg("decay interval is overridden")
+		s.logger.Warn().Dur("decay_interval_ms", cfg.decayInterval).Msg("decay interval is overridden")
 	}
 
 	// registers the score registry as the consumer of the invalid control message notifications

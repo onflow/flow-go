@@ -7,7 +7,6 @@ import (
 
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/libp2p/go-libp2p/core/host"
-	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/routing"
 	"github.com/rs/zerolog"
 
@@ -17,7 +16,6 @@ import (
 	"github.com/onflow/flow-go/module/mempool/queue"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network"
-	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/distributor"
 	"github.com/onflow/flow-go/network/p2p/inspector"
@@ -102,7 +100,8 @@ func (g *Builder) SetGossipSubConfigFunc(gossipSubConfigFunc p2p.GossipSubAdapte
 // Returns:
 // none
 func (g *Builder) EnableGossipSubScoringWithOverride(override *p2p.PeerScoringConfigOverride) {
-	if override != nil {
+	g.gossipSubPeerScoring = true // TODO: we should enable peer scoring by default.
+	if override == nil {
 		return
 	}
 	if override.AppSpecificScoreParams != nil {
@@ -146,21 +145,6 @@ func (g *Builder) SetRoutingSystem(routingSystem routing.Routing) {
 		return
 	}
 	g.routingSystem = routingSystem
-}
-
-// SetTopicScoreParams sets the topic score params of the builder.
-// There is a default topic score parameters that is used if this function is not called for a topic.
-// However, if this function is called multiple times for a topic, the last topic score params will be used.
-// Note: calling this function will override the default topic score params for the topic. Don't call this function
-// unless you know what you are doing.
-func (g *Builder) SetTopicScoreParams(topic channels.Topic, topicScoreParams *pubsub.TopicScoreParams) {
-	g.scoreOptionConfig.OverrideTopicScoreParams(topic, topicScoreParams)
-}
-
-// SetAppSpecificScoreParams sets the app specific score params of the builder.
-// There is no default app specific score function. However, if this function is called multiple times, the last function will be used.
-func (g *Builder) SetAppSpecificScoreParams(f func(peer.ID) float64) {
-	g.scoreOptionConfig.OverrideAppSpecificScoreFunction(f)
 }
 
 // OverrideDefaultRpcInspectorSuiteFactory overrides the default rpc inspector suite factory.
