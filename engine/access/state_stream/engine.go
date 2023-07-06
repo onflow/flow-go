@@ -13,6 +13,7 @@ import (
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data/cache"
 	"github.com/onflow/flow-go/module/grpcserver"
+	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/utils/logging"
@@ -114,7 +115,10 @@ func NewEng(
 	}
 
 	e.ComponentManager = component.NewComponentManagerBuilder().
-		AddWorker(component.WaitForComponentReady(server)).
+		AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+			ready()
+			<-server.Done()
+		}).
 		Build()
 
 	access.RegisterExecutionDataAPIServer(server.Server, e.handler)
