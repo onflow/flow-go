@@ -76,5 +76,5 @@ store this config value will be prefixed with `network` e.g.
 ```network.network-connection-pruning```
 
 Later in the config process we bind the underlying config store with our pflag set, this allows us to override default values using CLI flags.
-At this time the underlying config store would have 2 separate keys network-connection-pruning and network.network-connection-pruning for the same configuration value. This is because we don't use the network prefix for the CLI flags
-used to override network configs. Because of this an alias must be set from network.network-connection-pruning -> network-connection-pruning so that they both point to the value loaded from the CLI flag. See [SetAliases](https://github.com/onflow/flow-go/blob/master/config/network/config.go#L84) in the network package for a reference. 
+At this time the underlying config store would have 2 separate keys `network-connection-pruning` and `network.network-connection-pruning` for the same configuration value. This is because we don't use the network prefix for the CLI flags
+used to override network configs. As a result, an alias must be set from `network.network-connection-pruning` -> `network-connection-pruning` so that they both point to the value loaded from the CLI flag. See [SetAliases](https://github.com/onflow/flow-go/blob/master/config/network/config.go#L84) in the network package for a reference. 
