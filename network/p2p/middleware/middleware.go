@@ -649,7 +649,7 @@ func (m *Middleware) processUnicastStreamMessage(remotePeer peer.ID, msg *messag
 
 	// TODO: once we've implemented per topic message size limits per the TODO above,
 	// we can remove this check
-	maxSize, err := unicastMaxMsgSizeByCode(msg.Payload)
+	maxSize, err := UnicastMaxMsgSizeByCode(msg.Payload)
 	if err != nil {
 		m.slashingViolationsConsumer.OnUnknownMsgTypeError(&slashing.Violation{
 			Identity: nil, PeerID: remotePeer.String(), MsgType: "", Channel: channel, Protocol: message.ProtocolTypeUnicast, Err: err,
@@ -824,15 +824,15 @@ func (m *Middleware) IsConnected(nodeID flow.Identifier) (bool, error) {
 // unicastMaxMsgSize returns the max permissible size for a unicast message
 func unicastMaxMsgSize(messageType string) int {
 	switch messageType {
-	case "messages.ChunkDataResponse":
+	case "*messages.ChunkDataResponse":
 		return LargeMsgMaxUnicastMsgSize
 	default:
 		return DefaultMaxUnicastMsgSize
 	}
 }
 
-// unicastMaxMsgSizeByCode returns the max permissible size for a unicast message code
-func unicastMaxMsgSizeByCode(payload []byte) (int, error) {
+// UnicastMaxMsgSizeByCode returns the max permissible size for a unicast message code
+func UnicastMaxMsgSizeByCode(payload []byte) (int, error) {
 	msgCode, err := codec.MessageCodeFromPayload(payload)
 	if err != nil {
 		return 0, err

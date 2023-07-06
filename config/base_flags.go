@@ -3,7 +3,7 @@ package config
 import (
 	"github.com/spf13/pflag"
 
-	netconf "github.com/onflow/flow-go/config/network"
+	"github.com/onflow/flow-go/network/netconf"
 )
 
 const (

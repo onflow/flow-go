@@ -31,7 +31,7 @@ type PeerManager struct {
 	logger             zerolog.Logger
 	peersProvider      p2p.PeersProvider // callback to retrieve list of peers to connect to
 	peerRequestQ       chan struct{}     // a channel to queue a peer update request
-	connector          p2p.Connector     // connector to connect or disconnect from peers
+	connector          p2p.PeerUpdater   // connector to connect or disconnect from peers
 	peerUpdateInterval time.Duration     // interval the peer manager runs on
 
 	peersProviderMu sync.RWMutex
@@ -39,7 +39,7 @@ type PeerManager struct {
 
 // NewPeerManager creates a new peer manager which calls the peersProvider callback to get a list of peers to connect to
 // and it uses the connector to actually connect or disconnect from peers.
-func NewPeerManager(logger zerolog.Logger, updateInterval time.Duration, connector p2p.Connector) *PeerManager {
+func NewPeerManager(logger zerolog.Logger, updateInterval time.Duration, connector p2p.PeerUpdater) *PeerManager {
 	pm := &PeerManager{
 		logger:             logger,
 		connector:          connector,

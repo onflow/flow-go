@@ -18,25 +18,25 @@ type GossipSubFactoryFunc struct {
 	mock.Mock
 }
 
-// Execute provides a mock function with given fields: _a0, _a1, _a2, _a3
-func (_m *GossipSubFactoryFunc) Execute(_a0 context.Context, _a1 zerolog.Logger, _a2 host.Host, _a3 p2p.PubSubAdapterConfig) (p2p.PubSubAdapter, error) {
-	ret := _m.Called(_a0, _a1, _a2, _a3)
+// Execute provides a mock function with given fields: _a0, _a1, _a2, _a3, _a4
+func (_m *GossipSubFactoryFunc) Execute(_a0 context.Context, _a1 zerolog.Logger, _a2 host.Host, _a3 p2p.PubSubAdapterConfig, _a4 p2p.CollectionClusterChangesConsumer) (p2p.PubSubAdapter, error) {
+	ret := _m.Called(_a0, _a1, _a2, _a3, _a4)
 
 	var r0 p2p.PubSubAdapter
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, zerolog.Logger, host.Host, p2p.PubSubAdapterConfig) (p2p.PubSubAdapter, error)); ok {
-		return rf(_a0, _a1, _a2, _a3)
+	if rf, ok := ret.Get(0).(func(context.Context, zerolog.Logger, host.Host, p2p.PubSubAdapterConfig, p2p.CollectionClusterChangesConsumer) (p2p.PubSubAdapter, error)); ok {
+		return rf(_a0, _a1, _a2, _a3, _a4)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, zerolog.Logger, host.Host, p2p.PubSubAdapterConfig) p2p.PubSubAdapter); ok {
-		r0 = rf(_a0, _a1, _a2, _a3)
+	if rf, ok := ret.Get(0).(func(context.Context, zerolog.Logger, host.Host, p2p.PubSubAdapterConfig, p2p.CollectionClusterChangesConsumer) p2p.PubSubAdapter); ok {
+		r0 = rf(_a0, _a1, _a2, _a3, _a4)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(p2p.PubSubAdapter)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, zerolog.Logger, host.Host, p2p.PubSubAdapterConfig) error); ok {
-		r1 = rf(_a0, _a1, _a2, _a3)
+	if rf, ok := ret.Get(1).(func(context.Context, zerolog.Logger, host.Host, p2p.PubSubAdapterConfig, p2p.CollectionClusterChangesConsumer) error); ok {
+		r1 = rf(_a0, _a1, _a2, _a3, _a4)
 	} else {
 		r1 = ret.Error(1)
 	}

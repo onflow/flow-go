@@ -19,7 +19,6 @@ import (
 	"github.com/onflow/flow-go/insecure/corruptlibp2p"
 	"github.com/onflow/flow-go/insecure/internal"
 	"github.com/onflow/flow-go/module/irrecoverable"
-	mockmodule "github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/network/p2p"
 	p2ptest "github.com/onflow/flow-go/network/p2p/test"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -32,8 +31,8 @@ func TestSpam_IHave(t *testing.T) {
 	const messagesToSpam = 3
 	sporkId := unittest.IdentifierFixture()
 	role := flow.RoleConsensus
-	idProvider := mockmodule.NewIdentityProvider(t)
-	gsrSpammer := corruptlibp2p.NewGossipSubRouterSpammer(t, sporkId, role, nil)
+	idProvider := unittest.NewUpdatableIDProvider(flow.IdentityList{})
+	gsrSpammer := corruptlibp2p.NewGossipSubRouterSpammer(t, sporkId, role, idProvider)
 
 	allSpamIHavesReceived := sync.WaitGroup{}
 	allSpamIHavesReceived.Add(messagesToSpam)
@@ -57,7 +56,7 @@ func TestSpam_IHave(t *testing.T) {
 				return nil
 			})),
 	)
-	idProvider.On("ByPeerID", victimNode.Host().ID()).Return(&victimIdentity, true).Maybe()
+	idProvider.SetIdentities(flow.IdentityList{&victimIdentity, &gsrSpammer.SpammerId})
 	// starts nodes
 	ctx, cancel := context.WithCancel(context.Background())
 	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
