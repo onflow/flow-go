@@ -251,7 +251,7 @@ func NewNetworkCollector(logger zerolog.Logger, opts ...NetworkCollectorOpt) *Ne
 			Namespace: namespaceNetwork,
 			Subsystem: subsystemSecurity,
 			Name:      nc.prefix + "slashing_violation_reports_skipped_count",
-			Help:      "number of slashing violations consumer violations that were not reported for misbehavior when the identity of the sender not known",
+			Help:      "number of slashing violations consumer violations that were not reported for misbehavior because the identity of the sender not known",
 		},
 	)
 
