@@ -38,7 +38,7 @@ Adding a new config to the FlowConfig can be done in a few easy steps.
         }
     ```
    It's important to make sure that the CLI flag name matches the mapstructure field tag to avoid parsing errors.
-4. Add the new config and a default value to the default-config.yml file. Ensure that the new property added matches the configuration struct structure for the subpackage the config belongs to.
+4. Add the new config and a default value to the `default-config.yml` file. Ensure that the new property added matches the configuration struct structure for the subpackage the config belongs to.
     ```yaml
       config-file: "./default-config.yml"
       network-config:
