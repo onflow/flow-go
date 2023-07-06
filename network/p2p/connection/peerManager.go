@@ -41,7 +41,7 @@ type PeerManager struct {
 // and it uses the connector to actually connect or disconnect from peers.
 func NewPeerManager(logger zerolog.Logger, updateInterval time.Duration, connector p2p.PeerUpdater) *PeerManager {
 	pm := &PeerManager{
-		logger:             logger,
+		logger:             logger.With().Str("component", "peer-manager").Logger(),
 		connector:          connector,
 		peerRequestQ:       make(chan struct{}, 1),
 		peerUpdateInterval: updateInterval,

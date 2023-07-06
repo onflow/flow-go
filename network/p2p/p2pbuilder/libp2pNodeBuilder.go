@@ -149,9 +149,15 @@ func (builder *LibP2PNodeBuilder) SetGossipSubFactory(gf p2p.GossipSubFactoryFun
 	return builder
 }
 
-// EnableGossipSubScoringWithOverride enables peer scoring for the GossipSub pubsub system.
-// Arguments:
-// - *PeerScoringConfigOverride: the peer scoring configuration for the GossipSub pubsub system. If nil, the default configuration is used.
+// EnableGossipSubScoringWithOverride enables peer scoring for the GossipSub pubsub system with the given override.
+// Any existing peer scoring config attribute that is set in the override will override the default peer scoring config.
+// Anything that is left to nil or zero value in the override will be ignored and the default value will be used.
+// Note: it is not recommended to override the default peer scoring config in production unless you know what you are doing.
+// Production Tip: use PeerScoringConfigNoOverride as the argument to this function to enable peer scoring without any override.
+// Args:
+// - PeerScoringConfigOverride: override for the peer scoring config- Recommended to use PeerScoringConfigNoOverride for production.
+// Returns:
+// none
 func (builder *LibP2PNodeBuilder) EnableGossipSubScoringWithOverride(config *p2p.PeerScoringConfigOverride) p2p.NodeBuilder {
 	builder.gossipSubBuilder.EnableGossipSubScoringWithOverride(config)
 	return builder

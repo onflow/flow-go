@@ -108,7 +108,7 @@ func testGossipSubInvalidMessageDeliveryScoring(t *testing.T, spamMsgFactory fun
 		idProvider,
 		p2ptest.WithRole(role),
 		p2ptest.WithPeerScoreTracerInterval(1*time.Second),
-		p2ptest.WithPeerScoringEnabled(idProvider),
+		p2ptest.WithPeerScoringEnabled(p2p.PeerScoringConfigNoOverride),
 	)
 
 	idProvider.On("ByPeerID", victimNode.Host().ID()).Return(&victimIdentity, true).Maybe()
@@ -173,39 +173,48 @@ func testGossipSubInvalidMessageDeliveryScoring(t *testing.T, spamMsgFactory fun
 	})
 }
 
-func TestGossipSubMeshDeliveryScoring(t *testing.T) {
+// TestGossipSubMeshDeliveryScoring_UnderDelivery_SingleTopic tests that when a peer is under-performing in a topic mesh, its score is (slightly) penalized.
+func TestGossipSubMeshDeliveryScoring_UnderDelivery_SingleTopic(t *testing.T) {
 	role := flow.RoleConsensus
 	sporkId := unittest.IdentifierFixture()
 
 	idProvider := mock.NewIdentityProvider(t)
-	spammer := corruptlibp2p.NewGossipSubRouterSpammer(t, sporkId, role, idProvider)
 	ctx, cancel := context.WithCancel(context.Background())
 	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
 
 	blockTopic := channels.TopicFromChannel(channels.PushBlocks, sporkId)
+
+	// we override some of the default scoring parameters in order to speed up the test in a time-efficient manner.
 	blockTopicOverrideParams := scoring.DefaultTopicScoreParams()
-	blockTopicOverrideParams.MeshMessageDeliveriesActivation = 1 * time.Second
-	blockTopicOverrideParams.MeshMessageDeliveriesWindow = 1 * time.Second
-	victimNode, victimIdentity := p2ptest.NodeFixture(
+	blockTopicOverrideParams.MeshMessageDeliveriesActivation = 1 * time.Second // we start observing the mesh message deliveries after 1 second of the node startup.
+	thisNode, thisId := p2ptest.NodeFixture(                                   // this node is the one that will be penalizing the under-performer node.
 		t,
 		sporkId,
 		t.Name(),
 		idProvider,
 		p2ptest.WithRole(role),
 		p2ptest.WithPeerScoreTracerInterval(1*time.Second),
-		p2ptest.WithPeerScoringEnabled(idProvider),
-		p2ptest.WithPeerScoreParamsOption(&p2p.PeerScoringConfigOverride{
-			TopicScoreParams: map[channels.Topic]*pubsub.TopicScoreParams{
-				blockTopic: blockTopicOverrideParams,
-			},
-			DecayInterval: 1 * time.Second,
-		}),
+		p2ptest.WithPeerScoringEnabled(
+			&p2p.PeerScoringConfigOverride{
+				TopicScoreParams: map[channels.Topic]*pubsub.TopicScoreParams{
+					blockTopic: blockTopicOverrideParams,
+				},
+				DecayInterval: 1 * time.Second, // we override the decay interval to 1 second so that the score is updated within 1 second intervals.
+			}),
 	)
 
-	idProvider.On("ByPeerID", victimNode.Host().ID()).Return(&victimIdentity, true).Maybe()
-	idProvider.On("ByPeerID", spammer.SpammerNode.Host().ID()).Return(&spammer.SpammerId, true).Maybe()
-	ids := flow.IdentityList{&spammer.SpammerId, &victimIdentity}
-	nodes := []p2p.LibP2PNode{spammer.SpammerNode, victimNode}
+	underPerformerNode, underPerformerId := p2ptest.NodeFixture(
+		t,
+		sporkId,
+		t.Name(),
+		idProvider,
+		p2ptest.WithRole(role),
+	)
+
+	idProvider.On("ByPeerID", thisNode.Host().ID()).Return(&thisId, true).Maybe()
+	idProvider.On("ByPeerID", underPerformerNode.Host().ID()).Return(&underPerformerId, true).Maybe()
+	ids := flow.IdentityList{&underPerformerId, &thisId}
+	nodes := []p2p.LibP2PNode{underPerformerNode, thisNode}
 
 	p2ptest.StartNodes(t, signalerCtx, nodes, 100*time.Millisecond)
 	defer p2ptest.StopNodes(t, nodes, cancel, 2*time.Second)
@@ -213,7 +222,50 @@ func TestGossipSubMeshDeliveryScoring(t *testing.T) {
 	p2ptest.LetNodesDiscoverEachOther(t, ctx, nodes, ids)
 	p2ptest.TryConnectionAndEnsureConnected(t, ctx, nodes)
 
-	// checks end-to-end message delivery works on GossipSub
+	// initially both nodes should be able to publish and receive messages from each other in the topic mesh.
+	p2ptest.EnsurePubsubMessageExchange(t, ctx, nodes, func() (interface{}, channels.Topic) {
+		return unittest.ProposalFixture(), blockTopic
+	})
+
+	// Also initially the under-performing node should have a score that is at least equal to the MaxAppSpecificReward.
+	// The reason is in our scoring system, we reward the staked nodes by MaxAppSpecificReward, and the under-performing node is considered staked
+	// as it is in the id provider of thisNode.
+	require.Eventually(t, func() bool {
+		underPerformingNodeScore, ok := thisNode.PeerScoreExposer().GetScore(underPerformerNode.Host().ID())
+		if !ok {
+			return false
+		}
+		if underPerformingNodeScore < scoring.MaxAppSpecificReward {
+			// ensure the score is high enough so that gossip is routed by victim node to spammer node.
+			return false
+		}
+
+		return true
+	}, 1*time.Second, 100*time.Millisecond)
+
+	// however, after one decay interval, we expect the score of the under-performing node to be penalized by -0.05 * MaxAppSpecificReward.
+	require.Eventually(t, func() bool {
+		underPerformingNodeScore, ok := thisNode.PeerScoreExposer().GetScore(underPerformerNode.Host().ID())
+		if !ok {
+			return false
+		}
+		if underPerformingNodeScore > 0.96*scoring.MaxAppSpecificReward { // score must be penalized by -0.05 * MaxAppSpecificReward.
+			return false
+		}
+		if underPerformingNodeScore < scoring.DefaultGossipThreshold { // even the node is slightly penalized, it should still be able to gossip with this node.
+			return false
+		}
+		if underPerformingNodeScore < scoring.DefaultPublishThreshold { // even the node is slightly penalized, it should still be able to publish to this node.
+			return false
+		}
+		if underPerformingNodeScore < scoring.DefaultGraylistThreshold { // even the node is slightly penalized, it should still be able to establish rpc connection with this node.
+			return false
+		}
+
+		return true
+	}, 3*time.Second, 100*time.Millisecond)
+
+	// even though the under-performing node is penalized, it should still be able to publish and receive messages from this node in the topic mesh.
 	p2ptest.EnsurePubsubMessageExchange(t, ctx, nodes, func() (interface{}, channels.Topic) {
 		return unittest.ProposalFixture(), blockTopic
 	})

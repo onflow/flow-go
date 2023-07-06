@@ -119,10 +119,15 @@ type NodeBuilder interface {
 	SetConnectionGater(ConnectionGater) NodeBuilder
 	SetRoutingSystem(func(context.Context, host.Host) (routing.Routing, error)) NodeBuilder
 
-	// EnableGossipSubPeerScoring enables peer scoring for the GossipSub pubsub system.
-	// Arguments:
-	// - module.IdentityProvider: the identity provider for the node (must be set before calling this method).
-	// - *PeerScoringConfigOverride: the peer scoring configuration for the GossipSub pubsub system. If nil, the default configuration is used.
+	// EnableGossipSubScoringWithOverride enables peer scoring for the GossipSub pubsub system with the given override.
+	// Any existing peer scoring config attribute that is set in the override will override the default peer scoring config.
+	// Anything that is left to nil or zero value in the override will be ignored and the default value will be used.
+	// Note: it is not recommended to override the default peer scoring config in production unless you know what you are doing.
+	// Production Tip: use PeerScoringConfigNoOverride as the argument to this function to enable peer scoring without any override.
+	// Args:
+	// - PeerScoringConfigOverride: override for the peer scoring config- Recommended to use PeerScoringConfigNoOverride for production.
+	// Returns:
+	// none
 	EnableGossipSubScoringWithOverride(*PeerScoringConfigOverride) NodeBuilder
 	SetCreateNode(CreateNodeFunc) NodeBuilder
 	SetGossipSubFactory(GossipSubFactoryFunc, GossipSubAdapterConfigFunc) NodeBuilder

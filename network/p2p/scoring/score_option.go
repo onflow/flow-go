@@ -1,6 +1,7 @@
 package scoring
 
 import (
+	"fmt"
 	"time"
 
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
@@ -143,15 +144,6 @@ const (
 	// We set it to 1.0, which means that the overall score of a peer in a topic mesh is not affected by the weight of the topic.
 	defaultTopicWeight = 1.0
 
-	// defaultTopicMeshDeliveriesWeight is the weight for applying penalty when a peer is under-performing in a topic mesh.
-	// Upon every decay interval, if the number of actual message deliveries is less than the topic mesh message deliveries threshold
-	// (i.e., defaultTopicMeshMessageDeliveriesThreshold), the peer will be penalized by square of the difference between the actual
-	// message deliveries and the threshold, multiplied by this weight, i.e., -w * (actual - threshold)^2 where w is the weight, and
-	// `actual` and `threshold` are the actual message deliveries and the threshold, respectively. We set it to -0.1, which means that
-	// with around 40 under-performing message deliveries within a gossipsub heartbeat interval, the peer will be disconnected, i.e.,
-	// -0.1 * 40^2 = -160 < -100 (greylist threshold).
-	defaultTopicMeshMessageDeliveriesWeight = -0.1
-
 	// defaultTopicMeshMessageDeliveriesDecay is applied to the number of actual message deliveries in a topic mesh
 	// at each decay interval (i.e., defaultDecayInterval).
 	// It is used to decay the number of actual message deliveries, and prevents past message
@@ -178,9 +170,26 @@ const (
 	// the peer will be penalized by square of the difference between the actual message deliveries and the threshold,
 	// i.e., -w * (actual - threshold)^2 where `actual` and `threshold` are the actual message deliveries and the
 	// threshold, respectively, and `w` is the weight (i.e., defaultTopicMeshMessageDeliveriesWeight).
-	// We set it to 0.2 * defaultTopicMeshMessageDeliveriesCap, which means that with around 200 under-performing
+	// We set it to 0.1 * defaultTopicMeshMessageDeliveriesCap, which means that with around 200 under-performing
 	// message deliveries within a gossipsub heartbeat interval, the peer will be disconnected.
-	defaultMeshMessageDeliveryThreshold = 0.2 * defaultTopicMeshMessageDeliveriesCap
+	defaultTopicMeshMessageDeliveryThreshold = 0.2 * defaultTopicMeshMessageDeliveriesCap
+
+	// defaultTopicMeshDeliveriesWeight is the weight for applying penalty when a peer is under-performing in a topic mesh.
+	// Upon every decay interval, if the number of actual message deliveries is less than the topic mesh message deliveries threshold
+	// (i.e., defaultTopicMeshMessageDeliveriesThreshold), the peer will be penalized by square of the difference between the actual
+	// message deliveries and the threshold, multiplied by this weight, i.e., -w * (actual - threshold)^2 where w is the weight, and
+	// `actual` and `threshold` are the actual message deliveries and the threshold, respectively.
+	// We set this value to be - 0.05 MaxAppSpecificReward / (defaultTopicMeshMessageDeliveriesThreshold^2). This guarantees that even if a peer
+	// is not delivering any message in a topic mesh, it will not be disconnected.
+	// Rather, looses part of the MaxAppSpecificReward that is awarded by our app-specific scoring function to all staked
+	// nodes by default will be withdrawn, and the peer will be slightly penalized. In other words, under-performing in a topic mesh
+	// will drop the overall score of a peer by 5% of the MaxAppSpecificReward that is awarded by our app-specific scoring function.
+	// It means that under-performing in a topic mesh will not cause a peer to be disconnected, but it will cause the peer to lose
+	// its MaxAppSpecificReward that is awarded by our app-specific scoring function.
+	// At this point, we do not want to disconnect a peer only because it is under-performing in a topic mesh as it might be
+	// causing a false positive network partition.
+	// TODO: we must increase the penalty for under-performing in a topic mesh in the future, and disconnect the peer if it is under-performing.
+	defaultTopicMeshMessageDeliveriesWeight = -0.05 * MaxAppSpecificReward / (defaultTopicMeshMessageDeliveryThreshold * defaultTopicMeshMessageDeliveryThreshold)
 
 	// defaultMeshMessageDeliveriesWindow is the window size is time interval that we count a delivery of an already
 	// seen message towards the score of a peer in a topic mesh. The delivery is counted
@@ -414,7 +423,7 @@ func defaultPeerScoreParams() *pubsub.PeerScoreParams {
 
 // DefaultTopicScoreParams returns the default score params for topics.
 func DefaultTopicScoreParams() *pubsub.TopicScoreParams {
-	return &pubsub.TopicScoreParams{
+	p := &pubsub.TopicScoreParams{
 		TopicWeight:                     defaultTopicWeight,
 		SkipAtomicValidation:            defaultTopicSkipAtomicValidation,
 		InvalidMessageDeliveriesWeight:  defaultTopicInvalidMessageDeliveriesWeight,
@@ -423,8 +432,15 @@ func DefaultTopicScoreParams() *pubsub.TopicScoreParams {
 		MeshMessageDeliveriesWeight:     defaultTopicMeshMessageDeliveriesWeight,
 		MeshMessageDeliveriesDecay:      defaultTopicMeshMessageDeliveriesDecay,
 		MeshMessageDeliveriesCap:        defaultTopicMeshMessageDeliveriesCap,
-		MeshMessageDeliveriesThreshold:  defaultMeshMessageDeliveryThreshold,
+		MeshMessageDeliveriesThreshold:  defaultTopicMeshMessageDeliveryThreshold,
 		MeshMessageDeliveriesWindow:     defaultMeshMessageDeliveriesWindow,
 		MeshMessageDeliveriesActivation: defaultMeshMessageDeliveriesActivation,
 	}
+
+	if p.MeshMessageDeliveriesWeight >= 0 {
+		// GossipSub also does a validation, but we want to panic as early as possible.
+		panic(fmt.Sprintf("invalid mesh message deliveries weight %f", p.MeshMessageDeliveriesWeight))
+	}
+
+	return p
 }

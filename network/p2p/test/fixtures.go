@@ -145,7 +145,7 @@ func NodeFixture(
 	}
 
 	if parameters.PeerScoringEnabled {
-		builder.EnableGossipSubScoringWithOverride(parameters.PeerScoreConfig)
+		builder.EnableGossipSubScoringWithOverride(parameters.PeerScoringConfigOverride)
 	}
 
 	if parameters.GossipSubFactory != nil && parameters.GossipSubConfig != nil {
@@ -199,7 +199,7 @@ type NodeFixtureParameters struct {
 	Logger                            zerolog.Logger
 	PeerScoringEnabled                bool
 	IdProvider                        module.IdentityProvider
-	PeerScoreConfig                   *p2p.PeerScoringConfigOverride
+	PeerScoringConfigOverride         *p2p.PeerScoringConfigOverride
 	PeerManagerConfig                 *p2pconfig.PeerManagerConfig
 	PeerProvider                      p2p.PeersProvider // peer manager parameter
 	ConnGater                         p2p.ConnectionGater
@@ -240,10 +240,21 @@ func WithCreateStreamRetryDelay(delay time.Duration) NodeFixtureParameterOption 
 	}
 }
 
-func WithPeerScoringEnabled(idProvider module.IdentityProvider) NodeFixtureParameterOption {
+// WithPeerScoringEnabled enables peer scoring for the GossipSub pubsub system with the given override.
+// Any existing peer scoring config attribute that is set in the override will override the default peer scoring config.
+// Anything that is left to nil or zero value in the override will be ignored and the default value will be used.
+// Note: it is not recommended to override the default peer scoring config in production unless you know what you are doing.
+// Default Use Tip: use p2p.PeerScoringConfigNoOverride as the argument to this function to enable peer scoring without any override.
+// Args:
+//   - PeerScoringConfigOverride: override for the peer scoring config- Recommended to use p2p.PeerScoringConfigNoOverride for production or when
+//     you don't want to override the default peer scoring config.
+//
+// Returns:
+// - NodeFixtureParameterOption: a function that can be passed to the NodeFixture function to enable peer scoring.
+func WithPeerScoringEnabled(override *p2p.PeerScoringConfigOverride) NodeFixtureParameterOption {
 	return func(p *NodeFixtureParameters) {
 		p.PeerScoringEnabled = true
-		p.IdProvider = idProvider
+		p.PeerScoringConfigOverride = override
 	}
 }
 
@@ -310,7 +321,7 @@ func WithRole(role flow.Role) NodeFixtureParameterOption {
 
 func WithPeerScoreParamsOption(cfg *p2p.PeerScoringConfigOverride) NodeFixtureParameterOption {
 	return func(p *NodeFixtureParameters) {
-		p.PeerScoreConfig = cfg
+		p.PeerScoringConfigOverride = cfg
 	}
 }
 
