@@ -1183,22 +1183,14 @@ func convertSemverVersion(structVal cadence.Struct) (
 		return "", err
 	}
 
-	version := fmt.Sprintf(
-		"%d.%d.%d%s",
-		major,
-		minor,
-		patch,
-		preRelease,
-	)
-	_, err = semver.NewVersion(version)
-	if err != nil {
-		return "", fmt.Errorf(
-			"invalid semver %s: %w",
-			version,
-			err,
-		)
+	version := semver.Version{
+		Major:      int64(major),
+		Minor:      int64(minor),
+		Patch:      int64(patch),
+		PreRelease: semver.PreRelease(preRelease),
 	}
-	return version, nil
+
+	return version.String(), nil
 
 }
 

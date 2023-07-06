@@ -165,7 +165,7 @@ func VersionBeaconFixtureByChainID(chain flow.ChainID) (flow.Event, *flow.Versio
 		VersionBoundaries: []flow.VersionBoundary{
 			{
 				BlockHeight: 44,
-				Version:     "2.13.7",
+				Version:     "2.13.7-test",
 			},
 		},
 		Sequence: 5,
@@ -671,7 +671,7 @@ func createVersionBeaconEvent() cadence.Event {
 		cadence.UInt8(7),
 
 		// preRelease
-		cadence.NewOptional(cadence.String("")),
+		cadence.NewOptional(cadence.String("test")),
 	}).WithType(semverType)
 
 	versionBoundary := cadence.NewStruct([]cadence.Value{
