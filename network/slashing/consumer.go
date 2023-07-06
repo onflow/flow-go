@@ -82,9 +82,10 @@ func (c *Consumer) reportMisbehavior(misbehavior network.Misbehavior, violation 
 	}
 	report, err := alsp.NewMisbehaviorReport(violation.Identity.NodeID, misbehavior)
 	if err != nil {
+		// failing to create the misbehavior report is unlikely. If an error is encountered while
+		// creating the misbehavior report it indicates a bug and processing can not proceed.
 		c.log.Fatal().
 			Err(err).
-			Bool(logging.KeySuspicious, true).
 			Str("peerID", violation.PeerID).
 			Msg("failed to create misbehavior report")
 
