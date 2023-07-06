@@ -26,7 +26,8 @@ go build -tags relic -o flow-access-node ./cmd/access
 ### Adding a new config value
 Adding a new config to the FlowConfig can be done in a few easy steps.
 
-1. Create a new subpackage for the config value. This package will define the configuration structs and CLI flags for overriding.
+1. Create a new subpackage in the config package for the new configuration structs to live. Although it is encouraged to put all configuration sub-packages in the config package 
+so that configuration can be updated in one place these sub-packages can live anywhere. This package will define the configuration structs and CLI flags for overriding.
     ```shell
     mkdir example_config 
     ```
