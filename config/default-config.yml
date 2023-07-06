@@ -63,6 +63,8 @@ network-config:
   # The default interval at which the gossipsub score tracer logs the peer scores. This is used for debugging and forensics purposes.
   #	Note that we purposefully choose this logging interval high enough to avoid spamming the logs.
   gossipsub-score-tracer-interval: 1m
+  # The default RPC sent tracker cache size. The RPC sent tracker is used to track RPC control messages sent from the local node.
+  gossipsub-rpc-sent-tracker-cache-size: 10000
   # Peer scoring is the default value for enabling peer scoring
   gossipsub-peer-scoring-enabled: true
   # Gossipsub rpc inspectors configs

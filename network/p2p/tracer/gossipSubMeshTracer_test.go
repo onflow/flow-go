@@ -13,6 +13,7 @@ import (
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/irrecoverable"
+	"github.com/onflow/flow-go/module/metrics"
 	mockmodule "github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/p2p"
@@ -61,7 +62,16 @@ func TestGossipSubMeshTracer(t *testing.T) {
 	// we only need one node with a meshTracer to test the meshTracer.
 	// meshTracer logs at 1 second intervals for sake of testing.
 	collector := mockmodule.NewGossipSubLocalMeshMetrics(t)
-	meshTracer := tracer.NewGossipSubMeshTracer(logger, collector, idProvider, 1*time.Second)
+	meshTracerCfg := &tracer.GossipSubMeshTracerConfig{
+		Logger:                       logger,
+		Metrics:                      collector,
+		IDProvider:                   idProvider,
+		LoggerInterval:               1 * time.Second,
+		RpcSentTrackerCacheCollector: metrics.NewNoopCollector(),
+		RpcSentTrackerCacheSize:      uint32(100),
+	}
+	meshTracer, err := tracer.NewGossipSubMeshTracer(meshTracerCfg)
+	require.NoError(t, err)
 	tracerNode, tracerId := p2ptest.NodeFixture(
 		t,
 		sporkId,

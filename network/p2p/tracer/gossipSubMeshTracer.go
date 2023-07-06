@@ -14,6 +14,7 @@ import (
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/network/p2p"
+	"github.com/onflow/flow-go/network/p2p/tracer/internal"
 	"github.com/onflow/flow-go/utils/logging"
 )
 
@@ -43,23 +44,34 @@ type GossipSubMeshTracer struct {
 	idProvider     module.IdentityProvider
 	loggerInterval time.Duration
 	metrics        module.GossipSubLocalMeshMetrics
+	rpcSentTracker *internal.RPCSentTracker
 }
 
 var _ p2p.PubSubTracer = (*GossipSubMeshTracer)(nil)
 
-func NewGossipSubMeshTracer(
-	logger zerolog.Logger,
-	metrics module.GossipSubLocalMeshMetrics,
-	idProvider module.IdentityProvider,
-	loggerInterval time.Duration) *GossipSubMeshTracer {
+type GossipSubMeshTracerConfig struct {
+	Logger                       zerolog.Logger
+	Metrics                      module.GossipSubLocalMeshMetrics
+	IDProvider                   module.IdentityProvider
+	LoggerInterval               time.Duration
+	RpcSentTrackerCacheCollector module.HeroCacheMetrics
+	RpcSentTrackerCacheSize      uint32
+}
+
+func NewGossipSubMeshTracer(config *GossipSubMeshTracerConfig) (*GossipSubMeshTracer, error) {
+	rpcSentTracker, err := internal.NewRPCSentTracker(config.Logger, config.RpcSentTrackerCacheSize, config.RpcSentTrackerCacheCollector)
+	if err != nil {
+		return nil, err
+	}
 
 	g := &GossipSubMeshTracer{
 		RawTracer:      NewGossipSubNoopTracer(),
 		topicMeshMap:   make(map[string]map[peer.ID]struct{}),
-		idProvider:     idProvider,
-		metrics:        metrics,
-		logger:         logger.With().Str("component", "gossip_sub_topology_tracer").Logger(),
-		loggerInterval: loggerInterval,
+		idProvider:     config.IDProvider,
+		metrics:        config.Metrics,
+		logger:         config.Logger.With().Str("component", "gossip_sub_topology_tracer").Logger(),
+		loggerInterval: config.LoggerInterval,
+		rpcSentTracker: rpcSentTracker,
 	}
 
 	g.Component = component.NewComponentManagerBuilder().
@@ -69,7 +81,7 @@ func NewGossipSubMeshTracer(
 		}).
 		Build()
 
-	return g
+	return g, nil
 }
 
 // GetMeshPeers returns the local mesh peers for the given topic.
@@ -137,6 +149,15 @@ func (t *GossipSubMeshTracer) Prune(p peer.ID, topic string) {
 	}
 
 	lg.Info().Hex("flow_id", logging.ID(id.NodeID)).Str("role", id.Role.String()).Msg("pruned peer")
+}
+
+// SendRPC is called when a RPC is sent. Currently, the GossipSubMeshTracer tracks iHave RPC messages that have been sent.
+// This function can be updated to track other control messages in the future as required.
+func (t *GossipSubMeshTracer) SendRPC(rpc *pubsub.RPC, _ peer.ID) {
+	switch {
+	case len(rpc.GetControl().GetIhave()) > 0:
+		t.rpcSentTracker.OnIHaveRPCSent(rpc.GetControl().GetIhave())
+	}
 }
 
 // logLoop logs the mesh peers of the local node for each topic at a regular interval.

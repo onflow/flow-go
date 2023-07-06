@@ -8,10 +8,8 @@ import (
 	herocache "github.com/onflow/flow-go/module/mempool/herocache/backdata"
 	"github.com/onflow/flow-go/module/mempool/herocache/backdata/heropool"
 	"github.com/onflow/flow-go/module/mempool/stdmap"
-	"github.com/onflow/flow-go/network/p2p"
+	p2pmsg "github.com/onflow/flow-go/network/p2p/message"
 )
-
-type entityFactory func(id flow.Identifier, controlMsgType p2p.ControlMessageType) rpcSentEntity
 
 type RPCSentCacheConfig struct {
 	sizeLimit uint32
@@ -52,7 +50,7 @@ func newRPCSentCache(config *RPCSentCacheConfig) (*rpcSentCache, error) {
 // - bool: true if the record is initialized, false otherwise (i.e.: the record already exists).
 // Note that if init is called multiple times for the same messageID, the record is initialized only once, and the
 // subsequent calls return false and do not change the record (i.e.: the record is not re-initialized).
-func (r *rpcSentCache) init(messageID flow.Identifier, controlMsgType p2p.ControlMessageType) bool {
+func (r *rpcSentCache) init(messageID flow.Identifier, controlMsgType p2pmsg.ControlMessageType) bool {
 	return r.c.Add(newRPCSentEntity(messageID, controlMsgType))
 }
 

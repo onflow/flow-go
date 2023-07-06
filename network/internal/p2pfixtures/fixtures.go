@@ -102,11 +102,17 @@ func CreateNode(t *testing.T, networkKey crypto.PrivateKey, sporkID flow.Identif
 	idProvider := id.NewFixedIdentityProvider(nodeIds)
 	defaultFlowConfig, err := config.DefaultConfig()
 	require.NoError(t, err)
-	meshTracer := tracer.NewGossipSubMeshTracer(
-		logger,
-		metrics.NewNoopCollector(),
-		idProvider,
-		defaultFlowConfig.NetworkConfig.GossipSubConfig.LocalMeshLogInterval)
+
+	meshTracerCfg := &tracer.GossipSubMeshTracerConfig{
+		Logger:                       logger,
+		Metrics:                      metrics.NewNoopCollector(),
+		IDProvider:                   idProvider,
+		LoggerInterval:               defaultFlowConfig.NetworkConfig.GossipSubConfig.LocalMeshLogInterval,
+		RpcSentTrackerCacheCollector: metrics.NewNoopCollector(),
+		RpcSentTrackerCacheSize:      defaultFlowConfig.NetworkConfig.GossipSubConfig.RPCSentTrackerCacheSize,
+	}
+	meshTracer, err := tracer.NewGossipSubMeshTracer(meshTracerCfg)
+	require.NoError(t, err)
 
 	builder := p2pbuilder.NewNodeBuilder(
 		logger,

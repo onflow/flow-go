@@ -2,7 +2,7 @@ package internal
 
 import (
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/network/p2p"
+	p2pmsg "github.com/onflow/flow-go/network/p2p/message"
 )
 
 // rpcSentEntity struct representing an RPC control message sent from local node.
@@ -11,7 +11,7 @@ type rpcSentEntity struct {
 	// messageID the messageID of the rpc control message.
 	messageID flow.Identifier
 	// controlMsgType the control message type.
-	controlMsgType p2p.ControlMessageType
+	controlMsgType p2pmsg.ControlMessageType
 }
 
 var _ flow.Entity = (*rpcSentEntity)(nil)
@@ -29,7 +29,7 @@ func (r rpcSentEntity) Checksum() flow.Identifier {
 }
 
 // newRPCSentEntity returns a new rpcSentEntity.
-func newRPCSentEntity(id flow.Identifier, controlMessageType p2p.ControlMessageType) rpcSentEntity {
+func newRPCSentEntity(id flow.Identifier, controlMessageType p2pmsg.ControlMessageType) rpcSentEntity {
 	return rpcSentEntity{
 		messageID:      id,
 		controlMsgType: controlMessageType,

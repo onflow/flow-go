@@ -3,12 +3,12 @@ package internal
 import (
 	"fmt"
 
-	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/rs/zerolog"
 
+	pb "github.com/libp2p/go-libp2p-pubsub/pb"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
-	"github.com/onflow/flow-go/network/p2p"
+	p2pmsg "github.com/onflow/flow-go/network/p2p/message"
 )
 
 // RPCSentTracker tracks RPC messages that are sent.
@@ -33,9 +33,9 @@ func NewRPCSentTracker(logger zerolog.Logger, sizeLimit uint32, collector module
 // OnIHaveRPCSent caches a unique entity message ID for each message ID included in each rpc iHave control message.
 // Args:
 // - *pubsub.RPC: the rpc sent.
-func (t *RPCSentTracker) OnIHaveRPCSent(rpc *pubsub.RPC) {
-	controlMsgType := p2p.CtrlMsgIHave
-	for _, iHave := range rpc.GetControl().GetIhave() {
+func (t *RPCSentTracker) OnIHaveRPCSent(iHaves []*pb.ControlIHave) {
+	controlMsgType := p2pmsg.CtrlMsgIHave
+	for _, iHave := range iHaves {
 		topicID := iHave.GetTopicID()
 		for _, messageID := range iHave.GetMessageIDs() {
 			entityMsgID := iHaveRPCSentEntityID(topicID, messageID)
