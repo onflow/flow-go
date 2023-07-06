@@ -610,7 +610,7 @@ type RestMetrics interface {
 	// Example recorder taken from:
 	// https://github.com/slok/go-http-metrics/blob/master/metrics/prometheus/prometheus.go
 	httpmetrics.Recorder
-	AddTotalRequests(ctx context.Context, service string, id string)
+	AddTotalRequests(ctx context.Context, method string, routeName string)
 }
 
 type GRPCConnectionPoolMetrics interface {
@@ -740,6 +740,12 @@ type ExecutionMetrics interface {
 type BackendScriptsMetrics interface {
 	// Record the round trip time while executing a script
 	ScriptExecuted(dur time.Duration, size int)
+
+	// ScriptExecutionErrorOnExecutionNode records script execution failures on Execution Nodes
+	ScriptExecutionErrorOnArchiveNode()
+
+	// ScriptExecutionErrorOnArchiveNode records script execution failures in Archive Nodes
+	ScriptExecutionErrorOnExecutionNode()
 }
 
 type TransactionMetrics interface {
