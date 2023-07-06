@@ -115,7 +115,7 @@ func (p *Pool) Add(entityId flow.Identifier, entity flow.Entity, owner uint64) (
 		p.poolEntities[entityIndex].entity = entity
 		p.poolEntities[entityIndex].id = entityId
 		p.poolEntities[entityIndex].owner = owner
-		p.changeState(stateFree, stateUsed, entityIndex)
+		p.switchState(stateFree, stateUsed, entityIndex)
 	}
 
 	return entityIndex, slotAvailable, ejectedEntity
@@ -240,7 +240,7 @@ func (p *Pool) Remove(sliceIndex EIndex) flow.Entity {
 func (p *Pool) invalidateEntityAtIndex(sliceIndex EIndex) flow.Entity {
 	poolEntity := p.poolEntities[sliceIndex]
 	invalidatedEntity := poolEntity.entity
-	p.changeState(stateUsed, stateFree, sliceIndex)
+	p.switchState(stateUsed, stateFree, sliceIndex)
 	p.poolEntities[sliceIndex].id = flow.ZeroID
 	p.poolEntities[sliceIndex].entity = nil
 	return invalidatedEntity
@@ -316,7 +316,8 @@ func (p *Pool) appendEntity(stateType StateIndex, entityIndex EIndex) {
 	p.poolEntities[p.states[stateType].tail].node.next = InvalidIndex
 }
 
-func (p *Pool) changeState(stateFrom StateIndex, stateTo StateIndex, entityIndex EIndex) error {
+// switches state of an entity.
+func (p *Pool) switchState(stateFrom StateIndex, stateTo StateIndex, entityIndex EIndex) error {
 	// Remove from stateFrom list
 	if p.states[stateFrom].size == 0 {
 		panic("Removing an entity from an empty list")
