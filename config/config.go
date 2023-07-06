@@ -27,6 +27,10 @@ var (
 	errPflagsNotParsed = errors.New("failed to bind flags to configuration values, pflags must be parsed before binding")
 )
 
+func init() {
+	initialize()
+}
+
 // FlowConfig Flow configuration.
 type FlowConfig struct {
 	// ConfigFile used to set a path to a config.yml file used to override the default-config.yml file.
@@ -245,8 +249,4 @@ func initialize() {
 	// create validator, at this point you can register custom validation funcs
 	// struct tag translation etc.
 	validate = validator.New()
-}
-
-func init() {
-	initialize()
 }
