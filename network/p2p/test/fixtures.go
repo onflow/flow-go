@@ -560,17 +560,20 @@ func EnsureStreamCreationInBothDirections(t *testing.T, ctx context.Context, nod
 }
 
 // EnsurePubsubMessageExchange ensures that the given connected nodes exchange the given message on the given channel through pubsub.
-// Note: TryConnectionAndEnsureConnected() must be called to connect all nodes before calling this function.
-func EnsurePubsubMessageExchange(t *testing.T, ctx context.Context, nodes []p2p.LibP2PNode, messageFactory func() (interface{}, channels.Topic)) {
-	_, topic := messageFactory()
-
+// Args:
+//   - nodes: the nodes to exchange messages
+//   - ctx: the context- the test will fail if the context expires.
+//   - topic: the topic to exchange messages on
+//   - count: the number of messages to exchange from each node.
+//   - messageFactory: a function that creates a unique message to be published by the node.
+//     The function should return a different message each time it is called.
+//
+// Note-1: this function assumes a timeout of 5 seconds for each message to be received.
+// Note-2: TryConnectionAndEnsureConnected() must be called to connect all nodes before calling this function.
+func EnsurePubsubMessageExchange(t *testing.T, ctx context.Context, nodes []p2p.LibP2PNode, topic channels.Topic, count int, messageFactory func() interface{}) {
 	subs := make([]p2p.Subscription, len(nodes))
 	for i, node := range nodes {
-		ps, err := node.Subscribe(
-			topic,
-			validator.TopicValidator(
-				unittest.Logger(),
-				unittest.AllowAllPeerFilter()))
+		ps, err := node.Subscribe(topic, validator.TopicValidator(unittest.Logger(), unittest.AllowAllPeerFilter()))
 		require.NoError(t, err)
 		subs[i] = ps
 	}
@@ -582,15 +585,17 @@ func EnsurePubsubMessageExchange(t *testing.T, ctx context.Context, nodes []p2p.
 	require.True(t, ok)
 
 	for _, node := range nodes {
-		// creates a unique message to be published by the node
-		msg, _ := messageFactory()
-		data := p2pfixtures.MustEncodeEvent(t, msg, channel)
-		require.NoError(t, node.Publish(ctx, topic, data))
+		for i := 0; i < count; i++ {
+			// creates a unique message to be published by the node
+			msg := messageFactory()
+			data := p2pfixtures.MustEncodeEvent(t, msg, channel)
+			require.NoError(t, node.Publish(ctx, topic, data))
 
-		// wait for the message to be received by all nodes
-		ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
-		p2pfixtures.SubsMustReceiveMessage(t, ctx, data, subs)
-		cancel()
+			// wait for the message to be received by all nodes
+			ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+			p2pfixtures.SubsMustReceiveMessage(t, ctx, data, subs)
+			cancel()
+		}
 	}
 }
 

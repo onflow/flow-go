@@ -124,8 +124,8 @@ func testGossipSubInvalidMessageDeliveryScoring(t *testing.T, spamMsgFactory fun
 	p2ptest.TryConnectionAndEnsureConnected(t, ctx, nodes)
 
 	// checks end-to-end message delivery works on GossipSub
-	p2ptest.EnsurePubsubMessageExchange(t, ctx, nodes, func() (interface{}, channels.Topic) {
-		return unittest.ProposalFixture(), blockTopic
+	p2ptest.EnsurePubsubMessageExchange(t, ctx, nodes, blockTopic, 1, func() interface{} {
+		return unittest.ProposalFixture()
 	})
 
 	totalSpamMessages := 20
@@ -226,8 +226,8 @@ func TestGossipSubMeshDeliveryScoring_UnderDelivery_SingleTopic(t *testing.T) {
 	p2ptest.TryConnectionAndEnsureConnected(t, ctx, nodes)
 
 	// initially both nodes should be able to publish and receive messages from each other in the topic mesh.
-	p2ptest.EnsurePubsubMessageExchange(t, ctx, nodes, func() (interface{}, channels.Topic) {
-		return unittest.ProposalFixture(), blockTopic
+	p2ptest.EnsurePubsubMessageExchange(t, ctx, nodes, blockTopic, 1, func() interface{} {
+		return unittest.ProposalFixture()
 	})
 
 	// Also initially the under-performing node should have a score that is at least equal to the MaxAppSpecificReward.
@@ -269,8 +269,8 @@ func TestGossipSubMeshDeliveryScoring_UnderDelivery_SingleTopic(t *testing.T) {
 	}, 3*time.Second, 100*time.Millisecond)
 
 	// even though the under-performing node is penalized, it should still be able to publish and receive messages from this node in the topic mesh.
-	p2ptest.EnsurePubsubMessageExchange(t, ctx, nodes, func() (interface{}, channels.Topic) {
-		return unittest.ProposalFixture(), blockTopic
+	p2ptest.EnsurePubsubMessageExchange(t, ctx, nodes, blockTopic, 1, func() interface{} {
+		return unittest.ProposalFixture()
 	})
 }
 
@@ -376,10 +376,14 @@ func TestGossipSubMeshDeliveryScoring_UnderDelivery_TwoTopics(t *testing.T) {
 	}, 3*time.Second, 100*time.Millisecond)
 
 	// even though the under-performing node is penalized, it should still be able to publish and receive messages from this node in both topic meshes.
-	p2ptest.EnsurePubsubMessageExchange(t, ctx, nodes, func() (interface{}, channels.Topic) {
-		return unittest.ProposalFixture(), blockTopic
+	p2ptest.EnsurePubsubMessageExchange(t, ctx, nodes, blockTopic, 1, func() interface{} {
+		return unittest.ProposalFixture()
 	})
-	p2ptest.EnsurePubsubMessageExchange(t, ctx, nodes, func() (interface{}, channels.Topic) {
-		return unittest.DKGMessageFixture(), dkgTopic
+	p2ptest.EnsurePubsubMessageExchange(t, ctx, nodes, dkgTopic, 1, func() interface{} {
+		return unittest.DKGMessageFixture()
 	})
+}
+
+func TestGossipSubMeshDeliveryScoring_Replay(t *testing.T) {
+
 }

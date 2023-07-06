@@ -1196,9 +1196,9 @@ func TestGossipSubSpamMitigationIntegration(t *testing.T) {
 	p2ptest.LetNodesDiscoverEachOther(t, ctx, nodes, ids)
 
 	// as nodes started fresh and no spamming has happened yet, the nodes should be able to exchange messages on the topic.
-	p2ptest.EnsurePubsubMessageExchange(t, ctx, nodes, func() (interface{}, channels.Topic) {
-		blockTopic := channels.TopicFromChannel(channels.PushBlocks, sporkID)
-		return unittest.ProposalFixture(), blockTopic
+	blockTopic := channels.TopicFromChannel(channels.PushBlocks, sporkID)
+	p2ptest.EnsurePubsubMessageExchange(t, ctx, nodes, blockTopic, 1, func() interface{} {
+		return unittest.ProposalFixture()
 	})
 
 	// prepares spam graft and prune messages with different strategies.
