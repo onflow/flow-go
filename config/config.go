@@ -167,43 +167,10 @@ func LogConfig(logger *zerolog.Event, flags *pflag.FlagSet) map[string]struct{} 
 // keys do not match the CLI flags 1:1. ie: networking-connection-pruning -> network-config.networking-connection-pruning. After aliases
 // are set the conf store will override values with any CLI flag values that are set as expected.
 func setAliases() {
-	err := SetAliases(conf)
+	err := netconf.SetAliases(conf)
 	if err != nil {
 		panic(fmt.Errorf("failed to set network aliases: %w", err))
 	}
-}
-
-// SetAliases this func sets an aliases for each CLI flag defined for network config overrides to it's corresponding
-// full key in the viper config store. This is required because in our config.yml file all configuration values for the
-// Flow network are stored one level down on the network-config property. When the default config is bootstrapped viper will
-// store these values with the "network-config." prefix on the config key, because we do not want to use CLI flags like --network-config.networking-connection-pruning
-// to override default values we instead use cleans flags like --networking-connection-pruning and create an alias from networking-connection-pruning -> network-config.networking-connection-pruning
-// to ensure overrides happen as expected.
-// Args:
-// *viper.Viper: instance of the viper store to register network config aliases on.
-// Returns:
-// error: if a flag does not have a corresponding key in the viper store.
-func SetAliases(conf *viper.Viper) error {
-	m := make(map[string]string)
-	// create map of key -> full pathkey
-	// ie: "networking-connection-pruning" -> "network-config.networking-connection-pruning"
-	for _, key := range conf.AllKeys() {
-		s := strings.Split(key, ".")
-		// check len of s, we expect all network keys to have a single prefix "network-config"
-		// s should always contain only 2 elements
-		if len(s) == 2 {
-			m[s[1]] = key
-		}
-	}
-	// each flag name should correspond to exactly one key in our config store after it is loaded with the default config
-	for _, flagName := range netconf.AllFlagNames() {
-		fullKey, ok := m[flagName]
-		if !ok {
-			return fmt.Errorf("invalid network configuration missing configuration key flag name %s check config file and cli flags", flagName)
-		}
-		conf.RegisterAlias(fullKey, flagName)
-	}
-	return nil
 }
 
 // overrideConfigFile overrides the default config file by reading in the config file at the path set

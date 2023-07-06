@@ -41,7 +41,9 @@ func TestBindPFlags(t *testing.T) {
 
 // TestDefaultConfig ensures the default Flow config is created and returned without errors.
 func TestDefaultConfig(t *testing.T) {
-	defaultConfig(t)
+	c := defaultConfig(t)
+	require.Equalf(t, "./default-config.yml", c.ConfigFile, "expected default config file to be used")
+	require.NoErrorf(t, c.Validate(), "unexpected error encountered validating default config")
 	unittest.IdentifierFixture()
 }
 
@@ -126,7 +128,9 @@ network-config:
 // defaultConfig resets the config store gets the default Flow config.
 func defaultConfig(t *testing.T) *FlowConfig {
 	initialize()
-	return unittest.DefaultFlowConfig(t)
+	c, err := DefaultConfig()
+	require.NoError(t, err)
+	return c
 }
 
 func testFlagSet(c *FlowConfig) *pflag.FlagSet {

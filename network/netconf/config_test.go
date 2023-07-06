@@ -7,8 +7,6 @@ import (
 
 	"github.com/spf13/viper"
 	"github.com/stretchr/testify/require"
-
-	"github.com/onflow/flow-go/config"
 )
 
 // TestSetAliases ensures every network configuration key prefixed with "network" has an alias without the "network" prefix.
@@ -28,7 +26,7 @@ func TestSetAliases(t *testing.T) {
 		require.NotEqual(t, c.GetString(parts[1]), c.GetString(key))
 	}
 
-	err := config.SetAliases(c)
+	err := SetAliases(c)
 	require.NoError(t, err)
 
 	// ensure each network prefixed key now points to the non-prefixed alias
