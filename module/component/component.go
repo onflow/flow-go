@@ -3,7 +3,6 @@ package component
 import (
 	"context"
 	"fmt"
-	"github.com/rs/zerolog"
 	"sync"
 
 	"go.uber.org/atomic"
@@ -161,21 +160,20 @@ type ComponentManagerBuilder interface {
 	Build() *ComponentManager
 }
 
-type ComponentManagerBuilderImpl struct {
-	Log     zerolog.Logger
+type componentManagerBuilderImpl struct {
 	workers []ComponentWorker
 }
 
 // NewComponentManagerBuilder returns a new ComponentManagerBuilder
 func NewComponentManagerBuilder() ComponentManagerBuilder {
-	return &ComponentManagerBuilderImpl{}
+	return &componentManagerBuilderImpl{}
 }
 
 // AddWorker adds a ComponentWorker closure to the ComponentManagerBuilder
 // All worker functions will be run in parallel when the ComponentManager is started.
 // Note: AddWorker is not concurrency-safe, and should only be called on an individual builder
 // within a single goroutine.
-func (c *ComponentManagerBuilderImpl) AddWorker(worker ComponentWorker) ComponentManagerBuilder {
+func (c *componentManagerBuilderImpl) AddWorker(worker ComponentWorker) ComponentManagerBuilder {
 	c.workers = append(c.workers, worker)
 	return c
 }
@@ -184,9 +182,8 @@ func (c *ComponentManagerBuilderImpl) AddWorker(worker ComponentWorker) Componen
 // Build may be called multiple times to create multiple individual ComponentManagers. This will
 // result in the worker routines being called multiple times. If this is unsafe, do not call it
 // more than once!
-func (c *ComponentManagerBuilderImpl) Build() *ComponentManager {
-	c.Log.Info().Msg("_______ComponentManagerBuilderImpl Build()")
-	cm := &ComponentManager{
+func (c *componentManagerBuilderImpl) Build() *ComponentManager {
+	return &ComponentManager{
 		started:        atomic.NewBool(false),
 		ready:          make(chan struct{}),
 		done:           make(chan struct{}),
@@ -194,8 +191,6 @@ func (c *ComponentManagerBuilderImpl) Build() *ComponentManager {
 		shutdownSignal: make(chan struct{}),
 		workers:        c.workers,
 	}
-	c.Log.Info().Msg(fmt.Sprintf("_______ComponentManagerBuilderImpl %d", len(c.workers)))
-	return cm
 }
 
 var _ Component = (*ComponentManager)(nil)

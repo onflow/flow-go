@@ -178,30 +178,8 @@ func NewBuilder(log zerolog.Logger,
 	eng.backendNotifierActor = backendNotifierActor
 
 	eng.Component = component.NewComponentManagerBuilder().
-		AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
-			log.Info().Msg("================> Start secure add worker")
-			select {
-			case <-ctx.Done():
-			case <-secureGrpcServer.Ready():
-				log.Info().Msg("================> secure grpc component is ready")
-				ready()
-			}
-			log.Info().Msg("================> secure grpc component done")
-			<-secureGrpcServer.Done()
-		}).
-		AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
-			log.Info().Msg("================> Start unsecure add worker")
-			select {
-			case <-ctx.Done():
-			case <-unsecureGrpcServer.Ready():
-				log.Info().Msg("================> unsecure grpc component is ready")
-				ready()
-			}
-			log.Info().Msg("================> unsecure grpc component done")
-			<-unsecureGrpcServer.Done()
-		}).
-		//AddWorker(component.WaitForComponentReady(secureGrpcServer)).
-		//AddWorker(component.WaitForComponentReady(unsecureGrpcServer)).
+		AddWorker(component.WaitForComponentReady(secureGrpcServer)).
+		AddWorker(component.WaitForComponentReady(unsecureGrpcServer)).
 		AddWorker(eng.serveGRPCWebProxyWorker).
 		AddWorker(eng.serveREST).
 		AddWorker(finalizedCacheWorker).

@@ -30,18 +30,15 @@ func NewGrpcServer(log zerolog.Logger,
 	grpcListenAddr string,
 	grpcServer *grpc.Server,
 ) *GrpcServer {
-	log.Info().Msg("================> NewGrpcServer")
 	server := &GrpcServer{
 		log:            log,
 		Server:         grpcServer,
 		grpcListenAddr: grpcListenAddr,
 	}
-	cm := component.ComponentManagerBuilderImpl{Log: log}
-	server.Component = cm.
+	server.Component = component.NewComponentManagerBuilder().
 		AddWorker(server.serveGRPCWorker).
 		AddWorker(server.shutdownWorker).
 		Build()
-	log.Info().Msg("================> End NewGrpcServer")
 	return server
 }
 
@@ -49,7 +46,6 @@ func NewGrpcServer(log zerolog.Logger,
 // The ready callback is called after the server address is bound and set.
 func (g *GrpcServer) serveGRPCWorker(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 	g.log = g.log.With().Str("grpc_address", g.grpcListenAddr).Logger()
-	g.log.Info().Msg("================> serveGRPCWorker")
 	g.log.Info().Msg("starting grpc server on address")
 
 	l, err := net.Listen("tcp", g.grpcListenAddr)

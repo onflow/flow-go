@@ -896,14 +896,6 @@ func (builder *FlowAccessNodeBuilder) enqueueRelayNetwork() {
 }
 
 func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
-	builder.Module("access metrics", func(node *cmd.NodeConfig) error {
-		builder.AccessMetrics = metrics.NewAccessCollector(
-			metrics.WithTransactionMetrics(builder.TransactionMetrics),
-			metrics.WithBackendScriptsMetrics(builder.TransactionMetrics),
-		)
-		return nil
-	})
-
 	builder.
 		BuildConsensusFollower().
 		Module("collection node client", func(node *cmd.NodeConfig) error {
@@ -977,6 +969,13 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 			)
 			return nil
 		}).
+		Module("access metrics", func(node *cmd.NodeConfig) error {
+			builder.AccessMetrics = metrics.NewAccessCollector(
+				metrics.WithTransactionMetrics(builder.TransactionMetrics),
+				metrics.WithBackendScriptsMetrics(builder.TransactionMetrics),
+			)
+			return nil
+		}).
 		Module("ping metrics", func(node *cmd.NodeConfig) error {
 			builder.PingMetrics = metrics.NewPingCollector()
 			return nil
@@ -1010,7 +1009,6 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 			return nil
 		}).
 		Component("RPC engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-			builder.Logger.Info().Msg("____RPC engine")
 			engineBuilder, err := rpc.NewBuilder(
 				node.Logger,
 				node.State,
@@ -1122,7 +1120,6 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 	}
 
 	builder.Component("secure grpc server", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-		builder.Logger.Info().Msg("____secure grpc server in access node builder")
 		return builder.secureGrpcServer, nil
 	})
 
