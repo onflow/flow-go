@@ -197,8 +197,8 @@ func MiddlewareFixtures(t *testing.T, identities flow.IdentityList, libP2PNodes 
 		cfg.FlowId = identities[i].NodeID
 		idProviders[i] = unittest.NewUpdatableIDProvider(identities)
 		cfg.IdTranslator = translator.NewIdentityProviderIDTranslator(idProviders[i])
-		mws[i].SetSlashingViolationsConsumer(consumer)
 		mws[i] = middleware.NewMiddleware(cfg, opts...)
+		mws[i].SetSlashingViolationsConsumer(consumer)
 	}
 	return mws, idProviders
 }
