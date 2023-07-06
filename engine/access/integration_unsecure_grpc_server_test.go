@@ -40,8 +40,8 @@ import (
 	executiondataproto "github.com/onflow/flow/protobuf/go/flow/executiondata"
 )
 
-// SameGRPCPortTestSuite verifies both continue to work when configured
-// on the AccessAPI and ExecutionDataAPI on the same port
+// SameGRPCPortTestSuite verifies both AccessAPI and ExecutionDataAPI client continue to work when configured
+// on the same port
 type SameGRPCPortTestSuite struct {
 	suite.Suite
 	state          *protocol.State
