@@ -9,7 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// TestSetAliases ensures ever network configuration key prefixed with "network" has an alias without the "network" prefix.
+// TestSetAliases ensures every network configuration key prefixed with "network" has an alias without the "network" prefix.
 func TestSetAliases(t *testing.T) {
 	c := viper.New()
 	for _, key := range AllFlagNames() {
