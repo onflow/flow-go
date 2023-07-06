@@ -26,7 +26,7 @@ Adding a new config to the FlowConfig can be done in a few easy steps.
     const workersCLIFlag = "app-workers"
     flags.String(workersCLIFlag, 1, "number of app workers")
     ```
-    The network package can be used as a good example of how to structure CLI flag initialization. All flags are initialized in a single function [InitializeNetworkFlags](https://github.com/onflow/flow-go/blob/master/config/network/flags.go#L80), this function is then used to during flag initialization 
+    The network package can be used as a good example of how to structure CLI flag initialization. All flags are initialized in a single function [InitializeNetworkFlags](https://github.com/onflow/flow-go/blob/master/config/network/flags.go#L80), this function is then used during flag initialization 
     of the [config package](https://github.com/onflow/flow-go/blob/master/config/base_flags.go#L22).
 3. Add the config as a new field to an existing configuration struct or create a new one. Each configuration struct must be a field on the FlowConfig struct so that it is unmarshalled during configuration initialization.
     Each field on a configuration struct must contain the following field tags.
