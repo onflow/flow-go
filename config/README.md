@@ -4,7 +4,7 @@ to the entire FlowConfig and utilities to add a new config value, corresponding 
 
 ### Package structure
 The root config package contains the FlowConfig struct and the default config file [default-config.yml](https://github.com/onflow/flow-go/blob/master/config/default-config.yml). The `default-config.yml` file is the default configuration that is loaded when the config package is initialize.
-The default-config is a snapshot of all the configuration values defined for Flow.
+The `default-config.yml` is a snapshot of all the configuration values defined for Flow.
 Each subpackage contains configuration structs and utilities for components and their related subcomponents. These packages also contain the CLI flags for each configuration value. The [network](https://github.com/onflow/flow-go/tree/master/config/network) package
 is a good example of this pattern. The network component is a large component made of many other large components and subcomponents. Each configuration 
 struct is defined for all of these network related components in the network subpackage and CLI flags. 
