@@ -11,6 +11,8 @@ import (
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
 	"github.com/stretchr/testify/require"
+
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 // TestBindPFlags ensures configuration is bound to the pflag set as expected and configuration values are overridden when set with CLI flags.
@@ -40,6 +42,7 @@ func TestBindPFlags(t *testing.T) {
 // TestDefaultConfig ensures the default Flow config is created and returned without errors.
 func TestDefaultConfig(t *testing.T) {
 	defaultConfig(t)
+	unittest.IdentifierFixture()
 }
 
 // TestFlowConfig_Validate ensures the Flow validate returns the expected number of validator.ValidationErrors when incorrect
@@ -120,14 +123,10 @@ network-config:
 	})
 }
 
-// defaultConfig resets the config store gets the default Flow config and ensures no error is returned and expected config file is used.
+// defaultConfig resets the config store gets the default Flow config.
 func defaultConfig(t *testing.T) *FlowConfig {
 	initialize()
-	c, err := DefaultConfig()
-	require.NoError(t, err)
-	require.Equalf(t, "./default-config.yml", c.ConfigFile, "expected default config file to be used")
-	require.NoErrorf(t, c.Validate(), "unexpected error encountered validating default config")
-	return c
+	return unittest.DefaultFlowConfig(t)
 }
 
 func testFlagSet(c *FlowConfig) *pflag.FlagSet {

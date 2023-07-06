@@ -18,6 +18,7 @@ import (
 
 	sdk "github.com/onflow/flow-go-sdk"
 
+	"github.com/onflow/flow-go/config"
 	hotstuff "github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/crypto/hash"
@@ -53,6 +54,15 @@ const (
 	DefaultSeedFixtureLength = 64
 	DefaultAddress           = "localhost:0"
 )
+
+// DefaultFlowConfig returns the default flow config.
+func DefaultFlowConfig(t *testing.T) *config.FlowConfig {
+	c, err := config.DefaultConfig()
+	require.NoError(t, err)
+	require.Equalf(t, "./default-config.yml", c.ConfigFile, "expected default config file to be used")
+	require.NoErrorf(t, c.Validate(), "unexpected error encountered validating default config")
+	return c
+}
 
 // returns a deterministic math/rand PRG that can be used for deterministic randomness in tests only.
 // The PRG seed is logged in case the test iteration needs to be reproduced.
