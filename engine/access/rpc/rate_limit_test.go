@@ -128,22 +128,20 @@ func (suite *RateLimitTestSuite) SetupTest() {
 		"Ping": suite.rateLimit,
 	}
 
-	suite.secureGrpcServer, err = grpcserver.NewGrpcServerBuilder(suite.log,
+	suite.secureGrpcServer = grpcserver.NewGrpcServerBuilder(suite.log,
 		config.SecureGRPCListenAddr,
 		grpcutils.DefaultMaxMsgSize,
 		false,
 		apiRateLimt,
 		apiBurstLimt,
 		grpcserver.WithTransportCredentials(config.TransportCredentials)).Build()
-	require.NoError(suite.T(), err)
 
-	suite.unsecureGrpcServer, err = grpcserver.NewGrpcServerBuilder(suite.log,
+	suite.unsecureGrpcServer = grpcserver.NewGrpcServerBuilder(suite.log,
 		config.UnsecureGRPCListenAddr,
 		grpcutils.DefaultMaxMsgSize,
 		false,
 		apiRateLimt,
 		apiBurstLimt).Build()
-	require.NoError(suite.T(), err)
 
 	block := unittest.BlockHeaderFixture()
 	suite.snapshot.On("Head").Return(block, nil)
@@ -155,6 +153,8 @@ func (suite *RateLimitTestSuite) SetupTest() {
 	require.NoError(suite.T(), err)
 	suite.ctx, suite.cancel = irrecoverable.NewMockSignalerContextWithCancel(suite.T(), context.Background())
 
+	suite.rpcEng.Start(suite.ctx)
+
 	suite.secureGrpcServer.Start(suite.ctx)
 	suite.unsecureGrpcServer.Start(suite.ctx)
 
@@ -162,8 +162,7 @@ func (suite *RateLimitTestSuite) SetupTest() {
 	unittest.AssertClosesBefore(suite.T(), suite.secureGrpcServer.Ready(), 2*time.Second)
 	unittest.AssertClosesBefore(suite.T(), suite.unsecureGrpcServer.Ready(), 2*time.Second)
 
-	suite.rpcEng.Start(suite.ctx)
-
+	// wait for the engine to startup
 	unittest.RequireCloseBefore(suite.T(), suite.rpcEng.Ready(), 2*time.Second, "engine not ready at startup")
 
 	// create the access api client

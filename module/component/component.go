@@ -122,6 +122,18 @@ func RunComponent(ctx context.Context, componentFactory ComponentFactory, handle
 	}
 }
 
+// WaitForComponentReady is used for worker if it needs to wait until another component is ready
+func WaitForComponentReady(component Component) ComponentWorker {
+	return func(ctx irrecoverable.SignalerContext, ready ReadyFunc) {
+		select {
+		case <-ctx.Done():
+		case <-component.Ready():
+			ready()
+		}
+		<-component.Done()
+	}
+}
+
 // ReadyFunc is called within a ComponentWorker function to indicate that the worker is ready
 // ComponentManager's Ready channel is closed when all workers are ready.
 type ReadyFunc func()

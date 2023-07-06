@@ -29,7 +29,7 @@ type GrpcServer struct {
 func NewGrpcServer(log zerolog.Logger,
 	grpcListenAddr string,
 	grpcServer *grpc.Server,
-) (*GrpcServer, error) {
+) *GrpcServer {
 	server := &GrpcServer{
 		log:            log,
 		Server:         grpcServer,
@@ -39,7 +39,7 @@ func NewGrpcServer(log zerolog.Logger,
 		AddWorker(server.serveGRPCWorker).
 		AddWorker(server.shutdownWorker).
 		Build()
-	return server, nil
+	return server
 }
 
 // serveGRPCWorker is a worker routine which starts the gRPC server.

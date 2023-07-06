@@ -42,7 +42,6 @@ func NewGrpcServerBuilder(log zerolog.Logger,
 	log = log.With().Str("component", "grpc_server").Logger()
 
 	grpcServerBuilder := &GrpcServerBuilder{
-		log:            log,
 		gRPCListenAddr: gRPCListenAddr,
 	}
 
@@ -74,14 +73,18 @@ func NewGrpcServerBuilder(log zerolog.Logger,
 	grpcOpts = append(grpcOpts, chainedInterceptors)
 
 	if grpcServerBuilder.transportCredentials != nil {
+		log = log.With().Str("endpoint", "secure").Logger()
 		// create a secure server by using the secure grpc credentials that are passed in as part of config
 		grpcOpts = append(grpcOpts, grpc.Creds(grpcServerBuilder.transportCredentials))
+	} else {
+		log = log.With().Str("endpoint", "unsecure").Logger()
 	}
+	grpcServerBuilder.log = log
 	grpcServerBuilder.server = grpc.NewServer(grpcOpts...)
 
 	return grpcServerBuilder
 }
 
-func (b *GrpcServerBuilder) Build() (*GrpcServer, error) {
+func (b *GrpcServerBuilder) Build() *GrpcServer {
 	return NewGrpcServer(b.log, b.gRPCListenAddr, b.server)
 }

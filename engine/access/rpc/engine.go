@@ -178,6 +178,8 @@ func NewBuilder(log zerolog.Logger,
 	eng.backendNotifierActor = backendNotifierActor
 
 	eng.Component = component.NewComponentManagerBuilder().
+		//AddWorker(component.WaitForComponentReady(secureGrpcServer)).
+		//AddWorker(component.WaitForComponentReady(unsecureGrpcServer)).
 		AddWorker(eng.serveGRPCWebProxyWorker).
 		AddWorker(eng.serveREST).
 		AddWorker(finalizedCacheWorker).

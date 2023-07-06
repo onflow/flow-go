@@ -135,22 +135,20 @@ func (suite *RestAPITestSuite) SetupTest() {
 	// set the transport credentials for the server to use
 	config.TransportCredentials = credentials.NewTLS(tlsConfig)
 
-	suite.secureGrpcServer, err = grpcserver.NewGrpcServerBuilder(suite.log,
+	suite.secureGrpcServer = grpcserver.NewGrpcServerBuilder(suite.log,
 		config.SecureGRPCListenAddr,
 		grpcutils.DefaultMaxMsgSize,
 		false,
 		nil,
 		nil,
 		grpcserver.WithTransportCredentials(config.TransportCredentials)).Build()
-	assert.NoError(suite.T(), err)
 
-	suite.unsecureGrpcServer, err = grpcserver.NewGrpcServerBuilder(suite.log,
+	suite.unsecureGrpcServer = grpcserver.NewGrpcServerBuilder(suite.log,
 		config.UnsecureGRPCListenAddr,
 		grpcutils.DefaultMaxMsgSize,
 		false,
 		nil,
 		nil).Build()
-	assert.NoError(suite.T(), err)
 
 	rpcEngBuilder, err := rpc.NewBuilder(
 		suite.log,
@@ -180,6 +178,8 @@ func (suite *RestAPITestSuite) SetupTest() {
 
 	suite.ctx, suite.cancel = irrecoverable.NewMockSignalerContextWithCancel(suite.T(), context.Background())
 
+	suite.rpcEng.Start(suite.ctx)
+
 	suite.secureGrpcServer.Start(suite.ctx)
 	suite.unsecureGrpcServer.Start(suite.ctx)
 
@@ -187,7 +187,7 @@ func (suite *RestAPITestSuite) SetupTest() {
 	unittest.AssertClosesBefore(suite.T(), suite.secureGrpcServer.Ready(), 2*time.Second)
 	unittest.AssertClosesBefore(suite.T(), suite.unsecureGrpcServer.Ready(), 2*time.Second)
 
-	suite.rpcEng.Start(suite.ctx)
+	// wait for the engine to startup
 	unittest.AssertClosesBefore(suite.T(), suite.rpcEng.Ready(), 2*time.Second)
 }
 

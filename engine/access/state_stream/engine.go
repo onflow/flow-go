@@ -114,6 +114,7 @@ func NewEng(
 	}
 
 	e.ComponentManager = component.NewComponentManagerBuilder().
+		AddWorker(component.WaitForComponentReady(server)).
 		Build()
 
 	access.RegisterExecutionDataAPIServer(server.Server, e.handler)

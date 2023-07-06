@@ -991,27 +991,20 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 			return nil
 		}).
 		Module("creating grpc servers", func(node *cmd.NodeConfig) error {
-			var err error
-			builder.secureGrpcServer, err = grpcserver.NewGrpcServerBuilder(node.Logger,
+			builder.secureGrpcServer = grpcserver.NewGrpcServerBuilder(node.Logger,
 				builder.rpcConf.SecureGRPCListenAddr,
 				builder.rpcConf.MaxMsgSize,
 				builder.rpcMetricsEnabled,
 				builder.apiRatelimits,
 				builder.apiBurstlimits,
 				grpcserver.WithTransportCredentials(builder.rpcConf.TransportCredentials)).Build()
-			if err != nil {
-				return err
-			}
 
-			builder.unsecureGrpcServer, err = grpcserver.NewGrpcServerBuilder(node.Logger,
+			builder.unsecureGrpcServer = grpcserver.NewGrpcServerBuilder(node.Logger,
 				builder.rpcConf.UnsecureGRPCListenAddr,
 				builder.rpcConf.MaxMsgSize,
 				builder.rpcMetricsEnabled,
 				builder.apiRatelimits,
 				builder.apiBurstlimits).Build()
-			if err != nil {
-				return err
-			}
 
 			return nil
 		}).

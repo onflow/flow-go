@@ -2,19 +2,20 @@ package access
 
 import (
 	"context"
-
 	"io"
 	"os"
 	"testing"
 	"time"
 
-	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
+	"google.golang.org/grpc/credentials/insecure"
+
+	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
 
 	"github.com/onflow/flow-go/crypto"
 	accessmock "github.com/onflow/flow-go/engine/access/mock"
@@ -111,22 +112,20 @@ func (suite *SecureGRPCTestSuite) SetupTest() {
 	// save the public key to use later in tests later
 	suite.publicKey = networkingKey.PublicKey()
 
-	suite.secureGrpcServer, err = grpcserver.NewGrpcServerBuilder(suite.log,
+	suite.secureGrpcServer = grpcserver.NewGrpcServerBuilder(suite.log,
 		config.SecureGRPCListenAddr,
 		grpcutils.DefaultMaxMsgSize,
 		false,
 		nil,
 		nil,
 		grpcserver.WithTransportCredentials(config.TransportCredentials)).Build()
-	assert.NoError(suite.T(), err)
 
-	suite.unsecureGrpcServer, err = grpcserver.NewGrpcServerBuilder(suite.log,
+	suite.unsecureGrpcServer = grpcserver.NewGrpcServerBuilder(suite.log,
 		config.UnsecureGRPCListenAddr,
 		grpcutils.DefaultMaxMsgSize,
 		false,
 		nil,
 		nil).Build()
-	assert.NoError(suite.T(), err)
 
 	block := unittest.BlockHeaderFixture()
 	suite.snapshot.On("Head").Return(block, nil)
@@ -158,6 +157,8 @@ func (suite *SecureGRPCTestSuite) SetupTest() {
 	assert.NoError(suite.T(), err)
 	suite.ctx, suite.cancel = irrecoverable.NewMockSignalerContextWithCancel(suite.T(), context.Background())
 
+	suite.rpcEng.Start(suite.ctx)
+
 	suite.secureGrpcServer.Start(suite.ctx)
 	suite.unsecureGrpcServer.Start(suite.ctx)
 
@@ -165,8 +166,7 @@ func (suite *SecureGRPCTestSuite) SetupTest() {
 	unittest.AssertClosesBefore(suite.T(), suite.secureGrpcServer.Ready(), 2*time.Second)
 	unittest.AssertClosesBefore(suite.T(), suite.unsecureGrpcServer.Ready(), 2*time.Second)
 
-	suite.rpcEng.Start(suite.ctx)
-	// wait for the server to startup
+	// wait for the engine to startup
 	unittest.AssertClosesBefore(suite.T(), suite.rpcEng.Ready(), 2*time.Second)
 }
 
@@ -203,6 +203,19 @@ func (suite *SecureGRPCTestSuite) TestAPICallUsingSecureGRPC() {
 		client, closer := suite.secureGRPCClient(newKey.PublicKey())
 		defer closer.Close()
 		_, err := client.Ping(ctx, req)
+		assert.Error(suite.T(), err)
+	})
+
+	suite.Run("happy path - connection fails, unsecure client can not get info from secure server connection", func() {
+		conn, err := grpc.Dial(
+			suite.secureGrpcServer.GRPCAddress().String(), grpc.WithTransportCredentials(insecure.NewCredentials()))
+		assert.NoError(suite.T(), err)
+
+		client := accessproto.NewAccessAPIClient(conn)
+		closer := io.Closer(conn)
+		defer closer.Close()
+
+		_, err = client.Ping(ctx, req)
 		assert.Error(suite.T(), err)
 	})
 }
