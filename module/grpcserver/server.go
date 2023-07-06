@@ -30,22 +30,27 @@ func NewGrpcServer(log zerolog.Logger,
 	grpcListenAddr string,
 	grpcServer *grpc.Server,
 ) *GrpcServer {
+	log.Info().Msg("================> NewGrpcServer")
 	server := &GrpcServer{
 		log:            log,
 		Server:         grpcServer,
 		grpcListenAddr: grpcListenAddr,
 	}
-	server.Component = component.NewComponentManagerBuilder().
+	cm := component.ComponentManagerBuilderImpl{Log: log}
+	server.Component = cm.
 		AddWorker(server.serveGRPCWorker).
 		AddWorker(server.shutdownWorker).
 		Build()
+	log.Info().Msg("================> End NewGrpcServer")
 	return server
 }
 
 // serveGRPCWorker is a worker routine which starts the gRPC server.
 // The ready callback is called after the server address is bound and set.
 func (g *GrpcServer) serveGRPCWorker(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
-	g.log.Info().Str("grpc_address", g.grpcListenAddr).Msg("starting grpc server on address")
+	g.log = g.log.With().Str("grpc_address", g.grpcListenAddr).Logger()
+	g.log.Info().Msg("================> serveGRPCWorker")
+	g.log.Info().Msg("starting grpc server on address")
 
 	l, err := net.Listen("tcp", g.grpcListenAddr)
 	if err != nil {
@@ -59,7 +64,7 @@ func (g *GrpcServer) serveGRPCWorker(ctx irrecoverable.SignalerContext, ready co
 	g.addrLock.Lock()
 	g.grpcAddress = l.Addr()
 	g.addrLock.Unlock()
-	g.log.Debug().Str("grpc_address", g.grpcAddress.String()).Msg("listening on port")
+	g.log.Debug().Msg("listening on port")
 	ready()
 
 	err = g.Server.Serve(l) // blocking call
