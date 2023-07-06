@@ -67,7 +67,7 @@ type Config struct {
     ...
 }
 ```
-UnicastRateLimitersConfig is a nested struct that defines configuration for unicast rate limiter component. In our configuration yaml structure you will see that all network configs are defined under the network-config property.
+`UnicastRateLimitersConfig` is a nested struct that defines configuration for unicast rate limiter component. In our configuration yaml structure you will see that all network configs are defined under the `network-config` property.
 
 ### Setting Aliases
 Most configs will not be defined on the top layer FlowConfig but instead be defined on nested structs and in nested properties of the configuration yaml. When the default config is initially loaded the underlying config [viper](https://github.com/spf13/viper) store will store 
