@@ -499,7 +499,6 @@ func (fnb *FlowNodeBuilder) InitFlowNetworkWithConduitFactory(
 	}
 
 	fnb.Network = net
-	fnb.MisbehaviorReportConsumer = net
 
 	// register middleware's ReadyDoneAware interface so other components can depend on it for startup
 	if fnb.middlewareDependable != nil {
