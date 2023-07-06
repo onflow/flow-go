@@ -40,7 +40,9 @@ so that configuration can be updated in one place these sub-packages can live an
     of the [config package](https://github.com/onflow/flow-go/blob/master/config/base_flags.go#L22).
 3. Add the config as a new field to an existing configuration struct or create a new one. Each configuration struct must be a field on the FlowConfig struct so that it is unmarshalled during configuration initialization.
     Each field on a configuration struct must contain the following field tags.
-   1. `validate` - validate tag is used to perform validation on field structs using the [validator](https://github.com/go-playground/validator) package.
+   1. `validate` - validate tag is used to perform validation on field structs using the [validator](https://github.com/go-playground/validator) package. In the example below you will notice 
+   the `validate:"gt=0"` tag, this will ensure that the value of `AppWorkers` is greater than 0. The top level `FlowConfig` struct has a Validate method that performs struct validation. This 
+   validation is done with the validator package, each validate tag on ever struct field and sub struct field will be validated and validation errors are returned.
    2. `mapstructure` - mapstructure tag is used for unmarshalling and must match the CLI flag name defined in step or else the field will not be set when the config is unmarshalled.
    ```go
         type MyComponentConfig struct {
