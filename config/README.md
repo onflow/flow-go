@@ -72,6 +72,9 @@ UnicastRateLimitersConfig is a nested struct that defines configuration for unic
 ### Setting Aliases
 Most configs will not be defined on the top layer FlowConfig but instead be defined on nested structs and in nested properties of the configuration yaml. When the default config is initially loaded the underlying config [viper](https://github.com/spf13/viper) store will store 
 each configuration with a key that is prefixed with each parent property. For example, because `network-connection-pruning` is found on the `network-config` property of the configuration yaml, the key used by the config store to 
-store this config value will be prefixed with network -> network.network-connection-pruning. Later in the config process we bind the underlying config store with our pflag set, this allows us to override default values using CLI flags.
+store this config value will be prefixed with `network` e.g.
+```network.network-connection-pruning```
+
+Later in the config process we bind the underlying config store with our pflag set, this allows us to override default values using CLI flags.
 At this time the underlying config store would have 2 separate keys network-connection-pruning and network.network-connection-pruning for the same configuration value. This is because we don't use the network prefix for the CLI flags
 used to override network configs. Because of this an alias must be set from network.network-connection-pruning -> network-connection-pruning so that they both point to the value loaded from the CLI flag. See [SetAliases](https://github.com/onflow/flow-go/blob/master/config/network/config.go#L84) in the network package for a reference. 
