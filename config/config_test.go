@@ -22,7 +22,7 @@ func TestBindPFlags(t *testing.T) {
 		flags := testFlagSet(c)
 		err := flags.Set("networking-connection-pruning", "false")
 		require.NoError(t, err)
-		flags.Parse(nil)
+		require.NoError(t, flags.Parse(nil))
 
 		configFileUsed, err := BindPFlags(c, flags)
 		require.NoError(t, err)
