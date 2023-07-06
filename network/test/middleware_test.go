@@ -79,11 +79,10 @@ type MiddlewareTestSuite struct {
 	ids       []*flow.Identity
 	metrics   *metrics.NoopCollector // no-op performance monitoring simulation
 	logger    zerolog.Logger
-	providers []*testutils.UpdatableIDProvider
+	providers []*unittest.UpdatableIDProvider
 
-	mwCancel context.CancelFunc
-	mwCtx    irrecoverable.SignalerContext
-
+	mwCancel                   context.CancelFunc
+	mwCtx                      irrecoverable.SignalerContext
 	slashingViolationsConsumer network.ViolationsConsumer
 }
 
@@ -109,13 +108,8 @@ func (m *MiddlewareTestSuite) SetupTest() {
 	}
 
 	m.slashingViolationsConsumer = mocknetwork.NewViolationsConsumer(m.T())
-
-	m.ids, m.nodes, m.mws, obs, m.providers = testutils.GenerateIDsAndMiddlewares(m.T(),
-		m.size,
-		m.logger,
-		unittest.NetworkCodec(),
-		m.slashingViolationsConsumer)
-
+	m.ids, m.nodes, obs = testutils.LibP2PNodeForMiddlewareFixture(m.T(), m.size)
+	m.mws, m.providers = testutils.MiddlewareFixtures(m.T(), m.ids, m.nodes, testutils.MiddlewareConfigFixture(m.T()), m.slashingViolationsConsumer)
 	for _, observableConnMgr := range obs {
 		observableConnMgr.Subscribe(&ob)
 	}
@@ -165,9 +159,8 @@ func (m *MiddlewareTestSuite) TestUpdateNodeAddresses() {
 	irrecoverableCtx := irrecoverable.NewMockSignalerContext(m.T(), ctx)
 
 	// create a new staked identity
-	ids, libP2PNodes, _ := testutils.GenerateIDs(m.T(), m.logger, 1)
-
-	mws, providers := testutils.GenerateMiddlewares(m.T(), m.logger, ids, libP2PNodes, unittest.NetworkCodec(), m.slashingViolationsConsumer)
+	ids, libP2PNodes, _ := testutils.LibP2PNodeForMiddlewareFixture(m.T(), 1)
+	mws, providers := testutils.MiddlewareFixtures(m.T(), ids, libP2PNodes, testutils.MiddlewareConfigFixture(m.T()), m.slashingViolationsConsumer)
 	require.Len(m.T(), ids, 1)
 	require.Len(m.T(), providers, 1)
 	require.Len(m.T(), mws, 1)
@@ -247,33 +240,27 @@ func (m *MiddlewareTestSuite) TestUnicastRateLimit_Messages() {
 	opts := []ratelimit.RateLimitersOption{ratelimit.WithMessageRateLimiter(messageRateLimiter), ratelimit.WithNotifier(distributor), ratelimit.WithDisabledRateLimiting(false)}
 	rateLimiters := ratelimit.NewRateLimiters(opts...)
 
-	idProvider := testutils.NewUpdatableIDProvider(m.ids)
-	// create a new staked identity
-	connGaterFactory := func() p2p.ConnectionGater {
-		return testutils.NewConnectionGater(idProvider, func(pid peer.ID) error {
+	idProvider := unittest.NewUpdatableIDProvider(m.ids)
+
+	ids, libP2PNodes, _ := testutils.LibP2PNodeForMiddlewareFixture(m.T(),
+		1,
+		p2ptest.WithUnicastRateLimitDistributor(distributor),
+		p2ptest.WithConnectionGater(p2ptest.NewConnectionGater(idProvider, func(pid peer.ID) error {
 			if messageRateLimiter.IsRateLimited(pid) {
 				return fmt.Errorf("rate-limited peer")
 			}
 			return nil
-		})
-	}
-
-	ids, libP2PNodes, _ := testutils.GenerateIDs(m.T(),
-		m.logger,
-		1,
-		testutils.WithUnicastRateLimiterDistributor(distributor),
-		testutils.WithConnectionGaterFactory(connGaterFactory))
+		})))
 	idProvider.SetIdentities(append(m.ids, ids...))
 
 	// create middleware
-	mws, providers := testutils.GenerateMiddlewares(m.T(),
-		m.logger,
+	mws, providers := testutils.MiddlewareFixtures(m.T(),
 		ids,
 		libP2PNodes,
-		unittest.NetworkCodec(),
+		testutils.MiddlewareConfigFixture(m.T()),
 		m.slashingViolationsConsumer,
-		testutils.WithUnicastRateLimiters(rateLimiters),
-		testutils.WithPeerManagerFilters(testutils.IsRateLimitedPeerFilter(messageRateLimiter)))
+		middleware.WithUnicastRateLimiters(rateLimiters),
+		middleware.WithPeerManagerFilters([]p2p.PeerFilter{testutils.IsRateLimitedPeerFilter(messageRateLimiter)}))
 
 	require.Len(m.T(), ids, 1)
 	require.Len(m.T(), providers, 1)
@@ -405,34 +392,29 @@ func (m *MiddlewareTestSuite) TestUnicastRateLimit_Bandwidth() {
 	opts := []ratelimit.RateLimitersOption{ratelimit.WithBandwidthRateLimiter(bandwidthRateLimiter), ratelimit.WithNotifier(distributor), ratelimit.WithDisabledRateLimiting(false)}
 	rateLimiters := ratelimit.NewRateLimiters(opts...)
 
-	idProvider := testutils.NewUpdatableIDProvider(m.ids)
-	// create connection gater, connection gater will refuse connections from rate limited nodes
-	connGaterFactory := func() p2p.ConnectionGater {
-		return testutils.NewConnectionGater(idProvider, func(pid peer.ID) error {
+	idProvider := unittest.NewUpdatableIDProvider(m.ids)
+	// create a new staked identity
+	ids, libP2PNodes, _ := testutils.LibP2PNodeForMiddlewareFixture(m.T(),
+		1,
+		p2ptest.WithUnicastRateLimitDistributor(distributor),
+		p2ptest.WithConnectionGater(p2ptest.NewConnectionGater(idProvider, func(pid peer.ID) error {
+			// create connection gater, connection gater will refuse connections from rate limited nodes
 			if bandwidthRateLimiter.IsRateLimited(pid) {
 				return fmt.Errorf("rate-limited peer")
 			}
 
 			return nil
-		})
-	}
-	// create a new staked identity
-	ids, libP2PNodes, _ := testutils.GenerateIDs(m.T(),
-		m.logger,
-		1,
-		testutils.WithUnicastRateLimiterDistributor(distributor),
-		testutils.WithConnectionGaterFactory(connGaterFactory))
+		})))
 	idProvider.SetIdentities(append(m.ids, ids...))
 
 	// create middleware
-	mws, providers := testutils.GenerateMiddlewares(m.T(),
-		m.logger,
+	mws, providers := testutils.MiddlewareFixtures(m.T(),
 		ids,
 		libP2PNodes,
-		unittest.NetworkCodec(),
+		testutils.MiddlewareConfigFixture(m.T()),
 		m.slashingViolationsConsumer,
-		testutils.WithUnicastRateLimiters(rateLimiters),
-		testutils.WithPeerManagerFilters(testutils.IsRateLimitedPeerFilter(bandwidthRateLimiter)))
+		middleware.WithUnicastRateLimiters(rateLimiters),
+		middleware.WithPeerManagerFilters([]p2p.PeerFilter{testutils.IsRateLimitedPeerFilter(bandwidthRateLimiter)}))
 	require.Len(m.T(), ids, 1)
 	require.Len(m.T(), providers, 1)
 	require.Len(m.T(), mws, 1)
@@ -523,7 +505,7 @@ func (m *MiddlewareTestSuite) TestUnicastRateLimit_Bandwidth() {
 	require.Equal(m.T(), uint64(1), rateLimits.Load())
 }
 
-func (m *MiddlewareTestSuite) createOverlay(provider *testutils.UpdatableIDProvider) *mocknetwork.Overlay {
+func (m *MiddlewareTestSuite) createOverlay(provider *unittest.UpdatableIDProvider) *mocknetwork.Overlay {
 	overlay := &mocknetwork.Overlay{}
 	overlay.On("Identities").Maybe().Return(func() flow.IdentityList {
 		return provider.Identities(filter.Any)

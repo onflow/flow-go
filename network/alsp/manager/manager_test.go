@@ -53,6 +53,8 @@ func TestNetworkPassesReportedMisbehavior(t *testing.T) {
 
 	misbehaviorReportManger.On("Ready").Return(readyDoneChan).Once()
 	misbehaviorReportManger.On("Done").Return(readyDoneChan).Once()
+	ids, nodes, _ := testutils.LibP2PNodeForMiddlewareFixture(t, 1)
+	mws, _ := testutils.MiddlewareFixtures(t, ids, nodes, testutils.MiddlewareConfigFixture(t))
 
 	ids, nodes, mws, _, _ := testutils.GenerateIDsAndMiddlewares(
 		t,
@@ -63,6 +65,7 @@ func TestNetworkPassesReportedMisbehavior(t *testing.T) {
 	sms := testutils.GenerateSubscriptionManagers(t, mws)
 
 	networkCfg := testutils.NetworkConfigFixture(t, unittest.Logger(), *ids[0], ids, mws[0], sms[0])
+
 	net, err := p2p.NewNetwork(networkCfg, p2p.WithAlspManager(misbehaviorReportManger))
 	require.NoError(t, err)
 
@@ -224,6 +227,7 @@ func TestHandleReportedMisbehavior_And_DisallowListing_Integration(t *testing.T)
 		unittest.NetworkSlashingViolationsConsumer(unittest.Logger(), metrics.NewNoopCollector(), unittest.NewMisbehaviorReportConsumerFixture(nil)))
 	sms := testutils.GenerateSubscriptionManagers(t, mws)
 	networkCfg := testutils.NetworkConfigFixture(t, unittest.Logger(), *ids[0], ids, mws[0], sms[0], p2p.WithAlspConfig(cfg))
+
 	victimNetwork, err := p2p.NewNetwork(networkCfg)
 	require.NoError(t, err)
 
@@ -303,6 +307,7 @@ func TestMisbehaviorReportMetrics(t *testing.T) {
 	sms := testutils.GenerateSubscriptionManagers(t, mws)
 
 	networkCfg := testutils.NetworkConfigFixture(t, unittest.Logger(), *ids[0], ids, mws[0], sms[0], p2p.WithAlspConfig(cfg))
+
 	net, err := p2p.NewNetwork(networkCfg)
 	require.NoError(t, err)
 

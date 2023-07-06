@@ -18,6 +18,16 @@ func (_m *BackendScriptsMetrics) ScriptExecuted(dur time.Duration, size int) {
 	_m.Called(dur, size)
 }
 
+// ScriptExecutionErrorOnArchiveNode provides a mock function with given fields:
+func (_m *BackendScriptsMetrics) ScriptExecutionErrorOnArchiveNode() {
+	_m.Called()
+}
+
+// ScriptExecutionErrorOnExecutionNode provides a mock function with given fields:
+func (_m *BackendScriptsMetrics) ScriptExecutionErrorOnExecutionNode() {
+	_m.Called()
+}
+
 type mockConstructorTestingTNewBackendScriptsMetrics interface {
 	mock.TestingT
 	Cleanup(func())
