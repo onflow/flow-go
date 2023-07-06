@@ -13,7 +13,16 @@ struct is defined for all of these network related components in the network sub
 The entire default config can be overridden using the `--config-file` CLI flag. When set the config package will attempt to parse the specified config file and override all the values 
 defined. A single default value can be overridden by setting the CLI flag for that specific config. For example `--network-connection-pruning=false` will override the default network connection pruning 
 config to false.
-
+Override entire config file.
+```shell
+go build -tags relic -o flow-access-node ./cmd/access
+./flow-access-node --config-file=config/config.yml
+```
+Override a single configuration value.
+```shell
+go build -tags relic -o flow-access-node ./cmd/access
+./flow-access-node --network-connection-pruning=false
+```
 ### Adding a new config value
 Adding a new config to the FlowConfig can be done in a few easy steps.
 
