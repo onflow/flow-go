@@ -243,8 +243,9 @@ type FlowAccessNodeBuilder struct {
 	StateStreamEng *state_stream.Engine
 
 	// grpc servers
-	secureGrpcServer   *grpcserver.GrpcServer
-	unsecureGrpcServer *grpcserver.GrpcServer
+	secureGrpcServer      *grpcserver.GrpcServer
+	unsecureGrpcServer    *grpcserver.GrpcServer
+	stateStreamGrpcServer *grpcserver.GrpcServer
 }
 
 func (builder *FlowAccessNodeBuilder) buildFollowerState() *FlowAccessNodeBuilder {
@@ -617,7 +618,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionDataRequester() *FlowAccessN
 				node.RootChainID,
 				builder.executionDataConfig.InitialBlockHeight,
 				highestAvailableHeight,
-				builder.unsecureGrpcServer,
+				builder.stateStreamGrpcServer,
 			)
 			if err != nil {
 				return nil, fmt.Errorf("could not create state stream engine: %w", err)
@@ -1006,6 +1007,17 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				builder.apiRatelimits,
 				builder.apiBurstlimits).Build()
 
+			if builder.rpcConf.UnsecureGRPCListenAddr != builder.stateStreamConf.ListenAddr {
+				builder.stateStreamGrpcServer = grpcserver.NewGrpcServerBuilder(node.Logger,
+					builder.stateStreamConf.ListenAddr,
+					builder.stateStreamConf.MaxExecutionDataMsgSize,
+					builder.rpcMetricsEnabled,
+					builder.apiRatelimits,
+					builder.apiBurstlimits).Build()
+			} else {
+				builder.stateStreamGrpcServer = builder.unsecureGrpcServer
+			}
+
 			return nil
 		}).
 		Component("RPC engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
@@ -1126,6 +1138,12 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 	builder.Component("unsecure grpc server", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 		return builder.unsecureGrpcServer, nil
 	})
+
+	if builder.stateStreamGrpcServer != builder.unsecureGrpcServer {
+		builder.Component("state stream unsecure grpc server", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+			return builder.stateStreamGrpcServer, nil
+		})
+	}
 
 	builder.Component("ping engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 		ping, err := pingeng.New(
