@@ -965,6 +965,11 @@ func convertServiceEventVersionBeacon(event flow.Event) (*flow.ServiceEvent, err
 		return nil, err
 	}
 
+	// a converted version beacon event should also be valid
+	if err := versionBeacon.Validate(); err != nil {
+		return nil, fmt.Errorf("invalid VersionBeacon event: %w", err)
+	}
+
 	// create the service event
 	serviceEvent := &flow.ServiceEvent{
 		Type:  flow.ServiceEventVersionBeacon,
