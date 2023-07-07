@@ -2372,6 +2372,7 @@ func (suite *Suite) TestExecuteScriptOnArchiveNode() {
 		suite.log,
 		DefaultSnapshotHistoryLimit,
 		[]string{fullArchiveAddress},
+		false,
 	)
 
 	// mock parameters

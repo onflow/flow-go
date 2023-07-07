@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/hashicorp/go-multierror"
 	execproto "github.com/onflow/flow/protobuf/go/flow/execution"
 	"github.com/rs/zerolog"
 	"google.golang.org/grpc/codes"
@@ -21,13 +20,13 @@ import (
 )
 
 type backendEvents struct {
-	headers             storage.Headers
-	executionReceipts   storage.ExecutionReceipts
-	state               protocol.State
-	connFactory         ConnectionFactory
-	log                 zerolog.Logger
-	maxHeightRange      uint
-	nodeSelectorFactory NodeSelectorFactory
+	headers           storage.Headers
+	executionReceipts storage.ExecutionReceipts
+	state             protocol.State
+	connFactory       ConnectionFactory
+	log               zerolog.Logger
+	maxHeightRange    uint
+	nodeCommunicator  *NodeCommunicator
 }
 
 // GetEventsForHeightRange retrieves events for all sealed blocks between the start block height and
@@ -210,34 +209,37 @@ func verifyAndConvertToAccessEvents(
 func (b *backendEvents) getEventsFromAnyExeNode(ctx context.Context,
 	execNodes flow.IdentityList,
 	req *execproto.GetEventsForBlockIDsRequest) (*execproto.GetEventsForBlockIDsResponse, *flow.Identity, error) {
-	var errors *multierror.Error
+	var resp *execproto.GetEventsForBlockIDsResponse
+	var execNode *flow.Identity
+	errToReturn := b.nodeCommunicator.CallAvailableExecutionNode(
+		execNodes,
+		func(node *flow.Identity) error {
+			var err error
+			start := time.Now()
+			resp, err = b.tryGetEvents(ctx, node, req)
+			duration := time.Since(start)
 
-	execNodeSelector := b.nodeSelectorFactory.SelectExecutionNodes(execNodes)
+			logger := b.log.With().
+				Str("execution_node", node.String()).
+				Str("event", req.GetType()).
+				Int("blocks", len(req.BlockIds)).
+				Int64("rtt_ms", duration.Milliseconds()).
+				Logger()
 
-	// try to get events from one of the execution nodes
-	for execNode := execNodeSelector.Next(); execNode != nil; execNode = execNodeSelector.Next() {
-		start := time.Now()
-		resp, err := b.tryGetEvents(ctx, execNode, req)
-		duration := time.Since(start)
+			if err == nil {
+				// return if any execution node replied successfully
+				logger.Debug().Msg("Successfully got events")
+				execNode = node
+				return nil
+			}
 
-		logger := b.log.With().
-			Str("execution_node", execNode.String()).
-			Str("event", req.GetType()).
-			Int("blocks", len(req.BlockIds)).
-			Int64("rtt_ms", duration.Milliseconds()).
-			Logger()
+			logger.Err(err).Msg("failed to execute GetEvents")
+			return err
+		},
+		nil,
+	)
 
-		if err == nil {
-			// return if any execution node replied successfully
-			logger.Debug().Msg("Successfully got events")
-			return resp, execNode, nil
-		}
-
-		logger.Err(err).Msg("failed to execute GetEvents")
-
-		errors = multierror.Append(errors, err)
-	}
-	return nil, nil, errors.ErrorOrNil()
+	return resp, execNode, errToReturn
 }
 
 func (b *backendEvents) tryGetEvents(ctx context.Context,

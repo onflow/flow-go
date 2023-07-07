@@ -117,8 +117,8 @@ func New(
 		archivePorts[idx] = port
 	}
 
-	// create configured node selection factory to be used in sub-backend logic
-	nodeSelectorFactory := NodeSelectorFactory{circuitBreakerEnabled: circuitBreakerEnabled}
+	// create node communicator, that will be used in sub-backend logic for interacting with API calls
+	nodeCommunicator := NewNodeCommunicator(circuitBreakerEnabled)
 
 	b := &Backend{
 		state: state,
@@ -133,7 +133,7 @@ func New(
 			loggedScripts:       loggedScripts,
 			archiveAddressList:  archiveAddressList,
 			archivePorts:        archivePorts,
-			nodeSelectorFactory: nodeSelectorFactory,
+			nodeSelectorFactory: NodeSelectorFactory{circuitBreakerEnabled: circuitBreakerEnabled},
 		},
 		backendTransactions: backendTransactions{
 			staticCollectionRPC:  collectionRPC,
@@ -149,16 +149,16 @@ func New(
 			connFactory:          connFactory,
 			previousAccessNodes:  historicalAccessNodes,
 			log:                  log,
-			nodeSelectorFactory:  nodeSelectorFactory,
+			nodeCommunicator:     nodeCommunicator,
 		},
 		backendEvents: backendEvents{
-			state:               state,
-			headers:             headers,
-			executionReceipts:   executionReceipts,
-			connFactory:         connFactory,
-			log:                 log,
-			maxHeightRange:      maxHeightRange,
-			nodeSelectorFactory: nodeSelectorFactory,
+			state:             state,
+			headers:           headers,
+			executionReceipts: executionReceipts,
+			connFactory:       connFactory,
+			log:               log,
+			maxHeightRange:    maxHeightRange,
+			nodeCommunicator:  nodeCommunicator,
 		},
 		backendBlockHeaders: backendBlockHeaders{
 			headers: headers,
@@ -169,12 +169,12 @@ func New(
 			state:  state,
 		},
 		backendAccounts: backendAccounts{
-			state:               state,
-			headers:             headers,
-			executionReceipts:   executionReceipts,
-			connFactory:         connFactory,
-			log:                 log,
-			nodeSelectorFactory: nodeSelectorFactory,
+			state:             state,
+			headers:           headers,
+			executionReceipts: executionReceipts,
+			connFactory:       connFactory,
+			log:               log,
+			nodeCommunicator:  nodeCommunicator,
 		},
 		backendExecutionResults: backendExecutionResults{
 			executionResults: executionResults,

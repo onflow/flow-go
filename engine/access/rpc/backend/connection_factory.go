@@ -116,7 +116,7 @@ func (cf *ConnectionFactoryImpl) createConnection(address string, timeout time.D
 
 	var connInterceptors []grpc.UnaryClientInterceptor
 
-	if cf.CircuitBreakerConfig.Enabled {
+	if cf.CircuitBreakerConfig != nil && cf.CircuitBreakerConfig.Enabled {
 		connInterceptors = append(connInterceptors, cf.createCircuitBreakerInterceptor())
 	} else {
 		connInterceptors = append(connInterceptors, cf.createClientInvalidationInterceptor(address, clientType))
