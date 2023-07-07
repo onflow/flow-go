@@ -85,12 +85,12 @@ type ConnectionFactoryImpl struct {
 // MaxFailures specifies the maximum number of failed calls to the client that will cause the circuit breaker
 // to close the connection.
 //
-// MaxRetries specifies the maximum number of retries call to check if connection restored after timeout.
+// MaxRequests specifies the maximum number of requests to check if connection restored after timeout.
 type CircuitBreakerConfig struct {
 	Enabled        bool
 	RestoreTimeout time.Duration
 	MaxFailures    uint32
-	MaxRetries     uint32
+	MaxRequests    uint32
 }
 
 type CachedClient struct {
@@ -359,7 +359,7 @@ func (cf *ConnectionFactoryImpl) createCircuitBreakerInterceptor() grpc.UnaryCli
 				// The number of maximum failures is checked before the circuit breaker goes to the Open state.
 				return counts.ConsecutiveFailures >= cf.CircuitBreakerConfig.MaxFailures
 			},
-			MaxRequests: cf.CircuitBreakerConfig.MaxRetries,
+			MaxRequests: cf.CircuitBreakerConfig.MaxRequests,
 		})
 
 		circuitBreakerInterceptor := func(
