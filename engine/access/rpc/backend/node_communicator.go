@@ -60,12 +60,12 @@ func (b *NodeCommunicator) CallAvailableExecutionNode(
 	return errs.ErrorOrNil()
 }
 
-// CallAvailableConnectionNode calls the provided function on the available connection nodes.
-// It iterates through the connection nodes and executes the function.
+// CallAvailableCollectionNode calls the provided function on the available collection nodes.
+// It iterates through the collection nodes and executes the function.
 // If an error occurs, it keeps track of the errors.
-// If the error occurs in circuit breaker, it continues to the next execution node.
+// If the error occurs in circuit breaker, it continues to the next collection node.
 // If the maximum failed request count is reached, it returns the accumulated errors.
-func (b *NodeCommunicator) CallAvailableConnectionNode(nodes flow.IdentityList, call func(node *flow.Identity) error) error {
+func (b *NodeCommunicator) CallAvailableCollectionNode(nodes flow.IdentityList, call func(node *flow.Identity) error) error {
 	var errs *multierror.Error
 
 	collNodeSelector := b.nodeSelectorFactory.SelectCollectionNodes(nodes)

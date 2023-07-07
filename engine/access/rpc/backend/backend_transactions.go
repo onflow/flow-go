@@ -97,7 +97,7 @@ func (b *backendTransactions) trySendTransaction(ctx context.Context, tx *flow.T
 	defer logAnyError()
 
 	// try sending the transaction to one of the chosen collection nodes
-	sendError = b.nodeCommunicator.CallAvailableConnectionNode(collNodes, func(node *flow.Identity) error {
+	sendError = b.nodeCommunicator.CallAvailableCollectionNode(collNodes, func(node *flow.Identity) error {
 		err = b.sendTransactionToCollector(ctx, tx, node.Address)
 		if err != nil {
 			return err
