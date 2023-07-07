@@ -430,7 +430,7 @@ func TestHandleReportedMisbehavior_And_DisallowListing_RepeatOffender_Integratio
 				t.Logf("%s decayed the disallow-listing penalty of the spammer node to zero", now.Format(time.RFC3339))
 
 				// after serving the disallow-listing period, the spammer should be able to connect to the victim node again.
-				p2ptest.RequireConnectedEventually(t, []p2p.LibP2PNode{nodes[spammerIndex], nodes[victimIndex]}, 1*time.Millisecond, 4*time.Second)
+				p2ptest.RequireConnectedEventually(t, []p2p.LibP2PNode{nodes[spammerIndex], nodes[victimIndex]}, 1*time.Millisecond, 3*time.Second)
 				now = time.Now()
 				t.Logf("%s spammer node is able to connect to the victim node again", now.Format(time.RFC3339))
 
