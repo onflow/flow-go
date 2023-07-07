@@ -298,7 +298,8 @@ func TestHandleReportedMisbehavior_And_DisallowListing_RepeatOffender_Integratio
 		WithDecayFunc(fastDecayFunc),
 	}
 
-	ids, nodes, _ := testutils.LibP2PNodeForMiddlewareFixture(t, 3)
+	ids, nodes, _ := testutils.LibP2PNodeForMiddlewareFixture(t, 3,
+		p2ptest.WithPeerManagerEnabled(p2ptest.PeerManagerConfigFixture(p2ptest.WithZeroJitterAndZeroBackoff(t)), nil))
 	mws, _ := testutils.MiddlewareFixtures(t, ids, nodes, testutils.MiddlewareConfigFixture(t))
 	networkCfg := testutils.NetworkConfigFixture(t, *ids[0], ids, mws[0], p2p.WithAlspConfig(cfg))
 
