@@ -201,7 +201,7 @@ func benchmarkComputeBlock(
 		me,
 		prov,
 		nil,
-		testutil.ProtocolStateFixture(),
+		testutil.ProtocolStateWithSourceFixture(nil),
 		maxConcurrency)
 	require.NoError(b, err)
 

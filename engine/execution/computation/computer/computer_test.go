@@ -172,7 +172,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			me,
 			prov,
 			nil,
-			testutil.ProtocolStateFixture(),
+			testutil.ProtocolStateWithSourceFixture(nil),
 			testMaxConcurrency)
 		require.NoError(t, err)
 
@@ -307,7 +307,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			me,
 			prov,
 			nil,
-			testutil.ProtocolStateFixture(),
+			testutil.ProtocolStateWithSourceFixture(nil),
 			testMaxConcurrency)
 		require.NoError(t, err)
 
@@ -405,7 +405,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			me,
 			prov,
 			nil,
-			testutil.ProtocolStateFixture(),
+			testutil.ProtocolStateWithSourceFixture(nil),
 			testMaxConcurrency)
 		require.NoError(t, err)
 
@@ -465,7 +465,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			me,
 			prov,
 			nil,
-			testutil.ProtocolStateFixture(),
+			testutil.ProtocolStateWithSourceFixture(nil),
 			testMaxConcurrency)
 		require.NoError(t, err)
 
@@ -682,7 +682,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 				me,
 				prov,
 				nil,
-				testutil.ProtocolStateFixture(),
+				testutil.ProtocolStateWithSourceFixture(nil),
 				testMaxConcurrency)
 			require.NoError(t, err)
 
@@ -793,7 +793,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			me,
 			prov,
 			nil,
-			testutil.ProtocolStateFixture(),
+			testutil.ProtocolStateWithSourceFixture(nil),
 			testMaxConcurrency)
 		require.NoError(t, err)
 
@@ -906,7 +906,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			me,
 			prov,
 			nil,
-			testutil.ProtocolStateFixture(),
+			testutil.ProtocolStateWithSourceFixture(nil),
 			testMaxConcurrency)
 		require.NoError(t, err)
 
@@ -951,7 +951,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			me,
 			prov,
 			nil,
-			testutil.ProtocolStateFixture(),
+			testutil.ProtocolStateWithSourceFixture(nil),
 			testMaxConcurrency)
 		require.NoError(t, err)
 
@@ -1271,7 +1271,7 @@ func Test_ExecutingSystemCollection(t *testing.T) {
 		me,
 		prov,
 		nil,
-		testutil.ProtocolStateFixture(),
+		testutil.ProtocolStateWithSourceFixture(nil),
 		testMaxConcurrency)
 	require.NoError(t, err)
 

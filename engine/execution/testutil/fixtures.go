@@ -630,11 +630,14 @@ func ComputationResultFixture(t *testing.T) *execution.ComputationResult {
 	}
 }
 
-// ProtocolStateFixture returns a protocol state that can be used
-// by BlockComputer tests
-func ProtocolStateFixture() protocol.State {
+// ProtocolStateWithSourceFixture returns a protocol state that supports RandomSource()
+// If input is nil, a random source fixture is generated.
+func ProtocolStateWithSourceFixture(source []byte) protocol.State {
+	if source == nil {
+		source = unittest.SignatureFixture()
+	}
 	snapshot := pmock.Snapshot{}
-	snapshot.On("RandomSource").Return(unittest.RandomBytes(48), nil)
+	snapshot.On("RandomSource").Return(source, nil)
 	state := pmock.State{}
 	state.On("AtBlockID", mock.Anything).Return(&snapshot)
 	return &state

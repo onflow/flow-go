@@ -781,7 +781,7 @@ func executeBlockAndVerifyWithParameters(t *testing.T,
 		me,
 		prov,
 		nil,
-		testutil.ProtocolStateFixture(),
+		testutil.ProtocolStateWithSourceFixture(nil),
 		testVerifyMaxConcurrency)
 	require.NoError(t, err)
 

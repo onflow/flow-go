@@ -494,7 +494,11 @@ func withConsumers(t *testing.T,
 		builder.clusterCommittee = participants.Filter(filter.HasRole(flow.RoleCollection))
 	})
 
-	completeERs := CompleteExecutionReceiptChainFixture(t, root, blockCount, s.State, ops...)
+	// random sources for all blocks:
+	//  - root block (block[0]) is executed with sources[0] (included in QC of child block[1])
+	//  - block[i] is executed with sources[i] (included in QC of child block[i+1])
+	sources := unittest.RandomSourcesFixture(30)
+	completeERs := CompleteExecutionReceiptChainFixture(t, root, blockCount, sources, ops...)
 	blocks := ExtendStateWithFinalizedBlocks(t, completeERs, s.State)
 
 	// chunk assignment
