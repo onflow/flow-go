@@ -1,6 +1,7 @@
 package heropool
 
 import (
+	"fmt"
 	"math"
 
 	"github.com/rs/zerolog"
@@ -314,7 +315,16 @@ func (p *Pool) getStateFromType(stateType StateType) *state {
 // utility method that removes an entity from one of the states.
 // NOTE: a removed entity has to be added to another state.
 func (p *Pool) removeEntity(stateType StateType, entityIndex EIndex) {
-	var s *state = p.getStateFromType(stateType)
+	var s *state = nil
+	switch stateType {
+	case stateFree:
+		s = &p.free
+	case stateUsed:
+		s = &p.used
+	default:
+		panic(fmt.Sprintf("unknown state type: %s", stateType))
+	}
+
 	if s.size == 0 {
 		panic("Removing an entity from an empty list")
 	}
@@ -353,7 +363,15 @@ func (p *Pool) removeEntity(stateType StateType, entityIndex EIndex) {
 // appends an entity to the tail of the state or creates a first element.
 // NOTE: entity should not be in any list before this method is applied
 func (p *Pool) appendEntity(stateType StateType, entityIndex EIndex) {
-	var s *state = p.getStateFromType(stateType)
+	var s *state = nil
+	switch stateType {
+	case stateFree:
+		s = &p.free
+	case stateUsed:
+		s = &p.used
+	default:
+		panic(fmt.Sprintf("unknown state type: %s", stateType))
+	}
 
 	if s.size == 0 {
 		s.head = entityIndex
