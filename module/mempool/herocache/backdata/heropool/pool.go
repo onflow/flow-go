@@ -21,7 +21,7 @@ const (
 // EIndex is data type representing an entity index in Pool.
 type EIndex uint32
 
-// InvalidIndex is used when a link doesnt point anywhere, in other words it is an equivalent of a nil adress.
+// InvalidIndex is used when a link doesnt point anywhere, in other words it is an equivalent of a nil address.
 const InvalidIndex EIndex = math.MaxUint32
 
 // A type dedicated to describe possible states of placeholders for entities in the pool.
