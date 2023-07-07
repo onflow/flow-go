@@ -19,9 +19,8 @@ type SubscribeHandlerFunc func(
 	h *state_stream.SubscribeHandler,
 ) (interface{}, error)
 
-// WSHandler is custom http handler implementing custom handler function.
-// Handler function allows easier handling of errors and responses as it
-// wraps functionality for handling error and responses outside of endpoint handling.
+// WSHandler is websocket handler implementing custom handler function and allows easier handling of errors and
+// responses as it wraps functionality for handling error and responses outside of endpoint handling.
 type WSHandler struct {
 	*HttpHandler
 	*state_stream.SubscribeHandler
@@ -44,7 +43,7 @@ func NewWSHandler(
 	return handler
 }
 
-// ServerHTTP function acts as a wrapper to each request providing common handling functionality
+// ServeHTTP function acts as a wrapper to each request providing common handling functionality
 // such as logging, error handling, request decorators
 func (h *WSHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// create a logger
