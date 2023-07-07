@@ -26,7 +26,7 @@ import (
 	"github.com/onflow/flow-go/module/epochs"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	"github.com/onflow/flow-go/state/protocol"
-	pmock "github.com/onflow/flow-go/state/protocol/mock"
+	protocolMock "github.com/onflow/flow-go/state/protocol/mock"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -630,15 +630,25 @@ func ComputationResultFixture(t *testing.T) *execution.ComputationResult {
 	}
 }
 
-// ProtocolStateWithSourceFixture returns a protocol state that supports RandomSource()
+// ProtocolSnapshotWithSourceFixture returns a protocol state snapshot mock that only
+// supports RandomSource().
 // If input is nil, a random source fixture is generated.
-func ProtocolStateWithSourceFixture(source []byte) protocol.State {
+func ProtocolSnapshotWithSourceFixture(source []byte) protocol.Snapshot {
 	if source == nil {
 		source = unittest.SignatureFixture()
 	}
-	snapshot := pmock.Snapshot{}
+	snapshot := protocolMock.Snapshot{}
 	snapshot.On("RandomSource").Return(source, nil)
-	state := pmock.State{}
+	return &snapshot
+}
+
+// ProtocolStateWithSourceFixture returns a protocol state mock that only
+// supports AtBlockID to return a snapshot mock.
+// The snapshot mock only supports RandomSource().
+// If input is nil, a random source fixture is generated.
+func ProtocolStateWithSourceFixture(source []byte) protocol.State {
+	snapshot := ProtocolSnapshotWithSourceFixture(source)
+	state := protocolMock.State{}
 	state.On("AtBlockID", mock.Anything).Return(&snapshot)
 	return &state
 }

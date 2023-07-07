@@ -8,17 +8,16 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/crypto/random"
+	"github.com/onflow/flow-go/engine/execution/testutil"
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/tracing"
 	"github.com/onflow/flow-go/model/flow"
-	pmock "github.com/onflow/flow-go/state/protocol/mock"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
 func TestUnsafeRandomGenerator(t *testing.T) {
 	// protocol snapshot mock
-	snapshot := &pmock.Snapshot{}
-	snapshot.On("RandomSource").Return(unittest.RandomBytes(48), nil)
+	snapshot := testutil.ProtocolSnapshotWithSourceFixture(nil)
 
 	getRandoms := func(txId flow.Identifier, N int) []uint64 {
 		// seed the RG with the same block header

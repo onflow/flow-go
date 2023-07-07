@@ -15,14 +15,14 @@ import (
 	"github.com/onflow/flow-go/state/protocol/prg"
 )
 
-type UnsafeRandomGenerator interface {
+type RandomGenerator interface {
 	// UnsafeRandom returns a random uint64
 	UnsafeRandom() (uint64, error)
 }
 
-var _ UnsafeRandomGenerator = (*unsafeRandomGenerator)(nil)
+var _ RandomGenerator = (*unsafeRandomGenerator)(nil)
 
-// unsafeRandomGenerator implements UnsafeRandomGenerator and is used
+// unsafeRandomGenerator implements RandomGenerator and is used
 // for the transactions execution environment
 type unsafeRandomGenerator struct {
 	tracer tracing.TracerSpan
@@ -37,13 +37,13 @@ type unsafeRandomGenerator struct {
 
 type ParseRestrictedUnsafeRandomGenerator struct {
 	txnState state.NestedTransactionPreparer
-	impl     UnsafeRandomGenerator
+	impl     RandomGenerator
 }
 
 func NewParseRestrictedUnsafeRandomGenerator(
 	txnState state.NestedTransactionPreparer,
-	impl UnsafeRandomGenerator,
-) UnsafeRandomGenerator {
+	impl RandomGenerator,
+) RandomGenerator {
 	return ParseRestrictedUnsafeRandomGenerator{
 		txnState: txnState,
 		impl:     impl,
@@ -64,7 +64,7 @@ func NewUnsafeRandomGenerator(
 	tracer tracing.TracerSpan,
 	stateSnapshot protocol.Snapshot,
 	txId flow.Identifier,
-) UnsafeRandomGenerator {
+) RandomGenerator {
 	gen := &unsafeRandomGenerator{
 		tracer:        tracer,
 		stateSnapshot: stateSnapshot,
@@ -78,10 +78,10 @@ func (gen *unsafeRandomGenerator) createRandomGenerator() (
 	random.Rand,
 	error,
 ) {
-	// Use the protocol state source of randomness [SoR] for the current block
+	// Use the protocol state source of randomness [SoR] for the current block's
 	// execution
 	source, err := gen.stateSnapshot.RandomSource()
-	// expected errors of RandomSource() are :
+	// expected errors of RandomSource() are:
 	// - storage.ErrNotFound if the QC is unknown.
 	// - state.ErrUnknownSnapshotReference if the snapshot reference block is unknown
 	// at this stage, snapshot reference block should be known and the QC should also be known,
@@ -105,7 +105,7 @@ func (gen *unsafeRandomGenerator) createRandomGenerator() (
 }
 
 // maybeCreateRandomGenerator seeds the pseudo-random number generator using the
-// block header ID and transaction index as an entropy source.  The seed
+// block SoR as an entropy source, customized with the transaction hash. The seed
 // function is currently called for each transaction, the PRG is used to
 // provide all the randoms the transaction needs through UnsafeRandom.
 //
@@ -124,7 +124,7 @@ func (gen *unsafeRandomGenerator) maybeCreateRandomGenerator() error {
 // using a crypto-secure one).  This is not thread safe, due to the gen.prg
 // instance currently used.  Its also not thread safe because each thread needs
 // to be deterministically seeded with a different seed.  This is Ok because a
-// single transaction has a single UnsafeRandomGenerator and is run in a single
+// single transaction has a single RandomGenerator and is run in a single
 // thread.
 func (gen *unsafeRandomGenerator) UnsafeRandom() (uint64, error) {
 	defer gen.tracer.StartExtensiveTracingChildSpan(
@@ -141,13 +141,13 @@ func (gen *unsafeRandomGenerator) UnsafeRandom() (uint64, error) {
 	return binary.LittleEndian.Uint64(buf), nil
 }
 
-var _ UnsafeRandomGenerator = (*dummyRandomGenerator)(nil)
+var _ RandomGenerator = (*dummyRandomGenerator)(nil)
 
-// dummyRandomGenerator implements UnsafeRandomGenerator and is used
+// dummyRandomGenerator implements RandomGenerator and is used
 // for the scripts execution environment
 type dummyRandomGenerator struct{}
 
-func NewDummyRandomGenerator() UnsafeRandomGenerator {
+func NewDummyRandomGenerator() RandomGenerator {
 	return &dummyRandomGenerator{}
 }
 

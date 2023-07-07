@@ -377,7 +377,7 @@ func (s *Snapshot) descendants(blockID flow.Identifier) ([]flow.Identifier, erro
 	return descendantIDs, nil
 }
 
-// RandomSource returns the seed for the current block snapshot.
+// RandomSource returns the seed for the current block's snapshot.
 // Expected error returns:
 // * storage.ErrNotFound is returned if the QC is unknown.
 func (s *Snapshot) RandomSource() ([]byte, error) {

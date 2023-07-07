@@ -25,7 +25,6 @@ import (
 	errors "github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/model/flow"
-	pmock "github.com/onflow/flow-go/state/protocol/mock"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -1672,13 +1671,12 @@ func TestBlockContext_UnsafeRandom(t *testing.T) {
 	chain, vm := createChainAndVm(flow.Mainnet)
 
 	header := &flow.Header{Height: 42}
-	snapshot := pmock.Snapshot{}
-	snapshot.On("RandomSource").Return(unittest.RandomBytes(48), nil)
+	snapshot := testutil.ProtocolSnapshotWithSourceFixture(nil)
 
 	ctx := fvm.NewContext(
 		fvm.WithChain(chain),
 		fvm.WithBlockHeader(header),
-		fvm.WithProtocolSnapshot(&snapshot),
+		fvm.WithProtocolSnapshot(snapshot),
 		fvm.WithCadenceLogging(true),
 	)
 
