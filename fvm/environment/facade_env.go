@@ -102,8 +102,11 @@ func newFacadeEnvironment(
 
 		UUIDGenerator: NewUUIDGenerator(
 			tracer,
+			params.Logger,
 			meter,
-			txnState),
+			txnState,
+			params.BlockHeader,
+			params.TxIndex),
 		AccountLocalIDGenerator: NewAccountLocalIDGenerator(
 			tracer,
 			meter,

@@ -98,7 +98,7 @@ func (p *ProtocolPeerCache) consumeSubscription(logger zerolog.Logger, h host.Ho
 				logger.Err(err).Str("peer", evt.Peer.String()).Msg("failed to get protocols for peer")
 				continue
 			}
-			p.AddProtocols(evt.Peer, protocol.ConvertFromStrings(protocols))
+			p.AddProtocols(evt.Peer, protocols)
 		case event.EvtPeerProtocolsUpdated:
 			p.AddProtocols(evt.Peer, evt.Added)
 			p.RemoveProtocols(evt.Peer, evt.Removed)

@@ -3,6 +3,7 @@ package config
 import (
 	"bytes"
 	_ "embed"
+	"errors"
 	"fmt"
 	"path/filepath"
 	"regexp"
@@ -14,7 +15,7 @@ import (
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
 
-	"github.com/onflow/flow-go/config/network"
+	"github.com/onflow/flow-go/network/netconf"
 )
 
 var (
@@ -22,13 +23,19 @@ var (
 	validate *validator.Validate
 	//go:embed default-config.yml
 	configFile string
+
+	errPflagsNotParsed = errors.New("failed to bind flags to configuration values, pflags must be parsed before binding")
 )
+
+func init() {
+	initialize()
+}
 
 // FlowConfig Flow configuration.
 type FlowConfig struct {
 	// ConfigFile used to set a path to a config.yml file used to override the default-config.yml file.
 	ConfigFile    string          `validate:"filepath" mapstructure:"config-file"`
-	NetworkConfig *network.Config `mapstructure:"network-config"`
+	NetworkConfig *netconf.Config `mapstructure:"network-config"`
 }
 
 // Validate checks validity of the Flow config. Errors indicate that either the configuration is broken,
@@ -79,7 +86,7 @@ func DefaultConfig() (*FlowConfig, error) {
 // Note: As configuration management is improved, this func should accept the entire Flow config as the arg to unmarshall new config values into.
 func BindPFlags(c *FlowConfig, flags *pflag.FlagSet) (bool, error) {
 	if !flags.Parsed() {
-		return false, fmt.Errorf("failed to bind flags to configuration values, pflags must be parsed before binding")
+		return false, errPflagsNotParsed
 	}
 
 	// update the config store values from config file if --config-file flag is set
@@ -118,37 +125,13 @@ func Unmarshall(flowConfig *FlowConfig) error {
 		// enforce all fields are set on the FlowConfig struct
 		decoderConfig.ErrorUnset = true
 		// currently the entire flow configuration has not been moved to this package
-		// for now we all key's in the config which are unused.
+		// for now we allow key's in the config which are unused.
 		decoderConfig.ErrorUnused = false
 	})
 	if err != nil {
 		return fmt.Errorf("failed to unmarshal network config: %w", err)
 	}
 	return nil
-}
-
-// Print prints current configuration keys and values.
-// Returns:
-// map[string]struct{}: map of keys to avoid printing if they were set by an config file.
-// This is required because we still have other config values not migrated to the config package. When a
-// config file is used currently only network-configs are set, we want to avoid printing the config file
-// value and also the flag value.
-func Print(info *zerolog.Event, flags *pflag.FlagSet) map[string]struct{} {
-	// only print config values if they were overridden with a config file
-	m := make(map[string]struct{})
-	if flags.Lookup(configFileFlagName).Changed {
-		for _, key := range conf.AllKeys() {
-			info.Str(key, fmt.Sprintf("%v", conf.Get(key)))
-			s := strings.Split(key, ".")
-			if len(s) == 2 {
-				m[s[1]] = struct{}{}
-			} else {
-				m[key] = struct{}{}
-			}
-		}
-	}
-
-	return m
 }
 
 // LogConfig logs configuration keys and values if they were overridden with a config file.
@@ -184,7 +167,7 @@ func LogConfig(logger *zerolog.Event, flags *pflag.FlagSet) map[string]struct{} 
 // keys do not match the CLI flags 1:1. ie: networking-connection-pruning -> network-config.networking-connection-pruning. After aliases
 // are set the conf store will override values with any CLI flag values that are set as expected.
 func setAliases() {
-	err := network.SetAliases(conf)
+	err := netconf.SetAliases(conf)
 	if err != nil {
 		panic(fmt.Errorf("failed to set network aliases: %w", err))
 	}
@@ -207,6 +190,9 @@ func overrideConfigFile(flags *pflag.FlagSet) (bool, error) {
 		err := conf.ReadInConfig()
 		if err != nil {
 			return false, fmt.Errorf("failed to read config file %s: %w", p, err)
+		}
+		if len(conf.AllKeys()) == 0 {
+			return false, fmt.Errorf("failed to read in config file no config values found")
 		}
 		return true, nil
 	}
@@ -253,7 +239,7 @@ func splitConfigPath(path string) (string, string) {
 	return dir, baseName
 }
 
-func init() {
+func initialize() {
 	buf := bytes.NewBufferString(configFile)
 	conf.SetConfigType("yaml")
 	if err := conf.ReadConfig(buf); err != nil {
