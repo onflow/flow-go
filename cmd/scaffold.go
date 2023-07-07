@@ -60,7 +60,6 @@ import (
 	"github.com/onflow/flow-go/network/p2p/unicast/protocols"
 	"github.com/onflow/flow-go/network/p2p/unicast/ratelimit"
 	"github.com/onflow/flow-go/network/p2p/utils/ratelimiter"
-	"github.com/onflow/flow-go/network/slashing"
 	"github.com/onflow/flow-go/network/topology"
 	"github.com/onflow/flow-go/state/protocol"
 	badgerState "github.com/onflow/flow-go/state/protocol/badger"
@@ -437,17 +436,15 @@ func (fnb *FlowNodeBuilder) InitFlowNetworkWithConduitFactory(
 		mwOpts = append(mwOpts, middleware.WithPeerManagerFilters(peerManagerFilters))
 	}
 
-	slashingViolationsConsumer := slashing.NewSlashingViolationsConsumer(fnb.Logger, fnb.Metrics.Network)
 	mw := middleware.NewMiddleware(&middleware.Config{
-		Logger:                     fnb.Logger,
-		Libp2pNode:                 fnb.LibP2PNode,
-		FlowId:                     fnb.Me.NodeID(),
-		BitSwapMetrics:             fnb.Metrics.Bitswap,
-		RootBlockID:                fnb.SporkID,
-		UnicastMessageTimeout:      fnb.BaseConfig.FlowConfig.NetworkConfig.UnicastMessageTimeout,
-		IdTranslator:               fnb.IDTranslator,
-		Codec:                      fnb.CodecFactory(),
-		SlashingViolationsConsumer: slashingViolationsConsumer,
+		Logger:                fnb.Logger,
+		Libp2pNode:            fnb.LibP2PNode,
+		FlowId:                fnb.Me.NodeID(),
+		BitSwapMetrics:        fnb.Metrics.Bitswap,
+		RootBlockID:           fnb.SporkID,
+		UnicastMessageTimeout: fnb.FlowConfig.NetworkConfig.UnicastMessageTimeout,
+		IdTranslator:          fnb.IDTranslator,
+		Codec:                 fnb.CodecFactory(),
 	},
 		mwOpts...)
 
