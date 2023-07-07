@@ -2,11 +2,11 @@ package signature_test
 
 import (
 	"fmt"
-	"golang.org/x/exp/slices"
 	"sort"
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	"golang.org/x/exp/slices"
 	"pgregory.net/rapid"
 
 	"github.com/onflow/flow-go/ledger/common/bitutils"
