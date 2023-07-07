@@ -5,15 +5,15 @@ import (
 	"testing"
 	"time"
 
-	"github.com/onflow/flow-go/model/flow"
-	libp2pmessage "github.com/onflow/flow-go/model/libp2p/message"
-	"github.com/onflow/flow-go/network"
-	"github.com/onflow/flow-go/network/message"
-
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/peerstore"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/onflow/flow-go/model/flow"
+	libp2pmessage "github.com/onflow/flow-go/model/libp2p/message"
+	"github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/network/message"
 
 	"github.com/onflow/flow-go/network/p2p"
 	p2ptest "github.com/onflow/flow-go/network/p2p/test"
@@ -21,7 +21,6 @@ import (
 	"github.com/onflow/flow-go/network/p2p/utils"
 
 	"github.com/onflow/flow-go/module/irrecoverable"
-	mockmodule "github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/internal/p2pfixtures"
 	flowpubsub "github.com/onflow/flow-go/network/validator/pubsub"
@@ -41,8 +40,7 @@ import (
 // TestCrosstalkPreventionOnNetworkKeyChange tests that a node from the old chain cannot talk to a node in the new chain
 // if it's network key is updated while the libp2p protocol ID remains the same
 func TestCrosstalkPreventionOnNetworkKeyChange(t *testing.T) {
-	unittest.SkipUnless(t, unittest.TEST_FLAKY, "flaky test - passing in Flaky Test Monitor but keeps failing in CI and keeps blocking many PRs")
-	idProvider := mockmodule.NewIdentityProvider(t)
+	idProvider := unittest.NewUpdatableIDProvider(flow.IdentityList{})
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -65,7 +63,7 @@ func TestCrosstalkPreventionOnNetworkKeyChange(t *testing.T) {
 		idProvider,
 		p2ptest.WithNetworkingPrivateKey(node1key),
 	)
-	idProvider.On("ByPeerID", node1.Host().ID()).Return(&id1, true).Maybe()
+	idProvider.SetIdentities(flow.IdentityList{&id1})
 
 	p2ptest.StartNode(t, signalerCtx1, node1, 100*time.Millisecond)
 	defer p2ptest.StopNode(t, node1, cancel1, 100*time.Millisecond)
@@ -81,7 +79,7 @@ func TestCrosstalkPreventionOnNetworkKeyChange(t *testing.T) {
 		idProvider,
 		p2ptest.WithNetworkingPrivateKey(node2key),
 	)
-	idProvider.On("ByPeerID", node2.Host().ID()).Return(&id2, true).Maybe()
+	idProvider.SetIdentities(flow.IdentityList{&id1, &id2})
 
 	p2ptest.StartNode(t, signalerCtx2, node2, 100*time.Millisecond)
 
@@ -106,7 +104,7 @@ func TestCrosstalkPreventionOnNetworkKeyChange(t *testing.T) {
 		p2ptest.WithNetworkingPrivateKey(node2keyNew),
 		p2ptest.WithNetworkingAddress(id2.Address),
 	)
-	idProvider.On("ByPeerID", node2.Host().ID()).Return(&id2New, true).Maybe()
+	idProvider.SetIdentities(flow.IdentityList{&id1, &id2New})
 
 	p2ptest.StartNode(t, signalerCtx2a, node2, 100*time.Millisecond)
 	defer p2ptest.StopNode(t, node2, cancel2a, 100*time.Millisecond)
@@ -123,7 +121,7 @@ func TestCrosstalkPreventionOnNetworkKeyChange(t *testing.T) {
 // TestOneToOneCrosstalkPrevention tests that a node from the old chain cannot talk directly to a node in the new chain
 // if the Flow libp2p protocol ID is updated while the network keys are kept the same.
 func TestOneToOneCrosstalkPrevention(t *testing.T) {
-	idProvider := mockmodule.NewIdentityProvider(t)
+	idProvider := unittest.NewUpdatableIDProvider(flow.IdentityList{})
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -140,7 +138,6 @@ func TestOneToOneCrosstalkPrevention(t *testing.T) {
 
 	// create and start node 1 on localhost and random port
 	node1, id1 := p2ptest.NodeFixture(t, sporkId1, "test_one_to_one_crosstalk_prevention", idProvider)
-	idProvider.On("ByPeerID", node1.Host().ID()).Return(&id1, true).Maybe()
 
 	p2ptest.StartNode(t, signalerCtx1, node1, 100*time.Millisecond)
 	defer p2ptest.StopNode(t, node1, cancel1, 100*time.Millisecond)
@@ -150,8 +147,8 @@ func TestOneToOneCrosstalkPrevention(t *testing.T) {
 
 	// create and start node 2 on localhost and random port
 	node2, id2 := p2ptest.NodeFixture(t, sporkId1, "test_one_to_one_crosstalk_prevention", idProvider)
-	idProvider.On("ByPeerID", node2.Host().ID()).Return(&id2, true).Maybe()
 
+	idProvider.SetIdentities(flow.IdentityList{&id1, &id2})
 	p2ptest.StartNode(t, signalerCtx2, node2, 100*time.Millisecond)
 
 	// create stream from node 2 to node 1
@@ -168,7 +165,7 @@ func TestOneToOneCrosstalkPrevention(t *testing.T) {
 		idProvider,
 		p2ptest.WithNetworkingAddress(id2.Address),
 	)
-	idProvider.On("ByPeerID", node2.Host().ID()).Return(&id2New, true).Maybe()
+	idProvider.SetIdentities(flow.IdentityList{&id1, &id2New})
 
 	p2ptest.StartNode(t, signalerCtx2a, node2, 100*time.Millisecond)
 	defer p2ptest.StopNode(t, node2, cancel2a, 100*time.Millisecond)
@@ -184,7 +181,7 @@ func TestOneToOneCrosstalkPrevention(t *testing.T) {
 // TestOneToKCrosstalkPrevention tests that a node from the old chain cannot talk to a node in the new chain via PubSub
 // if the channel is updated while the network keys are kept the same.
 func TestOneToKCrosstalkPrevention(t *testing.T) {
-	idProvider := mockmodule.NewIdentityProvider(t)
+	idProvider := unittest.NewUpdatableIDProvider(flow.IdentityList{})
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -203,10 +200,10 @@ func TestOneToKCrosstalkPrevention(t *testing.T) {
 		"test_one_to_k_crosstalk_prevention",
 		idProvider,
 	)
-	idProvider.On("ByPeerID", node1.Host().ID()).Return(&id1, true).Maybe()
+
 	p2ptest.StartNode(t, signalerCtx1, node1, 100*time.Millisecond)
 	defer p2ptest.StopNode(t, node1, cancel1, 100*time.Millisecond)
-
+	idProvider.SetIdentities(flow.IdentityList{&id1})
 	// create and start node 2 on localhost and random port with the same root block ID
 	node2, id2 := p2ptest.NodeFixture(t,
 		previousSporkId,
@@ -276,7 +273,7 @@ func testOneToOneMessagingFails(t *testing.T, sourceNode p2p.LibP2PNode, peerInf
 	// assert that stream creation failed
 	assert.Error(t, err)
 	// assert that it failed with the expected error
-	assert.Regexp(t, ".*failed to negotiate security protocol.*|.*protocol not supported.*", err)
+	assert.Regexp(t, ".*failed to negotiate security protocol.*|.*protocols not supported.*", err)
 }
 
 func testOneToKMessagingSucceeds(ctx context.Context,

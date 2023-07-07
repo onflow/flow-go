@@ -49,17 +49,16 @@ import (
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/cache"
 	"github.com/onflow/flow-go/network/p2p/conduit"
+	"github.com/onflow/flow-go/network/p2p/connection"
 	"github.com/onflow/flow-go/network/p2p/dns"
 	"github.com/onflow/flow-go/network/p2p/middleware"
 	"github.com/onflow/flow-go/network/p2p/p2pbuilder"
 	p2pconfig "github.com/onflow/flow-go/network/p2p/p2pbuilder/config"
-	"github.com/onflow/flow-go/network/p2p/p2pbuilder/inspector"
 	"github.com/onflow/flow-go/network/p2p/ping"
 	"github.com/onflow/flow-go/network/p2p/subscription"
 	"github.com/onflow/flow-go/network/p2p/unicast/protocols"
 	"github.com/onflow/flow-go/network/p2p/unicast/ratelimit"
 	"github.com/onflow/flow-go/network/p2p/utils/ratelimiter"
-	"github.com/onflow/flow-go/network/slashing"
 	"github.com/onflow/flow-go/network/topology"
 	"github.com/onflow/flow-go/state/protocol"
 	badgerState "github.com/onflow/flow-go/state/protocol/badger"
@@ -335,6 +334,7 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 	peerManagerCfg := &p2pconfig.PeerManagerConfig{
 		ConnectionPruning: fnb.FlowConfig.NetworkConfig.NetworkConnectionPruning,
 		UpdateInterval:    fnb.FlowConfig.NetworkConfig.PeerUpdateInterval,
+		ConnectorFactory:  connection.DefaultLibp2pBackoffConnectorFactory(),
 	}
 
 	fnb.Component(LibP2PNodeComponent, func(node *NodeConfig) (module.ReadyDoneAware, error) {
@@ -343,34 +343,23 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 			myAddr = fnb.BaseConfig.BindAddr
 		}
 
-		metricsCfg := &p2pconfig.MetricsConfig{
-			Metrics:          fnb.Metrics.Network,
-			HeroCacheFactory: fnb.HeroCacheMetricsFactory(),
-		}
-
-		rpcInspectorSuite, err := inspector.NewGossipSubInspectorBuilder(fnb.Logger, fnb.SporkID, &fnb.FlowConfig.NetworkConfig.GossipSubConfig.GossipSubRPCInspectorsConfig, fnb.IdentityProvider, fnb.Metrics.Network).
-			SetNetworkType(network.PrivateNetwork).
-			SetMetrics(metricsCfg).
-			Build()
-		if err != nil {
-			return nil, fmt.Errorf("failed to create gossipsub rpc inspectors for default libp2p node: %w", err)
-		}
-
-		fnb.GossipSubRpcInspectorSuite = rpcInspectorSuite
-
 		builder, err := p2pbuilder.DefaultNodeBuilder(
 			fnb.Logger,
 			myAddr,
+			network.PrivateNetwork,
 			fnb.NetworkKey,
 			fnb.SporkID,
 			fnb.IdentityProvider,
-			metricsCfg,
+			&p2pconfig.MetricsConfig{
+				Metrics:          fnb.Metrics.Network,
+				HeroCacheFactory: fnb.HeroCacheMetricsFactory(),
+			},
 			fnb.Resolver,
 			fnb.BaseConfig.NodeRole,
 			connGaterCfg,
 			peerManagerCfg,
 			&fnb.FlowConfig.NetworkConfig.GossipSubConfig,
-			fnb.GossipSubRpcInspectorSuite,
+			&fnb.FlowConfig.NetworkConfig.GossipSubRPCInspectorsConfig,
 			&fnb.FlowConfig.NetworkConfig.ResourceManagerConfig,
 			uniCfg,
 			&fnb.FlowConfig.NetworkConfig.ConnectionManagerConfig,
@@ -446,17 +435,15 @@ func (fnb *FlowNodeBuilder) InitFlowNetworkWithConduitFactory(
 		mwOpts = append(mwOpts, middleware.WithPeerManagerFilters(peerManagerFilters))
 	}
 
-	slashingViolationsConsumer := slashing.NewSlashingViolationsConsumer(fnb.Logger, fnb.Metrics.Network)
 	mw := middleware.NewMiddleware(&middleware.Config{
-		Logger:                     fnb.Logger,
-		Libp2pNode:                 fnb.LibP2PNode,
-		FlowId:                     fnb.Me.NodeID(),
-		BitSwapMetrics:             fnb.Metrics.Bitswap,
-		RootBlockID:                fnb.SporkID,
-		UnicastMessageTimeout:      fnb.BaseConfig.FlowConfig.NetworkConfig.UnicastMessageTimeout,
-		IdTranslator:               fnb.IDTranslator,
-		Codec:                      fnb.CodecFactory(),
-		SlashingViolationsConsumer: slashingViolationsConsumer,
+		Logger:                fnb.Logger,
+		Libp2pNode:            fnb.LibP2PNode,
+		FlowId:                fnb.Me.NodeID(),
+		BitSwapMetrics:        fnb.Metrics.Bitswap,
+		RootBlockID:           fnb.SporkID,
+		UnicastMessageTimeout: fnb.FlowConfig.NetworkConfig.UnicastMessageTimeout,
+		IdTranslator:          fnb.IDTranslator,
+		Codec:                 fnb.CodecFactory(),
 	},
 		mwOpts...)
 

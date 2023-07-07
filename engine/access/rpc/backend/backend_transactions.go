@@ -429,7 +429,7 @@ func (b *backendTransactions) GetTransactionResultsByBlockID(
 				return nil, rpc.ConvertStorageError(err)
 			}
 
-			events, err := convert.MessagesToEventsFromVersion(txResult.GetEvents(), txResult.GetEventEncodingVersion())
+			events, err := convert.MessagesToEventsFromVersion(txResult.GetEvents(), resp.GetEventEncodingVersion())
 			if err != nil {
 				return nil, status.Errorf(codes.Internal,
 					"failed to convert events to message in txID %x: %v", txID, err)
@@ -484,7 +484,7 @@ func (b *backendTransactions) GetTransactionResultsByBlockID(
 			return nil, rpc.ConvertStorageError(err)
 		}
 
-		events, err := convert.MessagesToEventsFromVersion(systemTxResult.GetEvents(), systemTxResult.GetEventEncodingVersion())
+		events, err := convert.MessagesToEventsFromVersion(systemTxResult.GetEvents(), resp.GetEventEncodingVersion())
 		if err != nil {
 			return nil, rpc.ConvertError(err, "failed to convert events from system tx result", codes.Internal)
 		}

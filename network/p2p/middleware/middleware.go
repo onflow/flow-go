@@ -35,7 +35,6 @@ import (
 	"github.com/onflow/flow-go/network/p2p/unicast/protocols"
 	"github.com/onflow/flow-go/network/p2p/unicast/ratelimit"
 	"github.com/onflow/flow-go/network/p2p/utils"
-	"github.com/onflow/flow-go/network/slashing"
 	"github.com/onflow/flow-go/network/validator"
 	flowpubsub "github.com/onflow/flow-go/network/validator/pubsub"
 	_ "github.com/onflow/flow-go/utils/binstat"
@@ -62,13 +61,6 @@ const (
 
 	// LargeMsgUnicastTimeout is the maximum time to wait for a unicast request to complete for large message size
 	LargeMsgUnicastTimeout = 1000 * time.Second
-
-	// DisallowListCacheSize is the maximum number of peers that can be disallow-listed at a time. The recommended
-	// size is 100 * number of staked nodes. Note that when the cache is full, there is no eviction policy and
-	// disallow-listing a new peer will fail. Hence, the cache size should be set to a value that is large enough
-	// to accommodate all the peers that can be disallow-listed at a time. Also, note that this cache is only taking
-	// the staked (authorized) peers. Hence, Sybil attacks are not possible.
-	DisallowListCacheSize = 100 * 1000
 )
 
 var (
@@ -104,7 +96,7 @@ type Middleware struct {
 	idTranslator               p2p.IDTranslator
 	previousProtocolStatePeers []peer.AddrInfo
 	codec                      network.Codec
-	slashingViolationsConsumer slashing.ViolationsConsumer
+	slashingViolationsConsumer network.ViolationsConsumer
 	unicastRateLimiters        *ratelimit.RateLimiters
 	authorizedSenderValidator  *validator.AuthorizedSenderValidator
 }
@@ -140,15 +132,14 @@ func WithUnicastRateLimiters(rateLimiters *ratelimit.RateLimiters) OptionFn {
 
 // Config is the configuration for the middleware.
 type Config struct {
-	Logger                     zerolog.Logger
-	Libp2pNode                 p2p.LibP2PNode
-	FlowId                     flow.Identifier // This node's Flow ID
-	BitSwapMetrics             module.BitswapMetrics
-	RootBlockID                flow.Identifier
-	UnicastMessageTimeout      time.Duration
-	IdTranslator               p2p.IDTranslator
-	Codec                      network.Codec
-	SlashingViolationsConsumer slashing.ViolationsConsumer
+	Logger                zerolog.Logger
+	Libp2pNode            p2p.LibP2PNode
+	FlowId                flow.Identifier // This node's Flow ID
+	BitSwapMetrics        module.BitswapMetrics
+	RootBlockID           flow.Identifier
+	UnicastMessageTimeout time.Duration
+	IdTranslator          p2p.IDTranslator
+	Codec                 network.Codec
 }
 
 // Validate validates the configuration, and sets default values for any missing fields.
@@ -172,16 +163,15 @@ func NewMiddleware(cfg *Config, opts ...OptionFn) *Middleware {
 
 	// create the node entity and inject dependencies & config
 	mw := &Middleware{
-		log:                        cfg.Logger,
-		libP2PNode:                 cfg.Libp2pNode,
-		bitswapMetrics:             cfg.BitSwapMetrics,
-		rootBlockID:                cfg.RootBlockID,
-		validators:                 DefaultValidators(cfg.Logger, cfg.FlowId),
-		unicastMessageTimeout:      cfg.UnicastMessageTimeout,
-		idTranslator:               cfg.IdTranslator,
-		codec:                      cfg.Codec,
-		slashingViolationsConsumer: cfg.SlashingViolationsConsumer,
-		unicastRateLimiters:        ratelimit.NoopRateLimiters(),
+		log:                   cfg.Logger,
+		libP2PNode:            cfg.Libp2pNode,
+		bitswapMetrics:        cfg.BitSwapMetrics,
+		rootBlockID:           cfg.RootBlockID,
+		validators:            DefaultValidators(cfg.Logger, cfg.FlowId),
+		unicastMessageTimeout: cfg.UnicastMessageTimeout,
+		idTranslator:          cfg.IdTranslator,
+		codec:                 cfg.Codec,
+		unicastRateLimiters:   ratelimit.NoopRateLimiters(),
 	}
 
 	for _, opt := range opts {
@@ -302,6 +292,11 @@ func (m *Middleware) UpdateNodeAddresses() {
 
 func (m *Middleware) SetOverlay(ov network.Overlay) {
 	m.ov = ov
+}
+
+// SetSlashingViolationsConsumer sets the slashing violations consumer.
+func (m *Middleware) SetSlashingViolationsConsumer(consumer network.ViolationsConsumer) {
+	m.slashingViolationsConsumer = consumer
 }
 
 // authorizedPeers is a peer manager callback used by the underlying libp2p node that updates who can connect to this node (as
@@ -518,7 +513,7 @@ func (m *Middleware) handleIncomingStream(s libp2pnetwork.Stream) {
 
 		// ignore messages if node does not have subscription to topic
 		if !m.libP2PNode.HasSubscription(topic) {
-			violation := &slashing.Violation{
+			violation := &network.Violation{
 				Identity: nil, PeerID: remotePeer.String(), Channel: channel, Protocol: message.ProtocolTypeUnicast,
 			}
 
@@ -649,9 +644,9 @@ func (m *Middleware) processUnicastStreamMessage(remotePeer peer.ID, msg *messag
 
 	// TODO: once we've implemented per topic message size limits per the TODO above,
 	// we can remove this check
-	maxSize, err := unicastMaxMsgSizeByCode(msg.Payload)
+	maxSize, err := UnicastMaxMsgSizeByCode(msg.Payload)
 	if err != nil {
-		m.slashingViolationsConsumer.OnUnknownMsgTypeError(&slashing.Violation{
+		m.slashingViolationsConsumer.OnUnknownMsgTypeError(&network.Violation{
 			Identity: nil, PeerID: remotePeer.String(), MsgType: "", Channel: channel, Protocol: message.ProtocolTypeUnicast, Err: err,
 		})
 		return
@@ -705,14 +700,14 @@ func (m *Middleware) processAuthenticatedMessage(msg *message.Message, peerID pe
 	switch {
 	case codec.IsErrUnknownMsgCode(err):
 		// slash peer if message contains unknown message code byte
-		violation := &slashing.Violation{
+		violation := &network.Violation{
 			PeerID: peerID.String(), OriginID: originId, Channel: channel, Protocol: protocol, Err: err,
 		}
 		m.slashingViolationsConsumer.OnUnknownMsgTypeError(violation)
 		return
 	case codec.IsErrMsgUnmarshal(err) || codec.IsErrInvalidEncoding(err):
 		// slash if peer sent a message that could not be marshalled into the message type denoted by the message code byte
-		violation := &slashing.Violation{
+		violation := &network.Violation{
 			PeerID: peerID.String(), OriginID: originId, Channel: channel, Protocol: protocol, Err: err,
 		}
 		m.slashingViolationsConsumer.OnInvalidMsgError(violation)
@@ -722,7 +717,7 @@ func (m *Middleware) processAuthenticatedMessage(msg *message.Message, peerID pe
 		// don't crash as a result of external inputs since that creates a DoS vector
 		// collect slashing data because this could potentially lead to slashing
 		err = fmt.Errorf("unexpected error during message validation: %w", err)
-		violation := &slashing.Violation{
+		violation := &network.Violation{
 			PeerID: peerID.String(), OriginID: originId, Channel: channel, Protocol: protocol, Err: err,
 		}
 		m.slashingViolationsConsumer.OnUnexpectedError(violation)
@@ -744,7 +739,6 @@ func (m *Middleware) processAuthenticatedMessage(msg *message.Message, peerID pe
 
 // processMessage processes a message and eventually passes it to the overlay
 func (m *Middleware) processMessage(scope *network.IncomingMessageScope) {
-
 	logger := m.log.With().
 		Str("channel", scope.Channel().String()).
 		Str("type", scope.Protocol().String()).
@@ -824,15 +818,15 @@ func (m *Middleware) IsConnected(nodeID flow.Identifier) (bool, error) {
 // unicastMaxMsgSize returns the max permissible size for a unicast message
 func unicastMaxMsgSize(messageType string) int {
 	switch messageType {
-	case "messages.ChunkDataResponse":
+	case "*messages.ChunkDataResponse":
 		return LargeMsgMaxUnicastMsgSize
 	default:
 		return DefaultMaxUnicastMsgSize
 	}
 }
 
-// unicastMaxMsgSizeByCode returns the max permissible size for a unicast message code
-func unicastMaxMsgSizeByCode(payload []byte) (int, error) {
+// UnicastMaxMsgSizeByCode returns the max permissible size for a unicast message code
+func UnicastMaxMsgSizeByCode(payload []byte) (int, error) {
 	msgCode, err := codec.MessageCodeFromPayload(payload)
 	if err != nil {
 		return 0, err

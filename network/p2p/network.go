@@ -22,6 +22,7 @@ import (
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/message"
 	"github.com/onflow/flow-go/network/queue"
+	"github.com/onflow/flow-go/network/slashing"
 	_ "github.com/onflow/flow-go/utils/binstat"
 	"github.com/onflow/flow-go/utils/logging"
 )
@@ -53,6 +54,7 @@ type Network struct {
 	registerEngineRequests      chan *registerEngineRequest
 	registerBlobServiceRequests chan *registerBlobServiceRequest
 	misbehaviorReportManager    network.MisbehaviorReportManager
+	slashingViolationsConsumer  network.ViolationsConsumer
 }
 
 var _ network.Network = &Network{}
@@ -171,6 +173,8 @@ func NewNetwork(param *NetworkConfig, opts ...NetworkOption) (*Network, error) {
 		opt(n)
 	}
 
+	n.slashingViolationsConsumer = slashing.NewSlashingViolationsConsumer(param.Logger, param.Metrics, n)
+	n.mw.SetSlashingViolationsConsumer(n.slashingViolationsConsumer)
 	n.mw.SetOverlay(n)
 
 	if err := n.conduitFactory.RegisterAdapter(n); err != nil {

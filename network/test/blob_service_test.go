@@ -3,7 +3,6 @@ package test
 import (
 	"context"
 	"fmt"
-	"os"
 	"testing"
 	"time"
 
@@ -11,12 +10,14 @@ import (
 	"github.com/ipfs/go-datastore"
 	"github.com/ipfs/go-datastore/sync"
 	blockstore "github.com/ipfs/go-ipfs-blockstore"
-	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/atomic"
 
+	"github.com/onflow/flow-go/network/mocknetwork"
+	"github.com/onflow/flow-go/network/p2p/connection"
 	"github.com/onflow/flow-go/network/p2p/dht"
-
+	p2pconfig "github.com/onflow/flow-go/network/p2p/p2pbuilder/config"
+	p2ptest "github.com/onflow/flow-go/network/p2p/test"
 	"github.com/onflow/flow-go/utils/unittest"
 
 	"github.com/onflow/flow-go/model/flow"
@@ -26,7 +27,6 @@ import (
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/internal/testutils"
-	"github.com/onflow/flow-go/network/mocknetwork"
 )
 
 // conditionalTopology is a topology that behaves like the underlying topology when the condition is true,
@@ -71,8 +71,6 @@ func (suite *BlobServiceTestSuite) putBlob(ds datastore.Batching, blob blobs.Blo
 func (suite *BlobServiceTestSuite) SetupTest() {
 	suite.numNodes = 3
 
-	logger := zerolog.New(os.Stdout)
-
 	// Bitswap listens to connect events but doesn't iterate over existing connections, and fixing this without
 	// race conditions is tricky given the way the code is architected. As a result, libP2P hosts must first listen
 	// on Bitswap before connecting to each other, otherwise their Bitswap requests may never reach each other.
@@ -84,22 +82,21 @@ func (suite *BlobServiceTestSuite) SetupTest() {
 
 	signalerCtx := irrecoverable.NewMockSignalerContext(suite.T(), ctx)
 
-	ids, nodes, mws, networks, _ := testutils.GenerateIDsMiddlewaresNetworks(
-		suite.T(),
+	ids, nodes, _ := testutils.LibP2PNodeForMiddlewareFixture(suite.T(),
 		suite.numNodes,
-		logger,
-		unittest.NetworkCodec(),
-		mocknetwork.NewViolationsConsumer(suite.T()),
-		testutils.WithDHT("blob_service_test", dht.AsServer()),
-		testutils.WithPeerUpdateInterval(time.Second),
-	)
-	suite.networks = networks
-
-	testutils.StartNodesAndNetworks(signalerCtx, suite.T(), nodes, networks, 100*time.Millisecond)
+		p2ptest.WithDHTOptions(dht.AsServer()),
+		p2ptest.WithPeerManagerEnabled(&p2pconfig.PeerManagerConfig{
+			UpdateInterval:    1 * time.Second,
+			ConnectionPruning: true,
+			ConnectorFactory:  connection.DefaultLibp2pBackoffConnectorFactory(),
+		}, nil))
+	mws, _ := testutils.MiddlewareFixtures(suite.T(), ids, nodes, testutils.MiddlewareConfigFixture(suite.T()), mocknetwork.NewViolationsConsumer(suite.T()))
+	suite.networks = testutils.NetworksFixture(suite.T(), ids, mws)
+	testutils.StartNodesAndNetworks(signalerCtx, suite.T(), nodes, suite.networks, 100*time.Millisecond)
 
 	blobExchangeChannel := channels.Channel("blob-exchange")
 
-	for i, net := range networks {
+	for i, net := range suite.networks {
 		ds := sync.MutexWrap(datastore.NewMapDatastore())
 		suite.datastores = append(suite.datastores, ds)
 		blob := blobs.NewBlob([]byte(fmt.Sprintf("foo%v", i)))
@@ -107,7 +104,7 @@ func (suite *BlobServiceTestSuite) SetupTest() {
 		suite.putBlob(ds, blob)
 		blobService, err := net.RegisterBlobService(blobExchangeChannel, ds)
 		suite.Require().NoError(err)
-		<-blobService.Ready()
+		unittest.RequireCloseBefore(suite.T(), blobService.Ready(), 100*time.Millisecond, "blob service not ready")
 		suite.blobServices = append(suite.blobServices, blobService)
 	}
 

@@ -310,6 +310,6 @@ func (n *Network) StopConDev() {
 	close(n.qCD)
 }
 
-func (n *Network) ReportMisbehaviorOnChannel(channel channels.Channel, report network.MisbehaviorReport) {
+func (n *Network) ReportMisbehaviorOnChannel(_ channels.Channel, _ network.MisbehaviorReport) {
 	// no-op for stub network.
 }
