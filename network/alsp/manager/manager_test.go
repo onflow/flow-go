@@ -270,18 +270,14 @@ func TestHandleReportedMisbehavior_And_DisallowListing_RepeatOffender_Integratio
 	cfg := managerCfgFixture(t)
 	fastDecay := false
 	fastDecayFunc := func(record model.ProtocolSpamRecord) float64 {
-		now := time.Now()
-
-		t.Logf("%s decayFuc called with record: %+v", now.Format(time.RFC3339), record)
+		t.Logf("decayFuc called with record: %+v", record)
 		if fastDecay {
-			now = time.Now()
 			// decay to zero in a single heart beat
-			t.Logf("%s fastDecay is true, so decay to zero", now.Format(time.RFC3339))
+			t.Log("fastDecay is true, so decay to zero")
 			return 0
 		} else {
-			now = time.Now()
 			// decay as usual
-			t.Logf("%s fastDecay is false, so decay as usual", now.Format(time.RFC3339))
+			t.Log("fastDecay is false, so decay as usual")
 			return math.Min(record.Penalty+record.Decay, 0)
 		}
 	}
@@ -335,9 +331,6 @@ func TestHandleReportedMisbehavior_And_DisallowListing_RepeatOffender_Integratio
 	t.Log("resetting cutoff counter")
 	expectedCutoffCounter := 0
 
-	// creat subtest for each expected decay list
-	//t.Run(testCase, func(t *testing.T) {
-	//	t.Logf("starting test case: %s", testCase)
 	// keep misbehaving until the spammer is disallow-listed and check that the decay is as expected
 	for i := range expectedDecays {
 		t.Logf("starting iteration %d with expected decay %d", i, expectedDecays[i])
@@ -407,18 +400,13 @@ func TestHandleReportedMisbehavior_And_DisallowListing_RepeatOffender_Integratio
 		// check that the penalty has decayed by the expected amount in one heartbeat
 		require.Equal(t, float64(expectedDecays[i]), penalty2-penalty1)
 
-		now := time.Now()
-
 		// decay the disallow-listing penalty of the spammer node to zero.
-		t.Logf("%s about to decay the disallow-listing penalty of the spammer node to zero", now.Format(time.RFC3339))
+		t.Log("about to decay the disallow-listing penalty of the spammer node to zero")
 		fastDecay = true
-		// add time stamp to t.Logf() message to ensure that the message is printed in the correct order
-		now = time.Now()
-		t.Logf("%s decayed the disallow-listing penalty of the spammer node to zero", now.Format(time.RFC3339))
+		t.Log("decayed the disallow-listing penalty of the spammer node to zero")
 
 		// after serving the disallow-listing period, the spammer should be able to connect to the victim node again.
 		p2ptest.RequireConnectedEventually(t, []p2p.LibP2PNode{nodes[spammerIndex], nodes[victimIndex]}, 1*time.Millisecond, 3*time.Second)
-		now = time.Now()
 		t.Log("spammer node is able to connect to the victim node again")
 
 		// all the nodes should be able to connect to each other again.
@@ -440,7 +428,7 @@ func TestHandleReportedMisbehavior_And_DisallowListing_RepeatOffender_Integratio
 
 		// go back to regular decay to prepare for the next set of misbehavior reports.
 		fastDecay = false
-		t.Logf("about to report misbehavior again")
+		t.Log("about to report misbehavior again")
 	}
 }
 
