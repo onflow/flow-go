@@ -3,7 +3,6 @@ package environment
 import (
 	"encoding/binary"
 	"fmt"
-	"sync"
 
 	"github.com/onflow/flow-go/crypto/random"
 	"github.com/onflow/flow-go/fvm/errors"
@@ -31,9 +30,8 @@ type randomGenerator struct {
 	stateSnapshot protocol.Snapshot
 	txId          flow.Identifier
 
-	prg        random.Rand
-	createOnce sync.Once
-	createErr  error
+	prg          random.Rand
+	isPRGCreated bool
 }
 
 type ParseRestrictedRandomGenerator struct {
@@ -70,15 +68,13 @@ func NewRandomGenerator(
 		tracer:        tracer,
 		stateSnapshot: stateSnapshot,
 		txId:          txId,
+		isPRGCreated:  false, // PRG is not created
 	}
 
 	return gen
 }
 
-func (gen *randomGenerator) createRandomGenerator() (
-	random.Rand,
-	error,
-) {
+func (gen *randomGenerator) createPRG() (random.Rand, error) {
 	// Use the protocol state source of randomness [SoR] for the current block's
 	// execution
 	source, err := gen.stateSnapshot.RandomSource()
@@ -105,36 +101,23 @@ func (gen *randomGenerator) createRandomGenerator() (
 	return csprg, nil
 }
 
-// maybeCreateRandomGenerator seeds the pseudo-random number generator using the
-// block SoR as an entropy source, customized with the transaction hash. The seed
-// function is currently called for each transaction, the PRG is used to
-// provide all the randoms the transaction needs through Random.
-//
-// This allows lazy seeding of the random number generator, since not a lot of
-// transactions/scripts use it and the time it takes to seed it is not
-// negligible.
-func (gen *randomGenerator) maybeCreateRandomGenerator() error {
-	gen.createOnce.Do(func() {
-		gen.prg, gen.createErr = gen.createRandomGenerator()
-	})
-
-	return gen.createErr
-}
-
-// Random returns a random uint64 using the underlying PRG (currently
-// using a crypto-secure one).  This is not thread safe, due to the gen.prg
-// instance currently used.  Its also not thread safe because each thread needs
-// to be deterministically seeded with a different seed.  This is Ok because a
+// UnsafeRandom returns a random uint64 using the underlying PRG (currently
+// using a crypto-secure one). This function is not thread safe, due to the gen.prg
+// instance currently used. This is fine because a
 // single transaction has a single RandomGenerator and is run in a single
 // thread.
 func (gen *randomGenerator) UnsafeRandom() (uint64, error) {
 	defer gen.tracer.StartExtensiveTracingChildSpan(
 		trace.FVMEnvRandom).End()
 
-	// The internal seeding is only done once.
-	err := gen.maybeCreateRandomGenerator()
-	if err != nil {
-		return 0, err
+	// PRG creation is only done once.
+	if !gen.isPRGCreated {
+		newPRG, err := gen.createPRG()
+		if err != nil {
+			return 0, err
+		}
+		gen.prg = newPRG
+		gen.isPRGCreated = true
 	}
 
 	buf := make([]byte, 8)
@@ -152,7 +135,7 @@ func NewDummyRandomGenerator() RandomGenerator {
 	return &dummyRandomGenerator{}
 }
 
-// Random() returns an error because executing scripts
+// UnsafeRandom() returns an error because executing scripts
 // does not support randomness APIs.
 func (gen *dummyRandomGenerator) UnsafeRandom() (uint64, error) {
 	return 0, errors.NewOperationNotSupportedError("Random")
