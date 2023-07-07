@@ -45,9 +45,10 @@ type NetworkCollector struct {
 	dnsLookupRequestDroppedCount prometheus.Counter
 	routingTableSize             prometheus.Gauge
 
-	// authorization, rate limiting metrics
+	// security metrics
 	unAuthorizedMessagesCount       *prometheus.CounterVec
 	rateLimitedUnicastMessagesCount *prometheus.CounterVec
+	violationReportSkippedCount     prometheus.Counter
 
 	prefix string
 }
@@ -245,6 +246,15 @@ func NewNetworkCollector(logger zerolog.Logger, opts ...NetworkCollectorOpt) *Ne
 		}, []string{LabelNodeRole, LabelMessage, LabelChannel, LabelRateLimitReason},
 	)
 
+	nc.violationReportSkippedCount = promauto.NewCounter(
+		prometheus.CounterOpts{
+			Namespace: namespaceNetwork,
+			Subsystem: subsystemSecurity,
+			Name:      nc.prefix + "slashing_violation_reports_skipped_count",
+			Help:      "number of slashing violations consumer violations that were not reported for misbehavior because the identity of the sender not known",
+		},
+	)
+
 	return nc
 }
 
@@ -357,4 +367,10 @@ func (nc *NetworkCollector) OnRateLimitedPeer(peerID peer.ID, role, msgType, top
 		Bool(logging.KeySuspicious, true).
 		Msg("unicast peer rate limited")
 	nc.rateLimitedUnicastMessagesCount.WithLabelValues(role, msgType, topic, reason).Inc()
+}
+
+// OnViolationReportSkipped tracks the number of slashing violations consumer violations that were not
+// reported for misbehavior when the identity of the sender not known.
+func (nc *NetworkCollector) OnViolationReportSkipped() {
+	nc.violationReportSkippedCount.Inc()
 }
