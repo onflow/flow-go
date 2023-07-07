@@ -1664,7 +1664,7 @@ func TestBlockContext_GetAccount(t *testing.T) {
 	})
 }
 
-func TestBlockContext_UnsafeRandom(t *testing.T) {
+func TestBlockContext_Random(t *testing.T) {
 
 	t.Parallel()
 

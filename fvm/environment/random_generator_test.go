@@ -15,13 +15,13 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-func TestUnsafeRandomGenerator(t *testing.T) {
+func TestRandomGenerator(t *testing.T) {
 	// protocol snapshot mock
 	snapshot := testutil.ProtocolSnapshotWithSourceFixture(nil)
 
 	getRandoms := func(txId flow.Identifier, N int) []uint64 {
 		// seed the RG with the same block header
-		urg := environment.NewUnsafeRandomGenerator(
+		urg := environment.NewRandomGenerator(
 			tracing.NewTracerSpan(),
 			snapshot,
 			txId)
@@ -39,7 +39,7 @@ func TestUnsafeRandomGenerator(t *testing.T) {
 	t.Run("randomness test", func(t *testing.T) {
 		for i := 0; i < 10; i++ {
 			txId := unittest.TransactionFixture().ID()
-			urg := environment.NewUnsafeRandomGenerator(
+			urg := environment.NewRandomGenerator(
 				tracing.NewTracerSpan(),
 				snapshot,
 				txId)
@@ -52,8 +52,8 @@ func TestUnsafeRandomGenerator(t *testing.T) {
 		}
 	})
 
-	// tests that unsafeRandom is PRG based and hence has deterministic outputs.
-	t.Run("PRG-based UnsafeRandom", func(t *testing.T) {
+	// tests that has deterministic outputs.
+	t.Run("PRG-based Random", func(t *testing.T) {
 		for i := 0; i < 10; i++ {
 			txId := unittest.TransactionFixture().ID()
 			N := 100

@@ -17,14 +17,15 @@ import (
 
 type RandomGenerator interface {
 	// UnsafeRandom returns a random uint64
+	// Todo: rename to Random() once Cadence interface is updated
 	UnsafeRandom() (uint64, error)
 }
 
-var _ RandomGenerator = (*unsafeRandomGenerator)(nil)
+var _ RandomGenerator = (*randomGenerator)(nil)
 
-// unsafeRandomGenerator implements RandomGenerator and is used
+// randomGenerator implements RandomGenerator and is used
 // for the transactions execution environment
-type unsafeRandomGenerator struct {
+type randomGenerator struct {
 	tracer tracing.TracerSpan
 
 	stateSnapshot protocol.Snapshot
@@ -35,37 +36,37 @@ type unsafeRandomGenerator struct {
 	createErr  error
 }
 
-type ParseRestrictedUnsafeRandomGenerator struct {
+type ParseRestrictedRandomGenerator struct {
 	txnState state.NestedTransactionPreparer
 	impl     RandomGenerator
 }
 
-func NewParseRestrictedUnsafeRandomGenerator(
+func NewParseRestrictedRandomGenerator(
 	txnState state.NestedTransactionPreparer,
 	impl RandomGenerator,
 ) RandomGenerator {
-	return ParseRestrictedUnsafeRandomGenerator{
+	return ParseRestrictedRandomGenerator{
 		txnState: txnState,
 		impl:     impl,
 	}
 }
 
-func (gen ParseRestrictedUnsafeRandomGenerator) UnsafeRandom() (
+func (gen ParseRestrictedRandomGenerator) UnsafeRandom() (
 	uint64,
 	error,
 ) {
 	return parseRestrict1Ret(
 		gen.txnState,
-		trace.FVMEnvUnsafeRandom,
+		trace.FVMEnvRandom,
 		gen.impl.UnsafeRandom)
 }
 
-func NewUnsafeRandomGenerator(
+func NewRandomGenerator(
 	tracer tracing.TracerSpan,
 	stateSnapshot protocol.Snapshot,
 	txId flow.Identifier,
 ) RandomGenerator {
-	gen := &unsafeRandomGenerator{
+	gen := &randomGenerator{
 		tracer:        tracer,
 		stateSnapshot: stateSnapshot,
 		txId:          txId,
@@ -74,7 +75,7 @@ func NewUnsafeRandomGenerator(
 	return gen
 }
 
-func (gen *unsafeRandomGenerator) createRandomGenerator() (
+func (gen *randomGenerator) createRandomGenerator() (
 	random.Rand,
 	error,
 ) {
@@ -107,12 +108,12 @@ func (gen *unsafeRandomGenerator) createRandomGenerator() (
 // maybeCreateRandomGenerator seeds the pseudo-random number generator using the
 // block SoR as an entropy source, customized with the transaction hash. The seed
 // function is currently called for each transaction, the PRG is used to
-// provide all the randoms the transaction needs through UnsafeRandom.
+// provide all the randoms the transaction needs through Random.
 //
 // This allows lazy seeding of the random number generator, since not a lot of
 // transactions/scripts use it and the time it takes to seed it is not
 // negligible.
-func (gen *unsafeRandomGenerator) maybeCreateRandomGenerator() error {
+func (gen *randomGenerator) maybeCreateRandomGenerator() error {
 	gen.createOnce.Do(func() {
 		gen.prg, gen.createErr = gen.createRandomGenerator()
 	})
@@ -120,15 +121,15 @@ func (gen *unsafeRandomGenerator) maybeCreateRandomGenerator() error {
 	return gen.createErr
 }
 
-// UnsafeRandom returns a random uint64 using the underlying PRG (currently
+// Random returns a random uint64 using the underlying PRG (currently
 // using a crypto-secure one).  This is not thread safe, due to the gen.prg
 // instance currently used.  Its also not thread safe because each thread needs
 // to be deterministically seeded with a different seed.  This is Ok because a
 // single transaction has a single RandomGenerator and is run in a single
 // thread.
-func (gen *unsafeRandomGenerator) UnsafeRandom() (uint64, error) {
+func (gen *randomGenerator) UnsafeRandom() (uint64, error) {
 	defer gen.tracer.StartExtensiveTracingChildSpan(
-		trace.FVMEnvUnsafeRandom).End()
+		trace.FVMEnvRandom).End()
 
 	// The internal seeding is only done once.
 	err := gen.maybeCreateRandomGenerator()
@@ -151,8 +152,8 @@ func NewDummyRandomGenerator() RandomGenerator {
 	return &dummyRandomGenerator{}
 }
 
-// UnsafeRandom() returns an error because executing scripts
+// Random() returns an error because executing scripts
 // does not support randomness APIs.
 func (gen *dummyRandomGenerator) UnsafeRandom() (uint64, error) {
-	return 0, errors.NewOperationNotSupportedError("UnsafeRandom")
+	return 0, errors.NewOperationNotSupportedError("Random")
 }

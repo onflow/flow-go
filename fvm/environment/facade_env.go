@@ -226,7 +226,7 @@ func NewTransactionEnvironment(
 		txnState,
 		env)
 
-	env.RandomGenerator = NewUnsafeRandomGenerator(
+	env.RandomGenerator = NewRandomGenerator(
 		tracer,
 		params.Snapshot,
 		params.TxId,
@@ -272,7 +272,7 @@ func (env *facadeEnvironment) addParseRestrictedChecks() {
 	env.TransactionInfo = NewParseRestrictedTransactionInfo(
 		env.txnState,
 		env.TransactionInfo)
-	env.RandomGenerator = NewParseRestrictedUnsafeRandomGenerator(
+	env.RandomGenerator = NewParseRestrictedRandomGenerator(
 		env.txnState,
 		env.RandomGenerator)
 	env.UUIDGenerator = NewParseRestrictedUUIDGenerator(

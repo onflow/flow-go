@@ -9,8 +9,8 @@ type RandomGenerator struct {
 	mock.Mock
 }
 
-// UnsafeRandom provides a mock function with given fields:
-func (_m *RandomGenerator) UnsafeRandom() (uint64, error) {
+// Random provides a mock function with given fields:
+func (_m *RandomGenerator) Random() (uint64, error) {
 	ret := _m.Called()
 
 	var r0 uint64
