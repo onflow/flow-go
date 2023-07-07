@@ -30,14 +30,19 @@ func TestRPCSentTracker_IHave(t *testing.T) {
 
 	t.Run("WasIHaveRPCSent should return true for iHave message after it is tracked with OnIHaveRPCSent", func(t *testing.T) {
 		topicID := channels.PushBlocks.String()
-		messageID := unittest.IdentifierFixture().String()
+		messageID1 := unittest.IdentifierFixture().String()
 		iHaves := []*pb.ControlIHave{{
 			TopicID:    &topicID,
-			MessageIDs: []string{messageID},
+			MessageIDs: []string{messageID1},
 		}}
 		rpc := rpcFixture(withIhaves(iHaves))
 		tracker.OnIHaveRPCSent(rpc.GetControl().GetIhave())
-		require.True(t, tracker.WasIHaveRPCSent(topicID, messageID))
+		require.True(t, tracker.WasIHaveRPCSent(topicID, messageID1))
+
+		// manipulate last byte of message ID ensure false positive not returned
+		messageID2 := []byte(messageID1)
+		messageID2[len(messageID2)-1] = 'X'
+		require.False(t, tracker.WasIHaveRPCSent(topicID, string(messageID2)))
 	})
 }
 
