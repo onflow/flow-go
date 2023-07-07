@@ -59,6 +59,5 @@ func (t *RPCSentTracker) WasIHaveRPCSent(topicID, messageID string) bool {
 // Each iHave RPC control message contains a single topicId and multiple messageIds, to ensure we
 // produce a unique id for each message we append the messageId to the topicId.
 func iHaveRPCSentEntityID(topicId, messageId string) flow.Identifier {
-	b := []byte(fmt.Sprintf("%s%s", topicId, messageId))
-	return flow.HashToID(b)
+	return flow.MakeIDFromFingerPrint([]byte(fmt.Sprintf("%s%s", topicId, messageId)))
 }

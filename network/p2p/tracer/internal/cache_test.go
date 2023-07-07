@@ -13,7 +13,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/metrics"
-	"github.com/onflow/flow-go/network/p2p"
+	p2pmsg "github.com/onflow/flow-go/network/p2p/message"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -22,7 +22,7 @@ import (
 // and false when an existing record is initialized.
 func TestCache_Init(t *testing.T) {
 	cache := cacheFixture(t, 100, zerolog.Nop(), metrics.NewNoopCollector())
-	controlMsgType := p2p.CtrlMsgIHave
+	controlMsgType := p2pmsg.CtrlMsgIHave
 	id1 := unittest.IdentifierFixture()
 	id2 := unittest.IdentifierFixture()
 
@@ -48,7 +48,7 @@ func TestCache_Init(t *testing.T) {
 // 2. Ensuring that all records are correctly initialized.
 func TestCache_ConcurrentInit(t *testing.T) {
 	cache := cacheFixture(t, 100, zerolog.Nop(), metrics.NewNoopCollector())
-	controlMsgType := p2p.CtrlMsgIHave
+	controlMsgType := p2pmsg.CtrlMsgIHave
 	ids := unittest.IdentifierListFixture(10)
 
 	var wg sync.WaitGroup
@@ -76,7 +76,7 @@ func TestCache_ConcurrentInit(t *testing.T) {
 // 3. The record is correctly initialized in the cache and can be retrieved using the Get method.
 func TestCache_ConcurrentSameRecordInit(t *testing.T) {
 	cache := cacheFixture(t, 100, zerolog.Nop(), metrics.NewNoopCollector())
-	controlMsgType := p2p.CtrlMsgIHave
+	controlMsgType := p2pmsg.CtrlMsgIHave
 	id := unittest.IdentifierFixture()
 	const concurrentAttempts = 10
 
@@ -112,7 +112,7 @@ func TestCache_ConcurrentSameRecordInit(t *testing.T) {
 // 4. Attempting to remove a non-existent ID.
 func TestCache_Remove(t *testing.T) {
 	cache := cacheFixture(t, 100, zerolog.Nop(), metrics.NewNoopCollector())
-	controlMsgType := p2p.CtrlMsgIHave
+	controlMsgType := p2pmsg.CtrlMsgIHave
 	// initialize spam records for a few ids
 	id1 := unittest.IdentifierFixture()
 	id2 := unittest.IdentifierFixture()
@@ -143,7 +143,7 @@ func TestCache_Remove(t *testing.T) {
 // 2. The records are correctly removed from the cache.
 func TestCache_ConcurrentRemove(t *testing.T) {
 	cache := cacheFixture(t, 100, zerolog.Nop(), metrics.NewNoopCollector())
-	controlMsgType := p2p.CtrlMsgIHave
+	controlMsgType := p2pmsg.CtrlMsgIHave
 	ids := unittest.IdentifierListFixture(10)
 	for _, id := range ids {
 		cache.init(id, controlMsgType)
@@ -173,7 +173,7 @@ func TestCache_ConcurrentRemove(t *testing.T) {
 // 4. The removed records are correctly removed from the cache.
 func TestRecordCache_ConcurrentInitAndRemove(t *testing.T) {
 	cache := cacheFixture(t, 100, zerolog.Nop(), metrics.NewNoopCollector())
-	controlMsgType := p2p.CtrlMsgIHave
+	controlMsgType := p2pmsg.CtrlMsgIHave
 	ids := unittest.IdentifierListFixture(20)
 	idsToAdd := ids[:10]
 	idsToRemove := ids[10:]

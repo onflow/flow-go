@@ -36,7 +36,7 @@ func TestRPCSentTracker_IHave(t *testing.T) {
 			MessageIDs: []string{messageID},
 		}}
 		rpc := rpcFixture(withIhaves(iHaves))
-		tracker.OnIHaveRPCSent(rpc)
+		tracker.OnIHaveRPCSent(rpc.GetControl().GetIhave())
 		require.True(t, tracker.WasIHaveRPCSent(topicID, messageID))
 	})
 }
