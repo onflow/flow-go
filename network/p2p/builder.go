@@ -122,7 +122,6 @@ type NodeBuilder interface {
 	SetConnectionManager(connmgr.ConnManager) NodeBuilder
 	SetConnectionGater(ConnectionGater) NodeBuilder
 	SetRoutingSystem(func(context.Context, host.Host) (routing.Routing, error)) NodeBuilder
-	SetPeerManagerOptions(bool, time.Duration) NodeBuilder
 
 	// EnableGossipSubPeerScoring enables peer scoring for the GossipSub pubsub system.
 	// Arguments:
