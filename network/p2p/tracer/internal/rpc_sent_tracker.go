@@ -3,9 +3,9 @@ package internal
 import (
 	"fmt"
 
+	pb "github.com/libp2p/go-libp2p-pubsub/pb"
 	"github.com/rs/zerolog"
 
-	pb "github.com/libp2p/go-libp2p-pubsub/pb"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	p2pmsg "github.com/onflow/flow-go/network/p2p/message"
