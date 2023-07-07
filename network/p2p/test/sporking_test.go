@@ -273,7 +273,7 @@ func testOneToOneMessagingFails(t *testing.T, sourceNode p2p.LibP2PNode, peerInf
 	// assert that stream creation failed
 	assert.Error(t, err)
 	// assert that it failed with the expected error
-	assert.Regexp(t, ".*failed to negotiate security protocol.*|.*protocol not supported.*", err)
+	assert.Regexp(t, ".*failed to negotiate security protocol.*|.*protocols not supported.*", err)
 }
 
 func testOneToKMessagingSucceeds(ctx context.Context,
