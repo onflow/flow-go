@@ -97,25 +97,31 @@ func NewEng(
 		grpc.MaxSendMsgSize(int(config.MaxExecutionDataMsgSize)),
 	}
 
-	var interceptors []grpc.UnaryServerInterceptor // ordered list of interceptors
+	// ordered list of interceptors
+	var unaryInterceptors []grpc.UnaryServerInterceptor
+
 	// if rpc metrics is enabled, add the grpc metrics interceptor as a server option
 	if config.RpcMetricsEnabled {
-		interceptors = append(interceptors, grpc_prometheus.UnaryServerInterceptor)
+		unaryInterceptors = append(unaryInterceptors, grpc_prometheus.UnaryServerInterceptor)
+
+		// note: intentionally not adding logging or rate limit interceptors for streams.
+		// rate limiting is done in the handler, and we don't need log events for every message as
+		// that would be too noisy.
+		grpcOpts = append(grpcOpts, grpc.StreamInterceptor(grpc_prometheus.StreamServerInterceptor))
 	}
 
 	if len(apiRatelimits) > 0 {
 		// create a rate limit interceptor
 		rateLimitInterceptor := rpc.NewRateLimiterInterceptor(log, apiRatelimits, apiBurstLimits).UnaryServerInterceptor
 		// append the rate limit interceptor to the list of interceptors
-		interceptors = append(interceptors, rateLimitInterceptor)
+		unaryInterceptors = append(unaryInterceptors, rateLimitInterceptor)
 	}
 
 	// add the logging interceptor, ensure it is innermost wrapper
-	interceptors = append(interceptors, rpc.LoggingInterceptor(log)...)
+	unaryInterceptors = append(unaryInterceptors, rpc.LoggingInterceptor(log)...)
 
 	// create a chained unary interceptor
-	chainedInterceptors := grpc.ChainUnaryInterceptor(interceptors...)
-	grpcOpts = append(grpcOpts, chainedInterceptors)
+	grpcOpts = append(grpcOpts, grpc.ChainUnaryInterceptor(unaryInterceptors...))
 
 	server := grpc.NewServer(grpcOpts...)
 
