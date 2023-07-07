@@ -828,7 +828,15 @@ func checkEachEntityIsInFreeOrUsedState(t *testing.T, pool *Pool) {
 
 // discoverEntitiesBelongingToStateList discovers all entities in the pool that belong to the given list.
 func discoverEntitiesBelongingToStateList(t *testing.T, pool *Pool, stateType StateType) []bool {
-	s := pool.getStateFromType(stateType)
+	var s *state = nil
+	switch stateType {
+	case stateFree:
+		s = &pool.free
+	case stateUsed:
+		s = &pool.used
+	default:
+		panic(fmt.Sprintf("unknown state type: %s", stateType))
+	}
 	result := make([]bool, len(pool.poolEntities))
 	for node_index := s.head; node_index != InvalidIndex; {
 		require.False(t, result[node_index], "A node is present two times in the same state list")
