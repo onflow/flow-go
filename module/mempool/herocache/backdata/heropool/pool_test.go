@@ -283,11 +283,11 @@ func testAddRemoveEntities(t *testing.T, limit uint32, entityCount uint32, eject
 	addedEntities = make(map[flow.Identifier]Indexes)
 
 	for i := 0; i < numberOfOperations; i++ {
-		// choose between Add and Remove with a probability of 0.8 and 0.2 respectively.
+		// choose between Add and Remove with a probability of probabilityOfAdding and 1-probabilityOfAdding respectively.
 		if rand.Float32() < probabilityOfAdding || len(addedEntities) == 0 {
 			// adding an entity
 			entityToAdd := rand.Intn(int(entityCount))
-			// check that entity is not already inserted
+			// check that entity is not already inserted.
 			_, found := addedEntities[entities[entityToAdd].ID()]
 			if !found {
 				indexInThePool, _, ejectedEntity := pool.Add(entities[entityToAdd].ID(), entities[entityToAdd], uint64(ownerIds[entityToAdd]))
@@ -300,7 +300,7 @@ func testAddRemoveEntities(t *testing.T, limit uint32, entityCount uint32, eject
 			}
 
 		} else {
-			// randomly select an index of an entity to remove
+			// randomly select an index of an entity to remove.
 			entityToRemove := rand.Intn(len(addedEntities))
 			i := 0
 			var indexInPoolToRemove EIndex = 0
@@ -314,7 +314,7 @@ func testAddRemoveEntities(t *testing.T, limit uint32, entityCount uint32, eject
 				i++
 			}
 
-			// Remove the selected entity from the pool
+			// remove the selected entity from the pool.
 			removedEntity := pool.Remove(indexInPoolToRemove)
 			require.Equal(t, entities[indexInEntitiesArray].ID(), removedEntity.ID(), "Removed wrong entity")
 			delete(addedEntities, entities[indexInEntitiesArray].ID())
