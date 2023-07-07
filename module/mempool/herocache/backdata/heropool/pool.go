@@ -300,20 +300,6 @@ func (p *Pool) isInvalidated(sliceIndex EIndex) bool {
 	return true
 }
 
-// a helper method that allows to get an adress fo the state form the state type.
-func (p *Pool) getStateFromType(stateType StateType) *state {
-	var s *state = nil
-	switch stateType {
-	case stateFree:
-		s = &p.free
-	case stateUsed:
-		s = &p.used
-	default:
-		panic("Unknown state type")
-	}
-	return s
-}
-
 // utility method that removes an entity from one of the states.
 // NOTE: a removed entity has to be added to another state.
 func (p *Pool) removeEntity(stateType StateType, entityIndex EIndex) {
