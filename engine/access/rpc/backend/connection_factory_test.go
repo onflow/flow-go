@@ -484,13 +484,7 @@ func TestExecutionNodeClientClosedGracefully(t *testing.T) {
 				if err == nil {
 					reqCompleted.Inc()
 				} else {
-					if st, ok := status.FromError(err); ok {
-						if st.Code() == codes.Unavailable {
-							return
-						}
-					}
-					fmt.Println("!!! Failed: ", err)
-					t.Fail()
+					require.Equalf(t, codes.Unavailable, status.Code(err), "unexpected error: %v", err)
 				}
 			}()
 		}
