@@ -16,7 +16,6 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/irrecoverable"
-	"github.com/onflow/flow-go/module/metrics"
 	mockmodule "github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/alsp"
@@ -299,14 +298,10 @@ func TestHandleReportedMisbehavior_And_DisallowListing_RepeatOffender_Integratio
 		WithDecayFunc(fastDecayFunc),
 	}
 
-	ids, nodes, mws, _, _ := testutils.GenerateIDsAndMiddlewares(
-		t,
-		3,
-		unittest.Logger(),
-		unittest.NetworkCodec(),
-		unittest.NetworkSlashingViolationsConsumer(unittest.Logger(), metrics.NewNoopCollector()))
-	sms := testutils.GenerateSubscriptionManagers(t, mws)
-	networkCfg := testutils.NetworkConfigFixture(t, unittest.Logger(), *ids[0], ids, mws[0], sms[0], p2p.WithAlspConfig(cfg))
+	ids, nodes, _ := testutils.LibP2PNodeForMiddlewareFixture(t, 3)
+	mws, _ := testutils.MiddlewareFixtures(t, ids, nodes, testutils.MiddlewareConfigFixture(t))
+	networkCfg := testutils.NetworkConfigFixture(t, *ids[0], ids, mws[0], p2p.WithAlspConfig(cfg))
+
 	victimNetwork, err := p2p.NewNetwork(networkCfg)
 	require.NoError(t, err)
 
