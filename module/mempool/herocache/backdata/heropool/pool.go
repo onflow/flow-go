@@ -274,8 +274,10 @@ func (p *Pool) Remove(sliceIndex EIndex) flow.Entity {
 // removing its corresponding linked-list node from the used linked list, and appending
 // it to the tail of the free list. It also removes the entity that the invalidated node is presenting.
 func (p *Pool) invalidateEntityAtIndex(sliceIndex EIndex) flow.Entity {
-	poolEntity := p.poolEntities[sliceIndex]
-	invalidatedEntity := poolEntity.entity
+	invalidatedEntity := p.poolEntities[sliceIndex].entity
+	if invalidatedEntity == nil {
+		panic(fmt.Sprintf("removing an entity from an empty slot with an index : %d", sliceIndex))
+	}
 	p.removeEntity(stateUsed, sliceIndex)
 	p.poolEntities[sliceIndex].id = flow.ZeroID
 	p.poolEntities[sliceIndex].entity = nil

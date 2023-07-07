@@ -255,32 +255,35 @@ func TestAddAndRemoveEntities(t *testing.T) {
 	}
 }
 
-// Indexes contains ...
+// Indexes contains an index in the pool of an inserted entity and an index of this entity
+// in the array of entities created by the EntityListFixture.
 type Indexes struct {
 	indexInPool        EIndex
 	indexInEntitiesArr int
 }
 
 func testAddRemoveEntities(t *testing.T, limit uint32, entityCount uint32, ejectionMode EjectionMode, numberOfOperations int, probabilityOfAdding float32) {
-	//create and log the seed.
-	rand.Seed(time.Now().UnixNano())
+	// create and log the seed.
+	testSeed := time.Now().UnixNano()
+	rand.Seed(testSeed)
+	fmt.Println("Seed used for this testAddRemoveEntities execution", testSeed)
 
 	pool := NewHeroPool(limit, ejectionMode)
 
 	entities := unittest.EntityListFixture(uint(entityCount))
 
-	// an array of random owner Ids
+	// an array of random owner Ids.
 	ownerIds := make([]uint64, entityCount, entityCount)
 	// generate ownerId to index in the entities arrray.
 	for i := 0; i < int(entityCount); i++ {
 		ownerIds[i] = rand.Uint64()
 	}
-	// this map maintains entities currently stored in the pool
+	// this map maintains entities currently stored in the pool.
 	var addedEntities map[flow.Identifier]Indexes
 	addedEntities = make(map[flow.Identifier]Indexes)
 
 	for i := 0; i < numberOfOperations; i++ {
-		// choose between Add and Remove with a probability of 0.8 and 0.2 respectively
+		// choose between Add and Remove with a probability of 0.8 and 0.2 respectively.
 		if rand.Float32() < probabilityOfAdding || len(addedEntities) == 0 {
 			// adding an entity
 			entityToAdd := rand.Intn(int(entityCount))
