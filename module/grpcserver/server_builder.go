@@ -20,6 +20,13 @@ func WithTransportCredentials(transportCredentials credentials.TransportCredenti
 	}
 }
 
+// WithStreamInterceptor sets the StreamInterceptor option to grpc server.
+func WithStreamInterceptor() Option {
+	return func(c *GrpcServerBuilder) {
+		c.stateStreamInterceptorEnable = true
+	}
+}
+
 // GrpcServerBuilder created for separating the creation and starting GrpcServer,
 // cause services need to be registered before the server starts.
 type GrpcServerBuilder struct {
@@ -27,7 +34,8 @@ type GrpcServerBuilder struct {
 	gRPCListenAddr string
 	server         *grpc.Server
 
-	transportCredentials credentials.TransportCredentials // the GRPC credentials
+	transportCredentials         credentials.TransportCredentials // the GRPC credentials
+	stateStreamInterceptorEnable bool
 }
 
 // NewGrpcServerBuilder helps to build a new grpc server.
@@ -58,6 +66,16 @@ func NewGrpcServerBuilder(log zerolog.Logger,
 	// if rpc metrics is enabled, first create the grpc metrics interceptor
 	if rpcMetricsEnabled {
 		interceptors = append(interceptors, grpc_prometheus.UnaryServerInterceptor)
+
+		if grpcServerBuilder.stateStreamInterceptorEnable {
+			// note: intentionally not adding logging or rate limit interceptors for streams.
+			// rate limiting is done in the handler, and we don't need log events for every message as
+			// that would be too noisy.
+			log.Info().Msg("stateStreamInterceptorEnable true")
+			grpcOpts = append(grpcOpts, grpc.StreamInterceptor(grpc_prometheus.StreamServerInterceptor))
+		} else {
+			log.Info().Msg("stateStreamInterceptorEnable false")
+		}
 	}
 	if len(apiRateLimits) > 0 {
 		// create a rate limit interceptor
@@ -68,9 +86,8 @@ func NewGrpcServerBuilder(log zerolog.Logger,
 	// add the logging interceptor, ensure it is innermost wrapper
 	interceptors = append(interceptors, rpc.LoggingInterceptor(log)...)
 	// create a chained unary interceptor
-	chainedInterceptors := grpc.ChainUnaryInterceptor(interceptors...)
 	// create an unsecured grpc server
-	grpcOpts = append(grpcOpts, chainedInterceptors)
+	grpcOpts = append(grpcOpts, grpc.ChainUnaryInterceptor(interceptors...))
 
 	if grpcServerBuilder.transportCredentials != nil {
 		log = log.With().Str("endpoint", "secure").Logger()

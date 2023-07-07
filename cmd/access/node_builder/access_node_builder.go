@@ -992,7 +992,8 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 			return nil
 		}).
 		Module("creating grpc servers", func(node *cmd.NodeConfig) error {
-			builder.secureGrpcServer = grpcserver.NewGrpcServerBuilder(node.Logger,
+			builder.secureGrpcServer = grpcserver.NewGrpcServerBuilder(
+				node.Logger,
 				builder.rpcConf.SecureGRPCListenAddr,
 				builder.rpcConf.MaxMsgSize,
 				builder.rpcMetricsEnabled,
@@ -1000,22 +1001,24 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				builder.apiBurstlimits,
 				grpcserver.WithTransportCredentials(builder.rpcConf.TransportCredentials)).Build()
 
-			builder.unsecureGrpcServer = grpcserver.NewGrpcServerBuilder(node.Logger,
-				builder.rpcConf.UnsecureGRPCListenAddr,
-				builder.rpcConf.MaxMsgSize,
+			builder.stateStreamGrpcServer = grpcserver.NewGrpcServerBuilder(
+				node.Logger,
+				builder.stateStreamConf.ListenAddr,
+				builder.stateStreamConf.MaxExecutionDataMsgSize,
 				builder.rpcMetricsEnabled,
 				builder.apiRatelimits,
-				builder.apiBurstlimits).Build()
+				builder.apiBurstlimits,
+				grpcserver.WithStreamInterceptor()).Build()
 
 			if builder.rpcConf.UnsecureGRPCListenAddr != builder.stateStreamConf.ListenAddr {
-				builder.stateStreamGrpcServer = grpcserver.NewGrpcServerBuilder(node.Logger,
-					builder.stateStreamConf.ListenAddr,
-					builder.stateStreamConf.MaxExecutionDataMsgSize,
+				builder.unsecureGrpcServer = grpcserver.NewGrpcServerBuilder(node.Logger,
+					builder.rpcConf.UnsecureGRPCListenAddr,
+					builder.rpcConf.MaxMsgSize,
 					builder.rpcMetricsEnabled,
 					builder.apiRatelimits,
 					builder.apiBurstlimits).Build()
 			} else {
-				builder.stateStreamGrpcServer = builder.unsecureGrpcServer
+				builder.unsecureGrpcServer = builder.stateStreamGrpcServer
 			}
 
 			return nil
@@ -1135,13 +1138,13 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 		return builder.secureGrpcServer, nil
 	})
 
-	builder.Component("unsecure grpc server", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-		return builder.unsecureGrpcServer, nil
+	builder.Component("state stream unsecure grpc server", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+		return builder.stateStreamGrpcServer, nil
 	})
 
-	if builder.stateStreamGrpcServer != builder.unsecureGrpcServer {
-		builder.Component("state stream unsecure grpc server", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-			return builder.stateStreamGrpcServer, nil
+	if builder.rpcConf.UnsecureGRPCListenAddr != builder.stateStreamConf.ListenAddr {
+		builder.Component("unsecure grpc server", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+			return builder.unsecureGrpcServer, nil
 		})
 	}
 
