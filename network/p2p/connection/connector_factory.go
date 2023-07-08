@@ -38,18 +38,12 @@ const (
 // DefaultLibp2pBackoffConnectorFactory is a factory function to create a new BackoffConnector. It uses the default
 // values for the backoff connector.
 // (https://github.com/libp2p/go-libp2p-pubsub/blob/master/discovery.go#L34)
-<<<<<<< HEAD
-func DefaultLibp2pBackoffConnectorFactory(host host.Host) func() (*discoveryBackoff.BackoffConnector, error) {
-	return func() (*discoveryBackoff.BackoffConnector, error) {
+func DefaultLibp2pBackoffConnectorFactory() p2p.ConnectorFactory {
+	return func(host host.Host) (p2p.Connector, error) {
 		rngSrc, err := newSource()
 		if err != nil {
 			return nil, fmt.Errorf("failed to generate a random source: %w", err)
 		}
-=======
-func DefaultLibp2pBackoffConnectorFactory() p2p.ConnectorFactory {
-	return func(host host.Host) (p2p.Connector, error) {
-		rngSrc := rand.NewSource(rand.Int63())
->>>>>>> master
 
 		cacheSize := 100
 		dialTimeout := time.Minute * 2
