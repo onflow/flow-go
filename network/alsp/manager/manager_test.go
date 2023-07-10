@@ -2,6 +2,8 @@ package alspmgr_test
 
 import (
 	"context"
+	"fmt"
+	"github.com/onflow/flow-go/network/slashing"
 	"math"
 	"math/rand"
 	"sync"
@@ -183,7 +185,7 @@ func TestHandleReportedMisbehavior_Cache_Integration(t *testing.T) {
 // TestHandleReportedMisbehavior_And_DisallowListing_Integration implements an end-to-end integration test for the
 // handling of reported misbehavior and disallow listing.
 //
-// The test sets up 3 nodes, one victim, one honest, and one (alledged) spammer.
+// The test sets up 3 nodes, one victim, one honest, and one (alleged) spammer.
 // Initially, the test ensures that all nodes are connected to each other.
 // Then, test imitates that victim node reports the spammer node for spamming.
 // The test generates enough spam reports to trigger the disallow-listing of the victim node.
@@ -196,11 +198,11 @@ func TestHandleReportedMisbehavior_And_DisallowListing_Integration(t *testing.T)
 	// this test is assessing the integration of the ALSP manager with the network. As the ALSP manager is an attribute
 	// of the network, we need to configure the ALSP manager via the network configuration, and let the network create
 	// the ALSP manager.
-	var victimSpamRecordCacheCache alsp.SpamRecordCache
+	var victimSpamRecordCache alsp.SpamRecordCache
 	cfg.Opts = []alspmgr.MisbehaviorReportManagerOption{
 		alspmgr.WithSpamRecordsCacheFactory(func(logger zerolog.Logger, size uint32, metrics module.HeroCacheMetrics) alsp.SpamRecordCache {
-			victimSpamRecordCacheCache = internal.NewSpamRecordCache(size, logger, metrics, model.SpamRecordFactory())
-			return victimSpamRecordCacheCache
+			victimSpamRecordCache = internal.NewSpamRecordCache(size, logger, metrics, model.SpamRecordFactory())
+			return victimSpamRecordCache
 		}),
 	}
 
@@ -264,6 +266,120 @@ func TestHandleReportedMisbehavior_And_DisallowListing_Integration(t *testing.T)
 	// while the spammer node is disallow-listed, it cannot connect to the victim node. Also, the victim node  cannot directly dial and connect to the spammer node, unless
 	// it is allow-listed again.
 	p2ptest.EnsureNotConnectedBetweenGroups(t, ctx, []p2p.LibP2PNode{nodes[victimIndex]}, []p2p.LibP2PNode{nodes[spammerIndex]})
+}
+
+// TestHandleReportedMisbehavior_And_SlashingViolationsConsumer_Integration implements an end-to-end integration test for the
+// handling of reported misbehavior from the slashing.ViolationsConsumer.
+//
+// The test sets up one victim, one honest, and one (alleged) spammer for each of the current slashing violations.
+// Initially, the test ensures that all nodes are connected to each other.
+// Then, test imitates the slashing violations consumer on the victim node reporting misbehavior's for each slashing violation.
+// The test generates enough slashing violations to trigger the connection to each of the spamming nodes to be eventually pruned.
+// The test ensures that the victim node is disconnected from all spammer nodes.
+// The test ensures that despite attempting on connections, no inbound or outbound connections between the victim and
+// the pruned spammer nodes are established.
+func TestHandleReportedMisbehavior_And_SlashingViolationsConsumer_Integration(t *testing.T) {
+	cfg := managerCfgFixture(t)
+
+	// this test is assessing the integration of the ALSP manager with the network. As the ALSP manager is an attribute
+	// of the network, we need to configure the ALSP manager via the network configuration, and let the network create
+	// the ALSP manager.
+	var victimSpamRecordCache alsp.SpamRecordCache
+	cfg.Opts = []alspmgr.MisbehaviorReportManagerOption{
+		alspmgr.WithSpamRecordsCacheFactory(func(logger zerolog.Logger, size uint32, metrics module.HeroCacheMetrics) alsp.SpamRecordCache {
+			victimSpamRecordCache = internal.NewSpamRecordCache(size, logger, metrics, model.SpamRecordFactory())
+			return victimSpamRecordCache
+		}),
+	}
+
+	slashingMisbehaviors := []network.Misbehavior{
+		alsp.InvalidMessage, alsp.SenderEjected, alsp.UnauthorizedUnicastOnChannel,
+		alsp.UnauthorizedPublishOnChannel, alsp.UnknownMsgType,
+	}
+
+	// create 1 victim node, 1 honest node and a node for each slashing violation
+	ids, nodes, _ := testutils.LibP2PNodeForMiddlewareFixture(t, len(slashingMisbehaviors)+2,
+		p2ptest.WithPeerManagerEnabled(p2ptest.PeerManagerConfigFixture(), nil))
+	mws, _ := testutils.MiddlewareFixtures(t, ids, nodes, testutils.MiddlewareConfigFixture(t), mocknetwork.NewViolationsConsumer(t))
+	networkCfg := testutils.NetworkConfigFixture(t, *ids[0], ids, mws[0], p2p.WithAlspConfig(cfg))
+	victimNetwork, err := p2p.NewNetwork(networkCfg)
+	require.NoError(t, err)
+
+	// create slashing violations consumer with victim node network providing the network.MisbehaviorReportConsumer interface
+	violationsConsumer := slashing.NewSlashingViolationsConsumer(unittest.Logger(), metrics.NewNoopCollector(), victimNetwork)
+	mws[0].SetSlashingViolationsConsumer(violationsConsumer)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
+	testutils.StartNodesAndNetworks(signalerCtx, t, nodes, []network.Network{victimNetwork}, 100*time.Millisecond)
+	defer testutils.StopComponents[p2p.LibP2PNode](t, nodes, 100*time.Millisecond)
+	defer cancel()
+
+	p2ptest.LetNodesDiscoverEachOther(t, ctx, nodes, ids)
+	// initially victim and spammer should be able to connect to each other.
+	p2ptest.TryConnectionAndEnsureConnected(t, ctx, nodes)
+
+	// each slashing violation func is mapped to a violation with the identity of one of the misbehaving nodes
+	// index of the victim node in the nodes slice.
+	victimIndex := 0
+	honestNodeIndex := 1
+	invalidMessageIndex := 2
+	senderEjectedIndex := 3
+	unauthorizedUnicastOnChannelIndex := 4
+	unauthorizedPublishOnChannelIndex := 5
+	unknownMsgTypeIndex := 6
+	slashingViolationTestCases := []struct {
+		violationsConsumerFunc func(violation *network.Violation)
+		violation              *network.Violation
+	}{
+		//{violationsConsumer.OnUnAuthorizedSenderError, &network.Violation{Identity: ids[invalidMessageIndex]}},
+		//{violationsConsumer.OnSenderEjectedError, &network.Violation{Identity: ids[senderEjectedIndex]}},
+		{violationsConsumer.OnUnauthorizedUnicastOnChannel, &network.Violation{Identity: ids[unauthorizedUnicastOnChannelIndex]}},
+		{violationsConsumer.OnUnauthorizedPublishOnChannel, &network.Violation{Identity: ids[unauthorizedPublishOnChannelIndex]}},
+		{violationsConsumer.OnUnknownMsgTypeError, &network.Violation{Identity: ids[unknownMsgTypeIndex]}},
+	}
+
+	violationsWg := sync.WaitGroup{}
+	violationCount := 120
+	for _, testCase := range slashingViolationTestCases {
+		for i := 0; i < violationCount; i++ {
+			violationsWg.Add(1)
+			go func() {
+				defer violationsWg.Done()
+				testCase.violationsConsumerFunc(testCase.violation)
+			}()
+		}
+	}
+	unittest.RequireReturnsBefore(t, violationsWg.Wait, 100*time.Millisecond, "slashing violations not reported in time")
+
+	time.Sleep(10 * time.Second)
+
+	forEachMisbehavingNode := func(f func(i int)) {
+		//for misbehavingNodeIndex := 2; misbehavingNodeIndex <= len(nodes)-1; misbehavingNodeIndex++ {
+		//	f(misbehavingNodeIndex)
+		//}
+		f(invalidMessageIndex)
+		f(senderEjectedIndex)
+	}
+
+	// ensures connections to all misbehaving nodes are pruned
+	forEachMisbehavingNode(func(misbehavingNodeIndex int) {
+		fmt.Println(misbehavingNodeIndex)
+		p2ptest.RequireEventuallyNotConnected(t, []p2p.LibP2PNode{nodes[victimIndex]}, []p2p.LibP2PNode{nodes[misbehavingNodeIndex]}, 100*time.Millisecond, 2*time.Second)
+	})
+
+	// despite being disconnected from the victim node misbehaving nodes and the honest node are still connected.
+	forEachMisbehavingNode(func(misbehavingNodeIndex int) {
+		p2ptest.RequireConnectedEventually(t, []p2p.LibP2PNode{nodes[honestNodeIndex], nodes[misbehavingNodeIndex]}, 1*time.Millisecond, 100*time.Millisecond)
+	})
+
+	// despite pruning misbehaving nodes, ensure that (victim and honest) are still connected.
+	p2ptest.RequireConnectedEventually(t, []p2p.LibP2PNode{nodes[honestNodeIndex], nodes[victimIndex]}, 1*time.Millisecond, 100*time.Millisecond)
+
+	// while misbehaving nodes are pruned, they cannot connect to the victim node. Also, the victim node  cannot directly dial and connect to the misbehaving nodes until each node's peer score decays.
+	forEachMisbehavingNode(func(misbehavingNodeIndex int) {
+		p2ptest.EnsureNotConnectedBetweenGroups(t, ctx, []p2p.LibP2PNode{nodes[victimIndex]}, []p2p.LibP2PNode{nodes[misbehavingNodeIndex]})
+	})
 }
 
 // TestMisbehaviorReportMetrics tests the recording of misbehavior report metrics.

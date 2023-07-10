@@ -332,8 +332,9 @@ func (m *MisbehaviorReportManager) onHeartbeat() error {
 					FlowIds: flow.IdentifierList{id},
 					Cause:   network.DisallowListedCauseAlsp, // sets the ALSP disallow listing cause on node
 				})
+				fmt.Println("DISALLOW-LISTED", record.OriginId, record.Penalty)
 			}
-
+			fmt.Println(record.OriginId, record.Penalty)
 			// each time we decay the penalty by the decay speed, the penalty is a negative number, and the decay speed
 			// is a positive number. So the penalty is getting closer to zero.
 			// We use math.Min() to make sure the penalty is never positive.
@@ -376,6 +377,7 @@ func (m *MisbehaviorReportManager) onHeartbeat() error {
 			Float64("updated_penalty", penalty).
 			Msg("spam record decayed")
 	}
+	fmt.Println()
 
 	return nil
 }
@@ -425,7 +427,6 @@ func (m *MisbehaviorReportManager) processMisbehaviorReport(report internal.Repo
 		// we should crash the node in this case to prevent further misbehavior reports from being lost and fix the bug.
 		return fmt.Errorf("failed to apply penalty to the spam record: %w", err)
 	}
-
 	lg.Debug().Float64("updated_penalty", updatedPenalty).Msg("misbehavior report handled")
 	return nil
 }
