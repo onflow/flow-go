@@ -333,9 +333,7 @@ func (m *MisbehaviorReportManager) onHeartbeat() error {
 					FlowIds: flow.IdentifierList{id},
 					Cause:   network.DisallowListedCauseAlsp, // sets the ALSP disallow listing cause on node
 				})
-				fmt.Println("DISALLOW-LISTED", record.OriginId, record.Penalty)
 			}
-			fmt.Println(record.OriginId, record.Penalty)
 			// each time we decay the penalty by the decay speed, the penalty is a negative number, and the decay speed
 			// is a positive number. So the penalty is getting closer to zero.
 			// We use math.Min() to make sure the penalty is never positive.

@@ -2,7 +2,6 @@ package alspmgr_test
 
 import (
 	"context"
-	"fmt"
 	"math"
 	"math/rand"
 	"sync"
@@ -317,7 +316,7 @@ func TestHandleReportedMisbehavior_And_SlashingViolationsConsumer_Integration(t 
 	defer cancel()
 
 	p2ptest.LetNodesDiscoverEachOther(t, ctx, nodes, ids)
-	// initially victim and spammer should be able to connect to each other.
+	// initially victim and misbehaving nodes should be able to connect to each other.
 	p2ptest.TryConnectionAndEnsureConnected(t, ctx, nodes)
 
 	// each slashing violation func is mapped to a violation with the identity of one of the misbehaving nodes
@@ -333,8 +332,8 @@ func TestHandleReportedMisbehavior_And_SlashingViolationsConsumer_Integration(t 
 		violationsConsumerFunc func(violation *network.Violation)
 		violation              *network.Violation
 	}{
-		//{violationsConsumer.OnUnAuthorizedSenderError, &network.Violation{Identity: ids[invalidMessageIndex]}},
-		//{violationsConsumer.OnSenderEjectedError, &network.Violation{Identity: ids[senderEjectedIndex]}},
+		{violationsConsumer.OnUnAuthorizedSenderError, &network.Violation{Identity: ids[invalidMessageIndex]}},
+		{violationsConsumer.OnSenderEjectedError, &network.Violation{Identity: ids[senderEjectedIndex]}},
 		{violationsConsumer.OnUnauthorizedUnicastOnChannel, &network.Violation{Identity: ids[unauthorizedUnicastOnChannelIndex]}},
 		{violationsConsumer.OnUnauthorizedPublishOnChannel, &network.Violation{Identity: ids[unauthorizedPublishOnChannelIndex]}},
 		{violationsConsumer.OnUnknownMsgTypeError, &network.Violation{Identity: ids[unknownMsgTypeIndex]}},
@@ -354,19 +353,14 @@ func TestHandleReportedMisbehavior_And_SlashingViolationsConsumer_Integration(t 
 	}
 	unittest.RequireReturnsBefore(t, violationsWg.Wait, 100*time.Millisecond, "slashing violations not reported in time")
 
-	time.Sleep(10 * time.Second)
-
 	forEachMisbehavingNode := func(f func(i int)) {
-		//for misbehavingNodeIndex := 2; misbehavingNodeIndex <= len(nodes)-1; misbehavingNodeIndex++ {
-		//	f(misbehavingNodeIndex)
-		//}
-		f(invalidMessageIndex)
-		f(senderEjectedIndex)
+		for misbehavingNodeIndex := 2; misbehavingNodeIndex <= len(nodes)-1; misbehavingNodeIndex++ {
+			f(misbehavingNodeIndex)
+		}
 	}
 
 	// ensures connections to all misbehaving nodes are pruned
 	forEachMisbehavingNode(func(misbehavingNodeIndex int) {
-		fmt.Println(misbehavingNodeIndex)
 		p2ptest.RequireEventuallyNotConnected(t, []p2p.LibP2PNode{nodes[victimIndex]}, []p2p.LibP2PNode{nodes[misbehavingNodeIndex]}, 100*time.Millisecond, 2*time.Second)
 	})
 
