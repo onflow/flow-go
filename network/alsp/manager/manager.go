@@ -376,7 +376,6 @@ func (m *MisbehaviorReportManager) onHeartbeat() error {
 			Float64("updated_penalty", penalty).
 			Msg("spam record decayed")
 	}
-	fmt.Println()
 
 	return nil
 }
