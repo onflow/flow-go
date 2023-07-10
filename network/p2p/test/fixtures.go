@@ -599,6 +599,33 @@ func EnsurePubsubMessageExchange(t *testing.T, ctx context.Context, nodes []p2p.
 	}
 }
 
+func EnsurePubsubMessageExchangeFromNode(t *testing.T, ctx context.Context, sender p2p.LibP2PNode, receiver p2p.LibP2PNode, topic channels.Topic, count int, messageFactory func() interface{}) {
+	_, err := sender.Subscribe(topic, validator.TopicValidator(unittest.Logger(), unittest.AllowAllPeerFilter()))
+	require.NoError(t, err)
+
+	toSub, err := receiver.Subscribe(topic, validator.TopicValidator(unittest.Logger(), unittest.AllowAllPeerFilter()))
+	require.NoError(t, err)
+
+	// let subscriptions propagate
+	time.Sleep(1 * time.Second)
+
+	channel, ok := channels.ChannelFromTopic(topic)
+	require.True(t, ok)
+
+	for i := 0; i < count; i++ {
+		// creates a unique message to be published by the node
+		msg := messageFactory()
+		data := p2pfixtures.MustEncodeEvent(t, msg, channel)
+		require.NoError(t, sender.Publish(ctx, topic, data))
+
+		// wait for the message to be received by all nodes
+		ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+		p2pfixtures.SubsMustReceiveMessage(t, ctx, data, []p2p.Subscription{toSub})
+		cancel()
+	}
+
+}
+
 // PeerIdFixture returns a random peer ID for testing.
 // peer ID is the identifier of a node on the libp2p network.
 func PeerIdFixture(t *testing.T) peer.ID {
