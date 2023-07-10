@@ -68,22 +68,33 @@ func (s *ProtocolState) Index(blockID flow.Identifier, protocolStateID flow.Iden
 func (s *ProtocolState) ByID(id flow.Identifier) (*flow.ProtocolStateEntry, error) {
 	tx := s.db.NewTransaction(false)
 	defer tx.Discard()
-	return s.retrieveTx(id)(tx)
+	return s.byID(id)(tx)
 }
 
 // ByBlockID returns the protocol state by block ID.
 func (s *ProtocolState) ByBlockID(blockID flow.Identifier) (*flow.ProtocolStateEntry, error) {
 	tx := s.db.NewTransaction(false)
 	defer tx.Discard()
-	return s.retrieveTx(blockID)(tx)
+	return s.byBlockID(blockID)(tx)
 }
 
-func (s *ProtocolState) retrieveTx(protocolStateID flow.Identifier) func(*badger.Txn) (*flow.ProtocolStateEntry, error) {
+func (s *ProtocolState) byID(protocolStateID flow.Identifier) func(*badger.Txn) (*flow.ProtocolStateEntry, error) {
 	return func(tx *badger.Txn) (*flow.ProtocolStateEntry, error) {
 		val, err := s.cache.Get(protocolStateID)(tx)
 		if err != nil {
 			return nil, err
 		}
 		return val.(*flow.ProtocolStateEntry), nil
+	}
+}
+
+func (s *ProtocolState) byBlockID(blockID flow.Identifier) func(*badger.Txn) (*flow.ProtocolStateEntry, error) {
+	return func(tx *badger.Txn) (*flow.ProtocolStateEntry, error) {
+		var protocolStateID flow.Identifier
+		err := operation.LookupProtocolState(blockID, &protocolStateID)(tx)
+		if err != nil {
+			return nil, fmt.Errorf("could not lookup protocol state ID for block (%x): %w", blockID[:], err)
+		}
+		return s.byID(protocolStateID)(tx)
 	}
 }
