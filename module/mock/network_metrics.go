@@ -300,6 +300,11 @@ func (_m *NetworkMetrics) OnUnauthorizedMessage(role string, msgType string, top
 	_m.Called(role, msgType, topic, offense)
 }
 
+// OnViolationReportSkipped provides a mock function with given fields:
+func (_m *NetworkMetrics) OnViolationReportSkipped() {
+	_m.Called()
+}
+
 // OutboundConnections provides a mock function with given fields: connectionCount
 func (_m *NetworkMetrics) OutboundConnections(connectionCount uint) {
 	_m.Called(connectionCount)
