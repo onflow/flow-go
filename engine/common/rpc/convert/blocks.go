@@ -7,7 +7,6 @@ import (
 
 	"github.com/onflow/flow-go/model/flow"
 
-	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
 	"github.com/onflow/flow/protobuf/go/flow/entities"
 )
 
@@ -153,26 +152,4 @@ func PayloadFromMessage(m *entities.Block) (*flow.Payload, error) {
 		Receipts:   receipts,
 		Results:    results,
 	}, nil
-}
-
-// MessagesToBlockEvents converts a protobuf EventsResponse_Result messages to a flow.BlockEvents.
-func MessagesToBlockEvents(blocksEvents []*accessproto.EventsResponse_Result) []flow.BlockEvents {
-	evs := make([]flow.BlockEvents, len(blocksEvents))
-	for _, ev := range blocksEvents {
-		var blockEvent flow.BlockEvents
-		MessageToBlockEvents(ev)
-		evs = append(evs, blockEvent)
-	}
-
-	return evs
-}
-
-// MessageToBlockEvents converts a protobuf EventsResponse_Result message to a slice of flow.BlockEvents.
-func MessageToBlockEvents(blockEvents *accessproto.EventsResponse_Result) flow.BlockEvents {
-	return flow.BlockEvents{
-		BlockHeight:    blockEvents.BlockHeight,
-		BlockID:        MessageToIdentifier(blockEvents.BlockId),
-		BlockTimestamp: blockEvents.BlockTimestamp.AsTime(),
-		Events:         MessagesToEvents(blockEvents.Events),
-	}
 }

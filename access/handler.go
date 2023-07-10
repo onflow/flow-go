@@ -516,7 +516,7 @@ func (h *Handler) GetEventsForHeightRange(
 		return nil, err
 	}
 
-	resultEvents, err := blockEventsToMessages(results)
+	resultEvents, err := BlockEventsToMessages(results)
 	if err != nil {
 		return nil, err
 	}
@@ -548,7 +548,7 @@ func (h *Handler) GetEventsForBlockIDs(
 		return nil, err
 	}
 
-	resultEvents, err := blockEventsToMessages(results)
+	resultEvents, err := BlockEventsToMessages(results)
 	if err != nil {
 		return nil, err
 	}
@@ -680,7 +680,7 @@ func executionResultToMessages(er *flow.ExecutionResult, metadata *entities.Meta
 	}, nil
 }
 
-func blockEventsToMessages(blocks []flow.BlockEvents) ([]*access.EventsResponse_Result, error) {
+func BlockEventsToMessages(blocks []flow.BlockEvents) ([]*access.EventsResponse_Result, error) {
 	results := make([]*access.EventsResponse_Result, len(blocks))
 
 	for i, block := range blocks {

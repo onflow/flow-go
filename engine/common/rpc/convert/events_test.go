@@ -11,6 +11,7 @@ import (
 	jsoncdc "github.com/onflow/cadence/encoding/json"
 	execproto "github.com/onflow/flow/protobuf/go/flow/execution"
 
+	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -192,4 +193,25 @@ func TestConvertServiceEventList(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.Equal(t, serviceEvents, converted)
+}
+
+// TestConvertMessagesToBlockEvents tests that converting a protobuf EventsResponse_Result message to and from block events in the same
+// block
+func TestConvertMessagesToBlockEvents(t *testing.T) {
+	t.Parallel()
+
+	count := 2
+	blockEvents := make([]flow.BlockEvents, count)
+	for i := 0; i < count; i++ {
+		header := unittest.BlockHeaderFixture(unittest.WithHeaderHeight(uint64(i)))
+		blockEvents[i] = unittest.BlockEventsFixture(header, 2)
+	}
+
+	msg, err := access.BlockEventsToMessages(blockEvents)
+	require.NoError(t, err)
+
+	converted := convert.MessagesToBlockEvents(msg)
+	require.NoError(t, err)
+
+	assert.Equal(t, blockEvents, converted)
 }
