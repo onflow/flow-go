@@ -230,6 +230,7 @@ func (m *MisbehaviorReportManager) HandleMisbehaviorReport(channel channels.Chan
 		Hex("misbehaving_id", logging.ID(report.OriginId())).
 		Str("reason", report.Reason().String()).
 		Float64("penalty", report.Penalty()).Logger()
+	lg.Trace().Msg("received misbehavior report")
 	m.metrics.OnMisbehaviorReported(channel.String(), report.Reason().String())
 
 	nonce := [internal.NonceSize]byte{}

@@ -3,12 +3,13 @@ package alspmgr_test
 import (
 	"context"
 	"fmt"
-	"github.com/onflow/flow-go/network/slashing"
 	"math"
 	"math/rand"
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/onflow/flow-go/network/slashing"
 
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
@@ -343,6 +344,7 @@ func TestHandleReportedMisbehavior_And_SlashingViolationsConsumer_Integration(t 
 	violationCount := 120
 	for _, testCase := range slashingViolationTestCases {
 		for i := 0; i < violationCount; i++ {
+			testCase := testCase
 			violationsWg.Add(1)
 			go func() {
 				defer violationsWg.Done()
