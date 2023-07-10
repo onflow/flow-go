@@ -305,6 +305,7 @@ func (nc *NoopCollector) AsyncProcessingStarted(string)                         
 func (nc *NoopCollector) AsyncProcessingFinished(string, time.Duration)             {}
 
 func (nc *NoopCollector) OnMisbehaviorReported(string, string) {}
+func (nc *NoopCollector) OnViolationReportSkipped()            {}
 
 var _ ObserverMetrics = (*NoopCollector)(nil)
 

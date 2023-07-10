@@ -90,7 +90,7 @@ func (r *RestProxyHandler) GetCollectionByID(ctx context.Context, id flow.Identi
 
 	collectionResponse, err := upstream.GetCollectionByID(ctx, getCollectionByIDRequest)
 	r.log("upstream", "GetCollectionByID", err)
-	
+
 	if err != nil {
 		return nil, err
 	}
