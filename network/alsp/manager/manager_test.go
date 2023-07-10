@@ -359,20 +359,20 @@ func TestHandleReportedMisbehavior_And_SlashingViolationsConsumer_Integration(t 
 		}
 	}
 
-	// ensures connections to all misbehaving nodes are pruned
+	// ensures all misbehaving nodes are disconnected from the victim node
 	forEachMisbehavingNode(func(misbehavingNodeIndex int) {
 		p2ptest.RequireEventuallyNotConnected(t, []p2p.LibP2PNode{nodes[victimIndex]}, []p2p.LibP2PNode{nodes[misbehavingNodeIndex]}, 100*time.Millisecond, 2*time.Second)
 	})
 
-	// despite being disconnected from the victim node misbehaving nodes and the honest node are still connected.
+	// despite being disconnected from the victim node, misbehaving nodes and the honest node are still connected.
 	forEachMisbehavingNode(func(misbehavingNodeIndex int) {
 		p2ptest.RequireConnectedEventually(t, []p2p.LibP2PNode{nodes[honestNodeIndex], nodes[misbehavingNodeIndex]}, 1*time.Millisecond, 100*time.Millisecond)
 	})
 
-	// despite pruning misbehaving nodes, ensure that (victim and honest) are still connected.
+	// despite disconnecting misbehaving nodes, ensure that (victim and honest) are still connected.
 	p2ptest.RequireConnectedEventually(t, []p2p.LibP2PNode{nodes[honestNodeIndex], nodes[victimIndex]}, 1*time.Millisecond, 100*time.Millisecond)
 
-	// while misbehaving nodes are pruned, they cannot connect to the victim node. Also, the victim node  cannot directly dial and connect to the misbehaving nodes until each node's peer score decays.
+	// while misbehaving nodes are disconnected, they cannot connect to the victim node. Also, the victim node  cannot directly dial and connect to the misbehaving nodes until each node's peer score decays.
 	forEachMisbehavingNode(func(misbehavingNodeIndex int) {
 		p2ptest.EnsureNotConnectedBetweenGroups(t, ctx, []p2p.LibP2PNode{nodes[victimIndex]}, []p2p.LibP2PNode{nodes[misbehavingNodeIndex]})
 	})
