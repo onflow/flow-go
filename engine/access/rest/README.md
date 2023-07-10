@@ -12,7 +12,8 @@ available on our [docs site](https://docs.onflow.org/http-api/).
 - `request`: Implementation of API requests that provide validation for input data and build request models.
 - `routes`: The common HTTP handlers for all the requests, tests for each request.
 - `apiproxy`: Implementation of proxy backend handler which includes the local backend and forwards the methods which 
-can't be handled locally to an upstream using gRPC API.
+can't be handled locally to an upstream using gRPC API. This is used by observers that don't have all data in their
+local db.
 
 ## Request lifecycle
 
@@ -51,7 +52,7 @@ generator models.LinkGenerator,
 ) (interface{}, error)
 ```
 
-That handler implementation needs to be added to the `router.go` with corresponding API endpoint and method. Also needs 
-to override the method if it should be proxied to the backend handler `RestProxyHandler` for request forwarding. Adding 
-a new API endpoint also requires for a new request builder to be implemented and added in request package. Make sure to 
-not forget about adding tests for each of the API handler.
+That handler implementation needs to be added to the `router.go` with corresponding API endpoint and method. If the data
+is not available on observers, an override the method is needed in the backend handler `RestProxyHandler` for request 
+forwarding. Adding a new API endpoint also requires for a new request builder to be implemented and added in request 
+package. Make sure to not forget about adding tests for each of the API handler.

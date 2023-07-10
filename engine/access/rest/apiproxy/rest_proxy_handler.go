@@ -89,8 +89,9 @@ func (r *RestProxyHandler) GetCollectionByID(ctx context.Context, id flow.Identi
 	}
 
 	collectionResponse, err := upstream.GetCollectionByID(ctx, getCollectionByIDRequest)
+	r.log("upstream", "GetCollectionByID", err)
+	
 	if err != nil {
-		r.log("upstream", "GetCollectionByID", err)
 		return nil, err
 	}
 
@@ -131,8 +132,9 @@ func (r *RestProxyHandler) GetTransaction(ctx context.Context, id flow.Identifie
 		Id: id[:],
 	}
 	transactionResponse, err := upstream.GetTransaction(ctx, getTransactionRequest)
+	r.log("upstream", "GetTransaction", err)
+
 	if err != nil {
-		r.log("upstream", "GetTransaction", err)
 		return nil, err
 	}
 
@@ -159,8 +161,9 @@ func (r *RestProxyHandler) GetTransactionResult(ctx context.Context, id flow.Ide
 	}
 
 	transactionResultResponse, err := upstream.GetTransactionResult(ctx, getTransactionResultRequest)
+	r.log("upstream", "GetTransactionResult", err)
+
 	if err != nil {
-		r.log("upstream", "GetTransactionResult", err)
 		return nil, err
 	}
 
@@ -180,8 +183,9 @@ func (r *RestProxyHandler) GetAccountAtBlockHeight(ctx context.Context, address 
 	}
 
 	accountResponse, err := upstream.GetAccountAtBlockHeight(ctx, getAccountAtBlockHeightRequest)
+	r.log("upstream", "GetAccountAtBlockHeight", err)
+
 	if err != nil {
-		r.log("upstream", "GetAccountAtBlockHeight", err)
 		return nil, models.NewNotFoundError("not found account at block height", err)
 	}
 
@@ -200,8 +204,9 @@ func (r *RestProxyHandler) ExecuteScriptAtLatestBlock(ctx context.Context, scrip
 		Arguments: arguments,
 	}
 	executeScriptAtLatestBlockResponse, err := upstream.ExecuteScriptAtLatestBlock(ctx, executeScriptAtLatestBlockRequest)
+	r.log("upstream", "ExecuteScriptAtLatestBlock", err)
+
 	if err != nil {
-		r.log("upstream", "ExecuteScriptAtLatestBlock", err)
 		return nil, err
 	}
 
@@ -221,8 +226,9 @@ func (r *RestProxyHandler) ExecuteScriptAtBlockHeight(ctx context.Context, block
 		Arguments:   arguments,
 	}
 	executeScriptAtBlockHeightResponse, err := upstream.ExecuteScriptAtBlockHeight(ctx, executeScriptAtBlockHeightRequest)
+	r.log("upstream", "ExecuteScriptAtBlockHeight", err)
+
 	if err != nil {
-		r.log("upstream", "ExecuteScriptAtBlockHeight", err)
 		return nil, err
 	}
 
@@ -242,8 +248,9 @@ func (r *RestProxyHandler) ExecuteScriptAtBlockID(ctx context.Context, blockID f
 		Arguments: arguments,
 	}
 	executeScriptAtBlockIDResponse, err := upstream.ExecuteScriptAtBlockID(ctx, executeScriptAtBlockIDRequest)
+	r.log("upstream", "ExecuteScriptAtBlockID", err)
+
 	if err != nil {
-		r.log("upstream", "ExecuteScriptAtBlockID", err)
 		return nil, err
 	}
 
@@ -263,8 +270,9 @@ func (r *RestProxyHandler) GetEventsForHeightRange(ctx context.Context, eventTyp
 		EndHeight:   endHeight,
 	}
 	eventsResponse, err := upstream.GetEventsForHeightRange(ctx, getEventsForHeightRangeRequest)
+	r.log("upstream", "GetEventsForHeightRange", err)
+
 	if err != nil {
-		r.log("upstream", "GetEventsForHeightRange", err)
 		return nil, err
 	}
 
@@ -285,8 +293,9 @@ func (r *RestProxyHandler) GetEventsForBlockIDs(ctx context.Context, eventType s
 		BlockIds: blockIds,
 	}
 	eventsResponse, err := upstream.GetEventsForBlockIDs(ctx, getEventsForBlockIDsRequest)
+	r.log("upstream", "GetEventsForBlockIDs", err)
+
 	if err != nil {
-		r.log("upstream", "GetEventsForBlockIDs", err)
 		return nil, err
 	}
 
@@ -304,8 +313,9 @@ func (r *RestProxyHandler) GetExecutionResultForBlockID(ctx context.Context, blo
 		BlockId: blockID[:],
 	}
 	executionResultForBlockIDResponse, err := upstream.GetExecutionResultForBlockID(ctx, getExecutionResultForBlockID)
+	r.log("upstream", "GetExecutionResultForBlockID", err)
+
 	if err != nil {
-		r.log("upstream", "GetExecutionResultForBlockID", err)
 		return nil, err
 	}
 
@@ -324,8 +334,9 @@ func (r *RestProxyHandler) GetExecutionResultByID(ctx context.Context, id flow.I
 	}
 
 	executionResultByIDResponse, err := upstream.GetExecutionResultByID(ctx, executionResultByIDRequest)
+	r.log("upstream", "GetExecutionResultByID", err)
+
 	if err != nil {
-		r.log("upstream", "GetExecutionResultByID", err)
 		return nil, err
 	}
 
