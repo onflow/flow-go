@@ -7,7 +7,7 @@ import (
 
 	"github.com/onflow/cadence"
 
-	"github.com/onflow/flow-go/crypto"
+	"github.com/onflow/crypto"
 	"github.com/onflow/flow-go/crypto/hash"
 )
 

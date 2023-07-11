@@ -3,7 +3,7 @@ package module
 import (
 	"errors"
 
-	"github.com/onflow/flow-go/crypto"
+	"github.com/onflow/crypto"
 )
 
 var (

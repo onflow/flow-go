@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"path"
 
-	"github.com/onflow/flow-go/crypto"
+	"github.com/onflow/crypto"
 
 	"github.com/onflow/flow-go/cmd/bootstrap/utils"
 

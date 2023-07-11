@@ -101,6 +101,7 @@ require (
 	github.com/coreos/go-semver v0.3.0
 	github.com/go-playground/validator/v10 v10.14.1
 	github.com/mitchellh/mapstructure v1.5.0
+	github.com/onflow/crypto v0.24.9
 	github.com/onflow/wal v0.0.0-20230529184820-bc9f8244608d
 	github.com/slok/go-http-metrics v0.10.0
 	gonum.org/v1/gonum v0.13.0
