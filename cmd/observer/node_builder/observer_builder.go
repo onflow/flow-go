@@ -710,10 +710,7 @@ func (builder *ObserverServiceBuilder) initPublicLibp2pNode(networkKey crypto.Pr
 		RpcSentTrackerCacheCollector: metrics.GossipSubRPCSentTrackerMetricFactory(builder.HeroCacheMetricsFactory(), network.PublicNetwork),
 		RpcSentTrackerCacheSize:      builder.FlowConfig.NetworkConfig.GossipSubConfig.RPCSentTrackerCacheSize,
 	}
-	meshTracer, err := tracer.NewGossipSubMeshTracer(meshTracerCfg)
-	if err != nil {
-		return nil, fmt.Errorf("could not create gossipsub mesh tracer for staked access node: %w", err)
-	}
+	meshTracer := tracer.NewGossipSubMeshTracer(meshTracerCfg)
 
 	node, err := p2pbuilder.NewNodeBuilder(
 		builder.Logger,

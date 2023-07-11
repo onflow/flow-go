@@ -503,10 +503,8 @@ func DefaultNodeBuilder(
 		RpcSentTrackerCacheCollector: metrics.GossipSubRPCSentTrackerMetricFactory(metricsCfg.HeroCacheFactory, flownet.PrivateNetwork),
 		RpcSentTrackerCacheSize:      gossipCfg.RPCSentTrackerCacheSize,
 	}
-	meshTracer, err := tracer.NewGossipSubMeshTracer(meshTracerCfg)
-	if err != nil {
-		return nil, fmt.Errorf("could not create gossipsub mesh tracer: %w", err)
-	}
+	meshTracer := tracer.NewGossipSubMeshTracer(meshTracerCfg)
+
 	builder.SetGossipSubTracer(meshTracer)
 	builder.SetGossipSubScoreTracerInterval(gossipCfg.ScoreTracerInterval)
 

@@ -63,13 +63,8 @@ type GossipSubMeshTracerConfig struct {
 // - *GossipSubMeshTracerConfig: the mesh tracer config.
 // Returns:
 // - *GossipSubMeshTracer: new mesh tracer.
-// - error: if any error is encountered during the creation of the gossipsub mesh tracer, all errors are considered irrecoverable.
-func NewGossipSubMeshTracer(config *GossipSubMeshTracerConfig) (*GossipSubMeshTracer, error) {
-	rpcSentTracker, err := internal.NewRPCSentTracker(config.Logger, config.RpcSentTrackerCacheSize, config.RpcSentTrackerCacheCollector)
-	if err != nil {
-		return nil, fmt.Errof("could not create rpc send tracker: %w", err)
-	}
-
+func NewGossipSubMeshTracer(config *GossipSubMeshTracerConfig) *GossipSubMeshTracer {
+	rpcSentTracker := internal.NewRPCSentTracker(config.Logger, config.RpcSentTrackerCacheSize, config.RpcSentTrackerCacheCollector)
 	g := &GossipSubMeshTracer{
 		RawTracer:      NewGossipSubNoopTracer(),
 		topicMeshMap:   make(map[string]map[peer.ID]struct{}),
@@ -87,7 +82,7 @@ func NewGossipSubMeshTracer(config *GossipSubMeshTracerConfig) (*GossipSubMeshTr
 		}).
 		Build()
 
-	return g, nil
+	return g
 }
 
 // GetMeshPeers returns the local mesh peers for the given topic.

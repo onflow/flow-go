@@ -73,8 +73,7 @@ func TestGossipSubMeshTracer(t *testing.T) {
 		RpcSentTrackerCacheCollector: metrics.NewNoopCollector(),
 		RpcSentTrackerCacheSize:      defaultConfig.NetworkConfig.GossipSubConfig.RPCSentTrackerCacheSize,
 	}
-	meshTracer, err := tracer.NewGossipSubMeshTracer(meshTracerCfg)
-	require.NoError(t, err)
+	meshTracer := tracer.NewGossipSubMeshTracer(meshTracerCfg)
 	tracerNode, tracerId := p2ptest.NodeFixture(
 		t,
 		sporkId,

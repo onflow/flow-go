@@ -17,17 +17,13 @@ type RPCSentTracker struct {
 }
 
 // NewRPCSentTracker returns a new *NewRPCSentTracker.
-func NewRPCSentTracker(logger zerolog.Logger, sizeLimit uint32, collector module.HeroCacheMetrics) (*RPCSentTracker, error) {
+func NewRPCSentTracker(logger zerolog.Logger, sizeLimit uint32, collector module.HeroCacheMetrics) *RPCSentTracker {
 	config := &rpcCtrlMsgSentCacheConfig{
 		sizeLimit: sizeLimit,
 		logger:    logger,
 		collector: collector,
 	}
-	cache, err := newRPCSentCache(config)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create new rpc sent cahe: %w", err)
-	}
-	return &RPCSentTracker{cache: cache}, nil
+	return &RPCSentTracker{cache: newRPCSentCache(config)}
 }
 
 // OnIHaveRPCSent caches a unique entity message ID for each message ID included in each rpc iHave control message.

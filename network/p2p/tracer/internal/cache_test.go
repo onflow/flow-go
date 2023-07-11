@@ -216,8 +216,7 @@ func cacheFixture(t *testing.T, sizeLimit uint32, logger zerolog.Logger, collect
 		logger:    logger,
 		collector: collector,
 	}
-	r, err := newRPCSentCache(config)
-	require.NoError(t, err)
+	r := newRPCSentCache(config)
 	// expect cache to be empty
 	require.Equalf(t, uint(0), r.size(), "cache size must be 0")
 	require.NotNil(t, r)

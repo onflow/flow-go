@@ -15,13 +15,13 @@ import (
 
 // TestNewRPCSentTracker ensures *RPCSenTracker is created as expected.
 func TestNewRPCSentTracker(t *testing.T) {
-	tracker := mockTracker(t)
+	tracker := mockTracker()
 	require.NotNil(t, tracker)
 }
 
 // TestRPCSentTracker_IHave ensures *RPCSentTracker tracks sent iHave control messages as expected.
 func TestRPCSentTracker_IHave(t *testing.T) {
-	tracker := mockTracker(t)
+	tracker := mockTracker()
 	require.NotNil(t, tracker)
 
 	t.Run("WasIHaveRPCSent should return false for iHave message Id that has not been tracked", func(t *testing.T) {
@@ -46,12 +46,11 @@ func TestRPCSentTracker_IHave(t *testing.T) {
 	})
 }
 
-func mockTracker(t *testing.T) *RPCSentTracker {
+func mockTracker() *RPCSentTracker {
 	logger := zerolog.Nop()
 	sizeLimit := uint32(100)
 	collector := metrics.NewNoopCollector()
-	tracker, err := NewRPCSentTracker(logger, sizeLimit, collector)
-	require.NoError(t, err)
+	tracker := NewRPCSentTracker(logger, sizeLimit, collector)
 	return tracker
 }
 

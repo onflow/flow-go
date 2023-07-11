@@ -31,7 +31,7 @@ type rpcSentCache struct {
 // - *rpcSentCache: the created cache.
 // Note that this cache is intended to track control messages sent by the local node,
 // it stores a RPCSendEntity using an Id which should uniquely identifies the message being tracked.
-func newRPCSentCache(config *rpcCtrlMsgSentCacheConfig) (*rpcSentCache, error) {
+func newRPCSentCache(config *rpcCtrlMsgSentCacheConfig) *rpcSentCache {
 	backData := herocache.NewCache(config.sizeLimit,
 		herocache.DefaultOversizeFactor,
 		heropool.LRUEjection,
@@ -39,7 +39,7 @@ func newRPCSentCache(config *rpcCtrlMsgSentCacheConfig) (*rpcSentCache, error) {
 		config.collector)
 	return &rpcSentCache{
 		c: stdmap.NewBackend(stdmap.WithBackData(backData)),
-	}, nil
+	}
 }
 
 // init initializes the record cached for the given messageID if it does not exist.
