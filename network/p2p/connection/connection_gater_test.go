@@ -405,10 +405,10 @@ func ensureCommunicationSilenceAmongGroups(t *testing.T, ctx context.Context, sp
 
 // ensureCommunicationOverAllProtocols ensures that all nodes are connected to each other, and they can exchange messages over the pubsub and unicast.
 func ensureCommunicationOverAllProtocols(t *testing.T, ctx context.Context, sporkId flow.Identifier, nodes []p2p.LibP2PNode, inbounds []chan string) {
+	blockTopic := channels.TopicFromChannel(channels.PushBlocks, sporkId)
 	p2ptest.TryConnectionAndEnsureConnected(t, ctx, nodes)
-	p2ptest.EnsurePubsubMessageExchange(t, ctx, nodes, func() (interface{}, channels.Topic) {
-		blockTopic := channels.TopicFromChannel(channels.PushBlocks, sporkId)
-		return unittest.ProposalFixture(), blockTopic
+	p2ptest.EnsurePubsubMessageExchange(t, ctx, nodes, blockTopic, 1, func() interface{} {
+		return unittest.ProposalFixture()
 	})
 	p2pfixtures.EnsureMessageExchangeOverUnicast(t, ctx, nodes, inbounds, p2pfixtures.LongStringMessageFactoryFixture(t))
 }

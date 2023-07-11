@@ -128,11 +128,10 @@ func TestInvalidCtrlMsgScoringIntegration(t *testing.T) {
 	defer p2ptest.StopNodes(t, nodes, cancel, 2*time.Second)
 
 	p2ptest.LetNodesDiscoverEachOther(t, ctx, nodes, ids)
-
+	blockTopic := channels.TopicFromChannel(channels.PushBlocks, sporkId)
 	// checks end-to-end message delivery works on GossipSub
-	p2ptest.EnsurePubsubMessageExchange(t, ctx, nodes, func() (interface{}, channels.Topic) {
-		blockTopic := channels.TopicFromChannel(channels.PushBlocks, sporkId)
-		return unittest.ProposalFixture(), blockTopic
+	p2ptest.EnsurePubsubMessageExchange(t, ctx, nodes, blockTopic, 1, func() interface{} {
+		return unittest.ProposalFixture()
 	})
 
 	// now simulates node2 spamming node1 with invalid gossipsub control messages.
