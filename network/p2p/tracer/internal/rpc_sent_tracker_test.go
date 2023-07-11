@@ -8,6 +8,7 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 
+	"github.com/onflow/flow-go/config"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -15,13 +16,13 @@ import (
 
 // TestNewRPCSentTracker ensures *RPCSenTracker is created as expected.
 func TestNewRPCSentTracker(t *testing.T) {
-	tracker := mockTracker()
+	tracker := mockTracker(t)
 	require.NotNil(t, tracker)
 }
 
 // TestRPCSentTracker_IHave ensures *RPCSentTracker tracks sent iHave control messages as expected.
 func TestRPCSentTracker_IHave(t *testing.T) {
-	tracker := mockTracker()
+	tracker := mockTracker(t)
 	require.NotNil(t, tracker)
 
 	t.Run("WasIHaveRPCSent should return false for iHave message Id that has not been tracked", func(t *testing.T) {
@@ -29,28 +30,41 @@ func TestRPCSentTracker_IHave(t *testing.T) {
 	})
 
 	t.Run("WasIHaveRPCSent should return true for iHave message after it is tracked with OnIHaveRPCSent", func(t *testing.T) {
-		topicID := channels.PushBlocks.String()
-		messageID1 := unittest.IdentifierFixture().String()
-		iHaves := []*pb.ControlIHave{{
-			TopicID:    &topicID,
-			MessageIDs: []string{messageID1},
-		}}
+		numOfMsgIds := 100
+		testCases := []struct {
+			topic      string
+			messageIDS []string
+		}{
+			{channels.PushBlocks.String(), unittest.IdentifierListFixture(numOfMsgIds).Strings()},
+			{channels.ReceiveApprovals.String(), unittest.IdentifierListFixture(numOfMsgIds).Strings()},
+			{channels.SyncCommittee.String(), unittest.IdentifierListFixture(numOfMsgIds).Strings()},
+			{channels.RequestChunks.String(), unittest.IdentifierListFixture(numOfMsgIds).Strings()},
+		}
+		iHaves := make([]*pb.ControlIHave, len(testCases))
+		for i, testCase := range testCases {
+			testCase := testCase
+			iHaves[i] = &pb.ControlIHave{
+				TopicID:    &testCase.topic,
+				MessageIDs: testCase.messageIDS,
+			}
+		}
 		rpc := rpcFixture(withIhaves(iHaves))
 		tracker.OnIHaveRPCSent(rpc.GetControl().GetIhave())
-		require.True(t, tracker.WasIHaveRPCSent(topicID, messageID1))
 
-		// manipulate last byte of message ID ensure false positive not returned
-		messageID2 := []byte(messageID1)
-		messageID2[len(messageID2)-1] = 'X'
-		require.False(t, tracker.WasIHaveRPCSent(topicID, string(messageID2)))
+		for _, testCase := range testCases {
+			for _, messageID := range testCase.messageIDS {
+				require.True(t, tracker.WasIHaveRPCSent(testCase.topic, messageID))
+			}
+		}
 	})
 }
 
-func mockTracker() *RPCSentTracker {
+func mockTracker(t *testing.T) *RPCSentTracker {
 	logger := zerolog.Nop()
-	sizeLimit := uint32(100)
+	cfg, err := config.DefaultConfig()
+	require.NoError(t, err)
 	collector := metrics.NewNoopCollector()
-	tracker := NewRPCSentTracker(logger, sizeLimit, collector)
+	tracker := NewRPCSentTracker(logger, cfg.NetworkConfig.GossipSubConfig.RPCSentTrackerCacheSize, collector)
 	return tracker
 }
 
