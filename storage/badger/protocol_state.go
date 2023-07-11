@@ -104,7 +104,11 @@ func (s *ProtocolState) byBlockID(blockID flow.Identifier) func(*badger.Txn) (*f
 	}
 }
 
-func newRichProtocolStateEntry(protocolState flow.ProtocolStateEntry,
+// newRichProtocolStateEntry constructs a rich protocol state entry from a protocol state entry.
+// It queries and fills in epoch setups and commits for previous and current epochs and possibly next epoch.
+// No errors are expected during normal operation.
+func newRichProtocolStateEntry(
+	protocolState flow.ProtocolStateEntry,
 	setups storage.EpochSetups,
 	commits storage.EpochCommits,
 ) (*flow.RichProtocolStateEntry, error) {
@@ -138,7 +142,6 @@ func newRichProtocolStateEntry(protocolState flow.ProtocolStateEntry,
 	// if next epoch has been already committed, fill in data for it as well.
 	if protocolState.NextEpochProtocolState != nil {
 		nextEpochProtocolState := *protocolState.NextEpochProtocolState
-
 		nextEpochSetup, err := setups.ByID(nextEpochProtocolState.CurrentEpochEventIDs.SetupID)
 		if err != nil {
 			return nil, fmt.Errorf("could not retrieve next epoch setup: %w", err)
@@ -167,6 +170,9 @@ func newRichProtocolStateEntry(protocolState flow.ProtocolStateEntry,
 	return result, nil
 }
 
+// buildIdentityTable builds identity table for current epoch combining data from previous, current epoch setups and dynamic identities
+// that are stored in protocol state. It also performs sanity checks to make sure that data is consistent.
+// No errors are expected during normal operation.
 func buildIdentityTable(
 	dynamicIdentities flow.DynamicIdentityEntryList,
 	previousEpochSetup, currentEpochSetup *flow.EpochSetup,
