@@ -42,26 +42,26 @@ func newRPCSentCache(config *rpcCtrlMsgSentCacheConfig) *rpcSentCache {
 	}
 }
 
-// init initializes the record cached for the given messageID if it does not exist.
+// init initializes the record cached for the given messageEntityID if it does not exist.
 // Returns true if the record is initialized, false otherwise (i.e.: the record already exists).
 // Args:
-// - flow.Identifier: the messageID to store the rpc control message.
+// - flow.Identifier: the messageEntityID to store the rpc control message.
 // - p2p.ControlMessageType: the rpc control message type.
 // Returns:
 // - bool: true if the record is initialized, false otherwise (i.e.: the record already exists).
-// Note that if init is called multiple times for the same messageID, the record is initialized only once, and the
+// Note that if init is called multiple times for the same messageEntityID, the record is initialized only once, and the
 // subsequent calls return false and do not change the record (i.e.: the record is not re-initialized).
-func (r *rpcSentCache) init(messageID flow.Identifier, controlMsgType p2pmsg.ControlMessageType) bool {
-	return r.c.Add(newRPCSentEntity(messageID, controlMsgType))
+func (r *rpcSentCache) init(messageEntityID flow.Identifier, controlMsgType p2pmsg.ControlMessageType) bool {
+	return r.c.Add(newRPCSentEntity(messageEntityID, controlMsgType))
 }
 
 // has checks if the RPC message has been cached indicating it has been sent.
 // Args:
-// - flow.Identifier: the messageID to store the rpc control message.
+// - flow.Identifier: the messageEntityID to store the rpc control message.
 // Returns:
 // - bool: true if the RPC has been cache indicating it was sent from the local node.
-func (r *rpcSentCache) has(messageId flow.Identifier) bool {
-	return r.c.Has(messageId)
+func (r *rpcSentCache) has(messageEntityID flow.Identifier) bool {
+	return r.c.Has(messageEntityID)
 }
 
 // ids returns the list of ids of each rpcSentEntity stored.
@@ -69,14 +69,14 @@ func (r *rpcSentCache) ids() []flow.Identifier {
 	return flow.GetIDs(r.c.All())
 }
 
-// remove the record of the given messageID from the cache.
+// remove the record of the given messageEntityID from the cache.
 // Returns true if the record is removed, false otherwise (i.e., the record does not exist).
 // Args:
-// - flow.Identifier: the messageID to store the rpc control message.
+// - flow.Identifier: the messageEntityID to store the rpc control message.
 // Returns:
 // - true if the record is removed, false otherwise (i.e., the record does not exist).
-func (r *rpcSentCache) remove(messageID flow.Identifier) bool {
-	return r.c.Remove(messageID)
+func (r *rpcSentCache) remove(messageEntityID flow.Identifier) bool {
+	return r.c.Remove(messageEntityID)
 }
 
 // size returns the number of records in the cache.
