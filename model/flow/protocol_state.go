@@ -25,6 +25,27 @@ type ProtocolStateEntry struct {
 	NextEpochProtocolState *ProtocolStateEntry
 }
 
+// RichProtocolStateEntry is a ProtocolStateEntry which has additional fields that are cached
+// from storage layer for convenience.
+// Using this structure instead of ProtocolStateEntry allows us to avoid querying
+// the database for epoch setups and commits and full identity table.
+// It holds several invariants, such as:
+// - CurrentEpochSetup and CurrentEpochCommit are for the same epoch. Never nil.
+// - PreviousEpochSetup and PreviousEpochCommit are for the same epoch. Never nil.
+// - Identities is a full identity table for the current epoch. Identities are sorted in canonical order. Never nil.
+// - NextEpochProtocolState is a protocol state for the next epoch. Can be nil.
+type RichProtocolStateEntry struct {
+	ProtocolStateEntry
+
+	CurrentEpochSetup   *EpochSetup
+	CurrentEpochCommit  *EpochCommit
+	PreviousEpochSetup  *EpochSetup
+	PreviousEpochCommit *EpochCommit
+	Identities          IdentityList
+
+	NextEpochProtocolState *RichProtocolStateEntry
+}
+
 // ID returns hash of entry by hashing all fields.
 func (e *ProtocolStateEntry) ID() Identifier {
 	if e == nil {

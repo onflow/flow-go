@@ -12,7 +12,7 @@ type ProtocolState interface {
 	// Index indexes the protocol state by block ID.
 	Index(blockID flow.Identifier, protocolStateID flow.Identifier) func(*transaction.Tx) error
 	// ByID returns the protocol state by its ID.
-	ByID(id flow.Identifier) (*flow.ProtocolStateEntry, error)
+	ByID(id flow.Identifier) (*flow.RichProtocolStateEntry, error)
 	// ByBlockID returns the protocol state by block ID.
-	ByBlockID(blockID flow.Identifier) (*flow.ProtocolStateEntry, error)
+	ByBlockID(blockID flow.Identifier) (*flow.RichProtocolStateEntry, error)
 }
