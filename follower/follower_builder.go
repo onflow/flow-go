@@ -604,11 +604,15 @@ func (builder *FollowerServiceBuilder) initPublicLibp2pNode(networkKey crypto.Pr
 		pis = append(pis, pi)
 	}
 
-	meshTracer := tracer.NewGossipSubMeshTracer(
-		builder.Logger,
-		builder.Metrics.Network,
-		builder.IdentityProvider,
-		builder.FlowConfig.NetworkConfig.GossipSubConfig.LocalMeshLogInterval)
+	meshTracerCfg := &tracer.GossipSubMeshTracerConfig{
+		Logger:                       builder.Logger,
+		Metrics:                      builder.Metrics.Network,
+		IDProvider:                   builder.IdentityProvider,
+		LoggerInterval:               builder.FlowConfig.NetworkConfig.GossipSubConfig.LocalMeshLogInterval,
+		RpcSentTrackerCacheCollector: metrics.GossipSubRPCSentTrackerMetricFactory(builder.HeroCacheMetricsFactory(), network.PublicNetwork),
+		RpcSentTrackerCacheSize:      builder.FlowConfig.NetworkConfig.GossipSubConfig.RPCSentTrackerCacheSize,
+	}
+	meshTracer := tracer.NewGossipSubMeshTracer(meshTracerCfg)
 
 	node, err := p2pbuilder.NewNodeBuilder(
 		builder.Logger,
