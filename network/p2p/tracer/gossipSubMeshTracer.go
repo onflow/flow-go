@@ -61,7 +61,7 @@ type GossipSubMeshTracerConfig struct {
 func NewGossipSubMeshTracer(config *GossipSubMeshTracerConfig) (*GossipSubMeshTracer, error) {
 	rpcSentTracker, err := internal.NewRPCSentTracker(config.Logger, config.RpcSentTrackerCacheSize, config.RpcSentTrackerCacheCollector)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errof("could not create rpc send tracker: %w", err)
 	}
 
 	g := &GossipSubMeshTracer{
