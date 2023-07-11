@@ -649,6 +649,6 @@ func ProtocolSnapshotWithSourceFixture(source []byte) protocol.Snapshot {
 func ProtocolStateWithSourceFixture(source []byte) protocol.State {
 	snapshot := ProtocolSnapshotWithSourceFixture(source)
 	state := protocolMock.State{}
-	state.On("AtBlockID", mock.Anything).Return(&snapshot)
+	state.On("AtBlockID", mock.Anything).Return(snapshot)
 	return &state
 }
