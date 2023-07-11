@@ -18,6 +18,7 @@ import (
 	"github.com/onflow/flow/protobuf/go/flow/execution"
 	"github.com/stretchr/testify/assert"
 	testifymock "github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -432,7 +433,7 @@ func TestExecutionNodeClientClosedGracefully(t *testing.T) {
 		en, closer := createExecNode()
 		defer closer()
 
-		// setup the handler mock to not respond within the timeout
+		// setup the handler mock
 		req := &execution.PingRequest{}
 		resp := &execution.PingResponse{}
 		respSent := atomic.NewUint64(0)

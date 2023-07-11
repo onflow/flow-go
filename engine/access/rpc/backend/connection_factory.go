@@ -17,7 +17,6 @@ import (
 	"github.com/onflow/flow/protobuf/go/flow/execution"
 	"github.com/rs/zerolog"
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/connectivity"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/keepalive"
 
@@ -70,32 +69,13 @@ type ConnectionFactoryImpl struct {
 type CachedClient struct {
 	ClientConn     *grpc.ClientConn
 	Address        string
-	mutex          sync.Mutex
 	timeout        time.Duration
-	requestCounter *atomic.Int32
 	closeRequested *atomic.Bool
-	done           chan struct{}
-}
-
-func (s *CachedClient) UpdateConnection(conn *grpc.ClientConn) {
-	s.ClientConn = conn
-	s.closeRequested.Store(false)
-	s.requestCounter.Store(0)
-	s.done = make(chan struct{}, 1)
-}
-
-func NewCachedClient(timeout time.Duration, address string) *CachedClient {
-	return &CachedClient{
-		Address:        address,
-		timeout:        timeout,
-		requestCounter: atomic.NewInt32(0),
-		closeRequested: atomic.NewBool(false),
-		done:           make(chan struct{}, 1),
-	}
+	wg             sync.WaitGroup
 }
 
 // createConnection creates new gRPC connections to remote node
-func (cf *ConnectionFactoryImpl) createConnection(address string, timeout time.Duration) (*grpc.ClientConn, error) {
+func (cf *ConnectionFactoryImpl) createConnection(address string, timeout time.Duration, cachedClient *CachedClient) (*grpc.ClientConn, error) {
 
 	if timeout == 0 {
 		timeout = DefaultClientTimeout
@@ -110,11 +90,8 @@ func (cf *ConnectionFactoryImpl) createConnection(address string, timeout time.D
 
 	var connInterceptors []grpc.UnaryClientInterceptor
 
-	if cf.ConnectionsCache != nil {
-		if res, ok := cf.ConnectionsCache.Get(address); ok {
-			cachedClient := res.(*CachedClient)
-			connInterceptors = append(connInterceptors, createRequestWatcherInterceptor(cachedClient))
-		}
+	if cachedClient != nil {
+		connInterceptors = append(connInterceptors, createRequestWatcherInterceptor(cachedClient))
 	}
 
 	connInterceptors = append(connInterceptors, createClientTimeoutInterceptor(timeout))
@@ -137,45 +114,35 @@ func (cf *ConnectionFactoryImpl) createConnection(address string, timeout time.D
 }
 
 func (cf *ConnectionFactoryImpl) retrieveConnection(grpcAddress string, timeout time.Duration) (*grpc.ClientConn, error) {
-	var conn *grpc.ClientConn
-	var store *CachedClient
-	cacheHit := false
 	cf.mutex.Lock()
-	if res, ok := cf.ConnectionsCache.Get(grpcAddress); ok {
-		cacheHit = true
-		store = res.(*CachedClient)
-		conn = store.ClientConn
-	} else {
-		store = NewCachedClient(timeout, grpcAddress)
 
-		cf.Log.Debug().Str("cached_client_added", grpcAddress).Msg("adding new cached client to pool")
-		cf.ConnectionsCache.Add(grpcAddress, store)
-		if cf.AccessMetrics != nil {
-			cf.AccessMetrics.ConnectionAddedToPool()
-		}
+	store := &CachedClient{
+		ClientConn:     nil,
+		Address:        grpcAddress,
+		timeout:        timeout,
+		closeRequested: atomic.NewBool(false),
+		wg:             sync.WaitGroup{},
+	}
+
+	cf.Log.Debug().Str("cached_client_added", grpcAddress).Msg("adding new cached client to pool")
+	cf.ConnectionsCache.Add(grpcAddress, store)
+	if cf.AccessMetrics != nil {
+		cf.AccessMetrics.ConnectionAddedToPool()
+	}
+
+	conn, err := cf.createConnection(grpcAddress, timeout, store)
+	if err != nil {
+		return nil, err
+	}
+	store.ClientConn = conn
+
+	if cf.AccessMetrics != nil {
+		cf.AccessMetrics.NewConnectionEstablished()
+		cf.AccessMetrics.TotalConnectionsInPool(uint(cf.ConnectionsCache.Len()), cf.CacheSize)
 	}
 
 	cf.mutex.Unlock()
-	store.mutex.Lock()
-	defer store.mutex.Unlock()
 
-	if conn == nil || conn.GetState() == connectivity.Shutdown {
-		var err error
-		conn, err = cf.createConnection(grpcAddress, timeout)
-		if err != nil {
-			return nil, err
-		}
-		store.UpdateConnection(conn)
-		if cf.AccessMetrics != nil {
-			if cacheHit {
-				cf.AccessMetrics.ConnectionFromPoolUpdated()
-			}
-			cf.AccessMetrics.NewConnectionEstablished()
-			cf.AccessMetrics.TotalConnectionsInPool(uint(cf.ConnectionsCache.Len()), cf.CacheSize)
-		}
-	} else if cf.AccessMetrics != nil {
-		cf.AccessMetrics.ConnectionFromPoolReused()
-	}
 	return conn, nil
 }
 
@@ -199,7 +166,7 @@ func (cf *ConnectionFactoryImpl) GetAccessAPIClientWithPort(address string, port
 		return access.NewAccessAPIClient(conn), &noopCloser{}, err
 	}
 
-	conn, err = cf.createConnection(grpcAddress, cf.CollectionNodeGRPCTimeout)
+	conn, err = cf.createConnection(grpcAddress, cf.CollectionNodeGRPCTimeout, nil)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -232,7 +199,7 @@ func (cf *ConnectionFactoryImpl) GetExecutionAPIClient(address string) (executio
 		return execution.NewExecutionAPIClient(conn), &noopCloser{}, nil
 	}
 
-	conn, err = cf.createConnection(grpcAddress, cf.ExecutionNodeGRPCTimeout)
+	conn, err = cf.createConnection(grpcAddress, cf.ExecutionNodeGRPCTimeout, nil)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -249,38 +216,36 @@ func (cf *ConnectionFactoryImpl) InvalidateExecutionAPIClient(address string) {
 	}
 }
 
+// invalidateAPIClient invalidates the access API client associated with the given address and port.
+// It removes the cached client from the ConnectionsCache and closes the connection.
 func (cf *ConnectionFactoryImpl) invalidateAPIClient(address string, port uint) {
 	grpcAddress, _ := getGRPCAddress(address, port)
 	if res, ok := cf.ConnectionsCache.Get(grpcAddress); ok {
 		store := res.(*CachedClient)
-		store.Close()
-		if cf.AccessMetrics != nil {
-			cf.AccessMetrics.ConnectionFromPoolInvalidated()
+		// Check if it is possible to remove cached client from cache, or it is already removed or being processed
+		if cf.ConnectionsCache.Remove(grpcAddress) {
+			// Close the connection only if it is successfully removed from the cache
+			store.Close()
+			if cf.AccessMetrics != nil {
+				cf.AccessMetrics.ConnectionFromPoolInvalidated()
+			}
 		}
 	}
 }
 
-// Close closes the CachedClient connection
+// Close closes the CachedClient connection. It marks the connection for closure and waits asynchronously for ongoing
+// requests to complete before closing the connection.
 func (s *CachedClient) Close() {
-	s.mutex.Lock()
-	conn := s.ClientConn
-	s.ClientConn = nil
-	s.mutex.Unlock()
-
-	if conn == nil {
-		return
-	}
-
 	// Mark the connection for closure
 	s.closeRequested.Store(true)
 
-	// If there are ongoing requests, wait for them to complete
-	if s.requestCounter.Load() > 0 {
-		<-s.done
-	}
+	// If there are ongoing requests, wait for them to complete asynchronously
+	go func() {
+		s.wg.Wait()
 
-	// Close the connection
-	conn.Close()
+		// Close the connection
+		s.ClientConn.Close()
+	}()
 }
 
 // getExecutionNodeAddress translates flow.Identity address to the GRPC address of the node by switching the port to the
@@ -314,20 +279,13 @@ func createRequestWatcherInterceptor(cachedClient *CachedClient) grpc.UnaryClien
 		}
 
 		// Increment the request counter to track ongoing requests
-		cachedClient.requestCounter.Add(1)
+		cachedClient.wg.Add(1)
 
 		// Invoke the actual RPC method
 		err := invoker(ctx, method, req, reply, cc, opts...)
 
-		// Decrement the request counter and check if the connection is marked for closure and no more ongoing requests
-		count := cachedClient.requestCounter.Add(-1)
-		if cachedClient.closeRequested.Load() && count == 0 {
-			// Signal that all ongoing requests have completed
-			select {
-			case cachedClient.done <- struct{}{}:
-			default:
-			}
-		}
+		// Decrement the request counter
+		cachedClient.wg.Done()
 
 		return err
 	}
