@@ -176,7 +176,7 @@ func (s *ObserverSuite) TestObserverRPC() {
 // TestObserverRest runs the following tests:
 // 1. CompareEndpoints: verifies that the observer client returns the same errors as the access client for rests proxied to the upstream AN
 // 2. HandledByUpstream: stops the upstream AN and verifies that the observer client returns errors for all rests handled by the upstream
-// 3. HandledByObserver: stops the upstream AN and verifies that the observer client handles all others queries
+// 3. HandledByObserver: stops the upstream AN and verifies that the observer client handles all other queries
 func (s *ObserverSuite) TestObserverRest() {
 	t := s.T()
 
@@ -189,7 +189,11 @@ func (s *ObserverSuite) TestObserverRest() {
 		case http.MethodGet:
 			return httpClient.Get(url)
 		case http.MethodPost:
-			return httpClient.Post(url, "application/json", body)
+			if body == nil {
+				return httpClient.Post(url, "application/json", strings.NewReader("{}"))
+			} else {
+				return httpClient.Post(url, "application/json", body)
+			}
 		}
 		panic("not supported")
 	}
@@ -450,7 +454,6 @@ func (s *ObserverSuite) getRestEndpoints() []RestEndpointTest {
 			name:   "executeScript",
 			method: http.MethodPost,
 			path:   "/scripts",
-			body:   strings.NewReader("{}"),
 		},
 		{
 			name:   "getAccount",
