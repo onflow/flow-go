@@ -64,21 +64,6 @@ func (r *rpcSentCache) has(messageEntityID flow.Identifier) bool {
 	return r.c.Has(messageEntityID)
 }
 
-// ids returns the list of ids of each rpcSentEntity stored.
-func (r *rpcSentCache) ids() []flow.Identifier {
-	return flow.GetIDs(r.c.All())
-}
-
-// remove the record of the given messageEntityID from the cache.
-// Returns true if the record is removed, false otherwise (i.e., the record does not exist).
-// Args:
-// - flow.Identifier: the messageEntityID to store the rpc control message.
-// Returns:
-// - true if the record is removed, false otherwise (i.e., the record does not exist).
-func (r *rpcSentCache) remove(messageEntityID flow.Identifier) bool {
-	return r.c.Remove(messageEntityID)
-}
-
 // size returns the number of records in the cache.
 func (r *rpcSentCache) size() uint {
 	return r.c.Size()

@@ -1,7 +1,6 @@
 package internal
 
 import (
-	"fmt"
 	"sync"
 	"testing"
 	"time"
@@ -102,111 +101,6 @@ func TestCache_ConcurrentSameRecordInit(t *testing.T) {
 
 	// ensure that the record is correctly initialized in the cache
 	require.True(t, cache.has(id))
-}
-
-// TestCache_Remove tests the remove method of the RecordCache.
-// The test covers the following scenarios:
-// 1. Initializing the cache with multiple records.
-// 2. Removing a record and checking if it is removed correctly.
-// 3. Ensuring the other records are still in the cache after removal.
-// 4. Attempting to remove a non-existent ID.
-func TestCache_Remove(t *testing.T) {
-	cache := cacheFixture(t, 100, zerolog.Nop(), metrics.NewNoopCollector())
-	controlMsgType := p2pmsg.CtrlMsgIHave
-	// initialize spam records for a few ids
-	id1 := unittest.IdentifierFixture()
-	id2 := unittest.IdentifierFixture()
-	id3 := unittest.IdentifierFixture()
-
-	require.True(t, cache.init(id1, controlMsgType))
-	require.True(t, cache.init(id2, controlMsgType))
-	require.True(t, cache.init(id3, controlMsgType))
-
-	numOfIds := uint(3)
-	require.Equal(t, numOfIds, cache.size(), fmt.Sprintf("expected size of the cache to be %d", numOfIds))
-	// remove id1 and check if the record is removed
-	require.True(t, cache.remove(id1))
-	require.NotContains(t, id1, cache.ids())
-
-	// check if the other ids are still in the cache
-	require.True(t, cache.has(id2))
-	require.True(t, cache.has(id3))
-
-	// attempt to remove a non-existent ID
-	id4 := unittest.IdentifierFixture()
-	require.False(t, cache.remove(id4))
-}
-
-// TestCache_ConcurrentRemove tests the concurrent removal of records for different ids.
-// The test covers the following scenarios:
-// 1. Multiple goroutines removing records for different ids concurrently.
-// 2. The records are correctly removed from the cache.
-func TestCache_ConcurrentRemove(t *testing.T) {
-	cache := cacheFixture(t, 100, zerolog.Nop(), metrics.NewNoopCollector())
-	controlMsgType := p2pmsg.CtrlMsgIHave
-	ids := unittest.IdentifierListFixture(10)
-	for _, id := range ids {
-		cache.init(id, controlMsgType)
-	}
-
-	var wg sync.WaitGroup
-	wg.Add(len(ids))
-
-	for _, id := range ids {
-		go func(id flow.Identifier) {
-			defer wg.Done()
-			require.True(t, cache.remove(id))
-			require.NotContains(t, id, cache.ids())
-		}(id)
-	}
-
-	unittest.RequireReturnsBefore(t, wg.Wait, 100*time.Millisecond, "timed out waiting for goroutines to finish")
-
-	require.Equal(t, uint(0), cache.size())
-}
-
-// TestRecordCache_ConcurrentInitAndRemove tests the concurrent initialization and removal of records for different
-// ids. The test covers the following scenarios:
-// 1. Multiple goroutines initializing records for different ids concurrently.
-// 2. Multiple goroutines removing records for different ids concurrently.
-// 3. The initialized records are correctly added to the cache.
-// 4. The removed records are correctly removed from the cache.
-func TestRecordCache_ConcurrentInitAndRemove(t *testing.T) {
-	cache := cacheFixture(t, 100, zerolog.Nop(), metrics.NewNoopCollector())
-	controlMsgType := p2pmsg.CtrlMsgIHave
-	ids := unittest.IdentifierListFixture(20)
-	idsToAdd := ids[:10]
-	idsToRemove := ids[10:]
-
-	for _, id := range idsToRemove {
-		cache.init(id, controlMsgType)
-	}
-
-	var wg sync.WaitGroup
-	wg.Add(len(ids))
-
-	// initialize spam records concurrently
-	for _, id := range idsToAdd {
-		go func(id flow.Identifier) {
-			defer wg.Done()
-			cache.init(id, controlMsgType)
-		}(id)
-	}
-
-	// remove spam records concurrently
-	for _, id := range idsToRemove {
-		go func(id flow.Identifier) {
-			defer wg.Done()
-			require.True(t, cache.remove(id))
-			require.NotContains(t, id, cache.ids())
-		}(id)
-	}
-
-	unittest.RequireReturnsBefore(t, wg.Wait, 100*time.Millisecond, "timed out waiting for goroutines to finish")
-
-	// ensure that the initialized records are correctly added to the cache
-	// and removed records are correctly removed from the cache
-	require.ElementsMatch(t, idsToAdd, cache.ids())
 }
 
 // cacheFixture returns a new *RecordCache.
