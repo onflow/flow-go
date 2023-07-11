@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/atomic"
 
+	"github.com/onflow/flow-go/config"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
@@ -30,6 +31,8 @@ import (
 // One of the nodes is running with an unknown peer id, which the identity provider is mocked to return an error and
 // the mesh tracer should log a warning message.
 func TestGossipSubMeshTracer(t *testing.T) {
+	defaultConfig, err := config.DefaultConfig()
+	require.NoError(t, err)
 	ctx, cancel := context.WithCancel(context.Background())
 	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
 	sporkId := unittest.IdentifierFixture()
@@ -66,9 +69,9 @@ func TestGossipSubMeshTracer(t *testing.T) {
 		Logger:                       logger,
 		Metrics:                      collector,
 		IDProvider:                   idProvider,
-		LoggerInterval:               1 * time.Second,
+		LoggerInterval:               time.Second,
 		RpcSentTrackerCacheCollector: metrics.NewNoopCollector(),
-		RpcSentTrackerCacheSize:      uint32(100),
+		RpcSentTrackerCacheSize:      defaultConfig.NetworkConfig.GossipSubConfig.RPCSentTrackerCacheSize,
 	}
 	meshTracer, err := tracer.NewGossipSubMeshTracer(meshTracerCfg)
 	require.NoError(t, err)
