@@ -81,6 +81,11 @@ func (src *source) Int63() int64 {
 }
 
 // creates a source using a crypto PRG and secure random seed
+// returned errors:
+//   - exception error if the system randomness fails (the system and other components would
+//     have many other issues if this happens)
+//   - exception error if the CSPRG (Chacha20) isn't initialized properly (should not happen in normal
+//     operations)
 func newSource() (*source, error) {
 	seed := make([]byte, random.Chacha20SeedLen)
 	_, err := rand.Read(seed) // checking err only is enough
@@ -89,6 +94,7 @@ func newSource() (*source, error) {
 	}
 	prg, err := random.NewChacha20PRG(seed, nil)
 	if err != nil {
+		// should not happen in normal operations because `seed` has the correct length
 		return nil, fmt.Errorf("failed to generate a PRG: %w", err)
 	}
 	return &source{prg}, nil
