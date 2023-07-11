@@ -11,9 +11,10 @@ import (
 	p2pmsg "github.com/onflow/flow-go/network/p2p/message"
 )
 
+// rpcCtrlMsgSentCacheConfig configuration for the rpc sent cache.
 type rpcCtrlMsgSentCacheConfig struct {
-	sizeLimit uint32
 	logger    zerolog.Logger
+	sizeLimit uint32
 	collector module.HeroCacheMetrics
 }
 
