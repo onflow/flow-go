@@ -22,6 +22,7 @@ import (
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/engine"
+	"github.com/onflow/flow-go/engine/access/rest/util"
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/bitutils"
@@ -2459,5 +2460,37 @@ func ChunkExecutionDataFixture(t *testing.T, minSize int, opts ...func(*executio
 
 		ced.TrieUpdate.Payloads[0] = ledger.NewPayload(k, v)
 		size *= 2
+	}
+}
+
+func ValidCreateBody(tx flow.TransactionBody) map[string]interface{} {
+	tx.Arguments = [][]uint8{} // fix how fixture creates nil values
+	auth := make([]string, len(tx.Authorizers))
+	for i, a := range tx.Authorizers {
+		auth[i] = a.String()
+	}
+
+	return map[string]interface{}{
+		"script":             util.ToBase64(tx.Script),
+		"arguments":          tx.Arguments,
+		"reference_block_id": tx.ReferenceBlockID.String(),
+		"gas_limit":          fmt.Sprintf("%d", tx.GasLimit),
+		"payer":              tx.Payer.String(),
+		"proposal_key": map[string]interface{}{
+			"address":         tx.ProposalKey.Address.String(),
+			"key_index":       fmt.Sprintf("%d", tx.ProposalKey.KeyIndex),
+			"sequence_number": fmt.Sprintf("%d", tx.ProposalKey.SequenceNumber),
+		},
+		"authorizers": auth,
+		"payload_signatures": []map[string]interface{}{{
+			"address":   tx.PayloadSignatures[0].Address.String(),
+			"key_index": fmt.Sprintf("%d", tx.PayloadSignatures[0].KeyIndex),
+			"signature": util.ToBase64(tx.PayloadSignatures[0].Signature),
+		}},
+		"envelope_signatures": []map[string]interface{}{{
+			"address":   tx.EnvelopeSignatures[0].Address.String(),
+			"key_index": fmt.Sprintf("%d", tx.EnvelopeSignatures[0].KeyIndex),
+			"signature": util.ToBase64(tx.EnvelopeSignatures[0].Signature),
+		}},
 	}
 }

@@ -1,8 +1,11 @@
 package access
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"strings"
 	"testing"
@@ -173,7 +176,7 @@ func (s *ObserverSuite) TestObserverRPC() {
 // TestObserverRest runs the following tests:
 // 1. CompareRPCs: verifies that the observer client returns the same errors as the access client for rests proxied to the upstream AN
 // 2. HandledByUpstream: stops the upstream AN and verifies that the observer client returns errors for all rests handled by the upstream
-// 3. HandledByObserver: stops the upstream AN and verifies that the observer client handles all other queries
+// 3. HandledByObserver: stops the upstream AN and verifies that the observer client handles all others queries
 func (s *ObserverSuite) TestObserverRest() {
 	t := s.T()
 
@@ -186,7 +189,14 @@ func (s *ObserverSuite) TestObserverRest() {
 		case http.MethodGet:
 			return httpClient.Get(url)
 		case http.MethodPost:
-			return httpClient.Post(url, "application/json", strings.NewReader("{}"))
+			var body io.Reader
+			if strings.Contains(url, "/transactions") {
+				body = createTx(s.net)
+			} else {
+				body = strings.NewReader("{}")
+			}
+
+			return httpClient.Post(url, "application/json", body)
 		}
 		panic("not supported")
 	}
@@ -210,6 +220,7 @@ func (s *ObserverSuite) TestObserverRest() {
 				assert.NoError(t, accessErr)
 				assert.NoError(t, observerErr)
 				assert.Equal(t, accessResp.Status, observerResp.Status)
+				assert.Equal(t, accessResp.StatusCode, observerResp.StatusCode)
 			})
 		}
 	})
@@ -219,7 +230,7 @@ func (s *ObserverSuite) TestObserverRest() {
 	require.NoError(t, err)
 
 	t.Run("HandledByUpstream", func(t *testing.T) {
-		// verify that we receive StatusInternalServerError, StatusServiceUnavailable, StatusBadRequest errors from all rests handled upstream
+		// verify that we receive StatusInternalServerError, StatusServiceUnavailable errors from all rests handled upstream
 		for _, endpoint := range s.getRestEndpoints() {
 			if _, local := s.localRest[endpoint.name]; local {
 				continue
@@ -229,8 +240,7 @@ func (s *ObserverSuite) TestObserverRest() {
 				require.NoError(t, observerErr)
 				assert.Contains(t, [...]int{
 					http.StatusInternalServerError,
-					http.StatusServiceUnavailable,
-					http.StatusBadRequest}, observerResp.StatusCode)
+					http.StatusServiceUnavailable}, observerResp.StatusCode)
 			})
 		}
 	})
@@ -393,7 +403,7 @@ func (s *ObserverSuite) getRestEndpoints() []RestEndpointTest {
 	block := unittest.BlockFixture()
 	executionResult := unittest.ExecutionResultFixture()
 	collection := unittest.CollectionFixture(2)
-	blockEvents := unittest.BlockEventsFixture(unittest.BlockHeaderFixture(unittest.WithHeaderHeight(uint64(2))), 2)
+	eventType := "A.0123456789abcdef.flow.event"
 
 	return []RestEndpointTest{
 		{
@@ -454,7 +464,7 @@ func (s *ObserverSuite) getRestEndpoints() []RestEndpointTest {
 		{
 			name:   "getEvents",
 			method: http.MethodGet,
-			path:   fmt.Sprintf("/events?type=%s&start_height=%d&end_height=%d", blockEvents.Events[0].Type, 1, 3),
+			path:   fmt.Sprintf("/events?type=%s&start_height=%d&end_height=%d", eventType, 1, 3),
 		},
 		{
 			name:   "getNetworkParameters",
@@ -467,4 +477,23 @@ func (s *ObserverSuite) getRestEndpoints() []RestEndpointTest {
 			path:   "/node_version_info",
 		},
 	}
+}
+
+func createTx(net *testnet.FlowNetwork) *bytes.Buffer {
+	flowAddr := flow.Localnet.Chain().ServiceAddress()
+	signature := unittest.TransactionSignatureFixture()
+	signature.Address = flowAddr
+
+	tx := flow.NewTransactionBody().
+		AddAuthorizer(flowAddr).
+		SetPayer(flowAddr).
+		SetScript(unittest.NoopTxScript()).
+		SetReferenceBlockID(net.Root().ID()).
+		SetProposalKey(flowAddr, 1, 0)
+	tx.PayloadSignatures = []flow.TransactionSignature{signature}
+	tx.EnvelopeSignatures = []flow.TransactionSignature{signature}
+
+	jsonBody, _ := json.Marshal(unittest.ValidCreateBody(*tx))
+
+	return bytes.NewBuffer(jsonBody)
 }

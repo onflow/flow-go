@@ -69,38 +69,6 @@ func createTransactionReq(body interface{}) *http.Request {
 	return req
 }
 
-func validCreateBody(tx flow.TransactionBody) map[string]interface{} {
-	tx.Arguments = [][]uint8{} // fix how fixture creates nil values
-	auth := make([]string, len(tx.Authorizers))
-	for i, a := range tx.Authorizers {
-		auth[i] = a.String()
-	}
-
-	return map[string]interface{}{
-		"script":             util.ToBase64(tx.Script),
-		"arguments":          tx.Arguments,
-		"reference_block_id": tx.ReferenceBlockID.String(),
-		"gas_limit":          fmt.Sprintf("%d", tx.GasLimit),
-		"payer":              tx.Payer.String(),
-		"proposal_key": map[string]interface{}{
-			"address":         tx.ProposalKey.Address.String(),
-			"key_index":       fmt.Sprintf("%d", tx.ProposalKey.KeyIndex),
-			"sequence_number": fmt.Sprintf("%d", tx.ProposalKey.SequenceNumber),
-		},
-		"authorizers": auth,
-		"payload_signatures": []map[string]interface{}{{
-			"address":   tx.PayloadSignatures[0].Address.String(),
-			"key_index": fmt.Sprintf("%d", tx.PayloadSignatures[0].KeyIndex),
-			"signature": util.ToBase64(tx.PayloadSignatures[0].Signature),
-		}},
-		"envelope_signatures": []map[string]interface{}{{
-			"address":   tx.EnvelopeSignatures[0].Address.String(),
-			"key_index": fmt.Sprintf("%d", tx.EnvelopeSignatures[0].KeyIndex),
-			"signature": util.ToBase64(tx.EnvelopeSignatures[0].Signature),
-		}},
-	}
-}
-
 func TestGetTransactions(t *testing.T) {
 	t.Run("get by ID without results", func(t *testing.T) {
 		backend := &mock.API{}
@@ -380,7 +348,7 @@ func TestCreateTransaction(t *testing.T) {
 		tx := unittest.TransactionBodyFixture()
 		tx.PayloadSignatures = []flow.TransactionSignature{unittest.TransactionSignatureFixture()}
 		tx.Arguments = [][]uint8{}
-		req := createTransactionReq(validCreateBody(tx))
+		req := createTransactionReq(unittest.ValidCreateBody(tx))
 
 		backend.Mock.
 			On("SendTransaction", mocks.Anything, &tx).
@@ -447,7 +415,7 @@ func TestCreateTransaction(t *testing.T) {
 		for _, test := range tests {
 			tx := unittest.TransactionBodyFixture()
 			tx.PayloadSignatures = []flow.TransactionSignature{unittest.TransactionSignatureFixture()}
-			testTx := validCreateBody(tx)
+			testTx := unittest.ValidCreateBody(tx)
 			testTx[test.inputField] = test.inputValue
 			req := createTransactionReq(testTx)
 
