@@ -14,6 +14,8 @@ import (
 )
 
 // ProtocolState implements persistent storage for storing entities of protocol state.
+// Protocol state uses an embedded cache without storing capabilities(store happens on first retrieval) to avoid unnecessary
+// operations and to speed up access to frequently used  protocol states.
 type ProtocolState struct {
 	db    *badger.DB
 	cache *Cache
