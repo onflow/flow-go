@@ -1,6 +1,8 @@
 package internal
 
 import (
+	"fmt"
+
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/model/flow"
@@ -42,29 +44,43 @@ func newRPCSentCache(config *rpcCtrlMsgSentCacheConfig) *rpcSentCache {
 	}
 }
 
-// init initializes the record cached for the given messageEntityID if it does not exist.
+// add initializes the record cached for the given messageEntityID if it does not exist.
 // Returns true if the record is initialized, false otherwise (i.e.: the record already exists).
 // Args:
-// - flow.Identifier: the messageEntityID to store the rpc control message.
-// - p2p.ControlMessageType: the rpc control message type.
+// - topic: the topic ID.
+// - messageId: the message ID.
+// - controlMsgType: the rpc control message type.
 // Returns:
 // - bool: true if the record is initialized, false otherwise (i.e.: the record already exists).
-// Note that if init is called multiple times for the same messageEntityID, the record is initialized only once, and the
+// Note that if add is called multiple times for the same messageEntityID, the record is initialized only once, and the
 // subsequent calls return false and do not change the record (i.e.: the record is not re-initialized).
-func (r *rpcSentCache) init(messageEntityID flow.Identifier, controlMsgType p2pmsg.ControlMessageType) bool {
-	return r.c.Add(newRPCSentEntity(messageEntityID, controlMsgType))
+func (r *rpcSentCache) add(topic string, messageId string, controlMsgType p2pmsg.ControlMessageType) bool {
+	return r.c.Add(newRPCSentEntity(r.rpcSentEntityID(topic, messageId, controlMsgType), controlMsgType))
 }
 
 // has checks if the RPC message has been cached indicating it has been sent.
 // Args:
-// - flow.Identifier: the messageEntityID to store the rpc control message.
+// - topic: the topic ID.
+// - messageId: the message ID.
+// - controlMsgType: the rpc control message type.
 // Returns:
 // - bool: true if the RPC has been cache indicating it was sent from the local node.
-func (r *rpcSentCache) has(messageEntityID flow.Identifier) bool {
-	return r.c.Has(messageEntityID)
+func (r *rpcSentCache) has(topic string, messageId string, controlMsgType p2pmsg.ControlMessageType) bool {
+	return r.c.Has(r.rpcSentEntityID(topic, messageId, controlMsgType))
 }
 
 // size returns the number of records in the cache.
 func (r *rpcSentCache) size() uint {
 	return r.c.Size()
+}
+
+// rpcSentEntityID creates an entity ID from the topic, messageID and control message type.
+// Args:
+// - topic: the topic ID.
+// - messageId: the message ID.
+// - controlMsgType: the rpc control message type.
+// Returns:
+// - flow.Identifier: the entity ID.
+func (r *rpcSentCache) rpcSentEntityID(topic string, messageId string, controlMsgType p2pmsg.ControlMessageType) flow.Identifier {
+	return flow.MakeIDFromFingerPrint([]byte(fmt.Sprintf("%s%s%s", topic, messageId, controlMsgType)))
 }

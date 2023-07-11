@@ -1,12 +1,9 @@
 package internal
 
 import (
-	"fmt"
-
 	pb "github.com/libp2p/go-libp2p-pubsub/pb"
 	"github.com/rs/zerolog"
 
-	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	p2pmsg "github.com/onflow/flow-go/network/p2p/message"
 )
@@ -34,8 +31,7 @@ func (t *RPCSentTracker) OnIHaveRPCSent(iHaves []*pb.ControlIHave) {
 	for _, iHave := range iHaves {
 		topicID := iHave.GetTopicID()
 		for _, messageID := range iHave.GetMessageIDs() {
-			entityMsgID := iHaveRPCSentEntityID(topicID, messageID)
-			t.cache.init(entityMsgID, controlMsgType)
+			t.cache.add(topicID, messageID, controlMsgType)
 		}
 	}
 }
@@ -47,13 +43,5 @@ func (t *RPCSentTracker) OnIHaveRPCSent(iHaves []*pb.ControlIHave) {
 // Returns:
 // - bool: true if the iHave rpc with the provided message ID was sent.
 func (t *RPCSentTracker) WasIHaveRPCSent(topicID, messageID string) bool {
-	entityMsgID := iHaveRPCSentEntityID(topicID, messageID)
-	return t.cache.has(entityMsgID)
-}
-
-// iHaveRPCSentEntityID appends the topicId and messageId and returns the flow.Identifier hash.
-// Each iHave RPC control message contains a single topicId and multiple messageIds, to ensure we
-// produce a unique id for each message we append the messageId to the topicId.
-func iHaveRPCSentEntityID(topicId, messageId string) flow.Identifier {
-	return flow.MakeIDFromFingerPrint([]byte(fmt.Sprintf("%s%s", topicId, messageId)))
+	return t.cache.has(topicID, messageID, p2pmsg.CtrlMsgIHave)
 }
