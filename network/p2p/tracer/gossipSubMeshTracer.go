@@ -58,6 +58,12 @@ type GossipSubMeshTracerConfig struct {
 	RpcSentTrackerCacheSize      uint32
 }
 
+// NewGossipSubMeshTracer creates a new *GossipSubMeshTracer.
+// Args:
+// - *GossipSubMeshTracerConfig: the mesh tracer config.
+// Returns:
+// - *GossipSubMeshTracer: new mesh tracer.
+// - error: if any error is encountered during the creation of the gossipsub mesh tracer, all errors are considered irrecoverable.
 func NewGossipSubMeshTracer(config *GossipSubMeshTracerConfig) (*GossipSubMeshTracer, error) {
 	rpcSentTracker, err := internal.NewRPCSentTracker(config.Logger, config.RpcSentTrackerCacheSize, config.RpcSentTrackerCacheCollector)
 	if err != nil {
