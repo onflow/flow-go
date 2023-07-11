@@ -34,7 +34,7 @@ func newRPCSentCache(config *RPCSentCacheConfig) (*rpcSentCache, error) {
 	backData := herocache.NewCache(config.sizeLimit,
 		herocache.DefaultOversizeFactor,
 		heropool.LRUEjection,
-		config.logger.With().Str("mempool", "gossipsub=rpc-control-messages-sent").Logger(),
+		config.logger.With().Str("mempool", "gossipsub-rpc-control-messages-sent").Logger(),
 		config.collector)
 	return &rpcSentCache{
 		c: stdmap.NewBackend(stdmap.WithBackData(backData)),
