@@ -2,6 +2,7 @@ package scoring
 
 import (
 	"context"
+	"fmt"
 	"testing"
 	"time"
 
@@ -170,8 +171,8 @@ func testGossipSubInvalidMessageDeliveryScoring(t *testing.T, spamMsgFactory fun
 	// ensure that the topic snapshot of the spammer contains a record of at least (60%) of the spam messages sent. The 60% is to account for the messages that were delivered before the score was updated, after the spammer is PRUNED, as well as to account for decay.
 	require.True(t, blkTopicSnapshot.InvalidMessageDeliveries > 0.6*float64(totalSpamMessages), "invalid message deliveries must be greater than %f. invalid message deliveries: %f", 0.9*float64(totalSpamMessages), blkTopicSnapshot.InvalidMessageDeliveries)
 
-	p2ptest.EnsureNoPubsubExchangeBetweenGroups(t, ctx, []p2p.LibP2PNode{victimNode}, []p2p.LibP2PNode{spammer.SpammerNode}, func() (interface{}, channels.Topic) {
-		return unittest.ProposalFixture(), blockTopic
+	p2ptest.EnsureNoPubsubExchangeBetweenGroups(t, ctx, []p2p.LibP2PNode{victimNode}, []p2p.LibP2PNode{spammer.SpammerNode}, blockTopic, func() interface{} {
+		return unittest.ProposalFixture()
 	})
 }
 
@@ -458,12 +459,12 @@ func TestGossipSubMeshDeliveryScoring_Replay_Will_Not_Counted(t *testing.T) {
 
 	// replaying node acts honestly and sends 200 block proposals on the topic mesh. This is just as equal as the
 	// defaultTopicMeshMessageDeliveryThreshold, which prevents the replaying node to be penalized.
-	proposalList := make([]*messages.BlockProposal, 200)
-	for i := 0; i < 200; i++ {
+	proposalList := make([]*messages.BlockProposal, 1000)
+	for i := 0; i < len(proposalList); i++ {
 		proposalList[i] = unittest.ProposalFixture()
 	}
 	i := -1
-	p2ptest.EnsurePubsubMessageExchange(t, ctx, nodes, blockTopic, len(proposalList), func() interface{} {
+	p2ptest.EnsurePubsubMessageExchangeFromNode(t, ctx, replayingNode, thisNode, blockTopic, len(proposalList), func() interface{} {
 		i += 1
 		return proposalList[i]
 	})
@@ -474,6 +475,16 @@ func TestGossipSubMeshDeliveryScoring_Replay_Will_Not_Counted(t *testing.T) {
 		if !ok {
 			return false
 		}
+		topicSnapshot, ok := thisNode.PeerScoreExposer().GetTopicScores(replayingNode.Host().ID())
+		if !ok {
+			return false
+		}
+
+		fmt.Println("replayingNodeScore", replayingNodeScore, "initialReplayingNodeScore", initialReplayingNodeScore, "topic-snapshot-message-deliveries", topicSnapshot[blockTopic.String()].MeshMessageDeliveries)
+		if topicSnapshot[blockTopic.String()].MeshMessageDeliveries != float64(len(proposalList)) {
+			return false
+		}
+
 		if replayingNodeScore < scoring.MaxAppSpecificReward {
 			// ensure the score is high enough so that gossip is routed by victim node to spammer node.
 			return false
@@ -485,32 +496,32 @@ func TestGossipSubMeshDeliveryScoring_Replay_Will_Not_Counted(t *testing.T) {
 
 		initialReplayingNodeScore = replayingNodeScore
 		return true
-	}, 2*time.Second, 100*time.Millisecond)
+	}, 10*time.Second, 100*time.Millisecond)
 
-	//// however, after one decay interval, we expect the score of the under-performing node to be penalized by ~ 2 * -0.05 * MaxAppSpecificReward.
-	//require.Eventually(t, func() bool {
-	//	underPerformingNodeScore, ok := thisNode.PeerScoreExposer().GetScore(replayingNode.Host().ID())
-	//	if !ok {
-	//		return false
-	//	}
-	//	if underPerformingNodeScore > 0.91*scoring.MaxAppSpecificReward { // score must be penalized by ~ 2 * -0.05 * MaxAppSpecificReward.
-	//		return false
-	//	}
-	//	if underPerformingNodeScore < scoring.DefaultGossipThreshold { // even the node is slightly penalized, it should still be able to gossip with this node.
-	//		return false
-	//	}
-	//	if underPerformingNodeScore < scoring.DefaultPublishThreshold { // even the node is slightly penalized, it should still be able to publish to this node.
-	//		return false
-	//	}
-	//	if underPerformingNodeScore < scoring.DefaultGraylistThreshold { // even the node is slightly penalized, it should still be able to establish rpc connection with this node.
-	//		return false
-	//	}
-	//
-	//	return true
-	//}, 3*time.Second, 100*time.Millisecond)
-	//
-	//// even though the under-performing node is penalized, it should still be able to publish and receive messages from this node in both topic meshes.
-	//p2ptest.EnsurePubsubMessageExchange(t, ctx, nodes, blockTopic, 1, func() interface{} {
-	//	return unittest.ProposalFixture()
-	//})
+	// however, after one decay interval, we expect the score of the under-performing node to be penalized by ~ 2 * -0.05 * MaxAppSpecificReward.
+	require.Eventually(t, func() bool {
+		underPerformingNodeScore, ok := thisNode.PeerScoreExposer().GetScore(replayingNode.Host().ID())
+		if !ok {
+			return false
+		}
+		if underPerformingNodeScore > 0.91*scoring.MaxAppSpecificReward { // score must be penalized by ~ 2 * -0.05 * MaxAppSpecificReward.
+			return false
+		}
+		if underPerformingNodeScore < scoring.DefaultGossipThreshold { // even the node is slightly penalized, it should still be able to gossip with this node.
+			return false
+		}
+		if underPerformingNodeScore < scoring.DefaultPublishThreshold { // even the node is slightly penalized, it should still be able to publish to this node.
+			return false
+		}
+		if underPerformingNodeScore < scoring.DefaultGraylistThreshold { // even the node is slightly penalized, it should still be able to establish rpc connection with this node.
+			return false
+		}
+
+		return true
+	}, 3*time.Second, 100*time.Millisecond)
+
+	// even though the under-performing node is penalized, it should still be able to publish and receive messages from this node in both topic meshes.
+	p2ptest.EnsurePubsubMessageExchange(t, ctx, nodes, blockTopic, 1, func() interface{} {
+		return unittest.ProposalFixture()
+	})
 }

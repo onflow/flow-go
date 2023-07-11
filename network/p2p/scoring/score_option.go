@@ -170,9 +170,9 @@ const (
 	// the peer will be penalized by square of the difference between the actual message deliveries and the threshold,
 	// i.e., -w * (actual - threshold)^2 where `actual` and `threshold` are the actual message deliveries and the
 	// threshold, respectively, and `w` is the weight (i.e., defaultTopicMeshMessageDeliveriesWeight).
-	// We set it to 0.1 * defaultTopicMeshMessageDeliveriesCap, which means that with around 200 under-performing
-	// message deliveries within a gossipsub heartbeat interval, the peer will be disconnected.
-	defaultTopicMeshMessageDeliveryThreshold = 0.2 * defaultTopicMeshMessageDeliveriesCap
+	// We set it to 0.1 * defaultTopicMeshMessageDeliveriesCap, which means that with around 100 under-performing
+	// message deliveries within a gossipsub heartbeat interval, the peer will be penalized.
+	defaultTopicMeshMessageDeliveryThreshold = 0.1 * defaultTopicMeshMessageDeliveriesCap
 
 	// defaultTopicMeshDeliveriesWeight is the weight for applying penalty when a peer is under-performing in a topic mesh.
 	// Upon every decay interval, if the number of actual message deliveries is less than the topic mesh message deliveries threshold
