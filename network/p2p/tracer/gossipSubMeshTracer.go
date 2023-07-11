@@ -69,7 +69,7 @@ func NewGossipSubMeshTracer(config *GossipSubMeshTracerConfig) (*GossipSubMeshTr
 		topicMeshMap:   make(map[string]map[peer.ID]struct{}),
 		idProvider:     config.IDProvider,
 		metrics:        config.Metrics,
-		logger:         config.Logger.With().Str("component", "gossip_sub_topology_tracer").Logger(),
+		logger:         config.Logger.With().Str("component", "gossipsub_topology_tracer").Logger(),
 		loggerInterval: config.LoggerInterval,
 		rpcSentTracker: rpcSentTracker,
 	}
