@@ -18,7 +18,7 @@ type RPCSentTracker struct {
 
 // NewRPCSentTracker returns a new *NewRPCSentTracker.
 func NewRPCSentTracker(logger zerolog.Logger, sizeLimit uint32, collector module.HeroCacheMetrics) (*RPCSentTracker, error) {
-	config := &RPCSentCacheConfig{
+	config := &rpcCtrlMsgSentCacheConfig{
 		sizeLimit: sizeLimit,
 		logger:    logger,
 		collector: collector,

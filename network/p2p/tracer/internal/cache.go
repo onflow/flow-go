@@ -11,7 +11,7 @@ import (
 	p2pmsg "github.com/onflow/flow-go/network/p2p/message"
 )
 
-type RPCSentCacheConfig struct {
+type rpcCtrlMsgSentCacheConfig struct {
 	sizeLimit uint32
 	logger    zerolog.Logger
 	collector module.HeroCacheMetrics
@@ -30,7 +30,7 @@ type rpcSentCache struct {
 // - *rpcSentCache: the created cache.
 // Note that this cache is intended to track control messages sent by the local node,
 // it stores a RPCSendEntity using an Id which should uniquely identifies the message being tracked.
-func newRPCSentCache(config *RPCSentCacheConfig) (*rpcSentCache, error) {
+func newRPCSentCache(config *rpcCtrlMsgSentCacheConfig) (*rpcSentCache, error) {
 	backData := herocache.NewCache(config.sizeLimit,
 		herocache.DefaultOversizeFactor,
 		heropool.LRUEjection,

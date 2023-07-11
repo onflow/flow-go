@@ -211,7 +211,7 @@ func TestRecordCache_ConcurrentInitAndRemove(t *testing.T) {
 
 // cacheFixture returns a new *RecordCache.
 func cacheFixture(t *testing.T, sizeLimit uint32, logger zerolog.Logger, collector module.HeroCacheMetrics) *rpcSentCache {
-	config := &RPCSentCacheConfig{
+	config := &rpcCtrlMsgSentCacheConfig{
 		sizeLimit: sizeLimit,
 		logger:    logger,
 		collector: collector,
