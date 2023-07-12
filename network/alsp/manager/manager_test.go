@@ -290,7 +290,7 @@ func TestHandleReportedMisbehavior_And_SlashingViolationsConsumer_Integration(t 
 	ids, nodes, _ := testutils.LibP2PNodeForMiddlewareFixture(t, len(slashingMisbehaviors)+2,
 		p2ptest.WithPeerManagerEnabled(p2ptest.PeerManagerConfigFixture(), nil))
 	mws, _ := testutils.MiddlewareFixtures(t, ids, nodes, testutils.MiddlewareConfigFixture(t), mocknetwork.NewViolationsConsumer(t))
-	networkCfg := testutils.NetworkConfigFixture(t, *ids[0], ids, mws[0], p2p.WithAlspConfig(cfg))
+	networkCfg := testutils.NetworkConfigFixture(t, *ids[0], ids, mws[0], p2p.WithAlspConfig(managerCfgFixture(t)))
 	victimNetwork, err := p2p.NewNetwork(networkCfg)
 	require.NoError(t, err)
 
