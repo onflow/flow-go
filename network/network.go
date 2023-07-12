@@ -58,6 +58,7 @@ type Network interface {
 // Adapter is meant to be utilized by the Conduit interface to send messages to the Network layer to be
 // delivered to the remote targets.
 type Adapter interface {
+	MisbehaviorReportConsumer
 	// UnicastOnChannel sends the message in a reliable way to the given recipient.
 	UnicastOnChannel(channels.Channel, interface{}, flow.Identifier) error
 
@@ -71,7 +72,10 @@ type Adapter interface {
 	// UnRegisterChannel unregisters the engine for the specified channel. The engine will no longer be able to send or
 	// receive messages from that channel.
 	UnRegisterChannel(channel channels.Channel) error
+}
 
+// MisbehaviorReportConsumer set of funcs used to handle MisbehaviorReport disseminated from misbehavior reporters.
+type MisbehaviorReportConsumer interface {
 	// ReportMisbehaviorOnChannel reports the misbehavior of a node on sending a message to the current node that appears
 	// valid based on the networking layer but is considered invalid by the current node based on the Flow protocol.
 	// The misbehavior report is sent to the current node's networking layer on the given channel to be processed.
@@ -80,5 +84,5 @@ type Adapter interface {
 	// - report: The misbehavior report to be sent.
 	// Returns:
 	// none
-	ReportMisbehaviorOnChannel(channels.Channel, MisbehaviorReport)
+	ReportMisbehaviorOnChannel(channel channels.Channel, report MisbehaviorReport)
 }
