@@ -24,6 +24,9 @@ const (
 
 	// MeshLogIntervalWarnMsg is the message logged by the tracer every logInterval if there are unknown peers in the mesh.
 	MeshLogIntervalWarnMsg = "unknown peers in topic mesh peers of local node since last heartbeat"
+
+	// defaultLastHighestIHaveRPCSizeResetInterval this default interval should always be equal to the gossipsub heart beat interval.
+	defaultLastHighestIHaveRPCSizeResetInterval = time.Minute
 )
 
 // The GossipSubMeshTracer component in the GossipSub pubsub.RawTracer that is designed to track the local
@@ -69,12 +72,13 @@ type GossipSubMeshTracerConfig struct {
 func NewGossipSubMeshTracer(config *GossipSubMeshTracerConfig) *GossipSubMeshTracer {
 	lg := config.Logger.With().Str("component", "gossipsub_topology_tracer").Logger()
 	rpcSentTracker := internal.NewRPCSentTracker(&internal.RPCSentTrackerConfig{
-		Logger:                    lg,
-		RPCSentCacheSize:          config.RpcSentTrackerCacheSize,
-		RPCSentCacheCollector:     config.RpcSentTrackerCacheCollector,
-		WorkerQueueCacheCollector: config.RpcSentTrackerWorkerQueueCacheCollector,
-		WorkerQueueCacheSize:      config.RpcSentTrackerWorkerQueueCacheSize,
-		NumOfWorkers:              config.RpcSentTrackerNumOfWorkers,
+		Logger:                             lg,
+		RPCSentCacheSize:                   config.RpcSentTrackerCacheSize,
+		RPCSentCacheCollector:              config.RpcSentTrackerCacheCollector,
+		WorkerQueueCacheCollector:          config.RpcSentTrackerWorkerQueueCacheCollector,
+		WorkerQueueCacheSize:               config.RpcSentTrackerWorkerQueueCacheSize,
+		NumOfWorkers:                       config.RpcSentTrackerNumOfWorkers,
+		LastHighestIhavesSentResetInterval: defaultLastHighestIHaveRPCSizeResetInterval,
 	})
 	g := &GossipSubMeshTracer{
 		RawTracer:      NewGossipSubNoopTracer(),

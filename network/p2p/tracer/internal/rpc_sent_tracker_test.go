@@ -19,7 +19,7 @@ import (
 
 // TestNewRPCSentTracker ensures *RPCSenTracker is created as expected.
 func TestNewRPCSentTracker(t *testing.T) {
-	tracker := mockTracker(t)
+	tracker := mockTracker(t, time.Minute)
 	require.NotNil(t, tracker)
 }
 
@@ -28,7 +28,7 @@ func TestRPCSentTracker_IHave(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
 
-	tracker := mockTracker(t)
+	tracker := mockTracker(t, time.Minute)
 	require.NotNil(t, tracker)
 
 	tracker.Start(signalerCtx)
@@ -81,7 +81,7 @@ func TestRPCSentTracker_LastHighestIHaveRPCSize(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
 
-	tracker := mockTracker(t)
+	tracker := mockTracker(t, 3*time.Second)
 	require.NotNil(t, tracker)
 
 	tracker.Start(signalerCtx)
@@ -116,6 +116,17 @@ func TestRPCSentTracker_LastHighestIHaveRPCSize(t *testing.T) {
 	}, time.Second, 100*time.Millisecond)
 
 	require.Equal(t, int64(expectedLastHighestSize), tracker.LastHighestIHaveRPCSize())
+
+	// after setting sending large RPC lastHighestIHaveRPCSize should reset to 0 after lastHighestIHaveRPCSize reset loop tick
+	largeIhave := 50000
+	require.NoError(t, tracker.RPCSent(rpcFixture(withIhaves(mockIHaveFixture(largeIhave, numOfMessageIds)))))
+	require.Eventually(t, func() bool {
+		return tracker.LastHighestIHaveRPCSize() == int64(largeIhave)
+	}, 1*time.Second, 100*time.Millisecond)
+
+	require.Eventually(t, func() bool {
+		return tracker.LastHighestIHaveRPCSize() == 0
+	}, 4*time.Second, 100*time.Millisecond)
 }
 
 // mockIHaveFixture generate list of iHaves of size n. Each iHave will be created with m number of random message ids.
@@ -132,16 +143,17 @@ func mockIHaveFixture(n, m int) []*pb.ControlIHave {
 	return iHaves
 }
 
-func mockTracker(t *testing.T) *RPCSentTracker {
+func mockTracker(t *testing.T, lastHighestIhavesSentResetInterval time.Duration) *RPCSentTracker {
 	cfg, err := config.DefaultConfig()
 	require.NoError(t, err)
 	tracker := NewRPCSentTracker(&RPCSentTrackerConfig{
-		Logger:                    zerolog.Nop(),
-		RPCSentCacheSize:          cfg.NetworkConfig.GossipSubConfig.RPCSentTrackerCacheSize,
-		RPCSentCacheCollector:     metrics.NewNoopCollector(),
-		WorkerQueueCacheCollector: metrics.NewNoopCollector(),
-		WorkerQueueCacheSize:      cfg.NetworkConfig.GossipSubConfig.RPCSentTrackerQueueCacheSize,
-		NumOfWorkers:              1,
+		Logger:                             zerolog.Nop(),
+		RPCSentCacheSize:                   cfg.NetworkConfig.GossipSubConfig.RPCSentTrackerCacheSize,
+		RPCSentCacheCollector:              metrics.NewNoopCollector(),
+		WorkerQueueCacheCollector:          metrics.NewNoopCollector(),
+		WorkerQueueCacheSize:               cfg.NetworkConfig.GossipSubConfig.RPCSentTrackerQueueCacheSize,
+		NumOfWorkers:                       1,
+		LastHighestIhavesSentResetInterval: lastHighestIhavesSentResetInterval,
 	})
 	return tracker
 }
