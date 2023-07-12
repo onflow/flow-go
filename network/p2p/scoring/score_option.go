@@ -170,8 +170,9 @@ const (
 	// the peer will be penalized by square of the difference between the actual message deliveries and the threshold,
 	// i.e., -w * (actual - threshold)^2 where `actual` and `threshold` are the actual message deliveries and the
 	// threshold, respectively, and `w` is the weight (i.e., defaultTopicMeshMessageDeliveriesWeight).
-	// We set it to 0.1 * defaultTopicMeshMessageDeliveriesCap, which means that with around 100 under-performing
-	// message deliveries within a gossipsub heartbeat interval, the peer will be penalized.
+	// We set it to 0.1 * defaultTopicMeshMessageDeliveriesCap, which means that if a peer delivers less tha 10% of the
+	// maximum number of actual message deliveries in a topic mesh, it will be considered as an under-performing peer
+	// in that topic mesh.
 	defaultTopicMeshMessageDeliveryThreshold = 0.1 * defaultTopicMeshMessageDeliveriesCap
 
 	// defaultTopicMeshDeliveriesWeight is the weight for applying penalty when a peer is under-performing in a topic mesh.
@@ -197,7 +198,8 @@ const (
 	// We set it to the decay interval of the GossipSub scoring system, which is 1 minute.
 	// It means that if a peer delivers a message that it has already seen less than one minute ago,
 	// the delivery will be counted towards the score of the peer in a topic mesh only if the previous sender of the message.
-	// This also prevents replay attacks of messages that are older than one minute.
+	// This also prevents replay attacks of messages that are older than one minute. As replayed messages will not
+	// be counted towards the actual message deliveries of a peer in a topic mesh.
 	defaultMeshMessageDeliveriesWindow = defaultDecayInterval
 
 	// defaultMeshMessageDeliveryActivation is the time interval that we wait for a new peer that joins a topic mesh
