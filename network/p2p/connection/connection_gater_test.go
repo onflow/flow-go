@@ -398,7 +398,7 @@ func ensureCommunicationSilenceAmongGroups(t *testing.T, ctx context.Context, sp
 	p2ptest.EnsureNotConnectedBetweenGroups(t, ctx, groupA, groupB)
 
 	blockTopic := channels.TopicFromChannel(channels.PushBlocks, sporkId)
-	p2ptest.EnsureNoPubsubExchangeBetweenGroups(t, ctx, groupA, groupB, blockTopic, func() interface{} {
+	p2ptest.EnsureNoPubsubExchangeBetweenGroups(t, ctx, groupA, groupB, blockTopic, 1, func() interface{} {
 		return unittest.ProposalFixture()
 	})
 	p2pfixtures.EnsureNoStreamCreationBetweenGroups(t, ctx, groupA, groupB)
