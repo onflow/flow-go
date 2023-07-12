@@ -27,6 +27,7 @@ import (
 	"github.com/onflow/flow-go/network/p2p/scoring"
 	"github.com/onflow/flow-go/network/p2p/tracer"
 	"github.com/onflow/flow-go/network/p2p/utils"
+	"github.com/onflow/flow-go/utils/logging"
 )
 
 // The Builder struct is used to configure and create a new GossipSub pubsub system.
@@ -105,14 +106,21 @@ func (g *Builder) EnableGossipSubScoringWithOverride(override *p2p.PeerScoringCo
 		return
 	}
 	if override.AppSpecificScoreParams != nil {
+		g.logger.Warn().Str(logging.KeyNetworkingSecurity, "true").Msg("overriding app specific score params for gossipsub")
 		g.scoreOptionConfig.OverrideAppSpecificScoreFunction(override.AppSpecificScoreParams)
 	}
 	if override.TopicScoreParams != nil {
 		for topic, params := range override.TopicScoreParams {
+			topicLogger := utils.TopicScoreParamsLogger(g.logger, topic.String(), params)
+			topicLogger.Warn().Str(logging.KeyNetworkingSecurity, "true").Msg("overriding topic score params for gossipsub")
 			g.scoreOptionConfig.OverrideTopicScoreParams(topic, params)
 		}
 	}
 	if override.DecayInterval > 0 {
+		g.logger.Warn().
+			Str(logging.KeyNetworkingSecurity, "true").
+			Dur("decay_interval", override.DecayInterval).
+			Msg("overriding decay interval for gossipsub")
 		g.scoreOptionConfig.OverrideDecayInterval(override.DecayInterval)
 	}
 }
