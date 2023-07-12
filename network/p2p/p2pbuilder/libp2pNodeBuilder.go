@@ -26,6 +26,7 @@ import (
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/irrecoverable"
+	"github.com/onflow/flow-go/module/metrics"
 	flownet "github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/netconf"
 	"github.com/onflow/flow-go/network/p2p"
@@ -244,7 +245,6 @@ func (builder *LibP2PNodeBuilder) Build() (p2p.LibP2PNode, error) {
 	} else {
 		// setting up default resource manager, by hooking in the resource manager metrics reporter.
 		limits := rcmgr.DefaultLimits
-
 		libp2p.SetDefaultServiceLimits(&limits)
 
 		mem, err := allowedMemory(builder.resourceManagerCfg.MemoryLimitRatio)
@@ -495,7 +495,16 @@ func DefaultNodeBuilder(
 		builder.EnableGossipSubPeerScoring(nil)
 	}
 
-	meshTracer := tracer.NewGossipSubMeshTracer(logger, metricsCfg.Metrics, idProvider, gossipCfg.LocalMeshLogInterval)
+	meshTracerCfg := &tracer.GossipSubMeshTracerConfig{
+		Logger:                       logger,
+		Metrics:                      metricsCfg.Metrics,
+		IDProvider:                   idProvider,
+		LoggerInterval:               gossipCfg.LocalMeshLogInterval,
+		RpcSentTrackerCacheCollector: metrics.GossipSubRPCSentTrackerMetricFactory(metricsCfg.HeroCacheFactory, flownet.PrivateNetwork),
+		RpcSentTrackerCacheSize:      gossipCfg.RPCSentTrackerCacheSize,
+	}
+	meshTracer := tracer.NewGossipSubMeshTracer(meshTracerCfg)
+
 	builder.SetGossipSubTracer(meshTracer)
 	builder.SetGossipSubScoreTracerInterval(gossipCfg.ScoreTracerInterval)
 
