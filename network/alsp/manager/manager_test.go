@@ -8,8 +8,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/onflow/flow-go/network/slashing"
-
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -32,6 +30,7 @@ import (
 	"github.com/onflow/flow-go/network/mocknetwork"
 	"github.com/onflow/flow-go/network/p2p"
 	p2ptest "github.com/onflow/flow-go/network/p2p/test"
+	"github.com/onflow/flow-go/network/slashing"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -280,14 +279,8 @@ func TestHandleReportedMisbehavior_And_DisallowListing_Integration(t *testing.T)
 // the pruned spammer nodes are established.
 func TestHandleReportedMisbehavior_And_SlashingViolationsConsumer_Integration(t *testing.T) {
 
-
 	// create 1 victim node, 1 honest node and a node for each slashing violation
-	ids, nodes, _ := testutils.LibP2PNodeForMiddlewareFixture(t,
-		7) // creates 7 nodes (1 victim, 1 honest, 5 spammer nodes one for each slashing violation).
-	mws, _ := testutils.MiddlewareFixtures(t, ids, nodes, testutils.MiddlewareConfigFixture(t), mocknetwork.NewViolationsConsumer(t))
-	networkCfg := testutils.NetworkConfigFixture(t, *ids[0], ids, mws[0], p2p.WithAlspConfig(managerCfgFixture(t)))
-	victimNetwork, err := p2p.NewNetwork(networkCfg)
-	require.NoError(t, err)
+	ids, nodes, _ := testutils.LibP2PNodeForMiddlewareFixture(t, 7) // creates 7 nodes (1 victim, 1 honest, 5 spammer nodes one for each slashing violation).
 	mws, _ := testutils.MiddlewareFixtures(t, ids, nodes, testutils.MiddlewareConfigFixture(t), mocknetwork.NewViolationsConsumer(t))
 	networkCfg := testutils.NetworkConfigFixture(t, *ids[0], ids, mws[0], p2p.WithAlspConfig(managerCfgFixture(t)))
 	victimNetwork, err := p2p.NewNetwork(networkCfg)
