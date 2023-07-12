@@ -703,12 +703,15 @@ func (builder *ObserverServiceBuilder) initPublicLibp2pNode(networkKey crypto.Pr
 	}
 
 	meshTracerCfg := &tracer.GossipSubMeshTracerConfig{
-		Logger:                       builder.Logger,
-		Metrics:                      builder.Metrics.Network,
-		IDProvider:                   builder.IdentityProvider,
-		LoggerInterval:               builder.FlowConfig.NetworkConfig.GossipSubConfig.LocalMeshLogInterval,
-		RpcSentTrackerCacheCollector: metrics.GossipSubRPCSentTrackerMetricFactory(builder.HeroCacheMetricsFactory(), network.PublicNetwork),
-		RpcSentTrackerCacheSize:      builder.FlowConfig.NetworkConfig.GossipSubConfig.RPCSentTrackerCacheSize,
+		Logger:                                  builder.Logger,
+		Metrics:                                 builder.Metrics.Network,
+		IDProvider:                              builder.IdentityProvider,
+		LoggerInterval:                          builder.FlowConfig.NetworkConfig.GossipSubConfig.LocalMeshLogInterval,
+		RpcSentTrackerCacheCollector:            metrics.GossipSubRPCSentTrackerMetricFactory(builder.HeroCacheMetricsFactory(), network.PublicNetwork),
+		RpcSentTrackerCacheSize:                 builder.FlowConfig.NetworkConfig.GossipSubConfig.RPCSentTrackerCacheSize,
+		RpcSentTrackerWorkerQueueCacheSize:      builder.FlowConfig.NetworkConfig.GossipSubConfig.RPCSentTrackerQueueCacheSize,
+		RpcSentTrackerNumOfWorkers:              builder.FlowConfig.NetworkConfig.GossipSubConfig.RpcSentTrackerNumOfWorkers,
+		RpcSentTrackerWorkerQueueCacheCollector: metrics.GossipSubRPCSentTrackerQueueMetricFactory(builder.HeroCacheMetricsFactory(), network.PublicNetwork),
 	}
 	meshTracer := tracer.NewGossipSubMeshTracer(meshTracerCfg)
 

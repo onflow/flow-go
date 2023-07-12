@@ -104,12 +104,15 @@ func CreateNode(t *testing.T, networkKey crypto.PrivateKey, sporkID flow.Identif
 	require.NoError(t, err)
 
 	meshTracerCfg := &tracer.GossipSubMeshTracerConfig{
-		Logger:                       logger,
-		Metrics:                      metrics.NewNoopCollector(),
-		IDProvider:                   idProvider,
-		LoggerInterval:               defaultFlowConfig.NetworkConfig.GossipSubConfig.LocalMeshLogInterval,
-		RpcSentTrackerCacheCollector: metrics.NewNoopCollector(),
-		RpcSentTrackerCacheSize:      defaultFlowConfig.NetworkConfig.GossipSubConfig.RPCSentTrackerCacheSize,
+		Logger:                                  logger,
+		Metrics:                                 metrics.NewNoopCollector(),
+		IDProvider:                              idProvider,
+		LoggerInterval:                          defaultFlowConfig.NetworkConfig.GossipSubConfig.LocalMeshLogInterval,
+		RpcSentTrackerCacheCollector:            metrics.NewNoopCollector(),
+		RpcSentTrackerCacheSize:                 defaultFlowConfig.NetworkConfig.GossipSubConfig.RPCSentTrackerCacheSize,
+		RpcSentTrackerWorkerQueueCacheSize:      defaultFlowConfig.NetworkConfig.GossipSubConfig.RPCSentTrackerQueueCacheSize,
+		RpcSentTrackerNumOfWorkers:              defaultFlowConfig.NetworkConfig.GossipSubConfig.RpcSentTrackerNumOfWorkers,
+		RpcSentTrackerWorkerQueueCacheCollector: metrics.NewNoopCollector(),
 	}
 	meshTracer := tracer.NewGossipSubMeshTracer(meshTracerCfg)
 

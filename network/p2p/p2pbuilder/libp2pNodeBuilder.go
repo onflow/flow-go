@@ -496,12 +496,15 @@ func DefaultNodeBuilder(
 	}
 
 	meshTracerCfg := &tracer.GossipSubMeshTracerConfig{
-		Logger:                       logger,
-		Metrics:                      metricsCfg.Metrics,
-		IDProvider:                   idProvider,
-		LoggerInterval:               gossipCfg.LocalMeshLogInterval,
-		RpcSentTrackerCacheCollector: metrics.GossipSubRPCSentTrackerMetricFactory(metricsCfg.HeroCacheFactory, flownet.PrivateNetwork),
-		RpcSentTrackerCacheSize:      gossipCfg.RPCSentTrackerCacheSize,
+		Logger:                                  logger,
+		Metrics:                                 metricsCfg.Metrics,
+		IDProvider:                              idProvider,
+		LoggerInterval:                          gossipCfg.LocalMeshLogInterval,
+		RpcSentTrackerCacheCollector:            metrics.GossipSubRPCSentTrackerMetricFactory(metricsCfg.HeroCacheFactory, flownet.PrivateNetwork),
+		RpcSentTrackerCacheSize:                 gossipCfg.RPCSentTrackerCacheSize,
+		RpcSentTrackerWorkerQueueCacheSize:      gossipCfg.RPCSentTrackerQueueCacheSize,
+		RpcSentTrackerNumOfWorkers:              gossipCfg.RpcSentTrackerNumOfWorkers,
+		RpcSentTrackerWorkerQueueCacheCollector: metrics.GossipSubRPCSentTrackerQueueMetricFactory(metricsCfg.HeroCacheFactory, flownet.PrivateNetwork),
 	}
 	meshTracer := tracer.NewGossipSubMeshTracer(meshTracerCfg)
 
