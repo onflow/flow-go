@@ -262,6 +262,8 @@ type Indexes struct {
 	indexInEntitiesArr int
 }
 
+// testAddRemoveEntities adds and removes randomly elements in the pool, probabilityOfAdding and its counterpart 1-probabilityOfAdding are probabilities
+// for an operation to be add or remove. Current timestamp is taken as a seed for a random number generator.
 func testAddRemoveEntities(t *testing.T, limit uint32, entityCount uint32, ejectionMode EjectionMode, numberOfOperations int, probabilityOfAdding float32) {
 	// create and log the seed.
 	testSeed := time.Now().UnixNano()
@@ -279,46 +281,72 @@ func testAddRemoveEntities(t *testing.T, limit uint32, entityCount uint32, eject
 		ownerIds[i] = rand.Uint64()
 	}
 	// this map maintains entities currently stored in the pool.
-	var addedEntities map[flow.Identifier]Indexes
-	addedEntities = make(map[flow.Identifier]Indexes)
+	addedEntities := make(map[flow.Identifier]int)
+	addedEntitiesInPool := make(map[flow.Identifier]EIndex)
 
 	for i := 0; i < numberOfOperations; i++ {
 		// choose between Add and Remove with a probability of probabilityOfAdding and 1-probabilityOfAdding respectively.
 		if rand.Float32() < probabilityOfAdding || len(addedEntities) == 0 {
-			// adding an entity
-			entityToAdd := rand.Intn(int(entityCount))
-			// check that entity is not already inserted.
-			_, found := addedEntities[entities[entityToAdd].ID()]
-			if !found {
-				indexInThePool, _, ejectedEntity := pool.Add(entities[entityToAdd].ID(), entities[entityToAdd], uint64(ownerIds[entityToAdd]))
-				if indexInThePool != InvalidIndex {
-					addedEntities[entities[entityToAdd].ID()] = Indexes{indexInThePool, entityToAdd}
-				}
-				if ejectedEntity != nil {
-					delete(addedEntities, ejectedEntity.ID())
+
+			// find an entity to add
+			entityToAddIndex := -1
+			found := false
+			for retryTime := 0; retryTime < 100; retryTime++ {
+				entityToAddIndexTmp := rand.Intn(int(entityCount))
+				_, found = addedEntities[entities[entityToAddIndexTmp].ID()]
+				if !found {
+					entityToAddIndex = entityToAddIndexTmp
+					break
 				}
 			}
-
+			if !found {
+				indexInThePool, _, ejectedEntity := pool.Add(entities[entityToAddIndex].ID(), entities[entityToAddIndex], uint64(ownerIds[entityToAddIndex]))
+				require.True(t, indexInThePool != InvalidIndex || (ejectionMode == NoEjection && len(addedEntities) == int(limit)))
+				require.True(t, ejectionMode != NoEjection || ejectedEntity == nil)
+				if indexInThePool != InvalidIndex {
+					addedEntities[entities[entityToAddIndex].ID()] = entityToAddIndex
+					addedEntitiesInPool[entities[entityToAddIndex].ID()] = indexInThePool
+					actualFlowId, actualEntity, actualOwnerId := pool.Get(indexInThePool)
+					require.Equal(t, entities[entityToAddIndex].ID(), actualFlowId)
+					require.Equal(t, entities[entityToAddIndex], actualEntity)
+					require.Equal(t, ownerIds[entityToAddIndex], actualOwnerId)
+				}
+				if ejectedEntity != nil {
+					require.Contains(t, addedEntities, ejectedEntity.ID(), "pool ejected an entity that was not added before")
+					delete(addedEntities, ejectedEntity.ID())
+					delete(addedEntitiesInPool, ejectedEntity.ID())
+				}
+			}
 		} else {
 			// randomly select an index of an entity to remove.
 			entityToRemove := rand.Intn(len(addedEntities))
 			i := 0
 			var indexInPoolToRemove EIndex = 0
-			var indexInEntitiesArray EIndex = 0
-			for _, v := range addedEntities {
+			var indexInEntitiesArray int = 0
+			for k, v := range addedEntities {
 				if i == entityToRemove {
-					indexInPoolToRemove = v.indexInPool
-					indexInEntitiesArray = EIndex(v.indexInEntitiesArr)
+					indexInPoolToRemove = addedEntitiesInPool[k]
+					indexInEntitiesArray = v
 					break
 				}
 				i++
 			}
-
 			// remove the selected entity from the pool.
 			removedEntity := pool.Remove(indexInPoolToRemove)
-			require.Equal(t, entities[indexInEntitiesArray].ID(), removedEntity.ID(), "Removed wrong entity")
+			require.Equal(t, entities[indexInEntitiesArray].ID(), removedEntity.ID(), "removed wrong entity")
 			delete(addedEntities, entities[indexInEntitiesArray].ID())
+			delete(addedEntitiesInPool, entities[indexInEntitiesArray].ID())
+			actualFlowId, actualEntity, _ := pool.Get(indexInPoolToRemove)
+			require.Equal(t, flow.ZeroID, actualFlowId)
+			require.Equal(t, nil, actualEntity)
 		}
+	}
+	for k, v := range addedEntities {
+		indexInPool := addedEntitiesInPool[k]
+		actualFlowId, actualEntity, actualOwnerId := pool.Get(indexInPool)
+		require.Equal(t, entities[v].ID(), actualFlowId)
+		require.Equal(t, entities[v], actualEntity)
+		require.Equal(t, ownerIds[v], actualOwnerId)
 	}
 }
 
