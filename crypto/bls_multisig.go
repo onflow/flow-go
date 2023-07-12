@@ -7,7 +7,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/onflow/flow-go/crypto/hash"
+	"github.com/onflow/crypto/hash"
 )
 
 // BLS multi-signature using BLS12-381 curve

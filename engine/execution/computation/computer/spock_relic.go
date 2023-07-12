@@ -5,7 +5,7 @@ package computer
 
 import (
 	"github.com/onflow/crypto"
-	"github.com/onflow/flow-go/crypto/hash"
+	"github.com/onflow/crypto/hash"
 )
 
 // This is a temporary wrapper that around the crypto library.

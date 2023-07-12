@@ -9,8 +9,8 @@ require (
 	github.com/libp2p/go-libp2p v0.28.1
 	github.com/libp2p/go-libp2p-pubsub v0.9.3
 	github.com/multiformats/go-multiaddr-dns v0.3.1
+	github.com/onflow/crypto v0.24.9
 	github.com/onflow/flow-go v0.29.8
-	github.com/onflow/flow-go/crypto v0.24.7
 	github.com/rs/zerolog v1.29.0
 	github.com/spf13/pflag v1.0.5
 	github.com/stretchr/testify v1.8.4
@@ -182,7 +182,6 @@ require (
 	github.com/multiformats/go-varint v0.0.7 // indirect
 	github.com/onflow/atree v0.6.0 // indirect
 	github.com/onflow/cadence v0.39.14 // indirect
-	github.com/onflow/crypto v0.24.9 // indirect
 	github.com/onflow/flow-core-contracts/lib/go/contracts v1.2.3 // indirect
 	github.com/onflow/flow-core-contracts/lib/go/templates v1.2.3 // indirect
 	github.com/onflow/flow-ft/lib/go/contracts v0.7.0 // indirect

@@ -7,7 +7,6 @@ require (
 	github.com/VividCortex/ewma v1.2.0
 	github.com/coreos/go-semver v0.3.0
 	github.com/dapperlabs/testingdock v0.4.4
-	github.com/dgraph-io/badger/v2 v2.2007.4
 	github.com/docker/docker v1.4.2-0.20190513124817-8c8457b0f2f8
 	github.com/docker/go-connections v0.4.0
 	github.com/go-git/go-git/v5 v5.5.2
@@ -18,12 +17,12 @@ require (
 	github.com/ipfs/go-ds-badger2 v0.1.3
 	github.com/ipfs/go-ipfs-blockstore v1.3.0
 	github.com/onflow/cadence v0.39.14
+	github.com/onflow/crypto v0.24.9
 	github.com/onflow/flow-core-contracts/lib/go/contracts v1.2.3
 	github.com/onflow/flow-core-contracts/lib/go/templates v1.2.3
 	github.com/onflow/flow-emulator v0.50.6
 	github.com/onflow/flow-go v0.31.1-0.20230607185125-e75265a6c631
 	github.com/onflow/flow-go-sdk v0.41.8
-	github.com/onflow/flow-go/crypto v0.24.7
 	github.com/onflow/flow-go/insecure v0.0.0-00010101000000-000000000000
 	github.com/onflow/flow/protobuf/go/flow v0.3.2-0.20230602212908-08fc6536d391
 	github.com/plus3it/gorecurcopy v0.0.1
@@ -87,6 +86,7 @@ require (
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/davidlazar/go-crypto v0.0.0-20200604182044-b73af7476f6c // indirect
 	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.2.0 // indirect
+	github.com/dgraph-io/badger/v2 v2.2007.4 // indirect
 	github.com/dgraph-io/ristretto v0.1.0 // indirect
 	github.com/dgryski/go-farm v0.0.0-20200201041132-a6ae2369ad13 // indirect
 	github.com/dgryski/go-rendezvous v0.0.0-20200823014737-9f7001d12a5f // indirect
@@ -227,8 +227,8 @@ require (
 	github.com/multiformats/go-multistream v0.4.1 // indirect
 	github.com/multiformats/go-varint v0.0.7 // indirect
 	github.com/onflow/atree v0.6.0 // indirect
-	github.com/onflow/crypto v0.24.9 // indirect
 	github.com/onflow/flow-ft/lib/go/contracts v0.7.0 // indirect
+	github.com/onflow/flow-go/crypto v0.24.7 // indirect
 	github.com/onflow/flow-nft/lib/go/contracts v0.0.0-20220727161549-d59b1e547ac4 // indirect
 	github.com/onflow/fusd/lib/go/contracts v0.0.0-20211021081023-ae9de8fb2c7e // indirect
 	github.com/onflow/go-bitswap v0.0.0-20230703214630-6d3db958c73d // indirect

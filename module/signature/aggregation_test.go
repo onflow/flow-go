@@ -14,7 +14,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/onflow/flow-go/crypto"
+	"github.com/onflow/crypto"
 )
 
 // Utility function that flips a point sign bit to negate the point

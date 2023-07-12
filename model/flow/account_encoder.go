@@ -8,7 +8,7 @@ import (
 	"github.com/onflow/cadence"
 
 	"github.com/onflow/crypto"
-	"github.com/onflow/flow-go/crypto/hash"
+	"github.com/onflow/crypto/hash"
 )
 
 // accountPublicKeyWrapper is used for encoding and decoding.

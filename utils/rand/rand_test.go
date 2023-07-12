@@ -10,7 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"gonum.org/v1/gonum/stat"
 
-	_ "github.com/onflow/flow-go/crypto/random"
+	_ "github.com/onflow/crypto/random"
 )
 
 // TODO: these functions are copied from flow-go/crypto/rand

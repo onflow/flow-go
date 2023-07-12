@@ -44,7 +44,7 @@ import (
 
 	"golang.org/x/crypto/hkdf"
 
-	"github.com/onflow/flow-go/crypto/hash"
+	"github.com/onflow/crypto/hash"
 )
 
 const (

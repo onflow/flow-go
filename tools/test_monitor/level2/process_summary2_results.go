@@ -108,7 +108,7 @@ func saveExceptionMessage(testResult common.Level1TestResult) {
 // there could be multiple failures / exceptions of the same test, so we want to save each failed / exception message in a separate text file
 // each test with failures / exceptions will have a uniquely named (based on test name and package) subdirectory where failed / exception messages are saved
 // e.g. "failures/TestSanitySha3_256+github.com-onflow-flow-go-crypto-hash" will store failed messages text files
-// from test TestSanitySha3_256 from the "github.com/onflow/flow-go/crypto/hash" package
+// from test TestSanitySha3_256 from the "github.com/onflow/crypto/hash" package
 // failure and exception messages are saved in a similar way so this helper function
 // handles saving both types of messages
 func saveMessageHelper(testResult common.Level1TestResult, messagesDir string, messageFileStem string) {

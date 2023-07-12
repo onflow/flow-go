@@ -11,7 +11,7 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/onflow/flow-go/crypto/hash"
+	"github.com/onflow/crypto/hash"
 )
 
 // BLS-based threshold signature on BLS 12-381 curve

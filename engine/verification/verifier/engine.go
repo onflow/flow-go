@@ -8,8 +8,8 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 
 	"github.com/onflow/crypto"
+	"github.com/onflow/crypto/hash"
 
-	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/verification/utils"
 	chmodels "github.com/onflow/flow-go/model/chunks"

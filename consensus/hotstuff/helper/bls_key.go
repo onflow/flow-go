@@ -6,7 +6,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/onflow/flow-go/crypto"
+	"github.com/onflow/crypto"
 )
 
 func MakeBLSKey(t *testing.T) crypto.PrivateKey {

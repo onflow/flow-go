@@ -4,7 +4,8 @@ import (
 	"github.com/gammazero/workerpool"
 	"github.com/rs/zerolog"
 
-	"github.com/onflow/flow-go/crypto/hash"
+	"github.com/onflow/crypto/hash"
+
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/mempool"

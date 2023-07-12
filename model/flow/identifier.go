@@ -13,8 +13,8 @@ import (
 	mh "github.com/multiformats/go-multihash"
 
 	"github.com/onflow/crypto"
+	"github.com/onflow/crypto/hash"
 
-	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/model/fingerprint"
 	"github.com/onflow/flow-go/storage/merkle"
 )
