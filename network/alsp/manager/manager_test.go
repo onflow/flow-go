@@ -281,14 +281,13 @@ func TestHandleReportedMisbehavior_And_DisallowListing_Integration(t *testing.T)
 func TestHandleReportedMisbehavior_And_SlashingViolationsConsumer_Integration(t *testing.T) {
 
 
-	slashingMisbehaviors := []network.Misbehavior{
-		alsp.InvalidMessage, alsp.SenderEjected, alsp.UnauthorizedUnicastOnChannel,
-		alsp.UnauthorizedPublishOnChannel, alsp.UnknownMsgType,
-	}
-
 	// create 1 victim node, 1 honest node and a node for each slashing violation
-	ids, nodes, _ := testutils.LibP2PNodeForMiddlewareFixture(t, len(slashingMisbehaviors)+2,
-		p2ptest.WithPeerManagerEnabled(p2ptest.PeerManagerConfigFixture(), nil))
+	ids, nodes, _ := testutils.LibP2PNodeForMiddlewareFixture(t,
+		7) // creates 7 nodes (1 victim, 1 honest, 5 spammer nodes one for each slashing violation).
+	mws, _ := testutils.MiddlewareFixtures(t, ids, nodes, testutils.MiddlewareConfigFixture(t), mocknetwork.NewViolationsConsumer(t))
+	networkCfg := testutils.NetworkConfigFixture(t, *ids[0], ids, mws[0], p2p.WithAlspConfig(managerCfgFixture(t)))
+	victimNetwork, err := p2p.NewNetwork(networkCfg)
+	require.NoError(t, err)
 	mws, _ := testutils.MiddlewareFixtures(t, ids, nodes, testutils.MiddlewareConfigFixture(t), mocknetwork.NewViolationsConsumer(t))
 	networkCfg := testutils.NetworkConfigFixture(t, *ids[0], ids, mws[0], p2p.WithAlspConfig(managerCfgFixture(t)))
 	victimNetwork, err := p2p.NewNetwork(networkCfg)
