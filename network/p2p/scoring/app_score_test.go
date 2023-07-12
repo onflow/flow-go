@@ -35,15 +35,15 @@ func TestFullGossipSubConnectivity(t *testing.T) {
 	groupOneNodes, groupOneIds := p2ptest.NodesFixture(t, sporkId, t.Name(), 5,
 		idProvider,
 		p2ptest.WithRole(flow.RoleConsensus),
-		p2ptest.WithPeerScoringEnabled(p2p.PeerScoringConfigNoOverride))
+		p2ptest.EnablePeerScoringWithOverride(p2p.PeerScoringConfigNoOverride))
 	groupTwoNodes, groupTwoIds := p2ptest.NodesFixture(t, sporkId, t.Name(), 5,
 		idProvider,
 		p2ptest.WithRole(flow.RoleCollection),
-		p2ptest.WithPeerScoringEnabled(p2p.PeerScoringConfigNoOverride))
+		p2ptest.EnablePeerScoringWithOverride(p2p.PeerScoringConfigNoOverride))
 	accessNodeGroup, accessNodeIds := p2ptest.NodesFixture(t, sporkId, t.Name(), 5,
 		idProvider,
 		p2ptest.WithRole(flow.RoleAccess),
-		p2ptest.WithPeerScoringEnabled(p2p.PeerScoringConfigNoOverride))
+		p2ptest.EnablePeerScoringWithOverride(p2p.PeerScoringConfigNoOverride))
 
 	ids := append(append(groupOneIds, groupTwoIds...), accessNodeIds...)
 	nodes := append(append(groupOneNodes, groupTwoNodes...), accessNodeGroup...)
@@ -150,7 +150,7 @@ func testGossipSubMessageDeliveryUnderNetworkPartition(t *testing.T, honestPeerS
 	// two (honest) consensus nodes
 	opts := []p2ptest.NodeFixtureParameterOption{p2ptest.WithRole(flow.RoleConsensus)}
 	if honestPeerScoring {
-		opts = append(opts, p2ptest.WithPeerScoringEnabled(p2p.PeerScoringConfigNoOverride))
+		opts = append(opts, p2ptest.EnablePeerScoringWithOverride(p2p.PeerScoringConfigNoOverride))
 	}
 	con1Node, con1Id := p2ptest.NodeFixture(t, sporkId, t.Name(), idProvider, opts...)
 	con2Node, con2Id := p2ptest.NodeFixture(t, sporkId, t.Name(), idProvider, opts...)
@@ -163,7 +163,7 @@ func testGossipSubMessageDeliveryUnderNetworkPartition(t *testing.T, honestPeerS
 		idProvider,
 		p2ptest.WithRole(flow.RoleAccess),
 		// overrides the default peer scoring parameters to mute GossipSub traffic from/to honest nodes.
-		p2ptest.WithPeerScoringEnabled(&p2p.PeerScoringConfigOverride{
+		p2ptest.EnablePeerScoringWithOverride(&p2p.PeerScoringConfigOverride{
 			AppSpecificScoreParams: maliciousAppSpecificScore(flow.IdentityList{&con1Id, &con2Id}),
 		}),
 	)

@@ -92,7 +92,7 @@ func TestInvalidCtrlMsgScoringIntegration(t *testing.T) {
 		t.Name(),
 		idProvider,
 		p2ptest.WithRole(flow.RoleConsensus),
-		p2ptest.WithPeerScoringEnabled(p2p.PeerScoringConfigNoOverride),
+		p2ptest.EnablePeerScoringWithOverride(p2p.PeerScoringConfigNoOverride),
 		p2ptest.OverrideGossipSubRpcInspectorSuiteFactory(func(zerolog.Logger,
 			flow.Identifier,
 			*p2pconf.GossipSubRPCInspectorsConfig,
@@ -110,7 +110,7 @@ func TestInvalidCtrlMsgScoringIntegration(t *testing.T) {
 		t.Name(),
 		idProvider,
 		p2ptest.WithRole(flow.RoleConsensus),
-		p2ptest.WithPeerScoringEnabled(p2p.PeerScoringConfigNoOverride))
+		p2ptest.EnablePeerScoringWithOverride(p2p.PeerScoringConfigNoOverride))
 
 	ids := flow.IdentityList{&id1, &id2}
 	nodes := []p2p.LibP2PNode{node1, node2}

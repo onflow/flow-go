@@ -111,7 +111,7 @@ func testGossipSubInvalidMessageDeliveryScoring(t *testing.T, spamMsgFactory fun
 		idProvider,
 		p2ptest.WithRole(role),
 		p2ptest.WithPeerScoreTracerInterval(1*time.Second),
-		p2ptest.WithPeerScoringEnabled(p2p.PeerScoringConfigNoOverride),
+		p2ptest.EnablePeerScoringWithOverride(p2p.PeerScoringConfigNoOverride),
 	)
 
 	idProvider.On("ByPeerID", victimNode.Host().ID()).Return(&victimIdentity, true).Maybe()
@@ -199,7 +199,7 @@ func TestGossipSubMeshDeliveryScoring_UnderDelivery_SingleTopic(t *testing.T) {
 		idProvider,
 		p2ptest.WithRole(role),
 		p2ptest.WithPeerScoreTracerInterval(1*time.Second),
-		p2ptest.WithPeerScoringEnabled(
+		p2ptest.EnablePeerScoringWithOverride(
 			&p2p.PeerScoringConfigOverride{
 				TopicScoreParams: map[channels.Topic]*pubsub.TopicScoreParams{
 					blockTopic: blockTopicOverrideParams,
@@ -300,7 +300,7 @@ func TestGossipSubMeshDeliveryScoring_UnderDelivery_TwoTopics(t *testing.T) {
 		idProvider,
 		p2ptest.WithRole(role),
 		p2ptest.WithPeerScoreTracerInterval(1*time.Second),
-		p2ptest.WithPeerScoringEnabled(
+		p2ptest.EnablePeerScoringWithOverride(
 			&p2p.PeerScoringConfigOverride{
 				TopicScoreParams: map[channels.Topic]*pubsub.TopicScoreParams{
 					blockTopic: blockTopicOverrideParams,
@@ -406,7 +406,7 @@ func TestGossipSubMeshDeliveryScoring_Replay_Will_Not_Counted(t *testing.T) {
 		idProvider,
 		p2ptest.WithRole(role),
 		p2ptest.WithPeerScoreTracerInterval(1*time.Second),
-		p2ptest.WithPeerScoringEnabled(
+		p2ptest.EnablePeerScoringWithOverride(
 			&p2p.PeerScoringConfigOverride{
 				TopicScoreParams: map[channels.Topic]*pubsub.TopicScoreParams{
 					blockTopic: blockTopicOverrideParams,

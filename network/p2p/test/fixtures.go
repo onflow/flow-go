@@ -241,7 +241,7 @@ func WithCreateStreamRetryDelay(delay time.Duration) NodeFixtureParameterOption 
 	}
 }
 
-// WithPeerScoringEnabled enables peer scoring for the GossipSub pubsub system with the given override.
+// EnablePeerScoringWithOverride enables peer scoring for the GossipSub pubsub system with the given override.
 // Any existing peer scoring config attribute that is set in the override will override the default peer scoring config.
 // Anything that is left to nil or zero value in the override will be ignored and the default value will be used.
 // Note: it is not recommended to override the default peer scoring config in production unless you know what you are doing.
@@ -252,7 +252,7 @@ func WithCreateStreamRetryDelay(delay time.Duration) NodeFixtureParameterOption 
 //
 // Returns:
 // - NodeFixtureParameterOption: a function that can be passed to the NodeFixture function to enable peer scoring.
-func WithPeerScoringEnabled(override *p2p.PeerScoringConfigOverride) NodeFixtureParameterOption {
+func EnablePeerScoringWithOverride(override *p2p.PeerScoringConfigOverride) NodeFixtureParameterOption {
 	return func(p *NodeFixtureParameters) {
 		p.PeerScoringEnabled = true
 		p.PeerScoringConfigOverride = override
