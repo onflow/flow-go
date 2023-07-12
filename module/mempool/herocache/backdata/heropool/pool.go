@@ -180,7 +180,7 @@ func (p *Pool) sliceIndexForEntity() (i EIndex, hasAvailableSlot bool, ejectedEn
 			// we only eject randomly when the pool is full and random ejection is on.
 			random, err := rand.Uint32n(p.size)
 			if err != nil {
-				p.logger.Warn().Err(err).
+				p.logger.Fatal().Err(err).
 					Msg("hero pool random ejection failed - falling back to LRU ejection")
 				// fall back to LRU ejection only for this instance
 				return lruEject()
