@@ -50,12 +50,15 @@ type GossipSubMeshTracer struct {
 var _ p2p.PubSubTracer = (*GossipSubMeshTracer)(nil)
 
 type GossipSubMeshTracerConfig struct {
-	Logger                       zerolog.Logger
-	Metrics                      module.GossipSubLocalMeshMetrics
-	IDProvider                   module.IdentityProvider
-	LoggerInterval               time.Duration
-	RpcSentTrackerCacheCollector module.HeroCacheMetrics
-	RpcSentTrackerCacheSize      uint32
+	Logger                                  zerolog.Logger
+	Metrics                                 module.GossipSubLocalMeshMetrics
+	IDProvider                              module.IdentityProvider
+	LoggerInterval                          time.Duration
+	RpcSentTrackerCacheCollector            module.HeroCacheMetrics
+	RpcSentTrackerCacheSize                 uint32
+	RpcSentTrackerWorkerQueueCacheCollector module.HeroCacheMetrics
+	RpcSentTrackerWorkerQueueCacheSize      uint32
+	RpcSentTrackerNumOfWorkers              int
 }
 
 // NewGossipSubMeshTracer creates a new *GossipSubMeshTracer.
@@ -64,13 +67,21 @@ type GossipSubMeshTracerConfig struct {
 // Returns:
 // - *GossipSubMeshTracer: new mesh tracer.
 func NewGossipSubMeshTracer(config *GossipSubMeshTracerConfig) *GossipSubMeshTracer {
-	rpcSentTracker := internal.NewRPCSentTracker(config.Logger, config.RpcSentTrackerCacheSize, config.RpcSentTrackerCacheCollector)
+	lg := config.Logger.With().Str("component", "gossipsub_topology_tracer").Logger()
+	rpcSentTracker := internal.NewRPCSentTracker(&internal.RPCSentTrackerConfig{
+		Logger:                    lg,
+		RPCSentCacheSize:          config.RpcSentTrackerCacheSize,
+		RPCSentCacheCollector:     config.RpcSentTrackerCacheCollector,
+		WorkerQueueCacheCollector: config.RpcSentTrackerWorkerQueueCacheCollector,
+		WorkerQueueCacheSize:      config.RpcSentTrackerWorkerQueueCacheSize,
+		NumOfWorkers:              config.RpcSentTrackerNumOfWorkers,
+	})
 	g := &GossipSubMeshTracer{
 		RawTracer:      NewGossipSubNoopTracer(),
 		topicMeshMap:   make(map[string]map[peer.ID]struct{}),
 		idProvider:     config.IDProvider,
 		metrics:        config.Metrics,
-		logger:         config.Logger.With().Str("component", "gossipsub_topology_tracer").Logger(),
+		logger:         lg,
 		loggerInterval: config.LoggerInterval,
 		rpcSentTracker: rpcSentTracker,
 	}
@@ -79,6 +90,15 @@ func NewGossipSubMeshTracer(config *GossipSubMeshTracerConfig) *GossipSubMeshTra
 		AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 			ready()
 			g.logLoop(ctx)
+		}).
+		AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+			ready()
+			lg.Debug().Msg("starting rpc sent tracker")
+			g.rpcSentTracker.Start(ctx)
+			lg.Debug().Msg("rpc sent tracker started")
+
+			<-g.rpcSentTracker.Done()
+			lg.Debug().Msg("rpc sent tracker stopped")
 		}).
 		Build()
 
@@ -155,10 +175,7 @@ func (t *GossipSubMeshTracer) Prune(p peer.ID, topic string) {
 // SendRPC is called when a RPC is sent. Currently, the GossipSubMeshTracer tracks iHave RPC messages that have been sent.
 // This function can be updated to track other control messages in the future as required.
 func (t *GossipSubMeshTracer) SendRPC(rpc *pubsub.RPC, _ peer.ID) {
-	switch {
-	case len(rpc.GetControl().GetIhave()) > 0:
-		t.rpcSentTracker.OnIHaveRPCSent(rpc.GetControl().GetIhave())
-	}
+	t.rpcSentTracker.RPCSent(rpc)
 }
 
 // logLoop logs the mesh peers of the local node for each topic at a regular interval.

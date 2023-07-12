@@ -66,6 +66,10 @@ network-config:
   # The default RPC sent tracker cache size. The RPC sent tracker is used to track RPC control messages sent from the local node.
   # Note: this cache size must be large enough to keep a history of sent messages in a reasonable time window of past history.
   gossipsub-rpc-sent-tracker-cache-size: 1_000_000
+  # Cache size of the rpc sent tracker queue used for async tracking.
+  gossipsub-rpc-sent-tracker-queue-cache-size: 1000
+  # Number of workers for rpc sent tracker worker pool.
+  gossipsub-rpc-sent-tracker-workers: 5
   # Peer scoring is the default value for enabling peer scoring
   gossipsub-peer-scoring-enabled: true
   # Gossipsub rpc inspectors configs
