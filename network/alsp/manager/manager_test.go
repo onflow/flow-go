@@ -281,16 +281,6 @@ func TestHandleReportedMisbehavior_And_DisallowListing_Integration(t *testing.T)
 func TestHandleReportedMisbehavior_And_SlashingViolationsConsumer_Integration(t *testing.T) {
 	cfg := managerCfgFixture(t)
 
-	// this test is assessing the integration of the ALSP manager with the network. As the ALSP manager is an attribute
-	// of the network, we need to configure the ALSP manager via the network configuration, and let the network create
-	// the ALSP manager.
-	var victimSpamRecordCache alsp.SpamRecordCache
-	cfg.Opts = []alspmgr.MisbehaviorReportManagerOption{
-		alspmgr.WithSpamRecordsCacheFactory(func(logger zerolog.Logger, size uint32, metrics module.HeroCacheMetrics) alsp.SpamRecordCache {
-			victimSpamRecordCache = internal.NewSpamRecordCache(size, logger, metrics, model.SpamRecordFactory())
-			return victimSpamRecordCache
-		}),
-	}
 
 	slashingMisbehaviors := []network.Misbehavior{
 		alsp.InvalidMessage, alsp.SenderEjected, alsp.UnauthorizedUnicastOnChannel,
