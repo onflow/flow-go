@@ -5,6 +5,7 @@ import (
 	"context"
 	"crypto/rand"
 	crand "math/rand"
+	"sync"
 	"testing"
 	"time"
 
@@ -684,21 +685,31 @@ func EnsureNoPubsubMessageExchange(t *testing.T, ctx context.Context, from []p2p
 	// let subscriptions propagate
 	time.Sleep(1 * time.Second)
 
+	wg := &sync.WaitGroup{}
 	for _, node := range from {
+		node := node // capture range variable
 		for i := 0; i < count; i++ {
-			// creates a unique message to be published by the node.
-			msg := messageFactory()
-			channel, ok := channels.ChannelFromTopic(topic)
-			require.True(t, ok)
-			data := p2pfixtures.MustEncodeEvent(t, msg, channel)
+			wg.Add(1)
+			go func() {
+				// creates a unique message to be published by the node.
+				msg := messageFactory()
+				channel, ok := channels.ChannelFromTopic(topic)
+				require.True(t, ok)
+				data := p2pfixtures.MustEncodeEvent(t, msg, channel)
 
-			// ensure the message is NOT received by any of the nodes.
-			require.NoError(t, node.Publish(ctx, topic, data))
-			ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
-			p2pfixtures.SubsMustNeverReceiveAnyMessage(t, ctx, subs)
-			cancel()
+				// ensure the message is NOT received by any of the nodes.
+				require.NoError(t, node.Publish(ctx, topic, data))
+				ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+				p2pfixtures.SubsMustNeverReceiveAnyMessage(t, ctx, subs)
+				cancel()
+				wg.Done()
+			}()
 		}
 	}
+
+	// we wait for 5 seconds at most for the messages to be exchanged, hence we wait for a total of 6 seconds here to ensure
+	// that the goroutines are done in a timely manner.
+	unittest.RequireReturnsBefore(t, wg.Wait, 6*time.Second, "timed out waiting for messages to be exchanged")
 }
 
 // EnsureNoPubsubExchangeBetweenGroups ensures that no pubsub message is exchanged between the given groups of nodes.
