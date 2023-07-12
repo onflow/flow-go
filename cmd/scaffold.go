@@ -906,7 +906,7 @@ func (fnb *FlowNodeBuilder) initDB() error {
 		// could not store data: Value with size <xxxx> exceeded 1073741824 limit
 		// Maximum value size is 10G, needed by execution node
 		// TODO: finding a better max value for each node type
-		WithValueLogFileSize(128 << 23).
+		WithValueLogFileSize(256 << 23).
 		WithValueLogMaxEntries(100000) // Default is 1000000
 
 	publicDB, err := bstorage.InitPublic(opts)
