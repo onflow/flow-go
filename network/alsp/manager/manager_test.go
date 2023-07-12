@@ -279,7 +279,6 @@ func TestHandleReportedMisbehavior_And_DisallowListing_Integration(t *testing.T)
 // The test ensures that despite attempting on connections, no inbound or outbound connections between the victim and
 // the pruned spammer nodes are established.
 func TestHandleReportedMisbehavior_And_SlashingViolationsConsumer_Integration(t *testing.T) {
-	cfg := managerCfgFixture(t)
 
 
 	slashingMisbehaviors := []network.Misbehavior{
