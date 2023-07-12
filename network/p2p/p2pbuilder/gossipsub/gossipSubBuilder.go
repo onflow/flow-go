@@ -106,13 +106,17 @@ func (g *Builder) EnableGossipSubScoringWithOverride(override *p2p.PeerScoringCo
 		return
 	}
 	if override.AppSpecificScoreParams != nil {
-		g.logger.Warn().Str(logging.KeyNetworkingSecurity, "true").Msg("overriding app specific score params for gossipsub")
+		g.logger.Warn().
+			Str(logging.KeyNetworkingSecurity, "true").
+			Msg("overriding app specific score params for gossipsub")
 		g.scoreOptionConfig.OverrideAppSpecificScoreFunction(override.AppSpecificScoreParams)
 	}
 	if override.TopicScoreParams != nil {
 		for topic, params := range override.TopicScoreParams {
 			topicLogger := utils.TopicScoreParamsLogger(g.logger, topic.String(), params)
-			topicLogger.Warn().Str(logging.KeyNetworkingSecurity, "true").Msg("overriding topic score params for gossipsub")
+			topicLogger.Warn().
+				Str(logging.KeyNetworkingSecurity, "true").
+				Msg("overriding topic score params for gossipsub")
 			g.scoreOptionConfig.OverrideTopicScoreParams(topic, params)
 		}
 	}
