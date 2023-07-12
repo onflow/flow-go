@@ -61,7 +61,7 @@ func TestRPCSentTracker_IHave(t *testing.T) {
 			}
 		}
 		rpc := rpcFixture(withIhaves(iHaves))
-		tracker.RPCSent(rpc)
+		require.NoError(t, tracker.RPCSent(rpc))
 
 		// eventually we should have tracked numOfMsgIds per single topic
 		require.Eventually(t, func() bool {
