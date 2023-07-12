@@ -28,6 +28,22 @@ func (_m *ComponentManagerBuilder) AddWorker(_a0 component.ComponentWorker) comp
 	return r0
 }
 
+// AddWorkers provides a mock function with given fields: _a0, _a1
+func (_m *ComponentManagerBuilder) AddWorkers(_a0 int, _a1 component.ComponentWorker) component.ComponentManagerBuilder {
+	ret := _m.Called(_a0, _a1)
+
+	var r0 component.ComponentManagerBuilder
+	if rf, ok := ret.Get(0).(func(int, component.ComponentWorker) component.ComponentManagerBuilder); ok {
+		r0 = rf(_a0, _a1)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(component.ComponentManagerBuilder)
+		}
+	}
+
+	return r0
+}
+
 // Build provides a mock function with given fields:
 func (_m *ComponentManagerBuilder) Build() *component.ComponentManager {
 	ret := _m.Called()

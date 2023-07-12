@@ -143,7 +143,8 @@ func NoopWorker(ctx irrecoverable.SignalerContext, ready ReadyFunc) {
 type ComponentManagerBuilder interface {
 	// AddWorker adds a worker routine for the ComponentManager
 	AddWorker(ComponentWorker) ComponentManagerBuilder
-
+	// AddWorkers adds n number of worker routines for the ComponentManager.
+	AddWorkers(int, ComponentWorker) ComponentManagerBuilder
 	// Build builds and returns a new ComponentManager instance
 	Build() *ComponentManager
 }
@@ -157,12 +158,20 @@ func NewComponentManagerBuilder() ComponentManagerBuilder {
 	return &componentManagerBuilderImpl{}
 }
 
-// AddWorker adds a ComponentWorker closure to the ComponentManagerBuilder
 // All worker functions will be run in parallel when the ComponentManager is started.
 // Note: AddWorker is not concurrency-safe, and should only be called on an individual builder
-// within a single goroutine.
+// within a single goroutine.// AddWorker adds a ComponentWorker closure to the ComponentManagerBuilder
+
 func (c *componentManagerBuilderImpl) AddWorker(worker ComponentWorker) ComponentManagerBuilder {
 	c.workers = append(c.workers, worker)
+	return c
+}
+
+// AddWorkers adds n number of workers for the ComponentManager.
+func (c *componentManagerBuilderImpl) AddWorkers(n int, worker ComponentWorker) ComponentManagerBuilder {
+	for i := 0; i < n; i++ {
+		c.workers = append(c.workers, worker)
+	}
 	return c
 }
 

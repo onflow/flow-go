@@ -175,7 +175,10 @@ func (t *GossipSubMeshTracer) Prune(p peer.ID, topic string) {
 // SendRPC is called when a RPC is sent. Currently, the GossipSubMeshTracer tracks iHave RPC messages that have been sent.
 // This function can be updated to track other control messages in the future as required.
 func (t *GossipSubMeshTracer) SendRPC(rpc *pubsub.RPC, _ peer.ID) {
-	t.rpcSentTracker.RPCSent(rpc)
+	err := t.rpcSentTracker.RPCSent(rpc)
+	if err != nil {
+		t.logger.Err(err).Msg("failed to track sent pubsbub rpc")
+	}
 }
 
 // logLoop logs the mesh peers of the local node for each topic at a regular interval.

@@ -1,9 +1,13 @@
 package internal
 
 import (
+	"crypto/rand"
+	"fmt"
+
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	pb "github.com/libp2p/go-libp2p-pubsub/pb"
 	"github.com/rs/zerolog"
+	"go.uber.org/atomic"
 
 	"github.com/onflow/flow-go/engine/common/worker"
 	"github.com/onflow/flow-go/module"
@@ -15,7 +19,9 @@ import (
 // trackRPC is an internal data structure for "temporarily" storing *pubsub.RPC sent in the queue before they are processed
 // by the *RPCSentTracker.
 type trackRPC struct {
-	rpc *pubsub.RPC
+	// Nonce prevents deduplication in the hero store
+	Nonce []byte
+	rpc   *pubsub.RPC
 }
 
 // RPCSentTracker tracks RPC messages that are sent.
@@ -23,6 +29,8 @@ type RPCSentTracker struct {
 	component.Component
 	cache      *rpcSentCache
 	workerPool *worker.Pool[trackRPC]
+	// lastHighestIHaveRPCSize tracks the size of the last largest iHave rpc control message sent.
+	lastHighestIHaveRPCSize *atomic.Int64
 }
 
 // RPCSentTrackerConfig configuration for the RPCSentTracker.
@@ -53,17 +61,18 @@ func NewRPCSentTracker(config *RPCSentTrackerConfig) *RPCSentTracker {
 		config.Logger,
 		config.WorkerQueueCacheCollector)
 
-	tracker := &RPCSentTracker{cache: newRPCSentCache(cacheConfig)}
+	tracker := &RPCSentTracker{
+		cache:                   newRPCSentCache(cacheConfig),
+		lastHighestIHaveRPCSize: atomic.NewInt64(0),
+	}
 	tracker.workerPool = worker.NewWorkerPoolBuilder[trackRPC](
 		config.Logger,
 		store,
 		tracker.rpcSent).Build()
 
-	builder := component.NewComponentManagerBuilder()
-	for i := 0; i < config.NumOfWorkers; i++ {
-		builder.AddWorker(tracker.workerPool.WorkerLogic())
-	}
-	tracker.Component = builder.Build()
+	tracker.Component = component.NewComponentManagerBuilder().
+		AddWorkers(config.NumOfWorkers, tracker.workerPool.WorkerLogic()).
+		Build()
 
 	return tracker
 }
@@ -71,17 +80,30 @@ func NewRPCSentTracker(config *RPCSentTrackerConfig) *RPCSentTracker {
 // RPCSent submits the control message to the worker queue for async tracking.
 // Args:
 // - *pubsub.RPC: the rpc sent.
-func (t *RPCSentTracker) RPCSent(rpc *pubsub.RPC) {
-	t.workerPool.Submit(trackRPC{rpc})
+func (t *RPCSentTracker) RPCSent(rpc *pubsub.RPC) error {
+	n, err := nonce()
+	if err != nil {
+		return fmt.Errorf("failed to get track rpc work nonce: %w", err)
+	}
+	t.workerPool.Submit(trackRPC{Nonce: n, rpc: rpc})
+	return nil
 }
 
 // rpcSent tracks control messages sent in *pubsub.RPC.
 func (t *RPCSentTracker) rpcSent(work trackRPC) error {
 	switch {
 	case len(work.rpc.GetControl().GetIhave()) > 0:
-		t.iHaveRPCSent(work.rpc.GetControl().GetIhave())
+		iHave := work.rpc.GetControl().GetIhave()
+		t.iHaveRPCSent(iHave)
+		t.updateLastHighestIHaveRPCSize(int64(len(iHave)))
 	}
 	return nil
+}
+
+func (t *RPCSentTracker) updateLastHighestIHaveRPCSize(size int64) {
+	if t.lastHighestIHaveRPCSize.Load() < size {
+		t.lastHighestIHaveRPCSize.Store(size)
+	}
 }
 
 // iHaveRPCSent caches a unique entity message ID for each message ID included in each rpc iHave control message.
@@ -105,4 +127,19 @@ func (t *RPCSentTracker) iHaveRPCSent(iHaves []*pb.ControlIHave) {
 // - bool: true if the iHave rpc with the provided message ID was sent.
 func (t *RPCSentTracker) WasIHaveRPCSent(topicID, messageID string) bool {
 	return t.cache.has(topicID, messageID, p2pmsg.CtrlMsgIHave)
+}
+
+// LastHighestIHaveRPCSize returns the last highest size of iHaves sent in an rpc.
+func (t *RPCSentTracker) LastHighestIHaveRPCSize() int64 {
+	return t.lastHighestIHaveRPCSize.Load()
+}
+
+// nonce returns random string that is used to store unique items in herocache.
+func nonce() ([]byte, error) {
+	b := make([]byte, 16)
+	_, err := rand.Read(b)
+	if err != nil {
+		return nil, err
+	}
+	return b, nil
 }

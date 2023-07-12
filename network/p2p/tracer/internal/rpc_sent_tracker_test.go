@@ -76,6 +76,62 @@ func TestRPCSentTracker_IHave(t *testing.T) {
 	})
 }
 
+// TestRPCSentTracker_IHave ensures *RPCSentTracker tracks the last largest iHave size as expected.
+func TestRPCSentTracker_LastHighestIHaveRPCSize(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
+
+	tracker := mockTracker(t)
+	require.NotNil(t, tracker)
+
+	tracker.Start(signalerCtx)
+	defer func() {
+		cancel()
+		unittest.RequireComponentsDoneBefore(t, time.Second, tracker)
+	}()
+
+	expectedLastHighestSize := 1000
+	// adding a single message ID to the iHave enables us to track the expected cache size by the amount of iHaves.
+	numOfMessageIds := 1
+	testCases := []struct {
+		rpcFixture  *pubsub.RPC
+		numOfIhaves int
+	}{
+		{rpcFixture(withIhaves(mockIHaveFixture(10, numOfMessageIds))), 10},
+		{rpcFixture(withIhaves(mockIHaveFixture(100, numOfMessageIds))), 100},
+		{rpcFixture(withIhaves(mockIHaveFixture(expectedLastHighestSize, numOfMessageIds))), expectedLastHighestSize},
+		{rpcFixture(withIhaves(mockIHaveFixture(999, numOfMessageIds))), 999},
+		{rpcFixture(withIhaves(mockIHaveFixture(23, numOfMessageIds))), 23},
+	}
+
+	expectedCacheSize := 0
+	for _, testCase := range testCases {
+		require.NoError(t, tracker.RPCSent(testCase.rpcFixture))
+		expectedCacheSize += testCase.numOfIhaves
+	}
+
+	// eventually we should have tracked numOfMsgIds per single topic
+	require.Eventually(t, func() bool {
+		return tracker.cache.size() == uint(expectedCacheSize)
+	}, time.Second, 100*time.Millisecond)
+
+	require.Equal(t, int64(expectedLastHighestSize), tracker.LastHighestIHaveRPCSize())
+}
+
+// mockIHaveFixture generate list of iHaves of size n. Each iHave will be created with m number of random message ids.
+func mockIHaveFixture(n, m int) []*pb.ControlIHave {
+	iHaves := make([]*pb.ControlIHave, n)
+	for i := 0; i < n; i++ {
+		// topic does not have to be a valid flow topic, for teting purposes we can use a random string
+		topic := unittest.IdentifierFixture().String()
+		iHaves[i] = &pb.ControlIHave{
+			TopicID:    &topic,
+			MessageIDs: unittest.IdentifierListFixture(m).Strings(),
+		}
+	}
+	return iHaves
+}
+
 func mockTracker(t *testing.T) *RPCSentTracker {
 	cfg, err := config.DefaultConfig()
 	require.NoError(t, err)
