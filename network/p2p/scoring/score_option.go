@@ -321,20 +321,27 @@ func NewScoreOption(cfg *ScoreOptionConfig) *ScoreOption {
 		logger:          logger,
 		validator:       validator,
 		peerScoreParams: defaultPeerScoreParams(),
+		appScoreFunc:    scoreRegistry.AppSpecificScoreFunc(),
 	}
 
 	// set the app specific penalty function for the penalty option
 	// if the app specific penalty function is not set, use the default one
-	if cfg.appScoreFunc == nil {
-		s.appScoreFunc = scoreRegistry.AppSpecificScoreFunc()
-	} else {
+	if cfg.appScoreFunc != nil {
 		s.appScoreFunc = cfg.appScoreFunc
+		s.logger.
+			Warn().
+			Str(logging.KeyNetworkingSecurity, "true").
+			Msg("app specific score function is overridden")
 	}
 
 	if cfg.decayInterval > 0 {
 		// overrides the default decay interval if the decay interval is set.
 		s.peerScoreParams.DecayInterval = cfg.decayInterval
-		s.logger.Warn().Dur("decay_interval_ms", cfg.decayInterval).Msg("decay interval is overridden")
+		s.logger.
+			Warn().
+			Str(logging.KeyNetworkingSecurity, "true").
+			Dur("decay_interval_ms", cfg.decayInterval).
+			Msg("decay interval is overridden")
 	}
 
 	// registers the score registry as the consumer of the invalid control message notifications
