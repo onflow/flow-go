@@ -181,7 +181,11 @@ func NewGossipSubBuilder(
 	idProvider module.IdentityProvider,
 	rpcInspectorConfig *p2pconf.GossipSubRPCInspectorsConfig,
 ) *Builder {
-	lg := logger.With().Str("component", "gossipsub").Logger()
+	lg := logger.With().
+		Str("component", "gossipsub").
+		Str("network-type", networkType.String()).
+		Logger()
+
 	b := &Builder{
 		logger:                   lg,
 		metricsCfg:               metricsCfg,
@@ -194,6 +198,7 @@ func NewGossipSubBuilder(
 		rpcInspectorConfig:       rpcInspectorConfig,
 		rpcInspectorSuiteFactory: defaultInspectorSuite(),
 	}
+
 	return b
 }
 
@@ -318,6 +323,10 @@ func (g *Builder) Build(ctx irrecoverable.SignalerContext) (p2p.PubSubAdapter, e
 			gossipSubConfigs.WithScoreTracer(scoreTracer)
 		}
 
+	} else {
+		g.logger.Warn().
+			Str(logging.KeyNetworkingSecurity, "true").
+			Msg("gossipsub peer scoring is disabled")
 	}
 
 	if g.gossipSubTracer != nil {
