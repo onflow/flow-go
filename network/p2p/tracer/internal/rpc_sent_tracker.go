@@ -12,9 +12,9 @@ import (
 	p2pmsg "github.com/onflow/flow-go/network/p2p/message"
 )
 
-// trackRpcSentWork is an internal data structure for "temporarily" storing *pubsub.RPC sent in the queue before they are processed
+// trackRPC is an internal data structure for "temporarily" storing *pubsub.RPC sent in the queue before they are processed
 // by the *RPCSentTracker.
-type trackRpcSentWork struct {
+type trackRPC struct {
 	rpc *pubsub.RPC
 }
 
@@ -22,7 +22,7 @@ type trackRpcSentWork struct {
 type RPCSentTracker struct {
 	component.Component
 	cache      *rpcSentCache
-	workerPool *worker.Pool[trackRpcSentWork]
+	workerPool *worker.Pool[trackRPC]
 }
 
 // RPCSentTrackerConfig configuration for the RPCSentTracker.
@@ -54,7 +54,7 @@ func NewRPCSentTracker(config *RPCSentTrackerConfig) *RPCSentTracker {
 		config.WorkerQueueCacheCollector)
 
 	tracker := &RPCSentTracker{cache: newRPCSentCache(cacheConfig)}
-	tracker.workerPool = worker.NewWorkerPoolBuilder[trackRpcSentWork](
+	tracker.workerPool = worker.NewWorkerPoolBuilder[trackRPC](
 		config.Logger,
 		store,
 		tracker.rpcSent).Build()
@@ -72,11 +72,11 @@ func NewRPCSentTracker(config *RPCSentTrackerConfig) *RPCSentTracker {
 // Args:
 // - *pubsub.RPC: the rpc sent.
 func (t *RPCSentTracker) RPCSent(rpc *pubsub.RPC) {
-	t.workerPool.Submit(trackRpcSentWork{rpc})
+	t.workerPool.Submit(trackRPC{rpc})
 }
 
 // rpcSent tracks control messages sent in *pubsub.RPC.
-func (t *RPCSentTracker) rpcSent(work trackRpcSentWork) error {
+func (t *RPCSentTracker) rpcSent(work trackRPC) error {
 	switch {
 	case len(work.rpc.GetControl().GetIhave()) > 0:
 		t.iHaveRPCSent(work.rpc.GetControl().GetIhave())
