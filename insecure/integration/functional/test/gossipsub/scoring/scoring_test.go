@@ -2,7 +2,6 @@ package scoring
 
 import (
 	"context"
-	"fmt"
 	"testing"
 	"time"
 
@@ -190,9 +189,7 @@ func TestGossipSubMeshDeliveryScoring_UnderDelivery_SingleTopic(t *testing.T) {
 	// we override some of the default scoring parameters in order to speed up the test in a time-efficient manner.
 	blockTopicOverrideParams := scoring.DefaultTopicScoreParams()
 	blockTopicOverrideParams.MeshMessageDeliveriesActivation = 1 * time.Second // we start observing the mesh message deliveries after 1 second of the node startup.
-	dkgTopicOverrideParams := scoring.DefaultTopicScoreParams()
-	dkgTopicOverrideParams.MeshMessageDeliveriesActivation = 1 * time.Second // we start observing the mesh message deliveries after 1 second of the node startup.
-	thisNode, thisId := p2ptest.NodeFixture(                                 // this node is the one that will be penalizing the under-performer node.
+	thisNode, thisId := p2ptest.NodeFixture(                                   // this node is the one that will be penalizing the under-performer node.
 		t,
 		sporkId,
 		t.Name(),
@@ -248,13 +245,15 @@ func TestGossipSubMeshDeliveryScoring_UnderDelivery_SingleTopic(t *testing.T) {
 		return true
 	}, 1*time.Second, 100*time.Millisecond)
 
-	// however, after one decay interval, we expect the score of the under-performing node to be penalized by -0.05 * MaxAppSpecificReward.
+	// however, after one decay interval, we expect the score of the under-performing node to be penalized by -0.05 * MaxAppSpecificReward as
+	// it has not been able to deliver messages to this node in the topic mesh since the past decay interval.
 	require.Eventually(t, func() bool {
 		underPerformingNodeScore, ok := thisNode.PeerScoreExposer().GetScore(underPerformerNode.Host().ID())
 		if !ok {
 			return false
 		}
 		if underPerformingNodeScore > 0.96*scoring.MaxAppSpecificReward { // score must be penalized by -0.05 * MaxAppSpecificReward.
+			// 0.96 is to account for floating point errors.
 			return false
 		}
 		if underPerformingNodeScore < scoring.DefaultGossipThreshold { // even the node is slightly penalized, it should still be able to gossip with this node.
@@ -362,6 +361,7 @@ func TestGossipSubMeshDeliveryScoring_UnderDelivery_TwoTopics(t *testing.T) {
 			return false
 		}
 		if underPerformingNodeScore > 0.91*scoring.MaxAppSpecificReward { // score must be penalized by ~ 2 * -0.05 * MaxAppSpecificReward.
+			// 0.91 is to account for the floating point errors.
 			return false
 		}
 		if underPerformingNodeScore < scoring.DefaultGossipThreshold { // even the node is slightly penalized, it should still be able to gossip with this node.
@@ -386,6 +386,7 @@ func TestGossipSubMeshDeliveryScoring_UnderDelivery_TwoTopics(t *testing.T) {
 	})
 }
 
+// TestGossipSubMeshDeliveryScoring_Replay_Will_Not_Counted tests that replayed messages will not be counted towards the mesh message deliveries.
 func TestGossipSubMeshDeliveryScoring_Replay_Will_Not_Counted(t *testing.T) {
 	role := flow.RoleConsensus
 	sporkId := unittest.IdentifierFixture()
@@ -440,7 +441,7 @@ func TestGossipSubMeshDeliveryScoring_Replay_Will_Not_Counted(t *testing.T) {
 	})
 
 	// Initially the replaying node should have a score that is at least equal to the MaxAppSpecificReward.
-	// The reason is in our scoring system, we reward the staked nodes by MaxAppSpecificReward, and the under-performing node is considered staked
+	// The reason is in our scoring system, we reward the staked nodes by MaxAppSpecificReward, and initially every node is considered staked
 	// as it is in the id provider of thisNode.
 	initialReplayingNodeScore := float64(0)
 	require.Eventually(t, func() bool {
@@ -457,7 +458,7 @@ func TestGossipSubMeshDeliveryScoring_Replay_Will_Not_Counted(t *testing.T) {
 		return true
 	}, 2*time.Second, 100*time.Millisecond)
 
-	// replaying node acts honestly and sends 200 block proposals on the topic mesh. This is just as equal as the
+	// replaying node acts honestly and sends 200 block proposals on the topic mesh. This is twice the
 	// defaultTopicMeshMessageDeliveryThreshold, which prevents the replaying node to be penalized.
 	proposalList := make([]*messages.BlockProposal, 200)
 	for i := 0; i < len(proposalList); i++ {
@@ -475,12 +476,6 @@ func TestGossipSubMeshDeliveryScoring_Replay_Will_Not_Counted(t *testing.T) {
 		if !ok {
 			return false
 		}
-		topicSnapshot, ok := thisNode.PeerScoreExposer().GetTopicScores(replayingNode.Host().ID())
-		if !ok {
-			return false
-		}
-
-		fmt.Println("replayingNodeScore", replayingNodeScore, "initialReplayingNodeScore", initialReplayingNodeScore, "topic-snapshot-message-deliveries", topicSnapshot[blockTopic.String()].MeshMessageDeliveries)
 		if replayingNodeScore < scoring.MaxAppSpecificReward {
 			// ensure the score is high enough so that gossip is routed by victim node to spammer node.
 			return false
@@ -501,18 +496,13 @@ func TestGossipSubMeshDeliveryScoring_Replay_Will_Not_Counted(t *testing.T) {
 		return proposalList[i]
 	})
 
-	// as the replaying node is not penalized, we expect its score to be equal to the initial score.
+	// since the last decay interval, the replaying node has not delivered anything new, so its score should be penalized for under-performing.
 	require.Eventually(t, func() bool {
 		replayingNodeScore, ok := thisNode.PeerScoreExposer().GetScore(replayingNode.Host().ID())
 		if !ok {
 			return false
 		}
-		topicSnapshot, ok := thisNode.PeerScoreExposer().GetTopicScores(replayingNode.Host().ID())
-		if !ok {
-			return false
-		}
 
-		fmt.Println("replayingNodeScore", replayingNodeScore, "initialReplayingNodeScore", initialReplayingNodeScore, "topic-snapshot-message-deliveries", topicSnapshot[blockTopic.String()].MeshMessageDeliveries)
 		if replayingNodeScore >= initialReplayingNodeScore {
 			// node must be penalized for just replaying the same messages.
 			return false
@@ -541,4 +531,8 @@ func TestGossipSubMeshDeliveryScoring_Replay_Will_Not_Counted(t *testing.T) {
 		return true
 	}, 2*time.Second, 100*time.Millisecond)
 
+	// even though the replaying node is penalized, it should still be able to publish and receive messages from this node in both topic meshes.
+	p2ptest.EnsurePubsubMessageExchange(t, ctx, nodes, blockTopic, 1, func() interface{} {
+		return unittest.ProposalFixture()
+	})
 }
