@@ -22,7 +22,7 @@ func newRouter(backend access.API,
 	chain flow.Chain,
 	restCollector module.RestMetrics,
 	stateStreamApi state_stream.API,
-	conf state_stream.EventFilterConfig,
+	eventFilterConfig state_stream.EventFilterConfig,
 	maxGlobalStreams uint32,
 ) (*mux.Router, error) {
 	router := mux.NewRouter().StrictSlash(true)
@@ -46,7 +46,7 @@ func newRouter(backend access.API,
 	}
 
 	for _, r := range WSRoutes {
-		h := NewWSHandler(logger, r.Handler, chain, stateStreamApi, conf, maxGlobalStreams)
+		h := NewWSHandler(logger, r.Handler, chain, stateStreamApi, eventFilterConfig, maxGlobalStreams)
 		v1SubRouter.
 			Methods(r.Method).
 			Path(r.Pattern).

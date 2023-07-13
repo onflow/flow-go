@@ -32,14 +32,14 @@ func NewWSHandler(
 	subscribeFunc SubscribeHandlerFunc,
 	chain flow.Chain,
 	api state_stream.API,
-	conf state_stream.EventFilterConfig,
+	eventFilterConfig state_stream.EventFilterConfig,
 	maxGlobalStreams uint32,
 ) *WSHandler {
 	handler := &WSHandler{
 		subscribeFunc: subscribeFunc,
 	}
 	handler.HttpHandler = NewHttpHandler(logger, chain)
-	handler.SubscribeHandler = state_stream.NewSubscribeHandler(api, chain, conf, maxGlobalStreams)
+	handler.SubscribeHandler = state_stream.NewSubscribeHandler(api, chain, eventFilterConfig, maxGlobalStreams)
 	return handler
 }
 

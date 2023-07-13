@@ -19,9 +19,9 @@ type Handler struct {
 	*state_stream.SubscribeHandler
 }
 
-func NewHandler(api state_stream.API, chain flow.Chain, conf state_stream.EventFilterConfig, maxGlobalStreams uint32) *Handler {
+func NewHandler(api state_stream.API, chain flow.Chain, config state_stream.EventFilterConfig, maxGlobalStreams uint32) *Handler {
 	h := &Handler{}
-	h.SubscribeHandler = state_stream.NewSubscribeHandler(api, chain, conf, maxGlobalStreams)
+	h.SubscribeHandler = state_stream.NewSubscribeHandler(api, chain, config, maxGlobalStreams)
 	return h
 }
 

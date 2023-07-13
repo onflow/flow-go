@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/onflow/flow-go/engine/common/state_stream"
 	"net"
 	"net/http"
 	"sync"
@@ -21,6 +20,7 @@ import (
 	"github.com/onflow/flow-go/engine/access/rest"
 	"github.com/onflow/flow-go/engine/access/rpc/backend"
 	"github.com/onflow/flow-go/engine/common/rpc"
+	"github.com/onflow/flow-go/engine/common/state_stream"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/component"
@@ -77,7 +77,8 @@ type Engine struct {
 	restAPIAddress      net.Addr
 
 	stateStreamBackend state_stream.API
-	stateStreamConfig  state_stream.Config
+	eventFilterConfig  state_stream.EventFilterConfig
+	maxGlobalStreams   uint32
 }
 
 // NewBuilder returns a new RPC engine builder.
@@ -102,7 +103,8 @@ func NewBuilder(log zerolog.Logger,
 	apiBurstLimits map[string]int, // the api burst limit (max calls at the same time) for each of the Access API e.g. Ping->50, GetTransaction->10
 	me module.Local,
 	stateStreamBackend state_stream.API,
-	stateStreamConfig state_stream.Config,
+	eventFilterConfig state_stream.EventFilterConfig,
+	maxGlobalStreams uint32,
 ) (*RPCEngineBuilder, error) {
 
 	log = log.With().Str("engine", "rpc").Logger()
@@ -217,7 +219,8 @@ func NewBuilder(log zerolog.Logger,
 		chain:                     chainID.Chain(),
 		restCollector:             accessMetrics,
 		stateStreamBackend:        stateStreamBackend,
-		stateStreamConfig:         stateStreamConfig,
+		eventFilterConfig:         eventFilterConfig,
+		maxGlobalStreams:          maxGlobalStreams,
 	}
 	backendNotifierActor, backendNotifierWorker := events.NewFinalizationActor(eng.notifyBackendOnBlockFinalized)
 	eng.backendNotifierActor = backendNotifierActor
@@ -398,8 +401,8 @@ func (e *Engine) serveREST(ctx irrecoverable.SignalerContext, ready component.Re
 		e.chain,
 		e.restCollector,
 		e.stateStreamBackend,
-		e.stateStreamConfig.EventFilterConfig,
-		e.stateStreamConfig.MaxGlobalStreams)
+		e.eventFilterConfig,
+		e.maxGlobalStreams)
 	if err != nil {
 		e.log.Err(err).Msg("failed to initialize the REST server")
 		ctx.Throw(err)

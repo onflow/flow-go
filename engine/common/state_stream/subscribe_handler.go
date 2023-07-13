@@ -20,11 +20,11 @@ type SubscribeHandler struct {
 	StreamCount atomic.Int32
 }
 
-func NewSubscribeHandler(api API, chain flow.Chain, conf EventFilterConfig, maxGlobalStreams uint32) *SubscribeHandler {
+func NewSubscribeHandler(api API, chain flow.Chain, config EventFilterConfig, maxGlobalStreams uint32) *SubscribeHandler {
 	h := &SubscribeHandler{
 		Api:               api,
 		Chain:             chain,
-		EventFilterConfig: conf,
+		EventFilterConfig: config,
 		MaxStreams:        int32(maxGlobalStreams),
 		StreamCount:       atomic.Int32{},
 	}

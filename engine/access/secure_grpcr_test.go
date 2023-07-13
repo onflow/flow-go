@@ -18,6 +18,7 @@ import (
 	"github.com/onflow/flow-go/crypto"
 	accessmock "github.com/onflow/flow-go/engine/access/mock"
 	"github.com/onflow/flow-go/engine/access/rpc"
+	"github.com/onflow/flow-go/engine/common/state_stream"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
@@ -129,6 +130,9 @@ func (suite *SecureGRPCTestSuite) SetupTest() {
 		nil,
 		nil,
 		suite.me,
+		nil,
+		state_stream.DefaultEventFilterConfig,
+		0,
 	)
 	assert.NoError(suite.T(), err)
 	suite.rpcEng, err = rpcEngBuilder.WithLegacy().Build()

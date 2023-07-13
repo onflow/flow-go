@@ -864,7 +864,8 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 			builder.apiBurstlimits,
 			builder.Me,
 			nil,
-			state_stream.Config{},
+			state_stream.DefaultEventFilterConfig,
+			0,
 		)
 		if err != nil {
 			return nil, err

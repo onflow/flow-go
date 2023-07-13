@@ -31,13 +31,12 @@ func SubscribeEvents(r *request.Request, w http.ResponseWriter, h *state_stream.
 	var filter state_stream.EventFilter
 	// Retrieve the filter parameters from the request, if provided
 
-	emptyString := make([]string, 0) //Uliana: TODO: remove it
 	filter, err = state_stream.NewEventFilter(
 		h.EventFilterConfig,
 		r.Chain,
 		req.EventTypes,
-		emptyString, //Uliana: TODO: parsed addresses
-		emptyString, //Uliana: TODO: parsed contracts
+		req.Addresses,
+		req.Contracts,
 	)
 	if err != nil {
 		err = fmt.Errorf("invalid event filter: %s", err)

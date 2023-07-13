@@ -8,13 +8,16 @@ import (
 
 const startBlockIdQuery = "start_block_id"
 const eventTypesQuery = "event_types"
+const addressesQuery = "addresses"
+const contractsQuery = "contracts"
 
 type SubscribeEvents struct {
 	StartBlockID flow.Identifier
 	StartHeight  uint64
 
 	EventTypes []string
-	//Uliana: TODO: add events filter - contracts, addresses
+	Addresses  []string
+	Contracts  []string
 }
 
 func (g *SubscribeEvents) Build(r *Request) error {
@@ -22,10 +25,12 @@ func (g *SubscribeEvents) Build(r *Request) error {
 		r.GetQueryParam(startBlockIdQuery),
 		r.GetQueryParam(startHeightQuery),
 		r.GetQueryParams(eventTypesQuery),
+		r.GetQueryParams(addressesQuery),
+		r.GetQueryParams(contractsQuery),
 	)
 }
 
-func (g *SubscribeEvents) Parse(rawBlockID string, rawStart string, rawTypes []string) error {
+func (g *SubscribeEvents) Parse(rawBlockID string, rawStart string, rawTypes []string, rawAddresses []string, rawContracts []string) error {
 	var height Height
 	err := height.Parse(rawStart)
 	if err != nil {
@@ -52,6 +57,9 @@ func (g *SubscribeEvents) Parse(rawBlockID string, rawStart string, rawTypes []s
 	}
 
 	g.EventTypes = eventTypes.Flow()
+
+	g.Addresses = rawAddresses
+	g.Contracts = rawContracts
 
 	return nil
 }

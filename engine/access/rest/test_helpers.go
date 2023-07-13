@@ -12,7 +12,8 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/access/mock"
-	"github.com/onflow/flow-go/engine/common/state_stream"
+	mock_state_stream "github.com/onflow/flow-go/engine/access/state_stream/mock"
+	common_state_stream "github.com/onflow/flow-go/engine/common/state_stream"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
 )
@@ -27,16 +28,21 @@ const (
 	heightQueryParam          = "height"
 )
 
-func executeRequest(req *http.Request, backend *mock.API) (*httptest.ResponseRecorder, error) {
+func executeRequest(req *http.Request, backend *mock.API, stateStreamApi *mock_state_stream.API) (*httptest.ResponseRecorder, error) {
 	var b bytes.Buffer
 	logger := zerolog.New(&b)
 	restCollector := metrics.NewNoopCollector()
-	stateStreamConfig := state_stream.Config{} //Uliana: TODO: add test for subscribe_events, provide state_stream backend
+
+	stateStreamConfig := common_state_stream.Config{
+		EventFilterConfig: common_state_stream.DefaultEventFilterConfig,
+		MaxGlobalStreams:  common_state_stream.DefaultMaxGlobalStreams,
+	}
+
 	router, err := newRouter(backend,
 		logger,
 		flow.Testnet.Chain(),
 		restCollector,
-		nil,
+		stateStreamApi,
 		stateStreamConfig.EventFilterConfig,
 		stateStreamConfig.MaxGlobalStreams)
 	if err != nil {
@@ -48,12 +54,12 @@ func executeRequest(req *http.Request, backend *mock.API) (*httptest.ResponseRec
 	return rr, nil
 }
 
-func assertOKResponse(t *testing.T, req *http.Request, expectedRespBody string, backend *mock.API) {
-	assertResponse(t, req, http.StatusOK, expectedRespBody, backend)
+func assertOKResponse(t *testing.T, req *http.Request, expectedRespBody string, backend *mock.API, stateStreamApi *mock_state_stream.API) {
+	assertResponse(t, req, http.StatusOK, expectedRespBody, backend, stateStreamApi)
 }
 
-func assertResponse(t *testing.T, req *http.Request, status int, expectedRespBody string, backend *mock.API) {
-	rr, err := executeRequest(req, backend)
+func assertResponse(t *testing.T, req *http.Request, status int, expectedRespBody string, backend *mock.API, stateStreamApi *mock_state_stream.API) {
+	rr, err := executeRequest(req, backend, stateStreamApi)
 	assert.NoError(t, err)
 
 	actualResponseBody := rr.Body.String()

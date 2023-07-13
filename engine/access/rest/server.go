@@ -20,11 +20,11 @@ func NewServer(backend access.API,
 	chain flow.Chain,
 	restCollector module.RestMetrics,
 	api state_stream.API,
-	conf state_stream.EventFilterConfig,
+	eventFilterConfig state_stream.EventFilterConfig,
 	maxGlobalStreams uint32,
 ) (*http.Server, error) {
 
-	router, err := newRouter(backend, logger, chain, restCollector, api, conf, maxGlobalStreams)
+	router, err := newRouter(backend, logger, chain, restCollector, api, eventFilterConfig, maxGlobalStreams)
 	if err != nil {
 		return nil, err
 	}
