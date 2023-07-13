@@ -2474,3 +2474,55 @@ func ChunkExecutionDataFixture(t *testing.T, minSize int, opts ...func(*executio
 		size *= 2
 	}
 }
+
+func ProtocolStateFixture(options ...func(*flow.RichProtocolStateEntry)) *flow.RichProtocolStateEntry {
+	prevEpochSetup := EpochSetupFixture()
+	prevEpochCommit := EpochCommitFixture(func(commit *flow.EpochCommit) {
+		commit.Counter = prevEpochSetup.Counter
+	})
+	currentEpochSetup := EpochSetupFixture(func(setup *flow.EpochSetup) {
+		setup.Counter = prevEpochSetup.Counter + 1
+	})
+	currentEpochCommit := EpochCommitFixture(func(commit *flow.EpochCommit) {
+		commit.Counter = currentEpochSetup.Counter
+	})
+
+	allIdentities := append(prevEpochSetup.Participants, currentEpochSetup.Participants...)
+	allIdentities = allIdentities.Sort(order.Canonical)
+
+	var dynamicIdentities flow.DynamicIdentityEntryList
+	for _, identity := range allIdentities {
+		dynamicIdentities = append(dynamicIdentities, &flow.DynamicIdentityEntry{
+			NodeID:  identity.NodeID,
+			Dynamic: identity.DynamicIdentity,
+		})
+	}
+
+	entry := &flow.RichProtocolStateEntry{
+		ProtocolStateEntry: flow.ProtocolStateEntry{
+			CurrentEpochEventIDs: flow.EventIDs{
+				SetupID:  currentEpochSetup.ID(),
+				CommitID: currentEpochCommit.ID(),
+			},
+			PreviousEpochEventIDs: flow.EventIDs{
+				SetupID:  prevEpochSetup.ID(),
+				CommitID: prevEpochCommit.ID(),
+			},
+			Identities:                      dynamicIdentities,
+			InvalidStateTransitionAttempted: false,
+			NextEpochProtocolState:          nil,
+		},
+		CurrentEpochSetup:      currentEpochSetup,
+		CurrentEpochCommit:     currentEpochCommit,
+		PreviousEpochSetup:     prevEpochSetup,
+		PreviousEpochCommit:    prevEpochCommit,
+		Identities:             allIdentities,
+		NextEpochProtocolState: nil,
+	}
+
+	for _, option := range options {
+		option(entry)
+	}
+
+	return entry
+}
