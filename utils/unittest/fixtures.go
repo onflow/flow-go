@@ -2475,6 +2475,10 @@ func ChunkExecutionDataFixture(t *testing.T, minSize int, opts ...func(*executio
 	}
 }
 
+// ProtocolStateFixture creates a fixture with correctly structured data that passes basic sanity checks.
+// Epoch setup and commit counters are set to match.
+// Identities are constructed from setup events.
+// Identities are sorted in canonical order.
 func ProtocolStateFixture(options ...func(*flow.RichProtocolStateEntry)) *flow.RichProtocolStateEntry {
 	prevEpochSetup := EpochSetupFixture()
 	prevEpochCommit := EpochCommitFixture(func(commit *flow.EpochCommit) {
@@ -2525,4 +2529,48 @@ func ProtocolStateFixture(options ...func(*flow.RichProtocolStateEntry)) *flow.R
 	}
 
 	return entry
+}
+
+// WithNextEpochProtocolState creates a fixture with correctly structured data for next epoch.
+func WithNextEpochProtocolState() func(entry *flow.RichProtocolStateEntry) {
+	return func(entry *flow.RichProtocolStateEntry) {
+		nextEpochSetup := EpochSetupFixture(func(setup *flow.EpochSetup) {
+			setup.Counter = entry.CurrentEpochSetup.Counter + 1
+		})
+		nextEpochCommit := EpochCommitFixture(func(commit *flow.EpochCommit) {
+			commit.Counter = nextEpochSetup.Counter
+		})
+
+		allIdentities := append(entry.CurrentEpochSetup.Participants, nextEpochSetup.Participants...)
+		allIdentities = allIdentities.Sort(order.Canonical)
+
+		var dynamicIdentities flow.DynamicIdentityEntryList
+		for _, identity := range allIdentities {
+			dynamicIdentities = append(dynamicIdentities, &flow.DynamicIdentityEntry{
+				NodeID:  identity.NodeID,
+				Dynamic: identity.DynamicIdentity,
+			})
+		}
+
+		entry.ProtocolStateEntry.NextEpochProtocolState = &flow.ProtocolStateEntry{
+			CurrentEpochEventIDs: flow.EventIDs{
+				SetupID:  nextEpochSetup.ID(),
+				CommitID: nextEpochCommit.ID(),
+			},
+			PreviousEpochEventIDs:           entry.CurrentEpochEventIDs,
+			Identities:                      dynamicIdentities,
+			InvalidStateTransitionAttempted: false,
+			NextEpochProtocolState:          nil,
+		}
+
+		entry.NextEpochProtocolState = &flow.RichProtocolStateEntry{
+			ProtocolStateEntry:     *entry.ProtocolStateEntry.NextEpochProtocolState,
+			CurrentEpochSetup:      nextEpochSetup,
+			CurrentEpochCommit:     nextEpochCommit,
+			PreviousEpochSetup:     entry.CurrentEpochSetup,
+			PreviousEpochCommit:    entry.CurrentEpochCommit,
+			Identities:             allIdentities,
+			NextEpochProtocolState: nil,
+		}
+	}
 }

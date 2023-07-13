@@ -152,7 +152,7 @@ func newRichProtocolStateEntry(
 		if err != nil {
 			return nil, fmt.Errorf("could not retrieve next epoch commit: %w", err)
 		}
-		nextEpochIdentityTable, err := buildIdentityTable(protocolState.Identities, result.CurrentEpochSetup, nextEpochSetup)
+		nextEpochIdentityTable, err := buildIdentityTable(nextEpochProtocolState.Identities, result.CurrentEpochSetup, nextEpochSetup)
 		if err != nil {
 			return nil, fmt.Errorf("could not build next epoch identity table: %w", err)
 		}
