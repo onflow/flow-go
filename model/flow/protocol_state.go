@@ -8,8 +8,11 @@ type DynamicIdentityEntry struct {
 
 type DynamicIdentityEntryList []*DynamicIdentityEntry
 
-// ProtocolStateEntry is the main structure that will be saved in the database.
-// It contains the minimal protocol state that has to be persisted.
+// ProtocolStateEntry holds information about the protocol state at some point in time.
+// It allows to reconstruct the state of identity table using epoch setup events and dynamic identities.
+// It tracks attempts of invalid state transitions.
+// It also holds information about the next epoch, if it has been already committed.
+// This structure is used to persist protocol state in the database.
 type ProtocolStateEntry struct {
 	// setup and commit event IDs for current epoch.
 	CurrentEpochEventIDs EventIDs
