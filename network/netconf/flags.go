@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/spf13/pflag"
+	"github.com/spf13/viper"
 
 	p2pmsg "github.com/onflow/flow-go/network/p2p/message"
 )
@@ -36,9 +37,10 @@ const (
 	gracePeriod   = "libp2p-grace-period"
 	silencePeriod = "libp2p-silence-period"
 	// gossipsub
-	peerScoring          = "gossipsub-peer-scoring-enabled"
-	localMeshLogInterval = "gossipsub-local-mesh-logging-interval"
-	scoreTracerInterval  = "gossipsub-score-tracer-interval"
+	peerScoring             = "gossipsub-peer-scoring-enabled"
+	localMeshLogInterval    = "gossipsub-local-mesh-logging-interval"
+	rpcSentTrackerCacheSize = "gossipsub-rpc-sent-tracker-cache-size"
+	scoreTracerInterval     = "gossipsub-score-tracer-interval"
 	// gossipsub validation inspector
 	gossipSubRPCInspectorNotificationCacheSize                 = "gossipsub-rpc-inspector-notification-cache-size"
 	validationInspectorNumberOfWorkers                         = "gossipsub-rpc-validation-inspector-workers"
@@ -65,7 +67,7 @@ func AllFlagNames() []string {
 	return []string{
 		networkingConnectionPruning, preferredUnicastsProtocols, receivedMessageCacheSize, peerUpdateInterval, unicastMessageTimeout, unicastCreateStreamRetryDelay,
 		dnsCacheTTL, disallowListNotificationCacheSize, dryRun, lockoutDuration, messageRateLimit, bandwidthRateLimit, bandwidthBurstLimit, memoryLimitRatio,
-		fileDescriptorsRatio, peerBaseLimitConnsInbound, highWatermark, lowWatermark, gracePeriod, silencePeriod, peerScoring, localMeshLogInterval, scoreTracerInterval,
+		fileDescriptorsRatio, peerBaseLimitConnsInbound, highWatermark, lowWatermark, gracePeriod, silencePeriod, peerScoring, localMeshLogInterval, rpcSentTrackerCacheSize, scoreTracerInterval,
 		gossipSubRPCInspectorNotificationCacheSize, validationInspectorNumberOfWorkers, validationInspectorInspectMessageQueueCacheSize, validationInspectorClusterPrefixedTopicsReceivedCacheSize,
 		validationInspectorClusterPrefixedTopicsReceivedCacheDecay, validationInspectorClusterPrefixHardThreshold, ihaveSyncSampleSizePercentage, ihaveAsyncSampleSizePercentage,
 		ihaveMaxSampleSize, metricsInspectorNumberOfWorkers, metricsInspectorCacheSize, alspDisabled, alspSpamRecordCacheSize, alspSpamRecordQueueSize, alspHearBeatInterval,
@@ -106,6 +108,7 @@ func InitializeNetworkFlags(flags *pflag.FlagSet, config *Config) {
 	flags.Bool(peerScoring, config.GossipSubConfig.PeerScoring, "enabling peer scoring on pubsub network")
 	flags.Duration(localMeshLogInterval, config.GossipSubConfig.LocalMeshLogInterval, "logging interval for local mesh in gossipsub")
 	flags.Duration(scoreTracerInterval, config.GossipSubConfig.ScoreTracerInterval, "logging interval for peer score tracer in gossipsub, set to 0 to disable")
+	flags.Uint32(rpcSentTrackerCacheSize, config.GossipSubConfig.RPCSentTrackerCacheSize, "cache size of the rpc sent tracker used by the gossipsub mesh tracer.")
 	// gossipsub RPC control message validation limits used for validation configuration and rate limiting
 	flags.Int(validationInspectorNumberOfWorkers, config.GossipSubConfig.GossipSubRPCInspectorsConfig.GossipSubRPCValidationInspectorConfigs.NumberOfWorkers, "number of gossupsub RPC control message validation inspector component workers")
 	flags.Uint32(validationInspectorInspectMessageQueueCacheSize, config.GossipSubConfig.GossipSubRPCInspectorsConfig.GossipSubRPCValidationInspectorConfigs.CacheSize, "cache size for gossipsub RPC validation inspector events worker pool queue.")
@@ -145,4 +148,37 @@ func initRpcInspectorValidationLimitsFlags(flags *pflag.FlagSet, defaultNetConfi
 		flags.Uint64(fmt.Sprintf(safetyThresholdflagStrFmt, s), ctrlMsgValidationConfig.SafetyThreshold, fmt.Sprintf("safety threshold limit for gossipsub RPC %s message validation", ctrlMsgType))
 		flags.Int(fmt.Sprintf(rateLimitflagStrFmt, s), ctrlMsgValidationConfig.RateLimit, fmt.Sprintf("rate limit for gossipsub RPC %s message validation", ctrlMsgType))
 	}
+}
+
+// SetAliases this func sets an aliases for each CLI flag defined for network config overrides to it's corresponding
+// full key in the viper config store. This is required because in our config.yml file all configuration values for the
+// Flow network are stored one level down on the network-config property. When the default config is bootstrapped viper will
+// store these values with the "network-config." prefix on the config key, because we do not want to use CLI flags like --network-config.networking-connection-pruning
+// to override default values we instead use cleans flags like --networking-connection-pruning and create an alias from networking-connection-pruning -> network-config.networking-connection-pruning
+// to ensure overrides happen as expected.
+// Args:
+// *viper.Viper: instance of the viper store to register network config aliases on.
+// Returns:
+// error: if a flag does not have a corresponding key in the viper store.
+func SetAliases(conf *viper.Viper) error {
+	m := make(map[string]string)
+	// create map of key -> full pathkey
+	// ie: "networking-connection-pruning" -> "network-config.networking-connection-pruning"
+	for _, key := range conf.AllKeys() {
+		s := strings.Split(key, ".")
+		// check len of s, we expect all network keys to have a single prefix "network-config"
+		// s should always contain only 2 elements
+		if len(s) == 2 {
+			m[s[1]] = key
+		}
+	}
+	// each flag name should correspond to exactly one key in our config store after it is loaded with the default config
+	for _, flagName := range AllFlagNames() {
+		fullKey, ok := m[flagName]
+		if !ok {
+			return fmt.Errorf("invalid network configuration missing configuration key flag name %s check config file and cli flags", flagName)
+		}
+		conf.RegisterAlias(fullKey, flagName)
+	}
+	return nil
 }
