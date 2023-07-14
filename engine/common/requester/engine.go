@@ -367,7 +367,11 @@ func (e *Engine) dispatchRequest() (bool, error) {
 			if len(providers) == 0 {
 				return false, fmt.Errorf("no valid providers available")
 			}
-			providerID = providers.Sample(1)[0].NodeID
+			id, err := providers.Sample(1)
+			if err != nil {
+				return false, fmt.Errorf("sampling failed: %w", err)
+			}
+			providerID = id[0].NodeID
 		}
 
 		// add item to list and set retry parameters

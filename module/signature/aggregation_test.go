@@ -4,7 +4,6 @@
 package signature
 
 import (
-	"crypto/rand"
 	"errors"
 	mrand "math/rand"
 	"sort"
@@ -17,6 +16,13 @@ import (
 	"github.com/onflow/flow-go/crypto"
 )
 
+func getPRG(t *testing.T) *mrand.Rand {
+	random := time.Now().UnixNano()
+	t.Logf("rng seed is %d", random)
+	rng := mrand.New(mrand.NewSource(random))
+	return rng
+}
+
 // Utility function that flips a point sign bit to negate the point
 // this is shortcut which works only for zcash BLS12-381 compressed serialization
 // that is currently supported by the flow crypto module
@@ -25,7 +31,7 @@ func negatePoint(pointbytes []byte) {
 	pointbytes[0] ^= 0x20
 }
 
-func createAggregationData(t *testing.T, signersNumber int) (
+func createAggregationData(t *testing.T, rand *mrand.Rand, signersNumber int) (
 	[]byte, string, []crypto.Signature, []crypto.PublicKey,
 ) {
 	// create message and tag
@@ -54,7 +60,7 @@ func createAggregationData(t *testing.T, signersNumber int) (
 }
 
 func TestAggregatorSameMessage(t *testing.T) {
-
+	rand := getPRG(t)
 	signersNum := 20
 
 	// constructor edge cases
@@ -79,7 +85,7 @@ func TestAggregatorSameMessage(t *testing.T) {
 	// Happy paths
 	// all signatures are valid
 	t.Run("happy path", func(t *testing.T) {
-		msg, tag, sigs, pks := createAggregationData(t, signersNum)
+		msg, tag, sigs, pks := createAggregationData(t, rand, signersNum)
 		aggregator, err := NewSignatureAggregatorSameMessage(msg, tag, pks)
 		require.NoError(t, err)
 
@@ -150,7 +156,7 @@ func TestAggregatorSameMessage(t *testing.T) {
 
 	// Unhappy paths
 	t.Run("invalid inputs", func(t *testing.T) {
-		msg, tag, sigs, pks := createAggregationData(t, signersNum)
+		msg, tag, sigs, pks := createAggregationData(t, rand, signersNum)
 		aggregator, err := NewSignatureAggregatorSameMessage(msg, tag, pks)
 		require.NoError(t, err)
 		// invalid indices for different methods
@@ -184,7 +190,7 @@ func TestAggregatorSameMessage(t *testing.T) {
 	})
 
 	t.Run("duplicate signers", func(t *testing.T) {
-		msg, tag, sigs, pks := createAggregationData(t, signersNum)
+		msg, tag, sigs, pks := createAggregationData(t, rand, signersNum)
 		aggregator, err := NewSignatureAggregatorSameMessage(msg, tag, pks)
 		require.NoError(t, err)
 
@@ -223,7 +229,7 @@ func TestAggregatorSameMessage(t *testing.T) {
 
 	// 1: No signature has been added.
 	t.Run("aggregate with no signatures", func(t *testing.T) {
-		msg, tag, _, pks := createAggregationData(t, 1)
+		msg, tag, _, pks := createAggregationData(t, rand, 1)
 		aggregator, err := NewSignatureAggregatorSameMessage(msg, tag, pks)
 		require.NoError(t, err)
 		// Aggregation should error with sentinel InsufficientSignaturesError
@@ -239,7 +245,7 @@ func TestAggregatorSameMessage(t *testing.T) {
 	//      2.a. aggregated public key is not identity
 	//      2.b. aggregated public key is identity
 	t.Run("invalid signature serialization", func(t *testing.T) {
-		msg, tag, sigs, pks := createAggregationData(t, 2)
+		msg, tag, sigs, pks := createAggregationData(t, rand, 2)
 		invalidStructureSig := (crypto.Signature)([]byte{0, 0})
 
 		t.Run("with non-identity aggregated public key", func(t *testing.T) {
@@ -305,7 +311,7 @@ func TestAggregatorSameMessage(t *testing.T) {
 	//      3.a. aggregated public key is not identity
 	//      3.b. aggregated public key is identity
 	t.Run("correct serialization and invalid signature", func(t *testing.T) {
-		msg, tag, sigs, pks := createAggregationData(t, 2)
+		msg, tag, sigs, pks := createAggregationData(t, rand, 2)
 
 		t.Run("with non-identity aggregated public key", func(t *testing.T) {
 			aggregator, err := NewSignatureAggregatorSameMessage(msg, tag, pks)
@@ -374,7 +380,7 @@ func TestAggregatorSameMessage(t *testing.T) {
 
 	// 4. All signatures are valid but aggregated key is identity
 	t.Run("all valid signatures and identity aggregated key", func(t *testing.T) {
-		msg, tag, sigs, pks := createAggregationData(t, 2)
+		msg, tag, sigs, pks := createAggregationData(t, rand, 2)
 
 		// public key at index 1 is opposite of public key at index 0 (pks[1] = -pks[0])
 		// so that aggregation of pks[0] and pks[1] is identity
@@ -413,9 +419,7 @@ func TestAggregatorSameMessage(t *testing.T) {
 }
 
 func TestKeyAggregator(t *testing.T) {
-	r := time.Now().UnixNano()
-	mrand.Seed(r)
-	t.Logf("math rand seed is %d", r)
+	rand := getPRG(t)
 
 	signersNum := 20
 	// create keys
@@ -497,8 +501,8 @@ func TestKeyAggregator(t *testing.T) {
 		rounds := 30
 		for i := 0; i < rounds; i++ {
 			go func() { // test module concurrency
-				low := mrand.Intn(signersNum - 1)
-				high := low + 1 + mrand.Intn(signersNum-1-low)
+				low := rand.Intn(signersNum - 1)
+				high := low + 1 + rand.Intn(signersNum-1-low)
 				var key, expectedKey crypto.PublicKey
 				var err error
 				key, err = aggregator.KeyAggregate(indices[low:high])

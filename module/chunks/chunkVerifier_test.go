@@ -2,9 +2,7 @@ package chunks_test
 
 import (
 	"fmt"
-	"math/rand"
 	"testing"
-	"time"
 
 	"github.com/onflow/cadence/runtime"
 	"github.com/rs/zerolog"
@@ -68,9 +66,6 @@ type ChunkVerifierTestSuite struct {
 // Make sure variables are set properly
 // SetupTest is executed prior to each individual test in this test suite
 func (s *ChunkVerifierTestSuite) SetupSuite() {
-	// seed the RNG
-	rand.Seed(time.Now().UnixNano())
-
 	vm := new(vmMock)
 	systemOkVm := new(vmSystemOkMock)
 	systemBadVm := new(vmSystemBadMock)

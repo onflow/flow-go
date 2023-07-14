@@ -471,13 +471,16 @@ func (n *Network) PublishOnChannel(channel channels.Channel, message interface{}
 // MulticastOnChannel unreliably sends the specified event over the channel to randomly selected 'num' number of recipients
 // selected from the specified targetIDs.
 func (n *Network) MulticastOnChannel(channel channels.Channel, message interface{}, num uint, targetIDs ...flow.Identifier) error {
-	selectedIDs := flow.IdentifierList(targetIDs).Filter(n.removeSelfFilter()).Sample(num)
+	selectedIDs, err := flow.IdentifierList(targetIDs).Filter(n.removeSelfFilter()).Sample(num)
+	if err != nil {
+		return fmt.Errorf("sampling failed: %w", err)
+	}
 
 	if len(selectedIDs) == 0 {
 		return network.EmptyTargetList
 	}
 
-	err := n.sendOnChannel(channel, message, selectedIDs)
+	err = n.sendOnChannel(channel, message, selectedIDs)
 
 	// publishes the message to the selected targets
 	if err != nil {
