@@ -129,7 +129,10 @@ func (b *backendTransactions) chooseCollectionNodes(tx *flow.TransactionBody, sa
 	}
 
 	// select a random subset of collection nodes from the cluster to be tried in order
-	targetNodes := txCluster.Sample(sampleSize)
+	targetNodes, err := txCluster.Sample(sampleSize)
+	if err != nil {
+		return nil, fmt.Errorf("sampling failed: %w", err)
+	}
 
 	// collect the addresses of all the chosen collection nodes
 	var targetAddrs = make([]string, len(targetNodes))

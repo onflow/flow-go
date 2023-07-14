@@ -5,7 +5,6 @@ import (
 	"crypto/x509"
 	"errors"
 	"fmt"
-	"math/rand"
 	"os"
 	"runtime"
 	"strings"
@@ -1773,10 +1772,6 @@ func (fnb *FlowNodeBuilder) Build() (Node, error) {
 }
 
 func (fnb *FlowNodeBuilder) onStart() error {
-
-	// seed random generator
-	rand.Seed(time.Now().UnixNano())
-
 	// init nodeinfo by reading the private bootstrap file if not already set
 	if fnb.NodeID == flow.ZeroID {
 		if err := fnb.initNodeInfo(); err != nil {
