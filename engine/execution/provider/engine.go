@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"math/rand"
 	"time"
 
 	"github.com/rs/zerolog"
@@ -25,6 +24,7 @@ import (
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/utils/logging"
+	"github.com/onflow/flow-go/utils/rand"
 )
 
 type ProviderEngine interface {
@@ -266,6 +266,10 @@ func (e *Engine) onChunkDataRequest(request *mempool.ChunkDataPackRequest) {
 		Logger()
 	lg.Info().Msg("started processing chunk data pack request")
 
+	// TODO(ramtin): we might add a future logic to do extra checks on the origin of the request
+	// currently the networking layer checks that the requested is a valid node operator
+	// that has not been ejected.
+
 	// increases collector metric
 	e.metrics.ChunkDataPackRequestProcessed()
 	chunkDataPack, err := e.execState.ChunkDataPackByChunkID(request.ChunkId)
@@ -293,14 +297,6 @@ func (e *Engine) onChunkDataRequest(request *mempool.ChunkDataPackRequest) {
 			Msg("chunk data pack query takes longer than expected timeout")
 	}
 
-	_, err = e.ensureAuthorized(chunkDataPack.ChunkID, request.RequesterId)
-	if err != nil {
-		lg.Error().
-			Err(err).
-			Msg("could not verify authorization of identity of chunk data pack request")
-		return
-	}
-
 	e.deliverChunkDataResponse(chunkDataPack, request.RequesterId)
 }
 
@@ -315,12 +311,24 @@ func (e *Engine) deliverChunkDataResponse(chunkDataPack *flow.ChunkDataPack, req
 	// sends requested chunk data pack to the requester
 	deliveryStartTime := time.Now()
 
-	response := &messages.ChunkDataResponse{
-		ChunkDataPack: *chunkDataPack,
-		Nonce:         rand.Uint64(),
+	nonce, err := rand.Uint64()
+	if err != nil {
+		// TODO: this error should be returned by deliverChunkDataResponse
+		// it is logged for now since the only error possible is related to a failure
+		// of the system entropy generation. Such error is going to cause failures in other
+		// components where it's handled properly and will lead to crashing the module.
+		lg.Error().
+			Err(err).
+			Msg("could not generate nonce for chunk data response")
+		return
 	}
 
-	err := e.chunksConduit.Unicast(response, requesterId)
+	response := &messages.ChunkDataResponse{
+		ChunkDataPack: *chunkDataPack,
+		Nonce:         nonce,
+	}
+
+	err = e.chunksConduit.Unicast(response, requesterId)
 	if err != nil {
 		lg.Warn().
 			Err(err).
@@ -344,36 +352,6 @@ func (e *Engine) deliverChunkDataResponse(chunkDataPack *flow.ChunkDataPack, req
 			Logger()
 	}
 	lg.Info().Msg("chunk data pack request successfully replied")
-}
-
-func (e *Engine) ensureAuthorized(chunkID flow.Identifier, originID flow.Identifier) (*flow.Identity, error) {
-	blockID, err := e.execState.GetBlockIDByChunkID(chunkID)
-	if err != nil {
-		return nil, engine.NewInvalidInputErrorf("cannot find blockID corresponding to chunk data pack: %w", err)
-	}
-
-	authorizedAt, err := e.checkAuthorizedAtBlock(blockID)
-	if err != nil {
-		return nil, engine.NewInvalidInputErrorf("cannot check block staking status: %w", err)
-	}
-	if !authorizedAt {
-		return nil, engine.NewInvalidInputErrorf("this node is not authorized at the block (%s) corresponding to chunk data pack (%s)", blockID.String(), chunkID.String())
-	}
-
-	origin, err := e.state.AtBlockID(blockID).Identity(originID)
-	if err != nil {
-		return nil, engine.NewInvalidInputErrorf("invalid origin id (%s): %w", origin, err)
-	}
-
-	// only verifier nodes are allowed to request chunk data packs
-	if origin.Role != flow.RoleVerification {
-		return nil, engine.NewInvalidInputErrorf("invalid role for receiving collection: %s", origin.Role)
-	}
-
-	if origin.Weight == 0 {
-		return nil, engine.NewInvalidInputErrorf("node %s has zero weight at the block (%s) corresponding to chunk data pack (%s)", originID, blockID.String(), chunkID.String())
-	}
-	return origin, nil
 }
 
 func (e *Engine) BroadcastExecutionReceipt(ctx context.Context, receipt *flow.ExecutionReceipt) error {

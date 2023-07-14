@@ -6,7 +6,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/fvm/environment"
-	"github.com/onflow/flow-go/fvm/state"
+	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/fvm/storage/testutils"
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -34,7 +34,7 @@ func Test_NewAccountCreator_GeneratingUpdatesState(t *testing.T) {
 func Test_NewAccountCreator_UsesLedgerState(t *testing.T) {
 	chain := flow.MonotonicEmulator.Chain()
 	txnState := testutils.NewSimpleTransaction(
-		state.MapStorageSnapshot{
+		snapshot.MapStorageSnapshot{
 			flow.AddressStateRegisterID: flow.HexToAddress("01").Bytes(),
 		})
 	creator := environment.NewAddressGenerator(txnState, chain)

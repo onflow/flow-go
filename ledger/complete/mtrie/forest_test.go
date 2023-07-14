@@ -783,7 +783,6 @@ func TestRandomUpdateReadProofValueSizes(t *testing.T) {
 	rep := 10
 	maxNumPathsPerStep := 10
 	seed := time.Now().UnixNano()
-	rand.Seed(seed)
 	t.Log(seed)
 
 	forest, err := NewForest(5, &metrics.NoopCollector{}, nil)

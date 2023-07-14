@@ -14,6 +14,11 @@ type HotStuffFollower struct {
 	mock.Mock
 }
 
+// AddCertifiedBlock provides a mock function with given fields: certifiedBlock
+func (_m *HotStuffFollower) AddCertifiedBlock(certifiedBlock *model.CertifiedBlock) {
+	_m.Called(certifiedBlock)
+}
+
 // Done provides a mock function with given fields:
 func (_m *HotStuffFollower) Done() <-chan struct{} {
 	ret := _m.Called()
@@ -49,11 +54,6 @@ func (_m *HotStuffFollower) Ready() <-chan struct{} {
 // Start provides a mock function with given fields: _a0
 func (_m *HotStuffFollower) Start(_a0 irrecoverable.SignalerContext) {
 	_m.Called(_a0)
-}
-
-// SubmitProposal provides a mock function with given fields: proposal
-func (_m *HotStuffFollower) SubmitProposal(proposal *model.Proposal) {
-	_m.Called(proposal)
 }
 
 type mockConstructorTestingTNewHotStuffFollower interface {

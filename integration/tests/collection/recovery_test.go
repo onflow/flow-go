@@ -6,12 +6,9 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/suite"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
 
 	client "github.com/onflow/flow-go-sdk/access/grpc"
 	"github.com/onflow/flow-go/integration/convert"
-	"github.com/onflow/flow-go/integration/testnet"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -46,10 +43,8 @@ func (suite *RecoverySuite) TestProposal_Recovery() {
 	// create a client for each of the collectors
 	clients := make([]*client.Client, nNodes)
 	for i := 0; i < nNodes; i++ {
-		clients[i], err = client.NewClient(
-			suite.Collector(0, uint(i)).Addr(testnet.ColNodeAPIPort),
-			grpc.WithTransportCredentials(insecure.NewCredentials()),
-		)
+		node := suite.Collector(0, uint(i))
+		clients[i], err = node.SDKClient()
 		suite.Require().NoError(err)
 	}
 

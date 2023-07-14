@@ -12,6 +12,7 @@ import (
 //
 // Chain IDs are used used to prevent replay attacks and to support network-specific address generation.
 type ChainID string
+type ChainIDList []ChainID
 
 const (
 	// Mainnet is the chain ID for the mainnet chain.

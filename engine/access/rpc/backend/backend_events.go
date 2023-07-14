@@ -148,7 +148,7 @@ func (b *backendEvents) getBlockEventsFromExecutionNode(
 		Msg("successfully got events")
 
 	// convert execution node api result to access node api result
-	results, err := verifyAndConvertToAccessEvents(resp.GetResults(), blockHeaders)
+	results, err := verifyAndConvertToAccessEvents(resp.GetResults(), blockHeaders, resp.GetEventEncodingVersion())
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to verify retrieved events from execution node: %v", err)
 	}
@@ -158,7 +158,11 @@ func (b *backendEvents) getBlockEventsFromExecutionNode(
 
 // verifyAndConvertToAccessEvents converts execution node api result to access node api result, and verifies that the results contains
 // results from each block that was requested
-func verifyAndConvertToAccessEvents(execEvents []*execproto.GetEventsForBlockIDsResponse_Result, requestedBlockHeaders []*flow.Header) ([]flow.BlockEvents, error) {
+func verifyAndConvertToAccessEvents(
+	execEvents []*execproto.GetEventsForBlockIDsResponse_Result,
+	requestedBlockHeaders []*flow.Header,
+	version execproto.EventEncodingVersion,
+) ([]flow.BlockEvents, error) {
 	if len(execEvents) != len(requestedBlockHeaders) {
 		return nil, errors.New("number of results does not match number of blocks requested")
 	}
@@ -181,11 +185,17 @@ func verifyAndConvertToAccessEvents(execEvents []*execproto.GetEventsForBlockIDs
 				result.GetBlockId())
 		}
 
+		events, err := convert.MessagesToEventsFromVersion(result.GetEvents(), version)
+		if err != nil {
+			return nil, fmt.Errorf("failed to unmarshall events in event %d with encoding version %s: %w",
+				i, version.String(), err)
+		}
+
 		results[i] = flow.BlockEvents{
 			BlockID:        header.ID(),
 			BlockHeight:    header.Height,
 			BlockTimestamp: header.Timestamp,
-			Events:         convert.MessagesToEvents(result.GetEvents()),
+			Events:         events,
 		}
 	}
 

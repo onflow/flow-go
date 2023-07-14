@@ -7,7 +7,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/engine/execution/computation/committer"
-	"github.com/onflow/flow-go/fvm/state"
+	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	led "github.com/onflow/flow-go/ledger"
 	ledgermock "github.com/onflow/flow-go/ledger/mock"
 	"github.com/onflow/flow-go/model/flow"
@@ -34,7 +34,7 @@ func TestLedgerViewCommitter(t *testing.T) {
 			Once()
 
 		newState, proof, _, err := com.CommitView(
-			&state.ExecutionSnapshot{
+			&snapshot.ExecutionSnapshot{
 				WriteSet: map[flow.RegisterID]flow.RegisterValue{
 					flow.NewRegisterID("owner", "key"): []byte{1},
 				},

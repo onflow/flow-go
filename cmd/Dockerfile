@@ -19,10 +19,13 @@ ARG TARGET
 ARG COMMIT
 ARG VERSION
 
+ENV GOPRIVATE=
+
 COPY . .
 
 RUN --mount=type=cache,sharing=locked,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
+    --mount=type=secret,id=git_creds,dst=/root/.netrc \
     make crypto_setup_gopath
 
 ####################################
@@ -39,6 +42,7 @@ ARG TAGS="relic,netgo"
 # https://github.com/golang/go/issues/27719#issuecomment-514747274
 RUN --mount=type=cache,sharing=locked,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
+    --mount=type=secret,id=git_creds,dst=/root/.netrc \
     CGO_ENABLED=1 GOOS=linux go build --tags "${TAGS}" -ldflags "-extldflags -static \
     -X 'github.com/onflow/flow-go/cmd/build.commit=${COMMIT}' -X  'github.com/onflow/flow-go/cmd/build.semver=${VERSION}'" \
     -o ./app ${TARGET}

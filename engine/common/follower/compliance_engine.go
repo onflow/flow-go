@@ -13,6 +13,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/compliance"
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
@@ -27,6 +28,13 @@ type EngineOption func(*ComplianceEngine)
 func WithChannel(channel channels.Channel) EngineOption {
 	return func(e *ComplianceEngine) {
 		e.channel = channel
+	}
+}
+
+// WithComplianceConfigOpt applies compliance config opt to internal config
+func WithComplianceConfigOpt(opt compliance.Opt) EngineOption {
+	return func(e *ComplianceEngine) {
+		opt(&e.config)
 	}
 }
 
@@ -65,6 +73,7 @@ type ComplianceEngine struct {
 	me                         module.Local
 	engMetrics                 module.EngineMetrics
 	con                        network.Conduit
+	config                     compliance.Config
 	channel                    channels.Channel
 	headers                    storage.Headers
 	pendingProposals           *fifoqueue.FifoQueue        // queue for fresh proposals
@@ -89,6 +98,7 @@ func NewComplianceLayer(
 	headers storage.Headers,
 	finalized *flow.Header,
 	core complianceCore,
+	config compliance.Config,
 	opts ...EngineOption,
 ) (*ComplianceEngine, error) {
 	// FIFO queue for inbound block proposals
@@ -106,6 +116,7 @@ func NewComplianceLayer(
 		log:                        log.With().Str("engine", "follower").Logger(),
 		me:                         me,
 		engMetrics:                 engMetrics,
+		config:                     config,
 		channel:                    channels.ReceiveBlocks,
 		pendingProposals:           pendingBlocks,
 		syncedBlocks:               syncedBlocks,
@@ -238,7 +249,7 @@ func (e *ComplianceEngine) processBlocksLoop(ctx irrecoverable.SignalerContext, 
 //     to overwhelm another node through synchronization messages and drown out new blocks
 //     for a node that is up-to-date.
 //   - On the flip side, new proposals are relatively infrequent compared to the load that
-//     synchronization produces for a note that is catching up. In other words, prioritizing
+//     synchronization produces for a node that is catching up. In other words, prioritizing
 //     the few new proposals first is probably not going to be much of a distraction.
 //     Proposals too far in the future are dropped (see parameter `SkipNewProposalsThreshold`
 //     in `compliance.Config`), to prevent memory overflow.
@@ -325,6 +336,14 @@ func (e *ComplianceEngine) submitConnectedBatch(log zerolog.Logger, latestFinali
 	lastBlock := blocks[len(blocks)-1].Header
 	if lastBlock.View < latestFinalizedView {
 		log.Debug().Msgf("dropping range [%d, %d] below finalized view %d", blocks[0].Header.View, lastBlock.View, latestFinalizedView)
+		return
+	}
+	skipNewProposalsThreshold := e.config.GetSkipNewProposalsThreshold()
+	if lastBlock.View > latestFinalizedView+skipNewProposalsThreshold {
+		log.Debug().
+			Uint64("skip_new_proposals_threshold", skipNewProposalsThreshold).
+			Msgf("dropping range [%d, %d] too far ahead of locally finalized view %d",
+				blocks[0].Header.View, lastBlock.View, latestFinalizedView)
 		return
 	}
 	log.Debug().Msgf("submitting sub-range with views [%d, %d] for further processing", blocks[0].Header.View, lastBlock.View)

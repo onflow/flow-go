@@ -101,6 +101,16 @@ func (_m *Middleware) NewPingService(pingProtocol protocol.ID, provider network.
 	return r0
 }
 
+// OnAllowListNotification provides a mock function with given fields: _a0
+func (_m *Middleware) OnAllowListNotification(_a0 *network.AllowListingUpdate) {
+	_m.Called(_a0)
+}
+
+// OnDisallowListNotification provides a mock function with given fields: _a0
+func (_m *Middleware) OnDisallowListNotification(_a0 *network.DisallowListingUpdate) {
+	_m.Called(_a0)
+}
+
 // Publish provides a mock function with given fields: msg
 func (_m *Middleware) Publish(msg *network.OutgoingMessageScope) error {
 	ret := _m.Called(msg)
@@ -147,6 +157,11 @@ func (_m *Middleware) SendDirect(msg *network.OutgoingMessageScope) error {
 
 // SetOverlay provides a mock function with given fields: _a0
 func (_m *Middleware) SetOverlay(_a0 network.Overlay) {
+	_m.Called(_a0)
+}
+
+// SetSlashingViolationsConsumer provides a mock function with given fields: _a0
+func (_m *Middleware) SetSlashingViolationsConsumer(_a0 network.ViolationsConsumer) {
 	_m.Called(_a0)
 }
 

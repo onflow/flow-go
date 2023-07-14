@@ -17,9 +17,13 @@ import (
 // connections, as well as reading & writing to/from the connections.
 type Middleware interface {
 	component.Component
+	DisallowListNotificationConsumer
 
 	// SetOverlay sets the overlay used by the middleware. This must be called before the middleware can be Started.
 	SetOverlay(Overlay)
+
+	// SetSlashingViolationsConsumer sets the slashing violations consumer.
+	SetSlashingViolationsConsumer(ViolationsConsumer)
 
 	// SendDirect sends msg on a 1-1 direct connection to the target ID. It models a guaranteed delivery asynchronous
 	// direct one-to-one connection on the underlying network. No intermediate node on the overlay is utilized

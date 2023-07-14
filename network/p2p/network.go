@@ -17,19 +17,14 @@ import (
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/network"
+	alspmgr "github.com/onflow/flow-go/network/alsp/manager"
 	netcache "github.com/onflow/flow-go/network/cache"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/message"
-	"github.com/onflow/flow-go/network/p2p/conduit"
 	"github.com/onflow/flow-go/network/queue"
+	"github.com/onflow/flow-go/network/slashing"
 	_ "github.com/onflow/flow-go/utils/binstat"
 	"github.com/onflow/flow-go/utils/logging"
-)
-
-const (
-	// DefaultReceiveCacheSize represents size of receive cache that keeps hash of incoming messages
-	// for sake of deduplication.
-	DefaultReceiveCacheSize = 10e4
 )
 
 // NotEjectedFilter is an identity filter that, when applied to the identity
@@ -39,14 +34,6 @@ const (
 // NOTE: The protocol state includes nodes from the previous/next epoch that should
 // be included in network communication. We omit any nodes that have been ejected.
 var NotEjectedFilter = filter.Not(filter.Ejected)
-
-type NetworkOptFunction func(*Network)
-
-func WithConduitFactory(f network.ConduitFactory) NetworkOptFunction {
-	return func(n *Network) {
-		n.conduitFactory = f
-	}
-}
 
 // Network represents the overlay network of our peer-to-peer network, including
 // the protocols for handshakes, authentication, gossiping and heartbeats.
@@ -66,6 +53,8 @@ type Network struct {
 	topology                    network.Topology
 	registerEngineRequests      chan *registerEngineRequest
 	registerBlobServiceRequests chan *registerBlobServiceRequest
+	misbehaviorReportManager    network.MisbehaviorReportManager
+	slashingViolationsConsumer  network.ViolationsConsumer
 }
 
 var _ network.Network = &Network{}
@@ -96,7 +85,9 @@ type registerBlobServiceResp struct {
 
 var ErrNetworkShutdown = errors.New("network has already shutdown")
 
-type NetworkParameters struct {
+// NetworkConfig is a configuration struct for the network. It contains all the
+// necessary components to create a new network.
+type NetworkConfig struct {
 	Logger              zerolog.Logger
 	Codec               network.Codec
 	Me                  module.Local
@@ -106,22 +97,64 @@ type NetworkParameters struct {
 	Metrics             module.NetworkCoreMetrics
 	IdentityProvider    module.IdentityProvider
 	ReceiveCache        *netcache.ReceiveCache
-	Options             []NetworkOptFunction
+	ConduitFactory      network.ConduitFactory
+	AlspCfg             *alspmgr.MisbehaviorReportManagerConfig
+}
+
+// NetworkConfigOption is a function that can be used to override network config parmeters.
+type NetworkConfigOption func(*NetworkConfig)
+
+// WithAlspConfig overrides the default misbehavior report manager config. It is mostly used for testing purposes.
+// Note: do not override the default misbehavior report manager config in production unless you know what you are doing.
+// Args:
+// cfg: misbehavior report manager config
+// Returns:
+// NetworkConfigOption: network param option
+func WithAlspConfig(cfg *alspmgr.MisbehaviorReportManagerConfig) NetworkConfigOption {
+	return func(params *NetworkConfig) {
+		params.AlspCfg = cfg
+	}
+}
+
+// NetworkOption is a function that can be used to override network attributes.
+// It is mostly used for testing purposes.
+// Note: do not override network attributes in production unless you know what you are doing.
+type NetworkOption func(*Network)
+
+// WithAlspManager sets the misbehavior report manager for the network. It overrides the default
+// misbehavior report manager that is created from the config.
+// Note that this option is mostly used for testing purposes, do not use it in production unless you
+// know what you are doing.
+//
+// Args:
+//
+//	mgr: misbehavior report manager
+//
+// Returns:
+//
+//	NetworkOption: network option
+func WithAlspManager(mgr network.MisbehaviorReportManager) NetworkOption {
+	return func(n *Network) {
+		n.misbehaviorReportManager = mgr
+	}
 }
 
 // NewNetwork creates a new naive overlay network, using the given middleware to
 // communicate to direct peers, using the given codec for serialization, and
 // using the given state & cache interfaces to track volatile information.
 // csize determines the size of the cache dedicated to keep track of received messages
-func NewNetwork(param *NetworkParameters) (*Network, error) {
-
+func NewNetwork(param *NetworkConfig, opts ...NetworkOption) (*Network, error) {
 	mw, err := param.MiddlewareFactory()
 	if err != nil {
 		return nil, fmt.Errorf("could not create middleware: %w", err)
 	}
+	misbehaviorMngr, err := alspmgr.NewMisbehaviorReportManager(param.AlspCfg, mw)
+	if err != nil {
+		return nil, fmt.Errorf("could not create misbehavior report manager: %w", err)
+	}
 
 	n := &Network{
-		logger:                      param.Logger,
+		logger:                      param.Logger.With().Str("component", "network").Logger(),
 		codec:                       param.Codec,
 		me:                          param.Me,
 		mw:                          mw,
@@ -130,15 +163,18 @@ func NewNetwork(param *NetworkParameters) (*Network, error) {
 		metrics:                     param.Metrics,
 		subscriptionManager:         param.SubscriptionManager,
 		identityProvider:            param.IdentityProvider,
-		conduitFactory:              conduit.NewDefaultConduitFactory(),
+		conduitFactory:              param.ConduitFactory,
 		registerEngineRequests:      make(chan *registerEngineRequest),
 		registerBlobServiceRequests: make(chan *registerBlobServiceRequest),
+		misbehaviorReportManager:    misbehaviorMngr,
 	}
 
-	for _, opt := range param.Options {
+	for _, opt := range opts {
 		opt(n)
 	}
 
+	n.slashingViolationsConsumer = slashing.NewSlashingViolationsConsumer(param.Logger, param.Metrics, n)
+	n.mw.SetSlashingViolationsConsumer(n.slashingViolationsConsumer)
 	n.mw.SetOverlay(n)
 
 	if err := n.conduitFactory.RegisterAdapter(n); err != nil {
@@ -146,6 +182,23 @@ func NewNetwork(param *NetworkParameters) (*Network, error) {
 	}
 
 	n.ComponentManager = component.NewComponentManagerBuilder().
+		AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+			n.logger.Debug().Msg("starting misbehavior manager")
+			n.misbehaviorReportManager.Start(ctx)
+
+			select {
+			case <-n.misbehaviorReportManager.Ready():
+				n.logger.Debug().Msg("misbehavior manager is ready")
+				ready()
+			case <-ctx.Done():
+				// jumps to the end of the select statement to let a graceful shutdown.
+			}
+
+			<-ctx.Done()
+			n.logger.Debug().Msg("stopping misbehavior manager")
+			<-n.misbehaviorReportManager.Done()
+			n.logger.Debug().Msg("misbehavior manager stopped")
+		}).
 		AddWorker(n.runMiddleware).
 		AddWorker(n.processRegisterEngineRequests).
 		AddWorker(n.processRegisterBlobServiceRequests).Build()
@@ -504,4 +557,16 @@ func (n *Network) queueSubmitFunc(message interface{}) {
 
 func (n *Network) Topology() flow.IdentityList {
 	return n.topology.Fanout(n.Identities())
+}
+
+// ReportMisbehaviorOnChannel reports the misbehavior of a node on sending a message to the current node that appears
+// valid based on the networking layer but is considered invalid by the current node based on the Flow protocol.
+// The misbehavior report is sent to the current node's networking layer on the given channel to be processed.
+// Args:
+// - channel: The channel on which the misbehavior report is sent.
+// - report: The misbehavior report to be sent.
+// Returns:
+// none
+func (n *Network) ReportMisbehaviorOnChannel(channel channels.Channel, report network.MisbehaviorReport) {
+	n.misbehaviorReportManager.HandleMisbehaviorReport(channel, report)
 }

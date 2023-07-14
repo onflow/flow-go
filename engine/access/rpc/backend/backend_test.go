@@ -3,9 +3,8 @@ package backend
 import (
 	"context"
 	"fmt"
-	"math/rand"
+	"strconv"
 	"testing"
-	"time"
 
 	"github.com/dgraph-io/badger/v2"
 	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
@@ -48,6 +47,7 @@ type Suite struct {
 	colClient              *access.AccessAPIClient
 	execClient             *access.ExecutionAPIClient
 	historicalAccessClient *access.AccessAPIClient
+	archiveClient          *access.AccessAPIClient
 	connectionFactory      *backendmock.ConnectionFactory
 	chainID                flow.ChainID
 }
@@ -57,13 +57,12 @@ func TestHandler(t *testing.T) {
 }
 
 func (suite *Suite) SetupTest() {
-	rand.Seed(time.Now().UnixNano())
 	suite.log = zerolog.New(zerolog.NewConsoleWriter())
 	suite.state = new(protocol.State)
 	suite.snapshot = new(protocol.Snapshot)
 	header := unittest.BlockHeaderFixture()
 	params := new(protocol.Params)
-	params.On("Root").Return(header, nil)
+	params.On("FinalizedRoot").Return(header, nil)
 	params.On("SporkRootBlockHeight").Return(header.Height, nil)
 	suite.state.On("Params").Return(params).Maybe()
 	suite.blocks = new(storagemock.Blocks)
@@ -73,6 +72,7 @@ func (suite *Suite) SetupTest() {
 	suite.receipts = new(storagemock.ExecutionReceipts)
 	suite.results = new(storagemock.ExecutionResults)
 	suite.colClient = new(access.AccessAPIClient)
+	suite.archiveClient = new(access.AccessAPIClient)
 	suite.execClient = new(access.ExecutionAPIClient)
 	suite.chainID = flow.Testnet
 	suite.historicalAccessClient = new(access.AccessAPIClient)
@@ -107,6 +107,7 @@ func (suite *Suite) TestPing() {
 		nil,
 		suite.log,
 		DefaultSnapshotHistoryLimit,
+		nil,
 	)
 
 	err := backend.Ping(context.Background())
@@ -141,6 +142,7 @@ func (suite *Suite) TestGetLatestFinalizedBlockHeader() {
 		nil,
 		suite.log,
 		DefaultSnapshotHistoryLimit,
+		nil,
 	)
 
 	// query the handler for the latest finalized block
@@ -167,7 +169,7 @@ func (suite *Suite) TestGetLatestProtocolStateSnapshot_NoTransitionSpan() {
 		epochBuilder := unittest.NewEpochBuilder(suite.T(), state)
 		// build epoch 1
 		// blocks in current state
-		// P <- A(S_P-1) <- B(S_P) <- C(S_A) <- D(S_B) |setup| <- E(S_C) <- F(S_D) |commit| <- G(S_E)
+		// P <- A(S_P-1) <- B(S_P) <- C(S_A) <- D(S_B) |setup| <- E(S_C) <- F(S_D) |commit|
 		epochBuilder.
 			BuildEpoch().
 			CompleteEpoch()
@@ -181,9 +183,9 @@ func (suite *Suite) TestGetLatestProtocolStateSnapshot_NoTransitionSpan() {
 			suite.state.On("AtHeight", height).Return(state.AtHeight(height)).Once()
 		}
 
-		// Take snapshot at height of block D (epoch1.heights[3]) for valid segment and valid snapshot
-		// where it's sealing segment is B <- C <- D
-		snap := state.AtHeight(epoch1.Range()[3])
+		// Take snapshot at height of block D (epoch1.heights[2]) for valid segment and valid snapshot
+		// where its sealing segment is A <- B <- C
+		snap := state.AtHeight(epoch1.Range()[2])
 		suite.state.On("Final").Return(snap).Once()
 
 		backend := New(
@@ -205,6 +207,7 @@ func (suite *Suite) TestGetLatestProtocolStateSnapshot_NoTransitionSpan() {
 			nil,
 			suite.log,
 			DefaultSnapshotHistoryLimit,
+			nil,
 		)
 
 		// query the handler for the latest finalized snapshot
@@ -276,6 +279,7 @@ func (suite *Suite) TestGetLatestProtocolStateSnapshot_TransitionSpans() {
 			nil,
 			suite.log,
 			DefaultSnapshotHistoryLimit,
+			nil,
 		)
 
 		// query the handler for the latest finalized snapshot
@@ -283,8 +287,8 @@ func (suite *Suite) TestGetLatestProtocolStateSnapshot_TransitionSpans() {
 		suite.Require().NoError(err)
 		fmt.Println()
 
-		// we expect the endpoint to return last valid snapshot which is the snapshot at block D (height 3)
-		expectedSnapshotBytes, err := convert.SnapshotToBytes(state.AtHeight(epoch1.Range()[3]))
+		// we expect the endpoint to return last valid snapshot which is the snapshot at block C (height 2)
+		expectedSnapshotBytes, err := convert.SnapshotToBytes(state.AtHeight(epoch1.Range()[2]))
 		suite.Require().NoError(err)
 		suite.Require().Equal(expectedSnapshotBytes, bytes)
 	})
@@ -300,7 +304,7 @@ func (suite *Suite) TestGetLatestProtocolStateSnapshot_PhaseTransitionSpan() {
 		epochBuilder := unittest.NewEpochBuilder(suite.T(), state)
 		// build epoch 1
 		// blocks in current state
-		// P <- A(S_P-1) <- B(S_P) <- C(S_A) <- D(S_B) |setup| <- E(S_C) <- F(S_D) |commit| <- G(S_E)
+		// P <- A(S_P-1) <- B(S_P) <- C(S_A) <- D(S_B) |setup| <- E(S_C) <- F(S_D) |commit|
 		epochBuilder.
 			BuildEpoch().
 			CompleteEpoch()
@@ -314,11 +318,11 @@ func (suite *Suite) TestGetLatestProtocolStateSnapshot_PhaseTransitionSpan() {
 			suite.state.On("AtHeight", height).Return(state.AtHeight(height))
 		}
 
-		// Take snapshot at height of block E (epoch1.heights[4]) the sealing segment for this snapshot
-		// is C(S_A) <- D(S_B) |setup| <- E(S_C) which spans the epoch setup phase. This will force
+		// Take snapshot at height of block D (epoch1.heights[3]) the sealing segment for this snapshot
+		// is C(S_A) <- D(S_B) |setup|) which spans the epoch setup phase. This will force
 		// our RPC endpoint to return a snapshot at block D which is the snapshot at the boundary where the phase
 		// transition happens.
-		snap := state.AtHeight(epoch1.Range()[4])
+		snap := state.AtHeight(epoch1.Range()[3])
 		suite.state.On("Final").Return(snap).Once()
 
 		backend := New(
@@ -340,14 +344,15 @@ func (suite *Suite) TestGetLatestProtocolStateSnapshot_PhaseTransitionSpan() {
 			nil,
 			suite.log,
 			DefaultSnapshotHistoryLimit,
+			nil,
 		)
 
 		// query the handler for the latest finalized snapshot
 		bytes, err := backend.GetLatestProtocolStateSnapshot(context.Background())
 		suite.Require().NoError(err)
 
-		// we expect the endpoint to return last valid snapshot which is the snapshot at block D (height 3)
-		expectedSnapshotBytes, err := convert.SnapshotToBytes(state.AtHeight(epoch1.Range()[3]))
+		// we expect the endpoint to return last valid snapshot which is the snapshot at block C (height 2)
+		expectedSnapshotBytes, err := convert.SnapshotToBytes(state.AtHeight(epoch1.Range()[2]))
 		suite.Require().NoError(err)
 		suite.Require().Equal(expectedSnapshotBytes, bytes)
 	})
@@ -363,7 +368,7 @@ func (suite *Suite) TestGetLatestProtocolStateSnapshot_EpochTransitionSpan() {
 		epochBuilder := unittest.NewEpochBuilder(suite.T(), state)
 		// build epoch 1
 		// blocks in current state
-		// P <- A(S_P-1) <- B(S_P) <- C(S_A) <- D(S_B) |setup| <- E(S_C) <- F(S_D) |commit| <- G(S_E)
+		// P <- A(S_P-1) <- B(S_P) <- C(S_A) <- D(S_B) |setup| <- E(S_C) <- F(S_D) |commit|
 		epochBuilder.BuildEpoch()
 
 		// add more blocks to our state in the commit phase, this will allow
@@ -415,6 +420,7 @@ func (suite *Suite) TestGetLatestProtocolStateSnapshot_EpochTransitionSpan() {
 			nil,
 			suite.log,
 			DefaultSnapshotHistoryLimit,
+			nil,
 		)
 
 		// query the handler for the latest finalized snapshot
@@ -474,6 +480,7 @@ func (suite *Suite) TestGetLatestProtocolStateSnapshot_HistoryLimit() {
 			nil,
 			suite.log,
 			snapshotHistoryLimit,
+			nil,
 		)
 
 		// the handler should return a snapshot history limit error
@@ -511,6 +518,7 @@ func (suite *Suite) TestGetLatestSealedBlockHeader() {
 		nil,
 		suite.log,
 		DefaultSnapshotHistoryLimit,
+		nil,
 	)
 
 	// query the handler for the latest sealed block
@@ -556,6 +564,7 @@ func (suite *Suite) TestGetTransaction() {
 		nil,
 		suite.log,
 		DefaultSnapshotHistoryLimit,
+		nil,
 	)
 
 	actual, err := backend.GetTransaction(context.Background(), transaction.ID())
@@ -595,6 +604,7 @@ func (suite *Suite) TestGetCollection() {
 		nil,
 		suite.log,
 		DefaultSnapshotHistoryLimit,
+		nil,
 	)
 
 	actual, err := backend.GetCollectionByID(context.Background(), expected.ID())
@@ -657,6 +667,7 @@ func (suite *Suite) TestGetTransactionResultByIndex() {
 		flow.IdentifierList(fixedENIDs.NodeIDs()).Strings(),
 		suite.log,
 		DefaultSnapshotHistoryLimit,
+		nil,
 	)
 	suite.execClient.
 		On("GetTransactionResultByIndex", ctx, exeEventReq).
@@ -719,6 +730,7 @@ func (suite *Suite) TestGetTransactionResultsByBlockID() {
 		flow.IdentifierList(fixedENIDs.NodeIDs()).Strings(),
 		suite.log,
 		DefaultSnapshotHistoryLimit,
+		nil,
 	)
 	suite.execClient.
 		On("GetTransactionResultsByBlockID", ctx, exeEventReq).
@@ -743,12 +755,17 @@ func (suite *Suite) TestTransactionStatusTransition() {
 	block.Header.Height = 2
 	headBlock := unittest.BlockFixture()
 	headBlock.Header.Height = block.Header.Height - 1 // head is behind the current block
+	block.SetPayload(
+		unittest.PayloadFixture(
+			unittest.WithGuarantees(
+				unittest.CollectionGuaranteesWithCollectionIDFixture([]*flow.Collection{&collection})...)))
 
 	suite.snapshot.
 		On("Head").
 		Return(headBlock.Header, nil)
 
 	light := collection.Light()
+	suite.collections.On("LightByID", light.ID()).Return(&light, nil)
 
 	// transaction storage returns the corresponding transaction
 	suite.transactions.
@@ -804,6 +821,7 @@ func (suite *Suite) TestTransactionStatusTransition() {
 		flow.IdentifierList(fixedENIDs.NodeIDs()).Strings(),
 		suite.log,
 		DefaultSnapshotHistoryLimit,
+		nil,
 	)
 
 	// Successfully return empty event list
@@ -813,7 +831,7 @@ func (suite *Suite) TestTransactionStatusTransition() {
 		Once()
 
 	// first call - when block under test is greater height than the sealed head, but execution node does not know about Tx
-	result, err := backend.GetTransactionResult(ctx, txID)
+	result, err := backend.GetTransactionResult(ctx, txID, flow.ZeroID, flow.ZeroID)
 	suite.checkResponse(result, err)
 
 	// status should be finalized since the sealed blocks is smaller in height
@@ -828,7 +846,7 @@ func (suite *Suite) TestTransactionStatusTransition() {
 		Return(exeEventResp, nil)
 
 	// second call - when block under test's height is greater height than the sealed head
-	result, err = backend.GetTransactionResult(ctx, txID)
+	result, err = backend.GetTransactionResult(ctx, txID, flow.ZeroID, flow.ZeroID)
 	suite.checkResponse(result, err)
 
 	// status should be executed since no `NotFound` error in the `GetTransactionResult` call
@@ -838,7 +856,7 @@ func (suite *Suite) TestTransactionStatusTransition() {
 	headBlock.Header.Height = block.Header.Height + 1
 
 	// third call - when block under test's height is less than sealed head's height
-	result, err = backend.GetTransactionResult(ctx, txID)
+	result, err = backend.GetTransactionResult(ctx, txID, flow.ZeroID, flow.ZeroID)
 	suite.checkResponse(result, err)
 
 	// status should be sealed since the sealed blocks is greater in height
@@ -849,7 +867,7 @@ func (suite *Suite) TestTransactionStatusTransition() {
 
 	// fourth call - when block under test's height so much less than the head's height that it's considered expired,
 	// but since there is a execution result, means it should retain it's sealed status
-	result, err = backend.GetTransactionResult(ctx, txID)
+	result, err = backend.GetTransactionResult(ctx, txID, flow.ZeroID, flow.ZeroID)
 	suite.checkResponse(result, err)
 
 	// status should be expired since
@@ -923,12 +941,13 @@ func (suite *Suite) TestTransactionExpiredStatusTransition() {
 		nil,
 		suite.log,
 		DefaultSnapshotHistoryLimit,
+		nil,
 	)
 
 	// should return pending status when we have not observed an expiry block
 	suite.Run("pending", func() {
 		// referenced block isn't known yet, so should return pending status
-		result, err := backend.GetTransactionResult(ctx, txID)
+		result, err := backend.GetTransactionResult(ctx, txID, flow.ZeroID, flow.ZeroID)
 		suite.checkResponse(result, err)
 
 		suite.Assert().Equal(flow.TransactionStatusPending, result.Status)
@@ -944,7 +963,7 @@ func (suite *Suite) TestTransactionExpiredStatusTransition() {
 			// we have NOT observed all intermediary collections
 			fullHeight = block.Header.Height + flow.DefaultTransactionExpiry/2
 
-			result, err := backend.GetTransactionResult(ctx, txID)
+			result, err := backend.GetTransactionResult(ctx, txID, flow.ZeroID, flow.ZeroID)
 			suite.checkResponse(result, err)
 			suite.Assert().Equal(flow.TransactionStatusPending, result.Status)
 		})
@@ -954,7 +973,7 @@ func (suite *Suite) TestTransactionExpiredStatusTransition() {
 			// we have observed all intermediary collections
 			fullHeight = block.Header.Height + flow.DefaultTransactionExpiry + 1
 
-			result, err := backend.GetTransactionResult(ctx, txID)
+			result, err := backend.GetTransactionResult(ctx, txID, flow.ZeroID, flow.ZeroID)
 			suite.checkResponse(result, err)
 			suite.Assert().Equal(flow.TransactionStatusPending, result.Status)
 		})
@@ -969,7 +988,7 @@ func (suite *Suite) TestTransactionExpiredStatusTransition() {
 		// we have observed all intermediary collections
 		fullHeight = block.Header.Height + flow.DefaultTransactionExpiry + 1
 
-		result, err := backend.GetTransactionResult(ctx, txID)
+		result, err := backend.GetTransactionResult(ctx, txID, flow.ZeroID, flow.ZeroID)
 		suite.checkResponse(result, err)
 		suite.Assert().Equal(flow.TransactionStatusExpired, result.Status)
 	})
@@ -985,7 +1004,12 @@ func (suite *Suite) TestTransactionPendingToFinalizedStatusTransition() {
 	transactionBody := collection.Transactions[0]
 	// block which will eventually contain the transaction
 	block := unittest.BlockFixture()
+	block.SetPayload(
+		unittest.PayloadFixture(
+			unittest.WithGuarantees(
+				unittest.CollectionGuaranteesWithCollectionIDFixture([]*flow.Collection{&collection})...)))
 	blockID := block.ID()
+
 	// reference block to which the transaction points to
 	refBlock := unittest.BlockFixture()
 	refBlockID := refBlock.ID()
@@ -1037,6 +1061,9 @@ func (suite *Suite) TestTransactionPendingToFinalizedStatusTransition() {
 				return nil
 			})
 
+	light := collection.Light()
+	suite.collections.On("LightByID", mock.Anything).Return(&light, nil)
+
 	// refBlock storage returns the corresponding refBlock
 	suite.blocks.
 		On("ByCollectionID", collection.ID()).
@@ -1081,6 +1108,7 @@ func (suite *Suite) TestTransactionPendingToFinalizedStatusTransition() {
 		flow.IdentifierList(enIDs.NodeIDs()).Strings(),
 		suite.log,
 		DefaultSnapshotHistoryLimit,
+		nil,
 	)
 
 	preferredENIdentifiers = flow.IdentifierList{receipts[0].ExecutorID}
@@ -1088,18 +1116,18 @@ func (suite *Suite) TestTransactionPendingToFinalizedStatusTransition() {
 	// should return pending status when we have not observed collection for the transaction
 	suite.Run("pending", func() {
 		currentState = flow.TransactionStatusPending
-		result, err := backend.GetTransactionResult(ctx, txID)
+		result, err := backend.GetTransactionResult(ctx, txID, flow.ZeroID, flow.ZeroID)
 		suite.checkResponse(result, err)
 		suite.Assert().Equal(flow.TransactionStatusPending, result.Status)
 		// assert that no call to an execution node is made
 		suite.execClient.AssertNotCalled(suite.T(), "GetTransactionResult", mock.Anything, mock.Anything)
 	})
 
-	// should return finalized status when we have have observed collection for the transaction (after observing the
-	// a preceding sealed refBlock)
+	// should return finalized status when we have observed collection for the transaction (after observing the
+	// preceding sealed refBlock)
 	suite.Run("finalized", func() {
 		currentState = flow.TransactionStatusFinalized
-		result, err := backend.GetTransactionResult(ctx, txID)
+		result, err := backend.GetTransactionResult(ctx, txID, flow.ZeroID, flow.ZeroID)
 		suite.checkResponse(result, err)
 		suite.Assert().Equal(flow.TransactionStatusFinalized, result.Status)
 	})
@@ -1138,10 +1166,11 @@ func (suite *Suite) TestTransactionResultUnknown() {
 		nil,
 		suite.log,
 		DefaultSnapshotHistoryLimit,
+		nil,
 	)
 
 	// first call - when block under test is greater height than the sealed head, but execution node does not know about Tx
-	result, err := backend.GetTransactionResult(ctx, txID)
+	result, err := backend.GetTransactionResult(ctx, txID, flow.ZeroID, flow.ZeroID)
 	suite.checkResponse(result, err)
 
 	// status should be reported as unknown
@@ -1191,6 +1220,7 @@ func (suite *Suite) TestGetLatestFinalizedBlock() {
 		nil,
 		suite.log,
 		DefaultSnapshotHistoryLimit,
+		nil,
 	)
 
 	// query the handler for the latest finalized header
@@ -1320,6 +1350,7 @@ func (suite *Suite) TestGetEventsForBlockIDs() {
 			validENIDs.Strings(), // set the fixed EN Identifiers to the generated execution IDs
 			suite.log,
 			DefaultSnapshotHistoryLimit,
+			nil,
 		)
 
 		// execute request
@@ -1351,6 +1382,7 @@ func (suite *Suite) TestGetEventsForBlockIDs() {
 			validENIDs.Strings(), // set the fixed EN Identifiers to the generated execution IDs
 			suite.log,
 			DefaultSnapshotHistoryLimit,
+			nil,
 		)
 
 		// execute request with an empty block id list and expect an empty list of events and no error
@@ -1409,6 +1441,7 @@ func (suite *Suite) TestGetExecutionResultByID() {
 			validENIDs.Strings(), // set the fixed EN Identifiers to the generated execution IDs
 			suite.log,
 			DefaultSnapshotHistoryLimit,
+			nil,
 		)
 
 		// execute request
@@ -1438,6 +1471,7 @@ func (suite *Suite) TestGetExecutionResultByID() {
 			validENIDs.Strings(), // set the fixed EN Identifiers to the generated execution IDs
 			suite.log,
 			DefaultSnapshotHistoryLimit,
+			nil,
 		)
 
 		// execute request
@@ -1500,6 +1534,7 @@ func (suite *Suite) TestGetExecutionResultByBlockID() {
 			validENIDs.Strings(), // set the fixed EN Identifiers to the generated execution IDs
 			suite.log,
 			DefaultSnapshotHistoryLimit,
+			nil,
 		)
 
 		// execute request
@@ -1530,6 +1565,7 @@ func (suite *Suite) TestGetExecutionResultByBlockID() {
 			validENIDs.Strings(), // set the fixed EN Identifiers to the generated execution IDs
 			suite.log,
 			DefaultSnapshotHistoryLimit,
+			nil,
 		)
 
 		// execute request
@@ -1562,7 +1598,7 @@ func (suite *Suite) TestGetEventsForHeightRange() {
 
 	rootHeader := unittest.BlockHeaderFixture()
 	params := new(protocol.Params)
-	params.On("Root").Return(rootHeader, nil)
+	params.On("FinalizedRoot").Return(rootHeader, nil)
 	state.On("Params").Return(params).Maybe()
 
 	// mock snapshot to return head backend
@@ -1679,6 +1715,7 @@ func (suite *Suite) TestGetEventsForHeightRange() {
 			nil,
 			suite.log,
 			DefaultSnapshotHistoryLimit,
+			nil,
 		)
 
 		_, err := backend.GetEventsForHeightRange(ctx, string(flow.EventAccountCreated), maxHeight, minHeight)
@@ -1717,6 +1754,7 @@ func (suite *Suite) TestGetEventsForHeightRange() {
 			fixedENIdentifiersStr,
 			suite.log,
 			DefaultSnapshotHistoryLimit,
+			nil,
 		)
 
 		// execute request
@@ -1754,6 +1792,7 @@ func (suite *Suite) TestGetEventsForHeightRange() {
 			fixedENIdentifiersStr,
 			suite.log,
 			DefaultSnapshotHistoryLimit,
+			nil,
 		)
 
 		actualResp, err := backend.GetEventsForHeightRange(ctx, string(flow.EventAccountCreated), minHeight, maxHeight)
@@ -1790,6 +1829,7 @@ func (suite *Suite) TestGetEventsForHeightRange() {
 			fixedENIdentifiersStr,
 			suite.log,
 			DefaultSnapshotHistoryLimit,
+			nil,
 		)
 
 		_, err := backend.GetEventsForHeightRange(ctx, string(flow.EventAccountCreated), minHeight, minHeight+1)
@@ -1826,6 +1866,7 @@ func (suite *Suite) TestGetEventsForHeightRange() {
 			fixedENIdentifiersStr,
 			suite.log,
 			DefaultSnapshotHistoryLimit,
+			nil,
 		)
 
 		_, err := backend.GetEventsForHeightRange(ctx, string(flow.EventAccountCreated), minHeight, maxHeight)
@@ -1902,6 +1943,7 @@ func (suite *Suite) TestGetAccount() {
 		nil,
 		suite.log,
 		DefaultSnapshotHistoryLimit,
+		nil,
 	)
 
 	preferredENIdentifiers = flow.IdentifierList{receipts[0].ExecutorID}
@@ -1982,6 +2024,7 @@ func (suite *Suite) TestGetAccountAtBlockHeight() {
 		nil,
 		suite.log,
 		DefaultSnapshotHistoryLimit,
+		nil,
 	)
 
 	preferredENIdentifiers = flow.IdentifierList{receipts[0].ExecutorID}
@@ -2001,7 +2044,8 @@ func (suite *Suite) TestGetNetworkParameters() {
 
 	expectedChainID := flow.Mainnet
 
-	backend := New(nil,
+	backend := New(
+		nil,
 		nil,
 		nil,
 		nil,
@@ -2019,6 +2063,7 @@ func (suite *Suite) TestGetNetworkParameters() {
 		nil,
 		suite.log,
 		DefaultSnapshotHistoryLimit,
+		nil,
 	)
 
 	params := backend.GetNetworkParameters(context.Background())
@@ -2197,6 +2242,7 @@ func (suite *Suite) TestExecuteScriptOnExecutionNode() {
 		nil,
 		suite.log,
 		DefaultSnapshotHistoryLimit,
+		nil,
 	)
 
 	// mock parameters
@@ -2217,7 +2263,7 @@ func (suite *Suite) TestExecuteScriptOnExecutionNode() {
 
 	suite.Run("happy path script execution success", func() {
 		suite.execClient.On("ExecuteScriptAtBlockID", ctx, execReq).Return(execRes, nil).Once()
-		res, err := backend.tryExecuteScript(ctx, executionNode, execReq)
+		res, err := backend.tryExecuteScriptOnExecutionNode(ctx, executionNode.Address, blockID, script, arguments)
 		suite.execClient.AssertExpectations(suite.T())
 		suite.checkResponse(res, err)
 	})
@@ -2225,7 +2271,7 @@ func (suite *Suite) TestExecuteScriptOnExecutionNode() {
 	suite.Run("script execution failure returns status OK", func() {
 		suite.execClient.On("ExecuteScriptAtBlockID", ctx, execReq).
 			Return(nil, status.Error(codes.InvalidArgument, "execution failure!")).Once()
-		_, err := backend.tryExecuteScript(ctx, executionNode, execReq)
+		_, err := backend.tryExecuteScriptOnExecutionNode(ctx, executionNode.Address, blockID, script, arguments)
 		suite.execClient.AssertExpectations(suite.T())
 		suite.Require().Error(err)
 		suite.Require().Equal(status.Code(err), codes.InvalidArgument)
@@ -2234,8 +2280,89 @@ func (suite *Suite) TestExecuteScriptOnExecutionNode() {
 	suite.Run("execution node internal failure returns status code Internal", func() {
 		suite.execClient.On("ExecuteScriptAtBlockID", ctx, execReq).
 			Return(nil, status.Error(codes.Internal, "execution node internal error!")).Once()
-		_, err := backend.tryExecuteScript(ctx, executionNode, execReq)
+		_, err := backend.tryExecuteScriptOnExecutionNode(ctx, executionNode.Address, blockID, script, arguments)
 		suite.execClient.AssertExpectations(suite.T())
+		suite.Require().Error(err)
+		suite.Require().Equal(status.Code(err), codes.Internal)
+	})
+}
+
+// TestExecuteScriptOnArchiveNode tests the method backend.scripts.executeScriptOnArchiveNode for script execution
+func (suite *Suite) TestExecuteScriptOnArchiveNode() {
+
+	// create a mock connection factory
+	var mockPort uint = 9000
+	connFactory := new(backendmock.ConnectionFactory)
+	connFactory.On("GetAccessAPIClientWithPort", mock.Anything, mockPort).Return(suite.archiveClient, &mockCloser{}, nil)
+	connFactory.On("InvalidateAccessAPIClient", mock.Anything)
+	archiveNode := unittest.IdentityFixture(unittest.WithRole(flow.RoleAccess))
+	fullArchiveAddress := archiveNode.Address + ":" + strconv.FormatUint(uint64(mockPort), 10)
+
+	// create the handler with the mock
+	backend := New(
+		suite.state,
+		nil,
+		nil,
+		nil,
+		suite.headers,
+		nil,
+		nil,
+		suite.receipts,
+		suite.results,
+		flow.Mainnet,
+		metrics.NewNoopCollector(),
+		connFactory, // the connection factory should be used to get the execution node client
+		false,
+		DefaultMaxHeightRange,
+		nil,
+		nil,
+		suite.log,
+		DefaultSnapshotHistoryLimit,
+		[]string{fullArchiveAddress},
+	)
+
+	// mock parameters
+	ctx := context.Background()
+	block := unittest.BlockFixture()
+	blockID := block.ID()
+	script := []byte("dummy script")
+	arguments := [][]byte(nil)
+	archiveRes := &accessproto.ExecuteScriptResponse{Value: []byte{4, 5, 6}}
+	archiveReq := &accessproto.ExecuteScriptAtBlockIDRequest{
+		BlockId:   blockID[:],
+		Script:    script,
+		Arguments: arguments}
+
+	suite.Run("happy path script execution success", func() {
+		suite.archiveClient.On("ExecuteScriptAtBlockID", ctx, archiveReq).Return(archiveRes, nil).Once()
+		res, err := backend.tryExecuteScriptOnArchiveNode(ctx, archiveNode.Address, mockPort, blockID, script, arguments)
+		suite.archiveClient.AssertExpectations(suite.T())
+		suite.checkResponse(res, err)
+	})
+
+	suite.Run("script execution failure returns status OK", func() {
+		suite.archiveClient.On("ExecuteScriptAtBlockID", ctx, archiveReq).
+			Return(nil, status.Error(codes.InvalidArgument, "execution failure!")).Once()
+		_, err := backend.tryExecuteScriptOnArchiveNode(ctx, archiveNode.Address, mockPort, blockID, script, arguments)
+		suite.archiveClient.AssertExpectations(suite.T())
+		suite.Require().Error(err)
+		suite.Require().Equal(status.Code(err), codes.InvalidArgument)
+	})
+
+	suite.Run("script execution due to missing block returns Not found", func() {
+		suite.archiveClient.On("ExecuteScriptAtBlockID", ctx, archiveReq).
+			Return(nil, status.Error(codes.NotFound, "missing block!")).Once()
+		_, err := backend.tryExecuteScriptOnArchiveNode(ctx, archiveNode.Address, mockPort, blockID, script, arguments)
+		suite.archiveClient.AssertExpectations(suite.T())
+		suite.Require().Error(err)
+		suite.Require().Equal(status.Code(err), codes.NotFound)
+	})
+
+	suite.Run("archive node internal failure returns status code Internal", func() {
+		suite.archiveClient.On("ExecuteScriptAtBlockID", ctx, archiveReq).
+			Return(nil, status.Error(codes.Internal, "archive node internal error!")).Once()
+		_, err := backend.tryExecuteScriptOnArchiveNode(ctx, archiveNode.Address, mockPort, blockID, script, arguments)
+		suite.archiveClient.AssertExpectations(suite.T())
 		suite.Require().Error(err)
 		suite.Require().Equal(status.Code(err), codes.Internal)
 	})

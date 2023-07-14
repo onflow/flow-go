@@ -234,13 +234,15 @@ func (b *backendTransactions) GetTransactionsByBlockID(
 func (b *backendTransactions) GetTransactionResult(
 	ctx context.Context,
 	txID flow.Identifier,
+	blockID flow.Identifier,
+	collectionID flow.Identifier,
 ) (*access.TransactionResult, error) {
 	// look up transaction from storage
 	start := time.Now()
 	tx, err := b.transactions.ByID(txID)
 
-	txErr := rpc.ConvertStorageError(err)
-	if txErr != nil {
+	if err != nil {
+		txErr := rpc.ConvertStorageError(err)
 		if status.Code(txErr) == codes.NotFound {
 			// Tx not found. If we have historical Sporks setup, lets look through those as well
 			historicalTxResult, err := b.getHistoricalTransactionResult(ctx, txID)
@@ -258,26 +260,49 @@ func (b *backendTransactions) GetTransactionResult(
 		return nil, txErr
 	}
 
-	// find the block for the transaction
-	block, err := b.lookupBlock(txID)
-	if err != nil && !errors.Is(err, storage.ErrNotFound) {
+	block, err := b.retrieveBlock(blockID, collectionID, txID)
+
+	// an error occurred looking up the block or the requested block or collection was not found.
+	// If looking up the block based solely on the txID returns not found, then no error is
+	// returned since the block may not be finalized yet.
+	if err != nil {
 		return nil, rpc.ConvertStorageError(err)
 	}
 
-	var blockID flow.Identifier
 	var transactionWasExecuted bool
 	var events []flow.Event
 	var txError string
 	var statusCode uint32
 	var blockHeight uint64
+
 	// access node may not have the block if it hasn't yet been finalized, hence block can be nil at this point
 	if block != nil {
-		blockID = block.ID()
-		transactionWasExecuted, events, statusCode, txError, err = b.lookupTransactionResult(ctx, txID, blockID)
-		blockHeight = block.Header.Height
+		foundBlockID := block.ID()
+		transactionWasExecuted, events, statusCode, txError, err = b.lookupTransactionResult(ctx, txID, foundBlockID)
 		if err != nil {
 			return nil, rpc.ConvertError(err, "failed to retrieve result from any execution node", codes.Internal)
 		}
+
+		// an additional check to ensure the correctness of the collection ID.
+		expectedCollectionID, err := b.lookupCollectionIDInBlock(block, txID)
+		if err != nil {
+			// if the collection has not been indexed yet, the lookup will return a not found error.
+			// if the request included a blockID or collectionID in its the search criteria, not found
+			// should result in an error because it's not possible to guarantee that the result found
+			// is the correct one.
+			if blockID != flow.ZeroID || collectionID != flow.ZeroID {
+				return nil, rpc.ConvertStorageError(err)
+			}
+		}
+
+		if collectionID == flow.ZeroID {
+			collectionID = expectedCollectionID
+		} else if collectionID != expectedCollectionID {
+			return nil, status.Error(codes.InvalidArgument, "transaction not found in provided collection")
+		}
+
+		blockID = foundBlockID
+		blockHeight = block.Header.Height
 	}
 
 	// derive status of the transaction
@@ -295,8 +320,58 @@ func (b *backendTransactions) GetTransactionResult(
 		ErrorMessage:  txError,
 		BlockID:       blockID,
 		TransactionID: txID,
+		CollectionID:  collectionID,
 		BlockHeight:   blockHeight,
 	}, nil
+}
+
+// lookupCollectionIDInBlock returns the collection ID based on the transaction ID. The lookup is performed in block
+// collections.
+func (b *backendTransactions) lookupCollectionIDInBlock(
+	block *flow.Block,
+	txID flow.Identifier,
+) (flow.Identifier, error) {
+	for _, guarantee := range block.Payload.Guarantees {
+		collection, err := b.collections.LightByID(guarantee.ID())
+		if err != nil {
+			return flow.ZeroID, err
+		}
+
+		for _, collectionTxID := range collection.Transactions {
+			if collectionTxID == txID {
+				return collection.ID(), nil
+			}
+		}
+	}
+	return flow.ZeroID, status.Error(codes.NotFound, "transaction not found in block")
+}
+
+// retrieveBlock function returns a block based on the input argument. The block ID lookup has the highest priority,
+// followed by the collection ID lookup. If both are missing, the default lookup by transaction ID is performed.
+func (b *backendTransactions) retrieveBlock(
+
+	// the requested block or collection was not found. If looking up the block based solely on the txID returns
+	// not found, then no error is returned.
+	blockID flow.Identifier,
+	collectionID flow.Identifier,
+	txID flow.Identifier,
+) (*flow.Block, error) {
+	if blockID != flow.ZeroID {
+		return b.blocks.ByID(blockID)
+	}
+
+	if collectionID != flow.ZeroID {
+		return b.blocks.ByCollectionID(collectionID)
+	}
+
+	// find the block for the transaction
+	block, err := b.lookupBlock(txID)
+
+	if err != nil && !errors.Is(err, storage.ErrNotFound) {
+		return nil, err
+	}
+
+	return block, nil
 }
 
 func (b *backendTransactions) GetTransactionResultsByBlockID(
@@ -351,10 +426,16 @@ func (b *backendTransactions) GetTransactionResultsByBlockID(
 				return nil, rpc.ConvertStorageError(err)
 			}
 
+			events, err := convert.MessagesToEventsFromVersion(txResult.GetEvents(), resp.GetEventEncodingVersion())
+			if err != nil {
+				return nil, status.Errorf(codes.Internal,
+					"failed to convert events to message in txID %x: %v", txID, err)
+			}
+
 			results = append(results, &access.TransactionResult{
 				Status:        txStatus,
 				StatusCode:    uint(txResult.GetStatusCode()),
-				Events:        convert.MessagesToEvents(txResult.GetEvents()),
+				Events:        events,
 				ErrorMessage:  txResult.GetErrorMessage(),
 				BlockID:       blockID,
 				TransactionID: txID,
@@ -400,10 +481,15 @@ func (b *backendTransactions) GetTransactionResultsByBlockID(
 			return nil, rpc.ConvertStorageError(err)
 		}
 
+		events, err := convert.MessagesToEventsFromVersion(systemTxResult.GetEvents(), resp.GetEventEncodingVersion())
+		if err != nil {
+			return nil, rpc.ConvertError(err, "failed to convert events from system tx result", codes.Internal)
+		}
+
 		results = append(results, &access.TransactionResult{
 			Status:        systemTxStatus,
 			StatusCode:    uint(systemTxResult.GetStatusCode()),
-			Events:        convert.MessagesToEvents(systemTxResult.GetEvents()),
+			Events:        events,
 			ErrorMessage:  systemTxResult.GetErrorMessage(),
 			BlockID:       blockID,
 			TransactionID: systemTx.ID(),
@@ -451,11 +537,16 @@ func (b *backendTransactions) GetTransactionResultByIndex(
 		return nil, rpc.ConvertStorageError(err)
 	}
 
+	events, err := convert.MessagesToEventsFromVersion(resp.GetEvents(), resp.GetEventEncodingVersion())
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to convert events in blockID %x: %v", blockID, err)
+	}
+
 	// convert to response, cache and return
 	return &access.TransactionResult{
 		Status:       txStatus,
 		StatusCode:   uint(resp.GetStatusCode()),
-		Events:       convert.MessagesToEvents(resp.GetEvents()),
+		Events:       events,
 		ErrorMessage: resp.GetErrorMessage(),
 		BlockID:      blockID,
 		BlockHeight:  block.Header.Height,
@@ -670,7 +761,10 @@ func (b *backendTransactions) getTransactionResultFromExecutionNode(
 		return nil, 0, "", err
 	}
 
-	events := convert.MessagesToEvents(resp.GetEvents())
+	events, err := convert.MessagesToEventsFromVersion(resp.GetEvents(), resp.GetEventEncodingVersion())
+	if err != nil {
+		return nil, 0, "", rpc.ConvertError(err, "failed to convert events to message", codes.Internal)
+	}
 
 	return events, resp.GetStatusCode(), resp.GetErrorMessage(), nil
 }

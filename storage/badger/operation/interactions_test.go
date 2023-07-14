@@ -9,7 +9,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/onflow/flow-go/fvm/state"
+	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -23,7 +23,7 @@ func TestStateInteractionsInsertCheckRetrieve(t *testing.T) {
 		id2 := flow.NewRegisterID(string([]byte{2}), "")
 		id3 := flow.NewRegisterID(string([]byte{3}), "")
 
-		snapshot := &state.ExecutionSnapshot{
+		executionSnapshot := &snapshot.ExecutionSnapshot{
 			ReadSet: map[flow.RegisterID]struct{}{
 				id2: struct{}{},
 				id3: struct{}{},
@@ -34,9 +34,9 @@ func TestStateInteractionsInsertCheckRetrieve(t *testing.T) {
 			},
 		}
 
-		interactions := []*state.ExecutionSnapshot{
-			snapshot,
-			&state.ExecutionSnapshot{},
+		interactions := []*snapshot.ExecutionSnapshot{
+			executionSnapshot,
+			&snapshot.ExecutionSnapshot{},
 		}
 
 		blockID := unittest.IdentifierFixture()
@@ -44,13 +44,19 @@ func TestStateInteractionsInsertCheckRetrieve(t *testing.T) {
 		err := db.Update(InsertExecutionStateInteractions(blockID, interactions))
 		require.Nil(t, err)
 
-		var readInteractions []*state.ExecutionSnapshot
+		var readInteractions []*snapshot.ExecutionSnapshot
 
 		err = db.View(RetrieveExecutionStateInteractions(blockID, &readInteractions))
 		require.NoError(t, err)
 
 		assert.Equal(t, interactions, readInteractions)
-		assert.Equal(t, snapshot.WriteSet, readInteractions[0].WriteSet)
-		assert.Equal(t, snapshot.ReadSet, readInteractions[0].ReadSet)
+		assert.Equal(
+			t,
+			executionSnapshot.WriteSet,
+			readInteractions[0].WriteSet)
+		assert.Equal(
+			t,
+			executionSnapshot.ReadSet,
+			readInteractions[0].ReadSet)
 	})
 }

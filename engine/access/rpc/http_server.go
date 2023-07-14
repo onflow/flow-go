@@ -27,23 +27,18 @@ var defaultHTTPHeaders = []HTTPHeader{
 	},
 }
 
-// NewHTTPServer creates and intializes a new HTTP GRPC proxy server
-func NewHTTPServer(
-	grpcServer *grpc.Server,
-	address string,
-) *http.Server {
+// newHTTPProxyServer creates a new HTTP GRPC proxy server.
+func newHTTPProxyServer(grpcServer *grpc.Server) *http.Server {
 	wrappedServer := grpcweb.WrapServer(
 		grpcServer,
 		grpcweb.WithOriginFunc(func(origin string) bool { return true }),
 	)
 
-	mux := http.NewServeMux()
-
 	// register gRPC HTTP proxy
+	mux := http.NewServeMux()
 	mux.Handle("/", wrappedHandler(wrappedServer, defaultHTTPHeaders))
 
 	httpServer := &http.Server{
-		Addr:    address,
 		Handler: mux,
 	}
 

@@ -149,3 +149,23 @@ spec:
     app: {{ $k }}
   type: NodePort
 {{- end }}
+
+{{- if .Values.ingress.enabled -}}
+{{- range $k, $v := $.Values.access.nodes }}
+---
+apiVersion: projectcontour.io/v1
+kind: HTTPProxy
+metadata:
+  name: {{ $k }}
+spec:
+  virtualhost:
+    fqdn: {{ $k }}.benchnet.onflow.org
+  routes: 
+  - conditions: 
+    - prefix: /
+    services:
+      - name: {{ $k }}
+        port: 9000
+        protocol: h2c
+{{- end }}
+{{- end }}

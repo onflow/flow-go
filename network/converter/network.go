@@ -11,6 +11,8 @@ type Network struct {
 	to   channels.Channel
 }
 
+var _ network.Network = (*Network)(nil)
+
 func NewNetwork(net network.Network, from channels.Channel, to channels.Channel) *Network {
 	return &Network{net, from, to}
 }

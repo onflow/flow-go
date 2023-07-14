@@ -86,13 +86,23 @@ func (b *ExecutableBlock) Collections() []*CompleteCollection {
 	return collections
 }
 
-// CollectionAt returns an address to a collection at the given index,
+// CompleteCollectionAt returns a complete collection at the given index,
 // if index out of range, nil will be returned
-func (b *ExecutableBlock) CollectionAt(index int) *CompleteCollection {
-	if index < 0 && index > len(b.Block.Payload.Guarantees) {
+func (b *ExecutableBlock) CompleteCollectionAt(index int) *CompleteCollection {
+	if index < 0 || index >= len(b.Block.Payload.Guarantees) {
 		return nil
 	}
 	return b.CompleteCollections[b.Block.Payload.Guarantees[index].ID()]
+}
+
+// CollectionAt returns a collection at the given index,
+// if index out of range, nil will be returned
+func (b *ExecutableBlock) CollectionAt(index int) *flow.Collection {
+	cc := b.CompleteCollectionAt(index)
+	if cc == nil {
+		return nil
+	}
+	return &flow.Collection{Transactions: cc.Transactions}
 }
 
 // HasAllTransactions returns whether all the transactions for all collections

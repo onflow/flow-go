@@ -265,6 +265,11 @@ func IsValidRootSnapshot(snap protocol.Snapshot, verifyResultID bool) error {
 		return fmt.Errorf("final view of epoch less than first block view")
 	}
 
+	err = validateVersionBeacon(snap)
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -340,6 +345,40 @@ func validateClusterQC(cluster protocol.Cluster) error {
 	if err != nil {
 		return fmt.Errorf("could not validate root qc: %w", err)
 	}
+	return nil
+}
+
+// validateVersionBeacon returns an InvalidServiceEventError if the snapshot
+// version beacon is invalid
+func validateVersionBeacon(snap protocol.Snapshot) error {
+	errf := func(msg string, args ...any) error {
+		return protocol.NewInvalidServiceEventErrorf(msg, args)
+	}
+
+	versionBeacon, err := snap.VersionBeacon()
+	if err != nil {
+		return errf("could not get version beacon: %w", err)
+	}
+
+	if versionBeacon == nil {
+		return nil
+	}
+
+	head, err := snap.Head()
+	if err != nil {
+		return errf("could not get snapshot head: %w", err)
+	}
+
+	// version beacon must be included in a past block to be effective
+	if versionBeacon.SealHeight > head.Height {
+		return errf("version table height higher than highest height")
+	}
+
+	err = versionBeacon.Validate()
+	if err != nil {
+		return errf("version beacon is invalid: %w", err)
+	}
+
 	return nil
 }
 

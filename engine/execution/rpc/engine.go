@@ -20,7 +20,7 @@ import (
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
-	"github.com/onflow/flow-go/engine/execution/ingestion"
+	exeEng "github.com/onflow/flow-go/engine/execution"
 	fvmerrors "github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/state/protocol"
@@ -47,7 +47,7 @@ type Engine struct {
 func New(
 	log zerolog.Logger,
 	config Config,
-	e *ingestion.Engine,
+	scriptsExecutor exeEng.ScriptExecutor,
 	headers storage.Headers,
 	state protocol.State,
 	events storage.Events,
@@ -88,7 +88,7 @@ func New(
 		log:  log,
 		unit: engine.NewUnit(),
 		handler: &handler{
-			engine:               e,
+			engine:               scriptsExecutor,
 			chain:                chainID,
 			headers:              headers,
 			state:                state,
@@ -147,7 +147,7 @@ func (e *Engine) serve() {
 
 // handler implements a subset of the Observation API.
 type handler struct {
-	engine               ingestion.IngestRPC
+	engine               exeEng.ScriptExecutor
 	chain                flow.ChainID
 	headers              storage.Headers
 	state                protocol.State
@@ -256,7 +256,8 @@ func (h *handler) GetEventsForBlockIDs(_ context.Context,
 	}
 
 	return &execution.GetEventsForBlockIDsResponse{
-		Results: results,
+		Results:              results,
+		EventEncodingVersion: execution.EventEncodingVersion_CCF_V0,
 	}, nil
 }
 
@@ -316,9 +317,10 @@ func (h *handler) GetTransactionResult(
 
 	// compose a response with the events and the transaction error
 	return &execution.GetTransactionResultResponse{
-		StatusCode:   statusCode,
-		ErrorMessage: errMsg,
-		Events:       events,
+		StatusCode:           statusCode,
+		ErrorMessage:         errMsg,
+		Events:               events,
+		EventEncodingVersion: execution.EventEncodingVersion_CCF_V0,
 	}, nil
 }
 
@@ -374,9 +376,10 @@ func (h *handler) GetTransactionResultByIndex(
 
 	// compose a response with the events and the transaction error
 	return &execution.GetTransactionResultResponse{
-		StatusCode:   statusCode,
-		ErrorMessage: errMsg,
-		Events:       events,
+		StatusCode:           statusCode,
+		ErrorMessage:         errMsg,
+		Events:               events,
+		EventEncodingVersion: execution.EventEncodingVersion_CCF_V0,
 	}, nil
 }
 
@@ -452,7 +455,8 @@ func (h *handler) GetTransactionResultsByBlockID(
 
 	// compose a response
 	return &execution.GetTransactionResultsResponse{
-		TransactionResults: responseTxResults,
+		TransactionResults:   responseTxResults,
+		EventEncodingVersion: execution.EventEncodingVersion_CCF_V0,
 	}, nil
 }
 

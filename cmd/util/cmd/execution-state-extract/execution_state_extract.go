@@ -1,16 +1,20 @@
 package extract
 
 import (
+	"encoding/json"
 	"fmt"
 	"math"
+	"os"
 
 	"github.com/rs/zerolog"
 	"go.uber.org/atomic"
 
 	"github.com/onflow/flow-go/cmd/util/ledger/reporters"
 	"github.com/onflow/flow-go/ledger"
+	"github.com/onflow/flow-go/ledger/common/hash"
 	"github.com/onflow/flow-go/ledger/common/pathfinder"
 	"github.com/onflow/flow-go/ledger/complete"
+	"github.com/onflow/flow-go/ledger/complete/mtrie/trie"
 	"github.com/onflow/flow-go/ledger/complete/wal"
 	"github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/flow"
@@ -27,9 +31,6 @@ func extractExecutionState(
 	targetHash flow.StateCommitment,
 	outputDir string,
 	log zerolog.Logger,
-	chain flow.Chain,
-	migrate bool,
-	report bool,
 	nWorker int, // number of concurrent worker to migation payloads
 ) error {
 
@@ -82,50 +83,33 @@ func extractExecutionState(
 	}()
 
 	var migrations []ledger.Migration
-	var preCheckpointReporters, postCheckpointReporters []ledger.Reporter
 	newState := ledger.State(targetHash)
 
-	if migrate {
-		// add migration here
-		migrations = []ledger.Migration{
-			// the following migration calculate the storage usage and update the storage for each account
-			// mig.MigrateAccountUsage,
-		}
-	}
-	// generating reports at the end, so that the checkpoint file can be used
-	// for sporking as soon as it's generated.
-	if report {
-		log.Info().Msgf("preparing reporter files")
-		reportFileWriterFactory := reporters.NewReportFileWriterFactory(outputDir, log)
-
-		preCheckpointReporters = []ledger.Reporter{
-			// report epoch counter which is needed for finalizing root block
-			reporters.NewExportReporter(log,
-				chain,
-				func() flow.StateCommitment { return targetHash },
-			),
-		}
-
-		postCheckpointReporters = []ledger.Reporter{
-			&reporters.AccountReporter{
-				Log:   log,
-				Chain: chain,
-				RWF:   reportFileWriterFactory,
-			},
-			reporters.NewFungibleTokenTracker(log, reportFileWriterFactory, chain, []string{reporters.FlowTokenTypeID(chain)}),
-			&reporters.AtreeReporter{
-				Log: log,
-				RWF: reportFileWriterFactory,
-			},
-		}
-	}
-
-	migratedState, err := led.ExportCheckpointAt(
+	// migrate the trie if there migrations
+	newTrie, err := led.MigrateAt(
 		newState,
 		migrations,
-		preCheckpointReporters,
-		postCheckpointReporters,
 		complete.DefaultPathFinderVersion,
+	)
+
+	if err != nil {
+		return err
+	}
+
+	// create reporter
+	reporter := reporters.NewExportReporter(log,
+		func() flow.StateCommitment { return targetHash },
+	)
+
+	newMigratedState := ledger.State(newTrie.RootHash())
+	err = reporter.Report(nil, newMigratedState)
+	if err != nil {
+		log.Error().Err(err).Msgf("can not generate report for migrated state: %v", newMigratedState)
+	}
+
+	migratedState, err := createCheckpoint(
+		newTrie,
+		log,
 		outputDir,
 		bootstrap.FilenameWALRootCheckpoint,
 	)
@@ -140,4 +124,43 @@ func extractExecutionState(
 	)
 
 	return nil
+}
+
+func createCheckpoint(
+	newTrie *trie.MTrie,
+	log zerolog.Logger,
+	outputDir,
+	outputFile string,
+) (ledger.State, error) {
+	statecommitment := ledger.State(newTrie.RootHash())
+
+	log.Info().Msgf("successfully built new trie. NEW ROOT STATECOMMIEMENT: %v", statecommitment.String())
+
+	err := os.MkdirAll(outputDir, os.ModePerm)
+	if err != nil {
+		return ledger.State(hash.DummyHash), fmt.Errorf("could not create output dir %s: %w", outputDir, err)
+	}
+
+	err = wal.StoreCheckpointV6Concurrently([]*trie.MTrie{newTrie}, outputDir, outputFile, &log)
+
+	// Writing the checkpoint takes time to write and copy.
+	// Without relying on an exit code or stdout, we need to know when the copy is complete.
+	writeStatusFileErr := writeStatusFile("checkpoint_status.json", err)
+	if writeStatusFileErr != nil {
+		return ledger.State(hash.DummyHash), fmt.Errorf("failed to write checkpoint status file: %w", writeStatusFileErr)
+	}
+
+	if err != nil {
+		return ledger.State(hash.DummyHash), fmt.Errorf("failed to store the checkpoint: %w", err)
+	}
+
+	log.Info().Msgf("checkpoint file successfully stored at: %v %v", outputDir, outputFile)
+	return statecommitment, nil
+}
+
+func writeStatusFile(fileName string, e error) error {
+	checkpointStatus := map[string]bool{"succeeded": e == nil}
+	checkpointStatusJson, _ := json.MarshalIndent(checkpointStatus, "", " ")
+	err := os.WriteFile(fileName, checkpointStatusJson, 0644)
+	return err
 }

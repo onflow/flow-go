@@ -118,7 +118,7 @@ func TestHappyPath(t *testing.T) {
 		expected := generateBlockExecutionData(t, numChunks, minSerializedSizePerChunk)
 		executionDataID, err := provider.Provide(context.Background(), 0, expected)
 		require.NoError(t, err)
-		actual, err := store.GetExecutionData(context.Background(), executionDataID)
+		actual, err := store.Get(context.Background(), executionDataID)
 		require.NoError(t, err)
 		deepEqual(t, expected, actual)
 	}

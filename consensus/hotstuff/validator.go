@@ -22,7 +22,7 @@ type Validator interface {
 
 	// ValidateProposal checks the validity of a proposal.
 	// During normal operations, the following error returns are expected:
-	//  * model.InvalidBlockError if the block is invalid
+	//  * model.InvalidProposalError if the block is invalid
 	//  * model.ErrViewForUnknownEpoch if the proposal refers unknown epoch
 	ValidateProposal(proposal *model.Proposal) error
 

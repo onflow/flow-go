@@ -63,10 +63,10 @@ type Network struct {
 	approvalHasher hash.Hasher
 }
 
-var _ flownet.Network = &Network{}
-var _ insecure.EgressController = &Network{}
-var _ insecure.IngressController = &Network{}
-var _ insecure.CorruptNetworkServer = &Network{}
+var _ flownet.Network = (*Network)(nil)
+var _ insecure.EgressController = (*Network)(nil)
+var _ insecure.IngressController = (*Network)(nil)
+var _ insecure.CorruptNetworkServer = (*Network)(nil)
 
 func NewCorruptNetwork(
 	logger zerolog.Logger,

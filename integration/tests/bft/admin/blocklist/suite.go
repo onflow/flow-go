@@ -1,14 +1,14 @@
 package blocklist
 
 import (
-	"bytes"
+	"context"
 	"fmt"
-	"net/http"
 
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/insecure"
+	"github.com/onflow/flow-go/integration/client"
 	"github.com/onflow/flow-go/integration/testnet"
 	"github.com/onflow/flow-go/integration/tests/bft"
 	"github.com/onflow/flow-go/model/flow"
@@ -56,11 +56,17 @@ func (s *Suite) SetupSuite() {
 
 // blockNode submit request to our EN admin server to block sender VN.
 func (s *Suite) blockNode(nodeID flow.Identifier) {
-	url := fmt.Sprintf("http://0.0.0.0:%s/admin/run_command", s.Net.AdminPortsByNodeID[s.receiverEN])
-	body := fmt.Sprintf(`{"commandName": "set-config", "data": {"network-id-provider-blocklist": ["%s"]}}`, nodeID.String())
-	reqBody := bytes.NewBuffer([]byte(body))
-	resp, err := http.Post(url, "application/json", reqBody)
+	serverAddr := fmt.Sprintf("localhost:%s", s.Net.ContainerByID(s.receiverEN).Port(testnet.AdminPort))
+	adminClient := client.NewAdminClient(serverAddr)
+
+	data := map[string]interface{}{"network-id-provider-blocklist": []string{nodeID.String()}}
+	resp, err := adminClient.RunCommand(context.Background(), "set-config", data)
 	require.NoError(s.T(), err)
-	require.Equal(s.T(), 200, resp.StatusCode)
-	require.NoError(s.T(), resp.Body.Close())
+
+	output, ok := resp.Output.(map[string]interface{})
+	require.True(s.T(), ok)
+
+	newList, ok := output["newValue"].([]interface{})
+	require.True(s.T(), ok)
+	require.Contains(s.T(), newList, nodeID.String())
 }

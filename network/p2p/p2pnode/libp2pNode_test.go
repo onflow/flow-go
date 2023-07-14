@@ -24,7 +24,6 @@ import (
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/internal/p2pfixtures"
 	"github.com/onflow/flow-go/network/internal/p2putils"
-	"github.com/onflow/flow-go/network/internal/testutils"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/p2pnode"
 	p2ptest "github.com/onflow/flow-go/network/p2p/test"
@@ -71,11 +70,12 @@ func TestMultiAddress(t *testing.T) {
 func TestSingleNodeLifeCycle(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
-
+	idProvider := mockmodule.NewIdentityProvider(t)
 	node, _ := p2ptest.NodeFixture(
 		t,
 		unittest.IdentifierFixture(),
 		"test_single_node_life_cycle",
+		idProvider,
 	)
 
 	node.Start(signalerCtx)
@@ -113,9 +113,9 @@ func TestAddPeers(t *testing.T) {
 	count := 3
 	ctx, cancel := context.WithCancel(context.Background())
 	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
+	idProvider := unittest.NewUpdatableIDProvider(flow.IdentityList{})
 
-	// create nodes
-	nodes, identities := p2ptest.NodesFixture(t, unittest.IdentifierFixture(), "test_add_peers", count)
+	nodes, identities := p2ptest.NodesFixture(t, unittest.IdentifierFixture(), "test_add_peers", count, idProvider)
 	p2ptest.StartNodes(t, signalerCtx, nodes, 100*time.Millisecond)
 	defer p2ptest.StopNodes(t, nodes, cancel, 100*time.Millisecond)
 
@@ -135,9 +135,9 @@ func TestRemovePeers(t *testing.T) {
 	count := 3
 	ctx, cancel := context.WithCancel(context.Background())
 	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
-
+	idProvider := unittest.NewUpdatableIDProvider(flow.IdentityList{})
 	// create nodes
-	nodes, identities := p2ptest.NodesFixture(t, unittest.IdentifierFixture(), "test_remove_peers", count)
+	nodes, identities := p2ptest.NodesFixture(t, unittest.IdentifierFixture(), "test_remove_peers", count, idProvider)
 	peerInfos, errs := utils.PeerInfosFromIDs(identities)
 	assert.Len(t, errs, 0)
 
@@ -171,7 +171,8 @@ func TestConnGater(t *testing.T) {
 		t,
 		sporkID,
 		t.Name(),
-		p2ptest.WithConnectionGater(testutils.NewConnectionGater(idProvider, func(pid peer.ID) error {
+		idProvider,
+		p2ptest.WithConnectionGater(p2ptest.NewConnectionGater(idProvider, func(pid peer.ID) error {
 			if !node1Peers.Has(pid) {
 				return fmt.Errorf("peer id not found: %s", pid.String())
 			}
@@ -189,7 +190,8 @@ func TestConnGater(t *testing.T) {
 	node2, identity2 := p2ptest.NodeFixture(
 		t,
 		sporkID, t.Name(),
-		p2ptest.WithConnectionGater(testutils.NewConnectionGater(idProvider, func(pid peer.ID) error {
+		idProvider,
+		p2ptest.WithConnectionGater(p2ptest.NewConnectionGater(idProvider, func(pid peer.ID) error {
 			if !node2Peers.Has(pid) {
 				return fmt.Errorf("id not found: %s", pid.String())
 			}
@@ -227,9 +229,9 @@ func TestConnGater(t *testing.T) {
 func TestNode_HasSubscription(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
-
+	idProvider := unittest.NewUpdatableIDProvider(flow.IdentityList{})
 	sporkID := unittest.IdentifierFixture()
-	node, _ := p2ptest.NodeFixture(t, sporkID, "test_has_subscription")
+	node, _ := p2ptest.NodeFixture(t, sporkID, "test_has_subscription", idProvider)
 
 	p2ptest.StartNode(t, signalerCtx, node, 100*time.Millisecond)
 	defer p2ptest.StopNode(t, node, cancel, 100*time.Millisecond)
@@ -260,12 +262,14 @@ func TestCreateStream_SinglePairwiseConnection(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
-
+	idProvider := unittest.NewUpdatableIDProvider(flow.IdentityList{})
 	nodes, ids := p2ptest.NodesFixture(t,
 		sporkId,
 		"test_create_stream_single_pairwise_connection",
 		nodeCount,
+		idProvider,
 		p2ptest.WithDefaultResourceManager())
+	idProvider.SetIdentities(ids)
 
 	p2ptest.StartNodes(t, signalerCtx, nodes, 100*time.Millisecond)
 	defer p2ptest.StopNodes(t, nodes, cancel, 100*time.Millisecond)
@@ -332,7 +336,8 @@ func TestCreateStream_SinglePeerDial(t *testing.T) {
 		t,
 		sporkID,
 		t.Name(),
-		p2ptest.WithConnectionGater(testutils.NewConnectionGater(idProvider, func(pid peer.ID) error {
+		idProvider,
+		p2ptest.WithConnectionGater(p2ptest.NewConnectionGater(idProvider, func(pid peer.ID) error {
 			// avoid connection gating outbound messages on sender
 			return nil
 		})),
@@ -347,7 +352,8 @@ func TestCreateStream_SinglePeerDial(t *testing.T) {
 		t,
 		sporkID,
 		t.Name(),
-		p2ptest.WithConnectionGater(testutils.NewConnectionGater(idProvider, func(pid peer.ID) error {
+		idProvider,
+		p2ptest.WithConnectionGater(p2ptest.NewConnectionGater(idProvider, func(pid peer.ID) error {
 			// connection gate all incoming connections forcing the senders unicast manager to perform retries
 			return fmt.Errorf("gate keep")
 		})),
@@ -401,6 +407,7 @@ func TestCreateStream_InboundConnResourceLimit(t *testing.T) {
 		t,
 		sporkID,
 		t.Name(),
+		idProvider,
 		p2ptest.WithDefaultResourceManager(),
 		p2ptest.WithCreateStreamRetryDelay(10*time.Millisecond))
 
@@ -408,6 +415,7 @@ func TestCreateStream_InboundConnResourceLimit(t *testing.T) {
 		t,
 		sporkID,
 		t.Name(),
+		idProvider,
 		p2ptest.WithDefaultResourceManager(),
 		p2ptest.WithCreateStreamRetryDelay(10*time.Millisecond))
 

@@ -14,7 +14,7 @@ import (
 	"github.com/onflow/flow-go/ledger/common/pathfinder"
 
 	"github.com/onflow/flow-go/engine/execution/state"
-	"github.com/onflow/flow-go/engine/execution/state/delta"
+	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	ledger "github.com/onflow/flow-go/ledger/complete"
 	"github.com/onflow/flow-go/ledger/complete/wal/fixtures"
 	"github.com/onflow/flow-go/model/flow"
@@ -77,14 +77,14 @@ func TestExecutionStateWithTrieStorage(t *testing.T) {
 		sc1, err := es.StateCommitmentByBlockID(context.Background(), flow.Identifier{})
 		assert.NoError(t, err)
 
-		view1 := delta.NewDeltaView(es.NewStorageSnapshot(sc1))
+		executionSnapshot := &snapshot.ExecutionSnapshot{
+			WriteSet: map[flow.RegisterID]flow.RegisterValue{
+				registerID1: flow.RegisterValue("apple"),
+				registerID2: flow.RegisterValue("carrot"),
+			},
+		}
 
-		err = view1.Set(registerID1, flow.RegisterValue("apple"))
-		assert.NoError(t, err)
-		err = view1.Set(registerID2, flow.RegisterValue("carrot"))
-		assert.NoError(t, err)
-
-		sc2, update, err := state.CommitDelta(l, view1.Delta(), sc1)
+		sc2, update, err := state.CommitDelta(l, executionSnapshot, sc1)
 		assert.NoError(t, err)
 
 		assert.Equal(t, sc1[:], update.RootHash[:])
@@ -122,11 +122,11 @@ func TestExecutionStateWithTrieStorage(t *testing.T) {
 		assert.Equal(t, []byte("apple"), []byte(update.Payloads[0].Value()))
 		assert.Equal(t, []byte("carrot"), []byte(update.Payloads[1].Value()))
 
-		view2 := delta.NewDeltaView(es.NewStorageSnapshot(sc2))
+		storageSnapshot := es.NewStorageSnapshot(sc2)
 
-		b1, err := view2.Get(registerID1)
+		b1, err := storageSnapshot.Get(registerID1)
 		assert.NoError(t, err)
-		b2, err := view2.Get(registerID2)
+		b2, err := storageSnapshot.Get(registerID2)
 		assert.NoError(t, err)
 
 		assert.Equal(t, flow.RegisterValue("apple"), b1)
@@ -138,32 +138,36 @@ func TestExecutionStateWithTrieStorage(t *testing.T) {
 		sc1, err := es.StateCommitmentByBlockID(context.Background(), flow.Identifier{})
 		assert.NoError(t, err)
 
-		view1 := delta.NewDeltaView(es.NewStorageSnapshot(sc1))
+		executionSnapshot1 := &snapshot.ExecutionSnapshot{
+			WriteSet: map[flow.RegisterID]flow.RegisterValue{
+				registerID1: []byte("apple"),
+			},
+		}
 
-		err = view1.Set(registerID1, []byte("apple"))
-		assert.NoError(t, err)
-		sc2, _, err := state.CommitDelta(l, view1.Delta(), sc1)
+		sc2, _, err := state.CommitDelta(l, executionSnapshot1, sc1)
 		assert.NoError(t, err)
 
 		// update value and get resulting state commitment
-		view2 := delta.NewDeltaView(es.NewStorageSnapshot(sc2))
-		err = view2.Set(registerID1, []byte("orange"))
-		assert.NoError(t, err)
+		executionSnapshot2 := &snapshot.ExecutionSnapshot{
+			WriteSet: map[flow.RegisterID]flow.RegisterValue{
+				registerID1: []byte("orange"),
+			},
+		}
 
-		sc3, _, err := state.CommitDelta(l, view2.Delta(), sc2)
+		sc3, _, err := state.CommitDelta(l, executionSnapshot2, sc2)
 		assert.NoError(t, err)
 
 		// create a view for previous state version
-		view3 := delta.NewDeltaView(es.NewStorageSnapshot(sc2))
+		storageSnapshot3 := es.NewStorageSnapshot(sc2)
 
 		// create a view for new state version
-		view4 := delta.NewDeltaView(es.NewStorageSnapshot(sc3))
+		storageSnapshot4 := es.NewStorageSnapshot(sc3)
 
 		// fetch the value at both versions
-		b1, err := view3.Get(registerID1)
+		b1, err := storageSnapshot3.Get(registerID1)
 		assert.NoError(t, err)
 
-		b2, err := view4.Get(registerID1)
+		b2, err := storageSnapshot4.Get(registerID1)
 		assert.NoError(t, err)
 
 		assert.Equal(t, flow.RegisterValue("apple"), b1)
@@ -176,34 +180,37 @@ func TestExecutionStateWithTrieStorage(t *testing.T) {
 		assert.NoError(t, err)
 
 		// set initial value
-		view1 := delta.NewDeltaView(es.NewStorageSnapshot(sc1))
-		err = view1.Set(registerID1, []byte("apple"))
-		assert.NoError(t, err)
-		err = view1.Set(registerID2, []byte("apple"))
-		assert.NoError(t, err)
+		executionSnapshot1 := &snapshot.ExecutionSnapshot{
+			WriteSet: map[flow.RegisterID]flow.RegisterValue{
+				registerID1: []byte("apple"),
+				registerID2: []byte("apple"),
+			},
+		}
 
-		sc2, _, err := state.CommitDelta(l, view1.Delta(), sc1)
+		sc2, _, err := state.CommitDelta(l, executionSnapshot1, sc1)
 		assert.NoError(t, err)
 
 		// update value and get resulting state commitment
-		view2 := delta.NewDeltaView(es.NewStorageSnapshot(sc2))
-		err = view2.Set(registerID1, nil)
-		assert.NoError(t, err)
+		executionSnapshot2 := &snapshot.ExecutionSnapshot{
+			WriteSet: map[flow.RegisterID]flow.RegisterValue{
+				registerID1: nil,
+			},
+		}
 
-		sc3, _, err := state.CommitDelta(l, view2.Delta(), sc2)
+		sc3, _, err := state.CommitDelta(l, executionSnapshot2, sc2)
 		assert.NoError(t, err)
 
 		// create a view for previous state version
-		view3 := delta.NewDeltaView(es.NewStorageSnapshot(sc2))
+		storageSnapshot3 := es.NewStorageSnapshot(sc2)
 
 		// create a view for new state version
-		view4 := delta.NewDeltaView(es.NewStorageSnapshot(sc3))
+		storageSnapshot4 := es.NewStorageSnapshot(sc3)
 
 		// fetch the value at both versions
-		b1, err := view3.Get(registerID1)
+		b1, err := storageSnapshot3.Get(registerID1)
 		assert.NoError(t, err)
 
-		b2, err := view4.Get(registerID1)
+		b2, err := storageSnapshot4.Get(registerID1)
 		assert.NoError(t, err)
 
 		assert.Equal(t, flow.RegisterValue("apple"), b1)
@@ -216,17 +223,18 @@ func TestExecutionStateWithTrieStorage(t *testing.T) {
 		assert.NoError(t, err)
 
 		// set initial value
-		view1 := delta.NewDeltaView(es.NewStorageSnapshot(sc1))
-		err = view1.Set(registerID1, flow.RegisterValue("apple"))
-		assert.NoError(t, err)
-		err = view1.Set(registerID2, flow.RegisterValue("apple"))
-		assert.NoError(t, err)
+		executionSnapshot1 := &snapshot.ExecutionSnapshot{
+			WriteSet: map[flow.RegisterID]flow.RegisterValue{
+				registerID1: flow.RegisterValue("apple"),
+				registerID2: flow.RegisterValue("apple"),
+			},
+		}
 
-		sc2, _, err := state.CommitDelta(l, view1.Delta(), sc1)
+		sc2, _, err := state.CommitDelta(l, executionSnapshot1, sc1)
 		assert.NoError(t, err)
 
 		// committing for the second time should be OK
-		sc2Same, _, err := state.CommitDelta(l, view1.Delta(), sc1)
+		sc2Same, _, err := state.CommitDelta(l, executionSnapshot1, sc1)
 		assert.NoError(t, err)
 
 		require.Equal(t, sc2, sc2Same)

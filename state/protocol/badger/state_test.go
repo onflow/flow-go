@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/dgraph-io/badger/v2"
-
 	"github.com/stretchr/testify/assert"
 	testmock "github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -75,12 +74,17 @@ func TestBootstrapAndOpen(t *testing.T) {
 			all.Setups,
 			all.EpochCommits,
 			all.Statuses,
+			all.VersionBeacons,
 		)
 		require.NoError(t, err)
 
 		complianceMetrics.AssertExpectations(t)
 
 		unittest.AssertSnapshotsEqual(t, rootSnapshot, state.Final())
+
+		vb, err := state.Final().VersionBeacon()
+		require.NoError(t, err)
+		require.Nil(t, vb)
 	})
 }
 
@@ -155,6 +159,7 @@ func TestBootstrapAndOpen_EpochCommitted(t *testing.T) {
 			all.Setups,
 			all.EpochCommits,
 			all.Statuses,
+			all.VersionBeacons,
 		)
 		require.NoError(t, err)
 
@@ -260,7 +265,7 @@ func TestBootstrapNonRoot(t *testing.T) {
 	require.NoError(t, err)
 
 	// should be able to bootstrap from snapshot after sealing a non-root block
-	// ROOT <- B1 <- B2(S1) <- CHILD
+	// ROOT <- B1 <- B2(R1) <- B3(S1) <- CHILD
 	t.Run("with sealed block", func(t *testing.T) {
 		after := snapshotAfter(t, rootSnapshot, func(state *bprotocol.FollowerState) protocol.Snapshot {
 			block1 := unittest.BlockWithParentFixture(rootBlock)
@@ -268,18 +273,32 @@ func TestBootstrapNonRoot(t *testing.T) {
 
 			receipt1, seal1 := unittest.ReceiptAndSealForBlock(block1)
 			block2 := unittest.BlockWithParentFixture(block1.Header)
-			block2.SetPayload(unittest.PayloadFixture(unittest.WithSeals(seal1), unittest.WithReceipts(receipt1)))
+			block2.SetPayload(unittest.PayloadFixture(unittest.WithReceipts(receipt1)))
 			buildFinalizedBlock(t, state, block2)
 
-			child := unittest.BlockWithParentFixture(block2.Header)
+			block3 := unittest.BlockWithParentFixture(block2.Header)
+			block3.SetPayload(unittest.PayloadFixture(unittest.WithSeals(seal1)))
+			buildFinalizedBlock(t, state, block3)
+
+			child := unittest.BlockWithParentFixture(block3.Header)
 			buildBlock(t, state, child)
 
-			return state.AtBlockID(block2.ID())
+			return state.AtBlockID(block3.ID())
 		})
 
 		bootstrap(t, after, func(state *bprotocol.State, err error) {
 			require.NoError(t, err)
 			unittest.AssertSnapshotsEqual(t, after, state.Final())
+			// should be able to read all QCs
+			segment, err := state.Final().SealingSegment()
+			require.NoError(t, err)
+			for _, block := range segment.Blocks {
+				snapshot := state.AtBlockID(block.ID())
+				_, err := snapshot.QuorumCertificate()
+				require.NoError(t, err)
+				_, err = snapshot.RandomSource()
+				require.NoError(t, err)
+			}
 		})
 	})
 
@@ -510,8 +529,21 @@ func bootstrap(t *testing.T, rootSnapshot protocol.Snapshot, f func(*bprotocol.S
 	defer os.RemoveAll(dir)
 	db := unittest.BadgerDB(t, dir)
 	defer db.Close()
-	headers, _, seals, _, _, blocks, qcs, setups, commits, statuses, results := storutil.StorageLayer(t, db)
-	state, err := bprotocol.Bootstrap(metrics, db, headers, seals, results, blocks, qcs, setups, commits, statuses, rootSnapshot)
+	all := storutil.StorageLayer(t, db)
+	state, err := bprotocol.Bootstrap(
+		metrics,
+		db,
+		all.Headers,
+		all.Seals,
+		all.Results,
+		all.Blocks,
+		all.QuorumCertificates,
+		all.Setups,
+		all.EpochCommits,
+		all.Statuses,
+		all.VersionBeacons,
+		rootSnapshot,
+	)
 	f(state, err)
 }
 
@@ -552,7 +584,7 @@ func assertSealingSegmentBlocksQueryableAfterBootstrap(t *testing.T, snapshot pr
 		segment, err := state.Final().SealingSegment()
 		require.NoError(t, err)
 
-		rootBlock, err := state.Params().Root()
+		rootBlock, err := state.Params().FinalizedRoot()
 		require.NoError(t, err)
 
 		// root block should be the highest block from the sealing segment

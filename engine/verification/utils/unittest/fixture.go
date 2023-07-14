@@ -18,7 +18,7 @@ import (
 	"github.com/onflow/flow-go/engine/execution/state/bootstrap"
 	"github.com/onflow/flow-go/engine/execution/testutil"
 	"github.com/onflow/flow-go/fvm"
-	"github.com/onflow/flow-go/fvm/derived"
+	"github.com/onflow/flow-go/fvm/storage/derived"
 	completeLedger "github.com/onflow/flow-go/ledger/complete"
 	"github.com/onflow/flow-go/ledger/complete/wal/fixtures"
 	"github.com/onflow/flow-go/model/messages"
@@ -37,6 +37,12 @@ import (
 	requesterunit "github.com/onflow/flow-go/module/state_synchronization/requester/unittest"
 	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/utils/unittest"
+)
+
+const (
+	// TODO: enable parallel execution once cadence type equivalence check issue
+	// is resolved.
+	testMaxConcurrency = 1
 )
 
 // ExecutionReceiptData is a test helper struct that represents all data required
@@ -260,7 +266,6 @@ func ExecutionResultFixture(t *testing.T, chunkCount int, chain flow.Chain, refB
 			led,
 			startStateCommitment)
 		committer := committer.NewLedgerViewCommitter(led, trace.NewNoopTracer())
-		derivedBlockData := derived.NewEmptyDerivedBlockData()
 
 		bservice := requesterunit.MockBlobService(blockstore.NewBlockstore(dssync.MutexWrap(datastore.NewMapDatastore())))
 		trackerStorage := mocktracker.NewMockStorage()
@@ -289,7 +294,8 @@ func ExecutionResultFixture(t *testing.T, chunkCount int, chain flow.Chain, refB
 			committer,
 			me,
 			prov,
-			nil)
+			nil,
+			testMaxConcurrency)
 		require.NoError(t, err)
 
 		completeColls := make(map[flow.Identifier]*entity.CompleteCollection)
@@ -335,14 +341,14 @@ func ExecutionResultFixture(t *testing.T, chunkCount int, chain flow.Chain, refB
 			unittest.IdentifierFixture(),
 			executableBlock,
 			snapshot,
-			derivedBlockData)
+			derived.NewEmptyDerivedBlockData(0))
 		require.NoError(t, err)
 
-		for _, snapshot := range computationResult.StateSnapshots {
+		for _, snapshot := range computationResult.AllExecutionSnapshots() {
 			spockSecrets = append(spockSecrets, snapshot.SpockSecret)
 		}
 
-		chunkDataPacks = computationResult.ChunkDataPacks
+		chunkDataPacks = computationResult.AllChunkDataPacks()
 		result = &computationResult.ExecutionResult
 	})
 

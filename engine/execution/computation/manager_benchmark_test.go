@@ -19,9 +19,9 @@ import (
 	"github.com/onflow/flow-go/engine/execution/computation/computer"
 	"github.com/onflow/flow-go/engine/execution/testutil"
 	"github.com/onflow/flow-go/fvm"
-	"github.com/onflow/flow-go/fvm/derived"
 	reusableRuntime "github.com/onflow/flow-go/fvm/runtime"
-	"github.com/onflow/flow-go/fvm/storage"
+	"github.com/onflow/flow-go/fvm/storage/derived"
+	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	exedataprovider "github.com/onflow/flow-go/module/executiondatasync/provider"
@@ -47,10 +47,10 @@ type testAccounts struct {
 func createAccounts(
 	b *testing.B,
 	vm fvm.VM,
-	snapshotTree storage.SnapshotTree,
+	snapshotTree snapshot.SnapshotTree,
 	num int,
 ) (
-	storage.SnapshotTree,
+	snapshot.SnapshotTree,
 	*testAccounts,
 ) {
 	privateKeys, err := testutil.GenerateAccountPrivateKeys(num)
@@ -78,15 +78,10 @@ func createAccounts(
 func mustFundAccounts(
 	b *testing.B,
 	vm fvm.VM,
-	snapshotTree storage.SnapshotTree,
+	snapshotTree snapshot.SnapshotTree,
 	execCtx fvm.Context,
 	accs *testAccounts,
-) storage.SnapshotTree {
-	derivedBlockData := derived.NewEmptyDerivedBlockData()
-	execCtx = fvm.NewContextFromParent(
-		execCtx,
-		fvm.WithDerivedBlockData(derivedBlockData))
-
+) snapshot.SnapshotTree {
 	var err error
 	for _, acc := range accs.accounts {
 		transferTx := testutil.CreateTokenTransferTransaction(chain, 1_000_000, acc.address, chain.ServiceAddress())
@@ -94,10 +89,10 @@ func mustFundAccounts(
 		require.NoError(b, err)
 		accs.seq++
 
-		tx := fvm.Transaction(
-			transferTx,
-			derivedBlockData.NextTxIndexForTestingOnly())
-		executionSnapshot, output, err := vm.RunV2(execCtx, tx, snapshotTree)
+		executionSnapshot, output, err := vm.Run(
+			execCtx,
+			fvm.Transaction(transferTx, 0),
+			snapshotTree)
 		require.NoError(b, err)
 		require.NoError(b, output.Err)
 		snapshotTree = snapshotTree.Append(executionSnapshot)
@@ -108,7 +103,48 @@ func mustFundAccounts(
 
 func BenchmarkComputeBlock(b *testing.B) {
 	b.StopTimer()
+	b.SetParallelism(1)
 
+	type benchmarkCase struct {
+		numCollections               int
+		numTransactionsPerCollection int
+		maxConcurrency               int
+	}
+
+	for _, benchCase := range []benchmarkCase{
+		{
+			numCollections:               16,
+			numTransactionsPerCollection: 128,
+			maxConcurrency:               1,
+		},
+		{
+			numCollections:               16,
+			numTransactionsPerCollection: 128,
+			maxConcurrency:               2,
+		},
+	} {
+		b.Run(
+			fmt.Sprintf(
+				"%d/cols/%d/txes/%d/max-concurrency",
+				benchCase.numCollections,
+				benchCase.numTransactionsPerCollection,
+				benchCase.maxConcurrency),
+			func(b *testing.B) {
+				benchmarkComputeBlock(
+					b,
+					benchCase.numCollections,
+					benchCase.numTransactionsPerCollection,
+					benchCase.maxConcurrency)
+			})
+	}
+}
+
+func benchmarkComputeBlock(
+	b *testing.B,
+	numCollections int,
+	numTransactionsPerCollection int,
+	maxConcurrency int,
+) {
 	tracer, err := trace.NewTracer(zerolog.Nop(), "", "", 4)
 	require.NoError(b, err)
 
@@ -164,7 +200,8 @@ func BenchmarkComputeBlock(b *testing.B) {
 		committer.NewNoopViewCommitter(),
 		me,
 		prov,
-		nil)
+		nil,
+		maxConcurrency)
 	require.NoError(b, err)
 
 	derivedChainData, err := derived.NewDerivedChainData(
@@ -176,53 +213,49 @@ func BenchmarkComputeBlock(b *testing.B) {
 		derivedChainData: derivedChainData,
 	}
 
-	b.SetParallelism(1)
-
 	parentBlock := &flow.Block{
 		Header:  &flow.Header{},
 		Payload: &flow.Payload{},
 	}
 
-	const (
-		cols = 16
-		txes = 128
-	)
+	b.StopTimer()
+	b.ResetTimer()
 
-	b.Run(fmt.Sprintf("%d/cols/%d/txes", cols, txes), func(b *testing.B) {
+	var elapsed time.Duration
+	for i := 0; i < b.N; i++ {
+		executableBlock := createBlock(
+			b,
+			parentBlock,
+			accs,
+			numCollections,
+			numTransactionsPerCollection)
+		parentBlock = executableBlock.Block
+
+		b.StartTimer()
+		start := time.Now()
+		res, err := engine.ComputeBlock(
+			context.Background(),
+			unittest.IdentifierFixture(),
+			executableBlock,
+			snapshotTree)
+		elapsed += time.Since(start)
 		b.StopTimer()
-		b.ResetTimer()
 
-		var elapsed time.Duration
-		for i := 0; i < b.N; i++ {
-			executableBlock := createBlock(b, parentBlock, accs, cols, txes)
-			parentBlock = executableBlock.Block
-
-			b.StartTimer()
-			start := time.Now()
-			res, err := engine.ComputeBlock(
-				context.Background(),
-				unittest.IdentifierFixture(),
-				executableBlock,
-				snapshotTree)
-			elapsed += time.Since(start)
-			b.StopTimer()
-
-			for _, snapshot := range res.StateSnapshots {
-				snapshotTree = snapshotTree.Append(snapshot)
-			}
-
-			require.NoError(b, err)
-			for j, r := range res.TransactionResults {
-				// skip system transactions
-				if j >= cols*txes {
-					break
-				}
-				require.Emptyf(b, r.ErrorMessage, "Transaction %d failed", j)
-			}
+		require.NoError(b, err)
+		for _, snapshot := range res.AllExecutionSnapshots() {
+			snapshotTree = snapshotTree.Append(snapshot)
 		}
-		totalTxes := int64(cols) * int64(txes) * int64(b.N)
-		b.ReportMetric(float64(elapsed.Nanoseconds()/totalTxes/int64(time.Microsecond)), "us/tx")
-	})
+
+		for j, r := range res.AllTransactionResults() {
+			// skip system transactions
+			if j >= numCollections*numTransactionsPerCollection {
+				break
+			}
+			require.Emptyf(b, r.ErrorMessage, "Transaction %d failed", j)
+		}
+	}
+	totalTxes := int64(numCollections) * int64(numTransactionsPerCollection) * int64(b.N)
+	b.ReportMetric(float64(elapsed.Nanoseconds()/totalTxes/int64(time.Microsecond)), "us/tx")
 }
 
 func createBlock(b *testing.B, parentBlock *flow.Block, accs *testAccounts, colNum int, txNum int) *entity.ExecutableBlock {

@@ -10,7 +10,7 @@ import (
 	dssync "github.com/ipfs/go-datastore/sync"
 	blockstore "github.com/ipfs/go-ipfs-blockstore"
 	"github.com/onflow/cadence"
-	jsoncdc "github.com/onflow/cadence/encoding/json"
+	"github.com/onflow/cadence/encoding/ccf"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -21,8 +21,8 @@ import (
 	"github.com/onflow/flow-go/engine/execution/computation/computer"
 	"github.com/onflow/flow-go/engine/execution/testutil"
 	"github.com/onflow/flow-go/fvm"
-	"github.com/onflow/flow-go/fvm/derived"
-	"github.com/onflow/flow-go/fvm/storage"
+	"github.com/onflow/flow-go/fvm/storage/derived"
+	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	"github.com/onflow/flow-go/module/executiondatasync/provider"
@@ -33,6 +33,10 @@ import (
 	requesterunit "github.com/onflow/flow-go/module/state_synchronization/requester/unittest"
 	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/utils/unittest"
+)
+
+const (
+	testMaxConcurrency = 2
 )
 
 func TestPrograms_TestContractUpdates(t *testing.T) {
@@ -133,7 +137,8 @@ func TestPrograms_TestContractUpdates(t *testing.T) {
 		committer.NewNoopViewCommitter(),
 		me,
 		prov,
-		nil)
+		nil,
+		testMaxConcurrency)
 	require.NoError(t, err)
 
 	derivedChainData, err := derived.NewDerivedChainData(10)
@@ -151,22 +156,22 @@ func TestPrograms_TestContractUpdates(t *testing.T) {
 		snapshotTree)
 	require.NoError(t, err)
 
-	require.Len(t, returnedComputationResult.Events, 2) // 1 collection + 1 system chunk
+	events := returnedComputationResult.AllEvents()
 
 	// first event should be contract deployed
-	assert.EqualValues(t, "flow.AccountContractAdded", returnedComputationResult.Events[0][0].Type)
+	assert.EqualValues(t, "flow.AccountContractAdded", events[0].Type)
 
 	// second event should have a value of 1 (since is calling version 1 of contract)
-	hasValidEventValue(t, returnedComputationResult.Events[0][1], 1)
+	hasValidEventValue(t, events[1], 1)
 
 	// third event should be contract updated
-	assert.EqualValues(t, "flow.AccountContractUpdated", returnedComputationResult.Events[0][2].Type)
+	assert.EqualValues(t, "flow.AccountContractUpdated", events[2].Type)
 
 	// 4th event should have a value of 2 (since is calling version 2 of contract)
-	hasValidEventValue(t, returnedComputationResult.Events[0][3], 2)
+	hasValidEventValue(t, events[3], 2)
 
 	// 5th event should have a value of 2 (since is calling version 2 of contract)
-	hasValidEventValue(t, returnedComputationResult.Events[0][4], 2)
+	hasValidEventValue(t, events[4], 2)
 }
 
 type blockProvider struct {
@@ -243,7 +248,8 @@ func TestPrograms_TestBlockForks(t *testing.T) {
 		committer.NewNoopViewCommitter(),
 		me,
 		prov,
-		nil)
+		nil,
+		testMaxConcurrency)
 	require.NoError(t, err)
 
 	derivedChainData, err := derived.NewDerivedChainData(10)
@@ -261,7 +267,7 @@ func TestPrograms_TestBlockForks(t *testing.T) {
 		block1111, block12, block121, block1211 *flow.Block
 
 		block1Snapshot, block11Snapshot, block111Snapshot, block112Snapshot,
-		block12Snapshot, block121Snapshot storage.SnapshotTree
+		block12Snapshot, block121Snapshot snapshot.SnapshotTree
 	)
 
 	t.Run("executing block1 (no collection)", func(t *testing.T) {
@@ -301,7 +307,8 @@ func TestPrograms_TestBlockForks(t *testing.T) {
 		// cache should include value for this block
 		require.NotNil(t, derivedChainData.Get(block11.ID()))
 		// 1st event should be contract deployed
-		assert.EqualValues(t, "flow.AccountContractAdded", res.Events[0][0].Type)
+
+		assert.EqualValues(t, "flow.AccountContractAdded", res.AllEvents()[0].Type)
 	})
 
 	t.Run("executing block111 (emit event (expected v1), update contract to v3)", func(t *testing.T) {
@@ -324,12 +331,13 @@ func TestPrograms_TestBlockForks(t *testing.T) {
 		// cache should include a program for this block
 		require.NotNil(t, derivedChainData.Get(block111.ID()))
 
-		require.Len(t, res.Events, 2)
+		events := res.AllEvents()
+		require.Equal(t, res.BlockExecutionResult.Size(), 2)
 
 		// 1st event
-		hasValidEventValue(t, res.Events[0][0], block111ExpectedValue)
+		hasValidEventValue(t, events[0], block111ExpectedValue)
 		// second event should be contract deployed
-		assert.EqualValues(t, "flow.AccountContractUpdated", res.Events[0][1].Type)
+		assert.EqualValues(t, "flow.AccountContractUpdated", events[1].Type)
 	})
 
 	t.Run("executing block1111 (emit event (expected v3))", func(t *testing.T) {
@@ -347,10 +355,11 @@ func TestPrograms_TestBlockForks(t *testing.T) {
 		// cache should include a program for this block
 		require.NotNil(t, derivedChainData.Get(block1111.ID()))
 
-		require.Len(t, res.Events, 2)
+		events := res.AllEvents()
+		require.Equal(t, res.BlockExecutionResult.Size(), 2)
 
 		// 1st event
-		hasValidEventValue(t, res.Events[0][0], block1111ExpectedValue)
+		hasValidEventValue(t, events[0], block1111ExpectedValue)
 	})
 
 	t.Run("executing block112 (emit event (expected v1))", func(t *testing.T) {
@@ -372,12 +381,13 @@ func TestPrograms_TestBlockForks(t *testing.T) {
 		// cache should include a program for this block
 		require.NotNil(t, derivedChainData.Get(block112.ID()))
 
-		require.Len(t, res.Events, 2)
+		events := res.AllEvents()
+		require.Equal(t, res.BlockExecutionResult.Size(), 2)
 
 		// 1st event
-		hasValidEventValue(t, res.Events[0][0], block112ExpectedValue)
+		hasValidEventValue(t, events[0], block112ExpectedValue)
 		// second event should be contract deployed
-		assert.EqualValues(t, "flow.AccountContractUpdated", res.Events[0][1].Type)
+		assert.EqualValues(t, "flow.AccountContractUpdated", events[1].Type)
 
 	})
 	t.Run("executing block1121 (emit event (expected v4))", func(t *testing.T) {
@@ -395,10 +405,11 @@ func TestPrograms_TestBlockForks(t *testing.T) {
 		// cache should include a program for this block
 		require.NotNil(t, derivedChainData.Get(block1121.ID()))
 
-		require.Len(t, res.Events, 2)
+		events := res.AllEvents()
+		require.Equal(t, res.BlockExecutionResult.Size(), 2)
 
 		// 1st event
-		hasValidEventValue(t, res.Events[0][0], block1121ExpectedValue)
+		hasValidEventValue(t, events[0], block1121ExpectedValue)
 
 	})
 	t.Run("executing block12 (deploys contract V2)", func(t *testing.T) {
@@ -416,9 +427,10 @@ func TestPrograms_TestBlockForks(t *testing.T) {
 		// cache should include a program for this block
 		require.NotNil(t, derivedChainData.Get(block12.ID()))
 
-		require.Len(t, res.Events, 2)
+		events := res.AllEvents()
+		require.Equal(t, res.BlockExecutionResult.Size(), 2)
 
-		assert.EqualValues(t, "flow.AccountContractAdded", res.Events[0][0].Type)
+		assert.EqualValues(t, "flow.AccountContractAdded", events[0].Type)
 	})
 	t.Run("executing block121 (emit event (expected V2)", func(t *testing.T) {
 		block121ExpectedValue := 2
@@ -435,10 +447,11 @@ func TestPrograms_TestBlockForks(t *testing.T) {
 		// cache should include a program for this block
 		require.NotNil(t, derivedChainData.Get(block121.ID()))
 
-		require.Len(t, res.Events, 2)
+		events := res.AllEvents()
+		require.Equal(t, res.BlockExecutionResult.Size(), 2)
 
 		// 1st event
-		hasValidEventValue(t, res.Events[0][0], block121ExpectedValue)
+		hasValidEventValue(t, events[0], block121ExpectedValue)
 	})
 	t.Run("executing Block1211 (emit event (expected V2)", func(t *testing.T) {
 		block1211ExpectedValue := 2
@@ -457,10 +470,11 @@ func TestPrograms_TestBlockForks(t *testing.T) {
 		// had no change so cache should be equal to parent
 		require.Equal(t, derivedChainData.Get(block121.ID()), derivedChainData.Get(block1211.ID()))
 
-		require.Len(t, res.Events, 2)
+		events := res.AllEvents()
+		require.Equal(t, res.BlockExecutionResult.Size(), 2)
 
 		// 1st event
-		hasValidEventValue(t, res.Events[0][0], block1211ExpectedValue)
+		hasValidEventValue(t, events[0], block1211ExpectedValue)
 	})
 
 }
@@ -470,11 +484,11 @@ func createTestBlockAndRun(
 	engine *Manager,
 	parentBlock *flow.Block,
 	col flow.Collection,
-	snapshotTree storage.SnapshotTree,
+	snapshotTree snapshot.SnapshotTree,
 ) (
 	*flow.Block,
 	*execution.ComputationResult,
-	storage.SnapshotTree,
+	snapshot.SnapshotTree,
 ) {
 	guarantee := flow.CollectionGuarantee{
 		CollectionID: col.ID(),
@@ -509,11 +523,11 @@ func createTestBlockAndRun(
 		snapshotTree)
 	require.NoError(t, err)
 
-	for _, txResult := range returnedComputationResult.TransactionResults {
+	for _, txResult := range returnedComputationResult.AllTransactionResults() {
 		require.Empty(t, txResult.ErrorMessage)
 	}
 
-	for _, snapshot := range returnedComputationResult.StateSnapshots {
+	for _, snapshot := range returnedComputationResult.AllExecutionSnapshots() {
 		snapshotTree = snapshotTree.Append(snapshot)
 	}
 
@@ -535,7 +549,7 @@ func prepareTx(t *testing.T,
 }
 
 func hasValidEventValue(t *testing.T, event flow.Event, value int) {
-	data, err := jsoncdc.Decode(nil, event.Payload)
+	data, err := ccf.Decode(nil, event.Payload)
 	require.NoError(t, err)
 	assert.Equal(t, int16(value), data.(cadence.Event).Fields[0].ToGoValue())
 }

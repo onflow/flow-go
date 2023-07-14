@@ -14,6 +14,8 @@ import (
 	"github.com/onflow/flow-go/network/compressor"
 )
 
+// DefaultSerializer is the default implementation for an Execution Data serializer.
+// It is configured to use cbor encoding with LZ4 compression.
 var DefaultSerializer Serializer
 
 func init() {
@@ -33,17 +35,19 @@ func init() {
 	DefaultSerializer = NewSerializer(codec, compressor.NewLz4Compressor())
 }
 
-// header codes to distinguish between different types of data
-// these codes provide simple versioning of execution state data blobs and indicate how the data
-// should be deserialized into their original form. Therefore, each input format must have a unique
-// code, and the codes must never be reused. This allows for libraries that can accurately decode
-// the data without juggling software versions.
+// header codes are used to distinguish between the different data types serialized within a blob.
+// they provide simple versioning of execution state data blobs and indicate how the data should
+// be deserialized back into their original form. Therefore, each input format must have a unique
+// code, and the codes must never be reused. This allows libraries to accurately decode the data
+// without juggling software versions.
 const (
 	codeRecursiveCIDs = iota + 1
 	codeExecutionDataRoot
 	codeChunkExecutionData
 )
 
+// getCode returns the header code for the given value's type.
+// It returns an error if the type is not supported.
 func getCode(v interface{}) (byte, error) {
 	switch v.(type) {
 	case *BlockExecutionDataRoot:
@@ -57,6 +61,8 @@ func getCode(v interface{}) (byte, error) {
 	}
 }
 
+// getPrototype returns a new instance of the type that corresponds to the given header code.
+// It returns an error if the code is not supported.
 func getPrototype(code byte) (interface{}, error) {
 	switch code {
 	case codeExecutionDataRoot:
@@ -73,7 +79,12 @@ func getPrototype(code byte) (interface{}, error) {
 // Serializer is used to serialize / deserialize Execution Data and CID lists for the
 // Execution Data Service.
 type Serializer interface {
+	// Serialize encodes and compresses the given value to the given writer.
+	// No errors are expected during normal operation.
 	Serialize(io.Writer, interface{}) error
+
+	// Deserialize decompresses and decodes the data from the given reader.
+	// No errors are expected during normal operation.
 	Deserialize(io.Reader) (interface{}, error)
 }
 
@@ -87,6 +98,7 @@ type serializer struct {
 	compressor network.Compressor
 }
 
+// NewSerializer returns a new Execution Data serializer using the provided encoder and compressor.
 func NewSerializer(codec encoding.Codec, compressor network.Compressor) *serializer {
 	return &serializer{
 		codec:      codec,
@@ -116,7 +128,8 @@ func (s *serializer) writePrototype(w io.Writer, v interface{}) error {
 	return nil
 }
 
-// Serialize encodes and compresses the given value to the given writer
+// Serialize encodes and compresses the given value to the given writer.
+// No errors are expected during normal operation.
 func (s *serializer) Serialize(w io.Writer, v interface{}) error {
 	if err := s.writePrototype(w, v); err != nil {
 		return fmt.Errorf("failed to write prototype: %w", err)
@@ -162,7 +175,8 @@ func (s *serializer) readPrototype(r io.Reader) (interface{}, error) {
 	return getPrototype(code)
 }
 
-// Deserialize decompresses and decodes the data from the given reader
+// Deserialize decompresses and decodes the data from the given reader.
+// No errors are expected during normal operation.
 func (s *serializer) Deserialize(r io.Reader) (interface{}, error) {
 	v, err := s.readPrototype(r)
 

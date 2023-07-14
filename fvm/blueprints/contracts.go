@@ -13,15 +13,15 @@ import (
 )
 
 var ContractDeploymentAuthorizedAddressesPath = cadence.Path{
-	Domain:     common.PathDomainStorage.Identifier(),
+	Domain:     common.PathDomainStorage,
 	Identifier: "authorizedAddressesToDeployContracts",
 }
 var ContractRemovalAuthorizedAddressesPath = cadence.Path{
-	Domain:     common.PathDomainStorage.Identifier(),
+	Domain:     common.PathDomainStorage,
 	Identifier: "authorizedAddressesToRemoveContracts",
 }
 var IsContractDeploymentRestrictedPath = cadence.Path{
-	Domain:     common.PathDomainStorage.Identifier(),
+	Domain:     common.PathDomainStorage,
 	Identifier: "isContractDeploymentRestricted",
 }
 

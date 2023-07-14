@@ -4,12 +4,12 @@ package environment
 
 import (
 	"github.com/onflow/flow-go/fvm/errors"
-	"github.com/onflow/flow-go/fvm/state"
+	"github.com/onflow/flow-go/fvm/storage/state"
 	"github.com/onflow/flow-go/module/trace"
 )
 
 func parseRestricted(
-	txnState state.NestedTransaction,
+	txnState state.NestedTransactionPreparer,
 	spanName trace.SpanName,
 ) error {
 	if txnState.IsParseRestricted() {
@@ -31,7 +31,7 @@ func parseRestricted(
 func parseRestrict1Arg[
 	Arg0T any,
 ](
-	txnState state.NestedTransaction,
+	txnState state.NestedTransactionPreparer,
 	spanName trace.SpanName,
 	callback func(Arg0T) error,
 	arg0 Arg0T,
@@ -48,7 +48,7 @@ func parseRestrict2Arg[
 	Arg0T any,
 	Arg1T any,
 ](
-	txnState state.NestedTransaction,
+	txnState state.NestedTransactionPreparer,
 	spanName trace.SpanName,
 	callback func(Arg0T, Arg1T) error,
 	arg0 Arg0T,
@@ -67,7 +67,7 @@ func parseRestrict3Arg[
 	Arg1T any,
 	Arg2T any,
 ](
-	txnState state.NestedTransaction,
+	txnState state.NestedTransactionPreparer,
 	spanName trace.SpanName,
 	callback func(Arg0T, Arg1T, Arg2T) error,
 	arg0 Arg0T,
@@ -85,7 +85,7 @@ func parseRestrict3Arg[
 func parseRestrict1Ret[
 	Ret0T any,
 ](
-	txnState state.NestedTransaction,
+	txnState state.NestedTransactionPreparer,
 	spanName trace.SpanName,
 	callback func() (Ret0T, error),
 ) (
@@ -105,7 +105,7 @@ func parseRestrict1Arg1Ret[
 	Arg0T any,
 	Ret0T any,
 ](
-	txnState state.NestedTransaction,
+	txnState state.NestedTransactionPreparer,
 	spanName trace.SpanName,
 	callback func(Arg0T) (Ret0T, error),
 	arg0 Arg0T,
@@ -127,7 +127,7 @@ func parseRestrict2Arg1Ret[
 	Arg1T any,
 	Ret0T any,
 ](
-	txnState state.NestedTransaction,
+	txnState state.NestedTransactionPreparer,
 	spanName trace.SpanName,
 	callback func(Arg0T, Arg1T) (Ret0T, error),
 	arg0 Arg0T,
@@ -151,7 +151,7 @@ func parseRestrict3Arg1Ret[
 	Arg2T any,
 	Ret0T any,
 ](
-	txnState state.NestedTransaction,
+	txnState state.NestedTransactionPreparer,
 	spanName trace.SpanName,
 	callback func(Arg0T, Arg1T, Arg2T) (Ret0T, error),
 	arg0 Arg0T,
@@ -177,7 +177,7 @@ func parseRestrict4Arg1Ret[
 	Arg3T any,
 	Ret0T any,
 ](
-	txnState state.NestedTransaction,
+	txnState state.NestedTransactionPreparer,
 	spanName trace.SpanName,
 	callback func(Arg0T, Arg1T, Arg2T, Arg3T) (Ret0T, error),
 	arg0 Arg0T,
@@ -206,7 +206,7 @@ func parseRestrict6Arg1Ret[
 	Arg5T any,
 	Ret0T any,
 ](
-	txnState state.NestedTransaction,
+	txnState state.NestedTransactionPreparer,
 	spanName trace.SpanName,
 	callback func(Arg0T, Arg1T, Arg2T, Arg3T, Arg4T, Arg5T) (Ret0T, error),
 	arg0 Arg0T,
@@ -233,7 +233,7 @@ func parseRestrict1Arg2Ret[
 	Ret0T any,
 	Ret1T any,
 ](
-	txnState state.NestedTransaction,
+	txnState state.NestedTransactionPreparer,
 	spanName trace.SpanName,
 	callback func(Arg0T) (Ret0T, Ret1T, error),
 	arg0 Arg0T,

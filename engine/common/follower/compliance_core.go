@@ -13,7 +13,6 @@ import (
 	"github.com/onflow/flow-go/engine/common/follower/pending_tree"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
-	"github.com/onflow/flow-go/module/compliance"
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/trace"
@@ -21,7 +20,7 @@ import (
 )
 
 // CertifiedBlocks is a connected list of certified blocks, in ascending height order.
-type CertifiedBlocks []pending_tree.CertifiedBlock
+type CertifiedBlocks []flow.CertifiedBlock
 
 // defaultCertifiedRangeChannelCapacity maximum capacity of buffered channel that is used to transfer ranges of
 // certified blocks to specific worker.
@@ -39,18 +38,18 @@ const defaultPendingBlocksCacheCapacity = 1000
 // Generally is NOT concurrency safe but some functions can be used in concurrent setup.
 type ComplianceCore struct {
 	*component.ComponentManager
-	log                 zerolog.Logger
-	mempoolMetrics      module.MempoolMetrics
-	config              compliance.Config
-	tracer              module.Tracer
-	pendingCache        *cache.Cache
-	pendingTree         *pending_tree.PendingTree
-	state               protocol.FollowerState
-	follower            module.HotStuffFollower
-	validator           hotstuff.Validator
-	sync                module.BlockRequester
-	certifiedRangesChan chan CertifiedBlocks // delivers ranges of certified blocks to main core worker
-	finalizedBlocksChan chan *flow.Header    // delivers finalized blocks to main core worker.
+	log                       zerolog.Logger
+	mempoolMetrics            module.MempoolMetrics
+	tracer                    module.Tracer
+	proposalViolationNotifier hotstuff.ProposalViolationConsumer
+	pendingCache              *cache.Cache
+	pendingTree               *pending_tree.PendingTree
+	state                     protocol.FollowerState
+	follower                  module.HotStuffFollower
+	validator                 hotstuff.Validator
+	sync                      module.BlockRequester
+	certifiedRangesChan       chan CertifiedBlocks // delivers ranges of certified blocks to main core worker
+	finalizedBlocksChan       chan *flow.Header    // delivers finalized blocks to main core worker.
 }
 
 var _ complianceCore = (*ComplianceCore)(nil)
@@ -60,41 +59,31 @@ var _ complianceCore = (*ComplianceCore)(nil)
 func NewComplianceCore(log zerolog.Logger,
 	mempoolMetrics module.MempoolMetrics,
 	heroCacheCollector module.HeroCacheMetrics,
-	finalizationConsumer hotstuff.FinalizationConsumer,
+	followerConsumer hotstuff.FollowerConsumer,
 	state protocol.FollowerState,
 	follower module.HotStuffFollower,
 	validator hotstuff.Validator,
 	sync module.BlockRequester,
 	tracer module.Tracer,
-	opts ...compliance.Opt,
 ) (*ComplianceCore, error) {
-	onEquivocation := func(block, otherBlock *flow.Block) {
-		finalizationConsumer.OnDoubleProposeDetected(model.BlockFromFlow(block.Header), model.BlockFromFlow(otherBlock.Header))
-	}
-
-	config := compliance.DefaultConfig()
-	for _, apply := range opts {
-		apply(&config)
-	}
-
 	finalizedBlock, err := state.Final().Head()
 	if err != nil {
 		return nil, fmt.Errorf("could not query finalized block: %w", err)
 	}
 
 	c := &ComplianceCore{
-		log:                 log.With().Str("engine", "follower_core").Logger(),
-		mempoolMetrics:      mempoolMetrics,
-		state:               state,
-		pendingCache:        cache.NewCache(log, defaultPendingBlocksCacheCapacity, heroCacheCollector, onEquivocation),
-		pendingTree:         pending_tree.NewPendingTree(finalizedBlock),
-		follower:            follower,
-		validator:           validator,
-		sync:                sync,
-		tracer:              tracer,
-		config:              config,
-		certifiedRangesChan: make(chan CertifiedBlocks, defaultCertifiedRangeChannelCapacity),
-		finalizedBlocksChan: make(chan *flow.Header, defaultFinalizedBlocksChannelCapacity),
+		log:                       log.With().Str("engine", "follower_core").Logger(),
+		mempoolMetrics:            mempoolMetrics,
+		state:                     state,
+		proposalViolationNotifier: followerConsumer,
+		pendingCache:              cache.NewCache(log, defaultPendingBlocksCacheCapacity, heroCacheCollector, followerConsumer),
+		pendingTree:               pending_tree.NewPendingTree(finalizedBlock),
+		follower:                  follower,
+		validator:                 validator,
+		sync:                      sync,
+		tracer:                    tracer,
+		certifiedRangesChan:       make(chan CertifiedBlocks, defaultCertifiedRangeChannelCapacity),
+		finalizedBlocksChan:       make(chan *flow.Header, defaultFinalizedBlocksChannelCapacity),
 	}
 
 	// prune cache to latest finalized view
@@ -143,16 +132,18 @@ func (c *ComplianceCore) OnBlockRange(originID flow.Identifier, batch []*flow.Bl
 		// 1. The block has been signed by the legitimate primary for the view. This is important in case
 		//    there are multiple blocks for the view. We need to differentiate the following byzantine cases:
 		//     (i) Some other consensus node that is _not_ primary is trying to publish a block.
-		//         This would result in the validation below failing with an `InvalidBlockError`.
+		//         This would result in the validation below failing with an `InvalidProposalError`.
 		//    (ii) The legitimate primary for the view is equivocating. In this case, the validity check
 		//         below would pass. Though, the `PendingTree` would eventually notice this, when we connect
 		//         the equivocating blocks to the latest finalized block.
 		// 2. The QC within the block is valid. A valid QC proves validity of all ancestors.
 		err := c.validator.ValidateProposal(hotstuffProposal)
 		if err != nil {
-			if model.IsInvalidBlockError(err) {
-				// TODO potential slashing
-				log.Err(err).Msgf("received invalid block proposal (potential slashing evidence)")
+			if invalidBlockError, ok := model.AsInvalidProposalError(err); ok {
+				c.proposalViolationNotifier.OnInvalidBlockDetected(flow.Slashable[model.InvalidProposalError]{
+					OriginID: originID,
+					Message:  *invalidBlockError,
+				})
 				return nil
 			}
 			if errors.Is(err, model.ErrViewForUnknownEpoch) {
@@ -186,11 +177,15 @@ func (c *ComplianceCore) OnBlockRange(originID flow.Identifier, batch []*flow.Bl
 	if len(certifiedBatch) < 1 {
 		return nil
 	}
+	certifiedRange, err := rangeToCertifiedBlocks(certifiedBatch, certifyingQC)
+	if err != nil {
+		return fmt.Errorf("converting the certified batch to list of certified blocks failed: %w", err)
+	}
 
 	// in case we have already stopped our worker, we use a select statement to avoid
 	// blocking since there is no active consumer for this channel
 	select {
-	case c.certifiedRangesChan <- rangeToCertifiedBlocks(certifiedBatch, certifyingQC):
+	case c.certifiedRangesChan <- certifiedRange:
 	case <-c.ComponentManager.ShutdownSignal():
 	}
 	return nil
@@ -265,14 +260,17 @@ func (c *ComplianceCore) processCertifiedBlocks(ctx context.Context, blocks Cert
 	// Step 2 & 3: extend protocol state with connected certified blocks and forward them to consensus follower
 	for _, certifiedBlock := range connectedBlocks {
 		s, _ := c.tracer.StartBlockSpan(ctx, certifiedBlock.ID(), trace.FollowerExtendProtocolState)
-		err = c.state.ExtendCertified(ctx, certifiedBlock.Block, certifiedBlock.QC)
+		err = c.state.ExtendCertified(ctx, certifiedBlock.Block, certifiedBlock.CertifyingQC)
 		s.End()
 		if err != nil {
 			return fmt.Errorf("could not extend protocol state with certified block: %w", err)
 		}
 
-		hotstuffProposal := model.ProposalFromFlow(certifiedBlock.Block.Header)
-		c.follower.SubmitProposal(hotstuffProposal) // submit the model to follower for async processing
+		b, err := model.NewCertifiedBlock(model.BlockFromFlow(certifiedBlock.Block.Header), certifiedBlock.CertifyingQC)
+		if err != nil {
+			return fmt.Errorf("failed to convert certified block %v to HotStuff type: %w", certifiedBlock.Block.ID(), err)
+		}
+		c.follower.AddCertifiedBlock(&b) // submit the model to follower for async processing
 	}
 	return nil
 }
@@ -303,8 +301,8 @@ func (c *ComplianceCore) processFinalizedBlock(ctx context.Context, finalized *f
 
 // rangeToCertifiedBlocks transform batch of connected blocks and a QC that certifies last block to a range of
 // certified and connected blocks.
-// Pure function.
-func rangeToCertifiedBlocks(certifiedRange []*flow.Block, certifyingQC *flow.QuorumCertificate) CertifiedBlocks {
+// Pure function (side-effect free). No errors expected during normal operations.
+func rangeToCertifiedBlocks(certifiedRange []*flow.Block, certifyingQC *flow.QuorumCertificate) (CertifiedBlocks, error) {
 	certifiedBlocks := make(CertifiedBlocks, 0, len(certifiedRange))
 	lastIndex := len(certifiedRange) - 1
 	for i, block := range certifiedRange {
@@ -314,10 +312,13 @@ func rangeToCertifiedBlocks(certifiedRange []*flow.Block, certifyingQC *flow.Quo
 		} else {
 			qc = certifyingQC
 		}
-		certifiedBlocks = append(certifiedBlocks, pending_tree.CertifiedBlock{
-			Block: block,
-			QC:    qc,
-		})
+
+		// bundle block and its certifying QC to `CertifiedBlock`:
+		certBlock, err := flow.NewCertifiedBlock(block, qc)
+		if err != nil {
+			return nil, fmt.Errorf("constructing certified root block failed: %w", err)
+		}
+		certifiedBlocks = append(certifiedBlocks, certBlock)
 	}
-	return certifiedBlocks
+	return certifiedBlocks, nil
 }

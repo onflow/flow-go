@@ -135,7 +135,7 @@ func mapToZr(x *scalar, src []byte) bool {
 // writeScalar writes a G2 point in a slice of bytes
 func writeScalar(dest []byte, x *scalar) {
 	C.bn_write_bin((*C.uchar)(&dest[0]),
-		(C.int)(prKeyLengthBLSBLS12381),
+		(C.ulong)(prKeyLengthBLSBLS12381),
 		(*C.bn_st)(x),
 	)
 }
@@ -144,7 +144,7 @@ func writeScalar(dest []byte, x *scalar) {
 func readScalar(x *scalar, src []byte) {
 	C.bn_read_bin((*C.bn_st)(x),
 		(*C.uchar)(&src[0]),
-		(C.int)(len(src)),
+		(C.ulong)(len(src)),
 	)
 }
 

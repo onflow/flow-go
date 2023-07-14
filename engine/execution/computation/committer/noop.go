@@ -1,7 +1,7 @@
 package committer
 
 import (
-	"github.com/onflow/flow-go/fvm/state"
+	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -14,7 +14,7 @@ func NewNoopViewCommitter() *NoopViewCommitter {
 }
 
 func (NoopViewCommitter) CommitView(
-	_ *state.ExecutionSnapshot,
+	_ *snapshot.ExecutionSnapshot,
 	s flow.StateCommitment,
 ) (
 	flow.StateCommitment,

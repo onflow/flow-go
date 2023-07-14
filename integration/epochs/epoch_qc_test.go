@@ -70,7 +70,7 @@ func (s *Suite) TestEpochQuorumCertificate() {
 		key, signer := test.AccountKeyGenerator().NewWithSigner()
 
 		// create account on emualted chain
-		address, err := s.blockchain.CreateAccount([]*sdk.AccountKey{key}, []sdktemplates.Contract{})
+		address, err := s.emulatorClient.CreateAccount([]*sdk.AccountKey{key}, []sdktemplates.Contract{})
 		s.Require().NoError(err)
 
 		client := epochs.NewQCContractClient(zerolog.Nop(), s.emulatorClient, flow.ZeroID, nodeID, address.String(), 0, s.qcAddress.String(), signer)

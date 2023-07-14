@@ -224,7 +224,7 @@ func (g *GossipSubScoreTracer) logPeerScore(peerID peer.ID) bool {
 			Str("role", identity.Role.String()).Logger()
 	}
 
-	lg = g.logger.With().
+	lg = lg.With().
 		Str("peer_id", peerID.String()).
 		Float64("overall_score", snapshot.Score).
 		Float64("app_specific_score", snapshot.AppSpecificScore).

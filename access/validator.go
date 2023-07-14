@@ -5,12 +5,12 @@ import (
 	"fmt"
 
 	"github.com/onflow/flow-go/crypto"
+	"github.com/onflow/flow-go/state"
 
 	"github.com/onflow/cadence/runtime/parser"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/state/protocol"
-	"github.com/onflow/flow-go/storage"
 )
 
 type Blocks interface {
@@ -29,7 +29,7 @@ func NewProtocolStateBlocks(state protocol.State) *ProtocolStateBlocks {
 func (b *ProtocolStateBlocks) HeaderByID(id flow.Identifier) (*flow.Header, error) {
 	header, err := b.state.AtBlockID(id).Head()
 	if err != nil {
-		if errors.Is(err, storage.ErrNotFound) {
+		if errors.Is(err, state.ErrUnknownSnapshotReference) {
 			return nil, nil
 		}
 

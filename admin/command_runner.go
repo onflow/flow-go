@@ -76,9 +76,15 @@ func NewCommandRunnerBootstrapper() *CommandRunnerBootstrapper {
 func (r *CommandRunnerBootstrapper) Bootstrap(logger zerolog.Logger, bindAddress string, opts ...CommandRunnerOption) *CommandRunner {
 	handlers := make(map[string]CommandHandler)
 	commands := make([]interface{}, 0, len(r.handlers))
+
+	r.RegisterHandler("ping", func(ctx context.Context, req *CommandRequest) (interface{}, error) {
+		return "pong", nil
+	})
+
 	r.RegisterHandler("list-commands", func(ctx context.Context, req *CommandRequest) (interface{}, error) {
 		return commands, nil
 	})
+
 	for command, handler := range r.handlers {
 		handlers[command] = handler
 		commands = append(commands, command)

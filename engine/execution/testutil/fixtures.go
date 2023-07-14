@@ -8,16 +8,22 @@ import (
 	"testing"
 
 	"github.com/onflow/cadence"
+	"github.com/onflow/cadence/encoding/ccf"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/crypto/hash"
+	"github.com/onflow/flow-go/engine/execution"
 	"github.com/onflow/flow-go/engine/execution/utils"
 	"github.com/onflow/flow-go/fvm"
-	"github.com/onflow/flow-go/fvm/storage"
+	"github.com/onflow/flow-go/fvm/storage/snapshot"
+	"github.com/onflow/flow-go/ledger"
+	"github.com/onflow/flow-go/ledger/common/pathfinder"
+	"github.com/onflow/flow-go/ledger/complete"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/epochs"
+	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -187,11 +193,11 @@ func GenerateAccountPrivateKey() (flow.AccountPrivateKey, error) {
 // CreateAccounts inserts accounts into the ledger using the provided private keys.
 func CreateAccounts(
 	vm fvm.VM,
-	snapshotTree storage.SnapshotTree,
+	snapshotTree snapshot.SnapshotTree,
 	privateKeys []flow.AccountPrivateKey,
 	chain flow.Chain,
 ) (
-	storage.SnapshotTree,
+	snapshot.SnapshotTree,
 	[]flow.Address,
 	error,
 ) {
@@ -204,11 +210,11 @@ func CreateAccounts(
 
 func CreateAccountsWithSimpleAddresses(
 	vm fvm.VM,
-	snapshotTree storage.SnapshotTree,
+	snapshotTree snapshot.SnapshotTree,
 	privateKeys []flow.AccountPrivateKey,
 	chain flow.Chain,
 ) (
-	storage.SnapshotTree,
+	snapshot.SnapshotTree,
 	[]flow.Address,
 	error,
 ) {
@@ -259,7 +265,7 @@ func CreateAccountsWithSimpleAddresses(
 			AddAuthorizer(serviceAddress)
 
 		tx := fvm.Transaction(txBody, 0)
-		executionSnapshot, output, err := vm.RunV2(ctx, tx, snapshotTree)
+		executionSnapshot, output, err := vm.Run(ctx, tx, snapshotTree)
 		if err != nil {
 			return snapshotTree, nil, err
 		}
@@ -276,7 +282,7 @@ func CreateAccountsWithSimpleAddresses(
 
 		for _, event := range output.Events {
 			if event.Type == flow.EventAccountCreated {
-				data, err := jsoncdc.Decode(nil, event.Payload)
+				data, err := ccf.Decode(nil, event.Payload)
 				if err != nil {
 					return snapshotTree, nil, errors.New(
 						"error decoding events")
@@ -300,7 +306,7 @@ func RootBootstrappedLedger(
 	vm fvm.VM,
 	ctx fvm.Context,
 	additionalOptions ...fvm.BootstrapProcedureOption,
-) storage.SnapshotTree {
+) snapshot.SnapshotTree {
 	// set 0 clusters to pass n_collectors >= n_clusters check
 	epochConfig := epochs.DefaultEpochConfig()
 	epochConfig.NumCollectorClusters = 0
@@ -317,11 +323,11 @@ func RootBootstrappedLedger(
 		options...,
 	)
 
-	snapshot, _, err := vm.RunV2(ctx, bootstrap, nil)
+	executionSnapshot, _, err := vm.Run(ctx, bootstrap, nil)
 	if err != nil {
 		panic(err)
 	}
-	return storage.NewSnapshotTree(nil).Append(snapshot)
+	return snapshot.NewSnapshotTree(nil).Append(executionSnapshot)
 }
 
 func BytesToCadenceArray(l []byte) cadence.Array {
@@ -495,4 +501,128 @@ func bytesToCadenceArray(l []byte) cadence.Array {
 	}
 
 	return cadence.NewArray(values)
+}
+
+// TODO(ramtin): when we get rid of BlockExecutionData, this could move to the global unittest fixtures
+// TrieUpdates are internal data to the ledger package and should not have leaked into
+// packages like uploader in the first place
+func ComputationResultFixture(t *testing.T) *execution.ComputationResult {
+	startState := unittest.StateCommitmentFixture()
+	update1, err := ledger.NewUpdate(
+		ledger.State(startState),
+		[]ledger.Key{
+			ledger.NewKey([]ledger.KeyPart{ledger.NewKeyPart(3, []byte{33})}),
+			ledger.NewKey([]ledger.KeyPart{ledger.NewKeyPart(1, []byte{11})}),
+			ledger.NewKey([]ledger.KeyPart{ledger.NewKeyPart(2, []byte{1, 1}), ledger.NewKeyPart(3, []byte{2, 5})}),
+		},
+		[]ledger.Value{
+			[]byte{21, 37},
+			nil,
+			[]byte{3, 3, 3, 3, 3},
+		},
+	)
+	require.NoError(t, err)
+
+	trieUpdate1, err := pathfinder.UpdateToTrieUpdate(update1, complete.DefaultPathFinderVersion)
+	require.NoError(t, err)
+
+	update2, err := ledger.NewUpdate(
+		ledger.State(unittest.StateCommitmentFixture()),
+		[]ledger.Key{},
+		[]ledger.Value{},
+	)
+	require.NoError(t, err)
+
+	trieUpdate2, err := pathfinder.UpdateToTrieUpdate(update2, complete.DefaultPathFinderVersion)
+	require.NoError(t, err)
+
+	update3, err := ledger.NewUpdate(
+		ledger.State(unittest.StateCommitmentFixture()),
+		[]ledger.Key{
+			ledger.NewKey([]ledger.KeyPart{ledger.NewKeyPart(9, []byte{6})}),
+		},
+		[]ledger.Value{
+			[]byte{21, 37},
+		},
+	)
+	require.NoError(t, err)
+
+	trieUpdate3, err := pathfinder.UpdateToTrieUpdate(update3, complete.DefaultPathFinderVersion)
+	require.NoError(t, err)
+
+	update4, err := ledger.NewUpdate(
+		ledger.State(unittest.StateCommitmentFixture()),
+		[]ledger.Key{
+			ledger.NewKey([]ledger.KeyPart{ledger.NewKeyPart(9, []byte{6})}),
+		},
+		[]ledger.Value{
+			[]byte{21, 37},
+		},
+	)
+	require.NoError(t, err)
+
+	trieUpdate4, err := pathfinder.UpdateToTrieUpdate(update4, complete.DefaultPathFinderVersion)
+	require.NoError(t, err)
+
+	executableBlock := unittest.ExecutableBlockFixture([][]flow.Identifier{
+		{unittest.IdentifierFixture()},
+		{unittest.IdentifierFixture()},
+		{unittest.IdentifierFixture()},
+	}, &startState)
+
+	blockExecResult := execution.NewPopulatedBlockExecutionResult(executableBlock)
+	blockExecResult.CollectionExecutionResultAt(0).AppendTransactionResults(
+		flow.EventsList{
+			unittest.EventFixture("what", 0, 0, unittest.IdentifierFixture(), 2),
+			unittest.EventFixture("ever", 0, 1, unittest.IdentifierFixture(), 22),
+		},
+		nil,
+		nil,
+		flow.TransactionResult{
+			TransactionID:   unittest.IdentifierFixture(),
+			ErrorMessage:    "",
+			ComputationUsed: 23,
+			MemoryUsed:      101,
+		},
+	)
+	blockExecResult.CollectionExecutionResultAt(1).AppendTransactionResults(
+		flow.EventsList{
+			unittest.EventFixture("what", 2, 0, unittest.IdentifierFixture(), 2),
+			unittest.EventFixture("ever", 2, 1, unittest.IdentifierFixture(), 22),
+			unittest.EventFixture("ever", 2, 2, unittest.IdentifierFixture(), 2),
+			unittest.EventFixture("ever", 2, 3, unittest.IdentifierFixture(), 22),
+		},
+		nil,
+		nil,
+		flow.TransactionResult{
+			TransactionID:   unittest.IdentifierFixture(),
+			ErrorMessage:    "fail",
+			ComputationUsed: 1,
+			MemoryUsed:      22,
+		},
+	)
+
+	return &execution.ComputationResult{
+		BlockExecutionResult: blockExecResult,
+		BlockAttestationResult: &execution.BlockAttestationResult{
+			BlockExecutionData: &execution_data.BlockExecutionData{
+				ChunkExecutionDatas: []*execution_data.ChunkExecutionData{
+					{TrieUpdate: trieUpdate1},
+					{TrieUpdate: trieUpdate2},
+					{TrieUpdate: trieUpdate3},
+					{TrieUpdate: trieUpdate4},
+				},
+			},
+		},
+		ExecutionReceipt: &flow.ExecutionReceipt{
+			ExecutionResult: flow.ExecutionResult{
+				Chunks: flow.ChunkList{
+					{EndState: unittest.StateCommitmentFixture()},
+					{EndState: unittest.StateCommitmentFixture()},
+					{EndState: unittest.StateCommitmentFixture()},
+					{EndState: unittest.StateCommitmentFixture()},
+				},
+			},
+		},
+	}
 }

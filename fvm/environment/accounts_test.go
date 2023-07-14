@@ -8,7 +8,7 @@ import (
 
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/errors"
-	"github.com/onflow/flow-go/fvm/state"
+	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/fvm/storage/testutils"
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -23,8 +23,11 @@ func TestAccounts_Create(t *testing.T) {
 		err := accounts.Create(nil, address)
 		require.NoError(t, err)
 
+		snapshot, err := txnState.FinalizeMainTransaction()
+		require.NoError(t, err)
+
 		// account status
-		require.Equal(t, len(txnState.Finalize().AllRegisterIDs()), 1)
+		require.Equal(t, len(snapshot.AllRegisterIDs()), 1)
 	})
 
 	t.Run("Fails if account exists", func(t *testing.T) {
@@ -65,7 +68,7 @@ func TestAccounts_GetPublicKey(t *testing.T) {
 
 		for _, value := range [][]byte{{}, nil} {
 			txnState := testutils.NewSimpleTransaction(
-				state.MapStorageSnapshot{
+				snapshot.MapStorageSnapshot{
 					registerId: value,
 				})
 			accounts := environment.NewAccounts(txnState)
@@ -90,7 +93,7 @@ func TestAccounts_GetPublicKeyCount(t *testing.T) {
 
 		for _, value := range [][]byte{{}, nil} {
 			txnState := testutils.NewSimpleTransaction(
-				state.MapStorageSnapshot{
+				snapshot.MapStorageSnapshot{
 					registerId: value,
 				})
 			accounts := environment.NewAccounts(txnState)
@@ -116,7 +119,7 @@ func TestAccounts_GetPublicKeys(t *testing.T) {
 
 		for _, value := range [][]byte{{}, nil} {
 			txnState := testutils.NewSimpleTransaction(
-				state.MapStorageSnapshot{
+				snapshot.MapStorageSnapshot{
 					registerId: value,
 				})
 
@@ -221,6 +224,7 @@ func TestAccounts_SetContracts(t *testing.T) {
 }
 
 func TestAccount_StorageUsed(t *testing.T) {
+	emptyAccountSize := uint64(48)
 
 	t.Run("Storage used on account creation is deterministic", func(t *testing.T) {
 		txnState := testutils.NewSimpleTransaction(nil)
@@ -232,7 +236,7 @@ func TestAccount_StorageUsed(t *testing.T) {
 
 		storageUsed, err := accounts.GetStorageUsed(address)
 		require.NoError(t, err)
-		require.Equal(t, uint64(40), storageUsed)
+		require.Equal(t, emptyAccountSize, storageUsed)
 	})
 
 	t.Run("Storage used on register set increases", func(t *testing.T) {
@@ -249,7 +253,7 @@ func TestAccount_StorageUsed(t *testing.T) {
 
 		storageUsed, err := accounts.GetStorageUsed(address)
 		require.NoError(t, err)
-		require.Equal(t, uint64(40+32), storageUsed)
+		require.Equal(t, emptyAccountSize+uint64(32), storageUsed)
 	})
 
 	t.Run("Storage used, set twice on same register to same value, stays the same", func(t *testing.T) {
@@ -268,7 +272,7 @@ func TestAccount_StorageUsed(t *testing.T) {
 
 		storageUsed, err := accounts.GetStorageUsed(address)
 		require.NoError(t, err)
-		require.Equal(t, uint64(40+32), storageUsed)
+		require.Equal(t, emptyAccountSize+uint64(32), storageUsed)
 	})
 
 	t.Run("Storage used, set twice on same register to larger value, increases", func(t *testing.T) {
@@ -287,7 +291,7 @@ func TestAccount_StorageUsed(t *testing.T) {
 
 		storageUsed, err := accounts.GetStorageUsed(address)
 		require.NoError(t, err)
-		require.Equal(t, uint64(40+33), storageUsed)
+		require.Equal(t, emptyAccountSize+uint64(33), storageUsed)
 	})
 
 	t.Run("Storage used, set twice on same register to smaller value, decreases", func(t *testing.T) {
@@ -306,7 +310,7 @@ func TestAccount_StorageUsed(t *testing.T) {
 
 		storageUsed, err := accounts.GetStorageUsed(address)
 		require.NoError(t, err)
-		require.Equal(t, uint64(40+31), storageUsed)
+		require.Equal(t, emptyAccountSize+uint64(31), storageUsed)
 	})
 
 	t.Run("Storage used, after register deleted, decreases", func(t *testing.T) {
@@ -325,7 +329,7 @@ func TestAccount_StorageUsed(t *testing.T) {
 
 		storageUsed, err := accounts.GetStorageUsed(address)
 		require.NoError(t, err)
-		require.Equal(t, uint64(40+0), storageUsed)
+		require.Equal(t, emptyAccountSize+uint64(0), storageUsed)
 	})
 
 	t.Run("Storage used on a complex scenario has correct value", func(t *testing.T) {
@@ -356,8 +360,49 @@ func TestAccount_StorageUsed(t *testing.T) {
 
 		storageUsed, err := accounts.GetStorageUsed(address)
 		require.NoError(t, err)
-		require.Equal(t, uint64(40+33+42), storageUsed)
+		require.Equal(t, emptyAccountSize+uint64(33+42), storageUsed)
 	})
+}
+
+func TestStatefulAccounts_GenerateAccountLocalID(t *testing.T) {
+
+	// Create 3 accounts
+	addressA := flow.HexToAddress("0x01")
+	addressB := flow.HexToAddress("0x02")
+	addressC := flow.HexToAddress("0x03")
+	txnState := testutils.NewSimpleTransaction(nil)
+	a := environment.NewAccounts(txnState)
+	err := a.Create(nil, addressA)
+	require.NoError(t, err)
+	err = a.Create(nil, addressB)
+	require.NoError(t, err)
+	err = a.Create(nil, addressC)
+	require.NoError(t, err)
+
+	// setup some state
+	_, err = a.GenerateAccountLocalID(addressA)
+	require.NoError(t, err)
+	_, err = a.GenerateAccountLocalID(addressA)
+	require.NoError(t, err)
+	_, err = a.GenerateAccountLocalID(addressB)
+	require.NoError(t, err)
+
+	// assert
+
+	// addressA
+	id, err := a.GenerateAccountLocalID(addressA)
+	require.NoError(t, err)
+	require.Equal(t, uint64(3), id)
+
+	// addressB
+	id, err = a.GenerateAccountLocalID(addressB)
+	require.NoError(t, err)
+	require.Equal(t, uint64(2), id)
+
+	// addressC
+	id, err = a.GenerateAccountLocalID(addressC)
+	require.NoError(t, err)
+	require.Equal(t, uint64(1), id)
 }
 
 func createByteArray(size int) []byte {

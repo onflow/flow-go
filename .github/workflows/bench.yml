@@ -20,6 +20,11 @@ jobs:
   benchstat:
     name: Performance regression check
     runs-on: ubuntu-latest
+    # Check if the event is not triggered by a fork
+    # peter-evans/find-comment@v1 does not work on forks.
+    # see https://github.com/peter-evans/create-pull-request/blob/main/docs/concepts-guidelines.md#restrictions-on-repository-forks for details.
+    # Ideally we would like to still run the benchmark on forks, but we can't do that with the current setup.
+    if: github.event.pull_request.head.repo.full_name == github.repository
     continue-on-error: true
     steps:
       - name: Set benchmark repetitions

@@ -16,13 +16,13 @@ type CreateNodeFunc struct {
 	mock.Mock
 }
 
-// Execute provides a mock function with given fields: _a0, _a1, _a2, _a3
-func (_m *CreateNodeFunc) Execute(_a0 zerolog.Logger, _a1 host.Host, _a2 p2p.ProtocolPeerCache, _a3 p2p.PeerManager) p2p.LibP2PNode {
-	ret := _m.Called(_a0, _a1, _a2, _a3)
+// Execute provides a mock function with given fields: _a0, _a1, _a2, _a3, _a4
+func (_m *CreateNodeFunc) Execute(_a0 zerolog.Logger, _a1 host.Host, _a2 p2p.ProtocolPeerCache, _a3 p2p.PeerManager, _a4 *p2p.DisallowListCacheConfig) p2p.LibP2PNode {
+	ret := _m.Called(_a0, _a1, _a2, _a3, _a4)
 
 	var r0 p2p.LibP2PNode
-	if rf, ok := ret.Get(0).(func(zerolog.Logger, host.Host, p2p.ProtocolPeerCache, p2p.PeerManager) p2p.LibP2PNode); ok {
-		r0 = rf(_a0, _a1, _a2, _a3)
+	if rf, ok := ret.Get(0).(func(zerolog.Logger, host.Host, p2p.ProtocolPeerCache, p2p.PeerManager, *p2p.DisallowListCacheConfig) p2p.LibP2PNode); ok {
+		r0 = rf(_a0, _a1, _a2, _a3, _a4)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(p2p.LibP2PNode)

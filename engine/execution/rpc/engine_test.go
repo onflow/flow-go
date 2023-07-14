@@ -18,7 +18,7 @@ import (
 	"github.com/onflow/flow/protobuf/go/flow/execution"
 
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
-	ingestion "github.com/onflow/flow-go/engine/execution/ingestion/mock"
+	mockEng "github.com/onflow/flow-go/engine/execution/mock"
 	"github.com/onflow/flow-go/model/flow"
 	realstorage "github.com/onflow/flow-go/storage"
 	storage "github.com/onflow/flow-go/storage/mock"
@@ -51,7 +51,7 @@ func (suite *Suite) SetupTest() {
 // TestExecuteScriptAtBlockID tests the ExecuteScriptAtBlockID API call
 func (suite *Suite) TestExecuteScriptAtBlockID() {
 	// setup handler
-	mockEngine := new(ingestion.IngestRPC)
+	mockEngine := new(mockEng.ScriptExecutor)
 	handler := &handler{
 		engine: mockEngine,
 		chain:  flow.Mainnet,
@@ -242,7 +242,7 @@ func (suite *Suite) TestGetAccountAtBlockID() {
 		Address: serviceAddress,
 	}
 
-	mockEngine := new(ingestion.IngestRPC)
+	mockEngine := new(mockEng.ScriptExecutor)
 
 	// create the handler
 	handler := &handler{
@@ -301,7 +301,7 @@ func (suite *Suite) TestGetRegisterAtBlockID() {
 	serviceAddress := flow.Mainnet.Chain().ServiceAddress()
 	validKey := []byte("exists")
 
-	mockEngine := new(ingestion.IngestRPC)
+	mockEngine := new(mockEng.ScriptExecutor)
 
 	// create the handler
 	handler := &handler{

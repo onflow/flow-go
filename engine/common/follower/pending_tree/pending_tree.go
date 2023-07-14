@@ -9,52 +9,25 @@ import (
 	"github.com/onflow/flow-go/module/mempool"
 )
 
-// CertifiedBlock holds a certified block, it consists of a block and a QC which proves validity of block (QC.BlockID = Block.ID())
-// This is used to compactly store and transport block and certifying QC in one structure.
-type CertifiedBlock struct {
-	Block *flow.Block
-	QC    *flow.QuorumCertificate
-}
-
-// ID returns unique identifier for the certified block
-// To avoid computation we use value from the QC
-func (b *CertifiedBlock) ID() flow.Identifier {
-	return b.QC.BlockID
-}
-
-// View returns view where the block was produced.
-func (b *CertifiedBlock) View() uint64 {
-	return b.QC.View
-}
-
-// Height returns height of the block.
-func (b *CertifiedBlock) Height() uint64 {
-	return b.Block.Header.Height
-}
-
 // PendingBlockVertex wraps a block proposal to implement forest.Vertex
 // so the proposal can be stored in forest.LevelledForest
 type PendingBlockVertex struct {
-	CertifiedBlock
+	flow.CertifiedBlock
 	connectedToFinalized bool
 }
 
 var _ forest.Vertex = (*PendingBlockVertex)(nil)
 
 // NewVertex creates new vertex while performing a sanity check of data correctness.
-func NewVertex(certifiedBlock CertifiedBlock, connectedToFinalized bool) (*PendingBlockVertex, error) {
-	if certifiedBlock.Block.Header.View != certifiedBlock.QC.View {
-		return nil, fmt.Errorf("missmatched block(%d) and QC(%d) view",
-			certifiedBlock.Block.Header.View, certifiedBlock.QC.View)
-	}
+func NewVertex(certifiedBlock flow.CertifiedBlock, connectedToFinalized bool) (*PendingBlockVertex, error) {
 	return &PendingBlockVertex{
 		CertifiedBlock:       certifiedBlock,
 		connectedToFinalized: connectedToFinalized,
 	}, nil
 }
 
-func (v *PendingBlockVertex) VertexID() flow.Identifier { return v.QC.BlockID }
-func (v *PendingBlockVertex) Level() uint64             { return v.QC.View }
+func (v *PendingBlockVertex) VertexID() flow.Identifier { return v.CertifyingQC.BlockID }
+func (v *PendingBlockVertex) Level() uint64             { return v.CertifyingQC.View }
 func (v *PendingBlockVertex) Parent() (flow.Identifier, uint64) {
 	return v.Block.Header.ParentID, v.Block.Header.ParentView
 }
@@ -117,8 +90,8 @@ func NewPendingTree(finalized *flow.Header) *PendingTree {
 //   - model.ByzantineThresholdExceededError - detected two certified blocks at the same view
 //
 // All other errors should be treated as exceptions.
-func (t *PendingTree) AddBlocks(certifiedBlocks []CertifiedBlock) ([]CertifiedBlock, error) {
-	var allConnectedBlocks []CertifiedBlock
+func (t *PendingTree) AddBlocks(certifiedBlocks []flow.CertifiedBlock) ([]flow.CertifiedBlock, error) {
+	var allConnectedBlocks []flow.CertifiedBlock
 	for _, block := range certifiedBlocks {
 		// skip blocks lower than finalized view
 		if block.View() <= t.forest.LowestLevel {
@@ -159,7 +132,7 @@ func (t *PendingTree) AddBlocks(certifiedBlocks []CertifiedBlock) ([]CertifiedBl
 }
 
 // connectsToFinalizedBlock checks if candidate block connects to the finalized state.
-func (t *PendingTree) connectsToFinalizedBlock(block CertifiedBlock) bool {
+func (t *PendingTree) connectsToFinalizedBlock(block flow.CertifiedBlock) bool {
 	if block.Block.Header.ParentID == t.lastFinalizedID {
 		return true
 	}
@@ -200,8 +173,8 @@ func (t *PendingTree) connectsToFinalizedBlock(block CertifiedBlock) bool {
 // returns these blocks. Returned blocks are ordered such that parents appear before their children.
 //
 // No errors are expected during normal operation.
-func (t *PendingTree) FinalizeFork(finalized *flow.Header) ([]CertifiedBlock, error) {
-	var connectedBlocks []CertifiedBlock
+func (t *PendingTree) FinalizeFork(finalized *flow.Header) ([]flow.CertifiedBlock, error) {
+	var connectedBlocks []flow.CertifiedBlock
 
 	err := t.forest.PruneUpToLevel(finalized.View)
 	if err != nil {
@@ -236,7 +209,7 @@ func (t *PendingTree) FinalizeFork(finalized *flow.Header) ([]CertifiedBlock, er
 // This method has a similar signature as `append` for performance reasons:
 //   - any connected certified blocks are appended to `queue`
 //   - we return the _resulting slice_ after all appends
-func (t *PendingTree) updateAndCollectFork(queue []CertifiedBlock, vertex *PendingBlockVertex) []CertifiedBlock {
+func (t *PendingTree) updateAndCollectFork(queue []flow.CertifiedBlock, vertex *PendingBlockVertex) []flow.CertifiedBlock {
 	if vertex.connectedToFinalized {
 		return queue // no-op if already connected
 	}

@@ -117,26 +117,6 @@ static int bls_verify_ep(const ep2_t pk, const ep_t s, const byte* data, const i
     // elemsG2[0] = -g2
     ep2_neg(elemsG2[0], core_get()->ep2_g); // could be hardcoded
 
-    // TODO: temporary fix to delete once a bug in Relic is fixed
-    // The DOUBLE_PAIRING is still preferred over non-buggy SINGLE_PAIRING as
-    // the verification is 1.5x faster
-    // if sig=h then ret <- pk == g2 
-    if (ep_cmp(elemsG1[0], elemsG1[1])==RLC_EQ && ep2_cmp(elemsG2[1], core_get()->ep2_g)==RLC_EQ) {
-        ret = VALID;
-        goto out;
-    } 
-    // if pk = -g2 then ret <- s == -h
-    if (ep2_cmp(elemsG2[0], elemsG2[1])==RLC_EQ) { 
-        ep_st sum; ep_new(&sum);
-        ep_add(&sum, elemsG1[0], elemsG1[1]);
-        if (ep_is_infty(&sum)) {
-            ep_free(&sum);
-            ret = VALID;
-            goto out;
-        }
-        ep_free(&sum);
-    }  
-
     fp12_t pair;
     fp12_new(&pair);
     // double pairing with Optimal Ate 
@@ -525,9 +505,10 @@ void bls_batchVerify(const int sigs_len, byte* results, const ep2_st* pks_input,
         if ( read_ret != RLC_OK || check_membership_G1(&sigs[i]) != VALID) {
             if (read_ret == UNDEFINED) // unexpected error case 
                 goto out;
-            // set signature as infinity and set result as invald
+            // set signature and key to infinity (no effect on the aggregation tree)
+            // and set result to invalid
             ep_set_infty(&sigs[i]);
-            ep2_copy(&pks[i], (ep2_st*) &pks_input[i]);
+            ep2_set_infty(&pks[i]);
             results[i] = INVALID;
         // multiply signatures and public keys at the same index by random coefficients
         } else {

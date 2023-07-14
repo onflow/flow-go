@@ -10,7 +10,7 @@ import (
 
 	"github.com/onflow/flow-go/fvm/blueprints"
 	"github.com/onflow/flow-go/fvm/errors"
-	"github.com/onflow/flow-go/fvm/state"
+	"github.com/onflow/flow-go/fvm/storage/state"
 	"github.com/onflow/flow-go/fvm/tracing"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/trace"
@@ -57,9 +57,8 @@ func (lists *sortableContractUpdates) Less(i, j int) bool {
 	}
 }
 
-// ContractUpdater handles all smart contracts modification. It also captures
-// all changes as deltas and only commit them when called so smart contract
-// updates can be delayed until end of the tx execution.
+// ContractUpdater handles all smart contracts modification. It captures
+// contract updates and defer the updates to the end of the txn execution.
 //
 // Note that scripts cannot modify smart contracts, but must expose the API in
 // compliance with the runtime environment interface.
@@ -81,12 +80,12 @@ type ContractUpdater interface {
 }
 
 type ParseRestrictedContractUpdater struct {
-	txnState state.NestedTransaction
+	txnState state.NestedTransactionPreparer
 	impl     ContractUpdater
 }
 
 func NewParseRestrictedContractUpdater(
-	txnState state.NestedTransaction,
+	txnState state.NestedTransactionPreparer,
 	impl ContractUpdater,
 ) ParseRestrictedContractUpdater {
 	return ParseRestrictedContractUpdater{

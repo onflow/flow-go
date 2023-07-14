@@ -65,10 +65,7 @@ func TestMVP_Bootstrap(t *testing.T) {
 
 	flowNetwork.Start(ctx)
 
-	initialRoot := flowNetwork.Root()
-	chain := initialRoot.Header.ChainID.Chain()
-
-	client, err := testnet.NewClient(fmt.Sprintf(":%s", flowNetwork.AccessPorts[testnet.AccessNodeAPIPort]), chain)
+	client, err := flowNetwork.ContainerByName(testnet.PrimaryAN).TestnetClient()
 	require.NoError(t, err)
 
 	t.Log("@@ running mvp test 1")
@@ -85,7 +82,7 @@ func TestMVP_Bootstrap(t *testing.T) {
 	// verify that the downloaded snapshot is not for the root block
 	header, err := snapshot.Head()
 	require.NoError(t, err)
-	assert.True(t, header.ID() != initialRoot.Header.ID())
+	assert.True(t, header.ID() != flowNetwork.Root().Header.ID())
 
 	t.Log("@@ restarting network with new root snapshot")
 
@@ -117,12 +114,12 @@ func TestMVP_Bootstrap(t *testing.T) {
 
 func buildMVPNetConfig() testnet.NetworkConfig {
 	collectionConfigs := []func(*testnet.NodeConfig){
-		testnet.WithAdditionalFlag("--block-rate-delay=100ms"),
+		testnet.WithAdditionalFlag("--hotstuff-proposal-duration=100ms"),
 		testnet.WithLogLevel(zerolog.FatalLevel),
 	}
 
 	consensusConfigs := []func(config *testnet.NodeConfig){
-		testnet.WithAdditionalFlag("--block-rate-delay=100ms"),
+		testnet.WithAdditionalFlag("--cruise-ctl-fallback-proposal-duration=100ms"),
 		testnet.WithAdditionalFlag(fmt.Sprintf("--required-verification-seal-approvals=%d", 1)),
 		testnet.WithAdditionalFlag(fmt.Sprintf("--required-construction-seal-approvals=%d", 1)),
 		testnet.WithLogLevel(zerolog.FatalLevel),
@@ -147,7 +144,7 @@ func runMVPTest(t *testing.T, ctx context.Context, net *testnet.FlowNetwork) {
 
 	chain := net.Root().Header.ChainID.Chain()
 
-	serviceAccountClient, err := testnet.NewClient(fmt.Sprintf(":%s", net.AccessPorts[testnet.AccessNodeAPIPort]), chain)
+	serviceAccountClient, err := net.ContainerByName(testnet.PrimaryAN).TestnetClient()
 	require.NoError(t, err)
 
 	latestBlockID, err := serviceAccountClient.GetLatestBlockID(ctx)
@@ -180,7 +177,7 @@ func runMVPTest(t *testing.T, ctx context.Context, net *testnet.FlowNetwork) {
 		SetGasLimit(9999)
 
 	childCtx, cancel := context.WithTimeout(ctx, defaultTimeout)
-	err = serviceAccountClient.SignAndSendTransaction(ctx, createAccountTx)
+	err = serviceAccountClient.SignAndSendTransaction(childCtx, createAccountTx)
 	require.NoError(t, err)
 
 	cancel()
@@ -248,7 +245,7 @@ func runMVPTest(t *testing.T, ctx context.Context, net *testnet.FlowNetwork) {
 	t.Log(fundCreationTxRes)
 
 	accountClient, err := testnet.NewClientWithKey(
-		fmt.Sprintf(":%s", net.AccessPorts[testnet.AccessNodeAPIPort]),
+		net.ContainerByName(testnet.PrimaryAN).Addr(testnet.GRPCPort),
 		newAccountAddress,
 		accountPrivateKey,
 		chain,

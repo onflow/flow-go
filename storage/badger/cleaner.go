@@ -82,7 +82,7 @@ func (c *Cleaner) gcWorkerRoutine(ctx irrecoverable.SignalerContext, ready compo
 // We add 20% jitter into the interval, so that we don't risk nodes syncing their GC calls over time.
 // Therefore GC is run every X seconds, where X is uniformly sampled from [interval, interval*1.2]
 func (c *Cleaner) nextWaitDuration() time.Duration {
-	return time.Duration(c.interval.Milliseconds() + rand.Int63n(c.interval.Milliseconds()/5))
+	return time.Duration(c.interval.Nanoseconds() + rand.Int63n(c.interval.Nanoseconds()/5))
 }
 
 // runGC runs garbage collection for badger DB, handles sentinel errors and reports metrics.

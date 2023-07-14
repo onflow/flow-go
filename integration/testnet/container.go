@@ -8,22 +8,25 @@ import (
 	"strings"
 	"time"
 
-	sdk "github.com/onflow/flow-go-sdk"
-
-	"github.com/onflow/flow-go/cmd/bootstrap/utils"
-	"github.com/onflow/flow-go/crypto"
-	"github.com/onflow/flow-go/model/encodable"
-	"github.com/onflow/flow-go/model/flow"
-
+	"github.com/dapperlabs/testingdock"
 	"github.com/dgraph-io/badger/v2"
 	"github.com/docker/docker/api/types"
 	"github.com/docker/go-connections/nat"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 
-	"github.com/dapperlabs/testingdock"
+	sdk "github.com/onflow/flow-go-sdk"
+	sdkclient "github.com/onflow/flow-go-sdk/access/grpc"
 
+	"github.com/onflow/flow-go/cmd/bootstrap/utils"
+	"github.com/onflow/flow-go/crypto"
+	ghostclient "github.com/onflow/flow-go/engine/ghost/client"
+	"github.com/onflow/flow-go/integration/client"
 	"github.com/onflow/flow-go/model/bootstrap"
+	"github.com/onflow/flow-go/model/encodable"
+	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
 	state "github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/inmem"
@@ -47,13 +50,13 @@ func init() {
 type ContainerConfig struct {
 	bootstrap.NodeInfo
 	// Corrupted indicates a container is running a binary implementing a malicious node
-	Corrupted             bool
-	ContainerName         string
-	LogLevel              zerolog.Level
-	Ghost                 bool
-	AdditionalFlags       []string
-	Debug                 bool
-	SupportsUnstakedNodes bool
+	Corrupted           bool
+	ContainerName       string
+	LogLevel            zerolog.Level
+	Ghost               bool
+	AdditionalFlags     []string
+	Debug               bool
+	EnableMetricsServer bool
 }
 
 func (c ContainerConfig) WriteKeyFiles(bootstrapDir string, machineAccountAddr sdk.Address, machineAccountKey encodable.MachineAccountPrivKey, role flow.Role) error {
@@ -103,14 +106,14 @@ func NewContainerConfig(nodeName string, conf NodeConfig, networkKey, stakingKey
 	)
 
 	containerConf := ContainerConfig{
-		NodeInfo:              info,
-		ContainerName:         nodeName,
-		LogLevel:              conf.LogLevel,
-		Ghost:                 conf.Ghost,
-		AdditionalFlags:       conf.AdditionalFlags,
-		Debug:                 conf.Debug,
-		SupportsUnstakedNodes: conf.SupportsUnstakedNodes,
-		Corrupted:             conf.Corrupted,
+		NodeInfo:            info,
+		ContainerName:       nodeName,
+		LogLevel:            conf.LogLevel,
+		Ghost:               conf.Ghost,
+		AdditionalFlags:     conf.AdditionalFlags,
+		Debug:               conf.Debug,
+		EnableMetricsServer: conf.EnableMetricsServer,
+		Corrupted:           conf.Corrupted,
 	}
 
 	return containerConf
@@ -141,19 +144,33 @@ type Container struct {
 	opts    *testingdock.ContainerOpts
 }
 
-// Addr returns the host-accessible listening address of the container for the
-// given port name. Panics if the port does not exist.
-func (c *Container) Addr(portName string) string {
-	port, ok := c.Ports[portName]
-	if !ok {
-		panic("could not find port " + portName)
-	}
-	return fmt.Sprintf(":%s", port)
+// Addr returns the host-accessible listening address of the container for the given container port.
+// Panics if the port was not exposed.
+func (c *Container) Addr(containerPort string) string {
+	return fmt.Sprintf(":%s", c.Port(containerPort))
 }
 
-// bindPort exposes the given container port and binds it to the given host port.
+// ContainerAddr returns the container address for the provided port.
+// Panics if the port was not exposed.
+func (c *Container) ContainerAddr(containerPort string) string {
+	return fmt.Sprintf("%s:%s", c.Name(), containerPort)
+}
+
+// Port returns the container's host port for the given container port.
+// Panics if the port was not exposed.
+func (c *Container) Port(containerPort string) string {
+	port, ok := c.Ports[containerPort]
+	if !ok {
+		panic(fmt.Sprintf("port %s is not registered for %s", containerPort, c.Config.ContainerName))
+	}
+	return port
+}
+
+// exposePort exposes the given container port and binds it to the given host port.
 // If no protocol is specified, assumes TCP.
-func (c *Container) bindPort(hostPort, containerPort string) {
+func (c *Container) exposePort(containerPort, hostPort string) {
+	// keep track of port mapping for easy lookups
+	c.Ports[containerPort] = hostPort
 
 	// use TCP protocol if none specified
 	containerNATPort := nat.Port(containerPort)
@@ -374,6 +391,7 @@ func (c *Container) OpenState() (*state.State, error) {
 	setups := storage.NewEpochSetups(metrics, db)
 	commits := storage.NewEpochCommits(metrics, db)
 	statuses := storage.NewEpochStatuses(metrics, db)
+	versionBeacons := storage.NewVersionBeacons(db)
 
 	return state.OpenState(
 		metrics,
@@ -386,6 +404,7 @@ func (c *Container) OpenState() (*state.State, error) {
 		setups,
 		commits,
 		statuses,
+		versionBeacons,
 	)
 }
 
@@ -431,6 +450,76 @@ func (c *Container) waitForCondition(ctx context.Context, condition func(*types.
 		case <-time.After(retryAfter):
 			retryAfter *= 2
 			continue
+		}
+	}
+}
+
+// TestnetClient returns a testnet client that connects to this node.
+func (c *Container) TestnetClient() (*Client, error) {
+	if c.Config.Role != flow.RoleAccess && c.Config.Role != flow.RoleCollection {
+		return nil, fmt.Errorf("container does not implement flow.access.AccessAPI")
+	}
+
+	chain := c.net.Root().Header.ChainID.Chain()
+	return NewClient(c.Addr(GRPCPort), chain)
+}
+
+// SDKClient returns a flow-go-sdk client that connects to this node.
+func (c *Container) SDKClient() (*sdkclient.Client, error) {
+	if c.Config.Role != flow.RoleAccess && c.Config.Role != flow.RoleCollection {
+		return nil, fmt.Errorf("container does not implement flow.access.AccessAPI")
+	}
+
+	return sdkclient.NewClient(c.Addr(GRPCPort), grpc.WithTransportCredentials(insecure.NewCredentials()))
+}
+
+// GhostClient returns a ghostnode client that connects to this node.
+func (c *Container) GhostClient() (*ghostclient.GhostClient, error) {
+	if !c.Config.Ghost {
+		return nil, fmt.Errorf("container is not a ghost node")
+	}
+
+	return ghostclient.NewGhostClient(c.Addr(GRPCPort))
+}
+
+// HealthcheckCallback returns a Docker healthcheck function that pings the node's GRPC
+// service exposed at the given port.
+func (c *Container) HealthcheckCallback() func() error {
+	return func() error {
+		fmt.Printf("healthchecking %s...", c.Name())
+
+		ctx := context.Background()
+
+		// The admin server starts last, so it's a rough approximation of the node being ready.
+		adminAddress := fmt.Sprintf("localhost:%s", c.Port(AdminPort))
+		err := client.NewAdminClient(adminAddress).Ping(ctx)
+		if err != nil {
+			return fmt.Errorf("could not ping admin server: %w", err)
+		}
+
+		// also ping the GRPC server if it's enabled
+		if _, ok := c.Ports[GRPCPort]; !ok {
+			return nil
+		}
+
+		switch c.Config.Role {
+		case flow.RoleExecution:
+			apiClient, err := client.NewExecutionClient(c.Addr(GRPCPort))
+			if err != nil {
+				return fmt.Errorf("could not create execution client: %w", err)
+			}
+			defer apiClient.Close()
+
+			return apiClient.Ping(ctx)
+
+		default:
+			apiClient, err := client.NewAccessClient(c.Addr(GRPCPort))
+			if err != nil {
+				return fmt.Errorf("could not create access client: %w", err)
+			}
+			defer apiClient.Close()
+
+			return apiClient.Ping(ctx)
 		}
 	}
 }

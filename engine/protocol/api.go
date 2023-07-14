@@ -13,6 +13,7 @@ import (
 type NetworkAPI interface {
 	GetNetworkParameters(ctx context.Context) access.NetworkParameters
 	GetLatestProtocolStateSnapshot(ctx context.Context) ([]byte, error)
+	GetNodeVersionInfo(ctx context.Context) (*access.NodeVersionInfo, error)
 }
 
 type API interface {

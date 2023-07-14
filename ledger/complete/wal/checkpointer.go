@@ -24,6 +24,7 @@ import (
 	"github.com/onflow/flow-go/ledger/complete/mtrie/trie"
 	"github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/module/metrics"
+	"github.com/onflow/flow-go/module/util"
 	utilsio "github.com/onflow/flow-go/utils/io"
 )
 
@@ -516,15 +517,9 @@ func StoreCheckpointV5(dir string, fileName string, logger *zerolog.Logger, trie
 }
 
 func logProgress(msg string, estimatedSubtrieNodeCount int, logger *zerolog.Logger) func(nodeCounter uint64) {
-	lookup := make(map[int]int)
-	for i := 1; i < 10; i++ { // [1...9]
-		lookup[estimatedSubtrieNodeCount/10*i] = i * 10
-	}
-	return func(nodeCounter uint64) {
-		percentage, ok := lookup[int(nodeCounter)]
-		if ok {
-			logger.Info().Msgf("%s completion percentage: %v percent", msg, percentage)
-		}
+	lg := util.LogProgress(msg, estimatedSubtrieNodeCount, logger)
+	return func(index uint64) {
+		lg(int(index))
 	}
 }
 

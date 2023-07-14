@@ -60,9 +60,8 @@ type ExecutionCollector struct {
 	transactionCheckTime                   prometheus.Histogram
 	transactionInterpretTime               prometheus.Histogram
 	transactionExecutionTime               prometheus.Histogram
-	transactionMemoryUsage                 prometheus.Histogram
+	transactionConflictRetries             prometheus.Histogram
 	transactionMemoryEstimate              prometheus.Histogram
-	transactionMemoryDifference            prometheus.Histogram
 	transactionComputationUsed             prometheus.Histogram
 	transactionEmittedEvents               prometheus.Histogram
 	transactionEventSize                   prometheus.Histogram
@@ -390,6 +389,14 @@ func NewExecutionCollector(tracer module.Tracer) *ExecutionCollector {
 		Buckets:   prometheus.ExponentialBuckets(2, 2, 10),
 	})
 
+	transactionConflictRetries := promauto.NewHistogram(prometheus.HistogramOpts{
+		Namespace: namespaceExecution,
+		Subsystem: subsystemRuntime,
+		Name:      "transaction_conflict_retries",
+		Help:      "the number of conflict retries needed to successfully commit a transaction.  If retry count is high, consider reducing concurrency",
+		Buckets:   []float64{0, 1, 2, 3, 4, 5, 10, 20, 30, 40, 50, 100},
+	})
+
 	transactionComputationUsed := promauto.NewHistogram(prometheus.HistogramOpts{
 		Namespace: namespaceExecution,
 		Subsystem: subsystemRuntime,
@@ -398,28 +405,12 @@ func NewExecutionCollector(tracer module.Tracer) *ExecutionCollector {
 		Buckets:   []float64{50, 100, 500, 1000, 5000, 10000},
 	})
 
-	transactionMemoryUsage := promauto.NewHistogram(prometheus.HistogramOpts{
-		Namespace: namespaceExecution,
-		Subsystem: subsystemRuntime,
-		Name:      "transaction_memory_usage",
-		Help:      "the total amount of memory allocated by a transaction",
-		Buckets:   []float64{100_000, 1_000_000, 10_000_000, 50_000_000, 100_000_000, 500_000_000, 1_000_000_000},
-	})
-
 	transactionMemoryEstimate := promauto.NewHistogram(prometheus.HistogramOpts{
 		Namespace: namespaceExecution,
 		Subsystem: subsystemRuntime,
 		Name:      "transaction_memory_estimate",
 		Help:      "the estimated memory used by a transaction",
 		Buckets:   []float64{1_000_000, 10_000_000, 100_000_000, 1_000_000_000, 5_000_000_000, 10_000_000_000, 50_000_000_000, 100_000_000_000},
-	})
-
-	transactionMemoryDifference := promauto.NewHistogram(prometheus.HistogramOpts{
-		Namespace: namespaceExecution,
-		Subsystem: subsystemRuntime,
-		Name:      "transaction_memory_difference",
-		Help:      "the difference in actual memory usage and estimate for a transaction",
-		Buckets:   []float64{-1, 0, 10_000_000, 100_000_000, 1_000_000_000},
 	})
 
 	transactionEmittedEvents := promauto.NewHistogram(prometheus.HistogramOpts{
@@ -573,10 +564,9 @@ func NewExecutionCollector(tracer module.Tracer) *ExecutionCollector {
 		transactionCheckTime:                   transactionCheckTime,
 		transactionInterpretTime:               transactionInterpretTime,
 		transactionExecutionTime:               transactionExecutionTime,
+		transactionConflictRetries:             transactionConflictRetries,
 		transactionComputationUsed:             transactionComputationUsed,
-		transactionMemoryUsage:                 transactionMemoryUsage,
 		transactionMemoryEstimate:              transactionMemoryEstimate,
-		transactionMemoryDifference:            transactionMemoryDifference,
 		transactionEmittedEvents:               transactionEmittedEvents,
 		transactionEventSize:                   transactionEventSize,
 		scriptExecutionTime:                    scriptExecutionTime,
@@ -738,16 +728,18 @@ func (ec *ExecutionCollector) ExecutionBlockCachedPrograms(programs int) {
 // TransactionExecuted reports stats for executing a transaction
 func (ec *ExecutionCollector) ExecutionTransactionExecuted(
 	dur time.Duration,
-	compUsed, memoryUsed, actualMemoryUsed uint64,
-	eventCounts, eventSize int,
+	numConflictRetries int,
+	compUsed uint64,
+	memoryUsed uint64,
+	eventCounts int,
+	eventSize int,
 	failed bool,
 ) {
 	ec.totalExecutedTransactionsCounter.Inc()
 	ec.transactionExecutionTime.Observe(float64(dur.Milliseconds()))
+	ec.transactionConflictRetries.Observe(float64(numConflictRetries))
 	ec.transactionComputationUsed.Observe(float64(compUsed))
-	ec.transactionMemoryUsage.Observe(float64(actualMemoryUsed))
 	ec.transactionMemoryEstimate.Observe(float64(memoryUsed))
-	ec.transactionMemoryDifference.Observe(float64(memoryUsed) - float64(actualMemoryUsed))
 	ec.transactionEmittedEvents.Observe(float64(eventCounts))
 	ec.transactionEventSize.Observe(float64(eventSize))
 	if failed {

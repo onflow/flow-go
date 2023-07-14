@@ -1,6 +1,8 @@
 package queue
 
 import (
+	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -21,15 +23,15 @@ func TestQueue(t *testing.T) {
 
 	*/
 
-	a := unittest.ExecutableBlockFixture(nil)
-	c := unittest.ExecutableBlockFixtureWithParent(nil, a.Block.Header)
-	b := unittest.ExecutableBlockFixtureWithParent(nil, c.Block.Header)
-	d := unittest.ExecutableBlockFixtureWithParent(nil, c.Block.Header)
-	e := unittest.ExecutableBlockFixtureWithParent(nil, d.Block.Header)
-	f := unittest.ExecutableBlockFixtureWithParent(nil, d.Block.Header)
-	g := unittest.ExecutableBlockFixtureWithParent(nil, b.Block.Header)
+	a := unittest.ExecutableBlockFixture(nil, nil)
+	c := unittest.ExecutableBlockFixtureWithParent(nil, a.Block.Header, nil)
+	b := unittest.ExecutableBlockFixtureWithParent(nil, c.Block.Header, nil)
+	d := unittest.ExecutableBlockFixtureWithParent(nil, c.Block.Header, nil)
+	e := unittest.ExecutableBlockFixtureWithParent(nil, d.Block.Header, nil)
+	f := unittest.ExecutableBlockFixtureWithParent(nil, d.Block.Header, nil)
+	g := unittest.ExecutableBlockFixtureWithParent(nil, b.Block.Header, nil)
 
-	dBroken := unittest.ExecutableBlockFixtureWithParent(nil, c.Block.Header)
+	dBroken := unittest.ExecutableBlockFixtureWithParent(nil, c.Block.Header, nil)
 	dBroken.Block.Header.Height += 2 //change height
 
 	queue := NewQueue(a)
@@ -289,4 +291,23 @@ func TestQueue(t *testing.T) {
 	//	assert.Error(t, err)
 	//})
 
+	t.Run("String()", func(t *testing.T) {
+		// a <- c <- d <- f
+		queue := NewQueue(a)
+		stored, _ := queue.TryAdd(c)
+		require.True(t, stored)
+		stored, _ = queue.TryAdd(d)
+		require.True(t, stored)
+		stored, _ = queue.TryAdd(f)
+		require.True(t, stored)
+		var builder strings.Builder
+		builder.WriteString(fmt.Sprintf("Header: %v\n", a.ID()))
+		builder.WriteString(fmt.Sprintf("Highest: %v\n", f.ID()))
+		builder.WriteString("Size: 4, Height: 3\n")
+		builder.WriteString(fmt.Sprintf("Node(height: %v): %v (children: 1)\n", a.Height(), a.ID()))
+		builder.WriteString(fmt.Sprintf("Node(height: %v): %v (children: 1)\n", c.Height(), c.ID()))
+		builder.WriteString(fmt.Sprintf("Node(height: %v): %v (children: 1)\n", d.Height(), d.ID()))
+		builder.WriteString(fmt.Sprintf("Node(height: %v): %v (children: 0)\n", f.Height(), f.ID()))
+		require.Equal(t, builder.String(), queue.String())
+	})
 }

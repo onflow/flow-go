@@ -140,6 +140,12 @@ func (h *FlowAccessAPIRouter) Ping(context context.Context, req *access.PingRequ
 	return &access.PingResponse{}, nil
 }
 
+func (h *FlowAccessAPIRouter) GetNodeVersionInfo(ctx context.Context, request *access.GetNodeVersionInfoRequest) (*access.GetNodeVersionInfoResponse, error) {
+	res, err := h.Observer.GetNodeVersionInfo(ctx, request)
+	h.log("observer", "GetNodeVersionInfo", err)
+	return res, err
+}
+
 func (h *FlowAccessAPIRouter) GetLatestBlockHeader(context context.Context, req *access.GetLatestBlockHeaderRequest) (*access.BlockHeaderResponse, error) {
 	res, err := h.Observer.GetLatestBlockHeader(context, req)
 	h.log("observer", "GetLatestBlockHeader", err)
@@ -336,6 +342,15 @@ func (h *FlowAccessAPIForwarder) Ping(context context.Context, req *access.PingR
 		return nil, err
 	}
 	return upstream.Ping(context, req)
+}
+
+func (h *FlowAccessAPIForwarder) GetNodeVersionInfo(context context.Context, req *access.GetNodeVersionInfoRequest) (*access.GetNodeVersionInfoResponse, error) {
+	// This is a passthrough request
+	upstream, err := h.faultTolerantClient()
+	if err != nil {
+		return nil, err
+	}
+	return upstream.GetNodeVersionInfo(context, req)
 }
 
 func (h *FlowAccessAPIForwarder) GetLatestBlockHeader(context context.Context, req *access.GetLatestBlockHeaderRequest) (*access.BlockHeaderResponse, error) {

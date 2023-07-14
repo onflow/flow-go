@@ -6,10 +6,10 @@ import (
 	"github.com/rs/zerolog"
 	otelTrace "go.opentelemetry.io/otel/trace"
 
-	"github.com/onflow/flow-go/fvm/derived"
 	"github.com/onflow/flow-go/fvm/environment"
 	reusableRuntime "github.com/onflow/flow-go/fvm/runtime"
-	"github.com/onflow/flow-go/fvm/state"
+	"github.com/onflow/flow-go/fvm/storage/derived"
+	"github.com/onflow/flow-go/fvm/storage/state"
 	"github.com/onflow/flow-go/fvm/tracing"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
@@ -226,31 +226,6 @@ func WithExtensiveTracing() Option {
 	}
 }
 
-// TODO(patrick): rm after https://github.com/onflow/flow-emulator/pull/306
-// is merged and integrated.
-//
-// WithTransactionProcessors sets the transaction processors for a
-// virtual machine context.
-func WithTransactionProcessors(processors ...interface{}) Option {
-	return func(ctx Context) Context {
-		executeBody := false
-		for _, p := range processors {
-			switch p.(type) {
-			case *TransactionInvoker:
-				executeBody = true
-			default:
-				panic("Unexpected transaction processor")
-			}
-		}
-
-		ctx.AuthorizationChecksEnabled = false
-		ctx.SequenceNumberCheckAndIncrementEnabled = false
-		ctx.AccountKeyWeightThreshold = 0
-		ctx.TransactionBodyExecutionEnabled = executeBody
-		return ctx
-	}
-}
-
 // WithServiceAccount enables or disables calls to the Flow service account.
 func WithServiceAccount(enabled bool) Option {
 	return func(ctx Context) Context {
@@ -267,13 +242,6 @@ func WithContractRemovalRestricted(enabled bool) Option {
 		ctx.RestrictContractRemoval = enabled
 		return ctx
 	}
-}
-
-// @Depricated please use WithContractDeploymentRestricted instead of this
-// this has been kept to reduce breaking change on the emulator, but would be
-// removed at some point.
-func WithRestrictedDeployment(restricted bool) Option {
-	return WithContractDeploymentRestricted(restricted)
 }
 
 // WithRestrictedContractDeployment enables or disables restricted contract deployment for a

@@ -6,6 +6,12 @@
 //	go build -ldflags "-X github.com/onflow/flow-go/cmd/build.semver=v1.0.0"
 package build
 
+import (
+	"strings"
+
+	smv "github.com/coreos/go-semver/semver"
+)
+
 // Default value for build-time-injected version strings.
 const undefined = "undefined"
 
@@ -40,4 +46,39 @@ func init() {
 	if len(commit) == 0 {
 		commit = undefined
 	}
+}
+
+// SemverV2 returns the semantic version of this build as a semver.Version
+// if it is defined, or nil otherwise.
+// The version string is converted to a semver compliant one if it isn't already
+// but this might fail if the version string is still not semver compliant. In that
+// case, an error is returned.
+func SemverV2() (*smv.Version, error) {
+	if !IsDefined(semver) {
+		return nil, nil
+	}
+	ver, err := smv.NewVersion(makeSemverV2Compliant(semver))
+	return ver, err
+}
+
+// makeSemverV2Compliant converts a non-semver version string to a semver compliant one.
+// This removes the leading 'v'.
+// In the past we sometimes omitted the patch version, e.g. v1.0.0 became v1.0 so this
+// also adds a 0 patch version if there's no patch version.
+func makeSemverV2Compliant(version string) string {
+	if !IsDefined(version) {
+		return version
+	}
+
+	// Remove the leading 'v'
+	version = strings.TrimPrefix(version, "v")
+
+	// If there's no patch version, add .0
+	parts := strings.SplitN(version, "-", 2)
+	if strings.Count(parts[0], ".") == 1 {
+		parts[0] = parts[0] + ".0"
+	}
+
+	version = strings.Join(parts, "-")
+	return version
 }

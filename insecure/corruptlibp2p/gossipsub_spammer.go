@@ -8,10 +8,12 @@ import (
 	pb "github.com/libp2p/go-libp2p-pubsub/pb"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/stretchr/testify/require"
+
 	corrupt "github.com/yhassanzadeh13/go-libp2p-pubsub"
 
 	"github.com/onflow/flow-go/insecure/internal"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/network/p2p"
 	p2ptest "github.com/onflow/flow-go/network/p2p/test"
 )
@@ -21,22 +23,24 @@ import (
 type GossipSubRouterSpammer struct {
 	router      *atomicRouter
 	SpammerNode p2p.LibP2PNode
+	SpammerId   flow.Identity
 }
 
 // NewGossipSubRouterSpammer is the main method tests call for spamming attacks.
-func NewGossipSubRouterSpammer(t *testing.T, sporkId flow.Identifier, role flow.Role) *GossipSubRouterSpammer {
-	spammerNode, router := createSpammerNode(t, sporkId, role)
+func NewGossipSubRouterSpammer(t *testing.T, sporkId flow.Identifier, role flow.Role, provider module.IdentityProvider, opts ...p2ptest.NodeFixtureParameterOption) *GossipSubRouterSpammer {
+	spammerNode, spammerId, router := createSpammerNode(t, sporkId, role, provider, opts...)
 	return &GossipSubRouterSpammer{
 		router:      router,
 		SpammerNode: spammerNode,
+		SpammerId:   spammerId,
 	}
 }
 
 // SpamControlMessage spams the victim with junk control messages.
 // ctlMessages is the list of spam messages to send to the victim node.
-func (s *GossipSubRouterSpammer) SpamControlMessage(t *testing.T, victim p2p.LibP2PNode, ctlMessages []pb.ControlMessage) {
+func (s *GossipSubRouterSpammer) SpamControlMessage(t *testing.T, victim p2p.LibP2PNode, ctlMessages []pb.ControlMessage, msgs ...*pb.Message) {
 	for _, ctlMessage := range ctlMessages {
-		require.True(t, s.router.Get().SendControl(victim.Host().ID(), &ctlMessage))
+		require.True(t, s.router.Get().SendControl(victim.Host().ID(), &ctlMessage, msgs...))
 	}
 }
 
@@ -61,13 +65,9 @@ func (s *GossipSubRouterSpammer) Start(t *testing.T) {
 	s.router.set(s.router.Get())
 }
 
-func createSpammerNode(t *testing.T, sporkId flow.Identifier, role flow.Role) (p2p.LibP2PNode, *atomicRouter) {
+func createSpammerNode(t *testing.T, sporkId flow.Identifier, role flow.Role, provider module.IdentityProvider, opts ...p2ptest.NodeFixtureParameterOption) (p2p.LibP2PNode, flow.Identity, *atomicRouter) {
 	router := newAtomicRouter()
-	spammerNode, _ := p2ptest.NodeFixture(
-		t,
-		sporkId,
-		t.Name(),
-		p2ptest.WithRole(role),
+	opts = append(opts, p2ptest.WithRole(role),
 		internal.WithCorruptGossipSub(CorruptGossipSubFactory(func(r *corrupt.GossipSubRouter) {
 			require.NotNil(t, r)
 			router.set(r)
@@ -75,9 +75,15 @@ func createSpammerNode(t *testing.T, sporkId flow.Identifier, role flow.Role) (p
 			CorruptGossipSubConfigFactoryWithInspector(func(id peer.ID, rpc *corrupt.RPC) error {
 				// here we can inspect the incoming RPC message to the spammer node
 				return nil
-			})),
+			})))
+	spammerNode, spammerId := p2ptest.NodeFixture(
+		t,
+		sporkId,
+		t.Name(),
+		provider,
+		opts...,
 	)
-	return spammerNode, router
+	return spammerNode, spammerId, router
 }
 
 // atomicRouter is a wrapper around the corrupt.GossipSubRouter that allows atomic access to the router.

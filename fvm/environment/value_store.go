@@ -6,7 +6,7 @@ import (
 	"github.com/onflow/atree"
 
 	"github.com/onflow/flow-go/fvm/errors"
-	"github.com/onflow/flow-go/fvm/state"
+	"github.com/onflow/flow-go/fvm/storage/state"
 	"github.com/onflow/flow-go/fvm/tracing"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/trace"
@@ -24,12 +24,12 @@ type ValueStore interface {
 }
 
 type ParseRestrictedValueStore struct {
-	txnState state.NestedTransaction
+	txnState state.NestedTransactionPreparer
 	impl     ValueStore
 }
 
 func NewParseRestrictedValueStore(
-	txnState state.NestedTransaction,
+	txnState state.NestedTransactionPreparer,
 	impl ValueStore,
 ) ValueStore {
 	return ParseRestrictedValueStore{

@@ -23,7 +23,7 @@ func TestCIDNotFound(t *testing.T) {
 	downloader := execution_data.NewDownloader(blobService)
 	edStore := execution_data.NewExecutionDataStore(blobstore, execution_data.DefaultSerializer)
 	bed := generateBlockExecutionData(t, 10, 3*execution_data.DefaultMaxBlobSize)
-	edID, err := edStore.AddExecutionData(context.Background(), bed)
+	edID, err := edStore.Add(context.Background(), bed)
 	require.NoError(t, err)
 
 	blobGetter := new(mocknetwork.BlobGetter)
@@ -54,7 +54,7 @@ func TestCIDNotFound(t *testing.T) {
 		},
 	)
 
-	_, err = downloader.Download(context.Background(), edID)
+	_, err = downloader.Get(context.Background(), edID)
 	var blobNotFoundError *execution_data.BlobNotFoundError
 	assert.ErrorAs(t, err, &blobNotFoundError)
 }

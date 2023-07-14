@@ -27,6 +27,7 @@ import (
 func NewParticipant(
 	log zerolog.Logger,
 	metrics module.HotstuffMetrics,
+	mempoolMetrics module.MempoolMetrics,
 	builder module.Builder,
 	finalized *flow.Header,
 	pending []*flow.Header,
@@ -34,10 +35,8 @@ func NewParticipant(
 	options ...Option,
 ) (*eventloop.EventLoop, error) {
 
-	// initialize the default configuration
+	// initialize the default configuration and apply the configuration options
 	cfg := DefaultParticipantConfig()
-
-	// apply the configuration options
 	for _, option := range options {
 		option(&cfg)
 	}
@@ -46,28 +45,31 @@ func NewParticipant(
 	modules.VoteAggregator.PruneUpToView(finalized.View)
 	modules.TimeoutAggregator.PruneUpToView(finalized.View)
 
-	// recover hotstuff state (inserts all pending blocks into Forks and VoteAggregator)
-	err := recovery.Participant(log, modules.Forks, modules.VoteAggregator, modules.Validator, pending)
+	// recover HotStuff state from all pending blocks
+	qcCollector := recovery.NewCollector[*flow.QuorumCertificate]()
+	tcCollector := recovery.NewCollector[*flow.TimeoutCertificate]()
+	err := recovery.Recover(log, pending,
+		recovery.ForksState(modules.Forks),                   // add pending blocks to Forks
+		recovery.VoteAggregatorState(modules.VoteAggregator), // accept votes for all pending blocks
+		recovery.CollectParentQCs(qcCollector),               // collect QCs from all pending block to initialize PaceMaker (below)
+		recovery.CollectTCs(tcCollector),                     // collect TCs from all pending block to initialize PaceMaker (below)
+	)
 	if err != nil {
-		return nil, fmt.Errorf("could not recover hotstuff state: %w", err)
+		return nil, fmt.Errorf("failed to scan tree of pending blocks: %w", err)
 	}
 
-	// initialize the timeout config
-	timeoutConfig, err := timeout.NewConfig(
-		cfg.TimeoutMinimum,
-		cfg.TimeoutMaximum,
-		cfg.TimeoutAdjustmentFactor,
-		cfg.HappyPathMaxRoundFailures,
-		cfg.BlockRateDelay,
-		cfg.MaxTimeoutObjectRebroadcastInterval,
-	)
+	// initialize dynamically updatable timeout config
+	timeoutConfig, err := timeout.NewConfig(cfg.TimeoutMinimum, cfg.TimeoutMaximum, cfg.TimeoutAdjustmentFactor, cfg.HappyPathMaxRoundFailures, cfg.MaxTimeoutObjectRebroadcastInterval)
 	if err != nil {
 		return nil, fmt.Errorf("could not initialize timeout config: %w", err)
 	}
 
 	// initialize the pacemaker
 	controller := timeout.NewController(timeoutConfig)
-	pacemaker, err := pacemaker.New(controller, modules.Notifier, modules.Persist)
+	pacemaker, err := pacemaker.New(controller, cfg.ProposalDurationProvider, modules.Notifier, modules.Persist,
+		pacemaker.WithQCs(qcCollector.Retrieve()...),
+		pacemaker.WithTCs(tcCollector.Retrieve()...),
+	)
 	if err != nil {
 		return nil, fmt.Errorf("could not initialize flow pacemaker: %w", err)
 	}
@@ -100,22 +102,14 @@ func NewParticipant(
 	}
 
 	// initialize and return the event loop
-	loop, err := eventloop.NewEventLoop(log, metrics, eventHandler, cfg.StartupTime)
+	loop, err := eventloop.NewEventLoop(log, metrics, mempoolMetrics, eventHandler, cfg.StartupTime)
 	if err != nil {
 		return nil, fmt.Errorf("could not initialize event loop: %w", err)
 	}
 
 	// add observer, event loop needs to receive events from distributor
-	modules.QCCreatedDistributor.AddConsumer(loop)
-	modules.TimeoutCollectorDistributor.AddConsumer(loop)
-
-	// register dynamically updatable configs
-	if cfg.Registrar != nil {
-		err = cfg.Registrar.RegisterDurationConfig("hotstuff-block-rate-delay", timeoutConfig.GetBlockRateDelay, timeoutConfig.SetBlockRateDelay)
-		if err != nil {
-			return nil, fmt.Errorf("failed to register block rate delay config: %w", err)
-		}
-	}
+	modules.VoteCollectorDistributor.AddVoteCollectorConsumer(loop)
+	modules.TimeoutCollectorDistributor.AddTimeoutCollectorConsumer(loop)
 
 	return loop, nil
 }
@@ -131,7 +125,7 @@ func NewValidator(metrics module.HotstuffMetrics, committee hotstuff.DynamicComm
 }
 
 // NewForks recovers trusted root and creates new forks manager
-func NewForks(final *flow.Header, headers storage.Headers, updater module.Finalizer, notifier hotstuff.FinalizationConsumer, rootHeader *flow.Header, rootQC *flow.QuorumCertificate) (*forks.Forks, error) {
+func NewForks(final *flow.Header, headers storage.Headers, updater module.Finalizer, notifier hotstuff.FollowerConsumer, rootHeader *flow.Header, rootQC *flow.QuorumCertificate) (*forks.Forks, error) {
 	// recover the trusted root
 	trustedRoot, err := recoverTrustedRoot(final, headers, rootHeader, rootQC)
 	if err != nil {
@@ -148,7 +142,7 @@ func NewForks(final *flow.Header, headers storage.Headers, updater module.Finali
 }
 
 // recoverTrustedRoot based on our local state returns root block and QC that can be used to initialize base state
-func recoverTrustedRoot(final *flow.Header, headers storage.Headers, rootHeader *flow.Header, rootQC *flow.QuorumCertificate) (*forks.BlockQC, error) {
+func recoverTrustedRoot(final *flow.Header, headers storage.Headers, rootHeader *flow.Header, rootQC *flow.QuorumCertificate) (*model.CertifiedBlock, error) {
 	if final.View < rootHeader.View {
 		return nil, fmt.Errorf("finalized Block has older view than trusted root")
 	}
@@ -158,7 +152,11 @@ func recoverTrustedRoot(final *flow.Header, headers storage.Headers, rootHeader 
 		if final.ID() != rootHeader.ID() {
 			return nil, fmt.Errorf("finalized Block conflicts with trusted root")
 		}
-		return makeRootBlockQC(rootHeader, rootQC), nil
+		certifiedRoot, err := makeCertifiedRootBlock(rootHeader, rootQC)
+		if err != nil {
+			return nil, fmt.Errorf("constructing certified root block failed: %w", err)
+		}
+		return &certifiedRoot, nil
 	}
 
 	// find a valid child of the finalized block in order to get its QC
@@ -174,15 +172,14 @@ func recoverTrustedRoot(final *flow.Header, headers storage.Headers, rootHeader 
 	child := model.BlockFromFlow(children[0])
 
 	// create the root block to use
-	trustedRoot := &forks.BlockQC{
-		Block: model.BlockFromFlow(final),
-		QC:    child.QC,
+	trustedRoot, err := model.NewCertifiedBlock(model.BlockFromFlow(final), child.QC)
+	if err != nil {
+		return nil, fmt.Errorf("constructing certified root block failed: %w", err)
 	}
-
-	return trustedRoot, nil
+	return &trustedRoot, nil
 }
 
-func makeRootBlockQC(header *flow.Header, qc *flow.QuorumCertificate) *forks.BlockQC {
+func makeCertifiedRootBlock(header *flow.Header, qc *flow.QuorumCertificate) (model.CertifiedBlock, error) {
 	// By convention of Forks, the trusted root block does not need to have a qc
 	// (as is the case for the genesis block). For simplify of the implementation, we always omit
 	// the QC of the root block. Thereby, we have one algorithm which handles all cases,
@@ -196,8 +193,5 @@ func makeRootBlockQC(header *flow.Header, qc *flow.QuorumCertificate) *forks.Blo
 		PayloadHash: header.PayloadHash,
 		Timestamp:   header.Timestamp,
 	}
-	return &forks.BlockQC{
-		QC:    qc,
-		Block: rootBlock,
-	}
+	return model.NewCertifiedBlock(rootBlock, qc)
 }

@@ -8,6 +8,7 @@ import (
 	"fmt"
 
 	"github.com/dgraph-io/badger/v2"
+	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
@@ -39,6 +40,7 @@ type FollowerState struct {
 	index      storage.Index
 	payloads   storage.Payloads
 	tracer     module.Tracer
+	logger     zerolog.Logger
 	consumer   protocol.Consumer
 	blockTimer protocol.BlockTimer
 }
@@ -58,11 +60,12 @@ var _ protocol.ParticipantState = (*ParticipantState)(nil)
 // NewFollowerState initializes a light-weight version of a mutable protocol
 // state. This implementation is suitable only for NON-Consensus nodes.
 func NewFollowerState(
+	logger zerolog.Logger,
+	tracer module.Tracer,
+	consumer protocol.Consumer,
 	state *State,
 	index storage.Index,
 	payloads storage.Payloads,
-	tracer module.Tracer,
-	consumer protocol.Consumer,
 	blockTimer protocol.BlockTimer,
 ) (*FollowerState, error) {
 	followerState := &FollowerState{
@@ -70,6 +73,7 @@ func NewFollowerState(
 		index:      index,
 		payloads:   payloads,
 		tracer:     tracer,
+		logger:     logger,
 		consumer:   consumer,
 		blockTimer: blockTimer,
 	}
@@ -81,16 +85,25 @@ func NewFollowerState(
 // _entire_ block payload. Consensus nodes should use the FullConsensusState,
 // while other node roles can use the lighter FollowerState.
 func NewFullConsensusState(
+	logger zerolog.Logger,
+	tracer module.Tracer,
+	consumer protocol.Consumer,
 	state *State,
 	index storage.Index,
 	payloads storage.Payloads,
-	tracer module.Tracer,
-	consumer protocol.Consumer,
 	blockTimer protocol.BlockTimer,
 	receiptValidator module.ReceiptValidator,
 	sealValidator module.SealValidator,
 ) (*ParticipantState, error) {
-	followerState, err := NewFollowerState(state, index, payloads, tracer, consumer, blockTimer)
+	followerState, err := NewFollowerState(
+		logger,
+		tracer,
+		consumer,
+		state,
+		index,
+		payloads,
+		blockTimer,
+	)
 	if err != nil {
 		return nil, fmt.Errorf("initialization of Mutable Follower State failed: %w", err)
 	}
@@ -524,7 +537,7 @@ func (m *FollowerState) insert(ctx context.Context, candidate *flow.Block, certi
 			}
 		} else {
 			// trigger BlockProcessable for parent blocks above root height
-			if parent.Height > m.rootHeight {
+			if parent.Height > m.finalizedRootHeight {
 				events = append(events, func() {
 					m.consumer.BlockProcessable(parent, qc)
 				})
@@ -617,11 +630,11 @@ func (m *FollowerState) Finalize(ctx context.Context, blockID flow.Identifier) e
 
 	// We also want to update the last sealed height. Retrieve the block
 	// seal indexed for the block and retrieve the block that was sealed by it.
-	last, err := m.seals.HighestInFork(blockID)
+	lastSeal, err := m.seals.HighestInFork(blockID)
 	if err != nil {
 		return fmt.Errorf("could not look up sealed header: %w", err)
 	}
-	sealed, err := m.headers.ByBlockID(last.BlockID)
+	sealed, err := m.headers.ByBlockID(lastSeal.BlockID)
 	if err != nil {
 		return fmt.Errorf("could not retrieve sealed header: %w", err)
 	}
@@ -664,7 +677,7 @@ func (m *FollowerState) Finalize(ctx context.Context, blockID flow.Identifier) e
 	// If epoch emergency fallback is triggered, the current epoch continues until
 	// the next spork - so skip these updates.
 	if !epochFallbackTriggered {
-		epochPhaseMetrics, epochPhaseEvents, err := m.epochPhaseMetricsAndEventsOnBlockFinalized(header, epochStatus)
+		epochPhaseMetrics, epochPhaseEvents, err := m.epochPhaseMetricsAndEventsOnBlockFinalized(block, epochStatus)
 		if err != nil {
 			return fmt.Errorf("could not determine epoch phase metrics/events for finalized block: %w", err)
 		}
@@ -679,6 +692,12 @@ func (m *FollowerState) Finalize(ctx context.Context, blockID flow.Identifier) e
 			metrics = append(metrics, epochTransitionMetrics...)
 			events = append(events, epochTransitionEvents...)
 		}
+	}
+
+	// Extract and validate version beacon events from the block seals.
+	versionBeacons, err := m.versionBeaconOnBlockFinalized(block)
+	if err != nil {
+		return fmt.Errorf("cannot process version beacon: %w", err)
 	}
 
 	// Persist updates in database
@@ -724,10 +743,25 @@ func (m *FollowerState) Finalize(ctx context.Context, blockID flow.Identifier) e
 			}
 		}
 
+		if len(versionBeacons) > 0 {
+			// only index the last version beacon as that is the relevant one.
+			// TODO: The other version beacons can be used for validation.
+			err := operation.IndexVersionBeaconByHeight(versionBeacons[len(versionBeacons)-1])(tx)
+			if err != nil {
+				return fmt.Errorf("could not index version beacon or height (%d): %w", header.Height, err)
+			}
+		}
+
 		return nil
 	})
 	if err != nil {
 		return fmt.Errorf("could not persist finalization operations for block (%x): %w", blockID, err)
+	}
+
+	// update the cache
+	m.State.cachedFinal.Store(&cachedHeader{blockID, header})
+	if len(block.Payload.Seals) > 0 {
+		m.State.cachedSealed.Store(&cachedHeader{lastSeal.BlockID, sealed})
 	}
 
 	// Emit protocol events after database transaction succeeds. Event delivery is guaranteed,
@@ -848,41 +882,38 @@ func (m *FollowerState) epochTransitionMetricsAndEventsOnBlockFinalized(block *f
 	return
 }
 
-// epochPhaseMetricsAndEventsOnBlockFinalized determines metrics to update
-// and protocol events to emit, if this block is the first of a new epoch phase.
-//
-// Protocol events and metric updates happen when we finalize the block at
-// which a service event causing an epoch phase change comes into effect.
-// See handleEpochServiceEvents for details.
+// epochPhaseMetricsAndEventsOnBlockFinalized determines metrics to update and protocol
+// events to emit. Service Events embedded into an execution result take effect, when the
+// execution result's _seal is finalized_ (i.e. when the block holding a seal for the
+// result is finalized). See also handleEpochServiceEvents for further details. Example:
 //
 // Convention:
 //
-//	A <-- ... <-- P(Seal_A) <----- B
-//	              ↑                ↑
-//	block sealing service event    first block of new Epoch phase
-//	for epoch-phase transition     (e.g. EpochSetup phase)
-//	(e.g. EpochSetup event)
+//	A <-- ... <-- C(Seal_A)
 //
-// Per convention, protocol events for epoch phase changes are emitted when
-// the first block of the new phase (eg. EpochSetup phase) is _finalized_.
-// Meaning that the new phase has started.
+// Suppose an EpochSetup service event is emitted during execution of block A. C seals A, therefore
+// we apply the metrics/events when C is finalized. The first block of the EpochSetup
+// phase is block C.
 //
 // This function should only be called when epoch fallback *has not already been triggered*.
 // No errors are expected during normal operation.
-func (m *FollowerState) epochPhaseMetricsAndEventsOnBlockFinalized(block *flow.Header, epochStatus *flow.EpochStatus) (
+func (m *FollowerState) epochPhaseMetricsAndEventsOnBlockFinalized(block *flow.Block, epochStatus *flow.EpochStatus) (
 	metrics []func(),
 	events []func(),
 	err error,
 ) {
 
-	parent, err := m.blocks.ByID(block.ParentID)
+	// block payload may not specify seals in order, so order them by block height before processing
+	orderedSeals, err := protocol.OrderedSeals(block.Payload, m.headers)
 	if err != nil {
-		return nil, nil, fmt.Errorf("could not get parent (id=%x): %w", block.ParentID, err)
+		if errors.Is(err, storage.ErrNotFound) {
+			return nil, nil, fmt.Errorf("ordering seals: parent payload contains seals for unknown block: %s", err.Error())
+		}
+		return nil, nil, fmt.Errorf("unexpected error ordering seals: %w", err)
 	}
 
 	// track service event driven metrics and protocol events that should be emitted
-	for _, seal := range parent.Payload.Seals {
-
+	for _, seal := range orderedSeals {
 		result, err := m.results.ByID(seal.ResultID)
 		if err != nil {
 			return nil, nil, fmt.Errorf("could not retrieve result (id=%x) for seal (id=%x): %w", seal.ResultID, seal.ID(), err)
@@ -893,20 +924,22 @@ func (m *FollowerState) epochPhaseMetricsAndEventsOnBlockFinalized(block *flow.H
 				// update current epoch phase
 				events = append(events, func() { m.metrics.CurrentEpochPhase(flow.EpochPhaseSetup) })
 				// track epoch phase transition (staking->setup)
-				events = append(events, func() { m.consumer.EpochSetupPhaseStarted(ev.Counter-1, block) })
+				events = append(events, func() { m.consumer.EpochSetupPhaseStarted(ev.Counter-1, block.Header) })
 			case *flow.EpochCommit:
 				// update current epoch phase
 				events = append(events, func() { m.metrics.CurrentEpochPhase(flow.EpochPhaseCommitted) })
 				// track epoch phase transition (setup->committed)
-				events = append(events, func() { m.consumer.EpochCommittedPhaseStarted(ev.Counter-1, block) })
+				events = append(events, func() { m.consumer.EpochCommittedPhaseStarted(ev.Counter-1, block.Header) })
 				// track final view of committed epoch
 				nextEpochSetup, err := m.epoch.setups.ByID(epochStatus.NextEpoch.SetupID)
 				if err != nil {
 					return nil, nil, fmt.Errorf("could not retrieve setup event for next epoch: %w", err)
 				}
 				events = append(events, func() { m.metrics.CommittedEpochFinalView(nextEpochSetup.FinalView) })
+			case *flow.VersionBeacon:
+				// do nothing for now
 			default:
-				return nil, nil, fmt.Errorf("invalid service event type in payload (%T)", event)
+				return nil, nil, fmt.Errorf("invalid service event type in payload (%T)", ev)
 			}
 		}
 	}
@@ -969,29 +1002,90 @@ func (m *FollowerState) epochStatus(block *flow.Header, epochFallbackTriggered b
 
 }
 
+// versionBeaconOnBlockFinalized extracts and returns the VersionBeacons from the
+// finalized block's seals.
+// This could return multiple VersionBeacons if the parent block contains multiple Seals.
+// The version beacons will be returned in the ascending height order of the seals.
+// Technically only the last VersionBeacon is relevant.
+func (m *FollowerState) versionBeaconOnBlockFinalized(
+	finalized *flow.Block,
+) ([]*flow.SealedVersionBeacon, error) {
+	var versionBeacons []*flow.SealedVersionBeacon
+
+	seals, err := protocol.OrderedSeals(finalized.Payload, m.headers)
+	if err != nil {
+		if errors.Is(err, storage.ErrNotFound) {
+			return nil, fmt.Errorf(
+				"ordering seals: parent payload contains"+
+					" seals for unknown block: %w", err)
+		}
+		return nil, fmt.Errorf("unexpected error ordering seals: %w", err)
+	}
+
+	for _, seal := range seals {
+		result, err := m.results.ByID(seal.ResultID)
+		if err != nil {
+			return nil, fmt.Errorf(
+				"could not retrieve result (id=%x) for seal (id=%x): %w",
+				seal.ResultID,
+				seal.ID(),
+				err)
+		}
+		for _, event := range result.ServiceEvents {
+
+			ev, ok := event.Event.(*flow.VersionBeacon)
+
+			if !ok {
+				// skip other service event types.
+				// validation if this is a known service event type is done elsewhere.
+				continue
+			}
+
+			err := ev.Validate()
+			if err != nil {
+				m.logger.Warn().
+					Err(err).
+					Str("block_id", finalized.ID().String()).
+					Interface("event", ev).
+					Msg("invalid VersionBeacon service event")
+				continue
+			}
+
+			// The version beacon only becomes actionable/valid/active once the block
+			// containing the version beacon has been sealed. That is why we set the
+			// Seal height to the current block height.
+			versionBeacons = append(versionBeacons, &flow.SealedVersionBeacon{
+				VersionBeacon: ev,
+				SealHeight:    finalized.Header.Height,
+			})
+		}
+	}
+
+	return versionBeacons, nil
+}
+
 // handleEpochServiceEvents handles applying state changes which occur as a result
 // of service events being included in a block payload:
-// * inserting incorporated service events
-// * updating EpochStatus for the candidate block
+//   - inserting incorporated service events
+//   - updating EpochStatus for the candidate block
 //
 // Consider a chain where a service event is emitted during execution of block A.
-// Block B contains a receipt for A. Block C contains a seal for block A. Block
-// D contains a QC for C.
+// Block B contains a receipt for A. Block C contains a seal for block A.
 //
-// A <- B(RA) <- C(SA) <- D
+// A <- .. <- B(RA) <- .. <- C(SA)
 //
 // Service events are included within execution results, which are stored
 // opaquely as part of the block payload in block B. We only validate and insert
-// the typed service event to storage once we have received a valid QC for the
-// block containing the seal for A. This occurs once we mark block D as valid
-// with MarkValid. Because of this, any change to the protocol state introduced
-// by a service event emitted in A would only become visible when querying D or
-// later (D's children).
-// TODO(active-pacemaker) update docs here (remove reference to MarkValid) https://github.com/dapperlabs/flow-go/issues/6254
+// the typed service event to storage once we process C, the block containing the
+// seal for block A. This is because we rely on the sealing subsystem to validate
+// correctness of the service event before processing it.
+// Consequently, any change to the protocol state introduced by a service event
+// emitted during execution of block A would only become visible when querying
+// C or its descendants.
 //
 // This method will only apply service-event-induced state changes when the
-// input block has the form of block D (ie. has a parent, which contains a seal
-// for a block in which a service event was emitted).
+// input block has the form of block C (ie. contains a seal for a block in
+// which a service event was emitted).
 //
 // Return values:
 //   - dbUpdates - If the service events are valid, or there are no service events,
@@ -1025,20 +1119,16 @@ func (m *FollowerState) handleEpochServiceEvents(candidate *flow.Block) (dbUpdat
 		return dbUpdates, nil
 	}
 
-	// We apply service events from blocks which are sealed by this block's PARENT.
-	// The parent's payload might contain epoch preparation service events for the next
+	// We apply service events from blocks which are sealed by this candidate block.
+	// The block's payload might contain epoch preparation service events for the next
 	// epoch. In this case, we need to update the tentative protocol state.
 	// We need to validate whether all information is available in the protocol
 	// state to go to the next epoch when needed. In cases where there is a bug
 	// in the smart contract, it could be that this happens too late and the
 	// chain finalization should halt.
-	parent, err := m.blocks.ByID(candidate.Header.ParentID)
-	if err != nil {
-		return nil, fmt.Errorf("could not get parent (id=%x): %w", candidate.Header.ParentID, err)
-	}
 
 	// block payload may not specify seals in order, so order them by block height before processing
-	orderedSeals, err := protocol.OrderedSeals(parent.Payload, m.headers)
+	orderedSeals, err := protocol.OrderedSeals(candidate.Payload, m.headers)
 	if err != nil {
 		if errors.Is(err, storage.ErrNotFound) {
 			return nil, fmt.Errorf("ordering seals: parent payload contains seals for unknown block: %s", err.Error())
@@ -1107,7 +1197,8 @@ func (m *FollowerState) handleEpochServiceEvents(candidate *flow.Block) (dbUpdat
 
 				// we'll insert the commit event when we insert the block
 				dbUpdates = append(dbUpdates, m.epoch.commits.StoreTx(ev))
-
+			case *flow.VersionBeacon:
+				// do nothing for now
 			default:
 				return nil, fmt.Errorf("invalid service event type (type_name=%s, go_type=%T)", event.Type, ev)
 			}

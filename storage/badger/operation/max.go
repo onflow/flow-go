@@ -7,6 +7,7 @@ import (
 
 	"github.com/dgraph-io/badger/v2"
 
+	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/storage"
 )
 
@@ -50,7 +51,7 @@ func SetMax(tx storage.Transaction) error {
 	binary.LittleEndian.PutUint32(val, max)
 	err := tx.Set(key, val)
 	if err != nil {
-		return fmt.Errorf("could not set max: %w", err)
+		return irrecoverable.NewExceptionf("could not set max: %w", err)
 	}
 	return nil
 }

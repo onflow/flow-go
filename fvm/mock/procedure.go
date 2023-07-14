@@ -58,11 +58,11 @@ func (_m *Procedure) MemoryLimit(ctx fvm.Context) uint64 {
 }
 
 // NewExecutor provides a mock function with given fields: ctx, txnState
-func (_m *Procedure) NewExecutor(ctx fvm.Context, txnState storage.Transaction) fvm.ProcedureExecutor {
+func (_m *Procedure) NewExecutor(ctx fvm.Context, txnState storage.TransactionPreparer) fvm.ProcedureExecutor {
 	ret := _m.Called(ctx, txnState)
 
 	var r0 fvm.ProcedureExecutor
-	if rf, ok := ret.Get(0).(func(fvm.Context, storage.Transaction) fvm.ProcedureExecutor); ok {
+	if rf, ok := ret.Get(0).(func(fvm.Context, storage.TransactionPreparer) fvm.ProcedureExecutor); ok {
 		r0 = rf(ctx, txnState)
 	} else {
 		if ret.Get(0) != nil {
@@ -71,11 +71,6 @@ func (_m *Procedure) NewExecutor(ctx fvm.Context, txnState storage.Transaction) 
 	}
 
 	return r0
-}
-
-// SetOutput provides a mock function with given fields: output
-func (_m *Procedure) SetOutput(output fvm.ProcedureOutput) {
-	_m.Called(output)
 }
 
 // ShouldDisableMemoryAndInteractionLimits provides a mock function with given fields: ctx

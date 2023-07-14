@@ -1,5 +1,4 @@
 # Notifier
-
 The Notifier implements the following state machine
 ![Notifier State Machine](/docs/NotifierStateMachine.png)
 

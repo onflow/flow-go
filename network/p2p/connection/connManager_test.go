@@ -11,13 +11,15 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 
+	"github.com/onflow/flow-go/config"
+	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/irrecoverable"
+	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network/internal/p2pfixtures"
+	"github.com/onflow/flow-go/network/netconf"
 	"github.com/onflow/flow-go/network/p2p/connection"
 	p2ptest "github.com/onflow/flow-go/network/p2p/test"
 	"github.com/onflow/flow-go/network/p2p/utils"
-
-	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -54,8 +56,10 @@ var isNotProtected = fun{
 func TestConnectionManagerProtection(t *testing.T) {
 
 	log := zerolog.New(os.Stderr).Level(zerolog.ErrorLevel)
+	flowConfig, err := config.DefaultConfig()
+	require.NoError(t, err)
 	noopMetrics := metrics.NewNoopCollector()
-	connManager, err := connection.NewConnManager(log, noopMetrics, connection.DefaultConnManagerConfig())
+	connManager, err := connection.NewConnManager(log, noopMetrics, &flowConfig.NetworkConfig.ConnectionManagerConfig)
 	require.NoError(t, err)
 
 	testCases := [][]fun{
@@ -102,7 +106,7 @@ func TestConnectionManager_Watermarking(t *testing.T) {
 	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
 	defer cancel()
 
-	cfg := &connection.ManagerConfig{
+	cfg := &netconf.ConnectionManagerConfig{
 		HighWatermark: 4,                      // whenever the number of connections exceeds 4, connection manager prune connections.
 		LowWatermark:  2,                      // connection manager prune connections until the number of connections is 2.
 		GracePeriod:   500 * time.Millisecond, // extra connections will be pruned if they are older than a second (just for testing).
@@ -113,14 +117,16 @@ func TestConnectionManager_Watermarking(t *testing.T) {
 		metrics.NewNoopCollector(),
 		cfg)
 	require.NoError(t, err)
-
-	thisNode, _ := p2ptest.NodeFixture(
+	idProvider := unittest.NewUpdatableIDProvider(flow.IdentityList{})
+	thisNode, identity := p2ptest.NodeFixture(
 		t,
 		sporkId,
 		t.Name(),
+		idProvider,
 		p2ptest.WithConnectionManager(thisConnMgr))
+	idProvider.SetIdentities(flow.IdentityList{&identity})
 
-	otherNodes, _ := p2ptest.NodesFixture(t, sporkId, t.Name(), 5)
+	otherNodes, _ := p2ptest.NodesFixture(t, sporkId, t.Name(), 5, idProvider)
 
 	nodes := append(otherNodes, thisNode)
 

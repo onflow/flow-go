@@ -1,6 +1,7 @@
 package synchronization
 
 import (
+	"context"
 	"io"
 	"math"
 	"math/rand"
@@ -13,14 +14,13 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
-	"github.com/onflow/flow-go/consensus/hotstuff/notifications/pubsub"
-	"github.com/onflow/flow-go/engine"
 	mockconsensus "github.com/onflow/flow-go/engine/consensus/mock"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/model/messages"
 	synccore "github.com/onflow/flow-go/module/chainsync"
 	"github.com/onflow/flow-go/module/id"
+	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
 	module "github.com/onflow/flow-go/module/mock"
 	netint "github.com/onflow/flow-go/network"
@@ -58,9 +58,6 @@ type SyncSuite struct {
 }
 
 func (ss *SyncSuite) SetupTest() {
-	// seed the RNG
-	rand.Seed(time.Now().UnixNano())
-
 	// generate own ID
 	ss.participants = unittest.IdentityListFixture(3, unittest.WithRole(flow.RoleConsensus))
 	keys := unittest.NetworkingKeys(len(ss.participants))
@@ -168,12 +165,9 @@ func (ss *SyncSuite) SetupTest() {
 	log := zerolog.New(io.Discard)
 	metrics := metrics.NewNoopCollector()
 
-	finalizedHeader, err := NewFinalizedHeaderCache(log, ss.state, pubsub.NewFinalizationDistributor())
-	require.NoError(ss.T(), err, "could not create finalized snapshot cache")
-
 	idCache, err := cache.NewProtocolStateIDCache(log, ss.state, protocolEvents.NewDistributor())
 	require.NoError(ss.T(), err, "could not create protocol state identity cache")
-	e, err := New(log, metrics, ss.net, ss.me, ss.blocks, ss.comp, ss.core, finalizedHeader,
+	e, err := New(log, metrics, ss.net, ss.me, ss.state, ss.blocks, ss.comp, ss.core,
 		id.NewIdentityFilterIdentifierProvider(
 			filter.And(
 				filter.HasRole(flow.RoleConsensus),
@@ -515,15 +509,19 @@ func (ss *SyncSuite) TestSendRequests() {
 
 // test a synchronization engine can be started and stopped
 func (ss *SyncSuite) TestStartStop() {
-	unittest.AssertReturnsBefore(ss.T(), func() {
-		<-ss.e.Ready()
-		<-ss.e.Done()
-	}, time.Second)
+	ctx, cancel := irrecoverable.NewMockSignalerContextWithCancel(ss.T(), context.Background())
+	ss.e.Start(ctx)
+	unittest.AssertClosesBefore(ss.T(), ss.e.Ready(), time.Second)
+	cancel()
+	unittest.AssertClosesBefore(ss.T(), ss.e.Done(), time.Second)
 }
 
 // TestProcessingMultipleItems tests that items are processed in async way
 func (ss *SyncSuite) TestProcessingMultipleItems() {
-	<-ss.e.Ready()
+	ctx, cancel := irrecoverable.NewMockSignalerContextWithCancel(ss.T(), context.Background())
+	ss.e.Start(ctx)
+	unittest.AssertClosesBefore(ss.T(), ss.e.Ready(), time.Second)
+	defer cancel()
 
 	originID := unittest.IdentifierFixture()
 	for i := 0; i < 5; i++ {
@@ -556,20 +554,6 @@ func (ss *SyncSuite) TestProcessingMultipleItems() {
 	ss.core.AssertExpectations(ss.T())
 }
 
-// TestOnFinalizedBlock tests that when new finalized block is discovered engine updates cached variables
-// to latest state
-func (ss *SyncSuite) TestOnFinalizedBlock() {
-	finalizedBlock := unittest.BlockHeaderWithParentFixture(ss.head)
-	// change head
-	ss.head = finalizedBlock
-
-	err := ss.e.finalizedHeader.updateHeader()
-	require.NoError(ss.T(), err)
-	actualHeader := ss.e.finalizedHeader.Get()
-	require.ElementsMatch(ss.T(), ss.e.participantsProvider.Identifiers(), ss.participants[1:].NodeIDs())
-	require.Equal(ss.T(), actualHeader, finalizedBlock)
-}
-
 // TestProcessUnsupportedMessageType tests that Process and ProcessLocal correctly handle a case where invalid message type
 // was submitted from network layer.
 func (ss *SyncSuite) TestProcessUnsupportedMessageType() {
@@ -580,9 +564,4 @@ func (ss *SyncSuite) TestProcessUnsupportedMessageType() {
 		// shouldn't result in error since byzantine inputs are expected
 		require.NoError(ss.T(), err)
 	}
-
-	// in case of local processing error cannot be consumed since all inputs are trusted
-	err := ss.e.ProcessLocal(invalidEvent)
-	require.Error(ss.T(), err)
-	require.True(ss.T(), engine.IsIncompatibleInputTypeError(err))
 }

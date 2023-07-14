@@ -15,7 +15,8 @@ import (
 	executionState "github.com/onflow/flow-go/engine/execution/state"
 	"github.com/onflow/flow-go/fvm"
 	fvmErrors "github.com/onflow/flow-go/fvm/errors"
-	"github.com/onflow/flow-go/fvm/state"
+	"github.com/onflow/flow-go/fvm/storage"
+	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/ledger"
 	completeLedger "github.com/onflow/flow-go/ledger/complete"
 	"github.com/onflow/flow-go/ledger/complete/wal/fixtures"
@@ -369,12 +370,20 @@ func GetBaselineVerifiableChunk(t *testing.T, script string, system bool) *verif
 
 type vmMock struct{}
 
-func (vm *vmMock) RunV2(
+func (vm *vmMock) NewExecutor(
 	ctx fvm.Context,
 	proc fvm.Procedure,
-	storage state.StorageSnapshot,
+	txn storage.TransactionPreparer,
+) fvm.ProcedureExecutor {
+	panic("not implemented")
+}
+
+func (vm *vmMock) Run(
+	ctx fvm.Context,
+	proc fvm.Procedure,
+	storage snapshot.StorageSnapshot,
 ) (
-	*state.ExecutionSnapshot,
+	*snapshot.ExecutionSnapshot,
 	fvm.ProcedureOutput,
 	error,
 ) {
@@ -384,7 +393,7 @@ func (vm *vmMock) RunV2(
 			"invokable is not a transaction")
 	}
 
-	snapshot := &state.ExecutionSnapshot{}
+	snapshot := &snapshot.ExecutionSnapshot{}
 	output := fvm.ProcedureOutput{}
 
 	id0 := flow.NewRegisterID("00", "")
@@ -425,25 +434,10 @@ func (vm *vmMock) RunV2(
 	return snapshot, output, nil
 }
 
-func (vm *vmMock) Run(ctx fvm.Context, proc fvm.Procedure, led state.View) error {
-	snapshot, output, err := vm.RunV2(ctx, proc, nil)
-	if err != nil {
-		return err
-	}
-
-	err = led.Merge(snapshot)
-	if err != nil {
-		return err
-	}
-
-	proc.SetOutput(output)
-	return nil
-}
-
 func (vmMock) GetAccount(
 	_ fvm.Context,
 	_ flow.Address,
-	_ state.StorageSnapshot,
+	_ snapshot.StorageSnapshot,
 ) (
 	*flow.Account,
 	error) {
@@ -452,12 +446,20 @@ func (vmMock) GetAccount(
 
 type vmSystemOkMock struct{}
 
-func (vm *vmSystemOkMock) RunV2(
+func (vm *vmSystemOkMock) NewExecutor(
 	ctx fvm.Context,
 	proc fvm.Procedure,
-	storage state.StorageSnapshot,
+	txn storage.TransactionPreparer,
+) fvm.ProcedureExecutor {
+	panic("not implemented")
+}
+
+func (vm *vmSystemOkMock) Run(
+	ctx fvm.Context,
+	proc fvm.Procedure,
+	storage snapshot.StorageSnapshot,
 ) (
-	*state.ExecutionSnapshot,
+	*snapshot.ExecutionSnapshot,
 	fvm.ProcedureOutput,
 	error,
 ) {
@@ -471,7 +473,7 @@ func (vm *vmSystemOkMock) RunV2(
 	id5 := flow.NewRegisterID("05", "")
 
 	// add "default" interaction expected in tests
-	snapshot := &state.ExecutionSnapshot{
+	snapshot := &snapshot.ExecutionSnapshot{
 		ReadSet: map[flow.RegisterID]struct{}{
 			id0: struct{}{},
 			id5: struct{}{},
@@ -488,25 +490,10 @@ func (vm *vmSystemOkMock) RunV2(
 	return snapshot, output, nil
 }
 
-func (vm *vmSystemOkMock) Run(ctx fvm.Context, proc fvm.Procedure, led state.View) error {
-	snapshot, output, err := vm.RunV2(ctx, proc, nil)
-	if err != nil {
-		return err
-	}
-
-	err = led.Merge(snapshot)
-	if err != nil {
-		return err
-	}
-
-	proc.SetOutput(output)
-	return nil
-}
-
 func (vmSystemOkMock) GetAccount(
 	_ fvm.Context,
 	_ flow.Address,
-	_ state.StorageSnapshot,
+	_ snapshot.StorageSnapshot,
 ) (
 	*flow.Account,
 	error,
@@ -516,12 +503,20 @@ func (vmSystemOkMock) GetAccount(
 
 type vmSystemBadMock struct{}
 
-func (vm *vmSystemBadMock) RunV2(
+func (vm *vmSystemBadMock) NewExecutor(
 	ctx fvm.Context,
 	proc fvm.Procedure,
-	storage state.StorageSnapshot,
+	txn storage.TransactionPreparer,
+) fvm.ProcedureExecutor {
+	panic("not implemented")
+}
+
+func (vm *vmSystemBadMock) Run(
+	ctx fvm.Context,
+	proc fvm.Procedure,
+	storage snapshot.StorageSnapshot,
 ) (
-	*state.ExecutionSnapshot,
+	*snapshot.ExecutionSnapshot,
 	fvm.ProcedureOutput,
 	error,
 ) {
@@ -537,28 +532,13 @@ func (vm *vmSystemBadMock) RunV2(
 		ConvertedServiceEvents: flow.ServiceEventList{*epochCommitServiceEvent},
 	}
 
-	return &state.ExecutionSnapshot{}, output, nil
-}
-
-func (vm *vmSystemBadMock) Run(ctx fvm.Context, proc fvm.Procedure, led state.View) error {
-	snapshot, output, err := vm.RunV2(ctx, proc, nil)
-	if err != nil {
-		return err
-	}
-
-	err = led.Merge(snapshot)
-	if err != nil {
-		return err
-	}
-
-	proc.SetOutput(output)
-	return nil
+	return &snapshot.ExecutionSnapshot{}, output, nil
 }
 
 func (vmSystemBadMock) GetAccount(
 	_ fvm.Context,
 	_ flow.Address,
-	_ state.StorageSnapshot,
+	_ snapshot.StorageSnapshot,
 ) (
 	*flow.Account,
 	error,

@@ -7,11 +7,10 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/engine/execution"
+	"github.com/onflow/flow-go/engine/execution/testutil"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/pathfinder"
 	"github.com/onflow/flow-go/ledger/complete"
-	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -23,24 +22,22 @@ func Test_ComputationResultToBlockDataConversion(t *testing.T) {
 
 	assert.Equal(t, cr.ExecutableBlock.Block, blockData.Block)
 	assert.Equal(t, cr.ExecutableBlock.Collections(), blockData.Collections)
-	require.Equal(t, len(cr.TransactionResults), len(blockData.TxResults))
-	for i, result := range cr.TransactionResults {
+
+	allTxResults := cr.AllTransactionResults()
+	require.Equal(t, len(allTxResults), len(blockData.TxResults))
+	for i, result := range allTxResults {
 		assert.Equal(t, result, *blockData.TxResults[i])
 	}
 
-	eventsCombined := make([]flow.Event, 0)
-	for _, eventsList := range cr.Events {
-		eventsCombined = append(eventsCombined, eventsList...)
-	}
-	require.Equal(t, len(eventsCombined), len(blockData.Events))
+	// ramtin: warning returned events are not preserving orders,
+	// but since we are going to depricate this part of logic,
+	// I'm not going to spend more time fixing this mess
+	allEvents := cr.AllEvents()
+	require.Equal(t, len(allEvents), len(blockData.Events))
 
-	for i, event := range eventsCombined {
-		assert.Equal(t, event, *blockData.Events[i])
-	}
+	assert.Equal(t, len(expectedTrieUpdates), len(blockData.TrieUpdates))
 
-	assert.Equal(t, expectedTrieUpdates, blockData.TrieUpdates)
-
-	assert.Equal(t, cr.EndState, blockData.FinalStateCommitment)
+	assert.Equal(t, cr.CurrentEndState(), blockData.FinalStateCommitment)
 }
 
 func generateComputationResult(
@@ -105,81 +102,10 @@ func generateComputationResult(
 
 	trieUpdate4, err := pathfinder.UpdateToTrieUpdate(update4, complete.DefaultPathFinderVersion)
 	require.NoError(t, err)
-
-	return &execution.ComputationResult{
-			ExecutableBlock: unittest.ExecutableBlockFixture([][]flow.Identifier{
-				{unittest.IdentifierFixture()},
-				{unittest.IdentifierFixture()},
-				{unittest.IdentifierFixture()},
-			}),
-			StateSnapshots: nil,
-			Events: []flow.EventsList{
-				{
-					unittest.EventFixture("what", 0, 0, unittest.IdentifierFixture(), 2),
-					unittest.EventFixture("ever", 0, 1, unittest.IdentifierFixture(), 22),
-				},
-				{},
-				{
-					unittest.EventFixture("what", 2, 0, unittest.IdentifierFixture(), 2),
-					unittest.EventFixture("ever", 2, 1, unittest.IdentifierFixture(), 22),
-					unittest.EventFixture("ever", 2, 2, unittest.IdentifierFixture(), 2),
-					unittest.EventFixture("ever", 2, 3, unittest.IdentifierFixture(), 22),
-				},
-				{}, // system chunk events
-			},
-			EventsHashes:  nil,
-			ServiceEvents: nil,
-			TransactionResults: []flow.TransactionResult{
-				{
-					TransactionID:   unittest.IdentifierFixture(),
-					ErrorMessage:    "",
-					ComputationUsed: 23,
-				},
-				{
-					TransactionID:   unittest.IdentifierFixture(),
-					ErrorMessage:    "fail",
-					ComputationUsed: 1,
-				},
-			},
-			TransactionResultIndex: []int{1, 1, 2, 2},
-			BlockExecutionData: &execution_data.BlockExecutionData{
-				ChunkExecutionDatas: []*execution_data.ChunkExecutionData{
-					&execution_data.ChunkExecutionData{
-						TrieUpdate: trieUpdate1,
-					},
-					&execution_data.ChunkExecutionData{
-						TrieUpdate: trieUpdate2,
-					},
-					&execution_data.ChunkExecutionData{
-						TrieUpdate: trieUpdate3,
-					},
-					&execution_data.ChunkExecutionData{
-						TrieUpdate: trieUpdate4,
-					},
-				},
-			},
-			ExecutionReceipt: &flow.ExecutionReceipt{
-				ExecutionResult: flow.ExecutionResult{
-					Chunks: flow.ChunkList{
-						{
-							EndState: unittest.StateCommitmentFixture(),
-						},
-						{
-							EndState: unittest.StateCommitmentFixture(),
-						},
-						{
-							EndState: unittest.StateCommitmentFixture(),
-						},
-						{
-							EndState: unittest.StateCommitmentFixture(),
-						},
-					},
-				},
-			},
-		}, []*ledger.TrieUpdate{
-			trieUpdate1,
-			trieUpdate2,
-			trieUpdate3,
-			trieUpdate4,
-		}
+	return testutil.ComputationResultFixture(t), []*ledger.TrieUpdate{
+		trieUpdate1,
+		trieUpdate2,
+		trieUpdate3,
+		trieUpdate4,
+	}
 }

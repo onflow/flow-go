@@ -134,6 +134,7 @@ func (n CollectionNode) Start(t *testing.T) {
 	go unittest.FailOnIrrecoverableError(t, n.Ctx.Done(), n.Errs)
 	n.IngestionEngine.Start(n.Ctx)
 	n.EpochManagerEngine.Start(n.Ctx)
+	n.ProviderEngine.Start(n.Ctx)
 }
 
 func (n CollectionNode) Ready() <-chan struct{} {
@@ -212,6 +213,7 @@ func (en ExecutionNode) Ready(ctx context.Context) {
 	en.ReceiptsEngine.Start(irctx)
 	en.FollowerCore.Start(irctx)
 	en.FollowerEngine.Start(irctx)
+	en.SyncEngine.Start(irctx)
 
 	<-util.AllReady(
 		en.Ledger,

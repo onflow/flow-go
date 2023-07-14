@@ -483,6 +483,32 @@ func (_m *AccessAPIServer) GetNetworkParameters(_a0 context.Context, _a1 *access
 	return r0, r1
 }
 
+// GetNodeVersionInfo provides a mock function with given fields: _a0, _a1
+func (_m *AccessAPIServer) GetNodeVersionInfo(_a0 context.Context, _a1 *access.GetNodeVersionInfoRequest) (*access.GetNodeVersionInfoResponse, error) {
+	ret := _m.Called(_a0, _a1)
+
+	var r0 *access.GetNodeVersionInfoResponse
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, *access.GetNodeVersionInfoRequest) (*access.GetNodeVersionInfoResponse, error)); ok {
+		return rf(_a0, _a1)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, *access.GetNodeVersionInfoRequest) *access.GetNodeVersionInfoResponse); ok {
+		r0 = rf(_a0, _a1)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*access.GetNodeVersionInfoResponse)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, *access.GetNodeVersionInfoRequest) error); ok {
+		r1 = rf(_a0, _a1)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // GetTransaction provides a mock function with given fields: _a0, _a1
 func (_m *AccessAPIServer) GetTransaction(_a0 context.Context, _a1 *access.GetTransactionRequest) (*access.TransactionResponse, error) {
 	ret := _m.Called(_a0, _a1)

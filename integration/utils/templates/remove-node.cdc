@@ -14,12 +14,8 @@ transaction(id: String) {
     }
 
     execute {
+        // this method also removes them from the approve-list
         self.adminRef.removeAndRefundNodeRecord(id)
-        let nodeIDs = FlowIDTableStaking.getApprovedList()
-       	nodeIDs[id] = nil
-
-        // set the approved list to the new allow-list
-        self.adminRef.setApprovedList(nodeIDs)
     }
 }
 

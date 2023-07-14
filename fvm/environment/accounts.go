@@ -12,7 +12,7 @@ import (
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/fvm/errors"
-	"github.com/onflow/flow-go/fvm/state"
+	"github.com/onflow/flow-go/fvm/storage/state"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -37,15 +37,16 @@ type Accounts interface {
 	GetStorageUsed(address flow.Address) (uint64, error)
 	SetValue(id flow.RegisterID, value flow.RegisterValue) error
 	AllocateStorageIndex(address flow.Address) (atree.StorageIndex, error)
+	GenerateAccountLocalID(address flow.Address) (uint64, error)
 }
 
 var _ Accounts = &StatefulAccounts{}
 
 type StatefulAccounts struct {
-	txnState state.NestedTransaction
+	txnState state.NestedTransactionPreparer
 }
 
-func NewAccounts(txnState state.NestedTransaction) *StatefulAccounts {
+func NewAccounts(txnState state.NestedTransactionPreparer) *StatefulAccounts {
 	return &StatefulAccounts{
 		txnState: txnState,
 	}
@@ -696,6 +697,32 @@ func (a *StatefulAccounts) DeleteContract(
 	}
 	contractNames.remove(contractName)
 	return a.setContractNames(contractNames, address)
+}
+
+// GenerateAccountLocalID generates a new account local id for an address
+// it is sequential and starts at 1
+// Errors can happen if the account state cannot be read or written to
+func (a *StatefulAccounts) GenerateAccountLocalID(
+	address flow.Address,
+) (
+	uint64,
+	error,
+) {
+	as, err := a.getAccountStatus(address)
+	if err != nil {
+		return 0, fmt.Errorf("failed to get account local id: %w", err)
+	}
+	id := as.AccountIdCounter()
+	// AccountLocalIDs are defined as non 0 so return the incremented value
+	// see: https://github.com/onflow/cadence/blob/2081a601106baaf6ae695e3f2a84613160bb2166/runtime/interface.go#L149
+	id += 1
+
+	as.SetAccountIdCounter(id)
+	err = a.setAccountStatus(address, as)
+	if err != nil {
+		return 0, fmt.Errorf("failed to get increment account local id: %w", err)
+	}
+	return id, nil
 }
 
 func (a *StatefulAccounts) getAccountStatus(

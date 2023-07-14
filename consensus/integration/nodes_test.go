@@ -40,6 +40,7 @@ import (
 	"github.com/onflow/flow-go/module/buffer"
 	builder "github.com/onflow/flow-go/module/builder/consensus"
 	synccore "github.com/onflow/flow-go/module/chainsync"
+	modulecompliance "github.com/onflow/flow-go/module/compliance"
 	finalizer "github.com/onflow/flow-go/module/finalizer/consensus"
 	"github.com/onflow/flow-go/module/id"
 	"github.com/onflow/flow-go/module/irrecoverable"
@@ -314,7 +315,7 @@ func createConsensusIdentities(t *testing.T, n int) *run.ParticipantData {
 
 // completeConsensusIdentities runs KG process and fills nodeInfos with missing random beacon keys
 func completeConsensusIdentities(t *testing.T, nodeInfos []bootstrap.NodeInfo) *run.ParticipantData {
-	dkgData, err := bootstrapDKG.RunFastKG(len(nodeInfos), unittest.RandomBytes(48))
+	dkgData, err := bootstrapDKG.RandomBeaconKG(len(nodeInfos), unittest.RandomBytes(48))
 	require.NoError(t, err)
 
 	participantData := &run.ParticipantData{
@@ -375,7 +376,15 @@ func createNode(
 	setupsDB := storage.NewEpochSetups(metricsCollector, db)
 	commitsDB := storage.NewEpochCommits(metricsCollector, db)
 	statusesDB := storage.NewEpochStatuses(metricsCollector, db)
-	consumer := events.NewDistributor()
+	versionBeaconDB := storage.NewVersionBeacons(db)
+	protocolStateEvents := events.NewDistributor()
+
+	localID := identity.ID()
+
+	log := unittest.Logger().With().
+		Int("index", index).
+		Hex("node_id", localID[:]).
+		Logger()
 
 	state, err := bprotocol.Bootstrap(
 		metricsCollector,
@@ -388,6 +397,7 @@ func createNode(
 		setupsDB,
 		commitsDB,
 		statusesDB,
+		versionBeaconDB,
 		rootSnapshot,
 	)
 	require.NoError(t, err)
@@ -395,10 +405,18 @@ func createNode(
 	blockTimer, err := blocktimer.NewBlockTimer(1*time.Millisecond, 90*time.Second)
 	require.NoError(t, err)
 
-	fullState, err := bprotocol.NewFullConsensusState(state, indexDB, payloadsDB, tracer, consumer, blockTimer, util.MockReceiptValidator(), util.MockSealValidator(sealsDB))
+	fullState, err := bprotocol.NewFullConsensusState(
+		log,
+		tracer,
+		protocolStateEvents,
+		state,
+		indexDB,
+		payloadsDB,
+		blockTimer,
+		util.MockReceiptValidator(),
+		util.MockSealValidator(sealsDB),
+	)
 	require.NoError(t, err)
-
-	localID := identity.ID()
 
 	node := &Node{
 		db:    db,
@@ -406,12 +424,6 @@ func createNode(
 		index: index,
 		id:    identity,
 	}
-
-	// log with node index an ID
-	log := unittest.Logger().With().
-		Int("index", index).
-		Hex("node_id", localID[:]).
-		Logger()
 
 	stopper.AddNode(node)
 
@@ -423,9 +435,9 @@ func createNode(
 
 	// log with node index
 	logConsumer := notifications.NewLogConsumer(log)
-	notifier := pubsub.NewDistributor()
-	notifier.AddConsumer(counterConsumer)
-	notifier.AddConsumer(logConsumer)
+	hotstuffDistributor := pubsub.NewDistributor()
+	hotstuffDistributor.AddConsumer(counterConsumer)
+	hotstuffDistributor.AddConsumer(logConsumer)
 
 	require.Equal(t, participant.nodeInfo.NodeID, localID)
 	privateKeys, err := participant.nodeInfo.PrivateKeys()
@@ -463,7 +475,7 @@ func createNode(
 	// selector := filter.HasRole(flow.RoleConsensus)
 	committee, err := committees.NewConsensusCommittee(state, localID)
 	require.NoError(t, err)
-	consumer.AddConsumer(committee)
+	protocolStateEvents.AddConsumer(committee)
 
 	// initialize the block finalizer
 	final := finalizer.NewFinalizer(db, headersDB, fullState, trace.NewNoopTracer())
@@ -471,9 +483,10 @@ func createNode(
 	syncCore, err := synccore.New(log, synccore.DefaultConfig(), metricsCollector, rootHeader.ChainID)
 	require.NoError(t, err)
 
-	qcDistributor := pubsub.NewQCCreatedDistributor()
+	voteAggregationDistributor := pubsub.NewVoteAggregationDistributor()
+	voteAggregationDistributor.AddVoteAggregationConsumer(logConsumer)
 
-	forks, err := consensus.NewForks(rootHeader, headersDB, final, notifier, rootHeader, rootQC)
+	forks, err := consensus.NewForks(rootHeader, headersDB, final, hotstuffDistributor, rootHeader, rootQC)
 	require.NoError(t, err)
 
 	validator := consensus.NewValidator(metricsCollector, committee)
@@ -505,9 +518,9 @@ func createNode(
 	livenessData, err := persist.GetLivenessData()
 	require.NoError(t, err)
 
-	voteProcessorFactory := votecollector.NewCombinedVoteProcessorFactory(committee, qcDistributor.OnQcConstructedFromVotes)
+	voteProcessorFactory := votecollector.NewCombinedVoteProcessorFactory(committee, voteAggregationDistributor.OnQcConstructedFromVotes)
 
-	createCollectorFactoryMethod := votecollector.NewStateMachineFactory(log, notifier, voteProcessorFactory.Create)
+	createCollectorFactoryMethod := votecollector.NewStateMachineFactory(log, voteAggregationDistributor, voteProcessorFactory.Create)
 	voteCollectors := voteaggregator.NewVoteCollectors(log, livenessData.CurrentView, workerpool.New(2), createCollectorFactoryMethod)
 
 	voteAggregator, err := voteaggregator.NewVoteAggregator(
@@ -515,36 +528,39 @@ func createNode(
 		metricsCollector,
 		metricsCollector,
 		metricsCollector,
-		notifier,
+		voteAggregationDistributor,
 		livenessData.CurrentView,
 		voteCollectors,
 	)
 	require.NoError(t, err)
 
-	timeoutCollectorDistributor := pubsub.NewTimeoutCollectorDistributor()
-	timeoutCollectorDistributor.AddConsumer(logConsumer)
+	timeoutAggregationDistributor := pubsub.NewTimeoutAggregationDistributor()
+	timeoutAggregationDistributor.AddTimeoutCollectorConsumer(logConsumer)
 
 	timeoutProcessorFactory := timeoutcollector.NewTimeoutProcessorFactory(
 		log,
-		timeoutCollectorDistributor,
+		timeoutAggregationDistributor,
 		committee,
 		validator,
 		msig.ConsensusTimeoutTag,
 	)
 	timeoutCollectorsFactory := timeoutcollector.NewTimeoutCollectorFactory(
 		log,
-		notifier,
-		timeoutCollectorDistributor,
+		timeoutAggregationDistributor,
 		timeoutProcessorFactory,
 	)
-	timeoutCollectors := timeoutaggregator.NewTimeoutCollectors(log, livenessData.CurrentView, timeoutCollectorsFactory)
+	timeoutCollectors := timeoutaggregator.NewTimeoutCollectors(
+		log,
+		metricsCollector,
+		livenessData.CurrentView,
+		timeoutCollectorsFactory,
+	)
 
 	timeoutAggregator, err := timeoutaggregator.NewTimeoutAggregator(
 		log,
 		metricsCollector,
 		metricsCollector,
 		metricsCollector,
-		notifier,
 		livenessData.CurrentView,
 		timeoutCollectors,
 	)
@@ -553,12 +569,12 @@ func createNode(
 	hotstuffModules := &consensus.HotstuffModules{
 		Forks:                       forks,
 		Validator:                   validator,
-		Notifier:                    notifier,
+		Notifier:                    hotstuffDistributor,
 		Committee:                   committee,
 		Signer:                      signer,
 		Persist:                     persist,
-		QCCreatedDistributor:        qcDistributor,
-		TimeoutCollectorDistributor: timeoutCollectorDistributor,
+		VoteCollectorDistributor:    voteAggregationDistributor.VoteCollectorDistributor,
+		TimeoutCollectorDistributor: timeoutAggregationDistributor.TimeoutCollectorDistributor,
 		VoteAggregator:              voteAggregator,
 		TimeoutAggregator:           timeoutAggregator,
 	}
@@ -566,6 +582,7 @@ func createNode(
 	// initialize hotstuff
 	hot, err := consensus.NewParticipant(
 		log,
+		metricsCollector,
 		metricsCollector,
 		build,
 		rootHeader,
@@ -585,6 +602,7 @@ func createNode(
 		metricsCollector,
 		metricsCollector,
 		metricsCollector,
+		hotstuffDistributor,
 		tracer,
 		headersDB,
 		payloadsDB,
@@ -595,13 +613,11 @@ func createNode(
 		hot,
 		voteAggregator,
 		timeoutAggregator,
+		modulecompliance.DefaultConfig(),
 	)
 	require.NoError(t, err)
 
 	comp, err := compliance.NewEngine(log, me, compCore)
-	require.NoError(t, err)
-
-	finalizedHeader, err := synceng.NewFinalizedHeaderCache(log, state, pubsub.NewFinalizationDistributor())
 	require.NoError(t, err)
 
 	identities, err := state.Final().Identities(filter.And(
@@ -617,10 +633,10 @@ func createNode(
 		metricsCollector,
 		net,
 		me,
+		state,
 		blocksDB,
 		comp,
 		syncCore,
-		finalizedHeader,
 		idProvider,
 		func(cfg *synceng.Config) {
 			// use a small pool and scan interval for sync engine
@@ -644,7 +660,7 @@ func createNode(
 	)
 	require.NoError(t, err)
 
-	notifier.AddConsumer(messageHub)
+	hotstuffDistributor.AddConsumer(messageHub)
 
 	node.compliance = comp
 	node.sync = sync

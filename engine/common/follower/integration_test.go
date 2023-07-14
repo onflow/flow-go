@@ -13,11 +13,11 @@ import (
 
 	"github.com/onflow/flow-go/consensus"
 	"github.com/onflow/flow-go/consensus/hotstuff"
-	"github.com/onflow/flow-go/consensus/hotstuff/follower"
 	"github.com/onflow/flow-go/consensus/hotstuff/mocks"
 	"github.com/onflow/flow-go/consensus/hotstuff/notifications/pubsub"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/messages"
+	"github.com/onflow/flow-go/module/compliance"
 	moduleconsensus "github.com/onflow/flow-go/module/finalizer/consensus"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
@@ -48,18 +48,40 @@ func TestFollowerHappyPath(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		metrics := metrics.NewNoopCollector()
 		tracer := trace.NewNoopTracer()
+		log := unittest.Logger()
 		consumer := events.NewNoop()
-		headers, _, seals, index, payloads, blocks, qcs, setups, commits, statuses, results := storageutil.StorageLayer(t, db)
+		all := storageutil.StorageLayer(t, db)
 
 		// bootstrap root snapshot
-		state, err := pbadger.Bootstrap(metrics, db, headers, seals, results, blocks, qcs, setups, commits, statuses, rootSnapshot)
+		state, err := pbadger.Bootstrap(
+			metrics,
+			db,
+			all.Headers,
+			all.Seals,
+			all.Results,
+			all.Blocks,
+			all.QuorumCertificates,
+			all.Setups,
+			all.EpochCommits,
+			all.Statuses,
+			all.VersionBeacons,
+			rootSnapshot,
+		)
 		require.NoError(t, err)
 		mockTimer := util.MockBlockTimer()
 
 		// create follower state
-		followerState, err := pbadger.NewFollowerState(state, index, payloads, tracer, consumer, mockTimer)
+		followerState, err := pbadger.NewFollowerState(
+			log,
+			tracer,
+			consumer,
+			state,
+			all.Index,
+			all.Payloads,
+			mockTimer,
+		)
 		require.NoError(t, err)
-		finalizer := moduleconsensus.NewFinalizer(db, headers, followerState, tracer)
+		finalizer := moduleconsensus.NewFinalizer(db, all.Headers, followerState, tracer)
 		rootHeader, err := rootSnapshot.Head()
 		require.NoError(t, err)
 		rootQC, err := rootSnapshot.QuorumCertificate()
@@ -74,21 +96,17 @@ func TestFollowerHappyPath(t *testing.T) {
 		})
 		require.NoError(t, err)
 
-		consensusConsumer := pubsub.NewFinalizationDistributor()
+		consensusConsumer := pubsub.NewFollowerDistributor()
 		// use real consensus modules
-		forks, err := consensus.NewForks(rootHeader, headers, finalizer, consensusConsumer, rootHeader, rootQC)
+		forks, err := consensus.NewForks(rootHeader, all.Headers, finalizer, consensusConsumer, rootHeader, rootQC)
 		require.NoError(t, err)
 
 		// assume all proposals are valid
 		validator := mocks.NewValidator(t)
 		validator.On("ValidateProposal", mock.Anything).Return(nil)
 
-		// initialize the follower followerHotstuffLogic
-		followerHotstuffLogic, err := follower.New(unittest.Logger(), validator, forks)
-		require.NoError(t, err)
-
 		// initialize the follower loop
-		followerLoop, err := hotstuff.NewFollowerLoop(unittest.Logger(), followerHotstuffLogic)
+		followerLoop, err := hotstuff.NewFollowerLoop(unittest.Logger(), metrics, forks)
 		require.NoError(t, err)
 
 		syncCore := module.NewBlockRequester(t)
@@ -114,7 +132,16 @@ func TestFollowerHappyPath(t *testing.T) {
 		net.On("Register", mock.Anything, mock.Anything).Return(con, nil)
 
 		// use real engine
-		engine, err := NewComplianceLayer(unittest.Logger(), net, me, metrics, headers, rootHeader, followerCore)
+		engine, err := NewComplianceLayer(
+			unittest.Logger(),
+			net,
+			me,
+			metrics,
+			all.Headers,
+			rootHeader,
+			followerCore,
+			compliance.DefaultConfig(),
+		)
 		require.NoError(t, err)
 		// don't forget to subscribe for finalization notifications
 		consensusConsumer.AddOnBlockFinalizedConsumer(engine.OnFinalizedBlock)
@@ -143,8 +170,15 @@ func TestFollowerHappyPath(t *testing.T) {
 		}
 		pendingBlocks := flowBlocksToBlockProposals(flowBlocks...)
 
-		// this block should be finalized based on 2-chain finalization rule
-		targetBlockHeight := pendingBlocks[len(pendingBlocks)-4].Block.Header.Height
+		// Regarding the block that we expect to be finalized based on 2-chain finalization rule, we consider the last few blocks in `pendingBlocks`
+		//  ... <-- X <-- Y <-- Z
+		//            ╰─────────╯
+		//          2-chain on top of X
+		// Hence, we expect X to be finalized, which has the index `len(pendingBlocks)-3`
+		// Note: the HotStuff Follower does not see block Z (as there is no QC for X proving its validity). Instead, it sees the certified block
+		//  [◄(X) Y] ◄(Y)
+		// where ◄(B) denotes a QC for block B
+		targetBlockHeight := pendingBlocks[len(pendingBlocks)-3].Block.Header.Height
 
 		// emulate syncing logic, where we push same blocks over and over.
 		originID := unittest.IdentifierFixture()

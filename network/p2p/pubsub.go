@@ -10,6 +10,7 @@ import (
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/routing"
 
+	"github.com/onflow/flow-go/engine/collection"
 	"github.com/onflow/flow-go/module/component"
 )
 
@@ -26,6 +27,12 @@ type TopicValidatorFunc func(context.Context, peer.ID, *pubsub.Message) Validati
 // PubSubAdapter is the abstraction of the underlying pubsub logic that is used by the Flow network.
 type PubSubAdapter interface {
 	component.Component
+	// CollectionClusterChangesConsumer  is the interface for consuming the events of changes in the collection cluster.
+	// This is used to notify the node of changes in the collection cluster.
+	// PubSubAdapter implements this interface and consumes the events to be notified of changes in the clustering channels.
+	// The clustering channels are used by the collection nodes of a cluster to communicate with each other.
+	// As the cluster (and hence their cluster channels) of collection nodes changes over time (per epoch) the node needs to be notified of these changes.
+	CollectionClusterChangesConsumer
 	// RegisterTopicValidator registers a validator for topic.
 	RegisterTopicValidator(topic string, topicValidator TopicValidatorFunc) error
 
@@ -46,6 +53,16 @@ type PubSubAdapter interface {
 	// For example, if current peer has subscribed to topics A and B, then ListPeers only return
 	// subscribed peers for topics A and B, and querying for topic C will return an empty list.
 	ListPeers(topic string) []peer.ID
+
+	// PeerScoreExposer returns the peer score exposer for the gossipsub adapter. The exposer is a read-only interface
+	// for querying peer scores and returns the local scoring table of the underlying gossipsub node.
+	// The exposer is only available if the gossipsub adapter was configured with a score tracer.
+	// If the gossipsub adapter was not configured with a score tracer, the exposer will be nil.
+	// Args:
+	//     None.
+	// Returns:
+	//    The peer score exposer for the gossipsub adapter.
+	PeerScoreExposer() PeerScoreExposer
 }
 
 // PubSubAdapterConfig abstracts the configuration for the underlying pubsub implementation.
@@ -54,11 +71,11 @@ type PubSubAdapterConfig interface {
 	WithSubscriptionFilter(SubscriptionFilter)
 	WithScoreOption(ScoreOptionBuilder)
 	WithMessageIdFunction(f func([]byte) string)
-	WithAppSpecificRpcInspectors(...GossipSubRPCInspector)
 	WithTracer(t PubSubTracer)
 	// WithScoreTracer sets the tracer for the underlying pubsub score implementation.
 	// This is used to expose the local scoring table of the GossipSub node to its higher level components.
 	WithScoreTracer(tracer PeerScoreTracer)
+	WithInspectorSuite(GossipSubInspectorSuite)
 }
 
 // GossipSubControlMetricsObserver funcs used to observe gossipsub related metrics.
@@ -82,6 +99,18 @@ type GossipSubRPCInspector interface {
 	Inspect(peer.ID, *pubsub.RPC) error
 }
 
+// GossipSubMsgValidationRpcInspector abstracts the general behavior of an app specific RPC inspector specifically
+// used to inspect and validate incoming. It is used to implement custom message validation logic. It is injected into
+// the GossipSubRouter and run on every incoming RPC message before the message is processed by libp2p. If the message
+// is invalid the RPC message will be dropped.
+// Implementations must:
+//   - be concurrency safe
+//   - be non-blocking
+type GossipSubMsgValidationRpcInspector interface {
+	collection.ClusterEvents
+	GossipSubRPCInspector
+}
+
 // Topic is the abstraction of the underlying pubsub topic that is used by the Flow network.
 type Topic interface {
 	// String returns the topic name as a string.
@@ -100,7 +129,10 @@ type Topic interface {
 // ScoreOptionBuilder abstracts the configuration for the underlying pubsub score implementation.
 type ScoreOptionBuilder interface {
 	// BuildFlowPubSubScoreOption builds the pubsub score options as pubsub.Option for the Flow network.
-	BuildFlowPubSubScoreOption() pubsub.Option
+	BuildFlowPubSubScoreOption() (*pubsub.PeerScoreParams, *pubsub.PeerScoreThresholds)
+	// TopicScoreParams returns the topic score params for the given topic.
+	// If the topic score params for the given topic does not exist, it will return the default topic score params.
+	TopicScoreParams(*pubsub.Topic) *pubsub.TopicScoreParams
 }
 
 // Subscription is the abstraction of the underlying pubsub subscription that is used by the Flow network.

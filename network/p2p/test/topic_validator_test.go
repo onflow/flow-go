@@ -7,23 +7,26 @@ import (
 	"testing"
 	"time"
 
-	"github.com/onflow/flow-go/network/p2p"
-	p2ptest "github.com/onflow/flow-go/network/p2p/test"
-
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/stretchr/testify/require"
 
-	"github.com/onflow/flow-go/network/p2p/utils"
-
-	"github.com/onflow/flow-go/network/p2p/translator"
+	"github.com/stretchr/testify/mock"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
+	mockmodule "github.com/onflow/flow-go/module/mock"
+	"github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/network/alsp"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/internal/p2pfixtures"
 	"github.com/onflow/flow-go/network/message"
+	"github.com/onflow/flow-go/network/mocknetwork"
+	"github.com/onflow/flow-go/network/p2p"
+	p2ptest "github.com/onflow/flow-go/network/p2p/test"
+	"github.com/onflow/flow-go/network/p2p/translator"
+	"github.com/onflow/flow-go/network/p2p/utils"
 	"github.com/onflow/flow-go/network/slashing"
 	"github.com/onflow/flow-go/network/validator"
 	flowpubsub "github.com/onflow/flow-go/network/validator/pubsub"
@@ -34,15 +37,16 @@ import (
 func TestTopicValidator_Unstaked(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
-
+	idProvider := mockmodule.NewIdentityProvider(t)
 	// create a hooked logger
 	logger, hook := unittest.HookedLogger()
 
 	sporkId := unittest.IdentifierFixture()
 
-	sn1, identity1 := p2ptest.NodeFixture(t, sporkId, t.Name(), p2ptest.WithRole(flow.RoleConsensus), p2ptest.WithLogger(logger))
-	sn2, identity2 := p2ptest.NodeFixture(t, sporkId, t.Name(), p2ptest.WithRole(flow.RoleConsensus), p2ptest.WithLogger(logger))
-
+	sn1, identity1 := p2ptest.NodeFixture(t, sporkId, t.Name(), idProvider, p2ptest.WithRole(flow.RoleConsensus), p2ptest.WithLogger(logger))
+	sn2, identity2 := p2ptest.NodeFixture(t, sporkId, t.Name(), idProvider, p2ptest.WithRole(flow.RoleConsensus), p2ptest.WithLogger(logger))
+	idProvider.On("ByPeerID", sn1.Host().ID()).Return(&identity1, true).Maybe()
+	idProvider.On("ByPeerID", sn2.Host().ID()).Return(&identity2, true).Maybe()
 	nodes := []p2p.LibP2PNode{sn1, sn2}
 	p2ptest.StartNodes(t, signalerCtx, nodes, 100*time.Millisecond)
 	defer p2ptest.StopNodes(t, nodes, cancel, 100*time.Millisecond)
@@ -52,12 +56,12 @@ func TestTopicValidator_Unstaked(t *testing.T) {
 
 	//NOTE: identity2 is not in the ids list simulating an un-staked node
 	ids := flow.IdentityList{&identity1}
-	translator, err := translator.NewFixedTableIdentityTranslator(ids)
+	translatorFixture, err := translator.NewFixedTableIdentityTranslator(ids)
 	require.NoError(t, err)
 
 	// peer filter used by the topic validator to check if node is staked
 	isStaked := func(pid peer.ID) error {
-		fid, err := translator.GetFlowID(pid)
+		fid, err := translatorFixture.GetFlowID(pid)
 		if err != nil {
 			return fmt.Errorf("could not translate the peer_id %s to a Flow identifier: %w", pid.String(), err)
 		}
@@ -108,13 +112,14 @@ func TestTopicValidator_Unstaked(t *testing.T) {
 func TestTopicValidator_PublicChannel(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
-
+	idProvider := mockmodule.NewIdentityProvider(t)
 	sporkId := unittest.IdentifierFixture()
 	logger := unittest.Logger()
 
-	sn1, _ := p2ptest.NodeFixture(t, sporkId, t.Name(), p2ptest.WithRole(flow.RoleConsensus), p2ptest.WithLogger(logger))
-	sn2, identity2 := p2ptest.NodeFixture(t, sporkId, t.Name(), p2ptest.WithRole(flow.RoleConsensus), p2ptest.WithLogger(logger))
-
+	sn1, identity1 := p2ptest.NodeFixture(t, sporkId, t.Name(), idProvider, p2ptest.WithRole(flow.RoleConsensus), p2ptest.WithLogger(logger))
+	sn2, identity2 := p2ptest.NodeFixture(t, sporkId, t.Name(), idProvider, p2ptest.WithRole(flow.RoleConsensus), p2ptest.WithLogger(logger))
+	idProvider.On("ByPeerID", sn1.Host().ID()).Return(&identity1, true).Maybe()
+	idProvider.On("ByPeerID", sn2.Host().ID()).Return(&identity2, true).Maybe()
 	nodes := []p2p.LibP2PNode{sn1, sn2}
 	p2ptest.StartNodes(t, signalerCtx, nodes, 100*time.Millisecond)
 	defer p2ptest.StopNodes(t, nodes, cancel, 100*time.Millisecond)
@@ -166,15 +171,16 @@ func TestTopicValidator_PublicChannel(t *testing.T) {
 func TestTopicValidator_TopicMismatch(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
-
+	idProvider := mockmodule.NewIdentityProvider(t)
 	// create a hooked logger
 	logger, hook := unittest.HookedLogger()
 
 	sporkId := unittest.IdentifierFixture()
 
-	sn1, _ := p2ptest.NodeFixture(t, sporkId, t.Name(), p2ptest.WithRole(flow.RoleConsensus), p2ptest.WithLogger(logger))
-	sn2, identity2 := p2ptest.NodeFixture(t, sporkId, t.Name(), p2ptest.WithRole(flow.RoleConsensus), p2ptest.WithLogger(logger))
-
+	sn1, identity1 := p2ptest.NodeFixture(t, sporkId, t.Name(), idProvider, p2ptest.WithRole(flow.RoleConsensus), p2ptest.WithLogger(logger))
+	sn2, identity2 := p2ptest.NodeFixture(t, sporkId, t.Name(), idProvider, p2ptest.WithRole(flow.RoleConsensus), p2ptest.WithLogger(logger))
+	idProvider.On("ByPeerID", sn1.Host().ID()).Return(&identity1, true).Maybe()
+	idProvider.On("ByPeerID", sn2.Host().ID()).Return(&identity2, true).Maybe()
 	nodes := []p2p.LibP2PNode{sn1, sn2}
 	p2ptest.StartNodes(t, signalerCtx, nodes, 100*time.Millisecond)
 	defer p2ptest.StopNodes(t, nodes, cancel, 100*time.Millisecond)
@@ -218,15 +224,16 @@ func TestTopicValidator_TopicMismatch(t *testing.T) {
 func TestTopicValidator_InvalidTopic(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
-
+	idProvider := mockmodule.NewIdentityProvider(t)
 	// create a hooked logger
 	logger, hook := unittest.HookedLogger()
 
 	sporkId := unittest.IdentifierFixture()
 
-	sn1, _ := p2ptest.NodeFixture(t, sporkId, t.Name(), p2ptest.WithRole(flow.RoleConsensus), p2ptest.WithLogger(logger))
-	sn2, identity2 := p2ptest.NodeFixture(t, sporkId, t.Name(), p2ptest.WithRole(flow.RoleConsensus), p2ptest.WithLogger(logger))
-
+	sn1, identity1 := p2ptest.NodeFixture(t, sporkId, t.Name(), idProvider, p2ptest.WithRole(flow.RoleConsensus), p2ptest.WithLogger(logger))
+	sn2, identity2 := p2ptest.NodeFixture(t, sporkId, t.Name(), idProvider, p2ptest.WithRole(flow.RoleConsensus), p2ptest.WithLogger(logger))
+	idProvider.On("ByPeerID", sn1.Host().ID()).Return(&identity1, true).Maybe()
+	idProvider.On("ByPeerID", sn2.Host().ID()).Return(&identity2, true).Maybe()
 	nodes := []p2p.LibP2PNode{sn1, sn2}
 	p2ptest.StartNodes(t, signalerCtx, nodes, 100*time.Millisecond)
 	defer p2ptest.StopNodes(t, nodes, cancel, 100*time.Millisecond)
@@ -269,16 +276,17 @@ func TestTopicValidator_InvalidTopic(t *testing.T) {
 func TestAuthorizedSenderValidator_Unauthorized(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
-
-	// create a hooked logger
-	logger, hook := unittest.HookedLogger()
+	idProvider := mockmodule.NewIdentityProvider(t)
+	logger := unittest.Logger()
 
 	sporkId := unittest.IdentifierFixture()
 
-	sn1, identity1 := p2ptest.NodeFixture(t, sporkId, t.Name(), p2ptest.WithRole(flow.RoleConsensus))
-	sn2, identity2 := p2ptest.NodeFixture(t, sporkId, t.Name(), p2ptest.WithRole(flow.RoleConsensus))
-	an1, identity3 := p2ptest.NodeFixture(t, sporkId, t.Name(), p2ptest.WithRole(flow.RoleAccess))
-
+	sn1, identity1 := p2ptest.NodeFixture(t, sporkId, t.Name(), idProvider, p2ptest.WithRole(flow.RoleConsensus))
+	sn2, identity2 := p2ptest.NodeFixture(t, sporkId, t.Name(), idProvider, p2ptest.WithRole(flow.RoleConsensus))
+	an1, identity3 := p2ptest.NodeFixture(t, sporkId, t.Name(), idProvider, p2ptest.WithRole(flow.RoleAccess))
+	idProvider.On("ByPeerID", sn1.Host().ID()).Return(&identity1, true).Maybe()
+	idProvider.On("ByPeerID", sn2.Host().ID()).Return(&identity2, true).Maybe()
+	idProvider.On("ByPeerID", an1.Host().ID()).Return(&identity3, true).Maybe()
 	nodes := []p2p.LibP2PNode{sn1, sn2, an1}
 	p2ptest.StartNodes(t, signalerCtx, nodes, 100*time.Millisecond)
 	defer p2ptest.StopNodes(t, nodes, cancel, 100*time.Millisecond)
@@ -288,12 +296,22 @@ func TestAuthorizedSenderValidator_Unauthorized(t *testing.T) {
 
 	ids := flow.IdentityList{&identity1, &identity2, &identity3}
 
-	translator, err := translator.NewFixedTableIdentityTranslator(ids)
+	translatorFixture, err := translator.NewFixedTableIdentityTranslator(ids)
 	require.NoError(t, err)
 
-	violationsConsumer := slashing.NewSlashingViolationsConsumer(logger, metrics.NewNoopCollector())
+	violation := &network.Violation{
+		Identity: &identity3,
+		PeerID:   an1.Host().ID().String(),
+		OriginID: identity3.NodeID,
+		MsgType:  "*messages.BlockProposal",
+		Channel:  channel,
+		Protocol: message.ProtocolTypePubSub,
+		Err:      message.ErrUnauthorizedRole,
+	}
+	violationsConsumer := mocknetwork.NewViolationsConsumer(t)
+	violationsConsumer.On("OnUnAuthorizedSenderError", violation).Once().Return(nil)
 	getIdentity := func(pid peer.ID) (*flow.Identity, bool) {
-		fid, err := translator.GetFlowID(pid)
+		fid, err := translatorFixture.GetFlowID(pid)
 		if err != nil {
 			return &flow.Identity{}, false
 		}
@@ -369,24 +387,22 @@ func TestAuthorizedSenderValidator_Unauthorized(t *testing.T) {
 	p2pfixtures.SubMustNeverReceiveAnyMessage(t, timedCtx, sub2)
 
 	unittest.RequireReturnsBefore(t, wg.Wait, 5*time.Second, "could not receive message on time")
-
-	// ensure the correct error is contained in the logged error
-	require.Contains(t, hook.Logs(), message.ErrUnauthorizedRole.Error())
 }
 
 // TestAuthorizedSenderValidator_Authorized tests that the authorized sender validator rejects messages being sent on the wrong channel
 func TestAuthorizedSenderValidator_InvalidMsg(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
-
+	idProvider := mockmodule.NewIdentityProvider(t)
 	// create a hooked logger
 	logger, hook := unittest.HookedLogger()
 
 	sporkId := unittest.IdentifierFixture()
 
-	sn1, identity1 := p2ptest.NodeFixture(t, sporkId, "consensus_1", p2ptest.WithRole(flow.RoleConsensus))
-	sn2, identity2 := p2ptest.NodeFixture(t, sporkId, "consensus_2", p2ptest.WithRole(flow.RoleConsensus))
-
+	sn1, identity1 := p2ptest.NodeFixture(t, sporkId, "consensus_1", idProvider, p2ptest.WithRole(flow.RoleConsensus))
+	sn2, identity2 := p2ptest.NodeFixture(t, sporkId, "consensus_2", idProvider, p2ptest.WithRole(flow.RoleConsensus))
+	idProvider.On("ByPeerID", sn1.Host().ID()).Return(&identity1, true).Maybe()
+	idProvider.On("ByPeerID", sn2.Host().ID()).Return(&identity2, true).Maybe()
 	nodes := []p2p.LibP2PNode{sn1, sn2}
 	p2ptest.StartNodes(t, signalerCtx, nodes, 100*time.Millisecond)
 	defer p2ptest.StopNodes(t, nodes, cancel, 100*time.Millisecond)
@@ -396,12 +412,16 @@ func TestAuthorizedSenderValidator_InvalidMsg(t *testing.T) {
 	topic := channels.TopicFromChannel(channel, sporkId)
 
 	ids := flow.IdentityList{&identity1, &identity2}
-	translator, err := translator.NewFixedTableIdentityTranslator(ids)
+	translatorFixture, err := translator.NewFixedTableIdentityTranslator(ids)
 	require.NoError(t, err)
 
-	violationsConsumer := slashing.NewSlashingViolationsConsumer(logger, metrics.NewNoopCollector())
+	expectedMisbehaviorReport, err := alsp.NewMisbehaviorReport(identity2.NodeID, alsp.UnAuthorizedSender)
+	require.NoError(t, err)
+	misbehaviorReportConsumer := mocknetwork.NewMisbehaviorReportConsumer(t)
+	misbehaviorReportConsumer.On("ReportMisbehaviorOnChannel", channel, expectedMisbehaviorReport).Once()
+	violationsConsumer := slashing.NewSlashingViolationsConsumer(logger, metrics.NewNoopCollector(), misbehaviorReportConsumer)
 	getIdentity := func(pid peer.ID) (*flow.Identity, bool) {
-		fid, err := translator.GetFlowID(pid)
+		fid, err := translatorFixture.GetFlowID(pid)
 		if err != nil {
 			return &flow.Identity{}, false
 		}
@@ -449,16 +469,18 @@ func TestAuthorizedSenderValidator_InvalidMsg(t *testing.T) {
 func TestAuthorizedSenderValidator_Ejected(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
-
+	idProvider := mockmodule.NewIdentityProvider(t)
 	// create a hooked logger
 	logger, hook := unittest.HookedLogger()
 
 	sporkId := unittest.IdentifierFixture()
 
-	sn1, identity1 := p2ptest.NodeFixture(t, sporkId, "consensus_1", p2ptest.WithRole(flow.RoleConsensus))
-	sn2, identity2 := p2ptest.NodeFixture(t, sporkId, "consensus_2", p2ptest.WithRole(flow.RoleConsensus))
-	an1, identity3 := p2ptest.NodeFixture(t, sporkId, "access_1", p2ptest.WithRole(flow.RoleAccess))
-
+	sn1, identity1 := p2ptest.NodeFixture(t, sporkId, "consensus_1", idProvider, p2ptest.WithRole(flow.RoleConsensus))
+	sn2, identity2 := p2ptest.NodeFixture(t, sporkId, "consensus_2", idProvider, p2ptest.WithRole(flow.RoleConsensus))
+	an1, identity3 := p2ptest.NodeFixture(t, sporkId, "access_1", idProvider, p2ptest.WithRole(flow.RoleAccess))
+	idProvider.On("ByPeerID", sn1.Host().ID()).Return(&identity1, true).Maybe()
+	idProvider.On("ByPeerID", sn2.Host().ID()).Return(&identity2, true).Maybe()
+	idProvider.On("ByPeerID", an1.Host().ID()).Return(&identity3, true).Maybe()
 	nodes := []p2p.LibP2PNode{sn1, sn2, an1}
 	p2ptest.StartNodes(t, signalerCtx, nodes, 100*time.Millisecond)
 	defer p2ptest.StopNodes(t, nodes, cancel, 100*time.Millisecond)
@@ -467,12 +489,16 @@ func TestAuthorizedSenderValidator_Ejected(t *testing.T) {
 	topic := channels.TopicFromChannel(channel, sporkId)
 
 	ids := flow.IdentityList{&identity1, &identity2, &identity3}
-	translator, err := translator.NewFixedTableIdentityTranslator(ids)
+	translatorFixture, err := translator.NewFixedTableIdentityTranslator(ids)
 	require.NoError(t, err)
 
-	violationsConsumer := slashing.NewSlashingViolationsConsumer(logger, metrics.NewNoopCollector())
+	expectedMisbehaviorReport, err := alsp.NewMisbehaviorReport(identity2.NodeID, alsp.SenderEjected)
+	require.NoError(t, err)
+	misbehaviorReportConsumer := mocknetwork.NewMisbehaviorReportConsumer(t)
+	misbehaviorReportConsumer.On("ReportMisbehaviorOnChannel", channel, expectedMisbehaviorReport).Once()
+	violationsConsumer := slashing.NewSlashingViolationsConsumer(logger, metrics.NewNoopCollector(), misbehaviorReportConsumer)
 	getIdentity := func(pid peer.ID) (*flow.Identity, bool) {
-		fid, err := translator.GetFlowID(pid)
+		fid, err := translatorFixture.GetFlowID(pid)
 		if err != nil {
 			return &flow.Identity{}, false
 		}
@@ -544,13 +570,15 @@ func TestAuthorizedSenderValidator_Ejected(t *testing.T) {
 func TestAuthorizedSenderValidator_ClusterChannel(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
-
+	idProvider := mockmodule.NewIdentityProvider(t)
 	sporkId := unittest.IdentifierFixture()
 
-	ln1, identity1 := p2ptest.NodeFixture(t, sporkId, "collection_1", p2ptest.WithRole(flow.RoleCollection))
-	ln2, identity2 := p2ptest.NodeFixture(t, sporkId, "collection_2", p2ptest.WithRole(flow.RoleCollection))
-	ln3, identity3 := p2ptest.NodeFixture(t, sporkId, "collection_3", p2ptest.WithRole(flow.RoleCollection))
-
+	ln1, identity1 := p2ptest.NodeFixture(t, sporkId, "collection_1", idProvider, p2ptest.WithRole(flow.RoleCollection))
+	ln2, identity2 := p2ptest.NodeFixture(t, sporkId, "collection_2", idProvider, p2ptest.WithRole(flow.RoleCollection))
+	ln3, identity3 := p2ptest.NodeFixture(t, sporkId, "collection_3", idProvider, p2ptest.WithRole(flow.RoleCollection))
+	idProvider.On("ByPeerID", ln1.Host().ID()).Return(&identity1, true).Maybe()
+	idProvider.On("ByPeerID", ln2.Host().ID()).Return(&identity2, true).Maybe()
+	idProvider.On("ByPeerID", ln3.Host().ID()).Return(&identity3, true).Maybe()
 	nodes := []p2p.LibP2PNode{ln1, ln2, ln3}
 	p2ptest.StartNodes(t, signalerCtx, nodes, 100*time.Millisecond)
 	defer p2ptest.StopNodes(t, nodes, cancel, 100*time.Millisecond)
@@ -559,13 +587,15 @@ func TestAuthorizedSenderValidator_ClusterChannel(t *testing.T) {
 	topic := channels.TopicFromChannel(channel, sporkId)
 
 	ids := flow.IdentityList{&identity1, &identity2, &identity3}
-	translator, err := translator.NewFixedTableIdentityTranslator(ids)
+	translatorFixture, err := translator.NewFixedTableIdentityTranslator(ids)
 	require.NoError(t, err)
 
 	logger := unittest.Logger()
-	violationsConsumer := slashing.NewSlashingViolationsConsumer(logger, metrics.NewNoopCollector())
+	misbehaviorReportConsumer := mocknetwork.NewMisbehaviorReportConsumer(t)
+	defer misbehaviorReportConsumer.AssertNotCalled(t, "ReportMisbehaviorOnChannel", mock.AnythingOfType("channels.Channel"), mock.AnythingOfType("*alsp.MisbehaviorReport"))
+	violationsConsumer := slashing.NewSlashingViolationsConsumer(logger, metrics.NewNoopCollector(), misbehaviorReportConsumer)
 	getIdentity := func(pid peer.ID) (*flow.Identity, bool) {
-		fid, err := translator.GetFlowID(pid)
+		fid, err := translatorFixture.GetFlowID(pid)
 		if err != nil {
 			return &flow.Identity{}, false
 		}

@@ -2,7 +2,6 @@ package bft
 
 import (
 	"context"
-	"fmt"
 	"time"
 
 	"github.com/rs/zerolog"
@@ -29,29 +28,25 @@ type BaseSuite struct {
 	GhostID                 flow.Identifier      // represents id of ghost node
 	NodeConfigs             testnet.NodeConfigs  // used to keep configuration of nodes in testnet
 	OrchestratorNetwork     *orchestrator.Network
-	BlockRateFlag           string
 }
 
 // Ghost returns a client to interact with the Ghost node on testnet.
 func (b *BaseSuite) Ghost() *client.GhostClient {
-	ghost := b.Net.ContainerByID(b.GhostID)
-	cli, err := lib.GetGhostClient(ghost)
+	client, err := b.Net.ContainerByID(b.GhostID).GhostClient()
 	require.NoError(b.T(), err, "could not get ghost client")
-	return cli
+	return client
 }
 
 // AccessClient returns a client to interact with the access node api on testnet.
 func (b *BaseSuite) AccessClient() *testnet.Client {
-	chain := b.Net.Root().Header.ChainID.Chain()
-	cli, err := testnet.NewClient(fmt.Sprintf(":%s", b.Net.AccessPorts[testnet.AccessNodeAPIPort]), chain)
+	client, err := b.Net.ContainerByName(testnet.PrimaryAN).TestnetClient()
 	require.NoError(b.T(), err, "could not get access client")
-	return cli
+	return client
 }
 
 // SetupSuite sets up node configs to run a bare minimum Flow network to function correctly.
 func (b *BaseSuite) SetupSuite() {
 	b.Log = unittest.LoggerForTest(b.Suite.T(), zerolog.InfoLevel)
-	b.BlockRateFlag = "--block-rate-delay=1ms"
 
 	// setup access nodes
 	b.NodeConfigs = append(b.NodeConfigs,
@@ -66,7 +61,7 @@ func (b *BaseSuite) SetupSuite() {
 			testnet.WithLogLevel(zerolog.FatalLevel),
 			testnet.WithAdditionalFlag("--required-verification-seal-approvals=1"),
 			testnet.WithAdditionalFlag("--required-construction-seal-approvals=1"),
-			testnet.WithAdditionalFlag(b.BlockRateFlag),
+			testnet.WithAdditionalFlag("--cruise-ctl-fallback-proposal-duration=1ms"),
 		)
 		b.NodeConfigs = append(b.NodeConfigs, nodeConfig)
 	}
@@ -85,8 +80,8 @@ func (b *BaseSuite) SetupSuite() {
 
 	// setup collection nodes
 	b.NodeConfigs = append(b.NodeConfigs,
-		testnet.NewNodeConfig(flow.RoleCollection, testnet.WithLogLevel(zerolog.FatalLevel), testnet.WithAdditionalFlag(b.BlockRateFlag)),
-		testnet.NewNodeConfig(flow.RoleCollection, testnet.WithLogLevel(zerolog.FatalLevel), testnet.WithAdditionalFlag(b.BlockRateFlag)),
+		testnet.NewNodeConfig(flow.RoleCollection, testnet.WithLogLevel(zerolog.FatalLevel), testnet.WithAdditionalFlag("--hotstuff-proposal-duration=1ms")),
+		testnet.NewNodeConfig(flow.RoleCollection, testnet.WithLogLevel(zerolog.FatalLevel), testnet.WithAdditionalFlag("--hotstuff-proposal-duration=1ms")),
 	)
 
 	// Ghost Node
@@ -105,7 +100,10 @@ func (b *BaseSuite) SetupSuite() {
 func (b *BaseSuite) TearDownSuite() {
 	b.Net.Remove()
 	b.Cancel()
-	unittest.RequireCloseBefore(b.T(), b.OrchestratorNetwork.Done(), 1*time.Second, "could not stop orchestrator network on time")
+	// check if orchestrator network is set on the base suite, not all tests use the corrupted network.
+	if b.OrchestratorNetwork != nil {
+		unittest.RequireCloseBefore(b.T(), b.OrchestratorNetwork.Done(), 1*time.Second, "could not stop orchestrator network on time")
+	}
 }
 
 // StartCorruptedNetwork starts the corrupted network with the configured node configs, this func should be used after test suite is setup.

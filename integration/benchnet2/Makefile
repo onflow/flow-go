@@ -15,12 +15,12 @@ validate:
 ifeq ($(strip $(VALID_EXECUTION)), 1)
 	# multiple execution nodes are required to prevent seals being generated in case of execution forking.
 	$(error Number of Execution nodes should be no less than 2)
-else ifeq ($(strip $(NETWORK_ID)),)
-	$(error NETWORK_ID cannot be empty)
 else ifeq ($(strip $(VALID_CONSENSUS)), 1)
 	$(error Number of Consensus nodes should be no less than 2)
 else ifeq ($(strip $(VALID_COLLECTION)), 1)
 	$(error Number of Collection nodes should be no less than 6)
+else ifeq ($(strip $(NETWORK_ID)),)
+	$(error NETWORK_ID cannot be empty)
 else ifeq ($(strip $(NAMESPACE)),)
 	$(error NAMESPACE cannot be empty)
 endif
@@ -55,7 +55,7 @@ deploy-all: validate gen-helm-values k8s-secrets-create helm-deploy
 clean-all: validate k8s-delete k8s-delete-secrets clean-bootstrap clean-gen-helm clean-flow
 
 # target to be used in workflow as local clean up will not be needed
-remote-clean-all: validate k8s-delete-secrets k8s-delete 
+remote-clean-all: validate k8s-delete-secrets k8s-delete
 
 clean-bootstrap:
 	rm -rf ./bootstrap
@@ -68,7 +68,7 @@ k8s-secrets-create:
 	bash ./create-secrets.sh ${NETWORK_ID} ${NAMESPACE}
 
 helm-deploy:
-	helm upgrade --install -f ./values.yml ${NETWORK_ID} ./flow --set networkId="${NETWORK_ID}" --set owner="${OWNER}" --debug --namespace ${NAMESPACE} --wait
+	helm upgrade --install -f ./values.yml ${NETWORK_ID} ./flow --set ingress.enabled=true --set networkId="${NETWORK_ID}" --set owner="${OWNER}" --debug --namespace ${NAMESPACE} --wait
 
 k8s-delete:
 	helm delete ${NETWORK_ID} --namespace ${NAMESPACE}
@@ -77,15 +77,8 @@ k8s-delete:
 k8s-delete-secrets:
 	kubectl delete secrets -l networkId=${NETWORK_ID} --namespace ${NAMESPACE}
 
-k8s-expose-locally: validate
-	kubectl port-forward service/access1-${NETWORK_ID} 9000:9000 --namespace ${NAMESPACE}
-
 k8s-pod-health: validate
 	kubectl get pods --namespace ${NAMESPACE}
-
-k8s-test-network-accessibility:
-	flow blocks get latest --host localhost:9000
-	flow accounts create --network benchnet --key  e0ef5e52955e6542287db4528b3e8acc84a2c204eee9609f7c3120d1dac5a11b1bcb39677511db14354aa8c1a0ef62151220d97f015d49a8f0b78b653b570bfd --signer benchnet-account -f ~/flow.json
 
 clone-flow: clean-flow 
 	# this cloned repo will be used for generating bootstrap info specific to that tag / version

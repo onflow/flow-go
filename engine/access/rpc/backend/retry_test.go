@@ -60,6 +60,7 @@ func (suite *Suite) TestTransactionRetry() {
 		nil,
 		suite.log,
 		DefaultSnapshotHistoryLimit,
+		nil,
 	)
 	retry := newRetry().SetBackend(backend).Activate()
 	backend.retry = retry
@@ -96,7 +97,14 @@ func (suite *Suite) TestSuccessfulTransactionsDontRetry() {
 	block := unittest.BlockFixture()
 	// Height needs to be at least DefaultTransactionExpiry before we start doing retries
 	block.Header.Height = flow.DefaultTransactionExpiry + 1
-	transactionBody.SetReferenceBlockID(block.ID())
+	refBlock := unittest.BlockFixture()
+	refBlock.Header.Height = 2
+	transactionBody.SetReferenceBlockID(refBlock.ID())
+
+	block.SetPayload(
+		unittest.PayloadFixture(
+			unittest.WithGuarantees(
+				unittest.CollectionGuaranteesWithCollectionIDFixture([]*flow.Collection{&collection})...)))
 
 	light := collection.Light()
 	suite.state.On("Final").Return(suite.snapshot, nil).Maybe()
@@ -104,6 +112,7 @@ func (suite *Suite) TestSuccessfulTransactionsDontRetry() {
 	suite.transactions.On("ByID", transactionBody.ID()).Return(transactionBody, nil)
 	// collection storage returns the corresponding collection
 	suite.collections.On("LightByTransactionID", transactionBody.ID()).Return(&light, nil)
+	suite.collections.On("LightByID", light.ID()).Return(&light, nil)
 	// block storage returns the corresponding block
 	suite.blocks.On("ByCollectionID", collection.ID()).Return(&block, nil)
 
@@ -140,6 +149,7 @@ func (suite *Suite) TestSuccessfulTransactionsDontRetry() {
 		nil,
 		suite.log,
 		DefaultSnapshotHistoryLimit,
+		nil,
 	)
 	retry := newRetry().SetBackend(backend).Activate()
 	backend.retry = retry
@@ -151,7 +161,7 @@ func (suite *Suite) TestSuccessfulTransactionsDontRetry() {
 	// return not found to return finalized status
 	suite.execClient.On("GetTransactionResult", ctx, &exeEventReq).Return(&exeEventResp, status.Errorf(codes.NotFound, "not found")).Once()
 	// first call - when block under test is greater height than the sealed head, but execution node does not know about Tx
-	result, err := backend.GetTransactionResult(ctx, txID)
+	result, err := backend.GetTransactionResult(ctx, txID, flow.ZeroID, flow.ZeroID)
 	suite.checkResponse(result, err)
 
 	// status should be finalized since the sealed blocks is smaller in height

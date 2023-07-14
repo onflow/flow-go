@@ -8,7 +8,7 @@ import (
 
 	"github.com/onflow/flow-go/fvm/crypto"
 	"github.com/onflow/flow-go/fvm/errors"
-	"github.com/onflow/flow-go/fvm/state"
+	"github.com/onflow/flow-go/fvm/storage/state"
 	"github.com/onflow/flow-go/fvm/tracing"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/trace"
@@ -32,12 +32,12 @@ type AccountKeyReader interface {
 }
 
 type ParseRestrictedAccountKeyReader struct {
-	txnState state.NestedTransaction
+	txnState state.NestedTransactionPreparer
 	impl     AccountKeyReader
 }
 
 func NewParseRestrictedAccountKeyReader(
-	txnState state.NestedTransaction,
+	txnState state.NestedTransactionPreparer,
 	impl AccountKeyReader,
 ) AccountKeyReader {
 	return ParseRestrictedAccountKeyReader{

@@ -68,6 +68,7 @@ func (wr WrappedCadenceRuntime) ReadStored(address common.Address, path cadence.
 }
 
 func (wr WrappedCadenceRuntime) ReadLinked(address common.Address, path cadence.Path, context runtime.Context) (cadence.Value, error) {
+	//nolint:staticcheck
 	v, err := wr.Runtime.ReadLinked(address, path, context)
 	return v, errors.HandleRuntimeError(err)
 }

@@ -2,8 +2,6 @@ package access
 
 import (
 	"context"
-	"fmt"
-	"net"
 	"testing"
 
 	"github.com/rs/zerolog"
@@ -19,7 +17,6 @@ import (
 
 	"github.com/onflow/flow-go/integration/testnet"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/utils/unittest"
 )
 
 func TestObserver(t *testing.T) {
@@ -31,14 +28,23 @@ type ObserverSuite struct {
 	net      *testnet.FlowNetwork
 	teardown func()
 	local    map[string]struct{}
+
+	cancel context.CancelFunc
 }
 
-func (suite *ObserverSuite) TearDownTest() {
-	suite.net.Remove()
+func (s *ObserverSuite) TearDownTest() {
+	if s.net != nil {
+		s.net.Remove()
+		s.net = nil
+	}
+	if s.cancel != nil {
+		s.cancel()
+		s.cancel = nil
+	}
 }
 
-func (suite *ObserverSuite) SetupTest() {
-	suite.local = map[string]struct{}{
+func (s *ObserverSuite) SetupTest() {
+	s.local = map[string]struct{}{
 		"Ping":                           {},
 		"GetLatestBlockHeader":           {},
 		"GetBlockHeaderByID":             {},
@@ -52,114 +58,91 @@ func (suite *ObserverSuite) SetupTest() {
 
 	nodeConfigs := []testnet.NodeConfig{
 		// access node with unstaked nodes supported
-		testnet.NewNodeConfig(flow.RoleAccess, testnet.WithLogLevel(zerolog.InfoLevel), func(nc *testnet.NodeConfig) {
-			nc.SupportsUnstakedNodes = true
-		}),
+		testnet.NewNodeConfig(flow.RoleAccess, testnet.WithLogLevel(zerolog.InfoLevel), testnet.WithAdditionalFlag("--supports-observer=true")),
+
 		// need one dummy execution node (unused ghost)
 		testnet.NewNodeConfig(flow.RoleExecution, testnet.WithLogLevel(zerolog.FatalLevel), testnet.AsGhost()),
+
 		// need one dummy verification node (unused ghost)
 		testnet.NewNodeConfig(flow.RoleVerification, testnet.WithLogLevel(zerolog.FatalLevel), testnet.AsGhost()),
+
 		// need one controllable collection node (unused ghost)
 		testnet.NewNodeConfig(flow.RoleCollection, testnet.WithLogLevel(zerolog.FatalLevel), testnet.AsGhost()),
+
+		// need three consensus nodes (unused ghost)
+		testnet.NewNodeConfig(flow.RoleConsensus, testnet.WithLogLevel(zerolog.FatalLevel), testnet.AsGhost()),
+		testnet.NewNodeConfig(flow.RoleConsensus, testnet.WithLogLevel(zerolog.FatalLevel), testnet.AsGhost()),
+		testnet.NewNodeConfig(flow.RoleConsensus, testnet.WithLogLevel(zerolog.FatalLevel), testnet.AsGhost()),
 	}
 
-	// need three consensus nodes (unused ghost)
-	for n := 0; n < 3; n++ {
-		conID := unittest.IdentifierFixture()
-		nodeConfig := testnet.NewNodeConfig(flow.RoleConsensus,
-			testnet.WithLogLevel(zerolog.FatalLevel),
-			testnet.WithID(conID),
-			testnet.AsGhost())
-		nodeConfigs = append(nodeConfigs, nodeConfig)
-	}
+	observers := []testnet.ObserverConfig{{
+		LogLevel: zerolog.InfoLevel,
+	}}
 
 	// prepare the network
-	conf := testnet.NewNetworkConfig("observer_api_test", nodeConfigs)
-	suite.net = testnet.PrepareFlowNetwork(suite.T(), conf, flow.Localnet)
+	conf := testnet.NewNetworkConfig("observer_api_test", nodeConfigs, testnet.WithObservers(observers...))
+	s.net = testnet.PrepareFlowNetwork(s.T(), conf, flow.Localnet)
 
 	// start the network
-	ctx := context.Background()
+	ctx, cancel := context.WithCancel(context.Background())
+	s.cancel = cancel
 
-	err := suite.net.AddObserver(suite.T(), ctx, &testnet.ObserverConfig{
-		ObserverName:            "observer_1",
-		ObserverImage:           "gcr.io/flow-container-registry/observer:latest",
-		AccessName:              "access_1",
-		AccessPublicNetworkPort: fmt.Sprint(testnet.AccessNodePublicNetworkPort),
-		AccessGRPCSecurePort:    fmt.Sprint(testnet.DefaultSecureGRPCPort),
-	})
-	require.NoError(suite.T(), err)
-
-	suite.net.Start(ctx)
+	s.net.Start(ctx)
 }
 
-func (suite *ObserverSuite) TestObserverConnection() {
-	// tests that the observer can be pinged successfully but returns an error when the upstream access node is stopped
-	ctx := context.Background()
-	t := suite.T()
+// TestObserver runs the following tests:
+// 1. CompareRPCs: verifies that the observer client returns the same errors as the access client for rpcs proxied to the upstream AN
+// 2. HandledByUpstream: stops the upstream AN and verifies that the observer client returns errors for all rpcs handled by the upstream
+// 3. HandledByObserver: stops the upstream AN and verifies that the observer client handles all other queries
+func (s *ObserverSuite) TestObserver() {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	t := s.T()
 
 	// get an observer client
-	observer, err := suite.getObserverClient()
-	assert.NoError(t, err)
+	observer, err := s.getObserverClient()
+	require.NoError(t, err)
 
-	// ping the observer while the access container is running
-	_, err = observer.Ping(ctx, &accessproto.PingRequest{})
-	assert.NoError(t, err)
-}
+	access, err := s.getAccessClient()
+	require.NoError(t, err)
 
-func (suite *ObserverSuite) TestObserverCompareRPCs() {
-	ctx := context.Background()
-	t := suite.T()
-
-	// get an observer and access client
-	observer, err := suite.getObserverClient()
-	assert.NoError(t, err)
-
-	access, err := suite.getAccessClient()
-	assert.NoError(t, err)
-
-	// verify that both clients return the same errors
-	for _, rpc := range suite.getRPCs() {
-		if _, local := suite.local[rpc.name]; local {
-			continue
+	t.Run("CompareRPCs", func(t *testing.T) {
+		// verify that both clients return the same errors for proxied rpcs
+		for _, rpc := range s.getRPCs() {
+			// skip rpcs handled locally by observer
+			if _, local := s.local[rpc.name]; local {
+				continue
+			}
+			t.Run(rpc.name, func(t *testing.T) {
+				accessErr := rpc.call(ctx, access)
+				observerErr := rpc.call(ctx, observer)
+				assert.Equal(t, accessErr, observerErr)
+			})
 		}
-		t.Run(rpc.name, func(t *testing.T) {
-			accessErr := rpc.call(ctx, access)
-			observerErr := rpc.call(ctx, observer)
-			assert.Equal(t, accessErr, observerErr)
-		})
-	}
-}
-
-func (suite *ObserverSuite) TestObserverWithoutAccess() {
-	// tests that the observer returns errors when the access node is stopped
-	ctx := context.Background()
-	t := suite.T()
-
-	// get an observer client
-	observer, err := suite.getObserverClient()
-	assert.NoError(t, err)
+	})
 
 	// stop the upstream access container
-	err = suite.net.StopContainerByName(ctx, "access_1")
-	assert.NoError(t, err)
+	err = s.net.StopContainerByName(ctx, testnet.PrimaryAN)
+	require.NoError(t, err)
 
 	t.Run("HandledByUpstream", func(t *testing.T) {
-		// verify that we receive errors from all rpcs handled upstream
-		for _, rpc := range suite.getRPCs() {
-			if _, local := suite.local[rpc.name]; local {
+		// verify that we receive Unavailable errors from all rpcs handled upstream
+		for _, rpc := range s.getRPCs() {
+			if _, local := s.local[rpc.name]; local {
 				continue
 			}
 			t.Run(rpc.name, func(t *testing.T) {
 				err := rpc.call(ctx, observer)
-				assert.Error(t, err)
+				assert.Equal(t, codes.Unavailable, status.Code(err))
 			})
 		}
 	})
 
 	t.Run("HandledByObserver", func(t *testing.T) {
-		// verify that we receive not found errors or no error from all rpcs handled locally
-		for _, rpc := range suite.getRPCs() {
-			if _, local := suite.local[rpc.name]; !local {
+		// verify that we receive NotFound or no error from all rpcs handled locally
+		for _, rpc := range s.getRPCs() {
+			if _, local := s.local[rpc.name]; !local {
 				continue
 			}
 			t.Run(rpc.name, func(t *testing.T) {
@@ -167,23 +150,22 @@ func (suite *ObserverSuite) TestObserverWithoutAccess() {
 				if err == nil {
 					return
 				}
-				code := status.Code(err)
-				assert.Equal(t, codes.NotFound, code)
+				assert.Equal(t, codes.NotFound, status.Code(err))
 			})
 		}
 	})
 
 }
 
-func (suite *ObserverSuite) getAccessClient() (accessproto.AccessAPIClient, error) {
-	return suite.getClient(net.JoinHostPort("localhost", suite.net.AccessPorts[testnet.AccessNodeAPIPort]))
+func (s *ObserverSuite) getAccessClient() (accessproto.AccessAPIClient, error) {
+	return s.getClient(s.net.ContainerByName(testnet.PrimaryAN).Addr(testnet.GRPCPort))
 }
 
-func (suite *ObserverSuite) getObserverClient() (accessproto.AccessAPIClient, error) {
-	return suite.getClient(net.JoinHostPort("localhost", suite.net.ObserverPorts[testnet.ObserverNodeAPIPort]))
+func (s *ObserverSuite) getObserverClient() (accessproto.AccessAPIClient, error) {
+	return s.getClient(s.net.ContainerByName("observer_1").Addr(testnet.GRPCPort))
 }
 
-func (suite *ObserverSuite) getClient(address string) (accessproto.AccessAPIClient, error) {
+func (s *ObserverSuite) getClient(address string) (accessproto.AccessAPIClient, error) {
 	// helper func to create an access client
 	conn, err := grpc.Dial(address, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
@@ -199,7 +181,7 @@ type RPCTest struct {
 	call func(ctx context.Context, client accessproto.AccessAPIClient) error
 }
 
-func (suite *ObserverSuite) getRPCs() []RPCTest {
+func (s *ObserverSuite) getRPCs() []RPCTest {
 	return []RPCTest{
 		{name: "Ping", call: func(ctx context.Context, client accessproto.AccessAPIClient) error {
 			_, err := client.Ping(ctx, &accessproto.PingRequest{})

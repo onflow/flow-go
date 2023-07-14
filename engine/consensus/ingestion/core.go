@@ -18,6 +18,7 @@ import (
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/module/trace"
+	"github.com/onflow/flow-go/state"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
 )
@@ -158,7 +159,7 @@ func (e *Core) validateGuarantors(guarantee *flow.CollectionGuarantee) error {
 	snapshot := e.state.AtBlockID(guarantee.ReferenceBlockID)
 	cluster, err := snapshot.Epochs().Current().ClusterByChainID(guarantee.ChainID)
 	// reference block not found
-	if errors.Is(err, storage.ErrNotFound) {
+	if errors.Is(err, state.ErrUnknownSnapshotReference) {
 		return engine.NewUnverifiableInputError(
 			"could not get clusters with chainID %v for unknown reference block (id=%x): %w", guarantee.ChainID, guarantee.ReferenceBlockID, err)
 	}
@@ -212,7 +213,7 @@ func (e *Core) validateOrigin(originID flow.Identifier, guarantee *flow.Collecti
 	valid, err := protocol.IsNodeAuthorizedWithRoleAt(refState, originID, flow.RoleCollection)
 	if err != nil {
 		// collection with an unknown reference block is unverifiable
-		if errors.Is(err, storage.ErrNotFound) {
+		if errors.Is(err, state.ErrUnknownSnapshotReference) {
 			return engine.NewUnverifiableInputError("could not get origin (id=%x) for unknown reference block (id=%x): %w", originID, guarantee.ReferenceBlockID, err)
 		}
 		return fmt.Errorf("unexpected error checking collection origin %x at reference block %x: %w", originID, guarantee.ReferenceBlockID, err)

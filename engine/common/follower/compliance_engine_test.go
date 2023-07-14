@@ -15,6 +15,7 @@ import (
 	followermock "github.com/onflow/flow-go/engine/common/follower/mock"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/messages"
+	"github.com/onflow/flow-go/module/compliance"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
 	module "github.com/onflow/flow-go/module/mock"
@@ -70,7 +71,8 @@ func (s *EngineSuite) SetupTest() {
 		metrics,
 		s.headers,
 		s.finalized,
-		s.core)
+		s.core,
+		compliance.DefaultConfig())
 	require.Nil(s.T(), err)
 
 	s.engine = eng
