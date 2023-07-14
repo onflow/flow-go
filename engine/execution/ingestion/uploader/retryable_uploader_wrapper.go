@@ -264,6 +264,7 @@ func (b *BadgerRetryableUploaderWrapper) reconstructComputationResult(
 	compRes.AppendCollectionAttestationResult(
 		endState,
 		endState,
+		flow.ZeroID,
 		nil,
 		flow.ZeroID,
 		nil,
