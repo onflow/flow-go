@@ -89,12 +89,16 @@ func NewCollectionAttestationResult(
 	}
 }
 
-func (a *CollectionAttestationResult) StateDeltaCommitment() flow.Identifier {
-	return a.stateDeltaCommit
+func (a *CollectionAttestationResult) StartStateCommitment() flow.StateCommitment {
+	return a.startStateCommit
 }
 
 func (a *CollectionAttestationResult) EndStateCommitment() flow.StateCommitment {
 	return a.endStateCommit
+}
+
+func (a *CollectionAttestationResult) StateDeltaCommitment() flow.Identifier {
+	return a.stateDeltaCommit
 }
 
 func (a *CollectionAttestationResult) StateProof() flow.StorageProof {
