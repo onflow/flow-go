@@ -265,58 +265,65 @@ type Indexes struct {
 // testAddRemoveEntities adds and removes randomly elements in the pool, probabilityOfAdding and its counterpart 1-probabilityOfAdding are probabilities
 // for an operation to be add or remove. Current timestamp is taken as a seed for a random number generator.
 func testAddRemoveEntities(t *testing.T, limit uint32, entityCount uint32, ejectionMode EjectionMode, numberOfOperations int, probabilityOfAdding float32) {
+
+	require.GreaterOrEqual(t, entityCount, 2*limit, "entityCount must be greater or equal to 2*limit to test add/remove operations")
 	// create and log the seed.
 	testSeed := time.Now().UnixNano()
+	t.Logf("seed used for test %s is %d: ", t.Name(), testSeed)
 	rand.Seed(testSeed)
-	fmt.Println("Seed used for this testAddRemoveEntities execution", testSeed)
-
 	pool := NewHeroPool(limit, ejectionMode)
-
 	entities := unittest.EntityListFixture(uint(entityCount))
-
+	// retryLimit is the max number of retries to find an entity that is not already in the pool to add it.
+	// The test fails if it reaches this limit.
+	retryLimit := 100
 	// an array of random owner Ids.
-	ownerIds := make([]uint64, entityCount, entityCount)
-	// generate ownerId to index in the entities arrray.
+	ownerIds := make([]uint64, entityCount)
+	// generate ownerId to index in the entities array.
 	for i := 0; i < int(entityCount); i++ {
 		ownerIds[i] = rand.Uint64()
 	}
 	// this map maintains entities currently stored in the pool.
 	addedEntities := make(map[flow.Identifier]int)
 	addedEntitiesInPool := make(map[flow.Identifier]EIndex)
-
 	for i := 0; i < numberOfOperations; i++ {
 		// choose between Add and Remove with a probability of probabilityOfAdding and 1-probabilityOfAdding respectively.
 		if rand.Float32() < probabilityOfAdding || len(addedEntities) == 0 {
-
-			// find an entity to add
-			entityToAddIndex := -1
+			// keeps finding an entity to add until it finds one that is not already in the pool.
 			found := false
-			for retryTime := 0; retryTime < 100; retryTime++ {
-				entityToAddIndexTmp := rand.Intn(int(entityCount))
-				_, found = addedEntities[entities[entityToAddIndexTmp].ID()]
+			for retryTime := 0; retryTime < retryLimit; retryTime++ {
+				toAddIndexTmp := rand.Intn(int(entityCount))
+				_, found = addedEntities[entities[toAddIndexTmp].ID()]
 				if !found {
-					entityToAddIndex = entityToAddIndexTmp
+					// found an entity that is not in the pool, add it.
+					indexInThePool, _, ejectedEntity := pool.Add(entities[toAddIndexTmp].ID(), entities[toAddIndexTmp], ownerIds[toAddIndexTmp])
+					if ejectionMode != NoEjection || len(addedEntities) < int(limit) {
+						// when there is an ejection mode in place, and the pool is not full, the index should be valid.
+						require.NotEqual(t, InvalidIndex, indexInThePool)
+					}
+					if ejectionMode != NoEjection && len(addedEntities) >= int(limit) {
+						// when there is an ejection mode in place, the ejected entity should be valid.
+						require.NotNil(t, ejectedEntity)
+					}
+					if indexInThePool != InvalidIndex {
+						entityId := entities[toAddIndexTmp].ID()
+						// tracks the index of the entity in the pool and the index of the entity in the entities array.
+						addedEntities[entityId] = toAddIndexTmp
+						addedEntitiesInPool[entityId] = indexInThePool
+						// any entity added to the pool should be in the pool, and must be retrievable.
+						actualFlowId, actualEntity, actualOwnerId := pool.Get(indexInThePool)
+						require.Equal(t, entityId, actualFlowId)
+						require.Equal(t, entities[toAddIndexTmp], actualEntity, "pool returned a different entity than the one added")
+						require.Equal(t, ownerIds[toAddIndexTmp], actualOwnerId, "pool returned a different owner than the one added")
+					}
+					if ejectedEntity != nil {
+						require.Contains(t, addedEntities, ejectedEntity.ID(), "pool ejected an entity that was not added before")
+						delete(addedEntities, ejectedEntity.ID())
+						delete(addedEntitiesInPool, ejectedEntity.ID())
+					}
 					break
 				}
 			}
-			if !found {
-				indexInThePool, _, ejectedEntity := pool.Add(entities[entityToAddIndex].ID(), entities[entityToAddIndex], uint64(ownerIds[entityToAddIndex]))
-				require.True(t, indexInThePool != InvalidIndex || (ejectionMode == NoEjection && len(addedEntities) == int(limit)))
-				require.True(t, ejectionMode != NoEjection || ejectedEntity == nil)
-				if indexInThePool != InvalidIndex {
-					addedEntities[entities[entityToAddIndex].ID()] = entityToAddIndex
-					addedEntitiesInPool[entities[entityToAddIndex].ID()] = indexInThePool
-					actualFlowId, actualEntity, actualOwnerId := pool.Get(indexInThePool)
-					require.Equal(t, entities[entityToAddIndex].ID(), actualFlowId)
-					require.Equal(t, entities[entityToAddIndex], actualEntity)
-					require.Equal(t, ownerIds[entityToAddIndex], actualOwnerId)
-				}
-				if ejectedEntity != nil {
-					require.Contains(t, addedEntities, ejectedEntity.ID(), "pool ejected an entity that was not added before")
-					delete(addedEntities, ejectedEntity.ID())
-					delete(addedEntitiesInPool, ejectedEntity.ID())
-				}
-			}
+			require.Falsef(t, found, "could not find an entity to add after %d retries", retryLimit)
 		} else {
 			// randomly select an index of an entity to remove.
 			entityToRemove := rand.Intn(len(addedEntities))
@@ -333,9 +340,10 @@ func testAddRemoveEntities(t *testing.T, limit uint32, entityCount uint32, eject
 			}
 			// remove the selected entity from the pool.
 			removedEntity := pool.Remove(indexInPoolToRemove)
-			require.Equal(t, entities[indexInEntitiesArray].ID(), removedEntity.ID(), "removed wrong entity")
-			delete(addedEntities, entities[indexInEntitiesArray].ID())
-			delete(addedEntitiesInPool, entities[indexInEntitiesArray].ID())
+			expectedRemovedEntityId := entities[indexInEntitiesArray].ID()
+			require.Equal(t, expectedRemovedEntityId, removedEntity.ID(), "removed wrong entity")
+			delete(addedEntities, expectedRemovedEntityId)
+			delete(addedEntitiesInPool, expectedRemovedEntityId)
 			actualFlowId, actualEntity, _ := pool.Get(indexInPoolToRemove)
 			require.Equal(t, flow.ZeroID, actualFlowId)
 			require.Equal(t, nil, actualEntity)
@@ -348,6 +356,7 @@ func testAddRemoveEntities(t *testing.T, limit uint32, entityCount uint32, eject
 		require.Equal(t, entities[v], actualEntity)
 		require.Equal(t, ownerIds[v], actualOwnerId)
 	}
+	require.Equalf(t, len(addedEntities), int(pool.Size()), "pool size is not correct, expected %d, actual %d", len(addedEntities), pool.Size())
 }
 
 // testInvalidatingHead keeps invalidating the head and evaluates the linked-list keeps updating its head
