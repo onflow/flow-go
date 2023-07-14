@@ -134,6 +134,7 @@ func (ar *BlockAttestationResult) CollectionAttestationResultAt(colIndex int) *C
 func (ar *BlockAttestationResult) AppendCollectionAttestationResult(
 	startStateCommit flow.StateCommitment,
 	endStateCommit flow.StateCommitment,
+	stateDeltaCommit flow.Identifier,
 	stateProof flow.StorageProof,
 	eventCommit flow.Identifier,
 	chunkExecutionDatas *execution_data.ChunkExecutionData,
@@ -142,6 +143,7 @@ func (ar *BlockAttestationResult) AppendCollectionAttestationResult(
 		CollectionAttestationResult{
 			startStateCommit: startStateCommit,
 			endStateCommit:   endStateCommit,
+			stateDeltaCommit: stateDeltaCommit,
 			stateProof:       stateProof,
 			eventCommit:      eventCommit,
 		},
@@ -169,6 +171,7 @@ func (ar *BlockAttestationResult) ChunkAt(index int) *flow.Chunk {
 		ar.Block.ID(),
 		index,
 		attestRes.startStateCommit,
+		attestRes.stateDeltaCommit,
 		len(execRes.TransactionResults()),
 		attestRes.eventCommit,
 		attestRes.endStateCommit,

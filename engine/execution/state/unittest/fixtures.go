@@ -39,6 +39,7 @@ func ComputationResultForBlockFixture(
 		computationResult.AppendCollectionAttestationResult(
 			*completeBlock.StartState,
 			*completeBlock.StartState,
+			unittest.IdentifierFixture(),
 			nil,
 			unittest.IdentifierFixture(),
 			nil,

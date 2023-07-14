@@ -68,6 +68,7 @@ func (c *CollectionExecutionResult) TransactionResults() flow.TransactionResults
 type CollectionAttestationResult struct {
 	startStateCommit flow.StateCommitment
 	endStateCommit   flow.StateCommitment
+	stateDeltaCommit flow.Identifier
 	stateProof       flow.StorageProof
 	eventCommit      flow.Identifier
 }
@@ -75,19 +76,21 @@ type CollectionAttestationResult struct {
 func NewCollectionAttestationResult(
 	startStateCommit flow.StateCommitment,
 	endStateCommit flow.StateCommitment,
+	stateDeltaCommit flow.Identifier,
 	stateProof flow.StorageProof,
 	eventCommit flow.Identifier,
 ) *CollectionAttestationResult {
 	return &CollectionAttestationResult{
 		startStateCommit: startStateCommit,
 		endStateCommit:   endStateCommit,
+		stateDeltaCommit: stateDeltaCommit,
 		stateProof:       stateProof,
 		eventCommit:      eventCommit,
 	}
 }
 
-func (a *CollectionAttestationResult) StartStateCommitment() flow.StateCommitment {
-	return a.startStateCommit
+func (a *CollectionAttestationResult) StateDeltaCommitment() flow.Identifier {
+	return a.stateDeltaCommit
 }
 
 func (a *CollectionAttestationResult) EndStateCommitment() flow.StateCommitment {
