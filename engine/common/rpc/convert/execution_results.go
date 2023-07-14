@@ -148,6 +148,7 @@ func MessageToChunk(m *entities.Chunk) (*flow.Chunk, error) {
 	chunkBody := flow.ChunkBody{
 		CollectionIndex:      uint(m.CollectionIndex),
 		StartState:           startState,
+		StateDeltaCommitment: MessageToIdentifier(m.StateDeltaCommitment),
 		EventCollection:      MessageToIdentifier(m.EventCollection),
 		BlockID:              MessageToIdentifier(m.BlockId),
 		TotalComputationUsed: m.TotalComputationUsed,
