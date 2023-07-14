@@ -291,29 +291,34 @@ func testAddRemoveEntities(t *testing.T, limit uint32, entityCount uint32, eject
 			// keeps finding an entity to add until it finds one that is not already in the pool.
 			found := false
 			for retryTime := 0; retryTime < retryLimit; retryTime++ {
-				toAddIndexTmp := rand.Intn(int(entityCount))
-				_, found = addedEntities[entities[toAddIndexTmp].ID()]
+				toAddIndex := rand.Intn(int(entityCount))
+				_, found = addedEntities[entities[toAddIndex].ID()]
 				if !found {
 					// found an entity that is not in the pool, add it.
-					indexInThePool, _, ejectedEntity := pool.Add(entities[toAddIndexTmp].ID(), entities[toAddIndexTmp], ownerIds[toAddIndexTmp])
+					indexInThePool, _, ejectedEntity := pool.Add(entities[toAddIndex].ID(), entities[toAddIndex], ownerIds[toAddIndex])
 					if ejectionMode != NoEjection || len(addedEntities) < int(limit) {
-						// when there is an ejection mode in place, and the pool is not full, the index should be valid.
+						// when there is an ejection mode in place, or the pool is not full, the index should be valid.
 						require.NotEqual(t, InvalidIndex, indexInThePool)
+					}
+					require.LessOrEqual(t, len(addedEntities), int(limit), "pool should not contain more elements than its limit")
+					if ejectionMode != NoEjection && len(addedEntities) == int(limit) {
+						// when there is an ejection mode in place, the ejected entity should be valid.
+						require.NotNil(t, ejectedEntity)
 					}
 					if ejectionMode != NoEjection && len(addedEntities) >= int(limit) {
 						// when there is an ejection mode in place, the ejected entity should be valid.
 						require.NotNil(t, ejectedEntity)
 					}
 					if indexInThePool != InvalidIndex {
-						entityId := entities[toAddIndexTmp].ID()
+						entityId := entities[toAddIndex].ID()
 						// tracks the index of the entity in the pool and the index of the entity in the entities array.
-						addedEntities[entityId] = toAddIndexTmp
+						addedEntities[entityId] = toAddIndex
 						addedEntitiesInPool[entityId] = indexInThePool
 						// any entity added to the pool should be in the pool, and must be retrievable.
 						actualFlowId, actualEntity, actualOwnerId := pool.Get(indexInThePool)
 						require.Equal(t, entityId, actualFlowId)
-						require.Equal(t, entities[toAddIndexTmp], actualEntity, "pool returned a different entity than the one added")
-						require.Equal(t, ownerIds[toAddIndexTmp], actualOwnerId, "pool returned a different owner than the one added")
+						require.Equal(t, entities[toAddIndex], actualEntity, "pool returned a different entity than the one added")
+						require.Equal(t, ownerIds[toAddIndex], actualOwnerId, "pool returned a different owner than the one added")
 					}
 					if ejectedEntity != nil {
 						require.Contains(t, addedEntities, ejectedEntity.ID(), "pool ejected an entity that was not added before")
