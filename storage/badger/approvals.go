@@ -5,7 +5,6 @@ import (
 	"fmt"
 
 	"github.com/dgraph-io/badger/v2"
-
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/metrics"
@@ -17,20 +16,18 @@ import (
 // ResultApprovals implements persistent storage for result approvals.
 type ResultApprovals struct {
 	db    *badger.DB
-	cache *Cache
+	cache *Cache[flow.Identifier, *flow.ResultApproval]
 }
 
 func NewResultApprovals(collector module.CacheMetrics, db *badger.DB) *ResultApprovals {
 
-	store := func(key interface{}, val interface{}) func(*transaction.Tx) error {
-		approval := val.(*flow.ResultApproval)
-		return transaction.WithTx(operation.SkipDuplicates(operation.InsertResultApproval(approval)))
+	store := func(key flow.Identifier, val *flow.ResultApproval) func(*transaction.Tx) error {
+		return transaction.WithTx(operation.SkipDuplicates(operation.InsertResultApproval(val)))
 	}
 
-	retrieve := func(key interface{}) func(tx *badger.Txn) (interface{}, error) {
-		approvalID := key.(flow.Identifier)
+	retrieve := func(approvalID flow.Identifier) func(tx *badger.Txn) (*flow.ResultApproval, error) {
 		var approval flow.ResultApproval
-		return func(tx *badger.Txn) (interface{}, error) {
+		return func(tx *badger.Txn) (*flow.ResultApproval, error) {
 			err := operation.RetrieveResultApproval(approvalID, &approval)(tx)
 			return &approval, err
 		}
@@ -38,10 +35,10 @@ func NewResultApprovals(collector module.CacheMetrics, db *badger.DB) *ResultApp
 
 	res := &ResultApprovals{
 		db: db,
-		cache: newCache(collector, metrics.ResourceResultApprovals,
-			withLimit(flow.DefaultTransactionExpiry+100),
-			withStore(store),
-			withRetrieve(retrieve)),
+		cache: newCache[flow.Identifier, *flow.ResultApproval](collector, metrics.ResourceResultApprovals,
+			withLimit[flow.Identifier, *flow.ResultApproval](flow.DefaultTransactionExpiry+100),
+			withStore[flow.Identifier, *flow.ResultApproval](store),
+			withRetrieve[flow.Identifier, *flow.ResultApproval](retrieve)),
 	}
 
 	return res
@@ -57,7 +54,7 @@ func (r *ResultApprovals) byID(approvalID flow.Identifier) func(*badger.Txn) (*f
 		if err != nil {
 			return nil, err
 		}
-		return val.(*flow.ResultApproval), nil
+		return val, nil
 	}
 }
 

@@ -2,7 +2,6 @@ package badger
 
 import (
 	"github.com/dgraph-io/badger/v2"
-
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/metrics"
@@ -12,21 +11,18 @@ import (
 
 type EpochCommits struct {
 	db    *badger.DB
-	cache *Cache
+	cache *Cache[flow.Identifier, *flow.EpochCommit]
 }
 
 func NewEpochCommits(collector module.CacheMetrics, db *badger.DB) *EpochCommits {
 
-	store := func(key interface{}, val interface{}) func(*transaction.Tx) error {
-		id := key.(flow.Identifier)
-		commit := val.(*flow.EpochCommit)
+	store := func(id flow.Identifier, commit *flow.EpochCommit) func(*transaction.Tx) error {
 		return transaction.WithTx(operation.SkipDuplicates(operation.InsertEpochCommit(id, commit)))
 	}
 
-	retrieve := func(key interface{}) func(*badger.Txn) (interface{}, error) {
-		id := key.(flow.Identifier)
-		var commit flow.EpochCommit
-		return func(tx *badger.Txn) (interface{}, error) {
+	retrieve := func(id flow.Identifier) func(*badger.Txn) (*flow.EpochCommit, error) {
+		return func(tx *badger.Txn) (*flow.EpochCommit, error) {
+			var commit flow.EpochCommit
 			err := operation.RetrieveEpochCommit(id, &commit)(tx)
 			return &commit, err
 		}
@@ -34,8 +30,8 @@ func NewEpochCommits(collector module.CacheMetrics, db *badger.DB) *EpochCommits
 
 	ec := &EpochCommits{
 		db: db,
-		cache: newCache(collector, metrics.ResourceEpochCommit,
-			withLimit(4*flow.DefaultTransactionExpiry),
+		cache: newCache[flow.Identifier, *flow.EpochCommit](collector, metrics.ResourceEpochCommit,
+			withLimit[flow.Identifier, *flow.EpochCommit](4*flow.DefaultTransactionExpiry),
 			withStore(store),
 			withRetrieve(retrieve)),
 	}
@@ -53,7 +49,7 @@ func (ec *EpochCommits) retrieveTx(commitID flow.Identifier) func(tx *badger.Txn
 		if err != nil {
 			return nil, err
 		}
-		return val.(*flow.EpochCommit), nil
+		return val, nil
 	}
 }
 
