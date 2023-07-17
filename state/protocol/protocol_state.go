@@ -12,9 +12,9 @@ type InitialProtocolState interface {
 	// Clustering returns initial clustering from epoch setup.
 	Clustering() flow.ClusterList
 	// EpochSetup returns original epoch setup event that was used to initialize the protocol state.
-	EpochSetup() flow.EpochSetup
+	EpochSetup() *flow.EpochSetup
 	// EpochCommit returns original epoch commit event that was used to update the protocol state.
-	EpochCommit() flow.EpochCommit
+	EpochCommit() *flow.EpochCommit
 	// DKG returns information about DKG that was obtained from EpochCommit event.
 	DKG() DKG
 }
@@ -35,12 +35,17 @@ type DynamicProtocolState interface {
 // ProtocolState is the read-only interface for protocol state, it allows to query information
 // on a per-block and per-epoch basis.
 type ProtocolState interface {
+
 	// ByEpoch returns an object with static protocol state information by epoch number.
 	// To be able to use this interface we need to observe both epoch setup and commit events.
 	// Not available for next epoch unless we have observed an EpochCommit event.
 	// No errors are expected during normal operations.
 	// TODO(yuraolex): check return types
-	ByEpoch(epoch uint64) (InitialProtocolState, error)
+	// TODO(yuraolex): decide if we really need this approach. It's unclear if it's useful to query
+	//  by epoch counter. To implement it we need an additional index by epoch counter. Alternatively we need a way to map
+	//  epoch counter -> block ID. It gets worse if we consider that we need a way to get the epoch counter itself at caller side.
+	//ByEpoch(epoch uint64) (InitialProtocolState, error)
+
 	// AtBlockID returns protocol state at block ID.
 	// Resulting protocol state is returned AFTER applying updates that are contained in block.
 	// Can be queried for any block that has been added to the block tree.
