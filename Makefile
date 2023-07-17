@@ -87,6 +87,23 @@ emulator-norelic-check:
 	# test the fvm package compiles with Relic library disabled (required for the emulator build)
 	cd ./fvm && go test ./... -run=NoTestHasThisPrefix
 
+.SILENT: go-math-rand-check
+go-math-rand-check:
+	# check that the insecure math/rand Go package isn't used by production code.
+	# `exclude` should only specify non production code (test, bench..).
+	# If this check fails, try updating your code by using:
+	#   - "crypto/rand" or "flow-go/utils/rand" for non-deterministic randomness
+	#   - "flow-go/crypto/random" for deterministic randomness 
+	grep --include=\*.go \
+	--exclude=*test* --exclude=*helper* --exclude=*example* --exclude=*fixture* --exclude=*benchmark* --exclude=*profiler* \
+    --exclude-dir=*test* --exclude-dir=*helper* --exclude-dir=*example* --exclude-dir=*fixture* --exclude-dir=*benchmark* --exclude-dir=*profiler* -rnw '"math/rand"'; \
+    if [ $$? -ne 1 ]; then \
+       echo "[Error] Go production code should not use math/rand package"; exit 1; \
+    fi
+
+.PHONY: code-sanity-check
+code-sanity-check: go-math-rand-check emulator-norelic-check
+
 .PHONY: fuzz-fvm
 fuzz-fvm:
 	# run fuzz tests in the fvm package

@@ -3,9 +3,10 @@ package execution_data_test
 import (
 	"bytes"
 	"context"
+	"crypto/rand"
 	"fmt"
 	"io"
-	"math/rand"
+	mrand "math/rand"
 	"testing"
 
 	"github.com/ipfs/go-cid"
@@ -134,7 +135,7 @@ type corruptedTailSerializer struct {
 
 func newCorruptedTailSerializer(numChunks int) *corruptedTailSerializer {
 	return &corruptedTailSerializer{
-		corruptedChunk: rand.Intn(numChunks) + 1,
+		corruptedChunk: mrand.Intn(numChunks) + 1,
 	}
 }
 
@@ -197,7 +198,7 @@ func TestGetIncompleteData(t *testing.T) {
 	cids := getAllKeys(t, blobstore)
 	t.Logf("%d blobs in blob tree", len(cids))
 
-	cidToDelete := cids[rand.Intn(len(cids))]
+	cidToDelete := cids[mrand.Intn(len(cids))]
 	require.NoError(t, blobstore.DeleteBlob(context.Background(), cidToDelete))
 
 	_, err = eds.Get(context.Background(), rootID)
