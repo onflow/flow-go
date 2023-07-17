@@ -206,7 +206,7 @@ func RandomValues(n int, minByteSize, maxByteSize int) []l.Value {
 			byteSize = minByteSize + rand.Intn(maxByteSize-minByteSize)
 		}
 		value := make([]byte, byteSize)
-		_, err := rand.Read(value)
+		_, err := crand.Read(value)
 		if err != nil {
 			panic("random generation failed")
 		}
