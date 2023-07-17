@@ -255,15 +255,8 @@ func TestAddAndRemoveEntities(t *testing.T) {
 	}
 }
 
-// Indexes contains an index in the pool of an inserted entity and an index of this entity
-// in the array of entities created by the EntityListFixture.
-type Indexes struct {
-	indexInPool        EIndex
-	indexInEntitiesArr int
-}
-
 // testAddRemoveEntities adds and removes randomly elements in the pool, probabilityOfAdding and its counterpart 1-probabilityOfAdding are probabilities
-// for an operation to be add or remove. Current timestamp is taken as a seed for a random number generator.
+// for an operation to be add or remove. Current timestamp is taken as a seed for the random number generator.
 func testAddRemoveEntities(t *testing.T, limit uint32, entityCount uint32, ejectionMode EjectionMode, numberOfOperations int, probabilityOfAdding float32) {
 
 	require.GreaterOrEqual(t, entityCount, 2*limit, "entityCount must be greater or equal to 2*limit to test add/remove operations")
