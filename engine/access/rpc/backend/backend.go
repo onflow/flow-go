@@ -415,7 +415,10 @@ func executionNodesForBlockID(
 	}
 
 	// randomly choose upto maxExecutionNodesCnt identities
-	executionIdentitiesRandom := subsetENs.Sample(maxExecutionNodesCnt)
+	executionIdentitiesRandom, err := subsetENs.Sample(maxExecutionNodesCnt)
+	if err != nil {
+		return nil, fmt.Errorf("sampling failed: %w", err)
+	}
 
 	if len(executionIdentitiesRandom) == 0 {
 		return nil, fmt.Errorf("no matching execution node found for block ID %v", blockID)
