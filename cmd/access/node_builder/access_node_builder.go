@@ -1191,11 +1191,15 @@ func (builder *FlowAccessNodeBuilder) initPublicLibp2pNode(networkKey crypto.Pri
 		return nil, fmt.Errorf("could not create connection manager: %w", err)
 	}
 
-	meshTracer := tracer.NewGossipSubMeshTracer(
-		builder.Logger,
-		networkMetrics,
-		builder.IdentityProvider,
-		builder.FlowConfig.NetworkConfig.GossipSubConfig.LocalMeshLogInterval)
+	meshTracerCfg := &tracer.GossipSubMeshTracerConfig{
+		Logger:                       builder.Logger,
+		Metrics:                      networkMetrics,
+		IDProvider:                   builder.IdentityProvider,
+		LoggerInterval:               builder.FlowConfig.NetworkConfig.GossipSubConfig.LocalMeshLogInterval,
+		RpcSentTrackerCacheCollector: metrics.GossipSubRPCSentTrackerMetricFactory(builder.HeroCacheMetricsFactory(), network.PublicNetwork),
+		RpcSentTrackerCacheSize:      builder.FlowConfig.NetworkConfig.GossipSubConfig.RPCSentTrackerCacheSize,
+	}
+	meshTracer := tracer.NewGossipSubMeshTracer(meshTracerCfg)
 
 	libp2pNode, err := p2pbuilder.NewNodeBuilder(
 		builder.Logger,
