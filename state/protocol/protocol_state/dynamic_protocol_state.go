@@ -9,7 +9,8 @@ import (
 
 type dynamicProtocolStateAdapter struct {
 	*flow.RichProtocolStateEntry
-	dkg protocol.DKG
+	clustering flow.ClusterList
+	dkg        protocol.DKG
 }
 
 var _ protocol.DynamicProtocolState = (*dynamicProtocolStateAdapter)(nil)
@@ -19,8 +20,15 @@ func newDynamicProtocolStateAdaptor(entry *flow.RichProtocolStateEntry) (*dynami
 	if err != nil {
 		return nil, fmt.Errorf("could not construct encodable DKG from events: %w", err)
 	}
+
+	clustering, err := inmem.ClusteringFromSetupEvent(entry.CurrentEpochSetup)
+	if err != nil {
+		return nil, fmt.Errorf("could not extract cluster list from setup event: %w", err)
+	}
+
 	return &dynamicProtocolStateAdapter{
 		RichProtocolStateEntry: entry,
+		clustering:             clustering,
 		dkg:                    inmem.NewDKG(dkg),
 	}, nil
 }
@@ -30,7 +38,7 @@ func (s *dynamicProtocolStateAdapter) Epoch() uint64 {
 }
 
 func (s *dynamicProtocolStateAdapter) Clustering() flow.ClusterList {
-	panic("implement me")
+	return s.clustering
 }
 
 func (s *dynamicProtocolStateAdapter) EpochSetup() *flow.EpochSetup {
