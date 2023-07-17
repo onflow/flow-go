@@ -219,7 +219,7 @@ const (
 	// We set it to 1000, meaning that below 1000 misbehavior, the peer is not penalized, and above 1000 misbehavior, the peer is penalized.
 	// Note that misbehaviors are counted by GossipSub across all topics (and is different from the Application Layer Misbehaviors that we count through
 	// the ALSP system).
-	defaultBehaviourPenaltyThreshold = 1000
+	defaultBehaviourPenaltyThreshold = 10
 
 	// defaultBehaviorPenaltyWeight is the weight for applying penalty when a peer misbehavior goes beyond the threshold.
 	// The penalty is applied to the square of the difference between the misbehavior and the threshold, i.e., -|w| * (misbehavior - threshold)^2.
@@ -231,7 +231,7 @@ const (
 	// if misbehavior > threshold + sqrt(2) * 100.
 	// Note that misbehaviors are counted by GossipSub across all topics (and is different from the Application Layer Misbehaviors that we count through
 	// the ALSP system).
-	defaultBehaviourPenaltyWeight = -1e-4 * MaxAppSpecificReward
+	defaultBehaviourPenaltyWeight = -0.1 * MaxAppSpecificReward
 
 	// defaultBehaviorPenaltyDecay is the decay interval for the misbehavior counter of a peer. The misbehavior counter is
 	// incremented by GossipSub for each advertised iHave from the remote node to the local node that the local node does
@@ -368,7 +368,7 @@ func NewScoreOption(cfg *ScoreOptionConfig) *ScoreOption {
 		s.logger.
 			Warn().
 			Str(logging.KeyNetworkingSecurity, "true").
-			Msg("app specific score function is overridden")
+			Msg("app specific score function is overridden, should never happen in production")
 	}
 
 	if cfg.decayInterval > 0 {
@@ -378,7 +378,7 @@ func NewScoreOption(cfg *ScoreOptionConfig) *ScoreOption {
 			Warn().
 			Str(logging.KeyNetworkingSecurity, "true").
 			Dur("decay_interval_ms", cfg.decayInterval).
-			Msg("decay interval is overridden")
+			Msg("decay interval is overridden, should never happen in production")
 	}
 
 	// registers the score registry as the consumer of the invalid control message notifications
