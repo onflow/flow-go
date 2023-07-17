@@ -69,6 +69,7 @@ type ConnectionFactoryImpl struct {
 type CachedClient struct {
 	ClientConn     *grpc.ClientConn
 	Address        string
+	mutex          sync.Mutex
 	timeout        time.Duration
 	closeRequested *atomic.Bool
 	wg             sync.WaitGroup
@@ -90,6 +91,10 @@ func (cf *ConnectionFactoryImpl) createConnection(address string, timeout time.D
 
 	var connInterceptors []grpc.UnaryClientInterceptor
 
+	// The order in which interceptors are added to the `connInterceptors` slice is important since they will be called
+	// in the same order during gRPC requests. It is crucial to ensure that the request watcher interceptor is added
+	// first. This interceptor is responsible for executing necessary request monitoring before passing control to
+	// subsequent interceptors.
 	if cachedClient != nil {
 		connInterceptors = append(connInterceptors, createRequestWatcherInterceptor(cachedClient))
 	}
@@ -125,10 +130,14 @@ func (cf *ConnectionFactoryImpl) retrieveConnection(grpcAddress string, timeout 
 	}
 
 	cf.Log.Debug().Str("cached_client_added", grpcAddress).Msg("adding new cached client to pool")
-	cf.ConnectionsCache.Add(grpcAddress, store)
+	_ = cf.ConnectionsCache.Add(grpcAddress, store)
 	if cf.AccessMetrics != nil {
 		cf.AccessMetrics.ConnectionAddedToPool()
 	}
+	cf.mutex.Unlock()
+
+	store.mutex.Lock()
+	defer store.mutex.Unlock()
 
 	conn, err := cf.createConnection(grpcAddress, timeout, store)
 	if err != nil {
@@ -140,8 +149,6 @@ func (cf *ConnectionFactoryImpl) retrieveConnection(grpcAddress string, timeout 
 		cf.AccessMetrics.NewConnectionEstablished()
 		cf.AccessMetrics.TotalConnectionsInPool(uint(cf.ConnectionsCache.Len()), cf.CacheSize)
 	}
-
-	cf.mutex.Unlock()
 
 	return conn, nil
 }
@@ -237,7 +244,9 @@ func (cf *ConnectionFactoryImpl) invalidateAPIClient(address string, port uint) 
 // requests to complete before closing the connection.
 func (s *CachedClient) Close() {
 	// Mark the connection for closure
-	s.closeRequested.Store(true)
+	if swapped := s.closeRequested.CompareAndSwap(false, true); !swapped {
+		return
+	}
 
 	// If there are ongoing requests, wait for them to complete asynchronously
 	go func() {
@@ -278,16 +287,12 @@ func createRequestWatcherInterceptor(cachedClient *CachedClient) grpc.UnaryClien
 			return status.Errorf(codes.Unavailable, "the connection to %s was closed", cachedClient.Address)
 		}
 
-		// Increment the request counter to track ongoing requests
+		// Increment the request counter to track ongoing requests, then
+		// decrement the request counter before returning
 		cachedClient.wg.Add(1)
-
+		defer cachedClient.wg.Done()
 		// Invoke the actual RPC method
-		err := invoker(ctx, method, req, reply, cc, opts...)
-
-		// Decrement the request counter
-		cachedClient.wg.Done()
-
-		return err
+		return invoker(ctx, method, req, reply, cc, opts...)
 	}
 
 	return requestWatcherInterceptor
