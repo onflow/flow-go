@@ -254,6 +254,24 @@ func DKGFromEncodable(enc EncodableDKG) (*DKG, error) {
 	return &DKG{enc}, nil
 }
 
+// EncodableDKGFromEvents returns an EncodableDKG constructed from epoch setup and commit events.
+// No errors are expected during normal operations.
+func EncodableDKGFromEvents(setup *flow.EpochSetup, commit *flow.EpochCommit) (EncodableDKG, error) {
+	// filter initial participants to valid DKG participants
+	participants := setup.Participants.Filter(filter.IsValidDKGParticipant)
+	lookup, err := flow.ToDKGParticipantLookup(participants, commit.DKGParticipantKeys)
+	if err != nil {
+		return EncodableDKG{}, fmt.Errorf("could not construct dkg lookup: %w", err)
+	}
+
+	return EncodableDKG{
+		GroupKey: encodable.RandomBeaconPubKey{
+			PublicKey: commit.DKGGroupKey,
+		},
+		Participants: lookup,
+	}, nil
+}
+
 // ClusterFromEncodable returns a Cluster backed by the given encodable representation.
 func ClusterFromEncodable(enc EncodableCluster) (*Cluster, error) {
 	return &Cluster{enc}, nil
