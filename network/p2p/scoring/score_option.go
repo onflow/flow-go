@@ -231,7 +231,7 @@ const (
 	// if misbehavior > threshold + sqrt(2) * 100.
 	// Note that misbehaviors are counted by GossipSub across all topics (and is different from the Application Layer Misbehaviors that we count through
 	// the ALSP system).
-	defaultBehaviourPenaltyWeight = -0.1 * MaxAppSpecificReward
+	defaultBehaviourPenaltyWeight = -0.01 * MaxAppSpecificReward
 
 	// defaultBehaviorPenaltyDecay is the decay interval for the misbehavior counter of a peer. The misbehavior counter is
 	// incremented by GossipSub for each advertised iHave from the remote node to the local node that the local node does

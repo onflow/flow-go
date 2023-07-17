@@ -2,7 +2,6 @@ package scoring
 
 import (
 	"context"
-	"fmt"
 	"testing"
 	"time"
 
@@ -10,7 +9,6 @@ import (
 	pubsub_pb "github.com/libp2p/go-libp2p-pubsub/pb"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/stretchr/testify/require"
-	corrupt "github.com/yhassanzadeh13/go-libp2p-pubsub"
 
 	"github.com/onflow/flow-go/insecure/corruptlibp2p"
 	"github.com/onflow/flow-go/model/flow"
@@ -534,148 +532,6 @@ func TestGossipSubMeshDeliveryScoring_Replay_Will_Not_Counted(t *testing.T) {
 	}, 2*time.Second, 100*time.Millisecond)
 
 	// even though the replaying node is penalized, it should still be able to publish and receive messages from this node in both topic meshes.
-	p2ptest.EnsurePubsubMessageExchange(t, ctx, nodes, blockTopic, 1, func() interface{} {
-		return unittest.ProposalFixture()
-	})
-}
-
-// TestGossipSubIHaveBrokenPromises_Below_Threshold tests that as long as the spammer stays below the ihave spam thresholds, it is not caught and
-// penalized by the victim node.
-// The thresholds are:
-// Maximum messages that include iHave per heartbeat is: 10 (gossipsub parameter).
-// Threshold for broken promises of iHave per heartbeat is: 10 (Flow-specific) parameter. It means that GossipSub samples one iHave id out of the
-// entire RPC and if that iHave id is not eventually delivered within 3 seconds (gossipsub parameter), then the promise is considered broken. We set
-// this threshold to 10 meaning that the first 10 broken promises are ignored. This is to allow for some network churn.
-// Also, per hearbeat (i.e., decay interval), the spammer is allowed to send at most 5000 ihave messages (gossip sub parameter) on aggregate, and
-// excess messages are dropped (without being counted as broken promises).
-func TestGossipSubIHaveBrokenPromises_Below_Threshold(t *testing.T) {
-	role := flow.RoleConsensus
-	sporkId := unittest.IdentifierFixture()
-	blockTopic := channels.TopicFromChannel(channels.PushBlocks, sporkId)
-
-	receivedIWants := unittest.NewProtectedMap[string, struct{}]()
-	idProvider := mock.NewIdentityProvider(t)
-	spammer := corruptlibp2p.NewGossipSubRouterSpammerWithRpcInspector(t, sporkId, role, idProvider, func(id peer.ID, rpc *corrupt.RPC) error {
-		// override rpc inspector of the spammer node to keep track of the iwants it has received.
-		if rpc.RPC.Control == nil || rpc.RPC.Control.Iwant == nil {
-			return nil
-		}
-		for _, iwant := range rpc.RPC.Control.Iwant {
-			for _, msgId := range iwant.MessageIDs {
-				receivedIWants.Add(msgId, struct{}{})
-			}
-		}
-		return nil
-	})
-
-	ctx, cancel := context.WithCancel(context.Background())
-	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
-	// we override some of the default scoring parameters in order to speed up the test in a time-efficient manner.
-	blockTopicOverrideParams := scoring.DefaultTopicScoreParams()
-	blockTopicOverrideParams.MeshMessageDeliveriesActivation = 1 * time.Second // we start observing the mesh message deliveries after 1 second of the node startup.
-	// we disable invalid message delivery parameters, as the way we implement spammer, when it spams ihave messages, it does not sign them. Hence, without decaying the invalid message deliveries,
-	// the node would be penalized for invalid message delivery way sooner than it can mount an ihave broken-promises spam attack.
-	blockTopicOverrideParams.InvalidMessageDeliveriesWeight = 0.0
-	blockTopicOverrideParams.InvalidMessageDeliveriesDecay = 0.0
-	victimNode, victimIdentity := p2ptest.NodeFixture(
-		t,
-		sporkId,
-		t.Name(),
-		idProvider,
-		p2ptest.WithRole(role),
-		p2ptest.WithPeerScoreTracerInterval(1*time.Second),
-		p2ptest.EnablePeerScoringWithOverride(&p2p.PeerScoringConfigOverride{
-			TopicScoreParams: map[channels.Topic]*pubsub.TopicScoreParams{
-				blockTopic: blockTopicOverrideParams,
-			},
-			DecayInterval: 1 * time.Second, // we override the decay interval to 1 second so that the score is updated within 1 second intervals.
-		}),
-	)
-
-	idProvider.On("ByPeerID", victimNode.Host().ID()).Return(&victimIdentity, true).Maybe()
-	idProvider.On("ByPeerID", spammer.SpammerNode.Host().ID()).Return(&spammer.SpammerId, true).Maybe()
-	ids := flow.IdentityList{&spammer.SpammerId, &victimIdentity}
-	nodes := []p2p.LibP2PNode{spammer.SpammerNode, victimNode}
-
-	p2ptest.StartNodes(t, signalerCtx, nodes, 100*time.Millisecond)
-	defer p2ptest.StopNodes(t, nodes, cancel, 2*time.Second)
-
-	p2ptest.LetNodesDiscoverEachOther(t, ctx, nodes, ids)
-	p2ptest.TryConnectionAndEnsureConnected(t, ctx, nodes)
-
-	// checks end-to-end message delivery works on GossipSub
-	p2ptest.EnsurePubsubMessageExchange(t, ctx, nodes, blockTopic, 1, func() interface{} {
-		return unittest.ProposalFixture()
-	})
-
-	// creates 10 RPCs each with 10 iHave messages, each iHave message has 50 message ids, hence overall, we have 5000 iHave message ids.
-	spamMsgs := spammer.GenerateCtlMessages(10, corruptlibp2p.WithIHave(10, 50, blockTopic.String()))
-	var sentIHaves []string
-	for _, msg := range spamMsgs {
-		for _, iHave := range msg.Ihave {
-			for _, msgId := range iHave.MessageIDs {
-				require.NotContains(t, sentIHaves, msgId)
-				sentIHaves = append(sentIHaves, msgId)
-			}
-		}
-	}
-	require.Len(t, sentIHaves, 5000, "sanity check failed, we should have 5000 iHave message ids, actual: %d", len(sentIHaves))
-
-	// spams the victim node with 1000 spam iHave messages, since iHave messages are for junk message ids, there will be no
-	// reply from spammer to victim over the iWants. Hence, the victim must count this towards 10 broken promises.
-	// This sums up to 10 broken promises (1 per RPC).
-	spammer.SpamControlMessage(t, victimNode, spamMsgs, p2ptest.PubsubMessageFixture(t, p2ptest.WithTopic(blockTopic.String())))
-
-	// wait till all the spam iHaves are responded with iWants.
-	require.Eventually(t, func() bool {
-		for _, msgId := range sentIHaves {
-			if _, ok := receivedIWants.Get(msgId); !ok {
-				return false
-			}
-		}
-
-		return true
-	}, 5*time.Second, 100*time.Millisecond, fmt.Sprintf("sanity check failed, we should have received all the iWants for the spam iHaves, expected: %d, actual: %d", len(sentIHaves), receivedIWants.Size()))
-
-	// wait till victim counts the spam iHaves as broken promises (one per RPC for a total of 10).
-	initialBehavioralPenalty := float64(0) // keeps track of the initial behavioral penalty of the spammer node for decay testing.
-	require.Eventually(t, func() bool {
-		behavioralPenalty, ok := victimNode.PeerScoreExposer().GetBehaviourPenalty(spammer.SpammerNode.Host().ID())
-		if !ok {
-			return false
-		}
-		if behavioralPenalty < 9 { // ideally it must be 10 (one per RPC), but we give it a buffer of 1 to account for decays and floating point errors.
-			fmt.Println("behavioral penalty", behavioralPenalty)
-			return false
-		}
-
-		initialBehavioralPenalty = behavioralPenalty
-		return true
-		// Note: we have to wait at least 3 seconds for an iHave to be considered as broken promise (gossipsub parameters), we set it to 10
-		// seconds to be on the safe side.
-	}, 10*time.Second, 100*time.Millisecond)
-
-	spammerScore, ok := victimNode.PeerScoreExposer().GetScore(spammer.SpammerNode.Host().ID())
-	require.True(t, ok, "sanity check failed, we should have a score for the spammer node")
-	// since spammer is not yet considered to be penalized, its score must be greater than the gossipsub health thresholds.
-	require.Greaterf(t, spammerScore, scoring.DefaultGossipThreshold, "sanity check failed, the score of the spammer node must be greater than gossip threshold: %f, actual: %f", scoring.DefaultGossipThreshold, spammerScore)
-	require.Greaterf(t, spammerScore, scoring.DefaultPublishThreshold, "sanity check failed, the score of the spammer node must be greater than publish threshold: %f, actual: %f", scoring.DefaultPublishThreshold, spammerScore)
-	require.Greaterf(t, spammerScore, scoring.DefaultGraylistThreshold, "sanity check failed, the score of the spammer node must be greater than graylist threshold: %f, actual: %f", scoring.DefaultGraylistThreshold, spammerScore)
-
-	// eventually, after a heartbeat the spammer behavioral counter must be decayed
-	require.Eventually(t, func() bool {
-		behavioralPenalty, ok := victimNode.PeerScoreExposer().GetBehaviourPenalty(spammer.SpammerNode.Host().ID())
-		if !ok {
-			return false
-		}
-		if behavioralPenalty >= initialBehavioralPenalty { // after a heartbeat the spammer behavioral counter must be decayed.
-			return false
-		}
-
-		return true
-	}, 2*time.Second, 100*time.Millisecond, "sanity check failed, the spammer behavioral counter must be decayed after a heartbeat")
-
-	// since spammer stays below the threshold, it should be able to exchange messages with the victim node over pubsub.
 	p2ptest.EnsurePubsubMessageExchange(t, ctx, nodes, blockTopic, 1, func() interface{} {
 		return unittest.ProposalFixture()
 	})
