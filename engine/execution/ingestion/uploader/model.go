@@ -29,9 +29,10 @@ func ComputationResultToBlockData(computationResult *execution.ComputationResult
 		txResults[i] = &AllResults[i]
 	}
 
-	events := make([]*flow.Event, 0)
-	for _, e := range computationResult.AllEvents() {
-		events = append(events, &e)
+	eventsList := computationResult.AllEvents()
+	events := make([]*flow.Event, len(eventsList))
+	for i := 0; i < len(eventsList); i++ {
+		events[i] = &eventsList[i]
 	}
 
 	trieUpdates := make(
