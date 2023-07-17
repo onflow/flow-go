@@ -11,6 +11,8 @@ type ProtocolState struct {
 	protocolStateDB storage.ProtocolState
 }
 
+var _ protocol.ProtocolState = (*ProtocolState)(nil)
+
 func (s *ProtocolState) AtBlockID(blockID flow.Identifier) (protocol.DynamicProtocolState, error) {
 	protocolStateEntry, err := s.protocolStateDB.ByBlockID(blockID)
 	if err != nil {

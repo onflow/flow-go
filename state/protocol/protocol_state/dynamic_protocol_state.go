@@ -7,49 +7,49 @@ import (
 	"github.com/onflow/flow-go/state/protocol/inmem"
 )
 
-type dynamicProtocolStateAdaptor struct {
+type dynamicProtocolStateAdapter struct {
 	*flow.RichProtocolStateEntry
 	dkg protocol.DKG
 }
 
-func newDynamicProtocolStateAdaptor(entry *flow.RichProtocolStateEntry) (*dynamicProtocolStateAdaptor, error) {
+var _ protocol.DynamicProtocolState = (*dynamicProtocolStateAdapter)(nil)
+
+func newDynamicProtocolStateAdaptor(entry *flow.RichProtocolStateEntry) (*dynamicProtocolStateAdapter, error) {
 	dkg, err := inmem.EncodableDKGFromEvents(entry.CurrentEpochSetup, entry.CurrentEpochCommit)
 	if err != nil {
 		return nil, fmt.Errorf("could not construct encodable DKG from events: %w", err)
 	}
-	return &dynamicProtocolStateAdaptor{
+	return &dynamicProtocolStateAdapter{
 		RichProtocolStateEntry: entry,
 		dkg:                    inmem.NewDKG(dkg),
 	}, nil
 }
 
-var _ protocol.DynamicProtocolState = (*dynamicProtocolStateAdaptor)(nil)
-
-func (s *dynamicProtocolStateAdaptor) Epoch() uint64 {
+func (s *dynamicProtocolStateAdapter) Epoch() uint64 {
 	return s.CurrentEpochSetup.Counter
 }
 
-func (s *dynamicProtocolStateAdaptor) Clustering() flow.ClusterList {
+func (s *dynamicProtocolStateAdapter) Clustering() flow.ClusterList {
 	panic("implement me")
 }
 
-func (s *dynamicProtocolStateAdaptor) EpochSetup() *flow.EpochSetup {
+func (s *dynamicProtocolStateAdapter) EpochSetup() *flow.EpochSetup {
 	return s.CurrentEpochSetup
 }
 
-func (s *dynamicProtocolStateAdaptor) EpochCommit() *flow.EpochCommit {
+func (s *dynamicProtocolStateAdapter) EpochCommit() *flow.EpochCommit {
 	return s.CurrentEpochCommit
 }
 
-func (s *dynamicProtocolStateAdaptor) DKG() protocol.DKG {
+func (s *dynamicProtocolStateAdapter) DKG() protocol.DKG {
 	return s.dkg
 }
 
-func (s *dynamicProtocolStateAdaptor) Identities() flow.IdentityList {
+func (s *dynamicProtocolStateAdapter) Identities() flow.IdentityList {
 	return s.RichProtocolStateEntry.Identities
 }
 
-func (s *dynamicProtocolStateAdaptor) GlobalParams() protocol.GlobalParams {
+func (s *dynamicProtocolStateAdapter) GlobalParams() protocol.GlobalParams {
 	//TODO implement me
 	panic("implement me")
 }
