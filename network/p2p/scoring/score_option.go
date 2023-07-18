@@ -281,7 +281,7 @@ const (
 	// This means that regardless of how many iHave broken promises an RPC contains, the misbehavior counter is incremented by 1.
 	// That is why we decay the misbehavior counter very slow, as this counter indicates a severe misbehavior.
 	//
-	// The misbehavior counter is decayed per decay interval (i.e., defaultDecayInterval = 0.9) by GossipSub.
+	// The misbehavior counter is decayed per decay interval (i.e., defaultDecayInterval = 1 minute) by GossipSub.
 	// We set it to 0.99, which means that the misbehavior counter is decayed by 1% per decay interval.
 	// With the generous threshold that we set (i.e., defaultBehaviourPenaltyThreshold = 10), we take the peers going beyond the threshold as persistent misbehaviors,
 	// We expect honest peers never to go beyond the threshold, and if they do, we expect them to go back below the threshold quickly.
