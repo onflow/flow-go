@@ -93,6 +93,85 @@ scoreOption := NewScoreOption(config)
 16. `defaultTopicInvalidMessageDeliveriesWeight` is set to -1.0 and is used to penalize peers that send invalid messages by applying it to the square of the number of such messages. A message is considered invalid if it is not properly signed. A peer will be disconnected if it sends around 14 invalid messages within a gossipsub heartbeat interval.
 17. `defaultTopicInvalidMessageDeliveriesDecay` is a decay factor set to 0.99. It is used to reduce the number of invalid message deliveries counted against a peer by 1% at each heartbeat interval. This prevents the peer from being disconnected if it stops sending invalid messages. The heartbeat interval in the gossipsub scoring system is set to 1 minute by default.
 
+## GossipSub Message Delivery Scoring
+This section provides an overview of the GossipSub message delivery scoring mechanism used in the Flow network. 
+It's designed to maintain an efficient, secure and stable peer-to-peer network by scoring each peer based on their message delivery performance. 
+The system ensures the reliability of message propagation by scoring peers, which discourages malicious behaviors and enhances overall network performance.
+
+### Comprehensive System Overview
+The GossipSub message delivery scoring mechanism used in the Flow network is an integral component of its P2P communication model. 
+It is designed to monitor and incentivize appropriate network behaviors by attributing scores to peers based on their message delivery performance. 
+This scoring system is fundamental to ensure that messages are reliably propagated across the network, creating a robust P2P communication infrastructure.
+
+The scoring system is per topic, which means it tracks the efficiency of peers in delivering messages in each specific topic they are participating in. 
+These per-topic scores then contribute to an overall score for each peer, providing a comprehensive view of a peer's effectiveness within the network.
+In GossipSub, a crucial aspect of a peer's responsibility is to relay messages effectively to other nodes in the network. 
+The role of the scoring mechanism is to objectively assess a peer's efficiency in delivering these messages. 
+It takes into account several factors to determine the effectiveness of the peers.
+
+1. **Message Delivery Rate** - A peer's ability to deliver messages quickly is a vital metric. Slow delivery could lead to network lags and inefficiency.
+2. **Message Delivery Volume** - A peer's capacity to deliver a large number of messages accurately and consistently.
+3. **Continuity of Performance** - The scoring mechanism tracks not only the rate and volume of the messages but also the consistency in a peer's performance over time.
+4. **Prevention of Malicious Behaviors** - The scoring system also helps in mitigating potential network attacks such as spamming and message replay attacks.
+
+The system utilizes several parameters to maintain and adjust the scores of the peers:
+- `defaultTopicMeshMessageDeliveriesDecay`(value: 0.5): This parameter dictates how rapidly a peer's message delivery count decays with time. With a value of 0.5, it indicates a 50% decay at each decay interval. This mechanism ensures that past performances do not disproportionately impact the current score of the peer.
+- `defaultTopicMeshMessageDeliveriesCap` (value: 1000): This parameter sets an upper limit on the number of message deliveries that can contribute to the score of a peer in a topic. With a cap set at 1000, it prevents the score from being overly influenced by large volumes of message deliveries, providing a balanced assessment of peer performance.
+- `defaultTopicMeshMessageDeliveryThreshold` (value: 0.1 * `defaultTopicMeshMessageDeliveriesCap`): This threshold serves to identify under-performing peers. If a peer's message delivery count is below this threshold in a topic, the peer's score is penalized. This encourages peers to maintain a minimum level of performance.
+- `defaultTopicMeshMessageDeliveriesWeight`  (value: -0.05 * `MaxAppSpecificReward` / (`defaultTopicMeshMessageDeliveryThreshold` ^ 2) = 5^-4): This weight is applied when penalizing under-performing peers. The penalty is proportional to the square of the difference between the actual message deliveries and the threshold, multiplied by this weight.
+- `defaultMeshMessageDeliveriesWindow` (value: `defaultDecayInterval` = 1 minute): This parameter defines the time window within which a message delivery is counted towards the score. This window is set to the decay interval, preventing replay attacks and counting only unique message deliveries.
+- `defaultMeshMessageDeliveriesActivation` (value: 2 * `defaultDecayInterval` = 2 minutes): This time interval is the grace period before the scoring system starts tracking a new peer's performance. It accounts for the time it takes for a new peer to fully integrate into the network.
+
+By continually updating and adjusting the scores of peers based on these parameters, the GossipSub message delivery scoring mechanism ensures a robust, efficient, and secure P2P network.
+
+### Examples
+
+#### Scenario 1: Peer A Delivers Messages Within Cap and Above Threshold
+Let's assume a Peer A that consistently delivers 500 messages per decay interval. This is within the `defaultTopicMeshMessageDeliveriesCap` (1000) and above the `defaultTopicMeshMessageDeliveryThreshold` (100).
+As Peer A's deliveries are above the threshold and within the cap, its score will not be penalized. Instead, it will be maintained, promoting healthy network participation.
+
+#### Scenario 2: Peer B Delivers Messages Below Threshold
+Now, assume Peer B delivers 50 messages per decay interval, below the `defaultTopicMeshMessageDeliveryThreshold` (100).
+In this case, the score of Peer B will be penalized because its delivery rate is below the threshold. The penalty is calculated as `-|w| * (actual - threshold)^2`, where `w` is the weight (`defaultTopicMeshMessageDeliveriesWeight`), `actual` is the actual messages delivered (50), and `threshold` is the delivery threshold (100).
+
+#### Scenario 3: Peer C Delivers Messages Exceeding the Cap
+Consider Peer C, which delivers 1500 messages per decay interval, exceeding the `defaultTopicMeshMessageDeliveriesCap` (1000).
+In this case, even though Peer C is highly active, its score will not increase further once it hits the cap (1000). This is to avoid overemphasis on high delivery counts, which could skew the scoring system.
+
+#### Scenario 4: Peer D Joins a Topic Mesh
+When a new Peer D joins a topic mesh, it will be given a grace period of `defaultMeshMessageDeliveriesActivation` (2 decay intervals) before its message delivery performance is tracked. This grace period allows the peer to set up and begin receiving messages from the network.
+Remember, the parameters and scenarios described here aim to maintain a stable, efficient, and secure peer-to-peer network by carefully tracking and scoring each peer's message delivery performance.
+
+#### Scenario 5: Message Delivery Decay
+To better understand how the message delivery decay (`defaultTopicMeshMessageDeliveriesDecay`) works in the GossipSub protocol, let's examine a hypothetical scenario.
+Let's say we have a peer named `Peer A` who is actively participating in `Topic X`. `Peer A` has successfully delivered 800 messages in `Topic X` over a given time period.
+**Initial State**: At this point, `Peer A`'s message delivery count for `Topic X` is 800. Now, the decay interval elapses without `Peer A` delivering any new messages in `Topic X`.
+**After One Decay Interval**: Given that our `defaultTopicMeshMessageDeliveriesDecay` value is 0.5, after one decay interval, `Peer A`'s message delivery count for `Topic X` will decay by 50%. Therefore, `Peer A`'s count is now:
+
+    800 (previous message count) * 0.5 (decay factor) = 400
+
+**After Two Decay Intervals**
+If `Peer A` still hasn't delivered any new messages in `Topic X` during the next decay interval, the decay is applied again, further reducing the message delivery count:
+
+    400 (current message count) * 0.5 (decay factor) = 200
+And this process will continue at every decay interval, halving `Peer A`'s message delivery count for `Topic X` until `Peer A` delivers new messages in `Topic X` or the count reaches zero.
+This decay process ensures that a peer cannot rest on its past deliveries; it must continually contribute to the network to maintain its score. 
+It helps maintain a lively and dynamic network environment, incentivizing constant active participation from all peers.
+
+### Scenario 6: Replay Attack
+## Example Scenario: Preventing Replay Attacks
+The `defaultMeshMessageDeliveriesWindow` and `defaultMeshMessageDeliveriesActivation` parameters play a crucial role in preventing replay attacks in the GossipSub protocol. Let's illustrate this with an example.
+Consider a scenario where we have three peers: `Peer A`, `Peer B`, and `Peer C`. All three peers are active participants in `Topic X`.
+**Initial State**: At Time = 0: `Peer A` generates and broadcasts a new message `M` in `Topic X`. `Peer B` and `Peer C` receive this message from `Peer A` and update their message caches accordingly.
+**After Few Seconds**: At Time = 30 seconds: `Peer B`, with malicious intent, tries to rebroadcast the same message `M` back into `Topic X`. 
+Given that our `defaultMeshMessageDeliveriesWindow` value is equal to the decay interval (let's assume 1 minute), `Peer C` would have seen the original message `M` from `Peer A` less than one minute ago.
+This is within the `defaultMeshMessageDeliveriesWindow`. Because `Peer A` (the original sender) is different from `Peer B` (the current sender), this delivery will be counted towards `Peer B`'s message delivery score in `Topic X`.
+**After One Minute**: At Time = 61 seconds: `Peer B` tries to rebroadcast the same message `M` again. 
+Now, more than a minute has passed since `Peer C` first saw the message `M` from `Peer A`. This is outside the `defaultMeshMessageDeliveriesWindow`. 
+Therefore, the message `M` from `Peer B` will not count towards `Peer B`'s message delivery score in `Topic X` and `Peer B` still needs to fill up its threshold of message delivery in order not to be penalized for under-performing. 
+This effectively discouraging replay attacks of messages older than the `defaultMeshMessageDeliveriesWindow`.
+This mechanism, combined with other parameters, helps maintain the security and efficiency of the network by discouraging harmful behaviors such as message replay attacks.
+
 ## Customization
 The scoring mechanism can be easily customized to suit the needs of the Flow network. This includes changing the scoring parameters, thresholds, and the scoring function itself.
 You can customize the scoring parameters and thresholds by using the various setter methods provided in the `ScoreOptionConfig` object. Additionally, you can provide a custom app-specific scoring function through the `SetAppSpecificScoreFunction` method.
