@@ -498,7 +498,7 @@ func defaultPeerScoreParams() *pubsub.PeerScoreParams {
 		SkipAtomicValidation: true,
 		// DecayInterval is the interval over which we decay the effect of past behavior. So that
 		// a good or bad behavior will not have a permanent effect on the penalty. It is also interval
-		// that GossipSub refreshes the scores of all peers.
+		// that GossipSub uses to refresh the scores of all peers.
 		DecayInterval: defaultDecayInterval,
 		// DecayToZero defines the maximum value below which a peer scoring counter is reset to zero.
 		// This is to prevent the counter from decaying to a very small value.
