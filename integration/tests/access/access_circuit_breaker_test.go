@@ -120,7 +120,7 @@ func (s *AccessCircuitBreakerSuite) TestCircuitBreaker() {
 	require.True(s.T(), accessContainer.IsFlagSet("circuit-breaker-max-failures"))
 
 	accessClient, err := accessContainer.TestnetClient()
-	assert.NoError(s.T(), err, "failed to get collection node client")
+	assert.NoError(s.T(), err, "failed to get access node client")
 
 	latestBlockID, err := accessClient.GetLatestBlockID(ctx)
 	require.NoError(s.T(), err)
@@ -176,7 +176,7 @@ func (s *AccessCircuitBreakerSuite) TestCircuitBreaker() {
 	// Try to send the transaction for the first time. It should wait at least the timeout time and return Unknown error
 	duration, err := sendTransaction(ctx, signedTx)
 	assert.Equal(s.T(), codes.Unknown, status.Code(err))
-	assert.GreaterOrEqual(s.T(), requestTimeout, duration)
+	assert.Greater(s.T(), requestTimeout, duration)
 
 	// Try to send the transaction for the second time. It should wait less than a second because the circuit breaker
 	// is configured to break after the first failure

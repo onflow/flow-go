@@ -16,6 +16,7 @@ import (
 	"github.com/sony/gobreaker"
 	"github.com/stretchr/testify/assert"
 	testifymock "github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -221,7 +222,7 @@ func TestExecutionNodeClientTimeout(t *testing.T) {
 
 	// create the execution API client
 	client, _, err := connectionFactory.GetExecutionAPIClient(en.listener.Addr().String())
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	ctx := context.Background()
 	// make the call to the execution node
@@ -453,7 +454,7 @@ func TestCircuitBreakerExecutionNode(t *testing.T) {
 
 	// Create the execution API client.
 	client, _, err := connectionFactory.GetExecutionAPIClient(en.listener.Addr().String())
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	ctx := context.Background()
 
