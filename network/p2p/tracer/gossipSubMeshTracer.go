@@ -186,7 +186,7 @@ func (t *GossipSubMeshTracer) Prune(p peer.ID, topic string) {
 func (t *GossipSubMeshTracer) SendRPC(rpc *pubsub.RPC, _ peer.ID) {
 	err := t.rpcSentTracker.Track(rpc)
 	if err != nil {
-		t.logger.Err(err).Msg("failed to track sent pubsbub rpc")
+		t.logger.Err(err).Bool(logging.KeyNetworkingSecurity, true).Msg("failed to track sent pubsbub rpc")
 	}
 }
 
