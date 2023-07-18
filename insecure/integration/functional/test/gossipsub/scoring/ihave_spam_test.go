@@ -137,15 +137,14 @@ func TestGossipSubIHaveBrokenPromises_Below_Threshold(t *testing.T) {
 	})
 }
 
-// TestGossipSubIHaveBrokenPromises_Below_Threshold tests that as long as the spammer stays below the ihave spam thresholds, it is not caught and
-// penalized by the victim node.
-// The thresholds are:
-// Maximum messages that include iHave per heartbeat is: 10 (gossipsub parameter).
-// Threshold for broken promises of iHave per heartbeat is: 10 (Flow-specific) parameter. It means that GossipSub samples one iHave id out of the
-// entire RPC and if that iHave id is not eventually delivered within 3 seconds (gossipsub parameter), then the promise is considered broken. We set
-// this threshold to 10 meaning that the first 10 broken promises are ignored. This is to allow for some network churn.
-// Also, per hearbeat (i.e., decay interval), the spammer is allowed to send at most 5000 ihave messages (gossip sub parameter) on aggregate, and
-// excess messages are dropped (without being counted as broken promises).
+// TestGossipSubIHaveBrokenPromises_Above_Threshold tests that a continuous stream of spam iHave broken promises will
+// eventually cause the spammer node to be graylisted (i.e., no incoming RPCs from the spammer node will be accepted, and
+// no outgoing RPCs to the spammer node will be sent).
+// The test performs 3 rounds of attacks: each round with 10 RPCs, each RPC with 10 iHave messages, each iHave message with 50 message ids, hence overall, we have 5000 iHave message ids.
+// Note that based on GossipSub parameters 5000 iHave is the most one can send within one decay interval.
+// First round of attack makes spammers broken promises still below the threshold of 10 RPCs (broken promises are counted per RPC), hence no degradation of the spammers score.
+// Second round of attack makes spammers broken promises above the threshold of 10 RPCs, hence a degradation of the spammers score.
+// Third round of attack makes spammers broken promises to around 20 RPCs above the threshold, which causes the graylisting of the spammer node.
 func TestGossipSubIHaveBrokenPromises_Above_Threshold(t *testing.T) {
 	role := flow.RoleConsensus
 	sporkId := unittest.IdentifierFixture()
