@@ -20,13 +20,13 @@ type GossipSubConfig struct {
 	// LocalMeshLogInterval is the interval at which the local mesh is logged.
 	LocalMeshLogInterval time.Duration `mapstructure:"gossipsub-local-mesh-logging-interval"`
 	// ScoreTracerInterval is the interval at which the score tracer logs the peer scores.
-	ScoreTracerInterval time.Duration `mapstructure:"gossipsub-score-tracer-interval"`
+	ScoreTracerInterval time.Duration `validate:"gt=0s" mapstructure:"gossipsub-score-tracer-interval"`
 	// RPCSentTrackerCacheSize cache size of the rpc sent tracker used by the gossipsub mesh tracer.
-	RPCSentTrackerCacheSize uint32 `mapstructure:"gossipsub-rpc-sent-tracker-cache-size"`
+	RPCSentTrackerCacheSize uint32 `validate:"gt=0"  mapstructure:"gossipsub-rpc-sent-tracker-cache-size"`
 	// RPCSentTrackerQueueCacheSize cache size of the rpc sent tracker queue used for async tracking.
-	RPCSentTrackerQueueCacheSize uint32 `mapstructure:"gossipsub-rpc-sent-tracker-queue-cache-size"`
+	RPCSentTrackerQueueCacheSize uint32 `validate:"gt=0"  mapstructure:"gossipsub-rpc-sent-tracker-queue-cache-size"`
 	// RpcSentTrackerNumOfWorkers number of workers for rpc sent tracker worker pool.
-	RpcSentTrackerNumOfWorkers int `mapstructure:"gossipsub-rpc-sent-tracker-workers"`
+	RpcSentTrackerNumOfWorkers int `validate:"gt=0"  mapstructure:"gossipsub-rpc-sent-tracker-workers"`
 	// PeerScoring is whether to enable GossipSub peer scoring.
 	PeerScoring bool `mapstructure:"gossipsub-peer-scoring-enabled"`
 }
