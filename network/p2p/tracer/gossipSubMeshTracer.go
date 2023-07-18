@@ -25,7 +25,10 @@ const (
 	// MeshLogIntervalWarnMsg is the message logged by the tracer every logInterval if there are unknown peers in the mesh.
 	MeshLogIntervalWarnMsg = "unknown peers in topic mesh peers of local node since last heartbeat"
 
-	// defaultLastHighestIHaveRPCSizeResetInterval this default interval should always be equal to the gossipsub heart beat interval.
+        // defaultLastHighestIHaveRPCSizeResetInterval is the interval that we reset the tracker of max ihave size sent back 
+	// to a default. We use ihave message max size to determine the health of requested iwants from remote peers. However,
+	// we don't desire an ihave size anomaly to persist forever, hence, we reset it back to a default every minute. 
+	// The choice of the interval to be a minute is in harmony with the GossipSub decay interval.
 	defaultLastHighestIHaveRPCSizeResetInterval = time.Minute
 )
 
