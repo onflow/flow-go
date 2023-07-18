@@ -21,6 +21,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/connectivity"
 	"google.golang.org/grpc/status"
 
 	"github.com/onflow/flow-go/engine/access/mock"
@@ -495,47 +496,81 @@ func TestExecutionNodeClientClosedGracefully(t *testing.T) {
 	})
 }
 
-// TestExecutionEvictingCacheClients
+// TestExecutionEvictingCacheClients tests the eviction of cached clients in the execution flow.
+// It verifies that when a client is evicted from the cache, subsequent requests are handled correctly.
+//
+// Test Steps:
+//   - Call the gRPC method Ping with a delayed response.
+//   - Invalidate the access API client during the Ping call and verify the expected behavior.
+//   - Call the gRPC method GetNetworkParameters on the client immediately after eviction and assert the expected
+//     error response.
+//   - Wait for the client state to change from "Ready" to "Shutdown", indicating that the client connection was closed.
 func TestExecutionEvictingCacheClients(t *testing.T) {
-	// Add createCollNode function to recreate it each time for rapid test
+	// Create a new collection node for testing
 	cn := new(collectionNode)
 	cn.start(t)
 	defer cn.stop(t)
 
-	// setup the handler mock
-	req := &access.PingRequest{}
-	resp := &access.PingResponse{}
-	cn.handler.On("Ping", testifymock.Anything, req).After(3*time.Second).Return(resp, nil)
+	// Set up mock handlers for Ping and GetNetworkParameters
+	pingReq := &access.PingRequest{}
+	pingResp := &access.PingResponse{}
+	cn.handler.On("Ping", testifymock.Anything, pingReq).After(time.Second).Return(pingResp, nil)
 
-	// create the factory
+	netReq := &access.GetNetworkParametersRequest{}
+	netResp := &access.GetNetworkParametersResponse{}
+	cn.handler.On("GetNetworkParameters", testifymock.Anything).Return(netResp, nil)
+
+	// Create the connection factory
 	connectionFactory := new(ConnectionFactoryImpl)
-	// set the execution grpc port
-	connectionFactory.ExecutionGRPCPort = cn.port
-	// set the execution grpc client timeout
-	connectionFactory.ExecutionNodeGRPCTimeout = 10 * time.Second
-	// set the connection pool cache size
+	// Set the gRPC port
+	connectionFactory.CollectionGRPCPort = cn.port
+	// Set the gRPC client timeout
+	connectionFactory.CollectionNodeGRPCTimeout = 5 * time.Second
+	// Set the connection pool cache size
 	cacheSize := 1
 	cache, _ := lru.New(cacheSize)
 	connectionFactory.ConnectionsCache = cache
 	connectionFactory.CacheSize = uint(cacheSize)
-	// set metrics reporting
+	// Set metrics reporting
 	connectionFactory.AccessMetrics = metrics.NewNoopCollector()
 
 	clientAddress := cn.listener.Addr().String()
-	// create the execution API client
+	// Create the execution API client
 	client, _, err := connectionFactory.GetAccessAPIClient(clientAddress)
-	assert.NoError(t, err)
-
-	time.AfterFunc(time.Second, func() {
-		fmt.Println("Function called after 1 seconds")
-		connectionFactory.InvalidateAccessAPIClient(clientAddress)
-	})
+	require.NoError(t, err)
 
 	ctx := context.Background()
-	fmt.Println("Ping started")
-	_, err = client.Ping(ctx, req)
-	fmt.Println("Ping finished")
 
+	// Retrieve the cached client from the cache
+	result, _ := cache.Get(clientAddress)
+	cachedClient := result.(*CachedClient)
+
+	// Schedule the invalidation of the access API client after a delay
+	time.AfterFunc(250*time.Millisecond, func() {
+		// Invalidate the access API client
+		connectionFactory.InvalidateAccessAPIClient(clientAddress)
+
+		// Assert that the cached client is marked for closure but still waiting for previous request
+		assert.True(t, cachedClient.closeRequested.Load())
+		assert.Equal(t, cachedClient.ClientConn.GetState(), connectivity.Ready)
+
+		// Call a gRPC method on the client, that was already evicted
+		resp, err := client.GetNetworkParameters(ctx, netReq)
+		assert.Equal(t, status.Errorf(codes.Unavailable, "the connection to %s was closed", clientAddress), err)
+		assert.Nil(t, resp)
+	})
+
+	// Call a gRPC method on the client
+	_, err = client.Ping(ctx, pingReq)
+	// Check that Ping was called
+	cn.handler.AssertCalled(t, "Ping", testifymock.Anything, pingReq)
+	assert.NoError(t, err)
+
+	// Wait for the client connection to change state from "Ready" to "Shutdown" as connection was closed.
+	changed := cachedClient.ClientConn.WaitForStateChange(ctx, connectivity.Ready)
+	assert.True(t, changed)
+	assert.Equal(t, connectivity.Shutdown, cachedClient.ClientConn.GetState())
+	assert.Equal(t, 0, cache.Len())
 }
 
 // node mocks a flow node that runs a GRPC server
