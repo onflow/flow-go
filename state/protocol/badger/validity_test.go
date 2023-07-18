@@ -2,7 +2,6 @@ package badger
 
 import (
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/require"
 
@@ -31,9 +30,10 @@ func TestEpochSetupValidity(t *testing.T) {
 		_, result, _ := unittest.BootstrapFixture(participants)
 		setup := result.ServiceEvents[0].Event.(*flow.EpochSetup)
 		// randomly shuffle the identities so they are not canonically ordered
-		setup.Participants = setup.Participants.DeterministicShuffle(time.Now().UnixNano())
-
-		err := verifyEpochSetup(setup, true)
+		var err error
+		setup.Participants, err = setup.Participants.Shuffle()
+		require.NoError(t, err)
+		err = verifyEpochSetup(setup, true)
 		require.Error(t, err)
 	})
 

@@ -19,7 +19,7 @@ ifeq (${IMAGE_TAG},)
 IMAGE_TAG := ${SHORT_COMMIT}
 endif
 
-IMAGE_TAG_NO_NETGO := $(IMAGE_TAG)-without_netgo
+IMAGE_TAG_NO_NETGO := $(IMAGE_TAG)-without-netgo
 
 # Name of the cover profile
 COVER_PROFILE := coverage.txt
@@ -86,6 +86,23 @@ verify-mocks: tidy generate-mocks
 emulator-norelic-check:
 	# test the fvm package compiles with Relic library disabled (required for the emulator build)
 	cd ./fvm && go test ./... -run=NoTestHasThisPrefix
+
+.SILENT: go-math-rand-check
+go-math-rand-check:
+	# check that the insecure math/rand Go package isn't used by production code.
+	# `exclude` should only specify non production code (test, bench..).
+	# If this check fails, try updating your code by using:
+	#   - "crypto/rand" or "flow-go/utils/rand" for non-deterministic randomness
+	#   - "flow-go/crypto/random" for deterministic randomness 
+	grep --include=\*.go \
+	--exclude=*test* --exclude=*helper* --exclude=*example* --exclude=*fixture* --exclude=*benchmark* --exclude=*profiler* \
+    --exclude-dir=*test* --exclude-dir=*helper* --exclude-dir=*example* --exclude-dir=*fixture* --exclude-dir=*benchmark* --exclude-dir=*profiler* -rnw '"math/rand"'; \
+    if [ $$? -ne 1 ]; then \
+       echo "[Error] Go production code should not use math/rand package"; exit 1; \
+    fi
+
+.PHONY: code-sanity-check
+code-sanity-check: go-math-rand-check emulator-norelic-check
 
 .PHONY: fuzz-fvm
 fuzz-fvm:
@@ -167,7 +184,7 @@ generate-mocks: install-mock-generators
 	rm -rf ./fvm/environment/mock
 	mockery --name '.*' --dir=fvm/environment --case=underscore --output="./fvm/environment/mock" --outpkg="mock"
 	mockery --name '.*' --dir=ledger --case=underscore --output="./ledger/mock" --outpkg="mock"
-	mockery --name 'ViolationsConsumer' --dir=network/slashing --case=underscore --output="./network/mocknetwork" --outpkg="mocknetwork"
+	mockery --name 'ViolationsConsumer' --dir=network --case=underscore --output="./network/mocknetwork" --outpkg="mocknetwork"
 	mockery --name '.*' --dir=network/p2p/ --case=underscore --output="./network/p2p/mock" --outpkg="mockp2p"
 	mockery --name '.*' --dir=network/alsp --case=underscore --output="./network/alsp/mock" --outpkg="mockalsp"
 	mockery --name 'Vertex' --dir="./module/forest" --case=underscore --output="./module/forest/mock" --outpkg="mock"

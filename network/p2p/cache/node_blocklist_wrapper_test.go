@@ -143,7 +143,8 @@ func (s *NodeDisallowListWrapperTestSuite) TestDisallowListNode() {
 		blocklistLookup := blocklist.Lookup()
 		honestIdentities := unittest.IdentityListFixture(8)
 		combinedIdentities := honestIdentities.Union(blocklist)
-		combinedIdentities = combinedIdentities.DeterministicShuffle(1234)
+		combinedIdentities, err = combinedIdentities.Shuffle()
+		require.NoError(s.T(), err)
 		numIdentities := len(combinedIdentities)
 
 		s.provider.On("Identities", mock.Anything).Return(combinedIdentities)
@@ -170,7 +171,8 @@ func (s *NodeDisallowListWrapperTestSuite) TestDisallowListNode() {
 		blocklistLookup := blocklist.Lookup()
 		honestIdentities := unittest.IdentityListFixture(8)
 		combinedIdentities := honestIdentities.Union(blocklist)
-		combinedIdentities = combinedIdentities.DeterministicShuffle(1234)
+		combinedIdentities, err = combinedIdentities.Shuffle()
+		require.NoError(s.T(), err)
 		numIdentities := len(combinedIdentities)
 
 		s.provider.On("Identities", mock.Anything).Return(combinedIdentities)

@@ -19,7 +19,8 @@ type DNSCache struct {
 	txtCache *stdmap.Backend
 }
 
-func NewDNSCache(sizeLimit uint32, logger zerolog.Logger, ipCollector module.HeroCacheMetrics, txtCollector module.HeroCacheMetrics) *DNSCache {
+func NewDNSCache(sizeLimit uint32, logger zerolog.Logger, ipCollector module.HeroCacheMetrics, txtCollector module.HeroCacheMetrics,
+) *DNSCache {
 	return &DNSCache{
 		txtCache: stdmap.NewBackend(
 			stdmap.WithBackData(

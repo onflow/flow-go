@@ -81,8 +81,9 @@ type MiddlewareTestSuite struct {
 	logger    zerolog.Logger
 	providers []*unittest.UpdatableIDProvider
 
-	mwCancel context.CancelFunc
-	mwCtx    irrecoverable.SignalerContext
+	mwCancel                   context.CancelFunc
+	mwCtx                      irrecoverable.SignalerContext
+	slashingViolationsConsumer network.ViolationsConsumer
 }
 
 // TestMiddlewareTestSuit runs all the test methods in this test suit
@@ -106,8 +107,9 @@ func (m *MiddlewareTestSuite) SetupTest() {
 		log:  m.logger,
 	}
 
+	m.slashingViolationsConsumer = mocknetwork.NewViolationsConsumer(m.T())
 	m.ids, m.nodes, obs = testutils.LibP2PNodeForMiddlewareFixture(m.T(), m.size)
-	m.mws, m.providers = testutils.MiddlewareFixtures(m.T(), m.ids, m.nodes, testutils.MiddlewareConfigFixture(m.T()))
+	m.mws, m.providers = testutils.MiddlewareFixtures(m.T(), m.ids, m.nodes, testutils.MiddlewareConfigFixture(m.T()), m.slashingViolationsConsumer)
 	for _, observableConnMgr := range obs {
 		observableConnMgr.Subscribe(&ob)
 	}
@@ -158,7 +160,7 @@ func (m *MiddlewareTestSuite) TestUpdateNodeAddresses() {
 
 	// create a new staked identity
 	ids, libP2PNodes, _ := testutils.LibP2PNodeForMiddlewareFixture(m.T(), 1)
-	mws, providers := testutils.MiddlewareFixtures(m.T(), ids, libP2PNodes, testutils.MiddlewareConfigFixture(m.T()))
+	mws, providers := testutils.MiddlewareFixtures(m.T(), ids, libP2PNodes, testutils.MiddlewareConfigFixture(m.T()), m.slashingViolationsConsumer)
 	require.Len(m.T(), ids, 1)
 	require.Len(m.T(), providers, 1)
 	require.Len(m.T(), mws, 1)
@@ -256,6 +258,7 @@ func (m *MiddlewareTestSuite) TestUnicastRateLimit_Messages() {
 		ids,
 		libP2PNodes,
 		testutils.MiddlewareConfigFixture(m.T()),
+		m.slashingViolationsConsumer,
 		middleware.WithUnicastRateLimiters(rateLimiters),
 		middleware.WithPeerManagerFilters([]p2p.PeerFilter{testutils.IsRateLimitedPeerFilter(messageRateLimiter)}))
 
@@ -409,6 +412,7 @@ func (m *MiddlewareTestSuite) TestUnicastRateLimit_Bandwidth() {
 		ids,
 		libP2PNodes,
 		testutils.MiddlewareConfigFixture(m.T()),
+		m.slashingViolationsConsumer,
 		middleware.WithUnicastRateLimiters(rateLimiters),
 		middleware.WithPeerManagerFilters([]p2p.PeerFilter{testutils.IsRateLimitedPeerFilter(bandwidthRateLimiter)}))
 	require.Len(m.T(), ids, 1)
