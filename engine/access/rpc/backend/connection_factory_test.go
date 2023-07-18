@@ -462,10 +462,6 @@ func TestExecutionNodeClientClosedGracefully(t *testing.T) {
 		client, _, err := connectionFactory.GetExecutionAPIClient(clientAddress)
 		assert.NoError(t, err)
 
-		result, _ := cache.Get(clientAddress)
-		clientConn := result.(*CachedClient).ClientConn
-		clientConn.GetState()
-
 		ctx := context.Background()
 
 		// Generate random number of requests
@@ -497,6 +493,49 @@ func TestExecutionNodeClientClosedGracefully(t *testing.T) {
 
 		assert.Equal(t, reqCompleted.Load(), respSent.Load())
 	})
+}
+
+// TestExecutionEvictingCacheClients
+func TestExecutionEvictingCacheClients(t *testing.T) {
+	// Add createCollNode function to recreate it each time for rapid test
+	cn := new(collectionNode)
+	cn.start(t)
+	defer cn.stop(t)
+
+	// setup the handler mock
+	req := &access.PingRequest{}
+	resp := &access.PingResponse{}
+	cn.handler.On("Ping", testifymock.Anything, req).After(3*time.Second).Return(resp, nil)
+
+	// create the factory
+	connectionFactory := new(ConnectionFactoryImpl)
+	// set the execution grpc port
+	connectionFactory.ExecutionGRPCPort = cn.port
+	// set the execution grpc client timeout
+	connectionFactory.ExecutionNodeGRPCTimeout = 10 * time.Second
+	// set the connection pool cache size
+	cacheSize := 1
+	cache, _ := lru.New(cacheSize)
+	connectionFactory.ConnectionsCache = cache
+	connectionFactory.CacheSize = uint(cacheSize)
+	// set metrics reporting
+	connectionFactory.AccessMetrics = metrics.NewNoopCollector()
+
+	clientAddress := cn.listener.Addr().String()
+	// create the execution API client
+	client, _, err := connectionFactory.GetAccessAPIClient(clientAddress)
+	assert.NoError(t, err)
+
+	time.AfterFunc(time.Second, func() {
+		fmt.Println("Function called after 1 seconds")
+		connectionFactory.InvalidateAccessAPIClient(clientAddress)
+	})
+
+	ctx := context.Background()
+	fmt.Println("Ping started")
+	_, err = client.Ping(ctx, req)
+	fmt.Println("Ping finished")
+
 }
 
 // node mocks a flow node that runs a GRPC server
