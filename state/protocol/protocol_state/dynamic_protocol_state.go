@@ -6,6 +6,7 @@ import (
 	"github.com/onflow/flow-go/state/protocol"
 )
 
+// dynamicProtocolStateAdapter implements protocol.DynamicProtocolState by wrapping an initialProtocolStateAdapter.
 type dynamicProtocolStateAdapter struct {
 	*initialProtocolStateAdapter
 }
