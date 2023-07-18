@@ -17,15 +17,7 @@ import (
 // using constructor passing a RichProtocolStateEntry.
 func TestInitialProtocolStateAdapter(t *testing.T) {
 	// construct a valid protocol state entry that has semantically correct DKGParticipantKeys
-	entry := unittest.ProtocolStateFixture(func(entry *flow.RichProtocolStateEntry) {
-		commit := entry.CurrentEpochCommit
-		dkgParticipants := entry.CurrentEpochSetup.Participants.Filter(filter.IsValidDKGParticipant)
-		lookup := unittest.DKGParticipantLookup(dkgParticipants)
-		commit.DKGParticipantKeys = make([]crypto.PublicKey, len(lookup))
-		for _, participant := range lookup {
-			commit.DKGParticipantKeys[participant.Index] = participant.KeyShare
-		}
-	})
+	entry := unittest.ProtocolStateFixture(WithValidDKG())
 
 	adapter, err := newInitialProtocolStateAdapter(entry)
 	require.NoError(t, err)
@@ -57,4 +49,16 @@ func TestInitialProtocolStateAdapter(t *testing.T) {
 			assert.Equal(t, entry.CurrentEpochCommit.DKGParticipantKeys[index], keyShare)
 		}
 	})
+}
+
+func WithValidDKG() func(*flow.RichProtocolStateEntry) {
+	return func(entry *flow.RichProtocolStateEntry) {
+		commit := entry.CurrentEpochCommit
+		dkgParticipants := entry.CurrentEpochSetup.Participants.Filter(filter.IsValidDKGParticipant)
+		lookup := unittest.DKGParticipantLookup(dkgParticipants)
+		commit.DKGParticipantKeys = make([]crypto.PublicKey, len(lookup))
+		for _, participant := range lookup {
+			commit.DKGParticipantKeys[participant.Index] = participant.KeyShare
+		}
+	}
 }
