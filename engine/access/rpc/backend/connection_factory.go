@@ -72,7 +72,7 @@ type ConnectionFactoryImpl struct {
 	AccessMetrics             module.AccessMetrics
 	Log                       zerolog.Logger
 	mutex                     sync.Mutex
-	CircuitBreakerConfig      *CircuitBreakerConfig
+	CircuitBreakerConfig      CircuitBreakerConfig
 }
 
 // CircuitBreakerConfig is a configuration struct for the circuit breaker.
@@ -116,7 +116,7 @@ func (cf *ConnectionFactoryImpl) createConnection(address string, timeout time.D
 
 	var connInterceptors []grpc.UnaryClientInterceptor
 
-	if cf.CircuitBreakerConfig != nil && cf.CircuitBreakerConfig.Enabled {
+	if cf.CircuitBreakerConfig.Enabled {
 		connInterceptors = append(connInterceptors, cf.createCircuitBreakerInterceptor())
 	} else {
 		connInterceptors = append(connInterceptors, cf.createClientInvalidationInterceptor(address, clientType))
@@ -301,7 +301,7 @@ func (cf *ConnectionFactoryImpl) createClientInvalidationInterceptor(
 	address string,
 	clientType clientType,
 ) grpc.UnaryClientInterceptor {
-	if cf.CircuitBreakerConfig == nil || !cf.CircuitBreakerConfig.Enabled {
+	if !cf.CircuitBreakerConfig.Enabled {
 		clientInvalidationInterceptor := func(
 			ctx context.Context,
 			method string,
@@ -351,7 +351,7 @@ func (cf *ConnectionFactoryImpl) createClientInvalidationInterceptor(
 // created if the circuit breaker is enabled. All invocations will go through the circuit breaker to be tracked for
 // success or failure of the call.
 func (cf *ConnectionFactoryImpl) createCircuitBreakerInterceptor() grpc.UnaryClientInterceptor {
-	if cf.CircuitBreakerConfig != nil && cf.CircuitBreakerConfig.Enabled {
+	if cf.CircuitBreakerConfig.Enabled {
 		circuitBreaker := gobreaker.NewCircuitBreaker(gobreaker.Settings{
 			// The restore timeout is defined to automatically return the circuit breaker to the HalfClose state.
 			Timeout: cf.CircuitBreakerConfig.RestoreTimeout,
