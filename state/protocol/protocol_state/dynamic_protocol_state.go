@@ -12,8 +12,8 @@ type dynamicProtocolStateAdapter struct {
 
 var _ protocol.DynamicProtocolState = (*dynamicProtocolStateAdapter)(nil)
 
-func newDynamicProtocolStateAdaptor(entry *flow.RichProtocolStateEntry) (*dynamicProtocolStateAdapter, error) {
-	adapter, err := newInitialProtocolStateAdaptor(entry)
+func newDynamicProtocolStateAdapter(entry *flow.RichProtocolStateEntry) (*dynamicProtocolStateAdapter, error) {
+	adapter, err := newInitialProtocolStateAdapter(entry)
 	if err != nil {
 		return nil, fmt.Errorf("could not create internal protocol state adapter: %w", err)
 	}

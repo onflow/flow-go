@@ -15,7 +15,7 @@ type initialProtocolStateAdapter struct {
 
 var _ protocol.InitialProtocolState = (*initialProtocolStateAdapter)(nil)
 
-func newInitialProtocolStateAdaptor(entry *flow.RichProtocolStateEntry) (*initialProtocolStateAdapter, error) {
+func newInitialProtocolStateAdapter(entry *flow.RichProtocolStateEntry) (*initialProtocolStateAdapter, error) {
 	dkg, err := inmem.EncodableDKGFromEvents(entry.CurrentEpochSetup, entry.CurrentEpochCommit)
 	if err != nil {
 		return nil, fmt.Errorf("could not construct encodable DKG from events: %w", err)

@@ -13,12 +13,18 @@ type ProtocolState struct {
 
 var _ protocol.ProtocolState = (*ProtocolState)(nil)
 
+func NewProtocolState(protocolStateDB storage.ProtocolState) *ProtocolState {
+	return &ProtocolState{
+		protocolStateDB: protocolStateDB,
+	}
+}
+
 func (s *ProtocolState) AtBlockID(blockID flow.Identifier) (protocol.DynamicProtocolState, error) {
 	protocolStateEntry, err := s.protocolStateDB.ByBlockID(blockID)
 	if err != nil {
 		return nil, fmt.Errorf("could not query protocol state at block (%x): %w", blockID, err)
 	}
-	return newDynamicProtocolStateAdaptor(protocolStateEntry)
+	return newDynamicProtocolStateAdapter(protocolStateEntry)
 }
 
 func (s *ProtocolState) GlobalParams() {
