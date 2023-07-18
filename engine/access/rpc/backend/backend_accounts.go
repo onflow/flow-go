@@ -108,7 +108,7 @@ func (b *backendAccounts) getAccountAtBlockID(
 // error aggregating all failures is returned.
 func (b *backendAccounts) getAccountFromAnyExeNode(ctx context.Context, execNodes flow.IdentityList, req *execproto.GetAccountAtBlockIDRequest) (*execproto.GetAccountAtBlockIDResponse, error) {
 	var resp *execproto.GetAccountAtBlockIDResponse
-	errToReturn := b.nodeCommunicator.CallAvailableExecutionNode(
+	errToReturn := b.nodeCommunicator.CallAvailableNode(
 		execNodes,
 		func(node *flow.Identity) error {
 			var err error

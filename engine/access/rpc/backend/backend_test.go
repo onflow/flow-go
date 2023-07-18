@@ -171,7 +171,7 @@ func (suite *Suite) TestGetLatestProtocolStateSnapshot_NoTransitionSpan() {
 		epochBuilder := unittest.NewEpochBuilder(suite.T(), state)
 		// build epoch 1
 		// blocks in current state
-		// P <- A(S_P-1) <- B(S_P) <- C(S_A) <- D(S_B) |setup| <- E(S_C) <- F(S_D) |commit|
+		// P <- A(S_P-1) <- B(S_P) <- C(S_A) <- D(S_B) |setup| <- E(S_C) <- NodeAction(S_D) |commit|
 		epochBuilder.
 			BuildEpoch().
 			CompleteEpoch()
@@ -308,7 +308,7 @@ func (suite *Suite) TestGetLatestProtocolStateSnapshot_PhaseTransitionSpan() {
 		epochBuilder := unittest.NewEpochBuilder(suite.T(), state)
 		// build epoch 1
 		// blocks in current state
-		// P <- A(S_P-1) <- B(S_P) <- C(S_A) <- D(S_B) |setup| <- E(S_C) <- F(S_D) |commit|
+		// P <- A(S_P-1) <- B(S_P) <- C(S_A) <- D(S_B) |setup| <- E(S_C) <- NodeAction(S_D) |commit|
 		epochBuilder.
 			BuildEpoch().
 			CompleteEpoch()
@@ -373,7 +373,7 @@ func (suite *Suite) TestGetLatestProtocolStateSnapshot_EpochTransitionSpan() {
 		epochBuilder := unittest.NewEpochBuilder(suite.T(), state)
 		// build epoch 1
 		// blocks in current state
-		// P <- A(S_P-1) <- B(S_P) <- C(S_A) <- D(S_B) |setup| <- E(S_C) <- F(S_D) |commit|
+		// P <- A(S_P-1) <- B(S_P) <- C(S_A) <- D(S_B) |setup| <- E(S_C) <- NodeAction(S_D) |commit|
 		epochBuilder.BuildEpoch()
 
 		// add more blocks to our state in the commit phase, this will allow
@@ -2172,14 +2172,14 @@ func (suite *Suite) TestExecutionNodesForBlockID() {
 		require.NoError(suite.T(), err)
 
 		execNodeSelectorFactory := NodeSelectorFactory{circuitBreakerEnabled: false}
-		execSelector := execNodeSelectorFactory.SelectExecutionNodes(allExecNodes)
+		execSelector := execNodeSelectorFactory.SelectNodes(allExecNodes)
 
 		actualList := flow.IdentityList{}
 		for actual := execSelector.Next(); actual != nil; actual = execSelector.Next() {
 			actualList = append(actualList, actual)
 		}
 
-		if len(expectedENs) > maxExecutionNodesCnt {
+		if len(expectedENs) > maxNodesCnt {
 			for _, actual := range actualList {
 				require.Contains(suite.T(), expectedENs, actual)
 			}
@@ -2199,14 +2199,14 @@ func (suite *Suite) TestExecutionNodesForBlockID() {
 		require.NoError(suite.T(), err)
 
 		execNodeSelectorFactory := NodeSelectorFactory{circuitBreakerEnabled: false}
-		execSelector := execNodeSelectorFactory.SelectExecutionNodes(allExecNodes)
+		execSelector := execNodeSelectorFactory.SelectNodes(allExecNodes)
 
 		actualList := flow.IdentityList{}
 		for actual := execSelector.Next(); actual != nil; actual = execSelector.Next() {
 			actualList = append(actualList, actual)
 		}
 
-		require.Equal(suite.T(), len(actualList), maxExecutionNodesCnt)
+		require.Equal(suite.T(), len(actualList), maxNodesCnt)
 	})
 
 	// if no preferred or fixed ENs are specified, the ExecutionNodesForBlockID function should

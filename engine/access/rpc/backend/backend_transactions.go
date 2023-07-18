@@ -97,13 +97,17 @@ func (b *backendTransactions) trySendTransaction(ctx context.Context, tx *flow.T
 	defer logAnyError()
 
 	// try sending the transaction to one of the chosen collection nodes
-	sendError = b.nodeCommunicator.CallAvailableCollectionNode(collNodes, func(node *flow.Identity) error {
-		err = b.sendTransactionToCollector(ctx, tx, node.Address)
-		if err != nil {
-			return err
-		}
-		return nil
-	})
+	sendError = b.nodeCommunicator.CallAvailableNode(
+		collNodes,
+		func(node *flow.Identity) error {
+			err = b.sendTransactionToCollector(ctx, tx, node.Address)
+			if err != nil {
+				return err
+			}
+			return nil
+		},
+		nil,
+	)
 
 	return sendError
 }
@@ -773,7 +777,7 @@ func (b *backendTransactions) getTransactionResultFromAnyExeNode(
 	}()
 
 	var resp *execproto.GetTransactionResultResponse
-	errToReturn = b.nodeCommunicator.CallAvailableExecutionNode(
+	errToReturn = b.nodeCommunicator.CallAvailableNode(
 		execNodes,
 		func(node *flow.Identity) error {
 			var err error
@@ -835,7 +839,7 @@ func (b *backendTransactions) getTransactionResultsByBlockIDFromAnyExeNode(
 	}
 
 	var resp *execproto.GetTransactionResultsResponse
-	errToReturn = b.nodeCommunicator.CallAvailableExecutionNode(
+	errToReturn = b.nodeCommunicator.CallAvailableNode(
 		execNodes,
 		func(node *flow.Identity) error {
 			var err error
@@ -893,7 +897,7 @@ func (b *backendTransactions) getTransactionResultByIndexFromAnyExeNode(
 	}
 
 	var resp *execproto.GetTransactionResultResponse
-	errToReturn = b.nodeCommunicator.CallAvailableExecutionNode(
+	errToReturn = b.nodeCommunicator.CallAvailableNode(
 		execNodes,
 		func(node *flow.Identity) error {
 			var err error

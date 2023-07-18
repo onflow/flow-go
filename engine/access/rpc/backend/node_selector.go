@@ -2,11 +2,8 @@ package backend
 
 import "github.com/onflow/flow-go/model/flow"
 
-// maxExecutionNodesCnt is the maximum number of execution nodes that will be contacted to complete an execution API request.
-const maxExecutionNodesCnt = 3
-
-// maxCollectionNodesCnt is the maximum number of collection nodes that will be contacted to complete a collection API request.
-const maxCollectionNodesCnt = 3
+// maxNodesCnt is the maximum number of nodes that will be contacted to complete an API request.
+const maxNodesCnt = 3
 
 // NodeSelector is an interface that represents the ability to select node identities that the access node is trying to reach.
 // It encapsulates the internal logic of node selection and provides a way to change implementations for different types
@@ -21,65 +18,35 @@ type NodeSelectorFactory struct {
 	circuitBreakerEnabled bool
 }
 
-// SelectExecutionNodes selects the configured number of execution node identities from the provided list of execution nodes
-// and returns an execution node selector to iterate through them.
-func (n *NodeSelectorFactory) SelectExecutionNodes(executionNodes flow.IdentityList) NodeSelector {
+// SelectNodes selects the configured number of node identities from the provided list of nodes
+// and returns the node selector to iterate through them.
+func (n *NodeSelectorFactory) SelectNodes(nodes flow.IdentityList) NodeSelector {
 	// If the circuit breaker is disabled, the legacy logic should be used, which selects only a specified number of nodes.
 	if !n.circuitBreakerEnabled {
-		executionNodes = executionNodes.Sample(maxExecutionNodesCnt)
+		nodes = nodes.Sample(maxNodesCnt)
 	}
 
-	return &ExecutionNodeSelector{
-		nodes: executionNodes,
+	return &MainNodeSelector{
+		nodes: nodes,
 		index: 0,
 	}
 }
 
-// SelectCollectionNodes selects the configured number of collection node identities from the provided list of collection nodes
-// and returns a collection node selector to iterate through them.
-func (n *NodeSelectorFactory) SelectCollectionNodes(collectionNodes flow.IdentityList) NodeSelector {
-	// If the circuit breaker is disabled, the legacy logic should be used, which selects only a specified number of nodes.
-	if !n.circuitBreakerEnabled {
-		collectionNodes = collectionNodes.Sample(maxCollectionNodesCnt)
-	}
+// SelectCollectionNodes
 
-	return &CollectionNodeSelector{
-		nodes: collectionNodes,
-		index: 0,
-	}
-}
+var _ NodeSelector = (*MainNodeSelector)(nil)
 
-var _ NodeSelector = (*ExecutionNodeSelector)(nil)
-
-// ExecutionNodeSelector is a specific implementation of an execution node selector.
-type ExecutionNodeSelector struct {
+// MainNodeSelector is a specific implementation of the node selector.
+type MainNodeSelector struct {
 	nodes flow.IdentityList
 	index int
 }
 
-// Next returns the next execution node in the selector.
-func (e *ExecutionNodeSelector) Next() *flow.Identity {
+// Next returns the next node in the selector.
+func (e *MainNodeSelector) Next() *flow.Identity {
 	if e.index < len(e.nodes) {
 		next := e.nodes[e.index]
 		e.index++
-		return next
-	}
-	return nil
-}
-
-var _ NodeSelector = (*CollectionNodeSelector)(nil)
-
-// CollectionNodeSelector is a specific implementation of a collection node selector.
-type CollectionNodeSelector struct {
-	nodes flow.IdentityList
-	index int
-}
-
-// Next returns the next collection node in the selector.
-func (c *CollectionNodeSelector) Next() *flow.Identity {
-	if c.index < len(c.nodes) {
-		next := c.nodes[c.index]
-		c.index++
 		return next
 	}
 	return nil

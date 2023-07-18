@@ -116,7 +116,11 @@ func (cf *ConnectionFactoryImpl) createConnection(address string, timeout time.D
 
 	var connInterceptors []grpc.UnaryClientInterceptor
 
+	// The order in which interceptors are added to the `connInterceptors` slice is important since they will be called
+	// in the same order during gRPC requests.
 	if cf.CircuitBreakerConfig.Enabled {
+		// If the circuit breaker interceptor is enabled, it should always be called first before passing control to
+		// subsequent interceptors.
 		connInterceptors = append(connInterceptors, cf.createCircuitBreakerInterceptor())
 	} else {
 		connInterceptors = append(connInterceptors, cf.createClientInvalidationInterceptor(address, clientType))
@@ -318,6 +322,8 @@ func (cf *ConnectionFactoryImpl) createClientInvalidationInterceptor(
 					cf.InvalidateAccessAPIClient(address)
 				case ExecutionClient:
 					cf.InvalidateExecutionAPIClient(address)
+				default:
+					cf.Log.Info().Str("client_invalidation_interceptor", address).Msg(fmt.Sprintf("unexpected client type: %d", clientType))
 				}
 			}
 
@@ -353,12 +359,15 @@ func (cf *ConnectionFactoryImpl) createClientInvalidationInterceptor(
 func (cf *ConnectionFactoryImpl) createCircuitBreakerInterceptor() grpc.UnaryClientInterceptor {
 	if cf.CircuitBreakerConfig.Enabled {
 		circuitBreaker := gobreaker.NewCircuitBreaker(gobreaker.Settings{
-			// The restore timeout is defined to automatically return the circuit breaker to the HalfClose state.
+			// Timeout defines how long the circuit breaker will remain open before transitioning to the HalfClose state.
 			Timeout: cf.CircuitBreakerConfig.RestoreTimeout,
+			// ReadyToTrip returns true when the circuit breaker should trip and transition to the Open state
 			ReadyToTrip: func(counts gobreaker.Counts) bool {
 				// The number of maximum failures is checked before the circuit breaker goes to the Open state.
 				return counts.ConsecutiveFailures >= cf.CircuitBreakerConfig.MaxFailures
 			},
+			// MaxRequests defines the max number of concurrent requests while the circuit breaker is in the HalfClosed
+			// state.
 			MaxRequests: cf.CircuitBreakerConfig.MaxRequests,
 		})
 

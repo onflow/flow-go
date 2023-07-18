@@ -302,7 +302,7 @@ func (b *Backend) GetLatestProtocolStateSnapshot(_ context.Context) ([]byte, err
 	return convert.SnapshotToBytes(validSnapshot)
 }
 
-// executionNodesForBlockID returns upto maxExecutionNodesCnt number of randomly chosen execution node identities
+// executionNodesForBlockID returns upto maxNodesCnt number of randomly chosen execution node identities
 // which have executed the given block ID.
 // If no such execution node is found, an InsufficientExecutionReceipts error is returned.
 func executionNodesForBlockID(

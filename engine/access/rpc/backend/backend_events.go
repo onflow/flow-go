@@ -211,7 +211,7 @@ func (b *backendEvents) getEventsFromAnyExeNode(ctx context.Context,
 	req *execproto.GetEventsForBlockIDsRequest) (*execproto.GetEventsForBlockIDsResponse, *flow.Identity, error) {
 	var resp *execproto.GetEventsForBlockIDsResponse
 	var execNode *flow.Identity
-	errToReturn := b.nodeCommunicator.CallAvailableExecutionNode(
+	errToReturn := b.nodeCommunicator.CallAvailableNode(
 		execNodes,
 		func(node *flow.Identity) error {
 			var err error

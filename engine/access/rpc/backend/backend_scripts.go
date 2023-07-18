@@ -96,7 +96,7 @@ func (b *backendScripts) findScriptExecutors(
 		return nil, err
 	}
 	executorAddrs := make([]string, 0, len(executors))
-	execNodeSelector := b.nodeSelectorFactory.SelectExecutionNodes(executors)
+	execNodeSelector := b.nodeSelectorFactory.SelectNodes(executors)
 
 	for executor := execNodeSelector.Next(); executor != nil; executor = execNodeSelector.Next() {
 		executorAddrs = append(executorAddrs, executor.Address)

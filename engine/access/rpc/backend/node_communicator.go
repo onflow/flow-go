@@ -10,6 +10,14 @@ import (
 // maxFailedRequestCount represents the maximum number of failed requests before returning errors.
 const maxFailedRequestCount = 3
 
+// NodeAction is a callback function type that represents an action to be performed on a node.
+// It takes a node as input and returns an error indicating the result of the action.
+type NodeAction func(node *flow.Identity) error
+
+// ErrorTerminator is a callback function that determines whether an error should terminate further execution.
+// It takes an error as input and returns a boolean value indicating whether the error should be considered terminal.
+type ErrorTerminator func(err error) bool
+
 // NodeCommunicator is responsible for calling available nodes in the backend.
 type NodeCommunicator struct {
 	nodeSelectorFactory NodeSelectorFactory
@@ -22,56 +30,27 @@ func NewNodeCommunicator(circuitBreakerEnabled bool) *NodeCommunicator {
 	}
 }
 
-// CallAvailableExecutionNode calls the provided function on the available execution nodes.
-// It iterates through the execution nodes and executes the function.
-// If an error occurs, it applies the custom error handler (if provided) and keeps track of the errors.
-// If the error occurs in circuit breaker, it continues to the next execution node.
+// CallAvailableNode calls the provided function on the available nodes.
+// It iterates through the nodes and executes the function.
+// If an error occurs, it applies the custom error terminator (if provided) and keeps track of the errors.
+// If the error occurs in circuit breaker, it continues to the next node.
 // If the maximum failed request count is reached, it returns the accumulated errors.
-func (b *NodeCommunicator) CallAvailableExecutionNode(
+func (b *NodeCommunicator) CallAvailableNode(
 	nodes flow.IdentityList,
-	call func(node *flow.Identity) error,
-	customErrorHandler func(err error) bool,
+	call NodeAction,
+	shouldTerminateOnError ErrorTerminator,
 ) error {
 	var errs *multierror.Error
-	execNodeSelector := b.nodeSelectorFactory.SelectExecutionNodes(nodes)
+	nodeSelector := b.nodeSelectorFactory.SelectNodes(nodes)
 
-	for execNode := execNodeSelector.Next(); execNode != nil; execNode = execNodeSelector.Next() {
-		err := call(execNode)
+	for node := nodeSelector.Next(); node != nil; node = nodeSelector.Next() {
+		err := call(node)
 		if err == nil {
 			return nil
 		}
 
-		if customErrorHandler != nil && customErrorHandler(err) {
+		if shouldTerminateOnError != nil && shouldTerminateOnError(err) {
 			return err
-		}
-
-		if err == gobreaker.ErrOpenState {
-			continue
-		}
-
-		errs = multierror.Append(errs, err)
-		if len(errs.Errors) >= maxFailedRequestCount {
-			return errs.ErrorOrNil()
-		}
-	}
-
-	return errs.ErrorOrNil()
-}
-
-// CallAvailableCollectionNode calls the provided function on the available collection nodes.
-// It iterates through the collection nodes and executes the function.
-// If an error occurs, it keeps track of the errors.
-// If the error occurs in circuit breaker, it continues to the next collection node.
-// If the maximum failed request count is reached, it returns the accumulated errors.
-func (b *NodeCommunicator) CallAvailableCollectionNode(nodes flow.IdentityList, call func(node *flow.Identity) error) error {
-	var errs *multierror.Error
-
-	collNodeSelector := b.nodeSelectorFactory.SelectCollectionNodes(nodes)
-
-	for colNode := collNodeSelector.Next(); colNode != nil; colNode = collNodeSelector.Next() {
-		err := call(colNode)
-		if err == nil {
-			return nil
 		}
 
 		if err == gobreaker.ErrOpenState {
