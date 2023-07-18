@@ -18,10 +18,22 @@ import (
 )
 
 const (
+	// DefaultAppSpecificScoreWeight is the default weight for app-specific scores. It is used to scale the app-specific
+	// scores to the same range as the other scores. At the current version, we don't distinguish between the app-specific
+	// scores and the other scores, so we set it to 1.
 	DefaultAppSpecificScoreWeight = 1
-	MaxAppSpecificReward          = float64(100)
-	MaxAppSpecificPenalty         = -1 * MaxAppSpecificReward
-	MinAppSpecificPenalty         = -1
+
+	// MaxAppSpecificReward is the default reward for well-behaving staked peers. If a peer does not have
+	// any misbehavior record, e.g., invalid subscription, invalid message, etc., it will be rewarded with this score.
+	MaxAppSpecificReward = float64(100)
+
+	// MaxAppSpecificPenalty is the maximum penalty for sever offenses that we apply to a remote node score. The score
+	// mechanism of GossipSub in Flow is designed in a way that all other infractions are penalized with a fraction of
+	// this value. We have also set the other parameters such as DefaultGraylistThreshold, DefaultGossipThreshold and DefaultPublishThreshold to
+	// be a bit higher than this, i.e., MaxAppSpecificPenalty + 1. This ensures that a node with a score of MaxAppSpecificPenalty
+	// will be graylisted (i.e., all incoming and outgoing RPCs are rejected) and will not be able to publish or gossip any messages.
+	MaxAppSpecificPenalty = -1 * MaxAppSpecificReward
+	MinAppSpecificPenalty = -1
 
 	// DefaultStakedIdentityReward is the default reward for staking peers. It is applied to the peer's score when
 	// the peer does not have any misbehavior record, e.g., invalid subscription, invalid message, etc.
