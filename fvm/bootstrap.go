@@ -318,7 +318,9 @@ func (b *bootstrapExecutor) Execute() error {
 	service := b.createServiceAccount()
 
 	fungibleToken := b.deployFungibleToken()
-	flowToken := b.deployFlowToken(service, fungibleToken)
+	nonFungibleToken := b.deployNonFungibleToken(service)
+	b.deployMetadataViews(fungibleToken, nonFungibleToken)
+	flowToken := b.deployFlowToken(service, fungibleToken, nonFungibleToken)
 	storageFees := b.deployStorageFees(service, fungibleToken, flowToken)
 	feeContract := b.deployFlowFees(service, fungibleToken, flowToken, storageFees)
 
@@ -411,7 +413,46 @@ func (b *bootstrapExecutor) deployFungibleToken() flow.Address {
 	return fungibleToken
 }
 
-func (b *bootstrapExecutor) deployFlowToken(service, fungibleToken flow.Address) flow.Address {
+func (b *bootstrapExecutor) deployNonFungibleToken(deployTo flow.Address) flow.Address {
+
+	txError, err := b.invokeMetaTransaction(
+		b.ctx,
+		Transaction(
+			blueprints.DeployNonFungibleTokenContractTransaction(deployTo),
+			0),
+	)
+	panicOnMetaInvokeErrf("failed to deploy non-fungible token contract: %s", txError, err)
+	return deployTo
+}
+
+func (b *bootstrapExecutor) deployMetadataViews(fungibleToken, nonFungibleToken flow.Address) {
+
+	txError, err := b.invokeMetaTransaction(
+		b.ctx,
+		Transaction(
+			blueprints.DeployMetadataViewsContractTransaction(fungibleToken, nonFungibleToken),
+			0),
+	)
+	panicOnMetaInvokeErrf("failed to deploy metadata views contract: %s", txError, err)
+
+	txError, err = b.invokeMetaTransaction(
+		b.ctx,
+		Transaction(
+			blueprints.DeployViewResolverContractTransaction(nonFungibleToken),
+			0),
+	)
+	panicOnMetaInvokeErrf("failed to deploy view resolver contract: %s", txError, err)
+
+	txError, err = b.invokeMetaTransaction(
+		b.ctx,
+		Transaction(
+			blueprints.DeployFungibleTokenMetadataViewsContractTransaction(fungibleToken, nonFungibleToken),
+			0),
+	)
+	panicOnMetaInvokeErrf("failed to deploy fungible token metadata views contract: %s", txError, err)
+}
+
+func (b *bootstrapExecutor) deployFlowToken(service, fungibleToken, metadataViews flow.Address) flow.Address {
 	flowToken := b.createAccount(b.accountKeys.FlowTokenAccountPublicKeys)
 	txError, err := b.invokeMetaTransaction(
 		b.ctx,
@@ -419,6 +460,7 @@ func (b *bootstrapExecutor) deployFlowToken(service, fungibleToken flow.Address)
 			blueprints.DeployFlowTokenContractTransaction(
 				service,
 				fungibleToken,
+				metadataViews,
 				flowToken),
 			0),
 	)
