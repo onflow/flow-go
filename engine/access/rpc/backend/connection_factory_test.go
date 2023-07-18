@@ -411,8 +411,8 @@ func TestConnectionPoolStale(t *testing.T) {
 
 // TestCircuitBreakerExecutionNode tests the circuit breaker state changes for execution nodes.
 func TestCircuitBreakerExecutionNode(t *testing.T) {
-	requestTimeout := 1 * time.Second
-	circuitBreakerRestoreTimeout := 3 * time.Second
+	requestTimeout := 500 * time.Millisecond
+	circuitBreakerRestoreTimeout := 1500 * time.Millisecond
 
 	// Create an execution node for testing.
 	en := new(executionNode)
@@ -484,7 +484,7 @@ func TestCircuitBreakerExecutionNode(t *testing.T) {
 	en.handler.On("Ping", testifymock.Anything, req).Return(resp, nil)
 
 	// Wait until the circuit breaker transitions to the "HalfOpen" state.
-	time.Sleep(circuitBreakerRestoreTimeout + time.Second)
+	time.Sleep(circuitBreakerRestoreTimeout + (500 * time.Millisecond))
 
 	// Call and measure the duration for the third invocation (circuit breaker state is now "HalfOpen").
 	duration, err = callAndMeasurePingDuration()
@@ -494,8 +494,8 @@ func TestCircuitBreakerExecutionNode(t *testing.T) {
 
 // TestCircuitBreakerCollectionNode tests the circuit breaker state changes for collection nodes.
 func TestCircuitBreakerCollectionNode(t *testing.T) {
-	requestTimeout := 1 * time.Second
-	circuitBreakerRestoreTimeout := 3 * time.Second
+	requestTimeout := 500 * time.Millisecond
+	circuitBreakerRestoreTimeout := 1500 * time.Millisecond
 
 	// Create a collection node for testing.
 	cn := new(collectionNode)
@@ -567,7 +567,7 @@ func TestCircuitBreakerCollectionNode(t *testing.T) {
 	cn.handler.On("Ping", testifymock.Anything, req).Return(resp, nil)
 
 	// Wait until the circuit breaker transitions to the "HalfOpen" state.
-	time.Sleep(circuitBreakerRestoreTimeout + time.Second)
+	time.Sleep(circuitBreakerRestoreTimeout + (500 * time.Millisecond))
 
 	// Call and measure the duration for the third invocation (circuit breaker state is now "HalfOpen").
 	duration, err = callAndMeasurePingDuration()
