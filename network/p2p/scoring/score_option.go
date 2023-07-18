@@ -236,7 +236,7 @@ const (
 	//
 	// We set it to 10, meaning that we at most tolerate 10 of such RPCs containing iHave broken promises. After that, the peer is penalized for every
 	// excess RPC containing iHave broken promises.
-	// The counter is also decayed by (0.9) every decay interval (defaultDecayInterval) i.e., every minute.
+	// The counter is also decayed by (0.99) every decay interval (defaultDecayInterval) i.e., every minute.
 	// Note that misbehaviors are counted by GossipSub across all topics (and is different from the Application Layer Misbehaviors that we count through
 	// the ALSP system).
 	defaultBehaviourPenaltyThreshold = 10
@@ -264,9 +264,9 @@ const (
 	// is chosen in a way that with almost a few misbehaviors more than the threshold, the peer will be graylisted. The rationale relies on the fact that
 	// the misbehavior counter is incremented by 1 for each RPC containing one or more broken promises. Hence, it is per RPC, and not per broken promise.
 	// Having sqrt(2) * 10 broken promises RPC is a blatant misbehavior, and the peer should be graylisted. With decay interval of 1 minute, and decay value of
-	// 0.99 we expect a graylisted node due to borken promises to get back in about 34 minutes, i.e., (0.9)^x * (sqrt(2) * 10)^2 * MaxAppSpecificPenalty > GraylistThreshold
+	// 0.99 we expect a graylisted node due to borken promises to get back in about 527 minutes, i.e., (0.99)^x * (sqrt(2) * 10)^2 * MaxAppSpecificPenalty > GraylistThreshold
 	// where x is the number of decay intervals that the peer is graylisted. As MaxAppSpecificPenalty and GraylistThresholds are close, we can simplify the inequality
-	// to (0.9)^x * (sqrt(2) * 10)^2 > 1 --> (0.9)^x * 200 > 1 --> (0.9)^x > 1/200 --> x > log(1/200) / log(0.9) --> x > 50.28 decay intervals, i.e., 50.28 minutes.
+	// to (0.99)^x * (sqrt(2) * 10)^2 > 1 --> (0.99)^x * 200 > 1 --> (0.99)^x > 1/200 --> x > log(1/200) / log(0.99) --> x > 527.17 decay intervals, i.e., 527 minutes.
 	// Note that misbehaviors are counted by GossipSub across all topics (and is different from the Application Layer Misbehaviors that we count through
 	// the ALSP system that are reported by the engines).
 	defaultBehaviourPenaltyWeight = 0.01 * MaxAppSpecificPenalty
@@ -282,13 +282,13 @@ const (
 	// That is why we decay the misbehavior counter very slow, as this counter indicates a severe misbehavior.
 	//
 	// The misbehavior counter is decayed per decay interval (i.e., defaultDecayInterval = 0.9) by GossipSub.
-	// We set it to 0.9, which means that the the misbehavior counter is decayed by 10% per decay interval.
+	// We set it to 0.99, which means that the misbehavior counter is decayed by 1% per decay interval.
 	// With the generous threshold that we set (i.e., defaultBehaviourPenaltyThreshold = 10), we take the peers going beyond the threshold as persistent misbehaviors,
 	// We expect honest peers never to go beyond the threshold, and if they do, we expect them to go back below the threshold quickly.
 	//
 	// Note that misbehaviors are counted by GossipSub across all topics (and is different from the Application Layer Misbehaviors that we count through
 	// the ALSP system that is based on the engines report).
-	defaultBehaviourPenaltyDecay = 0.9
+	defaultBehaviourPenaltyDecay = 0.99
 )
 
 // ScoreOption is a functional option for configuring the peer scoring system.

@@ -190,13 +190,13 @@ mitigates GRAFT flood attacks.
 ### Configuring GossipSub Parameters
 In order to mitigate the iHave broken promises attacks, GossipSub expects the application layer (i.e., Flow protocol) to properly configure the relevant scoring parameters, notably: 
 
-- `BehaviourPenaltyThreshold` is set to `defaultBehaviourPenaltyThreshold`, i.e., 10.
-- `BehaviourPenaltyWeight` is set to `defaultBehaviourPenaltyWeight`, i.e., 0.01 * `MaxAppSpecificPenalty`
-- `BehaviourPenaltyDecay` is set to `defaultBehaviourPenaltyDecay`, i.e., 0.9.
+- `BehaviourPenaltyThreshold` is set to `defaultBehaviourPenaltyThreshold`, i.e., `10`.
+- `BehaviourPenaltyWeight` is set to `defaultBehaviourPenaltyWeight`, i.e., `0.01` * `MaxAppSpecificPenalty`
+- `BehaviourPenaltyDecay` is set to `defaultBehaviourPenaltyDecay`, i.e., `0.99`.
 
 #### 1. `defaultBehaviourPenaltyThreshold`
 This parameter sets the threshold for when the behavior of a peer is considered bad. Misbehavior is defined as advertising an iHave without responding to the iWants (iHave broken promises), and attempting on GRAFT when the peer is considered for a PRUNE backoff.
-If a remote peer sends an RPC that advertises at least one iHave for a message but doesn't respond to the iWant requests for that message within the next `3 seconds`, the peer misbehavior counter is incremented by `1`. This threshold is set to `10`, meaning that we at most tolerate 10 such RPCs containing iHave broken promises. After this, the peer is penalized for every excess RPC containing iHave broken promises. The counter decays by (0.9) every decay interval (defaultDecayInterval) i.e., every minute.
+If a remote peer sends an RPC that advertises at least one iHave for a message but doesn't respond to the iWant requests for that message within the next `3 seconds`, the peer misbehavior counter is incremented by `1`. This threshold is set to `10`, meaning that we at most tolerate 10 such RPCs containing iHave broken promises. After this, the peer is penalized for every excess RPC containing iHave broken promises. The counter decays by (`0.99`) every decay interval (defaultDecayInterval) i.e., every minute.
 
 #### 2. `defaultBehaviourPenaltyWeight`
 This is the weight applied as a penalty when a peer's misbehavior goes beyond the `defaultBehaviourPenaltyThreshold`. 
@@ -207,13 +207,13 @@ This also means that a peer misbehaving `sqrt(2) * 10` times more than the thres
 This means the peer is temporarily disconnected from the network, preventing it from causing further harm.
 
 #### 3. defaultBehaviourPenaltyDecay
-This is the decay interval for the misbehavior counter of a peer. This counter is decayed by the `defaultBehaviourPenaltyDecay` parameter (e.g., 0.9) per decay interval, which is currently every 1 minute.
+This is the decay interval for the misbehavior counter of a peer. This counter is decayed by the `defaultBehaviourPenaltyDecay` parameter (e.g., `0.99`) per decay interval, which is currently every 1 minute.
 This parameter helps to gradually reduce the effect of past misbehaviors and provides a chance for penalized nodes to rejoin the network. A very slow decay rate can help identify and isolate persistent offenders, while also allowing potentially honest nodes that had transient issues to regain their standing in the network.
 The duration a peer remains graylisted is governed by the choice of `defaultBehaviourPenaltyWeight` and the decay parameters. 
 Based on the given configuration, a peer which has misbehaved on `sqrt(2) * 10` RPCs more than the threshold will get graylisted (disconnected at GossipSub level).
-With the decay interval set to 1 minute and decay value of 0.9, a graylisted peer due to broken promises would be expected to be reconnected in about 50 minutes. 
-This is calculated by solving for `x` in the equation `(0.9)^x * (sqrt(2) * 10)^2 * MaxAppSpecificPenalty > GraylistThreshold`. 
-Simplifying, we find `x` to be approximately `50.28` decay intervals, or roughly `50.28` minutes. 
+With the decay interval set to 1 minute and decay value of 0.99, a graylisted peer due to broken promises would be expected to be reconnected in about 50 minutes. 
+This is calculated by solving for `x` in the equation `(0.99)^x * (sqrt(2) * 10)^2 * MaxAppSpecificPenalty > GraylistThreshold`. 
+Simplifying, we find `x` to be approximately `527` decay intervals, or roughly `527` minutes. 
 This is the estimated time it would take for a severely misbehaving peer to have its penalty decayed enough to exceed the `GraylistThreshold` and thus be reconnected to the network.
 
 ### Example Scenarios
@@ -222,8 +222,8 @@ In this scenario, consider peer `B` that has recently joined the network and is 
 This peer advertises to peer `A` many `iHave` messages over an RPC. But when other peer `A` requests these message with `iWant`s it fails to deliver the message within 3 seconds. 
 This action constitutes an _iHave broken promise_ for a single RPC and peer `A` increases the local behavior penalty counter of peer `B` by 1.
 If the peer `B` commits this misbehavior infrequently, such that the total number of these RPCs does not exceed the `defaultBehaviourPenaltyThreshold` (set to 10 in our configuration), 
-the misbehavior counter for this peer will increment by 1 for each RPC and decays by `10%` evey decay interval (1 minute), but no additional penalty will be applied. 
-The misbehavior counter decays by a factor of `defaultBehaviourPenaltyDecay` (0.9) every minute, allowing the peer to recover from these minor infractions without significant disruption.
+the misbehavior counter for this peer will increment by 1 for each RPC and decays by `1%` evey decay interval (1 minute), but no additional penalty will be applied. 
+The misbehavior counter decays by a factor of `defaultBehaviourPenaltyDecay` (0.99) every minute, allowing the peer to recover from these minor infractions without significant disruption.
 
 **Scenario 2: Misbehaving Above Threshold But Below Graylisting**
 Now consider that peer `B` frequently sends RPCs advertising many `iHaves`  to peer `A` but fails to deliver the promised messages. 
@@ -237,7 +237,7 @@ When peer `B` has a deteriorated score at node `A`, it will be less likely to be
 Now assume that peer `B` peer has been continually misbehaving, with RPCs including iHave broken promises exceeding `sqrt(2) * 10` the threshold. 
 At this point, the peer's score drops below the `GraylistThreshold` due to the `defaultBehaviorPenaltyWeight` applied to the excess misbehavior. 
 The peer is then graylisted by peer `A`, i.e., peer `A` rejects all incoming RPCs to and from peer `B` at GossipSub level. 
-In our configuration, peer `B` will stay disconnected for at least `50.28` decay intervals or approximately `50` minutes. 
+In our configuration, peer `B` will stay disconnected for at least `527` decay intervals or approximately `527` minutes. 
 This gives a strong disincentive for the peer to continue this behavior and also gives it time to recover and eventually be reconnected to the network.
 
 ## Customization
