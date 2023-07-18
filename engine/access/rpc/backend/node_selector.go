@@ -12,9 +12,10 @@ const maxNodesCnt = 3
 // NodeSelector is an interface that represents the ability to select node identities that the access node is trying to reach.
 // It encapsulates the internal logic of node selection and provides a way to change implementations for different types
 // of nodes. Implementations of this interface should define the Next method, which returns the next node identity to be
-// selected.
+// selected. HasNext checks if there is next node available.
 type NodeSelector interface {
 	Next() *flow.Identity
+	HasNext() bool
 }
 
 // NodeSelectorFactory is a factory for creating node selectors based on factory configuration and node type.
@@ -48,6 +49,11 @@ var _ NodeSelector = (*MainNodeSelector)(nil)
 type MainNodeSelector struct {
 	nodes flow.IdentityList
 	index int
+}
+
+// HasNext returns true if next node is available.
+func (e *MainNodeSelector) HasNext() bool {
+	return e.index < len(e.nodes)
 }
 
 // Next returns the next node in the selector.

@@ -3,6 +3,8 @@ package backend
 import (
 	"github.com/hashicorp/go-multierror"
 	"github.com/sony/gobreaker"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -57,6 +59,9 @@ func (b *NodeCommunicator) CallAvailableNode(
 		}
 
 		if err == gobreaker.ErrOpenState {
+			if !nodeSelector.HasNext() && len(errs.Errors) == 0 {
+				errs = multierror.Append(errs, status.Error(codes.Unavailable, "there are no available nodes"))
+			}
 			continue
 		}
 
