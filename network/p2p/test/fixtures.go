@@ -5,6 +5,7 @@ import (
 	"context"
 	"crypto/rand"
 	crand "math/rand"
+	"sync"
 	"testing"
 	"time"
 
@@ -145,7 +146,7 @@ func NodeFixture(
 	}
 
 	if parameters.PeerScoringEnabled {
-		builder.EnableGossipSubPeerScoring(parameters.PeerScoreConfig)
+		builder.EnableGossipSubScoringWithOverride(parameters.PeerScoringConfigOverride)
 	}
 
 	if parameters.GossipSubFactory != nil && parameters.GossipSubConfig != nil {
@@ -199,7 +200,7 @@ type NodeFixtureParameters struct {
 	Logger                            zerolog.Logger
 	PeerScoringEnabled                bool
 	IdProvider                        module.IdentityProvider
-	PeerScoreConfig                   *p2p.PeerScoringConfig
+	PeerScoringConfigOverride         *p2p.PeerScoringConfigOverride
 	PeerManagerConfig                 *p2pconfig.PeerManagerConfig
 	PeerProvider                      p2p.PeersProvider // peer manager parameter
 	ConnGater                         p2p.ConnectionGater
@@ -240,10 +241,21 @@ func WithCreateStreamRetryDelay(delay time.Duration) NodeFixtureParameterOption 
 	}
 }
 
-func WithPeerScoringEnabled(idProvider module.IdentityProvider) NodeFixtureParameterOption {
+// EnablePeerScoringWithOverride enables peer scoring for the GossipSub pubsub system with the given override.
+// Any existing peer scoring config attribute that is set in the override will override the default peer scoring config.
+// Anything that is left to nil or zero value in the override will be ignored and the default value will be used.
+// Note: it is not recommended to override the default peer scoring config in production unless you know what you are doing.
+// Default Use Tip: use p2p.PeerScoringConfigNoOverride as the argument to this function to enable peer scoring without any override.
+// Args:
+//   - PeerScoringConfigOverride: override for the peer scoring config- Recommended to use p2p.PeerScoringConfigNoOverride for production or when
+//     you don't want to override the default peer scoring config.
+//
+// Returns:
+// - NodeFixtureParameterOption: a function that can be passed to the NodeFixture function to enable peer scoring.
+func EnablePeerScoringWithOverride(override *p2p.PeerScoringConfigOverride) NodeFixtureParameterOption {
 	return func(p *NodeFixtureParameters) {
 		p.PeerScoringEnabled = true
-		p.IdProvider = idProvider
+		p.PeerScoringConfigOverride = override
 	}
 }
 
@@ -308,9 +320,9 @@ func WithRole(role flow.Role) NodeFixtureParameterOption {
 	}
 }
 
-func WithPeerScoreParamsOption(cfg *p2p.PeerScoringConfig) NodeFixtureParameterOption {
+func WithPeerScoreParamsOption(cfg *p2p.PeerScoringConfigOverride) NodeFixtureParameterOption {
 	return func(p *NodeFixtureParameters) {
-		p.PeerScoreConfig = cfg
+		p.PeerScoringConfigOverride = cfg
 	}
 }
 
@@ -549,17 +561,20 @@ func EnsureStreamCreationInBothDirections(t *testing.T, ctx context.Context, nod
 }
 
 // EnsurePubsubMessageExchange ensures that the given connected nodes exchange the given message on the given channel through pubsub.
-// Note: TryConnectionAndEnsureConnected() must be called to connect all nodes before calling this function.
-func EnsurePubsubMessageExchange(t *testing.T, ctx context.Context, nodes []p2p.LibP2PNode, messageFactory func() (interface{}, channels.Topic)) {
-	_, topic := messageFactory()
-
+// Args:
+//   - nodes: the nodes to exchange messages
+//   - ctx: the context- the test will fail if the context expires.
+//   - topic: the topic to exchange messages on
+//   - count: the number of messages to exchange from each node.
+//   - messageFactory: a function that creates a unique message to be published by the node.
+//     The function should return a different message each time it is called.
+//
+// Note-1: this function assumes a timeout of 5 seconds for each message to be received.
+// Note-2: TryConnectionAndEnsureConnected() must be called to connect all nodes before calling this function.
+func EnsurePubsubMessageExchange(t *testing.T, ctx context.Context, nodes []p2p.LibP2PNode, topic channels.Topic, count int, messageFactory func() interface{}) {
 	subs := make([]p2p.Subscription, len(nodes))
 	for i, node := range nodes {
-		ps, err := node.Subscribe(
-			topic,
-			validator.TopicValidator(
-				unittest.Logger(),
-				unittest.AllowAllPeerFilter()))
+		ps, err := node.Subscribe(topic, validator.TopicValidator(unittest.Logger(), unittest.AllowAllPeerFilter()))
 		require.NoError(t, err)
 		subs[i] = ps
 	}
@@ -571,14 +586,52 @@ func EnsurePubsubMessageExchange(t *testing.T, ctx context.Context, nodes []p2p.
 	require.True(t, ok)
 
 	for _, node := range nodes {
+		for i := 0; i < count; i++ {
+			// creates a unique message to be published by the node
+			msg := messageFactory()
+			data := p2pfixtures.MustEncodeEvent(t, msg, channel)
+			require.NoError(t, node.Publish(ctx, topic, data))
+
+			// wait for the message to be received by all nodes
+			ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+			p2pfixtures.SubsMustReceiveMessage(t, ctx, data, subs)
+			cancel()
+		}
+	}
+}
+
+// EnsurePubsubMessageExchangeFromNode ensures that the given node exchanges the given message on the given channel through pubsub with the other nodes.
+// Args:
+//   - node: the node to exchange messages
+//
+// - ctx: the context- the test will fail if the context expires.
+// - sender: the node that sends the message to the other node.
+// - receiver: the node that receives the message from the other node.
+// - topic: the topic to exchange messages on.
+// - count: the number of messages to exchange from `sender` to `receiver`.
+// - messageFactory: a function that creates a unique message to be published by the node.
+func EnsurePubsubMessageExchangeFromNode(t *testing.T, ctx context.Context, sender p2p.LibP2PNode, receiver p2p.LibP2PNode, topic channels.Topic, count int, messageFactory func() interface{}) {
+	_, err := sender.Subscribe(topic, validator.TopicValidator(unittest.Logger(), unittest.AllowAllPeerFilter()))
+	require.NoError(t, err)
+
+	toSub, err := receiver.Subscribe(topic, validator.TopicValidator(unittest.Logger(), unittest.AllowAllPeerFilter()))
+	require.NoError(t, err)
+
+	// let subscriptions propagate
+	time.Sleep(1 * time.Second)
+
+	channel, ok := channels.ChannelFromTopic(topic)
+	require.True(t, ok)
+
+	for i := 0; i < count; i++ {
 		// creates a unique message to be published by the node
-		msg, _ := messageFactory()
+		msg := messageFactory()
 		data := p2pfixtures.MustEncodeEvent(t, msg, channel)
-		require.NoError(t, node.Publish(ctx, topic, data))
+		require.NoError(t, sender.Publish(ctx, topic, data))
 
 		// wait for the message to be received by all nodes
 		ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
-		p2pfixtures.SubsMustReceiveMessage(t, ctx, data, subs)
+		p2pfixtures.SubsMustReceiveMessage(t, ctx, data, []p2p.Subscription{toSub})
 		cancel()
 	}
 }
@@ -605,9 +658,14 @@ func EnsureNotConnectedBetweenGroups(t *testing.T, ctx context.Context, groupA [
 }
 
 // EnsureNoPubsubMessageExchange ensures that the no pubsub message is exchanged "from" the given nodes "to" the given nodes.
-func EnsureNoPubsubMessageExchange(t *testing.T, ctx context.Context, from []p2p.LibP2PNode, to []p2p.LibP2PNode, messageFactory func() (interface{}, channels.Topic)) {
-	_, topic := messageFactory()
-
+// Args:
+//   - from: the nodes that send messages to the other group but their message must not be received by the other group.
+//
+// - to: the nodes that are the target of the messages sent by the other group ("from") but must not receive any message from them.
+// - topic: the topic to exchange messages on.
+// - count: the number of messages to exchange from each node.
+// - messageFactory: a function that creates a unique message to be published by the node.
+func EnsureNoPubsubMessageExchange(t *testing.T, ctx context.Context, from []p2p.LibP2PNode, to []p2p.LibP2PNode, topic channels.Topic, count int, messageFactory func() interface{}) {
 	subs := make([]p2p.Subscription, len(to))
 	tv := validator.TopicValidator(
 		unittest.Logger(),
@@ -627,27 +685,47 @@ func EnsureNoPubsubMessageExchange(t *testing.T, ctx context.Context, from []p2p
 	// let subscriptions propagate
 	time.Sleep(1 * time.Second)
 
+	wg := &sync.WaitGroup{}
 	for _, node := range from {
-		// creates a unique message to be published by the node.
-		msg, _ := messageFactory()
-		channel, ok := channels.ChannelFromTopic(topic)
-		require.True(t, ok)
-		data := p2pfixtures.MustEncodeEvent(t, msg, channel)
+		node := node // capture range variable
+		for i := 0; i < count; i++ {
+			wg.Add(1)
+			go func() {
+				// creates a unique message to be published by the node.
+				msg := messageFactory()
+				channel, ok := channels.ChannelFromTopic(topic)
+				require.True(t, ok)
+				data := p2pfixtures.MustEncodeEvent(t, msg, channel)
 
-		// ensure the message is NOT received by any of the nodes.
-		require.NoError(t, node.Publish(ctx, topic, data))
-		ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
-		p2pfixtures.SubsMustNeverReceiveAnyMessage(t, ctx, subs)
-		cancel()
+				// ensure the message is NOT received by any of the nodes.
+				require.NoError(t, node.Publish(ctx, topic, data))
+				ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+				p2pfixtures.SubsMustNeverReceiveAnyMessage(t, ctx, subs)
+				cancel()
+				wg.Done()
+			}()
+		}
 	}
+
+	// we wait for 5 seconds at most for the messages to be exchanged, hence we wait for a total of 6 seconds here to ensure
+	// that the goroutines are done in a timely manner.
+	unittest.RequireReturnsBefore(t, wg.Wait, 6*time.Second, "timed out waiting for messages to be exchanged")
 }
 
 // EnsureNoPubsubExchangeBetweenGroups ensures that no pubsub message is exchanged between the given groups of nodes.
-func EnsureNoPubsubExchangeBetweenGroups(t *testing.T, ctx context.Context, groupA []p2p.LibP2PNode, groupB []p2p.LibP2PNode, messageFactory func() (interface{}, channels.Topic)) {
+// Args:
+// - t: *testing.T instance
+// - ctx: context.Context instance
+// - groupA: first group of nodes- no message should be exchanged from any node of this group to the other group.
+// - groupB: second group of nodes- no message should be exchanged from any node of this group to the other group.
+// - topic: pubsub topic- no message should be exchanged on this topic.
+// - count: number of messages to be exchanged- no message should be exchanged.
+// - messageFactory: function to create a unique message to be published by the node.
+func EnsureNoPubsubExchangeBetweenGroups(t *testing.T, ctx context.Context, groupA []p2p.LibP2PNode, groupB []p2p.LibP2PNode, topic channels.Topic, count int, messageFactory func() interface{}) {
 	// ensure no message exchange from group A to group B
-	EnsureNoPubsubMessageExchange(t, ctx, groupA, groupB, messageFactory)
+	EnsureNoPubsubMessageExchange(t, ctx, groupA, groupB, topic, count, messageFactory)
 	// ensure no message exchange from group B to group A
-	EnsureNoPubsubMessageExchange(t, ctx, groupB, groupA, messageFactory)
+	EnsureNoPubsubMessageExchange(t, ctx, groupB, groupA, topic, count, messageFactory)
 }
 
 // PeerIdSliceFixture returns a slice of random peer IDs for testing.
