@@ -76,14 +76,15 @@ func NewRPCSentTracker(config *RPCSentTrackerConfig) *RPCSentTracker {
 		store,
 		tracker.rpcSent).Build()
 
-	tracker.Component = component.NewComponentManagerBuilder().
+	builder := component.NewComponentManagerBuilder().
 		AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 			ready()
 			tracker.lastHighestIHaveRPCSizeResetLoop(ctx)
-		}).
-		AddWorkers(config.NumOfWorkers, tracker.workerPool.WorkerLogic()).
-		Build()
-
+		})
+	for i := 0; i < config.NumOfWorkers; i++ {
+		builder.AddWorker(tracker.workerPool.WorkerLogic())
+	}
+	tracker.Component = builder.Build()
 	return tracker
 }
 

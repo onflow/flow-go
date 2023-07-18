@@ -143,8 +143,7 @@ func NoopWorker(ctx irrecoverable.SignalerContext, ready ReadyFunc) {
 type ComponentManagerBuilder interface {
 	// AddWorker adds a worker routine for the ComponentManager
 	AddWorker(ComponentWorker) ComponentManagerBuilder
-	// AddWorkers adds n number of worker routines for the ComponentManager.
-	AddWorkers(int, ComponentWorker) ComponentManagerBuilder
+
 	// Build builds and returns a new ComponentManager instance
 	Build() *ComponentManager
 }
