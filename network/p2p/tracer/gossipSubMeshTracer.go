@@ -102,12 +102,12 @@ func NewGossipSubMeshTracer(config *GossipSubMeshTracerConfig) *GossipSubMeshTra
 		}).
 		AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 			ready()
-			lg.Debug().Msg("starting rpc sent tracker")
+			lg.Info().Msg("starting rpc sent tracker")
 			g.rpcSentTracker.Start(ctx)
-			lg.Debug().Msg("rpc sent tracker started")
+			lg.Info().Msg("rpc sent tracker started")
 
 			<-g.rpcSentTracker.Done()
-			lg.Debug().Msg("rpc sent tracker stopped")
+			lg.Info().Msg("rpc sent tracker stopped")
 		}).
 		Build()
 
