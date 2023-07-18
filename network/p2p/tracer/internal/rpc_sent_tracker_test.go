@@ -61,7 +61,7 @@ func TestRPCSentTracker_IHave(t *testing.T) {
 			}
 		}
 		rpc := rpcFixture(withIhaves(iHaves))
-		require.NoError(t, tracker.RPCSent(rpc))
+		require.NoError(t, tracker.Track(rpc))
 
 		// eventually we should have tracked numOfMsgIds per single topic
 		require.Eventually(t, func() bool {
@@ -106,7 +106,7 @@ func TestRPCSentTracker_LastHighestIHaveRPCSize(t *testing.T) {
 
 	expectedCacheSize := 0
 	for _, testCase := range testCases {
-		require.NoError(t, tracker.RPCSent(testCase.rpcFixture))
+		require.NoError(t, tracker.Track(testCase.rpcFixture))
 		expectedCacheSize += testCase.numOfIhaves
 	}
 
@@ -119,7 +119,7 @@ func TestRPCSentTracker_LastHighestIHaveRPCSize(t *testing.T) {
 
 	// after setting sending large RPC lastHighestIHaveRPCSize should reset to 0 after lastHighestIHaveRPCSize reset loop tick
 	largeIhave := 50000
-	require.NoError(t, tracker.RPCSent(rpcFixture(withIhaves(mockIHaveFixture(largeIhave, numOfMessageIds)))))
+	require.NoError(t, tracker.Track(rpcFixture(withIhaves(mockIHaveFixture(largeIhave, numOfMessageIds)))))
 	require.Eventually(t, func() bool {
 		return tracker.LastHighestIHaveRPCSize() == int64(largeIhave)
 	}, 1*time.Second, 100*time.Millisecond)

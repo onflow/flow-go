@@ -88,10 +88,10 @@ func NewRPCSentTracker(config *RPCSentTrackerConfig) *RPCSentTracker {
 	return tracker
 }
 
-// RPCSent submits the control message to the worker queue for async tracking.
+// Track submits the control message to the worker queue for async tracking.
 // Args:
 // - *pubsub.RPC: the rpc sent.
-func (t *RPCSentTracker) RPCSent(rpc *pubsub.RPC) error {
+func (t *RPCSentTracker) Track(rpc *pubsub.RPC) error {
 	n, err := nonce()
 	if err != nil {
 		return fmt.Errorf("failed to get track rpc work nonce: %w", err)
