@@ -159,7 +159,6 @@ This decay process ensures that a peer cannot rest on its past deliveries; it mu
 It helps maintain a lively and dynamic network environment, incentivizing constant active participation from all peers.
 
 ### Scenario 6: Replay Attack
-## Example Scenario: Preventing Replay Attacks
 The `defaultMeshMessageDeliveriesWindow` and `defaultMeshMessageDeliveriesActivation` parameters play a crucial role in preventing replay attacks in the GossipSub protocol. Let's illustrate this with an example.
 Consider a scenario where we have three peers: `Peer A`, `Peer B`, and `Peer C`. All three peers are active participants in `Topic X`.
 **Initial State**: At Time = 0: `Peer A` generates and broadcasts a new message `M` in `Topic X`. `Peer B` and `Peer C` receive this message from `Peer A` and update their message caches accordingly.
@@ -172,6 +171,75 @@ Therefore, the message `M` from `Peer B` will not count towards `Peer B`'s messa
 This effectively discouraging replay attacks of messages older than the `defaultMeshMessageDeliveriesWindow`.
 This mechanism, combined with other parameters, helps maintain the security and efficiency of the network by discouraging harmful behaviors such as message replay attacks.
 
+## Mitigating iHave Broken Promises Attacks in GossipSub Protocol
+### What is an iHave Broken Promise Attack?
+In the GossipSub protocol, peers gossip information about new messages to a subset of random peers (out of their local mesh) in the form of an "iHave" message which basically tells the receiving peer what messages the sender has. 
+The receiving peer then replies with an "iWant" message, requesting for the messages it doesn't have. Note that for the peers in local mesh the actual new messages are sent instead of an "iHave" message (i.e., eager push). However,
+iHave-iWant protocol is part of a complementary mechanism to ensure that the information is disseminated to the entire network in a timely manner (i.e., lazy pull).
+
+An "iHave Broken Promise" attack occurs when a peer advertises many "iHave" for a message but doesn't respond to the "iWant" requests for those messages.
+This not only hinders the effective dissemination of information but can also strain the network with redundant requests. Hence, we stratify it as a spam behavior mounting a DoS attack on the network.
+
+### Detecting iHave Broken Promise Attacks
+Detecting iHave Broken Promise Attacks is done by the GossipSub itself. On each incoming RPC from a remote node, the local GossipSub node checks if the RPC contains an iHave message. It then samples one (and only one) iHave message
+randomly out of the entire set of iHave messages piggybacked on the incoming RPC. If the sampled iHave message is not literally addressed with the actual message, the local GossipSub node considers this as an iHave broken promise and
+increases the behavior penalty counter for that remote node. Hence, incrementing the behavior penalty counter for a remote peer is done per RPC containing at least one iHave broken promise and not per iHave message.
+Note that the behavior penalty counter also keeps track of GRAFT flood attacks that are done by a remote peer when it advertises many GRAFTs while it is on a PRUNE backoff by the local node. Mitigating iHave broken promise attacks also
+mitigates GRAFT flood attacks.
+
+### Configuring GossipSub Parameters
+In order to mitigate the iHave broken promises attacks, GossipSub expects the application layer (i.e., Flow protocol) to properly configure the relevant scoring parameters, notably: 
+
+- `BehaviourPenaltyThreshold` is set to `defaultBehaviourPenaltyThreshold`, i.e., 10.
+- `BehaviourPenaltyWeight` is set to `defaultBehaviourPenaltyWeight`, i.e., 0.01 * `MaxAppSpecificPenalty`
+- `BehaviourPenaltyDecay` is set to `defaultBehaviourPenaltyDecay`, i.e., 0.9.
+
+#### 1. `defaultBehaviourPenaltyThreshold`
+This parameter sets the threshold for when the behavior of a peer is considered bad. Misbehavior is defined as advertising an iHave without responding to the iWants (iHave broken promises), and attempting on GRAFT when the peer is considered for a PRUNE backoff.
+If a remote peer sends an RPC that advertises at least one iHave for a message but doesn't respond to the iWant requests for that message within the next `3 seconds`, the peer misbehavior counter is incremented by `1`. This threshold is set to `10`, meaning that we at most tolerate 10 such RPCs containing iHave broken promises. After this, the peer is penalized for every excess RPC containing iHave broken promises. The counter decays by (0.9) every decay interval (defaultDecayInterval) i.e., every minute.
+
+#### 2. `defaultBehaviourPenaltyWeight`
+This is the weight applied as a penalty when a peer's misbehavior goes beyond the `defaultBehaviourPenaltyThreshold`. 
+The penalty is applied to the square of the difference between the misbehavior counter and the threshold, i.e., -|w| * (misbehavior counter - threshold)^2, where `|w|` is the absolute value of the `defaultBehaviourPenaltyWeight`. 
+Note that `defaultBehaviourPenaltyWeight` is a negative value, meaning that the penalty is applied in the opposite direction of the misbehavior counter. For sake of illustration, we use the notion of `-|w|` to denote that a negative penalty is applied.
+We set  `defaultBehaviourPenaltyWeight` to `0.01 * MaxAppSpecificPenalty`, meaning a peer misbehaving `10` times more than the threshold (i.e., `10 + 10`) will lose its entire `MaxAppSpecificReward`, which is a reward given to all staked nodes in Flow blockchain.
+This also means that a peer misbehaving `sqrt(2) * 10` times more than the threshold will cause the peer score to be dropped below the `MaxAppSpecificPenalty`, which is also below the `GraylistThreshold`, and the peer will be graylisted (i.e., all incoming and outgoing GossipSub RPCs from and to that peer will be rejected). 
+This means the peer is temporarily disconnected from the network, preventing it from causing further harm.
+
+#### 3. defaultBehaviourPenaltyDecay
+This is the decay interval for the misbehavior counter of a peer. This counter is decayed by the `defaultBehaviourPenaltyDecay` parameter (e.g., 0.9) per decay interval, which is currently every 1 minute.
+This parameter helps to gradually reduce the effect of past misbehaviors and provides a chance for penalized nodes to rejoin the network. A very slow decay rate can help identify and isolate persistent offenders, while also allowing potentially honest nodes that had transient issues to regain their standing in the network.
+The duration a peer remains graylisted is governed by the choice of `defaultBehaviourPenaltyWeight` and the decay parameters. 
+Based on the given configuration, a peer which has misbehaved on `sqrt(2) * 10` RPCs more than the threshold will get graylisted (disconnected at GossipSub level).
+With the decay interval set to 1 minute and decay value of 0.9, a graylisted peer due to broken promises would be expected to be reconnected in about 50 minutes. 
+This is calculated by solving for `x` in the equation `(0.9)^x * (sqrt(2) * 10)^2 * MaxAppSpecificPenalty > GraylistThreshold`. 
+Simplifying, we find `x` to be approximately `50.28` decay intervals, or roughly `50.28` minutes. 
+This is the estimated time it would take for a severely misbehaving peer to have its penalty decayed enough to exceed the `GraylistThreshold` and thus be reconnected to the network.
+
+### Example Scenarios
+**Scenario 1: Misbehaving Below Threshold**
+In this scenario, consider peer `B` that has recently joined the network and is taking part in GossipSub. 
+This peer advertises to peer `A` many `iHave` messages over an RPC. But when other peer `A` requests these message with `iWant`s it fails to deliver the message within 3 seconds. 
+This action constitutes an _iHave broken promise_ for a single RPC and peer `A` increases the local behavior penalty counter of peer `B` by 1.
+If the peer `B` commits this misbehavior infrequently, such that the total number of these RPCs does not exceed the `defaultBehaviourPenaltyThreshold` (set to 10 in our configuration), 
+the misbehavior counter for this peer will increment by 1 for each RPC and decays by `10%` evey decay interval (1 minute), but no additional penalty will be applied. 
+The misbehavior counter decays by a factor of `defaultBehaviourPenaltyDecay` (0.9) every minute, allowing the peer to recover from these minor infractions without significant disruption.
+
+**Scenario 2: Misbehaving Above Threshold But Below Graylisting**
+Now consider that peer `B` frequently sends RPCs advertising many `iHaves`  to peer `A` but fails to deliver the promised messages. 
+If the number of these misbehaviors exceeds our threshold (10 in our configuration), the peer `B` is now penalized by the local GossipSub mechanism of peer `A`. 
+The amount of the penalty is determined by the `defaultBehaviourPenaltyWeight` (set to 0.01 * MaxAppSpecificPenalty) applied to the square of the difference between the misbehavior counter and the threshold.
+This penalty will progressively affect the peer's score, deteriorating its reputation in the local GossipSub scoring system of node `A`, but does not yet result in disconnection or graylisting. 
+The peer has a chance to amend its behavior before crossing into graylisting territory through stop misbehaving and letting the score to decay.
+When peer `B` has a deteriorated score at node `A`, it will be less likely to be selected by node `A` as its local mesh peer (i.e., to directly receive new messages from node `A`), and is deprived of the opportunity to receive new messages earlier through node `A`.
+
+**Scenario 3: Graylisting**
+Now assume that peer `B` peer has been continually misbehaving, with RPCs including iHave broken promises exceeding `sqrt(2) * 10` the threshold. 
+At this point, the peer's score drops below the `GraylistThreshold` due to the `defaultBehaviorPenaltyWeight` applied to the excess misbehavior. 
+The peer is then graylisted by peer `A`, i.e., peer `A` rejects all incoming RPCs to and from peer `B` at GossipSub level. 
+In our configuration, peer `B` will stay disconnected for at least `50.28` decay intervals or approximately `50` minutes. 
+This gives a strong disincentive for the peer to continue this behavior and also gives it time to recover and eventually be reconnected to the network.
+
 ## Customization
 The scoring mechanism can be easily customized to suit the needs of the Flow network. This includes changing the scoring parameters, thresholds, and the scoring function itself.
 You can customize the scoring parameters and thresholds by using the various setter methods provided in the `ScoreOptionConfig` object. Additionally, you can provide a custom app-specific scoring function through the `SetAppSpecificScoreFunction` method.
@@ -182,7 +250,6 @@ Example of setting custom app-specific scoring function:
 ```go
 config.SetAppSpecificScoreFunction(customAppSpecificScoreFunction)
 ```
-
 
 ## Peer Scoring System Integration
 The peer scoring system is integrated with the GossipSub protocol through the `ScoreOption` configuration option. 
