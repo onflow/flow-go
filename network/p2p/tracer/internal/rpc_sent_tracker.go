@@ -74,7 +74,7 @@ func NewRPCSentTracker(config *RPCSentTrackerConfig) *RPCSentTracker {
 	tracker.workerPool = worker.NewWorkerPoolBuilder[trackableRPC](
 		config.Logger,
 		store,
-		tracker.rpcSent).Build()
+		tracker.rpcSentWorkerLogic).Build()
 
 	builder := component.NewComponentManagerBuilder().
 		AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
@@ -103,8 +103,8 @@ func (t *RPCSentTracker) Track(rpc *pubsub.RPC) error {
 	return nil
 }
 
-// rpcSent tracks control messages sent in *pubsub.RPC.
-func (t *RPCSentTracker) rpcSent(work trackableRPC) error {
+// rpcSentWorkerLogic tracks control messages sent in *pubsub.RPC.
+func (t *RPCSentTracker) rpcSentWorkerLogic(work trackableRPC) error {
 	switch {
 	case len(work.rpc.GetControl().GetIhave()) > 0:
 		iHave := work.rpc.GetControl().GetIhave()
