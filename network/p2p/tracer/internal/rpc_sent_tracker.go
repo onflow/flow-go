@@ -13,7 +13,6 @@ import (
 	"github.com/onflow/flow-go/engine/common/worker"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/component"
-	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/mempool/queue"
 	p2pmsg "github.com/onflow/flow-go/network/p2p/message"
 )
@@ -26,13 +25,18 @@ type trackableRPC struct {
 	rpc   *pubsub.RPC
 }
 
-// RPCSentTracker tracks RPC messages that are sent.
+// lastHighestIHaveRPCSize tracks the last highest rpc control message size the time stamp it was last updated.
+type lastHighestIHaveRPCSize struct {
+	*atomic.Int64
+	lastUpdate time.Time
+}
+
+// RPCSentTracker tracks RPC messages and the size of the last largest iHave rpc control message sent.
 type RPCSentTracker struct {
 	component.Component
-	cache      *rpcSentCache
-	workerPool *worker.Pool[trackableRPC]
-	// lastHighestIHaveRPCSize tracks the size of the last largest iHave rpc control message sent.
-	lastHighestIHaveRPCSize              *atomic.Int64
+	*lastHighestIHaveRPCSize
+	cache                                *rpcSentCache
+	workerPool                           *worker.Pool[trackableRPC]
 	lastHighestIHaveRPCSizeResetInterval time.Duration
 }
 
@@ -67,8 +71,8 @@ func NewRPCSentTracker(config *RPCSentTrackerConfig) *RPCSentTracker {
 		config.WorkerQueueCacheCollector)
 
 	tracker := &RPCSentTracker{
+		lastHighestIHaveRPCSize:              &lastHighestIHaveRPCSize{atomic.NewInt64(0), time.Now()},
 		cache:                                newRPCSentCache(cacheConfig),
-		lastHighestIHaveRPCSize:              atomic.NewInt64(0),
 		lastHighestIHaveRPCSizeResetInterval: config.LastHighestIhavesSentResetInterval,
 	}
 	tracker.workerPool = worker.NewWorkerPoolBuilder[trackableRPC](
@@ -76,11 +80,7 @@ func NewRPCSentTracker(config *RPCSentTrackerConfig) *RPCSentTracker {
 		store,
 		tracker.rpcSentWorkerLogic).Build()
 
-	builder := component.NewComponentManagerBuilder().
-		AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
-			ready()
-			tracker.lastHighestIHaveRPCSizeResetLoop(ctx)
-		})
+	builder := component.NewComponentManagerBuilder()
 	for i := 0; i < config.NumOfWorkers; i++ {
 		builder.AddWorker(tracker.workerPool.WorkerLogic())
 	}
@@ -115,7 +115,8 @@ func (t *RPCSentTracker) rpcSentWorkerLogic(work trackableRPC) error {
 }
 
 func (t *RPCSentTracker) updateLastHighestIHaveRPCSize(size int64) {
-	if t.lastHighestIHaveRPCSize.Load() < size {
+	if t.lastHighestIHaveRPCSize.Load() < size || time.Since(t.lastHighestIHaveRPCSize.lastUpdate) > t.lastHighestIHaveRPCSizeResetInterval {
+		// The last highest ihave RPC size is updated if the new size is larger than the current size, or if the time elapsed since the last update surpasses the reset interval.
 		t.lastHighestIHaveRPCSize.Store(size)
 	}
 }
@@ -146,26 +147,6 @@ func (t *RPCSentTracker) WasIHaveRPCSent(topicID, messageID string) bool {
 // LastHighestIHaveRPCSize returns the last highest size of iHaves sent in an rpc.
 func (t *RPCSentTracker) LastHighestIHaveRPCSize() int64 {
 	return t.lastHighestIHaveRPCSize.Load()
-}
-
-// lastHighestIHaveRPCSizeResetLoop resets the lastHighestIHaveRPCSize to 0 on each interval tick.
-func (t *RPCSentTracker) lastHighestIHaveRPCSizeResetLoop(ctx irrecoverable.SignalerContext) {
-	ticker := time.NewTicker(t.lastHighestIHaveRPCSizeResetInterval)
-	defer ticker.Stop()
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		default:
-		}
-
-		select {
-		case <-ctx.Done():
-			return
-		case <-ticker.C:
-			t.lastHighestIHaveRPCSize.Store(0)
-		}
-	}
 }
 
 // nonce returns random string that is used to store unique items in herocache.

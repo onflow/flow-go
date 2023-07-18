@@ -124,8 +124,11 @@ func TestRPCSentTracker_LastHighestIHaveRPCSize(t *testing.T) {
 		return tracker.LastHighestIHaveRPCSize() == int64(largeIhave)
 	}, 1*time.Second, 100*time.Millisecond)
 
+	// we expect lastHighestIHaveRPCSize to be set to the current rpc size being tracked if it hasn't been updated since the configured lastHighestIHaveRPCSizeResetInterval
+	expectedEventualLastHighest := 8
 	require.Eventually(t, func() bool {
-		return tracker.LastHighestIHaveRPCSize() == 0
+		require.NoError(t, tracker.Track(rpcFixture(withIhaves(mockIHaveFixture(expectedEventualLastHighest, numOfMessageIds)))))
+		return tracker.LastHighestIHaveRPCSize() == int64(expectedEventualLastHighest)
 	}, 4*time.Second, 100*time.Millisecond)
 }
 
