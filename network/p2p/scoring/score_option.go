@@ -1,6 +1,7 @@
 package scoring
 
 import (
+	"fmt"
 	"time"
 
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
@@ -138,10 +139,77 @@ const (
 	// are churners, i.e., peers that join and leave a topic mesh frequently.
 	defaultTopicTimeInMesh = time.Hour
 
-	// defaultTopicWeight is the default weight of a topic in the GossipSub scoring system. The overall score of a peer in a topic mesh is
-	// multiplied by the weight of the topic when calculating the overall score of the peer.
+	// defaultTopicWeight is the default weight of a topic in the GossipSub scoring system.
+	// The overall score of a peer in a topic mesh is multiplied by the weight of the topic when calculating the overall score of the peer.
 	// We set it to 1.0, which means that the overall score of a peer in a topic mesh is not affected by the weight of the topic.
 	defaultTopicWeight = 1.0
+
+	// defaultTopicMeshMessageDeliveriesDecay is applied to the number of actual message deliveries in a topic mesh
+	// at each decay interval (i.e., defaultDecayInterval).
+	// It is used to decay the number of actual message deliveries, and prevents past message
+	// deliveries from affecting the current score of the peer.
+	// As the decay interval is 1 minute, we set it to 0.5, which means that the number of actual message
+	// deliveries will decay by 50% at each decay interval.
+	defaultTopicMeshMessageDeliveriesDecay = .5
+
+	// defaultTopicMeshMessageDeliveriesCap is the maximum number of actual message deliveries in a topic
+	// mesh that is used to calculate the score of a peer in that topic mesh.
+	// We set it to 1000, which means that the maximum number of actual message deliveries in a
+	// topic mesh that is used to calculate the score of a peer in that topic mesh is 1000.
+	// This is to prevent the score of a peer in a topic mesh from being affected by a large number of actual
+	// message deliveries and also affect the score of the peer in other topic meshes.
+	// When the total delivered messages in a topic mesh exceeds this value, the score of the peer in that topic
+	// mesh will not be affected by the actual message deliveries in that topic mesh.
+	// Moreover, this does not allow the peer to accumulate a large number of actual message deliveries in a topic mesh
+	// and then start under-performing in that topic mesh without being penalized.
+	defaultTopicMeshMessageDeliveriesCap = 1000
+
+	// defaultTopicMeshMessageDeliveriesThreshold is the threshold for the number of actual message deliveries in a
+	// topic mesh that is used to calculate the score of a peer in that topic mesh.
+	// If the number of actual message deliveries in a topic mesh is less than this value,
+	// the peer will be penalized by square of the difference between the actual message deliveries and the threshold,
+	// i.e., -w * (actual - threshold)^2 where `actual` and `threshold` are the actual message deliveries and the
+	// threshold, respectively, and `w` is the weight (i.e., defaultTopicMeshMessageDeliveriesWeight).
+	// We set it to 0.1 * defaultTopicMeshMessageDeliveriesCap, which means that if a peer delivers less tha 10% of the
+	// maximum number of actual message deliveries in a topic mesh, it will be considered as an under-performing peer
+	// in that topic mesh.
+	defaultTopicMeshMessageDeliveryThreshold = 0.1 * defaultTopicMeshMessageDeliveriesCap
+
+	// defaultTopicMeshDeliveriesWeight is the weight for applying penalty when a peer is under-performing in a topic mesh.
+	// Upon every decay interval, if the number of actual message deliveries is less than the topic mesh message deliveries threshold
+	// (i.e., defaultTopicMeshMessageDeliveriesThreshold), the peer will be penalized by square of the difference between the actual
+	// message deliveries and the threshold, multiplied by this weight, i.e., -w * (actual - threshold)^2 where w is the weight, and
+	// `actual` and `threshold` are the actual message deliveries and the threshold, respectively.
+	// We set this value to be - 0.05 MaxAppSpecificReward / (defaultTopicMeshMessageDeliveriesThreshold^2). This guarantees that even if a peer
+	// is not delivering any message in a topic mesh, it will not be disconnected.
+	// Rather, looses part of the MaxAppSpecificReward that is awarded by our app-specific scoring function to all staked
+	// nodes by default will be withdrawn, and the peer will be slightly penalized. In other words, under-performing in a topic mesh
+	// will drop the overall score of a peer by 5% of the MaxAppSpecificReward that is awarded by our app-specific scoring function.
+	// It means that under-performing in a topic mesh will not cause a peer to be disconnected, but it will cause the peer to lose
+	// its MaxAppSpecificReward that is awarded by our app-specific scoring function.
+	// At this point, we do not want to disconnect a peer only because it is under-performing in a topic mesh as it might be
+	// causing a false positive network partition.
+	// TODO: we must increase the penalty for under-performing in a topic mesh in the future, and disconnect the peer if it is under-performing.
+	defaultTopicMeshMessageDeliveriesWeight = -0.05 * MaxAppSpecificReward / (defaultTopicMeshMessageDeliveryThreshold * defaultTopicMeshMessageDeliveryThreshold)
+
+	// defaultMeshMessageDeliveriesWindow is the window size is time interval that we count a delivery of an already
+	// seen message towards the score of a peer in a topic mesh. The delivery is counted
+	// by GossipSub only if the previous sender of the message is different from the current sender.
+	// We set it to the decay interval of the GossipSub scoring system, which is 1 minute.
+	// It means that if a peer delivers a message that it has already seen less than one minute ago,
+	// the delivery will be counted towards the score of the peer in a topic mesh only if the previous sender of the message.
+	// This also prevents replay attacks of messages that are older than one minute. As replayed messages will not
+	// be counted towards the actual message deliveries of a peer in a topic mesh.
+	defaultMeshMessageDeliveriesWindow = defaultDecayInterval
+
+	// defaultMeshMessageDeliveryActivation is the time interval that we wait for a new peer that joins a topic mesh
+	// till start counting the number of actual message deliveries of that peer in that topic mesh.
+	// We set it to 2 * defaultDecayInterval, which means that we wait for 2 decay intervals before start counting
+	// the number of actual message deliveries of a peer in a topic mesh.
+	// With a default decay interval of 1 minute, it means that we wait for 2 minutes before start counting the
+	// number of actual message deliveries of a peer in a topic mesh. This is to account for
+	// the time that it takes for a peer to start up and receive messages from other peers in the topic mesh.
+	defaultMeshMessageDeliveriesActivation = 2 * defaultDecayInterval
 )
 
 // ScoreOption is a functional option for configuring the peer scoring system.
@@ -160,6 +228,7 @@ type ScoreOptionConfig struct {
 	cacheSize                        uint32
 	cacheMetrics                     module.HeroCacheMetrics
 	appScoreFunc                     func(peer.ID) float64
+	decayInterval                    time.Duration // the decay interval, when is set to 0, the default value will be used.
 	topicParams                      []func(map[string]*pubsub.TopicScoreParams)
 	registerNotificationConsumerFunc func(p2p.GossipSubInvCtrlMsgNotifConsumer)
 }
@@ -189,12 +258,12 @@ func (c *ScoreOptionConfig) SetCacheMetrics(metrics module.HeroCacheMetrics) {
 	c.cacheMetrics = metrics
 }
 
-// SetAppSpecificScoreFunction sets the app specific penalty function for the penalty option.
+// OverrideAppSpecificScoreFunction sets the app specific penalty function for the penalty option.
 // It is used to calculate the app specific penalty of a peer.
 // If the app specific penalty function is not set, the default one is used.
 // Note that it is always safer to use the default one, unless you know what you are doing.
 // It is safe to call this method multiple times, the last call will be used.
-func (c *ScoreOptionConfig) SetAppSpecificScoreFunction(appSpecificScoreFunction func(peer.ID) float64) {
+func (c *ScoreOptionConfig) OverrideAppSpecificScoreFunction(appSpecificScoreFunction func(peer.ID) float64) {
 	c.appScoreFunc = appSpecificScoreFunction
 }
 
@@ -212,6 +281,21 @@ func (c *ScoreOptionConfig) OverrideTopicScoreParams(topic channels.Topic, topic
 // notifications of invalid control messages.
 func (c *ScoreOptionConfig) SetRegisterNotificationConsumerFunc(f func(p2p.GossipSubInvCtrlMsgNotifConsumer)) {
 	c.registerNotificationConsumerFunc = f
+}
+
+// OverrideDecayInterval overrides the decay interval for the penalty option. It is used to override the default
+// decay interval for the penalty option. The decay interval is the time interval that the decay values are applied and
+// peer scores are updated.
+// Note: It is always recommended to use the default value unless you know what you are doing. Hence, calling this method
+// is not recommended in production.
+// Args:
+//
+//	interval: the decay interval.
+//
+// Returns:
+// none
+func (c *ScoreOptionConfig) OverrideDecayInterval(interval time.Duration) {
+	c.decayInterval = interval
 }
 
 // NewScoreOption creates a new penalty option with the given configuration.
@@ -239,14 +323,27 @@ func NewScoreOption(cfg *ScoreOptionConfig) *ScoreOption {
 		logger:          logger,
 		validator:       validator,
 		peerScoreParams: defaultPeerScoreParams(),
+		appScoreFunc:    scoreRegistry.AppSpecificScoreFunc(),
 	}
 
 	// set the app specific penalty function for the penalty option
 	// if the app specific penalty function is not set, use the default one
-	if cfg.appScoreFunc == nil {
-		s.appScoreFunc = scoreRegistry.AppSpecificScoreFunc()
-	} else {
+	if cfg.appScoreFunc != nil {
 		s.appScoreFunc = cfg.appScoreFunc
+		s.logger.
+			Warn().
+			Str(logging.KeyNetworkingSecurity, "true").
+			Msg("app specific score function is overridden")
+	}
+
+	if cfg.decayInterval > 0 {
+		// overrides the default decay interval if the decay interval is set.
+		s.peerScoreParams.DecayInterval = cfg.decayInterval
+		s.logger.
+			Warn().
+			Str(logging.KeyNetworkingSecurity, "true").
+			Dur("decay_interval_ms", cfg.decayInterval).
+			Msg("decay interval is overridden")
 	}
 
 	// registers the score registry as the consumer of the invalid control message notifications
@@ -308,7 +405,7 @@ func (s *ScoreOption) preparePeerScoreThresholds() {
 func (s *ScoreOption) TopicScoreParams(topic *pubsub.Topic) *pubsub.TopicScoreParams {
 	params, exists := s.peerScoreParams.Topics[topic.String()]
 	if !exists {
-		return defaultTopicScoreParams()
+		return DefaultTopicScoreParams()
 	}
 	return params
 }
@@ -320,7 +417,8 @@ func defaultPeerScoreParams() *pubsub.PeerScoreParams {
 		// atomic validation fails initialization if any parameter is not set.
 		SkipAtomicValidation: true,
 		// DecayInterval is the interval over which we decay the effect of past behavior. So that
-		// a good or bad behavior will not have a permanent effect on the penalty.
+		// a good or bad behavior will not have a permanent effect on the penalty. It is also interval
+		// that GossipSub refreshes the scores of all peers.
 		DecayInterval: defaultDecayInterval,
 		// DecayToZero defines the maximum value below which a peer scoring counter is reset to zero.
 		// This is to prevent the counter from decaying to a very small value.
@@ -332,13 +430,26 @@ func defaultPeerScoreParams() *pubsub.PeerScoreParams {
 	}
 }
 
-// defaultTopicScoreParams returns the default score params for topics.
-func defaultTopicScoreParams() *pubsub.TopicScoreParams {
-	return &pubsub.TopicScoreParams{
-		TopicWeight:                    defaultTopicWeight,
-		SkipAtomicValidation:           defaultTopicSkipAtomicValidation,
-		InvalidMessageDeliveriesWeight: defaultTopicInvalidMessageDeliveriesWeight,
-		InvalidMessageDeliveriesDecay:  defaultTopicInvalidMessageDeliveriesDecay,
-		TimeInMeshQuantum:              defaultTopicTimeInMesh,
+// DefaultTopicScoreParams returns the default score params for topics.
+func DefaultTopicScoreParams() *pubsub.TopicScoreParams {
+	p := &pubsub.TopicScoreParams{
+		TopicWeight:                     defaultTopicWeight,
+		SkipAtomicValidation:            defaultTopicSkipAtomicValidation,
+		InvalidMessageDeliveriesWeight:  defaultTopicInvalidMessageDeliveriesWeight,
+		InvalidMessageDeliveriesDecay:   defaultTopicInvalidMessageDeliveriesDecay,
+		TimeInMeshQuantum:               defaultTopicTimeInMesh,
+		MeshMessageDeliveriesWeight:     defaultTopicMeshMessageDeliveriesWeight,
+		MeshMessageDeliveriesDecay:      defaultTopicMeshMessageDeliveriesDecay,
+		MeshMessageDeliveriesCap:        defaultTopicMeshMessageDeliveriesCap,
+		MeshMessageDeliveriesThreshold:  defaultTopicMeshMessageDeliveryThreshold,
+		MeshMessageDeliveriesWindow:     defaultMeshMessageDeliveriesWindow,
+		MeshMessageDeliveriesActivation: defaultMeshMessageDeliveriesActivation,
 	}
+
+	if p.MeshMessageDeliveriesWeight >= 0 {
+		// GossipSub also does a validation, but we want to panic as early as possible.
+		panic(fmt.Sprintf("invalid mesh message deliveries weight %f", p.MeshMessageDeliveriesWeight))
+	}
+
+	return p
 }

@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/hex"
 	"fmt"
-	"math/rand"
 	"strings"
 	"sync"
 	"time"
@@ -18,6 +17,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/utils/debug"
+	"github.com/onflow/flow-go/utils/rand"
 )
 
 const (
@@ -71,7 +71,6 @@ type QueryExecutor struct {
 	vmCtx            fvm.Context
 	derivedChainData *derived.DerivedChainData
 	rngLock          *sync.Mutex
-	rng              *rand.Rand
 }
 
 var _ Executor = &QueryExecutor{}
@@ -92,7 +91,6 @@ func NewQueryExecutor(
 		vmCtx:            vmCtx,
 		derivedChainData: derivedChainData,
 		rngLock:          &sync.Mutex{},
-		rng:              rand.New(rand.NewSource(time.Now().UnixNano())),
 	}
 }
 
@@ -115,8 +113,11 @@ func (e *QueryExecutor) ExecuteScript(
 	// TODO: this is a temporary measure, we could remove this in the future
 	if e.logger.Debug().Enabled() {
 		e.rngLock.Lock()
-		trackerID := e.rng.Uint32()
-		e.rngLock.Unlock()
+		defer e.rngLock.Unlock()
+		trackerID, err := rand.Uint32()
+		if err != nil {
+			return nil, fmt.Errorf("failed to generate trackerID: %w", err)
+		}
 
 		trackedLogger := e.logger.With().Hex("script_hex", script).Uint32("trackerID", trackerID).Logger()
 		trackedLogger.Debug().Msg("script is sent for execution")
