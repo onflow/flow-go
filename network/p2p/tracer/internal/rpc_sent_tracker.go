@@ -18,9 +18,9 @@ import (
 	p2pmsg "github.com/onflow/flow-go/network/p2p/message"
 )
 
-// trackRPC is an internal data structure for "temporarily" storing *pubsub.RPC sent in the queue before they are processed
+// trackableRPC is an internal data structure for "temporarily" storing *pubsub.RPC sent in the queue before they are processed
 // by the *RPCSentTracker.
-type trackRPC struct {
+type trackableRPC struct {
 	// Nonce prevents deduplication in the hero store
 	Nonce []byte
 	rpc   *pubsub.RPC
@@ -30,7 +30,7 @@ type trackRPC struct {
 type RPCSentTracker struct {
 	component.Component
 	cache      *rpcSentCache
-	workerPool *worker.Pool[trackRPC]
+	workerPool *worker.Pool[trackableRPC]
 	// lastHighestIHaveRPCSize tracks the size of the last largest iHave rpc control message sent.
 	lastHighestIHaveRPCSize              *atomic.Int64
 	lastHighestIHaveRPCSizeResetInterval time.Duration
@@ -71,7 +71,7 @@ func NewRPCSentTracker(config *RPCSentTrackerConfig) *RPCSentTracker {
 		lastHighestIHaveRPCSize:              atomic.NewInt64(0),
 		lastHighestIHaveRPCSizeResetInterval: config.LastHighestIhavesSentResetInterval,
 	}
-	tracker.workerPool = worker.NewWorkerPoolBuilder[trackRPC](
+	tracker.workerPool = worker.NewWorkerPoolBuilder[trackableRPC](
 		config.Logger,
 		store,
 		tracker.rpcSent).Build()
@@ -96,12 +96,12 @@ func (t *RPCSentTracker) RPCSent(rpc *pubsub.RPC) error {
 	if err != nil {
 		return fmt.Errorf("failed to get track rpc work nonce: %w", err)
 	}
-	t.workerPool.Submit(trackRPC{Nonce: n, rpc: rpc})
+	t.workerPool.Submit(trackableRPC{Nonce: n, rpc: rpc})
 	return nil
 }
 
 // rpcSent tracks control messages sent in *pubsub.RPC.
-func (t *RPCSentTracker) rpcSent(work trackRPC) error {
+func (t *RPCSentTracker) rpcSent(work trackableRPC) error {
 	switch {
 	case len(work.rpc.GetControl().GetIhave()) > 0:
 		iHave := work.rpc.GetControl().GetIhave()
