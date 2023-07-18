@@ -12,15 +12,13 @@ const maxFailedRequestCount = 3
 
 // NodeCommunicator is responsible for calling available nodes in the backend.
 type NodeCommunicator struct {
-	circuitBreakerEnabled bool
-	nodeSelectorFactory   NodeSelectorFactory
+	nodeSelectorFactory NodeSelectorFactory
 }
 
 // NewNodeCommunicator creates a new instance of NodeCommunicator.
 func NewNodeCommunicator(circuitBreakerEnabled bool) *NodeCommunicator {
 	return &NodeCommunicator{
-		circuitBreakerEnabled: circuitBreakerEnabled,
-		nodeSelectorFactory:   NodeSelectorFactory{circuitBreakerEnabled: circuitBreakerEnabled},
+		nodeSelectorFactory: NodeSelectorFactory{circuitBreakerEnabled: circuitBreakerEnabled},
 	}
 }
 
