@@ -52,7 +52,6 @@ type ExecutionDataRequesterSuite struct {
 
 func TestExecutionDataRequesterSuite(t *testing.T) {
 	t.Parallel()
-	rand.Seed(time.Now().UnixMilli())
 	suite.Run(t, new(ExecutionDataRequesterSuite))
 }
 

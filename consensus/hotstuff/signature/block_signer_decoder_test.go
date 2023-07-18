@@ -140,7 +140,8 @@ func (s *blockSignerDecoderSuite) Test_EpochTransition() {
 	blockView := s.block.Header.View
 	parentView := s.block.Header.ParentView
 	epoch1Committee := s.allConsensus
-	epoch2Committee := s.allConsensus.SamplePct(.8)
+	epoch2Committee, err := s.allConsensus.SamplePct(.8)
+	require.NoError(s.T(), err)
 
 	*s.committee = *hotstuff.NewDynamicCommittee(s.T())
 	s.committee.On("IdentitiesByEpoch", parentView).Return(epoch1Committee, nil).Maybe()
