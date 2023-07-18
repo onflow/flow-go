@@ -91,6 +91,7 @@ func NewRPCSentTracker(config *RPCSentTrackerConfig) *RPCSentTracker {
 // Track submits the control message to the worker queue for async tracking.
 // Args:
 // - *pubsub.RPC: the rpc sent.
+// All errors returned from this function can be considered benign.
 func (t *RPCSentTracker) Track(rpc *pubsub.RPC) error {
 	n, err := nonce()
 	if err != nil {
