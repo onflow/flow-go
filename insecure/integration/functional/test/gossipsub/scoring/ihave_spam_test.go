@@ -208,16 +208,18 @@ func TestGossipSubIHaveBrokenPromises_Above_Threshold(t *testing.T) {
 	initScore, ok := victimNode.PeerScoreExposer().GetScore(spammer.SpammerNode.Host().ID())
 	require.True(t, ok, "score for spammer node must be present")
 
-	// conducts first round of the spam attack: we send 10 RPCs to the victim node, each containing 500 iHave messages.
+	// FIRST ROUND OF ATTACK: spammer sends 10 RPCs to the victim node, each containing 500 iHave messages.
 	spamIHaveBrokenPromise(t, spammer, blockTopic.String(), receivedIWants, victimNode)
 
-	// wait till victim counts the spam iHaves as broken promises (one per RPC for a total of 10).
+	// wait till victim counts the spam iHaves as broken promises for the second round of attack (one per RPC for a total of 10).
 	require.Eventually(t, func() bool {
 		behavioralPenalty, ok := victimNode.PeerScoreExposer().GetBehaviourPenalty(spammer.SpammerNode.Host().ID())
 		if !ok {
 			return false
 		}
-		if behavioralPenalty < 9 { // ideally it must be 10 (one per RPC), but we give it a buffer of 1 to account for decays and floating point errors.
+		// ideally it must be 10 (one per RPC), but we give it a buffer of 1 to account for decays and floating point errors.
+		// note that we intentionally override the decay speed to be 60-times faster in this test.
+		if behavioralPenalty < 9 {
 			return false
 		}
 
@@ -226,16 +228,25 @@ func TestGossipSubIHaveBrokenPromises_Above_Threshold(t *testing.T) {
 		// seconds to be on the safe side.
 	}, 10*time.Second, 100*time.Millisecond)
 
-	// second round of the spam attack: we send 10 RPCs to the victim node, each containing 500 iHave messages.
+	scoreAfterFirstRound, ok := victimNode.PeerScoreExposer().GetScore(spammer.SpammerNode.Host().ID())
+	require.True(t, ok, "score for spammer node must be present")
+	// spammer score after first round must not be decreased severely, we account for 10% drop due to under-performing
+	// (on sending fresh new messages since that is not part of the test).
+	require.Greater(t, scoreAfterFirstRound, 0.9*initScore)
+
+	// SECOND ROUND OF ATTACK: spammer sends 10 RPCs to the victim node, each containing 500 iHave messages.
 	spamIHaveBrokenPromise(t, spammer, blockTopic.String(), receivedIWants, victimNode)
 
-	// wait till victim counts the spam iHaves as broken promises (one per RPC for a total of 10).
+	// wait till victim counts the spam iHaves as broken promises for the second round of attack (one per RPC for a total of 10).
 	require.Eventually(t, func() bool {
 		behavioralPenalty, ok := victimNode.PeerScoreExposer().GetBehaviourPenalty(spammer.SpammerNode.Host().ID())
 		if !ok {
 			return false
 		}
-		if behavioralPenalty < 18 { // ideally we should have 20 (10 from the first round, 10 from the second round), but we give it a buffer of 2 to account for decays and floating point errors.
+
+		// ideally we should have 20 (10 from the first round, 10 from the second round), but we give it a buffer of 2 to account for decays and floating point errors.
+		// note that we intentionally override the decay speed to be 60-times faster in this test.
+		if behavioralPenalty < 18 {
 			return false
 		}
 
@@ -258,16 +269,18 @@ func TestGossipSubIHaveBrokenPromises_Above_Threshold(t *testing.T) {
 		return unittest.ProposalFixture()
 	})
 
-	// THIRD ROUND OF ATTACK: we send 10 RPCs to the victim node, each containing 500 iHave messages, we expect spammer to be graylisted.
+	// THIRD ROUND OF ATTACK: spammer sends 10 RPCs to the victim node, each containing 500 iHave messages, we expect spammer to be graylisted.
 	spamIHaveBrokenPromise(t, spammer, blockTopic.String(), receivedIWants, victimNode)
 
-	// wait till victim counts the spam iHaves as broken promises (one per RPC for a total of 10).
+	// wait till victim counts the spam iHaves as broken promises for the third round of attack (one per RPC for a total of 10).
 	require.Eventually(t, func() bool {
 		behavioralPenalty, ok := victimNode.PeerScoreExposer().GetBehaviourPenalty(spammer.SpammerNode.Host().ID())
 		if !ok {
 			return false
 		}
-		if behavioralPenalty < 27 { // ideally we should have 30 (10 from the first round, 10 from the second round, 10 from the third round), but we give it a buffer of 3 to account for decays and floating point errors.
+		// ideally we should have 30 (10 from the first round, 10 from the second round, 10 from the third round), but we give it a buffer of 3 to account for decays and floating point errors.
+		// note that we intentionally override the decay speed to be 60-times faster in this test.
+		if behavioralPenalty < 27 {
 			return false
 		}
 
@@ -278,8 +291,8 @@ func TestGossipSubIHaveBrokenPromises_Above_Threshold(t *testing.T) {
 
 	spammerScore, ok = victimNode.PeerScoreExposer().GetScore(spammer.SpammerNode.Host().ID())
 	require.True(t, ok, "sanity check failed, we should have a score for the spammer node")
-	// with the second round of the attack, the spammer is about 10 broken promises above the threshold (total ~20 broken promises, but the first 10 are not counted).
-	// we expect the score to be dropped to initScore - 10 * 10 * 0.01 * scoring.MaxAppSpecificReward, however, instead of 10, we consider 8 about the threshold, to account for decays.
+	// with the third round of the attack, the spammer is about 20 broken promises above the threshold (total ~30 broken promises), hence its overall score must be below the gossip, publish, and graylist thresholds, meaning that
+	// victim will not exchange messages with it anymore, and also that it will be graylisted meaning all incoming and outgoing RPCs to and from the spammer will be dropped by the victim.
 	require.Lessf(t, spammerScore, scoring.DefaultGossipThreshold, "sanity check failed, the score of the spammer node must be less than gossip threshold: %f, actual: %f", scoring.DefaultGossipThreshold, spammerScore)
 	require.Lessf(t, spammerScore, scoring.DefaultPublishThreshold, "sanity check failed, the score of the spammer node must be less than publish threshold: %f, actual: %f", scoring.DefaultPublishThreshold, spammerScore)
 	require.Lessf(t, spammerScore, scoring.DefaultGraylistThreshold, "sanity check failed, the score of the spammer node must be less than graylist threshold: %f, actual: %f", scoring.DefaultGraylistThreshold, spammerScore)
