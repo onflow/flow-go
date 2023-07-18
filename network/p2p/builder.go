@@ -155,8 +155,8 @@ type PeerScoringConfigOverride struct {
 	// If the function is nil, the default application specific score parameters are used.
 	AppSpecificScoreParams func(peer.ID) float64
 
-	// DecayInterval is the interval over which we decay the effect of past behavior. So that
-	// a good or bad behavior will not have a permanent effect on the penalty. It is also interval
+	// DecayInterval is the interval over which we decay the effect of past behavior, so that
+	// a good or bad behavior will not have a permanent effect on the penalty. It is also the interval
 	// that GossipSub uses to refresh the scores of all peers.
 	// Override criteria: if the value is not zero, it will override the default decay interval.
 	// If the value is zero, the default decay interval is used.
