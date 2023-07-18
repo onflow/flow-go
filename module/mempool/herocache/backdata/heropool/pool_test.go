@@ -645,7 +645,7 @@ func withTestScenario(t *testing.T,
 	ejectionMode EjectionMode,
 	helpers ...func(*testing.T, *Pool, []*unittest.MockEntity)) {
 
-	pool := NewHeroPool(limit, ejectionMode)
+	pool := NewHeroPool(limit, ejectionMode, unittest.Logger())
 
 	// head on underlying linked-list value should be uninitialized
 	require.True(t, pool.used.head.isUndefined())
