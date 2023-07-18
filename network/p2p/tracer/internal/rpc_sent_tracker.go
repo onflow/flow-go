@@ -97,7 +97,9 @@ func (t *RPCSentTracker) Track(rpc *pubsub.RPC) error {
 	if err != nil {
 		return fmt.Errorf("failed to get track rpc work nonce: %w", err)
 	}
-	t.workerPool.Submit(trackableRPC{Nonce: n, rpc: rpc})
+	if ok := t.workerPool.Submit(trackableRPC{Nonce: n, rpc: rpc}); !ok {
+		return fmt.Errorf("failed to track RPC could not submit work to worker pool")
+	}
 	return nil
 }
 
