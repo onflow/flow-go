@@ -14,7 +14,6 @@ import (
 	"github.com/onflow/flow-go/config"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/irrecoverable"
-	"github.com/onflow/flow-go/module/metrics"
 	mockmodule "github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/p2p"
@@ -66,15 +65,13 @@ func TestGossipSubMeshTracer(t *testing.T) {
 	// meshTracer logs at 1 second intervals for sake of testing.
 	collector := mockmodule.NewGossipSubLocalMeshMetrics(t)
 	meshTracerCfg := &tracer.GossipSubMeshTracerConfig{
-		Logger:                                  logger,
-		Metrics:                                 collector,
-		IDProvider:                              idProvider,
-		LoggerInterval:                          time.Second,
-		RpcSentTrackerCacheCollector:            metrics.NewNoopCollector(),
-		RpcSentTrackerCacheSize:                 defaultConfig.NetworkConfig.GossipSubConfig.RPCSentTrackerCacheSize,
-		RpcSentTrackerWorkerQueueCacheSize:      defaultConfig.NetworkConfig.GossipSubConfig.RPCSentTrackerQueueCacheSize,
-		RpcSentTrackerNumOfWorkers:              defaultConfig.NetworkConfig.GossipSubConfig.RpcSentTrackerNumOfWorkers,
-		RpcSentTrackerWorkerQueueCacheCollector: metrics.NewNoopCollector(),
+		Logger:                             logger,
+		Metrics:                            collector,
+		IDProvider:                         idProvider,
+		LoggerInterval:                     time.Second,
+		RpcSentTrackerCacheSize:            defaultConfig.NetworkConfig.GossipSubConfig.RPCSentTrackerCacheSize,
+		RpcSentTrackerWorkerQueueCacheSize: defaultConfig.NetworkConfig.GossipSubConfig.RPCSentTrackerQueueCacheSize,
+		RpcSentTrackerNumOfWorkers:         defaultConfig.NetworkConfig.GossipSubConfig.RpcSentTrackerNumOfWorkers,
 	}
 	meshTracer := tracer.NewGossipSubMeshTracer(meshTracerCfg)
 	tracerNode, tracerId := p2ptest.NodeFixture(

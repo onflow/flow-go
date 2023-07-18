@@ -13,6 +13,8 @@ import (
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/irrecoverable"
+	"github.com/onflow/flow-go/module/metrics"
+	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/tracer/internal"
 	"github.com/onflow/flow-go/utils/logging"
@@ -25,9 +27,9 @@ const (
 	// MeshLogIntervalWarnMsg is the message logged by the tracer every logInterval if there are unknown peers in the mesh.
 	MeshLogIntervalWarnMsg = "unknown peers in topic mesh peers of local node since last heartbeat"
 
-        // defaultLastHighestIHaveRPCSizeResetInterval is the interval that we reset the tracker of max ihave size sent back 
+	// defaultLastHighestIHaveRPCSizeResetInterval is the interval that we reset the tracker of max ihave size sent back
 	// to a default. We use ihave message max size to determine the health of requested iwants from remote peers. However,
-	// we don't desire an ihave size anomaly to persist forever, hence, we reset it back to a default every minute. 
+	// we don't desire an ihave size anomaly to persist forever, hence, we reset it back to a default every minute.
 	// The choice of the interval to be a minute is in harmony with the GossipSub decay interval.
 	defaultLastHighestIHaveRPCSizeResetInterval = time.Minute
 )
@@ -56,15 +58,15 @@ type GossipSubMeshTracer struct {
 var _ p2p.PubSubTracer = (*GossipSubMeshTracer)(nil)
 
 type GossipSubMeshTracerConfig struct {
-	Logger                                  zerolog.Logger
-	Metrics                                 module.GossipSubLocalMeshMetrics
-	IDProvider                              module.IdentityProvider
-	LoggerInterval                          time.Duration
-	RpcSentTrackerCacheCollector            module.HeroCacheMetrics
-	RpcSentTrackerCacheSize                 uint32
-	RpcSentTrackerWorkerQueueCacheCollector module.HeroCacheMetrics
-	RpcSentTrackerWorkerQueueCacheSize      uint32
-	RpcSentTrackerNumOfWorkers              int
+	network.NetworkingType
+	metrics.HeroCacheMetricsFactory
+	Logger                             zerolog.Logger
+	Metrics                            module.GossipSubLocalMeshMetrics
+	IDProvider                         module.IdentityProvider
+	LoggerInterval                     time.Duration
+	RpcSentTrackerCacheSize            uint32
+	RpcSentTrackerWorkerQueueCacheSize uint32
+	RpcSentTrackerNumOfWorkers         int
 }
 
 // NewGossipSubMeshTracer creates a new *GossipSubMeshTracer.
@@ -77,8 +79,8 @@ func NewGossipSubMeshTracer(config *GossipSubMeshTracerConfig) *GossipSubMeshTra
 	rpcSentTracker := internal.NewRPCSentTracker(&internal.RPCSentTrackerConfig{
 		Logger:                             lg,
 		RPCSentCacheSize:                   config.RpcSentTrackerCacheSize,
-		RPCSentCacheCollector:              config.RpcSentTrackerCacheCollector,
-		WorkerQueueCacheCollector:          config.RpcSentTrackerWorkerQueueCacheCollector,
+		RPCSentCacheCollector:              metrics.GossipSubRPCSentTrackerMetricFactory(config.HeroCacheMetricsFactory, config.NetworkingType),
+		WorkerQueueCacheCollector:          metrics.GossipSubRPCSentTrackerQueueMetricFactory(config.HeroCacheMetricsFactory, config.NetworkingType),
 		WorkerQueueCacheSize:               config.RpcSentTrackerWorkerQueueCacheSize,
 		NumOfWorkers:                       config.RpcSentTrackerNumOfWorkers,
 		LastHighestIhavesSentResetInterval: defaultLastHighestIHaveRPCSizeResetInterval,
