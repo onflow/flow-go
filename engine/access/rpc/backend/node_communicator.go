@@ -41,7 +41,10 @@ func (b *NodeCommunicator) CallAvailableNode(
 	shouldTerminateOnError ErrorTerminator,
 ) error {
 	var errs *multierror.Error
-	nodeSelector := b.nodeSelectorFactory.SelectNodes(nodes)
+	nodeSelector, err := b.nodeSelectorFactory.SelectNodes(nodes)
+	if err != nil {
+		return err
+	}
 
 	for node := nodeSelector.Next(); node != nil; node = nodeSelector.Next() {
 		err := call(node)

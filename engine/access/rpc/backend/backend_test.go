@@ -2172,7 +2172,8 @@ func (suite *Suite) TestExecutionNodesForBlockID() {
 		require.NoError(suite.T(), err)
 
 		execNodeSelectorFactory := NodeSelectorFactory{circuitBreakerEnabled: false}
-		execSelector := execNodeSelectorFactory.SelectNodes(allExecNodes)
+		execSelector, err := execNodeSelectorFactory.SelectNodes(allExecNodes)
+		require.NoError(suite.T(), err)
 
 		actualList := flow.IdentityList{}
 		for actual := execSelector.Next(); actual != nil; actual = execSelector.Next() {
@@ -2199,7 +2200,8 @@ func (suite *Suite) TestExecutionNodesForBlockID() {
 		require.NoError(suite.T(), err)
 
 		execNodeSelectorFactory := NodeSelectorFactory{circuitBreakerEnabled: false}
-		execSelector := execNodeSelectorFactory.SelectNodes(allExecNodes)
+		execSelector, err := execNodeSelectorFactory.SelectNodes(allExecNodes)
+		require.NoError(suite.T(), err)
 
 		actualList := flow.IdentityList{}
 		for actual := execSelector.Next(); actual != nil; actual = execSelector.Next() {

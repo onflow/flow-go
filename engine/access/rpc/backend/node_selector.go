@@ -1,6 +1,10 @@
 package backend
 
-import "github.com/onflow/flow-go/model/flow"
+import (
+	"fmt"
+
+	"github.com/onflow/flow-go/model/flow"
+)
 
 // maxNodesCnt is the maximum number of nodes that will be contacted to complete an API request.
 const maxNodesCnt = 3
@@ -20,16 +24,20 @@ type NodeSelectorFactory struct {
 
 // SelectNodes selects the configured number of node identities from the provided list of nodes
 // and returns the node selector to iterate through them.
-func (n *NodeSelectorFactory) SelectNodes(nodes flow.IdentityList) NodeSelector {
+func (n *NodeSelectorFactory) SelectNodes(nodes flow.IdentityList) (NodeSelector, error) {
+	var err error
 	// If the circuit breaker is disabled, the legacy logic should be used, which selects only a specified number of nodes.
 	if !n.circuitBreakerEnabled {
-		nodes = nodes.Sample(maxNodesCnt)
+		nodes, err = nodes.Sample(maxNodesCnt)
+		if err != nil {
+			return nil, fmt.Errorf("sampling failed: %w", err)
+		}
 	}
 
 	return &MainNodeSelector{
 		nodes: nodes,
 		index: 0,
-	}
+	}, nil
 }
 
 // SelectCollectionNodes
