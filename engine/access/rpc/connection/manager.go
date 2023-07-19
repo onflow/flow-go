@@ -73,6 +73,10 @@ func (m *Manager) Remove(grpcAddress string) bool {
 	return true
 }
 
+func (m *Manager) HasCache() bool {
+	return m.cache != nil
+}
+
 func (m *Manager) retrieveConnection(grpcAddress string, timeout time.Duration) (*grpc.ClientConn, error) {
 
 	client, ok := m.cache.GetOrAdd(grpcAddress, timeout)

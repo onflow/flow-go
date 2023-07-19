@@ -6,7 +6,6 @@ import (
 	"net"
 	"time"
 
-	lru "github.com/hashicorp/golang-lru"
 	"github.com/onflow/flow/protobuf/go/flow/access"
 	"github.com/onflow/flow/protobuf/go/flow/execution"
 	"github.com/rs/zerolog"
@@ -49,7 +48,6 @@ type ConnectionFactoryImpl struct {
 	ExecutionGRPCPort         uint
 	CollectionNodeGRPCTimeout time.Duration
 	ExecutionNodeGRPCTimeout  time.Duration
-	ConnectionsCache          *lru.Cache
 	CacheSize                 uint
 	MaxMsgSize                uint
 	AccessMetrics             module.AccessMetrics
@@ -78,7 +76,7 @@ func (cf *ConnectionFactoryImpl) GetAccessAPIClientWithPort(address string, port
 }
 
 func (cf *ConnectionFactoryImpl) InvalidateAccessAPIClient(address string) {
-	if cf.ConnectionsCache == nil {
+	if !cf.manager.HasCache() {
 		return
 	}
 
@@ -102,7 +100,7 @@ func (cf *ConnectionFactoryImpl) GetExecutionAPIClient(address string) (executio
 }
 
 func (cf *ConnectionFactoryImpl) InvalidateExecutionAPIClient(address string) {
-	if cf.ConnectionsCache == nil {
+	if !cf.manager.HasCache() {
 		return
 	}
 
