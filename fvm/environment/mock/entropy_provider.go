@@ -35,3 +35,17 @@ func (_m *EntropyProvider) RandomSource() ([]byte, error) {
 	return r0, r1
 }
 
+type mockConstructorTestingTNewEntropyProvider interface {
+	mock.TestingT
+	Cleanup(func())
+}
+
+// NewEntropyProvider creates a new instance of EntropyProvider. It also registers a testing interface on the mock and a cleanup function to assert the mocks expectations.
+func NewEntropyProvider(t mockConstructorTestingTNewEntropyProvider) *EntropyProvider {
+	mock := &EntropyProvider{}
+	mock.Mock.Test(t)
+
+	t.Cleanup(func() { mock.AssertExpectations(t) })
+
+	return mock
+}
