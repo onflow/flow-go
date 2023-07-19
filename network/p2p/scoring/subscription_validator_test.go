@@ -178,20 +178,20 @@ func TestSubscriptionValidator_Integration(t *testing.T) {
 	conNode, conId := p2ptest.NodeFixture(t, sporkId, t.Name(),
 		idProvider,
 		p2ptest.WithLogger(unittest.Logger()),
-		p2ptest.WithPeerScoringEnabled(idProvider),
+		p2ptest.EnablePeerScoringWithOverride(p2p.PeerScoringConfigNoOverride),
 		p2ptest.WithRole(flow.RoleConsensus))
 
 	// two verification node.
 	verNode1, verId1 := p2ptest.NodeFixture(t, sporkId, t.Name(),
 		idProvider,
 		p2ptest.WithLogger(unittest.Logger()),
-		p2ptest.WithPeerScoringEnabled(idProvider),
+		p2ptest.EnablePeerScoringWithOverride(p2p.PeerScoringConfigNoOverride),
 		p2ptest.WithRole(flow.RoleVerification))
 
 	verNode2, verId2 := p2ptest.NodeFixture(t, sporkId, t.Name(),
 		idProvider,
 		p2ptest.WithLogger(unittest.Logger()),
-		p2ptest.WithPeerScoringEnabled(idProvider),
+		p2ptest.EnablePeerScoringWithOverride(p2p.PeerScoringConfigNoOverride),
 		p2ptest.WithRole(flow.RoleVerification))
 
 	ids := flow.IdentityList{&conId, &verId1, &verId2}
