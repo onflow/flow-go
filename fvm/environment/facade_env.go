@@ -228,7 +228,7 @@ func NewTransactionEnvironment(
 
 	env.RandomGenerator = NewRandomGenerator(
 		tracer,
-		params.Snapshot,
+		params.EntropyProvider,
 		params.TxId,
 	)
 

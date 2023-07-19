@@ -18,6 +18,8 @@ import (
 	"github.com/onflow/flow-go/engine/execution"
 	"github.com/onflow/flow-go/engine/execution/utils"
 	"github.com/onflow/flow-go/fvm"
+	"github.com/onflow/flow-go/fvm/environment"
+	envMock "github.com/onflow/flow-go/fvm/environment/mock"
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/pathfinder"
@@ -630,16 +632,16 @@ func ComputationResultFixture(t *testing.T) *execution.ComputationResult {
 	}
 }
 
-// ProtocolSnapshotWithSourceFixture returns a protocol state snapshot mock that only
+// EntropyProviderFixture returns an entropy provider mock that
 // supports RandomSource().
 // If input is nil, a random source fixture is generated.
-func ProtocolSnapshotWithSourceFixture(source []byte) protocol.Snapshot {
+func EntropyProviderFixture(source []byte) environment.EntropyProvider {
 	if source == nil {
 		source = unittest.SignatureFixture()
 	}
-	snapshot := protocolMock.Snapshot{}
-	snapshot.On("RandomSource").Return(source, nil)
-	return &snapshot
+	provider := envMock.EntropyProvider{}
+	provider.On("RandomSource").Return(source, nil)
+	return &provider
 }
 
 // ProtocolStateWithSourceFixture returns a protocol state mock that only
@@ -647,7 +649,11 @@ func ProtocolSnapshotWithSourceFixture(source []byte) protocol.Snapshot {
 // The snapshot mock only supports RandomSource().
 // If input is nil, a random source fixture is generated.
 func ProtocolStateWithSourceFixture(source []byte) protocol.State {
-	snapshot := ProtocolSnapshotWithSourceFixture(source)
+	if source == nil {
+		source = unittest.SignatureFixture()
+	}
+	snapshot := &protocolMock.Snapshot{}
+	snapshot.On("RandomSource").Return(source, nil)
 	state := protocolMock.State{}
 	state.On("AtBlockID", mock.Anything).Return(snapshot)
 	return &state

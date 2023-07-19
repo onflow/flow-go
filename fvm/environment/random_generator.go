@@ -10,13 +10,22 @@ import (
 	"github.com/onflow/flow-go/fvm/tracing"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/trace"
-	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/prg"
 )
 
+// EntropyProvider represents an entropy (source of randomness) provider
+type EntropyProvider interface {
+	// RandomSource provides a source of entropy that can be
+	// expanded into randoms (using a pseudo-random generator).
+	// The returned slice should have at least 128 bits of entropy.
+	// The function doesn't error in normal operations, any
+	// error should be treated as an exception.
+	RandomSource() ([]byte, error)
+}
+
 type RandomGenerator interface {
 	// UnsafeRandom returns a random uint64
-	// Todo: rename to Random() once Cadence interface is updated
+	// The name follows Cadence interface
 	UnsafeRandom() (uint64, error)
 }
 
@@ -25,13 +34,11 @@ var _ RandomGenerator = (*randomGenerator)(nil)
 // randomGenerator implements RandomGenerator and is used
 // for the transactions execution environment
 type randomGenerator struct {
-	tracer tracing.TracerSpan
-
-	stateSnapshot protocol.Snapshot
+	tracer        tracing.TracerSpan
+	entropySource EntropyProvider
 	txId          flow.Identifier
-
-	prg          random.Rand
-	isPRGCreated bool
+	prg           random.Rand
+	isPRGCreated  bool
 }
 
 type ParseRestrictedRandomGenerator struct {
@@ -61,12 +68,12 @@ func (gen ParseRestrictedRandomGenerator) UnsafeRandom() (
 
 func NewRandomGenerator(
 	tracer tracing.TracerSpan,
-	stateSnapshot protocol.Snapshot,
+	entropySource EntropyProvider,
 	txId flow.Identifier,
 ) RandomGenerator {
 	gen := &randomGenerator{
 		tracer:        tracer,
-		stateSnapshot: stateSnapshot,
+		entropySource: entropySource,
 		txId:          txId,
 		isPRGCreated:  false, // PRG is not created
 	}
@@ -77,12 +84,9 @@ func NewRandomGenerator(
 func (gen *randomGenerator) createPRG() (random.Rand, error) {
 	// Use the protocol state source of randomness [SoR] for the current block's
 	// execution
-	source, err := gen.stateSnapshot.RandomSource()
-	// expected errors of RandomSource() are:
-	// - storage.ErrNotFound if the QC is unknown.
-	// - state.ErrUnknownSnapshotReference if the snapshot reference block is unknown
-	// at this stage, snapshot reference block should be known and the QC should also be known,
-	// so no error is expected in normal operations
+	source, err := gen.entropySource.RandomSource()
+	// `RandomSource` does not error in normal operations.
+	// Any error should be treated as an exception.
 	if err != nil {
 		return nil, fmt.Errorf("reading random source from state failed: %w", err)
 	}

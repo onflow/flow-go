@@ -13,7 +13,6 @@ import (
 	"github.com/onflow/flow-go/fvm/tracing"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
-	"github.com/onflow/flow-go/state/protocol"
 )
 
 const (
@@ -161,13 +160,12 @@ func WithEventCollectionSizeLimit(limit uint64) Option {
 	}
 }
 
-// WithProtocolSnapshot sets the protocol state for a virtual machine context.
+// WithEntropyProvider sets the entropy provider of a virtual machine context.
 //
-// The VM uses the protocol state to provide protocol information to the Cadence runtime,
-// including the source of the pseudorandom number generator.
-func WithProtocolSnapshot(snapshot protocol.Snapshot) Option {
+// The VM uses the input to provide entropy to the Cadence runtime randomness functions.
+func WithEntropyProvider(source environment.EntropyProvider) Option {
 	return func(ctx Context) Context {
-		ctx.Snapshot = snapshot
+		ctx.EntropyProvider = source
 		return ctx
 	}
 }
