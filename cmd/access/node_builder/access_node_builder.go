@@ -972,7 +972,11 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 			return nil
 		}).
 		Module("rest metrics", func(node *cmd.NodeConfig) error {
-			builder.RESTMetrics = metrics.NewRestCollector(rest.URLToRoute, node.MetricsRegisterer)
+			m, err := metrics.NewRestCollector(rest.URLToRoute, node.MetricsRegisterer)
+			if err != nil {
+				return err
+			}
+			builder.RESTMetrics = m
 			return nil
 		}).
 		Module("access metrics", func(node *cmd.NodeConfig) error {
