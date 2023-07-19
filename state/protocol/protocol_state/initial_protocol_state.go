@@ -19,10 +19,10 @@ type initialProtocolStateAdapter struct {
 
 var _ protocol.InitialProtocolState = (*initialProtocolStateAdapter)(nil)
 
-func newInitialProtocolStateAdapter(entry *flow.RichProtocolStateEntry) (*initialProtocolStateAdapter, error) {
+func newInitialProtocolStateAdapter(entry *flow.RichProtocolStateEntry) *initialProtocolStateAdapter {
 	return &initialProtocolStateAdapter{
 		RichProtocolStateEntry: entry,
-	}, nil
+	}
 }
 
 func (s *initialProtocolStateAdapter) Epoch() uint64 {

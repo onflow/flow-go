@@ -24,7 +24,7 @@ func (s *ProtocolState) AtBlockID(blockID flow.Identifier) (protocol.DynamicProt
 	if err != nil {
 		return nil, fmt.Errorf("could not query protocol state at block (%x): %w", blockID, err)
 	}
-	return newDynamicProtocolStateAdapter(protocolStateEntry)
+	return newDynamicProtocolStateAdapter(protocolStateEntry), nil
 }
 
 func (s *ProtocolState) GlobalParams() {

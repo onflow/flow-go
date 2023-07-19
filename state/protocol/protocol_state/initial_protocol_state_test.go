@@ -19,7 +19,7 @@ func TestInitialProtocolStateAdapter(t *testing.T) {
 	// construct a valid protocol state entry that has semantically correct DKGParticipantKeys
 	entry := unittest.ProtocolStateFixture(WithValidDKG())
 
-	adapter, err := newInitialProtocolStateAdapter(entry)
+	adapter := newInitialProtocolStateAdapter(entry)
 	require.NoError(t, err)
 
 	t.Run("clustering", func(t *testing.T) {

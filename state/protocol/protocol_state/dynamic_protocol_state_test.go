@@ -13,7 +13,7 @@ func TestDynamicProtocolStateAdapter(t *testing.T) {
 	// construct a valid protocol state entry that has semantically correct DKGParticipantKeys
 	entry := unittest.ProtocolStateFixture(WithValidDKG())
 
-	adapter, err := newDynamicProtocolStateAdapter(entry)
+	adapter := newDynamicProtocolStateAdapter(entry)
 	require.NoError(t, err)
 
 	t.Run("identities", func(t *testing.T) {
