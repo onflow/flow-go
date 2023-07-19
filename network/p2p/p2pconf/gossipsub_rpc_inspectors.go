@@ -17,6 +17,7 @@ type GossipSubRPCInspectorsConfig struct {
 // GossipSubRPCValidationInspectorConfigs validation limits used for gossipsub RPC control message inspection.
 type GossipSubRPCValidationInspectorConfigs struct {
 	ClusterPrefixedMessageConfig `mapstructure:",squash"`
+	IWantRPCInspectionConfig     `mapstructure:",squash"`
 	// NumberOfWorkers number of worker pool workers.
 	NumberOfWorkers int `validate:"gte=1" mapstructure:"gossipsub-rpc-validation-inspector-workers"`
 	// CacheSize size of the queue used by worker pool for the control message validation inspector.
@@ -47,6 +48,16 @@ type GossipSubRPCValidationInspectorConfigs struct {
 	IHaveInspectionMaxSampleSize float64 `validate:"gte=100" mapstructure:"ihave-max-sample-size"`
 }
 
+// IWantRPCInspectionConfig validation configuration for iWANT RPC control messages.
+type IWantRPCInspectionConfig struct {
+	// MaxSampleSize max inspection sample size to use.
+	MaxSampleSize uint `validate:"gt=0" mapstructure:"gossipsub-rpc-iwant-max-sample-size"`
+	// CacheMissThreshold the threshold of missing corresponding iHave messages for iWant messages received before an invalid control message notification is disseminated.
+	CacheMissThreshold float64 `validate:"gt=0" mapstructure:"gossipsub-rpc-iwant-cache-miss-threshold"`
+}
+
+// half of the sample
+
 // GetCtrlMsgValidationConfig returns the CtrlMsgValidationConfig for the specified p2p.ControlMessageType.
 func (conf *GossipSubRPCValidationInspectorConfigs) GetCtrlMsgValidationConfig(controlMsg p2pmsg.ControlMessageType) (*CtrlMsgValidationConfig, bool) {
 	switch controlMsg {
@@ -70,6 +81,10 @@ func (conf *GossipSubRPCValidationInspectorConfigs) GetCtrlMsgValidationConfig(c
 			HardThreshold:   conf.IHaveLimits.HardThreshold,
 			SafetyThreshold: conf.IHaveLimits.SafetyThreshold,
 			RateLimit:       conf.IHaveLimits.RateLimit,
+		}, true
+	case p2pmsg.CtrlMsgIWant:
+		return &CtrlMsgValidationConfig{
+			ControlMsg: p2pmsg.CtrlMsgIWant,
 		}, true
 	default:
 		return nil, false

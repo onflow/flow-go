@@ -190,6 +190,17 @@ func (t *GossipSubMeshTracer) SendRPC(rpc *pubsub.RPC, _ peer.ID) {
 	}
 }
 
+// WasIHaveRPCSent returns true if an iHave control message for the messageID was sent, otherwise false.
+func (t *GossipSubMeshTracer) WasIHaveRPCSent(messageID string) bool {
+	// TODO: topic string is obsolete since messageID is globally unique
+	return t.rpcSentTracker.WasIHaveRPCSent("", messageID)
+}
+
+// LastHighestIHaveRPCSize returns the last highest RPC iHave message sent.
+func (t *GossipSubMeshTracer) LastHighestIHaveRPCSize() int64 {
+	return t.rpcSentTracker.LastHighestIHaveRPCSize()
+}
+
 // logLoop logs the mesh peers of the local node for each topic at a regular interval.
 func (t *GossipSubMeshTracer) logLoop(ctx irrecoverable.SignalerContext) {
 	ticker := time.NewTicker(t.loggerInterval)

@@ -59,6 +59,9 @@ const (
 	metricsInspectorNumberOfWorkers = "gossipsub-rpc-metrics-inspector-workers"
 	metricsInspectorCacheSize       = "gossipsub-rpc-metrics-inspector-cache-size"
 
+	iwantMaxSampleSize      = "gossipsub-rpc-iwant-max-sample-size"
+	iwantCacheMissThreshold = "gossipsub-rpc-iwant-cache-miss-threshold"
+
 	alspDisabled            = "alsp-disable-penalty"
 	alspSpamRecordCacheSize = "alsp-spam-record-cache-size"
 	alspSpamRecordQueueSize = "alsp-spam-report-queue-size"
@@ -73,6 +76,7 @@ func AllFlagNames() []string {
 		scoreTracerInterval, gossipSubRPCInspectorNotificationCacheSize, validationInspectorNumberOfWorkers, validationInspectorInspectMessageQueueCacheSize, validationInspectorClusterPrefixedTopicsReceivedCacheSize,
 		validationInspectorClusterPrefixedTopicsReceivedCacheDecay, validationInspectorClusterPrefixHardThreshold, ihaveSyncSampleSizePercentage, ihaveAsyncSampleSizePercentage,
 		ihaveMaxSampleSize, metricsInspectorNumberOfWorkers, metricsInspectorCacheSize, alspDisabled, alspSpamRecordCacheSize, alspSpamRecordQueueSize, alspHearBeatInterval,
+		iwantMaxSampleSize, iwantCacheMissThreshold,
 	}
 }
 
@@ -133,6 +137,9 @@ func InitializeNetworkFlags(flags *pflag.FlagSet, config *Config) {
 	flags.Float64(ihaveSyncSampleSizePercentage, config.GossipSubConfig.GossipSubRPCInspectorsConfig.GossipSubRPCValidationInspectorConfigs.IHaveSyncInspectSampleSizePercentage, "percentage of ihave messages to sample during synchronous validation")
 	flags.Float64(ihaveAsyncSampleSizePercentage, config.GossipSubConfig.GossipSubRPCInspectorsConfig.GossipSubRPCValidationInspectorConfigs.IHaveAsyncInspectSampleSizePercentage, "percentage of ihave messages to sample during asynchronous validation")
 	flags.Float64(ihaveMaxSampleSize, config.GossipSubConfig.GossipSubRPCInspectorsConfig.GossipSubRPCValidationInspectorConfigs.IHaveInspectionMaxSampleSize, "max number of ihaves to sample when performing validation")
+
+	flags.Uint64(iwantMaxSampleSize, config.GossipSubConfig.GossipSubRPCInspectorsConfig.GossipSubRPCValidationInspectorConfigs.IWantRPCInspectionConfig.MaxSampleSize, "max number of ihaves to sample when performing validation")
+	flags.Float64(iwantCacheMissThreshold, config.GossipSubConfig.GossipSubRPCInspectorsConfig.GossipSubRPCValidationInspectorConfigs.IWantRPCInspectionConfig.CacheMissThreshold, "max number of ihaves to sample when performing validation")
 }
 
 // rpcInspectorValidationLimits utility func that adds flags for each of the validation limits for each control message type.

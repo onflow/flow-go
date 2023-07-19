@@ -608,7 +608,7 @@ func TestValidationInspector_DuplicateTopicId_Detection(t *testing.T) {
 			notification, ok := args[0].(*p2p.InvCtrlMsgNotif)
 			require.True(t, ok)
 			require.Equal(t, spammer.SpammerNode.Host().ID(), notification.PeerID)
-			require.True(t, validation.IsErrDuplicateTopic(notification.Err))
+			require.True(t, validation.IsDuplicateFoundErr(notification.Err))
 			require.Equal(t, messageCount, notification.Count)
 			switch notification.MsgType {
 			case p2pmsg.CtrlMsgGraft:
