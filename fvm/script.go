@@ -198,11 +198,13 @@ func (executor *scriptExecutor) executeScript() error {
 			Source:    executor.proc.Script,
 			Arguments: executor.proc.Arguments,
 		},
-		common.ScriptLocation(executor.proc.ID))
+		common.ScriptLocation(executor.proc.ID),
+	)
+	populateErr := executor.output.PopulateEnvironmentValues(executor.env)
 	if err != nil {
 		return err
 	}
 
 	executor.output.Value = value
-	return executor.output.PopulateEnvironmentValues(executor.env)
+	return populateErr
 }
