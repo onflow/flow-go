@@ -25,7 +25,9 @@ func TestInitialProtocolStateAdapter(t *testing.T) {
 	t.Run("clustering", func(t *testing.T) {
 		clustering, err := inmem.ClusteringFromSetupEvent(entry.CurrentEpochSetup)
 		require.NoError(t, err)
-		assert.Equal(t, clustering, adapter.Clustering())
+		actual, err := adapter.Clustering()
+		require.NoError(t, err)
+		assert.Equal(t, clustering, actual)
 	})
 	t.Run("epoch", func(t *testing.T) {
 		assert.Equal(t, entry.CurrentEpochSetup.Counter, adapter.Epoch())
@@ -37,7 +39,8 @@ func TestInitialProtocolStateAdapter(t *testing.T) {
 		assert.Equal(t, entry.CurrentEpochCommit, adapter.EpochCommit())
 	})
 	t.Run("dkg", func(t *testing.T) {
-		dkg := adapter.DKG()
+		dkg, err := adapter.DKG()
+		require.NoError(t, err)
 		assert.Equal(t, entry.CurrentEpochCommit.DKGGroupKey, dkg.GroupKey())
 		assert.Equal(t, len(entry.CurrentEpochCommit.DKGParticipantKeys), int(dkg.Size()))
 		dkgParticipants := entry.CurrentEpochSetup.Participants.Filter(filter.IsValidDKGParticipant)

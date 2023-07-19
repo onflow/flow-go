@@ -15,27 +15,13 @@ import (
 // 2. Inject irrecoverable.Signaler into the adapter and panic on error since any error in that method has to be a severe implementation bug.
 type initialProtocolStateAdapter struct {
 	*flow.RichProtocolStateEntry
-	clustering flow.ClusterList
-	dkg        protocol.DKG
 }
 
 var _ protocol.InitialProtocolState = (*initialProtocolStateAdapter)(nil)
 
 func newInitialProtocolStateAdapter(entry *flow.RichProtocolStateEntry) (*initialProtocolStateAdapter, error) {
-	dkg, err := inmem.EncodableDKGFromEvents(entry.CurrentEpochSetup, entry.CurrentEpochCommit)
-	if err != nil {
-		return nil, fmt.Errorf("could not construct encodable DKG from events: %w", err)
-	}
-
-	clustering, err := inmem.ClusteringFromSetupEvent(entry.CurrentEpochSetup)
-	if err != nil {
-		return nil, fmt.Errorf("could not extract cluster list from setup event: %w", err)
-	}
-
 	return &initialProtocolStateAdapter{
 		RichProtocolStateEntry: entry,
-		clustering:             clustering,
-		dkg:                    inmem.NewDKG(dkg),
 	}, nil
 }
 
@@ -43,8 +29,12 @@ func (s *initialProtocolStateAdapter) Epoch() uint64 {
 	return s.CurrentEpochSetup.Counter
 }
 
-func (s *initialProtocolStateAdapter) Clustering() flow.ClusterList {
-	return s.clustering
+func (s *initialProtocolStateAdapter) Clustering() (flow.ClusterList, error) {
+	clustering, err := inmem.ClusteringFromSetupEvent(s.CurrentEpochSetup)
+	if err != nil {
+		return nil, fmt.Errorf("could not extract cluster list from setup event: %w", err)
+	}
+	return clustering, nil
 }
 
 func (s *initialProtocolStateAdapter) EpochSetup() *flow.EpochSetup {
@@ -55,6 +45,11 @@ func (s *initialProtocolStateAdapter) EpochCommit() *flow.EpochCommit {
 	return s.CurrentEpochCommit
 }
 
-func (s *initialProtocolStateAdapter) DKG() protocol.DKG {
-	return s.dkg
+func (s *initialProtocolStateAdapter) DKG() (protocol.DKG, error) {
+	dkg, err := inmem.EncodableDKGFromEvents(s.CurrentEpochSetup, s.CurrentEpochCommit)
+	if err != nil {
+		return nil, fmt.Errorf("could not construct encodable DKG from events: %w", err)
+	}
+
+	return inmem.NewDKG(dkg), nil
 }

@@ -15,7 +15,7 @@ type DynamicProtocolState struct {
 }
 
 // Clustering provides a mock function with given fields:
-func (_m *DynamicProtocolState) Clustering() flow.ClusterList {
+func (_m *DynamicProtocolState) Clustering() (flow.ClusterList, error) {
 	ret := _m.Called()
 
 	var r0 flow.ClusterList
@@ -27,11 +27,11 @@ func (_m *DynamicProtocolState) Clustering() flow.ClusterList {
 		}
 	}
 
-	return r0
+	return r0, nil
 }
 
 // DKG provides a mock function with given fields:
-func (_m *DynamicProtocolState) DKG() protocol.DKG {
+func (_m *DynamicProtocolState) DKG() (protocol.DKG, error) {
 	ret := _m.Called()
 
 	var r0 protocol.DKG
@@ -43,7 +43,7 @@ func (_m *DynamicProtocolState) DKG() protocol.DKG {
 		}
 	}
 
-	return r0
+	return r0, nil
 }
 
 // Epoch provides a mock function with given fields:

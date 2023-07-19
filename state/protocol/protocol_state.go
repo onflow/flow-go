@@ -10,13 +10,15 @@ type InitialProtocolState interface {
 	// Epoch returns counter of epoch.
 	Epoch() uint64
 	// Clustering returns initial clustering from epoch setup.
-	Clustering() flow.ClusterList
+	// No errors are expected during normal operations.
+	Clustering() (flow.ClusterList, error)
 	// EpochSetup returns original epoch setup event that was used to initialize the protocol state.
 	EpochSetup() *flow.EpochSetup
 	// EpochCommit returns original epoch commit event that was used to update the protocol state.
 	EpochCommit() *flow.EpochCommit
 	// DKG returns information about DKG that was obtained from EpochCommit event.
-	DKG() DKG
+	// No errors are expected during normal operations.
+	DKG() (DKG, error)
 }
 
 // DynamicProtocolState extends the InitialProtocolState with data that can change from block to block.
