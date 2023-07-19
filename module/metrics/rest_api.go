@@ -2,6 +2,7 @@ package metrics
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -24,7 +25,11 @@ var _ module.RestMetrics = (*RestCollector)(nil)
 
 // NewRestCollector returns a new metrics RestCollector that implements the RestCollector
 // using Prometheus as the backend.
-func NewRestCollector(urlToRouteMapper func(string) (string, error), registerer prometheus.Registerer) *RestCollector {
+func NewRestCollector(urlToRouteMapper func(string) (string, error), registerer prometheus.Registerer) (*RestCollector, error) {
+	if urlToRouteMapper == nil {
+		return nil, fmt.Errorf("urlToRouteMapper cannot be nil")
+	}
+
 	r := &RestCollector{
 		urlToRouteMapper: urlToRouteMapper,
 		httpRequestDurHistogram: prometheus.NewHistogramVec(prometheus.HistogramOpts{
@@ -99,10 +104,6 @@ func (r *RestCollector) AddTotalRequests(_ context.Context, method, path string)
 // mapURLToRoute uses the urlToRouteMapper callback to convert a URL to a route name
 // This normalizes the URL, removing dynamic information converting it to a static string
 func (r *RestCollector) mapURLToRoute(url string) string {
-	if r.urlToRouteMapper == nil {
-		return "unknown"
-	}
-
 	route, err := r.urlToRouteMapper(url)
 	if err != nil {
 		return "unknown"
