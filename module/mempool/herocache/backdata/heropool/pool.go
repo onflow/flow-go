@@ -115,7 +115,6 @@ func (p *Pool) initFreeEntities() {
 //
 // If the pool has no available slots and an ejection is set, ejection occurs when adding a new entity.
 // If an ejection occurred, ejectedEntity holds the ejected entity.
-
 func (p *Pool) Add(entityId flow.Identifier, entity flow.Entity, owner uint64) (
 	entityIndex EIndex, slotAvailable bool, ejectedEntity flow.Entity) {
 	entityIndex, slotAvailable, ejectedEntity = p.sliceIndexForEntity()
@@ -209,7 +208,6 @@ func (p Pool) Size() uint32 {
 // getHeads returns entities corresponding to the used and free heads.
 func (p *Pool) getHeads() (*poolEntity, *poolEntity) {
 	var usedHead, freeHead *poolEntity
-
 	if p.used.size != 0 {
 		usedHead = &p.poolEntities[p.used.head]
 	}
@@ -227,6 +225,7 @@ func (p *Pool) getTails() (*poolEntity, *poolEntity) {
 	if p.used.size != 0 {
 		usedTail = &p.poolEntities[p.used.tail]
 	}
+
 	if p.free.size != 0 {
 		freeTail = &p.poolEntities[p.free.tail]
 	}
