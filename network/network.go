@@ -13,6 +13,17 @@ import (
 // and private (i.e., staked) networks.
 type NetworkingType uint8
 
+func (t NetworkingType) String() string {
+	switch t {
+	case PrivateNetwork:
+		return "private"
+	case PublicNetwork:
+		return "public"
+	default:
+		return "unknown"
+	}
+}
+
 const (
 	// PrivateNetwork indicates that the staked private-side of the Flow blockchain that nodes can only join and leave
 	// with a staking requirement.

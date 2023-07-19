@@ -57,7 +57,15 @@ func (fcv *ChunkVerifier) Verify(
 	if vc.IsSystemChunk {
 		ctx = fvm.NewContextFromParent(
 			fcv.systemChunkCtx,
-			fvm.WithBlockHeader(vc.Header))
+			fvm.WithBlockHeader(vc.Header),
+			// `protocol.Snapshot` implements `EntropyProvider` interface
+			// Note that `Snapshot` possible errors for RandomSource() are:
+			// - storage.ErrNotFound if the QC is unknown.
+			// - state.ErrUnknownSnapshotReference if the snapshot reference block is unknown
+			// However, at this stage, snapshot reference block should be known and the QC should also be known,
+			// so no error is expected in normal operations, as required by `EntropyProvider`.
+			fvm.WithEntropyProvider(vc.Snapshot),
+		)
 
 		txBody, err := blueprints.SystemChunkTransaction(fcv.vmCtx.Chain)
 		if err != nil {
@@ -70,7 +78,15 @@ func (fcv *ChunkVerifier) Verify(
 	} else {
 		ctx = fvm.NewContextFromParent(
 			fcv.vmCtx,
-			fvm.WithBlockHeader(vc.Header))
+			fvm.WithBlockHeader(vc.Header),
+			// `protocol.Snapshot` implements `EntropyProvider` interface
+			// Note that `Snapshot` possible errors for RandomSource() are:
+			// - storage.ErrNotFound if the QC is unknown.
+			// - state.ErrUnknownSnapshotReference if the snapshot reference block is unknown
+			// However, at this stage, snapshot reference block should be known and the QC should also be known,
+			// so no error is expected in normal operations, as required by `EntropyProvider`.
+			fvm.WithEntropyProvider(vc.Snapshot),
+		)
 
 		transactions = make(
 			[]*fvm.TransactionProcedure,

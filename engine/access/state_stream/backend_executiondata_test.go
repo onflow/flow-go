@@ -3,7 +3,6 @@ package state_stream
 import (
 	"context"
 	"fmt"
-	"math/rand"
 	"testing"
 	"time"
 
@@ -65,8 +64,6 @@ func TestBackendExecutionDataSuite(t *testing.T) {
 }
 
 func (s *BackendExecutionDataSuite) SetupTest() {
-	rand.Seed(time.Now().UnixNano())
-
 	logger := unittest.Logger()
 
 	s.state = protocolmock.NewState(s.T())

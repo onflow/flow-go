@@ -1778,8 +1778,9 @@ github.com/onflow/flow-ft/lib/go/contracts v0.7.1-0.20230718214600-8cc31ee7dcc4/
 github.com/onflow/flow-go-sdk v0.41.7-stable-cadence/go.mod h1:ejVN+bqcsTHVvRpDDJDoBNdmcxUfFMW4IvdTbMeQ/hQ=
 github.com/onflow/flow-go-sdk v0.41.10-0.20230719221154-2a4946e41c23 h1:2mE0uSQAXqeNcbOhuj7fDEcurouRlyebI30WVAuOT4s=
 github.com/onflow/flow-go-sdk v0.41.10-0.20230719221154-2a4946e41c23/go.mod h1:U5JP8mlCiOxaKZrQC8ww9yeko5yxBfTOsbZY0ziEtJQ=
-github.com/onflow/flow-go/crypto v0.24.7 h1:RCLuB83At4z5wkAyUCF7MYEnPoIIOHghJaODuJyEoW0=
 github.com/onflow/flow-go/crypto v0.24.7/go.mod h1:fqCzkIBBMRRkciVrvW21rECKq1oD7Q6u+bCI78lfNX0=
+github.com/onflow/flow-go/crypto v0.24.9 h1:0EQp+kSZYJepMIiSypfJVe7tzsPcb6UXOdOtsTCDhBs=
+github.com/onflow/flow-go/crypto v0.24.9/go.mod h1:fqCzkIBBMRRkciVrvW21rECKq1oD7Q6u+bCI78lfNX0=
 github.com/onflow/flow-nft/lib/go/contracts v1.1.1-0.20230718212804-c5d491b84ec6 h1:HHQRd6+7OSSs99aW6PaHwK7cmEAVwKgEPq688PTcdSs=
 github.com/onflow/flow-nft/lib/go/contracts v1.1.1-0.20230718212804-c5d491b84ec6/go.mod h1:OKA2xWNugqqbaFSmxdb1VWixtuqSdz/VK1MlbdcIUxw=
 github.com/onflow/flow/protobuf/go/flow v0.3.2-0.20221202093946-932d1c70e288/go.mod h1:gQxYqCfkI8lpnKsmIjwtN2mV/N2PIwc1I+RUK4HPIc8=

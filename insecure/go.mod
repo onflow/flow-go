@@ -1,6 +1,6 @@
 module github.com/onflow/flow-go/insecure
 
-go 1.19
+go 1.20
 
 require (
 	github.com/golang/protobuf v1.5.3
@@ -10,7 +10,7 @@ require (
 	github.com/libp2p/go-libp2p-pubsub v0.9.3
 	github.com/multiformats/go-multiaddr-dns v0.3.1
 	github.com/onflow/flow-go v0.29.8
-	github.com/onflow/flow-go/crypto v0.24.7
+	github.com/onflow/flow-go/crypto v0.24.9
 	github.com/rs/zerolog v1.29.0
 	github.com/spf13/pflag v1.0.5
 	github.com/stretchr/testify v1.8.4
