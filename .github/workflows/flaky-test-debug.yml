@@ -5,7 +5,7 @@ on:
     branches:
       - '**/*flaky-test-debug*'
 env:
-  GO_VERSION: 1.19
+  GO_VERSION: "1.20"
 
 #concurrency:
 #  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
@@ -36,7 +36,7 @@ jobs:
         uses: golangci/golangci-lint-action@v3
         with:
           # Required: the version of golangci-lint is required and must be specified without patch version: we always use the latest patch version.
-          version: v1.49
+          version: v1.51
           args: -v --build-tags relic
           working-directory: ${{ matrix.dir }}
           # https://github.com/golangci/golangci-lint-action/issues/244
