@@ -667,7 +667,14 @@ func OpenState(
 }
 
 func (state *State) Params() protocol.Params {
-	return Params{state: state}
+	globalParams, err := ReadGlobalParams(state)
+	if err != nil {
+		panic("failed to read global params: " + err.Error())
+	}
+	return Params{
+		GlobalParams: globalParams,
+		state:        state,
+	}
 }
 
 // Sealed returns a snapshot for the latest sealed block. A latest sealed block

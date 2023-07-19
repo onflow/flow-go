@@ -11,6 +11,12 @@ type Params struct {
 
 var _ protocol.GlobalParams = (*Params)(nil)
 
+func NewParams(enc EncodableParams) *Params {
+	return &Params{
+		enc: enc,
+	}
+}
+
 func (p Params) ChainID() (flow.ChainID, error) {
 	return p.enc.ChainID, nil
 }

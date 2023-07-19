@@ -9,13 +9,15 @@ import (
 
 type ProtocolState struct {
 	protocolStateDB storage.ProtocolState
+	globalParams    protocol.GlobalParams
 }
 
 var _ protocol.ProtocolState = (*ProtocolState)(nil)
 
-func NewProtocolState(protocolStateDB storage.ProtocolState) *ProtocolState {
+func NewProtocolState(protocolStateDB storage.ProtocolState, globalParams protocol.GlobalParams) *ProtocolState {
 	return &ProtocolState{
 		protocolStateDB: protocolStateDB,
+		globalParams:    globalParams,
 	}
 }
 
@@ -27,7 +29,6 @@ func (s *ProtocolState) AtBlockID(blockID flow.Identifier) (protocol.DynamicProt
 	return newDynamicProtocolStateAdapter(protocolStateEntry), nil
 }
 
-func (s *ProtocolState) GlobalParams() {
-	//TODO implement me
-	panic("implement me")
+func (s *ProtocolState) GlobalParams() protocol.GlobalParams {
+	return s.globalParams
 }

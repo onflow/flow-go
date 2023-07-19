@@ -41,8 +41,19 @@ func (_m *ProtocolState) AtBlockID(blockID flow.Identifier) (protocol.DynamicPro
 }
 
 // GlobalParams provides a mock function with given fields:
-func (_m *ProtocolState) GlobalParams() {
-	_m.Called()
+func (_m *ProtocolState) GlobalParams() protocol.GlobalParams {
+	ret := _m.Called()
+
+	var r0 protocol.GlobalParams
+	if rf, ok := ret.Get(0).(func() protocol.GlobalParams); ok {
+		r0 = rf()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(protocol.GlobalParams)
+		}
+	}
+
+	return r0
 }
 
 type mockConstructorTestingTNewProtocolState interface {

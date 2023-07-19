@@ -55,5 +55,5 @@ type ProtocolState interface {
 	// TODO(yuraolex): check return types
 	AtBlockID(blockID flow.Identifier) (DynamicProtocolState, error)
 	// GlobalParams returns params that are same for all nodes in the network.
-	GlobalParams()
+	GlobalParams() GlobalParams
 }

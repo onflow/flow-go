@@ -3,7 +3,6 @@ package protocol_state
 import (
 	"github.com/onflow/flow-go/utils/unittest"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 	"testing"
 )
 
@@ -14,7 +13,6 @@ func TestDynamicProtocolStateAdapter(t *testing.T) {
 	entry := unittest.ProtocolStateFixture(WithValidDKG())
 
 	adapter := newDynamicProtocolStateAdapter(entry)
-	require.NoError(t, err)
 
 	t.Run("identities", func(t *testing.T) {
 		assert.Equal(t, entry.Identities, adapter.Identities())

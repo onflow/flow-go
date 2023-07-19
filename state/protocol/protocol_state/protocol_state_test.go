@@ -2,6 +2,7 @@ package protocol_state
 
 import (
 	"errors"
+	"github.com/onflow/flow-go/state/protocol/mock"
 	"github.com/onflow/flow-go/storage"
 	storagemock "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -21,7 +22,8 @@ func TestProtocolState_AtBlockID(t *testing.T) {
 	protocolStateDB.On("ByBlockID", blockID).Return(entry, nil).Once()
 	protocolStateDB.On("ByBlockID", otherBlockID).Return(otherEntry, nil).Once()
 
-	protocolState := NewProtocolState(protocolStateDB)
+	params := mock.NewGlobalParams(t)
+	protocolState := NewProtocolState(protocolStateDB, params)
 	t.Run("exists", func(t *testing.T) {
 		dynamicProtocolState, err := protocolState.AtBlockID(blockID)
 		require.NoError(t, err)

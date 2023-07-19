@@ -19,6 +19,10 @@ func (_m *InitialProtocolState) Clustering() (flow.ClusterList, error) {
 	ret := _m.Called()
 
 	var r0 flow.ClusterList
+	var r1 error
+	if rf, ok := ret.Get(0).(func() (flow.ClusterList, error)); ok {
+		return rf()
+	}
 	if rf, ok := ret.Get(0).(func() flow.ClusterList); ok {
 		r0 = rf()
 	} else {
@@ -27,7 +31,13 @@ func (_m *InitialProtocolState) Clustering() (flow.ClusterList, error) {
 		}
 	}
 
-	return r0, nil
+	if rf, ok := ret.Get(1).(func() error); ok {
+		r1 = rf()
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
 }
 
 // DKG provides a mock function with given fields:
@@ -35,6 +45,10 @@ func (_m *InitialProtocolState) DKG() (protocol.DKG, error) {
 	ret := _m.Called()
 
 	var r0 protocol.DKG
+	var r1 error
+	if rf, ok := ret.Get(0).(func() (protocol.DKG, error)); ok {
+		return rf()
+	}
 	if rf, ok := ret.Get(0).(func() protocol.DKG); ok {
 		r0 = rf()
 	} else {
@@ -43,7 +57,13 @@ func (_m *InitialProtocolState) DKG() (protocol.DKG, error) {
 		}
 	}
 
-	return r0, nil
+	if rf, ok := ret.Get(1).(func() error); ok {
+		r1 = rf()
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
 }
 
 // Epoch provides a mock function with given fields:

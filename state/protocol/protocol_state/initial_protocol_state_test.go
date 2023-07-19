@@ -20,7 +20,6 @@ func TestInitialProtocolStateAdapter(t *testing.T) {
 	entry := unittest.ProtocolStateFixture(WithValidDKG())
 
 	adapter := newInitialProtocolStateAdapter(entry)
-	require.NoError(t, err)
 
 	t.Run("clustering", func(t *testing.T) {
 		clustering, err := inmem.ClusteringFromSetupEvent(entry.CurrentEpochSetup)
