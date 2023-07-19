@@ -100,6 +100,7 @@ func New(
 	log zerolog.Logger,
 	snapshotHistoryLimit int,
 	archiveAddressList []string,
+	scriptExecValidation bool,
 ) *Backend {
 	retry := newRetry()
 	if retryEnabled {
@@ -124,15 +125,16 @@ func New(
 		state: state,
 		// create the sub-backends
 		backendScripts: backendScripts{
-			headers:            headers,
-			executionReceipts:  executionReceipts,
-			connFactory:        connFactory,
-			state:              state,
-			log:                log,
-			metrics:            accessMetrics,
-			loggedScripts:      loggedScripts,
-			archiveAddressList: archiveAddressList,
-			archivePorts:       archivePorts,
+			headers:              headers,
+			executionReceipts:    executionReceipts,
+			connFactory:          connFactory,
+			state:                state,
+			log:                  log,
+			metrics:              accessMetrics,
+			loggedScripts:        loggedScripts,
+			archiveAddressList:   archiveAddressList,
+			archivePorts:         archivePorts,
+			scriptExecValidation: scriptExecValidation,
 		},
 		backendTransactions: backendTransactions{
 			staticCollectionRPC:  collectionRPC,
