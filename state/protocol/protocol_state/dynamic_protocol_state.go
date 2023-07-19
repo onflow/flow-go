@@ -8,14 +8,16 @@ import (
 // dynamicProtocolStateAdapter implements protocol.DynamicProtocolState by wrapping an initialProtocolStateAdapter.
 type dynamicProtocolStateAdapter struct {
 	*initialProtocolStateAdapter
+	params protocol.GlobalParams
 }
 
 var _ protocol.DynamicProtocolState = (*dynamicProtocolStateAdapter)(nil)
 
-func newDynamicProtocolStateAdapter(entry *flow.RichProtocolStateEntry) *dynamicProtocolStateAdapter {
+func newDynamicProtocolStateAdapter(entry *flow.RichProtocolStateEntry, params protocol.GlobalParams) *dynamicProtocolStateAdapter {
 	adapter := newInitialProtocolStateAdapter(entry)
 	return &dynamicProtocolStateAdapter{
 		initialProtocolStateAdapter: adapter,
+		params:                      params,
 	}
 }
 
@@ -24,6 +26,5 @@ func (s *dynamicProtocolStateAdapter) Identities() flow.IdentityList {
 }
 
 func (s *dynamicProtocolStateAdapter) GlobalParams() protocol.GlobalParams {
-	//TODO implement me
-	panic("implement me")
+	return s.params
 }

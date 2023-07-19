@@ -1,8 +1,11 @@
 package protocol_state
 
 import (
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/state/protocol/mock"
 	"github.com/onflow/flow-go/utils/unittest"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"testing"
 )
 
@@ -12,12 +15,17 @@ func TestDynamicProtocolStateAdapter(t *testing.T) {
 	// construct a valid protocol state entry that has semantically correct DKGParticipantKeys
 	entry := unittest.ProtocolStateFixture(WithValidDKG())
 
-	adapter := newDynamicProtocolStateAdapter(entry)
+	globalParams := mock.NewGlobalParams(t)
+	adapter := newDynamicProtocolStateAdapter(entry, globalParams)
 
 	t.Run("identities", func(t *testing.T) {
 		assert.Equal(t, entry.Identities, adapter.Identities())
 	})
 	t.Run("global-params", func(t *testing.T) {
-
+		expectedChainID := flow.Testnet
+		globalParams.On("ChainID").Return(expectedChainID, nil).Once()
+		actualChainID, err := adapter.GlobalParams().ChainID()
+		require.NoError(t, err)
+		assert.Equal(t, expectedChainID, actualChainID)
 	})
 }

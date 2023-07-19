@@ -2,6 +2,7 @@ package protocol_state
 
 import (
 	"errors"
+	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/state/protocol/mock"
 	"github.com/onflow/flow-go/storage"
 	storagemock "github.com/onflow/flow-go/storage/mock"
@@ -22,8 +23,8 @@ func TestProtocolState_AtBlockID(t *testing.T) {
 	protocolStateDB.On("ByBlockID", blockID).Return(entry, nil).Once()
 	protocolStateDB.On("ByBlockID", otherBlockID).Return(otherEntry, nil).Once()
 
-	params := mock.NewGlobalParams(t)
-	protocolState := NewProtocolState(protocolStateDB, params)
+	globalParams := mock.NewGlobalParams(t)
+	protocolState := NewProtocolState(protocolStateDB, globalParams)
 	t.Run("exists", func(t *testing.T) {
 		dynamicProtocolState, err := protocolState.AtBlockID(blockID)
 		require.NoError(t, err)
@@ -46,5 +47,12 @@ func TestProtocolState_AtBlockID(t *testing.T) {
 		protocolStateDB.On("ByBlockID", blockID).Return(nil, exception).Once()
 		_, err := protocolState.AtBlockID(blockID)
 		require.ErrorIs(t, err, exception)
+	})
+	t.Run("global-params", func(t *testing.T) {
+		expectedChainID := flow.Testnet
+		globalParams.On("ChainID").Return(expectedChainID, nil).Once()
+		actualChainID, err := protocolState.GlobalParams().ChainID()
+		require.NoError(t, err)
+		assert.Equal(t, expectedChainID, actualChainID)
 	})
 }
