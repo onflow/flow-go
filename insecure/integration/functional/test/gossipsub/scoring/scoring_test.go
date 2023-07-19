@@ -27,6 +27,8 @@ import (
 // a spammer peer, the victim will eventually penalize the spammer and stop receiving messages from them.
 // Note: the term integration is used here because it requires integrating all components of the libp2p stack.
 func TestGossipSubInvalidMessageDelivery_Integration(t *testing.T) {
+	t.Parallel()
+
 	tt := []struct {
 		name           string
 		spamMsgFactory func(spammerId peer.ID, victimId peer.ID, topic channels.Topic) *pubsub_pb.Message
@@ -94,6 +96,7 @@ func TestGossipSubInvalidMessageDelivery_Integration(t *testing.T) {
 // - t: the test instance.
 // - spamMsgFactory: a function that creates unique invalid messages to spam the victim with.
 func testGossipSubInvalidMessageDeliveryScoring(t *testing.T, spamMsgFactory func(peer.ID, peer.ID, channels.Topic) *pubsub_pb.Message) {
+
 	role := flow.RoleConsensus
 	sporkId := unittest.IdentifierFixture()
 	blockTopic := channels.TopicFromChannel(channels.PushBlocks, sporkId)
@@ -177,6 +180,8 @@ func testGossipSubInvalidMessageDeliveryScoring(t *testing.T, spamMsgFactory fun
 
 // TestGossipSubMeshDeliveryScoring_UnderDelivery_SingleTopic tests that when a peer is under-performing in a topic mesh, its score is (slightly) penalized.
 func TestGossipSubMeshDeliveryScoring_UnderDelivery_SingleTopic(t *testing.T) {
+	t.Parallel()
+
 	role := flow.RoleConsensus
 	sporkId := unittest.IdentifierFixture()
 
@@ -189,7 +194,7 @@ func TestGossipSubMeshDeliveryScoring_UnderDelivery_SingleTopic(t *testing.T) {
 	// we override some of the default scoring parameters in order to speed up the test in a time-efficient manner.
 	blockTopicOverrideParams := scoring.DefaultTopicScoreParams()
 	blockTopicOverrideParams.MeshMessageDeliveriesActivation = 1 * time.Second // we start observing the mesh message deliveries after 1 second of the node startup.
-	thisNode, thisId := p2ptest.NodeFixture(                                   // this node is the one that will be penalizing the under-performer node.
+	thisNode, thisId := p2ptest.NodeFixture( // this node is the one that will be penalizing the under-performer node.
 		t,
 		sporkId,
 		t.Name(),
@@ -277,6 +282,8 @@ func TestGossipSubMeshDeliveryScoring_UnderDelivery_SingleTopic(t *testing.T) {
 
 // TestGossipSubMeshDeliveryScoring_UnderDelivery_TwoTopics tests that when a peer is under-performing in two topics, it is penalized in both topics.
 func TestGossipSubMeshDeliveryScoring_UnderDelivery_TwoTopics(t *testing.T) {
+	t.Parallel()
+
 	role := flow.RoleConsensus
 	sporkId := unittest.IdentifierFixture()
 
@@ -292,7 +299,7 @@ func TestGossipSubMeshDeliveryScoring_UnderDelivery_TwoTopics(t *testing.T) {
 	blockTopicOverrideParams.MeshMessageDeliveriesActivation = 1 * time.Second // we start observing the mesh message deliveries after 1 second of the node startup.
 	dkgTopicOverrideParams := scoring.DefaultTopicScoreParams()
 	dkgTopicOverrideParams.MeshMessageDeliveriesActivation = 1 * time.Second // we start observing the mesh message deliveries after 1 second of the node startup.
-	thisNode, thisId := p2ptest.NodeFixture(                                 // this node is the one that will be penalizing the under-performer node.
+	thisNode, thisId := p2ptest.NodeFixture( // this node is the one that will be penalizing the under-performer node.
 		t,
 		sporkId,
 		t.Name(),
@@ -388,6 +395,8 @@ func TestGossipSubMeshDeliveryScoring_UnderDelivery_TwoTopics(t *testing.T) {
 
 // TestGossipSubMeshDeliveryScoring_Replay_Will_Not_Counted tests that replayed messages will not be counted towards the mesh message deliveries.
 func TestGossipSubMeshDeliveryScoring_Replay_Will_Not_Counted(t *testing.T) {
+	t.Parallel()
+	
 	role := flow.RoleConsensus
 	sporkId := unittest.IdentifierFixture()
 
@@ -400,7 +409,7 @@ func TestGossipSubMeshDeliveryScoring_Replay_Will_Not_Counted(t *testing.T) {
 	// we override some of the default scoring parameters in order to speed up the test in a time-efficient manner.
 	blockTopicOverrideParams := scoring.DefaultTopicScoreParams()
 	blockTopicOverrideParams.MeshMessageDeliveriesActivation = 1 * time.Second // we start observing the mesh message deliveries after 1 second of the node startup.
-	thisNode, thisId := p2ptest.NodeFixture(                                   // this node is the one that will be penalizing the under-performer node.
+	thisNode, thisId := p2ptest.NodeFixture( // this node is the one that will be penalizing the under-performer node.
 		t,
 		sporkId,
 		t.Name(),
