@@ -388,6 +388,7 @@ func TestConnectionPoolStale(t *testing.T) {
 	// close connection to simulate something "going wrong" with our stored connection
 	res, _ := connectionFactory.ConnectionsCache.Get(proxyConnectionFactory.targetAddress)
 
+	connectionFactory.ConnectionsCache.Remove(proxyConnectionFactory.targetAddress)
 	res.(*CachedClient).Close()
 
 	ctx := context.Background()

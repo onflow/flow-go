@@ -63,13 +63,12 @@ type ConnectionFactoryImpl struct {
 	MaxMsgSize                uint
 	AccessMetrics             module.AccessMetrics
 	Log                       zerolog.Logger
-	mutex                     sync.Mutex
+	mutex                     sync.RWMutex
 }
 
 type CachedClient struct {
 	ClientConn     *grpc.ClientConn
 	Address        string
-	mutex          sync.Mutex
 	timeout        time.Duration
 	closeRequested *atomic.Bool
 	wg             sync.WaitGroup
@@ -118,9 +117,34 @@ func (cf *ConnectionFactoryImpl) createConnection(address string, timeout time.D
 	return conn, nil
 }
 
-func (cf *ConnectionFactoryImpl) retrieveConnection(grpcAddress string, timeout time.Duration) (*grpc.ClientConn, error) {
-	cf.mutex.Lock()
+func (cf *ConnectionFactoryImpl) getClientConnection(grpcAddress string) *grpc.ClientConn {
+	cf.mutex.RLock()
+	defer cf.mutex.RUnlock()
 
+	if res, ok := cf.ConnectionsCache.Get(grpcAddress); ok {
+		return res.(*CachedClient).ClientConn
+	}
+	return nil
+}
+
+func (cf *ConnectionFactoryImpl) retrieveConnection(grpcAddress string, timeout time.Duration) (*grpc.ClientConn, error) {
+
+	// 1. attempt to read with Read lock
+	clientConn := cf.getClientConnection(grpcAddress)
+	if clientConn != nil {
+		return clientConn, nil
+	}
+
+	// 2. if not found acquire write lock
+	cf.mutex.Lock()
+	defer cf.mutex.Unlock()
+
+	// 3. Check if other goroutine haven't created an entity
+	if res, ok := cf.ConnectionsCache.Get(grpcAddress); ok {
+		return res.(*CachedClient).ClientConn, nil
+	}
+
+	// 4. Perform initialization in critical section
 	store := &CachedClient{
 		ClientConn:     nil,
 		Address:        grpcAddress,
@@ -130,27 +154,21 @@ func (cf *ConnectionFactoryImpl) retrieveConnection(grpcAddress string, timeout 
 	}
 
 	cf.Log.Debug().Str("cached_client_added", grpcAddress).Msg("adding new cached client to pool")
-	_ = cf.ConnectionsCache.Add(grpcAddress, store)
-	if cf.AccessMetrics != nil {
-		cf.AccessMetrics.ConnectionAddedToPool()
-	}
-	cf.mutex.Unlock()
 
-	store.mutex.Lock()
-	defer store.mutex.Unlock()
-
-	conn, err := cf.createConnection(grpcAddress, timeout, store)
+	var err error
+	store.ClientConn, err = cf.createConnection(grpcAddress, timeout, store)
 	if err != nil {
 		return nil, err
 	}
-	store.ClientConn = conn
 
+	_ = cf.ConnectionsCache.Add(grpcAddress, store)
 	if cf.AccessMetrics != nil {
+		cf.AccessMetrics.ConnectionAddedToPool()
 		cf.AccessMetrics.NewConnectionEstablished()
 		cf.AccessMetrics.TotalConnectionsInPool(uint(cf.ConnectionsCache.Len()), cf.CacheSize)
 	}
 
-	return conn, nil
+	return store.ClientConn, nil
 }
 
 func (cf *ConnectionFactoryImpl) GetAccessAPIClient(address string) (access.AccessAPIClient, io.Closer, error) {
