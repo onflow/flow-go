@@ -18,10 +18,22 @@ import (
 )
 
 const (
+	// DefaultAppSpecificScoreWeight is the default weight for app-specific scores. It is used to scale the app-specific
+	// scores to the same range as the other scores. At the current version, we don't distinguish between the app-specific
+	// scores and the other scores, so we set it to 1.
 	DefaultAppSpecificScoreWeight = 1
-	MaxAppSpecificPenalty         = float64(-100)
-	MinAppSpecificPenalty         = -1
-	MaxAppSpecificReward          = float64(100)
+
+	// MaxAppSpecificReward is the default reward for well-behaving staked peers. If a peer does not have
+	// any misbehavior record, e.g., invalid subscription, invalid message, etc., it will be rewarded with this score.
+	MaxAppSpecificReward = float64(100)
+
+	// MaxAppSpecificPenalty is the maximum penalty for sever offenses that we apply to a remote node score. The score
+	// mechanism of GossipSub in Flow is designed in a way that all other infractions are penalized with a fraction of
+	// this value. We have also set the other parameters such as DefaultGraylistThreshold, DefaultGossipThreshold and DefaultPublishThreshold to
+	// be a bit higher than this, i.e., MaxAppSpecificPenalty + 1. This ensures that a node with a score of MaxAppSpecificPenalty
+	// will be graylisted (i.e., all incoming and outgoing RPCs are rejected) and will not be able to publish or gossip any messages.
+	MaxAppSpecificPenalty = -1 * MaxAppSpecificReward
+	MinAppSpecificPenalty = -1
 
 	// DefaultStakedIdentityReward is the default reward for staking peers. It is applied to the peer's score when
 	// the peer does not have any misbehavior record, e.g., invalid subscription, invalid message, etc.
@@ -44,7 +56,7 @@ const (
 	// How we use it:
 	// As current max penalty is -100, we set the threshold to -99 so that all gossips
 	// to and from peers with penalty -100 are ignored.
-	DefaultGossipThreshold = -99
+	DefaultGossipThreshold = MaxAppSpecificPenalty + 1
 
 	// DefaultPublishThreshold when a peer's penalty drops below this threshold,
 	// self-published messages are not propagated towards this peer.
@@ -55,7 +67,7 @@ const (
 	// How we use it:
 	// As current max penalty is -100, we set the threshold to -99 so that all penalized peers are deprived of
 	// receiving any published messages.
-	DefaultPublishThreshold = -99
+	DefaultPublishThreshold = MaxAppSpecificPenalty + 1
 
 	// DefaultGraylistThreshold when a peer's penalty drops below this threshold, the peer is graylisted, i.e.,
 	// incoming RPCs from the peer are ignored.
@@ -65,7 +77,7 @@ const (
 	//
 	// How we use it:
 	// As current max penalty is -100, we set the threshold to -99 so that all penalized peers are graylisted.
-	DefaultGraylistThreshold = -99
+	DefaultGraylistThreshold = MaxAppSpecificPenalty + 1
 
 	// DefaultAcceptPXThreshold when a peer sends us PX information with a prune, we only accept it and connect to the supplied
 	// peers if the originating peer's penalty exceeds this threshold.
@@ -75,7 +87,7 @@ const (
 	// How we use it:
 	// As current max reward is 100, we set the threshold to 99 so that we only receive supplied peers from
 	// well-behaved peers.
-	DefaultAcceptPXThreshold = 99
+	DefaultAcceptPXThreshold = MaxAppSpecificReward - 1
 
 	// DefaultOpportunisticGraftThreshold when the median peer penalty in the mesh drops below this value,
 	// the peer may select more peers with penalty above the median to opportunistically graft on the mesh.
@@ -210,6 +222,73 @@ const (
 	// number of actual message deliveries of a peer in a topic mesh. This is to account for
 	// the time that it takes for a peer to start up and receive messages from other peers in the topic mesh.
 	defaultMeshMessageDeliveriesActivation = 2 * defaultDecayInterval
+
+	// defaultBehaviorPenaltyThreshold is the threshold when the behavior of a peer is considered as bad by GossipSub.
+	// Currently, the misbehavior is defined as advertising an iHave without responding to the iWants (iHave broken promises), as well as attempting
+	// on GRAFT when the peer is considered for a PRUNE backoff, i.e., the local peer does not allow the peer to join the local topic mesh
+	// for a while, and the remote peer keep attempting on GRAFT (aka GRAFT flood).
+	// When the misbehavior counter of a peer goes beyond this threshold, the peer is penalized by defaultBehaviorPenaltyWeight (see below) for the excess misbehavior.
+	//
+	// An iHave broken promise means that a peer advertises an iHave for a message, but does not respond to the iWant requests for that message.
+	// For iHave broken promises, the gossipsub scoring works as follows:
+	// It samples ONLY A SINGLE iHave out of the entire RPC.
+	// If that iHave is not followed by an actual message within the next 3 seconds, the peer misbehavior counter is incremented by 1.
+	//
+	// We set it to 10, meaning that we at most tolerate 10 of such RPCs containing iHave broken promises. After that, the peer is penalized for every
+	// excess RPC containing iHave broken promises.
+	// The counter is also decayed by (0.99) every decay interval (defaultDecayInterval) i.e., every minute.
+	// Note that misbehaviors are counted by GossipSub across all topics (and is different from the Application Layer Misbehaviors that we count through
+	// the ALSP system).
+	defaultBehaviourPenaltyThreshold = 10
+
+	// defaultBehaviorPenaltyWeight is the weight for applying penalty when a peer misbehavior goes beyond the threshold.
+	// Misbehavior of a peer at gossipsub layer is defined as advertising an iHave without responding to the iWants (broken promises), as well as attempting
+	// on GRAFT when the peer is considered for a PRUNE backoff, i.e., the local peer does not allow the peer to join the local topic mesh
+	// This is detected by the GossipSub scoring system, and the peer is penalized by defaultBehaviorPenaltyWeight.
+	//
+	// An iHave broken promise means that a peer advertises an iHave for a message, but does not respond to the iWant requests for that message.
+	// For iHave broken promises, the gossipsub scoring works as follows:
+	// It samples ONLY A SINGLE iHave out of the entire RPC.
+	// If that iHave is not followed by an actual message within the next 3 seconds, the peer misbehavior counter is incremented by 1.
+	//
+	// The penalty is applied to the square of the difference between the misbehavior counter and the threshold, i.e., -|w| * (misbehavior counter - threshold)^2.
+	// We set it to 0.01 * MaxAppSpecificPenalty, which means that misbehaving 10 times more than the threshold (i.e., 10 + 10) will cause the peer to lose
+	// its entire AppSpecificReward that is awarded by our app-specific scoring function to all staked (i.e., authorized) nodes by default.
+	// Moreover, as the MaxAppSpecificPenalty is -MaxAppSpecificReward, misbehaving sqrt(2) * 10 times more than the threshold will cause the peer score
+	// to be dropped below the MaxAppSpecificPenalty, which is also below the GraylistThreshold, and the peer will be graylisted (i.e., disconnected).
+	//
+	// The math is as follows: -|w| * (misbehavior - threshold)^2 = 0.01 * MaxAppSpecificPenalty * (misbehavior - threshold)^2 < 2 * MaxAppSpecificPenalty
+	// if misbehavior > threshold + sqrt(2) * 10.
+	// As shown above, with this choice of defaultBehaviorPenaltyWeight, misbehaving sqrt(2) * 10 times more than the threshold will cause the peer score
+	// to be dropped below the MaxAppSpecificPenalty, which is also below the GraylistThreshold, and the peer will be graylisted (i.e., disconnected). This weight
+	// is chosen in a way that with almost a few misbehaviors more than the threshold, the peer will be graylisted. The rationale relies on the fact that
+	// the misbehavior counter is incremented by 1 for each RPC containing one or more broken promises. Hence, it is per RPC, and not per broken promise.
+	// Having sqrt(2) * 10 broken promises RPC is a blatant misbehavior, and the peer should be graylisted. With decay interval of 1 minute, and decay value of
+	// 0.99 we expect a graylisted node due to borken promises to get back in about 527 minutes, i.e., (0.99)^x * (sqrt(2) * 10)^2 * MaxAppSpecificPenalty > GraylistThreshold
+	// where x is the number of decay intervals that the peer is graylisted. As MaxAppSpecificPenalty and GraylistThresholds are close, we can simplify the inequality
+	// to (0.99)^x * (sqrt(2) * 10)^2 > 1 --> (0.99)^x * 200 > 1 --> (0.99)^x > 1/200 --> x > log(1/200) / log(0.99) --> x > 527.17 decay intervals, i.e., 527 minutes.
+	// Note that misbehaviors are counted by GossipSub across all topics (and is different from the Application Layer Misbehaviors that we count through
+	// the ALSP system that are reported by the engines).
+	defaultBehaviourPenaltyWeight = 0.01 * MaxAppSpecificPenalty
+
+	// defaultBehaviorPenaltyDecay is the decay interval for the misbehavior counter of a peer. The misbehavior counter is
+	// incremented by GossipSub for iHave broken promises or the GRAFT flooding attacks (i.e., each GRAFT received from a remote peer while that peer is on a PRUNE backoff).
+	//
+	// An iHave broken promise means that a peer advertises an iHave for a message, but does not respond to the iWant requests for that message.
+	// For iHave broken promises, the gossipsub scoring works as follows:
+	// It samples ONLY A SINGLE iHave out of the entire RPC.
+	// If that iHave is not followed by an actual message within the next 3 seconds, the peer misbehavior counter is incremented by 1.
+	// This means that regardless of how many iHave broken promises an RPC contains, the misbehavior counter is incremented by 1.
+	// That is why we decay the misbehavior counter very slow, as this counter indicates a severe misbehavior.
+	//
+	// The misbehavior counter is decayed per decay interval (i.e., defaultDecayInterval = 1 minute) by GossipSub.
+	// We set it to 0.99, which means that the misbehavior counter is decayed by 1% per decay interval.
+	// With the generous threshold that we set (i.e., defaultBehaviourPenaltyThreshold = 10), we take the peers going beyond the threshold as persistent misbehaviors,
+	// We expect honest peers never to go beyond the threshold, and if they do, we expect them to go back below the threshold quickly.
+	//
+	// Note that misbehaviors are counted by GossipSub across all topics (and is different from the Application Layer Misbehaviors that we count through
+	// the ALSP system that is based on the engines report).
+	defaultBehaviourPenaltyDecay = 0.99
 )
 
 // ScoreOption is a functional option for configuring the peer scoring system.
@@ -333,7 +412,7 @@ func NewScoreOption(cfg *ScoreOptionConfig) *ScoreOption {
 		s.logger.
 			Warn().
 			Str(logging.KeyNetworkingSecurity, "true").
-			Msg("app specific score function is overridden")
+			Msg("app specific score function is overridden, should never happen in production")
 	}
 
 	if cfg.decayInterval > 0 {
@@ -343,7 +422,7 @@ func NewScoreOption(cfg *ScoreOptionConfig) *ScoreOption {
 			Warn().
 			Str(logging.KeyNetworkingSecurity, "true").
 			Dur("decay_interval_ms", cfg.decayInterval).
-			Msg("decay interval is overridden")
+			Msg("decay interval is overridden, should never happen in production")
 	}
 
 	// registers the score registry as the consumer of the invalid control message notifications
@@ -411,14 +490,15 @@ func (s *ScoreOption) TopicScoreParams(topic *pubsub.Topic) *pubsub.TopicScorePa
 }
 
 func defaultPeerScoreParams() *pubsub.PeerScoreParams {
+	// DO NOT CHANGE THE DEFAULT VALUES, THEY ARE TUNED FOR THE BEST SECURITY PRACTICES.
 	return &pubsub.PeerScoreParams{
 		Topics: make(map[string]*pubsub.TopicScoreParams),
 		// we don't set all the parameters, so we skip the atomic validation.
 		// atomic validation fails initialization if any parameter is not set.
 		SkipAtomicValidation: true,
-		// DecayInterval is the interval over which we decay the effect of past behavior. So that
-		// a good or bad behavior will not have a permanent effect on the penalty. It is also interval
-		// that GossipSub refreshes the scores of all peers.
+		// DecayInterval is the interval over which we decay the effect of past behavior, so that
+		// a good or bad behavior will not have a permanent effect on the penalty. It is also the interval
+		// that GossipSub uses to refresh the scores of all peers.
 		DecayInterval: defaultDecayInterval,
 		// DecayToZero defines the maximum value below which a peer scoring counter is reset to zero.
 		// This is to prevent the counter from decaying to a very small value.
@@ -427,11 +507,18 @@ func defaultPeerScoreParams() *pubsub.PeerScoreParams {
 		DecayToZero: defaultDecayToZero,
 		// AppSpecificWeight is the weight of the application specific penalty.
 		AppSpecificWeight: DefaultAppSpecificScoreWeight,
+		// BehaviourPenaltyThreshold is the threshold above which a peer is penalized for GossipSub-level misbehaviors.
+		BehaviourPenaltyThreshold: defaultBehaviourPenaltyThreshold,
+		// BehaviourPenaltyWeight is the weight of the GossipSub-level penalty.
+		BehaviourPenaltyWeight: defaultBehaviourPenaltyWeight,
+		// BehaviourPenaltyDecay is the decay of the GossipSub-level penalty (applied every decay interval).
+		BehaviourPenaltyDecay: defaultBehaviourPenaltyDecay,
 	}
 }
 
 // DefaultTopicScoreParams returns the default score params for topics.
 func DefaultTopicScoreParams() *pubsub.TopicScoreParams {
+	// DO NOT CHANGE THE DEFAULT VALUES, THEY ARE TUNED FOR THE BEST SECURITY PRACTICES.
 	p := &pubsub.TopicScoreParams{
 		TopicWeight:                     defaultTopicWeight,
 		SkipAtomicValidation:            defaultTopicSkipAtomicValidation,
