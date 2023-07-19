@@ -1,9 +1,9 @@
 module github.com/onflow/flow-go/integration
 
-go 1.19
+go 1.20
 
 require (
-	cloud.google.com/go/bigquery v1.48.0
+	cloud.google.com/go/bigquery v1.50.0
 	github.com/VividCortex/ewma v1.2.0
 	github.com/coreos/go-semver v0.3.0
 	github.com/dapperlabs/testingdock v0.4.4
@@ -17,12 +17,12 @@ require (
 	github.com/ipfs/go-datastore v0.6.0
 	github.com/ipfs/go-ds-badger2 v0.1.3
 	github.com/ipfs/go-ipfs-blockstore v1.3.0
-	github.com/onflow/cadence v0.39.12
-	github.com/onflow/flow-core-contracts/lib/go/contracts v1.2.3
+	github.com/onflow/cadence v0.39.14
+	github.com/onflow/flow-core-contracts/lib/go/contracts v1.2.4-0.20230703193002-53362441b57d
 	github.com/onflow/flow-core-contracts/lib/go/templates v1.2.3
-	github.com/onflow/flow-emulator v0.50.6
-	github.com/onflow/flow-go v0.31.1-0.20230607185125-e75265a6c631
-	github.com/onflow/flow-go-sdk v0.41.6
+	github.com/onflow/flow-emulator v0.51.2-0.20230704183611-ecad54e231b7
+	github.com/onflow/flow-go v0.31.1-0.20230704154018-87a84e9d36c2
+	github.com/onflow/flow-go-sdk v0.41.9
 	github.com/onflow/flow-go/crypto v0.24.9
 	github.com/onflow/flow-go/insecure v0.0.0-00010101000000-000000000000
 	github.com/onflow/flow/protobuf/go/flow v0.3.2-0.20230602212908-08fc6536d391
@@ -36,23 +36,23 @@ require (
 	go.uber.org/atomic v1.11.0
 	golang.org/x/exp v0.0.0-20230321023759-10a507213a29
 	golang.org/x/sync v0.2.0
-	google.golang.org/grpc v1.55.0
+	google.golang.org/grpc v1.56.1
 	google.golang.org/protobuf v1.30.0
 )
 
 require (
 	cloud.google.com/go v0.110.0 // indirect
-	cloud.google.com/go/compute v1.18.0 // indirect
+	cloud.google.com/go/compute v1.19.1 // indirect
 	cloud.google.com/go/compute/metadata v0.2.3 // indirect
-	cloud.google.com/go/iam v0.12.0 // indirect
-	cloud.google.com/go/storage v1.28.1 // indirect
+	cloud.google.com/go/iam v0.13.0 // indirect
+	cloud.google.com/go/storage v1.29.0 // indirect
 	github.com/Azure/go-ansiterm v0.0.0-20170929234023-d6e3b3328b78 // indirect
 	github.com/Microsoft/go-winio v0.5.2 // indirect
 	github.com/Microsoft/hcsshim v0.8.7 // indirect
 	github.com/ProtonMail/go-crypto v0.0.0-20221026131551-cf6655e29de4 // indirect
 	github.com/acomagu/bufpipe v1.0.3 // indirect
 	github.com/andybalholm/brotli v1.0.4 // indirect
-	github.com/apache/arrow/go/v10 v10.0.1 // indirect
+	github.com/apache/arrow/go/v11 v11.0.0 // indirect
 	github.com/apache/thrift v0.16.0 // indirect
 	github.com/aws/aws-sdk-go-v2 v1.17.7 // indirect
 	github.com/aws/aws-sdk-go-v2/config v1.18.19 // indirect
@@ -228,7 +228,7 @@ require (
 	github.com/multiformats/go-varint v0.0.7 // indirect
 	github.com/onflow/atree v0.6.0 // indirect
 	github.com/onflow/flow-ft/lib/go/contracts v0.7.0 // indirect
-	github.com/onflow/flow-nft/lib/go/contracts v0.0.0-20220727161549-d59b1e547ac4 // indirect
+	github.com/onflow/flow-nft/lib/go/contracts v1.1.0 // indirect
 	github.com/onflow/fusd/lib/go/contracts v0.0.0-20211021081023-ae9de8fb2c7e // indirect
 	github.com/onflow/go-bitswap v0.0.0-20230703214630-6d3db958c73d // indirect
 	github.com/onflow/nft-storefront/lib/go/contracts v0.0.0-20221222181731-14b90207cead // indirect
@@ -306,7 +306,7 @@ require (
 	golang.org/x/crypto v0.10.0 // indirect
 	golang.org/x/mod v0.10.0 // indirect
 	golang.org/x/net v0.10.0 // indirect
-	golang.org/x/oauth2 v0.6.0 // indirect
+	golang.org/x/oauth2 v0.7.0 // indirect
 	golang.org/x/sys v0.9.0 // indirect
 	golang.org/x/term v0.9.0 // indirect
 	golang.org/x/text v0.10.0 // indirect
@@ -316,7 +316,7 @@ require (
 	gonum.org/v1/gonum v0.13.0 // indirect
 	google.golang.org/api v0.114.0 // indirect
 	google.golang.org/appengine v1.6.7 // indirect
-	google.golang.org/genproto v0.0.0-20230306155012-7f2fa6fef1f4 // indirect
+	google.golang.org/genproto v0.0.0-20230410155749-daa745c078e1 // indirect
 	google.golang.org/grpc/cmd/protoc-gen-go-grpc v1.2.0 // indirect
 	gopkg.in/ini.v1 v1.67.0 // indirect
 	gopkg.in/warnings.v0 v0.1.2 // indirect

@@ -71,9 +71,9 @@ func TestSpam_IHave(t *testing.T) {
 	// this is vital as the spammer will circumvent the normal pubsub subscription mechanism and send iHAVE messages directly to the victim.
 	// without a prior connection established, directly spamming pubsub messages may cause a race condition in the pubsub implementation.
 	p2ptest.TryConnectionAndEnsureConnected(t, ctx, nodes)
-	p2ptest.EnsurePubsubMessageExchange(t, ctx, nodes, func() (interface{}, channels.Topic) {
-		blockTopic := channels.TopicFromChannel(channels.PushBlocks, sporkId)
-		return unittest.ProposalFixture(), blockTopic
+	blockTopic := channels.TopicFromChannel(channels.PushBlocks, sporkId)
+	p2ptest.EnsurePubsubMessageExchange(t, ctx, nodes, blockTopic, 1, func() interface{} {
+		return unittest.ProposalFixture()
 	})
 
 	// prepare to spam - generate iHAVE control messages

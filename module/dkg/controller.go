@@ -3,7 +3,6 @@ package dkg
 import (
 	"fmt"
 	"math"
-	"math/rand"
 	"sync"
 	"time"
 
@@ -12,6 +11,7 @@ import (
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/utils/rand"
 )
 
 const (
@@ -304,7 +304,10 @@ func (c *Controller) doBackgroundWork() {
 				isFirstMessage := false
 				c.once.Do(func() {
 					isFirstMessage = true
-					delay := c.preHandleFirstBroadcastDelay()
+					delay, err := c.preHandleFirstBroadcastDelay()
+					if err != nil {
+						c.log.Err(err).Msg("pre handle first broadcast delay failed")
+					}
 					c.log.Info().Msgf("sleeping for %s before processing first phase 1 broadcast message", delay)
 					time.Sleep(delay)
 				})
@@ -337,12 +340,15 @@ func (c *Controller) start() error {
 
 	// before starting the DKG, sleep for a random delay to avoid synchronizing
 	// this expensive operation across all consensus nodes
-	delay := c.preStartDelay()
+	delay, err := c.preStartDelay()
+	if err != nil {
+		return fmt.Errorf("pre start delay failed: %w", err)
+	}
 	c.log.Debug().Msgf("sleeping for %s before starting DKG", delay)
 	time.Sleep(delay)
 
 	c.dkgLock.Lock()
-	err := c.dkg.Start(c.seed)
+	err = c.dkg.Start(c.seed)
 	c.dkgLock.Unlock()
 	if err != nil {
 		return fmt.Errorf("Error starting DKG: %w", err)
@@ -421,18 +427,16 @@ func (c *Controller) phase3() error {
 // preStartDelay returns a duration to delay prior to starting the DKG process.
 // This prevents synchronization of the DKG starting (an expensive operation)
 // across the network, which can impact finalization.
-func (c *Controller) preStartDelay() time.Duration {
-	delay := computePreprocessingDelay(c.config.BaseStartDelay, c.dkg.Size())
-	return delay
+func (c *Controller) preStartDelay() (time.Duration, error) {
+	return computePreprocessingDelay(c.config.BaseStartDelay, c.dkg.Size())
 }
 
 // preHandleFirstBroadcastDelay returns a duration to delay prior to handling
 // the first broadcast message. This delay is used only during phase 1 of the DKG.
 // This prevents synchronization of processing verification vectors (an
 // expensive operation) across the network, which can impact finalization.
-func (c *Controller) preHandleFirstBroadcastDelay() time.Duration {
-	delay := computePreprocessingDelay(c.config.BaseHandleFirstBroadcastDelay, c.dkg.Size())
-	return delay
+func (c *Controller) preHandleFirstBroadcastDelay() (time.Duration, error) {
+	return computePreprocessingDelay(c.config.BaseHandleFirstBroadcastDelay, c.dkg.Size())
 }
 
 // computePreprocessingDelay computes a random delay to introduce before an
@@ -441,15 +445,18 @@ func (c *Controller) preHandleFirstBroadcastDelay() time.Duration {
 // The maximum delay is m=b*n^2 where:
 // * b is a configurable base delay
 // * n is the size of the DKG committee
-func computePreprocessingDelay(baseDelay time.Duration, dkgSize int) time.Duration {
+func computePreprocessingDelay(baseDelay time.Duration, dkgSize int) (time.Duration, error) {
 
 	maxDelay := computePreprocessingDelayMax(baseDelay, dkgSize)
 	if maxDelay <= 0 {
-		return 0
+		return 0, nil
 	}
 	// select delay from [0,m)
-	delay := time.Duration(rand.Int63n(maxDelay.Nanoseconds()))
-	return delay
+	r, err := rand.Uint64n(uint64(maxDelay.Nanoseconds()))
+	if err != nil {
+		return time.Duration(0), fmt.Errorf("delay generation failed %w", err)
+	}
+	return time.Duration(r), nil
 }
 
 // computePreprocessingDelayMax computes the maximum dely for computePreprocessingDelay.
