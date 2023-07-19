@@ -217,7 +217,7 @@ type FlowAccessNodeBuilder struct {
 	CollectionsToMarkExecuted  *stdmap.Times
 	BlocksToMarkExecuted       *stdmap.Times
 	TransactionMetrics         *metrics.TransactionCollector
-	RESTMetrics                *metrics.RestCollector
+	RestMetrics                *metrics.RestCollector
 	AccessMetrics              module.AccessMetrics
 	PingMetrics                module.PingMetrics
 	Committee                  hotstuff.DynamicCommittee
@@ -971,14 +971,14 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 			if err != nil {
 				return err
 			}
-			builder.RESTMetrics = m
+			builder.RestMetrics = m
 			return nil
 		}).
 		Module("access metrics", func(node *cmd.NodeConfig) error {
 			builder.AccessMetrics = metrics.NewAccessCollector(
 				metrics.WithTransactionMetrics(builder.TransactionMetrics),
 				metrics.WithBackendScriptsMetrics(builder.TransactionMetrics),
-				metrics.WithRestMetrics(builder.RESTMetrics),
+				metrics.WithRestMetrics(builder.RestMetrics),
 			)
 			return nil
 		}).

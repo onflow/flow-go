@@ -70,7 +70,7 @@ func NewRestCollector(urlToRouteMapper func(string) (string, error), registerer 
 		r.httpRequestsTotal,
 	)
 
-	return r
+	return r, nil
 }
 
 // ObserveHTTPRequestDuration records the duration of the REST request.
