@@ -63,11 +63,11 @@ func (p PoolEntity) Entity() flow.Entity {
 }
 
 type Pool struct {
+	logger       zerolog.Logger
 	free         state // keeps track of free slots.
 	used         state // keeps track of allocated slots to cachedEntities.
 	poolEntities []poolEntity
 	ejectionMode EjectionMode
-	logger       zerolog.Logger
 }
 
 func NewHeroPool(sizeLimit uint32, ejectionMode EjectionMode, logger zerolog.Logger) *Pool {
