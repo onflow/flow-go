@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/hashicorp/go-multierror"
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/common"
 
@@ -206,5 +207,5 @@ func (executor *scriptExecutor) executeScript() error {
 	}
 
 	executor.output.Value = value
-	return populateErr
+	return multierror.Append(err, populateErr)
 }
