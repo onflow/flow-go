@@ -194,7 +194,7 @@ func TestGossipSubMeshDeliveryScoring_UnderDelivery_SingleTopic(t *testing.T) {
 	// we override some of the default scoring parameters in order to speed up the test in a time-efficient manner.
 	blockTopicOverrideParams := scoring.DefaultTopicScoreParams()
 	blockTopicOverrideParams.MeshMessageDeliveriesActivation = 1 * time.Second // we start observing the mesh message deliveries after 1 second of the node startup.
-	thisNode, thisId := p2ptest.NodeFixture( // this node is the one that will be penalizing the under-performer node.
+	thisNode, thisId := p2ptest.NodeFixture(                                   // this node is the one that will be penalizing the under-performer node.
 		t,
 		sporkId,
 		t.Name(),
@@ -299,7 +299,7 @@ func TestGossipSubMeshDeliveryScoring_UnderDelivery_TwoTopics(t *testing.T) {
 	blockTopicOverrideParams.MeshMessageDeliveriesActivation = 1 * time.Second // we start observing the mesh message deliveries after 1 second of the node startup.
 	dkgTopicOverrideParams := scoring.DefaultTopicScoreParams()
 	dkgTopicOverrideParams.MeshMessageDeliveriesActivation = 1 * time.Second // we start observing the mesh message deliveries after 1 second of the node startup.
-	thisNode, thisId := p2ptest.NodeFixture( // this node is the one that will be penalizing the under-performer node.
+	thisNode, thisId := p2ptest.NodeFixture(                                 // this node is the one that will be penalizing the under-performer node.
 		t,
 		sporkId,
 		t.Name(),
@@ -396,7 +396,7 @@ func TestGossipSubMeshDeliveryScoring_UnderDelivery_TwoTopics(t *testing.T) {
 // TestGossipSubMeshDeliveryScoring_Replay_Will_Not_Counted tests that replayed messages will not be counted towards the mesh message deliveries.
 func TestGossipSubMeshDeliveryScoring_Replay_Will_Not_Counted(t *testing.T) {
 	t.Parallel()
-	
+
 	role := flow.RoleConsensus
 	sporkId := unittest.IdentifierFixture()
 
@@ -409,7 +409,7 @@ func TestGossipSubMeshDeliveryScoring_Replay_Will_Not_Counted(t *testing.T) {
 	// we override some of the default scoring parameters in order to speed up the test in a time-efficient manner.
 	blockTopicOverrideParams := scoring.DefaultTopicScoreParams()
 	blockTopicOverrideParams.MeshMessageDeliveriesActivation = 1 * time.Second // we start observing the mesh message deliveries after 1 second of the node startup.
-	thisNode, thisId := p2ptest.NodeFixture( // this node is the one that will be penalizing the under-performer node.
+	thisNode, thisId := p2ptest.NodeFixture(                                   // this node is the one that will be penalizing the under-performer node.
 		t,
 		sporkId,
 		t.Name(),
