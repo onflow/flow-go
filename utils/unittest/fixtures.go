@@ -465,6 +465,38 @@ func BlockHeaderWithParentFixture(parent *flow.Header) *flow.Header {
 	}
 }
 
+func BlockHeaderWithParentWithSoRFixture(parent *flow.Header, source []byte) *flow.Header {
+	height := parent.Height + 1
+	view := parent.View + 1 + uint64(rand.Intn(10)) // Intn returns [0, n)
+	var lastViewTC *flow.TimeoutCertificate
+	if view != parent.View+1 {
+		newestQC := QuorumCertificateFixture(func(qc *flow.QuorumCertificate) {
+			qc.View = parent.View
+		})
+		lastViewTC = &flow.TimeoutCertificate{
+			View:          view - 1,
+			NewestQCViews: []uint64{newestQC.View},
+			NewestQC:      newestQC,
+			SignerIndices: SignerIndicesFixture(4),
+			SigData:       SignatureFixture(),
+		}
+	}
+	return &flow.Header{
+		ChainID:            parent.ChainID,
+		ParentID:           parent.ID(),
+		Height:             height,
+		PayloadHash:        IdentifierFixture(),
+		Timestamp:          time.Now().UTC(),
+		View:               view,
+		ParentView:         parent.View,
+		ParentVoterIndices: SignerIndicesFixture(4),
+		ParentVoterSigData: QCSigDataWithSoRFixture(source),
+		ProposerID:         IdentifierFixture(),
+		ProposerSigData:    SignatureFixture(),
+		LastViewTC:         lastViewTC,
+	}
+}
+
 func ClusterPayloadFixture(n int) *cluster.Payload {
 	transactions := make([]*flow.TransactionBody, n)
 	for i := 0; i < n; i++ {
@@ -1271,8 +1303,7 @@ func ChunkStatusListFixture(
 	return statuses
 }
 
-func QCSigDataFixture() []byte {
-	packer := hotstuff.SigDataPacker{}
+func qcSignatureDataFixture() hotstuff.SignatureData {
 	sigType := RandomBytes(5)
 	for i := range sigType {
 		sigType[i] = sigType[i] % 2
@@ -1283,6 +1314,20 @@ func QCSigDataFixture() []byte {
 		AggregatedRandomBeaconSig:    SignatureFixture(),
 		ReconstructedRandomBeaconSig: SignatureFixture(),
 	}
+	return sigData
+}
+
+func QCSigDataFixture() []byte {
+	packer := hotstuff.SigDataPacker{}
+	sigData := qcSignatureDataFixture()
+	encoded, _ := packer.Encode(&sigData)
+	return encoded
+}
+
+func QCSigDataWithSoRFixture(sor []byte) []byte {
+	packer := hotstuff.SigDataPacker{}
+	sigData := qcSignatureDataFixture()
+	sigData.ReconstructedRandomBeaconSig = sor
 	encoded, _ := packer.Encode(&sigData)
 	return encoded
 }
@@ -1295,6 +1340,14 @@ func SignatureFixture() crypto.Signature {
 
 func SignaturesFixture(n int) []crypto.Signature {
 	var sigs []crypto.Signature
+	for i := 0; i < n; i++ {
+		sigs = append(sigs, SignatureFixture())
+	}
+	return sigs
+}
+
+func RandomSourcesFixture(n int) [][]byte {
+	var sigs [][]byte
 	for i := 0; i < n; i++ {
 		sigs = append(sigs, SignatureFixture())
 	}
