@@ -2,9 +2,10 @@ package heropool
 
 import (
 	"fmt"
-	"math/rand"
+	"math"
 	"testing"
-	"time"
+
+	"github.com/onflow/flow-go/utils/rand"
 
 	"github.com/stretchr/testify/require"
 
@@ -260,11 +261,14 @@ func TestAddAndRemoveEntities(t *testing.T) {
 func testAddRemoveEntities(t *testing.T, limit uint32, entityCount uint32, ejectionMode EjectionMode, numberOfOperations int, probabilityOfAdding float32) {
 
 	require.GreaterOrEqual(t, entityCount, 2*limit, "entityCount must be greater or equal to 2*limit to test add/remove operations")
-	// create and log the seed.
-	testSeed := time.Now().UnixNano()
-	t.Logf("seed used for test %s is %d: ", t.Name(), testSeed)
-	rand.Seed(testSeed)
-	pool := NewHeroPool(limit, ejectionMode)
+
+	randomIntN := func(length int) int {
+		random, err := rand.Uintn(uint(length))
+		require.Nil(t, err)
+		return int(random)
+	}
+
+	pool := NewHeroPool(limit, ejectionMode, unittest.Logger())
 	entities := unittest.EntityListFixture(uint(entityCount))
 	// retryLimit is the max number of retries to find an entity that is not already in the pool to add it.
 	// The test fails if it reaches this limit.
@@ -273,18 +277,20 @@ func testAddRemoveEntities(t *testing.T, limit uint32, entityCount uint32, eject
 	ownerIds := make([]uint64, entityCount)
 	// generate ownerId to index in the entities array.
 	for i := 0; i < int(entityCount); i++ {
-		ownerIds[i] = rand.Uint64()
+		randomOwnerId, err := rand.Uint64()
+		require.Nil(t, err)
+		ownerIds[i] = randomOwnerId
 	}
 	// this map maintains entities currently stored in the pool.
 	addedEntities := make(map[flow.Identifier]int)
 	addedEntitiesInPool := make(map[flow.Identifier]EIndex)
 	for i := 0; i < numberOfOperations; i++ {
 		// choose between Add and Remove with a probability of probabilityOfAdding and 1-probabilityOfAdding respectively.
-		if rand.Float32() < probabilityOfAdding || len(addedEntities) == 0 {
+		if float32(randomIntN(math.MaxInt32))/math.MaxInt32 < probabilityOfAdding || len(addedEntities) == 0 {
 			// keeps finding an entity to add until it finds one that is not already in the pool.
 			found := false
 			for retryTime := 0; retryTime < retryLimit; retryTime++ {
-				toAddIndex := rand.Intn(int(entityCount))
+				toAddIndex := randomIntN(int(entityCount))
 				_, found = addedEntities[entities[toAddIndex].ID()]
 				if !found {
 					// found an entity that is not in the pool, add it.
@@ -305,7 +311,7 @@ func testAddRemoveEntities(t *testing.T, limit uint32, entityCount uint32, eject
 					if indexInThePool != InvalidIndex {
 						entityId := entities[toAddIndex].ID()
 						// tracks the index of the entity in the pool and the index of the entity in the entities array.
-						addedEntities[entityId] = toAddIndex
+						addedEntities[entityId] = int(toAddIndex)
 						addedEntitiesInPool[entityId] = indexInThePool
 						// any entity added to the pool should be in the pool, and must be retrievable.
 						actualFlowId, actualEntity, actualOwnerId := pool.Get(indexInThePool)
@@ -324,7 +330,7 @@ func testAddRemoveEntities(t *testing.T, limit uint32, entityCount uint32, eject
 			require.Falsef(t, found, "could not find an entity to add after %d retries", retryLimit)
 		} else {
 			// randomly select an index of an entity to remove.
-			entityToRemove := rand.Intn(len(addedEntities))
+			entityToRemove := randomIntN(len(addedEntities))
 			i := 0
 			var indexInPoolToRemove EIndex = 0
 			var indexInEntitiesArray int = 0

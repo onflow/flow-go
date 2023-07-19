@@ -63,14 +63,11 @@ func (p PoolEntity) Entity() flow.Entity {
 }
 
 type Pool struct {
-	logger zerolog.Logger
-	// This size is a size of used linked list. As we will have it now as a part of
-	// linked list it can be removed
-	size         uint32
 	free         state // keeps track of free slots.
 	used         state // keeps track of allocated slots to cachedEntities.
 	poolEntities []poolEntity
 	ejectionMode EjectionMode
+	logger       zerolog.Logger
 }
 
 func NewHeroPool(sizeLimit uint32, ejectionMode EjectionMode, logger zerolog.Logger) *Pool {
@@ -119,7 +116,6 @@ func (p *Pool) initFreeEntities() {
 // If the pool has no available slots and an ejection is set, ejection occurs when adding a new entity.
 // If an ejection occurred, ejectedEntity holds the ejected entity.
 
-// done
 func (p *Pool) Add(entityId flow.Identifier, entity flow.Entity, owner uint64) (
 	entityIndex EIndex, slotAvailable bool, ejectedEntity flow.Entity) {
 	entityIndex, slotAvailable, ejectedEntity = p.sliceIndexForEntity()
@@ -177,20 +173,15 @@ func (p *Pool) sliceIndexForEntity() (i EIndex, hasAvailableSlot bool, ejectedEn
 		return p.claimFreeHead(), true, invalidatedEntity
 	}
 
-	if p.free.head.isUndefined() {
+	if p.free.size == 0 {
 		// the free list is empty, so we are out of space, and we need to eject.
 		switch p.ejectionMode {
 		case NoEjection:
 			// pool is set for no ejection, hence, no slice index is selected, abort immediately.
 			return InvalidIndex, false, nil
-		case LRUEjection:
-			// LRU ejection
-			// the used head is the oldest entity, so we turn the used head to a free head here.
-			invalidatedEntity := p.invalidateUsedHead()
-			return p.claimFreeHead(), true, invalidatedEntity
 		case RandomEjection:
 			// we only eject randomly when the pool is full and random ejection is on.
-			random, err := rand.Uint32n(p.size)
+			random, err := rand.Uint32n(p.used.size)
 			if err != nil {
 				p.logger.Fatal().Err(err).
 					Msg("hero pool random ejection failed - falling back to LRU ejection")
