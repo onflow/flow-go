@@ -9,8 +9,6 @@ import (
 	"testing"
 	"time"
 
-	blocks "github.com/ipfs/go-block-format"
-	"github.com/ipfs/go-cid"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/stretchr/testify/require"
 
@@ -413,12 +411,6 @@ func BlockHeaderFixture(opts ...func(header *flow.Header)) *flow.Header {
 	}
 
 	return header
-}
-
-func CidFixture() cid.Cid {
-	data := make([]byte, 1024)
-	_, _ = rand.Read(data)
-	return blocks.NewBlock(data).Cid()
 }
 
 func BlockHeaderFixtureOnChain(
@@ -2451,7 +2443,7 @@ func ChunkExecutionDataFixture(t *testing.T, minSize int, opts ...func(*executio
 		}
 
 		v := make([]byte, size)
-		_, err := rand.Read(v)
+		_, err := crand.Read(v)
 		require.NoError(t, err)
 
 		k, err := ced.TrieUpdate.Payloads[0].Key()
