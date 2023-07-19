@@ -161,17 +161,20 @@ var (
 		common.MemoryKindTypeAnnotation:    25,
 		common.MemoryKindDictionaryEntry:   33,
 
-		common.MemoryKindFunctionDeclaration:        49,
-		common.MemoryKindCompositeDeclaration:       65,
-		common.MemoryKindInterfaceDeclaration:       41,
-		common.MemoryKindEnumCaseDeclaration:        25,
-		common.MemoryKindFieldDeclaration:           41,
-		common.MemoryKindTransactionDeclaration:     81,
-		common.MemoryKindImportDeclaration:          41,
-		common.MemoryKindVariableDeclaration:        97,
-		common.MemoryKindSpecialFunctionDeclaration: 17,
-		common.MemoryKindPragmaDeclaration:          17,
-		common.MemoryKindAttachmentDeclaration:      70,
+		common.MemoryKindFunctionDeclaration:           49,
+		common.MemoryKindCompositeDeclaration:          65,
+		common.MemoryKindInterfaceDeclaration:          41,
+		common.MemoryKindEnumCaseDeclaration:           25,
+		common.MemoryKindFieldDeclaration:              41,
+		common.MemoryKindTransactionDeclaration:        81,
+		common.MemoryKindImportDeclaration:             41,
+		common.MemoryKindVariableDeclaration:           97,
+		common.MemoryKindSpecialFunctionDeclaration:    17,
+		common.MemoryKindPragmaDeclaration:             17,
+		common.MemoryKindAttachmentDeclaration:         70,
+		common.MemoryKindEntitlementDeclaration:        33,
+		common.MemoryKindEntitlementMappingElement:     17,
+		common.MemoryKindEntitlementMappingDeclaration: 57,
 
 		common.MemoryKindAssignmentStatement: 41,
 		common.MemoryKindBreakStatement:      1,
@@ -226,18 +229,27 @@ var (
 		common.MemoryKindElaboration:       501,
 
 		// sema types
-		common.MemoryKindVariableSizedSemaType: 51,
-		common.MemoryKindConstantSizedSemaType: 59,
-		common.MemoryKindDictionarySemaType:    67,
-		common.MemoryKindOptionalSemaType:      17,
-		common.MemoryKindIntersectionSemaType:  75,
-		common.MemoryKindReferenceSemaType:     25,
-		common.MemoryKindCapabilitySemaType:    51,
+		common.MemoryKindVariableSizedSemaType:  51,
+		common.MemoryKindConstantSizedSemaType:  59,
+		common.MemoryKindDictionarySemaType:     67,
+		common.MemoryKindOptionalSemaType:       17,
+		common.MemoryKindIntersectionSemaType:   75,
+		common.MemoryKindReferenceSemaType:      25,
+		common.MemoryKindCapabilitySemaType:     51,
+		common.MemoryKindEntitlementSemaType:    49,
+		common.MemoryKindEntitlementMapSemaType: 73,
 
 		// ordered-map
 		common.MemoryKindOrderedMap:          17,
 		common.MemoryKindOrderedMapEntryList: 50,
 		common.MemoryKindOrderedMapEntry:     64,
+
+		// Entitlement access
+		common.MemoryKindUnauthorizedStaticAccess:    1, // unused
+		common.MemoryKindEntitlementSetStaticAccess:  17,
+		common.MemoryKindEntitlementMapStaticAccess:  17,
+		common.MemoryKindCadenceEntitlementSetAccess: 33,
+		common.MemoryKindCadenceEntitlementMapAccess: 17,
 	}
 )
 
