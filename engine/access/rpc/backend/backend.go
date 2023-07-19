@@ -87,6 +87,7 @@ type Config struct {
 	PreferredExecutionNodeIDs []string                        // preferred list of upstream execution node IDs
 	FixedExecutionNodeIDs     []string                        // fixed list of execution node IDs to choose from if no node ID can be chosen from the PreferredExecutionNodeIDs
 	ArchiveAddressList        []string                        // the archive node address list to send script executions. when configured, script executions will be all sent to the archive node
+	ScriptExecValidation      bool
 	CircuitBreakerConfig      connection.CircuitBreakerConfig // the configuration for circuit breaker
 }
 
@@ -110,6 +111,7 @@ func New(
 	log zerolog.Logger,
 	snapshotHistoryLimit int,
 	archiveAddressList []string,
+	scriptExecValidation bool,
 	circuitBreakerEnabled bool,
 ) *Backend {
 	retry := newRetry()
@@ -147,6 +149,7 @@ func New(
 			loggedScripts:      loggedScripts,
 			archiveAddressList: archiveAddressList,
 			archivePorts:       archivePorts,
+			scriptExecValidation: scriptExecValidation,
 			nodeCommunicator:   nodeCommunicator,
 		},
 		backendTransactions: backendTransactions{
