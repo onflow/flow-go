@@ -7,7 +7,6 @@ import (
 
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/libp2p/go-libp2p/core/host"
-	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/routing"
 	"github.com/rs/zerolog"
 
@@ -17,7 +16,6 @@ import (
 	"github.com/onflow/flow-go/module/mempool/queue"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network"
-	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/distributor"
 	"github.com/onflow/flow-go/network/p2p/inspector"
@@ -29,6 +27,7 @@ import (
 	"github.com/onflow/flow-go/network/p2p/scoring"
 	"github.com/onflow/flow-go/network/p2p/tracer"
 	"github.com/onflow/flow-go/network/p2p/utils"
+	"github.com/onflow/flow-go/utils/logging"
 )
 
 // The Builder struct is used to configure and create a new GossipSub pubsub system.
@@ -92,14 +91,42 @@ func (g *Builder) SetGossipSubConfigFunc(gossipSubConfigFunc p2p.GossipSubAdapte
 	g.gossipSubConfigFunc = gossipSubConfigFunc
 }
 
-// SetGossipSubPeerScoring sets the gossipsub peer scoring of the builder.
-// If the gossipsub peer scoring flag has already been set, a fatal error is logged.
-func (g *Builder) SetGossipSubPeerScoring(gossipSubPeerScoring bool) {
-	if g.gossipSubPeerScoring {
-		g.logger.Fatal().Msg("gossipsub peer scoring has already been set")
+// EnableGossipSubScoringWithOverride enables peer scoring for the GossipSub pubsub system with the given override.
+// Any existing peer scoring config attribute that is set in the override will override the default peer scoring config.
+// Anything that is left to nil or zero value in the override will be ignored and the default value will be used.
+// Note: it is not recommended to override the default peer scoring config in production unless you know what you are doing.
+// Production Tip: use PeerScoringConfigNoOverride as the argument to this function to enable peer scoring without any override.
+// Args:
+// - PeerScoringConfigOverride: override for the peer scoring config- Recommended to use PeerScoringConfigNoOverride for production.
+// Returns:
+// none
+func (g *Builder) EnableGossipSubScoringWithOverride(override *p2p.PeerScoringConfigOverride) {
+	g.gossipSubPeerScoring = true // TODO: we should enable peer scoring by default.
+	if override == nil {
 		return
 	}
-	g.gossipSubPeerScoring = gossipSubPeerScoring
+	if override.AppSpecificScoreParams != nil {
+		g.logger.Warn().
+			Str(logging.KeyNetworkingSecurity, "true").
+			Msg("overriding app specific score params for gossipsub")
+		g.scoreOptionConfig.OverrideAppSpecificScoreFunction(override.AppSpecificScoreParams)
+	}
+	if override.TopicScoreParams != nil {
+		for topic, params := range override.TopicScoreParams {
+			topicLogger := utils.TopicScoreParamsLogger(g.logger, topic.String(), params)
+			topicLogger.Warn().
+				Str(logging.KeyNetworkingSecurity, "true").
+				Msg("overriding topic score params for gossipsub")
+			g.scoreOptionConfig.OverrideTopicScoreParams(topic, params)
+		}
+	}
+	if override.DecayInterval > 0 {
+		g.logger.Warn().
+			Str(logging.KeyNetworkingSecurity, "true").
+			Dur("decay_interval", override.DecayInterval).
+			Msg("overriding decay interval for gossipsub")
+		g.scoreOptionConfig.OverrideDecayInterval(override.DecayInterval)
+	}
 }
 
 // SetGossipSubScoreTracerInterval sets the gossipsub score tracer interval of the builder.
@@ -132,21 +159,6 @@ func (g *Builder) SetRoutingSystem(routingSystem routing.Routing) {
 	g.routingSystem = routingSystem
 }
 
-// SetTopicScoreParams sets the topic score params of the builder.
-// There is a default topic score parameters that is used if this function is not called for a topic.
-// However, if this function is called multiple times for a topic, the last topic score params will be used.
-// Note: calling this function will override the default topic score params for the topic. Don't call this function
-// unless you know what you are doing.
-func (g *Builder) SetTopicScoreParams(topic channels.Topic, topicScoreParams *pubsub.TopicScoreParams) {
-	g.scoreOptionConfig.OverrideTopicScoreParams(topic, topicScoreParams)
-}
-
-// SetAppSpecificScoreParams sets the app specific score params of the builder.
-// There is no default app specific score function. However, if this function is called multiple times, the last function will be used.
-func (g *Builder) SetAppSpecificScoreParams(f func(peer.ID) float64) {
-	g.scoreOptionConfig.SetAppSpecificScoreFunction(f)
-}
-
 // OverrideDefaultRpcInspectorSuiteFactory overrides the default rpc inspector suite factory.
 // Note: this function should only be used for testing purposes. Never override the default rpc inspector suite factory unless you know what you are doing.
 func (g *Builder) OverrideDefaultRpcInspectorSuiteFactory(factory p2p.GossipSubRpcInspectorSuiteFactoryFunc) {
@@ -173,7 +185,11 @@ func NewGossipSubBuilder(
 	idProvider module.IdentityProvider,
 	rpcInspectorConfig *p2pconf.GossipSubRPCInspectorsConfig,
 ) *Builder {
-	lg := logger.With().Str("component", "gossipsub").Logger()
+	lg := logger.With().
+		Str("component", "gossipsub").
+		Str("network-type", networkType.String()).
+		Logger()
+
 	b := &Builder{
 		logger:                   lg,
 		metricsCfg:               metricsCfg,
@@ -186,6 +202,7 @@ func NewGossipSubBuilder(
 		rpcInspectorConfig:       rpcInspectorConfig,
 		rpcInspectorSuiteFactory: defaultInspectorSuite(),
 	}
+
 	return b
 }
 
@@ -310,6 +327,10 @@ func (g *Builder) Build(ctx irrecoverable.SignalerContext) (p2p.PubSubAdapter, e
 			gossipSubConfigs.WithScoreTracer(scoreTracer)
 		}
 
+	} else {
+		g.logger.Warn().
+			Str(logging.KeyNetworkingSecurity, "true").
+			Msg("gossipsub peer scoring is disabled")
 	}
 
 	if g.gossipSubTracer != nil {
