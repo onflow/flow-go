@@ -1,6 +1,6 @@
 {
  "EpochCounter": 0,
- "PreviousStateCommitment": "bdc5ebc2f17236ea9004f669998b9fa1c556576e886c2f2b95a7d431281700cc",
- "CurrentStateCommitment": "bdc5ebc2f17236ea9004f669998b9fa1c556576e886c2f2b95a7d431281700cc",
+ "PreviousStateCommitment": "f24ba9e5dcc6798acf7705fb906b4785ed29c8f3464dd710c3c5541453030d0f",
+ "CurrentStateCommitment": "f24ba9e5dcc6798acf7705fb906b4785ed29c8f3464dd710c3c5541453030d0f",
  "ReportSucceeded": true
 }

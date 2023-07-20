@@ -49,26 +49,22 @@ type GlobalParams interface {
 
 	// ChainID returns the chain ID for the current Flow network. The chain ID
 	// uniquely identifies a Flow network in perpetuity across epochs and sporks.
-	// No errors are expected during normal operation.
-	ChainID() (flow.ChainID, error)
+	ChainID() flow.ChainID
 
 	// SporkID returns the unique identifier for this network within the current spork.
 	// This ID is determined at the beginning of a spork during bootstrapping and is
 	// part of the root protocol state snapshot.
-	// No errors are expected during normal operation.
-	SporkID() (flow.Identifier, error)
+	SporkID() flow.Identifier
 
 	// SporkRootBlockHeight returns the height of the spork's root block.
 	// This value is determined at the beginning of a spork during bootstrapping.
 	// If node uses a sealing segment for bootstrapping then this value will be carried over
 	// as part of snapshot.
-	// No errors are expected during normal operation.
-	SporkRootBlockHeight() (uint64, error)
+	SporkRootBlockHeight() uint64
 
 	// ProtocolVersion returns the protocol version, the major software version
 	// of the protocol software.
-	// No errors are expected during normal operation.
-	ProtocolVersion() (uint, error)
+	ProtocolVersion() uint
 
 	// EpochCommitSafetyThreshold defines a deadline for sealing the EpochCommit
 	// service event near the end of each epoch - the "epoch commitment deadline".
@@ -114,6 +110,5 @@ type GlobalParams interface {
 	// EPOCH N        v        EPOCH N+1
 	// ...------------|------||-----...
 	//
-	// No errors are expected during normal operation.
-	EpochCommitSafetyThreshold() (uint64, error)
+	EpochCommitSafetyThreshold() uint64
 }

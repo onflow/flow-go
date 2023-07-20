@@ -544,16 +544,13 @@ func (state *State) bootstrapSporkInfo(root protocol.Snapshot) func(*badger.Txn)
 	return func(tx *badger.Txn) error {
 		params := root.Params()
 
-		sporkID, err := params.SporkID()
-		if err != nil {
-			return fmt.Errorf("could not get spork ID: %w", err)
-		}
-		err = operation.InsertSporkID(sporkID)(tx)
+		sporkID := params.SporkID()
+		err := operation.InsertSporkID(sporkID)(tx)
 		if err != nil {
 			return fmt.Errorf("could not insert spork ID: %w", err)
 		}
 
-		sporkRootBlockHeight, err := params.SporkRootBlockHeight()
+		sporkRootBlockHeight := params.SporkRootBlockHeight()
 		if err != nil {
 			return fmt.Errorf("could not get spork root block height: %w", err)
 		}
@@ -562,7 +559,7 @@ func (state *State) bootstrapSporkInfo(root protocol.Snapshot) func(*badger.Txn)
 			return fmt.Errorf("could not insert spork root block height: %w", err)
 		}
 
-		version, err := params.ProtocolVersion()
+		version := params.ProtocolVersion()
 		if err != nil {
 			return fmt.Errorf("could not get protocol version: %w", err)
 		}
@@ -571,7 +568,7 @@ func (state *State) bootstrapSporkInfo(root protocol.Snapshot) func(*badger.Txn)
 			return fmt.Errorf("could not insert protocol version: %w", err)
 		}
 
-		threshold, err := params.EpochCommitSafetyThreshold()
+		threshold := params.EpochCommitSafetyThreshold()
 		if err != nil {
 			return fmt.Errorf("could not get epoch commit safety threshold: %w", err)
 		}

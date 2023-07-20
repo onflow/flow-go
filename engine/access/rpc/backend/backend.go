@@ -7,9 +7,6 @@ import (
 	"strconv"
 	"time"
 
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
-
 	lru "github.com/hashicorp/golang-lru"
 	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
 	"github.com/rs/zerolog"
@@ -245,17 +242,11 @@ func (b *Backend) Ping(ctx context.Context) error {
 }
 
 // GetNodeVersionInfo returns node version information such as semver, commit, sporkID, protocolVersion, etc
-func (b *Backend) GetNodeVersionInfo(ctx context.Context) (*access.NodeVersionInfo, error) {
+func (b *Backend) GetNodeVersionInfo(_ context.Context) (*access.NodeVersionInfo, error) {
 	stateParams := b.state.Params()
-	sporkId, err := stateParams.SporkID()
-	if err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to read spork ID: %v", err)
-	}
+	sporkId := stateParams.SporkID()
 
-	protocolVersion, err := stateParams.ProtocolVersion()
-	if err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to read protocol version: %v", err)
-	}
+	protocolVersion := stateParams.ProtocolVersion()
 
 	return &access.NodeVersionInfo{
 		Semver:          build.Semver(),

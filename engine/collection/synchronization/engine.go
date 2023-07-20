@@ -101,7 +101,7 @@ func New(
 		return nil, fmt.Errorf("could not setup message handler")
 	}
 
-	chainID, err := state.Params().ChainID()
+	chainID := state.Params().ChainID()
 	if err != nil {
 		return nil, fmt.Errorf("could not get chain ID: %w", err)
 	}

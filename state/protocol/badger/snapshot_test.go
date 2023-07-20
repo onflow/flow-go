@@ -105,12 +105,9 @@ func TestSnapshot_Params(t *testing.T) {
 	participants := unittest.IdentityListFixture(5, unittest.WithAllRoles())
 	rootSnapshot := unittest.RootSnapshotFixture(participants)
 
-	expectedChainID, err := rootSnapshot.Params().ChainID()
-	require.NoError(t, err)
-	expectedSporkID, err := rootSnapshot.Params().SporkID()
-	require.NoError(t, err)
-	expectedProtocolVersion, err := rootSnapshot.Params().ProtocolVersion()
-	require.NoError(t, err)
+	expectedChainID := rootSnapshot.Params().ChainID()
+	expectedSporkID := rootSnapshot.Params().SporkID()
+	expectedProtocolVersion := rootSnapshot.Params().ProtocolVersion()
 
 	rootHeader, err := rootSnapshot.Head()
 	require.NoError(t, err)
@@ -133,17 +130,17 @@ func TestSnapshot_Params(t *testing.T) {
 		}
 		for _, snapshot := range snapshots {
 			t.Run("should be able to get chain ID from snapshot", func(t *testing.T) {
-				chainID, err := snapshot.Params().ChainID()
+				chainID := snapshot.Params().ChainID()
 				require.NoError(t, err)
 				assert.Equal(t, expectedChainID, chainID)
 			})
 			t.Run("should be able to get spork ID from snapshot", func(t *testing.T) {
-				sporkID, err := snapshot.Params().SporkID()
+				sporkID := snapshot.Params().SporkID()
 				require.NoError(t, err)
 				assert.Equal(t, expectedSporkID, sporkID)
 			})
 			t.Run("should be able to get protocol version from snapshot", func(t *testing.T) {
-				protocolVersion, err := snapshot.Params().ProtocolVersion()
+				protocolVersion := snapshot.Params().ProtocolVersion()
 				require.NoError(t, err)
 				assert.Equal(t, expectedProtocolVersion, protocolVersion)
 			})

@@ -101,23 +101,23 @@ func FromParams(from protocol.GlobalParams) (*Params, error) {
 		err    error
 	)
 
-	params.ChainID, err = from.ChainID()
+	params.ChainID = from.ChainID()
 	if err != nil {
 		return nil, fmt.Errorf("could not get chain id: %w", err)
 	}
-	params.SporkID, err = from.SporkID()
+	params.SporkID = from.SporkID()
 	if err != nil {
 		return nil, fmt.Errorf("could not get spork id: %w", err)
 	}
-	params.SporkRootBlockHeight, err = from.SporkRootBlockHeight()
+	params.SporkRootBlockHeight = from.SporkRootBlockHeight()
 	if err != nil {
 		return nil, fmt.Errorf("could not get spork root block height: %w", err)
 	}
-	params.ProtocolVersion, err = from.ProtocolVersion()
+	params.ProtocolVersion = from.ProtocolVersion()
 	if err != nil {
 		return nil, fmt.Errorf("could not get protocol version: %w", err)
 	}
-	params.EpochCommitSafetyThreshold, err = from.EpochCommitSafetyThreshold()
+	params.EpochCommitSafetyThreshold = from.EpochCommitSafetyThreshold()
 	if err != nil {
 		return nil, fmt.Errorf("could not get protocol version: %w", err)
 	}

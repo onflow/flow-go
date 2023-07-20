@@ -5,7 +5,6 @@ import (
 	"github.com/onflow/flow-go/state/protocol/mock"
 	"github.com/onflow/flow-go/utils/unittest"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 	"testing"
 )
 
@@ -24,8 +23,7 @@ func TestDynamicProtocolStateAdapter(t *testing.T) {
 	t.Run("global-params", func(t *testing.T) {
 		expectedChainID := flow.Testnet
 		globalParams.On("ChainID").Return(expectedChainID, nil).Once()
-		actualChainID, err := adapter.GlobalParams().ChainID()
-		require.NoError(t, err)
+		actualChainID := adapter.GlobalParams().ChainID()
 		assert.Equal(t, expectedChainID, actualChainID)
 	})
 }

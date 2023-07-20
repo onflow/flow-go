@@ -51,8 +51,7 @@ func TestProtocolState_AtBlockID(t *testing.T) {
 	t.Run("global-params", func(t *testing.T) {
 		expectedChainID := flow.Testnet
 		globalParams.On("ChainID").Return(expectedChainID, nil).Once()
-		actualChainID, err := protocolState.GlobalParams().ChainID()
-		require.NoError(t, err)
+		actualChainID := protocolState.GlobalParams().ChainID()
 		assert.Equal(t, expectedChainID, actualChainID)
 	})
 }

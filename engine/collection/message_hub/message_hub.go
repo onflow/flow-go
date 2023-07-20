@@ -156,7 +156,7 @@ func NewMessageHub(log zerolog.Logger,
 	}
 
 	// register network conduit
-	chainID, err := clusterState.Params().ChainID()
+	chainID := clusterState.Params().ChainID()
 	if err != nil {
 		return nil, fmt.Errorf("could not get chain ID: %w", err)
 	}

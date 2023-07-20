@@ -454,7 +454,7 @@ func (b *backendTransactions) GetTransactionResultsByBlockID(
 	// user transactions in the block
 	txCount := i
 
-	sporkRootBlockHeight, err := b.state.Params().SporkRootBlockHeight()
+	sporkRootBlockHeight := b.state.Params().SporkRootBlockHeight()
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to retrieve root block: %v", err)
 	}

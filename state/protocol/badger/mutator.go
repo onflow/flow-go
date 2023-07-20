@@ -812,10 +812,7 @@ func (m *FollowerState) epochFallbackTriggeredByFinalizedBlock(block *flow.Heade
 	}
 
 	// 2.(a) determine whether block B is past the epoch commitment deadline
-	safetyThreshold, err := m.Params().EpochCommitSafetyThreshold()
-	if err != nil {
-		return false, fmt.Errorf("could not get epoch commit safety threshold: %w", err)
-	}
+	safetyThreshold := m.Params().EpochCommitSafetyThreshold()
 	blockExceedsDeadline := block.View+safetyThreshold >= currentEpochSetup.FinalView
 
 	// 2.(b) determine whether the next epoch is committed w.r.t. block B
