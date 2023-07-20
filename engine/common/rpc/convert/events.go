@@ -8,9 +8,10 @@ import (
 
 	"github.com/onflow/cadence/encoding/ccf"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
-	"github.com/onflow/flow-go/model/flow"
-	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
 
+	"github.com/onflow/flow-go/model/flow"
+
+	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
 	"github.com/onflow/flow/protobuf/go/flow/entities"
 	execproto "github.com/onflow/flow/protobuf/go/flow/execution"
 )
