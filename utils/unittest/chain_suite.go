@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
 	"github.com/onflow/flow-go/model/chunks"
@@ -504,7 +505,8 @@ func (bc *BaseChainSuite) ValidSubgraphFixture() subgraphFixture {
 	assignedVerifiersPerChunk := uint(len(bc.Approvers) / 2)
 	approvals := make(map[uint64]map[flow.Identifier]*flow.ResultApproval)
 	for _, chunk := range incorporatedResult.Result.Chunks {
-		assignedVerifiers := bc.Approvers.Sample(assignedVerifiersPerChunk)
+		assignedVerifiers, err := bc.Approvers.Sample(assignedVerifiersPerChunk)
+		require.NoError(bc.T(), err)
 		assignment.Add(chunk, assignedVerifiers.NodeIDs())
 
 		// generate approvals
@@ -543,7 +545,8 @@ func (bc *BaseChainSuite) Extend(block *flow.Block) {
 		assignedVerifiersPerChunk := uint(len(bc.Approvers) / 2)
 		approvals := make(map[uint64]map[flow.Identifier]*flow.ResultApproval)
 		for _, chunk := range incorporatedResult.Result.Chunks {
-			assignedVerifiers := bc.Approvers.Sample(assignedVerifiersPerChunk)
+			assignedVerifiers, err := bc.Approvers.Sample(assignedVerifiersPerChunk)
+			require.NoError(bc.T(), err)
 			assignment.Add(chunk, assignedVerifiers.NodeIDs())
 
 			// generate approvals

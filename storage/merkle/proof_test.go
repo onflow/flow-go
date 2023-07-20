@@ -3,7 +3,6 @@ package merkle
 import (
 	"math/rand"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -142,7 +141,7 @@ func TestValidateFormat(t *testing.T) {
 // when trie includes many random keys. (only a random subset of keys are checked for proofs)
 func TestProofsWithRandomKeys(t *testing.T) {
 	// initialize random generator, two trees and zero hash
-	rand.Seed(time.Now().UnixNano())
+
 	keyLength := 32
 	numberOfInsertions := 10000
 	numberOfProofsToVerify := 100
