@@ -130,21 +130,19 @@ func (t *RPCSentTracker) updateLastHighestIHaveRPCSize(size int64) {
 func (t *RPCSentTracker) iHaveRPCSent(iHaves []*pb.ControlIHave) {
 	controlMsgType := p2pmsg.CtrlMsgIHave
 	for _, iHave := range iHaves {
-		topicID := iHave.GetTopicID()
 		for _, messageID := range iHave.GetMessageIDs() {
-			t.cache.add(topicID, messageID, controlMsgType)
+			t.cache.add(messageID, controlMsgType)
 		}
 	}
 }
 
 // WasIHaveRPCSent checks if an iHave control message with the provided message ID was sent.
 // Args:
-// - string: the topic ID of the iHave RPC.
-// - string: the message ID of the iHave RPC.
+// - messageID: the message ID of the iHave RPC.
 // Returns:
 // - bool: true if the iHave rpc with the provided message ID was sent.
-func (t *RPCSentTracker) WasIHaveRPCSent(topicID, messageID string) bool {
-	return t.cache.has(topicID, messageID, p2pmsg.CtrlMsgIHave)
+func (t *RPCSentTracker) WasIHaveRPCSent(messageID string) bool {
+	return t.cache.has(messageID, p2pmsg.CtrlMsgIHave)
 }
 
 // LastHighestIHaveRPCSize returns the last highest size of iHaves sent in an rpc.

@@ -13,7 +13,6 @@ import (
 	"github.com/onflow/flow-go/config"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
-	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -38,25 +37,23 @@ func TestRPCSentTracker_IHave(t *testing.T) {
 	}()
 
 	t.Run("WasIHaveRPCSent should return false for iHave message Id that has not been tracked", func(t *testing.T) {
-		require.False(t, tracker.WasIHaveRPCSent("topic_id", "message_id"))
+		require.False(t, tracker.WasIHaveRPCSent("message_id"))
 	})
 
 	t.Run("WasIHaveRPCSent should return true for iHave message after it is tracked with iHaveRPCSent", func(t *testing.T) {
 		numOfMsgIds := 100
 		testCases := []struct {
-			topic      string
 			messageIDS []string
 		}{
-			{channels.PushBlocks.String(), unittest.IdentifierListFixture(numOfMsgIds).Strings()},
-			{channels.ReceiveApprovals.String(), unittest.IdentifierListFixture(numOfMsgIds).Strings()},
-			{channels.SyncCommittee.String(), unittest.IdentifierListFixture(numOfMsgIds).Strings()},
-			{channels.RequestChunks.String(), unittest.IdentifierListFixture(numOfMsgIds).Strings()},
+			{unittest.IdentifierListFixture(numOfMsgIds).Strings()},
+			{unittest.IdentifierListFixture(numOfMsgIds).Strings()},
+			{unittest.IdentifierListFixture(numOfMsgIds).Strings()},
+			{unittest.IdentifierListFixture(numOfMsgIds).Strings()},
 		}
 		iHaves := make([]*pb.ControlIHave, len(testCases))
 		for i, testCase := range testCases {
 			testCase := testCase
 			iHaves[i] = &pb.ControlIHave{
-				TopicID:    &testCase.topic,
 				MessageIDs: testCase.messageIDS,
 			}
 		}
@@ -70,7 +67,7 @@ func TestRPCSentTracker_IHave(t *testing.T) {
 
 		for _, testCase := range testCases {
 			for _, messageID := range testCase.messageIDS {
-				require.True(t, tracker.WasIHaveRPCSent(testCase.topic, messageID))
+				require.True(t, tracker.WasIHaveRPCSent(messageID))
 			}
 		}
 	})
