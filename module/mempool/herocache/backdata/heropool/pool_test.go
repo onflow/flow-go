@@ -264,7 +264,7 @@ func testAddRemoveEntities(t *testing.T, limit uint32, entityCount uint32, eject
 
 	randomIntN := func(length int) int {
 		random, err := rand.Uintn(uint(length))
-		require.Nil(t, err)
+		require.NoError(t, err)
 		return int(random)
 	}
 

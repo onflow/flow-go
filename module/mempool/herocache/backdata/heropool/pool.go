@@ -70,6 +70,8 @@ type Pool struct {
 	ejectionMode EjectionMode
 }
 
+// NewHeroPool returns a pointer to a new hero pool constructed based on a provided EjectionMode,
+// logger and a provided fixed size.
 func NewHeroPool(sizeLimit uint32, ejectionMode EjectionMode, logger zerolog.Logger) *Pool {
 	l := &Pool{
 		free: state{
