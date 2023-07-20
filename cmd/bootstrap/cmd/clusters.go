@@ -10,7 +10,6 @@ import (
 	"github.com/onflow/flow-go/model/flow/assignment"
 	"github.com/onflow/flow-go/model/flow/factory"
 	"github.com/onflow/flow-go/model/flow/filter"
-	"github.com/onflow/flow-go/utils/rand"
 )
 
 // Construct random cluster assignment with internal and partner nodes.
@@ -39,12 +38,11 @@ func constructClusterAssignment(partnerNodes, internalNodes []model.NodeInfo) (f
 	}
 
 	// shuffle both collector lists based on a non-deterministic algorithm
-	var err error
-	err = rand.Shuffle(uint(len(partners)), func(i, j uint) { partners[i], partners[j] = partners[j], partners[i] })
+	partners, err := partners.Shuffle()
 	if err != nil {
 		log.Fatal().Err(err).Msg("could not shuffle partners")
 	}
-	err = rand.Shuffle(uint(len(internals)), func(i, j uint) { internals[i], internals[j] = internals[j], internals[i] })
+	internals, err = internals.Shuffle()
 	if err != nil {
 		log.Fatal().Err(err).Msg("could not shuffle internals")
 	}

@@ -56,7 +56,6 @@ import (
 	"github.com/onflow/flow-go/network/p2p/translator"
 	"github.com/onflow/flow-go/network/p2p/unicast/protocols"
 	"github.com/onflow/flow-go/network/p2p/utils"
-	"github.com/onflow/flow-go/network/slashing"
 	"github.com/onflow/flow-go/network/validator"
 	"github.com/onflow/flow-go/state/protocol"
 	badgerState "github.com/onflow/flow-go/state/protocol/badger"
@@ -605,11 +604,15 @@ func (builder *FollowerServiceBuilder) initPublicLibp2pNode(networkKey crypto.Pr
 		pis = append(pis, pi)
 	}
 
-	meshTracer := tracer.NewGossipSubMeshTracer(
-		builder.Logger,
-		builder.Metrics.Network,
-		builder.IdentityProvider,
-		builder.FlowConfig.NetworkConfig.GossipSubConfig.LocalMeshLogInterval)
+	meshTracerCfg := &tracer.GossipSubMeshTracerConfig{
+		Logger:                       builder.Logger,
+		Metrics:                      builder.Metrics.Network,
+		IDProvider:                   builder.IdentityProvider,
+		LoggerInterval:               builder.FlowConfig.NetworkConfig.GossipSubConfig.LocalMeshLogInterval,
+		RpcSentTrackerCacheCollector: metrics.GossipSubRPCSentTrackerMetricFactory(builder.HeroCacheMetricsFactory(), network.PublicNetwork),
+		RpcSentTrackerCacheSize:      builder.FlowConfig.NetworkConfig.GossipSubConfig.RPCSentTrackerCacheSize,
+	}
+	meshTracer := tracer.NewGossipSubMeshTracer(meshTracerCfg)
 
 	node, err := p2pbuilder.NewNodeBuilder(
 		builder.Logger,
@@ -748,15 +751,14 @@ func (builder *FollowerServiceBuilder) initMiddleware(nodeID flow.Identifier,
 	validators ...network.MessageValidator,
 ) network.Middleware {
 	mw := middleware.NewMiddleware(&middleware.Config{
-		Logger:                     builder.Logger,
-		Libp2pNode:                 libp2pNode,
-		FlowId:                     nodeID,
-		BitSwapMetrics:             builder.Metrics.Bitswap,
-		RootBlockID:                builder.SporkID,
-		UnicastMessageTimeout:      middleware.DefaultUnicastTimeout,
-		IdTranslator:               builder.IDTranslator,
-		Codec:                      builder.CodecFactory(),
-		SlashingViolationsConsumer: slashing.NewSlashingViolationsConsumer(builder.Logger, builder.Metrics.Network),
+		Logger:                builder.Logger,
+		Libp2pNode:            libp2pNode,
+		FlowId:                nodeID,
+		BitSwapMetrics:        builder.Metrics.Bitswap,
+		RootBlockID:           builder.SporkID,
+		UnicastMessageTimeout: middleware.DefaultUnicastTimeout,
+		IdTranslator:          builder.IDTranslator,
+		Codec:                 builder.CodecFactory(),
 	},
 		middleware.WithMessageValidators(validators...),
 	)

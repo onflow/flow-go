@@ -119,8 +119,7 @@ func New(
 					// Capability Controllers are enabled everywhere except for Mainnet
 					CapabilityControllersEnabled: chainID != flow.Mainnet,
 				},
-			),
-		),
+			)),
 	}
 	if params.ExtensiveTracing {
 		options = append(options, fvm.WithExtensiveTracing())
@@ -138,6 +137,7 @@ func New(
 		me,
 		executionDataProvider,
 		nil, // TODO(ramtin): update me with proper consumers
+		protoState,
 		params.MaxConcurrency,
 	)
 

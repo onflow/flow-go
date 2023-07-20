@@ -158,6 +158,7 @@ func (g *GossipSubAdapter) Join(topic string) (p2p.Topic, error) {
 		topicParamsLogger.Info().Msg("joined topic with score params set")
 	} else {
 		g.logger.Warn().
+			Bool(logging.KeyNetworkingSecurity, true).
 			Str("topic", topic).
 			Msg("joining topic without score params, this is not recommended from a security perspective")
 	}
