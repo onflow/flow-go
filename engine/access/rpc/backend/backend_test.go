@@ -171,7 +171,7 @@ func (suite *Suite) TestGetLatestProtocolStateSnapshot_NoTransitionSpan() {
 		epochBuilder := unittest.NewEpochBuilder(suite.T(), state)
 		// build epoch 1
 		// blocks in current state
-		// P <- A(S_P-1) <- B(S_P) <- C(S_A) <- D(S_B) |setup| <- E(S_C) <- NodeAction(S_D) |commit|
+		// P <- A(S_P-1) <- B(S_P) <- C(S_A) <- D(S_B) |setup| <- E(S_C) <- F(S_D) |commit|
 		epochBuilder.
 			BuildEpoch().
 			CompleteEpoch()
@@ -308,7 +308,7 @@ func (suite *Suite) TestGetLatestProtocolStateSnapshot_PhaseTransitionSpan() {
 		epochBuilder := unittest.NewEpochBuilder(suite.T(), state)
 		// build epoch 1
 		// blocks in current state
-		// P <- A(S_P-1) <- B(S_P) <- C(S_A) <- D(S_B) |setup| <- E(S_C) <- NodeAction(S_D) |commit|
+		// P <- A(S_P-1) <- B(S_P) <- C(S_A) <- D(S_B) |setup| <- E(S_C) <- F(S_D) |commit|
 		epochBuilder.
 			BuildEpoch().
 			CompleteEpoch()
@@ -373,7 +373,7 @@ func (suite *Suite) TestGetLatestProtocolStateSnapshot_EpochTransitionSpan() {
 		epochBuilder := unittest.NewEpochBuilder(suite.T(), state)
 		// build epoch 1
 		// blocks in current state
-		// P <- A(S_P-1) <- B(S_P) <- C(S_A) <- D(S_B) |setup| <- E(S_C) <- NodeAction(S_D) |commit|
+		// P <- A(S_P-1) <- B(S_P) <- C(S_A) <- D(S_B) |setup| <- E(S_C) <- F(S_D) |commit|
 		epochBuilder.BuildEpoch()
 
 		// add more blocks to our state in the commit phase, this will allow
