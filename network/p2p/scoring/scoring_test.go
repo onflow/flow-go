@@ -92,7 +92,7 @@ func TestInvalidCtrlMsgScoringIntegration(t *testing.T) {
 		t.Name(),
 		idProvider,
 		p2ptest.WithRole(flow.RoleConsensus),
-		p2ptest.WithPeerScoringEnabled(idProvider),
+		p2ptest.EnablePeerScoringWithOverride(p2p.PeerScoringConfigNoOverride),
 		p2ptest.OverrideGossipSubRpcInspectorSuiteFactory(func(zerolog.Logger,
 			flow.Identifier,
 			*p2pconf.GossipSubRPCInspectorsConfig,
@@ -110,7 +110,7 @@ func TestInvalidCtrlMsgScoringIntegration(t *testing.T) {
 		t.Name(),
 		idProvider,
 		p2ptest.WithRole(flow.RoleConsensus),
-		p2ptest.WithPeerScoringEnabled(idProvider))
+		p2ptest.EnablePeerScoringWithOverride(p2p.PeerScoringConfigNoOverride))
 
 	ids := flow.IdentityList{&id1, &id2}
 	nodes := []p2p.LibP2PNode{node1, node2}
@@ -128,11 +128,10 @@ func TestInvalidCtrlMsgScoringIntegration(t *testing.T) {
 	defer p2ptest.StopNodes(t, nodes, cancel, 2*time.Second)
 
 	p2ptest.LetNodesDiscoverEachOther(t, ctx, nodes, ids)
-
+	blockTopic := channels.TopicFromChannel(channels.PushBlocks, sporkId)
 	// checks end-to-end message delivery works on GossipSub
-	p2ptest.EnsurePubsubMessageExchange(t, ctx, nodes, func() (interface{}, channels.Topic) {
-		blockTopic := channels.TopicFromChannel(channels.PushBlocks, sporkId)
-		return unittest.ProposalFixture(), blockTopic
+	p2ptest.EnsurePubsubMessageExchange(t, ctx, nodes, blockTopic, 1, func() interface{} {
+		return unittest.ProposalFixture()
 	})
 
 	// now simulates node2 spamming node1 with invalid gossipsub control messages.
@@ -146,8 +145,7 @@ func TestInvalidCtrlMsgScoringIntegration(t *testing.T) {
 	}
 
 	// checks no GossipSub message exchange should no longer happen between node1 and node2.
-	p2ptest.EnsureNoPubsubExchangeBetweenGroups(t, ctx, []p2p.LibP2PNode{node1}, []p2p.LibP2PNode{node2}, func() (interface{}, channels.Topic) {
-		blockTopic := channels.TopicFromChannel(channels.PushBlocks, sporkId)
-		return unittest.ProposalFixture(), blockTopic
+	p2ptest.EnsureNoPubsubExchangeBetweenGroups(t, ctx, []p2p.LibP2PNode{node1}, []p2p.LibP2PNode{node2}, blockTopic, 1, func() interface{} {
+		return unittest.ProposalFixture()
 	})
 }

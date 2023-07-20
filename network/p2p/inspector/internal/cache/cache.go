@@ -40,9 +40,7 @@ type RecordCache struct {
 
 // NewRecordCache creates a new *RecordCache.
 // Args:
-// - sizeLimit: the maximum number of records that the cache can hold.
-// - logger: the logger used by the cache.
-// - collector: the metrics collector used by the cache.
+// - config: record cache config.
 // - recordEntityFactory: a factory function that creates a new spam record.
 // Returns:
 // - *RecordCache, the created cache.
