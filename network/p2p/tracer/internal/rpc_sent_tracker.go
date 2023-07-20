@@ -16,6 +16,10 @@ import (
 	"github.com/rs/zerolog"
 )
 
+const (
+	iHaveRPCTrackedLog = "ihave rpc tracked successfully"
+)
+
 // trackableRPC is an internal data structure for "temporarily" storing *pubsub.RPC sent in the queue before they are processed
 // by the *RPCSentTracker.
 type trackableRPC struct {
@@ -35,6 +39,7 @@ type lastHighestIHaveRPCSize struct {
 type RPCSentTracker struct {
 	component.Component
 	*lastHighestIHaveRPCSize
+	logger                               zerolog.Logger
 	cache                                *rpcSentCache
 	workerPool                           *worker.Pool[trackableRPC]
 	lastHighestIHaveRPCSizeResetInterval time.Duration
@@ -71,6 +76,7 @@ func NewRPCSentTracker(config *RPCSentTrackerConfig) *RPCSentTracker {
 		config.WorkerQueueCacheCollector)
 
 	tracker := &RPCSentTracker{
+		logger:                               config.Logger.With().Str("component", "rpc_sent_tracker").Logger(),
 		lastHighestIHaveRPCSize:              &lastHighestIHaveRPCSize{sync.RWMutex{}, 0, time.Now()},
 		cache:                                newRPCSentCache(cacheConfig),
 		lastHighestIHaveRPCSizeResetInterval: config.LastHighestIhavesSentResetInterval,
@@ -110,6 +116,7 @@ func (t *RPCSentTracker) rpcSentWorkerLogic(work trackableRPC) error {
 		iHave := work.rpc.GetControl().GetIhave()
 		t.iHaveRPCSent(iHave)
 		t.updateLastHighestIHaveRPCSize(int64(len(iHave)))
+		t.logger.Info().Int("size", len(iHave)).Msg(iHaveRPCTrackedLog)
 	}
 	return nil
 }

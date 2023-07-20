@@ -2,6 +2,7 @@ package internal
 
 import (
 	"context"
+	"os"
 	"testing"
 	"time"
 
@@ -9,6 +10,7 @@ import (
 	pb "github.com/libp2p/go-libp2p-pubsub/pb"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/atomic"
 
 	"github.com/onflow/flow-go/config"
 	"github.com/onflow/flow-go/module/irrecoverable"
@@ -71,6 +73,84 @@ func TestRPCSentTracker_IHave(t *testing.T) {
 			}
 		}
 	})
+
+}
+
+// TestRPCSentTracker_DuplicateMessageID ensures the worker pool of the RPC tracker processes req with the same message ID but different nonce.
+func TestRPCSentTracker_DuplicateMessageID(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
+
+	processedWorkLogs := atomic.NewInt64(0)
+	hook := zerolog.HookFunc(func(e *zerolog.Event, level zerolog.Level, message string) {
+		if level == zerolog.InfoLevel {
+			if message == iHaveRPCTrackedLog {
+				processedWorkLogs.Inc()
+			}
+		}
+	})
+	logger := zerolog.New(os.Stdout).Level(zerolog.InfoLevel).Hook(hook)
+
+	tracker := mockTracker(t, time.Minute)
+	require.NotNil(t, tracker)
+	tracker.logger = logger
+	tracker.Start(signalerCtx)
+	defer func() {
+		cancel()
+		unittest.RequireComponentsDoneBefore(t, time.Second, tracker)
+	}()
+
+	messageID := unittest.IdentifierFixture().String()
+	rpc := rpcFixture(withIhaves([]*pb.ControlIHave{{
+		MessageIDs: []string{messageID},
+	}}))
+	// track duplicate RPC's each will be processed by a worker
+	require.NoError(t, tracker.Track(rpc))
+	require.NoError(t, tracker.Track(rpc))
+
+	// eventually we should have processed both RPCs
+	require.Eventually(t, func() bool {
+		return processedWorkLogs.Load() == 2
+	}, time.Second, 100*time.Millisecond)
+}
+
+// TestRPCSentTracker_ConcurrentTracking ensures that all message IDs in RPC's are tracked as expected when tracked concurrently.
+func TestRPCSentTracker_ConcurrentTracking(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
+
+	tracker := mockTracker(t, time.Minute)
+	require.NotNil(t, tracker)
+
+	tracker.Start(signalerCtx)
+	defer func() {
+		cancel()
+		unittest.RequireComponentsDoneBefore(t, time.Second, tracker)
+	}()
+
+	numOfMsgIds := 100
+	numOfRPCs := 100
+	rpcs := make([]*pubsub.RPC, numOfRPCs)
+	for i := 0; i < numOfRPCs; i++ {
+		i := i
+		go func() {
+			rpc := rpcFixture(withIhaves([]*pb.ControlIHave{{MessageIDs: unittest.IdentifierListFixture(numOfMsgIds).Strings()}}))
+			require.NoError(t, tracker.Track(rpc))
+			rpcs[i] = rpc
+		}()
+	}
+
+	// eventually we should have tracked numOfMsgIds per single topic
+	require.Eventually(t, func() bool {
+		return tracker.cache.size() == uint(numOfRPCs*numOfMsgIds)
+	}, time.Second, 100*time.Millisecond)
+
+	for _, rpc := range rpcs {
+		ihaves := rpc.GetControl().GetIhave()
+		for _, messageID := range ihaves[0].GetMessageIDs() {
+			require.True(t, tracker.WasIHaveRPCSent(messageID))
+		}
+	}
 }
 
 // TestRPCSentTracker_IHave ensures *RPCSentTracker tracks the last largest iHave size as expected.
