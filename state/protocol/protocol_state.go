@@ -51,8 +51,10 @@ type ProtocolState interface {
 	// AtBlockID returns protocol state at block ID.
 	// Resulting protocol state is returned AFTER applying updates that are contained in block.
 	// Can be queried for any block that has been added to the block tree.
-	// No errors are expected during normal operations.
-	// TODO(yuraolex): check return types
+	// Returns:
+	// - (DynamicProtocolState, nil) - if there is a protocol state associated with given block ID.
+	// - (nil, storage.ErrNotFound) - if there is no protocol state associated with given block ID.
+	// - (nil, exception) - any other error should be treated as exception.
 	AtBlockID(blockID flow.Identifier) (DynamicProtocolState, error)
 	// GlobalParams returns params that are same for all nodes in the network.
 	GlobalParams() GlobalParams
