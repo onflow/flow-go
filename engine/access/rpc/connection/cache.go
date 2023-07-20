@@ -37,11 +37,13 @@ func (s *CachedClient) Close() {
 
 type Cache struct {
 	cache *lru.Cache
+	size  int
 }
 
-func NewCache(cache *lru.Cache) *Cache {
+func NewCache(cache *lru.Cache, size int) *Cache {
 	return &Cache{
 		cache: cache,
+		size:  size,
 	}
 }
 
@@ -84,4 +86,12 @@ func (c *Cache) Remove(address string) (present bool) {
 
 func (c *Cache) Len() int {
 	return c.cache.Len()
+}
+
+func (c *Cache) Size() int {
+	return c.size
+}
+
+func (c *Cache) Contains(address string) (containKey bool) {
+	return c.cache.Contains(address)
 }

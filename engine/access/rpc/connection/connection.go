@@ -13,9 +13,6 @@ import (
 	"github.com/onflow/flow-go/module"
 )
 
-// DefaultClientTimeout is used when making a GRPC request to a collection node or an execution node
-const DefaultClientTimeout = 3 * time.Second
-
 // ConnectionFactory is used to create an access api client
 type ConnectionFactory interface {
 	GetAccessAPIClient(address string) (access.AccessAPIClient, io.Closer, error)
@@ -43,17 +40,16 @@ func (p *ProxyConnectionFactory) GetExecutionAPIClient(address string) (executio
 	return p.ConnectionFactory.GetExecutionAPIClient(p.targetAddress)
 }
 
+var _ ConnectionFactory = (*ConnectionFactoryImpl)(nil)
+
 type ConnectionFactoryImpl struct {
 	CollectionGRPCPort        uint
 	ExecutionGRPCPort         uint
 	CollectionNodeGRPCTimeout time.Duration
 	ExecutionNodeGRPCTimeout  time.Duration
-	CacheSize                 uint
-	MaxMsgSize                uint
 	AccessMetrics             module.AccessMetrics
 	Log                       zerolog.Logger
-
-	manager *Manager
+	Manager                   Manager
 }
 
 func (cf *ConnectionFactoryImpl) GetAccessAPIClient(address string) (access.AccessAPIClient, io.Closer, error) {
@@ -67,7 +63,7 @@ func (cf *ConnectionFactoryImpl) GetAccessAPIClientWithPort(address string, port
 		return nil, nil, err
 	}
 
-	conn, closer, err := cf.manager.GetConnection(grpcAddress, cf.CollectionNodeGRPCTimeout)
+	conn, closer, err := cf.Manager.GetConnection(grpcAddress, cf.CollectionNodeGRPCTimeout)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -76,7 +72,7 @@ func (cf *ConnectionFactoryImpl) GetAccessAPIClientWithPort(address string, port
 }
 
 func (cf *ConnectionFactoryImpl) InvalidateAccessAPIClient(address string) {
-	if !cf.manager.HasCache() {
+	if !cf.Manager.HasCache() {
 		return
 	}
 
@@ -91,7 +87,7 @@ func (cf *ConnectionFactoryImpl) GetExecutionAPIClient(address string) (executio
 		return nil, nil, err
 	}
 
-	conn, closer, err := cf.manager.GetConnection(grpcAddress, cf.ExecutionNodeGRPCTimeout)
+	conn, closer, err := cf.Manager.GetConnection(grpcAddress, cf.ExecutionNodeGRPCTimeout)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -100,7 +96,7 @@ func (cf *ConnectionFactoryImpl) GetExecutionAPIClient(address string) (executio
 }
 
 func (cf *ConnectionFactoryImpl) InvalidateExecutionAPIClient(address string) {
-	if !cf.manager.HasCache() {
+	if !cf.Manager.HasCache() {
 		return
 	}
 
@@ -117,7 +113,7 @@ func (cf *ConnectionFactoryImpl) invalidateAPIClient(address string, port uint) 
 		panic(err)
 	}
 
-	if !cf.manager.Remove(grpcAddress) {
+	if !cf.Manager.Remove(grpcAddress) {
 		return
 	}
 

@@ -16,6 +16,7 @@ import (
 
 	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/cmd/build"
+	"github.com/onflow/flow-go/engine/access/rpc/connection"
 	"github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/model/flow"
@@ -77,7 +78,7 @@ type Backend struct {
 	chainID           flow.ChainID
 	collections       storage.Collections
 	executionReceipts storage.ExecutionReceipts
-	connFactory       ConnectionFactory
+	connFactory       connection.ConnectionFactory
 }
 
 func New(
@@ -92,7 +93,7 @@ func New(
 	executionResults storage.ExecutionResults,
 	chainID flow.ChainID,
 	accessMetrics module.AccessMetrics,
-	connFactory ConnectionFactory,
+	connFactory connection.ConnectionFactory,
 	retryEnabled bool,
 	maxHeightRange uint,
 	preferredExecutionNodeIDs []string,

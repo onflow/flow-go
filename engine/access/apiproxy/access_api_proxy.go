@@ -17,7 +17,7 @@ import (
 	"github.com/onflow/flow/protobuf/go/flow/access"
 	"github.com/rs/zerolog"
 
-	"github.com/onflow/flow-go/engine/access/rpc/backend"
+	rpcConnection "github.com/onflow/flow-go/engine/access/rpc/connection"
 	"github.com/onflow/flow-go/engine/protocol"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
@@ -65,7 +65,7 @@ func (h *FlowAccessAPIForwarder) reconnectingClient(i int) error {
 				identity.Address,
 				grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(int(h.maxMsgSize))),
 				grpc.WithTransportCredentials(insecure.NewCredentials()),
-				backend.WithClientTimeoutOption(timeout))
+				rpcConnection.WithClientTimeoutOption(timeout))
 			if err != nil {
 				return err
 			}
@@ -79,7 +79,7 @@ func (h *FlowAccessAPIForwarder) reconnectingClient(i int) error {
 				identity.Address,
 				grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(int(h.maxMsgSize))),
 				grpc.WithTransportCredentials(credentials.NewTLS(tlsConfig)),
-				backend.WithClientTimeoutOption(timeout))
+				rpcConnection.WithClientTimeoutOption(timeout))
 			if err != nil {
 				return fmt.Errorf("cannot connect to %s %w", identity.Address, err)
 			}

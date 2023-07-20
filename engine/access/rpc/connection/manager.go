@@ -6,7 +6,6 @@ import (
 	"io"
 	"time"
 
-	"github.com/onflow/flow-go/module"
 	"github.com/rs/zerolog"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -14,7 +13,12 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/keepalive"
 	"google.golang.org/grpc/status"
+
+	"github.com/onflow/flow-go/module"
 )
+
+// DefaultClientTimeout is used when making a GRPC request to a collection node or an execution node
+const DefaultClientTimeout = 3 * time.Second
 
 type Manager struct {
 	cache      *Cache
@@ -28,8 +32,8 @@ func NewManager(
 	logger zerolog.Logger,
 	metrics module.AccessMetrics,
 	maxMsgSize uint,
-) *Manager {
-	return &Manager{
+) Manager {
+	return Manager{
 		cache:      cache,
 		logger:     logger,
 		metrics:    metrics,
@@ -78,11 +82,17 @@ func (m *Manager) HasCache() bool {
 }
 
 func (m *Manager) retrieveConnection(grpcAddress string, timeout time.Duration) (*grpc.ClientConn, error) {
-
 	client, ok := m.cache.GetOrAdd(grpcAddress, timeout)
 	if ok {
 		// client was from the cache, wait for the lock
 		client.mu.Lock()
+		if m.metrics != nil {
+			m.metrics.ConnectionFromPoolReused()
+		}
+	} else {
+		if m.metrics != nil {
+			m.metrics.ConnectionAddedToPool()
+		}
 	}
 	defer client.mu.Unlock()
 
@@ -96,12 +106,19 @@ func (m *Manager) retrieveConnection(grpcAddress string, timeout time.Duration) 
 	}
 
 	client.ClientConn = conn
+	if m.metrics != nil {
+		m.metrics.NewConnectionEstablished()
+		m.metrics.TotalConnectionsInPool(uint(m.cache.Len()), uint(m.cache.Size()))
+	}
 
 	return client.ClientConn, nil
 }
 
 // createConnection creates new gRPC connections to remote node
 func (m *Manager) createConnection(address string, timeout time.Duration, cachedClient *CachedClient) (*grpc.ClientConn, error) {
+	if timeout == 0 {
+		timeout = DefaultClientTimeout
+	}
 
 	keepaliveParams := keepalive.ClientParameters{
 		// how long the client will wait before sending a keepalive to the server if there is no activity

@@ -19,6 +19,7 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/engine/access/rest"
 	"github.com/onflow/flow-go/engine/access/rpc/backend"
+	"github.com/onflow/flow-go/engine/access/rpc/connection"
 	"github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
@@ -149,7 +150,7 @@ func NewBuilder(log zerolog.Logger,
 		}
 		var err error
 		cache, err = lru.NewWithEvict(int(cacheSize), func(_, evictedValue interface{}) {
-			store := evictedValue.(*backend.CachedClient)
+			store := evictedValue.(*connection.CachedClient)
 			store.Close()
 			log.Debug().Str("grpc_conn_evicted", store.Address).Msg("closing grpc connection evicted from pool")
 			if accessMetrics != nil {
@@ -161,16 +162,14 @@ func NewBuilder(log zerolog.Logger,
 		}
 	}
 
-	connectionFactory := &backend.ConnectionFactoryImpl{
+	connectionFactory := &connection.ConnectionFactoryImpl{
 		CollectionGRPCPort:        collectionGRPCPort,
 		ExecutionGRPCPort:         executionGRPCPort,
 		CollectionNodeGRPCTimeout: config.CollectionClientTimeout,
 		ExecutionNodeGRPCTimeout:  config.ExecutionClientTimeout,
-		ConnectionsCache:          cache,
-		CacheSize:                 cacheSize,
-		MaxMsgSize:                config.MaxMsgSize,
 		AccessMetrics:             accessMetrics,
 		Log:                       log,
+		Manager:                   connection.NewManager(connection.NewCache(cache, int(cacheSize)), log, accessMetrics, config.MaxMsgSize),
 	}
 
 	backend := backend.New(state,
