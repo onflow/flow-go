@@ -13,7 +13,7 @@ import (
 	"github.com/onflow/flow-go/module"
 )
 
-// ConnectionFactory is used to create an access api client
+// ConnectionFactory is an interface for creating access and execution API clients.
 type ConnectionFactory interface {
 	GetAccessAPIClient(address string) (access.AccessAPIClient, io.Closer, error)
 	GetAccessAPIClientWithPort(address string, port uint) (access.AccessAPIClient, io.Closer, error)
@@ -22,6 +22,7 @@ type ConnectionFactory interface {
 	InvalidateExecutionAPIClient(address string)
 }
 
+// ProxyConnectionFactory wraps an existing ConnectionFactory and allows getting API clients for a target address.
 type ProxyConnectionFactory struct {
 	ConnectionFactory
 	targetAddress string
@@ -52,12 +53,13 @@ type ConnectionFactoryImpl struct {
 	Manager                   Manager
 }
 
+// GetAccessAPIClient gets an access API client for the specified address using the default CollectionGRPCPort.
 func (cf *ConnectionFactoryImpl) GetAccessAPIClient(address string) (access.AccessAPIClient, io.Closer, error) {
 	return cf.GetAccessAPIClientWithPort(address, cf.CollectionGRPCPort)
 }
 
+// GetAccessAPIClientWithPort gets an access API client for the specified address and port.
 func (cf *ConnectionFactoryImpl) GetAccessAPIClientWithPort(address string, port uint) (access.AccessAPIClient, io.Closer, error) {
-
 	grpcAddress, err := getGRPCAddress(address, port)
 	if err != nil {
 		return nil, nil, err
@@ -71,6 +73,8 @@ func (cf *ConnectionFactoryImpl) GetAccessAPIClientWithPort(address string, port
 	return access.NewAccessAPIClient(conn), closer, nil
 }
 
+// InvalidateAccessAPIClient invalidates the access API client associated with the given address.
+// It removes the cached client from the cache and closes the connection if a cache is used.
 func (cf *ConnectionFactoryImpl) InvalidateAccessAPIClient(address string) {
 	if !cf.Manager.HasCache() {
 		return
@@ -80,8 +84,8 @@ func (cf *ConnectionFactoryImpl) InvalidateAccessAPIClient(address string) {
 	cf.invalidateAPIClient(address, cf.CollectionGRPCPort)
 }
 
+// GetExecutionAPIClient gets an execution API client for the specified address using the default ExecutionGRPCPort.
 func (cf *ConnectionFactoryImpl) GetExecutionAPIClient(address string) (execution.ExecutionAPIClient, io.Closer, error) {
-
 	grpcAddress, err := getGRPCAddress(address, cf.ExecutionGRPCPort)
 	if err != nil {
 		return nil, nil, err
@@ -95,6 +99,8 @@ func (cf *ConnectionFactoryImpl) GetExecutionAPIClient(address string) (executio
 	return execution.NewExecutionAPIClient(conn), closer, nil
 }
 
+// InvalidateExecutionAPIClient invalidates the execution API client associated with the given address.
+// It removes the cached client from the cache and closes the connection if a cache is used.
 func (cf *ConnectionFactoryImpl) InvalidateExecutionAPIClient(address string) {
 	if !cf.Manager.HasCache() {
 		return
@@ -104,13 +110,12 @@ func (cf *ConnectionFactoryImpl) InvalidateExecutionAPIClient(address string) {
 	cf.invalidateAPIClient(address, cf.ExecutionGRPCPort)
 }
 
-// invalidateAPIClient invalidates the access API client associated with the given address and port.
-// It removes the cached client from the ConnectionsCache and closes the connection.
+// invalidateAPIClient invalidates the access or execution API client associated with the given address and port.
+// It removes the cached client from the ConnectionsCache and closes the connection if a cache is used.
 func (cf *ConnectionFactoryImpl) invalidateAPIClient(address string, port uint) {
 	grpcAddress, err := getGRPCAddress(address, port)
 	if err != nil {
-		// TODO: return and handle the error
-		panic(err)
+		panic(err) // TODO: return and handle the error
 	}
 
 	if !cf.Manager.Remove(grpcAddress) {
@@ -122,15 +127,15 @@ func (cf *ConnectionFactoryImpl) invalidateAPIClient(address string, port uint) 
 	}
 }
 
-// getExecutionNodeAddress translates flow.Identity address to the GRPC address of the node by switching the port to the
-// GRPC port from the libp2p port
+// getGRPCAddress translates the flow.Identity address to the GRPC address of the node by switching the port to the
+// GRPC port from the libp2p port.
 func getGRPCAddress(address string, grpcPort uint) (string, error) {
-	// split hostname and port
+	// Split hostname and port
 	hostnameOrIP, _, err := net.SplitHostPort(address)
 	if err != nil {
 		return "", err
 	}
-	// use the hostname from identity list and port number as the one passed in as argument
+	// Use the hostname from the identity list and the GRPC port number as the one passed in as an argument.
 	grpcAddress := fmt.Sprintf("%s:%d", hostnameOrIP, grpcPort)
 
 	return grpcAddress, nil

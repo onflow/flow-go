@@ -9,6 +9,7 @@ import (
 	"google.golang.org/grpc"
 )
 
+// CachedClient represents a gRPC client connection that is cached for reuse.
 type CachedClient struct {
 	ClientConn     *grpc.ClientConn
 	Address        string
@@ -35,11 +36,13 @@ func (s *CachedClient) Close() {
 	}()
 }
 
+// Cache represents a cache of CachedClient instances with a given maximum size.
 type Cache struct {
 	cache *lru.Cache
 	size  int
 }
 
+// NewCache creates a new Cache with the specified maximum size and the underlying LRU cache.
 func NewCache(cache *lru.Cache, size int) *Cache {
 	return &Cache{
 		cache: cache,
@@ -47,6 +50,8 @@ func NewCache(cache *lru.Cache, size int) *Cache {
 	}
 }
 
+// Get retrieves the CachedClient for the given address from the cache.
+// It returns the CachedClient and a boolean indicating whether the entry exists in the cache.
 func (c *Cache) Get(address string) (*CachedClient, bool) {
 	val, ok := c.cache.Get(address)
 	if !ok {
@@ -76,22 +81,30 @@ func (c *Cache) GetOrAdd(address string, timeout time.Duration) (*CachedClient, 
 	return client, false
 }
 
+// Add adds a CachedClient to the cache with the given address.
+// It returns a boolean indicating whether an existing entry was evicted.
 func (c *Cache) Add(address string, client *CachedClient) (evicted bool) {
 	return c.cache.Add(address, client)
 }
 
+// Remove removes the CachedClient entry from the cache with the given address.
+// It returns a boolean indicating whether the entry was present and removed.
 func (c *Cache) Remove(address string) (present bool) {
 	return c.cache.Remove(address)
 }
 
+// Len returns the number of CachedClient entries in the cache.
 func (c *Cache) Len() int {
 	return c.cache.Len()
 }
 
+// Size returns the maximum size of the cache.
 func (c *Cache) Size() int {
 	return c.size
 }
 
+// Contains checks if the cache contains an entry with the given address.
+// It returns a boolean indicating whether the address is present in the cache.
 func (c *Cache) Contains(address string) (containKey bool) {
 	return c.cache.Contains(address)
 }
