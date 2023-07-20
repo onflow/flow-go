@@ -98,6 +98,8 @@ type EnvironmentParams struct {
 	BlockInfoParams
 	TransactionInfoParams
 
+	EntropyProvider
+
 	ContractUpdaterParams
 }
 

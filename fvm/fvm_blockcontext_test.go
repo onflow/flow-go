@@ -1664,17 +1664,19 @@ func TestBlockContext_GetAccount(t *testing.T) {
 	})
 }
 
-func TestBlockContext_UnsafeRandom(t *testing.T) {
+func TestBlockContext_Random(t *testing.T) {
 
 	t.Parallel()
 
 	chain, vm := createChainAndVm(flow.Mainnet)
 
 	header := &flow.Header{Height: 42}
+	source := testutil.EntropyProviderFixture(nil)
 
 	ctx := fvm.NewContext(
 		fvm.WithChain(chain),
 		fvm.WithBlockHeader(header),
+		fvm.WithEntropyProvider(source),
 		fvm.WithCadenceLogging(true),
 	)
 
@@ -1701,9 +1703,10 @@ func TestBlockContext_UnsafeRandom(t *testing.T) {
 
 		require.Len(t, output.Logs, 1)
 
-		num, err := strconv.ParseUint(output.Logs[0], 10, 64)
+		// output cannot be deterministic because transaction signature is not deterministic
+		// (which makes the tx hash and the PRG seed used by the execution not deterministic)
+		_, err = strconv.ParseUint(output.Logs[0], 10, 64)
 		require.NoError(t, err)
-		require.Equal(t, uint64(0x7515f254adc6f8af), num)
 	})
 }
 
