@@ -172,7 +172,7 @@ func (b *backendScripts) executeScriptOnExecutor(
 
 			return err
 		},
-		func(node flow.Identity, err error) bool {
+		func(node *flow.Identity, err error) bool {
 			hasInvalidArgument = status.Code(err) == codes.InvalidArgument
 			if hasInvalidArgument {
 				b.log.Debug().Err(err).

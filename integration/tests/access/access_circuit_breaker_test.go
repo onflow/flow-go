@@ -181,7 +181,7 @@ func (s *AccessCircuitBreakerSuite) TestCircuitBreaker() {
 	// Try to send the transaction for the second time. It should wait less than a second because the circuit breaker
 	// is configured to break after the first failure
 	duration, err = sendTransaction(ctx, signedTx)
-	assert.Equal(s.T(), codes.Unknown, status.Code(err))
+	assert.Equal(s.T(), codes.Unavailable, status.Code(err))
 	assert.Greater(s.T(), time.Second, duration)
 
 	// Reconnect the collection node
