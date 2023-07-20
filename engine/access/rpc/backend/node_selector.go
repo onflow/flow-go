@@ -41,8 +41,6 @@ func (n *NodeSelectorFactory) SelectNodes(nodes flow.IdentityList) (NodeSelector
 	}, nil
 }
 
-// SelectCollectionNodes
-
 var _ NodeSelector = (*MainNodeSelector)(nil)
 
 // MainNodeSelector is a specific implementation of the node selector.
