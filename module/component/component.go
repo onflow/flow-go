@@ -166,14 +166,6 @@ func (c *componentManagerBuilderImpl) AddWorker(worker ComponentWorker) Componen
 	return c
 }
 
-// AddWorkers adds n number of workers for the ComponentManager.
-func (c *componentManagerBuilderImpl) AddWorkers(n int, worker ComponentWorker) ComponentManagerBuilder {
-	for i := 0; i < n; i++ {
-		c.workers = append(c.workers, worker)
-	}
-	return c
-}
-
 // Build returns a new ComponentManager instance with the configured workers
 // Build may be called multiple times to create multiple individual ComponentManagers. This will
 // result in the worker routines being called multiple times. If this is unsafe, do not call it
