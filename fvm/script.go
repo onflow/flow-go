@@ -203,9 +203,9 @@ func (executor *scriptExecutor) executeScript() error {
 	)
 	populateErr := executor.output.PopulateEnvironmentValues(executor.env)
 	if err != nil {
-		return err
+		return multierror.Append(err, populateErr)
 	}
 
 	executor.output.Value = value
-	return multierror.Append(err, populateErr)
+	return populateErr
 }
