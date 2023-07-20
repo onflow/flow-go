@@ -191,11 +191,11 @@ func (b *backendScripts) executeScriptOnExecutor(
 	}
 
 	if errToReturn == nil {
+		return result, nil
+	} else {
 		b.metrics.ScriptExecutionErrorOnExecutionNode()
 		b.log.Error().Err(err).Msg("script execution failed for execution node internal reasons")
 		return nil, rpc.ConvertError(errToReturn, "failed to execute script on execution nodes", codes.Internal)
-	} else {
-		return result, nil
 	}
 }
 
