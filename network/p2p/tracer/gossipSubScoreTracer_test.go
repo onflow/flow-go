@@ -83,9 +83,7 @@ func TestGossipSubScoreTracer(t *testing.T) {
 		}),
 		p2ptest.WithLogger(logger),
 		p2ptest.WithPeerScoreTracerInterval(1*time.Second), // set the peer score log interval to 1 second for sake of testing.
-		p2ptest.WithPeerScoringEnabled(idProvider),         // enable peer scoring for sake of testing.
-		// 4. Sets some fixed scores for the nodes for the sake of testing based on their roles.
-		p2ptest.WithPeerScoreParamsOption(&p2p.PeerScoringConfig{
+		p2ptest.EnablePeerScoringWithOverride(&p2p.PeerScoringConfigOverride{
 			AppSpecificScoreParams: func(pid peer.ID) float64 {
 				id, ok := idProvider.ByPeerID(pid)
 				require.True(t, ok)

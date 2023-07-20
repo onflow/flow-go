@@ -24,7 +24,7 @@ type facadeEnvironment struct {
 	*ProgramLogger
 	EventEmitter
 
-	UnsafeRandomGenerator
+	RandomGenerator
 	CryptoLibrary
 
 	BlockInfo
@@ -75,11 +75,6 @@ func newFacadeEnvironment(
 		ProgramLogger: logger,
 		EventEmitter:  NoEventEmitter{},
 
-		UnsafeRandomGenerator: NewUnsafeRandomGenerator(
-			tracer,
-			params.BlockHeader,
-			params.TxIndex,
-		),
 		CryptoLibrary: NewCryptoLibrary(tracer, meter),
 
 		BlockInfo: NewBlockInfo(
@@ -175,9 +170,8 @@ func NewScriptEnv(
 		params,
 		txnState,
 		NewCancellableMeter(ctx, txnState))
-
+	env.RandomGenerator = NewDummyRandomGenerator()
 	env.addParseRestrictedChecks()
-
 	return env
 }
 
@@ -232,6 +226,12 @@ func NewTransactionEnvironment(
 		txnState,
 		env)
 
+	env.RandomGenerator = NewRandomGenerator(
+		tracer,
+		params.EntropyProvider,
+		params.TxId,
+	)
+
 	env.addParseRestrictedChecks()
 
 	return env
@@ -272,9 +272,9 @@ func (env *facadeEnvironment) addParseRestrictedChecks() {
 	env.TransactionInfo = NewParseRestrictedTransactionInfo(
 		env.txnState,
 		env.TransactionInfo)
-	env.UnsafeRandomGenerator = NewParseRestrictedUnsafeRandomGenerator(
+	env.RandomGenerator = NewParseRestrictedRandomGenerator(
 		env.txnState,
-		env.UnsafeRandomGenerator)
+		env.RandomGenerator)
 	env.UUIDGenerator = NewParseRestrictedUUIDGenerator(
 		env.txnState,
 		env.UUIDGenerator)

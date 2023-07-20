@@ -65,7 +65,8 @@ func withReader(
 		root, err := s.State.Params().FinalizedRoot()
 		require.NoError(t, err)
 		clusterCommittee := participants.Filter(filter.HasRole(flow.RoleCollection))
-		results := vertestutils.CompleteExecutionReceiptChainFixture(t, root, blockCount/2, vertestutils.WithClusterCommittee(clusterCommittee))
+		sources := unittest.RandomSourcesFixture(10)
+		results := vertestutils.CompleteExecutionReceiptChainFixture(t, root, blockCount/2, sources, vertestutils.WithClusterCommittee(clusterCommittee))
 		blocks := vertestutils.ExtendStateWithFinalizedBlocks(t, results, s.State)
 
 		withBlockReader(reader, blocks)
