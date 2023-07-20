@@ -12,8 +12,8 @@ import (
 	"github.com/onflow/flow-go/module/irrecoverable"
 )
 
-// GrpcServer defines a grpc server that starts once and uses in different Engines.
-// It makes it easy to configure the node to use the same port for both APIs.
+// GrpcServer wraps `grpc.Server` and allows to manage it using `component.Component` interface. It can be injected
+// into different engines making it possible to use single grpc server for multiple services which live in different modules.
 type GrpcServer struct {
 	component.Component
 	log    zerolog.Logger
@@ -24,6 +24,8 @@ type GrpcServer struct {
 	addrLock    sync.RWMutex
 	grpcAddress net.Addr
 }
+
+var _ component.Component = (*GrpcServer)(nil)
 
 // NewGrpcServer returns a new grpc server.
 func NewGrpcServer(log zerolog.Logger,

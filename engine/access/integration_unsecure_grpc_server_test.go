@@ -248,6 +248,8 @@ func (suite *SameGRPCPortTestSuite) SetupTest() {
 	unittest.AssertClosesBefore(suite.T(), suite.stateStreamEng.Ready(), 2*time.Second)
 }
 
+// TestEnginesOnTheSameGrpcPort verifies if both AccessAPI and ExecutionDataAPI client successfully connect and continue
+// to work when configured on the same port
 func (suite *SameGRPCPortTestSuite) TestEnginesOnTheSameGrpcPort() {
 	ctx := context.Background()
 
@@ -285,7 +287,7 @@ func TestSameGRPCTestSuite(t *testing.T) {
 	suite.Run(t, new(SameGRPCPortTestSuite))
 }
 
-// unsecureGRPCClient creates an unsecure GRPC client
+// unsecureAccessAPIClient creates an unsecure grpc AccessAPI client
 func (suite *SameGRPCPortTestSuite) unsecureAccessAPIClient(conn *grpc.ClientConn) accessproto.AccessAPIClient {
 	client := accessproto.NewAccessAPIClient(conn)
 	return client
