@@ -492,7 +492,7 @@ func createTx(net *testnet.FlowNetwork) *bytes.Buffer {
 	tx.PayloadSignatures = []flow.TransactionSignature{signature}
 	tx.EnvelopeSignatures = []flow.TransactionSignature{signature}
 
-	jsonBody, _ := json.Marshal(unittest.ValidCreateBody(*tx))
+	jsonBody, _ := json.Marshal(unittest.CreateSendTxHttpPayload(*tx))
 
 	return bytes.NewBuffer(jsonBody)
 }

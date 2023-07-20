@@ -48,7 +48,6 @@ func TestScripts(t *testing.T) {
 
 	t.Run("get by Latest height", func(t *testing.T) {
 		backend := &mock.API{}
-
 		backend.Mock.
 			On("ExecuteScriptAtLatestBlock", mocks.Anything, validCode, [][]byte{validArgs}).
 			Return([]byte("hello world"), nil)
@@ -92,7 +91,6 @@ func TestScripts(t *testing.T) {
 
 	t.Run("get error", func(t *testing.T) {
 		backend := &mock.API{}
-
 		backend.Mock.
 			On("ExecuteScriptAtBlockHeight", mocks.Anything, uint64(1337), validCode, [][]byte{validArgs}).
 			Return(nil, status.Error(codes.Internal, "internal server error"))
@@ -109,7 +107,6 @@ func TestScripts(t *testing.T) {
 
 	t.Run("get invalid", func(t *testing.T) {
 		backend := &mock.API{}
-
 		backend.Mock.
 			On("ExecuteScriptAtBlockHeight", mocks.Anything, mocks.Anything, mocks.Anything, mocks.Anything).
 			Return(nil, nil)

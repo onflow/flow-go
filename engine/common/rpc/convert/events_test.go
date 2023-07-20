@@ -11,7 +11,6 @@ import (
 	jsoncdc "github.com/onflow/cadence/encoding/json"
 	execproto "github.com/onflow/flow/protobuf/go/flow/execution"
 
-	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -207,7 +206,7 @@ func TestConvertMessagesToBlockEvents(t *testing.T) {
 		blockEvents[i] = unittest.BlockEventsFixture(header, 2)
 	}
 
-	msg, err := access.BlockEventsToMessages(blockEvents)
+	msg, err := convert.BlockEventsToMessages(blockEvents)
 	require.NoError(t, err)
 
 	converted := convert.MessagesToBlockEvents(msg)

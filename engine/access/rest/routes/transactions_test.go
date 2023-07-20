@@ -72,7 +72,6 @@ func createTransactionReq(body interface{}) *http.Request {
 func TestGetTransactions(t *testing.T) {
 	t.Run("get by ID without results", func(t *testing.T) {
 		backend := &mock.API{}
-
 		tx := unittest.TransactionFixture()
 		req := getTransactionReq(tx.ID().String(), false, "", "")
 
@@ -348,7 +347,7 @@ func TestCreateTransaction(t *testing.T) {
 		tx := unittest.TransactionBodyFixture()
 		tx.PayloadSignatures = []flow.TransactionSignature{unittest.TransactionSignatureFixture()}
 		tx.Arguments = [][]uint8{}
-		req := createTransactionReq(unittest.ValidCreateBody(tx))
+		req := createTransactionReq(unittest.CreateSendTxHttpPayload(tx))
 
 		backend.Mock.
 			On("SendTransaction", mocks.Anything, &tx).
@@ -415,7 +414,7 @@ func TestCreateTransaction(t *testing.T) {
 		for _, test := range tests {
 			tx := unittest.TransactionBodyFixture()
 			tx.PayloadSignatures = []flow.TransactionSignature{unittest.TransactionSignatureFixture()}
-			testTx := unittest.ValidCreateBody(tx)
+			testTx := unittest.CreateSendTxHttpPayload(tx)
 			testTx[test.inputField] = test.inputValue
 			req := createTransactionReq(testTx)
 

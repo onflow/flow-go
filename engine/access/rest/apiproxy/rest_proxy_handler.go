@@ -2,6 +2,7 @@ package apiproxy
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"google.golang.org/grpc/status"
@@ -44,7 +45,7 @@ func NewRestProxyHandler(
 		timeout,
 		maxMsgSize)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("could not create REST forwarder: %w", err)
 	}
 
 	restProxyHandler := &RestProxyHandler{

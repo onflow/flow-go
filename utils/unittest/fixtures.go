@@ -2455,7 +2455,7 @@ func ChunkExecutionDataFixture(t *testing.T, minSize int, opts ...func(*executio
 	}
 }
 
-func ValidCreateBody(tx flow.TransactionBody) map[string]interface{} {
+func CreateSendTxHttpPayload(tx flow.TransactionBody) map[string]interface{} {
 	tx.Arguments = [][]uint8{} // fix how fixture creates nil values
 	auth := make([]string, len(tx.Authorizers))
 	for i, a := range tx.Authorizers {

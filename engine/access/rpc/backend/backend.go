@@ -213,7 +213,8 @@ func New(
 	return b
 }
 
-// NewCache constructs cache and its size.
+// NewCache constructs cache for storing connections to other nodes.
+// No errors are expected during normal operations.
 func NewCache(
 	log zerolog.Logger,
 	accessMetrics module.AccessMetrics,
