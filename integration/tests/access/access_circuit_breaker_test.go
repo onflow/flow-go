@@ -173,10 +173,10 @@ func (s *AccessCircuitBreakerSuite) TestCircuitBreaker() {
 		return duration, err
 	}
 
-	// Try to send the transaction for the first time. It should wait at least the timeout time and return Unknown error
+	// Try to send the transaction for the first time. It should wait at least the timeout time and return Unavailable error
 	duration, err := sendTransaction(ctx, signedTx)
 	assert.Equal(s.T(), codes.Unavailable, status.Code(err))
-	assert.Greater(s.T(), requestTimeout, duration)
+	assert.Less(s.T(), duration, requestTimeout)
 
 	// Try to send the transaction for the second time. It should wait less than a second because the circuit breaker
 	// is configured to break after the first failure
