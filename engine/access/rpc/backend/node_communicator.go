@@ -18,7 +18,7 @@ type NodeAction func(node *flow.Identity) error
 
 // ErrorTerminator is a callback function that determines whether an error should terminate further execution.
 // It takes an error as input and returns a boolean value indicating whether the error should be considered terminal.
-type ErrorTerminator func(err error) bool
+type ErrorTerminator func(node flow.Identity, err error) bool
 
 // NodeCommunicator is responsible for calling available nodes in the backend.
 type NodeCommunicator struct {
@@ -54,7 +54,7 @@ func (b *NodeCommunicator) CallAvailableNode(
 			return nil
 		}
 
-		if shouldTerminateOnError != nil && shouldTerminateOnError(err) {
+		if shouldTerminateOnError != nil && shouldTerminateOnError(*node, err) {
 			return err
 		}
 
