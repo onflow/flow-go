@@ -3,18 +3,17 @@ package internal
 import (
 	"crypto/rand"
 	"fmt"
+	"sync"
 	"time"
 
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	pb "github.com/libp2p/go-libp2p-pubsub/pb"
-	"github.com/rs/zerolog"
-	"go.uber.org/atomic"
-
 	"github.com/onflow/flow-go/engine/common/worker"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/mempool/queue"
 	p2pmsg "github.com/onflow/flow-go/network/p2p/message"
+	"github.com/rs/zerolog"
 )
 
 // trackableRPC is an internal data structure for "temporarily" storing *pubsub.RPC sent in the queue before they are processed
@@ -27,7 +26,8 @@ type trackableRPC struct {
 
 // lastHighestIHaveRPCSize tracks the last highest rpc control message size the time stamp it was last updated.
 type lastHighestIHaveRPCSize struct {
-	*atomic.Int64
+	sync.RWMutex
+	lastSize   int64
 	lastUpdate time.Time
 }
 
@@ -71,7 +71,7 @@ func NewRPCSentTracker(config *RPCSentTrackerConfig) *RPCSentTracker {
 		config.WorkerQueueCacheCollector)
 
 	tracker := &RPCSentTracker{
-		lastHighestIHaveRPCSize:              &lastHighestIHaveRPCSize{atomic.NewInt64(0), time.Now()},
+		lastHighestIHaveRPCSize:              &lastHighestIHaveRPCSize{sync.RWMutex{}, 0, time.Now()},
 		cache:                                newRPCSentCache(cacheConfig),
 		lastHighestIHaveRPCSizeResetInterval: config.LastHighestIhavesSentResetInterval,
 	}
@@ -115,9 +115,12 @@ func (t *RPCSentTracker) rpcSentWorkerLogic(work trackableRPC) error {
 }
 
 func (t *RPCSentTracker) updateLastHighestIHaveRPCSize(size int64) {
-	if t.lastHighestIHaveRPCSize.Load() < size || time.Since(t.lastHighestIHaveRPCSize.lastUpdate) > t.lastHighestIHaveRPCSizeResetInterval {
+	t.Lock()
+	defer t.Unlock()
+	if t.lastSize < size || time.Since(t.lastUpdate) > t.lastHighestIHaveRPCSizeResetInterval {
 		// The last highest ihave RPC size is updated if the new size is larger than the current size, or if the time elapsed since the last update surpasses the reset interval.
-		t.lastHighestIHaveRPCSize.Store(size)
+		t.lastSize = size
+		t.lastUpdate = time.Now()
 	}
 }
 
@@ -146,7 +149,9 @@ func (t *RPCSentTracker) WasIHaveRPCSent(topicID, messageID string) bool {
 
 // LastHighestIHaveRPCSize returns the last highest size of iHaves sent in an rpc.
 func (t *RPCSentTracker) LastHighestIHaveRPCSize() int64 {
-	return t.lastHighestIHaveRPCSize.Load()
+	t.RLock()
+	defer t.RUnlock()
+	return t.lastSize
 }
 
 // nonce returns random string that is used to store unique items in herocache.
