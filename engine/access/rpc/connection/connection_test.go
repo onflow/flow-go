@@ -10,8 +10,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/rs/zerolog"
-
 	"go.uber.org/atomic"
 	"pgregory.net/rapid"
 
@@ -49,7 +47,7 @@ func TestProxyAccessAPI(t *testing.T) {
 	connectionFactory.AccessMetrics = metrics.NewNoopCollector()
 	connectionFactory.Manager = NewManager(
 		nil,
-		zerolog.New(zerolog.NewConsoleWriter()),
+		unittest.Logger(),
 		connectionFactory.AccessMetrics,
 		0,
 	)
@@ -90,7 +88,7 @@ func TestProxyExecutionAPI(t *testing.T) {
 	connectionFactory.AccessMetrics = metrics.NewNoopCollector()
 	connectionFactory.Manager = NewManager(
 		nil,
-		zerolog.New(zerolog.NewConsoleWriter()),
+		unittest.Logger(),
 		connectionFactory.AccessMetrics,
 		0,
 	)
@@ -136,7 +134,7 @@ func TestProxyAccessAPIConnectionReuse(t *testing.T) {
 	connectionFactory.AccessMetrics = metrics.NewNoopCollector()
 	connectionFactory.Manager = NewManager(
 		connectionCache,
-		zerolog.New(zerolog.NewConsoleWriter()),
+		unittest.Logger(),
 		connectionFactory.AccessMetrics,
 		0,
 	)
@@ -189,7 +187,7 @@ func TestProxyExecutionAPIConnectionReuse(t *testing.T) {
 	connectionFactory.AccessMetrics = metrics.NewNoopCollector()
 	connectionFactory.Manager = NewManager(
 		connectionCache,
-		zerolog.New(zerolog.NewConsoleWriter()),
+		unittest.Logger(),
 		connectionFactory.AccessMetrics,
 		0,
 	)
@@ -249,7 +247,7 @@ func TestExecutionNodeClientTimeout(t *testing.T) {
 	connectionFactory.AccessMetrics = metrics.NewNoopCollector()
 	connectionFactory.Manager = NewManager(
 		connectionCache,
-		zerolog.New(zerolog.NewConsoleWriter()),
+		unittest.Logger(),
 		connectionFactory.AccessMetrics,
 		0,
 	)
@@ -297,7 +295,7 @@ func TestCollectionNodeClientTimeout(t *testing.T) {
 	connectionFactory.AccessMetrics = metrics.NewNoopCollector()
 	connectionFactory.Manager = NewManager(
 		connectionCache,
-		zerolog.New(zerolog.NewConsoleWriter()),
+		unittest.Logger(),
 		connectionFactory.AccessMetrics,
 		0,
 	)
@@ -345,7 +343,7 @@ func TestConnectionPoolFull(t *testing.T) {
 	connectionFactory.AccessMetrics = metrics.NewNoopCollector()
 	connectionFactory.Manager = NewManager(
 		connectionCache,
-		zerolog.New(zerolog.NewConsoleWriter()),
+		unittest.Logger(),
 		connectionFactory.AccessMetrics,
 		0,
 	)
@@ -420,7 +418,7 @@ func TestConnectionPoolStale(t *testing.T) {
 	connectionFactory.AccessMetrics = metrics.NewNoopCollector()
 	connectionFactory.Manager = NewManager(
 		connectionCache,
-		zerolog.New(zerolog.NewConsoleWriter()),
+		unittest.Logger(),
 		connectionFactory.AccessMetrics,
 		0,
 	)
@@ -508,7 +506,7 @@ func TestExecutionNodeClientClosedGracefully(t *testing.T) {
 		connectionFactory.AccessMetrics = metrics.NewNoopCollector()
 		connectionFactory.Manager = NewManager(
 			connectionCache,
-			zerolog.New(zerolog.NewConsoleWriter()),
+			unittest.Logger(),
 			connectionFactory.AccessMetrics,
 			0,
 		)
@@ -583,13 +581,15 @@ func TestExecutionEvictingCacheClients(t *testing.T) {
 	connectionFactory.CollectionNodeGRPCTimeout = 5 * time.Second
 	// Set the connection pool cache size
 	cacheSize := 1
-	cache, _ := lru.New(cacheSize)
+	cache, err := lru.New(cacheSize)
+	require.NoError(t, err)
+
 	connectionCache := NewCache(cache, cacheSize)
 	// set metrics reporting
 	connectionFactory.AccessMetrics = metrics.NewNoopCollector()
 	connectionFactory.Manager = NewManager(
 		connectionCache,
-		zerolog.New(zerolog.NewConsoleWriter()),
+		unittest.Logger(),
 		connectionFactory.AccessMetrics,
 		0,
 	)

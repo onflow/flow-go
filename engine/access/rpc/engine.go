@@ -162,6 +162,11 @@ func NewBuilder(log zerolog.Logger,
 		}
 	}
 
+	var connCache *connection.Cache
+	if cache != nil {
+		connCache = connection.NewCache(cache, int(cacheSize))
+	}
+
 	connectionFactory := &connection.ConnectionFactoryImpl{
 		CollectionGRPCPort:        collectionGRPCPort,
 		ExecutionGRPCPort:         executionGRPCPort,
@@ -169,7 +174,7 @@ func NewBuilder(log zerolog.Logger,
 		ExecutionNodeGRPCTimeout:  config.ExecutionClientTimeout,
 		AccessMetrics:             accessMetrics,
 		Log:                       log,
-		Manager:                   connection.NewManager(connection.NewCache(cache, int(cacheSize)), log, accessMetrics, config.MaxMsgSize),
+		Manager:                   connection.NewManager(connCache, log, accessMetrics, config.MaxMsgSize),
 	}
 
 	backend := backend.New(state,

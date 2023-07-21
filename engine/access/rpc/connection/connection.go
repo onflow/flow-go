@@ -28,12 +28,6 @@ type ProxyConnectionFactory struct {
 	targetAddress string
 }
 
-type noopCloser struct{}
-
-func (c *noopCloser) Close() error {
-	return nil
-}
-
 func (p *ProxyConnectionFactory) GetAccessAPIClient(address string) (access.AccessAPIClient, io.Closer, error) {
 	return p.ConnectionFactory.GetAccessAPIClient(p.targetAddress)
 }

@@ -98,8 +98,8 @@ func (c *Cache) Len() int {
 	return c.cache.Len()
 }
 
-// Size returns the maximum size of the cache.
-func (c *Cache) Size() int {
+// MaxSize returns the maximum size of the cache.
+func (c *Cache) MaxSize() int {
 	return c.size
 }
 

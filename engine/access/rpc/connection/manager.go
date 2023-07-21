@@ -20,6 +20,12 @@ import (
 // DefaultClientTimeout is used when making a GRPC request to a collection node or an execution node.
 const DefaultClientTimeout = 3 * time.Second
 
+type noopCloser struct{}
+
+func (c *noopCloser) Close() error {
+	return nil
+}
+
 // Manager provides methods for getting and managing gRPC client connections.
 type Manager struct {
 	cache      *Cache
@@ -79,6 +85,10 @@ func (m *Manager) Remove(grpcAddress string) bool {
 		return false
 	}
 
+	// Obtain the lock here to ensure that ClientConn was initialized, avoiding a situation with a nil ClientConn.
+	res.mu.Lock()
+	defer res.mu.Unlock()
+
 	// Close the connection only if it is successfully removed from the cache
 	res.Close()
 	return true
@@ -101,7 +111,7 @@ func (m *Manager) retrieveConnection(grpcAddress string, timeout time.Duration) 
 			m.metrics.ConnectionFromPoolReused()
 		}
 	} else {
-		// The client is new, add it to the cache
+		// The client is new, lock is already held
 		if m.metrics != nil {
 			m.metrics.ConnectionAddedToPool()
 		}
@@ -122,7 +132,7 @@ func (m *Manager) retrieveConnection(grpcAddress string, timeout time.Duration) 
 	client.ClientConn = conn
 	if m.metrics != nil {
 		m.metrics.NewConnectionEstablished()
-		m.metrics.TotalConnectionsInPool(uint(m.cache.Len()), uint(m.cache.Size()))
+		m.metrics.TotalConnectionsInPool(uint(m.cache.Len()), uint(m.cache.MaxSize()))
 	}
 
 	return client.ClientConn, nil
