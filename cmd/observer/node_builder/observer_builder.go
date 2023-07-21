@@ -41,6 +41,7 @@ import (
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/chainsync"
 	finalizer "github.com/onflow/flow-go/module/finalizer/consensus"
+	"github.com/onflow/flow-go/module/grpcserver"
 	"github.com/onflow/flow-go/module/id"
 	"github.com/onflow/flow-go/module/local"
 	"github.com/onflow/flow-go/module/metrics"
@@ -170,6 +171,9 @@ type ObserverServiceBuilder struct {
 
 	RestMetrics   *metrics.RestCollector
 	AccessMetrics module.AccessMetrics
+	// grpc servers
+	secureGrpcServer   *grpcserver.GrpcServer
+	unsecureGrpcServer *grpcserver.GrpcServer
 }
 
 // deriveBootstrapPeerIdentities derives the Flow Identity of the bootstrap peers from the parameters.
@@ -853,6 +857,24 @@ func (builder *ObserverServiceBuilder) enqueueConnectWithStakedAN() {
 }
 
 func (builder *ObserverServiceBuilder) enqueueRPCServer() {
+	builder.Module("creating grpc servers", func(node *cmd.NodeConfig) error {
+		builder.secureGrpcServer = grpcserver.NewGrpcServerBuilder(node.Logger,
+			builder.rpcConf.SecureGRPCListenAddr,
+			builder.rpcConf.MaxMsgSize,
+			builder.rpcMetricsEnabled,
+			builder.apiRatelimits,
+			builder.apiBurstlimits,
+			grpcserver.WithTransportCredentials(builder.rpcConf.TransportCredentials)).Build()
+
+		builder.unsecureGrpcServer = grpcserver.NewGrpcServerBuilder(node.Logger,
+			builder.rpcConf.UnsecureGRPCListenAddr,
+			builder.rpcConf.MaxMsgSize,
+			builder.rpcMetricsEnabled,
+			builder.apiRatelimits,
+			builder.apiBurstlimits).Build()
+
+		return nil
+	})
 	builder.Module("rest metrics", func(node *cmd.NodeConfig) error {
 		m, err := metrics.NewRestCollector(routes.URLToRoute, node.MetricsRegisterer)
 		if err != nil {
@@ -932,11 +954,11 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 			node.RootChainID,
 			accessMetrics,
 			builder.rpcMetricsEnabled,
-			builder.apiRatelimits,
-			builder.apiBurstlimits,
 			builder.Me,
 			accessBackend,
 			restHandler,
+			builder.secureGrpcServer,
+			builder.unsecureGrpcServer,
 		)
 		if err != nil {
 			return nil, err
@@ -970,6 +992,16 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 		}
 		builder.FollowerDistributor.AddOnBlockFinalizedConsumer(builder.RpcEng.OnFinalizedBlock)
 		return builder.RpcEng, nil
+	})
+
+	// build secure grpc server
+	builder.Component("secure grpc server", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+		return builder.secureGrpcServer, nil
+	})
+
+	// build unsecure grpc server
+	builder.Component("unsecure grpc server", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+		return builder.unsecureGrpcServer, nil
 	})
 }
 

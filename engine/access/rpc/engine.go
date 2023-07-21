@@ -8,24 +8,21 @@ import (
 	"net/http"
 	"sync"
 
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials"
-
 	"github.com/rs/zerolog"
+
+	"google.golang.org/grpc/credentials"
 
 	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/engine/access/rest"
 	"github.com/onflow/flow-go/engine/access/rpc/backend"
-	"github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/events"
+	"github.com/onflow/flow-go/module/grpcserver"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/state/protocol"
-
-	grpc_prometheus "github.com/grpc-ecosystem/go-grpc-prometheus"
 )
 
 // Config defines the configurable options for the access node server
@@ -56,20 +53,18 @@ type Engine struct {
 
 	log                zerolog.Logger
 	restCollector      module.RestMetrics
-	backend            *backend.Backend // the gRPC service implementation
-	unsecureGrpcServer *grpc.Server     // the unsecure gRPC server
-	secureGrpcServer   *grpc.Server     // the secure gRPC server
+	backend            *backend.Backend       // the gRPC service implementation
+	unsecureGrpcServer *grpcserver.GrpcServer // the unsecure gRPC server
+	secureGrpcServer   *grpcserver.GrpcServer // the secure gRPC server
 	httpServer         *http.Server
 	restServer         *http.Server
 	config             Config
 	chain              flow.Chain
 
-	addrLock            sync.RWMutex
-	unsecureGrpcAddress net.Addr
-	secureGrpcAddress   net.Addr
-	restAPIAddress      net.Addr
-
 	restHandler access.API
+
+	addrLock       sync.RWMutex
+	restAPIAddress net.Addr
 }
 type Option func(*RPCEngineBuilder)
 
@@ -80,49 +75,16 @@ func NewBuilder(log zerolog.Logger,
 	chainID flow.ChainID,
 	accessMetrics module.AccessMetrics,
 	rpcMetricsEnabled bool,
-	apiRatelimits map[string]int, // the api rate limit (max calls per second) for each of the Access API e.g. Ping->100, GetTransaction->300
-	apiBurstLimits map[string]int, // the api burst limit (max calls at the same time) for each of the Access API e.g. Ping->50, GetTransaction->10
 	me module.Local,
 	backend *backend.Backend,
 	restHandler access.API,
+	secureGrpcServer *grpcserver.GrpcServer,
+	unsecureGrpcServer *grpcserver.GrpcServer,
 ) (*RPCEngineBuilder, error) {
 	log = log.With().Str("engine", "rpc").Logger()
 
-	// create a GRPC server to serve GRPC clients
-	grpcOpts := []grpc.ServerOption{
-		grpc.MaxRecvMsgSize(int(config.MaxMsgSize)),
-		grpc.MaxSendMsgSize(int(config.MaxMsgSize)),
-	}
-
-	var interceptors []grpc.UnaryServerInterceptor // ordered list of interceptors
-	// if rpc metrics is enabled, first create the grpc metrics interceptor
-	if rpcMetricsEnabled {
-		interceptors = append(interceptors, grpc_prometheus.UnaryServerInterceptor)
-	}
-
-	if len(apiRatelimits) > 0 {
-		// create a rate limit interceptor
-		rateLimitInterceptor := rpc.NewRateLimiterInterceptor(log, apiRatelimits, apiBurstLimits).UnaryServerInterceptor
-		// append the rate limit interceptor to the list of interceptors
-		interceptors = append(interceptors, rateLimitInterceptor)
-	}
-
-	// add the logging interceptor, ensure it is innermost wrapper
-	interceptors = append(interceptors, rpc.LoggingInterceptor(log)...)
-
-	// create a chained unary interceptor
-	chainedInterceptors := grpc.ChainUnaryInterceptor(interceptors...)
-	grpcOpts = append(grpcOpts, chainedInterceptors)
-
-	// create an unsecured grpc server
-	unsecureGrpcServer := grpc.NewServer(grpcOpts...)
-
-	// create a secure server by using the secure grpc credentials that are passed in as part of config
-	grpcOpts = append(grpcOpts, grpc.Creds(config.TransportCredentials))
-	secureGrpcServer := grpc.NewServer(grpcOpts...)
-
 	// wrap the unsecured server with an HTTP proxy server to serve HTTP clients
-	httpServer := newHTTPProxyServer(unsecureGrpcServer)
+	httpServer := newHTTPProxyServer(unsecureGrpcServer.Server)
 
 	finalizedCache, finalizedCacheWorker, err := events.NewFinalizedHeaderCache(state)
 	if err != nil {
@@ -146,8 +108,14 @@ func NewBuilder(log zerolog.Logger,
 	eng.backendNotifierActor = backendNotifierActor
 
 	eng.Component = component.NewComponentManagerBuilder().
-		AddWorker(eng.serveUnsecureGRPCWorker).
-		AddWorker(eng.serveSecureGRPCWorker).
+		AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+			ready()
+			<-secureGrpcServer.Done()
+		}).
+		AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+			ready()
+			<-unsecureGrpcServer.Done()
+		}).
 		AddWorker(eng.serveGRPCWebProxyWorker).
 		AddWorker(eng.serveREST).
 		AddWorker(finalizedCacheWorker).
@@ -176,8 +144,6 @@ func (e *Engine) shutdown() {
 	// use unbounded context, rely on shutdown logic to have timeout
 	ctx := context.Background()
 
-	e.unsecureGrpcServer.GracefulStop()
-	e.secureGrpcServer.GracefulStop()
 	err := e.httpServer.Shutdown(ctx)
 	if err != nil {
 		e.log.Error().Err(err).Msg("error stopping http server")
@@ -204,81 +170,12 @@ func (e *Engine) notifyBackendOnBlockFinalized(_ *model.Block) error {
 	return nil
 }
 
-// UnsecureGRPCAddress returns the listen address of the unsecure GRPC server.
-// Guaranteed to be non-nil after Engine.Ready is closed.
-func (e *Engine) UnsecureGRPCAddress() net.Addr {
-	e.addrLock.RLock()
-	defer e.addrLock.RUnlock()
-	return e.unsecureGrpcAddress
-}
-
-// SecureGRPCAddress returns the listen address of the secure GRPC server.
-// Guaranteed to be non-nil after Engine.Ready is closed.
-func (e *Engine) SecureGRPCAddress() net.Addr {
-	e.addrLock.RLock()
-	defer e.addrLock.RUnlock()
-	return e.secureGrpcAddress
-}
-
 // RestApiAddress returns the listen address of the REST API server.
 // Guaranteed to be non-nil after Engine.Ready is closed.
 func (e *Engine) RestApiAddress() net.Addr {
 	e.addrLock.RLock()
 	defer e.addrLock.RUnlock()
 	return e.restAPIAddress
-}
-
-// serveUnsecureGRPCWorker is a worker routine which starts the unsecure gRPC server.
-// The ready callback is called after the server address is bound and set.
-func (e *Engine) serveUnsecureGRPCWorker(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
-	e.log.Info().Str("grpc_address", e.config.UnsecureGRPCListenAddr).Msg("starting grpc server on address")
-
-	l, err := net.Listen("tcp", e.config.UnsecureGRPCListenAddr)
-	if err != nil {
-		e.log.Err(err).Msg("failed to start the grpc server")
-		ctx.Throw(err)
-		return
-	}
-
-	// save the actual address on which we are listening (may be different from e.config.UnsecureGRPCListenAddr if not port
-	// was specified)
-	e.addrLock.Lock()
-	e.unsecureGrpcAddress = l.Addr()
-	e.addrLock.Unlock()
-	e.log.Debug().Str("unsecure_grpc_address", e.unsecureGrpcAddress.String()).Msg("listening on port")
-	ready()
-
-	err = e.unsecureGrpcServer.Serve(l) // blocking call
-	if err != nil {
-		e.log.Err(err).Msg("fatal error in unsecure grpc server")
-		ctx.Throw(err)
-	}
-}
-
-// serveSecureGRPCWorker is a worker routine which starts the secure gRPC server.
-// The ready callback is called after the server address is bound and set.
-func (e *Engine) serveSecureGRPCWorker(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
-	e.log.Info().Str("secure_grpc_address", e.config.SecureGRPCListenAddr).Msg("starting grpc server on address")
-
-	l, err := net.Listen("tcp", e.config.SecureGRPCListenAddr)
-	if err != nil {
-		e.log.Err(err).Msg("failed to start the grpc server")
-		ctx.Throw(err)
-		return
-	}
-
-	e.addrLock.Lock()
-	e.secureGrpcAddress = l.Addr()
-	e.addrLock.Unlock()
-
-	e.log.Debug().Str("secure_grpc_address", e.secureGrpcAddress.String()).Msg("listening on port")
-	ready()
-
-	err = e.secureGrpcServer.Serve(l) // blocking call
-	if err != nil {
-		e.log.Err(err).Msg("fatal error in secure grpc server")
-		ctx.Throw(err)
-	}
 }
 
 // serveGRPCWebProxyWorker is a worker routine which starts the gRPC web proxy server.

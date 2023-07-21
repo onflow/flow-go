@@ -7,19 +7,22 @@ import (
 	"testing"
 	"time"
 
-	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
+	"google.golang.org/grpc/credentials/insecure"
+
+	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
 
 	"github.com/onflow/flow-go/crypto"
 	accessmock "github.com/onflow/flow-go/engine/access/mock"
 	"github.com/onflow/flow-go/engine/access/rpc"
 	"github.com/onflow/flow-go/engine/access/rpc/backend"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/grpcserver"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
 	module "github.com/onflow/flow-go/module/mock"
@@ -56,6 +59,10 @@ type SecureGRPCTestSuite struct {
 
 	ctx    irrecoverable.SignalerContext
 	cancel context.CancelFunc
+
+	// grpc servers
+	secureGrpcServer   *grpcserver.GrpcServer
+	unsecureGrpcServer *grpcserver.GrpcServer
 }
 
 func (suite *SecureGRPCTestSuite) SetupTest() {
@@ -106,6 +113,21 @@ func (suite *SecureGRPCTestSuite) SetupTest() {
 	// save the public key to use later in tests later
 	suite.publicKey = networkingKey.PublicKey()
 
+	suite.secureGrpcServer = grpcserver.NewGrpcServerBuilder(suite.log,
+		config.SecureGRPCListenAddr,
+		grpcutils.DefaultMaxMsgSize,
+		false,
+		nil,
+		nil,
+		grpcserver.WithTransportCredentials(config.TransportCredentials)).Build()
+
+	suite.unsecureGrpcServer = grpcserver.NewGrpcServerBuilder(suite.log,
+		config.UnsecureGRPCListenAddr,
+		grpcutils.DefaultMaxMsgSize,
+		false,
+		nil,
+		nil).Build()
+
 	block := unittest.BlockHeaderFixture()
 	suite.snapshot.On("Head").Return(block, nil)
 
@@ -137,23 +159,34 @@ func (suite *SecureGRPCTestSuite) SetupTest() {
 		suite.chainID,
 		suite.metrics,
 		false,
-		nil,
-		nil,
 		suite.me,
 		backend,
 		backend,
+		suite.secureGrpcServer,
+		suite.unsecureGrpcServer,
 	)
 	assert.NoError(suite.T(), err)
 	suite.rpcEng, err = rpcEngBuilder.WithLegacy().Build()
 	assert.NoError(suite.T(), err)
 	suite.ctx, suite.cancel = irrecoverable.NewMockSignalerContextWithCancel(suite.T(), context.Background())
+
 	suite.rpcEng.Start(suite.ctx)
-	// wait for the server to startup
+
+	suite.secureGrpcServer.Start(suite.ctx)
+	suite.unsecureGrpcServer.Start(suite.ctx)
+
+	// wait for the servers to startup
+	unittest.AssertClosesBefore(suite.T(), suite.secureGrpcServer.Ready(), 2*time.Second)
+	unittest.AssertClosesBefore(suite.T(), suite.unsecureGrpcServer.Ready(), 2*time.Second)
+
+	// wait for the engine to startup
 	unittest.AssertClosesBefore(suite.T(), suite.rpcEng.Ready(), 2*time.Second)
 }
 
 func (suite *SecureGRPCTestSuite) TearDownTest() {
 	suite.cancel()
+	unittest.AssertClosesBefore(suite.T(), suite.secureGrpcServer.Done(), 2*time.Second)
+	unittest.AssertClosesBefore(suite.T(), suite.unsecureGrpcServer.Done(), 2*time.Second)
 	unittest.AssertClosesBefore(suite.T(), suite.rpcEng.Done(), 2*time.Second)
 }
 
@@ -185,6 +218,19 @@ func (suite *SecureGRPCTestSuite) TestAPICallUsingSecureGRPC() {
 		_, err := client.Ping(ctx, req)
 		assert.Error(suite.T(), err)
 	})
+
+	suite.Run("happy path - connection fails, unsecure client can not get info from secure server connection", func() {
+		conn, err := grpc.Dial(
+			suite.secureGrpcServer.GRPCAddress().String(), grpc.WithTransportCredentials(insecure.NewCredentials()))
+		assert.NoError(suite.T(), err)
+
+		client := accessproto.NewAccessAPIClient(conn)
+		closer := io.Closer(conn)
+		defer closer.Close()
+
+		_, err = client.Ping(ctx, req)
+		assert.Error(suite.T(), err)
+	})
 }
 
 // secureGRPCClient creates a secure GRPC client using the given public key
@@ -193,7 +239,7 @@ func (suite *SecureGRPCTestSuite) secureGRPCClient(publicKey crypto.PublicKey) (
 	assert.NoError(suite.T(), err)
 
 	conn, err := grpc.Dial(
-		suite.rpcEng.SecureGRPCAddress().String(),
+		suite.secureGrpcServer.GRPCAddress().String(),
 		grpc.WithTransportCredentials(credentials.NewTLS(tlsConfig)))
 	assert.NoError(suite.T(), err)
 
