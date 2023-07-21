@@ -1,4 +1,4 @@
-package rest
+package routes
 
 import (
 	"github.com/onflow/flow-go/access"
@@ -10,7 +10,7 @@ import (
 func GetAccount(r *request.Request, backend access.API, link models.LinkGenerator) (interface{}, error) {
 	req, err := r.GetAccountRequest()
 	if err != nil {
-		return nil, NewBadRequestError(err)
+		return nil, models.NewBadRequestError(err)
 	}
 
 	// in case we receive special height values 'final' and 'sealed', fetch that height and overwrite request with it

@@ -44,6 +44,18 @@ func LightCollectionToMessage(c *flow.LightCollection) (*entities.Collection, er
 	}, nil
 }
 
+// MessageToLightCollection converts a protobuf message to a light collection
+func MessageToLightCollection(m *entities.Collection) (*flow.LightCollection, error) {
+	transactions := make([]flow.Identifier, 0, len(m.TransactionIds))
+	for _, txId := range m.TransactionIds {
+		transactions = append(transactions, MessageToIdentifier(txId))
+	}
+
+	return &flow.LightCollection{
+		Transactions: transactions,
+	}, nil
+}
+
 // CollectionGuaranteeToMessage converts a collection guarantee to a protobuf message
 func CollectionGuaranteeToMessage(g *flow.CollectionGuarantee) *entities.CollectionGuarantee {
 	id := g.ID()
