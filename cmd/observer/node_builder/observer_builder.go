@@ -902,6 +902,11 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 			return nil, fmt.Errorf("could not initialize backend cache: %w", err)
 		}
 
+		var connBackendCache *rpcConnection.Cache
+		if backendCache != nil {
+			connBackendCache = rpcConnection.NewCache(backendCache, int(cacheSize))
+		}
+
 		connFactory := &rpcConnection.ConnectionFactoryImpl{
 			CollectionGRPCPort:        0,
 			ExecutionGRPCPort:         0,
@@ -909,6 +914,12 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 			ExecutionNodeGRPCTimeout:  backendConfig.ExecutionClientTimeout,
 			AccessMetrics:             accessMetrics,
 			Log:                       node.Logger,
+			Manager: rpcConnection.NewManager(
+				connBackendCache,
+				node.Logger,
+				accessMetrics,
+				config.MaxMsgSize,
+			),
 		}
 
 		accessBackend := backend.New(
