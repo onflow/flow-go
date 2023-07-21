@@ -62,6 +62,7 @@ func (s *AccessCircuitBreakerSuite) SetupTest() {
 			testnet.WithLogLevel(zerolog.InfoLevel),
 			testnet.WithAdditionalFlag("--circuit-breaker-enabled=true"),
 			testnet.WithAdditionalFlag(fmt.Sprintf("--circuit-breaker-restore-timeout=%s", cbRestoreTimeout.String())),
+			testnet.WithAdditionalFlag("--circuit-breaker-max-requests=1"),
 			testnet.WithAdditionalFlag("--circuit-breaker-max-failures=1"),
 			testnet.WithAdditionalFlag(fmt.Sprintf("--collection-client-timeout=%s", requestTimeout.String())),
 		),
@@ -105,9 +106,6 @@ func (s *AccessCircuitBreakerSuite) SetupTest() {
 // 3. Connect the collection node to the network and wait for the circuit breaker restore time.
 // 4. Successfully send a transaction.
 func (s *AccessCircuitBreakerSuite) TestCircuitBreaker() {
-	ctx, cancel := context.WithCancel(s.ctx)
-	defer cancel()
-
 	// 1. Get the collection node
 	collectionContainer := s.net.ContainerByName("collection_1")
 
@@ -117,12 +115,14 @@ func (s *AccessCircuitBreakerSuite) TestCircuitBreaker() {
 	// Check if access node was created with circuit breaker flags
 	require.True(s.T(), accessContainer.IsFlagSet("circuit-breaker-enabled"))
 	require.True(s.T(), accessContainer.IsFlagSet("circuit-breaker-restore-timeout"))
+	require.True(s.T(), accessContainer.IsFlagSet("circuit-breaker-max-requests"))
 	require.True(s.T(), accessContainer.IsFlagSet("circuit-breaker-max-failures"))
 
 	accessClient, err := accessContainer.TestnetClient()
-	assert.NoError(s.T(), err, "failed to get access node client")
+	require.NoError(s.T(), err, "failed to get access node client")
+	require.NotNil(s.T(), accessClient, "failed to get access node client")
 
-	latestBlockID, err := accessClient.GetLatestBlockID(ctx)
+	latestBlockID, err := accessClient.GetLatestBlockID(s.ctx)
 	require.NoError(s.T(), err)
 
 	// Create a new account to deploy Counter to
@@ -153,7 +153,7 @@ func (s *AccessCircuitBreakerSuite) TestCircuitBreaker() {
 		SetGasLimit(9999)
 
 	// Sign the transaction
-	childCtx, cancel := context.WithTimeout(ctx, time.Second*10)
+	childCtx, cancel := context.WithTimeout(s.ctx, time.Second*10)
 	signedTx, err := accessClient.SignTransaction(createAccountTx)
 	require.NoError(s.T(), err)
 	cancel()
@@ -174,13 +174,13 @@ func (s *AccessCircuitBreakerSuite) TestCircuitBreaker() {
 	}
 
 	// Try to send the transaction for the first time. It should wait at least the timeout time and return Unavailable error
-	duration, err := sendTransaction(ctx, signedTx)
+	duration, err := sendTransaction(s.ctx, signedTx)
 	assert.Equal(s.T(), codes.Unavailable, status.Code(err))
 	assert.GreaterOrEqual(s.T(), duration, requestTimeout)
 
 	// Try to send the transaction for the second time. It should wait less than a second because the circuit breaker
 	// is configured to break after the first failure
-	duration, err = sendTransaction(ctx, signedTx)
+	duration, err = sendTransaction(s.ctx, signedTx)
 	assert.Equal(s.T(), codes.Unavailable, status.Code(err))
 	assert.Greater(s.T(), time.Second, duration)
 
@@ -192,6 +192,6 @@ func (s *AccessCircuitBreakerSuite) TestCircuitBreaker() {
 	time.Sleep(cbRestoreTimeout)
 
 	// Try to send the transaction for the third time. The transaction should be sent successfully
-	_, err = sendTransaction(ctx, signedTx)
+	_, err = sendTransaction(s.ctx, signedTx)
 	require.NoError(s.T(), err, "transaction should be sent")
 }

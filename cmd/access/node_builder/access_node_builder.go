@@ -762,7 +762,7 @@ func (builder *FlowAccessNodeBuilder) extraFlags() {
 			if builder.rpcConf.CircuitBreakerConfig.MaxRequests == 0 {
 				return errors.New("circuit-breaker-max-requests must be greater than 0")
 			}
-			if builder.rpcConf.CircuitBreakerConfig.RestoreTimeout > 0 {
+			if builder.rpcConf.CircuitBreakerConfig.RestoreTimeout <= 0 {
 				return errors.New("circuit-breaker-restore-timeout must be greater than 0")
 			}
 		}
