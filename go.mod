@@ -53,7 +53,7 @@ require (
 	github.com/onflow/atree v0.6.0
 	github.com/onflow/cadence v0.39.13-stable-cadence.0.20230719215202-3311f5f8189b
 	github.com/onflow/flow v0.3.4
-	github.com/onflow/flow-core-contracts/lib/go/contracts v1.2.4-0.20230719145137-aa0d30b1fbca
+	github.com/onflow/flow-core-contracts/lib/go/contracts v1.2.4-0.20230719215509-9f786d598196
 	github.com/onflow/flow-core-contracts/lib/go/templates v1.2.3
 	github.com/onflow/flow-go-sdk v0.41.10-0.20230719221154-2a4946e41c23
 	github.com/onflow/flow-go/crypto v0.24.9
@@ -227,8 +227,8 @@ require (
 	github.com/multiformats/go-multicodec v0.9.0 // indirect
 	github.com/multiformats/go-multistream v0.4.1 // indirect
 	github.com/multiformats/go-varint v0.0.7 // indirect
-	github.com/onflow/flow-ft/lib/go/contracts v0.7.1-0.20230718214600-8cc31ee7dcc4 // indirect
-	github.com/onflow/flow-nft/lib/go/contracts v1.1.1-0.20230718212804-c5d491b84ec6 // indirect
+	github.com/onflow/flow-ft/lib/go/contracts v0.7.1-0.20230719170605-0b47d4dcf761 // indirect
+	github.com/onflow/flow-nft/lib/go/contracts v1.1.1-0.20230719151715-3bd6381cd54b // indirect
 	github.com/onflow/sdks v0.5.0 // indirect
 	github.com/onsi/ginkgo/v2 v2.9.7 // indirect
 	github.com/opencontainers/runtime-spec v1.0.2 // indirect
