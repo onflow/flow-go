@@ -68,7 +68,7 @@ var createFlowTokenMinterTransactionTemplate string
 var mintFlowTokenTransactionTemplate string
 
 func DeployFlowTokenContractTransaction(service, fungibleToken, metadataViews, flowToken flow.Address) *flow.TransactionBody {
-	contract := contracts.FlowToken(fungibleToken.HexWithPrefix(), metadataViews.HexWithPrefix(), metadataViews.HexWithPrefix())
+	contract := contracts.FlowToken(fungibleToken.HexWithPrefix(), fungibleToken.HexWithPrefix(), metadataViews.HexWithPrefix(), metadataViews.HexWithPrefix())
 
 	return flow.NewTransactionBody().
 		SetScript([]byte(deployFlowTokenTransactionTemplate)).
