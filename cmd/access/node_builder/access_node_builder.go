@@ -37,6 +37,7 @@ import (
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/engine/access/ingestion"
 	pingeng "github.com/onflow/flow-go/engine/access/ping"
+	"github.com/onflow/flow-go/engine/access/rest"
 	"github.com/onflow/flow-go/engine/access/rpc"
 	"github.com/onflow/flow-go/engine/access/rpc/backend"
 	"github.com/onflow/flow-go/engine/access/state_stream"
@@ -216,6 +217,7 @@ type FlowAccessNodeBuilder struct {
 	CollectionsToMarkExecuted  *stdmap.Times
 	BlocksToMarkExecuted       *stdmap.Times
 	TransactionMetrics         *metrics.TransactionCollector
+	RestMetrics                *metrics.RestCollector
 	AccessMetrics              module.AccessMetrics
 	PingMetrics                module.PingMetrics
 	Committee                  hotstuff.DynamicCommittee
@@ -964,10 +966,19 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 			)
 			return nil
 		}).
+		Module("rest metrics", func(node *cmd.NodeConfig) error {
+			m, err := metrics.NewRestCollector(rest.URLToRoute, node.MetricsRegisterer)
+			if err != nil {
+				return err
+			}
+			builder.RestMetrics = m
+			return nil
+		}).
 		Module("access metrics", func(node *cmd.NodeConfig) error {
 			builder.AccessMetrics = metrics.NewAccessCollector(
 				metrics.WithTransactionMetrics(builder.TransactionMetrics),
 				metrics.WithBackendScriptsMetrics(builder.TransactionMetrics),
+				metrics.WithRestMetrics(builder.RestMetrics),
 			)
 			return nil
 		}).
