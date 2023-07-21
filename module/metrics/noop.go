@@ -4,6 +4,8 @@ import (
 	"context"
 	"time"
 
+	"google.golang.org/grpc/codes"
+
 	"github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/protocol"
@@ -304,3 +306,7 @@ func (nc *NoopCollector) AsyncProcessingFinished(string, time.Duration)         
 
 func (nc *NoopCollector) OnMisbehaviorReported(string, string) {}
 func (nc *NoopCollector) OnViolationReportSkipped()            {}
+
+var _ ObserverMetrics = (*NoopCollector)(nil)
+
+func (nc *NoopCollector) RecordRPC(handler, rpc string, code codes.Code) {}

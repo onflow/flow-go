@@ -193,3 +193,24 @@ func TestConvertServiceEventList(t *testing.T) {
 
 	assert.Equal(t, serviceEvents, converted)
 }
+
+// TestConvertMessagesToBlockEvents tests that converting a protobuf EventsResponse_Result message to and from block events in the same
+// block
+func TestConvertMessagesToBlockEvents(t *testing.T) {
+	t.Parallel()
+
+	count := 2
+	blockEvents := make([]flow.BlockEvents, count)
+	for i := 0; i < count; i++ {
+		header := unittest.BlockHeaderFixture(unittest.WithHeaderHeight(uint64(i)))
+		blockEvents[i] = unittest.BlockEventsFixture(header, 2)
+	}
+
+	msg, err := convert.BlockEventsToMessages(blockEvents)
+	require.NoError(t, err)
+
+	converted := convert.MessagesToBlockEvents(msg)
+	require.NoError(t, err)
+
+	assert.Equal(t, blockEvents, converted)
+}

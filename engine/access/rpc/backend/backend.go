@@ -11,7 +11,6 @@ import (
 	"google.golang.org/grpc/status"
 
 	lru "github.com/hashicorp/golang-lru"
-	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/access"
@@ -24,6 +23,8 @@ import (
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
+
+	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
 )
 
 // maxExecutionNodesCnt is the max number of execution nodes that will be contacted to complete an execution api request
@@ -79,6 +80,17 @@ type Backend struct {
 	collections       storage.Collections
 	executionReceipts storage.ExecutionReceipts
 	connFactory       connection.ConnectionFactory
+}
+
+// Config defines the configurable options for creating Backend
+type Config struct {
+	ExecutionClientTimeout    time.Duration // execution API GRPC client timeout
+	CollectionClientTimeout   time.Duration // collection API GRPC client timeout
+	ConnectionPoolSize        uint          // size of the cache for storing collection and execution connections
+	MaxHeightRange            uint          // max size of height range requests
+	PreferredExecutionNodeIDs []string      // preferred list of upstream execution node IDs
+	FixedExecutionNodeIDs     []string      // fixed list of execution node IDs to choose from if no node ID can be chosen from the PreferredExecutionNodeIDs
+	ArchiveAddressList        []string      // the archive node address list to send script executions. when configured, script executions will be all sent to the archive node
 }
 
 func New(
@@ -200,6 +212,40 @@ func New(
 	}
 
 	return b
+}
+
+// NewCache constructs cache for storing connections to other nodes.
+// No errors are expected during normal operations.
+func NewCache(
+	log zerolog.Logger,
+	accessMetrics module.AccessMetrics,
+	connectionPoolSize uint,
+) (*lru.Cache, uint, error) {
+
+	var cache *lru.Cache
+	cacheSize := connectionPoolSize
+	if cacheSize > 0 {
+		// TODO: remove this fallback after fixing issues with evictions
+		// It was observed that evictions cause connection errors for in flight requests. This works around
+		// the issue by forcing hte pool size to be greater than the number of ENs + LNs
+		if cacheSize < DefaultConnectionPoolSize {
+			log.Warn().Msg("connection pool size below threshold, setting pool size to default value ")
+			cacheSize = DefaultConnectionPoolSize
+		}
+		var err error
+		cache, err = lru.NewWithEvict(int(cacheSize), func(_, evictedValue interface{}) {
+			store := evictedValue.(*connection.CachedClient)
+			store.Close()
+			log.Debug().Str("grpc_conn_evicted", store.Address).Msg("closing grpc connection evicted from pool")
+			if accessMetrics != nil {
+				accessMetrics.ConnectionFromPoolEvicted()
+			}
+		})
+		if err != nil {
+			return nil, 0, fmt.Errorf("could not initialize connection pool cache: %w", err)
+		}
+	}
+	return cache, cacheSize, nil
 }
 
 func identifierList(ids []string) (flow.IdentifierList, error) {
