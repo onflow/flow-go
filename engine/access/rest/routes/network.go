@@ -1,4 +1,4 @@
-package rest
+package routes
 
 import (
 	"github.com/onflow/flow-go/access"
@@ -7,7 +7,7 @@ import (
 )
 
 // GetNetworkParameters returns network-wide parameters of the blockchain
-func GetNetworkParameters(r *request.Request, backend access.API, link models.LinkGenerator) (interface{}, error) {
+func GetNetworkParameters(r *request.Request, backend access.API, _ models.LinkGenerator) (interface{}, error) {
 	params := backend.GetNetworkParameters(r.Context())
 
 	var response models.NetworkParameters

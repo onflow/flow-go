@@ -20,6 +20,7 @@ import (
 	"github.com/onflow/flow-go/crypto"
 	accessmock "github.com/onflow/flow-go/engine/access/mock"
 	"github.com/onflow/flow-go/engine/access/rpc"
+	"github.com/onflow/flow-go/engine/access/rpc/backend"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/grpcserver"
 	"github.com/onflow/flow-go/module/irrecoverable"
@@ -130,10 +131,8 @@ func (suite *SecureGRPCTestSuite) SetupTest() {
 	block := unittest.BlockHeaderFixture()
 	suite.snapshot.On("Head").Return(block, nil)
 
-	rpcEngBuilder, err := rpc.NewBuilder(
-		suite.log,
+	backend := backend.New(
 		suite.state,
-		config,
 		suite.collClient,
 		nil,
 		suite.blocks,
@@ -144,11 +143,25 @@ func (suite *SecureGRPCTestSuite) SetupTest() {
 		nil,
 		suite.chainID,
 		suite.metrics,
-		0,
-		0,
+		nil,
 		false,
+		0,
+		nil,
+		nil,
+		suite.log,
+		0,
+		nil)
+
+	rpcEngBuilder, err := rpc.NewBuilder(
+		suite.log,
+		suite.state,
+		config,
+		suite.chainID,
+		suite.metrics,
 		false,
 		suite.me,
+		backend,
+		backend,
 		suite.secureGrpcServer,
 		suite.unsecureGrpcServer,
 	)

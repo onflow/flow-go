@@ -1,4 +1,4 @@
-package rest
+package routes
 
 import (
 	"context"
@@ -18,10 +18,11 @@ import (
 func GetBlocksByIDs(r *request.Request, backend access.API, link models.LinkGenerator) (interface{}, error) {
 	req, err := r.GetBlockByIDsRequest()
 	if err != nil {
-		return nil, NewBadRequestError(err)
+		return nil, models.NewBadRequestError(err)
 	}
 
 	blocks := make([]*models.Block, len(req.IDs))
+
 	for i, id := range req.IDs {
 		block, err := getBlock(forID(&id), r, backend, link)
 		if err != nil {
@@ -33,10 +34,11 @@ func GetBlocksByIDs(r *request.Request, backend access.API, link models.LinkGene
 	return blocks, nil
 }
 
+// GetBlocksByHeight gets blocks by height.
 func GetBlocksByHeight(r *request.Request, backend access.API, link models.LinkGenerator) (interface{}, error) {
 	req, err := r.GetBlockRequest()
 	if err != nil {
-		return nil, NewBadRequestError(err)
+		return nil, models.NewBadRequestError(err)
 	}
 
 	if req.FinalHeight || req.SealedHeight {
@@ -72,7 +74,7 @@ func GetBlocksByHeight(r *request.Request, backend access.API, link models.LinkG
 		req.EndHeight = latest.Header.Height // overwrite special value height with fetched
 
 		if req.StartHeight > req.EndHeight {
-			return nil, NewBadRequestError(fmt.Errorf("start height must be less than or equal to end height"))
+			return nil, models.NewBadRequestError(fmt.Errorf("start height must be less than or equal to end height"))
 		}
 	}
 
@@ -93,7 +95,7 @@ func GetBlocksByHeight(r *request.Request, backend access.API, link models.LinkG
 func GetBlockPayloadByID(r *request.Request, backend access.API, _ models.LinkGenerator) (interface{}, error) {
 	req, err := r.GetBlockPayloadRequest()
 	if err != nil {
-		return nil, NewBadRequestError(err)
+		return nil, models.NewBadRequestError(err)
 	}
 
 	blkProvider := NewBlockProvider(backend, forID(&req.ID))
@@ -194,7 +196,7 @@ func (blkProvider *blockProvider) getBlock(ctx context.Context) (*flow.Block, fl
 	if blkProvider.id != nil {
 		blk, _, err := blkProvider.backend.GetBlockByID(ctx, *blkProvider.id)
 		if err != nil { // unfortunately backend returns internal error status if not found
-			return nil, flow.BlockStatusUnknown, NewNotFoundError(
+			return nil, flow.BlockStatusUnknown, models.NewNotFoundError(
 				fmt.Sprintf("error looking up block with ID %s", blkProvider.id.String()), err,
 			)
 		}
@@ -205,14 +207,14 @@ func (blkProvider *blockProvider) getBlock(ctx context.Context) (*flow.Block, fl
 		blk, status, err := blkProvider.backend.GetLatestBlock(ctx, blkProvider.sealed)
 		if err != nil {
 			// cannot be a 'not found' error since final and sealed block should always be found
-			return nil, flow.BlockStatusUnknown, NewRestError(http.StatusInternalServerError, "block lookup failed", err)
+			return nil, flow.BlockStatusUnknown, models.NewRestError(http.StatusInternalServerError, "block lookup failed", err)
 		}
 		return blk, status, nil
 	}
 
 	blk, status, err := blkProvider.backend.GetBlockByHeight(ctx, blkProvider.height)
 	if err != nil { // unfortunately backend returns internal error status if not found
-		return nil, flow.BlockStatusUnknown, NewNotFoundError(
+		return nil, flow.BlockStatusUnknown, models.NewNotFoundError(
 			fmt.Sprintf("error looking up block at height %d", blkProvider.height), err,
 		)
 	}

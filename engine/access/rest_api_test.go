@@ -24,9 +24,10 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	accessmock "github.com/onflow/flow-go/engine/access/mock"
-	"github.com/onflow/flow-go/engine/access/rest"
 	"github.com/onflow/flow-go/engine/access/rest/request"
+	"github.com/onflow/flow-go/engine/access/rest/routes"
 	"github.com/onflow/flow-go/engine/access/rpc"
+	"github.com/onflow/flow-go/engine/access/rpc/backend"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
@@ -150,10 +151,7 @@ func (suite *RestAPITestSuite) SetupTest() {
 		nil,
 		nil).Build()
 
-	rpcEngBuilder, err := rpc.NewBuilder(
-		suite.log,
-		suite.state,
-		config,
+	backend := backend.New(suite.state,
 		suite.collClient,
 		nil,
 		suite.blocks,
@@ -164,11 +162,25 @@ func (suite *RestAPITestSuite) SetupTest() {
 		suite.executionResults,
 		suite.chainID,
 		suite.metrics,
-		0,
-		0,
+		nil,
 		false,
+		0,
+		nil,
+		nil,
+		suite.log,
+		0,
+		nil)
+
+	rpcEngBuilder, err := rpc.NewBuilder(
+		suite.log,
+		suite.state,
+		config,
+		suite.chainID,
+		suite.metrics,
 		false,
 		suite.me,
+		backend,
+		backend,
 		suite.secureGrpcServer,
 		suite.unsecureGrpcServer,
 	)
@@ -399,7 +411,7 @@ func (suite *RestAPITestSuite) TestRequestSizeRestriction() {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
 	// make a request of size larger than the max permitted size
-	requestBytes := make([]byte, rest.MaxRequestSize+1)
+	requestBytes := make([]byte, routes.MaxRequestSize+1)
 	script := restclient.ScriptsBody{
 		Script: string(requestBytes),
 	}
@@ -426,13 +438,13 @@ func assertError(t *testing.T, resp *http.Response, err error, expectedCode int,
 
 func optionsForBlockByID() *restclient.BlocksApiBlocksIdGetOpts {
 	return &restclient.BlocksApiBlocksIdGetOpts{
-		Expand:  optional.NewInterface([]string{rest.ExpandableFieldPayload}),
+		Expand:  optional.NewInterface([]string{routes.ExpandableFieldPayload}),
 		Select_: optional.NewInterface([]string{"header.id"}),
 	}
 }
 func optionsForBlockByStartEndHeight(startHeight, endHeight uint64) *restclient.BlocksApiBlocksGetOpts {
 	return &restclient.BlocksApiBlocksGetOpts{
-		Expand:      optional.NewInterface([]string{rest.ExpandableFieldPayload}),
+		Expand:      optional.NewInterface([]string{routes.ExpandableFieldPayload}),
 		Select_:     optional.NewInterface([]string{"header.id", "header.height"}),
 		StartHeight: optional.NewInterface(startHeight),
 		EndHeight:   optional.NewInterface(endHeight),
@@ -441,7 +453,7 @@ func optionsForBlockByStartEndHeight(startHeight, endHeight uint64) *restclient.
 
 func optionsForBlockByHeights(heights []uint64) *restclient.BlocksApiBlocksGetOpts {
 	return &restclient.BlocksApiBlocksGetOpts{
-		Expand:  optional.NewInterface([]string{rest.ExpandableFieldPayload}),
+		Expand:  optional.NewInterface([]string{routes.ExpandableFieldPayload}),
 		Select_: optional.NewInterface([]string{"header.id", "header.height"}),
 		Height:  optional.NewInterface(heights),
 	}
@@ -449,7 +461,7 @@ func optionsForBlockByHeights(heights []uint64) *restclient.BlocksApiBlocksGetOp
 
 func optionsForFinalizedBlock(finalOrSealed string) *restclient.BlocksApiBlocksGetOpts {
 	return &restclient.BlocksApiBlocksGetOpts{
-		Expand:  optional.NewInterface([]string{rest.ExpandableFieldPayload}),
+		Expand:  optional.NewInterface([]string{routes.ExpandableFieldPayload}),
 		Select_: optional.NewInterface([]string{"header.id", "header.height"}),
 		Height:  optional.NewInterface(finalOrSealed),
 	}

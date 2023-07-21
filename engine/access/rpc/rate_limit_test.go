@@ -8,7 +8,6 @@ import (
 	"testing"
 	"time"
 
-	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -21,6 +20,7 @@ import (
 	"google.golang.org/grpc/status"
 
 	accessmock "github.com/onflow/flow-go/engine/access/mock"
+	"github.com/onflow/flow-go/engine/access/rpc/backend"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/grpcserver"
 	"github.com/onflow/flow-go/module/irrecoverable"
@@ -31,6 +31,8 @@ import (
 	storagemock "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/utils/grpcutils"
 	"github.com/onflow/flow-go/utils/unittest"
+
+	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
 )
 
 type RateLimitTestSuite struct {
@@ -146,8 +148,40 @@ func (suite *RateLimitTestSuite) SetupTest() {
 	block := unittest.BlockHeaderFixture()
 	suite.snapshot.On("Head").Return(block, nil)
 
-	rpcEngBuilder, err := NewBuilder(suite.log, suite.state, config, suite.collClient, nil, suite.blocks, suite.headers, suite.collections, suite.transactions, nil,
-		nil, suite.chainID, suite.metrics, 0, 0, false, false, suite.me, suite.secureGrpcServer, suite.unsecureGrpcServer)
+	backend := backend.New(
+		suite.state,
+		suite.collClient,
+		nil,
+		suite.blocks,
+		suite.headers,
+		suite.collections,
+		suite.transactions,
+		nil,
+		nil,
+		suite.chainID,
+		suite.metrics,
+		nil,
+		false,
+		0,
+		nil,
+		nil,
+		suite.log,
+		0,
+		nil)
+
+	rpcEngBuilder, err := NewBuilder(
+		suite.log,
+		suite.state,
+		config,
+		suite.chainID,
+		suite.metrics,
+		false,
+		suite.me,
+		backend,
+		backend,
+		suite.secureGrpcServer,
+		suite.unsecureGrpcServer)
+
 	require.NoError(suite.T(), err)
 	suite.rpcEng, err = rpcEngBuilder.WithLegacy().Build()
 	require.NoError(suite.T(), err)

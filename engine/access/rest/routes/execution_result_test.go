@@ -1,4 +1,4 @@
-package rest
+package routes
 
 import (
 	"fmt"
@@ -37,7 +37,6 @@ func getResultByIDReq(id string, blockIDs []string) *http.Request {
 }
 
 func TestGetResultByID(t *testing.T) {
-
 	t.Run("get by ID", func(t *testing.T) {
 		backend := &mock.API{}
 		result := unittest.ExecutionResultFixture()
@@ -68,6 +67,7 @@ func TestGetResultByID(t *testing.T) {
 }
 
 func TestGetResultBlockID(t *testing.T) {
+
 	t.Run("get by block ID", func(t *testing.T) {
 		backend := &mock.API{}
 		blockID := unittest.IdentifierFixture()

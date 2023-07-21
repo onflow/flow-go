@@ -28,6 +28,8 @@ import (
 	recovery "github.com/onflow/flow-go/consensus/recovery/protocol"
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/engine/access/apiproxy"
+	restapiproxy "github.com/onflow/flow-go/engine/access/rest/apiproxy"
+	"github.com/onflow/flow-go/engine/access/rest/routes"
 	"github.com/onflow/flow-go/engine/access/rpc"
 	"github.com/onflow/flow-go/engine/access/rpc/backend"
 	"github.com/onflow/flow-go/engine/common/follower"
@@ -110,19 +112,22 @@ type ObserverServiceConfig struct {
 func DefaultObserverServiceConfig() *ObserverServiceConfig {
 	return &ObserverServiceConfig{
 		rpcConf: rpc.Config{
-			UnsecureGRPCListenAddr:    "0.0.0.0:9000",
-			SecureGRPCListenAddr:      "0.0.0.0:9001",
-			HTTPListenAddr:            "0.0.0.0:8000",
-			RESTListenAddr:            "",
-			CollectionAddr:            "",
-			HistoricalAccessAddrs:     "",
-			CollectionClientTimeout:   3 * time.Second,
-			ExecutionClientTimeout:    3 * time.Second,
-			MaxHeightRange:            backend.DefaultMaxHeightRange,
-			PreferredExecutionNodeIDs: nil,
-			FixedExecutionNodeIDs:     nil,
-			ArchiveAddressList:        nil,
-			MaxMsgSize:                grpcutils.DefaultMaxMsgSize,
+			UnsecureGRPCListenAddr: "0.0.0.0:9000",
+			SecureGRPCListenAddr:   "0.0.0.0:9001",
+			HTTPListenAddr:         "0.0.0.0:8000",
+			RESTListenAddr:         "",
+			CollectionAddr:         "",
+			HistoricalAccessAddrs:  "",
+			BackendConfig: backend.Config{
+				CollectionClientTimeout:   3 * time.Second,
+				ExecutionClientTimeout:    3 * time.Second,
+				ConnectionPoolSize:        backend.DefaultConnectionPoolSize,
+				MaxHeightRange:            backend.DefaultMaxHeightRange,
+				PreferredExecutionNodeIDs: nil,
+				FixedExecutionNodeIDs:     nil,
+				ArchiveAddressList:        nil,
+			},
+			MaxMsgSize: grpcutils.DefaultMaxMsgSize,
 		},
 		rpcMetricsEnabled:         false,
 		apiRatelimits:             nil,
@@ -164,6 +169,8 @@ type ObserverServiceBuilder struct {
 	// Public network
 	peerID peer.ID
 
+	RestMetrics   *metrics.RestCollector
+	AccessMetrics module.AccessMetrics
 	// grpc servers
 	secureGrpcServer   *grpcserver.GrpcServer
 	unsecureGrpcServer *grpcserver.GrpcServer
@@ -451,7 +458,8 @@ func (builder *ObserverServiceBuilder) extraFlags() {
 		flags.StringVarP(&builder.rpcConf.HTTPListenAddr, "http-addr", "h", defaultConfig.rpcConf.HTTPListenAddr, "the address the http proxy server listens on")
 		flags.StringVar(&builder.rpcConf.RESTListenAddr, "rest-addr", defaultConfig.rpcConf.RESTListenAddr, "the address the REST server listens on (if empty the REST server will not be started)")
 		flags.UintVar(&builder.rpcConf.MaxMsgSize, "rpc-max-message-size", defaultConfig.rpcConf.MaxMsgSize, "the maximum message size in bytes for messages sent or received over grpc")
-		flags.UintVar(&builder.rpcConf.MaxHeightRange, "rpc-max-height-range", defaultConfig.rpcConf.MaxHeightRange, "maximum size for height range requests")
+		flags.UintVar(&builder.rpcConf.BackendConfig.ConnectionPoolSize, "connection-pool-size", defaultConfig.rpcConf.BackendConfig.ConnectionPoolSize, "maximum number of connections allowed in the connection pool, size of 0 disables the connection pooling, and anything less than the default size will be overridden to use the default size")
+		flags.UintVar(&builder.rpcConf.BackendConfig.MaxHeightRange, "rpc-max-height-range", defaultConfig.rpcConf.BackendConfig.MaxHeightRange, "maximum size for height range requests")
 		flags.StringToIntVar(&builder.apiRatelimits, "api-rate-limits", defaultConfig.apiRatelimits, "per second rate limits for Access API methods e.g. Ping=300,GetTransaction=500 etc.")
 		flags.StringToIntVar(&builder.apiBurstlimits, "api-burst-limits", defaultConfig.apiBurstlimits, "burst limits for Access API methods e.g. Ping=100,GetTransaction=100 etc.")
 		flags.StringVar(&builder.observerNetworkingKeyPath, "observer-networking-key-path", defaultConfig.observerNetworkingKeyPath, "path to the networking key for observer")
@@ -867,11 +875,46 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 
 		return nil
 	})
+	builder.Module("rest metrics", func(node *cmd.NodeConfig) error {
+		m, err := metrics.NewRestCollector(routes.URLToRoute, node.MetricsRegisterer)
+		if err != nil {
+			return err
+		}
+		builder.RestMetrics = m
+		return nil
+	})
+	builder.Module("access metrics", func(node *cmd.NodeConfig) error {
+		builder.AccessMetrics = metrics.NewAccessCollector(
+			metrics.WithRestMetrics(builder.RestMetrics),
+		)
+		return nil
+	})
 	builder.Component("RPC engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-		engineBuilder, err := rpc.NewBuilder(
-			node.Logger,
+		accessMetrics := builder.AccessMetrics
+		config := builder.rpcConf
+		backendConfig := config.BackendConfig
+
+		backendCache, cacheSize, err := backend.NewCache(node.Logger,
+			accessMetrics,
+			config.BackendConfig.ConnectionPoolSize)
+		if err != nil {
+			return nil, fmt.Errorf("could not initialize backend cache: %w", err)
+		}
+
+		connFactory := &backend.ConnectionFactoryImpl{
+			CollectionGRPCPort:        0,
+			ExecutionGRPCPort:         0,
+			CollectionNodeGRPCTimeout: backendConfig.CollectionClientTimeout,
+			ExecutionNodeGRPCTimeout:  backendConfig.ExecutionClientTimeout,
+			ConnectionsCache:          backendCache,
+			CacheSize:                 cacheSize,
+			MaxMsgSize:                config.MaxMsgSize,
+			AccessMetrics:             accessMetrics,
+			Log:                       node.Logger,
+		}
+
+		accessBackend := backend.New(
 			node.State,
-			builder.rpcConf,
 			nil,
 			nil,
 			node.Storage.Blocks,
@@ -881,12 +924,39 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 			node.Storage.Receipts,
 			node.Storage.Results,
 			node.RootChainID,
-			metrics.NewNoopCollector(),
-			0,
-			0,
+			accessMetrics,
+			connFactory,
 			false,
+			backendConfig.MaxHeightRange,
+			backendConfig.PreferredExecutionNodeIDs,
+			backendConfig.FixedExecutionNodeIDs,
+			node.Logger,
+			backend.DefaultSnapshotHistoryLimit,
+			backendConfig.ArchiveAddressList)
+
+		observerCollector := metrics.NewObserverCollector()
+		restHandler, err := restapiproxy.NewRestProxyHandler(
+			accessBackend,
+			builder.upstreamIdentities,
+			builder.apiTimeout,
+			config.MaxMsgSize,
+			builder.Logger,
+			observerCollector,
+			node.RootChainID.Chain())
+		if err != nil {
+			return nil, err
+		}
+
+		engineBuilder, err := rpc.NewBuilder(
+			node.Logger,
+			node.State,
+			config,
+			node.RootChainID,
+			accessMetrics,
 			builder.rpcMetricsEnabled,
 			builder.Me,
+			accessBackend,
+			restHandler,
 			builder.secureGrpcServer,
 			builder.unsecureGrpcServer,
 		)
@@ -895,14 +965,14 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 		}
 
 		// upstream access node forwarder
-		forwarder, err := apiproxy.NewFlowAccessAPIForwarder(builder.upstreamIdentities, builder.apiTimeout, builder.rpcConf.MaxMsgSize)
+		forwarder, err := apiproxy.NewFlowAccessAPIForwarder(builder.upstreamIdentities, builder.apiTimeout, config.MaxMsgSize)
 		if err != nil {
 			return nil, err
 		}
 
-		proxy := &apiproxy.FlowAccessAPIRouter{
+		rpcHandler := &apiproxy.FlowAccessAPIRouter{
 			Logger:   builder.Logger,
-			Metrics:  metrics.NewObserverCollector(),
+			Metrics:  observerCollector,
 			Upstream: forwarder,
 			Observer: protocol.NewHandler(protocol.New(
 				node.State,
@@ -914,7 +984,7 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 
 		// build the rpc engine
 		builder.RpcEng, err = engineBuilder.
-			WithNewHandler(proxy).
+			WithRpcHandler(rpcHandler).
 			WithLegacy().
 			Build()
 		if err != nil {
