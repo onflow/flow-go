@@ -19,6 +19,9 @@ type NodeSelector interface {
 }
 
 // NodeSelectorFactory is a factory for creating node selectors based on factory configuration and node type.
+// Supported configurations:
+// circuitBreakerEnabled = true - nodes will be pseudo-randomly sampled and picked in-order.
+// circuitBreakerEnabled = false - nodes will be picked from proposed list in-order without any changes.
 type NodeSelectorFactory struct {
 	circuitBreakerEnabled bool
 }
@@ -44,6 +47,7 @@ func (n *NodeSelectorFactory) SelectNodes(nodes flow.IdentityList) (NodeSelector
 var _ NodeSelector = (*MainNodeSelector)(nil)
 
 // MainNodeSelector is a specific implementation of the node selector.
+// Which performs in-order node selection using fixed list of pre-defined nodes.
 type MainNodeSelector struct {
 	nodes flow.IdentityList
 	index int
