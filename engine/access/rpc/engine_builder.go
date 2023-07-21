@@ -68,11 +68,11 @@ func (builder *RPCEngineBuilder) WithNewHandler(handler accessproto.AccessAPISer
 func (builder *RPCEngineBuilder) WithLegacy() *RPCEngineBuilder {
 	// Register legacy gRPC handlers for backwards compatibility, to be removed at a later date
 	legacyaccessproto.RegisterAccessAPIServer(
-		builder.unsecureGrpcServer,
+		builder.unsecureGrpcServer.Server,
 		legacyaccess.NewHandler(builder.backend, builder.chain),
 	)
 	legacyaccessproto.RegisterAccessAPIServer(
-		builder.secureGrpcServer,
+		builder.secureGrpcServer.Server,
 		legacyaccess.NewHandler(builder.backend, builder.chain),
 	)
 	return builder
@@ -83,8 +83,8 @@ func (builder *RPCEngineBuilder) WithLegacy() *RPCEngineBuilder {
 func (builder *RPCEngineBuilder) WithMetrics() *RPCEngineBuilder {
 	// Not interested in legacy metrics, so initialize here
 	grpc_prometheus.EnableHandlingTimeHistogram()
-	grpc_prometheus.Register(builder.unsecureGrpcServer)
-	grpc_prometheus.Register(builder.secureGrpcServer)
+	grpc_prometheus.Register(builder.unsecureGrpcServer.Server)
+	grpc_prometheus.Register(builder.secureGrpcServer.Server)
 	return builder
 }
 
@@ -100,7 +100,7 @@ func (builder *RPCEngineBuilder) Build() (*Engine, error) {
 			handler = access.NewHandler(builder.Engine.backend, builder.Engine.chain, builder.finalizedHeaderCache, builder.me, access.WithBlockSignerDecoder(builder.signerIndicesDecoder))
 		}
 	}
-	accessproto.RegisterAccessAPIServer(builder.unsecureGrpcServer, handler)
-	accessproto.RegisterAccessAPIServer(builder.secureGrpcServer, handler)
+	accessproto.RegisterAccessAPIServer(builder.unsecureGrpcServer.Server, handler)
+	accessproto.RegisterAccessAPIServer(builder.secureGrpcServer.Server, handler)
 	return builder.Engine, nil
 }

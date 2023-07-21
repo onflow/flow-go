@@ -138,6 +138,7 @@ func TestPrograms_TestContractUpdates(t *testing.T) {
 		me,
 		prov,
 		nil,
+		testutil.ProtocolStateWithSourceFixture(nil),
 		testMaxConcurrency)
 	require.NoError(t, err)
 
@@ -249,6 +250,7 @@ func TestPrograms_TestBlockForks(t *testing.T) {
 		me,
 		prov,
 		nil,
+		testutil.ProtocolStateWithSourceFixture(nil),
 		testMaxConcurrency)
 	require.NoError(t, err)
 
