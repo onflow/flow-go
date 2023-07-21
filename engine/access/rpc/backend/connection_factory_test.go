@@ -443,10 +443,7 @@ func TestCircuitBreakerExecutionNode(t *testing.T) {
 
 	// Set the connection pool cache size.
 	cacheSize := 1
-	cache, _ := lru.NewWithEvict(cacheSize, func(_, evictedValue interface{}) {
-		evictedValue.(*CachedClient).Close()
-	})
-	connectionFactory.ConnectionsCache = cache
+	connectionFactory.ConnectionsCache, _ = lru.New(cacheSize)
 	connectionFactory.CacheSize = uint(cacheSize)
 
 	// Set metrics reporting.
@@ -526,10 +523,7 @@ func TestCircuitBreakerCollectionNode(t *testing.T) {
 
 	// Set the connection pool cache size.
 	cacheSize := 1
-	cache, _ := lru.NewWithEvict(cacheSize, func(_, evictedValue interface{}) {
-		evictedValue.(*CachedClient).Close()
-	})
-	connectionFactory.ConnectionsCache = cache
+	connectionFactory.ConnectionsCache, _ = lru.New(cacheSize)
 	connectionFactory.CacheSize = uint(cacheSize)
 
 	// Set metrics reporting.

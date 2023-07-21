@@ -38,19 +38,20 @@ func (n *NodeSelectorFactory) SelectNodes(nodes flow.IdentityList) (NodeSelector
 		}
 	}
 
-	return &MainNodeSelector{
-		nodes: nodes,
-		index: 0,
-	}, nil
+	return NewMainNodeSelector(nodes), nil
 }
-
-var _ NodeSelector = (*MainNodeSelector)(nil)
 
 // MainNodeSelector is a specific implementation of the node selector.
 // Which performs in-order node selection using fixed list of pre-defined nodes.
 type MainNodeSelector struct {
 	nodes flow.IdentityList
 	index int
+}
+
+var _ NodeSelector = (*MainNodeSelector)(nil)
+
+func NewMainNodeSelector(nodes flow.IdentityList) *MainNodeSelector {
+	return &MainNodeSelector{nodes: nodes, index: 0}
 }
 
 // HasNext returns true if next node is available.

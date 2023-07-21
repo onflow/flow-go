@@ -27,6 +27,7 @@ import (
 // DefaultClientTimeout is used when making a GRPC request to a collection node or an execution node
 const DefaultClientTimeout = 3 * time.Second
 
+// clientType is an enumeration type used to differentiate between different types of gRPC clients.
 type clientType int
 
 const (
