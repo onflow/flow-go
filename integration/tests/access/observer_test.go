@@ -5,9 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
-	"strings"
 	"testing"
 
 	"google.golang.org/grpc"
@@ -20,6 +18,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
+	"github.com/onflow/flow-go/engine/access/rest/util"
 	"github.com/onflow/flow-go/integration/testnet"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -77,14 +76,14 @@ func (s *ObserverSuite) SetupTest() {
 		// access node with unstaked nodes supported
 		testnet.NewNodeConfig(flow.RoleAccess, testnet.WithLogLevel(zerolog.InfoLevel), testnet.WithAdditionalFlag("--supports-observer=true")),
 
-		// need one dummy execution node (unused ghost)
-		testnet.NewNodeConfig(flow.RoleExecution, testnet.WithLogLevel(zerolog.FatalLevel), testnet.AsGhost()),
+		// need one dummy execution node
+		testnet.NewNodeConfig(flow.RoleExecution, testnet.WithLogLevel(zerolog.FatalLevel)),
 
 		// need one dummy verification node (unused ghost)
 		testnet.NewNodeConfig(flow.RoleVerification, testnet.WithLogLevel(zerolog.FatalLevel), testnet.AsGhost()),
 
-		// need one controllable collection node (unused ghost)
-		testnet.NewNodeConfig(flow.RoleCollection, testnet.WithLogLevel(zerolog.FatalLevel), testnet.AsGhost()),
+		// need one controllable collection node
+		testnet.NewNodeConfig(flow.RoleCollection, testnet.WithLogLevel(zerolog.FatalLevel)),
 
 		// need three consensus nodes (unused ghost)
 		testnet.NewNodeConfig(flow.RoleConsensus, testnet.WithLogLevel(zerolog.FatalLevel), testnet.AsGhost()),
@@ -184,23 +183,20 @@ func (s *ObserverSuite) TestObserverRest() {
 	observerAddr := s.net.ContainerByName("observer_1").Addr(testnet.RESTPort)
 
 	httpClient := http.DefaultClient
-	makeHttpCall := func(method string, url string, body io.Reader) (*http.Response, error) {
+	makeHttpCall := func(method string, url string, body interface{}) (*http.Response, error) {
 		switch method {
 		case http.MethodGet:
 			return httpClient.Get(url)
 		case http.MethodPost:
-			if body == nil {
-				return httpClient.Post(url, "application/json", strings.NewReader("{}"))
-			} else {
-				return httpClient.Post(url, "application/json", body)
-			}
+			jsonBody, _ := json.Marshal(body)
+			return httpClient.Post(url, "application/json", bytes.NewBuffer(jsonBody))
 		}
 		panic("not supported")
 	}
-	makeObserverCall := func(method string, path string, body io.Reader) (*http.Response, error) {
+	makeObserverCall := func(method string, path string, body interface{}) (*http.Response, error) {
 		return makeHttpCall(method, "http://"+observerAddr+"/v1"+path, body)
 	}
-	makeAccessCall := func(method string, path string, body io.Reader) (*http.Response, error) {
+	makeAccessCall := func(method string, path string, body interface{}) (*http.Response, error) {
 		return makeHttpCall(method, "http://"+accessAddr+"/v1"+path, body)
 	}
 
@@ -218,6 +214,10 @@ func (s *ObserverSuite) TestObserverRest() {
 				assert.NoError(t, observerErr)
 				assert.Equal(t, accessResp.Status, observerResp.Status)
 				assert.Equal(t, accessResp.StatusCode, observerResp.StatusCode)
+				assert.Contains(t, [...]int{
+					http.StatusNotFound,
+					http.StatusOK,
+				}, observerResp.StatusCode)
 			})
 		}
 	})
@@ -236,7 +236,6 @@ func (s *ObserverSuite) TestObserverRest() {
 				observerResp, observerErr := makeObserverCall(endpoint.method, endpoint.path, endpoint.body)
 				require.NoError(t, observerErr)
 				assert.Contains(t, [...]int{
-					http.StatusInternalServerError,
 					http.StatusServiceUnavailable}, observerResp.StatusCode)
 			})
 		}
@@ -392,12 +391,12 @@ type RestEndpointTest struct {
 	name   string
 	method string
 	path   string
-	body   io.Reader
+	body   interface{}
 }
 
 func (s *ObserverSuite) getRestEndpoints() []RestEndpointTest {
 	transactionId := unittest.IdentifierFixture().String()
-	account, _ := unittest.AccountFixture()
+	account := flow.Localnet.Chain().ServiceAddress().String()
 	block := unittest.BlockFixture()
 	executionResult := unittest.ExecutionResultFixture()
 	collection := unittest.CollectionFixture(2)
@@ -454,16 +453,17 @@ func (s *ObserverSuite) getRestEndpoints() []RestEndpointTest {
 			name:   "executeScript",
 			method: http.MethodPost,
 			path:   "/scripts",
+			body:   createScript(),
 		},
 		{
 			name:   "getAccount",
 			method: http.MethodGet,
-			path:   "/accounts/" + account.Address.HexWithPrefix() + "?block_height=1",
+			path:   "/accounts/" + account + "?block_height=1",
 		},
 		{
 			name:   "getEvents",
 			method: http.MethodGet,
-			path:   fmt.Sprintf("/events?type=%s&start_height=%d&end_height=%d", eventType, 1, 3),
+			path:   fmt.Sprintf("/events?type=%s&start_height=%d&end_height=%d", eventType, 0, 3),
 		},
 		{
 			name:   "getNetworkParameters",
@@ -478,10 +478,15 @@ func (s *ObserverSuite) getRestEndpoints() []RestEndpointTest {
 	}
 }
 
-func createTx(net *testnet.FlowNetwork) *bytes.Buffer {
+func createTx(net *testnet.FlowNetwork) interface{} {
 	flowAddr := flow.Localnet.Chain().ServiceAddress()
-	signature := unittest.TransactionSignatureFixture()
-	signature.Address = flowAddr
+	payloadSignature := unittest.TransactionSignatureFixture()
+	envelopeSignature := unittest.TransactionSignatureFixture()
+
+	payloadSignature.Address = flowAddr
+
+	envelopeSignature.Address = flowAddr
+	envelopeSignature.KeyIndex = 2
 
 	tx := flow.NewTransactionBody().
 		AddAuthorizer(flowAddr).
@@ -489,10 +494,18 @@ func createTx(net *testnet.FlowNetwork) *bytes.Buffer {
 		SetScript(unittest.NoopTxScript()).
 		SetReferenceBlockID(net.Root().ID()).
 		SetProposalKey(flowAddr, 1, 0)
-	tx.PayloadSignatures = []flow.TransactionSignature{signature}
-	tx.EnvelopeSignatures = []flow.TransactionSignature{signature}
+	tx.PayloadSignatures = []flow.TransactionSignature{payloadSignature}
+	tx.EnvelopeSignatures = []flow.TransactionSignature{envelopeSignature}
 
-	jsonBody, _ := json.Marshal(unittest.CreateSendTxHttpPayload(*tx))
+	return unittest.CreateSendTxHttpPayload(*tx)
+}
 
-	return bytes.NewBuffer(jsonBody)
+func createScript() interface{} {
+	validCode := []byte(`pub fun main(foo: String): String { return foo }`)
+	validArgs := []byte(`{ "type": "String", "value": "hello world" }`)
+	body := map[string]interface{}{
+		"script":    util.ToBase64(validCode),
+		"arguments": []string{util.ToBase64(validArgs)},
+	}
+	return body
 }

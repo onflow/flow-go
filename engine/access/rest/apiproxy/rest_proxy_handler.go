@@ -10,7 +10,6 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/access"
-	"github.com/onflow/flow-go/engine/access/rest/models"
 	"github.com/onflow/flow-go/engine/common/grpc/forwarder"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/model/flow"
@@ -187,7 +186,7 @@ func (r *RestProxyHandler) GetAccountAtBlockHeight(ctx context.Context, address 
 	r.log("upstream", "GetAccountAtBlockHeight", err)
 
 	if err != nil {
-		return nil, models.NewNotFoundError("not found account at block height", err)
+		return nil, err
 	}
 
 	return convert.MessageToAccount(accountResponse.Account)

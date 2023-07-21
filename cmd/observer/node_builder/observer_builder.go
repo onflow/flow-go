@@ -29,6 +29,7 @@ import (
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/engine/access/apiproxy"
 	restapiproxy "github.com/onflow/flow-go/engine/access/rest/apiproxy"
+	"github.com/onflow/flow-go/engine/access/rest/routes"
 	"github.com/onflow/flow-go/engine/access/rpc"
 	"github.com/onflow/flow-go/engine/access/rpc/backend"
 	"github.com/onflow/flow-go/engine/common/follower"
@@ -166,6 +167,9 @@ type ObserverServiceBuilder struct {
 
 	// Public network
 	peerID peer.ID
+
+	RestMetrics   *metrics.RestCollector
+	AccessMetrics module.AccessMetrics
 }
 
 // deriveBootstrapPeerIdentities derives the Flow Identity of the bootstrap peers from the parameters.
@@ -849,8 +853,22 @@ func (builder *ObserverServiceBuilder) enqueueConnectWithStakedAN() {
 }
 
 func (builder *ObserverServiceBuilder) enqueueRPCServer() {
+	builder.Module("rest metrics", func(node *cmd.NodeConfig) error {
+		m, err := metrics.NewRestCollector(routes.URLToRoute, node.MetricsRegisterer)
+		if err != nil {
+			return err
+		}
+		builder.RestMetrics = m
+		return nil
+	})
+	builder.Module("access metrics", func(node *cmd.NodeConfig) error {
+		builder.AccessMetrics = metrics.NewAccessCollector(
+			metrics.WithRestMetrics(builder.RestMetrics),
+		)
+		return nil
+	})
 	builder.Component("RPC engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-		accessMetrics := metrics.NewAccessCollector()
+		accessMetrics := builder.AccessMetrics
 		config := builder.rpcConf
 		backendConfig := config.BackendConfig
 
