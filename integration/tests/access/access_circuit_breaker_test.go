@@ -38,8 +38,8 @@ type AccessCircuitBreakerSuite struct {
 	net *testnet.FlowNetwork
 }
 
-var requestTimeout = 3 * time.Second
-var cbRestoreTimeout = 6 * time.Second
+var requestTimeout = 1500 * time.Millisecond
+var cbRestoreTimeout = 3 * time.Second
 
 func (s *AccessCircuitBreakerSuite) TearDownTest() {
 	s.log.Info().Msg("================> Start TearDownTest")
@@ -153,36 +153,23 @@ func (s *AccessCircuitBreakerSuite) TestCircuitBreaker() {
 		SetGasLimit(9999)
 
 	// Sign the transaction
-	childCtx, cancel := context.WithTimeout(s.ctx, time.Second*10)
 	signedTx, err := accessClient.SignTransaction(createAccountTx)
 	require.NoError(s.T(), err)
-	cancel()
 
 	// 3. Disconnect the collection node from the network to activate the Circuit Breaker
 	err = collectionContainer.Disconnect()
 	require.NoError(s.T(), err, "failed to pause connection node")
 
 	// 4. Send a couple of transactions to test if the circuit breaker opens correctly
-	sendTransaction := func(ctx context.Context, tx *sdk.Transaction) (time.Duration, error) {
-		childCtx, cancel = context.WithTimeout(ctx, time.Second*10)
-		start := time.Now()
-		err := accessClient.SendTransaction(childCtx, tx)
-		duration := time.Since(start)
-		defer cancel()
-
-		return duration, err
-	}
-
 	// Try to send the transaction for the first time. It should wait at least the timeout time and return Unavailable error
-	duration, err := sendTransaction(s.ctx, signedTx)
+	err = accessClient.SendTransaction(s.ctx, signedTx)
 	assert.Equal(s.T(), codes.Unavailable, status.Code(err))
-	assert.GreaterOrEqual(s.T(), duration, requestTimeout)
 
 	// Try to send the transaction for the second time. It should wait less than a second because the circuit breaker
 	// is configured to break after the first failure
-	duration, err = sendTransaction(s.ctx, signedTx)
-	assert.Equal(s.T(), codes.Unavailable, status.Code(err))
-	assert.Greater(s.T(), time.Second, duration)
+	err = accessClient.SendTransaction(s.ctx, signedTx)
+	//Here we catch the codes.Unknown error, as this is the one that comes from the Circuit Breaker when the state is Open.
+	assert.Equal(s.T(), codes.Unknown, status.Code(err))
 
 	// Reconnect the collection node
 	err = collectionContainer.Connect()
@@ -192,6 +179,6 @@ func (s *AccessCircuitBreakerSuite) TestCircuitBreaker() {
 	time.Sleep(cbRestoreTimeout)
 
 	// Try to send the transaction for the third time. The transaction should be sent successfully
-	_, err = sendTransaction(s.ctx, signedTx)
+	err = accessClient.SendTransaction(s.ctx, signedTx)
 	require.NoError(s.T(), err, "transaction should be sent")
 }

@@ -99,7 +99,6 @@ type CachedClient struct {
 
 // createConnection creates new gRPC connections to remote node
 func (cf *ConnectionFactoryImpl) createConnection(address string, timeout time.Duration, clientType clientType) (*grpc.ClientConn, error) {
-
 	if timeout == 0 {
 		timeout = DefaultClientTimeout
 	}
@@ -113,8 +112,11 @@ func (cf *ConnectionFactoryImpl) createConnection(address string, timeout time.D
 
 	var connInterceptors []grpc.UnaryClientInterceptor
 
+	connInterceptors = append(connInterceptors, createClientTimeoutInterceptor(timeout))
+
 	// The order in which interceptors are added to the `connInterceptors` slice is important since they will be called
-	// in the same order during gRPC requests.
+	// in the opposite order during gRPC requests. See documentation for more info:
+	// https://grpc.io/blog/grpc-web-interceptor/#binding-interceptors
 	if cf.CircuitBreakerConfig.Enabled {
 		// If the circuit breaker interceptor is enabled, it should always be called first before passing control to
 		// subsequent interceptors.
@@ -122,8 +124,6 @@ func (cf *ConnectionFactoryImpl) createConnection(address string, timeout time.D
 	} else {
 		connInterceptors = append(connInterceptors, cf.createClientInvalidationInterceptor(address, clientType))
 	}
-
-	connInterceptors = append(connInterceptors, createClientTimeoutInterceptor(timeout))
 
 	// ClientConn's default KeepAlive on connections is indefinite, assuming the timeout isn't reached
 	// The connections should be safe to be persisted and reused
@@ -386,7 +386,6 @@ func (cf *ConnectionFactoryImpl) createCircuitBreakerInterceptor() grpc.UnaryCli
 			// the "StateClosed" and handles invocations as usual.
 			_, err := circuitBreaker.Execute(func() (interface{}, error) {
 				err := invoker(ctx, method, req, reply, cc, opts...)
-
 				return nil, err
 			})
 			return err
