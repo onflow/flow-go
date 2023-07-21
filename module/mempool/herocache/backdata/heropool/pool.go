@@ -1,7 +1,6 @@
 package heropool
 
 import (
-	"fmt"
 	"math"
 
 	"github.com/rs/zerolog"
@@ -18,20 +17,20 @@ const (
 	NoEjection     = EjectionMode("no-ejection")
 )
 
+// StateIndex is a type of a state of a placeholder in a pool.
+type StateIndex uint
+
+const numberOfStates = 2
+const ( // iota is reset to 0
+	stateFree StateIndex = iota
+	stateUsed
+)
+
 // EIndex is data type representing an entity index in Pool.
 type EIndex uint32
 
 // InvalidIndex is used when a link doesnt point anywhere, in other words it is an equivalent of a nil address.
 const InvalidIndex EIndex = math.MaxUint32
-
-// A type dedicated to describe possible states of placeholders for entities in the pool.
-type StateType string
-
-// A placeholder in a free state can be used to store an entity.
-const stateFree StateType = "free-state"
-
-// A placeholder in a used state stores currently an entity.
-const stateUsed StateType = "used-state"
 
 // poolEntity represents the data type that is maintained by
 type poolEntity struct {
@@ -64,8 +63,7 @@ func (p PoolEntity) Entity() flow.Entity {
 
 type Pool struct {
 	logger       zerolog.Logger
-	free         state // keeps track of free slots.
-	used         state // keeps track of allocated slots to cachedEntities.
+	states       []state // keeps track of a slot's state
 	poolEntities []poolEntity
 	ejectionMode EjectionMode
 }
@@ -74,16 +72,8 @@ type Pool struct {
 // logger and a provided fixed size.
 func NewHeroPool(sizeLimit uint32, ejectionMode EjectionMode, logger zerolog.Logger) *Pool {
 	l := &Pool{
-		free: state{
-			head: InvalidIndex,
-			tail: InvalidIndex,
-			size: 0,
-		},
-		used: state{
-			head: InvalidIndex,
-			tail: InvalidIndex,
-			size: 0,
-		},
+		//constructor for states make them invalid
+		states:       NewStates(numberOfStates),
 		poolEntities: make([]poolEntity, sizeLimit),
 		ejectionMode: ejectionMode,
 		logger:       logger,
@@ -105,8 +95,16 @@ func (p *Pool) setDefaultNodeLinkValues() {
 
 // initFreeEntities initializes the free double linked-list with the indices of all cached entity poolEntities.
 func (p *Pool) initFreeEntities() {
-	for i := 0; i < len(p.poolEntities); i++ {
-		p.appendEntity(stateFree, EIndex(i))
+	p.states[stateFree].head = 0
+	p.states[stateFree].tail = 0
+	p.poolEntities[p.states[stateFree].head].node.prev = InvalidIndex
+	p.poolEntities[p.states[stateFree].tail].node.next = InvalidIndex
+	p.states[stateFree].size = 1
+	for i := 1; i < len(p.poolEntities); i++ {
+		p.connect(p.states[stateFree].tail, EIndex(i))
+		p.states[stateFree].tail = EIndex(i)
+		p.poolEntities[p.states[stateFree].tail].node.next = InvalidIndex
+		p.states[stateFree].size++
 	}
 }
 
@@ -124,7 +122,7 @@ func (p *Pool) Add(entityId flow.Identifier, entity flow.Entity, owner uint64) (
 		p.poolEntities[entityIndex].entity = entity
 		p.poolEntities[entityIndex].id = entityId
 		p.poolEntities[entityIndex].owner = owner
-		p.appendEntity(stateUsed, entityIndex)
+		p.switchState(stateFree, stateUsed, entityIndex)
 	}
 
 	return entityIndex, slotAvailable, ejectedEntity
@@ -137,10 +135,10 @@ func (p *Pool) Get(entityIndex EIndex) (flow.Identifier, flow.Entity, uint64) {
 
 // All returns all stored entities in this pool.
 func (p Pool) All() []PoolEntity {
-	all := make([]PoolEntity, p.used.size)
-	next := p.used.head
+	all := make([]PoolEntity, p.states[stateUsed].size)
+	next := p.states[stateUsed].head
 
-	for i := uint32(0); i < p.used.size; i++ {
+	for i := uint32(0); i < p.states[stateUsed].size; i++ {
 		e := p.poolEntities[next]
 		all[i] = e.PoolEntity
 		next = e.node.next
@@ -149,13 +147,14 @@ func (p Pool) All() []PoolEntity {
 	return all
 }
 
-// Head returns the head of used items. Assuming no ejection happened and pool never goes beyond limit, Head returns
+// Head returns the head of states[stateUsed] items. Assuming no ejection happened and pool never goes beyond limit, Head returns
 // the first inserted element.
 func (p Pool) Head() (flow.Entity, bool) {
-	if p.used.size == 0 {
+
+	if p.states[stateUsed].size == 0 {
 		return nil, false
 	}
-	e := p.poolEntities[p.used.head]
+	e := p.poolEntities[p.states[stateUsed].head]
 	return e.Entity(), true
 }
 
@@ -169,12 +168,12 @@ func (p Pool) Head() (flow.Entity, bool) {
 func (p *Pool) sliceIndexForEntity() (i EIndex, hasAvailableSlot bool, ejectedEntity flow.Entity) {
 	lruEject := func() (EIndex, bool, flow.Entity) {
 		// LRU ejection
-		// the used head is the oldest entity, so we turn the used head to a free head here.
+		// the states[stateUsed] head is the oldest entity, so we turn the states[stateUsed] head to a states[stateFree] head here.
 		invalidatedEntity := p.invalidateUsedHead()
-		return p.claimFreeHead(), true, invalidatedEntity
+		return p.states[stateFree].head, true, invalidatedEntity
 	}
 
-	if p.free.size == 0 {
+	if p.states[stateFree].size == 0 {
 		// the free list is empty, so we are out of space, and we need to eject.
 		switch p.ejectionMode {
 		case NoEjection:
@@ -182,7 +181,7 @@ func (p *Pool) sliceIndexForEntity() (i EIndex, hasAvailableSlot bool, ejectedEn
 			return InvalidIndex, false, nil
 		case RandomEjection:
 			// we only eject randomly when the pool is full and random ejection is on.
-			random, err := rand.Uint32n(p.used.size)
+			random, err := rand.Uint32n(p.states[stateUsed].size)
 			if err != nil {
 				p.logger.Fatal().Err(err).
 					Msg("hero pool random ejection failed - falling back to LRU ejection")
@@ -191,45 +190,44 @@ func (p *Pool) sliceIndexForEntity() (i EIndex, hasAvailableSlot bool, ejectedEn
 			}
 			randomIndex := EIndex(random)
 			invalidatedEntity := p.invalidateEntityAtIndex(randomIndex)
-			return p.claimFreeHead(), true, invalidatedEntity
+			return p.states[stateFree].head, true, invalidatedEntity
 		case LRUEjection:
 			// LRU ejection
 			return lruEject()
 		}
 	}
 
-	// claiming the head of free list as the slice index for the next entity to be added
-	return p.claimFreeHead(), true, nil
+	// returning the head of states[stateFree] list as the slice index for the next entity to be added
+	return p.states[stateFree].head, true, nil
 }
 
 // Size returns total number of entities that this list maintains.
 func (p Pool) Size() uint32 {
-	return p.used.size
+	return p.states[stateUsed].size
 }
 
 // getHeads returns entities corresponding to the used and free heads.
-func (p *Pool) getHeads() (*poolEntity, *poolEntity) {
+func (p Pool) getHeads() (*poolEntity, *poolEntity) {
 	var usedHead, freeHead *poolEntity
-	if p.used.size != 0 {
-		usedHead = &p.poolEntities[p.used.head]
+	if p.states[stateUsed].size != 0 {
+		usedHead = &p.poolEntities[p.states[stateUsed].head]
 	}
 
-	if p.free.size != 0 {
-		freeHead = &p.poolEntities[p.free.head]
+	if p.states[stateFree].size != 0 {
+		freeHead = &p.poolEntities[p.states[stateFree].head]
 	}
 
 	return usedHead, freeHead
 }
 
-// getTails returns entities corresponding to the used and free tails.
-func (p *Pool) getTails() (*poolEntity, *poolEntity) {
+// getTails returns entities corresponding to the states[stateUsed] and states[stateFree] tails.
+func (p Pool) getTails() (*poolEntity, *poolEntity) {
 	var usedTail, freeTail *poolEntity
-	if p.used.size != 0 {
-		usedTail = &p.poolEntities[p.used.tail]
+	if p.states[stateUsed].size != 0 {
+		usedTail = &p.poolEntities[p.states[stateUsed].tail]
 	}
-
-	if p.free.size != 0 {
-		freeTail = &p.poolEntities[p.free.tail]
+	if p.states[stateFree].size != 0 {
+		freeTail = &p.poolEntities[p.states[stateFree].tail]
 	}
 
 	return usedTail, freeTail
@@ -241,20 +239,12 @@ func (p *Pool) connect(prev EIndex, next EIndex) {
 	p.poolEntities[next].node.prev = prev
 }
 
-// invalidateUsedHead moves current used head forward by one node. It
+// invalidateUsedHead moves current states[stateUsed] head forward by one node. It
 // also removes the entity the invalidated head is presenting and appends the
-// node represented by the used head to the tail of the free list.
+// node represented by the states[stateUsed] head to the tail of the states[stateFree] list.
 func (p *Pool) invalidateUsedHead() flow.Entity {
-	headSliceIndex := p.used.head
+	headSliceIndex := p.states[stateUsed].head
 	return p.invalidateEntityAtIndex(headSliceIndex)
-}
-
-// claimFreeHead moves the free head forward, and returns the slice index of the
-// old free head to host a new entity.
-func (p *Pool) claimFreeHead() EIndex {
-	oldFreeHeadIndex := p.free.head
-	p.removeEntity(stateFree, oldFreeHeadIndex)
-	return oldFreeHeadIndex
 }
 
 // Remove removes entity corresponding to given getSliceIndex from the list.
@@ -263,18 +253,14 @@ func (p *Pool) Remove(sliceIndex EIndex) flow.Entity {
 }
 
 // invalidateEntityAtIndex invalidates the given getSliceIndex in the linked list by
-// removing its corresponding linked-list node from the used linked list, and appending
-// it to the tail of the free list. It also removes the entity that the invalidated node is presenting.
+// removing its corresponding linked-list node from the states[stateUsed] linked list, and appending
+// it to the tail of the states[stateFree] list. It also removes the entity that the invalidated node is presenting.
 func (p *Pool) invalidateEntityAtIndex(sliceIndex EIndex) flow.Entity {
-	invalidatedEntity := p.poolEntities[sliceIndex].entity
-	if invalidatedEntity == nil {
-		panic(fmt.Sprintf("removing an entity from an empty slot with an index : %d", sliceIndex))
-	}
-	p.removeEntity(stateUsed, sliceIndex)
+	poolEntity := p.poolEntities[sliceIndex]
+	invalidatedEntity := poolEntity.entity
+	p.switchState(stateUsed, stateFree, sliceIndex)
 	p.poolEntities[sliceIndex].id = flow.ZeroID
 	p.poolEntities[sliceIndex].entity = nil
-	p.appendEntity(stateFree, EIndex(sliceIndex))
-
 	return invalidatedEntity
 }
 
@@ -292,77 +278,47 @@ func (p *Pool) isInvalidated(sliceIndex EIndex) bool {
 	return true
 }
 
-// utility method that removes an entity from one of the states.
-// NOTE: a removed entity has to be added to another state.
-func (p *Pool) removeEntity(stateType StateType, entityIndex EIndex) {
-	var s *state = nil
-	switch stateType {
-	case stateFree:
-		s = &p.free
-	case stateUsed:
-		s = &p.used
-	default:
-		panic(fmt.Sprintf("unknown state type: %s", stateType))
-	}
-
-	if s.size == 0 {
+// switches state of an entity.
+func (p *Pool) switchState(stateFrom StateIndex, stateTo StateIndex, entityIndex EIndex) error {
+	// Remove from stateFrom list
+	if p.states[stateFrom].size == 0 {
 		panic("Removing an entity from an empty list")
-	}
-	if s.size == 1 {
-		// here set to InvalidIndex
-		s.head = InvalidIndex
-		s.tail = InvalidIndex
-		s.size--
-		p.poolEntities[entityIndex].node.next = InvalidIndex
-		p.poolEntities[entityIndex].node.prev = InvalidIndex
-		return
-	}
-	node := p.poolEntities[entityIndex].node
+	} else if p.states[stateFrom].size == 1 {
+		p.states[stateFrom].head = InvalidIndex
+		p.states[stateFrom].tail = InvalidIndex
+	} else {
+		node := p.poolEntities[entityIndex].node
 
-	if entityIndex != s.head && entityIndex != s.tail {
-		// links next and prev elements for non-head and non-tail element
-		p.connect(node.prev, node.next)
-	}
+		if entityIndex != p.states[stateFrom].head && entityIndex != p.states[stateFrom].tail {
+			// links next and prev elements for non-head and non-tail element
+			p.connect(node.prev, node.next)
+		}
 
-	if entityIndex == s.head {
-		// moves head forward
-		s.head = node.next
-		p.poolEntities[s.head].node.prev = InvalidIndex
-	}
+		if entityIndex == p.states[stateFrom].head {
+			// moves head forward
+			p.states[stateFrom].head = node.next
+			p.poolEntities[p.states[stateFrom].head].node.prev = InvalidIndex
+		}
 
-	if entityIndex == s.tail {
-		// moves tail backwards
-		s.tail = node.prev
-		p.poolEntities[s.tail].node.next = InvalidIndex
+		if entityIndex == p.states[stateFrom].tail {
+			// moves tail backwards
+			p.states[stateFrom].tail = node.prev
+			p.poolEntities[p.states[stateFrom].tail].node.next = InvalidIndex
+		}
 	}
-	s.size--
-	p.poolEntities[entityIndex].node.next = InvalidIndex
-	p.poolEntities[entityIndex].node.prev = InvalidIndex
-}
+	p.states[stateFrom].size--
 
-// appends an entity to the tail of the state or creates a first element.
-// NOTE: entity should not be in any list before this method is applied
-func (p *Pool) appendEntity(stateType StateType, entityIndex EIndex) {
-	var s *state = nil
-	switch stateType {
-	case stateFree:
-		s = &p.free
-	case stateUsed:
-		s = &p.used
-	default:
-		panic(fmt.Sprintf("unknown state type: %s", stateType))
+	// Add to stateTo list
+	if p.states[stateTo].size == 0 {
+		p.states[stateTo].head = entityIndex
+		p.states[stateTo].tail = entityIndex
+		p.poolEntities[p.states[stateTo].head].node.prev = InvalidIndex
+		p.poolEntities[p.states[stateTo].tail].node.next = InvalidIndex
+	} else {
+		p.connect(p.states[stateTo].tail, entityIndex)
+		p.states[stateTo].tail = entityIndex
+		p.poolEntities[p.states[stateTo].tail].node.next = InvalidIndex
 	}
-
-	if s.size == 0 {
-		s.head = entityIndex
-		s.tail = entityIndex
-		p.poolEntities[s.head].node.prev = InvalidIndex
-		p.poolEntities[s.tail].node.next = InvalidIndex
-		s.size = 1
-		return
-	}
-	p.connect(s.tail, entityIndex)
-	s.size++
-	s.tail = entityIndex
-	p.poolEntities[s.tail].node.next = InvalidIndex
+	p.states[stateTo].size++
+	return nil
 }
