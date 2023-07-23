@@ -135,7 +135,7 @@ func NewTransactionResults(collector module.CacheMetrics, db *badger.DB, transac
 		cache: newCache[string, flow.TransactionResult](collector, metrics.ResourceTransactionResults,
 			withLimit[string, flow.TransactionResult](transactionResultsCacheSize),
 			withStore(noopStore[string, flow.TransactionResult]),
-			withRetrieve[string, flow.TransactionResult](retrieve),
+			withRetrieve(retrieve),
 		),
 		indexCache: newCache[string, flow.TransactionResult](collector, metrics.ResourceTransactionResultIndices,
 			withLimit[string, flow.TransactionResult](transactionResultsCacheSize),

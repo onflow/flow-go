@@ -101,7 +101,6 @@ func (c *Cache[K, V]) Get(key K) func(*badger.Txn) (V, error) {
 		// get it from the database
 		resource, err := c.retrieve(key)(tx)
 		if err != nil {
-
 			if errors.Is(err, storage.ErrNotFound) {
 				c.metrics.CacheNotFound(c.resource)
 			}

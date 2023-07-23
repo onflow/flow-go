@@ -156,7 +156,7 @@ func NewServiceEvents(collector module.CacheMetrics, db *badger.DB) *ServiceEven
 		db: db,
 		cache: newCache[flow.Identifier, []flow.Event](collector, metrics.ResourceEvents,
 			withStore(noopStore[flow.Identifier, []flow.Event]),
-			withRetrieve[flow.Identifier, []flow.Event](retrieve)),
+			withRetrieve(retrieve)),
 	}
 }
 
