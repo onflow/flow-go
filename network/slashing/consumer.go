@@ -88,7 +88,6 @@ func (c *Consumer) reportMisbehavior(misbehavior network.Misbehavior, violation 
 			Err(err).
 			Str("peerID", violation.PeerID).
 			Msg("failed to create misbehavior report")
-
 	}
 	c.misbehaviorReportConsumer.ReportMisbehaviorOnChannel(violation.Channel, report)
 }

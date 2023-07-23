@@ -10,7 +10,7 @@ import (
 
 	chmodels "github.com/onflow/flow-go/model/chunks"
 	"github.com/onflow/flow-go/model/flow"
-	protocolMock "github.com/onflow/flow-go/state/protocol/mock"
+	protocol "github.com/onflow/flow-go/state/protocol/mock"
 	"github.com/onflow/flow-go/state/protocol/prg"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -21,7 +21,7 @@ type PublicAssignmentTestSuite struct {
 }
 
 // Setup test with n verification nodes
-func (a *PublicAssignmentTestSuite) SetupTest(n int) (*flow.Header, *protocolMock.Snapshot, *protocolMock.State) {
+func (a *PublicAssignmentTestSuite) SetupTest(n int) (*flow.Header, *protocol.Snapshot, *protocol.State) {
 	nodes := make([]flow.Role, 0)
 	for i := 1; i < n; i++ {
 		nodes = append(nodes, flow.RoleVerification)

@@ -446,6 +446,39 @@ func (_m *AccessAPIClient) GetEventsForHeightRange(ctx context.Context, in *acce
 	return r0, r1
 }
 
+// GetExecutionResultByID provides a mock function with given fields: ctx, in, opts
+func (_m *AccessAPIClient) GetExecutionResultByID(ctx context.Context, in *access.GetExecutionResultByIDRequest, opts ...grpc.CallOption) (*access.ExecutionResultByIDResponse, error) {
+	_va := make([]interface{}, len(opts))
+	for _i := range opts {
+		_va[_i] = opts[_i]
+	}
+	var _ca []interface{}
+	_ca = append(_ca, ctx, in)
+	_ca = append(_ca, _va...)
+	ret := _m.Called(_ca...)
+
+	var r0 *access.ExecutionResultByIDResponse
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, *access.GetExecutionResultByIDRequest, ...grpc.CallOption) (*access.ExecutionResultByIDResponse, error)); ok {
+		return rf(ctx, in, opts...)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, *access.GetExecutionResultByIDRequest, ...grpc.CallOption) *access.ExecutionResultByIDResponse); ok {
+		r0 = rf(ctx, in, opts...)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*access.ExecutionResultByIDResponse)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, *access.GetExecutionResultByIDRequest, ...grpc.CallOption) error); ok {
+		r1 = rf(ctx, in, opts...)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // GetExecutionResultForBlockID provides a mock function with given fields: ctx, in, opts
 func (_m *AccessAPIClient) GetExecutionResultForBlockID(ctx context.Context, in *access.GetExecutionResultForBlockIDRequest, opts ...grpc.CallOption) (*access.ExecutionResultForBlockIDResponse, error) {
 	_va := make([]interface{}, len(opts))

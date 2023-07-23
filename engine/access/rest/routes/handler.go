@@ -1,4 +1,4 @@
-package rest
+package routes
 
 import (
 	"encoding/json"
@@ -6,17 +6,17 @@ import (
 	"fmt"
 	"net/http"
 
+	"github.com/rs/zerolog"
+
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
+
+	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/engine/access/rest/models"
 	"github.com/onflow/flow-go/engine/access/rest/request"
 	"github.com/onflow/flow-go/engine/access/rest/util"
 	fvmErrors "github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/model/flow"
-
-	"github.com/rs/zerolog"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
-
-	"github.com/onflow/flow-go/access"
 )
 
 const MaxRequestSize = 2 << 20 // 2MB
@@ -93,7 +93,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) errorHandler(w http.ResponseWriter, err error, errorLogger zerolog.Logger) {
 	// rest status type error should be returned with status and user message provided
-	var statusErr StatusError
+	var statusErr models.StatusError
 	if errors.As(err, &statusErr) {
 		h.errorResponse(w, statusErr.Status(), statusErr.UserMessage(), errorLogger)
 		return
@@ -122,6 +122,11 @@ func (h *Handler) errorHandler(w http.ResponseWriter, err error, errorLogger zer
 		if se.Code() == codes.Internal {
 			msg := fmt.Sprintf("Invalid Flow request: %s", se.Message())
 			h.errorResponse(w, http.StatusBadRequest, msg, errorLogger)
+			return
+		}
+		if se.Code() == codes.Unavailable {
+			msg := fmt.Sprintf("Failed to process request: %s", se.Message())
+			h.errorResponse(w, http.StatusServiceUnavailable, msg, errorLogger)
 			return
 		}
 	}
