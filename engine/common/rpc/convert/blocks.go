@@ -3,10 +3,11 @@ package convert
 import (
 	"fmt"
 
-	"github.com/onflow/flow/protobuf/go/flow/entities"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/onflow/flow-go/model/flow"
+
+	"github.com/onflow/flow/protobuf/go/flow/entities"
 )
 
 // BlockToMessage converts a flow.Block to a protobuf Block message.

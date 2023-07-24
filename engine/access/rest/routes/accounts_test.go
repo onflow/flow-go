@@ -1,4 +1,4 @@
-package rest
+package routes
 
 import (
 	"fmt"
@@ -14,6 +14,7 @@ import (
 	"github.com/onflow/flow-go/access/mock"
 	"github.com/onflow/flow-go/engine/access/rest/middleware"
 	"github.com/onflow/flow-go/model/flow"
+
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -33,7 +34,15 @@ func accountURL(t *testing.T, address string, height string) string {
 	return u.String()
 }
 
-func TestGetAccount(t *testing.T) {
+// TestAccessGetAccount tests local getAccount request.
+//
+//	Runs the following tests:
+//	1. Get account by address at latest sealed block.
+//	2. Get account by address at latest finalized block.
+//	3. Get account by address at height.
+//	4. Get account by address at height condensed.
+//	5. Get invalid account.
+func TestAccessGetAccount(t *testing.T) {
 	backend := &mock.API{}
 
 	t.Run("get by address at latest sealed block", func(t *testing.T) {
@@ -165,6 +174,7 @@ func getAccountRequest(t *testing.T, account *flow.Account, height string, expan
 		q.Add(middleware.ExpandQueryParam, fieldParam)
 		req.URL.RawQuery = q.Encode()
 	}
+
 	require.NoError(t, err)
 	return req
 }
