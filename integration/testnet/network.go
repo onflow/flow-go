@@ -768,6 +768,9 @@ func (net *FlowNetwork) addObserver(t *testing.T, conf ObserverConfig) {
 	nodeContainer.exposePort(AdminPort, testingdock.RandomPort(t))
 	nodeContainer.AddFlag("admin-addr", nodeContainer.ContainerAddr(AdminPort))
 
+	nodeContainer.exposePort(RESTPort, testingdock.RandomPort(t))
+	nodeContainer.AddFlag("rest-addr", nodeContainer.ContainerAddr(RESTPort))
+
 	nodeContainer.opts.HealthCheck = testingdock.HealthCheckCustom(nodeContainer.HealthcheckCallback())
 
 	suiteContainer := net.suite.Container(containerOpts)

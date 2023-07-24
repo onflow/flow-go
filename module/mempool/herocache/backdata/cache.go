@@ -135,7 +135,7 @@ func NewCache(sizeLimit uint32,
 		sizeLimit:              sizeLimit,
 		buckets:                make([]slotBucket, bucketNum),
 		ejectionMode:           ejectionMode,
-		entities:               heropool.NewHeroPool(sizeLimit, ejectionMode),
+		entities:               heropool.NewHeroPool(sizeLimit, ejectionMode, logger),
 		availableSlotHistogram: make([]uint64, slotsPerBucket+1), // +1 is to account for empty buckets as well.
 		interactionCounter:     atomic.NewUint64(0),
 		lastTelemetryDump:      atomic.NewInt64(0),
@@ -267,7 +267,7 @@ func (c *Cache) Clear() {
 	defer c.logTelemetry()
 
 	c.buckets = make([]slotBucket, c.bucketNum)
-	c.entities = heropool.NewHeroPool(c.sizeLimit, c.ejectionMode)
+	c.entities = heropool.NewHeroPool(c.sizeLimit, c.ejectionMode, c.logger)
 	c.availableSlotHistogram = make([]uint64, slotsPerBucket+1)
 	c.interactionCounter = atomic.NewUint64(0)
 	c.lastTelemetryDump = atomic.NewInt64(0)

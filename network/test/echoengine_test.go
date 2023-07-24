@@ -3,16 +3,12 @@ package test
 import (
 	"context"
 	"fmt"
-	"os"
 	"strings"
 	"sync"
 	"testing"
 	"time"
 
-	"github.com/onflow/flow-go/network/p2p"
-
 	"github.com/ipfs/go-log"
-	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
@@ -24,6 +20,7 @@ import (
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/internal/testutils"
 	"github.com/onflow/flow-go/network/mocknetwork"
+	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -48,7 +45,6 @@ func TestStubEngineTestSuite(t *testing.T) {
 
 func (suite *EchoEngineTestSuite) SetupTest() {
 	const count = 2
-	logger := zerolog.New(os.Stderr).Level(zerolog.ErrorLevel)
 	log.SetAllLoggers(log.LevelError)
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -58,14 +54,9 @@ func (suite *EchoEngineTestSuite) SetupTest() {
 
 	// both nodes should be of the same role to get connected on epidemic dissemination
 	var nodes []p2p.LibP2PNode
-	suite.ids, nodes, suite.mws, suite.nets, _ = testutils.GenerateIDsMiddlewaresNetworks(
-		suite.T(),
-		count,
-		logger,
-		unittest.NetworkCodec(),
-		mocknetwork.NewViolationsConsumer(suite.T()),
-	)
-
+	suite.ids, nodes, _ = testutils.LibP2PNodeForMiddlewareFixture(suite.T(), count)
+	suite.mws, _ = testutils.MiddlewareFixtures(suite.T(), suite.ids, nodes, testutils.MiddlewareConfigFixture(suite.T()), mocknetwork.NewViolationsConsumer(suite.T()))
+	suite.nets = testutils.NetworksFixture(suite.T(), suite.ids, suite.mws)
 	testutils.StartNodesAndNetworks(signalerCtx, suite.T(), nodes, suite.nets, 100*time.Millisecond)
 }
 

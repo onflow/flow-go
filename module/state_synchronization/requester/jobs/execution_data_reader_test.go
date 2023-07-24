@@ -3,7 +3,6 @@ package jobs
 import (
 	"context"
 	"errors"
-	"math/rand"
 	"testing"
 	"time"
 
@@ -46,7 +45,6 @@ type ExecutionDataReaderSuite struct {
 
 func TestExecutionDataReaderSuite(t *testing.T) {
 	t.Parallel()
-	rand.Seed(time.Now().UnixMilli())
 	suite.Run(t, new(ExecutionDataReaderSuite))
 }
 

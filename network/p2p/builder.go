@@ -28,7 +28,6 @@ type GossipSubAdapterConfigFunc func(*BasePubSubAdapterConfig) PubSubAdapterConf
 
 // GossipSubBuilder provides a builder pattern for creating a GossipSub pubsub system.
 type GossipSubBuilder interface {
-	PeerScoringBuilder
 	// SetHost sets the host of the builder.
 	// If the host has already been set, a fatal error is logged.
 	SetHost(host.Host)
@@ -45,9 +44,16 @@ type GossipSubBuilder interface {
 	// We expect the node to initialize with a default gossipsub config. Hence, this function overrides the default config.
 	SetGossipSubConfigFunc(GossipSubAdapterConfigFunc)
 
-	// SetGossipSubPeerScoring sets the gossipsub peer scoring of the builder.
-	// If the gossipsub peer scoring flag has already been set, a fatal error is logged.
-	SetGossipSubPeerScoring(bool)
+	// EnableGossipSubScoringWithOverride enables peer scoring for the GossipSub pubsub system with the given override.
+	// Any existing peer scoring config attribute that is set in the override will override the default peer scoring config.
+	// Anything that is left to nil or zero value in the override will be ignored and the default value will be used.
+	// Note: it is not recommended to override the default peer scoring config in production unless you know what you are doing.
+	// Production Tip: use PeerScoringConfigNoOverride as the argument to this function to enable peer scoring without any override.
+	// Args:
+	// - PeerScoringConfigOverride: override for the peer scoring config- Recommended to use PeerScoringConfigNoOverride for production.
+	// Returns:
+	// none
+	EnableGossipSubScoringWithOverride(*PeerScoringConfigOverride)
 
 	// SetGossipSubScoreTracerInterval sets the gossipsub score tracer interval of the builder.
 	// If the gossipsub score tracer interval has already been set, a fatal error is logged.
@@ -81,16 +87,6 @@ type GossipSubBuilder interface {
 	Build(irrecoverable.SignalerContext) (PubSubAdapter, error)
 }
 
-type PeerScoringBuilder interface {
-	// SetTopicScoreParams sets the topic score parameters for the given topic.
-	// If the topic score parameters have already been set for the given topic, it is overwritten.
-	SetTopicScoreParams(topic channels.Topic, topicScoreParams *pubsub.TopicScoreParams)
-
-	// SetAppSpecificScoreParams sets the application specific score parameters for the given topic.
-	// If the application specific score parameters have already been set for the given topic, it is overwritten.
-	SetAppSpecificScoreParams(func(peer.ID) float64)
-}
-
 // GossipSubRpcInspectorSuiteFactoryFunc is a function that creates a new RPC inspector suite. It is used to create
 // RPC inspectors for the gossipsub protocol. The RPC inspectors are used to inspect and validate
 // incoming RPC messages before they are processed by the gossipsub protocol.
@@ -122,13 +118,17 @@ type NodeBuilder interface {
 	SetConnectionManager(connmgr.ConnManager) NodeBuilder
 	SetConnectionGater(ConnectionGater) NodeBuilder
 	SetRoutingSystem(func(context.Context, host.Host) (routing.Routing, error)) NodeBuilder
-	SetPeerManagerOptions(bool, time.Duration) NodeBuilder
 
-	// EnableGossipSubPeerScoring enables peer scoring for the GossipSub pubsub system.
-	// Arguments:
-	// - module.IdentityProvider: the identity provider for the node (must be set before calling this method).
-	// - *PeerScoringConfig: the peer scoring configuration for the GossipSub pubsub system. If nil, the default configuration is used.
-	EnableGossipSubPeerScoring(*PeerScoringConfig) NodeBuilder
+	// EnableGossipSubScoringWithOverride enables peer scoring for the GossipSub pubsub system with the given override.
+	// Any existing peer scoring config attribute that is set in the override will override the default peer scoring config.
+	// Anything that is left to nil or zero value in the override will be ignored and the default value will be used.
+	// Note: it is not recommended to override the default peer scoring config in production unless you know what you are doing.
+	// Production Tip: use PeerScoringConfigNoOverride as the argument to this function to enable peer scoring without any override.
+	// Args:
+	// - PeerScoringConfigOverride: override for the peer scoring config- Recommended to use PeerScoringConfigNoOverride for production.
+	// Returns:
+	// none
+	EnableGossipSubScoringWithOverride(*PeerScoringConfigOverride) NodeBuilder
 	SetCreateNode(CreateNodeFunc) NodeBuilder
 	SetGossipSubFactory(GossipSubFactoryFunc, GossipSubAdapterConfigFunc) NodeBuilder
 	SetStreamCreationRetryInterval(time.Duration) NodeBuilder
@@ -139,10 +139,31 @@ type NodeBuilder interface {
 	Build() (LibP2PNode, error)
 }
 
-// PeerScoringConfig is a configuration for peer scoring parameters for a GossipSub pubsub system.
-type PeerScoringConfig struct {
+// PeerScoringConfigOverride is a structure that is used to carry over the override values for peer scoring configuration.
+// Any attribute that is set in the override will override the default peer scoring config.
+// Typically, we are not recommending to override the default peer scoring config in production unless you know what you are doing.
+type PeerScoringConfigOverride struct {
 	// TopicScoreParams is a map of topic score parameters for each topic.
+	// Override criteria: any topic (i.e., key in the map) will override the default topic score parameters for that topic and
+	// the corresponding value in the map will be used instead of the default value.
+	// If you don't want to override topic score params for a given topic, simply don't include that topic in the map.
+	// If the map is nil, the default topic score parameters are used for all topics.
 	TopicScoreParams map[channels.Topic]*pubsub.TopicScoreParams
+
 	// AppSpecificScoreParams is a function that returns the application specific score parameters for a given peer.
+	// Override criteria: if the function is not nil, it will override the default application specific score parameters.
+	// If the function is nil, the default application specific score parameters are used.
 	AppSpecificScoreParams func(peer.ID) float64
+
+	// DecayInterval is the interval over which we decay the effect of past behavior, so that
+	// a good or bad behavior will not have a permanent effect on the penalty. It is also the interval
+	// that GossipSub uses to refresh the scores of all peers.
+	// Override criteria: if the value is not zero, it will override the default decay interval.
+	// If the value is zero, the default decay interval is used.
+	DecayInterval time.Duration
 }
+
+// PeerScoringConfigNoOverride is a default peer scoring configuration for a GossipSub pubsub system.
+// It is set to nil, which means that no override is done to the default peer scoring configuration.
+// It is the recommended way to use the default peer scoring configuration.
+var PeerScoringConfigNoOverride = (*PeerScoringConfigOverride)(nil)

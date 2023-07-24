@@ -135,7 +135,7 @@ func (suite *MutableIdentityTableSuite) signalIdentityChanged() {
 func (suite *MutableIdentityTableSuite) SetupTest() {
 	suite.testNodes = newTestNodeList()
 	suite.removedTestNodes = newTestNodeList()
-	rand.Seed(time.Now().UnixNano())
+
 	nodeCount := 10
 	suite.logger = zerolog.New(os.Stderr).Level(zerolog.ErrorLevel)
 	log.SetAllLoggers(log.LevelError)
@@ -181,13 +181,9 @@ func (suite *MutableIdentityTableSuite) addNodes(count int) {
 	signalerCtx := irrecoverable.NewMockSignalerContext(suite.T(), ctx)
 
 	// create the ids, middlewares and networks
-	ids, nodes, mws, nets, _ := testutils.GenerateIDsMiddlewaresNetworks(
-		suite.T(),
-		count,
-		suite.logger,
-		unittest.NetworkCodec(),
-		mocknetwork.NewViolationsConsumer(suite.T()),
-	)
+	ids, nodes, _ := testutils.LibP2PNodeForMiddlewareFixture(suite.T(), count)
+	mws, _ := testutils.MiddlewareFixtures(suite.T(), ids, nodes, testutils.MiddlewareConfigFixture(suite.T()), mocknetwork.NewViolationsConsumer(suite.T()))
+	nets := testutils.NetworksFixture(suite.T(), ids, mws)
 	suite.cancels = append(suite.cancels, cancel)
 
 	testutils.StartNodesAndNetworks(signalerCtx, suite.T(), nodes, nets, 100*time.Millisecond)
