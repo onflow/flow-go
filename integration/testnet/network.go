@@ -876,7 +876,7 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 			nodeContainer.AddFlag("rest-addr", nodeContainer.ContainerAddr(RESTPort))
 
 			nodeContainer.exposePort(ExecutionStatePort, testingdock.RandomPort(t))
-			nodeContainer.AddFlag("state_stream-addr", nodeContainer.ContainerAddr(ExecutionStatePort))
+			nodeContainer.AddFlag("state-stream-addr", nodeContainer.ContainerAddr(ExecutionStatePort))
 
 			// uncomment line below to point the access node exclusively to a single collection node
 			// nodeContainer.AddFlag("static-collection-ingress-addr", "collection_1:9000")
