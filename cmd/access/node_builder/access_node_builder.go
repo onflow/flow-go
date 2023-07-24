@@ -181,6 +181,7 @@ func DefaultAccessNodeConfig() *AccessNodeConfig {
 		stateStreamBackend:           nil,
 		stateStreamFilterConf:        nil,
 		execDataBroadcaster:          nil,
+		executionDataCache:           nil,
 		ExecutionNodeAddress:         "localhost:9000",
 		logTxTimeToFinalized:         false,
 		logTxTimeToExecuted:          false,

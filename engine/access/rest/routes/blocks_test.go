@@ -32,13 +32,12 @@ type testVector struct {
 	expectedResponse string
 }
 
-// TestGetBlocks tests the get blocks by ID and get blocks by heights API
-func TestGetBlocks(t *testing.T) {
-	backend := &mock.API{}
-	stateStreamBackend := &mock_state_stream.API{}
-
-	blkCnt := 10
-	blockIDs, heights, blocks, executionResults := generateMocks(backend, blkCnt)
+func prepareTestVectors(t *testing.T,
+	blockIDs []string,
+	heights []string,
+	blocks []*flow.Block,
+	executionResults []*flow.ExecutionResult,
+	blkCnt int) []testVector {
 
 	singleBlockExpandedResponse := expectedBlockResponsesExpanded(blocks[:1], executionResults[:1], true, flow.BlockStatusUnknown)
 	singleSealedBlockExpandedResponse := expectedBlockResponsesExpanded(blocks[:1], executionResults[:1], true, flow.BlockStatusSealed)
@@ -139,6 +138,17 @@ func TestGetBlocks(t *testing.T) {
 			expectedResponse: fmt.Sprintf(`{"code":400, "message": "at most %d IDs can be requested at a time"}`, request.MaxBlockRequestHeightRange),
 		},
 	}
+	return testVectors
+}
+
+// TestGetBlocks tests local get blocks by ID and get blocks by heights API
+func TestAccessGetBlocks(t *testing.T) {
+	backend := &mock.API{}
+	stateStreamBackend := &mock_state_stream.API{}
+
+	blkCnt := 10
+	blockIDs, heights, blocks, executionResults := generateMocks(backend, blkCnt)
+	testVectors := prepareTestVectors(t, blockIDs, heights, blocks, executionResults, blkCnt)
 
 	for _, tv := range testVectors {
 		responseRec, err := executeRequest(tv.request, backend, stateStreamBackend)

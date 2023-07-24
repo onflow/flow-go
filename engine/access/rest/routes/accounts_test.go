@@ -35,7 +35,15 @@ func accountURL(t *testing.T, address string, height string) string {
 	return u.String()
 }
 
-func TestGetAccount(t *testing.T) {
+// TestAccessGetAccount tests local getAccount request.
+//
+//	Runs the following tests:
+//	1. Get account by address at latest sealed block.
+//	2. Get account by address at latest finalized block.
+//	3. Get account by address at height.
+//	4. Get account by address at height condensed.
+//	5. Get invalid account.
+func TestAccessGetAccount(t *testing.T) {
 	backend := &mock.API{}
 	stateStreamBackend := &mock_state_stream.API{}
 
