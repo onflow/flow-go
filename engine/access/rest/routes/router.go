@@ -1,4 +1,4 @@
-package rest
+package routes
 
 import (
 	"fmt"
@@ -16,7 +16,7 @@ import (
 	"github.com/onflow/flow-go/module"
 )
 
-func newRouter(backend access.API, logger zerolog.Logger, chain flow.Chain, restCollector module.RestMetrics) (*mux.Router, error) {
+func NewRouter(backend access.API, logger zerolog.Logger, chain flow.Chain, restCollector module.RestMetrics) (*mux.Router, error) {
 	router := mux.NewRouter().StrictSlash(true)
 	v1SubRouter := router.PathPrefix("/v1").Subrouter()
 
@@ -24,7 +24,7 @@ func newRouter(backend access.API, logger zerolog.Logger, chain flow.Chain, rest
 	v1SubRouter.Use(middleware.LoggingMiddleware(logger))
 	v1SubRouter.Use(middleware.QueryExpandable())
 	v1SubRouter.Use(middleware.QuerySelect())
-	v1SubRouter.Use(middleware.MetricsMiddleware(restCollector, URLToRoute))
+	v1SubRouter.Use(middleware.MetricsMiddleware(restCollector))
 
 	linkGenerator := models.NewLinkGeneratorImpl(v1SubRouter)
 

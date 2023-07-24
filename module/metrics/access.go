@@ -3,7 +3,6 @@ package metrics
 import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
-	metricsProm "github.com/slok/go-http-metrics/metrics/prometheus"
 
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/counters"
@@ -20,6 +19,12 @@ func WithTransactionMetrics(m module.TransactionMetrics) AccessCollectorOpts {
 func WithBackendScriptsMetrics(m module.BackendScriptsMetrics) AccessCollectorOpts {
 	return func(ac *AccessCollector) {
 		ac.BackendScriptsMetrics = m
+	}
+}
+
+func WithRestMetrics(m module.RestMetrics) AccessCollectorOpts {
+	return func(ac *AccessCollector) {
+		ac.RestMetrics = m
 	}
 }
 
@@ -101,8 +106,6 @@ func NewAccessCollector(opts ...AccessCollectorOpts) *AccessCollector {
 			Help:      "gauge to track the maximum block height of execution receipts received",
 		}),
 		maxReceiptHeightValue: counters.NewMonotonousCounter(0),
-
-		RestMetrics: NewRestCollector(metricsProm.Config{Prefix: "access_rest_api"}),
 	}
 
 	for _, opt := range opts {
