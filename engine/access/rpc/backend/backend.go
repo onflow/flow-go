@@ -225,13 +225,6 @@ func NewCache(
 	var cache *lru.Cache
 	cacheSize := connectionPoolSize
 	if cacheSize > 0 {
-		// TODO: remove this fallback after fixing issues with evictions
-		// It was observed that evictions cause connection errors for in flight requests. This works around
-		// the issue by forcing hte pool size to be greater than the number of ENs + LNs
-		if cacheSize < DefaultConnectionPoolSize {
-			log.Warn().Msg("connection pool size below threshold, setting pool size to default value ")
-			cacheSize = DefaultConnectionPoolSize
-		}
 		var err error
 		cache, err = lru.NewWithEvict(int(cacheSize), func(_, evictedValue interface{}) {
 			store := evictedValue.(*connection.CachedClient)
