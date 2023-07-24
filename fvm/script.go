@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/hashicorp/go-multierror"
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/common"
 
@@ -198,11 +199,13 @@ func (executor *scriptExecutor) executeScript() error {
 			Source:    executor.proc.Script,
 			Arguments: executor.proc.Arguments,
 		},
-		common.ScriptLocation(executor.proc.ID))
+		common.ScriptLocation(executor.proc.ID),
+	)
+	populateErr := executor.output.PopulateEnvironmentValues(executor.env)
 	if err != nil {
-		return err
+		return multierror.Append(err, populateErr)
 	}
 
 	executor.output.Value = value
-	return executor.output.PopulateEnvironmentValues(executor.env)
+	return populateErr
 }

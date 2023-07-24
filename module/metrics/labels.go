@@ -20,6 +20,10 @@ const (
 	LabelSuccess             = "success"
 	LabelCtrlMsgType         = "control_message"
 	LabelMisbehavior         = "misbehavior"
+	LabelHandler             = "handler"
+	LabelStatusCode          = "code"
+	LabelMethod              = "method"
+	LabelService             = "service"
 )
 
 const (

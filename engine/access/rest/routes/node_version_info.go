@@ -1,4 +1,4 @@
-package rest
+package routes
 
 import (
 	"github.com/onflow/flow-go/access"
@@ -7,7 +7,7 @@ import (
 )
 
 // GetNodeVersionInfo returns node version information
-func GetNodeVersionInfo(r *request.Request, backend access.API, link models.LinkGenerator) (interface{}, error) {
+func GetNodeVersionInfo(r *request.Request, backend access.API, _ models.LinkGenerator) (interface{}, error) {
 	params, err := backend.GetNodeVersionInfo(r.Context())
 	if err != nil {
 		return nil, err
