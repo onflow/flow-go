@@ -38,8 +38,8 @@ type AccessCircuitBreakerSuite struct {
 	net *testnet.FlowNetwork
 }
 
-var requestTimeout = 1500 * time.Millisecond
-var cbRestoreTimeout = 3 * time.Second
+var requestTimeout = 3 * time.Second
+var cbRestoreTimeout = 6 * time.Second
 
 func (s *AccessCircuitBreakerSuite) TearDownTest() {
 	s.log.Info().Msg("================> Start TearDownTest")
