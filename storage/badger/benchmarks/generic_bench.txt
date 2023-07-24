@@ -1,0 +1,8 @@
+goos: darwin
+goarch: amd64
+pkg: github.com/onflow/flow-go/storage/badger
+cpu: VirtualApple @ 2.50GHz
+BenchmarkInterface-8   	 1625692	       695.4 ns/op
+BenchmarkGenerics-8    	 2015852	       595.0 ns/op
+PASS
+ok  	github.com/onflow/flow-go/storage/badger	12.342s
