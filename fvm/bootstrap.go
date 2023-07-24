@@ -364,6 +364,8 @@ func (b *bootstrapExecutor) Execute() error {
 
 	b.deployVersionBeacon(service, b.versionFreezePeriod)
 
+	b.deploySourceOfRandomness(service)
+
 	// deploy staking proxy contract to the service account
 	b.deployStakingProxyContract(service)
 
@@ -843,6 +845,20 @@ func (b *bootstrapExecutor) deployVersionBeacon(
 		),
 	)
 	panicOnMetaInvokeErrf("failed to deploy NodeVersionBeacon contract: %s", txError, err)
+}
+
+func (b *bootstrapExecutor) deploySourceOfRandomness(
+	service flow.Address,
+) {
+	tx := blueprints.DeploySourceOfRandomnessTransaction(service)
+	txError, err := b.invokeMetaTransaction(
+		b.ctx,
+		Transaction(
+			tx,
+			0,
+		),
+	)
+	panicOnMetaInvokeErrf("failed to deploy SourceOfRandomness contract: %s", txError, err)
 }
 
 func (b *bootstrapExecutor) deployLockedTokensContract(
