@@ -932,7 +932,8 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 			backendConfig.FixedExecutionNodeIDs,
 			node.Logger,
 			backend.DefaultSnapshotHistoryLimit,
-			backendConfig.ArchiveAddressList)
+			backendConfig.ArchiveAddressList,
+			backendConfig.ScriptExecValidation)
 
 		observerCollector := metrics.NewObserverCollector()
 		restHandler, err := restapiproxy.NewRestProxyHandler(

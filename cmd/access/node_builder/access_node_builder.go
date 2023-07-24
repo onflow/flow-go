@@ -126,7 +126,6 @@ type AccessNodeConfig struct {
 	retryEnabled                 bool
 	rpcMetricsEnabled            bool
 	executionDataSyncEnabled     bool
-	scriptExecValidation         bool
 	executionDataDir             string
 	executionDataStartHeight     uint64
 	executionDataConfig          edrequester.ExecutionDataConfig
@@ -162,7 +161,7 @@ func DefaultAccessNodeConfig() *AccessNodeConfig {
 				PreferredExecutionNodeIDs: nil,
 				FixedExecutionNodeIDs:     nil,
 				ArchiveAddressList:        nil,
-				ScriptExecValidation:      true,
+				ScriptExecValidation:      false,
 			},
 			MaxMsgSize: grpcutils.DefaultMaxMsgSize,
 		},
