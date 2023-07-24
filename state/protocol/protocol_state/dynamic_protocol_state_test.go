@@ -1,11 +1,13 @@
 package protocol_state
 
 import (
+	"testing"
+
+	"github.com/stretchr/testify/assert"
+
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/state/protocol/mock"
 	"github.com/onflow/flow-go/utils/unittest"
-	"github.com/stretchr/testify/assert"
-	"testing"
 )
 
 // TestDynamicProtocolStateAdapter tests if the dynamicProtocolStateAdapter returns expected values when created
