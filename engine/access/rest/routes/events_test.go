@@ -1,24 +1,25 @@
-package rest
+package routes
 
 import (
 	"encoding/json"
 	"fmt"
+
 	"net/http"
 	"net/url"
 	"strings"
 	"testing"
 	"time"
 
-	"github.com/onflow/flow-go/engine/access/rest/util"
-
-	"github.com/onflow/flow-go/access/mock"
-	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/utils/unittest"
-
 	mocks "github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+
+	"github.com/onflow/flow-go/access/mock"
+	"github.com/onflow/flow-go/engine/access/rest/util"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 func TestGetEvents(t *testing.T) {
@@ -136,7 +137,7 @@ func getEventReq(t *testing.T, eventType string, start string, end string, block
 	q := u.Query()
 
 	if len(blockIDs) > 0 {
-		q.Add(blockQueryParam, strings.Join(blockIDs, ","))
+		q.Add(BlockQueryParam, strings.Join(blockIDs, ","))
 	}
 
 	if start != "" && end != "" {
@@ -144,7 +145,7 @@ func getEventReq(t *testing.T, eventType string, start string, end string, block
 		q.Add(endHeightQueryParam, end)
 	}
 
-	q.Add(eventTypeQuery, eventType)
+	q.Add(EventTypeQuery, eventType)
 
 	u.RawQuery = q.Encode()
 

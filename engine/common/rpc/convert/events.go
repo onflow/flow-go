@@ -4,12 +4,16 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"google.golang.org/protobuf/types/known/timestamppb"
+
 	"github.com/onflow/cadence/encoding/ccf"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
-	"github.com/onflow/flow/protobuf/go/flow/entities"
-	execproto "github.com/onflow/flow/protobuf/go/flow/execution"
 
 	"github.com/onflow/flow-go/model/flow"
+
+	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
+	"github.com/onflow/flow/protobuf/go/flow/entities"
+	execproto "github.com/onflow/flow/protobuf/go/flow/execution"
 )
 
 // EventToMessage converts a flow.Event to a protobuf message
@@ -170,5 +174,53 @@ func CcfEventToJsonEvent(e flow.Event) (*flow.Event, error) {
 		TransactionIndex: e.TransactionIndex,
 		EventIndex:       e.EventIndex,
 		Payload:          convertedPayload,
+	}, nil
+}
+
+// MessagesToBlockEvents converts a protobuf EventsResponse_Result messages to a slice of flow.BlockEvents.
+func MessagesToBlockEvents(blocksEvents []*accessproto.EventsResponse_Result) []flow.BlockEvents {
+	evs := make([]flow.BlockEvents, len(blocksEvents))
+	for i, ev := range blocksEvents {
+		evs[i] = MessageToBlockEvents(ev)
+	}
+
+	return evs
+}
+
+// MessageToBlockEvents converts a protobuf EventsResponse_Result message to a flow.BlockEvents.
+func MessageToBlockEvents(blockEvents *accessproto.EventsResponse_Result) flow.BlockEvents {
+	return flow.BlockEvents{
+		BlockHeight:    blockEvents.BlockHeight,
+		BlockID:        MessageToIdentifier(blockEvents.BlockId),
+		BlockTimestamp: blockEvents.BlockTimestamp.AsTime(),
+		Events:         MessagesToEvents(blockEvents.Events),
+	}
+}
+
+func BlockEventsToMessages(blocks []flow.BlockEvents) ([]*accessproto.EventsResponse_Result, error) {
+	results := make([]*accessproto.EventsResponse_Result, len(blocks))
+
+	for i, block := range blocks {
+		event, err := BlockEventsToMessage(block)
+		if err != nil {
+			return nil, err
+		}
+		results[i] = event
+	}
+
+	return results, nil
+}
+
+func BlockEventsToMessage(block flow.BlockEvents) (*accessproto.EventsResponse_Result, error) {
+	eventMessages := make([]*entities.Event, len(block.Events))
+	for i, event := range block.Events {
+		eventMessages[i] = EventToMessage(event)
+	}
+	timestamp := timestamppb.New(block.BlockTimestamp)
+	return &accessproto.EventsResponse_Result{
+		BlockId:        block.BlockID[:],
+		BlockHeight:    block.BlockHeight,
+		BlockTimestamp: timestamp,
+		Events:         eventMessages,
 	}, nil
 }

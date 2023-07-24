@@ -1,4 +1,4 @@
-package rest
+package routes
 
 import (
 	"github.com/onflow/flow-go/access"
@@ -11,7 +11,7 @@ import (
 func GetCollectionByID(r *request.Request, backend access.API, link models.LinkGenerator) (interface{}, error) {
 	req, err := r.GetCollectionRequest()
 	if err != nil {
-		return nil, NewBadRequestError(err)
+		return nil, models.NewBadRequestError(err)
 	}
 
 	collection, err := backend.GetCollectionByID(r.Context(), req.ID)

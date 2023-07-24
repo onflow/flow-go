@@ -1,4 +1,4 @@
-package rest
+package routes
 
 import (
 	"fmt"
@@ -12,7 +12,7 @@ import (
 func GetExecutionResultsByBlockIDs(r *request.Request, backend access.API, link models.LinkGenerator) (interface{}, error) {
 	req, err := r.GetExecutionResultByBlockIDsRequest()
 	if err != nil {
-		return nil, NewBadRequestError(err)
+		return nil, models.NewBadRequestError(err)
 	}
 
 	// for each block ID we retrieve execution result
@@ -38,7 +38,7 @@ func GetExecutionResultsByBlockIDs(r *request.Request, backend access.API, link 
 func GetExecutionResultByID(r *request.Request, backend access.API, link models.LinkGenerator) (interface{}, error) {
 	req, err := r.GetExecutionResultRequest()
 	if err != nil {
-		return nil, NewBadRequestError(err)
+		return nil, models.NewBadRequestError(err)
 	}
 
 	res, err := backend.GetExecutionResultByID(r.Context(), req.ID)
@@ -48,7 +48,7 @@ func GetExecutionResultByID(r *request.Request, backend access.API, link models.
 
 	if res == nil {
 		err := fmt.Errorf("execution result with ID: %s not found", req.ID.String())
-		return nil, NewNotFoundError(err.Error(), err)
+		return nil, models.NewNotFoundError(err.Error(), err)
 	}
 
 	var response models.ExecutionResult
