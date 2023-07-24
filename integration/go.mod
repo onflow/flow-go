@@ -17,11 +17,11 @@ require (
 	github.com/ipfs/go-datastore v0.6.0
 	github.com/ipfs/go-ds-badger2 v0.1.3
 	github.com/ipfs/go-ipfs-blockstore v1.3.0
-	github.com/onflow/cadence v0.39.14
+	github.com/onflow/cadence v0.39.13-stable-cadence.0.20230719215202-3311f5f8189b
 	github.com/onflow/flow-core-contracts/lib/go/contracts v1.2.4-0.20230719215509-9f786d598196
 	github.com/onflow/flow-core-contracts/lib/go/templates v1.2.3
-	github.com/onflow/flow-emulator v0.53.0
-	github.com/onflow/flow-go v0.31.1-0.20230718164039-e3411eff1e9d
+	github.com/onflow/flow-emulator v0.53.1-0.20230724232425-9ccf8e1e418d
+	github.com/onflow/flow-go v0.31.1-0.20230721155331-8dba96844d6e
 	github.com/onflow/flow-go-sdk v0.41.10-0.20230719221154-2a4946e41c23
 	github.com/onflow/flow-go/crypto v0.24.9
 	github.com/onflow/flow-go/insecure v0.0.0-00010101000000-000000000000
@@ -50,6 +50,7 @@ require (
 	github.com/Microsoft/go-winio v0.5.2 // indirect
 	github.com/Microsoft/hcsshim v0.8.7 // indirect
 	github.com/ProtonMail/go-crypto v0.0.0-20221026131551-cf6655e29de4 // indirect
+	github.com/SaveTheRbtz/mph v0.1.2 // indirect
 	github.com/acomagu/bufpipe v1.0.3 // indirect
 	github.com/andybalholm/brotli v1.0.4 // indirect
 	github.com/apache/arrow/go/v11 v11.0.0 // indirect
@@ -174,6 +175,7 @@ require (
 	github.com/jbenet/go-temp-err-catcher v0.1.0 // indirect
 	github.com/jbenet/goprocess v0.1.4 // indirect
 	github.com/jmespath/go-jmespath v0.4.0 // indirect
+	github.com/k0kubun/pp v3.0.1+incompatible // indirect
 	github.com/kevinburke/go-bindata v3.23.0+incompatible // indirect
 	github.com/kevinburke/ssh_config v1.2.0 // indirect
 	github.com/klauspost/asmfmt v1.3.2 // indirect
