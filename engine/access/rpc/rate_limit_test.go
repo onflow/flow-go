@@ -8,7 +8,6 @@ import (
 	"testing"
 	"time"
 
-	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -16,11 +15,14 @@ import (
 	"github.com/stretchr/testify/suite"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/status"
 
 	accessmock "github.com/onflow/flow-go/engine/access/mock"
+	"github.com/onflow/flow-go/engine/access/rpc/backend"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/grpcserver"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
 	module "github.com/onflow/flow-go/module/mock"
@@ -29,6 +31,8 @@ import (
 	storagemock "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/utils/grpcutils"
 	"github.com/onflow/flow-go/utils/unittest"
+
+	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
 )
 
 type RateLimitTestSuite struct {
@@ -61,6 +65,10 @@ type RateLimitTestSuite struct {
 
 	ctx    irrecoverable.SignalerContext
 	cancel context.CancelFunc
+
+	// grpc servers
+	secureGrpcServer   *grpcserver.GrpcServer
+	unsecureGrpcServer *grpcserver.GrpcServer
 }
 
 func (suite *RateLimitTestSuite) SetupTest() {
@@ -101,6 +109,14 @@ func (suite *RateLimitTestSuite) SetupTest() {
 		HTTPListenAddr:         unittest.DefaultAddress,
 	}
 
+	// generate a server certificate that will be served by the GRPC server
+	networkingKey := unittest.NetworkingPrivKeyFixture()
+	x509Certificate, err := grpcutils.X509Certificate(networkingKey)
+	assert.NoError(suite.T(), err)
+	tlsConfig := grpcutils.DefaultServerTLSConfig(x509Certificate)
+	// set the transport credentials for the server to use
+	config.TransportCredentials = credentials.NewTLS(tlsConfig)
+
 	// set the rate limit to test with
 	suite.rateLimit = 2
 	// set the burst limit to test with
@@ -114,21 +130,77 @@ func (suite *RateLimitTestSuite) SetupTest() {
 		"Ping": suite.rateLimit,
 	}
 
+	suite.secureGrpcServer = grpcserver.NewGrpcServerBuilder(suite.log,
+		config.SecureGRPCListenAddr,
+		grpcutils.DefaultMaxMsgSize,
+		false,
+		apiRateLimt,
+		apiBurstLimt,
+		grpcserver.WithTransportCredentials(config.TransportCredentials)).Build()
+
+	suite.unsecureGrpcServer = grpcserver.NewGrpcServerBuilder(suite.log,
+		config.UnsecureGRPCListenAddr,
+		grpcutils.DefaultMaxMsgSize,
+		false,
+		apiRateLimt,
+		apiBurstLimt).Build()
+
 	block := unittest.BlockHeaderFixture()
 	suite.snapshot.On("Head").Return(block, nil)
 
-	rpcEngBuilder, err := NewBuilder(suite.log, suite.state, config, suite.collClient, nil, suite.blocks, suite.headers, suite.collections, suite.transactions, nil,
-		nil, suite.chainID, suite.metrics, 0, 0, false, false, apiRateLimt, apiBurstLimt, suite.me)
+	backend := backend.New(
+		suite.state,
+		suite.collClient,
+		nil,
+		suite.blocks,
+		suite.headers,
+		suite.collections,
+		suite.transactions,
+		nil,
+		nil,
+		suite.chainID,
+		suite.metrics,
+		nil,
+		false,
+		0,
+		nil,
+		nil,
+		suite.log,
+		0,
+		nil)
+
+	rpcEngBuilder, err := NewBuilder(
+		suite.log,
+		suite.state,
+		config,
+		suite.chainID,
+		suite.metrics,
+		false,
+		suite.me,
+		backend,
+		backend,
+		suite.secureGrpcServer,
+		suite.unsecureGrpcServer)
+
 	require.NoError(suite.T(), err)
 	suite.rpcEng, err = rpcEngBuilder.WithLegacy().Build()
 	require.NoError(suite.T(), err)
 	suite.ctx, suite.cancel = irrecoverable.NewMockSignalerContextWithCancel(suite.T(), context.Background())
+
 	suite.rpcEng.Start(suite.ctx)
-	// wait for the server to startup
+
+	suite.secureGrpcServer.Start(suite.ctx)
+	suite.unsecureGrpcServer.Start(suite.ctx)
+
+	// wait for the servers to startup
+	unittest.AssertClosesBefore(suite.T(), suite.secureGrpcServer.Ready(), 2*time.Second)
+	unittest.AssertClosesBefore(suite.T(), suite.unsecureGrpcServer.Ready(), 2*time.Second)
+
+	// wait for the engine to startup
 	unittest.RequireCloseBefore(suite.T(), suite.rpcEng.Ready(), 2*time.Second, "engine not ready at startup")
 
 	// create the access api client
-	suite.client, suite.closer, err = accessAPIClient(suite.rpcEng.UnsecureGRPCAddress().String())
+	suite.client, suite.closer, err = accessAPIClient(suite.unsecureGrpcServer.GRPCAddress().String())
 	require.NoError(suite.T(), err)
 }
 
@@ -140,8 +212,9 @@ func (suite *RateLimitTestSuite) TearDownTest() {
 	if suite.closer != nil {
 		suite.closer.Close()
 	}
-	// close the server
-	unittest.AssertClosesBefore(suite.T(), suite.rpcEng.Done(), 2*time.Second)
+	// close servers
+	unittest.AssertClosesBefore(suite.T(), suite.secureGrpcServer.Done(), 2*time.Second)
+	unittest.AssertClosesBefore(suite.T(), suite.unsecureGrpcServer.Done(), 2*time.Second)
 }
 
 func TestRateLimit(t *testing.T) {

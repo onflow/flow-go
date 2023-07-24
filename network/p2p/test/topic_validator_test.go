@@ -10,14 +10,19 @@ import (
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/stretchr/testify/require"
 
+	"github.com/stretchr/testify/mock"
+
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
 	mockmodule "github.com/onflow/flow-go/module/mock"
+	"github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/network/alsp"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/internal/p2pfixtures"
 	"github.com/onflow/flow-go/network/message"
+	"github.com/onflow/flow-go/network/mocknetwork"
 	"github.com/onflow/flow-go/network/p2p"
 	p2ptest "github.com/onflow/flow-go/network/p2p/test"
 	"github.com/onflow/flow-go/network/p2p/translator"
@@ -51,12 +56,12 @@ func TestTopicValidator_Unstaked(t *testing.T) {
 
 	//NOTE: identity2 is not in the ids list simulating an un-staked node
 	ids := flow.IdentityList{&identity1}
-	translator, err := translator.NewFixedTableIdentityTranslator(ids)
+	translatorFixture, err := translator.NewFixedTableIdentityTranslator(ids)
 	require.NoError(t, err)
 
 	// peer filter used by the topic validator to check if node is staked
 	isStaked := func(pid peer.ID) error {
-		fid, err := translator.GetFlowID(pid)
+		fid, err := translatorFixture.GetFlowID(pid)
 		if err != nil {
 			return fmt.Errorf("could not translate the peer_id %s to a Flow identifier: %w", pid.String(), err)
 		}
@@ -272,8 +277,7 @@ func TestAuthorizedSenderValidator_Unauthorized(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
 	idProvider := mockmodule.NewIdentityProvider(t)
-	// create a hooked logger
-	logger, hook := unittest.HookedLogger()
+	logger := unittest.Logger()
 
 	sporkId := unittest.IdentifierFixture()
 
@@ -292,12 +296,22 @@ func TestAuthorizedSenderValidator_Unauthorized(t *testing.T) {
 
 	ids := flow.IdentityList{&identity1, &identity2, &identity3}
 
-	translator, err := translator.NewFixedTableIdentityTranslator(ids)
+	translatorFixture, err := translator.NewFixedTableIdentityTranslator(ids)
 	require.NoError(t, err)
 
-	violationsConsumer := slashing.NewSlashingViolationsConsumer(logger, metrics.NewNoopCollector())
+	violation := &network.Violation{
+		Identity: &identity3,
+		PeerID:   an1.Host().ID().String(),
+		OriginID: identity3.NodeID,
+		MsgType:  "*messages.BlockProposal",
+		Channel:  channel,
+		Protocol: message.ProtocolTypePubSub,
+		Err:      message.ErrUnauthorizedRole,
+	}
+	violationsConsumer := mocknetwork.NewViolationsConsumer(t)
+	violationsConsumer.On("OnUnAuthorizedSenderError", violation).Once().Return(nil)
 	getIdentity := func(pid peer.ID) (*flow.Identity, bool) {
-		fid, err := translator.GetFlowID(pid)
+		fid, err := translatorFixture.GetFlowID(pid)
 		if err != nil {
 			return &flow.Identity{}, false
 		}
@@ -373,9 +387,6 @@ func TestAuthorizedSenderValidator_Unauthorized(t *testing.T) {
 	p2pfixtures.SubMustNeverReceiveAnyMessage(t, timedCtx, sub2)
 
 	unittest.RequireReturnsBefore(t, wg.Wait, 5*time.Second, "could not receive message on time")
-
-	// ensure the correct error is contained in the logged error
-	require.Contains(t, hook.Logs(), message.ErrUnauthorizedRole.Error())
 }
 
 // TestAuthorizedSenderValidator_Authorized tests that the authorized sender validator rejects messages being sent on the wrong channel
@@ -401,12 +412,16 @@ func TestAuthorizedSenderValidator_InvalidMsg(t *testing.T) {
 	topic := channels.TopicFromChannel(channel, sporkId)
 
 	ids := flow.IdentityList{&identity1, &identity2}
-	translator, err := translator.NewFixedTableIdentityTranslator(ids)
+	translatorFixture, err := translator.NewFixedTableIdentityTranslator(ids)
 	require.NoError(t, err)
 
-	violationsConsumer := slashing.NewSlashingViolationsConsumer(logger, metrics.NewNoopCollector())
+	expectedMisbehaviorReport, err := alsp.NewMisbehaviorReport(identity2.NodeID, alsp.UnAuthorizedSender)
+	require.NoError(t, err)
+	misbehaviorReportConsumer := mocknetwork.NewMisbehaviorReportConsumer(t)
+	misbehaviorReportConsumer.On("ReportMisbehaviorOnChannel", channel, expectedMisbehaviorReport).Once()
+	violationsConsumer := slashing.NewSlashingViolationsConsumer(logger, metrics.NewNoopCollector(), misbehaviorReportConsumer)
 	getIdentity := func(pid peer.ID) (*flow.Identity, bool) {
-		fid, err := translator.GetFlowID(pid)
+		fid, err := translatorFixture.GetFlowID(pid)
 		if err != nil {
 			return &flow.Identity{}, false
 		}
@@ -474,12 +489,16 @@ func TestAuthorizedSenderValidator_Ejected(t *testing.T) {
 	topic := channels.TopicFromChannel(channel, sporkId)
 
 	ids := flow.IdentityList{&identity1, &identity2, &identity3}
-	translator, err := translator.NewFixedTableIdentityTranslator(ids)
+	translatorFixture, err := translator.NewFixedTableIdentityTranslator(ids)
 	require.NoError(t, err)
 
-	violationsConsumer := slashing.NewSlashingViolationsConsumer(logger, metrics.NewNoopCollector())
+	expectedMisbehaviorReport, err := alsp.NewMisbehaviorReport(identity2.NodeID, alsp.SenderEjected)
+	require.NoError(t, err)
+	misbehaviorReportConsumer := mocknetwork.NewMisbehaviorReportConsumer(t)
+	misbehaviorReportConsumer.On("ReportMisbehaviorOnChannel", channel, expectedMisbehaviorReport).Once()
+	violationsConsumer := slashing.NewSlashingViolationsConsumer(logger, metrics.NewNoopCollector(), misbehaviorReportConsumer)
 	getIdentity := func(pid peer.ID) (*flow.Identity, bool) {
-		fid, err := translator.GetFlowID(pid)
+		fid, err := translatorFixture.GetFlowID(pid)
 		if err != nil {
 			return &flow.Identity{}, false
 		}
@@ -568,13 +587,15 @@ func TestAuthorizedSenderValidator_ClusterChannel(t *testing.T) {
 	topic := channels.TopicFromChannel(channel, sporkId)
 
 	ids := flow.IdentityList{&identity1, &identity2, &identity3}
-	translator, err := translator.NewFixedTableIdentityTranslator(ids)
+	translatorFixture, err := translator.NewFixedTableIdentityTranslator(ids)
 	require.NoError(t, err)
 
 	logger := unittest.Logger()
-	violationsConsumer := slashing.NewSlashingViolationsConsumer(logger, metrics.NewNoopCollector())
+	misbehaviorReportConsumer := mocknetwork.NewMisbehaviorReportConsumer(t)
+	defer misbehaviorReportConsumer.AssertNotCalled(t, "ReportMisbehaviorOnChannel", mock.AnythingOfType("channels.Channel"), mock.AnythingOfType("*alsp.MisbehaviorReport"))
+	violationsConsumer := slashing.NewSlashingViolationsConsumer(logger, metrics.NewNoopCollector(), misbehaviorReportConsumer)
 	getIdentity := func(pid peer.ID) (*flow.Identity, bool) {
-		fid, err := translator.GetFlowID(pid)
+		fid, err := translatorFixture.GetFlowID(pid)
 		if err != nil {
 			return &flow.Identity{}, false
 		}

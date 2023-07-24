@@ -1,7 +1,7 @@
 # syntax = docker/dockerfile:experimental
 # NOTE: Must be run in the context of the repo's root directory
 
-FROM golang:1.19-buster AS build-setup
+FROM golang:1.20-buster AS build-setup
 
 RUN apt-get update
 RUN apt-get -y install cmake zip

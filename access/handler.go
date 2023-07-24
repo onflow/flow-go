@@ -3,17 +3,17 @@ package access
 import (
 	"context"
 
-	"github.com/onflow/flow/protobuf/go/flow/access"
-	"github.com/onflow/flow/protobuf/go/flow/entities"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
-	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/signature"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
+
+	"github.com/onflow/flow/protobuf/go/flow/access"
+	"github.com/onflow/flow/protobuf/go/flow/entities"
 )
 
 type Handler struct {
@@ -516,7 +516,7 @@ func (h *Handler) GetEventsForHeightRange(
 		return nil, err
 	}
 
-	resultEvents, err := blockEventsToMessages(results)
+	resultEvents, err := convert.BlockEventsToMessages(results)
 	if err != nil {
 		return nil, err
 	}
@@ -548,7 +548,7 @@ func (h *Handler) GetEventsForBlockIDs(
 		return nil, err
 	}
 
-	resultEvents, err := blockEventsToMessages(results)
+	resultEvents, err := convert.BlockEventsToMessages(results)
 	if err != nil {
 		return nil, err
 	}
@@ -588,6 +588,27 @@ func (h *Handler) GetExecutionResultForBlockID(ctx context.Context, req *access.
 	}
 
 	return executionResultToMessages(result, metadata)
+}
+
+// GetExecutionResultByID returns the execution result for the given ID.
+func (h *Handler) GetExecutionResultByID(ctx context.Context, req *access.GetExecutionResultByIDRequest) (*access.ExecutionResultByIDResponse, error) {
+	metadata := h.buildMetadataResponse()
+
+	blockID := convert.MessageToIdentifier(req.GetId())
+
+	result, err := h.api.GetExecutionResultByID(ctx, blockID)
+	if err != nil {
+		return nil, err
+	}
+
+	execResult, err := convert.ExecutionResultToMessage(result)
+	if err != nil {
+		return nil, err
+	}
+	return &access.ExecutionResultByIDResponse{
+		ExecutionResult: execResult,
+		Metadata:        metadata,
+	}, nil
 }
 
 func (h *Handler) blockResponse(block *flow.Block, fullResponse bool, status flow.BlockStatus) (*access.BlockResponse, error) {
@@ -656,34 +677,6 @@ func executionResultToMessages(er *flow.ExecutionResult, metadata *entities.Meta
 	return &access.ExecutionResultForBlockIDResponse{
 		ExecutionResult: execResult,
 		Metadata:        metadata,
-	}, nil
-}
-
-func blockEventsToMessages(blocks []flow.BlockEvents) ([]*access.EventsResponse_Result, error) {
-	results := make([]*access.EventsResponse_Result, len(blocks))
-
-	for i, block := range blocks {
-		event, err := blockEventsToMessage(block)
-		if err != nil {
-			return nil, err
-		}
-		results[i] = event
-	}
-
-	return results, nil
-}
-
-func blockEventsToMessage(block flow.BlockEvents) (*access.EventsResponse_Result, error) {
-	eventMessages := make([]*entities.Event, len(block.Events))
-	for i, event := range block.Events {
-		eventMessages[i] = convert.EventToMessage(event)
-	}
-	timestamp := timestamppb.New(block.BlockTimestamp)
-	return &access.EventsResponse_Result{
-		BlockId:        block.BlockID[:],
-		BlockHeight:    block.BlockHeight,
-		BlockTimestamp: timestamp,
-		Events:         eventMessages,
 	}, nil
 }
 
