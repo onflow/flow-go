@@ -9,7 +9,7 @@ import (
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	pb "github.com/libp2p/go-libp2p-pubsub/pb"
 	"github.com/rs/zerolog"
-	
+
 	"github.com/onflow/flow-go/engine/common/worker"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/component"
