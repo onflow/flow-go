@@ -59,3 +59,25 @@ type ProtocolState interface {
 	// GlobalParams returns params that are same for all nodes in the network.
 	GlobalParams() GlobalParams
 }
+
+// StateUpdater is a dedicated interface for updating protocol state.
+// It is used by the compliance layer to update protocol state when certain events that are stored in blocks are observed.
+type StateUpdater interface {
+	// Build returns updated protocol state entry, state ID and a flag indicating if there were any changes.
+	Build() (updatedState *flow.ProtocolStateEntry, stateID flow.Identifier, hasChanges bool)
+	// ProcessEpochSetup updates current protocol state with data from epoch setup event.
+	// As result of this operation protocol state for next epoch will be created.
+	// No errors are expected during normal operations.
+	ProcessEpochSetup(epochSetup *flow.EpochSetup) error
+	// ProcessEpochCommit updates current protocol state with data from epoch commit event.
+	// As result of this operation protocol state for next epoch will be committed.
+	// No errors are expected during normal operations.
+	ProcessEpochCommit(epochCommit *flow.EpochCommit) error
+	// UpdateIdentity updates identity table with new identity entry.
+	// Should pass identity which is already present in the table, otherwise an exception will be raised.
+	// No errors are expected during normal operations.
+	UpdateIdentity(updated *flow.DynamicIdentityEntry) error
+	// SetInvalidStateTransitionAttempted sets flag indicating that invalid state transition was attempted.
+	// Such transition can be detected by compliance layer.
+	SetInvalidStateTransitionAttempted()
+}
