@@ -103,6 +103,11 @@ var Routes = []route{{
 	Handler: GetAccount,
 }, {
 	Method:  http.MethodGet,
+	Pattern: "/accounts/{address}/keys/{keyID}",
+	Name:    "getAccountKeyByID",
+	Handler: GetAccountKeyByID,
+}, {
+	Method:  http.MethodGet,
 	Pattern: "/events",
 	Name:    "getEvents",
 	Handler: GetEvents,
