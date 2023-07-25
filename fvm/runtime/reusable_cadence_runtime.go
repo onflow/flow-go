@@ -4,13 +4,26 @@ import (
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/common"
+	"github.com/onflow/cadence/runtime/interpreter"
 	"github.com/onflow/cadence/runtime/sema"
+	"github.com/onflow/cadence/runtime/stdlib"
+
+	"github.com/onflow/flow-go/fvm/errors"
 )
 
 // Note: this is a subset of environment.Environment, redeclared to handle
 // circular dependency.
 type Environment interface {
 	runtime.Interface
+
+	BlockEntropy() ([]byte, error)
+}
+
+// entropyFunctionType is the type of the `entropy` function.
+// This defies the signature as `func (): [UInt8]`
+var entropyFunctionType = &sema.FunctionType{
+	Parameters:           []sema.Parameter{},
+	ReturnTypeAnnotation: sema.NewTypeAnnotation(sema.ByteArrayType),
 }
 
 type ReusableCadenceRuntime struct {
@@ -25,6 +38,39 @@ func NewReusableCadenceRuntime(rt runtime.Runtime, config runtime.Config) *Reusa
 		Runtime:     rt,
 		Environment: runtime.NewBaseInterpreterEnvironment(config),
 	}
+
+	blockEntropy := stdlib.StandardLibraryValue{
+		Name: "entropy",
+		Type: entropyFunctionType,
+		Kind: common.DeclarationKindFunction,
+		Value: interpreter.NewUnmeteredHostFunctionValue(
+			entropyFunctionType,
+			func(invocation interpreter.Invocation) interpreter.Value {
+				if len(invocation.Arguments) != 0 {
+					panic(errors.NewInvalidArgumentErrorf(
+						"entropy should be called without arguments"))
+				}
+
+				var err error
+				var entropy []byte
+				if reusable.fvmEnv != nil {
+					entropy, err = reusable.fvmEnv.BlockEntropy()
+				} else {
+					err = errors.NewOperationNotSupportedError("entropy")
+				}
+
+				if err != nil {
+					panic(err)
+				}
+
+				return interpreter.ByteSliceToByteArrayValue(
+					invocation.Interpreter,
+					entropy)
+			},
+		),
+	}
+
+	reusable.Declare(blockEntropy)
 
 	return reusable
 }
