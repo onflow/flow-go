@@ -9,6 +9,8 @@ import (
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
+
+	"github.com/onflow/flow/protobuf/go/flow/entities"
 )
 
 // TestConvertCollection tests that converting a collection to a protobuf message results in the correct
@@ -32,15 +34,27 @@ func TestConvertCollection(t *testing.T) {
 		}
 	})
 
-	t.Run("convert light collection to message", func(t *testing.T) {
-		lightCollection := flow.LightCollection{Transactions: txIDs}
+	var msg *entities.Collection
+	lightCollection := flow.LightCollection{Transactions: txIDs}
 
-		msg, err := convert.LightCollectionToMessage(&lightCollection)
+	t.Run("convert light collection to message", func(t *testing.T) {
+		var err error
+		msg, err = convert.LightCollectionToMessage(&lightCollection)
 		require.NoError(t, err)
 
 		assert.Len(t, msg.TransactionIds, len(txIDs))
 		for i, txID := range txIDs {
 			assert.Equal(t, txID[:], msg.TransactionIds[i])
+		}
+	})
+
+	t.Run("convert message to light collection", func(t *testing.T) {
+		lightColl, err := convert.MessageToLightCollection(msg)
+		require.NoError(t, err)
+
+		assert.Equal(t, len(txIDs), len(lightColl.Transactions))
+		for _, txID := range lightColl.Transactions {
+			assert.Equal(t, txID[:], txID[:])
 		}
 	})
 }

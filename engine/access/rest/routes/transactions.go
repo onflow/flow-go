@@ -1,4 +1,4 @@
-package rest
+package routes
 
 import (
 	"github.com/onflow/flow-go/access"
@@ -10,7 +10,7 @@ import (
 func GetTransactionByID(r *request.Request, backend access.API, link models.LinkGenerator) (interface{}, error) {
 	req, err := r.GetTransactionRequest()
 	if err != nil {
-		return nil, NewBadRequestError(err)
+		return nil, models.NewBadRequestError(err)
 	}
 
 	tx, err := backend.GetTransaction(r.Context(), req.ID)
@@ -36,7 +36,7 @@ func GetTransactionByID(r *request.Request, backend access.API, link models.Link
 func GetTransactionResultByID(r *request.Request, backend access.API, link models.LinkGenerator) (interface{}, error) {
 	req, err := r.GetTransactionResultRequest()
 	if err != nil {
-		return nil, NewBadRequestError(err)
+		return nil, models.NewBadRequestError(err)
 	}
 
 	txr, err := backend.GetTransactionResult(r.Context(), req.ID, req.BlockID, req.CollectionID)
@@ -53,7 +53,7 @@ func GetTransactionResultByID(r *request.Request, backend access.API, link model
 func CreateTransaction(r *request.Request, backend access.API, link models.LinkGenerator) (interface{}, error) {
 	req, err := r.CreateTransactionRequest()
 	if err != nil {
-		return nil, NewBadRequestError(err)
+		return nil, models.NewBadRequestError(err)
 	}
 
 	err = backend.SendTransaction(r.Context(), &req.Transaction)

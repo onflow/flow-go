@@ -2023,6 +2023,87 @@ func TestScriptAccountKeyMutationsFailure(t *testing.T) {
 	)
 }
 
+func TestScriptExecutionLimit(t *testing.T) {
+
+	t.Parallel()
+
+	script := fvm.Script([]byte(`
+		pub fun main() {
+			var s: Int256 = 1024102410241024
+			var i: Int256 = 0
+			var a: Int256 = 7
+			var b: Int256 = 5
+			var c: Int256 = 2
+
+			while i < 150000 {
+				s = s * a
+				s = s / b
+				s = s / c
+				i = i + 1
+			}
+		}
+	`))
+
+	bootstrapProcedureOptions := []fvm.BootstrapProcedureOption{
+		fvm.WithTransactionFee(fvm.DefaultTransactionFees),
+		fvm.WithExecutionMemoryLimit(math.MaxUint32),
+		fvm.WithExecutionEffortWeights(map[common.ComputationKind]uint64{
+			common.ComputationKindStatement:          1569,
+			common.ComputationKindLoop:               1569,
+			common.ComputationKindFunctionInvocation: 1569,
+			environment.ComputationKindGetValue:      808,
+			environment.ComputationKindCreateAccount: 2837670,
+			environment.ComputationKindSetValue:      765,
+		}),
+		fvm.WithExecutionMemoryWeights(meter.DefaultMemoryWeights),
+		fvm.WithMinimumStorageReservation(fvm.DefaultMinimumStorageReservation),
+		fvm.WithAccountCreationFee(fvm.DefaultAccountCreationFee),
+		fvm.WithStorageMBPerFLOW(fvm.DefaultStorageMBPerFLOW),
+	}
+
+	t.Run("Exceeding computation limit",
+		newVMTest().withBootstrapProcedureOptions(
+			bootstrapProcedureOptions...,
+		).withContextOptions(
+			fvm.WithTransactionFeesEnabled(true),
+			fvm.WithAccountStorageLimit(true),
+			fvm.WithComputationLimit(10000),
+		).run(
+			func(t *testing.T, vm fvm.VM, chain flow.Chain, ctx fvm.Context, snapshotTree snapshot.SnapshotTree) {
+				scriptCtx := fvm.NewContextFromParent(ctx)
+
+				_, output, err := vm.Run(scriptCtx, script, snapshotTree)
+				require.NoError(t, err)
+				require.Error(t, output.Err)
+				require.True(t, errors.IsComputationLimitExceededError(output.Err))
+				require.ErrorContains(t, output.Err, "computation exceeds limit (10000)")
+				require.GreaterOrEqual(t, output.ComputationUsed, uint64(10000))
+				require.GreaterOrEqual(t, output.MemoryEstimate, uint64(548020260))
+			},
+		),
+	)
+
+	t.Run("Sufficient computation limit",
+		newVMTest().withBootstrapProcedureOptions(
+			bootstrapProcedureOptions...,
+		).withContextOptions(
+			fvm.WithTransactionFeesEnabled(true),
+			fvm.WithAccountStorageLimit(true),
+			fvm.WithComputationLimit(20000),
+		).run(
+			func(t *testing.T, vm fvm.VM, chain flow.Chain, ctx fvm.Context, snapshotTree snapshot.SnapshotTree) {
+				scriptCtx := fvm.NewContextFromParent(ctx)
+
+				_, output, err := vm.Run(scriptCtx, script, snapshotTree)
+				require.NoError(t, err)
+				require.NoError(t, output.Err)
+				require.GreaterOrEqual(t, output.ComputationUsed, uint64(17955))
+				require.GreaterOrEqual(t, output.MemoryEstimate, uint64(984017413))
+			},
+		),
+	)
+}
+
 func TestInteractionLimit(t *testing.T) {
 	type testCase struct {
 		name             string

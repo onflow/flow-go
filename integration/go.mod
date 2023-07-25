@@ -20,12 +20,12 @@ require (
 	github.com/onflow/cadence v0.39.14
 	github.com/onflow/flow-core-contracts/lib/go/contracts v1.2.4-0.20230703193002-53362441b57d
 	github.com/onflow/flow-core-contracts/lib/go/templates v1.2.3
-	github.com/onflow/flow-emulator v0.51.2-0.20230704183611-ecad54e231b7
-	github.com/onflow/flow-go v0.31.1-0.20230704154018-87a84e9d36c2
+	github.com/onflow/flow-emulator v0.53.0
+	github.com/onflow/flow-go v0.31.1-0.20230718164039-e3411eff1e9d
 	github.com/onflow/flow-go-sdk v0.41.9
-	github.com/onflow/flow-go/crypto v0.24.7
+	github.com/onflow/flow-go/crypto v0.24.9
 	github.com/onflow/flow-go/insecure v0.0.0-00010101000000-000000000000
-	github.com/onflow/flow/protobuf/go/flow v0.3.2-0.20230602212908-08fc6536d391
+	github.com/onflow/flow/protobuf/go/flow v0.3.2-0.20230628215638-83439d22e0ce
 	github.com/plus3it/gorecurcopy v0.0.1
 	github.com/prometheus/client_golang v1.14.0
 	github.com/prometheus/client_model v0.4.0
@@ -229,7 +229,6 @@ require (
 	github.com/onflow/atree v0.6.0 // indirect
 	github.com/onflow/flow-ft/lib/go/contracts v0.7.0 // indirect
 	github.com/onflow/flow-nft/lib/go/contracts v1.1.0 // indirect
-	github.com/onflow/fusd/lib/go/contracts v0.0.0-20211021081023-ae9de8fb2c7e // indirect
 	github.com/onflow/go-bitswap v0.0.0-20230703214630-6d3db958c73d // indirect
 	github.com/onflow/nft-storefront/lib/go/contracts v0.0.0-20221222181731-14b90207cead // indirect
 	github.com/onflow/sdks v0.5.0 // indirect
