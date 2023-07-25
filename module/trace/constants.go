@@ -179,6 +179,7 @@ const (
 	FVMEnvGetCurrentBlockHeight      SpanName = "fvm.env.getCurrentBlockHeight"
 	FVMEnvGetBlockAtHeight           SpanName = "fvm.env.getBlockAtHeight"
 	FVMEnvRandom                     SpanName = "fvm.env.unsafeRandom"
+	FVMEnvBlockEntropyProvider       SpanName = "fvm.env.blockEntropyProvider"
 	FVMEnvCreateAccount              SpanName = "fvm.env.createAccount"
 	FVMEnvAddAccountKey              SpanName = "fvm.env.addAccountKey"
 	FVMEnvAddEncodedAccountKey       SpanName = "fvm.env.addEncodedAccountKey"

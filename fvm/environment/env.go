@@ -69,6 +69,8 @@ type Environment interface {
 	// AccountInfo
 	GetAccount(address flow.Address) (*flow.Account, error)
 
+	BlockEntropy() ([]byte, error)
+
 	// FlushPendingUpdates flushes pending updates from the stateful environment
 	// modules (i.e., ContractUpdater) to the state transaction, and return
 	// the updated contract keys.
