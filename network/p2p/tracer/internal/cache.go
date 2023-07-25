@@ -47,26 +47,24 @@ func newRPCSentCache(config *rpcCtrlMsgSentCacheConfig) *rpcSentCache {
 // add initializes the record cached for the given messageEntityID if it does not exist.
 // Returns true if the record is initialized, false otherwise (i.e.: the record already exists).
 // Args:
-// - topic: the topic ID.
 // - messageId: the message ID.
 // - controlMsgType: the rpc control message type.
 // Returns:
 // - bool: true if the record is initialized, false otherwise (i.e.: the record already exists).
 // Note that if add is called multiple times for the same messageEntityID, the record is initialized only once, and the
 // subsequent calls return false and do not change the record (i.e.: the record is not re-initialized).
-func (r *rpcSentCache) add(topic string, messageId string, controlMsgType p2pmsg.ControlMessageType) bool {
-	return r.c.Add(newRPCSentEntity(r.rpcSentEntityID(topic, messageId, controlMsgType), controlMsgType))
+func (r *rpcSentCache) add(messageId string, controlMsgType p2pmsg.ControlMessageType) bool {
+	return r.c.Add(newRPCSentEntity(r.rpcSentEntityID(messageId, controlMsgType), controlMsgType))
 }
 
 // has checks if the RPC message has been cached indicating it has been sent.
 // Args:
-// - topic: the topic ID.
 // - messageId: the message ID.
 // - controlMsgType: the rpc control message type.
 // Returns:
 // - bool: true if the RPC has been cache indicating it was sent from the local node.
-func (r *rpcSentCache) has(topic string, messageId string, controlMsgType p2pmsg.ControlMessageType) bool {
-	return r.c.Has(r.rpcSentEntityID(topic, messageId, controlMsgType))
+func (r *rpcSentCache) has(messageId string, controlMsgType p2pmsg.ControlMessageType) bool {
+	return r.c.Has(r.rpcSentEntityID(messageId, controlMsgType))
 }
 
 // size returns the number of records in the cache.
@@ -74,13 +72,12 @@ func (r *rpcSentCache) size() uint {
 	return r.c.Size()
 }
 
-// rpcSentEntityID creates an entity ID from the topic, messageID and control message type.
+// rpcSentEntityID creates an entity ID from the messageID and control message type.
 // Args:
-// - topic: the topic ID.
 // - messageId: the message ID.
 // - controlMsgType: the rpc control message type.
 // Returns:
 // - flow.Identifier: the entity ID.
-func (r *rpcSentCache) rpcSentEntityID(topic string, messageId string, controlMsgType p2pmsg.ControlMessageType) flow.Identifier {
-	return flow.MakeIDFromFingerPrint([]byte(fmt.Sprintf("%s%s%s", topic, messageId, controlMsgType)))
+func (r *rpcSentCache) rpcSentEntityID(messageId string, controlMsgType p2pmsg.ControlMessageType) flow.Identifier {
+	return flow.MakeIDFromFingerPrint([]byte(fmt.Sprintf("%s%s", messageId, controlMsgType)))
 }

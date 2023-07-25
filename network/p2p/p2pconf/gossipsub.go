@@ -17,12 +17,24 @@ type ResourceManagerConfig struct {
 type GossipSubConfig struct {
 	// GossipSubRPCInspectorsConfig configuration for all gossipsub RPC control message inspectors.
 	GossipSubRPCInspectorsConfig `mapstructure:",squash"`
-	// LocalMeshLogInterval is the interval at which the local mesh is logged.
-	LocalMeshLogInterval time.Duration `mapstructure:"gossipsub-local-mesh-logging-interval"`
-	// ScoreTracerInterval is the interval at which the score tracer logs the peer scores.
-	ScoreTracerInterval time.Duration `mapstructure:"gossipsub-score-tracer-interval"`
-	// RPCSentTrackerCacheSize cache size of the rpc sent tracker used by the gossipsub mesh tracer.
-	RPCSentTrackerCacheSize uint32 `mapstructure:"gossipsub-rpc-sent-tracker-cache-size"`
+
+	// GossipSubTracerConfig is the configuration for the gossipsub tracer. GossipSub tracer is used to trace the local mesh events and peer scores.
+	GossipSubTracerConfig `mapstructure:",squash"`
+
 	// PeerScoring is whether to enable GossipSub peer scoring.
 	PeerScoring bool `mapstructure:"gossipsub-peer-scoring-enabled"`
+}
+
+// GossipSubTracerConfig is the config for the gossipsub tracer. GossipSub tracer is used to trace the local mesh events and peer scores.
+type GossipSubTracerConfig struct {
+	// LocalMeshLogInterval is the interval at which the local mesh is logged.
+	LocalMeshLogInterval time.Duration `validate:"gt=0s" mapstructure:"gossipsub-local-mesh-logging-interval"`
+	// ScoreTracerInterval is the interval at which the score tracer logs the peer scores.
+	ScoreTracerInterval time.Duration `validate:"gt=0s" mapstructure:"gossipsub-score-tracer-interval"`
+	// RPCSentTrackerCacheSize cache size of the rpc sent tracker used by the gossipsub mesh tracer.
+	RPCSentTrackerCacheSize uint32 `validate:"gt=0" mapstructure:"gossipsub-rpc-sent-tracker-cache-size"`
+	// RPCSentTrackerQueueCacheSize cache size of the rpc sent tracker queue used for async tracking.
+	RPCSentTrackerQueueCacheSize uint32 `validate:"gt=0" mapstructure:"gossipsub-rpc-sent-tracker-queue-cache-size"`
+	// RpcSentTrackerNumOfWorkers number of workers for rpc sent tracker worker pool.
+	RpcSentTrackerNumOfWorkers int `validate:"gt=0" mapstructure:"gossipsub-rpc-sent-tracker-workers"`
 }
