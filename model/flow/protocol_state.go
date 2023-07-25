@@ -69,3 +69,24 @@ func (e *ProtocolStateEntry) ID() Identifier {
 	}
 	return MakeID(body)
 }
+
+// Copy returns a full copy of the entry.
+func (e *ProtocolStateEntry) Copy() *ProtocolStateEntry {
+	if e == nil {
+		return nil
+	}
+	identities := make(DynamicIdentityEntryList, 0, len(e.Identities))
+	for _, identity := range e.Identities {
+		identities = append(identities, &DynamicIdentityEntry{
+			NodeID:  identity.NodeID,
+			Dynamic: identity.Dynamic,
+		})
+	}
+	return &ProtocolStateEntry{
+		CurrentEpochEventIDs:            e.CurrentEpochEventIDs,
+		PreviousEpochEventIDs:           e.PreviousEpochEventIDs,
+		Identities:                      identities,
+		InvalidStateTransitionAttempted: e.InvalidStateTransitionAttempted,
+		NextEpochProtocolState:          e.NextEpochProtocolState.Copy(),
+	}
+}
