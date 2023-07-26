@@ -17,7 +17,7 @@ type UpdaterSuite struct {
 
 	parentProtocolState *flow.RichProtocolStateEntry
 	parentBlock         *flow.Header
-	candidateBlock      *flow.Header
+	candidate           *flow.Header
 
 	updater *Updater
 }
@@ -25,9 +25,9 @@ type UpdaterSuite struct {
 func (s *UpdaterSuite) SetupTest() {
 	s.parentProtocolState = unittest.ProtocolStateFixture()
 	s.parentBlock = unittest.BlockHeaderFixture(unittest.HeaderWithView(s.parentProtocolState.CurrentEpochSetup.FirstView + 1))
-	s.candidateBlock = unittest.BlockHeaderWithParentFixture(s.parentBlock)
+	s.candidate = unittest.BlockHeaderWithParentFixture(s.parentBlock)
 
-	s.updater = newUpdater(s.candidateBlock, s.parentProtocolState)
+	s.updater = newUpdater(s.candidate, s.parentProtocolState)
 }
 
 // TestNewUpdater tests if the constructor correctly setups invariants for updater.
@@ -46,8 +46,8 @@ func (s *UpdaterSuite) TestTransitionToNextEpoch() {
 	candidate := unittest.BlockHeaderFixture(
 		unittest.HeaderWithView(s.parentProtocolState.CurrentEpochSetup.FinalView + 1))
 	// since candidate block is from next epoch, updater should transition to next epoch
-	updater := newUpdater(candidate, s.parentProtocolState)
-	updatedState, _, _ := updater.Build()
+	s.updater = newUpdater(candidate, s.parentProtocolState)
+	updatedState, _, _ := s.updater.Build()
 	require.Equal(s.T(), updatedState.ID(), s.parentProtocolState.NextEpochProtocolState.ID(), "should transition into next epoch")
 	require.Nil(s.T(), updatedState.NextEpochProtocolState, "next epoch protocol state should be nil")
 }
@@ -63,5 +63,20 @@ func (s *UpdaterSuite) TestBuild() {
 	updatedState, stateID, hasChanges = s.updater.Build()
 	require.NotEqual(s.T(), stateID, s.parentProtocolState.ID(), "should return same protocol state")
 	require.True(s.T(), hasChanges, "should have changes")
+}
 
+// TestSetInvalidStateTransitionAttempted tests if setting invalid state transition attempted flag is reflected in built
+// protocol state. It should be set for both current and next epoch protocol state.
+func (s *UpdaterSuite) TestSetInvalidStateTransitionAttempted() {
+	// update protocol state with next epoch information
+	unittest.WithNextEpochProtocolState()(s.parentProtocolState)
+	// create new updater with next epoch information
+	s.updater = newUpdater(s.candidate, s.parentProtocolState)
+
+	s.updater.SetInvalidStateTransitionAttempted()
+	updatedState, _, hasChanges := s.updater.Build()
+	require.True(s.T(), hasChanges, "should have changes")
+	require.True(s.T(), updatedState.InvalidStateTransitionAttempted, "should set invalid state transition attempted")
+	require.True(s.T(), updatedState.NextEpochProtocolState.InvalidStateTransitionAttempted,
+		"should set invalid state transition attempted for next epoch as well")
 }
