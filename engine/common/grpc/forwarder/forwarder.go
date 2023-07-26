@@ -12,7 +12,7 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/status"
 
-	"github.com/onflow/flow-go/engine/access/rpc/backend"
+	rpcConnection "github.com/onflow/flow-go/engine/access/rpc/connection"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/grpcutils"
 
@@ -76,7 +76,7 @@ func (f *Forwarder) reconnectingClient(i int) error {
 				identity.Address,
 				grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(int(f.maxMsgSize))),
 				grpc.WithTransportCredentials(insecure.NewCredentials()),
-				backend.WithClientUnaryInterceptor(timeout))
+				rpcConnection.WithClientTimeoutOption(timeout))
 			if err != nil {
 				return err
 			}
@@ -90,7 +90,7 @@ func (f *Forwarder) reconnectingClient(i int) error {
 				identity.Address,
 				grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(int(f.maxMsgSize))),
 				grpc.WithTransportCredentials(credentials.NewTLS(tlsConfig)),
-				backend.WithClientUnaryInterceptor(timeout))
+				rpcConnection.WithClientTimeoutOption(timeout))
 			if err != nil {
 				return fmt.Errorf("cannot connect to %s %w", identity.Address, err)
 			}
