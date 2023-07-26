@@ -117,7 +117,6 @@ func (b *backendScripts) executeScriptOnExecutor(
 	// try execution on Archive nodes first
 	archiveResult, err := b.executeScriptOnAvailableArchiveNodes(ctx, blockID, script, arguments, insecureScriptHash)
 	// try execution nodes if the script wasn't executed
-	b.log.Info().Bool("validation mode", b.scriptExecValidation).Msg("running script execution strategy")
 	if b.scriptExecValidation {
 		execNodeResult, errExec := b.executeScriptOnAvailableExecutionNodes(
 			ctx, blockID, script, arguments, insecureScriptHash)
