@@ -117,7 +117,7 @@ func (b *backendScripts) executeScriptOnExecutor(
 	// try execution on Archive nodes first
 	archiveResult, err := b.executeScriptOnAvailableArchiveNodes(ctx, blockID, script, arguments, insecureScriptHash)
 	// try execution nodes if the script wasn't executed
-	b.log.Debug().Bool("validation mode", b.scriptExecValidation).Msg("running script execution strategy")
+	b.log.Info().Bool("validation mode", b.scriptExecValidation).Msg("running script execution strategy")
 	if b.scriptExecValidation {
 		execNodeResult, errExec := b.executeScriptOnAvailableExecutionNodes(
 			ctx, blockID, script, arguments, insecureScriptHash)
@@ -148,7 +148,7 @@ func (b *backendScripts) logScriptExecutionComparison(
 	insecureScriptHash [16]byte,
 	msg string,
 ) {
-	b.log.Debug().Hex("block_id", blockID[:]).Hex("script_hash", insecureScriptHash[:]).Msg(msg)
+	b.log.Info().Hex("block_id", blockID[:]).Hex("script_hash", insecureScriptHash[:]).Msg(msg)
 }
 
 // executeScriptOnAvailableArchiveNodes executes the given script for a blockID on all archive nodes available
