@@ -36,7 +36,7 @@ func GetAccountKeyByID(r *request.Request, backend access.API, link models.LinkG
 	}
 	if !found {
 		return nil, models.NewNotFoundError(
-			fmt.Sprintf("error looking up account key with ID %d", req.KeyID),
+			fmt.Sprintf("account key with ID: %d does not exist", req.KeyID),
 			nil,
 		)
 	}

@@ -66,7 +66,7 @@ func TestGetAccountKeyByID(t *testing.T) {
 		expected := fmt.Sprintf(`
           {
             "code": %d,
-            "message": "error looking up account key with ID %s"
+            "message": "account key with ID: %s does not exist"
           }
 		`, statusCode, keyID)
 
