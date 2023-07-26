@@ -2,7 +2,6 @@ package badger
 
 import (
 	"github.com/dgraph-io/badger/v2"
-
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/metrics"
@@ -23,7 +22,6 @@ var _ storage.QuorumCertificates = (*QuorumCertificates)(nil)
 // which supports storing, caching and retrieving by block ID.
 func NewQuorumCertificates(collector module.CacheMetrics, db *badger.DB, cacheSize uint) *QuorumCertificates {
 	store := func(_ flow.Identifier, qc *flow.QuorumCertificate) func(*transaction.Tx) error {
-		//qc := val.(*flow.QuorumCertificate)
 		return transaction.WithTx(operation.InsertQuorumCertificate(qc))
 	}
 

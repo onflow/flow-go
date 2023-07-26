@@ -2,7 +2,6 @@ package badger
 
 import (
 	"github.com/dgraph-io/badger/v2"
-
 	"github.com/onflow/flow-go/model/cluster"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
@@ -25,10 +24,10 @@ func NewClusterPayloads(cacheMetrics module.CacheMetrics, db *badger.DB) *Cluste
 		return transaction.WithTx(procedure.InsertClusterPayload(blockID, payload))
 	}
 
-	retrieve := func(key flow.Identifier) func(tx *badger.Txn) (*cluster.Payload, error) {
+	retrieve := func(blockID flow.Identifier) func(tx *badger.Txn) (*cluster.Payload, error) {
 		var payload cluster.Payload
 		return func(tx *badger.Txn) (*cluster.Payload, error) {
-			err := procedure.RetrieveClusterPayload(key, &payload)(tx)
+			err := procedure.RetrieveClusterPayload(blockID, &payload)(tx)
 			return &payload, err
 		}
 	}
