@@ -14,14 +14,13 @@ import (
 
 type Events struct {
 	db    *badger.DB
-	cache *Cache
+	cache *Cache[flow.Identifier, []flow.Event]
 }
 
 func NewEvents(collector module.CacheMetrics, db *badger.DB) *Events {
-	retrieve := func(key interface{}) func(tx *badger.Txn) (interface{}, error) {
-		blockID := key.(flow.Identifier)
+	retrieve := func(blockID flow.Identifier) func(tx *badger.Txn) ([]flow.Event, error) {
 		var events []flow.Event
-		return func(tx *badger.Txn) (interface{}, error) {
+		return func(tx *badger.Txn) ([]flow.Event, error) {
 			err := operation.LookupEventsByBlockID(blockID, &events)(tx)
 			return events, handleError(err, flow.Event{})
 		}
@@ -29,8 +28,8 @@ func NewEvents(collector module.CacheMetrics, db *badger.DB) *Events {
 
 	return &Events{
 		db: db,
-		cache: newCache(collector, metrics.ResourceEvents,
-			withStore(noopStore),
+		cache: newCache[flow.Identifier, []flow.Event](collector, metrics.ResourceEvents,
+			withStore(noopStore[flow.Identifier, []flow.Event]),
 			withRetrieve(retrieve)),
 	}
 }
@@ -77,7 +76,7 @@ func (e *Events) ByBlockID(blockID flow.Identifier) ([]flow.Event, error) {
 	if err != nil {
 		return nil, err
 	}
-	return val.([]flow.Event), nil
+	return val, nil
 }
 
 // ByBlockIDTransactionID returns the events for the given block ID and transaction ID
@@ -142,14 +141,13 @@ func (e *Events) BatchRemoveByBlockID(blockID flow.Identifier, batch storage.Bat
 
 type ServiceEvents struct {
 	db    *badger.DB
-	cache *Cache
+	cache *Cache[flow.Identifier, []flow.Event]
 }
 
 func NewServiceEvents(collector module.CacheMetrics, db *badger.DB) *ServiceEvents {
-	retrieve := func(key interface{}) func(tx *badger.Txn) (interface{}, error) {
-		blockID := key.(flow.Identifier)
+	retrieve := func(blockID flow.Identifier) func(tx *badger.Txn) ([]flow.Event, error) {
 		var events []flow.Event
-		return func(tx *badger.Txn) (interface{}, error) {
+		return func(tx *badger.Txn) ([]flow.Event, error) {
 			err := operation.LookupServiceEventsByBlockID(blockID, &events)(tx)
 			return events, handleError(err, flow.Event{})
 		}
@@ -157,8 +155,8 @@ func NewServiceEvents(collector module.CacheMetrics, db *badger.DB) *ServiceEven
 
 	return &ServiceEvents{
 		db: db,
-		cache: newCache(collector, metrics.ResourceEvents,
-			withStore(noopStore),
+		cache: newCache[flow.Identifier, []flow.Event](collector, metrics.ResourceEvents,
+			withStore(noopStore[flow.Identifier, []flow.Event]),
 			withRetrieve(retrieve)),
 	}
 }
@@ -190,7 +188,7 @@ func (e *ServiceEvents) ByBlockID(blockID flow.Identifier) ([]flow.Event, error)
 	if err != nil {
 		return nil, err
 	}
-	return val.([]flow.Event), nil
+	return val, nil
 }
 
 // RemoveByBlockID removes service events by block ID
