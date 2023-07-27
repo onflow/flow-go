@@ -12,6 +12,7 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
+	"github.com/onflow/flow-go/engine/access/rpc/connection"
 	"github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/model/flow"
@@ -23,7 +24,7 @@ type backendEvents struct {
 	headers           storage.Headers
 	executionReceipts storage.ExecutionReceipts
 	state             protocol.State
-	connFactory       ConnectionFactory
+	connFactory       connection.ConnectionFactory
 	log               zerolog.Logger
 	maxHeightRange    uint
 	nodeCommunicator  *NodeCommunicator

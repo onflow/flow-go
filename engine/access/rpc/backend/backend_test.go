@@ -6,6 +6,8 @@ import (
 	"strconv"
 	"testing"
 
+	"github.com/onflow/flow-go/engine/access/rpc/connection"
+
 	"github.com/dgraph-io/badger/v2"
 	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
 	entitiesproto "github.com/onflow/flow/protobuf/go/flow/entities"
@@ -2455,7 +2457,7 @@ func (suite *Suite) setupReceipts(block *flow.Block) ([]*flow.ExecutionReceipt, 
 	return receipts, ids
 }
 
-func (suite *Suite) setupConnectionFactory() ConnectionFactory {
+func (suite *Suite) setupConnectionFactory() connection.ConnectionFactory {
 	// create a mock connection factory
 	connFactory := new(backendmock.ConnectionFactory)
 	connFactory.On("GetExecutionAPIClient", mock.Anything).Return(suite.execClient, &mockCloser{}, nil)

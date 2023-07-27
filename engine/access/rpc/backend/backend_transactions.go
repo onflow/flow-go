@@ -14,6 +14,7 @@ import (
 	"google.golang.org/grpc/status"
 
 	"github.com/onflow/flow-go/access"
+	"github.com/onflow/flow-go/engine/access/rpc/connection"
 	"github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/fvm/blueprints"
@@ -34,10 +35,11 @@ type backendTransactions struct {
 	transactionMetrics   module.TransactionMetrics
 	transactionValidator *access.TransactionValidator
 	retry                *Retry
-	connFactory          ConnectionFactory
-	previousAccessNodes  []accessproto.AccessAPIClient
-	log                  zerolog.Logger
-	nodeCommunicator     *NodeCommunicator
+	connFactory          connection.ConnectionFactory
+
+	previousAccessNodes []accessproto.AccessAPIClient
+	log                 zerolog.Logger
+	nodeCommunicator    *NodeCommunicator
 }
 
 // SendTransaction forwards the transaction to the collection node

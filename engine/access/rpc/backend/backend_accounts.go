@@ -4,11 +4,13 @@ import (
 	"context"
 	"time"
 
-	execproto "github.com/onflow/flow/protobuf/go/flow/execution"
 	"github.com/rs/zerolog"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
+	execproto "github.com/onflow/flow/protobuf/go/flow/execution"
+
+	"github.com/onflow/flow-go/engine/access/rpc/connection"
 	"github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/model/flow"
@@ -20,7 +22,7 @@ type backendAccounts struct {
 	state             protocol.State
 	headers           storage.Headers
 	executionReceipts storage.ExecutionReceipts
-	connFactory       ConnectionFactory
+	connFactory       connection.ConnectionFactory
 	log               zerolog.Logger
 	nodeCommunicator  *NodeCommunicator
 }

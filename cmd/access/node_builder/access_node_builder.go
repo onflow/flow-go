@@ -40,6 +40,7 @@ import (
 	"github.com/onflow/flow-go/engine/access/rest/routes"
 	"github.com/onflow/flow-go/engine/access/rpc"
 	"github.com/onflow/flow-go/engine/access/rpc/backend"
+	rpcConnection "github.com/onflow/flow-go/engine/access/rpc/connection"
 	"github.com/onflow/flow-go/engine/access/state_stream"
 	followereng "github.com/onflow/flow-go/engine/common/follower"
 	"github.com/onflow/flow-go/engine/common/requester"
@@ -161,7 +162,7 @@ func DefaultAccessNodeConfig() *AccessNodeConfig {
 				PreferredExecutionNodeIDs: nil,
 				FixedExecutionNodeIDs:     nil,
 				ArchiveAddressList:        nil,
-				CircuitBreakerConfig: backend.CircuitBreakerConfig{
+				CircuitBreakerConfig: rpcConnection.CircuitBreakerConfig{
 					Enabled:        false,
 					RestoreTimeout: 60 * time.Second,
 					MaxFailures:    5,
@@ -937,7 +938,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				builder.rpcConf.CollectionAddr,
 				grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(int(builder.rpcConf.MaxMsgSize))),
 				grpc.WithTransportCredentials(insecure.NewCredentials()),
-				backend.WithClientTimeoutOption(builder.rpcConf.BackendConfig.CollectionClientTimeout))
+				rpcConnection.WithClientTimeoutOption(builder.rpcConf.BackendConfig.CollectionClientTimeout))
 			if err != nil {
 				return err
 			}
@@ -1067,16 +1068,25 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				return nil, fmt.Errorf("could not initialize backend cache: %w", err)
 			}
 
-			connFactory := &backend.ConnectionFactoryImpl{
+			var connBackendCache *rpcConnection.Cache
+			if backendCache != nil {
+				connBackendCache = rpcConnection.NewCache(backendCache, int(cacheSize))
+			}
+
+			connFactory := &rpcConnection.ConnectionFactoryImpl{
 				CollectionGRPCPort:        builder.collectionGRPCPort,
 				ExecutionGRPCPort:         builder.executionGRPCPort,
 				CollectionNodeGRPCTimeout: backendConfig.CollectionClientTimeout,
 				ExecutionNodeGRPCTimeout:  backendConfig.ExecutionClientTimeout,
-				ConnectionsCache:          backendCache,
-				CacheSize:                 cacheSize,
-				MaxMsgSize:                config.MaxMsgSize,
 				AccessMetrics:             accessMetrics,
 				Log:                       node.Logger,
+				Manager: rpcConnection.NewManager(
+					connBackendCache,
+					node.Logger,
+					accessMetrics,
+					config.MaxMsgSize,
+					backendConfig.CircuitBreakerConfig,
+				),
 			}
 
 			backend := backend.New(
@@ -1312,12 +1322,15 @@ func (builder *FlowAccessNodeBuilder) initPublicLibp2pNode(networkKey crypto.Pri
 	}
 
 	meshTracerCfg := &tracer.GossipSubMeshTracerConfig{
-		Logger:                       builder.Logger,
-		Metrics:                      networkMetrics,
-		IDProvider:                   builder.IdentityProvider,
-		LoggerInterval:               builder.FlowConfig.NetworkConfig.GossipSubConfig.LocalMeshLogInterval,
-		RpcSentTrackerCacheCollector: metrics.GossipSubRPCSentTrackerMetricFactory(builder.HeroCacheMetricsFactory(), network.PublicNetwork),
-		RpcSentTrackerCacheSize:      builder.FlowConfig.NetworkConfig.GossipSubConfig.RPCSentTrackerCacheSize,
+		Logger:                             builder.Logger,
+		Metrics:                            networkMetrics,
+		IDProvider:                         builder.IdentityProvider,
+		LoggerInterval:                     builder.FlowConfig.NetworkConfig.GossipSubConfig.LocalMeshLogInterval,
+		RpcSentTrackerCacheSize:            builder.FlowConfig.NetworkConfig.GossipSubConfig.RPCSentTrackerCacheSize,
+		RpcSentTrackerWorkerQueueCacheSize: builder.FlowConfig.NetworkConfig.GossipSubConfig.RPCSentTrackerQueueCacheSize,
+		RpcSentTrackerNumOfWorkers:         builder.FlowConfig.NetworkConfig.GossipSubConfig.RpcSentTrackerNumOfWorkers,
+		HeroCacheMetricsFactory:            builder.HeroCacheMetricsFactory(),
+		NetworkingType:                     network.PublicNetwork,
 	}
 	meshTracer := tracer.NewGossipSubMeshTracer(meshTracerCfg)
 
