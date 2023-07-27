@@ -12,6 +12,7 @@ func TestUpdaterSuite(t *testing.T) {
 	suite.Run(t, new(UpdaterSuite))
 }
 
+// UpdaterSuite is a dedicated test suite for testing updater. It holds a minimal state to initialize updater.
 type UpdaterSuite struct {
 	suite.Suite
 
@@ -58,11 +59,13 @@ func (s *UpdaterSuite) TestBuild() {
 	require.Equal(s.T(), stateID, s.parentProtocolState.ID(), "should return same protocol state")
 	require.False(s.T(), hasChanges, "should not have changes")
 	require.NotSame(s.T(), updatedState, s.updater.state, "should return a copy of protocol state")
+	require.Equal(s.T(), updatedState.ID(), stateID, "should return correct ID")
 
 	s.updater.SetInvalidStateTransitionAttempted()
 	updatedState, stateID, hasChanges = s.updater.Build()
 	require.NotEqual(s.T(), stateID, s.parentProtocolState.ID(), "should return same protocol state")
 	require.True(s.T(), hasChanges, "should have changes")
+	require.Equal(s.T(), updatedState.ID(), stateID, "should return correct ID")
 }
 
 // TestSetInvalidStateTransitionAttempted tests if setting invalid state transition attempted flag is reflected in built
@@ -79,4 +82,66 @@ func (s *UpdaterSuite) TestSetInvalidStateTransitionAttempted() {
 	require.True(s.T(), updatedState.InvalidStateTransitionAttempted, "should set invalid state transition attempted")
 	require.True(s.T(), updatedState.NextEpochProtocolState.InvalidStateTransitionAttempted,
 		"should set invalid state transition attempted for next epoch as well")
+}
+
+// TestProcessEpochCommit tests if processing epoch commit event correctly updates internal state of updater and
+// correctly behaves when invariants are violated.
+func (s *UpdaterSuite) TestProcessEpochCommit() {
+	s.Run("invalid-counter", func() {
+		commit := unittest.EpochCommitFixture(func(commit *flow.EpochCommit) {
+			commit.Counter = s.parentProtocolState.CurrentEpochSetup.Counter + 10 // set invalid counter for next epoch
+		})
+		err := s.updater.ProcessEpochCommit(commit)
+		require.Error(s.T(), err)
+	})
+	s.Run("no next epoch protocol state", func() {
+		commit := unittest.EpochCommitFixture(func(commit *flow.EpochCommit) {
+			commit.Counter = s.parentProtocolState.CurrentEpochSetup.Counter + 1
+		})
+		err := s.updater.ProcessEpochCommit(commit)
+		require.Error(s.T(), err)
+	})
+	s.Run("invalid state transition attempted", func() {
+		updater := newUpdater(s.candidate, s.parentProtocolState)
+		setup := unittest.EpochSetupFixture(func(setup *flow.EpochSetup) {
+			setup.Counter = s.parentProtocolState.CurrentEpochSetup.Counter + 1
+		})
+		// processing setup event results in creating next epoch protocol state
+		err := updater.ProcessEpochSetup(setup)
+		require.NoError(s.T(), err)
+
+		updater.SetInvalidStateTransitionAttempted()
+
+		commit := unittest.EpochCommitFixture(func(commit *flow.EpochCommit) {
+			commit.Counter = s.parentProtocolState.CurrentEpochSetup.Counter + 1
+		})
+
+		// processing epoch commit should be no-op since we have observed an invalid state transition
+		err = updater.ProcessEpochCommit(commit)
+		require.NoError(s.T(), err)
+
+		newState, _, _ := updater.Build()
+		require.Equal(s.T(), flow.ZeroID, newState.NextEpochProtocolState.CurrentEpochEventIDs.CommitID,
+			"operation must be no-op")
+	})
+	s.Run("happy path processing", func() {
+		updater := newUpdater(s.candidate, s.parentProtocolState)
+		setup := unittest.EpochSetupFixture(func(setup *flow.EpochSetup) {
+			setup.Counter = s.parentProtocolState.CurrentEpochSetup.Counter + 1
+		})
+		// processing setup event results in creating next epoch protocol state
+		err := updater.ProcessEpochSetup(setup)
+		require.NoError(s.T(), err)
+
+		commit := unittest.EpochCommitFixture(func(commit *flow.EpochCommit) {
+			commit.Counter = s.parentProtocolState.CurrentEpochSetup.Counter + 1
+		})
+
+		err = updater.ProcessEpochCommit(commit)
+		require.NoError(s.T(), err)
+
+		// processing another epoch commit has to be an error since we have already processed one
+		err = updater.ProcessEpochCommit(commit)
+		require.Error(s.T(), err)
+	})
 }
