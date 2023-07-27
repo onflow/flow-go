@@ -84,10 +84,44 @@ func (s *UpdaterSuite) TestSetInvalidStateTransitionAttempted() {
 		"should set invalid state transition attempted for next epoch as well")
 }
 
+// TestProcessEpochSetupInvariants tests if processing epoch setup when invariants are violated doesn't update internal structures.
+func (s *UpdaterSuite) TestProcessEpochSetupInvariants() {
+	s.Run("invalid counter", func() {
+		setup := unittest.EpochSetupFixture(func(setup *flow.EpochSetup) {
+			setup.Counter = s.parentProtocolState.CurrentEpochSetup.Counter + 10 // set invalid counter for next epoch
+		})
+		err := s.updater.ProcessEpochSetup(setup)
+		require.Error(s.T(), err)
+	})
+	s.Run("invalid state transition attempted", func() {
+		updater := newUpdater(s.candidate, s.parentProtocolState)
+		setup := unittest.EpochSetupFixture(func(setup *flow.EpochSetup) {
+			setup.Counter = s.parentProtocolState.CurrentEpochSetup.Counter + 1
+		})
+		updater.SetInvalidStateTransitionAttempted()
+		err := updater.ProcessEpochSetup(setup)
+		require.NoError(s.T(), err)
+
+		updatedState, _, _ := updater.Build()
+		require.Nil(s.T(), updatedState.NextEpochProtocolState, "should not process epoch setup if invalid state transition attempted")
+	})
+	s.Run("processing second epoch setup", func() {
+		updater := newUpdater(s.candidate, s.parentProtocolState)
+		setup := unittest.EpochSetupFixture(func(setup *flow.EpochSetup) {
+			setup.Counter = s.parentProtocolState.CurrentEpochSetup.Counter + 1
+		})
+		err := updater.ProcessEpochSetup(setup)
+		require.NoError(s.T(), err)
+
+		err = updater.ProcessEpochSetup(setup)
+		require.Error(s.T(), err)
+	})
+}
+
 // TestProcessEpochCommit tests if processing epoch commit event correctly updates internal state of updater and
 // correctly behaves when invariants are violated.
 func (s *UpdaterSuite) TestProcessEpochCommit() {
-	s.Run("invalid-counter", func() {
+	s.Run("invalid counter", func() {
 		commit := unittest.EpochCommitFixture(func(commit *flow.EpochCommit) {
 			commit.Counter = s.parentProtocolState.CurrentEpochSetup.Counter + 10 // set invalid counter for next epoch
 		})
@@ -143,5 +177,8 @@ func (s *UpdaterSuite) TestProcessEpochCommit() {
 		// processing another epoch commit has to be an error since we have already processed one
 		err = updater.ProcessEpochCommit(commit)
 		require.Error(s.T(), err)
+
+		newState, _, _ := updater.Build()
+		require.Equal(s.T(), commit.ID(), newState.NextEpochProtocolState.CurrentEpochEventIDs.CommitID, "next epoch must be committed")
 	})
 }
