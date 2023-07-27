@@ -35,7 +35,7 @@ const RandomSourceLength = crypto.SignatureLenBLSBLS12381
 // "customizers.go" to add new values. The same sub-protocol can further create independent PRGs
 // by using `diversifier`.
 func New(source []byte, customizer []byte, diversifier []byte) (random.Rand, error) {
-	seed, err := XOF(source, diversifier, random.Chacha20SeedLen)
+	seed, err := xof(source, diversifier, random.Chacha20SeedLen)
 	if err != nil {
 		return nil, fmt.Errorf("extendable output function failed: %w", err)
 	}
@@ -57,7 +57,7 @@ func New(source []byte, customizer []byte, diversifier []byte) (random.Rand, err
 // distributed entropy (for instance a cryptographic signature), and hashing doesn't necessarily
 // output the number of bytes required for the PRG seed (the code currently relies on ChaCha20 but this
 // choice could evolve).
-func XOF(source []byte, diversifier []byte, outLen int) ([]byte, error) {
+func xof(source []byte, diversifier []byte, outLen int) ([]byte, error) {
 	// CShake is used in this case but any other primitive that acts as a xof
 	// and accepts a diversifier can be used.
 	shake := sha3.NewCShake128(nil, diversifier)
