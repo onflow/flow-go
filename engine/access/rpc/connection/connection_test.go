@@ -52,12 +52,7 @@ func TestProxyAccessAPI(t *testing.T) {
 		unittest.Logger(),
 		connectionFactory.AccessMetrics,
 		0,
-		CircuitBreakerConfig{
-			Enabled:        false,
-			MaxFailures:    0,
-			MaxRequests:    0,
-			RestoreTimeout: 0,
-		},
+		CircuitBreakerConfig{},
 	)
 
 	proxyConnectionFactory := ProxyConnectionFactory{
@@ -99,12 +94,7 @@ func TestProxyExecutionAPI(t *testing.T) {
 		unittest.Logger(),
 		connectionFactory.AccessMetrics,
 		0,
-		CircuitBreakerConfig{
-			Enabled:        false,
-			MaxFailures:    0,
-			MaxRequests:    0,
-			RestoreTimeout: 0,
-		},
+		CircuitBreakerConfig{},
 	)
 
 	proxyConnectionFactory := ProxyConnectionFactory{
@@ -151,12 +141,7 @@ func TestProxyAccessAPIConnectionReuse(t *testing.T) {
 		unittest.Logger(),
 		connectionFactory.AccessMetrics,
 		0,
-		CircuitBreakerConfig{
-			Enabled:        false,
-			MaxFailures:    0,
-			MaxRequests:    0,
-			RestoreTimeout: 0,
-		},
+		CircuitBreakerConfig{},
 	)
 
 	proxyConnectionFactory := ProxyConnectionFactory{
@@ -210,12 +195,7 @@ func TestProxyExecutionAPIConnectionReuse(t *testing.T) {
 		unittest.Logger(),
 		connectionFactory.AccessMetrics,
 		0,
-		CircuitBreakerConfig{
-			Enabled:        false,
-			MaxFailures:    0,
-			MaxRequests:    0,
-			RestoreTimeout: 0,
-		},
+		CircuitBreakerConfig{},
 	)
 
 	proxyConnectionFactory := ProxyConnectionFactory{
@@ -276,12 +256,7 @@ func TestExecutionNodeClientTimeout(t *testing.T) {
 		unittest.Logger(),
 		connectionFactory.AccessMetrics,
 		0,
-		CircuitBreakerConfig{
-			Enabled:        false,
-			MaxFailures:    0,
-			MaxRequests:    0,
-			RestoreTimeout: 0,
-		},
+		CircuitBreakerConfig{},
 	)
 
 	// create the execution API client
@@ -330,12 +305,7 @@ func TestCollectionNodeClientTimeout(t *testing.T) {
 		unittest.Logger(),
 		connectionFactory.AccessMetrics,
 		0,
-		CircuitBreakerConfig{
-			Enabled:        false,
-			MaxFailures:    0,
-			MaxRequests:    0,
-			RestoreTimeout: 0,
-		},
+		CircuitBreakerConfig{},
 	)
 
 	// create the collection API client
@@ -384,12 +354,7 @@ func TestConnectionPoolFull(t *testing.T) {
 		unittest.Logger(),
 		connectionFactory.AccessMetrics,
 		0,
-		CircuitBreakerConfig{
-			Enabled:        false,
-			MaxFailures:    0,
-			MaxRequests:    0,
-			RestoreTimeout: 0,
-		},
+		CircuitBreakerConfig{},
 	)
 
 	cn1Address := "foo1:123"
@@ -465,12 +430,7 @@ func TestConnectionPoolStale(t *testing.T) {
 		unittest.Logger(),
 		connectionFactory.AccessMetrics,
 		0,
-		CircuitBreakerConfig{
-			Enabled:        false,
-			MaxFailures:    0,
-			MaxRequests:    0,
-			RestoreTimeout: 0,
-		},
+		CircuitBreakerConfig{},
 	)
 
 	proxyConnectionFactory := ProxyConnectionFactory{
@@ -559,12 +519,7 @@ func TestExecutionNodeClientClosedGracefully(t *testing.T) {
 			unittest.Logger(),
 			connectionFactory.AccessMetrics,
 			0,
-			CircuitBreakerConfig{
-				Enabled:        false,
-				MaxFailures:    0,
-				MaxRequests:    0,
-				RestoreTimeout: 0,
-			},
+			CircuitBreakerConfig{},
 		)
 
 		clientAddress := en.listener.Addr().String()
@@ -648,12 +603,7 @@ func TestExecutionEvictingCacheClients(t *testing.T) {
 		unittest.Logger(),
 		connectionFactory.AccessMetrics,
 		0,
-		CircuitBreakerConfig{
-			Enabled:        false,
-			MaxFailures:    0,
-			MaxRequests:    0,
-			RestoreTimeout: 0,
-		},
+		CircuitBreakerConfig{},
 	)
 
 	clientAddress := cn.listener.Addr().String()

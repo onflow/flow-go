@@ -104,8 +104,8 @@ func (b *backendScripts) executeScriptOnExecutor(
 	// *DO NOT* use this hash for any protocol-related or cryptographic functions.
 	insecureScriptHash := md5.Sum(script) //nolint:gosec
 
-	// try execution on Archive nodes if there is no execution nodes found
-	if len(executors) == 0 && len(b.archiveAddressList) > 0 {
+	// try execution on Archive nodes
+	if len(b.archiveAddressList) > 0 {
 		startTime := time.Now()
 		for idx, rnAddr := range b.archiveAddressList {
 			rnPort := b.archivePorts[idx]
