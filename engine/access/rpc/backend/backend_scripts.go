@@ -120,19 +120,23 @@ func (b *backendScripts) executeScriptOnExecutor(
 	if b.scriptExecValidation {
 		execNodeResult, errExec := b.executeScriptOnAvailableExecutionNodes(
 			ctx, blockID, script, arguments, insecureScriptHash)
-		if bytes.Equal(execNodeResult, archiveResult) && errExec == nil {
+		if bytes.Equal(execNodeResult, archiveResult) {
 			b.logScriptExecutionComparison(blockID, insecureScriptHash,
 				"script execution results on Archive node and EN are equal")
 		} else {
-			if errExec != nil && err != nil {
-				b.log.Error().Err(err).Msg("error from archive node")
-				b.log.Error().Err(err).Msg("error from execution node")
-			} else {
-				b.log.Info().Hex("archive result", archiveResult).Msg("got archive node response for comparison")
-				b.log.Info().Hex("exec node result", execNodeResult).Msg("got execution node response for comparison")
-				b.logScriptExecutionComparison(blockID, insecureScriptHash,
-					"script execution results on Archive node and EN are not equal")
+			if errExec == nil && err == nil {
+				args := ""
+				for _, arg := range arguments {
+					args += string(arg) + " "
+				}
+				b.log.Info().Hex("archive result", archiveResult).
+					Str("script", string(script)).
+					Str("args", args).
+					Hex("exec node result", execNodeResult).
+					Msg("got different responses for archive and execution comparison")
 			}
+			b.logScriptExecutionComparison(blockID, insecureScriptHash,
+				"script execution results on Archive node and EN are not equal")
 		}
 		// return EN results by default
 		return execNodeResult, errExec
@@ -192,10 +196,11 @@ func (b *backendScripts) executeScriptOnAvailableArchiveNodes(
 					// failures due to unavailable blocks are explicitly marked Not found
 					b.metrics.ScriptExecutionErrorOnArchiveNode()
 					b.log.Error().Err(err).Msg("script execution failed for archive node")
+					return nil, err
 				default:
+					errors = multierror.Append(errors, err)
 					continue
 				}
-				errors = multierror.Append(errors, err)
 			}
 		}
 	}
