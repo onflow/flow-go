@@ -127,11 +127,12 @@ func (b *backendScripts) executeScriptOnExecutor(
 			if errExec != nil && err != nil {
 				b.log.Error().Err(err).Msg("error from archive node")
 				b.log.Error().Err(err).Msg("error from execution node")
+			} else {
+				b.log.Info().Hex("archive result", archiveResult).Msg("got archive node response for comparison")
+				b.log.Info().Hex("exec node result", execNodeResult).Msg("got execution node response for comparison")
+				b.logScriptExecutionComparison(blockID, insecureScriptHash,
+					"script execution results on Archive node and EN are not equal")
 			}
-			b.log.Info().Hex("archive result", archiveResult).Msg("got archive node response for comparison")
-			b.log.Info().Hex("exec node result", execNodeResult).Msg("got execution node response for comparison")
-			b.logScriptExecutionComparison(blockID, insecureScriptHash,
-				"script execution results on Archive node and EN are not equal")
 		}
 		// return EN results by default
 		return execNodeResult, errExec
