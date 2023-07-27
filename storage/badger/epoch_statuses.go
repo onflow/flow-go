@@ -12,22 +12,19 @@ import (
 
 type EpochStatuses struct {
 	db    *badger.DB
-	cache *Cache
+	cache *Cache[flow.Identifier, *flow.EpochStatus]
 }
 
 // NewEpochStatuses ...
 func NewEpochStatuses(collector module.CacheMetrics, db *badger.DB) *EpochStatuses {
 
-	store := func(key interface{}, val interface{}) func(*transaction.Tx) error {
-		blockID := key.(flow.Identifier)
-		status := val.(*flow.EpochStatus)
+	store := func(blockID flow.Identifier, status *flow.EpochStatus) func(*transaction.Tx) error {
 		return transaction.WithTx(operation.InsertEpochStatus(blockID, status))
 	}
 
-	retrieve := func(key interface{}) func(*badger.Txn) (interface{}, error) {
-		blockID := key.(flow.Identifier)
-		var status flow.EpochStatus
-		return func(tx *badger.Txn) (interface{}, error) {
+	retrieve := func(blockID flow.Identifier) func(*badger.Txn) (*flow.EpochStatus, error) {
+		return func(tx *badger.Txn) (*flow.EpochStatus, error) {
+			var status flow.EpochStatus
 			err := operation.RetrieveEpochStatus(blockID, &status)(tx)
 			return &status, err
 		}
@@ -35,8 +32,8 @@ func NewEpochStatuses(collector module.CacheMetrics, db *badger.DB) *EpochStatus
 
 	es := &EpochStatuses{
 		db: db,
-		cache: newCache(collector, metrics.ResourceEpochStatus,
-			withLimit(4*flow.DefaultTransactionExpiry),
+		cache: newCache[flow.Identifier, *flow.EpochStatus](collector, metrics.ResourceEpochStatus,
+			withLimit[flow.Identifier, *flow.EpochStatus](4*flow.DefaultTransactionExpiry),
 			withStore(store),
 			withRetrieve(retrieve)),
 	}
@@ -54,7 +51,7 @@ func (es *EpochStatuses) retrieveTx(blockID flow.Identifier) func(tx *badger.Txn
 		if err != nil {
 			return nil, err
 		}
-		return val.(*flow.EpochStatus), nil
+		return val, nil
 	}
 }
 

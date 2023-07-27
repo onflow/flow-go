@@ -17,28 +17,25 @@ import (
 type ChunkDataPacks struct {
 	db             *badger.DB
 	collections    storage.Collections
-	byChunkIDCache *Cache
+	byChunkIDCache *Cache[flow.Identifier, *badgermodel.StoredChunkDataPack]
 }
 
 func NewChunkDataPacks(collector module.CacheMetrics, db *badger.DB, collections storage.Collections, byChunkIDCacheSize uint) *ChunkDataPacks {
 
-	store := func(key interface{}, val interface{}) func(*transaction.Tx) error {
-		chdp := val.(*badgermodel.StoredChunkDataPack)
-		return transaction.WithTx(operation.SkipDuplicates(operation.InsertChunkDataPack(chdp)))
+	store := func(key flow.Identifier, val *badgermodel.StoredChunkDataPack) func(*transaction.Tx) error {
+		return transaction.WithTx(operation.SkipDuplicates(operation.InsertChunkDataPack(val)))
 	}
 
-	retrieve := func(key interface{}) func(tx *badger.Txn) (interface{}, error) {
-		chunkID := key.(flow.Identifier)
-
-		var c badgermodel.StoredChunkDataPack
-		return func(tx *badger.Txn) (interface{}, error) {
-			err := operation.RetrieveChunkDataPack(chunkID, &c)(tx)
+	retrieve := func(key flow.Identifier) func(tx *badger.Txn) (*badgermodel.StoredChunkDataPack, error) {
+		return func(tx *badger.Txn) (*badgermodel.StoredChunkDataPack, error) {
+			var c badgermodel.StoredChunkDataPack
+			err := operation.RetrieveChunkDataPack(key, &c)(tx)
 			return &c, err
 		}
 	}
 
-	cache := newCache(collector, metrics.ResourceChunkDataPack,
-		withLimit(byChunkIDCacheSize),
+	cache := newCache[flow.Identifier, *badgermodel.StoredChunkDataPack](collector, metrics.ResourceChunkDataPack,
+		withLimit[flow.Identifier, *badgermodel.StoredChunkDataPack](byChunkIDCacheSize),
 		withStore(store),
 		withRetrieve(retrieve),
 	)
@@ -135,7 +132,7 @@ func (ch *ChunkDataPacks) retrieveCHDP(chunkID flow.Identifier) func(*badger.Txn
 		if err != nil {
 			return nil, err
 		}
-		return val.(*badgermodel.StoredChunkDataPack), nil
+		return val, nil
 	}
 }
 
