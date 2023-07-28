@@ -18,7 +18,6 @@ import (
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/insecure"
 
-	"github.com/onflow/flow/protobuf/go/flow/access"
 	"github.com/onflow/go-bitswap"
 
 	"github.com/onflow/flow-go/admin/commands"
@@ -89,6 +88,8 @@ import (
 	"github.com/onflow/flow-go/storage"
 	bstorage "github.com/onflow/flow-go/storage/badger"
 	"github.com/onflow/flow-go/utils/grpcutils"
+
+	"github.com/onflow/flow/protobuf/go/flow/access"
 )
 
 // AccessNodeBuilder extends cmd.NodeBuilder and declares additional functions needed to bootstrap an Access node.
@@ -120,8 +121,6 @@ type AccessNodeConfig struct {
 	rpcConf                      rpc.Config
 	stateStreamBackend           *cstate_stream.StateStreamBackend
 	stateStreamConf              cstate_stream.Config
-	execDataBroadcaster          *engine.Broadcaster
-	executionDataCache           *execdatacache.ExecutionDataCache
 	stateStreamFilterConf        map[string]int
 	ExecutionNodeAddress         string // deprecated
 	HistoricalAccessRPCs         []access.AccessAPIClient
@@ -180,8 +179,6 @@ func DefaultAccessNodeConfig() *AccessNodeConfig {
 		},
 		stateStreamBackend:           nil,
 		stateStreamFilterConf:        nil,
-		execDataBroadcaster:          nil,
-		executionDataCache:           nil,
 		ExecutionNodeAddress:         "localhost:9000",
 		logTxTimeToFinalized:         false,
 		logTxTimeToExecuted:          false,
@@ -436,13 +433,14 @@ func (builder *FlowAccessNodeBuilder) BuildConsensusFollower() *FlowAccessNodeBu
 	return builder
 }
 
-func (builder *FlowAccessNodeBuilder) BuildExecutionDataRequester() *FlowAccessNodeBuilder {
+func (builder *FlowAccessNodeBuilder) BuildStateStreamPool() *FlowAccessNodeBuilder {
 	var ds *badger.Datastore
 	var bs network.BlobService
 	var processedBlockHeight storage.ConsumerProgress
 	var processedNotifications storage.ConsumerProgress
 	var bsDependable *module.ProxiedReadyDoneAware
 	var execDataDistributor *edrequester.ExecutionDataDistributor
+	var execDataCacheBackend *herocache.BlockExecutionData
 
 	builder.
 		AdminCommand("read-execution-data", func(config *cmd.NodeConfig) commands.AdminCommand {
@@ -551,11 +549,27 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionDataRequester() *FlowAccessN
 
 			execDataDistributor = edrequester.NewExecutionDataDistributor()
 
+			var heroCacheCollector module.HeroCacheMetrics = metrics.NewNoopCollector()
+			if builder.HeroCacheMetricsEnable {
+				heroCacheCollector = metrics.AccessNodeExecutionDataCacheMetrics(builder.MetricsRegisterer)
+			}
+
+			execDataCacheBackend = herocache.NewBlockExecutionData(builder.stateStreamConf.ExecutionDataCacheSize, builder.Logger, heroCacheCollector)
+			// Execution Data cache with a downloader as the backend. This is used by the requester
+			// to download and cache execution data for each block.
+			executionDataCache := execdatacache.NewExecutionDataCache(
+				builder.ExecutionDataDownloader,
+				builder.Storage.Headers,
+				builder.Storage.Seals,
+				builder.Storage.Results,
+				execDataCacheBackend,
+			)
+
 			builder.ExecutionDataRequester = edrequester.New(
 				builder.Logger,
 				metrics.NewExecutionDataRequesterCollector(),
 				builder.ExecutionDataDownloader,
-				builder.executionDataCache,
+				executionDataCache,
 				processedBlockHeight,
 				processedNotifications,
 				builder.State,
@@ -571,16 +585,61 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionDataRequester() *FlowAccessN
 
 	if builder.stateStreamConf.ListenAddr != "" {
 		builder.Component("exec state stream engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+			for key, value := range builder.stateStreamFilterConf {
+				switch key {
+				case "EventTypes":
+					builder.stateStreamConf.MaxEventTypes = value
+				case "Addresses":
+					builder.stateStreamConf.MaxAddresses = value
+				case "Contracts":
+					builder.stateStreamConf.MaxContracts = value
+				}
+			}
+			builder.stateStreamConf.RpcMetricsEnabled = builder.rpcMetricsEnabled
+
+			// Execution Data cache that uses a blobstore as the backend (instead of a downloader)
+			// This ensures that it simply returns a not found error if the blob doesn't exist
+			// instead of attempting to download it from the network. It shares a cache backend instance
+			// with the requester's implementation.
+			executionDataCache := execdatacache.NewExecutionDataCache(
+				builder.ExecutionDataStore,
+				builder.Storage.Headers,
+				builder.Storage.Seals,
+				builder.Storage.Results,
+				execDataCacheBackend,
+			)
+
+			highestAvailableHeight, err := builder.ExecutionDataRequester.HighestConsecutiveHeight()
+			if err != nil {
+				return nil, fmt.Errorf("could not get highest consecutive height: %w", err)
+			}
+			broadcaster := engine.NewBroadcaster()
+
+			builder.stateStreamBackend, err = cstate_stream.New(node.Logger,
+				builder.stateStreamConf,
+				node.State,
+				node.Storage.Headers,
+				node.Storage.Seals,
+				node.Storage.Results,
+				builder.ExecutionDataStore,
+				executionDataCache,
+				broadcaster,
+				builder.executionDataConfig.InitialBlockHeight,
+				highestAvailableHeight)
+
+			if err != nil {
+				return nil, fmt.Errorf("could not create state stream backend: %w", err)
+			}
 
 			stateStreamEng, err := state_stream.NewEng(
 				node.Logger,
 				builder.stateStreamConf,
-				builder.executionDataCache,
+				executionDataCache,
 				node.Storage.Headers,
 				node.RootChainID,
 				builder.stateStreamGrpcServer,
 				builder.stateStreamBackend,
-				builder.execDataBroadcaster,
+				broadcaster,
 			)
 			if err != nil {
 				return nil, fmt.Errorf("could not create state stream engine: %w", err)
@@ -859,6 +918,10 @@ func (builder *FlowAccessNodeBuilder) enqueueRelayNetwork() {
 }
 
 func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
+	if builder.executionDataSyncEnabled {
+		builder.BuildStateStreamPool()
+	}
+
 	builder.
 		BuildConsensusFollower().
 		Module("collection node client", func(node *cmd.NodeConfig) error {
@@ -992,72 +1055,6 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				builder.unsecureGrpcServer = builder.stateStreamGrpcServer
 			}
 
-			return nil
-		}).
-		Module("state stream backend", func(node *cmd.NodeConfig) error {
-			for key, value := range builder.stateStreamFilterConf {
-				switch key {
-				case "EventTypes":
-					builder.stateStreamConf.MaxEventTypes = value
-				case "Addresses":
-					builder.stateStreamConf.MaxAddresses = value
-				case "Contracts":
-					builder.stateStreamConf.MaxContracts = value
-				}
-			}
-			builder.stateStreamConf.RpcMetricsEnabled = builder.rpcMetricsEnabled
-
-			var heroCacheCollector module.HeroCacheMetrics = metrics.NewNoopCollector()
-			if builder.HeroCacheMetricsEnable {
-				heroCacheCollector = metrics.AccessNodeExecutionDataCacheMetrics(builder.MetricsRegisterer)
-			}
-
-			execDataCacheBackend := herocache.NewBlockExecutionData(builder.stateStreamConf.ExecutionDataCacheSize, builder.Logger, heroCacheCollector)
-			// Execution Data cache with a downloader as the backend. This is used by the requester
-			// to download and cache execution data for each block.
-			builder.executionDataCache = execdatacache.NewExecutionDataCache(
-				builder.ExecutionDataDownloader,
-				builder.Storage.Headers,
-				builder.Storage.Seals,
-				builder.Storage.Results,
-				execDataCacheBackend,
-			)
-
-			// Execution Data cache that uses a blobstore as the backend (instead of a downloader)
-			// This ensures that it simply returns a not found error if the blob doesn't exist
-			// instead of attempting to download it from the network. It shares a cache backend instance
-			// with the requester's implementation.
-			builder.executionDataCache = execdatacache.NewExecutionDataCache(
-				builder.ExecutionDataStore,
-				builder.Storage.Headers,
-				builder.Storage.Seals,
-				builder.Storage.Results,
-				execDataCacheBackend,
-			)
-
-			highestAvailableHeight, err := builder.ExecutionDataRequester.HighestConsecutiveHeight()
-			if err != nil {
-				return fmt.Errorf("could not get highest consecutive height: %w", err)
-			}
-
-			builder.execDataBroadcaster = engine.NewBroadcaster()
-
-			builder.stateStreamBackend, err = cstate_stream.New(
-				node.Logger,
-				builder.stateStreamConf,
-				node.State,
-				node.Storage.Headers,
-				node.Storage.Seals,
-				node.Storage.Results,
-				builder.ExecutionDataStore,
-				builder.executionDataCache,
-				builder.execDataBroadcaster,
-				builder.executionDataConfig.InitialBlockHeight,
-				highestAvailableHeight,
-			)
-			if err != nil {
-				return fmt.Errorf("could not create state stream backend: %w", err)
-			}
 			return nil
 		}).
 		Component("RPC engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
@@ -1203,10 +1200,6 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 
 			return syncRequestHandler, nil
 		})
-	}
-
-	if builder.executionDataSyncEnabled {
-		builder.BuildExecutionDataRequester()
 	}
 
 	builder.Component("secure grpc server", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {

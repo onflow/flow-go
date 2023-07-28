@@ -85,6 +85,11 @@ func (h *HttpHandler) errorHandler(w http.ResponseWriter, err error, errorLogger
 			h.errorResponse(w, http.StatusBadRequest, msg, errorLogger)
 			return
 		}
+		if se.Code() == codes.Unavailable {
+			msg := fmt.Sprintf("Failed to process request: %s", se.Message())
+			h.errorResponse(w, http.StatusServiceUnavailable, msg, errorLogger)
+			return
+		}
 	}
 
 	// stop going further - catch all error

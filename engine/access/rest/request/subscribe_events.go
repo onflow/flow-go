@@ -30,24 +30,29 @@ func (g *SubscribeEvents) Build(r *Request) error {
 	)
 }
 
-func (g *SubscribeEvents) Parse(rawBlockID string, rawStart string, rawTypes []string, rawAddresses []string, rawContracts []string) error {
-	var height Height
-	err := height.Parse(rawStart)
-	if err != nil {
-		return fmt.Errorf("invalid start height: %w", err)
-	}
-	g.StartHeight = height.Flow()
-
+func (g *SubscribeEvents) Parse(rawStartBlockID string, rawStartHeight string, rawTypes []string, rawAddresses []string, rawContracts []string) error {
 	var startBlockID ID
-	err = startBlockID.Parse(rawBlockID)
+	err := startBlockID.Parse(rawStartBlockID)
 	if err != nil {
 		return err
 	}
 	g.StartBlockID = startBlockID.Flow()
 
-	// if both height and one or both of start and end height are provided
-	if len(startBlockID) > 0 && g.StartHeight != EmptyHeight {
-		return fmt.Errorf("can only provide either block ID or start height range")
+	var height Height
+	err = height.Parse(rawStartHeight)
+	if err != nil {
+		return fmt.Errorf("invalid start height: %w", err)
+	}
+	g.StartHeight = height.Flow()
+
+	// if both start_block_id and start_height are provided
+	if g.StartBlockID != flow.ZeroID && g.StartHeight != EmptyHeight {
+		return fmt.Errorf("can only provide either block ID or start height")
+	}
+
+	// default to root block
+	if g.StartHeight == EmptyHeight {
+		g.StartHeight = 0
 	}
 
 	var eventTypes EventTypes

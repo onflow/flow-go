@@ -2,11 +2,11 @@ package routes
 
 import (
 	"net/http"
+	"sync/atomic"
 
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/engine/access/rest/request"
-	"github.com/onflow/flow-go/engine/access/rest/util"
 	"github.com/onflow/flow-go/engine/common/state_stream"
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -16,15 +16,26 @@ import (
 type SubscribeHandlerFunc func(
 	r *request.Request,
 	w http.ResponseWriter,
-	h *state_stream.SubscribeHandler,
-) (interface{}, error)
 
-// WSHandler is websocket handler implementing custom handler function and allows easier handling of errors and
+	logger zerolog.Logger,
+	api state_stream.API,
+	eventFilterConfig state_stream.EventFilterConfig,
+	maxStreams int32,
+	streamCount *atomic.Int32,
+	errorHandler func(w http.ResponseWriter, err error, errorLogger zerolog.Logger),
+	jsonResponse func(w http.ResponseWriter, code int, response interface{}, errLogger zerolog.Logger),
+)
+
+// WSHandler is websocket handler implementing custom websocket handler function and allows easier handling of errors and
 // responses as it wraps functionality for handling error and responses outside of endpoint handling.
 type WSHandler struct {
 	*HttpHandler
-	*state_stream.SubscribeHandler
 	subscribeFunc SubscribeHandlerFunc
+
+	api               state_stream.API
+	eventFilterConfig state_stream.EventFilterConfig
+	maxStreams        int32
+	streamCount       atomic.Int32
 }
 
 func NewWSHandler(
@@ -36,10 +47,14 @@ func NewWSHandler(
 	maxGlobalStreams uint32,
 ) *WSHandler {
 	handler := &WSHandler{
-		subscribeFunc: subscribeFunc,
+		subscribeFunc:     subscribeFunc,
+		api:               api,
+		eventFilterConfig: eventFilterConfig,
+		maxStreams:        int32(maxGlobalStreams),
+		streamCount:       atomic.Int32{},
 	}
 	handler.HttpHandler = NewHttpHandler(logger, chain)
-	handler.SubscribeHandler = state_stream.NewSubscribeHandler(api, chain, eventFilterConfig, maxGlobalStreams)
+
 	return handler
 }
 
@@ -55,19 +70,14 @@ func (h *WSHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	decoratedRequest := request.Decorate(r, h.HttpHandler.Chain)
 
-	response, err := h.subscribeFunc(decoratedRequest, w, h.SubscribeHandler)
-	if err != nil {
-		h.errorHandler(w, err, errLog)
-		return
-	}
+	h.subscribeFunc(decoratedRequest,
+		w,
+		errLog,
+		h.api,
+		h.eventFilterConfig,
+		h.maxStreams,
+		&h.streamCount,
+		h.errorHandler,
+		h.jsonResponse)
 
-	// apply the select filter if any select fields have been specified
-	response, err = util.SelectFilter(response, decoratedRequest.Selects())
-	if err != nil {
-		h.errorHandler(w, err, errLog)
-		return
-	}
-
-	// write response to response stream
-	h.jsonResponse(w, http.StatusOK, response, errLog)
 }

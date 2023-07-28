@@ -223,7 +223,14 @@ func (e *Engine) serveREST(ctx irrecoverable.SignalerContext, ready component.Re
 
 	e.log.Info().Str("rest_api_address", e.config.RESTListenAddr).Msg("starting REST server on address")
 
-	r, err := rest.NewServer(e.restHandler, e.config.RESTListenAddr, e.log, e.chain, e.restCollector, e.stateStreamBackend, e.eventFilterConfig, e.maxGlobalStreams)
+	r, err := rest.NewServer(e.restHandler,
+		e.config.RESTListenAddr,
+		e.log,
+		e.chain,
+		e.restCollector,
+		e.stateStreamBackend,
+		e.eventFilterConfig,
+		e.maxGlobalStreams)
 	if err != nil {
 		e.log.Err(err).Msg("failed to initialize the REST server")
 		ctx.Throw(err)

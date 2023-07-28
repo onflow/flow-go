@@ -44,13 +44,16 @@ func NewRouter(backend access.API,
 			Handler(h)
 	}
 
-	for _, r := range WSRoutes {
-		h := NewWSHandler(logger, r.Handler, chain, stateStreamApi, eventFilterConfig, maxGlobalStreams)
-		v1SubRouter.
-			Methods(r.Method).
-			Path(r.Pattern).
-			Name(r.Name).
-			Handler(h)
+	// Note: we add subscribe routes only if stateStreamApi is available
+	if stateStreamApi != nil {
+		for _, r := range WSRoutes {
+			h := NewWSHandler(logger, r.Handler, chain, stateStreamApi, eventFilterConfig, maxGlobalStreams)
+			v1SubRouter.
+				Methods(r.Method).
+				Path(r.Pattern).
+				Name(r.Name).
+				Handler(h)
+		}
 	}
 
 	return router, nil
@@ -143,7 +146,7 @@ var Routes = []route{{
 }}
 
 var WSRoutes = []wsroute{{
-	Method:  http.MethodPost,
+	Method:  http.MethodGet,
 	Pattern: "/subscribe_events",
 	Name:    "subscribeEvents",
 	Handler: SubscribeEvents,
