@@ -666,15 +666,18 @@ func (exeNode *ExecutionNode) LoadStopControl(
 	module.ReadyDoneAware,
 	error,
 ) {
-	ver, err := build.SemverV2()
+	ver, err := build.Semver()
 	if err != nil {
-		ver = nil
-		// TODO: In the future we want to error here, but for now we just log a warning.
-		// This is because we currently have no strong guarantee that then node version
-		// tag is semver compliant.
-		exeNode.builder.Logger.Warn().
+		err = fmt.Errorf("could not set semver version for stop control. "+
+			"version %s is not semver compliant: %w", build.Version(), err)
+
+		// The node would not know its own version. Without this the node would not know
+		// how to reach to version boundaries.
+		exeNode.builder.Logger.
 			Err(err).
-			Msg("could not set semver version for stop control")
+			Msg("error starting stop control")
+
+		return nil, err
 	}
 
 	latestFinalizedBlock, err := node.State.Final().Head()

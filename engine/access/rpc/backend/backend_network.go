@@ -57,7 +57,7 @@ func (b *backendNetwork) GetNodeVersionInfo(ctx context.Context) (*access.NodeVe
 	}
 
 	return &access.NodeVersionInfo{
-		Semver:          build.Semver(),
+		Semver:          build.Version(),
 		Commit:          build.Commit(),
 		SporkId:         sporkId,
 		ProtocolVersion: uint64(protocolVersion),

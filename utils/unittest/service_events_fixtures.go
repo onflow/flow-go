@@ -165,7 +165,7 @@ func VersionBeaconFixtureByChainID(chain flow.ChainID) (flow.Event, *flow.Versio
 		VersionBoundaries: []flow.VersionBoundary{
 			{
 				BlockHeight: 44,
-				Version:     "2.13.7",
+				Version:     "2.13.7-test",
 			},
 		},
 		Sequence: 5,
@@ -656,9 +656,9 @@ func createEpochCommittedEvent() cadence.Event {
 }
 
 func createVersionBeaconEvent() cadence.Event {
-	versionBoundaryType := newNodeVersionBeaconVersionBoundaryStructType()
+	versionBoundaryType := NewNodeVersionBeaconVersionBoundaryStructType()
 
-	semverType := newNodeVersionBeaconSemverStructType()
+	semverType := NewNodeVersionBeaconSemverStructType()
 
 	semver := cadence.NewStruct([]cadence.Value{
 		// major
@@ -671,7 +671,7 @@ func createVersionBeaconEvent() cadence.Event {
 		cadence.UInt8(7),
 
 		// preRelease
-		cadence.NewOptional(cadence.String("")),
+		cadence.NewOptional(cadence.String("test")),
 	}).WithType(semverType)
 
 	versionBoundary := cadence.NewStruct([]cadence.Value{
@@ -690,7 +690,7 @@ func createVersionBeaconEvent() cadence.Event {
 
 		// sequence
 		cadence.UInt64(5),
-	}).WithType(newNodeVersionBeaconVersionBeaconEventType())
+	}).WithType(NewNodeVersionBeaconVersionBeaconEventType())
 }
 
 func newFlowClusterQCVoteStructType() cadence.Type {
@@ -943,7 +943,7 @@ func newFlowClusterQCClusterQCStructType() *cadence.StructType {
 	}
 }
 
-func newNodeVersionBeaconVersionBeaconEventType() *cadence.EventType {
+func NewNodeVersionBeaconVersionBeaconEventType() *cadence.EventType {
 
 	// A.01cf0e2f2f715450.NodeVersionBeacon.VersionBeacon
 
@@ -956,7 +956,7 @@ func newNodeVersionBeaconVersionBeaconEventType() *cadence.EventType {
 		Fields: []cadence.Field{
 			{
 				Identifier: "versionBoundaries",
-				Type:       cadence.NewVariableSizedArrayType(newNodeVersionBeaconVersionBoundaryStructType()),
+				Type:       cadence.NewVariableSizedArrayType(NewNodeVersionBeaconVersionBoundaryStructType()),
 			},
 			{
 				Identifier: "sequence",
@@ -966,7 +966,7 @@ func newNodeVersionBeaconVersionBeaconEventType() *cadence.EventType {
 	}
 }
 
-func newNodeVersionBeaconVersionBoundaryStructType() *cadence.StructType {
+func NewNodeVersionBeaconVersionBoundaryStructType() *cadence.StructType {
 
 	// A.01cf0e2f2f715450.NodeVersionBeacon.VersionBoundary
 
@@ -983,13 +983,13 @@ func newNodeVersionBeaconVersionBoundaryStructType() *cadence.StructType {
 			},
 			{
 				Identifier: "version",
-				Type:       newNodeVersionBeaconSemverStructType(),
+				Type:       NewNodeVersionBeaconSemverStructType(),
 			},
 		},
 	}
 }
 
-func newNodeVersionBeaconSemverStructType() *cadence.StructType {
+func NewNodeVersionBeaconSemverStructType() *cadence.StructType {
 
 	// A.01cf0e2f2f715450.NodeVersionBeacon.Semver
 

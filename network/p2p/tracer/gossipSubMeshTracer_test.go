@@ -66,12 +66,14 @@ func TestGossipSubMeshTracer(t *testing.T) {
 	// meshTracer logs at 1 second intervals for sake of testing.
 	collector := mockmodule.NewGossipSubLocalMeshMetrics(t)
 	meshTracerCfg := &tracer.GossipSubMeshTracerConfig{
-		Logger:                       logger,
-		Metrics:                      collector,
-		IDProvider:                   idProvider,
-		LoggerInterval:               time.Second,
-		RpcSentTrackerCacheCollector: metrics.NewNoopCollector(),
-		RpcSentTrackerCacheSize:      defaultConfig.NetworkConfig.GossipSubConfig.RPCSentTrackerCacheSize,
+		Logger:                             logger,
+		Metrics:                            collector,
+		IDProvider:                         idProvider,
+		LoggerInterval:                     time.Second,
+		HeroCacheMetricsFactory:            metrics.NewNoopHeroCacheMetricsFactory(),
+		RpcSentTrackerCacheSize:            defaultConfig.NetworkConfig.GossipSubConfig.RPCSentTrackerCacheSize,
+		RpcSentTrackerWorkerQueueCacheSize: defaultConfig.NetworkConfig.GossipSubConfig.RPCSentTrackerQueueCacheSize,
+		RpcSentTrackerNumOfWorkers:         defaultConfig.NetworkConfig.GossipSubConfig.RpcSentTrackerNumOfWorkers,
 	}
 	meshTracer := tracer.NewGossipSubMeshTracer(meshTracerCfg)
 	tracerNode, tracerId := p2ptest.NodeFixture(

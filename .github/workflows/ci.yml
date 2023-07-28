@@ -18,7 +18,7 @@ on:
 env:
   GO_VERSION: "1.20"
 
-concurrency: 
+concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
   cancel-in-progress: true
 
@@ -203,6 +203,9 @@ jobs:
     steps:
     - name: Checkout repo
       uses: actions/checkout@v3
+      with:
+          # all tags are needed for integration tests
+          fetch-depth: 0
     - name: Setup Go
       uses: actions/setup-go@v3
       with:
