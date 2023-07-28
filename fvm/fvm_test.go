@@ -2822,7 +2822,7 @@ func TestEntropyCallOnlyOkIfAllowed(t *testing.T) {
 		newVMTest().
 			withBootstrapProcedureOptions().
 			withContextOptions(
-				fvm.WithBlockEntropyCallAllowed(allowed),
+				fvm.WithRandomSourceHistoryCallAllowed(allowed),
 				fvm.WithEntropyProvider(source),
 			).
 			run(func(
@@ -2836,7 +2836,7 @@ func TestEntropyCallOnlyOkIfAllowed(t *testing.T) {
 					SetScript([]byte(`
 						transaction {
 						  prepare() {
-							entropy()
+							randomSourceHistory()
 						  }
 						}
 					`)).
@@ -2876,7 +2876,7 @@ func TestEntropyCallExpectsNoParameters(t *testing.T) {
 	newVMTest().
 		withBootstrapProcedureOptions().
 		withContextOptions(
-			fvm.WithBlockEntropyCallAllowed(true),
+			fvm.WithRandomSourceHistoryCallAllowed(true),
 			fvm.WithEntropyProvider(source),
 		).
 		run(func(
@@ -2890,7 +2890,7 @@ func TestEntropyCallExpectsNoParameters(t *testing.T) {
 				SetScript([]byte(`
 						transaction {
 						  prepare() {
-							entropy("foo")
+							randomSourceHistory("foo")
 						  }
 						}
 					`)).

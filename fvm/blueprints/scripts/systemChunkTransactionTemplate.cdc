@@ -1,6 +1,6 @@
 import FlowEpoch from 0xEPOCHADDRESS
 import NodeVersionBeacon from 0xNODEVERSIONBEACONADDRESS
-import SourceOfRandomness from 0xSORADDRESS
+import SourceOfRandomnessHistory from 0xSORHISTORYADDRESS
 
 transaction {
     prepare(serviceAccount: AuthAccount) {
@@ -13,9 +13,10 @@ transaction {
                 ?? panic("Couldn't borrow NodeVersionBeacon.Heartbeat Resource")
         versionBeaconHeartbeat.heartbeat()
 
-        let sourceOfRandomnessHeartbeat = serviceAccount.borrow<&SourceOfRandomness.Heartbeat>(
-            from: SourceOfRandomness.HeartbeatStoragePath)
-                ?? panic("Couldn't borrow SourceOfRandomness.Heartbeat Resource")
-        sourceOfRandomnessHeartbeat.heartbeat()
+        let sourceOfRandomnessHistoryHeartbeat = serviceAccount.borrow<&SourceOfRandomnessHistory.Heartbeat>(
+            from: SourceOfRandomnessHistory.HeartbeatStoragePath)
+                ?? panic("Couldn't borrow SourceOfRandomnessHistory.Heartbeat Resource")
+        let sor = randomSourceHistory()
+        sourceOfRandomnessHistoryHeartbeat.heartbeat(randomSourceHistory: sor)
     }
 }
