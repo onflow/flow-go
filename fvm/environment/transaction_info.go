@@ -96,6 +96,8 @@ func (info ParseRestrictedTransactionInfo) GetSigningAccounts() (
 		info.impl.GetSigningAccounts)
 }
 
+var _ TransactionInfo = &transactionInfo{}
+
 type transactionInfo struct {
 	params TransactionInfoParams
 

@@ -24,7 +24,7 @@ type ScriptProcedure struct {
 }
 
 func Script(code []byte) *ScriptProcedure {
-	scriptHash := hash.DefaultHasher.ComputeHash(code)
+	scriptHash := hash.DefaultComputeHash(code)
 
 	return &ScriptProcedure{
 		Script:         code,
@@ -58,7 +58,7 @@ func NewScriptWithContextAndArgs(
 	reqContext context.Context,
 	args ...[]byte,
 ) *ScriptProcedure {
-	scriptHash := hash.DefaultHasher.ComputeHash(code)
+	scriptHash := hash.DefaultComputeHash(code)
 	return &ScriptProcedure{
 		ID:             flow.HashToID(scriptHash),
 		Script:         code,
@@ -121,6 +121,10 @@ func newScriptExecutor(
 	proc *ScriptProcedure,
 	txnState storage.TransactionPreparer,
 ) *scriptExecutor {
+	// update `ctx.EnvironmentParams` with the script info before
+	// creating the executor
+	scriptInfo := environment.NewScriptInfoParams(proc.Script, proc.Arguments)
+	ctx.EnvironmentParams.SetScriptInfoParams(scriptInfo)
 	return &scriptExecutor{
 		ctx:      ctx,
 		proc:     proc,

@@ -66,7 +66,7 @@ var _ network.MessageProcessor = (*Engine)(nil)
 func New(
 	log zerolog.Logger,
 	metrics module.EngineMetrics,
-	net network.Network,
+	net network.EngineRegistry,
 	me module.Local,
 	state protocol.State,
 	requestQueue engine.MessageStore,

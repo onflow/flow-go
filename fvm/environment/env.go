@@ -32,7 +32,7 @@ type Environment interface {
 	TransactionInfo
 
 	// ProgramLogger
-	Logger() *zerolog.Logger
+	Logger() zerolog.Logger
 	Logs() []string
 
 	// EventEmitter
@@ -102,6 +102,7 @@ type EnvironmentParams struct {
 
 	BlockInfoParams
 	TransactionInfoParams
+	ScriptInfoParams
 
 	EntropyProvider
 
@@ -120,4 +121,8 @@ func DefaultEnvironmentParams() EnvironmentParams {
 		TransactionInfoParams: DefaultTransactionInfoParams(),
 		ContractUpdaterParams: DefaultContractUpdaterParams(),
 	}
+}
+
+func (env *EnvironmentParams) SetScriptInfoParams(info *ScriptInfoParams) {
+	env.ScriptInfoParams = *info
 }

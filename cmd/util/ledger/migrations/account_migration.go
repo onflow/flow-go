@@ -7,6 +7,7 @@ import (
 
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/ledger"
+	"github.com/onflow/flow-go/ledger/common/convert"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -15,7 +16,7 @@ func MigrateAccountUsage(payloads []ledger.Payload, nWorker int) ([]ledger.Paylo
 }
 
 func payloadSize(key ledger.Key, payload ledger.Payload) (uint64, error) {
-	id, err := KeyToRegisterID(key)
+	id, err := convert.LedgerKeyToRegisterID(key)
 	if err != nil {
 		return 0, err
 	}

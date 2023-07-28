@@ -199,6 +199,10 @@ func (nc *NoopCollector) RuntimeTransactionProgramsCacheHit()                   
 func (nc *NoopCollector) ScriptExecuted(dur time.Duration, size int)                       {}
 func (nc *NoopCollector) ScriptExecutionErrorOnArchiveNode()                               {}
 func (nc *NoopCollector) ScriptExecutionErrorOnExecutionNode()                             {}
+func (nc *NoopCollector) ScriptExecutionResultMismatch()                                   {}
+func (nc *NoopCollector) ScriptExecutionResultMatch()                                      {}
+func (nc *NoopCollector) ScriptExecutionErrorMismatch()                                    {}
+func (nc *NoopCollector) ScriptExecutionErrorMatch()                                       {}
 func (nc *NoopCollector) TransactionResultFetched(dur time.Duration, size int)             {}
 func (nc *NoopCollector) TransactionReceived(txID flow.Identifier, when time.Time)         {}
 func (nc *NoopCollector) TransactionFinalized(txID flow.Identifier, when time.Time)        {}
@@ -299,10 +303,8 @@ func (nc *NoopCollector) OnIPColocationFactorUpdated(f float64)                 
 func (nc *NoopCollector) OnAppSpecificScoreUpdated(f float64)                              {}
 func (nc *NoopCollector) OnOverallPeerScoreUpdated(f float64)                              {}
 
-func (nc *NoopCollector) BlockingPreProcessingStarted(string, uint)                 {}
-func (nc *NoopCollector) BlockingPreProcessingFinished(string, uint, time.Duration) {}
-func (nc *NoopCollector) AsyncProcessingStarted(string)                             {}
-func (nc *NoopCollector) AsyncProcessingFinished(string, time.Duration)             {}
+func (nc *NoopCollector) AsyncProcessingStarted()               {}
+func (nc *NoopCollector) AsyncProcessingFinished(time.Duration) {}
 
 func (nc *NoopCollector) OnMisbehaviorReported(string, string) {}
 func (nc *NoopCollector) OnViolationReportSkipped()            {}

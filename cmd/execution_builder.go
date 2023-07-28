@@ -13,6 +13,7 @@ import (
 
 	awsconfig "github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
+	badgerDB "github.com/dgraph-io/badger/v2"
 	"github.com/ipfs/go-cid"
 	badger "github.com/ipfs/go-ds-badger2"
 	"github.com/onflow/flow-core-contracts/lib/go/templates"
@@ -47,6 +48,8 @@ import (
 	"github.com/onflow/flow-go/engine/execution/computation"
 	"github.com/onflow/flow-go/engine/execution/computation/committer"
 	"github.com/onflow/flow-go/engine/execution/ingestion"
+	"github.com/onflow/flow-go/engine/execution/ingestion/fetcher"
+	"github.com/onflow/flow-go/engine/execution/ingestion/loader"
 	"github.com/onflow/flow-go/engine/execution/ingestion/stop"
 	"github.com/onflow/flow-go/engine/execution/ingestion/uploader"
 	exeprovider "github.com/onflow/flow-go/engine/execution/provider"
@@ -82,6 +85,7 @@ import (
 	storageerr "github.com/onflow/flow-go/storage"
 	storage "github.com/onflow/flow-go/storage/badger"
 	"github.com/onflow/flow-go/storage/badger/procedure"
+	sutil "github.com/onflow/flow-go/storage/util"
 )
 
 const (
@@ -334,7 +338,7 @@ func (exeNode *ExecutionNode) LoadBlobService(
 		opts = append(opts, blob.WithRateLimit(float64(exeNode.exeConf.blobstoreRateLimit), exeNode.exeConf.blobstoreBurstLimit))
 	}
 
-	bs, err := node.Network.RegisterBlobService(channels.ExecutionDataService, exeNode.executionDataDatastore, opts...)
+	bs, err := node.EngineRegistry.RegisterBlobService(channels.ExecutionDataService, exeNode.executionDataDatastore, opts...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to register blob service: %w", err)
 	}
@@ -513,7 +517,7 @@ func (exeNode *ExecutionNode) LoadProviderEngine(
 	exeNode.providerEngine, err = exeprovider.New(
 		node.Logger,
 		node.Tracer,
-		node.Network,
+		node.EngineRegistry,
 		node.State,
 		exeNode.executionState,
 		exeNode.collector,
@@ -627,6 +631,30 @@ func (exeNode *ExecutionNode) LoadExecutionDataGetter(node *NodeConfig) error {
 	return nil
 }
 
+func openChunkDataPackDB(dbPath string, logger zerolog.Logger) (*badgerDB.DB, error) {
+	log := sutil.NewLogger(logger)
+
+	opts := badgerDB.
+		DefaultOptions(dbPath).
+		WithKeepL0InMemory(true).
+		WithLogger(log).
+
+		// the ValueLogFileSize option specifies how big the value of a
+		// key-value pair is allowed to be saved into badger.
+		// exceeding this limit, will fail with an error like this:
+		// could not store data: Value with size <xxxx> exceeded 1073741824 limit
+		// Maximum value size is 10G, needed by execution node
+		// TODO: finding a better max value for each node type
+		WithValueLogFileSize(256 << 23).
+		WithValueLogMaxEntries(100000) // Default is 1000000
+
+	db, err := badgerDB.Open(opts)
+	if err != nil {
+		return nil, fmt.Errorf("could not open chunk data pack badger db at path %v: %w", dbPath, err)
+	}
+	return db, nil
+}
+
 func (exeNode *ExecutionNode) LoadExecutionState(
 	node *NodeConfig,
 ) (
@@ -634,7 +662,17 @@ func (exeNode *ExecutionNode) LoadExecutionState(
 	error,
 ) {
 
-	chunkDataPacks := storage.NewChunkDataPacks(node.Metrics.Cache, node.DB, node.Storage.Collections, exeNode.exeConf.chunkDataPackCacheSize)
+	chunkDataPackDB, err := openChunkDataPackDB(exeNode.exeConf.chunkDataPackDir, node.Logger)
+	if err != nil {
+		return nil, err
+	}
+	exeNode.builder.ShutdownFunc(func() error {
+		if err := chunkDataPackDB.Close(); err != nil {
+			return fmt.Errorf("error closing chunk data pack database: %w", err)
+		}
+		return nil
+	})
+	chunkDataPacks := storage.NewChunkDataPacks(node.Metrics.Cache, chunkDataPackDB, node.Storage.Collections, exeNode.exeConf.chunkDataPackCacheSize)
 
 	// Needed for gRPC server, make sure to assign to main scoped vars
 	exeNode.events = storage.NewEvents(node.Metrics.Cache, node.DB)
@@ -666,15 +704,18 @@ func (exeNode *ExecutionNode) LoadStopControl(
 	module.ReadyDoneAware,
 	error,
 ) {
-	ver, err := build.SemverV2()
+	ver, err := build.Semver()
 	if err != nil {
-		ver = nil
-		// TODO: In the future we want to error here, but for now we just log a warning.
-		// This is because we currently have no strong guarantee that then node version
-		// tag is semver compliant.
-		exeNode.builder.Logger.Warn().
+		err = fmt.Errorf("could not set semver version for stop control. "+
+			"version %s is not semver compliant: %w", build.Version(), err)
+
+		// The node would not know its own version. Without this the node would not know
+		// how to reach to version boundaries.
+		exeNode.builder.Logger.
 			Err(err).
-			Msg("could not set semver version for stop control")
+			Msg("error starting stop control")
+
+		return nil, err
 	}
 
 	latestFinalizedBlock, err := node.State.Final().Head()
@@ -810,7 +851,7 @@ func (exeNode *ExecutionNode) LoadIngestionEngine(
 	error,
 ) {
 	var err error
-	exeNode.collectionRequester, err = requester.New(node.Logger, node.Metrics.Engine, node.Network, node.Me, node.State,
+	exeNode.collectionRequester, err = requester.New(node.Logger, node.Metrics.Engine, node.EngineRegistry, node.Me, node.State,
 		channels.RequestCollections,
 		filter.Any,
 		func() flow.Entity { return &flow.Collection{} },
@@ -825,30 +866,28 @@ func (exeNode *ExecutionNode) LoadIngestionEngine(
 		return nil, fmt.Errorf("could not create requester engine: %w", err)
 	}
 
+	fetcher := fetcher.NewCollectionFetcher(node.Logger, exeNode.collectionRequester, node.State, exeNode.exeConf.onflowOnlyLNs)
+	loader := loader.NewLoader(node.Logger, node.State, node.Storage.Headers, exeNode.executionState)
+
 	exeNode.ingestionEng, err = ingestion.New(
 		exeNode.ingestionUnit,
 		node.Logger,
-		node.Network,
+		node.EngineRegistry,
 		node.Me,
-		exeNode.collectionRequester,
-		node.State,
+		fetcher,
 		node.Storage.Headers,
 		node.Storage.Blocks,
 		node.Storage.Collections,
-		exeNode.events,
-		exeNode.serviceEvents,
-		exeNode.txResults,
 		exeNode.computationManager,
 		exeNode.providerEngine,
 		exeNode.executionState,
 		exeNode.collector,
 		node.Tracer,
 		exeNode.exeConf.extensiveLog,
-		exeNode.checkAuthorizedAtBlock,
 		exeNode.executionDataPruner,
 		exeNode.blockDataUploader,
 		exeNode.stopControl,
-		exeNode.exeConf.onflowOnlyLNs,
+		loader,
 	)
 
 	// TODO: we should solve these mutual dependencies better
@@ -862,11 +901,11 @@ func (exeNode *ExecutionNode) LoadIngestionEngine(
 
 // create scripts engine for handling script execution
 func (exeNode *ExecutionNode) LoadScriptsEngine(node *NodeConfig) (module.ReadyDoneAware, error) {
-	// for RPC to load it
+
 	exeNode.scriptsEng = scripts.New(
 		node.Logger,
 		node.State,
-		exeNode.computationManager,
+		exeNode.computationManager.QueryExecutor(),
 		exeNode.executionState,
 	)
 
@@ -962,7 +1001,7 @@ func (exeNode *ExecutionNode) LoadFollowerEngine(
 
 	exeNode.followerEng, err = followereng.NewComplianceLayer(
 		node.Logger,
-		node.Network,
+		node.EngineRegistry,
 		node.Me,
 		node.Metrics.Engine,
 		node.Storage.Headers,
@@ -1009,7 +1048,7 @@ func (exeNode *ExecutionNode) LoadReceiptProviderEngine(
 	eng, err := provider.New(
 		node.Logger,
 		node.Metrics.Engine,
-		node.Network,
+		node.EngineRegistry,
 		node.Me,
 		node.State,
 		receiptRequestQueue,
@@ -1035,13 +1074,14 @@ func (exeNode *ExecutionNode) LoadSynchronizationEngine(
 	exeNode.syncEngine, err = synchronization.New(
 		node.Logger,
 		node.Metrics.Engine,
-		node.Network,
+		node.EngineRegistry,
 		node.Me,
 		node.State,
 		node.Storage.Blocks,
 		exeNode.followerEng,
 		exeNode.syncCore,
 		node.SyncEngineIdentifierProvider,
+		synchronization.NewSpamDetectionConfig(),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("could not initialize synchronization engine: %w", err)

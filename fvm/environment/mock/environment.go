@@ -982,16 +982,14 @@ func (_m *Environment) LimitAccountStorage() bool {
 }
 
 // Logger provides a mock function with given fields:
-func (_m *Environment) Logger() *zerolog.Logger {
+func (_m *Environment) Logger() zerolog.Logger {
 	ret := _m.Called()
 
-	var r0 *zerolog.Logger
-	if rf, ok := ret.Get(0).(func() *zerolog.Logger); ok {
+	var r0 zerolog.Logger
+	if rf, ok := ret.Get(0).(func() zerolog.Logger); ok {
 		r0 = rf()
 	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*zerolog.Logger)
-		}
+		r0 = ret.Get(0).(zerolog.Logger)
 	}
 
 	return r0
@@ -1093,30 +1091,18 @@ func (_m *Environment) ProgramLog(_a0 string) error {
 	return r0
 }
 
-// RandomSourceHistory provides a mock function with given fields:
-func (_m *Environment) RandomSourceHistory() ([]byte, error) {
-	ret := _m.Called()
+// ReadRandom provides a mock function with given fields: _a0
+func (_m *Environment) ReadRandom(_a0 []byte) error {
+	ret := _m.Called(_a0)
 
-	var r0 []byte
-	var r1 error
-	if rf, ok := ret.Get(0).(func() ([]byte, error)); ok {
-		return rf()
-	}
-	if rf, ok := ret.Get(0).(func() []byte); ok {
-		r0 = rf()
+	var r0 error
+	if rf, ok := ret.Get(0).(func([]byte) error); ok {
+		r0 = rf(_a0)
 	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]byte)
-		}
+		r0 = ret.Error(0)
 	}
 
-	if rf, ok := ret.Get(1).(func() error); ok {
-		r1 = rf()
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
+	return r0
 }
 
 // RecordTrace provides a mock function with given fields: operation, location, duration, attrs
@@ -1343,30 +1329,6 @@ func (_m *Environment) TxIndex() uint32 {
 	}
 
 	return r0
-}
-
-// UnsafeRandom provides a mock function with given fields:
-func (_m *Environment) UnsafeRandom() (uint64, error) {
-	ret := _m.Called()
-
-	var r0 uint64
-	var r1 error
-	if rf, ok := ret.Get(0).(func() (uint64, error)); ok {
-		return rf()
-	}
-	if rf, ok := ret.Get(0).(func() uint64); ok {
-		r0 = rf()
-	} else {
-		r0 = ret.Get(0).(uint64)
-	}
-
-	if rf, ok := ret.Get(1).(func() error); ok {
-		r1 = rf()
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
 }
 
 // UpdateAccountContractCode provides a mock function with given fields: location, code

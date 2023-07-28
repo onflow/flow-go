@@ -109,7 +109,7 @@ type blockComputer struct {
 	log                   zerolog.Logger
 	systemChunkCtx        fvm.Context
 	committer             ViewCommitter
-	executionDataProvider *provider.Provider
+	executionDataProvider provider.Provider
 	signer                module.Local
 	spockHasher           hash.Hasher
 	receiptHasher         hash.Hasher
@@ -143,7 +143,7 @@ func NewBlockComputer(
 	logger zerolog.Logger,
 	committer ViewCommitter,
 	signer module.Local,
-	executionDataProvider *provider.Provider,
+	executionDataProvider provider.Provider,
 	colResCons []result.ExecutedCollectionConsumer,
 	state protocol.State,
 	maxConcurrency int,
@@ -205,6 +205,7 @@ func (e *blockComputer) queueTransactionRequests(
 	rawCollections []*entity.CompleteCollection,
 	systemTxnBody *flow.TransactionBody,
 	requestQueue chan TransactionRequest,
+	numTxns int,
 ) {
 	txnIndex := uint32(0)
 
@@ -265,6 +266,8 @@ func (e *blockComputer) queueTransactionRequests(
 		Uint64("height", blockHeader.Height).
 		Bool("system_chunk", true).
 		Bool("system_transaction", true).
+		Int("num_collections", len(rawCollections)).
+		Int("num_txs", numTxns).
 		Logger()
 	systemCollectionInfo := collectionInfo{
 		blockId:         blockId,
@@ -360,7 +363,9 @@ func (e *blockComputer) executeBlock(
 		block.Block.Header,
 		rawCollections,
 		systemTxn,
-		requestQueue)
+		requestQueue,
+		numTxns,
+	)
 	close(requestQueue)
 
 	wg := &sync.WaitGroup{}

@@ -7,12 +7,13 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
+	"github.com/onflow/flow-go/ledger/common/testutils"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-func TestConvertBlockExecutionData1(t *testing.T) {
+func TestConvertBlockExecutionData(t *testing.T) {
 	t.Parallel()
 
 	chain := flow.Testnet.Chain() // this is used by the AddressFixture
@@ -21,7 +22,13 @@ func TestConvertBlockExecutionData1(t *testing.T) {
 	chunks := 5
 	chunkData := make([]*execution_data.ChunkExecutionData, 0, chunks)
 	for i := 0; i < chunks-1; i++ {
-		chunkData = append(chunkData, unittest.ChunkExecutionDataFixture(t, execution_data.DefaultMaxBlobSize/5, unittest.WithChunkEvents(events)))
+		ced := unittest.ChunkExecutionDataFixture(t,
+			0, // updates set explicitly to target 160-320KB per chunk
+			unittest.WithChunkEvents(events),
+			unittest.WithTrieUpdate(testutils.TrieUpdateFixture(5, 32*1024, 64*1024)),
+		)
+
+		chunkData = append(chunkData, ced)
 	}
 	makeServiceTx := func(ced *execution_data.ChunkExecutionData) {
 		// proposal key and payer are empty addresses for service tx
@@ -38,23 +45,80 @@ func TestConvertBlockExecutionData1(t *testing.T) {
 
 	blockData := unittest.BlockExecutionDataFixture(unittest.WithChunkExecutionDatas(chunkData...))
 
-	t.Run("chunk execution data conversions", func(t *testing.T) {
-		chunkMsg, err := convert.ChunkExecutionDataToMessage(chunkData[0])
-		require.NoError(t, err)
+	msg, err := convert.BlockExecutionDataToMessage(blockData)
+	require.NoError(t, err)
 
-		chunkReConverted, err := convert.MessageToChunkExecutionData(chunkMsg, flow.Testnet.Chain())
-		require.NoError(t, err)
+	converted, err := convert.MessageToBlockExecutionData(msg, chain)
+	require.NoError(t, err)
 
-		assert.Equal(t, chunkData[0], chunkReConverted)
-	})
+	assert.Equal(t, blockData, converted)
+	for i, chunk := range blockData.ChunkExecutionDatas {
+		if chunk.TrieUpdate == nil {
+			assert.Nil(t, converted.ChunkExecutionDatas[i].TrieUpdate)
+		} else {
+			assert.True(t, chunk.TrieUpdate.Equals(converted.ChunkExecutionDatas[i].TrieUpdate))
+		}
+	}
+}
 
-	t.Run("block execution data conversions", func(t *testing.T) {
-		msg, err := convert.BlockExecutionDataToMessage(blockData)
-		require.NoError(t, err)
+func TestConvertChunkExecutionData(t *testing.T) {
+	tests := []struct {
+		name string
+		fn   func(*testing.T) *execution_data.ChunkExecutionData
+	}{
+		{
+			name: "chunk execution data conversions",
+			fn: func(t *testing.T) *execution_data.ChunkExecutionData {
+				return unittest.ChunkExecutionDataFixture(t,
+					0, // updates set explicitly to target 160-320KB per chunk
+					unittest.WithChunkEvents(unittest.EventsFixture(5)),
+					unittest.WithTrieUpdate(testutils.TrieUpdateFixture(5, 32*1024, 64*1024)),
+				)
+			},
+		},
+		{
+			name: "chunk execution data conversions - no events",
+			fn: func(t *testing.T) *execution_data.ChunkExecutionData {
+				ced := unittest.ChunkExecutionDataFixture(t, 0)
+				ced.Events = nil
+				return ced
+			},
+		},
+		{
+			name: "chunk execution data conversions - no trie update",
+			fn: func(t *testing.T) *execution_data.ChunkExecutionData {
+				ced := unittest.ChunkExecutionDataFixture(t, 0)
+				ced.TrieUpdate = nil
+				return ced
+			},
+		},
+		{
+			name: "chunk execution data conversions - empty collection",
+			fn: func(t *testing.T) *execution_data.ChunkExecutionData {
+				ced := unittest.ChunkExecutionDataFixture(t, 0)
+				ced.Collection = &flow.Collection{}
+				ced.TransactionResults = nil
+				return ced
+			},
+		},
+	}
 
-		converted, err := convert.MessageToBlockExecutionData(msg, chain)
-		require.NoError(t, err)
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			ced := test.fn(t)
 
-		assert.Equal(t, blockData, converted)
-	})
+			chunkMsg, err := convert.ChunkExecutionDataToMessage(ced)
+			require.NoError(t, err)
+
+			chunkReConverted, err := convert.MessageToChunkExecutionData(chunkMsg, flow.Testnet.Chain())
+			require.NoError(t, err)
+
+			assert.Equal(t, ced, chunkReConverted)
+			if ced.TrieUpdate == nil {
+				assert.Nil(t, chunkReConverted.TrieUpdate)
+			} else {
+				assert.True(t, ced.TrieUpdate.Equals(chunkReConverted.TrieUpdate))
+			}
+		})
+	}
 }
