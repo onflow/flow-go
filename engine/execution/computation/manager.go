@@ -93,7 +93,7 @@ func New(
 	protoState protocol.State,
 	vmCtx fvm.Context,
 	committer computer.ViewCommitter,
-	executionDataProvider *provider.Provider,
+	executionDataProvider provider.Provider,
 	params ComputationConfig,
 ) (*Manager, error) {
 	log := logger.With().Str("engine", "computation").Logger()

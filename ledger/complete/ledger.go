@@ -200,7 +200,11 @@ func (l *Ledger) Set(update *ledger.Update) (newState ledger.State, trieUpdate *
 	// TODO: add test case
 	if update.Size() == 0 {
 		// return current state root unchanged
-		return update.State(), nil, nil
+		return update.State(), &ledger.TrieUpdate{
+			RootHash: ledger.RootHash(update.State()),
+			Paths:    make([]ledger.Path, 0),
+			Payloads: make([]*ledger.Payload, 0),
+		}, nil
 	}
 
 	trieUpdate, err = pathfinder.UpdateToTrieUpdate(update, l.pathFinderVersion)

@@ -68,13 +68,13 @@ func NewExecutionDataStore(blobstore blobs.Blobstore, serializer Serializer, opt
 // then returns the rootID.
 // No errors are expected during normal operation.
 func (s *store) Add(ctx context.Context, executionData *BlockExecutionData) (flow.Identifier, error) {
-	executionDataRoot := &BlockExecutionDataRoot{
+	executionDataRoot := &flow.BlockExecutionDataRoot{
 		BlockID:               executionData.BlockID,
 		ChunkExecutionDataIDs: make([]cid.Cid, len(executionData.ChunkExecutionDatas)),
 	}
 
 	for i, chunkExecutionData := range executionData.ChunkExecutionDatas {
-		chunkExecutionDataID, err := s.addChunkExecutionData(ctx, chunkExecutionData)
+		chunkExecutionDataID, err := s.AddChunkExecutionData(ctx, chunkExecutionData)
 		if err != nil {
 			return flow.ZeroID, fmt.Errorf("could not add chunk execution data at index %d: %w", i, err)
 		}
@@ -114,7 +114,7 @@ func (s *store) Add(ctx context.Context, executionData *BlockExecutionData) (flo
 // addChunkExecutionData constructs a blob tree for the given ChunkExecutionData, adds it to the
 // blobstore, and returns the root CID.
 // No errors are expected during normal operation.
-func (s *store) addChunkExecutionData(ctx context.Context, chunkExecutionData *ChunkExecutionData) (cid.Cid, error) {
+func (s *store) AddChunkExecutionData(ctx context.Context, chunkExecutionData *ChunkExecutionData) (cid.Cid, error) {
 	var v interface{} = chunkExecutionData
 
 	// given an arbitrarily large v, split it into blobs of size up to maxBlobSize, adding them to
@@ -195,9 +195,9 @@ func (s *store) Get(ctx context.Context, rootID flow.Identifier) (*BlockExecutio
 		return nil, NewMalformedDataError(err)
 	}
 
-	executionDataRoot, ok := rootData.(*BlockExecutionDataRoot)
+	executionDataRoot, ok := rootData.(*flow.BlockExecutionDataRoot)
 	if !ok {
-		return nil, NewMalformedDataError(fmt.Errorf("root blob does not deserialize to a BlockExecutionDataRoot, got %T instead", rootData))
+		return nil, NewMalformedDataError(fmt.Errorf("root blob does not deserialize to a flow.BlockExecutionDataRoot, got %T instead", rootData))
 	}
 
 	// next, get each chunk blob and deserialize it

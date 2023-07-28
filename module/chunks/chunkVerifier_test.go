@@ -1,9 +1,11 @@
 package chunks_test
 
 import (
+	"context"
 	"fmt"
 	"testing"
 
+	"github.com/ipfs/go-cid"
 	"github.com/onflow/cadence/runtime"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
@@ -16,13 +18,17 @@ import (
 	"github.com/onflow/flow-go/fvm/storage"
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/ledger"
+	"github.com/onflow/flow-go/ledger/common/pathfinder"
 	completeLedger "github.com/onflow/flow-go/ledger/complete"
 	"github.com/onflow/flow-go/ledger/complete/wal/fixtures"
+	"github.com/onflow/flow-go/ledger/partial"
 	chunksmodels "github.com/onflow/flow-go/model/chunks"
 	"github.com/onflow/flow-go/model/convert"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/verification"
 	"github.com/onflow/flow-go/module/chunks"
+	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
+	"github.com/onflow/flow-go/module/executiondatasync/provider"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -56,6 +62,8 @@ var serviceEventsList = []flow.ServiceEvent{
 	*epochSetupServiceEvent,
 }
 
+var executionDataCIDProvider = provider.NewExecutionDataCIDProvider(execution_data.DefaultSerializer)
+
 type ChunkVerifierTestSuite struct {
 	suite.Suite
 	verifier          *chunks.ChunkVerifier
@@ -85,10 +93,11 @@ func TestChunkVerifier(t *testing.T) {
 
 // TestHappyPath tests verification of the baseline verifiable chunk
 func (s *ChunkVerifierTestSuite) TestHappyPath() {
-	vch := GetBaselineVerifiableChunk(s.T(), "", false)
-	assert.NotNil(s.T(), vch)
+	vch, _ := GetBaselineVerifiableChunk(s.T(), "", false)
+	require.NotNil(s.T(), vch)
+
 	spockSecret, chFaults, err := s.verifier.Verify(vch)
-	assert.Nil(s.T(), err)
+	assert.NoError(s.T(), err)
 	assert.Nil(s.T(), chFaults)
 	assert.NotNil(s.T(), spockSecret)
 }
@@ -97,12 +106,13 @@ func (s *ChunkVerifierTestSuite) TestHappyPath() {
 func (s *ChunkVerifierTestSuite) TestMissingRegisterTouchForUpdate() {
 	unittest.SkipUnless(s.T(), unittest.TEST_DEPRECATED, "Check new partial ledger for missing keys")
 
-	vch := GetBaselineVerifiableChunk(s.T(), "", false)
-	assert.NotNil(s.T(), vch)
+	vch, _ := GetBaselineVerifiableChunk(s.T(), "", false)
+	require.NotNil(s.T(), vch)
+
 	// remove the second register touch
 	// vch.ChunkDataPack.RegisterTouches = vch.ChunkDataPack.RegisterTouches[:1]
 	spockSecret, chFaults, err := s.verifier.Verify(vch)
-	assert.Nil(s.T(), err)
+	assert.NoError(s.T(), err)
 	assert.NotNil(s.T(), chFaults)
 	assert.Nil(s.T(), spockSecret)
 	_, ok := chFaults.(*chunksmodels.CFMissingRegisterTouch)
@@ -113,12 +123,13 @@ func (s *ChunkVerifierTestSuite) TestMissingRegisterTouchForUpdate() {
 func (s *ChunkVerifierTestSuite) TestMissingRegisterTouchForRead() {
 	unittest.SkipUnless(s.T(), unittest.TEST_DEPRECATED, "Check new partial ledger for missing keys")
 
-	vch := GetBaselineVerifiableChunk(s.T(), "", false)
-	assert.NotNil(s.T(), vch)
+	vch, _ := GetBaselineVerifiableChunk(s.T(), "", false)
+	require.NotNil(s.T(), vch)
+
 	// remove the second register touch
 	// vch.ChunkDataPack.RegisterTouches = vch.ChunkDataPack.RegisterTouches[1:]
 	spockSecret, chFaults, err := s.verifier.Verify(vch)
-	assert.Nil(s.T(), err)
+	assert.NoError(s.T(), err)
 	assert.NotNil(s.T(), chFaults)
 	assert.Nil(s.T(), spockSecret)
 	_, ok := chFaults.(*chunksmodels.CFMissingRegisterTouch)
@@ -129,24 +140,57 @@ func (s *ChunkVerifierTestSuite) TestMissingRegisterTouchForRead() {
 // the state commitment computed after updating the partial trie
 // doesn't match the one provided by the chunks
 func (s *ChunkVerifierTestSuite) TestWrongEndState() {
-	vch := GetBaselineVerifiableChunk(s.T(), "wrongEndState", false)
-	assert.NotNil(s.T(), vch)
+	vch, chunkEvents := GetBaselineVerifiableChunk(s.T(), "wrongEndState", false)
+	require.NotNil(s.T(), vch)
+
+	id1 := flow.NewRegisterID("00", "")
+	value1 := []byte{'F'}
+
+	id2 := flow.NewRegisterID("05", "")
+	value2 := []byte{'B'}
+
+	ids := make([]flow.RegisterID, 0)
+	values := make([]flow.RegisterValue, 0)
+	ids = append(ids, id1, id2)
+	values = append(values, value1, value2)
+
+	require.Equal(s.T(), len(ids), len(values))
+
+	entries := make(flow.RegisterEntries, len(ids))
+	for i := range ids {
+		entries = append(entries, flow.RegisterEntry{
+			Key:   ids[i],
+			Value: values[i],
+		})
+	}
+
+	keys, regValues := executionState.RegisterEntriesToKeysValues(entries)
+
+	update, err := ledger.NewUpdate(
+		ledger.State(vch.ChunkDataPack.StartState),
+		keys,
+		regValues,
+	)
+	assert.NoError(s.T(), err)
+
+	updateExecutionData(s.T(), vch, vch.ChunkDataPack.Collection, chunkEvents, update, vch.Result.BlockID)
+
 	spockSecret, chFaults, err := s.verifier.Verify(vch)
-	assert.Nil(s.T(), err)
+	assert.NoError(s.T(), err)
 	assert.NotNil(s.T(), chFaults)
 	assert.Nil(s.T(), spockSecret)
-	_, ok := chFaults.(*chunksmodels.CFNonMatchingFinalState)
-	assert.True(s.T(), ok)
+	assert.IsType(s.T(), &chunksmodels.CFNonMatchingFinalState{}, chFaults)
 }
 
 // TestFailedTx tests verification behavior in case
 // of failed transaction. if a transaction fails, it should
 // still change the state commitment.
 func (s *ChunkVerifierTestSuite) TestFailedTx() {
-	vch := GetBaselineVerifiableChunk(s.T(), "failedTx", false)
-	assert.NotNil(s.T(), vch)
+	vch, _ := GetBaselineVerifiableChunk(s.T(), "failedTx", false)
+	require.NotNil(s.T(), vch)
+
 	spockSecret, chFaults, err := s.verifier.Verify(vch)
-	assert.Nil(s.T(), err)
+	assert.NoError(s.T(), err)
 	assert.Nil(s.T(), chFaults)
 	assert.NotNil(s.T(), spockSecret)
 }
@@ -154,10 +198,11 @@ func (s *ChunkVerifierTestSuite) TestFailedTx() {
 // TestEventsMismatch tests verification behavior in case
 // of emitted events not matching chunks
 func (s *ChunkVerifierTestSuite) TestEventsMismatch() {
-	vch := GetBaselineVerifiableChunk(s.T(), "eventsMismatch", false)
-	assert.NotNil(s.T(), vch)
+	vch, _ := GetBaselineVerifiableChunk(s.T(), "eventsMismatch", false)
+	require.NotNil(s.T(), vch)
+
 	_, chFault, err := s.verifier.Verify(vch)
-	assert.Nil(s.T(), err)
+	assert.NoError(s.T(), err)
 	assert.NotNil(s.T(), chFault)
 	assert.IsType(s.T(), &chunksmodels.CFInvalidEventsCollection{}, chFault)
 }
@@ -165,44 +210,144 @@ func (s *ChunkVerifierTestSuite) TestEventsMismatch() {
 // TestServiceEventsMismatch tests verification behavior in case
 // of emitted service events not matching chunks'
 func (s *ChunkVerifierTestSuite) TestServiceEventsMismatch() {
-	vch := GetBaselineVerifiableChunk(s.T(), "doesn't matter", true)
-	assert.NotNil(s.T(), vch)
+	vch, _ := GetBaselineVerifiableChunk(s.T(), "doesn't matter", true)
+	require.NotNil(s.T(), vch)
+
 	_, chFault, err := s.systemBadVerifier.Verify(vch)
-	assert.Nil(s.T(), err)
+	assert.NoError(s.T(), err)
 	assert.NotNil(s.T(), chFault)
 	assert.IsType(s.T(), &chunksmodels.CFInvalidServiceEventsEmitted{}, chFault)
 }
 
 // TestServiceEventsAreChecked ensures that service events are in fact checked
 func (s *ChunkVerifierTestSuite) TestServiceEventsAreChecked() {
-	vch := GetBaselineVerifiableChunk(s.T(), "doesn't matter", true)
-	assert.NotNil(s.T(), vch)
+	vch, _ := GetBaselineVerifiableChunk(s.T(), "doesn't matter", true)
+	require.NotNil(s.T(), vch)
+
 	_, chFault, err := s.systemOkVerifier.Verify(vch)
-	assert.Nil(s.T(), err)
+	assert.NoError(s.T(), err)
 	assert.Nil(s.T(), chFault)
 }
 
 // TestEmptyCollection tests verification behaviour if a
 // collection doesn't have any transaction.
 func (s *ChunkVerifierTestSuite) TestEmptyCollection() {
-	vch := GetBaselineVerifiableChunk(s.T(), "", false)
-	assert.NotNil(s.T(), vch)
+	vch, _ := GetBaselineVerifiableChunk(s.T(), "", false)
+	require.NotNil(s.T(), vch)
+
 	col := unittest.CollectionFixture(0)
 	vch.ChunkDataPack.Collection = &col
 	vch.EndState = vch.ChunkDataPack.StartState
+
 	emptyListHash, err := flow.EventsMerkleRootHash(flow.EventsList{})
-	assert.NoError(s.T(), err)
+	require.NoError(s.T(), err)
 	vch.Chunk.EventCollection = emptyListHash // empty collection emits no events
+
+	update, err := ledger.NewEmptyUpdate(ledger.State(vch.ChunkDataPack.StartState))
+	require.NoError(s.T(), err)
+	updateExecutionData(s.T(), vch, &col, nil, update, vch.Result.BlockID)
+
 	spockSecret, chFaults, err := s.verifier.Verify(vch)
-	assert.Nil(s.T(), err)
+	assert.NoError(s.T(), err)
 	assert.Nil(s.T(), chFaults)
 	assert.NotNil(s.T(), spockSecret)
+}
+
+func (s *ChunkVerifierTestSuite) TestExecutionDataBlockMismatch() {
+	vch, _ := GetBaselineVerifiableChunk(s.T(), "", false)
+	require.NotNil(s.T(), vch)
+
+	col := unittest.CollectionFixture(0)
+	vch.ChunkDataPack.Collection = &col
+	vch.EndState = vch.ChunkDataPack.StartState
+
+	emptyListHash, err := flow.EventsMerkleRootHash(flow.EventsList{})
+	require.NoError(s.T(), err)
+	vch.Chunk.EventCollection = emptyListHash //empty collection emits no events
+
+	update, err := ledger.NewEmptyUpdate(ledger.State(vch.ChunkDataPack.StartState))
+	require.NoError(s.T(), err)
+
+	wrongBlock := vch.Result.BlockID
+
+	wrongBlock[5]++ // it wraps
+
+	updateExecutionData(s.T(), vch, &col, flow.EventsList{}, update, wrongBlock)
+
+	_, chFaults, err := s.verifier.Verify(vch)
+	assert.NoError(s.T(), err)
+	assert.NotNil(s.T(), chFaults)
+	assert.IsType(s.T(), &chunksmodels.CFExecutionDataBlockIDMismatch{}, chFaults)
+}
+
+func (s *ChunkVerifierTestSuite) TestExecutionDataChunkIdsLengthDiffers() {
+	vch, _ := GetBaselineVerifiableChunk(s.T(), "", false)
+	require.NotNil(s.T(), vch)
+
+	vch.ChunkDataPack.ExecutionDataRoot.ChunkExecutionDataIDs = append(vch.ChunkDataPack.ExecutionDataRoot.ChunkExecutionDataIDs, cid.Undef)
+
+	_, chFaults, err := s.verifier.Verify(vch)
+
+	assert.NoError(s.T(), err)
+	assert.NotNil(s.T(), chFaults)
+	assert.IsType(s.T(), &chunksmodels.CFExecutionDataChunksLengthMismatch{}, chFaults)
+}
+
+func (s *ChunkVerifierTestSuite) TestExecutionDataChunkIdMismatch() {
+	vch, _ := GetBaselineVerifiableChunk(s.T(), "", false)
+	require.NotNil(s.T(), vch)
+
+	vch.ChunkDataPack.ExecutionDataRoot.ChunkExecutionDataIDs[0] = cid.Undef // substitute invalid CID
+
+	_, chFaults, err := s.verifier.Verify(vch)
+
+	assert.NoError(s.T(), err)
+	assert.NotNil(s.T(), chFaults)
+	assert.IsType(s.T(), &chunksmodels.CFExecutionDataInvalidChunkCID{}, chFaults)
+}
+
+func (s *ChunkVerifierTestSuite) TestExecutionDataIdMismatch() {
+	vch, _ := GetBaselineVerifiableChunk(s.T(), "", false)
+	require.NotNil(s.T(), vch)
+
+	vch.Result.ExecutionDataID[5]++ //wraparounds
+
+	_, chFaults, err := s.verifier.Verify(vch)
+
+	assert.NoError(s.T(), err)
+	assert.NotNil(s.T(), chFaults)
+	assert.IsType(s.T(), &chunksmodels.CFInvalidExecutionDataID{}, chFaults)
+}
+
+// updateExecutionData the VerifiableChunkData with a new execution data containing the execution
+// data for the given collection and events
+func updateExecutionData(t *testing.T, vch *verification.VerifiableChunkData, collection *flow.Collection, chunkEvents flow.EventsList, update *ledger.Update, blockID flow.Identifier) {
+	trieUpdate, err := pathfinder.UpdateToTrieUpdate(update, partial.DefaultPathFinderVersion)
+	require.NoError(t, err)
+
+	ced := &execution_data.ChunkExecutionData{
+		Collection: collection,
+		Events:     chunkEvents,
+		TrieUpdate: trieUpdate,
+	}
+
+	cedCID, err := executionDataCIDProvider.CalculateChunkExecutionDataID(context.Background(), ced)
+	require.NoError(t, err)
+
+	bedr := flow.BlockExecutionDataRoot{
+		BlockID:               blockID,
+		ChunkExecutionDataIDs: []cid.Cid{cedCID},
+	}
+	vch.ChunkDataPack.ExecutionDataRoot = bedr
+
+	vch.Result.ExecutionDataID, err = executionDataCIDProvider.CalculateExecutionDataRootID(context.Background(), &bedr)
+	require.NoError(t, err)
 }
 
 // GetBaselineVerifiableChunk returns a verifiable chunk and sets the script
 // of a transaction in the middle of the collection to some value to signal the
 // mocked vm on what to return as tx exec outcome.
-func GetBaselineVerifiableChunk(t *testing.T, script string, system bool) *verification.VerifiableChunkData {
+func GetBaselineVerifiableChunk(t *testing.T, script string, system bool) (*verification.VerifiableChunkData, flow.EventsList) {
 
 	// Collection setup
 
@@ -289,12 +434,12 @@ func GetBaselineVerifiableChunk(t *testing.T, script string, system bool) *verif
 	require.NoError(t, err)
 
 	// events
-	chunkEvents := make(flow.EventsList, 0)
+	var chunkEvents flow.EventsList
 
 	erServiceEvents := make([]flow.ServiceEvent, 0)
 
 	if system {
-		chunkEvents = flow.EventsList{}
+		chunkEvents = nil
 		erServiceEvents = serviceEventsList
 	} else {
 		for i := 0; i < collectionSize; i++ {
@@ -311,6 +456,25 @@ func GetBaselineVerifiableChunk(t *testing.T, script string, system bool) *verif
 	EventsMerkleRootHash, err := flow.EventsMerkleRootHash(chunkEvents)
 	require.NoError(t, err)
 
+	trieUpdate, err := pathfinder.UpdateToTrieUpdate(update, partial.DefaultPathFinderVersion)
+	require.NoError(t, err)
+
+	chunkExecutionData := execution_data.ChunkExecutionData{
+		Collection: &coll,
+		Events:     chunkEvents,
+		TrieUpdate: trieUpdate,
+	}
+	chunkCid, err := executionDataCIDProvider.CalculateChunkExecutionDataID(context.Background(), &chunkExecutionData)
+	require.NoError(t, err)
+
+	executionDataRoot := flow.BlockExecutionDataRoot{
+		BlockID:               blockID,
+		ChunkExecutionDataIDs: []cid.Cid{chunkCid},
+	}
+
+	executionDataID, err := executionDataCIDProvider.CalculateExecutionDataRootID(context.Background(), &executionDataRoot)
+	require.NoError(t, err)
+
 	// Chunk setup
 	chunk := flow.Chunk{
 		ChunkBody: flow.ChunkBody{
@@ -323,17 +487,19 @@ func GetBaselineVerifiableChunk(t *testing.T, script string, system bool) *verif
 	}
 
 	chunkDataPack := flow.ChunkDataPack{
-		ChunkID:    chunk.ID(),
-		StartState: flow.StateCommitment(startState),
-		Proof:      proof,
-		Collection: &coll,
+		ChunkID:           chunk.ID(),
+		StartState:        flow.StateCommitment(startState),
+		Proof:             proof,
+		Collection:        &coll,
+		ExecutionDataRoot: executionDataRoot,
 	}
 
 	// ExecutionResult setup
 	result := flow.ExecutionResult{
-		BlockID:       blockID,
-		Chunks:        flow.ChunkList{&chunk},
-		ServiceEvents: erServiceEvents,
+		BlockID:         blockID,
+		Chunks:          flow.ChunkList{&chunk},
+		ServiceEvents:   erServiceEvents,
+		ExecutionDataID: executionDataID,
 	}
 
 	verifiableChunkData = verification.VerifiableChunkData{
@@ -345,7 +511,7 @@ func GetBaselineVerifiableChunk(t *testing.T, script string, system bool) *verif
 		EndState:      flow.StateCommitment(endState),
 	}
 
-	return &verifiableChunkData
+	return &verifiableChunkData, chunkEvents
 }
 
 type vmMock struct{}

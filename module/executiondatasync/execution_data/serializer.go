@@ -10,6 +10,7 @@ import (
 
 	"github.com/onflow/flow-go/model/encoding"
 	"github.com/onflow/flow-go/model/encoding/cbor"
+	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/compressor"
 )
@@ -50,7 +51,7 @@ const (
 // It returns an error if the type is not supported.
 func getCode(v interface{}) (byte, error) {
 	switch v.(type) {
-	case *BlockExecutionDataRoot:
+	case *flow.BlockExecutionDataRoot:
 		return codeExecutionDataRoot, nil
 	case *ChunkExecutionData:
 		return codeChunkExecutionData, nil
@@ -66,7 +67,7 @@ func getCode(v interface{}) (byte, error) {
 func getPrototype(code byte) (interface{}, error) {
 	switch code {
 	case codeExecutionDataRoot:
-		return &BlockExecutionDataRoot{}, nil
+		return &flow.BlockExecutionDataRoot{}, nil
 	case codeChunkExecutionData:
 		return &ChunkExecutionData{}, nil
 	case codeRecursiveCIDs:

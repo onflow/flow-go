@@ -1,25 +1,28 @@
 package chunks
 
 import (
+	gocontext "context"
 	"errors"
 	"fmt"
 
 	"github.com/rs/zerolog"
 
-	"github.com/onflow/flow-go/fvm/blueprints"
-	"github.com/onflow/flow-go/model/verification"
-
 	"github.com/onflow/flow-go/engine/execution/computation/computer"
 	executionState "github.com/onflow/flow-go/engine/execution/state"
 	"github.com/onflow/flow-go/fvm"
+	"github.com/onflow/flow-go/fvm/blueprints"
 	"github.com/onflow/flow-go/fvm/storage/derived"
 	"github.com/onflow/flow-go/fvm/storage/logical"
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	fvmState "github.com/onflow/flow-go/fvm/storage/state"
 	"github.com/onflow/flow-go/ledger"
+	"github.com/onflow/flow-go/ledger/common/pathfinder"
 	"github.com/onflow/flow-go/ledger/partial"
 	chmodels "github.com/onflow/flow-go/model/chunks"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/verification"
+	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
+	"github.com/onflow/flow-go/module/executiondatasync/provider"
 )
 
 // ChunkVerifier is a verifier based on the current definitions of the flow network
@@ -74,6 +77,14 @@ func (fcv *ChunkVerifier) Verify(
 
 		transactions = []*fvm.TransactionProcedure{
 			fvm.Transaction(txBody, vc.TransactionOffset+uint32(0)),
+		}
+
+		// enhance ChDP with collection if this is a system chunk. the collection is required to verify
+		// the chunk's execution data
+		if vc.ChunkDataPack.Collection == nil {
+			vc.ChunkDataPack.Collection = &flow.Collection{
+				Transactions: []*flow.TransactionBody{txBody},
+			}
 		}
 	} else {
 		ctx = fvm.NewContextFromParent(
@@ -163,7 +174,13 @@ func (fcv *ChunkVerifier) verifyTransactionsInContext(
 		return nil, nil, fmt.Errorf("missing chunk data pack")
 	}
 
-	events := make(flow.EventsList, 0)
+	if int(chIndex) >= len(result.Chunks) {
+		return nil, chmodels.NewCFInvalidVerifiableChunk("error constructing partial trie: ",
+				fmt.Errorf("chunk index out of bounds of ExecutionResult's chunk list"), chIndex, execResID),
+			nil
+	}
+
+	var events flow.EventsList = nil
 	serviceEvents := make(flow.ServiceEventList, 0)
 
 	// constructing a partial trie given chunk data package
@@ -306,5 +323,55 @@ func (fcv *ChunkVerifier) verifyTransactionsInContext(
 	if flow.StateCommitment(expEndStateComm) != endState {
 		return nil, chmodels.NewCFNonMatchingFinalState(flow.StateCommitment(expEndStateComm), endState, chIndex, execResID), nil
 	}
+
+	// verify the execution data ID included in the ExecutionResult
+	// 1. check basic execution data root fields
+	if chunk.BlockID != chunkDataPack.ExecutionDataRoot.BlockID {
+		return nil, chmodels.NewCFExecutionDataBlockIDMismatch(chunkDataPack.ExecutionDataRoot.BlockID, chunk.BlockID, chIndex, execResID), nil
+	}
+
+	if len(chunkDataPack.ExecutionDataRoot.ChunkExecutionDataIDs) != len(result.Chunks) {
+		return nil, chmodels.NewCFExecutionDataChunksLengthMismatch(len(chunkDataPack.ExecutionDataRoot.ChunkExecutionDataIDs), len(result.Chunks), chIndex, execResID), nil
+	}
+
+	// 2. build our chunk's chunk execution data using the locally calculated values, and calculate
+	// its CID
+	trieUpdate, err := pathfinder.UpdateToTrieUpdate(update, partial.DefaultPathFinderVersion)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to convert to trie update: %w", err)
+	}
+
+	chunkExecutionData := &execution_data.ChunkExecutionData{
+		Collection: chunkDataPack.Collection,
+		Events:     events,
+		TrieUpdate: trieUpdate,
+	}
+
+	cidProvider := provider.NewExecutionDataCIDProvider(execution_data.DefaultSerializer)
+	cedCID, err := cidProvider.CalculateChunkExecutionDataID(gocontext.Background(), chunkExecutionData)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to calculate CID of ChunkExecutionData: %w", err)
+	}
+
+	// 3. check that chunk execution data ID for our index is valid
+	if cedCID != chunkDataPack.ExecutionDataRoot.ChunkExecutionDataIDs[chIndex] {
+		return nil, chmodels.NewCFExecutionDataInvalidChunkCID(
+			chunkDataPack.ExecutionDataRoot.ChunkExecutionDataIDs[chIndex],
+			cedCID,
+			chIndex,
+			execResID,
+		), nil
+	}
+
+	// 4. check the execution data root ID by calculating it using the provided execution data root
+	executionDataID, err := cidProvider.CalculateExecutionDataRootID(gocontext.Background(), &chunkDataPack.ExecutionDataRoot)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to calculate ID of ExecutionDataRoot: %w", err)
+	}
+
+	if executionDataID != result.ExecutionDataID {
+		return nil, chmodels.NewCFInvalidExecutionDataID(result.ExecutionDataID, executionDataID, chIndex, execResID), nil
+	}
+
 	return chunkExecutionSnapshot.SpockSecret, nil, nil
 }

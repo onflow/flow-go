@@ -1,8 +1,6 @@
 package execution_data
 
 import (
-	"github.com/ipfs/go-cid"
-
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -16,17 +14,6 @@ type ChunkExecutionData struct {
 	Collection *flow.Collection
 	Events     flow.EventsList
 	TrieUpdate *ledger.TrieUpdate
-}
-
-// BlockExecutionDataRoot represents the root of a serialized BlockExecutionData.
-// The hash of the serialized BlockExecutionDataRoot is the ExecutionDataID used within an flow.ExecutionResult.
-type BlockExecutionDataRoot struct {
-	// BlockID is the ID of the block who's result this execution data is for.
-	BlockID flow.Identifier
-
-	// ChunkExecutionDataIDs is a list of the root CIDs for each serialized ChunkExecutionData
-	// associated with this block.
-	ChunkExecutionDataIDs []cid.Cid
 }
 
 // BlockExecutionData represents the execution data of a block.

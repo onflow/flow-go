@@ -12,6 +12,7 @@ type BlockExecutionResult struct {
 	*entity.ExecutableBlock
 
 	collectionExecutionResults []CollectionExecutionResult
+	ExecutionDataRoot          *flow.BlockExecutionDataRoot
 }
 
 // NewPopulatedBlockExecutionResult constructs a new BlockExecutionResult,
@@ -201,6 +202,7 @@ func (ar *BlockAttestationResult) ChunkDataPackAt(index int) *flow.ChunkDataPack
 		attestRes.startStateCommit,
 		attestRes.stateProof,
 		collection,
+		*ar.ExecutionDataRoot,
 	)
 }
 
