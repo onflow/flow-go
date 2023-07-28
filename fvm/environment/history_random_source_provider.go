@@ -100,8 +100,8 @@ func (b *historySourceProvider) RandomSourceHistory() ([]byte, error) {
 	// `RandomSource` does not error in normal operations.
 	// Any error should be treated as an exception.
 	if err != nil {
-		return nil, fmt.Errorf(
-			"get random source for block randomSource failed: %w", err)
+		return nil, errors.NewRandomSourceFailure(fmt.Errorf(
+			"get random source for block randomSource failed: %w", err))
 	}
 
 	// A method that derives `randomSourceHistoryLen` bytes from `source` must:
