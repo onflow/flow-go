@@ -74,7 +74,7 @@ func (s *store) Add(ctx context.Context, executionData *BlockExecutionData) (flo
 	}
 
 	for i, chunkExecutionData := range executionData.ChunkExecutionDatas {
-		chunkExecutionDataID, err := s.AddChunkExecutionData(ctx, chunkExecutionData)
+		chunkExecutionDataID, err := s.addChunkExecutionData(ctx, chunkExecutionData)
 		if err != nil {
 			return flow.ZeroID, fmt.Errorf("could not add chunk execution data at index %d: %w", i, err)
 		}
@@ -114,7 +114,7 @@ func (s *store) Add(ctx context.Context, executionData *BlockExecutionData) (flo
 // addChunkExecutionData constructs a blob tree for the given ChunkExecutionData, adds it to the
 // blobstore, and returns the root CID.
 // No errors are expected during normal operation.
-func (s *store) AddChunkExecutionData(ctx context.Context, chunkExecutionData *ChunkExecutionData) (cid.Cid, error) {
+func (s *store) addChunkExecutionData(ctx context.Context, chunkExecutionData *ChunkExecutionData) (cid.Cid, error) {
 	var v interface{} = chunkExecutionData
 
 	// given an arbitrarily large v, split it into blobs of size up to maxBlobSize, adding them to
