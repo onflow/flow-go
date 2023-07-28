@@ -16,12 +16,12 @@ import (
 type Environment interface {
 	runtime.Interface
 
-	BlockEntropy() ([]byte, error)
+	RandomSourceHistory() ([]byte, error)
 }
 
-// entropyFunctionType is the type of the `entropy` function.
+// randomSourceFunctionType is the type of the `randomSource` function.
 // This defies the signature as `func (): [UInt8]`
-var entropyFunctionType = &sema.FunctionType{
+var randomSourceFunctionType = &sema.FunctionType{
 	Parameters:           []sema.Parameter{},
 	ReturnTypeAnnotation: sema.NewTypeAnnotation(sema.ByteArrayType),
 }
@@ -39,24 +39,24 @@ func NewReusableCadenceRuntime(rt runtime.Runtime, config runtime.Config) *Reusa
 		Environment: runtime.NewBaseInterpreterEnvironment(config),
 	}
 
-	blockEntropy := stdlib.StandardLibraryValue{
-		Name: "entropy",
-		Type: entropyFunctionType,
+	blockRandomSource := stdlib.StandardLibraryValue{
+		Name: "randomSourceHistory",
+		Type: randomSourceFunctionType,
 		Kind: common.DeclarationKindFunction,
 		Value: interpreter.NewUnmeteredHostFunctionValue(
-			entropyFunctionType,
+			randomSourceFunctionType,
 			func(invocation interpreter.Invocation) interpreter.Value {
 				if len(invocation.Arguments) != 0 {
 					panic(errors.NewInvalidArgumentErrorf(
-						"entropy should be called without arguments"))
+						"randomSourceHistory should be called without arguments"))
 				}
 
 				var err error
-				var entropy []byte
+				var source []byte
 				if reusable.fvmEnv != nil {
-					entropy, err = reusable.fvmEnv.BlockEntropy()
+					source, err = reusable.fvmEnv.RandomSourceHistory()
 				} else {
-					err = errors.NewOperationNotSupportedError("entropy")
+					err = errors.NewOperationNotSupportedError("randomSourceHistory")
 				}
 
 				if err != nil {
@@ -65,12 +65,12 @@ func NewReusableCadenceRuntime(rt runtime.Runtime, config runtime.Config) *Reusa
 
 				return interpreter.ByteSliceToByteArrayValue(
 					invocation.Interpreter,
-					entropy)
+					source)
 			},
 		),
 	}
 
-	reusable.Declare(blockEntropy)
+	reusable.Declare(blockRandomSource)
 
 	return reusable
 }

@@ -130,7 +130,7 @@ func SystemChunkContext(vmCtx fvm.Context) fvm.Context {
 		fvm.WithEventCollectionSizeLimit(SystemChunkEventCollectionMaxSize),
 		fvm.WithMemoryAndInteractionLimitsDisabled(),
 		// only the system transaction is allowed to call the block entropy provider
-		fvm.WithBlockEntropyCallAllowed(true),
+		fvm.WithRandomSourceHistoryCallAllowed(true),
 	)
 }
 

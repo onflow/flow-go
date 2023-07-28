@@ -17,18 +17,18 @@ type TransactionInfoParams struct {
 
 	TransactionFeesEnabled bool
 	LimitAccountStorage    bool
-	// BlockEntropyCallAllowed is true if the transaction is allowed to call the `entropy`
+	// RandomSourceHistoryCallAllowed is true if the transaction is allowed to call the `entropy`
 	// cadence function to get the entropy of that block.
-	BlockEntropyCallAllowed bool
+	RandomSourceHistoryCallAllowed bool
 }
 
 func DefaultTransactionInfoParams() TransactionInfoParams {
 	// NOTE: TxIndex, TxId and TxBody are populated by NewTransactionEnv rather
 	// than by Context.
 	return TransactionInfoParams{
-		TransactionFeesEnabled:  false,
-		LimitAccountStorage:     false,
-		BlockEntropyCallAllowed: false,
+		TransactionFeesEnabled:         false,
+		LimitAccountStorage:            false,
+		RandomSourceHistoryCallAllowed: false,
 	}
 }
 

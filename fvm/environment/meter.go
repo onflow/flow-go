@@ -47,7 +47,7 @@ const (
 	ComputationKindBLSAggregatePublicKeys     = 2033
 	ComputationKindGetOrLoadProgram           = 2034
 	ComputationKindGenerateAccountLocalID     = 2035
-	ComputationKindGetBlockEntropy            = 2036
+	ComputationKindGetRandomSourceHistory     = 2036
 )
 
 type Meter interface {
