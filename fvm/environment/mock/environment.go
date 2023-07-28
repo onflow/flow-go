@@ -236,8 +236,8 @@ func (_m *Environment) BLSVerifyPOP(publicKey *stdlib.PublicKey, signature []byt
 	return r0, r1
 }
 
-// BlockEntropy provides a mock function with given fields:
-func (_m *Environment) BlockEntropy() ([]byte, error) {
+// RandomSourceHistory provides a mock function with given fields:
+func (_m *Environment) RandomSourceHistory() ([]byte, error) {
 	ret := _m.Called()
 
 	var r0 []byte

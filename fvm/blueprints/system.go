@@ -46,9 +46,9 @@ func SystemChunkTransaction(chain flow.Chain) (*flow.TransactionBody, error) {
 			[]byte(templates.ReplaceAddresses(
 				systemChunkTransactionTemplate,
 				templates.Environment{
-					EpochAddress:             contracts.Epoch.Address.Hex(),
-					NodeVersionBeaconAddress: contracts.NodeVersionBeacon.Address.Hex(),
-					SourceOfRandomness:       contracts.SourceOfRandomness.Address.Hex(),
+					EpochAddress:              contracts.Epoch.Address.Hex(),
+					NodeVersionBeaconAddress:  contracts.NodeVersionBeacon.Address.Hex(),
+					SourceOfRandomnessHistory: contracts.SourceOfRandomnessHistory.Address.Hex(),
 				},
 			)),
 		).
@@ -74,9 +74,9 @@ func systemChunkTransactionDualAuthorizers(
 			[]byte(templates.ReplaceAddresses(
 				systemChunkTransactionTemplateDualAuthorizer,
 				templates.Environment{
-					EpochAddress:             contracts.Epoch.Address.Hex(),
-					NodeVersionBeaconAddress: contracts.NodeVersionBeacon.Address.Hex(),
-					SourceOfRandomness:       contracts.SourceOfRandomness.Address.Hex(),
+					EpochAddress:              contracts.Epoch.Address.Hex(),
+					NodeVersionBeaconAddress:  contracts.NodeVersionBeacon.Address.Hex(),
+					SourceOfRandomnessHistory: contracts.SourceOfRandomnessHistory.Address.Hex(),
 				},
 			)),
 		).

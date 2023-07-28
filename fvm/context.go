@@ -330,11 +330,11 @@ func WithTransactionFeesEnabled(enabled bool) Option {
 	}
 }
 
-// WithBlockEntropyCallAllowed enables or disables calling the `entropy` function
+// WithRandomSourceHistoryCallAllowed enables or disables calling the `entropy` function
 // within cadence
-func WithBlockEntropyCallAllowed(allowed bool) Option {
+func WithRandomSourceHistoryCallAllowed(allowed bool) Option {
 	return func(ctx Context) Context {
-		ctx.BlockEntropyCallAllowed = allowed
+		ctx.RandomSourceHistoryCallAllowed = allowed
 		return ctx
 	}
 }
