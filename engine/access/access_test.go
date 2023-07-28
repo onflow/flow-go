@@ -1142,7 +1142,7 @@ func (suite *Suite) TestAPICallNodeVersionInfo() {
 
 		respNodeVersionInfo := resp.Info
 		suite.Require().Equal(respNodeVersionInfo, &entitiesproto.NodeVersionInfo{
-			Semver:          build.Semver(),
+			Semver:          build.Version(),
 			Commit:          build.Commit(),
 			SporkId:         sporkId[:],
 			ProtocolVersion: uint64(protocolVersion),

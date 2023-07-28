@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/coreos/go-semver/semver"
 	"github.com/ipfs/go-datastore"
 	dssync "github.com/ipfs/go-datastore/sync"
 	blockstore "github.com/ipfs/go-ipfs-blockstore"
@@ -687,8 +688,9 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	// disabled by default
 	uploader := uploader.NewManager(node.Tracer)
 
-	ver, err := build.SemverV2()
-	require.NoError(t, err, "failed to parse semver version from build info")
+	_, err = build.Semver()
+	require.ErrorIs(t, err, build.UndefinedVersionError)
+	ver := semver.New("0.0.0")
 
 	latestFinalizedBlock, err := node.State.Final().Head()
 	require.NoError(t, err)
