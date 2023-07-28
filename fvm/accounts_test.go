@@ -207,7 +207,15 @@ transaction {
 const addAccountKeyTransaction = `
 transaction(key: [UInt8]) {
   prepare(signer: AuthAccount) {
-    signer.addPublicKey(key)
+	let publicKey = PublicKey(
+		publicKey: key,
+		signatureAlgorithm: SignatureAlgorithm.ECDSA_P256
+	 )
+    signer.keys.add(
+		publicKey: publicKey,
+		hashAlgorithm: HashAlgorithm.SHA3_256,
+		weight: 1000.0
+	)
   }
 }
 `
@@ -230,8 +238,22 @@ transaction(key: [UInt8]) {
 const addMultipleAccountKeysTransaction = `
 transaction(key1: [UInt8], key2: [UInt8]) {
   prepare(signer: AuthAccount) {
-    signer.addPublicKey(key1)
-    signer.addPublicKey(key2)
+    signer.keys.add(
+		publicKey: PublicKey(
+			publicKey: key1,
+			signatureAlgorithm: SignatureAlgorithm.ECDSA_P256
+		),
+		hashAlgorithm: HashAlgorithm.SHA3_256,
+		weight: 100.0
+	)
+    signer.keys.add(
+		publicKey: PublicKey(
+			publicKey: [1, 2, 3],
+			signatureAlgorithm: SignatureAlgorithm.ECDSA_P256
+		),
+		hashAlgorithm: HashAlgorithm.SHA3_256,
+		weight: 100.0
+	)
   }
 }
 `
@@ -257,7 +279,7 @@ transaction(key1: [UInt8], key2: [UInt8]) {
 const removeAccountKeyTransaction = `
 transaction(key: Int) {
   prepare(signer: AuthAccount) {
-    signer.removePublicKey(key)
+    signer.revoke(key)
   }
 }
 `
@@ -273,8 +295,8 @@ transaction(keyIndex: Int) {
 const removeMultipleAccountKeysTransaction = `
 transaction(key1: Int, key2: Int) {
   prepare(signer: AuthAccount) {
-    signer.removePublicKey(key1)
-    signer.removePublicKey(key2)
+    signer.revoke(key1)
+    signer.revoke(key2)
   }
 }
 `
@@ -1483,7 +1505,7 @@ func TestAccountBalanceFields(t *testing.T) {
 				snapshotTree = snapshotTree.Append(executionSnapshot)
 
 				script := fvm.Script([]byte(fmt.Sprintf(`
-					pub fun main(): UFix64 {
+					access(all) fun main(): UFix64 {
 						let acc = getAccount(0x%s)
 						return acc.balance
 					}
@@ -1513,7 +1535,7 @@ func TestAccountBalanceFields(t *testing.T) {
 				require.NoError(t, err)
 
 				script := fvm.Script([]byte(fmt.Sprintf(`
-					pub fun main(): UFix64 {
+					access(all) fun main(): UFix64 {
 						let acc = getAccount(0x%s)
 						return acc.balance
 					}
@@ -1544,7 +1566,7 @@ func TestAccountBalanceFields(t *testing.T) {
 					snapshotTree)
 
 				script := fvm.Script([]byte(fmt.Sprintf(`
-					pub fun main(): UFix64 {
+					access(all) fun main(): UFix64 {
 						let acc = getAccount(0x%s)
 						return acc.balance
 					}
@@ -1597,7 +1619,7 @@ func TestAccountBalanceFields(t *testing.T) {
 				snapshotTree = snapshotTree.Append(executionSnapshot)
 
 				script := fvm.Script([]byte(fmt.Sprintf(`
-					pub fun main(): UFix64 {
+					access(all) fun main(): UFix64 {
 						let acc = getAccount(0x%s)
 						return acc.availableBalance
 					}
@@ -1624,7 +1646,7 @@ func TestAccountBalanceFields(t *testing.T) {
 				require.NoError(t, err)
 
 				script := fvm.Script([]byte(fmt.Sprintf(`
-					pub fun main(): UFix64 {
+					access(all) fun main(): UFix64 {
 						let acc = getAccount(0x%s)
 						return acc.availableBalance
 					}
@@ -1670,7 +1692,7 @@ func TestAccountBalanceFields(t *testing.T) {
 				snapshotTree = snapshotTree.Append(executionSnapshot)
 
 				script := fvm.Script([]byte(fmt.Sprintf(`
-					pub fun main(): UFix64 {
+					access(all) fun main(): UFix64 {
 						let acc = getAccount(0x%s)
 						return acc.availableBalance
 					}
@@ -1721,7 +1743,7 @@ func TestGetStorageCapacity(t *testing.T) {
 				snapshotTree = snapshotTree.Append(executionSnapshot)
 
 				script := fvm.Script([]byte(fmt.Sprintf(`
-					pub fun main(): UInt64 {
+					access(all) fun main(): UInt64 {
 						let acc = getAccount(0x%s)
 						return acc.storageCapacity
 					}
@@ -1750,7 +1772,7 @@ func TestGetStorageCapacity(t *testing.T) {
 				require.NoError(t, err)
 
 				script := fvm.Script([]byte(fmt.Sprintf(`
-					pub fun main(): UInt64 {
+					access(all) fun main(): UInt64 {
 						let acc = getAccount(0x%s)
 						return acc.storageCapacity
 					}
@@ -1778,7 +1800,7 @@ func TestGetStorageCapacity(t *testing.T) {
 				address := chain.ServiceAddress()
 
 				script := fvm.Script([]byte(fmt.Sprintf(`
-					pub fun main(): UInt64 {
+					access(all) fun main(): UInt64 {
 						let acc = getAccount(0x%s)
 						return acc.storageCapacity
 					}
