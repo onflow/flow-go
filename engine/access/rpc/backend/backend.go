@@ -15,6 +15,7 @@ import (
 
 	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/cmd/build"
+	"github.com/onflow/flow-go/engine/access/rpc/connection"
 	"github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/model/flow"
@@ -78,7 +79,7 @@ type Backend struct {
 	chainID           flow.ChainID
 	collections       storage.Collections
 	executionReceipts storage.ExecutionReceipts
-	connFactory       ConnectionFactory
+	connFactory       connection.ConnectionFactory
 }
 
 // Config defines the configurable options for creating Backend
@@ -104,7 +105,7 @@ func New(
 	executionResults storage.ExecutionResults,
 	chainID flow.ChainID,
 	accessMetrics module.AccessMetrics,
-	connFactory ConnectionFactory,
+	connFactory connection.ConnectionFactory,
 	retryEnabled bool,
 	maxHeightRange uint,
 	preferredExecutionNodeIDs []string,
@@ -224,16 +225,9 @@ func NewCache(
 	var cache *lru.Cache
 	cacheSize := connectionPoolSize
 	if cacheSize > 0 {
-		// TODO: remove this fallback after fixing issues with evictions
-		// It was observed that evictions cause connection errors for in flight requests. This works around
-		// the issue by forcing hte pool size to be greater than the number of ENs + LNs
-		if cacheSize < DefaultConnectionPoolSize {
-			log.Warn().Msg("connection pool size below threshold, setting pool size to default value ")
-			cacheSize = DefaultConnectionPoolSize
-		}
 		var err error
 		cache, err = lru.NewWithEvict(int(cacheSize), func(_, evictedValue interface{}) {
-			store := evictedValue.(*CachedClient)
+			store := evictedValue.(*connection.CachedClient)
 			store.Close()
 			log.Debug().Str("grpc_conn_evicted", store.Address).Msg("closing grpc connection evicted from pool")
 			if accessMetrics != nil {

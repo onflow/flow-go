@@ -26,7 +26,6 @@ import (
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/irrecoverable"
-	"github.com/onflow/flow-go/module/metrics"
 	flownet "github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/netconf"
 	"github.com/onflow/flow-go/network/p2p"
@@ -491,12 +490,15 @@ func DefaultNodeBuilder(
 	}
 
 	meshTracerCfg := &tracer.GossipSubMeshTracerConfig{
-		Logger:                       logger,
-		Metrics:                      metricsCfg.Metrics,
-		IDProvider:                   idProvider,
-		LoggerInterval:               gossipCfg.LocalMeshLogInterval,
-		RpcSentTrackerCacheCollector: metrics.GossipSubRPCSentTrackerMetricFactory(metricsCfg.HeroCacheFactory, flownet.PrivateNetwork),
-		RpcSentTrackerCacheSize:      gossipCfg.RPCSentTrackerCacheSize,
+		Logger:                             logger,
+		Metrics:                            metricsCfg.Metrics,
+		IDProvider:                         idProvider,
+		LoggerInterval:                     gossipCfg.LocalMeshLogInterval,
+		RpcSentTrackerCacheSize:            gossipCfg.RPCSentTrackerCacheSize,
+		RpcSentTrackerWorkerQueueCacheSize: gossipCfg.RPCSentTrackerQueueCacheSize,
+		RpcSentTrackerNumOfWorkers:         gossipCfg.RpcSentTrackerNumOfWorkers,
+		HeroCacheMetricsFactory:            metricsCfg.HeroCacheFactory,
+		NetworkingType:                     flownet.PrivateNetwork,
 	}
 	meshTracer := tracer.NewGossipSubMeshTracer(meshTracerCfg)
 
