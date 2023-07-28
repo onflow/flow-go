@@ -104,6 +104,7 @@ require (
 	github.com/mitchellh/mapstructure v1.5.0
 	github.com/onflow/wal v0.0.0-20230529184820-bc9f8244608d
 	github.com/slok/go-http-metrics v0.10.0
+	github.com/sony/gobreaker v0.5.0
 )
 
 require (

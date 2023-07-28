@@ -10,6 +10,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/sony/gobreaker"
+
 	"go.uber.org/atomic"
 	"pgregory.net/rapid"
 
@@ -50,6 +52,7 @@ func TestProxyAccessAPI(t *testing.T) {
 		unittest.Logger(),
 		connectionFactory.AccessMetrics,
 		0,
+		CircuitBreakerConfig{},
 	)
 
 	proxyConnectionFactory := ProxyConnectionFactory{
@@ -91,6 +94,7 @@ func TestProxyExecutionAPI(t *testing.T) {
 		unittest.Logger(),
 		connectionFactory.AccessMetrics,
 		0,
+		CircuitBreakerConfig{},
 	)
 
 	proxyConnectionFactory := ProxyConnectionFactory{
@@ -137,6 +141,7 @@ func TestProxyAccessAPIConnectionReuse(t *testing.T) {
 		unittest.Logger(),
 		connectionFactory.AccessMetrics,
 		0,
+		CircuitBreakerConfig{},
 	)
 
 	proxyConnectionFactory := ProxyConnectionFactory{
@@ -190,6 +195,7 @@ func TestProxyExecutionAPIConnectionReuse(t *testing.T) {
 		unittest.Logger(),
 		connectionFactory.AccessMetrics,
 		0,
+		CircuitBreakerConfig{},
 	)
 
 	proxyConnectionFactory := ProxyConnectionFactory{
@@ -250,11 +256,12 @@ func TestExecutionNodeClientTimeout(t *testing.T) {
 		unittest.Logger(),
 		connectionFactory.AccessMetrics,
 		0,
+		CircuitBreakerConfig{},
 	)
 
 	// create the execution API client
 	client, _, err := connectionFactory.GetExecutionAPIClient(en.listener.Addr().String())
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	ctx := context.Background()
 	// make the call to the execution node
@@ -298,6 +305,7 @@ func TestCollectionNodeClientTimeout(t *testing.T) {
 		unittest.Logger(),
 		connectionFactory.AccessMetrics,
 		0,
+		CircuitBreakerConfig{},
 	)
 
 	// create the collection API client
@@ -346,6 +354,7 @@ func TestConnectionPoolFull(t *testing.T) {
 		unittest.Logger(),
 		connectionFactory.AccessMetrics,
 		0,
+		CircuitBreakerConfig{},
 	)
 
 	cn1Address := "foo1:123"
@@ -421,6 +430,7 @@ func TestConnectionPoolStale(t *testing.T) {
 		unittest.Logger(),
 		connectionFactory.AccessMetrics,
 		0,
+		CircuitBreakerConfig{},
 	)
 
 	proxyConnectionFactory := ProxyConnectionFactory{
@@ -509,6 +519,7 @@ func TestExecutionNodeClientClosedGracefully(t *testing.T) {
 			unittest.Logger(),
 			connectionFactory.AccessMetrics,
 			0,
+			CircuitBreakerConfig{},
 		)
 
 		clientAddress := en.listener.Addr().String()
@@ -592,6 +603,7 @@ func TestExecutionEvictingCacheClients(t *testing.T) {
 		unittest.Logger(),
 		connectionFactory.AccessMetrics,
 		0,
+		CircuitBreakerConfig{},
 	)
 
 	clientAddress := cn.listener.Addr().String()
@@ -631,6 +643,174 @@ func TestExecutionEvictingCacheClients(t *testing.T) {
 	assert.True(t, changed)
 	assert.Equal(t, connectivity.Shutdown, cachedClient.ClientConn.GetState())
 	assert.Equal(t, 0, cache.Len())
+}
+
+// TestCircuitBreakerExecutionNode tests the circuit breaker state changes for execution nodes.
+func TestCircuitBreakerExecutionNode(t *testing.T) {
+	requestTimeout := 500 * time.Millisecond
+	circuitBreakerRestoreTimeout := 1500 * time.Millisecond
+
+	// Create an execution node for testing.
+	en := new(executionNode)
+	en.start(t)
+	defer en.stop(t)
+
+	// Set up the handler mock to not respond within the requestTimeout.
+	req := &execution.PingRequest{}
+	resp := &execution.PingResponse{}
+	en.handler.On("Ping", testifymock.Anything, req).After(2*requestTimeout).Return(resp, nil)
+
+	// Create the connection factory.
+	connectionFactory := new(ConnectionFactoryImpl)
+
+	// Set the execution gRPC port.
+	connectionFactory.ExecutionGRPCPort = en.port
+
+	// Set the execution gRPC client requestTimeout.
+	connectionFactory.ExecutionNodeGRPCTimeout = requestTimeout
+
+	// Set the connection pool cache size.
+	cacheSize := 1
+	connectionCache, _ := lru.New(cacheSize)
+
+	connectionFactory.Manager = NewManager(
+		NewCache(connectionCache, cacheSize),
+		unittest.Logger(),
+		connectionFactory.AccessMetrics,
+		0,
+		CircuitBreakerConfig{
+			Enabled:        true,
+			MaxFailures:    1,
+			MaxRequests:    1,
+			RestoreTimeout: circuitBreakerRestoreTimeout,
+		},
+	)
+
+	// Set metrics reporting.
+	connectionFactory.AccessMetrics = metrics.NewNoopCollector()
+
+	// Create the execution API client.
+	client, _, err := connectionFactory.GetExecutionAPIClient(en.listener.Addr().String())
+	require.NoError(t, err)
+
+	ctx := context.Background()
+
+	// Helper function to make the Ping call to the execution node and measure the duration.
+	callAndMeasurePingDuration := func() (time.Duration, error) {
+		start := time.Now()
+
+		// Make the call to the execution node.
+		_, err = client.Ping(ctx, req)
+		en.handler.AssertCalled(t, "Ping", testifymock.Anything, req)
+
+		return time.Since(start), err
+	}
+
+	// Call and measure the duration for the first invocation.
+	duration, err := callAndMeasurePingDuration()
+	assert.Equal(t, codes.DeadlineExceeded, status.Code(err))
+	assert.LessOrEqual(t, requestTimeout, duration)
+
+	// Call and measure the duration for the second invocation (circuit breaker state is now "Open").
+	duration, err = callAndMeasurePingDuration()
+	assert.Equal(t, gobreaker.ErrOpenState, err)
+	assert.Greater(t, requestTimeout, duration)
+
+	// Reset the mock Ping for the next invocation to return response without delay
+	en.handler.On("Ping", testifymock.Anything, req).Unset()
+	en.handler.On("Ping", testifymock.Anything, req).Return(resp, nil)
+
+	// Wait until the circuit breaker transitions to the "HalfOpen" state.
+	time.Sleep(circuitBreakerRestoreTimeout + (500 * time.Millisecond))
+
+	// Call and measure the duration for the third invocation (circuit breaker state is now "HalfOpen").
+	duration, err = callAndMeasurePingDuration()
+	assert.Greater(t, requestTimeout, duration)
+	assert.Equal(t, nil, err)
+}
+
+// TestCircuitBreakerCollectionNode tests the circuit breaker state changes for collection nodes.
+func TestCircuitBreakerCollectionNode(t *testing.T) {
+	requestTimeout := 500 * time.Millisecond
+	circuitBreakerRestoreTimeout := 1500 * time.Millisecond
+
+	// Create a collection node for testing.
+	cn := new(collectionNode)
+	cn.start(t)
+	defer cn.stop(t)
+
+	// Set up the handler mock to not respond within the requestTimeout.
+	req := &access.PingRequest{}
+	resp := &access.PingResponse{}
+	cn.handler.On("Ping", testifymock.Anything, req).After(2*requestTimeout).Return(resp, nil)
+
+	// Create the connection factory.
+	connectionFactory := new(ConnectionFactoryImpl)
+
+	// Set the collection gRPC port.
+	connectionFactory.CollectionGRPCPort = cn.port
+
+	// Set the collection gRPC client requestTimeout.
+	connectionFactory.CollectionNodeGRPCTimeout = requestTimeout
+
+	// Set the connection pool cache size.
+	cacheSize := 1
+	connectionCache, _ := lru.New(cacheSize)
+
+	connectionFactory.Manager = NewManager(
+		NewCache(connectionCache, cacheSize),
+		unittest.Logger(),
+		connectionFactory.AccessMetrics,
+		0,
+		CircuitBreakerConfig{
+			Enabled:        true,
+			MaxFailures:    1,
+			MaxRequests:    1,
+			RestoreTimeout: circuitBreakerRestoreTimeout,
+		},
+	)
+
+	// Set metrics reporting.
+	connectionFactory.AccessMetrics = metrics.NewNoopCollector()
+
+	// Create the collection API client.
+	client, _, err := connectionFactory.GetAccessAPIClient(cn.listener.Addr().String())
+	assert.NoError(t, err)
+
+	ctx := context.Background()
+
+	// Helper function to make the Ping call to the collection node and measure the duration.
+	callAndMeasurePingDuration := func() (time.Duration, error) {
+		start := time.Now()
+
+		// Make the call to the collection node.
+		_, err = client.Ping(ctx, req)
+		cn.handler.AssertCalled(t, "Ping", testifymock.Anything, req)
+
+		return time.Since(start), err
+	}
+
+	// Call and measure the duration for the first invocation.
+	duration, err := callAndMeasurePingDuration()
+	assert.Equal(t, codes.DeadlineExceeded, status.Code(err))
+	assert.LessOrEqual(t, requestTimeout, duration)
+
+	// Call and measure the duration for the second invocation (circuit breaker state is now "Open").
+	duration, err = callAndMeasurePingDuration()
+	assert.Equal(t, gobreaker.ErrOpenState, err)
+	assert.Greater(t, requestTimeout, duration)
+
+	// Reset the mock Ping for the next invocation to return response without delay
+	cn.handler.On("Ping", testifymock.Anything, req).Unset()
+	cn.handler.On("Ping", testifymock.Anything, req).Return(resp, nil)
+
+	// Wait until the circuit breaker transitions to the "HalfOpen" state.
+	time.Sleep(circuitBreakerRestoreTimeout + (500 * time.Millisecond))
+
+	// Call and measure the duration for the third invocation (circuit breaker state is now "HalfOpen").
+	duration, err = callAndMeasurePingDuration()
+	assert.Greater(t, requestTimeout, duration)
+	assert.Equal(t, nil, err)
 }
 
 // node mocks a flow node that runs a GRPC server

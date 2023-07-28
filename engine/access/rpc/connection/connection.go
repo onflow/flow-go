@@ -59,7 +59,7 @@ func (cf *ConnectionFactoryImpl) GetAccessAPIClientWithPort(address string, port
 		return nil, nil, err
 	}
 
-	conn, closer, err := cf.Manager.GetConnection(grpcAddress, cf.CollectionNodeGRPCTimeout)
+	conn, closer, err := cf.Manager.GetConnection(grpcAddress, cf.CollectionNodeGRPCTimeout, AccessClient)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -85,7 +85,7 @@ func (cf *ConnectionFactoryImpl) GetExecutionAPIClient(address string) (executio
 		return nil, nil, err
 	}
 
-	conn, closer, err := cf.Manager.GetConnection(grpcAddress, cf.ExecutionNodeGRPCTimeout)
+	conn, closer, err := cf.Manager.GetConnection(grpcAddress, cf.ExecutionNodeGRPCTimeout, ExecutionClient)
 	if err != nil {
 		return nil, nil, err
 	}

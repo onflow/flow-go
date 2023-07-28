@@ -922,6 +922,7 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 				node.Logger,
 				accessMetrics,
 				config.MaxMsgSize,
+				backendConfig.CircuitBreakerConfig,
 			),
 		}
 
@@ -944,7 +945,8 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 			backendConfig.FixedExecutionNodeIDs,
 			node.Logger,
 			backend.DefaultSnapshotHistoryLimit,
-			backendConfig.ArchiveAddressList)
+			backendConfig.ArchiveAddressList,
+			backendConfig.CircuitBreakerConfig.Enabled)
 
 		observerCollector := metrics.NewObserverCollector()
 		restHandler, err := restapiproxy.NewRestProxyHandler(

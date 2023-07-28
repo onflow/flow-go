@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/hashicorp/go-multierror"
 	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
 	"github.com/onflow/flow/protobuf/go/flow/entities"
 	execproto "github.com/onflow/flow/protobuf/go/flow/execution"
@@ -25,8 +24,6 @@ import (
 	"github.com/onflow/flow-go/storage"
 )
 
-const collectionNodesToTry uint = 3
-
 type backendTransactions struct {
 	staticCollectionRPC  accessproto.AccessAPIClient // rpc client tied to a fixed collection node
 	transactions         storage.Transactions
@@ -42,6 +39,7 @@ type backendTransactions struct {
 
 	previousAccessNodes []accessproto.AccessAPIClient
 	log                 zerolog.Logger
+	nodeCommunicator    *NodeCommunicator
 }
 
 // SendTransaction forwards the transaction to the collection node
@@ -86,36 +84,39 @@ func (b *backendTransactions) trySendTransaction(ctx context.Context, tx *flow.T
 		return b.grpcTxSend(ctx, b.staticCollectionRPC, tx)
 	}
 
-	// otherwise choose a random set of collections nodes to try
-	collAddrs, err := b.chooseCollectionNodes(tx, collectionNodesToTry)
+	// otherwise choose all collection nodes to try
+	collNodes, err := b.chooseCollectionNodes(tx)
 	if err != nil {
 		return fmt.Errorf("failed to determine collection node for tx %x: %w", tx, err)
 	}
 
-	var sendErrors *multierror.Error
+	var sendError error
 	logAnyError := func() {
-		err = sendErrors.ErrorOrNil()
-		if err != nil {
+		if sendError != nil {
 			b.log.Info().Err(err).Msg("failed to send transactions to collector nodes")
 		}
 	}
 	defer logAnyError()
 
 	// try sending the transaction to one of the chosen collection nodes
-	for _, addr := range collAddrs {
-		err = b.sendTransactionToCollector(ctx, tx, addr)
-		if err == nil {
+	sendError = b.nodeCommunicator.CallAvailableNode(
+		collNodes,
+		func(node *flow.Identity) error {
+			err = b.sendTransactionToCollector(ctx, tx, node.Address)
+			if err != nil {
+				return err
+			}
 			return nil
-		}
-		sendErrors = multierror.Append(sendErrors, err)
-	}
+		},
+		nil,
+	)
 
-	return sendErrors.ErrorOrNil()
+	return sendError
 }
 
 // chooseCollectionNodes finds a random subset of size sampleSize of collection node addresses from the
 // collection node cluster responsible for the given tx
-func (b *backendTransactions) chooseCollectionNodes(tx *flow.TransactionBody, sampleSize uint) ([]string, error) {
+func (b *backendTransactions) chooseCollectionNodes(tx *flow.TransactionBody) (flow.IdentityList, error) {
 
 	// retrieve the set of collector clusters
 	clusters, err := b.state.Final().Epochs().Current().Clustering()
@@ -124,24 +125,12 @@ func (b *backendTransactions) chooseCollectionNodes(tx *flow.TransactionBody, sa
 	}
 
 	// get the cluster responsible for the transaction
-	txCluster, ok := clusters.ByTxID(tx.ID())
+	targetNodes, ok := clusters.ByTxID(tx.ID())
 	if !ok {
 		return nil, fmt.Errorf("could not get local cluster by txID: %x", tx.ID())
 	}
 
-	// select a random subset of collection nodes from the cluster to be tried in order
-	targetNodes, err := txCluster.Sample(sampleSize)
-	if err != nil {
-		return nil, fmt.Errorf("sampling failed: %w", err)
-	}
-
-	// collect the addresses of all the chosen collection nodes
-	var targetAddrs = make([]string, len(targetNodes))
-	for i, id := range targetNodes {
-		targetAddrs[i] = id.Address
-	}
-
-	return targetAddrs, nil
+	return targetNodes, nil
 }
 
 // sendTransactionToCollection sends the transaction to the given collection node via grpc
@@ -157,9 +146,6 @@ func (b *backendTransactions) sendTransactionToCollector(ctx context.Context,
 
 	err = b.grpcTxSend(ctx, collectionRPC, tx)
 	if err != nil {
-		if status.Code(err) == codes.Unavailable {
-			b.connFactory.InvalidateAccessAPIClient(collectionNodeAddr)
-		}
 		return fmt.Errorf("failed to send transaction to collection node at %s: %w", collectionNodeAddr, err)
 	}
 	return nil
@@ -391,6 +377,7 @@ func (b *backendTransactions) GetTransactionResultsByBlockID(
 	req := &execproto.GetTransactionsByBlockIDRequest{
 		BlockId: blockID[:],
 	}
+
 	execNodes, err := executionNodesForBlockID(ctx, blockID, b.executionReceipts, b.state, b.log)
 	if err != nil {
 		if IsInsufficientExecutionReceipts(err) {
@@ -522,6 +509,7 @@ func (b *backendTransactions) GetTransactionResultByIndex(
 		BlockId: blockID[:],
 		Index:   index,
 	}
+
 	execNodes, err := executionNodesForBlockID(ctx, blockID, b.executionReceipts, b.state, b.log)
 	if err != nil {
 		if IsInsufficientExecutionReceipts(err) {
@@ -782,32 +770,36 @@ func (b *backendTransactions) getTransactionResultFromAnyExeNode(
 	execNodes flow.IdentityList,
 	req *execproto.GetTransactionResultRequest,
 ) (*execproto.GetTransactionResultResponse, error) {
-	var errs *multierror.Error
-	logAnyError := func() {
-		errToReturn := errs.ErrorOrNil()
+	var errToReturn error
+
+	defer func() {
 		if errToReturn != nil {
 			b.log.Info().Err(errToReturn).Msg("failed to get transaction result from execution nodes")
 		}
-	}
-	defer logAnyError()
-	// try to execute the script on one of the execution nodes
-	for _, execNode := range execNodes {
-		resp, err := b.tryGetTransactionResult(ctx, execNode, req)
-		if err == nil {
-			b.log.Debug().
-				Str("execution_node", execNode.String()).
-				Hex("block_id", req.GetBlockId()).
-				Hex("transaction_id", req.GetTransactionId()).
-				Msg("Successfully got transaction results from any node")
-			return resp, nil
-		}
-		if status.Code(err) == codes.NotFound {
-			return nil, err
-		}
-		errs = multierror.Append(errs, err)
-	}
+	}()
 
-	return nil, errs.ErrorOrNil()
+	var resp *execproto.GetTransactionResultResponse
+	errToReturn = b.nodeCommunicator.CallAvailableNode(
+		execNodes,
+		func(node *flow.Identity) error {
+			var err error
+			resp, err = b.tryGetTransactionResult(ctx, node, req)
+			if err == nil {
+				b.log.Debug().
+					Str("execution_node", node.String()).
+					Hex("block_id", req.GetBlockId()).
+					Hex("transaction_id", req.GetTransactionId()).
+					Msg("Successfully got transaction results from any node")
+				return nil
+			}
+			return err
+		},
+		func(_ *flow.Identity, err error) bool {
+			return status.Code(err) == codes.NotFound
+		},
+	)
+
+	return resp, errToReturn
 }
 
 func (b *backendTransactions) tryGetTransactionResult(
@@ -823,9 +815,6 @@ func (b *backendTransactions) tryGetTransactionResult(
 
 	resp, err := execRPCClient.GetTransactionResult(ctx, req)
 	if err != nil {
-		if status.Code(err) == codes.Unavailable {
-			b.connFactory.InvalidateExecutionAPIClient(execNode.Address)
-		}
 		return nil, err
 	}
 
@@ -837,12 +826,12 @@ func (b *backendTransactions) getTransactionResultsByBlockIDFromAnyExeNode(
 	execNodes flow.IdentityList,
 	req *execproto.GetTransactionsByBlockIDRequest,
 ) (*execproto.GetTransactionResultsResponse, error) {
-	var errs *multierror.Error
+	var errToReturn error
 
 	defer func() {
 		// log the errors
-		if err := errs.ErrorOrNil(); err != nil {
-			b.log.Err(errs).Msg("failed to get transaction results from execution nodes")
+		if errToReturn != nil {
+			b.log.Err(errToReturn).Msg("failed to get transaction results from execution nodes")
 		}
 	}()
 
@@ -851,22 +840,27 @@ func (b *backendTransactions) getTransactionResultsByBlockIDFromAnyExeNode(
 		return nil, errors.New("zero execution nodes")
 	}
 
-	for _, execNode := range execNodes {
-		resp, err := b.tryGetTransactionResultsByBlockID(ctx, execNode, req)
-		if err == nil {
-			b.log.Debug().
-				Str("execution_node", execNode.String()).
-				Hex("block_id", req.GetBlockId()).
-				Msg("Successfully got transaction results from any node")
-			return resp, nil
-		}
-		if status.Code(err) == codes.NotFound {
-			return nil, err
-		}
-		errs = multierror.Append(errs, err)
-	}
+	var resp *execproto.GetTransactionResultsResponse
+	errToReturn = b.nodeCommunicator.CallAvailableNode(
+		execNodes,
+		func(node *flow.Identity) error {
+			var err error
+			resp, err = b.tryGetTransactionResultsByBlockID(ctx, node, req)
+			if err == nil {
+				b.log.Debug().
+					Str("execution_node", node.String()).
+					Hex("block_id", req.GetBlockId()).
+					Msg("Successfully got transaction results from any node")
+				return nil
+			}
+			return err
+		},
+		func(_ *flow.Identity, err error) bool {
+			return status.Code(err) == codes.NotFound
+		},
+	)
 
-	return nil, errs.ErrorOrNil()
+	return resp, errToReturn
 }
 
 func (b *backendTransactions) tryGetTransactionResultsByBlockID(
@@ -882,9 +876,6 @@ func (b *backendTransactions) tryGetTransactionResultsByBlockID(
 
 	resp, err := execRPCClient.GetTransactionResultsByBlockID(ctx, req)
 	if err != nil {
-		if status.Code(err) == codes.Unavailable {
-			b.connFactory.InvalidateExecutionAPIClient(execNode.Address)
-		}
 		return nil, err
 	}
 
@@ -896,37 +887,39 @@ func (b *backendTransactions) getTransactionResultByIndexFromAnyExeNode(
 	execNodes flow.IdentityList,
 	req *execproto.GetTransactionByIndexRequest,
 ) (*execproto.GetTransactionResultResponse, error) {
-	var errs *multierror.Error
-	logAnyError := func() {
-		errToReturn := errs.ErrorOrNil()
+	var errToReturn error
+	defer func() {
 		if errToReturn != nil {
 			b.log.Info().Err(errToReturn).Msg("failed to get transaction result from execution nodes")
 		}
-	}
-	defer logAnyError()
+	}()
 
 	if len(execNodes) == 0 {
 		return nil, errors.New("zero execution nodes provided")
 	}
 
-	// try to execute the script on one of the execution nodes
-	for _, execNode := range execNodes {
-		resp, err := b.tryGetTransactionResultByIndex(ctx, execNode, req)
-		if err == nil {
-			b.log.Debug().
-				Str("execution_node", execNode.String()).
-				Hex("block_id", req.GetBlockId()).
-				Uint32("index", req.GetIndex()).
-				Msg("Successfully got transaction results from any node")
-			return resp, nil
-		}
-		if status.Code(err) == codes.NotFound {
-			return nil, err
-		}
-		errs = multierror.Append(errs, err)
-	}
+	var resp *execproto.GetTransactionResultResponse
+	errToReturn = b.nodeCommunicator.CallAvailableNode(
+		execNodes,
+		func(node *flow.Identity) error {
+			var err error
+			resp, err = b.tryGetTransactionResultByIndex(ctx, node, req)
+			if err == nil {
+				b.log.Debug().
+					Str("execution_node", node.String()).
+					Hex("block_id", req.GetBlockId()).
+					Uint32("index", req.GetIndex()).
+					Msg("Successfully got transaction results from any node")
+				return nil
+			}
+			return err
+		},
+		func(_ *flow.Identity, err error) bool {
+			return status.Code(err) == codes.NotFound
+		},
+	)
 
-	return nil, errs.ErrorOrNil()
+	return resp, errToReturn
 }
 
 func (b *backendTransactions) tryGetTransactionResultByIndex(
@@ -942,9 +935,6 @@ func (b *backendTransactions) tryGetTransactionResultByIndex(
 
 	resp, err := execRPCClient.GetTransactionResultByIndex(ctx, req)
 	if err != nil {
-		if status.Code(err) == codes.Unavailable {
-			b.connFactory.InvalidateExecutionAPIClient(execNode.Address)
-		}
 		return nil, err
 	}
 

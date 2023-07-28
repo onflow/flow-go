@@ -162,6 +162,12 @@ func DefaultAccessNodeConfig() *AccessNodeConfig {
 				PreferredExecutionNodeIDs: nil,
 				FixedExecutionNodeIDs:     nil,
 				ArchiveAddressList:        nil,
+				CircuitBreakerConfig: rpcConnection.CircuitBreakerConfig{
+					Enabled:        false,
+					RestoreTimeout: 60 * time.Second,
+					MaxFailures:    5,
+					MaxRequests:    1,
+				},
 			},
 			MaxMsgSize: grpcutils.DefaultMaxMsgSize,
 		},
@@ -690,7 +696,10 @@ func (builder *FlowAccessNodeBuilder) extraFlags() {
 		flags.StringToIntVar(&builder.apiBurstlimits, "api-burst-limits", defaultConfig.apiBurstlimits, "burst limits for Access API methods e.g. Ping=100,GetTransaction=100 etc.")
 		flags.BoolVar(&builder.supportsObserver, "supports-observer", defaultConfig.supportsObserver, "true if this staked access node supports observer or follower connections")
 		flags.StringVar(&builder.PublicNetworkConfig.BindAddress, "public-network-address", defaultConfig.PublicNetworkConfig.BindAddress, "staked access node's public network bind address")
-
+		flags.BoolVar(&builder.rpcConf.BackendConfig.CircuitBreakerConfig.Enabled, "circuit-breaker-enabled", defaultConfig.rpcConf.BackendConfig.CircuitBreakerConfig.Enabled, "specifies whether the circuit breaker is enabled for collection and execution API clients.")
+		flags.DurationVar(&builder.rpcConf.BackendConfig.CircuitBreakerConfig.RestoreTimeout, "circuit-breaker-restore-timeout", defaultConfig.rpcConf.BackendConfig.CircuitBreakerConfig.RestoreTimeout, "duration after which the circuit breaker will restore the connection to the client after closing it due to failures. Default value is 60s")
+		flags.Uint32Var(&builder.rpcConf.BackendConfig.CircuitBreakerConfig.MaxFailures, "circuit-breaker-max-failures", defaultConfig.rpcConf.BackendConfig.CircuitBreakerConfig.MaxFailures, "maximum number of failed calls to the client that will cause the circuit breaker to close the connection. Default value is 5")
+		flags.Uint32Var(&builder.rpcConf.BackendConfig.CircuitBreakerConfig.MaxRequests, "circuit-breaker-max-requests", defaultConfig.rpcConf.BackendConfig.CircuitBreakerConfig.MaxRequests, "maximum number of requests to check if connection restored after timeout. Default value is 1")
 		// ExecutionDataRequester config
 		flags.BoolVar(&builder.executionDataSyncEnabled, "execution-data-sync-enabled", defaultConfig.executionDataSyncEnabled, "whether to enable the execution data sync protocol")
 		flags.StringVar(&builder.executionDataDir, "execution-data-dir", defaultConfig.executionDataDir, "directory to use for Execution Data database")
@@ -752,6 +761,17 @@ func (builder *FlowAccessNodeBuilder) extraFlags() {
 			}
 			if builder.stateStreamConf.ResponseLimit < 0 {
 				return errors.New("state-stream-response-limit must be greater than or equal to 0")
+			}
+		}
+		if builder.rpcConf.BackendConfig.CircuitBreakerConfig.Enabled {
+			if builder.rpcConf.BackendConfig.CircuitBreakerConfig.MaxFailures == 0 {
+				return errors.New("circuit-breaker-max-failures must be greater than 0")
+			}
+			if builder.rpcConf.BackendConfig.CircuitBreakerConfig.MaxRequests == 0 {
+				return errors.New("circuit-breaker-max-requests must be greater than 0")
+			}
+			if builder.rpcConf.BackendConfig.CircuitBreakerConfig.RestoreTimeout <= 0 {
+				return errors.New("circuit-breaker-restore-timeout must be greater than 0")
 			}
 		}
 
@@ -1065,6 +1085,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 					node.Logger,
 					accessMetrics,
 					config.MaxMsgSize,
+					backendConfig.CircuitBreakerConfig,
 				),
 			}
 
@@ -1087,7 +1108,8 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				backendConfig.FixedExecutionNodeIDs,
 				node.Logger,
 				backend.DefaultSnapshotHistoryLimit,
-				backendConfig.ArchiveAddressList)
+				backendConfig.ArchiveAddressList,
+				backendConfig.CircuitBreakerConfig.Enabled)
 
 			engineBuilder, err := rpc.NewBuilder(
 				node.Logger,
