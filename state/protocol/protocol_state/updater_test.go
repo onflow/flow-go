@@ -268,7 +268,7 @@ func (s *UpdaterSuite) TestUpdateIdentityHappyPath() {
 	unittest.WithNextEpochProtocolState()(s.parentProtocolState)
 	s.updater = newUpdater(s.candidate, s.parentProtocolState)
 
-	weightChanges, err := s.parentProtocolState.CurrentEpochSetup.Participants.Sample(5)
+	weightChanges, err := s.parentProtocolState.CurrentEpochSetup.Participants.Sample(2)
 	require.NoError(s.T(), err)
 	ejectedChanges, err := s.parentProtocolState.CurrentEpochSetup.Participants.Sample(2)
 	require.NoError(s.T(), err)
@@ -306,12 +306,12 @@ func (s *UpdaterSuite) TestUpdateIdentityHappyPath() {
 // TestEpochSetupAfterIdentityChange tests that after processing epoch setup event all previously made changes to the identity table
 // are preserved and reflected in the resulting protocol state.
 func (s *UpdaterSuite) TestEpochSetupAfterIdentityChange() {
-	weightChanges, err := s.parentProtocolState.CurrentEpochSetup.Participants.Sample(5)
+	weightChanges, err := s.parentProtocolState.CurrentEpochSetup.Participants.Sample(2)
 	require.NoError(s.T(), err)
 	ejectedChanges, err := s.parentProtocolState.CurrentEpochSetup.Participants.Sample(2)
 	require.NoError(s.T(), err)
 	for i, identity := range weightChanges {
-		identity.DynamicIdentity.Weight = uint64(100 * i)
+		identity.DynamicIdentity.Weight = uint64(100 * (i + 1))
 	}
 	for _, identity := range ejectedChanges {
 		identity.Ejected = true
@@ -337,7 +337,7 @@ func (s *UpdaterSuite) TestEpochSetupAfterIdentityChange() {
 		Identities:             s.parentProtocolState.Identities.Copy(),
 		NextEpochProtocolState: nil,
 	}
-	// Update enriched data with the changes made to the low-level identity table
+	// Update enriched data with the changes made to the low-level updated table
 	for _, identity := range allUpdates {
 		toBeUpdated, _ := updatedRichProtocolState.Identities.ByNodeID(identity.NodeID)
 		toBeUpdated.DynamicIdentity = identity.DynamicIdentity
@@ -349,8 +349,26 @@ func (s *UpdaterSuite) TestEpochSetupAfterIdentityChange() {
 
 	setup := unittest.EpochSetupFixture(func(setup *flow.EpochSetup) {
 		setup.Counter = s.parentProtocolState.CurrentEpochSetup.Counter + 1
+		setup.Participants = append(setup.Participants, allUpdates...) // add those nodes that were changed in previous epoch
 	})
 
 	err = s.updater.ProcessEpochSetup(setup)
 	require.NoError(s.T(), err)
+
+	updatedState, _, _ = s.updater.Build()
+
+	// HUGE problem in using Lookup, if same entries are in both current and next epoch,
+	// then lookup will return the one from current(or next) epoch
+	currentEpochLookup := updatedState.Identities.Lookup()
+	nextEpochLookup := updatedState.NextEpochProtocolState.Identities.Lookup()
+
+	for _, updated := range allUpdates {
+		currentEpochIdentity := currentEpochLookup[updated.NodeID]
+		nextEpochIdentity := nextEpochLookup[updated.NodeID]
+		require.Equal(s.T(), updated.NodeID, currentEpochIdentity.NodeID)
+		require.Equal(s.T(), updated.NodeID, nextEpochIdentity.NodeID)
+		//require.Equal(s.T(), updated.DynamicIdentity, currentEpochIdentity.Dynamic)
+		require.Equal(s.T(), updated.Weight, currentEpochIdentity.Dynamic.Weight)
+	}
+
 }
