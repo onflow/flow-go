@@ -8,7 +8,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/model/flow/order"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/storage/badger/transaction"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -106,9 +105,9 @@ func assertRichProtocolStateValidity(t *testing.T, state *flow.RichProtocolState
 	assert.Equal(t, state.PreviousEpochSetup.ID(), state.ProtocolStateEntry.PreviousEpochEventIDs.SetupID, "epoch setup should be for correct event ID")
 	assert.Equal(t, state.PreviousEpochCommit.ID(), state.ProtocolStateEntry.PreviousEpochEventIDs.CommitID, "epoch commit should be for correct event ID")
 
-	// invariant: Identities is a full identity table for the current epoch. Identities are sorted in canonical order. Never nil.
-	allIdentities := append(state.PreviousEpochSetup.Participants, state.CurrentEpochSetup.Participants...).Sort(order.Canonical)
-	assert.Equal(t, allIdentities, state.Identities, "identities should be a full identity table for the current epoch")
+	// invariant: Identities is a full identity table for the current epoch. Identities are sorted in canonical order. Without duplicates. Never nil.
+	allIdentities := state.PreviousEpochSetup.Participants.Union(state.CurrentEpochSetup.Participants)
+	assert.Equal(t, allIdentities, state.Identities, "identities should be a full identity table for the current epoch, without duplicates")
 
 	for i, identity := range state.ProtocolStateEntry.Identities {
 		assert.Equal(t, identity.NodeID, allIdentities[i].NodeID, "identity node ID should match")
