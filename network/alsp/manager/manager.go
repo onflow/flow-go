@@ -299,7 +299,7 @@ func (m *MisbehaviorReportManager) onHeartbeat() error {
 	allIds := m.cache.Identities()
 
 	for _, id := range allIds {
-		m.logger.Info().Hex("identifier", logging.ID(id)).Msg("onHeartbeat - looping through spam records")
+		m.logger.Trace().Hex("identifier", logging.ID(id)).Msg("onHeartbeat - looping through spam records")
 		penalty, err := m.cache.Adjust(id, func(record model.ProtocolSpamRecord) (model.ProtocolSpamRecord, error) {
 			if record.Penalty > 0 {
 				// sanity check; this should never happen.
@@ -336,14 +336,14 @@ func (m *MisbehaviorReportManager) onHeartbeat() error {
 			// each time we decay the penalty by the decay speed, the penalty is a negative number, and the decay speed
 			// is a positive number. So the penalty is getting closer to zero.
 			// We use math.Min() to make sure the penalty is never positive.
-			m.logger.Info().
+			m.logger.Trace().
 				Hex("identifier", logging.ID(id)).
 				Uint64("cutoff_counter", record.CutoffCounter).
 				Bool("disallow_listed", record.DisallowListed).
 				Float64("penalty", record.Penalty).
 				Msg("onHeartbeat - before adjusting penalty via decayFunc")
 			record.Penalty = m.DecayFunc(record)
-			m.logger.Info().
+			m.logger.Trace().
 				Hex("identifier", logging.ID(id)).
 				Uint64("cutoff_counter", record.CutoffCounter).
 				Bool("disallow_listed", record.DisallowListed).
