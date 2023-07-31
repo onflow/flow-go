@@ -2,9 +2,7 @@ package badger
 
 import (
 	"fmt"
-
 	"github.com/dgraph-io/badger/v2"
-
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/order"
 	"github.com/onflow/flow-go/module"
@@ -58,7 +56,17 @@ func NewProtocolState(collector module.CacheMetrics,
 
 // StoreTx allows us to store protocol state as part of a DB tx, while still going through the caching layer.
 func (s *ProtocolState) StoreTx(id flow.Identifier, protocolState *flow.ProtocolStateEntry) func(*transaction.Tx) error {
-	return transaction.WithTx(operation.InsertProtocolState(id, protocolState))
+	return func(tx *transaction.Tx) error {
+		if !protocolState.Identities.Sorted(order.IdentifierCanonical) {
+			return fmt.Errorf("sanity check failed: identities are not sorted")
+		}
+		if protocolState.NextEpochProtocolState != nil {
+			if !protocolState.NextEpochProtocolState.Identities.Sorted(order.IdentifierCanonical) {
+				return fmt.Errorf("sanity check failed: next epoch identities are not sorted")
+			}
+		}
+		return transaction.WithTx(operation.InsertProtocolState(id, protocolState))(tx)
+	}
 }
 
 // Index indexes the protocol state by block ID.

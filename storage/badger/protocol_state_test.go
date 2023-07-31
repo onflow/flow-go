@@ -65,6 +65,30 @@ func TestProtocolStateStorage(t *testing.T) {
 	})
 }
 
+// TestProtocolStateStoreInvalidProtocolState tests that storing protocol state which has unsorted identities fails for
+// current and next epoch protocol states.
+func TestProtocolStateStoreInvalidProtocolState(t *testing.T) {
+	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+		metrics := metrics.NewNoopCollector()
+		setups := NewEpochSetups(metrics, db)
+		commits := NewEpochCommits(metrics, db)
+		store := NewProtocolState(metrics, setups, commits, db, DefaultCacheSize)
+		invalid := unittest.ProtocolStateFixture().ProtocolStateEntry
+		// swap first and second elements to break canonical order
+		invalid.Identities[0], invalid.Identities[1] = invalid.Identities[1], invalid.Identities[0]
+
+		err := transaction.Update(db, store.StoreTx(invalid.ID(), &invalid))
+		require.Error(t, err)
+
+		invalid = unittest.ProtocolStateFixture(unittest.WithNextEpochProtocolState()).ProtocolStateEntry
+		// swap first and second elements to break canonical order
+		invalid.NextEpochProtocolState.Identities[0], invalid.NextEpochProtocolState.Identities[1] = invalid.NextEpochProtocolState.Identities[1], invalid.NextEpochProtocolState.Identities[0]
+
+		err = transaction.Update(db, store.StoreTx(invalid.ID(), &invalid))
+		require.Error(t, err)
+	})
+}
+
 // assertRichProtocolStateValidity checks if RichProtocolState holds its invariant and is correctly populated by storage layer.
 func assertRichProtocolStateValidity(t *testing.T, state *flow.RichProtocolStateEntry) {
 	// invariant: CurrentEpochSetup and CurrentEpochCommit are for the same epoch. Never nil.
