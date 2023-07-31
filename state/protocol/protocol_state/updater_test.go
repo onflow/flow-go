@@ -257,4 +257,100 @@ func (s *UpdaterSuite) TestUpdateIdentityUnknownIdentity() {
 	}
 	err := s.updater.UpdateIdentity(identity)
 	require.Error(s.T(), err, "should not be able to update data of unknown identity")
+
+	_, _, hasChanges := s.updater.Build()
+	require.False(s.T(), hasChanges, "should not have changes")
+}
+
+// TestUpdateIdentityHappyPath tests if identity updates are correctly processed and reflected in resulting protocol state.
+func (s *UpdaterSuite) TestUpdateIdentityHappyPath() {
+	// update protocol state to have next epoch protocol state
+	unittest.WithNextEpochProtocolState()(s.parentProtocolState)
+	s.updater = newUpdater(s.candidate, s.parentProtocolState)
+
+	weightChanges, err := s.parentProtocolState.CurrentEpochSetup.Participants.Sample(5)
+	require.NoError(s.T(), err)
+	ejectedChanges, err := s.parentProtocolState.CurrentEpochSetup.Participants.Sample(2)
+	require.NoError(s.T(), err)
+	for i, identity := range weightChanges {
+		identity.DynamicIdentity.Weight = uint64(100 * i)
+	}
+	for _, identity := range ejectedChanges {
+		identity.Ejected = true
+	}
+
+	allUpdates := append(weightChanges, ejectedChanges...)
+	for _, update := range allUpdates {
+		err := s.updater.UpdateIdentity(&flow.DynamicIdentityEntry{
+			NodeID:  update.NodeID,
+			Dynamic: update.DynamicIdentity,
+		})
+		require.NoError(s.T(), err)
+	}
+	updatedState, _, hasChanges := s.updater.Build()
+	require.True(s.T(), hasChanges, "should have changes")
+
+	requireUpdatesApplied := func(identityLookup map[flow.Identifier]*flow.DynamicIdentityEntry) {
+		for _, identity := range allUpdates {
+			updatedIdentity := identityLookup[identity.NodeID]
+			require.Equal(s.T(), identity.NodeID, updatedIdentity.NodeID)
+			require.Equal(s.T(), identity.DynamicIdentity, updatedIdentity.Dynamic, "identity should be updated")
+		}
+	}
+
+	// check if changes are reflected in current and next epochs
+	requireUpdatesApplied(updatedState.Identities.Lookup())
+	requireUpdatesApplied(updatedState.NextEpochProtocolState.Identities.Lookup())
+}
+
+// TestEpochSetupAfterIdentityChange tests that after processing epoch setup event all previously made changes to the identity table
+// are preserved and reflected in the resulting protocol state.
+func (s *UpdaterSuite) TestEpochSetupAfterIdentityChange() {
+	weightChanges, err := s.parentProtocolState.CurrentEpochSetup.Participants.Sample(5)
+	require.NoError(s.T(), err)
+	ejectedChanges, err := s.parentProtocolState.CurrentEpochSetup.Participants.Sample(2)
+	require.NoError(s.T(), err)
+	for i, identity := range weightChanges {
+		identity.DynamicIdentity.Weight = uint64(100 * i)
+	}
+	for _, identity := range ejectedChanges {
+		identity.Ejected = true
+	}
+	allUpdates := append(weightChanges, ejectedChanges...)
+	for _, update := range allUpdates {
+		err := s.updater.UpdateIdentity(&flow.DynamicIdentityEntry{
+			NodeID:  update.NodeID,
+			Dynamic: update.DynamicIdentity,
+		})
+		require.NoError(s.T(), err)
+	}
+	updatedState, _, _ := s.updater.Build()
+
+	// Construct a valid flow.RichProtocolStateEntry for next block
+	// We do this by copying the parent protocol state and updating the identities manually
+	updatedRichProtocolState := &flow.RichProtocolStateEntry{
+		ProtocolStateEntry:     *updatedState,
+		CurrentEpochSetup:      s.parentProtocolState.CurrentEpochSetup,
+		CurrentEpochCommit:     s.parentProtocolState.CurrentEpochCommit,
+		PreviousEpochSetup:     s.parentProtocolState.PreviousEpochSetup,
+		PreviousEpochCommit:    s.parentProtocolState.PreviousEpochCommit,
+		Identities:             s.parentProtocolState.Identities.Copy(),
+		NextEpochProtocolState: nil,
+	}
+	// Update enriched data with the changes made to the low-level identity table
+	for _, identity := range allUpdates {
+		toBeUpdated, _ := updatedRichProtocolState.Identities.ByNodeID(identity.NodeID)
+		toBeUpdated.DynamicIdentity = identity.DynamicIdentity
+	}
+
+	// now we can use it to construct updater for next block, which will process epoch setup event.
+	nextBlock := unittest.BlockHeaderWithParentFixture(s.candidate)
+	s.updater = newUpdater(nextBlock, updatedRichProtocolState)
+
+	setup := unittest.EpochSetupFixture(func(setup *flow.EpochSetup) {
+		setup.Counter = s.parentProtocolState.CurrentEpochSetup.Counter + 1
+	})
+
+	err = s.updater.ProcessEpochSetup(setup)
+	require.NoError(s.T(), err)
 }
