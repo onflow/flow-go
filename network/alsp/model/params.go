@@ -45,9 +45,3 @@ const (
 	// speed is 1, and it takes around a day to recover from each disallow-listing.
 	InitialDecaySpeed = 1000 // (Don't change this value)
 )
-
-type PenaltyParams struct {
-	DisallowListingThreshold float64
-	DefaultPenaltyValue      float64
-	InitialDecaySpeed        int
-}
