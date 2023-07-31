@@ -90,3 +90,11 @@ func (e *ProtocolStateEntry) Copy() *ProtocolStateEntry {
 		NextEpochProtocolState:          e.NextEpochProtocolState.Copy(),
 	}
 }
+
+func (ll DynamicIdentityEntryList) Lookup() map[Identifier]*DynamicIdentityEntry {
+	result := make(map[Identifier]*DynamicIdentityEntry, len(ll))
+	for _, entry := range ll {
+		result[entry.NodeID] = entry
+	}
+	return result
+}

@@ -248,3 +248,13 @@ func (s *UpdaterSuite) TestProcessEpochCommit() {
 		require.Equal(s.T(), commit.ID(), newState.NextEpochProtocolState.CurrentEpochEventIDs.CommitID, "next epoch must be committed")
 	})
 }
+
+// TestUpdateIdentityUnknownIdentity tests if updating identity of unknown node results in an error.
+func (s *UpdaterSuite) TestUpdateIdentityUnknownIdentity() {
+	identity := &flow.DynamicIdentityEntry{
+		NodeID:  unittest.IdentifierFixture(),
+		Dynamic: flow.DynamicIdentity{},
+	}
+	err := s.updater.UpdateIdentity(identity)
+	require.Error(s.T(), err, "should not be able to update data of unknown identity")
+}

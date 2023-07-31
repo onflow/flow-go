@@ -8,6 +8,9 @@ import (
 type Updater struct {
 	parentState *flow.RichProtocolStateEntry
 	state       *flow.ProtocolStateEntry
+
+	currentEpochIdentitiesLookup map[flow.Identifier]*flow.DynamicIdentityEntry
+	nextEpochIdentitiesLookup    map[flow.Identifier]*flow.DynamicIdentityEntry
 }
 
 func newUpdater(candidate *flow.Header, parentState *flow.RichProtocolStateEntry) *Updater {
@@ -136,13 +139,40 @@ func (u *Updater) ProcessEpochCommit(epochCommit *flow.EpochCommit) error {
 }
 
 func (u *Updater) UpdateIdentity(updated *flow.DynamicIdentityEntry) error {
-	//TODO implement me
-	panic("implement me")
+	u.ensureLookupPopulated()
+
+	newData := updated.Dynamic
+
+	currentEpochIdentity, found := u.currentEpochIdentitiesLookup[updated.NodeID]
+	if !found {
+		return fmt.Errorf("expected to find identity for current epoch, but (%v) not found", updated.NodeID)
+	}
+	currentEpochIdentity.Dynamic = newData
+
+	if u.state.NextEpochProtocolState != nil {
+		nextEpochIdentity, found := u.nextEpochIdentitiesLookup[updated.NodeID]
+		if !found {
+			return fmt.Errorf("expected to find identity for next epoch, but (%v) not found", updated.NodeID)
+		}
+		nextEpochIdentity.Dynamic = newData
+	}
+	return nil
 }
 
 func (u *Updater) SetInvalidStateTransitionAttempted() {
 	u.state.InvalidStateTransitionAttempted = true
 	if u.state.NextEpochProtocolState != nil {
 		u.state.NextEpochProtocolState.InvalidStateTransitionAttempted = true
+	}
+}
+
+func (u *Updater) ensureLookupPopulated() {
+	if len(u.currentEpochIdentitiesLookup) > 0 {
+		return
+	}
+
+	u.currentEpochIdentitiesLookup = u.state.Identities.Lookup()
+	if u.state.NextEpochProtocolState != nil {
+		u.nextEpochIdentitiesLookup = u.state.NextEpochProtocolState.Identities.Lookup()
 	}
 }
