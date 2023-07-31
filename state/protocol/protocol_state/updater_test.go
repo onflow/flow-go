@@ -303,6 +303,25 @@ func (s *UpdaterSuite) TestUpdateIdentityHappyPath() {
 	requireUpdatesApplied(updatedState.NextEpochProtocolState.Identities.Lookup())
 }
 
+func (s *UpdaterSuite) TestProcessEpochSetupWithSameParticipants() {
+	overlappingNodes, err := s.parentProtocolState.CurrentEpochSetup.Participants.Sample(2)
+	require.NoError(s.T(), err)
+	setup := unittest.EpochSetupFixture(func(setup *flow.EpochSetup) {
+		setup.Counter = s.parentProtocolState.CurrentEpochSetup.Counter + 1
+		setup.Participants = append(setup.Participants, overlappingNodes...)
+	})
+	err = s.updater.ProcessEpochSetup(setup)
+	require.NoError(s.T(), err)
+	updatedState, _, _ := s.updater.Build()
+	expectedLen := len(s.parentProtocolState.CurrentEpochSetup.Participants) + len(setup.Participants) - len(overlappingNodes)
+	require.Len(s.T(), updatedState.Identities,
+		expectedLen,
+		"should have all participants from current epoch and next epoch, but without duplicates")
+	require.Len(s.T(), updatedState.NextEpochProtocolState.Identities,
+		expectedLen,
+		"should have all participants from previous epoch and current epoch, but without duplicates")
+}
+
 // TestEpochSetupAfterIdentityChange tests that after processing epoch setup event all previously made changes to the identity table
 // are preserved and reflected in the resulting protocol state.
 func (s *UpdaterSuite) TestEpochSetupAfterIdentityChange() {
