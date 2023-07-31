@@ -39,6 +39,32 @@ jobs:
         id: set-test-matrix
         run: go run utils/test_matrix/test_matrix.go access admin cmd consensus engine fvm ledger module network utils
 
+  unit-test:
+    name: Unit Tests (${{ matrix.targets.name }})
+    needs: create-dynamic-test-matrix
+    strategy:
+      fail-fast: false
+      matrix:
+        targets: ${{ fromJSON(needs.create-dynamic-test-matrix.outputs.dynamic-matrix)}}
+    # need to set image explicitly due to GitHub logging issue as described in https://github.com/onflow/flow-go/pull/3087#issuecomment-1234383202
+    runs-on: ubuntu-20.04
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v3
+      - name: Setup Go
+        uses: actions/setup-go@v3
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+      - name: Setup tests (${{ matrix.targets.name }}
+        run: VERBOSE=1 make -e GO_TEST_PACKAGES="${{ matrix.targets.packages }}" install-tools
+      - name: Run tests (${{ matrix.targets.name }})
+        uses: nick-fields/retry@v2
+        with:
+          timeout_minutes: 25
+          max_attempts: 3
+          command: VERBOSE=1 make -e GO_TEST_PACKAGES="${{ matrix.targets.packages }}" test
+
   regular-skipped-test-run:
     name: Test Monitor - Regular, Skipped Tests Run
     strategy:
