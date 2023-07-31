@@ -2532,14 +2532,14 @@ func ProtocolStateFixture(options ...func(*flow.RichProtocolStateEntry)) *flow.R
 	})
 	currentEpochSetup := EpochSetupFixture(func(setup *flow.EpochSetup) {
 		setup.Counter = prevEpochSetup.Counter + 1
+		// reuse same participant for current epoch
+		setup.Participants[1] = prevEpochSetup.Participants[1]
 	})
 	currentEpochCommit := EpochCommitFixture(func(commit *flow.EpochCommit) {
 		commit.Counter = currentEpochSetup.Counter
 	})
 
-	allIdentities := append(prevEpochSetup.Participants, currentEpochSetup.Participants...)
-	allIdentities = allIdentities.Sort(order.Canonical)
-
+	allIdentities := prevEpochSetup.Participants.Union(currentEpochSetup.Participants)
 	var dynamicIdentities flow.DynamicIdentityEntryList
 	for _, identity := range allIdentities {
 		dynamicIdentities = append(dynamicIdentities, &flow.DynamicIdentityEntry{
@@ -2582,13 +2582,12 @@ func WithNextEpochProtocolState() func(entry *flow.RichProtocolStateEntry) {
 	return func(entry *flow.RichProtocolStateEntry) {
 		nextEpochSetup := EpochSetupFixture(func(setup *flow.EpochSetup) {
 			setup.Counter = entry.CurrentEpochSetup.Counter + 1
+			setup.Participants[1] = entry.CurrentEpochSetup.Participants[1]
 		})
 		nextEpochCommit := EpochCommitFixture(func(commit *flow.EpochCommit) {
 			commit.Counter = nextEpochSetup.Counter
 		})
-
-		allIdentities := append(entry.CurrentEpochSetup.Participants, nextEpochSetup.Participants...)
-		allIdentities = allIdentities.Sort(order.Canonical)
+		allIdentities := entry.CurrentEpochSetup.Participants.Union(nextEpochSetup.Participants)
 
 		var dynamicIdentities flow.DynamicIdentityEntryList
 		for _, identity := range allIdentities {
