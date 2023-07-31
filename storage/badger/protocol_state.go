@@ -2,7 +2,9 @@ package badger
 
 import (
 	"fmt"
+
 	"github.com/dgraph-io/badger/v2"
+
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/order"
 	"github.com/onflow/flow-go/module"
@@ -188,8 +190,8 @@ func buildIdentityTable(
 	dynamicIdentities flow.DynamicIdentityEntryList,
 	previousEpochSetup, currentEpochSetup *flow.EpochSetup,
 ) (flow.IdentityList, error) {
-	allEpochParticipants := append(previousEpochSetup.Participants, currentEpochSetup.Participants...)
-	allEpochParticipants = allEpochParticipants.Sort(order.Canonical)
+	// produce a unique set for current and previous epoch participants
+	allEpochParticipants := previousEpochSetup.Participants.Union(currentEpochSetup.Participants)
 	// sanity check: size of identities should be equal to previous and current epoch participants combined
 	if len(allEpochParticipants) != len(dynamicIdentities) {
 		return nil, fmt.Errorf("invalid number of identities in protocol state: expected %d, got %d", len(allEpochParticipants), len(dynamicIdentities))
