@@ -19,6 +19,7 @@ type ProtocolStateEntry struct {
 	// setup and commit event IDs for previous epoch.
 	PreviousEpochEventIDs EventIDs
 	// Part of identity table that can be changed during the epoch.
+	// Always sorted in canonical order.
 	Identities DynamicIdentityEntryList
 	// InvalidStateTransitionAttempted encodes whether an invalid state transition
 	// has been detected in this fork. When this happens, epoch fallback is triggered
@@ -68,4 +69,16 @@ func (e *ProtocolStateEntry) ID() Identifier {
 		NextEpochProtocolStateID:        e.NextEpochProtocolState.ID(),
 	}
 	return MakeID(body)
+}
+
+// Sorted returns whether the list is sorted by the input ordering.
+func (ll DynamicIdentityEntryList) Sorted(less IdentifierOrder) bool {
+	for i := 0; i < len(ll)-1; i++ {
+		a := ll[i]
+		b := ll[i+1]
+		if !less(a.NodeID, b.NodeID) {
+			return false
+		}
+	}
+	return true
 }
