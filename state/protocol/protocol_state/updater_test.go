@@ -118,6 +118,72 @@ func (s *UpdaterSuite) TestProcessEpochSetupInvariants() {
 	})
 }
 
+// TestProcessEpochSetupHappyPath tests if processing epoch setup when invariants are not violated updates internal structures.
+// It must produce valid identity table for current and next epochs.
+// For current epoch we should have identity table with all the nodes from the current epoch + nodes from the next epoch with 0 weight.
+// For next epoch we should have identity table with all the nodes from the next epoch + nodes from the current epoch with 0 weight.
+func (s *UpdaterSuite) TestProcessEpochSetupHappyPath() {
+	setup := unittest.EpochSetupFixture(func(setup *flow.EpochSetup) {
+		setup.Counter = s.parentProtocolState.CurrentEpochSetup.Counter + 1
+		setup.Participants[0].InitialWeight = 13
+	})
+
+	// prepare expected identity tables for current and next epochs
+	expectedCurrentEpochIdentityTable := make(flow.DynamicIdentityEntryList, 0,
+		len(s.parentProtocolState.CurrentEpochSetup.Participants)+len(setup.Participants))
+	expectedNextEpochIdentityTable := make(flow.DynamicIdentityEntryList, 0,
+		len(expectedCurrentEpochIdentityTable))
+	for _, participant := range s.parentProtocolState.CurrentEpochSetup.Participants {
+		expectedCurrentEpochIdentityTable = append(expectedCurrentEpochIdentityTable, &flow.DynamicIdentityEntry{
+			NodeID: participant.NodeID,
+			Dynamic: flow.DynamicIdentity{
+				Weight:  participant.Weight,
+				Ejected: participant.Ejected,
+			},
+		})
+
+		expectedNextEpochIdentityTable = append(expectedNextEpochIdentityTable, &flow.DynamicIdentityEntry{
+			NodeID: participant.NodeID,
+			Dynamic: flow.DynamicIdentity{
+				Weight:  0,
+				Ejected: participant.Ejected,
+			},
+		})
+	}
+	for _, participant := range setup.Participants {
+		expectedCurrentEpochIdentityTable = append(expectedCurrentEpochIdentityTable, &flow.DynamicIdentityEntry{
+			NodeID: participant.NodeID,
+			Dynamic: flow.DynamicIdentity{
+				Weight:  0,
+				Ejected: participant.Ejected,
+			},
+		})
+
+		expectedNextEpochIdentityTable = append(expectedNextEpochIdentityTable, &flow.DynamicIdentityEntry{
+			NodeID: participant.NodeID,
+			Dynamic: flow.DynamicIdentity{
+				Weight:  participant.InitialWeight,
+				Ejected: participant.Ejected,
+			},
+		})
+	}
+
+	// process actual event
+	err := s.updater.ProcessEpochSetup(setup)
+	require.NoError(s.T(), err)
+
+	updatedState, _, hasChanges := s.updater.Build()
+	require.True(s.T(), hasChanges, "should have changes")
+	require.Equal(s.T(), expectedCurrentEpochIdentityTable, updatedState.Identities)
+	nextEpochProtocolState := updatedState.NextEpochProtocolState
+	require.NotNil(s.T(), nextEpochProtocolState, "should have next epoch protocol state")
+	require.Equal(s.T(), nextEpochProtocolState.CurrentEpochEventIDs.SetupID, setup.ID(),
+		"should have correct setup ID for next protocol state")
+	require.False(s.T(), nextEpochProtocolState.InvalidStateTransitionAttempted, "should not set invalid state transition attempted")
+	require.Nil(s.T(), nextEpochProtocolState.NextEpochProtocolState, "should not have next epoch protocol state")
+	require.Equal(s.T(), expectedNextEpochIdentityTable, nextEpochProtocolState.Identities)
+}
+
 // TestProcessEpochCommit tests if processing epoch commit event correctly updates internal state of updater and
 // correctly behaves when invariants are violated.
 func (s *UpdaterSuite) TestProcessEpochCommit() {
