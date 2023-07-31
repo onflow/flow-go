@@ -146,6 +146,24 @@ func GossipSubRPCInspectorQueueMetricFactory(f HeroCacheMetricsFactory, networkT
 	return f(namespaceNetwork, r)
 }
 
+func GossipSubRPCSentTrackerMetricFactory(f HeroCacheMetricsFactory, networkType network.NetworkingType) module.HeroCacheMetrics {
+	// we don't use the public prefix for the metrics here for sake of backward compatibility of metric name.
+	r := ResourceNetworkingRPCSentTrackerCache
+	if networkType == network.PublicNetwork {
+		r = PrependPublicPrefix(r)
+	}
+	return f(namespaceNetwork, r)
+}
+
+func GossipSubRPCSentTrackerQueueMetricFactory(f HeroCacheMetricsFactory, networkType network.NetworkingType) module.HeroCacheMetrics {
+	// we don't use the public prefix for the metrics here for sake of backward compatibility of metric name.
+	r := ResourceNetworkingRPCSentTrackerQueue
+	if networkType == network.PublicNetwork {
+		r = PrependPublicPrefix(r)
+	}
+	return f(namespaceNetwork, r)
+}
+
 func RpcInspectorNotificationQueueMetricFactory(f HeroCacheMetricsFactory, networkType network.NetworkingType) module.HeroCacheMetrics {
 	r := ResourceNetworkingRpcInspectorNotificationQueue
 	if networkType == network.PublicNetwork {

@@ -2,7 +2,7 @@ package trace
 
 import (
 	"context"
-	"math/rand"
+	"crypto/rand"
 	"testing"
 
 	"github.com/rs/zerolog"

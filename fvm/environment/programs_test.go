@@ -209,7 +209,7 @@ func Test_Programs(t *testing.T) {
 
 	})
 	t.Run("register touches are captured for simple contract A", func(t *testing.T) {
-		fmt.Println("---------- Real transaction here ------------")
+		t.Log("---------- Real transaction here ------------")
 
 		// run a TX using contract A
 

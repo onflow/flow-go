@@ -4,12 +4,13 @@ import (
 	"context"
 	"time"
 
-	"github.com/hashicorp/go-multierror"
-	execproto "github.com/onflow/flow/protobuf/go/flow/execution"
 	"github.com/rs/zerolog"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
+	execproto "github.com/onflow/flow/protobuf/go/flow/execution"
+
+	"github.com/onflow/flow-go/engine/access/rpc/connection"
 	"github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/model/flow"
@@ -21,8 +22,9 @@ type backendAccounts struct {
 	state             protocol.State
 	headers           storage.Headers
 	executionReceipts storage.ExecutionReceipts
-	connFactory       ConnectionFactory
+	connFactory       connection.ConnectionFactory
 	log               zerolog.Logger
+	nodeCommunicator  *NodeCommunicator
 }
 
 func (b *backendAccounts) GetAccount(ctx context.Context, address flow.Address) (*flow.Account, error) {
@@ -107,34 +109,39 @@ func (b *backendAccounts) getAccountAtBlockID(
 // other ENs are logged and swallowed. If all ENs fail to return a valid response, then an
 // error aggregating all failures is returned.
 func (b *backendAccounts) getAccountFromAnyExeNode(ctx context.Context, execNodes flow.IdentityList, req *execproto.GetAccountAtBlockIDRequest) (*execproto.GetAccountAtBlockIDResponse, error) {
-	var errors *multierror.Error
-	for _, execNode := range execNodes {
-		// TODO: use the GRPC Client interceptor
-		start := time.Now()
+	var resp *execproto.GetAccountAtBlockIDResponse
+	errToReturn := b.nodeCommunicator.CallAvailableNode(
+		execNodes,
+		func(node *flow.Identity) error {
+			var err error
+			// TODO: use the GRPC Client interceptor
+			start := time.Now()
 
-		resp, err := b.tryGetAccount(ctx, execNode, req)
-		duration := time.Since(start)
-		if err == nil {
-			// return if any execution node replied successfully
-			b.log.Debug().
-				Str("execution_node", execNode.String()).
+			resp, err = b.tryGetAccount(ctx, node, req)
+			duration := time.Since(start)
+			if err == nil {
+				// return if any execution node replied successfully
+				b.log.Debug().
+					Str("execution_node", node.String()).
+					Hex("block_id", req.GetBlockId()).
+					Hex("address", req.GetAddress()).
+					Int64("rtt_ms", duration.Milliseconds()).
+					Msg("Successfully got account info")
+				return nil
+			}
+			b.log.Error().
+				Str("execution_node", node.String()).
 				Hex("block_id", req.GetBlockId()).
 				Hex("address", req.GetAddress()).
 				Int64("rtt_ms", duration.Milliseconds()).
-				Msg("Successfully got account info")
-			return resp, nil
-		}
-		b.log.Error().
-			Str("execution_node", execNode.String()).
-			Hex("block_id", req.GetBlockId()).
-			Hex("address", req.GetAddress()).
-			Int64("rtt_ms", duration.Milliseconds()).
-			Err(err).
-			Msg("failed to execute GetAccount")
-		errors = multierror.Append(errors, err)
-	}
+				Err(err).
+				Msg("failed to execute GetAccount")
+			return err
+		},
+		nil,
+	)
 
-	return nil, errors.ErrorOrNil()
+	return resp, errToReturn
 }
 
 func (b *backendAccounts) tryGetAccount(ctx context.Context, execNode *flow.Identity, req *execproto.GetAccountAtBlockIDRequest) (*execproto.GetAccountAtBlockIDResponse, error) {
@@ -146,9 +153,6 @@ func (b *backendAccounts) tryGetAccount(ctx context.Context, execNode *flow.Iden
 
 	resp, err := execRPCClient.GetAccountAtBlockID(ctx, req)
 	if err != nil {
-		if status.Code(err) == codes.Unavailable {
-			b.connFactory.InvalidateExecutionAPIClient(execNode.Address)
-		}
 		return nil, err
 	}
 	return resp, nil

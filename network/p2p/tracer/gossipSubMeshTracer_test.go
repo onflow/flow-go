@@ -11,8 +11,10 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/atomic"
 
+	"github.com/onflow/flow-go/config"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/irrecoverable"
+	"github.com/onflow/flow-go/module/metrics"
 	mockmodule "github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/p2p"
@@ -29,6 +31,8 @@ import (
 // One of the nodes is running with an unknown peer id, which the identity provider is mocked to return an error and
 // the mesh tracer should log a warning message.
 func TestGossipSubMeshTracer(t *testing.T) {
+	defaultConfig, err := config.DefaultConfig()
+	require.NoError(t, err)
 	ctx, cancel := context.WithCancel(context.Background())
 	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
 	sporkId := unittest.IdentifierFixture()
@@ -61,7 +65,17 @@ func TestGossipSubMeshTracer(t *testing.T) {
 	// we only need one node with a meshTracer to test the meshTracer.
 	// meshTracer logs at 1 second intervals for sake of testing.
 	collector := mockmodule.NewGossipSubLocalMeshMetrics(t)
-	meshTracer := tracer.NewGossipSubMeshTracer(logger, collector, idProvider, 1*time.Second)
+	meshTracerCfg := &tracer.GossipSubMeshTracerConfig{
+		Logger:                             logger,
+		Metrics:                            collector,
+		IDProvider:                         idProvider,
+		LoggerInterval:                     time.Second,
+		HeroCacheMetricsFactory:            metrics.NewNoopHeroCacheMetricsFactory(),
+		RpcSentTrackerCacheSize:            defaultConfig.NetworkConfig.GossipSubConfig.RPCSentTrackerCacheSize,
+		RpcSentTrackerWorkerQueueCacheSize: defaultConfig.NetworkConfig.GossipSubConfig.RPCSentTrackerQueueCacheSize,
+		RpcSentTrackerNumOfWorkers:         defaultConfig.NetworkConfig.GossipSubConfig.RpcSentTrackerNumOfWorkers,
+	}
+	meshTracer := tracer.NewGossipSubMeshTracer(meshTracerCfg)
 	tracerNode, tracerId := p2ptest.NodeFixture(
 		t,
 		sporkId,

@@ -28,7 +28,6 @@ import (
 	netcache "github.com/onflow/flow-go/network/cache"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/codec/cbor"
-	"github.com/onflow/flow-go/network/mocknetwork"
 	"github.com/onflow/flow-go/network/netconf"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/conduit"
@@ -166,12 +165,11 @@ func LibP2PNodeForMiddlewareFixture(t *testing.T, n int, opts ...p2ptest.NodeFix
 // - a middleware config.
 func MiddlewareConfigFixture(t *testing.T) *middleware.Config {
 	return &middleware.Config{
-		Logger:                     unittest.Logger(),
-		BitSwapMetrics:             metrics.NewNoopCollector(),
-		RootBlockID:                sporkID,
-		UnicastMessageTimeout:      middleware.DefaultUnicastTimeout,
-		Codec:                      unittest.NetworkCodec(),
-		SlashingViolationsConsumer: mocknetwork.NewViolationsConsumer(t),
+		Logger:                unittest.Logger(),
+		BitSwapMetrics:        metrics.NewNoopCollector(),
+		RootBlockID:           sporkID,
+		UnicastMessageTimeout: middleware.DefaultUnicastTimeout,
+		Codec:                 unittest.NetworkCodec(),
 	}
 }
 
@@ -186,7 +184,7 @@ func MiddlewareConfigFixture(t *testing.T) *middleware.Config {
 // Returns:
 // - a list of middlewares - one for each identity.
 // - a list of UpdatableIDProvider - one for each identity.
-func MiddlewareFixtures(t *testing.T, identities flow.IdentityList, libP2PNodes []p2p.LibP2PNode, cfg *middleware.Config, opts ...middleware.OptionFn) ([]network.Middleware, []*unittest.UpdatableIDProvider) {
+func MiddlewareFixtures(t *testing.T, identities flow.IdentityList, libP2PNodes []p2p.LibP2PNode, cfg *middleware.Config, consumer network.ViolationsConsumer, opts ...middleware.OptionFn) ([]network.Middleware, []*unittest.UpdatableIDProvider) {
 	require.Equal(t, len(identities), len(libP2PNodes))
 
 	mws := make([]network.Middleware, len(identities))
@@ -198,8 +196,8 @@ func MiddlewareFixtures(t *testing.T, identities flow.IdentityList, libP2PNodes 
 		cfg.FlowId = identities[i].NodeID
 		idProviders[i] = unittest.NewUpdatableIDProvider(identities)
 		cfg.IdTranslator = translator.NewIdentityProviderIDTranslator(idProviders[i])
-
 		mws[i] = middleware.NewMiddleware(cfg, opts...)
+		mws[i].SetSlashingViolationsConsumer(consumer)
 	}
 	return mws, idProviders
 }

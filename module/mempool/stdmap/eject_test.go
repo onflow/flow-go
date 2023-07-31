@@ -196,7 +196,7 @@ func TestLRUEjector_UntrackEject(t *testing.T) {
 	ejector.Untrack(items[0])
 
 	// next ejectable item should be the second oldest item
-	id, _, _ := ejector.Eject(backEnd)
+	id := ejector.Eject(backEnd)
 	assert.Equal(t, id, items[1])
 }
 
@@ -224,7 +224,7 @@ func TestLRUEjector_EjectAll(t *testing.T) {
 
 	// ejects one by one
 	for i := 0; i < size; i++ {
-		id, _, _ := ejector.Eject(backEnd)
+		id := ejector.Eject(backEnd)
 		require.Equal(t, id, items[i])
 	}
 }

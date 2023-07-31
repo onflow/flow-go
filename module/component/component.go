@@ -157,10 +157,10 @@ func NewComponentManagerBuilder() ComponentManagerBuilder {
 	return &componentManagerBuilderImpl{}
 }
 
-// AddWorker adds a ComponentWorker closure to the ComponentManagerBuilder
 // All worker functions will be run in parallel when the ComponentManager is started.
 // Note: AddWorker is not concurrency-safe, and should only be called on an individual builder
-// within a single goroutine.
+// within a single goroutine.// AddWorker adds a ComponentWorker closure to the ComponentManagerBuilder
+
 func (c *componentManagerBuilderImpl) AddWorker(worker ComponentWorker) ComponentManagerBuilder {
 	c.workers = append(c.workers, worker)
 	return c

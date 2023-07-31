@@ -226,6 +226,7 @@ func (m *MisbehaviorReportManager) HandleMisbehaviorReport(channel channels.Chan
 		Hex("misbehaving_id", logging.ID(report.OriginId())).
 		Str("reason", report.Reason().String()).
 		Float64("penalty", report.Penalty()).Logger()
+	lg.Trace().Msg("received misbehavior report")
 	m.metrics.OnMisbehaviorReported(channel.String(), report.Reason().String())
 
 	nonce := [internal.NonceSize]byte{}
@@ -332,7 +333,6 @@ func (m *MisbehaviorReportManager) onHeartbeat() error {
 					Cause:   network.DisallowListedCauseAlsp, // sets the ALSP disallow listing cause on node
 				})
 			}
-
 			// each time we decay the penalty by the decay speed, the penalty is a negative number, and the decay speed
 			// is a positive number. So the penalty is getting closer to zero.
 			// We use math.Min() to make sure the penalty is never positive.
@@ -446,7 +446,6 @@ func (m *MisbehaviorReportManager) processMisbehaviorReport(report internal.Repo
 		// we should crash the node in this case to prevent further misbehavior reports from being lost and fix the bug.
 		return fmt.Errorf("failed to apply penalty to the spam record: %w", err)
 	}
-
 	lg.Debug().Float64("updated_penalty", updatedPenalty).Msg("misbehavior report handled")
 	return nil
 }

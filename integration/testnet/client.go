@@ -88,7 +88,7 @@ func NewClient(addr string, chain flow.Chain) (*Client, error) {
 	//if err != nil {
 	//	return nil, fmt.Errorf("cannot marshal key json: %w", err)
 	//}
-
+	//
 	//fmt.Printf("New client with private key: \n%s\n", json)
 	//fmt.Printf("and public key: \n%s\n", publicJson)
 
