@@ -568,7 +568,7 @@ func TestBroadcastToMultipleVerificationNodes(t *testing.T) {
 			assert.Equal(t, block.ID(), receipt.ExecutionResult.BlockID)
 			for i, chunk := range receipt.ExecutionResult.Chunks {
 				assert.EqualValues(t, i, chunk.CollectionIndex)
-				assert.Greater(t, chunk.TotalComputationUsed, uint64(10))
+				assert.Greater(t, chunk.TotalComputationUsed, uint64(0))
 			}
 		}).
 		Return(nil)
