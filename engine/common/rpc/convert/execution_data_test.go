@@ -23,9 +23,9 @@ func TestConvertBlockExecutionData(t *testing.T) {
 	chunkData := make([]*execution_data.ChunkExecutionData, 0, chunks)
 	for i := 0; i < chunks-1; i++ {
 		ced := unittest.ChunkExecutionDataFixture(t,
-			0, // updates set explicitly to target 5*32K per chunk
+			0, // updates set explicitly to target 160-320KB per chunk
 			unittest.WithChunkEvents(events),
-			unittest.WithTrieUpdate(testutils.TrieUpdateFixture(5, 32*1024, 128*1024)),
+			unittest.WithTrieUpdate(testutils.TrieUpdateFixture(5, 32*1024, 64*1024)),
 		)
 		chunkData = append(chunkData, ced)
 	}

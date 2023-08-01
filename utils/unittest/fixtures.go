@@ -2421,7 +2421,7 @@ func ChunkExecutionDataFixture(t *testing.T, minSize int, opts ...func(*executio
 	ced := &execution_data.ChunkExecutionData{
 		Collection: &collection,
 		Events:     flow.EventsList{},
-		TrieUpdate: testutils.TrieUpdateFixture(1, 1, 8),
+		TrieUpdate: testutils.TrieUpdateFixture(2, 1, 8),
 	}
 
 	for _, opt := range opts {
