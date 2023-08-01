@@ -10,7 +10,7 @@ import (
 	"github.com/onflow/flow-go/engine/access/rest/util"
 )
 
-const validBody = "pub fun main() { }"
+const validBody = "access(all) fun main() { }"
 
 var validBodyEncoded = util.ToBase64([]byte(validBody))
 
