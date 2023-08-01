@@ -7,12 +7,13 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
+	"github.com/onflow/flow-go/ledger/common/testutils"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-func TestConvertBlockExecutionData1(t *testing.T) {
+func TestConvertBlockExecutionData(t *testing.T) {
 	t.Parallel()
 
 	chain := flow.Testnet.Chain() // this is used by the AddressFixture
@@ -21,7 +22,12 @@ func TestConvertBlockExecutionData1(t *testing.T) {
 	chunks := 5
 	chunkData := make([]*execution_data.ChunkExecutionData, 0, chunks)
 	for i := 0; i < chunks-1; i++ {
-		chunkData = append(chunkData, unittest.ChunkExecutionDataFixture(t, execution_data.DefaultMaxBlobSize/5, unittest.WithChunkEvents(events)))
+		ced := unittest.ChunkExecutionDataFixture(t,
+			0, // updates set explicitly to target 5*32K per chunk
+			unittest.WithChunkEvents(events),
+			unittest.WithTrieUpdate(testutils.TrieUpdateFixture(5, 32*1024, 128*1024)),
+		)
+		chunkData = append(chunkData, ced)
 	}
 	makeServiceTx := func(ced *execution_data.ChunkExecutionData) {
 		// proposal key and payer are empty addresses for service tx
@@ -46,6 +52,7 @@ func TestConvertBlockExecutionData1(t *testing.T) {
 		require.NoError(t, err)
 
 		assert.Equal(t, chunkData[0], chunkReConverted)
+		assert.True(t, chunkData[0].TrieUpdate.Equals(chunkReConverted.TrieUpdate))
 	})
 
 	t.Run("block execution data conversions", func(t *testing.T) {
@@ -56,5 +63,12 @@ func TestConvertBlockExecutionData1(t *testing.T) {
 		require.NoError(t, err)
 
 		assert.Equal(t, blockData, converted)
+		for i, chunk := range blockData.ChunkExecutionDatas {
+			if chunk.TrieUpdate == nil {
+				assert.Nil(t, converted.ChunkExecutionDatas[i].TrieUpdate)
+			} else {
+				assert.True(t, chunk.TrieUpdate.Equals(converted.ChunkExecutionDatas[i].TrieUpdate))
+			}
+		}
 	})
 }
