@@ -65,7 +65,7 @@ jobs:
         with:
           timeout_minutes: 25
           max_attempts: 1
-          command: VERBOSE=1 make -e GO_TEST_PACKAGES="${{ matrix.targets.packages }}" test
+          command: VERBOSE=1 make -e GO_TEST_PACKAGES="${{ matrix.targets.packages }}" test > test-output
         # test run should continue even if there are failed tests
         continue-on-error: true
       - name: Get commit date
@@ -79,7 +79,9 @@ jobs:
         env:
           JOB_STARTED: ${{ steps.job_run_date.outputs.date }}
           COMMIT_DATE: ${{ steps.commit_date.outputs.date }}
-
+#      - name: Setup tmate session
+#        uses: mxschmitt/action-tmate@v3
+#        if: success() || failure()
 
 #  regular-skipped-test-run:
 #    name: Test Monitor - Regular, Skipped Tests Run
