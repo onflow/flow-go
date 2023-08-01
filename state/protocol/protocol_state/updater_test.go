@@ -303,6 +303,9 @@ func (s *UpdaterSuite) TestUpdateIdentityHappyPath() {
 	requireUpdatesApplied(updatedState.NextEpochProtocolState.Identities.Lookup())
 }
 
+// TestProcessEpochSetupWithSameParticipants tests that processing epoch setup with overlapping participants results in correctly
+// built updated protocol state. It should build a union of participants from current and next epoch for current and
+// next epoch protocol states respectively.
 func (s *UpdaterSuite) TestProcessEpochSetupWithSameParticipants() {
 	overlappingNodes, err := s.parentProtocolState.CurrentEpochSetup.Participants.Sample(2)
 	require.NoError(s.T(), err)
