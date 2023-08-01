@@ -88,6 +88,55 @@ func TestProtocolStateStoreInvalidProtocolState(t *testing.T) {
 	})
 }
 
+// TestProtocolStateMergeParticipants tests that merging participants between epochs works correctly. We always take participants
+// from current epoch and additionally add participants from previous epoch if they are not present in current epoch.
+// If there is participant in previous and current epochs we should see it only once in the merged list and the entity has to be from current epoch.
+func TestProtocolStateMergeParticipants(t *testing.T) {
+	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+		metrics := metrics.NewNoopCollector()
+
+		setups := NewEpochSetups(metrics, db)
+		commits := NewEpochCommits(metrics, db)
+		store := NewProtocolState(metrics, setups, commits, db, DefaultCacheSize)
+
+		stateEntry := unittest.ProtocolStateFixture()
+		require.Equal(t, stateEntry.CurrentEpochSetup.Participants[1], stateEntry.PreviousEpochSetup.Participants[1])
+		// change address of participant in current epoch, so we can distinguish it from the one in previous epoch
+		// when performing assertion.
+		newAddress := "123"
+		nodeID := stateEntry.CurrentEpochSetup.Participants[1].NodeID
+		stateEntry.CurrentEpochSetup.Participants[1].Address = newAddress
+		stateEntry.CurrentEpochEventIDs.SetupID = stateEntry.CurrentEpochSetup.ID()
+		protocolStateID := stateEntry.ID()
+
+		// store protocol state and auxiliary info
+		err := transaction.Update(db, func(tx *transaction.Tx) error {
+			// store epoch events to be able to retrieve them later
+			err := setups.StoreTx(stateEntry.PreviousEpochSetup)(tx)
+			require.NoError(t, err)
+			err = setups.StoreTx(stateEntry.CurrentEpochSetup)(tx)
+			require.NoError(t, err)
+			err = commits.StoreTx(stateEntry.PreviousEpochCommit)(tx)
+			require.NoError(t, err)
+			err = commits.StoreTx(stateEntry.CurrentEpochCommit)(tx)
+			require.NoError(t, err)
+
+			return store.StoreTx(protocolStateID, &stateEntry.ProtocolStateEntry)(tx)
+		})
+		require.NoError(t, err)
+
+		// fetch protocol state
+		actual, err := store.ByID(protocolStateID)
+		require.NoError(t, err)
+		require.Equal(t, stateEntry, actual)
+
+		assertRichProtocolStateValidity(t, actual)
+		identity, ok := actual.Identities.ByNodeID(nodeID)
+		require.True(t, ok)
+		require.Equal(t, newAddress, identity.Address)
+	})
+}
+
 // assertRichProtocolStateValidity checks if RichProtocolState holds its invariant and is correctly populated by storage layer.
 func assertRichProtocolStateValidity(t *testing.T, state *flow.RichProtocolStateEntry) {
 	// invariant: CurrentEpochSetup and CurrentEpochCommit are for the same epoch. Never nil.
@@ -106,7 +155,7 @@ func assertRichProtocolStateValidity(t *testing.T, state *flow.RichProtocolState
 	assert.Equal(t, state.PreviousEpochCommit.ID(), state.ProtocolStateEntry.PreviousEpochEventIDs.CommitID, "epoch commit should be for correct event ID")
 
 	// invariant: Identities is a full identity table for the current epoch. Identities are sorted in canonical order. Without duplicates. Never nil.
-	allIdentities := state.PreviousEpochSetup.Participants.Union(state.CurrentEpochSetup.Participants)
+	allIdentities := state.CurrentEpochSetup.Participants.Union(state.PreviousEpochSetup.Participants)
 	assert.Equal(t, allIdentities, state.Identities, "identities should be a full identity table for the current epoch, without duplicates")
 
 	for i, identity := range state.ProtocolStateEntry.Identities {
