@@ -1,5 +1,7 @@
 package flow
 
+import "sort"
+
 // DynamicIdentityEntry encapsulates nodeID and dynamic portion of identity.
 type DynamicIdentityEntry struct {
 	NodeID  Identifier
@@ -111,4 +113,35 @@ func (ll DynamicIdentityEntryList) Sorted(less IdentifierOrder) bool {
 		}
 	}
 	return true
+}
+
+// ByNodeID gets a node from the list by node ID.
+func (ll DynamicIdentityEntryList) ByNodeID(nodeID Identifier) (*DynamicIdentityEntry, bool) {
+	for _, identity := range ll {
+		if identity.NodeID == nodeID {
+			return identity, true
+		}
+	}
+	return nil, false
+}
+
+func (ll DynamicIdentityEntryList) Copy() DynamicIdentityEntryList {
+	dup := make(DynamicIdentityEntryList, 0, len(ll))
+
+	lenList := len(ll)
+	for i := 0; i < lenList; i++ {
+		// copy the object
+		next := *(ll[i])
+		dup = append(dup, &next)
+	}
+	return dup
+}
+
+// Sort sorts the list by the input ordering.
+func (ll DynamicIdentityEntryList) Sort(less IdentifierOrder) DynamicIdentityEntryList {
+	dup := ll.Copy()
+	sort.Slice(dup, func(i int, j int) bool {
+		return less(dup[i].NodeID, dup[j].NodeID)
+	})
+	return dup
 }

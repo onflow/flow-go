@@ -3,6 +3,7 @@ package protocol_state
 import (
 	"fmt"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow/order"
 )
 
 type Updater struct {
@@ -49,49 +50,45 @@ func (u *Updater) ProcessEpochSetup(epochSetup *flow.EpochSetup) error {
 		return nil // won't process new events if we are in EECC
 	}
 	// Observing epoch setup impacts current and next epoch.
-	// 1. For current epoch we stop returning identities from previous epoch.
+	// - For current epoch we stop returning identities from previous epoch.
 	// Instead, we will return identities of current epoch + identities from next epoch with 0 weight.
-	// 2. For next epoch we need to additionally include identities from previous(current) epoch with 0 weight.
+	// - For next epoch we need to additionally include identities from previous(current) epoch with 0 weight.
+	// We will do this in next steps:
+	// 1. Add identities from current epoch setup event to currentEpochIdentities.
+	// 2. Add identities from next epoch setup event to currentEpochIdentities, with 0 weight,
+	// but only if they are not present in currentEpochIdentities.
+	// 3. Add identities from next epoch setup event to nextEpochIdentities.
+	// 4. Add identities from current epoch setup event to nextEpochIdentities, with 0 weight,
+	// but only if they are not present in nextEpochIdentities.
 
 	identitiesStateLookup := u.parentState.Identities.Lookup()
+
+	// construct identities for current epoch: current epoch participants + next epoch participants with 0 weight
 	var currentEpochIdentities flow.DynamicIdentityEntryList
-	var nextEpochIdentities flow.DynamicIdentityEntryList
+	// In this loop we will perform step 1 from above.
 	for _, identity := range u.parentState.CurrentEpochSetup.Participants {
 		identityParentState := identitiesStateLookup[identity.NodeID]
-		// for current epoch we include identities from setup event but take dynamic portion from parent protocol state.
 		currentEpochIdentities = append(currentEpochIdentities, &flow.DynamicIdentityEntry{
-			NodeID: identity.NodeID,
-			Dynamic: flow.DynamicIdentity{
-				Weight:  identityParentState.Weight,
-				Ejected: identityParentState.Ejected,
-			},
-		})
-
-		// for next epoch we include identities(with 0 weight) from setup event but take ejected flag from parent protocol state.
-		nextEpochIdentities = append(nextEpochIdentities, &flow.DynamicIdentityEntry{
-			NodeID: identity.NodeID,
-			Dynamic: flow.DynamicIdentity{
-				Weight:  0,
-				Ejected: identityParentState.Ejected,
-			},
+			NodeID:  identity.NodeID,
+			Dynamic: identityParentState.DynamicIdentity,
 		})
 	}
 
-	// traverse setup event and add identities to both current and next epochs.
+	var nextEpochIdentities flow.DynamicIdentityEntryList
+	currentEpochIdentitiesLookup := currentEpochIdentities.Lookup()
+	// in this loop we will fill participants for both current and next epochs, effectively performing steps 2 and 3 from above.
 	for _, identity := range epochSetup.Participants {
-		// for current epoch we include identities(with weight 0) from setup event but take ejected flag from parent protocol state.
-		identityParentState, found := identitiesStateLookup[identity.NodeID]
-		identityFromNextEpochEjectedInCurrent := identity.Ejected
-		if found {
-			identityFromNextEpochEjectedInCurrent = identityParentState.Ejected
+		// if present in current epoch, skip
+		if _, found := currentEpochIdentitiesLookup[identity.NodeID]; !found {
+			currentEpochIdentities = append(currentEpochIdentities, &flow.DynamicIdentityEntry{
+				NodeID: identity.NodeID,
+				Dynamic: flow.DynamicIdentity{
+					Weight:  0,
+					Ejected: identity.Ejected,
+				},
+			})
 		}
-		currentEpochIdentities = append(currentEpochIdentities, &flow.DynamicIdentityEntry{
-			NodeID: identity.NodeID,
-			Dynamic: flow.DynamicIdentity{
-				Weight:  0,
-				Ejected: identityFromNextEpochEjectedInCurrent,
-			},
-		})
+
 		// for next epoch we include identities from setup event,
 		// we give authority to epoch smart contract to decide who should be included in the next epoch and with what flags.
 		nextEpochIdentities = append(nextEpochIdentities, &flow.DynamicIdentityEntry{
@@ -103,7 +100,23 @@ func (u *Updater) ProcessEpochSetup(epochSetup *flow.EpochSetup) error {
 		})
 	}
 
-	u.state.Identities = currentEpochIdentities
+	nextEpochIdentitiesLookup := nextEpochIdentities.Lookup()
+	// finally we need to augment next epoch identities with identities from current epoch with 0 weight, effectively performing step 4 from above.
+	// for next epoch we include identities(with 0 weight) from setup event but take ejected flag from parent protocol state.
+	for _, identity := range u.parentState.CurrentEpochSetup.Participants {
+		if _, found := nextEpochIdentitiesLookup[identity.NodeID]; !found {
+			identityParentState := identitiesStateLookup[identity.NodeID]
+			nextEpochIdentities = append(nextEpochIdentities, &flow.DynamicIdentityEntry{
+				NodeID: identity.NodeID,
+				Dynamic: flow.DynamicIdentity{
+					Weight:  0,
+					Ejected: identityParentState.Ejected,
+				},
+			})
+		}
+	}
+
+	u.state.Identities = currentEpochIdentities.Sort(order.IdentifierCanonical)
 
 	// construct protocol state entry for next epoch
 	u.state.NextEpochProtocolState = &flow.ProtocolStateEntry{
@@ -112,7 +125,7 @@ func (u *Updater) ProcessEpochSetup(epochSetup *flow.EpochSetup) error {
 			CommitID: flow.ZeroID,
 		},
 		PreviousEpochEventIDs:           u.state.CurrentEpochEventIDs,
-		Identities:                      nextEpochIdentities,
+		Identities:                      nextEpochIdentities.Sort(order.IdentifierCanonical),
 		InvalidStateTransitionAttempted: false,
 		NextEpochProtocolState:          nil,
 	}
