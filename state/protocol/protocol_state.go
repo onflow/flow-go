@@ -49,14 +49,14 @@ type ProtocolState interface {
 	//ByEpoch(epoch uint64) (InitialProtocolState, error)
 
 	// AtBlockID returns protocol state at block ID.
-	// Resulting protocol state is returned AFTER applying updates that are contained in block.
+	// The resulting protocol state is returned AFTER applying updates that are contained in block.
 	// Can be queried for any block that has been added to the block tree.
 	// Returns:
 	// - (DynamicProtocolState, nil) - if there is a protocol state associated with given block ID.
 	// - (nil, storage.ErrNotFound) - if there is no protocol state associated with given block ID.
 	// - (nil, exception) - any other error should be treated as exception.
 	AtBlockID(blockID flow.Identifier) (DynamicProtocolState, error)
-	// GlobalParams returns params that are same for all nodes in the network.
+	// GlobalParams returns params that are the same for all nodes in the network.
 	GlobalParams() GlobalParams
 }
 
@@ -66,18 +66,23 @@ type StateUpdater interface {
 	// Build returns updated protocol state entry, state ID and a flag indicating if there were any changes.
 	Build() (updatedState *flow.ProtocolStateEntry, stateID flow.Identifier, hasChanges bool)
 	// ProcessEpochSetup updates current protocol state with data from epoch setup event.
-	// As result of this operation protocol state for next epoch will be created.
+	// Processing epoch setup event also affects identity table for current epoch.
+	// Observing an epoch setup event, transitions protocol state from staking to setup phase, we stop returning
+	// identities from previous+current epochs and start returning identities from current+next epochs.
+	// As a result of this operation protocol state for the next epoch will be created.
 	// No errors are expected during normal operations.
 	ProcessEpochSetup(epochSetup *flow.EpochSetup) error
 	// ProcessEpochCommit updates current protocol state with data from epoch commit event.
-	// As result of this operation protocol state for next epoch will be committed.
+	// Observing an epoch setup commit, transitions protocol state from setup to commit phase, at this point we have
+	// finished construction of the next epoch.
+	// As a result of this operation protocol state for next epoch will be committed.
 	// No errors are expected during normal operations.
 	ProcessEpochCommit(epochCommit *flow.EpochCommit) error
 	// UpdateIdentity updates identity table with new identity entry.
 	// Should pass identity which is already present in the table, otherwise an exception will be raised.
 	// No errors are expected during normal operations.
 	UpdateIdentity(updated *flow.DynamicIdentityEntry) error
-	// SetInvalidStateTransitionAttempted sets flag indicating that invalid state transition was attempted.
+	// SetInvalidStateTransitionAttempted sets a flag indicating that invalid state transition was attempted.
 	// Such transition can be detected by compliance layer.
 	SetInvalidStateTransitionAttempted()
 }

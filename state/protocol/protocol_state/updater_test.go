@@ -49,7 +49,7 @@ func (s *UpdaterSuite) TestTransitionToNextEpoch() {
 
 	candidate := unittest.BlockHeaderFixture(
 		unittest.HeaderWithView(s.parentProtocolState.CurrentEpochSetup.FinalView + 1))
-	// since candidate block is from next epoch, updater should transition to next epoch
+	// since the candidate block is from next epoch, updater should transition to next epoch
 	s.updater = newUpdater(candidate, s.parentProtocolState)
 	updatedState, _, _ := s.updater.Build()
 	require.Equal(s.T(), updatedState.ID(), s.parentProtocolState.NextEpochProtocolState.ID(), "should transition into next epoch")
@@ -152,7 +152,7 @@ func (s *UpdaterSuite) TestProcessEpochCommit() {
 	})
 }
 
-// TestUpdateIdentityUnknownIdentity tests if updating identity of unknown node results in an error.
+// TestUpdateIdentityUnknownIdentity tests if updating the identity of unknown node results in an error.
 func (s *UpdaterSuite) TestUpdateIdentityUnknownIdentity() {
 	identity := &flow.DynamicIdentityEntry{
 		NodeID:  unittest.IdentifierFixture(),
@@ -165,7 +165,7 @@ func (s *UpdaterSuite) TestUpdateIdentityUnknownIdentity() {
 	require.False(s.T(), hasChanges, "should not have changes")
 }
 
-// TestUpdateIdentityHappyPath tests if identity updates are correctly processed and reflected in resulting protocol state.
+// TestUpdateIdentityHappyPath tests if identity updates are correctly processed and reflected in the resulting protocol state.
 func (s *UpdaterSuite) TestUpdateIdentityHappyPath() {
 	// update protocol state to have next epoch protocol state
 	unittest.WithNextEpochProtocolState()(s.parentProtocolState)
