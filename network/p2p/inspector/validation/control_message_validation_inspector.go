@@ -211,6 +211,12 @@ func (c *ControlMsgValidationInspector) Inspect(from peer.ID, rpc *pubsub.RPC) e
 func (c *ControlMsgValidationInspector) inspectIWant(iWants []*pubsub_pb.ControlIWant) error {
 	sampleSize := uint(10 * c.rpcTracker.LastHighestIHaveRPCSize())
 	if sampleSize == 0 || sampleSize > c.config.IWantRPCInspectionConfig.MaxSampleSize {
+		c.logger.Warn().
+			Uint("sample_size", sampleSize).
+			Uint("max_sample_size", c.config.IWantRPCInspectionConfig.MaxSampleSize).
+			Str(logging.KeySuspicious, "true").         // max sample size is suspicious
+			Str(logging.KeyNetworkingSecurity, "true"). // zero sample size is a security hole
+			Msg("zero or invalid sample size, using default max sample size")
 		sampleSize = c.config.IWantRPCInspectionConfig.MaxSampleSize
 	}
 
