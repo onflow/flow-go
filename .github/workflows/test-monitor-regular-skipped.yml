@@ -65,7 +65,12 @@ jobs:
         with:
           timeout_minutes: 25
           max_attempts: 1
-          command: VERBOSE=1 make -e GO_TEST_PACKAGES="${{ matrix.targets.packages }}" unittest-main > test-output
+          command: make -es GO_TEST_PACKAGES="${{ matrix.targets.packages }}" unittest-main > test-output
+          # command line from GitHub runner that works:
+          # make VERBOSE=1 JSON_OUTPUT=true GO_TEST_PACKAGES=github.com/onflow/flow-go/admin/commands/common -es unittest-main > test-output
+        env:
+          JSON_OUTPUT: true
+          VERBOSE: true
         # test run should continue even if there are failed tests
         continue-on-error: true
       - name: Get commit date
