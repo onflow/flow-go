@@ -1,11 +1,14 @@
 package protocol_state
 
 import (
-	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/utils/unittest"
+	"testing"
+
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
-	"testing"
+
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow/order"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 func TestUpdaterSuite(t *testing.T) {
@@ -82,106 +85,6 @@ func (s *UpdaterSuite) TestSetInvalidStateTransitionAttempted() {
 	require.True(s.T(), updatedState.InvalidStateTransitionAttempted, "should set invalid state transition attempted")
 	require.True(s.T(), updatedState.NextEpochProtocolState.InvalidStateTransitionAttempted,
 		"should set invalid state transition attempted for next epoch as well")
-}
-
-// TestProcessEpochSetupInvariants tests if processing epoch setup when invariants are violated doesn't update internal structures.
-func (s *UpdaterSuite) TestProcessEpochSetupInvariants() {
-	s.Run("invalid counter", func() {
-		setup := unittest.EpochSetupFixture(func(setup *flow.EpochSetup) {
-			setup.Counter = s.parentProtocolState.CurrentEpochSetup.Counter + 10 // set invalid counter for next epoch
-		})
-		err := s.updater.ProcessEpochSetup(setup)
-		require.Error(s.T(), err)
-	})
-	s.Run("invalid state transition attempted", func() {
-		updater := newUpdater(s.candidate, s.parentProtocolState)
-		setup := unittest.EpochSetupFixture(func(setup *flow.EpochSetup) {
-			setup.Counter = s.parentProtocolState.CurrentEpochSetup.Counter + 1
-		})
-		updater.SetInvalidStateTransitionAttempted()
-		err := updater.ProcessEpochSetup(setup)
-		require.NoError(s.T(), err)
-
-		updatedState, _, _ := updater.Build()
-		require.Nil(s.T(), updatedState.NextEpochProtocolState, "should not process epoch setup if invalid state transition attempted")
-	})
-	s.Run("processing second epoch setup", func() {
-		updater := newUpdater(s.candidate, s.parentProtocolState)
-		setup := unittest.EpochSetupFixture(func(setup *flow.EpochSetup) {
-			setup.Counter = s.parentProtocolState.CurrentEpochSetup.Counter + 1
-		})
-		err := updater.ProcessEpochSetup(setup)
-		require.NoError(s.T(), err)
-
-		err = updater.ProcessEpochSetup(setup)
-		require.Error(s.T(), err)
-	})
-}
-
-// TestProcessEpochSetupHappyPath tests if processing epoch setup when invariants are not violated updates internal structures.
-// It must produce valid identity table for current and next epochs.
-// For current epoch we should have identity table with all the nodes from the current epoch + nodes from the next epoch with 0 weight.
-// For next epoch we should have identity table with all the nodes from the next epoch + nodes from the current epoch with 0 weight.
-func (s *UpdaterSuite) TestProcessEpochSetupHappyPath() {
-	setup := unittest.EpochSetupFixture(func(setup *flow.EpochSetup) {
-		setup.Counter = s.parentProtocolState.CurrentEpochSetup.Counter + 1
-		setup.Participants[0].InitialWeight = 13
-	})
-
-	// prepare expected identity tables for current and next epochs
-	expectedCurrentEpochIdentityTable := make(flow.DynamicIdentityEntryList, 0,
-		len(s.parentProtocolState.CurrentEpochSetup.Participants)+len(setup.Participants))
-	expectedNextEpochIdentityTable := make(flow.DynamicIdentityEntryList, 0,
-		len(expectedCurrentEpochIdentityTable))
-	for _, participant := range s.parentProtocolState.CurrentEpochSetup.Participants {
-		expectedCurrentEpochIdentityTable = append(expectedCurrentEpochIdentityTable, &flow.DynamicIdentityEntry{
-			NodeID: participant.NodeID,
-			Dynamic: flow.DynamicIdentity{
-				Weight:  participant.Weight,
-				Ejected: participant.Ejected,
-			},
-		})
-
-		expectedNextEpochIdentityTable = append(expectedNextEpochIdentityTable, &flow.DynamicIdentityEntry{
-			NodeID: participant.NodeID,
-			Dynamic: flow.DynamicIdentity{
-				Weight:  0,
-				Ejected: participant.Ejected,
-			},
-		})
-	}
-	for _, participant := range setup.Participants {
-		expectedCurrentEpochIdentityTable = append(expectedCurrentEpochIdentityTable, &flow.DynamicIdentityEntry{
-			NodeID: participant.NodeID,
-			Dynamic: flow.DynamicIdentity{
-				Weight:  0,
-				Ejected: participant.Ejected,
-			},
-		})
-
-		expectedNextEpochIdentityTable = append(expectedNextEpochIdentityTable, &flow.DynamicIdentityEntry{
-			NodeID: participant.NodeID,
-			Dynamic: flow.DynamicIdentity{
-				Weight:  participant.InitialWeight,
-				Ejected: participant.Ejected,
-			},
-		})
-	}
-
-	// process actual event
-	err := s.updater.ProcessEpochSetup(setup)
-	require.NoError(s.T(), err)
-
-	updatedState, _, hasChanges := s.updater.Build()
-	require.True(s.T(), hasChanges, "should have changes")
-	require.Equal(s.T(), expectedCurrentEpochIdentityTable, updatedState.Identities)
-	nextEpochProtocolState := updatedState.NextEpochProtocolState
-	require.NotNil(s.T(), nextEpochProtocolState, "should have next epoch protocol state")
-	require.Equal(s.T(), nextEpochProtocolState.CurrentEpochEventIDs.SetupID, setup.ID(),
-		"should have correct setup ID for next protocol state")
-	require.False(s.T(), nextEpochProtocolState.InvalidStateTransitionAttempted, "should not set invalid state transition attempted")
-	require.Nil(s.T(), nextEpochProtocolState.NextEpochProtocolState, "should not have next epoch protocol state")
-	require.Equal(s.T(), expectedNextEpochIdentityTable, nextEpochProtocolState.Identities)
 }
 
 // TestProcessEpochCommit tests if processing epoch commit event correctly updates internal state of updater and
@@ -268,9 +171,10 @@ func (s *UpdaterSuite) TestUpdateIdentityHappyPath() {
 	unittest.WithNextEpochProtocolState()(s.parentProtocolState)
 	s.updater = newUpdater(s.candidate, s.parentProtocolState)
 
-	weightChanges, err := s.parentProtocolState.CurrentEpochSetup.Participants.Sample(2)
+	currentEpochParticipants := s.parentProtocolState.CurrentEpochSetup.Participants.Copy()
+	weightChanges, err := currentEpochParticipants.Sample(2)
 	require.NoError(s.T(), err)
-	ejectedChanges, err := s.parentProtocolState.CurrentEpochSetup.Participants.Sample(2)
+	ejectedChanges, err := currentEpochParticipants.Sample(2)
 	require.NoError(s.T(), err)
 	for i, identity := range weightChanges {
 		identity.DynamicIdentity.Weight = uint64(100 * i)
@@ -303,6 +207,122 @@ func (s *UpdaterSuite) TestUpdateIdentityHappyPath() {
 	requireUpdatesApplied(updatedState.NextEpochProtocolState.Identities.Lookup())
 }
 
+// TestProcessEpochSetupInvariants tests if processing epoch setup when invariants are violated doesn't update internal structures.
+func (s *UpdaterSuite) TestProcessEpochSetupInvariants() {
+	s.Run("invalid counter", func() {
+		setup := unittest.EpochSetupFixture(func(setup *flow.EpochSetup) {
+			setup.Counter = s.parentProtocolState.CurrentEpochSetup.Counter + 10 // set invalid counter for next epoch
+		})
+		err := s.updater.ProcessEpochSetup(setup)
+		require.Error(s.T(), err)
+	})
+	s.Run("invalid state transition attempted", func() {
+		updater := newUpdater(s.candidate, s.parentProtocolState)
+		setup := unittest.EpochSetupFixture(func(setup *flow.EpochSetup) {
+			setup.Counter = s.parentProtocolState.CurrentEpochSetup.Counter + 1
+		})
+		updater.SetInvalidStateTransitionAttempted()
+		err := updater.ProcessEpochSetup(setup)
+		require.NoError(s.T(), err)
+
+		updatedState, _, _ := updater.Build()
+		require.Nil(s.T(), updatedState.NextEpochProtocolState, "should not process epoch setup if invalid state transition attempted")
+	})
+	s.Run("processing second epoch setup", func() {
+		updater := newUpdater(s.candidate, s.parentProtocolState)
+		setup := unittest.EpochSetupFixture(func(setup *flow.EpochSetup) {
+			setup.Counter = s.parentProtocolState.CurrentEpochSetup.Counter + 1
+		})
+		err := updater.ProcessEpochSetup(setup)
+		require.NoError(s.T(), err)
+
+		err = updater.ProcessEpochSetup(setup)
+		require.Error(s.T(), err)
+	})
+}
+
+// TestProcessEpochSetupHappyPath tests if processing epoch setup when invariants are not violated updates internal structures.
+// It must produce valid identity table for current and next epochs.
+// For current epoch we should have identity table with all the nodes from the current epoch + nodes from the next epoch with 0 weight.
+// For next epoch we should have identity table with all the nodes from the next epoch + nodes from the current epoch with 0 weight.
+func (s *UpdaterSuite) TestProcessEpochSetupHappyPath() {
+	setup := unittest.EpochSetupFixture(func(setup *flow.EpochSetup) {
+		setup.Counter = s.parentProtocolState.CurrentEpochSetup.Counter + 1
+		setup.Participants[0].InitialWeight = 13
+	})
+
+	// prepare expected identity tables for current and next epochs
+	expectedCurrentEpochIdentityTable := make(flow.DynamicIdentityEntryList, 0,
+		len(s.parentProtocolState.CurrentEpochSetup.Participants)+len(setup.Participants))
+	expectedNextEpochIdentityTable := make(flow.DynamicIdentityEntryList, 0,
+		len(expectedCurrentEpochIdentityTable))
+
+	// for current epoch we will have all the nodes from the current epoch + nodes from the next epoch with 0 weight
+	// for next epoch we will have all the nodes from the next epoch + nodes from the current epoch with 0 weight
+	for _, participant := range s.parentProtocolState.CurrentEpochSetup.Participants {
+		expectedCurrentEpochIdentityTable = append(expectedCurrentEpochIdentityTable, &flow.DynamicIdentityEntry{
+			NodeID: participant.NodeID,
+			Dynamic: flow.DynamicIdentity{
+				Weight:  participant.Weight,
+				Ejected: participant.Ejected,
+			},
+		})
+
+		expectedNextEpochIdentityTable = append(expectedNextEpochIdentityTable, &flow.DynamicIdentityEntry{
+			NodeID: participant.NodeID,
+			Dynamic: flow.DynamicIdentity{
+				Weight:  0,
+				Ejected: participant.Ejected,
+			},
+		})
+	}
+
+	// in this loop we perform a few extra lookups to avoid duplicates
+	for _, participant := range setup.Participants {
+		if _, found := expectedCurrentEpochIdentityTable.ByNodeID(participant.NodeID); !found {
+			expectedCurrentEpochIdentityTable = append(expectedCurrentEpochIdentityTable, &flow.DynamicIdentityEntry{
+				NodeID: participant.NodeID,
+				Dynamic: flow.DynamicIdentity{
+					Weight:  0,
+					Ejected: participant.Ejected,
+				},
+			})
+		}
+
+		entry := &flow.DynamicIdentityEntry{
+			NodeID: participant.NodeID,
+			Dynamic: flow.DynamicIdentity{
+				Weight:  participant.InitialWeight,
+				Ejected: participant.Ejected,
+			},
+		}
+		existing, found := expectedNextEpochIdentityTable.ByNodeID(participant.NodeID)
+		if found {
+			existing.Dynamic = entry.Dynamic
+		} else {
+			expectedNextEpochIdentityTable = append(expectedNextEpochIdentityTable, entry)
+		}
+	}
+	// finally, sort in canonical order
+	expectedCurrentEpochIdentityTable = expectedCurrentEpochIdentityTable.Sort(order.IdentifierCanonical)
+	expectedNextEpochIdentityTable = expectedNextEpochIdentityTable.Sort(order.IdentifierCanonical)
+
+	// process actual event
+	err := s.updater.ProcessEpochSetup(setup)
+	require.NoError(s.T(), err)
+
+	updatedState, _, hasChanges := s.updater.Build()
+	require.True(s.T(), hasChanges, "should have changes")
+	require.Equal(s.T(), expectedCurrentEpochIdentityTable, updatedState.Identities)
+	nextEpochProtocolState := updatedState.NextEpochProtocolState
+	require.NotNil(s.T(), nextEpochProtocolState, "should have next epoch protocol state")
+	require.Equal(s.T(), nextEpochProtocolState.CurrentEpochEventIDs.SetupID, setup.ID(),
+		"should have correct setup ID for next protocol state")
+	require.False(s.T(), nextEpochProtocolState.InvalidStateTransitionAttempted, "should not set invalid state transition attempted")
+	require.Nil(s.T(), nextEpochProtocolState.NextEpochProtocolState, "should not have next epoch protocol state")
+	require.Equal(s.T(), expectedNextEpochIdentityTable, nextEpochProtocolState.Identities)
+}
+
 // TestProcessEpochSetupWithSameParticipants tests that processing epoch setup with overlapping participants results in correctly
 // built updated protocol state. It should build a union of participants from current and next epoch for current and
 // next epoch protocol states respectively.
@@ -328,9 +348,10 @@ func (s *UpdaterSuite) TestProcessEpochSetupWithSameParticipants() {
 // TestEpochSetupAfterIdentityChange tests that after processing epoch setup event all previously made changes to the identity table
 // are preserved and reflected in the resulting protocol state.
 func (s *UpdaterSuite) TestEpochSetupAfterIdentityChange() {
-	weightChanges, err := s.parentProtocolState.CurrentEpochSetup.Participants.Sample(2)
+	currentEpochParticipants := s.parentProtocolState.CurrentEpochSetup.Participants.Copy()
+	weightChanges, err := currentEpochParticipants.Sample(2)
 	require.NoError(s.T(), err)
-	ejectedChanges, err := s.parentProtocolState.CurrentEpochSetup.Participants.Sample(2)
+	ejectedChanges, err := currentEpochParticipants.Sample(2)
 	require.NoError(s.T(), err)
 	for i, identity := range weightChanges {
 		identity.DynamicIdentity.Weight = uint64(100 * (i + 1))
@@ -379,18 +400,30 @@ func (s *UpdaterSuite) TestEpochSetupAfterIdentityChange() {
 
 	updatedState, _, _ = s.updater.Build()
 
-	// HUGE problem in using Lookup, if same entries are in both current and next epoch,
-	// then lookup will return the one from current(or next) epoch
+	// assert that all changes made in previous epoch are preserved
 	currentEpochLookup := updatedState.Identities.Lookup()
 	nextEpochLookup := updatedState.NextEpochProtocolState.Identities.Lookup()
 
-	for _, updated := range allUpdates {
+	for _, updated := range ejectedChanges {
 		currentEpochIdentity := currentEpochLookup[updated.NodeID]
 		nextEpochIdentity := nextEpochLookup[updated.NodeID]
 		require.Equal(s.T(), updated.NodeID, currentEpochIdentity.NodeID)
 		require.Equal(s.T(), updated.NodeID, nextEpochIdentity.NodeID)
-		//require.Equal(s.T(), updated.DynamicIdentity, currentEpochIdentity.Dynamic)
-		require.Equal(s.T(), updated.Weight, currentEpochIdentity.Dynamic.Weight)
+
+		require.Equal(s.T(), updated.Ejected, currentEpochIdentity.Dynamic.Ejected)
+		require.Equal(s.T(), updated.Ejected, nextEpochIdentity.Dynamic.Ejected)
 	}
 
+	for _, updated := range weightChanges {
+		currentEpochIdentity := currentEpochLookup[updated.NodeID]
+		nextEpochIdentity := nextEpochLookup[updated.NodeID]
+		require.Equal(s.T(), updated.NodeID, currentEpochIdentity.NodeID)
+		require.Equal(s.T(), updated.NodeID, nextEpochIdentity.NodeID)
+
+		require.Equal(s.T(), updated.DynamicIdentity.Weight, currentEpochIdentity.Dynamic.Weight)
+		require.NotEqual(s.T(), updated.InitialWeight, currentEpochIdentity.Dynamic.Weight,
+			"since we have updated weight it should not be equal to initial weight")
+		require.Equal(s.T(), updated.InitialWeight, nextEpochIdentity.Dynamic.Weight,
+			"we take information about weight from next epoc setup event")
+	}
 }
