@@ -244,15 +244,15 @@ transaction(key1: [UInt8], key2: [UInt8]) {
 			signatureAlgorithm: SignatureAlgorithm.ECDSA_P256
 		),
 		hashAlgorithm: HashAlgorithm.SHA3_256,
-		weight: 100.0
+		weight: 1000.0
 	)
     signer.keys.add(
 		publicKey: PublicKey(
-			publicKey: [1, 2, 3],
+			publicKey: key2,
 			signatureAlgorithm: SignatureAlgorithm.ECDSA_P256
 		),
 		hashAlgorithm: HashAlgorithm.SHA3_256,
-		weight: 100.0
+		weight: 1000.0
 	)
   }
 }
@@ -279,7 +279,7 @@ transaction(key1: [UInt8], key2: [UInt8]) {
 const removeAccountKeyTransaction = `
 transaction(key: Int) {
   prepare(signer: AuthAccount) {
-    signer.revoke(key)
+    signer.keys.revoke(keyIndex: key)
   }
 }
 `
@@ -295,8 +295,8 @@ transaction(keyIndex: Int) {
 const removeMultipleAccountKeysTransaction = `
 transaction(key1: Int, key2: Int) {
   prepare(signer: AuthAccount) {
-    signer.revoke(key1)
-    signer.revoke(key2)
+    signer.keys.revoke(keyIndex: key1)
+    signer.keys.revoke(keyIndex: key2)
   }
 }
 `
@@ -648,7 +648,7 @@ func TestAddAccountKey(t *testing.T) {
 
 	for _, test := range singleKeyTests {
 
-		t.Run(fmt.Sprintf("Add to empty key list %s", test.apiVersion),
+		t.Run(fmt.Sprintf("Add to empty key list %s", accountKeyAPIVersionV2),
 			newVMTest().withContextOptions(options...).
 				run(func(t *testing.T, vm fvm.VM, chain flow.Chain, ctx fvm.Context, snapshotTree snapshot.SnapshotTree) {
 					snapshotTree, address := createAccount(
@@ -665,7 +665,7 @@ func TestAddAccountKey(t *testing.T) {
 					privateKey, err := unittest.AccountKeyDefaultFixture()
 					require.NoError(t, err)
 
-					publicKeyA, cadencePublicKey := newAccountKey(t, privateKey, test.apiVersion)
+					publicKeyA, cadencePublicKey := newAccountKey(t, privateKey, accountKeyAPIVersionV2)
 
 					txBody := flow.NewTransactionBody().
 						SetScript([]byte(test.source)).
@@ -696,7 +696,7 @@ func TestAddAccountKey(t *testing.T) {
 				}),
 		)
 
-		t.Run(fmt.Sprintf("Add to non-empty key list %s", test.apiVersion),
+		t.Run(fmt.Sprintf("Add to non-empty key list %s", accountKeyAPIVersionV2),
 			newVMTest().withContextOptions(options...).
 				run(func(t *testing.T, vm fvm.VM, chain flow.Chain, ctx fvm.Context, snapshotTree snapshot.SnapshotTree) {
 					snapshotTree, address := createAccount(
@@ -712,7 +712,7 @@ func TestAddAccountKey(t *testing.T) {
 						ctx,
 						snapshotTree,
 						address,
-						test.apiVersion)
+						accountKeyAPIVersionV2)
 
 					before, err := vm.GetAccount(ctx, address, snapshotTree)
 					require.NoError(t, err)
@@ -721,7 +721,7 @@ func TestAddAccountKey(t *testing.T) {
 					privateKey, err := unittest.AccountKeyDefaultFixture()
 					require.NoError(t, err)
 
-					publicKey2, publicKey2Arg := newAccountKey(t, privateKey, test.apiVersion)
+					publicKey2, publicKey2Arg := newAccountKey(t, privateKey, accountKeyAPIVersionV2)
 
 					txBody := flow.NewTransactionBody().
 						SetScript([]byte(test.source)).
@@ -758,7 +758,7 @@ func TestAddAccountKey(t *testing.T) {
 				}),
 		)
 
-		t.Run(fmt.Sprintf("Invalid key %s", test.apiVersion),
+		t.Run(fmt.Sprintf("Invalid key %s", accountKeyAPIVersionV2),
 			newVMTest().withContextOptions(options...).
 				run(func(t *testing.T, vm fvm.VM, chain flow.Chain, ctx fvm.Context, snapshotTree snapshot.SnapshotTree) {
 					snapshotTree, address := createAccount(
@@ -808,7 +808,7 @@ func TestAddAccountKey(t *testing.T) {
 	}
 
 	for _, test := range multipleKeysTests {
-		t.Run(fmt.Sprintf("Multiple keys %s", test.apiVersion),
+		t.Run(fmt.Sprintf("Multiple keys %s", accountKeyAPIVersionV2),
 			newVMTest().withContextOptions(options...).
 				run(func(t *testing.T, vm fvm.VM, chain flow.Chain, ctx fvm.Context, snapshotTree snapshot.SnapshotTree) {
 					snapshotTree, address := createAccount(
@@ -828,8 +828,8 @@ func TestAddAccountKey(t *testing.T) {
 					privateKey2, err := unittest.AccountKeyDefaultFixture()
 					require.NoError(t, err)
 
-					publicKey1, publicKey1Arg := newAccountKey(t, privateKey1, test.apiVersion)
-					publicKey2, publicKey2Arg := newAccountKey(t, privateKey2, test.apiVersion)
+					publicKey1, publicKey1Arg := newAccountKey(t, privateKey1, accountKeyAPIVersionV2)
+					publicKey2, publicKey2Arg := newAccountKey(t, privateKey2, accountKeyAPIVersionV2)
 
 					txBody := flow.NewTransactionBody().
 						SetScript([]byte(test.source)).
@@ -962,7 +962,7 @@ func TestRemoveAccountKey(t *testing.T) {
 
 	for _, test := range singleKeyTests {
 
-		t.Run(fmt.Sprintf("Non-existent key %s", test.apiVersion),
+		t.Run(fmt.Sprintf("Non-existent key %s", accountKeyAPIVersionV2),
 			newVMTest().withContextOptions(options...).
 				run(func(t *testing.T, vm fvm.VM, chain flow.Chain, ctx fvm.Context, snapshotTree snapshot.SnapshotTree) {
 					snapshotTree, address := createAccount(
@@ -981,7 +981,7 @@ func TestRemoveAccountKey(t *testing.T) {
 							ctx,
 							snapshotTree,
 							address,
-							test.apiVersion)
+							accountKeyAPIVersionV2)
 					}
 
 					before, err := vm.GetAccount(ctx, address, snapshotTree)
@@ -1022,7 +1022,7 @@ func TestRemoveAccountKey(t *testing.T) {
 				}),
 		)
 
-		t.Run(fmt.Sprintf("Existing key %s", test.apiVersion),
+		t.Run(fmt.Sprintf("Existing key %s", accountKeyAPIVersionV2),
 			newVMTest().withContextOptions(options...).
 				run(func(t *testing.T, vm fvm.VM, chain flow.Chain, ctx fvm.Context, snapshotTree snapshot.SnapshotTree) {
 					snapshotTree, address := createAccount(
@@ -1042,7 +1042,7 @@ func TestRemoveAccountKey(t *testing.T) {
 							ctx,
 							snapshotTree,
 							address,
-							test.apiVersion)
+							accountKeyAPIVersionV2)
 					}
 
 					before, err := vm.GetAccount(ctx, address, snapshotTree)
@@ -1078,7 +1078,7 @@ func TestRemoveAccountKey(t *testing.T) {
 				}),
 		)
 
-		t.Run(fmt.Sprintf("Key added by a different api version %s", test.apiVersion),
+		t.Run(fmt.Sprintf("Key added by a different api version %s", accountKeyAPIVersionV2),
 			newVMTest().withContextOptions(options...).
 				run(func(t *testing.T, vm fvm.VM, chain flow.Chain, ctx fvm.Context, snapshotTree snapshot.SnapshotTree) {
 					snapshotTree, address := createAccount(
@@ -1091,14 +1091,6 @@ func TestRemoveAccountKey(t *testing.T) {
 					const keyCount = 2
 					const keyIndex = keyCount - 1
 
-					// Use one version of API to add the keys, and a different version of the API to revoke the keys.
-					var apiVersionForAdding accountKeyAPIVersion
-					if test.apiVersion == accountKeyAPIVersionV1 {
-						apiVersionForAdding = accountKeyAPIVersionV2
-					} else {
-						apiVersionForAdding = accountKeyAPIVersionV1
-					}
-
 					for i := 0; i < keyCount; i++ {
 						snapshotTree, _ = addAccountKey(
 							t,
@@ -1106,7 +1098,7 @@ func TestRemoveAccountKey(t *testing.T) {
 							ctx,
 							snapshotTree,
 							address,
-							apiVersionForAdding)
+							accountKeyAPIVersionV2)
 					}
 
 					before, err := vm.GetAccount(ctx, address, snapshotTree)
@@ -1157,7 +1149,7 @@ func TestRemoveAccountKey(t *testing.T) {
 	}
 
 	for _, test := range multipleKeysTests {
-		t.Run(fmt.Sprintf("Multiple keys %s", test.apiVersion),
+		t.Run(fmt.Sprintf("Multiple keys %s", accountKeyAPIVersionV2),
 			newVMTest().withContextOptions(options...).
 				run(func(t *testing.T, vm fvm.VM, chain flow.Chain, ctx fvm.Context, snapshotTree snapshot.SnapshotTree) {
 					snapshotTree, address := createAccount(
@@ -1176,7 +1168,7 @@ func TestRemoveAccountKey(t *testing.T) {
 							ctx,
 							snapshotTree,
 							address,
-							test.apiVersion)
+							accountKeyAPIVersionV2)
 					}
 
 					before, err := vm.GetAccount(ctx, address, snapshotTree)
