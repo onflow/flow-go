@@ -588,7 +588,7 @@ func TestTransactionFeeDeduction(t *testing.T) {
 							transaction(amount: UFix64, to: Address) {
 							
 								// The Vault resource that holds the tokens that are being transferred
-								let sentVault: @FungibleToken.Vault
+								let sentVault: @{FungibleToken.Vault}
 							
 								prepare(signer: AuthAccount) {
 							

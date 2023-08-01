@@ -2,7 +2,7 @@ import FungibleToken from 0xFUNGIBLETOKENADDRESS
 import FlowToken from 0xTOKENADDRESS
 
 transaction(amount: UFix64, to: Address) {
-    let sentVault: @FungibleToken.Vault
+    let sentVault: @{FungibleToken.Vault}
 
     prepare(signer: AuthAccount) {
         let vaultRef = signer.borrow<&FlowToken.Vault>(from: /storage/flowTokenVault)
