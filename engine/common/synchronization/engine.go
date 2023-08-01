@@ -24,9 +24,11 @@ import (
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/network/alsp"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
+	"github.com/onflow/flow-go/utils/logging"
 	"github.com/onflow/flow-go/utils/rand"
 )
 
@@ -201,8 +203,15 @@ func (e *Engine) Process(channel channels.Channel, originID flow.Identifier, eve
 //   - IncompatibleInputTypeError if input has unexpected type
 //   - All other errors are potential symptoms of internal state corruption or bugs (fatal).
 func (e *Engine) process(channel channels.Channel, originID flow.Identifier, event interface{}) error {
-	switch event.(type) {
+	switch resource := event.(type) {
 	case *messages.RangeRequest, *messages.BatchRequest, *messages.SyncRequest:
+		report, misbehavior := e.validateSyncRequestForALSP(originID, channel, resource) {
+		if misbehavior {
+			e.con.ReportMisbehavior(report) // report misbehavior to ALSP
+			e.log.Warn().Hex("origin_id", logging.ID(originID)).Str(logging.KeySuspicious, "true").Msgf("received invalid sync request from %x: %v", originID[:], misbehavior)
+			e.metrics.InboundMessageDropped(metrics.EngineSynchronization, metrics.MessageSyncRequest)
+			return nil
+		}
 		return e.requestHandler.Process(channel, originID, event)
 	case *messages.SyncResponse, *messages.BlockResponse:
 		return e.responseMessageHandler.Process(originID, event)
@@ -423,4 +432,8 @@ func (e *Engine) sendRequests(participants flow.IdentifierList, ranges []chainsy
 	if err := errs.ErrorOrNil(); err != nil {
 		e.log.Warn().Err(err).Msg("sending range and batch requests failed")
 	}
+}
+
+func (e *Engine) validateSyncRequestForALSP(id flow.Identifier, channel channels.Channel, resource interface{}) (*alsp.MisbehaviorReport, bool) {
+	return nil, true
 }
