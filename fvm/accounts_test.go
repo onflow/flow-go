@@ -103,15 +103,8 @@ func addAccountKey(
 
 	publicKeyA, cadencePublicKey := newAccountKey(t, privateKey, apiVersion)
 
-	var addAccountKeyTx accountKeyAPIVersion
-	if apiVersion == accountKeyAPIVersionV1 {
-		addAccountKeyTx = addAccountKeyTransaction
-	} else {
-		addAccountKeyTx = addAccountKeyTransactionV2
-	}
-
 	txBody := flow.NewTransactionBody().
-		SetScript([]byte(addAccountKeyTx)).
+		SetScript([]byte(addAccountKeyTransaction)).
 		AddArgument(cadencePublicKey).
 		AddAuthorizer(address)
 
@@ -219,21 +212,6 @@ transaction(key: [UInt8]) {
   }
 }
 `
-const addAccountKeyTransactionV2 = `
-transaction(key: [UInt8]) {
-  prepare(signer: AuthAccount) {
-    let publicKey = PublicKey(
-	  publicKey: key,
-	  signatureAlgorithm: SignatureAlgorithm.ECDSA_P256
-	)
-    signer.keys.add(
-      publicKey: publicKey,
-      hashAlgorithm: HashAlgorithm.SHA3_256,
-      weight: 1000.0
-    )
-  }
-}
-`
 
 const addMultipleAccountKeysTransaction = `
 transaction(key1: [UInt8], key2: [UInt8]) {
@@ -258,45 +236,10 @@ transaction(key1: [UInt8], key2: [UInt8]) {
 }
 `
 
-const addMultipleAccountKeysTransactionV2 = `
-transaction(key1: [UInt8], key2: [UInt8]) {
-  prepare(signer: AuthAccount) {
-    for key in [key1, key2] {
-      let publicKey = PublicKey(
-	    publicKey: key,
-	    signatureAlgorithm: SignatureAlgorithm.ECDSA_P256
-	  )
-      signer.keys.add(
-        publicKey: publicKey,
-        hashAlgorithm: HashAlgorithm.SHA3_256,
-        weight: 1000.0
-      )
-    }
-  }
-}
-`
-
-const removeAccountKeyTransaction = `
-transaction(key: Int) {
-  prepare(signer: AuthAccount) {
-    signer.keys.revoke(keyIndex: key)
-  }
-}
-`
-
 const revokeAccountKeyTransaction = `
 transaction(keyIndex: Int) {
   prepare(signer: AuthAccount) {
     signer.keys.revoke(keyIndex: keyIndex)
-  }
-}
-`
-
-const removeMultipleAccountKeysTransaction = `
-transaction(key1: Int, key2: Int) {
-  prepare(signer: AuthAccount) {
-    signer.keys.revoke(keyIndex: key1)
-    signer.keys.revoke(keyIndex: key2)
   }
 }
 `
@@ -638,10 +581,6 @@ func TestAddAccountKey(t *testing.T) {
 	singleKeyTests := []addKeyTest{
 		{
 			source:     addAccountKeyTransaction,
-			apiVersion: accountKeyAPIVersionV1,
-		},
-		{
-			source:     addAccountKeyTransactionV2,
 			apiVersion: accountKeyAPIVersionV2,
 		},
 	}
@@ -799,10 +738,6 @@ func TestAddAccountKey(t *testing.T) {
 	multipleKeysTests := []addKeyTest{
 		{
 			source:     addMultipleAccountKeysTransaction,
-			apiVersion: accountKeyAPIVersionV1,
-		},
-		{
-			source:     addMultipleAccountKeysTransactionV2,
 			apiVersion: accountKeyAPIVersionV2,
 		},
 	}
@@ -948,11 +883,6 @@ func TestRemoveAccountKey(t *testing.T) {
 	// Remove a single key
 
 	singleKeyTests := []removeKeyTest{
-		{
-			source:      removeAccountKeyTransaction,
-			apiVersion:  accountKeyAPIVersionV1,
-			expectError: true,
-		},
 		{
 			source:      revokeAccountKeyTransaction,
 			apiVersion:  accountKeyAPIVersionV2,
@@ -1138,10 +1068,6 @@ func TestRemoveAccountKey(t *testing.T) {
 	// Remove multiple keys
 
 	multipleKeysTests := []removeKeyTest{
-		{
-			source:     removeMultipleAccountKeysTransaction,
-			apiVersion: accountKeyAPIVersionV1,
-		},
 		{
 			source:     revokeMultipleAccountKeysTransaction,
 			apiVersion: accountKeyAPIVersionV2,
@@ -1350,7 +1276,7 @@ func TestGetAccountKey(t *testing.T) {
 						ctx,
 						snapshotTree,
 						address,
-						accountKeyAPIVersionV1)
+						accountKeyAPIVersionV2)
 				}
 
 				before, err := vm.GetAccount(ctx, address, snapshotTree)
@@ -1620,7 +1546,7 @@ func TestAccountBalanceFields(t *testing.T) {
 				_, output, err = vm.Run(ctx, script, snapshotTree)
 				assert.NoError(t, err)
 				assert.NoError(t, output.Err)
-				assert.Equal(t, cadence.UFix64(99_993_040), output.Value)
+				assert.Equal(t, cadence.UFix64(99_994_110), output.Value)
 			}),
 	)
 

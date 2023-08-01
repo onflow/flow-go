@@ -9,16 +9,16 @@ import (
 const CounterContract = `
 access(all) contract Container {
 	access(all) resource Counter {
-		pub var count: Int
+		access(all) var count: Int
 
 		init(_ v: Int) {
 			self.count = v
 		}
-		pub fun add(_ count: Int) {
+		access(all) fun add(_ count: Int) {
 			self.count = self.count + count
 		}
 	}
-	pub fun createCounter(_ v: Int): @Counter {
+	access(all) fun createCounter(_ v: Int): @Counter {
 		return <-create Counter(v)
 	}
 }
@@ -27,20 +27,20 @@ access(all) contract Container {
 const CounterContractV2 = `
 access(all) contract Container {
 	access(all) resource Counter {
-		pub var count: Int
+		access(all) var count: Int
 
 		init(_ v: Int) {
 			self.count = v
 		}
-		pub fun add(_ count: Int) {
+		access(all) fun add(_ count: Int) {
 			self.count = self.count + count
 		}
 	}
-	pub fun createCounter(_ v: Int): @Counter {
+	access(all) fun createCounter(_ v: Int): @Counter {
 		return <-create Counter(v)
 	}
 
-	pub fun createCounter2(_ v: Int): @Counter {
+	access(all) fun createCounter2(_ v: Int): @Counter {
 		return <-create Counter(v)
 	}
 }

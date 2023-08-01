@@ -605,10 +605,10 @@ func TestTransactionFeeDeduction(t *testing.T) {
 					access(all) fun main(account: Address): UFix64 {
 						let acct = getAccount(account)
 						let vaultRef = acct.getCapability(/public/flowTokenBalance)
-							.borrow<&FlowToken.Vault{FungibleToken.Balance}>()
+							.borrow<&FlowToken.Vault>()
 							?? panic("Could not borrow Balance reference to the Vault")
 
-						return vaultRef.balance
+						return vaultRef.getBalance()
 					}
 				`, fvm.FungibleTokenAddress(chain), fvm.FlowTokenAddress(chain)))
 		script := fvm.Script(code).WithArguments(
@@ -1718,7 +1718,7 @@ func TestStorageCapacity(t *testing.T) {
 								?? panic("Could not borrow receiver reference to the recipient''s Vault")
 
 							let vaultRef = signer
-								.borrow<&{FungibleToken.Provider}>(from: /storage/flowTokenVault)
+								.borrow<auth(FungibleToken.Withdrawable) &FlowToken.Vault>(from: /storage/flowTokenVault)
 								?? panic("Could not borrow reference to the owner''s Vault!")
 
 							var cap0: UInt64 = signer.storageCapacity
@@ -2013,7 +2013,7 @@ func TestScriptAccountKeyMutationsFailure(t *testing.T) {
 				script := fvm.Script([]byte(`
 				access(all) fun main(account: Address) {
 					let acc = getAuthAccount(account)
-					acc.keys.revoke(0)
+					acc.keys.revoke(keyIndex: 0)
 				}`,
 				)).WithArguments(
 					jsoncdc.MustEncode(address),

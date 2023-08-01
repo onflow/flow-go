@@ -43,42 +43,42 @@ var (
 	}
 
 	contractA0Code = `
-		pub contract A {
-			pub struct interface Foo{}
+		access(all) contract A {
+			access(all) struct interface Foo{}
 			
-			pub fun hello(): String {
+			access(all) fun hello(): String {
         		return "bad version"
     		}
 		}
 	`
 
 	contractACode = `
-		pub contract A {
-			pub struct interface Foo{}
+		access(all) contract A {
+			access(all) struct interface Foo{}
 
-			pub fun hello(): String {
+			access(all) fun hello(): String {
         		return "hello from A"
     		}
 		}
 	`
 
 	contractA2Code = `
-		pub contract A2 {
-			pub struct interface Foo{}
+		access(all) contract A2 {
+			access(all) struct interface Foo{}
 
-			pub fun hello(): String {
+			access(all) fun hello(): String {
         		return "hello from A2"
     		}
 		}
 	`
 
 	contractABreakingCode = `
-		pub contract A {
-			pub struct interface Foo{
-				pub fun hello()
+		access(all) contract A {
+			access(all) struct interface Foo{
+				access(all) fun hello()
 			}
 	
-			pub fun hello(): String {
+			access(all) fun hello(): String {
 	  		return "hello from A with breaking change"
 			}
 		}
@@ -87,10 +87,10 @@ var (
 	contractBCode = `
 		import 0xa
 
-		pub contract B {
-			pub struct Bar : A.Foo {}
+		access(all) contract B {
+			access(all) struct Bar : A.Foo {}
 
-			pub fun hello(): String {
+			access(all) fun hello(): String {
        			return "hello from B but also ".concat(A.hello())
     		}
 		}
@@ -100,10 +100,10 @@ var (
 		import B from 0xb
 		import A from 0xa
 
-		pub contract C {
-            pub struct Bar : A.Foo {}
+		access(all) contract C {
+            access(all) struct Bar : A.Foo {}
 
-			pub fun hello(): String {
+			access(all) fun hello(): String {
 	   			return "hello from C, ".concat(B.hello())
 			}
 		}

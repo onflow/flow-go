@@ -44,12 +44,12 @@ func transferTokensTx(chain flow.Chain) *flow.TransactionBody {
 							transaction(amount: UFix64, to: Address) {
 
 								// The Vault resource that holds the tokens that are being transferred
-								let sentVault: @FungibleToken.Vault
+								let sentVault: @{FungibleToken.Vault}
 
 								prepare(signer: AuthAccount) {
 
 									// Get a reference to the signer's stored vault
-									let vaultRef = signer.borrow<&FlowToken.Vault>(from: /storage/flowTokenVault)
+									let vaultRef = signer.borrow<auth(FungibleToken.Withdrawable) &FlowToken.Vault>(from: /storage/flowTokenVault)
 										?? panic("Could not borrow reference to the owner's Vault!")
 
 									// Withdraw tokens from the signer's stored vault
@@ -1019,7 +1019,7 @@ func TestBlockContext_ExecuteTransaction_StorageLimit(t *testing.T) {
 						prepare(signer: AuthAccount, service: AuthAccount) {
 							signer.contracts.add(name: "%s", code: "%s".decodeHex())
 
-							let vaultRef = service.borrow<&FlowToken.Vault>(from: /storage/flowTokenVault)!
+							let vaultRef = service.borrow<auth(FungibleToken.Withdrawable) &FlowToken.Vault>(from: /storage/flowTokenVault)!
 							// deposit additional flow
 							let payment <- vaultRef.withdraw(amount: 10.0) as! @FlowToken.Vault
 
@@ -1762,10 +1762,10 @@ func TestBlockContext_ExecuteTransaction_FailingTransactions(t *testing.T) {
 					access(all) fun main(account: Address): UFix64 {
 						let acct = getAccount(account)
 						let vaultRef = acct.getCapability(/public/flowTokenBalance)
-							.borrow<&FlowToken.Vault{FungibleToken.Balance}>()
+							.borrow<&FlowToken.Vault>()
 							?? panic("Could not borrow Balance reference to the Vault")
 
-						return vaultRef.balance
+						return vaultRef.getBalance()
 					}
 				`, fvm.FungibleTokenAddress(chain), fvm.FlowTokenAddress(chain)))
 		script := fvm.Script(code).WithArguments(
