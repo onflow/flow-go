@@ -191,7 +191,7 @@ func buildIdentityTable(
 	previousEpochSetup, currentEpochSetup *flow.EpochSetup,
 ) (flow.IdentityList, error) {
 	// produce a unique set for current and previous epoch participants
-	allEpochParticipants := previousEpochSetup.Participants.Union(currentEpochSetup.Participants)
+	allEpochParticipants := currentEpochSetup.Participants.Union(previousEpochSetup.Participants)
 	// sanity check: size of identities should be equal to previous and current epoch participants combined
 	if len(allEpochParticipants) != len(dynamicIdentities) {
 		return nil, fmt.Errorf("invalid number of identities in protocol state: expected %d, got %d", len(allEpochParticipants), len(dynamicIdentities))
