@@ -17,8 +17,12 @@ env:
   BIGQUERY_TABLE: skipped_tests
   BIGQUERY_TABLE2: test_results
   GO_VERSION: "1.20"
+  SKIPPED_TESTS_FILE: skipped-tests
+  RESULTS_FILE: test-results
+  COMMIT_SHA: ${{ github.sha }}
+  RUN_ID: ${{ github.run_id }}
 
-concurrency: 
+concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
   cancel-in-progress: true
 
