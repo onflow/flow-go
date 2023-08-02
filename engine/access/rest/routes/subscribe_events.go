@@ -23,6 +23,7 @@ const (
 	pingPeriod = (pongWait * 9) / 10
 )
 
+// SubscribeEvents create websocket connection and write to it requested events.
 func SubscribeEvents(r *request.Request,
 	w http.ResponseWriter,
 	logger zerolog.Logger,
@@ -62,16 +63,25 @@ func SubscribeEvents(r *request.Request,
 		req.Contracts,
 	)
 	if err != nil {
-		errorHandler(w, models.NewRestError(http.StatusInternalServerError, "create event filter error: ", err), logger)
+		err := fmt.Errorf("event filter error")
+		errorHandler(w, models.NewBadRequestError(err), logger)
 		return
 	}
 
 	streamCount.Add(1)
 
 	// Write messages to the WebSocket connection
-	go writeEvents(logger, w, req, r.Context(), conn, api, filter, errorHandler, streamCount)
-	time.Sleep(1 * time.Second) // wait for creating child context in goroutine
-	jsonResponse(w, http.StatusOK, "{}", logger)
+	go writeEvents(logger,
+		w,
+		req,
+		r.Context(),
+		conn,
+		api,
+		filter,
+		errorHandler,
+		jsonResponse,
+		streamCount)
+	time.Sleep(2 * time.Second) // wait for creating child context in goroutine
 }
 
 func writeEvents(
@@ -83,6 +93,7 @@ func writeEvents(
 	api state_stream.API,
 	filter state_stream.EventFilter,
 	errorHandler func(w http.ResponseWriter, err error, errorLogger zerolog.Logger),
+	jsonResponse func(w http.ResponseWriter, code int, response interface{}, errLogger zerolog.Logger),
 	streamCount *atomic.Int32,
 ) {
 	ticker := time.NewTicker(pingPeriod)
@@ -115,13 +126,13 @@ func writeEvents(
 		case v, ok := <-sub.Channel():
 			if !ok {
 				if sub.Err() != nil {
-					err := fmt.Errorf("stream encountered an error: %w", sub.Err())
+					err := fmt.Errorf("stream encountered an error: %v", sub.Err())
 					errorHandler(w, models.NewBadRequestError(err), log)
 					conn.Close()
 					return
 				}
 				err := fmt.Errorf("subscription channel closed, no error occurred")
-				errorHandler(w, err, log)
+				errorHandler(w, models.NewRestError(http.StatusRequestTimeout, "subscription channel closed", err), log)
 				conn.Close()
 				return
 			}
@@ -141,6 +152,7 @@ func writeEvents(
 				conn.Close()
 				return
 			}
+			jsonResponse(w, http.StatusOK, "", log)
 		case <-ticker.C:
 			if err := conn.WriteMessage(websocket.PingMessage, nil); err != nil {
 				conn.Close()

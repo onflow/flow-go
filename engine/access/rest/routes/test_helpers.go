@@ -5,19 +5,17 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"net"
+	"net/http"
+	"net/http/httptest"
 	"strings"
+	"testing"
 	"time"
 
 	"github.com/gorilla/mux"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
-	//"io"
-	"net"
-	"net/http"
-	"net/http/httptest"
-	"testing"
 
 	"github.com/onflow/flow-go/access/mock"
 	mock_state_stream "github.com/onflow/flow-go/engine/access/state_stream/mock"
