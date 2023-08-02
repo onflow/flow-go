@@ -21,6 +21,8 @@ env:
   RESULTS_FILE: test-results
   COMMIT_SHA: ${{ github.sha }}
   RUN_ID: ${{ github.run_id }}
+  JSON_OUTPUT: true
+  VERBOSE: true
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
@@ -73,8 +75,7 @@ jobs:
           # command line from GitHub runner that works:
           # make VERBOSE=1 JSON_OUTPUT=true GO_TEST_PACKAGES=github.com/onflow/flow-go/admin/commands/common -es unittest-main > test-output
         env:
-          JSON_OUTPUT: true
-          VERBOSE: true
+          TEST_CATEGORY: unit
         # test run should continue even if there are failed tests
         continue-on-error: true
       - name: Get commit date
