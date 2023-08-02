@@ -16,25 +16,25 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-// TestGetAccountKeyByID tests local getAccountKeyByID request.
+// TestGetAccountKeyByIndex tests local getAccountKeyByIndex request.
 //
 // Runs the following tests:
-// 1. Get key by address and ID at latest sealed block.
-// 2. Get key by address and ID at latest finalized block.
-// 3. Get missing key by address and ID at latest sealed block.
-// 4. Get missing key by address and ID at latest finalized block.
-// 5. Get key by missing address and ID at latest sealed block.
-// 6. Get key by missing address and ID at latest finalized block.
-// 7. Get key by address and ID at height.
-func TestGetAccountKeyByID(t *testing.T) {
+// 1. Get key by address and index at latest sealed block.
+// 2. Get key by address and index at latest finalized block.
+// 3. Get missing key by address and index at latest sealed block.
+// 4. Get missing key by address and index at latest finalized block.
+// 5. Get key by missing address and index at latest sealed block.
+// 6. Get key by missing address and index at latest finalized block.
+// 7. Get key by address and index at height.
+func TestGetAccountKeyByIndex(t *testing.T) {
 	backend := &mock.API{}
 
-	t.Run("get key by address and ID at latest sealed block", func(t *testing.T) {
+	t.Run("get key by address and index at latest sealed block", func(t *testing.T) {
 		account := accountFixture(t)
 		var height uint64 = 100
 		block := unittest.BlockHeaderFixture(unittest.WithHeaderHeight(height))
 
-		req := getAccountKeyByIDRequest(t, account, "0", sealedHeightQueryParam)
+		req := getAccountKeyByIndexRequest(t, account, "0", sealedHeightQueryParam)
 
 		backend.Mock.
 			On("GetLatestBlockHeader", mocktestify.Anything, true).
@@ -50,12 +50,12 @@ func TestGetAccountKeyByID(t *testing.T) {
 		mocktestify.AssertExpectationsForObjects(t, backend)
 	})
 
-	t.Run("get key by address and ID at latest finalized block", func(t *testing.T) {
+	t.Run("get key by address and index at latest finalized block", func(t *testing.T) {
 		account := accountFixture(t)
 		var height uint64 = 100
 		block := unittest.BlockHeaderFixture(unittest.WithHeaderHeight(height))
 
-		req := getAccountKeyByIDRequest(t, account, "0", finalHeightQueryParam)
+		req := getAccountKeyByIndexRequest(t, account, "0", finalHeightQueryParam)
 
 		backend.Mock.
 			On("GetLatestBlockHeader", mocktestify.Anything, false).
@@ -71,13 +71,13 @@ func TestGetAccountKeyByID(t *testing.T) {
 		mocktestify.AssertExpectationsForObjects(t, backend)
 	})
 
-	t.Run("get missing key by address and ID at latest sealed block", func(t *testing.T) {
+	t.Run("get missing key by address and index at latest sealed block", func(t *testing.T) {
 		account := accountFixture(t)
 		var height uint64 = 100
-		keyIndex := "2"
+		index := "2"
 		block := unittest.BlockHeaderFixture(unittest.WithHeaderHeight(height))
 
-		req := getAccountKeyByIDRequest(t, account, keyIndex, sealedHeightQueryParam)
+		req := getAccountKeyByIndexRequest(t, account, index, sealedHeightQueryParam)
 
 		backend.Mock.
 			On("GetLatestBlockHeader", mocktestify.Anything, true).
@@ -93,18 +93,18 @@ func TestGetAccountKeyByID(t *testing.T) {
             "code": %d,
             "message": "account key with index: %s does not exist"
           }
-		`, statusCode, keyIndex)
+		`, statusCode, index)
 
 		assertResponse(t, req, statusCode, expected, backend)
 	})
 
-	t.Run("get missing key by address and ID at latest finalized block", func(t *testing.T) {
+	t.Run("get missing key by address and index at latest finalized block", func(t *testing.T) {
 		account := accountFixture(t)
 		var height uint64 = 100
-		keyIndex := "2"
+		index := "2"
 		block := unittest.BlockHeaderFixture(unittest.WithHeaderHeight(height))
 
-		req := getAccountKeyByIDRequest(t, account, keyIndex, finalHeightQueryParam)
+		req := getAccountKeyByIndexRequest(t, account, index, finalHeightQueryParam)
 
 		backend.Mock.
 			On("GetLatestBlockHeader", mocktestify.Anything, false).
@@ -120,18 +120,18 @@ func TestGetAccountKeyByID(t *testing.T) {
             "code": %d,
             "message": "account key with index: %s does not exist"
           }
-		`, statusCode, keyIndex)
+		`, statusCode, index)
 
 		assertResponse(t, req, statusCode, expected, backend)
 	})
 
-	t.Run("get key by missing address and ID at latest sealed block", func(t *testing.T) {
+	t.Run("get key by missing address and index at latest sealed block", func(t *testing.T) {
 		account := accountFixture(t)
 		var height uint64 = 100
-		keyIndex := "2"
+		index := "2"
 		block := unittest.BlockHeaderFixture(unittest.WithHeaderHeight(height))
 
-		req := getAccountKeyByIDRequest(t, account, keyIndex, sealedHeightQueryParam)
+		req := getAccountKeyByIndexRequest(t, account, index, sealedHeightQueryParam)
 
 		backend.Mock.
 			On("GetLatestBlockHeader", mocktestify.Anything, true).
@@ -153,13 +153,13 @@ func TestGetAccountKeyByID(t *testing.T) {
 		assertResponse(t, req, statusCode, expected, backend)
 	})
 
-	t.Run("get key by missing address and ID at latest finalized block", func(t *testing.T) {
+	t.Run("get key by missing address and index at latest finalized block", func(t *testing.T) {
 		account := accountFixture(t)
 		var height uint64 = 100
-		keyIndex := "2"
+		index := "2"
 		block := unittest.BlockHeaderFixture(unittest.WithHeaderHeight(height))
 
-		req := getAccountKeyByIDRequest(t, account, keyIndex, finalHeightQueryParam)
+		req := getAccountKeyByIndexRequest(t, account, index, finalHeightQueryParam)
 
 		backend.Mock.
 			On("GetLatestBlockHeader", mocktestify.Anything, false).
@@ -181,10 +181,10 @@ func TestGetAccountKeyByID(t *testing.T) {
 		assertResponse(t, req, statusCode, expected, backend)
 	})
 
-	t.Run("get key by address and ID at height", func(t *testing.T) {
+	t.Run("get key by address and index at height", func(t *testing.T) {
 		var height uint64 = 1337
 		account := accountFixture(t)
-		req := getAccountKeyByIDRequest(t, account, "0", "1337")
+		req := getAccountKeyByIndexRequest(t, account, "0", "1337")
 
 		backend.Mock.
 			On("GetAccountAtBlockHeight", mocktestify.Anything, account.Address, height).
@@ -207,7 +207,7 @@ func TestGetAccountKeyByID(t *testing.T) {
 			`{"code":400, "message":"invalid address"}`,
 		},
 		{
-			"get key with invalid ID",
+			"get key with invalid index",
 			accountKeyURL(
 				t,
 				unittest.AddressFixture().String(),
@@ -240,9 +240,9 @@ func TestGetAccountKeyByID(t *testing.T) {
 	}
 }
 
-func accountKeyURL(t *testing.T, address string, keyIndex string, height string) string {
+func accountKeyURL(t *testing.T, address string, index string, height string) string {
 	u, err := url.ParseRequestURI(
-		fmt.Sprintf("/v1/accounts/%s/keys/%s", address, keyIndex),
+		fmt.Sprintf("/v1/accounts/%s/keys/%s", address, index),
 	)
 	require.NoError(t, err)
 	q := u.Query()
@@ -255,15 +255,15 @@ func accountKeyURL(t *testing.T, address string, keyIndex string, height string)
 	return u.String()
 }
 
-func getAccountKeyByIDRequest(
+func getAccountKeyByIndexRequest(
 	t *testing.T,
 	account *flow.Account,
-	keyIndex string,
+	index string,
 	height string,
 ) *http.Request {
 	req, err := http.NewRequest(
 		"GET",
-		accountKeyURL(t, account.Address.String(), keyIndex, height),
+		accountKeyURL(t, account.Address.String(), index, height),
 		nil,
 	)
 	require.NoError(t, err)

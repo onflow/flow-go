@@ -10,11 +10,11 @@ func Test_GetAccountKey_InvalidParse(t *testing.T) {
 	var getAccountKey GetAccountKey
 
 	tests := []struct {
-		name     string
-		address  string
-		keyIndex string
-		height   string
-		err      string
+		name    string
+		address string
+		index   string
+		height  string
+		err     string
 	}{
 		{
 			"parse with invalid address",
@@ -41,7 +41,7 @@ func Test_GetAccountKey_InvalidParse(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			err := getAccountKey.Parse(test.address, test.keyIndex, test.height)
+			err := getAccountKey.Parse(test.address, test.index, test.height)
 			assert.EqualError(t, err, test.err)
 		})
 	}
@@ -56,6 +56,6 @@ func Test_GetAccountKey_ValidParse(t *testing.T) {
 	err := getAccountKey.Parse(addr, keyIndex, height)
 	assert.NoError(t, err)
 	assert.Equal(t, getAccountKey.Address.String(), addr)
-	assert.Equal(t, getAccountKey.KeyIndex, uint64(5))
+	assert.Equal(t, getAccountKey.Index, uint64(5))
 	assert.Equal(t, getAccountKey.Height, uint64(100))
 }

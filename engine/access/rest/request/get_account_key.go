@@ -7,25 +7,25 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-const keyIndexVar = "key_index"
+const indexVar = "index"
 
 type GetAccountKey struct {
-	Address  flow.Address
-	KeyIndex uint64
-	Height   uint64
+	Address flow.Address
+	Index   uint64
+	Height  uint64
 }
 
 func (g *GetAccountKey) Build(r *Request) error {
 	return g.Parse(
 		r.GetVar(addressVar),
-		r.GetVar(keyIndexVar),
+		r.GetVar(indexVar),
 		r.GetQueryParam(blockHeightQuery),
 	)
 }
 
 func (g *GetAccountKey) Parse(
 	rawAddress string,
-	rawKeyIndex string,
+	rawIndex string,
 	rawHeight string,
 ) error {
 	address, err := ParseAddress(rawAddress)
@@ -33,7 +33,7 @@ func (g *GetAccountKey) Parse(
 		return err
 	}
 
-	keyIndex, err := util.ToUint64(rawKeyIndex)
+	index, err := util.ToUint64(rawIndex)
 	if err != nil {
 		return fmt.Errorf("invalid key index: %w", err)
 	}
@@ -45,7 +45,7 @@ func (g *GetAccountKey) Parse(
 	}
 
 	g.Address = address
-	g.KeyIndex = keyIndex
+	g.Index = index
 	g.Height = height.Flow()
 
 	// default to last block

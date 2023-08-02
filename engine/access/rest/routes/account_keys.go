@@ -8,8 +8,8 @@ import (
 	"github.com/onflow/flow-go/engine/access/rest/request"
 )
 
-// GetAccountKeyByID handler retrieves an account key by address and ID and returns the response
-func GetAccountKeyByID(r *request.Request, backend access.API, link models.LinkGenerator) (interface{}, error) {
+// GetAccountKeyByIndex handler retrieves an account key by address and index and returns the response
+func GetAccountKeyByIndex(r *request.Request, backend access.API, link models.LinkGenerator) (interface{}, error) {
 	req, err := r.GetAccountKeyRequest()
 	if err != nil {
 		return nil, models.NewBadRequestError(err)
@@ -33,12 +33,12 @@ func GetAccountKeyByID(r *request.Request, backend access.API, link models.LinkG
 
 	var response models.AccountPublicKey
 	for _, key := range account.Keys {
-		if key.Index == int(req.KeyIndex) {
+		if key.Index == int(req.Index) {
 			response.Build(key)
 			return response, nil
 		}
 	}
 
-	err = fmt.Errorf("account key with index: %d does not exist", req.KeyIndex)
+	err = fmt.Errorf("account key with index: %d does not exist", req.Index)
 	return nil, models.NewNotFoundError(err.Error(), err)
 }

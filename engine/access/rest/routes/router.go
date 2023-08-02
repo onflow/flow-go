@@ -103,9 +103,9 @@ var Routes = []route{{
 	Handler: GetAccount,
 }, {
 	Method:  http.MethodGet,
-	Pattern: "/accounts/{address}/keys/{key_index}",
-	Name:    "getAccountKeyByID",
-	Handler: GetAccountKeyByID,
+	Pattern: "/accounts/{address}/keys/{index}",
+	Name:    "getAccountKeyByIndex",
+	Handler: GetAccountKeyByIndex,
 }, {
 	Method:  http.MethodGet,
 	Pattern: "/events",
@@ -171,7 +171,7 @@ func normalizeURL(url string) (string, error) {
 		// address based resource. e.g. /v1/accounts/1234567890abcdef
 		parts = append(parts, "{address}")
 		if matches[0][4] != "" {
-			parts = append(parts, "keys", "{key_index}")
+			parts = append(parts, "keys", "{index}")
 		}
 	default:
 		// named resource. e.g. /v1/network/parameters
