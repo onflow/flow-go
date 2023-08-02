@@ -1,6 +1,8 @@
 package routes
 
 import (
+	"crypto/rand"
+	"encoding/base64"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -160,7 +162,8 @@ func (s *SubscribeEventsSuite) TestSubscribeEvents() {
 			}
 			stateStreamBackend.Mock.On("SubscribeEvents", mocks.Anything, test.startBlockID, startHeight, filter).Return(subscription)
 
-			req := getSubscribeEventsRequest(s.T(), test.startBlockID, test.startHeight, test.eventTypes, test.addresses, test.contracts)
+			req, err := getSubscribeEventsRequest(s.T(), test.startBlockID, test.startHeight, test.eventTypes, test.addresses, test.contracts)
+			assert.NoError(s.T(), err)
 			rr, err := executeRequest(req, backend, stateStreamBackend)
 			assert.NoError(s.T(), err)
 			assert.Equal(s.T(), http.StatusOK, rr.Code)
@@ -173,7 +176,8 @@ func (s *SubscribeEventsSuite) TestSubscribeEventsHandlesErrors() {
 		stateStreamBackend := &mockstatestream.API{}
 		backend := &mock.API{}
 
-		req := getSubscribeEventsRequest(s.T(), s.blocks[0].ID(), s.blocks[0].Header.Height, nil, nil, nil)
+		req, err := getSubscribeEventsRequest(s.T(), s.blocks[0].ID(), s.blocks[0].Header.Height, nil, nil, nil)
+		assert.NoError(s.T(), err)
 		assertResponse(s.T(), req, http.StatusBadRequest, `{"code":400,"message":"can only provide either block ID or start height"}`, backend, stateStreamBackend)
 	})
 
@@ -195,7 +199,8 @@ func (s *SubscribeEventsSuite) TestSubscribeEventsHandlesErrors() {
 		subscription.Mock.On("Err").Return(fmt.Errorf("subscription error"))
 		stateStreamBackend.Mock.On("SubscribeEvents", mocks.Anything, invalidBlock.ID(), mocks.Anything, mocks.Anything).Return(subscription)
 
-		req := getSubscribeEventsRequest(s.T(), invalidBlock.ID(), request.EmptyHeight, nil, nil, nil)
+		req, err := getSubscribeEventsRequest(s.T(), invalidBlock.ID(), request.EmptyHeight, nil, nil, nil)
+		assert.NoError(s.T(), err)
 		assertResponse(s.T(), req, http.StatusBadRequest, `{"code":400,"message":"stream encountered an error: subscription error"}`, backend, stateStreamBackend)
 	})
 
@@ -216,7 +221,8 @@ func (s *SubscribeEventsSuite) TestSubscribeEventsHandlesErrors() {
 		subscription.Mock.On("Err").Return(nil)
 		stateStreamBackend.Mock.On("SubscribeEvents", mocks.Anything, s.blocks[0].ID(), mocks.Anything, mocks.Anything).Return(subscription)
 
-		req := getSubscribeEventsRequest(s.T(), s.blocks[0].ID(), request.EmptyHeight, nil, nil, nil)
+		req, err := getSubscribeEventsRequest(s.T(), s.blocks[0].ID(), request.EmptyHeight, nil, nil, nil)
+		assert.NoError(s.T(), err)
 		assertResponse(s.T(), req, http.StatusRequestTimeout, `{"code":408,"message":"subscription channel closed"}`, backend, stateStreamBackend)
 	})
 
@@ -239,12 +245,13 @@ func (s *SubscribeEventsSuite) TestSubscribeEventsHandlesErrors() {
 		subscription.Mock.On("Err").Return(nil)
 		stateStreamBackend.Mock.On("SubscribeEvents", mocks.Anything, s.blocks[0].ID(), 0, mocks.Anything).Return(subscription)
 
-		req := getSubscribeEventsRequest(s.T(), s.blocks[0].ID(), request.EmptyHeight, nil, nil, nil)
+		req, err := getSubscribeEventsRequest(s.T(), s.blocks[0].ID(), request.EmptyHeight, nil, nil, nil)
+		assert.NoError(s.T(), err)
 		assertResponse(s.T(), req, http.StatusInternalServerError, `{"code":500,"message":"internal server error"}`, backend, stateStreamBackend)
 	})
 }
 
-func getSubscribeEventsRequest(t *testing.T, startBlockId flow.Identifier, startHeight uint64, eventTypes []string, addresses []string, contracts []string) *http.Request {
+func getSubscribeEventsRequest(t *testing.T, startBlockId flow.Identifier, startHeight uint64, eventTypes []string, addresses []string, contracts []string) (*http.Request, error) {
 	u, _ := url.Parse("/v1/subscribe_events")
 	q := u.Query()
 
@@ -267,12 +274,28 @@ func getSubscribeEventsRequest(t *testing.T, startBlockId flow.Identifier, start
 	}
 
 	u.RawQuery = q.Encode()
+	key, err := generateWebSocketKey()
+	if err != nil {
+		err := fmt.Errorf("error generating websocket key: %v", err)
+		return nil, err
+	}
 
 	req, err := http.NewRequest("GET", u.String(), nil)
 	req.Header.Set("Connection", "upgrade")
 	req.Header.Set("Upgrade", "websocket")
 	req.Header.Set("Sec-Websocket-Version", "13")
-	req.Header.Set("Sec-Websocket-Key", "dGhlIHNhbXBsZSBub25jZQ==") // Uliana: ask or read about it
+	req.Header.Set("Sec-Websocket-Key", key)
 	require.NoError(t, err)
-	return req
+	return req, nil
+}
+
+func generateWebSocketKey() (string, error) {
+	// Generate 16 random bytes.
+	keyBytes := make([]byte, 16)
+	if _, err := rand.Read(keyBytes); err != nil {
+		return "", err
+	}
+
+	// Encode the bytes to base64 and return the key as a string.
+	return base64.StdEncoding.EncodeToString(keyBytes), nil
 }

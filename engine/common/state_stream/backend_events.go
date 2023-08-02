@@ -30,12 +30,17 @@ type EventsBackend struct {
 }
 
 func (b EventsBackend) SubscribeEvents(ctx context.Context, startBlockID flow.Identifier, startHeight uint64, filter EventFilter) Subscription {
+	fmt.Println("_____SubscribeEvents_ start")
 	nextHeight, err := b.getStartHeight(startBlockID, startHeight)
 	if err != nil {
+		fmt.Println("_____SubscribeEvents: getStartHeight failed")
 		return NewFailedSubscription(err, "could not get start height")
 	}
+	fmt.Println("_____SubscribeEvents: getStartHeight success")
 
 	sub := NewHeightBasedSubscription(b.sendBufferSize, nextHeight, b.getResponseFactory(filter))
+
+	fmt.Println("_____SubscribeEvents: NewHeightBasedSubscription success")
 
 	go NewStreamer(b.log, b.broadcaster, b.sendTimeout, b.responseLimit, sub).Stream(ctx)
 
