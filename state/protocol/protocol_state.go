@@ -86,6 +86,9 @@ type StateUpdater interface {
 	// SetInvalidStateTransitionAttempted sets a flag indicating that invalid state transition was attempted.
 	// Such transition can be detected by compliance layer.
 	SetInvalidStateTransitionAttempted()
+	// Block returns the block header that is associated with this state updater.
+	// StateUpdater is created for a specific block where protocol state changes are incorporated.
+	Block() *flow.Header
 }
 
 // StateMutator is an interface for creating protocol state updaters and committing protocol state to the database.

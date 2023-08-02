@@ -39,6 +39,7 @@ func (s *UpdaterSuite) TestNewUpdater() {
 	require.NotSame(s.T(), s.updater.parentState, s.updater.state, "except to take deep copy of parent state")
 	require.Nil(s.T(), s.updater.parentState.NextEpochProtocolState)
 	require.Nil(s.T(), s.updater.state.NextEpochProtocolState)
+	require.Equal(s.T(), s.candidate, s.updater.Block())
 }
 
 // TestTransitionToNextEpoch tests a scenario where the updater processes first block from next epoch.
