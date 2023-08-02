@@ -96,9 +96,11 @@ type StateUpdater interface {
 // It has to be used for each block that is added to the block tree to maintain a correct protocol state on a block-by-block basis.
 type StateMutator interface {
 	// CreateUpdater creates a protocol state updater based on previous protocol state.
+	// Has to be called for each block to correctly index the protocol state.
 	// No errors are expected during normal operations.
 	CreateUpdater(candidate *flow.Header) (StateUpdater, error)
 	// CommitProtocolState commits the protocol state to the database.
+	// Has to be called for each block to correctly index the protocol state.
 	// No errors are expected during normal operations.
 	CommitProtocolState(updater StateUpdater) func(tx *transaction.Tx) error
 }
