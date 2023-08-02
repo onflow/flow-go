@@ -45,7 +45,7 @@ jobs:
       - name: Set Test Matrix
         id: set-test-matrix
 #        run: go run utils/test_matrix/test_matrix.go access admin cmd consensus engine fvm ledger module network utils
-        run: go run utils/test_matrix/test_matrix.go access
+        run: go run utils/test_matrix/test_matrix.go access admin cmd consensus engine fvm ledger module network utils
 
   unit-test:
     name: Unit Tests (${{ matrix.targets.name }})
@@ -89,9 +89,21 @@ jobs:
         env:
           JOB_STARTED: ${{ steps.job_run_date.outputs.date }}
           COMMIT_DATE: ${{ steps.commit_date.outputs.date }}
-      - name: Setup tmate session
-        uses: mxschmitt/action-tmate@v3
-        if: success() || failure()
+#      - name: Setup tmate session
+#        uses: mxschmitt/action-tmate@v3
+#        if: success() || failure()
+      - name: Upload results to BigQuery (skipped tests)
+        uses: nick-fields/retry@v2
+        with:
+          timeout_minutes: 1
+          max_attempts: 3
+          command: bq load --source_format=NEWLINE_DELIMITED_JSON $BIGQUERY_DATASET.$BIGQUERY_TABLE $SKIPPED_TESTS_FILE tools/test_monitor/schemas/skipped_tests_schema.json
+      - name: Upload results to BigQuery (test run)
+        uses: nick-fields/retry@v2
+        with:
+          timeout_minutes: 2
+          max_attempts: 3
+          command: bq load --source_format=NEWLINE_DELIMITED_JSON $BIGQUERY_DATASET.$BIGQUERY_TABLE2 $RESULTS_FILE tools/test_monitor/schemas/test_results_schema.json
 
 #  regular-skipped-test-run:
 #    name: Test Monitor - Regular, Skipped Tests Run
