@@ -6,7 +6,6 @@ import (
 	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/engine/access/rest/models"
 	"github.com/onflow/flow-go/engine/access/rest/request"
-	"github.com/onflow/flow-go/model/flow"
 )
 
 // GetAccountKeyByID handler retrieves an account key by address and ID and returns the response
@@ -16,32 +15,30 @@ func GetAccountKeyByID(r *request.Request, backend access.API, link models.LinkG
 		return nil, models.NewBadRequestError(err)
 	}
 
-	header, _, err := backend.GetLatestBlockHeader(r.Context(), false)
-	if err != nil {
-		return nil, err
-	}
-
-	account, err := backend.GetAccountAtBlockHeight(r.Context(), req.Address, header.Height)
-	if err != nil {
-		return nil, err
-	}
-
-	var accountKey flow.AccountPublicKey
-	found := false
-	for _, key := range account.Keys {
-		if key.Index == int(req.KeyID) {
-			accountKey = key
-			found = true
+	// in case we receive special height values 'final' and 'sealed', fetch that height and overwrite request with it
+	if req.Height == request.FinalHeight || req.Height == request.SealedHeight {
+		isSealed := req.Height == request.SealedHeight
+		header, _, err := backend.GetLatestBlockHeader(r.Context(), isSealed)
+		if err != nil {
+			return nil, err
 		}
+		req.Height = header.Height
 	}
-	if !found {
-		return nil, models.NewNotFoundError(
-			fmt.Sprintf("account key with ID: %d does not exist", req.KeyID),
-			nil,
-		)
+
+	account, err := backend.GetAccountAtBlockHeight(r.Context(), req.Address, req.Height)
+	if err != nil {
+		err := fmt.Errorf("account with address: %s does not exist", req.Address)
+		return nil, models.NewNotFoundError(err.Error(), err)
 	}
 
 	var response models.AccountPublicKey
-	response.Build(accountKey)
-	return response, nil
+	for _, key := range account.Keys {
+		if key.Index == int(req.KeyIndex) {
+			response.Build(key)
+			return response, nil
+		}
+	}
+
+	err = fmt.Errorf("account key with index: %d does not exist", req.KeyIndex)
+	return nil, models.NewNotFoundError(err.Error(), err)
 }
