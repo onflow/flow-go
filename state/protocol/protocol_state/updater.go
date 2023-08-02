@@ -20,6 +20,7 @@ import (
 type Updater struct {
 	parentState *flow.RichProtocolStateEntry
 	state       *flow.ProtocolStateEntry
+	candidate   *flow.Header
 
 	currentEpochIdentitiesLookup map[flow.Identifier]*flow.DynamicIdentityEntry
 	nextEpochIdentitiesLookup    map[flow.Identifier]*flow.DynamicIdentityEntry
@@ -33,6 +34,7 @@ func newUpdater(candidate *flow.Header, parentState *flow.RichProtocolStateEntry
 	updater := &Updater{
 		parentState: parentState,
 		state:       parentState.ProtocolStateEntry.Copy(),
+		candidate:   candidate,
 	}
 
 	// Check if we are at the first block of new epoch.
@@ -215,6 +217,12 @@ func (u *Updater) SetInvalidStateTransitionAttempted() {
 	if u.state.NextEpochProtocolState != nil {
 		u.state.NextEpochProtocolState.InvalidStateTransitionAttempted = true
 	}
+}
+
+// Block returns the block header that is associated with this state updater.
+// StateUpdater is created for a specific block where protocol state changes are incorporated.
+func (u *Updater) Block() *flow.Header {
+	return u.candidate
 }
 
 // ensureLookupPopulated ensures that current and next epoch identities lookups are populated.
