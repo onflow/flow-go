@@ -49,6 +49,8 @@ jobs:
 
   unit-test:
     name: Unit Tests (${{ matrix.targets.name }})
+    env:
+      TEST_CATEGORY: unit
     needs: create-dynamic-test-matrix
     strategy:
       fail-fast: false
@@ -74,8 +76,6 @@ jobs:
           command: make -es GO_TEST_PACKAGES="${{ matrix.targets.packages }}" unittest-main > test-output
           # command line from GitHub runner that works:
           # make VERBOSE=1 JSON_OUTPUT=true GO_TEST_PACKAGES=github.com/onflow/flow-go/admin/commands/common -es unittest-main > test-output
-        env:
-          TEST_CATEGORY: unit
         # test run should continue even if there are failed tests
         continue-on-error: true
       - name: Get commit date
@@ -92,6 +92,10 @@ jobs:
 #      - name: Setup tmate session
 #        uses: mxschmitt/action-tmate@v3
 #        if: success() || failure()
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v0
+        with:
+          service_account_key: ${{ secrets.GCP_SA_KEY }}
       - name: Upload results to BigQuery (skipped tests)
         uses: nick-fields/retry@v2
         with:
