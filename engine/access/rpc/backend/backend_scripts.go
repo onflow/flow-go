@@ -7,10 +7,9 @@ import (
 	"io"
 	"time"
 
+	"github.com/hashicorp/go-multierror"
 	lru "github.com/hashicorp/golang-lru"
 	"github.com/onflow/flow/protobuf/go/flow/access"
-
-	"github.com/hashicorp/go-multierror"
 	execproto "github.com/onflow/flow/protobuf/go/flow/execution"
 	"github.com/rs/zerolog"
 	"google.golang.org/grpc/codes"
@@ -127,18 +126,22 @@ func (b *backendScripts) executeScriptOnExecutor(
 		// which may produce a valid RN output but an error for the EN
 		if archiveErr != nil && execErr != nil {
 			if bytes.Equal(execNodeResult, archiveResult) {
+				b.metrics.ScriptExecutionResultMatch()
 				b.logScriptExecutionComparison(blockID, insecureScriptHash,
 					"script execution results on Archive node and EN are equal")
 			} else {
+				b.metrics.ScriptExecutionResultMismatch()
 				b.logScriptExecutionComparison(blockID, insecureScriptHash,
 					"script execution results on Archive node and EN are not equal")
 			}
 		} else if status.Code(archiveErr) == codes.InvalidArgument && status.Code(execErr) == codes.InvalidArgument {
 			// Check if cadence errors returned by the two, we can check for a match
 			if execErr == archiveErr {
+				b.metrics.ScriptExecutionErrorMatch()
 				b.logScriptExecutionComparison(blockID, insecureScriptHash,
 					"cadence errors on Archive node and EN are equal")
 			} else {
+				b.metrics.ScriptExecutionErrorMismatch()
 				b.logScriptExecutionComparison(blockID, insecureScriptHash,
 					"cadence errors on Archive node and EN are not equal")
 			}
@@ -161,7 +164,7 @@ func (b *backendScripts) logScriptExecutionComparison(
 	insecureScriptHash [16]byte,
 	msg string,
 ) {
-	b.log.Info().Hex("block_id", blockID[:]).Hex("script_hash", insecureScriptHash[:]).Msg(msg)
+	b.log.Debug().Hex("block_id", blockID[:]).Hex("script_hash", insecureScriptHash[:]).Msg(msg)
 }
 
 // executeScriptOnAvailableArchiveNodes executes the given script for a blockID on all archive nodes available
