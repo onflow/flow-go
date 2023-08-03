@@ -37,12 +37,13 @@ import (
 type FollowerState struct {
 	*State
 
-	index      storage.Index
-	payloads   storage.Payloads
-	tracer     module.Tracer
-	logger     zerolog.Logger
-	consumer   protocol.Consumer
-	blockTimer protocol.BlockTimer
+	index                storage.Index
+	payloads             storage.Payloads
+	tracer               module.Tracer
+	logger               zerolog.Logger
+	consumer             protocol.Consumer
+	blockTimer           protocol.BlockTimer
+	protocolStateMutator protocol.StateMutator
 }
 
 var _ protocol.FollowerState = (*FollowerState)(nil)
@@ -510,8 +511,13 @@ func (m *FollowerState) insert(ctx context.Context, candidate *flow.Block, certi
 		return fmt.Errorf("could not retrieve block header for %x: %w", parentID, err)
 	}
 
+	protocolStateUpdater, err := m.protocolStateMutator.CreateUpdater(candidate.Header)
+	if err != nil {
+		return fmt.Errorf("could not create protocol state updater: %w", err)
+	}
+
 	// apply any state changes from service events sealed by this block's parent
-	dbUpdates, err := m.handleEpochServiceEvents(candidate)
+	dbUpdates, err := m.handleEpochServiceEvents(candidate, protocolStateUpdater)
 	if err != nil {
 		return fmt.Errorf("could not process service events: %w", err)
 	}
@@ -574,6 +580,12 @@ func (m *FollowerState) insert(ctx context.Context, candidate *flow.Block, certi
 			if err != nil {
 				return fmt.Errorf("could not apply operation: %w", err)
 			}
+		}
+
+		// commit the updated protocol state
+		err = m.protocolStateMutator.CommitProtocolState(protocolStateUpdater)(tx)
+		if err != nil {
+			return fmt.Errorf("could not commit protocol state: %w", err)
 		}
 
 		return nil
@@ -1091,7 +1103,7 @@ func (m *FollowerState) versionBeaconOnBlockFinalized(
 //     operations to insert service events for blocks that include them.
 //
 // No errors are expected during normal operation.
-func (m *FollowerState) handleEpochServiceEvents(candidate *flow.Block) (dbUpdates []func(*transaction.Tx) error, err error) {
+func (m *FollowerState) handleEpochServiceEvents(candidate *flow.Block, updater protocol.StateUpdater) (dbUpdates []func(*transaction.Tx) error, err error) {
 	epochFallbackTriggered, err := m.isEpochEmergencyFallbackTriggered()
 	if err != nil {
 		return nil, fmt.Errorf("could not retrieve epoch fallback status: %w", err)
@@ -1156,6 +1168,11 @@ func (m *FollowerState) handleEpochServiceEvents(candidate *flow.Block) (dbUpdat
 				// prevents multiple setup events for same Epoch (including multiple setup events in payload of same block)
 				epochStatus.NextEpoch.SetupID = ev.ID()
 
+				err = updater.ProcessEpochSetup(ev)
+				if err != nil {
+					return nil, irrecoverable.NewExceptionf("could not process epoch setup event: %w", err)
+				}
+
 				// we'll insert the setup event when we insert the block
 				dbUpdates = append(dbUpdates, m.epoch.setups.StoreTx(ev))
 
@@ -1191,6 +1208,11 @@ func (m *FollowerState) handleEpochServiceEvents(candidate *flow.Block) (dbUpdat
 
 				// prevents multiple setup events for same Epoch (including multiple setup events in payload of same block)
 				epochStatus.NextEpoch.CommitID = ev.ID()
+
+				err = updater.ProcessEpochCommit(ev)
+				if err != nil {
+					return nil, irrecoverable.NewExceptionf("could not process epoch commit event: %w", err)
+				}
 
 				// we'll insert the commit event when we insert the block
 				dbUpdates = append(dbUpdates, m.epoch.commits.StoreTx(ev))
