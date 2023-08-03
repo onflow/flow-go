@@ -202,7 +202,7 @@ func (fnb *FlowNodeBuilder) EnqueuePingService() {
 		// setup the Ping provider to return the software version and the sealed block height
 		pingInfoProvider := &ping.InfoProvider{
 			SoftwareVersionFun: func() string {
-				return build.Semver()
+				return build.Version()
 			},
 			SealedBlockHeightFun: func() (uint64, error) {
 				head, err := node.State.Sealed().Head()
@@ -610,7 +610,7 @@ func (fnb *FlowNodeBuilder) ValidateFlags(f func() error) NodeBuilder {
 }
 
 func (fnb *FlowNodeBuilder) PrintBuildVersionDetails() {
-	fnb.Logger.Info().Str("version", build.Semver()).Str("commit", build.Commit()).Msg("build details")
+	fnb.Logger.Info().Str("version", build.Version()).Str("commit", build.Commit()).Msg("build details")
 }
 
 func (fnb *FlowNodeBuilder) initNodeInfo() error {
@@ -733,7 +733,7 @@ func (fnb *FlowNodeBuilder) initMetrics() error {
 			if err != nil {
 				return fmt.Errorf("could not query root snapshoot protocol version: %w", err)
 			}
-			nodeInfoMetrics.NodeInfo(build.Semver(), build.Commit(), nodeConfig.SporkID.String(), protocolVersion)
+			nodeInfoMetrics.NodeInfo(build.Version(), build.Commit(), nodeConfig.SporkID.String(), protocolVersion)
 			return nil
 		})
 	}
@@ -761,7 +761,7 @@ func (fnb *FlowNodeBuilder) createGCEProfileUploader(client *gcemd.Client, opts 
 		ProjectID: projectID,
 		ChainID:   chainID,
 		Role:      fnb.NodeConfig.NodeRole,
-		Version:   build.Semver(),
+		Version:   build.Version(),
 		Commit:    build.Commit(),
 		Instance:  instance,
 	}

@@ -157,6 +157,7 @@ func (suite *Suite) RunTest(
 			suite.log,
 			backend.DefaultSnapshotHistoryLimit,
 			nil,
+			false,
 		)
 		handler := access.NewHandler(suite.backend, suite.chainID.Chain(), suite.finalizedHeaderCache, suite.me, access.WithBlockSignerDecoder(suite.signerIndicesDecoder))
 		f(handler, db, all)
@@ -329,6 +330,7 @@ func (suite *Suite) TestSendTransactionToRandomCollectionNode() {
 			suite.log,
 			backend.DefaultSnapshotHistoryLimit,
 			nil,
+			false,
 		)
 
 		handler := access.NewHandler(backend, suite.chainID.Chain(), suite.finalizedHeaderCache, suite.me)
@@ -655,6 +657,7 @@ func (suite *Suite) TestGetSealedTransaction() {
 			suite.log,
 			backend.DefaultSnapshotHistoryLimit,
 			nil,
+			false,
 		)
 
 		handler := access.NewHandler(backend, suite.chainID.Chain(), suite.finalizedHeaderCache, suite.me)
@@ -794,6 +797,7 @@ func (suite *Suite) TestGetTransactionResult() {
 			suite.log,
 			backend.DefaultSnapshotHistoryLimit,
 			nil,
+			false,
 		)
 
 		handler := access.NewHandler(backend, suite.chainID.Chain(), suite.finalizedHeaderCache, suite.me)
@@ -985,6 +989,7 @@ func (suite *Suite) TestExecuteScript() {
 			suite.log,
 			backend.DefaultSnapshotHistoryLimit,
 			nil,
+			false,
 		)
 
 		handler := access.NewHandler(suite.backend, suite.chainID.Chain(), suite.finalizedHeaderCache, suite.me)
@@ -1137,7 +1142,7 @@ func (suite *Suite) TestAPICallNodeVersionInfo() {
 
 		respNodeVersionInfo := resp.Info
 		suite.Require().Equal(respNodeVersionInfo, &entitiesproto.NodeVersionInfo{
-			Semver:          build.Semver(),
+			Semver:          build.Version(),
 			Commit:          build.Commit(),
 			SporkId:         sporkId[:],
 			ProtocolVersion: uint64(protocolVersion),

@@ -31,7 +31,7 @@ func TestGetNodeVersionInfo(t *testing.T) {
 		req := getNodeVersionInfoRequest(t)
 
 		params := &access.NodeVersionInfo{
-			Semver:          build.Semver(),
+			Semver:          build.Version(),
 			Commit:          build.Commit(),
 			SporkId:         unittest.IdentifierFixture(),
 			ProtocolVersion: unittest.Uint64InRange(10, 30),

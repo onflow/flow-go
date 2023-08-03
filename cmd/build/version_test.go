@@ -17,7 +17,7 @@ func TestMakeSemverV2Compliant(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			output := makeSemverV2Compliant(tc.input)
+			output := makeSemverCompliant(tc.input)
 			if output != tc.expected {
 				t.Errorf("Got %s; expected %s", output, tc.expected)
 			}
