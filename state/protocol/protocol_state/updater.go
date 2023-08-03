@@ -225,6 +225,11 @@ func (u *Updater) Block() *flow.Header {
 	return u.candidate
 }
 
+// ParentState returns parent protocol state that is associated with this state updater.
+func (u *Updater) ParentState() *flow.RichProtocolStateEntry {
+	return u.parentState
+}
+
 // ensureLookupPopulated ensures that current and next epoch identities lookups are populated.
 // We use this to avoid populating lookups on every UpdateIdentity call.
 func (u *Updater) ensureLookupPopulated() {

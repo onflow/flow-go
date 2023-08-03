@@ -40,6 +40,7 @@ func (s *UpdaterSuite) TestNewUpdater() {
 	require.Nil(s.T(), s.updater.parentState.NextEpochProtocolState)
 	require.Nil(s.T(), s.updater.state.NextEpochProtocolState)
 	require.Equal(s.T(), s.candidate, s.updater.Block())
+	require.Equal(s.T(), s.parentProtocolState, s.updater.ParentState())
 }
 
 // TestTransitionToNextEpoch tests a scenario where the updater processes first block from next epoch.

@@ -91,6 +91,8 @@ type StateUpdater interface {
 	// Block returns the block header that is associated with this state updater.
 	// StateUpdater is created for a specific block where protocol state changes are incorporated.
 	Block() *flow.Header
+	// ParentState returns parent protocol state that is associated with this state updater.
+	ParentState() *flow.RichProtocolStateEntry
 }
 
 // StateMutator is an interface for creating protocol state updaters and committing protocol state to the database.
