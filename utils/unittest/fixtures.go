@@ -200,6 +200,7 @@ func FullBlockFixture() flow.Block {
 		ExecutionReceiptFixture(WithResult(payload.Results[0])).Meta(),
 		ExecutionReceiptFixture(WithResult(payload.Results[1])).Meta(),
 	}
+	payload.ProtocolStateID = IdentifierFixture()
 
 	header := block.Header
 	header.PayloadHash = payload.Hash()
@@ -270,6 +271,7 @@ func WithAllTheFixins(payload *flow.Payload) {
 		payload.Receipts = flow.ExecutionReceiptMetaList{receipt.Meta()}
 		payload.Results = flow.ExecutionResultList{&receipt.ExecutionResult}
 	}
+	payload.ProtocolStateID = IdentifierFixture()
 }
 
 func WithSeals(seals ...*flow.Seal) func(*flow.Payload) {
