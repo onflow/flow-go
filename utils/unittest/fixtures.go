@@ -1642,6 +1642,22 @@ func EventFixture(
 	}
 }
 
+func EventsFixture(
+	n int,
+	types ...flow.EventType,
+) []flow.Event {
+	if len(types) == 0 {
+		types = []flow.EventType{"A.0x1.Foo.Bar", "A.0x2.Zoo.Moo", "A.0x3.Goo.Hoo"}
+	}
+
+	events := make([]flow.Event, n)
+	for i := 0; i < n; i++ {
+		events[i] = EventFixture(types[i%len(types)], 0, uint32(i), IdentifierFixture(), 0)
+	}
+
+	return events
+}
+
 func EmulatorRootKey() (*flow.AccountPrivateKey, error) {
 
 	// TODO seems this key literal doesn't decode anymore
