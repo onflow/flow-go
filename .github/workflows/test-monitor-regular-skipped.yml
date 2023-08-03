@@ -61,8 +61,6 @@ jobs:
     steps:
       - name: Checkout repo
         uses: actions/checkout@v3
-#        with:
-#          ref: misha/fix-flaky-test-monitor-ci # TODO remove this before merging PR
       - name: Setup Go
         uses: actions/setup-go@v3
         with:
