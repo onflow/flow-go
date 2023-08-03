@@ -45,7 +45,7 @@ jobs:
       - name: Set Test Matrix
         id: set-test-matrix
 #        run: go run utils/test_matrix/test_matrix.go access admin cmd consensus engine fvm ledger module network utils
-        run: go run utils/test_matrix/test_matrix.go access admin cmd consensus engine fvm ledger module network utils
+        run: go run utils/test_matrix/test_matrix.go admin cmd consensus engine fvm ledger module network utils
 
   unit-test:
     name: Unit Tests (${{ matrix.targets.name }})
