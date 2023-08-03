@@ -115,8 +115,6 @@ func (b *backendScripts) executeScriptOnExecutor(
 	// CAUTION: cryptographically insecure md5 is used here, but only to de-duplicate logs.
 	// *DO NOT* use this hash for any protocol-related or cryptographic functions.
 	insecureScriptHash := md5.Sum(script) //nolint:gosec
-	// try execution on Archive nodes first
-	archiveResult, archiveErr := b.executeScriptOnAvailableArchiveNodes(ctx, blockID, script, arguments, insecureScriptHash)
 	// try execution nodes if the script wasn't executed
 	if b.scriptExecValidation {
 		execNodeResult, execErr := b.executeScriptOnAvailableExecutionNodes(
@@ -124,31 +122,18 @@ func (b *backendScripts) executeScriptOnExecutor(
 		// we can only compare the results if there are no errors from RN and EN
 		// since we cannot distinguish the EN error as caused by the block being pruned or some other reason,
 		// which may produce a valid RN output but an error for the EN
-		if archiveErr != nil && execErr != nil {
-			if bytes.Equal(execNodeResult, archiveResult) {
-				b.metrics.ScriptExecutionResultMatch()
-				b.logScriptExecutionComparison(blockID, insecureScriptHash,
-					"script execution results on Archive node and EN are equal")
-			} else {
-				b.metrics.ScriptExecutionResultMismatch()
-				b.logScriptExecutionComparison(blockID, insecureScriptHash,
-					"script execution results on Archive node and EN are not equal")
-			}
-		} else if status.Code(archiveErr) == codes.InvalidArgument && status.Code(execErr) == codes.InvalidArgument {
-			// Check if cadence errors returned by the two, we can check for a match
-			if execErr == archiveErr {
-				b.metrics.ScriptExecutionErrorMatch()
-				b.logScriptExecutionComparison(blockID, insecureScriptHash,
-					"cadence errors on Archive node and EN are equal")
-			} else {
-				b.metrics.ScriptExecutionErrorMismatch()
-				b.logScriptExecutionComparison(blockID, insecureScriptHash,
-					"cadence errors on Archive node and EN are not equal")
-			}
+		if execErr == nil || status.Code(execErr) == codes.InvalidArgument {
+			archiveResult, archiveErr := b.executeScriptOnAvailableArchiveNodes(ctx, blockID, script, arguments,
+				insecureScriptHash)
+			// return EN results by default
+			b.compareScriptExecutionResults(execNodeResult, execErr, archiveResult, archiveErr, blockID,
+				insecureScriptHash)
+			return execNodeResult, execErr
 		}
-		// return EN results by default
 		return execNodeResult, execErr
 	} else {
+		archiveResult, archiveErr := b.executeScriptOnAvailableArchiveNodes(ctx, blockID, script, arguments,
+			insecureScriptHash)
 		// execute on execution nodes if it's not a script error
 		if archiveErr != nil && status.Code(archiveErr) != codes.InvalidArgument {
 			execNodeResult, err := b.executeScriptOnAvailableExecutionNodes(
@@ -156,6 +141,35 @@ func (b *backendScripts) executeScriptOnExecutor(
 			return execNodeResult, err
 		}
 		return archiveResult, archiveErr
+	}
+}
+
+func (b *backendScripts) compareScriptExecutionResults(
+	execNodeResult []byte,
+	execErr error,
+	archiveResult []byte,
+	archiveErr error,
+	blockID flow.Identifier,
+	insecureScriptHash [16]byte,
+) {
+	if bytes.Equal(execNodeResult, archiveResult) {
+		b.metrics.ScriptExecutionResultMatch()
+		b.logScriptExecutionComparison(blockID, insecureScriptHash,
+			"script execution results on Archive node and EN are equal")
+	} else {
+		b.metrics.ScriptExecutionResultMismatch()
+		b.logScriptExecutionComparison(blockID, insecureScriptHash,
+			"script execution results on Archive node and EN are not equal")
+	}
+
+	if execErr == archiveErr {
+		b.metrics.ScriptExecutionErrorMatch()
+		b.logScriptExecutionComparison(blockID, insecureScriptHash,
+			"cadence errors on Archive node and EN are equal")
+	} else {
+		b.metrics.ScriptExecutionErrorMismatch()
+		b.logScriptExecutionComparison(blockID, insecureScriptHash,
+			"cadence errors on Archive node and EN are not equal")
 	}
 }
 
