@@ -28,4 +28,42 @@ func TestDynamicProtocolStateAdapter(t *testing.T) {
 		actualChainID := adapter.GlobalParams().ChainID()
 		assert.Equal(t, expectedChainID, actualChainID)
 	})
+	t.Run("epoch-status-staking", func(t *testing.T) {
+		entry := unittest.ProtocolStateFixture()
+		adapter := newDynamicProtocolStateAdapter(entry, globalParams)
+		status := adapter.EpochStatus()
+		assert.Equal(t, entry.PreviousEpochEventIDs, status.PreviousEpoch)
+		assert.Equal(t, entry.CurrentEpochEventIDs, status.CurrentEpoch)
+		assert.Equal(t, flow.EventIDs{}, status.NextEpoch)
+		assert.False(t, status.InvalidServiceEventIncorporated)
+	})
+	t.Run("epoch-status-setup", func(t *testing.T) {
+		entry := unittest.ProtocolStateFixture(unittest.WithNextEpochProtocolState())
+		// cleanup the commit event, so we are in setup phase
+		entry.NextEpochProtocolState.CurrentEpochEventIDs.CommitID = flow.ZeroID
+
+		adapter := newDynamicProtocolStateAdapter(entry, globalParams)
+		status := adapter.EpochStatus()
+		assert.Equal(t, entry.PreviousEpochEventIDs, status.PreviousEpoch)
+		assert.Equal(t, entry.CurrentEpochEventIDs, status.CurrentEpoch)
+		assert.Equal(t, flow.EventIDs{SetupID: entry.NextEpochProtocolState.CurrentEpochSetup.ID()}, status.NextEpoch)
+		assert.False(t, status.InvalidServiceEventIncorporated)
+	})
+	t.Run("epoch-status-commit", func(t *testing.T) {
+		entry := unittest.ProtocolStateFixture(unittest.WithNextEpochProtocolState())
+		adapter := newDynamicProtocolStateAdapter(entry, globalParams)
+		status := adapter.EpochStatus()
+		assert.Equal(t, entry.PreviousEpochEventIDs, status.PreviousEpoch)
+		assert.Equal(t, entry.CurrentEpochEventIDs, status.CurrentEpoch)
+		assert.Equal(t, entry.NextEpochProtocolState.CurrentEpochEventIDs, status.NextEpoch)
+		assert.False(t, status.InvalidServiceEventIncorporated)
+	})
+	t.Run("invalid-state-transition-attempted", func(t *testing.T) {
+		entry := unittest.ProtocolStateFixture(func(entry *flow.RichProtocolStateEntry) {
+			entry.InvalidStateTransitionAttempted = true
+		})
+		adapter := newDynamicProtocolStateAdapter(entry, globalParams)
+		status := adapter.EpochStatus()
+		assert.True(t, status.InvalidServiceEventIncorporated)
+	})
 }
