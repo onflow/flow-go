@@ -76,7 +76,7 @@ jobs:
         # test run should continue even if there are failed tests
         continue-on-error: true
       - name: Process test results (${{ matrix.targets.name }})
-        uses: ./.github/actions/test-monitor-process-tests
+        uses: ./workflows/actions/test-monitor-process-tests
 #      - name: Get commit date
 #        id: commit_date
 #        run: echo "::set-output name=date::$(git show --no-patch --no-notes --pretty='%cI' $COMMIT_SHA)"
