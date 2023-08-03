@@ -27,7 +27,7 @@ type backendEvents struct {
 	connFactory       connection.ConnectionFactory
 	log               zerolog.Logger
 	maxHeightRange    uint
-	nodeCommunicator  *NodeCommunicator
+	nodeCommunicator  Communicator
 }
 
 // GetEventsForHeightRange retrieves events for all sealed blocks between the start block height and

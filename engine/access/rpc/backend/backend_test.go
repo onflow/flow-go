@@ -46,11 +46,16 @@ type Suite struct {
 	transactions           *storagemock.Transactions
 	receipts               *storagemock.ExecutionReceipts
 	results                *storagemock.ExecutionResults
+
+
 	colClient              *access.AccessAPIClient
 	execClient             *access.ExecutionAPIClient
 	historicalAccessClient *access.AccessAPIClient
 	archiveClient          *access.AccessAPIClient
+
 	connectionFactory      *backendmock.ConnectionFactory
+	communicator	 *NodeCommunicatorMock
+
 	chainID                flow.ChainID
 }
 
@@ -79,6 +84,8 @@ func (suite *Suite) SetupTest() {
 	suite.chainID = flow.Testnet
 	suite.historicalAccessClient = new(access.AccessAPIClient)
 	suite.connectionFactory = new(backendmock.ConnectionFactory)
+
+	suite.communicator = new(NodeCommunicatorMock)
 }
 
 func (suite *Suite) TestPing() {

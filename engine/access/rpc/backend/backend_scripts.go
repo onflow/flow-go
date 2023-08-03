@@ -35,7 +35,7 @@ type backendScripts struct {
 	loggedScripts      *lru.Cache
 	archiveAddressList []string
 	archivePorts       []uint
-	nodeCommunicator   *NodeCommunicator
+	nodeCommunicator   Communicator
 }
 
 func (b *backendScripts) ExecuteScriptAtLatestBlock(

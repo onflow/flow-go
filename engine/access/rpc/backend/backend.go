@@ -8,10 +8,7 @@ import (
 	"time"
 
 	lru "github.com/hashicorp/golang-lru"
-	"github.com/rs/zerolog"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
-
+	lru2 "github.com/hashicorp/golang-lru/v2"
 	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/cmd/build"
 	"github.com/onflow/flow-go/engine/access/rpc/connection"
@@ -22,8 +19,11 @@ import (
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
-
+	"github.com/onflow/flow-go/storage/badger"
 	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
+	"github.com/rs/zerolog"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 // minExecutionNodesCnt is the minimum number of execution nodes expected to have sent the execution receipt for a block
@@ -76,6 +76,7 @@ type Backend struct {
 	collections       storage.Collections
 	executionReceipts storage.ExecutionReceipts
 	connFactory       connection.ConnectionFactory
+	resultCache       *badger.Cache[flow.Identifier, *access.TransactionResult]
 }
 
 // Config defines the configurable options for creating Backend
@@ -90,6 +91,148 @@ type Config struct {
 	CircuitBreakerConfig      connection.CircuitBreakerConfig // the configuration for circuit breaker
 }
 
+type Communicator interface {
+	CallAvailableNode(
+		nodes flow.IdentityList,
+		call NodeAction,
+		shouldTerminateOnError ErrorTerminator,
+	) error
+}
+
+// NewBackend creates backend accepting Communicator interfaces instead of circuitBreakerEnabled flag
+// More convenient fur unit testing scenarios when you need to pass test NodeCommunicator objects.
+func NewBackend(state protocol.State,
+	collectionRPC accessproto.AccessAPIClient,
+	historicalAccessNodes []accessproto.AccessAPIClient,
+	blocks storage.Blocks,
+	headers storage.Headers,
+	collections storage.Collections,
+	transactions storage.Transactions,
+	executionReceipts storage.ExecutionReceipts,
+	executionResults storage.ExecutionResults,
+	chainID flow.ChainID,
+	accessMetrics module.AccessMetrics,
+	connFactory connection.ConnectionFactory,
+	retryEnabled bool,
+	maxHeightRange uint,
+	preferredExecutionNodeIDs []string,
+	fixedExecutionNodeIDs []string,
+	log zerolog.Logger,
+	snapshotHistoryLimit int,
+	archiveAddressList []string,
+	communicator Communicator) *Backend {
+	retry := newRetry()
+	if retryEnabled {
+		retry.Activate()
+	}
+
+	loggedScripts, err := lru.New(DefaultLoggedScriptsCacheSize)
+	if err != nil {
+		log.Fatal().Err(err).Msg("failed to initialize script logging cache")
+	}
+
+	archivePorts := make([]uint, len(archiveAddressList))
+	for idx, addr := range archiveAddressList {
+		port, err := findPortFromAddress(addr)
+		if err != nil {
+			log.Fatal().Err(err).Msg("failed to find archive node port")
+		}
+		archivePorts[idx] = port
+	}
+
+	txResCache, err := lru2.New[flow.Identifier, *access.TransactionResult](int(badger.DefaultCacheSize))
+	if err != nil {
+		log.Fatal().Err(err).Msg("failed to init cache for transaction results")
+	}
+
+	b := &Backend{
+		state: state,
+		// create the sub-backends
+		backendScripts: backendScripts{
+			headers:            headers,
+			executionReceipts:  executionReceipts,
+			connFactory:        connFactory,
+			state:              state,
+			log:                log,
+			metrics:            accessMetrics,
+			loggedScripts:      loggedScripts,
+			archiveAddressList: archiveAddressList,
+			archivePorts:       archivePorts,
+			nodeCommunicator:   communicator,
+		},
+		backendTransactions: backendTransactions{
+			staticCollectionRPC:  collectionRPC,
+			state:                state,
+			chainID:              chainID,
+			collections:          collections,
+			blocks:               blocks,
+			transactions:         transactions,
+			executionReceipts:    executionReceipts,
+			transactionValidator: configureTransactionValidator(state, chainID),
+			transactionMetrics:   accessMetrics,
+			retry:                retry,
+			connFactory:          connFactory,
+			previousAccessNodes:  historicalAccessNodes,
+			log:                  log,
+			nodeCommunicator:     communicator,
+			txResultCache:        txResCache,
+		},
+		backendEvents: backendEvents{
+			state:             state,
+			headers:           headers,
+			executionReceipts: executionReceipts,
+			connFactory:       connFactory,
+			log:               log,
+			maxHeightRange:    maxHeightRange,
+			nodeCommunicator:  communicator,
+		},
+		backendBlockHeaders: backendBlockHeaders{
+			headers: headers,
+			state:   state,
+		},
+		backendBlockDetails: backendBlockDetails{
+			blocks: blocks,
+			state:  state,
+		},
+		backendAccounts: backendAccounts{
+			state:             state,
+			headers:           headers,
+			executionReceipts: executionReceipts,
+			connFactory:       connFactory,
+			log:               log,
+			nodeCommunicator:  communicator,
+		},
+		backendExecutionResults: backendExecutionResults{
+			executionResults: executionResults,
+		},
+		backendNetwork: backendNetwork{
+			state:                state,
+			chainID:              chainID,
+			snapshotHistoryLimit: snapshotHistoryLimit,
+		},
+		collections:       collections,
+		executionReceipts: executionReceipts,
+		connFactory:       connFactory,
+		chainID:           chainID,
+	}
+
+	retry.SetBackend(b)
+
+	preferredENIdentifiers, err = identifierList(preferredExecutionNodeIDs)
+	if err != nil {
+		log.Fatal().Err(err).Msg("failed to convert node id string to Flow Identifier for preferred EN map")
+	}
+
+	fixedENIdentifiers, err = identifierList(fixedExecutionNodeIDs)
+	if err != nil {
+		log.Fatal().Err(err).Msg("failed to convert node id string to Flow Identifier for fixed EN map")
+	}
+
+	return b
+}
+
+// New create new backend instance
+// Deprecated: Use NewBackend for enhanced testability
 func New(
 	state protocol.State,
 	collectionRPC accessproto.AccessAPIClient,
@@ -134,6 +277,11 @@ func New(
 	// create node communicator, that will be used in sub-backend logic for interacting with API calls
 	nodeCommunicator := NewNodeCommunicator(circuitBreakerEnabled)
 
+	txResCache, err := lru2.New[flow.Identifier, *access.TransactionResult](int(badger.DefaultCacheSize))
+	if err != nil {
+		log.Fatal().Err(err).Msg("failed to init cache for transaction results")
+	}
+
 	b := &Backend{
 		state: state,
 		// create the sub-backends
@@ -164,6 +312,7 @@ func New(
 			previousAccessNodes:  historicalAccessNodes,
 			log:                  log,
 			nodeCommunicator:     nodeCommunicator,
+			txResultCache:        txResCache,
 		},
 		backendEvents: backendEvents{
 			state:             state,
@@ -218,6 +367,8 @@ func New(
 
 	return b
 }
+
+//TODO: refactor cache, replace with generic lru.Cache alternative
 
 // NewCache constructs cache for storing connections to other nodes.
 // No errors are expected during normal operations.

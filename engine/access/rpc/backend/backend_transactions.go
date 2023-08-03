@@ -24,6 +24,8 @@ import (
 	"github.com/onflow/flow-go/storage"
 )
 
+
+
 type backendTransactions struct {
 	staticCollectionRPC  accessproto.AccessAPIClient // rpc client tied to a fixed collection node
 	transactions         storage.Transactions
@@ -39,7 +41,7 @@ type backendTransactions struct {
 
 	previousAccessNodes []accessproto.AccessAPIClient
 	log                 zerolog.Logger
-	nodeCommunicator    *NodeCommunicator
+	nodeCommunicator    Communicator
 }
 
 // SendTransaction forwards the transaction to the collection node
@@ -229,12 +231,13 @@ func (b *backendTransactions) GetTransactionResult(
 ) (*access.TransactionResult, error) {
 	// look up transaction from storage
 	start := time.Now()
-	tx, err := b.transactions.ByID(txID)
 
+  	tx, err := b.transactions.ByID(txID)
 	if err != nil {
 		txErr := rpc.ConvertStorageError(err)
 		if status.Code(txErr) == codes.NotFound {
 			// Tx not found. If we have historical Sporks setup, lets look through those as well
+
 			historicalTxResult, err := b.getHistoricalTransactionResult(ctx, txID)
 			if err != nil {
 				// if tx not found in old access nodes either, then assume that the tx was submitted to a different AN
