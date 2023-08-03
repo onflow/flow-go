@@ -122,12 +122,14 @@ func (b *backendScripts) executeScriptOnExecutor(
 	if b.scriptExecValidation {
 		execNodeResult, errExec := b.executeScriptOnAvailableExecutionNodes(
 			ctx, blockID, script, arguments, insecureScriptHash)
-		if bytes.Equal(execNodeResult, archiveResult) && errExec == err {
-			b.logScriptExecutionComparison(blockID, insecureScriptHash,
-				"script execution results on Archive node and EN are equal")
-		} else {
-			b.logScriptExecutionComparison(blockID, insecureScriptHash,
-				"script execution results on Archive node and EN are not equal")
+		if status.Code(err) != codes.NotFound {
+			if bytes.Equal(execNodeResult, archiveResult) && errExec == err {
+				b.logScriptExecutionComparison(blockID, insecureScriptHash,
+					"script execution results on Archive node and EN are equal")
+			} else {
+				b.logScriptExecutionComparison(blockID, insecureScriptHash,
+					"script execution results on Archive node and EN are not equal")
+			}
 		}
 		// return EN results by default
 		return execNodeResult, errExec
