@@ -131,17 +131,16 @@ func (b *backendScripts) executeScriptOnExecutor(
 			return execNodeResult, execErr
 		}
 		return execNodeResult, execErr
-	} else {
-		archiveResult, archiveErr := b.executeScriptOnAvailableArchiveNodes(ctx, blockID, script, arguments,
-			insecureScriptHash)
-		// execute on execution nodes if it's not a script error
-		if archiveErr != nil && status.Code(archiveErr) != codes.InvalidArgument {
-			execNodeResult, err := b.executeScriptOnAvailableExecutionNodes(
-				ctx, blockID, script, arguments, insecureScriptHash)
-			return execNodeResult, err
-		}
-		return archiveResult, archiveErr
 	}
+	archiveResult, archiveErr := b.executeScriptOnAvailableArchiveNodes(ctx, blockID, script, arguments,
+		insecureScriptHash)
+	// execute on execution nodes if it's not a script error
+	if archiveErr != nil && status.Code(archiveErr) != codes.InvalidArgument {
+		execNodeResult, err := b.executeScriptOnAvailableExecutionNodes(
+			ctx, blockID, script, arguments, insecureScriptHash)
+		return execNodeResult, err
+	}
+	return archiveResult, archiveErr
 }
 
 func (b *backendScripts) compareScriptExecutionResults(
