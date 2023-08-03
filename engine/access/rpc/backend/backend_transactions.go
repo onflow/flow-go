@@ -6,13 +6,7 @@ import (
 	"fmt"
 	"time"
 
-	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
-	"github.com/onflow/flow/protobuf/go/flow/entities"
-	execproto "github.com/onflow/flow/protobuf/go/flow/execution"
-	"github.com/rs/zerolog"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
-
+	lru2 "github.com/hashicorp/golang-lru/v2"
 	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/engine/access/rpc/connection"
 	"github.com/onflow/flow-go/engine/common/rpc"
@@ -22,9 +16,13 @@ import (
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
+	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
+	"github.com/onflow/flow/protobuf/go/flow/entities"
+	execproto "github.com/onflow/flow/protobuf/go/flow/execution"
+	"github.com/rs/zerolog"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
-
-
 
 type backendTransactions struct {
 	staticCollectionRPC  accessproto.AccessAPIClient // rpc client tied to a fixed collection node
@@ -42,6 +40,7 @@ type backendTransactions struct {
 	previousAccessNodes []accessproto.AccessAPIClient
 	log                 zerolog.Logger
 	nodeCommunicator    Communicator
+	txResultCache       *lru2.Cache[flow.Identifier, *access.TransactionResult]
 }
 
 // SendTransaction forwards the transaction to the collection node
@@ -232,12 +231,16 @@ func (b *backendTransactions) GetTransactionResult(
 	// look up transaction from storage
 	start := time.Now()
 
-  	tx, err := b.transactions.ByID(txID)
+	tx, err := b.transactions.ByID(txID)
 	if err != nil {
 		txErr := rpc.ConvertStorageError(err)
 		if status.Code(txErr) == codes.NotFound {
 			// Tx not found. If we have historical Sporks setup, lets look through those as well
 
+			val, ok := b.txResultCache.Get(txID)
+			if ok {
+				return val, nil
+			}
 			historicalTxResult, err := b.getHistoricalTransactionResult(ctx, txID)
 			if err != nil {
 				// if tx not found in old access nodes either, then assume that the tx was submitted to a different AN
@@ -248,6 +251,8 @@ func (b *backendTransactions) GetTransactionResult(
 					StatusCode: uint(txStatus),
 				}, nil
 			}
+			
+			b.txResultCache.Add(txID, historicalTxResult)
 			return historicalTxResult, nil
 		}
 		return nil, txErr
@@ -343,8 +348,8 @@ func (b *backendTransactions) lookupCollectionIDInBlock(
 // followed by the collection ID lookup. If both are missing, the default lookup by transaction ID is performed.
 func (b *backendTransactions) retrieveBlock(
 
-	// the requested block or collection was not found. If looking up the block based solely on the txID returns
-	// not found, then no error is returned.
+// the requested block or collection was not found. If looking up the block based solely on the txID returns
+// not found, then no error is returned.
 	blockID flow.Identifier,
 	collectionID flow.Identifier,
 	txID flow.Identifier,
