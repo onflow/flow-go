@@ -159,6 +159,9 @@ func init() {
 	for _, r := range Routes {
 		routeUrlMap[r.Pattern] = r.Name
 	}
+	for _, r := range WSRoutes {
+		routeUrlMap[r.Pattern] = r.Name
+	}
 }
 
 func URLToRoute(url string) (string, error) {
