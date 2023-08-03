@@ -6,6 +6,7 @@
 /cmd/testclient/testclient
 /cmd/util/util
 /cmd/bootstrap/bootstrap
+/engine/access/rpc/backend/mock_communicator.go
 
 # crypto relic folder
 crypto/relic/
