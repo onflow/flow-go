@@ -26,6 +26,7 @@ func (s *MutatorSuite) SetupTest() {
 	s.mutator = NewMutator(s.protocolStateDB)
 }
 
+// TestCreateUpdaterForUnknownBlock tests that CreateUpdater returns an error if the parent protocol state is not found.
 func (s *MutatorSuite) TestCreateUpdaterForUnknownBlock() {
 	candidate := unittest.BlockHeaderFixture()
 	s.protocolStateDB.On("ByBlockID", candidate.ParentID).Return(nil, storerr.ErrNotFound)
@@ -34,6 +35,7 @@ func (s *MutatorSuite) TestCreateUpdaterForUnknownBlock() {
 	require.Nil(s.T(), updater)
 }
 
+// TestMutatorHappyPathNoChanges tests that Mutator correctly indexes the protocol state when there are no changes.
 func (s *MutatorSuite) TestMutatorHappyPathNoChanges() {
 	candidate := unittest.BlockHeaderFixture()
 	parentState := unittest.ProtocolStateFixture()
@@ -41,13 +43,13 @@ func (s *MutatorSuite) TestMutatorHappyPathNoChanges() {
 	updater, err := s.mutator.CreateUpdater(candidate)
 	require.NoError(s.T(), err)
 
-	//s.protocolStateDB.On("StoreTx", parentState.ID(), parentState).Return(func(tx *transaction.Tx) error { return nil })
 	s.protocolStateDB.On("Index", candidate.ID(), parentState.ID()).Return(func(tx *transaction.Tx) error { return nil })
 
 	err = s.mutator.CommitProtocolState(updater)(&transaction.Tx{})
 	require.NoError(s.T(), err)
 }
 
+// TestMutatorHappyPathHasChanges tests that Mutator correctly persists and indexes the protocol state when there are changes.
 func (s *MutatorSuite) TestMutatorHappyPathHasChanges() {
 	parentState := unittest.ProtocolStateFixture()
 	candidate := unittest.BlockHeaderFixture(unittest.HeaderWithView(parentState.CurrentEpochSetup.FirstView))
