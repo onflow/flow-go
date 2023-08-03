@@ -7,6 +7,13 @@ import (
 	"time"
 
 	lru2 "github.com/hashicorp/golang-lru/v2"
+	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
+	"github.com/onflow/flow/protobuf/go/flow/entities"
+	execproto "github.com/onflow/flow/protobuf/go/flow/execution"
+	"github.com/rs/zerolog"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
+
 	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/engine/access/rpc/connection"
 	"github.com/onflow/flow-go/engine/common/rpc"
@@ -16,12 +23,6 @@ import (
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
-	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
-	"github.com/onflow/flow/protobuf/go/flow/entities"
-	execproto "github.com/onflow/flow/protobuf/go/flow/execution"
-	"github.com/rs/zerolog"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 )
 
 type backendTransactions struct {
@@ -251,7 +252,7 @@ func (b *backendTransactions) GetTransactionResult(
 					StatusCode: uint(txStatus),
 				}, nil
 			}
-			
+
 			b.txResultCache.Add(txID, historicalTxResult)
 			return historicalTxResult, nil
 		}
@@ -348,8 +349,8 @@ func (b *backendTransactions) lookupCollectionIDInBlock(
 // followed by the collection ID lookup. If both are missing, the default lookup by transaction ID is performed.
 func (b *backendTransactions) retrieveBlock(
 
-// the requested block or collection was not found. If looking up the block based solely on the txID returns
-// not found, then no error is returned.
+	// the requested block or collection was not found. If looking up the block based solely on the txID returns
+	// not found, then no error is returned.
 	blockID flow.Identifier,
 	collectionID flow.Identifier,
 	txID flow.Identifier,

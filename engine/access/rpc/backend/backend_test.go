@@ -40,23 +40,22 @@ type Suite struct {
 	snapshot *protocol.Snapshot
 	log      zerolog.Logger
 
-	blocks                 *storagemock.Blocks
-	headers                *storagemock.Headers
-	collections            *storagemock.Collections
-	transactions           *storagemock.Transactions
-	receipts               *storagemock.ExecutionReceipts
-	results                *storagemock.ExecutionResults
-
+	blocks       *storagemock.Blocks
+	headers      *storagemock.Headers
+	collections  *storagemock.Collections
+	transactions *storagemock.Transactions
+	receipts     *storagemock.ExecutionReceipts
+	results      *storagemock.ExecutionResults
 
 	colClient              *access.AccessAPIClient
 	execClient             *access.ExecutionAPIClient
 	historicalAccessClient *access.AccessAPIClient
 	archiveClient          *access.AccessAPIClient
 
-	connectionFactory      *backendmock.ConnectionFactory
-	communicator	 *NodeCommunicatorMock
+	connectionFactory *backendmock.ConnectionFactory
+	communicator      *NodeCommunicatorMock
 
-	chainID                flow.ChainID
+	chainID flow.ChainID
 }
 
 func TestHandler(t *testing.T) {

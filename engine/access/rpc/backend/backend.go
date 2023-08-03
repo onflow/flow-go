@@ -9,6 +9,11 @@ import (
 
 	lru "github.com/hashicorp/golang-lru"
 	lru2 "github.com/hashicorp/golang-lru/v2"
+	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
+	"github.com/rs/zerolog"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
+
 	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/cmd/build"
 	"github.com/onflow/flow-go/engine/access/rpc/connection"
@@ -20,10 +25,6 @@ import (
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/badger"
-	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
-	"github.com/rs/zerolog"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 )
 
 // minExecutionNodesCnt is the minimum number of execution nodes expected to have sent the execution receipt for a block
