@@ -33,11 +33,8 @@ func SubscribeEvents(r *request.Request,
 	streamCount *atomic.Int32,
 	errorHandler func(w http.ResponseWriter, err error, errorLogger zerolog.Logger),
 	jsonResponse func(w http.ResponseWriter, code int, response interface{}, errLogger zerolog.Logger)) {
-	fmt.Println("+++++SubscribeEvents")
-	logger.Info().Msg("+++++SubscribeEvents")
 	req, err := r.SubscribeEventsRequest()
 	if err != nil {
-		fmt.Println(fmt.Sprintf("SubscribeEventsRequest .Err(): %v", err))
 		errorHandler(w, models.NewBadRequestError(err), logger)
 		return
 	}
@@ -53,7 +50,6 @@ func SubscribeEvents(r *request.Request,
 	upgrader := websocket.Upgrader{}
 	conn, err := upgrader.Upgrade(w, r.Request, nil)
 	if err != nil {
-		fmt.Println(fmt.Sprintf("Upgrade.Err(): %v", err))
 		errorHandler(w, models.NewRestError(http.StatusInternalServerError, "webSocket upgrade error: ", err), logger)
 		return
 	}
@@ -77,8 +73,8 @@ func SubscribeEvents(r *request.Request,
 	go writeEvents(logger,
 		w,
 		req,
-		r.Context(),
 		conn,
+		r.Context(),
 		api,
 		filter,
 		errorHandler,
@@ -91,19 +87,18 @@ func writeEvents(
 	log zerolog.Logger,
 	w http.ResponseWriter,
 	req request.SubscribeEvents,
-	c context.Context,
 	conn *websocket.Conn,
+	c context.Context,
 	api state_stream.API,
 	filter state_stream.EventFilter,
 	errorHandler func(w http.ResponseWriter, err error, errorLogger zerolog.Logger),
 	jsonResponse func(w http.ResponseWriter, code int, response interface{}, errLogger zerolog.Logger),
 	streamCount *atomic.Int32,
 ) {
-	ticker := time.NewTicker(pingPeriod)
 	ctx, cancel := context.WithCancel(context.Background())
-	//ctx, cancel := context.WithCancel(c)
-
+	ticker := time.NewTicker(pingPeriod)
 	sub := api.SubscribeEvents(ctx, req.StartBlockID, req.StartHeight, filter)
+
 	defer func() {
 		ticker.Stop()
 		streamCount.Add(-1)
@@ -128,45 +123,34 @@ func writeEvents(
 	for {
 		select {
 		case v, ok := <-sub.Channel():
-			fmt.Println(fmt.Sprintf("____sub"))
 			if !ok {
 				if sub.Err() != nil {
-					fmt.Println(fmt.Sprintf("____sub.Err(): %v", sub.Err()))
 					err := fmt.Errorf("stream encountered an error: %v", sub.Err())
-					fmt.Println("stream encountered an error:")
-					errorHandler(w, models.NewRestError(http.StatusRequestTimeout, "bla bla", err), log)
-					//errorHandler(w, models.NewBadRequestError(err), log)
+					errorHandler(w, models.NewBadRequestError(err), log)
 					conn.Close()
 					return
 				}
 				err := fmt.Errorf("subscription channel closed, no error occurred")
-				fmt.Println("subscription channel closed, no error occurred")
 				errorHandler(w, models.NewRestError(http.StatusRequestTimeout, "subscription channel closed", err), log)
 				conn.Close()
 				return
 			}
-			fmt.Println("_____before resp, ok := v.(*state_stream.EventsResponse)")
 
 			resp, ok := v.(*state_stream.EventsResponse)
 			if !ok {
-				fmt.Println("____error: resp, ok := v.(*state_stream.EventsResponse)")
 				err := fmt.Errorf("unexpected response type: %T", v)
 				errorHandler(w, err, log)
 				conn.Close()
 				return
 			}
 
-			fmt.Println(fmt.Sprintf("____response %v", resp))
 			// Write the response to the WebSocket connection
 			err := conn.WriteJSON(resp)
 			if err != nil {
-				fmt.Println("_____error, err := conn.WriteJSON(resp)")
-				fmt.Println(err)
 				errorHandler(w, err, log)
 				conn.Close()
 				return
 			}
-			fmt.Println("StatusOK")
 			jsonResponse(w, http.StatusOK, "", log)
 		case <-ticker.C:
 			if err := conn.WriteMessage(websocket.PingMessage, nil); err != nil {

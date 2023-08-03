@@ -154,9 +154,10 @@ func (s *SubscribeEventsSuite) TestSubscribeEvents() {
 
 			filter, err := state_stream.NewEventFilter(state_stream.DefaultEventFilterConfig, chain, test.eventTypes, test.addresses, test.contracts)
 			assert.NoError(s.T(), err)
+
 			var startHeight uint64
 			if test.startHeight == request.EmptyHeight {
-				startHeight = 0
+				startHeight = uint64(0)
 			} else {
 				startHeight = test.startHeight
 			}
@@ -197,7 +198,7 @@ func (s *SubscribeEventsSuite) TestSubscribeEventsHandlesErrors() {
 
 		subscription.Mock.On("Channel").Return(chReadOnly)
 		subscription.Mock.On("Err").Return(fmt.Errorf("subscription error"))
-		stateStreamBackend.Mock.On("SubscribeEvents", mocks.Anything, invalidBlock.ID(), mocks.Anything, mocks.Anything).Return(subscription)
+		stateStreamBackend.Mock.On("SubscribeEvents", mocks.Anything, invalidBlock.ID(), uint64(0), mocks.Anything).Return(subscription)
 
 		req, err := getSubscribeEventsRequest(s.T(), invalidBlock.ID(), request.EmptyHeight, nil, nil, nil)
 		assert.NoError(s.T(), err)
@@ -219,7 +220,7 @@ func (s *SubscribeEventsSuite) TestSubscribeEventsHandlesErrors() {
 
 		subscription.Mock.On("Channel").Return(chReadOnly)
 		subscription.Mock.On("Err").Return(nil)
-		stateStreamBackend.Mock.On("SubscribeEvents", mocks.Anything, s.blocks[0].ID(), mocks.Anything, mocks.Anything).Return(subscription)
+		stateStreamBackend.Mock.On("SubscribeEvents", mocks.Anything, s.blocks[0].ID(), uint64(0), mocks.Anything).Return(subscription)
 
 		req, err := getSubscribeEventsRequest(s.T(), s.blocks[0].ID(), request.EmptyHeight, nil, nil, nil)
 		assert.NoError(s.T(), err)
@@ -243,7 +244,7 @@ func (s *SubscribeEventsSuite) TestSubscribeEventsHandlesErrors() {
 
 		subscription.Mock.On("Channel").Return(chReadOnly)
 		subscription.Mock.On("Err").Return(nil)
-		stateStreamBackend.Mock.On("SubscribeEvents", mocks.Anything, s.blocks[0].ID(), 0, mocks.Anything).Return(subscription)
+		stateStreamBackend.Mock.On("SubscribeEvents", mocks.Anything, s.blocks[0].ID(), uint64(0), mocks.Anything).Return(subscription)
 
 		req, err := getSubscribeEventsRequest(s.T(), s.blocks[0].ID(), request.EmptyHeight, nil, nil, nil)
 		assert.NoError(s.T(), err)
