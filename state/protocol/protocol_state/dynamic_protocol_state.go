@@ -22,16 +22,7 @@ func newDynamicProtocolStateAdapter(entry *flow.RichProtocolStateEntry, params p
 }
 
 func (s *dynamicProtocolStateAdapter) EpochStatus() *flow.EpochStatus {
-	var nextEpoch flow.EventIDs
-	if s.NextEpochProtocolState != nil {
-		nextEpoch = s.NextEpochProtocolState.CurrentEpochEventIDs
-	}
-	return &flow.EpochStatus{
-		PreviousEpoch:                   s.PreviousEpochEventIDs,
-		CurrentEpoch:                    s.CurrentEpochEventIDs,
-		NextEpoch:                       nextEpoch,
-		InvalidServiceEventIncorporated: s.InvalidStateTransitionAttempted,
-	}
+	return s.RichProtocolStateEntry.EpochStatus()
 }
 
 func (s *dynamicProtocolStateAdapter) Identities() flow.IdentityList {

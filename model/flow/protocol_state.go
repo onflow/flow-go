@@ -88,6 +88,20 @@ func (e *ProtocolStateEntry) Copy() *ProtocolStateEntry {
 	}
 }
 
+// EpochStatus returns epoch status for the current protocol state.
+func (e *ProtocolStateEntry) EpochStatus() *EpochStatus {
+	var nextEpoch EventIDs
+	if e.NextEpochProtocolState != nil {
+		nextEpoch = e.NextEpochProtocolState.CurrentEpochEventIDs
+	}
+	return &EpochStatus{
+		PreviousEpoch:                   e.PreviousEpochEventIDs,
+		CurrentEpoch:                    e.CurrentEpochEventIDs,
+		NextEpoch:                       nextEpoch,
+		InvalidServiceEventIncorporated: e.InvalidStateTransitionAttempted,
+	}
+}
+
 func (ll DynamicIdentityEntryList) Lookup() map[Identifier]*DynamicIdentityEntry {
 	result := make(map[Identifier]*DynamicIdentityEntry, len(ll))
 	for _, entry := range ll {
