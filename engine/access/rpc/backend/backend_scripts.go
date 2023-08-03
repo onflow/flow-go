@@ -28,17 +28,17 @@ import (
 const uniqueScriptLoggingTimeWindow = 10 * time.Minute
 
 type backendScripts struct {
-	headers            storage.Headers
-	executionReceipts  storage.ExecutionReceipts
-	state              protocol.State
-	connFactory        connection.ConnectionFactory
-	log                zerolog.Logger
-	metrics            module.BackendScriptsMetrics
-	loggedScripts      *lru.Cache
-	archiveAddressList []string
-	archivePorts       []uint
+	headers              storage.Headers
+	executionReceipts    storage.ExecutionReceipts
+	state                protocol.State
+	connFactory          connection.ConnectionFactory
+	log                  zerolog.Logger
+	metrics              module.BackendScriptsMetrics
+	loggedScripts        *lru.Cache
+	archiveAddressList   []string
+	archivePorts         []uint
 	scriptExecValidation bool
-	nodeCommunicator   *NodeCommunicator
+	nodeCommunicator     *NodeCommunicator
 }
 
 func (b *backendScripts) ExecuteScriptAtLatestBlock(
@@ -117,30 +117,42 @@ func (b *backendScripts) executeScriptOnExecutor(
 	// *DO NOT* use this hash for any protocol-related or cryptographic functions.
 	insecureScriptHash := md5.Sum(script) //nolint:gosec
 	// try execution on Archive nodes first
-	archiveResult, err := b.executeScriptOnAvailableArchiveNodes(ctx, blockID, script, arguments, insecureScriptHash)
+	archiveResult, archiveErr := b.executeScriptOnAvailableArchiveNodes(ctx, blockID, script, arguments, insecureScriptHash)
 	// try execution nodes if the script wasn't executed
 	if b.scriptExecValidation {
-		execNodeResult, errExec := b.executeScriptOnAvailableExecutionNodes(
+		execNodeResult, execErr := b.executeScriptOnAvailableExecutionNodes(
 			ctx, blockID, script, arguments, insecureScriptHash)
-		if status.Code(err) != codes.NotFound {
-			if bytes.Equal(execNodeResult, archiveResult) && errExec == err {
+		// we can only compare the results if there are no errors from RN and EN
+		// since we cannot distinguish the EN error as caused by the block being pruned or some other reason,
+		// which may produce a valid RN output but an error for the EN
+		if archiveErr != nil && execErr != nil {
+			if bytes.Equal(execNodeResult, archiveResult) {
 				b.logScriptExecutionComparison(blockID, insecureScriptHash,
 					"script execution results on Archive node and EN are equal")
 			} else {
 				b.logScriptExecutionComparison(blockID, insecureScriptHash,
 					"script execution results on Archive node and EN are not equal")
 			}
+		} else if status.Code(archiveErr) == codes.InvalidArgument && status.Code(execErr) == codes.InvalidArgument {
+			// Check if cadence errors returned by the two, we can check for a match
+			if execErr == archiveErr {
+				b.logScriptExecutionComparison(blockID, insecureScriptHash,
+					"cadence errors on Archive node and EN are equal")
+			} else {
+				b.logScriptExecutionComparison(blockID, insecureScriptHash,
+					"cadence errors on Archive node and EN are not equal")
+			}
 		}
 		// return EN results by default
-		return execNodeResult, errExec
+		return execNodeResult, execErr
 	} else {
 		// execute on execution nodes if it's not a script error
-		if err != nil && status.Code(err) != codes.InvalidArgument {
+		if archiveErr != nil && status.Code(archiveErr) != codes.InvalidArgument {
 			execNodeResult, err := b.executeScriptOnAvailableExecutionNodes(
 				ctx, blockID, script, arguments, insecureScriptHash)
 			return execNodeResult, err
 		}
-		return archiveResult, err
+		return archiveResult, archiveErr
 	}
 }
 
@@ -189,7 +201,7 @@ func (b *backendScripts) executeScriptOnAvailableArchiveNodes(
 					// failures due to unavailable blocks are explicitly marked Not found
 					b.metrics.ScriptExecutionErrorOnArchiveNode()
 					b.log.Error().Err(err).Msg("script execution failed for archive node")
-					retrun nil, err
+					return nil, err
 				default:
 					errors = multierror.Append(errors, err)
 					continue
@@ -209,56 +221,67 @@ func (b *backendScripts) executeScriptOnAvailableExecutionNodes(
 	insecureScriptHash [16]byte,
 ) ([]byte, error) {
 	// find few execution nodes which have executed the block earlier and provided an execution receipt for it
-	scriptExecutors, err := b.findScriptExecutors(ctx, blockID)
+	executors, err := executionNodesForBlockID(ctx, blockID, b.executionReceipts, b.state, b.log)
 	if err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to find script executors at blockId %v: %v",
-			blockID.String(), err)
+		return nil, status.Errorf(codes.Internal, "failed to find script executors at blockId %v: %v", blockID.String(), err)
 	}
-	var errors *multierror.Error
-	for _, executorAddress := range scriptExecutors {
-		execStartTime := time.Now() // record start time
-		result, err := b.tryExecuteScriptOnExecutionNode(ctx, executorAddress, blockID, script, arguments)
-		if err == nil {
-			if b.log.GetLevel() == zerolog.DebugLevel {
-				executionTime := time.Now()
-				if b.shouldLogScript(executionTime, insecureScriptHash) {
-					b.log.Debug().
-						Str("script_executor_addr", executorAddress).
-						Hex("block_id", blockID[:]).
-						Hex("script_hash", insecureScriptHash[:]).
-						Str("script", string(script)).
-						Msg("Successfully executed script")
-					b.loggedScripts.Add(insecureScriptHash, executionTime)
+	var result []byte
+	hasInvalidArgument := false
+	errToReturn := b.nodeCommunicator.CallAvailableNode(
+		executors,
+		func(node *flow.Identity) error {
+			execStartTime := time.Now()
+			result, err = b.tryExecuteScriptOnExecutionNode(ctx, node.Address, blockID, script, arguments)
+			if err == nil {
+				if b.log.GetLevel() == zerolog.DebugLevel {
+					executionTime := time.Now()
+					if b.shouldLogScript(executionTime, insecureScriptHash) {
+						b.log.Debug().
+							Str("script_executor_addr", node.Address).
+							Hex("block_id", blockID[:]).
+							Hex("script_hash", insecureScriptHash[:]).
+							Str("script", string(script)).
+							Msg("Successfully executed script")
+						b.loggedScripts.Add(insecureScriptHash, executionTime)
+					}
 				}
+
+				// log execution time
+				b.metrics.ScriptExecuted(
+					time.Since(execStartTime),
+					len(script),
+				)
+
+				return nil
 			}
 
-			// log execution time
-			b.metrics.ScriptExecuted(
-				time.Since(execStartTime),
-				len(script),
-			)
-			return result, nil
-		}
-		// return if it's just a script failure as opposed to an EN/RN failure and skip trying other ENs/RNs
-		if status.Code(err) == codes.InvalidArgument {
-			b.log.Debug().Err(err).
-				Str("script_executor_addr", executorAddress).
-				Hex("block_id", blockID[:]).
-				Hex("script_hash", insecureScriptHash[:]).
-				Str("script", string(script)).
-				Msg("script failed to execute on the execution node")
-			return nil, err
-		}
-		errors = multierror.Append(errors, err)
+			return err
+		},
+		func(node *flow.Identity, err error) bool {
+			hasInvalidArgument = status.Code(err) == codes.InvalidArgument
+			if hasInvalidArgument {
+				b.log.Debug().Err(err).
+					Str("script_executor_addr", node.Address).
+					Hex("block_id", blockID[:]).
+					Hex("script_hash", insecureScriptHash[:]).
+					Str("script", string(script)).
+					Msg("script failed to execute on the execution node")
+			}
+			return hasInvalidArgument
+		},
+	)
+
+	if hasInvalidArgument {
+		return nil, errToReturn
 	}
 
-	errToReturn := errors.ErrorOrNil()
-	if errToReturn != nil {
+	if errToReturn == nil {
+		return result, nil
+	} else {
 		b.metrics.ScriptExecutionErrorOnExecutionNode()
 		b.log.Error().Err(err).Msg("script execution failed for execution node internal reasons")
+		return nil, rpc.ConvertError(errToReturn, "failed to execute script on execution nodes", codes.Internal)
 	}
-
-	return nil, rpc.ConvertMultiError(errors, "failed to execute script on execution nodes", codes.Internal)
 }
 
 // shouldLogScript checks if the script hash is unique in the time window
