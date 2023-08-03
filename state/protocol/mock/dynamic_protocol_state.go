@@ -112,6 +112,22 @@ func (_m *DynamicProtocolState) EpochSetup() *flow.EpochSetup {
 	return r0
 }
 
+// EpochStatus provides a mock function with given fields:
+func (_m *DynamicProtocolState) EpochStatus() *flow.EpochStatus {
+	ret := _m.Called()
+
+	var r0 *flow.EpochStatus
+	if rf, ok := ret.Get(0).(func() *flow.EpochStatus); ok {
+		r0 = rf()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*flow.EpochStatus)
+		}
+	}
+
+	return r0
+}
+
 // GlobalParams provides a mock function with given fields:
 func (_m *DynamicProtocolState) GlobalParams() protocol.GlobalParams {
 	ret := _m.Called()
