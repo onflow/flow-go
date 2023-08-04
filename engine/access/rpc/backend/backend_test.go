@@ -2466,10 +2466,10 @@ func (suite *Suite) TestScriptExecutionValidationMode() {
 	var mockPort uint = 9000
 	connFactory := new(backendmock.ConnectionFactory)
 	connFactory.On("GetAccessAPIClientWithPort", mock.Anything, mockPort).Return(suite.archiveClient, &mockCloser{}, nil)
+	connFactory.On("GetExecutionAPIClient", mock.Anything).Return(suite.execClient, &mockCloser{}, nil)
 	connFactory.On("InvalidateAccessAPIClient", mock.Anything)
 	archiveNode := unittest.IdentityFixture(unittest.WithRole(flow.RoleAccess))
 	fullArchiveAddress := archiveNode.Address + ":" + strconv.FormatUint(uint64(mockPort), 10)
-
 	// create the handler with the mock
 	backend := New(
 		suite.state,
@@ -2499,6 +2499,11 @@ func (suite *Suite) TestScriptExecutionValidationMode() {
 	ctx := context.Background()
 	block := unittest.BlockFixture()
 	blockID := block.ID()
+	_, ids := suite.setupReceipts(&block)
+	suite.state.On("Final").Return(suite.snapshot, nil).Maybe()
+	suite.snapshot.On("Identities", mock.Anything).Return(ids, nil)
+	suite.state.On("AtBlockID", mock.Anything).Return(suite.snapshot)
+
 	script := []byte("dummy script")
 	arguments := [][]byte(nil)
 	archiveRes := &accessproto.ExecuteScriptResponse{Value: []byte{4, 5, 6}}
@@ -2507,50 +2512,68 @@ func (suite *Suite) TestScriptExecutionValidationMode() {
 		Script:    script,
 		Arguments: arguments}
 
+	archiveBlockUnavailableErr := status.Error(codes.NotFound, "placeholder block error")
+	archiveCadenceErr := status.Error(codes.InvalidArgument, "placeholder cadence error")
+	internalErr := status.Error(codes.Internal, "placeholder internal error")
+
+	execReq := &execproto.ExecuteScriptAtBlockIDRequest{
+		BlockId:   blockID[:],
+		Script:    script,
+		Arguments: arguments}
 	matchingExecRes := &execproto.ExecuteScriptAtBlockIDResponse{Value: []byte{4, 5, 6}}
-	matchingExecReq := &execproto.ExecuteScriptAtBlockIDRequest{
-		BlockId:   blockID[:],
-		Script:    script,
-		Arguments: arguments}
+	mismatchingExecRes := &execproto.ExecuteScriptAtBlockIDResponse{Value: []byte{1, 2, 3}}
 
-	mismatchingExecRes := &execproto.ExecuteScriptAtBlockIDResponse{Value: []byte{4, 5, 6}}
-	matchingExecReq := &execproto.ExecuteScriptAtBlockIDRequest{
-		BlockId:   blockID[:],
-		Script:    script,
-		Arguments: arguments}
-
-	suite.Run("happy path script execution success", func() {
+	suite.Run("happy path script execution success both en and rn return responses", func() {
 		suite.archiveClient.On("ExecuteScriptAtBlockID", ctx, archiveReq).Return(archiveRes, nil).Once()
-		res, err := backend.tryExecuteScriptOnArchiveNode(ctx, archiveNode.Address, mockPort, blockID, script, arguments)
+		suite.execClient.On("ExecuteScriptAtBlockID", ctx, execReq).Return(matchingExecRes, nil).Once()
+		res, err := backend.executeScriptOnExecutor(ctx, blockID, script, arguments)
 		suite.archiveClient.AssertExpectations(suite.T())
 		suite.checkResponse(res, err)
+		assert.Equal(suite.T(), res, matchingExecRes.Value)
 	})
 
-	suite.Run("script execution failure returns status OK", func() {
-		suite.archiveClient.On("ExecuteScriptAtBlockID", ctx, archiveReq).
-			Return(nil, status.Error(codes.InvalidArgument, "execution failure!")).Once()
-		_, err := backend.tryExecuteScriptOnArchiveNode(ctx, archiveNode.Address, mockPort, blockID, script, arguments)
+	suite.Run("script execution success but mismatching responses", func() {
+		suite.archiveClient.On("ExecuteScriptAtBlockID", ctx, archiveReq).Return(archiveRes, nil).Once()
+		suite.execClient.On("ExecuteScriptAtBlockID", ctx, execReq).Return(mismatchingExecRes, nil).Once()
+		res, err := backend.executeScriptOnExecutor(ctx, blockID, script, arguments)
+		suite.archiveClient.AssertExpectations(suite.T())
+		suite.checkResponse(res, err)
+		suite.Require().Equal(res, mismatchingExecRes.Value)
+	})
+
+	suite.Run("script execution failure on both nodes", func() {
+		suite.archiveClient.On("ExecuteScriptAtBlockID", ctx, archiveReq).Return(nil, archiveCadenceErr).Once()
+		suite.execClient.On("ExecuteScriptAtBlockID", ctx, execReq).Return(nil, archiveCadenceErr).Once()
+		_, err := backend.executeScriptOnExecutor(ctx, blockID, script, arguments)
 		suite.archiveClient.AssertExpectations(suite.T())
 		suite.Require().Error(err)
 		suite.Require().Equal(status.Code(err), codes.InvalidArgument)
 	})
 
-	suite.Run("script execution due to missing block returns Not found", func() {
-		suite.archiveClient.On("ExecuteScriptAtBlockID", ctx, archiveReq).
-			Return(nil, status.Error(codes.NotFound, "missing block!")).Once()
-		_, err := backend.tryExecuteScriptOnArchiveNode(ctx, archiveNode.Address, mockPort, blockID, script, arguments)
+	suite.Run("script execution failure on rn but not en", func() {
+		suite.archiveClient.On("ExecuteScriptAtBlockID", ctx, archiveReq).Return(
+			nil, archiveCadenceErr).Once()
+		suite.execClient.On("ExecuteScriptAtBlockID", ctx, execReq).Return(matchingExecRes, nil).Once()
+		_, err := backend.executeScriptOnExecutor(ctx, blockID, script, arguments)
+		suite.Require().NoError(err)
 		suite.archiveClient.AssertExpectations(suite.T())
-		suite.Require().Error(err)
-		suite.Require().Equal(status.Code(err), codes.NotFound)
 	})
 
-	suite.Run("archive node internal failure returns status code Internal", func() {
-		suite.archiveClient.On("ExecuteScriptAtBlockID", ctx, archiveReq).
-			Return(nil, status.Error(codes.Internal, "archive node internal error!")).Once()
-		_, err := backend.tryExecuteScriptOnArchiveNode(ctx, archiveNode.Address, mockPort, blockID, script, arguments)
+	suite.Run("block not found on rn", func() {
+		suite.archiveClient.On("ExecuteScriptAtBlockID", ctx, archiveReq).Return(
+			nil, archiveBlockUnavailableErr).Once()
+		suite.execClient.On("ExecuteScriptAtBlockID", ctx, execReq).Return(matchingExecRes, nil).Once()
+		_, err := backend.ExecuteScriptAtBlockID(ctx, blockID, script, arguments)
+		suite.Require().NoError(err)
+		suite.archiveClient.AssertExpectations(suite.T())
+	})
+
+	suite.Run("block not found on en", func() {
+		suite.execClient.On("ExecuteScriptAtBlockID", ctx, execReq).Return(nil, internalErr).
+			Times(int(ids.Count()))
+		_, err := backend.ExecuteScriptAtBlockID(ctx, blockID, script, arguments)
 		suite.archiveClient.AssertExpectations(suite.T())
 		suite.Require().Error(err)
-		suite.Require().Equal(status.Code(err), codes.Internal)
 	})
 }
 
