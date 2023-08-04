@@ -1,6 +1,11 @@
 name: Test Monitor - Reusable Workflow Steps 1
 
-description: Custom action that's used in multiple Flaky Test Monitor jobs
+description: Custom action that's used in multiple Flaky Test Monitor jobs to process test results and upload them to BigQuery
+
+inputs:
+  gcp_sa_key:
+    description: 'The GCP service account key for uploading to BigQuery'
+    required: true
 
 runs:
   using : "composite"
