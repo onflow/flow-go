@@ -111,6 +111,7 @@ func (suite *Suite) TestPing() {
 		DefaultSnapshotHistoryLimit,
 		nil,
 		false,
+		false,
 	)
 
 	err := backend.Ping(context.Background())
@@ -146,6 +147,7 @@ func (suite *Suite) TestGetLatestFinalizedBlockHeader() {
 		suite.log,
 		DefaultSnapshotHistoryLimit,
 		nil,
+		false,
 		false,
 	)
 
@@ -212,6 +214,7 @@ func (suite *Suite) TestGetLatestProtocolStateSnapshot_NoTransitionSpan() {
 			suite.log,
 			DefaultSnapshotHistoryLimit,
 			nil,
+			false,
 			false,
 		)
 
@@ -286,6 +289,7 @@ func (suite *Suite) TestGetLatestProtocolStateSnapshot_TransitionSpans() {
 			DefaultSnapshotHistoryLimit,
 			nil,
 			false,
+			false,
 		)
 
 		// query the handler for the latest finalized snapshot
@@ -351,6 +355,7 @@ func (suite *Suite) TestGetLatestProtocolStateSnapshot_PhaseTransitionSpan() {
 			suite.log,
 			DefaultSnapshotHistoryLimit,
 			nil,
+			false,
 			false,
 		)
 
@@ -429,6 +434,7 @@ func (suite *Suite) TestGetLatestProtocolStateSnapshot_EpochTransitionSpan() {
 			DefaultSnapshotHistoryLimit,
 			nil,
 			false,
+			false,
 		)
 
 		// query the handler for the latest finalized snapshot
@@ -490,6 +496,7 @@ func (suite *Suite) TestGetLatestProtocolStateSnapshot_HistoryLimit() {
 			snapshotHistoryLimit,
 			nil,
 			false,
+			false,
 		)
 
 		// the handler should return a snapshot history limit error
@@ -528,6 +535,7 @@ func (suite *Suite) TestGetLatestSealedBlockHeader() {
 		suite.log,
 		DefaultSnapshotHistoryLimit,
 		nil,
+		false,
 		false,
 	)
 
@@ -576,6 +584,7 @@ func (suite *Suite) TestGetTransaction() {
 		DefaultSnapshotHistoryLimit,
 		nil,
 		false,
+		false,
 	)
 
 	actual, err := backend.GetTransaction(context.Background(), transaction.ID())
@@ -616,6 +625,7 @@ func (suite *Suite) TestGetCollection() {
 		suite.log,
 		DefaultSnapshotHistoryLimit,
 		nil,
+		false,
 		false,
 	)
 
@@ -681,6 +691,7 @@ func (suite *Suite) TestGetTransactionResultByIndex() {
 		DefaultSnapshotHistoryLimit,
 		nil,
 		false,
+		false,
 	)
 	suite.execClient.
 		On("GetTransactionResultByIndex", ctx, exeEventReq).
@@ -744,6 +755,7 @@ func (suite *Suite) TestGetTransactionResultsByBlockID() {
 		suite.log,
 		DefaultSnapshotHistoryLimit,
 		nil,
+		false,
 		false,
 	)
 	suite.execClient.
@@ -836,6 +848,7 @@ func (suite *Suite) TestTransactionStatusTransition() {
 		suite.log,
 		DefaultSnapshotHistoryLimit,
 		nil,
+		false,
 		false,
 	)
 
@@ -957,6 +970,7 @@ func (suite *Suite) TestTransactionExpiredStatusTransition() {
 		suite.log,
 		DefaultSnapshotHistoryLimit,
 		nil,
+		false,
 		false,
 	)
 
@@ -1126,6 +1140,7 @@ func (suite *Suite) TestTransactionPendingToFinalizedStatusTransition() {
 		DefaultSnapshotHistoryLimit,
 		nil,
 		false,
+		false,
 	)
 
 	preferredENIdentifiers = flow.IdentifierList{receipts[0].ExecutorID}
@@ -1185,6 +1200,7 @@ func (suite *Suite) TestTransactionResultUnknown() {
 		DefaultSnapshotHistoryLimit,
 		nil,
 		false,
+		false,
 	)
 
 	// first call - when block under test is greater height than the sealed head, but execution node does not know about Tx
@@ -1239,6 +1255,7 @@ func (suite *Suite) TestGetLatestFinalizedBlock() {
 		suite.log,
 		DefaultSnapshotHistoryLimit,
 		nil,
+		false,
 		false,
 	)
 
@@ -1371,6 +1388,7 @@ func (suite *Suite) TestGetEventsForBlockIDs() {
 			DefaultSnapshotHistoryLimit,
 			nil,
 			false,
+			false,
 		)
 
 		// execute request
@@ -1403,6 +1421,7 @@ func (suite *Suite) TestGetEventsForBlockIDs() {
 			suite.log,
 			DefaultSnapshotHistoryLimit,
 			nil,
+			false,
 			false,
 		)
 
@@ -1464,6 +1483,7 @@ func (suite *Suite) TestGetExecutionResultByID() {
 			DefaultSnapshotHistoryLimit,
 			nil,
 			false,
+			false,
 		)
 
 		// execute request
@@ -1494,6 +1514,7 @@ func (suite *Suite) TestGetExecutionResultByID() {
 			suite.log,
 			DefaultSnapshotHistoryLimit,
 			nil,
+			false,
 			false,
 		)
 
@@ -1559,6 +1580,7 @@ func (suite *Suite) TestGetExecutionResultByBlockID() {
 			DefaultSnapshotHistoryLimit,
 			nil,
 			false,
+			false,
 		)
 
 		// execute request
@@ -1590,6 +1612,7 @@ func (suite *Suite) TestGetExecutionResultByBlockID() {
 			suite.log,
 			DefaultSnapshotHistoryLimit,
 			nil,
+			false,
 			false,
 		)
 
@@ -1742,6 +1765,7 @@ func (suite *Suite) TestGetEventsForHeightRange() {
 			DefaultSnapshotHistoryLimit,
 			nil,
 			false,
+			false,
 		)
 
 		_, err := backend.GetEventsForHeightRange(ctx, string(flow.EventAccountCreated), maxHeight, minHeight)
@@ -1782,6 +1806,7 @@ func (suite *Suite) TestGetEventsForHeightRange() {
 			DefaultSnapshotHistoryLimit,
 			nil,
 			false,
+			false,
 		)
 
 		// execute request
@@ -1821,6 +1846,7 @@ func (suite *Suite) TestGetEventsForHeightRange() {
 			DefaultSnapshotHistoryLimit,
 			nil,
 			false,
+			false,
 		)
 
 		actualResp, err := backend.GetEventsForHeightRange(ctx, string(flow.EventAccountCreated), minHeight, maxHeight)
@@ -1859,6 +1885,7 @@ func (suite *Suite) TestGetEventsForHeightRange() {
 			DefaultSnapshotHistoryLimit,
 			nil,
 			false,
+			false,
 		)
 
 		_, err := backend.GetEventsForHeightRange(ctx, string(flow.EventAccountCreated), minHeight, minHeight+1)
@@ -1896,6 +1923,7 @@ func (suite *Suite) TestGetEventsForHeightRange() {
 			suite.log,
 			DefaultSnapshotHistoryLimit,
 			nil,
+			false,
 			false,
 		)
 
@@ -1974,6 +2002,7 @@ func (suite *Suite) TestGetAccount() {
 		suite.log,
 		DefaultSnapshotHistoryLimit,
 		nil,
+		false,
 		false,
 	)
 
@@ -2057,6 +2086,7 @@ func (suite *Suite) TestGetAccountAtBlockHeight() {
 		DefaultSnapshotHistoryLimit,
 		nil,
 		false,
+		false,
 	)
 
 	preferredENIdentifiers = flow.IdentifierList{receipts[0].ExecutorID}
@@ -2096,6 +2126,7 @@ func (suite *Suite) TestGetNetworkParameters() {
 		suite.log,
 		DefaultSnapshotHistoryLimit,
 		nil,
+		false,
 		false,
 	)
 
@@ -2300,6 +2331,7 @@ func (suite *Suite) TestExecuteScriptOnExecutionNode() {
 		DefaultSnapshotHistoryLimit,
 		nil,
 		false,
+		false,
 	)
 
 	// mock parameters
@@ -2377,6 +2409,7 @@ func (suite *Suite) TestExecuteScriptOnArchiveNode() {
 		DefaultSnapshotHistoryLimit,
 		[]string{fullArchiveAddress},
 		false,
+		false,
 	)
 
 	// mock parameters
@@ -2387,6 +2420,101 @@ func (suite *Suite) TestExecuteScriptOnArchiveNode() {
 	arguments := [][]byte(nil)
 	archiveRes := &accessproto.ExecuteScriptResponse{Value: []byte{4, 5, 6}}
 	archiveReq := &accessproto.ExecuteScriptAtBlockIDRequest{
+		BlockId:   blockID[:],
+		Script:    script,
+		Arguments: arguments}
+
+	suite.Run("happy path script execution success", func() {
+		suite.archiveClient.On("ExecuteScriptAtBlockID", ctx, archiveReq).Return(archiveRes, nil).Once()
+		res, err := backend.tryExecuteScriptOnArchiveNode(ctx, archiveNode.Address, mockPort, blockID, script, arguments)
+		suite.archiveClient.AssertExpectations(suite.T())
+		suite.checkResponse(res, err)
+	})
+
+	suite.Run("script execution failure returns status OK", func() {
+		suite.archiveClient.On("ExecuteScriptAtBlockID", ctx, archiveReq).
+			Return(nil, status.Error(codes.InvalidArgument, "execution failure!")).Once()
+		_, err := backend.tryExecuteScriptOnArchiveNode(ctx, archiveNode.Address, mockPort, blockID, script, arguments)
+		suite.archiveClient.AssertExpectations(suite.T())
+		suite.Require().Error(err)
+		suite.Require().Equal(status.Code(err), codes.InvalidArgument)
+	})
+
+	suite.Run("script execution due to missing block returns Not found", func() {
+		suite.archiveClient.On("ExecuteScriptAtBlockID", ctx, archiveReq).
+			Return(nil, status.Error(codes.NotFound, "missing block!")).Once()
+		_, err := backend.tryExecuteScriptOnArchiveNode(ctx, archiveNode.Address, mockPort, blockID, script, arguments)
+		suite.archiveClient.AssertExpectations(suite.T())
+		suite.Require().Error(err)
+		suite.Require().Equal(status.Code(err), codes.NotFound)
+	})
+
+	suite.Run("archive node internal failure returns status code Internal", func() {
+		suite.archiveClient.On("ExecuteScriptAtBlockID", ctx, archiveReq).
+			Return(nil, status.Error(codes.Internal, "archive node internal error!")).Once()
+		_, err := backend.tryExecuteScriptOnArchiveNode(ctx, archiveNode.Address, mockPort, blockID, script, arguments)
+		suite.archiveClient.AssertExpectations(suite.T())
+		suite.Require().Error(err)
+		suite.Require().Equal(status.Code(err), codes.Internal)
+	})
+}
+
+// TestExecuteScriptOnArchiveNode tests the method backend.scripts.executeScriptOnArchiveNode for script execution
+func (suite *Suite) TestScriptExecutionValidationMode() {
+
+	// create a mock connection factory
+	var mockPort uint = 9000
+	connFactory := new(backendmock.ConnectionFactory)
+	connFactory.On("GetAccessAPIClientWithPort", mock.Anything, mockPort).Return(suite.archiveClient, &mockCloser{}, nil)
+	connFactory.On("InvalidateAccessAPIClient", mock.Anything)
+	archiveNode := unittest.IdentityFixture(unittest.WithRole(flow.RoleAccess))
+	fullArchiveAddress := archiveNode.Address + ":" + strconv.FormatUint(uint64(mockPort), 10)
+
+	// create the handler with the mock
+	backend := New(
+		suite.state,
+		nil,
+		nil,
+		nil,
+		suite.headers,
+		nil,
+		nil,
+		suite.receipts,
+		suite.results,
+		flow.Mainnet,
+		metrics.NewNoopCollector(),
+		connFactory, // the connection factory should be used to get the execution node client
+		false,
+		DefaultMaxHeightRange,
+		nil,
+		nil,
+		suite.log,
+		DefaultSnapshotHistoryLimit,
+		[]string{fullArchiveAddress},
+		true,
+		false,
+	)
+
+	// mock parameters
+	ctx := context.Background()
+	block := unittest.BlockFixture()
+	blockID := block.ID()
+	script := []byte("dummy script")
+	arguments := [][]byte(nil)
+	archiveRes := &accessproto.ExecuteScriptResponse{Value: []byte{4, 5, 6}}
+	archiveReq := &accessproto.ExecuteScriptAtBlockIDRequest{
+		BlockId:   blockID[:],
+		Script:    script,
+		Arguments: arguments}
+
+	matchingExecRes := &execproto.ExecuteScriptAtBlockIDResponse{Value: []byte{4, 5, 6}}
+	matchingExecReq := &execproto.ExecuteScriptAtBlockIDRequest{
+		BlockId:   blockID[:],
+		Script:    script,
+		Arguments: arguments}
+
+	mismatchingExecRes := &execproto.ExecuteScriptAtBlockIDResponse{Value: []byte{4, 5, 6}}
+	matchingExecReq := &execproto.ExecuteScriptAtBlockIDRequest{
 		BlockId:   blockID[:],
 		Script:    script,
 		Arguments: arguments}
