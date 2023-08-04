@@ -58,8 +58,7 @@ func (s *RestStateStreamSuite) SetupTest() {
 	// access node
 	bridgeANConfig := testnet.NewNodeConfig(
 		flow.RoleAccess,
-		testnet.WithLogLevel(zerolog.DebugLevel),
-		testnet.WithAdditionalFlag("--supports-observer=true"),
+		testnet.WithLogLevel(zerolog.InfoLevel),
 		testnet.WithAdditionalFlag("--execution-data-sync-enabled=true"),
 		testnet.WithAdditionalFlag(fmt.Sprintf("--execution-data-dir=%s", testnet.DefaultExecutionDataServiceDir)),
 		testnet.WithAdditionalFlag("--execution-data-retry-delay=1s"),
@@ -101,7 +100,7 @@ func (s *RestStateStreamSuite) SetupTest() {
 	s.net.Start(s.ctx)
 }
 
-// TestRestEventStreaming tests event streaming on REST
+// TestRestEventStreaming tests event streaming route on REST
 func (s *RestStateStreamSuite) TestRestEventStreaming() {
 	ctx, cancel := context.WithTimeout(s.ctx, 1*time.Second)
 	defer cancel()
@@ -162,6 +161,8 @@ func (s *RestStateStreamSuite) TestRestEventStreaming() {
 	})
 }
 
+// requireEvents is a helper function that encapsulates logic for comparing received events from rest state streaming and
+// events which received from grpc api
 func (s *RestStateStreamSuite) requireEvents(receivedEventsResponse []*state_stream.EventsResponse) {
 	grpcCtx, grpcCancel := context.WithCancel(s.ctx)
 	defer grpcCancel()
@@ -202,6 +203,7 @@ func (s *RestStateStreamSuite) requireEvents(receivedEventsResponse []*state_str
 	}
 }
 
+// getWSClient is a helper function that creates a websocket client
 func getWSClient(ctx context.Context, address string) (*websocket.Conn, error) {
 	// helper func to create WebSocket client
 	client, _, err := websocket.DefaultDialer.DialContext(ctx, strings.Replace(address, "http", "ws", 1), nil)
@@ -211,6 +213,7 @@ func getWSClient(ctx context.Context, address string) (*websocket.Conn, error) {
 	return client, nil
 }
 
+// getSubscribeEventsRequest is a helper function that creates SubscribeEventsRequest
 func getSubscribeEventsRequest(accessAddr string, startBlockId flow.Identifier, startHeight uint64, eventTypes []string, addresses []string, contracts []string) string {
 	u, _ := url.Parse("http://" + accessAddr + "/v1/subscribe_events")
 	q := u.Query()
