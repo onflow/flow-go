@@ -3,7 +3,7 @@
   "most_failures": [
     {
       "test": "TestSanitySha3_256_4",
-      "package": "github.com/onflow/flow-go/crypto/hash",
+      "package": "github.com/onflow/crypto/hash",
       "runs": 24,
       "passed": 14,
       "failed": 19,
@@ -40,7 +40,7 @@
     },
     {
       "test": "TestSanitySha3_256_2",
-      "package": "github.com/onflow/flow-go/crypto/hash",
+      "package": "github.com/onflow/crypto/hash",
       "runs": 24,
       "passed": 14,
       "failed": 11,
@@ -77,7 +77,7 @@
     },
     {
       "test": "TestSanitySha3_256",
-      "package": "github.com/onflow/flow-go/crypto/hash",
+      "package": "github.com/onflow/crypto/hash",
       "runs": 24,
       "passed": 14,
       "failed": 10,
@@ -114,7 +114,7 @@
     },
     {
       "test": "TestSanitySha3_256_3",
-      "package": "github.com/onflow/flow-go/crypto/hash",
+      "package": "github.com/onflow/crypto/hash",
       "runs": 24,
       "passed": 14,
       "failed": 9,
@@ -151,7 +151,7 @@
     },
     {
       "test": "TestSanitySha2_256",
-      "package": "github.com/onflow/flow-go/crypto/hash",
+      "package": "github.com/onflow/crypto/hash",
       "runs": 25,
       "passed": 24,
       "failed": 1,
@@ -192,7 +192,7 @@
   "longest_running": [
     {
       "test": "TestSha3",
-      "package": "github.com/onflow/flow-go/crypto/hash",
+      "package": "github.com/onflow/crypto/hash",
       "runs": 25,
       "passed": 25,
       "failed": 0,
@@ -230,7 +230,7 @@
     },
     {
       "test": "TestSha3/SHA3_384",
-      "package": "github.com/onflow/flow-go/crypto/hash",
+      "package": "github.com/onflow/crypto/hash",
       "runs": 25,
       "passed": 25,
       "failed": 0,
@@ -268,7 +268,7 @@
     },
     {
       "test": "TestSha3/SHA3_256",
-      "package": "github.com/onflow/flow-go/crypto/hash",
+      "package": "github.com/onflow/crypto/hash",
       "runs": 25,
       "passed": 25,
       "failed": 0,

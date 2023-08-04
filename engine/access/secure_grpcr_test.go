@@ -17,7 +17,7 @@ import (
 
 	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
 
-	"github.com/onflow/flow-go/crypto"
+	"github.com/onflow/crypto"
 	accessmock "github.com/onflow/flow-go/engine/access/mock"
 	"github.com/onflow/flow-go/engine/access/rpc"
 	"github.com/onflow/flow-go/engine/access/rpc/backend"

@@ -4,7 +4,7 @@ import (
 	"github.com/onflow/cadence"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
 
-	"github.com/onflow/flow-go/crypto"
+	"github.com/onflow/crypto"
 	"github.com/onflow/flow-go/model/flow"
 )
 

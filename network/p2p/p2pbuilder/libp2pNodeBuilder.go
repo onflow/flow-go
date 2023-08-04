@@ -21,7 +21,7 @@ import (
 	madns "github.com/multiformats/go-multiaddr-dns"
 	"github.com/rs/zerolog"
 
-	fcrypto "github.com/onflow/flow-go/crypto"
+	fcrypto "github.com/onflow/crypto"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/component"

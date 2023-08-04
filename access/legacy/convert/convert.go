@@ -8,9 +8,9 @@ import (
 	entitiesproto "github.com/onflow/flow/protobuf/go/flow/legacy/entities"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
+	"github.com/onflow/crypto"
+	"github.com/onflow/crypto/hash"
 	"github.com/onflow/flow-go/access"
-	"github.com/onflow/flow-go/crypto"
-	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/model/flow"
 )

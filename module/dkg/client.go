@@ -15,7 +15,7 @@ import (
 	sdkcrypto "github.com/onflow/flow-go-sdk/crypto"
 	"github.com/onflow/flow-go/model/flow"
 
-	"github.com/onflow/flow-go/crypto"
+	"github.com/onflow/crypto"
 	model "github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/epochs"

@@ -4,7 +4,7 @@
 package signature
 
 import (
-	"github.com/onflow/flow-go/crypto"
+	"github.com/onflow/crypto"
 )
 
 const panic_relic = "function only supported with the relic build tag"

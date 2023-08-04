@@ -16,9 +16,9 @@ import (
 
 	sdk "github.com/onflow/flow-go-sdk"
 
+	"github.com/onflow/crypto"
+	"github.com/onflow/crypto/hash"
 	hotstuff "github.com/onflow/flow-go/consensus/hotstuff/model"
-	"github.com/onflow/flow-go/crypto"
-	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/access/rest/util"
 	"github.com/onflow/flow-go/fvm/storage/snapshot"

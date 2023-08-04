@@ -1,7 +1,7 @@
 package convert_test
 
 import (
-	"github.com/onflow/flow-go/crypto"
+	"github.com/onflow/crypto"
 	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"

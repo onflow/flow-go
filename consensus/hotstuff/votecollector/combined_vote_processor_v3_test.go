@@ -12,6 +12,7 @@ import (
 	"go.uber.org/atomic"
 	"pgregory.net/rapid"
 
+	"github.com/onflow/crypto"
 	bootstrapDKG "github.com/onflow/flow-go/cmd/bootstrap/dkg"
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/committees"
@@ -21,7 +22,6 @@ import (
 	hsig "github.com/onflow/flow-go/consensus/hotstuff/signature"
 	hotstuffvalidator "github.com/onflow/flow-go/consensus/hotstuff/validator"
 	"github.com/onflow/flow-go/consensus/hotstuff/verification"
-	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/encodable"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/local"

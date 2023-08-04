@@ -3,7 +3,7 @@ package dkg
 import (
 	"github.com/rs/zerolog"
 
-	"github.com/onflow/flow-go/crypto"
+	"github.com/onflow/crypto"
 	"github.com/onflow/flow-go/model/flow"
 	model "github.com/onflow/flow-go/model/messages"
 )

@@ -1,13 +1,13 @@
 
 #!/bin/bash
 
-# crypto package 
-PKG_NAME="github.com/onflow/flow-go/crypto"
+# crypto package
+PKG_NAME="github.com/onflow/crypto"
 
 # go.mod
 MOD_FILE="./go.mod"
 
-# the version of onflow/flow-go/crypto used in the project is read from the go.mod file
+# the version of onflow/crypto used in the project is read from the go.mod file
 if [ -f "${MOD_FILE}" ]
 then
     # extract the imported version
@@ -16,7 +16,7 @@ then
     go get "${PKG_NAME}@${VERSION}" || { echo "go get the package failed"; exit 1; }
     # using the right version, get the package directory path
     PKG_DIR="$(go env GOPATH)/pkg/mod/${PKG_NAME}@${VERSION}"
-else 
+else
    { echo "couldn't find go.mod file - make sure the script is in the project root directory"; exit 1; }
 fi
 

@@ -16,7 +16,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/vmihailenco/msgpack"
 
-	"github.com/onflow/flow-go/crypto"
+	"github.com/onflow/crypto"
 	"github.com/onflow/flow-go/utils/rand"
 )
 

@@ -5,8 +5,8 @@ import (
 
 	"golang.org/x/crypto/sha3"
 
-	"github.com/onflow/flow-go/crypto"
-	"github.com/onflow/flow-go/crypto/random"
+	"github.com/onflow/crypto"
+	"github.com/onflow/crypto/random"
 )
 
 const RandomSourceLength = crypto.SignatureLenBLSBLS12381

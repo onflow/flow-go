@@ -4,7 +4,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/onflow/flow-go/crypto"
+	"github.com/onflow/crypto"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/storage"
 )

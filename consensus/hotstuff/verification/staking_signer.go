@@ -3,9 +3,9 @@ package verification
 import (
 	"fmt"
 
+	"github.com/onflow/crypto/hash"
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
-	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	msig "github.com/onflow/flow-go/module/signature"
