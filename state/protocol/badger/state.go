@@ -35,9 +35,8 @@ type State struct {
 	results storage.ExecutionResults
 	seals   storage.Seals
 	epoch   struct {
-		setups   storage.EpochSetups
-		commits  storage.EpochCommits
-		statuses storage.EpochStatuses
+		setups  storage.EpochSetups
+		commits storage.EpochCommits
 	}
 	versionBeacons storage.VersionBeacons
 
@@ -757,13 +756,11 @@ func newState(
 		blocks:  blocks,
 		qcs:     qcs,
 		epoch: struct {
-			setups   storage.EpochSetups
-			commits  storage.EpochCommits
-			statuses storage.EpochStatuses
+			setups  storage.EpochSetups
+			commits storage.EpochCommits
 		}{
-			setups:   setups,
-			commits:  commits,
-			statuses: statuses,
+			setups:  setups,
+			commits: commits,
 		},
 		versionBeacons: versionBeacons,
 		cachedFinal:    new(atomic.Pointer[cachedHeader]),
