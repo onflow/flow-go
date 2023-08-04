@@ -77,9 +77,11 @@ jobs:
 #        continue-on-error: true
       - name: Process test results (${{ matrix.targets.name }})
         uses: ./.github/workflows/actions/test-monitor-process-tests
-      - name: Setup tmate session
-        uses: mxschmitt/action-tmate@v3
-        if: success() || failure()
+        with:
+          gcp_sa_key: ${{ secrets.GCP_SA_KEY }}
+#      - name: Setup tmate session
+#        uses: mxschmitt/action-tmate@v3
+#        if: success() || failure()
 
 #      - name: Get commit date
 #        id: commit_date
