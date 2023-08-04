@@ -79,6 +79,50 @@ jobs:
         with:
           gcp_sa_key: ${{ secrets.GCP_SA_KEY }}
 
+  unit-test-modules:
+    name: Unit Tests (Modules)
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: crypto
+            make1: -C crypto setup
+            make2: unittest
+            race: 1
+            test_category: unit-crypto
+          - name: insecure
+            make1: install-tools
+            make2: test
+            race: 0
+            test_category: unit-insecure
+          - name: integration
+            make1: install-tools
+            make2: test
+            race: 0
+            test_category: unit-integration
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v3
+      - name: Setup Go
+        uses: actions/setup-go@v3
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+      - name: Setup tests (${{ matrix.name }})
+        run: make ${{ matrix.make1 }}
+      - name: Run tests (${{ matrix.name }})
+        env:
+          RACE_DETECTOR: ${{ matrix.race }}
+          TEST_CATEGORY: ${{ matrix.test_category }}
+        run: make -esC ${{ matrix.name }} ${{ matrix.make2 }} > test-output
+        timeout-minutes: 25
+        continue-on-error: true
+      - name: Process test results (${{ matrix.targets.name }})
+        uses: ./.github/workflows/actions/test-monitor-process-results
+        with:
+          gcp_sa_key: ${{ secrets.GCP_SA_KEY }}
+
 #  regular-skipped-test-run:
 #    name: Test Monitor - Regular, Skipped Tests Run
 #    strategy:
