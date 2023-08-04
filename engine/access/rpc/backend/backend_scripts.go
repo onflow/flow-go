@@ -131,7 +131,7 @@ func (b *backendScripts) executeScriptOnExecutor(
 				insecureScriptHash)
 			// return EN results by default
 			b.compareScriptExecutionResults(execNodeResult, execErr, archiveResult, archiveErr, blockID,
-				insecureScriptHash)
+				script)
 			return execNodeResult, execErr
 		}
 		return execNodeResult, execErr
@@ -153,38 +153,51 @@ func (b *backendScripts) compareScriptExecutionResults(
 	archiveResult []byte,
 	archiveErr error,
 	blockID flow.Identifier,
-	insecureScriptHash [16]byte,
+	script []byte,
 ) {
 	// check errors first
 	if execErr != nil {
-		if execErr == archiveErr {
+		if archiveErr != nil && execErr == archiveErr {
 			b.metrics.ScriptExecutionErrorMatch()
-			b.logScriptExecutionComparison(blockID, insecureScriptHash,
-				"cadence errors on Archive node and EN are equal")
 		} else {
 			b.metrics.ScriptExecutionErrorMismatch()
-			b.logScriptExecutionComparison(blockID, insecureScriptHash,
+			b.logScriptExecutionComparison(blockID, script, execNodeResult, archiveResult, execErr, archiveErr,
 				"cadence errors on Archive node and EN are not equal")
 		}
 		return
 	}
 	if bytes.Equal(execNodeResult, archiveResult) {
 		b.metrics.ScriptExecutionResultMatch()
-		b.logScriptExecutionComparison(blockID, insecureScriptHash,
-			"script execution results on Archive node and EN are equal")
 	} else {
 		b.metrics.ScriptExecutionResultMismatch()
-		b.logScriptExecutionComparison(blockID, insecureScriptHash,
+		b.logScriptExecutionComparison(blockID, script, execNodeResult, archiveResult, execErr, archiveErr,
 			"script execution results on Archive node and EN are not equal")
 	}
 }
 
 func (b *backendScripts) logScriptExecutionComparison(
 	blockID flow.Identifier,
-	insecureScriptHash [16]byte,
+	script []byte,
+	execNodeResult []byte,
+	archiveResult []byte,
+	executionError error,
+	archiveError error,
 	msg string,
 ) {
-	b.log.Debug().Hex("block_id", blockID[:]).Hex("script_hash", insecureScriptHash[:]).Msg(msg)
+	// over-log for ease of debug
+	if executionError != nil || archiveError != nil {
+		b.log.Debug().Hex("block_id", blockID[:]).
+			Str("script", string(script)).
+			AnErr("execution_node_error", executionError).
+			AnErr("archive_node_error", archiveError).
+			Msg(msg)
+	} else {
+		b.log.Debug().Hex("block_id", blockID[:]).
+			Str("script", string(script)).
+			Hex("execution_node_result", execNodeResult).
+			Hex("archive_node_result", archiveResult).
+			Msg(msg)
+	}
 }
 
 // executeScriptOnAvailableArchiveNodes executes the given script for a blockID on all archive nodes available
