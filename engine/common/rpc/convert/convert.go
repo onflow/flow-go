@@ -1007,9 +1007,13 @@ func ChunkExecutionDataToMessage(data *execution_data.ChunkExecutionData) (
 		events = nil
 	}
 
-	trieUpdate, err := TrieUpdateToMessage(data.TrieUpdate)
-	if err != nil {
-		return nil, err
+	var trieUpdate *entities.TrieUpdate = nil
+	if data.TrieUpdate == nil {
+		update, err := TrieUpdateToMessage(data.TrieUpdate)
+		if err != nil {
+			return nil, err
+		}
+		trieUpdate = update
 	}
 
 	return &entities.ChunkExecutionData{
@@ -1187,10 +1191,6 @@ func MessageToTrieUpdate(m *entities.TrieUpdate) (*ledger.TrieUpdate, error) {
 
 // TrieUpdateToMessage converts a TrieUpdate to a protobuf message
 func TrieUpdateToMessage(t *ledger.TrieUpdate) (*entities.TrieUpdate, error) {
-	if t == nil {
-		return nil, nil
-	}
-
 	paths := make([][]byte, len(t.Paths))
 	for i := range t.Paths {
 		paths[i] = t.Paths[i][:]
