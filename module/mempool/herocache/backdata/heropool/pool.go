@@ -1,6 +1,7 @@
 package heropool
 
 import (
+	"fmt"
 	"math"
 
 	"github.com/rs/zerolog"
@@ -72,7 +73,7 @@ type Pool struct {
 // logger and a provided fixed size.
 func NewHeroPool(sizeLimit uint32, ejectionMode EjectionMode, logger zerolog.Logger) *Pool {
 	l := &Pool{
-		//constructor for states make them invalid
+		//construcs states initialized to InvalidIndexes
 		states:       NewStates(numberOfStates),
 		poolEntities: make([]poolEntity, sizeLimit),
 		ejectionMode: ejectionMode,
@@ -150,7 +151,6 @@ func (p Pool) All() []PoolEntity {
 // Head returns the head of states[stateUsed] items. Assuming no ejection happened and pool never goes beyond limit, Head returns
 // the first inserted element.
 func (p Pool) Head() (flow.Entity, bool) {
-
 	if p.states[stateUsed].size == 0 {
 		return nil, false
 	}
@@ -256,8 +256,10 @@ func (p *Pool) Remove(sliceIndex EIndex) flow.Entity {
 // removing its corresponding linked-list node from the states[stateUsed] linked list, and appending
 // it to the tail of the states[stateFree] list. It also removes the entity that the invalidated node is presenting.
 func (p *Pool) invalidateEntityAtIndex(sliceIndex EIndex) flow.Entity {
-	poolEntity := p.poolEntities[sliceIndex]
-	invalidatedEntity := poolEntity.entity
+	invalidatedEntity := p.poolEntities[sliceIndex].entity
+	if invalidatedEntity == nil {
+		panic(fmt.Sprintf("removing an entity from an empty slot with an index : %d", sliceIndex))
+	}
 	p.switchState(stateUsed, stateFree, sliceIndex)
 	p.poolEntities[sliceIndex].id = flow.ZeroID
 	p.poolEntities[sliceIndex].entity = nil
