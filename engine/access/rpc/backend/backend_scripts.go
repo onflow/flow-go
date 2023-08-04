@@ -88,21 +88,6 @@ func (b *backendScripts) ExecuteScriptAtBlockHeight(
 	return b.executeScriptOnExecutor(ctx, blockID, script, arguments)
 }
 
-func (b *backendScripts) findScriptExecutors(
-	ctx context.Context,
-	blockID flow.Identifier,
-) ([]string, error) {
-	executors, err := executionNodesForBlockID(ctx, blockID, b.executionReceipts, b.state, b.log)
-	if err != nil {
-		return nil, err
-	}
-	executorAddrs := make([]string, 0, len(executors))
-	for _, executor := range executors {
-		executorAddrs = append(executorAddrs, executor.Address)
-	}
-	return executorAddrs, nil
-}
-
 func isCadenceScriptError(scriptExecutionErr error) bool {
 	return scriptExecutionErr == nil || status.Code(scriptExecutionErr) == codes.InvalidArgument
 }
