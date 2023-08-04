@@ -157,7 +157,6 @@ func (s *RestStateStreamSuite) TestRestEventStreaming() {
 					return
 				}
 				receivedEventsResponse = append(receivedEventsResponse, eventResponse)
-				s.T().Logf(fmt.Sprintf("___event %v", eventResponse))
 			}
 		}
 	})
