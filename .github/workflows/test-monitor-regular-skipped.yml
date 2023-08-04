@@ -66,15 +66,13 @@ jobs:
           go-version: ${{ env.GO_VERSION }}
           cache: true
       - name: Setup tests (${{ matrix.targets.name }})
-        run: VERBOSE=1 make -e GO_TEST_PACKAGES="${{ matrix.targets.packages }}" install-tools
+        run: make -e GO_TEST_PACKAGES="${{ matrix.targets.packages }}" install-tools
       - name: Run tests (${{ matrix.targets.name }})
         run: make -es GO_TEST_PACKAGES="${{ matrix.targets.packages }}" unittest-main > test-output
         timeout-minutes: 25
-          # command line from GitHub runner that works:
-          # make VERBOSE=1 JSON_OUTPUT=true GO_TEST_PACKAGES=github.com/onflow/flow-go/admin/commands/common -es unittest-main > test-output
         # test run should continue even if there are failed tests
         continue-on-error: true
-      - name: Process test results (${{ matrix.targets.name }})
+      - name: Process test results
         uses: ./.github/workflows/actions/test-monitor-process-results
         with:
           gcp_sa_key: ${{ secrets.GCP_SA_KEY }}
@@ -118,7 +116,7 @@ jobs:
         run: make -esC ${{ matrix.name }} ${{ matrix.make2 }} > test-output
         timeout-minutes: 25
         continue-on-error: true
-      - name: Process test results (${{ matrix.targets.name }})
+      - name: Process test results (${{ matrix.name }})
         uses: ./.github/workflows/actions/test-monitor-process-results
         with:
           gcp_sa_key: ${{ secrets.GCP_SA_KEY }}
@@ -172,84 +170,10 @@ jobs:
       - name: Run tests
         env:
           TEST_CATEGORY: ${{ matrix.test_category }}
-        run: VERBOSE=1 make -esC integration ${{ matrix.target }} > test-output
+        run: make -esC integration ${{ matrix.target }} > test-output
         timeout-minutes: 25
         continue-on-error: true
-      - name: Process test results (${{ matrix.targets.name }})
+      - name: Process test results
         uses: ./.github/workflows/actions/test-monitor-process-results
         with:
           gcp_sa_key: ${{ secrets.GCP_SA_KEY }}
-
-#  regular-skipped-test-run:
-#    name: Test Monitor - Regular, Skipped Tests Run
-#    strategy:
-#      fail-fast: false
-#      matrix:
-#        test-category:
-#          - unit
-#          - unit-crypto
-#          - unit-insecure
-#          - unit-integration
-#          - integration-bft
-#          - integration-mvp
-#          - integration-ghost
-#          - integration-network
-#          - integration-epochs
-#          - integration-access
-#          - integration-collection
-#          - integration-consensus
-#          - integration-execution
-#          - integration-verification
-#    env:
-#      TEST_CATEGORY: ${{ matrix.test-category }}
-#      COMMIT_SHA: ${{ github.sha }}
-#      RUN_ID: ${{ github.run_id }}
-#      SKIPPED_TESTS_FILE: skipped-tests
-#      RESULTS_FILE: test-results
-#    runs-on: ubuntu-latest
-#    steps:
-#    - name: Get job run date
-#      id: job_run_date
-#      run: echo "::set-output name=date::$(TZ=":America/Los_Angeles" date -Iseconds)"
-#    - name: Set up Cloud SDK
-#      uses: google-github-actions/setup-gcloud@v0
-#      with:
-#        service_account_key: ${{ secrets.GCP_SA_KEY }}
-#    - name: Setup Go
-#      uses: actions/setup-go@v2
-#      with:
-#        go-version: ${{ env.GO_VERSION }}
-#    - name: Checkout repo
-#      uses: actions/checkout@v2
-#      with:
-#        ref: ${{ env.COMMIT_SHA }}
-#    - name: Get commit date
-#      id: commit_date
-#      run: echo "::set-output name=date::$(git show --no-patch --no-notes --pretty='%cI' $COMMIT_SHA)"
-#    - name: Run tests
-#      uses: nick-fields/retry@v2
-#      with:
-#        timeout_minutes: 60
-#        max_attempts: 5
-#        command: ./tools/test_monitor/run-tests.sh
-#      env:
-#        JSON_OUTPUT: true
-#    - name: Print test results
-#      run: cat test-output
-#    - name: Process test results
-#      run: cat test-output | go run tools/test_monitor/level1/process_summary1_results.go
-#      env:
-#        JOB_STARTED: ${{ steps.job_run_date.outputs.date }}
-#        COMMIT_DATE: ${{ steps.commit_date.outputs.date }}
-#    - name: Upload results to BigQuery (skipped tests)
-#      uses: nick-fields/retry@v2
-#      with:
-#        timeout_minutes: 1
-#        max_attempts: 3
-#        command: bq load --source_format=NEWLINE_DELIMITED_JSON $BIGQUERY_DATASET.$BIGQUERY_TABLE $SKIPPED_TESTS_FILE tools/test_monitor/schemas/skipped_tests_schema.json
-#    - name: Upload results to BigQuery (test run)
-#      uses: nick-fields/retry@v2
-#      with:
-#        timeout_minutes: 2
-#        max_attempts: 3
-#        command: bq load --source_format=NEWLINE_DELIMITED_JSON $BIGQUERY_DATASET.$BIGQUERY_TABLE2 $RESULTS_FILE tools/test_monitor/schemas/test_results_schema.json
