@@ -1,4 +1,4 @@
-name: Test Monitor - Reusable Workflow Steps 1
+name: Test Monitor - Process Results
 
 description: Custom action that's used in multiple Flaky Test Monitor jobs to process test results and upload them to BigQuery
 

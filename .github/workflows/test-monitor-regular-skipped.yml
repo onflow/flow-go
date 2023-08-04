@@ -75,7 +75,7 @@ jobs:
         # test run should continue even if there are failed tests
         continue-on-error: true
       - name: Process test results (${{ matrix.targets.name }})
-        uses: ./.github/workflows/actions/test-monitor-process-tests
+        uses: ./.github/workflows/actions/test-monitor-process-results
         with:
           gcp_sa_key: ${{ secrets.GCP_SA_KEY }}
 
