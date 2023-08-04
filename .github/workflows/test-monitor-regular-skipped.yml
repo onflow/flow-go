@@ -23,6 +23,7 @@ env:
   RUN_ID: ${{ github.run_id }}
   JSON_OUTPUT: true
   VERBOSE: true
+  TEST_FLAKY: true
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
@@ -69,7 +70,7 @@ jobs:
         run: make -e GO_TEST_PACKAGES="${{ matrix.targets.packages }}" install-tools
       - name: Run tests (${{ matrix.targets.name }})
         run: make -es GO_TEST_PACKAGES="${{ matrix.targets.packages }}" unittest-main > test-output
-        timeout-minutes: 25
+        timeout-minutes: 100
         # test run should continue even if there are failed tests
         continue-on-error: true
       - name: Process test results
@@ -114,7 +115,7 @@ jobs:
           RACE_DETECTOR: ${{ matrix.race }}
           TEST_CATEGORY: ${{ matrix.test_category }}
         run: make -esC ${{ matrix.name }} ${{ matrix.make2 }} > test-output
-        timeout-minutes: 25
+        timeout-minutes: 100
         continue-on-error: true
       - name: Process test results (${{ matrix.name }})
         uses: ./.github/workflows/actions/test-monitor-process-results
@@ -171,7 +172,7 @@ jobs:
         env:
           TEST_CATEGORY: ${{ matrix.test_category }}
         run: make -esC integration ${{ matrix.target }} > test-output
-        timeout-minutes: 25
+        timeout-minutes: 100
         continue-on-error: true
       - name: Process test results
         uses: ./.github/workflows/actions/test-monitor-process-results
