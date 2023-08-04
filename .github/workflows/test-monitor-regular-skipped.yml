@@ -76,7 +76,7 @@ jobs:
         # test run should continue even if there are failed tests
         continue-on-error: true
       - name: Process test results (${{ matrix.targets.name }})
-        uses: .github/workflows/actions/test-monitor-process-tests
+        uses: ./.github/workflows/actions/test-monitor-process-tests
       - name: Setup tmate session
         uses: mxschmitt/action-tmate@v3
         if: success() || failure()
