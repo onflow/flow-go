@@ -6,8 +6,6 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/onflow/flow-go/engine/access/rpc/connection"
-
 	"github.com/dgraph-io/badger/v2"
 	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
 	entitiesproto "github.com/onflow/flow/protobuf/go/flow/entities"
@@ -22,6 +20,7 @@ import (
 
 	access "github.com/onflow/flow-go/engine/access/mock"
 	backendmock "github.com/onflow/flow-go/engine/access/rpc/backend/mock"
+	"github.com/onflow/flow-go/engine/access/rpc/connection"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
@@ -116,7 +115,7 @@ func (suite *Suite) TestPing() {
 		suite.log,
 		DefaultSnapshotHistoryLimit,
 		nil,
-		false,
+		NewNodeCommunicator(false),
 	)
 
 	err := backend.Ping(context.Background())
@@ -152,7 +151,7 @@ func (suite *Suite) TestGetLatestFinalizedBlockHeader() {
 		suite.log,
 		DefaultSnapshotHistoryLimit,
 		nil,
-		false,
+		NewNodeCommunicator(false),
 	)
 
 	// query the handler for the latest finalized block
@@ -218,7 +217,7 @@ func (suite *Suite) TestGetLatestProtocolStateSnapshot_NoTransitionSpan() {
 			suite.log,
 			DefaultSnapshotHistoryLimit,
 			nil,
-			false,
+			NewNodeCommunicator(false),
 		)
 
 		// query the handler for the latest finalized snapshot
@@ -291,7 +290,7 @@ func (suite *Suite) TestGetLatestProtocolStateSnapshot_TransitionSpans() {
 			suite.log,
 			DefaultSnapshotHistoryLimit,
 			nil,
-			false,
+			NewNodeCommunicator(false),
 		)
 
 		// query the handler for the latest finalized snapshot
@@ -357,7 +356,7 @@ func (suite *Suite) TestGetLatestProtocolStateSnapshot_PhaseTransitionSpan() {
 			suite.log,
 			DefaultSnapshotHistoryLimit,
 			nil,
-			false,
+			NewNodeCommunicator(false),
 		)
 
 		// query the handler for the latest finalized snapshot
@@ -434,7 +433,7 @@ func (suite *Suite) TestGetLatestProtocolStateSnapshot_EpochTransitionSpan() {
 			suite.log,
 			DefaultSnapshotHistoryLimit,
 			nil,
-			false,
+			NewNodeCommunicator(false),
 		)
 
 		// query the handler for the latest finalized snapshot
@@ -495,7 +494,7 @@ func (suite *Suite) TestGetLatestProtocolStateSnapshot_HistoryLimit() {
 			suite.log,
 			snapshotHistoryLimit,
 			nil,
-			false,
+			NewNodeCommunicator(false),
 		)
 
 		// the handler should return a snapshot history limit error
@@ -534,7 +533,7 @@ func (suite *Suite) TestGetLatestSealedBlockHeader() {
 		suite.log,
 		DefaultSnapshotHistoryLimit,
 		nil,
-		false,
+		NewNodeCommunicator(false),
 	)
 
 	// query the handler for the latest sealed block
@@ -581,7 +580,7 @@ func (suite *Suite) TestGetTransaction() {
 		suite.log,
 		DefaultSnapshotHistoryLimit,
 		nil,
-		false,
+		NewNodeCommunicator(false),
 	)
 
 	actual, err := backend.GetTransaction(context.Background(), transaction.ID())
@@ -622,7 +621,7 @@ func (suite *Suite) TestGetCollection() {
 		suite.log,
 		DefaultSnapshotHistoryLimit,
 		nil,
-		false,
+		NewNodeCommunicator(false),
 	)
 
 	actual, err := backend.GetCollectionByID(context.Background(), expected.ID())
@@ -686,7 +685,7 @@ func (suite *Suite) TestGetTransactionResultByIndex() {
 		suite.log,
 		DefaultSnapshotHistoryLimit,
 		nil,
-		false,
+		NewNodeCommunicator(false),
 	)
 	suite.execClient.
 		On("GetTransactionResultByIndex", ctx, exeEventReq).
@@ -750,7 +749,7 @@ func (suite *Suite) TestGetTransactionResultsByBlockID() {
 		suite.log,
 		DefaultSnapshotHistoryLimit,
 		nil,
-		false,
+		NewNodeCommunicator(false),
 	)
 	suite.execClient.
 		On("GetTransactionResultsByBlockID", ctx, exeEventReq).
@@ -842,7 +841,7 @@ func (suite *Suite) TestTransactionStatusTransition() {
 		suite.log,
 		DefaultSnapshotHistoryLimit,
 		nil,
-		false,
+		NewNodeCommunicator(false),
 	)
 
 	// Successfully return empty event list
@@ -963,7 +962,7 @@ func (suite *Suite) TestTransactionExpiredStatusTransition() {
 		suite.log,
 		DefaultSnapshotHistoryLimit,
 		nil,
-		false,
+		NewNodeCommunicator(false),
 	)
 
 	// should return pending status when we have not observed an expiry block
@@ -1131,7 +1130,7 @@ func (suite *Suite) TestTransactionPendingToFinalizedStatusTransition() {
 		suite.log,
 		DefaultSnapshotHistoryLimit,
 		nil,
-		false,
+		NewNodeCommunicator(false),
 	)
 
 	preferredENIdentifiers = flow.IdentifierList{receipts[0].ExecutorID}
@@ -1190,7 +1189,7 @@ func (suite *Suite) TestTransactionResultUnknown() {
 		suite.log,
 		DefaultSnapshotHistoryLimit,
 		nil,
-		false,
+		NewNodeCommunicator(false),
 	)
 
 	// first call - when block under test is greater height than the sealed head, but execution node does not know about Tx
@@ -1245,7 +1244,7 @@ func (suite *Suite) TestGetLatestFinalizedBlock() {
 		suite.log,
 		DefaultSnapshotHistoryLimit,
 		nil,
-		false,
+		NewNodeCommunicator(false),
 	)
 
 	// query the handler for the latest finalized header
@@ -1376,7 +1375,7 @@ func (suite *Suite) TestGetEventsForBlockIDs() {
 			suite.log,
 			DefaultSnapshotHistoryLimit,
 			nil,
-			false,
+			NewNodeCommunicator(false),
 		)
 
 		// execute request
@@ -1409,7 +1408,7 @@ func (suite *Suite) TestGetEventsForBlockIDs() {
 			suite.log,
 			DefaultSnapshotHistoryLimit,
 			nil,
-			false,
+			NewNodeCommunicator(false),
 		)
 
 		// execute request with an empty block id list and expect an empty list of events and no error
@@ -1469,7 +1468,7 @@ func (suite *Suite) TestGetExecutionResultByID() {
 			suite.log,
 			DefaultSnapshotHistoryLimit,
 			nil,
-			false,
+			NewNodeCommunicator(false),
 		)
 
 		// execute request
@@ -1500,7 +1499,7 @@ func (suite *Suite) TestGetExecutionResultByID() {
 			suite.log,
 			DefaultSnapshotHistoryLimit,
 			nil,
-			false,
+			NewNodeCommunicator(false),
 		)
 
 		// execute request
@@ -1564,7 +1563,7 @@ func (suite *Suite) TestGetExecutionResultByBlockID() {
 			suite.log,
 			DefaultSnapshotHistoryLimit,
 			nil,
-			false,
+			NewNodeCommunicator(false),
 		)
 
 		// execute request
@@ -1747,7 +1746,7 @@ func (suite *Suite) TestGetEventsForHeightRange() {
 			suite.log,
 			DefaultSnapshotHistoryLimit,
 			nil,
-			false,
+			NewNodeCommunicator(false),
 		)
 
 		_, err := backend.GetEventsForHeightRange(ctx, string(flow.EventAccountCreated), maxHeight, minHeight)
@@ -1787,7 +1786,7 @@ func (suite *Suite) TestGetEventsForHeightRange() {
 			suite.log,
 			DefaultSnapshotHistoryLimit,
 			nil,
-			false,
+			NewNodeCommunicator(false),
 		)
 
 		// execute request
@@ -1826,7 +1825,7 @@ func (suite *Suite) TestGetEventsForHeightRange() {
 			suite.log,
 			DefaultSnapshotHistoryLimit,
 			nil,
-			false,
+			NewNodeCommunicator(false),
 		)
 
 		actualResp, err := backend.GetEventsForHeightRange(ctx, string(flow.EventAccountCreated), minHeight, maxHeight)
@@ -1864,7 +1863,7 @@ func (suite *Suite) TestGetEventsForHeightRange() {
 			suite.log,
 			DefaultSnapshotHistoryLimit,
 			nil,
-			false,
+			NewNodeCommunicator(false),
 		)
 
 		_, err := backend.GetEventsForHeightRange(ctx, string(flow.EventAccountCreated), minHeight, minHeight+1)
@@ -1902,7 +1901,7 @@ func (suite *Suite) TestGetEventsForHeightRange() {
 			suite.log,
 			DefaultSnapshotHistoryLimit,
 			nil,
-			false,
+			NewNodeCommunicator(false),
 		)
 
 		_, err := backend.GetEventsForHeightRange(ctx, string(flow.EventAccountCreated), minHeight, maxHeight)
@@ -1980,7 +1979,7 @@ func (suite *Suite) TestGetAccount() {
 		suite.log,
 		DefaultSnapshotHistoryLimit,
 		nil,
-		false,
+		NewNodeCommunicator(false),
 	)
 
 	preferredENIdentifiers = flow.IdentifierList{receipts[0].ExecutorID}
@@ -2062,7 +2061,7 @@ func (suite *Suite) TestGetAccountAtBlockHeight() {
 		suite.log,
 		DefaultSnapshotHistoryLimit,
 		nil,
-		false,
+		NewNodeCommunicator(false),
 	)
 
 	preferredENIdentifiers = flow.IdentifierList{receipts[0].ExecutorID}
@@ -2102,7 +2101,7 @@ func (suite *Suite) TestGetNetworkParameters() {
 		suite.log,
 		DefaultSnapshotHistoryLimit,
 		nil,
-		false,
+		NewNodeCommunicator(false),
 	)
 
 	params := backend.GetNetworkParameters(context.Background())
@@ -2305,7 +2304,7 @@ func (suite *Suite) TestExecuteScriptOnExecutionNode() {
 		suite.log,
 		DefaultSnapshotHistoryLimit,
 		nil,
-		false,
+		NewNodeCommunicator(false),
 	)
 
 	// mock parameters
@@ -2382,7 +2381,7 @@ func (suite *Suite) TestExecuteScriptOnArchiveNode() {
 		suite.log,
 		DefaultSnapshotHistoryLimit,
 		[]string{fullArchiveAddress},
-		false,
+		NewNodeCommunicator(false),
 	)
 
 	// mock parameters

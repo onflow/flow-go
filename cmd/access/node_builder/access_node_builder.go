@@ -12,14 +12,13 @@ import (
 	badger "github.com/ipfs/go-ds-badger2"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/routing"
+	"github.com/onflow/flow/protobuf/go/flow/access"
+	"github.com/onflow/go-bitswap"
 	"github.com/rs/zerolog"
 	"github.com/spf13/pflag"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/insecure"
-
-	"github.com/onflow/flow/protobuf/go/flow/access"
-	"github.com/onflow/go-bitswap"
 
 	"github.com/onflow/flow-go/admin/commands"
 	stateSyncCommands "github.com/onflow/flow-go/admin/commands/state_synchronization"
@@ -1088,7 +1087,6 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 					backendConfig.CircuitBreakerConfig,
 				),
 			}
-
 			backend := backend.New(
 				node.State,
 				builder.CollectionRPC,
@@ -1109,7 +1107,8 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				node.Logger,
 				backend.DefaultSnapshotHistoryLimit,
 				backendConfig.ArchiveAddressList,
-				backendConfig.CircuitBreakerConfig.Enabled)
+				backend.NewNodeCommunicator(backendConfig.CircuitBreakerConfig.Enabled),
+			)
 
 			engineBuilder, err := rpc.NewBuilder(
 				node.Logger,

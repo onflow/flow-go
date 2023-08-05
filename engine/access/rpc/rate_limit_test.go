@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -31,8 +32,6 @@ import (
 	storagemock "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/utils/grpcutils"
 	"github.com/onflow/flow-go/utils/unittest"
-
-	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
 )
 
 type RateLimitTestSuite struct {
@@ -168,7 +167,7 @@ func (suite *RateLimitTestSuite) SetupTest() {
 		suite.log,
 		0,
 		nil,
-		false)
+		backend.NewNodeCommunicator(false))
 
 	rpcEngBuilder, err := NewBuilder(
 		suite.log,

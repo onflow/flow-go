@@ -82,7 +82,7 @@ func (suite *Suite) TestGetTransactionResultReturnsUnknown() {
 			On("ByBlockID", block.ID()).
 			Return(l, nil)
 
-		backend := NewBackend(
+		backend := New(
 			suite.state,
 			suite.colClient,
 			nil,
@@ -140,7 +140,7 @@ func (suite *Suite) TestGetTransactionResultReturnsTransactionError() {
 			On("ByBlockID", block.ID()).
 			Return(l, nil)
 
-		backend := NewBackend(
+		backend := New(
 			suite.state,
 			suite.colClient,
 			nil,
@@ -213,7 +213,7 @@ func (suite *Suite) TestGetTransactionResultReturnsValidTransactionResult() {
 			On("GetTransactionResult", mock.Anything, mock.Anything).
 			Return(&transactionResultResponse, nil)
 
-		backend := NewBackend(
+		backend := New(
 			suite.state,
 			suite.colClient,
 			[]access.AccessAPIClient{suite.historicalAccessClient},
@@ -287,7 +287,7 @@ func (suite *Suite) TestGetTransactionResultFromCache() {
 			On("GetTransactionResult", mock.Anything, mock.Anything).
 			Return(&transactionResultResponse, nil).Once()
 
-		backend := NewBackend(
+		backend := New(
 			suite.state,
 			suite.colClient,
 			[]access.AccessAPIClient{suite.historicalAccessClient},

@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -14,8 +15,6 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/insecure"
-
-	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
 
 	"github.com/onflow/flow-go/crypto"
 	accessmock "github.com/onflow/flow-go/engine/access/mock"
@@ -151,7 +150,7 @@ func (suite *SecureGRPCTestSuite) SetupTest() {
 		suite.log,
 		0,
 		nil,
-		false)
+		backend.NewNodeCommunicator(false))
 
 	rpcEngBuilder, err := rpc.NewBuilder(
 		suite.log,

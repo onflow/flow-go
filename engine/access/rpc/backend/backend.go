@@ -100,9 +100,9 @@ type Communicator interface {
 	) error
 }
 
-// NewBackend creates backend accepting Communicator interfaces instead of circuitBreakerEnabled flag
+// New creates backend accepting Communicator interfaces instead of circuitBreakerEnabled flag
 // More convenient fur unit testing scenarios when you need to pass test NodeCommunicator objects.
-func NewBackend(state protocol.State,
+func New(state protocol.State,
 	collectionRPC accessproto.AccessAPIClient,
 	historicalAccessNodes []accessproto.AccessAPIClient,
 	blocks storage.Blocks,
@@ -202,143 +202,6 @@ func NewBackend(state protocol.State,
 			connFactory:       connFactory,
 			log:               log,
 			nodeCommunicator:  communicator,
-		},
-		backendExecutionResults: backendExecutionResults{
-			executionResults: executionResults,
-		},
-		backendNetwork: backendNetwork{
-			state:                state,
-			chainID:              chainID,
-			snapshotHistoryLimit: snapshotHistoryLimit,
-		},
-		collections:       collections,
-		executionReceipts: executionReceipts,
-		connFactory:       connFactory,
-		chainID:           chainID,
-	}
-
-	retry.SetBackend(b)
-
-	preferredENIdentifiers, err = identifierList(preferredExecutionNodeIDs)
-	if err != nil {
-		log.Fatal().Err(err).Msg("failed to convert node id string to Flow Identifier for preferred EN map")
-	}
-
-	fixedENIdentifiers, err = identifierList(fixedExecutionNodeIDs)
-	if err != nil {
-		log.Fatal().Err(err).Msg("failed to convert node id string to Flow Identifier for fixed EN map")
-	}
-
-	return b
-}
-
-// New create new backend instance
-// Deprecated: Use NewBackend for enhanced testability
-func New(
-	state protocol.State,
-	collectionRPC accessproto.AccessAPIClient,
-	historicalAccessNodes []accessproto.AccessAPIClient,
-	blocks storage.Blocks,
-	headers storage.Headers,
-	collections storage.Collections,
-	transactions storage.Transactions,
-	executionReceipts storage.ExecutionReceipts,
-	executionResults storage.ExecutionResults,
-	chainID flow.ChainID,
-	accessMetrics module.AccessMetrics,
-	connFactory connection.ConnectionFactory,
-	retryEnabled bool,
-	maxHeightRange uint,
-	preferredExecutionNodeIDs []string,
-	fixedExecutionNodeIDs []string,
-	log zerolog.Logger,
-	snapshotHistoryLimit int,
-	archiveAddressList []string,
-	circuitBreakerEnabled bool,
-) *Backend {
-	retry := newRetry()
-	if retryEnabled {
-		retry.Activate()
-	}
-
-	loggedScripts, err := lru.New(DefaultLoggedScriptsCacheSize)
-	if err != nil {
-		log.Fatal().Err(err).Msg("failed to initialize script logging cache")
-	}
-
-	archivePorts := make([]uint, len(archiveAddressList))
-	for idx, addr := range archiveAddressList {
-		port, err := findPortFromAddress(addr)
-		if err != nil {
-			log.Fatal().Err(err).Msg("failed to find archive node port")
-		}
-		archivePorts[idx] = port
-	}
-
-	// create node communicator, that will be used in sub-backend logic for interacting with API calls
-	nodeCommunicator := NewNodeCommunicator(circuitBreakerEnabled)
-
-	txResCache, err := lru2.New[flow.Identifier, *access.TransactionResult](int(badger.DefaultCacheSize))
-	if err != nil {
-		log.Fatal().Err(err).Msg("failed to init cache for transaction results")
-	}
-
-	b := &Backend{
-		state: state,
-		// create the sub-backends
-		backendScripts: backendScripts{
-			headers:            headers,
-			executionReceipts:  executionReceipts,
-			connFactory:        connFactory,
-			state:              state,
-			log:                log,
-			metrics:            accessMetrics,
-			loggedScripts:      loggedScripts,
-			archiveAddressList: archiveAddressList,
-			archivePorts:       archivePorts,
-			nodeCommunicator:   nodeCommunicator,
-		},
-		backendTransactions: backendTransactions{
-			staticCollectionRPC:  collectionRPC,
-			state:                state,
-			chainID:              chainID,
-			collections:          collections,
-			blocks:               blocks,
-			transactions:         transactions,
-			executionReceipts:    executionReceipts,
-			transactionValidator: configureTransactionValidator(state, chainID),
-			transactionMetrics:   accessMetrics,
-			retry:                retry,
-			connFactory:          connFactory,
-			previousAccessNodes:  historicalAccessNodes,
-			log:                  log,
-			nodeCommunicator:     nodeCommunicator,
-			txResultCache:        txResCache,
-		},
-		backendEvents: backendEvents{
-			state:             state,
-			headers:           headers,
-			executionReceipts: executionReceipts,
-			connFactory:       connFactory,
-			log:               log,
-			maxHeightRange:    maxHeightRange,
-			nodeCommunicator:  nodeCommunicator,
-		},
-		backendBlockHeaders: backendBlockHeaders{
-			headers: headers,
-			state:   state,
-		},
-		backendBlockDetails: backendBlockDetails{
-			blocks: blocks,
-			state:  state,
-		},
-		backendAccounts: backendAccounts{
-			state:             state,
-			headers:           headers,
-			executionReceipts: executionReceipts,
-			connFactory:       connFactory,
-			log:               log,
-			nodeCommunicator:  nodeCommunicator,
 		},
 		backendExecutionResults: backendExecutionResults{
 			executionResults: executionResults,

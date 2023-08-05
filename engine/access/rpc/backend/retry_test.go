@@ -3,12 +3,11 @@ package backend
 import (
 	"context"
 
+	"github.com/onflow/flow/protobuf/go/flow/access"
+	"github.com/onflow/flow/protobuf/go/flow/execution"
 	"github.com/stretchr/testify/mock"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
-
-	"github.com/onflow/flow/protobuf/go/flow/access"
-	"github.com/onflow/flow/protobuf/go/flow/execution"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
@@ -61,7 +60,7 @@ func (suite *Suite) TestTransactionRetry() {
 		suite.log,
 		DefaultSnapshotHistoryLimit,
 		nil,
-		false,
+		NewNodeCommunicator(false),
 	)
 	retry := newRetry().SetBackend(backend).Activate()
 	backend.retry = retry
@@ -151,7 +150,7 @@ func (suite *Suite) TestSuccessfulTransactionsDontRetry() {
 		suite.log,
 		DefaultSnapshotHistoryLimit,
 		nil,
-		false,
+		NewNodeCommunicator(false),
 	)
 	retry := newRetry().SetBackend(backend).Activate()
 	backend.retry = retry
