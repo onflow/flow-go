@@ -2665,6 +2665,19 @@ func WithNextEpochProtocolState() func(entry *flow.RichProtocolStateEntry) {
 	}
 }
 
+// WithValidDKG updated protocol state with correctly structured data for DKG.
+func WithValidDKG() func(*flow.RichProtocolStateEntry) {
+	return func(entry *flow.RichProtocolStateEntry) {
+		commit := entry.CurrentEpochCommit
+		dkgParticipants := entry.CurrentEpochSetup.Participants.Filter(filter.IsValidDKGParticipant)
+		lookup := DKGParticipantLookup(dkgParticipants)
+		commit.DKGParticipantKeys = make([]crypto.PublicKey, len(lookup))
+		for _, participant := range lookup {
+			commit.DKGParticipantKeys[participant.Index] = participant.KeyShare
+		}
+	}
+}
+
 func CreateSendTxHttpPayload(tx flow.TransactionBody) map[string]interface{} {
 	tx.Arguments = [][]uint8{} // fix how fixture creates nil values
 	auth := make([]string, len(tx.Authorizers))
