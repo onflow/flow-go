@@ -137,6 +137,8 @@ type Snapshot interface {
 	// Returns invalid.Params with state.ErrUnknownSnapshotReference if snapshot reference block is unknown.
 	Params() GlobalParams
 
+	ProtocolState() (DynamicProtocolState, error)
+
 	// VersionBeacon returns the latest sealed version beacon.
 	// If no version beacon has been sealed so far during the current spork, returns nil.
 	// The latest VersionBeacon is only updated for finalized blocks. This means that, when

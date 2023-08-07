@@ -200,6 +200,32 @@ func (_m *Snapshot) Phase() (flow.EpochPhase, error) {
 	return r0, r1
 }
 
+// ProtocolState provides a mock function with given fields:
+func (_m *Snapshot) ProtocolState() (protocol.DynamicProtocolState, error) {
+	ret := _m.Called()
+
+	var r0 protocol.DynamicProtocolState
+	var r1 error
+	if rf, ok := ret.Get(0).(func() (protocol.DynamicProtocolState, error)); ok {
+		return rf()
+	}
+	if rf, ok := ret.Get(0).(func() protocol.DynamicProtocolState); ok {
+		r0 = rf()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(protocol.DynamicProtocolState)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func() error); ok {
+		r1 = rf()
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // QuorumCertificate provides a mock function with given fields:
 func (_m *Snapshot) QuorumCertificate() (*flow.QuorumCertificate, error) {
 	ret := _m.Called()

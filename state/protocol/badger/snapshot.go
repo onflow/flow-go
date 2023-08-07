@@ -403,6 +403,10 @@ func (s *Snapshot) Params() protocol.GlobalParams {
 	return s.state.Params()
 }
 
+func (s *Snapshot) ProtocolState() (protocol.DynamicProtocolState, error) {
+	panic("not implemented")
+}
+
 func (s *Snapshot) VersionBeacon() (*flow.SealedVersionBeacon, error) {
 	head, err := s.state.headers.ByBlockID(s.blockID)
 	if err != nil {

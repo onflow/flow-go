@@ -63,6 +63,22 @@ func (_m *StateUpdater) Build() (*flow.ProtocolStateEntry, flow.Identifier, bool
 	return r0, r1, r2
 }
 
+// ParentState provides a mock function with given fields:
+func (_m *StateUpdater) ParentState() *flow.RichProtocolStateEntry {
+	ret := _m.Called()
+
+	var r0 *flow.RichProtocolStateEntry
+	if rf, ok := ret.Get(0).(func() *flow.RichProtocolStateEntry); ok {
+		r0 = rf()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*flow.RichProtocolStateEntry)
+		}
+	}
+
+	return r0
+}
+
 // ProcessEpochCommit provides a mock function with given fields: epochCommit
 func (_m *StateUpdater) ProcessEpochCommit(epochCommit *flow.EpochCommit) error {
 	ret := _m.Called(epochCommit)

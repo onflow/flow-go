@@ -72,6 +72,10 @@ func (s Snapshot) Encodable() EncodableSnapshot {
 	return s.enc
 }
 
+func (s Snapshot) ProtocolState() (protocol.DynamicProtocolState, error) {
+	panic("not implemented")
+}
+
 func (s Snapshot) VersionBeacon() (*flow.SealedVersionBeacon, error) {
 	return s.enc.SealedVersionBeacon, nil
 }
