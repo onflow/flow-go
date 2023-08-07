@@ -5,6 +5,7 @@ import (
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/state/protocol"
+	"github.com/onflow/flow-go/state/protocol/inmem"
 	"github.com/onflow/flow-go/storage"
 )
 
@@ -36,7 +37,7 @@ func (s *ProtocolState) AtBlockID(blockID flow.Identifier) (protocol.DynamicProt
 	if err != nil {
 		return nil, fmt.Errorf("could not query protocol state at block (%x): %w", blockID, err)
 	}
-	return newDynamicProtocolStateAdapter(protocolStateEntry, s.globalParams), nil
+	return inmem.NewDynamicProtocolStateAdapter(protocolStateEntry, s.globalParams), nil
 }
 
 // GlobalParams returns an interface which can be used to query global protocol parameters.
