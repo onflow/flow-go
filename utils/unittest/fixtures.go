@@ -2541,7 +2541,7 @@ func RootProtocolStateFixture() *flow.RichProtocolStateEntry {
 	}
 
 	return &flow.RichProtocolStateEntry{
-		ProtocolStateEntry: flow.ProtocolStateEntry{
+		ProtocolStateEntry: &flow.ProtocolStateEntry{
 			CurrentEpochEventIDs: flow.EventIDs{
 				SetupID:  currentEpochSetup.ID(),
 				CommitID: currentEpochCommit.ID(),
@@ -2592,7 +2592,7 @@ func ProtocolStateFixture(options ...func(*flow.RichProtocolStateEntry)) *flow.R
 	}
 
 	entry := &flow.RichProtocolStateEntry{
-		ProtocolStateEntry: flow.ProtocolStateEntry{
+		ProtocolStateEntry: &flow.ProtocolStateEntry{
 			CurrentEpochEventIDs: flow.EventIDs{
 				SetupID:  currentEpochSetup.ID(),
 				CommitID: currentEpochCommit.ID(),
@@ -2654,7 +2654,7 @@ func WithNextEpochProtocolState() func(entry *flow.RichProtocolStateEntry) {
 		}
 
 		entry.NextEpochProtocolState = &flow.RichProtocolStateEntry{
-			ProtocolStateEntry:     *entry.ProtocolStateEntry.NextEpochProtocolState,
+			ProtocolStateEntry:     entry.ProtocolStateEntry.NextEpochProtocolState,
 			CurrentEpochSetup:      nextEpochSetup,
 			CurrentEpochCommit:     nextEpochCommit,
 			PreviousEpochSetup:     entry.CurrentEpochSetup,

@@ -42,7 +42,7 @@ func TestProtocolStateStorage(t *testing.T) {
 			err = commits.StoreTx(expected.NextEpochProtocolState.CurrentEpochCommit)(tx)
 			require.NoError(t, err)
 
-			err = store.StoreTx(protocolStateID, &expected.ProtocolStateEntry)(tx)
+			err = store.StoreTx(protocolStateID, expected.ProtocolStateEntry)(tx)
 			require.NoError(t, err)
 			return store.Index(blockID, protocolStateID)(tx)
 		})
@@ -76,14 +76,14 @@ func TestProtocolStateStoreInvalidProtocolState(t *testing.T) {
 		// swap first and second elements to break canonical order
 		invalid.Identities[0], invalid.Identities[1] = invalid.Identities[1], invalid.Identities[0]
 
-		err := transaction.Update(db, store.StoreTx(invalid.ID(), &invalid))
+		err := transaction.Update(db, store.StoreTx(invalid.ID(), invalid))
 		require.Error(t, err)
 
 		invalid = unittest.ProtocolStateFixture(unittest.WithNextEpochProtocolState()).ProtocolStateEntry
 		// swap first and second elements to break canonical order
 		invalid.NextEpochProtocolState.Identities[0], invalid.NextEpochProtocolState.Identities[1] = invalid.NextEpochProtocolState.Identities[1], invalid.NextEpochProtocolState.Identities[0]
 
-		err = transaction.Update(db, store.StoreTx(invalid.ID(), &invalid))
+		err = transaction.Update(db, store.StoreTx(invalid.ID(), invalid))
 		require.Error(t, err)
 	})
 }
@@ -121,7 +121,7 @@ func TestProtocolStateMergeParticipants(t *testing.T) {
 			err = commits.StoreTx(stateEntry.CurrentEpochCommit)(tx)
 			require.NoError(t, err)
 
-			return store.StoreTx(protocolStateID, &stateEntry.ProtocolStateEntry)(tx)
+			return store.StoreTx(protocolStateID, stateEntry.ProtocolStateEntry)(tx)
 		})
 		require.NoError(t, err)
 
@@ -158,7 +158,7 @@ func TestProtocolStateRootSnapshot(t *testing.T) {
 			err = commits.StoreTx(expected.CurrentEpochCommit)(tx)
 			require.NoError(t, err)
 
-			err = store.StoreTx(protocolStateID, &expected.ProtocolStateEntry)(tx)
+			err = store.StoreTx(protocolStateID, expected.ProtocolStateEntry)(tx)
 			require.NoError(t, err)
 			return store.Index(blockID, protocolStateID)(tx)
 		})
