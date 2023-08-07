@@ -231,7 +231,10 @@ func (b *backendScripts) executeScriptOnAvailableArchiveNodes(
 		}
 	}
 	// don't need to distinguish error codes at this point
-	return nil, rpc.ConvertMultiError(errors, "failed to execute script on archive nodes", codes.Internal)
+	if errors.ErrorOrNil() != nil {
+		return nil, rpc.ConvertMultiError(errors, "failed to execute script on archive nodes", codes.Internal)
+	}
+	return nil, status.Errorf(codes.Unavailable, "no archive nodes in address list")
 }
 
 func (b *backendScripts) executeScriptOnAvailableExecutionNodes(
