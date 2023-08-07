@@ -41,7 +41,7 @@ func TestDynamicProtocolStateAdapter(t *testing.T) {
 	t.Run("epoch-status-setup", func(t *testing.T) {
 		entry := unittest.ProtocolStateFixture(unittest.WithNextEpochProtocolState())
 		// cleanup the commit event, so we are in setup phase
-		entry.ProtocolStateEntry.NextEpochProtocolState.CurrentEpochEventIDs.CommitID = flow.ZeroID
+		entry.NextEpochProtocolState.CurrentEpochEventIDs.CommitID = flow.ZeroID
 
 		adapter := inmem.NewDynamicProtocolStateAdapter(entry, globalParams)
 		status := adapter.EpochStatus()
