@@ -19,6 +19,10 @@ type InitialProtocolState interface {
 	// DKG returns information about DKG that was obtained from EpochCommit event.
 	// No errors are expected during normal operations.
 	DKG() (DKG, error)
+	// Entry Returns low-level protocol state entry that was used to initialize this object.
+	// It shouldn't be used by high-level logic, it is useful for some cases such as bootstrapping.
+	// Prefer using other methods to access protocol state.
+	Entry() *flow.ProtocolStateEntry
 }
 
 // DynamicProtocolState extends the InitialProtocolState with data that can change from block to block.
