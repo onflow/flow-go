@@ -51,6 +51,11 @@ func TestInitialProtocolStateAdapter(t *testing.T) {
 			assert.Equal(t, entry.CurrentEpochCommit.DKGParticipantKeys[index], keyShare)
 		}
 	})
+	t.Run("entry", func(t *testing.T) {
+		actualEntry := adapter.Entry()
+		assert.Equal(t, &entry.ProtocolStateEntry, actualEntry, "entry should be equal to the one passed to the constructor")
+		assert.NotSame(t, &entry.ProtocolStateEntry, actualEntry, "entry should be a copy of the one passed to the constructor")
+	})
 }
 
 func WithValidDKG() func(*flow.RichProtocolStateEntry) {
