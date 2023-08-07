@@ -39,7 +39,7 @@ func NewProtocolState(collector module.CacheMetrics,
 			if err != nil {
 				return nil, err
 			}
-			result, err := newRichProtocolStateEntry(protocolStateEntry, epochSetups, epochCommits)
+			result, err := newRichProtocolStateEntry(&protocolStateEntry, epochSetups, epochCommits)
 			if err != nil {
 				return nil, fmt.Errorf("could not create rich protocol state entry: %w", err)
 			}
@@ -121,7 +121,7 @@ func (s *ProtocolState) byBlockID(blockID flow.Identifier) func(*badger.Txn) (*f
 // It queries and fills in epoch setups and commits for previous and current epochs and possibly next epoch.
 // No errors are expected during normal operation.
 func newRichProtocolStateEntry(
-	protocolState flow.ProtocolStateEntry,
+	protocolState *flow.ProtocolStateEntry,
 	setups storage.EpochSetups,
 	commits storage.EpochCommits,
 ) (*flow.RichProtocolStateEntry, error) {

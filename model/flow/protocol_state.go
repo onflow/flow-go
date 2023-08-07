@@ -42,7 +42,7 @@ type ProtocolStateEntry struct {
 //     Identities are sorted in canonical order. Without duplicates. Never nil.
 //   - NextEpochProtocolState is a protocol state for the next epoch. Can be nil.
 type RichProtocolStateEntry struct {
-	ProtocolStateEntry
+	*ProtocolStateEntry
 
 	CurrentEpochSetup   *EpochSetup
 	CurrentEpochCommit  *EpochCommit
@@ -56,7 +56,7 @@ type RichProtocolStateEntry struct {
 // NewRichProtocolStateEntry constructs a rich protocol state entry from a protocol state entry and additional data.
 // No errors are expected during normal operation.
 func NewRichProtocolStateEntry(
-	protocolState ProtocolStateEntry,
+	protocolState *ProtocolStateEntry,
 	previousEpochSetup *EpochSetup,
 	previousEpochCommit *EpochCommit,
 	currentEpochSetup *EpochSetup,
@@ -82,7 +82,7 @@ func NewRichProtocolStateEntry(
 
 	// if next epoch has been already committed, fill in data for it as well.
 	if protocolState.NextEpochProtocolState != nil {
-		nextEpochProtocolState := *protocolState.NextEpochProtocolState
+		nextEpochProtocolState := protocolState.NextEpochProtocolState
 		nextEpochIdentityTable, err := buildIdentityTable(nextEpochProtocolState.Identities, result.CurrentEpochSetup, nextEpochSetup)
 		if err != nil {
 			return nil, fmt.Errorf("could not build next epoch identity table: %w", err)
