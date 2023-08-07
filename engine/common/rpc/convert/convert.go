@@ -1007,7 +1007,7 @@ func ChunkExecutionDataToMessage(data *execution_data.ChunkExecutionData) (
 		events = nil
 	}
 
-	var trieUpdate *entities.TrieUpdate = nil
+	var trieUpdate *entities.TrieUpdate
 	if data.TrieUpdate != nil {
 		update, err := TrieUpdateToMessage(data.TrieUpdate)
 		if err != nil {
