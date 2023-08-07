@@ -2521,6 +2521,48 @@ func ChunkExecutionDataFixture(t *testing.T, minSize int, opts ...func(*executio
 	}
 }
 
+// RootProtocolStateFixture creates a fixture with correctly structured data for root protocol state.
+// This can be useful for testing bootstrap when there is no previous epoch.
+func RootProtocolStateFixture() *flow.RichProtocolStateEntry {
+	currentEpochSetup := EpochSetupFixture(func(setup *flow.EpochSetup) {
+		setup.Counter = 1
+	})
+	currentEpochCommit := EpochCommitFixture(func(commit *flow.EpochCommit) {
+		commit.Counter = currentEpochSetup.Counter
+	})
+
+	allIdentities := currentEpochSetup.Participants
+	var dynamicIdentities flow.DynamicIdentityEntryList
+	for _, identity := range allIdentities {
+		dynamicIdentities = append(dynamicIdentities, &flow.DynamicIdentityEntry{
+			NodeID:  identity.NodeID,
+			Dynamic: identity.DynamicIdentity,
+		})
+	}
+
+	return &flow.RichProtocolStateEntry{
+		ProtocolStateEntry: flow.ProtocolStateEntry{
+			CurrentEpochEventIDs: flow.EventIDs{
+				SetupID:  currentEpochSetup.ID(),
+				CommitID: currentEpochCommit.ID(),
+			},
+			PreviousEpochEventIDs: flow.EventIDs{
+				SetupID:  flow.ZeroID,
+				CommitID: flow.ZeroID,
+			},
+			Identities:                      dynamicIdentities,
+			InvalidStateTransitionAttempted: false,
+			NextEpochProtocolState:          nil,
+		},
+		CurrentEpochSetup:      currentEpochSetup,
+		CurrentEpochCommit:     currentEpochCommit,
+		PreviousEpochSetup:     nil,
+		PreviousEpochCommit:    nil,
+		Identities:             allIdentities,
+		NextEpochProtocolState: nil,
+	}
+}
+
 // ProtocolStateFixture creates a fixture with correctly structured data that passes basic sanity checks.
 // Epoch setup and commit counters are set to match.
 // Identities are constructed from setup events.

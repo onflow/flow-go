@@ -1,5 +1,7 @@
 package flow
 
+import "fmt"
+
 // DynamicIdentityEntry encapsulates nodeID and dynamic portion of identity.
 type DynamicIdentityEntry struct {
 	NodeID  Identifier
@@ -51,6 +53,56 @@ type RichProtocolStateEntry struct {
 	NextEpochProtocolState *RichProtocolStateEntry
 }
 
+// NewRichProtocolStateEntry constructs a rich protocol state entry from a protocol state entry and additional data.
+// No errors are expected during normal operation.
+func NewRichProtocolStateEntry(
+	protocolState ProtocolStateEntry,
+	previousEpochSetup *EpochSetup,
+	previousEpochCommit *EpochCommit,
+	currentEpochSetup *EpochSetup,
+	currentEpochCommit *EpochCommit,
+	nextEpochSetup *EpochSetup,
+	nextEpochCommit *EpochCommit,
+) (*RichProtocolStateEntry, error) {
+	result := &RichProtocolStateEntry{
+		ProtocolStateEntry:     protocolState,
+		CurrentEpochSetup:      currentEpochSetup,
+		CurrentEpochCommit:     currentEpochCommit,
+		PreviousEpochSetup:     previousEpochSetup,
+		PreviousEpochCommit:    previousEpochCommit,
+		Identities:             nil,
+		NextEpochProtocolState: nil,
+	}
+
+	var err error
+	result.Identities, err = buildIdentityTable(protocolState.Identities, result.PreviousEpochSetup, result.CurrentEpochSetup)
+	if err != nil {
+		return nil, fmt.Errorf("could not build identity table: %w", err)
+	}
+
+	// if next epoch has been already committed, fill in data for it as well.
+	if protocolState.NextEpochProtocolState != nil {
+		nextEpochProtocolState := *protocolState.NextEpochProtocolState
+		nextEpochIdentityTable, err := buildIdentityTable(nextEpochProtocolState.Identities, result.CurrentEpochSetup, nextEpochSetup)
+		if err != nil {
+			return nil, fmt.Errorf("could not build next epoch identity table: %w", err)
+		}
+
+		// fill identities for next epoch
+		result.NextEpochProtocolState = &RichProtocolStateEntry{
+			ProtocolStateEntry:     nextEpochProtocolState,
+			CurrentEpochSetup:      nextEpochSetup,
+			CurrentEpochCommit:     nextEpochCommit,
+			PreviousEpochSetup:     result.CurrentEpochSetup,  // previous epoch setup is current epoch setup
+			PreviousEpochCommit:    result.CurrentEpochCommit, // previous epoch setup is current epoch setup
+			Identities:             nextEpochIdentityTable,
+			NextEpochProtocolState: nil, // always nil
+		}
+	}
+
+	return result, nil
+}
+
 // ID returns hash of entry by hashing all fields.
 func (e *ProtocolStateEntry) ID() Identifier {
 	if e == nil {
@@ -82,4 +134,37 @@ func (ll DynamicIdentityEntryList) Sorted(less IdentifierOrder) bool {
 		}
 	}
 	return true
+}
+
+// buildIdentityTable builds identity table for current epoch combining data from previous, current epoch setups and dynamic identities
+// that are stored in protocol state. It also performs sanity checks to make sure that data is consistent.
+// No errors are expected during normal operation.
+func buildIdentityTable(
+	dynamicIdentities DynamicIdentityEntryList,
+	previousEpochSetup, currentEpochSetup *EpochSetup,
+) (IdentityList, error) {
+	var previousEpochParticipants IdentityList
+	if previousEpochSetup != nil {
+		previousEpochParticipants = previousEpochSetup.Participants
+	}
+	// produce a unique set for current and previous epoch participants
+	allEpochParticipants := currentEpochSetup.Participants.Union(previousEpochParticipants)
+	// sanity check: size of identities should be equal to previous and current epoch participants combined
+	if len(allEpochParticipants) != len(dynamicIdentities) {
+		return nil, fmt.Errorf("invalid number of identities in protocol state: expected %d, got %d", len(allEpochParticipants), len(dynamicIdentities))
+	}
+
+	// build full identity table for current epoch
+	var result IdentityList
+	for i, identity := range dynamicIdentities {
+		// sanity check: identities should be sorted in canonical order
+		if identity.NodeID != allEpochParticipants[i].NodeID {
+			return nil, fmt.Errorf("identites in protocol state are not in canonical order: expected %s, got %s", allEpochParticipants[i].NodeID, identity.NodeID)
+		}
+		result = append(result, &Identity{
+			IdentitySkeleton: allEpochParticipants[i].IdentitySkeleton,
+			DynamicIdentity:  identity.Dynamic,
+		})
+	}
+	return result, nil
 }
