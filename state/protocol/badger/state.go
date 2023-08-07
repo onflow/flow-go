@@ -38,8 +38,9 @@ type State struct {
 		setups  storage.EpochSetups
 		commits storage.EpochCommits
 	}
-	protocolState  protocol.ProtocolState
-	versionBeacons storage.VersionBeacons
+	protocolState       storage.ProtocolState
+	protocolStateReader protocol.ProtocolState
+	versionBeacons      storage.VersionBeacons
 
 	// rootHeight marks the cutoff of the history this node knows about. We cache it in the state
 	// because it cannot change over the lifecycle of a protocol state instance. It is frequently
@@ -89,7 +90,7 @@ func Bootstrap(
 	qcs storage.QuorumCertificates,
 	setups storage.EpochSetups,
 	commits storage.EpochCommits,
-	statuses storage.EpochStatuses,
+	protocolState storage.ProtocolState,
 	versionBeacons storage.VersionBeacons,
 	root protocol.Snapshot,
 	options ...BootstrapConfigOptions,
@@ -118,7 +119,7 @@ func Bootstrap(
 		qcs,
 		setups,
 		commits,
-		statuses,
+		protocolState,
 		versionBeacons,
 	)
 
@@ -614,7 +615,7 @@ func OpenState(
 	qcs storage.QuorumCertificates,
 	setups storage.EpochSetups,
 	commits storage.EpochCommits,
-	statuses storage.EpochStatuses,
+	protocolState storage.ProtocolState,
 	versionBeacons storage.VersionBeacons,
 ) (*State, error) {
 	isBootstrapped, err := IsBootstrapped(db)
@@ -634,7 +635,7 @@ func OpenState(
 		qcs,
 		setups,
 		commits,
-		statuses,
+		protocolState,
 		versionBeacons,
 	) // populate the protocol state cache
 	err = state.populateCache()
@@ -747,7 +748,7 @@ func newState(
 	qcs storage.QuorumCertificates,
 	setups storage.EpochSetups,
 	commits storage.EpochCommits,
-	statuses storage.EpochStatuses,
+	protocolState storage.ProtocolState,
 	versionBeacons storage.VersionBeacons,
 ) *State {
 	return &State{
@@ -765,6 +766,7 @@ func newState(
 			setups:  setups,
 			commits: commits,
 		},
+		protocolState:  protocolState,
 		versionBeacons: versionBeacons,
 		cachedFinal:    new(atomic.Pointer[cachedHeader]),
 		cachedSealed:   new(atomic.Pointer[cachedHeader]),

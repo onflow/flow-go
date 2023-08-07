@@ -77,7 +77,7 @@ func RunWithBootstrapState(t testing.TB, rootSnapshot protocol.Snapshot, f func(
 			all.QuorumCertificates,
 			all.Setups,
 			all.EpochCommits,
-			all.Statuses,
+			all.ProtocolState,
 			all.VersionBeacons,
 			rootSnapshot,
 		)
@@ -103,7 +103,7 @@ func RunWithFullProtocolState(t testing.TB, rootSnapshot protocol.Snapshot, f fu
 			all.QuorumCertificates,
 			all.Setups,
 			all.EpochCommits,
-			all.Statuses,
+			all.ProtocolState,
 			all.VersionBeacons,
 			rootSnapshot,
 		)
@@ -111,7 +111,17 @@ func RunWithFullProtocolState(t testing.TB, rootSnapshot protocol.Snapshot, f fu
 		receiptValidator := MockReceiptValidator()
 		sealValidator := MockSealValidator(all.Seals)
 		mockTimer := MockBlockTimer()
-		fullState, err := pbadger.NewFullConsensusState(log, tracer, consumer, state, all.Index, all.Payloads, mockTimer, receiptValidator, sealValidator)
+		fullState, err := pbadger.NewFullConsensusState(
+			log,
+			tracer,
+			consumer,
+			state,
+			all.Index,
+			all.Payloads,
+			mockTimer,
+			receiptValidator,
+			sealValidator,
+		)
 		require.NoError(t, err)
 		f(db, fullState)
 	})
@@ -133,7 +143,7 @@ func RunWithFullProtocolStateAndMetrics(t testing.TB, rootSnapshot protocol.Snap
 			all.QuorumCertificates,
 			all.Setups,
 			all.EpochCommits,
-			all.Statuses,
+			all.ProtocolState,
 			all.VersionBeacons,
 			rootSnapshot,
 		)
@@ -141,7 +151,17 @@ func RunWithFullProtocolStateAndMetrics(t testing.TB, rootSnapshot protocol.Snap
 		receiptValidator := MockReceiptValidator()
 		sealValidator := MockSealValidator(all.Seals)
 		mockTimer := MockBlockTimer()
-		fullState, err := pbadger.NewFullConsensusState(log, tracer, consumer, state, all.Index, all.Payloads, mockTimer, receiptValidator, sealValidator)
+		fullState, err := pbadger.NewFullConsensusState(
+			log,
+			tracer,
+			consumer,
+			state,
+			all.Index,
+			all.Payloads,
+			mockTimer,
+			receiptValidator,
+			sealValidator,
+		)
 		require.NoError(t, err)
 		f(db, fullState)
 	})
@@ -164,14 +184,24 @@ func RunWithFullProtocolStateAndValidator(t testing.TB, rootSnapshot protocol.Sn
 			all.QuorumCertificates,
 			all.Setups,
 			all.EpochCommits,
-			all.Statuses,
+			all.ProtocolState,
 			all.VersionBeacons,
 			rootSnapshot,
 		)
 		require.NoError(t, err)
 		sealValidator := MockSealValidator(all.Seals)
 		mockTimer := MockBlockTimer()
-		fullState, err := pbadger.NewFullConsensusState(log, tracer, consumer, state, all.Index, all.Payloads, mockTimer, validator, sealValidator)
+		fullState, err := pbadger.NewFullConsensusState(
+			log,
+			tracer,
+			consumer,
+			state,
+			all.Index,
+			all.Payloads,
+			mockTimer,
+			validator,
+			sealValidator,
+		)
 		require.NoError(t, err)
 		f(db, fullState)
 	})
@@ -194,13 +224,21 @@ func RunWithFollowerProtocolState(t testing.TB, rootSnapshot protocol.Snapshot, 
 			all.QuorumCertificates,
 			all.Setups,
 			all.EpochCommits,
-			all.Statuses,
+			all.ProtocolState,
 			all.VersionBeacons,
 			rootSnapshot,
 		)
 		require.NoError(t, err)
 		mockTimer := MockBlockTimer()
-		followerState, err := pbadger.NewFollowerState(log, tracer, consumer, state, all.Index, all.Payloads, mockTimer)
+		followerState, err := pbadger.NewFollowerState(
+			log,
+			tracer,
+			consumer,
+			state,
+			all.Index,
+			all.Payloads,
+			mockTimer,
+		)
 		require.NoError(t, err)
 		f(db, followerState)
 	})
@@ -222,7 +260,7 @@ func RunWithFullProtocolStateAndConsumer(t testing.TB, rootSnapshot protocol.Sna
 			all.QuorumCertificates,
 			all.Setups,
 			all.EpochCommits,
-			all.Statuses,
+			all.ProtocolState,
 			all.VersionBeacons,
 			rootSnapshot,
 		)
@@ -230,7 +268,17 @@ func RunWithFullProtocolStateAndConsumer(t testing.TB, rootSnapshot protocol.Sna
 		receiptValidator := MockReceiptValidator()
 		sealValidator := MockSealValidator(all.Seals)
 		mockTimer := MockBlockTimer()
-		fullState, err := pbadger.NewFullConsensusState(log, tracer, consumer, state, all.Index, all.Payloads, mockTimer, receiptValidator, sealValidator)
+		fullState, err := pbadger.NewFullConsensusState(
+			log,
+			tracer,
+			consumer,
+			state,
+			all.Index,
+			all.Payloads,
+			mockTimer,
+			receiptValidator,
+			sealValidator,
+		)
 		require.NoError(t, err)
 		f(db, fullState)
 	})
@@ -251,7 +299,7 @@ func RunWithFullProtocolStateAndMetricsAndConsumer(t testing.TB, rootSnapshot pr
 			all.QuorumCertificates,
 			all.Setups,
 			all.EpochCommits,
-			all.Statuses,
+			all.ProtocolState,
 			all.VersionBeacons,
 			rootSnapshot,
 		)
@@ -259,7 +307,17 @@ func RunWithFullProtocolStateAndMetricsAndConsumer(t testing.TB, rootSnapshot pr
 		receiptValidator := MockReceiptValidator()
 		sealValidator := MockSealValidator(all.Seals)
 		mockTimer := MockBlockTimer()
-		fullState, err := pbadger.NewFullConsensusState(log, tracer, consumer, state, all.Index, all.Payloads, mockTimer, receiptValidator, sealValidator)
+		fullState, err := pbadger.NewFullConsensusState(
+			log,
+			tracer,
+			consumer,
+			state,
+			all.Index,
+			all.Payloads,
+			mockTimer,
+			receiptValidator,
+			sealValidator,
+		)
 		require.NoError(t, err)
 		f(db, fullState)
 	})
@@ -282,13 +340,21 @@ func RunWithFollowerProtocolStateAndHeaders(t testing.TB, rootSnapshot protocol.
 			all.QuorumCertificates,
 			all.Setups,
 			all.EpochCommits,
-			all.Statuses,
+			all.ProtocolState,
 			all.VersionBeacons,
 			rootSnapshot,
 		)
 		require.NoError(t, err)
 		mockTimer := MockBlockTimer()
-		followerState, err := pbadger.NewFollowerState(log, tracer, consumer, state, all.Index, all.Payloads, mockTimer)
+		followerState, err := pbadger.NewFollowerState(
+			log,
+			tracer,
+			consumer,
+			state,
+			all.Index,
+			all.Payloads,
+			mockTimer,
+		)
 		require.NoError(t, err)
 		f(db, followerState, all.Headers, all.Index)
 	})

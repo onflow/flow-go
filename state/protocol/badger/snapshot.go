@@ -85,7 +85,7 @@ func (s *Snapshot) QuorumCertificate() (*flow.QuorumCertificate, error) {
 }
 
 func (s *Snapshot) Phase() (flow.EpochPhase, error) {
-	status, err := s.state.protocolState.AtBlockID(s.blockID)
+	status, err := s.state.protocolStateReader.AtBlockID(s.blockID)
 	if err != nil {
 		return flow.EpochPhaseUndefined, fmt.Errorf("could not retrieve epoch status: %w", err)
 	}
@@ -100,7 +100,7 @@ func (s *Snapshot) Identities(selector flow.IdentityFilter) (flow.IdentityList, 
 	// event here -- this will need revision to support mid-epoch identity changes
 	// once slashing is implemented
 
-	protocolState, err := s.state.protocolState.AtBlockID(s.blockID)
+	protocolState, err := s.state.protocolStateReader.AtBlockID(s.blockID)
 	if err != nil {
 		return nil, err
 	}
@@ -421,7 +421,7 @@ type EpochQuery struct {
 func (q *EpochQuery) Current() protocol.Epoch {
 	// all errors returned from storage reads here are unexpected, because all
 	// snapshots reside within a current epoch, which must be queryable
-	protocolState, err := q.snap.state.protocolState.AtBlockID(q.snap.blockID)
+	protocolState, err := q.snap.state.protocolStateReader.AtBlockID(q.snap.blockID)
 	if err != nil {
 		return invalid.NewEpochf("could not get protocol state at block %x: %w", q.snap.blockID, err)
 	}
@@ -448,7 +448,7 @@ func (q *EpochQuery) Current() protocol.Epoch {
 // Next returns the next epoch, if it is available.
 func (q *EpochQuery) Next() protocol.Epoch {
 
-	protocolState, err := q.snap.state.protocolState.AtBlockID(q.snap.blockID)
+	protocolState, err := q.snap.state.protocolStateReader.AtBlockID(q.snap.blockID)
 	if err != nil {
 		return invalid.NewEpochf("could not get protocol state at block %x: %w", q.snap.blockID, err)
 	}
@@ -487,7 +487,7 @@ func (q *EpochQuery) Next() protocol.Epoch {
 // For all other epochs, returns the previous epoch.
 func (q *EpochQuery) Previous() protocol.Epoch {
 
-	protocolState, err := q.snap.state.protocolState.AtBlockID(q.snap.blockID)
+	protocolState, err := q.snap.state.protocolStateReader.AtBlockID(q.snap.blockID)
 	if err != nil {
 		return invalid.NewEpochf("could not get protocol state at block %x: %w", q.snap.blockID, err)
 	}

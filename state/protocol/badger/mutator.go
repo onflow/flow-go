@@ -38,13 +38,12 @@ import (
 type FollowerState struct {
 	*State
 
-	index           storage.Index
-	payloads        storage.Payloads
-	tracer          module.Tracer
-	logger          zerolog.Logger
-	consumer        protocol.Consumer
-	blockTimer      protocol.BlockTimer
-	protocolStateDB storage.ProtocolState
+	index      storage.Index
+	payloads   storage.Payloads
+	tracer     module.Tracer
+	logger     zerolog.Logger
+	consumer   protocol.Consumer
+	blockTimer protocol.BlockTimer
 }
 
 var _ protocol.FollowerState = (*FollowerState)(nil)
@@ -512,7 +511,7 @@ func (m *FollowerState) insert(ctx context.Context, candidate *flow.Block, certi
 		return fmt.Errorf("could not retrieve block header for %x: %w", parentID, err)
 	}
 
-	parentProtocolState, err := m.protocolStateDB.ByBlockID(candidate.Header.ParentID)
+	parentProtocolState, err := m.protocolState.ByBlockID(candidate.Header.ParentID)
 	if err != nil {
 		return fmt.Errorf("could not retrieve protocol state for block (%v): %w", candidate.Header.ParentID, err)
 	}
@@ -591,14 +590,14 @@ func (m *FollowerState) insert(ctx context.Context, candidate *flow.Block, certi
 		}
 
 		if hasChanges {
-			err := m.protocolStateDB.StoreTx(updatedStateID, updatedState)(tx)
+			err := m.protocolState.StoreTx(updatedStateID, updatedState)(tx)
 			if err != nil {
 				return fmt.Errorf("could not store protocol state (%v): %w", updatedStateID, err)
 			}
 		}
 
 		// TODO: most likely temporary, it can be indexed as part of payload.
-		err = m.protocolStateDB.Index(blockID, updatedStateID)(tx)
+		err = m.protocolState.Index(blockID, updatedStateID)(tx)
 		if err != nil {
 			return fmt.Errorf("could not index protocol state (%v) for block (%v): %w",
 				updatedStateID, blockID, err)
@@ -669,7 +668,7 @@ func (m *FollowerState) Finalize(ctx context.Context, blockID flow.Identifier) e
 
 	// We update metrics and emit protocol events for epoch state changes when
 	// the block corresponding to the state change is finalized
-	protocolState, err := m.protocolState.AtBlockID(blockID)
+	protocolState, err := m.protocolStateReader.AtBlockID(blockID)
 	if err != nil {
 		return fmt.Errorf("could not retrieve protocol state: %w", err)
 	}
