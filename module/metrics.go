@@ -737,6 +737,14 @@ type BackendScriptsMetrics interface {
 
 	// ScriptExecutionErrorOnArchiveNode records script execution failures in Archive Nodes
 	ScriptExecutionErrorOnExecutionNode()
+
+	ScriptExecutionResultMismatch()
+
+	ScriptExecutionResultMatch()
+
+	ScriptExecutionErrorMismatch()
+
+	ScriptExecutionErrorMatch()
 }
 
 type TransactionMetrics interface {

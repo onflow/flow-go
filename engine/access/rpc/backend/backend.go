@@ -100,6 +100,7 @@ func New(
 	log zerolog.Logger,
 	snapshotHistoryLimit int,
 	archiveAddressList []string,
+	scriptExecValidation bool,
 ) *Backend {
 	retry := newRetry()
 	if retryEnabled {
@@ -132,6 +133,7 @@ func New(
 			metrics:            accessMetrics,
 			loggedScripts:      loggedScripts,
 			archiveAddressList: archiveAddressList,
+			scriptExecValidation: scriptExecValidation,
 			archivePorts:       archivePorts,
 		},
 		backendTransactions: backendTransactions{
