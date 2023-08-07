@@ -11,7 +11,7 @@ import (
 
 // TestProtocolStateEntry_Copy tests if the copy method returns a deep copy of the entry. All changes to cpy shouldn't affect the original entry.
 func TestProtocolStateEntry_Copy(t *testing.T) {
-	entry := &unittest.ProtocolStateFixture(unittest.WithNextEpochProtocolState()).ProtocolStateEntry
+	entry := unittest.ProtocolStateFixture(unittest.WithNextEpochProtocolState()).ProtocolStateEntry
 	cpy := entry.Copy()
 	assert.Equal(t, entry, cpy)
 	assert.NotSame(t, entry.NextEpochProtocolState, cpy.NextEpochProtocolState)

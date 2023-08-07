@@ -1,7 +1,9 @@
 package flow
 
-import "sort"
-import "fmt"
+import (
+	"fmt"
+	"sort"
+)
 
 // DynamicIdentityEntry encapsulates nodeID and dynamic portion of identity.
 type DynamicIdentityEntry struct {
