@@ -42,7 +42,7 @@ func TestProtocolStateStorage(t *testing.T) {
 			err = commits.StoreTx(expected.NextEpochProtocolState.CurrentEpochCommit)(tx)
 			require.NoError(t, err)
 
-			err = store.StoreTx(protocolStateID, &expected.ProtocolStateEntry)(tx)
+			err = store.StoreTx(protocolStateID, expected.ProtocolStateEntry)(tx)
 			require.NoError(t, err)
 			return store.Index(blockID, protocolStateID)(tx)
 		})
@@ -76,14 +76,14 @@ func TestProtocolStateStoreInvalidProtocolState(t *testing.T) {
 		// swap first and second elements to break canonical order
 		invalid.Identities[0], invalid.Identities[1] = invalid.Identities[1], invalid.Identities[0]
 
-		err := transaction.Update(db, store.StoreTx(invalid.ID(), &invalid))
+		err := transaction.Update(db, store.StoreTx(invalid.ID(), invalid))
 		require.Error(t, err)
 
 		invalid = unittest.ProtocolStateFixture(unittest.WithNextEpochProtocolState()).ProtocolStateEntry
 		// swap first and second elements to break canonical order
 		invalid.NextEpochProtocolState.Identities[0], invalid.NextEpochProtocolState.Identities[1] = invalid.NextEpochProtocolState.Identities[1], invalid.NextEpochProtocolState.Identities[0]
 
-		err = transaction.Update(db, store.StoreTx(invalid.ID(), &invalid))
+		err = transaction.Update(db, store.StoreTx(invalid.ID(), invalid))
 		require.Error(t, err)
 	})
 }
@@ -121,7 +121,7 @@ func TestProtocolStateMergeParticipants(t *testing.T) {
 			err = commits.StoreTx(stateEntry.CurrentEpochCommit)(tx)
 			require.NoError(t, err)
 
-			return store.StoreTx(protocolStateID, &stateEntry.ProtocolStateEntry)(tx)
+			return store.StoreTx(protocolStateID, stateEntry.ProtocolStateEntry)(tx)
 		})
 		require.NoError(t, err)
 
@@ -137,25 +137,74 @@ func TestProtocolStateMergeParticipants(t *testing.T) {
 	})
 }
 
+// TestProtocolStateRootSnapshot tests that storing and retrieving root protocol state(in case of bootstrap) works as expected.
+func TestProtocolStateRootSnapshot(t *testing.T) {
+	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+		metrics := metrics.NewNoopCollector()
+
+		setups := NewEpochSetups(metrics, db)
+		commits := NewEpochCommits(metrics, db)
+		store := NewProtocolState(metrics, setups, commits, db, DefaultCacheSize)
+		expected := unittest.RootProtocolStateFixture()
+
+		protocolStateID := expected.ID()
+		blockID := unittest.IdentifierFixture()
+
+		// store protocol state and auxiliary info
+		err := transaction.Update(db, func(tx *transaction.Tx) error {
+			// store epoch events to be able to retrieve them later
+			err := setups.StoreTx(expected.CurrentEpochSetup)(tx)
+			require.NoError(t, err)
+			err = commits.StoreTx(expected.CurrentEpochCommit)(tx)
+			require.NoError(t, err)
+
+			err = store.StoreTx(protocolStateID, expected.ProtocolStateEntry)(tx)
+			require.NoError(t, err)
+			return store.Index(blockID, protocolStateID)(tx)
+		})
+		require.NoError(t, err)
+
+		// fetch protocol state
+		actual, err := store.ByID(protocolStateID)
+		require.NoError(t, err)
+		require.Equal(t, expected, actual)
+
+		assertRichProtocolStateValidity(t, actual)
+
+		// fetch protocol state by block ID
+		actualByBlockID, err := store.ByBlockID(blockID)
+		require.NoError(t, err)
+		require.Equal(t, expected, actualByBlockID)
+
+		assertRichProtocolStateValidity(t, actualByBlockID)
+	})
+}
+
 // assertRichProtocolStateValidity checks if RichProtocolState holds its invariant and is correctly populated by storage layer.
 func assertRichProtocolStateValidity(t *testing.T, state *flow.RichProtocolStateEntry) {
 	// invariant: CurrentEpochSetup and CurrentEpochCommit are for the same epoch. Never nil.
 	assert.Equal(t, state.CurrentEpochSetup.Counter, state.CurrentEpochCommit.Counter, "current epoch setup and commit should be for the same epoch")
-	assert.Equal(t, state.CurrentEpochSetup.Counter, state.PreviousEpochSetup.Counter+1, "current epoch setup should be next after previous epoch")
 
 	// invariant: CurrentEpochSetup and CurrentEpochCommit IDs are the equal to the ID of the protocol state entry. Never nil.
 	assert.Equal(t, state.CurrentEpochSetup.ID(), state.ProtocolStateEntry.CurrentEpochEventIDs.SetupID, "epoch setup should be for correct event ID")
 	assert.Equal(t, state.CurrentEpochCommit.ID(), state.ProtocolStateEntry.CurrentEpochEventIDs.CommitID, "epoch commit should be for correct event ID")
 
-	// invariant: PreviousEpochSetup and PreviousEpochCommit are for the same epoch. Never nil.
-	assert.Equal(t, state.PreviousEpochSetup.Counter, state.PreviousEpochCommit.Counter, "previous epoch setup and commit should be for the same epoch")
+	var previousEpochParticipants flow.IdentityList
+	// invariant: PreviousEpochSetup and PreviousEpochCommit should be present if respective ID is not zero.
+	if state.PreviousEpochEventIDs.SetupID != flow.ZeroID {
+		// invariant: PreviousEpochSetup and PreviousEpochCommit are for the same epoch. Never nil.
+		assert.Equal(t, state.CurrentEpochSetup.Counter, state.PreviousEpochSetup.Counter+1, "current epoch setup should be next after previous epoch")
+		assert.Equal(t, state.PreviousEpochSetup.Counter, state.PreviousEpochCommit.Counter, "previous epoch setup and commit should be for the same epoch")
 
-	// invariant: PreviousEpochSetup and PreviousEpochCommit IDs are the equal to the ID of the protocol state entry. Never nil.
-	assert.Equal(t, state.PreviousEpochSetup.ID(), state.ProtocolStateEntry.PreviousEpochEventIDs.SetupID, "epoch setup should be for correct event ID")
-	assert.Equal(t, state.PreviousEpochCommit.ID(), state.ProtocolStateEntry.PreviousEpochEventIDs.CommitID, "epoch commit should be for correct event ID")
+		// invariant: PreviousEpochSetup and PreviousEpochCommit IDs are the equal to the ID of the protocol state entry. Never nil.
+		assert.Equal(t, state.PreviousEpochSetup.ID(), state.ProtocolStateEntry.PreviousEpochEventIDs.SetupID, "epoch setup should be for correct event ID")
+		assert.Equal(t, state.PreviousEpochCommit.ID(), state.ProtocolStateEntry.PreviousEpochEventIDs.CommitID, "epoch commit should be for correct event ID")
+
+		previousEpochParticipants = state.PreviousEpochSetup.Participants
+	}
 
 	// invariant: Identities is a full identity table for the current epoch. Identities are sorted in canonical order. Without duplicates. Never nil.
-	allIdentities := state.CurrentEpochSetup.Participants.Union(state.PreviousEpochSetup.Participants)
+	allIdentities := state.CurrentEpochSetup.Participants.Union(previousEpochParticipants)
 	assert.Equal(t, allIdentities, state.Identities, "identities should be a full identity table for the current epoch, without duplicates")
 
 	for i, identity := range state.ProtocolStateEntry.Identities {
@@ -166,6 +215,7 @@ func assertRichProtocolStateValidity(t *testing.T, state *flow.RichProtocolState
 	if nextEpochState == nil {
 		return
 	}
+
 	// invariant: NextEpochProtocolState is a protocol state for the next epoch. Can be nil.
 	assertRichProtocolStateValidity(t, nextEpochState)
 }

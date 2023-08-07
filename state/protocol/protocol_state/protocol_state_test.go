@@ -16,8 +16,8 @@ import (
 
 // TestProtocolState_AtBlockID
 func TestProtocolState_AtBlockID(t *testing.T) {
-	entry := unittest.ProtocolStateFixture(WithValidDKG())
-	otherEntry := unittest.ProtocolStateFixture(WithValidDKG())
+	entry := unittest.ProtocolStateFixture(unittest.WithValidDKG())
+	otherEntry := unittest.ProtocolStateFixture(unittest.WithValidDKG())
 	blockID := unittest.IdentifierFixture()
 	otherBlockID := unittest.IdentifierFixture()
 
