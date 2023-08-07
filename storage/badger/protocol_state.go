@@ -125,89 +125,56 @@ func newRichProtocolStateEntry(
 	setups storage.EpochSetups,
 	commits storage.EpochCommits,
 ) (*flow.RichProtocolStateEntry, error) {
-	result := &flow.RichProtocolStateEntry{
-		ProtocolStateEntry: protocolState,
+	var (
+		previousEpochSetup  *flow.EpochSetup
+		previousEpochCommit *flow.EpochCommit
+		nextEpochSetup      *flow.EpochSetup
+		nextEpochCommit     *flow.EpochCommit
+		err                 error
+	)
+	// query and fill in epoch setups and commits for previous and current epochs
+	if protocolState.PreviousEpochEventIDs.SetupID != flow.ZeroID {
+		previousEpochSetup, err = setups.ByID(protocolState.PreviousEpochEventIDs.SetupID)
+		if err != nil {
+			return nil, fmt.Errorf("could not retrieve previous epoch setup: %w", err)
+		}
+		previousEpochCommit, err = commits.ByID(protocolState.PreviousEpochEventIDs.CommitID)
+		if err != nil {
+			return nil, fmt.Errorf("could not retrieve previous epoch commit: %w", err)
+		}
 	}
 
-	// query and fill in epoch setups and commits for previous and current epochs
-	var err error
-	result.PreviousEpochSetup, err = setups.ByID(protocolState.PreviousEpochEventIDs.SetupID)
-	if err != nil {
-		return nil, fmt.Errorf("could not retrieve previous epoch setup: %w", err)
-	}
-	result.PreviousEpochCommit, err = commits.ByID(protocolState.PreviousEpochEventIDs.CommitID)
-	if err != nil {
-		return nil, fmt.Errorf("could not retrieve previous epoch commit: %w", err)
-	}
-	result.CurrentEpochSetup, err = setups.ByID(protocolState.CurrentEpochEventIDs.SetupID)
+	currentEpochSetup, err := setups.ByID(protocolState.CurrentEpochEventIDs.SetupID)
 	if err != nil {
 		return nil, fmt.Errorf("could not retrieve current epoch setup: %w", err)
 	}
-	result.CurrentEpochCommit, err = commits.ByID(protocolState.CurrentEpochEventIDs.CommitID)
+	currentEpochCommit, err := commits.ByID(protocolState.CurrentEpochEventIDs.CommitID)
 	if err != nil {
 		return nil, fmt.Errorf("could not retrieve current epoch commit: %w", err)
-	}
-	result.Identities, err = buildIdentityTable(protocolState.Identities, result.PreviousEpochSetup, result.CurrentEpochSetup)
-	if err != nil {
-		return nil, fmt.Errorf("could not build identity table: %w", err)
 	}
 
 	// if next epoch has been already committed, fill in data for it as well.
 	if protocolState.NextEpochProtocolState != nil {
 		nextEpochProtocolState := *protocolState.NextEpochProtocolState
-		nextEpochSetup, err := setups.ByID(nextEpochProtocolState.CurrentEpochEventIDs.SetupID)
+		nextEpochSetup, err = setups.ByID(nextEpochProtocolState.CurrentEpochEventIDs.SetupID)
 		if err != nil {
 			return nil, fmt.Errorf("could not retrieve next epoch setup: %w", err)
 		}
-		nextEpochCommit, err := commits.ByID(nextEpochProtocolState.CurrentEpochEventIDs.CommitID)
-		if err != nil {
-			return nil, fmt.Errorf("could not retrieve next epoch commit: %w", err)
-		}
-		nextEpochIdentityTable, err := buildIdentityTable(nextEpochProtocolState.Identities, result.CurrentEpochSetup, nextEpochSetup)
-		if err != nil {
-			return nil, fmt.Errorf("could not build next epoch identity table: %w", err)
-		}
-
-		// fill identities for next epoch
-		result.NextEpochProtocolState = &flow.RichProtocolStateEntry{
-			ProtocolStateEntry:     nextEpochProtocolState,
-			CurrentEpochSetup:      nextEpochSetup,
-			CurrentEpochCommit:     nextEpochCommit,
-			PreviousEpochSetup:     result.CurrentEpochSetup,  // previous epoch setup is current epoch setup
-			PreviousEpochCommit:    result.CurrentEpochCommit, // previous epoch setup is current epoch setup
-			Identities:             nextEpochIdentityTable,
-			NextEpochProtocolState: nil, // always nil
+		if nextEpochProtocolState.CurrentEpochEventIDs.CommitID != flow.ZeroID {
+			nextEpochCommit, err = commits.ByID(nextEpochProtocolState.CurrentEpochEventIDs.CommitID)
+			if err != nil {
+				return nil, fmt.Errorf("could not retrieve next epoch commit: %w", err)
+			}
 		}
 	}
 
-	return result, nil
-}
-
-// buildIdentityTable builds identity table for current epoch combining data from previous, current epoch setups and dynamic identities
-// that are stored in protocol state. It also performs sanity checks to make sure that data is consistent.
-// No errors are expected during normal operation.
-func buildIdentityTable(
-	dynamicIdentities flow.DynamicIdentityEntryList,
-	previousEpochSetup, currentEpochSetup *flow.EpochSetup,
-) (flow.IdentityList, error) {
-	// produce a unique set for current and previous epoch participants
-	allEpochParticipants := currentEpochSetup.Participants.Union(previousEpochSetup.Participants)
-	// sanity check: size of identities should be equal to previous and current epoch participants combined
-	if len(allEpochParticipants) != len(dynamicIdentities) {
-		return nil, fmt.Errorf("invalid number of identities in protocol state: expected %d, got %d", len(allEpochParticipants), len(dynamicIdentities))
-	}
-
-	// build full identity table for current epoch
-	var result flow.IdentityList
-	for i, identity := range dynamicIdentities {
-		// sanity check: identities should be sorted in canonical order
-		if identity.NodeID != allEpochParticipants[i].NodeID {
-			return nil, fmt.Errorf("identites in protocol state are not in canonical order: expected %s, got %s", allEpochParticipants[i].NodeID, identity.NodeID)
-		}
-		result = append(result, &flow.Identity{
-			IdentitySkeleton: allEpochParticipants[i].IdentitySkeleton,
-			DynamicIdentity:  identity.Dynamic,
-		})
-	}
-	return result, nil
+	return flow.NewRichProtocolStateEntry(
+		protocolState,
+		previousEpochSetup,
+		previousEpochCommit,
+		currentEpochSetup,
+		currentEpochCommit,
+		nextEpochSetup,
+		nextEpochCommit,
+	)
 }

@@ -1,4 +1,4 @@
-package protocol_state
+package inmem_test
 
 import (
 	"testing"
@@ -6,18 +6,19 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/state/protocol/inmem"
 	"github.com/onflow/flow-go/state/protocol/mock"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-// TestDynamicProtocolStateAdapter tests if the dynamicProtocolStateAdapter returns expected values when created
+// TestDynamicProtocolStateAdapter tests if the DynamicProtocolStateAdapter returns expected values when created
 // using constructor passing a RichProtocolStateEntry.
 func TestDynamicProtocolStateAdapter(t *testing.T) {
 	// construct a valid protocol state entry that has semantically correct DKGParticipantKeys
-	entry := unittest.ProtocolStateFixture(WithValidDKG())
+	entry := unittest.ProtocolStateFixture(unittest.WithValidDKG())
 
 	globalParams := mock.NewGlobalParams(t)
-	adapter := newDynamicProtocolStateAdapter(entry, globalParams)
+	adapter := inmem.NewDynamicProtocolStateAdapter(entry, globalParams)
 
 	t.Run("identities", func(t *testing.T) {
 		assert.Equal(t, entry.Identities, adapter.Identities())
@@ -30,7 +31,7 @@ func TestDynamicProtocolStateAdapter(t *testing.T) {
 	})
 	t.Run("epoch-status-staking", func(t *testing.T) {
 		entry := unittest.ProtocolStateFixture()
-		adapter := newDynamicProtocolStateAdapter(entry, globalParams)
+		adapter := inmem.NewDynamicProtocolStateAdapter(entry, globalParams)
 		status := adapter.EpochStatus()
 		assert.Equal(t, entry.PreviousEpochEventIDs, status.PreviousEpoch)
 		assert.Equal(t, entry.CurrentEpochEventIDs, status.CurrentEpoch)
@@ -40,9 +41,9 @@ func TestDynamicProtocolStateAdapter(t *testing.T) {
 	t.Run("epoch-status-setup", func(t *testing.T) {
 		entry := unittest.ProtocolStateFixture(unittest.WithNextEpochProtocolState())
 		// cleanup the commit event, so we are in setup phase
-		entry.NextEpochProtocolState.CurrentEpochEventIDs.CommitID = flow.ZeroID
+		entry.ProtocolStateEntry.NextEpochProtocolState.CurrentEpochEventIDs.CommitID = flow.ZeroID
 
-		adapter := newDynamicProtocolStateAdapter(entry, globalParams)
+		adapter := inmem.NewDynamicProtocolStateAdapter(entry, globalParams)
 		status := adapter.EpochStatus()
 		assert.Equal(t, entry.PreviousEpochEventIDs, status.PreviousEpoch)
 		assert.Equal(t, entry.CurrentEpochEventIDs, status.CurrentEpoch)
@@ -51,7 +52,7 @@ func TestDynamicProtocolStateAdapter(t *testing.T) {
 	})
 	t.Run("epoch-status-commit", func(t *testing.T) {
 		entry := unittest.ProtocolStateFixture(unittest.WithNextEpochProtocolState())
-		adapter := newDynamicProtocolStateAdapter(entry, globalParams)
+		adapter := inmem.NewDynamicProtocolStateAdapter(entry, globalParams)
 		status := adapter.EpochStatus()
 		assert.Equal(t, entry.PreviousEpochEventIDs, status.PreviousEpoch)
 		assert.Equal(t, entry.CurrentEpochEventIDs, status.CurrentEpoch)
@@ -62,7 +63,7 @@ func TestDynamicProtocolStateAdapter(t *testing.T) {
 		entry := unittest.ProtocolStateFixture(func(entry *flow.RichProtocolStateEntry) {
 			entry.InvalidStateTransitionAttempted = true
 		})
-		adapter := newDynamicProtocolStateAdapter(entry, globalParams)
+		adapter := inmem.NewDynamicProtocolStateAdapter(entry, globalParams)
 		status := adapter.EpochStatus()
 		assert.True(t, status.InvalidServiceEventIncorporated)
 	})
