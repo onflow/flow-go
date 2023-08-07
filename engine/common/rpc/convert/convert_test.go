@@ -170,7 +170,7 @@ func TestConvertBlockExecutionData(t *testing.T) {
 		chunk := &execution_data.ChunkExecutionData{
 			Collection: col,
 			Events:     events,
-			TrieUpdate: testutils.TrieUpdateFixture(1, 1, 8),
+			TrieUpdate: testutils.TrieUpdateFixture(5, 1, 8),
 		}
 		size := 1
 

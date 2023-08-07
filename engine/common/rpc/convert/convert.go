@@ -990,6 +990,7 @@ func BlockExecutionDataToMessage(data *execution_data.BlockExecutionData) (
 	}, nil
 }
 
+// ChunkExecutionDataToMessage converts a ChunkExecutionData to a protobuf message
 func ChunkExecutionDataToMessage(data *execution_data.ChunkExecutionData) (
 	*entities.ChunkExecutionData,
 	error,
@@ -1008,35 +1009,11 @@ func ChunkExecutionDataToMessage(data *execution_data.ChunkExecutionData) (
 
 	var trieUpdate *entities.TrieUpdate
 	if data.TrieUpdate != nil {
-		paths := make([][]byte, len(data.TrieUpdate.Paths))
-		for i, path := range data.TrieUpdate.Paths {
-			paths[i] = path[:]
+		update, err := TrieUpdateToMessage(data.TrieUpdate)
+		if err != nil {
+			return nil, err
 		}
-
-		payloads := make([]*entities.Payload, len(data.TrieUpdate.Payloads))
-		for i, payload := range data.TrieUpdate.Payloads {
-			key, err := payload.Key()
-			if err != nil {
-				return nil, err
-			}
-			keyParts := make([]*entities.KeyPart, len(key.KeyParts))
-			for j, keyPart := range key.KeyParts {
-				keyParts[j] = &entities.KeyPart{
-					Type:  uint32(keyPart.Type),
-					Value: keyPart.Value,
-				}
-			}
-			payloads[i] = &entities.Payload{
-				KeyPart: keyParts,
-				Value:   payload.Value(),
-			}
-		}
-
-		trieUpdate = &entities.TrieUpdate{
-			RootHash: data.TrieUpdate.RootHash[:],
-			Paths:    paths,
-			Payloads: payloads,
-		}
+		trieUpdate = update
 	}
 
 	return &entities.ChunkExecutionData{
@@ -1207,6 +1184,39 @@ func MessageToTrieUpdate(m *entities.TrieUpdate) (*ledger.TrieUpdate, error) {
 
 	return &ledger.TrieUpdate{
 		RootHash: rootHash,
+		Paths:    paths,
+		Payloads: payloads,
+	}, nil
+}
+
+// TrieUpdateToMessage converts a TrieUpdate to a protobuf message
+func TrieUpdateToMessage(t *ledger.TrieUpdate) (*entities.TrieUpdate, error) {
+	paths := make([][]byte, len(t.Paths))
+	for i := range t.Paths {
+		paths[i] = t.Paths[i][:]
+	}
+
+	payloads := make([]*entities.Payload, len(t.Payloads))
+	for i, payload := range t.Payloads {
+		key, err := payload.Key()
+		if err != nil {
+			return nil, fmt.Errorf("could not convert payload %d: %w", i, err)
+		}
+		keyParts := make([]*entities.KeyPart, len(key.KeyParts))
+		for j, keyPart := range key.KeyParts {
+			keyParts[j] = &entities.KeyPart{
+				Type:  uint32(keyPart.Type),
+				Value: keyPart.Value,
+			}
+		}
+		payloads[i] = &entities.Payload{
+			KeyPart: keyParts,
+			Value:   payload.Value(),
+		}
+	}
+
+	return &entities.TrieUpdate{
+		RootHash: t.RootHash[:],
 		Paths:    paths,
 		Payloads: payloads,
 	}, nil

@@ -1642,6 +1642,22 @@ func EventFixture(
 	}
 }
 
+func EventsFixture(
+	n int,
+	types ...flow.EventType,
+) []flow.Event {
+	if len(types) == 0 {
+		types = []flow.EventType{"A.0x1.Foo.Bar", "A.0x2.Zoo.Moo", "A.0x3.Goo.Hoo"}
+	}
+
+	events := make([]flow.Event, n)
+	for i := 0; i < n; i++ {
+		events[i] = EventFixture(types[i%len(types)], 0, uint32(i), IdentifierFixture(), 0)
+	}
+
+	return events
+}
+
 func EmulatorRootKey() (*flow.AccountPrivateKey, error) {
 
 	// TODO seems this key literal doesn't decode anymore
@@ -2410,12 +2426,18 @@ func WithChunkEvents(events flow.EventsList) func(*execution_data.ChunkExecution
 	}
 }
 
+func WithTrieUpdate(trieUpdate *ledger.TrieUpdate) func(*execution_data.ChunkExecutionData) {
+	return func(conf *execution_data.ChunkExecutionData) {
+		conf.TrieUpdate = trieUpdate
+	}
+}
+
 func ChunkExecutionDataFixture(t *testing.T, minSize int, opts ...func(*execution_data.ChunkExecutionData)) *execution_data.ChunkExecutionData {
 	collection := CollectionFixture(1)
 	ced := &execution_data.ChunkExecutionData{
 		Collection: &collection,
 		Events:     flow.EventsList{},
-		TrieUpdate: testutils.TrieUpdateFixture(1, 1, 8),
+		TrieUpdate: testutils.TrieUpdateFixture(2, 1, 8),
 	}
 
 	for _, opt := range opts {
