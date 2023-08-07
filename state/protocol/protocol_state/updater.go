@@ -28,9 +28,9 @@ type Updater struct {
 
 var _ protocol.StateUpdater = (*Updater)(nil)
 
-// newUpdater creates a new protocol state updater, when candidate block enters new epoch we will discard
+// NewUpdater creates a new protocol state updater, when candidate block enters new epoch we will discard
 // previous protocol state and move to the next epoch protocol state.
-func newUpdater(candidate *flow.Header, parentState *flow.RichProtocolStateEntry) *Updater {
+func NewUpdater(candidate *flow.Header, parentState *flow.RichProtocolStateEntry) *Updater {
 	updater := &Updater{
 		parentState: parentState,
 		state:       parentState.ProtocolStateEntry.Copy(),

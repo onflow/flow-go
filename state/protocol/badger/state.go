@@ -38,6 +38,7 @@ type State struct {
 		setups  storage.EpochSetups
 		commits storage.EpochCommits
 	}
+	protocolState  protocol.ProtocolState
 	versionBeacons storage.VersionBeacons
 
 	// rootHeight marks the cutoff of the history this node knows about. We cache it in the state
@@ -525,13 +526,15 @@ func (state *State) bootstrapEpoch(epochs protocol.EpochQuery, segment *flow.Sea
 
 		// NOTE: as specified in the godoc, this code assumes that each block
 		// in the sealing segment in within the same phase within the same epoch.
-		for _, block := range segment.AllBlocks() {
-			blockID := block.ID()
-			err = state.epoch.statuses.StoreTx(blockID, status)(tx)
-			if err != nil {
-				return fmt.Errorf("could not store epoch status for block (id=%x): %w", blockID, err)
-			}
-		}
+		// TODO(yuraolex): revisit this case, probably we need to bootstrap protocol state with some information from
+		// the sealing segment.
+		//for _, block := range segment.AllBlocks() {
+		//	blockID := block.ID()
+		//	err = state.epoch.statuses.StoreTx(blockID, status)(tx)
+		//	if err != nil {
+		//		return fmt.Errorf("could not store epoch status for block (id=%x): %w", blockID, err)
+		//	}
+		//}
 
 		return nil
 	}

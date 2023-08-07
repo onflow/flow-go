@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/onflow/flow-go/state/protocol/protocol_state"
 
 	"github.com/dgraph-io/badger/v2"
 	"github.com/rs/zerolog"
@@ -37,14 +38,13 @@ import (
 type FollowerState struct {
 	*State
 
-	index                storage.Index
-	payloads             storage.Payloads
-	tracer               module.Tracer
-	logger               zerolog.Logger
-	consumer             protocol.Consumer
-	blockTimer           protocol.BlockTimer
-	protocolState        protocol.ProtocolState
-	protocolStateMutator protocol.StateMutator
+	index           storage.Index
+	payloads        storage.Payloads
+	tracer          module.Tracer
+	logger          zerolog.Logger
+	consumer        protocol.Consumer
+	blockTimer      protocol.BlockTimer
+	protocolStateDB storage.ProtocolState
 }
 
 var _ protocol.FollowerState = (*FollowerState)(nil)
@@ -512,10 +512,11 @@ func (m *FollowerState) insert(ctx context.Context, candidate *flow.Block, certi
 		return fmt.Errorf("could not retrieve block header for %x: %w", parentID, err)
 	}
 
-	protocolStateUpdater, err := m.protocolStateMutator.CreateUpdater(candidate.Header)
+	parentProtocolState, err := m.protocolStateDB.ByBlockID(candidate.Header.ParentID)
 	if err != nil {
-		return fmt.Errorf("could not create protocol state updater: %w", err)
+		return fmt.Errorf("could not retrieve protocol state for block (%v): %w", candidate.Header.ParentID, err)
 	}
+	protocolStateUpdater := protocol_state.NewUpdater(candidate.Header, parentProtocolState)
 
 	// apply any state changes from service events sealed by this block's parent
 	dbUpdates, err := m.handleEpochServiceEvents(candidate, protocolStateUpdater)
@@ -523,8 +524,11 @@ func (m *FollowerState) insert(ctx context.Context, candidate *flow.Block, certi
 		return fmt.Errorf("could not process service events: %w", err)
 	}
 
-	// TODO(yuraolex): check if updates applied to the protocol state are consistent root state ID
-	// within block payload.
+	updatedState, updatedStateID, hasChanges := protocolStateUpdater.Build()
+	// TODO: check if updatedStateID corresponds to the root protocol state ID stored in payload
+	// if updatedStateID != payload.ProtocolStateID {
+	// 	return state.NewInvalidExtension("invalid protocol state transition detected expected (%x) got %x", payload.ProtocolStateID, updatedStateID)
+	// }
 
 	qc := candidate.Header.QuorumCertificate()
 
@@ -586,10 +590,18 @@ func (m *FollowerState) insert(ctx context.Context, candidate *flow.Block, certi
 			}
 		}
 
-		// commit the updated protocol state
-		err = m.protocolStateMutator.CommitProtocolState(protocolStateUpdater)(tx)
+		if hasChanges {
+			err := m.protocolStateDB.StoreTx(updatedStateID, updatedState)(tx)
+			if err != nil {
+				return fmt.Errorf("could not store protocol state (%v): %w", updatedStateID, err)
+			}
+		}
+
+		// TODO: most likely temporary, it can be indexed as part of payload.
+		err = m.protocolStateDB.Index(blockID, updatedStateID)(tx)
 		if err != nil {
-			return fmt.Errorf("could not commit protocol state: %w", err)
+			return fmt.Errorf("could not index protocol state (%v) for block (%v): %w",
+				updatedStateID, blockID, err)
 		}
 
 		return nil

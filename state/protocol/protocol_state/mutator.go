@@ -32,7 +32,7 @@ func (m *Mutator) CreateUpdater(candidate *flow.Header) (protocol.StateUpdater, 
 	if err != nil {
 		return nil, fmt.Errorf("could not retrieve protocol state for block (%v): %w", candidate.ParentID, err)
 	}
-	return newUpdater(candidate, parentState), nil
+	return NewUpdater(candidate, parentState), nil
 }
 
 // CommitProtocolState commits the protocol state updater as part of DB transaction.
