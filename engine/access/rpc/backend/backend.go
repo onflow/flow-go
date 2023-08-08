@@ -7,11 +7,7 @@ import (
 	"strconv"
 	"time"
 
-	lru "github.com/hashicorp/golang-lru"
-	"github.com/rs/zerolog"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
-
+	lru "github.com/hashicorp/golang-lru/v2"
 	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/cmd/build"
 	"github.com/onflow/flow-go/engine/access/rpc/connection"
@@ -22,8 +18,10 @@ import (
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
-
 	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
+	"github.com/rs/zerolog"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 // minExecutionNodesCnt is the minimum number of execution nodes expected to have sent the execution receipt for a block
@@ -117,7 +115,7 @@ func New(
 		retry.Activate()
 	}
 
-	loggedScripts, err := lru.New(DefaultLoggedScriptsCacheSize)
+	loggedScripts, err := lru.New[[16]byte, time.Time](DefaultLoggedScriptsCacheSize)
 	if err != nil {
 		log.Fatal().Err(err).Msg("failed to initialize script logging cache")
 	}
@@ -225,14 +223,13 @@ func NewCache(
 	log zerolog.Logger,
 	accessMetrics module.AccessMetrics,
 	connectionPoolSize uint,
-) (*lru.Cache, uint, error) {
+) (*lru.Cache[string, *connection.CachedClient], uint, error) {
 
-	var cache *lru.Cache
+	var cache *lru.Cache[string, *connection.CachedClient]
 	cacheSize := connectionPoolSize
 	if cacheSize > 0 {
 		var err error
-		cache, err = lru.NewWithEvict(int(cacheSize), func(_, evictedValue interface{}) {
-			store := evictedValue.(*connection.CachedClient)
+		cache, err = lru.NewWithEvict[string, *connection.CachedClient](int(cacheSize), func(_ string, store *connection.CachedClient) {
 			store.Close()
 			log.Debug().Str("grpc_conn_evicted", store.Address).Msg("closing grpc connection evicted from pool")
 			if accessMetrics != nil {

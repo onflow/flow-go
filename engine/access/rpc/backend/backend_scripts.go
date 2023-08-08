@@ -1,25 +1,23 @@
 package backend
 
 import (
-	"context"
 	"crypto/md5" //nolint:gosec
+	"context"
 	"io"
 	"time"
 
-	lru "github.com/hashicorp/golang-lru"
-	"github.com/onflow/flow/protobuf/go/flow/access"
-
-	execproto "github.com/onflow/flow/protobuf/go/flow/execution"
-	"github.com/rs/zerolog"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
-
+	lru "github.com/hashicorp/golang-lru/v2"
 	"github.com/onflow/flow-go/engine/access/rpc/connection"
 	"github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
+	"github.com/onflow/flow/protobuf/go/flow/access"
+	execproto "github.com/onflow/flow/protobuf/go/flow/execution"
+	"github.com/rs/zerolog"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 // uniqueScriptLoggingTimeWindow is the duration for checking the uniqueness of scripts sent for execution
@@ -32,7 +30,7 @@ type backendScripts struct {
 	connFactory        connection.ConnectionFactory
 	log                zerolog.Logger
 	metrics            module.BackendScriptsMetrics
-	loggedScripts      *lru.Cache
+	loggedScripts      *lru.Cache[[16]byte, time.Time]
 	archiveAddressList []string
 	archivePorts       []uint
 	nodeCommunicator   *NodeCommunicator
@@ -202,14 +200,11 @@ func (b *backendScripts) executeScriptOnExecutor(
 
 // shouldLogScript checks if the script hash is unique in the time window
 func (b *backendScripts) shouldLogScript(execTime time.Time, scriptHash [16]byte) bool {
-	rawTimestamp, seen := b.loggedScripts.Get(scriptHash)
-	if !seen || rawTimestamp == nil {
+	timestamp, seen := b.loggedScripts.Get(scriptHash)
+	if !seen {
 		return true
-	} else {
-		// safe cast
-		timestamp := rawTimestamp.(time.Time)
-		return execTime.Sub(timestamp) >= uniqueScriptLoggingTimeWindow
 	}
+	return execTime.Sub(timestamp) >= uniqueScriptLoggingTimeWindow
 }
 
 func (b *backendScripts) tryExecuteScriptOnExecutionNode(

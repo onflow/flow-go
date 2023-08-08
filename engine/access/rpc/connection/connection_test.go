@@ -4,31 +4,25 @@ import (
 	"context"
 	"fmt"
 	"net"
-	"strconv"
-	"strings"
 	"sync"
 	"testing"
 	"time"
 
-	"github.com/sony/gobreaker"
-
-	"go.uber.org/atomic"
-	"pgregory.net/rapid"
-
-	lru "github.com/hashicorp/golang-lru"
+	lru "github.com/hashicorp/golang-lru/v2"
+	"github.com/onflow/flow-go/module/metrics"
+	"github.com/onflow/flow-go/utils/unittest"
 	"github.com/onflow/flow/protobuf/go/flow/access"
 	"github.com/onflow/flow/protobuf/go/flow/execution"
+	"github.com/sony/gobreaker"
 	"github.com/stretchr/testify/assert"
 	testifymock "github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/atomic"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/connectivity"
 	"google.golang.org/grpc/status"
-
-	"github.com/onflow/flow-go/engine/access/mock"
-	"github.com/onflow/flow-go/module/metrics"
-	"github.com/onflow/flow-go/utils/unittest"
+	"pgregory.net/rapid"
 )
 
 func TestProxyAccessAPI(t *testing.T) {
@@ -129,8 +123,8 @@ func TestProxyAccessAPIConnectionReuse(t *testing.T) {
 	connectionFactory.CollectionGRPCPort = cn.port
 	// set the connection pool cache size
 	cacheSize := 1
-	cache, _ := lru.NewWithEvict(cacheSize, func(_, evictedValue interface{}) {
-		evictedValue.(*CachedClient).Close()
+	cache, _ := lru.NewWithEvict[string, *CachedClient](cacheSize, func(_ string, client *CachedClient) {
+		client.Close()
 	})
 	connectionCache := NewCache(cache, cacheSize)
 
@@ -184,8 +178,8 @@ func TestProxyExecutionAPIConnectionReuse(t *testing.T) {
 	connectionFactory.ExecutionGRPCPort = en.port
 	// set the connection pool cache size
 	cacheSize := 5
-	cache, _ := lru.NewWithEvict(cacheSize, func(_, evictedValue interface{}) {
-		evictedValue.(*CachedClient).Close()
+	cache, _ := lru.NewWithEvict[string, *CachedClient](cacheSize, func(_ string, client *CachedClient) {
+		client.Close()
 	})
 	connectionCache := NewCache(cache, cacheSize)
 	// set metrics reporting
@@ -245,8 +239,8 @@ func TestExecutionNodeClientTimeout(t *testing.T) {
 	connectionFactory.ExecutionNodeGRPCTimeout = timeout
 	// set the connection pool cache size
 	cacheSize := 5
-	cache, _ := lru.NewWithEvict(cacheSize, func(_, evictedValue interface{}) {
-		evictedValue.(*CachedClient).Close()
+	cache, _ := lru.NewWithEvict[string, *CachedClient](cacheSize, func(_ string, client *CachedClient) {
+		client.Close()
 	})
 	connectionCache := NewCache(cache, cacheSize)
 	// set metrics reporting
@@ -294,8 +288,8 @@ func TestCollectionNodeClientTimeout(t *testing.T) {
 	connectionFactory.CollectionNodeGRPCTimeout = timeout
 	// set the connection pool cache size
 	cacheSize := 5
-	cache, _ := lru.NewWithEvict(cacheSize, func(_, evictedValue interface{}) {
-		evictedValue.(*CachedClient).Close()
+	cache, _ := lru.NewWithEvict[string, *CachedClient](cacheSize, func(_ string, client *CachedClient) {
+		client.Close()
 	})
 	connectionCache := NewCache(cache, cacheSize)
 	// set metrics reporting
@@ -343,9 +337,10 @@ func TestConnectionPoolFull(t *testing.T) {
 	connectionFactory.CollectionGRPCPort = cn1.port
 	// set the connection pool cache size
 	cacheSize := 2
-	cache, _ := lru.NewWithEvict(cacheSize, func(_, evictedValue interface{}) {
-		evictedValue.(*CachedClient).Close()
+	cache, _ := lru.NewWithEvict[string, *CachedClient](cacheSize, func(_ string, client *CachedClient) {
+		client.Close()
 	})
+
 	connectionCache := NewCache(cache, cacheSize)
 	// set metrics reporting
 	connectionFactory.AccessMetrics = metrics.NewNoopCollector()
@@ -419,9 +414,10 @@ func TestConnectionPoolStale(t *testing.T) {
 	connectionFactory.CollectionGRPCPort = cn.port
 	// set the connection pool cache size
 	cacheSize := 5
-	cache, _ := lru.NewWithEvict(cacheSize, func(_, evictedValue interface{}) {
-		evictedValue.(*CachedClient).Close()
+	cache, _ := lru.NewWithEvict[string, *CachedClient](cacheSize, func(_ string, client *CachedClient) {
+		client.Close()
 	})
+
 	connectionCache := NewCache(cache, cacheSize)
 	// set metrics reporting
 	connectionFactory.AccessMetrics = metrics.NewNoopCollector()
@@ -508,9 +504,10 @@ func TestExecutionNodeClientClosedGracefully(t *testing.T) {
 		connectionFactory.ExecutionNodeGRPCTimeout = time.Second
 		// set the connection pool cache size
 		cacheSize := 1
-		cache, _ := lru.NewWithEvict(cacheSize, func(_, evictedValue interface{}) {
-			evictedValue.(*CachedClient).Close()
+		cache, _ := lru.NewWithEvict[string, *CachedClient](cacheSize, func(_ string, client *CachedClient) {
+			client.Close()
 		})
+
 		connectionCache := NewCache(cache, cacheSize)
 		// set metrics reporting
 		connectionFactory.AccessMetrics = metrics.NewNoopCollector()
@@ -592,7 +589,7 @@ func TestExecutionEvictingCacheClients(t *testing.T) {
 	connectionFactory.CollectionNodeGRPCTimeout = 5 * time.Second
 	// Set the connection pool cache size
 	cacheSize := 1
-	cache, err := lru.New(cacheSize)
+	cache, err := lru.New[string, *CachedClient](cacheSize)
 	require.NoError(t, err)
 
 	connectionCache := NewCache(cache, cacheSize)
@@ -614,8 +611,7 @@ func TestExecutionEvictingCacheClients(t *testing.T) {
 	ctx := context.Background()
 
 	// Retrieve the cached client from the cache
-	result, _ := cache.Get(clientAddress)
-	cachedClient := result.(*CachedClient)
+	cachedClient, _ := cache.Get(clientAddress)
 
 	// Schedule the invalidation of the access API client after a delay
 	time.AfterFunc(250*time.Millisecond, func() {
@@ -671,7 +667,7 @@ func TestCircuitBreakerExecutionNode(t *testing.T) {
 
 	// Set the connection pool cache size.
 	cacheSize := 1
-	connectionCache, _ := lru.New(cacheSize)
+	connectionCache, _ := lru.New[string, *CachedClient](cacheSize)
 
 	connectionFactory.Manager = NewManager(
 		NewCache(connectionCache, cacheSize),
@@ -755,8 +751,8 @@ func TestCircuitBreakerCollectionNode(t *testing.T) {
 
 	// Set the connection pool cache size.
 	cacheSize := 1
-	connectionCache, _ := lru.New(cacheSize)
 
+	connectionCache, _ := lru.New[string, *CachedClient](cacheSize)
 	connectionFactory.Manager = NewManager(
 		NewCache(connectionCache, cacheSize),
 		unittest.Logger(),
@@ -811,80 +807,4 @@ func TestCircuitBreakerCollectionNode(t *testing.T) {
 	duration, err = callAndMeasurePingDuration()
 	assert.Greater(t, requestTimeout, duration)
 	assert.Equal(t, nil, err)
-}
-
-// node mocks a flow node that runs a GRPC server
-type node struct {
-	server   *grpc.Server
-	listener net.Listener
-	port     uint
-}
-
-func (n *node) setupNode(t *testing.T) {
-	n.server = grpc.NewServer()
-	listener, err := net.Listen("tcp4", unittest.DefaultAddress)
-	assert.NoError(t, err)
-	n.listener = listener
-	assert.Eventually(t, func() bool {
-		return !strings.HasSuffix(listener.Addr().String(), ":0")
-	}, time.Second*4, 10*time.Millisecond)
-
-	_, port, err := net.SplitHostPort(listener.Addr().String())
-	assert.NoError(t, err)
-	portAsUint, err := strconv.ParseUint(port, 10, 32)
-	assert.NoError(t, err)
-	n.port = uint(portAsUint)
-}
-
-func (n *node) start(t *testing.T) {
-	// using a wait group here to ensure the goroutine has started before returning. Otherwise,
-	// there's a race condition where the server is sometimes stopped before it has started
-	wg := sync.WaitGroup{}
-	wg.Add(1)
-	go func() {
-		wg.Done()
-		err := n.server.Serve(n.listener)
-		assert.NoError(t, err)
-	}()
-	unittest.RequireReturnsBefore(t, wg.Wait, 10*time.Millisecond, "could not start goroutine on time")
-}
-
-func (n *node) stop(t *testing.T) {
-	if n.server != nil {
-		n.server.Stop()
-	}
-}
-
-type executionNode struct {
-	node
-	handler *mock.ExecutionAPIServer
-}
-
-func (en *executionNode) start(t *testing.T) {
-	en.setupNode(t)
-	handler := new(mock.ExecutionAPIServer)
-	execution.RegisterExecutionAPIServer(en.server, handler)
-	en.handler = handler
-	en.node.start(t)
-}
-
-func (en *executionNode) stop(t *testing.T) {
-	en.node.stop(t)
-}
-
-type collectionNode struct {
-	node
-	handler *mock.AccessAPIServer
-}
-
-func (cn *collectionNode) start(t *testing.T) {
-	cn.setupNode(t)
-	handler := new(mock.AccessAPIServer)
-	access.RegisterAccessAPIServer(cn.server, handler)
-	cn.handler = handler
-	cn.node.start(t)
-}
-
-func (cn *collectionNode) stop(t *testing.T) {
-	cn.node.stop(t)
 }
