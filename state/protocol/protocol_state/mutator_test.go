@@ -39,8 +39,8 @@ func (s *MutatorSuite) TestCreateUpdaterForUnknownBlock() {
 
 // TestMutatorHappyPathNoChanges tests that Mutator correctly indexes the protocol state when there are no changes.
 func (s *MutatorSuite) TestMutatorHappyPathNoChanges() {
-	candidate := unittest.BlockHeaderFixture()
 	parentState := unittest.ProtocolStateFixture()
+	candidate := unittest.BlockHeaderFixture(unittest.HeaderWithView(parentState.CurrentEpochSetup.FirstView))
 	s.protocolStateDB.On("ByBlockID", candidate.ParentID).Return(parentState, nil)
 	updater, err := s.mutator.CreateUpdater(candidate)
 	require.NoError(s.T(), err)
