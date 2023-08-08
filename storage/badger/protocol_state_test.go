@@ -204,7 +204,13 @@ func assertRichProtocolStateValidity(t *testing.T, state *flow.RichProtocolState
 	}
 
 	// invariant: Identities is a full identity table for the current epoch. Identities are sorted in canonical order. Without duplicates. Never nil.
-	allIdentities := state.CurrentEpochSetup.Participants.Union(previousEpochParticipants)
+	var allIdentities flow.IdentityList
+	if state.NextEpochProtocolState != nil {
+		allIdentities = state.CurrentEpochSetup.Participants.Union(state.NextEpochProtocolState.CurrentEpochSetup.Participants)
+	} else {
+		allIdentities = state.CurrentEpochSetup.Participants.Union(previousEpochParticipants)
+	}
+
 	assert.Equal(t, allIdentities, state.Identities, "identities should be a full identity table for the current epoch, without duplicates")
 
 	for i, identity := range state.ProtocolStateEntry.Identities {
