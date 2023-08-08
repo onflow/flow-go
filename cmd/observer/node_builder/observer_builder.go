@@ -946,6 +946,7 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 			node.Logger,
 			backend.DefaultSnapshotHistoryLimit,
 			backendConfig.ArchiveAddressList,
+			backendConfig.ScriptExecValidation,
 			backendConfig.CircuitBreakerConfig.Enabled)
 
 		observerCollector := metrics.NewObserverCollector()

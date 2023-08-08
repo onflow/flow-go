@@ -158,6 +158,7 @@ func (suite *Suite) RunTest(
 			backend.DefaultSnapshotHistoryLimit,
 			nil,
 			false,
+			false,
 		)
 		handler := access.NewHandler(suite.backend, suite.chainID.Chain(), suite.finalizedHeaderCache, suite.me, access.WithBlockSignerDecoder(suite.signerIndicesDecoder))
 		f(handler, db, all)
@@ -330,6 +331,7 @@ func (suite *Suite) TestSendTransactionToRandomCollectionNode() {
 			suite.log,
 			backend.DefaultSnapshotHistoryLimit,
 			nil,
+			false,
 			false,
 		)
 
@@ -658,6 +660,7 @@ func (suite *Suite) TestGetSealedTransaction() {
 			backend.DefaultSnapshotHistoryLimit,
 			nil,
 			false,
+			false,
 		)
 
 		handler := access.NewHandler(backend, suite.chainID.Chain(), suite.finalizedHeaderCache, suite.me)
@@ -797,6 +800,7 @@ func (suite *Suite) TestGetTransactionResult() {
 			suite.log,
 			backend.DefaultSnapshotHistoryLimit,
 			nil,
+			false,
 			false,
 		)
 
@@ -989,6 +993,7 @@ func (suite *Suite) TestExecuteScript() {
 			suite.log,
 			backend.DefaultSnapshotHistoryLimit,
 			nil,
+			false,
 			false,
 		)
 
