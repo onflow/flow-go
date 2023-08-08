@@ -3,15 +3,14 @@ package backend
 import (
 	"context"
 
-	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
-	"github.com/onflow/flow/protobuf/go/flow/entities"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
-
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/utils/unittest"
+	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
+	"github.com/onflow/flow/protobuf/go/flow/entities"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 // TestHistoricalTransactionResult tests to see if the historical transaction status can be retrieved
@@ -56,6 +55,7 @@ func (suite *Suite) TestHistoricalTransactionResult() {
 		DefaultSnapshotHistoryLimit,
 		nil,
 		NewNodeCommunicator(false),
+		false,
 	)
 
 	// Successfully return the transaction from the historical node
@@ -115,6 +115,7 @@ func (suite *Suite) TestHistoricalTransaction() {
 		DefaultSnapshotHistoryLimit,
 		nil,
 		NewNodeCommunicator(false),
+		false,
 	)
 
 	// Successfully return the transaction from the historical node

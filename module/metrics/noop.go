@@ -199,6 +199,10 @@ func (nc *NoopCollector) RuntimeTransactionProgramsCacheHit()                   
 func (nc *NoopCollector) ScriptExecuted(dur time.Duration, size int)                       {}
 func (nc *NoopCollector) ScriptExecutionErrorOnArchiveNode()                               {}
 func (nc *NoopCollector) ScriptExecutionErrorOnExecutionNode()                             {}
+func (nc *NoopCollector) ScriptExecutionResultMismatch()                                   {}
+func (nc *NoopCollector) ScriptExecutionResultMatch()                                      {}
+func (nc *NoopCollector) ScriptExecutionErrorMismatch()                                    {}
+func (nc *NoopCollector) ScriptExecutionErrorMatch()                                       {}
 func (nc *NoopCollector) TransactionResultFetched(dur time.Duration, size int)             {}
 func (nc *NoopCollector) TransactionReceived(txID flow.Identifier, when time.Time)         {}
 func (nc *NoopCollector) TransactionFinalized(txID flow.Identifier, when time.Time)        {}

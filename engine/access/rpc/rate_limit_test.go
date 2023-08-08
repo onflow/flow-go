@@ -8,18 +8,6 @@ import (
 	"testing"
 	"time"
 
-	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
-	"github.com/rs/zerolog"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
-	"github.com/stretchr/testify/require"
-	"github.com/stretchr/testify/suite"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/credentials"
-	"google.golang.org/grpc/credentials/insecure"
-	"google.golang.org/grpc/status"
-
 	accessmock "github.com/onflow/flow-go/engine/access/mock"
 	"github.com/onflow/flow-go/engine/access/rpc/backend"
 	"github.com/onflow/flow-go/model/flow"
@@ -32,6 +20,17 @@ import (
 	storagemock "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/utils/grpcutils"
 	"github.com/onflow/flow-go/utils/unittest"
+	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
+	"github.com/rs/zerolog"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
+	"github.com/stretchr/testify/suite"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/credentials"
+	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/status"
 )
 
 type RateLimitTestSuite struct {
@@ -147,7 +146,7 @@ func (suite *RateLimitTestSuite) SetupTest() {
 	block := unittest.BlockHeaderFixture()
 	suite.snapshot.On("Head").Return(block, nil)
 
-	backend := backend.New(
+	bnd := backend.New(
 		suite.state,
 		suite.collClient,
 		nil,
@@ -167,7 +166,9 @@ func (suite *RateLimitTestSuite) SetupTest() {
 		suite.log,
 		0,
 		nil,
-		backend.NewNodeCommunicator(false))
+		backend.NewNodeCommunicator(false),
+		false,
+	)
 
 	rpcEngBuilder, err := NewBuilder(
 		suite.log,
@@ -177,8 +178,8 @@ func (suite *RateLimitTestSuite) SetupTest() {
 		suite.metrics,
 		false,
 		suite.me,
-		backend,
-		backend,
+		bnd,
+		bnd,
 		suite.secureGrpcServer,
 		suite.unsecureGrpcServer)
 

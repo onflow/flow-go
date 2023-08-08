@@ -9,11 +9,6 @@ import (
 
 	lru "github.com/hashicorp/golang-lru"
 	lru2 "github.com/hashicorp/golang-lru/v2"
-	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
-	"github.com/rs/zerolog"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
-
 	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/cmd/build"
 	"github.com/onflow/flow-go/engine/access/rpc/connection"
@@ -25,6 +20,10 @@ import (
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/badger"
+	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
+	"github.com/rs/zerolog"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 // minExecutionNodesCnt is the minimum number of execution nodes expected to have sent the execution receipt for a block
@@ -82,13 +81,14 @@ type Backend struct {
 
 // Config defines the configurable options for creating Backend
 type Config struct {
-	ExecutionClientTimeout    time.Duration                   // execution API GRPC client timeout
-	CollectionClientTimeout   time.Duration                   // collection API GRPC client timeout
-	ConnectionPoolSize        uint                            // size of the cache for storing collection and execution connections
-	MaxHeightRange            uint                            // max size of height range requests
-	PreferredExecutionNodeIDs []string                        // preferred list of upstream execution node IDs
-	FixedExecutionNodeIDs     []string                        // fixed list of execution node IDs to choose from if no node ID can be chosen from the PreferredExecutionNodeIDs
-	ArchiveAddressList        []string                        // the archive node address list to send script executions. when configured, script executions will be all sent to the archive node
+	ExecutionClientTimeout    time.Duration // execution API GRPC client timeout
+	CollectionClientTimeout   time.Duration // collection API GRPC client timeout
+	ConnectionPoolSize        uint          // size of the cache for storing collection and execution connections
+	MaxHeightRange            uint          // max size of height range requests
+	PreferredExecutionNodeIDs []string      // preferred list of upstream execution node IDs
+	FixedExecutionNodeIDs     []string      // fixed list of execution node IDs to choose from if no node ID can be chosen from the PreferredExecutionNodeIDs
+	ArchiveAddressList        []string      // the archive node address list to send script executions. when configured, script executions will be all sent to the archive node
+	ScriptExecValidation      bool
 	CircuitBreakerConfig      connection.CircuitBreakerConfig // the configuration for circuit breaker
 }
 
@@ -121,7 +121,9 @@ func New(state protocol.State,
 	log zerolog.Logger,
 	snapshotHistoryLimit int,
 	archiveAddressList []string,
-	communicator Communicator) *Backend {
+	communicator Communicator,
+	scriptExecValidation bool,
+) *Backend {
 	retry := newRetry()
 	if retryEnabled {
 		retry.Activate()
@@ -150,16 +152,17 @@ func New(state protocol.State,
 		state: state,
 		// create the sub-backends
 		backendScripts: backendScripts{
-			headers:            headers,
-			executionReceipts:  executionReceipts,
-			connFactory:        connFactory,
-			state:              state,
-			log:                log,
-			metrics:            accessMetrics,
-			loggedScripts:      loggedScripts,
-			archiveAddressList: archiveAddressList,
-			archivePorts:       archivePorts,
-			nodeCommunicator:   communicator,
+			headers:              headers,
+			executionReceipts:    executionReceipts,
+			connFactory:          connFactory,
+			state:                state,
+			log:                  log,
+			metrics:              accessMetrics,
+			loggedScripts:        loggedScripts,
+			archiveAddressList:   archiveAddressList,
+			archivePorts:         archivePorts,
+			nodeCommunicator:     communicator,
+			scriptExecValidation: scriptExecValidation,
 		},
 		backendTransactions: backendTransactions{
 			staticCollectionRPC:  collectionRPC,

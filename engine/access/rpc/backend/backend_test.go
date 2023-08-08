@@ -7,17 +7,6 @@ import (
 	"testing"
 
 	"github.com/dgraph-io/badger/v2"
-	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
-	entitiesproto "github.com/onflow/flow/protobuf/go/flow/entities"
-	execproto "github.com/onflow/flow/protobuf/go/flow/execution"
-	"github.com/rs/zerolog"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
-	"github.com/stretchr/testify/require"
-	"github.com/stretchr/testify/suite"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
-
 	access "github.com/onflow/flow-go/engine/access/mock"
 	backendmock "github.com/onflow/flow-go/engine/access/rpc/backend/mock"
 	"github.com/onflow/flow-go/engine/access/rpc/connection"
@@ -30,6 +19,16 @@ import (
 	"github.com/onflow/flow-go/storage"
 	storagemock "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/utils/unittest"
+	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
+	entitiesproto "github.com/onflow/flow/protobuf/go/flow/entities"
+	execproto "github.com/onflow/flow/protobuf/go/flow/execution"
+	"github.com/rs/zerolog"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
+	"github.com/stretchr/testify/suite"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 type Suite struct {
@@ -116,6 +115,7 @@ func (suite *Suite) TestPing() {
 		DefaultSnapshotHistoryLimit,
 		nil,
 		NewNodeCommunicator(false),
+		false,
 	)
 
 	err := backend.Ping(context.Background())
@@ -152,6 +152,7 @@ func (suite *Suite) TestGetLatestFinalizedBlockHeader() {
 		DefaultSnapshotHistoryLimit,
 		nil,
 		NewNodeCommunicator(false),
+		false,
 	)
 
 	// query the handler for the latest finalized block
@@ -218,6 +219,7 @@ func (suite *Suite) TestGetLatestProtocolStateSnapshot_NoTransitionSpan() {
 			DefaultSnapshotHistoryLimit,
 			nil,
 			NewNodeCommunicator(false),
+			false,
 		)
 
 		// query the handler for the latest finalized snapshot
@@ -291,6 +293,7 @@ func (suite *Suite) TestGetLatestProtocolStateSnapshot_TransitionSpans() {
 			DefaultSnapshotHistoryLimit,
 			nil,
 			NewNodeCommunicator(false),
+			false,
 		)
 
 		// query the handler for the latest finalized snapshot
@@ -357,6 +360,7 @@ func (suite *Suite) TestGetLatestProtocolStateSnapshot_PhaseTransitionSpan() {
 			DefaultSnapshotHistoryLimit,
 			nil,
 			NewNodeCommunicator(false),
+			false,
 		)
 
 		// query the handler for the latest finalized snapshot
@@ -434,6 +438,7 @@ func (suite *Suite) TestGetLatestProtocolStateSnapshot_EpochTransitionSpan() {
 			DefaultSnapshotHistoryLimit,
 			nil,
 			NewNodeCommunicator(false),
+			false,
 		)
 
 		// query the handler for the latest finalized snapshot
@@ -495,6 +500,7 @@ func (suite *Suite) TestGetLatestProtocolStateSnapshot_HistoryLimit() {
 			snapshotHistoryLimit,
 			nil,
 			NewNodeCommunicator(false),
+			false,
 		)
 
 		// the handler should return a snapshot history limit error
@@ -534,6 +540,7 @@ func (suite *Suite) TestGetLatestSealedBlockHeader() {
 		DefaultSnapshotHistoryLimit,
 		nil,
 		NewNodeCommunicator(false),
+		false,
 	)
 
 	// query the handler for the latest sealed block
@@ -581,6 +588,7 @@ func (suite *Suite) TestGetTransaction() {
 		DefaultSnapshotHistoryLimit,
 		nil,
 		NewNodeCommunicator(false),
+		false,
 	)
 
 	actual, err := backend.GetTransaction(context.Background(), transaction.ID())
@@ -622,6 +630,7 @@ func (suite *Suite) TestGetCollection() {
 		DefaultSnapshotHistoryLimit,
 		nil,
 		NewNodeCommunicator(false),
+		false,
 	)
 
 	actual, err := backend.GetCollectionByID(context.Background(), expected.ID())
@@ -686,6 +695,7 @@ func (suite *Suite) TestGetTransactionResultByIndex() {
 		DefaultSnapshotHistoryLimit,
 		nil,
 		NewNodeCommunicator(false),
+		false,
 	)
 	suite.execClient.
 		On("GetTransactionResultByIndex", ctx, exeEventReq).
@@ -750,6 +760,7 @@ func (suite *Suite) TestGetTransactionResultsByBlockID() {
 		DefaultSnapshotHistoryLimit,
 		nil,
 		NewNodeCommunicator(false),
+		false,
 	)
 	suite.execClient.
 		On("GetTransactionResultsByBlockID", ctx, exeEventReq).
@@ -842,6 +853,7 @@ func (suite *Suite) TestTransactionStatusTransition() {
 		DefaultSnapshotHistoryLimit,
 		nil,
 		NewNodeCommunicator(false),
+		false,
 	)
 
 	// Successfully return empty event list
@@ -963,6 +975,7 @@ func (suite *Suite) TestTransactionExpiredStatusTransition() {
 		DefaultSnapshotHistoryLimit,
 		nil,
 		NewNodeCommunicator(false),
+		false,
 	)
 
 	// should return pending status when we have not observed an expiry block
@@ -1131,6 +1144,7 @@ func (suite *Suite) TestTransactionPendingToFinalizedStatusTransition() {
 		DefaultSnapshotHistoryLimit,
 		nil,
 		NewNodeCommunicator(false),
+		false,
 	)
 
 	preferredENIdentifiers = flow.IdentifierList{receipts[0].ExecutorID}
@@ -1190,6 +1204,7 @@ func (suite *Suite) TestTransactionResultUnknown() {
 		DefaultSnapshotHistoryLimit,
 		nil,
 		NewNodeCommunicator(false),
+		false,
 	)
 
 	// first call - when block under test is greater height than the sealed head, but execution node does not know about Tx
@@ -1245,6 +1260,7 @@ func (suite *Suite) TestGetLatestFinalizedBlock() {
 		DefaultSnapshotHistoryLimit,
 		nil,
 		NewNodeCommunicator(false),
+		false,
 	)
 
 	// query the handler for the latest finalized header
@@ -1376,6 +1392,7 @@ func (suite *Suite) TestGetEventsForBlockIDs() {
 			DefaultSnapshotHistoryLimit,
 			nil,
 			NewNodeCommunicator(false),
+			false,
 		)
 
 		// execute request
@@ -1409,6 +1426,7 @@ func (suite *Suite) TestGetEventsForBlockIDs() {
 			DefaultSnapshotHistoryLimit,
 			nil,
 			NewNodeCommunicator(false),
+			false,
 		)
 
 		// execute request with an empty block id list and expect an empty list of events and no error
@@ -1469,6 +1487,7 @@ func (suite *Suite) TestGetExecutionResultByID() {
 			DefaultSnapshotHistoryLimit,
 			nil,
 			NewNodeCommunicator(false),
+			false,
 		)
 
 		// execute request
@@ -1500,6 +1519,7 @@ func (suite *Suite) TestGetExecutionResultByID() {
 			DefaultSnapshotHistoryLimit,
 			nil,
 			NewNodeCommunicator(false),
+			false,
 		)
 
 		// execute request
@@ -1564,6 +1584,7 @@ func (suite *Suite) TestGetExecutionResultByBlockID() {
 			DefaultSnapshotHistoryLimit,
 			nil,
 			NewNodeCommunicator(false),
+			false,
 		)
 
 		// execute request
@@ -1595,6 +1616,7 @@ func (suite *Suite) TestGetExecutionResultByBlockID() {
 			suite.log,
 			DefaultSnapshotHistoryLimit,
 			nil,
+			NewNodeCommunicator(false),
 			false,
 		)
 
@@ -1747,6 +1769,7 @@ func (suite *Suite) TestGetEventsForHeightRange() {
 			DefaultSnapshotHistoryLimit,
 			nil,
 			NewNodeCommunicator(false),
+			false,
 		)
 
 		_, err := backend.GetEventsForHeightRange(ctx, string(flow.EventAccountCreated), maxHeight, minHeight)
@@ -1787,6 +1810,7 @@ func (suite *Suite) TestGetEventsForHeightRange() {
 			DefaultSnapshotHistoryLimit,
 			nil,
 			NewNodeCommunicator(false),
+			false,
 		)
 
 		// execute request
@@ -1826,6 +1850,7 @@ func (suite *Suite) TestGetEventsForHeightRange() {
 			DefaultSnapshotHistoryLimit,
 			nil,
 			NewNodeCommunicator(false),
+			false,
 		)
 
 		actualResp, err := backend.GetEventsForHeightRange(ctx, string(flow.EventAccountCreated), minHeight, maxHeight)
@@ -1864,6 +1889,7 @@ func (suite *Suite) TestGetEventsForHeightRange() {
 			DefaultSnapshotHistoryLimit,
 			nil,
 			NewNodeCommunicator(false),
+			false,
 		)
 
 		_, err := backend.GetEventsForHeightRange(ctx, string(flow.EventAccountCreated), minHeight, minHeight+1)
@@ -1902,6 +1928,7 @@ func (suite *Suite) TestGetEventsForHeightRange() {
 			DefaultSnapshotHistoryLimit,
 			nil,
 			NewNodeCommunicator(false),
+			false,
 		)
 
 		_, err := backend.GetEventsForHeightRange(ctx, string(flow.EventAccountCreated), minHeight, maxHeight)
@@ -1980,6 +2007,7 @@ func (suite *Suite) TestGetAccount() {
 		DefaultSnapshotHistoryLimit,
 		nil,
 		NewNodeCommunicator(false),
+		false,
 	)
 
 	preferredENIdentifiers = flow.IdentifierList{receipts[0].ExecutorID}
@@ -2062,6 +2090,7 @@ func (suite *Suite) TestGetAccountAtBlockHeight() {
 		DefaultSnapshotHistoryLimit,
 		nil,
 		NewNodeCommunicator(false),
+		false,
 	)
 
 	preferredENIdentifiers = flow.IdentifierList{receipts[0].ExecutorID}
@@ -2102,6 +2131,7 @@ func (suite *Suite) TestGetNetworkParameters() {
 		DefaultSnapshotHistoryLimit,
 		nil,
 		NewNodeCommunicator(false),
+		false,
 	)
 
 	params := backend.GetNetworkParameters(context.Background())
@@ -2305,6 +2335,7 @@ func (suite *Suite) TestExecuteScriptOnExecutionNode() {
 		DefaultSnapshotHistoryLimit,
 		nil,
 		NewNodeCommunicator(false),
+		false,
 	)
 
 	// mock parameters
@@ -2382,6 +2413,7 @@ func (suite *Suite) TestExecuteScriptOnArchiveNode() {
 		DefaultSnapshotHistoryLimit,
 		[]string{fullArchiveAddress},
 		NewNodeCommunicator(false),
+		false,
 	)
 
 	// mock parameters
@@ -2428,6 +2460,124 @@ func (suite *Suite) TestExecuteScriptOnArchiveNode() {
 		suite.archiveClient.AssertExpectations(suite.T())
 		suite.Require().Error(err)
 		suite.Require().Equal(status.Code(err), codes.Internal)
+	})
+}
+
+// TestExecuteScriptOnArchiveNode tests the method backend.scripts.executeScriptOnArchiveNode for script execution
+func (suite *Suite) TestScriptExecutionValidationMode() {
+
+	// create a mock connection factory
+	var mockPort uint = 9000
+	connFactory := new(backendmock.ConnectionFactory)
+	connFactory.On("GetAccessAPIClientWithPort", mock.Anything, mockPort).Return(suite.archiveClient, &mockCloser{}, nil)
+	connFactory.On("GetExecutionAPIClient", mock.Anything).Return(suite.execClient, &mockCloser{}, nil)
+	connFactory.On("InvalidateAccessAPIClient", mock.Anything)
+	archiveNode := unittest.IdentityFixture(unittest.WithRole(flow.RoleAccess))
+	fullArchiveAddress := archiveNode.Address + ":" + strconv.FormatUint(uint64(mockPort), 10)
+	// create the handler with the mock
+	backend := New(
+		suite.state,
+		nil,
+		nil,
+		nil,
+		suite.headers,
+		nil,
+		nil,
+		suite.receipts,
+		suite.results,
+		flow.Mainnet,
+		metrics.NewNoopCollector(),
+		connFactory, // the connection factory should be used to get the execution node client
+		false,
+		DefaultMaxHeightRange,
+		nil,
+		nil,
+		suite.log,
+		DefaultSnapshotHistoryLimit,
+		[]string{fullArchiveAddress},
+		NewNodeCommunicator(true),
+		false,
+	)
+
+	// mock parameters
+	ctx := context.Background()
+	block := unittest.BlockFixture()
+	blockID := block.ID()
+	_, ids := suite.setupReceipts(&block)
+	suite.state.On("Final").Return(suite.snapshot, nil).Maybe()
+	suite.snapshot.On("Identities", mock.Anything).Return(ids, nil)
+	suite.state.On("AtBlockID", mock.Anything).Return(suite.snapshot)
+
+	script := []byte("dummy script")
+	arguments := [][]byte(nil)
+	archiveRes := &accessproto.ExecuteScriptResponse{Value: []byte{4, 5, 6}}
+	archiveReq := &accessproto.ExecuteScriptAtBlockIDRequest{
+		BlockId:   blockID[:],
+		Script:    script,
+		Arguments: arguments}
+
+	archiveBlockUnavailableErr := status.Error(codes.NotFound, "placeholder block error")
+	archiveCadenceErr := status.Error(codes.InvalidArgument, "placeholder cadence error")
+	internalErr := status.Error(codes.Internal, "placeholder internal error")
+
+	execReq := &execproto.ExecuteScriptAtBlockIDRequest{
+		BlockId:   blockID[:],
+		Script:    script,
+		Arguments: arguments}
+	matchingExecRes := &execproto.ExecuteScriptAtBlockIDResponse{Value: []byte{4, 5, 6}}
+	mismatchingExecRes := &execproto.ExecuteScriptAtBlockIDResponse{Value: []byte{1, 2, 3}}
+
+	suite.Run("happy path script execution success both en and rn return responses", func() {
+		suite.archiveClient.On("ExecuteScriptAtBlockID", ctx, archiveReq).Return(archiveRes, nil).Once()
+		suite.execClient.On("ExecuteScriptAtBlockID", ctx, execReq).Return(matchingExecRes, nil).Once()
+		res, err := backend.executeScriptOnExecutor(ctx, blockID, script, arguments)
+		suite.archiveClient.AssertExpectations(suite.T())
+		suite.checkResponse(res, err)
+		assert.Equal(suite.T(), res, matchingExecRes.Value)
+	})
+
+	suite.Run("script execution success but mismatching responses", func() {
+		suite.archiveClient.On("ExecuteScriptAtBlockID", ctx, archiveReq).Return(archiveRes, nil).Once()
+		suite.execClient.On("ExecuteScriptAtBlockID", ctx, execReq).Return(mismatchingExecRes, nil).Once()
+		res, err := backend.executeScriptOnExecutor(ctx, blockID, script, arguments)
+		suite.archiveClient.AssertExpectations(suite.T())
+		suite.checkResponse(res, err)
+		suite.Require().Equal(res, mismatchingExecRes.Value)
+	})
+
+	suite.Run("script execution failure on both nodes", func() {
+		suite.archiveClient.On("ExecuteScriptAtBlockID", ctx, archiveReq).Return(nil, archiveCadenceErr).Once()
+		suite.execClient.On("ExecuteScriptAtBlockID", ctx, execReq).Return(nil, archiveCadenceErr).Once()
+		_, err := backend.executeScriptOnExecutor(ctx, blockID, script, arguments)
+		suite.archiveClient.AssertExpectations(suite.T())
+		suite.Require().Error(err)
+		suite.Require().Equal(status.Code(err), codes.InvalidArgument)
+	})
+
+	suite.Run("script execution failure on rn but not en", func() {
+		suite.archiveClient.On("ExecuteScriptAtBlockID", ctx, archiveReq).Return(
+			nil, archiveCadenceErr).Once()
+		suite.execClient.On("ExecuteScriptAtBlockID", ctx, execReq).Return(matchingExecRes, nil).Once()
+		_, err := backend.executeScriptOnExecutor(ctx, blockID, script, arguments)
+		suite.Require().NoError(err)
+		suite.archiveClient.AssertExpectations(suite.T())
+	})
+
+	suite.Run("block not found on rn", func() {
+		suite.archiveClient.On("ExecuteScriptAtBlockID", ctx, archiveReq).Return(
+			nil, archiveBlockUnavailableErr).Once()
+		suite.execClient.On("ExecuteScriptAtBlockID", ctx, execReq).Return(matchingExecRes, nil).Once()
+		_, err := backend.ExecuteScriptAtBlockID(ctx, blockID, script, arguments)
+		suite.Require().NoError(err)
+		suite.archiveClient.AssertExpectations(suite.T())
+	})
+
+	suite.Run("block not found on en", func() {
+		suite.execClient.On("ExecuteScriptAtBlockID", ctx, execReq).Return(nil, internalErr).
+			Times(int(ids.Count()))
+		_, err := backend.ExecuteScriptAtBlockID(ctx, blockID, script, arguments)
+		suite.archiveClient.AssertExpectations(suite.T())
+		suite.Require().Error(err)
 	})
 }
 

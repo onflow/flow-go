@@ -7,16 +7,6 @@ import (
 	"testing"
 	"time"
 
-	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
-	executiondataproto "github.com/onflow/flow/protobuf/go/flow/executiondata"
-	"github.com/rs/zerolog"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
-	"github.com/stretchr/testify/suite"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials"
-	"google.golang.org/grpc/credentials/insecure"
-
 	"github.com/onflow/flow-go/engine"
 	accessmock "github.com/onflow/flow-go/engine/access/mock"
 	"github.com/onflow/flow-go/engine/access/rpc"
@@ -37,6 +27,15 @@ import (
 	storagemock "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/utils/grpcutils"
 	"github.com/onflow/flow-go/utils/unittest"
+	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
+	executiondataproto "github.com/onflow/flow/protobuf/go/flow/executiondata"
+	"github.com/rs/zerolog"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/suite"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials"
+	"google.golang.org/grpc/credentials/insecure"
 )
 
 // SameGRPCPortTestSuite verifies both AccessAPI and ExecutionDataAPI client continue to work when configured
@@ -186,7 +185,9 @@ func (suite *SameGRPCPortTestSuite) SetupTest() {
 		suite.log,
 		0,
 		nil,
-		backend.NewNodeCommunicator(false))
+		backend.NewNodeCommunicator(false),
+		false,
+	)
 
 	// create rpc engine builder
 	rpcEngBuilder, err := rpc.NewBuilder(

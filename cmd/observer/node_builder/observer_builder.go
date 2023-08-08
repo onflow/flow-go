@@ -13,9 +13,6 @@ import (
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/routing"
-	"github.com/rs/zerolog"
-	"github.com/spf13/pflag"
-
 	"github.com/onflow/flow-go/cmd"
 	"github.com/onflow/flow-go/consensus"
 	"github.com/onflow/flow-go/consensus/hotstuff"
@@ -73,6 +70,8 @@ import (
 	"github.com/onflow/flow-go/state/protocol/events/gadgets"
 	"github.com/onflow/flow-go/utils/grpcutils"
 	"github.com/onflow/flow-go/utils/io"
+	"github.com/rs/zerolog"
+	"github.com/spf13/pflag"
 )
 
 // ObserverBuilder extends cmd.NodeBuilder and declares additional functions needed to bootstrap an Access node
@@ -946,7 +945,8 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 			node.Logger,
 			backend.DefaultSnapshotHistoryLimit,
 			backendConfig.ArchiveAddressList,
-			backend.NewNodeCommunicator(backendConfig.CircuitBreakerConfig.Enabled))
+			backend.NewNodeCommunicator(backendConfig.CircuitBreakerConfig.Enabled),
+			backendConfig.ScriptExecValidation)
 
 		observerCollector := metrics.NewObserverCollector()
 		restHandler, err := restapiproxy.NewRestProxyHandler(

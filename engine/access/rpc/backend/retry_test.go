@@ -3,17 +3,16 @@ package backend
 import (
 	"context"
 
-	"github.com/onflow/flow/protobuf/go/flow/access"
-	"github.com/onflow/flow/protobuf/go/flow/execution"
-	"github.com/stretchr/testify/mock"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
-
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
 	protocol "github.com/onflow/flow-go/state/protocol/mock"
 	realstorage "github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/utils/unittest"
+	"github.com/onflow/flow/protobuf/go/flow/access"
+	"github.com/onflow/flow/protobuf/go/flow/execution"
+	"github.com/stretchr/testify/mock"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 // TestTransactionRetry tests that the retry mechanism will send retries at specific times
@@ -61,6 +60,7 @@ func (suite *Suite) TestTransactionRetry() {
 		DefaultSnapshotHistoryLimit,
 		nil,
 		NewNodeCommunicator(false),
+		false,
 	)
 	retry := newRetry().SetBackend(backend).Activate()
 	backend.retry = retry
@@ -151,6 +151,7 @@ func (suite *Suite) TestSuccessfulTransactionsDontRetry() {
 		DefaultSnapshotHistoryLimit,
 		nil,
 		NewNodeCommunicator(false),
+		false,
 	)
 	retry := newRetry().SetBackend(backend).Activate()
 	backend.retry = retry
