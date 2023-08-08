@@ -189,7 +189,9 @@ func (suite *SameGRPCPortTestSuite) SetupTest() {
 		suite.log,
 		0,
 		nil,
-		false)
+		false,
+		false,
+	)
 
 	// create rpc engine builder
 	rpcEngBuilder, err := rpc.NewBuilder(
