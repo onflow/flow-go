@@ -46,11 +46,11 @@ func TestIndexStoreRetrieveCompaction(t *testing.T) {
 		require.NoError(t, os.RemoveAll(dbDir))
 	}()
 
-	opts := badger.
-		DefaultOptions(dbDir).
-		WithKeepL0InMemory(true).
-		WithLogger(nil)
-	db, err := badger.Open(opts)
+	// create database without compression
+	compressed := badgerstorage.BadgerOptions(dbDir, nil)
+
+	nocompression := compressed.WithCompression(options.None)
+	db, err := badger.Open(nocompression)
 	require.NoError(t, err)
 
 	metrics := metrics.NewNoopCollector()
@@ -74,11 +74,6 @@ func TestIndexStoreRetrieveCompaction(t *testing.T) {
 	require.NoError(t, db.Close())
 
 	// reopen the database with compression
-	compressed := badger.
-		DefaultOptions(dbDir).
-		WithCompression(options.Snappy).
-		WithKeepL0InMemory(true).
-		WithLogger(nil)
 	cdb, err := badger.Open(compressed)
 	require.NoError(t, err)
 

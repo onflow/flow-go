@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/dgraph-io/badger/v2"
+	"github.com/dgraph-io/badger/v2/options"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -319,7 +320,10 @@ func badgerDB(t testing.TB, dir string, create func(badger.Options) (*badger.DB,
 	opts := badger.
 		DefaultOptions(dir).
 		WithKeepL0InMemory(true).
-		WithLogger(nil)
+		WithLogger(nil).
+		WithCompression(options.Snappy).
+		WithValueLogFileSize(128 << 23).
+		WithValueLogMaxEntries(100_000) // Default is 1_000_000
 	db, err := create(opts)
 	require.NoError(t, err)
 	return db
