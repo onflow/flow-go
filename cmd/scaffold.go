@@ -870,7 +870,6 @@ func (fnb *FlowNodeBuilder) initDB() error {
 		DefaultOptions(fnb.BaseConfig.datadir).
 		WithKeepL0InMemory(true).
 		WithCompression(options.Snappy). // turn on snappy compression
-		// WithCompression(options.ZSTD). // TODO: to benchmark with Snappy, and pick a better one
 		WithLogger(log).
 
 		// the ValueLogFileSize option specifies how big the value of a
