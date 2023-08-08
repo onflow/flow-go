@@ -17,6 +17,7 @@ type EncodableSnapshot struct {
 	Phase               flow.EpochPhase
 	Epochs              EncodableEpochs
 	Params              EncodableParams
+	ProtocolState       *flow.ProtocolStateEntry
 	SealedVersionBeacon *flow.SealedVersionBeacon
 }
 

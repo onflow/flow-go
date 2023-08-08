@@ -5,6 +5,7 @@ package badger
 import (
 	"errors"
 	"fmt"
+	"github.com/onflow/flow-go/state/protocol/protocol_state"
 	"sync/atomic"
 
 	"github.com/dgraph-io/badger/v2"
@@ -109,6 +110,7 @@ func Bootstrap(
 		return nil, fmt.Errorf("expected empty database")
 	}
 
+	protocolStateReader := protocol_state.NewProtocolState(protocolState, root.Params())
 	state := newState(
 		metrics,
 		db,
@@ -120,6 +122,7 @@ func Bootstrap(
 		setups,
 		commits,
 		protocolState,
+		protocolStateReader,
 		versionBeacons,
 	)
 
@@ -190,6 +193,20 @@ func Bootstrap(
 		state.metrics.FinalizedHeight(lastFinalized.Header.Height)
 		for _, block := range segment.Blocks {
 			state.metrics.BlockFinalized(block)
+		}
+
+		rootProtocolState, err := root.ProtocolState()
+		if err != nil {
+			return fmt.Errorf("could not get root protocol state: %w", err)
+		}
+		rootProtocolStateEntry := rootProtocolState.Entry()
+		err = protocolState.StoreTx(rootProtocolStateEntry.ID(), rootProtocolStateEntry)(tx)
+		if err != nil {
+			return fmt.Errorf("could not insert root protocol state: %w", err)
+		}
+		err = protocolState.Index(lastFinalized.ID(), rootProtocolStateEntry.ID())(tx)
+		if err != nil {
+			return fmt.Errorf("could not index root protocol state: %w", err)
 		}
 
 		// 7) initialize version beacon
@@ -625,6 +642,11 @@ func OpenState(
 	if !isBootstrapped {
 		return nil, fmt.Errorf("expected database to contain bootstrapped state")
 	}
+	globalParams, err := ReadGlobalParams(db, headers)
+	if err != nil {
+		return nil, fmt.Errorf("could not read global params")
+	}
+	protocolStateReader := protocol_state.NewProtocolState(protocolState, globalParams)
 	state := newState(
 		metrics,
 		db,
@@ -636,6 +658,7 @@ func OpenState(
 		setups,
 		commits,
 		protocolState,
+		protocolStateReader,
 		versionBeacons,
 	) // populate the protocol state cache
 	err = state.populateCache()
@@ -667,12 +690,8 @@ func OpenState(
 }
 
 func (state *State) Params() protocol.Params {
-	globalParams, err := ReadGlobalParams(state)
-	if err != nil {
-		panic("failed to read global params: " + err.Error())
-	}
 	return Params{
-		GlobalParams: globalParams,
+		GlobalParams: state.protocolStateReader.GlobalParams(),
 		state:        state,
 	}
 }
@@ -749,6 +768,7 @@ func newState(
 	setups storage.EpochSetups,
 	commits storage.EpochCommits,
 	protocolState storage.ProtocolState,
+	protocolStateReader protocol.ProtocolState,
 	versionBeacons storage.VersionBeacons,
 ) *State {
 	return &State{
@@ -766,10 +786,11 @@ func newState(
 			setups:  setups,
 			commits: commits,
 		},
-		protocolState:  protocolState,
-		versionBeacons: versionBeacons,
-		cachedFinal:    new(atomic.Pointer[cachedHeader]),
-		cachedSealed:   new(atomic.Pointer[cachedHeader]),
+		protocolState:       protocolState,
+		protocolStateReader: protocolStateReader,
+		versionBeacons:      versionBeacons,
+		cachedFinal:         new(atomic.Pointer[cachedHeader]),
+		cachedSealed:        new(atomic.Pointer[cachedHeader]),
 	}
 }
 

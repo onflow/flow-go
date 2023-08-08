@@ -1,6 +1,8 @@
 package inmem
 
 import (
+	"errors"
+	"fmt"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/state/protocol"
@@ -73,7 +75,62 @@ func (s Snapshot) Encodable() EncodableSnapshot {
 }
 
 func (s Snapshot) ProtocolState() (protocol.DynamicProtocolState, error) {
-	panic("not implemented")
+	epochs := s.Epochs()
+	previous := epochs.Previous()
+	current := epochs.Current()
+	next := epochs.Next()
+	var (
+		err                                                      error
+		previousEpochSetup, currentEpochSetup, nextEpochSetup    *flow.EpochSetup
+		previousEpochCommit, currentEpochCommit, nextEpochCommit *flow.EpochCommit
+	)
+
+	if _, err := previous.Counter(); err == nil {
+		// if there is a previous epoch, both setup and commit events must exist
+		previousEpochSetup, err = protocol.ToEpochSetup(previous)
+		if err != nil {
+			return nil, fmt.Errorf("could not get previous epoch setup event: %w", err)
+		}
+		previousEpochCommit, err = protocol.ToEpochCommit(previous)
+		if err != nil {
+			return nil, fmt.Errorf("could not get previous epoch commit event: %w", err)
+		}
+	}
+
+	// insert current epoch - both setup and commit events must exist
+	currentEpochSetup, err = protocol.ToEpochSetup(current)
+	if err != nil {
+		return nil, fmt.Errorf("could not get current epoch setup event: %w", err)
+	}
+	currentEpochCommit, err = protocol.ToEpochCommit(current)
+	if err != nil {
+		return nil, fmt.Errorf("could not get current epoch commit event: %w", err)
+	}
+
+	if _, err := next.Counter(); err == nil {
+		// if there is a previous epoch, both setup and commit events must exist
+		nextEpochSetup, err = protocol.ToEpochSetup(next)
+		if err != nil {
+			return nil, fmt.Errorf("could not get next epoch setup event: %w", err)
+		}
+		if err != nil && !errors.Is(err, protocol.ErrNextEpochNotCommitted) {
+			return nil, fmt.Errorf("could not get next epoch commit event: %w", err)
+		}
+	}
+
+	protocolStateEntry, err := flow.NewRichProtocolStateEntry(
+		s.enc.ProtocolState,
+		previousEpochSetup,
+		previousEpochCommit,
+		currentEpochSetup,
+		currentEpochCommit,
+		nextEpochSetup,
+		nextEpochCommit)
+	if err != nil {
+		return nil, fmt.Errorf("could not create protocol state entry: %w", err)
+	}
+
+	return NewDynamicProtocolStateAdapter(protocolStateEntry, s.Params()), nil
 }
 
 func (s Snapshot) VersionBeacon() (*flow.SealedVersionBeacon, error) {
