@@ -53,3 +53,10 @@ func (s *InitialProtocolStateAdapter) DKG() (protocol.DKG, error) {
 
 	return NewDKG(dkg), nil
 }
+
+// Entry Returns low-level protocol state entry that was used to initialize this object.
+// It shouldn't be used by high-level logic, it is useful for some cases such as bootstrapping.
+// Prefer using other methods to access protocol state.
+func (s *InitialProtocolStateAdapter) Entry() *flow.ProtocolStateEntry {
+	return s.RichProtocolStateEntry.ProtocolStateEntry.Copy()
+}
