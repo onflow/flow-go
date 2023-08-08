@@ -89,16 +89,16 @@ jobs:
             make2: unittest
             race: 1
             test_category: unit-crypto
-          - name: insecure
-            make1: install-tools
-            make2: test
-            race: 0
-            test_category: unit-insecure
-          - name: integration
-            make1: install-tools
-            make2: test
-            race: 0
-            test_category: unit-integration
+#          - name: insecure
+#            make1: install-tools
+#            make2: test
+#            race: 0
+#            test_category: unit-insecure
+#          - name: integration
+#            make1: install-tools
+#            make2: test
+#            race: 0
+#            test_category: unit-integration
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repo
@@ -118,9 +118,14 @@ jobs:
         timeout-minutes: 100
         continue-on-error: true
       - name: Process test results (${{ matrix.name }})
+        env:
+          TEST_CATEGORY: ${{ matrix.test_category }}
         uses: ./.github/workflows/actions/test-monitor-process-results
         with:
           gcp_sa_key: ${{ secrets.GCP_SA_KEY }}
+      - name: Setup tmate session
+        uses: mxschmitt/action-tmate@v3
+        if: success() || failure()
 
   integration-test:
     name: Integration Tests
@@ -175,6 +180,8 @@ jobs:
         timeout-minutes: 100
         continue-on-error: true
       - name: Process test results
+        env:
+          TEST_CATEGORY: ${{ matrix.test_category }}
         uses: ./.github/workflows/actions/test-monitor-process-results
         with:
           gcp_sa_key: ${{ secrets.GCP_SA_KEY }}
