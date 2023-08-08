@@ -590,8 +590,9 @@ func (m *FollowerState) insert(ctx context.Context, candidate *flow.Block, certi
 		}
 
 		if hasChanges {
-			err := m.protocolState.StoreTx(updatedStateID, updatedState)(tx)
-			if err != nil {
+			err = m.protocolState.StoreTx(updatedStateID, updatedState)(tx)
+			// in case of fork, the protocol state may already exist
+			if err != nil && !errors.Is(err, storage.ErrAlreadyExists) {
 				return fmt.Errorf("could not store protocol state (%v): %w", updatedStateID, err)
 			}
 		}
