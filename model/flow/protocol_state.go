@@ -78,15 +78,25 @@ func NewRichProtocolStateEntry(
 	}
 
 	var err error
-	result.Identities, err = buildIdentityTable(protocolState.Identities, result.PreviousEpochSetup, result.CurrentEpochSetup)
-	if err != nil {
-		return nil, fmt.Errorf("could not build identity table: %w", err)
-	}
-
 	// if next epoch has been already committed, fill in data for it as well.
 	if protocolState.NextEpochProtocolState != nil {
+		// if next epoch is available, it means that we have observed epoch setup event and we are not anymore in staking phase,
+		// so we need to build the identity table using current and next epoch setup events.
+		result.Identities, err = buildIdentityTable(
+			protocolState.Identities,
+			currentEpochSetup.Participants,
+			nextEpochSetup.Participants,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("could not build identity table for setup/commit phase: %w", err)
+		}
+
 		nextEpochProtocolState := protocolState.NextEpochProtocolState
-		nextEpochIdentityTable, err := buildIdentityTable(nextEpochProtocolState.Identities, result.CurrentEpochSetup, nextEpochSetup)
+		nextEpochIdentityTable, err := buildIdentityTable(
+			nextEpochProtocolState.Identities,
+			nextEpochSetup.Participants,
+			currentEpochSetup.Participants,
+		)
 		if err != nil {
 			return nil, fmt.Errorf("could not build next epoch identity table: %w", err)
 		}
@@ -100,6 +110,21 @@ func NewRichProtocolStateEntry(
 			PreviousEpochCommit:    result.CurrentEpochCommit, // previous epoch setup is current epoch setup
 			Identities:             nextEpochIdentityTable,
 			NextEpochProtocolState: nil, // always nil
+		}
+	} else {
+		// if next epoch is not yet created, it means that we are in staking phase,
+		// so we need to build the identity table using previous and current epoch setup events.
+		var otherIdentities IdentityList
+		if previousEpochSetup != nil {
+			otherIdentities = previousEpochSetup.Participants
+		}
+		result.Identities, err = buildIdentityTable(
+			protocolState.Identities,
+			currentEpochSetup.Participants,
+			otherIdentities,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("could not build identity table for staking phase: %w", err)
 		}
 	}
 
@@ -211,14 +236,10 @@ func (ll DynamicIdentityEntryList) Sort(less IdentifierOrder) DynamicIdentityEnt
 // No errors are expected during normal operation.
 func buildIdentityTable(
 	dynamicIdentities DynamicIdentityEntryList,
-	previousEpochSetup, currentEpochSetup *EpochSetup,
+	coreIdentities, otherIdentities IdentityList,
 ) (IdentityList, error) {
-	var previousEpochParticipants IdentityList
-	if previousEpochSetup != nil {
-		previousEpochParticipants = previousEpochSetup.Participants
-	}
 	// produce a unique set for current and previous epoch participants
-	allEpochParticipants := currentEpochSetup.Participants.Union(previousEpochParticipants)
+	allEpochParticipants := coreIdentities.Union(otherIdentities)
 	// sanity check: size of identities should be equal to previous and current epoch participants combined
 	if len(allEpochParticipants) != len(dynamicIdentities) {
 		return nil, fmt.Errorf("invalid number of identities in protocol state: expected %d, got %d", len(allEpochParticipants), len(dynamicIdentities))
@@ -237,4 +258,16 @@ func buildIdentityTable(
 		})
 	}
 	return result, nil
+}
+
+// DynamicIdentityEntryListFromIdentities converts IdentityList to DynamicIdentityEntryList.
+func DynamicIdentityEntryListFromIdentities(identities IdentityList) DynamicIdentityEntryList {
+	dynamicIdentities := make(DynamicIdentityEntryList, 0, len(identities))
+	for _, identity := range identities {
+		dynamicIdentities = append(dynamicIdentities, &DynamicIdentityEntry{
+			NodeID:  identity.NodeID,
+			Dynamic: identity.DynamicIdentity,
+		})
+	}
+	return dynamicIdentities
 }
