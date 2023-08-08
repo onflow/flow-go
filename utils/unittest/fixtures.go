@@ -2532,13 +2532,6 @@ func RootProtocolStateFixture() *flow.RichProtocolStateEntry {
 	})
 
 	allIdentities := currentEpochSetup.Participants
-	var dynamicIdentities flow.DynamicIdentityEntryList
-	for _, identity := range allIdentities {
-		dynamicIdentities = append(dynamicIdentities, &flow.DynamicIdentityEntry{
-			NodeID:  identity.NodeID,
-			Dynamic: identity.DynamicIdentity,
-		})
-	}
 
 	return &flow.RichProtocolStateEntry{
 		ProtocolStateEntry: &flow.ProtocolStateEntry{
@@ -2550,7 +2543,7 @@ func RootProtocolStateFixture() *flow.RichProtocolStateEntry {
 				SetupID:  flow.ZeroID,
 				CommitID: flow.ZeroID,
 			},
-			Identities:                      dynamicIdentities,
+			Identities:                      flow.DynamicIdentityEntryListFromIdentities(allIdentities),
 			InvalidStateTransitionAttempted: false,
 			NextEpochProtocolState:          nil,
 		},
@@ -2583,13 +2576,6 @@ func ProtocolStateFixture(options ...func(*flow.RichProtocolStateEntry)) *flow.R
 	})
 
 	allIdentities := currentEpochSetup.Participants.Union(prevEpochSetup.Participants)
-	var dynamicIdentities flow.DynamicIdentityEntryList
-	for _, identity := range allIdentities {
-		dynamicIdentities = append(dynamicIdentities, &flow.DynamicIdentityEntry{
-			NodeID:  identity.NodeID,
-			Dynamic: identity.DynamicIdentity,
-		})
-	}
 
 	entry := &flow.RichProtocolStateEntry{
 		ProtocolStateEntry: &flow.ProtocolStateEntry{
@@ -2601,7 +2587,7 @@ func ProtocolStateFixture(options ...func(*flow.RichProtocolStateEntry)) *flow.R
 				SetupID:  prevEpochSetup.ID(),
 				CommitID: prevEpochCommit.ID(),
 			},
-			Identities:                      dynamicIdentities,
+			Identities:                      flow.DynamicIdentityEntryListFromIdentities(allIdentities),
 			InvalidStateTransitionAttempted: false,
 			NextEpochProtocolState:          nil,
 		},
@@ -2634,13 +2620,8 @@ func WithNextEpochProtocolState() func(entry *flow.RichProtocolStateEntry) {
 		})
 		allIdentities := nextEpochSetup.Participants.Union(entry.CurrentEpochSetup.Participants)
 
-		var dynamicIdentities flow.DynamicIdentityEntryList
-		for _, identity := range allIdentities {
-			dynamicIdentities = append(dynamicIdentities, &flow.DynamicIdentityEntry{
-				NodeID:  identity.NodeID,
-				Dynamic: identity.DynamicIdentity,
-			})
-		}
+		entry.Identities = entry.CurrentEpochSetup.Participants.Union(nextEpochSetup.Participants)
+		entry.ProtocolStateEntry.Identities = flow.DynamicIdentityEntryListFromIdentities(entry.Identities)
 
 		entry.ProtocolStateEntry.NextEpochProtocolState = &flow.ProtocolStateEntry{
 			CurrentEpochEventIDs: flow.EventIDs{
@@ -2648,7 +2629,7 @@ func WithNextEpochProtocolState() func(entry *flow.RichProtocolStateEntry) {
 				CommitID: nextEpochCommit.ID(),
 			},
 			PreviousEpochEventIDs:           entry.CurrentEpochEventIDs,
-			Identities:                      dynamicIdentities,
+			Identities:                      flow.DynamicIdentityEntryListFromIdentities(allIdentities),
 			InvalidStateTransitionAttempted: false,
 			NextEpochProtocolState:          nil,
 		}
