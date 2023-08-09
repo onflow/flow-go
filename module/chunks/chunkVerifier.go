@@ -16,7 +16,6 @@ import (
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	fvmState "github.com/onflow/flow-go/fvm/storage/state"
 	"github.com/onflow/flow-go/ledger"
-	"github.com/onflow/flow-go/ledger/common/pathfinder"
 	"github.com/onflow/flow-go/ledger/partial"
 	chmodels "github.com/onflow/flow-go/model/chunks"
 	"github.com/onflow/flow-go/model/flow"
@@ -303,7 +302,7 @@ func (fcv *ChunkVerifier) verifyTransactionsInContext(
 		return nil, nil, fmt.Errorf("cannot create ledger update: %w", err)
 	}
 
-	expEndStateComm, _, err := psmt.Set(update)
+	expEndStateComm, trieUpdate, err := psmt.Set(update)
 
 	if err != nil {
 		if errors.Is(err, ledger.ErrMissingKeys{}) {
@@ -336,12 +335,7 @@ func (fcv *ChunkVerifier) verifyTransactionsInContext(
 
 	// 2. build our chunk's chunk execution data using the locally calculated values, and calculate
 	// its CID
-	trieUpdate, err := pathfinder.UpdateToTrieUpdate(update, partial.DefaultPathFinderVersion)
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to convert to trie update: %w", err)
-	}
-
-	chunkExecutionData := &execution_data.ChunkExecutionData{
+	chunkExecutionData := execution_data.ChunkExecutionData{
 		Collection: chunkDataPack.Collection,
 		Events:     events,
 		TrieUpdate: trieUpdate,
@@ -364,7 +358,7 @@ func (fcv *ChunkVerifier) verifyTransactionsInContext(
 	}
 
 	// 4. check the execution data root ID by calculating it using the provided execution data root
-	executionDataID, err := cidProvider.CalculateExecutionDataRootID(gocontext.Background(), &chunkDataPack.ExecutionDataRoot)
+	executionDataID, err := cidProvider.CalculateExecutionDataRootID(gocontext.Background(), chunkDataPack.ExecutionDataRoot)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to calculate ID of ExecutionDataRoot: %w", err)
 	}

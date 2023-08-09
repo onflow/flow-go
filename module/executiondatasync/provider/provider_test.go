@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ipfs/go-cid"
 	"github.com/ipfs/go-datastore"
 	dssync "github.com/ipfs/go-datastore/sync"
 	"github.com/stretchr/testify/assert"
@@ -12,6 +13,8 @@ import (
 	"github.com/stretchr/testify/require"
 	goassert "gotest.tools/assert"
 
+	"github.com/onflow/flow-go/ledger"
+	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/blobs"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	"github.com/onflow/flow-go/module/executiondatasync/provider"
@@ -82,10 +85,13 @@ func TestHappyPath(t *testing.T) {
 		expected := generateBlockExecutionData(t, numChunks, minSerializedSizePerChunk)
 		executionDataID, executionDataRoot, err := provider.Provide(context.Background(), 0, expected)
 		require.NoError(t, err)
+
 		actual, err := store.Get(context.Background(), executionDataID)
 		require.NoError(t, err)
 		deepEqual(t, expected, actual)
+
 		assert.Equal(t, expected.BlockID, executionDataRoot.BlockID)
+		assert.Len(t, executionDataRoot.ChunkExecutionDataIDs, numChunks)
 	}
 
 	test(1, 0)                                   // small execution data (single level blob tree)
@@ -112,4 +118,56 @@ func TestProvideContextCanceled(t *testing.T) {
 	defer cancel()
 	_, _, err = provider.Provide(ctx, 0, bed)
 	assert.ErrorIs(t, err, ctx.Err())
+}
+
+// TestCalculateExecutionDataRootID tests that CalculateExecutionDataRootID calculates the correct ID given a static BlockExecutionDataRoot
+func TestCalculateExecutionDataRootID(t *testing.T) {
+	t.Parallel()
+
+	expected := flow.MustHexStringToIdentifier("ae80bb200545de7ff009d2f3e20970643198be635a9b90fffb9da1198a988deb")
+	edRoot := flow.BlockExecutionDataRoot{
+		BlockID: flow.MustHexStringToIdentifier("2b31c5e26b999a41d18dc62584ac68476742b071fc9412d68be9e516e1dfc79e"),
+		ChunkExecutionDataIDs: []cid.Cid{
+			cid.MustParse("QmcA2h3jARWXkCc9VvpR4jvt9cNc7RdiqSMvPJ1TU69Xvw"),
+			cid.MustParse("QmQN81Y7KdHWNdsLthDxtdf2dCHLb3ddjDWmDZQ4Znqfs4"),
+			cid.MustParse("QmcfMmNPa8jFN64t1Hu7Afk7Trx8a6dg7gZfEEUqzC827b"),
+			cid.MustParse("QmYTooZGux6epKrdHbzgubUN4JFHkLK9hw6Z6F3fAMEDH5"),
+			cid.MustParse("QmXxYakkZKZEoCVdLLzVisctMxyiWQSfassMMzvCdaCjAj"),
+		},
+	}
+
+	cidProvider := provider.NewExecutionDataCIDProvider(execution_data.DefaultSerializer)
+	actual, err := cidProvider.CalculateExecutionDataRootID(context.Background(), edRoot)
+	require.NoError(t, err)
+
+	assert.Equal(t, expected, actual)
+}
+
+// TestCalculateChunkExecutionDataID tests that CalculateChunkExecutionDataID calculates the correct ID given a static ChunkExecutionData
+func TestCalculateChunkExecutionDataID(t *testing.T) {
+	t.Parallel()
+
+	rootHash, err := ledger.ToRootHash([]byte("0123456789acbdef0123456789acbdef"))
+	require.NoError(t, err)
+
+	expected := cid.MustParse("QmYSvEvCYCaMJXjCdWLzFYqMBzxgiE5GzEGQCKqHKM8KkP")
+	ced := execution_data.ChunkExecutionData{
+		Collection: &flow.Collection{
+			Transactions: []*flow.TransactionBody{
+				{Script: []byte("pub fun main() {}")},
+			},
+		},
+		Events: []flow.Event{
+			unittest.EventFixture(flow.EventType("A.0123456789abcdef.SomeContract.SomeEvent"), 1, 2, flow.MustHexStringToIdentifier("95e0929839063afbe334a3d175bea0775cdf5d93f64299e369d16ce21aa423d3"), 0),
+		},
+		TrieUpdate: &ledger.TrieUpdate{
+			RootHash: rootHash,
+		},
+	}
+
+	cidProvider := provider.NewExecutionDataCIDProvider(execution_data.DefaultSerializer)
+	actual, err := cidProvider.CalculateChunkExecutionDataID(context.Background(), ced)
+	require.NoError(t, err)
+
+	assert.Equal(t, expected, actual)
 }

@@ -55,9 +55,9 @@ func NewProvider(
 		logger:       logger.With().Str("component", "execution_data_provider").Logger(),
 		metrics:      metrics,
 		maxBlobSize:  execution_data.DefaultMaxBlobSize,
+		cidsProvider: NewExecutionDataCIDProvider(serializer),
 		blobService:  blobService,
 		storage:      storage,
-		cidsProvider: NewExecutionDataCIDProvider(serializer),
 	}
 
 	for _, opt := range opts {
@@ -133,9 +133,13 @@ func (p *ExecutionDataProvider) Provide(ctx context.Context, blockHeight uint64,
 
 	if ok {
 		return flow.ZeroID, nil, storeErr
-	} else {
-		return rootID, rootData, nil
 	}
+
+	if err = p.storage.SetFulfilledHeight(blockHeight); err != nil {
+		return flow.ZeroID, nil, err
+	}
+
+	return rootID, rootData, nil
 }
 
 func (p *ExecutionDataProvider) provide(ctx context.Context, blockHeight uint64, executionData *execution_data.BlockExecutionData) (flow.Identifier, *flow.BlockExecutionDataRoot, <-chan error, error) {
@@ -202,16 +206,16 @@ type ExecutionDataCIDProvider struct {
 
 func (p *ExecutionDataCIDProvider) CalculateExecutionDataRootID(
 	ctx context.Context,
-	edRoot *flow.BlockExecutionDataRoot,
+	edRoot flow.BlockExecutionDataRoot,
 ) (flow.Identifier, error) {
-	return p.addExecutionDataRoot(ctx, edRoot, nil)
+	return p.addExecutionDataRoot(ctx, &edRoot, nil)
 }
 
 func (p *ExecutionDataCIDProvider) CalculateChunkExecutionDataID(
 	ctx context.Context,
-	ced *execution_data.ChunkExecutionData,
+	ced execution_data.ChunkExecutionData,
 ) (cid.Cid, error) {
-	return p.addChunkExecutionData(ctx, ced, nil)
+	return p.addChunkExecutionData(ctx, &ced, nil)
 }
 
 func (p *ExecutionDataCIDProvider) addExecutionDataRoot(

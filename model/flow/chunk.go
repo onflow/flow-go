@@ -156,13 +156,14 @@ func (cl ChunkList) Len() int {
 	return len(cl)
 }
 
-// BlockExecutionDataRoot represents the root of a serialized BlockExecutionData.
-// The hash of the serialized BlockExecutionDataRoot is the ExecutionDataID used within an flow.ExecutionResult.
+// BlockExecutionDataRoot represents the root of a serialized execution_data.BlockExecutionData.
+// The hash of the serialized BlockExecutionDataRoot is the ExecutionDataID used within an
+// flow.ExecutionResult.
 type BlockExecutionDataRoot struct {
 	// BlockID is the ID of the block who's result this execution data is for.
 	BlockID Identifier
 
-	// ChunkExecutionDataIDs is a list of the root CIDs for each serialized ChunkExecutionData
+	// ChunkExecutionDataIDs is a list of the root CIDs for each serialized execution_data.ChunkExecutionData
 	// associated with this block.
 	ChunkExecutionDataIDs []cid.Cid
 }

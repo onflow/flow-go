@@ -153,7 +153,7 @@ func (d *downloader) getExecutionDataRoot(
 
 	edRoot, ok := v.(*flow.BlockExecutionDataRoot)
 	if !ok {
-		return nil, NewMalformedDataError(fmt.Errorf("execution data root blob does not deserialize to a flow.BlockExecutionDataRoot, got %T instead", v))
+		return nil, NewMalformedDataError(fmt.Errorf("execution data root blob does not deserialize to a BlockExecutionDataRoot, got %T instead", v))
 	}
 
 	return edRoot, nil

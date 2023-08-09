@@ -13,5 +13,5 @@ type StoredChunkDataPack struct {
 	Proof             flow.StorageProof
 	CollectionID      flow.Identifier
 	SystemChunk       bool
-	ExecutionDataRoot flow.BlockExecutionDataRoot // TODO: should this just be the ID (and actual is stored in execution_data store)?
+	ExecutionDataRoot flow.BlockExecutionDataRoot
 }

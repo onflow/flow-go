@@ -197,7 +197,7 @@ func (s *store) Get(ctx context.Context, rootID flow.Identifier) (*BlockExecutio
 
 	executionDataRoot, ok := rootData.(*flow.BlockExecutionDataRoot)
 	if !ok {
-		return nil, NewMalformedDataError(fmt.Errorf("root blob does not deserialize to a flow.BlockExecutionDataRoot, got %T instead", rootData))
+		return nil, NewMalformedDataError(fmt.Errorf("root blob does not deserialize to a BlockExecutionDataRoot, got %T instead", rootData))
 	}
 
 	// next, get each chunk blob and deserialize it
