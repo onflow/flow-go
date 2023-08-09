@@ -3,7 +3,6 @@ package rpc
 import (
 	"context"
 	"fmt"
-
 	"io"
 	"os"
 	"testing"

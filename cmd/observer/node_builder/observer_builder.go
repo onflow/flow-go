@@ -959,7 +959,6 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 			observerCollector,
 			node.RootChainID.Chain())
 		if err != nil {
-
 			return nil, err
 		}
 

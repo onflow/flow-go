@@ -18,6 +18,7 @@ import (
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/insecure"
 
+	"github.com/onflow/flow/protobuf/go/flow/access"
 	"github.com/onflow/go-bitswap"
 
 	"github.com/onflow/flow-go/admin/commands"
@@ -88,8 +89,6 @@ import (
 	"github.com/onflow/flow-go/storage"
 	bstorage "github.com/onflow/flow-go/storage/badger"
 	"github.com/onflow/flow-go/utils/grpcutils"
-
-	"github.com/onflow/flow/protobuf/go/flow/access"
 )
 
 // AccessNodeBuilder extends cmd.NodeBuilder and declares additional functions needed to bootstrap an Access node.

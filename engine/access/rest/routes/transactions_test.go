@@ -70,7 +70,6 @@ func createTransactionReq(body interface{}) *http.Request {
 }
 
 func TestGetTransactions(t *testing.T) {
-
 	t.Run("get by ID without results", func(t *testing.T) {
 		backend := &mock.API{}
 		tx := unittest.TransactionFixture()
@@ -118,6 +117,7 @@ func TestGetTransactions(t *testing.T) {
 
 	t.Run("Get by ID with results", func(t *testing.T) {
 		backend := &mock.API{}
+
 		tx := unittest.TransactionFixture()
 		txr := transactionResultFixture(tx)
 
@@ -195,6 +195,7 @@ func TestGetTransactions(t *testing.T) {
 
 	t.Run("get by ID non-existing", func(t *testing.T) {
 		backend := &mock.API{}
+
 		tx := unittest.TransactionFixture()
 		req := getTransactionReq(tx.ID().String(), false, "", "")
 
@@ -257,6 +258,7 @@ func TestGetTransactionResult(t *testing.T) {
 
 	t.Run("get by block ID", func(t *testing.T) {
 		backend := &mock.API{}
+
 		req := getTransactionResultReq(id.String(), bid.String(), "")
 
 		backend.Mock.
@@ -279,6 +281,7 @@ func TestGetTransactionResult(t *testing.T) {
 
 	t.Run("get execution statuses", func(t *testing.T) {
 		backend := &mock.API{}
+
 		testVectors := map[*access.TransactionResult]string{{
 			Status:       flow.TransactionStatusExpired,
 			ErrorMessage: "",
@@ -327,6 +330,7 @@ func TestGetTransactionResult(t *testing.T) {
 
 	t.Run("get by ID Invalid", func(t *testing.T) {
 		backend := &mock.API{}
+
 		req := getTransactionResultReq("invalid", "", "")
 
 		expected := `{"code":400, "message":"invalid ID format"}`
@@ -335,9 +339,9 @@ func TestGetTransactionResult(t *testing.T) {
 }
 
 func TestCreateTransaction(t *testing.T) {
+	backend := &mock.API{}
 
 	t.Run("create", func(t *testing.T) {
-		backend := &mock.API{}
 		tx := unittest.TransactionBodyFixture()
 		tx.PayloadSignatures = []flow.TransactionSignature{unittest.TransactionSignatureFixture()}
 		tx.Arguments = [][]uint8{}
@@ -389,7 +393,6 @@ func TestCreateTransaction(t *testing.T) {
 	})
 
 	t.Run("post invalid transaction", func(t *testing.T) {
-		backend := &mock.API{}
 		tests := []struct {
 			inputField string
 			inputValue string

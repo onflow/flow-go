@@ -173,6 +173,7 @@ func getAccountRequest(t *testing.T, account *flow.Account, height string, expan
 		q.Add(middleware.ExpandQueryParam, fieldParam)
 		req.URL.RawQuery = q.Encode()
 	}
+
 	require.NoError(t, err)
 	return req
 }
