@@ -48,6 +48,7 @@ type Config struct {
 	PreferredExecutionNodeIDs []string                         // preferred list of upstream execution node IDs
 	FixedExecutionNodeIDs     []string                         // fixed list of execution node IDs to choose from if no node node ID can be chosen from the PreferredExecutionNodeIDs
 	ArchiveAddressList        []string                         // the archive node address list to send script executions. when configured, script executions will be all sent to the archive node
+	ScriptExecValidation      bool                             // Enable validating results between the Archive node and the Execution node when scripts are executed
 }
 
 // Engine exposes the server with a simplified version of the Access API.
@@ -192,6 +193,7 @@ func NewBuilder(log zerolog.Logger,
 		log,
 		backend.DefaultSnapshotHistoryLimit,
 		config.ArchiveAddressList,
+		config.ScriptExecValidation,
 	)
 
 	finalizedCache, finalizedCacheWorker, err := events.NewFinalizedHeaderCache(state)
