@@ -113,7 +113,6 @@ jobs:
       - name: Run tests (${{ matrix.name }})
         env:
           RACE_DETECTOR: ${{ matrix.race }}
-          TEST_CATEGORY: ${{ matrix.test_category }}
         run: make -es -C ${{ matrix.name }} ${{ matrix.make2 }} > test-output
         timeout-minutes: 100
         continue-on-error: true
