@@ -1,8 +1,6 @@
-# This workflow
-# 1) runs all non-skipped (regular) tests and generates a summary.
-# 2) generates a report of all skipped tests (e.g. due to flakiness).
+# This workflow runs all skipped (flaky) and non-skipped (regular) tests and generates a summary.
 
-name: Test Monitor - Regular and Skipped
+name: Test Monitor - Regular and Flaky (Skipped)
 
 on:
   schedule:
