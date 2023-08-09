@@ -18,6 +18,16 @@ func (_m *BackendScriptsMetrics) ScriptExecuted(dur time.Duration, size int) {
 	_m.Called(dur, size)
 }
 
+// ScriptExecutionErrorMatch provides a mock function with given fields:
+func (_m *BackendScriptsMetrics) ScriptExecutionErrorMatch() {
+	_m.Called()
+}
+
+// ScriptExecutionErrorMismatch provides a mock function with given fields:
+func (_m *BackendScriptsMetrics) ScriptExecutionErrorMismatch() {
+	_m.Called()
+}
+
 // ScriptExecutionErrorOnArchiveNode provides a mock function with given fields:
 func (_m *BackendScriptsMetrics) ScriptExecutionErrorOnArchiveNode() {
 	_m.Called()
@@ -25,6 +35,16 @@ func (_m *BackendScriptsMetrics) ScriptExecutionErrorOnArchiveNode() {
 
 // ScriptExecutionErrorOnExecutionNode provides a mock function with given fields:
 func (_m *BackendScriptsMetrics) ScriptExecutionErrorOnExecutionNode() {
+	_m.Called()
+}
+
+// ScriptExecutionResultMatch provides a mock function with given fields:
+func (_m *BackendScriptsMetrics) ScriptExecutionResultMatch() {
+	_m.Called()
+}
+
+// ScriptExecutionResultMismatch provides a mock function with given fields:
+func (_m *BackendScriptsMetrics) ScriptExecutionResultMismatch() {
 	_m.Called()
 }
 

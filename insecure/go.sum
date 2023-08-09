@@ -1314,8 +1314,8 @@ github.com/kami-zh/go-capturer v0.0.0-20171211120116-e492ea43421d/go.mod h1:P2vi
 github.com/karalabe/usb v0.0.0-20190919080040-51dc0efba356/go.mod h1:Od972xHfMJowv7NGVDiWVxk2zxnWgjLlJzE+F4F7AGU=
 github.com/kballard/go-shellquote v0.0.0-20180428030007-95032a82bc51/go.mod h1:CzGEWj7cYgsdH8dAjBGEr58BoE7ScuLd+fwFZ44+/x8=
 github.com/kevinburke/go-bindata v3.22.0+incompatible/go.mod h1:/pEEZ72flUW2p0yi30bslSp9YqD9pysLxunQDdb2CPM=
-github.com/kevinburke/go-bindata v3.23.0+incompatible h1:rqNOXZlqrYhMVVAsQx8wuc+LaA73YcfbQ407wAykyS8=
-github.com/kevinburke/go-bindata v3.23.0+incompatible/go.mod h1:/pEEZ72flUW2p0yi30bslSp9YqD9pysLxunQDdb2CPM=
+github.com/kevinburke/go-bindata v3.24.0+incompatible h1:qajFA3D0pH94OTLU4zcCCKCDgR+Zr2cZK/RPJHDdFoY=
+github.com/kevinburke/go-bindata v3.24.0+incompatible/go.mod h1:/pEEZ72flUW2p0yi30bslSp9YqD9pysLxunQDdb2CPM=
 github.com/kisielk/errcheck v1.1.0/go.mod h1:EZBBE59ingxPouuu3KfxchcWSUPOHkagtvWXihfKN4Q=
 github.com/kisielk/errcheck v1.2.0/go.mod h1:/BMXB+zMLi60iA8Vv6Ksmxu/1UDYcXs4uQLJ+jE2L00=
 github.com/kisielk/errcheck v1.5.0/go.mod h1:pFxgyoBC7bSaBwPgfKdkLd5X25qrDl4LWUI2bnpBCr8=
@@ -1772,10 +1772,10 @@ github.com/onflow/atree v0.6.0/go.mod h1:gBHU0M05qCbv9NN0kijLWMgC47gHVNBIp4KmsVF
 github.com/onflow/cadence v0.39.13-stable-cadence/go.mod h1:SxT8/IEkS1drFj2ofUEK9S6KyJ5GQbrm0LX4EFCp/7Q=
 github.com/onflow/cadence v0.39.13-stable-cadence.0.20230719215202-3311f5f8189b h1:9VxYBVvnLFz7JICP+X7rPWwJb+9aZquc0uCuRjVMgdA=
 github.com/onflow/cadence v0.39.13-stable-cadence.0.20230719215202-3311f5f8189b/go.mod h1:SxT8/IEkS1drFj2ofUEK9S6KyJ5GQbrm0LX4EFCp/7Q=
-github.com/onflow/flow-core-contracts/lib/go/contracts v1.2.4-0.20230728191924-d03de9aa57b1 h1:l7cJz4F7xIJmnkCe2/64AnjZldWTz1buwQKo+QUXy7M=
-github.com/onflow/flow-core-contracts/lib/go/contracts v1.2.4-0.20230728191924-d03de9aa57b1/go.mod h1:6Jo+45NRYaqDDbY42rxAEQ+GrG47avd1UDqudttlBmI=
-github.com/onflow/flow-core-contracts/lib/go/templates v1.2.3 h1:X25A1dNajNUtE+KoV76wQ6BR6qI7G65vuuRXxDDqX7E=
-github.com/onflow/flow-core-contracts/lib/go/templates v1.2.3/go.mod h1:dqAUVWwg+NlOhsuBHex7bEWmsUjsiExzhe/+t4xNH6A=
+github.com/onflow/flow-core-contracts/lib/go/contracts v1.2.4-0.20230808220007-f00e74ca675b h1:Z5W3qsSQlXfu6VU6rxkoTMe665DmaULiX1oQim+4myM=
+github.com/onflow/flow-core-contracts/lib/go/contracts v1.2.4-0.20230808220007-f00e74ca675b/go.mod h1:6Jo+45NRYaqDDbY42rxAEQ+GrG47avd1UDqudttlBmI=
+github.com/onflow/flow-core-contracts/lib/go/templates v1.2.4-0.20230808220007-f00e74ca675b h1:f+5TwXPwlvtaDwn0ZlMIxibuPwbvmtlnSkeZgAm38Yw=
+github.com/onflow/flow-core-contracts/lib/go/templates v1.2.4-0.20230808220007-f00e74ca675b/go.mod h1:a9vPOJl7SwR0L6MMzPGEshp5HEsPQfay/pze+jrNlrw=
 github.com/onflow/flow-ft/lib/go/contracts v0.7.1-0.20230726183918-f90805445bfa h1:bPhsiGMiPIGKoYvhcYKlRRhNrEvQvorX2JGGSAuIPjA=
 github.com/onflow/flow-ft/lib/go/contracts v0.7.1-0.20230726183918-f90805445bfa/go.mod h1:kTMFIySzEJJeupk+7EmXs0EJ6CBWY/MV9fv9iYQk+RU=
 github.com/onflow/flow-go-sdk v0.41.7-stable-cadence/go.mod h1:ejVN+bqcsTHVvRpDDJDoBNdmcxUfFMW4IvdTbMeQ/hQ=

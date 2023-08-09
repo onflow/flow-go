@@ -18,8 +18,8 @@ require (
 	github.com/ipfs/go-ds-badger2 v0.1.3
 	github.com/ipfs/go-ipfs-blockstore v1.3.0
 	github.com/onflow/cadence v0.39.13-stable-cadence.0.20230719215202-3311f5f8189b
-	github.com/onflow/flow-core-contracts/lib/go/contracts v1.2.4-0.20230728191924-d03de9aa57b1
-	github.com/onflow/flow-core-contracts/lib/go/templates v1.2.3
+	github.com/onflow/flow-core-contracts/lib/go/contracts v1.2.4-0.20230808220007-f00e74ca675b
+	github.com/onflow/flow-core-contracts/lib/go/templates v1.2.4-0.20230808220007-f00e74ca675b
 	github.com/onflow/flow-emulator v0.53.1-0.20230801165926-9fd4af1cce5b
 	github.com/onflow/flow-go v0.31.1-0.20230801162100-85890d2bf9bb
 	github.com/onflow/flow-go-sdk v0.41.10-0.20230719221154-2a4946e41c23
@@ -176,7 +176,7 @@ require (
 	github.com/jbenet/goprocess v0.1.4 // indirect
 	github.com/jmespath/go-jmespath v0.4.0 // indirect
 	github.com/k0kubun/pp v3.0.1+incompatible // indirect
-	github.com/kevinburke/go-bindata v3.23.0+incompatible // indirect
+	github.com/kevinburke/go-bindata v3.24.0+incompatible // indirect
 	github.com/kevinburke/ssh_config v1.2.0 // indirect
 	github.com/klauspost/asmfmt v1.3.2 // indirect
 	github.com/klauspost/compress v1.16.5 // indirect

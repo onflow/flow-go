@@ -138,7 +138,7 @@ require (
 	github.com/jbenet/goprocess v0.1.4 // indirect
 	github.com/jmespath/go-jmespath v0.4.0 // indirect
 	github.com/k0kubun/pp v3.0.1+incompatible // indirect
-	github.com/kevinburke/go-bindata v3.23.0+incompatible // indirect
+	github.com/kevinburke/go-bindata v3.24.0+incompatible // indirect
 	github.com/klauspost/compress v1.16.5 // indirect
 	github.com/klauspost/cpuid/v2 v2.2.5 // indirect
 	github.com/koron/go-ssdp v0.0.4 // indirect
@@ -183,8 +183,8 @@ require (
 	github.com/multiformats/go-varint v0.0.7 // indirect
 	github.com/onflow/atree v0.6.0 // indirect
 	github.com/onflow/cadence v0.39.13-stable-cadence.0.20230719215202-3311f5f8189b // indirect
-	github.com/onflow/flow-core-contracts/lib/go/contracts v1.2.4-0.20230728191924-d03de9aa57b1 // indirect
-	github.com/onflow/flow-core-contracts/lib/go/templates v1.2.3 // indirect
+	github.com/onflow/flow-core-contracts/lib/go/contracts v1.2.4-0.20230808220007-f00e74ca675b // indirect
+	github.com/onflow/flow-core-contracts/lib/go/templates v1.2.4-0.20230808220007-f00e74ca675b // indirect
 	github.com/onflow/flow-ft/lib/go/contracts v0.7.1-0.20230726183918-f90805445bfa // indirect
 	github.com/onflow/flow-go-sdk v0.41.10-0.20230719221154-2a4946e41c23 // indirect
 	github.com/onflow/flow-nft/lib/go/contracts v1.1.1-0.20230726191152-4293bb676808 // indirect
