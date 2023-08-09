@@ -28,24 +28,13 @@ type Updater struct {
 
 var _ protocol.StateUpdater = (*Updater)(nil)
 
-// NewUpdater creates a new protocol state updater, when candidate block enters new epoch we will discard
-// previous protocol state and move to the next epoch protocol state.
+// NewUpdater creates a new protocol state updater.
 func NewUpdater(candidate *flow.Header, parentState *flow.RichProtocolStateEntry) *Updater {
 	updater := &Updater{
 		parentState: parentState,
 		state:       parentState.ProtocolStateEntry.Copy(),
 		candidate:   candidate,
 	}
-
-	// Check if we are at the first block of new epoch.
-	// This check will be true only if parent block is in previous epoch and candidate block is a new epoch.
-	if candidate.View > parentState.CurrentEpochSetup.FinalView {
-		// discard protocol state from the previous epoch and update the current protocol state
-		// identities and other changes are applied to both current and next epochs so this object is up-to-date
-		// with all applied deltas.
-		updater.state = updater.state.NextEpochProtocolState
-	}
-
 	return updater
 }
 
