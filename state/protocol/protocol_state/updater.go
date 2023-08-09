@@ -208,6 +208,31 @@ func (u *Updater) SetInvalidStateTransitionAttempted() {
 	}
 }
 
+// TransitionToNextEpoch discards current protocol state and transitions to the next epoch.
+// Epoch transition is only allowed when:
+// - next epoch has been set up,
+// - next epoch has been committed,
+// - we are at the first block of the next epoch.
+// No errors are expected during normal operations.
+func (u *Updater) TransitionToNextEpoch() error {
+	// Check if there is next epoch protocol state
+	if u.state.NextEpochProtocolState == nil {
+		return fmt.Errorf("protocol state has not been setup yet")
+	}
+	nextEpochState := u.state.NextEpochProtocolState
+	// Check if there is a commit event for next epoch
+	if nextEpochState.CurrentEpochEventIDs.CommitID == flow.ZeroID {
+		return fmt.Errorf("protocol state has not been committed yet")
+	}
+	// Check if we are at first block of next epoch, only then a transition is allowed
+	if u.parentState.CurrentEpochSetup.FinalView+1 != u.candidate.View {
+		return fmt.Errorf("protocol state transition is only allowed when enterring next epoch")
+	}
+	u.state = nextEpochState
+	u.invalidateLookup()
+	return nil
+}
+
 // Block returns the block header that is associated with this state updater.
 // StateUpdater is created for a specific block where protocol state changes are incorporated.
 func (u *Updater) Block() *flow.Header {
@@ -233,5 +258,7 @@ func (u *Updater) invalidateLookup() {
 	u.currentEpochIdentitiesLookup = u.state.Identities.Lookup()
 	if u.state.NextEpochProtocolState != nil {
 		u.nextEpochIdentitiesLookup = u.state.NextEpochProtocolState.Identities.Lookup()
+	} else {
+		u.state.NextEpochProtocolState = nil
 	}
 }
