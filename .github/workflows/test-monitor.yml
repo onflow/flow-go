@@ -7,8 +7,7 @@ on:
     - cron: '0 */2 * * *' # every 2 hours
   push:
     paths:
-# temp: for testing
-#      - 'tools/test_monitor/**'
+      - '.github/workflows/test-monitor.yml'
 
 env:
   BIGQUERY_DATASET: production_src_flow_test_metrics
