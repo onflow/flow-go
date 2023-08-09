@@ -52,7 +52,7 @@ func (s *UpdaterSuite) TestTransitionToNextEpoch() {
 	candidate := unittest.BlockHeaderFixture(
 		unittest.HeaderWithView(s.parentProtocolState.CurrentEpochSetup.FinalView + 1))
 	// since the candidate block is from next epoch, updater should transition to next epoch
-	s.updater = newUpdater(candidate, s.parentProtocolState)
+	s.updater = NewUpdater(candidate, s.parentProtocolState)
 	err := s.updater.TransitionToNextEpoch()
 	require.NoError(s.T(), err)
 	updatedState, _, _ := s.updater.Build()
@@ -66,7 +66,7 @@ func (s *UpdaterSuite) TestTransitionToNextEpochNotAllowed() {
 		protocolState := unittest.ProtocolStateFixture()
 		candidate := unittest.BlockHeaderFixture(
 			unittest.HeaderWithView(protocolState.CurrentEpochSetup.FinalView + 1))
-		updater := newUpdater(candidate, protocolState)
+		updater := NewUpdater(candidate, protocolState)
 		err := updater.TransitionToNextEpoch()
 		require.Error(s.T(), err, "should not allow transition to next epoch if there is no next epoch protocol state")
 	})
@@ -77,7 +77,7 @@ func (s *UpdaterSuite) TestTransitionToNextEpochNotAllowed() {
 		})
 		candidate := unittest.BlockHeaderFixture(
 			unittest.HeaderWithView(protocolState.CurrentEpochSetup.FinalView + 1))
-		updater := newUpdater(candidate, protocolState)
+		updater := NewUpdater(candidate, protocolState)
 		err := updater.TransitionToNextEpoch()
 		require.Error(s.T(), err, "should not allow transition to next epoch if it is not committed")
 	})
@@ -85,7 +85,7 @@ func (s *UpdaterSuite) TestTransitionToNextEpochNotAllowed() {
 		protocolState := unittest.ProtocolStateFixture(unittest.WithNextEpochProtocolState())
 		candidate := unittest.BlockHeaderFixture(
 			unittest.HeaderWithView(protocolState.CurrentEpochSetup.FinalView))
-		updater := newUpdater(candidate, protocolState)
+		updater := NewUpdater(candidate, protocolState)
 		err := updater.TransitionToNextEpoch()
 		require.Error(s.T(), err, "should not allow transition to next epoch if next block is not first block from next epoch")
 	})

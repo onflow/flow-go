@@ -1071,6 +1071,22 @@ func (m *FollowerState) handleEpochServiceEvents(candidate *flow.Block, updater 
 	epochStatus := parentProtocolState.EpochStatus()
 	activeSetup := parentProtocolState.CurrentEpochSetup
 
+	// perform protocol state transition to next epoch if next epoch is committed and we are at first block of epoch
+	if !epochFallbackTriggered {
+		phase, err := epochStatus.Phase()
+		if err != nil {
+			return nil, fmt.Errorf("could not determine epoch phase: %w", err)
+		}
+		if phase == flow.EpochPhaseCommitted {
+			if candidate.Header.View > parentProtocolState.CurrentEpochSetup.FinalView {
+				err = updater.TransitionToNextEpoch()
+				if err != nil {
+					return nil, fmt.Errorf("could not transition protocol state to next epoch: %w", err)
+				}
+			}
+		}
+	}
+
 	// never process service events after epoch fallback is triggered
 	if epochStatus.InvalidServiceEventIncorporated || epochFallbackTriggered {
 		return dbUpdates, nil
