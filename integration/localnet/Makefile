@@ -25,7 +25,7 @@ COMMIT=$(shell git rev-parse HEAD)
 
 # The version to include in container builds. Must be semver compliant
 ifeq ($(VERSION),)
-	VERSION := $(shell git describe --tags --abbrev=2 --match "v*" --match "secure-cadence*" 2>/dev/null)-localnetbuild
+	VERSION := $(shell git describe --tags --abbrev=2 --match "v*" 2>/dev/null)-localnetbuild
 endif
 
 CURRENT_DIRECTORY=$(shell pwd)
