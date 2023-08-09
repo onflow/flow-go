@@ -1,6 +1,6 @@
-# This workflow runs all skipped (flaky) and non-skipped (regular) tests and generates a summary.
+# This workflow runs all skipped (flaky) and non-skipped (regular) tests and generates a summary that's uploaded to BigQuery.
 
-name: Test Monitor - Regular and Flaky (Skipped)
+name: Flaky Test Monitor
 
 on:
   schedule:
