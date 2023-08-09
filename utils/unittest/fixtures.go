@@ -2611,6 +2611,8 @@ func WithNextEpochProtocolState() func(entry *flow.RichProtocolStateEntry) {
 	return func(entry *flow.RichProtocolStateEntry) {
 		nextEpochSetup := EpochSetupFixture(func(setup *flow.EpochSetup) {
 			setup.Counter = entry.CurrentEpochSetup.Counter + 1
+			setup.FirstView = entry.CurrentEpochSetup.FinalView + 1
+			setup.FinalView = setup.FirstView + 1000
 			// reuse same participant for current epoch
 			sameParticipant := *entry.CurrentEpochSetup.Participants[1]
 			setup.Participants[1] = &sameParticipant
