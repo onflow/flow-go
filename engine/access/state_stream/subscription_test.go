@@ -3,7 +3,6 @@ package state_stream_test
 import (
 	"context"
 	"fmt"
-
 	"sync"
 	"testing"
 	"time"
@@ -11,7 +10,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/onflow/flow-go/engine/common/state_stream"
+	"github.com/onflow/flow-go/engine/access/state_stream"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 

@@ -18,8 +18,8 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/access/mock"
+	"github.com/onflow/flow-go/engine/access/state_stream"
 	mock_state_stream "github.com/onflow/flow-go/engine/access/state_stream/mock"
-	common_state_stream "github.com/onflow/flow-go/engine/common/state_stream"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
 )
@@ -87,9 +87,9 @@ func newRouter(backend *mock.API, stateStreamApi *mock_state_stream.API) (*mux.R
 	logger := zerolog.New(&b)
 	restCollector := metrics.NewNoopCollector()
 
-	stateStreamConfig := common_state_stream.Config{
-		EventFilterConfig: common_state_stream.DefaultEventFilterConfig,
-		MaxGlobalStreams:  common_state_stream.DefaultMaxGlobalStreams,
+	stateStreamConfig := state_stream.Config{
+		EventFilterConfig: state_stream.DefaultEventFilterConfig,
+		MaxGlobalStreams:  state_stream.DefaultMaxGlobalStreams,
 	}
 
 	return NewRouter(backend,
@@ -107,8 +107,8 @@ func executeRequest(req *http.Request, backend *mock.API, stateStreamApi *mock_s
 		return nil, err
 	}
 
-	br := bufio.NewReaderSize(strings.NewReader(""), common_state_stream.DefaultSendBufferSize)
-	bw := bufio.NewWriterSize(&bytes.Buffer{}, common_state_stream.DefaultSendBufferSize)
+	br := bufio.NewReaderSize(strings.NewReader(""), state_stream.DefaultSendBufferSize)
+	bw := bufio.NewWriterSize(&bytes.Buffer{}, state_stream.DefaultSendBufferSize)
 	resp := NewHijackResponseRecorder(bufio.NewReadWriter(br, bw))
 
 	router.ServeHTTP(resp, req)

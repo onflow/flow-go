@@ -21,7 +21,6 @@ import (
 	"github.com/onflow/flow-go/engine/access/rpc"
 	"github.com/onflow/flow-go/engine/access/rpc/backend"
 	"github.com/onflow/flow-go/engine/access/state_stream"
-	cstatestream "github.com/onflow/flow-go/engine/common/state_stream"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/blobs"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
@@ -114,7 +113,7 @@ func (suite *SameGRPCPortTestSuite) SetupTest() {
 
 	suite.broadcaster = engine.NewBroadcaster()
 
-	suite.execDataHeroCache = herocache.NewBlockExecutionData(cstatestream.DefaultCacheSize, suite.log, metrics.NewNoopCollector())
+	suite.execDataHeroCache = herocache.NewBlockExecutionData(state_stream.DefaultCacheSize, suite.log, metrics.NewNoopCollector())
 	suite.execDataCache = cache.NewExecutionDataCache(suite.eds, suite.headers, suite.seals, suite.results, suite.execDataHeroCache)
 
 	accessIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleAccess))
@@ -205,7 +204,7 @@ func (suite *SameGRPCPortTestSuite) SetupTest() {
 		suite.secureGrpcServer,
 		suite.unsecureGrpcServer,
 		nil,
-		cstatestream.DefaultEventFilterConfig,
+		state_stream.DefaultEventFilterConfig,
 		0,
 	)
 	assert.NoError(suite.T(), err)
@@ -228,12 +227,12 @@ func (suite *SameGRPCPortTestSuite) SetupTest() {
 		},
 	).Maybe()
 
-	conf := cstatestream.Config{
-		ClientSendTimeout:    cstatestream.DefaultSendTimeout,
-		ClientSendBufferSize: cstatestream.DefaultSendBufferSize,
+	conf := state_stream.Config{
+		ClientSendTimeout:    state_stream.DefaultSendTimeout,
+		ClientSendBufferSize: state_stream.DefaultSendBufferSize,
 	}
 
-	stateStreamBackend, err := cstatestream.New(
+	stateStreamBackend, err := state_stream.New(
 		suite.log,
 		conf,
 		suite.state,

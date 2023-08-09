@@ -44,7 +44,6 @@ import (
 	"github.com/onflow/flow-go/engine/access/state_stream"
 	followereng "github.com/onflow/flow-go/engine/common/follower"
 	"github.com/onflow/flow-go/engine/common/requester"
-	cstate_stream "github.com/onflow/flow-go/engine/common/state_stream"
 	synceng "github.com/onflow/flow-go/engine/common/synchronization"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
@@ -120,8 +119,8 @@ type AccessNodeConfig struct {
 	apiRatelimits                map[string]int
 	apiBurstlimits               map[string]int
 	rpcConf                      rpc.Config
-	stateStreamBackend           *cstate_stream.StateStreamBackend
-	stateStreamConf              cstate_stream.Config
+	stateStreamBackend           *state_stream.StateStreamBackend
+	stateStreamConf              state_stream.Config
 	stateStreamFilterConf        map[string]int
 	ExecutionNodeAddress         string // deprecated
 	HistoricalAccessRPCs         []access.AccessAPIClient
@@ -175,14 +174,14 @@ func DefaultAccessNodeConfig() *AccessNodeConfig {
 			},
 			MaxMsgSize: grpcutils.DefaultMaxMsgSize,
 		},
-		stateStreamConf: cstate_stream.Config{
+		stateStreamConf: state_stream.Config{
 			MaxExecutionDataMsgSize: grpcutils.DefaultMaxMsgSize,
-			ExecutionDataCacheSize:  cstate_stream.DefaultCacheSize,
-			ClientSendTimeout:       cstate_stream.DefaultSendTimeout,
-			ClientSendBufferSize:    cstate_stream.DefaultSendBufferSize,
-			MaxGlobalStreams:        cstate_stream.DefaultMaxGlobalStreams,
-			EventFilterConfig:       cstate_stream.DefaultEventFilterConfig,
-			ResponseLimit:           cstate_stream.DefaultResponseLimit,
+			ExecutionDataCacheSize:  state_stream.DefaultCacheSize,
+			ClientSendTimeout:       state_stream.DefaultSendTimeout,
+			ClientSendBufferSize:    state_stream.DefaultSendBufferSize,
+			MaxGlobalStreams:        state_stream.DefaultMaxGlobalStreams,
+			EventFilterConfig:       state_stream.DefaultEventFilterConfig,
+			ResponseLimit:           state_stream.DefaultResponseLimit,
 		},
 		stateStreamBackend:           nil,
 		stateStreamFilterConf:        nil,
@@ -622,7 +621,7 @@ func (builder *FlowAccessNodeBuilder) BuildStateStreamPool() *FlowAccessNodeBuil
 			}
 			broadcaster := engine.NewBroadcaster()
 
-			builder.stateStreamBackend, err = cstate_stream.New(node.Logger,
+			builder.stateStreamBackend, err = state_stream.New(node.Logger,
 				builder.stateStreamConf,
 				node.State,
 				node.Storage.Headers,

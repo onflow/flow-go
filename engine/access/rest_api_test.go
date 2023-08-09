@@ -12,6 +12,7 @@ import (
 
 	"google.golang.org/grpc/credentials"
 
+	"github.com/onflow/flow-go/engine/access/state_stream"
 	"github.com/onflow/flow-go/module/grpcserver"
 	"github.com/onflow/flow-go/utils/grpcutils"
 
@@ -28,7 +29,6 @@ import (
 	"github.com/onflow/flow-go/engine/access/rest/routes"
 	"github.com/onflow/flow-go/engine/access/rpc"
 	"github.com/onflow/flow-go/engine/access/rpc/backend"
-	"github.com/onflow/flow-go/engine/common/state_stream"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"

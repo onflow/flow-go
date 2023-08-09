@@ -18,8 +18,8 @@ import (
 
 	"github.com/onflow/flow-go/access/mock"
 	"github.com/onflow/flow-go/engine/access/rest/request"
+	"github.com/onflow/flow-go/engine/access/state_stream"
 	mockstatestream "github.com/onflow/flow-go/engine/access/state_stream/mock"
-	"github.com/onflow/flow-go/engine/common/state_stream"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -125,7 +125,7 @@ func (s *SubscribeEventsSuite) TestSubscribeEvents() {
 			// Create a channel to receive mock EventsResponse objects
 			ch := make(chan interface{})
 			var chReadOnly <-chan interface{}
-			expectedEventsResponses := []*state_stream.EventsResponse{}
+			var expectedEventsResponses []*state_stream.EventsResponse
 
 			for i, b := range s.blocks {
 				s.T().Logf("checking block %d %v", i, b.ID())

@@ -16,8 +16,8 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 
 	"github.com/onflow/flow-go/engine/access/rest/request"
+	"github.com/onflow/flow-go/engine/access/state_stream"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
-	"github.com/onflow/flow-go/engine/common/state_stream"
 	"github.com/onflow/flow-go/integration/testnet"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"

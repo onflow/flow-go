@@ -4,8 +4,7 @@ package mock
 
 import (
 	context "context"
-	state_stream2 "github.com/onflow/flow-go/engine/common/state_stream"
-
+	"github.com/onflow/flow-go/engine/access/state_stream"
 	flow "github.com/onflow/flow-go/model/flow"
 	execution_data "github.com/onflow/flow-go/module/executiondatasync/execution_data"
 
@@ -44,15 +43,15 @@ func (_m *API) GetExecutionDataByBlockID(ctx context.Context, blockID flow.Ident
 }
 
 // SubscribeEvents provides a mock function with given fields: ctx, startBlockID, startHeight, filter
-func (_m *API) SubscribeEvents(ctx context.Context, startBlockID flow.Identifier, startHeight uint64, filter state_stream2.EventFilter) state_stream2.Subscription {
+func (_m *API) SubscribeEvents(ctx context.Context, startBlockID flow.Identifier, startHeight uint64, filter state_stream.EventFilter) state_stream.Subscription {
 	ret := _m.Called(ctx, startBlockID, startHeight, filter)
 
-	var r0 state_stream2.Subscription
-	if rf, ok := ret.Get(0).(func(context.Context, flow.Identifier, uint64, state_stream2.EventFilter) state_stream2.Subscription); ok {
+	var r0 state_stream.Subscription
+	if rf, ok := ret.Get(0).(func(context.Context, flow.Identifier, uint64, state_stream.EventFilter) state_stream.Subscription); ok {
 		r0 = rf(ctx, startBlockID, startHeight, filter)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(state_stream2.Subscription)
+			r0 = ret.Get(0).(state_stream.Subscription)
 		}
 	}
 
@@ -60,15 +59,15 @@ func (_m *API) SubscribeEvents(ctx context.Context, startBlockID flow.Identifier
 }
 
 // SubscribeExecutionData provides a mock function with given fields: ctx, startBlockID, startBlockHeight
-func (_m *API) SubscribeExecutionData(ctx context.Context, startBlockID flow.Identifier, startBlockHeight uint64) state_stream2.Subscription {
+func (_m *API) SubscribeExecutionData(ctx context.Context, startBlockID flow.Identifier, startBlockHeight uint64) state_stream.Subscription {
 	ret := _m.Called(ctx, startBlockID, startBlockHeight)
 
-	var r0 state_stream2.Subscription
-	if rf, ok := ret.Get(0).(func(context.Context, flow.Identifier, uint64) state_stream2.Subscription); ok {
+	var r0 state_stream.Subscription
+	if rf, ok := ret.Get(0).(func(context.Context, flow.Identifier, uint64) state_stream.Subscription); ok {
 		r0 = rf(ctx, startBlockID, startBlockHeight)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(state_stream2.Subscription)
+			r0 = ret.Get(0).(state_stream.Subscription)
 		}
 	}
 

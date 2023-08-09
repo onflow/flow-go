@@ -12,21 +12,20 @@ import (
 
 	"github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
-	"github.com/onflow/flow-go/engine/common/state_stream"
 	"github.com/onflow/flow-go/model/flow"
 )
 
 type Handler struct {
-	api   state_stream.API
+	api   API
 	chain flow.Chain
 
-	eventFilterConfig state_stream.EventFilterConfig
+	eventFilterConfig EventFilterConfig
 
 	maxStreams  int32
 	streamCount atomic.Int32
 }
 
-func NewHandler(api state_stream.API, chain flow.Chain, conf state_stream.EventFilterConfig, maxGlobalStreams uint32) *Handler {
+func NewHandler(api API, chain flow.Chain, conf EventFilterConfig, maxGlobalStreams uint32) *Handler {
 	h := &Handler{
 		api:               api,
 		chain:             chain,
@@ -84,7 +83,7 @@ func (h *Handler) SubscribeExecutionData(request *access.SubscribeExecutionDataR
 			return nil
 		}
 
-		resp, ok := v.(*state_stream.ExecutionDataResponse)
+		resp, ok := v.(*ExecutionDataResponse)
 		if !ok {
 			return status.Errorf(codes.Internal, "unexpected response type: %T", v)
 		}
@@ -121,11 +120,11 @@ func (h *Handler) SubscribeEvents(request *access.SubscribeEventsRequest, stream
 		startBlockID = blockID
 	}
 
-	filter := state_stream.EventFilter{}
+	filter := EventFilter{}
 	if request.GetFilter() != nil {
 		var err error
 		reqFilter := request.GetFilter()
-		filter, err = state_stream.NewEventFilter(
+		filter, err = NewEventFilter(
 			h.eventFilterConfig,
 			h.chain,
 			reqFilter.GetEventType(),
@@ -147,7 +146,7 @@ func (h *Handler) SubscribeEvents(request *access.SubscribeEventsRequest, stream
 			return nil
 		}
 
-		resp, ok := v.(*state_stream.EventsResponse)
+		resp, ok := v.(*EventsResponse)
 		if !ok {
 			return status.Errorf(codes.Internal, "unexpected response type: %T", v)
 		}

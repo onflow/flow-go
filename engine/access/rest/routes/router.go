@@ -12,7 +12,7 @@ import (
 	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/engine/access/rest/middleware"
 	"github.com/onflow/flow-go/engine/access/rest/models"
-	"github.com/onflow/flow-go/engine/common/state_stream"
+	"github.com/onflow/flow-go/engine/access/state_stream"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 )

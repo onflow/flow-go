@@ -4,7 +4,6 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/engine"
-	"github.com/onflow/flow-go/engine/common/state_stream"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
@@ -23,8 +22,8 @@ import (
 type Engine struct {
 	*component.ComponentManager
 	log     zerolog.Logger
-	backend *state_stream.StateStreamBackend
-	config  state_stream.Config
+	backend *StateStreamBackend
+	config  Config
 	chain   flow.Chain
 	handler *Handler
 
@@ -36,12 +35,12 @@ type Engine struct {
 // NewEng returns a new ingress server.
 func NewEng(
 	log zerolog.Logger,
-	config state_stream.Config,
+	config Config,
 	execDataCache *cache.ExecutionDataCache,
 	headers storage.Headers,
 	chainID flow.ChainID,
 	server *grpcserver.GrpcServer,
-	backend *state_stream.StateStreamBackend,
+	backend *StateStreamBackend,
 	broadcaster *engine.Broadcaster,
 ) (*Engine, error) {
 	logger := log.With().Str("engine", "state_stream_rpc").Logger()
