@@ -317,6 +317,7 @@ func RunWithTempDir(t testing.TB, f func(string)) {
 }
 
 func badgerDB(t testing.TB, dir string, create func(badger.Options) (*badger.DB, error)) *badger.DB {
+	// copied from storage/badger/options#BadgerOptions in order to avoid circular dependency
 	opts := badger.
 		DefaultOptions(dir).
 		WithKeepL0InMemory(true).
