@@ -16,7 +16,7 @@ runs:
       shell: bash
     - name: Get job run date
       id: job_run_date
-      run: echo "::set-output name=date::$(TZ=":America/Los_Angeles" date -Iseconds)"
+      run: echo "::set-output name=date::$(TZ=":UTC" date -Iseconds)"
       shell: bash
     - name: Process test results
       run: cat test-output | go run tools/test_monitor/level1/process_summary1_results.go
