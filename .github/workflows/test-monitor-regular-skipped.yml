@@ -49,8 +49,6 @@ jobs:
 
   unit-test:
     name: Unit Tests (${{ matrix.targets.name }})
-    env:
-      TEST_CATEGORY: unit
     needs: create-dynamic-test-matrix
     strategy:
       fail-fast: false
@@ -74,6 +72,8 @@ jobs:
         # test run should continue even if there are failed tests
         continue-on-error: true
       - name: Process test results
+        env:
+          TEST_CATEGORY: unit
         uses: ./.github/workflows/actions/test-monitor-process-results
         with:
           gcp_sa_key: ${{ secrets.GCP_SA_KEY }}
@@ -89,16 +89,16 @@ jobs:
             make2: unittest
             race: 1
             test_category: unit-crypto
-#          - name: insecure
-#            make1: install-tools
-#            make2: test
-#            race: 0
-#            test_category: unit-insecure
-#          - name: integration
-#            make1: install-tools
-#            make2: test
-#            race: 0
-#            test_category: unit-integration
+          - name: insecure
+            make1: install-tools
+            make2: test
+            race: 0
+            test_category: unit-insecure
+          - name: integration
+            make1: install-tools
+            make2: test
+            race: 0
+            test_category: unit-integration
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repo
@@ -122,9 +122,6 @@ jobs:
         uses: ./.github/workflows/actions/test-monitor-process-results
         with:
           gcp_sa_key: ${{ secrets.GCP_SA_KEY }}
-      - name: Setup tmate session
-        uses: mxschmitt/action-tmate@v3
-        if: success() || failure()
 
   integration-test:
     name: Integration Tests
@@ -171,10 +168,7 @@ jobs:
         run: make crypto_setup_gopath
       - name: Docker build
         run: make docker-build-flow docker-build-flow-corrupt
-
       - name: Run tests
-        env:
-          TEST_CATEGORY: ${{ matrix.test_category }}
         run: make -es -C integration ${{ matrix.target }} > test-output
         timeout-minutes: 100
         continue-on-error: true
