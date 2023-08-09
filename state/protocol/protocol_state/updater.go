@@ -212,7 +212,7 @@ func (u *Updater) SetInvalidStateTransitionAttempted() {
 // Epoch transition is only allowed when:
 // - next epoch has been set up,
 // - next epoch has been committed,
-// - we are at the first block of the next epoch.
+// - candidate block is in the next epoch.
 // No errors are expected during normal operations.
 func (u *Updater) TransitionToNextEpoch() error {
 	// Check if there is next epoch protocol state
@@ -224,8 +224,8 @@ func (u *Updater) TransitionToNextEpoch() error {
 	if nextEpochState.CurrentEpochEventIDs.CommitID == flow.ZeroID {
 		return fmt.Errorf("protocol state has not been committed yet")
 	}
-	// Check if we are at first block of next epoch, only then a transition is allowed
-	if u.parentState.CurrentEpochSetup.FinalView+1 != u.candidate.View {
+	// Check if we are at the next epoch, only then a transition is allowed
+	if u.candidate.View < u.parentState.NextEpochProtocolState.CurrentEpochSetup.FirstView {
 		return fmt.Errorf("protocol state transition is only allowed when enterring next epoch")
 	}
 	u.state = nextEpochState

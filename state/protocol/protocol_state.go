@@ -96,7 +96,7 @@ type StateUpdater interface {
 	// Epoch transition is only allowed when:
 	// - next epoch has been set up,
 	// - next epoch has been committed,
-	// - we are at the first block of the next epoch.
+	// - candidate block is in the next epoch.
 	// No errors are expected during normal operations.
 	TransitionToNextEpoch() error
 	// Block returns the block header that is associated with this state updater.

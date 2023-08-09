@@ -81,10 +81,10 @@ func (s *UpdaterSuite) TestTransitionToNextEpochNotAllowed() {
 		err := updater.TransitionToNextEpoch()
 		require.Error(s.T(), err, "should not allow transition to next epoch if it is not committed")
 	})
-	s.Run("candidate block is not first block from next epoch", func() {
+	s.Run("candidate block is not from next epoch", func() {
 		protocolState := unittest.ProtocolStateFixture(unittest.WithNextEpochProtocolState())
 		candidate := unittest.BlockHeaderFixture(
-			unittest.HeaderWithView(protocolState.NextEpochProtocolState.CurrentEpochSetup.FirstView + 1))
+			unittest.HeaderWithView(protocolState.CurrentEpochSetup.FinalView))
 		updater := newUpdater(candidate, protocolState)
 		err := updater.TransitionToNextEpoch()
 		require.Error(s.T(), err, "should not allow transition to next epoch if next block is not first block from next epoch")
