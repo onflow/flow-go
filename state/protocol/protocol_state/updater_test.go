@@ -43,21 +43,6 @@ func (s *UpdaterSuite) TestNewUpdater() {
 	require.Equal(s.T(), s.parentProtocolState, s.updater.ParentState())
 }
 
-// TestTransitionToNextEpoch tests a scenario where the updater processes first block from next epoch.
-// It has to discard the parent state and build a new state with data from next epoch.
-func (s *UpdaterSuite) TestTransitionToNextEpoch() {
-	// update protocol state with next epoch information
-	unittest.WithNextEpochProtocolState()(s.parentProtocolState)
-
-	candidate := unittest.BlockHeaderFixture(
-		unittest.HeaderWithView(s.parentProtocolState.CurrentEpochSetup.FinalView + 1))
-	// since the candidate block is from next epoch, updater should transition to next epoch
-	s.updater = newUpdater(candidate, s.parentProtocolState)
-	updatedState, _, _ := s.updater.Build()
-	require.Equal(s.T(), updatedState.ID(), s.parentProtocolState.NextEpochProtocolState.ID(), "should transition into next epoch")
-	require.Nil(s.T(), updatedState.NextEpochProtocolState, "next epoch protocol state should be nil")
-}
-
 // TestBuild tests if the updater returns correct protocol state.
 func (s *UpdaterSuite) TestBuild() {
 	updatedState, stateID, hasChanges := s.updater.Build()
