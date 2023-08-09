@@ -80,13 +80,14 @@ type Backend struct {
 
 // Config defines the configurable options for creating Backend
 type Config struct {
-	ExecutionClientTimeout    time.Duration                   // execution API GRPC client timeout
-	CollectionClientTimeout   time.Duration                   // collection API GRPC client timeout
-	ConnectionPoolSize        uint                            // size of the cache for storing collection and execution connections
-	MaxHeightRange            uint                            // max size of height range requests
-	PreferredExecutionNodeIDs []string                        // preferred list of upstream execution node IDs
-	FixedExecutionNodeIDs     []string                        // fixed list of execution node IDs to choose from if no node ID can be chosen from the PreferredExecutionNodeIDs
-	ArchiveAddressList        []string                        // the archive node address list to send script executions. when configured, script executions will be all sent to the archive node
+	ExecutionClientTimeout    time.Duration // execution API GRPC client timeout
+	CollectionClientTimeout   time.Duration // collection API GRPC client timeout
+	ConnectionPoolSize        uint          // size of the cache for storing collection and execution connections
+	MaxHeightRange            uint          // max size of height range requests
+	PreferredExecutionNodeIDs []string      // preferred list of upstream execution node IDs
+	FixedExecutionNodeIDs     []string      // fixed list of execution node IDs to choose from if no node ID can be chosen from the PreferredExecutionNodeIDs
+	ArchiveAddressList        []string      // the archive node address list to send script executions. when configured, script executions will be all sent to the archive node
+	ScriptExecValidation      bool
 	CircuitBreakerConfig      connection.CircuitBreakerConfig // the configuration for circuit breaker
 }
 
@@ -110,6 +111,7 @@ func New(
 	log zerolog.Logger,
 	snapshotHistoryLimit int,
 	archiveAddressList []string,
+	scriptExecValidation bool,
 	circuitBreakerEnabled bool,
 ) *Backend {
 	retry := newRetry()
@@ -138,16 +140,17 @@ func New(
 		state: state,
 		// create the sub-backends
 		backendScripts: backendScripts{
-			headers:            headers,
-			executionReceipts:  executionReceipts,
-			connFactory:        connFactory,
-			state:              state,
-			log:                log,
-			metrics:            accessMetrics,
-			loggedScripts:      loggedScripts,
-			archiveAddressList: archiveAddressList,
-			archivePorts:       archivePorts,
-			nodeCommunicator:   nodeCommunicator,
+			headers:              headers,
+			executionReceipts:    executionReceipts,
+			connFactory:          connFactory,
+			state:                state,
+			log:                  log,
+			metrics:              accessMetrics,
+			loggedScripts:        loggedScripts,
+			archiveAddressList:   archiveAddressList,
+			archivePorts:         archivePorts,
+			scriptExecValidation: scriptExecValidation,
+			nodeCommunicator:     nodeCommunicator,
 		},
 		backendTransactions: backendTransactions{
 			staticCollectionRPC:  collectionRPC,

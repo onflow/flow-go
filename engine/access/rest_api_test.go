@@ -171,7 +171,9 @@ func (suite *RestAPITestSuite) SetupTest() {
 		suite.log,
 		0,
 		nil,
-		false)
+		false,
+		false,
+	)
 
 	rpcEngBuilder, err := rpc.NewBuilder(
 		suite.log,
