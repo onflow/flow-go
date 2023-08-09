@@ -439,7 +439,7 @@ func (builder *FlowAccessNodeBuilder) BuildConsensusFollower() *FlowAccessNodeBu
 	return builder
 }
 
-func (builder *FlowAccessNodeBuilder) BuildStateStreamPool() *FlowAccessNodeBuilder {
+func (builder *FlowAccessNodeBuilder) BuildStateStreamComponentsAndModules() *FlowAccessNodeBuilder {
 	var ds *badger.Datastore
 	var bs network.BlobService
 	var processedBlockHeight storage.ConsumerProgress
@@ -939,7 +939,7 @@ func (builder *FlowAccessNodeBuilder) enqueueRelayNetwork() {
 
 func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 	if builder.executionDataSyncEnabled {
-		builder.BuildStateStreamPool()
+		builder.BuildStateStreamComponentsAndModules()
 	}
 
 	builder.

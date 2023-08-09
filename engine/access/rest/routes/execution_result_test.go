@@ -14,7 +14,6 @@ import (
 
 	"github.com/onflow/flow-go/access/mock"
 	"github.com/onflow/flow-go/engine/access/rest/util"
-	mock_state_stream "github.com/onflow/flow-go/engine/access/state_stream/mock"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -38,7 +37,6 @@ func getResultByIDReq(id string, blockIDs []string) *http.Request {
 }
 
 func TestGetResultByID(t *testing.T) {
-	stateStreamBackend := &mock_state_stream.API{}
 
 	t.Run("get by ID", func(t *testing.T) {
 		backend := &mock.API{}
@@ -51,7 +49,7 @@ func TestGetResultByID(t *testing.T) {
 		req := getResultByIDReq(id.String(), nil)
 
 		expected := executionResultExpectedStr(result)
-		assertOKResponse(t, req, expected, backend, stateStreamBackend)
+		assertOKResponse(t, req, expected, backend, nil)
 		mocks.AssertExpectationsForObjects(t, backend)
 	})
 
@@ -64,13 +62,12 @@ func TestGetResultByID(t *testing.T) {
 			Once()
 
 		req := getResultByIDReq(id.String(), nil)
-		assertResponse(t, req, http.StatusNotFound, `{"code":404,"message":"Flow resource not found: block not found"}`, backend, stateStreamBackend)
+		assertResponse(t, req, http.StatusNotFound, `{"code":404,"message":"Flow resource not found: block not found"}`, backend, nil)
 		mocks.AssertExpectationsForObjects(t, backend)
 	})
 }
 
 func TestGetResultBlockID(t *testing.T) {
-	stateStreamBackend := &mock_state_stream.API{}
 
 	t.Run("get by block ID", func(t *testing.T) {
 		backend := &mock.API{}
@@ -85,7 +82,7 @@ func TestGetResultBlockID(t *testing.T) {
 		req := getResultByIDReq("", []string{blockID.String()})
 
 		expected := fmt.Sprintf(`[%s]`, executionResultExpectedStr(result))
-		assertOKResponse(t, req, expected, backend, stateStreamBackend)
+		assertOKResponse(t, req, expected, backend, nil)
 		mocks.AssertExpectationsForObjects(t, backend)
 	})
 
@@ -98,7 +95,7 @@ func TestGetResultBlockID(t *testing.T) {
 			Once()
 
 		req := getResultByIDReq("", []string{blockID.String()})
-		assertResponse(t, req, http.StatusNotFound, `{"code":404,"message":"Flow resource not found: block not found"}`, backend, stateStreamBackend)
+		assertResponse(t, req, http.StatusNotFound, `{"code":404,"message":"Flow resource not found: block not found"}`, backend, nil)
 		mocks.AssertExpectationsForObjects(t, backend)
 	})
 }

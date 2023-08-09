@@ -2,7 +2,6 @@ package routes
 
 import (
 	"fmt"
-
 	"net/http"
 	"net/url"
 	"strings"
@@ -14,7 +13,6 @@ import (
 
 	"github.com/onflow/flow-go/access/mock"
 	"github.com/onflow/flow-go/engine/access/rest/middleware"
-	mock_state_stream "github.com/onflow/flow-go/engine/access/state_stream/mock"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -45,7 +43,6 @@ func accountURL(t *testing.T, address string, height string) string {
 //	5. Get invalid account.
 func TestAccessGetAccount(t *testing.T) {
 	backend := &mock.API{}
-	stateStreamBackend := &mock_state_stream.API{}
 
 	t.Run("get by address at latest sealed block", func(t *testing.T) {
 		account := accountFixture(t)
@@ -64,7 +61,7 @@ func TestAccessGetAccount(t *testing.T) {
 
 		expected := expectedExpandedResponse(account)
 
-		assertOKResponse(t, req, expected, backend, stateStreamBackend)
+		assertOKResponse(t, req, expected, backend, nil)
 		mocktestify.AssertExpectationsForObjects(t, backend)
 	})
 
@@ -84,7 +81,7 @@ func TestAccessGetAccount(t *testing.T) {
 
 		expected := expectedExpandedResponse(account)
 
-		assertOKResponse(t, req, expected, backend, stateStreamBackend)
+		assertOKResponse(t, req, expected, backend, nil)
 		mocktestify.AssertExpectationsForObjects(t, backend)
 	})
 
@@ -99,7 +96,7 @@ func TestAccessGetAccount(t *testing.T) {
 
 		expected := expectedExpandedResponse(account)
 
-		assertOKResponse(t, req, expected, backend, stateStreamBackend)
+		assertOKResponse(t, req, expected, backend, nil)
 		mocktestify.AssertExpectationsForObjects(t, backend)
 	})
 
@@ -114,7 +111,7 @@ func TestAccessGetAccount(t *testing.T) {
 
 		expected := expectedCondensedResponse(account)
 
-		assertOKResponse(t, req, expected, backend, stateStreamBackend)
+		assertOKResponse(t, req, expected, backend, nil)
 		mocktestify.AssertExpectationsForObjects(t, backend)
 	})
 
@@ -129,7 +126,7 @@ func TestAccessGetAccount(t *testing.T) {
 
 		for i, test := range tests {
 			req, _ := http.NewRequest("GET", test.url, nil)
-			rr, err := executeRequest(req, backend, stateStreamBackend)
+			rr, err := executeRequest(req, backend, nil)
 			assert.NoError(t, err)
 
 			assert.Equal(t, http.StatusBadRequest, rr.Code)

@@ -62,7 +62,6 @@ func (g *SubscribeEvents) Parse(rawStartBlockID string, rawStartHeight string, r
 	}
 
 	g.EventTypes = eventTypes.Flow()
-
 	g.Addresses = rawAddresses
 	g.Contracts = rawContracts
 

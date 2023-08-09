@@ -12,7 +12,6 @@ import (
 	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/access/mock"
 	"github.com/onflow/flow-go/cmd/build"
-	mock_state_stream "github.com/onflow/flow-go/engine/access/state_stream/mock"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -25,7 +24,6 @@ func nodeVersionInfoURL(t *testing.T) string {
 
 func TestGetNodeVersionInfo(t *testing.T) {
 	backend := mock.NewAPI(t)
-	stateStreamBackend := &mock_state_stream.API{}
 
 	t.Run("get node version info", func(t *testing.T) {
 		req := getNodeVersionInfoRequest(t)
@@ -43,7 +41,7 @@ func TestGetNodeVersionInfo(t *testing.T) {
 
 		expected := nodeVersionInfoExpectedStr(params)
 
-		assertOKResponse(t, req, expected, backend, stateStreamBackend)
+		assertOKResponse(t, req, expected, backend, nil)
 		mocktestify.AssertExpectationsForObjects(t, backend)
 	})
 }

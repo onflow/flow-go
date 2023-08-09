@@ -975,7 +975,7 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 			restHandler,
 			builder.secureGrpcServer,
 			builder.unsecureGrpcServer,
-			nil,
+			nil, // state streaming is not supported
 			state_stream.DefaultEventFilterConfig,
 			0,
 		)

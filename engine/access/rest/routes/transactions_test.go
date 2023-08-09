@@ -19,7 +19,6 @@ import (
 	"github.com/onflow/flow-go/access/mock"
 	"github.com/onflow/flow-go/engine/access/rest/models"
 	"github.com/onflow/flow-go/engine/access/rest/util"
-	mock_state_stream "github.com/onflow/flow-go/engine/access/state_stream/mock"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -71,7 +70,6 @@ func createTransactionReq(body interface{}) *http.Request {
 }
 
 func TestGetTransactions(t *testing.T) {
-	stateStreamBackend := &mock_state_stream.API{}
 
 	t.Run("get by ID without results", func(t *testing.T) {
 		backend := &mock.API{}
@@ -115,7 +113,7 @@ func TestGetTransactions(t *testing.T) {
 			}`,
 			tx.ID(), tx.ReferenceBlockID, util.ToBase64(tx.EnvelopeSignatures[0].Signature), tx.ID(), tx.ID())
 
-		assertOKResponse(t, req, expected, backend, stateStreamBackend)
+		assertOKResponse(t, req, expected, backend, nil)
 	})
 
 	t.Run("Get by ID with results", func(t *testing.T) {
@@ -184,7 +182,7 @@ func TestGetTransactions(t *testing.T) {
 			   }
 			}`,
 			tx.ID(), tx.ReferenceBlockID, util.ToBase64(tx.EnvelopeSignatures[0].Signature), tx.ReferenceBlockID, txr.CollectionID, tx.ID(), tx.ID(), tx.ID())
-		assertOKResponse(t, req, expected, backend, stateStreamBackend)
+		assertOKResponse(t, req, expected, backend, nil)
 	})
 
 	t.Run("get by ID Invalid", func(t *testing.T) {
@@ -192,7 +190,7 @@ func TestGetTransactions(t *testing.T) {
 
 		req := getTransactionReq("invalid", false, "", "")
 		expected := `{"code":400, "message":"invalid ID format"}`
-		assertResponse(t, req, http.StatusBadRequest, expected, backend, stateStreamBackend)
+		assertResponse(t, req, http.StatusBadRequest, expected, backend, nil)
 	})
 
 	t.Run("get by ID non-existing", func(t *testing.T) {
@@ -205,7 +203,7 @@ func TestGetTransactions(t *testing.T) {
 			Return(nil, status.Error(codes.NotFound, "transaction not found"))
 
 		expected := `{"code":404, "message":"Flow resource not found: transaction not found"}`
-		assertResponse(t, req, http.StatusNotFound, expected, backend, stateStreamBackend)
+		assertResponse(t, req, http.StatusNotFound, expected, backend, nil)
 	})
 }
 
@@ -246,7 +244,6 @@ func TestGetTransactionResult(t *testing.T) {
 			}
 		}`, bid.String(), cid.String(), id.String(), util.ToBase64(txr.Events[0].Payload), id.String())
 
-	stateStreamBackend := &mock_state_stream.API{}
 	t.Run("get by transaction ID", func(t *testing.T) {
 		backend := &mock.API{}
 		req := getTransactionResultReq(id.String(), "", "")
@@ -255,7 +252,7 @@ func TestGetTransactionResult(t *testing.T) {
 			On("GetTransactionResult", mocks.Anything, id, flow.ZeroID, flow.ZeroID).
 			Return(txr, nil)
 
-		assertOKResponse(t, req, expected, backend, stateStreamBackend)
+		assertOKResponse(t, req, expected, backend, nil)
 	})
 
 	t.Run("get by block ID", func(t *testing.T) {
@@ -266,7 +263,7 @@ func TestGetTransactionResult(t *testing.T) {
 			On("GetTransactionResult", mocks.Anything, id, bid, flow.ZeroID).
 			Return(txr, nil)
 
-		assertOKResponse(t, req, expected, backend, stateStreamBackend)
+		assertOKResponse(t, req, expected, backend, nil)
 	})
 
 	t.Run("get by collection ID", func(t *testing.T) {
@@ -277,7 +274,7 @@ func TestGetTransactionResult(t *testing.T) {
 			On("GetTransactionResult", mocks.Anything, id, flow.ZeroID, cid).
 			Return(txr, nil)
 
-		assertOKResponse(t, req, expected, backend, stateStreamBackend)
+		assertOKResponse(t, req, expected, backend, nil)
 	})
 
 	t.Run("get execution statuses", func(t *testing.T) {
@@ -324,7 +321,7 @@ func TestGetTransactionResult(t *testing.T) {
 					"_self": "/v1/transaction_results/%s"
 				}
 			}`, bid.String(), cid.String(), err, cases.Title(language.English).String(strings.ToLower(txResult.Status.String())), txResult.ErrorMessage, id.String())
-			assertOKResponse(t, req, expectedResp, backend, stateStreamBackend)
+			assertOKResponse(t, req, expectedResp, backend, nil)
 		}
 	})
 
@@ -333,12 +330,11 @@ func TestGetTransactionResult(t *testing.T) {
 		req := getTransactionResultReq("invalid", "", "")
 
 		expected := `{"code":400, "message":"invalid ID format"}`
-		assertResponse(t, req, http.StatusBadRequest, expected, backend, stateStreamBackend)
+		assertResponse(t, req, http.StatusBadRequest, expected, backend, nil)
 	})
 }
 
 func TestCreateTransaction(t *testing.T) {
-	stateStreamBackend := &mock_state_stream.API{}
 
 	t.Run("create", func(t *testing.T) {
 		backend := &mock.API{}
@@ -389,7 +385,7 @@ func TestCreateTransaction(t *testing.T) {
 			   }
 			}`,
 			tx.ID(), tx.ReferenceBlockID, util.ToBase64(tx.PayloadSignatures[0].Signature), util.ToBase64(tx.EnvelopeSignatures[0].Signature), tx.ID(), tx.ID())
-		assertOKResponse(t, req, expected, backend, stateStreamBackend)
+		assertOKResponse(t, req, expected, backend, nil)
 	})
 
 	t.Run("post invalid transaction", func(t *testing.T) {
@@ -417,7 +413,7 @@ func TestCreateTransaction(t *testing.T) {
 			testTx[test.inputField] = test.inputValue
 			req := createTransactionReq(testTx)
 
-			assertResponse(t, req, http.StatusBadRequest, test.output, backend, stateStreamBackend)
+			assertResponse(t, req, http.StatusBadRequest, test.output, backend, nil)
 		}
 	})
 }

@@ -252,7 +252,7 @@ func (s *BackendExecutionDataSuite) TestGetExecutionDataByBlockID() {
 	execData := s.execDataMap[block.ID()]
 
 	// notify backend block is available
-	s.backend.SetHighestHeight(block.Header.Height)
+	s.backend.setHighestHeight(block.Header.Height)
 
 	var err error
 	s.Run("happy path TestGetExecutionDataByBlockID success", func() {
@@ -328,7 +328,7 @@ func (s *BackendExecutionDataSuite) TestSubscribeExecutionData() {
 			// this simulates a subscription on a past block
 			for i := 0; i <= test.highestBackfill; i++ {
 				s.T().Logf("backfilling block %d", i)
-				s.backend.SetHighestHeight(s.blocks[i].Header.Height)
+				s.backend.setHighestHeight(s.blocks[i].Header.Height)
 			}
 
 			subCtx, subCancel := context.WithCancel(ctx)
@@ -342,7 +342,7 @@ func (s *BackendExecutionDataSuite) TestSubscribeExecutionData() {
 				// simulate new exec data received.
 				// exec data for all blocks with index <= highestBackfill were already received
 				if i > test.highestBackfill {
-					s.backend.SetHighestHeight(b.Header.Height)
+					s.backend.setHighestHeight(b.Header.Height)
 					s.broadcaster.Publish()
 				}
 

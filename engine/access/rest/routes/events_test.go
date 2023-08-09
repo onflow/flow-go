@@ -16,14 +16,12 @@ import (
 
 	"github.com/onflow/flow-go/access/mock"
 	"github.com/onflow/flow-go/engine/access/rest/util"
-	mock_state_stream "github.com/onflow/flow-go/engine/access/state_stream/mock"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
 func TestGetEvents(t *testing.T) {
 	backend := &mock.API{}
-	stateStreamBackend := &mock_state_stream.API{}
 	events := generateEventsMocks(backend, 5)
 
 	allBlockIDs := make([]string, len(events))
@@ -126,7 +124,7 @@ func TestGetEvents(t *testing.T) {
 
 	for _, test := range testVectors {
 		t.Run(test.description, func(t *testing.T) {
-			assertResponse(t, test.request, test.expectedStatus, test.expectedResponse, backend, stateStreamBackend)
+			assertResponse(t, test.request, test.expectedStatus, test.expectedResponse, backend, nil)
 		})
 	}
 

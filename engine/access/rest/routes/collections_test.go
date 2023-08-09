@@ -16,7 +16,6 @@ import (
 	mocks "github.com/stretchr/testify/mock"
 
 	"github.com/onflow/flow-go/access/mock"
-	mock_state_stream "github.com/onflow/flow-go/engine/access/state_stream/mock"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -32,7 +31,6 @@ func getCollectionReq(id string, expandTransactions bool) *http.Request {
 
 func TestGetCollections(t *testing.T) {
 	backend := &mock.API{}
-	stateStreamBackend := &mock_state_stream.API{}
 
 	t.Run("get by ID", func(t *testing.T) {
 		inputs := []flow.LightCollection{
@@ -64,7 +62,7 @@ func TestGetCollections(t *testing.T) {
 			}`, col.ID(), col.ID(), transactionsStr)
 
 			req := getCollectionReq(col.ID().String(), false)
-			assertOKResponse(t, req, expected, backend, stateStreamBackend)
+			assertOKResponse(t, req, expected, backend, nil)
 			mocks.AssertExpectationsForObjects(t, backend)
 		}
 	})
@@ -89,7 +87,7 @@ func TestGetCollections(t *testing.T) {
 			Once()
 
 		req := getCollectionReq(col.ID().String(), true)
-		rr, err := executeRequest(req, backend, stateStreamBackend)
+		rr, err := executeRequest(req, backend, nil)
 		assert.NoError(t, err)
 
 		assert.Equal(t, http.StatusOK, rr.Code)
@@ -148,7 +146,7 @@ func TestGetCollections(t *testing.T) {
 					Return(test.mockValue, test.mockErr)
 			}
 			req := getCollectionReq(test.id, false)
-			assertResponse(t, req, test.status, test.response, backend, stateStreamBackend)
+			assertResponse(t, req, test.status, test.response, backend, nil)
 		}
 	})
 }

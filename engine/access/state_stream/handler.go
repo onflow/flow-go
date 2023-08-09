@@ -6,7 +6,6 @@ import (
 
 	access "github.com/onflow/flow/protobuf/go/flow/executiondata"
 	executiondata "github.com/onflow/flow/protobuf/go/flow/executiondata"
-
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
@@ -135,6 +134,7 @@ func (h *Handler) SubscribeEvents(request *access.SubscribeEventsRequest, stream
 			return status.Errorf(codes.InvalidArgument, "invalid event filter: %v", err)
 		}
 	}
+
 	sub := h.api.SubscribeEvents(stream.Context(), startBlockID, request.GetStartBlockHeight(), filter)
 
 	for {

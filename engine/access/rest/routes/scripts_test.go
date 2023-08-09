@@ -9,14 +9,12 @@ import (
 	"net/url"
 	"testing"
 
-	"github.com/onflow/flow-go/engine/access/rest/util"
-	mock_state_stream "github.com/onflow/flow-go/engine/access/state_stream/mock"
-
 	mocks "github.com/stretchr/testify/mock"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
 	"github.com/onflow/flow-go/access/mock"
+	"github.com/onflow/flow-go/engine/access/rest/util"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -47,8 +45,6 @@ func TestScripts(t *testing.T) {
 		"arguments": []string{util.ToBase64(validArgs)},
 	}
 
-	stateStreamBackend := &mock_state_stream.API{}
-
 	t.Run("get by Latest height", func(t *testing.T) {
 		backend := &mock.API{}
 		backend.Mock.
@@ -59,7 +55,7 @@ func TestScripts(t *testing.T) {
 		assertOKResponse(t, req, fmt.Sprintf(
 			"\"%s\"",
 			base64.StdEncoding.EncodeToString([]byte(`hello world`)),
-		), backend, stateStreamBackend)
+		), backend, nil)
 	})
 
 	t.Run("get by height", func(t *testing.T) {
@@ -74,7 +70,7 @@ func TestScripts(t *testing.T) {
 		assertOKResponse(t, req, fmt.Sprintf(
 			"\"%s\"",
 			base64.StdEncoding.EncodeToString([]byte(`hello world`)),
-		), backend, stateStreamBackend)
+		), backend, nil)
 	})
 
 	t.Run("get by ID", func(t *testing.T) {
@@ -89,7 +85,7 @@ func TestScripts(t *testing.T) {
 		assertOKResponse(t, req, fmt.Sprintf(
 			"\"%s\"",
 			base64.StdEncoding.EncodeToString([]byte(`hello world`)),
-		), backend, stateStreamBackend)
+		), backend, nil)
 	})
 
 	t.Run("get error", func(t *testing.T) {
@@ -105,7 +101,7 @@ func TestScripts(t *testing.T) {
 			http.StatusBadRequest,
 			`{"code":400, "message":"Invalid Flow request: internal server error"}`,
 			backend,
-			stateStreamBackend,
+			nil,
 		)
 	})
 
@@ -130,7 +126,7 @@ func TestScripts(t *testing.T) {
 
 		for _, test := range tests {
 			req := scriptReq(test.id, test.height, test.body)
-			assertResponse(t, req, http.StatusBadRequest, test.out, backend, stateStreamBackend)
+			assertResponse(t, req, http.StatusBadRequest, test.out, backend, nil)
 		}
 	})
 }

@@ -43,7 +43,7 @@ type responseWriter struct {
 	statusCode int
 }
 
-// http.Hijacker necessary for upgrading gorilla websocket connection for "subscribe_events" route.
+// http.Hijacker necessary for using middleware with gorilla websocket connections.
 var _ http.Hijacker = (*responseWriter)(nil)
 
 func newResponseWriter(w http.ResponseWriter) *responseWriter {

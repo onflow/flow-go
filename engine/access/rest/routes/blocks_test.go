@@ -20,7 +20,6 @@ import (
 
 	"github.com/onflow/flow-go/access/mock"
 	"github.com/onflow/flow-go/engine/access/rest/middleware"
-	mock_state_stream "github.com/onflow/flow-go/engine/access/state_stream/mock"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -144,14 +143,13 @@ func prepareTestVectors(t *testing.T,
 // TestGetBlocks tests local get blocks by ID and get blocks by heights API
 func TestAccessGetBlocks(t *testing.T) {
 	backend := &mock.API{}
-	stateStreamBackend := &mock_state_stream.API{}
 
 	blkCnt := 10
 	blockIDs, heights, blocks, executionResults := generateMocks(backend, blkCnt)
 	testVectors := prepareTestVectors(t, blockIDs, heights, blocks, executionResults, blkCnt)
 
 	for _, tv := range testVectors {
-		responseRec, err := executeRequest(tv.request, backend, stateStreamBackend)
+		responseRec, err := executeRequest(tv.request, backend, nil)
 		assert.NoError(t, err)
 		require.Equal(t, tv.expectedStatus, responseRec.Code, "failed test %s: incorrect response code", tv.description)
 		actualResp := responseRec.Body.String()

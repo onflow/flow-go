@@ -11,7 +11,6 @@ import (
 
 	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/access/mock"
-	mock_state_stream "github.com/onflow/flow-go/engine/access/state_stream/mock"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -24,7 +23,6 @@ func networkURL(t *testing.T) string {
 
 func TestGetNetworkParameters(t *testing.T) {
 	backend := &mock.API{}
-	stateStreamBackend := &mock_state_stream.API{}
 
 	t.Run("get network parameters on mainnet", func(t *testing.T) {
 
@@ -40,7 +38,7 @@ func TestGetNetworkParameters(t *testing.T) {
 
 		expected := networkParametersExpectedStr(flow.Mainnet)
 
-		assertOKResponse(t, req, expected, backend, stateStreamBackend)
+		assertOKResponse(t, req, expected, backend, nil)
 		mocktestify.AssertExpectationsForObjects(t, backend)
 	})
 }
