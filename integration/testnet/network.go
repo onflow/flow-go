@@ -629,7 +629,8 @@ func PrepareFlowNetwork(t *testing.T, networkConf NetworkConfig, chainID flow.Ch
 
 	// add each follower to the network
 	for _, followerConf := range networkConf.ConsensusFollowers {
-		t.Logf("add consensus follower %v", followerConf.NodeID)
+		t.Logf(""+
+			"add consensus follower %v", followerConf.NodeID)
 		flowNetwork.addConsensusFollower(t, rootProtocolSnapshotPath, followerConf, confs)
 	}
 

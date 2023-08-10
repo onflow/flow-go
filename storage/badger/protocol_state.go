@@ -33,8 +33,8 @@ func NewProtocolState(collector module.CacheMetrics,
 	cacheSize uint) *ProtocolState {
 	retrieve := func(key interface{}) func(tx *badger.Txn) (interface{}, error) {
 		protocolStateID := key.(flow.Identifier)
-		var protocolStateEntry flow.ProtocolStateEntry
 		return func(tx *badger.Txn) (interface{}, error) {
+			var protocolStateEntry flow.ProtocolStateEntry
 			err := operation.RetrieveProtocolState(protocolStateID, &protocolStateEntry)(tx)
 			if err != nil {
 				return nil, err

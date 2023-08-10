@@ -77,9 +77,35 @@ func NewRichProtocolStateEntry(
 		NextEpochProtocolState: nil,
 	}
 
+	// ensure data is consistent
+	if protocolState.PreviousEpochEventIDs.SetupID != ZeroID {
+		if protocolState.PreviousEpochEventIDs.SetupID != previousEpochSetup.ID() {
+			return nil, fmt.Errorf("supplied previous epoch setup does not match protocol state")
+		}
+		if protocolState.PreviousEpochEventIDs.CommitID != previousEpochCommit.ID() {
+			return nil, fmt.Errorf("supplied previous epoch commit does not match protocol state")
+		}
+	}
+	if protocolState.CurrentEpochEventIDs.SetupID != currentEpochSetup.ID() {
+		return nil, fmt.Errorf("supplied current epoch setup does not match protocol state")
+	}
+	if protocolState.CurrentEpochEventIDs.CommitID != currentEpochCommit.ID() {
+		return nil, fmt.Errorf("supplied current epoch commit does not match protocol state")
+	}
+
 	var err error
+	nextEpochProtocolState := protocolState.NextEpochProtocolState
 	// if next epoch has been already committed, fill in data for it as well.
-	if protocolState.NextEpochProtocolState != nil {
+	if nextEpochProtocolState != nil {
+		if nextEpochProtocolState.CurrentEpochEventIDs.SetupID != nextEpochSetup.ID() {
+			return nil, fmt.Errorf("supplied next epoch setup does not match protocol state")
+		}
+		if nextEpochProtocolState.CurrentEpochEventIDs.CommitID != ZeroID {
+			if nextEpochProtocolState.CurrentEpochEventIDs.CommitID != nextEpochCommit.ID() {
+				return nil, fmt.Errorf("supplied next epoch commit does not match protocol state")
+			}
+		}
+
 		// if next epoch is available, it means that we have observed epoch setup event and we are not anymore in staking phase,
 		// so we need to build the identity table using current and next epoch setup events.
 		result.Identities, err = buildIdentityTable(
@@ -91,7 +117,6 @@ func NewRichProtocolStateEntry(
 			return nil, fmt.Errorf("could not build identity table for setup/commit phase: %w", err)
 		}
 
-		nextEpochProtocolState := protocolState.NextEpochProtocolState
 		nextEpochIdentityTable, err := buildIdentityTable(
 			nextEpochProtocolState.Identities,
 			nextEpochSetup.Participants,

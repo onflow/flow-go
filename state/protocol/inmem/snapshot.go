@@ -108,11 +108,12 @@ func (s Snapshot) ProtocolState() (protocol.DynamicProtocolState, error) {
 	}
 
 	if _, err := next.Counter(); err == nil {
-		// if there is a previous epoch, both setup and commit events must exist
+		// if there is a next epoch, both setup event should exist, but commit event may not
 		nextEpochSetup, err = protocol.ToEpochSetup(next)
 		if err != nil {
 			return nil, fmt.Errorf("could not get next epoch setup event: %w", err)
 		}
+		nextEpochCommit, err = protocol.ToEpochCommit(next)
 		if err != nil && !errors.Is(err, protocol.ErrNextEpochNotCommitted) {
 			return nil, fmt.Errorf("could not get next epoch commit event: %w", err)
 		}
