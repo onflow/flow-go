@@ -390,7 +390,7 @@ func (c *Container) OpenState() (*state.State, error) {
 	qcs := storage.NewQuorumCertificates(metrics, db, storage.DefaultCacheSize)
 	setups := storage.NewEpochSetups(metrics, db)
 	commits := storage.NewEpochCommits(metrics, db)
-	statuses := storage.NewEpochStatuses(metrics, db)
+	protocolState := storage.NewProtocolState(metrics, setups, commits, db, storage.DefaultCacheSize)
 	versionBeacons := storage.NewVersionBeacons(db)
 
 	return state.OpenState(
@@ -403,7 +403,7 @@ func (c *Container) OpenState() (*state.State, error) {
 		qcs,
 		setups,
 		commits,
-		statuses,
+		protocolState,
 		versionBeacons,
 	)
 }

@@ -249,7 +249,7 @@ func CompleteStateFixture(
 		s.QuorumCertificates,
 		s.Setups,
 		s.EpochCommits,
-		s.Statuses,
+		s.ProtocolState,
 		s.VersionBeacons,
 		rootSnapshot,
 	)
