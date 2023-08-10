@@ -15,12 +15,14 @@ func GetAccountKeyByIndex(r *request.Request, backend access.API, link models.Li
 		return nil, models.NewBadRequestError(err)
 	}
 
-	// in case we receive special height values 'final' and 'sealed', fetch that height and overwrite request with it
+	// In case we receive special height values 'final' and 'sealed',
+	// fetch that height and overwrite request with it.
 	if req.Height == request.FinalHeight || req.Height == request.SealedHeight {
 		isSealed := req.Height == request.SealedHeight
 		header, _, err := backend.GetLatestBlockHeader(r.Context(), isSealed)
 		if err != nil {
-			return nil, err
+			err := fmt.Errorf("block with height: %d does not exist", req.Height)
+			return nil, models.NewNotFoundError(err.Error(), err)
 		}
 		req.Height = header.Height
 	}

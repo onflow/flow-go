@@ -58,4 +58,22 @@ func Test_GetAccountKey_ValidParse(t *testing.T) {
 	assert.Equal(t, getAccountKey.Address.String(), addr)
 	assert.Equal(t, getAccountKey.Index, uint64(5))
 	assert.Equal(t, getAccountKey.Height, uint64(100))
+
+	err = getAccountKey.Parse(addr, keyIndex, "")
+	assert.NoError(t, err)
+	assert.Equal(t, getAccountKey.Address.String(), addr)
+	assert.Equal(t, getAccountKey.Index, uint64(5))
+	assert.Equal(t, getAccountKey.Height, SealedHeight)
+
+	err = getAccountKey.Parse(addr, keyIndex, "sealed")
+	assert.NoError(t, err)
+	assert.Equal(t, getAccountKey.Address.String(), addr)
+	assert.Equal(t, getAccountKey.Index, uint64(5))
+	assert.Equal(t, getAccountKey.Height, SealedHeight)
+
+	err = getAccountKey.Parse(addr, keyIndex, "final")
+	assert.NoError(t, err)
+	assert.Equal(t, getAccountKey.Address.String(), addr)
+	assert.Equal(t, getAccountKey.Index, uint64(5))
+	assert.Equal(t, getAccountKey.Height, FinalHeight)
 }

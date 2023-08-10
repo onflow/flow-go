@@ -2,6 +2,7 @@ package routes
 
 import (
 	"fmt"
+	"math"
 	"net/http"
 	"net/url"
 	"testing"
@@ -26,8 +27,9 @@ import (
 // 5. Get key by missing address and index at latest sealed block.
 // 6. Get key by missing address and index at latest finalized block.
 // 7. Get key by address and index at height.
+// 8. Get key by address and index at missing block.
 func TestGetAccountKeyByIndex(t *testing.T) {
-	backend := &mock.API{}
+	backend := mock.NewAPI(t)
 
 	t.Run("get key by address and index at latest sealed block", func(t *testing.T) {
 		account := accountFixture(t)
@@ -96,6 +98,7 @@ func TestGetAccountKeyByIndex(t *testing.T) {
 		`, statusCode, index)
 
 		assertResponse(t, req, statusCode, expected, backend)
+		mocktestify.AssertExpectationsForObjects(t, backend)
 	})
 
 	t.Run("get missing key by address and index at latest finalized block", func(t *testing.T) {
@@ -123,6 +126,7 @@ func TestGetAccountKeyByIndex(t *testing.T) {
 		`, statusCode, index)
 
 		assertResponse(t, req, statusCode, expected, backend)
+		mocktestify.AssertExpectationsForObjects(t, backend)
 	})
 
 	t.Run("get key by missing address and index at latest sealed block", func(t *testing.T) {
@@ -151,6 +155,7 @@ func TestGetAccountKeyByIndex(t *testing.T) {
 		`, statusCode, account.Address)
 
 		assertResponse(t, req, statusCode, expected, backend)
+		mocktestify.AssertExpectationsForObjects(t, backend)
 	})
 
 	t.Run("get key by missing address and index at latest finalized block", func(t *testing.T) {
@@ -179,6 +184,7 @@ func TestGetAccountKeyByIndex(t *testing.T) {
 		`, statusCode, account.Address)
 
 		assertResponse(t, req, statusCode, expected, backend)
+		mocktestify.AssertExpectationsForObjects(t, backend)
 	})
 
 	t.Run("get key by address and index at height", func(t *testing.T) {
@@ -193,6 +199,30 @@ func TestGetAccountKeyByIndex(t *testing.T) {
 		expected := expectedAccountKeyResponse(account)
 
 		assertOKResponse(t, req, expected, backend)
+		mocktestify.AssertExpectationsForObjects(t, backend)
+	})
+
+	t.Run("get key by address and index at missing block", func(t *testing.T) {
+		backend := mock.NewAPI(t)
+		account := accountFixture(t)
+		const finalHeight uint64 = math.MaxUint64 - 2
+
+		req := getAccountKeyByIndexRequest(t, account, "0", finalHeightQueryParam)
+
+		err := fmt.Errorf("block with height: %d does not exist", finalHeight)
+		backend.Mock.
+			On("GetLatestBlockHeader", mocktestify.Anything, false).
+			Return(nil, flow.BlockStatusUnknown, err)
+
+		statusCode := 404
+		expected := fmt.Sprintf(`
+			  {
+				"code": %d,
+				"message": "block with height: %d does not exist"
+			  }
+			`, statusCode, finalHeight)
+
+		assertResponse(t, req, statusCode, expected, backend)
 		mocktestify.AssertExpectationsForObjects(t, backend)
 	})
 
