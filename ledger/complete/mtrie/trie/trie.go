@@ -513,7 +513,7 @@ func update(
 	if len(paths) == 0 {
 		if compactLeaf != nil {
 			leafHash := compactLeaf.ExpandedLeafHash()
-			compactPath, leafPayload, err := payloadStorage.Get(leafHash)
+			leafPath, leafPayload, err := payloadStorage.Get(leafHash)
 			if err != nil {
 				return nil, 0, 0, 0, fmt.Errorf("could not get payload by leaf hash %v: %w", leafHash, err)
 			}
@@ -522,7 +522,7 @@ func update(
 			// then expand the compact leaf node to the current height by creating a new compact leaf
 			// node with the same path and payload.
 			// The old node shouldn't be recycled as it is still used by the tree copy before the update.
-			n = node.NewLeaf(compactPath, leafPayload, nodeHeight)
+			n = node.NewLeaf(leafPath, leafPayload, nodeHeight)
 			return n, 0, 0, nodeHeight, nil
 		}
 		// if no path to update and there is no compact leaf node on this path, we return
