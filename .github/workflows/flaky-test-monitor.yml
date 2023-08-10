@@ -21,6 +21,7 @@ env:
   JSON_OUTPUT: true
   VERBOSE: true
   TEST_FLAKY: true
+  TEMP_DIR: /tmp
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
