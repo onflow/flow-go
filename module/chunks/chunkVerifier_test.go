@@ -322,8 +322,13 @@ func (s *ChunkVerifierTestSuite) TestExecutionDataIdMismatch() {
 // updateExecutionData the VerifiableChunkData with a new execution data containing the execution
 // data for the given collection and events
 func updateExecutionData(t *testing.T, vch *verification.VerifiableChunkData, collection *flow.Collection, chunkEvents flow.EventsList, update *ledger.Update, blockID flow.Identifier) {
-	trieUpdate, err := pathfinder.UpdateToTrieUpdate(update, partial.DefaultPathFinderVersion)
-	require.NoError(t, err)
+	var trieUpdate *ledger.TrieUpdate
+
+	if update.Size() > 0 {
+		var err error
+		trieUpdate, err = pathfinder.UpdateToTrieUpdate(update, partial.DefaultPathFinderVersion)
+		require.NoError(t, err)
+	}
 
 	ced := execution_data.ChunkExecutionData{
 		Collection: collection,
