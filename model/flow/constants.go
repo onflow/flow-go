@@ -28,6 +28,10 @@ const DefaultTransactionExpiryBuffer = 30
 // DefaultMaxTransactionGasLimit is the default maximum value for the transaction gas limit.
 const DefaultMaxTransactionGasLimit = 9999
 
+// EstimatedComputationPerMillisecond is the approximate number of computation units that can be performed in a millisecond.
+// this was calibrated during the Variable Transaction Fees: Execution Effort FLIP https://github.com/onflow/flow/pull/753
+const EstimatedComputationPerMillisecond = 9999.0 / 200.0
+
 // DefaultMaxTransactionByteSize is the default maximum transaction byte size. (~1.5MB)
 const DefaultMaxTransactionByteSize = 1_500_000
 
