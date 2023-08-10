@@ -815,6 +815,7 @@ func (b *bootstrapExecutor) registerNodes(service, fungibleToken, flowToken flow
 			b.ctx,
 			Transaction(blueprints.RegisterNodeTransaction(service,
 				flowToken,
+				fungibleToken,
 				nodeAddress,
 				id),
 				0),
