@@ -2,12 +2,13 @@ package badger
 
 import (
 	"fmt"
+
 	"github.com/dgraph-io/badger/v2"
-	"github.com/onflow/flow-go/storage"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/inmem"
+	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/badger/operation"
 )
 
@@ -130,6 +131,9 @@ func ReadGlobalParams(db *badger.DB, headers storage.Headers) (*inmem.Params, er
 func ReadFinalizedRoot(db *badger.DB, headers storage.Headers) (*flow.Header, error) {
 	var finalizedRootHeight uint64
 	err := db.View(operation.RetrieveRootHeight(&finalizedRootHeight))
+	if err != nil {
+		return nil, fmt.Errorf("could not get finalized root height: %w", err)
+	}
 
 	// look up root block ID
 	var rootID flow.Identifier

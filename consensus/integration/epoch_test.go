@@ -1,7 +1,6 @@
 package integration_test
 
 import (
-	"github.com/onflow/flow-go/state/protocol"
 	"testing"
 	"time"
 
@@ -14,6 +13,7 @@ import (
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/model/flow/mapfunc"
 	"github.com/onflow/flow-go/model/flow/order"
+	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/inmem"
 	"github.com/onflow/flow-go/utils/unittest"
 )

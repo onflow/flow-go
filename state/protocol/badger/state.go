@@ -5,7 +5,6 @@ package badger
 import (
 	"errors"
 	"fmt"
-	"github.com/onflow/flow-go/state/protocol/protocol_state"
 	"sync/atomic"
 
 	"github.com/dgraph-io/badger/v2"
@@ -16,6 +15,7 @@ import (
 	statepkg "github.com/onflow/flow-go/state"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/invalid"
+	"github.com/onflow/flow-go/state/protocol/protocol_state"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/badger/operation"
 	"github.com/onflow/flow-go/storage/badger/transaction"
