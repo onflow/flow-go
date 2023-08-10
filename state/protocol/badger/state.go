@@ -172,7 +172,7 @@ func Bootstrap(
 		}
 
 		// 4) initialize values related to the epoch logic
-		err = state.bootstrapEpoch(root.Epochs(), segment, !config.SkipNetworkAddressValidation)(tx)
+		err = state.bootstrapEpoch(root.Epochs(), !config.SkipNetworkAddressValidation)(tx)
 		if err != nil {
 			return fmt.Errorf("could not bootstrap epoch values: %w", err)
 		}
@@ -195,12 +195,13 @@ func Bootstrap(
 			state.metrics.BlockFinalized(block)
 		}
 
+		// 7) bootstrap dynamic protocol state
 		err = state.bootstrapProtocolState(segment, root, protocolState)(tx)
 		if err != nil {
 			return fmt.Errorf("could not bootstrap protocol state: %w", err)
 		}
 
-		// 7) initialize version beacon
+		// 8) initialize version beacon
 		err = transaction.WithTx(state.boostrapVersionBeacon(root))(tx)
 		if err != nil {
 			return fmt.Errorf("could not bootstrap version beacon: %w", err)
@@ -221,6 +222,11 @@ func Bootstrap(
 	return state, nil
 }
 
+// bootstrapProtocolState bootstraps data structures needed for Dynamic Protocol State.
+// It inserts the root protocol state and indexes all blocks in the sealing segment assuming that
+// dynamic protocol state didn't change in the sealing segment.
+// The root snapshot's sealing segment must not straddle any epoch transitions
+// or epoch phase transitions.
 func (state *State) bootstrapProtocolState(segment *flow.SealingSegment, root protocol.Snapshot, protocolState storage.ProtocolState) func(tx *transaction.Tx) error {
 	return func(tx *transaction.Tx) error {
 		rootProtocolState, err := root.ProtocolState()
@@ -234,6 +240,9 @@ func (state *State) bootstrapProtocolState(segment *flow.SealingSegment, root pr
 			return fmt.Errorf("could not insert root protocol state: %w", err)
 		}
 
+		// NOTE: as specified in the godoc, this code assumes that each block
+		// in the sealing segment in within the same phase within the same epoch.
+		// the sealing segment.
 		for _, block := range segment.AllBlocks() {
 			err = protocolState.Index(block.ID(), protocolStateID)(tx)
 			if err != nil {
@@ -432,10 +441,8 @@ func (state *State) bootstrapStatePointers(root protocol.Snapshot) func(*badger.
 
 // bootstrapEpoch bootstraps the protocol state database with information about
 // the previous, current, and next epochs as of the root snapshot.
-//
-// The root snapshot's sealing segment must not straddle any epoch transitions
-// or epoch phase transitions.
-func (state *State) bootstrapEpoch(epochs protocol.EpochQuery, segment *flow.SealingSegment, verifyNetworkAddress bool) func(*transaction.Tx) error {
+// TODO(yuraolex): This information can be bootstrapped from dynamic protocol state.
+func (state *State) bootstrapEpoch(epochs protocol.EpochQuery, verifyNetworkAddress bool) func(*transaction.Tx) error {
 	return func(tx *transaction.Tx) error {
 		previous := epochs.Previous()
 		current := epochs.Current()
@@ -555,18 +562,6 @@ func (state *State) bootstrapEpoch(epochs protocol.EpochQuery, segment *flow.Sea
 				return fmt.Errorf("could not store epoch commit event: %w", err)
 			}
 		}
-
-		// NOTE: as specified in the godoc, this code assumes that each block
-		// in the sealing segment in within the same phase within the same epoch.
-		// TODO(yuraolex): revisit this case, probably we need to bootstrap protocol state with some information from
-		// the sealing segment.
-		//for _, block := range segment.AllBlocks() {
-		//	blockID := block.ID()
-		//	err = state.epoch.statuses.StoreTx(blockID, status)(tx)
-		//	if err != nil {
-		//		return fmt.Errorf("could not store epoch status for block (id=%x): %w", blockID, err)
-		//	}
-		//}
 
 		return nil
 	}

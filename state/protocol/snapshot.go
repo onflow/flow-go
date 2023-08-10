@@ -137,6 +137,9 @@ type Snapshot interface {
 	// Returns invalid.Params with state.ErrUnknownSnapshotReference if snapshot reference block is unknown.
 	Params() GlobalParams
 
+	// ProtocolState returns the dynamic protocol state at the w.r.t the Head block.
+	// Returns state.ErrUnknownSnapshotReference if snapshot reference block is unknown.
+	// All other errors should be treated as exceptions.
 	ProtocolState() (DynamicProtocolState, error)
 
 	// VersionBeacon returns the latest sealed version beacon.
