@@ -622,7 +622,7 @@ func (s *Suite) runTestEpochJoinAndLeave(role flow.Role, checkNetworkHealth node
 	// staking our new node and add get the corresponding container for that node
 	s.TimedLogf("staking joining node with role %s", role.String())
 	info, testContainer := s.StakeNewNode(s.ctx, env, role)
-	s.TimedLogf("successfully staked joining node: %s", info.NodeID)
+	s.TimedLogf("successfully staked joining node: %s %s", testContainer.Name(), info.NodeID)
 
 	// use admin transaction to remove node, this simulates a node leaving the network
 	s.TimedLogf("removing node %s with role %s", containerToReplace.Config.NodeID, role.String())
