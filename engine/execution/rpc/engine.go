@@ -186,7 +186,7 @@ func (h *handler) ExecuteScriptAtBlockID(
 	// return a more user friendly error if block has not been executed
 	if _, err = h.commits.ByBlockID(blockID); err != nil {
 		if errors.Is(err, storage.ErrNotFound) {
-			return nil, status.Errorf(codes.NotFound, "block %s has not been executed by node", blockID)
+			return nil, status.Errorf(codes.NotFound, "block %s has not been executed by node or was pruned", blockID)
 		}
 		return nil, status.Errorf(codes.Internal, "state commitment for block ID %s could not be retrieved", blockID)
 	}
@@ -257,7 +257,7 @@ func (h *handler) GetEventsForBlockIDs(
 		// Check if block has been executed
 		if _, err := h.commits.ByBlockID(bID); err != nil {
 			if errors.Is(err, storage.ErrNotFound) {
-				return nil, status.Errorf(codes.NotFound, "block %s has not been executed by node", bID)
+				return nil, status.Errorf(codes.NotFound, "block %s has not been executed by node or was pruned", bID)
 			}
 			return nil, status.Errorf(codes.Internal, "state commitment for block ID %s could not be retrieved", bID)
 		}
@@ -419,7 +419,7 @@ func (h *handler) GetTransactionResultsByBlockID(
 	// an empty slice if block does not exist
 	if _, err = h.commits.ByBlockID(blockID); err != nil {
 		if errors.Is(err, storage.ErrNotFound) {
-			return nil, status.Errorf(codes.NotFound, "block %s has not been executed by node", blockID)
+			return nil, status.Errorf(codes.NotFound, "block %s has not been executed by node or was pruned", blockID)
 		}
 		return nil, status.Errorf(codes.Internal, "state commitment for block ID %s could not be retrieved", blockID)
 	}
@@ -531,7 +531,7 @@ func (h *handler) GetAccountAtBlockID(
 	// return a more user friendly error if block has not been executed
 	if _, err = h.commits.ByBlockID(blockFlowID); err != nil {
 		if errors.Is(err, storage.ErrNotFound) {
-			return nil, status.Errorf(codes.NotFound, "block %s has not been executed by node", blockFlowID)
+			return nil, status.Errorf(codes.NotFound, "block %s has not been executed by node or was pruned", blockFlowID)
 		}
 		return nil, status.Errorf(codes.Internal, "state commitment for block ID %s could not be retrieved", blockFlowID)
 	}
