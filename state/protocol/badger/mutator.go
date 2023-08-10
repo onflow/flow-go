@@ -597,7 +597,6 @@ func (m *FollowerState) insert(ctx context.Context, candidate *flow.Block, certi
 			}
 		}
 
-		// TODO: most likely temporary, it can be indexed as part of payload.
 		err = m.protocolState.Index(blockID, updatedStateID)(tx)
 		if err != nil {
 			return fmt.Errorf("could not index protocol state (%v) for block (%v): %w",
