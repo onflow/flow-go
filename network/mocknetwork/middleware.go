@@ -160,6 +160,11 @@ func (_m *Middleware) SetOverlay(_a0 network.Overlay) {
 	_m.Called(_a0)
 }
 
+// SetSlashingViolationsConsumer provides a mock function with given fields: _a0
+func (_m *Middleware) SetSlashingViolationsConsumer(_a0 network.ViolationsConsumer) {
+	_m.Called(_a0)
+}
+
 // Start provides a mock function with given fields: _a0
 func (_m *Middleware) Start(_a0 irrecoverable.SignalerContext) {
 	_m.Called(_a0)

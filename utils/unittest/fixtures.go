@@ -9,8 +9,6 @@ import (
 	"testing"
 	"time"
 
-	blocks "github.com/ipfs/go-block-format"
-	"github.com/ipfs/go-cid"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/stretchr/testify/require"
 
@@ -22,6 +20,7 @@ import (
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/engine"
+	"github.com/onflow/flow-go/engine/access/rest/util"
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/bitutils"
@@ -264,7 +263,10 @@ func WithAllTheFixins(payload *flow.Payload) {
 	payload.Seals = Seal.Fixtures(3)
 	payload.Guarantees = CollectionGuaranteesFixture(4)
 	for i := 0; i < 10; i++ {
-		receipt := ExecutionReceiptFixture()
+		receipt := ExecutionReceiptFixture(
+			WithResult(ExecutionResultFixture(WithServiceEvents(3))),
+			WithSpocks(SignaturesFixture(3)),
+		)
 		payload.Receipts = flow.ExecutionReceiptMetaList{receipt.Meta()}
 		payload.Results = flow.ExecutionResultList{&receipt.ExecutionResult}
 	}
@@ -412,12 +414,6 @@ func BlockHeaderFixture(opts ...func(header *flow.Header)) *flow.Header {
 	return header
 }
 
-func CidFixture() cid.Cid {
-	data := make([]byte, 1024)
-	_, _ = rand.Read(data)
-	return blocks.NewBlock(data).Cid()
-}
-
 func BlockHeaderFixtureOnChain(
 	chainID flow.ChainID,
 	opts ...func(header *flow.Header),
@@ -464,6 +460,38 @@ func BlockHeaderWithParentFixture(parent *flow.Header) *flow.Header {
 		ParentView:         parent.View,
 		ParentVoterIndices: SignerIndicesFixture(4),
 		ParentVoterSigData: QCSigDataFixture(),
+		ProposerID:         IdentifierFixture(),
+		ProposerSigData:    SignatureFixture(),
+		LastViewTC:         lastViewTC,
+	}
+}
+
+func BlockHeaderWithParentWithSoRFixture(parent *flow.Header, source []byte) *flow.Header {
+	height := parent.Height + 1
+	view := parent.View + 1 + uint64(rand.Intn(10)) // Intn returns [0, n)
+	var lastViewTC *flow.TimeoutCertificate
+	if view != parent.View+1 {
+		newestQC := QuorumCertificateFixture(func(qc *flow.QuorumCertificate) {
+			qc.View = parent.View
+		})
+		lastViewTC = &flow.TimeoutCertificate{
+			View:          view - 1,
+			NewestQCViews: []uint64{newestQC.View},
+			NewestQC:      newestQC,
+			SignerIndices: SignerIndicesFixture(4),
+			SigData:       SignatureFixture(),
+		}
+	}
+	return &flow.Header{
+		ChainID:            parent.ChainID,
+		ParentID:           parent.ID(),
+		Height:             height,
+		PayloadHash:        IdentifierFixture(),
+		Timestamp:          time.Now().UTC(),
+		View:               view,
+		ParentView:         parent.View,
+		ParentVoterIndices: SignerIndicesFixture(4),
+		ParentVoterSigData: QCSigDataWithSoRFixture(source),
 		ProposerID:         IdentifierFixture(),
 		ProposerSigData:    SignatureFixture(),
 		LastViewTC:         lastViewTC,
@@ -710,6 +738,12 @@ func WithExecutorID(executorID flow.Identifier) func(*flow.ExecutionReceipt) {
 func WithResult(result *flow.ExecutionResult) func(*flow.ExecutionReceipt) {
 	return func(receipt *flow.ExecutionReceipt) {
 		receipt.ExecutionResult = *result
+	}
+}
+
+func WithSpocks(spocks []crypto.Signature) func(*flow.ExecutionReceipt) {
+	return func(receipt *flow.ExecutionReceipt) {
+		receipt.Spocks = spocks
 	}
 }
 
@@ -1270,8 +1304,7 @@ func ChunkStatusListFixture(
 	return statuses
 }
 
-func QCSigDataFixture() []byte {
-	packer := hotstuff.SigDataPacker{}
+func qcSignatureDataFixture() hotstuff.SignatureData {
 	sigType := RandomBytes(5)
 	for i := range sigType {
 		sigType[i] = sigType[i] % 2
@@ -1282,6 +1315,20 @@ func QCSigDataFixture() []byte {
 		AggregatedRandomBeaconSig:    SignatureFixture(),
 		ReconstructedRandomBeaconSig: SignatureFixture(),
 	}
+	return sigData
+}
+
+func QCSigDataFixture() []byte {
+	packer := hotstuff.SigDataPacker{}
+	sigData := qcSignatureDataFixture()
+	encoded, _ := packer.Encode(&sigData)
+	return encoded
+}
+
+func QCSigDataWithSoRFixture(sor []byte) []byte {
+	packer := hotstuff.SigDataPacker{}
+	sigData := qcSignatureDataFixture()
+	sigData.ReconstructedRandomBeaconSig = sor
 	encoded, _ := packer.Encode(&sigData)
 	return encoded
 }
@@ -1294,6 +1341,14 @@ func SignatureFixture() crypto.Signature {
 
 func SignaturesFixture(n int) []crypto.Signature {
 	var sigs []crypto.Signature
+	for i := 0; i < n; i++ {
+		sigs = append(sigs, SignatureFixture())
+	}
+	return sigs
+}
+
+func RandomSourcesFixture(n int) [][]byte {
+	var sigs [][]byte
 	for i := 0; i < n; i++ {
 		sigs = append(sigs, SignatureFixture())
 	}
@@ -1608,6 +1663,18 @@ func BlockEventsFixture(
 	n int,
 	types ...flow.EventType,
 ) flow.BlockEvents {
+	return flow.BlockEvents{
+		BlockID:        header.ID(),
+		BlockHeight:    header.Height,
+		BlockTimestamp: header.Timestamp,
+		Events:         EventsFixture(n, types...),
+	}
+}
+
+func EventsFixture(
+	n int,
+	types ...flow.EventType,
+) []flow.Event {
 	if len(types) == 0 {
 		types = []flow.EventType{"A.0x1.Foo.Bar", "A.0x2.Zoo.Moo", "A.0x3.Goo.Hoo"}
 	}
@@ -1617,12 +1684,7 @@ func BlockEventsFixture(
 		events[i] = EventFixture(types[i%len(types)], 0, uint32(i), IdentifierFixture(), 0)
 	}
 
-	return flow.BlockEvents{
-		BlockID:        header.ID(),
-		BlockHeight:    header.Height,
-		BlockTimestamp: header.Timestamp,
-		Events:         events,
-	}
+	return events
 }
 
 // EventFixture returns an event
@@ -2410,19 +2472,25 @@ func WithChunkEvents(events flow.EventsList) func(*execution_data.ChunkExecution
 	}
 }
 
+func WithTrieUpdate(trieUpdate *ledger.TrieUpdate) func(*execution_data.ChunkExecutionData) {
+	return func(conf *execution_data.ChunkExecutionData) {
+		conf.TrieUpdate = trieUpdate
+	}
+}
+
 func ChunkExecutionDataFixture(t *testing.T, minSize int, opts ...func(*execution_data.ChunkExecutionData)) *execution_data.ChunkExecutionData {
-	collection := CollectionFixture(1)
+	collection := CollectionFixture(5)
 	ced := &execution_data.ChunkExecutionData{
 		Collection: &collection,
 		Events:     flow.EventsList{},
-		TrieUpdate: testutils.TrieUpdateFixture(1, 1, 8),
+		TrieUpdate: testutils.TrieUpdateFixture(2, 1, 8),
 	}
 
 	for _, opt := range opts {
 		opt(ced)
 	}
 
-	if minSize <= 1 {
+	if minSize <= 1 || ced.TrieUpdate == nil {
 		return ced
 	}
 
@@ -2435,7 +2503,7 @@ func ChunkExecutionDataFixture(t *testing.T, minSize int, opts ...func(*executio
 		}
 
 		v := make([]byte, size)
-		_, err := rand.Read(v)
+		_, err := crand.Read(v)
 		require.NoError(t, err)
 
 		k, err := ced.TrieUpdate.Payloads[0].Key()
@@ -2443,5 +2511,37 @@ func ChunkExecutionDataFixture(t *testing.T, minSize int, opts ...func(*executio
 
 		ced.TrieUpdate.Payloads[0] = ledger.NewPayload(k, v)
 		size *= 2
+	}
+}
+
+func CreateSendTxHttpPayload(tx flow.TransactionBody) map[string]interface{} {
+	tx.Arguments = [][]uint8{} // fix how fixture creates nil values
+	auth := make([]string, len(tx.Authorizers))
+	for i, a := range tx.Authorizers {
+		auth[i] = a.String()
+	}
+
+	return map[string]interface{}{
+		"script":             util.ToBase64(tx.Script),
+		"arguments":          tx.Arguments,
+		"reference_block_id": tx.ReferenceBlockID.String(),
+		"gas_limit":          fmt.Sprintf("%d", tx.GasLimit),
+		"payer":              tx.Payer.String(),
+		"proposal_key": map[string]interface{}{
+			"address":         tx.ProposalKey.Address.String(),
+			"key_index":       fmt.Sprintf("%d", tx.ProposalKey.KeyIndex),
+			"sequence_number": fmt.Sprintf("%d", tx.ProposalKey.SequenceNumber),
+		},
+		"authorizers": auth,
+		"payload_signatures": []map[string]interface{}{{
+			"address":   tx.PayloadSignatures[0].Address.String(),
+			"key_index": fmt.Sprintf("%d", tx.PayloadSignatures[0].KeyIndex),
+			"signature": util.ToBase64(tx.PayloadSignatures[0].Signature),
+		}},
+		"envelope_signatures": []map[string]interface{}{{
+			"address":   tx.EnvelopeSignatures[0].Address.String(),
+			"key_index": fmt.Sprintf("%d", tx.EnvelopeSignatures[0].KeyIndex),
+			"signature": util.ToBase64(tx.EnvelopeSignatures[0].Signature),
+		}},
 	}
 }

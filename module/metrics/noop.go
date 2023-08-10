@@ -4,6 +4,8 @@ import (
 	"context"
 	"time"
 
+	"google.golang.org/grpc/codes"
+
 	"github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/protocol"
@@ -197,6 +199,10 @@ func (nc *NoopCollector) RuntimeTransactionProgramsCacheHit()                   
 func (nc *NoopCollector) ScriptExecuted(dur time.Duration, size int)                       {}
 func (nc *NoopCollector) ScriptExecutionErrorOnArchiveNode()                               {}
 func (nc *NoopCollector) ScriptExecutionErrorOnExecutionNode()                             {}
+func (nc *NoopCollector) ScriptExecutionResultMismatch()                                   {}
+func (nc *NoopCollector) ScriptExecutionResultMatch()                                      {}
+func (nc *NoopCollector) ScriptExecutionErrorMismatch()                                    {}
+func (nc *NoopCollector) ScriptExecutionErrorMatch()                                       {}
 func (nc *NoopCollector) TransactionResultFetched(dur time.Duration, size int)             {}
 func (nc *NoopCollector) TransactionReceived(txID flow.Identifier, when time.Time)         {}
 func (nc *NoopCollector) TransactionFinalized(txID flow.Identifier, when time.Time)        {}
@@ -303,3 +309,8 @@ func (nc *NoopCollector) AsyncProcessingStarted(string)                         
 func (nc *NoopCollector) AsyncProcessingFinished(string, time.Duration)             {}
 
 func (nc *NoopCollector) OnMisbehaviorReported(string, string) {}
+func (nc *NoopCollector) OnViolationReportSkipped()            {}
+
+var _ ObserverMetrics = (*NoopCollector)(nil)
+
+func (nc *NoopCollector) RecordRPC(handler, rpc string, code codes.Code) {}

@@ -178,7 +178,7 @@ const (
 	FVMEnvBLSAggregatePublicKeys     SpanName = "fvm.env.blsAggregatePublicKeys"
 	FVMEnvGetCurrentBlockHeight      SpanName = "fvm.env.getCurrentBlockHeight"
 	FVMEnvGetBlockAtHeight           SpanName = "fvm.env.getBlockAtHeight"
-	FVMEnvUnsafeRandom               SpanName = "fvm.env.unsafeRandom"
+	FVMEnvRandom                     SpanName = "fvm.env.unsafeRandom"
 	FVMEnvCreateAccount              SpanName = "fvm.env.createAccount"
 	FVMEnvAddAccountKey              SpanName = "fvm.env.addAccountKey"
 	FVMEnvAddEncodedAccountKey       SpanName = "fvm.env.addEncodedAccountKey"
