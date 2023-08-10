@@ -350,20 +350,13 @@ func SnapshotFromBootstrapStateWithParams(
 		EpochCommitSafetyThreshold: epochCommitSafetyThreshold, // see protocol.Params for details
 	}
 
-	initialProtocolStateParticipants := make(flow.DynamicIdentityEntryList, 0, len(setup.Participants))
-	for _, participant := range setup.Participants {
-		initialProtocolStateParticipants = append(initialProtocolStateParticipants, &flow.DynamicIdentityEntry{
-			NodeID:  participant.NodeID,
-			Dynamic: participant.DynamicIdentity,
-		})
-	}
 	protocolState := &flow.ProtocolStateEntry{
 		CurrentEpochEventIDs: flow.EventIDs{
 			SetupID:  setup.ID(),
 			CommitID: commit.ID(),
 		},
 		PreviousEpochEventIDs:           flow.EventIDs{},
-		Identities:                      initialProtocolStateParticipants,
+		Identities:                      flow.DynamicIdentityEntryListFromIdentities(setup.Participants),
 		InvalidStateTransitionAttempted: false,
 		NextEpochProtocolState:          nil,
 	}

@@ -1,6 +1,7 @@
 package run
 
 import (
+	"github.com/onflow/flow-go/model/flow/order"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -32,7 +33,8 @@ func TestGenerateClusterRootQC(t *testing.T) {
 	payload := cluster.EmptyPayload(flow.ZeroID)
 	clusterBlock.SetPayload(payload)
 
-	_, err := GenerateClusterRootQC(participants, model.ToIdentityList(participants), &clusterBlock)
+	orderedParticipants := model.ToIdentityList(participants).Sort(order.Canonical)
+	_, err := GenerateClusterRootQC(participants, orderedParticipants, &clusterBlock)
 	require.NoError(t, err)
 }
 

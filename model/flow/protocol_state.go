@@ -80,17 +80,25 @@ func NewRichProtocolStateEntry(
 	// ensure data is consistent
 	if protocolState.PreviousEpochEventIDs.SetupID != ZeroID {
 		if protocolState.PreviousEpochEventIDs.SetupID != previousEpochSetup.ID() {
-			return nil, fmt.Errorf("supplied previous epoch setup does not match protocol state")
+			return nil, fmt.Errorf("supplied previous epoch setup (%x) does not match protocol state (%x)",
+				previousEpochSetup.ID(),
+				protocolState.PreviousEpochEventIDs.SetupID)
 		}
 		if protocolState.PreviousEpochEventIDs.CommitID != previousEpochCommit.ID() {
-			return nil, fmt.Errorf("supplied previous epoch commit does not match protocol state")
+			return nil, fmt.Errorf("supplied previous epoch commit (%x) does not match protocol state (%x)",
+				previousEpochCommit.ID(),
+				protocolState.PreviousEpochEventIDs.CommitID)
 		}
 	}
 	if protocolState.CurrentEpochEventIDs.SetupID != currentEpochSetup.ID() {
-		return nil, fmt.Errorf("supplied current epoch setup does not match protocol state")
+		return nil, fmt.Errorf("supplied current epoch setup (%x) does not match protocol state (%x)",
+			currentEpochSetup.ID(),
+			protocolState.CurrentEpochEventIDs.SetupID)
 	}
 	if protocolState.CurrentEpochEventIDs.CommitID != currentEpochCommit.ID() {
-		return nil, fmt.Errorf("supplied current epoch commit does not match protocol state")
+		return nil, fmt.Errorf("supplied current epoch commit (%x) does not match protocol state (%x)",
+			currentEpochCommit.ID(),
+			protocolState.CurrentEpochEventIDs.CommitID)
 	}
 
 	var err error
@@ -98,11 +106,15 @@ func NewRichProtocolStateEntry(
 	// if next epoch has been already committed, fill in data for it as well.
 	if nextEpochProtocolState != nil {
 		if nextEpochProtocolState.CurrentEpochEventIDs.SetupID != nextEpochSetup.ID() {
-			return nil, fmt.Errorf("supplied next epoch setup does not match protocol state")
+			return nil, fmt.Errorf("supplied next epoch setup (%x) does not match protocol state (%x)",
+				nextEpochSetup.ID(),
+				nextEpochProtocolState.CurrentEpochEventIDs.SetupID)
 		}
 		if nextEpochProtocolState.CurrentEpochEventIDs.CommitID != ZeroID {
 			if nextEpochProtocolState.CurrentEpochEventIDs.CommitID != nextEpochCommit.ID() {
-				return nil, fmt.Errorf("supplied next epoch commit does not match protocol state")
+				return nil, fmt.Errorf("supplied next epoch commit (%x) does not match protocol state (%x)",
+					nextEpochCommit.ID(),
+					nextEpochProtocolState.CurrentEpochEventIDs.CommitID)
 			}
 		}
 

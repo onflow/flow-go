@@ -2,7 +2,6 @@ package protocol
 
 import (
 	"fmt"
-
 	"github.com/onflow/flow-go/module/signature"
 
 	"github.com/onflow/flow-go/crypto"
