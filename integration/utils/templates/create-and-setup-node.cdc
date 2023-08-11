@@ -1,7 +1,7 @@
 import Crypto
 import FungibleToken from 0xFUNGIBLETOKENADDRESS
 import FlowToken from 0xFLOWTOKENADDRESS
-import FlowIDTableStaking from 0xIDENTITYTABLEADDRESS
+import FlowIDTableStaking from "FlowIDTableStaking"
 import FlowStakingCollection from 0xSTAKINGCOLLECTIONADDRESS
 
 transaction(
