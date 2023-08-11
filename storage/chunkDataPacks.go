@@ -10,6 +10,8 @@ type ChunkDataPacks interface {
 	// Store inserts the chunk header, keyed by chunk ID.
 	Store(c *flow.ChunkDataPack) error
 
+	StoreMul(c []*flow.ChunkDataPack) error
+
 	// BatchStore inserts the chunk header, keyed by chunk ID into a given batch
 	BatchStore(c *flow.ChunkDataPack, batch BatchStorage) error
 

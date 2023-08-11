@@ -77,6 +77,7 @@ type state struct {
 	serviceEvents      storage.ServiceEvents
 	transactionResults storage.TransactionResults
 	db                 *badger.DB
+	chunkDB            *badger.DB
 }
 
 func RegisterIDToKey(reg flow.RegisterID) ledger.Key {
@@ -288,6 +289,11 @@ func (s *state) SaveExecutionResults(
 	header := result.ExecutableBlock.Block.Header
 	blockID := header.ID()
 
+	err := s.chunkDataPacks.StoreMul(result.AllChunkDataPacks())
+	if err != nil {
+		return fmt.Errorf("can not store multile chunk data pack: %w", err)
+	}
+
 	// Write Batch is BadgerDB feature designed for handling lots of writes
 	// in efficient and automatic manner, hence pushing all the updates we can
 	// as tightly as possible to let Badger manage it.
@@ -295,14 +301,7 @@ func (s *state) SaveExecutionResults(
 	// but it's the closest thing to atomicity we could have
 	batch := badgerstorage.NewBatch(s.db)
 
-	for _, chunkDataPack := range result.AllChunkDataPacks() {
-		err := s.chunkDataPacks.BatchStore(chunkDataPack, batch)
-		if err != nil {
-			return fmt.Errorf("cannot store chunk data pack: %w", err)
-		}
-	}
-
-	err := s.events.BatchStore(blockID, []flow.EventsList{result.AllEvents()}, batch)
+	err = s.events.BatchStore(blockID, []flow.EventsList{result.AllEvents()}, batch)
 	if err != nil {
 		return fmt.Errorf("cannot store events: %w", err)
 	}
