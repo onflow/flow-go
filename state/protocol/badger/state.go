@@ -233,7 +233,7 @@ func (state *State) bootstrapProtocolState(segment *flow.SealingSegment, root pr
 		if err != nil {
 			return fmt.Errorf("could not get root protocol state: %w", err)
 		}
-		rootProtocolStateEntry := rootProtocolState.Entry()
+		rootProtocolStateEntry := rootProtocolState.Entry().ProtocolStateEntry
 		protocolStateID := rootProtocolStateEntry.ID()
 		err = protocolState.StoreTx(protocolStateID, rootProtocolStateEntry)(tx)
 		if err != nil {
