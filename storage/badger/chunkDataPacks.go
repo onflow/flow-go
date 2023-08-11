@@ -82,6 +82,22 @@ func (ch *ChunkDataPacks) BatchStore(c *flow.ChunkDataPack, batch storage.BatchS
 	return operation.BatchInsertChunkDataPack(sc)(writeBatch)
 }
 
+func (ch *ChunkDataPacks) StoreMul(cs []*flow.ChunkDataPack) error {
+	batch := NewBatch(ch.db)
+	for _, c := range cs {
+		err := ch.BatchStore(c, batch)
+		if err != nil {
+			return fmt.Errorf("cannot store chunk data pack: %w", err)
+		}
+	}
+
+	err := batch.Flush()
+	if err != nil {
+		return fmt.Errorf("cannot flush batch: %w", err)
+	}
+	return nil
+}
+
 // BatchRemove removes ChunkDataPack c keyed by its ChunkID in provided batch
 // No errors are expected during normal operation, even if no entries are matched.
 // If Badger unexpectedly fails to process the request, the error is wrapped in a generic error and returned.
