@@ -68,6 +68,11 @@ func (e *Events) BatchStore(blockID flow.Identifier, blockEvents []flow.EventsLi
 	return nil
 }
 
+func (e *Events) Store(blockID flow.Identifier, blockEvents []flow.EventsList) error {
+	batch := NewBatch(e.db)
+	return e.BatchStore(blockID, blockEvents, batch)
+}
+
 // ByBlockID returns the events for the given block ID
 func (e *Events) ByBlockID(blockID flow.Identifier) ([]flow.Event, error) {
 	tx := e.db.NewTransaction(false)
@@ -178,6 +183,11 @@ func (e *ServiceEvents) BatchStore(blockID flow.Identifier, events []flow.Event,
 	}
 	batch.OnSucceed(callback)
 	return nil
+}
+
+func (e *ServiceEvents) Store(blockID flow.Identifier, events []flow.Event) error {
+	batch := NewBatch(e.db)
+	return e.BatchStore(blockID, events, batch)
 }
 
 // ByBlockID returns the events for the given block ID

@@ -26,6 +26,8 @@ type Events interface {
 	// No errors are expected during normal operation, even if no entries are matched.
 	// If Badger unexpectedly fails to process the request, the error is wrapped in a generic error and returned.
 	BatchRemoveByBlockID(blockID flow.Identifier, batch BatchStorage) error
+
+	Store(blockID flow.Identifier, blockEvents []flow.EventsList) error
 }
 
 type ServiceEvents interface {
@@ -41,4 +43,6 @@ type ServiceEvents interface {
 	// No errors are expected during normal operation, even if no entries are matched.
 	// If Badger unexpectedly fails to process the request, the error is wrapped in a generic error and returned.
 	BatchRemoveByBlockID(blockID flow.Identifier, batch BatchStorage) error
+
+	Store(blockID flow.Identifier, events []flow.Event) error
 }
