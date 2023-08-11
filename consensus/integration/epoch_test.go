@@ -242,8 +242,6 @@ func withNextEpoch(
 
 	participantsCache.Update(encodableSnapshot.Epochs.Next.Counter, nextEpochParticipantData)
 
-	// we must start the current epoch in committed phase so we can transition to the next epoch
-	encodableSnapshot.Phase = flow.EpochPhaseCommitted
 	encodableSnapshot.LatestSeal.ResultID = encodableSnapshot.LatestResult.ID()
 
 	// set identities for root snapshot to include next epoch identities,

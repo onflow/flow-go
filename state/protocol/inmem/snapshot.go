@@ -77,7 +77,7 @@ func (s Snapshot) Encodable() EncodableSnapshot {
 
 func (s Snapshot) ProtocolState() (protocol.DynamicProtocolState, error) {
 	epochs := s.Epochs()
-	previous := epochs.Previous()gita
+	previous := epochs.Previous()
 	current := epochs.Current()
 	next := epochs.Next()
 	var (
