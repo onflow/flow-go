@@ -43,10 +43,6 @@ func FromSnapshot(from protocol.Snapshot) (*Snapshot, error) {
 	if err != nil {
 		return nil, fmt.Errorf("could not get qc: %w", err)
 	}
-	snap.Phase, err = from.Phase()
-	if err != nil {
-		return nil, fmt.Errorf("could not get phase: %w", err)
-	}
 
 	// convert epochs
 	previous, err := FromEpoch(from.Epochs().Previous())
@@ -374,7 +370,6 @@ func SnapshotFromBootstrapStateWithParams(
 			ExtraBlocks:      make([]*flow.Block, 0),
 		},
 		QuorumCertificate:   qc,
-		Phase:               flow.EpochPhaseStaking,
 		Epochs:              epochs,
 		Params:              params,
 		ProtocolState:       protocolState,

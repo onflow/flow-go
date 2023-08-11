@@ -56,7 +56,7 @@ func (s Snapshot) Descendants() ([]flow.Identifier, error) {
 }
 
 func (s Snapshot) Phase() (flow.EpochPhase, error) {
-	return s.enc.Phase, nil
+	return s.enc.ProtocolState.EpochStatus().Phase()
 }
 
 func (s Snapshot) RandomSource() ([]byte, error) {
@@ -77,7 +77,7 @@ func (s Snapshot) Encodable() EncodableSnapshot {
 
 func (s Snapshot) ProtocolState() (protocol.DynamicProtocolState, error) {
 	epochs := s.Epochs()
-	previous := epochs.Previous()
+	previous := epochs.Previous()gita
 	current := epochs.Current()
 	next := epochs.Next()
 	var (

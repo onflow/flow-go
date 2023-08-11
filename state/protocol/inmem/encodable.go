@@ -14,7 +14,6 @@ type EncodableSnapshot struct {
 	LatestResult        *flow.ExecutionResult
 	SealingSegment      *flow.SealingSegment
 	QuorumCertificate   *flow.QuorumCertificate
-	Phase               flow.EpochPhase
 	Epochs              EncodableEpochs
 	Params              EncodableParams
 	ProtocolState       *flow.ProtocolStateEntry
