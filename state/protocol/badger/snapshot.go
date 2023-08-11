@@ -386,13 +386,13 @@ func (q *EpochQuery) Next() protocol.Epoch {
 	}
 
 	// if we are in setup phase, return a SetupEpoch
-	nextSetup := protocolState.Entry().CurrentEpochSetup
+	nextSetup := protocolState.Entry().NextEpochProtocolState.CurrentEpochSetup
 	if phase == flow.EpochPhaseSetup {
 		return inmem.NewSetupEpoch(nextSetup)
 	}
 
 	// if we are in committed phase, return a CommittedEpoch
-	nextCommit := protocolState.Entry().CurrentEpochCommit
+	nextCommit := protocolState.Entry().NextEpochProtocolState.CurrentEpochCommit
 	return inmem.NewCommittedEpoch(nextSetup, nextCommit)
 }
 
