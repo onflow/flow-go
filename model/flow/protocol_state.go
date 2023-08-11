@@ -203,6 +203,22 @@ func (e *ProtocolStateEntry) Copy() *ProtocolStateEntry {
 	}
 }
 
+// Copy returns a full copy of rich protocol state entry.
+func (e *RichProtocolStateEntry) Copy() *RichProtocolStateEntry {
+	if e == nil {
+		return nil
+	}
+	return &RichProtocolStateEntry{
+		ProtocolStateEntry:     e.ProtocolStateEntry.Copy(),
+		CurrentEpochSetup:      e.CurrentEpochSetup,
+		CurrentEpochCommit:     e.CurrentEpochCommit,
+		PreviousEpochSetup:     e.PreviousEpochSetup,
+		PreviousEpochCommit:    e.PreviousEpochCommit,
+		Identities:             e.Identities.Copy(),
+		NextEpochProtocolState: e.NextEpochProtocolState.Copy(),
+	}
+}
+
 // EpochStatus returns epoch status for the current protocol state.
 func (e *ProtocolStateEntry) EpochStatus() *EpochStatus {
 	var nextEpoch EventIDs
