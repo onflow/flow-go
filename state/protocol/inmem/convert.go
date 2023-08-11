@@ -26,10 +26,6 @@ func FromSnapshot(from protocol.Snapshot) (*Snapshot, error) {
 	if err != nil {
 		return nil, fmt.Errorf("could not get head: %w", err)
 	}
-	snap.Identities, err = from.Identities(filter.Any)
-	if err != nil {
-		return nil, fmt.Errorf("could not get identities: %w", err)
-	}
 	snap.LatestResult, snap.LatestSeal, err = from.SealedResult()
 	if err != nil {
 		return nil, fmt.Errorf("could not get seal: %w", err)
@@ -359,7 +355,6 @@ func SnapshotFromBootstrapStateWithParams(
 
 	snap := SnapshotFromEncodable(EncodableSnapshot{
 		Head:         root.Header,
-		Identities:   setup.Participants,
 		LatestSeal:   seal,
 		LatestResult: result,
 		SealingSegment: &flow.SealingSegment{

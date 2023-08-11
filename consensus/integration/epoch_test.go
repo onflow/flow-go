@@ -33,9 +33,11 @@ func TestUnweightedNode(t *testing.T) {
 	// * same collection node from epoch 1, so cluster QCs are consistent
 	// * 1 new consensus node, joining at epoch 2
 	// * random nodes with other roles
+	currentEpochCollectionNodes, err := rootSnapshot.Identities(filter.HasRole(flow.RoleCollection))
+	require.NoError(t, err)
 	nextEpochIdentities := unittest.CompleteIdentitySet(
 		append(
-			rootSnapshot.Encodable().Identities.Filter(filter.HasRole(flow.RoleCollection)),
+			currentEpochCollectionNodes,
 			nextEpochParticipantsData.Identities()...)...,
 	)
 	rootSnapshot = withNextEpoch(
@@ -244,16 +246,20 @@ func withNextEpoch(
 
 	encodableSnapshot.LatestSeal.ResultID = encodableSnapshot.LatestResult.ID()
 
+	// update protocol state
+	protocolState := encodableSnapshot.ProtocolState
+
 	// set identities for root snapshot to include next epoch identities,
 	// since we are in committed phase
-	encodableSnapshot.Identities = append(
-		// all the current epoch identities
-		currentEpochIdentities,
-		// and all the NEW identities in next epoch, with 0 weight
-		nextEpochIdentities.
-			Filter(filter.Not(filter.In(encodableSnapshot.Identities))).
-			Map(mapfunc.WithWeight(0))...,
-	).Sort(order.Canonical)
+	protocolState.Identities = flow.DynamicIdentityEntryListFromIdentities(
+		append(
+			// all the current epoch identities
+			currentEpochIdentities,
+			// and all the NEW identities in next epoch, with 0 weight
+			nextEpochIdentities.
+				Filter(filter.Not(filter.In(currentEpochIdentities))).
+				Map(mapfunc.WithWeight(0))...,
+		).Sort(order.Canonical))
 
 	nextEpochIdentities = append(
 		// all the next epoch identities
@@ -264,10 +270,6 @@ func withNextEpoch(
 			Map(mapfunc.WithWeight(0))...,
 	).Sort(order.Canonical)
 
-	// update protocol state
-	protocolState := encodableSnapshot.ProtocolState
-	// update protocol state identities since we are in committed phase
-	protocolState.Identities = flow.DynamicIdentityEntryListFromIdentities(encodableSnapshot.Identities)
 	// setup ID has changed, need to update it
 	convertedEpochSetup, _ := protocol.ToEpochSetup(inmem.NewEpoch(*currEpoch))
 	protocolState.CurrentEpochEventIDs.SetupID = convertedEpochSetup.ID()

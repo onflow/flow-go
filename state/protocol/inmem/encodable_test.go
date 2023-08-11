@@ -56,7 +56,7 @@ func TestStrippedEncodeDecode(t *testing.T) {
 	err = json.Unmarshal(snapshotJson, &decodedSnapshot)
 	require.NoError(t, err)
 	// check that the network addresses for all the identities are still empty
-	assert.Len(t, decodedSnapshot.Identities.Filter(func(id *flow.Identity) bool {
+	assert.Len(t, decodedSnapshot.Epochs.Current.InitialIdentities.Filter(func(id *flow.Identity) bool {
 		return id.Address == ""
 	}), len(participants))
 }
