@@ -86,7 +86,7 @@ func FromSnapshot(from protocol.Snapshot) (*Snapshot, error) {
 	if err != nil {
 		return nil, fmt.Errorf("could not get protocol state: %w", err)
 	}
-	snap.ProtocolState = protocolState.Entry()
+	snap.ProtocolState = protocolState.Entry().ProtocolStateEntry
 
 	// convert version beacon
 	versionBeacon, err := from.VersionBeacon()
