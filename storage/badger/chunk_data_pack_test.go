@@ -79,6 +79,25 @@ func TestChunkDataPacks_MissingItem(t *testing.T) {
 	})
 }
 
+// TestChunkDataPacks_StoreTwice evaluates that storing the same chunk data pack twice
+// does not result in an error.
+func TestChunkDataPacks_StoreTwice(t *testing.T) {
+	WithChunkDataPacks(t, 2, func(t *testing.T, chunkDataPacks []*flow.ChunkDataPack, chunkDataPackStore *badgerstorage.ChunkDataPacks, db *badger.DB) {
+		transactions := badgerstorage.NewTransactions(&metrics.NoopCollector{}, db)
+		collections := badgerstorage.NewCollections(db, transactions)
+		store := badgerstorage.NewChunkDataPacks(&metrics.NoopCollector{}, db, collections, 1)
+		require.NoError(t, store.StoreMul(chunkDataPacks))
+
+		for _, c := range chunkDataPacks {
+			c2, err := store.ByChunkID(c.ChunkID)
+			require.NoError(t, err)
+			require.Equal(t, c, c2)
+		}
+
+		require.NoError(t, store.StoreMul(chunkDataPacks))
+	})
+}
+
 // WithChunkDataPacks is a test helper that generates specified number of chunk data packs, store them using the storeFunc, and
 // then evaluates whether they are successfully retrieved from storage.
 func WithChunkDataPacks(t *testing.T, chunks int, storeFunc func(*testing.T, []*flow.ChunkDataPack, *badgerstorage.ChunkDataPacks, *badger.DB)) {
