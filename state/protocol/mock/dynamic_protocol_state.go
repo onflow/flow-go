@@ -67,15 +67,15 @@ func (_m *DynamicProtocolState) DKG() (protocol.DKG, error) {
 }
 
 // Entry provides a mock function with given fields:
-func (_m *DynamicProtocolState) Entry() *flow.ProtocolStateEntry {
+func (_m *DynamicProtocolState) Entry() *flow.RichProtocolStateEntry {
 	ret := _m.Called()
 
-	var r0 *flow.ProtocolStateEntry
-	if rf, ok := ret.Get(0).(func() *flow.ProtocolStateEntry); ok {
+	var r0 *flow.RichProtocolStateEntry
+	if rf, ok := ret.Get(0).(func() *flow.RichProtocolStateEntry); ok {
 		r0 = rf()
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*flow.ProtocolStateEntry)
+			r0 = ret.Get(0).(*flow.RichProtocolStateEntry)
 		}
 	}
 
