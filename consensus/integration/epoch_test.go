@@ -217,9 +217,10 @@ func withNextEpoch(
 	// convert to encodable representation for simple modification
 	encodableSnapshot := snapshot.Encodable()
 
+	currEpoch := &encodableSnapshot.Epochs.Current // take pointer so assignments apply
+	currentEpochIdentities := currEpoch.InitialIdentities
 	nextEpochIdentities = nextEpochIdentities.Sort(order.Canonical)
 
-	currEpoch := &encodableSnapshot.Epochs.Current                // take pointer so assignments apply
 	currEpoch.FinalView = currEpoch.FirstView + curEpochViews - 1 // first epoch lasts curEpochViews
 	encodableSnapshot.Epochs.Next = &inmem.EncodableEpoch{
 		Counter:           currEpoch.Counter + 1,
@@ -249,10 +250,19 @@ func withNextEpoch(
 	// since we are in committed phase
 	encodableSnapshot.Identities = append(
 		// all the current epoch identities
-		encodableSnapshot.Identities,
+		currentEpochIdentities,
 		// and all the NEW identities in next epoch, with 0 weight
 		nextEpochIdentities.
 			Filter(filter.Not(filter.In(encodableSnapshot.Identities))).
+			Map(mapfunc.WithWeight(0))...,
+	).Sort(order.Canonical)
+
+	nextEpochIdentities = append(
+		// all the next epoch identities
+		nextEpochIdentities,
+		// and all identities from current epoch, with 0 weight
+		currentEpochIdentities.
+			Filter(filter.Not(filter.In(nextEpochIdentities))).
 			Map(mapfunc.WithWeight(0))...,
 	).Sort(order.Canonical)
 
@@ -272,7 +282,7 @@ func withNextEpoch(
 			CommitID: convertedEpochCommit.ID(),
 		},
 		PreviousEpochEventIDs:           protocolState.CurrentEpochEventIDs,
-		Identities:                      flow.DynamicIdentityEntryListFromIdentities(encodableSnapshot.Identities),
+		Identities:                      flow.DynamicIdentityEntryListFromIdentities(nextEpochIdentities),
 		InvalidStateTransitionAttempted: false,
 		NextEpochProtocolState:          nil,
 	}
