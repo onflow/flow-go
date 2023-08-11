@@ -386,17 +386,13 @@ func (q *EpochQuery) Next() protocol.Epoch {
 	}
 
 	// if we are in setup phase, return a SetupEpoch
-	nextSetup := protocolState.Entry()
+	nextSetup := protocolState.Entry().CurrentEpochSetup
 	if phase == flow.EpochPhaseSetup {
 		return inmem.NewSetupEpoch(nextSetup)
 	}
 
 	// if we are in committed phase, return a CommittedEpoch
-	nextCommit, err := q.snap.state.epoch.commits.ByID(status.NextEpoch.CommitID)
-	if err != nil {
-		// all errors are critical, because we must be able to retrieve EpochCommit when in committed phase
-		return invalid.NewEpochf("could not get next EpochCommit (id=%x) for block %x: %w", status.NextEpoch.CommitID, q.snap.blockID, err)
-	}
+	nextCommit := protocolState.Entry().CurrentEpochCommit
 	return inmem.NewCommittedEpoch(nextSetup, nextCommit)
 }
 
@@ -410,6 +406,7 @@ func (q *EpochQuery) Previous() protocol.Epoch {
 		return invalid.NewEpochf("could not get protocol state at block %x: %w", q.snap.blockID, err)
 	}
 	status := protocolState.EpochStatus()
+	entry := protocolState.Entry()
 
 	// CASE 1: there is no previous epoch - this indicates we are in the first
 	// epoch after a spork root or genesis block
@@ -419,16 +416,8 @@ func (q *EpochQuery) Previous() protocol.Epoch {
 
 	// CASE 2: we are in any other epoch - retrieve the setup and commit events
 	// for the previous epoch
-	setup, err := q.snap.state.epoch.setups.ByID(status.PreviousEpoch.SetupID)
-	if err != nil {
-		// all errors are critical, because we must be able to retrieve EpochSetup for previous epoch
-		return invalid.NewEpochf("could not get previous EpochSetup (id=%x) for block %x: %w", status.PreviousEpoch.SetupID, q.snap.blockID, err)
-	}
-	commit, err := q.snap.state.epoch.commits.ByID(status.PreviousEpoch.CommitID)
-	if err != nil {
-		// all errors are critical, because we must be able to retrieve EpochCommit for previous epoch
-		return invalid.NewEpochf("could not get current EpochCommit (id=%x) for block %x: %w", status.PreviousEpoch.CommitID, q.snap.blockID, err)
-	}
+	setup := entry.PreviousEpochSetup
+	commit := entry.PreviousEpochCommit
 
 	firstHeight, finalHeight, _, epochEnded, err := q.retrieveEpochHeightBounds(setup.Counter)
 	if err != nil {
