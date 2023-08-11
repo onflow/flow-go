@@ -23,7 +23,7 @@ type InitialProtocolState interface {
 	// Entry Returns low-level protocol state entry that was used to initialize this object.
 	// It shouldn't be used by high-level logic, it is useful for some cases such as bootstrapping.
 	// Prefer using other methods to access protocol state.
-	Entry() *flow.ProtocolStateEntry
+	Entry() *flow.RichProtocolStateEntry
 }
 
 // DynamicProtocolState extends the InitialProtocolState with data that can change from block to block.
