@@ -36,7 +36,7 @@ func (suite *Suite) WithPreConfiguredState(f func(snap protocol.Snapshot)) {
 
 		// setup AtHeight mock returns for state
 		for _, height := range epoch1.Range() {
-			suite.state.On("AtHeisght", epoch1.Range()).Return(state.AtHeight(height))
+			suite.state.On("AtHeight", epoch1.Range()).Return(state.AtHeight(height))
 		}
 
 		snap := state.AtHeight(epoch1.Range()[0])
