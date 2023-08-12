@@ -312,10 +312,9 @@ func (m *MisbehaviorReportManager) onHeartbeat() error {
 
 			// TODO: this can be done in batch but at this stage let's send individual notifications.
 			//       (it requires enabling the batch mode end-to-end including the cache in middleware).
-			// as long as record.Penalty is NOT below model.disallowListingThreshold,
+			// as long as record.Penalty is NOT below model.DisallowListingThreshold,
 			// the node is considered allow-listed and can conduct inbound and outbound connections.
-			// Once it falls below model.disallowListingThreshold, it needs to be disallow listed.
-			//if record.Penalty < model.disallowListingThreshold && !record.DisallowListed {
+			// Once it falls below model.DisallowListingThreshold, it needs to be disallow listed.
 			if record.Penalty < model.DisallowListingThreshold && !record.DisallowListed {
 				// cutoff counter keeps track of how many times the penalty has been below the threshold.
 				record.CutoffCounter++
