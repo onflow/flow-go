@@ -172,7 +172,7 @@ func (suite *Suite) TestGetTransactionResultReturnsValidTransactionResultFromHis
 
 		suite.historicalAccessClient.
 			On("GetTransactionResult", mock.Anything, mock.Anything).
-			Return(&transactionResultResponse, nil)
+			Return(&transactionResultResponse, nil).Once()
 
 		backend := New(
 			suite.state,
