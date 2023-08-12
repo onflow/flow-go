@@ -5,13 +5,6 @@ import (
 	"fmt"
 
 	"github.com/dgraph-io/badger/v2"
-	"github.com/onflow/flow/protobuf/go/flow/access"
-	"github.com/onflow/flow/protobuf/go/flow/entities"
-	"github.com/stretchr/testify/mock"
-	"github.com/stretchr/testify/require"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
-
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/state/protocol"
@@ -19,6 +12,12 @@ import (
 	"github.com/onflow/flow-go/state/protocol/util"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/utils/unittest"
+	"github.com/onflow/flow/protobuf/go/flow/access"
+	"github.com/onflow/flow/protobuf/go/flow/entities"
+	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 func (suite *Suite) WithPreConfiguredState(f func(snap protocol.Snapshot)) {
@@ -102,7 +101,7 @@ func (suite *Suite) TestGetTransactionResultReturnsUnknown() {
 			suite.log,
 			DefaultSnapshotHistoryLimit,
 			nil,
-			*suite.communicator,
+			suite.communicator,
 			false,
 		)
 		res, err := backend.GetTransactionResult(context.Background(), tx.ID(), block.ID(), coll.ID())
@@ -161,7 +160,7 @@ func (suite *Suite) TestGetTransactionResultReturnsTransactionError() {
 			suite.log,
 			DefaultSnapshotHistoryLimit,
 			nil,
-			*suite.communicator,
+			suite.communicator,
 			false,
 		)
 		_, err := backend.GetTransactionResult(context.Background(), tx.ID(), block.ID(), coll.ID())
@@ -235,7 +234,7 @@ func (suite *Suite) TestGetTransactionResultReturnsValidTransactionResult() {
 			suite.log,
 			DefaultSnapshotHistoryLimit,
 			nil,
-			*suite.communicator,
+			suite.communicator,
 			false,
 		)
 		resp, err := backend.GetTransactionResult(context.Background(), tx.ID(), block.ID(), coll.ID())
@@ -310,7 +309,7 @@ func (suite *Suite) TestGetTransactionResultFromCache() {
 			suite.log,
 			DefaultSnapshotHistoryLimit,
 			nil,
-			*suite.communicator,
+			suite.communicator,
 			false,
 		)
 
