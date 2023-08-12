@@ -340,14 +340,14 @@ func (m *MisbehaviorReportManager) onHeartbeat() error {
 				Uint64("cutoff_counter", record.CutoffCounter).
 				Bool("disallow_listed", record.DisallowListed).
 				Float64("penalty", record.Penalty).
-				Msg("onHeartbeat - before adjusting penalty via decayFunc")
+				Msg("heartbeat interval, pulled the spam record for decaying")
 			record.Penalty = m.decayFunc(record)
 			m.logger.Trace().
 				Hex("identifier", logging.ID(id)).
 				Uint64("cutoff_counter", record.CutoffCounter).
 				Bool("disallow_listed", record.DisallowListed).
 				Float64("penalty", record.Penalty).
-				Msg("onHeartbeat - after adjusting penalty via decayFunc")
+				Msg("heartbeat interval, after adjusting penalty via decayFunc")
 
 			// TODO: this can be done in batch but at this stage let's send individual notifications.
 			//       (it requires enabling the batch mode end-to-end including the cache in middleware).
