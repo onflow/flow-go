@@ -66,15 +66,7 @@ func (suite *Suite) TestGetTransactionResultReturnsUnknown() {
 			On("ByID", tx.ID()).
 			Return(nil, storage.ErrNotFound)
 
-		suite.blocks.
-			On("ByID", block.ID()).
-			Return(&block, nil).
-			Once()
-
 		receipt := unittest.ExecutionReceiptFixture()
-		identity := unittest.IdentityFixture()
-		identity.Role = flow.RoleExecution
-
 		l := flow.ExecutionReceiptList{receipt}
 
 		suite.receipts.
