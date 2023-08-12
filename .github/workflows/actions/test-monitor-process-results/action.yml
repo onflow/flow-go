@@ -1,0 +1,42 @@
+name: Test Monitor - Process Results
+
+description: Custom action that's used in multiple Flaky Test Monitor jobs to process test results and upload them to BigQuery
+
+inputs:
+  gcp_sa_key:
+    description: 'The GCP service account key for uploading to BigQuery'
+    required: true
+
+runs:
+  using : "composite"
+  steps:
+    - name: Get commit date
+      id: commit_date
+      run: echo "::set-output name=date::$(git show --no-patch --no-notes --pretty='%cI' $COMMIT_SHA)"
+      shell: bash
+    - name: Get job run date
+      id: job_run_date
+      run: echo "::set-output name=date::$(TZ=":UTC" date -Iseconds)"
+      shell: bash
+    - name: Process test results
+      run: cat test-output | go run tools/test_monitor/level1/process_summary1_results.go
+      env:
+        JOB_STARTED: ${{ steps.job_run_date.outputs.date }}
+        COMMIT_DATE: ${{ steps.commit_date.outputs.date }}
+      shell: bash
+    - name: Set up Cloud SDK
+      uses: google-github-actions/setup-gcloud@v0
+      with:
+        service_account_key: ${{ inputs.gcp_sa_key }}
+    - name: Upload results to BigQuery (skipped tests)
+      uses: nick-fields/retry@v2
+      with:
+        timeout_minutes: 1
+        max_attempts: 3
+        command: bq load --source_format=NEWLINE_DELIMITED_JSON $BIGQUERY_DATASET.$BIGQUERY_TABLE $SKIPPED_TESTS_FILE tools/test_monitor/schemas/skipped_tests_schema.json
+    - name: Upload results to BigQuery (test run)
+      uses: nick-fields/retry@v2
+      with:
+        timeout_minutes: 2
+        max_attempts: 3
+        command: bq load --source_format=NEWLINE_DELIMITED_JSON $BIGQUERY_DATASET.$BIGQUERY_TABLE2 $RESULTS_FILE tools/test_monitor/schemas/test_results_schema.json
