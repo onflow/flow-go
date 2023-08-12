@@ -6,6 +6,8 @@ import (
 
 // Events represents persistent storage for events.
 type Events interface {
+	// Store will store events for the given block ID
+	Store(blockID flow.Identifier, blockEvents []flow.EventsList) error
 
 	// BatchStore will store events for the given block ID in a given batch
 	BatchStore(blockID flow.Identifier, events []flow.EventsList, batch BatchStorage) error
@@ -26,11 +28,14 @@ type Events interface {
 	// No errors are expected during normal operation, even if no entries are matched.
 	// If Badger unexpectedly fails to process the request, the error is wrapped in a generic error and returned.
 	BatchRemoveByBlockID(blockID flow.Identifier, batch BatchStorage) error
-
-	Store(blockID flow.Identifier, blockEvents []flow.EventsList) error
 }
 
 type ServiceEvents interface {
+	// Store stores service events keyed by a blockID
+	// No errors are expected during normal operation, even if no entries are matched.
+	// If Badger unexpectedly fails to process the request, the error is wrapped in a generic error and returned.
+	Store(blockID flow.Identifier, events []flow.Event) error
+
 	// BatchStore stores service events keyed by a blockID in provided batch
 	// No errors are expected during normal operation, even if no entries are matched.
 	// If Badger unexpectedly fails to process the request, the error is wrapped in a generic error and returned.
@@ -43,6 +48,4 @@ type ServiceEvents interface {
 	// No errors are expected during normal operation, even if no entries are matched.
 	// If Badger unexpectedly fails to process the request, the error is wrapped in a generic error and returned.
 	BatchRemoveByBlockID(blockID flow.Identifier, batch BatchStorage) error
-
-	Store(blockID flow.Identifier, events []flow.Event) error
 }

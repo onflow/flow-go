@@ -51,12 +51,12 @@ type Engine struct {
 // New creates a new access ingestion engine
 func New(
 	log zerolog.Logger,
+	accessMetrics module.AccessMetrics,
 	headers storage.Headers,
 	collections storage.Collections,
 	events storage.Events,
 	transactions storage.Transactions,
 	execDataCache *cache.ExecutionDataCache,
-	accessMetrics module.AccessMetrics,
 	lastFullyIndexedHeight uint64,
 	highestAvailableHeight uint64,
 ) (*Engine, error) {
@@ -256,6 +256,8 @@ func (e *Engine) handleCollection(blockID flow.Identifier, collection *flow.Coll
 }
 
 func (e *Engine) handleEvents(blockID flow.Identifier, events flow.EventsList) error {
+	// Note: service events are currently not included in execution data
+	// see https://github.com/onflow/flow-go/issues/4624
 	return e.events.Store(blockID, []flow.EventsList{events})
 }
 

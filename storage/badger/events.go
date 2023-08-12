@@ -68,9 +68,21 @@ func (e *Events) BatchStore(blockID flow.Identifier, blockEvents []flow.EventsLi
 	return nil
 }
 
+// Store will store events for the given block ID
 func (e *Events) Store(blockID flow.Identifier, blockEvents []flow.EventsList) error {
 	batch := NewBatch(e.db)
-	return e.BatchStore(blockID, blockEvents, batch)
+
+	err := e.BatchStore(blockID, blockEvents, batch)
+	if err != nil {
+		return err
+	}
+
+	err = batch.Flush()
+	if err != nil {
+		return fmt.Errorf("cannot flush batch: %w", err)
+	}
+
+	return nil
 }
 
 // ByBlockID returns the events for the given block ID
@@ -185,9 +197,23 @@ func (e *ServiceEvents) BatchStore(blockID flow.Identifier, events []flow.Event,
 	return nil
 }
 
+// Store stores service events keyed by a blockID
+// No errors are expected during normal operation, even if no entries are matched.
+// If Badger unexpectedly fails to process the request, the error is wrapped in a generic error and returned.
 func (e *ServiceEvents) Store(blockID flow.Identifier, events []flow.Event) error {
 	batch := NewBatch(e.db)
-	return e.BatchStore(blockID, events, batch)
+
+	err := e.BatchStore(blockID, events, batch)
+	if err != nil {
+		return err
+	}
+
+	err = batch.Flush()
+	if err != nil {
+		return fmt.Errorf("cannot flush batch: %w", err)
+	}
+
+	return nil
 }
 
 // ByBlockID returns the events for the given block ID

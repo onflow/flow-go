@@ -35,6 +35,7 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/verification"
 	recovery "github.com/onflow/flow-go/consensus/recovery/protocol"
 	"github.com/onflow/flow-go/crypto"
+	"github.com/onflow/flow-go/engine/access/index"
 	"github.com/onflow/flow-go/engine/access/ingestion"
 	pingeng "github.com/onflow/flow-go/engine/access/ping"
 	"github.com/onflow/flow-go/engine/access/rest/routes"
@@ -249,6 +250,7 @@ type FlowAccessNodeBuilder struct {
 	// engines
 	IngestEng      *ingestion.Engine
 	RequestEng     *requester.Engine
+	IndexEng       *index.Engine
 	FollowerEng    *followereng.ComplianceEngine
 	SyncEng        *synceng.Engine
 	StateStreamEng *state_stream.Engine
@@ -444,6 +446,8 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionDataRequester() *FlowAccessN
 	var bsDependable *module.ProxiedReadyDoneAware
 	var execDataDistributor *edrequester.ExecutionDataDistributor
 	var execDataCacheBackend *herocache.BlockExecutionData
+	var localExecutionDataCache *execdatacache.ExecutionDataCache
+	var highestAvailableHeight uint64
 
 	builder.
 		AdminCommand("read-execution-data", func(config *cmd.NodeConfig) commands.AdminCommand {
@@ -583,7 +587,47 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionDataRequester() *FlowAccessN
 			builder.FollowerDistributor.AddOnBlockFinalizedConsumer(builder.ExecutionDataRequester.OnBlockFinalized)
 			builder.ExecutionDataRequester.AddOnExecutionDataReceivedConsumer(execDataDistributor.OnExecutionDataReceived)
 
+			var err error
+			highestAvailableHeight, err = builder.ExecutionDataRequester.HighestConsecutiveHeight()
+			if err != nil {
+				return nil, fmt.Errorf("could not get highest consecutive height: %w", err)
+			}
+
 			return builder.ExecutionDataRequester, nil
+		}).
+		Component("index engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+			var err error
+
+			// Execution Data cache that uses a blobstore as the backend (instead of a downloader)
+			// This ensures that it simply returns a not found error if the blob doesn't exist
+			// instead of attempting to download it from the network. It shares a cache backend instance
+			// with the requester's implementation.
+			localExecutionDataCache = execdatacache.NewExecutionDataCache(
+				builder.ExecutionDataStore,
+				builder.Storage.Headers,
+				builder.Storage.Seals,
+				builder.Storage.Results,
+				execDataCacheBackend,
+			)
+
+			builder.IndexEng, err = index.New(
+				node.Logger,
+				builder.AccessMetrics,
+				node.Storage.Headers,
+				node.Storage.Collections,
+				node.Storage.Events,
+				node.Storage.Transactions,
+				localExecutionDataCache,
+				highestAvailableHeight, // TODO: this should be persisted separately from highestAvailableHeight
+				highestAvailableHeight,
+			)
+			if err != nil {
+				return nil, fmt.Errorf("could not create index engine: %w", err)
+			}
+
+			execDataDistributor.AddOnExecutionDataReceivedConsumer(builder.IndexEng.OnExecutionData)
+
+			return builder.IndexEng, nil
 		})
 
 	if builder.stateStreamConf.ListenAddr != "" {
@@ -600,28 +644,11 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionDataRequester() *FlowAccessN
 			}
 			builder.stateStreamConf.RpcMetricsEnabled = builder.rpcMetricsEnabled
 
-			// Execution Data cache that uses a blobstore as the backend (instead of a downloader)
-			// This ensures that it simply returns a not found error if the blob doesn't exist
-			// instead of attempting to download it from the network. It shares a cache backend instance
-			// with the requester's implementation.
-			executionDataCache := execdatacache.NewExecutionDataCache(
-				builder.ExecutionDataStore,
-				builder.Storage.Headers,
-				builder.Storage.Seals,
-				builder.Storage.Results,
-				execDataCacheBackend,
-			)
-
-			highestAvailableHeight, err := builder.ExecutionDataRequester.HighestConsecutiveHeight()
-			if err != nil {
-				return nil, fmt.Errorf("could not get highest consecutive height: %w", err)
-			}
-
 			stateStreamEng, err := state_stream.NewEng(
 				node.Logger,
 				builder.stateStreamConf,
 				builder.ExecutionDataStore,
-				executionDataCache,
+				localExecutionDataCache,
 				node.State,
 				node.Storage.Headers,
 				node.Storage.Seals,
