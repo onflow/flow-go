@@ -180,8 +180,9 @@ func (ss *SyncSuite) SetupTest() {
 	ss.e = e
 }
 
-func (ss *SyncSuite) TestOnSyncRequest() {
-
+// TestOnSyncRequest_WithinTolerance tests that a sync request that's within tolerance of the receiver doesn't trigger
+// a response, even if request height is lower than receiver.
+func (ss *SyncSuite) TestOnSyncRequest_WithinTolerance() {
 	// generate origin and request message
 	originID := unittest.IdentifierFixture()
 	req := &messages.SyncRequest{
@@ -196,13 +197,40 @@ func (ss *SyncSuite) TestOnSyncRequest() {
 	ss.Assert().NoError(err, "same height sync request should pass")
 	ss.con.AssertNotCalled(ss.T(), "Unicast", mock.Anything, mock.Anything)
 
+	ss.core.AssertExpectations(ss.T())
+}
+
+// TestOnSyncRequest_HeightHigherThanReceiver tests that a sync request that's higher than the receiver's height doesn't
+// trigger a response, even if outside tolerance.
+func (ss *SyncSuite) TestOnSyncRequest_HeightHigherThanReceiver() {
+	// generate origin and request message
+	originID := unittest.IdentifierFixture()
+	req := &messages.SyncRequest{
+		Nonce:  rand.Uint64(),
+		Height: 0,
+	}
+
 	// if request height is higher than local finalized, we should not respond
 	req.Height = ss.head.Height + 1
 	ss.core.On("HandleHeight", ss.head, req.Height)
 	ss.core.On("WithinTolerance", ss.head, req.Height).Return(false)
-	err = ss.e.requestHandler.onSyncRequest(originID, req)
+	err := ss.e.requestHandler.onSyncRequest(originID, req)
 	ss.Assert().NoError(err, "same height sync request should pass")
 	ss.con.AssertNotCalled(ss.T(), "Unicast", mock.Anything, mock.Anything)
+
+	ss.core.AssertExpectations(ss.T())
+}
+
+// TestOnSyncRequest_HeightLowerThanReceiver_OutsideTolerance tests that a sync request that's outside tolerance and
+// lower than the receiver's height triggers a response.
+func (ss *SyncSuite) TestOnSyncRequest_HeightLowerThanReceiver_OutsideTolerance() {
+
+	// generate origin and request message
+	originID := unittest.IdentifierFixture()
+	req := &messages.SyncRequest{
+		Nonce:  rand.Uint64(),
+		Height: 0,
+	}
 
 	// if the request height is lower than head and outside tolerance, we should submit correct response
 	req.Height = ss.head.Height - 1
@@ -217,7 +245,7 @@ func (ss *SyncSuite) TestOnSyncRequest() {
 			assert.Equal(ss.T(), originID, recipientID, "should send response to original sender")
 		},
 	)
-	err = ss.e.requestHandler.onSyncRequest(originID, req)
+	err := ss.e.requestHandler.onSyncRequest(originID, req)
 	require.NoError(ss.T(), err, "smaller height sync request should pass")
 
 	ss.core.AssertExpectations(ss.T())
