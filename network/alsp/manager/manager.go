@@ -69,12 +69,12 @@ type MisbehaviorReportManager struct {
 	component.Component
 	logger  zerolog.Logger
 	metrics module.AlspMetrics
-	// CacheFactory is the factory for creating the spam record cache. MisbehaviorReportManager is coming with a
+	// cacheFactory is the factory for creating the spam record cache. MisbehaviorReportManager is coming with a
 	// default factory that creates a new spam record cache with the given parameter. However, this factory can be
 	// overridden with a custom factory.
-	CacheFactory SpamRecordCacheFactory
+	cacheFactory SpamRecordCacheFactory
 	// cache is the spam record cache that stores the spam records for the authorized nodes. It is initialized by
-	// invoking the CacheFactory.
+	// invoking the cacheFactory.
 	cache alsp.SpamRecordCache
 	// disablePenalty indicates whether applying the penalty to the misbehaving node is disabled.
 	// When disabled, the ALSP module logs the misbehavior reports and updates the metrics, but does not apply the penalty.
@@ -170,7 +170,7 @@ func NewMisbehaviorReportManager(cfg *MisbehaviorReportManagerConfig, consumer n
 		metrics:                 cfg.AlspMetrics,
 		disablePenalty:          cfg.DisablePenalty,
 		disallowListingConsumer: consumer,
-		CacheFactory:            defaultSpamRecordCacheFactory(),
+		cacheFactory:            defaultSpamRecordCacheFactory(),
 		DecayFunc:               defaultSpamRecordDecayFunc(),
 	}
 
@@ -188,7 +188,7 @@ func NewMisbehaviorReportManager(cfg *MisbehaviorReportManagerConfig, consumer n
 		opt(m)
 	}
 
-	m.cache = m.CacheFactory(
+	m.cache = m.cacheFactory(
 		lg,
 		cfg.SpamRecordCacheSize,
 		metrics.ApplicationLayerSpamRecordCacheMetricFactory(cfg.HeroCacheMetricsFactory, cfg.NetworkType))
@@ -448,4 +448,20 @@ func (m *MisbehaviorReportManager) processMisbehaviorReport(report internal.Repo
 	}
 	lg.Debug().Float64("updated_penalty", updatedPenalty).Msg("misbehavior report handled")
 	return nil
+}
+
+// WithSpamRecordsCacheFactory sets the spam record cache factory for the MisbehaviorReportManager.
+// Args:
+//
+//	f: the spam record cache factory.
+//
+// Returns:
+//
+//	a MisbehaviorReportManagerOption that sets the spam record cache for the MisbehaviorReportManager.
+//
+// Note: this option is useful primarily for testing purposes. The default factory should be sufficient for production.
+func WithSpamRecordsCacheFactory(f SpamRecordCacheFactory) MisbehaviorReportManagerOption {
+	return func(m *MisbehaviorReportManager) {
+		m.cacheFactory = f
+	}
 }
