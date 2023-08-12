@@ -66,13 +66,6 @@ func (suite *Suite) TestGetTransactionResultReturnsUnknown() {
 			On("ByID", tx.ID()).
 			Return(nil, storage.ErrNotFound)
 
-		receipt := unittest.ExecutionReceiptFixture()
-		l := flow.ExecutionReceiptList{receipt}
-
-		suite.receipts.
-			On("ByBlockID", block.ID()).
-			Return(l, nil)
-
 		backend := New(
 			suite.state,
 			suite.colClient,
@@ -120,17 +113,7 @@ func (suite *Suite) TestGetTransactionResultReturnsTransactionError() {
 			Return(&block, nil).
 			Once()
 
-		receipt := unittest.ExecutionReceiptFixture()
-		identity := unittest.IdentityFixture()
-		identity.Role = flow.RoleExecution
-
 		suite.state.On("AtBlockID", block.ID()).Return(snap, nil).Once()
-
-		l := flow.ExecutionReceiptList{receipt}
-
-		suite.receipts.
-			On("ByBlockID", block.ID()).
-			Return(l, nil)
 
 		backend := New(
 			suite.state,
@@ -180,22 +163,12 @@ func (suite *Suite) TestGetTransactionResultReturnsValidTransactionResult() {
 			mock.Anything).
 			Return(nil).Once()
 
-		receipt := unittest.ExecutionReceiptFixture()
-		identity := unittest.IdentityFixture()
-		identity.Role = flow.RoleExecution
-
 		suite.state.On("AtBlockID", block.ID()).Return(snap, nil).Once()
-
-		l := flow.ExecutionReceiptList{receipt}
 
 		transactionResultResponse := access.TransactionResultResponse{
 			Status:     entities.TransactionStatus_EXECUTED,
 			StatusCode: uint32(entities.TransactionStatus_EXECUTED),
 		}
-
-		suite.receipts.
-			On("ByBlockID", block.ID()).
-			Return(l, nil)
 
 		suite.historicalAccessClient.
 			On("GetTransactionResult", mock.Anything, mock.Anything).
