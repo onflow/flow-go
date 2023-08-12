@@ -144,7 +144,7 @@ func (suite *Suite) TestGetTransactionResultReturnsTransactionError() {
 	})
 }
 
-func (suite *Suite) TestGetTransactionResultReturnsValidTransactionResult() {
+func (suite *Suite) TestGetTransactionResultReturnsValidTransactionResultFromHistoricNode() {
 	suite.WithPreConfiguredState(func(snap protocol.Snapshot) {
 		block := unittest.BlockFixture()
 		tbody := unittest.TransactionBodyFixture()
