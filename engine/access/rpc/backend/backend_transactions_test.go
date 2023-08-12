@@ -174,16 +174,11 @@ func (suite *Suite) TestGetTransactionResultReturnsValidTransactionResult() {
 			On("ByID", tx.ID()).
 			Return(nil, storage.ErrNotFound)
 
-		suite.blocks.
-			On("ByID", block.ID()).
-			Return(&block, nil).
-			Once()
-
 		suite.communicator.On("CallAvailableNode",
 			mock.Anything,
 			mock.Anything,
 			mock.Anything).
-			Return(nil)
+			Return(nil).Once()
 
 		receipt := unittest.ExecutionReceiptFixture()
 		identity := unittest.IdentityFixture()
@@ -258,24 +253,14 @@ func (suite *Suite) TestGetTransactionResultFromCache() {
 			mock.Anything,
 			mock.Anything,
 			mock.Anything).
-			Return(nil)
-
-		receipt := unittest.ExecutionReceiptFixture()
-		identity := unittest.IdentityFixture()
-		identity.Role = flow.RoleExecution
+			Return(nil).Once()
 
 		suite.state.On("AtBlockID", block.ID()).Return(snap, nil).Once()
-
-		l := flow.ExecutionReceiptList{receipt}
 
 		transactionResultResponse := access.TransactionResultResponse{
 			Status:     entities.TransactionStatus_EXECUTED,
 			StatusCode: uint32(entities.TransactionStatus_EXECUTED),
 		}
-
-		suite.receipts.
-			On("ByBlockID", block.ID()).
-			Return(l, nil)
 
 		suite.historicalAccessClient.
 			On("GetTransactionResult", mock.Anything, mock.Anything).
