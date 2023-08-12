@@ -294,7 +294,7 @@ func TestHandleReportedMisbehavior_And_DisallowListing_RepeatOffender_Integratio
 			victimSpamRecordCache = internal.NewSpamRecordCache(size, logger, metrics, model.SpamRecordFactory())
 			return victimSpamRecordCache
 		}),
-		withDecayFunc(fastDecayFunc),
+		alspmgr.WithDecayFunc(fastDecayFunc),
 	}
 
 	ids, nodes, _ := testutils.LibP2PNodeForMiddlewareFixture(t, 3,
@@ -1794,20 +1794,4 @@ func misbehaviorReportFixtureWithPenalty(t *testing.T, originID flow.Identifier,
 	report.On("Penalty").Return(penalty)
 
 	return report
-}
-
-// withDecayFunc sets the decay function for the MisbehaviorReportManager. Useful for testing purposes to simulate the decay of the penalty without waiting for the actual decay.
-// Args:
-//
-//	f: the decay function.
-//
-// Returns:
-//
-//	a MisbehaviorReportManagerOption that sets the decay function for the MisbehaviorReportManager.
-//
-// Note: this option is useful primarily for testing purposes. The default decay function should be used for production.
-func withDecayFunc(f alspmgr.SpamRecordDecayFunc) alspmgr.MisbehaviorReportManagerOption {
-	return func(m *alspmgr.MisbehaviorReportManager) {
-		m.DecayFunc = f
-	}
 }

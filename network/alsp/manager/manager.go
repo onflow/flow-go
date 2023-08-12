@@ -89,8 +89,8 @@ type MisbehaviorReportManager struct {
 	// workerPool is the worker pool for handling the misbehavior reports in a thread-safe and non-blocking manner.
 	workerPool *worker.Pool[internal.ReportedMisbehaviorWork]
 
-	// DecayFunc is the function that calculates the decay of the spam record.
-	DecayFunc SpamRecordDecayFunc
+	// decayFunc is the function that calculates the decay of the spam record.
+	decayFunc SpamRecordDecayFunc
 }
 
 var _ network.MisbehaviorReportManager = (*MisbehaviorReportManager)(nil)
@@ -171,7 +171,7 @@ func NewMisbehaviorReportManager(cfg *MisbehaviorReportManagerConfig, consumer n
 		disablePenalty:          cfg.DisablePenalty,
 		disallowListingConsumer: consumer,
 		cacheFactory:            defaultSpamRecordCacheFactory(),
-		DecayFunc:               defaultSpamRecordDecayFunc(),
+		decayFunc:               defaultSpamRecordDecayFunc(),
 	}
 
 	store := queue.NewHeroStore(
@@ -342,7 +342,7 @@ func (m *MisbehaviorReportManager) onHeartbeat() error {
 				Bool("disallow_listed", record.DisallowListed).
 				Float64("penalty", record.Penalty).
 				Msg("onHeartbeat - before adjusting penalty via decayFunc")
-			record.Penalty = m.DecayFunc(record)
+			record.Penalty = m.decayFunc(record)
 			m.logger.Trace().
 				Hex("identifier", logging.ID(id)).
 				Uint64("cutoff_counter", record.CutoffCounter).
@@ -463,5 +463,21 @@ func (m *MisbehaviorReportManager) processMisbehaviorReport(report internal.Repo
 func WithSpamRecordsCacheFactory(f SpamRecordCacheFactory) MisbehaviorReportManagerOption {
 	return func(m *MisbehaviorReportManager) {
 		m.cacheFactory = f
+	}
+}
+
+// WithDecayFunc sets the decay function for the MisbehaviorReportManager. Useful for testing purposes to simulate the decay of the penalty without waiting for the actual decay.
+// Args:
+//
+//	f: the decay function.
+//
+// Returns:
+//
+//	a MisbehaviorReportManagerOption that sets the decay function for the MisbehaviorReportManager.
+//
+// Note: this option is useful primarily for testing purposes. The default decay function should be used for production.
+func WithDecayFunc(f SpamRecordDecayFunc) MisbehaviorReportManagerOption {
+	return func(m *MisbehaviorReportManager) {
+		m.decayFunc = f
 	}
 }
