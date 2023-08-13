@@ -236,10 +236,11 @@ func (b *backendTransactions) GetTransactionResult(
 		txErr := rpc.ConvertStorageError(err)
 		if status.Code(txErr) == codes.NotFound {
 			// Tx not found. If we have historical Sporks setup, lets look through those as well
-
-			val, ok := b.txResultCache.Get(txID)
-			if ok {
-				return val, nil
+			if b.txResultCache != nil {
+				val, ok := b.txResultCache.Get(txID)
+				if ok {
+					return val, nil
+				}
 			}
 			historicalTxResult, err := b.getHistoricalTransactionResult(ctx, txID)
 			if err != nil {
@@ -251,8 +252,10 @@ func (b *backendTransactions) GetTransactionResult(
 					StatusCode: uint(txStatus),
 				}, nil
 			}
-
-			b.txResultCache.Add(txID, historicalTxResult)
+			
+			if b.txResultCache != nil {
+				b.txResultCache.Add(txID, historicalTxResult)
+			}
 			return historicalTxResult, nil
 		}
 		return nil, txErr
@@ -348,8 +351,8 @@ func (b *backendTransactions) lookupCollectionIDInBlock(
 // followed by the collection ID lookup. If both are missing, the default lookup by transaction ID is performed.
 func (b *backendTransactions) retrieveBlock(
 
-	// the requested block or collection was not found. If looking up the block based solely on the txID returns
-	// not found, then no error is returned.
+// the requested block or collection was not found. If looking up the block based solely on the txID returns
+// not found, then no error is returned.
 	blockID flow.Identifier,
 	collectionID flow.Identifier,
 	txID flow.Identifier,

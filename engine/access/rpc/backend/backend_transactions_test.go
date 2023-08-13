@@ -226,6 +226,7 @@ func (suite *Suite) TestGetTransactionResultFromCache() {
 			Log:                   suite.log,
 			SnapshotHistoryLimit:  DefaultSnapshotHistoryLimit,
 			Communicator:          suite.communicator,
+			TxResultCacheSize:     10,
 		})
 
 		resp, err := backend.GetTransactionResult(context.Background(), tx.ID(), block.ID(), coll.ID())
