@@ -3,13 +3,12 @@ package backend
 import (
 	"context"
 
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
-
 	"github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 type backendBlockHeaders struct {
@@ -78,14 +77,14 @@ func (b *backendBlockHeaders) GetBlockHeaderByHeight(_ context.Context, height u
 func (b *backendBlockHeaders) getBlockStatus(header *flow.Header) (flow.BlockStatus, error) {
 	sealed, err := b.state.Sealed().Head()
 	if err != nil {
-		// In the RPC engine, if we encounter an error from the protocol State indicating State corruption,
+		// In the RPC engine, if we encounter an error from the protocol state indicating state corruption,
 		// we should halt processing requests, but do throw an exception which might cause a crash:
 		// - It is unsafe to process requests if we have an internally bad State.
 		//   TODO: https://github.com/onflow/flow-go/issues/4028
 		// - We would like to avoid throwing an exception as a result of an Access API request by policy
 		//   because this can cause DOS potential
-		// - Since the protocol State is widely shared, we assume that in practice another component will
-		//   observe the protocol State error and throw an exception.
+		// - Since the protocol state is widely shared, we assume that in practice another component will
+		//   observe the protocol state error and throw an exception.
 		return flow.BlockStatusUnknown, status.Errorf(codes.Internal, "failed to find latest sealed header: %v", err)
 	}
 
