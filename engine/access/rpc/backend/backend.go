@@ -122,7 +122,7 @@ type Params struct {
 	ArchiveAddressList        []string
 	Communicator              Communicator
 	ScriptExecValidation      bool
-	TxResultCacheSize         int
+	TxResultCacheSize         uint
 }
 
 // New creates backend instance
@@ -148,7 +148,7 @@ func New(params Params) *Backend {
 
 	var txResCache *lru2.Cache[flow.Identifier, *access.TransactionResult]
 	if params.TxResultCacheSize > 0 {
-		txResCache, err = lru2.New[flow.Identifier, *access.TransactionResult](params.TxResultCacheSize)
+		txResCache, err = lru2.New[flow.Identifier, *access.TransactionResult](int(params.TxResultCacheSize))
 		if err != nil {
 			params.Log.Fatal().Err(err).Msg("failed to init cache for transaction results")
 		}
