@@ -100,7 +100,7 @@ type Communicator interface {
 	) error
 }
 
-type BackendParams struct {
+type Params struct {
 	State                     protocol.State
 	CollectionRPC             accessproto.AccessAPIClient
 	HistoricalAccessNodes     []accessproto.AccessAPIClient
@@ -125,7 +125,7 @@ type BackendParams struct {
 }
 
 // New creates backend instance
-func New(params BackendParams) *Backend {
+func New(params Params) *Backend {
 	retry := newRetry()
 	if params.RetryEnabled {
 		retry.Activate()

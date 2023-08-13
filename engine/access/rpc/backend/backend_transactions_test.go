@@ -67,7 +67,7 @@ func (suite *Suite) TestGetTransactionResultReturnsUnknown() {
 			Return(nil, storage.ErrNotFound)
 
 		backend := New(
-			BackendParams{
+			Params{
 				State:                suite.state,
 				CollectionRPC:        suite.colClient,
 				Blocks:               suite.blocks,
@@ -107,7 +107,7 @@ func (suite *Suite) TestGetTransactionResultReturnsTransactionError() {
 		suite.state.On("AtBlockID", block.ID()).Return(snap, nil).Once()
 
 		backend := New(
-			BackendParams{
+			Params{
 				State:                suite.state,
 				CollectionRPC:        suite.colClient,
 				Blocks:               suite.blocks,
@@ -157,7 +157,7 @@ func (suite *Suite) TestGetTransactionResultReturnsValidTransactionResultFromHis
 			Return(&transactionResultResponse, nil).Once()
 
 		backend := New(
-			BackendParams{
+			Params{
 				State:                 suite.state,
 				CollectionRPC:         suite.colClient,
 				HistoricalAccessNodes: []access.AccessAPIClient{suite.historicalAccessClient},
@@ -213,7 +213,7 @@ func (suite *Suite) TestGetTransactionResultFromCache() {
 			On("GetTransactionResult", mock.Anything, mock.Anything).
 			Return(&transactionResultResponse, nil).Once()
 
-		backend := New(BackendParams{
+		backend := New(Params{
 			State:                 suite.state,
 			CollectionRPC:         suite.colClient,
 			HistoricalAccessNodes: []access.AccessAPIClient{suite.historicalAccessClient},

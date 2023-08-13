@@ -41,7 +41,7 @@ func (suite *Suite) TestTransactionRetry() {
 	// blockID := block.ID()
 	// Setup Handler + Retry
 	backend := New(
-		BackendParams{
+		Params{
 			State:                suite.state,
 			CollectionRPC:        suite.colClient,
 			Blocks:               suite.blocks,
@@ -127,7 +127,7 @@ func (suite *Suite) TestSuccessfulTransactionsDontRetry() {
 	connFactory := suite.setupConnectionFactory()
 
 	backend := New(
-		BackendParams{
+		Params{
 			State:                suite.state,
 			CollectionRPC:        suite.colClient,
 			Blocks:               suite.blocks,
@@ -144,7 +144,7 @@ func (suite *Suite) TestSuccessfulTransactionsDontRetry() {
 			Log:                  suite.log,
 			Communicator:         NewNodeCommunicator(false),
 		})
-	
+
 	retry := newRetry().SetBackend(backend).Activate()
 	backend.retry = retry
 
