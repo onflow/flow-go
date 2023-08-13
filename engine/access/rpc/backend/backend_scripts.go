@@ -199,7 +199,7 @@ func (b *backendScripts) executeScriptOnAvailableArchiveNodes(
 			rnPort := b.archivePorts[idx]
 			result, err := b.tryExecuteScriptOnArchiveNode(ctx, rnAddr, rnPort, blockID, script, arguments)
 			if err == nil {
-				// Log execution time
+				// log execution time
 				b.metrics.ScriptExecuted(
 					time.Since(startTime),
 					len(script),
@@ -218,7 +218,7 @@ func (b *backendScripts) executeScriptOnAvailableArchiveNodes(
 						Msg("script failed to execute on the execution node")
 					return nil, err
 				case codes.NotFound:
-					// failures due to unavailable Blocks are explicitly marked Not found
+					// failures due to unavailable blocks  are explicitly marked Not found
 					b.metrics.ScriptExecutionErrorOnArchiveNode()
 					b.log.Error().Err(err).Msg("script execution failed for archive node")
 					return nil, err
@@ -269,7 +269,7 @@ func (b *backendScripts) executeScriptOnAvailableExecutionNodes(
 					}
 				}
 
-				// Log execution time
+				// log execution time
 				b.metrics.ScriptExecuted(
 					time.Since(execStartTime),
 					len(script),

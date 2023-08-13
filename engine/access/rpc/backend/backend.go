@@ -332,7 +332,7 @@ func (b *Backend) GetCollectionByID(_ context.Context, colID flow.Identifier) (*
 	// retrieve the collection from the collection storage
 	col, err := b.collections.LightByID(colID)
 	if err != nil {
-		// Collections are retrieved asynchronously as we finalize Blocks, so
+		// Collections are retrieved asynchronously as we finalize blocks, so
 		// it is possible for a client to request a finalized block from us
 		// containing some collection, then get a not found error when requesting
 		// that collection. These clients should retry.
@@ -398,7 +398,7 @@ func executionNodesForBlockID(
 				break
 			}
 
-			// Log the attempt
+			// log the attempt
 			log.Debug().Int("attempt", attempt).Int("max_attempt", maxAttemptsForExecutionReceipt).
 				Int("execution_receipts_found", len(executorIDs)).
 				Str("block_id", blockID.String()).
@@ -472,7 +472,7 @@ func findAllExecutionNodes(
 		}
 	}
 
-	// if there are more than one execution result for the same block ID, Log as error
+	// if there are more than one execution result for the same block ID, log as error
 	if executionResultGroupedMetaList.NumberGroups() > 1 {
 		identicalReceiptsStr := fmt.Sprintf("%v", flow.GetIDs(allReceipts))
 		log.Error().

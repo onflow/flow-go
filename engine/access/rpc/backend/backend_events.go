@@ -29,7 +29,7 @@ type backendEvents struct {
 	nodeCommunicator  Communicator
 }
 
-// GetEventsForHeightRange retrieves events for all sealed Blocks between the start block height and
+// GetEventsForHeightRange retrieves events for all sealed blocks between the start block height and
 // the end block height (inclusive) that have the given type.
 func (b *backendEvents) GetEventsForHeightRange(
 	ctx context.Context,
@@ -64,7 +64,7 @@ func (b *backendEvents) GetEventsForHeightRange(
 		endHeight = head.Height
 	}
 
-	// find the block Headers for all the Blocks between min and max height (inclusive)
+	// find the block headers  for all the blocks between min and max height (inclusive)
 	blockHeaders := make([]*flow.Header, 0)
 
 	for i := startHeight; i <= endHeight; i++ {
@@ -90,7 +90,7 @@ func (b *backendEvents) GetEventsForBlockIDs(
 		return nil, status.Errorf(codes.InvalidArgument, "requested block range (%d) exceeded maximum (%d)", len(blockIDs), b.maxHeightRange)
 	}
 
-	// find the block Headers for all the block IDs
+	// find the block headers  for all the block IDs
 	blockHeaders := make([]*flow.Header, 0)
 	for _, blockID := range blockIDs {
 		header, err := b.headers.ByBlockID(blockID)
@@ -164,7 +164,7 @@ func verifyAndConvertToAccessEvents(
 	version execproto.EventEncodingVersion,
 ) ([]flow.BlockEvents, error) {
 	if len(execEvents) != len(requestedBlockHeaders) {
-		return nil, errors.New("number of results does not match number of Blocks requested")
+		return nil, errors.New("number of results does not match number of blocks requested")
 	}
 
 	requestedBlockHeaderSet := map[string]*flow.Header{}
@@ -222,7 +222,7 @@ func (b *backendEvents) getEventsFromAnyExeNode(ctx context.Context,
 			logger := b.log.With().
 				Str("execution_node", node.String()).
 				Str("event", req.GetType()).
-				Int("Blocks", len(req.BlockIds)).
+				Int("blocks", len(req.BlockIds)).
 				Int64("rtt_ms", duration.Milliseconds()).
 				Logger()
 

@@ -24,21 +24,21 @@ func (b *backendBlockDetails) GetLatestBlock(_ context.Context, isSealed bool) (
 		// get the latest seal header from storage
 		header, err = b.state.Sealed().Head()
 	} else {
-		// get the finalized header from State
+		// get the finalized header from state
 		header, err = b.state.Final().Head()
 	}
 
 	if err != nil {
 		// node should always have the latest block
 
-		// In the RPC engine, if we encounter an error from the protocol State indicating State corruption,
+		// In the RPC engine, if we encounter an error from the protocol state indicating state corruption,
 		// we should halt processing requests, but do throw an exception which might cause a crash:
-		// - It is unsafe to process requests if we have an internally bad State.
+		// - It is unsafe to process requests if we have an internally bad state.
 		//   TODO: https://github.com/onflow/flow-go/issues/4028
 		// - We would like to avoid throwing an exception as a result of an Access API request by policy
 		//   because this can cause DOS potential
-		// - Since the protocol State is widely shared, we assume that in practice another component will
-		//   observe the protocol State error and throw an exception.
+		// - Since the protocol state is widely shared, we assume that in practice another component will
+		//   observe the protocol state error and throw an exception.
 		return nil, flow.BlockStatusUnknown, status.Errorf(codes.Internal, "could not get latest block: %v", err)
 	}
 
@@ -48,11 +48,11 @@ func (b *backendBlockDetails) GetLatestBlock(_ context.Context, isSealed bool) (
 		return nil, flow.BlockStatusUnknown, status.Errorf(codes.Internal, "could not get latest block: %v", err)
 	}
 
-	status, err := b.getBlockStatus(block)
+	stat, err := b.getBlockStatus(block)
 	if err != nil {
-		return nil, status, err
+		return nil, stat, err
 	}
-	return block, status, nil
+	return block, stat, nil
 }
 
 func (b *backendBlockDetails) GetBlockByID(_ context.Context, id flow.Identifier) (*flow.Block, flow.BlockStatus, error) {
@@ -61,11 +61,11 @@ func (b *backendBlockDetails) GetBlockByID(_ context.Context, id flow.Identifier
 		return nil, flow.BlockStatusUnknown, rpc.ConvertStorageError(err)
 	}
 
-	status, err := b.getBlockStatus(block)
+	stat, err := b.getBlockStatus(block)
 	if err != nil {
-		return nil, status, err
+		return nil, stat, err
 	}
-	return block, status, nil
+	return block, stat, nil
 }
 
 func (b *backendBlockDetails) GetBlockByHeight(_ context.Context, height uint64) (*flow.Block, flow.BlockStatus, error) {
@@ -74,24 +74,24 @@ func (b *backendBlockDetails) GetBlockByHeight(_ context.Context, height uint64)
 		return nil, flow.BlockStatusUnknown, rpc.ConvertStorageError(err)
 	}
 
-	status, err := b.getBlockStatus(block)
+	stat, err := b.getBlockStatus(block)
 	if err != nil {
-		return nil, status, err
+		return nil, stat, err
 	}
-	return block, status, nil
+	return block, stat, nil
 }
 
 func (b *backendBlockDetails) getBlockStatus(block *flow.Block) (flow.BlockStatus, error) {
 	sealed, err := b.state.Sealed().Head()
 	if err != nil {
-		// In the RPC engine, if we encounter an error from the protocol State indicating State corruption,
+		// In the RPC engine, if we encounter an error from the protocol state indicating state corruption,
 		// we should halt processing requests, but do throw an exception which might cause a crash:
 		// - It is unsafe to process requests if we have an internally bad State.
 		//   TODO: https://github.com/onflow/flow-go/issues/4028
 		// - We would like to avoid throwing an exception as a result of an Access API request by policy
 		//   because this can cause DOS potential
-		// - Since the protocol State is widely shared, we assume that in practice another component will
-		//   observe the protocol State error and throw an exception.
+		// - Since the protocol state is widely shared, we assume that in practice another component will
+		//   observe the protocol state error and throw an exception.
 		return flow.BlockStatusUnknown, status.Errorf(codes.Internal, "failed to find latest sealed header: %v", err)
 	}
 
