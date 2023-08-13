@@ -64,7 +64,7 @@ func (b *backendEvents) GetEventsForHeightRange(
 		endHeight = head.Height
 	}
 
-	// find the block headers  for all the blocks between min and max height (inclusive)
+	// find the block headers for all the blocks between min and max height (inclusive)
 	blockHeaders := make([]*flow.Header, 0)
 
 	for i := startHeight; i <= endHeight; i++ {
@@ -90,7 +90,7 @@ func (b *backendEvents) GetEventsForBlockIDs(
 		return nil, status.Errorf(codes.InvalidArgument, "requested block range (%d) exceeded maximum (%d)", len(blockIDs), b.maxHeightRange)
 	}
 
-	// find the block headers  for all the block IDs
+	// find the block headers for all the block IDs
 	blockHeaders := make([]*flow.Header, 0)
 	for _, blockID := range blockIDs {
 		header, err := b.headers.ByBlockID(blockID)

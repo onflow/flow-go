@@ -168,7 +168,7 @@ func (b *backendScripts) logScriptExecutionComparison(
 	archiveError error,
 	msg string,
 ) {
-	// over-Log for ease of debug
+	// over-log for ease of debug
 	if executionError != nil || archiveError != nil {
 		b.log.Debug().Hex("block_id", blockID[:]).
 			Str("script", string(script)).

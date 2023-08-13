@@ -24,28 +24,28 @@ func (b *backendBlockHeaders) GetLatestBlockHeader(_ context.Context, isSealed b
 		// get the latest seal header from storage
 		header, err = b.state.Sealed().Head()
 	} else {
-		// get the finalized header from State
+		// get the finalized header from state
 		header, err = b.state.Final().Head()
 	}
 
 	if err != nil {
 		// node should always have the latest block
-		// In the RPC engine, if we encounter an error from the protocol State indicating State corruption,
+		// In the RPC engine, if we encounter an error from the protocol state indicating state corruption,
 		// we should halt processing requests, but do throw an exception which might cause a crash:
-		// - It is unsafe to process requests if we have an internally bad State.
+		// - It is unsafe to process requests if we have an internally bad state.
 		//   TODO: https://github.com/onflow/flow-go/issues/4028
 		// - We would like to avoid throwing an exception as a result of an Access API request by policy
 		//   because this can cause DOS potential
-		// - Since the protocol State is widely shared, we assume that in practice another component will
-		//   observe the protocol State error and throw an exception.
+		// - Since the protocol state is widely shared, we assume that in practice another component will
+		//   observe the protocol state error and throw an exception.
 		return nil, flow.BlockStatusUnknown, status.Errorf(codes.Internal, "could not get latest block header: %v", err)
 	}
 
-	status, err := b.getBlockStatus(header)
+	stat, err := b.getBlockStatus(header)
 	if err != nil {
-		return nil, status, err
+		return nil, stat, err
 	}
-	return header, status, nil
+	return header, stat, nil
 }
 
 func (b *backendBlockHeaders) GetBlockHeaderByID(_ context.Context, id flow.Identifier) (*flow.Header, flow.BlockStatus, error) {
@@ -54,11 +54,11 @@ func (b *backendBlockHeaders) GetBlockHeaderByID(_ context.Context, id flow.Iden
 		return nil, flow.BlockStatusUnknown, rpc.ConvertStorageError(err)
 	}
 
-	status, err := b.getBlockStatus(header)
+	stat, err := b.getBlockStatus(header)
 	if err != nil {
-		return nil, status, err
+		return nil, stat, err
 	}
-	return header, status, nil
+	return header, stat, nil
 }
 
 func (b *backendBlockHeaders) GetBlockHeaderByHeight(_ context.Context, height uint64) (*flow.Header, flow.BlockStatus, error) {
@@ -67,11 +67,11 @@ func (b *backendBlockHeaders) GetBlockHeaderByHeight(_ context.Context, height u
 		return nil, flow.BlockStatusUnknown, rpc.ConvertStorageError(err)
 	}
 
-	status, err := b.getBlockStatus(header)
+	stat, err := b.getBlockStatus(header)
 	if err != nil {
-		return nil, status, err
+		return nil, stat, err
 	}
-	return header, status, nil
+	return header, stat, nil
 }
 
 func (b *backendBlockHeaders) getBlockStatus(header *flow.Header) (flow.BlockStatus, error) {

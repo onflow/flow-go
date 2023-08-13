@@ -35,7 +35,7 @@ const maxAttemptsForExecutionReceipt = 3
 // DefaultMaxHeightRange is the default maximum size of range requests.
 const DefaultMaxHeightRange = 250
 
-// DefaultSnapshotHistoryLimit the amount of Blocks to look back in State
+// DefaultSnapshotHistoryLimit the amount of blocks to look back in state
 // when recursively searching for a valid snapshot
 const DefaultSnapshotHistoryLimit = 50
 
