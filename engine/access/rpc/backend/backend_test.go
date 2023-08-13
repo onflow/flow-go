@@ -1533,7 +1533,7 @@ func (suite *Suite) TestGetEventsForHeightRange() {
 		fixedENIdentifiersStr := flow.IdentifierList(nodeIdentities.NodeIDs()).Strings()
 
 		backend := New(BackendParams{
-			State:                 suite.state,
+			State:                 state,
 			Blocks:                suite.blocks,
 			Headers:               suite.headers,
 			ExecutionReceipts:     suite.receipts,
@@ -1565,7 +1565,7 @@ func (suite *Suite) TestGetEventsForHeightRange() {
 		fixedENIdentifiersStr := flow.IdentifierList(nodeIdentities.NodeIDs()).Strings()
 
 		backend := New(BackendParams{
-			State:                 suite.state,
+			State:                 state,
 			Blocks:                suite.blocks,
 			Headers:               suite.headers,
 			ExecutionReceipts:     suite.receipts,
@@ -1625,7 +1625,7 @@ func (suite *Suite) TestGetEventsForHeightRange() {
 		fixedENIdentifiersStr := flow.IdentifierList(nodeIdentities.NodeIDs()).Strings()
 
 		backend := New(BackendParams{
-			State:                 suite.state,
+			State:                 state,
 			Blocks:                suite.blocks,
 			Headers:               suite.headers,
 			ExecutionReceipts:     suite.receipts,
