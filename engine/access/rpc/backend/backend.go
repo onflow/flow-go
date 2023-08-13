@@ -35,7 +35,7 @@ const maxAttemptsForExecutionReceipt = 3
 // DefaultMaxHeightRange is the default maximum size of range requests.
 const DefaultMaxHeightRange = 250
 
-// DefaultSnapshotHistoryLimit the amount of blocks to look back in state
+// DefaultSnapshotHistoryLimit the amount of Blocks to look back in State
 // when recursively searching for a valid snapshot
 const DefaultSnapshotHistoryLimit = 50
 
@@ -100,141 +100,142 @@ type Communicator interface {
 	) error
 }
 
+type BackendParams struct {
+	State                     protocol.State
+	CollectionRPC             accessproto.AccessAPIClient
+	HistoricalAccessNodes     []accessproto.AccessAPIClient
+	Blocks                    storage.Blocks
+	Headers                   storage.Headers
+	Collections               storage.Collections
+	Transactions              storage.Transactions
+	ExecutionReceipts         storage.ExecutionReceipts
+	ExecutionResults          storage.ExecutionResults
+	ChainID                   flow.ChainID
+	AccessMetrics             module.AccessMetrics
+	ConnFactory               connection.ConnectionFactory
+	RetryEnabled              bool
+	MaxHeightRange            uint
+	PreferredExecutionNodeIDs []string
+	FixedExecutionNodeIDs     []string
+	Log                       zerolog.Logger
+	SnapshotHistoryLimit      int
+	ArchiveAddressList        []string
+	Communicator              Communicator
+	ScriptExecValidation      bool
+}
+
 // New creates backend instance
-func New(state protocol.State,
-	collectionRPC accessproto.AccessAPIClient,
-	historicalAccessNodes []accessproto.AccessAPIClient,
-	blocks storage.Blocks,
-	headers storage.Headers,
-	collections storage.Collections,
-	transactions storage.Transactions,
-	executionReceipts storage.ExecutionReceipts,
-	executionResults storage.ExecutionResults,
-	chainID flow.ChainID,
-	accessMetrics module.AccessMetrics,
-	connFactory connection.ConnectionFactory,
-	retryEnabled bool,
-	maxHeightRange uint,
-	preferredExecutionNodeIDs []string,
-	fixedExecutionNodeIDs []string,
-	log zerolog.Logger,
-	snapshotHistoryLimit int,
-	archiveAddressList []string,
-	communicator Communicator,
-	scriptExecValidation bool,
-) *Backend {
+func New(params BackendParams) *Backend {
 	retry := newRetry()
-	if retryEnabled {
+	if params.RetryEnabled {
 		retry.Activate()
 	}
 
 	loggedScripts, err := lru.New(DefaultLoggedScriptsCacheSize)
 	if err != nil {
-		log.Fatal().Err(err).Msg("failed to initialize script logging cache")
+		params.Log.Fatal().Err(err).Msg("failed to initialize script logging cache")
 	}
 
-	archivePorts := make([]uint, len(archiveAddressList))
-	for idx, addr := range archiveAddressList {
+	archivePorts := make([]uint, len(params.ArchiveAddressList))
+	for idx, addr := range params.ArchiveAddressList {
 		port, err := findPortFromAddress(addr)
 		if err != nil {
-			log.Fatal().Err(err).Msg("failed to find archive node port")
+			params.Log.Fatal().Err(err).Msg("failed to find archive node port")
 		}
 		archivePorts[idx] = port
 	}
 
 	txResCache, err := lru2.New[flow.Identifier, *access.TransactionResult](int(badger.DefaultCacheSize))
 	if err != nil {
-		log.Fatal().Err(err).Msg("failed to init cache for transaction results")
+		params.Log.Fatal().Err(err).Msg("failed to init cache for transaction results")
 	}
 
 	b := &Backend{
-		state: state,
+		state: params.State,
 		// create the sub-backends
 		backendScripts: backendScripts{
-			headers:              headers,
-			executionReceipts:    executionReceipts,
-			connFactory:          connFactory,
-			state:                state,
-			log:                  log,
-			metrics:              accessMetrics,
+			headers:              params.Headers,
+			executionReceipts:    params.ExecutionReceipts,
+			connFactory:          params.ConnFactory,
+			state:                params.State,
+			log:                  params.Log,
+			metrics:              params.AccessMetrics,
 			loggedScripts:        loggedScripts,
-			archiveAddressList:   archiveAddressList,
+			archiveAddressList:   params.ArchiveAddressList,
 			archivePorts:         archivePorts,
-			nodeCommunicator:     communicator,
-			scriptExecValidation: scriptExecValidation,
+			nodeCommunicator:     params.Communicator,
+			scriptExecValidation: params.ScriptExecValidation,
 		},
 		backendTransactions: backendTransactions{
-			staticCollectionRPC:  collectionRPC,
-			state:                state,
-			chainID:              chainID,
-			collections:          collections,
-			blocks:               blocks,
-			transactions:         transactions,
-			executionReceipts:    executionReceipts,
-			transactionValidator: configureTransactionValidator(state, chainID),
-			transactionMetrics:   accessMetrics,
+			staticCollectionRPC:  params.CollectionRPC,
+			state:                params.State,
+			chainID:              params.ChainID,
+			collections:          params.Collections,
+			blocks:               params.Blocks,
+			transactions:         params.Transactions,
+			executionReceipts:    params.ExecutionReceipts,
+			transactionValidator: configureTransactionValidator(params.State, params.ChainID),
+			transactionMetrics:   params.AccessMetrics,
 			retry:                retry,
-			connFactory:          connFactory,
-			previousAccessNodes:  historicalAccessNodes,
-			log:                  log,
-			nodeCommunicator:     communicator,
+			connFactory:          params.ConnFactory,
+			previousAccessNodes:  params.HistoricalAccessNodes,
+			log:                  params.Log,
+			nodeCommunicator:     params.Communicator,
 			txResultCache:        txResCache,
 		},
 		backendEvents: backendEvents{
-			state:             state,
-			headers:           headers,
-			executionReceipts: executionReceipts,
-			connFactory:       connFactory,
-			log:               log,
-			maxHeightRange:    maxHeightRange,
-			nodeCommunicator:  communicator,
+			state:             params.State,
+			headers:           params.Headers,
+			executionReceipts: params.ExecutionReceipts,
+			connFactory:       params.ConnFactory,
+			log:               params.Log,
+			maxHeightRange:    params.MaxHeightRange,
+			nodeCommunicator:  params.Communicator,
 		},
 		backendBlockHeaders: backendBlockHeaders{
-			headers: headers,
-			state:   state,
+			headers: params.Headers,
+			state:   params.State,
 		},
 		backendBlockDetails: backendBlockDetails{
-			blocks: blocks,
-			state:  state,
+			blocks: params.Blocks,
+			state:  params.State,
 		},
 		backendAccounts: backendAccounts{
-			state:             state,
-			headers:           headers,
-			executionReceipts: executionReceipts,
-			connFactory:       connFactory,
-			log:               log,
-			nodeCommunicator:  communicator,
+			state:             params.State,
+			headers:           params.Headers,
+			executionReceipts: params.ExecutionReceipts,
+			connFactory:       params.ConnFactory,
+			log:               params.Log,
+			nodeCommunicator:  params.Communicator,
 		},
 		backendExecutionResults: backendExecutionResults{
-			executionResults: executionResults,
+			executionResults: params.ExecutionResults,
 		},
 		backendNetwork: backendNetwork{
-			state:                state,
-			chainID:              chainID,
-			snapshotHistoryLimit: snapshotHistoryLimit,
+			state:                params.State,
+			chainID:              params.ChainID,
+			snapshotHistoryLimit: params.SnapshotHistoryLimit,
 		},
-		collections:       collections,
-		executionReceipts: executionReceipts,
-		connFactory:       connFactory,
-		chainID:           chainID,
+		collections:       params.Collections,
+		executionReceipts: params.ExecutionReceipts,
+		connFactory:       params.ConnFactory,
+		chainID:           params.ChainID,
 	}
 
 	retry.SetBackend(b)
 
-	preferredENIdentifiers, err = identifierList(preferredExecutionNodeIDs)
+	preferredENIdentifiers, err = identifierList(params.PreferredExecutionNodeIDs)
 	if err != nil {
-		log.Fatal().Err(err).Msg("failed to convert node id string to Flow Identifier for preferred EN map")
+		params.Log.Fatal().Err(err).Msg("failed to convert node id string to Flow Identifier for preferred EN map")
 	}
 
-	fixedENIdentifiers, err = identifierList(fixedExecutionNodeIDs)
+	fixedENIdentifiers, err = identifierList(params.FixedExecutionNodeIDs)
 	if err != nil {
-		log.Fatal().Err(err).Msg("failed to convert node id string to Flow Identifier for fixed EN map")
+		params.Log.Fatal().Err(err).Msg("failed to convert node id string to Flow Identifier for fixed EN map")
 	}
 
 	return b
 }
-
-//TODO: refactor cache, replace with generic lru.Cache alternative
 
 // NewCache constructs cache for storing connections to other nodes.
 // No errors are expected during normal operations.
@@ -331,7 +332,7 @@ func (b *Backend) GetCollectionByID(_ context.Context, colID flow.Identifier) (*
 	// retrieve the collection from the collection storage
 	col, err := b.collections.LightByID(colID)
 	if err != nil {
-		// Collections are retrieved asynchronously as we finalize blocks, so
+		// Collections are retrieved asynchronously as we finalize Blocks, so
 		// it is possible for a client to request a finalized block from us
 		// containing some collection, then get a not found error when requesting
 		// that collection. These clients should retry.
@@ -397,7 +398,7 @@ func executionNodesForBlockID(
 				break
 			}
 
-			// log the attempt
+			// Log the attempt
 			log.Debug().Int("attempt", attempt).Int("max_attempt", maxAttemptsForExecutionReceipt).
 				Int("execution_receipts_found", len(executorIDs)).
 				Str("block_id", blockID.String()).
@@ -471,7 +472,7 @@ func findAllExecutionNodes(
 		}
 	}
 
-	// if there are more than one execution result for the same block ID, log as error
+	// if there are more than one execution result for the same block ID, Log as error
 	if executionResultGroupedMetaList.NumberGroups() > 1 {
 		identicalReceiptsStr := fmt.Sprintf("%v", flow.GetIDs(allReceipts))
 		log.Error().

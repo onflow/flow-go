@@ -34,7 +34,7 @@ func (suite *Suite) WithPreConfiguredState(f func(snap protocol.Snapshot)) {
 		epoch1, ok := epochBuilder.EpochHeights(1)
 		require.True(suite.T(), ok)
 
-		// setup AtHeight mock returns for state
+		// setup AtHeight mock returns for State
 		for _, height := range epoch1.Range() {
 			suite.state.On("AtHeight", epoch1.Range()).Return(state.AtHeight(height))
 		}
@@ -67,28 +67,19 @@ func (suite *Suite) TestGetTransactionResultReturnsUnknown() {
 			Return(nil, storage.ErrNotFound)
 
 		backend := New(
-			suite.state,
-			suite.colClient,
-			nil,
-			suite.blocks,
-			nil,
-			nil,
-			suite.transactions,
-			suite.receipts,
-			nil,
-			suite.chainID,
-			metrics.NewNoopCollector(),
-			nil,
-			false,
-			DefaultMaxHeightRange,
-			nil,
-			nil,
-			suite.log,
-			DefaultSnapshotHistoryLimit,
-			nil,
-			suite.communicator,
-			false,
-		)
+			BackendParams{
+				State:                suite.state,
+				CollectionRPC:        suite.colClient,
+				Blocks:               suite.blocks,
+				Transactions:         suite.transactions,
+				ExecutionReceipts:    suite.receipts,
+				ChainID:              suite.chainID,
+				AccessMetrics:        metrics.NewNoopCollector(),
+				MaxHeightRange:       DefaultMaxHeightRange,
+				Log:                  suite.log,
+				SnapshotHistoryLimit: DefaultSnapshotHistoryLimit,
+				Communicator:         suite.communicator,
+			})
 		res, err := backend.GetTransactionResult(context.Background(), tx.ID(), block.ID(), coll.ID())
 		suite.Require().NoError(err)
 		suite.Require().Equal(res.Status, flow.TransactionStatusUnknown)
@@ -116,28 +107,19 @@ func (suite *Suite) TestGetTransactionResultReturnsTransactionError() {
 		suite.state.On("AtBlockID", block.ID()).Return(snap, nil).Once()
 
 		backend := New(
-			suite.state,
-			suite.colClient,
-			nil,
-			suite.blocks,
-			nil,
-			nil,
-			suite.transactions,
-			suite.receipts,
-			nil,
-			suite.chainID,
-			metrics.NewNoopCollector(),
-			nil,
-			false,
-			DefaultMaxHeightRange,
-			nil,
-			nil,
-			suite.log,
-			DefaultSnapshotHistoryLimit,
-			nil,
-			suite.communicator,
-			false,
-		)
+			BackendParams{
+				State:                suite.state,
+				CollectionRPC:        suite.colClient,
+				Blocks:               suite.blocks,
+				Transactions:         suite.transactions,
+				ExecutionReceipts:    suite.receipts,
+				ChainID:              suite.chainID,
+				AccessMetrics:        metrics.NewNoopCollector(),
+				MaxHeightRange:       DefaultMaxHeightRange,
+				Log:                  suite.log,
+				SnapshotHistoryLimit: DefaultSnapshotHistoryLimit,
+				Communicator:         suite.communicator,
+			})
 		_, err := backend.GetTransactionResult(context.Background(), tx.ID(), block.ID(), coll.ID())
 		suite.Require().Equal(err, status.Errorf(codes.Internal, "failed to find: %v", fmt.Errorf("some other error")))
 
@@ -175,28 +157,20 @@ func (suite *Suite) TestGetTransactionResultReturnsValidTransactionResultFromHis
 			Return(&transactionResultResponse, nil).Once()
 
 		backend := New(
-			suite.state,
-			suite.colClient,
-			[]access.AccessAPIClient{suite.historicalAccessClient},
-			suite.blocks,
-			nil,
-			nil,
-			suite.transactions,
-			suite.receipts,
-			nil,
-			suite.chainID,
-			metrics.NewNoopCollector(),
-			nil,
-			false,
-			DefaultMaxHeightRange,
-			nil,
-			nil,
-			suite.log,
-			DefaultSnapshotHistoryLimit,
-			nil,
-			suite.communicator,
-			false,
-		)
+			BackendParams{
+				State:                 suite.state,
+				CollectionRPC:         suite.colClient,
+				HistoricalAccessNodes: []access.AccessAPIClient{suite.historicalAccessClient},
+				Blocks:                suite.blocks,
+				Transactions:          suite.transactions,
+				ExecutionReceipts:     suite.receipts,
+				ChainID:               suite.chainID,
+				AccessMetrics:         metrics.NewNoopCollector(),
+				MaxHeightRange:        DefaultMaxHeightRange,
+				Log:                   suite.log,
+				SnapshotHistoryLimit:  DefaultSnapshotHistoryLimit,
+				Communicator:          suite.communicator,
+			})
 		resp, err := backend.GetTransactionResult(context.Background(), tx.ID(), block.ID(), coll.ID())
 		suite.Require().NoError(err)
 		suite.Require().Equal(flow.TransactionStatusExecuted, resp.Status)
@@ -239,29 +213,20 @@ func (suite *Suite) TestGetTransactionResultFromCache() {
 			On("GetTransactionResult", mock.Anything, mock.Anything).
 			Return(&transactionResultResponse, nil).Once()
 
-		backend := New(
-			suite.state,
-			suite.colClient,
-			[]access.AccessAPIClient{suite.historicalAccessClient},
-			suite.blocks,
-			nil,
-			nil,
-			suite.transactions,
-			suite.receipts,
-			nil,
-			suite.chainID,
-			metrics.NewNoopCollector(),
-			nil,
-			false,
-			DefaultMaxHeightRange,
-			nil,
-			nil,
-			suite.log,
-			DefaultSnapshotHistoryLimit,
-			nil,
-			suite.communicator,
-			false,
-		)
+		backend := New(BackendParams{
+			State:                 suite.state,
+			CollectionRPC:         suite.colClient,
+			HistoricalAccessNodes: []access.AccessAPIClient{suite.historicalAccessClient},
+			Blocks:                suite.blocks,
+			Transactions:          suite.transactions,
+			ExecutionReceipts:     suite.receipts,
+			ChainID:               suite.chainID,
+			AccessMetrics:         metrics.NewNoopCollector(),
+			MaxHeightRange:        DefaultMaxHeightRange,
+			Log:                   suite.log,
+			SnapshotHistoryLimit:  DefaultSnapshotHistoryLimit,
+			Communicator:          suite.communicator,
+		})
 
 		resp, err := backend.GetTransactionResult(context.Background(), tx.ID(), block.ID(), coll.ID())
 		suite.Require().NoError(err)

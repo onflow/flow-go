@@ -4,15 +4,13 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/onflow/flow-go/cmd/build"
-
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
-
 	"github.com/onflow/flow-go/access"
+	"github.com/onflow/flow-go/cmd/build"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/state/protocol"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 var SnapshotHistoryLimitErr = fmt.Errorf("reached the snapshot history limit")
@@ -86,8 +84,8 @@ func (b *backendNetwork) isEpochOrPhaseDifferent(counter1, counter2 uint64, phas
 }
 
 // getValidSnapshot will return a valid snapshot that has a sealing segment which
-// 1. does not contain any blocks that span an epoch transition
-// 2. does not contain any blocks that span an epoch phase transition
+// 1. does not contain any Blocks that span an epoch transition
+// 2. does not contain any Blocks that span an epoch phase transition
 // If a snapshot does contain an invalid sealing segment query the state
 // by height of each block in the segment and return a snapshot at the point
 // where the transition happens.

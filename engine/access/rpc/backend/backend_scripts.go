@@ -1,26 +1,25 @@
 package backend
 
 import (
+	"crypto/md5" //nolint:gosec
 	"bytes"
 	"context"
-	"crypto/md5" //nolint:gosec
 	"io"
 	"time"
 
 	"github.com/hashicorp/go-multierror"
 	lru "github.com/hashicorp/golang-lru"
-	"github.com/onflow/flow/protobuf/go/flow/access"
-	execproto "github.com/onflow/flow/protobuf/go/flow/execution"
-	"github.com/rs/zerolog"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
-
 	"github.com/onflow/flow-go/engine/access/rpc/connection"
 	"github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
+	"github.com/onflow/flow/protobuf/go/flow/access"
+	execproto "github.com/onflow/flow/protobuf/go/flow/execution"
+	"github.com/rs/zerolog"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 // uniqueScriptLoggingTimeWindow is the duration for checking the uniqueness of scripts sent for execution
@@ -169,7 +168,7 @@ func (b *backendScripts) logScriptExecutionComparison(
 	archiveError error,
 	msg string,
 ) {
-	// over-log for ease of debug
+	// over-Log for ease of debug
 	if executionError != nil || archiveError != nil {
 		b.log.Debug().Hex("block_id", blockID[:]).
 			Str("script", string(script)).
@@ -200,7 +199,7 @@ func (b *backendScripts) executeScriptOnAvailableArchiveNodes(
 			rnPort := b.archivePorts[idx]
 			result, err := b.tryExecuteScriptOnArchiveNode(ctx, rnAddr, rnPort, blockID, script, arguments)
 			if err == nil {
-				// log execution time
+				// Log execution time
 				b.metrics.ScriptExecuted(
 					time.Since(startTime),
 					len(script),
@@ -219,7 +218,7 @@ func (b *backendScripts) executeScriptOnAvailableArchiveNodes(
 						Msg("script failed to execute on the execution node")
 					return nil, err
 				case codes.NotFound:
-					// failures due to unavailable blocks are explicitly marked Not found
+					// failures due to unavailable Blocks are explicitly marked Not found
 					b.metrics.ScriptExecutionErrorOnArchiveNode()
 					b.log.Error().Err(err).Msg("script execution failed for archive node")
 					return nil, err
@@ -270,7 +269,7 @@ func (b *backendScripts) executeScriptOnAvailableExecutionNodes(
 					}
 				}
 
-				// log execution time
+				// Log execution time
 				b.metrics.ScriptExecuted(
 					time.Since(execStartTime),
 					len(script),
