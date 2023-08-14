@@ -20,5 +20,5 @@ type EpochJoinAndLeaveANSuite struct {
 // TestEpochJoinAndLeaveAN should update access nodes and assert healthy network conditions
 // after the epoch transition completes. See health check function for details.
 func (s *EpochJoinAndLeaveANSuite) TestEpochJoinAndLeaveAN() {
-	s.runTestEpochJoinAndLeave(flow.RoleAccess, s.assertNetworkHealthyAfterANChange)
+	s.RunTestEpochJoinAndLeave(flow.RoleAccess, s.AssertNetworkHealthyAfterANChange)
 }

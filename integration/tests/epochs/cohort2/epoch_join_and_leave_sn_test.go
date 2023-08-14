@@ -20,5 +20,5 @@ type EpochJoinAndLeaveSNSuite struct {
 // TestEpochJoinAndLeaveSN should update consensus nodes and assert healthy network conditions
 // after the epoch transition completes. See health check function for details.
 func (s *EpochJoinAndLeaveSNSuite) TestEpochJoinAndLeaveSN() {
-	s.runTestEpochJoinAndLeave(flow.RoleConsensus, s.assertNetworkHealthyAfterSNChange)
+	s.RunTestEpochJoinAndLeave(flow.RoleConsensus, s.AssertNetworkHealthyAfterSNChange)
 }
