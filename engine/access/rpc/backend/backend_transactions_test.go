@@ -5,13 +5,7 @@ import (
 	"fmt"
 
 	"github.com/dgraph-io/badger/v2"
-	"github.com/onflow/flow/protobuf/go/flow/access"
-	"github.com/onflow/flow/protobuf/go/flow/entities"
-	"github.com/stretchr/testify/mock"
-	"github.com/stretchr/testify/require"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
-
+	acc "github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/state/protocol"
@@ -19,6 +13,12 @@ import (
 	"github.com/onflow/flow-go/state/protocol/util"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/utils/unittest"
+	"github.com/onflow/flow/protobuf/go/flow/access"
+	"github.com/onflow/flow/protobuf/go/flow/entities"
+	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 func (suite *Suite) WithPreConfiguredState(f func(snap protocol.Snapshot)) {
@@ -241,5 +241,132 @@ func (suite *Suite) TestGetTransactionResultFromCache() {
 		suite.Require().Equal(uint(flow.TransactionStatusExecuted), resp2.StatusCode)
 
 		suite.historicalAccessClient.AssertExpectations(suite.T())
+	})
+}
+
+func (suite *Suite) TestGetTransactionResultCacheNonExistent() {
+	suite.WithPreConfiguredState(func(snap protocol.Snapshot) {
+		block := unittest.BlockFixture()
+		tbody := unittest.TransactionBodyFixture()
+		tx := unittest.TransactionFixture()
+		tx.TransactionBody = tbody
+
+		coll := flow.CollectionFromTransactions([]*flow.Transaction{&tx})
+
+		suite.transactions.
+			On("ByID", tx.ID()).
+			Return(nil, storage.ErrNotFound)
+
+		suite.communicator.On("CallAvailableNode",
+			mock.Anything,
+			mock.Anything,
+			mock.Anything).
+			Return(nil).Once()
+
+		suite.state.On("AtBlockID", block.ID()).Return(snap, nil).Once()
+
+		suite.historicalAccessClient.
+			On("GetTransactionResult", mock.Anything, mock.Anything).
+			Return(nil, status.Errorf(codes.NotFound, "no known transaction with ID %s", tx.ID())).Once()
+
+		backend := New(Params{
+			State:                 suite.state,
+			CollectionRPC:         suite.colClient,
+			HistoricalAccessNodes: []access.AccessAPIClient{suite.historicalAccessClient},
+			Blocks:                suite.blocks,
+			Transactions:          suite.transactions,
+			ExecutionReceipts:     suite.receipts,
+			ChainID:               suite.chainID,
+			AccessMetrics:         metrics.NewNoopCollector(),
+			MaxHeightRange:        DefaultMaxHeightRange,
+			Log:                   suite.log,
+			SnapshotHistoryLimit:  DefaultSnapshotHistoryLimit,
+			Communicator:          suite.communicator,
+			TxResultCacheSize:     10,
+		})
+
+		resp, err := backend.GetTransactionResult(context.Background(), tx.ID(), block.ID(), coll.ID())
+		suite.Require().NoError(err)
+		suite.Require().Equal(flow.TransactionStatusUnknown, resp.Status)
+		suite.Require().Equal(uint(flow.TransactionStatusUnknown), resp.StatusCode)
+
+		// ensure the unknown transaction is cached when not found anywhere
+		//panic("here")
+		txStatus := flow.TransactionStatusUnknown
+		res, ok := backend.txResultCache.Get(tx.ID())
+		suite.Require().True(ok)
+		suite.Require().Equal(res, &acc.TransactionResult{
+			Status:     txStatus,
+			StatusCode: uint(txStatus),
+		})
+
+		suite.historicalAccessClient.AssertExpectations(suite.T())
+
+	})
+}
+
+func (suite *Suite) TestGetTransactionResultUnknownFromCache() {
+	suite.WithPreConfiguredState(func(snap protocol.Snapshot) {
+		block := unittest.BlockFixture()
+		tbody := unittest.TransactionBodyFixture()
+		tx := unittest.TransactionFixture()
+		tx.TransactionBody = tbody
+
+		coll := flow.CollectionFromTransactions([]*flow.Transaction{&tx})
+
+		suite.transactions.
+			On("ByID", tx.ID()).
+			Return(nil, storage.ErrNotFound)
+
+		suite.communicator.On("CallAvailableNode",
+			mock.Anything,
+			mock.Anything,
+			mock.Anything).
+			Return(nil).Once()
+
+		suite.state.On("AtBlockID", block.ID()).Return(snap, nil).Once()
+
+		suite.historicalAccessClient.
+			On("GetTransactionResult", mock.Anything, mock.Anything).
+			Return(nil, status.Errorf(codes.NotFound, "no known transaction with ID %s", tx.ID())).Once()
+
+		backend := New(Params{
+			State:                 suite.state,
+			CollectionRPC:         suite.colClient,
+			HistoricalAccessNodes: []access.AccessAPIClient{suite.historicalAccessClient},
+			Blocks:                suite.blocks,
+			Transactions:          suite.transactions,
+			ExecutionReceipts:     suite.receipts,
+			ChainID:               suite.chainID,
+			AccessMetrics:         metrics.NewNoopCollector(),
+			MaxHeightRange:        DefaultMaxHeightRange,
+			Log:                   suite.log,
+			SnapshotHistoryLimit:  DefaultSnapshotHistoryLimit,
+			Communicator:          suite.communicator,
+			TxResultCacheSize:     10,
+		})
+
+		resp, err := backend.GetTransactionResult(context.Background(), tx.ID(), block.ID(), coll.ID())
+		suite.Require().NoError(err)
+		suite.Require().Equal(flow.TransactionStatusUnknown, resp.Status)
+		suite.Require().Equal(uint(flow.TransactionStatusUnknown), resp.StatusCode)
+
+		// ensure the unknown transaction is cached when not found anywhere
+		//panic("here")
+		txStatus := flow.TransactionStatusUnknown
+		res, ok := backend.txResultCache.Get(tx.ID())
+		suite.Require().True(ok)
+		suite.Require().Equal(res, &acc.TransactionResult{
+			Status:     txStatus,
+			StatusCode: uint(txStatus),
+		})
+
+		resp2, err := backend.GetTransactionResult(context.Background(), tx.ID(), block.ID(), coll.ID())
+		suite.Require().NoError(err)
+		suite.Require().Equal(flow.TransactionStatusUnknown, resp2.Status)
+		suite.Require().Equal(uint(flow.TransactionStatusUnknown), resp2.StatusCode)
+
+		suite.historicalAccessClient.AssertExpectations(suite.T())
+
 	})
 }
