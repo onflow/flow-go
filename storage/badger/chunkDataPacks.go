@@ -79,6 +79,8 @@ func (ch *ChunkDataPacks) BatchStore(c *flow.ChunkDataPack, batch storage.BatchS
 	return operation.BatchInsertChunkDataPack(sc)(writeBatch)
 }
 
+// StoreMul stores multiple ChunkDataPacks cs keyed by their ChunkIDs in provided batch.
+// No errors are expected during normal operation, but it may return generic error
 func (ch *ChunkDataPacks) StoreMul(cs []*flow.ChunkDataPack) error {
 	batch := NewBatch(ch.db)
 	for _, c := range cs {

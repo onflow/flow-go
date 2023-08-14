@@ -288,11 +288,11 @@ func (s *state) SaveExecutionResults(
 
 	err := s.chunkDataPacks.StoreMul(result.AllChunkDataPacks())
 	if err != nil {
-		return fmt.Errorf("can not store multile chunk data pack: %w", err)
+		return fmt.Errorf("can not store multiple chunk data pack: %w", err)
 	}
 
 	// Write Batch is BadgerDB feature designed for handling lots of writes
-	// in efficient and automatic manner, hence pushing all the updates we can
+	// in efficient and atomic manner, hence pushing all the updates we can
 	// as tightly as possible to let Badger manage it.
 	// Note, that it does not guarantee atomicity as transactions has size limit,
 	// but it's the closest thing to atomicity we could have
