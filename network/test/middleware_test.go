@@ -167,7 +167,12 @@ func (m *MiddlewareTestSuite) TestUpdateNodeAddresses() {
 	// create a new staked identity
 	sporkId := unittest.IdentifierFixture()
 	ids, libP2PNodes, _ := testutils.LibP2PNodeForMiddlewareFixture(m.T(), sporkId, 1)
-	mws, providers := testutils.MiddlewareFixtures(m.T(), ids, libP2PNodes, testutils.MiddlewareConfigFixture(m.T()), m.slashingViolationsConsumer)
+	mws, providers := testutils.MiddlewareFixtures(
+		m.T(),
+		ids,
+		libP2PNodes,
+		testutils.MiddlewareConfigFixture(m.T(), sporkId),
+		m.slashingViolationsConsumer)
 	require.Len(m.T(), ids, 1)
 	require.Len(m.T(), providers, 1)
 	require.Len(m.T(), mws, 1)
@@ -265,7 +270,7 @@ func (m *MiddlewareTestSuite) TestUnicastRateLimit_Messages() {
 	mws, providers := testutils.MiddlewareFixtures(m.T(),
 		ids,
 		libP2PNodes,
-		testutils.MiddlewareConfigFixture(m.T()),
+		testutils.MiddlewareConfigFixture(m.T(), sporkId),
 		m.slashingViolationsConsumer,
 		middleware.WithUnicastRateLimiters(rateLimiters),
 		middleware.WithPeerManagerFilters([]p2p.PeerFilter{testutils.IsRateLimitedPeerFilter(messageRateLimiter)}))
@@ -421,7 +426,7 @@ func (m *MiddlewareTestSuite) TestUnicastRateLimit_Bandwidth() {
 	mws, providers := testutils.MiddlewareFixtures(m.T(),
 		ids,
 		libP2PNodes,
-		testutils.MiddlewareConfigFixture(m.T()),
+		testutils.MiddlewareConfigFixture(m.T(), sporkId),
 		m.slashingViolationsConsumer,
 		middleware.WithUnicastRateLimiters(rateLimiters),
 		middleware.WithPeerManagerFilters([]p2p.PeerFilter{testutils.IsRateLimitedPeerFilter(bandwidthRateLimiter)}))
