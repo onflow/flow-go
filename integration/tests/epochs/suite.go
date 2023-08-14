@@ -1,3 +1,11 @@
+// Package epochs contains common functionality for the epoch integration test suite.
+// Individual tests exist in sub-directories of this: cohort1, cohort2...
+// Each cohort is run as a separate, sequential CI job. Since the epoch tests are long
+// and resource-heavy, we split them into several cohorts, which can be run in parallel.
+//
+// If a new cohort is added in the future, it must be added to:
+//   - ci.yml, flaky-test-monitor.yml (ensure new cohort of tests is run)
+//   - Makefile (include new cohort in integration-test directive, etc.)
 package epochs
 
 import (
