@@ -1114,8 +1114,8 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				SnapshotHistoryLimit:      backend.DefaultSnapshotHistoryLimit,
 				ArchiveAddressList:        backendConfig.ArchiveAddressList,
 				Communicator:              backend.NewNodeCommunicator(backendConfig.CircuitBreakerConfig.Enabled),
-				ScriptExecValidation:      backendConfig.ScriptExecValidation
-				TxResultCacheSize: builder.TxResultCacheSize,
+				ScriptExecValidation:      backendConfig.ScriptExecValidation,
+				TxResultCacheSize:         builder.TxResultCacheSize,
 			})
 
 			engineBuilder, err := rpc.NewBuilder(
