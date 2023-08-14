@@ -342,17 +342,6 @@ func SnapshotFromBootstrapStateWithParams(
 		EpochCommitSafetyThreshold: epochCommitSafetyThreshold, // see protocol.Params for details
 	}
 
-	protocolState := &flow.ProtocolStateEntry{
-		CurrentEpochEventIDs: flow.EventIDs{
-			SetupID:  setup.ID(),
-			CommitID: commit.ID(),
-		},
-		PreviousEpochEventIDs:           flow.EventIDs{},
-		Identities:                      flow.DynamicIdentityEntryListFromIdentities(setup.Participants),
-		InvalidStateTransitionAttempted: false,
-		NextEpochProtocolState:          nil,
-	}
-
 	snap := SnapshotFromEncodable(EncodableSnapshot{
 		Head:         root.Header,
 		LatestSeal:   seal,
@@ -367,8 +356,22 @@ func SnapshotFromBootstrapStateWithParams(
 		QuorumCertificate:   qc,
 		Epochs:              epochs,
 		Params:              params,
-		ProtocolState:       protocolState,
+		ProtocolState:       ProtocolStateForBootstrapState(setup, commit),
 		SealedVersionBeacon: nil,
 	})
 	return snap, nil
+}
+
+// ProtocolStateForBootstrapState generates a protocol.ProtocolStateEntry for a root protocol state which is used for bootstrapping.
+func ProtocolStateForBootstrapState(setup *flow.EpochSetup, commit *flow.EpochCommit) *flow.ProtocolStateEntry {
+	return &flow.ProtocolStateEntry{
+		CurrentEpochEventIDs: flow.EventIDs{
+			SetupID:  setup.ID(),
+			CommitID: commit.ID(),
+		},
+		PreviousEpochEventIDs:           flow.EventIDs{},
+		Identities:                      flow.DynamicIdentityEntryListFromIdentities(setup.Participants),
+		InvalidStateTransitionAttempted: false,
+		NextEpochProtocolState:          nil,
+	}
 }

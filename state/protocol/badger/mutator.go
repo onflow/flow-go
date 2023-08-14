@@ -524,10 +524,10 @@ func (m *FollowerState) insert(ctx context.Context, candidate *flow.Block, certi
 	}
 
 	updatedState, updatedStateID, hasChanges := protocolStateUpdater.Build()
-	// TODO: check if updatedStateID corresponds to the root protocol state ID stored in payload
-	// if updatedStateID != payload.ProtocolStateID {
-	// 	return state.NewInvalidExtension("invalid protocol state transition detected expected (%x) got %x", payload.ProtocolStateID, updatedStateID)
-	// }
+	if updatedStateID != candidate.Payload.ProtocolStateID {
+		return state.NewInvalidExtensionErrorf("invalid protocol state transition detected, "+
+			"payload contains (%x) but after applying changes got %x", candidate.Payload.ProtocolStateID, updatedStateID)
+	}
 
 	qc := candidate.Header.QuorumCertificate()
 

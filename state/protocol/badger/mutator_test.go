@@ -129,7 +129,7 @@ func TestExtendValid(t *testing.T) {
 		require.NoError(t, err)
 
 		// insert block1 on top of the root block
-		block1 := unittest.BlockWithParentFixture(block.Header)
+		block1 := unittest.BlockWithParentProtocolState(block)
 		err = fullState.Extend(context.Background(), block1)
 		require.NoError(t, err)
 
@@ -143,7 +143,7 @@ func TestExtendValid(t *testing.T) {
 		})
 
 		t.Run("BlockProcessable event should be emitted when any child of block1 is inserted", func(t *testing.T) {
-			block2 := unittest.BlockWithParentFixture(block1.Header)
+			block2 := unittest.BlockWithParentProtocolState(block1)
 			consumer.On("BlockProcessable", block1.Header, mock.Anything).Once()
 			err := fullState.Extend(context.Background(), block2)
 			require.NoError(t, err)
