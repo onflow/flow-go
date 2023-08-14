@@ -134,7 +134,9 @@ jobs:
             test_category: integration-collection
           - target: consensus-tests
             test_category: integration-consensus
-          - target: epochs-tests
+          - target: epochs-cohort1-tests
+            test_category: integration-epochs
+          - target: epochs-cohort2-tests
             test_category: integration-epochs
           - target: execution-tests
             test_category: integration-execution

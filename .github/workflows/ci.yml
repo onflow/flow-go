@@ -192,7 +192,8 @@ jobs:
           - make -C integration bft-tests
           - make -C integration collection-tests
           - make -C integration consensus-tests
-          - make -C integration epochs-tests
+          - make -C integration epochs-cohort1-tests
+          - make -C integration epochs-cohort2-tests
           - make -C integration execution-tests
           - make -C integration ghost-tests
           - make -C integration mvp-tests
