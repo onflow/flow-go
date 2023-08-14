@@ -30,6 +30,14 @@ func IndexPayloadResults(blockID flow.Identifier, resultIDs []flow.Identifier) f
 	return insert(makePrefix(codePayloadResults, blockID), resultIDs)
 }
 
+func IndexPayloadProtocolStateID(blockID flow.Identifier, stateID flow.Identifier) func(*badger.Txn) error {
+	return insert(makePrefix(codePayloadProtocolStateID, blockID), stateID)
+}
+
+func LookupPayloadProtocolStateID(blockID flow.Identifier, stateID *flow.Identifier) func(*badger.Txn) error {
+	return retrieve(makePrefix(codePayloadProtocolStateID, blockID), stateID)
+}
+
 func LookupPayloadReceipts(blockID flow.Identifier, receiptIDs *[]flow.Identifier) func(*badger.Txn) error {
 	return retrieve(makePrefix(codePayloadReceipts, blockID), receiptIDs)
 }
