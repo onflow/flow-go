@@ -291,7 +291,6 @@ func (suite *Suite) TestGetTransactionResultCacheNonExistent() {
 		suite.Require().Equal(uint(flow.TransactionStatusUnknown), resp.StatusCode)
 
 		// ensure the unknown transaction is cached when not found anywhere
-		//panic("here")
 		txStatus := flow.TransactionStatusUnknown
 		res, ok := backend.txResultCache.Get(tx.ID())
 		suite.Require().True(ok)
@@ -352,7 +351,6 @@ func (suite *Suite) TestGetTransactionResultUnknownFromCache() {
 		suite.Require().Equal(uint(flow.TransactionStatusUnknown), resp.StatusCode)
 
 		// ensure the unknown transaction is cached when not found anywhere
-		//panic("here")
 		txStatus := flow.TransactionStatusUnknown
 		res, ok := backend.txResultCache.Get(tx.ID())
 		suite.Require().True(ok)
