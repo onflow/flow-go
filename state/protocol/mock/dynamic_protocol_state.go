@@ -66,6 +66,22 @@ func (_m *DynamicProtocolState) DKG() (protocol.DKG, error) {
 	return r0, r1
 }
 
+// Entry provides a mock function with given fields:
+func (_m *DynamicProtocolState) Entry() *flow.RichProtocolStateEntry {
+	ret := _m.Called()
+
+	var r0 *flow.RichProtocolStateEntry
+	if rf, ok := ret.Get(0).(func() *flow.RichProtocolStateEntry); ok {
+		r0 = rf()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*flow.RichProtocolStateEntry)
+		}
+	}
+
+	return r0
+}
+
 // Epoch provides a mock function with given fields:
 func (_m *DynamicProtocolState) Epoch() uint64 {
 	ret := _m.Called()
@@ -106,6 +122,22 @@ func (_m *DynamicProtocolState) EpochSetup() *flow.EpochSetup {
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*flow.EpochSetup)
+		}
+	}
+
+	return r0
+}
+
+// EpochStatus provides a mock function with given fields:
+func (_m *DynamicProtocolState) EpochStatus() *flow.EpochStatus {
+	ret := _m.Called()
+
+	var r0 *flow.EpochStatus
+	if rf, ok := ret.Get(0).(func() *flow.EpochStatus); ok {
+		r0 = rf()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*flow.EpochStatus)
 		}
 	}
 

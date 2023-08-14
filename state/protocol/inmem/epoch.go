@@ -19,6 +19,10 @@ type Epoch struct {
 
 var _ protocol.Epoch = (*Epoch)(nil)
 
+func NewEpoch(enc EncodableEpoch) Epoch {
+	return Epoch{enc}
+}
+
 func (e Epoch) Encodable() EncodableEpoch {
 	return e.enc
 }

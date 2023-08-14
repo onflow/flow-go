@@ -20,12 +20,18 @@ type InitialProtocolState interface {
 	// DKG returns information about DKG that was obtained from EpochCommit event.
 	// No errors are expected during normal operations.
 	DKG() (DKG, error)
+	// Entry Returns low-level protocol state entry that was used to initialize this object.
+	// It shouldn't be used by high-level logic, it is useful for some cases such as bootstrapping.
+	// Prefer using other methods to access protocol state.
+	Entry() *flow.RichProtocolStateEntry
 }
 
 // DynamicProtocolState extends the InitialProtocolState with data that can change from block to block.
 // It can be used to access the identity table at given block.
 type DynamicProtocolState interface {
 	InitialProtocolState
+	// EpochStatus returns the status of current epoch at given block based on the internal state of protocol.
+	EpochStatus() *flow.EpochStatus
 	// Identities returns identities that can participate in current and next epochs.
 	// Set of Authorized identities are different depending on epoch state:
 	// staking phase - identities for current epoch + identities from previous epoch (with 0 weight)
@@ -86,9 +92,18 @@ type StateUpdater interface {
 	// SetInvalidStateTransitionAttempted sets a flag indicating that invalid state transition was attempted.
 	// Such transition can be detected by compliance layer.
 	SetInvalidStateTransitionAttempted()
+	// TransitionToNextEpoch discards current protocol state and transitions to the next epoch.
+	// Epoch transition is only allowed when:
+	// - next epoch has been set up,
+	// - next epoch has been committed,
+	// - candidate block is in the next epoch.
+	// No errors are expected during normal operations.
+	TransitionToNextEpoch() error
 	// Block returns the block header that is associated with this state updater.
 	// StateUpdater is created for a specific block where protocol state changes are incorporated.
 	Block() *flow.Header
+	// ParentState returns parent protocol state that is associated with this state updater.
+	ParentState() *flow.RichProtocolStateEntry
 }
 
 // StateMutator is an interface for creating protocol state updaters and committing protocol state to the database.

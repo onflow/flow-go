@@ -72,7 +72,7 @@ func TestBootstrapAndOpen(t *testing.T) {
 			all.QuorumCertificates,
 			all.Setups,
 			all.EpochCommits,
-			all.Statuses,
+			all.ProtocolState,
 			all.VersionBeacons,
 		)
 		require.NoError(t, err)
@@ -157,7 +157,7 @@ func TestBootstrapAndOpen_EpochCommitted(t *testing.T) {
 			all.QuorumCertificates,
 			all.Setups,
 			all.EpochCommits,
-			all.Statuses,
+			all.ProtocolState,
 			all.VersionBeacons,
 		)
 		require.NoError(t, err)
@@ -426,7 +426,7 @@ func TestBootstrap_InvalidIdentities(t *testing.T) {
 		// randomly shuffle the identities so they are not canonically ordered
 		encodable := root.Encodable()
 		var err error
-		encodable.Identities, err = participants.Shuffle()
+		encodable.Epochs.Current.InitialIdentities, err = participants.Shuffle()
 		require.NoError(t, err)
 		root = inmem.SnapshotFromEncodable(encodable)
 		bootstrap(t, root, func(state *bprotocol.State, err error) {
@@ -541,7 +541,7 @@ func bootstrap(t *testing.T, rootSnapshot protocol.Snapshot, f func(*bprotocol.S
 		all.QuorumCertificates,
 		all.Setups,
 		all.EpochCommits,
-		all.Statuses,
+		all.ProtocolState,
 		all.VersionBeacons,
 		rootSnapshot,
 	)

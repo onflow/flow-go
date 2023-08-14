@@ -66,6 +66,22 @@ func (_m *InitialProtocolState) DKG() (protocol.DKG, error) {
 	return r0, r1
 }
 
+// Entry provides a mock function with given fields:
+func (_m *InitialProtocolState) Entry() *flow.RichProtocolStateEntry {
+	ret := _m.Called()
+
+	var r0 *flow.RichProtocolStateEntry
+	if rf, ok := ret.Get(0).(func() *flow.RichProtocolStateEntry); ok {
+		r0 = rf()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*flow.RichProtocolStateEntry)
+		}
+	}
+
+	return r0
+}
+
 // Epoch provides a mock function with given fields:
 func (_m *InitialProtocolState) Epoch() uint64 {
 	ret := _m.Called()

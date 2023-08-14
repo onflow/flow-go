@@ -3,9 +3,12 @@ package badger
 import (
 	"fmt"
 
+	"github.com/dgraph-io/badger/v2"
+
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/inmem"
+	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/badger/operation"
 )
 
@@ -82,34 +85,34 @@ func (p Params) Seal() (*flow.Seal, error) {
 
 // ReadGlobalParams reads the global parameters from the database and returns them as in-memory representation.
 // No errors are expected during normal operation.
-func ReadGlobalParams(state *State) (*inmem.Params, error) {
+func ReadGlobalParams(db *badger.DB, headers storage.Headers) (*inmem.Params, error) {
 	var sporkID flow.Identifier
-	err := state.db.View(operation.RetrieveSporkID(&sporkID))
+	err := db.View(operation.RetrieveSporkID(&sporkID))
 	if err != nil {
 		return nil, fmt.Errorf("could not get spork id: %w", err)
 	}
 
 	var sporkRootBlockHeight uint64
-	err = state.db.View(operation.RetrieveSporkRootBlockHeight(&sporkRootBlockHeight))
+	err = db.View(operation.RetrieveSporkRootBlockHeight(&sporkRootBlockHeight))
 	if err != nil {
 		return nil, fmt.Errorf("could not get spork root block height: %w", err)
 	}
 
 	var threshold uint64
-	err = state.db.View(operation.RetrieveEpochCommitSafetyThreshold(&threshold))
+	err = db.View(operation.RetrieveEpochCommitSafetyThreshold(&threshold))
 	if err != nil {
 		return nil, fmt.Errorf("could not get epoch commit safety threshold")
 	}
 
 	var version uint
-	err = state.db.View(operation.RetrieveProtocolVersion(&version))
+	err = db.View(operation.RetrieveProtocolVersion(&version))
 	if err != nil {
 		return nil, fmt.Errorf("could not get protocol version: %w", err)
 	}
 
 	// retrieve root header
 
-	root, err := Params{state: state}.FinalizedRoot()
+	root, err := ReadFinalizedRoot(db, headers)
 	if err != nil {
 		return nil, fmt.Errorf("could not get root: %w", err)
 	}
@@ -123,4 +126,27 @@ func ReadGlobalParams(state *State) (*inmem.Params, error) {
 			EpochCommitSafetyThreshold: threshold,
 		},
 	), nil
+}
+
+func ReadFinalizedRoot(db *badger.DB, headers storage.Headers) (*flow.Header, error) {
+	var finalizedRootHeight uint64
+	err := db.View(operation.RetrieveRootHeight(&finalizedRootHeight))
+	if err != nil {
+		return nil, fmt.Errorf("could not get finalized root height: %w", err)
+	}
+
+	// look up root block ID
+	var rootID flow.Identifier
+	err = db.View(operation.LookupBlockHeight(finalizedRootHeight, &rootID))
+	if err != nil {
+		return nil, fmt.Errorf("could not look up root header: %w", err)
+	}
+
+	// retrieve root header
+	header, err := headers.ByBlockID(rootID)
+	if err != nil {
+		return nil, fmt.Errorf("could not retrieve root header: %w", err)
+	}
+
+	return header, nil
 }

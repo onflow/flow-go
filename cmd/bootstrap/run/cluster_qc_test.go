@@ -8,6 +8,7 @@ import (
 	model "github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/cluster"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow/order"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -32,7 +33,8 @@ func TestGenerateClusterRootQC(t *testing.T) {
 	payload := cluster.EmptyPayload(flow.ZeroID)
 	clusterBlock.SetPayload(payload)
 
-	_, err := GenerateClusterRootQC(participants, model.ToIdentityList(participants), &clusterBlock)
+	orderedParticipants := model.ToIdentityList(participants).Sort(order.Canonical)
+	_, err := GenerateClusterRootQC(participants, orderedParticipants, &clusterBlock)
 	require.NoError(t, err)
 }
 

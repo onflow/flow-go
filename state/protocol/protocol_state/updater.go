@@ -28,24 +28,13 @@ type Updater struct {
 
 var _ protocol.StateUpdater = (*Updater)(nil)
 
-// newUpdater creates a new protocol state updater, when candidate block enters new epoch we will discard
-// previous protocol state and move to the next epoch protocol state.
-func newUpdater(candidate *flow.Header, parentState *flow.RichProtocolStateEntry) *Updater {
+// NewUpdater creates a new protocol state updater.
+func NewUpdater(candidate *flow.Header, parentState *flow.RichProtocolStateEntry) *Updater {
 	updater := &Updater{
 		parentState: parentState,
 		state:       parentState.ProtocolStateEntry.Copy(),
 		candidate:   candidate,
 	}
-
-	// Check if we are at the first block of new epoch.
-	// This check will be true only if parent block is in previous epoch and candidate block is a new epoch.
-	if candidate.View > parentState.CurrentEpochSetup.FinalView {
-		// discard protocol state from the previous epoch and update the current protocol state
-		// identities and other changes are applied to both current and next epochs so this object is up-to-date
-		// with all applied deltas.
-		updater.state = updater.state.NextEpochProtocolState
-	}
-
 	return updater
 }
 
@@ -219,10 +208,40 @@ func (u *Updater) SetInvalidStateTransitionAttempted() {
 	}
 }
 
+// TransitionToNextEpoch discards current protocol state and transitions to the next epoch.
+// Epoch transition is only allowed when:
+// - next epoch has been set up,
+// - next epoch has been committed,
+// - candidate block is in the next epoch.
+// No errors are expected during normal operations.
+func (u *Updater) TransitionToNextEpoch() error {
+	// Check if there is next epoch protocol state
+	if u.state.NextEpochProtocolState == nil {
+		return fmt.Errorf("protocol state has not been setup yet")
+	}
+	nextEpochState := u.state.NextEpochProtocolState
+	// Check if there is a commit event for next epoch
+	if nextEpochState.CurrentEpochEventIDs.CommitID == flow.ZeroID {
+		return fmt.Errorf("protocol state has not been committed yet")
+	}
+	// Check if we are at the next epoch, only then a transition is allowed
+	if u.candidate.View < u.parentState.NextEpochProtocolState.CurrentEpochSetup.FirstView {
+		return fmt.Errorf("protocol state transition is only allowed when enterring next epoch")
+	}
+	u.state = nextEpochState
+	u.invalidateLookup()
+	return nil
+}
+
 // Block returns the block header that is associated with this state updater.
 // StateUpdater is created for a specific block where protocol state changes are incorporated.
 func (u *Updater) Block() *flow.Header {
 	return u.candidate
+}
+
+// ParentState returns parent protocol state that is associated with this state updater.
+func (u *Updater) ParentState() *flow.RichProtocolStateEntry {
+	return u.parentState
 }
 
 // ensureLookupPopulated ensures that current and next epoch identities lookups are populated.
@@ -239,5 +258,7 @@ func (u *Updater) invalidateLookup() {
 	u.currentEpochIdentitiesLookup = u.state.Identities.Lookup()
 	if u.state.NextEpochProtocolState != nil {
 		u.nextEpochIdentitiesLookup = u.state.NextEpochProtocolState.Identities.Lookup()
+	} else {
+		u.state.NextEpochProtocolState = nil
 	}
 }

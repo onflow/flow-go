@@ -1,6 +1,9 @@
 package flow
 
-import "sort"
+import (
+	"fmt"
+	"sort"
+)
 
 // DynamicIdentityEntry encapsulates nodeID and dynamic portion of identity.
 type DynamicIdentityEntry struct {
@@ -42,7 +45,7 @@ type ProtocolStateEntry struct {
 //     Identities are sorted in canonical order. Without duplicates. Never nil.
 //   - NextEpochProtocolState is a protocol state for the next epoch. Can be nil.
 type RichProtocolStateEntry struct {
-	ProtocolStateEntry
+	*ProtocolStateEntry
 
 	CurrentEpochSetup   *EpochSetup
 	CurrentEpochCommit  *EpochCommit
@@ -51,6 +54,118 @@ type RichProtocolStateEntry struct {
 	Identities          IdentityList
 
 	NextEpochProtocolState *RichProtocolStateEntry
+}
+
+// NewRichProtocolStateEntry constructs a rich protocol state entry from a protocol state entry and additional data.
+// No errors are expected during normal operation.
+func NewRichProtocolStateEntry(
+	protocolState *ProtocolStateEntry,
+	previousEpochSetup *EpochSetup,
+	previousEpochCommit *EpochCommit,
+	currentEpochSetup *EpochSetup,
+	currentEpochCommit *EpochCommit,
+	nextEpochSetup *EpochSetup,
+	nextEpochCommit *EpochCommit,
+) (*RichProtocolStateEntry, error) {
+	result := &RichProtocolStateEntry{
+		ProtocolStateEntry:     protocolState,
+		CurrentEpochSetup:      currentEpochSetup,
+		CurrentEpochCommit:     currentEpochCommit,
+		PreviousEpochSetup:     previousEpochSetup,
+		PreviousEpochCommit:    previousEpochCommit,
+		Identities:             nil,
+		NextEpochProtocolState: nil,
+	}
+
+	// ensure data is consistent
+	if protocolState.PreviousEpochEventIDs.SetupID != ZeroID {
+		if protocolState.PreviousEpochEventIDs.SetupID != previousEpochSetup.ID() {
+			return nil, fmt.Errorf("supplied previous epoch setup (%x) does not match protocol state (%x)",
+				previousEpochSetup.ID(),
+				protocolState.PreviousEpochEventIDs.SetupID)
+		}
+		if protocolState.PreviousEpochEventIDs.CommitID != previousEpochCommit.ID() {
+			return nil, fmt.Errorf("supplied previous epoch commit (%x) does not match protocol state (%x)",
+				previousEpochCommit.ID(),
+				protocolState.PreviousEpochEventIDs.CommitID)
+		}
+	}
+	if protocolState.CurrentEpochEventIDs.SetupID != currentEpochSetup.ID() {
+		return nil, fmt.Errorf("supplied current epoch setup (%x) does not match protocol state (%x)",
+			currentEpochSetup.ID(),
+			protocolState.CurrentEpochEventIDs.SetupID)
+	}
+	if protocolState.CurrentEpochEventIDs.CommitID != currentEpochCommit.ID() {
+		return nil, fmt.Errorf("supplied current epoch commit (%x) does not match protocol state (%x)",
+			currentEpochCommit.ID(),
+			protocolState.CurrentEpochEventIDs.CommitID)
+	}
+
+	var err error
+	nextEpochProtocolState := protocolState.NextEpochProtocolState
+	// if next epoch has been already committed, fill in data for it as well.
+	if nextEpochProtocolState != nil {
+		if nextEpochProtocolState.CurrentEpochEventIDs.SetupID != nextEpochSetup.ID() {
+			return nil, fmt.Errorf("supplied next epoch setup (%x) does not match protocol state (%x)",
+				nextEpochSetup.ID(),
+				nextEpochProtocolState.CurrentEpochEventIDs.SetupID)
+		}
+		if nextEpochProtocolState.CurrentEpochEventIDs.CommitID != ZeroID {
+			if nextEpochProtocolState.CurrentEpochEventIDs.CommitID != nextEpochCommit.ID() {
+				return nil, fmt.Errorf("supplied next epoch commit (%x) does not match protocol state (%x)",
+					nextEpochCommit.ID(),
+					nextEpochProtocolState.CurrentEpochEventIDs.CommitID)
+			}
+		}
+
+		// if next epoch is available, it means that we have observed epoch setup event and we are not anymore in staking phase,
+		// so we need to build the identity table using current and next epoch setup events.
+		result.Identities, err = buildIdentityTable(
+			protocolState.Identities,
+			currentEpochSetup.Participants,
+			nextEpochSetup.Participants,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("could not build identity table for setup/commit phase: %w", err)
+		}
+
+		nextEpochIdentityTable, err := buildIdentityTable(
+			nextEpochProtocolState.Identities,
+			nextEpochSetup.Participants,
+			currentEpochSetup.Participants,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("could not build next epoch identity table: %w", err)
+		}
+
+		// fill identities for next epoch
+		result.NextEpochProtocolState = &RichProtocolStateEntry{
+			ProtocolStateEntry:     nextEpochProtocolState,
+			CurrentEpochSetup:      nextEpochSetup,
+			CurrentEpochCommit:     nextEpochCommit,
+			PreviousEpochSetup:     result.CurrentEpochSetup,  // previous epoch setup is current epoch setup
+			PreviousEpochCommit:    result.CurrentEpochCommit, // previous epoch setup is current epoch setup
+			Identities:             nextEpochIdentityTable,
+			NextEpochProtocolState: nil, // always nil
+		}
+	} else {
+		// if next epoch is not yet created, it means that we are in staking phase,
+		// so we need to build the identity table using previous and current epoch setup events.
+		var otherIdentities IdentityList
+		if previousEpochSetup != nil {
+			otherIdentities = previousEpochSetup.Participants
+		}
+		result.Identities, err = buildIdentityTable(
+			protocolState.Identities,
+			currentEpochSetup.Participants,
+			otherIdentities,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("could not build identity table for staking phase: %w", err)
+		}
+	}
+
+	return result, nil
 }
 
 // ID returns hash of entry by hashing all fields.
@@ -85,6 +200,36 @@ func (e *ProtocolStateEntry) Copy() *ProtocolStateEntry {
 		Identities:                      e.Identities.Copy(),
 		InvalidStateTransitionAttempted: e.InvalidStateTransitionAttempted,
 		NextEpochProtocolState:          e.NextEpochProtocolState.Copy(),
+	}
+}
+
+// Copy returns a full copy of rich protocol state entry.
+func (e *RichProtocolStateEntry) Copy() *RichProtocolStateEntry {
+	if e == nil {
+		return nil
+	}
+	return &RichProtocolStateEntry{
+		ProtocolStateEntry:     e.ProtocolStateEntry.Copy(),
+		CurrentEpochSetup:      e.CurrentEpochSetup,
+		CurrentEpochCommit:     e.CurrentEpochCommit,
+		PreviousEpochSetup:     e.PreviousEpochSetup,
+		PreviousEpochCommit:    e.PreviousEpochCommit,
+		Identities:             e.Identities.Copy(),
+		NextEpochProtocolState: e.NextEpochProtocolState.Copy(),
+	}
+}
+
+// EpochStatus returns epoch status for the current protocol state.
+func (e *ProtocolStateEntry) EpochStatus() *EpochStatus {
+	var nextEpoch EventIDs
+	if e.NextEpochProtocolState != nil {
+		nextEpoch = e.NextEpochProtocolState.CurrentEpochEventIDs
+	}
+	return &EpochStatus{
+		PreviousEpoch:                   e.PreviousEpochEventIDs,
+		CurrentEpoch:                    e.CurrentEpochEventIDs,
+		NextEpoch:                       nextEpoch,
+		InvalidServiceEventIncorporated: e.InvalidStateTransitionAttempted,
 	}
 }
 
@@ -137,4 +282,45 @@ func (ll DynamicIdentityEntryList) Sort(less IdentifierOrder) DynamicIdentityEnt
 		return less(dup[i].NodeID, dup[j].NodeID)
 	})
 	return dup
+}
+
+// buildIdentityTable builds identity table for current epoch combining data from previous, current epoch setups and dynamic identities
+// that are stored in protocol state. It also performs sanity checks to make sure that data is consistent.
+// No errors are expected during normal operation.
+func buildIdentityTable(
+	dynamicIdentities DynamicIdentityEntryList,
+	coreIdentities, otherIdentities IdentityList,
+) (IdentityList, error) {
+	// produce a unique set for current and previous epoch participants
+	allEpochParticipants := coreIdentities.Union(otherIdentities)
+	// sanity check: size of identities should be equal to previous and current epoch participants combined
+	if len(allEpochParticipants) != len(dynamicIdentities) {
+		return nil, fmt.Errorf("invalid number of identities in protocol state: expected %d, got %d", len(allEpochParticipants), len(dynamicIdentities))
+	}
+
+	// build full identity table for current epoch
+	var result IdentityList
+	for i, identity := range dynamicIdentities {
+		// sanity check: identities should be sorted in canonical order
+		if identity.NodeID != allEpochParticipants[i].NodeID {
+			return nil, fmt.Errorf("identites in protocol state are not in canonical order: expected %s, got %s", allEpochParticipants[i].NodeID, identity.NodeID)
+		}
+		result = append(result, &Identity{
+			IdentitySkeleton: allEpochParticipants[i].IdentitySkeleton,
+			DynamicIdentity:  identity.Dynamic,
+		})
+	}
+	return result, nil
+}
+
+// DynamicIdentityEntryListFromIdentities converts IdentityList to DynamicIdentityEntryList.
+func DynamicIdentityEntryListFromIdentities(identities IdentityList) DynamicIdentityEntryList {
+	dynamicIdentities := make(DynamicIdentityEntryList, 0, len(identities))
+	for _, identity := range identities {
+		dynamicIdentities = append(dynamicIdentities, &DynamicIdentityEntry{
+			NodeID:  identity.NodeID,
+			Dynamic: identity.DynamicIdentity,
+		})
+	}
+	return dynamicIdentities
 }

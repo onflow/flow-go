@@ -15,6 +15,7 @@ import (
 	statepkg "github.com/onflow/flow-go/state"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/invalid"
+	"github.com/onflow/flow-go/state/protocol/protocol_state"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/badger/operation"
 	"github.com/onflow/flow-go/storage/badger/transaction"
@@ -35,11 +36,12 @@ type State struct {
 	results storage.ExecutionResults
 	seals   storage.Seals
 	epoch   struct {
-		setups   storage.EpochSetups
-		commits  storage.EpochCommits
-		statuses storage.EpochStatuses
+		setups  storage.EpochSetups
+		commits storage.EpochCommits
 	}
-	versionBeacons storage.VersionBeacons
+	protocolState       storage.ProtocolState
+	protocolStateReader protocol.ProtocolState
+	versionBeacons      storage.VersionBeacons
 
 	// rootHeight marks the cutoff of the history this node knows about. We cache it in the state
 	// because it cannot change over the lifecycle of a protocol state instance. It is frequently
@@ -89,7 +91,7 @@ func Bootstrap(
 	qcs storage.QuorumCertificates,
 	setups storage.EpochSetups,
 	commits storage.EpochCommits,
-	statuses storage.EpochStatuses,
+	protocolState storage.ProtocolState,
 	versionBeacons storage.VersionBeacons,
 	root protocol.Snapshot,
 	options ...BootstrapConfigOptions,
@@ -108,6 +110,7 @@ func Bootstrap(
 		return nil, fmt.Errorf("expected empty database")
 	}
 
+	protocolStateReader := protocol_state.NewProtocolState(protocolState, root.Params())
 	state := newState(
 		metrics,
 		db,
@@ -118,7 +121,8 @@ func Bootstrap(
 		qcs,
 		setups,
 		commits,
-		statuses,
+		protocolState,
+		protocolStateReader,
 		versionBeacons,
 	)
 
@@ -168,7 +172,7 @@ func Bootstrap(
 		}
 
 		// 4) initialize values related to the epoch logic
-		err = state.bootstrapEpoch(root.Epochs(), segment, !config.SkipNetworkAddressValidation)(tx)
+		err = state.bootstrapEpoch(root.Epochs(), !config.SkipNetworkAddressValidation)(tx)
 		if err != nil {
 			return fmt.Errorf("could not bootstrap epoch values: %w", err)
 		}
@@ -191,7 +195,13 @@ func Bootstrap(
 			state.metrics.BlockFinalized(block)
 		}
 
-		// 7) initialize version beacon
+		// 7) bootstrap dynamic protocol state
+		err = state.bootstrapProtocolState(segment, root, protocolState)(tx)
+		if err != nil {
+			return fmt.Errorf("could not bootstrap protocol state: %w", err)
+		}
+
+		// 8) initialize version beacon
 		err = transaction.WithTx(state.boostrapVersionBeacon(root))(tx)
 		if err != nil {
 			return fmt.Errorf("could not bootstrap version beacon: %w", err)
@@ -210,6 +220,37 @@ func Bootstrap(
 	}
 
 	return state, nil
+}
+
+// bootstrapProtocolState bootstraps data structures needed for Dynamic Protocol State.
+// It inserts the root protocol state and indexes all blocks in the sealing segment assuming that
+// dynamic protocol state didn't change in the sealing segment.
+// The root snapshot's sealing segment must not straddle any epoch transitions
+// or epoch phase transitions.
+func (state *State) bootstrapProtocolState(segment *flow.SealingSegment, root protocol.Snapshot, protocolState storage.ProtocolState) func(tx *transaction.Tx) error {
+	return func(tx *transaction.Tx) error {
+		rootProtocolState, err := root.ProtocolState()
+		if err != nil {
+			return fmt.Errorf("could not get root protocol state: %w", err)
+		}
+		rootProtocolStateEntry := rootProtocolState.Entry().ProtocolStateEntry
+		protocolStateID := rootProtocolStateEntry.ID()
+		err = protocolState.StoreTx(protocolStateID, rootProtocolStateEntry)(tx)
+		if err != nil {
+			return fmt.Errorf("could not insert root protocol state: %w", err)
+		}
+
+		// NOTE: as specified in the godoc, this code assumes that each block
+		// in the sealing segment in within the same phase within the same epoch.
+		// the sealing segment.
+		for _, block := range segment.AllBlocks() {
+			err = protocolState.Index(block.ID(), protocolStateID)(tx)
+			if err != nil {
+				return fmt.Errorf("could not index root protocol state: %w", err)
+			}
+		}
+		return nil
+	}
 }
 
 // bootstrapSealingSegment inserts all blocks and associated metadata for the
@@ -400,10 +441,8 @@ func (state *State) bootstrapStatePointers(root protocol.Snapshot) func(*badger.
 
 // bootstrapEpoch bootstraps the protocol state database with information about
 // the previous, current, and next epochs as of the root snapshot.
-//
-// The root snapshot's sealing segment must not straddle any epoch transitions
-// or epoch phase transitions.
-func (state *State) bootstrapEpoch(epochs protocol.EpochQuery, segment *flow.SealingSegment, verifyNetworkAddress bool) func(*transaction.Tx) error {
+// TODO(yuraolex): This information can be bootstrapped from dynamic protocol state.
+func (state *State) bootstrapEpoch(epochs protocol.EpochQuery, verifyNetworkAddress bool) func(*transaction.Tx) error {
 	return func(tx *transaction.Tx) error {
 		previous := epochs.Previous()
 		current := epochs.Current()
@@ -524,16 +563,6 @@ func (state *State) bootstrapEpoch(epochs protocol.EpochQuery, segment *flow.Sea
 			}
 		}
 
-		// NOTE: as specified in the godoc, this code assumes that each block
-		// in the sealing segment in within the same phase within the same epoch.
-		for _, block := range segment.AllBlocks() {
-			blockID := block.ID()
-			err = state.epoch.statuses.StoreTx(blockID, status)(tx)
-			if err != nil {
-				return fmt.Errorf("could not store epoch status for block (id=%x): %w", blockID, err)
-			}
-		}
-
 		return nil
 	}
 }
@@ -612,7 +641,7 @@ func OpenState(
 	qcs storage.QuorumCertificates,
 	setups storage.EpochSetups,
 	commits storage.EpochCommits,
-	statuses storage.EpochStatuses,
+	protocolState storage.ProtocolState,
 	versionBeacons storage.VersionBeacons,
 ) (*State, error) {
 	isBootstrapped, err := IsBootstrapped(db)
@@ -622,6 +651,11 @@ func OpenState(
 	if !isBootstrapped {
 		return nil, fmt.Errorf("expected database to contain bootstrapped state")
 	}
+	globalParams, err := ReadGlobalParams(db, headers)
+	if err != nil {
+		return nil, fmt.Errorf("could not read global params")
+	}
+	protocolStateReader := protocol_state.NewProtocolState(protocolState, globalParams)
 	state := newState(
 		metrics,
 		db,
@@ -632,7 +666,8 @@ func OpenState(
 		qcs,
 		setups,
 		commits,
-		statuses,
+		protocolState,
+		protocolStateReader,
 		versionBeacons,
 	) // populate the protocol state cache
 	err = state.populateCache()
@@ -664,12 +699,8 @@ func OpenState(
 }
 
 func (state *State) Params() protocol.Params {
-	globalParams, err := ReadGlobalParams(state)
-	if err != nil {
-		panic("failed to read global params: " + err.Error())
-	}
 	return Params{
-		GlobalParams: globalParams,
+		GlobalParams: state.protocolStateReader.GlobalParams(),
 		state:        state,
 	}
 }
@@ -745,7 +776,8 @@ func newState(
 	qcs storage.QuorumCertificates,
 	setups storage.EpochSetups,
 	commits storage.EpochCommits,
-	statuses storage.EpochStatuses,
+	protocolState storage.ProtocolState,
+	protocolStateReader protocol.ProtocolState,
 	versionBeacons storage.VersionBeacons,
 ) *State {
 	return &State{
@@ -757,17 +789,17 @@ func newState(
 		blocks:  blocks,
 		qcs:     qcs,
 		epoch: struct {
-			setups   storage.EpochSetups
-			commits  storage.EpochCommits
-			statuses storage.EpochStatuses
+			setups  storage.EpochSetups
+			commits storage.EpochCommits
 		}{
-			setups:   setups,
-			commits:  commits,
-			statuses: statuses,
+			setups:  setups,
+			commits: commits,
 		},
-		versionBeacons: versionBeacons,
-		cachedFinal:    new(atomic.Pointer[cachedHeader]),
-		cachedSealed:   new(atomic.Pointer[cachedHeader]),
+		protocolState:       protocolState,
+		protocolStateReader: protocolStateReader,
+		versionBeacons:      versionBeacons,
+		cachedFinal:         new(atomic.Pointer[cachedHeader]),
+		cachedSealed:        new(atomic.Pointer[cachedHeader]),
 	}
 }
 
