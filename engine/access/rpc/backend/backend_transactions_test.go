@@ -46,7 +46,7 @@ func (suite *Suite) WithPreConfiguredState(f func(snap protocol.Snapshot)) {
 			mock.Anything,
 			mock.Anything,
 			mock.Anything).
-			Return(nil)
+			Return(nil).Once()
 
 		f(snap)
 	})
@@ -140,12 +140,6 @@ func (suite *Suite) TestGetTransactionResultReturnsValidTransactionResultFromHis
 			On("ByID", tx.ID()).
 			Return(nil, storage.ErrNotFound)
 
-		suite.communicator.On("CallAvailableNode",
-			mock.Anything,
-			mock.Anything,
-			mock.Anything).
-			Return(nil).Once()
-
 		suite.state.On("AtBlockID", block.ID()).Return(snap, nil).Once()
 
 		transactionResultResponse := access.TransactionResultResponse{
@@ -189,12 +183,6 @@ func (suite *Suite) WithGetTransactionCachingTestSetup(f func(b *flow.Block, t *
 		suite.transactions.
 			On("ByID", tx.ID()).
 			Return(nil, storage.ErrNotFound)
-
-		suite.communicator.On("CallAvailableNode",
-			mock.Anything,
-			mock.Anything,
-			mock.Anything).
-			Return(nil).Once()
 
 		suite.state.On("AtBlockID", block.ID()).Return(snap, nil).Once()
 
@@ -312,7 +300,7 @@ func (suite *Suite) TestGetTransactionResultUnknownFromCache() {
 		})
 
 		coll := flow.CollectionFromTransactions([]*flow.Transaction{tx})
-		
+
 		resp, err := backend.GetTransactionResult(context.Background(), tx.ID(), block.ID(), coll.ID())
 		suite.Require().NoError(err)
 		suite.Require().Equal(flow.TransactionStatusUnknown, resp.Status)
