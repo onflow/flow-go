@@ -1,10 +1,11 @@
-package epochs
+package cohort2
 
 import (
 	"testing"
 
 	"github.com/stretchr/testify/suite"
 
+	"github.com/onflow/flow-go/integration/tests/epochs"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -13,7 +14,7 @@ func TestEpochJoinAndLeaveSN(t *testing.T) {
 }
 
 type EpochJoinAndLeaveSNSuite struct {
-	DynamicEpochTransitionSuite
+	epochs.DynamicEpochTransitionSuite
 }
 
 // TestEpochJoinAndLeaveSN should update consensus nodes and assert healthy network conditions

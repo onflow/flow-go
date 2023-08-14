@@ -1,4 +1,4 @@
-package epochs
+package cohort1
 
 import (
 	"testing"
@@ -7,6 +7,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
+	"github.com/onflow/flow-go/integration/tests/epochs"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -17,7 +18,7 @@ func TestEpochStaticTransition(t *testing.T) {
 // StaticEpochTransitionSuite is the suite used for epoch transition tests
 // with a static identity table.
 type StaticEpochTransitionSuite struct {
-	Suite
+	epochs.Suite
 }
 
 func (s *StaticEpochTransitionSuite) SetupTest() {
