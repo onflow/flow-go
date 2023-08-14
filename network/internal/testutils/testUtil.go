@@ -39,8 +39,6 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-var sporkID = unittest.IdentifierFixture()
-
 // RateLimitConsumer p2p.RateLimiterConsumer fixture that invokes a callback when rate limit event is consumed.
 type RateLimitConsumer struct {
 	callback func(pid peer.ID, role, msgType, topic, reason string) // callback func that will be invoked on rate limit
@@ -118,9 +116,10 @@ func NewTagWatchingConnManager(log zerolog.Logger, metrics module.LibP2PConnecti
 // If you want to create a standalone LibP2PNode without network and middleware components, please use p2ptest.NodeFixture.
 // Args:
 //
-//	t: testing.T- the test object
+//		t: testing.T- the test object
+//		sporkId: flow.Identifier - the spork id to use for the nodes
+//	 n: int - number of nodes to create
 //
-// n: int - number of nodes to create
 // opts: []p2ptest.NodeFixtureParameterOption - options to configure the nodes
 // Returns:
 //
@@ -128,8 +127,7 @@ func NewTagWatchingConnManager(log zerolog.Logger, metrics module.LibP2PConnecti
 //
 // []p2p.LibP2PNode - list of libp2p nodes created.
 // []observable.Observable - list of observables created for each node.
-func LibP2PNodeForMiddlewareFixture(t *testing.T, n int, opts ...p2ptest.NodeFixtureParameterOption) (flow.IdentityList, []p2p.LibP2PNode, []observable.Observable) {
-
+func LibP2PNodeForMiddlewareFixture(t *testing.T, sporkId flow.Identifier, n int, opts ...p2ptest.NodeFixtureParameterOption) (flow.IdentityList, []p2p.LibP2PNode, []observable.Observable) {
 	libP2PNodes := make([]p2p.LibP2PNode, 0)
 	identities := make(flow.IdentityList, 0)
 	tagObservables := make([]observable.Observable, 0)
@@ -147,7 +145,7 @@ func LibP2PNodeForMiddlewareFixture(t *testing.T, n int, opts ...p2ptest.NodeFix
 
 		opts = append(opts, p2ptest.WithConnectionManager(connManager))
 		node, nodeId := p2ptest.NodeFixture(t,
-			sporkID,
+			sporkId,
 			t.Name(),
 			idProvider,
 			opts...)
@@ -164,11 +162,11 @@ func LibP2PNodeForMiddlewareFixture(t *testing.T, n int, opts ...p2ptest.NodeFix
 // - t: the test instance.
 // Returns:
 // - a middleware config.
-func MiddlewareConfigFixture(t *testing.T) *middleware.Config {
+func MiddlewareConfigFixture(t *testing.T, sporkId flow.Identifier) *middleware.Config {
 	return &middleware.Config{
 		Logger:                unittest.Logger(),
 		BitSwapMetrics:        metrics.NewNoopCollector(),
-		RootBlockID:           sporkID,
+		RootBlockID:           sporkId,
 		UnicastMessageTimeout: middleware.DefaultUnicastTimeout,
 		Codec:                 unittest.NetworkCodec(),
 	}
