@@ -419,13 +419,8 @@ func TestHandleReportedMisbehavior_And_DisallowListing_RepeatOffender_Integratio
 		require.True(t, ok)
 		require.NotNil(t, record)
 
-		expectedDecayAfterCutoff := expectedDecays[expectedDecay]
-		if expectedDecay < len(expectedDecays)-1 {
-			expectedDecayAfterCutoff = expectedDecays[expectedDecay+1]
-		}
-
 		require.Equal(t, float64(0), record.Penalty)
-		require.Equal(t, float64(expectedDecayAfterCutoff), record.Decay)
+		require.Equal(t, float64(expectedDecays[expectedDecay]), record.Decay)
 		require.Equal(t, false, record.DisallowListed)
 		require.Equal(t, uint64(expectedCutoffCounter), record.CutoffCounter)
 

@@ -319,6 +319,8 @@ func (m *MisbehaviorReportManager) onHeartbeat() error {
 				// cutoff counter keeps track of how many times the penalty has been below the threshold.
 				record.CutoffCounter++
 				record.DisallowListed = true
+				// Adjusts decay dynamically based on how many times the node was disallow-listed (cutoff).
+				record.Decay = m.adjustDecayFunc(record.CutoffCounter)
 				m.logger.Warn().
 					Str("key", logging.KeySuspicious).
 					Hex("identifier", logging.ID(id)).
@@ -326,7 +328,7 @@ func (m *MisbehaviorReportManager) onHeartbeat() error {
 					Uint64("cutoff_counter", record.CutoffCounter).
 					Float64("decay_speed", record.Decay).
 					Bool("disallow_listed", record.DisallowListed).
-					Msg("node penalty is below threshold, disallow listing")
+					Msg("node penalty dropped below threshold, initiating disallow listing")
 				m.disallowListingConsumer.OnDisallowListNotification(&network.DisallowListingUpdate{
 					FlowIds: flow.IdentifierList{id},
 					Cause:   network.DisallowListedCauseAlsp, // sets the ALSP disallow listing cause on node
@@ -354,8 +356,8 @@ func (m *MisbehaviorReportManager) onHeartbeat() error {
 			if record.Penalty == float64(0) && record.DisallowListed {
 				record.DisallowListed = false
 
-				// after fully decaying the penalty, update decay for next disallow listing
-				record.UpdateDecay()
+				//// after fully decaying the penalty, update decay for next disallow listing
+				//record.UpdateDecay()
 
 				m.logger.Info().
 					Hex("identifier", logging.ID(id)).
@@ -447,6 +449,27 @@ func (m *MisbehaviorReportManager) processMisbehaviorReport(report internal.Repo
 	}
 	lg.Debug().Float64("updated_penalty", updatedPenalty).Msg("misbehavior report handled")
 	return nil
+}
+
+// adjustDecayFunc calculates the decay value of the spam record. This allows the decay to be different on subsequent disallow listings.
+func (m *MisbehaviorReportManager) adjustDecayFunc(cutoffCounter uint64) float64 {
+	// decaySpeeds illustrates the decay speeds for different cutoff counters.
+	// The first cutoff does not reduce the decay speed (1000 -> 1000). However, the second, third,
+	// and forth cutoffs reduce the decay speed by 90% (1000 -> 100, 100 -> 10, 10 -> 1).
+	// All subsequent cutoffs after the fourth cutoff use the last decay speed (1).
+	// This is to prevent the decay speed from becoming too small and the spam record from taking too long to decay.
+	decaySpeeds := []float64{1000, 1000, 100, 10, 1}
+
+	if cutoffCounter <= 0 {
+		// illegal state, this should never happen unless there is a bug in the code.
+		panic(fmt.Sprintf("illegal-state cutoff counter must be positive, it should include the current time: %d", cutoffCounter))
+	}
+
+	if int(cutoffCounter) >= len(decaySpeeds) {
+		return decaySpeeds[len(decaySpeeds)-1] // clamp to the last value
+	}
+
+	return decaySpeeds[cutoffCounter]
 }
 
 // WithSpamRecordsCacheFactory sets the spam record cache factory for the MisbehaviorReportManager.
