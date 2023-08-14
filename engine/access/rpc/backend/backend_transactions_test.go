@@ -179,23 +179,16 @@ func (suite *Suite) TestGetTransactionResultReturnsValidTransactionResultFromHis
 	})
 }
 
-func (suite *Suite) TestGetTransactionResultFromCache() {
+func (suite *Suite) WithGetTransactionCachingTestSetup(f func(b *flow.Block, t *flow.Transaction)) {
 	suite.WithPreConfiguredState(func(snap protocol.Snapshot) {
 		block := unittest.BlockFixture()
 		tbody := unittest.TransactionBodyFixture()
 		tx := unittest.TransactionFixture()
 		tx.TransactionBody = tbody
 
-		coll := flow.CollectionFromTransactions([]*flow.Transaction{&tx})
-
 		suite.transactions.
 			On("ByID", tx.ID()).
 			Return(nil, storage.ErrNotFound)
-
-		suite.blocks.
-			On("ByID", block.ID()).
-			Return(&block, nil).
-			Once()
 
 		suite.communicator.On("CallAvailableNode",
 			mock.Anything,
@@ -205,6 +198,12 @@ func (suite *Suite) TestGetTransactionResultFromCache() {
 
 		suite.state.On("AtBlockID", block.ID()).Return(snap, nil).Once()
 
+		f(&block, &tx)
+	})
+}
+
+func (suite *Suite) TestGetTransactionResultFromCache() {
+	suite.WithGetTransactionCachingTestSetup(func(block *flow.Block, tx *flow.Transaction) {
 		transactionResultResponse := access.TransactionResultResponse{
 			Status:     entities.TransactionStatus_EXECUTED,
 			StatusCode: uint32(entities.TransactionStatus_EXECUTED),
@@ -230,6 +229,8 @@ func (suite *Suite) TestGetTransactionResultFromCache() {
 			TxResultCacheSize:     10,
 		})
 
+		coll := flow.CollectionFromTransactions([]*flow.Transaction{tx})
+
 		resp, err := backend.GetTransactionResult(context.Background(), tx.ID(), block.ID(), coll.ID())
 		suite.Require().NoError(err)
 		suite.Require().Equal(flow.TransactionStatusExecuted, resp.Status)
@@ -245,25 +246,7 @@ func (suite *Suite) TestGetTransactionResultFromCache() {
 }
 
 func (suite *Suite) TestGetTransactionResultCacheNonExistent() {
-	suite.WithPreConfiguredState(func(snap protocol.Snapshot) {
-		block := unittest.BlockFixture()
-		tbody := unittest.TransactionBodyFixture()
-		tx := unittest.TransactionFixture()
-		tx.TransactionBody = tbody
-
-		coll := flow.CollectionFromTransactions([]*flow.Transaction{&tx})
-
-		suite.transactions.
-			On("ByID", tx.ID()).
-			Return(nil, storage.ErrNotFound)
-
-		suite.communicator.On("CallAvailableNode",
-			mock.Anything,
-			mock.Anything,
-			mock.Anything).
-			Return(nil).Once()
-
-		suite.state.On("AtBlockID", block.ID()).Return(snap, nil).Once()
+	suite.WithGetTransactionCachingTestSetup(func(block *flow.Block, tx *flow.Transaction) {
 
 		suite.historicalAccessClient.
 			On("GetTransactionResult", mock.Anything, mock.Anything).
@@ -284,6 +267,8 @@ func (suite *Suite) TestGetTransactionResultCacheNonExistent() {
 			Communicator:          suite.communicator,
 			TxResultCacheSize:     10,
 		})
+
+		coll := flow.CollectionFromTransactions([]*flow.Transaction{tx})
 
 		resp, err := backend.GetTransactionResult(context.Background(), tx.ID(), block.ID(), coll.ID())
 		suite.Require().NoError(err)
@@ -305,26 +290,7 @@ func (suite *Suite) TestGetTransactionResultCacheNonExistent() {
 }
 
 func (suite *Suite) TestGetTransactionResultUnknownFromCache() {
-	suite.WithPreConfiguredState(func(snap protocol.Snapshot) {
-		block := unittest.BlockFixture()
-		tbody := unittest.TransactionBodyFixture()
-		tx := unittest.TransactionFixture()
-		tx.TransactionBody = tbody
-
-		coll := flow.CollectionFromTransactions([]*flow.Transaction{&tx})
-
-		suite.transactions.
-			On("ByID", tx.ID()).
-			Return(nil, storage.ErrNotFound)
-
-		suite.communicator.On("CallAvailableNode",
-			mock.Anything,
-			mock.Anything,
-			mock.Anything).
-			Return(nil).Once()
-
-		suite.state.On("AtBlockID", block.ID()).Return(snap, nil).Once()
-
+	suite.WithGetTransactionCachingTestSetup(func(block *flow.Block, tx *flow.Transaction) {
 		suite.historicalAccessClient.
 			On("GetTransactionResult", mock.Anything, mock.Anything).
 			Return(nil, status.Errorf(codes.NotFound, "no known transaction with ID %s", tx.ID())).Once()
@@ -345,6 +311,8 @@ func (suite *Suite) TestGetTransactionResultUnknownFromCache() {
 			TxResultCacheSize:     10,
 		})
 
+		coll := flow.CollectionFromTransactions([]*flow.Transaction{tx})
+		
 		resp, err := backend.GetTransactionResult(context.Background(), tx.ID(), block.ID(), coll.ID())
 		suite.Require().NoError(err)
 		suite.Require().Equal(flow.TransactionStatusUnknown, resp.Status)
