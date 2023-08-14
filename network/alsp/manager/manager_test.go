@@ -341,7 +341,7 @@ func TestHandleReportedMisbehavior_And_DisallowListing_RepeatOffender_Integratio
 		// reset the decay function to the default
 		fastDecay = false
 
-		// simulates the victim node reporting the spammer node misbehavior 10 times
+		// simulates the victim node reporting the spammer node misbehavior 120 times
 		// as each report has the default penalty, ideally the spammer should be disallow-listed after
 		// 100 reports (each having 0.01 * disallow-listing penalty). But we take 120 as a safe number to ensure that
 		// the spammer is definitely disallow-listed.
