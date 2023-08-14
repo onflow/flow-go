@@ -295,6 +295,12 @@ func WithReceipts(receipts ...*flow.ExecutionReceipt) func(*flow.Payload) {
 	}
 }
 
+func WithProtocolStateID(stateID flow.Identifier) func(payload *flow.Payload) {
+	return func(payload *flow.Payload) {
+		payload.ProtocolStateID = stateID
+	}
+}
+
 // WithReceiptsAndNoResults will add receipt to payload only
 func WithReceiptsAndNoResults(receipts ...*flow.ExecutionReceipt) func(*flow.Payload) {
 	return func(payload *flow.Payload) {

@@ -439,6 +439,7 @@ func TestVersionBeaconIndex(t *testing.T) {
 
 func TestExtendSealedBoundary(t *testing.T) {
 	rootSnapshot := unittest.RootSnapshotFixture(participants)
+	rootProtocolStateID := getRootProtocolStateID(t, rootSnapshot)
 	util.RunWithFullProtocolState(t, rootSnapshot, func(db *badger.DB, state *protocol.ParticipantState) {
 		head, err := rootSnapshot.Head()
 		require.NoError(t, err)
@@ -450,7 +451,7 @@ func TestExtendSealedBoundary(t *testing.T) {
 
 		// Create a first block on top of the snapshot
 		block1 := unittest.BlockWithParentFixture(head)
-		block1.SetPayload(flow.EmptyPayload())
+		block1.SetPayload(unittest.PayloadFixture(unittest.WithProtocolStateID(rootProtocolStateID)))
 		err = state.Extend(context.Background(), block1)
 		require.NoError(t, err)
 
@@ -458,8 +459,9 @@ func TestExtendSealedBoundary(t *testing.T) {
 		block1Receipt := unittest.ReceiptForBlockFixture(block1)
 		block2 := unittest.BlockWithParentFixture(block1.Header)
 		block2.SetPayload(flow.Payload{
-			Receipts: []*flow.ExecutionReceiptMeta{block1Receipt.Meta()},
-			Results:  []*flow.ExecutionResult{&block1Receipt.ExecutionResult},
+			Receipts:        []*flow.ExecutionReceiptMeta{block1Receipt.Meta()},
+			Results:         []*flow.ExecutionResult{&block1Receipt.ExecutionResult},
+			ProtocolStateID: rootProtocolStateID,
 		})
 		err = state.Extend(context.Background(), block2)
 		require.NoError(t, err)
@@ -468,7 +470,8 @@ func TestExtendSealedBoundary(t *testing.T) {
 		block1Seal := unittest.Seal.Fixture(unittest.Seal.WithResult(&block1Receipt.ExecutionResult))
 		block3 := unittest.BlockWithParentFixture(block2.Header)
 		block3.SetPayload(flow.Payload{
-			Seals: []*flow.Seal{block1Seal},
+			Seals:           []*flow.Seal{block1Seal},
+			ProtocolStateID: rootProtocolStateID,
 		})
 		err = state.Extend(context.Background(), block3)
 		require.NoError(t, err)
@@ -1996,6 +1999,7 @@ func TestExtendInvalidSealsInBlock(t *testing.T) {
 
 func TestHeaderExtendValid(t *testing.T) {
 	rootSnapshot := unittest.RootSnapshotFixture(participants)
+	rootProtocolStateID := getRootProtocolStateID(t, rootSnapshot)
 	util.RunWithFollowerProtocolState(t, rootSnapshot, func(db *badger.DB, state *protocol.FollowerState) {
 		head, err := rootSnapshot.Head()
 		require.NoError(t, err)
@@ -2003,7 +2007,7 @@ func TestHeaderExtendValid(t *testing.T) {
 		require.NoError(t, err)
 
 		extend := unittest.BlockWithParentFixture(head)
-		extend.SetPayload(flow.EmptyPayload())
+		extend.SetPayload(unittest.PayloadFixture(unittest.WithProtocolStateID(rootProtocolStateID)))
 
 		err = state.ExtendCertified(context.Background(), extend, unittest.CertifyBlock(extend.Header))
 		require.NoError(t, err)
@@ -2039,11 +2043,13 @@ func TestHeaderExtendMissingParent(t *testing.T) {
 
 func TestHeaderExtendHeightTooSmall(t *testing.T) {
 	rootSnapshot := unittest.RootSnapshotFixture(participants)
+	rootProtocolStateID := getRootProtocolStateID(t, rootSnapshot)
 	util.RunWithFollowerProtocolState(t, rootSnapshot, func(db *badger.DB, state *protocol.FollowerState) {
 		head, err := rootSnapshot.Head()
 		require.NoError(t, err)
 
 		block1 := unittest.BlockWithParentFixture(head)
+		block1.SetPayload(unittest.PayloadFixture(unittest.WithProtocolStateID(rootProtocolStateID)))
 
 		// create another block that points to the previous block `extend` as parent
 		// but has _same_ height as parent. This violates the condition that a child's
@@ -2087,11 +2093,13 @@ func TestExtendBlockProcessable(t *testing.T) {
 	rootSnapshot := unittest.RootSnapshotFixture(participants)
 	head, err := rootSnapshot.Head()
 	require.NoError(t, err)
+	rootProtocolStateID := getRootProtocolStateID(t, rootSnapshot)
 	consumer := mockprotocol.NewConsumer(t)
 	util.RunWithFullProtocolStateAndConsumer(t, rootSnapshot, consumer, func(db *badger.DB, state *protocol.ParticipantState) {
 		block := unittest.BlockWithParentFixture(head)
-		child := unittest.BlockWithParentFixture(block.Header)
-		grandChild := unittest.BlockWithParentFixture(child.Header)
+		block.SetPayload(unittest.PayloadFixture(unittest.WithProtocolStateID(rootProtocolStateID)))
+		child := unittest.BlockWithParentProtocolState(block)
+		grandChild := unittest.BlockWithParentProtocolState(child)
 
 		// extend block using certifying QC, expect that BlockProcessable will be emitted once
 		consumer.On("BlockProcessable", block.Header, child.Header.QuorumCertificate()).Once()
@@ -2120,11 +2128,13 @@ func TestExtendBlockProcessable(t *testing.T) {
 // The Follower should accept this block since tracking of orphan blocks is implemented by another component.
 func TestFollowerHeaderExtendBlockNotConnected(t *testing.T) {
 	rootSnapshot := unittest.RootSnapshotFixture(participants)
+	rootProtocolStateID := getRootProtocolStateID(t, rootSnapshot)
 	util.RunWithFollowerProtocolState(t, rootSnapshot, func(db *badger.DB, state *protocol.FollowerState) {
 		head, err := rootSnapshot.Head()
 		require.NoError(t, err)
 
 		block1 := unittest.BlockWithParentFixture(head)
+		block1.SetPayload(unittest.PayloadFixture(unittest.WithProtocolStateID(rootProtocolStateID)))
 		err = state.ExtendCertified(context.Background(), block1, unittest.CertifyBlock(block1.Header))
 		require.NoError(t, err)
 
@@ -2133,6 +2143,7 @@ func TestFollowerHeaderExtendBlockNotConnected(t *testing.T) {
 
 		// create a fork at view/height 1 and try to connect it to root
 		block2 := unittest.BlockWithParentFixture(head)
+		block2.SetPayload(unittest.PayloadFixture(unittest.WithProtocolStateID(rootProtocolStateID)))
 		err = state.ExtendCertified(context.Background(), block2, unittest.CertifyBlock(block2.Header))
 		require.NoError(t, err)
 
@@ -2150,11 +2161,13 @@ func TestFollowerHeaderExtendBlockNotConnected(t *testing.T) {
 // The Participant should reject this block as an outdated chain extension
 func TestParticipantHeaderExtendBlockNotConnected(t *testing.T) {
 	rootSnapshot := unittest.RootSnapshotFixture(participants)
+	rootProtocolStateID := getRootProtocolStateID(t, rootSnapshot)
 	util.RunWithFullProtocolState(t, rootSnapshot, func(db *badger.DB, state *protocol.ParticipantState) {
 		head, err := rootSnapshot.Head()
 		require.NoError(t, err)
 
 		block1 := unittest.BlockWithParentFixture(head)
+		block1.SetPayload(unittest.PayloadFixture(unittest.WithProtocolStateID(rootProtocolStateID)))
 		err = state.Extend(context.Background(), block1)
 		require.NoError(t, err)
 
@@ -2163,6 +2176,7 @@ func TestParticipantHeaderExtendBlockNotConnected(t *testing.T) {
 
 		// create a fork at view/height 1 and try to connect it to root
 		block2 := unittest.BlockWithParentFixture(head)
+		block2.SetPayload(unittest.PayloadFixture(unittest.WithProtocolStateID(rootProtocolStateID)))
 		err = state.Extend(context.Background(), block2)
 		require.True(t, st.IsOutdatedExtensionError(err), err)
 
@@ -2547,4 +2561,10 @@ func mockMetricsForRootSnapshot(metricsMock *mockmodule.ComplianceMetrics, rootS
 	metricsMock.On("BlockFinalized", mock.Anything)
 	metricsMock.On("FinalizedHeight", mock.Anything)
 	metricsMock.On("SealedHeight", mock.Anything)
+}
+
+func getRootProtocolStateID(t *testing.T, rootSnapshot *inmem.Snapshot) flow.Identifier {
+	rootProtocolState, err := rootSnapshot.ProtocolState()
+	require.NoError(t, err)
+	return rootProtocolState.Entry().ID()
 }
