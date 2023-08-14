@@ -451,7 +451,16 @@ func (m *MisbehaviorReportManager) processMisbehaviorReport(report internal.Repo
 	return nil
 }
 
-// adjustDecayFunc calculates the decay value of the spam record. This allows the decay to be different on subsequent disallow listings.
+// adjustDecayFunc calculates the decay value of the spam record cache. This allows the decay to be different on subsequent disallow listings.
+// It returns the decay speed for the given cutoff counter.
+// The cutoff counter is the number of times that the node has been disallow-listed.
+// Args:
+// cutoffCounter: the number of times that the node has been disallow-listed including the current time. Note that the cutoff counter
+// must always be updated before calling this function.
+//
+// Returns:
+//
+//	float64: the decay speed for the given cutoff counter.
 func (m *MisbehaviorReportManager) adjustDecayFunc(cutoffCounter uint64) float64 {
 	// decaySpeeds illustrates the decay speeds for different cutoff counters.
 	// The first cutoff does not reduce the decay speed (1000 -> 1000). However, the second, third,
