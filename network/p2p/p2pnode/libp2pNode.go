@@ -319,15 +319,40 @@ func (n *Node) UnSubscribe(topic channels.Topic) error {
 
 // Publish publishes the given payload on the topic.
 // All errors returned from this function can be considered benign.
-func (n *Node) Publish(ctx context.Context, topic channels.Topic, data []byte) error {
+func (n *Node) Publish(ctx context.Context, msgScope *flownet.OutgoingMessageScope) error {
+	lg := n.logger.With().
+		Str("channel", msgScope.Channel().String()).
+		Interface("proto_message", msgScope.Proto()).
+		Str("payload_type", msgScope.PayloadType()).
+		Int("message_size", msgScope.Size()).Logger()
+	lg.Debug().Msg("received message to publish")
+
+	// convert the message to bytes to be put on the wire.
+	data, err := msgScope.Proto().Marshal()
+	if err != nil {
+		return fmt.Errorf("failed to marshal the message: %w", err)
+	}
+
+	msgSize := len(data)
+	if msgSize > DefaultMaxPubSubMsgSize {
+		// libp2p pubsub will silently drop the message if its size is greater than the configured pubsub max message size
+		// hence return an error as this message is undeliverable
+		return fmt.Errorf("message size %d exceeds configured max message size %d", msgSize, DefaultMaxPubSubMsgSize)
+	}
+
+	topic := channels.TopicFromChannel(msgScope.Channel(), n.sporkId)
+	lg = lg.With().Str("topic", topic.String()).Logger()
+
 	ps, found := n.topics[topic]
 	if !found {
 		return fmt.Errorf("could not find topic (%s)", topic)
 	}
-	err := ps.Publish(ctx, data)
+	err = ps.Publish(ctx, data)
 	if err != nil {
 		return fmt.Errorf("could not publish to topic (%s): %w", topic, err)
 	}
+
+	lg.Debug().Msg("published message to topic")
 	return nil
 }
 

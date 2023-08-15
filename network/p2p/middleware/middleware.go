@@ -30,7 +30,6 @@ import (
 	"github.com/onflow/flow-go/network/message"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/blob"
-	"github.com/onflow/flow-go/network/p2p/p2pnode"
 	"github.com/onflow/flow-go/network/p2p/ping"
 	"github.com/onflow/flow-go/network/p2p/unicast/protocols"
 	"github.com/onflow/flow-go/network/p2p/unicast/ratelimit"
@@ -774,35 +773,7 @@ func (m *Middleware) processMessage(scope *network.IncomingMessageScope) {
 //
 // All errors returned from this function can be considered benign.
 func (m *Middleware) Publish(msg *network.OutgoingMessageScope) error {
-	m.log.Debug().
-		Str("channel", msg.Channel().String()).
-		Interface("msg", msg.Proto()).
-		Str("type", msg.PayloadType()).
-		Int("msg_size", msg.Size()).
-		Msg("publishing new message")
-
-	// convert the message to bytes to be put on the wire.
-	data, err := msg.Proto().Marshal()
-	if err != nil {
-		return fmt.Errorf("failed to marshal the message: %w", err)
-	}
-
-	msgSize := len(data)
-	if msgSize > p2pnode.DefaultMaxPubSubMsgSize {
-		// libp2p pubsub will silently drop the message if its size is greater than the configured pubsub max message size
-		// hence return an error as this message is undeliverable
-		return fmt.Errorf("message size %d exceeds configured max message size %d", msgSize, p2pnode.DefaultMaxPubSubMsgSize)
-	}
-
-	topic := channels.TopicFromChannel(msg.Channel(), m.rootBlockID)
-
-	// publish the bytes on the topic
-	err = m.libP2PNode.Publish(m.ctx, topic, data)
-	if err != nil {
-		return fmt.Errorf("failed to publish the message: %w", err)
-	}
-
-	return nil
+	return m.libP2PNode.Publish(m.ctx, msg)
 }
 
 // unicastMaxMsgSize returns the max permissible size for a unicast message

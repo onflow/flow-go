@@ -67,7 +67,7 @@ type LibP2PNode interface {
 	// UnSubscribe cancels the subscriber and closes the topic.
 	UnSubscribe(topic channels.Topic) error
 	// Publish publishes the given payload on the topic.
-	Publish(ctx context.Context, topic channels.Topic, data []byte) error
+	Publish(ctx context.Context, msgScope *network.OutgoingMessageScope) error
 	// Host returns pointer to host object of node.
 	Host() host.Host
 	// WithDefaultUnicastProtocol overrides the default handler of the unicast manager and registers all preferred protocols.
