@@ -235,35 +235,37 @@ func (b *backendTransactions) GetTransactionResult(
 	tx, err := b.transactions.ByID(txID)
 	if err != nil {
 		txErr := rpc.ConvertStorageError(err)
-		if status.Code(txErr) == codes.NotFound {
-			// Tx not found. If we have historical Sporks setup, lets look through those as well
-			if b.txResultCache != nil {
-				val, ok := b.txResultCache.Get(txID)
-				if ok {
-					return val, nil
-				}
-			}
-			historicalTxResult, err := b.getHistoricalTransactionResult(ctx, txID)
-			if err != nil {
-				// if tx not found in old access nodes either, then assume that the tx was submitted to a different AN
-				// and return status as unknown
-				txStatus := flow.TransactionStatusUnknown
-				result := &access.TransactionResult{
-					Status:     txStatus,
-					StatusCode: uint(txStatus),
-				}
-				if b.txResultCache != nil {
-					b.txResultCache.Add(txID, result)
-				}
-				return result, nil
-			}
 
-			if b.txResultCache != nil {
-				b.txResultCache.Add(txID, historicalTxResult)
-			}
-			return historicalTxResult, nil
+		if status.Code(txErr) != codes.NotFound {
+			return nil, txErr
 		}
-		return nil, txErr
+
+		// Tx not found. If we have historical Sporks setup, lets look through those as well
+		if b.txResultCache != nil {
+			val, ok := b.txResultCache.Get(txID)
+			if ok {
+				return val, nil
+			}
+		}
+		historicalTxResult, err := b.getHistoricalTransactionResult(ctx, txID)
+		if err != nil {
+			// if tx not found in old access nodes either, then assume that the tx was submitted to a different AN
+			// and return status as unknown
+			txStatus := flow.TransactionStatusUnknown
+			result := &access.TransactionResult{
+				Status:     txStatus,
+				StatusCode: uint(txStatus),
+			}
+			if b.txResultCache != nil {
+				b.txResultCache.Add(txID, result)
+			}
+			return result, nil
+		}
+
+		if b.txResultCache != nil {
+			b.txResultCache.Add(txID, historicalTxResult)
+		}
+		return historicalTxResult, nil
 	}
 
 	block, err := b.retrieveBlock(blockID, collectionID, txID)
