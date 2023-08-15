@@ -22,24 +22,11 @@ import (
 // It also evaluates that re-inserting is idempotent.
 func TestChunkDataPacks_Store(t *testing.T) {
 	WithChunkDataPacks(t, 100, func(t *testing.T, chunkDataPacks []*flow.ChunkDataPack, chunkDataPackStore *badgerstorage.ChunkDataPacks, _ *badger.DB) {
-		wg := sync.WaitGroup{}
-		wg.Add(len(chunkDataPacks))
-		for _, chunkDataPack := range chunkDataPacks {
-			go func(cdp flow.ChunkDataPack) {
-				err := chunkDataPackStore.Store(&cdp)
-				require.NoError(t, err)
-
-				wg.Done()
-			}(*chunkDataPack)
-		}
-
-		unittest.RequireReturnsBefore(t, wg.Wait, 1*time.Second, "could not store chunk data packs on time")
+		require.NoError(t, chunkDataPackStore.Store(chunkDataPacks))
 
 		// re-insert - should be idempotent
-		for _, chunkDataPack := range chunkDataPacks {
-			err := chunkDataPackStore.Store(chunkDataPack)
-			require.NoError(t, err)
-		}
+
+		require.NoError(t, chunkDataPackStore.Store(chunkDataPacks))
 	})
 }
 
@@ -76,6 +63,25 @@ func TestChunkDataPacks_MissingItem(t *testing.T) {
 		// attempt to get an invalid
 		_, err := store.ByChunkID(unittest.IdentifierFixture())
 		assert.True(t, errors.Is(err, storage.ErrNotFound))
+	})
+}
+
+// TestChunkDataPacks_StoreTwice evaluates that storing the same chunk data pack twice
+// does not result in an error.
+func TestChunkDataPacks_StoreTwice(t *testing.T) {
+	WithChunkDataPacks(t, 2, func(t *testing.T, chunkDataPacks []*flow.ChunkDataPack, chunkDataPackStore *badgerstorage.ChunkDataPacks, db *badger.DB) {
+		transactions := badgerstorage.NewTransactions(&metrics.NoopCollector{}, db)
+		collections := badgerstorage.NewCollections(db, transactions)
+		store := badgerstorage.NewChunkDataPacks(&metrics.NoopCollector{}, db, collections, 1)
+		require.NoError(t, store.Store(chunkDataPacks))
+
+		for _, c := range chunkDataPacks {
+			c2, err := store.ByChunkID(c.ChunkID)
+			require.NoError(t, err)
+			require.Equal(t, c, c2)
+		}
+
+		require.NoError(t, store.Store(chunkDataPacks))
 	})
 }
 

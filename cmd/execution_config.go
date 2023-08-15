@@ -31,6 +31,7 @@ type ExecutionConfig struct {
 	transactionResultsCacheSize          uint
 	checkpointDistance                   uint
 	checkpointsToKeep                    uint
+	chunkDataPackDir                     string
 	chunkDataPackCacheSize               uint
 	chunkDataPackRequestsCacheSize       uint32
 	requestInterval                      time.Duration
@@ -77,6 +78,7 @@ func (exeConf *ExecutionConfig) SetupFlags(flags *pflag.FlagSet) {
 		"cache size for Cadence execution")
 	flags.BoolVar(&exeConf.computationConfig.ExtensiveTracing, "extensive-tracing", false, "adds high-overhead tracing to execution")
 	flags.BoolVar(&exeConf.computationConfig.CadenceTracing, "cadence-tracing", false, "enables cadence runtime level tracing")
+	flags.StringVar(&exeConf.chunkDataPackDir, "chunk-data-pack-dir", filepath.Join(homedir, ".flow", "chunk_data_packs"), "directory to use for storing chunk data packs")
 	flags.UintVar(&exeConf.chunkDataPackCacheSize, "chdp-cache", storage.DefaultCacheSize, "cache size for chunk data packs")
 	flags.Uint32Var(&exeConf.chunkDataPackRequestsCacheSize, "chdp-request-queue", mempool.DefaultChunkDataPackRequestQueueSize, "queue size for chunk data pack requests")
 	flags.DurationVar(&exeConf.requestInterval, "request-interval", 60*time.Second, "the interval between requests for the requester engine")
