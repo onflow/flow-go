@@ -20,6 +20,7 @@ import (
 	"go.uber.org/atomic"
 	"golang.org/x/time/rate"
 
+	"github.com/onflow/flow-go/config"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	libp2pmessage "github.com/onflow/flow-go/model/libp2p/message"
@@ -100,7 +101,6 @@ func (m *MiddlewareTestSuite) SetupTest() {
 	m.metrics = metrics.NewNoopCollector()
 
 	// create and start the middlewares and inject a connection observer
-	var obs []observable.Observable
 	peerChannel := make(chan string)
 	ob := tagsObserver{
 		tags: peerChannel,
@@ -109,19 +109,50 @@ func (m *MiddlewareTestSuite) SetupTest() {
 
 	m.slashingViolationsConsumer = mocknetwork.NewViolationsConsumer(m.T())
 	m.sporkId = unittest.IdentifierFixture()
-	m.ids, m.nodes, obs = testutils.LibP2PNodeForMiddlewareFixture(m.T(), m.sporkId, m.size)
+
+	libP2PNodes := make([]p2p.LibP2PNode, 0)
+	identities := make(flow.IdentityList, 0)
+	tagObservables := make([]observable.Observable, 0)
+	idProvider := unittest.NewUpdatableIDProvider(flow.IdentityList{})
+	defaultFlowConfig, err := config.DefaultConfig()
+	require.NoError(m.T(), err)
+
+	opts := []p2ptest.NodeFixtureParameterOption{p2ptest.WithUnicastHandlerFunc(nil)}
+
+	for i := 0; i < m.size; i++ {
+		connManager, err := testutils.NewTagWatchingConnManager(
+			unittest.Logger(),
+			metrics.NewNoopCollector(),
+			&defaultFlowConfig.NetworkConfig.ConnectionManagerConfig)
+		require.NoError(m.T(), err)
+
+		opts = append(opts, p2ptest.WithConnectionManager(connManager))
+		node, nodeId := p2ptest.NodeFixture(m.T(),
+			m.sporkId,
+			m.T().Name(),
+			idProvider,
+			opts...)
+		libP2PNodes = append(libP2PNodes, node)
+		identities = append(identities, &nodeId)
+		tagObservables = append(tagObservables, connManager)
+	}
+	idProvider.SetIdentities(identities)
+
+	m.ids = identities
+	m.nodes = libP2PNodes
+
 	m.mws, m.providers = testutils.MiddlewareFixtures(
 		m.T(),
 		m.ids,
 		m.nodes,
 		testutils.MiddlewareConfigFixture(m.T(), m.sporkId),
 		m.slashingViolationsConsumer)
-	for _, observableConnMgr := range obs {
+	for _, observableConnMgr := range tagObservables {
 		observableConnMgr.Subscribe(&ob)
 	}
 	m.obs = peerChannel
 
-	require.Len(m.Suite.T(), obs, m.size)
+	require.Len(m.Suite.T(), tagObservables, m.size)
 	require.Len(m.Suite.T(), m.ids, m.size)
 	require.Len(m.Suite.T(), m.mws, m.size)
 
