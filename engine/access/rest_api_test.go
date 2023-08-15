@@ -11,14 +11,6 @@ import (
 	"time"
 
 	"github.com/antihax/optional"
-	restclient "github.com/onflow/flow/openapi/go-client-generated"
-	"github.com/rs/zerolog"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
-	"github.com/stretchr/testify/require"
-	"github.com/stretchr/testify/suite"
-	"google.golang.org/grpc/credentials"
-
 	accessmock "github.com/onflow/flow-go/engine/access/mock"
 	"github.com/onflow/flow-go/engine/access/rest/request"
 	"github.com/onflow/flow-go/engine/access/rest/routes"
@@ -35,6 +27,13 @@ import (
 	storagemock "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/utils/grpcutils"
 	"github.com/onflow/flow-go/utils/unittest"
+	restclient "github.com/onflow/flow/openapi/go-client-generated"
+	"github.com/rs/zerolog"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
+	"github.com/stretchr/testify/suite"
+	"google.golang.org/grpc/credentials"
 )
 
 // RestAPITestSuite tests that the Access node serves the REST API defined via the OpenApi spec accurately

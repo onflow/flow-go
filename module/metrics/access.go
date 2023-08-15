@@ -1,11 +1,10 @@
 package metrics
 
 import (
-	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/client_golang/prometheus/promauto"
-
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/counters"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promauto"
 )
 
 type AccessCollectorOpts func(*AccessCollector)
@@ -32,6 +31,8 @@ type AccessCollector struct {
 	module.RestMetrics
 	module.TransactionMetrics
 	module.BackendScriptsMetrics
+
+	//module.TransactionResultMetrics
 
 	connectionReused      prometheus.Counter
 	connectionsInPool     *prometheus.GaugeVec

@@ -6,12 +6,11 @@ import (
 
 	"github.com/libp2p/go-libp2p/core/peer"
 	rcmgr "github.com/libp2p/go-libp2p/p2p/host/resource-manager"
-	httpmetrics "github.com/slok/go-http-metrics/metrics"
-
 	"github.com/onflow/flow-go/model/chainsync"
 	"github.com/onflow/flow-go/model/cluster"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/network/channels"
+	httpmetrics "github.com/slok/go-http-metrics/metrics"
 )
 
 type EntriesFunc func() uint
@@ -647,11 +646,23 @@ type AccessMetrics interface {
 	TransactionMetrics
 	BackendScriptsMetrics
 
+	//TrnasactionResultMetrics
+
 	// UpdateExecutionReceiptMaxHeight is called whenever we store an execution receipt from a block from a newer height
 	UpdateExecutionReceiptMaxHeight(height uint64)
 
 	// UpdateLastFullBlockHeight tracks the height of the last block for which all collections were received
 	UpdateLastFullBlockHeight(height uint64)
+}
+
+type TrnasactionResultMetrics interface {
+	OnKeyHitSuccess()
+	OnKeyHitFailure()
+
+	OnKeyAddSuccess()
+	OnKeyEviction()
+
+	OnKeyAddFailureDueToFullCache()
 }
 
 type ExecutionResultStats struct {
