@@ -245,7 +245,6 @@ var (
 		common.MemoryKindOrderedMapEntry:     64,
 
 		// Entitlement access
-		common.MemoryKindUnauthorizedStaticAccess:    1, // unused
 		common.MemoryKindEntitlementSetStaticAccess:  17,
 		common.MemoryKindEntitlementMapStaticAccess:  17,
 		common.MemoryKindCadenceEntitlementSetAccess: 33,
