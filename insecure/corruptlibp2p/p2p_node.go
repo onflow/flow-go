@@ -8,6 +8,7 @@ import (
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/rs/zerolog"
 
+	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/codec/cbor"
@@ -53,10 +54,11 @@ func (n *CorruptP2PNode) Subscribe(topic channels.Topic, _ p2p.TopicValidatorFun
 // NewCorruptLibP2PNode returns corrupted libP2PNode that will subscribe to topics using the AcceptAllTopicValidator.
 func NewCorruptLibP2PNode(
 	logger zerolog.Logger,
+	sporkId flow.Identifier,
 	host host.Host,
 	pCache p2p.ProtocolPeerCache,
 	peerManager p2p.PeerManager,
 	disallowListCacheCfg *p2p.DisallowListCacheConfig) p2p.LibP2PNode {
-	node := p2pnode.NewNode(logger, host, pCache, peerManager, disallowListCacheCfg)
+	node := p2pnode.NewNode(logger, sporkId, host, pCache, peerManager, disallowListCacheCfg)
 	return &CorruptP2PNode{Node: node, logger: logger, codec: cbor.NewCodec()}
 }

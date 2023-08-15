@@ -66,20 +66,22 @@ type Node struct {
 	// Cache of temporary disallow-listed peers, when a peer is disallow-listed, the connections to that peer
 	// are closed and further connections are not allowed till the peer is removed from the disallow-list.
 	disallowListedCache p2p.DisallowListCache
+	sporkId             flow.Identifier
 }
 
 // NewNode creates a new libp2p node and sets its parameters.
 func NewNode(
 	logger zerolog.Logger,
+	sporkId flow.Identifier,
 	host host.Host,
 	pCache p2p.ProtocolPeerCache,
 	peerManager p2p.PeerManager,
 	disallowLstCacheCfg *p2p.DisallowListCacheConfig,
 ) *Node {
-	lg := logger.With().Str("component", "libp2p-node").Logger()
 	return &Node{
 		host:        host,
-		logger:      lg,
+		logger:      logger.With().Str("component", "libp2p-node").Logger(),
+		sporkId:     sporkId,
 		topics:      make(map[channels.Topic]p2p.Topic),
 		subs:        make(map[channels.Topic]p2p.Subscription),
 		pCache:      pCache,
