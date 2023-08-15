@@ -18,6 +18,8 @@ jobs:
     name: Build boot tools
     runs-on: ubuntu-latest
     steps:
+    - name: Print all input variables
+      run: echo '${{ toJson(inputs) }}' | jq
     - id: auth
       uses: google-github-actions/auth@v1
       with:
