@@ -200,6 +200,13 @@ func (ss *SyncSuite) TestOnSyncRequest_LowerThanReceiver_WithinTolerance() {
 	ss.core.AssertExpectations(ss.T())
 }
 
+func BenchmarkPrimeNumbers(b *testing.B) {
+	foo := 5
+	for i := 0; i < b.N; i++ {
+		primeNumbers(foo)
+	}
+}
+
 // TestOnSyncRequest_HigherThanReceiver_OutsideTolerance tests that a sync request that's higher than the receiver's height doesn't
 // trigger a response, even if outside tolerance.
 func (ss *SyncSuite) TestOnSyncRequest_HigherThanReceiver_OutsideTolerance() {
@@ -221,6 +228,58 @@ func (ss *SyncSuite) TestOnSyncRequest_HigherThanReceiver_OutsideTolerance() {
 	ss.core.AssertExpectations(ss.T())
 }
 
+func (ss *SyncSuite) TestOnSyncRequest_HigherThanReceiver_OutsideTolerance_Load() {
+	// generate origin and request message
+	originID := unittest.IdentifierFixture()
+	req := &messages.SyncRequest{
+		Nonce:  rand.Uint64(),
+		Height: 0,
+	}
+
+	load := 30
+
+	// create channel to limit goroutines
+	//limiter := make(chan struct{}, 10)
+
+	// create channel to count results
+	results := make(chan bool, load)
+
+	//req.Height = ss.head.Height + 1
+	//ss.core.On("HandleHeight", ss.head, req.Height)
+	//ss.core.On("WithinTolerance", ss.head, req.Height).Return(false)
+
+	// define custom matcher
+	// Define a custom matcher function that takes a Person and returns true if the Name is “John”
+	handleHeightMatcher := mock.MatchedBy(func(head, height int) bool {
+		return p.Name == “John”
+	})
+
+	// loop over goroutines to simulate load
+	for i := 0; i < load; i++ {
+		// if request height is higher than local finalized, we should not respond
+		go func() {
+
+			req.Height = ss.head.Height + 1
+			ss.core.On("HandleHeight", ss.head, req.Height)
+			ss.core.On("WithinTolerance", ss.head, req.Height).Return(false)
+
+			err := ss.e.requestHandler.onSyncRequest(originID, req)
+			ss.Assert().NoError(err, "same height sync request should pass")
+			ss.con.AssertNotCalled(ss.T(), "Unicast", mock.Anything, mock.Anything)
+			results <- true
+		}()
+	}
+
+	// wait for all goroutines to finish
+	for i := 0; i < load; i++ {
+		//<-results
+		results <- true
+		ss.core.AssertExpectations(ss.T())
+	}
+
+	close(results)
+}
+
 // TestOnSyncRequest_LowerThanReceiver_OutsideTolerance tests that a sync request that's outside tolerance and
 // lower than the receiver's height triggers a response.
 func (ss *SyncSuite) TestOnSyncRequest_LowerThanReceiver_OutsideTolerance() {
@@ -232,7 +291,7 @@ func (ss *SyncSuite) TestOnSyncRequest_LowerThanReceiver_OutsideTolerance() {
 		Height: 0,
 	}
 
-	// if the request height is lower than head and outside tolerance, we should submit correct response
+	// if the request height is lower than head and outside tolerance, we should expect correct response
 	req.Height = ss.head.Height - 1
 	ss.core.On("HandleHeight", ss.head, req.Height)
 	ss.core.On("WithinTolerance", ss.head, req.Height).Return(false)
