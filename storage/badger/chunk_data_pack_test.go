@@ -22,24 +22,11 @@ import (
 // It also evaluates that re-inserting is idempotent.
 func TestChunkDataPacks_Store(t *testing.T) {
 	WithChunkDataPacks(t, 100, func(t *testing.T, chunkDataPacks []*flow.ChunkDataPack, chunkDataPackStore *badgerstorage.ChunkDataPacks, _ *badger.DB) {
-		wg := sync.WaitGroup{}
-		wg.Add(len(chunkDataPacks))
-		for _, chunkDataPack := range chunkDataPacks {
-			go func(cdp flow.ChunkDataPack) {
-				err := chunkDataPackStore.Store(&cdp)
-				require.NoError(t, err)
-
-				wg.Done()
-			}(*chunkDataPack)
-		}
-
-		unittest.RequireReturnsBefore(t, wg.Wait, 1*time.Second, "could not store chunk data packs on time")
+		require.NoError(t, chunkDataPackStore.Store(chunkDataPacks))
 
 		// re-insert - should be idempotent
-		for _, chunkDataPack := range chunkDataPacks {
-			err := chunkDataPackStore.Store(chunkDataPack)
-			require.NoError(t, err)
-		}
+
+		require.NoError(t, chunkDataPackStore.Store(chunkDataPacks))
 	})
 }
 
