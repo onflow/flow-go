@@ -329,14 +329,14 @@ func TestHandleReportedMisbehavior_And_DisallowListing_RepeatOffender_Integratio
 	// creates a misbehavior report for the spammer
 	report := misbehaviorReportFixtureWithPenalty(t, ids[spammerIndex].NodeID, model.DefaultPenaltyValue)
 
-	expectedDecays := []int{1000, 100, 10, 1, 1, 1} // list of expected decay values after each disallow listing
+	expectedDecays := []float64{1000, 100, 10, 1, 1, 1} // list of expected decay values after each disallow listing
 
 	t.Log("resetting cutoff counter")
-	expectedCutoffCounter := 0
+	expectedCutoffCounter := uint64(0)
 
 	// keep misbehaving until the spammer is disallow-listed and check that the decay is as expected
-	for expectedDecay := range expectedDecays {
-		t.Logf("starting iteration %d with expected decay %d", expectedDecay, expectedDecays[expectedDecay])
+	for expectedDecayIndex := range expectedDecays {
+		t.Logf("starting iteration %d with expected decay index %f", expectedDecayIndex, expectedDecays[expectedDecayIndex])
 
 		// reset the decay function to the default
 		fastDecay = false
@@ -371,17 +371,19 @@ func TestHandleReportedMisbehavior_And_DisallowListing_RepeatOffender_Integratio
 		p2ptest.RequireConnectedEventually(t, []p2p.LibP2PNode{nodes[honestIndex], nodes[spammerIndex]}, 1*time.Millisecond, 100*time.Millisecond)
 
 		// ensures that the spammer is disallow-listed for the expected amount of time
-
 		record, ok := victimSpamRecordCache.Get(ids[spammerIndex].NodeID)
 		require.True(t, ok)
 		require.NotNil(t, record)
 
-		// check the penalty of the spammer node. It should be greater than the disallow-listing threshold.
-		require.Greater(t, float64(model.DisallowListingThreshold), record.Penalty)
+		// check the penalty of the spammer node, which should be below the disallow-listing threshold.
+		// i.e. spammer penalty should be more negative than the disallow-listing threshold, hence disallow-listed.
+		require.Less(t, record.Penalty, float64(model.DisallowListingThreshold))
+		require.Equal(t, expectedDecays[expectedDecayIndex], record.Decay)
 
-		require.Equal(t, float64(expectedDecays[expectedDecay]), record.Decay)
+		require.Equal(t, expectedDecays[expectedDecayIndex], record.Decay)
+		// when a node is disallow-listed, it remains disallow-listed until its penalty decays back to zero.
 		require.Equal(t, true, record.DisallowListed)
-		require.Equal(t, uint64(expectedCutoffCounter), record.CutoffCounter)
+		require.Equal(t, expectedCutoffCounter, record.CutoffCounter)
 
 		penalty1 := record.Penalty
 
@@ -392,16 +394,19 @@ func TestHandleReportedMisbehavior_And_DisallowListing_RepeatOffender_Integratio
 		require.True(t, ok)
 		require.NotNil(t, record)
 
-		// check the penalty of the spammer node. It should be greater than the disallow-listing threshold.
-		require.Greater(t, float64(model.DisallowListingThreshold), record.Penalty)
+		// check the penalty of the spammer node, which should be below the disallow-listing threshold.
+		// i.e. spammer penalty should be more negative than the disallow-listing threshold, hence disallow-listed.
+		require.Less(t, record.Penalty, float64(model.DisallowListingThreshold))
+		require.Equal(t, expectedDecays[expectedDecayIndex], record.Decay)
 
-		require.Equal(t, float64(expectedDecays[expectedDecay]), record.Decay)
+		require.Equal(t, expectedDecays[expectedDecayIndex], record.Decay)
+		// when a node is disallow-listed, it remains disallow-listed until its penalty decays back to zero.
 		require.Equal(t, true, record.DisallowListed)
-		require.Equal(t, uint64(expectedCutoffCounter), record.CutoffCounter)
+		require.Equal(t, expectedCutoffCounter, record.CutoffCounter)
 		penalty2 := record.Penalty
 
 		// check that the penalty has decayed by the expected amount in one heartbeat
-		require.Equal(t, float64(expectedDecays[expectedDecay]), penalty2-penalty1)
+		require.Equal(t, expectedDecays[expectedDecayIndex], penalty2-penalty1)
 
 		// decay the disallow-listing penalty of the spammer node to zero.
 		t.Log("about to decay the disallow-listing penalty of the spammer node to zero")
@@ -420,9 +425,9 @@ func TestHandleReportedMisbehavior_And_DisallowListing_RepeatOffender_Integratio
 		require.NotNil(t, record)
 
 		require.Equal(t, float64(0), record.Penalty)
-		require.Equal(t, float64(expectedDecays[expectedDecay]), record.Decay)
+		require.Equal(t, expectedDecays[expectedDecayIndex], record.Decay)
 		require.Equal(t, false, record.DisallowListed)
-		require.Equal(t, uint64(expectedCutoffCounter), record.CutoffCounter)
+		require.Equal(t, expectedCutoffCounter, record.CutoffCounter)
 
 		// go back to regular decay to prepare for the next set of misbehavior reports.
 		fastDecay = false
