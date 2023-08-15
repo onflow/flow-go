@@ -108,6 +108,14 @@ func TestProxyExecutionAPI(t *testing.T) {
 	assert.Equal(t, resp, expected)
 }
 
+func getCache(t *testing.T, cacheSize int) *lru.Cache[string, *CachedClient] {
+	cache, err := lru.NewWithEvict[string, *CachedClient](cacheSize, func(_ string, client *CachedClient) {
+		client.Close()
+	})
+	require.NoError(t, err)
+	return cache
+}
+
 func TestProxyAccessAPIConnectionReuse(t *testing.T) {
 	// create a collection node
 	cn := new(collectionNode)
@@ -124,10 +132,7 @@ func TestProxyAccessAPIConnectionReuse(t *testing.T) {
 	connectionFactory.CollectionGRPCPort = cn.port
 	// set the connection pool cache size
 	cacheSize := 1
-	cache, _ := lru.NewWithEvict[string, *CachedClient](cacheSize, func(_ string, client *CachedClient) {
-		client.Close()
-	})
-	connectionCache := NewCache(cache, cacheSize)
+	connectionCache := NewCache(getCache(t, cacheSize), cacheSize)
 
 	// set metrics reporting
 	connectionFactory.AccessMetrics = metrics.NewNoopCollector()
@@ -179,10 +184,7 @@ func TestProxyExecutionAPIConnectionReuse(t *testing.T) {
 	connectionFactory.ExecutionGRPCPort = en.port
 	// set the connection pool cache size
 	cacheSize := 5
-	cache, _ := lru.NewWithEvict[string, *CachedClient](cacheSize, func(_ string, client *CachedClient) {
-		client.Close()
-	})
-	connectionCache := NewCache(cache, cacheSize)
+	connectionCache := NewCache(getCache(t, cacheSize), cacheSize)
 	// set metrics reporting
 	connectionFactory.AccessMetrics = metrics.NewNoopCollector()
 	connectionFactory.Manager = NewManager(
@@ -240,10 +242,7 @@ func TestExecutionNodeClientTimeout(t *testing.T) {
 	connectionFactory.ExecutionNodeGRPCTimeout = timeout
 	// set the connection pool cache size
 	cacheSize := 5
-	cache, _ := lru.NewWithEvict[string, *CachedClient](cacheSize, func(_ string, client *CachedClient) {
-		client.Close()
-	})
-	connectionCache := NewCache(cache, cacheSize)
+	connectionCache := NewCache(getCache(t, cacheSize), cacheSize)
 	// set metrics reporting
 	connectionFactory.AccessMetrics = metrics.NewNoopCollector()
 	connectionFactory.Manager = NewManager(
@@ -289,10 +288,7 @@ func TestCollectionNodeClientTimeout(t *testing.T) {
 	connectionFactory.CollectionNodeGRPCTimeout = timeout
 	// set the connection pool cache size
 	cacheSize := 5
-	cache, _ := lru.NewWithEvict[string, *CachedClient](cacheSize, func(_ string, client *CachedClient) {
-		client.Close()
-	})
-	connectionCache := NewCache(cache, cacheSize)
+	connectionCache := NewCache(getCache(t, cacheSize), cacheSize)
 	// set metrics reporting
 	connectionFactory.AccessMetrics = metrics.NewNoopCollector()
 	connectionFactory.Manager = NewManager(
@@ -338,11 +334,8 @@ func TestConnectionPoolFull(t *testing.T) {
 	connectionFactory.CollectionGRPCPort = cn1.port
 	// set the connection pool cache size
 	cacheSize := 2
-	cache, _ := lru.NewWithEvict[string, *CachedClient](cacheSize, func(_ string, client *CachedClient) {
-		client.Close()
-	})
 
-	connectionCache := NewCache(cache, cacheSize)
+	connectionCache := NewCache(getCache(t, cacheSize), cacheSize)
 	// set metrics reporting
 	connectionFactory.AccessMetrics = metrics.NewNoopCollector()
 	connectionFactory.Manager = NewManager(
@@ -415,11 +408,8 @@ func TestConnectionPoolStale(t *testing.T) {
 	connectionFactory.CollectionGRPCPort = cn.port
 	// set the connection pool cache size
 	cacheSize := 5
-	cache, _ := lru.NewWithEvict[string, *CachedClient](cacheSize, func(_ string, client *CachedClient) {
-		client.Close()
-	})
 
-	connectionCache := NewCache(cache, cacheSize)
+	connectionCache := NewCache(getCache(t, cacheSize), cacheSize)
 	// set metrics reporting
 	connectionFactory.AccessMetrics = metrics.NewNoopCollector()
 	connectionFactory.Manager = NewManager(
@@ -474,18 +464,18 @@ func TestConnectionPoolStale(t *testing.T) {
 // - Invalidate the execution API client.
 // - Wait for all goroutines to finish.
 // - Verify that the number of completed requests matches the number of sent responses.
-func TestExecutionNodeClientClosedGracefully(t *testing.T) {
+func TestExecutionNodeClientClosedGracefully(tt *testing.T) {
 	// Add createExecNode function to recreate it each time for rapid test
 	createExecNode := func() (*executionNode, func()) {
 		en := new(executionNode)
-		en.start(t)
+		en.start(tt)
 		return en, func() {
-			en.stop(t)
+			en.stop(tt)
 		}
 	}
 
 	// Add rapid test, to check graceful close on different number of requests
-	rapid.Check(t, func(t *rapid.T) {
+	rapid.Check(tt, func(t *rapid.T) {
 		en, closer := createExecNode()
 		defer closer()
 
@@ -505,11 +495,8 @@ func TestExecutionNodeClientClosedGracefully(t *testing.T) {
 		connectionFactory.ExecutionNodeGRPCTimeout = time.Second
 		// set the connection pool cache size
 		cacheSize := 1
-		cache, _ := lru.NewWithEvict[string, *CachedClient](cacheSize, func(_ string, client *CachedClient) {
-			client.Close()
-		})
 
-		connectionCache := NewCache(cache, cacheSize)
+		connectionCache := NewCache(getCache(tt, cacheSize), cacheSize)
 		// set metrics reporting
 		connectionFactory.AccessMetrics = metrics.NewNoopCollector()
 		connectionFactory.Manager = NewManager(
