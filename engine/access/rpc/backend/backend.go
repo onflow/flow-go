@@ -2,6 +2,7 @@ package backend
 
 import (
 	"context"
+	"crypto/md5"
 	"fmt"
 	"net"
 	"strconv"
@@ -118,7 +119,7 @@ func New(
 		retry.Activate()
 	}
 
-	loggedScripts, err := lru.New[[16]byte, time.Time](DefaultLoggedScriptsCacheSize)
+	loggedScripts, err := lru.New[[md5.Size]byte, time.Time](DefaultLoggedScriptsCacheSize)
 	if err != nil {
 		log.Fatal().Err(err).Msg("failed to initialize script logging cache")
 	}

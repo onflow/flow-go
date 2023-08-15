@@ -1,9 +1,9 @@
 package backend
 
 import (
+	"crypto/md5" //nolint:gosec
 	"bytes"
 	"context"
-	"crypto/md5" //nolint:gosec
 	"io"
 	"time"
 
@@ -33,7 +33,7 @@ type backendScripts struct {
 	connFactory       connection.ConnectionFactory
 	log               zerolog.Logger
 	metrics           module.BackendScriptsMetrics
-	loggedScripts     *lru.Cache[[16]byte, time.Time]
+	loggedScripts     *lru.Cache[[md5.Size]byte, time.Time]
 
 	archiveAddressList   []string
 	archivePorts         []uint
