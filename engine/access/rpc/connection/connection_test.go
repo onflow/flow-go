@@ -599,8 +599,8 @@ func TestExecutionEvictingCacheClients(t *testing.T) {
 	ctx := context.Background()
 
 	// Retrieve the cached client from the cache
-	cachedClient, _ := cache.Get(clientAddress)
-
+	cachedClient, ok := cache.Get(clientAddress)
+	require.True(t, ok)
 	// Schedule the invalidation of the access API client after a delay
 	time.AfterFunc(250*time.Millisecond, func() {
 		// Invalidate the access API client
@@ -655,8 +655,8 @@ func TestCircuitBreakerExecutionNode(t *testing.T) {
 
 	// Set the connection pool cache size.
 	cacheSize := 1
-	connectionCache, _ := lru.New[string, *CachedClient](cacheSize)
-
+	connectionCache, err := lru.New[string, *CachedClient](cacheSize)
+	require.Nil(t, err)
 	connectionFactory.Manager = NewManager(
 		NewCache(connectionCache, cacheSize),
 		unittest.Logger(),
@@ -740,7 +740,8 @@ func TestCircuitBreakerCollectionNode(t *testing.T) {
 	// Set the connection pool cache size.
 	cacheSize := 1
 
-	connectionCache, _ := lru.New[string, *CachedClient](cacheSize)
+	connectionCache, err := lru.New[string, *CachedClient](cacheSize)
+	require.Nil(t, err)
 	connectionFactory.Manager = NewManager(
 		NewCache(connectionCache, cacheSize),
 		unittest.Logger(),
