@@ -106,7 +106,7 @@ func (n *Node) Stop() error {
 
 	n.logger.Debug().Msg("unsubscribing from all topics")
 	for t := range n.topics {
-		err := n.UnSubscribe(t)
+		err := n.unsubscribeTopic(t)
 		// context cancelled errors are expected while unsubscribing from topics during shutdown
 		if err != nil && !errors.Is(err, context.Canceled) {
 			result = multierror.Append(result, err)
@@ -280,11 +280,32 @@ func (n *Node) Subscribe(topic channels.Topic, topicValidator p2p.TopicValidator
 	return s, err
 }
 
-// UnSubscribe cancels the subscriber and closes the topic.
+// Unsubscribe cancels the subscriber and closes the topic.
 // All errors returned from this function can be considered benign.
-func (n *Node) UnSubscribe(topic channels.Topic) error {
+func (n *Node) Unsubscribe(channel channels.Channel) error {
+	topic := channels.TopicFromChannel(channel, n.sporkId)
+	err := n.unsubscribeTopic(topic)
+	if err != nil {
+		return fmt.Errorf("failed to unsubscribe from topic: %w", err)
+	}
+
+	n.RequestPeerUpdate()
+
+	return nil
+}
+
+// unsubscribeTopic cancels the subscriber and closes the topic.
+// All errors returned from this function can be considered benign.
+// Args:
+//
+//	topic: topic to unsubscribe from
+//
+// Returns:
+// error: error if any.
+func (n *Node) unsubscribeTopic(topic channels.Topic) error {
 	n.Lock()
 	defer n.Unlock()
+
 	// Remove the Subscriber from the cache
 	if s, found := n.subs[topic]; found {
 		s.Cancel()
@@ -314,7 +335,8 @@ func (n *Node) UnSubscribe(topic channels.Topic) error {
 	n.logger.Debug().
 		Str("topic", topic.String()).
 		Msg("unsubscribed from topic")
-	return err
+
+	return nil
 }
 
 // Publish publishes the given payload on the topic.

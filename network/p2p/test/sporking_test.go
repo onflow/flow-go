@@ -248,7 +248,7 @@ func TestOneToKCrosstalkPrevention(t *testing.T) {
 	// mimic that node1 is now part of the new spork while node2 remains on the old spork
 	// by unsubscribing node1 from 'topicBeforeSpork' and subscribing it to 'topicAfterSpork'
 	// and keeping node2 subscribed to topic 'topicBeforeSpork'
-	err = node1.UnSubscribe(topicBeforeSpork)
+	err = node1.Unsubscribe(topicBeforeSpork)
 	require.NoError(t, err)
 	_, err = node1.Subscribe(topicAfterSpork, topicValidator)
 	require.NoError(t, err)

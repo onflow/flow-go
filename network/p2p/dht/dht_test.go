@@ -15,6 +15,7 @@ import (
 	libp2pmsg "github.com/onflow/flow-go/model/libp2p/message"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	mockmodule "github.com/onflow/flow-go/module/mock"
+	flownet "github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/message"
 	"github.com/onflow/flow-go/network/p2p"
@@ -102,7 +103,6 @@ func TestPubSubWithDHTDiscovery(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
 
-	topic := channels.Topic("/flow/" + unittest.IdentifierFixture().String())
 	count := 5
 	golog.SetAllLoggers(golog.LevelFatal) // change this to Debug if libp2p logs are needed
 
@@ -155,18 +155,16 @@ func TestPubSubWithDHTDiscovery(t *testing.T) {
 	// hence expect count and not count - 1 messages to be received (one by each node, including the sender)
 	ch := make(chan peer.ID, count)
 
-	codec := unittest.NetworkCodec()
-
-	payload, _ := codec.Encode(&libp2pmsg.TestMessage{})
-	msg := &message.Message{
-		Payload: payload,
-	}
-
-	data, err := msg.Marshal()
+	messageScope, err := flownet.NewOutgoingScope(
+		ids.NodeIDs(),
+		channels.TestNetworkChannel,
+		&libp2pmsg.TestMessage{},
+		unittest.NetworkCodec().Encode,
+		message.ProtocolTypePubSub)
 	require.NoError(t, err)
 
 	logger := unittest.Logger()
-
+	topic := channels.TopicFromChannel(channels.TestNetworkChannel, sporkId)
 	topicValidator := flowpubsub.TopicValidator(logger, unittest.AllowAllPeerFilter())
 	for _, n := range nodes {
 		s, err := n.Subscribe(topic, topicValidator)
@@ -176,7 +174,7 @@ func TestPubSubWithDHTDiscovery(t *testing.T) {
 			msg, err := s.Next(ctx)
 			require.NoError(t, err)
 			require.NotNil(t, msg)
-			assert.Equal(t, data, msg.Data)
+			assert.Equal(t, messageScope.Proto().Payload, msg.Data)
 			ch <- nodeID
 		}(s, n.Host().ID())
 	}
@@ -196,7 +194,7 @@ func TestPubSubWithDHTDiscovery(t *testing.T) {
 	require.Eventually(t, fullyConnectedGraph, time.Second*5, ticksForAssertEventually, "nodes failed to discover each other")
 
 	// Step 4: publish a message to the topic
-	require.NoError(t, dhtServerNode.Publish(ctx, topic, data))
+	require.NoError(t, dhtServerNode.Publish(ctx, messageScope))
 
 	// Step 5: By now, all peers would have been discovered and the message should have been successfully published
 	// A hash set to keep track of the nodes who received the message
@@ -221,6 +219,6 @@ loop:
 
 	// Step 6: unsubscribes all nodes from the topic
 	for _, n := range nodes {
-		assert.NoError(t, n.UnSubscribe(topic))
+		assert.NoError(t, n.Unsubscribe(channels.TestNetworkChannel))
 	}
 }

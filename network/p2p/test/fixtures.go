@@ -30,6 +30,7 @@ import (
 	flownet "github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/internal/p2pfixtures"
+	"github.com/onflow/flow-go/network/message"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/connection"
 	p2pdht "github.com/onflow/flow-go/network/p2p/dht"
@@ -582,19 +583,28 @@ func EnsurePubsubMessageExchange(t *testing.T, ctx context.Context, nodes []p2p.
 	// let subscriptions propagate
 	time.Sleep(1 * time.Second)
 
+	// TODO: remove this and use channel as an argument
 	channel, ok := channels.ChannelFromTopic(topic)
 	require.True(t, ok)
 
 	for _, node := range nodes {
 		for i := 0; i < count; i++ {
 			// creates a unique message to be published by the node
-			msg := messageFactory()
-			data := p2pfixtures.MustEncodeEvent(t, msg, channel)
-			require.NoError(t, node.Publish(ctx, topic, data))
+			payload := messageFactory()
+			outgoingMessageScope, err := flownet.NewOutgoingScope(
+				flow.IdentifierList{unittest.IdentifierFixture()},
+				channel,
+				payload,
+				unittest.NetworkCodec().Encode,
+				message.ProtocolTypePubSub)
+			require.NoError(t, err)
+			require.NoError(t, node.Publish(ctx, outgoingMessageScope))
 
 			// wait for the message to be received by all nodes
 			ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
-			p2pfixtures.SubsMustReceiveMessage(t, ctx, data, subs)
+			expectedReceivedData, err := outgoingMessageScope.Proto().Marshal()
+			require.NoError(t, err)
+			p2pfixtures.SubsMustReceiveMessage(t, ctx, expectedReceivedData, subs)
 			cancel()
 		}
 	}
@@ -620,18 +630,27 @@ func EnsurePubsubMessageExchangeFromNode(t *testing.T, ctx context.Context, send
 	// let subscriptions propagate
 	time.Sleep(1 * time.Second)
 
+	// TODO: remove this and use channel as an argument
 	channel, ok := channels.ChannelFromTopic(topic)
 	require.True(t, ok)
 
 	for i := 0; i < count; i++ {
 		// creates a unique message to be published by the node
-		msg := messageFactory()
-		data := p2pfixtures.MustEncodeEvent(t, msg, channel)
-		require.NoError(t, sender.Publish(ctx, topic, data))
+		payload := messageFactory()
+		outgoingMessageScope, err := flownet.NewOutgoingScope(
+			flow.IdentifierList{},
+			channel,
+			payload,
+			unittest.NetworkCodec().Encode,
+			message.ProtocolTypePubSub)
+		require.NoError(t, err)
+		require.NoError(t, sender.Publish(ctx, outgoingMessageScope))
 
 		// wait for the message to be received by all nodes
 		ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
-		p2pfixtures.SubsMustReceiveMessage(t, ctx, data, []p2p.Subscription{toSub})
+		expectedReceivedData, err := outgoingMessageScope.Proto().Marshal()
+		require.NoError(t, err)
+		p2pfixtures.SubsMustReceiveMessage(t, ctx, expectedReceivedData, []p2p.Subscription{toSub})
 		cancel()
 	}
 }
@@ -692,13 +711,20 @@ func EnsureNoPubsubMessageExchange(t *testing.T, ctx context.Context, from []p2p
 			wg.Add(1)
 			go func() {
 				// creates a unique message to be published by the node.
-				msg := messageFactory()
+				// TODO: remove this and use channel as an argument
 				channel, ok := channels.ChannelFromTopic(topic)
 				require.True(t, ok)
-				data := p2pfixtures.MustEncodeEvent(t, msg, channel)
 
-				// ensure the message is NOT received by any of the nodes.
-				require.NoError(t, node.Publish(ctx, topic, data))
+				payload := messageFactory()
+				outgoingMessageScope, err := flownet.NewOutgoingScope(
+					flow.IdentifierList{unittest.IdentifierFixture()},
+					channel,
+					payload,
+					unittest.NetworkCodec().Encode,
+					message.ProtocolTypePubSub)
+				require.NoError(t, err)
+				require.NoError(t, node.Publish(ctx, outgoingMessageScope))
+
 				ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 				p2pfixtures.SubsMustNeverReceiveAnyMessage(t, ctx, subs)
 				cancel()

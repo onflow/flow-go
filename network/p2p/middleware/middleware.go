@@ -624,16 +624,7 @@ func (m *Middleware) processPubSubMessages(msg *message.Message, peerID peer.ID)
 //
 // All errors returned from this function can be considered benign.
 func (m *Middleware) Unsubscribe(channel channels.Channel) error {
-	topic := channels.TopicFromChannel(channel, m.rootBlockID)
-	err := m.libP2PNode.UnSubscribe(topic)
-	if err != nil {
-		return fmt.Errorf("failed to unsubscribe from channel (%s): %w", channel, err)
-	}
-
-	// update peers to remove nodes subscribed to channel
-	m.libP2PNode.RequestPeerUpdate()
-
-	return nil
+	return m.libP2PNode.Unsubscribe(channel)
 }
 
 // processUnicastStreamMessage will decode, perform authorized sender validation and process a message
