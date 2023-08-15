@@ -196,7 +196,7 @@ func (m *MiddlewareTestSuite) TestUpdateNodeAddresses() {
 	irrecoverableCtx := irrecoverable.NewMockSignalerContext(m.T(), ctx)
 
 	// create a new staked identity
-	ids, libP2PNodes, _ := testutils.LibP2PNodeForMiddlewareFixture(m.T(), m.sporkId, 1)
+	ids, libP2PNodes := testutils.LibP2PNodeForMiddlewareFixture(m.T(), m.sporkId, 1)
 	mws, providers := testutils.MiddlewareFixtures(
 		m.T(),
 		ids,
@@ -283,7 +283,7 @@ func (m *MiddlewareTestSuite) TestUnicastRateLimit_Messages() {
 	rateLimiters := ratelimit.NewRateLimiters(opts...)
 
 	idProvider := unittest.NewUpdatableIDProvider(m.ids)
-	ids, libP2PNodes, _ := testutils.LibP2PNodeForMiddlewareFixture(m.T(),
+	ids, libP2PNodes := testutils.LibP2PNodeForMiddlewareFixture(m.T(),
 		m.sporkId,
 		1,
 		p2ptest.WithUnicastRateLimitDistributor(distributor),
@@ -436,7 +436,7 @@ func (m *MiddlewareTestSuite) TestUnicastRateLimit_Bandwidth() {
 
 	idProvider := unittest.NewUpdatableIDProvider(m.ids)
 	// create a new staked identity
-	ids, libP2PNodes, _ := testutils.LibP2PNodeForMiddlewareFixture(m.T(),
+	ids, libP2PNodes := testutils.LibP2PNodeForMiddlewareFixture(m.T(),
 		m.sporkId,
 		1,
 		p2ptest.WithUnicastRateLimitDistributor(distributor),
