@@ -18,10 +18,12 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
+	"github.com/onflow/flow-go/config"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/model/libp2p/message"
 	"github.com/onflow/flow-go/module/irrecoverable"
+	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/observable"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/channels"
@@ -30,6 +32,7 @@ import (
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/middleware"
 	"github.com/onflow/flow-go/network/p2p/p2pnode"
+	p2ptest "github.com/onflow/flow-go/network/p2p/test"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -59,7 +62,6 @@ func (suite *MeshEngineTestSuite) SetupTest() {
 	log.SetAllLoggers(log.LevelError)
 
 	// set up a channel to receive pubsub tags from connManagers of the nodes
-	var obs []observable.Observable
 	peerChannel := make(chan string)
 	ob := tagsObserver{
 		tags: peerChannel,
@@ -71,19 +73,45 @@ func (suite *MeshEngineTestSuite) SetupTest() {
 
 	signalerCtx := irrecoverable.NewMockSignalerContext(suite.T(), ctx)
 
-	var nodes []p2p.LibP2PNode
 	sporkId := unittest.IdentifierFixture()
-	suite.ids, nodes, obs = testutils.LibP2PNodeForMiddlewareFixture(suite.T(), sporkId, count)
+	libP2PNodes := make([]p2p.LibP2PNode, 0)
+	identities := make(flow.IdentityList, 0)
+	tagObservables := make([]observable.Observable, 0)
+	idProvider := unittest.NewUpdatableIDProvider(flow.IdentityList{})
+	defaultFlowConfig, err := config.DefaultConfig()
+	require.NoError(suite.T(), err)
+	opts := []p2ptest.NodeFixtureParameterOption{p2ptest.WithUnicastHandlerFunc(nil)}
+
+	for i := 0; i < count; i++ {
+		connManager, err := testutils.NewTagWatchingConnManager(
+			unittest.Logger(),
+			metrics.NewNoopCollector(),
+			&defaultFlowConfig.NetworkConfig.ConnectionManagerConfig)
+		require.NoError(suite.T(), err)
+
+		opts = append(opts, p2ptest.WithConnectionManager(connManager))
+		node, nodeId := p2ptest.NodeFixture(suite.T(),
+			sporkId,
+			suite.T().Name(),
+			idProvider,
+			opts...)
+		libP2PNodes = append(libP2PNodes, node)
+		identities = append(identities, &nodeId)
+		tagObservables = append(tagObservables, connManager)
+	}
+	idProvider.SetIdentities(identities)
+
+	suite.ids = identities
 	suite.mws, _ = testutils.MiddlewareFixtures(
 		suite.T(),
 		suite.ids,
-		nodes,
+		libP2PNodes,
 		testutils.MiddlewareConfigFixture(suite.T(), sporkId),
 		mocknetwork.NewViolationsConsumer(suite.T()))
 	suite.nets = testutils.NetworksFixture(suite.T(), suite.ids, suite.mws)
-	testutils.StartNodesAndNetworks(signalerCtx, suite.T(), nodes, suite.nets, 100*time.Millisecond)
+	testutils.StartNodesAndNetworks(signalerCtx, suite.T(), libP2PNodes, suite.nets, 100*time.Millisecond)
 
-	for _, observableConnMgr := range obs {
+	for _, observableConnMgr := range tagObservables {
 		observableConnMgr.Subscribe(&ob)
 	}
 	suite.obs = peerChannel
