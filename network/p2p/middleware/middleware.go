@@ -805,16 +805,6 @@ func (m *Middleware) Publish(msg *network.OutgoingMessageScope) error {
 	return nil
 }
 
-// IsConnected returns true if this node is connected to the node with id nodeID.
-// All errors returned from this function can be considered benign.
-func (m *Middleware) IsConnected(nodeID flow.Identifier) (bool, error) {
-	peerID, err := m.idTranslator.GetPeerID(nodeID)
-	if err != nil {
-		return false, fmt.Errorf("could not find peer id for target id: %w", err)
-	}
-	return m.libP2PNode.IsConnected(peerID)
-}
-
 // unicastMaxMsgSize returns the max permissible size for a unicast message
 func unicastMaxMsgSize(messageType string) int {
 	switch messageType {

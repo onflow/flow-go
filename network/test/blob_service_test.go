@@ -10,6 +10,7 @@ import (
 	"github.com/ipfs/go-datastore"
 	"github.com/ipfs/go-datastore/sync"
 	blockstore "github.com/ipfs/go-ipfs-blockstore"
+	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/atomic"
 
@@ -118,10 +119,10 @@ func (suite *BlobServiceTestSuite) SetupTest() {
 	// let nodes connect to each other only after they are all listening on Bitswap
 	topologyActive.Store(true)
 	suite.Require().Eventually(func() bool {
-		for i, mw := range mws {
+		for i, libp2pNode := range nodes {
 			for j := i + 1; j < suite.numNodes; j++ {
-				connected, err := mw.IsConnected(ids[j].NodeID)
-				suite.Require().NoError(err)
+				connected, err := libp2pNode.IsConnected(nodes[j].Host().ID())
+				require.NoError(suite.T(), err)
 				if !connected {
 					return false
 				}

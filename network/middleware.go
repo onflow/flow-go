@@ -57,8 +57,6 @@ type Middleware interface {
 
 	// NewPingService creates a new PingService for the given ping protocol ID.
 	NewPingService(pingProtocol protocol.ID, provider PingInfoProvider) PingService
-
-	IsConnected(nodeID flow.Identifier) (bool, error)
 }
 
 // Overlay represents the interface that middleware uses to interact with the
