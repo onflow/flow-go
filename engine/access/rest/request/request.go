@@ -54,6 +54,12 @@ func (rd *Request) GetAccountRequest() (GetAccount, error) {
 	return req, err
 }
 
+func (rd *Request) GetAccountKeyRequest() (GetAccountKey, error) {
+	var req GetAccountKey
+	err := req.Build(rd)
+	return req, err
+}
+
 func (rd *Request) GetExecutionResultByBlockIDsRequest() (GetExecutionResultByBlockIDs, error) {
 	var req GetExecutionResultByBlockIDs
 	err := req.Build(rd)
