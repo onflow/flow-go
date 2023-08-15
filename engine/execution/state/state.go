@@ -288,7 +288,7 @@ func (s *state) SaveExecutionResults(
 	header := result.ExecutableBlock.Block.Header
 	blockID := header.ID()
 
-	err := s.chunkDataPacks.StoreMul(result.AllChunkDataPacks())
+	err := s.chunkDataPacks.Store(result.AllChunkDataPacks())
 	if err != nil {
 		return fmt.Errorf("can not store multiple chunk data pack: %w", err)
 	}
