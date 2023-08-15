@@ -832,7 +832,7 @@ func (m *Middleware) IsConnected(nodeID flow.Identifier) (bool, error) {
 // unicastMaxMsgSize returns the max permissible size for a unicast message
 func unicastMaxMsgSize(messageType string) int {
 	switch messageType {
-	case "*messages.ChunkDataResponse":
+	case "*messages.ChunkDataResponse", "messages.ChunkDataResponse":
 		return LargeMsgMaxUnicastMsgSize
 	default:
 		return DefaultMaxUnicastMsgSize
@@ -857,7 +857,7 @@ func UnicastMaxMsgSizeByCode(payload []byte) (int, error) {
 // unicastMaxMsgDuration returns the max duration to allow for a unicast send to complete
 func (m *Middleware) unicastMaxMsgDuration(messageType string) time.Duration {
 	switch messageType {
-	case "messages.ChunkDataResponse":
+	case "*messages.ChunkDataResponse", "messages.ChunkDataResponse":
 		if LargeMsgUnicastTimeout > m.unicastMessageTimeout {
 			return LargeMsgUnicastTimeout
 		}
