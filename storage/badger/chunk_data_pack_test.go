@@ -86,7 +86,7 @@ func TestChunkDataPacks_StoreTwice(t *testing.T) {
 		transactions := badgerstorage.NewTransactions(&metrics.NoopCollector{}, db)
 		collections := badgerstorage.NewCollections(db, transactions)
 		store := badgerstorage.NewChunkDataPacks(&metrics.NoopCollector{}, db, collections, 1)
-		require.NoError(t, store.StoreMul(chunkDataPacks))
+		require.NoError(t, store.Store(chunkDataPacks))
 
 		for _, c := range chunkDataPacks {
 			c2, err := store.ByChunkID(c.ChunkID)
@@ -94,7 +94,7 @@ func TestChunkDataPacks_StoreTwice(t *testing.T) {
 			require.Equal(t, c, c2)
 		}
 
-		require.NoError(t, store.StoreMul(chunkDataPacks))
+		require.NoError(t, store.Store(chunkDataPacks))
 	})
 }
 

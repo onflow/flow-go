@@ -68,27 +68,13 @@ func (_m *ChunkDataPacks) ByChunkID(chunkID flow.Identifier) (*flow.ChunkDataPac
 	return r0, r1
 }
 
-// Store provides a mock function with given fields: c
-func (_m *ChunkDataPacks) Store(c *flow.ChunkDataPack) error {
-	ret := _m.Called(c)
-
-	var r0 error
-	if rf, ok := ret.Get(0).(func(*flow.ChunkDataPack) error); ok {
-		r0 = rf(c)
-	} else {
-		r0 = ret.Error(0)
-	}
-
-	return r0
-}
-
-// StoreMul provides a mock function with given fields: c
-func (_m *ChunkDataPacks) StoreMul(c []*flow.ChunkDataPack) error {
-	ret := _m.Called(c)
+// Store provides a mock function with given fields: cs
+func (_m *ChunkDataPacks) Store(cs []*flow.ChunkDataPack) error {
+	ret := _m.Called(cs)
 
 	var r0 error
 	if rf, ok := ret.Get(0).(func([]*flow.ChunkDataPack) error); ok {
-		r0 = rf(c)
+		r0 = rf(cs)
 	} else {
 		r0 = ret.Error(0)
 	}

@@ -48,15 +48,6 @@ func NewChunkDataPacks(collector module.CacheMetrics, db *badger.DB, collections
 	return &ch
 }
 
-func (ch *ChunkDataPacks) Store(c *flow.ChunkDataPack) error {
-	sc := toStoredChunkDataPack(c)
-	err := operation.RetryOnConflictTx(ch.db, transaction.Update, ch.byChunkIDCache.PutTx(sc.ChunkID, sc))
-	if err != nil {
-		return fmt.Errorf("could not store chunk datapack: %w", err)
-	}
-	return nil
-}
-
 func (ch *ChunkDataPacks) Remove(chunkID flow.Identifier) error {
 	err := operation.RetryOnConflict(ch.db.Update, operation.RemoveChunkDataPack(chunkID))
 	if err != nil {
@@ -79,9 +70,9 @@ func (ch *ChunkDataPacks) BatchStore(c *flow.ChunkDataPack, batch storage.BatchS
 	return operation.BatchInsertChunkDataPack(sc)(writeBatch)
 }
 
-// StoreMul stores multiple ChunkDataPacks cs keyed by their ChunkIDs in provided batch.
+// Store stores multiple ChunkDataPacks cs keyed by their ChunkIDs in a batch.
 // No errors are expected during normal operation, but it may return generic error
-func (ch *ChunkDataPacks) StoreMul(cs []*flow.ChunkDataPack) error {
+func (ch *ChunkDataPacks) Store(cs []*flow.ChunkDataPack) error {
 	batch := NewBatch(ch.db)
 	for _, c := range cs {
 		err := ch.BatchStore(c, batch)
