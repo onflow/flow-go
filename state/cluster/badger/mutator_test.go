@@ -43,7 +43,7 @@ type MutatorSuite struct {
 
 	// protocol state for reference blocks for transactions
 	protoState   protocol.FollowerState
-	protoGenesis *flow.Header
+	protoGenesis *flow.Block
 
 	state cluster.MutableState
 }
@@ -66,15 +66,17 @@ func (suite *MutatorSuite) SetupTest() {
 
 	// just bootstrap with a genesis block, we'll use this as reference
 	genesis, result, seal := unittest.BootstrapFixture(unittest.IdentityListFixture(5, unittest.WithAllRoles()))
+
 	// ensure we don't enter a new epoch for tests that build many blocks
 	result.ServiceEvents[0].Event.(*flow.EpochSetup).FinalView = genesis.Header.View + 100_000
+
 	seal.ResultID = result.ID()
 	qc := unittest.QuorumCertificateFixture(unittest.QCWithRootBlockID(genesis.ID()))
 	rootSnapshot, err := inmem.SnapshotFromBootstrapState(genesis, result, seal, qc)
 	require.NoError(suite.T(), err)
 	suite.epochCounter = rootSnapshot.Encodable().Epochs.Current.Counter
 
-	suite.protoGenesis = genesis.Header
+	suite.protoGenesis = genesis
 	state, err := pbadger.Bootstrap(
 		metrics,
 		suite.db,
@@ -366,14 +368,12 @@ func (suite *MutatorSuite) TestExtend_WithExpiredReferenceBlock() {
 	// the collection to be expired
 	parent := suite.protoGenesis
 	for i := 0; i < flow.DefaultTransactionExpiry+1; i++ {
-		next := unittest.BlockWithParentFixture(parent)
-		next.Payload.Guarantees = nil
-		next.SetPayload(*next.Payload)
+		next := unittest.BlockWithParentProtocolState(parent)
 		err := suite.protoState.ExtendCertified(context.Background(), next, unittest.CertifyBlock(next.Header))
 		suite.Require().Nil(err)
 		err = suite.protoState.Finalize(context.Background(), next.ID())
 		suite.Require().Nil(err)
-		parent = next.Header
+		parent = next
 	}
 
 	block := suite.Block()
@@ -417,9 +417,7 @@ func (suite *MutatorSuite) TestExtend_WithReferenceBlockFromDifferentEpoch() {
 // should be considered an unverifiable extension. It's possible that this reference
 // block has been finalized, we just haven't processed it yet.
 func (suite *MutatorSuite) TestExtend_WithUnfinalizedReferenceBlock() {
-	unfinalized := unittest.BlockWithParentFixture(suite.protoGenesis)
-	unfinalized.Payload.Guarantees = nil
-	unfinalized.SetPayload(*unfinalized.Payload)
+	unfinalized := unittest.BlockWithParentProtocolState(suite.protoGenesis)
 	err := suite.protoState.ExtendCertified(context.Background(), unfinalized, unittest.CertifyBlock(unfinalized.Header))
 	suite.Require().NoError(err)
 
@@ -436,12 +434,12 @@ func (suite *MutatorSuite) TestExtend_WithUnfinalizedReferenceBlock() {
 // to only use finalized blocks as reference, the proposer knowingly generated an invalid
 func (suite *MutatorSuite) TestExtend_WithOrphanedReferenceBlock() {
 	// create a block extending genesis which is not finalized
-	orphaned := unittest.BlockWithParentFixture(suite.protoGenesis)
+	orphaned := unittest.BlockWithParentProtocolState(suite.protoGenesis)
 	err := suite.protoState.ExtendCertified(context.Background(), orphaned, unittest.CertifyBlock(orphaned.Header))
 	suite.Require().NoError(err)
 
 	// create a block extending genesis (conflicting with previous) which is finalized
-	finalized := unittest.BlockWithParentFixture(suite.protoGenesis)
+	finalized := unittest.BlockWithParentProtocolState(suite.protoGenesis)
 	finalized.Payload.Guarantees = nil
 	finalized.SetPayload(*finalized.Payload)
 	err = suite.protoState.ExtendCertified(context.Background(), finalized, unittest.CertifyBlock(finalized.Header))

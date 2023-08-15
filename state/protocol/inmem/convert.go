@@ -342,6 +342,12 @@ func SnapshotFromBootstrapStateWithParams(
 		EpochCommitSafetyThreshold: epochCommitSafetyThreshold, // see protocol.Params for details
 	}
 
+	rootProtocolState := ProtocolStateForBootstrapState(setup, commit)
+	if rootProtocolState.ID() != root.Payload.ProtocolStateID {
+		return nil, fmt.Errorf("incorrect protocol state ID in root block, expected (%x) but got (%x)",
+			root.Payload.ProtocolStateID, rootProtocolState.ID())
+	}
+
 	snap := SnapshotFromEncodable(EncodableSnapshot{
 		Head:         root.Header,
 		LatestSeal:   seal,
@@ -356,9 +362,10 @@ func SnapshotFromBootstrapStateWithParams(
 		QuorumCertificate:   qc,
 		Epochs:              epochs,
 		Params:              params,
-		ProtocolState:       ProtocolStateForBootstrapState(setup, commit),
+		ProtocolState:       rootProtocolState,
 		SealedVersionBeacon: nil,
 	})
+
 	return snap, nil
 }
 

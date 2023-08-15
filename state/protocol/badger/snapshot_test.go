@@ -104,6 +104,7 @@ func TestHead(t *testing.T) {
 func TestSnapshot_Params(t *testing.T) {
 	participants := unittest.IdentityListFixture(5, unittest.WithAllRoles())
 	rootSnapshot := unittest.RootSnapshotFixture(participants)
+	rootProtocolStateID := getRootProtocolStateID(t, rootSnapshot)
 
 	expectedChainID := rootSnapshot.Params().ChainID()
 	expectedSporkID := rootSnapshot.Params().SporkID()
@@ -118,6 +119,7 @@ func TestSnapshot_Params(t *testing.T) {
 		const nBlocks = 10
 		for i := 0; i < nBlocks; i++ {
 			next := unittest.BlockWithParentFixture(head)
+			next.SetPayload(unittest.PayloadFixture(unittest.WithProtocolStateID(rootProtocolStateID)))
 			buildFinalizedBlock(t, state, next)
 			head = next.Header
 		}
@@ -905,6 +907,7 @@ func TestLatestSealedResult(t *testing.T) {
 func TestQuorumCertificate(t *testing.T) {
 	identities := unittest.IdentityListFixture(5, unittest.WithAllRoles())
 	rootSnapshot := unittest.RootSnapshotFixture(identities)
+	rootProtocolStateID := getRootProtocolStateID(t, rootSnapshot)
 	head, err := rootSnapshot.Head()
 	require.NoError(t, err)
 
@@ -914,7 +917,7 @@ func TestQuorumCertificate(t *testing.T) {
 
 			// create a block to query
 			block1 := unittest.BlockWithParentFixture(head)
-			block1.SetPayload(flow.EmptyPayload())
+			block1.SetPayload(unittest.PayloadFixture(unittest.WithProtocolStateID(rootProtocolStateID)))
 			err := state.Extend(context.Background(), block1)
 			require.NoError(t, err)
 
@@ -944,7 +947,7 @@ func TestQuorumCertificate(t *testing.T) {
 
 			// add a block so we aren't testing against root
 			block1 := unittest.BlockWithParentFixture(head)
-			block1.SetPayload(flow.EmptyPayload())
+			block1.SetPayload(unittest.PayloadFixture(unittest.WithProtocolStateID(rootProtocolStateID)))
 			certifyingQC := unittest.CertifyBlock(block1.Header)
 			err := state.ExtendCertified(context.Background(), block1, certifyingQC)
 			require.NoError(t, err)
@@ -967,15 +970,14 @@ func TestQuorumCertificate(t *testing.T) {
 		util.RunWithFullProtocolState(t, rootSnapshot, func(db *badger.DB, state *bprotocol.ParticipantState) {
 			// create a block to query
 			block1 := unittest.BlockWithParentFixture(head)
-			block1.SetPayload(flow.EmptyPayload())
+			block1.SetPayload(unittest.PayloadFixture(unittest.WithProtocolStateID(rootProtocolStateID)))
 			err := state.Extend(context.Background(), block1)
 			require.NoError(t, err)
 
 			_, err = state.AtBlockID(block1.ID()).QuorumCertificate()
 			assert.ErrorIs(t, err, storage.ErrNotFound)
 
-			block2 := unittest.BlockWithParentFixture(block1.Header)
-			block2.SetPayload(flow.EmptyPayload())
+			block2 := unittest.BlockWithParentProtocolState(block1)
 			err = state.Extend(context.Background(), block2)
 			require.NoError(t, err)
 

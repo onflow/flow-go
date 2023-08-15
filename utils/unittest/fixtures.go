@@ -330,9 +330,7 @@ func BlockWithParentFixture(parent *flow.Header) *flow.Block {
 }
 
 func BlockWithParentProtocolState(parent *flow.Block) *flow.Block {
-	payload := PayloadFixture(func(p *flow.Payload) {
-		p.ProtocolStateID = parent.Payload.ProtocolStateID
-	})
+	payload := PayloadFixture(WithProtocolStateID(parent.Payload.ProtocolStateID))
 	header := BlockHeaderWithParentFixture(parent.Header)
 	header.PayloadHash = payload.Hash()
 	return &flow.Block{
@@ -2160,7 +2158,7 @@ func BootstrapFixtureWithChainID(
 		WithDKGFromParticipants(participants),
 	)
 
-	root.Payload.ProtocolStateID = inmem.ProtocolStateForBootstrapState(setup, commit).ID()
+	root.SetPayload(flow.Payload{ProtocolStateID: inmem.ProtocolStateForBootstrapState(setup, commit).ID()})
 	stateCommit := GenesisStateCommitmentByChainID(chainID)
 
 	result := BootstrapExecutionResultFixture(root, stateCommit)
