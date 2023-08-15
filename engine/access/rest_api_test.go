@@ -149,28 +149,22 @@ func (suite *RestAPITestSuite) SetupTest() {
 		nil,
 		nil).Build()
 
-	backend := backend.New(suite.state,
-		suite.collClient,
-		nil,
-		suite.blocks,
-		suite.headers,
-		suite.collections,
-		suite.transactions,
-		nil,
-		suite.executionResults,
-		suite.chainID,
-		suite.metrics,
-		nil,
-		false,
-		0,
-		nil,
-		nil,
-		suite.log,
-		0,
-		nil,
-		backend.NewNodeCommunicator(false),
-		false,
-	)
+	bnd := backend.New(
+		backend.Params{
+			State:                suite.state,
+			CollectionRPC:        suite.collClient,
+			Blocks:               suite.blocks,
+			Headers:              suite.headers,
+			Collections:          suite.collections,
+			Transactions:         suite.transactions,
+			ExecutionResults:     suite.executionResults,
+			ChainID:              suite.chainID,
+			AccessMetrics:        suite.metrics,
+			MaxHeightRange:       0,
+			Log:                  suite.log,
+			SnapshotHistoryLimit: 0,
+			Communicator:         backend.NewNodeCommunicator(false),
+		})
 
 	rpcEngBuilder, err := rpc.NewBuilder(
 		suite.log,
@@ -180,8 +174,8 @@ func (suite *RestAPITestSuite) SetupTest() {
 		suite.metrics,
 		false,
 		suite.me,
-		backend,
-		backend,
+		bnd,
+		bnd,
 		suite.secureGrpcServer,
 		suite.unsecureGrpcServer,
 	)
