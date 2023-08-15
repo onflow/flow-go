@@ -472,21 +472,21 @@ func (e *Engine) sendRequests(participants flow.IdentifierList, ranges []chainsy
 }
 
 func (e *Engine) validateBatchRequestForALSP(id flow.Identifier, channel channels.Channel, resource interface{}) (*alsp.MisbehaviorReport, bool) {
-	return nil, true
+	return nil, false
 }
 
 func (e *Engine) validateBlockResponseForALSP(id flow.Identifier, channel channels.Channel, resource interface{}) (*alsp.MisbehaviorReport, bool) {
-	return nil, true
+	return nil, false
 }
 
 func (e *Engine) validateRangeRequestForALSP(id flow.Identifier, channel channels.Channel, resource interface{}) (*alsp.MisbehaviorReport, bool) {
-	return nil, true
+	return nil, false
 }
 
 func (e *Engine) validateSyncRequestForALSP(id flow.Identifier, channel channels.Channel, resource interface{}) (*alsp.MisbehaviorReport, bool) {
-	return nil, true
+	return nil, false
 }
 
 func (e *Engine) validateSyncResponseForALSP(id flow.Identifier, channel channels.Channel, resource interface{}) (*alsp.MisbehaviorReport, bool) {
-	return nil, true
+	return nil, false
 }

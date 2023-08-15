@@ -180,9 +180,9 @@ func (ss *SyncSuite) SetupTest() {
 	ss.e = e
 }
 
-// TestOnSyncRequest_WithinTolerance tests that a sync request that's within tolerance of the receiver doesn't trigger
+// TestOnSyncRequest_LowerThanReceiver_WithinTolerance tests that a sync request that's within tolerance of the receiver doesn't trigger
 // a response, even if request height is lower than receiver.
-func (ss *SyncSuite) TestOnSyncRequest_WithinTolerance() {
+func (ss *SyncSuite) TestOnSyncRequest_LowerThanReceiver_WithinTolerance() {
 	// generate origin and request message
 	originID := unittest.IdentifierFixture()
 	req := &messages.SyncRequest{
@@ -200,9 +200,9 @@ func (ss *SyncSuite) TestOnSyncRequest_WithinTolerance() {
 	ss.core.AssertExpectations(ss.T())
 }
 
-// TestOnSyncRequest_HeightHigherThanReceiver tests that a sync request that's higher than the receiver's height doesn't
+// TestOnSyncRequest_HigherThanReceiver_OutsideTolerance tests that a sync request that's higher than the receiver's height doesn't
 // trigger a response, even if outside tolerance.
-func (ss *SyncSuite) TestOnSyncRequest_HeightHigherThanReceiver() {
+func (ss *SyncSuite) TestOnSyncRequest_HigherThanReceiver_OutsideTolerance() {
 	// generate origin and request message
 	originID := unittest.IdentifierFixture()
 	req := &messages.SyncRequest{
@@ -221,9 +221,9 @@ func (ss *SyncSuite) TestOnSyncRequest_HeightHigherThanReceiver() {
 	ss.core.AssertExpectations(ss.T())
 }
 
-// TestOnSyncRequest_HeightLowerThanReceiver_OutsideTolerance tests that a sync request that's outside tolerance and
+// TestOnSyncRequest_LowerThanReceiver_OutsideTolerance tests that a sync request that's outside tolerance and
 // lower than the receiver's height triggers a response.
-func (ss *SyncSuite) TestOnSyncRequest_HeightLowerThanReceiver_OutsideTolerance() {
+func (ss *SyncSuite) TestOnSyncRequest_LowerThanReceiver_OutsideTolerance() {
 
 	// generate origin and request message
 	originID := unittest.IdentifierFixture()
