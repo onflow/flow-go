@@ -1,21 +1,32 @@
 package migrations
 
 import (
+	"context"
 	"fmt"
 
+	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 
+	"github.com/onflow/cadence/runtime/common"
+
+	"github.com/onflow/flow-go/cmd/util/ledger/util"
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/model/flow"
 )
 
-func MigrateAccountUsage(payloads []ledger.Payload, nWorker int) ([]ledger.Payload, error) {
-	return MigrateByAccount(AccountUsageMigrator{}, payloads, nWorker)
+func MigrateAccountUsage(log zerolog.Logger, nWorker int) func([]ledger.Payload) ([]ledger.Payload, error) {
+	return CreateAccountBasedMigration(
+		log,
+		func(allPayloads []ledger.Payload, nWorker int) (AccountMigrator, error) {
+			return AccountUsageMigrator{}, nil
+		},
+		nWorker,
+	)
 }
 
 func payloadSize(key ledger.Key, payload ledger.Payload) (uint64, error) {
-	id, err := KeyToRegisterID(key)
+	id, err := util.KeyToRegisterID(key)
 	if err != nil {
 		return 0, err
 	}
@@ -31,7 +42,7 @@ type AccountUsageMigrator struct{}
 
 // AccountUsageMigrator iterate through each payload, and calculate the storage usage
 // and update the accoutns status with the updated storage usage
-func (m AccountUsageMigrator) MigratePayloads(account string, payloads []ledger.Payload) ([]ledger.Payload, error) {
+func (m AccountUsageMigrator) MigratePayloads(ctx context.Context, address common.Address, payloads []ledger.Payload) ([]ledger.Payload, error) {
 	var status *environment.AccountStatus
 	var statusIndex int
 	totalSize := uint64(0)
@@ -62,7 +73,7 @@ func (m AccountUsageMigrator) MigratePayloads(account string, payloads []ledger.
 	}
 
 	if status == nil {
-		return nil, fmt.Errorf("could not find account status for account %v", account)
+		return nil, fmt.Errorf("could not find account status for account %v", address.Hex())
 	}
 
 	// update storage used

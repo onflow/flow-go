@@ -9,6 +9,7 @@ import (
 	"github.com/rs/zerolog"
 	"go.uber.org/atomic"
 
+	migrators "github.com/onflow/flow-go/cmd/util/ledger/migrations"
 	"github.com/onflow/flow-go/cmd/util/ledger/reporters"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/hash"
@@ -82,7 +83,12 @@ func extractExecutionState(
 		<-compactor.Done()
 	}()
 
-	var migrations []ledger.Migration
+	var migrations = []ledger.Migration{
+		migrators.MigrateAtreeRegisters(
+			log,
+			reporters.NewReportFileWriterFactory(dir, log),
+			nWorker),
+	}
 	newState := ledger.State(targetHash)
 
 	// migrate the trie if there are migrations

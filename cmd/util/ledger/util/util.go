@@ -1,12 +1,14 @@
-package migrations
+package util
 
 import (
 	"fmt"
 
 	"github.com/onflow/atree"
+	"github.com/onflow/cadence/runtime/common"
 
 	"github.com/onflow/flow-go/engine/execution/state"
 	"github.com/onflow/flow-go/fvm/environment"
+	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -24,7 +26,7 @@ func KeyToRegisterID(key ledger.Key) (flow.RegisterID, error) {
 	), nil
 }
 
-func registerIDToKey(registerID flow.RegisterID) ledger.Key {
+func RegisterIDToKey(registerID flow.RegisterID) ledger.Key {
 	newKey := ledger.Key{}
 	newKey.KeyParts = []ledger.KeyPart{
 		{
@@ -89,3 +91,41 @@ func (a *AccountsAtreeLedger) AllocateStorageIndex(owner []byte) (atree.StorageI
 	}
 	return v, nil
 }
+
+type PayloadSnapshot struct {
+	Payloads map[flow.RegisterID]flow.RegisterValue
+}
+
+var _ snapshot.StorageSnapshot = (*PayloadSnapshot)(nil)
+
+func NewPayloadSnapshot(payloads []ledger.Payload) (*PayloadSnapshot, error) {
+	l := &PayloadSnapshot{
+		Payloads: make(map[flow.RegisterID][]byte, len(payloads)),
+	}
+	for _, payload := range payloads {
+		key, err := payload.Key()
+		if err != nil {
+			return nil, err
+		}
+		id, err := KeyToRegisterID(key)
+		if err != nil {
+			return nil, err
+		}
+		l.Payloads[id] = payload.Value()
+	}
+	return l, nil
+}
+
+func (p PayloadSnapshot) Get(id flow.RegisterID) (flow.RegisterValue, error) {
+	value := p.Payloads[id]
+	return value, nil
+}
+
+// NopMemoryGauge is a no-op implementation of the MemoryGauge interface
+type NopMemoryGauge struct{}
+
+func (n NopMemoryGauge) MeterMemory(common.MemoryUsage) error {
+	return nil
+}
+
+var _ common.MemoryGauge = (*NopMemoryGauge)(nil)
