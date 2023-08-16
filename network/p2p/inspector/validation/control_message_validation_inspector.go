@@ -216,7 +216,7 @@ func (c *ControlMsgValidationInspector) inspectIWant(iWants []*pubsub_pb.Control
 		c.logger.Warn().
 			Uint("sample_size", sampleSize).
 			Uint("max_sample_size", c.config.IWantRPCInspectionConfig.MaxSampleSize).
-			Str(logging.KeySuspicious, "true"). // max sample size is suspicious
+			Str(logging.KeySuspicious, "true").         // max sample size is suspicious
 			Str(logging.KeyNetworkingSecurity, "true"). // zero sample size is a security hole
 			Msg("zero or invalid sample size, using default max sample size")
 		sampleSize = c.config.IWantRPCInspectionConfig.MaxSampleSize
@@ -233,7 +233,7 @@ func (c *ControlMsgValidationInspector) inspectIWant(iWants []*pubsub_pb.Control
 
 	err := c.sampleCtrlMessages(p2pmsg.CtrlMsgIWant, numOfIWants, sampleSize, swap)
 	if err != nil {
-		return fmt.Errorf("failed to sample iwant messages: %w", err)
+		c.logger.Fatal().Err(fmt.Errorf("failed to sample iwant messages: %w", err)).Msg("irrecoverable error encountered while sampling iwant control messages")
 	}
 
 	tracker := make(duplicateStrTracker)
@@ -405,13 +405,17 @@ func (c *ControlMsgValidationInspector) processInspectMsgReq(req *InspectMsgRequ
 		c.metrics.AsyncProcessingFinished(req.validationConfig.ControlMsg.String(), time.Since(start))
 	}()
 
+	count := c.getCtrlMsgCount(req.validationConfig.ControlMsg, req.ctrlMsg)
+
 	// iWant validation uses new sample size validation. This will be updated for all other control message types.
 	switch req.validationConfig.ControlMsg {
 	case p2pmsg.CtrlMsgIWant:
-		return c.inspectIWant(req.ctrlMsg.GetIwant())
+		if err := c.inspectIWant(req.ctrlMsg.GetIwant()); err != nil {
+			c.logAndDistributeAsyncInspectErr(req, count, err)
+		}
+		return nil
 	}
 
-	count := c.getCtrlMsgCount(req.validationConfig.ControlMsg, req.ctrlMsg)
 	lg := c.logger.With().
 		Str("peer_id", req.Peer.String()).
 		Str("ctrl_msg_type", string(req.validationConfig.ControlMsg)).
@@ -670,4 +674,22 @@ func (c *ControlMsgValidationInspector) checkClusterPrefixHardThreshold(nodeID f
 			Msg("unexpected irrecoverable error encountered while loading the cluster prefixed control message gauge during hard threshold check")
 	}
 	return gauge <= c.config.ClusterPrefixHardThreshold
+}
+
+// logAndDistributeErr logs the provided error and attempts to disseminate an invalid control message validation notification for the error.
+func (c *ControlMsgValidationInspector) logAndDistributeAsyncInspectErr(req *InspectMsgRequest, count uint64, err error) {
+	lg := c.logger.With().
+		Bool(logging.KeySuspicious, true).
+		Str("peer_id", req.Peer.String()).
+		Str("ctrl_msg_type", string(req.validationConfig.ControlMsg)).
+		Uint64("ctrl_msg_count", count).Logger()
+
+	lg.Error().Err(err).Msg("rpc control message async inspection failed")
+
+	err = c.distributor.Distribute(p2p.NewInvalidControlMessageNotification(req.Peer, req.validationConfig.ControlMsg, count, err))
+	if err != nil {
+		lg.Error().
+			Err(err).
+			Msg("failed to distribute invalid control message notification")
+	}
 }
