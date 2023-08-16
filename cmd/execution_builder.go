@@ -664,6 +664,12 @@ func (exeNode *ExecutionNode) LoadExecutionState(
 	if err != nil {
 		return nil, err
 	}
+	exeNode.builder.ShutdownFunc(func() error {
+		if err := chunkDataPackDB.Close(); err != nil {
+			return fmt.Errorf("error closing chunk data pack database: %w", err)
+		}
+		return nil
+	})
 	chunkDataPacks := storage.NewChunkDataPacks(node.Metrics.Cache, chunkDataPackDB, node.Storage.Collections, exeNode.exeConf.chunkDataPackCacheSize)
 
 	// Needed for gRPC server, make sure to assign to main scoped vars

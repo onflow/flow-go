@@ -298,6 +298,18 @@ func (s *state) SaveExecutionResults(
 	// but it's the closest thing to atomicity we could have
 	batch := badgerstorage.NewBatch(s.db)
 
+	defer func() {
+		// Rollback if an error occurs during batch operations
+		if err != nil {
+			chunks := result.AllChunkDataPacks()
+			chunkIDs := make([]flow.Identifier, 0, len(chunks))
+			for _, chunk := range chunks {
+				chunkIDs = append(chunkIDs, chunk.ID())
+			}
+			s.chunkDataPacks.Remove(chunkIDs)
+		}
+	}()
+
 	err = s.events.BatchStore(blockID, []flow.EventsList{result.AllEvents()}, batch)
 	if err != nil {
 		return fmt.Errorf("cannot store events: %w", err)
