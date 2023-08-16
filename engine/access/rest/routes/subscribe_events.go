@@ -69,6 +69,10 @@ func SubscribeEvents(
 	}
 }
 
+// writeEvents use for writes events and pings to the WebSocket connection. It listens to a subscription's channel for
+// events and writes them to the connection. If an error occurs or the subscription channel is closed, it handles the
+// error or termination accordingly.
+// The function uses a ticker to periodically send ping messages to the client to maintain the connection.
 func writeEvents(
 	sub state_stream.Subscription,
 	h SubscribeHandler,

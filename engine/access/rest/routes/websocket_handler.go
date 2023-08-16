@@ -3,14 +3,14 @@ package routes
 import (
 	"errors"
 	"fmt"
-	"github.com/gorilla/websocket"
-	"github.com/onflow/flow-go/engine/access/rest/models"
 	"net/http"
 	"sync/atomic"
 	"time"
 
+	"github.com/gorilla/websocket"
 	"github.com/rs/zerolog"
 
+	"github.com/onflow/flow-go/engine/access/rest/models"
 	"github.com/onflow/flow-go/engine/access/rest/request"
 	"github.com/onflow/flow-go/engine/access/state_stream"
 	"github.com/onflow/flow-go/model/flow"
@@ -27,15 +27,19 @@ const (
 	writeWait = 10 * time.Second
 )
 
+// SubscribeHandler holds the necessary components and parameters for handling a WebSocket subscription.
+// It manages the communication between the server and the WebSocket client for subscribing.
 type SubscribeHandler struct {
-	request    *request.Request
-	respWriter http.ResponseWriter
-	conn       *websocket.Conn
-
-	api        state_stream.API
-	maxStreams int32
+	request    *request.Request    // the incoming HTTP request containing the subscription details.
+	respWriter http.ResponseWriter // the HTTP response writer to communicate back to the client.
+	conn       *websocket.Conn     // the established WebSocket connection for communication with the client.
+	api        state_stream.API    // the state_stream.API instance for managing event subscriptions.
+	maxStreams int32               // the maximum number of streams allowed.
 }
 
+// SetReadWriteDeadline used to set read and write deadlines for WebSocket connections. These methods allow you to
+// specify a time limit for reading from or writing to a WebSocket connection. If the operation (reading or writing)
+// takes longer than the specified deadline, the connection will be closed.
 func (h *SubscribeHandler) SetReadWriteDeadline() error {
 	err := h.conn.SetWriteDeadline(time.Now().Add(writeWait)) // Set the initial write deadline for the first ping message
 	if err != nil {
@@ -48,8 +52,7 @@ func (h *SubscribeHandler) SetReadWriteDeadline() error {
 	return nil
 }
 
-// SubscribeHandlerFunc is a function that contains endpoint handling logic for subscribes,
-// it fetches necessary resources and returns an error.
+// SubscribeHandlerFunc is a function that contains endpoint handling logic for subscribes, fetches necessary resources
 type SubscribeHandlerFunc func(
 	logger zerolog.Logger,
 	subscribeHandler SubscribeHandler,

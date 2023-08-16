@@ -25,7 +25,6 @@ func NewServer(serverAPI access.API,
 	maxGlobalStreams uint32,
 ) (*http.Server, error) {
 	router, err := routes.NewRouter(serverAPI, logger, chain, restCollector, stateStreamApi, eventFilterConfig, maxGlobalStreams)
-
 	if err != nil {
 		return nil, err
 	}

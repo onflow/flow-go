@@ -48,7 +48,7 @@ func TestGetAccountKeyByIndex(t *testing.T) {
 
 		expected := expectedAccountKeyResponse(account)
 
-		assertOKResponse(t, req, expected, backend)
+		assertOKResponse(t, req, expected, backend, nil)
 		mocktestify.AssertExpectationsForObjects(t, backend)
 	})
 
@@ -69,7 +69,7 @@ func TestGetAccountKeyByIndex(t *testing.T) {
 
 		expected := expectedAccountKeyResponse(account)
 
-		assertOKResponse(t, req, expected, backend)
+		assertOKResponse(t, req, expected, backend, nil)
 		mocktestify.AssertExpectationsForObjects(t, backend)
 	})
 
@@ -97,7 +97,7 @@ func TestGetAccountKeyByIndex(t *testing.T) {
           }
 		`, statusCode, index)
 
-		assertResponse(t, req, statusCode, expected, backend)
+		assertResponse(t, req, statusCode, expected, backend, nil)
 		mocktestify.AssertExpectationsForObjects(t, backend)
 	})
 
@@ -125,7 +125,7 @@ func TestGetAccountKeyByIndex(t *testing.T) {
           }
 		`, statusCode, index)
 
-		assertResponse(t, req, statusCode, expected, backend)
+		assertResponse(t, req, statusCode, expected, backend, nil)
 		mocktestify.AssertExpectationsForObjects(t, backend)
 	})
 
@@ -154,7 +154,7 @@ func TestGetAccountKeyByIndex(t *testing.T) {
           }
 		`, statusCode, account.Address)
 
-		assertResponse(t, req, statusCode, expected, backend)
+		assertResponse(t, req, statusCode, expected, backend, nil)
 		mocktestify.AssertExpectationsForObjects(t, backend)
 	})
 
@@ -183,7 +183,7 @@ func TestGetAccountKeyByIndex(t *testing.T) {
           }
 		`, statusCode, account.Address)
 
-		assertResponse(t, req, statusCode, expected, backend)
+		assertResponse(t, req, statusCode, expected, backend, nil)
 		mocktestify.AssertExpectationsForObjects(t, backend)
 	})
 
@@ -198,8 +198,8 @@ func TestGetAccountKeyByIndex(t *testing.T) {
 
 		expected := expectedAccountKeyResponse(account)
 
-		assertOKResponse(t, req, expected, backend)
-		mocktestify.AssertExpectationsForObjects(t, backend)
+		assertOKResponse(t, req, expected, backend, nil)
+		mocktestify.AssertExpectationsForObjects(t, backend, nil)
 	})
 
 	t.Run("get key by address and index at missing block", func(t *testing.T) {
@@ -222,7 +222,7 @@ func TestGetAccountKeyByIndex(t *testing.T) {
 			  }
 			`, statusCode, finalHeight)
 
-		assertResponse(t, req, statusCode, expected, backend)
+		assertResponse(t, req, statusCode, expected, backend, nil)
 		mocktestify.AssertExpectationsForObjects(t, backend)
 	})
 
@@ -261,7 +261,7 @@ func TestGetAccountKeyByIndex(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			req, _ := http.NewRequest("GET", test.url, nil)
-			rr, err := executeRequest(req, backend)
+			rr, err := executeRequest(req, backend, nil)
 			assert.NoError(t, err)
 
 			assert.Equal(t, http.StatusBadRequest, rr.Code)

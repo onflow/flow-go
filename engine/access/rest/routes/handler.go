@@ -41,8 +41,9 @@ func NewHandler(
 		backend:        backend,
 		apiHandlerFunc: handlerFunc,
 		linkGenerator:  generator,
+		HttpHandler:    NewHttpHandler(logger, chain),
 	}
-	handler.HttpHandler = NewHttpHandler(logger, chain)
+
 	return handler
 }
 

@@ -439,7 +439,7 @@ func (builder *FlowAccessNodeBuilder) BuildConsensusFollower() *FlowAccessNodeBu
 	return builder
 }
 
-func (builder *FlowAccessNodeBuilder) BuildStateStreamComponentsAndModules() *FlowAccessNodeBuilder {
+func (builder *FlowAccessNodeBuilder) BuildStateStreamPipeline() *FlowAccessNodeBuilder {
 	var ds *badger.Datastore
 	var bs network.BlobService
 	var processedBlockHeight storage.ConsumerProgress
@@ -632,7 +632,6 @@ func (builder *FlowAccessNodeBuilder) BuildStateStreamComponentsAndModules() *Fl
 				broadcaster,
 				builder.executionDataConfig.InitialBlockHeight,
 				highestAvailableHeight)
-
 			if err != nil {
 				return nil, fmt.Errorf("could not create state stream backend: %w", err)
 			}
@@ -940,7 +939,7 @@ func (builder *FlowAccessNodeBuilder) enqueueRelayNetwork() {
 
 func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 	if builder.executionDataSyncEnabled {
-		builder.BuildStateStreamComponentsAndModules()
+		builder.BuildStateStreamPipeline()
 	}
 
 	builder.
