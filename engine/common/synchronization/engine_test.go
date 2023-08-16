@@ -229,6 +229,8 @@ func (ss *SyncSuite) TestOnSyncRequest_HigherThanReceiver_OutsideTolerance() {
 }
 
 func (ss *SyncSuite) TestOnSyncRequest_HigherThanReceiver_OutsideTolerance_Load() {
+	load := 1000
+
 	// generate origin and request message
 	originID := unittest.IdentifierFixture()
 	req := &messages.SyncRequest{
@@ -236,48 +238,18 @@ func (ss *SyncSuite) TestOnSyncRequest_HigherThanReceiver_OutsideTolerance_Load(
 		Height: 0,
 	}
 
-	load := 30
-
-	// create channel to limit goroutines
-	//limiter := make(chan struct{}, 10)
-
-	// create channel to count results
-	results := make(chan bool, load)
-
-	//req.Height = ss.head.Height + 1
-	//ss.core.On("HandleHeight", ss.head, req.Height)
-	//ss.core.On("WithinTolerance", ss.head, req.Height).Return(false)
-
-	// define custom matcher
-	// Define a custom matcher function that takes a Person and returns true if the Name is “John”
-	handleHeightMatcher := mock.MatchedBy(func(head, height int) bool {
-		return p.Name == “John”
-	})
-
-	// loop over goroutines to simulate load
 	for i := 0; i < load; i++ {
+		ss.T().Logf("i: %d", i)
 		// if request height is higher than local finalized, we should not respond
-		go func() {
-
-			req.Height = ss.head.Height + 1
-			ss.core.On("HandleHeight", ss.head, req.Height)
-			ss.core.On("WithinTolerance", ss.head, req.Height).Return(false)
-
-			err := ss.e.requestHandler.onSyncRequest(originID, req)
-			ss.Assert().NoError(err, "same height sync request should pass")
-			ss.con.AssertNotCalled(ss.T(), "Unicast", mock.Anything, mock.Anything)
-			results <- true
-		}()
+		req.Height = ss.head.Height + 1
+		ss.core.On("HandleHeight", ss.head, req.Height)
+		ss.core.On("WithinTolerance", ss.head, req.Height).Return(false)
+		err := ss.e.requestHandler.onSyncRequest(originID, req)
+		ss.Assert().NoError(err, "same height sync request should pass")
+		ss.con.AssertNotCalled(ss.T(), "Unicast", mock.Anything, mock.Anything)
 	}
 
-	// wait for all goroutines to finish
-	for i := 0; i < load; i++ {
-		//<-results
-		results <- true
-		ss.core.AssertExpectations(ss.T())
-	}
-
-	close(results)
+	ss.core.AssertExpectations(ss.T())
 }
 
 // TestOnSyncRequest_LowerThanReceiver_OutsideTolerance tests that a sync request that's outside tolerance and
