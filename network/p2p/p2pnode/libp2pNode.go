@@ -343,8 +343,7 @@ func (n *Node) unsubscribeTopic(topic channels.Topic) error {
 // All errors returned from this function can be considered benign.
 func (n *Node) Publish(ctx context.Context, msgScope *flownet.OutgoingMessageScope) error {
 	lg := n.logger.With().
-		Str("channel", msgScope.Channel().String()).
-		Hex("spork_id", logging.ID(msgScope.SporkId())).
+		Str("topic", msgScope.Topic().String()).
 		Interface("proto_message", msgScope.Proto()).
 		Str("payload_type", msgScope.PayloadType()).
 		Int("message_size", msgScope.Size()).Logger()
@@ -363,16 +362,13 @@ func (n *Node) Publish(ctx context.Context, msgScope *flownet.OutgoingMessageSco
 		return fmt.Errorf("message size %d exceeds configured max message size %d", msgSize, DefaultMaxPubSubMsgSize)
 	}
 
-	topic := channels.TopicFromChannel(msgScope.Channel(), msgScope.SporkId())
-	lg = lg.With().Str("topic", topic.String()).Logger()
-
-	ps, found := n.topics[topic]
+	ps, found := n.topics[msgScope.Topic()]
 	if !found {
-		return fmt.Errorf("could not find topic (%s)", topic)
+		return fmt.Errorf("could not find topic (%s)", msgScope.Topic())
 	}
 	err = ps.Publish(ctx, data)
 	if err != nil {
-		return fmt.Errorf("could not publish to topic (%s): %w", topic, err)
+		return fmt.Errorf("could not publish to topic (%s): %w", msgScope.Topic(), err)
 	}
 
 	lg.Debug().Msg("published message to topic")

@@ -40,6 +40,7 @@ var NotEjectedFilter = filter.Not(filter.Ejected)
 type Network struct {
 	sync.RWMutex
 	*component.ComponentManager
+	sporkId                     flow.Identifier
 	identityProvider            module.IdentityProvider
 	logger                      zerolog.Logger
 	codec                       network.Codec
@@ -99,6 +100,7 @@ type NetworkConfig struct {
 	ReceiveCache        *netcache.ReceiveCache
 	ConduitFactory      network.ConduitFactory
 	AlspCfg             *alspmgr.MisbehaviorReportManagerConfig
+	SporkId             flow.Identifier
 }
 
 // NetworkConfigOption is a function that can be used to override network config parmeters.
@@ -167,6 +169,7 @@ func NewNetwork(param *NetworkConfig, opts ...NetworkOption) (*Network, error) {
 		registerEngineRequests:      make(chan *registerEngineRequest),
 		registerBlobServiceRequests: make(chan *registerBlobServiceRequest),
 		misbehaviorReportManager:    misbehaviorMngr,
+		sporkId:                     param.SporkId,
 	}
 
 	for _, opt := range opts {
@@ -428,7 +431,7 @@ func (n *Network) UnicastOnChannel(channel channels.Channel, payload interface{}
 
 	msg, err := network.NewOutgoingScope(
 		flow.IdentifierList{targetID},
-		channel,
+		channels.TopicFromChannel(channel, n.sporkId),
 		payload,
 		n.codec.Encode,
 		message.ProtocolTypeUnicast)
@@ -436,14 +439,14 @@ func (n *Network) UnicastOnChannel(channel channels.Channel, payload interface{}
 		return fmt.Errorf("could not generate outgoing message scope for unicast: %w", err)
 	}
 
-	n.metrics.UnicastMessageSendingStarted(msg.Channel().String())
-	defer n.metrics.UnicastMessageSendingCompleted(msg.Channel().String())
+	n.metrics.UnicastMessageSendingStarted(channel.String())
+	defer n.metrics.UnicastMessageSendingCompleted(channel.String())
 	err = n.mw.SendDirect(msg)
 	if err != nil {
 		return fmt.Errorf("failed to send message to %x: %w", targetID, err)
 	}
 
-	n.metrics.OutboundMessageSent(msg.Size(), msg.Channel().String(), message.ProtocolTypeUnicast.String(), msg.PayloadType())
+	n.metrics.OutboundMessageSent(msg.Size(), channel.String(), message.ProtocolTypeUnicast.String(), msg.PayloadType())
 
 	return nil
 }
@@ -506,7 +509,12 @@ func (n *Network) sendOnChannel(channel channels.Channel, msg interface{}, targe
 		Msg("sending new message on channel")
 
 	// generate network message (encoding) based on list of recipients
-	scope, err := network.NewOutgoingScope(targetIDs, channel, msg, n.codec.Encode, message.ProtocolTypePubSub)
+	scope, err := network.NewOutgoingScope(
+		targetIDs,
+		channels.TopicFromChannel(channel, n.sporkId),
+		msg,
+		n.codec.Encode,
+		message.ProtocolTypePubSub)
 	if err != nil {
 		return fmt.Errorf("failed to generate outgoing message scope %s: %w", channel, err)
 	}
@@ -518,7 +526,7 @@ func (n *Network) sendOnChannel(channel channels.Channel, msg interface{}, targe
 		return fmt.Errorf("failed to send message on channel %s: %w", channel, err)
 	}
 
-	n.metrics.OutboundMessageSent(scope.Size(), scope.Channel().String(), message.ProtocolTypePubSub.String(), scope.PayloadType())
+	n.metrics.OutboundMessageSent(scope.Size(), channel.String(), message.ProtocolTypePubSub.String(), scope.PayloadType())
 
 	return nil
 }

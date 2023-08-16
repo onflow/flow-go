@@ -237,7 +237,31 @@ func TestOneToKCrosstalkPrevention(t *testing.T) {
 	time.Sleep(time.Second)
 
 	// assert that node 1 can successfully send a message to node 2 via PubSub
-	testOneToKMessagingSucceeds(ctx, t, node1, sub2, topicBeforeSpork)
+	outgoingMessageScope, err := network.NewOutgoingScope(
+		flow.IdentifierList{unittest.IdentifierFixture()},
+		topicBeforeSpork,
+		&libp2pmessage.TestMessage{
+			Text: string("hello"),
+		},
+		unittest.NetworkCodec().Encode,
+		message.ProtocolTypePubSub)
+	require.NoError(t, err)
+
+	expectedReceivedData, err := outgoingMessageScope.Proto().Marshal()
+	require.NoError(t, err)
+
+	// send a 1-k message from source node to destination node
+	err = node1.Publish(ctx, outgoingMessageScope)
+	require.NoError(t, err)
+
+	// assert that the message is received by the destination node
+	unittest.AssertReturnsBefore(t, func() {
+		msg, err := sub2.Next(ctx)
+		require.NoError(t, err)
+		assert.Equal(t, expectedReceivedData, msg.Data)
+	},
+		// libp2p hearbeats every second, so at most the message should take 1 second
+		2*time.Second)
 
 	// new root id after spork
 	rootIDAfterSpork := unittest.IdentifierFixture()
@@ -248,13 +272,33 @@ func TestOneToKCrosstalkPrevention(t *testing.T) {
 	// mimic that node1 is now part of the new spork while node2 remains on the old spork
 	// by unsubscribing node1 from 'topicBeforeSpork' and subscribing it to 'topicAfterSpork'
 	// and keeping node2 subscribed to topic 'topicBeforeSpork'
-	err = node1.Unsubscribe(topicBeforeSpork)
+	err = node1.Unsubscribe(channels.TestNetworkChannel)
 	require.NoError(t, err)
 	_, err = node1.Subscribe(topicAfterSpork, topicValidator)
 	require.NoError(t, err)
 
 	// assert that node 1 can no longer send a message to node 2 via PubSub
-	testOneToKMessagingFails(ctx, t, node1, sub2, topicAfterSpork)
+	outgoingMessageScope, err = network.NewOutgoingScope(
+		flow.IdentifierList{id2.NodeID},
+		topicAfterSpork,
+		&libp2pmessage.TestMessage{
+			Text: string("hello"),
+		},
+		unittest.NetworkCodec().Encode,
+		message.ProtocolTypePubSub)
+	require.NoError(t, err)
+
+	// send a 1-k message from source node to destination node
+	err = node1.Publish(ctx, outgoingMessageScope)
+	require.NoError(t, err)
+
+	// assert that the message is never received by the destination node
+	_ = unittest.RequireNeverReturnBefore(t, func() {
+		_, _ = sub2.Next(ctx)
+	},
+		// libp2p hearbeats every second, so at most the message should take 1 second
+		2*time.Second,
+		"nodes on different sporks were able to communicate")
 }
 
 func testOneToOneMessagingSucceeds(t *testing.T, sourceNode p2p.LibP2PNode, peerInfo peer.AddrInfo) {
@@ -274,69 +318,4 @@ func testOneToOneMessagingFails(t *testing.T, sourceNode p2p.LibP2PNode, peerInf
 	assert.Error(t, err)
 	// assert that it failed with the expected error
 	assert.Regexp(t, ".*failed to negotiate security protocol.*|.*protocols not supported.*", err)
-}
-
-func testOneToKMessagingSucceeds(ctx context.Context,
-	t *testing.T,
-	sourceNode p2p.LibP2PNode,
-	dstnSub p2p.Subscription,
-	topic channels.Topic) {
-
-	sentMsg, err := network.NewOutgoingScope(
-		flow.IdentifierList{unittest.IdentifierFixture()},
-		channels.TestNetworkChannel,
-		&libp2pmessage.TestMessage{
-			Text: string("hello"),
-		},
-		unittest.NetworkCodec().Encode,
-		message.ProtocolTypePubSub)
-	require.NoError(t, err)
-
-	sentData, err := sentMsg.Proto().Marshal()
-	require.NoError(t, err)
-
-	// send a 1-k message from source node to destination node
-	err = sourceNode.Publish(ctx, topic, sentData)
-	require.NoError(t, err)
-
-	// assert that the message is received by the destination node
-	unittest.AssertReturnsBefore(t, func() {
-		msg, err := dstnSub.Next(ctx)
-		require.NoError(t, err)
-		assert.Equal(t, sentData, msg.Data)
-	},
-		// libp2p hearbeats every second, so at most the message should take 1 second
-		2*time.Second)
-}
-
-func testOneToKMessagingFails(ctx context.Context,
-	t *testing.T,
-	sourceNode p2p.LibP2PNode,
-	dstnSub p2p.Subscription,
-	topic channels.Topic) {
-
-	sentMsg, err := network.NewOutgoingScope(
-		flow.IdentifierList{unittest.IdentifierFixture()},
-		channels.TestNetworkChannel,
-		&libp2pmessage.TestMessage{
-			Text: string("hello"),
-		},
-		unittest.NetworkCodec().Encode,
-		message.ProtocolTypePubSub)
-	require.NoError(t, err)
-
-	sentData, err := sentMsg.Proto().Marshal()
-	require.NoError(t, err)
-
-	// send a 1-k message from source node to destination node
-	err = sourceNode.Publish(ctx, topic, sentData)
-	require.NoError(t, err)
-
-	// assert that the message is never received by the destination node
-	_ = unittest.RequireNeverReturnBefore(t, func() {
-		_, _ = dstnSub.Next(ctx)
-	},
-		// libp2p hearbeats every second, so at most the message should take 1 second
-		2*time.Second,
-		"nodes on different sporks were able to communicate")
 }
