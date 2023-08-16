@@ -19,6 +19,77 @@ import (
 	"github.com/onflow/flow-go/network/p2p/unicast/protocols"
 )
 
+// Node single node management capabilities
+type Node interface {
+	// Start the libp2p node.
+	Start(ctx irrecoverable.SignalerContext)
+	// Stop terminates the libp2p node.
+	Stop() error
+	// GetIPPort returns the IP and Port the libp2p node is listening on.
+	GetIPPort() (string, string, error)
+	// Host returns pointer to host object of node.
+	Host() host.Host
+}
+
+// PeerManagement set of node traits related to its lifecycle and metadata retrieval
+type PeerManagement interface {
+	// SetComponentManager sets the component manager for the node.
+	// SetComponentManager may be called at most once.
+	SetComponentManager(cm *component.ComponentManager)
+
+	// WithDefaultUnicastProtocol overrides the default handler of the unicast manager and registers all preferred protocols.
+	WithDefaultUnicastProtocol(defaultHandler libp2pnet.StreamHandler, preferred []protocols.ProtocolName) error
+	// WithPeersProvider sets the PeersProvider for the peer manager.
+	// If a peer manager factory is set, this method will set the peer manager's PeersProvider.
+	WithPeersProvider(peersProvider PeersProvider)
+	// PeerManagerComponent returns the component interface of the peer manager.
+	PeerManagerComponent() component.Component
+	// RequestPeerUpdate requests an update to the peer connections of this node using the peer manager.
+	RequestPeerUpdate()
+}
+
+// Routable set of node routing capabilities
+type Routable interface {
+	// RoutingTable returns the node routing table
+	RoutingTable() *kbucket.RoutingTable
+	// SetRouting sets the node's routing implementation.
+	// SetRouting may be called at most once.
+	SetRouting(r routing.Routing)
+	// Routing returns node routing object.
+	Routing() routing.Routing
+}
+
+// PeerToPeer peers list operations
+type PeerToPeer interface {
+	// AddPeer adds a peer to this node by adding it to this node's peerstore and connecting to it.
+	AddPeer(ctx context.Context, peerInfo peer.AddrInfo) error
+	// RemovePeer closes the connection with the peer.
+	RemovePeer(peerID peer.ID) error
+	// ListPeers returns list of peer IDs for peers subscribed to the topic.
+	ListPeers(topic string) []peer.ID
+	// GetPeersForProtocol returns slice peer IDs for the specified protocol ID.
+	GetPeersForProtocol(pid protocol.ID) peer.IDSlice
+}
+
+// StreamManagement peer to peer stream management functions
+type StreamManagement interface {
+	// CreateStream returns an existing stream connected to the peer if it exists, or creates a new stream with it.
+	CreateStream(ctx context.Context, peerID peer.ID) (libp2pnet.Stream, error)
+}
+
+// PubSub publish subscribe features for node
+type PubSub interface {
+	// Subscribe subscribes the node to the given topic and returns the subscription
+	Subscribe(topic channels.Topic, topicValidator TopicValidatorFunc) (Subscription, error)
+	// UnSubscribe cancels the subscriber and closes the topic.
+	UnSubscribe(topic channels.Topic) error
+	// Publish publishes the given payload on the topic.
+	Publish(ctx context.Context, topic channels.Topic, data []byte) error
+	// SetPubSub sets the node's pubsub implementation.
+	// SetPubSub may be called at most once.
+	SetPubSub(ps PubSubAdapter)
+}
+
 // LibP2PNode represents a flow libp2p node. It provides the network layer with the necessary interface to
 // control the underlying libp2p node. It is essentially the flow wrapper around the libp2p node, and allows
 // us to define different types of libp2p nodes that can operate in different ways by overriding these methods.
@@ -44,52 +115,24 @@ type LibP2PNode interface {
 	CollectionClusterChangesConsumer
 	// DisallowListOracle exposes the disallow list oracle API for external consumers to query about the disallow list.
 	DisallowListOracle
-	// Start the libp2p node.
-	Start(ctx irrecoverable.SignalerContext)
-	// Stop terminates the libp2p node.
-	Stop() error
-	// AddPeer adds a peer to this node by adding it to this node's peerstore and connecting to it.
-	AddPeer(ctx context.Context, peerInfo peer.AddrInfo) error
-	// RemovePeer closes the connection with the peer.
-	RemovePeer(peerID peer.ID) error
-	// GetPeersForProtocol returns slice peer IDs for the specified protocol ID.
-	GetPeersForProtocol(pid protocol.ID) peer.IDSlice
-	// CreateStream returns an existing stream connected to the peer if it exists, or creates a new stream with it.
-	CreateStream(ctx context.Context, peerID peer.ID) (libp2pnet.Stream, error)
-	// GetIPPort returns the IP and Port the libp2p node is listening on.
-	GetIPPort() (string, string, error)
-	// RoutingTable returns the node routing table
-	RoutingTable() *kbucket.RoutingTable
-	// ListPeers returns list of peer IDs for peers subscribed to the topic.
-	ListPeers(topic string) []peer.ID
-	// Subscribe subscribes the node to the given topic and returns the subscription
-	Subscribe(topic channels.Topic, topicValidator TopicValidatorFunc) (Subscription, error)
-	// UnSubscribe cancels the subscriber and closes the topic.
-	UnSubscribe(topic channels.Topic) error
-	// Publish publishes the given payload on the topic.
-	Publish(ctx context.Context, topic channels.Topic, data []byte) error
-	// Host returns pointer to host object of node.
-	Host() host.Host
-	// WithDefaultUnicastProtocol overrides the default handler of the unicast manager and registers all preferred protocols.
-	WithDefaultUnicastProtocol(defaultHandler libp2pnet.StreamHandler, preferred []protocols.ProtocolName) error
-	// WithPeersProvider sets the PeersProvider for the peer manager.
-	// If a peer manager factory is set, this method will set the peer manager's PeersProvider.
-	WithPeersProvider(peersProvider PeersProvider)
-	// PeerManagerComponent returns the component interface of the peer manager.
-	PeerManagerComponent() component.Component
-	// RequestPeerUpdate requests an update to the peer connections of this node using the peer manager.
-	RequestPeerUpdate()
-	// SetRouting sets the node's routing implementation.
-	// SetRouting may be called at most once.
-	SetRouting(r routing.Routing)
-	// Routing returns node routing object.
-	Routing() routing.Routing
-	// SetPubSub sets the node's pubsub implementation.
-	// SetPubSub may be called at most once.
-	SetPubSub(ps PubSubAdapter)
-	// SetComponentManager sets the component manager for the node.
-	// SetComponentManager may be called at most once.
-	SetComponentManager(cm *component.ComponentManager)
+
+	// Node single node management capabilities
+	Node
+
+	// PeerManagement current peer management functions
+	PeerManagement
+
+	// Routable routing related features
+	Routable
+
+	// PubSub publish subscribe features for node
+	PubSub
+
+	// PeerToPeer peers list operations
+	PeerToPeer
+
+	// StreamManagement node stream management
+	StreamManagement
 }
 
 // Subscriptions set of funcs related to current subscription info of a node.
