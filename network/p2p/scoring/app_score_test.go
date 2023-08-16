@@ -13,8 +13,10 @@ import (
 	"github.com/onflow/flow-go/module/id"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/mock"
+	flownet "github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/internal/p2pfixtures"
+	"github.com/onflow/flow-go/network/message"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/scoring"
 	p2ptest "github.com/onflow/flow-go/network/p2p/test"
@@ -93,14 +95,22 @@ func TestFullGossipSubConnectivity(t *testing.T) {
 	// checks end-to-end message delivery works
 	// each node sends a distinct message to all and checks that all nodes receive it.
 	for _, node := range nodes {
-		proposalMsg := p2pfixtures.MustEncodeEvent(t, unittest.ProposalFixture(), channels.PushBlocks)
-		require.NoError(t, node.Publish(ctx, blockTopic, proposalMsg))
+		outgoingMessageScope, err := flownet.NewOutgoingScope(
+			ids.NodeIDs(),
+			channels.PushBlocks,
+			unittest.ProposalFixture(),
+			unittest.NetworkCodec().Encode,
+			message.ProtocolTypePubSub)
+		require.NoError(t, err)
+		require.NoError(t, node.Publish(ctx, outgoingMessageScope))
 
 		// checks that the message is received by all nodes.
 		ctx1s, cancel1s := context.WithTimeout(ctx, 5*time.Second)
-		p2pfixtures.SubsMustReceiveMessage(t, ctx1s, proposalMsg, groupOneSubs)
-		p2pfixtures.SubsMustReceiveMessage(t, ctx1s, proposalMsg, accessNodeSubs)
-		p2pfixtures.SubsMustReceiveMessage(t, ctx1s, proposalMsg, groupTwoSubs)
+		expectedReceivedData, err := outgoingMessageScope.Proto().Marshal()
+		require.NoError(t, err)
+		p2pfixtures.SubsMustReceiveMessage(t, ctx1s, expectedReceivedData, groupOneSubs)
+		p2pfixtures.SubsMustReceiveMessage(t, ctx1s, expectedReceivedData, accessNodeSubs)
+		p2pfixtures.SubsMustReceiveMessage(t, ctx1s, expectedReceivedData, groupTwoSubs)
 
 		cancel1s()
 	}
@@ -169,7 +179,7 @@ func testGossipSubMessageDeliveryUnderNetworkPartition(t *testing.T, honestPeerS
 	)
 
 	allNodes := append([]p2p.LibP2PNode{con1Node, con2Node}, accessNodeGroup...)
-	allIds := append([]*flow.Identity{&con1Id, &con2Id}, accessNodeIds...)
+	allIds := append(flow.IdentityList{&con1Id, &con2Id}, accessNodeIds...)
 
 	provider := id.NewFixedIdentityProvider(allIds)
 	idProvider.On("ByPeerID", mocktestify.Anything).Return(
@@ -206,8 +216,14 @@ func testGossipSubMessageDeliveryUnderNetworkPartition(t *testing.T, honestPeerS
 	// let nodes reside on a full topology, hence no partition is caused by the topology.
 	p2ptest.LetNodesDiscoverEachOther(t, ctx, allNodes, allIds)
 
-	proposalMsg := p2pfixtures.MustEncodeEvent(t, unittest.ProposalFixture(), channels.PushBlocks)
-	require.NoError(t, con1Node.Publish(ctx, blockTopic, proposalMsg))
+	outgoingMessageScope, err := flownet.NewOutgoingScope(
+		allIds.NodeIDs(),
+		channels.PushBlocks,
+		unittest.ProposalFixture(),
+		unittest.NetworkCodec().Encode,
+		message.ProtocolTypePubSub)
+	require.NoError(t, err)
+	require.NoError(t, con1Node.Publish(ctx, outgoingMessageScope))
 
 	// we check that whether within a one-second window the message is received by the other honest consensus node.
 	// the one-second window is important because it triggers the heartbeat of the con1Node to perform a lazy pull (iHave).
@@ -218,7 +234,11 @@ func testGossipSubMessageDeliveryUnderNetworkPartition(t *testing.T, honestPeerS
 	// If honest peer scoring is enabled, then con1Node and con2Node are certainly in the same mesh, and hence the message is delivered.
 	ctx1s, cancel1s := context.WithTimeout(ctx, 1*time.Second)
 	defer cancel1s()
-	return p2pfixtures.HasSubReceivedMessage(t, ctx1s, proposalMsg, con2Sub)
+
+	expectedReceivedData, err := outgoingMessageScope.Proto().Marshal()
+	require.NoError(t, err)
+
+	return p2pfixtures.HasSubReceivedMessage(t, ctx1s, expectedReceivedData, con2Sub)
 }
 
 // maliciousAppSpecificScore returns a malicious app specific penalty function that rewards the malicious node and
