@@ -203,9 +203,9 @@ func (e *Engine) Process(channel channels.Channel, originID flow.Identifier, eve
 //   - IncompatibleInputTypeError if input has unexpected type
 //   - All other errors are potential symptoms of internal state corruption or bugs (fatal).
 func (e *Engine) process(channel channels.Channel, originID flow.Identifier, event interface{}) error {
-	switch resource := event.(type) {
+	switch event.(type) {
 	case *messages.BatchRequest:
-		report, misbehavior := e.validateBatchRequestForALSP(originID, channel, resource)
+		report, misbehavior := e.validateBatchRequestForALSP(channel, originID, event)
 		if misbehavior {
 			e.con.ReportMisbehavior(report) // report misbehavior to ALSP
 			e.log.Warn().Hex("origin_id", logging.ID(originID)).Str(logging.KeySuspicious, "true").Msgf("received invalid batch request from %x: %v", originID[:], misbehavior)
@@ -214,7 +214,7 @@ func (e *Engine) process(channel channels.Channel, originID flow.Identifier, eve
 		}
 		return e.requestHandler.Process(channel, originID, event)
 	case *messages.RangeRequest:
-		report, misbehavior := e.validateRangeRequestForALSP(originID, channel, resource)
+		report, misbehavior := e.validateRangeRequestForALSP(channel, originID, event)
 		if misbehavior {
 			e.con.ReportMisbehavior(report) // report misbehavior to ALSP
 			e.log.Warn().Hex("origin_id", logging.ID(originID)).Str(logging.KeySuspicious, "true").Msgf("received invalid range request from %x: %v", originID[:], misbehavior)
@@ -224,7 +224,7 @@ func (e *Engine) process(channel channels.Channel, originID flow.Identifier, eve
 		return e.requestHandler.Process(channel, originID, event)
 
 	case *messages.SyncRequest:
-		report, misbehavior := e.validateSyncRequestForALSP(originID, channel, resource)
+		report, misbehavior := e.validateSyncRequestForALSP(channel, originID, event)
 		if misbehavior {
 			e.con.ReportMisbehavior(report) // report misbehavior to ALSP
 			e.log.Warn().Hex("origin_id", logging.ID(originID)).Str(logging.KeySuspicious, "true").Msgf("received invalid sync request from %x: %v", originID[:], misbehavior)
@@ -234,7 +234,7 @@ func (e *Engine) process(channel channels.Channel, originID flow.Identifier, eve
 		return e.requestHandler.Process(channel, originID, event)
 
 	case *messages.BlockResponse:
-		report, misbehavior := e.validateBlockResponseForALSP(originID, channel, resource)
+		report, misbehavior := e.validateBlockResponseForALSP(channel, originID, event)
 		if misbehavior {
 			e.con.ReportMisbehavior(report) // report misbehavior to ALSP
 			e.log.Warn().Hex("origin_id", logging.ID(originID)).Str(logging.KeySuspicious, "true").Msgf("received invalid block response from %x: %v", originID[:], misbehavior)
@@ -244,7 +244,7 @@ func (e *Engine) process(channel channels.Channel, originID flow.Identifier, eve
 		return e.responseMessageHandler.Process(originID, event)
 
 	case *messages.SyncResponse:
-		report, misbehavior := e.validateSyncResponseForALSP(originID, channel, resource)
+		report, misbehavior := e.validateSyncResponseForALSP(channel, originID, event)
 		if misbehavior {
 			e.con.ReportMisbehavior(report) // report misbehavior to ALSP
 			e.log.Warn().Hex("origin_id", logging.ID(originID)).Str(logging.KeySuspicious, "true").Msgf("received invalid sync response from %x: %v", originID[:], misbehavior)
@@ -471,22 +471,22 @@ func (e *Engine) sendRequests(participants flow.IdentifierList, ranges []chainsy
 	}
 }
 
-func (e *Engine) validateBatchRequestForALSP(id flow.Identifier, channel channels.Channel, resource interface{}) (*alsp.MisbehaviorReport, bool) {
+func (e *Engine) validateBatchRequestForALSP(channel channels.Channel, id flow.Identifier, event interface{}) (*alsp.MisbehaviorReport, bool) {
 	return nil, false
 }
 
-func (e *Engine) validateBlockResponseForALSP(id flow.Identifier, channel channels.Channel, resource interface{}) (*alsp.MisbehaviorReport, bool) {
+func (e *Engine) validateBlockResponseForALSP(channel channels.Channel, id flow.Identifier, event interface{}) (*alsp.MisbehaviorReport, bool) {
 	return nil, false
 }
 
-func (e *Engine) validateRangeRequestForALSP(id flow.Identifier, channel channels.Channel, resource interface{}) (*alsp.MisbehaviorReport, bool) {
+func (e *Engine) validateRangeRequestForALSP(channel channels.Channel, id flow.Identifier, event interface{}) (*alsp.MisbehaviorReport, bool) {
 	return nil, false
 }
 
-func (e *Engine) validateSyncRequestForALSP(id flow.Identifier, channel channels.Channel, resource interface{}) (*alsp.MisbehaviorReport, bool) {
+func (e *Engine) validateSyncRequestForALSP(channel channels.Channel, id flow.Identifier, event interface{}) (*alsp.MisbehaviorReport, bool) {
 	return nil, true
 }
 
-func (e *Engine) validateSyncResponseForALSP(id flow.Identifier, channel channels.Channel, resource interface{}) (*alsp.MisbehaviorReport, bool) {
+func (e *Engine) validateSyncResponseForALSP(channel channels.Channel, id flow.Identifier, event interface{}) (*alsp.MisbehaviorReport, bool) {
 	return nil, false
 }
