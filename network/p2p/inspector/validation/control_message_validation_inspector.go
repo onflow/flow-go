@@ -211,6 +211,9 @@ func (c *ControlMsgValidationInspector) Inspect(from peer.ID, rpc *pubsub.RPC) e
 // - IWantCacheMissThresholdErr: if the rate of cache misses exceeds the configured allowed threshold.
 // - error: if any error occurs while sampling the iWants
 func (c *ControlMsgValidationInspector) inspectIWant(iWants []*pubsub_pb.ControlIWant) error {
+	if len(iWants) == 0 {
+		return nil
+	}
 	sampleSize := uint(10 * c.rpcTracker.LastHighestIHaveRPCSize())
 	if sampleSize == 0 || sampleSize > c.config.IWantRPCInspectionConfig.MaxSampleSize {
 		c.logger.Warn().
@@ -222,11 +225,6 @@ func (c *ControlMsgValidationInspector) inspectIWant(iWants []*pubsub_pb.Control
 		sampleSize = c.config.IWantRPCInspectionConfig.MaxSampleSize
 	}
 
-	numOfIWants := uint(len(iWants))
-	if numOfIWants < sampleSize {
-		sampleSize = numOfIWants
-	}
-
 	var iWantMsgIDPool []string
 	// opens all iWant boxes into a sample pool to be sampled.
 	for _, iWant := range iWants {
@@ -236,18 +234,21 @@ func (c *ControlMsgValidationInspector) inspectIWant(iWants []*pubsub_pb.Control
 		iWantMsgIDPool = append(iWantMsgIDPool, iWant.GetMessageIDs()...)
 	}
 
+	if sampleSize > uint(len(iWantMsgIDPool)) {
+		sampleSize = uint(len(iWantMsgIDPool))
+	}
+
 	swap := func(i, j uint) {
 		iWantMsgIDPool[i], iWantMsgIDPool[j] = iWantMsgIDPool[j], iWantMsgIDPool[i]
 	}
 
-	err := c.sampleCtrlMessages(p2pmsg.CtrlMsgIWant, numOfIWants, sampleSize, swap)
+	err := c.sampleCtrlMessages(p2pmsg.CtrlMsgIWant, uint(len(iWantMsgIDPool)), sampleSize, swap)
 	if err != nil {
 		c.logger.Fatal().Err(fmt.Errorf("failed to sample iwant messages: %w", err)).Msg("irrecoverable error encountered while sampling iwant control messages")
 	}
 
 	tracker := make(duplicateStrTracker)
 	cacheMisses := float64(0)
-
 	for _, messageID := range iWantMsgIDPool[:sampleSize] {
 		if tracker.isDuplicate(messageID) {
 			return NewDuplicateFoundErr(fmt.Errorf("duplicate message ID found: %s", messageID))
@@ -464,6 +465,8 @@ func (c *ControlMsgValidationInspector) getCtrlMsgCount(ctrlMsgType p2pmsg.Contr
 		return uint64(len(ctrlMsg.GetPrune()))
 	case p2pmsg.CtrlMsgIHave:
 		return uint64(len(ctrlMsg.GetIhave()))
+	case p2pmsg.CtrlMsgIWant:
+		return uint64(len(ctrlMsg.GetIwant()))
 	default:
 		return 0
 	}

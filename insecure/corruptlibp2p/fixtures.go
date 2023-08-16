@@ -42,13 +42,13 @@ func WithIHave(msgCount, msgSize int, topicId string) GossipSubCtrlOption {
 	}
 }
 
-// WithIWant adds iWant control messages of the given size and number to the control message.
-func WithIWant(msgCount, msgSize int) GossipSubCtrlOption {
+// WithIWant adds n number of iWants each having m number of message ID's of size s.
+func WithIWant(n, m int) GossipSubCtrlOption {
 	return func(msg *pubsubpb.ControlMessage) {
-		iWants := make([]*pubsubpb.ControlIWant, msgCount)
-		for i := 0; i < msgCount; i++ {
+		iWants := make([]*pubsubpb.ControlIWant, n)
+		for i := 0; i < n; i++ {
 			iWants[i] = &pubsubpb.ControlIWant{
-				MessageIDs: GossipSubMessageIdsFixture(msgSize),
+				MessageIDs: GossipSubMessageIdsFixture(m),
 			}
 		}
 		msg.Iwant = iWants

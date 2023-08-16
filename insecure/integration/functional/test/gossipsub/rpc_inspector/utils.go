@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/p2p"
@@ -26,7 +27,7 @@ func startNodesAndEnsureConnected(t *testing.T, ctx irrecoverable.SignalerContex
 	})
 }
 
-func stopNodesAndInspector(t *testing.T, cancel context.CancelFunc, nodes []p2p.LibP2PNode, inspector p2p.GossipSubRPCInspector) {
+func stopTestComponents(t *testing.T, cancel context.CancelFunc, nodes []p2p.LibP2PNode, components ...module.ReadyDoneAware) {
 	p2ptest.StopNodes(t, nodes, cancel, 5*time.Second)
-	unittest.RequireComponentsDoneBefore(t, time.Second, inspector)
+	unittest.RequireComponentsDoneBefore(t, time.Second, components...)
 }
