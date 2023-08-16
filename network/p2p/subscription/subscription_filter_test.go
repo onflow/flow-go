@@ -14,8 +14,10 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/id"
 	"github.com/onflow/flow-go/module/irrecoverable"
+	flownet "github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/internal/p2pfixtures"
+	"github.com/onflow/flow-go/network/message"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/subscription"
 	p2ptest "github.com/onflow/flow-go/network/p2p/test"
@@ -78,16 +80,26 @@ func TestFilterSubscribe(t *testing.T) {
 	wg.Add(2)
 
 	testPublish := func(wg *sync.WaitGroup, from p2p.LibP2PNode, sub p2p.Subscription) {
-		data := []byte("hello")
 
-		err := from.Publish(context.TODO(), badTopic, data)
+		outgoingMessageScope, err := flownet.NewOutgoingScope(
+			ids.NodeIDs(),
+			channels.SyncCommittee,
+			[]byte("hello"),
+			unittest.NetworkCodec().Encode,
+			message.ProtocolTypePubSub)
+		require.NoError(t, err)
+
+		err = from.Publish(context.TODO(), outgoingMessageScope)
 		require.NoError(t, err)
 
 		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 		msg, err := sub.Next(ctx)
 		cancel()
 		require.NoError(t, err)
-		require.Equal(t, msg.Data, data)
+
+		expectedReceivedData, err := outgoingMessageScope.Proto().Marshal()
+		require.NoError(t, err)
+		require.Equal(t, msg.Data, expectedReceivedData)
 
 		ctx, cancel = context.WithTimeout(context.Background(), time.Second)
 		_, err = unstakedSub.Next(ctx)
