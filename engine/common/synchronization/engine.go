@@ -483,8 +483,21 @@ func (e *Engine) validateRangeRequestForALSP(channel channels.Channel, id flow.I
 	return nil, false
 }
 
-func (e *Engine) validateSyncRequestForALSP(channel channels.Channel, id flow.Identifier, event interface{}) (*alsp.MisbehaviorReport, bool) {
-	return nil, true
+func (e *Engine) validateSyncRequestForALSP(channel channels.Channel, originID flow.Identifier, event interface{}) (*alsp.MisbehaviorReport, bool) {
+	//syncRequestMsg := event.(*messages.SyncRequest)
+
+	report, err := alsp.NewMisbehaviorReport(originID, alsp.PotentialSpam)
+
+	if err != nil {
+		// failing to create the misbehavior report is unlikely. If an error is encountered while
+		// creating the misbehavior report it indicates a bug and processing can not proceed.
+		e.log.Fatal().
+			Err(err).
+			Str("originID", originID.String()).
+			Msg("failed to create misbehavior report")
+	}
+
+	return report, true
 }
 
 func (e *Engine) validateSyncResponseForALSP(channel channels.Channel, id flow.Identifier, event interface{}) (*alsp.MisbehaviorReport, bool) {

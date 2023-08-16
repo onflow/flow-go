@@ -43,6 +43,9 @@ const (
 
 	// UnauthorizedPublishOnChannel is a misbehavior that is reported when a message not authorized to be sent via pubsub is received via pubsub.
 	UnauthorizedPublishOnChannel network.Misbehavior = "unauthorized-pubsub-on-channel"
+
+	// PotentialSpam is a misbehavior that is reported when a message is potentially spam.
+	PotentialSpam network.Misbehavior = "potential-spam"
 )
 
 func AllMisbehaviorTypes() []network.Misbehavior {
