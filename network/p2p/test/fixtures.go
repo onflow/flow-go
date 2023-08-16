@@ -583,17 +583,13 @@ func EnsurePubsubMessageExchange(t *testing.T, ctx context.Context, nodes []p2p.
 	// let subscriptions propagate
 	time.Sleep(1 * time.Second)
 
-	// TODO: remove this and use channel as an argument
-	channel, ok := channels.ChannelFromTopic(topic)
-	require.True(t, ok)
-
 	for _, node := range nodes {
 		for i := 0; i < count; i++ {
 			// creates a unique message to be published by the node
 			payload := messageFactory()
 			outgoingMessageScope, err := flownet.NewOutgoingScope(
 				flow.IdentifierList{unittest.IdentifierFixture()},
-				channel,
+				topic,
 				payload,
 				unittest.NetworkCodec().Encode,
 				message.ProtocolTypePubSub)
@@ -630,16 +626,12 @@ func EnsurePubsubMessageExchangeFromNode(t *testing.T, ctx context.Context, send
 	// let subscriptions propagate
 	time.Sleep(1 * time.Second)
 
-	// TODO: remove this and use channel as an argument
-	channel, ok := channels.ChannelFromTopic(topic)
-	require.True(t, ok)
-
 	for i := 0; i < count; i++ {
 		// creates a unique message to be published by the node
 		payload := messageFactory()
 		outgoingMessageScope, err := flownet.NewOutgoingScope(
 			flow.IdentifierList{},
-			channel,
+			topic,
 			payload,
 			unittest.NetworkCodec().Encode,
 			message.ProtocolTypePubSub)
@@ -719,14 +711,11 @@ func EnsureNoPubsubMessageExchange(
 			wg.Add(1)
 			go func() {
 				// creates a unique message to be published by the node.
-				// TODO: remove this and use channel as an argument
-				channel, ok := channels.ChannelFromTopic(topic)
-				require.True(t, ok)
 
 				payload := messageFactory()
 				outgoingMessageScope, err := flownet.NewOutgoingScope(
 					toIdentifiers,
-					channel,
+					topic,
 					payload,
 					unittest.NetworkCodec().Encode,
 					message.ProtocolTypePubSub)
