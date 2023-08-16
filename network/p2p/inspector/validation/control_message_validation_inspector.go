@@ -81,10 +81,11 @@ func NewControlMsgValidationInspector(
 	inspectMsgQueueCacheCollector module.HeroCacheMetrics,
 	clusterPrefixedCacheCollector module.HeroCacheMetrics,
 	idProvider module.IdentityProvider,
-	inspectorMetrics module.GossipSubRpcValidationInspectorMetrics) (*ControlMsgValidationInspector, error) {
+	inspectorMetrics module.GossipSubRpcValidationInspectorMetrics,
+	rpcTracker p2p.RPCControlTracking) (*ControlMsgValidationInspector, error) {
 	lg := logger.With().Str("component", "gossip_sub_rpc_validation_inspector").Logger()
 
-	tracker, err := cache.NewClusterPrefixedMessagesReceivedTracker(logger, config.ClusterPrefixedControlMsgsReceivedCacheSize, clusterPrefixedCacheCollector, config.ClusterPrefixedControlMsgsReceivedCacheDecay)
+	clusterPrefixedTracker, err := cache.NewClusterPrefixedMessagesReceivedTracker(logger, config.ClusterPrefixedControlMsgsReceivedCacheSize, clusterPrefixedCacheCollector, config.ClusterPrefixedControlMsgsReceivedCacheDecay)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create cluster prefix topics received tracker")
 	}
@@ -94,7 +95,8 @@ func NewControlMsgValidationInspector(
 		sporkID:      sporkID,
 		config:       config,
 		distributor:  distributor,
-		tracker:      tracker,
+		tracker:      clusterPrefixedTracker,
+		rpcTracker:   rpcTracker,
 		idProvider:   idProvider,
 		metrics:      inspectorMetrics,
 		rateLimiters: make(map[p2pmsg.ControlMessageType]p2p.BasicRateLimiter),
@@ -132,7 +134,7 @@ func NewControlMsgValidationInspector(
 	return c, nil
 }
 
-// Inspect is called by gossipsub upon reception of an rpc from a remote node.
+// Inspect is called by gossipsub upon reception of an rpc from a remote  node.
 // It examines the provided message to ensure it adheres to the expected
 // format and conventions. If the message passes validation, the method returns
 // a nil error. If an issue is found, the method returns an error detailing
@@ -214,16 +216,22 @@ func (c *ControlMsgValidationInspector) inspectIWant(iWants []*pubsub_pb.Control
 		c.logger.Warn().
 			Uint("sample_size", sampleSize).
 			Uint("max_sample_size", c.config.IWantRPCInspectionConfig.MaxSampleSize).
-			Str(logging.KeySuspicious, "true").         // max sample size is suspicious
+			Str(logging.KeySuspicious, "true"). // max sample size is suspicious
 			Str(logging.KeyNetworkingSecurity, "true"). // zero sample size is a security hole
 			Msg("zero or invalid sample size, using default max sample size")
 		sampleSize = c.config.IWantRPCInspectionConfig.MaxSampleSize
 	}
 
+	numOfIWants := uint(len(iWants))
+	if numOfIWants < sampleSize {
+		sampleSize = numOfIWants
+	}
+
 	swap := func(i, j uint) {
 		iWants[i], iWants[j] = iWants[j], iWants[i]
 	}
-	err := c.sampleCtrlMessages(uint(len(iWants)), sampleSize, swap)
+
+	err := c.sampleCtrlMessages(p2pmsg.CtrlMsgIWant, numOfIWants, sampleSize, swap)
 	if err != nil {
 		return fmt.Errorf("failed to sample iwant messages: %w", err)
 	}
@@ -345,7 +353,7 @@ func (c *ControlMsgValidationInspector) blockingPreprocessingSampleRpc(from peer
 	if count > validationConfig.HardThreshold {
 		// for iHave control message topic validation we only validate a random subset of the messages
 		// shuffle the ihave messages to perform random validation on a subset of size sampleSize
-		err := c.sampleCtrlMessages(totalIhaves, sampleSize, swap)
+		err := c.sampleCtrlMessages(p2pmsg.CtrlMsgIHave, totalIhaves, sampleSize, swap)
 		if err != nil {
 			return fmt.Errorf("failed to sample ihave messages: %w", err)
 		}
@@ -371,7 +379,7 @@ func (c *ControlMsgValidationInspector) blockingPreprocessingSampleRpc(from peer
 	// to randomize async validation to avoid data race that can occur when
 	// performing the sampling asynchronously.
 	// for iHave control message topic validation we only validate a random subset of the messages
-	err := c.sampleCtrlMessages(totalIhaves, sampleSize, swap)
+	err := c.sampleCtrlMessages(p2pmsg.CtrlMsgIHave, totalIhaves, sampleSize, swap)
 	if err != nil {
 		return fmt.Errorf("failed to sample ihave messages: %w", err)
 	}
@@ -380,10 +388,10 @@ func (c *ControlMsgValidationInspector) blockingPreprocessingSampleRpc(from peer
 
 // sampleCtrlMessages performs sampling on the specified control message that will randomize
 // the items in the control message slice up to index sampleSize-1.
-func (c *ControlMsgValidationInspector) sampleCtrlMessages(totalSize, sampleSize uint, swap func(i, j uint)) error {
+func (c *ControlMsgValidationInspector) sampleCtrlMessages(ctrlMsg p2pmsg.ControlMessageType, totalSize, sampleSize uint, swap func(i, j uint)) error {
 	err := flowrand.Samples(totalSize, sampleSize, swap)
 	if err != nil {
-		return fmt.Errorf("failed to get random sample of ihave control messages: %w", err)
+		return fmt.Errorf("failed to get random sample of %s control messages: %w", ctrlMsg, err)
 	}
 	return nil
 }

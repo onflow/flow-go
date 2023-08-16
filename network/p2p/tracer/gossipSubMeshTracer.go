@@ -192,8 +192,7 @@ func (t *GossipSubMeshTracer) SendRPC(rpc *pubsub.RPC, _ peer.ID) {
 
 // WasIHaveRPCSent returns true if an iHave control message for the messageID was sent, otherwise false.
 func (t *GossipSubMeshTracer) WasIHaveRPCSent(messageID string) bool {
-	// TODO: topic string is obsolete since messageID is globally unique
-	return t.rpcSentTracker.WasIHaveRPCSent("", messageID)
+	return t.rpcSentTracker.WasIHaveRPCSent(messageID)
 }
 
 // LastHighestIHaveRPCSize returns the last highest RPC iHave message sent.
