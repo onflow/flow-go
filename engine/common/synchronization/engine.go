@@ -484,15 +484,9 @@ func (e *Engine) validateRangeRequestForALSP(id flow.Identifier, channel channel
 }
 
 func (e *Engine) validateSyncRequestForALSP(id flow.Identifier, channel channels.Channel, resource interface{}) (*alsp.MisbehaviorReport, bool) {
-	return nil, false
+	return nil, true
 }
 
 func (e *Engine) validateSyncResponseForALSP(id flow.Identifier, channel channels.Channel, resource interface{}) (*alsp.MisbehaviorReport, bool) {
 	return nil, false
-}
-
-func primeNumbers(foo int) {
-	for i := 0; i < foo; i++ {
-		fmt.Println(i)
-	}
 }

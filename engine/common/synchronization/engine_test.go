@@ -200,13 +200,6 @@ func (ss *SyncSuite) TestOnSyncRequest_LowerThanReceiver_WithinTolerance() {
 	ss.core.AssertExpectations(ss.T())
 }
 
-func BenchmarkPrimeNumbers(b *testing.B) {
-	foo := 5
-	for i := 0; i < b.N; i++ {
-		primeNumbers(foo)
-	}
-}
-
 // TestOnSyncRequest_HigherThanReceiver_OutsideTolerance tests that a sync request that's higher than the receiver's height doesn't
 // trigger a response, even if outside tolerance.
 func (ss *SyncSuite) TestOnSyncRequest_HigherThanReceiver_OutsideTolerance() {
@@ -249,11 +242,17 @@ func (ss *SyncSuite) TestOnSyncRequest_HigherThanReceiver_OutsideTolerance_Load(
 
 		// if request height is higher than local finalized, we should not respond
 		req.Height = ss.head.Height + 1
-		ss.core.On("HandleHeight", ss.head, req.Height)
-		ss.core.On("WithinTolerance", ss.head, req.Height).Return(false)
+
+		// assert that misbehavior is reported
+		ss.con.On("ReportMisbehavior", mock.Anything).Return(true)
+
+		// assert that HandleHeight, WithinTolerance are not called because misbehavior is reported
+		// also, check that response is never sent
+		ss.core.AssertNotCalled(ss.T(), "HandleHeight")
+		ss.core.AssertNotCalled(ss.T(), "WithinTolerance")
+		ss.con.AssertNotCalled(ss.T(), "Unicast", mock.Anything, mock.Anything)
 
 		require.NoError(ss.T(), ss.e.Process(channels.SyncCommittee, originID, req))
-		ss.con.AssertNotCalled(ss.T(), "Unicast", mock.Anything, mock.Anything)
 	}
 
 	ss.core.AssertExpectations(ss.T())
