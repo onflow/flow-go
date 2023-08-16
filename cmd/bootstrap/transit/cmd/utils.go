@@ -36,7 +36,7 @@ var (
 
 	// commit and semver vars
 	commit = build.Commit()
-	semver = build.Semver()
+	semver = build.Version()
 )
 
 // readNodeID reads the NodeID file

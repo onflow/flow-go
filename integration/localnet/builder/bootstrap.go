@@ -518,7 +518,7 @@ func defaultService(name, role, dataDir, profilerDir string, i int) Service {
 			Dockerfile: "cmd/Dockerfile",
 			Args: map[string]string{
 				"TARGET":  fmt.Sprintf("./cmd/%s", role),
-				"VERSION": build.Semver(),
+				"VERSION": build.Version(),
 				"COMMIT":  build.Commit(),
 				"GOARCH":  runtime.GOARCH,
 			},

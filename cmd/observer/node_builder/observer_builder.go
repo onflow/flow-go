@@ -32,6 +32,7 @@ import (
 	"github.com/onflow/flow-go/engine/access/rest/routes"
 	"github.com/onflow/flow-go/engine/access/rpc"
 	"github.com/onflow/flow-go/engine/access/rpc/backend"
+	rpcConnection "github.com/onflow/flow-go/engine/access/rpc/connection"
 	"github.com/onflow/flow-go/engine/common/follower"
 	synceng "github.com/onflow/flow-go/engine/common/synchronization"
 	"github.com/onflow/flow-go/engine/protocol"
@@ -905,16 +906,25 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 			return nil, fmt.Errorf("could not initialize backend cache: %w", err)
 		}
 
-		connFactory := &backend.ConnectionFactoryImpl{
+		var connBackendCache *rpcConnection.Cache
+		if backendCache != nil {
+			connBackendCache = rpcConnection.NewCache(backendCache, int(cacheSize))
+		}
+
+		connFactory := &rpcConnection.ConnectionFactoryImpl{
 			CollectionGRPCPort:        0,
 			ExecutionGRPCPort:         0,
 			CollectionNodeGRPCTimeout: backendConfig.CollectionClientTimeout,
 			ExecutionNodeGRPCTimeout:  backendConfig.ExecutionClientTimeout,
-			ConnectionsCache:          backendCache,
-			CacheSize:                 cacheSize,
-			MaxMsgSize:                config.MaxMsgSize,
 			AccessMetrics:             accessMetrics,
 			Log:                       node.Logger,
+			Manager: rpcConnection.NewManager(
+				connBackendCache,
+				node.Logger,
+				accessMetrics,
+				config.MaxMsgSize,
+				backendConfig.CircuitBreakerConfig,
+			),
 		}
 
 		accessBackend := backend.New(
@@ -936,7 +946,9 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 			backendConfig.FixedExecutionNodeIDs,
 			node.Logger,
 			backend.DefaultSnapshotHistoryLimit,
-			backendConfig.ArchiveAddressList)
+			backendConfig.ArchiveAddressList,
+			backendConfig.ScriptExecValidation,
+			backendConfig.CircuitBreakerConfig.Enabled)
 
 		observerCollector := metrics.NewObserverCollector()
 		restHandler, err := restapiproxy.NewRestProxyHandler(

@@ -153,8 +153,8 @@ func TrieUpdateToMessage(t *ledger.TrieUpdate) (*entities.TrieUpdate, error) {
 	}
 
 	paths := make([][]byte, len(t.Paths))
-	for i, path := range t.Paths {
-		paths[i] = path[:]
+	for i := range t.Paths {
+		paths[i] = t.Paths[i][:]
 	}
 
 	payloads := make([]*entities.Payload, len(t.Payloads))

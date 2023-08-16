@@ -73,6 +73,16 @@ func (_m *AccessMetrics) ScriptExecuted(dur time.Duration, size int) {
 	_m.Called(dur, size)
 }
 
+// ScriptExecutionErrorMatch provides a mock function with given fields:
+func (_m *AccessMetrics) ScriptExecutionErrorMatch() {
+	_m.Called()
+}
+
+// ScriptExecutionErrorMismatch provides a mock function with given fields:
+func (_m *AccessMetrics) ScriptExecutionErrorMismatch() {
+	_m.Called()
+}
+
 // ScriptExecutionErrorOnArchiveNode provides a mock function with given fields:
 func (_m *AccessMetrics) ScriptExecutionErrorOnArchiveNode() {
 	_m.Called()
@@ -80,6 +90,16 @@ func (_m *AccessMetrics) ScriptExecutionErrorOnArchiveNode() {
 
 // ScriptExecutionErrorOnExecutionNode provides a mock function with given fields:
 func (_m *AccessMetrics) ScriptExecutionErrorOnExecutionNode() {
+	_m.Called()
+}
+
+// ScriptExecutionResultMatch provides a mock function with given fields:
+func (_m *AccessMetrics) ScriptExecutionResultMatch() {
+	_m.Called()
+}
+
+// ScriptExecutionResultMismatch provides a mock function with given fields:
+func (_m *AccessMetrics) ScriptExecutionResultMismatch() {
 	_m.Called()
 }
 

@@ -167,7 +167,10 @@ func (suite *RateLimitTestSuite) SetupTest() {
 		nil,
 		suite.log,
 		0,
-		nil)
+		nil,
+		false,
+		false,
+	)
 
 	rpcEngBuilder, err := NewBuilder(
 		suite.log,

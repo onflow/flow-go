@@ -7,14 +7,14 @@ import (
 	"strconv"
 	"time"
 
+	lru "github.com/hashicorp/golang-lru"
+	"github.com/rs/zerolog"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
-	lru "github.com/hashicorp/golang-lru"
-	"github.com/rs/zerolog"
-
 	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/cmd/build"
+	"github.com/onflow/flow-go/engine/access/rpc/connection"
 	"github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/model/flow"
@@ -25,9 +25,6 @@ import (
 
 	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
 )
-
-// maxExecutionNodesCnt is the max number of execution nodes that will be contacted to complete an execution api request
-const maxExecutionNodesCnt = 3
 
 // minExecutionNodesCnt is the minimum number of execution nodes expected to have sent the execution receipt for a block
 const minExecutionNodesCnt = 2
@@ -78,7 +75,7 @@ type Backend struct {
 	chainID           flow.ChainID
 	collections       storage.Collections
 	executionReceipts storage.ExecutionReceipts
-	connFactory       ConnectionFactory
+	connFactory       connection.ConnectionFactory
 }
 
 // Config defines the configurable options for creating Backend
@@ -90,6 +87,8 @@ type Config struct {
 	PreferredExecutionNodeIDs []string      // preferred list of upstream execution node IDs
 	FixedExecutionNodeIDs     []string      // fixed list of execution node IDs to choose from if no node ID can be chosen from the PreferredExecutionNodeIDs
 	ArchiveAddressList        []string      // the archive node address list to send script executions. when configured, script executions will be all sent to the archive node
+	ScriptExecValidation      bool
+	CircuitBreakerConfig      connection.CircuitBreakerConfig // the configuration for circuit breaker
 }
 
 func New(
@@ -104,7 +103,7 @@ func New(
 	executionResults storage.ExecutionResults,
 	chainID flow.ChainID,
 	accessMetrics module.AccessMetrics,
-	connFactory ConnectionFactory,
+	connFactory connection.ConnectionFactory,
 	retryEnabled bool,
 	maxHeightRange uint,
 	preferredExecutionNodeIDs []string,
@@ -112,6 +111,8 @@ func New(
 	log zerolog.Logger,
 	snapshotHistoryLimit int,
 	archiveAddressList []string,
+	scriptExecValidation bool,
+	circuitBreakerEnabled bool,
 ) *Backend {
 	retry := newRetry()
 	if retryEnabled {
@@ -132,19 +133,24 @@ func New(
 		archivePorts[idx] = port
 	}
 
+	// create node communicator, that will be used in sub-backend logic for interacting with API calls
+	nodeCommunicator := NewNodeCommunicator(circuitBreakerEnabled)
+
 	b := &Backend{
 		state: state,
 		// create the sub-backends
 		backendScripts: backendScripts{
-			headers:            headers,
-			executionReceipts:  executionReceipts,
-			connFactory:        connFactory,
-			state:              state,
-			log:                log,
-			metrics:            accessMetrics,
-			loggedScripts:      loggedScripts,
-			archiveAddressList: archiveAddressList,
-			archivePorts:       archivePorts,
+			headers:              headers,
+			executionReceipts:    executionReceipts,
+			connFactory:          connFactory,
+			state:                state,
+			log:                  log,
+			metrics:              accessMetrics,
+			loggedScripts:        loggedScripts,
+			archiveAddressList:   archiveAddressList,
+			archivePorts:         archivePorts,
+			scriptExecValidation: scriptExecValidation,
+			nodeCommunicator:     nodeCommunicator,
 		},
 		backendTransactions: backendTransactions{
 			staticCollectionRPC:  collectionRPC,
@@ -160,6 +166,7 @@ func New(
 			connFactory:          connFactory,
 			previousAccessNodes:  historicalAccessNodes,
 			log:                  log,
+			nodeCommunicator:     nodeCommunicator,
 		},
 		backendEvents: backendEvents{
 			state:             state,
@@ -168,6 +175,7 @@ func New(
 			connFactory:       connFactory,
 			log:               log,
 			maxHeightRange:    maxHeightRange,
+			nodeCommunicator:  nodeCommunicator,
 		},
 		backendBlockHeaders: backendBlockHeaders{
 			headers: headers,
@@ -183,6 +191,7 @@ func New(
 			executionReceipts: executionReceipts,
 			connFactory:       connFactory,
 			log:               log,
+			nodeCommunicator:  nodeCommunicator,
 		},
 		backendExecutionResults: backendExecutionResults{
 			executionResults: executionResults,
@@ -224,16 +233,9 @@ func NewCache(
 	var cache *lru.Cache
 	cacheSize := connectionPoolSize
 	if cacheSize > 0 {
-		// TODO: remove this fallback after fixing issues with evictions
-		// It was observed that evictions cause connection errors for in flight requests. This works around
-		// the issue by forcing hte pool size to be greater than the number of ENs + LNs
-		if cacheSize < DefaultConnectionPoolSize {
-			log.Warn().Msg("connection pool size below threshold, setting pool size to default value ")
-			cacheSize = DefaultConnectionPoolSize
-		}
 		var err error
 		cache, err = lru.NewWithEvict(int(cacheSize), func(_, evictedValue interface{}) {
-			store := evictedValue.(*CachedClient)
+			store := evictedValue.(*connection.CachedClient)
 			store.Close()
 			log.Debug().Str("grpc_conn_evicted", store.Address).Msg("closing grpc connection evicted from pool")
 			if accessMetrics != nil {
@@ -304,7 +306,7 @@ func (b *Backend) GetNodeVersionInfo(ctx context.Context) (*access.NodeVersionIn
 	}
 
 	return &access.NodeVersionInfo{
-		Semver:          build.Semver(),
+		Semver:          build.Version(),
 		Commit:          build.Commit(),
 		SporkId:         sporkId,
 		ProtocolVersion: uint64(protocolVersion),
@@ -344,7 +346,7 @@ func (b *Backend) GetLatestProtocolStateSnapshot(_ context.Context) ([]byte, err
 	return convert.SnapshotToBytes(validSnapshot)
 }
 
-// executionNodesForBlockID returns upto maxExecutionNodesCnt number of randomly chosen execution node identities
+// executionNodesForBlockID returns upto maxNodesCnt number of randomly chosen execution node identities
 // which have executed the given block ID.
 // If no such execution node is found, an InsufficientExecutionReceipts error is returned.
 func executionNodesForBlockID(
@@ -415,17 +417,11 @@ func executionNodesForBlockID(
 		return nil, fmt.Errorf("failed to retreive execution IDs for block ID %v: %w", blockID, err)
 	}
 
-	// randomly choose upto maxExecutionNodesCnt identities
-	executionIdentitiesRandom, err := subsetENs.Sample(maxExecutionNodesCnt)
-	if err != nil {
-		return nil, fmt.Errorf("sampling failed: %w", err)
-	}
-
-	if len(executionIdentitiesRandom) == 0 {
+	if len(subsetENs) == 0 {
 		return nil, fmt.Errorf("no matching execution node found for block ID %v", blockID)
 	}
 
-	return executionIdentitiesRandom, nil
+	return subsetENs, nil
 }
 
 // findAllExecutionNodes find all the execution nodes ids from the execution receipts that have been received for the
