@@ -684,7 +684,15 @@ func EnsureNotConnectedBetweenGroups(t *testing.T, ctx context.Context, groupA [
 // - topic: the topic to exchange messages on.
 // - count: the number of messages to exchange from each node.
 // - messageFactory: a function that creates a unique message to be published by the node.
-func EnsureNoPubsubMessageExchange(t *testing.T, ctx context.Context, from []p2p.LibP2PNode, to []p2p.LibP2PNode, topic channels.Topic, count int, messageFactory func() interface{}) {
+func EnsureNoPubsubMessageExchange(
+	t *testing.T,
+	ctx context.Context,
+	from []p2p.LibP2PNode,
+	to []p2p.LibP2PNode,
+	toIdentifiers flow.IdentifierList,
+	topic channels.Topic,
+	count int,
+	messageFactory func() interface{}) {
 	subs := make([]p2p.Subscription, len(to))
 	tv := validator.TopicValidator(
 		unittest.Logger(),
@@ -717,7 +725,7 @@ func EnsureNoPubsubMessageExchange(t *testing.T, ctx context.Context, from []p2p
 
 				payload := messageFactory()
 				outgoingMessageScope, err := flownet.NewOutgoingScope(
-					flow.IdentifierList{unittest.IdentifierFixture()},
+					toIdentifiers,
 					channel,
 					payload,
 					unittest.NetworkCodec().Encode,
@@ -742,16 +750,27 @@ func EnsureNoPubsubMessageExchange(t *testing.T, ctx context.Context, from []p2p
 // Args:
 // - t: *testing.T instance
 // - ctx: context.Context instance
-// - groupA: first group of nodes- no message should be exchanged from any node of this group to the other group.
-// - groupB: second group of nodes- no message should be exchanged from any node of this group to the other group.
+// - groupANodes: first group of nodes- no message should be exchanged from any node of this group to the other group.
+// - groupAIdentifiers: identifiers of the nodes in the first group.
+// - groupBNodes: second group of nodes- no message should be exchanged from any node of this group to the other group.
+// - groupBIdentifiers: identifiers of the nodes in the second group.
 // - topic: pubsub topic- no message should be exchanged on this topic.
 // - count: number of messages to be exchanged- no message should be exchanged.
 // - messageFactory: function to create a unique message to be published by the node.
-func EnsureNoPubsubExchangeBetweenGroups(t *testing.T, ctx context.Context, groupA []p2p.LibP2PNode, groupB []p2p.LibP2PNode, topic channels.Topic, count int, messageFactory func() interface{}) {
+func EnsureNoPubsubExchangeBetweenGroups(
+	t *testing.T,
+	ctx context.Context,
+	groupANodes []p2p.LibP2PNode,
+	groupAIdentifiers flow.IdentifierList,
+	groupBNodes []p2p.LibP2PNode,
+	groupBIdentifiers flow.IdentifierList,
+	topic channels.Topic,
+	count int,
+	messageFactory func() interface{}) {
 	// ensure no message exchange from group A to group B
-	EnsureNoPubsubMessageExchange(t, ctx, groupA, groupB, topic, count, messageFactory)
+	EnsureNoPubsubMessageExchange(t, ctx, groupANodes, groupBNodes, groupBIdentifiers, topic, count, messageFactory)
 	// ensure no message exchange from group B to group A
-	EnsureNoPubsubMessageExchange(t, ctx, groupB, groupA, topic, count, messageFactory)
+	EnsureNoPubsubMessageExchange(t, ctx, groupBNodes, groupANodes, groupAIdentifiers, topic, count, messageFactory)
 }
 
 // PeerIdSliceFixture returns a slice of random peer IDs for testing.
