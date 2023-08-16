@@ -227,8 +227,17 @@ func (c *ControlMsgValidationInspector) inspectIWant(iWants []*pubsub_pb.Control
 		sampleSize = numOfIWants
 	}
 
+	var iWantMsgIDPool []string
+	// opens all iWant boxes into a sample pool to be sampled.
+	for _, iWant := range iWants {
+		if len(iWant.GetMessageIDs()) == 0 {
+			continue
+		}
+		iWantMsgIDPool = append(iWantMsgIDPool, iWant.GetMessageIDs()...)
+	}
+
 	swap := func(i, j uint) {
-		iWants[i], iWants[j] = iWants[j], iWants[i]
+		iWantMsgIDPool[i], iWantMsgIDPool[j] = iWantMsgIDPool[j], iWantMsgIDPool[i]
 	}
 
 	err := c.sampleCtrlMessages(p2pmsg.CtrlMsgIWant, numOfIWants, sampleSize, swap)
@@ -238,25 +247,20 @@ func (c *ControlMsgValidationInspector) inspectIWant(iWants []*pubsub_pb.Control
 
 	tracker := make(duplicateStrTracker)
 	cacheMisses := float64(0)
-	totalMessageIDS := float64(0)
-	for i := uint(0); i < sampleSize; i++ {
-		iWant := iWants[i]
-		for _, messageID := range iWant.GetMessageIDs() {
-			if tracker.isDuplicate(messageID) {
-				return NewDuplicateFoundErr(fmt.Errorf("duplicate message ID found: %s", messageID))
-			}
 
-			if !c.rpcTracker.WasIHaveRPCSent(messageID) {
-				cacheMisses++
-			}
-			tracker.set(messageID)
-			totalMessageIDS++
+	for _, messageID := range iWantMsgIDPool[:sampleSize] {
+		if tracker.isDuplicate(messageID) {
+			return NewDuplicateFoundErr(fmt.Errorf("duplicate message ID found: %s", messageID))
 		}
+		if !c.rpcTracker.WasIHaveRPCSent(messageID) {
+			cacheMisses++
+		}
+		tracker.set(messageID)
 	}
 
 	// check cache miss rate
-	if cacheMisses/totalMessageIDS > c.config.IWantRPCInspectionConfig.CacheMissThreshold {
-		return NewIWantCacheMissThresholdErr(cacheMisses, totalMessageIDS, c.config.IWantRPCInspectionConfig.CacheMissThreshold)
+	if cacheMisses/float64(sampleSize) > c.config.IWantRPCInspectionConfig.CacheMissThreshold {
+		return NewIWantCacheMissThresholdErr(cacheMisses, float64(sampleSize), c.config.IWantRPCInspectionConfig.CacheMissThreshold)
 	}
 
 	return nil
