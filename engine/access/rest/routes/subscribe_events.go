@@ -11,112 +11,75 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/engine/access/rest/models"
-	"github.com/onflow/flow-go/engine/access/rest/request"
 	"github.com/onflow/flow-go/engine/access/state_stream"
 )
 
-const (
-	// Time allowed to read the next pong message from the peer.
-	pongWait = 60 * time.Second
-
-	// Send pings to peer with this period. Must be less than pongWait.
-	pingPeriod = (pongWait * 9) / 10
-)
-
 // SubscribeEvents create websocket connection and write to it requested events.
-func SubscribeEvents(r *request.Request,
-	w http.ResponseWriter,
+func SubscribeEvents(
 	logger zerolog.Logger,
-	api state_stream.API,
+	h SubscribeHandler,
 	eventFilterConfig state_stream.EventFilterConfig,
-	maxStreams int32,
 	streamCount *atomic.Int32,
-	errorHandler func(w http.ResponseWriter, err error, errorLogger zerolog.Logger),
-	jsonResponse func(w http.ResponseWriter, code int, response interface{}, errLogger zerolog.Logger)) {
-	req, err := r.SubscribeEventsRequest()
-	if err != nil {
-		errorHandler(w, models.NewBadRequestError(err), logger)
-		return
-	}
+	errorHandler func(logger zerolog.Logger, conn *websocket.Conn, err error)) {
+	logger = logger.With().Str("subscribe events", h.request.URL.String()).Logger()
+	defer func() {
+		h.conn.Close()
+	}()
 
-	logger = logger.With().Str("subscribe events", r.URL.String()).Logger()
-	if streamCount.Load() >= maxStreams {
-		err := fmt.Errorf("maximum number of streams reached")
-		errorHandler(w, models.NewRestError(http.StatusServiceUnavailable, "maximum number of streams reached", err), logger)
-		return
-	}
-
-	// Upgrade the HTTP connection to a WebSocket connection
-	upgrader := websocket.Upgrader{}
-	conn, err := upgrader.Upgrade(w, r.Request, nil)
+	req, err := h.request.SubscribeEventsRequest()
 	if err != nil {
-		errorHandler(w, models.NewRestError(http.StatusInternalServerError, "webSocket upgrade error: ", err), logger)
+		errorHandler(logger, h.conn, models.NewBadRequestError(err))
 		return
 	}
 	// Retrieve the filter parameters from the request, if provided
 	filter, err := state_stream.NewEventFilter(
 		eventFilterConfig,
-		r.Chain,
+		h.request.Chain,
 		req.EventTypes,
 		req.Addresses,
 		req.Contracts,
 	)
 	if err != nil {
 		err := fmt.Errorf("event filter error")
-		errorHandler(w, models.NewBadRequestError(err), logger)
+		errorHandler(logger, h.conn, models.NewBadRequestError(err))
 		return
 	}
 
+	if streamCount.Load() >= h.maxStreams {
+		err := fmt.Errorf("maximum number of streams reached")
+		errorHandler(logger, h.conn, models.NewRestError(http.StatusServiceUnavailable, "maximum number of streams reached", err))
+		return
+	}
 	streamCount.Add(1)
 
+	ctx, cancel := context.WithCancel(context.Background())
+	defer func() {
+		cancel()
+	}()
+	sub := h.api.SubscribeEvents(ctx, req.StartBlockID, req.StartHeight, filter)
+
 	// Write messages to the WebSocket connection
-	go writeEvents(logger,
-		w,
-		req,
-		conn,
-		api,
-		filter,
-		errorHandler,
-		jsonResponse,
+	err = writeEvents(
+		sub,
+		h,
 		streamCount)
-	time.Sleep(2 * time.Second) // wait for creating child context in goroutine
+	if err != nil {
+		errorHandler(logger, h.conn, err)
+		return
+	}
 }
 
 func writeEvents(
-	log zerolog.Logger,
-	w http.ResponseWriter,
-	req request.SubscribeEvents,
-	conn *websocket.Conn,
-	api state_stream.API,
-	filter state_stream.EventFilter,
-	errorHandler func(w http.ResponseWriter, err error, errorLogger zerolog.Logger),
-	jsonResponse func(w http.ResponseWriter, code int, response interface{}, errLogger zerolog.Logger),
+	sub state_stream.Subscription,
+	h SubscribeHandler,
 	streamCount *atomic.Int32,
-) {
-	ctx, cancel := context.WithCancel(context.Background())
+) error {
 	ticker := time.NewTicker(pingPeriod)
-	sub := api.SubscribeEvents(ctx, req.StartBlockID, req.StartHeight, filter)
 
 	defer func() {
 		ticker.Stop()
 		streamCount.Add(-1)
-		conn.Close()
-		cancel()
 	}()
-	err := conn.SetReadDeadline(time.Now().Add(pongWait)) // Set the initial read deadline for the first pong message
-	if err != nil {
-		errorHandler(w, models.NewRestError(http.StatusInternalServerError, "Set the initial read deadline error: ", err), log)
-		return
-	}
-	conn.SetPongHandler(func(string) error {
-		err = conn.SetReadDeadline(time.Now().Add(pongWait)) // Reset the read deadline upon receiving a pong message
-		if err != nil {
-			errorHandler(w, models.NewRestError(http.StatusInternalServerError, "Set the initial read deadline error: ", err), log)
-			conn.Close()
-			return err
-		}
-		return nil
-	})
 
 	for {
 		select {
@@ -124,36 +87,25 @@ func writeEvents(
 			if !ok {
 				if sub.Err() != nil {
 					err := fmt.Errorf("stream encountered an error: %v", sub.Err())
-					errorHandler(w, models.NewBadRequestError(err), log)
-					conn.Close()
-					return
+					return models.NewBadRequestError(err)
 				}
 				err := fmt.Errorf("subscription channel closed, no error occurred")
-				errorHandler(w, models.NewRestError(http.StatusRequestTimeout, "subscription channel closed", err), log)
-				conn.Close()
-				return
+				return models.NewRestError(http.StatusRequestTimeout, "subscription channel closed", err)
 			}
 
 			resp, ok := v.(*state_stream.EventsResponse)
 			if !ok {
-				err := fmt.Errorf("unexpected response type: %T", v)
-				errorHandler(w, err, log)
-				conn.Close()
-				return
+				return fmt.Errorf("unexpected response type: %T", v)
 			}
 
 			// Write the response to the WebSocket connection
-			err := conn.WriteJSON(resp)
+			err := h.conn.WriteJSON(resp)
 			if err != nil {
-				errorHandler(w, err, log)
-				conn.Close()
-				return
+				return err
 			}
-			jsonResponse(w, http.StatusOK, "", log)
 		case <-ticker.C:
-			if err := conn.WriteMessage(websocket.PingMessage, nil); err != nil {
-				conn.Close()
-				return
+			if err := h.conn.WriteMessage(websocket.PingMessage, nil); err != nil {
+				return err
 			}
 		}
 	}

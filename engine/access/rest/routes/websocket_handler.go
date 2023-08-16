@@ -1,8 +1,13 @@
 package routes
 
 import (
+	"errors"
+	"fmt"
+	"github.com/gorilla/websocket"
+	"github.com/onflow/flow-go/engine/access/rest/models"
 	"net/http"
 	"sync/atomic"
+	"time"
 
 	"github.com/rs/zerolog"
 
@@ -11,19 +16,46 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
+const (
+	// Time allowed to read the next pong message from the peer.
+	pongWait = 60 * time.Second
+
+	// Send pings to peer with this period. Must be less than pongWait.
+	pingPeriod = (pongWait * 9) / 10
+
+	// Time allowed to write a message to the peer.
+	writeWait = 10 * time.Second
+)
+
+type SubscribeHandler struct {
+	request    *request.Request
+	respWriter http.ResponseWriter
+	conn       *websocket.Conn
+
+	api        state_stream.API
+	maxStreams int32
+}
+
+func (h *SubscribeHandler) SetReadWriteDeadline() error {
+	err := h.conn.SetWriteDeadline(time.Now().Add(writeWait)) // Set the initial write deadline for the first ping message
+	if err != nil {
+		return models.NewRestError(http.StatusInternalServerError, "Set the initial write deadline error: ", err)
+	}
+	err = h.conn.SetReadDeadline(time.Now().Add(pongWait)) // Set the initial read deadline for the first pong message
+	if err != nil {
+		return models.NewRestError(http.StatusInternalServerError, "Set the initial read deadline error: ", err)
+	}
+	return nil
+}
+
 // SubscribeHandlerFunc is a function that contains endpoint handling logic for subscribes,
 // it fetches necessary resources and returns an error.
 type SubscribeHandlerFunc func(
-	r *request.Request,
-	w http.ResponseWriter,
-
 	logger zerolog.Logger,
-	api state_stream.API,
+	subscribeHandler SubscribeHandler,
 	eventFilterConfig state_stream.EventFilterConfig,
-	maxStreams int32,
 	streamCount *atomic.Int32,
-	errorHandler func(w http.ResponseWriter, err error, errorLogger zerolog.Logger),
-	jsonResponse func(w http.ResponseWriter, code int, response interface{}, errLogger zerolog.Logger),
+	errorHandler func(logger zerolog.Logger, conn *websocket.Conn, err error),
 )
 
 // WSHandler is websocket handler implementing custom websocket handler function and allows easier handling of errors and
@@ -52,8 +84,8 @@ func NewWSHandler(
 		eventFilterConfig: eventFilterConfig,
 		maxStreams:        int32(maxGlobalStreams),
 		streamCount:       atomic.Int32{},
+		HttpHandler:       NewHttpHandler(logger, chain),
 	}
-	handler.HttpHandler = NewHttpHandler(logger, chain)
 
 	return handler
 }
@@ -62,22 +94,66 @@ func NewWSHandler(
 // such as logging, error handling, request decorators
 func (h *WSHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// create a logger
-	errLog := h.Logger.With().Str("request_url", r.URL.String()).Logger()
+	logger := h.Logger.With().Str("request_url", r.URL.String()).Logger()
 
 	err := h.VerifyRequest(w, r)
 	if err != nil {
 		return
 	}
+
+	// Upgrade the HTTP connection to a WebSocket connection
+	upgrader := websocket.Upgrader{}
+	conn, err := upgrader.Upgrade(w, r, nil)
+	if err != nil {
+		h.errorHandler(w, models.NewRestError(http.StatusInternalServerError, "webSocket upgrade error: ", err), logger)
+		return
+	}
+
 	decoratedRequest := request.Decorate(r, h.HttpHandler.Chain)
 
-	h.subscribeFunc(decoratedRequest,
-		w,
-		errLog,
-		h.api,
-		h.eventFilterConfig,
-		h.maxStreams,
-		&h.streamCount,
-		h.errorHandler,
-		h.jsonResponse)
+	subscribeHandler := SubscribeHandler{
+		request:    decoratedRequest,
+		respWriter: w,
+		conn:       conn,
+		api:        h.api,
+		maxStreams: h.maxStreams,
+	}
 
+	err = subscribeHandler.SetReadWriteDeadline()
+	if err != nil {
+		h.errorHandler(w, err, logger)
+		conn.Close()
+	}
+
+	go h.subscribeFunc(
+		logger,
+		subscribeHandler,
+		h.eventFilterConfig,
+		&h.streamCount,
+		h.sendError)
+}
+
+func (h *WSHandler) sendError(
+	logger zerolog.Logger,
+	conn *websocket.Conn,
+	err error) {
+	// rest status type error should be returned with status and user message provided
+	var statusErr models.StatusError
+	var errMsg models.ModelError
+	if errors.As(err, &statusErr) {
+		errMsg = models.ModelError{
+			Code:    int32(statusErr.Status()),
+			Message: statusErr.UserMessage(),
+		}
+	} else {
+		errMsg = models.ModelError{
+			Code:    http.StatusInternalServerError,
+			Message: "internal server error",
+		}
+	}
+
+	err = conn.WriteJSON(errMsg)
+	if err != nil {
+		logger.Error().Err(err).Msg(fmt.Sprintf("error sending WebSocket error: %v", err))
+	}
 }
