@@ -89,7 +89,7 @@ func (m IncomingMessageScope) PayloadType() string {
 // OutgoingMessageScope captures the context around an outgoing message that is about to be sent.
 type OutgoingMessageScope struct {
 	targetIds flow.IdentifierList               // the target node IDs.
-	channelId channels.Channel                  // the channel ID.
+	topic     channels.Topic                    // the topic, i.e., channel-id/spork-id.
 	payload   interface{}                       // the payload to be sent.
 	encoder   func(interface{}) ([]byte, error) // the encoder to encode the payload.
 	msg       *message.Message                  // raw proto message sent on wire.
@@ -103,13 +103,13 @@ type OutgoingMessageScope struct {
 // should have exactly one target ID, while pubsub messages should have at least one target ID).
 func NewOutgoingScope(
 	targetIds flow.IdentifierList,
-	channelId channels.Channel,
+	topic channels.Topic,
 	payload interface{},
 	encoder func(interface{}) ([]byte, error),
 	protocolType message.ProtocolType) (*OutgoingMessageScope, error) {
 	scope := &OutgoingMessageScope{
 		targetIds: targetIds,
-		channelId: channelId,
+		topic:     topic,
 		payload:   payload,
 		encoder:   encoder,
 		protocol:  protocolType,
@@ -148,8 +148,8 @@ func (o OutgoingMessageScope) PayloadType() string {
 	return MessageType(o.payload)
 }
 
-func (o OutgoingMessageScope) Channel() channels.Channel {
-	return o.channelId
+func (o OutgoingMessageScope) Topic() channels.Topic {
+	return o.topic
 }
 
 // buildMessage builds the raw proto message to be sent on the wire.
@@ -165,9 +165,14 @@ func (o OutgoingMessageScope) buildMessage() (*message.Message, error) {
 		emTargets = append(emTargets, tempID[:])
 	}
 
+	channel, ok := channels.ChannelFromTopic(o.topic)
+	if !ok {
+		return nil, fmt.Errorf("could not convert topic to channel: %s", o.topic)
+	}
+
 	return &message.Message{
 		TargetIDs: emTargets,
-		ChannelID: o.channelId.String(),
+		ChannelID: channel.String(),
 		Payload:   payload,
 	}, nil
 }
