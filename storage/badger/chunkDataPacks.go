@@ -51,13 +51,22 @@ func NewChunkDataPacks(collector module.CacheMetrics, db *badger.DB, collections
 	return &ch
 }
 
-func (ch *ChunkDataPacks) Remove(chunkID flow.Identifier) error {
-	err := operation.RetryOnConflict(ch.db.Update, operation.RemoveChunkDataPack(chunkID))
-	if err != nil {
-		return fmt.Errorf("could not remove chunk datapack: %w", err)
+// Remove removes multiple ChunkDataPacks cs keyed by their ChunkIDs in a batch.
+// No errors are expected during normal operation, even if no entries are matched.
+func (ch *ChunkDataPacks) Remove(chunkIDs []flow.Identifier) error {
+	batch := NewBatch(ch.db)
+
+	for _, c := range chunkIDs {
+		err := ch.BatchRemove(c, batch)
+		if err != nil {
+			return fmt.Errorf("cannot remove chunk data pack: %w", err)
+		}
 	}
-	// TODO Integrate cache removal in a similar way as storage/retrieval is
-	ch.byChunkIDCache.Remove(chunkID)
+
+	err := batch.Flush()
+	if err != nil {
+		return fmt.Errorf("cannot flush batch to remove chunk data pack: %w", err)
+	}
 	return nil
 }
 
