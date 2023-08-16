@@ -465,6 +465,7 @@ func (fnb *FlowNodeBuilder) InitFlowNetworkWithConduitFactory(
 		Logger:              fnb.Logger,
 		Codec:               fnb.CodecFactory(),
 		Me:                  fnb.Me,
+		SporkId:             fnb.SporkID,
 		MiddlewareFactory:   func() (network.Middleware, error) { return fnb.Middleware, nil },
 		Topology:            topology.NewFullyConnectedTopology(),
 		SubscriptionManager: subscriptionManager,

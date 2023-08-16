@@ -191,6 +191,7 @@ func MiddlewareFixtures(t *testing.T, identities flow.IdentityList, libP2PNodes 
 
 // NetworksFixture generates the network for the given middlewares
 func NetworksFixture(t *testing.T,
+	sporkId flow.Identifier,
 	ids flow.IdentityList,
 	mws []network.Middleware) []network.Network {
 
@@ -199,7 +200,7 @@ func NetworksFixture(t *testing.T,
 
 	for i := 0; i < count; i++ {
 
-		params := NetworkConfigFixture(t, *ids[i], ids, mws[i])
+		params := NetworkConfigFixture(t, *ids[i], ids, sporkId, mws[i])
 		net, err := p2p.NewNetwork(params)
 		require.NoError(t, err)
 
@@ -213,6 +214,7 @@ func NetworkConfigFixture(
 	t *testing.T,
 	myId flow.Identity,
 	allIds flow.IdentityList,
+	sporkId flow.Identifier,
 	mw network.Middleware,
 	opts ...p2p.NetworkConfigOption) *p2p.NetworkConfig {
 
@@ -240,6 +242,7 @@ func NetworkConfigFixture(
 		IdentityProvider:    id.NewFixedIdentityProvider(allIds),
 		ReceiveCache:        receiveCache,
 		ConduitFactory:      conduit.NewDefaultConduitFactory(),
+		SporkId:             sporkId,
 		AlspCfg: &alspmgr.MisbehaviorReportManagerConfig{
 			Logger:                  unittest.Logger(),
 			SpamRecordCacheSize:     defaultFlowConfig.NetworkConfig.AlspConfig.SpamRecordCacheSize,

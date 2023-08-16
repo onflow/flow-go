@@ -344,6 +344,7 @@ func (n *Node) unsubscribeTopic(topic channels.Topic) error {
 func (n *Node) Publish(ctx context.Context, msgScope *flownet.OutgoingMessageScope) error {
 	lg := n.logger.With().
 		Str("channel", msgScope.Channel().String()).
+		Hex("spork_id", logging.ID(msgScope.SporkId())).
 		Interface("proto_message", msgScope.Proto()).
 		Str("payload_type", msgScope.PayloadType()).
 		Int("message_size", msgScope.Size()).Logger()
@@ -362,7 +363,7 @@ func (n *Node) Publish(ctx context.Context, msgScope *flownet.OutgoingMessageSco
 		return fmt.Errorf("message size %d exceeds configured max message size %d", msgSize, DefaultMaxPubSubMsgSize)
 	}
 
-	topic := channels.TopicFromChannel(msgScope.Channel(), n.sporkId)
+	topic := channels.TopicFromChannel(msgScope.Channel(), msgScope.SporkId())
 	lg = lg.With().Str("topic", topic.String()).Logger()
 
 	ps, found := n.topics[topic]

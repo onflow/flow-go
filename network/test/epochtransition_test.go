@@ -201,7 +201,7 @@ func (suite *MutableIdentityTableSuite) addNodes(count int) {
 		nodes,
 		testutils.MiddlewareConfigFixture(suite.T(), sporkId),
 		mocknetwork.NewViolationsConsumer(suite.T()))
-	nets := testutils.NetworksFixture(suite.T(), ids, mws)
+	nets := testutils.NetworksFixture(suite.T(), sporkId, ids, mws)
 	suite.cancels = append(suite.cancels, cancel)
 
 	testutils.StartNodesAndNetworks(signalerCtx, suite.T(), nodes, nets, 100*time.Millisecond)

@@ -63,7 +63,7 @@ func TestNetworkPassesReportedMisbehavior(t *testing.T) {
 		testutils.MiddlewareConfigFixture(t, sporkId),
 		mocknetwork.NewViolationsConsumer(t))
 
-	networkCfg := testutils.NetworkConfigFixture(t, *ids[0], ids, mws[0])
+	networkCfg := testutils.NetworkConfigFixture(t, *ids[0], ids, sporkId, mws[0])
 	net, err := p2p.NewNetwork(networkCfg, p2p.WithAlspManager(misbehaviorReportManger))
 	require.NoError(t, err)
 
@@ -126,7 +126,7 @@ func TestHandleReportedMisbehavior_Cache_Integration(t *testing.T) {
 		nodes,
 		testutils.MiddlewareConfigFixture(t, sporkId),
 		mocknetwork.NewViolationsConsumer(t))
-	networkCfg := testutils.NetworkConfigFixture(t, *ids[0], ids, mws[0], p2p.WithAlspConfig(cfg))
+	networkCfg := testutils.NetworkConfigFixture(t, *ids[0], ids, sporkId, mws[0], p2p.WithAlspConfig(cfg))
 	net, err := p2p.NewNetwork(networkCfg)
 	require.NoError(t, err)
 
@@ -230,7 +230,7 @@ func TestHandleReportedMisbehavior_And_DisallowListing_Integration(t *testing.T)
 		nodes,
 		testutils.MiddlewareConfigFixture(t, sporkId),
 		mocknetwork.NewViolationsConsumer(t))
-	networkCfg := testutils.NetworkConfigFixture(t, *ids[0], ids, mws[0], p2p.WithAlspConfig(cfg))
+	networkCfg := testutils.NetworkConfigFixture(t, *ids[0], ids, sporkId, mws[0], p2p.WithAlspConfig(cfg))
 	victimNetwork, err := p2p.NewNetwork(networkCfg)
 	require.NoError(t, err)
 
@@ -313,6 +313,7 @@ func TestHandleReportedMisbehavior_And_SlashingViolationsConsumer_Integration(t 
 		t,
 		*ids[0],
 		ids,
+		sporkId,
 		mws[0],
 		p2p.WithAlspConfig(managerCfgFixture(t)))
 	victimNetwork, err := p2p.NewNetwork(networkCfg)
@@ -406,7 +407,7 @@ func TestMisbehaviorReportMetrics(t *testing.T) {
 	sporkId := unittest.IdentifierFixture()
 	ids, nodes := testutils.LibP2PNodeForMiddlewareFixture(t, sporkId, 1)
 	mws, _ := testutils.MiddlewareFixtures(t, ids, nodes, testutils.MiddlewareConfigFixture(t, sporkId), mocknetwork.NewViolationsConsumer(t))
-	networkCfg := testutils.NetworkConfigFixture(t, *ids[0], ids, mws[0], p2p.WithAlspConfig(cfg))
+	networkCfg := testutils.NetworkConfigFixture(t, *ids[0], ids, sporkId, mws[0], p2p.WithAlspConfig(cfg))
 	net, err := p2p.NewNetwork(networkCfg)
 	require.NoError(t, err)
 
