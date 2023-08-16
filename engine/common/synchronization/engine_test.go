@@ -231,21 +231,28 @@ func (ss *SyncSuite) TestOnSyncRequest_HigherThanReceiver_OutsideTolerance() {
 func (ss *SyncSuite) TestOnSyncRequest_HigherThanReceiver_OutsideTolerance_Load() {
 	load := 1000
 
+	ctx, cancel := irrecoverable.NewMockSignalerContextWithCancel(ss.T(), context.Background())
+	ss.e.Start(ctx)
+	unittest.AssertClosesBefore(ss.T(), ss.e.Ready(), time.Second)
+	defer cancel()
+
 	// generate origin and request message
 	originID := unittest.IdentifierFixture()
-	req := &messages.SyncRequest{
-		Nonce:  rand.Uint64(),
-		Height: 0,
-	}
 
 	for i := 0; i < load; i++ {
 		ss.T().Logf("i: %d", i)
+
+		req := &messages.SyncRequest{
+			Nonce:  rand.Uint64(),
+			Height: 0,
+		}
+
 		// if request height is higher than local finalized, we should not respond
 		req.Height = ss.head.Height + 1
 		ss.core.On("HandleHeight", ss.head, req.Height)
 		ss.core.On("WithinTolerance", ss.head, req.Height).Return(false)
-		err := ss.e.requestHandler.onSyncRequest(originID, req)
-		ss.Assert().NoError(err, "same height sync request should pass")
+
+		require.NoError(ss.T(), ss.e.Process(channels.SyncCommittee, originID, req))
 		ss.con.AssertNotCalled(ss.T(), "Unicast", mock.Anything, mock.Anything)
 	}
 
