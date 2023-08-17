@@ -57,6 +57,7 @@ type Engine struct {
 	participantsProvider module.IdentifierProvider
 
 	requestHandler *RequestHandler // component responsible for handling requests
+	randomizer     rand.Randomizer
 
 	pendingSyncResponses   engine.MessageStore    // message store for *message.SyncResponse
 	pendingBlockResponses  engine.MessageStore    // message store for *message.BlockResponse
@@ -107,6 +108,7 @@ func New(
 		pollInterval:         opt.PollInterval,
 		scanInterval:         opt.ScanInterval,
 		participantsProvider: participantsProvider,
+		randomizer:           rand.NewDefaultRandomizer(),
 	}
 
 	// register the engine with the network layer and store the conduit
@@ -484,20 +486,12 @@ func (e *Engine) validateRangeRequestForALSP(channel channels.Channel, id flow.I
 }
 
 func (e *Engine) validateSyncRequestForALSP(channel channels.Channel, originID flow.Identifier, event interface{}) (*alsp.MisbehaviorReport, bool) {
+	// Generate a random integer between 1 and 1000
+	n := e.randomizer.Uint32n(uint32(1001))
+
 	// use a probabilistic approach to create a misbehavior report - create a report with a probability of 1/1000
 	// this is done to avoid creating a report for every sync request received
 	// the probability of creating a misbehavior report is 1/1000
-
-	// Generate a random integer between 1 and 1000
-	n, err := rand.Uint32n(1001)
-
-	if err != nil {
-		e.log.Fatal().
-			Err(err).
-			Str("originID", originID.String()).
-			Msg("failed to create random number")
-	}
-
 	if n == 835 {
 		// create a misbehavior report
 		e.log.Info().Str("originID", originID.String()).Msg("creating misbehavior report")

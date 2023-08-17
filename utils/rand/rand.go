@@ -15,6 +15,8 @@ import (
 	"crypto/rand"
 	"encoding/binary"
 	"fmt"
+
+	"github.com/stretchr/testify/mock"
 )
 
 // Uint64 returns a random uint64.
@@ -166,4 +168,37 @@ func Samples(n uint, m uint, swap func(i, j uint)) error {
 		swap(i, i+j)
 	}
 	return nil
+}
+
+// Randomizer is an interface that defines a method for generating random numbers. This is useful for testing where
+// we want to mock out random number generation.
+type Randomizer interface {
+	// Uint32n returns a random uint32 strictly less than `n`.
+	Uint32n(n uint32) uint32
+}
+
+func NewDefaultRandomizer() Randomizer {
+	return &defaultRandomizer{}
+}
+
+type defaultRandomizer struct{}
+
+// Uint32n returns a random number between 0 and n (exclusive)
+func (e *defaultRandomizer) Uint32n(n uint32) uint32 {
+	n, err := Uint32n(n)
+	if err != nil {
+		fmt.Errorf("failed to create random number (%d): %w", n, err)
+	}
+	return n
+}
+
+// MockRandomizer is a mock object that implements the Randomizer interface
+type MockRandomizer struct {
+	mock.Mock
+}
+
+// Uint32n is a mock method that returns a random number
+func (m *MockRandomizer) Uint32n(n uint32) uint32 {
+	args := m.Called(n)
+	return uint32(args.Int(0))
 }
