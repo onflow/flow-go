@@ -41,9 +41,14 @@ const (
 type fakeNetConn struct {
 	io.Reader
 	io.Writer
+	closed chan struct{}
 }
 
-func (c fakeNetConn) Close() error                       { return nil }
+// Close closes the fakeNetConn and signals its closure by closing the "closed" channel.
+func (c fakeNetConn) Close() error {
+	close(c.closed)
+	return nil
+}
 func (c fakeNetConn) LocalAddr() net.Addr                { return localAddr }
 func (c fakeNetConn) RemoteAddr() net.Addr               { return remoteAddr }
 func (c fakeNetConn) SetDeadline(t time.Time) error      { return nil }
@@ -65,19 +70,28 @@ func (a fakeAddr) String() string {
 	return "str"
 }
 
+// HijackResponseRecorder is a custom ResponseRecorder that implements the http.Hijacker interface
+// for testing WebSocket connections and hijacking.
 type HijackResponseRecorder struct {
 	*httptest.ResponseRecorder
-	brw *bufio.ReadWriter
+	closed       chan struct{}
+	responseBuff *bytes.Buffer
 }
 
+// Hijack implements the http.Hijacker interface by returning a fakeNetConn and a bufio.ReadWriter
+// that simulate a hijacked connection.
 func (w *HijackResponseRecorder) Hijack() (net.Conn, *bufio.ReadWriter, error) {
-	return fakeNetConn{strings.NewReader(""), &bytes.Buffer{}}, w.brw, nil
+	br := bufio.NewReaderSize(strings.NewReader(""), state_stream.DefaultSendBufferSize)
+	bw := bufio.NewWriterSize(&bytes.Buffer{}, state_stream.DefaultSendBufferSize)
+	w.responseBuff = bytes.NewBuffer(make([]byte, 0))
+	w.closed = make(chan struct{}, 1)
+
+	return fakeNetConn{strings.NewReader(""), w.responseBuff, w.closed}, bufio.NewReadWriter(br, bw), nil
 }
 
-func NewHijackResponseRecorder(brw *bufio.ReadWriter) *HijackResponseRecorder {
-	responseRecorder := &HijackResponseRecorder{
-		brw: brw,
-	}
+// NewHijackResponseRecorder creates a new instance of HijackResponseRecorder.
+func NewHijackResponseRecorder() *HijackResponseRecorder {
+	responseRecorder := &HijackResponseRecorder{}
 	responseRecorder.ResponseRecorder = httptest.NewRecorder()
 	return responseRecorder
 }
@@ -101,18 +115,15 @@ func newRouter(backend *mock.API, stateStreamApi *mock_state_stream.API) (*mux.R
 		stateStreamConfig.MaxGlobalStreams)
 }
 
-func executeRequest(req *http.Request, backend *mock.API, stateStreamApi *mock_state_stream.API) (*httptest.ResponseRecorder, error) {
+func executeRequest(req *http.Request, backend *mock.API, stateStreamApi *mock_state_stream.API) (*HijackResponseRecorder, error) {
 	router, err := newRouter(backend, stateStreamApi)
 	if err != nil {
 		return nil, err
 	}
 
-	br := bufio.NewReaderSize(strings.NewReader(""), state_stream.DefaultSendBufferSize)
-	bw := bufio.NewWriterSize(&bytes.Buffer{}, state_stream.DefaultSendBufferSize)
-	resp := NewHijackResponseRecorder(bufio.NewReadWriter(br, bw))
-
+	resp := NewHijackResponseRecorder()
 	router.ServeHTTP(resp, req)
-	return resp.ResponseRecorder, nil
+	return resp, nil
 }
 
 func assertOKResponse(t *testing.T, req *http.Request, expectedRespBody string, backend *mock.API, stateStreamApi *mock_state_stream.API) {

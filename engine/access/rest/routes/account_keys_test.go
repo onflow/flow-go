@@ -199,7 +199,7 @@ func TestGetAccountKeyByIndex(t *testing.T) {
 		expected := expectedAccountKeyResponse(account)
 
 		assertOKResponse(t, req, expected, backend, nil)
-		mocktestify.AssertExpectationsForObjects(t, backend, nil)
+		mocktestify.AssertExpectationsForObjects(t, backend)
 	})
 
 	t.Run("get key by address and index at missing block", func(t *testing.T) {

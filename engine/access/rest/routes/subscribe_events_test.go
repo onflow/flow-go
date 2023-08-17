@@ -165,9 +165,8 @@ func (s *SubscribeEventsSuite) TestSubscribeEvents() {
 
 			req, err := getSubscribeEventsRequest(s.T(), test.startBlockID, test.startHeight, test.eventTypes, test.addresses, test.contracts)
 			assert.NoError(s.T(), err)
-			rr, err := executeRequest(req, backend, stateStreamBackend)
+			_, err = executeRequest(req, backend, stateStreamBackend)
 			assert.NoError(s.T(), err)
-			assert.Equal(s.T(), http.StatusOK, rr.Code)
 		})
 	}
 }
@@ -179,7 +178,9 @@ func (s *SubscribeEventsSuite) TestSubscribeEventsHandlesErrors() {
 
 		req, err := getSubscribeEventsRequest(s.T(), s.blocks[0].ID(), s.blocks[0].Header.Height, nil, nil, nil)
 		assert.NoError(s.T(), err)
-		assertResponse(s.T(), req, http.StatusBadRequest, `{"code":400,"message":"can only provide either block ID or start height"}`, backend, stateStreamBackend)
+		respRecorder, err := executeRequest(req, backend, stateStreamBackend)
+		assert.NoError(s.T(), err)
+		requireError(s.T(), respRecorder, "can only provide either block ID or start height")
 	})
 
 	s.Run("returns error for invalid block id", func() {
@@ -202,7 +203,9 @@ func (s *SubscribeEventsSuite) TestSubscribeEventsHandlesErrors() {
 
 		req, err := getSubscribeEventsRequest(s.T(), invalidBlock.ID(), request.EmptyHeight, nil, nil, nil)
 		assert.NoError(s.T(), err)
-		assertResponse(s.T(), req, http.StatusBadRequest, `{"code":400,"message":"stream encountered an error: subscription error"}`, backend, stateStreamBackend)
+		respRecorder, err := executeRequest(req, backend, stateStreamBackend)
+		assert.NoError(s.T(), err)
+		requireError(s.T(), respRecorder, "stream encountered an error: subscription error")
 	})
 
 	s.Run("returns error when channel closed", func() {
@@ -224,7 +227,9 @@ func (s *SubscribeEventsSuite) TestSubscribeEventsHandlesErrors() {
 
 		req, err := getSubscribeEventsRequest(s.T(), s.blocks[0].ID(), request.EmptyHeight, nil, nil, nil)
 		assert.NoError(s.T(), err)
-		assertResponse(s.T(), req, http.StatusRequestTimeout, `{"code":408,"message":"subscription channel closed"}`, backend, stateStreamBackend)
+		respRecorder, err := executeRequest(req, backend, stateStreamBackend)
+		assert.NoError(s.T(), err)
+		requireError(s.T(), respRecorder, "subscription channel closed")
 	})
 
 	s.Run("returns error for unexpected response type", func() {
@@ -248,7 +253,10 @@ func (s *SubscribeEventsSuite) TestSubscribeEventsHandlesErrors() {
 
 		req, err := getSubscribeEventsRequest(s.T(), s.blocks[0].ID(), request.EmptyHeight, nil, nil, nil)
 		assert.NoError(s.T(), err)
-		assertResponse(s.T(), req, http.StatusInternalServerError, `{"code":500,"message":"internal server error"}`, backend, stateStreamBackend)
+
+		respRecorder, err := executeRequest(req, backend, stateStreamBackend)
+		assert.NoError(s.T(), err)
+		requireError(s.T(), respRecorder, "unexpected response type: *state_stream.ExecutionDataResponse")
 	})
 }
 
@@ -299,4 +307,9 @@ func generateWebSocketKey() (string, error) {
 
 	// Encode the bytes to base64 and return the key as a string.
 	return base64.StdEncoding.EncodeToString(keyBytes), nil
+}
+
+func requireError(t *testing.T, recorder *HijackResponseRecorder, expected string) {
+	<-recorder.closed
+	require.Contains(t, recorder.responseBuff.String(), expected)
 }

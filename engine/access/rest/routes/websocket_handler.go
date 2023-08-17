@@ -30,11 +30,10 @@ const (
 // SubscribeHandler holds the necessary components and parameters for handling a WebSocket subscription.
 // It manages the communication between the server and the WebSocket client for subscribing.
 type SubscribeHandler struct {
-	request    *request.Request    // the incoming HTTP request containing the subscription details.
-	respWriter http.ResponseWriter // the HTTP response writer to communicate back to the client.
-	conn       *websocket.Conn     // the established WebSocket connection for communication with the client.
-	api        state_stream.API    // the state_stream.API instance for managing event subscriptions.
-	maxStreams int32               // the maximum number of streams allowed.
+	request    *request.Request // the incoming HTTP request containing the subscription details.
+	conn       *websocket.Conn  // the established WebSocket connection for communication with the client.
+	api        state_stream.API // the state_stream.API instance for managing event subscriptions.
+	maxStreams int32            // the maximum number of streams allowed.
 }
 
 // SetReadWriteDeadline used to set read and write deadlines for WebSocket connections. These methods allow you to
@@ -112,11 +111,8 @@ func (h *WSHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	decoratedRequest := request.Decorate(r, h.HttpHandler.Chain)
-
 	subscribeHandler := SubscribeHandler{
-		request:    decoratedRequest,
-		respWriter: w,
+		request:    request.Decorate(r, h.HttpHandler.Chain),
 		conn:       conn,
 		api:        h.api,
 		maxStreams: h.maxStreams,
@@ -124,7 +120,7 @@ func (h *WSHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	err = subscribeHandler.SetReadWriteDeadline()
 	if err != nil {
-		h.errorHandler(w, err, logger)
+		h.wsErrorHandler(logger, conn, err)
 		conn.Close()
 	}
 
@@ -133,29 +129,47 @@ func (h *WSHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		subscribeHandler,
 		h.eventFilterConfig,
 		&h.streamCount,
-		h.sendError)
+		h.wsErrorHandler)
 }
 
-func (h *WSHandler) sendError(
+// wsErrorHandler handles WebSocket errors by sending an appropriate close message
+// to the client WebSocket connection.
+//
+// If the error is an instance of models.StatusError, the function extracts the
+// relevant information like status code and user message to construct the WebSocket
+// close code and message. If the error is not a models.StatusError, a default
+// internal server error close code and the error's message are used.
+// The connection is then closed using WriteControl to send a CloseMessage with the
+// constructed close code and message. Any errors that occur during the closing
+// process are logged using the provided logger.
+func (h *WSHandler) wsErrorHandler(
 	logger zerolog.Logger,
 	conn *websocket.Conn,
 	err error) {
 	// rest status type error should be returned with status and user message provided
 	var statusErr models.StatusError
-	var errMsg models.ModelError
+	var wsCode int
+	var wsMsg string
+
 	if errors.As(err, &statusErr) {
-		errMsg = models.ModelError{
-			Code:    int32(statusErr.Status()),
-			Message: statusErr.UserMessage(),
+		if statusErr.Status() == http.StatusBadRequest {
+			wsCode = websocket.CloseUnsupportedData
 		}
+		if statusErr.Status() == http.StatusServiceUnavailable {
+			wsCode = websocket.CloseTryAgainLater
+		}
+		if statusErr.Status() == http.StatusRequestTimeout {
+			wsCode = websocket.CloseGoingAway
+		}
+		wsMsg = statusErr.UserMessage()
+
 	} else {
-		errMsg = models.ModelError{
-			Code:    http.StatusInternalServerError,
-			Message: "internal server error",
-		}
+		wsCode = websocket.CloseInternalServerErr
+		wsMsg = err.Error()
 	}
 
-	err = conn.WriteJSON(errMsg)
+	// Close the connection with the CloseError message
+	err = conn.WriteControl(websocket.CloseMessage, websocket.FormatCloseMessage(wsCode, wsMsg), time.Now().Add(time.Second))
 	if err != nil {
 		logger.Error().Err(err).Msg(fmt.Sprintf("error sending WebSocket error: %v", err))
 	}

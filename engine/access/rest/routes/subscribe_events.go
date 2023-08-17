@@ -22,9 +22,7 @@ func SubscribeEvents(
 	streamCount *atomic.Int32,
 	errorHandler func(logger zerolog.Logger, conn *websocket.Conn, err error)) {
 	logger = logger.With().Str("subscribe events", h.request.URL.String()).Logger()
-	defer func() {
-		h.conn.Close()
-	}()
+	defer h.conn.Close()
 
 	req, err := h.request.SubscribeEventsRequest()
 	if err != nil {
@@ -53,9 +51,8 @@ func SubscribeEvents(
 	streamCount.Add(1)
 
 	ctx, cancel := context.WithCancel(context.Background())
-	defer func() {
-		cancel()
-	}()
+	defer cancel()
+
 	sub := h.api.SubscribeEvents(ctx, req.StartBlockID, req.StartHeight, filter)
 
 	// Write messages to the WebSocket connection
