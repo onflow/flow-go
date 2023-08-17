@@ -283,10 +283,13 @@ func (s *state) SaveExecutionResults(
 		trace.EXEStateSaveExecutionResults)
 	defer span.End()
 
-	header := result.ExecutableBlock.Block.Header
+	err := s.saveExecutionResults(ctx, result)
+	if err != nil {
+		return fmt.Errorf("could not save execution results: %w", err)
+	}
 
 	//outside batch because it requires read access
-	err := s.UpdateHighestExecutedBlockIfHigher(childCtx, header)
+	err = s.UpdateHighestExecutedBlockIfHigher(childCtx, result.ExecutableBlock.Block.Header)
 	if err != nil {
 		return fmt.Errorf("cannot update highest executed block: %w", err)
 	}
