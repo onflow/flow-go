@@ -6,13 +6,8 @@ import (
 
 	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/channels"
 )
-
-// Ensure structs implement the interfaces
-var _ network.IncomingMessageScope = &IncomingMessageScope{}
-var _ network.OutgoingMessageScope = &OutgoingMessageScope{}
 
 const (
 	// eventIDPackingPrefix is used as a salt to generate payload hash for messages.
