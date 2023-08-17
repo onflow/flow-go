@@ -3,8 +3,7 @@
 package mocknetwork
 
 import (
-	"github.com/onflow/flow-go/network/message"
-
+	network "github.com/onflow/flow-go/network"
 	mock "github.com/stretchr/testify/mock"
 )
 
@@ -14,11 +13,11 @@ type MessageValidator struct {
 }
 
 // Validate provides a mock function with given fields: msg
-func (_m *MessageValidator) Validate(msg message.IncomingMessageScope) bool {
+func (_m *MessageValidator) Validate(msg network.IncomingMessageScope) bool {
 	ret := _m.Called(msg)
 
 	var r0 bool
-	if rf, ok := ret.Get(0).(func(message.IncomingMessageScope) bool); ok {
+	if rf, ok := ret.Get(0).(func(network.IncomingMessageScope) bool); ok {
 		r0 = rf(msg)
 	} else {
 		r0 = ret.Get(0).(bool)

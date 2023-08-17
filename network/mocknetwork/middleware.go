@@ -4,9 +4,7 @@ package mocknetwork
 
 import (
 	datastore "github.com/ipfs/go-datastore"
-
 	channels "github.com/onflow/flow-go/network/channels"
-	"github.com/onflow/flow-go/network/message"
 
 	irrecoverable "github.com/onflow/flow-go/module/irrecoverable"
 
@@ -88,11 +86,11 @@ func (_m *Middleware) OnDisallowListNotification(_a0 *network.DisallowListingUpd
 }
 
 // Publish provides a mock function with given fields: msg
-func (_m *Middleware) Publish(msg *message.OutgoingMessageScope) error {
+func (_m *Middleware) Publish(msg network.OutgoingMessageScope) error {
 	ret := _m.Called(msg)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(*message.OutgoingMessageScope) error); ok {
+	if rf, ok := ret.Get(0).(func(network.OutgoingMessageScope) error); ok {
 		r0 = rf(msg)
 	} else {
 		r0 = ret.Error(0)
@@ -118,11 +116,11 @@ func (_m *Middleware) Ready() <-chan struct{} {
 }
 
 // SendDirect provides a mock function with given fields: msg
-func (_m *Middleware) SendDirect(msg *message.OutgoingMessageScope) error {
+func (_m *Middleware) SendDirect(msg network.OutgoingMessageScope) error {
 	ret := _m.Called(msg)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(*message.OutgoingMessageScope) error); ok {
+	if rf, ok := ret.Get(0).(func(network.OutgoingMessageScope) error); ok {
 		r0 = rf(msg)
 	} else {
 		r0 = ret.Error(0)

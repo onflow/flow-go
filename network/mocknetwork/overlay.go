@@ -4,9 +4,9 @@ package mocknetwork
 
 import (
 	flow "github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/network/message"
-
 	mock "github.com/stretchr/testify/mock"
+
+	network "github.com/onflow/flow-go/network"
 
 	peer "github.com/libp2p/go-libp2p/core/peer"
 )
@@ -59,11 +59,11 @@ func (_m *Overlay) Identity(_a0 peer.ID) (*flow.Identity, bool) {
 }
 
 // Receive provides a mock function with given fields: _a0
-func (_m *Overlay) Receive(_a0 *message.IncomingMessageScope) error {
+func (_m *Overlay) Receive(_a0 network.IncomingMessageScope) error {
 	ret := _m.Called(_a0)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(*message.IncomingMessageScope) error); ok {
+	if rf, ok := ret.Get(0).(func(network.IncomingMessageScope) error); ok {
 		r0 = rf(_a0)
 	} else {
 		r0 = ret.Error(0)
