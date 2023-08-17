@@ -13,7 +13,7 @@ import (
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/channels"
-	message2 "github.com/onflow/flow-go/network/message"
+	flownetmsg "github.com/onflow/flow-go/network/message"
 	"github.com/onflow/flow-go/utils/logging"
 )
 
@@ -160,7 +160,7 @@ func (on *Network) processEgressMessage(message *insecure.EgressMessage) error {
 
 	channel := channels.Channel(message.ChannelID)
 
-	egressEventIDHash, err := message2.EventId(channel, message.Payload)
+	egressEventIDHash, err := flownetmsg.EventId(channel, message.Payload)
 	if err != nil {
 		return fmt.Errorf("could not create egress event ID: %w", err)
 	}
@@ -206,7 +206,7 @@ func (on *Network) processIngressMessage(message *insecure.IngressMessage) error
 	defer on.orchestratorMutex.Unlock()
 
 	channel := channels.Channel(message.ChannelID)
-	ingressEventIDHash, err := message2.EventId(channel, message.Payload)
+	ingressEventIDHash, err := flownetmsg.EventId(channel, message.Payload)
 	if err != nil {
 		return fmt.Errorf("could not create ingress event ID: %w", err)
 	}
