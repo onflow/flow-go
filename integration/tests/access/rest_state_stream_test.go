@@ -153,6 +153,7 @@ func (s *RestStateStreamSuite) TestRestEventStreaming() {
 					// Event channel closed, events received
 					s.T().Log(" Event channel closed, events received")
 					client.Close()
+					require.Equal(s.T(), len(receivedEventsResponse) > 0, "expect some events ")
 					return
 				}
 				receivedEventsResponse = append(receivedEventsResponse, eventResponse)

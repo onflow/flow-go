@@ -3,13 +3,14 @@ package routes
 import (
 	"crypto/rand"
 	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/url"
+	"regexp"
 	"strings"
 	"testing"
-
-	"golang.org/x/exp/slices"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	mocks "github.com/stretchr/testify/mock"
@@ -112,33 +113,51 @@ func (s *SubscribeEventsSuite) TestSubscribeEvents() {
 		s.Run(test.name, func() {
 			stateStreamBackend := &mockstatestream.API{}
 			backend := &mock.API{}
-
 			subscription := &mockstatestream.Subscription{}
 
-			expectedEvents := flow.EventsList{}
-			for _, event := range s.blockEvents[s.blocks[0].ID()] {
-				if slices.Contains(test.eventTypes, string(event.Type)) {
-					expectedEvents = append(expectedEvents, event)
+			filter, err := state_stream.NewEventFilter(state_stream.DefaultEventFilterConfig, chain, test.eventTypes, test.addresses, test.contracts)
+			assert.NoError(s.T(), err)
+
+			var expectedEventsResponses []*state_stream.EventsResponse
+			startBlockFound := test.startBlockID == flow.ZeroID
+
+			// Helper function to check if a string is present in a slice
+			addExpectedEvent := func(slice []string, item string) bool {
+				if slice == nil {
+					return true // Include all events when test.eventTypes is nil
+				}
+				for _, s := range slice {
+					if s == item {
+						return true
+					}
+				}
+				return false
+			}
+
+			// construct expected event responses based on the provided test configuration
+			for _, block := range s.blocks {
+				if startBlockFound || block.ID() == test.startBlockID {
+					startBlockFound = true
+					if test.startHeight == request.EmptyHeight || block.Header.Height >= test.startHeight {
+						eventsForBlock := flow.EventsList{}
+						for _, event := range s.blockEvents[block.ID()] {
+							if addExpectedEvent(test.eventTypes, string(event.Type)) {
+								eventsForBlock = append(eventsForBlock, event)
+							}
+						}
+						eventResponse := &state_stream.EventsResponse{
+							Height:  block.Header.Height,
+							BlockID: block.ID(),
+							Events:  eventsForBlock,
+						}
+						expectedEventsResponses = append(expectedEventsResponses, eventResponse)
+					}
 				}
 			}
 
 			// Create a channel to receive mock EventsResponse objects
 			ch := make(chan interface{})
 			var chReadOnly <-chan interface{}
-			var expectedEventsResponses []*state_stream.EventsResponse
-
-			for i, b := range s.blocks {
-				s.T().Logf("checking block %d %v", i, b.ID())
-
-				//simulate EventsResponse
-				eventResponse := &state_stream.EventsResponse{
-					Height:  b.Header.Height,
-					BlockID: b.ID(),
-					Events:  expectedEvents,
-				}
-				expectedEventsResponses = append(expectedEventsResponses, eventResponse)
-			}
-
 			// Simulate sending a mock EventsResponse
 			go func() {
 				for _, eventResponse := range expectedEventsResponses {
@@ -148,12 +167,8 @@ func (s *SubscribeEventsSuite) TestSubscribeEvents() {
 			}()
 
 			chReadOnly = ch
-
 			subscription.Mock.On("Channel").Return(chReadOnly)
 			subscription.Mock.On("Err").Return(nil)
-
-			filter, err := state_stream.NewEventFilter(state_stream.DefaultEventFilterConfig, chain, test.eventTypes, test.addresses, test.contracts)
-			assert.NoError(s.T(), err)
 
 			var startHeight uint64
 			if test.startHeight == request.EmptyHeight {
@@ -165,8 +180,9 @@ func (s *SubscribeEventsSuite) TestSubscribeEvents() {
 
 			req, err := getSubscribeEventsRequest(s.T(), test.startBlockID, test.startHeight, test.eventTypes, test.addresses, test.contracts)
 			assert.NoError(s.T(), err)
-			_, err = executeRequest(req, backend, stateStreamBackend)
+			respRecorder, err := executeRequest(req, backend, stateStreamBackend)
 			assert.NoError(s.T(), err)
+			requireResponse(s.T(), respRecorder, expectedEventsResponses)
 		})
 	}
 }
@@ -312,4 +328,34 @@ func generateWebSocketKey() (string, error) {
 func requireError(t *testing.T, recorder *HijackResponseRecorder, expected string) {
 	<-recorder.closed
 	require.Contains(t, recorder.responseBuff.String(), expected)
+}
+
+func requireResponse(t *testing.T, recorder *HijackResponseRecorder, expected []*state_stream.EventsResponse) {
+	time.Sleep(1 * time.Second)
+	// Convert the actual response from respRecorder to JSON bytes
+	actualJSON := recorder.responseBuff.Bytes()
+	// Define a regular expression pattern to match JSON objects
+	pattern := `\{"BlockID":".*?","Height":\d+,"Events":\[\{.*?\}\]\}`
+	matches := regexp.MustCompile(pattern).FindAll(actualJSON, -1)
+
+	// Unmarshal each matched JSON into []state_stream.EventsResponse
+	var actual []state_stream.EventsResponse
+	for _, match := range matches {
+		var response state_stream.EventsResponse
+		if err := json.Unmarshal(match, &response); err == nil {
+			actual = append(actual, response)
+		}
+	}
+
+	// Compare the count of expected and actual responses
+	assert.Equal(t, len(expected), len(actual))
+
+	// Compare the BlockID and Events count for each response
+	for i := 0; i < len(expected); i++ {
+		expected := expected[i]
+		actual := actual[i]
+
+		assert.Equal(t, expected.BlockID, actual.BlockID)
+		assert.Equal(t, len(expected.Events), len(actual.Events))
+	}
 }
