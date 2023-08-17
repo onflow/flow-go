@@ -262,7 +262,7 @@ func TestTopicValidator_InvalidTopic(t *testing.T) {
 	p2ptest.StartNodes(t, signalerCtx, nodes, 100*time.Millisecond)
 	defer p2ptest.StopNodes(t, nodes, cancel, 100*time.Millisecond)
 
-	topic := channels.TopicFromChannel(channels.ConsensusCommittee, sporkId)
+	topic := channels.Topic("invalid-topic")
 
 	pInfo2, err := utils.PeerAddressInfo(identity2)
 	require.NoError(t, err)
@@ -284,24 +284,32 @@ func TestTopicValidator_InvalidTopic(t *testing.T) {
 
 	timedCtx, cancel5s := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel5s()
-	// create a dummy block proposal to publish from our SN node
-	outgoingMessageScope1, err := message.NewOutgoingScope(
+
+	// invalid topic is malformed, hence it cannot be used to create a message scope, as it faces an error.
+	// Hence, we create a dummy block proposal message scope to publish on a legit topic, and then override
+	// the topic in the next step to a malformed topic.
+	dummyMessageScope, err := message.NewOutgoingScope(
 		flow.IdentifierList{identity1.NodeID, identity2.NodeID},
-		topic,
+		channels.TopicFromChannel(channels.PushBlocks, sporkId),
 		unittest.ProposalFixture(),
 		unittest.NetworkCodec().Encode,
 		message.ProtocolTypePubSub)
 	require.NoError(t, err)
 
-	// intentionally overriding the channel id to be a valid channel id (though the topic is invalid)
-	// hence imitating a message that was published to the wrong topic
-	outgoingMessageScope1.Proto().ChannelID = channels.PushBlocks.String()
+	// overrides the topic to be an invalid topic
+	corruptOutgoingMessageScope := mocknetwork.NewOutgoingMessageScope(t)
+	corruptOutgoingMessageScope.On("TargetIds").Return(dummyMessageScope.TargetIds()).Maybe()
+	corruptOutgoingMessageScope.On("Topic").Return(topic).Maybe()
+	corruptOutgoingMessageScope.On("Proto").Return(dummyMessageScope.Proto()).Maybe()
+	corruptOutgoingMessageScope.On("PayloadType").Return(dummyMessageScope.PayloadType()).Maybe()
+	corruptOutgoingMessageScope.On("Size").Return(dummyMessageScope.Size()).Maybe()
 
-	err = sn2.Publish(timedCtx, outgoingMessageScope1)
+	// create a dummy block proposal to publish from our SN node
+	err = sn2.Publish(timedCtx, corruptOutgoingMessageScope)
 
 	// publish fails because the topic conversion fails
 	require.Error(t, err)
-
+	fmt.Println(err)
 	// ensure the correct error is contained in the logged error
 	require.Contains(t, hook.Logs(), "could not convert topic to channel")
 }
