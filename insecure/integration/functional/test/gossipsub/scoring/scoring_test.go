@@ -483,7 +483,7 @@ func TestGossipSubMeshDeliveryScoring_Replay_Will_Not_Counted(t *testing.T) {
 		proposalList[i] = unittest.ProposalFixture()
 	}
 	i := -1
-	p2ptest.EnsurePubsubMessageExchangeFromNode(t, ctx, replayingNode, thisNode, blockTopic, len(proposalList), func() interface{} {
+	p2ptest.EnsurePubsubMessageExchangeFromNode(t, ctx, replayingNode, thisNode, thisId.NodeID, blockTopic, len(proposalList), func() interface{} {
 		i += 1
 		return proposalList[i]
 	})

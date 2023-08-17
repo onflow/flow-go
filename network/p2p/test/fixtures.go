@@ -612,15 +612,24 @@ func EnsurePubsubMessageExchange(t *testing.T, ctx context.Context, nodes []p2p.
 //
 // - ctx: the context- the test will fail if the context expires.
 // - sender: the node that sends the message to the other node.
-// - receiver: the node that receives the message from the other node.
+// - receiverNode: the node that receives the message from the other node.
+// - receiverIdentifier: the identifier of the receiver node.
 // - topic: the topic to exchange messages on.
 // - count: the number of messages to exchange from `sender` to `receiver`.
 // - messageFactory: a function that creates a unique message to be published by the node.
-func EnsurePubsubMessageExchangeFromNode(t *testing.T, ctx context.Context, sender p2p.LibP2PNode, receiver p2p.LibP2PNode, topic channels.Topic, count int, messageFactory func() interface{}) {
+func EnsurePubsubMessageExchangeFromNode(
+	t *testing.T,
+	ctx context.Context,
+	sender p2p.LibP2PNode,
+	receiverNode p2p.LibP2PNode,
+	receiverIdentifier flow.Identifier,
+	topic channels.Topic,
+	count int,
+	messageFactory func() interface{}) {
 	_, err := sender.Subscribe(topic, validator.TopicValidator(unittest.Logger(), unittest.AllowAllPeerFilter()))
 	require.NoError(t, err)
 
-	toSub, err := receiver.Subscribe(topic, validator.TopicValidator(unittest.Logger(), unittest.AllowAllPeerFilter()))
+	toSub, err := receiverNode.Subscribe(topic, validator.TopicValidator(unittest.Logger(), unittest.AllowAllPeerFilter()))
 	require.NoError(t, err)
 
 	// let subscriptions propagate
@@ -630,7 +639,7 @@ func EnsurePubsubMessageExchangeFromNode(t *testing.T, ctx context.Context, send
 		// creates a unique message to be published by the node
 		payload := messageFactory()
 		outgoingMessageScope, err := message.NewOutgoingScope(
-			flow.IdentifierList{},
+			flow.IdentifierList{receiverIdentifier},
 			topic,
 			payload,
 			unittest.NetworkCodec().Encode,
