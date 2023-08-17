@@ -204,3 +204,55 @@ func EventId(channel channels.Channel, payload []byte) (hash.Hash, error) {
 func MessageType(decodedPayload interface{}) string {
 	return strings.TrimLeft(fmt.Sprintf("%T", decodedPayload), "*")
 }
+
+// IncomingMessageScoper defines the interface for handling incoming message scope.
+type IncomingMessageScoper interface {
+	// OriginId returns the origin node ID.
+	OriginId() flow.Identifier
+
+	// Proto returns the raw message received.
+	Proto() *message.Message
+
+	// DecodedPayload returns the decoded payload of the message.
+	DecodedPayload() interface{}
+
+	// Protocol returns the type of protocol used to receive the message.
+	Protocol() message.ProtocolType
+
+	// Channel returns the channel of the message.
+	Channel() channels.Channel
+
+	// Size returns the size of the message.
+	Size() int
+
+	// TargetIDs returns the target node IDs, i.e., the intended recipients.
+	TargetIDs() flow.IdentifierList
+
+	// EventID returns the hash of the payload and channel.
+	EventID() []byte
+
+	// PayloadType returns the type of the decoded payload.
+	PayloadType() string
+}
+
+// OutgoingMessageScoper defines the interface for handling outgoing message scope.
+type OutgoingMessageScoper interface {
+	// TargetIds returns the target node IDs.
+	TargetIds() flow.IdentifierList
+
+	// Size returns the size of the message.
+	Size() int
+
+	// PayloadType returns the type of the payload to be sent.
+	PayloadType() string
+
+	// Topic returns the topic, i.e., channel-id/spork-id.
+	Topic() channels.Topic
+
+	// Proto returns the raw proto message sent on the wire.
+	Proto() *message.Message
+}
+
+// Ensure structs implement the interfaces
+var _ IncomingMessageScoper = &IncomingMessageScope{}
+var _ OutgoingMessageScoper = &OutgoingMessageScope{}
