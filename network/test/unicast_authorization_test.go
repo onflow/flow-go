@@ -470,7 +470,7 @@ func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_PublicChannel()
 		Run(func(args mockery.Arguments) {
 			close(u.waitCh)
 
-			msg, ok := args[0].(*message.IncomingMessageScope)
+			msg, ok := args[0].(network.IncomingMessageScope)
 			require.True(u.T(), ok)
 
 			require.Equal(u.T(), testChannel, msg.Channel())                                              // channel
@@ -652,7 +652,7 @@ func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_ReceiverHasSubs
 		Run(func(args mockery.Arguments) {
 			close(u.waitCh)
 
-			msg, ok := args[0].(*message.IncomingMessageScope)
+			msg, ok := args[0].(network.IncomingMessageScope)
 			require.True(u.T(), ok)
 
 			require.Equal(u.T(), channel, msg.Channel())                      // channel

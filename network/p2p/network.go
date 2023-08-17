@@ -378,7 +378,7 @@ func (n *Network) Identity(pid peer.ID) (*flow.Identity, bool) {
 	return n.identityProvider.ByPeerID(pid)
 }
 
-func (n *Network) Receive(msg *message.IncomingMessageScope) error {
+func (n *Network) Receive(msg network.IncomingMessageScope) error {
 	n.metrics.InboundMessageReceived(msg.Size(), msg.Channel().String(), msg.Protocol().String(), msg.PayloadType())
 
 	err := n.processNetworkMessage(msg)
@@ -388,7 +388,7 @@ func (n *Network) Receive(msg *message.IncomingMessageScope) error {
 	return nil
 }
 
-func (n *Network) processNetworkMessage(msg *message.IncomingMessageScope) error {
+func (n *Network) processNetworkMessage(msg network.IncomingMessageScope) error {
 	// checks the cache for deduplication and adds the message if not already present
 	if !n.receiveCache.Add(msg.EventID()) {
 		// drops duplicate message

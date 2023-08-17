@@ -9,6 +9,10 @@ import (
 	"github.com/onflow/flow-go/network/channels"
 )
 
+// Ensure structs implement the interfaces
+var _ network.IncomingMessageScope = &IncomingMessageScope{}
+var _ network.OutgoingMessageScope = &OutgoingMessageScope{}
+
 // IncomingMessageScope captures the context around an incoming message that is received by the network layer.
 type IncomingMessageScope struct {
 	originId       flow.Identifier     // the origin node ID.

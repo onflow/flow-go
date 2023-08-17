@@ -604,7 +604,7 @@ func (m *MiddlewareTestSuite) TestPing() {
 		Run(func(args mockery.Arguments) {
 			receiveWG.Done()
 
-			msg, ok := args[0].(*message.IncomingMessageScope)
+			msg, ok := args[0].(network.IncomingMessageScope)
 			require.True(m.T(), ok)
 
 			require.Equal(m.T(), testChannel, msg.Channel())                                              // channel
@@ -662,7 +662,7 @@ func (m *MiddlewareTestSuite) MultiPing(count int) {
 			Run(func(args mockery.Arguments) {
 				receiveWG.Done()
 
-				msg, ok := args[0].(*message.IncomingMessageScope)
+				msg, ok := args[0].(network.IncomingMessageScope)
 				require.True(m.T(), ok)
 
 				require.Equal(m.T(), testChannel, msg.Channel())                      // channel
@@ -739,7 +739,7 @@ func (m *MiddlewareTestSuite) TestEcho() {
 			wg.Done()
 
 			// sanity checks the message content.
-			msg, ok := args[0].(*message.IncomingMessageScope)
+			msg, ok := args[0].(network.IncomingMessageScope)
 			require.True(m.T(), ok)
 
 			require.Equal(m.T(), testChannel, msg.Channel())                                              // channel
@@ -762,7 +762,7 @@ func (m *MiddlewareTestSuite) TestEcho() {
 		Run(func(args mockery.Arguments) {
 			wg.Done()
 			// sanity checks the message content.
-			msg, ok := args[0].(*message.IncomingMessageScope)
+			msg, ok := args[0].(network.IncomingMessageScope)
 			require.True(m.T(), ok)
 
 			require.Equal(m.T(), testChannel, msg.Channel())                                               // channel
@@ -845,7 +845,7 @@ func (m *MiddlewareTestSuite) TestLargeMessageSize_SendDirect() {
 	ch := make(chan struct{})
 	m.ov[targetIndex].On("Receive", mockery.Anything).Return(nil).Once().
 		Run(func(args mockery.Arguments) {
-			msg, ok := args[0].(*message.IncomingMessageScope)
+			msg, ok := args[0].(network.IncomingMessageScope)
 			require.True(m.T(), ok)
 
 			require.Equal(m.T(), channels.ProvideChunks, msg.Channel())
@@ -932,7 +932,7 @@ func (m *MiddlewareTestSuite) TestUnsubscribe() {
 	require.NoError(m.T(), err)
 
 	m.ov[last].On("Receive", mockery.Anything).Return(nil).Run(func(args mockery.Arguments) {
-		msg, ok := args[0].(*message.IncomingMessageScope)
+		msg, ok := args[0].(network.IncomingMessageScope)
 		require.True(m.T(), ok)
 		require.Equal(m.T(), firstNode, msg.OriginId())
 		msgRcvd <- struct{}{}

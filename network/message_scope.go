@@ -39,8 +39,8 @@ func MessageType(decodedPayload interface{}) string {
 	return strings.TrimLeft(fmt.Sprintf("%T", decodedPayload), "*")
 }
 
-// IncomingMessageScoper defines the interface for handling incoming message scope.
-type IncomingMessageScoper interface {
+// IncomingMessageScope defines the interface for handling incoming message scope.
+type IncomingMessageScope interface {
 	// OriginId returns the origin node ID.
 	OriginId() flow.Identifier
 
@@ -69,8 +69,8 @@ type IncomingMessageScoper interface {
 	PayloadType() string
 }
 
-// OutgoingMessageScoper defines the interface for handling outgoing message scope.
-type OutgoingMessageScoper interface {
+// OutgoingMessageScope defines the interface for handling outgoing message scope.
+type OutgoingMessageScope interface {
 	// TargetIds returns the target node IDs.
 	TargetIds() flow.IdentifierList
 
@@ -86,7 +86,3 @@ type OutgoingMessageScoper interface {
 	// Proto returns the raw proto message sent on the wire.
 	Proto() *message.Message
 }
-
-// Ensure structs implement the interfaces
-var _ IncomingMessageScoper = &message.IncomingMessageScope{}
-var _ OutgoingMessageScoper = &message.OutgoingMessageScope{}

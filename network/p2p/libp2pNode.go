@@ -16,7 +16,6 @@ import (
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/channels"
-	"github.com/onflow/flow-go/network/message"
 	"github.com/onflow/flow-go/network/p2p/unicast/protocols"
 )
 
@@ -68,7 +67,7 @@ type LibP2PNode interface {
 	// Unsubscribe cancels the subscriber and closes the topic corresponding to the given channel.
 	Unsubscribe(channel channels.Channel) error
 	// Publish publishes the given payload on the topic.
-	Publish(ctx context.Context, msgScope *message.OutgoingMessageScope) error
+	Publish(ctx context.Context, scope network.OutgoingMessageScope) error
 	// Host returns pointer to host object of node.
 	Host() host.Host
 	// WithDefaultUnicastProtocol overrides the default handler of the unicast manager and registers all preferred protocols.
