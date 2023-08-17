@@ -96,7 +96,7 @@ func TestFullGossipSubConnectivity(t *testing.T) {
 	for _, node := range nodes {
 		outgoingMessageScope, err := message.NewOutgoingScope(
 			ids.NodeIDs(),
-			channels.PushBlocks,
+			channels.TopicFromChannel(channels.PushBlocks, sporkId),
 			unittest.ProposalFixture(),
 			unittest.NetworkCodec().Encode,
 			message.ProtocolTypePubSub)
@@ -217,7 +217,7 @@ func testGossipSubMessageDeliveryUnderNetworkPartition(t *testing.T, honestPeerS
 
 	outgoingMessageScope, err := message.NewOutgoingScope(
 		allIds.NodeIDs(),
-		channels.PushBlocks,
+		channels.TopicFromChannel(channels.PushBlocks, sporkId),
 		unittest.ProposalFixture(),
 		unittest.NetworkCodec().Encode,
 		message.ProtocolTypePubSub)

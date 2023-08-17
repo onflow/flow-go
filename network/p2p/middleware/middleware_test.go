@@ -19,7 +19,7 @@ func TestChunkDataPackMaxMessageSize(t *testing.T) {
 	// creates an outgoing chunk data pack response message (imitating an EN is sending a chunk data pack response to VN).
 	msg, err := message.NewOutgoingScope(
 		flow.IdentifierList{unittest.IdentifierFixture()},
-		channels.ProvideChunks,
+		channels.TopicFromChannel(channels.ProvideChunks, unittest.IdentifierFixture()),
 		&messages.ChunkDataResponse{
 			ChunkDataPack: *unittest.ChunkDataPackFixture(unittest.IdentifierFixture()),
 			Nonce:         rand.Uint64(),

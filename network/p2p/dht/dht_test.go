@@ -156,7 +156,7 @@ func TestPubSubWithDHTDiscovery(t *testing.T) {
 
 	messageScope, err := message.NewOutgoingScope(
 		ids.NodeIDs(),
-		channels.TestNetworkChannel,
+		channels.TopicFromChannel(channels.TestNetworkChannel, sporkId),
 		&libp2pmsg.TestMessage{},
 		unittest.NetworkCodec().Encode,
 		message.ProtocolTypePubSub)

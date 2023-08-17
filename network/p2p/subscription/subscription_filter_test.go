@@ -82,7 +82,7 @@ func TestFilterSubscribe(t *testing.T) {
 
 		outgoingMessageScope, err := message.NewOutgoingScope(
 			ids.NodeIDs(),
-			channels.SyncCommittee,
+			channels.TopicFromChannel(channels.SyncCommittee, sporkId),
 			[]byte("hello"),
 			unittest.NetworkCodec().Encode,
 			message.ProtocolTypePubSub)

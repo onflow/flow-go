@@ -240,7 +240,7 @@ func TestSubscriptionValidator_Integration(t *testing.T) {
 
 	outgoingMessageScope, err := message.NewOutgoingScope(
 		ids.NodeIDs(),
-		channels.PushBlocks,
+		channels.TopicFromChannel(channels.PushBlocks, sporkId),
 		unittest.ProposalFixture(),
 		unittest.NetworkCodec().Encode,
 		message.ProtocolTypePubSub)
@@ -269,7 +269,7 @@ func TestSubscriptionValidator_Integration(t *testing.T) {
 	// the GossipSub scoring protocol.
 	outgoingMessageScope, err = message.NewOutgoingScope(
 		ids.NodeIDs(),
-		channels.PushBlocks,
+		channels.TopicFromChannel(channels.PushBlocks, sporkId),
 		unittest.ProposalFixture(),
 		unittest.NetworkCodec().Encode,
 		message.ProtocolTypePubSub)
@@ -284,7 +284,7 @@ func TestSubscriptionValidator_Integration(t *testing.T) {
 	// however, both verification nodes should receive the message.
 	outgoingMessageScope, err = message.NewOutgoingScope(
 		ids.NodeIDs(),
-		channels.RequestChunks,
+		channels.TopicFromChannel(channels.RequestChunks, sporkId),
 		&messages.ChunkDataRequest{
 			ChunkID: unittest.IdentifierFixture(),
 			Nonce:   rand.Uint64(),
