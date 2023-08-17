@@ -378,7 +378,7 @@ func (n *Network) Identity(pid peer.ID) (*flow.Identity, bool) {
 	return n.identityProvider.ByPeerID(pid)
 }
 
-func (n *Network) Receive(msg *network.IncomingMessageScope) error {
+func (n *Network) Receive(msg *message.IncomingMessageScope) error {
 	n.metrics.InboundMessageReceived(msg.Size(), msg.Channel().String(), msg.Protocol().String(), msg.PayloadType())
 
 	err := n.processNetworkMessage(msg)
@@ -388,7 +388,7 @@ func (n *Network) Receive(msg *network.IncomingMessageScope) error {
 	return nil
 }
 
-func (n *Network) processNetworkMessage(msg *network.IncomingMessageScope) error {
+func (n *Network) processNetworkMessage(msg *message.IncomingMessageScope) error {
 	// checks the cache for deduplication and adds the message if not already present
 	if !n.receiveCache.Add(msg.EventID()) {
 		// drops duplicate message
@@ -429,7 +429,7 @@ func (n *Network) UnicastOnChannel(channel channels.Channel, payload interface{}
 		return nil
 	}
 
-	msg, err := network.NewOutgoingScope(
+	msg, err := message.NewOutgoingScope(
 		flow.IdentifierList{targetID},
 		channels.TopicFromChannel(channel, n.sporkId),
 		payload,
@@ -509,7 +509,7 @@ func (n *Network) sendOnChannel(channel channels.Channel, msg interface{}, targe
 		Msg("sending new message on channel")
 
 	// generate network message (encoding) based on list of recipients
-	scope, err := network.NewOutgoingScope(
+	scope, err := message.NewOutgoingScope(
 		targetIDs,
 		channels.TopicFromChannel(channel, n.sporkId),
 		msg,

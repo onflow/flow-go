@@ -24,6 +24,7 @@ import (
 	flownet "github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/internal/p2putils"
+	"github.com/onflow/flow-go/network/message"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/p2pnode/internal"
 	"github.com/onflow/flow-go/network/p2p/unicast/protocols"
@@ -341,7 +342,7 @@ func (n *Node) unsubscribeTopic(topic channels.Topic) error {
 
 // Publish publishes the given payload on the topic.
 // All errors returned from this function can be considered benign.
-func (n *Node) Publish(ctx context.Context, msgScope *flownet.OutgoingMessageScope) error {
+func (n *Node) Publish(ctx context.Context, msgScope *message.OutgoingMessageScope) error {
 	lg := n.logger.With().
 		Str("topic", msgScope.Topic().String()).
 		Interface("proto_message", msgScope.Proto()).

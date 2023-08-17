@@ -5,6 +5,7 @@ package mockp2p
 import (
 	component "github.com/onflow/flow-go/module/component"
 	channels "github.com/onflow/flow-go/network/channels"
+	"github.com/onflow/flow-go/network/message"
 
 	context "context"
 
@@ -285,11 +286,11 @@ func (_m *LibP2PNode) PeerScoreExposer() p2p.PeerScoreExposer {
 }
 
 // Publish provides a mock function with given fields: ctx, msgScope
-func (_m *LibP2PNode) Publish(ctx context.Context, msgScope *flow_gonetwork.OutgoingMessageScope) error {
+func (_m *LibP2PNode) Publish(ctx context.Context, msgScope *message.OutgoingMessageScope) error {
 	ret := _m.Called(ctx, msgScope)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, *flow_gonetwork.OutgoingMessageScope) error); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, *message.OutgoingMessageScope) error); ok {
 		r0 = rf(ctx, msgScope)
 	} else {
 		r0 = ret.Error(0)

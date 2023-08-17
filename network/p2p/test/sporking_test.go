@@ -12,7 +12,6 @@ import (
 
 	"github.com/onflow/flow-go/model/flow"
 	libp2pmessage "github.com/onflow/flow-go/model/libp2p/message"
-	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/message"
 
 	"github.com/onflow/flow-go/network/p2p"
@@ -237,7 +236,7 @@ func TestOneToKCrosstalkPrevention(t *testing.T) {
 	time.Sleep(time.Second)
 
 	// assert that node 1 can successfully send a message to node 2 via PubSub
-	outgoingMessageScope, err := network.NewOutgoingScope(
+	outgoingMessageScope, err := message.NewOutgoingScope(
 		flow.IdentifierList{unittest.IdentifierFixture()},
 		topicBeforeSpork,
 		&libp2pmessage.TestMessage{
@@ -278,7 +277,7 @@ func TestOneToKCrosstalkPrevention(t *testing.T) {
 	require.NoError(t, err)
 
 	// assert that node 1 can no longer send a message to node 2 via PubSub
-	outgoingMessageScope, err = network.NewOutgoingScope(
+	outgoingMessageScope, err = message.NewOutgoingScope(
 		flow.IdentifierList{id2.NodeID},
 		topicAfterSpork,
 		&libp2pmessage.TestMessage{

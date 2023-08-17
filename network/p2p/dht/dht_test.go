@@ -15,7 +15,6 @@ import (
 	libp2pmsg "github.com/onflow/flow-go/model/libp2p/message"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	mockmodule "github.com/onflow/flow-go/module/mock"
-	flownet "github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/message"
 	"github.com/onflow/flow-go/network/p2p"
@@ -155,7 +154,7 @@ func TestPubSubWithDHTDiscovery(t *testing.T) {
 	// hence expect count and not count - 1 messages to be received (one by each node, including the sender)
 	ch := make(chan peer.ID, count)
 
-	messageScope, err := flownet.NewOutgoingScope(
+	messageScope, err := message.NewOutgoingScope(
 		ids.NodeIDs(),
 		channels.TestNetworkChannel,
 		&libp2pmsg.TestMessage{},

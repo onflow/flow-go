@@ -94,7 +94,7 @@ func TestTopicValidator_Unstaked(t *testing.T) {
 	timedCtx, cancel5s := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel5s()
 
-	outgoingMessageScope1, err := network.NewOutgoingScope(
+	outgoingMessageScope1, err := message.NewOutgoingScope(
 		flow.IdentifierList{identity1.NodeID, identity2.NodeID},
 		topic,
 		unittest.ProposalFixture(),
@@ -153,7 +153,7 @@ func TestTopicValidator_PublicChannel(t *testing.T) {
 	timedCtx, cancel5s := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel5s()
 
-	outgoingMessageScope1, err := network.NewOutgoingScope(
+	outgoingMessageScope1, err := message.NewOutgoingScope(
 		flow.IdentifierList{identity1.NodeID, identity2.NodeID},
 		topic,
 		&messages.SyncRequest{Nonce: 0, Height: 0},
@@ -225,7 +225,7 @@ func TestTopicValidator_TopicMismatch(t *testing.T) {
 	defer cancel5s()
 
 	// create a dummy block proposal to publish from our SN node
-	outgoingMessageScope1, err := network.NewOutgoingScope(
+	outgoingMessageScope1, err := message.NewOutgoingScope(
 		flow.IdentifierList{identity1.NodeID, identity2.NodeID},
 		topic,
 		unittest.ProposalFixture(),
@@ -285,7 +285,7 @@ func TestTopicValidator_InvalidTopic(t *testing.T) {
 	timedCtx, cancel5s := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel5s()
 	// create a dummy block proposal to publish from our SN node
-	outgoingMessageScope1, err := network.NewOutgoingScope(
+	outgoingMessageScope1, err := message.NewOutgoingScope(
 		flow.IdentifierList{identity1.NodeID, identity2.NodeID},
 		topic,
 		unittest.ProposalFixture(),
@@ -383,7 +383,7 @@ func TestAuthorizedSenderValidator_Unauthorized(t *testing.T) {
 	// sn2 publishes the block proposal, sn1 and an1 should receive the message because
 	// SN nodes are authorized to send block proposals
 	// create a dummy block proposal to publish from our SN node
-	outgoingMessageScope1, err := network.NewOutgoingScope(
+	outgoingMessageScope1, err := message.NewOutgoingScope(
 		flow.IdentifierList{identity1.NodeID, identity2.NodeID},
 		topic,
 		unittest.ProposalFixture(),
@@ -410,7 +410,7 @@ func TestAuthorizedSenderValidator_Unauthorized(t *testing.T) {
 
 	// the access node now publishes the block proposal message, AN are not authorized to publish block proposals
 	// the message should be rejected by the topic validator on sn1
-	outgoingMessageScope2, err := network.NewOutgoingScope(
+	outgoingMessageScope2, err := message.NewOutgoingScope(
 		flow.IdentifierList{identity1.NodeID, identity2.NodeID},
 		topic,
 		unittest.ProposalFixture(),
@@ -504,7 +504,7 @@ func TestAuthorizedSenderValidator_InvalidMsg(t *testing.T) {
 
 	// create a dummy block proposal to publish from our SN node
 	// sn2 publishes the block proposal on the sync committee channel
-	outgoingMessageScope1, err := network.NewOutgoingScope(
+	outgoingMessageScope1, err := message.NewOutgoingScope(
 		flow.IdentifierList{identity1.NodeID, identity2.NodeID},
 		topic,
 		unittest.ProposalFixture(),
@@ -594,7 +594,7 @@ func TestAuthorizedSenderValidator_Ejected(t *testing.T) {
 	// sn2 publishes the block proposal, sn1 and an1 should receive the message because
 	// SN nodes are authorized to send block proposals
 	// create a dummy block proposal to publish from our SN node
-	outgoingMessageScope1, err := network.NewOutgoingScope(
+	outgoingMessageScope1, err := message.NewOutgoingScope(
 		flow.IdentifierList{identity1.NodeID, identity2.NodeID},
 		topic,
 		unittest.ProposalFixture(),
@@ -619,7 +619,7 @@ func TestAuthorizedSenderValidator_Ejected(t *testing.T) {
 	// "eject" sn2 to ensure messages published by ejected nodes get rejected
 	identity2.Ejected = true
 
-	outgoingMessageScope3, err := network.NewOutgoingScope(
+	outgoingMessageScope3, err := message.NewOutgoingScope(
 		flow.IdentifierList{identity1.NodeID, identity2.NodeID},
 		topic,
 		unittest.ProposalFixture(),
@@ -704,7 +704,7 @@ func TestAuthorizedSenderValidator_ClusterChannel(t *testing.T) {
 	defer cancel5s()
 
 	// create a dummy sync request to publish from our LN node
-	outgoingMessageScope1, err := network.NewOutgoingScope(
+	outgoingMessageScope1, err := message.NewOutgoingScope(
 		flow.IdentifierList{identity1.NodeID, identity2.NodeID},
 		topic,
 		&messages.RangeRequest{},

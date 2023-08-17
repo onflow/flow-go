@@ -358,7 +358,7 @@ func (m *Middleware) OnAllowListNotification(notification *network.AllowListingU
 // - failed to send message to peer.
 //
 // All errors returned from this function can be considered benign.
-func (m *Middleware) SendDirect(msg *network.OutgoingMessageScope) error {
+func (m *Middleware) SendDirect(msg *message.OutgoingMessageScope) error {
 	// since it is a unicast, we only need to get the first peer ID.
 	peerID, err := m.idTranslator.GetPeerID(msg.TargetIds()[0])
 	if err != nil {
@@ -714,7 +714,7 @@ func (m *Middleware) processAuthenticatedMessage(msg *message.Message, peerID pe
 		return
 	}
 
-	scope, err := network.NewIncomingScope(originId, protocol, msg, decodedMsgPayload)
+	scope, err := message.NewIncomingScope(originId, protocol, msg, decodedMsgPayload)
 	if err != nil {
 		m.log.Error().
 			Err(err).
@@ -728,7 +728,7 @@ func (m *Middleware) processAuthenticatedMessage(msg *message.Message, peerID pe
 }
 
 // processMessage processes a message and eventually passes it to the overlay
-func (m *Middleware) processMessage(scope *network.IncomingMessageScope) {
+func (m *Middleware) processMessage(scope *message.IncomingMessageScope) {
 	logger := m.log.With().
 		Str("channel", scope.Channel().String()).
 		Str("type", scope.Protocol().String()).
@@ -763,7 +763,7 @@ func (m *Middleware) processMessage(scope *network.IncomingMessageScope) {
 // - the libP2P node fails to publish the message.
 //
 // All errors returned from this function can be considered benign.
-func (m *Middleware) Publish(msg *network.OutgoingMessageScope) error {
+func (m *Middleware) Publish(msg *message.OutgoingMessageScope) error {
 	return m.libP2PNode.Publish(m.ctx, msg)
 }
 

@@ -8,7 +8,6 @@ import (
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/messages"
-	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/message"
 	"github.com/onflow/flow-go/network/p2p/middleware"
@@ -18,7 +17,7 @@ import (
 // TestChunkDataPackMaxMessageSize tests that the max message size for a chunk data pack response is set to the large message size.
 func TestChunkDataPackMaxMessageSize(t *testing.T) {
 	// creates an outgoing chunk data pack response message (imitating an EN is sending a chunk data pack response to VN).
-	msg, err := network.NewOutgoingScope(
+	msg, err := message.NewOutgoingScope(
 		flow.IdentifierList{unittest.IdentifierFixture()},
 		channels.ProvideChunks,
 		&messages.ChunkDataResponse{

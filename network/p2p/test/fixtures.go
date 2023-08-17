@@ -587,7 +587,7 @@ func EnsurePubsubMessageExchange(t *testing.T, ctx context.Context, nodes []p2p.
 		for i := 0; i < count; i++ {
 			// creates a unique message to be published by the node
 			payload := messageFactory()
-			outgoingMessageScope, err := flownet.NewOutgoingScope(
+			outgoingMessageScope, err := message.NewOutgoingScope(
 				flow.IdentifierList{unittest.IdentifierFixture()},
 				topic,
 				payload,
@@ -629,7 +629,7 @@ func EnsurePubsubMessageExchangeFromNode(t *testing.T, ctx context.Context, send
 	for i := 0; i < count; i++ {
 		// creates a unique message to be published by the node
 		payload := messageFactory()
-		outgoingMessageScope, err := flownet.NewOutgoingScope(
+		outgoingMessageScope, err := message.NewOutgoingScope(
 			flow.IdentifierList{},
 			topic,
 			payload,
@@ -713,7 +713,7 @@ func EnsureNoPubsubMessageExchange(
 				// creates a unique message to be published by the node.
 
 				payload := messageFactory()
-				outgoingMessageScope, err := flownet.NewOutgoingScope(
+				outgoingMessageScope, err := message.NewOutgoingScope(
 					toIdentifiers,
 					topic,
 					payload,

@@ -14,7 +14,6 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/id"
 	"github.com/onflow/flow-go/module/irrecoverable"
-	flownet "github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/internal/p2pfixtures"
 	"github.com/onflow/flow-go/network/message"
@@ -81,7 +80,7 @@ func TestFilterSubscribe(t *testing.T) {
 
 	testPublish := func(wg *sync.WaitGroup, from p2p.LibP2PNode, sub p2p.Subscription) {
 
-		outgoingMessageScope, err := flownet.NewOutgoingScope(
+		outgoingMessageScope, err := message.NewOutgoingScope(
 			ids.NodeIDs(),
 			channels.SyncCommittee,
 			[]byte("hello"),

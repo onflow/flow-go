@@ -226,7 +226,7 @@ func (m *MiddlewareTestSuite) TestUpdateNodeAddresses() {
 	// needed to enable ID translation
 	m.providers[0].SetIdentities(idList)
 
-	outMsg, err := network.NewOutgoingScope(
+	outMsg, err := message.NewOutgoingScope(
 		flow.IdentifierList{newId.NodeID},
 		testChannel,
 		&libp2pmessage.TestMessage{
@@ -354,7 +354,7 @@ func (m *MiddlewareTestSuite) TestUnicastRateLimit_Messages() {
 	// to be invoked at-least once. We send 10 messages due to the flakiness that is caused by async stream
 	// handling of streams.
 	for i := 0; i < 10; i++ {
-		msg, err := network.NewOutgoingScope(
+		msg, err := message.NewOutgoingScope(
 			flow.IdentifierList{newId.NodeID},
 			testChannel,
 			&libp2pmessage.TestMessage{
@@ -378,7 +378,7 @@ func (m *MiddlewareTestSuite) TestUnicastRateLimit_Messages() {
 
 	// eventually the rate limited node should be able to reconnect and send messages
 	require.Eventually(m.T(), func() bool {
-		msg, err := network.NewOutgoingScope(
+		msg, err := message.NewOutgoingScope(
 			flow.IdentifierList{newId.NodeID},
 			testChannel,
 			&libp2pmessage.TestMessage{
@@ -490,7 +490,7 @@ func (m *MiddlewareTestSuite) TestUnicastRateLimit_Bandwidth() {
 		b[i] = byte('X')
 	}
 
-	msg, err := network.NewOutgoingScope(
+	msg, err := message.NewOutgoingScope(
 		flow.IdentifierList{newId.NodeID},
 		testChannel,
 		&libp2pmessage.TestMessage{
@@ -528,7 +528,7 @@ func (m *MiddlewareTestSuite) TestUnicastRateLimit_Bandwidth() {
 
 	// eventually the rate limited node should be able to reconnect and send messages
 	require.Eventually(m.T(), func() bool {
-		msg, err = network.NewOutgoingScope(
+		msg, err = message.NewOutgoingScope(
 			flow.IdentifierList{newId.NodeID},
 			testChannel,
 			&libp2pmessage.TestMessage{
@@ -590,7 +590,7 @@ func (m *MiddlewareTestSuite) TestPing() {
 	lastNodeIndex := m.size - 1
 
 	expectedPayload := "TestPingContentReception"
-	msg, err := network.NewOutgoingScope(
+	msg, err := message.NewOutgoingScope(
 		flow.IdentifierList{m.ids[lastNodeIndex].NodeID},
 		testChannel,
 		&libp2pmessage.TestMessage{
@@ -604,7 +604,7 @@ func (m *MiddlewareTestSuite) TestPing() {
 		Run(func(args mockery.Arguments) {
 			receiveWG.Done()
 
-			msg, ok := args[0].(*network.IncomingMessageScope)
+			msg, ok := args[0].(*message.IncomingMessageScope)
 			require.True(m.T(), ok)
 
 			require.Equal(m.T(), testChannel, msg.Channel())                                              // channel
@@ -648,7 +648,7 @@ func (m *MiddlewareTestSuite) MultiPing(count int) {
 		sendWG.Add(1)
 
 		expectedPayloadText := fmt.Sprintf("hello from: %d", i)
-		msg, err := network.NewOutgoingScope(
+		msg, err := message.NewOutgoingScope(
 			flow.IdentifierList{m.ids[lastNodeIndex].NodeID},
 			testChannel,
 			&libp2pmessage.TestMessage{
@@ -662,7 +662,7 @@ func (m *MiddlewareTestSuite) MultiPing(count int) {
 			Run(func(args mockery.Arguments) {
 				receiveWG.Done()
 
-				msg, ok := args[0].(*network.IncomingMessageScope)
+				msg, ok := args[0].(*message.IncomingMessageScope)
 				require.True(m.T(), ok)
 
 				require.Equal(m.T(), testChannel, msg.Channel())                      // channel
@@ -711,7 +711,7 @@ func (m *MiddlewareTestSuite) TestEcho() {
 
 	// message sent from first node to the last node.
 	expectedSendMsg := "TestEcho"
-	sendMsg, err := network.NewOutgoingScope(
+	sendMsg, err := message.NewOutgoingScope(
 		flow.IdentifierList{lastNode},
 		testChannel,
 		&libp2pmessage.TestMessage{
@@ -723,7 +723,7 @@ func (m *MiddlewareTestSuite) TestEcho() {
 
 	// reply from last node to the first node.
 	expectedReplyMsg := "TestEcho response"
-	replyMsg, err := network.NewOutgoingScope(
+	replyMsg, err := message.NewOutgoingScope(
 		flow.IdentifierList{firstNode},
 		testChannel,
 		&libp2pmessage.TestMessage{
@@ -739,7 +739,7 @@ func (m *MiddlewareTestSuite) TestEcho() {
 			wg.Done()
 
 			// sanity checks the message content.
-			msg, ok := args[0].(*network.IncomingMessageScope)
+			msg, ok := args[0].(*message.IncomingMessageScope)
 			require.True(m.T(), ok)
 
 			require.Equal(m.T(), testChannel, msg.Channel())                                              // channel
@@ -762,7 +762,7 @@ func (m *MiddlewareTestSuite) TestEcho() {
 		Run(func(args mockery.Arguments) {
 			wg.Done()
 			// sanity checks the message content.
-			msg, ok := args[0].(*network.IncomingMessageScope)
+			msg, ok := args[0].(*message.IncomingMessageScope)
 			require.True(m.T(), ok)
 
 			require.Equal(m.T(), testChannel, msg.Channel())                                               // channel
@@ -805,7 +805,7 @@ func (m *MiddlewareTestSuite) TestMaxMessageSize_SendDirect() {
 		Text: string(payload),
 	}
 
-	msg, err := network.NewOutgoingScope(
+	msg, err := message.NewOutgoingScope(
 		flow.IdentifierList{lastNode},
 		testChannel,
 		event,
@@ -833,7 +833,7 @@ func (m *MiddlewareTestSuite) TestLargeMessageSize_SendDirect() {
 	targetSize := uint64(middleware.DefaultMaxUnicastMsgSize) + 1000
 	event := unittest.ChunkDataResponseMsgFixture(unittest.IdentifierFixture(), unittest.WithApproximateSize(targetSize))
 
-	msg, err := network.NewOutgoingScope(
+	msg, err := message.NewOutgoingScope(
 		flow.IdentifierList{targetNode},
 		channels.ProvideChunks,
 		event,
@@ -845,7 +845,7 @@ func (m *MiddlewareTestSuite) TestLargeMessageSize_SendDirect() {
 	ch := make(chan struct{})
 	m.ov[targetIndex].On("Receive", mockery.Anything).Return(nil).Once().
 		Run(func(args mockery.Arguments) {
-			msg, ok := args[0].(*network.IncomingMessageScope)
+			msg, ok := args[0].(*message.IncomingMessageScope)
 			require.True(m.T(), ok)
 
 			require.Equal(m.T(), channels.ProvideChunks, msg.Channel())
@@ -886,7 +886,7 @@ func (m *MiddlewareTestSuite) TestMaxMessageSize_Publish() {
 	event := &libp2pmessage.TestMessage{
 		Text: string(payload),
 	}
-	msg, err := network.NewOutgoingScope(
+	msg, err := message.NewOutgoingScope(
 		flow.IdentifierList{lastNode},
 		testChannel,
 		event,
@@ -921,7 +921,7 @@ func (m *MiddlewareTestSuite) TestUnsubscribe() {
 		<-msgRcvd
 	}
 
-	message1, err := network.NewOutgoingScope(
+	message1, err := message.NewOutgoingScope(
 		flow.IdentifierList{lastNode},
 		testChannel,
 		&libp2pmessage.TestMessage{
@@ -932,7 +932,7 @@ func (m *MiddlewareTestSuite) TestUnsubscribe() {
 	require.NoError(m.T(), err)
 
 	m.ov[last].On("Receive", mockery.Anything).Return(nil).Run(func(args mockery.Arguments) {
-		msg, ok := args[0].(*network.IncomingMessageScope)
+		msg, ok := args[0].(*message.IncomingMessageScope)
 		require.True(m.T(), ok)
 		require.Equal(m.T(), firstNode, msg.OriginId())
 		msgRcvd <- struct{}{}
@@ -949,7 +949,7 @@ func (m *MiddlewareTestSuite) TestUnsubscribe() {
 	assert.NoError(m.T(), err)
 
 	// create and send a new message on the channel from the origin node
-	message2, err := network.NewOutgoingScope(
+	message2, err := message.NewOutgoingScope(
 		flow.IdentifierList{lastNode},
 		testChannel,
 		&libp2pmessage.TestMessage{

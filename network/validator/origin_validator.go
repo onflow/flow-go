@@ -3,6 +3,7 @@ package validator
 import (
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/network/message"
 )
 
 var _ network.MessageValidator = (*OriginValidator)(nil)
@@ -17,6 +18,6 @@ func NewOriginValidator(provider module.IdentifierProvider) network.MessageValid
 	return &OriginValidator{provider}
 }
 
-func (v OriginValidator) Validate(msg network.IncomingMessageScope) bool {
+func (v OriginValidator) Validate(msg message.IncomingMessageScope) bool {
 	return v.idProvider.Identifiers().Contains(msg.OriginId())
 }

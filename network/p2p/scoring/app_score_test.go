@@ -13,7 +13,6 @@ import (
 	"github.com/onflow/flow-go/module/id"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/mock"
-	flownet "github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/internal/p2pfixtures"
 	"github.com/onflow/flow-go/network/message"
@@ -95,7 +94,7 @@ func TestFullGossipSubConnectivity(t *testing.T) {
 	// checks end-to-end message delivery works
 	// each node sends a distinct message to all and checks that all nodes receive it.
 	for _, node := range nodes {
-		outgoingMessageScope, err := flownet.NewOutgoingScope(
+		outgoingMessageScope, err := message.NewOutgoingScope(
 			ids.NodeIDs(),
 			channels.PushBlocks,
 			unittest.ProposalFixture(),
@@ -216,7 +215,7 @@ func testGossipSubMessageDeliveryUnderNetworkPartition(t *testing.T, honestPeerS
 	// let nodes reside on a full topology, hence no partition is caused by the topology.
 	p2ptest.LetNodesDiscoverEachOther(t, ctx, allNodes, allIds)
 
-	outgoingMessageScope, err := flownet.NewOutgoingScope(
+	outgoingMessageScope, err := message.NewOutgoingScope(
 		allIds.NodeIDs(),
 		channels.PushBlocks,
 		unittest.ProposalFixture(),

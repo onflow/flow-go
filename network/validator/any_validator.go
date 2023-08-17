@@ -2,6 +2,7 @@ package validator
 
 import (
 	"github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/network/message"
 )
 
 var _ network.MessageValidator = (*AnyValidator)(nil)
@@ -17,7 +18,7 @@ func NewAnyValidator(validators ...network.MessageValidator) network.MessageVali
 	}
 }
 
-func (v AnyValidator) Validate(msg network.IncomingMessageScope) bool {
+func (v AnyValidator) Validate(msg message.IncomingMessageScope) bool {
 	for _, validator := range v.validators {
 		if validator.Validate(msg) {
 			return true

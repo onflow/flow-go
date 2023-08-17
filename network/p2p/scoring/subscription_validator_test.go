@@ -7,7 +7,6 @@ import (
 	"testing"
 	"time"
 
-	flownet "github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/message"
 	"github.com/onflow/flow-go/network/p2p"
 	p2ptest "github.com/onflow/flow-go/network/p2p/test"
@@ -132,8 +131,8 @@ func TestSubscriptionValidator_InvalidSubscriptions(t *testing.T) {
 	for _, role := range flow.Roles() {
 		peerId := p2pfixtures.PeerIdFixture(t)
 		unauthorizedChannels := channels.Channels(). // all channels
-			ExcludeChannels(channels.ChannelsByRole(role)). // excluding the channels for the role
-			ExcludePattern(regexp.MustCompile("^(test).*")) // excluding the test channels.
+								ExcludeChannels(channels.ChannelsByRole(role)). // excluding the channels for the role
+								ExcludePattern(regexp.MustCompile("^(test).*")) // excluding the test channels.
 		sporkID := unittest.IdentifierFixture()
 		unauthorizedTopics := make([]string, 0, len(unauthorizedChannels))
 		for _, channel := range unauthorizedChannels {
@@ -239,7 +238,7 @@ func TestSubscriptionValidator_Integration(t *testing.T) {
 	// let the subscriptions be established
 	time.Sleep(2 * time.Second)
 
-	outgoingMessageScope, err := flownet.NewOutgoingScope(
+	outgoingMessageScope, err := message.NewOutgoingScope(
 		ids.NodeIDs(),
 		channels.PushBlocks,
 		unittest.ProposalFixture(),
@@ -268,7 +267,7 @@ func TestSubscriptionValidator_Integration(t *testing.T) {
 	// consensus node publishes another proposal, but this time, it should not reach verification node.
 	// since upon an unauthorized subscription, verification node should have slashed consensus node on
 	// the GossipSub scoring protocol.
-	outgoingMessageScope, err = flownet.NewOutgoingScope(
+	outgoingMessageScope, err = message.NewOutgoingScope(
 		ids.NodeIDs(),
 		channels.PushBlocks,
 		unittest.ProposalFixture(),
@@ -283,7 +282,7 @@ func TestSubscriptionValidator_Integration(t *testing.T) {
 
 	// moreover, a verification node publishing a message to the request chunk topic should not reach consensus node.
 	// however, both verification nodes should receive the message.
-	outgoingMessageScope, err = flownet.NewOutgoingScope(
+	outgoingMessageScope, err = message.NewOutgoingScope(
 		ids.NodeIDs(),
 		channels.RequestChunks,
 		&messages.ChunkDataRequest{
