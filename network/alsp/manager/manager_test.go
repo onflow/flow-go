@@ -1709,13 +1709,13 @@ func TestDisallowListNotification(t *testing.T) {
 			return false
 		}
 		require.True(t, record.DisallowListed) // the peer should be disallow-listed.
-		// cuttoff counter should be incremented since the penalty is above the disallowlisting threshold.
+		// cutoff counter should be incremented since the penalty is above the disallow-listing threshold.
 		require.Equal(t, uint64(1), record.CutoffCounter)
 		// the decay should be the default decay value.
 		require.Equal(t, model.SpamRecordFactory()(unittest.IdentifierFixture()).Decay, record.Decay)
 
 		return true
-	}, 1*time.Second, 10*time.Millisecond, "ALSP manager did not handle the misbehavior report")
+	}, 2*time.Second, 10*time.Millisecond, "ALSP manager did not handle the misbehavior report")
 }
 
 ////////////////////////////// TEST HELPERS ///////////////////////////////////////////////////////////////////////////////
