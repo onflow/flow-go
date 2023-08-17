@@ -464,18 +464,18 @@ func (m *MisbehaviorReportManager) adjustDecayFunc(cutoffCounter uint64) float64
 	// and forth cutoffs reduce the decay speed by 90% (1000 -> 100, 100 -> 10, 10 -> 1).
 	// All subsequent cutoffs after the fourth cutoff use the last decay speed (1).
 	// This is to prevent the decay speed from becoming too small and the spam record from taking too long to decay.
-	decaySpeeds := []float64{1000, 1000, 100, 10, 1}
-
-	if cutoffCounter <= 0 {
-		// illegal state, this should never happen unless there is a bug in the code.
+	switch {
+	case cutoffCounter == 1:
+		return 1000
+	case cutoffCounter == 2:
+		return 100
+	case cutoffCounter == 3:
+		return 10
+	case cutoffCounter >= 4:
+		return 1
+	default:
 		panic(fmt.Sprintf("illegal-state cutoff counter must be positive, it should include the current time: %d", cutoffCounter))
 	}
-
-	if int(cutoffCounter) >= len(decaySpeeds) {
-		return decaySpeeds[len(decaySpeeds)-1] // clamp to the last value
-	}
-
-	return decaySpeeds[cutoffCounter]
 }
 
 // WithSpamRecordsCacheFactory sets the spam record cache factory for the MisbehaviorReportManager.
