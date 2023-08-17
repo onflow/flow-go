@@ -1,43 +1,10 @@
 package network
 
 import (
-	"fmt"
-	"strings"
-
-	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/message"
 )
-
-const (
-	// eventIDPackingPrefix is used as a salt to generate payload hash for messages.
-	eventIDPackingPrefix = "libp2ppacking"
-)
-
-// EventId computes the event ID for a given channel and payload (i.e., the hash of the payload and channel).
-// All errors returned by this function are benign and should not cause the node to crash.
-// It errors if the hash function fails to hash the payload and channel.
-func EventId(channel channels.Channel, payload []byte) (hash.Hash, error) {
-	// use a hash with an engine-specific salt to get the payload hash
-	h := hash.NewSHA3_384()
-	_, err := h.Write([]byte(eventIDPackingPrefix + channel))
-	if err != nil {
-		return nil, fmt.Errorf("could not hash channel as salt: %w", err)
-	}
-
-	_, err = h.Write(payload)
-	if err != nil {
-		return nil, fmt.Errorf("could not hash event: %w", err)
-	}
-
-	return h.SumHash(), nil
-}
-
-// MessageType returns the type of the message payload.
-func MessageType(decodedPayload interface{}) string {
-	return strings.TrimLeft(fmt.Sprintf("%T", decodedPayload), "*")
-}
 
 // IncomingMessageScope defines the interface for handling incoming message scope.
 type IncomingMessageScope interface {

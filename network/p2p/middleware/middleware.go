@@ -559,7 +559,7 @@ func (m *Middleware) handleIncomingStream(s libp2pnetwork.Stream) {
 			remotePeer,
 			role,
 			msg.Size(),
-			network.MessageType(msg.Payload),
+			message.MessageType(msg.Payload),
 			channels.Topic(msg.ChannelID)) {
 			return
 		}

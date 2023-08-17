@@ -2,6 +2,7 @@ package message
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/model/flow"
@@ -12,6 +13,35 @@ import (
 // Ensure structs implement the interfaces
 var _ network.IncomingMessageScope = &IncomingMessageScope{}
 var _ network.OutgoingMessageScope = &OutgoingMessageScope{}
+
+const (
+	// eventIDPackingPrefix is used as a salt to generate payload hash for messages.
+	eventIDPackingPrefix = "libp2ppacking"
+)
+
+// EventId computes the event ID for a given channel and payload (i.e., the hash of the payload and channel).
+// All errors returned by this function are benign and should not cause the node to crash.
+// It errors if the hash function fails to hash the payload and channel.
+func EventId(channel channels.Channel, payload []byte) (hash.Hash, error) {
+	// use a hash with an engine-specific salt to get the payload hash
+	h := hash.NewSHA3_384()
+	_, err := h.Write([]byte(eventIDPackingPrefix + channel))
+	if err != nil {
+		return nil, fmt.Errorf("could not hash channel as salt: %w", err)
+	}
+
+	_, err = h.Write(payload)
+	if err != nil {
+		return nil, fmt.Errorf("could not hash event: %w", err)
+	}
+
+	return h.SumHash(), nil
+}
+
+// MessageType returns the type of the message payload.
+func MessageType(decodedPayload interface{}) string {
+	return strings.TrimLeft(fmt.Sprintf("%T", decodedPayload), "*")
+}
 
 // IncomingMessageScope captures the context around an incoming message that is received by the network layer.
 type IncomingMessageScope struct {
@@ -29,7 +59,7 @@ type IncomingMessageScope struct {
 // It errors if event id (i.e., hash of the payload and channel) cannot be computed, or if it fails to
 // convert the target IDs from bytes slice to a flow.IdentifierList.
 func NewIncomingScope(originId flow.Identifier, protocol ProtocolType, msg *Message, decodedPayload interface{}) (*IncomingMessageScope, error) {
-	eventId, err := network.EventId(channels.Channel(msg.ChannelID), msg.Payload)
+	eventId, err := EventId(channels.Channel(msg.ChannelID), msg.Payload)
 	if err != nil {
 		return nil, fmt.Errorf("could not compute event id: %w", err)
 	}
@@ -81,7 +111,7 @@ func (m IncomingMessageScope) EventID() []byte {
 }
 
 func (m IncomingMessageScope) PayloadType() string {
-	return network.MessageType(m.decodedPayload)
+	return MessageType(m.decodedPayload)
 }
 
 // OutgoingMessageScope captures the context around an outgoing message that is about to be sent.
@@ -143,7 +173,7 @@ func (o OutgoingMessageScope) Size() int {
 }
 
 func (o OutgoingMessageScope) PayloadType() string {
-	return network.MessageType(o.payload)
+	return MessageType(o.payload)
 }
 
 func (o OutgoingMessageScope) Topic() channels.Topic {
