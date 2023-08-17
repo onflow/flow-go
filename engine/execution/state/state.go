@@ -285,6 +285,24 @@ func (s *state) SaveExecutionResults(
 		trace.EXEStateSaveExecutionResults)
 	defer span.End()
 
+	err := s.saveExecutionResults(ctx, result)
+	if err != nil {
+		return fmt.Errorf("could not save execution results: %w", err)
+	}
+
+	//outside batch because it requires read access
+	err = s.UpdateHighestExecutedBlockIfHigher(childCtx, result.ExecutableBlock.Block.Header)
+	if err != nil {
+		return fmt.Errorf("cannot update highest executed block: %w", err)
+	}
+
+	return nil
+}
+
+func (s *state) saveExecutionResults(
+	ctx context.Context,
+	result *execution.ComputationResult,
+) error {
 	header := result.ExecutableBlock.Block.Header
 	blockID := header.ID()
 
@@ -359,11 +377,6 @@ func (s *state) SaveExecutionResults(
 		return fmt.Errorf("batch flush error: %w", err)
 	}
 
-	//outside batch because it requires read access
-	err = s.UpdateHighestExecutedBlockIfHigher(childCtx, header)
-	if err != nil {
-		return fmt.Errorf("cannot update highest executed block: %w", err)
-	}
 	return nil
 }
 
