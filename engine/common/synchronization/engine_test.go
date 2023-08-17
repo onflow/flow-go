@@ -222,7 +222,7 @@ func (ss *SyncSuite) TestOnSyncRequest_HigherThanReceiver_OutsideTolerance() {
 }
 
 func (ss *SyncSuite) TestOnSyncRequest_HigherThanReceiver_OutsideTolerance_Load() {
-	load := 1000
+	load := 10000
 
 	ctx, cancel := irrecoverable.NewMockSignalerContextWithCancel(ss.T(), context.Background())
 	ss.e.Start(ctx)
@@ -248,14 +248,16 @@ func (ss *SyncSuite) TestOnSyncRequest_HigherThanReceiver_OutsideTolerance_Load(
 
 		// assert that HandleHeight, WithinTolerance are not called because misbehavior is reported
 		// also, check that response is never sent
-		ss.core.AssertNotCalled(ss.T(), "HandleHeight")
-		ss.core.AssertNotCalled(ss.T(), "WithinTolerance")
+		//ss.core.AssertNotCalled(ss.T(), "HandleHeight")
+		//ss.core.AssertNotCalled(ss.T(), "WithinTolerance")
+		ss.core.On("HandleHeight", ss.head, req.Height)
+		ss.core.On("WithinTolerance", ss.head, req.Height).Return(false)
+
 		ss.con.AssertNotCalled(ss.T(), "Unicast", mock.Anything, mock.Anything)
 
 		require.NoError(ss.T(), ss.e.Process(channels.SyncCommittee, originID, req))
+		ss.core.AssertExpectations(ss.T())
 	}
-
-	ss.core.AssertExpectations(ss.T())
 }
 
 // TestOnSyncRequest_LowerThanReceiver_OutsideTolerance tests that a sync request that's outside tolerance and

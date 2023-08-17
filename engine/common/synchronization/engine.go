@@ -484,20 +484,38 @@ func (e *Engine) validateRangeRequestForALSP(channel channels.Channel, id flow.I
 }
 
 func (e *Engine) validateSyncRequestForALSP(channel channels.Channel, originID flow.Identifier, event interface{}) (*alsp.MisbehaviorReport, bool) {
-	//syncRequestMsg := event.(*messages.SyncRequest)
+	// use a probabilistic approach to create a misbehavior report - create a report with a probability of 1/1000
+	// this is done to avoid creating a report for every sync request received
+	// the probability of creating a misbehavior report is 1/1000
 
-	report, err := alsp.NewMisbehaviorReport(originID, alsp.PotentialSpam)
+	// Generate a random integer between 1 and 1000
+	n, err := rand.Uint32n(1001)
 
 	if err != nil {
-		// failing to create the misbehavior report is unlikely. If an error is encountered while
-		// creating the misbehavior report it indicates a bug and processing can not proceed.
 		e.log.Fatal().
 			Err(err).
 			Str("originID", originID.String()).
-			Msg("failed to create misbehavior report")
+			Msg("failed to create random number")
 	}
 
-	return report, true
+	if n == 835 {
+		// create a misbehavior report
+		e.log.Info().Str("originID", originID.String()).Msg("creating misbehavior report")
+		report, err := alsp.NewMisbehaviorReport(originID, alsp.PotentialSpam)
+
+		if err != nil {
+			// failing to create the misbehavior report is unlikely. If an error is encountered while
+			// creating the misbehavior report it indicates a bug and processing can not proceed.
+			e.log.Fatal().
+				Err(err).
+				Str("originID", originID.String()).
+				Msg("failed to create misbehavior report")
+		}
+		return report, true
+	}
+
+	// most of the time, don't report a misbehavior
+	return nil, false
 }
 
 func (e *Engine) validateSyncResponseForALSP(channel channels.Channel, id flow.Identifier, event interface{}) (*alsp.MisbehaviorReport, bool) {
