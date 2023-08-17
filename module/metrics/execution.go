@@ -410,7 +410,7 @@ func NewExecutionCollector(tracer module.Tracer) *ExecutionCollector {
 		Namespace: namespaceExecution,
 		Subsystem: subsystemRuntime,
 		Name:      "transaction_ms_per_computation",
-		Help:      "The normalized ratio of millisecond of execution time per computation used. Value below 1 means the transaction was executed faster then estimated (is using less resources then estimated)",
+		Help:      "The normalized ratio of millisecond of execution time per computation used. Value below 1 means the transaction was executed faster than estimated (is using less resources then estimated)",
 		Buckets:   []float64{0.015625, 0.03125, 0.0625, 0.125, 0.25, 0.5, 1, 2, 4, 8, 16, 32, 64},
 	})
 
