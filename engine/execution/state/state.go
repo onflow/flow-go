@@ -308,7 +308,7 @@ func (s *state) SaveExecutionResults(
 			for _, chunk := range chunks {
 				chunkIDs = append(chunkIDs, chunk.ID())
 			}
-			s.chunkDataPacks.Remove(chunkIDs)
+			_ = s.chunkDataPacks.Remove(chunkIDs)
 		}
 	}()
 
