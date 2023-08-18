@@ -121,6 +121,7 @@ func TestPubSubWithDHTDiscovery(t *testing.T) {
 	//   N4     N5                      N4-----N5
 
 	sporkId := unittest.IdentifierFixture()
+	topic := channels.TopicFromChannel(channels.TestNetworkChannel, sporkId)
 	idProvider := mockmodule.NewIdentityProvider(t)
 	// create one node running the DHT Server (mimicking the staked AN)
 	dhtServerNodes, serverIDs := p2ptest.NodesFixture(t, sporkId, "dht_test", 1, idProvider, p2ptest.WithDHTOptions(dht.AsServer()))
@@ -156,14 +157,13 @@ func TestPubSubWithDHTDiscovery(t *testing.T) {
 
 	messageScope, err := message.NewOutgoingScope(
 		ids.NodeIDs(),
-		channels.TopicFromChannel(channels.TestNetworkChannel, sporkId),
+		topic,
 		&libp2pmsg.TestMessage{},
 		unittest.NetworkCodec().Encode,
 		message.ProtocolTypePubSub)
 	require.NoError(t, err)
 
 	logger := unittest.Logger()
-	topic := channels.Topic("/flow/" + unittest.IdentifierFixture().String())
 	topicValidator := flowpubsub.TopicValidator(logger, unittest.AllowAllPeerFilter())
 	for _, n := range nodes {
 		s, err := n.Subscribe(topic, topicValidator)
@@ -218,6 +218,6 @@ loop:
 
 	// Step 6: unsubscribes all nodes from the topic
 	for _, n := range nodes {
-		assert.NoError(t, n.Unsubscribe(channels.TestNetworkChannel))
+		assert.NoError(t, n.Unsubscribe(topic))
 	}
 }

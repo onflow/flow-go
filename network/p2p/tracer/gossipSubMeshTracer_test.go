@@ -178,9 +178,9 @@ func TestGossipSubMeshTracer(t *testing.T) {
 
 	// all nodes except the tracerNode unsubscribe from the topic1, which triggers sending a PRUNE to the tracerNode for each unsubscription.
 	// We expect the tracerNode to remove the otherNode1, otherNode2, and unknownNode from its mesh.
-	require.NoError(t, otherNode1.Unsubscribe(channel1))
-	require.NoError(t, otherNode2.Unsubscribe(channel1))
-	require.NoError(t, unknownNode.Unsubscribe(channel1))
+	require.NoError(t, otherNode1.Unsubscribe(topic1))
+	require.NoError(t, otherNode2.Unsubscribe(topic1))
+	require.NoError(t, unknownNode.Unsubscribe(topic1))
 
 	assert.Eventually(t, func() bool {
 		// eventually, the tracerNode should not have the other node in its mesh for topic1.
