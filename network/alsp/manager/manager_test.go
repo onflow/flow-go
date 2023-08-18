@@ -293,6 +293,7 @@ func TestHandleReportedMisbehavior_And_DisallowListing_Integration(t *testing.T)
 // handling of repeated reported misbehavior and disallow listing.
 func TestHandleReportedMisbehavior_And_DisallowListing_RepeatOffender_Integration(t *testing.T) {
 	cfg := managerCfgFixture(t)
+	sporkId := unittest.IdentifierFixture()
 	fastDecay := false
 	fastDecayFunc := func(record model.ProtocolSpamRecord) float64 {
 		t.Logf("decayFuc called with record: %+v", record)
@@ -319,9 +320,9 @@ func TestHandleReportedMisbehavior_And_DisallowListing_RepeatOffender_Integratio
 		alspmgr.WithDecayFunc(fastDecayFunc),
 	}
 
-	ids, nodes, _ := testutils.LibP2PNodeForMiddlewareFixture(t, 3,
+	ids, nodes, _ := testutils.LibP2PNodeForMiddlewareFixture(t, sporkId, 3,
 		p2ptest.WithPeerManagerEnabled(p2ptest.PeerManagerConfigFixture(p2ptest.WithZeroJitterAndZeroBackoff(t)), nil))
-	mws, _ := testutils.MiddlewareFixtures(t, ids, nodes, testutils.MiddlewareConfigFixture(t), mocknetwork.NewViolationsConsumer(t))
+	mws, _ := testutils.MiddlewareFixtures(t, ids, nodes, testutils.MiddlewareConfigFixture(t, sporkId), mocknetwork.NewViolationsConsumer(t))
 	networkCfg := testutils.NetworkConfigFixture(t, *ids[0], ids, mws[0], p2p.WithAlspConfig(cfg))
 
 	victimNetwork, err := p2p.NewNetwork(networkCfg)
