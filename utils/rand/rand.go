@@ -174,7 +174,7 @@ func Samples(n uint, m uint, swap func(i, j uint)) error {
 // we want to mock out random number generation.
 type Randomizer interface {
 	// Uint32n returns a random uint32 strictly less than `n`.
-	Uint32n(n uint32) uint32
+	Uint32n(n uint32) (uint32, error)
 }
 
 func NewDefaultRandomizer() Randomizer {
@@ -184,12 +184,13 @@ func NewDefaultRandomizer() Randomizer {
 type defaultRandomizer struct{}
 
 // Uint32n returns a random number between 0 and n (exclusive)
-func (e *defaultRandomizer) Uint32n(n uint32) uint32 {
+func (e *defaultRandomizer) Uint32n(n uint32) (uint32, error) {
 	n, err := Uint32n(n)
 	if err != nil {
-		fmt.Errorf("failed to create random number (%d): %w", n, err)
+		e := fmt.Errorf("failed to create random number (%d): %w", n, err)
+		return 0, e
 	}
-	return n
+	return n, nil
 }
 
 // MockRandomizer is a mock object that implements the Randomizer interface
@@ -197,8 +198,8 @@ type MockRandomizer struct {
 	mock.Mock
 }
 
-// Uint32n is a mock method that returns a random number
-func (m *MockRandomizer) Uint32n(n uint32) uint32 {
+// Uint32n is a mock method that allows tests to specify what random number to return
+func (m *MockRandomizer) Uint32n(n uint32) (uint32, error) {
 	args := m.Called(n)
-	return uint32(args.Int(0))
+	return uint32(args.Int(0)), nil
 }

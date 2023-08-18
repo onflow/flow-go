@@ -487,7 +487,16 @@ func (e *Engine) validateRangeRequestForALSP(channel channels.Channel, id flow.I
 
 func (e *Engine) validateSyncRequestForALSP(channel channels.Channel, originID flow.Identifier, event interface{}) (*alsp.MisbehaviorReport, bool) {
 	// Generate a random integer between 1 and 1000
-	n := e.randomizer.Uint32n(uint32(1001))
+	n, err := e.randomizer.Uint32n(uint32(1001))
+
+	if err != nil {
+		// failing to generate a random number is unlikely. If an error is encountered while
+		// generating a random number it indicates a bug and processing can not proceed.
+		e.log.Fatal().
+			Err(err).
+			Str("originID", originID.String()).
+			Msg("failed to generate random number")
+	}
 
 	// use a probabilistic approach to create a misbehavior report - create a report with a probability of 1/1000
 	// this is done to avoid creating a report for every sync request received
