@@ -34,6 +34,8 @@ import (
 
 // blsThresholdSignatureParticipant implements ThresholdSignatureParticipant
 // based on the BLS signature scheme
+var _ ThresholdSignatureParticipant = (*blsThresholdSignatureParticipant)(nil)
+
 type blsThresholdSignatureParticipant struct {
 	// embed the follower
 	*blsThresholdSignatureInspector
@@ -45,6 +47,8 @@ type blsThresholdSignatureParticipant struct {
 
 // blsThresholdSignatureInspector implements ThresholdSignatureInspector
 // based on the BLS signature scheme
+var _ ThresholdSignatureInspector = (*blsThresholdSignatureInspector)(nil)
+
 type blsThresholdSignatureInspector struct {
 	// size of the group
 	size int
