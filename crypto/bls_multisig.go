@@ -192,15 +192,9 @@ func AggregateBLSPublicKeys(keys []PublicKey) (PublicKey, error) {
 }
 
 // IdentityBLSPublicKey returns an identity public key which corresponds to the point
-// at infinity in G2 (identity element of G2).
-// TODO: return a constant key instead of a newly allocated one
+// at infinity in G2 (identity element g2).
 func IdentityBLSPublicKey() PublicKey {
-
-	identity := *newPubKeyBLSBLS12381(nil)
-	// set the point to infinity
-	C.E2_set_infty((*C.E2)(&identity.point))
-	identity.isIdentity = true
-	return &identity
+	return &g2PublicKey
 }
 
 // RemoveBLSPublicKeys removes multiple BLS public keys from a given (aggregated) public key.

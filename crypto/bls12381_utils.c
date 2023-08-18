@@ -165,7 +165,6 @@ static void pow256_from_be_bytes(pow256 ret, const byte a[Fr_BYTES])
 }
 
 // internal type of BLST `pow256` uses bytes little endian.
-// TODO: check endianness!!
 static void pow256_from_Fr(pow256 ret, const Fr* in) {
     le_bytes_from_limbs(ret, (limb_t*)in, Fr_BYTES);
 }

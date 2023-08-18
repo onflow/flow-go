@@ -398,7 +398,7 @@ void bls_batch_verify(const int sigs_len, byte* results, const E2* pks_input,
             Fr_set_limb(&one, 1);
             Fr_add(&r, &r, &one); 
             // multiply public key and signature by the same random exponent r
-            E2_mult(&pks[i], &pks_input[i], &r);  // TODO: faster version for short expos?
+            E2_mult(&pks[i], &pks_input[i], &r);
             E1_mult(&sigs[i], &sigs[i], &r);   
         } 
     }

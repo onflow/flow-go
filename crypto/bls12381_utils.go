@@ -67,6 +67,8 @@ var g2SerHeader byte // g2
 // `g1“ serialization
 var g1Serialization []byte
 
+var g2PublicKey pubKeyBLSBLS12381
+
 // initialization of BLS12-381 curve
 func initBLS12381() {
 	if isG1Compressed() {
@@ -80,6 +82,9 @@ func initBLS12381() {
 	} else {
 		g2SerHeader = 0x40
 	}
+	// set a global point to infinity
+	C.E2_set_infty((*C.E2)(&g2PublicKey.point))
+	g2PublicKey.isIdentity = true
 }
 
 func (a *scalar) String() string {
