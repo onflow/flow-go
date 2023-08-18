@@ -6,7 +6,8 @@ import (
 	"github.com/onflow/flow-go/network/message"
 )
 
-// IncomingMessageScope defines the interface for handling incoming message scope.
+// IncomingMessageScope defines the interface for incoming message scopes, i.e., self-contained messages that have been
+// received on the wire and are ready to be processed.
 type IncomingMessageScope interface {
 	// OriginId returns the origin node ID.
 	OriginId() flow.Identifier
@@ -36,7 +37,8 @@ type IncomingMessageScope interface {
 	PayloadType() string
 }
 
-// OutgoingMessageScope defines the interface for handling outgoing message scope.
+// OutgoingMessageScope defines the interface for building outgoing message scopes, i.e., self-contained messages
+// that are ready to be sent on the wire.
 type OutgoingMessageScope interface {
 	// TargetIds returns the target node IDs.
 	TargetIds() flow.IdentifierList

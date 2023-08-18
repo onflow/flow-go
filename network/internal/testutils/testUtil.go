@@ -154,7 +154,7 @@ func MiddlewareConfigFixture(t *testing.T, sporkId flow.Identifier) *middleware.
 	return &middleware.Config{
 		Logger:                unittest.Logger(),
 		BitSwapMetrics:        metrics.NewNoopCollector(),
-		RootBlockID:           sporkId,
+		SporkId:               sporkId,
 		UnicastMessageTimeout: middleware.DefaultUnicastTimeout,
 		Codec:                 unittest.NetworkCodec(),
 	}

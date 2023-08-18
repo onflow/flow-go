@@ -440,7 +440,7 @@ func (fnb *FlowNodeBuilder) InitFlowNetworkWithConduitFactory(
 		Libp2pNode:            fnb.LibP2PNode,
 		FlowId:                fnb.Me.NodeID(),
 		BitSwapMetrics:        fnb.Metrics.Bitswap,
-		RootBlockID:           fnb.SporkID,
+		SporkId:               fnb.SporkID,
 		UnicastMessageTimeout: fnb.FlowConfig.NetworkConfig.UnicastMessageTimeout,
 		IdTranslator:          fnb.IDTranslator,
 		Codec:                 fnb.CodecFactory(),

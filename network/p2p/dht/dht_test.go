@@ -163,7 +163,7 @@ func TestPubSubWithDHTDiscovery(t *testing.T) {
 	require.NoError(t, err)
 
 	logger := unittest.Logger()
-	topic := channels.TopicFromChannel(channels.TestNetworkChannel, sporkId)
+	topic := channels.Topic("/flow/" + unittest.IdentifierFixture().String())
 	topicValidator := flowpubsub.TopicValidator(logger, unittest.AllowAllPeerFilter())
 	for _, n := range nodes {
 		s, err := n.Subscribe(topic, topicValidator)

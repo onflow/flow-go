@@ -341,16 +341,16 @@ func (n *Node) unsubscribeTopic(topic channels.Topic) error {
 
 // Publish publishes the given payload on the topic.
 // All errors returned from this function can be considered benign.
-func (n *Node) Publish(ctx context.Context, msgScope flownet.OutgoingMessageScope) error {
+func (n *Node) Publish(ctx context.Context, messageScope flownet.OutgoingMessageScope) error {
 	lg := n.logger.With().
-		Str("topic", msgScope.Topic().String()).
-		Interface("proto_message", msgScope.Proto()).
-		Str("payload_type", msgScope.PayloadType()).
-		Int("message_size", msgScope.Size()).Logger()
+		Str("topic", messageScope.Topic().String()).
+		Interface("proto_message", messageScope.Proto()).
+		Str("payload_type", messageScope.PayloadType()).
+		Int("message_size", messageScope.Size()).Logger()
 	lg.Debug().Msg("received message to publish")
 
 	// convert the message to bytes to be put on the wire.
-	data, err := msgScope.Proto().Marshal()
+	data, err := messageScope.Proto().Marshal()
 	if err != nil {
 		return fmt.Errorf("failed to marshal the message: %w", err)
 	}
@@ -362,13 +362,13 @@ func (n *Node) Publish(ctx context.Context, msgScope flownet.OutgoingMessageScop
 		return fmt.Errorf("message size %d exceeds configured max message size %d", msgSize, DefaultMaxPubSubMsgSize)
 	}
 
-	ps, found := n.topics[msgScope.Topic()]
+	ps, found := n.topics[messageScope.Topic()]
 	if !found {
-		return fmt.Errorf("could not find topic (%s)", msgScope.Topic())
+		return fmt.Errorf("could not find topic (%s)", messageScope.Topic())
 	}
 	err = ps.Publish(ctx, data)
 	if err != nil {
-		return fmt.Errorf("could not publish to topic (%s): %w", msgScope.Topic(), err)
+		return fmt.Errorf("could not publish to topic (%s): %w", messageScope.Topic(), err)
 	}
 
 	lg.Debug().Msg("published message to topic")

@@ -88,7 +88,7 @@ type Middleware struct {
 	libP2PNode                 p2p.LibP2PNode
 	preferredUnicasts          []protocols.ProtocolName
 	bitswapMetrics             module.BitswapMetrics
-	rootBlockID                flow.Identifier
+	sporkId                    flow.Identifier
 	validators                 []network.MessageValidator
 	peerManagerFilters         []p2p.PeerFilter
 	unicastMessageTimeout      time.Duration
@@ -135,7 +135,7 @@ type Config struct {
 	Libp2pNode            p2p.LibP2PNode
 	FlowId                flow.Identifier // This node's Flow ID
 	BitSwapMetrics        module.BitswapMetrics
-	RootBlockID           flow.Identifier
+	SporkId               flow.Identifier
 	UnicastMessageTimeout time.Duration
 	IdTranslator          p2p.IDTranslator
 	Codec                 network.Codec
@@ -165,7 +165,7 @@ func NewMiddleware(cfg *Config, opts ...OptionFn) *Middleware {
 		log:                   cfg.Logger,
 		libP2PNode:            cfg.Libp2pNode,
 		bitswapMetrics:        cfg.BitSwapMetrics,
-		rootBlockID:           cfg.RootBlockID,
+		sporkId:               cfg.SporkId,
 		validators:            DefaultValidators(cfg.Logger, cfg.FlowId),
 		unicastMessageTimeout: cfg.UnicastMessageTimeout,
 		idTranslator:          cfg.IdTranslator,
@@ -512,7 +512,7 @@ func (m *Middleware) handleIncomingStream(s libp2pnetwork.Stream) {
 		}
 
 		channel := channels.Channel(msg.ChannelID)
-		topic := channels.TopicFromChannel(channel, m.rootBlockID)
+		topic := channels.TopicFromChannel(channel, m.sporkId)
 
 		// ignore messages if node does not have subscription to topic
 		if !m.libP2PNode.HasSubscription(topic) {
@@ -577,8 +577,7 @@ func (m *Middleware) handleIncomingStream(s libp2pnetwork.Stream) {
 // Subscribe subscribes the middleware to a channel.
 // No errors are expected during normal operation.
 func (m *Middleware) Subscribe(channel channels.Channel) error {
-
-	topic := channels.TopicFromChannel(channel, m.rootBlockID)
+	topic := channels.TopicFromChannel(channel, m.sporkId)
 
 	var peerFilter p2p.PeerFilter
 	var validators []validator.PubSubMessageValidator
@@ -628,7 +627,8 @@ func (m *Middleware) processPubSubMessages(msg *message.Message, peerID peer.ID)
 //
 // All errors returned from this function can be considered benign.
 func (m *Middleware) Unsubscribe(channel channels.Channel) error {
-	return m.libP2PNode.Unsubscribe(channel)
+	topic := channels.TopicFromChannel(channel, m.sporkId)
+	return m.libP2PNode.Unsubscribe(topic)
 }
 
 // processUnicastStreamMessage will decode, perform authorized sender validation and process a message
@@ -767,6 +767,7 @@ func (m *Middleware) processMessage(scope network.IncomingMessageScope) {
 // - the libP2P node fails to publish the message.
 //
 // All errors returned from this function can be considered benign.
+// TODO: publish has made ready to be removed from middleware, and instead the libp2pNode.Publish should be used directly.
 func (m *Middleware) Publish(msg network.OutgoingMessageScope) error {
 	return m.libP2PNode.Publish(m.ctx, msg)
 }
