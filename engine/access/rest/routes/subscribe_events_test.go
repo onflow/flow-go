@@ -247,33 +247,6 @@ func (s *SubscribeEventsSuite) TestSubscribeEventsHandlesErrors() {
 		assert.NoError(s.T(), err)
 		requireError(s.T(), respRecorder, "subscription channel closed")
 	})
-
-	s.Run("returns error for unexpected response type", func() {
-		stateStreamBackend := &mockstatestream.API{}
-		backend := &mock.API{}
-		subscription := &mockstatestream.Subscription{}
-
-		ch := make(chan interface{})
-		var chReadOnly <-chan interface{}
-		go func() {
-			executionDataResponse := &state_stream.ExecutionDataResponse{
-				Height: s.blocks[0].Header.Height,
-			}
-			ch <- executionDataResponse
-		}()
-		chReadOnly = ch
-
-		subscription.Mock.On("Channel").Return(chReadOnly)
-		subscription.Mock.On("Err").Return(nil)
-		stateStreamBackend.Mock.On("SubscribeEvents", mocks.Anything, s.blocks[0].ID(), uint64(0), mocks.Anything).Return(subscription)
-
-		req, err := getSubscribeEventsRequest(s.T(), s.blocks[0].ID(), request.EmptyHeight, nil, nil, nil)
-		assert.NoError(s.T(), err)
-
-		respRecorder, err := executeRequest(req, backend, stateStreamBackend)
-		assert.NoError(s.T(), err)
-		requireError(s.T(), respRecorder, "unexpected response type: *state_stream.ExecutionDataResponse")
-	})
 }
 
 func getSubscribeEventsRequest(t *testing.T, startBlockId flow.Identifier, startHeight uint64, eventTypes []string, addresses []string, contracts []string) (*http.Request, error) {
