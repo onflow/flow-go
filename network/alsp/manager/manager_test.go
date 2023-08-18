@@ -52,10 +52,16 @@ func TestNetworkPassesReportedMisbehavior(t *testing.T) {
 		return ch
 	}()
 
+	sporkId := unittest.IdentifierFixture()
 	misbehaviorReportManger.On("Ready").Return(readyDoneChan).Once()
 	misbehaviorReportManger.On("Done").Return(readyDoneChan).Once()
-	ids, nodes, _ := testutils.LibP2PNodeForMiddlewareFixture(t, 1)
-	mws, _ := testutils.MiddlewareFixtures(t, ids, nodes, testutils.MiddlewareConfigFixture(t), mocknetwork.NewViolationsConsumer(t))
+	ids, nodes, _ := testutils.LibP2PNodeForMiddlewareFixture(t, sporkId, 1)
+	mws, _ := testutils.MiddlewareFixtures(
+		t,
+		ids,
+		nodes,
+		testutils.MiddlewareConfigFixture(t, sporkId),
+		mocknetwork.NewViolationsConsumer(t))
 
 	networkCfg := testutils.NetworkConfigFixture(t, *ids[0], ids, mws[0])
 	net, err := p2p.NewNetwork(networkCfg, p2p.WithAlspManager(misbehaviorReportManger))
@@ -111,8 +117,15 @@ func TestHandleReportedMisbehavior_Cache_Integration(t *testing.T) {
 			return cache
 		}),
 	}
-	ids, nodes, _ := testutils.LibP2PNodeForMiddlewareFixture(t, 1)
-	mws, _ := testutils.MiddlewareFixtures(t, ids, nodes, testutils.MiddlewareConfigFixture(t), mocknetwork.NewViolationsConsumer(t))
+
+	sporkId := unittest.IdentifierFixture()
+	ids, nodes, _ := testutils.LibP2PNodeForMiddlewareFixture(t, sporkId, 1)
+	mws, _ := testutils.MiddlewareFixtures(
+		t,
+		ids,
+		nodes,
+		testutils.MiddlewareConfigFixture(t, sporkId),
+		mocknetwork.NewViolationsConsumer(t))
 	networkCfg := testutils.NetworkConfigFixture(t, *ids[0], ids, mws[0], p2p.WithAlspConfig(cfg))
 	net, err := p2p.NewNetwork(networkCfg)
 	require.NoError(t, err)
@@ -205,9 +218,18 @@ func TestHandleReportedMisbehavior_And_DisallowListing_Integration(t *testing.T)
 		}),
 	}
 
-	ids, nodes, _ := testutils.LibP2PNodeForMiddlewareFixture(t, 3,
+	sporkId := unittest.IdentifierFixture()
+	ids, nodes, _ := testutils.LibP2PNodeForMiddlewareFixture(
+		t,
+		sporkId,
+		3,
 		p2ptest.WithPeerManagerEnabled(p2ptest.PeerManagerConfigFixture(), nil))
-	mws, _ := testutils.MiddlewareFixtures(t, ids, nodes, testutils.MiddlewareConfigFixture(t), mocknetwork.NewViolationsConsumer(t))
+	mws, _ := testutils.MiddlewareFixtures(
+		t,
+		ids,
+		nodes,
+		testutils.MiddlewareConfigFixture(t, sporkId),
+		mocknetwork.NewViolationsConsumer(t))
 	networkCfg := testutils.NetworkConfigFixture(t, *ids[0], ids, mws[0], p2p.WithAlspConfig(cfg))
 	victimNetwork, err := p2p.NewNetwork(networkCfg)
 	require.NoError(t, err)
@@ -278,11 +300,21 @@ func TestHandleReportedMisbehavior_And_DisallowListing_Integration(t *testing.T)
 // The test ensures that despite attempting on connections, no inbound or outbound connections between the victim and
 // the pruned spammer nodes are established.
 func TestHandleReportedMisbehavior_And_SlashingViolationsConsumer_Integration(t *testing.T) {
-
+	sporkId := unittest.IdentifierFixture()
 	// create 1 victim node, 1 honest node and a node for each slashing violation
-	ids, nodes, _ := testutils.LibP2PNodeForMiddlewareFixture(t, 7) // creates 7 nodes (1 victim, 1 honest, 5 spammer nodes one for each slashing violation).
-	mws, _ := testutils.MiddlewareFixtures(t, ids, nodes, testutils.MiddlewareConfigFixture(t), mocknetwork.NewViolationsConsumer(t))
-	networkCfg := testutils.NetworkConfigFixture(t, *ids[0], ids, mws[0], p2p.WithAlspConfig(managerCfgFixture(t)))
+	ids, nodes, _ := testutils.LibP2PNodeForMiddlewareFixture(t, sporkId, 7) // creates 7 nodes (1 victim, 1 honest, 5 spammer nodes one for each slashing violation).
+	mws, _ := testutils.MiddlewareFixtures(
+		t,
+		ids,
+		nodes,
+		testutils.MiddlewareConfigFixture(t, sporkId),
+		mocknetwork.NewViolationsConsumer(t))
+	networkCfg := testutils.NetworkConfigFixture(
+		t,
+		*ids[0],
+		ids,
+		mws[0],
+		p2p.WithAlspConfig(managerCfgFixture(t)))
 	victimNetwork, err := p2p.NewNetwork(networkCfg)
 	require.NoError(t, err)
 
@@ -371,8 +403,9 @@ func TestMisbehaviorReportMetrics(t *testing.T) {
 	alspMetrics := mockmodule.NewAlspMetrics(t)
 	cfg.AlspMetrics = alspMetrics
 
-	ids, nodes, _ := testutils.LibP2PNodeForMiddlewareFixture(t, 1)
-	mws, _ := testutils.MiddlewareFixtures(t, ids, nodes, testutils.MiddlewareConfigFixture(t), mocknetwork.NewViolationsConsumer(t))
+	sporkId := unittest.IdentifierFixture()
+	ids, nodes, _ := testutils.LibP2PNodeForMiddlewareFixture(t, sporkId, 1)
+	mws, _ := testutils.MiddlewareFixtures(t, ids, nodes, testutils.MiddlewareConfigFixture(t, sporkId), mocknetwork.NewViolationsConsumer(t))
 	networkCfg := testutils.NetworkConfigFixture(t, *ids[0], ids, mws[0], p2p.WithAlspConfig(cfg))
 	net, err := p2p.NewNetwork(networkCfg)
 	require.NoError(t, err)
