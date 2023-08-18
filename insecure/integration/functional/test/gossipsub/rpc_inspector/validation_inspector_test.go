@@ -243,7 +243,7 @@ func TestValidationInspector_HardThresholdIHave_Detection(t *testing.T) {
 	inspectorConfig := flowConfig.NetworkConfig.GossipSubConfig.GossipSubRPCInspectorsConfig.GossipSubRPCValidationInspectorConfigs
 	inspectorConfig.NumberOfWorkers = 1
 	inspectorConfig.IHaveLimits.HardThreshold = 50
-	inspectorConfig.IHaveInspectionMaxSampleSize = 100
+	inspectorConfig.IHaveMaxSampleSize = 100
 	// set the sample size divisor to 2 which will force inspection of 50% of topic IDS
 	inspectorConfig.IHaveSyncInspectSampleSizePercentage = .5
 
@@ -465,7 +465,7 @@ func TestValidationInspector_InvalidTopicId_Detection(t *testing.T) {
 	inspectorConfig.IHaveLimits.SafetyThreshold = 0
 	inspectorConfig.IHaveLimits.HardThreshold = 50
 	inspectorConfig.IHaveAsyncInspectSampleSizePercentage = .5
-	inspectorConfig.IHaveInspectionMaxSampleSize = 100
+	inspectorConfig.IHaveMaxSampleSize = 100
 	ihaveMessageCount := 100
 	inspectorConfig.NumberOfWorkers = 1
 

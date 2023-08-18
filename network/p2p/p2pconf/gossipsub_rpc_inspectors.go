@@ -22,6 +22,11 @@ type GossipSubRPCValidationInspectorConfigs struct {
 	NumberOfWorkers int `validate:"gte=1" mapstructure:"gossipsub-rpc-validation-inspector-workers"`
 	// CacheSize size of the queue used by worker pool for the control message validation inspector.
 	CacheSize uint32 `validate:"gte=100" mapstructure:"gossipsub-rpc-validation-inspector-queue-cache-size"`
+	// IHaveMaxSampleSize the max number of ihave messages in a sample to be inspected.
+	IHaveMaxSampleSize int `validate:"gte=5000" mapstructure:"gossipsub-rpc-ihave-max-sample-size"`
+	// ControlMessageMaxSampleSize the max sample size used for control message validation of GRAFT and PRUNE.
+	ControlMessageMaxSampleSize int `validate:"gte=1000" mapstructure:"gossipsub-rpc-control-message-max-sample-size"`
+
 	// GraftLimits GRAFT control message validation limits.
 	GraftLimits struct {
 		HardThreshold   uint64 `validate:"gt=0" mapstructure:"gossipsub-rpc-graft-hard-threshold"`
@@ -44,8 +49,6 @@ type GossipSubRPCValidationInspectorConfigs struct {
 	IHaveSyncInspectSampleSizePercentage float64 `validate:"gte=.25" mapstructure:"ihave-sync-inspection-sample-size-percentage"`
 	// IHaveAsyncInspectSampleSizePercentage  the percentage of topics to sample for async pre-processing in float64 form.
 	IHaveAsyncInspectSampleSizePercentage float64 `validate:"gte=.10" mapstructure:"ihave-async-inspection-sample-size-percentage"`
-	// IHaveInspectionMaxSampleSize the max number of ihave messages in a sample to be inspected.
-	IHaveInspectionMaxSampleSize float64 `validate:"gte=100" mapstructure:"ihave-max-sample-size"`
 }
 
 // IWantRPCInspectionConfig validation configuration for iWANT RPC control messages.
@@ -55,8 +58,6 @@ type IWantRPCInspectionConfig struct {
 	// CacheMissThreshold the threshold of missing corresponding iHave messages for iWant messages received before an invalid control message notification is disseminated.
 	CacheMissThreshold float64 `validate:"gt=0" mapstructure:"gossipsub-rpc-iwant-cache-miss-threshold"`
 }
-
-// half of the sample
 
 // GetCtrlMsgValidationConfig returns the CtrlMsgValidationConfig for the specified p2p.ControlMessageType.
 func (conf *GossipSubRPCValidationInspectorConfigs) GetCtrlMsgValidationConfig(controlMsg p2pmsg.ControlMessageType) (*CtrlMsgValidationConfig, bool) {

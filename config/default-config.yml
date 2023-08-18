@@ -72,12 +72,21 @@ network-config:
   gossipsub-rpc-sent-tracker-workers: 5
   # Peer scoring is the default value for enabling peer scoring
   gossipsub-peer-scoring-enabled: true
+
   # Gossipsub rpc inspectors configs
   # The size of the queue for notifications about invalid RPC messages
   gossipsub-rpc-inspector-notification-cache-size: 10000
   # RPC control message validation inspector configs
   # Rpc validation inspector number of pool workers
   gossipsub-rpc-validation-inspector-workers: 5
+  # Max number of ihave messages in a sample to be inspected
+  gossipsub-rpc-ihave-max-sample-size: 5000
+  # Max number of control messages in a sample to be inspected when inspecting GRAFT and PRUNE message types
+  gossipsub-rpc-control-message-max-sample-size: 1000
+  # Max number of iwant messages in a sample to be inspected
+  gossipsub-rpc-iwant-max-sample-size: 1_000_000
+  # The allowed threshold of iWant messages receievd without a corresponding tracked iHave message that was sent
+  gossipsub-rpc-iwant-cache-miss-threshold: .5
   # The size of the queue used by worker pool for the control message validation inspector
   gossipsub-rpc-validation-inspector-queue-cache-size: 100
   # Cluster prefixed control message validation configs
@@ -87,6 +96,7 @@ network-config:
   gossipsub-cluster-prefix-tracker-cache-decay: 0.99
   # The upper bound on the amount of cluster prefixed control messages that will be processed
   gossipsub-rpc-cluster-prefixed-hard-threshold: 100
+
   # GRAFT libp2p control message validation limits
   gossipsub-rpc-graft-hard-threshold: 30
   gossipsub-rpc-graft-safety-threshold: 15
@@ -104,13 +114,6 @@ network-config:
   ihave-sync-inspection-sample-size-percentage: .25
   # Percentage of ihaves to use as the sample size for asynchronous inspection 10%
   ihave-async-inspection-sample-size-percentage: .10
-  # Max number of ihave messages in a sample to be inspected
-  ihave-max-sample-size: 100
-
-  # Max number of iwant messages in a sample to be inspected
-  gossipsub-rpc-iwant-max-sample-size: 1_000_000
-  # The allowed threshold of iWant messages receievd without a corresponding tracked iHave message that was sent
-  gossipsub-rpc-iwant-cache-miss-threshold: .5
 
   # RPC metrics observer inspector configs
   # The number of metrics inspector pool workers
