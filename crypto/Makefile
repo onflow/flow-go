@@ -29,6 +29,15 @@ else
 endif
 CGO_FLAG := CGO_CFLAGS=$(CRYPTO_FLAG)
 
+# format
+.PHONY: c-format
+c-format:
+	clang-format -style=llvm -dump-config > .clang-format
+	clang-format -i *.c
+	clang-format -i *.h
+	rm -f .clang-format
+	git diff --exit-code
+
 # test all packages
 .PHONY: test
 test:
