@@ -95,8 +95,7 @@ void Fr_inv_montg_eucl(Fr *res, const Fr *a) {
 // if base = b*R, res = b^expo * R
 // In general, res = base^expo * R^(-expo+1)
 // `expo` is encoded as a little-endian limb_t table of length `expo_len`.
-// `expo` must be non-zero.
-// TODO: clean up?
+// TODO: could be deleted
 void Fr_exp_montg(Fr *res, const Fr* base, const limb_t* expo, const int expo_len) {
     // mask of the most significant bit
 	const limb_t msb_mask =  (limb_t)1<<((sizeof(limb_t)<<3)-1);
@@ -108,29 +107,38 @@ void Fr_exp_montg(Fr *res, const Fr* base, const limb_t* expo, const int expo_le
 	while((index < expo_len) && (*(--expo) == 0)) {
 		index++;
     }
+    // if expo is zero
+    if (index == expo_len) {
+        Fr_copy(res, base);
+        return;
+    }
+    // expo is non zero
 	// process the most significant zero bits
 	while((*expo & mask) == 0) {
 		mask >>= 1;
     }
+    Fr tmp;
 	// process the first `1` bit
-	Fr_copy(res, base);
+	Fr_copy(&tmp, base);
 	mask >>= 1;
 	// Scan all limbs of the exponent
 	for ( ; index < expo_len; expo--) {
 		// Scan all bits 
 		for ( ; mask != 0 ; mask >>= 1 ) {
 			// square
-			Fr_squ_montg(res, res);
+			Fr_squ_montg(&tmp, &tmp);
 			// multiply
 			if (*expo & mask) {
-				Fr_mul_montg(res, res ,base);
+				Fr_mul_montg(&tmp, &tmp ,base);
 			}
 		}
 		mask = msb_mask;
         index++;
 	}
+    Fr_copy(res, &tmp);
 }
 
+// TODO: could be deleted
 void Fr_inv_exp_montg(Fr *res, const Fr *a) {
     Fr r_2;
     Fr_copy(&r_2, (Fr*)BLS12_381_r);
@@ -217,8 +225,7 @@ void Fr_write_bytes(byte *bin, const Fr* a) {
 // maps big-endian bytes into an Fr element using modular reduction
 // Input is byte-big-endian, output is Fr (internally vec256)
 // TODO: check redc_mont_256(vec256 ret, const vec512 a, const vec256 p, limb_t n0);
-static void Fr_from_be_bytes(Fr* out, const byte *bytes, size_t n)
-{
+static void Fr_from_be_bytes(Fr* out, const byte *bytes, size_t n) {
     Fr digit, radix;
     Fr_set_zero(out);
     Fr_copy(&radix, (Fr*)BLS12_381_rRR); // R^2
@@ -610,7 +617,6 @@ void E1_add(E1* res, const E1* a, const E1* b) {
 
 // Point negation: res = -a
 void E1_neg(E1* res, const E1* a) {
-    // TODO: optimize
     E1_copy(res, a);
     POINTonE1_cneg((POINTonE1*)res, 1);
 }
@@ -916,7 +922,6 @@ void E2_double(E2* res, const E2* a) {
 
 // Point negation: res = -a
 void E2_neg(E2* res, const E2* a) {
-    // TODO: optimize
     E2_copy(res, a);
     POINTonE2_cneg((POINTonE2*)res, 1);
 }
