@@ -23,7 +23,7 @@ import (
 )
 
 type GossipSubFactoryFunc func(context.Context, zerolog.Logger, host.Host, PubSubAdapterConfig, CollectionClusterChangesConsumer) (PubSubAdapter, error)
-type CreateNodeFunc func(zerolog.Logger, flow.Identifier, host.Host, ProtocolPeerCache, PeerManager, *DisallowListCacheConfig) LibP2PNode
+type CreateNodeFunc func(zerolog.Logger, host.Host, ProtocolPeerCache, PeerManager, *DisallowListCacheConfig) LibP2PNode
 type GossipSubAdapterConfigFunc func(*BasePubSubAdapterConfig) PubSubAdapterConfig
 
 // GossipSubBuilder provides a builder pattern for creating a GossipSub pubsub system.

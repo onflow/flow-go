@@ -65,7 +65,7 @@ type LibP2PNode interface {
 	// Subscribe subscribes the node to the given topic and returns the subscription
 	Subscribe(topic channels.Topic, topicValidator TopicValidatorFunc) (Subscription, error)
 	// Unsubscribe cancels the subscriber and closes the topic corresponding to the given channel.
-	Unsubscribe(channel channels.Channel) error
+	Unsubscribe(topic channels.Topic) error
 	// Publish publishes the given payload on the topic.
 	Publish(ctx context.Context, scope network.OutgoingMessageScope) error
 	// Host returns pointer to host object of node.

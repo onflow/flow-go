@@ -301,7 +301,7 @@ func (builder *LibP2PNodeBuilder) Build() (p2p.LibP2PNode, error) {
 		}
 	}
 
-	node := builder.createNode(builder.logger, builder.sporkId, h, pCache, peerManager, builder.disallowListCacheCfg)
+	node := builder.createNode(builder.logger, h, pCache, peerManager, builder.disallowListCacheCfg)
 
 	if builder.connGater != nil {
 		builder.connGater.SetDisallowListOracle(node)
@@ -414,12 +414,11 @@ func defaultLibP2POptions(address string, key fcrypto.PrivateKey) ([]config.Opti
 
 // DefaultCreateNodeFunc returns new libP2P node.
 func DefaultCreateNodeFunc(logger zerolog.Logger,
-	sporkId flow.Identifier,
 	host host.Host,
 	pCache p2p.ProtocolPeerCache,
 	peerManager p2p.PeerManager,
 	disallowListCacheCfg *p2p.DisallowListCacheConfig) p2p.LibP2PNode {
-	return p2pnode.NewNode(logger, sporkId, host, pCache, peerManager, disallowListCacheCfg)
+	return p2pnode.NewNode(logger, host, pCache, peerManager, disallowListCacheCfg)
 }
 
 // DefaultNodeBuilder returns a node builder.

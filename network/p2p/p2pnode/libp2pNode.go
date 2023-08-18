@@ -66,13 +66,11 @@ type Node struct {
 	// Cache of temporary disallow-listed peers, when a peer is disallow-listed, the connections to that peer
 	// are closed and further connections are not allowed till the peer is removed from the disallow-list.
 	disallowListedCache p2p.DisallowListCache
-	sporkId             flow.Identifier
 }
 
 // NewNode creates a new libp2p node and sets its parameters.
 func NewNode(
 	logger zerolog.Logger,
-	sporkId flow.Identifier,
 	host host.Host,
 	pCache p2p.ProtocolPeerCache,
 	peerManager p2p.PeerManager,
@@ -81,7 +79,6 @@ func NewNode(
 	return &Node{
 		host:        host,
 		logger:      logger.With().Str("component", "libp2p-node").Logger(),
-		sporkId:     sporkId,
 		topics:      make(map[channels.Topic]p2p.Topic),
 		subs:        make(map[channels.Topic]p2p.Subscription),
 		pCache:      pCache,
@@ -281,9 +278,12 @@ func (n *Node) Subscribe(topic channels.Topic, topicValidator p2p.TopicValidator
 }
 
 // Unsubscribe cancels the subscriber and closes the topic.
+// Args:
+// topic: topic to unsubscribe from.
+// Returns:
+// error: error if any, which means unsubscribe failed.
 // All errors returned from this function can be considered benign.
-func (n *Node) Unsubscribe(channel channels.Channel) error {
-	topic := channels.TopicFromChannel(channel, n.sporkId)
+func (n *Node) Unsubscribe(topic channels.Topic) error {
 	err := n.unsubscribeTopic(topic)
 	if err != nil {
 		return fmt.Errorf("failed to unsubscribe from topic: %w", err)
