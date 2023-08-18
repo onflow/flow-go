@@ -313,13 +313,18 @@ func (ss *SyncSuite) TestProcess_SyncRequest_HigherThanReceiver_OutsideTolerance
 	ss.con.AssertExpectations(ss.T())
 }
 
+// TestProcess_SyncRequest_HigherThanReceiver_OutsideTolerance_Load load tests that a sync request that's higher
+// than the receiver's height doesn't trigger a response, even if outside tolerance. It checks that an ALSP
+// spamming misbehavior report was generated and that the number of misbehavior reports is within a reasonable range.
 func (ss *SyncSuite) TestProcess_SyncRequest_HigherThanReceiver_OutsideTolerance_Load() {
 	ctx, cancel := irrecoverable.NewMockSignalerContextWithCancel(ss.T(), context.Background())
 	ss.e.Start(ctx)
 	unittest.AssertClosesBefore(ss.T(), ss.e.Ready(), time.Second)
 	defer cancel()
 
-	load := 1000
+	misbehaviorReported := 0
+	load := 5000
+
 	for i := 0; i < load; i++ {
 		ss.T().Log("load iteration", i)
 		nonce, err := rand.Uint64()
@@ -342,17 +347,29 @@ func (ss *SyncSuite) TestProcess_SyncRequest_HigherThanReceiver_OutsideTolerance
 		// maybe function calls that might or might not occur over the course of the load test
 		ss.core.On("ScanPending", ss.head).Return([]chainsync.Range{}, []chainsync.Batch{}).Maybe()
 		ss.con.On("Multicast", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
-		ss.con.On("ReportMisbehavior", mock.Anything).Return(mock.Anything).Maybe()
+
+		// count misbehavior reports over the course of a load test
+		ss.con.On("ReportMisbehavior", mock.Anything).Return(mock.Anything).Maybe().Run(
+			func(args mock.Arguments) {
+				misbehaviorReported++
+			},
+		)
 
 		require.NoError(ss.T(), ss.e.Process(channels.SyncCommittee, originID, req))
 	}
 
 	// give at least some time to process items
-	time.Sleep(time.Millisecond * 100)
+	//time.Sleep(time.Millisecond * 100)
 
 	// check function call expectations at the end of the load test; otherwise, load test would take much longer
 	ss.core.AssertExpectations(ss.T())
 	ss.con.AssertExpectations(ss.T())
+
+	// check that correct range of misbehavior reports were generated (between 1-2 reports per 1000 requests)
+	// since we're using a random method to generate misbehavior reports, we can't guarantee the exact number, so we
+	// check that it's within a larger range, but that at least 1 misbehavior report was generated
+	assert.GreaterOrEqual(ss.T(), misbehaviorReported, 1)
+	assert.LessOrEqual(ss.T(), misbehaviorReported, 8) // too many reports would indicate a bug
 }
 
 // TestOnSyncRequest_LowerThanReceiver_OutsideTolerance tests that a sync request that's outside tolerance and
