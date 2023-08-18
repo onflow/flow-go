@@ -172,6 +172,7 @@ func (ar *BlockAttestationResult) ChunkAt(index int) *flow.Chunk {
 		len(execRes.TransactionResults()),
 		attestRes.eventCommit,
 		attestRes.endStateCommit,
+		execRes.executionSnapshot.TotalComputationUsed(),
 	)
 }
 
