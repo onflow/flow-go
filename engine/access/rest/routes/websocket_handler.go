@@ -147,8 +147,7 @@ func NewWSHandler(
 // such as logging, error handling, request decorators
 func (h *WSHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// create a logger
-	logger := h.Logger.With().Str("request_url", r.URL.String()).Logger()
-	//logger := wsCtx.logger.With().Str("subscribe events", request.URL.String()).Logger()
+	logger := h.Logger.With().Str("subscribe_url", r.URL.String()).Logger()
 
 	err := h.VerifyRequest(w, r)
 	if err != nil {
