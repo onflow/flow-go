@@ -95,6 +95,7 @@ void Fr_inv_montg_eucl(Fr *res, const Fr *a) {
 // if base = b*R, res = b^expo * R
 // In general, res = base^expo * R^(-expo+1)
 // `expo` is encoded as a little-endian limb_t table of length `expo_len`.
+// `expo` must be non-zero.
 // TODO: clean up?
 void Fr_exp_montg(Fr *res, const Fr* base, const limb_t* expo, const int expo_len) {
     // mask of the most significant bit
@@ -103,15 +104,15 @@ void Fr_exp_montg(Fr *res, const Fr* base, const limb_t* expo, const int expo_le
 	int index = 0;
 
     expo += expo_len;
-	// Treat most significant zero limbs
+	// process most significant zero limbs
 	while((index < expo_len) && (*(--expo) == 0)) {
 		index++;
     }
-	// Treat the most significant zero bits
+	// process the most significant zero bits
 	while((*expo & mask) == 0) {
 		mask >>= 1;
     }
-	// Treat the first `1` bit
+	// process the first `1` bit
 	Fr_copy(res, base);
 	mask >>= 1;
 	// Scan all limbs of the exponent
@@ -909,6 +910,11 @@ void E2_add(E2* res, const E2* a, const E2* b) {
     POINTonE2_dadd((POINTonE2*)res, (POINTonE2*)a, (POINTonE2*)b, NULL); 
 }
 
+// generic point double that must handle point at infinity
+void E2_double(E2* res, const E2* a) {
+    POINTonE2_double((POINTonE2*)res, (POINTonE2*)a); 
+}
+
 // Point negation: res = -a
 void E2_neg(E2* res, const E2* a) {
     // TODO: optimize
@@ -924,14 +930,34 @@ void E2_mult(E2* res, const E2* p, const Fr* expo) {
     vec_zero(&tmp, sizeof(tmp)); 
 }
 
-// Exponentiation of a generic point `a` in E2 by a byte exponent.
+// Exponentiation of a generic point `a` in E2 by a byte exponent,
+// using a classic double-and-add algorithm (non constant-time)
 void  E2_mult_small_expo(E2* res, const E2* p, const byte expo) {
-    pow256 pow_expo; 
-    vec_zero(&pow_expo, sizeof(pow256)); 
-    pow_expo[0] = expo; // `pow256` uses bytes little endian.
-    // TODO: to bench against a specific version of mult with 8 bits expo
-    POINTonE2_mult_gls((POINTonE2*)res, (POINTonE2*)p, pow_expo);
-    pow_expo[0] = 0;
+    // return early if expo is zero
+    if (expo == 0) {
+        E2_set_infty(res);
+        return;
+    }
+    // expo is non zero
+
+	byte mask = 1<<7;
+	// process the most significant zero bits
+	while((expo & mask) == 0) {
+		mask >>= 1;
+    }
+
+	// process the first `1` bit
+    E2 tmp;
+	E2_copy(&tmp, p);
+	mask >>= 1;
+    // scan the remaining bits
+    for ( ; mask != 0 ; mask >>= 1 ) {
+        E2_double(&tmp, &tmp);
+        if (expo & mask) {
+            E2_add(&tmp, &tmp, p);  
+        }
+    }
+    E2_copy(res, &tmp);
 }
 
 // Exponentiation of generator g2 of G2, res = expo.g2
@@ -1126,8 +1152,8 @@ void E1_print_(char* s, const E1* p, const int jacob) {
 
 void E2_print_(char* s, const E2* p, const int jacob) {
     E2 a; E2_copy(&a, p);
-    if (strlen(s)) if (!jacob) E2_to_affine(&a, &a);
-    printf("[%s]:\n", s);
+    if (!jacob) E2_to_affine(&a, &a);
+    if (strlen(s)) printf("[%s]:\n", s);
     Fp2_print_("", &(a.x));
     Fp2_print_("", &(a.y));
     if (jacob) Fp2_print_("", &(a.z));

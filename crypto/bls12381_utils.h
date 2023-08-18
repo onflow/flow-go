@@ -113,6 +113,7 @@ void        G2_mult_gen(E2*, const Fr*);
 void        E2_mult(E2*, const E2*, const Fr*);
 void        E2_mult_small_expo(E2*, const E2*, const byte);
 void        E2_add(E2* res, const E2* a, const E2* b);
+void        E2_double(E2* res, const E2* a);
 void        E2_neg(E2*, const E2*);
 void        E2_sum_vector(E2*, const E2*, const int);
 void        E2_subtract_vector(E2* res, const E2* x, const E2* y, const int len);
@@ -129,7 +130,7 @@ void        Fp12_multi_pairing(Fp12*, const E1*, const E2*, const int);
 void xmd_sha256(byte *, int, byte *, int, byte *, int);
 
 // Debugging related functions
-#define DEBUG 0
+#define DEBUG 1
 #if (DEBUG == 1)
 #include <stdio.h>
 void     bytes_print_(char*, byte*, int);

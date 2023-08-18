@@ -5,6 +5,7 @@ import (
 	"fmt"
 	mrand "math/rand"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -13,7 +14,7 @@ import (
 )
 
 func getPRG(t *testing.T) *mrand.Rand {
-	random := int64(1685491239186156000) //time.Now().UnixNano()
+	random := time.Now().UnixNano()
 	t.Logf("rng seed is %d", random)
 	rng := mrand.New(mrand.NewSource(random))
 	return rng

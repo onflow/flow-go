@@ -35,7 +35,7 @@ void Fr_polynomial_image(Fr* image, E2* y, const Fr* a, const int degree, const 
 static void E2_polynomial_image(E2* y, const E2* A, const int degree, const byte x){        
     E2_set_infty(y);
     for (int i = degree; i >= 0 ; i--) {
-        E2_mult_small_expo(y, y, x); // TODO: to bench against a specific version of mult with 8 bits expo
+        E2_mult_small_expo(y, y, x);
         E2_add(y, y, &A[i]);
     }
 }
