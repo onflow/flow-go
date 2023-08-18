@@ -72,8 +72,14 @@ func (suite *MeshEngineTestSuite) SetupTest() {
 	signalerCtx := irrecoverable.NewMockSignalerContext(suite.T(), ctx)
 
 	var nodes []p2p.LibP2PNode
-	suite.ids, nodes, obs = testutils.LibP2PNodeForMiddlewareFixture(suite.T(), count)
-	suite.mws, _ = testutils.MiddlewareFixtures(suite.T(), suite.ids, nodes, testutils.MiddlewareConfigFixture(suite.T()), mocknetwork.NewViolationsConsumer(suite.T()))
+	sporkId := unittest.IdentifierFixture()
+	suite.ids, nodes, obs = testutils.LibP2PNodeForMiddlewareFixture(suite.T(), sporkId, count)
+	suite.mws, _ = testutils.MiddlewareFixtures(
+		suite.T(),
+		suite.ids,
+		nodes,
+		testutils.MiddlewareConfigFixture(suite.T(), sporkId),
+		mocknetwork.NewViolationsConsumer(suite.T()))
 	suite.nets = testutils.NetworksFixture(suite.T(), suite.ids, suite.mws)
 	testutils.StartNodesAndNetworks(signalerCtx, suite.T(), nodes, suite.nets, 100*time.Millisecond)
 
