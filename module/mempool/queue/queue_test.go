@@ -292,7 +292,7 @@ func TestQueue(t *testing.T) {
 	//})
 
 	t.Run("String()", func(t *testing.T) {
-		t.Skip("flakey, because String() will iterate through a map, which is not determinsitic")
+		unittest.SkipUnless(t, unittest.TEST_FLAKY, "flakey, because String() will iterate through a map, which is not determinsitic")
 		// a <- c <- d <- f
 		queue := NewQueue(a)
 		stored, _ := queue.TryAdd(c)
