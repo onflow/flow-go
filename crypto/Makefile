@@ -29,7 +29,7 @@ else
 endif
 CGO_FLAG := CGO_CFLAGS=$(CRYPTO_FLAG)
 
-# format
+# format C code
 .PHONY: c-format
 c-format:
 	clang-format -style=llvm -dump-config > .clang-format
@@ -37,6 +37,13 @@ c-format:
 	clang-format -i *.h
 	rm -f .clang-format
 	git diff --exit-code
+
+# tidy Go and C code
+.PHONY: tidy
+tidy: c-format
+	go mod tidy -v
+	git diff --exit-code
+
 
 # test all packages
 .PHONY: test
