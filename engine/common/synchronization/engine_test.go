@@ -202,14 +202,24 @@ func (ss *SyncSuite) TestOnSyncRequest_LowerThanReceiver_WithinTolerance() {
 	ss.core.AssertExpectations(ss.T())
 }
 
-// TestOnSyncRequest_HigherThanReceiver_OutsideTolerance tests that a sync request that's higher than the receiver's height doesn't
-// trigger a response, even if outside tolerance.
-func (ss *SyncSuite) TestOnSyncRequest_HigherThanReceiver_OutsideTolerance() {
-	nonce, err := rand.Uint64()
-	require.NoError(ss.T(), err, "should generate nonce")
+// TestOnSyncRequest_HigherThanReceiver_OutsideTolerance_NoMisbehaviorReport tests that a sync request that's higher
+// than the receiver's height doesn't trigger a response, even if outside tolerance and does not generate ALSP
+// spamming misbehavior report (simulating the most likely probability).
+func (ss *SyncSuite) TestOnSyncRequest_HigherThanReceiver_OutsideTolerance_NoMisbehaviorReport() {
+	mockRandomizer := new(rand.MockRandomizer)
+	ss.e.randomizer = mockRandomizer
+
+	ctx, cancel := irrecoverable.NewMockSignalerContextWithCancel(ss.T(), context.Background())
+	ss.e.Start(ctx)
+	unittest.AssertClosesBefore(ss.T(), ss.e.Ready(), time.Second)
+	defer cancel()
 
 	// generate origin and request message
 	originID := unittest.IdentifierFixture()
+
+	nonce, err := rand.Uint64()
+	require.NoError(ss.T(), err, "should generate nonce")
+
 	req := &messages.SyncRequest{
 		Nonce:  nonce,
 		Height: 0,
@@ -217,62 +227,28 @@ func (ss *SyncSuite) TestOnSyncRequest_HigherThanReceiver_OutsideTolerance() {
 
 	// if request height is higher than local finalized, we should not respond
 	req.Height = ss.head.Height + 1
-	ss.core.On("HandleHeight", ss.head, req.Height)
-	ss.core.On("WithinTolerance", ss.head, req.Height).Return(false)
-	err = ss.e.requestHandler.onSyncRequest(originID, req)
-	ss.Assert().NoError(err, "same height sync request should pass")
+
+	ss.core.On("HandleHeight", ss.head, req.Height).Once()
+	ss.core.On("WithinTolerance", ss.head, req.Height).Return(false).Once()
+
 	ss.con.AssertNotCalled(ss.T(), "Unicast", mock.Anything, mock.Anything)
 
+	// expect Uint32n(1001) to be called once and return 1, not triggering a misbehavior report
+	mockRandomizer.On("Uint32n", uint32(1001)).Return(1).Once()
+
+	require.NoError(ss.T(), ss.e.Process(channels.SyncCommittee, originID, req))
+
+	// give at least some time to process items
+	time.Sleep(time.Millisecond * 100)
+
 	ss.core.AssertExpectations(ss.T())
+	ss.con.AssertExpectations(ss.T())
 }
 
-func (ss *SyncSuite) TestOnSyncRequest_HigherThanReceiver_OutsideTolerance_NoMisbehaviorReport() {
-	load := 10
-	mockRandomizer := new(rand.MockRandomizer)
-	ss.e.randomizer = mockRandomizer
-
-	ctx, cancel := irrecoverable.NewMockSignalerContextWithCancel(ss.T(), context.Background())
-	ss.e.Start(ctx)
-	unittest.AssertClosesBefore(ss.T(), ss.e.Ready(), time.Second)
-	defer cancel()
-
-	for i := 0; i < load; i++ {
-		ss.T().Logf("i: %d", i)
-
-		// generate origin and request message
-		originID := unittest.IdentifierFixture()
-
-		nonce, err := rand.Uint64()
-		require.NoError(ss.T(), err, "should generate nonce")
-
-		req := &messages.SyncRequest{
-			Nonce:  nonce,
-			Height: 0,
-		}
-
-		// if request height is higher than local finalized, we should not respond
-		req.Height = ss.head.Height + 1
-
-		ss.core.On("HandleHeight", ss.head, req.Height).Once()
-		ss.core.On("WithinTolerance", ss.head, req.Height).Return(false).Once()
-
-		ss.con.AssertNotCalled(ss.T(), "Unicast", mock.Anything, mock.Anything)
-
-		// expect Uint32n(1001) to be called once and return 1, not triggering a misbehavior report
-		mockRandomizer.On("Uint32n", uint32(1001)).Return(1).Once()
-
-		require.NoError(ss.T(), ss.e.Process(channels.SyncCommittee, originID, req))
-
-		// give at least some time to process items
-		time.Sleep(time.Millisecond * 100)
-
-		ss.core.AssertExpectations(ss.T())
-		ss.con.AssertExpectations(ss.T())
-	}
-}
-
+// TestOnSyncRequest_HigherThanReceiver_OutsideTolerance_MisbehaviorReport tests that a sync request that's higher
+// than the receiver's height doesn't trigger a response, even if outside tolerance and generates ALSP
+// spamming misbehavior report (simulating the unlikely probability).
 func (ss *SyncSuite) TestOnSyncRequest_HigherThanReceiver_OutsideTolerance_MisbehaviorReport() {
-	load := 10
 	mockRandomizer := new(rand.MockRandomizer)
 	ss.e.randomizer = mockRandomizer
 
@@ -281,43 +257,39 @@ func (ss *SyncSuite) TestOnSyncRequest_HigherThanReceiver_OutsideTolerance_Misbe
 	unittest.AssertClosesBefore(ss.T(), ss.e.Ready(), time.Second)
 	defer cancel()
 
-	for i := 0; i < load; i++ {
-		ss.T().Logf("i: %d", i)
+	// generate origin and request message
+	originID := unittest.IdentifierFixture()
 
-		// generate origin and request message
-		originID := unittest.IdentifierFixture()
+	nonce, err := rand.Uint64()
+	require.NoError(ss.T(), err, "should generate nonce")
 
-		nonce, err := rand.Uint64()
-		require.NoError(ss.T(), err, "should generate nonce")
-
-		req := &messages.SyncRequest{
-			Nonce:  nonce,
-			Height: 0,
-		}
-
-		// if request height is higher than local finalized, we should not respond
-		req.Height = ss.head.Height + 1
-
-		// assert that misbehavior is reported
-		ss.con.On("ReportMisbehavior", mock.Anything).Return(false)
-
-		// assert that HandleHeight, WithinTolerance are not called because misbehavior is reported
-		// also, check that response is never sent
-		ss.core.AssertNotCalled(ss.T(), "HandleHeight")
-		ss.core.AssertNotCalled(ss.T(), "WithinTolerance")
-		ss.con.AssertNotCalled(ss.T(), "Unicast", mock.Anything, mock.Anything)
-
-		// expect Uint32n(1001) to be called once and return misbehavior report because it happened to be 835
-		mockRandomizer.On("Uint32n", uint32(1001)).Return(835).Once()
-
-		require.NoError(ss.T(), ss.e.Process(channels.SyncCommittee, originID, req))
-
-		// give at least some time to process items
-		time.Sleep(time.Millisecond * 100)
-
-		ss.core.AssertExpectations(ss.T())
-		ss.con.AssertExpectations(ss.T())
+	req := &messages.SyncRequest{
+		Nonce:  nonce,
+		Height: 0,
 	}
+
+	// if request height is higher than local finalized, we should not respond
+	req.Height = ss.head.Height + 1
+
+	// assert that misbehavior is reported
+	ss.con.On("ReportMisbehavior", mock.Anything).Return(mock.Anything).Once()
+
+	// assert that HandleHeight, WithinTolerance are not called because misbehavior is reported
+	// also, check that response is never sent
+	ss.core.AssertNotCalled(ss.T(), "HandleHeight")
+	ss.core.AssertNotCalled(ss.T(), "WithinTolerance")
+	ss.con.AssertNotCalled(ss.T(), "Unicast", mock.Anything, mock.Anything)
+
+	// expect Uint32n(1001) to be called once and return misbehavior report because it happened to be 835
+	mockRandomizer.On("Uint32n", uint32(1001)).Return(835).Once()
+
+	require.NoError(ss.T(), ss.e.Process(channels.SyncCommittee, originID, req))
+
+	// give at least some time to process items
+	time.Sleep(time.Millisecond * 100)
+
+	ss.core.AssertExpectations(ss.T())
+	ss.con.AssertExpectations(ss.T())
 }
 
 // TestOnSyncRequest_LowerThanReceiver_OutsideTolerance tests that a sync request that's outside tolerance and
