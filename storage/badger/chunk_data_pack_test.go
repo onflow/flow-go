@@ -30,6 +30,37 @@ func TestChunkDataPacks_Store(t *testing.T) {
 	})
 }
 
+func TestChunkDataPack_Remove(t *testing.T) {
+	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+		transactions := badgerstorage.NewTransactions(&metrics.NoopCollector{}, db)
+		collections := badgerstorage.NewCollections(db, transactions)
+		// keep the cache size at 1 to make sure that entries are written and read from storage itself.
+		chunkDataPackStore := badgerstorage.NewChunkDataPacks(&metrics.NoopCollector{}, db, collections, 1)
+
+		chunkDataPacks := unittest.ChunkDataPacksFixture(10)
+		for _, chunkDataPack := range chunkDataPacks {
+			// stores collection in Collections storage (which ChunkDataPacks store uses internally)
+			err := collections.Store(chunkDataPack.Collection)
+			require.NoError(t, err)
+		}
+
+		chunkIDs := make([]flow.Identifier, 0, len(chunkDataPacks))
+		for _, chunk := range chunkDataPacks {
+			chunkIDs = append(chunkIDs, chunk.ID())
+		}
+
+		require.NoError(t, chunkDataPackStore.Store(chunkDataPacks))
+		require.NoError(t, chunkDataPackStore.Remove(chunkIDs))
+
+		// verify it has been removed
+		_, err := chunkDataPackStore.ByChunkID(chunkIDs[0])
+		assert.True(t, errors.Is(err, storage.ErrNotFound))
+
+		// Removing again should not error
+		require.NoError(t, chunkDataPackStore.Remove(chunkIDs))
+	})
+}
+
 // TestChunkDataPack_BatchStore evaluates correct batch storage and retrieval of chunk data packs in the storage.
 func TestChunkDataPacks_BatchStore(t *testing.T) {
 	WithChunkDataPacks(t, 100, func(t *testing.T, chunkDataPacks []*flow.ChunkDataPack, chunkDataPackStore *badgerstorage.ChunkDataPacks, db *badger.DB) {

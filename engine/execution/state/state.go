@@ -285,10 +285,28 @@ func (s *state) SaveExecutionResults(
 		trace.EXEStateSaveExecutionResults)
 	defer span.End()
 
+	err := s.saveExecutionResults(ctx, result)
+	if err != nil {
+		return fmt.Errorf("could not save execution results: %w", err)
+	}
+
+	//outside batch because it requires read access
+	err = s.UpdateHighestExecutedBlockIfHigher(childCtx, result.ExecutableBlock.Block.Header)
+	if err != nil {
+		return fmt.Errorf("cannot update highest executed block: %w", err)
+	}
+
+	return nil
+}
+
+func (s *state) saveExecutionResults(
+	ctx context.Context,
+	result *execution.ComputationResult,
+) (err error) {
 	header := result.ExecutableBlock.Block.Header
 	blockID := header.ID()
 
-	err := s.chunkDataPacks.Store(result.AllChunkDataPacks())
+	err = s.chunkDataPacks.Store(result.AllChunkDataPacks())
 	if err != nil {
 		return fmt.Errorf("can not store multiple chunk data pack: %w", err)
 	}
@@ -299,6 +317,18 @@ func (s *state) SaveExecutionResults(
 	// Note, that it does not guarantee atomicity as transactions has size limit,
 	// but it's the closest thing to atomicity we could have
 	batch := badgerstorage.NewBatch(s.db)
+
+	defer func() {
+		// Rollback if an error occurs during batch operations
+		if err != nil {
+			chunks := result.AllChunkDataPacks()
+			chunkIDs := make([]flow.Identifier, 0, len(chunks))
+			for _, chunk := range chunks {
+				chunkIDs = append(chunkIDs, chunk.ID())
+			}
+			_ = s.chunkDataPacks.Remove(chunkIDs)
+		}
+	}()
 
 	err = s.events.BatchStore(blockID, []flow.EventsList{result.AllEvents()}, batch)
 	if err != nil {
@@ -347,11 +377,6 @@ func (s *state) SaveExecutionResults(
 		return fmt.Errorf("batch flush error: %w", err)
 	}
 
-	//outside batch because it requires read access
-	err = s.UpdateHighestExecutedBlockIfHigher(childCtx, header)
-	if err != nil {
-		return fmt.Errorf("cannot update highest executed block: %w", err)
-	}
 	return nil
 }
 
