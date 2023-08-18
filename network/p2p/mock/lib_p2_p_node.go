@@ -284,13 +284,13 @@ func (_m *LibP2PNode) PeerScoreExposer() p2p.PeerScoreExposer {
 	return r0
 }
 
-// Publish provides a mock function with given fields: ctx, scope
-func (_m *LibP2PNode) Publish(ctx context.Context, scope flow_gonetwork.OutgoingMessageScope) error {
-	ret := _m.Called(ctx, scope)
+// Publish provides a mock function with given fields: ctx, messageScope
+func (_m *LibP2PNode) Publish(ctx context.Context, messageScope flow_gonetwork.OutgoingMessageScope) error {
+	ret := _m.Called(ctx, messageScope)
 
 	var r0 error
 	if rf, ok := ret.Get(0).(func(context.Context, flow_gonetwork.OutgoingMessageScope) error); ok {
-		r0 = rf(ctx, scope)
+		r0 = rf(ctx, messageScope)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -430,13 +430,13 @@ func (_m *LibP2PNode) Subscribe(topic channels.Topic, topicValidator p2p.TopicVa
 	return r0, r1
 }
 
-// Unsubscribe provides a mock function with given fields: channel
-func (_m *LibP2PNode) Unsubscribe(channel channels.Channel) error {
-	ret := _m.Called(channel)
+// Unsubscribe provides a mock function with given fields: topic
+func (_m *LibP2PNode) Unsubscribe(topic channels.Topic) error {
+	ret := _m.Called(topic)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(channels.Channel) error); ok {
-		r0 = rf(channel)
+	if rf, ok := ret.Get(0).(func(channels.Topic) error); ok {
+		r0 = rf(topic)
 	} else {
 		r0 = ret.Error(0)
 	}
