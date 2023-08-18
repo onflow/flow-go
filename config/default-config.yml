@@ -97,24 +97,6 @@ network-config:
   # The upper bound on the amount of cluster prefixed control messages that will be processed
   gossipsub-rpc-cluster-prefixed-hard-threshold: 100
 
-  # GRAFT libp2p control message validation limits
-  gossipsub-rpc-graft-hard-threshold: 30
-  gossipsub-rpc-graft-safety-threshold: 15
-  gossipsub-rpc-graft-rate-limit: 30
-  # PRUNE libp2p control message validation limits
-  gossipsub-rpc-prune-hard-threshold: 30
-  gossipsub-rpc-prune-safety-threshold: 15
-  gossipsub-rpc-prune-rate-limit: 30
-  # IHAVE libp2p control message validation limits
-  gossipsub-rpc-ihave-hard-threshold: 100
-  gossipsub-rpc-ihave-safety-threshold: 50
-  # Rate limiting is disabled for ihave control messages
-  gossipsub-rpc-ihave-rate-limit: 0
-  # Percentage of ihaves to use as the sample size for synchronous inspection 25%
-  ihave-sync-inspection-sample-size-percentage: .25
-  # Percentage of ihaves to use as the sample size for asynchronous inspection 10%
-  ihave-async-inspection-sample-size-percentage: .10
-
   # RPC metrics observer inspector configs
   # The number of metrics inspector pool workers
   gossipsub-rpc-metrics-inspector-workers: 1

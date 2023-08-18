@@ -8,9 +8,6 @@ import (
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	pubsub_pb "github.com/libp2p/go-libp2p-pubsub/pb"
 	"github.com/libp2p/go-libp2p/core/peer"
-	"github.com/rs/zerolog"
-	"golang.org/x/time/rate"
-
 	"github.com/onflow/flow-go/engine/common/worker"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
@@ -20,13 +17,13 @@ import (
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/inspector/internal/cache"
-	"github.com/onflow/flow-go/network/p2p/inspector/internal/ratelimit"
 	p2pmsg "github.com/onflow/flow-go/network/p2p/message"
 	"github.com/onflow/flow-go/network/p2p/p2pconf"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/events"
 	"github.com/onflow/flow-go/utils/logging"
 	flowrand "github.com/onflow/flow-go/utils/rand"
+	"github.com/rs/zerolog"
 )
 
 // ControlMsgValidationInspector RPC message inspector that inspects control messages and performs some validation on them,
@@ -117,16 +114,6 @@ func NewControlMsgValidationInspector(
 		}
 		<-distributor.Done()
 	})
-	// start rate limiters cleanup loop in workers
-	for _, conf := range c.config.AllCtrlMsgValidationConfig() {
-		l := logger.With().Str("control_message_type", conf.ControlMsg.String()).Logger()
-		limiter := ratelimit.NewControlMessageRateLimiter(l, rate.Limit(conf.RateLimit), conf.RateLimit)
-		c.rateLimiters[conf.ControlMsg] = limiter
-		builder.AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
-			ready()
-			limiter.Start(ctx)
-		})
-	}
 	for i := 0; i < c.config.NumberOfWorkers; i++ {
 		builder.AddWorker(pool.WorkerLogic())
 	}
@@ -134,7 +121,7 @@ func NewControlMsgValidationInspector(
 	return c, nil
 }
 
-// Inspect is called by gossipsub upon reception of an rpc from a remote  node.
+// Inspect is called by gossipsub upon reception of a rpc from a remote  node.
 // It creates a new InspectRPCRequest for the RPC to be inspected async by the worker pool.
 func (c *ControlMsgValidationInspector) Inspect(from peer.ID, rpc *pubsub.RPC) error {
 	// queue further async inspection
@@ -170,7 +157,7 @@ func (c *ControlMsgValidationInspector) inspectIWant(iWants []*pubsub_pb.Control
 		c.logger.Warn().
 			Uint("sample_size", sampleSize).
 			Uint("max_sample_size", c.config.IWantRPCInspectionConfig.MaxSampleSize).
-			Str(logging.KeySuspicious, "true"). // max sample size is suspicious
+			Str(logging.KeySuspicious, "true").         // max sample size is suspicious
 			Str(logging.KeyNetworkingSecurity, "true"). // zero sample size is a security hole
 			Msg("zero or invalid sample size, using default max sample size")
 		sampleSize = c.config.IWantRPCInspectionConfig.MaxSampleSize
