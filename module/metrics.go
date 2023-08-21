@@ -646,23 +646,11 @@ type AccessMetrics interface {
 	TransactionMetrics
 	BackendScriptsMetrics
 
-	//TrnasactionResultMetrics
-
 	// UpdateExecutionReceiptMaxHeight is called whenever we store an execution receipt from a block from a newer height
 	UpdateExecutionReceiptMaxHeight(height uint64)
 
 	// UpdateLastFullBlockHeight tracks the height of the last block for which all collections were received
 	UpdateLastFullBlockHeight(height uint64)
-}
-
-type TrnasactionResultMetrics interface {
-	OnKeyHitSuccess()
-	OnKeyHitFailure()
-
-	OnKeyAddSuccess()
-	OnKeyEviction()
-
-	OnKeyAddFailureDueToFullCache()
 }
 
 type ExecutionResultStats struct {

@@ -32,8 +32,6 @@ type AccessCollector struct {
 	module.TransactionMetrics
 	module.BackendScriptsMetrics
 
-	//module.TransactionResultMetrics
-
 	connectionReused      prometheus.Counter
 	connectionsInPool     *prometheus.GaugeVec
 	connectionAdded       prometheus.Counter
