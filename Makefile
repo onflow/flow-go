@@ -205,7 +205,7 @@ generate-mocks: install-mock-generators
 tidy:
 	go mod tidy -v
 	cd integration; go mod tidy -v
-	$(MAKE) -C crypto tidy
+	cd crypo; go mod tidy -v
 	cd cmd/testclient; go mod tidy -v
 	cd insecure; go mod tidy -v
 	git diff --exit-code
