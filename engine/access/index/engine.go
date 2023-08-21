@@ -106,6 +106,9 @@ func (e *Engine) OnExecutionData(executionData *execution_data.BlockExecutionDat
 	if ok := e.highestHeight.Set(header.Height); !ok {
 		// this means that the height was lower than the current highest height
 
+		// TODO(sideninja) should we differentiate between height being same (a case that can happen)
+		// from the case where the height is lower than current height (a case that shouldn't happen?)
+
 		// OnExecutionData is guaranteed by the requester to be called in order, but may be called
 		// multiple times for the same block.
 		lg.Debug().Msg("execution data for block already received")
