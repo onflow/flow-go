@@ -645,6 +645,20 @@ func (mr *MockEventsMockRecorder) ByBlockIDTransactionIndex(arg0, arg1 interface
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ByBlockIDTransactionIndex", reflect.TypeOf((*MockEvents)(nil).ByBlockIDTransactionIndex), arg0, arg1)
 }
 
+// Store mocks base method.
+func (m *MockEvents) Store(arg0 flow.Identifier, arg1 []flow.EventsList) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Store", arg0, arg1)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// Store indicates an expected call of Store.
+func (mr *MockEventsMockRecorder) Store(arg0, arg1 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Store", reflect.TypeOf((*MockEvents)(nil).Store), arg0, arg1)
+}
+
 // MockServiceEvents is a mock of ServiceEvents interface.
 type MockServiceEvents struct {
 	ctrl     *gomock.Controller
@@ -709,6 +723,20 @@ func (m *MockServiceEvents) ByBlockID(arg0 flow.Identifier) ([]flow.Event, error
 func (mr *MockServiceEventsMockRecorder) ByBlockID(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ByBlockID", reflect.TypeOf((*MockServiceEvents)(nil).ByBlockID), arg0)
+}
+
+// Store mocks base method.
+func (m *MockServiceEvents) Store(arg0 flow.Identifier, arg1 []flow.Event) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Store", arg0, arg1)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// Store indicates an expected call of Store.
+func (mr *MockServiceEventsMockRecorder) Store(arg0, arg1 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Store", reflect.TypeOf((*MockServiceEvents)(nil).Store), arg0, arg1)
 }
 
 // MockTransactionResults is a mock of TransactionResults interface.
