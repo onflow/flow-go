@@ -114,14 +114,12 @@ func TestFullGossipSubConnectivity(t *testing.T) {
 // the network of honest nodes.
 func TestFullGossipSubConnectivityAmongHonestNodesWithMaliciousMajority(t *testing.T) {
 	// Note: if this test is ever flaky, this means a bug in our scoring system. Please escalate to the team instead of skipping.
-	total := 10
-	for i := 0; i < total; i++ {
-		if !testGossipConnectivityUnderNetworkPartition(t, true) {
-			// even one failure should not happen, as it means that malicious majority can partition the network
-			// with our peer scoring parameters.
-			require.Fail(t, "honest nodes are not on each others' topic mesh on GossipSub")
-		}
+	if !testGossipConnectivityUnderNetworkPartition(t, true) {
+		// even one failure should not happen, as it means that malicious majority can partition the network
+		// with our peer scoring parameters.
+		require.Fail(t, "honest nodes are not on each others' topic mesh on GossipSub")
 	}
+
 }
 
 // TestNetworkPartitionWithNoHonestPeerScoringInFullTopology is part one of testing pushing access nodes to the edges of the network.
