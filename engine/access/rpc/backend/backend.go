@@ -91,14 +91,6 @@ type Config struct {
 	CircuitBreakerConfig      connection.CircuitBreakerConfig // the configuration for circuit breaker
 }
 
-type Communicator interface {
-	CallAvailableNode(
-		nodes flow.IdentityList,
-		call NodeAction,
-		shouldTerminateOnError ErrorTerminator,
-	) error
-}
-
 type Params struct {
 	State                     protocol.State
 	CollectionRPC             accessproto.AccessAPIClient

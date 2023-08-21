@@ -20,6 +20,16 @@ type NodeAction func(node *flow.Identity) error
 // It takes an error as input and returns a boolean value indicating whether the error should be considered terminal.
 type ErrorTerminator func(node *flow.Identity, err error) bool
 
+type Communicator interface {
+	CallAvailableNode(
+		nodes flow.IdentityList,
+		call NodeAction,
+		shouldTerminateOnError ErrorTerminator,
+	) error
+}
+
+var _ Communicator = (*NodeCommunicator)(nil)
+
 // NodeCommunicator is responsible for calling available nodes in the backend.
 type NodeCommunicator struct {
 	nodeSelectorFactory NodeSelectorFactory
