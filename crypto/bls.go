@@ -349,6 +349,9 @@ func (a *blsBLS12381Algo) decodePublicKeyCompressed(publicKeyBytes []byte) (Publ
 }
 
 // prKeyBLSBLS12381 is the private key of BLS using BLS12_381, it implements PrivateKey
+
+var _ PrivateKey = (*prKeyBLSBLS12381)(nil)
+
 type prKeyBLSBLS12381 struct {
 	// public key
 	pk *pubKeyBLSBLS12381
@@ -426,6 +429,9 @@ func (sk *prKeyBLSBLS12381) String() string {
 
 // pubKeyBLSBLS12381 is the public key of BLS using BLS12_381,
 // it implements PublicKey.
+
+var _ PublicKey = (*pubKeyBLSBLS12381)(nil)
+
 type pubKeyBLSBLS12381 struct {
 	// The package guarantees an instance is only created with a point
 	// on the correct G2 subgroup. No membership check is needed when the

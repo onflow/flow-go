@@ -1,6 +1,7 @@
 package crypto
 
 import (
+	"crypto/rand"
 	"encoding/hex"
 	mrand "math/rand"
 	"testing"
@@ -54,7 +55,7 @@ func TestScalarMultBLS12381(t *testing.T) {
 // G1 and G2 scalar multiplication
 func BenchmarkScalarMult(b *testing.B) {
 	seed := make([]byte, securityBits/8)
-	_, err := mrand.Read(seed)
+	_, err := rand.Read(seed)
 	require.NoError(b, err)
 
 	var expo scalar

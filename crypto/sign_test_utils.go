@@ -5,6 +5,7 @@ import (
 	"fmt"
 	mrand "math/rand"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -13,7 +14,7 @@ import (
 )
 
 func getPRG(t *testing.T) *mrand.Rand {
-	random := int64(1685491239186156000) //time.Now().UnixNano()
+	random := time.Now().UnixNano()
 	t.Logf("rng seed is %d", random)
 	rng := mrand.New(mrand.NewSource(random))
 	return rng
@@ -75,15 +76,13 @@ func testGenSignVerify(t *testing.T, salg SigningAlgorithm, halg hash.Hasher) {
 			// test a valid signature
 			result, err := pk.Verify(s, input, halg)
 			require.NoError(t, err)
-			assert.True(t, result, fmt.Sprintf(
-				"Verification should succeed:\n signature:%s\n message:%x\n private key:%s", s, input, sk))
+			assert.True(t, result)
 
 			// test with a different message
 			input[0] ^= 1
 			result, err = pk.Verify(s, input, halg)
 			require.NoError(t, err)
-			assert.False(t, result, fmt.Sprintf(
-				"Verification should fail:\n signature:%s\n message:%x\n private key:%s", s, input, sk))
+			assert.False(t, result)
 			input[0] ^= 1
 
 			// test with a valid but different key
@@ -92,8 +91,7 @@ func testGenSignVerify(t *testing.T, salg SigningAlgorithm, halg hash.Hasher) {
 			require.NoError(t, err)
 			result, err = wrongSk.PublicKey().Verify(s, input, halg)
 			require.NoError(t, err)
-			assert.False(t, result, fmt.Sprintf(
-				"Verification should fail:\n signature:%s\n message:%x\n private key:%s", s, input, sk))
+			assert.False(t, result)
 
 			// test a wrong signature length
 			invalidLen := rand.Intn(2 * len(s)) // try random invalid lengths
@@ -103,9 +101,7 @@ func testGenSignVerify(t *testing.T, salg SigningAlgorithm, halg hash.Hasher) {
 			invalidSig := make([]byte, invalidLen)
 			result, err = pk.Verify(invalidSig, input, halg)
 			require.NoError(t, err)
-			assert.False(t, result, fmt.Sprintf(
-				"Verification should fail:\n signature:%s\n with invalid length %d", invalidSig, invalidLen))
-
+			assert.False(t, result)
 		}
 	})
 }
@@ -172,7 +168,7 @@ func testEncodeDecode(t *testing.T, salg SigningAlgorithm) {
 				require.Equal(t, read, KeyGenSeedMinLen)
 				require.NoError(t, err)
 				sk, err := GeneratePrivateKey(salg, seed)
-				assert.Nil(t, err, "the key generation failed")
+				assert.Nil(t, err)
 				seed[0] ^= 1 // alter the seed to get a new private key
 				distinctSk, err := GeneratePrivateKey(salg, seed)
 				require.NoError(t, err)
@@ -180,10 +176,10 @@ func testEncodeDecode(t *testing.T, salg SigningAlgorithm) {
 				// check private key encoding
 				skBytes := sk.Encode()
 				skCheck, err := DecodePrivateKey(salg, skBytes)
-				require.Nil(t, err, "the key decoding failed")
-				assert.True(t, sk.Equals(skCheck), "key equality check failed")
+				require.Nil(t, err)
+				assert.True(t, sk.Equals(skCheck))
 				skCheckBytes := skCheck.Encode()
-				assert.Equal(t, skBytes, skCheckBytes, "keys should be equal")
+				assert.Equal(t, skBytes, skCheckBytes)
 				distinctSkBytes := distinctSk.Encode()
 				assert.NotEqual(t, skBytes, distinctSkBytes)
 
@@ -192,23 +188,23 @@ func testEncodeDecode(t *testing.T, salg SigningAlgorithm) {
 				pkBytes := pk.Encode()
 				pkCheck, err := DecodePublicKey(salg, pkBytes)
 				require.Nil(t, err)
-				assert.True(t, pk.Equals(pkCheck), "key equality check failed")
+				assert.True(t, pk.Equals(pkCheck))
 				pkCheckBytes := pkCheck.Encode()
-				assert.Equal(t, pkBytes, pkCheckBytes, "keys should be equal")
+				assert.Equal(t, pkBytes, pkCheckBytes)
 				distinctPkBytes := distinctSk.PublicKey().Encode()
-				assert.NotEqual(t, pkBytes, distinctPkBytes, "keys should be different")
+				assert.NotEqual(t, pkBytes, distinctPkBytes)
 
 				// same for the compressed encoding
 				// skip is BLS is used and compression isn't supported
 				if !(salg == BLSBLS12381 && !isG2Compressed()) {
 					pkComprBytes := pk.EncodeCompressed()
 					pkComprCheck, err := DecodePublicKeyCompressed(salg, pkComprBytes)
-					require.Nil(t, err, "the key decoding failed")
-					assert.True(t, pk.Equals(pkComprCheck), "key equality check failed")
+					require.Nil(t, err)
+					assert.True(t, pk.Equals(pkComprCheck))
 					pkCheckComprBytes := pkComprCheck.EncodeCompressed()
-					assert.Equal(t, pkComprBytes, pkCheckComprBytes, "keys should be equal")
+					assert.Equal(t, pkComprBytes, pkCheckComprBytes)
 					distinctPkComprBytes := distinctSk.PublicKey().EncodeCompressed()
-					assert.NotEqual(t, pkComprBytes, distinctPkComprBytes, "keys should be different")
+					assert.NotEqual(t, pkComprBytes, distinctPkComprBytes)
 				}
 			}
 		})
@@ -228,7 +224,7 @@ func testEncodeDecode(t *testing.T, salg SigningAlgorithm) {
 			groupOrder[BLSBLS12381] = BLS12381Order
 
 			sk, err := DecodePrivateKey(salg, groupOrder[salg])
-			require.Error(t, err, "the key decoding should fail - private key value is too large")
+			require.Error(t, err)
 			assert.True(t, IsInvalidInputsError(err))
 			assert.Nil(t, sk)
 		})
@@ -293,12 +289,12 @@ func testEquals(t *testing.T, salg SigningAlgorithm, otherSigAlgo SigningAlgorit
 		pk4 := sk4.PublicKey()
 
 		// tests
-		assert.True(t, sk1.Equals(sk2), "key equality should return true")
-		assert.True(t, pk1.Equals(pk2), "key equality should return true")
-		assert.False(t, sk1.Equals(sk3), "key equality should return false")
-		assert.False(t, pk1.Equals(pk3), "key equality should return false")
-		assert.False(t, sk1.Equals(sk4), "key equality should return false")
-		assert.False(t, pk1.Equals(pk4), "key equality should return false")
+		assert.True(t, sk1.Equals(sk2))
+		assert.True(t, pk1.Equals(pk2))
+		assert.False(t, sk1.Equals(sk3))
+		assert.False(t, pk1.Equals(pk3))
+		assert.False(t, sk1.Equals(sk4))
+		assert.False(t, pk1.Equals(pk4))
 	})
 }
 
