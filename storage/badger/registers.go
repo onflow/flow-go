@@ -16,12 +16,12 @@ func NewRegisters(db *badger.DB) *Registers {
 	return &Registers{db: db}
 }
 
-func (r Registers) Store(path *ledger.Path, payload *ledger.Payload) error {
+func (r Registers) Store(path ledger.Path, payload *ledger.Payload) error {
 	//TODO implement me
 	panic("implement me")
 }
 
-func (r Registers) ByPath(paths ledger.Path) (*ledger.Payload, error) {
+func (r Registers) ByPath(path ledger.Path) (*ledger.Payload, error) {
 	//TODO implement me
 	panic("implement me")
 }
