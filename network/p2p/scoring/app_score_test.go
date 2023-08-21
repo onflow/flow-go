@@ -57,8 +57,8 @@ func TestFullGossipSubConnectivity(t *testing.T) {
 			_, ok := provider.ByPeerID(peerId)
 			return ok
 		})
-	p2ptest.StartNodes(t, signalerCtx, nodes, 100*time.Millisecond)
-	defer p2ptest.StopNodes(t, nodes, cancel, 2*time.Second)
+	p2ptest.StartNodes(t, signalerCtx, nodes)
+	defer p2ptest.StopNodes(t, nodes, cancel)
 
 	blockTopic := channels.TopicFromChannel(channels.PushBlocks, sporkId)
 
@@ -181,8 +181,8 @@ func testGossipSubMessageDeliveryUnderNetworkPartition(t *testing.T, honestPeerS
 			return ok
 		}).Maybe()
 
-	p2ptest.StartNodes(t, signalerCtx, allNodes, 100*time.Millisecond)
-	defer p2ptest.StopNodes(t, allNodes, cancel, 2*time.Second)
+	p2ptest.StartNodes(t, signalerCtx, allNodes)
+	defer p2ptest.StopNodes(t, allNodes, cancel)
 
 	blockTopic := channels.TopicFromChannel(channels.PushBlocks, sporkId)
 

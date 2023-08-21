@@ -416,7 +416,7 @@ func NodesFixture(t *testing.T, sporkID flow.Identifier, dhtPrefix string, count
 
 // StartNodes start all nodes in the input slice using the provided context, timing out if nodes are
 // not all Ready() before duration expires
-func StartNodes(t *testing.T, ctx irrecoverable.SignalerContext, nodes []p2p.LibP2PNode, timeout time.Duration) {
+func StartNodes(t *testing.T, ctx irrecoverable.SignalerContext, nodes []p2p.LibP2PNode) {
 	rdas := make([]module.ReadyDoneAware, 0, len(nodes))
 	for _, node := range nodes {
 		node.Start(ctx)
@@ -428,30 +428,42 @@ func StartNodes(t *testing.T, ctx irrecoverable.SignalerContext, nodes []p2p.Lib
 			rdas = append(rdas, peerManager)
 		}
 	}
-	unittest.RequireComponentsReadyBefore(t, timeout, rdas...)
+	unittest.RequireComponentsReadyBefore(t, 2*time.Second, rdas...)
 }
 
 // StartNode start a single node using the provided context, timing out if nodes are not all Ready()
-// before duration expires
-func StartNode(t *testing.T, ctx irrecoverable.SignalerContext, node p2p.LibP2PNode, timeout time.Duration) {
+// before duration expires, (i.e., 2 seconds).
+// Args:
+// - t: testing.T- the test object.
+// - ctx: context to use.
+// - node: node to start.
+func StartNode(t *testing.T, ctx irrecoverable.SignalerContext, node p2p.LibP2PNode) {
 	node.Start(ctx)
-	unittest.RequireComponentsReadyBefore(t, timeout, node)
+	unittest.RequireComponentsReadyBefore(t, 2*time.Second, node)
 }
 
 // StopNodes stops all nodes in the input slice using the provided cancel func, timing out if nodes are
-// not all Done() before duration expires
-func StopNodes(t *testing.T, nodes []p2p.LibP2PNode, cancel context.CancelFunc, timeout time.Duration) {
+// not all Done() before duration expires (i.e., 2 seconds).
+// Args:
+// - t: testing.T- the test object.
+// - nodes: nodes to stop.
+// - cancel: cancel func, the function first cancels the context and then waits for the nodes to be done.
+func StopNodes(t *testing.T, nodes []p2p.LibP2PNode, cancel context.CancelFunc) {
 	cancel()
 	for _, node := range nodes {
-		unittest.RequireComponentsDoneBefore(t, timeout, node)
+		unittest.RequireComponentsDoneBefore(t, 2*time.Second, node)
 	}
 }
 
 // StopNode stops a single node using the provided cancel func, timing out if nodes are not all Done()
-// before duration expires
-func StopNode(t *testing.T, node p2p.LibP2PNode, cancel context.CancelFunc, timeout time.Duration) {
+// before duration expires, (i.e., 2 seconds).
+// Args:
+// - t: testing.T- the test object.
+// - node: node to stop.
+// - cancel: cancel func, the function first cancels the context and then waits for the nodes to be done.
+func StopNode(t *testing.T, node p2p.LibP2PNode, cancel context.CancelFunc) {
 	cancel()
-	unittest.RequireComponentsDoneBefore(t, timeout, node)
+	unittest.RequireComponentsDoneBefore(t, 2*time.Second, node)
 }
 
 // StreamHandlerFixture returns a stream handler that writes the received message to the given channel.
