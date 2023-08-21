@@ -69,8 +69,8 @@ type EpochSetup struct {
 	DKGPhase2FinalView uint64         // the final view of DKG phase 2
 	DKGPhase3FinalView uint64         // the final view of DKG phase 3
 	FinalView          uint64         // the final view of the epoch
-	Participants       IdentityList   // all participants of the epoch
-	Assignments        AssignmentList // cluster assignment for the epoch
+	Participants       IdentityList   // all participants of the epoch in canonical order
+	Assignments        AssignmentList // cluster assignment for the epoch with node IDs for each cluster in canonical order
 	RandomSource       []byte         // source of randomness for epoch-specific setup tasks
 }
 

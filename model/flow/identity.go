@@ -9,12 +9,11 @@ import (
 	"regexp"
 	"strconv"
 
-	"golang.org/x/exp/slices"
-
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/fxamacker/cbor/v2"
 	"github.com/pkg/errors"
 	"github.com/vmihailenco/msgpack"
+	"golang.org/x/exp/slices"
 
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/utils/rand"
@@ -27,7 +26,7 @@ const DefaultInitialWeight = 100
 // rxid is the regex for parsing node identity entries.
 var rxid = regexp.MustCompile(`^(collection|consensus|execution|verification|access)-([0-9a-fA-F]{64})@([\w\d]+|[\w\d][\w\d\-]*[\w\d](?:\.*[\w\d][\w\d\-]*[\w\d])*|[\w\d][\w\d\-]*[\w\d])(:[\d]+)?=(\d{1,20})$`)
 
-// IdentitySkeleton represents the static part of public identity of one network participant (node).
+// IdentitySkeleton represents the static part of a network participant's (i.e. node's) public identity.
 type IdentitySkeleton struct {
 	// NodeID uniquely identifies a particular node. A node's ID is fixed for
 	// the duration of that node's participation in the network.
