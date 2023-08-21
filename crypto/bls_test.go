@@ -660,7 +660,6 @@ func TestBLSBatchVerify(t *testing.T) {
 	// number of signatures to aggregate
 	sigsNum := rand.Intn(100) + 2
 	sigs := make([]Signature, 0, sigsNum)
-	sks := make([]PrivateKey, 0, sigsNum)
 	pks := make([]PublicKey, 0, sigsNum)
 	expectedValid := make([]bool, 0, sigsNum)
 
@@ -670,7 +669,6 @@ func TestBLSBatchVerify(t *testing.T) {
 		s, err := sk.Sign(input, kmac)
 		require.NoError(t, err)
 		sigs = append(sigs, s)
-		sks = append(sks, sk)
 		pks = append(pks, sk.PublicKey())
 		expectedValid = append(expectedValid, true)
 	}
