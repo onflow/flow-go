@@ -8,6 +8,8 @@ type Registers interface {
 	// Store insert register payload indexed by path. If update paths exist the payloads are overwritten.
 	Store(path *ledger.Path, payload *ledger.Payload) error
 
-	// ByPaths returns trie update payloads for provided paths.
-	ByPaths(paths []ledger.Path) ([]*ledger.Payload, error)
+	// ByPath returns trie update payloads for provided path.
+	ByPath(paths ledger.Path) (*ledger.Payload, error)
+
+	// TODO(sideninja) maybe we should add batch insert and retrieve methods to optimize operations.
 }
