@@ -235,7 +235,6 @@ func testGossipConnectivityUnderNetworkPartition(t *testing.T, honestPeerScoring
 			con1BlockTopicPeers := con1NodeTracer.GetMeshPeers(blockTopic.String())
 			for _, p := range con1BlockTopicPeers {
 				if p == con2Node.Host().ID() {
-					t.Log("con1 has con2 in its mesh")
 					con2HasCon1 = true
 					break // con1 has con2 in its mesh, break out of the current loop
 				}
@@ -244,7 +243,6 @@ func testGossipConnectivityUnderNetworkPartition(t *testing.T, honestPeerScoring
 			con2BlockTopicPeers := con2NodeTracer.GetMeshPeers(blockTopic.String())
 			for _, p := range con2BlockTopicPeers {
 				if p == con1Node.Host().ID() {
-					t.Log("con2 has con1 in its mesh")
 					con1HasCon2 = true
 					break // con2 has con1 in its mesh, break out of the current loop
 				}
