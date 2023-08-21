@@ -174,7 +174,7 @@ func NewScriptEnv(
 	env.RandomGenerator = NewRandomGenerator(
 		tracer,
 		params.EntropyProvider,
-		flow.ZeroID,
+		flow.ZeroID[:],
 	)
 	env.addParseRestrictedChecks()
 	return env
@@ -234,7 +234,7 @@ func NewTransactionEnvironment(
 	env.RandomGenerator = NewRandomGenerator(
 		tracer,
 		params.EntropyProvider,
-		params.TxId,
+		params.TxId[:],
 	)
 
 	env.addParseRestrictedChecks()
