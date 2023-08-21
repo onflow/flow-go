@@ -127,19 +127,3 @@ func (gen *randomGenerator) UnsafeRandom() (uint64, error) {
 	gen.prg.Read(buf) // Note: prg.Read does not return error
 	return binary.LittleEndian.Uint64(buf), nil
 }
-
-var _ RandomGenerator = (*dummyRandomGenerator)(nil)
-
-// dummyRandomGenerator implements RandomGenerator and is used
-// for the scripts execution environment
-type dummyRandomGenerator struct{}
-
-func NewDummyRandomGenerator() RandomGenerator {
-	return &dummyRandomGenerator{}
-}
-
-// UnsafeRandom() returns an error because executing scripts
-// does not support randomness APIs.
-func (gen *dummyRandomGenerator) UnsafeRandom() (uint64, error) {
-	return 0, nil
-}
