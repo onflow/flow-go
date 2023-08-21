@@ -116,10 +116,10 @@ func TestFullGossipSubConnectivityAmongHonestNodesWithMaliciousMajority(t *testi
 	// Note: if this test is ever flaky, this means a bug in our scoring system. Please escalate to the team instead of skipping.
 	total := 10
 	for i := 0; i < total; i++ {
-		if !testGossipSubMessageDeliveryUnderNetworkPartition(t, true) {
+		if !testGossipConnectivityUnderNetworkPartition(t, true) {
 			// even one failure should not happen, as it means that malicious majority can partition the network
 			// with our peer scoring parameters.
-			require.Fail(t, "honest nodes could not exchange message on GossipSub")
+			require.Fail(t, "honest nodes are not on each others' topic mesh on GossipSub")
 		}
 	}
 }
@@ -131,19 +131,19 @@ func TestNetworkPartitionWithNoHonestPeerScoringInFullTopology(t *testing.T) {
 	total := 100
 	for i := 0; i < total; i++ {
 		// false means no honest peer scoring.
-		if !testGossipSubMessageDeliveryUnderNetworkPartition(t, false) {
+		if !testGossipConnectivityUnderNetworkPartition(t, false) {
 			return // partition is successful
 		}
 	}
 	require.Fail(t, "expected at least one network partition")
 }
 
-// testGossipSubMessageDeliveryUnderNetworkPartition tests that whether two honest nodes can exchange messages on GossipSub
+// testGossipConnectivityUnderNetworkPartition tests that whether two honest nodes are in each others topic mesh on GossipSub
 // when the network topology is a complete graph (i.e., full topology) and a malicious majority of access nodes are present.
 // If honestPeerScoring is true, then the honest nodes are enabled with peer scoring.
 // A true return value means that the two honest nodes have each other in each others' mesh.
 // A false return value means that the two honest nodes do not have each other in each others' mesh (at least one of them is partitioned).
-func testGossipSubMessageDeliveryUnderNetworkPartition(t *testing.T, honestPeerScoring bool) bool {
+func testGossipConnectivityUnderNetworkPartition(t *testing.T, honestPeerScoring bool) bool {
 	ctx, cancel := context.WithCancel(context.Background())
 	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
 	sporkId := unittest.IdentifierFixture()
@@ -175,8 +175,7 @@ func testGossipSubMessageDeliveryUnderNetworkPartition(t *testing.T, honestPeerS
 
 	// create > 2 * 12 malicious access nodes
 	// 12 is the maximum size of default GossipSub mesh.
-	// We want to make sure that it is unlikely for honest nodes to be in the same mesh (hence messages from
-	// one honest node to the other is routed through the malicious nodes).
+	// We want to make sure that it is unlikely for honest nodes to be in the same mesh without peer scoring.
 	accessNodeGroup, accessNodeIds := p2ptest.NodesFixture(t, sporkId, t.Name(), 30,
 		idProvider,
 		p2ptest.WithRole(flow.RoleAccess),
