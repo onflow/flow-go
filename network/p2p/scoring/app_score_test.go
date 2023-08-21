@@ -212,7 +212,7 @@ func testGossipConnectivityUnderNetworkPartition(t *testing.T, honestPeerScoring
 	accessNodeSubs := make([]p2p.Subscription, len(accessNodeGroup))
 	for i, node := range accessNodeGroup {
 		sub, err := node.Subscribe(blockTopic, flowpubsub.TopicValidator(unittest.Logger(), unittest.AllowAllPeerFilter()))
-		require.NoError(t, err)
+		require.NoError(t, err, "access node %d failed to subscribe to block topic", i)
 		accessNodeSubs[i] = sub
 	}
 
