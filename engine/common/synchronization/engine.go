@@ -110,6 +110,7 @@ func New(
 		scanInterval:         opt.ScanInterval,
 		participantsProvider: participantsProvider,
 		randomizer:           rand.NewDefaultRandomizer(),
+		alsp:                 NewAlsp(),
 	}
 
 	// register the engine with the network layer and store the conduit
@@ -489,7 +490,6 @@ func (e *Engine) validateRangeRequestForALSP(channel channels.Channel, id flow.I
 func (e *Engine) validateSyncRequestForALSP(channel channels.Channel, originID flow.Identifier, event interface{}) (*alsp.MisbehaviorReport, bool) {
 	// Generate a random integer between 1 and 1000
 	n, err := e.randomizer.Uint32n(uint32(1001))
-	e.alsp.syncRequestProbabilityFactor
 
 	if err != nil {
 		// failing to generate a random number is unlikely. If an error is encountered while
@@ -500,10 +500,9 @@ func (e *Engine) validateSyncRequestForALSP(channel channels.Channel, originID f
 			Msg("failed to generate random number")
 	}
 
-	// use a probabilistic approach to create a misbehavior report - create a report with a probability of 1/1000
-	// this is done to avoid creating a report for every sync request received
-	// the probability of creating a misbehavior report is 1/1000
-	if n == 835 {
+	// to avoid creating a misbehavior report for every sync request received, use a probabilistic approach.
+	// Create a report with a probability of alsp.syncRequestProbabilityFactor
+	if float32(n) < e.alsp.syncRequestProbabilityFactor*1000 {
 		// create a misbehavior report
 		e.log.Info().Str("originID", originID.String()).Msg("creating misbehavior report")
 		report, err := alsp.NewMisbehaviorReport(originID, alsp.PotentialSpam)

@@ -301,6 +301,9 @@ func (ss *SyncSuite) TestProcess_SyncRequest_HigherThanReceiver_OutsideTolerance
 	ss.core.AssertNotCalled(ss.T(), "WithinTolerance")
 	ss.con.AssertNotCalled(ss.T(), "Unicast", mock.Anything, mock.Anything)
 
+	// force creating misbehavior report by setting syncRequestProbabilityFactor to 1.0 (i.e. report misbehavior 100% of the time)
+	ss.e.alsp.syncRequestProbabilityFactor = 1.0
+
 	// expect Uint32n(1001) to be called once and return misbehavior report because it happened to be 835
 	mockRandomizer.On("Uint32n", uint32(1001)).Return(835).Once()
 
