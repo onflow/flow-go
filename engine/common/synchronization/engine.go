@@ -57,7 +57,6 @@ type Engine struct {
 	participantsProvider module.IdentifierProvider
 
 	requestHandler *RequestHandler // component responsible for handling requests
-	randomizer     rand.Randomizer
 	alsp           *Alsp
 
 	pendingSyncResponses   engine.MessageStore    // message store for *message.SyncResponse
@@ -109,7 +108,6 @@ func New(
 		pollInterval:         opt.PollInterval,
 		scanInterval:         opt.ScanInterval,
 		participantsProvider: participantsProvider,
-		randomizer:           rand.NewDefaultRandomizer(),
 		alsp:                 NewAlsp(),
 	}
 
@@ -489,7 +487,7 @@ func (e *Engine) validateRangeRequestForALSP(channel channels.Channel, id flow.I
 
 func (e *Engine) validateSyncRequestForALSP(channel channels.Channel, originID flow.Identifier, event interface{}) (*alsp.MisbehaviorReport, bool) {
 	// Generate a random integer between 1 and 1000
-	n, err := e.randomizer.Uint32n(uint32(1001))
+	n, err := rand.Uint32n(1001)
 
 	if err != nil {
 		// failing to generate a random number is unlikely. If an error is encountered while

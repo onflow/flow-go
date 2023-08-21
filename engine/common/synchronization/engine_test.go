@@ -227,9 +227,6 @@ func (ss *SyncSuite) TestOnSyncRequest_HigherThanReceiver_OutsideTolerance() {
 // than the receiver's height doesn't trigger a response, even if outside tolerance and does not generate ALSP
 // spamming misbehavior report (simulating the most likely probability).
 func (ss *SyncSuite) TestProcess_SyncRequest_HigherThanReceiver_OutsideTolerance_NoMisbehaviorReport() {
-	mockRandomizer := new(rand.MockRandomizer)
-	ss.e.randomizer = mockRandomizer
-
 	ctx, cancel := irrecoverable.NewMockSignalerContextWithCancel(ss.T(), context.Background())
 	ss.e.Start(ctx)
 	unittest.AssertClosesBefore(ss.T(), ss.e.Ready(), time.Second)
@@ -254,8 +251,7 @@ func (ss *SyncSuite) TestProcess_SyncRequest_HigherThanReceiver_OutsideTolerance
 
 	ss.con.AssertNotCalled(ss.T(), "Unicast", mock.Anything, mock.Anything)
 
-	// expect Uint32n(1001) to be called once and return 1, not triggering a misbehavior report
-	mockRandomizer.On("Uint32n", uint32(1001)).Return(1).Once()
+	ss.e.alsp.syncRequestProbabilityFactor = 0.0 // force not creating misbehavior report
 
 	require.NoError(ss.T(), ss.e.Process(channels.SyncCommittee, originID, req))
 
@@ -270,9 +266,6 @@ func (ss *SyncSuite) TestProcess_SyncRequest_HigherThanReceiver_OutsideTolerance
 // than the receiver's height doesn't trigger a response, even if outside tolerance and generates ALSP
 // spamming misbehavior report (simulating the unlikely probability).
 func (ss *SyncSuite) TestProcess_SyncRequest_HigherThanReceiver_OutsideTolerance_MisbehaviorReport() {
-	mockRandomizer := new(rand.MockRandomizer)
-	ss.e.randomizer = mockRandomizer
-
 	ctx, cancel := irrecoverable.NewMockSignalerContextWithCancel(ss.T(), context.Background())
 	ss.e.Start(ctx)
 	unittest.AssertClosesBefore(ss.T(), ss.e.Ready(), time.Second)
@@ -303,9 +296,6 @@ func (ss *SyncSuite) TestProcess_SyncRequest_HigherThanReceiver_OutsideTolerance
 
 	// force creating misbehavior report by setting syncRequestProbabilityFactor to 1.0 (i.e. report misbehavior 100% of the time)
 	ss.e.alsp.syncRequestProbabilityFactor = 1.0
-
-	// expect Uint32n(1001) to be called once and return misbehavior report because it happened to be 835
-	mockRandomizer.On("Uint32n", uint32(1001)).Return(835).Once()
 
 	require.NoError(ss.T(), ss.e.Process(channels.SyncCommittee, originID, req))
 
