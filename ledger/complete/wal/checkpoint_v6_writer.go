@@ -103,7 +103,7 @@ func storeCheckpointV6(
 		subTrieRootAndTopLevelTrieCount(tries),
 		outputDir,
 		outputFile,
-		&lg,
+		lg,
 		nWorker,
 	)
 	if err != nil {
@@ -113,12 +113,12 @@ func storeCheckpointV6(
 	lg.Info().Msgf("subtrie have been stored. sub trie node count: %v", subTriesNodeCount)
 
 	topTrieChecksum, err := storeTopLevelNodesAndTrieRoots(
-		tries, subTrieRootIndices, subTriesNodeCount, outputDir, outputFile, &lg)
+		tries, subTrieRootIndices, subTriesNodeCount, outputDir, outputFile, lg)
 	if err != nil {
 		return fmt.Errorf("could not store top level tries: %w", err)
 	}
 
-	err = storeCheckpointHeader(subTrieChecksums, topTrieChecksum, outputDir, outputFile, &lg)
+	err = storeCheckpointHeader(subTrieChecksums, topTrieChecksum, outputDir, outputFile, lg)
 	if err != nil {
 		return fmt.Errorf("could not store checkpoint header: %w", err)
 	}
@@ -136,7 +136,7 @@ func storeCheckpointHeader(
 	topTrieChecksum uint32,
 	outputDir string,
 	outputFile string,
-	logger *zerolog.Logger,
+	logger zerolog.Logger,
 ) (
 	errToReturn error,
 ) {
@@ -207,7 +207,7 @@ func storeTopLevelNodesAndTrieRoots(
 	subTriesNodeCount uint64,
 	outputDir string,
 	outputFile string,
-	logger *zerolog.Logger,
+	logger zerolog.Logger,
 ) (
 	checksumOfTopTriePartFile uint32,
 	errToReturn error,
@@ -319,7 +319,7 @@ func storeSubTrieConcurrently(
 	subAndTopNodeCount int, // useful for preallocating memory for the node indices map to be returned
 	outputDir string,
 	outputFile string,
-	logger *zerolog.Logger,
+	logger zerolog.Logger,
 	nWorker uint,
 ) (
 	map[*node.Node]uint64, // node indices
@@ -399,13 +399,13 @@ func storeSubTrieConcurrently(
 	return results, nodeCounter, checksums, nil
 }
 
-func createWriterForTopTries(dir string, file string, logger *zerolog.Logger) (io.WriteCloser, error) {
+func createWriterForTopTries(dir string, file string, logger zerolog.Logger) (io.WriteCloser, error) {
 	_, topTriesFileName := filePathTopTries(dir, file)
 
 	return createClosableWriter(dir, topTriesFileName, logger)
 }
 
-func createWriterForSubtrie(dir string, file string, logger *zerolog.Logger, index int) (io.WriteCloser, error) {
+func createWriterForSubtrie(dir string, file string, logger zerolog.Logger, index int) (io.WriteCloser, error) {
 	_, subTriesFileName, err := filePathSubTries(dir, file, index)
 	if err != nil {
 		return nil, err
@@ -414,7 +414,7 @@ func createWriterForSubtrie(dir string, file string, logger *zerolog.Logger, ind
 	return createClosableWriter(dir, subTriesFileName, logger)
 }
 
-func createClosableWriter(dir string, fileName string, logger *zerolog.Logger) (io.WriteCloser, error) {
+func createClosableWriter(dir string, fileName string, logger zerolog.Logger) (io.WriteCloser, error) {
 	fullPath := path.Join(dir, fileName)
 	if utilsio.FileExists(fullPath) {
 		return nil, fmt.Errorf("checkpoint part file %v already exists", fullPath)
@@ -447,7 +447,7 @@ func storeCheckpointSubTrie(
 	estimatedSubtrieNodeCount int, // for estimate the amount of memory to be preallocated
 	outputDir string,
 	outputFile string,
-	logger *zerolog.Logger,
+	logger zerolog.Logger,
 ) (
 	rootNodesOfAllSubtries map[*node.Node]uint64, // the stored position of each unique root node
 	totalSubtrieNodeCount uint64,

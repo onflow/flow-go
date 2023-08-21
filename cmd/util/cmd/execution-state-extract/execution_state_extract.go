@@ -85,7 +85,7 @@ func extractExecutionState(
 	var migrations []ledger.Migration
 	newState := ledger.State(targetHash)
 
-	// migrate the trie if there migrations
+	// migrate the trie if there are migrations
 	newTrie, err := led.MigrateAt(
 		newState,
 		migrations,
@@ -97,7 +97,8 @@ func extractExecutionState(
 	}
 
 	// create reporter
-	reporter := reporters.NewExportReporter(log,
+	reporter := reporters.NewExportReporter(
+		log,
 		func() flow.StateCommitment { return targetHash },
 	)
 

@@ -170,7 +170,7 @@ func TestEncodeSubTrie(t *testing.T) {
 	for index, roots := range subtrieRoots {
 		unittest.RunWithTempDir(t, func(dir string) {
 			uniqueIndices, nodeCount, checksum, err := storeCheckpointSubTrie(
-				index, roots, estimatedSubtrieNodeCount, dir, file, &logger)
+				index, roots, estimatedSubtrieNodeCount, dir, file, logger)
 			require.NoError(t, err)
 
 			// subtrie roots might have duplciates, that why we group the them,
@@ -205,7 +205,7 @@ func TestEncodeSubTrie(t *testing.T) {
 				uniqueIndices, nodeCount, checksum)
 
 			// all the nodes
-			nodes, err := readCheckpointSubTrie(dir, file, index, checksum, &logger)
+			nodes, err := readCheckpointSubTrie(dir, file, index, checksum, logger)
 			require.NoError(t, err)
 
 			for _, root := range roots {
@@ -263,7 +263,7 @@ func TestWriteAndReadCheckpointV6EmptyTrie(t *testing.T) {
 		fileName := "checkpoint-empty-trie"
 		logger := unittest.Logger()
 		require.NoErrorf(t, StoreCheckpointV6Concurrently(tries, dir, fileName, &logger), "fail to store checkpoint")
-		decoded, err := OpenAndReadCheckpointV6(dir, fileName, &logger)
+		decoded, err := OpenAndReadCheckpointV6(dir, fileName, logger)
 		require.NoErrorf(t, err, "fail to read checkpoint %v/%v", dir, fileName)
 		requireTriesEqual(t, tries, decoded)
 	})
@@ -275,7 +275,7 @@ func TestWriteAndReadCheckpointV6SimpleTrie(t *testing.T) {
 		fileName := "checkpoint"
 		logger := unittest.Logger()
 		require.NoErrorf(t, StoreCheckpointV6Concurrently(tries, dir, fileName, &logger), "fail to store checkpoint")
-		decoded, err := OpenAndReadCheckpointV6(dir, fileName, &logger)
+		decoded, err := OpenAndReadCheckpointV6(dir, fileName, logger)
 		require.NoErrorf(t, err, "fail to read checkpoint %v/%v", dir, fileName)
 		requireTriesEqual(t, tries, decoded)
 	})
@@ -287,7 +287,7 @@ func TestWriteAndReadCheckpointV6MultipleTries(t *testing.T) {
 		fileName := "checkpoint-multi-file"
 		logger := unittest.Logger()
 		require.NoErrorf(t, StoreCheckpointV6Concurrently(tries, dir, fileName, &logger), "fail to store checkpoint")
-		decoded, err := OpenAndReadCheckpointV6(dir, fileName, &logger)
+		decoded, err := OpenAndReadCheckpointV6(dir, fileName, logger)
 		require.NoErrorf(t, err, "fail to read checkpoint %v/%v", dir, fileName)
 		requireTriesEqual(t, tries, decoded)
 	})
@@ -322,7 +322,7 @@ func TestWriteAndReadCheckpointV6LeafEmptyTrie(t *testing.T) {
 		bufSize := 10
 		leafNodesCh := make(chan *LeafNode, bufSize)
 		go func() {
-			err := OpenAndReadLeafNodesFromCheckpointV6(leafNodesCh, dir, fileName, &logger)
+			err := OpenAndReadLeafNodesFromCheckpointV6(leafNodesCh, dir, fileName, logger)
 			require.NoErrorf(t, err, "fail to read checkpoint %v/%v", dir, fileName)
 		}()
 		for range leafNodesCh {
@@ -340,7 +340,7 @@ func TestWriteAndReadCheckpointV6LeafSimpleTrie(t *testing.T) {
 		bufSize := 1
 		leafNodesCh := make(chan *LeafNode, bufSize)
 		go func() {
-			err := OpenAndReadLeafNodesFromCheckpointV6(leafNodesCh, dir, fileName, &logger)
+			err := OpenAndReadLeafNodesFromCheckpointV6(leafNodesCh, dir, fileName, logger)
 			require.NoErrorf(t, err, "fail to read checkpoint %v/%v", dir, fileName)
 		}()
 		resultPayloads := make([]ledger.Payload, 0)
@@ -363,7 +363,7 @@ func TestWriteAndReadCheckpointV6LeafMultipleTries(t *testing.T) {
 		bufSize := 5
 		leafNodesCh := make(chan *LeafNode, bufSize)
 		go func() {
-			err := OpenAndReadLeafNodesFromCheckpointV6(leafNodesCh, dir, fileName, &logger)
+			err := OpenAndReadLeafNodesFromCheckpointV6(leafNodesCh, dir, fileName, logger)
 			require.NoErrorf(t, err, "fail to read checkpoint %v/%v", dir, fileName)
 		}()
 		resultPayloads := make([]ledger.Payload, 0)
@@ -422,7 +422,7 @@ func compareFiles(file1, file2 string) error {
 	return nil
 }
 
-func storeCheckpointV5(tries []*trie.MTrie, dir string, fileName string, logger *zerolog.Logger) error {
+func storeCheckpointV5(tries []*trie.MTrie, dir string, fileName string, logger zerolog.Logger) error {
 	return StoreCheckpointV5(dir, fileName, logger, tries...)
 }
 
@@ -432,8 +432,8 @@ func TestWriteAndReadCheckpointV5(t *testing.T) {
 		fileName := "checkpoint1"
 		logger := unittest.Logger()
 
-		require.NoErrorf(t, storeCheckpointV5(tries, dir, fileName, &logger), "fail to store checkpoint")
-		decoded, err := LoadCheckpoint(filepath.Join(dir, fileName), &logger)
+		require.NoErrorf(t, storeCheckpointV5(tries, dir, fileName, logger), "fail to store checkpoint")
+		decoded, err := LoadCheckpoint(filepath.Join(dir, fileName), logger)
 		require.NoErrorf(t, err, "fail to load checkpoint")
 		requireTriesEqual(t, tries, decoded)
 	})
@@ -448,12 +448,12 @@ func TestWriteAndReadCheckpointV6ThenBackToV5(t *testing.T) {
 
 		// store tries into v6 then read back, then store into v5
 		require.NoErrorf(t, StoreCheckpointV6Concurrently(tries, dir, "checkpoint-v6", &logger), "fail to store checkpoint")
-		decoded, err := OpenAndReadCheckpointV6(dir, "checkpoint-v6", &logger)
+		decoded, err := OpenAndReadCheckpointV6(dir, "checkpoint-v6", logger)
 		require.NoErrorf(t, err, "fail to read checkpoint %v/checkpoint-v6", dir)
-		require.NoErrorf(t, storeCheckpointV5(decoded, dir, "checkpoint-v6-v5", &logger), "fail to store checkpoint")
+		require.NoErrorf(t, storeCheckpointV5(decoded, dir, "checkpoint-v6-v5", logger), "fail to store checkpoint")
 
 		// store tries directly into v5 checkpoint
-		require.NoErrorf(t, storeCheckpointV5(tries, dir, "checkpoint-v5", &logger), "fail to store checkpoint")
+		require.NoErrorf(t, storeCheckpointV5(tries, dir, "checkpoint-v5", logger), "fail to store checkpoint")
 
 		// compare the two v5 checkpoint files should be identical
 		require.NoError(t, compareFiles(
@@ -511,7 +511,7 @@ func TestAllPartFileExist(t *testing.T) {
 			err = os.Remove(fileToDelete)
 			require.NoError(t, err, "fail to remove part file")
 
-			_, err = OpenAndReadCheckpointV6(dir, fileName, &logger)
+			_, err = OpenAndReadCheckpointV6(dir, fileName, logger)
 			require.ErrorIs(t, err, os.ErrNotExist, "wrong error type returned")
 		}
 	})
@@ -541,7 +541,7 @@ func TestAllPartFileExistLeafReader(t *testing.T) {
 
 			bufSize := 10
 			leafNodesCh := make(chan *LeafNode, bufSize)
-			err = OpenAndReadLeafNodesFromCheckpointV6(leafNodesCh, dir, fileName, &logger)
+			err = OpenAndReadLeafNodesFromCheckpointV6(leafNodesCh, dir, fileName, logger)
 			require.ErrorIs(t, err, os.ErrNotExist, "wrong error type returned")
 		}
 	})
@@ -585,7 +585,7 @@ func TestCopyCheckpointFileV6(t *testing.T) {
 		newPaths, err := CopyCheckpointFile(fileName, dir, to)
 		require.NoError(t, err)
 		log.Info().Msgf("copied to :%v", newPaths)
-		decoded, err := OpenAndReadCheckpointV6(to, fileName, &logger)
+		decoded, err := OpenAndReadCheckpointV6(to, fileName, logger)
 		require.NoErrorf(t, err, "fail to read checkpoint %v/%v", dir, fileName)
 		requireTriesEqual(t, tries, decoded)
 	})
