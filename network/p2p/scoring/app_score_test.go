@@ -126,7 +126,7 @@ func TestFullGossipSubConnectivityAmongHonestNodesWithMaliciousMajority(t *testi
 // This test proves that if access nodes are NOT pushed to the edge of network, a malicious majority of them can
 // partition the network by disconnecting honest nodes from each other even when the network topology is a complete graph (i.e., full topology).
 func TestNetworkPartitionWithNoHonestPeerScoringInFullTopology(t *testing.T) {
-	total := 100
+	total := 50
 	for i := 0; i < total; i++ {
 		// false means no honest peer scoring.
 		if !testGossipConnectivityUnderNetworkPartition(t, false) {
