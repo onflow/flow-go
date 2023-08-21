@@ -44,6 +44,21 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
+const (
+	// libp2pNodeStartupTimeout is the timeout for starting a libp2p node in tests. Note that the
+	// timeout has been selected to be large enough to allow for the node to start up on a CI even when
+	// the test is run in parallel with other tests. Hence, no further increase of the timeout is
+	// expected to be necessary. Any failure to start a node within this timeout is likely to be
+	// caused by a bug in the code.
+	libp2pNodeStartupTimeout = 5 * time.Second
+	// libp2pNodeStartupTimeout is the timeout for starting a libp2p node in tests. Note that the
+	// timeout has been selected to be large enough to allow for the node to start up on a CI even when
+	// the test is run in parallel with other tests. Hence, no further increase of the timeout is
+	// expected to be necessary. Any failure to start a node within this timeout is likely to be
+	// caused by a bug in the code.
+	libp2pNodeShutdownTimeout = 5 * time.Second
+)
+
 // NetworkingKeyFixtures is a test helper that generates a ECDSA flow key pair.
 func NetworkingKeyFixtures(t *testing.T) crypto.PrivateKey {
 	seed := unittest.SeedFixture(48)
@@ -428,7 +443,10 @@ func StartNodes(t *testing.T, ctx irrecoverable.SignalerContext, nodes []p2p.Lib
 			rdas = append(rdas, peerManager)
 		}
 	}
-	unittest.RequireComponentsReadyBefore(t, 2*time.Second, rdas...)
+	for _, r := range rdas {
+		// Any failure to start a node within this timeout is likely to be caused by a bug in the code.
+		unittest.RequireComponentsReadyBefore(t, libp2pNodeStartupTimeout, r)
+	}
 }
 
 // StartNode start a single node using the provided context, timing out if nodes are not all Ready()
@@ -439,11 +457,12 @@ func StartNodes(t *testing.T, ctx irrecoverable.SignalerContext, nodes []p2p.Lib
 // - node: node to start.
 func StartNode(t *testing.T, ctx irrecoverable.SignalerContext, node p2p.LibP2PNode) {
 	node.Start(ctx)
-	unittest.RequireComponentsReadyBefore(t, 2*time.Second, node)
+	// Any failure to start a node within this timeout is likely to be caused by a bug in the code.
+	unittest.RequireComponentsReadyBefore(t, libp2pNodeStartupTimeout, node)
 }
 
 // StopNodes stops all nodes in the input slice using the provided cancel func, timing out if nodes are
-// not all Done() before duration expires (i.e., 2 seconds).
+// not all Done() before duration expires (i.e., 5 seconds).
 // Args:
 // - t: testing.T- the test object.
 // - nodes: nodes to stop.
@@ -451,7 +470,8 @@ func StartNode(t *testing.T, ctx irrecoverable.SignalerContext, node p2p.LibP2PN
 func StopNodes(t *testing.T, nodes []p2p.LibP2PNode, cancel context.CancelFunc) {
 	cancel()
 	for _, node := range nodes {
-		unittest.RequireComponentsDoneBefore(t, 2*time.Second, node)
+		// Any failure to start a node within this timeout is likely to be caused by a bug in the code.
+		unittest.RequireComponentsDoneBefore(t, libp2pNodeShutdownTimeout, node)
 	}
 }
 
@@ -463,7 +483,8 @@ func StopNodes(t *testing.T, nodes []p2p.LibP2PNode, cancel context.CancelFunc) 
 // - cancel: cancel func, the function first cancels the context and then waits for the nodes to be done.
 func StopNode(t *testing.T, node p2p.LibP2PNode, cancel context.CancelFunc) {
 	cancel()
-	unittest.RequireComponentsDoneBefore(t, 2*time.Second, node)
+	// Any failure to start a node within this timeout is likely to be caused by a bug in the code.
+	unittest.RequireComponentsDoneBefore(t, libp2pNodeShutdownTimeout, node)
 }
 
 // StreamHandlerFixture returns a stream handler that writes the received message to the given channel.
