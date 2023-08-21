@@ -1,10 +1,11 @@
-package epochs
+package cohort2
 
 import (
 	"testing"
 
 	"github.com/stretchr/testify/suite"
 
+	"github.com/onflow/flow-go/integration/tests/epochs"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -13,7 +14,7 @@ func TestEpochJoinAndLeaveVN(t *testing.T) {
 }
 
 type EpochJoinAndLeaveVNSuite struct {
-	DynamicEpochTransitionSuite
+	epochs.DynamicEpochTransitionSuite
 }
 
 func (s *EpochJoinAndLeaveVNSuite) SetupTest() {
@@ -33,5 +34,5 @@ func (s *EpochJoinAndLeaveVNSuite) SetupTest() {
 // TestEpochJoinAndLeaveVN should update verification nodes and assert healthy network conditions
 // after the epoch transition completes. See health check function for details.
 func (s *EpochJoinAndLeaveVNSuite) TestEpochJoinAndLeaveVN() {
-	s.runTestEpochJoinAndLeave(flow.RoleVerification, s.assertNetworkHealthyAfterVNChange)
+	s.RunTestEpochJoinAndLeave(flow.RoleVerification, s.AssertNetworkHealthyAfterVNChange)
 }
