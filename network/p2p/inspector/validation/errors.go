@@ -8,7 +8,7 @@ import (
 	p2pmsg "github.com/onflow/flow-go/network/p2p/message"
 )
 
-// IWantCacheMissThresholdErr indicates that the amount of cache misses exceeds the allowed threshold.
+// IWantCacheMissThresholdErr indicates that the amount of cache misses exceeds the allowed threshold, it indicates that the libp2p node has received an RPC with the majority of iWants that has never been advertised originally by the current node with an iHave.
 type IWantCacheMissThresholdErr struct {
 	misses          float64
 	totalMessageIDS float64
