@@ -13,6 +13,7 @@ type ProtocolSpamRecord struct {
 	OriginId flow.Identifier
 
 	// Decay speed of Penalty for this misbehaving node. Each node may have a different Decay speed based on its behavior.
+	// Subsequent disallow listings of the node will decrease the Decay speed of the node so it will take longer to be allow-listed.
 	Decay float64
 
 	// CutoffCounter is a counter that is used to determine how many times the connections to the node has been cut due to
