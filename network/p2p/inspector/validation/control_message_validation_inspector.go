@@ -249,27 +249,26 @@ func (c *ControlMsgValidationInspector) inspectIWant(iWants []*pubsub_pb.Control
 
 	tracker := make(duplicateStrTracker)
 	cacheMisses := 0
+	numOfAllowedCacheMisses := float64(sampleSize) * c.config.IWantRPCInspectionConfig.CacheMissThreshold
 	duplicates := 0
+	numOfAllowedDuplicates := float64(sampleSize) * c.config.IWantRPCInspectionConfig.DuplicateMsgIDThreshold
 	for _, messageID := range iWantMsgIDPool[:sampleSize] {
+		// check duplicate allowed threshold
 		if tracker.isDuplicate(messageID) {
 			duplicates++
+			if float64(duplicates) > numOfAllowedDuplicates {
+				return NewIWantDuplicateMsgIDThresholdErr(duplicates, sampleSize, c.config.IWantRPCInspectionConfig.DuplicateMsgIDThreshold)
+			}
 		}
+		// check cache miss threshold
 		if !c.rpcTracker.WasIHaveRPCSent(messageID) {
 			cacheMisses++
+			if float64(cacheMisses) > numOfAllowedCacheMisses {
+				return NewIWantCacheMissThresholdErr(cacheMisses, sampleSize, c.config.IWantRPCInspectionConfig.CacheMissThreshold)
+			}
 		}
 		tracker.set(messageID)
 	}
-
-	// check cache miss threshold
-	if float64(cacheMisses)/float64(sampleSize) > c.config.IWantRPCInspectionConfig.CacheMissThreshold {
-		return NewIWantCacheMissThresholdErr(cacheMisses, sampleSize, c.config.IWantRPCInspectionConfig.CacheMissThreshold)
-	}
-
-	// check duplicate allowed threshold
-	if float64(duplicates)/float64(sampleSize) > c.config.IWantRPCInspectionConfig.DuplicateMsgIDThreshold {
-		return NewIWantDuplicateMsgIDThresholdErr(duplicates, sampleSize, c.config.IWantRPCInspectionConfig.DuplicateMsgIDThreshold)
-	}
-
 	return nil
 }
 
