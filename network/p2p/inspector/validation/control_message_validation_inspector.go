@@ -209,7 +209,7 @@ func (c *ControlMsgValidationInspector) Inspect(from peer.ID, rpc *pubsub.RPC) e
 // Returns:
 // - DuplicateFoundErr: if there are any duplicate message ids found in across any of the iWants.
 // - IWantCacheMissThresholdErr: if the rate of cache misses exceeds the configured allowed threshold.
-// - error: if any error occurs while sampling the iWants
+// - error: if any error occurs while sampling the iWants, all returned errors are benign and should not cause the node to crash.
 func (c *ControlMsgValidationInspector) inspectIWant(iWants []*pubsub_pb.ControlIWant) error {
 	if len(iWants) == 0 {
 		return nil
