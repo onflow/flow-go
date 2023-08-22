@@ -61,8 +61,8 @@ type DynamicIdentity struct {
 	// table with zero weight.
 	Weight uint64
 	// Ejected represents whether a node has been permanently removed from the
-	// network. A node may be ejected for either:
-	// * request self-ejection to protect its stake in case the node operator suspects
+	// network. A node may be ejected by either:
+	// * requesting self-ejection to protect its stake in case the node operator suspects
 	//   the node's keys to be compromised
 	// * committing a serious protocol violation or multiple smaller misdemeanours
 	Ejected bool
