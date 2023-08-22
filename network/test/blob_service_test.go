@@ -82,7 +82,9 @@ func (suite *BlobServiceTestSuite) SetupTest() {
 
 	signalerCtx := irrecoverable.NewMockSignalerContext(suite.T(), ctx)
 
+	sporkId := unittest.IdentifierFixture()
 	ids, nodes, _ := testutils.LibP2PNodeForMiddlewareFixture(suite.T(),
+		sporkId,
 		suite.numNodes,
 		p2ptest.WithDHTOptions(dht.AsServer()),
 		p2ptest.WithPeerManagerEnabled(&p2pconfig.PeerManagerConfig{
@@ -90,7 +92,12 @@ func (suite *BlobServiceTestSuite) SetupTest() {
 			ConnectionPruning: true,
 			ConnectorFactory:  connection.DefaultLibp2pBackoffConnectorFactory(),
 		}, nil))
-	mws, _ := testutils.MiddlewareFixtures(suite.T(), ids, nodes, testutils.MiddlewareConfigFixture(suite.T()), mocknetwork.NewViolationsConsumer(suite.T()))
+	mws, _ := testutils.MiddlewareFixtures(
+		suite.T(),
+		ids,
+		nodes,
+		testutils.MiddlewareConfigFixture(suite.T(), sporkId),
+		mocknetwork.NewViolationsConsumer(suite.T()))
 	suite.networks = testutils.NetworksFixture(suite.T(), ids, mws)
 	testutils.StartNodesAndNetworks(signalerCtx, suite.T(), nodes, suite.networks, 100*time.Millisecond)
 
