@@ -70,7 +70,7 @@ func (_m *UnicastManager) Register(unicast protocols.ProtocolName) error {
 }
 
 // WithDefaultHandler provides a mock function with given fields: defaultHandler
-func (_m *UnicastManager) WithDefaultHandler(defaultHandler network.StreamHandler) {
+func (_m *UnicastManager) SetDefaultHandler(defaultHandler network.StreamHandler) {
 	_m.Called(defaultHandler)
 }
 

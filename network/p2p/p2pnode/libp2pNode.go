@@ -390,7 +390,7 @@ func (n *Node) Host() host.Host {
 
 // WithDefaultUnicastProtocol overrides the default handler of the unicast manager and registers all preferred protocols.
 func (n *Node) WithDefaultUnicastProtocol(defaultHandler libp2pnet.StreamHandler, preferred []protocols.ProtocolName) error {
-	n.uniMgr.WithDefaultHandler(defaultHandler)
+	n.uniMgr.SetDefaultHandler(defaultHandler)
 	for _, p := range preferred {
 		err := n.uniMgr.Register(p)
 		if err != nil {
