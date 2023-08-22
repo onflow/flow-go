@@ -32,18 +32,18 @@ func IsIWantDuplicateMsgIDThresholdErr(err error) bool {
 
 // IWantCacheMissThresholdErr indicates that the amount of cache misses exceeds the allowed threshold.
 type IWantCacheMissThresholdErr struct {
-	misses     int
-	sampleSize uint
-	threshold  float64
+	cacheMissCount int // total iwant cache misses
+	sampleSize     uint
+	threshold      float64
 }
 
 func (e IWantCacheMissThresholdErr) Error() string {
-	return fmt.Sprintf("%d/%d iWant cache misses exceeds the allowed threshold: %f", e.misses, e.sampleSize, e.threshold)
+	return fmt.Sprintf("%d/%d iWant cache misses exceeds the allowed threshold: %f", e.cacheMissCount, e.sampleSize, e.threshold)
 }
 
 // NewIWantCacheMissThresholdErr returns a new IWantCacheMissThresholdErr.
-func NewIWantCacheMissThresholdErr(misses int, sampleSize uint, threshold float64) IWantCacheMissThresholdErr {
-	return IWantCacheMissThresholdErr{misses, sampleSize, threshold}
+func NewIWantCacheMissThresholdErr(cacheMissCount int, sampleSize uint, threshold float64) IWantCacheMissThresholdErr {
+	return IWantCacheMissThresholdErr{cacheMissCount, sampleSize, threshold}
 }
 
 // IsIWantCacheMissThresholdErr returns true if an error is IWantCacheMissThresholdErr
