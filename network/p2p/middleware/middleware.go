@@ -345,6 +345,10 @@ func (m *Middleware) OnAllowListNotification(notification *network.AllowListingU
 	}
 }
 
+func (m *Middleware) OpenProtectedStream(ctx context.Context, peerID peer.ID, protectionTag string, writingLogic func(stream libp2pnetwork.Stream) error) {
+	return m.libP2PNode.OpenProtectedStream(ctx, peerID, protectionTag, writingLogic)
+}
+
 // SendDirect sends msg on a 1-1 direct connection to the target ID. It models a guaranteed delivery asynchronous
 // direct one-to-one connection on the underlying network. No intermediate node on the overlay is utilized
 // as the router.

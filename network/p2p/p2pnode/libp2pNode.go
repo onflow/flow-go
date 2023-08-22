@@ -179,6 +179,85 @@ func (n *Node) GetPeersForProtocol(pid protocol.ID) peer.IDSlice {
 	return peers
 }
 
+func (n *Node) OpenProtectedStream(ctx context.Context, peerID peer.ID, protectionTag string, writingLogic func(stream libp2pnet.Stream) error) error {
+	n.host.ConnManager().Protect(peerID, protectionTag)
+	defer n.host.ConnManager().Unprotect(peerID, protectionTag)
+
+	// streams don't need to be reused and are fairly inexpensive to be created for each send.
+	// A stream creation does NOT incur an RTT as stream negotiation happens on an existing connection.
+	s, err := n.createStream(ctx, peerID)
+	if err != nil {
+		return fmt.Errorf("failed to create stream for %s: %w", peerID, err)
+	}
+
+	deadline, _ := ctx.Deadline()
+	err = s.SetWriteDeadline(deadline)
+	if err != nil {
+		return fmt.Errorf("failed to set write deadline for stream: %w", err)
+	}
+
+	// create a gogo protobuf writer
+	err = writingLogic(s)
+
+	if err != nil {
+		// reset the stream to ensure that the next stream creation is not affected by the error.
+		resetErr := s.Reset()
+		if resetErr != nil {
+			n.logger.Error().
+				Str("target_peer_id", peerID.String()).
+				Err(resetErr).
+				Msg("failed to reset stream")
+		}
+
+		return fmt.Errorf("writing logic failed for %s: %w", peerID, err)
+	}
+
+	// close the stream immediately
+	err = s.Close()
+	if err != nil {
+		err = fmt.Errorf("failed to close the stream for %s: %w", peerID, err)
+	}
+
+	return nil
+}
+
+func (n *Node) createStream(ctx context.Context, peerID peer.ID) (libp2pnet.Stream, error) {
+	lg := n.logger.With().Str("peer_id", peerID.String()).Logger()
+
+	// If we do not currently have any addresses for the given peer, stream creation will almost
+	// certainly fail. If this Node was configured with a routing system, we can try to use it to
+	// look up the address of the peer.
+	if len(n.host.Peerstore().Addrs(peerID)) == 0 && n.routing != nil {
+		lg.Info().Msg("address not found in peer store, searching for peer in routing system")
+
+		var err error
+		func() {
+			timedCtx, cancel := context.WithTimeout(ctx, findPeerQueryTimeout)
+			defer cancel()
+			// try to find the peer using the routing system
+			_, err = n.routing.FindPeer(timedCtx, peerID)
+		}()
+
+		if err != nil {
+			lg.Warn().Err(err).Msg("address not found in both peer store and routing system")
+		} else {
+			lg.Debug().Msg("address not found in peer store, but found in routing system search")
+		}
+	}
+
+	stream, dialAddrs, err := n.uniMgr.CreateStream(ctx, peerID, MaxConnectAttempt)
+	if err != nil {
+		return nil, flownet.NewPeerUnreachableError(fmt.Errorf("could not create stream (peer_id: %s, dialing address(s): %v): %w", peerID,
+			dialAddrs, err))
+	}
+
+	lg.Info().
+		Str("networking_protocol_id", string(stream.Protocol())).
+		Str("dial_address", fmt.Sprintf("%v", dialAddrs)).
+		Msg("stream successfully created to remote peer")
+	return stream, nil
+}
+
 // CreateStream returns an existing stream connected to the peer if it exists, or creates a new stream with it.
 // All errors returned from this function can be considered benign.
 func (n *Node) CreateStream(ctx context.Context, peerID peer.ID) (libp2pnet.Stream, error) {
