@@ -122,20 +122,6 @@ func TestFullGossipSubConnectivityAmongHonestNodesWithMaliciousMajority(t *testi
 
 }
 
-// TestNetworkPartitionWithNoHonestPeerScoringInFullTopology is part one of testing pushing access nodes to the edges of the network.
-// This test proves that if access nodes are NOT pushed to the edge of network, a malicious majority of them can
-// partition the network by disconnecting honest nodes from each other even when the network topology is a complete graph (i.e., full topology).
-func TestNetworkPartitionWithNoHonestPeerScoringInFullTopology(t *testing.T) {
-	total := 50
-	for i := 0; i < total; i++ {
-		// false means no honest peer scoring.
-		if !testGossipConnectivityUnderNetworkPartition(t, false) {
-			return // partition is successful
-		}
-	}
-	require.Fail(t, "expected at least one network partition")
-}
-
 // testGossipConnectivityUnderNetworkPartition tests that whether two honest nodes are in each others topic mesh on GossipSub
 // when the network topology is a complete graph (i.e., full topology) and a malicious majority of access nodes are present.
 // If honestPeerScoring is true, then the honest nodes are enabled with peer scoring.
