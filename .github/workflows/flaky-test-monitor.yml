@@ -8,6 +8,7 @@ on:
   push:
     paths:
       - '.github/workflows/flaky-test-monitor.yml'
+      - '.github/workflows/ci.yml'
 
 env:
   BIGQUERY_DATASET: production_src_flow_test_metrics
@@ -134,7 +135,9 @@ jobs:
             test_category: integration-collection
           - target: consensus-tests
             test_category: integration-consensus
-          - target: epochs-tests
+          - target: epochs-cohort1-tests
+            test_category: integration-epochs
+          - target: epochs-cohort2-tests
             test_category: integration-epochs
           - target: execution-tests
             test_category: integration-execution

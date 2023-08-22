@@ -3,6 +3,7 @@ package unittest
 import (
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/engine/execution"
+	"github.com/onflow/flow-go/fvm/meter"
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/mempool/entity"
@@ -10,7 +11,9 @@ import (
 )
 
 func StateInteractionsFixture() *snapshot.ExecutionSnapshot {
-	return &snapshot.ExecutionSnapshot{}
+	return &snapshot.ExecutionSnapshot{
+		Meter: meter.NewMeter(meter.DefaultParameters()),
+	}
 }
 
 func ComputationResultFixture(
