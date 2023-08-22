@@ -51,6 +51,7 @@ func (a *AdminCommandDisallowListTestSuite) TestAdminCommandDisallowList() {
 	// in normal situations if the node is not disallow-listed, these messages would be considered
 	// legit and hence would be delivered to the recipients.
 	a.Orchestrator.sendExpectedBlockedMsgs(a.T())
+
 	// The sleep is unavoidable for the following reasons these messages are sent between 2 running libp2p nodes we don't have any hooks in between
 	// These are messages sent after the node is blocked meaning that these messages are not expected to be delivered to the receiver node,
 	// so we sleep this approximate amount of time to ensure all messages were attempted, processed and dropped.
