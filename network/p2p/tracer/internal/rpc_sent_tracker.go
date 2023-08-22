@@ -117,10 +117,11 @@ func (t *RPCSentTracker) rpcSentWorkerLogic(work trackableRPC) error {
 	case len(work.rpc.GetControl().GetIhave()) > 0:
 		iHave := work.rpc.GetControl().GetIhave()
 		numOfMessageIdsTracked := t.iHaveRPCSent(iHave)
-		t.updateLastHighestIHaveRPCSize(int64(numOfMessageIdsTracked))
-		t.logger.Info().
+		lastHighestIHaveCount := t.updateLastHighestIHaveRPCSize(int64(numOfMessageIdsTracked))
+		t.logger.Debug().
 			Int("num_of_ihaves", len(iHave)).
 			Int("num_of_message_ids", numOfMessageIdsTracked).
+			Int("last_highest_ihave_count", lastHighestIHaveCount).
 			Msg(iHaveRPCTrackedLog)
 	}
 	return nil
