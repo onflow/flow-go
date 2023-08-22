@@ -129,8 +129,12 @@ jobs:
         include:
           - target: access-tests
             test_category: integration-access
-          - target: bft-tests
-            test_category: integration-bft
+          - target: bft-protocol-tests
+            test_category: integration-bft-protocol
+          - target: bft-framework-tests
+            test_category: integration-bft-framework
+          - target: bft-gossipsub-tests
+            test_category: integration-bft-gossipsub
           - target: collection-tests
             test_category: integration-collection
           - target: consensus-tests
