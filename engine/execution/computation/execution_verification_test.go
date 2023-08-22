@@ -70,7 +70,7 @@ func Test_ExecutionMatchesVerification(t *testing.T) {
 			`access(all) contract Foo {
 				access(all) event FooEvent(x: Int, y: Int)
 
-				access(all) fun event() { 
+				access(all) fun emitEvent() { 
 					emit FooEvent(x: 2, y: 1)
 				}
 			}`), "Foo")
@@ -81,7 +81,7 @@ func Test_ExecutionMatchesVerification(t *testing.T) {
 			transaction {
 				prepare() {}
 				execute {
-					Foo.event()
+					Foo.emitEvent()
 				}
 			}`, chain.ServiceAddress())),
 		}
@@ -114,7 +114,7 @@ func Test_ExecutionMatchesVerification(t *testing.T) {
 			`access(all) contract Foo {
 				access(all) event FooEvent(x: Int, y: Int)
 
-				access(all) fun event() { 
+				access(all) fun emitEvent() { 
 					emit FooEvent(x: 2, y: 1)
 				}
 			}`), "Foo")
@@ -125,7 +125,7 @@ func Test_ExecutionMatchesVerification(t *testing.T) {
 			transaction {
 				prepare() {}
 				execute {
-					Foo.event()
+					Foo.emitEvent()
 				}
 			}`, chain.ServiceAddress())),
 		}
@@ -593,7 +593,7 @@ func TestTransactionFeeDeduction(t *testing.T) {
 								prepare(signer: AuthAccount) {
 							
 									// Get a reference to the signer's stored vault
-									let vaultRef = signer.borrow<&FlowToken.Vault>(from: /storage/flowTokenVault)
+									let vaultRef = signer.borrow<auth(FungibleToken.Withdrawable) &FlowToken.Vault>(from: /storage/flowTokenVault)
 										?? panic("Could not borrow reference to the owner's Vault!")
 							
 									// Withdraw tokens from the signer's stored vault
