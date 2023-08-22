@@ -23,8 +23,8 @@ type ErrorTerminator func(node *flow.Identity, err error) bool
 type Communicator interface {
 	CallAvailableNode(
 		nodes flow.IdentityList,
-		call NodeAction,
-		shouldTerminateOnError ErrorTerminator,
+		call func(node *flow.Identity) error,
+		shouldTerminateOnError func(node *flow.Identity, err error) bool,
 	) error
 }
 
@@ -49,8 +49,8 @@ func NewNodeCommunicator(circuitBreakerEnabled bool) *NodeCommunicator {
 // If the maximum failed request count is reached, it returns the accumulated errors.
 func (b *NodeCommunicator) CallAvailableNode(
 	nodes flow.IdentityList,
-	call NodeAction,
-	shouldTerminateOnError ErrorTerminator,
+	call func(id *flow.Identity) error,
+	shouldTerminateOnError func(node *flow.Identity, err error) bool,
 ) error {
 	var errs *multierror.Error
 	nodeSelector, err := b.nodeSelectorFactory.SelectNodes(nodes)

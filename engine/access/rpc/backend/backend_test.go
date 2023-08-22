@@ -54,7 +54,7 @@ type Suite struct {
 	archiveClient          *access.AccessAPIClient
 
 	connectionFactory *backendmock.ConnectionFactory
-	communicator      *NodeCommunicatorMock
+	communicator      *backendmock.Communicator
 
 	chainID flow.ChainID
 }
@@ -85,7 +85,7 @@ func (suite *Suite) SetupTest() {
 	suite.historicalAccessClient = new(access.AccessAPIClient)
 	suite.connectionFactory = new(backendmock.ConnectionFactory)
 
-	suite.communicator = new(NodeCommunicatorMock)
+	suite.communicator = new(backendmock.Communicator)
 }
 
 func (suite *Suite) TestPing() {
