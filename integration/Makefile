@@ -72,9 +72,16 @@ network-tests:
 	go test $(if $(VERBOSE),-v,) $(RACE_FLAG) $(if $(JSON_OUTPUT),-json,) $(if $(NUM_RUNS),-count $(NUM_RUNS),) -tags relic ./tests/network/...
 
 # BFT tests need to be run sequentially (-p 1) due to interference between different Docker networks when tests are run in parallel
+.PHONY: bft-framework-tests
+bft-framework-tests:
+	go test $(if $(VERBOSE),-v,) $(RACE_FLAG) $(if $(JSON_OUTPUT),-json,) $(if $(NUM_RUNS),-count $(NUM_RUNS),) -tags relic ./tests/bft/framework/... -p 1
+.PHONY: bft-protocol-tests
+bft-protocol-tests:
+	go test $(if $(VERBOSE),-v,) $(RACE_FLAG) $(if $(JSON_OUTPUT),-json,) $(if $(NUM_RUNS),-count $(NUM_RUNS),) -tags relic ./tests/bft/protocol/... -p 1
+.PHONY: bft-gossipsub-tests
+bft-gossipsub-tests:
+	go test $(if $(VERBOSE),-v,) $(RACE_FLAG) $(if $(JSON_OUTPUT),-json,) $(if $(NUM_RUNS),-count $(NUM_RUNS),) -tags relic ./tests/bft/gossipsub/... -p 1
+
 .PHONY: bft-tests
-bft-tests:
-	go test $(if $(VERBOSE),-v,) $(RACE_FLAG) $(if $(JSON_OUTPUT),-json,) $(if $(NUM_RUNS),-count $(NUM_RUNS),) -tags relic ./tests/bft/... -p 1
-
-
+bft-tests: bft-framework-tests bft-protocol-tests bft-gossipsub-tests
 ############################################################################################
