@@ -421,7 +421,18 @@ func (c *ControlMsgValidationInspector) processInspectMsgReq(req *InspectMsgRequ
 	switch req.validationConfig.ControlMsg {
 	case p2pmsg.CtrlMsgIWant:
 		if err := c.inspectIWant(req.ctrlMsg.GetIwant()); err != nil {
-			c.logAndDistributeAsyncInspectErr(req, count, err)
+			if IsIWantCacheMissThresholdErr(err) || IsIWantDuplicateMsgIDThresholdErr(err) {
+				c.logAndDistributeAsyncInspectErr(req, count, err)
+				return nil
+			}
+			c.logger.
+				Error().
+				Err(err).
+				Bool(logging.KeySuspicious, true).
+				Str("peer_id", req.Peer.String()).
+				Str("ctrl_msg_type", p2pmsg.CtrlMsgIWant.String()).
+				Uint64("ctrl_msg_count", count).
+				Msg("unexpected error encountered while performing iwant validation")
 		}
 		return nil
 	}
