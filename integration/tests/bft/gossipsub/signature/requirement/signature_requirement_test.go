@@ -36,9 +36,6 @@ func (s *GossipSubSignatureRequirementTestSuite) TestGossipSubSignatureRequireme
 
 	// messages with correct message signatures are expected to always pass libp2p signature verification and be delivered to the victim EN.
 	require.Eventually(s.T(), func() bool {
-		if s.Orchestrator.authorizedEventsReceived.Load() == int64(numOfAuthorizedEvents) {
-			return true
-		}
-		return false
+		return s.Orchestrator.authorizedEventsReceived.Load() == int64(numOfAuthorizedEvents)
 	}, 5*time.Second, 500*time.Millisecond, fmt.Sprintf("expected to receive %d authorized events got: %d", numOfAuthorizedEvents, s.Orchestrator.unauthorizedEventsReceived.Load()))
 }

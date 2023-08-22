@@ -44,10 +44,7 @@ func (s *TopicValidatorTestSuite) TestTopicValidatorE2E() {
 
 	// Victim nodes should receive all the authorized events sent.
 	require.Eventually(s.T(), func() bool {
-		if len(s.Orchestrator.authorizedEventsReceived) == numOfAuthorizedEvents {
-			return true
-		}
-		return false
+		return len(s.Orchestrator.authorizedEventsReceived) == numOfAuthorizedEvents
 	}, 5*time.Second, 500*time.Millisecond,
 		fmt.Sprintf("expected to receive %d authorized events got: %d", numOfAuthorizedEvents, len(s.Orchestrator.unauthorizedEventsReceived)))
 }
