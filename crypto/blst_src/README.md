@@ -9,9 +9,21 @@ While BLST exports multiple functions and tools, the implementation in Flow cryp
 
 The folder contains:
 - BLST LICENSE file
-- all <blst>/src/*.c and <blst>/src/*.h files (C source files)
-- all <blst>/build   (assembly generated files)
-- <blst>/bindings/blst.h  (headers of external functions)
-- <blst>/bindings/blst_aux.h (headers of external aux functions)
+- all `<blst>/src/*.c` and `<blst>/src/*.h` files (C source files) but `server.c`.
+- `server.c` is replaced by `blst_src.c` (which lists only the files needed by Flow crypto).
+- all `<blst>/build`   (assembly generated files).
+- `<blst>/bindings/blst.h`  (headers of external functions).
+- `<blst>/bindings/blst_aux.h` (headers of external aux functions).
+- this `README` file.
 
-TODO: add steps for upgrading the BLST version
+To upgrade the BLST version:
+- [ ] delete all files in this folder but `blst_src.c` and `README.md`.
+- [ ] open BLST repository on the new version.
+- [ ] copy all `.c` and `.h` files from `<blst>/src/` into this folder.
+- [ ] delete `server.c` from this folder.
+- [ ] copy the folder `<blst>/build/` into this folder.
+- [ ] copy `<blst>/bindings/blst.h` and `<blst>/bindings/blst_aux.h` into this folder.
+- [ ] solve all breaking changes that may occur.
+- [ ] update the commit version on this `README`.
+
+Remember that Flow crypto is using non exported internal functions from BLST. Checking for interfaces breaking changes in BLST should made along with auditing changes between the old and new versions. This includes checking logical changes and assumptions beyond interfaces, and assessing their security and performance impact on protocols implemented in Flow crypto. 

@@ -22,7 +22,7 @@ const Fr BLS12_381_rR = {{
 
 // returns true if a == 0 and false otherwise
 bool Fr_is_zero(const Fr *a) {
-  return bytes_are_zero((const byte *)a, sizeof(Fr));
+  return vec_is_zero(a, sizeof(Fr));
 }
 
 // returns true if a == b and false otherwise
