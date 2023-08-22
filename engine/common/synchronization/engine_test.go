@@ -324,7 +324,7 @@ func (ss *SyncSuite) TestProcess_SyncRequest_HigherThanReceiver_OutsideTolerance
 		expectedMisbehaviorsUpper    int
 	}
 
-	loadGroups := make([]loadGroup, 5)
+	loadGroups := []loadGroup{}
 
 	loadGroups = append(loadGroups, loadGroup{0.1, 75, 140})
 	loadGroups = append(loadGroups, loadGroup{0.001, 0, 7})

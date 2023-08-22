@@ -486,8 +486,8 @@ func (e *Engine) validateRangeRequestForALSP(channel channels.Channel, id flow.I
 }
 
 func (e *Engine) validateSyncRequestForALSP(channel channels.Channel, originID flow.Identifier, event interface{}) (*alsp.MisbehaviorReport, bool) {
-	// Generate a random integer between 1 and 1000
-	n, err := rand.Uint32n(1001)
+	// Generate a random integer between 1 and probabilityFactorMultiplier (exclusive)
+	n, err := rand.Uint32n(probabilityFactorMultiplier)
 
 	if err != nil {
 		// failing to generate a random number is unlikely. If an error is encountered while
@@ -500,7 +500,7 @@ func (e *Engine) validateSyncRequestForALSP(channel channels.Channel, originID f
 
 	// to avoid creating a misbehavior report for every sync request received, use a probabilistic approach.
 	// Create a report with a probability of alsp.syncRequestProbabilityFactor
-	if float32(n) < e.alsp.syncRequestProbabilityFactor*1001 {
+	if float32(n) < e.alsp.syncRequestProbabilityFactor*probabilityFactorMultiplier {
 		// create a misbehavior report
 		e.log.Info().Str("originID", originID.String()).Msg("creating misbehavior report")
 		report, err := alsp.NewMisbehaviorReport(originID, alsp.PotentialSpam)
