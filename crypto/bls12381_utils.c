@@ -95,62 +95,6 @@ void Fr_inv_montg_eucl(Fr *res, const Fr *a) {
   redc_mont_256((limb_t *)res, temp, BLS12_381_r, r0);
 }
 
-// result is in Montgomery form if base is in montgomery form
-// if base = b*R, res = b^expo * R
-// In general, res = base^expo * R^(-expo+1)
-// `expo` is encoded as a little-endian limb_t table of length `expo_len`.
-// TODO: could be deleted
-void Fr_exp_montg(Fr *res, const Fr *base, const limb_t *expo,
-                  const int expo_len) {
-  // mask of the most significant bit
-  const limb_t msb_mask = (limb_t)1 << ((sizeof(limb_t) << 3) - 1);
-  limb_t mask = msb_mask;
-  int index = 0;
-
-  expo += expo_len;
-  // process most significant zero limbs
-  while ((index < expo_len) && (*(--expo) == 0)) {
-    index++;
-  }
-  // if expo is zero
-  if (index == expo_len) {
-    Fr_copy(res, base);
-    return;
-  }
-  // expo is non zero
-  // process the most significant zero bits
-  while ((*expo & mask) == 0) {
-    mask >>= 1;
-  }
-  Fr tmp;
-  // process the first `1` bit
-  Fr_copy(&tmp, base);
-  mask >>= 1;
-  // Scan all limbs of the exponent
-  for (; index < expo_len; expo--) {
-    // Scan all bits
-    for (; mask != 0; mask >>= 1) {
-      // square
-      Fr_squ_montg(&tmp, &tmp);
-      // multiply
-      if (*expo & mask) {
-        Fr_mul_montg(&tmp, &tmp, base);
-      }
-    }
-    mask = msb_mask;
-    index++;
-  }
-  Fr_copy(res, &tmp);
-}
-
-// TODO: could be deleted
-void Fr_inv_exp_montg(Fr *res, const Fr *a) {
-  Fr r_2;
-  Fr_copy(&r_2, (Fr *)BLS12_381_r);
-  r_2.limbs[0] -= 2;
-  Fr_exp_montg(res, a, (limb_t *)&r_2, 4);
-}
-
 // computes the sum of the array elements and writes the sum in jointx
 void Fr_sum_vector(Fr *jointx, const Fr x[], const int len) {
   Fr_set_zero(jointx);

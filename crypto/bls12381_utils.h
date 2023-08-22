@@ -66,10 +66,7 @@ void Fr_mul_montg(Fr *res, const Fr *a, const Fr *b);
 void Fr_squ_montg(Fr *res, const Fr *a);
 void Fr_to_montg(Fr *res, const Fr *a);
 void Fr_from_montg(Fr *res, const Fr *a);
-void Fr_exp_montg(Fr *res, const Fr *base, const limb_t *expo,
-                  const int expo_len);
 void Fr_inv_montg_eucl(Fr *res, const Fr *a);
-void Fr_inv_exp_montg(Fr *res, const Fr *a);
 ERROR Fr_read_bytes(Fr *a, const byte *bin, int len);
 ERROR Fr_star_read_bytes(Fr *a, const byte *bin, int len);
 void Fr_write_bytes(byte *bin, const Fr *a);
