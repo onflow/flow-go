@@ -25,10 +25,6 @@ func (e EventType) Flow() string {
 type EventTypes []EventType
 
 func (e *EventTypes) Parse(raw []string) error {
-	if len(raw) > MaxIDsLength {
-		return fmt.Errorf("at most %d event types can be requested at a time", MaxIDsLength)
-	}
-
 	// make a map to have only unique values as keys
 	eventTypes := make(EventTypes, 0)
 	uniqueTypes := make(map[string]bool)
