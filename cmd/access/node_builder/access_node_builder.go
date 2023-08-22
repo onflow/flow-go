@@ -1094,7 +1094,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				),
 			}
 
-			bnd := backend.New(backend.Params{
+			nodeBackend := backend.New(backend.Params{
 				State:                     node.State,
 				CollectionRPC:             builder.CollectionRPC,
 				HistoricalAccessNodes:     builder.HistoricalAccessRPCs,
@@ -1127,8 +1127,8 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				builder.AccessMetrics,
 				builder.rpcMetricsEnabled,
 				builder.Me,
-				bnd,
-				bnd,
+				nodeBackend,
+				nodeBackend,
 				builder.secureGrpcServer,
 				builder.unsecureGrpcServer,
 			)
