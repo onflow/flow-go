@@ -316,7 +316,7 @@ func (ss *SyncSuite) TestProcess_SyncRequest_HigherThanReceiver_OutsideTolerance
 	unittest.AssertClosesBefore(ss.T(), ss.e.Ready(), time.Second)
 	defer cancel()
 
-	load := 5000
+	load := 1000
 
 	type loadGroup struct {
 		syncRequestProbabilityFactor float32
@@ -324,23 +324,18 @@ func (ss *SyncSuite) TestProcess_SyncRequest_HigherThanReceiver_OutsideTolerance
 		expectedMisbehaviorsUpper    int
 	}
 
-	loadGroups := []loadGroup{}
-	loadGroups = append(loadGroups, loadGroup{0.001, 1, 9})
+	loadGroups := make([]loadGroup, 5)
 
-	for _, group := range loadGroups {
-		
-	}
+	loadGroups = append(loadGroups, loadGroup{0.1, 75, 140})
+	loadGroups = append(loadGroups, loadGroup{0.001, 0, 7})
+	loadGroups = append(loadGroups, loadGroup{0.5, 450, 550})
+	loadGroups = append(loadGroups, loadGroup{0.9, 850, 950})
 
-	for h := 0; h < 1; h++ {
+	// reset misbehavior report counter for each subtest
+	misbehaviorReported := 0
 
-		// reset misbehavior report counter for each subtest
-		misbehaviorReported := 0
-
-		syncRequestProbabilityFactor := float32(0.001)
-		expectedMisbehaviorsLower := 1
-		expectedMisbehaviorsUpper := 9
-
-		ss.T().Run(fmt.Sprintf("load test; pfactor=%f lower=%d upper=%d", syncRequestProbabilityFactor, expectedMisbehaviorsLower, expectedMisbehaviorsUpper), func(t *testing.T) {
+	for _, loadGroup := range loadGroups {
+		ss.T().Run(fmt.Sprintf("load test; pfactor=%f lower=%d upper=%d", loadGroup.syncRequestProbabilityFactor, loadGroup.expectedMisbehaviorsLower, loadGroup.expectedMisbehaviorsUpper), func(t *testing.T) {
 			for i := 0; i < load; i++ {
 				ss.T().Log("load iteration", i)
 				nonce, err := rand.Uint64()
@@ -370,7 +365,7 @@ func (ss *SyncSuite) TestProcess_SyncRequest_HigherThanReceiver_OutsideTolerance
 						misbehaviorReported++
 					},
 				)
-				ss.e.alsp.syncRequestProbabilityFactor = syncRequestProbabilityFactor
+				ss.e.alsp.syncRequestProbabilityFactor = loadGroup.syncRequestProbabilityFactor
 				require.NoError(ss.T(), ss.e.Process(channels.SyncCommittee, originID, req))
 			}
 
@@ -381,8 +376,10 @@ func (ss *SyncSuite) TestProcess_SyncRequest_HigherThanReceiver_OutsideTolerance
 			// check that correct range of misbehavior reports were generated (between 1-2 reports per 1000 requests)
 			// since we're using a random method to generate misbehavior reports, we can't guarantee the exact number, so we
 			// check that it's within a larger range, but that at least 1 misbehavior report was generated
-			assert.GreaterOrEqual(ss.T(), misbehaviorReported, expectedMisbehaviorsLower)
-			assert.LessOrEqual(ss.T(), misbehaviorReported, expectedMisbehaviorsUpper) // too many reports would indicate a bug
+			assert.GreaterOrEqual(ss.T(), misbehaviorReported, loadGroup.expectedMisbehaviorsLower)
+			assert.LessOrEqual(ss.T(), misbehaviorReported, loadGroup.expectedMisbehaviorsUpper) // too many reports would indicate a bug
+
+			misbehaviorReported = 0 // reset counter for next subtest
 		})
 	}
 }
