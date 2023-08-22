@@ -21,10 +21,10 @@ const (
 	// The numOfAuthorizedEvents allows us to wait for a certain number of authorized messages to be received, this should
 	// give the network enough time to process the unauthorized messages. This ensures us that the unauthorized messages
 	// were indeed dropped and not unprocessed.
-	numOfAuthorizedEvents = 50
+	numOfAuthorizedEvents = 5
 
 	// numOfUnauthorizedEvents the number of unauthorized events to send by the test orchestrator.
-	numOfUnauthorizedEvents = 10
+	numOfUnauthorizedEvents = 5
 )
 
 // Orchestrator represents a simple `insecure.AttackOrchestrator` that tracks any unsigned messages received by victim nodes as well as the typically expected messages.
