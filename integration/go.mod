@@ -18,7 +18,7 @@ require (
 	github.com/ipfs/go-ds-badger2 v0.1.3
 	github.com/ipfs/go-ipfs-blockstore v1.3.0
 	github.com/onflow/cadence v0.39.13-stable-cadence.0.20230815215130-fc15617946a1
-	github.com/onflow/flow-core-contracts/lib/go/contracts v1.2.4-0.20230808220007-f00e74ca675b
+	github.com/onflow/flow-core-contracts/lib/go/contracts v1.2.4-0.20230822191436-8a95802475f4
 	github.com/onflow/flow-core-contracts/lib/go/templates v1.2.4-0.20230808220007-f00e74ca675b
 	github.com/onflow/flow-emulator v0.53.1-0.20230801165926-9fd4af1cce5b
 	github.com/onflow/flow-go v0.31.1-0.20230801162100-85890d2bf9bb
@@ -229,8 +229,8 @@ require (
 	github.com/multiformats/go-multistream v0.4.1 // indirect
 	github.com/multiformats/go-varint v0.0.7 // indirect
 	github.com/onflow/atree v0.6.0 // indirect
-	github.com/onflow/flow-ft/lib/go/contracts v0.7.1-0.20230726183918-f90805445bfa // indirect
-	github.com/onflow/flow-nft/lib/go/contracts v1.1.1-0.20230726191152-4293bb676808 // indirect
+	github.com/onflow/flow-ft/lib/go/contracts v0.7.1-0.20230818200853-ab1b03e98a95 // indirect
+	github.com/onflow/flow-nft/lib/go/contracts v1.1.1-0.20230818200521-3acffe2472a3 // indirect
 	github.com/onflow/go-bitswap v0.0.0-20230703214630-6d3db958c73d // indirect
 	github.com/onflow/nft-storefront/lib/go/contracts v0.0.0-20221222181731-14b90207cead // indirect
 	github.com/onflow/sdks v0.5.0 // indirect
