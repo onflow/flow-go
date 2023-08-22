@@ -353,56 +353,6 @@ func (updater *accountKeyUpdater) revokeAccountKey(
 	}, nil
 }
 
-// RemoveAccountKey revokes a public key by index from an existing account.
-//
-// This function returns an error if the specified account does not exist, the
-// provided key is invalid, or if key revoking fails.
-func (updater *accountKeyUpdater) removeAccountKey(
-	address flow.Address,
-	keyIndex int,
-) (
-	[]byte,
-	error,
-) {
-	ok, err := updater.accounts.Exists(address)
-	if err != nil {
-		return nil, fmt.Errorf("remove account key failed: %w", err)
-	}
-
-	if !ok {
-		issue := errors.NewAccountNotFoundError(address)
-		return nil, fmt.Errorf("remove account key failed: %w", issue)
-	}
-
-	if keyIndex < 0 {
-		err = errors.NewValueErrorf(
-			fmt.Sprint(keyIndex),
-			"key index must be positive")
-		return nil, fmt.Errorf("remove account key failed: %w", err)
-	}
-
-	var publicKey flow.AccountPublicKey
-	publicKey, err = updater.accounts.GetPublicKey(
-		address,
-		uint64(keyIndex))
-	if err != nil {
-		return nil, fmt.Errorf("remove account key failed: %w", err)
-	}
-
-	// mark this key as revoked
-	publicKey.Revoked = true
-
-	encodedPublicKey, err := updater.accounts.SetPublicKey(
-		address,
-		uint64(keyIndex),
-		publicKey)
-	if err != nil {
-		return nil, fmt.Errorf("remove account key failed: %w", err)
-	}
-
-	return encodedPublicKey, nil
-}
-
 func (updater *accountKeyUpdater) AddAccountKey(
 	runtimeAddress common.Address,
 	publicKey *runtime.PublicKey,
