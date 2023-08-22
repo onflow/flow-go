@@ -59,8 +59,9 @@ const (
 	metricsInspectorNumberOfWorkers = "gossipsub-rpc-metrics-inspector-workers"
 	metricsInspectorCacheSize       = "gossipsub-rpc-metrics-inspector-cache-size"
 
-	iwantMaxSampleSize      = "gossipsub-rpc-iwant-max-sample-size"
-	iwantCacheMissThreshold = "gossipsub-rpc-iwant-cache-miss-threshold"
+	iwantMaxSampleSize           = "gossipsub-rpc-iwant-max-sample-size"
+	iwantCacheMissThreshold      = "gossipsub-rpc-iwant-cache-miss-threshold"
+	iwantDuplicateMsgIDThreshold = "gossipsub-rpc-iwant-duplicate-message-id-threshold"
 
 	alspDisabled            = "alsp-disable-penalty"
 	alspSpamRecordCacheSize = "alsp-spam-record-cache-size"
@@ -76,7 +77,7 @@ func AllFlagNames() []string {
 		scoreTracerInterval, gossipSubRPCInspectorNotificationCacheSize, validationInspectorNumberOfWorkers, validationInspectorInspectMessageQueueCacheSize, validationInspectorClusterPrefixedTopicsReceivedCacheSize,
 		validationInspectorClusterPrefixedTopicsReceivedCacheDecay, validationInspectorClusterPrefixHardThreshold, ihaveSyncSampleSizePercentage, ihaveAsyncSampleSizePercentage,
 		ihaveMaxSampleSize, metricsInspectorNumberOfWorkers, metricsInspectorCacheSize, alspDisabled, alspSpamRecordCacheSize, alspSpamRecordQueueSize, alspHearBeatInterval,
-		iwantMaxSampleSize, iwantCacheMissThreshold,
+		iwantMaxSampleSize, iwantCacheMissThreshold, iwantDuplicateMsgIDThreshold,
 	}
 }
 
@@ -140,6 +141,7 @@ func InitializeNetworkFlags(flags *pflag.FlagSet, config *Config) {
 
 	flags.Uint(iwantMaxSampleSize, config.GossipSubConfig.GossipSubRPCInspectorsConfig.GossipSubRPCValidationInspectorConfigs.IWantRPCInspectionConfig.MaxSampleSize, "max number of iwants to sample when performing validation")
 	flags.Float64(iwantCacheMissThreshold, config.GossipSubConfig.GossipSubRPCInspectorsConfig.GossipSubRPCValidationInspectorConfigs.IWantRPCInspectionConfig.CacheMissThreshold, "max number of iwants to sample when performing validation")
+	flags.Float64(iwantDuplicateMsgIDThreshold, config.GossipSubConfig.GossipSubRPCInspectorsConfig.GossipSubRPCValidationInspectorConfigs.IWantRPCInspectionConfig.CacheMissThreshold, "max allowed duplicate message IDs in a single iWant control message")
 }
 
 // rpcInspectorValidationLimits utility func that adds flags for each of the validation limits for each control message type.

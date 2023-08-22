@@ -8,20 +8,42 @@ import (
 	p2pmsg "github.com/onflow/flow-go/network/p2p/message"
 )
 
+// IWantDuplicateMsgIDThresholdErr indicates that the amount of duplicate message ids exceeds the allowed threshold.
+type IWantDuplicateMsgIDThresholdErr struct {
+	duplicates int
+	sampleSize uint
+	threshold  float64
+}
+
+func (e IWantDuplicateMsgIDThresholdErr) Error() string {
+	return fmt.Sprintf("%d/%d iWant duplicate message ids exceeds the allowed threshold: %f", e.duplicates, e.sampleSize, e.threshold)
+}
+
+// NewIWantDuplicateMsgIDThresholdErr returns a new IWantDuplicateMsgIDThresholdErr.
+func NewIWantDuplicateMsgIDThresholdErr(duplicates int, sampleSize uint, threshold float64) IWantDuplicateMsgIDThresholdErr {
+	return IWantDuplicateMsgIDThresholdErr{duplicates, sampleSize, threshold}
+}
+
+// IsIWantDuplicateMsgIDThresholdErr returns true if an error is IWantDuplicateMsgIDThresholdErr
+func IsIWantDuplicateMsgIDThresholdErr(err error) bool {
+	var e IWantDuplicateMsgIDThresholdErr
+	return errors.As(err, &e)
+}
+
 // IWantCacheMissThresholdErr indicates that the amount of cache misses exceeds the allowed threshold.
 type IWantCacheMissThresholdErr struct {
-	misses          float64
-	totalMessageIDS float64
-	threshold       float64
+	misses     int
+	sampleSize uint
+	threshold  float64
 }
 
 func (e IWantCacheMissThresholdErr) Error() string {
-	return fmt.Sprintf("%f/%f iWant cache misses exceeds the allowed threshold: %f", e.misses, e.totalMessageIDS, e.threshold)
+	return fmt.Sprintf("%d/%d iWant cache misses exceeds the allowed threshold: %f", e.misses, e.sampleSize, e.threshold)
 }
 
 // NewIWantCacheMissThresholdErr returns a new IWantCacheMissThresholdErr.
-func NewIWantCacheMissThresholdErr(misses, totalMessageIDS, threshold float64) IWantCacheMissThresholdErr {
-	return IWantCacheMissThresholdErr{misses, totalMessageIDS, threshold}
+func NewIWantCacheMissThresholdErr(misses int, sampleSize uint, threshold float64) IWantCacheMissThresholdErr {
+	return IWantCacheMissThresholdErr{misses, sampleSize, threshold}
 }
 
 // IsIWantCacheMissThresholdErr returns true if an error is IWantCacheMissThresholdErr
