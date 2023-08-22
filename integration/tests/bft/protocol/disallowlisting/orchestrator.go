@@ -1,4 +1,4 @@
-package blocklist
+package disallowlisting
 
 import (
 	"sync"
@@ -16,14 +16,15 @@ import (
 )
 
 const (
-	// numOfAuthorizedEvents number of events to send before blocking the sender node via the block list command.
-	numOfAuthorizedEvents = 10
+	// numOfAuthorizedEvents number of events to send before disallow-listing the sender node via the disallow-list command.
+	numOfAuthorizedEvents = 5
 
-	// numOfUnauthorizedEvents number of events to send after blocking the sender node via the block list command.
-	numOfUnauthorizedEvents = 10
+	// numOfUnauthorizedEvents number of events to send after disallow-listing the sender node via the disallow-list command.
+	numOfUnauthorizedEvents = 5
 )
 
-// Orchestrator represents a simple `insecure.AttackOrchestrator` that tracks messages received before and after the senderVN is blocked by the receiverEN via the admin blocklist command.
+// Orchestrator represents a simple `insecure.AttackOrchestrator` that tracks messages received before and after the
+// senderVN is disallow-listed by the receiverEN via the admin disallow-list command.
 type Orchestrator struct {
 	*bft.BaseOrchestrator
 	sync.Mutex
@@ -60,11 +61,11 @@ func NewOrchestrator(t *testing.T, logger zerolog.Logger, senderVN, receiverEN f
 	return orchestrator
 }
 
-// trackIngressEvents callback that will track authorized messages that are expected to be received by the receiverEN before we block the sender.
-// It also tracks unauthorized messages received if any that are expected to be blocked after the senderVN is blocked via the admin blocklist command.
+// trackIngressEvents callback that will track authorized messages that are expected to be received by the receiverEN before we disallow-list the sender.
+// It also tracks unauthorized messages received if any that are expected to be blocked after the senderVN is disallow-listed via the admin disallow-list command.
 func (a *Orchestrator) trackIngressEvents(event *insecure.IngressEvent) error {
-	// Track any unauthorized events that are received, these events are sent after the admin blocklist command
-	// is used to block the sender node.
+	// Track any unauthorized events that are received, these events are sent after the admin disallow-list command
+	// is used to disallow-list the sender node.
 	if _, ok := a.expectedBlockedEvents[event.FlowProtocolEventID]; ok {
 		if event.OriginID == a.senderVN {
 			a.expectedBlockedEventsReceived.Inc()
@@ -72,7 +73,7 @@ func (a *Orchestrator) trackIngressEvents(event *insecure.IngressEvent) error {
 		}
 	}
 
-	// track all authorized events sent before the sender node is blocked.
+	// track all authorized events sent before the sender node is disallow-listed.
 	if _, ok := a.authorizedEvents[event.FlowProtocolEventID]; ok {
 		// ensure event received intact no changes have been made to the underlying message
 		//a.assertEventsEqual(expectedEvent, event)
@@ -84,7 +85,7 @@ func (a *Orchestrator) trackIngressEvents(event *insecure.IngressEvent) error {
 }
 
 // sendAuthorizedMsgs publishes a number of authorized messages from the senderVN. Authorized messages are messages
-// that are sent before the senderVN is blocked.
+// that are sent before the senderVN is disallow-listed.
 func (a *Orchestrator) sendAuthorizedMsgs(t *testing.T) {
 	for i := 0; i < numOfAuthorizedEvents; i++ {
 		event := bft.RequestChunkDataPackEgressFixture(a.T, a.senderVN, a.receiverEN, insecure.Protocol_PUBLISH)
@@ -96,7 +97,7 @@ func (a *Orchestrator) sendAuthorizedMsgs(t *testing.T) {
 }
 
 // sendExpectedBlockedMsgs publishes a number of unauthorized messages. Unauthorized messages are messages that are sent
-// after the senderVN is blocked via the admin blocklist command. These messages are not expected to be received.
+// after the senderVN is blocked via the admin disallow-listed command. These messages are not expected to be received.
 func (a *Orchestrator) sendExpectedBlockedMsgs(t *testing.T) {
 	for i := 0; i < numOfUnauthorizedEvents; i++ {
 		event := bft.RequestChunkDataPackEgressFixture(a.T, a.senderVN, a.receiverEN, insecure.Protocol_PUBLISH)
