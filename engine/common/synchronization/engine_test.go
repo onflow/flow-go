@@ -2,6 +2,7 @@ package synchronization
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"math"
 	"testing"
@@ -315,54 +316,75 @@ func (ss *SyncSuite) TestProcess_SyncRequest_HigherThanReceiver_OutsideTolerance
 	unittest.AssertClosesBefore(ss.T(), ss.e.Ready(), time.Second)
 	defer cancel()
 
-	misbehaviorReported := 0
 	load := 5000
 
-	for i := 0; i < load; i++ {
-		ss.T().Log("load iteration", i)
-		nonce, err := rand.Uint64()
-		require.NoError(ss.T(), err, "should generate nonce")
-
-		// generate origin and request message
-		originID := unittest.IdentifierFixture()
-		req := &messages.SyncRequest{
-			Nonce:  nonce,
-			Height: 0,
-		}
-
-		// if request height is higher than local finalized, we should not respond
-		req.Height = ss.head.Height + 1
-
-		ss.core.On("HandleHeight", ss.head, req.Height)
-		ss.core.On("WithinTolerance", ss.head, req.Height).Return(false)
-		ss.con.AssertNotCalled(ss.T(), "Unicast", mock.Anything, mock.Anything)
-
-		// maybe function calls that might or might not occur over the course of the load test
-		ss.core.On("ScanPending", ss.head).Return([]chainsync.Range{}, []chainsync.Batch{}).Maybe()
-		ss.con.On("Multicast", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
-
-		// count misbehavior reports over the course of a load test
-		ss.con.On("ReportMisbehavior", mock.Anything).Return(mock.Anything).Maybe().Run(
-			func(args mock.Arguments) {
-				misbehaviorReported++
-			},
-		)
-
-		require.NoError(ss.T(), ss.e.Process(channels.SyncCommittee, originID, req))
+	type loadGroup struct {
+		syncRequestProbabilityFactor float32
+		expectedMisbehaviorsLower    int
+		expectedMisbehaviorsUpper    int
 	}
 
-	// give at least some time to process items
-	//time.Sleep(time.Millisecond * 100)
+	loadGroups := []loadGroup{}
+	loadGroups = append(loadGroups, loadGroup{0.001, 1, 9})
 
-	// check function call expectations at the end of the load test; otherwise, load test would take much longer
-	ss.core.AssertExpectations(ss.T())
-	ss.con.AssertExpectations(ss.T())
+	for _, group := range loadGroups {
+		
+	}
 
-	// check that correct range of misbehavior reports were generated (between 1-2 reports per 1000 requests)
-	// since we're using a random method to generate misbehavior reports, we can't guarantee the exact number, so we
-	// check that it's within a larger range, but that at least 1 misbehavior report was generated
-	assert.GreaterOrEqual(ss.T(), misbehaviorReported, 1)
-	assert.LessOrEqual(ss.T(), misbehaviorReported, 8) // too many reports would indicate a bug
+	for h := 0; h < 1; h++ {
+
+		// reset misbehavior report counter for each subtest
+		misbehaviorReported := 0
+
+		syncRequestProbabilityFactor := float32(0.001)
+		expectedMisbehaviorsLower := 1
+		expectedMisbehaviorsUpper := 9
+
+		ss.T().Run(fmt.Sprintf("load test; pfactor=%f lower=%d upper=%d", syncRequestProbabilityFactor, expectedMisbehaviorsLower, expectedMisbehaviorsUpper), func(t *testing.T) {
+			for i := 0; i < load; i++ {
+				ss.T().Log("load iteration", i)
+				nonce, err := rand.Uint64()
+				require.NoError(ss.T(), err, "should generate nonce")
+
+				// generate origin and request message
+				originID := unittest.IdentifierFixture()
+				req := &messages.SyncRequest{
+					Nonce:  nonce,
+					Height: 0,
+				}
+
+				// if request height is higher than local finalized, we should not respond
+				req.Height = ss.head.Height + 1
+
+				ss.core.On("HandleHeight", ss.head, req.Height)
+				ss.core.On("WithinTolerance", ss.head, req.Height).Return(false)
+				ss.con.AssertNotCalled(ss.T(), "Unicast", mock.Anything, mock.Anything)
+
+				// maybe function calls that might or might not occur over the course of the load test
+				ss.core.On("ScanPending", ss.head).Return([]chainsync.Range{}, []chainsync.Batch{}).Maybe()
+				ss.con.On("Multicast", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
+
+				// count misbehavior reports over the course of a load test
+				ss.con.On("ReportMisbehavior", mock.Anything).Return(mock.Anything).Maybe().Run(
+					func(args mock.Arguments) {
+						misbehaviorReported++
+					},
+				)
+				ss.e.alsp.syncRequestProbabilityFactor = syncRequestProbabilityFactor
+				require.NoError(ss.T(), ss.e.Process(channels.SyncCommittee, originID, req))
+			}
+
+			// check function call expectations at the end of the load test; otherwise, load test would take much longer
+			ss.core.AssertExpectations(ss.T())
+			ss.con.AssertExpectations(ss.T())
+
+			// check that correct range of misbehavior reports were generated (between 1-2 reports per 1000 requests)
+			// since we're using a random method to generate misbehavior reports, we can't guarantee the exact number, so we
+			// check that it's within a larger range, but that at least 1 misbehavior report was generated
+			assert.GreaterOrEqual(ss.T(), misbehaviorReported, expectedMisbehaviorsLower)
+			assert.LessOrEqual(ss.T(), misbehaviorReported, expectedMisbehaviorsUpper) // too many reports would indicate a bug
+		})
+	}
 }
 
 // TestOnSyncRequest_LowerThanReceiver_OutsideTolerance tests that a sync request that's outside tolerance and
