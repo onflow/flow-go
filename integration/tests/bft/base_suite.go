@@ -32,16 +32,16 @@ type BaseSuite struct {
 
 // Ghost returns a client to interact with the Ghost node on testnet.
 func (b *BaseSuite) Ghost() *client.GhostClient {
-	client, err := b.Net.ContainerByID(b.GhostID).GhostClient()
+	c, err := b.Net.ContainerByID(b.GhostID).GhostClient()
 	require.NoError(b.T(), err, "could not get ghost client")
-	return client
+	return c
 }
 
 // AccessClient returns a client to interact with the access node api on testnet.
 func (b *BaseSuite) AccessClient() *testnet.Client {
-	client, err := b.Net.ContainerByName(testnet.PrimaryAN).TestnetClient()
+	c, err := b.Net.ContainerByName(testnet.PrimaryAN).TestnetClient()
 	require.NoError(b.T(), err, "could not get access client")
-	return client
+	return c
 }
 
 // SetupSuite sets up node configs to run a bare minimum Flow network to function correctly.
@@ -51,11 +51,10 @@ func (b *BaseSuite) SetupSuite() {
 	// setup access nodes
 	b.NodeConfigs = append(b.NodeConfigs,
 		testnet.NewNodeConfig(flow.RoleAccess, testnet.WithLogLevel(zerolog.FatalLevel)),
-		testnet.NewNodeConfig(flow.RoleAccess, testnet.WithLogLevel(zerolog.FatalLevel)),
 	)
 
 	// setup consensus nodes
-	for _, nodeID := range unittest.IdentifierListFixture(4) {
+	for _, nodeID := range unittest.IdentifierListFixture(3) {
 		nodeConfig := testnet.NewNodeConfig(flow.RoleConsensus,
 			testnet.WithID(nodeID),
 			testnet.WithLogLevel(zerolog.FatalLevel),
@@ -68,7 +67,6 @@ func (b *BaseSuite) SetupSuite() {
 
 	// setup verification nodes
 	b.NodeConfigs = append(b.NodeConfigs,
-		testnet.NewNodeConfig(flow.RoleVerification, testnet.WithLogLevel(zerolog.FatalLevel)),
 		testnet.NewNodeConfig(flow.RoleVerification, testnet.WithLogLevel(zerolog.FatalLevel)),
 	)
 
