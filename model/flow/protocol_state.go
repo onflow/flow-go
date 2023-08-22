@@ -37,7 +37,7 @@ type ProtocolStateEntry struct {
 // the database for epoch setups and commits and full identity table.
 // It holds several invariants, such as:
 //   - CurrentEpochSetup and CurrentEpochCommit are for the same epoch. Never nil.
-//   - PreviousEpochSetup and PreviousEpochCommit are for the same epoch. Never nil.
+//   - PreviousEpochSetup and PreviousEpochCommit are for the same epoch. Can be nil.
 //   - Identities is a full identity table for the current epoch.
 //     Identities are sorted in canonical order. Without duplicates. Never nil.
 //   - NextEpochProtocolState is a protocol state for the next epoch. Can be nil.
