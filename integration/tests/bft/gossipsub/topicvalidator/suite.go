@@ -38,8 +38,6 @@ func (s *Suite) SetupSuite() {
 		return n.Role != flow.RoleExecution && n.Role != flow.RoleVerification && n.Role != flow.RoleAccess
 	})
 
-	s.NodeConfigs = append(s.NodeConfigs, testnet.NewNodeConfig(flow.RoleAccess, testnet.WithLogLevel(zerolog.FatalLevel)))
-
 	// create corrupt access node
 	s.attackerANID = unittest.IdentifierFixture()
 	s.NodeConfigs = append(s.NodeConfigs, testnet.NewNodeConfig(flow.RoleAccess,
