@@ -82,4 +82,6 @@ bft-protocol-tests:
 bft-gossipsub-tests:
 	go test $(if $(VERBOSE),-v,) $(RACE_FLAG) $(if $(JSON_OUTPUT),-json,) $(if $(NUM_RUNS),-count $(NUM_RUNS),) -tags relic ./tests/bft/gossipsub/... -p 1
 
+.PHONY: bft-tests
+bft-tests: bft-framework-tests bft-protocol-tests bft-gossipsub-tests
 ############################################################################################
