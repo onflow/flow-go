@@ -125,7 +125,7 @@ func TestFullGossipSubConnectivityAmongHonestNodesWithMaliciousMajority(t *testi
 // testGossipConnectivityUnderNetworkPartition tests that whether two honest nodes are in each others topic mesh on GossipSub
 // when the network topology is a complete graph (i.e., full topology) and a malicious majority of access nodes are present.
 // If honestPeerScoring is true, then the honest nodes are enabled with peer scoring.
-// A true return value means that the two honest nodes have each other in each others' mesh.
+// A true return value means that the two honest nodes have each other in each other's mesh.
 // A false return value means that the two honest nodes do not have each other in each others' mesh (at least one of them is partitioned).
 func testGossipConnectivityUnderNetworkPartition(t *testing.T, honestPeerScoring bool) bool {
 	ctx, cancel := context.WithCancel(context.Background())
