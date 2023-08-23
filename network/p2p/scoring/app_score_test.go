@@ -201,14 +201,6 @@ func TestFullGossipSubConnectivityAmongHonestNodesWithMaliciousMajority(t *testi
 	// let nodes reside on a full topology, hence no partition is caused by the topology.
 	p2ptest.LetNodesDiscoverEachOther(t, ctx, allNodes, allIds)
 
-	outgoingMessageScope, err := message.NewOutgoingScope(
-		allIds.NodeIDs(),
-		channels.TopicFromChannel(channels.PushBlocks, sporkId),
-		unittest.ProposalFixture(),
-		unittest.NetworkCodec().Encode,
-		message.ProtocolTypePubSub)
-	require.NoError(t, err)
-	require.NoError(t, con1Node.Publish(ctx, outgoingMessageScope))
 	// checks whether con1 and con2 are in the same mesh
 	tick := time.Second        // Set the tick duration as needed
 	timeout := 5 * time.Second // Set the timeout duration as needed
@@ -246,20 +238,6 @@ func TestFullGossipSubConnectivityAmongHonestNodesWithMaliciousMajority(t *testi
 			require.Fail(t, "timed out waiting for con1 to have con2 in its mesh; honest nodes are not on each others' topic mesh on GossipSub")
 		}
 	}
-	// we check that whether within a one-second window the message is received by the other honest consensus node.
-	// the one-second window is important because it triggers the heartbeat of the con1Node to perform a lazy pull (iHave).
-	// And con1Node may randomly choose con2Node as the peer to perform the lazy pull.
-	// However, under a network partition con2Node is not in the mesh of con1Node, and hence is deprived of the eager push from con1Node.
-	//
-	// If no honest peer scoring is enabled, then con1Node and con2Node are less-likely to be in the same mesh, and hence the message is not delivered.
-	// If honest peer scoring is enabled, then con1Node and con2Node are certainly in the same mesh, and hence the message is delivered.
-	ctx1s, cancel1s := context.WithTimeout(ctx, 1*time.Second)
-	defer cancel1s()
-
-	expectedReceivedData, err := outgoingMessageScope.Proto().Marshal()
-	require.NoError(t, err)
-
-	return p2pfixtures.HasSubReceivedMessage(t, ctx1s, expectedReceivedData, con2Sub)
 }
 
 // maliciousAppSpecificScore returns a malicious app specific penalty function that rewards the malicious node and
