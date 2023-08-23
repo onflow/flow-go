@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"math/rand"
 	"testing"
-	"time"
 
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/libp2p/go-libp2p/core/peer"
@@ -124,8 +123,8 @@ func TestInvalidCtrlMsgScoringIntegration(t *testing.T) {
 			_, ok := provider.ByPeerID(peerId)
 			return ok
 		})
-	p2ptest.StartNodes(t, signalerCtx, nodes, 100*time.Millisecond)
-	defer p2ptest.StopNodes(t, nodes, cancel, 2*time.Second)
+	p2ptest.StartNodes(t, signalerCtx, nodes)
+	defer p2ptest.StopNodes(t, nodes, cancel)
 
 	p2ptest.LetNodesDiscoverEachOther(t, ctx, nodes, ids)
 	blockTopic := channels.TopicFromChannel(channels.PushBlocks, sporkId)
