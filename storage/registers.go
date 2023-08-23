@@ -12,7 +12,7 @@ type Registers interface {
 }
 
 type RegistersReader interface {
-	Get(ID flow.RegisterID, height uint64) flow.RegisterEntry
+	Get(ID flow.RegisterID, height uint64) (flow.RegisterValue, error)
 }
 
 type RegistersWriter interface {
