@@ -309,7 +309,6 @@ func TestTopicValidator_InvalidTopic(t *testing.T) {
 
 	// publish fails because the topic conversion fails
 	require.Error(t, err)
-	fmt.Println(err)
 	// ensure the correct error is contained in the logged error
 	require.Contains(t, hook.Logs(), "could not convert topic to channel")
 }
