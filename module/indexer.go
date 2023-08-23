@@ -12,5 +12,6 @@ type Indexer interface {
 	Values(IDs flow.RegisterIDs, height uint64) ([]flow.RegisterValue, error) // retrieve register values for register IDs at given height
 
 	StorePayloads(payloads []*ledger.Payload, height uint64) error // index payloads at given height
+	StoreCommitment(commitment flow.StateCommitment, height uint64) error
 	StoreLast(uint64) error
 }

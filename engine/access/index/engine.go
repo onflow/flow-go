@@ -283,7 +283,12 @@ func (e *Engine) handleTrieUpdate(blockID flow.Identifier, update *ledger.TrieUp
 	}
 
 	// TODO make sure we can use the payload encKey instead of the path
-	return e.index.StorePayloads(update.Payloads, header.Height)
+	err = e.index.StorePayloads(update.Payloads, header.Height)
+	if err != nil {
+		return err
+	}
+
+	return e.index.StoreCommitment(flow.StateCommitment(update.RootHash), header.Height)
 }
 
 // lookupCollection looks up the collection from the collection db with collID

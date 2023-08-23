@@ -1,6 +1,7 @@
 package indexer
 
 import (
+	"fmt"
 	"github.com/onflow/flow-go/cmd/util/ledger/migrations"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/model/flow"
@@ -11,9 +12,10 @@ import (
 var _ module.Indexer = &Indexer{}
 
 type Indexer struct {
-	registers storage.Registers
-	headers   storage.Headers
-	last      uint64 // todo persist
+	registers   storage.Registers
+	headers     storage.Headers
+	last        uint64                          // todo persist
+	commitments map[uint64]flow.StateCommitment // todo persist
 }
 
 func (i *Indexer) Last() (uint64, error) {
@@ -35,8 +37,17 @@ func (i *Indexer) HeightForBlock(ID flow.Identifier) (uint64, error) {
 }
 
 func (i *Indexer) Commitment(height uint64) (flow.StateCommitment, error) {
-	//TODO implement me
-	panic("implement me")
+	val, ok := i.commitments[height]
+	if !ok {
+		return flow.DummyStateCommitment, fmt.Errorf("could not find commitment at height %d", height)
+	}
+
+	return val, nil
+}
+
+func (i *Indexer) StoreCommitment(commitment flow.StateCommitment, height uint64) error {
+	i.commitments[height] = commitment
+	return nil
 }
 
 func (i *Indexer) Values(IDs flow.RegisterIDs, height uint64) ([]flow.RegisterValue, error) {
