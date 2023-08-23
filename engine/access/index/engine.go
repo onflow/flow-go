@@ -34,7 +34,8 @@ type Engine struct {
 	collections  storage.Collections
 	events       storage.Events
 	transactions storage.Transactions
-	index        module.Indexer
+
+	index module.Indexer
 
 	execDataCache *cache.ExecutionDataCache
 
@@ -168,7 +169,7 @@ func (e *Engine) processAvailableExecutionData(ctx context.Context) error {
 
 		err = e.index.StoreLast(height)
 		if err != nil {
-			return err
+			return fmt.Errorf("could not persist last processed height to %d: %w", height, err)
 		}
 
 	}
