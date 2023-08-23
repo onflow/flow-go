@@ -10,7 +10,6 @@ import (
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/fvm/storage/state"
 	"github.com/onflow/flow-go/fvm/tracing"
-	"github.com/onflow/flow-go/model/flow"
 )
 
 var _ Environment = &facadeEnvironment{}
@@ -174,7 +173,7 @@ func NewScriptEnv(
 	env.RandomGenerator = NewRandomGenerator(
 		tracer,
 		params.EntropyProvider,
-		flow.ZeroID[:],
+		params.ScriptInfoParams.ID[:],
 	)
 	env.addParseRestrictedChecks()
 	return env

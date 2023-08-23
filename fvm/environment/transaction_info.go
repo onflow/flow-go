@@ -7,6 +7,7 @@ import (
 	"github.com/onflow/flow-go/fvm/storage/state"
 	"github.com/onflow/flow-go/fvm/tracing"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/hash"
 	"github.com/onflow/flow-go/module/trace"
 )
 
@@ -17,6 +18,25 @@ type TransactionInfoParams struct {
 
 	TransactionFeesEnabled bool
 	LimitAccountStorage    bool
+}
+
+type ScriptInfoParams struct {
+	ID     flow.Identifier
+	Script []byte
+}
+
+func NewScriptInfoParams(id flow.Identifier, code []byte) *ScriptInfoParams {
+	return &ScriptInfoParams{
+		ID:     id,
+		Script: code,
+	}
+}
+
+func NewScriptInfoParamsWithCode(code []byte) *ScriptInfoParams {
+	return &ScriptInfoParams{
+		ID:     flow.HashToID(hash.DefaultHasher.ComputeHash(code)),
+		Script: code,
+	}
 }
 
 func DefaultTransactionInfoParams() TransactionInfoParams {
@@ -91,6 +111,8 @@ func (info ParseRestrictedTransactionInfo) GetSigningAccounts() (
 		trace.FVMEnvGetSigningAccounts,
 		info.impl.GetSigningAccounts)
 }
+
+var _ TransactionInfo = &transactionInfo{}
 
 type transactionInfo struct {
 	params TransactionInfoParams

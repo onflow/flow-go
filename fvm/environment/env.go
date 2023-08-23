@@ -97,6 +97,7 @@ type EnvironmentParams struct {
 
 	BlockInfoParams
 	TransactionInfoParams
+	ScriptInfoParams
 
 	EntropyProvider
 
@@ -115,4 +116,8 @@ func DefaultEnvironmentParams() EnvironmentParams {
 		TransactionInfoParams: DefaultTransactionInfoParams(),
 		ContractUpdaterParams: DefaultContractUpdaterParams(),
 	}
+}
+
+func (env *EnvironmentParams) SetScriptInfoParams(info *ScriptInfoParams) {
+	env.ScriptInfoParams = *info
 }
