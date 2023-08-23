@@ -1,8 +1,12 @@
 package p2p
 
 import (
+	"bufio"
+	"context"
 	"errors"
 	"fmt"
+	ggio "github.com/gogo/protobuf/io"
+	libp2pnet "github.com/libp2p/go-libp2p/core/network"
 	"sync"
 	"time"
 
@@ -27,6 +31,28 @@ import (
 	"github.com/onflow/flow-go/utils/logging"
 )
 
+const (
+	_ = iota
+	_ = 1 << (10 * iota)
+	mb
+	gb
+)
+
+const (
+	// DefaultMaxUnicastMsgSize defines maximum message size in unicast mode for most messages
+	DefaultMaxUnicastMsgSize = 10 * mb // 10 mb
+
+	// LargeMsgMaxUnicastMsgSize defines maximum message size in unicast mode for large messages
+	LargeMsgMaxUnicastMsgSize = gb // 1 gb
+
+	// DefaultUnicastTimeout is the default maximum time to wait for a default unicast request to complete
+	// assuming at least a 1mb/sec connection
+	DefaultUnicastTimeout = 5 * time.Second
+
+	// LargeMsgUnicastTimeout is the maximum time to wait for a unicast request to complete for large message size
+	LargeMsgUnicastTimeout = 1000 * time.Second
+)
+
 // NotEjectedFilter is an identity filter that, when applied to the identity
 // table at a given snapshot, returns all nodes that we should communicate with
 // over the networking layer.
@@ -40,8 +66,10 @@ var NotEjectedFilter = filter.Not(filter.Ejected)
 type Network struct {
 	sync.RWMutex
 	*component.ComponentManager
+	ctx                         context.Context
 	sporkId                     flow.Identifier
 	identityProvider            module.IdentityProvider
+	identityTranslator          IDTranslator
 	logger                      zerolog.Logger
 	codec                       network.Codec
 	me                          module.Local
@@ -56,6 +84,7 @@ type Network struct {
 	registerBlobServiceRequests chan *registerBlobServiceRequest
 	misbehaviorReportManager    network.MisbehaviorReportManager
 	slashingViolationsConsumer  network.ViolationsConsumer
+	unicastMessageTimeout       time.Duration
 }
 
 var _ network.Network = &Network{}
@@ -89,18 +118,20 @@ var ErrNetworkShutdown = errors.New("network has already shutdown")
 // NetworkConfig is a configuration struct for the network. It contains all the
 // necessary components to create a new network.
 type NetworkConfig struct {
-	Logger              zerolog.Logger
-	Codec               network.Codec
-	Me                  module.Local
-	MiddlewareFactory   func() (network.Middleware, error)
-	Topology            network.Topology
-	SubscriptionManager network.SubscriptionManager
-	Metrics             module.NetworkCoreMetrics
-	IdentityProvider    module.IdentityProvider
-	ReceiveCache        *netcache.ReceiveCache
-	ConduitFactory      network.ConduitFactory
-	AlspCfg             *alspmgr.MisbehaviorReportManagerConfig
-	SporkId             flow.Identifier
+	Logger                zerolog.Logger
+	Codec                 network.Codec
+	Me                    module.Local
+	MiddlewareFactory     func() (network.Middleware, error)
+	Topology              network.Topology
+	SubscriptionManager   network.SubscriptionManager
+	Metrics               module.NetworkCoreMetrics
+	IdentityProvider      module.IdentityProvider
+	IdentityTranslator    IDTranslator
+	ReceiveCache          *netcache.ReceiveCache
+	ConduitFactory        network.ConduitFactory
+	AlspCfg               *alspmgr.MisbehaviorReportManagerConfig
+	SporkId               flow.Identifier
+	UnicastMessageTimeout time.Duration
 }
 
 // NetworkConfigOption is a function that can be used to override network config parmeters.
@@ -170,6 +201,8 @@ func NewNetwork(param *NetworkConfig, opts ...NetworkOption) (*Network, error) {
 		registerBlobServiceRequests: make(chan *registerBlobServiceRequest),
 		misbehaviorReportManager:    misbehaviorMngr,
 		sporkId:                     param.SporkId,
+		identityTranslator:          param.IdentityTranslator,
+		unicastMessageTimeout:       param.UnicastMessageTimeout,
 	}
 
 	for _, opt := range opts {
@@ -201,6 +234,15 @@ func NewNetwork(param *NetworkConfig, opts ...NetworkOption) (*Network, error) {
 			n.logger.Debug().Msg("stopping misbehavior manager")
 			<-n.misbehaviorReportManager.Done()
 			n.logger.Debug().Msg("misbehavior manager stopped")
+		}).
+		AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+			n.logger.Debug().Msg("setting up network context")
+			n.ctx = ctx
+
+			ready()
+
+			<-ctx.Done()
+			n.logger.Debug().Msg("network context is done")
 		}).
 		AddWorker(n.runMiddleware).
 		AddWorker(n.processRegisterEngineRequests).
@@ -441,13 +483,57 @@ func (n *Network) UnicastOnChannel(channel channels.Channel, payload interface{}
 
 	n.metrics.UnicastMessageSendingStarted(channel.String())
 	defer n.metrics.UnicastMessageSendingCompleted(channel.String())
-	err = n.mw.SendDirect(msg)
+
+	// since it is a unicast, we only need to get the first peer ID.
+	peerID, err := n.identityTranslator.GetPeerID(msg.TargetIds()[0])
+	if err != nil {
+		return fmt.Errorf("could not find peer id for target id: %w", err)
+	}
+
+	maxMsgSize := unicastMaxMsgSize(msg.PayloadType())
+	if msg.Size() > maxMsgSize {
+		// message size goes beyond maximum size that the serializer can handle.
+		// proceeding with this message results in closing the connection by the target side, and
+		// delivery failure.
+		return fmt.Errorf("message size %d exceeds configured max message size %d", msg.Size(), maxMsgSize)
+	}
+
+	maxTimeout := n.unicastMaxMsgDuration(msg.PayloadType())
+
+	// pass in a context with timeout to make the unicast call fail fast
+	ctx, cancel := context.WithTimeout(n.ctx, maxTimeout)
+	defer cancel()
+
+	// protect the underlying connection from being inadvertently pruned by the peer manager while the stream and
+	// connection creation is being attempted, and remove it from protected list once stream created.
+	channel, ok := channels.ChannelFromTopic(msg.Topic())
+	if !ok {
+		return fmt.Errorf("could not find channel for topic %s", msg.Topic())
+	}
+	streamProtectionTag := fmt.Sprintf("%v:%v", channel, msg.PayloadType())
+
+	err = n.mw.OpenProtectedStream(ctx, peerID, streamProtectionTag, func(stream libp2pnet.Stream) error {
+		bufw := bufio.NewWriter(stream)
+		writer := ggio.NewDelimitedWriter(bufw)
+
+		err = writer.WriteMsg(msg.Proto())
+		if err != nil {
+			return fmt.Errorf("failed to send message to target id %x with peer id %s: %w", msg.TargetIds()[0], peerID, err)
+		}
+
+		// flush the stream
+		err = bufw.Flush()
+		if err != nil {
+			return fmt.Errorf("failed to flush stream for target id %x with peer id %s: %w", msg.TargetIds()[0], peerID, err)
+		}
+
+		return nil
+	})
 	if err != nil {
 		return fmt.Errorf("failed to send message to %x: %w", targetID, err)
 	}
 
 	n.metrics.OutboundMessageSent(msg.Size(), channel.String(), message.ProtocolTypeUnicast.String(), msg.PayloadType())
-
 	return nil
 }
 
@@ -580,4 +666,27 @@ func (n *Network) Topology() flow.IdentityList {
 // none
 func (n *Network) ReportMisbehaviorOnChannel(channel channels.Channel, report network.MisbehaviorReport) {
 	n.misbehaviorReportManager.HandleMisbehaviorReport(channel, report)
+}
+
+// unicastMaxMsgSize returns the max permissible size for a unicast message
+func unicastMaxMsgSize(messageType string) int {
+	switch messageType {
+	case "*messages.ChunkDataResponse":
+		return LargeMsgMaxUnicastMsgSize
+	default:
+		return DefaultMaxUnicastMsgSize
+	}
+}
+
+// unicastMaxMsgDuration returns the max duration to allow for a unicast send to complete
+func (n *Network) unicastMaxMsgDuration(messageType string) time.Duration {
+	switch messageType {
+	case "messages.ChunkDataResponse":
+		if LargeMsgUnicastTimeout > n.unicastMessageTimeout {
+			return LargeMsgUnicastTimeout
+		}
+		return n.unicastMessageTimeout
+	default:
+		return n.unicastMessageTimeout
+	}
 }
