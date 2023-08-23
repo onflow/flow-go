@@ -1,8 +1,11 @@
 package indexer
 
 import (
+	"context"
 	"fmt"
 	"github.com/onflow/flow-go/cmd/util/ledger/migrations"
+	"github.com/onflow/flow-go/engine/execution/state"
+	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
@@ -10,12 +13,45 @@ import (
 )
 
 var _ module.Indexer = &Indexer{}
+var _ state.ReadOnlyExecutionState = &Indexer{}
 
 type Indexer struct {
 	registers   storage.Registers
 	headers     storage.Headers
 	last        uint64                          // todo persist
 	commitments map[uint64]flow.StateCommitment // todo persist
+}
+
+func (i *Indexer) NewStorageSnapshot(commitment flow.StateCommitment) snapshot.StorageSnapshot {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (i *Indexer) StateCommitmentByBlockID(
+	ctx context.Context,
+	identifier flow.Identifier,
+) (flow.StateCommitment, error) {
+	h, err := i.headers.ByBlockID(identifier)
+	if err != nil {
+		return flow.DummyStateCommitment, fmt.Errorf("could not find block by ID %s for state commitment: %w", identifier.String(), err)
+	}
+
+	commit, ok := i.commitments[h.Height]
+	if !ok {
+		return flow.DummyStateCommitment, fmt.Errorf("could not find the state commitment by height %d", h.Height)
+	}
+
+	return commit, nil
+}
+
+func (i *Indexer) HasState(commitment flow.StateCommitment) bool {
+	for _, c := range i.commitments {
+		if c == commitment {
+			return true
+		}
+	}
+
+	return false
 }
 
 func (i *Indexer) Last() (uint64, error) {
@@ -67,6 +103,7 @@ func (i *Indexer) Values(IDs flow.RegisterIDs, height uint64) ([]flow.RegisterVa
 
 func (i *Indexer) StorePayloads(payloads []*ledger.Payload, height uint64) error {
 
+	// TODO add batch store
 	for _, payload := range payloads {
 		k, err := payload.Key()
 		if err != nil {
@@ -82,7 +119,7 @@ func (i *Indexer) StorePayloads(payloads []*ledger.Payload, height uint64) error
 			Value: payload.Value(),
 		}
 
-		err = i.registers.Store(regEntry, height) // TODO add batch store
+		err = i.registers.Store(regEntry, height)
 		if err != nil {
 			return err
 		}
