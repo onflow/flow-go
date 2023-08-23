@@ -122,8 +122,8 @@ func TestCanSubscribe(t *testing.T) {
 		flow.IdentityList{identity},
 		p2pfixtures.WithSubscriptionFilter(subscriptionFilter(identity, flow.IdentityList{identity})))
 
-	p2ptest.StartNode(t, signalerCtx, collectionNode, 100*time.Millisecond)
-	defer p2ptest.StopNode(t, collectionNode, cancel, 1*time.Second)
+	p2ptest.StartNode(t, signalerCtx, collectionNode)
+	defer p2ptest.StopNode(t, collectionNode, cancel)
 
 	logger := unittest.Logger()
 	topicValidator := flowpubsub.TopicValidator(logger, unittest.AllowAllPeerFilter())
