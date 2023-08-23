@@ -47,11 +47,11 @@ func TestStakingSigner_CreateProposal(t *testing.T) {
 		require.Nil(t, proposal)
 	})
 	t.Run("created-proposal", func(t *testing.T) {
-		me, err := local.New(signer, stakingPriv)
+		me, err := local.New(signer.IdentitySkeleton, stakingPriv)
 		require.NoError(t, err)
 
-		signerIdentity := unittest.IdentityFixture(unittest.WithNodeID(signerID),
-			unittest.WithStakingPubKey(stakingPriv.PublicKey()))
+		signerIdentity := &unittest.IdentityFixture(unittest.WithNodeID(signerID),
+			unittest.WithStakingPubKey(stakingPriv.PublicKey())).IdentitySkeleton
 
 		signer := NewStakingSigner(me)
 
@@ -88,11 +88,11 @@ func TestStakingSigner_CreateVote(t *testing.T) {
 		require.Nil(t, proposal)
 	})
 	t.Run("created-vote", func(t *testing.T) {
-		me, err := local.New(signer, stakingPriv)
+		me, err := local.New(signer.IdentitySkeleton, stakingPriv)
 		require.NoError(t, err)
 
-		signerIdentity := unittest.IdentityFixture(unittest.WithNodeID(signerID),
-			unittest.WithStakingPubKey(stakingPriv.PublicKey()))
+		signerIdentity := &unittest.IdentityFixture(unittest.WithNodeID(signerID),
+			unittest.WithStakingPubKey(stakingPriv.PublicKey())).IdentitySkeleton
 
 		signer := NewStakingSigner(me)
 
@@ -114,7 +114,7 @@ func TestStakingSigner_VerifyQC(t *testing.T) {
 	sigData := unittest.RandomBytes(127)
 
 	verifier := NewStakingVerifier()
-	err := verifier.VerifyQC([]*flow.Identity{}, sigData, block.View, block.BlockID)
+	err := verifier.VerifyQC(flow.IdentitySkeletonList{}, sigData, block.View, block.BlockID)
 	require.True(t, model.IsInsufficientSignaturesError(err))
 
 	err = verifier.VerifyQC(nil, sigData, block.View, block.BlockID)

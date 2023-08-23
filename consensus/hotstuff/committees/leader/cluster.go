@@ -40,7 +40,7 @@ func SelectionForCluster(cluster protocol.Cluster, epoch protocol.Epoch) (*Leade
 		firstView,
 		rng,
 		int(finalView-firstView+1),
-		identities,
+		identities.ToSkeleton(),
 	)
 	return leaders, err
 }

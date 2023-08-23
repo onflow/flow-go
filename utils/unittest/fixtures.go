@@ -1011,6 +1011,13 @@ func WithRole(role flow.Role) func(*flow.Identity) {
 	}
 }
 
+// WithInitialWeight sets the initial weight on an identity fixture.
+func WithInitialWeight(weight uint64) func(*flow.Identity) {
+	return func(identity *flow.Identity) {
+		identity.InitialWeight = weight
+	}
+}
+
 // WithWeight sets the weight on an identity fixture.
 func WithWeight(weight uint64) func(*flow.Identity) {
 	return func(identity *flow.Identity) {
@@ -1089,11 +1096,17 @@ func IdentityFixture(opts ...func(*flow.Identity)) *flow.Identity {
 	nodeID := IdentifierFixture()
 	stakingKey := StakingPrivKeyByIdentifier(nodeID)
 	identity := flow.Identity{
-		NodeID:        nodeID,
-		Address:       fmt.Sprintf("address-%x", nodeID[0:7]),
-		Role:          flow.RoleConsensus,
-		Weight:        1000,
-		StakingPubKey: stakingKey.PublicKey(),
+		IdentitySkeleton: flow.IdentitySkeleton{
+			NodeID:        nodeID,
+			Address:       fmt.Sprintf("address-%x", nodeID[0:7]),
+			Role:          flow.RoleConsensus,
+			InitialWeight: 1000,
+			StakingPubKey: stakingKey.PublicKey(),
+		},
+		DynamicIdentity: flow.DynamicIdentity{
+			Weight:  1000,
+			Ejected: false,
+		},
 	}
 	for _, apply := range opts {
 		apply(&identity)

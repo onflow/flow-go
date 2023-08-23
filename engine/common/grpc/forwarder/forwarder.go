@@ -23,14 +23,14 @@ import (
 type Forwarder struct {
 	lock        sync.Mutex
 	roundRobin  int
-	ids         flow.IdentityList
+	ids         flow.IdentitySkeletonList
 	upstream    []access.AccessAPIClient
 	connections []*grpc.ClientConn
 	timeout     time.Duration
 	maxMsgSize  uint
 }
 
-func NewForwarder(identities flow.IdentityList, timeout time.Duration, maxMsgSize uint) (*Forwarder, error) {
+func NewForwarder(identities flow.IdentitySkeletonList, timeout time.Duration, maxMsgSize uint) (*Forwarder, error) {
 	forwarder := &Forwarder{maxMsgSize: maxMsgSize}
 	err := forwarder.setFlowAccessAPI(identities, timeout)
 	return forwarder, err
@@ -40,11 +40,11 @@ func NewForwarder(identities flow.IdentityList, timeout time.Duration, maxMsgSiz
 // It is used by Observer services, Blockchain Data Service, etc.
 // Make sure that this is just for observation and not a staked participant in the flow network.
 // This means that observers see a copy of the data but there is no interaction to ensure integrity from the root block.
-func (f *Forwarder) setFlowAccessAPI(accessNodeAddressAndPort flow.IdentityList, timeout time.Duration) error {
+func (f *Forwarder) setFlowAccessAPI(accessNodeAddressAndPort flow.IdentitySkeletonList, timeout time.Duration) error {
 	f.timeout = timeout
 	f.ids = accessNodeAddressAndPort
-	f.upstream = make([]access.AccessAPIClient, accessNodeAddressAndPort.Count())
-	f.connections = make([]*grpc.ClientConn, accessNodeAddressAndPort.Count())
+	f.upstream = make([]access.AccessAPIClient, len(accessNodeAddressAndPort))
+	f.connections = make([]*grpc.ClientConn, len(accessNodeAddressAndPort))
 	for i, identity := range accessNodeAddressAndPort {
 		// Store the faultTolerantClient setup parameters such as address, public, key and timeout, so that
 		// we can refresh the API on connection loss

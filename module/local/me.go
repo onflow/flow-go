@@ -12,11 +12,11 @@ import (
 )
 
 type Local struct {
-	me *flow.Identity
+	me flow.IdentitySkeleton
 	sk crypto.PrivateKey // instance of the node's private staking key
 }
 
-func New(id *flow.Identity, sk crypto.PrivateKey) (*Local, error) {
+func New(id flow.IdentitySkeleton, sk crypto.PrivateKey) (*Local, error) {
 	if !sk.PublicKey().Equals(id.StakingPubKey) {
 		return nil, fmt.Errorf("cannot initialize with mismatching keys, expect %v, but got %v",
 			id.StakingPubKey, sk.PublicKey())

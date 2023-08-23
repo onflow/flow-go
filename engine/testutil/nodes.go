@@ -216,7 +216,7 @@ func LocalFixture(t testing.TB, identity *flow.Identity) module.Local {
 	// sets staking public key of the node
 	identity.StakingPubKey = sk.PublicKey()
 
-	me, err := local.New(identity, sk)
+	me, err := local.New(identity.IdentitySkeleton, sk)
 	require.NoError(t, err)
 
 	return me
@@ -284,7 +284,7 @@ func CollectionNode(t *testing.T, hub *stub.Hub, identity bootstrap.NodeInfo, ro
 	node := GenericNode(t, hub, identity.Identity(), rootSnapshot)
 	privKeys, err := identity.PrivateKeys()
 	require.NoError(t, err)
-	node.Me, err = local.New(identity.Identity(), privKeys.StakingKey)
+	node.Me, err = local.New(identity.Identity().IdentitySkeleton, privKeys.StakingKey)
 	require.NoError(t, err)
 
 	pools := epochs.NewTransactionPools(
@@ -857,16 +857,16 @@ func (s *RoundRobinLeaderSelection) IdentityByBlock(_ flow.Identifier, participa
 	return id, nil
 }
 
-func (s *RoundRobinLeaderSelection) IdentitiesByEpoch(_ uint64) (flow.IdentityList, error) {
-	return s.identities, nil
+func (s *RoundRobinLeaderSelection) IdentitiesByEpoch(view uint64) (flow.IdentitySkeletonList, error) {
+	return s.identities.ToSkeleton(), nil
 }
 
-func (s *RoundRobinLeaderSelection) IdentityByEpoch(_ uint64, participantID flow.Identifier) (*flow.Identity, error) {
+func (s *RoundRobinLeaderSelection) IdentityByEpoch(view uint64, participantID flow.Identifier) (*flow.IdentitySkeleton, error) {
 	id, found := s.identities.ByNodeID(participantID)
 	if !found {
 		return nil, model.NewInvalidSignerErrorf("unknown participant %x", participantID)
 	}
-	return id, nil
+	return &id.IdentitySkeleton, nil
 }
 
 func (s *RoundRobinLeaderSelection) LeaderForView(view uint64) (flow.Identifier, error) {
@@ -874,11 +874,11 @@ func (s *RoundRobinLeaderSelection) LeaderForView(view uint64) (flow.Identifier,
 }
 
 func (s *RoundRobinLeaderSelection) QuorumThresholdForView(_ uint64) (uint64, error) {
-	return committees.WeightThresholdToBuildQC(s.identities.TotalWeight()), nil
+	return committees.WeightThresholdToBuildQC(s.identities.ToSkeleton().TotalWeight()), nil
 }
 
 func (s *RoundRobinLeaderSelection) TimeoutThresholdForView(_ uint64) (uint64, error) {
-	return committees.WeightThresholdToTimeout(s.identities.TotalWeight()), nil
+	return committees.WeightThresholdToTimeout(s.identities.ToSkeleton().TotalWeight()), nil
 }
 
 func (s *RoundRobinLeaderSelection) Self() flow.Identifier {

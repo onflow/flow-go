@@ -210,7 +210,7 @@ type FlowAccessAPIForwarder struct {
 	*forwarder.Forwarder
 }
 
-func NewFlowAccessAPIForwarder(identities flow.IdentityList, timeout time.Duration, maxMsgSize uint) (*FlowAccessAPIForwarder, error) {
+func NewFlowAccessAPIForwarder(identities flow.IdentitySkeletonList, timeout time.Duration, maxMsgSize uint) (*FlowAccessAPIForwarder, error) {
 	forwarder, err := forwarder.NewForwarder(identities, timeout, maxMsgSize)
 	if err != nil {
 		return nil, err

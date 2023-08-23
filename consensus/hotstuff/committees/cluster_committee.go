@@ -28,10 +28,10 @@ type Cluster struct {
 	// a filter that returns all members of the cluster committee allowed to vote
 	clusterMemberFilter flow.IdentityFilter
 	// initial set of cluster members, WITHOUT dynamic weight changes
-	// TODO: should use identity skeleton https://github.com/dapperlabs/flow-go/issues/6232
-	initialClusterMembers flow.IdentityList
-	weightThresholdForQC  uint64 // computed based on initial cluster committee weights
-	weightThresholdForTO  uint64 // computed based on initial cluster committee weights
+	initialClusterMembers    flow.IdentitySkeletonList
+	initialClusterIdentities flow.IdentityList
+	weightThresholdForQC     uint64 // computed based on initial cluster committee weights
+	weightThresholdForTO     uint64 // computed based on initial cluster committee weights
 }
 
 var _ hotstuff.Replicas = (*Cluster)(nil)
@@ -50,7 +50,7 @@ func NewClusterCommittee(
 		return nil, fmt.Errorf("could not compute leader selection for cluster: %w", err)
 	}
 
-	totalWeight := cluster.Members().TotalWeight()
+	totalWeight := cluster.Members().ToSkeleton().TotalWeight()
 	com := &Cluster{
 		state:     state,
 		payloads:  payloads,
@@ -61,9 +61,10 @@ func NewClusterCommittee(
 			filter.Not(filter.Ejected),
 			filter.HasWeight(true),
 		),
-		initialClusterMembers: cluster.Members(),
-		weightThresholdForQC:  WeightThresholdToBuildQC(totalWeight),
-		weightThresholdForTO:  WeightThresholdToTimeout(totalWeight),
+		initialClusterMembers:    cluster.Members().ToSkeleton(),
+		initialClusterIdentities: cluster.Members(),
+		weightThresholdForQC:     WeightThresholdToBuildQC(totalWeight),
+		weightThresholdForTO:     WeightThresholdToTimeout(totalWeight),
 	}
 	return com, nil
 }
@@ -85,7 +86,7 @@ func (c *Cluster) IdentitiesByBlock(blockID flow.Identifier) (flow.IdentityList,
 
 	// use the initial cluster members for root block
 	if isRootBlock {
-		return c.initialClusterMembers, nil
+		return c.initialClusterIdentities, nil
 	}
 
 	// otherwise use the snapshot given by the reference block
@@ -106,7 +107,7 @@ func (c *Cluster) IdentityByBlock(blockID flow.Identifier, nodeID flow.Identifie
 
 	// use the initial cluster members for root block
 	if isRootBlock {
-		identity, ok := c.initialClusterMembers.ByNodeID(nodeID)
+		identity, ok := c.initialClusterIdentities.ByNodeID(nodeID)
 		if !ok {
 			return nil, model.NewInvalidSignerErrorf("node %v is not an authorized hotstuff participant", nodeID)
 		}
@@ -130,7 +131,7 @@ func (c *Cluster) IdentityByBlock(blockID flow.Identifier, nodeID flow.Identifie
 // IdentitiesByEpoch returns the initial cluster members for this epoch. The view
 // parameter is the view in the cluster consensus. Since clusters only exist for
 // one epoch, we don't need to check the view.
-func (c *Cluster) IdentitiesByEpoch(_ uint64) (flow.IdentityList, error) {
+func (c *Cluster) IdentitiesByEpoch(_ uint64) (flow.IdentitySkeletonList, error) {
 	return c.initialClusterMembers, nil
 }
 
@@ -141,10 +142,10 @@ func (c *Cluster) IdentitiesByEpoch(_ uint64) (flow.IdentityList, error) {
 // Returns:
 //   - model.InvalidSignerError if nodeID was not listed by the Epoch Setup event as an
 //     authorized participant in this cluster
-func (c *Cluster) IdentityByEpoch(_ uint64, nodeID flow.Identifier) (*flow.Identity, error) {
-	identity, ok := c.initialClusterMembers.ByNodeID(nodeID)
+func (c *Cluster) IdentityByEpoch(view uint64, participantID flow.Identifier) (*flow.IdentitySkeleton, error) {
+	identity, ok := c.initialClusterMembers.ByNodeID(participantID)
 	if !ok {
-		return nil, model.NewInvalidSignerErrorf("node %v is not an authorized hotstuff participant", nodeID)
+		return nil, model.NewInvalidSignerErrorf("node %v is not an authorized hotstuff participant", participantID)
 	}
 	return identity, nil
 }

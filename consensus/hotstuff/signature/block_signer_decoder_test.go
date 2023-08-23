@@ -36,7 +36,7 @@ func (s *blockSignerDecoderSuite) SetupTest() {
 
 	// mock consensus committee
 	s.committee = hotstuff.NewDynamicCommittee(s.T())
-	s.committee.On("IdentitiesByEpoch", mock.Anything).Return(s.allConsensus, nil).Maybe()
+	s.committee.On("IdentitiesByEpoch", mock.Anything).Return(s.allConsensus.ToSkeleton(), nil).Maybe()
 
 	// prepare valid test block:
 	voterIndices, err := signature.EncodeSignersToIndices(s.allConsensus.NodeIDs(), s.allConsensus.NodeIDs())
@@ -139,13 +139,13 @@ func (s *blockSignerDecoderSuite) Test_EpochTransition() {
 	//   PARENT <- | -- B
 	blockView := s.block.Header.View
 	parentView := s.block.Header.ParentView
-	epoch1Committee := s.allConsensus
+	epoch1Committee := s.allConsensus.ToSkeleton()
 	epoch2Committee, err := s.allConsensus.SamplePct(.8)
 	require.NoError(s.T(), err)
 
 	*s.committee = *hotstuff.NewDynamicCommittee(s.T())
 	s.committee.On("IdentitiesByEpoch", parentView).Return(epoch1Committee, nil).Maybe()
-	s.committee.On("IdentitiesByEpoch", blockView).Return(epoch2Committee, nil).Maybe()
+	s.committee.On("IdentitiesByEpoch", blockView).Return(epoch2Committee.ToSkeleton(), nil).Maybe()
 
 	ids, err := s.decoder.DecodeSignerIDs(s.block.Header)
 	require.NoError(s.T(), err)

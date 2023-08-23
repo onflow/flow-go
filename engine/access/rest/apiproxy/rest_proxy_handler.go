@@ -31,7 +31,7 @@ type RestProxyHandler struct {
 // NewRestProxyHandler returns a new rest proxy handler for observer node.
 func NewRestProxyHandler(
 	api access.API,
-	identities flow.IdentityList,
+	identities flow.IdentitySkeletonList,
 	timeout time.Duration,
 	maxMsgSize uint,
 	log zerolog.Logger,

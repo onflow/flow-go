@@ -73,11 +73,11 @@ func (suite *ClusterSuite) SetupTest() {
 func (suite *ClusterSuite) TestThresholds() {
 	threshold, err := suite.com.QuorumThresholdForView(rand.Uint64())
 	suite.Require().NoError(err)
-	suite.Assert().Equal(WeightThresholdToBuildQC(suite.members.TotalWeight()), threshold)
+	suite.Assert().Equal(WeightThresholdToBuildQC(suite.members.ToSkeleton().TotalWeight()), threshold)
 
 	threshold, err = suite.com.TimeoutThresholdForView(rand.Uint64())
 	suite.Require().NoError(err)
-	suite.Assert().Equal(WeightThresholdToTimeout(suite.members.TotalWeight()), threshold)
+	suite.Assert().Equal(WeightThresholdToTimeout(suite.members.ToSkeleton().TotalWeight()), threshold)
 }
 
 // TestInvalidSigner tests that the InvalidSignerError sentinel is
@@ -159,7 +159,7 @@ func (suite *ClusterSuite) TestInvalidSigner() {
 		suite.Run("by epoch", func() {
 			actual, err := suite.com.IdentityByEpoch(rand.Uint64(), realEjectedClusterMember.NodeID)
 			suite.Assert().NoError(err)
-			suite.Assert().Equal(realEjectedClusterMember, actual)
+			suite.Assert().Equal(realEjectedClusterMember.IdentitySkeleton, *actual)
 		})
 	})
 
@@ -177,7 +177,7 @@ func (suite *ClusterSuite) TestInvalidSigner() {
 		suite.Run("by epoch", func() {
 			actual, err := suite.com.IdentityByEpoch(rand.Uint64(), realNoWeightClusterMember.NodeID)
 			suite.Require().NoError(err)
-			suite.Assert().Equal(realNoWeightClusterMember, actual)
+			suite.Assert().Equal(realNoWeightClusterMember.IdentitySkeleton, *actual)
 		})
 	})
 
@@ -195,7 +195,7 @@ func (suite *ClusterSuite) TestInvalidSigner() {
 		suite.Run("by epoch", func() {
 			actual, err := suite.com.IdentityByEpoch(rand.Uint64(), realClusterMember.NodeID)
 			suite.Require().NoError(err)
-			suite.Assert().Equal(realClusterMember, actual)
+			suite.Assert().Equal(realClusterMember.IdentitySkeleton, *actual)
 		})
 	})
 }

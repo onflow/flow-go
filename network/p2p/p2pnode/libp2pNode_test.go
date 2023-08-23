@@ -57,7 +57,7 @@ func TestMultiAddress(t *testing.T) {
 	}
 
 	for _, tc := range tt {
-		ip, port, _, err := p2putils.NetworkingInfo(*tc.identity)
+		ip, port, _, err := p2putils.NetworkingInfo(tc.identity.IdentitySkeleton)
 		require.NoError(t, err)
 
 		actualAddress := utils.MultiAddressStr(ip, port)
@@ -96,12 +96,12 @@ func TestGetPeerInfo(t *testing.T) {
 		identity := unittest.IdentityFixture(unittest.WithNetworkingKey(key.PublicKey()), unittest.WithAddress("1.1.1.1:0"))
 
 		// translates node-i address into info
-		info, err := utils.PeerAddressInfo(*identity)
+		info, err := utils.PeerAddressInfo(identity.IdentitySkeleton)
 		require.NoError(t, err)
 
 		// repeats the translation for node-i
 		for j := 0; j < 10; j++ {
-			rinfo, err := utils.PeerAddressInfo(*identity)
+			rinfo, err := utils.PeerAddressInfo(identity.IdentitySkeleton)
 			require.NoError(t, err)
 			assert.Equal(t, rinfo.String(), info.String(), "inconsistent id generated")
 		}
@@ -121,7 +121,7 @@ func TestAddPeers(t *testing.T) {
 
 	// add the remaining nodes to the first node as its set of peers
 	for _, identity := range identities[1:] {
-		peerInfo, err := utils.PeerAddressInfo(*identity)
+		peerInfo, err := utils.PeerAddressInfo(identity.IdentitySkeleton)
 		require.NoError(t, err)
 		require.NoError(t, nodes[0].AddPeer(ctx, peerInfo))
 	}
@@ -183,7 +183,7 @@ func TestConnGater(t *testing.T) {
 	p2ptest.StartNode(t, signalerCtx, node1, 100*time.Millisecond)
 	defer p2ptest.StopNode(t, node1, cancel, 100*time.Millisecond)
 
-	node1Info, err := utils.PeerAddressInfo(identity1)
+	node1Info, err := utils.PeerAddressInfo(identity1.IdentitySkeleton)
 	assert.NoError(t, err)
 
 	node2Peers := unittest.NewProtectedMap[peer.ID, struct{}]()
@@ -204,7 +204,7 @@ func TestConnGater(t *testing.T) {
 	p2ptest.StartNode(t, signalerCtx, node2, 100*time.Millisecond)
 	defer p2ptest.StopNode(t, node2, cancel, 100*time.Millisecond)
 
-	node2Info, err := utils.PeerAddressInfo(identity2)
+	node2Info, err := utils.PeerAddressInfo(identity2.IdentitySkeleton)
 	assert.NoError(t, err)
 
 	node1.Host().Peerstore().AddAddrs(node2Info.ID, node2Info.Addrs, peerstore.PermanentAddrTTL)
@@ -460,7 +460,7 @@ func createConcurrentStreams(t *testing.T, ctx context.Context, nodes []p2p.LibP
 				continue
 			}
 
-			pInfo, err := utils.PeerAddressInfo(*ids[i])
+			pInfo, err := utils.PeerAddressInfo(ids[i].IdentitySkeleton)
 			require.NoError(t, err)
 			this.Host().Peerstore().AddAddrs(pInfo.ID, pInfo.Addrs, peerstore.AddressTTL)
 

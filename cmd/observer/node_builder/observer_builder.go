@@ -97,7 +97,7 @@ type ObserverServiceConfig struct {
 	bootstrapNodeAddresses    []string
 	bootstrapNodePublicKeys   []string
 	observerNetworkingKeyPath string
-	bootstrapIdentities       flow.IdentityList // the identity list of bootstrap peers the node uses to discover other nodes
+	bootstrapIdentities       flow.IdentitySkeletonList // the identity list of bootstrap peers the node uses to discover other nodes
 	apiRatelimits             map[string]int
 	apiBurstlimits            map[string]int
 	rpcConf                   rpc.Config
@@ -105,7 +105,7 @@ type ObserverServiceConfig struct {
 	apiTimeout                time.Duration
 	upstreamNodeAddresses     []string
 	upstreamNodePublicKeys    []string
-	upstreamIdentities        flow.IdentityList // the identity list of upstream peers the node uses to forward API requests to
+	upstreamIdentities        flow.IdentitySkeletonList // the identity list of upstream peers the node uses to forward API requests to
 }
 
 // DefaultObserverServiceConfig defines all the default values for the ObserverServiceConfig
@@ -213,7 +213,7 @@ func (builder *ObserverServiceBuilder) deriveUpstreamIdentities() error {
 		return fmt.Errorf("number of addresses and keys provided for the boostrap nodes don't match")
 	}
 
-	ids := make([]*flow.Identity, len(addresses))
+	ids := make(flow.IdentitySkeletonList, len(addresses))
 	for i, address := range addresses {
 		key := keys[i]
 
@@ -225,7 +225,7 @@ func (builder *ObserverServiceBuilder) deriveUpstreamIdentities() error {
 		}
 
 		// create the identity of the peer by setting only the relevant fields
-		ids[i] = &flow.Identity{
+		ids[i] = &flow.IdentitySkeleton{
 			NodeID:        flow.ZeroID, // the NodeID is the hash of the staking key and for the public network it does not apply
 			Address:       address,
 			Role:          flow.RoleAccess, // the upstream node has to be an access node
@@ -528,12 +528,12 @@ func publicNetworkMsgValidators(log zerolog.Logger, idProvider module.IdentityPr
 // BootstrapIdentities converts the bootstrap node addresses and keys to a Flow Identity list where
 // each Flow Identity is initialized with the passed address, the networking key
 // and the Node ID set to ZeroID, role set to Access, 0 stake and no staking key.
-func BootstrapIdentities(addresses []string, keys []string) (flow.IdentityList, error) {
+func BootstrapIdentities(addresses []string, keys []string) (flow.IdentitySkeletonList, error) {
 	if len(addresses) != len(keys) {
 		return nil, fmt.Errorf("number of addresses and keys provided for the boostrap nodes don't match")
 	}
 
-	ids := make([]*flow.Identity, len(addresses))
+	ids := make(flow.IdentitySkeletonList, len(addresses))
 	for i, address := range addresses {
 		bytes, err := hex.DecodeString(keys[i])
 		if err != nil {
@@ -546,7 +546,7 @@ func BootstrapIdentities(addresses []string, keys []string) (flow.IdentityList, 
 		}
 
 		// create the identity of the peer by setting only the relevant fields
-		ids[i] = &flow.Identity{
+		ids[i] = &flow.IdentitySkeleton{
 			NodeID:        flow.ZeroID, // the NodeID is the hash of the staking key and for the public network it does not apply
 			Address:       address,
 			Role:          flow.RoleAccess, // the upstream node has to be an access node
@@ -776,7 +776,7 @@ func (builder *ObserverServiceBuilder) initPublicLibp2pNode(networkKey crypto.Pr
 func (builder *ObserverServiceBuilder) initObserverLocal() func(node *cmd.NodeConfig) error {
 	return func(node *cmd.NodeConfig) error {
 		// for an observer, set the identity here explicitly since it will not be found in the protocol state
-		self := &flow.Identity{
+		self := flow.IdentitySkeleton{
 			NodeID:        node.NodeID,
 			NetworkPubKey: node.NetworkKey.PublicKey(),
 			StakingPubKey: nil,             // no staking key needed for the observer

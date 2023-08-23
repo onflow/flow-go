@@ -80,7 +80,7 @@ func createRootBlockVotes(participants []bootstrap.NodeInfo, rootBlock *model.Bl
 		if err != nil {
 			return nil, fmt.Errorf("could not retrieve private keys for participant: %w", err)
 		}
-		me, err := local.New(participant.Identity(), keys.StakingKey)
+		me, err := local.New(participant.Identity().IdentitySkeleton, keys.StakingKey)
 		if err != nil {
 			return nil, err
 		}

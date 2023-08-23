@@ -1256,7 +1256,7 @@ func (fnb *FlowNodeBuilder) initLocal() error {
 		return fmt.Errorf("configured staking key does not match protocol state")
 	}
 
-	fnb.Me, err = local.New(self, fnb.StakingKey)
+	fnb.Me, err = local.New(self.IdentitySkeleton, fnb.StakingKey)
 	if err != nil {
 		return fmt.Errorf("could not initialize local: %w", err)
 	}

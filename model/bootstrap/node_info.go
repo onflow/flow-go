@@ -347,12 +347,18 @@ func (node NodeInfo) PartnerPublic() PartnerNodeInfoPub {
 // Identity returns the node info as a public Flow identity.
 func (node NodeInfo) Identity() *flow.Identity {
 	identity := &flow.Identity{
-		NodeID:        node.NodeID,
-		Address:       node.Address,
-		Role:          node.Role,
-		Weight:        node.Weight,
-		StakingPubKey: node.StakingPubKey(),
-		NetworkPubKey: node.NetworkPubKey(),
+		IdentitySkeleton: flow.IdentitySkeleton{
+			NodeID:        node.NodeID,
+			Address:       node.Address,
+			Role:          node.Role,
+			InitialWeight: node.Weight,
+			StakingPubKey: node.stakingPubKey,
+			NetworkPubKey: node.networkPubKey,
+		},
+		DynamicIdentity: flow.DynamicIdentity{
+			Weight:  node.Weight,
+			Ejected: false,
+		},
 	}
 	return identity
 }

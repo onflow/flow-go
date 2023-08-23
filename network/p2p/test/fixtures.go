@@ -473,7 +473,7 @@ func LetNodesDiscoverEachOther(t *testing.T, ctx context.Context, nodes []p2p.Li
 			if node == other {
 				continue
 			}
-			otherPInfo, err := utils.PeerAddressInfo(*ids[i])
+			otherPInfo, err := utils.PeerAddressInfo(ids[i].IdentitySkeleton)
 			require.NoError(t, err)
 			require.NoError(t, node.AddPeer(ctx, otherPInfo))
 		}

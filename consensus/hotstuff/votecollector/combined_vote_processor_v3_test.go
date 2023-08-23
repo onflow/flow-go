@@ -952,7 +952,7 @@ func TestCombinedVoteProcessorV3_BuildVerifyQC(t *testing.T) {
 
 		beaconSignerStore := hsig.NewEpochAwareRandomBeaconKeyStore(epochLookup, keys)
 
-		me, err := local.New(identity, stakingPriv)
+		me, err := local.New(identity.IdentitySkeleton, stakingPriv)
 		require.NoError(t, err)
 
 		signers[identity.NodeID] = verification.NewCombinedSignerV3(me, beaconSignerStore)
@@ -974,7 +974,7 @@ func TestCombinedVoteProcessorV3_BuildVerifyQC(t *testing.T) {
 
 		beaconSignerStore := hsig.NewEpochAwareRandomBeaconKeyStore(epochLookup, keys)
 
-		me, err := local.New(identity, stakingPriv)
+		me, err := local.New(identity.IdentitySkeleton, stakingPriv)
 		require.NoError(t, err)
 
 		signers[identity.NodeID] = verification.NewCombinedSignerV3(me, beaconSignerStore)
@@ -995,8 +995,8 @@ func TestCombinedVoteProcessorV3_BuildVerifyQC(t *testing.T) {
 
 	committee := &mockhotstuff.DynamicCommittee{}
 	committee.On("IdentitiesByBlock", block.BlockID).Return(allIdentities, nil)
-	committee.On("IdentitiesByEpoch", block.View).Return(allIdentities, nil)
-	committee.On("QuorumThresholdForView", mock.Anything).Return(committees.WeightThresholdToBuildQC(allIdentities.TotalWeight()), nil)
+	committee.On("IdentitiesByEpoch", block.View).Return(allIdentities.ToSkeleton(), nil)
+	committee.On("QuorumThresholdForView", mock.Anything).Return(committees.WeightThresholdToBuildQC(allIdentities.ToSkeleton().TotalWeight()), nil)
 	committee.On("DKG", block.View).Return(inmemDKG, nil)
 
 	votes := make([]*model.Vote, 0, len(allIdentities))

@@ -10,10 +10,10 @@ import (
 )
 
 type LocalNoKey struct {
-	me *flow.Identity
+	me flow.IdentitySkeleton
 }
 
-func NewNoKey(id *flow.Identity) (*LocalNoKey, error) {
+func NewNoKey(id flow.IdentitySkeleton) (*LocalNoKey, error) {
 	l := &LocalNoKey{
 		me: id,
 	}

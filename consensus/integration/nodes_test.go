@@ -444,7 +444,7 @@ func createNode(
 	require.NoError(t, err)
 
 	// make local
-	me, err := local.New(identity, privateKeys.StakingKey)
+	me, err := local.New(identity.IdentitySkeleton, privateKeys.StakingKey)
 	require.NoError(t, err)
 
 	// add a network for this node to the hub

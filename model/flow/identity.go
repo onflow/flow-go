@@ -9,12 +9,11 @@ import (
 	"regexp"
 	"strconv"
 
-	"golang.org/x/exp/slices"
-
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/fxamacker/cbor/v2"
 	"github.com/pkg/errors"
 	"github.com/vmihailenco/msgpack"
+	"golang.org/x/exp/slices"
 
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/utils/rand"
@@ -27,8 +26,8 @@ const DefaultInitialWeight = 100
 // rxid is the regex for parsing node identity entries.
 var rxid = regexp.MustCompile(`^(collection|consensus|execution|verification|access)-([0-9a-fA-F]{64})@([\w\d]+|[\w\d][\w\d\-]*[\w\d](?:\.*[\w\d][\w\d\-]*[\w\d])*|[\w\d][\w\d\-]*[\w\d])(:[\d]+)?=(\d{1,20})$`)
 
-// Identity represents the public identity of one network participant (node).
-type Identity struct {
+// IdentitySkeleton represents the static part of a network participant's (i.e. node's) public identity.
+type IdentitySkeleton struct {
 	// NodeID uniquely identifies a particular node. A node's ID is fixed for
 	// the duration of that node's participation in the network.
 	NodeID Identifier
@@ -37,9 +36,18 @@ type Identity struct {
 	// Role is the node's role in the network and defines its abilities and
 	// responsibilities.
 	Role Role
+	// InitialWeight is a 'trust score' initially assigned by EpochSetup event after
+	// the staking phase. The initial weights define the supermajority thresholds for
+	// the cluster and security node consensus throughout the Epoch.
+	InitialWeight uint64
+	StakingPubKey crypto.PublicKey
+	NetworkPubKey crypto.PublicKey
+}
+
+// DynamicIdentity represents the dynamic part of public identity of one network participant (node).
+type DynamicIdentity struct {
 	// Weight represents the node's authority to perform certain tasks relative
-	// to other nodes. For example, in the consensus committee, the node's weight
-	// represents the weight assigned to its votes.
+	// to other nodes.
 	//
 	// A node's weight is distinct from its stake. Stake represents the quantity
 	// of FLOW tokens held by the network in escrow during the course of the node's
@@ -48,17 +56,22 @@ type Identity struct {
 	//
 	// Nodes which are registered to join at the next epoch will appear in the
 	// identity table but are considered to have zero weight up until their first
-	// epoch begins. Likewise nodes which were registered in the previous epoch
+	// epoch begins. Likewise, nodes which were registered in the previous epoch
 	// but have left at the most recent epoch boundary will appear in the identity
 	// table with zero weight.
 	Weight uint64
 	// Ejected represents whether a node has been permanently removed from the
-	// network. A node may be ejected for either:
-	// * committing one protocol felony
-	// * committing a series of protocol misdemeanours
-	Ejected       bool
-	StakingPubKey crypto.PublicKey
-	NetworkPubKey crypto.PublicKey
+	// network. A node may be ejected by either:
+	// * requesting self-ejection to protect its stake in case the node operator suspects
+	//   the node's keys to be compromised
+	// * committing a serious protocol violation or multiple smaller misdemeanours
+	Ejected bool
+}
+
+// Identity is combined from static and dynamic part and represents the full public identity of one network participant (node).
+type Identity struct {
+	IdentitySkeleton
+	DynamicIdentity
 }
 
 // ParseIdentity parses a string representation of an identity.
@@ -82,10 +95,15 @@ func ParseIdentity(identity string) (*Identity, error) {
 
 	// create the identity
 	iy := Identity{
-		NodeID:  nodeID,
-		Address: address,
-		Role:    role,
-		Weight:  weight,
+		IdentitySkeleton: IdentitySkeleton{
+			NodeID:        nodeID,
+			Address:       address,
+			Role:          role,
+			InitialWeight: weight,
+		},
+		DynamicIdentity: DynamicIdentity{
+			Weight: weight,
+		},
 	}
 
 	return &iy, nil
@@ -111,7 +129,9 @@ type encodableIdentity struct {
 	NodeID        Identifier
 	Address       string `json:",omitempty"`
 	Role          Role
+	InitialWeight uint64
 	Weight        uint64
+	Ejected       bool
 	StakingPubKey []byte
 	NetworkPubKey []byte
 }
@@ -126,7 +146,14 @@ type decodableIdentity struct {
 }
 
 func encodableFromIdentity(iy Identity) (encodableIdentity, error) {
-	ie := encodableIdentity{iy.NodeID, iy.Address, iy.Role, iy.Weight, nil, nil}
+	ie := encodableIdentity{
+		NodeID:        iy.NodeID,
+		Address:       iy.Address,
+		Role:          iy.Role,
+		InitialWeight: iy.InitialWeight,
+		Weight:        iy.Weight,
+		Ejected:       iy.Ejected,
+	}
 	if iy.StakingPubKey != nil {
 		ie.StakingPubKey = iy.StakingPubKey.Encode()
 	}
@@ -189,7 +216,9 @@ func identityFromEncodable(ie encodableIdentity, identity *Identity) error {
 	identity.NodeID = ie.NodeID
 	identity.Address = ie.Address
 	identity.Role = ie.Role
+	identity.InitialWeight = ie.InitialWeight
 	identity.Weight = ie.Weight
+	identity.Ejected = ie.Ejected
 	var err error
 	if ie.StakingPubKey != nil {
 		if identity.StakingPubKey, err = crypto.DecodePublicKey(crypto.BLSBLS12381, ie.StakingPubKey); err != nil {
@@ -260,6 +289,9 @@ func (iy *Identity) EqualTo(other *Identity) bool {
 	if iy.Role != other.Role {
 		return false
 	}
+	if iy.InitialWeight != other.InitialWeight {
+		return false
+	}
 	if iy.Weight != other.Weight {
 		return false
 	}
@@ -294,6 +326,9 @@ type IdentityOrder func(*Identity, *Identity) bool
 // IdentityMapFunc is a modifier function for map operations for identities.
 // Identities are COPIED from the source slice.
 type IdentityMapFunc func(Identity) Identity
+
+// IdentitySkeletonList is a list of nodes skeletons.
+type IdentitySkeletonList []*IdentitySkeleton
 
 // IdentityList is a list of nodes.
 type IdentityList []*Identity
@@ -358,6 +393,14 @@ func (il IdentityList) Selector() IdentityFilter {
 	}
 }
 
+func (il IdentitySkeletonList) Lookup() map[Identifier]*IdentitySkeleton {
+	lookup := make(map[Identifier]*IdentitySkeleton, len(il))
+	for _, identity := range il {
+		lookup[identity.NodeID] = identity
+	}
+	return lookup
+}
+
 func (il IdentityList) Lookup() map[Identifier]*Identity {
 	lookup := make(map[Identifier]*Identity, len(il))
 	for _, identity := range il {
@@ -389,8 +432,17 @@ func (il IdentityList) NodeIDs() IdentifierList {
 	return nodeIDs
 }
 
+// NodeIDs returns the NodeIDs of the nodes in the list.
+func (il IdentitySkeletonList) NodeIDs() IdentifierList {
+	nodeIDs := make([]Identifier, 0, len(il))
+	for _, id := range il {
+		nodeIDs = append(nodeIDs, id.NodeID)
+	}
+	return nodeIDs
+}
+
 // PublicStakingKeys returns a list with the public staking keys (order preserving).
-func (il IdentityList) PublicStakingKeys() []crypto.PublicKey {
+func (il IdentitySkeletonList) PublicStakingKeys() []crypto.PublicKey {
 	pks := make([]crypto.PublicKey, 0, len(il))
 	for _, id := range il {
 		pks = append(pks, id.StakingPubKey)
@@ -420,10 +472,10 @@ func (il IdentityList) Checksum() Identifier {
 }
 
 // TotalWeight returns the total weight of all given identities.
-func (il IdentityList) TotalWeight() uint64 {
+func (il IdentitySkeletonList) TotalWeight() uint64 {
 	var total uint64
 	for _, identity := range il {
-		total += identity.Weight
+		total += identity.InitialWeight
 	}
 	return total
 }
@@ -439,6 +491,16 @@ func (il IdentityList) ByIndex(index uint) (*Identity, bool) {
 		return nil, false
 	}
 	return il[int(index)], true
+}
+
+// ByNodeID gets a node from the list by node ID.
+func (il IdentitySkeletonList) ByNodeID(nodeID Identifier) (*IdentitySkeleton, bool) {
+	for _, identity := range il {
+		if identity.NodeID == nodeID {
+			return identity, true
+		}
+	}
+	return nil, false
 }
 
 // ByNodeID gets a node from the list by node ID.
@@ -551,7 +613,7 @@ func (il IdentityList) Exists(target *Identity) bool {
 // target:  value to search for
 // CAUTION:  The identity list MUST be sorted prior to calling this method
 func (il IdentityList) IdentifierExists(target Identifier) bool {
-	_, ok := slices.BinarySearchFunc(il, &Identity{NodeID: target}, func(a, b *Identity) int {
+	_, ok := slices.BinarySearchFunc(il, &Identity{IdentitySkeleton: IdentitySkeleton{NodeID: target}}, func(a, b *Identity) int {
 		return bytes.Compare(a.NodeID[:], b.NodeID[:])
 	})
 	return ok
@@ -567,4 +629,13 @@ func (il IdentityList) GetIndex(target Identifier) (uint, bool) {
 		return 0, false
 	}
 	return uint(i), true
+}
+
+// ToSkeleton converts the identity list to a list of identity skeletons.
+func (il IdentityList) ToSkeleton() IdentitySkeletonList {
+	skeletons := make(IdentitySkeletonList, len(il))
+	for i, id := range il {
+		skeletons[i] = &id.IdentitySkeleton
+	}
+	return skeletons
 }

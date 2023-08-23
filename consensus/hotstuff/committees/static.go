@@ -43,6 +43,9 @@ type Static struct {
 	dkg          protocol.DKG
 }
 
+var _ hotstuff.Replicas = (*Static)(nil)
+var _ hotstuff.DynamicCommittee = (*Static)(nil)
+
 func (s Static) IdentitiesByBlock(_ flow.Identifier) (flow.IdentityList, error) {
 	return s.participants, nil
 }
@@ -55,16 +58,16 @@ func (s Static) IdentityByBlock(_ flow.Identifier, participantID flow.Identifier
 	return identity, nil
 }
 
-func (s Static) IdentitiesByEpoch(_ uint64) (flow.IdentityList, error) {
-	return s.participants, nil
+func (s Static) IdentitiesByEpoch(view uint64) (flow.IdentitySkeletonList, error) {
+	return s.participants.ToSkeleton(), nil
 }
 
-func (s Static) IdentityByEpoch(_ uint64, participantID flow.Identifier) (*flow.Identity, error) {
+func (s Static) IdentityByEpoch(view uint64, participantID flow.Identifier) (*flow.IdentitySkeleton, error) {
 	identity, ok := s.participants.ByNodeID(participantID)
 	if !ok {
 		return nil, model.NewInvalidSignerErrorf("unknown participant %x", participantID)
 	}
-	return identity, nil
+	return &identity.IdentitySkeleton, nil
 }
 
 func (s Static) LeaderForView(_ uint64) (flow.Identifier, error) {
@@ -72,11 +75,11 @@ func (s Static) LeaderForView(_ uint64) (flow.Identifier, error) {
 }
 
 func (s Static) QuorumThresholdForView(_ uint64) (uint64, error) {
-	return WeightThresholdToBuildQC(s.participants.TotalWeight()), nil
+	return WeightThresholdToBuildQC(s.participants.ToSkeleton().TotalWeight()), nil
 }
 
 func (s Static) TimeoutThresholdForView(_ uint64) (uint64, error) {
-	return WeightThresholdToTimeout(s.participants.TotalWeight()), nil
+	return WeightThresholdToTimeout(s.participants.ToSkeleton().TotalWeight()), nil
 }
 
 func (s Static) Self() flow.Identifier {

@@ -69,7 +69,7 @@ func (p *ConsensusSigDataPacker) Pack(view uint64, sig *hotstuff.BlockSignatureD
 // It returns:
 //   - (sigData, nil) if successfully unpacked the signature data
 //   - (nil, model.InvalidFormatError) if failed to unpack the signature data
-func (p *ConsensusSigDataPacker) Unpack(signerIdentities flow.IdentityList, sigData []byte) (*hotstuff.BlockSignatureData, error) {
+func (p *ConsensusSigDataPacker) Unpack(signerIdentities flow.IdentitySkeletonList, sigData []byte) (*hotstuff.BlockSignatureData, error) {
 	// decode into typed data
 	data, err := p.Decode(sigData) // all potential error are of type `model.InvalidFormatError`
 	if err != nil {

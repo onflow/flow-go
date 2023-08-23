@@ -19,6 +19,7 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/verification"
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow/order"
 	"github.com/onflow/flow-go/module/local"
 	modulemock "github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/module/signature"
@@ -260,11 +261,11 @@ func TestStakingVoteProcessorV2_BuildVerifyQC(t *testing.T) {
 		stakingPriv := unittest.StakingPrivKeyFixture()
 		identity.StakingPubKey = stakingPriv.PublicKey()
 
-		me, err := local.New(identity, stakingPriv)
+		me, err := local.New(identity.IdentitySkeleton, stakingPriv)
 		require.NoError(t, err)
 
 		signers[identity.NodeID] = verification.NewStakingSigner(me)
-	})
+	}).Sort(order.Canonical)
 
 	leader := stakingSigners[0]
 
@@ -272,9 +273,9 @@ func TestStakingVoteProcessorV2_BuildVerifyQC(t *testing.T) {
 		helper.WithBlockProposer(leader.NodeID))
 
 	committee := &mockhotstuff.DynamicCommittee{}
-	committee.On("IdentitiesByEpoch", block.View).Return(stakingSigners, nil)
+	committee.On("IdentitiesByEpoch", block.View).Return(stakingSigners.ToSkeleton(), nil)
 	committee.On("IdentitiesByBlock", block.BlockID).Return(stakingSigners, nil)
-	committee.On("QuorumThresholdForView", mock.Anything).Return(committees.WeightThresholdToBuildQC(stakingSigners.TotalWeight()), nil)
+	committee.On("QuorumThresholdForView", mock.Anything).Return(committees.WeightThresholdToBuildQC(stakingSigners.ToSkeleton().TotalWeight()), nil)
 
 	votes := make([]*model.Vote, 0, len(stakingSigners))
 
