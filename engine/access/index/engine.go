@@ -35,7 +35,7 @@ type Engine struct {
 	collections  storage.Collections
 	events       storage.Events
 	transactions storage.Transactions
-	registers    map[ledger.Path]*ledger.Payload
+	index        module.Indexer
 
 	execDataCache *cache.ExecutionDataCache
 
@@ -57,6 +57,7 @@ func New(
 	events storage.Events,
 	transactions storage.Transactions,
 	execDataCache *cache.ExecutionDataCache,
+	index module.Indexer,
 	lastFullyIndexedHeight uint64,
 	highestAvailableHeight uint64,
 ) (*Engine, error) {
@@ -71,7 +72,7 @@ func New(
 		events:        events,
 		transactions:  transactions,
 		execDataCache: execDataCache,
-		registers:     make(map[ledger.Path]*ledger.Payload),
+		index:         index,
 
 		lastFullyProcessedHeight: counters.NewSequentialCounter(lastFullyIndexedHeight),
 		highestHeight:            counters.NewMonotonousCounter(highestAvailableHeight),
@@ -271,13 +272,13 @@ func (e *Engine) handleTrieUpdate(blockID flow.Identifier, update *ledger.TrieUp
 		return fmt.Errorf("trie update paths and payloads have different lengths")
 	}
 
-	// TODO: add badger/pebble index for register data
-
-	for i, path := range update.Paths {
-		e.registers[path] = update.Payloads[i]
+	header, err := e.headers.ByBlockID(blockID)
+	if err != nil {
+		return err
 	}
 
-	return nil
+	// TODO make sure we can use the payload encKey instead of the path
+	return e.index.StorePayloads(update.Payloads, header.Height)
 }
 
 // lookupCollection looks up the collection from the collection db with collID
