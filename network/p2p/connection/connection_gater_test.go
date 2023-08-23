@@ -64,8 +64,8 @@ func TestConnectionGating(t *testing.T) {
 
 	nodes := []p2p.LibP2PNode{node1, node2}
 	ids := flow.IdentityList{&node1Id, &node2Id}
-	p2ptest.StartNodes(t, signalerCtx, nodes, 100*time.Millisecond)
-	defer p2ptest.StopNodes(t, nodes, cancel, 100*time.Millisecond)
+	p2ptest.StartNodes(t, signalerCtx, nodes)
+	defer p2ptest.StopNodes(t, nodes, cancel)
 
 	p2pfixtures.AddNodesToEachOthersPeerStore(t, nodes, ids)
 
@@ -161,8 +161,8 @@ func TestConnectionGating_ResourceAllocation_AllowListing(t *testing.T) {
 
 	nodes := []p2p.LibP2PNode{node1, node2}
 	ids := flow.IdentityList{&node1Id, &node2Id}
-	p2ptest.StartNodes(t, signalerCtx, nodes, 100*time.Millisecond)
-	defer p2ptest.StopNodes(t, nodes, cancel, 100*time.Millisecond)
+	p2ptest.StartNodes(t, signalerCtx, nodes)
+	defer p2ptest.StopNodes(t, nodes, cancel)
 
 	p2pfixtures.AddNodesToEachOthersPeerStore(t, nodes, ids)
 
@@ -206,8 +206,8 @@ func TestConnectionGating_ResourceAllocation_DisAllowListing(t *testing.T) {
 
 	nodes := []p2p.LibP2PNode{node1, node2}
 	ids := flow.IdentityList{&node1Id, &node2Id}
-	p2ptest.StartNodes(t, signalerCtx, nodes, 100*time.Millisecond)
-	defer p2ptest.StopNodes(t, nodes, cancel, 100*time.Millisecond)
+	p2ptest.StartNodes(t, signalerCtx, nodes)
+	defer p2ptest.StopNodes(t, nodes, cancel)
 
 	p2pfixtures.AddNodesToEachOthersPeerStore(t, nodes, ids)
 
@@ -289,8 +289,8 @@ func TestConnectionGater_InterceptUpgrade(t *testing.T) {
 	disallowedPeerIds.Add(nodes[0].Host().ID(), struct{}{})
 
 	// starts the nodes
-	p2ptest.StartNodes(t, signalerCtx, nodes, 1*time.Second)
-	defer p2ptest.StopNodes(t, nodes, cancel, 1*time.Second)
+	p2ptest.StartNodes(t, signalerCtx, nodes)
+	defer p2ptest.StopNodes(t, nodes, cancel)
 
 	// Checks that only an allowed REMOTE node can establish an upgradable connection.
 	connectionGater.On("InterceptUpgraded", mock.Anything).Run(func(args mock.Arguments) {
@@ -369,8 +369,8 @@ func TestConnectionGater_Disallow_Integration(t *testing.T) {
 		inbounds = append(inbounds, inbound)
 	}
 
-	p2ptest.StartNodes(t, signalerCtx, nodes, 1*time.Second)
-	defer p2ptest.StopNodes(t, nodes, cancel, 1*time.Second)
+	p2ptest.StartNodes(t, signalerCtx, nodes)
+	defer p2ptest.StopNodes(t, nodes, cancel)
 
 	p2ptest.LetNodesDiscoverEachOther(t, ctx, nodes, ids)
 

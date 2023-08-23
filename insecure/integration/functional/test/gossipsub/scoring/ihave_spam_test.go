@@ -82,8 +82,8 @@ func TestGossipSubIHaveBrokenPromises_Below_Threshold(t *testing.T) {
 	ids := flow.IdentityList{&spammer.SpammerId, &victimIdentity}
 	nodes := []p2p.LibP2PNode{spammer.SpammerNode, victimNode}
 
-	p2ptest.StartNodes(t, signalerCtx, nodes, 100*time.Millisecond)
-	defer p2ptest.StopNodes(t, nodes, cancel, 2*time.Second)
+	p2ptest.StartNodes(t, signalerCtx, nodes)
+	defer p2ptest.StopNodes(t, nodes, cancel)
 
 	p2ptest.LetNodesDiscoverEachOther(t, ctx, nodes, ids)
 	p2ptest.TryConnectionAndEnsureConnected(t, ctx, nodes)
@@ -198,8 +198,8 @@ func TestGossipSubIHaveBrokenPromises_Above_Threshold(t *testing.T) {
 	ids := flow.IdentityList{&spammer.SpammerId, &victimIdentity}
 	nodes := []p2p.LibP2PNode{spammer.SpammerNode, victimNode}
 
-	p2ptest.StartNodes(t, signalerCtx, nodes, 100*time.Millisecond)
-	defer p2ptest.StopNodes(t, nodes, cancel, 2*time.Second)
+	p2ptest.StartNodes(t, signalerCtx, nodes)
+	defer p2ptest.StopNodes(t, nodes, cancel)
 
 	p2ptest.LetNodesDiscoverEachOther(t, ctx, nodes, ids)
 	p2ptest.TryConnectionAndEnsureConnected(t, ctx, nodes)

@@ -64,8 +64,8 @@ func TestCrosstalkPreventionOnNetworkKeyChange(t *testing.T) {
 	)
 	idProvider.SetIdentities(flow.IdentityList{&id1})
 
-	p2ptest.StartNode(t, signalerCtx1, node1, 100*time.Millisecond)
-	defer p2ptest.StopNode(t, node1, cancel1, 100*time.Millisecond)
+	p2ptest.StartNode(t, signalerCtx1, node1)
+	defer p2ptest.StopNode(t, node1, cancel1)
 
 	t.Logf(" %s node started on %s", id1.NodeID.String(), id1.Address)
 	t.Logf("libp2p ID for %s: %s", id1.NodeID.String(), node1.Host().ID())
@@ -80,7 +80,7 @@ func TestCrosstalkPreventionOnNetworkKeyChange(t *testing.T) {
 	)
 	idProvider.SetIdentities(flow.IdentityList{&id1, &id2})
 
-	p2ptest.StartNode(t, signalerCtx2, node2, 100*time.Millisecond)
+	p2ptest.StartNode(t, signalerCtx2, node2)
 
 	peerInfo2, err := utils.PeerAddressInfo(id2)
 	require.NoError(t, err)
@@ -93,7 +93,7 @@ func TestCrosstalkPreventionOnNetworkKeyChange(t *testing.T) {
 
 	// Simulate a hard-spoon: node1 is on the old chain, but node2 is moved from the old chain to the new chain
 	// stop node 2 and start it again with a different networking key but on the same IP and port
-	p2ptest.StopNode(t, node2, cancel2, 100*time.Millisecond)
+	p2ptest.StopNode(t, node2, cancel2)
 
 	// start node2 with the same name, ip and port but with the new key
 	node2keyNew := p2pfixtures.NetworkingKeyFixtures(t)
@@ -107,8 +107,8 @@ func TestCrosstalkPreventionOnNetworkKeyChange(t *testing.T) {
 	)
 	idProvider.SetIdentities(flow.IdentityList{&id1, &id2New})
 
-	p2ptest.StartNode(t, signalerCtx2a, node2, 100*time.Millisecond)
-	defer p2ptest.StopNode(t, node2, cancel2a, 100*time.Millisecond)
+	p2ptest.StartNode(t, signalerCtx2a, node2)
+	defer p2ptest.StopNode(t, node2, cancel2a)
 
 	// make sure the node2 indeed came up on the old ip and port
 	assert.Equal(t, id2New.Address, id2.Address)
@@ -140,8 +140,8 @@ func TestOneToOneCrosstalkPrevention(t *testing.T) {
 	// create and start node 1 on localhost and random port
 	node1, id1 := p2ptest.NodeFixture(t, sporkId1, "test_one_to_one_crosstalk_prevention", idProvider)
 
-	p2ptest.StartNode(t, signalerCtx1, node1, 100*time.Millisecond)
-	defer p2ptest.StopNode(t, node1, cancel1, 100*time.Millisecond)
+	p2ptest.StartNode(t, signalerCtx1, node1)
+	defer p2ptest.StopNode(t, node1, cancel1)
 
 	peerInfo1, err := utils.PeerAddressInfo(id1)
 	require.NoError(t, err)
@@ -150,7 +150,7 @@ func TestOneToOneCrosstalkPrevention(t *testing.T) {
 	node2, id2 := p2ptest.NodeFixture(t, sporkId1, "test_one_to_one_crosstalk_prevention", idProvider)
 
 	idProvider.SetIdentities(flow.IdentityList{&id1, &id2})
-	p2ptest.StartNode(t, signalerCtx2, node2, 100*time.Millisecond)
+	p2ptest.StartNode(t, signalerCtx2, node2)
 
 	// create stream from node 1 to node 2
 	node2.Host().Peerstore().AddAddrs(peerInfo1.ID, peerInfo1.Addrs, peerstore.AddressTTL)
@@ -160,7 +160,7 @@ func TestOneToOneCrosstalkPrevention(t *testing.T) {
 
 	// Simulate a hard-spoon: node1 is on the old chain, but node2 is moved from the old chain to the new chain
 	// stop node 2 and start it again with a different libp2p protocol id to listen for
-	p2ptest.StopNode(t, node2, cancel2, time.Second)
+	p2ptest.StopNode(t, node2, cancel2)
 
 	// start node2 with the same address and root key but different root block id
 	node2, id2New := p2ptest.NodeFixture(t,
@@ -171,8 +171,8 @@ func TestOneToOneCrosstalkPrevention(t *testing.T) {
 	)
 	idProvider.SetIdentities(flow.IdentityList{&id1, &id2New})
 
-	p2ptest.StartNode(t, signalerCtx2a, node2, 100*time.Millisecond)
-	defer p2ptest.StopNode(t, node2, cancel2a, 100*time.Millisecond)
+	p2ptest.StartNode(t, signalerCtx2a, node2)
+	defer p2ptest.StopNode(t, node2, cancel2a)
 
 	// make sure the node2 indeed came up on the old ip and port
 	assert.Equal(t, id2New.Address, id2.Address)
@@ -205,8 +205,8 @@ func TestOneToKCrosstalkPrevention(t *testing.T) {
 		idProvider,
 	)
 
-	p2ptest.StartNode(t, signalerCtx1, node1, 100*time.Millisecond)
-	defer p2ptest.StopNode(t, node1, cancel1, 100*time.Millisecond)
+	p2ptest.StartNode(t, signalerCtx1, node1)
+	defer p2ptest.StopNode(t, node1, cancel1)
 	idProvider.SetIdentities(flow.IdentityList{&id1})
 	// create and start node 2 on localhost and random port with the same root block ID
 	node2, id2 := p2ptest.NodeFixture(t,
@@ -215,8 +215,8 @@ func TestOneToKCrosstalkPrevention(t *testing.T) {
 		idProvider,
 	)
 
-	p2ptest.StartNode(t, signalerCtx2, node2, 100*time.Millisecond)
-	defer p2ptest.StopNode(t, node2, cancel2, 100*time.Millisecond)
+	p2ptest.StartNode(t, signalerCtx2, node2)
+	defer p2ptest.StopNode(t, node2, cancel2)
 
 	pInfo2, err := utils.PeerAddressInfo(id2)
 	require.NoError(t, err)

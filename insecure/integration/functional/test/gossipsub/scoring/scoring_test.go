@@ -121,8 +121,8 @@ func testGossipSubInvalidMessageDeliveryScoring(t *testing.T, spamMsgFactory fun
 	ids := flow.IdentityList{&spammer.SpammerId, &victimIdentity}
 	nodes := []p2p.LibP2PNode{spammer.SpammerNode, victimNode}
 
-	p2ptest.StartNodes(t, signalerCtx, nodes, 100*time.Millisecond)
-	defer p2ptest.StopNodes(t, nodes, cancel, 2*time.Second)
+	p2ptest.StartNodes(t, signalerCtx, nodes)
+	defer p2ptest.StopNodes(t, nodes, cancel)
 
 	p2ptest.LetNodesDiscoverEachOther(t, ctx, nodes, ids)
 	p2ptest.TryConnectionAndEnsureConnected(t, ctx, nodes)
@@ -232,8 +232,8 @@ func TestGossipSubMeshDeliveryScoring_UnderDelivery_SingleTopic(t *testing.T) {
 	ids := flow.IdentityList{&underPerformerId, &thisId}
 	nodes := []p2p.LibP2PNode{underPerformerNode, thisNode}
 
-	p2ptest.StartNodes(t, signalerCtx, nodes, 100*time.Millisecond)
-	defer p2ptest.StopNodes(t, nodes, cancel, 2*time.Second)
+	p2ptest.StartNodes(t, signalerCtx, nodes)
+	defer p2ptest.StopNodes(t, nodes, cancel)
 
 	p2ptest.LetNodesDiscoverEachOther(t, ctx, nodes, ids)
 	p2ptest.TryConnectionAndEnsureConnected(t, ctx, nodes)
@@ -338,8 +338,8 @@ func TestGossipSubMeshDeliveryScoring_UnderDelivery_TwoTopics(t *testing.T) {
 	ids := flow.IdentityList{&underPerformerId, &thisId}
 	nodes := []p2p.LibP2PNode{underPerformerNode, thisNode}
 
-	p2ptest.StartNodes(t, signalerCtx, nodes, 100*time.Millisecond)
-	defer p2ptest.StopNodes(t, nodes, cancel, 2*time.Second)
+	p2ptest.StartNodes(t, signalerCtx, nodes)
+	defer p2ptest.StopNodes(t, nodes, cancel)
 
 	p2ptest.LetNodesDiscoverEachOther(t, ctx, nodes, ids)
 	p2ptest.TryConnectionAndEnsureConnected(t, ctx, nodes)
@@ -447,8 +447,8 @@ func TestGossipSubMeshDeliveryScoring_Replay_Will_Not_Counted(t *testing.T) {
 	ids := flow.IdentityList{&replayingId, &thisId}
 	nodes := []p2p.LibP2PNode{replayingNode, thisNode}
 
-	p2ptest.StartNodes(t, signalerCtx, nodes, 100*time.Millisecond)
-	defer p2ptest.StopNodes(t, nodes, cancel, 2*time.Second)
+	p2ptest.StartNodes(t, signalerCtx, nodes)
+	defer p2ptest.StopNodes(t, nodes, cancel)
 
 	p2ptest.LetNodesDiscoverEachOther(t, ctx, nodes, ids)
 	p2ptest.TryConnectionAndEnsureConnected(t, ctx, nodes)
