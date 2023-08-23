@@ -188,7 +188,7 @@ func (s *RestStateStreamSuite) requireEvents(receivedEventsResponse []*state_str
 			// get events by block id and event type
 			response, err := MakeApiRequest(grpcClient.GetEventsForBlockIDs, grpcCtx,
 				&accessproto.GetEventsForBlockIDsRequest{BlockIds: [][]byte{convert.IdentifierToMessage(receivedEventResponse.BlockID)},
-					Type: fmt.Sprintf("%s", eventType)})
+					Type: string(eventType)})
 			require.NoError(s.T(), err)
 			require.Equal(s.T(), 1, len(response.Results), "expect to get 1 result")
 
