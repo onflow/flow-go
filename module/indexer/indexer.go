@@ -119,6 +119,9 @@ func (i *Indexer) StorePayloads(payloads []*ledger.Payload, height uint64) error
 		if err != nil {
 			return err
 		}
+
+		// TODO make sure we can use the payload encKey instead of the paths,
+		// is the key encoded in the payload key convertable the same way?
 		id, err := migrations.KeyToRegisterID(k)
 		if err != nil {
 			return err

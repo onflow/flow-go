@@ -31,7 +31,6 @@ type Engine struct {
 
 	// storage
 	// FIX: remove direct DB access by substituting indexer module
-	headers      storage.Headers
 	collections  storage.Collections
 	events       storage.Events
 	transactions storage.Transactions
@@ -67,7 +66,6 @@ func New(
 		log:     log.With().Str("engine", "index").Logger(),
 		metrics: accessMetrics,
 
-		headers:       headers,
 		collections:   collections,
 		events:        events,
 		transactions:  transactions,
@@ -97,14 +95,14 @@ func (e *Engine) OnExecutionData(executionData *execution_data.BlockExecutionDat
 
 	lg.Trace().Msg("received execution data")
 
-	header, err := e.headers.ByBlockID(executionData.BlockID)
+	height, err := e.index.HeightForBlock(executionData.BlockID)
 	if err != nil {
 		// if the execution data is available, the block must be locally finalized
 		lg.Fatal().Err(err).Msg("failed to get header for execution data")
 		return
 	}
 
-	if ok := e.highestHeight.Set(header.Height); !ok {
+	if ok := e.highestHeight.Set(height); !ok {
 		// this means that the height was lower than the current highest height
 
 		// OnExecutionData is guaranteed by the requester to be called in order, but may be called
@@ -277,18 +275,17 @@ func (e *Engine) handleTrieUpdate(blockID flow.Identifier, update *ledger.TrieUp
 		return fmt.Errorf("trie update paths and payloads have different lengths")
 	}
 
-	header, err := e.headers.ByBlockID(blockID)
+	height, err := e.index.HeightForBlock(blockID)
 	if err != nil {
 		return err
 	}
 
-	// TODO make sure we can use the payload encKey instead of the path
-	err = e.index.StorePayloads(update.Payloads, header.Height)
+	err = e.index.StorePayloads(update.Payloads, height)
 	if err != nil {
 		return err
 	}
 
-	return e.index.StoreCommitment(flow.StateCommitment(update.RootHash), header.Height)
+	return e.index.StoreCommitment(flow.StateCommitment(update.RootHash), height)
 }
 
 // lookupCollection looks up the collection from the collection db with collID
