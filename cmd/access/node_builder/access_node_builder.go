@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/onflow/flow-go/module/indexer"
+	"github.com/onflow/flow-go/storage/memory"
 	"os"
 	"path/filepath"
 	"strings"
@@ -441,6 +443,7 @@ func (builder *FlowAccessNodeBuilder) BuildConsensusFollower() *FlowAccessNodeBu
 func (builder *FlowAccessNodeBuilder) BuildExecutionDataRequester() *FlowAccessNodeBuilder {
 	var ds *badger.Datastore
 	var bs network.BlobService
+	var exeIndexer module.Indexer
 	var processedBlockHeight storage.ConsumerProgress
 	var processedNotifications storage.ConsumerProgress
 	var bsDependable *module.ProxiedReadyDoneAware
@@ -472,6 +475,11 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionDataRequester() *FlowAccessN
 				return nil
 			})
 
+			return nil
+		}).
+		Module("execution data indexer", func(node *cmd.NodeConfig) error {
+			registers := memory.NewRegisters()
+			exeIndexer = indexer.New(registers, node.Storage.Headers)
 			return nil
 		}).
 		Module("processed block height consumer progress", func(node *cmd.NodeConfig) error {
@@ -618,6 +626,8 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionDataRequester() *FlowAccessN
 				node.Storage.Events,
 				node.Storage.Transactions,
 				localExecutionDataCache,
+				exeIndexer,
+				// TODO(sideninja): should highestAvailableHeight be removed altogether and retrieved using the indexer module?
 				highestAvailableHeight, // TODO: this should be persisted separately from highestAvailableHeight
 				highestAvailableHeight,
 			)

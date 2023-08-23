@@ -12,6 +12,12 @@ type Registers struct {
 	registers map[uint64]map[flow.RegisterID]flow.RegisterValue
 }
 
+func NewRegisters() *Registers {
+	return &Registers{
+		registers: make(map[uint64]map[flow.RegisterID]flow.RegisterValue),
+	}
+}
+
 func (r Registers) Get(ID flow.RegisterID, height uint64) (flow.RegisterValue, error) {
 	h, ok := r.registers[height]
 	if !ok {

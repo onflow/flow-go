@@ -22,6 +22,15 @@ type Indexer struct {
 	commitments map[uint64]flow.StateCommitment // todo persist
 }
 
+func New(registers storage.Registers, headers storage.Headers) *Indexer {
+	return &Indexer{
+		registers:   registers,
+		headers:     headers,
+		last:        0,
+		commitments: make(map[uint64]flow.StateCommitment),
+	}
+}
+
 func (i *Indexer) NewStorageSnapshot(commitment flow.StateCommitment) snapshot.StorageSnapshot {
 	var height uint64
 	for h, commit := range i.commitments {
