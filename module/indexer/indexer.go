@@ -23,8 +23,18 @@ type Indexer struct {
 }
 
 func (i *Indexer) NewStorageSnapshot(commitment flow.StateCommitment) snapshot.StorageSnapshot {
-	//TODO implement me
-	panic("implement me")
+	var height uint64
+	for h, commit := range i.commitments {
+		if commit == commitment {
+			height = h
+		}
+	}
+
+	reader := func(id flow.RegisterID) (flow.RegisterValue, error) {
+		return i.registers.Get(id, height)
+	}
+
+	return snapshot.NewReadFuncStorageSnapshot(reader)
 }
 
 func (i *Indexer) StateCommitmentByBlockID(
