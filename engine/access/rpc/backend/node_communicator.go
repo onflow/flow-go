@@ -20,6 +20,16 @@ type NodeAction func(node *flow.Identity) error
 // It takes an error as input and returns a boolean value indicating whether the error should be considered terminal.
 type ErrorTerminator func(node *flow.Identity, err error) bool
 
+type Communicator interface {
+	CallAvailableNode(
+		nodes flow.IdentityList,
+		call func(node *flow.Identity) error,
+		shouldTerminateOnError func(node *flow.Identity, err error) bool,
+	) error
+}
+
+var _ Communicator = (*NodeCommunicator)(nil)
+
 // NodeCommunicator is responsible for calling available nodes in the backend.
 type NodeCommunicator struct {
 	nodeSelectorFactory NodeSelectorFactory
@@ -39,8 +49,8 @@ func NewNodeCommunicator(circuitBreakerEnabled bool) *NodeCommunicator {
 // If the maximum failed request count is reached, it returns the accumulated errors.
 func (b *NodeCommunicator) CallAvailableNode(
 	nodes flow.IdentityList,
-	call NodeAction,
-	shouldTerminateOnError ErrorTerminator,
+	call func(id *flow.Identity) error,
+	shouldTerminateOnError func(node *flow.Identity, err error) bool,
 ) error {
 	var errs *multierror.Error
 	nodeSelector, err := b.nodeSelectorFactory.SelectNodes(nodes)

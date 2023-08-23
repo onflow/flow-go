@@ -12,14 +12,13 @@ import (
 	badger "github.com/ipfs/go-ds-badger2"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/routing"
+	"github.com/onflow/flow/protobuf/go/flow/access"
+	"github.com/onflow/go-bitswap"
 	"github.com/rs/zerolog"
 	"github.com/spf13/pflag"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/insecure"
-
-	"github.com/onflow/flow/protobuf/go/flow/access"
-	"github.com/onflow/go-bitswap"
 
 	"github.com/onflow/flow-go/admin/commands"
 	stateSyncCommands "github.com/onflow/flow-go/admin/commands/state_synchronization"
@@ -131,6 +130,7 @@ type AccessNodeConfig struct {
 	executionDataStartHeight     uint64
 	executionDataConfig          edrequester.ExecutionDataConfig
 	PublicNetworkConfig          PublicNetworkConfig
+	TxResultCacheSize            uint
 }
 
 type PublicNetworkConfig struct {
@@ -207,6 +207,7 @@ func DefaultAccessNodeConfig() *AccessNodeConfig {
 			RetryDelay:         edrequester.DefaultRetryDelay,
 			MaxRetryDelay:      edrequester.DefaultMaxRetryDelay,
 		},
+		TxResultCacheSize: 0,
 	}
 }
 
@@ -720,6 +721,8 @@ func (builder *FlowAccessNodeBuilder) extraFlags() {
 		flags.DurationVar(&builder.stateStreamConf.ClientSendTimeout, "state-stream-send-timeout", defaultConfig.stateStreamConf.ClientSendTimeout, "maximum wait before timing out while sending a response to a streaming client e.g. 30s")
 		flags.UintVar(&builder.stateStreamConf.ClientSendBufferSize, "state-stream-send-buffer-size", defaultConfig.stateStreamConf.ClientSendBufferSize, "maximum number of responses to buffer within a stream")
 		flags.Float64Var(&builder.stateStreamConf.ResponseLimit, "state-stream-response-limit", defaultConfig.stateStreamConf.ResponseLimit, "max number of responses per second to send over streaming endpoints. this helps manage resources consumed by each client querying data not in the cache e.g. 3 or 0.5. 0 means no limit")
+
+		flags.UintVar(&builder.TxResultCacheSize, "transaction-result-cache-size", defaultConfig.TxResultCacheSize, "transaction result cache size.(Disabled by default i.e 0)")
 	}).ValidateFlags(func() error {
 		if builder.supportsObserver && (builder.PublicNetworkConfig.BindAddress == cmd.NotSet || builder.PublicNetworkConfig.BindAddress == "") {
 			return errors.New("public-network-address must be set if supports-observer is true")
@@ -1091,28 +1094,30 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				),
 			}
 
-			backend := backend.New(
-				node.State,
-				builder.CollectionRPC,
-				builder.HistoricalAccessRPCs,
-				node.Storage.Blocks,
-				node.Storage.Headers,
-				node.Storage.Collections,
-				node.Storage.Transactions,
-				node.Storage.Receipts,
-				node.Storage.Results,
-				node.RootChainID,
-				builder.AccessMetrics,
-				connFactory,
-				builder.retryEnabled,
-				backendConfig.MaxHeightRange,
-				backendConfig.PreferredExecutionNodeIDs,
-				backendConfig.FixedExecutionNodeIDs,
-				node.Logger,
-				backend.DefaultSnapshotHistoryLimit,
-				backendConfig.ArchiveAddressList,
-				backendConfig.ScriptExecValidation,
-				backendConfig.CircuitBreakerConfig.Enabled)
+			nodeBackend := backend.New(backend.Params{
+				State:                     node.State,
+				CollectionRPC:             builder.CollectionRPC,
+				HistoricalAccessNodes:     builder.HistoricalAccessRPCs,
+				Blocks:                    node.Storage.Blocks,
+				Headers:                   node.Storage.Headers,
+				Collections:               node.Storage.Collections,
+				Transactions:              node.Storage.Transactions,
+				ExecutionReceipts:         node.Storage.Receipts,
+				ExecutionResults:          node.Storage.Results,
+				ChainID:                   node.RootChainID,
+				AccessMetrics:             builder.AccessMetrics,
+				ConnFactory:               connFactory,
+				RetryEnabled:              builder.retryEnabled,
+				MaxHeightRange:            backendConfig.MaxHeightRange,
+				PreferredExecutionNodeIDs: backendConfig.PreferredExecutionNodeIDs,
+				FixedExecutionNodeIDs:     backendConfig.FixedExecutionNodeIDs,
+				Log:                       node.Logger,
+				SnapshotHistoryLimit:      backend.DefaultSnapshotHistoryLimit,
+				ArchiveAddressList:        backendConfig.ArchiveAddressList,
+				Communicator:              backend.NewNodeCommunicator(backendConfig.CircuitBreakerConfig.Enabled),
+				ScriptExecValidation:      backendConfig.ScriptExecValidation,
+				TxResultCacheSize:         builder.TxResultCacheSize,
+			})
 
 			engineBuilder, err := rpc.NewBuilder(
 				node.Logger,
@@ -1122,8 +1127,8 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				builder.AccessMetrics,
 				builder.rpcMetricsEnabled,
 				builder.Me,
-				backend,
-				backend,
+				nodeBackend,
+				nodeBackend,
 				builder.secureGrpcServer,
 				builder.unsecureGrpcServer,
 			)
