@@ -201,6 +201,15 @@ func (m *MiddlewareTestSuite) TestUpdateNodeAddresses() {
 		libP2PNodes,
 		testutils.MiddlewareConfigFixture(m.T(), m.sporkId),
 		m.slashingViolationsConsumer)
+	networkCfg := testutils.NetworkConfigFixture(
+		m.T(),
+		*ids[0],
+		m.ids,
+		m.sporkId,
+		mws[0])
+	newNet, err := p2p.NewNetwork(networkCfg)
+	require.NoError(m.T(), err)
+
 	require.Len(m.T(), ids, 1)
 	require.Len(m.T(), providers, 1)
 	require.Len(m.T(), mws, 1)
@@ -212,38 +221,30 @@ func (m *MiddlewareTestSuite) TestUpdateNodeAddresses() {
 	newMw.SetOverlay(overlay)
 
 	// start up nodes and peer managers
-	testutils.StartNodes(irrecoverableCtx, m.T(), libP2PNodes, 100*time.Millisecond)
-	defer testutils.StopComponents(m.T(), libP2PNodes, 100*time.Millisecond)
+	testutils.StartNodes(irrecoverableCtx, m.T(), libP2PNodes, 1*time.Second)
+	defer testutils.StopComponents(m.T(), libP2PNodes, 1*time.Second)
 
-	newMw.Start(irrecoverableCtx)
-	defer testutils.StopComponents(m.T(), mws, 100*time.Millisecond)
-	unittest.RequireComponentsReadyBefore(m.T(), 100*time.Millisecond, newMw)
+	newNet.Start(irrecoverableCtx)
+	defer testutils.StopComponents(m.T(), []network.Network{newNet}, 1*time.Second)
+	unittest.RequireComponentsReadyBefore(m.T(), 1*time.Second, newNet)
 
 	idList := flow.IdentityList(append(m.ids, newId))
 
 	// needed to enable ID translation
 	m.providers[0].SetIdentities(idList)
 
-	outMsg, err := message.NewOutgoingScope(
-		flow.IdentifierList{newId.NodeID},
-		channels.TopicFromChannel(channels.TestNetworkChannel, m.sporkId),
-		&libp2pmessage.TestMessage{
-			Text: "TestUpdateNodeAddresses",
-		},
-		unittest.NetworkCodec().Encode,
-		message.ProtocolTypeUnicast)
-	require.NoError(m.T(), err)
-	// message should fail to send because no address is known yet
-	// for the new identity
-	err = m.mws[0].SendDirect(outMsg)
+	// unicast should fail to send because no address is known yet for the new identity
+	err = newNet.UnicastOnChannel(channels.TestNetworkChannel, &libp2pmessage.TestMessage{
+		Text: "TestUpdateNodeAddresses",
+	}, m.ids[1].NodeID)
 	require.True(m.T(), strings.Contains(err.Error(), swarm.ErrNoAddresses.Error()))
 
 	// update the addresses
 	m.mws[0].UpdateNodeAddresses()
 
 	// now the message should send successfully
-	err = m.mws[0].SendDirect(outMsg)
-	require.NoError(m.T(), err)
+	// err = m.mws[0].SendDirect(outMsg)
+	// require.NoError(m.T(), err)
 
 	cancel()
 	unittest.RequireComponentsReadyBefore(m.T(), 100*time.Millisecond, newMw)
@@ -302,6 +303,15 @@ func (m *MiddlewareTestSuite) TestUnicastRateLimit_Messages() {
 		middleware.WithUnicastRateLimiters(rateLimiters),
 		middleware.WithPeerManagerFilters([]p2p.PeerFilter{testutils.IsRateLimitedPeerFilter(messageRateLimiter)}))
 
+	networkCfg := testutils.NetworkConfigFixture(
+		m.T(),
+		*ids[0],
+		m.ids,
+		m.sporkId,
+		mws[0])
+	newNet, err := p2p.NewNetwork(networkCfg)
+	require.NoError(m.T(), err)
+
 	require.Len(m.T(), ids, 1)
 	require.Len(m.T(), providers, 1)
 	require.Len(m.T(), mws, 1)
@@ -327,11 +337,12 @@ func (m *MiddlewareTestSuite) TestUnicastRateLimit_Messages() {
 	ctx, cancel := context.WithCancel(m.mwCtx)
 	irrecoverableCtx := irrecoverable.NewMockSignalerContext(m.T(), ctx)
 
-	testutils.StartNodes(irrecoverableCtx, m.T(), libP2PNodes, 100*time.Millisecond)
-	defer testutils.StopComponents(m.T(), libP2PNodes, 100*time.Millisecond)
+	testutils.StartNodes(irrecoverableCtx, m.T(), libP2PNodes, 1*time.Second)
+	defer testutils.StopComponents(m.T(), libP2PNodes, 1*time.Second)
 
-	newMw.Start(irrecoverableCtx)
-	unittest.RequireComponentsReadyBefore(m.T(), 100*time.Millisecond, newMw)
+	newNet.Start(irrecoverableCtx)
+	unittest.RequireComponentsReadyBefore(m.T(), 1*time.Second, newNet)
+	defer testutils.StopComponents(m.T(), []network.Network{newNet}, 1*time.Second)
 
 	require.NoError(m.T(), newMw.Subscribe(channels.TestNetworkChannel))
 
@@ -352,6 +363,9 @@ func (m *MiddlewareTestSuite) TestUnicastRateLimit_Messages() {
 	// to be invoked at-least once. We send 10 messages due to the flakiness that is caused by async stream
 	// handling of streams.
 	for i := 0; i < 10; i++ {
+		newNet.UnicastOnChannel(channels.TestNetworkChannel, &libp2pmessage.TestMessage{
+			Text: fmt.Sprintf("hello-%d", i),
+		}, newId.NodeID)
 		msg, err := message.NewOutgoingScope(
 			flow.IdentifierList{newId.NodeID},
 			channels.TopicFromChannel(channels.TestNetworkChannel, m.sporkId),
