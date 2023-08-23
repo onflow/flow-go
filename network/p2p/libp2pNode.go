@@ -54,6 +54,25 @@ type LibP2PNode interface {
 	RemovePeer(peerID peer.ID) error
 	// GetPeersForProtocol returns slice peer IDs for the specified protocol ID.
 	GetPeersForProtocol(pid protocol.ID) peer.IDSlice
+	// OpenProtectedStream opens a new stream to a peer with a protection tag. The protection tag can be used to ensure
+	// that the connection to the peer is maintained for a particular purpose. The stream is opened to the given peerID
+	// and writingLogic is executed on the stream. The created stream does not need to be reused and can be inexpensively
+	// created for each send. Moreover, the stream creation does not incur a round-trip time as the stream negotiation happens
+	// on an existing connection.
+	//
+	// Args:
+	// - ctx: The context used to control the stream's lifecycle.
+	// - peerID: The ID of the peer to open the stream to.
+	// - protectionTag: A tag that protects the connection and ensures that the connection manager keeps it alive, and
+	//   won't prune the connection while the tag is active.
+	// - writingLogic: A callback function that contains the logic for writing to the stream. It allows an external caller to
+	//   write to the stream without having to worry about the stream creation and management.
+	//
+	// Returns:
+	// error: An error, if any occurred during the process. This includes failure in creating the stream, setting the write
+	// deadline, executing the writing logic, resetting the stream if the writing logic fails, or closing the stream.
+	// All returned errors during this process can be considered benign.
+	OpenProtectedStream(ctx context.Context, peerID peer.ID, protectionTag string, writingLogic func(stream libp2pnet.Stream) error) error
 	// CreateStream returns an existing stream connected to the peer if it exists, or creates a new stream with it.
 	CreateStream(ctx context.Context, peerID peer.ID) (libp2pnet.Stream, error)
 	// GetIPPort returns the IP and Port the libp2p node is listening on.

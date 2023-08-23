@@ -179,6 +179,24 @@ func (n *Node) GetPeersForProtocol(pid protocol.ID) peer.IDSlice {
 	return peers
 }
 
+// OpenProtectedStream opens a new stream to a peer with a protection tag. The protection tag can be used to ensure
+// that the connection to the peer is maintained for a particular purpose. The stream is opened to the given peerID
+// and writingLogic is executed on the stream. The created stream does not need to be reused and can be inexpensively
+// created for each send. Moreover, the stream creation does not incur a round-trip time as the stream negotiation happens
+// on an existing connection.
+//
+// Args:
+//   - ctx: The context used to control the stream's lifecycle.
+//   - peerID: The ID of the peer to open the stream to.
+//   - protectionTag: A tag that protects the connection and ensures that the connection manager keeps it alive, and
+//     won't prune the connection while the tag is active.
+//   - writingLogic: A callback function that contains the logic for writing to the stream. It allows an external caller to
+//     write to the stream without having to worry about the stream creation and management.
+//
+// Returns:
+// error: An error, if any occurred during the process. This includes failure in creating the stream, setting the write
+// deadline, executing the writing logic, resetting the stream if the writing logic fails, or closing the stream.
+// All returned errors during this process can be considered benign.
 func (n *Node) OpenProtectedStream(ctx context.Context, peerID peer.ID, protectionTag string, writingLogic func(stream libp2pnet.Stream) error) error {
 	n.host.ConnManager().Protect(peerID, protectionTag)
 	defer n.host.ConnManager().Unprotect(peerID, protectionTag)
@@ -198,7 +216,6 @@ func (n *Node) OpenProtectedStream(ctx context.Context, peerID peer.ID, protecti
 
 	// create a gogo protobuf writer
 	err = writingLogic(s)
-
 	if err != nil {
 		// reset the stream to ensure that the next stream creation is not affected by the error.
 		resetErr := s.Reset()

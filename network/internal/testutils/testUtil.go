@@ -126,6 +126,7 @@ func NewTagWatchingConnManager(log zerolog.Logger, metrics module.LibP2PConnecti
 //	flow.IdentityList - list of identities created for the nodes, one for each node.
 //
 // []p2p.LibP2PNode - list of libp2p nodes created.
+// TODO: several test cases only need a single node, consider encapsulating this function in a single node fixture.
 func LibP2PNodeForMiddlewareFixture(t *testing.T, sporkId flow.Identifier, n int, opts ...p2ptest.NodeFixtureParameterOption) (flow.IdentityList, []p2p.LibP2PNode) {
 	libP2PNodes := make([]p2p.LibP2PNode, 0)
 	identities := make(flow.IdentityList, 0)
@@ -226,23 +227,26 @@ func NetworkConfigFixture(
 	defaultFlowConfig, err := config.DefaultConfig()
 	require.NoError(t, err)
 
+	idProvider := id.NewFixedIdentityProvider(allIds)
 	receiveCache := netcache.NewHeroReceiveCache(
 		defaultFlowConfig.NetworkConfig.NetworkReceivedMessageCacheSize,
 		unittest.Logger(),
 		metrics.NewNoopCollector())
 	subMgr := subscription.NewChannelSubscriptionManager(mw)
 	params := &p2p.NetworkConfig{
-		Logger:              unittest.Logger(),
-		Codec:               unittest.NetworkCodec(),
-		Me:                  me,
-		MiddlewareFactory:   func() (network.Middleware, error) { return mw, nil },
-		Topology:            unittest.NetworkTopology(),
-		SubscriptionManager: subMgr,
-		Metrics:             metrics.NewNoopCollector(),
-		IdentityProvider:    id.NewFixedIdentityProvider(allIds),
-		ReceiveCache:        receiveCache,
-		ConduitFactory:      conduit.NewDefaultConduitFactory(),
-		SporkId:             sporkId,
+		Logger:                unittest.Logger(),
+		Codec:                 unittest.NetworkCodec(),
+		Me:                    me,
+		MiddlewareFactory:     func() (network.Middleware, error) { return mw, nil },
+		Topology:              unittest.NetworkTopology(),
+		SubscriptionManager:   subMgr,
+		Metrics:               metrics.NewNoopCollector(),
+		IdentityProvider:      idProvider,
+		ReceiveCache:          receiveCache,
+		ConduitFactory:        conduit.NewDefaultConduitFactory(),
+		SporkId:               sporkId,
+		UnicastMessageTimeout: p2p.DefaultUnicastTimeout,
+		IdentityTranslator:    translator.NewIdentityProviderIDTranslator(idProvider),
 		AlspCfg: &alspmgr.MisbehaviorReportManagerConfig{
 			Logger:                  unittest.Logger(),
 			SpamRecordCacheSize:     defaultFlowConfig.NetworkConfig.AlspConfig.SpamRecordCacheSize,
