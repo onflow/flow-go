@@ -7,8 +7,13 @@ import (
 
 	"github.com/onflow/cadence"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
+
 	"github.com/onflow/flow-core-contracts/lib/go/contracts"
 	"github.com/onflow/flow-core-contracts/lib/go/templates"
+
+	sdk "github.com/onflow/flow-go-sdk"
+
+	nftContracts "github.com/onflow/flow-nft/lib/go/contracts"
 
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -47,6 +52,16 @@ func DeployViewResolverContractTransaction(nonFungibleToken flow.Address) *flow.
 		nonFungibleToken,
 		contract,
 		contractName)
+}
+
+func DeployMultipleNFTContractTransaction(deployTo, nonFungibleToken flow.Address) *flow.TransactionBody {
+	contract := nftContracts.MultipleNFT(sdk.Address(nonFungibleToken))
+	contractName := "MultipleNFT"
+	return DeployContractTransaction(
+		deployTo,
+		contract,
+		contractName,
+	)
 }
 
 func DeployFungibleTokenMetadataViewsContractTransaction(fungibleToken, nonFungibleToken, viewResolver flow.Address) *flow.TransactionBody {

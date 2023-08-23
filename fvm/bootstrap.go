@@ -321,7 +321,11 @@ func (b *bootstrapExecutor) Execute() error {
 
 	fungibleToken := b.deployFungibleToken(service)
 	nonFungibleToken := b.deployNonFungibleToken(service, service)
+
+	b.deployMultipleNFT(service, nonFungibleToken)
+
 	b.deployMetadataViews(fungibleToken, nonFungibleToken, service)
+
 	flowToken := b.deployFlowToken(service, fungibleToken, nonFungibleToken)
 	storageFees := b.deployStorageFees(service, fungibleToken, flowToken)
 	feeContract := b.deployFlowFees(service, fungibleToken, flowToken, storageFees)
@@ -436,6 +440,17 @@ func (b *bootstrapExecutor) deployViewResolver(deployTo flow.Address) {
 			0),
 	)
 	panicOnMetaInvokeErrf("failed to deploy view resolver contract: %s", txError, err)
+}
+
+func (b *bootstrapExecutor) deployMultipleNFT(deployTo, nonFungibleToken flow.Address) {
+
+	txError, err := b.invokeMetaTransaction(
+		b.ctx,
+		Transaction(
+			blueprints.DeployMultipleNFTContractTransaction(deployTo, nonFungibleToken),
+			0),
+	)
+	panicOnMetaInvokeErrf("failed to deploy MultipleNFT contract: %s", txError, err)
 }
 
 func (b *bootstrapExecutor) deployMetadataViews(fungibleToken, nonFungibleToken, viewResolver flow.Address) {
