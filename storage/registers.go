@@ -5,16 +5,16 @@ import (
 	"io"
 )
 
-type Register interface {
-	RegisterReader
-	RegisterWriter
+type Registers interface {
+	RegistersReader
+	RegistersWriter
 	io.Closer
 }
 
-type RegisterReader interface {
+type RegistersReader interface {
 	Get(ID flow.RegisterID, height uint64) flow.RegisterEntry
 }
 
-type RegisterWriter interface {
+type RegistersWriter interface {
 	Store(entry flow.RegisterEntry, height uint64) error
 }
