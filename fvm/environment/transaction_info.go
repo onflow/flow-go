@@ -34,7 +34,7 @@ func NewScriptInfoParams(id flow.Identifier, code []byte) *ScriptInfoParams {
 
 func NewScriptInfoParamsWithCode(code []byte) *ScriptInfoParams {
 	return &ScriptInfoParams{
-		ID:     flow.HashToID(hash.DefaultHasher.ComputeHash(code)),
+		ID:     flow.HashToID(hash.DefaultComputeHash(code)),
 		Script: code,
 	}
 }
