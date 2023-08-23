@@ -44,10 +44,27 @@ import (
 
 const testChannel = channels.TestNetworkChannel
 
+// tagsObserver is used to observe peer connections and their tags within a GossipSub mesh.
+// It plays a crucial role in verifying the formation of a mesh within unit tests.
 // libp2p emits a call to `Protect` with a topic-specific tag upon establishing each peering connection in a GossipSUb mesh, see:
 // https://github.com/libp2p/go-libp2p-pubsub/blob/master/tag_tracer.go
 // One way to make sure such a mesh has formed, asynchronously, in unit tests, is to wait for libp2p.GossipSubD such calls,
 // and that's what we do with tagsObserver.
+// Usage:
+// The tagsObserver struct observes the OnNext, OnError, and OnComplete events related to peer tags.
+// A channel 'tags' is used to communicate these tags, and the observer is subscribed to the observable connection manager.
+// Advantages:
+// Using tag observables helps understand the connectivity between different peers,
+// and can be valuable in testing scenarios where network connectivity is critical.
+// Issues:
+//   - Deviation from Production Code: This tag observation might be unique to the test environment,
+//     and therefore not reflect the behavior of the production code.
+//   - Mask Issues in the Production Environment: The observables are tied to testing and might
+//     lead to behaviors or errors that are masked or not evident within the actual production environment.
+//
+// TODO: Evaluate the necessity of tag observables in this test. Consider addressing the deviation from
+// production code and potential mask issues in the production environment. Evaluate the possibility
+// of removing this part eventually.
 type tagsObserver struct {
 	tags chan string
 	log  zerolog.Logger
