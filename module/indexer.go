@@ -9,7 +9,7 @@ type Indexer interface {
 	Last() (uint64, error)                                                    // get last indexed sealed block height
 	HeightForBlock(ID flow.Identifier) (uint64, error)                        // get height by block ID
 	Commitment(height uint64) (flow.StateCommitment, error)                   // get state commitment by height
-	Values(height uint64, IDs flow.RegisterIDs) ([]flow.RegisterValue, error) // retrieve register values for register IDs at given height
+	Values(IDs flow.RegisterIDs, height uint64) ([]flow.RegisterValue, error) // retrieve register values for register IDs at given height
 
-	StorePayloads(height uint64, payloads []*ledger.Payload) error // index payloads at given height
+	StorePayloads(payloads []*ledger.Payload, height uint64) error // index payloads at given height
 }
