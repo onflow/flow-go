@@ -163,11 +163,16 @@ func (e *Engine) processAvailableExecutionData(ctx context.Context) error {
 			return err
 		}
 
-		// TODO: persist the last processed height
 		if ok := e.lastFullyProcessedHeight.Set(height); !ok {
 			// TODO: should this cause the node to crash?
 			return fmt.Errorf("could not set last processed height to %d", height)
 		}
+
+		err = e.index.StoreLast(height)
+		if err != nil {
+			return err
+		}
+
 	}
 }
 

@@ -8,28 +8,33 @@ import (
 	"github.com/onflow/flow-go/storage"
 )
 
-var _ module.Indexer = Indexer{}
+var _ module.Indexer = &Indexer{}
 
 type Indexer struct {
 	registers storage.Registers
+	last      uint64 // todo persist
 }
 
-func (i Indexer) Last() (uint64, error) {
+func (i *Indexer) Last() (uint64, error) {
+	return i.last, nil
+}
+
+func (i *Indexer) StoreLast(last uint64) error {
+	i.last = last
+	return nil
+}
+
+func (i *Indexer) HeightForBlock(ID flow.Identifier) (uint64, error) {
 	//TODO implement me
 	panic("implement me")
 }
 
-func (i Indexer) HeightForBlock(ID flow.Identifier) (uint64, error) {
+func (i *Indexer) Commitment(height uint64) (flow.StateCommitment, error) {
 	//TODO implement me
 	panic("implement me")
 }
 
-func (i Indexer) Commitment(height uint64) (flow.StateCommitment, error) {
-	//TODO implement me
-	panic("implement me")
-}
-
-func (i Indexer) Values(IDs flow.RegisterIDs, height uint64) ([]flow.RegisterValue, error) {
+func (i *Indexer) Values(IDs flow.RegisterIDs, height uint64) ([]flow.RegisterValue, error) {
 	values := make([]flow.RegisterValue, len(IDs))
 
 	for j, id := range IDs {
@@ -44,7 +49,7 @@ func (i Indexer) Values(IDs flow.RegisterIDs, height uint64) ([]flow.RegisterVal
 	return values, nil
 }
 
-func (i Indexer) StorePayloads(payloads []*ledger.Payload, height uint64) error {
+func (i *Indexer) StorePayloads(payloads []*ledger.Payload, height uint64) error {
 
 	for _, payload := range payloads {
 		k, err := payload.Key()
