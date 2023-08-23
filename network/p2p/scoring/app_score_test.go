@@ -9,15 +9,18 @@ import (
 	mocktestify "github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
+	"github.com/onflow/flow-go/config"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/id"
 	"github.com/onflow/flow-go/module/irrecoverable"
+	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/internal/p2pfixtures"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/scoring"
 	p2ptest "github.com/onflow/flow-go/network/p2p/test"
+	"github.com/onflow/flow-go/network/p2p/tracer"
 	flowpubsub "github.com/onflow/flow-go/network/validator/pubsub"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -57,8 +60,8 @@ func TestFullGossipSubConnectivity(t *testing.T) {
 			_, ok := provider.ByPeerID(peerId)
 			return ok
 		})
-	p2ptest.StartNodes(t, signalerCtx, nodes, 100*time.Millisecond)
-	defer p2ptest.StopNodes(t, nodes, cancel, 2*time.Second)
+	p2ptest.StartNodes(t, signalerCtx, nodes)
+	defer p2ptest.StopNodes(t, nodes, cancel)
 
 	blockTopic := channels.TopicFromChannel(channels.PushBlocks, sporkId)
 
@@ -106,42 +109,14 @@ func TestFullGossipSubConnectivity(t *testing.T) {
 	}
 }
 
-// TestFullGossipSubConnectivityAmongHonestNodesWithMaliciousMajority is part two of testing pushing access nodes to the edges of the network.
+// TestFullGossipSubConnectivityAmongHonestNodesWithMaliciousMajority tests pushing access nodes to the edges of the network.
 // This test proves that if access nodes are PUSHED to the edge of the network, even their malicious majority cannot partition
 // the network of honest nodes.
+// The scenario tests that whether two honest nodes are in each others topic mesh on GossipSub
+// when the network topology is a complete graph (i.e., full topology) and a malicious majority of access nodes are present.
+// The honest nodes (i.e., non-Access nodes) are enabled with peer scoring, then the honest nodes are enabled with peer scoring.
 func TestFullGossipSubConnectivityAmongHonestNodesWithMaliciousMajority(t *testing.T) {
 	// Note: if this test is ever flaky, this means a bug in our scoring system. Please escalate to the team instead of skipping.
-	total := 10
-	for i := 0; i < total; i++ {
-		if !testGossipSubMessageDeliveryUnderNetworkPartition(t, true) {
-			// even one failure should not happen, as it means that malicious majority can partition the network
-			// with our peer scoring parameters.
-			require.Fail(t, "honest nodes could not exchange message on GossipSub")
-		}
-	}
-}
-
-// TestNetworkPartitionWithNoHonestPeerScoringInFullTopology is part one of testing pushing access nodes to the edges of the network.
-// This test proves that if access nodes are NOT pushed to the edge of network, a malicious majority of them can
-// partition the network by disconnecting honest nodes from each other even when the network topology is a complete graph (i.e., full topology).
-func TestNetworkPartitionWithNoHonestPeerScoringInFullTopology(t *testing.T) {
-	unittest.SkipUnless(t, unittest.TEST_FLAKY, "to be fixed later")
-	total := 100
-	for i := 0; i < total; i++ {
-		// false means no honest peer scoring.
-		if !testGossipSubMessageDeliveryUnderNetworkPartition(t, false) {
-			return // partition is successful
-		}
-	}
-	require.Fail(t, "expected at least one network partition")
-}
-
-// testGossipSubMessageDeliveryUnderNetworkPartition tests that whether two honest nodes can exchange messages on GossipSub
-// when the network topology is a complete graph (i.e., full topology) and a malicious majority of access nodes are present.
-// If honestPeerScoring is true, then the honest nodes are enabled with peer scoring.
-// A true return value means that the two honest nodes can exchange messages.
-// A false return value means that the two honest nodes cannot exchange messages within the given timeout.
-func testGossipSubMessageDeliveryUnderNetworkPartition(t *testing.T, honestPeerScoring bool) bool {
 	ctx, cancel := context.WithCancel(context.Background())
 	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
 	sporkId := unittest.IdentifierFixture()
@@ -149,16 +124,29 @@ func testGossipSubMessageDeliveryUnderNetworkPartition(t *testing.T, honestPeerS
 	idProvider := mock.NewIdentityProvider(t)
 	// two (honest) consensus nodes
 	opts := []p2ptest.NodeFixtureParameterOption{p2ptest.WithRole(flow.RoleConsensus)}
-	if honestPeerScoring {
-		opts = append(opts, p2ptest.EnablePeerScoringWithOverride(p2p.PeerScoringConfigNoOverride))
+	opts = append(opts, p2ptest.EnablePeerScoringWithOverride(p2p.PeerScoringConfigNoOverride))
+
+	defaultConfig, err := config.DefaultConfig()
+	require.NoError(t, err)
+	meshTracerCfg := &tracer.GossipSubMeshTracerConfig{
+		Logger:                             unittest.Logger(),
+		Metrics:                            metrics.NewNoopCollector(),
+		IDProvider:                         idProvider,
+		LoggerInterval:                     time.Second,
+		HeroCacheMetricsFactory:            metrics.NewNoopHeroCacheMetricsFactory(),
+		RpcSentTrackerCacheSize:            defaultConfig.NetworkConfig.GossipSubConfig.RPCSentTrackerCacheSize,
+		RpcSentTrackerWorkerQueueCacheSize: defaultConfig.NetworkConfig.GossipSubConfig.RPCSentTrackerQueueCacheSize,
+		RpcSentTrackerNumOfWorkers:         defaultConfig.NetworkConfig.GossipSubConfig.RpcSentTrackerNumOfWorkers,
 	}
-	con1Node, con1Id := p2ptest.NodeFixture(t, sporkId, t.Name(), idProvider, opts...)
-	con2Node, con2Id := p2ptest.NodeFixture(t, sporkId, t.Name(), idProvider, opts...)
+
+	con1NodeTracer := tracer.NewGossipSubMeshTracer(meshTracerCfg) // mesh tracer for con1
+	con2NodeTracer := tracer.NewGossipSubMeshTracer(meshTracerCfg) // mesh tracer for con2
+	con1Node, con1Id := p2ptest.NodeFixture(t, sporkId, t.Name(), idProvider, append(opts, p2ptest.WithGossipSubTracer(con1NodeTracer))...)
+	con2Node, con2Id := p2ptest.NodeFixture(t, sporkId, t.Name(), idProvider, append(opts, p2ptest.WithGossipSubTracer(con2NodeTracer))...)
 
 	// create > 2 * 12 malicious access nodes
 	// 12 is the maximum size of default GossipSub mesh.
-	// We want to make sure that it is unlikely for honest nodes to be in the same mesh (hence messages from
-	// one honest node to the other is routed through the malicious nodes).
+	// We want to make sure that it is unlikely for honest nodes to be in the same mesh without peer scoring.
 	accessNodeGroup, accessNodeIds := p2ptest.NodesFixture(t, sporkId, t.Name(), 30,
 		idProvider,
 		p2ptest.WithRole(flow.RoleAccess),
@@ -181,44 +169,66 @@ func testGossipSubMessageDeliveryUnderNetworkPartition(t *testing.T, honestPeerS
 			return ok
 		}).Maybe()
 
-	p2ptest.StartNodes(t, signalerCtx, allNodes, 100*time.Millisecond)
-	defer p2ptest.StopNodes(t, allNodes, cancel, 2*time.Second)
+	p2ptest.StartNodes(t, signalerCtx, allNodes)
+	defer p2ptest.StopNodes(t, allNodes, cancel)
 
 	blockTopic := channels.TopicFromChannel(channels.PushBlocks, sporkId)
 
-	logger := unittest.Logger()
-
 	// all nodes subscribe to block topic (common topic among all roles)
-	_, err := con1Node.Subscribe(blockTopic, flowpubsub.TopicValidator(logger, unittest.AllowAllPeerFilter()))
+	_, err = con1Node.Subscribe(blockTopic, flowpubsub.TopicValidator(unittest.Logger(), unittest.AllowAllPeerFilter()))
 	require.NoError(t, err)
 
-	con2Sub, err := con2Node.Subscribe(blockTopic, flowpubsub.TopicValidator(logger, unittest.AllowAllPeerFilter()))
+	_, err = con2Node.Subscribe(blockTopic, flowpubsub.TopicValidator(unittest.Logger(), unittest.AllowAllPeerFilter()))
 	require.NoError(t, err)
 
 	// access node group
 	accessNodeSubs := make([]p2p.Subscription, len(accessNodeGroup))
 	for i, node := range accessNodeGroup {
-		sub, err := node.Subscribe(blockTopic, flowpubsub.TopicValidator(logger, unittest.AllowAllPeerFilter()))
-		require.NoError(t, err)
+		sub, err := node.Subscribe(blockTopic, flowpubsub.TopicValidator(unittest.Logger(), unittest.AllowAllPeerFilter()))
+		require.NoError(t, err, "access node %d failed to subscribe to block topic", i)
 		accessNodeSubs[i] = sub
 	}
 
 	// let nodes reside on a full topology, hence no partition is caused by the topology.
 	p2ptest.LetNodesDiscoverEachOther(t, ctx, allNodes, allIds)
 
-	proposalMsg := p2pfixtures.MustEncodeEvent(t, unittest.ProposalFixture(), channels.PushBlocks)
-	require.NoError(t, con1Node.Publish(ctx, blockTopic, proposalMsg))
+	// checks whether con1 and con2 are in the same mesh
+	tick := time.Second        // Set the tick duration as needed
+	timeout := 5 * time.Second // Set the timeout duration as needed
 
-	// we check that whether within a one-second window the message is received by the other honest consensus node.
-	// the one-second window is important because it triggers the heartbeat of the con1Node to perform a lazy pull (iHave).
-	// And con1Node may randomly choose con2Node as the peer to perform the lazy pull.
-	// However, under a network partition con2Node is not in the mesh of con1Node, and hence is deprived of the eager push from con1Node.
-	//
-	// If no honest peer scoring is enabled, then con1Node and con2Node are less-likely to be in the same mesh, and hence the message is not delivered.
-	// If honest peer scoring is enabled, then con1Node and con2Node are certainly in the same mesh, and hence the message is delivered.
-	ctx1s, cancel1s := context.WithTimeout(ctx, 1*time.Second)
-	defer cancel1s()
-	return p2pfixtures.HasSubReceivedMessage(t, ctx1s, proposalMsg, con2Sub)
+	ticker := time.NewTicker(tick)
+	defer ticker.Stop()
+	timeoutCh := time.After(timeout)
+
+	con1HasCon2 := false // denotes whether con1 has con2 in its mesh
+	con2HasCon1 := false // denotes whether con2 has con1 in its mesh
+	for {
+		select {
+		case <-ticker.C:
+			con1BlockTopicPeers := con1NodeTracer.GetMeshPeers(blockTopic.String())
+			for _, p := range con1BlockTopicPeers {
+				if p == con2Node.Host().ID() {
+					con2HasCon1 = true
+					break // con1 has con2 in its mesh, break out of the current loop
+				}
+			}
+
+			con2BlockTopicPeers := con2NodeTracer.GetMeshPeers(blockTopic.String())
+			for _, p := range con2BlockTopicPeers {
+				if p == con1Node.Host().ID() {
+					con1HasCon2 = true
+					break // con2 has con1 in its mesh, break out of the current loop
+				}
+			}
+
+			if con2HasCon1 && con1HasCon2 {
+				return
+			}
+
+		case <-timeoutCh:
+			require.Fail(t, "timed out waiting for con1 to have con2 in its mesh; honest nodes are not on each others' topic mesh on GossipSub")
+		}
+	}
 }
 
 // maliciousAppSpecificScore returns a malicious app specific penalty function that rewards the malicious node and
