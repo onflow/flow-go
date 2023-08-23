@@ -109,25 +109,14 @@ func TestFullGossipSubConnectivity(t *testing.T) {
 	}
 }
 
-// TestFullGossipSubConnectivityAmongHonestNodesWithMaliciousMajority is part two of testing pushing access nodes to the edges of the network.
+// TestFullGossipSubConnectivityAmongHonestNodesWithMaliciousMajority tests pushing access nodes to the edges of the network.
 // This test proves that if access nodes are PUSHED to the edge of the network, even their malicious majority cannot partition
 // the network of honest nodes.
+// The scenario tests that whether two honest nodes are in each others topic mesh on GossipSub
+// when the network topology is a complete graph (i.e., full topology) and a malicious majority of access nodes are present.
+// The honest nodes (i.e., non-Access nodes) are enabled with peer scoring, then the honest nodes are enabled with peer scoring.
 func TestFullGossipSubConnectivityAmongHonestNodesWithMaliciousMajority(t *testing.T) {
 	// Note: if this test is ever flaky, this means a bug in our scoring system. Please escalate to the team instead of skipping.
-	if !testGossipConnectivityUnderNetworkPartition(t, true) {
-		// even one failure should not happen, as it means that malicious majority can partition the network
-		// with our peer scoring parameters.
-		require.Fail(t, "honest nodes are not on each others' topic mesh on GossipSub")
-	}
-
-}
-
-// testGossipConnectivityUnderNetworkPartition tests that whether two honest nodes are in each others topic mesh on GossipSub
-// when the network topology is a complete graph (i.e., full topology) and a malicious majority of access nodes are present.
-// If honestPeerScoring is true, then the honest nodes are enabled with peer scoring.
-// A true return value means that the two honest nodes have each other in each others' mesh.
-// A false return value means that the two honest nodes do not have each other in each others' mesh (at least one of them is partitioned).
-func testGossipConnectivityUnderNetworkPartition(t *testing.T, honestPeerScoring bool) bool {
 	ctx, cancel := context.WithCancel(context.Background())
 	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
 	sporkId := unittest.IdentifierFixture()
@@ -135,9 +124,7 @@ func testGossipConnectivityUnderNetworkPartition(t *testing.T, honestPeerScoring
 	idProvider := mock.NewIdentityProvider(t)
 	// two (honest) consensus nodes
 	opts := []p2ptest.NodeFixtureParameterOption{p2ptest.WithRole(flow.RoleConsensus)}
-	if honestPeerScoring {
-		opts = append(opts, p2ptest.EnablePeerScoringWithOverride(p2p.PeerScoringConfigNoOverride))
-	}
+	opts = append(opts, p2ptest.EnablePeerScoringWithOverride(p2p.PeerScoringConfigNoOverride))
 
 	defaultConfig, err := config.DefaultConfig()
 	require.NoError(t, err)
@@ -235,12 +222,11 @@ func testGossipConnectivityUnderNetworkPartition(t *testing.T, honestPeerScoring
 			}
 
 			if con2HasCon1 && con1HasCon2 {
-				return true
+				return
 			}
 
 		case <-timeoutCh:
-			t.Log("timed out waiting for con1 to have con2 in its mesh")
-			return false
+			require.Fail(t, "timed out waiting for con1 to have con2 in its mesh; honest nodes are not on each others' topic mesh on GossipSub")
 		}
 	}
 }
