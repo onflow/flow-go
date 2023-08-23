@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/onflow/flow-go/cmd/util/ledger/migrations"
-	"github.com/onflow/flow-go/engine/execution/state"
+	"github.com/onflow/flow-go/engine/execution/scripts"
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/model/flow"
@@ -13,7 +13,7 @@ import (
 )
 
 var _ module.Indexer = &Indexer{}
-var _ state.ReadOnlyExecutionState = &Indexer{}
+var _ scripts.ScriptExecutionState = &Indexer{}
 
 type Indexer struct {
 	registers   storage.Registers
