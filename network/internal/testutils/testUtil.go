@@ -126,24 +126,13 @@ func NewTagWatchingConnManager(log zerolog.Logger, metrics module.LibP2PConnecti
 //	flow.IdentityList - list of identities created for the nodes, one for each node.
 //
 // []p2p.LibP2PNode - list of libp2p nodes created.
-// []observable.Observable - list of observables created for each node.
-func LibP2PNodeForMiddlewareFixture(t *testing.T, sporkId flow.Identifier, n int, opts ...p2ptest.NodeFixtureParameterOption) (flow.IdentityList, []p2p.LibP2PNode, []observable.Observable) {
+func LibP2PNodeForMiddlewareFixture(t *testing.T, sporkId flow.Identifier, n int, opts ...p2ptest.NodeFixtureParameterOption) (flow.IdentityList, []p2p.LibP2PNode) {
 	libP2PNodes := make([]p2p.LibP2PNode, 0)
 	identities := make(flow.IdentityList, 0)
-	tagObservables := make([]observable.Observable, 0)
 	idProvider := unittest.NewUpdatableIDProvider(flow.IdentityList{})
-	defaultFlowConfig, err := config.DefaultConfig()
-	require.NoError(t, err)
-
 	opts = append(opts, p2ptest.WithUnicastHandlerFunc(nil))
 
 	for i := 0; i < n; i++ {
-		// TODO: generating a tag watching connection manager can be moved to a separate function, as only a few tests need this.
-		// For the rest of tests, the node can run on the default connection manager without setting and option.
-		connManager, err := NewTagWatchingConnManager(unittest.Logger(), metrics.NewNoopCollector(), &defaultFlowConfig.NetworkConfig.ConnectionManagerConfig)
-		require.NoError(t, err)
-
-		opts = append(opts, p2ptest.WithConnectionManager(connManager))
 		node, nodeId := p2ptest.NodeFixture(t,
 			sporkId,
 			t.Name(),
@@ -151,10 +140,9 @@ func LibP2PNodeForMiddlewareFixture(t *testing.T, sporkId flow.Identifier, n int
 			opts...)
 		libP2PNodes = append(libP2PNodes, node)
 		identities = append(identities, &nodeId)
-		tagObservables = append(tagObservables, connManager)
 	}
 	idProvider.SetIdentities(identities)
-	return identities, libP2PNodes, tagObservables
+	return identities, libP2PNodes
 }
 
 // MiddlewareConfigFixture is a test helper that generates a middleware config for testing.

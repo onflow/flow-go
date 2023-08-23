@@ -48,8 +48,8 @@ func TestTopicValidator_Unstaked(t *testing.T) {
 	idProvider.On("ByPeerID", sn1.Host().ID()).Return(&identity1, true).Maybe()
 	idProvider.On("ByPeerID", sn2.Host().ID()).Return(&identity2, true).Maybe()
 	nodes := []p2p.LibP2PNode{sn1, sn2}
-	p2ptest.StartNodes(t, signalerCtx, nodes, 100*time.Millisecond)
-	defer p2ptest.StopNodes(t, nodes, cancel, 100*time.Millisecond)
+	p2ptest.StartNodes(t, signalerCtx, nodes)
+	defer p2ptest.StopNodes(t, nodes, cancel)
 
 	channel := channels.ConsensusCommittee
 	topic := channels.TopicFromChannel(channel, sporkId)
@@ -121,8 +121,8 @@ func TestTopicValidator_PublicChannel(t *testing.T) {
 	idProvider.On("ByPeerID", sn1.Host().ID()).Return(&identity1, true).Maybe()
 	idProvider.On("ByPeerID", sn2.Host().ID()).Return(&identity2, true).Maybe()
 	nodes := []p2p.LibP2PNode{sn1, sn2}
-	p2ptest.StartNodes(t, signalerCtx, nodes, 100*time.Millisecond)
-	defer p2ptest.StopNodes(t, nodes, cancel, 100*time.Millisecond)
+	p2ptest.StartNodes(t, signalerCtx, nodes)
+	defer p2ptest.StopNodes(t, nodes, cancel)
 
 	// unauthenticated messages should not be dropped on public channels
 	channel := channels.PublicSyncCommittee
@@ -182,8 +182,8 @@ func TestTopicValidator_TopicMismatch(t *testing.T) {
 	idProvider.On("ByPeerID", sn1.Host().ID()).Return(&identity1, true).Maybe()
 	idProvider.On("ByPeerID", sn2.Host().ID()).Return(&identity2, true).Maybe()
 	nodes := []p2p.LibP2PNode{sn1, sn2}
-	p2ptest.StartNodes(t, signalerCtx, nodes, 100*time.Millisecond)
-	defer p2ptest.StopNodes(t, nodes, cancel, 100*time.Millisecond)
+	p2ptest.StartNodes(t, signalerCtx, nodes)
+	defer p2ptest.StopNodes(t, nodes, cancel)
 
 	channel := channels.ConsensusCommittee
 	topic := channels.TopicFromChannel(channel, sporkId)
@@ -235,8 +235,8 @@ func TestTopicValidator_InvalidTopic(t *testing.T) {
 	idProvider.On("ByPeerID", sn1.Host().ID()).Return(&identity1, true).Maybe()
 	idProvider.On("ByPeerID", sn2.Host().ID()).Return(&identity2, true).Maybe()
 	nodes := []p2p.LibP2PNode{sn1, sn2}
-	p2ptest.StartNodes(t, signalerCtx, nodes, 100*time.Millisecond)
-	defer p2ptest.StopNodes(t, nodes, cancel, 100*time.Millisecond)
+	p2ptest.StartNodes(t, signalerCtx, nodes)
+	defer p2ptest.StopNodes(t, nodes, cancel)
 
 	topic := channels.Topic("invalid-topic")
 
@@ -288,8 +288,8 @@ func TestAuthorizedSenderValidator_Unauthorized(t *testing.T) {
 	idProvider.On("ByPeerID", sn2.Host().ID()).Return(&identity2, true).Maybe()
 	idProvider.On("ByPeerID", an1.Host().ID()).Return(&identity3, true).Maybe()
 	nodes := []p2p.LibP2PNode{sn1, sn2, an1}
-	p2ptest.StartNodes(t, signalerCtx, nodes, 100*time.Millisecond)
-	defer p2ptest.StopNodes(t, nodes, cancel, 100*time.Millisecond)
+	p2ptest.StartNodes(t, signalerCtx, nodes)
+	defer p2ptest.StopNodes(t, nodes, cancel)
 
 	channel := channels.ConsensusCommittee
 	topic := channels.TopicFromChannel(channel, sporkId)
@@ -404,8 +404,8 @@ func TestAuthorizedSenderValidator_InvalidMsg(t *testing.T) {
 	idProvider.On("ByPeerID", sn1.Host().ID()).Return(&identity1, true).Maybe()
 	idProvider.On("ByPeerID", sn2.Host().ID()).Return(&identity2, true).Maybe()
 	nodes := []p2p.LibP2PNode{sn1, sn2}
-	p2ptest.StartNodes(t, signalerCtx, nodes, 100*time.Millisecond)
-	defer p2ptest.StopNodes(t, nodes, cancel, 100*time.Millisecond)
+	p2ptest.StartNodes(t, signalerCtx, nodes)
+	defer p2ptest.StopNodes(t, nodes, cancel)
 
 	// try to publish BlockProposal on invalid SyncCommittee channel
 	channel := channels.SyncCommittee
@@ -482,8 +482,8 @@ func TestAuthorizedSenderValidator_Ejected(t *testing.T) {
 	idProvider.On("ByPeerID", sn2.Host().ID()).Return(&identity2, true).Maybe()
 	idProvider.On("ByPeerID", an1.Host().ID()).Return(&identity3, true).Maybe()
 	nodes := []p2p.LibP2PNode{sn1, sn2, an1}
-	p2ptest.StartNodes(t, signalerCtx, nodes, 100*time.Millisecond)
-	defer p2ptest.StopNodes(t, nodes, cancel, 100*time.Millisecond)
+	p2ptest.StartNodes(t, signalerCtx, nodes)
+	defer p2ptest.StopNodes(t, nodes, cancel)
 
 	channel := channels.ConsensusCommittee
 	topic := channels.TopicFromChannel(channel, sporkId)
@@ -580,8 +580,8 @@ func TestAuthorizedSenderValidator_ClusterChannel(t *testing.T) {
 	idProvider.On("ByPeerID", ln2.Host().ID()).Return(&identity2, true).Maybe()
 	idProvider.On("ByPeerID", ln3.Host().ID()).Return(&identity3, true).Maybe()
 	nodes := []p2p.LibP2PNode{ln1, ln2, ln3}
-	p2ptest.StartNodes(t, signalerCtx, nodes, 100*time.Millisecond)
-	defer p2ptest.StopNodes(t, nodes, cancel, 100*time.Millisecond)
+	p2ptest.StartNodes(t, signalerCtx, nodes)
+	defer p2ptest.StopNodes(t, nodes, cancel)
 
 	channel := channels.SyncCluster(flow.Testnet)
 	topic := channels.TopicFromChannel(channel, sporkId)
