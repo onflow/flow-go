@@ -12,6 +12,7 @@ var _ module.Indexer = &Indexer{}
 
 type Indexer struct {
 	registers storage.Registers
+	headers   storage.Headers
 	last      uint64 // todo persist
 }
 
@@ -25,8 +26,12 @@ func (i *Indexer) StoreLast(last uint64) error {
 }
 
 func (i *Indexer) HeightForBlock(ID flow.Identifier) (uint64, error) {
-	//TODO implement me
-	panic("implement me")
+	header, err := i.headers.ByBlockID(ID)
+	if err != nil {
+		return 0, err
+	}
+
+	return header.Height, nil
 }
 
 func (i *Indexer) Commitment(height uint64) (flow.StateCommitment, error) {
