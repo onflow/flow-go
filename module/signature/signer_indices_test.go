@@ -336,7 +336,6 @@ func Test_DecodeSignerIndicesToIdentifiers(t *testing.T) {
 const UpperBoundCommitteeSize = 272
 
 func Test_DecodeSignerIndicesToIdentities(t *testing.T) {
-
 	rapid.Check(t, func(t *rapid.T) {
 		// select total committee size, number of random beacon signers and number of staking signers
 		committeeSize := rapid.IntRange(1, UpperBoundCommitteeSize).Draw(t, "committeeSize").(int)
@@ -356,6 +355,7 @@ func Test_DecodeSignerIndicesToIdentities(t *testing.T) {
 		decodedSigners, err := signature.DecodeSignerIndicesToIdentities(identities.ToSkeleton(), signerIndices)
 		require.NoError(t, err)
 
+<<<<<<< HEAD
 		slices.SortFunc(signers, func(lhs, rhs *flow.IdentitySkeleton) bool {
 			return order.IdentifierCanonical(lhs.NodeID, rhs.NodeID)
 		})
@@ -364,6 +364,16 @@ func Test_DecodeSignerIndicesToIdentities(t *testing.T) {
 			return order.IdentifierCanonical(lhs.NodeID, rhs.NodeID)
 		})
 
+=======
+		// Note that sampling from `identities` generates an _unordered_ list `signers`. Though,
+		// this is fine, as `EncodeSignersToIndices` as no ordering requirement on its input `signers`.
+		// Nevertheless, note that the output of `DecodeSignerIndicesToIdentities` is _always_ canonically
+		// ordered. Therefore, we need to order the input `signers` (so far unordered) before comparing it
+		// to the decoded output (canonically ordered)
+		slices.SortFunc(signers, func(lhs, rhs *flow.IdentitySkeleton) bool {
+			return order.IdentifierCanonical(lhs.NodeID, rhs.NodeID)
+		})
+>>>>>>> feature/dynamic-protocol-state
 		require.Equal(t, signers, decodedSigners)
 	})
 }
