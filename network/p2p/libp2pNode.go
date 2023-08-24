@@ -9,7 +9,6 @@ import (
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/protocol"
 	"github.com/libp2p/go-libp2p/core/routing"
-
 	"github.com/onflow/flow-go/engine/collection"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/component"
@@ -19,8 +18,8 @@ import (
 	"github.com/onflow/flow-go/network/p2p/unicast/protocols"
 )
 
-// Node single node management capabilities
-type Node interface {
+// P2PService service management capabilities
+type P2PService interface {
 	// Start the libp2p node.
 	Start(ctx irrecoverable.SignalerContext)
 	// Stop terminates the libp2p node.
@@ -29,16 +28,21 @@ type Node interface {
 	GetIPPort() (string, string, error)
 	// Host returns pointer to host object of node.
 	Host() host.Host
+	// SetComponentManager sets the component manager for the node.
+	// SetComponentManager may be called at most once.
+	SetComponentManager(cm *component.ComponentManager)
 }
 
 // PeerManagement set of node traits related to its lifecycle and metadata retrieval
 type PeerManagement interface {
-	// SetComponentManager sets the component manager for the node.
-	// SetComponentManager may be called at most once.
-	SetComponentManager(cm *component.ComponentManager)
-
-	// WithDefaultUnicastProtocol overrides the default handler of the unicast manager and registers all preferred protocols.
-	WithDefaultUnicastProtocol(defaultHandler libp2pnet.StreamHandler, preferred []protocols.ProtocolName) error
+	// AddPeer adds a peer to this node by adding it to this node's peerstore and connecting to it.
+	AddPeer(ctx context.Context, peerInfo peer.AddrInfo) error
+	// RemovePeer closes the connection with the peer.
+	RemovePeer(peerID peer.ID) error
+	// ListPeers returns list of peer IDs for peers subscribed to the topic.
+	ListPeers(topic string) []peer.ID
+	// GetPeersForProtocol returns slice peer IDs for the specified protocol ID.
+	GetPeersForProtocol(pid protocol.ID) peer.IDSlice
 	// WithPeersProvider sets the PeersProvider for the peer manager.
 	// If a peer manager factory is set, this method will set the peer manager's PeersProvider.
 	WithPeersProvider(peersProvider PeersProvider)
@@ -59,22 +63,12 @@ type Routable interface {
 	Routing() routing.Routing
 }
 
-// PeerToPeer peers list operations
-type PeerToPeer interface {
-	// AddPeer adds a peer to this node by adding it to this node's peerstore and connecting to it.
-	AddPeer(ctx context.Context, peerInfo peer.AddrInfo) error
-	// RemovePeer closes the connection with the peer.
-	RemovePeer(peerID peer.ID) error
-	// ListPeers returns list of peer IDs for peers subscribed to the topic.
-	ListPeers(topic string) []peer.ID
-	// GetPeersForProtocol returns slice peer IDs for the specified protocol ID.
-	GetPeersForProtocol(pid protocol.ID) peer.IDSlice
-}
-
 // StreamManagement peer to peer stream management functions
-type StreamManagement interface {
+type UnicastManagement interface {
 	// CreateStream returns an existing stream connected to the peer if it exists, or creates a new stream with it.
 	CreateStream(ctx context.Context, peerID peer.ID) (libp2pnet.Stream, error)
+	// WithDefaultUnicastProtocol overrides the default handler of the unicast manager and registers all preferred protocols.
+	WithDefaultUnicastProtocol(defaultHandler libp2pnet.StreamHandler, preferred []protocols.ProtocolName) error
 }
 
 // PubSub publish subscribe features for node
@@ -90,13 +84,9 @@ type PubSub interface {
 	SetPubSub(ps PubSubAdapter)
 }
 
-// LibP2PNode represents a flow libp2p node. It provides the network layer with the necessary interface to
-// control the underlying libp2p node. It is essentially the flow wrapper around the libp2p node, and allows
+// LibP2PNode represents a Flow libp2p node. It provides the network layer with the necessary interface to
+// control the underlying libp2p node. It is essentially the Flow wrapper around the libp2p node, and allows
 // us to define different types of libp2p nodes that can operate in different ways by overriding these methods.
-// TODO: this interface is highly coupled with the current implementation of the libp2p node. We should
-//
-//	consider refactoring it to be more generic and less coupled with the current implementation.
-//	https://github.com/dapperlabs/flow-go/issues/6575
 type LibP2PNode interface {
 	module.ReadyDoneAware
 	Subscriptions
@@ -116,8 +106,8 @@ type LibP2PNode interface {
 	// DisallowListOracle exposes the disallow list oracle API for external consumers to query about the disallow list.
 	DisallowListOracle
 
-	// Node single node management capabilities
-	Node
+	// P2PService service management capabilities
+	P2PService
 
 	// PeerManagement current peer management functions
 	PeerManagement
@@ -128,11 +118,8 @@ type LibP2PNode interface {
 	// PubSub publish subscribe features for node
 	PubSub
 
-	// PeerToPeer peers list operations
-	PeerToPeer
-
-	// StreamManagement node stream management
-	StreamManagement
+	// UnicastManagement node stream management
+	UnicastManagement
 }
 
 // Subscriptions set of funcs related to current subscription info of a node.
