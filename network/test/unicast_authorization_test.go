@@ -48,7 +48,8 @@ type UnicastAuthorizationTestSuite struct {
 	// providers id providers generated at beginning of a test run
 	providers []*unittest.UpdatableIDProvider
 	// cancel is the cancel func from the context that was used to start the middlewares in a test run
-	cancel context.CancelFunc
+	cancel  context.CancelFunc
+	sporkId flow.Identifier
 	// waitCh is the channel used to wait for the middleware to perform authorization and invoke the slashing
 	//violation's consumer before making mock assertions and cleaning up resources
 	waitCh chan struct{}
@@ -73,9 +74,9 @@ func (u *UnicastAuthorizationTestSuite) TearDownTest() {
 
 // setupMiddlewaresAndProviders will setup 2 middlewares that will be used as a sender and receiver in each suite test.
 func (u *UnicastAuthorizationTestSuite) setupMiddlewaresAndProviders(slashingViolationsConsumer network.ViolationsConsumer) {
-	sporkId := unittest.IdentifierFixture()
-	ids, libP2PNodes := testutils.LibP2PNodeForMiddlewareFixture(u.T(), sporkId, 2)
-	cfg := testutils.MiddlewareConfigFixture(u.T(), sporkId)
+	u.sporkId = unittest.IdentifierFixture()
+	ids, libP2PNodes := testutils.LibP2PNodeForMiddlewareFixture(u.T(), u.sporkId, 2)
+	cfg := testutils.MiddlewareConfigFixture(u.T(), u.sporkId)
 	mws, providers := testutils.MiddlewareFixtures(u.T(), ids, libP2PNodes, cfg, slashingViolationsConsumer)
 	require.Len(u.T(), ids, 2)
 	require.Len(u.T(), providers, 2)
@@ -154,12 +155,12 @@ func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_UnstakedPeer() 
 
 	u.startMiddlewares(overlay)
 
-	require.NoError(u.T(), u.receiverMW.Subscribe(testChannel))
-	require.NoError(u.T(), u.senderMW.Subscribe(testChannel))
+	require.NoError(u.T(), u.receiverMW.Subscribe(channels.TestNetworkChannel))
+	require.NoError(u.T(), u.senderMW.Subscribe(channels.TestNetworkChannel))
 
-	msg, err := network.NewOutgoingScope(
+	msg, err := message.NewOutgoingScope(
 		flow.IdentifierList{u.receiverID.NodeID},
-		testChannel,
+		channels.TopicFromChannel(channels.TestNetworkChannel, u.sporkId),
 		&libp2pmessage.TestMessage{
 			Text: string("hello"),
 		},
@@ -216,12 +217,12 @@ func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_EjectedPeer() {
 
 	u.startMiddlewares(overlay)
 
-	require.NoError(u.T(), u.receiverMW.Subscribe(testChannel))
-	require.NoError(u.T(), u.senderMW.Subscribe(testChannel))
+	require.NoError(u.T(), u.receiverMW.Subscribe(channels.TestNetworkChannel))
+	require.NoError(u.T(), u.senderMW.Subscribe(channels.TestNetworkChannel))
 
-	msg, err := network.NewOutgoingScope(
+	msg, err := message.NewOutgoingScope(
 		flow.IdentifierList{u.receiverID.NodeID},
-		testChannel,
+		channels.TopicFromChannel(channels.TestNetworkChannel, u.sporkId),
 		&libp2pmessage.TestMessage{
 			Text: string("hello"),
 		},
@@ -280,9 +281,9 @@ func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_UnauthorizedPee
 	require.NoError(u.T(), u.receiverMW.Subscribe(channel))
 	require.NoError(u.T(), u.senderMW.Subscribe(channel))
 
-	msg, err := network.NewOutgoingScope(
+	msg, err := message.NewOutgoingScope(
 		flow.IdentifierList{u.receiverID.NodeID},
-		channel,
+		channels.TopicFromChannel(channels.ConsensusCommittee, u.sporkId),
 		&libp2pmessage.TestMessage{
 			Text: string("hello"),
 		},
@@ -340,12 +341,12 @@ func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_UnknownMsgCode(
 
 	u.startMiddlewares(overlay)
 
-	require.NoError(u.T(), u.receiverMW.Subscribe(testChannel))
-	require.NoError(u.T(), u.senderMW.Subscribe(testChannel))
+	require.NoError(u.T(), u.receiverMW.Subscribe(channels.TestNetworkChannel))
+	require.NoError(u.T(), u.senderMW.Subscribe(channels.TestNetworkChannel))
 
-	msg, err := network.NewOutgoingScope(
+	msg, err := message.NewOutgoingScope(
 		flow.IdentifierList{u.receiverID.NodeID},
-		testChannel,
+		channels.TopicFromChannel(channels.TestNetworkChannel, u.sporkId),
 		&libp2pmessage.TestMessage{
 			Text: "hello",
 		},
@@ -410,12 +411,12 @@ func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_WrongMsgCode() 
 
 	u.startMiddlewares(overlay)
 
-	require.NoError(u.T(), u.receiverMW.Subscribe(testChannel))
-	require.NoError(u.T(), u.senderMW.Subscribe(testChannel))
+	require.NoError(u.T(), u.receiverMW.Subscribe(channels.TestNetworkChannel))
+	require.NoError(u.T(), u.senderMW.Subscribe(channels.TestNetworkChannel))
 
-	msg, err := network.NewOutgoingScope(
+	msg, err := message.NewOutgoingScope(
 		flow.IdentifierList{u.receiverID.NodeID},
-		testChannel,
+		channels.TopicFromChannel(channels.TestNetworkChannel, u.sporkId),
 		&libp2pmessage.TestMessage{
 			Text: "hello",
 		},
@@ -445,9 +446,9 @@ func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_PublicChannel()
 	u.setupMiddlewaresAndProviders(slashingViolationsConsumer)
 
 	expectedPayload := "hello"
-	msg, err := network.NewOutgoingScope(
+	msg, err := message.NewOutgoingScope(
 		flow.IdentifierList{u.receiverID.NodeID},
-		testChannel,
+		channels.TopicFromChannel(channels.TestNetworkChannel, u.sporkId),
 		&libp2pmessage.TestMessage{
 			Text: expectedPayload,
 		},
@@ -470,10 +471,10 @@ func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_PublicChannel()
 		Run(func(args mockery.Arguments) {
 			close(u.waitCh)
 
-			msg, ok := args[0].(*network.IncomingMessageScope)
+			msg, ok := args[0].(network.IncomingMessageScope)
 			require.True(u.T(), ok)
 
-			require.Equal(u.T(), testChannel, msg.Channel())                                              // channel
+			require.Equal(u.T(), channels.TestNetworkChannel, msg.Channel())                              // channel
 			require.Equal(u.T(), u.senderID.NodeID, msg.OriginId())                                       // sender id
 			require.Equal(u.T(), u.receiverID.NodeID, msg.TargetIDs()[0])                                 // target id
 			require.Equal(u.T(), message.ProtocolTypeUnicast, msg.Protocol())                             // protocol
@@ -482,8 +483,8 @@ func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_PublicChannel()
 
 	u.startMiddlewares(overlay)
 
-	require.NoError(u.T(), u.receiverMW.Subscribe(testChannel))
-	require.NoError(u.T(), u.senderMW.Subscribe(testChannel))
+	require.NoError(u.T(), u.receiverMW.Subscribe(channels.TestNetworkChannel))
+	require.NoError(u.T(), u.senderMW.Subscribe(channels.TestNetworkChannel))
 
 	// send message via unicast
 	err = u.senderMW.SendDirect(msg)
@@ -543,9 +544,9 @@ func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_UnauthorizedUni
 	// messages.BlockProposal is not authorized to be sent via unicast over the ConsensusCommittee channel
 	payload := unittest.ProposalFixture()
 
-	msg, err := network.NewOutgoingScope(
+	msg, err := message.NewOutgoingScope(
 		flow.IdentifierList{u.receiverID.NodeID},
-		channel,
+		channels.TopicFromChannel(channel, u.sporkId),
 		payload,
 		unittest.NetworkCodec().Encode,
 		message.ProtocolTypeUnicast)
@@ -600,9 +601,9 @@ func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_ReceiverHasNoSu
 
 	channel := channels.TestNetworkChannel
 
-	msg, err := network.NewOutgoingScope(
+	msg, err := message.NewOutgoingScope(
 		flow.IdentifierList{u.receiverID.NodeID},
-		channel,
+		channels.TopicFromChannel(channel, u.sporkId),
 		&libp2pmessage.TestMessage{
 			Text: "TestUnicastAuthorization_ReceiverHasNoSubscription",
 		},
@@ -626,9 +627,9 @@ func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_ReceiverHasSubs
 	u.setupMiddlewaresAndProviders(slashingViolationsConsumer)
 	channel := channels.RequestReceiptsByBlockID
 
-	msg, err := network.NewOutgoingScope(
+	msg, err := message.NewOutgoingScope(
 		flow.IdentifierList{u.receiverID.NodeID},
-		channel,
+		channels.TopicFromChannel(channel, u.sporkId),
 		&messages.EntityRequest{},
 		unittest.NetworkCodec().Encode,
 		message.ProtocolTypeUnicast)
@@ -652,7 +653,7 @@ func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_ReceiverHasSubs
 		Run(func(args mockery.Arguments) {
 			close(u.waitCh)
 
-			msg, ok := args[0].(*network.IncomingMessageScope)
+			msg, ok := args[0].(network.IncomingMessageScope)
 			require.True(u.T(), ok)
 
 			require.Equal(u.T(), channel, msg.Channel())                      // channel
