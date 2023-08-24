@@ -38,6 +38,19 @@ c-format:
 	rm -f .clang-format
 	git diff --exit-code
 
+# sanitize C code
+# cannot run on macos
+.PHONY: c-sanitize
+c-format:
+# memory sanitization
+	$(CGO_FLAG) CC="clang -O0 -g -fsanitize=memory -fno-omit-frame-pointer" \
+	LD="-fsanitize=memory" go test \
+	if [ $$? -ne 0 ]; then exit 1; fi
+# address sanitization and other checks
+	$(CGO_FLAG) CC="clang -O0 -g -fsanitize=address -fno-omit-frame-pointer -fsanitize=undefined -fno-sanitize-recover=all -fsanitize=float-divide-by-zero -fsanitize=float-cast-overflow -fno-sanitize=null -fno-sanitize=alignment" \
+	LD="-fsanitize=address" go test \
+	if [ $$? -ne 0 ]; then exit 1; fi
+
 # Go tidy
 .PHONY: go-tidy
 go-tidy:
