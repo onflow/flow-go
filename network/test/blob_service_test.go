@@ -99,7 +99,7 @@ func (suite *BlobServiceTestSuite) SetupTest() {
 		nodes,
 		testutils.MiddlewareConfigFixture(suite.T(), sporkId),
 		mocknetwork.NewViolationsConsumer(suite.T()))
-	suite.networks = testutils.NetworksFixture(suite.T(), sporkId, ids, mws)
+	suite.networks, _ = testutils.NetworksFixture(suite.T(), sporkId, ids, mws)
 	testutils.StartNodesAndNetworks(signalerCtx, suite.T(), nodes, suite.networks, 100*time.Millisecond)
 
 	blobExchangeChannel := channels.Channel("blob-exchange")

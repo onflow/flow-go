@@ -62,7 +62,7 @@ func (suite *EchoEngineTestSuite) SetupTest() {
 		nodes,
 		testutils.MiddlewareConfigFixture(suite.T(), sporkId),
 		mocknetwork.NewViolationsConsumer(suite.T()))
-	suite.nets = testutils.NetworksFixture(suite.T(), sporkId, suite.ids, suite.mws)
+	suite.nets, _ = testutils.NetworksFixture(suite.T(), sporkId, suite.ids, suite.mws)
 	testutils.StartNodesAndNetworks(signalerCtx, suite.T(), nodes, suite.nets, 100*time.Millisecond)
 }
 

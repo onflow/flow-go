@@ -18,7 +18,6 @@ import (
 	"github.com/onflow/flow-go/model/flow/filter"
 	libp2pmessage "github.com/onflow/flow-go/model/libp2p/message"
 	"github.com/onflow/flow-go/module"
-	"github.com/onflow/flow-go/module/id"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/mock"
@@ -172,7 +171,14 @@ func MiddlewareConfigFixture(t *testing.T, sporkId flow.Identifier) *middleware.
 // Returns:
 // - a list of middlewares - one for each identity.
 // - a list of UpdatableIDProvider - one for each identity.
-func MiddlewareFixtures(t *testing.T, identities flow.IdentityList, libP2PNodes []p2p.LibP2PNode, cfg *middleware.Config, consumer network.ViolationsConsumer, opts ...middleware.OptionFn) ([]network.Middleware, []*unittest.UpdatableIDProvider) {
+func MiddlewareFixtures(
+	t *testing.T,
+	identities flow.IdentityList,
+	libP2PNodes []p2p.LibP2PNode,
+	cfg *middleware.Config,
+	consumer network.ViolationsConsumer,
+	opts ...middleware.OptionFn) ([]network.Middleware, []*unittest.UpdatableIDProvider) {
+
 	require.Equal(t, len(identities), len(libP2PNodes))
 
 	mws := make([]network.Middleware, len(identities))
@@ -194,27 +200,29 @@ func MiddlewareFixtures(t *testing.T, identities flow.IdentityList, libP2PNodes 
 func NetworksFixture(t *testing.T,
 	sporkId flow.Identifier,
 	ids flow.IdentityList,
-	mws []network.Middleware) []network.Network {
+	mws []network.Middleware) ([]network.Network, []*unittest.UpdatableIDProvider) {
 
 	count := len(ids)
 	nets := make([]network.Network, 0)
+	idProviders := make([]*unittest.UpdatableIDProvider, 0)
 
 	for i := 0; i < count; i++ {
-
-		params := NetworkConfigFixture(t, *ids[i], ids, sporkId, mws[i])
+		idProvider := unittest.NewUpdatableIDProvider(ids)
+		params := NetworkConfigFixture(t, *ids[i], idProvider, sporkId, mws[i])
 		net, err := p2p.NewNetwork(params)
 		require.NoError(t, err)
 
 		nets = append(nets, net)
+		idProviders = append(idProviders, idProvider)
 	}
 
-	return nets
+	return nets, idProviders
 }
 
 func NetworkConfigFixture(
 	t *testing.T,
 	myId flow.Identity,
-	allIds flow.IdentityList,
+	idProvider module.IdentityProvider,
 	sporkId flow.Identifier,
 	mw network.Middleware,
 	opts ...p2p.NetworkConfigOption) *p2p.NetworkConfig {
@@ -227,7 +235,6 @@ func NetworkConfigFixture(
 	defaultFlowConfig, err := config.DefaultConfig()
 	require.NoError(t, err)
 
-	idProvider := id.NewFixedIdentityProvider(allIds)
 	receiveCache := netcache.NewHeroReceiveCache(
 		defaultFlowConfig.NetworkConfig.NetworkReceivedMessageCacheSize,
 		unittest.Logger(),

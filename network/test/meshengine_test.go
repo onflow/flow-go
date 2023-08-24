@@ -108,7 +108,7 @@ func (suite *MeshEngineTestSuite) SetupTest() {
 		libP2PNodes,
 		testutils.MiddlewareConfigFixture(suite.T(), sporkId),
 		mocknetwork.NewViolationsConsumer(suite.T()))
-	suite.nets = testutils.NetworksFixture(suite.T(), sporkId, suite.ids, suite.mws)
+	suite.nets, _ = testutils.NetworksFixture(suite.T(), sporkId, suite.ids, suite.mws)
 	testutils.StartNodesAndNetworks(signalerCtx, suite.T(), libP2PNodes, suite.nets, 100*time.Millisecond)
 
 	for _, observableConnMgr := range tagObservables {
