@@ -140,6 +140,7 @@ type AccessNodeConfig struct {
 	executionDataDir             string
 	executionDataStartHeight     uint64
 	executionDataConfig          edrequester.ExecutionDataConfig
+	queryExecutorConfig query.QueryConfig
 	PublicNetworkConfig          PublicNetworkConfig
 }
 
@@ -672,7 +673,11 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionDataRequester() *FlowAccessN
 			}
 
 			queryExecutor := query.NewQueryExecutor(
-				query.NewDefaultConfig(), // TODO check
+				query.QueryConfig{
+					LogTimeThreshold:    0,
+					ExecutionTimeLimit:  0,
+					MaxErrorMessageSize: 0,
+				}
 				builder.Logger,
 				metrics.NewExecutionCollector(node.Tracer), // TODO check
 				vm,
@@ -805,6 +810,10 @@ func (builder *FlowAccessNodeBuilder) extraFlags() {
 		flags.DurationVar(&builder.stateStreamConf.ClientSendTimeout, "state-stream-send-timeout", defaultConfig.stateStreamConf.ClientSendTimeout, "maximum wait before timing out while sending a response to a streaming client e.g. 30s")
 		flags.UintVar(&builder.stateStreamConf.ClientSendBufferSize, "state-stream-send-buffer-size", defaultConfig.stateStreamConf.ClientSendBufferSize, "maximum number of responses to buffer within a stream")
 		flags.Float64Var(&builder.stateStreamConf.ResponseLimit, "state-stream-response-limit", defaultConfig.stateStreamConf.ResponseLimit, "max number of responses per second to send over streaming endpoints. this helps manage resources consumed by each client querying data not in the cache e.g. 3 or 0.5. 0 means no limit")
+
+		// Script Execution
+		flags.DurationVar(&builder.queryExecutorConfig.LogTimeThreshold, "script-log-threshold", query.DefaultLogTimeThreshold, "threshold for logging script execution")
+		flags.DurationVar(&builder.queryExecutorConfig.ExecutionTimeLimit, "script-execution-time-limit", query.DefaultExecutionTimeLimit, "script execution time limit")
 	}).ValidateFlags(func() error {
 		if builder.supportsObserver && (builder.PublicNetworkConfig.BindAddress == cmd.NotSet || builder.PublicNetworkConfig.BindAddress == "") {
 			return errors.New("public-network-address must be set if supports-observer is true")
