@@ -285,7 +285,7 @@ func (c *ControlMsgValidationInspector) inspectIWant(from peer.ID, iWants []*pub
 		Int("cache_misses", cacheMisses).
 		Int("duplicates", duplicates).
 		Msg("iwant control message validation complete")
-		
+
 	return nil
 }
 
@@ -333,6 +333,7 @@ func (c *ControlMsgValidationInspector) blockingPreprocessingRpc(from peer.ID, v
 			lg.Error().
 				Err(err).
 				Bool(logging.KeySuspicious, true).
+				Bool(logging.KeyNetworkingSecurity, true).
 				Msg("failed to distribute invalid control message notification")
 			return err
 		}
@@ -389,12 +390,14 @@ func (c *ControlMsgValidationInspector) blockingPreprocessingSampleRpc(from peer
 			lg.Warn().
 				Err(err).
 				Bool(logging.KeySuspicious, true).
+				Bool(logging.KeyNetworkingSecurity, true).
 				Msg("topic validation pre-processing failed rejecting rpc control message")
 			disErr := c.distributor.Distribute(p2p.NewInvalidControlMessageNotification(from, validationConfig.ControlMsg, count, err))
 			if disErr != nil {
 				lg.Error().
 					Err(disErr).
 					Bool(logging.KeySuspicious, true).
+					Bool(logging.KeyNetworkingSecurity, true).
 					Msg("failed to distribute invalid control message notification")
 				return disErr
 			}
@@ -477,12 +480,14 @@ func (c *ControlMsgValidationInspector) processInspectMsgReq(req *InspectMsgRequ
 		lg.Error().
 			Err(validationErr).
 			Bool(logging.KeySuspicious, true).
+			Bool(logging.KeyNetworkingSecurity, true).
 			Msg("rpc control message async inspection failed")
 		err := c.distributor.Distribute(p2p.NewInvalidControlMessageNotification(req.Peer, req.validationConfig.ControlMsg, count, validationErr))
 		if err != nil {
 			lg.Error().
 				Err(err).
 				Bool(logging.KeySuspicious, true).
+				Bool(logging.KeyNetworkingSecurity, true).
 				Msg("failed to distribute invalid control message notification")
 		}
 	}
@@ -720,6 +725,7 @@ func (c *ControlMsgValidationInspector) checkClusterPrefixHardThreshold(nodeID f
 func (c *ControlMsgValidationInspector) logAndDistributeAsyncInspectErr(req *InspectMsgRequest, count uint64, err error) {
 	lg := c.logger.With().
 		Bool(logging.KeySuspicious, true).
+		Bool(logging.KeyNetworkingSecurity, true).
 		Str("peer_id", req.Peer.String()).
 		Str("ctrl_msg_type", string(req.validationConfig.ControlMsg)).
 		Uint64("ctrl_msg_count", count).Logger()
