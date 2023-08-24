@@ -653,7 +653,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionDataRequester() *FlowAccessN
 			options := computation.DefaultFVMOptions(node.RootChainID, false, false)
 			vmCtx := fvm.NewContext(options...)
 
-			derivedChainData, err := derived.NewDerivedChainData(derived.DefaultDerivedDataCacheSize) // TODO check
+			derivedChainData, err := derived.NewDerivedChainData(derived.DefaultDerivedDataCacheSize)
 			if err != nil {
 				return nil, err
 			}
@@ -661,7 +661,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionDataRequester() *FlowAccessN
 			queryExecutor := query.NewQueryExecutor(
 				builder.queryExecutorConfig,
 				builder.Logger,
-				metrics.NewExecutionCollector(node.Tracer), // TODO check
+				metrics.NewExecutionCollector(node.Tracer),
 				vm,
 				vmCtx,
 				derivedChainData,
