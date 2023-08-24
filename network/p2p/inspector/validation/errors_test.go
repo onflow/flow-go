@@ -4,11 +4,29 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/libp2p/go-libp2p/core/test"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/network/channels"
 	p2pmsg "github.com/onflow/flow-go/network/p2p/message"
 )
+
+func BenchmarkPeerID_String(b *testing.B) {
+	id, err := test.RandPeerID()
+	require.NoError(b, err)
+
+	// count up lengths to ensure String is called each time
+	var l int
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		l = l + len(id.String())
+	}
+
+	// force l to be used
+	require.Greater(b, l, 0)
+}
 
 // TestErrActiveClusterIDsNotSetRoundTrip ensures correct error formatting for ErrActiveClusterIdsNotSet.
 func TestErrActiveClusterIDsNotSetRoundTrip(t *testing.T) {
