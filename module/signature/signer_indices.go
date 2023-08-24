@@ -156,6 +156,7 @@ func DecodeSigTypeToStakingAndBeaconSigners(
 //   - The input `canonicalIdentifiers` must exhaustively list the set of authorized signers in their canonical order.
 //   - The input `signerIDs` represents a set, i.e. it should not contain any duplicates.
 //   - `signerIDs` must be a subset of `canonicalIdentifiers`
+//   - `signerIDs` can be in arbitrary order (canonical order _not required_)
 //
 // RETURN VALUE:
 //   - `signerIndices` is a bit vector. Let signerIndices[i] denote the ith bit of `signerIndices`.
@@ -277,6 +278,8 @@ func decodeSignerIndices(
 // DecodeSignerIndicesToIdentities decodes the given compacted bit vector into node Identities.
 // Prerequisite:
 //   - The input `canonicalIdentifiers` must exhaustively list the set of authorized signers in their canonical order.
+//
+// The returned list of decoded identities is in canonical order.
 //
 // Expected Error returns during normal operations:
 // * signature.InvalidSignerIndicesError if the given index vector `prefixed` does not encode a valid set of signers
