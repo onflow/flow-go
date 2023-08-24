@@ -1488,7 +1488,16 @@ func TestGossipSubSpamMitigationIntegration(t *testing.T) {
 
 	// now we expect the detection and mitigation to kick in and the victim node to disconnect from the spammer node.
 	// so the spammer and victim nodes should not be able to exchange messages on the topic.
-	p2ptest.EnsureNoPubsubExchangeBetweenGroups(t, ctx, []p2p.LibP2PNode{victimNode}, []p2p.LibP2PNode{spammer.SpammerNode}, blockTopic, 1, func() interface{} {
-		return unittest.ProposalFixture()
-	})
+	p2ptest.EnsureNoPubsubExchangeBetweenGroups(
+		t,
+		ctx,
+		[]p2p.LibP2PNode{victimNode},
+		flow.IdentifierList{victimId.NodeID},
+		[]p2p.LibP2PNode{spammer.SpammerNode},
+		flow.IdentifierList{spammer.SpammerId.NodeID},
+		blockTopic,
+		1,
+		func() interface{} {
+			return unittest.ProposalFixture()
+		})
 }
