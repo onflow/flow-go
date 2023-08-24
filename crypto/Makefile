@@ -41,9 +41,9 @@ c-format:
 # sanitize C code
 # cannot run on macos
 .PHONY: c-sanitize
-c-format:
+c-sanitize:
 # memory sanitization
-	$(CGO_FLAG) CC="clang -O0 -g -fsanitize=memory -fno-omit-frame-pointer" \
+	$(CGO_FLAG) CC="clang -O -D__BLST_PORTABLE__ -O0 -g -fsanitize=memory -fno-omit-frame-pointer" \
 	LD="-fsanitize=memory" go test \
 	if [ $$? -ne 0 ]; then exit 1; fi
 # address sanitization and other checks
