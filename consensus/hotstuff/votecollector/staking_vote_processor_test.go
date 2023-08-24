@@ -268,9 +268,7 @@ func TestStakingVoteProcessorV2_BuildVerifyQC(t *testing.T) {
 	}).Sort(order.Canonical)
 
 	leader := stakingSigners[0]
-
-	block := helper.MakeBlock(helper.WithBlockView(view),
-		helper.WithBlockProposer(leader.NodeID))
+	block := helper.MakeBlock(helper.WithBlockView(view), helper.WithBlockProposer(leader.NodeID))
 
 	committee := &mockhotstuff.DynamicCommittee{}
 	committee.On("IdentitiesByEpoch", block.View).Return(stakingSigners.ToSkeleton(), nil)
