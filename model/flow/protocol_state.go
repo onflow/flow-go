@@ -82,6 +82,16 @@ func NewRichProtocolStateEntry(
 	var err error
 	// if next epoch has been already committed, fill in data for it as well.
 	if protocolState.NextEpochProtocolState != nil {
+		// sanity check consistency of input data
+		if protocolState.NextEpochProtocolState.CurrentEpochEventIDs.SetupID != nextEpochSetup.ID() {
+			return nil, fmt.Errorf("inconsistent EpochSetup for constucting RichProtocolStateEntry, next protocol state states ID %v while input event has ID %v",
+				protocolState.NextEpochProtocolState.CurrentEpochEventIDs.SetupID, nextEpochSetup.ID())
+		}
+		if protocolState.NextEpochProtocolState.CurrentEpochEventIDs.CommitID != nextEpochCommit.ID() {
+			return nil, fmt.Errorf("inconsistent EpochCommit for constucting RichProtocolStateEntry, next protocol state states ID %v while input event has ID %v",
+				protocolState.NextEpochProtocolState.CurrentEpochEventIDs.CommitID, nextEpochCommit.ID())
+		}
+
 		// if next epoch is available, it means that we have observed epoch setup event and we are not anymore in staking phase,
 		// so we need to build the identity table using current and next epoch setup events.
 		result.Identities, err = buildIdentityTable(
@@ -166,8 +176,11 @@ func (ll DynamicIdentityEntryList) Sorted(less IdentifierOrder) bool {
 	return true
 }
 
-// buildIdentityTable builds identity table for current epoch combining data from previous, current epoch setups and dynamic identities
-// that are stored in protocol state. It also performs sanity checks to make sure that data is consistent.
+// buildIdentityTable builds identity table for current epoch combining data from:
+//   - the current epoch's Dynamic Identities
+//   - and previous + current EpochSetup events
+//
+// It also performs sanity checks to make sure that the data is consistent.
 // No errors are expected during normal operation.
 func buildIdentityTable(
 	dynamicIdentities DynamicIdentityEntryList,
@@ -176,6 +189,7 @@ func buildIdentityTable(
 	// produce a unique set for current and previous epoch participants
 	allEpochParticipants := coreIdentities.Union(otherIdentities)
 	// sanity check: size of identities should be equal to previous and current epoch participants combined
+	// This is because
 	if len(allEpochParticipants) != len(dynamicIdentities) {
 		return nil, fmt.Errorf("invalid number of identities in protocol state: expected %d, got %d", len(allEpochParticipants), len(dynamicIdentities))
 	}
