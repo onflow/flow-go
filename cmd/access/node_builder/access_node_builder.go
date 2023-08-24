@@ -651,20 +651,8 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionDataRequester() *FlowAccessN
 		// TODO(sideninja): should we put this behind a flag, only to enable it explicitly?
 		Component("script execution", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			vm := fvm.NewVirtualMachine()
-			options := []fvm.Option{
-				fvm.WithReusableCadenceRuntimePool(
-					reusableRuntime.NewReusableCadenceRuntimePool(
-						computation.ReusableCadenceRuntimePoolSize,
-						runtime.Config{
-							AccountLinkingEnabled: true,
-							// Attachments are enabled everywhere except for Mainnet
-							AttachmentsEnabled: node.RootChainID != flow.Mainnet,
-							// Capability Controllers are enabled everywhere except for Mainnet
-							CapabilityControllersEnabled: node.RootChainID != flow.Mainnet,
-						},
-					)),
-			}
 
+			options := computation.DefaultFVMOptions(node.RootChainID, false, false)
 			vmCtx := fvm.NewContext(options...)
 
 			derivedChainData, err := derived.NewDerivedChainData(derived.DefaultDerivedDataCacheSize) // TODO check
