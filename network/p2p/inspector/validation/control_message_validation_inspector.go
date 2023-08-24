@@ -210,18 +210,21 @@ func (c *ControlMsgValidationInspector) Inspect(from peer.ID, rpc *pubsub.RPC) e
 // - DuplicateFoundErr: if there are any duplicate message ids found in across any of the iWants.
 // - IWantCacheMissThresholdErr: if the rate of cache misses exceeds the configured allowed threshold.
 // - error: if any error occurs while sampling the iWants, all returned errors are benign and should not cause the node to crash.
-func (c *ControlMsgValidationInspector) inspectIWant(iWants []*pubsub_pb.ControlIWant) error {
+func (c *ControlMsgValidationInspector) inspectIWant(from peer.ID, iWants []*pubsub_pb.ControlIWant) error {
+	lastHighest := c.rpcTracker.LastHighestIHaveRPCSize()
+	lg := c.logger.With().
+		Str("peer_id", from.String()).
+		Uint("max_sample_size", c.config.IWantRPCInspectionConfig.MaxSampleSize).
+		Int64("last_highest_ihave_rpc_size", lastHighest).
+		Logger()
+
 	if len(iWants) == 0 {
 		return nil
 	}
-	sampleSize := uint(10 * c.rpcTracker.LastHighestIHaveRPCSize())
+	sampleSize := uint(10 * lastHighest)
 	if sampleSize == 0 || sampleSize > c.config.IWantRPCInspectionConfig.MaxSampleSize {
-		c.logger.Warn().
-			Uint("sample_size", sampleSize).
-			Uint("max_sample_size", c.config.IWantRPCInspectionConfig.MaxSampleSize).
-			Str(logging.KeySuspicious, "true").         // max sample size is suspicious
-			Str(logging.KeyNetworkingSecurity, "true"). // zero sample size is a security hole
-			Msg("zero or invalid sample size, using default max sample size")
+		// invalid or 0 sample size is suspicious
+		lg.Warn().Str(logging.KeySuspicious, "true").Msg("zero or invalid sample size, using default max sample size")
 		sampleSize = c.config.IWantRPCInspectionConfig.MaxSampleSize
 	}
 
@@ -249,21 +252,28 @@ func (c *ControlMsgValidationInspector) inspectIWant(iWants []*pubsub_pb.Control
 
 	tracker := make(duplicateStrTracker)
 	cacheMisses := 0
-	numOfAllowedCacheMisses := float64(sampleSize) * c.config.IWantRPCInspectionConfig.CacheMissThreshold
+	allowedCacheMissesThreshold := float64(sampleSize) * c.config.IWantRPCInspectionConfig.CacheMissThreshold
 	duplicates := 0
-	numOfAllowedDuplicates := float64(sampleSize) * c.config.IWantRPCInspectionConfig.DuplicateMsgIDThreshold
+	allowedDuplicatesThreshold := float64(sampleSize) * c.config.IWantRPCInspectionConfig.DuplicateMsgIDThreshold
+
+	lg.Trace().
+		Uint("sample_size", sampleSize).
+		Float64("allowed_cache_misses_threshold", allowedCacheMissesThreshold).
+		Float64("allowed_duplicates_threshold", allowedDuplicatesThreshold).
+		Msg("validating sample of message ids from iwant control message")
+
 	for _, messageID := range iWantMsgIDPool[:sampleSize] {
 		// check duplicate allowed threshold
 		if tracker.isDuplicate(messageID) {
 			duplicates++
-			if float64(duplicates) > numOfAllowedDuplicates {
+			if float64(duplicates) > allowedDuplicatesThreshold {
 				return NewIWantDuplicateMsgIDThresholdErr(duplicates, sampleSize, c.config.IWantRPCInspectionConfig.DuplicateMsgIDThreshold)
 			}
 		}
 		// check cache miss threshold
 		if !c.rpcTracker.WasIHaveRPCSent(messageID) {
 			cacheMisses++
-			if float64(cacheMisses) > numOfAllowedCacheMisses {
+			if float64(cacheMisses) > allowedCacheMissesThreshold {
 				return NewIWantCacheMissThresholdErr(cacheMisses, sampleSize, c.config.IWantRPCInspectionConfig.CacheMissThreshold)
 			}
 		}
@@ -420,7 +430,7 @@ func (c *ControlMsgValidationInspector) processInspectMsgReq(req *InspectMsgRequ
 	// iWant validation uses new sample size validation. This will be updated for all other control message types.
 	switch req.validationConfig.ControlMsg {
 	case p2pmsg.CtrlMsgIWant:
-		if err := c.inspectIWant(req.ctrlMsg.GetIwant()); err != nil {
+		if err := c.inspectIWant(req.Peer, req.ctrlMsg.GetIwant()); err != nil {
 			if IsIWantCacheMissThresholdErr(err) || IsIWantDuplicateMsgIDThresholdErr(err) {
 				c.logAndDistributeAsyncInspectErr(req, count, err)
 				return nil
