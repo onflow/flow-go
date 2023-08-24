@@ -1,7 +1,6 @@
 package test
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 	"regexp"
@@ -24,6 +23,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	libp2pmessage "github.com/onflow/flow-go/model/libp2p/message"
+	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module/id"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
@@ -32,7 +32,6 @@ import (
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/internal/p2pfixtures"
 	"github.com/onflow/flow-go/network/internal/testutils"
-	"github.com/onflow/flow-go/network/message"
 	"github.com/onflow/flow-go/network/mocknetwork"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/middleware"
@@ -90,7 +89,7 @@ type MiddlewareTestSuite struct {
 
 // TestMiddlewareTestSuit runs all the test methods in this test suit
 func TestMiddlewareTestSuite(t *testing.T) {
-	t.Parallel()
+	// should not run in parallel, some tests are stateful.
 	suite.Run(t, new(MiddlewareTestSuite))
 }
 
@@ -127,7 +126,9 @@ func (m *MiddlewareTestSuite) SetupTest() {
 			&defaultFlowConfig.NetworkConfig.ConnectionManagerConfig)
 		require.NoError(m.T(), err)
 
-		opts = append(opts, p2ptest.WithConnectionManager(connManager))
+		opts = append(opts,
+			p2ptest.WithConnectionManager(connManager),
+			p2ptest.WithRole(flow.RoleExecution))
 		node, nodeId := p2ptest.NodeFixture(m.T(),
 			m.sporkId,
 			m.T().Name(),
@@ -172,9 +173,9 @@ func (m *MiddlewareTestSuite) SetupTest() {
 	testutils.StartNodes(m.mwCtx, m.T(), m.libP2PNodes, 1*time.Second)
 
 	for i, net := range m.networks {
+		unittest.RequireComponentsReadyBefore(m.T(), 1*time.Second, libP2PNodes[i])
 		net.Start(m.mwCtx)
 		unittest.RequireComponentsReadyBefore(m.T(), 1*time.Second, net)
-		require.NoError(m.T(), m.mws[i].Subscribe(channels.TestNetworkChannel))
 	}
 }
 
@@ -264,6 +265,10 @@ func (m *MiddlewareTestSuite) TestUnicastRateLimit_Messages() {
 
 	// burst per interval
 	burst := 5
+
+	for _, mw := range m.mws {
+		require.NoError(m.T(), mw.Subscribe(channels.TestNetworkChannel))
+	}
 
 	messageRateLimiter := ratelimiter.NewRateLimiter(limit, burst, 3*time.Second)
 
@@ -538,7 +543,7 @@ func (m *MiddlewareTestSuite) createOverlay(provider *unittest.UpdatableIDProvid
 		return provider.Identities(filter.Any)
 	}, nil)
 	// this test is not testing the topic validator, especially in spoofing,
-	// so we always return a valid identity. We only care about the node role for the test TestMaxMessageSize_SendDirect
+	// so we always return a valid identity. We only care about the node role for the test TestMaxMessageSize_Unicast
 	// where EN are the only node authorized to send chunk data response.
 	identityOpts := unittest.WithRole(flow.RoleExecution)
 	overlay.On("Identity", mockery.AnythingOfType("peer.ID")).Maybe().Return(unittest.IdentityFixture(identityOpts), true)
@@ -642,6 +647,7 @@ func (m *MiddlewareTestSuite) MultiPing(count int) {
 			require.Equal(m.T(), m.ids[senderNodeIndex].NodeID, msgOriginID) // sender id
 
 			msgPayload, ok := args[2].(*libp2pmessage.TestMessage)
+			require.True(m.T(), ok)
 			// payload
 			require.True(m.T(), regex.MatchString(msgPayload.Text))
 			require.False(m.T(), receivedPayloads.Has(msgPayload.Text)) // payload must be unique
@@ -748,12 +754,11 @@ func (m *MiddlewareTestSuite) TestEcho() {
 	unittest.RequireReturnsBefore(m.T(), wg.Wait, 5*time.Second, "could not receive unicast on time")
 }
 
-// TestMaxMessageSize_SendDirect evaluates that invoking SendDirect method of the middleware on a message
+// TestMaxMessageSize_Unicast evaluates that invoking Unicast method of the middleware on a message
 // size beyond the permissible unicast message size returns an error.
-func (m *MiddlewareTestSuite) TestMaxMessageSize_SendDirect() {
+func (m *MiddlewareTestSuite) TestMaxMessageSize_Unicast() {
 	first := 0
 	last := m.size - 1
-	lastNode := m.ids[last].NodeID
 
 	// creates a network payload beyond the maximum message size
 	// Note: networkPayloadFixture considers 1000 bytes as the overhead of the encoded message,
@@ -765,17 +770,10 @@ func (m *MiddlewareTestSuite) TestMaxMessageSize_SendDirect() {
 		Text: string(payload),
 	}
 
-	msg, err := message.NewOutgoingScope(
-		flow.IdentifierList{lastNode},
-		channels.TopicFromChannel(channels.TestNetworkChannel, m.sporkId),
-		event,
-		unittest.NetworkCodec().Encode,
-		message.ProtocolTypeUnicast)
-	require.NoError(m.T(), err)
-
 	// sends a direct message from first node to the last node
-	err = m.mws[first].SendDirect(msg)
-	require.Error(m.Suite.T(), err)
+	con0, err := m.networks[first].Register(channels.TestNetworkChannel, &mocknetwork.MessageProcessor{})
+	require.NoError(m.T(), err)
+	require.Error(m.T(), con0.Unicast(event, m.ids[last].NodeID))
 }
 
 // TestLargeMessageSize_SendDirect asserts that a ChunkDataResponse is treated as a large message and can be unicasted
@@ -783,59 +781,50 @@ func (m *MiddlewareTestSuite) TestMaxMessageSize_SendDirect() {
 func (m *MiddlewareTestSuite) TestLargeMessageSize_SendDirect() {
 	sourceIndex := 0
 	targetIndex := m.size - 1
-	targetNode := m.ids[targetIndex].NodeID
-	targetMW := m.mws[targetIndex]
-
-	// subscribe to channels.ProvideChunks so that the message is not dropped
-	require.NoError(m.T(), targetMW.Subscribe(channels.ProvideChunks))
+	targetId := m.ids[targetIndex].NodeID
 
 	// creates a network payload with a size greater than the default max size using a known large message type
 	targetSize := uint64(middleware.DefaultMaxUnicastMsgSize) + 1000
 	event := unittest.ChunkDataResponseMsgFixture(unittest.IdentifierFixture(), unittest.WithApproximateSize(targetSize))
 
-	msg, err := message.NewOutgoingScope(
-		flow.IdentifierList{targetNode},
-		channels.TopicFromChannel(channels.ProvideChunks, m.sporkId),
-		event,
-		unittest.NetworkCodec().Encode,
-		message.ProtocolTypeUnicast)
-	require.NoError(m.T(), err)
-
 	// expect one message to be received by the target
 	ch := make(chan struct{})
-	m.ov[targetIndex].On("Receive", mockery.Anything).Return(nil).Once().
+	// mocks a target engine on the last node of the test suit that will receive the message on the test channel.
+	targetEngine := &mocknetwork.MessageProcessor{}
+	_, err := m.networks[targetIndex].Register(channels.ProvideChunks, targetEngine)
+	require.NoError(m.T(), err)
+	targetEngine.On("Process", mockery.Anything, mockery.Anything, mockery.Anything).
 		Run(func(args mockery.Arguments) {
-			msg, ok := args[0].(network.IncomingMessageScope)
+			defer close(ch)
+
+			msgChannel, ok := args[0].(channels.Channel)
 			require.True(m.T(), ok)
+			require.Equal(m.T(), channels.ProvideChunks, msgChannel) // channel
 
-			require.Equal(m.T(), channels.ProvideChunks, msg.Channel())
-			require.Equal(m.T(), m.ids[sourceIndex].NodeID, msg.OriginId())
-			require.Equal(m.T(), targetNode, msg.TargetIDs()[0])
-			require.Equal(m.T(), message.ProtocolTypeUnicast, msg.Protocol())
+			msgOriginID, ok := args[1].(flow.Identifier)
+			require.True(m.T(), ok)
+			require.Equal(m.T(), m.ids[sourceIndex].NodeID, msgOriginID) // sender id
 
-			eventId, err := message.EventId(msg.Channel(), msg.Proto().Payload)
-			require.NoError(m.T(), err)
-			require.True(m.T(), bytes.Equal(eventId, msg.EventID()))
-			close(ch)
-		})
+			msgPayload, ok := args[2].(*messages.ChunkDataResponse)
+			require.True(m.T(), ok)
+			require.Equal(m.T(), event, msgPayload) // payload
+		}).Return(nil).Once()
 
 	// sends a direct message from source node to the target node
-	err = m.mws[sourceIndex].SendDirect(msg)
-	// SendDirect should not error since this is a known large message
-	require.NoError(m.Suite.T(), err)
+	con0, err := m.networks[sourceIndex].Register(channels.ProvideChunks, &mocknetwork.MessageProcessor{})
+	require.NoError(m.T(), err)
+	require.NoError(m.T(), con0.Unicast(event, targetId))
 
 	// check message reception on target
-	unittest.RequireCloseBefore(m.T(), ch, 60*time.Second, "source node failed to send large message to target")
-
-	m.ov[targetIndex].AssertExpectations(m.T())
+	unittest.RequireCloseBefore(m.T(), ch, 5*time.Second, "source node failed to send large message to target")
 }
 
 // TestMaxMessageSize_Publish evaluates that invoking Publish method of the middleware on a message
 // size beyond the permissible publish message size returns an error.
 func (m *MiddlewareTestSuite) TestMaxMessageSize_Publish() {
-	first := 0
-	last := m.size - 1
-	lastNode := m.ids[last].NodeID
+	firstIndex := 0
+	lastIndex := m.size - 1
+	lastNodeId := m.ids[lastIndex].NodeID
 
 	// creates a network payload beyond the maximum message size
 	// Note: networkPayloadFixture considers 1000 bytes as the overhead of the encoded message,
@@ -846,26 +835,47 @@ func (m *MiddlewareTestSuite) TestMaxMessageSize_Publish() {
 	event := &libp2pmessage.TestMessage{
 		Text: string(payload),
 	}
-	msg, err := message.NewOutgoingScope(
-		flow.IdentifierList{lastNode},
-		channels.TopicFromChannel(channels.TestNetworkChannel, m.sporkId),
-		event,
-		unittest.NetworkCodec().Encode,
-		message.ProtocolTypePubSub)
+	con0, err := m.networks[firstIndex].Register(channels.TestNetworkChannel, &mocknetwork.MessageProcessor{})
 	require.NoError(m.T(), err)
 
-	// sends a direct message from first node to the last node
-	err = m.mws[first].Publish(msg)
+	err = con0.Publish(event, lastNodeId)
 	require.Error(m.Suite.T(), err)
+	require.ErrorContains(m.T(), err, "exceeds configured max message size")
 }
 
 // TestUnsubscribe tests that an engine can unsubscribe from a topic it was earlier subscribed to and stop receiving
 // messages.
 func (m *MiddlewareTestSuite) TestUnsubscribe() {
-	first := 0
-	last := m.size - 1
-	firstNode := m.ids[first].NodeID
-	lastNode := m.ids[last].NodeID
+	senderIndex := 0
+	targetIndex := m.size - 1
+	targetId := m.ids[targetIndex].NodeID
+
+	msgRcvd := make(chan struct{}, 2)
+	msgRcvdFun := func() {
+		<-msgRcvd
+	}
+
+	targetEngine := &mocknetwork.MessageProcessor{}
+	con2, err := m.networks[targetIndex].Register(channels.TestNetworkChannel, targetEngine)
+	targetEngine.On("Process", mockery.Anything, mockery.Anything, mockery.Anything).
+		Run(func(args mockery.Arguments) {
+			msgChannel, ok := args[0].(channels.Channel)
+			require.True(m.T(), ok)
+			require.Equal(m.T(), channels.TestNetworkChannel, msgChannel) // channel
+
+			msgOriginID, ok := args[1].(flow.Identifier)
+			require.True(m.T(), ok)
+			require.Equal(m.T(), m.ids[senderIndex].NodeID, msgOriginID) // sender id
+
+			msgPayload, ok := args[2].(*libp2pmessage.TestMessage)
+			require.True(m.T(), ok)
+			require.True(m.T(), msgPayload.Text == "hello1") // payload, we only expect hello 1 that was sent before unsubscribe.
+			msgRcvd <- struct{}{}
+		}).Return(nil)
+
+	// first test that when both nodes are subscribed to the channel, the target node receives the message
+	con1, err := m.networks[senderIndex].Register(channels.TestNetworkChannel, &mocknetwork.MessageProcessor{})
+	require.NoError(m.T(), err)
 
 	// set up waiting for m.size pubsub tags indicating a mesh has formed
 	for i := 0; i < m.size; i++ {
@@ -876,50 +886,20 @@ func (m *MiddlewareTestSuite) TestUnsubscribe() {
 		}
 	}
 
-	msgRcvd := make(chan struct{}, 2)
-	msgRcvdFun := func() {
-		<-msgRcvd
-	}
-
-	message1, err := message.NewOutgoingScope(
-		flow.IdentifierList{lastNode},
-		channels.TopicFromChannel(channels.TestNetworkChannel, m.sporkId),
-		&libp2pmessage.TestMessage{
-			Text: string("hello1"),
-		},
-		unittest.NetworkCodec().Encode,
-		message.ProtocolTypeUnicast)
+	err = con1.Publish(&libp2pmessage.TestMessage{
+		Text: string("hello1"),
+	}, targetId)
 	require.NoError(m.T(), err)
 
-	m.ov[last].On("Receive", mockery.Anything).Return(nil).Run(func(args mockery.Arguments) {
-		msg, ok := args[0].(network.IncomingMessageScope)
-		require.True(m.T(), ok)
-		require.Equal(m.T(), firstNode, msg.OriginId())
-		msgRcvd <- struct{}{}
-	})
-
-	// first test that when both nodes are subscribed to the channel, the target node receives the message
-	err = m.mws[first].Publish(message1)
-	assert.NoError(m.T(), err)
-
-	unittest.RequireReturnsBefore(m.T(), msgRcvdFun, 2*time.Second, "message not received")
+	unittest.RequireReturnsBefore(m.T(), msgRcvdFun, 3*time.Second, "message not received")
 
 	// now unsubscribe the target node from the channel
-	err = m.mws[last].Unsubscribe(channels.TestNetworkChannel)
-	assert.NoError(m.T(), err)
+	require.NoError(m.T(), con2.Close())
 
-	// create and send a new message on the channel from the origin node
-	message2, err := message.NewOutgoingScope(
-		flow.IdentifierList{lastNode},
-		channels.TopicFromChannel(channels.TestNetworkChannel, m.sporkId),
-		&libp2pmessage.TestMessage{
-			Text: string("hello2"),
-		},
-		unittest.NetworkCodec().Encode,
-		message.ProtocolTypeUnicast)
-	require.NoError(m.T(), err)
-
-	err = m.mws[first].Publish(message2)
+	// now publish a new message from the first node
+	err = con1.Publish(&libp2pmessage.TestMessage{
+		Text: string("hello2"),
+	}, targetId)
 	assert.NoError(m.T(), err)
 
 	// assert that the new message is not received by the target node

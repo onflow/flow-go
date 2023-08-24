@@ -60,7 +60,7 @@ func (sm *ChannelSubscriptionManager) Unregister(channel channels.Channel) error
 
 	err := sm.mw.Unsubscribe(channel)
 	if err != nil {
-		return fmt.Errorf("subscriptionManager: failed to unregister from channel %s", channel)
+		return fmt.Errorf("subscriptionManager: failed to unregister from channel %s: %w", channel, err)
 	}
 
 	delete(sm.engines, channel)

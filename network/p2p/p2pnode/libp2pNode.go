@@ -416,14 +416,13 @@ func (n *Node) unsubscribeTopic(topic channels.Topic) error {
 	}
 
 	if err := n.pubSub.UnregisterTopicValidator(topic.String()); err != nil {
-		n.logger.Err(err).Str("topic", topic.String()).Msg("failed to unregister topic validator")
+		return fmt.Errorf("failed to unregister topic validator: %w", err)
 	}
 
 	// attempt to close the topic
 	err := tp.Close()
 	if err != nil {
-		err = fmt.Errorf("could not close topic (%s): %w", topic, err)
-		return err
+		return fmt.Errorf("could not close topic (%s): %w", topic, err)
 	}
 	n.topics[topic] = nil
 	delete(n.topics, topic)
