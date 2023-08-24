@@ -76,10 +76,9 @@ func NewNode(
 	peerManager p2p.PeerManager,
 	disallowLstCacheCfg *p2p.DisallowListCacheConfig,
 ) *Node {
-	lg := logger.With().Str("component", "libp2p-node").Logger()
 	return &Node{
 		host:        host,
-		logger:      lg,
+		logger:      logger.With().Str("component", "libp2p-node").Logger(),
 		topics:      make(map[channels.Topic]p2p.Topic),
 		subs:        make(map[channels.Topic]p2p.Subscription),
 		pCache:      pCache,
@@ -104,7 +103,7 @@ func (n *Node) Stop() error {
 
 	n.logger.Debug().Msg("unsubscribing from all topics")
 	for t := range n.topics {
-		err := n.UnSubscribe(t)
+		err := n.unsubscribeTopic(t)
 		// context cancelled errors are expected while unsubscribing from topics during shutdown
 		if err != nil && !errors.Is(err, context.Canceled) {
 			result = multierror.Append(result, err)
@@ -278,11 +277,35 @@ func (n *Node) Subscribe(topic channels.Topic, topicValidator p2p.TopicValidator
 	return s, err
 }
 
-// UnSubscribe cancels the subscriber and closes the topic.
+// Unsubscribe cancels the subscriber and closes the topic.
+// Args:
+// topic: topic to unsubscribe from.
+// Returns:
+// error: error if any, which means unsubscribe failed.
 // All errors returned from this function can be considered benign.
-func (n *Node) UnSubscribe(topic channels.Topic) error {
+func (n *Node) Unsubscribe(topic channels.Topic) error {
+	err := n.unsubscribeTopic(topic)
+	if err != nil {
+		return fmt.Errorf("failed to unsubscribe from topic: %w", err)
+	}
+
+	n.RequestPeerUpdate()
+
+	return nil
+}
+
+// unsubscribeTopic cancels the subscriber and closes the topic.
+// All errors returned from this function can be considered benign.
+// Args:
+//
+//	topic: topic to unsubscribe from
+//
+// Returns:
+// error: error if any.
+func (n *Node) unsubscribeTopic(topic channels.Topic) error {
 	n.Lock()
 	defer n.Unlock()
+
 	// Remove the Subscriber from the cache
 	if s, found := n.subs[topic]; found {
 		s.Cancel()
@@ -312,20 +335,43 @@ func (n *Node) UnSubscribe(topic channels.Topic) error {
 	n.logger.Debug().
 		Str("topic", topic.String()).
 		Msg("unsubscribed from topic")
-	return err
+
+	return nil
 }
 
 // Publish publishes the given payload on the topic.
 // All errors returned from this function can be considered benign.
-func (n *Node) Publish(ctx context.Context, topic channels.Topic, data []byte) error {
-	ps, found := n.topics[topic]
-	if !found {
-		return fmt.Errorf("could not find topic (%s)", topic)
-	}
-	err := ps.Publish(ctx, data)
+func (n *Node) Publish(ctx context.Context, messageScope flownet.OutgoingMessageScope) error {
+	lg := n.logger.With().
+		Str("topic", messageScope.Topic().String()).
+		Interface("proto_message", messageScope.Proto()).
+		Str("payload_type", messageScope.PayloadType()).
+		Int("message_size", messageScope.Size()).Logger()
+	lg.Debug().Msg("received message to publish")
+
+	// convert the message to bytes to be put on the wire.
+	data, err := messageScope.Proto().Marshal()
 	if err != nil {
-		return fmt.Errorf("could not publish to topic (%s): %w", topic, err)
+		return fmt.Errorf("failed to marshal the message: %w", err)
 	}
+
+	msgSize := len(data)
+	if msgSize > DefaultMaxPubSubMsgSize {
+		// libp2p pubsub will silently drop the message if its size is greater than the configured pubsub max message size
+		// hence return an error as this message is undeliverable
+		return fmt.Errorf("message size %d exceeds configured max message size %d", msgSize, DefaultMaxPubSubMsgSize)
+	}
+
+	ps, found := n.topics[messageScope.Topic()]
+	if !found {
+		return fmt.Errorf("could not find topic (%s)", messageScope.Topic())
+	}
+	err = ps.Publish(ctx, data)
+	if err != nil {
+		return fmt.Errorf("could not publish to topic (%s): %w", messageScope.Topic(), err)
+	}
+
+	lg.Debug().Msg("published message to topic")
 	return nil
 }
 
