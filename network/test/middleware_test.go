@@ -24,6 +24,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	libp2pmessage "github.com/onflow/flow-go/model/libp2p/message"
+	"github.com/onflow/flow-go/module/id"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/observable"
@@ -67,11 +68,13 @@ func (co *tagsObserver) OnComplete() {
 	close(co.tags)
 }
 
+// TODO: eventually this should be renamed to NetworkTesTSuite and should be moved to the p2p.network package.
 type MiddlewareTestSuite struct {
 	suite.Suite
 	sync.RWMutex
 	size                       int // used to determine number of middlewares under test
-	nodes                      []p2p.LibP2PNode
+	libP2PNodes                []p2p.LibP2PNode
+	networks                   []network.Network
 	mws                        []network.Middleware // used to keep track of middlewares under test
 	ov                         []*mocknetwork.Overlay
 	obs                        chan string // used to keep track of Protect events tagged by pubsub messages
@@ -137,14 +140,16 @@ func (m *MiddlewareTestSuite) SetupTest() {
 	idProvider.SetIdentities(identities)
 
 	m.ids = identities
-	m.nodes = libP2PNodes
+	m.libP2PNodes = libP2PNodes
 
-	m.mws, m.providers = testutils.MiddlewareFixtures(
+	m.mws, _ = testutils.MiddlewareFixtures(
 		m.T(),
 		m.ids,
-		m.nodes,
+		m.libP2PNodes,
 		testutils.MiddlewareConfigFixture(m.T(), m.sporkId),
 		m.slashingViolationsConsumer)
+
+	m.networks, m.providers = testutils.NetworksFixture(m.T(), m.sporkId, m.ids, m.mws)
 	for _, observableConnMgr := range tagObservables {
 		observableConnMgr.Subscribe(&ob)
 	}
@@ -164,24 +169,23 @@ func (m *MiddlewareTestSuite) SetupTest() {
 
 	m.mwCtx = irrecoverable.NewMockSignalerContext(m.T(), ctx)
 
-	testutils.StartNodes(m.mwCtx, m.T(), m.nodes, 100*time.Millisecond)
+	testutils.StartNodes(m.mwCtx, m.T(), m.libP2PNodes, 1*time.Second)
 
-	for i, mw := range m.mws {
-		mw.SetOverlay(m.ov[i])
-		mw.Start(m.mwCtx)
-		unittest.RequireComponentsReadyBefore(m.T(), 100*time.Millisecond, mw)
-		require.NoError(m.T(), mw.Subscribe(channels.TestNetworkChannel))
+	for i, net := range m.networks {
+		net.Start(m.mwCtx)
+		unittest.RequireComponentsReadyBefore(m.T(), 1*time.Second, net)
+		require.NoError(m.T(), m.mws[i].Subscribe(channels.TestNetworkChannel))
 	}
 }
 
 func (m *MiddlewareTestSuite) TearDownTest() {
 	m.mwCancel()
 
-	testutils.StopComponents(m.T(), m.mws, 100*time.Millisecond)
-	testutils.StopComponents(m.T(), m.nodes, 100*time.Millisecond)
+	testutils.StopComponents(m.T(), m.networks, 1*time.Second)
+	testutils.StopComponents(m.T(), m.libP2PNodes, 1*time.Second)
 
 	m.mws = nil
-	m.nodes = nil
+	m.libP2PNodes = nil
 	m.ov = nil
 	m.ids = nil
 	m.size = 0
@@ -195,6 +199,7 @@ func (m *MiddlewareTestSuite) TestUpdateNodeAddresses() {
 
 	// create a new staked identity
 	ids, libP2PNodes := testutils.LibP2PNodeForMiddlewareFixture(m.T(), m.sporkId, 1)
+	idProvider := id.NewFixedIdentityProvider(ids)
 	mws, providers := testutils.MiddlewareFixtures(
 		m.T(),
 		ids,
@@ -204,7 +209,7 @@ func (m *MiddlewareTestSuite) TestUpdateNodeAddresses() {
 	networkCfg := testutils.NetworkConfigFixture(
 		m.T(),
 		*ids[0],
-		m.ids,
+		idProvider,
 		m.sporkId,
 		mws[0])
 	newNet, err := p2p.NewNetwork(networkCfg)
@@ -225,8 +230,8 @@ func (m *MiddlewareTestSuite) TestUpdateNodeAddresses() {
 	defer testutils.StopComponents(m.T(), libP2PNodes, 1*time.Second)
 
 	newNet.Start(irrecoverableCtx)
-	defer testutils.StopComponents(m.T(), []network.Network{newNet}, 1*time.Second)
-	unittest.RequireComponentsReadyBefore(m.T(), 1*time.Second, newNet)
+	defer testutils.StopComponents(m.T(), []network.Middleware{newMw}, 1*time.Second)
+	unittest.RequireComponentsReadyBefore(m.T(), 1*time.Second, newMw)
 
 	idList := flow.IdentityList(append(m.ids, newId))
 
@@ -234,20 +239,23 @@ func (m *MiddlewareTestSuite) TestUpdateNodeAddresses() {
 	m.providers[0].SetIdentities(idList)
 
 	// unicast should fail to send because no address is known yet for the new identity
-	err = newNet.UnicastOnChannel(channels.TestNetworkChannel, &libp2pmessage.TestMessage{
+	con, err := m.networks[0].Register(channels.TestNetworkChannel, &mocknetwork.MessageProcessor{})
+	err = con.Unicast(&libp2pmessage.TestMessage{
 		Text: "TestUpdateNodeAddresses",
-	}, m.ids[1].NodeID)
+	}, newId.NodeID)
 	require.True(m.T(), strings.Contains(err.Error(), swarm.ErrNoAddresses.Error()))
 
 	// update the addresses
 	m.mws[0].UpdateNodeAddresses()
 
 	// now the message should send successfully
-	// err = m.mws[0].SendDirect(outMsg)
-	// require.NoError(m.T(), err)
+	err = con.Unicast(&libp2pmessage.TestMessage{
+		Text: "TestUpdateNodeAddresses",
+	}, newId.NodeID)
+	require.NoError(m.T(), err)
 
 	cancel()
-	unittest.RequireComponentsReadyBefore(m.T(), 100*time.Millisecond, newMw)
+	unittest.RequireComponentsReadyBefore(m.T(), 1*time.Second, newMw)
 }
 
 func (m *MiddlewareTestSuite) TestUnicastRateLimit_Messages() {
@@ -303,15 +311,6 @@ func (m *MiddlewareTestSuite) TestUnicastRateLimit_Messages() {
 		middleware.WithUnicastRateLimiters(rateLimiters),
 		middleware.WithPeerManagerFilters([]p2p.PeerFilter{testutils.IsRateLimitedPeerFilter(messageRateLimiter)}))
 
-	networkCfg := testutils.NetworkConfigFixture(
-		m.T(),
-		*ids[0],
-		m.ids,
-		m.sporkId,
-		mws[0])
-	newNet, err := p2p.NewNetwork(networkCfg)
-	require.NoError(m.T(), err)
-
 	require.Len(m.T(), ids, 1)
 	require.Len(m.T(), providers, 1)
 	require.Len(m.T(), mws, 1)
@@ -331,7 +330,6 @@ func (m *MiddlewareTestSuite) TestUnicastRateLimit_Messages() {
 			close(ch)
 		}
 	})
-
 	newMw.SetOverlay(overlay)
 
 	ctx, cancel := context.WithCancel(m.mwCtx)
@@ -340,10 +338,8 @@ func (m *MiddlewareTestSuite) TestUnicastRateLimit_Messages() {
 	testutils.StartNodes(irrecoverableCtx, m.T(), libP2PNodes, 1*time.Second)
 	defer testutils.StopComponents(m.T(), libP2PNodes, 1*time.Second)
 
-	newNet.Start(irrecoverableCtx)
-	unittest.RequireComponentsReadyBefore(m.T(), 1*time.Second, newNet)
-	defer testutils.StopComponents(m.T(), []network.Network{newNet}, 1*time.Second)
-
+	newMw.Start(irrecoverableCtx)
+	unittest.RequireComponentsReadyBefore(m.T(), 1*time.Second, newMw)
 	require.NoError(m.T(), newMw.Subscribe(channels.TestNetworkChannel))
 
 	// needed to enable ID translation
@@ -356,26 +352,19 @@ func (m *MiddlewareTestSuite) TestUnicastRateLimit_Messages() {
 	// that connections to peers that are rate limited are completely prune. IsConnected will
 	// return true only if the node is a direct peer of the other, after rate limiting this direct
 	// peer should be removed by the peer manager.
-	p2ptest.LetNodesDiscoverEachOther(m.T(), ctx, []p2p.LibP2PNode{libP2PNodes[0], m.nodes[0]}, flow.IdentityList{ids[0], m.ids[0]})
-	p2ptest.TryConnectionAndEnsureConnected(m.T(), ctx, []p2p.LibP2PNode{libP2PNodes[0], m.nodes[0]})
+	p2ptest.LetNodesDiscoverEachOther(m.T(), ctx, []p2p.LibP2PNode{libP2PNodes[0], m.libP2PNodes[0]}, flow.IdentityList{ids[0], m.ids[0]})
+	p2ptest.TryConnectionAndEnsureConnected(m.T(), ctx, []p2p.LibP2PNode{libP2PNodes[0], m.libP2PNodes[0]})
+
+	con0, err := m.networks[0].Register(channels.TestNetworkChannel, &mocknetwork.MessageProcessor{})
+	require.NoError(m.T(), err)
 
 	// with the rate limit configured to 5 msg/sec we send 10 messages at once and expect the rate limiter
 	// to be invoked at-least once. We send 10 messages due to the flakiness that is caused by async stream
 	// handling of streams.
 	for i := 0; i < 10; i++ {
-		newNet.UnicastOnChannel(channels.TestNetworkChannel, &libp2pmessage.TestMessage{
+		err = con0.Unicast(&libp2pmessage.TestMessage{
 			Text: fmt.Sprintf("hello-%d", i),
 		}, newId.NodeID)
-		msg, err := message.NewOutgoingScope(
-			flow.IdentifierList{newId.NodeID},
-			channels.TopicFromChannel(channels.TestNetworkChannel, m.sporkId),
-			&libp2pmessage.TestMessage{
-				Text: fmt.Sprintf("hello-%d", i),
-			},
-			unittest.NetworkCodec().Encode,
-			message.ProtocolTypeUnicast)
-		require.NoError(m.T(), err)
-		err = m.mws[0].SendDirect(msg)
 		require.NoError(m.T(), err)
 	}
 	// wait for all rate limits before shutting down middleware
@@ -385,21 +374,15 @@ func (m *MiddlewareTestSuite) TestUnicastRateLimit_Messages() {
 	time.Sleep(1 * time.Second)
 
 	// ensure connection to rate limited peer is pruned
-	p2ptest.EnsureNotConnectedBetweenGroups(m.T(), ctx, []p2p.LibP2PNode{libP2PNodes[0]}, []p2p.LibP2PNode{m.nodes[0]})
-	p2pfixtures.EnsureNoStreamCreationBetweenGroups(m.T(), ctx, []p2p.LibP2PNode{libP2PNodes[0]}, []p2p.LibP2PNode{m.nodes[0]})
+	p2ptest.EnsureNotConnectedBetweenGroups(m.T(), ctx, []p2p.LibP2PNode{libP2PNodes[0]}, []p2p.LibP2PNode{m.libP2PNodes[0]})
+	p2pfixtures.EnsureNoStreamCreationBetweenGroups(m.T(), ctx, []p2p.LibP2PNode{libP2PNodes[0]}, []p2p.LibP2PNode{m.libP2PNodes[0]})
 
 	// eventually the rate limited node should be able to reconnect and send messages
 	require.Eventually(m.T(), func() bool {
-		msg, err := message.NewOutgoingScope(
-			flow.IdentifierList{newId.NodeID},
-			channels.TopicFromChannel(channels.TestNetworkChannel, m.sporkId),
-			&libp2pmessage.TestMessage{
-				Text: "hello",
-			},
-			unittest.NetworkCodec().Encode,
-			message.ProtocolTypeUnicast)
-		require.NoError(m.T(), err)
-		return m.mws[0].SendDirect(msg) == nil
+		err = con0.Unicast(&libp2pmessage.TestMessage{
+			Text: "hello",
+		}, newId.NodeID)
+		return err == nil
 	}, 3*time.Second, 100*time.Millisecond)
 
 	// shutdown our middleware so that each message can be processed
@@ -519,7 +502,7 @@ func (m *MiddlewareTestSuite) TestUnicastRateLimit_Bandwidth() {
 	// that connections to peers that are rate limited are completely prune. IsConnected will
 	// return true only if the node is a direct peer of the other, after rate limiting this direct
 	// peer should be removed by the peer manager.
-	p2ptest.LetNodesDiscoverEachOther(m.T(), ctx, []p2p.LibP2PNode{libP2PNodes[0], m.nodes[0]}, flow.IdentityList{ids[0], m.ids[0]})
+	p2ptest.LetNodesDiscoverEachOther(m.T(), ctx, []p2p.LibP2PNode{libP2PNodes[0], m.libP2PNodes[0]}, flow.IdentityList{ids[0], m.ids[0]})
 
 	// send 3 messages at once with a size of 400 bytes each. The third message will be rate limited
 	// as it is more than our allowed bandwidth of 1000 bytes.
@@ -535,8 +518,8 @@ func (m *MiddlewareTestSuite) TestUnicastRateLimit_Bandwidth() {
 	time.Sleep(1 * time.Second)
 
 	// ensure connection to rate limited peer is pruned
-	p2ptest.EnsureNotConnectedBetweenGroups(m.T(), ctx, []p2p.LibP2PNode{libP2PNodes[0]}, []p2p.LibP2PNode{m.nodes[0]})
-	p2pfixtures.EnsureNoStreamCreationBetweenGroups(m.T(), ctx, []p2p.LibP2PNode{libP2PNodes[0]}, []p2p.LibP2PNode{m.nodes[0]})
+	p2ptest.EnsureNotConnectedBetweenGroups(m.T(), ctx, []p2p.LibP2PNode{libP2PNodes[0]}, []p2p.LibP2PNode{m.libP2PNodes[0]})
+	p2pfixtures.EnsureNoStreamCreationBetweenGroups(m.T(), ctx, []p2p.LibP2PNode{libP2PNodes[0]}, []p2p.LibP2PNode{m.libP2PNodes[0]})
 
 	// eventually the rate limited node should be able to reconnect and send messages
 	require.Eventually(m.T(), func() bool {
