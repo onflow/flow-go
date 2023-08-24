@@ -186,6 +186,7 @@ func (e *Engine) getExecutionData(ctx context.Context, height uint64) (*executio
 		return nil, fmt.Errorf("execution data for block %d is not available yet: %w", height, storage.ErrNotFound)
 	}
 
+	// TODO: we get finalized and not sealed block execution data, this could lead to issues if finalized block is not sealed.
 	execData, err := e.execDataCache.ByHeight(ctx, height)
 	if err != nil {
 		return nil, fmt.Errorf("could not get execution data for block %d: %w", height, err)
