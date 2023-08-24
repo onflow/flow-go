@@ -2,14 +2,19 @@ package rpc_inspector
 
 import (
 	"context"
+	"fmt"
 	"testing"
 	"time"
 
+	mockery "github.com/stretchr/testify/mock"
+
+	"github.com/onflow/flow-go/insecure/corruptlibp2p"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/p2p"
+	mockp2p "github.com/onflow/flow-go/network/p2p/mock"
 	p2ptest "github.com/onflow/flow-go/network/p2p/test"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -30,4 +35,21 @@ func startNodesAndEnsureConnected(t *testing.T, ctx irrecoverable.SignalerContex
 func stopTestComponents(t *testing.T, cancel context.CancelFunc, nodes []p2p.LibP2PNode, components ...module.ReadyDoneAware) {
 	p2ptest.StopNodes(t, nodes, cancel, 5*time.Second)
 	unittest.RequireComponentsDoneBefore(t, time.Second, components...)
+}
+
+func randomClusterPrefixedTopic() channels.Topic {
+	return channels.Topic(channels.SyncCluster(flow.ChainID(fmt.Sprintf("%d", rand.Uint64()))))
+}
+
+type onNotificationDissemination func(spammer *corruptlibp2p.GossipSubRouterSpammer) func(args mockery.Arguments)
+type mockDistributorOption func(*mockp2p.GossipSubInspectorNotificationDistributor, *corruptlibp2p.GossipSubRouterSpammer)
+
+func withExpectedNotificationDissemination(expectedNumOfTotalNotif int, f onNotificationDissemination) mockDistributorOption {
+	return func(distributor *mockp2p.GossipSubInspectorNotificationDistributor, spammer *corruptlibp2p.GossipSubRouterSpammer) {
+		distributor.
+			On("Distribute", mockery.Anything).
+			Times(expectedNumOfTotalNotif).
+			Run(f(spammer)).
+			Return(nil)
+	}
 }
