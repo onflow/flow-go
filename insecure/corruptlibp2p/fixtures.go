@@ -46,8 +46,8 @@ func WithIHave(msgCount, msgSize int, topicId string) GossipSubCtrlOption {
 // The message IDs are generated randomly.
 // Args:
 //
-//		msgCount: number of iWant messages to add.
-//	 msgIdsPerIWant: number of message IDs to add to each iWant message.
+//	msgCount: number of iWant messages to add.
+//	msgIdsPerIWant: number of message IDs to add to each iWant message.
 //
 // Returns:
 // A GossipSubCtrlOption that adds iWant messages to the control message.
