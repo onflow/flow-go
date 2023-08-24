@@ -21,11 +21,10 @@ import (
 // staticEpochInfo contains leader selection and the initial committee for one epoch.
 // This data structure must not be mutated after construction.
 type staticEpochInfo struct {
-	firstView    uint64                  // first view of the epoch (inclusive)
-	finalView    uint64                  // final view of the epoch (inclusive)
-	randomSource []byte                  // random source of epoch
-	leaders      *leader.LeaderSelection // pre-computed leader selection for the epoch
-	// TODO: should use identity skeleton https://github.com/dapperlabs/flow-go/issues/6232
+	firstView            uint64                  // first view of the epoch (inclusive)
+	finalView            uint64                  // final view of the epoch (inclusive)
+	randomSource         []byte                  // random source of epoch
+	leaders              *leader.LeaderSelection // pre-computed leader selection for the epoch
 	initialCommittee     flow.IdentitySkeletonList
 	initialCommitteeMap  map[flow.Identifier]*flow.IdentitySkeleton
 	weightThresholdForQC uint64 // computed based on initial committee weights
@@ -84,7 +83,6 @@ func newStaticEpochInfo(epoch protocol.Epoch) (*staticEpochInfo, error) {
 // * lasts until the next spork (estimated 6 months)
 // * has the same static committee as the last committed epoch
 func newEmergencyFallbackEpoch(lastCommittedEpoch *staticEpochInfo) (*staticEpochInfo, error) {
-
 	rng, err := prg.New(lastCommittedEpoch.randomSource, prg.ConsensusLeaderSelection, nil)
 	if err != nil {
 		return nil, fmt.Errorf("could not create rng from seed: %w", err)
@@ -131,7 +129,6 @@ var _ hotstuff.Replicas = (*Consensus)(nil)
 var _ hotstuff.DynamicCommittee = (*Consensus)(nil)
 
 func NewConsensusCommittee(state protocol.State, me flow.Identifier) (*Consensus, error) {
-
 	com := &Consensus{
 		state:                  state,
 		me:                     me,
