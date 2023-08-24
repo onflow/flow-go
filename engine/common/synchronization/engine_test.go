@@ -252,7 +252,7 @@ func (ss *SyncSuite) TestProcess_SyncRequest_HigherThanReceiver_OutsideTolerance
 
 	ss.con.AssertNotCalled(ss.T(), "Unicast", mock.Anything, mock.Anything)
 
-	ss.e.alsp.syncRequestProbabilityFactor = 0.0 // force not creating misbehavior report
+	ss.e.spamReportConfig.syncRequestProbability = 0.0 // force not creating misbehavior report
 
 	require.NoError(ss.T(), ss.e.Process(channels.SyncCommittee, originID, req))
 
@@ -295,8 +295,8 @@ func (ss *SyncSuite) TestProcess_SyncRequest_HigherThanReceiver_OutsideTolerance
 	ss.core.AssertNotCalled(ss.T(), "WithinTolerance")
 	ss.con.AssertNotCalled(ss.T(), "Unicast", mock.Anything, mock.Anything)
 
-	// force creating misbehavior report by setting syncRequestProbabilityFactor to 1.0 (i.e. report misbehavior 100% of the time)
-	ss.e.alsp.syncRequestProbabilityFactor = 1.0
+	// force creating misbehavior report by setting syncRequestProbability to 1.0 (i.e. report misbehavior 100% of the time)
+	ss.e.spamReportConfig.syncRequestProbability = 1.0
 
 	require.NoError(ss.T(), ss.e.Process(channels.SyncCommittee, originID, req))
 
@@ -309,7 +309,7 @@ func (ss *SyncSuite) TestProcess_SyncRequest_HigherThanReceiver_OutsideTolerance
 
 // TestProcess_SyncRequest_HigherThanReceiver_OutsideTolerance_Load load tests that a sync request that's higher
 // than the receiver's height doesn't trigger a response, even if outside tolerance. It checks that an ALSP
-// spamming misbehavior report was generated and that the number of misbehavior reports is within a reasonable range.
+// spamming misbehavor report was generated and that the number of misbehavior reports is within a reasonable range.
 func (ss *SyncSuite) TestProcess_SyncRequest_HigherThanReceiver_OutsideTolerance_Load() {
 	ctx, cancel := irrecoverable.NewMockSignalerContextWithCancel(ss.T(), context.Background())
 	ss.e.Start(ctx)
@@ -326,13 +326,26 @@ func (ss *SyncSuite) TestProcess_SyncRequest_HigherThanReceiver_OutsideTolerance
 
 	loadGroups := []loadGroup{}
 
+	// expect to never get misbehavior report
+	loadGroups = append(loadGroups, loadGroup{0.0, 0, 0})
+
+	// expect to get misbehavior report between 10% of the time
 	loadGroups = append(loadGroups, loadGroup{0.1, 75, 140})
+
+	// expect to get misbehavior report between 1% of the time
+	loadGroups = append(loadGroups, loadGroup{0.01, 5, 15})
+
+	// expect to get misbehavior report between 0.1% of the time (1 in 1000 requests)
 	loadGroups = append(loadGroups, loadGroup{0.001, 0, 7})
+
+	// expect to get misbehavior report between 50% of the time
 	loadGroups = append(loadGroups, loadGroup{0.5, 450, 550})
+
+	// expect to get misbehavior report between 90% of the time
 	loadGroups = append(loadGroups, loadGroup{0.9, 850, 950})
 
 	// reset misbehavior report counter for each subtest
-	misbehaviorReported := 0
+	misbehaviorsCounter := 0
 
 	for _, loadGroup := range loadGroups {
 		ss.T().Run(fmt.Sprintf("load test; pfactor=%f lower=%d upper=%d", loadGroup.syncRequestProbabilityFactor, loadGroup.expectedMisbehaviorsLower, loadGroup.expectedMisbehaviorsUpper), func(t *testing.T) {
@@ -362,10 +375,10 @@ func (ss *SyncSuite) TestProcess_SyncRequest_HigherThanReceiver_OutsideTolerance
 				// count misbehavior reports over the course of a load test
 				ss.con.On("ReportMisbehavior", mock.Anything).Return(mock.Anything).Maybe().Run(
 					func(args mock.Arguments) {
-						misbehaviorReported++
+						misbehaviorsCounter++
 					},
 				)
-				ss.e.alsp.syncRequestProbabilityFactor = loadGroup.syncRequestProbabilityFactor
+				ss.e.spamReportConfig.syncRequestProbability = loadGroup.syncRequestProbabilityFactor
 				require.NoError(ss.T(), ss.e.Process(channels.SyncCommittee, originID, req))
 			}
 
@@ -376,10 +389,12 @@ func (ss *SyncSuite) TestProcess_SyncRequest_HigherThanReceiver_OutsideTolerance
 			// check that correct range of misbehavior reports were generated (between 1-2 reports per 1000 requests)
 			// since we're using a random method to generate misbehavior reports, we can't guarantee the exact number, so we
 			// check that it's within a larger range, but that at least 1 misbehavior report was generated
-			assert.GreaterOrEqual(ss.T(), misbehaviorReported, loadGroup.expectedMisbehaviorsLower)
-			assert.LessOrEqual(ss.T(), misbehaviorReported, loadGroup.expectedMisbehaviorsUpper) // too many reports would indicate a bug
 
-			misbehaviorReported = 0 // reset counter for next subtest
+			ss.T().Logf("misbehaviors counter after load test: %d (expected lower bound: %d expected upper bound: %d)", misbehaviorsCounter, loadGroup.expectedMisbehaviorsLower, loadGroup.expectedMisbehaviorsUpper)
+			assert.GreaterOrEqual(ss.T(), misbehaviorsCounter, loadGroup.expectedMisbehaviorsLower)
+			assert.LessOrEqual(ss.T(), misbehaviorsCounter, loadGroup.expectedMisbehaviorsUpper) // too many reports would indicate a bug
+
+			misbehaviorsCounter = 0 // reset counter for next subtest
 		})
 	}
 }

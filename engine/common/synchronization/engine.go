@@ -56,8 +56,8 @@ type Engine struct {
 	core                 module.SyncCore
 	participantsProvider module.IdentifierProvider
 
-	requestHandler *RequestHandler // component responsible for handling requests
-	alsp           *Alsp
+	requestHandler   *RequestHandler // component responsible for handling requests
+	spamReportConfig *SpamReportConfig
 
 	pendingSyncResponses   engine.MessageStore    // message store for *message.SyncResponse
 	pendingBlockResponses  engine.MessageStore    // message store for *message.BlockResponse
@@ -108,7 +108,7 @@ func New(
 		pollInterval:         opt.PollInterval,
 		scanInterval:         opt.ScanInterval,
 		participantsProvider: participantsProvider,
-		alsp:                 NewAlsp(),
+		spamReportConfig:     NewSpamReportConfig(),
 	}
 
 	// register the engine with the network layer and store the conduit
@@ -486,8 +486,8 @@ func (e *Engine) validateRangeRequestForALSP(channel channels.Channel, id flow.I
 }
 
 func (e *Engine) validateSyncRequestForALSP(channel channels.Channel, originID flow.Identifier, event interface{}) (*alsp.MisbehaviorReport, bool) {
-	// Generate a random integer between 1 and probabilityFactorMultiplier (exclusive)
-	n, err := rand.Uint32n(probabilityFactorMultiplier)
+	// Generate a random integer between 1 and spamProbabilityMultiplier (exclusive)
+	n, err := rand.Uint32n(spamProbabilityMultiplier)
 
 	if err != nil {
 		// failing to generate a random number is unlikely. If an error is encountered while
@@ -499,8 +499,8 @@ func (e *Engine) validateSyncRequestForALSP(channel channels.Channel, originID f
 	}
 
 	// to avoid creating a misbehavior report for every sync request received, use a probabilistic approach.
-	// Create a report with a probability of alsp.syncRequestProbabilityFactor
-	if float32(n) < e.alsp.syncRequestProbabilityFactor*probabilityFactorMultiplier {
+	// Create a report with a probability of spamReportConfig.syncRequestProbability
+	if float32(n) < e.spamReportConfig.syncRequestProbability*spamProbabilityMultiplier {
 		// create a misbehavior report
 		e.log.Info().Str("originID", originID.String()).Msg("creating misbehavior report")
 		report, err := alsp.NewMisbehaviorReport(originID, alsp.PotentialSpam)
