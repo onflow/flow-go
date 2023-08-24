@@ -6,11 +6,12 @@ import (
 
 	"github.com/libp2p/go-libp2p/core/peer"
 	rcmgr "github.com/libp2p/go-libp2p/p2p/host/resource-manager"
+	httpmetrics "github.com/slok/go-http-metrics/metrics"
+
 	"github.com/onflow/flow-go/model/chainsync"
 	"github.com/onflow/flow-go/model/cluster"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/network/channels"
-	httpmetrics "github.com/slok/go-http-metrics/metrics"
 )
 
 type EntriesFunc func() uint
