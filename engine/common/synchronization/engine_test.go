@@ -263,54 +263,65 @@ func (ss *SyncSuite) TestProcess_SyncRequest_HigherThanReceiver_OutsideTolerance
 	ss.con.AssertExpectations(ss.T())
 }
 
-// TestProcess_SyncRequest_HigherThanReceiver_OutsideTolerance_MisbehaviorReport tests that a sync request that's higher
+// TestLoad_Process_SyncRequest_HigherThanReceiver_OutsideTolerance_AlwaysReportSpam tests that a sync request that's higher
 // than the receiver's height doesn't trigger a response, even if outside tolerance and generates ALSP
 // spamming misbehavior report (simulating the unlikely probability).
-func (ss *SyncSuite) TestProcess_SyncRequest_HigherThanReceiver_OutsideTolerance_MisbehaviorReport() {
+// This load test ensures that a misbehavior report is generated every time when the probability factor is set to 1.0.
+func (ss *SyncSuite) TestLoad_Process_SyncRequest_HigherThanReceiver_OutsideTolerance_AlwaysReportSpam() {
 	ctx, cancel := irrecoverable.NewMockSignalerContextWithCancel(ss.T(), context.Background())
 	ss.e.Start(ctx)
 	unittest.AssertClosesBefore(ss.T(), ss.e.Ready(), time.Second)
 	defer cancel()
 
-	// generate origin and request message
-	originID := unittest.IdentifierFixture()
+	load := 1000
 
-	nonce, err := rand.Uint64()
-	require.NoError(ss.T(), err, "should generate nonce")
+	// reset misbehavior report counter for each subtest
+	misbehaviorsCounter := 0
 
-	req := &messages.SyncRequest{
-		Nonce:  nonce,
-		Height: 0,
+	for i := 0; i < load; i++ {
+		// generate origin and request message
+		originID := unittest.IdentifierFixture()
+
+		nonce, err := rand.Uint64()
+		require.NoError(ss.T(), err, "should generate nonce")
+
+		req := &messages.SyncRequest{
+			Nonce:  nonce,
+			Height: 0,
+		}
+
+		// if request height is higher than local finalized, we should not respond
+		req.Height = ss.head.Height + 1
+
+		// assert that HandleHeight, WithinTolerance are not called because misbehavior is reported
+		// also, check that response is never sent
+		ss.core.AssertNotCalled(ss.T(), "HandleHeight")
+		ss.core.AssertNotCalled(ss.T(), "WithinTolerance")
+		ss.con.AssertNotCalled(ss.T(), "Unicast", mock.Anything, mock.Anything)
+
+		// count misbehavior reports over the course of a load test
+		ss.con.On("ReportMisbehavior", mock.Anything).Return(mock.Anything).Run(
+			func(args mock.Arguments) {
+				misbehaviorsCounter++
+			},
+		)
+
+		// force creating misbehavior report by setting syncRequestProbability to 1.0 (i.e. report misbehavior 100% of the time)
+		ss.e.spamReportConfig.syncRequestProbability = 1.0
+
+		require.NoError(ss.T(), ss.e.Process(channels.SyncCommittee, originID, req))
 	}
-
-	// if request height is higher than local finalized, we should not respond
-	req.Height = ss.head.Height + 1
-
-	// assert that misbehavior is reported
-	ss.con.On("ReportMisbehavior", mock.Anything).Return(mock.Anything).Once()
-
-	// assert that HandleHeight, WithinTolerance are not called because misbehavior is reported
-	// also, check that response is never sent
-	ss.core.AssertNotCalled(ss.T(), "HandleHeight")
-	ss.core.AssertNotCalled(ss.T(), "WithinTolerance")
-	ss.con.AssertNotCalled(ss.T(), "Unicast", mock.Anything, mock.Anything)
-
-	// force creating misbehavior report by setting syncRequestProbability to 1.0 (i.e. report misbehavior 100% of the time)
-	ss.e.spamReportConfig.syncRequestProbability = 1.0
-
-	require.NoError(ss.T(), ss.e.Process(channels.SyncCommittee, originID, req))
-
-	// give at least some time to process items
-	time.Sleep(time.Millisecond * 100)
 
 	ss.core.AssertExpectations(ss.T())
 	ss.con.AssertExpectations(ss.T())
+	assert.Equal(ss.T(), misbehaviorsCounter, load) // should generate misbehavior report every time
 }
 
-// TestProcess_SyncRequest_HigherThanReceiver_OutsideTolerance_Load load tests that a sync request that's higher
+// TestLoad_Process_SyncRequest_HigherThanReceiver_OutsideTolerance_SometimesReportSpam load tests that a sync request that's higher
 // than the receiver's height doesn't trigger a response, even if outside tolerance. It checks that an ALSP
-// spamming misbehavor report was generated and that the number of misbehavior reports is within a reasonable range.
-func (ss *SyncSuite) TestProcess_SyncRequest_HigherThanReceiver_OutsideTolerance_Load() {
+// spam misbehavior report was generated and that the number of misbehavior reports is within a reasonable range.
+// This load test ensures that a misbehavior report is generated an appropriate range of times when the probability factor is set to different values.
+func (ss *SyncSuite) TestLoad_Process_SyncRequest_HigherThanReceiver_OutsideTolerance_SometimesReportSpam() {
 	ctx, cancel := irrecoverable.NewMockSignalerContextWithCancel(ss.T(), context.Background())
 	ss.e.Start(ctx)
 	unittest.AssertClosesBefore(ss.T(), ss.e.Ready(), time.Second)
