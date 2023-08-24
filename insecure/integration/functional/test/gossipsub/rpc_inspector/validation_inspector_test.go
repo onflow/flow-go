@@ -1448,8 +1448,8 @@ func TestGossipSubSpamMitigationIntegration(t *testing.T) {
 
 	// starting the nodes.
 	nodes := []p2p.LibP2PNode{victimNode, spammer.SpammerNode}
-	p2ptest.StartNodes(t, signalerCtx, nodes, 100*time.Millisecond)
-	defer p2ptest.StopNodes(t, nodes, cancel, 2*time.Second)
+	p2ptest.StartNodes(t, signalerCtx, nodes)
+	defer p2ptest.StopNodes(t, nodes, cancel)
 	spammer.Start(t)
 
 	// wait for the nodes to discover each other

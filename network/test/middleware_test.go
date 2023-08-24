@@ -20,6 +20,7 @@ import (
 	"go.uber.org/atomic"
 	"golang.org/x/time/rate"
 
+	"github.com/onflow/flow-go/config"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	libp2pmessage "github.com/onflow/flow-go/model/libp2p/message"
@@ -43,10 +44,27 @@ import (
 
 const testChannel = channels.TestNetworkChannel
 
+// tagsObserver is used to observe peer connections and their tags within a GossipSub mesh.
+// It plays a crucial role in verifying the formation of a mesh within unit tests.
 // libp2p emits a call to `Protect` with a topic-specific tag upon establishing each peering connection in a GossipSUb mesh, see:
 // https://github.com/libp2p/go-libp2p-pubsub/blob/master/tag_tracer.go
 // One way to make sure such a mesh has formed, asynchronously, in unit tests, is to wait for libp2p.GossipSubD such calls,
 // and that's what we do with tagsObserver.
+// Usage:
+// The tagsObserver struct observes the OnNext, OnError, and OnComplete events related to peer tags.
+// A channel 'tags' is used to communicate these tags, and the observer is subscribed to the observable connection manager.
+// Advantages:
+// Using tag observables helps understand the connectivity between different peers,
+// and can be valuable in testing scenarios where network connectivity is critical.
+// Issues:
+//   - Deviation from Production Code: This tag observation might be unique to the test environment,
+//     and therefore not reflect the behavior of the production code.
+//   - Mask Issues in the Production Environment: The observables are tied to testing and might
+//     lead to behaviors or errors that are masked or not evident within the actual production environment.
+//
+// TODO: Evaluate the necessity of tag observables in this test. Consider addressing the deviation from
+// production code and potential mask issues in the production environment. Evaluate the possibility
+// of removing this part eventually.
 type tagsObserver struct {
 	tags chan string
 	log  zerolog.Logger
@@ -100,7 +118,6 @@ func (m *MiddlewareTestSuite) SetupTest() {
 	m.metrics = metrics.NewNoopCollector()
 
 	// create and start the middlewares and inject a connection observer
-	var obs []observable.Observable
 	peerChannel := make(chan string)
 	ob := tagsObserver{
 		tags: peerChannel,
@@ -109,19 +126,50 @@ func (m *MiddlewareTestSuite) SetupTest() {
 
 	m.slashingViolationsConsumer = mocknetwork.NewViolationsConsumer(m.T())
 	m.sporkId = unittest.IdentifierFixture()
-	m.ids, m.nodes, obs = testutils.LibP2PNodeForMiddlewareFixture(m.T(), m.sporkId, m.size)
+
+	libP2PNodes := make([]p2p.LibP2PNode, 0)
+	identities := make(flow.IdentityList, 0)
+	tagObservables := make([]observable.Observable, 0)
+	idProvider := unittest.NewUpdatableIDProvider(flow.IdentityList{})
+	defaultFlowConfig, err := config.DefaultConfig()
+	require.NoError(m.T(), err)
+
+	opts := []p2ptest.NodeFixtureParameterOption{p2ptest.WithUnicastHandlerFunc(nil)}
+
+	for i := 0; i < m.size; i++ {
+		connManager, err := testutils.NewTagWatchingConnManager(
+			unittest.Logger(),
+			metrics.NewNoopCollector(),
+			&defaultFlowConfig.NetworkConfig.ConnectionManagerConfig)
+		require.NoError(m.T(), err)
+
+		opts = append(opts, p2ptest.WithConnectionManager(connManager))
+		node, nodeId := p2ptest.NodeFixture(m.T(),
+			m.sporkId,
+			m.T().Name(),
+			idProvider,
+			opts...)
+		libP2PNodes = append(libP2PNodes, node)
+		identities = append(identities, &nodeId)
+		tagObservables = append(tagObservables, connManager)
+	}
+	idProvider.SetIdentities(identities)
+
+	m.ids = identities
+	m.nodes = libP2PNodes
+
 	m.mws, m.providers = testutils.MiddlewareFixtures(
 		m.T(),
 		m.ids,
 		m.nodes,
 		testutils.MiddlewareConfigFixture(m.T(), m.sporkId),
 		m.slashingViolationsConsumer)
-	for _, observableConnMgr := range obs {
+	for _, observableConnMgr := range tagObservables {
 		observableConnMgr.Subscribe(&ob)
 	}
 	m.obs = peerChannel
 
-	require.Len(m.Suite.T(), obs, m.size)
+	require.Len(m.Suite.T(), tagObservables, m.size)
 	require.Len(m.Suite.T(), m.ids, m.size)
 	require.Len(m.Suite.T(), m.mws, m.size)
 
@@ -165,7 +213,7 @@ func (m *MiddlewareTestSuite) TestUpdateNodeAddresses() {
 	irrecoverableCtx := irrecoverable.NewMockSignalerContext(m.T(), ctx)
 
 	// create a new staked identity
-	ids, libP2PNodes, _ := testutils.LibP2PNodeForMiddlewareFixture(m.T(), m.sporkId, 1)
+	ids, libP2PNodes := testutils.LibP2PNodeForMiddlewareFixture(m.T(), m.sporkId, 1)
 	mws, providers := testutils.MiddlewareFixtures(
 		m.T(),
 		ids,
@@ -252,7 +300,7 @@ func (m *MiddlewareTestSuite) TestUnicastRateLimit_Messages() {
 	rateLimiters := ratelimit.NewRateLimiters(opts...)
 
 	idProvider := unittest.NewUpdatableIDProvider(m.ids)
-	ids, libP2PNodes, _ := testutils.LibP2PNodeForMiddlewareFixture(m.T(),
+	ids, libP2PNodes := testutils.LibP2PNodeForMiddlewareFixture(m.T(),
 		m.sporkId,
 		1,
 		p2ptest.WithUnicastRateLimitDistributor(distributor),
@@ -405,7 +453,7 @@ func (m *MiddlewareTestSuite) TestUnicastRateLimit_Bandwidth() {
 
 	idProvider := unittest.NewUpdatableIDProvider(m.ids)
 	// create a new staked identity
-	ids, libP2PNodes, _ := testutils.LibP2PNodeForMiddlewareFixture(m.T(),
+	ids, libP2PNodes := testutils.LibP2PNodeForMiddlewareFixture(m.T(),
 		m.sporkId,
 		1,
 		p2ptest.WithUnicastRateLimitDistributor(distributor),

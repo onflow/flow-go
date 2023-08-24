@@ -52,8 +52,8 @@ func TestStreamClosing(t *testing.T) {
 		p2ptest.WithDefaultStreamHandler(handler))
 	idProvider.SetIdentities(identities)
 
-	p2ptest.StartNodes(t, signalerCtx, nodes, 100*time.Millisecond)
-	defer p2ptest.StopNodes(t, nodes, cancel, 100*time.Millisecond)
+	p2ptest.StartNodes(t, signalerCtx, nodes)
+	defer p2ptest.StopNodes(t, nodes, cancel)
 
 	nodeInfo1, err := utils.PeerAddressInfo(*identities[1])
 	require.NoError(t, err)
@@ -159,8 +159,8 @@ func testCreateStream(t *testing.T, sporkId flow.Identifier, unicasts []protocol
 		idProvider,
 		p2ptest.WithPreferredUnicasts(unicasts))
 	idProvider.SetIdentities(identities)
-	p2ptest.StartNodes(t, signalerCtx, nodes, 100*time.Millisecond)
-	defer p2ptest.StopNodes(t, nodes, cancel, 100*time.Millisecond)
+	p2ptest.StartNodes(t, signalerCtx, nodes)
+	defer p2ptest.StopNodes(t, nodes, cancel)
 
 	id2 := identities[1]
 
@@ -225,8 +225,8 @@ func TestCreateStream_FallBack(t *testing.T) {
 		idProvider.On("ByPeerID", node.Host().ID()).Return(&identities[i], true).Maybe()
 
 	}
-	p2ptest.StartNodes(t, signalerCtx, nodes, 100*time.Millisecond)
-	defer p2ptest.StopNodes(t, nodes, cancel, 100*time.Millisecond)
+	p2ptest.StartNodes(t, signalerCtx, nodes)
+	defer p2ptest.StopNodes(t, nodes, cancel)
 
 	// Assert that there is no outbound stream to the target yet (neither default nor preferred)
 	defaultProtocolId := protocols.FlowProtocolID(sporkId)
@@ -287,8 +287,8 @@ func TestCreateStreamIsConcurrencySafe(t *testing.T) {
 	nodes, identities := p2ptest.NodesFixture(t, unittest.IdentifierFixture(), "test_create_stream_is_concurrency_safe", 2, idProvider)
 	require.Len(t, identities, 2)
 	idProvider.SetIdentities(flow.IdentityList{identities[0], identities[1]})
-	p2ptest.StartNodes(t, signalerCtx, nodes, 100*time.Millisecond)
-	defer p2ptest.StopNodes(t, nodes, cancel, 100*time.Millisecond)
+	p2ptest.StartNodes(t, signalerCtx, nodes)
+	defer p2ptest.StopNodes(t, nodes, cancel)
 
 	nodeInfo1, err := utils.PeerAddressInfo(*identities[1])
 	require.NoError(t, err)
@@ -342,12 +342,12 @@ func TestNoBackoffWhenCreatingStream(t *testing.T) {
 	node1 := nodes[0]
 	node2 := nodes[1]
 	idProvider.SetIdentities(flow.IdentityList{identities[0], identities[1]})
-	p2ptest.StartNode(t, signalerCtx1, node1, 100*time.Millisecond)
-	p2ptest.StartNode(t, signalerCtx2, node2, 100*time.Millisecond)
+	p2ptest.StartNode(t, signalerCtx1, node1)
+	p2ptest.StartNode(t, signalerCtx2, node2)
 
 	// stop node 2 immediately
-	p2ptest.StopNode(t, node2, cancel2, 100*time.Millisecond)
-	defer p2ptest.StopNode(t, node1, cancel1, 100*time.Millisecond)
+	p2ptest.StopNode(t, node2, cancel2)
+	defer p2ptest.StopNode(t, node1, cancel1)
 
 	id2 := identities[1]
 	pInfo, err := utils.PeerAddressInfo(*id2)
@@ -427,8 +427,8 @@ func testUnicastOverStream(t *testing.T, opts ...p2ptest.NodeFixtureParameterOpt
 		idProvider.On("ByPeerID", node.Host().ID()).Return(ids[i], true).Maybe()
 
 	}
-	p2ptest.StartNodes(t, signalerCtx, nodes, 100*time.Millisecond)
-	defer p2ptest.StopNodes(t, nodes, cancel, 100*time.Millisecond)
+	p2ptest.StartNodes(t, signalerCtx, nodes)
+	defer p2ptest.StopNodes(t, nodes, cancel)
 
 	p2ptest.LetNodesDiscoverEachOther(t, ctx, nodes, ids)
 
@@ -476,8 +476,8 @@ func TestUnicastOverStream_Fallback(t *testing.T) {
 		idProvider.On("ByPeerID", node.Host().ID()).Return(ids[i], true).Maybe()
 
 	}
-	p2ptest.StartNodes(t, signalerCtx, nodes, 100*time.Millisecond)
-	defer p2ptest.StopNodes(t, nodes, cancel, 100*time.Millisecond)
+	p2ptest.StartNodes(t, signalerCtx, nodes)
+	defer p2ptest.StopNodes(t, nodes, cancel)
 
 	p2ptest.LetNodesDiscoverEachOther(t, ctx, nodes, ids)
 	p2pfixtures.EnsureMessageExchangeOverUnicast(t, ctx, nodes, []chan string{inbound1, inbound2}, p2pfixtures.LongStringMessageFactoryFixture(t))
@@ -498,8 +498,8 @@ func TestCreateStreamTimeoutWithUnresponsiveNode(t *testing.T) {
 	)
 	require.Len(t, identities, 1)
 	idProvider.SetIdentities(identities)
-	p2ptest.StartNodes(t, signalerCtx, nodes, 100*time.Millisecond)
-	defer p2ptest.StopNodes(t, nodes, cancel, 100*time.Millisecond)
+	p2ptest.StartNodes(t, signalerCtx, nodes)
+	defer p2ptest.StopNodes(t, nodes, cancel)
 
 	// create a silent node which never replies
 	listener, silentNodeId := p2pfixtures.SilentNodeFixture(t)
@@ -540,8 +540,8 @@ func TestCreateStreamIsConcurrent(t *testing.T) {
 	)
 	require.Len(t, goodNodeIds, 2)
 	idProvider.SetIdentities(goodNodeIds)
-	p2ptest.StartNodes(t, signalerCtx, goodNodes, 100*time.Millisecond)
-	defer p2ptest.StopNodes(t, goodNodes, cancel, 100*time.Millisecond)
+	p2ptest.StartNodes(t, signalerCtx, goodNodes)
+	defer p2ptest.StopNodes(t, goodNodes, cancel)
 
 	goodNodeInfo1, err := utils.PeerAddressInfo(*goodNodeIds[1])
 	require.NoError(t, err)
