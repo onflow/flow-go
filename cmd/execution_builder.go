@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/onflow/flow-go/engine/execution/computation/query"
+	"github.com/onflow/flow-go/fvm/storage/derived"
 	"os"
 	"path"
 	"path/filepath"
@@ -866,10 +868,29 @@ func (exeNode *ExecutionNode) LoadIngestionEngine(
 // create scripts engine for handling script execution
 func (exeNode *ExecutionNode) LoadScriptsEngine(node *NodeConfig) (module.ReadyDoneAware, error) {
 	// for RPC to load it
+	vm := fvm.NewVirtualMachine()
+
+	options := computation.DefaultFVMOptions(node.RootChainID, false, false)
+	vmCtx := fvm.NewContext(options...)
+
+	derivedChainData, err := derived.NewDerivedChainData(derived.DefaultDerivedDataCacheSize)
+	if err != nil {
+		return nil, err
+	}
+
+	queryExecutor := query.NewQueryExecutor(
+		exeNode.exeConf.computationConfig.QueryConfig,
+		node.Logger,
+		metrics.NewExecutionCollector(node.Tracer),
+		vm,
+		vmCtx,
+		derivedChainData,
+	)
+
 	exeNode.scriptsEng = scripts.New(
 		node.Logger,
 		node.State,
-		exeNode.computationManager,
+		queryExecutor,
 		exeNode.executionState,
 	)
 
