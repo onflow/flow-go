@@ -25,20 +25,24 @@ transaction(
         let stakeDst = stakingAccount.getCapability(/public/flowTokenReceiver).borrow<&{FungibleToken.Receiver}>()
             ?? panic("Could not borrow receiver reference to the recipient's Vault")
         // withdraw stake from service account
-        let stakeSrc = service.borrow<&FlowToken.Vault>(from: /storage/flowTokenVault)
+        let stakeSrc = service.borrow<auth(FungibleToken.Withdrawable) &FlowToken.Vault>(from: /storage/flowTokenVault)
             ?? panic("Could not borrow reference to the owner's Vault!")
         stakeDst.deposit(from: <-stakeSrc.withdraw(amount: stake))
 
         // 3 - set up the staking collection
         //
-        let flowToken = stakingAccount.link<&FlowToken.Vault>(/private/flowTokenVault, target: /storage/flowTokenVault)!
+        let flowToken = stakingAccount.link<auth(FungibleToken.Withdrawable) &FlowToken.Vault>(/private/flowTokenVault, target: /storage/flowTokenVault)!
         // Create a new Staking Collection and put it in storage
         let stakingCollection <-FlowStakingCollection.createStakingCollection(unlockedVault: flowToken, tokenHolder: nil)
-        let stakingCollectionRef = &stakingCollection as &FlowStakingCollection.StakingCollection
         stakingAccount.save(<-stakingCollection, to: FlowStakingCollection.StakingCollectionStoragePath)
 
+        // Reference must be taken after storing in the storage.
+        // Otherwise the reference gets invalidated upon move.
+        let stakingCollectionRef = stakingAccount.borrow<auth(FlowStakingCollection.CollectionOwner) &FlowStakingCollection.StakingCollection>(from: FlowStakingCollection.StakingCollectionStoragePath)
+            ?? panic("Could not borrow reference to the staking collection")
+
         // Create a public link to the staking collection
-        stakingAccount.link <&FlowStakingCollection.StakingCollection{FlowStakingCollection.StakingCollectionPublic}> (
+        stakingAccount.link<&FlowStakingCollection.StakingCollection> (
             FlowStakingCollection.StakingCollectionPublicPath,
             target: FlowStakingCollection.StakingCollectionStoragePath
         )

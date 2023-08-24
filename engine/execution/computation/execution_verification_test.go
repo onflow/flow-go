@@ -205,7 +205,7 @@ func Test_ExecutionMatchesVerification(t *testing.T) {
 		err = testutil.SignTransaction(addKeyTx, accountAddress, accountPrivKey, 0)
 		require.NoError(t, err)
 
-		minimumStorage, err := cadence.NewUFix64("0.00010807")
+		minimumStorage, err := cadence.NewUFix64("0.00010902")
 		require.NoError(t, err)
 
 		cr := executeBlockAndVerify(t, [][]*flow.TransactionBody{
