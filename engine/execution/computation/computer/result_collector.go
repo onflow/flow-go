@@ -139,6 +139,7 @@ func (collector *resultCollector) commitCollection(
 		trace.EXECommitDelta).End()
 
 	startState := collector.result.CurrentEndState()
+	// baseStorageSnapshot := collector.result.CurrentStorageSnapshot()
 	endState, proof, trieUpdate, err := collector.committer.CommitView(
 		collectionExecutionSnapshot,
 		startState)
