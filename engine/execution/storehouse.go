@@ -15,32 +15,38 @@ import (
 
 type RegisterStore interface {
 	// Depend on OnDiskRegisterStore.Init
-	// Depend on InMemoryRegisterStore.InitWithLatestHeight
 	Init() error
 
+	// GetRegister first try to get the register from InMemoryRegisterStore, then OnDiskRegisterStore
 	GetRegister(height uint64, blockID flow.Identifier, register flow.RegisterID) (flow.RegisterValue, error)
-	GetRegisters(height uint64, blockID flow.Identifier, registers []flow.RegisterID) ([]flow.RegisterValue, error)
 
-	// SaveRegister will always save to InMemoryRegisterStore first
+	// SaveRegister saves to InMemoryRegisterStore first, then trigger the same check as OnBlockFinalized
 	// Depend on InMemoryRegisterStore.SaveRegister
 	SaveRegister(height uint64, blockID flow.Identifier, registers []flow.RegisterEntry) error
 
+	// Depend on FinalizedReader's GetFinalizedBlockIDAtHeight
 	// Depend on ExecutedFinalizedWAL.Append
 	// Depend on OnDiskRegisterStore.SaveRegister
-	// Depend on FinalizedReader's GetFinalizedBlockIDAtHeight
-	// OnBlockFinalized will trigger the check of whether a block at the next height becomes finalized and executed.
+	// OnBlockFinalized trigger the check of whether a block at the next height becomes finalized and executed.
 	// the next height is the existing finalized and executed block's height + 1.
-	// If a block at next height becomes finalized and executed, save the registers of the block to
-	// OnDiskRegisterStore, and then prune the height in InMemoryRegisterStore
+	// If a block at next height becomes finalized and executed, then:
+	// 1. write the registers to write ahead logs
+	// 2. save the registers of the block to OnDiskRegisterStore
+	// 3. prune the height in InMemoryRegisterStore
 	OnBlockFinalized() error
 
+	// FinalizedAndExecutedHeight returns the height of the last finalized and executed block,
+	// which has been saved in OnDiskRegisterStore
 	FinalizedAndExecutedHeight() (uint64, error)
-
-	Checkpoint() (height uint64, err error)
 }
 
 type FinalizedReader interface {
 	GetFinalizedBlockIDAtHeight(height uint64) (flow.Identifier, error)
+}
+
+type RegisterStaging interface {
+	StageRegisters(blockID flow.Identifier, startState flow.StateCommitment, registers []flow.RegisterEntry) error
+	Finalize() error
 }
 
 type InMemoryRegisterStore interface {
@@ -50,18 +56,32 @@ type InMemoryRegisterStore interface {
 	PrunedHeight() uint64
 
 	GetRegister(height uint64, blockID flow.Identifier, register flow.RegisterID) (flow.RegisterValue, error)
-	GetRegisters(height uint64, blockID flow.Identifier, registers []flow.RegisterID) ([]flow.RegisterValue, error)
 	SaveRegister(height uint64, blockID flow.Identifier, registers []flow.RegisterEntry) error
 }
 
 type OnDiskRegisterStore interface {
 	GetRegister(height uint64, register flow.RegisterID) (flow.RegisterValue, error)
-	GetRegisters(height uint64) ([]flow.RegisterEntry, error)
 	SaveRegister(height uint64, registers []flow.RegisterEntry) error
 	// latest finalized and executed height
 	Latest() (height uint64)
 }
 
+type ExecutedFinalizedWAL interface {
+	Append(height uint64, trieUpdates []*ledger.TrieUpdate) error
+
+	// GetLatest returns the latest height in the WAL.
+	Latest() (uint64, error)
+
+	GetReader(height uint64) (WALReader, error)
+}
+
+type WALReader interface {
+	// Next returns the next height and trie updates in the WAL.
+	// It returns EOF when there are no more entries.
+	Next() (height uint64, trieUpdates []*ledger.TrieUpdate, err error)
+}
+
+// Does not depend on Storehouse and Trie directly
 type IngestionEngine interface {
 	Ready() error
 	// Depend on ComputerManager's ComputeBlock
@@ -94,6 +114,10 @@ type ReadyOnlyExecutionState interface {
 	// TODO: add height
 	NewStorageSnapshot(flow.StateCommitment) snapshot.StorageSnapshot
 
+	// NewBlockStorageSnapshot creates a new read-only view at the given block.
+	// Depend on Storehouse.GetRegister
+	NewBlockStorageSnapshot(height uint64, blockID flow.Identifier) snapshot.StorageSnapshot
+
 	// StateCommitmentByBlockID returns the final state commitment for the provided block ID.
 	StateCommitmentByBlockID(context.Context, flow.Identifier) (flow.StateCommitment, error)
 
@@ -106,7 +130,8 @@ type ReadyOnlyExecutionState interface {
 type ExecutionState interface {
 	ReadyOnlyExecutionState
 
-	// Depend on badger DB
+	// Depend on Protocol Badger DB
+	// Depend on Storehouse.Store
 	SaveExecutionResults(
 		ctx context.Context,
 		result *ComputationResult,
@@ -173,7 +198,8 @@ type ExecutionDataProvider interface {
 type ViewCommiter interface {
 	// Depend on ledger.Prove (proof)
 	// Depend on ledger.Set to save the trie update (deprecated)
-	// Depend on RegisterStore.Store
+	// Depend on RegisterStore.Get, but NOT Register.Store
+	// The register updates are saved by ingestion engine
 	CommitView(
 		*snapshot.ExecutionSnapshot,
 		flow.StateCommitment,
@@ -185,26 +211,13 @@ type ViewCommiter interface {
 	)
 }
 
-type ExecutedFinalizedWAL interface {
-	Append(height uint64, trieUpdates []*ledger.TrieUpdate) error
-
-	// GetLatest returns the latest height in the WAL.
-	Latest() (uint64, error)
-
-	GetReader(height uint64) (WALReader, error)
-}
-
-type WALReader interface {
-	// Next returns the next height and trie updates in the WAL.
-	// It returns EOF when there are no more entries.
-	Next() (height uint64, trieUpdates []*ledger.TrieUpdate, err error)
-}
-
 type Ledger interface {
 	// Depend on RegisterlessTrieCheckpointReader.ReadChecpoint
 	Init() error
-	// Depend on RegisterlessTrie
-	Prove(height uint64, query *ledger.Query) (proof ledger.Proof, err error)
+	// Depend on RegisterlessTrie.UnsafeProofs
+	Prove(height uint64, state ledger.State, key ledger.Key) (proof ledger.Proof, err error)
+	// (deprecated) If the register is not found, the err message will include the pruned height
+	GetSingleValue(state ledger.State, registerID flow.RegisterID) (value flow.RegisterValue, err error)
 	// baseState is the state at the previous height (height - 1)
 	Update(height uint64, baseState ledger.State, updates flow.RegisterEntries) (newState ledger.State, trieUpdate *ledger.TrieUpdate, err error)
 	// Prune with finalized and executed height

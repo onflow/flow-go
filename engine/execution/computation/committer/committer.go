@@ -29,20 +29,26 @@ func NewLedgerViewCommitter(
 	}
 }
 
+// ComitView commits the given execution snapshot to the ledger.
+// the execution snapshot is the result of executing a collection.
 func (committer *LedgerViewCommitter) CommitView(
 	snapshot *snapshot.ExecutionSnapshot,
 	baseState flow.StateCommitment,
+	// caller will create a new baseStorageSnapshot with trie updates up to the previous state
+	// baseStorageSnapshot snapshot.StorageSnapshot,
 ) (
 	newCommit flow.StateCommitment,
 	proof []byte,
 	trieUpdate *ledger.TrieUpdate,
 	err error,
 ) {
+	// storageSnapshot
 	var err1, err2 error
 	var wg sync.WaitGroup
 	wg.Add(1)
 	go func() {
 		proof, err2 = committer.collectProofs(snapshot, baseState)
+		// proof, err2 = committer.collectProofs(snapshot, baseState, baseStorageSnapshot)
 		wg.Done()
 	}()
 
@@ -58,6 +64,7 @@ func (committer *LedgerViewCommitter) CommitView(
 	if err2 != nil {
 		err = multierror.Append(err, err2)
 	}
+
 	return
 }
 
