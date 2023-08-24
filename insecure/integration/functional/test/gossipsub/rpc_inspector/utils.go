@@ -25,7 +25,7 @@ import (
 
 // StartNodesAndEnsureConnected starts the victim and spammer node and ensures they are both connected.
 func startNodesAndEnsureConnected(t *testing.T, ctx irrecoverable.SignalerContext, nodes []p2p.LibP2PNode, sporkID flow.Identifier) {
-	p2ptest.StartNodes(t, ctx, nodes, 5*time.Second)
+	p2ptest.StartNodes(t, ctx, nodes)
 	// prior to the test we should ensure that spammer and victim connect.
 	// this is vital as the spammer will circumvent the normal pubsub subscription mechanism and send iHAVE messages directly to the victim.
 	// without a prior connection established, directly spamming pubsub messages may cause a race condition in the pubsub implementation.
@@ -37,7 +37,7 @@ func startNodesAndEnsureConnected(t *testing.T, ctx irrecoverable.SignalerContex
 }
 
 func stopTestComponents(t *testing.T, cancel context.CancelFunc, nodes []p2p.LibP2PNode, components ...module.ReadyDoneAware) {
-	p2ptest.StopNodes(t, nodes, cancel, 5*time.Second)
+	p2ptest.StopNodes(t, nodes, cancel)
 	unittest.RequireComponentsDoneBefore(t, time.Second, components...)
 }
 
