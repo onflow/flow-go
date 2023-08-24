@@ -13,11 +13,16 @@ type DynamicIdentityEntry struct {
 
 type DynamicIdentityEntryList []*DynamicIdentityEntry
 
-// ProtocolStateEntry holds information about the protocol state at some point in time.
-// It allows to reconstruct the state of identity table using epoch setup events and dynamic identities.
-// It tracks attempts of invalid state transitions.
+// ProtocolStateEntry represents a snapshot of the identity table (i.e. the set of all notes authorized to
+// be part of the network) at some point in time. It allows to reconstruct the state of identity table using
+// epoch setup events and dynamic identities. It tracks attempts of invalid state transitions.
 // It also holds information about the next epoch, if it has been already committed.
 // This structure is used to persist protocol state in the database.
+//
+// Note that the current implementation does not store the identity table directly. Instead, we store
+// the original events that constituted the _initial_ identity table at the beginning of the epoch
+// plus some modifiers. We intend to restructure this code soon.
+// TODO: https://github.com/onflow/flow-go/issues/4649
 type ProtocolStateEntry struct {
 	// setup and commit event IDs for current epoch.
 	CurrentEpochEventIDs EventIDs
@@ -40,7 +45,7 @@ type ProtocolStateEntry struct {
 // the database for epoch setups and commits and full identity table.
 // It holds several invariants, such as:
 //   - CurrentEpochSetup and CurrentEpochCommit are for the same epoch. Never nil.
-//   - PreviousEpochSetup and PreviousEpochCommit are for the same epoch. Never nil.
+//   - PreviousEpochSetup and PreviousEpochCommit are for the same epoch. Can be nil.
 //   - Identities is a full identity table for the current epoch.
 //     Identities are sorted in canonical order. Without duplicates. Never nil.
 //   - NextEpochProtocolState is a protocol state for the next epoch. Can be nil.
