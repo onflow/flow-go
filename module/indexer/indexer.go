@@ -108,6 +108,7 @@ func (i *Indexer) StoreCommitment(commitment flow.StateCommitment, height uint64
 func (i *Indexer) Values(IDs flow.RegisterIDs, height uint64) ([]flow.RegisterValue, error) {
 	values := make([]flow.RegisterValue, len(IDs))
 
+	// TODO batch retrieve
 	for j, id := range IDs {
 		val, err := i.registers.Get(id, height)
 		if err != nil {
