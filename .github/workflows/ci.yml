@@ -38,6 +38,8 @@ jobs:
       with:
         go-version: ${{ env.GO_VERSION }}
         cache: true
+    - name: Setup tmate session
+      uses: mxschmitt/action-tmate@v3
     - name: Install C formatter
       run: sudo apt-get install -y clang-format
     - name: Run C formatter for ./crypto
@@ -69,8 +71,6 @@ jobs:
           cache: true
       - name: Run tidy
         run: make tidy
-      - name: Setup tmate session
-        uses: mxschmitt/action-tmate@v3
 
   create-dynamic-test-matrix:
     name: Create Dynamic Test Matrix
