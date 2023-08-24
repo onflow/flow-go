@@ -117,16 +117,17 @@ func (t *RPCSentTracker) rpcSentWorkerLogic(work trackableRPC) error {
 	case len(work.rpc.GetControl().GetIhave()) > 0:
 		iHave := work.rpc.GetControl().GetIhave()
 		numOfMessageIdsTracked := t.iHaveRPCSent(iHave)
-		t.updateLastHighestIHaveRPCSize(int64(numOfMessageIdsTracked))
-		t.logger.Info().
+		lastHighestIHaveCount := t.updateLastHighestIHaveRPCSize(int64(numOfMessageIdsTracked))
+		t.logger.Debug().
 			Int("num_of_ihaves", len(iHave)).
 			Int("num_of_message_ids", numOfMessageIdsTracked).
+			Int64("last_highest_ihave_count", lastHighestIHaveCount).
 			Msg(iHaveRPCTrackedLog)
 	}
 	return nil
 }
 
-func (t *RPCSentTracker) updateLastHighestIHaveRPCSize(size int64) {
+func (t *RPCSentTracker) updateLastHighestIHaveRPCSize(size int64) int64 {
 	t.Lock()
 	defer t.Unlock()
 	if t.lastSize < size || time.Since(t.lastUpdate) > t.lastHighestIHaveRPCSizeResetInterval {
@@ -134,6 +135,7 @@ func (t *RPCSentTracker) updateLastHighestIHaveRPCSize(size int64) {
 		t.lastSize = size
 		t.lastUpdate = time.Now()
 	}
+	return t.lastSize
 }
 
 // iHaveRPCSent caches a unique entity message ID for each message ID included in each rpc iHave control message.

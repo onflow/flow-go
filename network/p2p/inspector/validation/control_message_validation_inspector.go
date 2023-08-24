@@ -145,21 +145,24 @@ func (c *ControlMsgValidationInspector) Inspect(from peer.ID, rpc *pubsub.RPC) e
 // Args:
 // - iWant: the list of iWant control messages.
 // Returns:
-// - DuplicateFoundErr: if there are any duplicate message ids found in across any of the iWants.
+// - DuplicateFoundErr: if there are any duplicate message ids found in any of the iWants.
 // - IWantCacheMissThresholdErr: if the rate of cache misses exceeds the configured allowed threshold.
-// - error: if any error occurs while sampling the iWants
-func (c *ControlMsgValidationInspector) inspectIWant(iWants []*pubsub_pb.ControlIWant) error {
+// - error: if any error occurs while sampling the iWants, all returned errors are benign and should not cause the node to crash.
+func (c *ControlMsgValidationInspector) inspectIWant(from peer.ID, iWants []*pubsub_pb.ControlIWant) error {
+	lastHighest := c.rpcTracker.LastHighestIHaveRPCSize()
+	lg := c.logger.With().
+		Str("peer_id", from.String()).
+		Uint("max_sample_size", c.config.IWantRPCInspectionConfig.MaxSampleSize).
+		Int64("last_highest_ihave_rpc_size", lastHighest).
+		Logger()
+
 	if len(iWants) == 0 {
 		return nil
 	}
-	sampleSize := uint(10 * c.rpcTracker.LastHighestIHaveRPCSize())
+	sampleSize := uint(10 * lastHighest)
 	if sampleSize == 0 || sampleSize > c.config.IWantRPCInspectionConfig.MaxSampleSize {
-		c.logger.Warn().
-			Uint("sample_size", sampleSize).
-			Uint("max_sample_size", c.config.IWantRPCInspectionConfig.MaxSampleSize).
-			Str(logging.KeySuspicious, "true").         // max sample size is suspicious
-			Str(logging.KeyNetworkingSecurity, "true"). // zero sample size is a security hole
-			Msg("zero or invalid sample size, using default max sample size")
+		// invalid or 0 sample size is suspicious
+		lg.Warn().Str(logging.KeySuspicious, "true").Msg("zero or invalid sample size, using default max sample size")
 		sampleSize = c.config.IWantRPCInspectionConfig.MaxSampleSize
 	}
 
@@ -186,21 +189,40 @@ func (c *ControlMsgValidationInspector) inspectIWant(iWants []*pubsub_pb.Control
 	}
 
 	tracker := make(duplicateStrTracker)
-	cacheMisses := float64(0)
+	cacheMisses := 0
+	allowedCacheMissesThreshold := float64(sampleSize) * c.config.IWantRPCInspectionConfig.CacheMissThreshold
+	duplicates := 0
+	allowedDuplicatesThreshold := float64(sampleSize) * c.config.IWantRPCInspectionConfig.DuplicateMsgIDThreshold
+
+	lg = lg.With().
+		Uint("sample_size", sampleSize).
+		Float64("allowed_cache_misses_threshold", allowedCacheMissesThreshold).
+		Float64("allowed_duplicates_threshold", allowedDuplicatesThreshold).Logger()
+
+	lg.Trace().Msg("validating sample of message ids from iwant control message")
+
 	for _, messageID := range iWantMsgIDPool[:sampleSize] {
+		// check duplicate allowed threshold
 		if tracker.isDuplicate(messageID) {
-			return NewDuplicateFoundErr(fmt.Errorf("duplicate message ID found: %s", messageID))
+			duplicates++
+			if float64(duplicates) > allowedDuplicatesThreshold {
+				return NewIWantDuplicateMsgIDThresholdErr(duplicates, sampleSize, c.config.IWantRPCInspectionConfig.DuplicateMsgIDThreshold)
+			}
 		}
+		// check cache miss threshold
 		if !c.rpcTracker.WasIHaveRPCSent(messageID) {
 			cacheMisses++
+			if float64(cacheMisses) > allowedCacheMissesThreshold {
+				return NewIWantCacheMissThresholdErr(cacheMisses, sampleSize, c.config.IWantRPCInspectionConfig.CacheMissThreshold)
+			}
 		}
 		tracker.set(messageID)
 	}
 
-	// check cache miss rate
-	if cacheMisses/float64(sampleSize) > c.config.IWantRPCInspectionConfig.CacheMissThreshold {
-		return NewIWantCacheMissThresholdErr(cacheMisses, float64(sampleSize), c.config.IWantRPCInspectionConfig.CacheMissThreshold)
-	}
+	lg.Debug().
+		Int("cache_misses", cacheMisses).
+		Int("duplicates", duplicates).
+		Msg("iwant control message validation complete")
 
 	return nil
 }
@@ -354,7 +376,7 @@ func (c *ControlMsgValidationInspector) processInspectRPCReq(req *InspectRPCRequ
 				errs = multierror.Append(errs, err)
 			}
 		case p2pmsg.CtrlMsgIHave:
-			err := c.inspectIWant(req.rpc.GetControl().GetIwant())
+			err := c.inspectIhave(req.Peer, req.rpc.GetControl().GetIhave(), activeClusterIDS)
 			if err != nil {
 				errs = multierror.Append(errs, err)
 			}
@@ -491,6 +513,7 @@ func (c *ControlMsgValidationInspector) checkClusterPrefixHardThreshold(nodeID f
 func (c *ControlMsgValidationInspector) logAndDistributeAsyncInspectErrs(req *InspectRPCRequest, errs *multierror.Error) {
 	lg := c.logger.With().
 		Bool(logging.KeySuspicious, true).
+		Bool(logging.KeyNetworkingSecurity, true).
 		Str("peer_id", req.Peer.String()).
 		Int("error_count", errs.Len()).
 		Logger()

@@ -30,6 +30,8 @@ type IWantRPCInspectionConfig struct {
 	MaxSampleSize uint `validate:"gt=0" mapstructure:"gossipsub-rpc-iwant-max-sample-size"`
 	// CacheMissThreshold the threshold of missing corresponding iHave messages for iWant messages received before an invalid control message notification is disseminated.
 	CacheMissThreshold float64 `validate:"gt=0" mapstructure:"gossipsub-rpc-iwant-cache-miss-threshold"`
+	// DuplicateMsgIDThreshold maximum allowed duplicate message IDs in a single iWant control message.
+	DuplicateMsgIDThreshold float64 `validate:"gt=0" mapstructure:"gossipsub-rpc-iwant-duplicate-message-id-threshold"`
 }
 
 // ClusterPrefixedMessageConfig configuration values for cluster prefixed control message validation.

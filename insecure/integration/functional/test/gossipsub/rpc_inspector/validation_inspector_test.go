@@ -3,7 +3,6 @@ package rpc_inspector
 import (
 	"context"
 	"fmt"
-	"math/rand"
 	"testing"
 	"time"
 
@@ -18,7 +17,6 @@ import (
 	"github.com/onflow/flow-go/insecure/corruptlibp2p"
 	"github.com/onflow/flow-go/insecure/internal"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/mock"
@@ -28,7 +26,6 @@ import (
 	p2pmsg "github.com/onflow/flow-go/network/p2p/message"
 	mockp2p "github.com/onflow/flow-go/network/p2p/mock"
 	p2ptest "github.com/onflow/flow-go/network/p2p/test"
-	"github.com/onflow/flow-go/network/p2p/tracer"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -59,7 +56,7 @@ func TestValidationInspector_InvalidTopicId_Detection(t *testing.T) {
 	done := make(chan struct{})
 	expectedNumOfTotalNotif := 9
 	// ensure expected notifications are disseminated with expected error
-	inspectDisseminatedNotif := func(spammer *corruptlibp2p.GossipSubRouterSpammer) func(args mockery.Arguments) {
+	inspectDisseminatedNotifyFunc := func(spammer *corruptlibp2p.GossipSubRouterSpammer) func(args mockery.Arguments) {
 		return func(args mockery.Arguments) {
 			count.Inc()
 			notification, ok := args[0].(*p2p.InvCtrlMsgNotif)
@@ -93,7 +90,7 @@ func TestValidationInspector_InvalidTopicId_Detection(t *testing.T) {
 
 	distributor := mockp2p.NewGossipSubInspectorNotificationDistributor(t)
 	mockDistributorReadyDoneAware(distributor)
-	withExpectedNotificationDissemination(expectedNumOfTotalNotif, inspectDisseminatedNotif)(distributor, spammer)
+	withExpectedNotificationDissemination(expectedNumOfTotalNotif, inspectDisseminatedNotifyFunc)(distributor, spammer)
 	meshTracer := meshTracerFixture(flowConfig, idProvider)
 	validationInspector, err := validation.NewControlMsgValidationInspector(
 		unittest.Logger(),
@@ -199,7 +196,7 @@ func TestValidationInspector_DuplicateTopicId_Detection(t *testing.T) {
 	expectedNumOfTotalNotif := 2
 	invGraftNotifCount := atomic.NewUint64(0)
 	invPruneNotifCount := atomic.NewUint64(0)
-	inspectDisseminatedNotif := func(spammer *corruptlibp2p.GossipSubRouterSpammer) func(args mockery.Arguments) {
+	inspectDisseminatedNotifyFunc := func(spammer *corruptlibp2p.GossipSubRouterSpammer) func(args mockery.Arguments) {
 		return func(args mockery.Arguments) {
 			count.Inc()
 			notification, ok := args[0].(*p2p.InvCtrlMsgNotif)
@@ -229,7 +226,7 @@ func TestValidationInspector_DuplicateTopicId_Detection(t *testing.T) {
 
 	distributor := mockp2p.NewGossipSubInspectorNotificationDistributor(t)
 	mockDistributorReadyDoneAware(distributor)
-	withExpectedNotificationDissemination(expectedNumOfTotalNotif, inspectDisseminatedNotif)(distributor, spammer)
+	withExpectedNotificationDissemination(expectedNumOfTotalNotif, inspectDisseminatedNotifyFunc)(distributor, spammer)
 	meshTracer := meshTracerFixture(flowConfig, idProvider)
 	validationInspector, err := validation.NewControlMsgValidationInspector(
 		unittest.Logger(),
@@ -309,7 +306,7 @@ func TestValidationInspector_UnknownClusterId_Detection(t *testing.T) {
 	expectedNumOfTotalNotif := 2
 	invGraftNotifCount := atomic.NewUint64(0)
 	invPruneNotifCount := atomic.NewUint64(0)
-	inspectDisseminatedNotif := func(spammer *corruptlibp2p.GossipSubRouterSpammer) func(args mockery.Arguments) {
+	inspectDisseminatedNotifyFunc := func(spammer *corruptlibp2p.GossipSubRouterSpammer) func(args mockery.Arguments) {
 		return func(args mockery.Arguments) {
 			count.Inc()
 			notification, ok := args[0].(*p2p.InvCtrlMsgNotif)
@@ -338,7 +335,7 @@ func TestValidationInspector_UnknownClusterId_Detection(t *testing.T) {
 
 	distributor := mockp2p.NewGossipSubInspectorNotificationDistributor(t)
 	mockDistributorReadyDoneAware(distributor)
-	withExpectedNotificationDissemination(expectedNumOfTotalNotif, inspectDisseminatedNotif)(distributor, spammer)
+	withExpectedNotificationDissemination(expectedNumOfTotalNotif, inspectDisseminatedNotifyFunc)(distributor, spammer)
 	meshTracer := meshTracerFixture(flowConfig, idProvider)
 	validationInspector, err := validation.NewControlMsgValidationInspector(
 		unittest.Logger(),
@@ -411,7 +408,7 @@ func TestValidationInspector_ActiveClusterIdsNotSet_Graft_Detection(t *testing.T
 	done := make(chan struct{})
 	expectedNumOfTotalNotif := 5
 	invGraftNotifCount := atomic.NewUint64(0)
-	inspectDisseminatedNotif := func(spammer *corruptlibp2p.GossipSubRouterSpammer) func(args mockery.Arguments) {
+	inspectDisseminatedNotifyFunc := func(spammer *corruptlibp2p.GossipSubRouterSpammer) func(args mockery.Arguments) {
 		return func(args mockery.Arguments) {
 			count.Inc()
 			notification, ok := args[0].(*p2p.InvCtrlMsgNotif)
@@ -438,7 +435,7 @@ func TestValidationInspector_ActiveClusterIdsNotSet_Graft_Detection(t *testing.T
 
 	distributor := mockp2p.NewGossipSubInspectorNotificationDistributor(t)
 	mockDistributorReadyDoneAware(distributor)
-	withExpectedNotificationDissemination(expectedNumOfTotalNotif, inspectDisseminatedNotif)(distributor, spammer)
+	withExpectedNotificationDissemination(expectedNumOfTotalNotif, inspectDisseminatedNotifyFunc)(distributor, spammer)
 	meshTracer := meshTracerFixture(flowConfig, idProvider)
 	validationInspector, err := validation.NewControlMsgValidationInspector(
 		unittest.Logger(),
@@ -506,7 +503,7 @@ func TestValidationInspector_ActiveClusterIdsNotSet_Prune_Detection(t *testing.T
 	done := make(chan struct{})
 	expectedNumOfTotalNotif := 5
 	invPruneNotifCount := atomic.NewUint64(0)
-	inspectDisseminatedNotif := func(spammer *corruptlibp2p.GossipSubRouterSpammer) func(args mockery.Arguments) {
+	inspectDisseminatedNotifyFunc := func(spammer *corruptlibp2p.GossipSubRouterSpammer) func(args mockery.Arguments) {
 		return func(args mockery.Arguments) {
 			count.Inc()
 			notification, ok := args[0].(*p2p.InvCtrlMsgNotif)
@@ -533,7 +530,7 @@ func TestValidationInspector_ActiveClusterIdsNotSet_Prune_Detection(t *testing.T
 
 	distributor := mockp2p.NewGossipSubInspectorNotificationDistributor(t)
 	mockDistributorReadyDoneAware(distributor)
-	withExpectedNotificationDissemination(expectedNumOfTotalNotif, inspectDisseminatedNotif)(distributor, spammer)
+	withExpectedNotificationDissemination(expectedNumOfTotalNotif, inspectDisseminatedNotifyFunc)(distributor, spammer)
 	meshTracer := meshTracerFixture(flowConfig, idProvider)
 	validationInspector, err := validation.NewControlMsgValidationInspector(
 		unittest.Logger(),
@@ -609,7 +606,7 @@ func TestValidationInspector_UnstakedNode_Detection(t *testing.T) {
 	expectedNumOfTotalNotif := 2
 	invGraftNotifCount := atomic.NewUint64(0)
 	invPruneNotifCount := atomic.NewUint64(0)
-	inspectDisseminatedNotif := func(spammer *corruptlibp2p.GossipSubRouterSpammer) func(args mockery.Arguments) {
+	inspectDisseminatedNotifyFunc := func(spammer *corruptlibp2p.GossipSubRouterSpammer) func(args mockery.Arguments) {
 		return func(args mockery.Arguments) {
 			count.Inc()
 			notification, ok := args[0].(*p2p.InvCtrlMsgNotif)
@@ -638,7 +635,7 @@ func TestValidationInspector_UnstakedNode_Detection(t *testing.T) {
 
 	distributor := mockp2p.NewGossipSubInspectorNotificationDistributor(t)
 	mockDistributorReadyDoneAware(distributor)
-	withExpectedNotificationDissemination(expectedNumOfTotalNotif, inspectDisseminatedNotif)(distributor, spammer)
+	withExpectedNotificationDissemination(expectedNumOfTotalNotif, inspectDisseminatedNotifyFunc)(distributor, spammer)
 	meshTracer := meshTracerFixture(flowConfig, idProvider)
 	validationInspector, err := validation.NewControlMsgValidationInspector(
 		unittest.Logger(),
@@ -708,7 +705,7 @@ func TestValidationInspector_InspectIWants_DuplicateMessageIDs(t *testing.T) {
 	duplicateMessageIDNotifCount := atomic.NewUint64(0)
 	done := make(chan struct{})
 	// ensure expected notifications are disseminated with expected error
-	inspectDisseminatedNotif := func(spammer *corruptlibp2p.GossipSubRouterSpammer) func(args mockery.Arguments) {
+	inspectDisseminatedNotifyFunc := func(spammer *corruptlibp2p.GossipSubRouterSpammer) func(args mockery.Arguments) {
 		return func(args mockery.Arguments) {
 			notification, ok := args[0].(*p2p.InvCtrlMsgNotif)
 			require.True(t, ok)
@@ -730,7 +727,7 @@ func TestValidationInspector_InspectIWants_DuplicateMessageIDs(t *testing.T) {
 
 	distributor := mockp2p.NewGossipSubInspectorNotificationDistributor(t)
 	mockDistributorReadyDoneAware(distributor)
-	withExpectedNotificationDissemination(2, inspectDisseminatedNotif)(distributor, spammer)
+	withExpectedNotificationDissemination(2, inspectDisseminatedNotifyFunc)(distributor, spammer)
 	meshTracer := mockp2p.NewPubSubTracer(t)
 	validationInspector, err := validation.NewControlMsgValidationInspector(
 		unittest.Logger(),
@@ -801,7 +798,7 @@ func TestValidationInspector_InspectIWants_CacheMissThreshold(t *testing.T) {
 	cacheMissThresholdNotifCount := atomic.NewUint64(0)
 	done := make(chan struct{})
 	// ensure expected notifications are disseminated with expected error
-	inspectDisseminatedNotif := func(spammer *corruptlibp2p.GossipSubRouterSpammer) func(args mockery.Arguments) {
+	inspectDisseminatedNotifyFunc := func(spammer *corruptlibp2p.GossipSubRouterSpammer) func(args mockery.Arguments) {
 		return func(args mockery.Arguments) {
 			notification, ok := args[0].(*p2p.InvCtrlMsgNotif)
 			require.True(t, ok)
@@ -823,7 +820,7 @@ func TestValidationInspector_InspectIWants_CacheMissThreshold(t *testing.T) {
 
 	distributor := mockp2p.NewGossipSubInspectorNotificationDistributor(t)
 	mockDistributorReadyDoneAware(distributor)
-	withExpectedNotificationDissemination(1, inspectDisseminatedNotif)(distributor, spammer)
+	withExpectedNotificationDissemination(1, inspectDisseminatedNotifyFunc)(distributor, spammer)
 	meshTracer := meshTracerFixture(flowConfig, idProvider)
 	validationInspector, err := validation.NewControlMsgValidationInspector(
 		unittest.Logger(),
@@ -880,21 +877,90 @@ func TestValidationInspector_InspectIWants_CacheMissThreshold(t *testing.T) {
 	unittest.RequireCloseBefore(t, done, 2*time.Second, "failed to inspect RPC messages on time")
 }
 
-func randomClusterPrefixedTopic() channels.Topic {
-	return channels.Topic(channels.SyncCluster(flow.ChainID(fmt.Sprintf("%d", rand.Uint64()))))
-}
-
-type onNotificationDissemination func(spammer *corruptlibp2p.GossipSubRouterSpammer) func(args mockery.Arguments)
-type mockDistributorOption func(*mockp2p.GossipSubInspectorNotificationDistributor, *corruptlibp2p.GossipSubRouterSpammer)
-
-func withExpectedNotificationDissemination(expectedNumOfTotalNotif int, f onNotificationDissemination) mockDistributorOption {
-	return func(distributor *mockp2p.GossipSubInspectorNotificationDistributor, spammer *corruptlibp2p.GossipSubRouterSpammer) {
-		distributor.
-			On("Distribute", mockery.Anything).
-			Times(expectedNumOfTotalNotif).
-			Run(f(spammer)).
-			Return(nil)
+// TestValidationInspector_InspectIWants_DuplicateMsgIDThreshold ensures that expected invalid control message notification is disseminated when the number
+// of duplicate message Ids in a single iWant control message exceeds the configured duplicate message ID threshold.
+func TestValidationInspector_InspectIWants_DuplicateMsgIDThreshold(t *testing.T) {
+	t.Parallel()
+	role := flow.RoleConsensus
+	sporkID := unittest.IdentifierFixture()
+	// create our RPC validation inspector
+	flowConfig, err := config.DefaultConfig()
+	require.NoError(t, err)
+	inspectorConfig := flowConfig.NetworkConfig.GossipSubConfig.GossipSubRPCInspectorsConfig.GossipSubRPCValidationInspectorConfigs
+	inspectorConfig.NumberOfWorkers = 1
+	inspectorConfig.IWantRPCInspectionConfig.DuplicateMsgIDThreshold = .5 // set duplicate message id threshold to 50%
+	inspectorConfig.IWantRPCInspectionConfig.CacheMissThreshold = 2       // avoid throwing cache miss threshold error
+	messageCount := 1
+	controlMessageCount := int64(1)
+	done := make(chan struct{})
+	// ensure expected notifications are disseminated with expected error
+	inspectDisseminatedNotifyFunc := func(spammer *corruptlibp2p.GossipSubRouterSpammer) func(args mockery.Arguments) {
+		return func(args mockery.Arguments) {
+			defer close(done)
+			notification, ok := args[0].(*p2p.InvCtrlMsgNotif)
+			require.True(t, ok)
+			require.Equal(t, spammer.SpammerNode.Host().ID(), notification.PeerID)
+			require.Equal(t, uint64(messageCount), notification.Count)
+			require.True(t, validation.IsIWantDuplicateMsgIDThresholdErr(notification.Err))
+		}
 	}
+
+	idProvider := mock.NewIdentityProvider(t)
+	spammer := corruptlibp2p.NewGossipSubRouterSpammer(t, sporkID, role, idProvider)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
+
+	distributor := mockp2p.NewGossipSubInspectorNotificationDistributor(t)
+	mockDistributorReadyDoneAware(distributor)
+	withExpectedNotificationDissemination(1, inspectDisseminatedNotifyFunc)(distributor, spammer)
+	meshTracer := meshTracerFixture(flowConfig, idProvider)
+	validationInspector, err := validation.NewControlMsgValidationInspector(
+		unittest.Logger(),
+		sporkID,
+		&inspectorConfig,
+		distributor,
+		metrics.NewNoopCollector(),
+		metrics.NewNoopCollector(),
+		idProvider,
+		metrics.NewNoopCollector(),
+		meshTracer)
+	require.NoError(t, err)
+	corruptInspectorFunc := corruptlibp2p.CorruptInspectorFunc(validationInspector)
+	victimNode, victimIdentity := p2ptest.NodeFixture(
+		t,
+		sporkID,
+		t.Name(),
+		idProvider,
+		p2ptest.WithRole(role),
+		p2ptest.WithGossipSubTracer(meshTracer),
+		internal.WithCorruptGossipSub(corruptlibp2p.CorruptGossipSubFactory(),
+			corruptlibp2p.CorruptGossipSubConfigFactoryWithInspector(corruptInspectorFunc)),
+	)
+	idProvider.On("ByPeerID", victimNode.Host().ID()).Return(&victimIdentity, true).Maybe()
+	idProvider.On("ByPeerID", spammer.SpammerNode.Host().ID()).Return(&spammer.SpammerId, true).Maybe()
+
+	messageIDs := corruptlibp2p.GossipSubMessageIdsFixture(10)
+
+	// create control message with iWant that contains 5 message IDs that were not tracked
+	ctlMsg := spammer.GenerateCtlMessages(int(controlMessageCount), corruptlibp2p.WithIWant(messageCount, messageCount))
+	ctlMsg[0].Iwant[0].MessageIDs = messageIDs
+	// set first 6 message ids to duplicate id > 50% duplicate message ID threshold
+	for i := 0; i <= 6; i++ {
+		ctlMsg[0].Iwant[0].MessageIDs[i] = messageIDs[0]
+	}
+
+	validationInspector.Start(signalerCtx)
+	nodes := []p2p.LibP2PNode{victimNode, spammer.SpammerNode}
+	startNodesAndEnsureConnected(t, signalerCtx, nodes, sporkID)
+	spammer.Start(t)
+	meshTracer.Start(signalerCtx)
+	defer stopTestComponents(t, cancel, nodes, validationInspector, meshTracer)
+
+	// spam the victim with iWant message that contains 60% duplicate message ids more than the configured 50% allowed threshold
+	spammer.SpamControlMessage(t, victimNode, ctlMsg)
+
+	unittest.RequireCloseBefore(t, done, 2*time.Second, "failed to inspect RPC messages on time")
 }
 
 // TestGossipSubSpamMitigationIntegration tests that the spam mitigation feature of GossipSub is working as expected.
@@ -960,8 +1026,8 @@ func TestGossipSubSpamMitigationIntegration(t *testing.T) {
 
 	// starting the nodes.
 	nodes := []p2p.LibP2PNode{victimNode, spammer.SpammerNode}
-	p2ptest.StartNodes(t, signalerCtx, nodes, 100*time.Millisecond)
-	defer p2ptest.StopNodes(t, nodes, cancel, 2*time.Second)
+	p2ptest.StartNodes(t, signalerCtx, nodes)
+	defer p2ptest.StopNodes(t, nodes, cancel)
 	spammer.Start(t)
 
 	// wait for the nodes to discover each other
@@ -1000,37 +1066,16 @@ func TestGossipSubSpamMitigationIntegration(t *testing.T) {
 
 	// now we expect the detection and mitigation to kick in and the victim node to disconnect from the spammer node.
 	// so the spammer and victim nodes should not be able to exchange messages on the topic.
-	p2ptest.EnsureNoPubsubExchangeBetweenGroups(t, ctx, []p2p.LibP2PNode{victimNode}, []p2p.LibP2PNode{spammer.SpammerNode}, blockTopic, 1, func() interface{} {
-		return unittest.ProposalFixture()
-	})
-}
-
-// mockDistributorReadyDoneAware mocks the Ready and Done methods of the distributor to return a channel that is already closed,
-// so that the distributor is considered ready and done when the test needs.
-func mockDistributorReadyDoneAware(d *mockp2p.GossipSubInspectorNotificationDistributor) {
-	d.On("Start", mockery.Anything).Return().Maybe()
-	d.On("Ready").Return(func() <-chan struct{} {
-		ch := make(chan struct{})
-		close(ch)
-		return ch
-	}()).Maybe()
-	d.On("Done").Return(func() <-chan struct{} {
-		ch := make(chan struct{})
-		close(ch)
-		return ch
-	}()).Maybe()
-}
-
-func meshTracerFixture(flowConfig *config.FlowConfig, idProvider module.IdentityProvider) *tracer.GossipSubMeshTracer {
-	meshTracerCfg := &tracer.GossipSubMeshTracerConfig{
-		Logger:                             unittest.Logger(),
-		Metrics:                            metrics.NewNoopCollector(),
-		IDProvider:                         idProvider,
-		LoggerInterval:                     time.Second,
-		HeroCacheMetricsFactory:            metrics.NewNoopHeroCacheMetricsFactory(),
-		RpcSentTrackerCacheSize:            flowConfig.NetworkConfig.GossipSubConfig.RPCSentTrackerCacheSize,
-		RpcSentTrackerWorkerQueueCacheSize: flowConfig.NetworkConfig.GossipSubConfig.RPCSentTrackerQueueCacheSize,
-		RpcSentTrackerNumOfWorkers:         flowConfig.NetworkConfig.GossipSubConfig.RpcSentTrackerNumOfWorkers,
-	}
-	return tracer.NewGossipSubMeshTracer(meshTracerCfg)
+	p2ptest.EnsureNoPubsubExchangeBetweenGroups(
+		t,
+		ctx,
+		[]p2p.LibP2PNode{victimNode},
+		flow.IdentifierList{victimId.NodeID},
+		[]p2p.LibP2PNode{spammer.SpammerNode},
+		flow.IdentifierList{spammer.SpammerId.NodeID},
+		blockTopic,
+		1,
+		func() interface{} {
+			return unittest.ProposalFixture()
+		})
 }

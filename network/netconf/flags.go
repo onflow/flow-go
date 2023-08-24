@@ -53,6 +53,7 @@ const (
 	controlMessageMaxSampleSize                                = "gossipsub-rpc-control-message-max-sample-size"
 	iwantMaxSampleSize                                         = "gossipsub-rpc-iwant-max-sample-size"
 	iwantCacheMissThreshold                                    = "gossipsub-rpc-iwant-cache-miss-threshold"
+	iwantDuplicateMsgIDThreshold                               = "gossipsub-rpc-iwant-duplicate-message-id-threshold"
 
 	// gossipsub metrics inspector
 	metricsInspectorNumberOfWorkers = "gossipsub-rpc-metrics-inspector-workers"
@@ -72,7 +73,7 @@ func AllFlagNames() []string {
 		scoreTracerInterval, gossipSubRPCInspectorNotificationCacheSize, validationInspectorNumberOfWorkers, validationInspectorInspectMessageQueueCacheSize, validationInspectorClusterPrefixedTopicsReceivedCacheSize,
 		validationInspectorClusterPrefixedTopicsReceivedCacheDecay, validationInspectorClusterPrefixHardThreshold,
 		ihaveMaxSampleSize, metricsInspectorNumberOfWorkers, metricsInspectorCacheSize, alspDisabled, alspSpamRecordCacheSize, alspSpamRecordQueueSize, alspHearBeatInterval,
-		iwantMaxSampleSize, iwantCacheMissThreshold, controlMessageMaxSampleSize,
+		iwantMaxSampleSize, iwantCacheMissThreshold, controlMessageMaxSampleSize, iwantDuplicateMsgIDThreshold,
 	}
 }
 
@@ -133,6 +134,7 @@ func InitializeNetworkFlags(flags *pflag.FlagSet, config *Config) {
 	flags.Int(controlMessageMaxSampleSize, config.GossipSubConfig.GossipSubRPCInspectorsConfig.GossipSubRPCValidationInspectorConfigs.ControlMessageMaxSampleSize, "max number of control messages to sample when performing validation on GRAFT and PRUNE message types")
 	flags.Uint(iwantMaxSampleSize, config.GossipSubConfig.GossipSubRPCInspectorsConfig.GossipSubRPCValidationInspectorConfigs.IWantRPCInspectionConfig.MaxSampleSize, "max number of iwants to sample when performing validation")
 	flags.Float64(iwantCacheMissThreshold, config.GossipSubConfig.GossipSubRPCInspectorsConfig.GossipSubRPCValidationInspectorConfigs.IWantRPCInspectionConfig.CacheMissThreshold, "max number of iwants to sample when performing validation")
+	flags.Float64(iwantDuplicateMsgIDThreshold, config.GossipSubConfig.GossipSubRPCInspectorsConfig.GossipSubRPCValidationInspectorConfigs.IWantRPCInspectionConfig.DuplicateMsgIDThreshold, "max allowed duplicate message IDs in a single iWant control message")
 }
 
 // SetAliases this func sets an aliases for each CLI flag defined for network config overrides to it's corresponding
