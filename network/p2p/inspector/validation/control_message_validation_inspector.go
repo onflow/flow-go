@@ -256,11 +256,12 @@ func (c *ControlMsgValidationInspector) inspectIWant(from peer.ID, iWants []*pub
 	duplicates := 0
 	allowedDuplicatesThreshold := float64(sampleSize) * c.config.IWantRPCInspectionConfig.DuplicateMsgIDThreshold
 
-	lg.Trace().
+	lg = lg.With().
 		Uint("sample_size", sampleSize).
 		Float64("allowed_cache_misses_threshold", allowedCacheMissesThreshold).
-		Float64("allowed_duplicates_threshold", allowedDuplicatesThreshold).
-		Msg("validating sample of message ids from iwant control message")
+		Float64("allowed_duplicates_threshold", allowedDuplicatesThreshold).Logger()
+
+	lg.Trace().Msg("validating sample of message ids from iwant control message")
 
 	for _, messageID := range iWantMsgIDPool[:sampleSize] {
 		// check duplicate allowed threshold
@@ -279,6 +280,12 @@ func (c *ControlMsgValidationInspector) inspectIWant(from peer.ID, iWants []*pub
 		}
 		tracker.set(messageID)
 	}
+
+	lg.Debug().
+		Int("cache_misses", cacheMisses).
+		Int("duplicates", duplicates).
+		Msg("iwant control message validation complete")
+		
 	return nil
 }
 
