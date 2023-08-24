@@ -93,10 +93,16 @@ func TestTopicValidator_Unstaked(t *testing.T) {
 
 	timedCtx, cancel5s := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel5s()
-	// create a dummy block proposal to publish from our SN node
-	data1 := p2pfixtures.MustEncodeEvent(t, unittest.ProposalFixture(), channel)
 
-	err = sn2.Publish(timedCtx, topic, data1)
+	outgoingMessageScope1, err := message.NewOutgoingScope(
+		flow.IdentifierList{identity1.NodeID, identity2.NodeID},
+		topic,
+		unittest.ProposalFixture(),
+		unittest.NetworkCodec().Encode,
+		message.ProtocolTypePubSub)
+	require.NoError(t, err)
+
+	err = sn2.Publish(timedCtx, outgoingMessageScope1)
 	require.NoError(t, err)
 
 	// sn1 should not receive message from sn2 because sn2 is unstaked
@@ -146,10 +152,16 @@ func TestTopicValidator_PublicChannel(t *testing.T) {
 
 	timedCtx, cancel5s := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel5s()
-	// create a dummy sync request to publish from our SN node
-	data1 := p2pfixtures.MustEncodeEvent(t, &messages.SyncRequest{Nonce: 0, Height: 0}, channel)
 
-	err = sn2.Publish(timedCtx, topic, data1)
+	outgoingMessageScope1, err := message.NewOutgoingScope(
+		flow.IdentifierList{identity1.NodeID, identity2.NodeID},
+		topic,
+		&messages.SyncRequest{Nonce: 0, Height: 0},
+		unittest.NetworkCodec().Encode,
+		message.ProtocolTypePubSub)
+	require.NoError(t, err)
+
+	err = sn2.Publish(timedCtx, outgoingMessageScope1)
 	require.NoError(t, err)
 
 	var wg sync.WaitGroup
@@ -158,11 +170,14 @@ func TestTopicValidator_PublicChannel(t *testing.T) {
 	timedCtx, cancel1s := context.WithTimeout(ctx, time.Second)
 	defer cancel1s()
 
+	expectedReceivedData, err := outgoingMessageScope1.Proto().Marshal()
+	require.NoError(t, err)
+
 	// sn1 gets the message
-	p2pfixtures.SubMustReceiveMessage(t, timedCtx, data1, sub1)
+	p2pfixtures.SubMustReceiveMessage(t, timedCtx, expectedReceivedData, sub1)
 
 	// sn2 also gets the message (as part of the libp2p loopback of published topic messages)
-	p2pfixtures.SubMustReceiveMessage(t, timedCtx, data1, sub2)
+	p2pfixtures.SubMustReceiveMessage(t, timedCtx, expectedReceivedData, sub2)
 
 	unittest.RequireReturnsBefore(t, wg.Wait, 5*time.Second, "could not receive message on time")
 }
@@ -208,11 +223,20 @@ func TestTopicValidator_TopicMismatch(t *testing.T) {
 
 	timedCtx, cancel5s := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel5s()
+
 	// create a dummy block proposal to publish from our SN node
-	data1 := p2pfixtures.MustEncodeEvent(t, unittest.ProposalFixture(), channels.Channel("invalid-channel"))
+	outgoingMessageScope1, err := message.NewOutgoingScope(
+		flow.IdentifierList{identity1.NodeID, identity2.NodeID},
+		topic,
+		unittest.ProposalFixture(),
+		unittest.NetworkCodec().Encode,
+		message.ProtocolTypePubSub)
+	require.NoError(t, err)
 
-	err = sn2.Publish(timedCtx, topic, data1)
+	// intentionally overriding the channel id to be different from the topic
+	outgoingMessageScope1.Proto().ChannelID = channels.PublicSyncCommittee.String()
 
+	err = sn2.Publish(timedCtx, outgoingMessageScope1)
 	// publish fails because the channel validation fails
 	require.Error(t, err)
 
@@ -260,14 +284,30 @@ func TestTopicValidator_InvalidTopic(t *testing.T) {
 
 	timedCtx, cancel5s := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel5s()
-	// create a dummy block proposal to publish from our SN node
-	data1 := p2pfixtures.MustEncodeEvent(t, unittest.ProposalFixture(), channels.PushBlocks)
 
-	err = sn2.Publish(timedCtx, topic, data1)
+	// invalid topic is malformed, hence it cannot be used to create a message scope, as it faces an error.
+	// Hence, we create a dummy block proposal message scope to publish on a legit topic, and then override
+	// the topic in the next step to a malformed topic.
+	dummyMessageScope, err := message.NewOutgoingScope(
+		flow.IdentifierList{identity1.NodeID, identity2.NodeID},
+		channels.TopicFromChannel(channels.PushBlocks, sporkId),
+		unittest.ProposalFixture(),
+		unittest.NetworkCodec().Encode,
+		message.ProtocolTypePubSub)
+	require.NoError(t, err)
+
+	// overrides the topic to be an invalid topic
+	corruptOutgoingMessageScope := mocknetwork.NewOutgoingMessageScope(t)
+	corruptOutgoingMessageScope.On("Topic").Return(topic)
+	corruptOutgoingMessageScope.On("Proto").Return(dummyMessageScope.Proto())
+	corruptOutgoingMessageScope.On("PayloadType").Return(dummyMessageScope.PayloadType())
+	corruptOutgoingMessageScope.On("Size").Return(dummyMessageScope.Size())
+
+	// create a dummy block proposal to publish from our SN node
+	err = sn2.Publish(timedCtx, corruptOutgoingMessageScope)
 
 	// publish fails because the topic conversion fails
 	require.Error(t, err)
-
 	// ensure the correct error is contained in the logged error
 	require.Contains(t, hook.Logs(), "could not convert topic to channel")
 }
@@ -345,34 +385,52 @@ func TestAuthorizedSenderValidator_Unauthorized(t *testing.T) {
 
 	timedCtx, cancel5s := context.WithTimeout(ctx, 60*time.Second)
 	defer cancel5s()
-	// create a dummy block proposal to publish from our SN node
-	data1 := p2pfixtures.MustEncodeEvent(t, unittest.ProposalFixture(), channel)
 
 	// sn2 publishes the block proposal, sn1 and an1 should receive the message because
 	// SN nodes are authorized to send block proposals
-	err = sn2.Publish(timedCtx, topic, data1)
+	// create a dummy block proposal to publish from our SN node
+	outgoingMessageScope1, err := message.NewOutgoingScope(
+		flow.IdentifierList{identity1.NodeID, identity2.NodeID},
+		topic,
+		unittest.ProposalFixture(),
+		unittest.NetworkCodec().Encode,
+		message.ProtocolTypePubSub)
+	require.NoError(t, err)
+	err = sn2.Publish(timedCtx, outgoingMessageScope1)
+	require.NoError(t, err)
+
+	expectedReceivedData1, err := outgoingMessageScope1.Proto().Marshal()
 	require.NoError(t, err)
 
 	// sn1 gets the message
-	p2pfixtures.SubMustReceiveMessage(t, timedCtx, data1, sub1)
+	p2pfixtures.SubMustReceiveMessage(t, timedCtx, expectedReceivedData1, sub1)
 
 	// sn2 also gets the message (as part of the libp2p loopback of published topic messages)
-	p2pfixtures.SubMustReceiveMessage(t, timedCtx, data1, sub2)
+	p2pfixtures.SubMustReceiveMessage(t, timedCtx, expectedReceivedData1, sub2)
 
 	// an1 also gets the message
-	p2pfixtures.SubMustReceiveMessage(t, timedCtx, data1, sub3)
+	p2pfixtures.SubMustReceiveMessage(t, timedCtx, expectedReceivedData1, sub3)
 
 	timedCtx, cancel2s := context.WithTimeout(ctx, 2*time.Second)
 	defer cancel2s()
-	data2 := p2pfixtures.MustEncodeEvent(t, unittest.ProposalFixture(), channel)
 
 	// the access node now publishes the block proposal message, AN are not authorized to publish block proposals
 	// the message should be rejected by the topic validator on sn1
-	err = an1.Publish(timedCtx, topic, data2)
+	outgoingMessageScope2, err := message.NewOutgoingScope(
+		flow.IdentifierList{identity1.NodeID, identity2.NodeID},
+		topic,
+		unittest.ProposalFixture(),
+		unittest.NetworkCodec().Encode,
+		message.ProtocolTypePubSub)
+	require.NoError(t, err)
+	err = an1.Publish(timedCtx, outgoingMessageScope2)
+	require.NoError(t, err)
+
+	expectedReceivedData2, err := outgoingMessageScope2.Proto().Marshal()
 	require.NoError(t, err)
 
 	// an1 receives its own message
-	p2pfixtures.SubMustReceiveMessage(t, timedCtx, data2, sub3)
+	p2pfixtures.SubMustReceiveMessage(t, timedCtx, expectedReceivedData2, sub3)
 
 	var wg sync.WaitGroup
 
@@ -449,11 +507,17 @@ func TestAuthorizedSenderValidator_InvalidMsg(t *testing.T) {
 
 	timedCtx, cancel5s := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel5s()
-	// create a dummy block proposal to publish from our SN node
-	data1 := p2pfixtures.MustEncodeEvent(t, unittest.ProposalFixture(), channel)
 
+	// create a dummy block proposal to publish from our SN node
 	// sn2 publishes the block proposal on the sync committee channel
-	err = sn2.Publish(timedCtx, topic, data1)
+	outgoingMessageScope1, err := message.NewOutgoingScope(
+		flow.IdentifierList{identity1.NodeID, identity2.NodeID},
+		topic,
+		unittest.ProposalFixture(),
+		unittest.NetworkCodec().Encode,
+		message.ProtocolTypePubSub)
+	require.NoError(t, err)
+	err = sn2.Publish(timedCtx, outgoingMessageScope1)
 	require.NoError(t, err)
 
 	// sn1 should not receive message from sn2
@@ -532,29 +596,46 @@ func TestAuthorizedSenderValidator_Ejected(t *testing.T) {
 
 	timedCtx, cancel5s := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel5s()
-	// create a dummy block proposal to publish from our SN node
-	data1 := p2pfixtures.MustEncodeEvent(t, unittest.ProposalFixture(), channel)
 
 	// sn2 publishes the block proposal, sn1 and an1 should receive the message because
 	// SN nodes are authorized to send block proposals
-	err = sn2.Publish(timedCtx, topic, data1)
+	// create a dummy block proposal to publish from our SN node
+	outgoingMessageScope1, err := message.NewOutgoingScope(
+		flow.IdentifierList{identity1.NodeID, identity2.NodeID},
+		topic,
+		unittest.ProposalFixture(),
+		unittest.NetworkCodec().Encode,
+		message.ProtocolTypePubSub)
+	require.NoError(t, err)
+	err = sn2.Publish(timedCtx, outgoingMessageScope1)
+	require.NoError(t, err)
+
+	expectedReceivedData1, err := outgoingMessageScope1.Proto().Marshal()
 	require.NoError(t, err)
 
 	// sn1 gets the message
-	p2pfixtures.SubMustReceiveMessage(t, timedCtx, data1, sub1)
+	p2pfixtures.SubMustReceiveMessage(t, timedCtx, expectedReceivedData1, sub1)
 
 	// sn2 also gets the message (as part of the libp2p loopback of published topic messages)
-	p2pfixtures.SubMustReceiveMessage(t, timedCtx, data1, sub2)
+	p2pfixtures.SubMustReceiveMessage(t, timedCtx, expectedReceivedData1, sub2)
 
 	// an1 also gets the message
-	p2pfixtures.SubMustReceiveMessage(t, timedCtx, data1, sub3)
+	p2pfixtures.SubMustReceiveMessage(t, timedCtx, expectedReceivedData1, sub3)
 
 	// "eject" sn2 to ensure messages published by ejected nodes get rejected
 	identity2.Ejected = true
-	data3 := p2pfixtures.MustEncodeEvent(t, unittest.ProposalFixture(), channel)
+
+	outgoingMessageScope3, err := message.NewOutgoingScope(
+		flow.IdentifierList{identity1.NodeID, identity2.NodeID},
+		topic,
+		unittest.ProposalFixture(),
+		unittest.NetworkCodec().Encode,
+		message.ProtocolTypePubSub)
+	require.NoError(t, err)
+
 	timedCtx, cancel2s := context.WithTimeout(ctx, time.Second)
 	defer cancel2s()
-	err = sn2.Publish(timedCtx, topic, data3)
+	err = sn2.Publish(timedCtx, outgoingMessageScope3)
 	require.NoError(t, err)
 
 	// sn1 should not receive rejected message from ejected sn2
@@ -627,19 +708,29 @@ func TestAuthorizedSenderValidator_ClusterChannel(t *testing.T) {
 
 	timedCtx, cancel5s := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel5s()
+
 	// create a dummy sync request to publish from our LN node
-	data := p2pfixtures.MustEncodeEvent(t, &messages.RangeRequest{}, channel)
+	outgoingMessageScope1, err := message.NewOutgoingScope(
+		flow.IdentifierList{identity1.NodeID, identity2.NodeID},
+		topic,
+		&messages.RangeRequest{},
+		unittest.NetworkCodec().Encode,
+		message.ProtocolTypePubSub)
+	require.NoError(t, err)
 
 	// ln2 publishes the sync request on the cluster channel
-	err = ln2.Publish(timedCtx, topic, data)
+	err = ln2.Publish(timedCtx, outgoingMessageScope1)
+	require.NoError(t, err)
+
+	expectedReceivedData1, err := outgoingMessageScope1.Proto().Marshal()
 	require.NoError(t, err)
 
 	// ln1 gets the message
-	p2pfixtures.SubMustReceiveMessage(t, timedCtx, data, sub1)
+	p2pfixtures.SubMustReceiveMessage(t, timedCtx, expectedReceivedData1, sub1)
 
 	// ln2 also gets the message (as part of the libp2p loopback of published topic messages)
-	p2pfixtures.SubMustReceiveMessage(t, timedCtx, data, sub2)
+	p2pfixtures.SubMustReceiveMessage(t, timedCtx, expectedReceivedData1, sub2)
 
 	// ln3 also gets the message
-	p2pfixtures.SubMustReceiveMessage(t, timedCtx, data, sub3)
+	p2pfixtures.SubMustReceiveMessage(t, timedCtx, expectedReceivedData1, sub3)
 }
