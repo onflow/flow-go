@@ -4,6 +4,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/onflow/cadence/runtime"
+	"github.com/onflow/flow-go/engine/execution/computation"
+	"github.com/onflow/flow-go/engine/execution/computation/query"
+	"github.com/onflow/flow-go/engine/execution/scripts"
+	"github.com/onflow/flow-go/fvm"
+	reusableRuntime "github.com/onflow/flow-go/fvm/runtime"
+	"github.com/onflow/flow-go/fvm/storage/derived"
 	"github.com/onflow/flow-go/module/indexer"
 	"github.com/onflow/flow-go/storage/memory"
 	"os"
@@ -253,6 +260,7 @@ type FlowAccessNodeBuilder struct {
 	IngestEng      *ingestion.Engine
 	RequestEng     *requester.Engine
 	IndexEng       *index.Engine
+	ScriptsEng     *scripts.Engine
 	FollowerEng    *followereng.ComplianceEngine
 	SyncEng        *synceng.Engine
 	StateStreamEng *state_stream.Engine
@@ -638,6 +646,46 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionDataRequester() *FlowAccessN
 			execDataDistributor.AddOnExecutionDataReceivedConsumer(builder.IndexEng.OnExecutionData)
 
 			return builder.IndexEng, nil
+		}).
+		// TODO(sideninja): should we put this behind a flag, only to enable it explicitly?
+		Component("script execution", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+			vm := fvm.NewVirtualMachine()
+			options := []fvm.Option{
+				fvm.WithReusableCadenceRuntimePool(
+					reusableRuntime.NewReusableCadenceRuntimePool(
+						computation.ReusableCadenceRuntimePoolSize,
+						runtime.Config{
+							AccountLinkingEnabled: true,
+							// Attachments are enabled everywhere except for Mainnet
+							AttachmentsEnabled: node.RootChainID != flow.Mainnet,
+							// Capability Controllers are enabled everywhere except for Mainnet
+							CapabilityControllersEnabled: node.RootChainID != flow.Mainnet,
+						},
+					)),
+			}
+
+			vmCtx := fvm.NewContext(options...)
+
+			derivedChainData, err := derived.NewDerivedChainData(derived.DefaultDerivedDataCacheSize) // TODO check
+			if err != nil {
+				return nil, err
+			}
+
+			queryExecutor := query.NewQueryExecutor(
+				query.NewDefaultConfig(), // TODO check
+				builder.Logger,
+				metrics.NewExecutionCollector(node.Tracer), // TODO check
+				vm,
+				vmCtx,
+				derivedChainData,
+			)
+
+			builder.ScriptsEng = scripts.New(
+				node.Logger,
+				node.State,
+				queryExecutor,
+				exeIndexer,
+			)
 		})
 
 	if builder.stateStreamConf.ListenAddr != "" {
