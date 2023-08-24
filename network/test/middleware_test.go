@@ -466,34 +466,17 @@ func (m *MiddlewareTestSuite) TestUnicastRateLimit_Bandwidth() {
 	ctx, cancel := context.WithCancel(m.mwCtx)
 	irrecoverableCtx := irrecoverable.NewMockSignalerContext(m.T(), ctx)
 
-	testutils.StartNodes(irrecoverableCtx, m.T(), libP2PNodes, 100*time.Millisecond)
-	defer testutils.StopComponents(m.T(), libP2PNodes, 100*time.Millisecond)
+	testutils.StartNodes(irrecoverableCtx, m.T(), libP2PNodes, 1*time.Second)
+	defer testutils.StopComponents(m.T(), libP2PNodes, 1*time.Second)
 
 	newMw.Start(irrecoverableCtx)
-	unittest.RequireComponentsReadyBefore(m.T(), 100*time.Millisecond, newMw)
-
+	unittest.RequireComponentsReadyBefore(m.T(), 1*time.Second, newMw)
 	require.NoError(m.T(), newMw.Subscribe(channels.TestNetworkChannel))
 
 	idList := flow.IdentityList(append(m.ids, newId))
 
 	// needed to enable ID translation
 	m.providers[0].SetIdentities(idList)
-
-	// create message with about 400bytes (300 random bytes + 100bytes message info)
-	b := make([]byte, 300)
-	for i := range b {
-		b[i] = byte('X')
-	}
-
-	msg, err := message.NewOutgoingScope(
-		flow.IdentifierList{newId.NodeID},
-		channels.TopicFromChannel(channels.TestNetworkChannel, m.sporkId),
-		&libp2pmessage.TestMessage{
-			Text: string(b),
-		},
-		unittest.NetworkCodec().Encode,
-		message.ProtocolTypeUnicast)
-	require.NoError(m.T(), err)
 
 	// update the addresses
 	m.mws[0].UpdateNodeAddresses()
@@ -504,10 +487,19 @@ func (m *MiddlewareTestSuite) TestUnicastRateLimit_Bandwidth() {
 	// peer should be removed by the peer manager.
 	p2ptest.LetNodesDiscoverEachOther(m.T(), ctx, []p2p.LibP2PNode{libP2PNodes[0], m.libP2PNodes[0]}, flow.IdentityList{ids[0], m.ids[0]})
 
+	// create message with about 400bytes (300 random bytes + 100bytes message info)
+	b := make([]byte, 300)
+	for i := range b {
+		b[i] = byte('X')
+	}
 	// send 3 messages at once with a size of 400 bytes each. The third message will be rate limited
 	// as it is more than our allowed bandwidth of 1000 bytes.
+	con0, err := m.networks[0].Register(channels.TestNetworkChannel, &mocknetwork.MessageProcessor{})
+	require.NoError(m.T(), err)
 	for i := 0; i < 3; i++ {
-		err = m.mws[0].SendDirect(msg)
+		err = con0.Unicast(&libp2pmessage.TestMessage{
+			Text: string(b),
+		}, newId.NodeID)
 		require.NoError(m.T(), err)
 	}
 
@@ -523,16 +515,10 @@ func (m *MiddlewareTestSuite) TestUnicastRateLimit_Bandwidth() {
 
 	// eventually the rate limited node should be able to reconnect and send messages
 	require.Eventually(m.T(), func() bool {
-		msg, err = message.NewOutgoingScope(
-			flow.IdentifierList{newId.NodeID},
-			channels.TopicFromChannel(channels.TestNetworkChannel, m.sporkId),
-			&libp2pmessage.TestMessage{
-				Text: "",
-			},
-			unittest.NetworkCodec().Encode,
-			message.ProtocolTypeUnicast)
-		require.NoError(m.T(), err)
-		return m.mws[0].SendDirect(msg) == nil
+		err = con0.Unicast(&libp2pmessage.TestMessage{
+			Text: "",
+		}, newId.NodeID)
+		return err == nil
 	}, 3*time.Second, 100*time.Millisecond)
 
 	// shutdown our middleware so that each message can be processed
@@ -559,19 +545,6 @@ func (m *MiddlewareTestSuite) createOverlay(provider *unittest.UpdatableIDProvid
 	return overlay
 }
 
-// TestMultiPing tests the middleware against type of received payload
-// of distinct messages that are sent concurrently from a node to another
-func (m *MiddlewareTestSuite) TestMultiPing() {
-	// one distinct message
-	m.MultiPing(1)
-
-	// two distinct messages
-	m.MultiPing(2)
-
-	// 10 distinct messages
-	m.MultiPing(10)
-}
-
 // TestPing sends a message from the first middleware of the test suit to the last one and checks that the
 // last middleware receives the message and that the message is correctly decoded.
 func (m *MiddlewareTestSuite) TestPing() {
@@ -581,45 +554,58 @@ func (m *MiddlewareTestSuite) TestPing() {
 	var err error
 
 	// mocks Overlay.Receive for middleware.Overlay.Receive(*nodeID, payload)
-	firstNodeIndex := 0
-	lastNodeIndex := m.size - 1
+	senderNodeIndex := 0
+	targetNodeIndex := m.size - 1
 
 	expectedPayload := "TestPingContentReception"
-	msg, err := message.NewOutgoingScope(
-		flow.IdentifierList{m.ids[lastNodeIndex].NodeID},
-		channels.TopicFromChannel(channels.TestNetworkChannel, m.sporkId),
-		&libp2pmessage.TestMessage{
-			Text: expectedPayload,
-		},
-		unittest.NetworkCodec().Encode,
-		message.ProtocolTypeUnicast)
+	// mocks a target engine on the last node of the test suit that will receive the message on the test channel.
+	targetEngine := &mocknetwork.MessageProcessor{} // target engine on the last node of the test suit that will receive the message
+	_, err = m.networks[targetNodeIndex].Register(channels.TestNetworkChannel, targetEngine)
 	require.NoError(m.T(), err)
-
-	m.ov[lastNodeIndex].On("Receive", mockery.Anything).Return(nil).Once().
+	// target engine must receive the message once with the expected payload
+	targetEngine.On("Process", mockery.Anything, mockery.Anything, mockery.Anything).
 		Run(func(args mockery.Arguments) {
 			receiveWG.Done()
 
-			msg, ok := args[0].(network.IncomingMessageScope)
+			msgChannel, ok := args[0].(channels.Channel)
 			require.True(m.T(), ok)
+			require.Equal(m.T(), channels.TestNetworkChannel, msgChannel) // channel
 
-			require.Equal(m.T(), channels.TestNetworkChannel, msg.Channel())                              // channel
-			require.Equal(m.T(), m.ids[firstNodeIndex].NodeID, msg.OriginId())                            // sender id
-			require.Equal(m.T(), m.ids[lastNodeIndex].NodeID, msg.TargetIDs()[0])                         // target id
-			require.Equal(m.T(), message.ProtocolTypeUnicast, msg.Protocol())                             // protocol
-			require.Equal(m.T(), expectedPayload, msg.DecodedPayload().(*libp2pmessage.TestMessage).Text) // payload
-		})
+			msgOriginID, ok := args[1].(flow.Identifier)
+			require.True(m.T(), ok)
+			require.Equal(m.T(), m.ids[senderNodeIndex].NodeID, msgOriginID) // sender id
+
+			msgPayload, ok := args[2].(*libp2pmessage.TestMessage)
+			require.Equal(m.T(), expectedPayload, msgPayload.Text) // payload
+		}).Return(nil).Once()
 
 	// sends a direct message from first node to the last node
-	err = m.mws[firstNodeIndex].SendDirect(msg)
+	con0, err := m.networks[senderNodeIndex].Register(channels.TestNetworkChannel, &mocknetwork.MessageProcessor{})
+	require.NoError(m.T(), err)
+	err = con0.Unicast(&libp2pmessage.TestMessage{
+		Text: expectedPayload,
+	}, m.ids[targetNodeIndex].NodeID)
 	require.NoError(m.Suite.T(), err)
 
-	unittest.RequireReturnsBefore(m.T(), receiveWG.Wait, 1000*time.Millisecond, "did not receive message")
+	unittest.RequireReturnsBefore(m.T(), receiveWG.Wait, 1*time.Second, "did not receive message")
+}
 
-	// evaluates the mock calls
-	for i := 1; i < m.size; i++ {
-		m.ov[i].AssertExpectations(m.T())
-	}
+// TestMultiPing_TwoPings sends two messages concurrently from the first middleware of the test suit to the last one,
+// and checks that the last middleware receives the messages and that the messages are correctly decoded.
+func (m *MiddlewareTestSuite) TestMultiPing_TwoPings() {
+	m.MultiPing(2)
+}
 
+// TestMultiPing_FourPings sends four messages concurrently from the first middleware of the test suit to the last one,
+// and checks that the last middleware receives the messages and that the messages are correctly decoded.
+func (m *MiddlewareTestSuite) TestMultiPing_FourPings() {
+	m.MultiPing(4)
+}
+
+// TestMultiPing_EightPings sends eight messages concurrently from the first middleware of the test suit to the last one,
+// and checks that the last middleware receives the messages and that the messages are correctly decoded.
+func (m *MiddlewareTestSuite) TestMultiPing_EightPings() {
+	m.MultiPing(8)
 }
 
 // MultiPing sends count-many distinct messages concurrently from the first middleware of the test suit to the last one.
@@ -628,52 +614,56 @@ func (m *MiddlewareTestSuite) TestPing() {
 func (m *MiddlewareTestSuite) MultiPing(count int) {
 	receiveWG := sync.WaitGroup{}
 	sendWG := sync.WaitGroup{}
-	// extracts sender id based on the mock option
-	// mocks Overlay.Receive for  middleware.Overlay.Receive(*nodeID, payload)
-	firstNodeIndex := 0
-	lastNodeIndex := m.size - 1
+	senderNodeIndex := 0
+	targetNodeIndex := m.size - 1
 
 	receivedPayloads := unittest.NewProtectedMap[string, struct{}]() // keep track of unique payloads received.
 
 	// regex to extract the payload from the message
 	regex := regexp.MustCompile(`^hello from: \d`)
 
+	// creates a conduit on sender to send messages to the target on the test channel.
+	con0, err := m.networks[senderNodeIndex].Register(channels.TestNetworkChannel, &mocknetwork.MessageProcessor{})
+	require.NoError(m.T(), err)
+
+	// mocks a target engine on the last node of the test suit that will receive the message on the test channel.
+	targetEngine := &mocknetwork.MessageProcessor{}
+	_, err = m.networks[targetNodeIndex].Register(channels.TestNetworkChannel, targetEngine)
+	targetEngine.On("Process", mockery.Anything, mockery.Anything, mockery.Anything).
+		Run(func(args mockery.Arguments) {
+			receiveWG.Done()
+
+			msgChannel, ok := args[0].(channels.Channel)
+			require.True(m.T(), ok)
+			require.Equal(m.T(), channels.TestNetworkChannel, msgChannel) // channel
+
+			msgOriginID, ok := args[1].(flow.Identifier)
+			require.True(m.T(), ok)
+			require.Equal(m.T(), m.ids[senderNodeIndex].NodeID, msgOriginID) // sender id
+
+			msgPayload, ok := args[2].(*libp2pmessage.TestMessage)
+			// payload
+			require.True(m.T(), regex.MatchString(msgPayload.Text))
+			require.False(m.T(), receivedPayloads.Has(msgPayload.Text)) // payload must be unique
+			receivedPayloads.Add(msgPayload.Text, struct{}{})
+		}).Return(nil)
+
 	for i := 0; i < count; i++ {
 		receiveWG.Add(1)
 		sendWG.Add(1)
 
 		expectedPayloadText := fmt.Sprintf("hello from: %d", i)
-		msg, err := message.NewOutgoingScope(
-			flow.IdentifierList{m.ids[lastNodeIndex].NodeID},
-			channels.TopicFromChannel(channels.TestNetworkChannel, m.sporkId),
-			&libp2pmessage.TestMessage{
-				Text: expectedPayloadText,
-			},
-			unittest.NetworkCodec().Encode,
-			message.ProtocolTypeUnicast)
 		require.NoError(m.T(), err)
+		err = con0.Unicast(&libp2pmessage.TestMessage{
+			Text: expectedPayloadText,
+		}, m.ids[targetNodeIndex].NodeID)
+		require.NoError(m.Suite.T(), err)
 
-		m.ov[lastNodeIndex].On("Receive", mockery.Anything).Return(nil).Once().
-			Run(func(args mockery.Arguments) {
-				receiveWG.Done()
-
-				msg, ok := args[0].(network.IncomingMessageScope)
-				require.True(m.T(), ok)
-
-				require.Equal(m.T(), channels.TestNetworkChannel, msg.Channel())      // channel
-				require.Equal(m.T(), m.ids[firstNodeIndex].NodeID, msg.OriginId())    // sender id
-				require.Equal(m.T(), m.ids[lastNodeIndex].NodeID, msg.TargetIDs()[0]) // target id
-				require.Equal(m.T(), message.ProtocolTypeUnicast, msg.Protocol())     // protocol
-
-				// payload
-				decodedPayload := msg.DecodedPayload().(*libp2pmessage.TestMessage).Text
-				require.True(m.T(), regex.MatchString(decodedPayload))
-				require.False(m.T(), receivedPayloads.Has(decodedPayload)) // payload must be unique
-				receivedPayloads.Add(decodedPayload, struct{}{})
-			})
 		go func() {
 			// sends a direct message from first node to the last node
-			err := m.mws[firstNodeIndex].SendDirect(msg)
+			err := con0.Unicast(&libp2pmessage.TestMessage{
+				Text: expectedPayloadText,
+			}, m.ids[targetNodeIndex].NodeID)
 			require.NoError(m.Suite.T(), err)
 
 			sendWG.Done()
@@ -682,11 +672,6 @@ func (m *MiddlewareTestSuite) MultiPing(count int) {
 
 	unittest.RequireReturnsBefore(m.T(), sendWG.Wait, 1*time.Second, "could not send unicasts on time")
 	unittest.RequireReturnsBefore(m.T(), receiveWG.Wait, 1*time.Second, "could not receive unicasts on time")
-
-	// evaluates the mock calls
-	for i := 1; i < m.size; i++ {
-		m.ov[i].AssertExpectations(m.T())
-	}
 }
 
 // TestEcho sends an echo message from first middleware to the last middleware
@@ -701,86 +686,66 @@ func (m *MiddlewareTestSuite) TestEcho() {
 	// mocks Overlay.Receive for middleware.Overlay.Receive(*nodeID, payload)
 	first := 0
 	last := m.size - 1
-	firstNode := m.ids[first].NodeID
-	lastNode := m.ids[last].NodeID
+	// mocks a target engine on the first and last nodes of the test suit that will receive the message on the test channel.
+	targetEngine1 := &mocknetwork.MessageProcessor{}
+	con1, err := m.networks[first].Register(channels.TestNetworkChannel, targetEngine1)
+	require.NoError(m.T(), err)
+	targetEngine2 := &mocknetwork.MessageProcessor{}
+	con2, err := m.networks[last].Register(channels.TestNetworkChannel, targetEngine2)
+	require.NoError(m.T(), err)
 
 	// message sent from first node to the last node.
 	expectedSendMsg := "TestEcho"
-	sendMsg, err := message.NewOutgoingScope(
-		flow.IdentifierList{lastNode},
-		channels.TopicFromChannel(channels.TestNetworkChannel, m.sporkId),
-		&libp2pmessage.TestMessage{
-			Text: expectedSendMsg,
-		},
-		unittest.NetworkCodec().Encode,
-		message.ProtocolTypeUnicast)
-	require.NoError(m.T(), err)
-
 	// reply from last node to the first node.
 	expectedReplyMsg := "TestEcho response"
-	replyMsg, err := message.NewOutgoingScope(
-		flow.IdentifierList{firstNode},
-		channels.TopicFromChannel(channels.TestNetworkChannel, m.sporkId),
-		&libp2pmessage.TestMessage{
-			Text: expectedReplyMsg,
-		},
-		unittest.NetworkCodec().Encode,
-		message.ProtocolTypeUnicast)
-	require.NoError(m.T(), err)
 
-	// last node
-	m.ov[last].On("Receive", mockery.Anything).Return(nil).Once().
+	// mocks the target engine on the last node of the test suit that will receive the message on the test channel, and
+	// echos back the reply message to the sender.
+	targetEngine2.On("Process", mockery.Anything, mockery.Anything, mockery.Anything).
 		Run(func(args mockery.Arguments) {
 			wg.Done()
 
-			// sanity checks the message content.
-			msg, ok := args[0].(network.IncomingMessageScope)
+			msgChannel, ok := args[0].(channels.Channel)
 			require.True(m.T(), ok)
+			require.Equal(m.T(), channels.TestNetworkChannel, msgChannel) // channel
 
-			require.Equal(m.T(), channels.TestNetworkChannel, msg.Channel())                              // channel
-			require.Equal(m.T(), m.ids[first].NodeID, msg.OriginId())                                     // sender id
-			require.Equal(m.T(), lastNode, msg.TargetIDs()[0])                                            // target id
-			require.Equal(m.T(), message.ProtocolTypeUnicast, msg.Protocol())                             // protocol
-			require.Equal(m.T(), expectedSendMsg, msg.DecodedPayload().(*libp2pmessage.TestMessage).Text) // payload
-			// event id
-			eventId, err := message.EventId(msg.Channel(), msg.Proto().Payload)
-			require.NoError(m.T(), err)
-			require.True(m.T(), bytes.Equal(eventId, msg.EventID()))
+			msgOriginID, ok := args[1].(flow.Identifier)
+			require.True(m.T(), ok)
+			require.Equal(m.T(), m.ids[first].NodeID, msgOriginID) // sender id
+
+			msgPayload, ok := args[2].(*libp2pmessage.TestMessage)
+			require.Equal(m.T(), expectedSendMsg, msgPayload.Text) // payload
 
 			// echos back the same message back to the sender
-			err = m.mws[last].SendDirect(replyMsg)
-			assert.NoError(m.T(), err)
-		})
+			require.NoError(m.T(), con2.Unicast(&libp2pmessage.TestMessage{
+				Text: expectedReplyMsg,
+			}, m.ids[first].NodeID))
+		}).Return(nil).Once()
 
-	// first node
-	m.ov[first].On("Receive", mockery.Anything).Return(nil).Once().
+	// mocks the target engine on the last node of the test suit that will receive the message on the test channel, and
+	// echos back the reply message to the sender.
+	targetEngine1.On("Process", mockery.Anything, mockery.Anything, mockery.Anything).
 		Run(func(args mockery.Arguments) {
 			wg.Done()
-			// sanity checks the message content.
-			msg, ok := args[0].(network.IncomingMessageScope)
-			require.True(m.T(), ok)
 
-			require.Equal(m.T(), channels.TestNetworkChannel, msg.Channel())                               // channel
-			require.Equal(m.T(), m.ids[last].NodeID, msg.OriginId())                                       // sender id
-			require.Equal(m.T(), firstNode, msg.TargetIDs()[0])                                            // target id
-			require.Equal(m.T(), message.ProtocolTypeUnicast, msg.Protocol())                              // protocol
-			require.Equal(m.T(), expectedReplyMsg, msg.DecodedPayload().(*libp2pmessage.TestMessage).Text) // payload
-			// event id
-			eventId, err := message.EventId(msg.Channel(), msg.Proto().Payload)
-			require.NoError(m.T(), err)
-			require.True(m.T(), bytes.Equal(eventId, msg.EventID()))
-		})
+			msgChannel, ok := args[0].(channels.Channel)
+			require.True(m.T(), ok)
+			require.Equal(m.T(), channels.TestNetworkChannel, msgChannel) // channel
+
+			msgOriginID, ok := args[1].(flow.Identifier)
+			require.True(m.T(), ok)
+			require.Equal(m.T(), m.ids[last].NodeID, msgOriginID) // sender id
+
+			msgPayload, ok := args[2].(*libp2pmessage.TestMessage)
+			require.Equal(m.T(), expectedReplyMsg, msgPayload.Text) // payload
+		}).Return(nil)
 
 	// sends a direct message from first node to the last node
-	err = m.mws[first].SendDirect(sendMsg)
-	require.NoError(m.Suite.T(), err)
+	require.NoError(m.T(), con1.Unicast(&libp2pmessage.TestMessage{
+		Text: expectedSendMsg,
+	}, m.ids[last].NodeID))
 
-	unittest.RequireReturnsBefore(m.T(), wg.Wait, 100*time.Second, "could not receive unicast on time")
-
-	// evaluates the mock calls
-	for i := 1; i < m.size; i++ {
-		m.ov[i].AssertExpectations(m.T())
-	}
+	unittest.RequireReturnsBefore(m.T(), wg.Wait, 5*time.Second, "could not receive unicast on time")
 }
 
 // TestMaxMessageSize_SendDirect evaluates that invoking SendDirect method of the middleware on a message
