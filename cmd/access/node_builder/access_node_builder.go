@@ -4,12 +4,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/flow-go/engine/execution/computation"
 	"github.com/onflow/flow-go/engine/execution/computation/query"
 	"github.com/onflow/flow-go/engine/execution/scripts"
 	"github.com/onflow/flow-go/fvm"
-	reusableRuntime "github.com/onflow/flow-go/fvm/runtime"
 	"github.com/onflow/flow-go/fvm/storage/derived"
 	"github.com/onflow/flow-go/module/indexer"
 	"github.com/onflow/flow-go/storage/memory"
@@ -140,7 +138,7 @@ type AccessNodeConfig struct {
 	executionDataDir             string
 	executionDataStartHeight     uint64
 	executionDataConfig          edrequester.ExecutionDataConfig
-	queryExecutorConfig query.QueryConfig
+	queryExecutorConfig          query.QueryConfig
 	PublicNetworkConfig          PublicNetworkConfig
 }
 
@@ -661,11 +659,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionDataRequester() *FlowAccessN
 			}
 
 			queryExecutor := query.NewQueryExecutor(
-				query.QueryConfig{
-					LogTimeThreshold:    0,
-					ExecutionTimeLimit:  0,
-					MaxErrorMessageSize: 0,
-				}
+				builder.queryExecutorConfig,
 				builder.Logger,
 				metrics.NewExecutionCollector(node.Tracer), // TODO check
 				vm,
@@ -679,6 +673,8 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionDataRequester() *FlowAccessN
 				queryExecutor,
 				exeIndexer,
 			)
+
+			return builder.ScriptsEng, nil
 		})
 
 	if builder.stateStreamConf.ListenAddr != "" {
