@@ -767,7 +767,7 @@ func (m *Middleware) processMessage(scope network.IncomingMessageScope) {
 // - the libP2P node fails to publish the message.
 //
 // All errors returned from this function can be considered benign.
-// TODO: publish has made ready to be removed from middleware, and instead the libp2pNode.Publish should be used directly.
+// TODO: DO NOT USE. Publish is ready to be removed from middleware. Use libp2pNode.Publish directly.
 func (m *Middleware) Publish(msg network.OutgoingMessageScope) error {
 	return m.libP2PNode.Publish(m.ctx, msg)
 }
