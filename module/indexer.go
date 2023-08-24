@@ -1,13 +1,16 @@
 package module
 
 import (
+	"github.com/onflow/flow-go/engine/execution/scripts"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/model/flow"
 )
 
+// TODO rename to execution state indexer
 type Indexer interface {
 	IndexReader
 	IndexWriter
+	scripts.ScriptExecutionState
 }
 
 type IndexReader interface {
