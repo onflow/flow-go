@@ -69,6 +69,8 @@ jobs:
           cache: true
       - name: Run tidy
         run: make tidy
+      - name: Setup tmate session
+        uses: mxschmitt/action-tmate@v3
 
   create-dynamic-test-matrix:
     name: Create Dynamic Test Matrix
