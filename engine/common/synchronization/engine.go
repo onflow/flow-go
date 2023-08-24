@@ -473,18 +473,22 @@ func (e *Engine) sendRequests(participants flow.IdentifierList, ranges []chainsy
 	}
 }
 
+// TODO: implement spam reporting similar to validateSyncRequestForALSP
 func (e *Engine) validateBatchRequestForALSP(channel channels.Channel, id flow.Identifier, event interface{}) (*alsp.MisbehaviorReport, bool) {
 	return nil, false
 }
 
+// TODO: implement spam reporting similar to validateSyncRequestForALSP
 func (e *Engine) validateBlockResponseForALSP(channel channels.Channel, id flow.Identifier, event interface{}) (*alsp.MisbehaviorReport, bool) {
 	return nil, false
 }
 
+// TODO: implement spam reporting similar to validateSyncRequestForALSP
 func (e *Engine) validateRangeRequestForALSP(channel channels.Channel, id flow.Identifier, event interface{}) (*alsp.MisbehaviorReport, bool) {
 	return nil, false
 }
 
+// validateSyncRequestForALSP checks if a sync request should be reported as spam. It returns a misbehavior report and a boolean indicating whether the request should be reported.
 func (e *Engine) validateSyncRequestForALSP(channel channels.Channel, originID flow.Identifier, event interface{}) (*alsp.MisbehaviorReport, bool) {
 	// Generate a random integer between 1 and spamProbabilityMultiplier (exclusive)
 	n, err := rand.Uint32n(spamProbabilityMultiplier)
@@ -520,6 +524,7 @@ func (e *Engine) validateSyncRequestForALSP(channel channels.Channel, originID f
 	return nil, false
 }
 
+// TODO: implement spam reporting similar to validateSyncRequestForALSP
 func (e *Engine) validateSyncResponseForALSP(channel channels.Channel, id flow.Identifier, event interface{}) (*alsp.MisbehaviorReport, bool) {
 	return nil, false
 }

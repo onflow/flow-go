@@ -48,6 +48,7 @@ type SpamReportConfig struct {
 func NewSpamReportConfig() *SpamReportConfig {
 	return &SpamReportConfig{
 		// create misbehavior report 1/100 message requests
+		// TODO: make this configurable as a start up flag for the engine
 		syncRequestProbability: 0.01,
 	}
 }
