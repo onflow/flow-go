@@ -298,11 +298,10 @@ func TestTopicValidator_InvalidTopic(t *testing.T) {
 
 	// overrides the topic to be an invalid topic
 	corruptOutgoingMessageScope := mocknetwork.NewOutgoingMessageScope(t)
-	corruptOutgoingMessageScope.On("TargetIds").Return(dummyMessageScope.TargetIds()).Maybe()
-	corruptOutgoingMessageScope.On("Topic").Return(topic).Maybe()
-	corruptOutgoingMessageScope.On("Proto").Return(dummyMessageScope.Proto()).Maybe()
-	corruptOutgoingMessageScope.On("PayloadType").Return(dummyMessageScope.PayloadType()).Maybe()
-	corruptOutgoingMessageScope.On("Size").Return(dummyMessageScope.Size()).Maybe()
+	corruptOutgoingMessageScope.On("Topic").Return(topic)
+	corruptOutgoingMessageScope.On("Proto").Return(dummyMessageScope.Proto())
+	corruptOutgoingMessageScope.On("PayloadType").Return(dummyMessageScope.PayloadType())
+	corruptOutgoingMessageScope.On("Size").Return(dummyMessageScope.Size())
 
 	// create a dummy block proposal to publish from our SN node
 	err = sn2.Publish(timedCtx, corruptOutgoingMessageScope)
