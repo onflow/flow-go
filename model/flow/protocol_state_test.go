@@ -89,6 +89,8 @@ func TestNewRichProtocolStateEntry(t *testing.T) {
 		assert.Equal(t, expectedIdentities, richEntry.NextEpochProtocolState.Identities, "should be equal to next epoch setup participants + current epoch setup participants")
 	})
 
+	// TODO: include test for epoch setup phase where no prior epoch exist (i.e. first epoch setup phase after spork)
+
 	// Common situation during the epoch commit phase for epoch N+1
 	//  * we are currently in Epoch N
 	//  * previous epoch N-1 is known (specifically EpochSetup and EpochCommit events)
@@ -111,4 +113,7 @@ func TestNewRichProtocolStateEntry(t *testing.T) {
 		expectedIdentities = stateEntry.NextEpochProtocolState.CurrentEpochSetup.Participants.Union(stateEntry.CurrentEpochSetup.Participants)
 		assert.Equal(t, expectedIdentities, richEntry.NextEpochProtocolState.Identities, "should be equal to next epoch setup participants + current epoch setup participants")
 	})
+
+	// TODO: include test for epoch commit phase where no prior epoch exist (i.e. first epoch commit phase after spork)
+
 }
