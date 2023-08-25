@@ -3,10 +3,11 @@ package backend
 import (
 	"context"
 
-	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
-	"github.com/onflow/flow/protobuf/go/flow/entities"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+
+	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
+	"github.com/onflow/flow/protobuf/go/flow/entities"
 
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/model/flow"
@@ -36,21 +37,28 @@ func (suite *Suite) TestHistoricalTransactionResult() {
 		Events: nil,
 	}
 
-	backend := New(Params{
-		State:                 suite.state,
-		HistoricalAccessNodes: []accessproto.AccessAPIClient{suite.historicalAccessClient},
-		Blocks:                suite.blocks,
-		Headers:               suite.headers,
-		Collections:           suite.collections,
-		Transactions:          suite.transactions,
-		ExecutionReceipts:     suite.receipts,
-		ExecutionResults:      suite.results,
-		ChainID:               suite.chainID,
-		AccessMetrics:         metrics.NewNoopCollector(),
-		MaxHeightRange:        DefaultMaxHeightRange,
-		SnapshotHistoryLimit:  DefaultSnapshotHistoryLimit,
-		Communicator:          NewNodeCommunicator(false),
-	})
+	backend := New(suite.state,
+		nil,
+		[]accessproto.AccessAPIClient{suite.historicalAccessClient},
+		suite.blocks,
+		suite.headers,
+		suite.collections,
+		suite.transactions,
+		suite.receipts,
+		suite.results,
+		suite.chainID,
+		metrics.NewNoopCollector(),
+		nil,
+		false,
+		DefaultMaxHeightRange,
+		nil,
+		nil,
+		suite.log,
+		DefaultSnapshotHistoryLimit,
+		nil,
+		false,
+		false,
+	)
 
 	// Successfully return the transaction from the historical node
 	suite.historicalAccessClient.
@@ -89,22 +97,28 @@ func (suite *Suite) TestHistoricalTransaction() {
 		Transaction: convert.TransactionToMessage(*transactionBody),
 	}
 
-	backend := New(
-		Params{
-			State:                 suite.state,
-			HistoricalAccessNodes: []accessproto.AccessAPIClient{suite.historicalAccessClient},
-			Blocks:                suite.blocks,
-			Headers:               suite.headers,
-			Collections:           suite.collections,
-			Transactions:          suite.transactions,
-			ExecutionReceipts:     suite.receipts,
-			ExecutionResults:      suite.results,
-			ChainID:               suite.chainID,
-			AccessMetrics:         metrics.NewNoopCollector(),
-			MaxHeightRange:        DefaultMaxHeightRange,
-			SnapshotHistoryLimit:  DefaultSnapshotHistoryLimit,
-			Communicator:          NewNodeCommunicator(false),
-		})
+	backend := New(suite.state,
+		nil,
+		[]accessproto.AccessAPIClient{suite.historicalAccessClient},
+		suite.blocks,
+		suite.headers,
+		suite.collections,
+		suite.transactions,
+		suite.receipts,
+		suite.results,
+		suite.chainID,
+		metrics.NewNoopCollector(),
+		nil,
+		false,
+		DefaultMaxHeightRange,
+		nil,
+		nil,
+		suite.log,
+		DefaultSnapshotHistoryLimit,
+		nil,
+		false,
+		false,
+	)
 
 	// Successfully return the transaction from the historical node
 	suite.historicalAccessClient.
