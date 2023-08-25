@@ -75,8 +75,7 @@ type MiddlewareTestSuite struct {
 	libP2PNodes                []p2p.LibP2PNode
 	networks                   []network.Network
 	mws                        []network.Middleware // used to keep track of middlewares under test
-	ov                         []*mocknetwork.Overlay
-	obs                        chan string // used to keep track of Protect events tagged by pubsub messages
+	obs                        chan string          // used to keep track of Protect events tagged by pubsub messages
 	ids                        []*flow.Identity
 	metrics                    *metrics.NoopCollector // no-op performance monitoring simulation
 	logger                     zerolog.Logger
@@ -160,11 +159,6 @@ func (m *MiddlewareTestSuite) SetupTest() {
 	require.Len(m.Suite.T(), m.ids, m.size)
 	require.Len(m.Suite.T(), m.mws, m.size)
 
-	// create the mock overlays
-	for i := 0; i < m.size; i++ {
-		m.ov = append(m.ov, m.createOverlay(m.providers[i]))
-	}
-
 	ctx, cancel := context.WithCancel(context.Background())
 	m.mwCancel = cancel
 
@@ -187,7 +181,6 @@ func (m *MiddlewareTestSuite) TearDownTest() {
 
 	m.mws = nil
 	m.libP2PNodes = nil
-	m.ov = nil
 	m.ids = nil
 	m.size = 0
 }
