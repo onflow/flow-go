@@ -6,7 +6,6 @@ import (
 
 	"github.com/onflow/flow-go/model/flow"
 	libp2pmessage "github.com/onflow/flow-go/model/libp2p/message"
-	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/message"
 
 	"github.com/stretchr/testify/require"
@@ -37,9 +36,10 @@ func TestBandWidthRateLimiter_Allow(t *testing.T) {
 		b[i] = byte('X')
 	}
 
-	msg, err := network.NewOutgoingScope(
+	sporkId := unittest.IdentifierFixture()
+	msg, err := message.NewOutgoingScope(
 		flow.IdentifierList{unittest.IdentifierFixture()},
-		channels.TestNetworkChannel,
+		channels.TopicFromChannel(channels.TestNetworkChannel, sporkId),
 		&libp2pmessage.TestMessage{
 			Text: string(b),
 		},
@@ -90,9 +90,10 @@ func TestBandWidthRateLimiter_IsRateLimited(t *testing.T) {
 
 	require.False(t, bandwidthRateLimiter.IsRateLimited(peerID))
 
-	msg, err := network.NewOutgoingScope(
+	sporkId := unittest.IdentifierFixture()
+	msg, err := message.NewOutgoingScope(
 		flow.IdentifierList{unittest.IdentifierFixture()},
-		channels.TestNetworkChannel,
+		channels.TopicFromChannel(channels.TestNetworkChannel, sporkId),
 		&libp2pmessage.TestMessage{
 			Text: string(b),
 		},
