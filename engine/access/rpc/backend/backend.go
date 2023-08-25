@@ -228,13 +228,13 @@ func NewCache(
 	log zerolog.Logger,
 	accessMetrics module.AccessMetrics,
 	connectionPoolSize uint,
-) (*lru2.Cache[flow.Identifier, *connection.CachedClient], uint, error) {
+) (*lru2.Cache[string, *connection.CachedClient], uint, error) {
 
-	var cache *lru2.Cache[flow.Identifier, *connection.CachedClient]
+	var cache *lru2.Cache[string, *connection.CachedClient]
 	cacheSize := connectionPoolSize
 	if cacheSize > 0 {
 		var err error
-		cache, err = lru2.NewWithEvict[flow.Identifier, *connection.CachedClient](int(cacheSize), func(_ flow.Identifier, store *connection.CachedClient) {
+		cache, err = lru2.NewWithEvict[string, *connection.CachedClient](int(cacheSize), func(_ string, store *connection.CachedClient) {
 			store.Close()
 			log.Debug().Str("grpc_conn_evicted", store.Address).Msg("closing grpc connection evicted from pool")
 			if accessMetrics != nil {
