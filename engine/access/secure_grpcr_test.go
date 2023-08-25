@@ -7,7 +7,6 @@ import (
 	"testing"
 	"time"
 
-	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -15,6 +14,8 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/insecure"
+
+	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
 
 	"github.com/onflow/flow-go/crypto"
 	accessmock "github.com/onflow/flow-go/engine/access/mock"
@@ -130,20 +131,29 @@ func (suite *SecureGRPCTestSuite) SetupTest() {
 	block := unittest.BlockHeaderFixture()
 	suite.snapshot.On("Head").Return(block, nil)
 
-	bnd := backend.New(backend.Params{
-		State:                suite.state,
-		CollectionRPC:        suite.collClient,
-		Blocks:               suite.blocks,
-		Headers:              suite.headers,
-		Collections:          suite.collections,
-		Transactions:         suite.transactions,
-		ChainID:              suite.chainID,
-		AccessMetrics:        suite.metrics,
-		MaxHeightRange:       0,
-		Log:                  suite.log,
-		SnapshotHistoryLimit: 0,
-		Communicator:         backend.NewNodeCommunicator(false),
-	})
+	backend := backend.New(
+		suite.state,
+		suite.collClient,
+		nil,
+		suite.blocks,
+		suite.headers,
+		suite.collections,
+		suite.transactions,
+		nil,
+		nil,
+		suite.chainID,
+		suite.metrics,
+		nil,
+		false,
+		0,
+		nil,
+		nil,
+		suite.log,
+		0,
+		nil,
+		false,
+		false,
+	)
 
 	rpcEngBuilder, err := rpc.NewBuilder(
 		suite.log,
@@ -153,8 +163,8 @@ func (suite *SecureGRPCTestSuite) SetupTest() {
 		suite.metrics,
 		false,
 		suite.me,
-		bnd,
-		bnd,
+		backend,
+		backend,
 		suite.secureGrpcServer,
 		suite.unsecureGrpcServer,
 	)

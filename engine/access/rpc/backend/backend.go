@@ -1,14 +1,19 @@
 package backend
 
 import (
-	"crypto/md5" // #nosec
 	"context"
+	"crypto/md5"
 	"fmt"
 	"net"
 	"strconv"
 	"time"
 
 	lru2 "github.com/hashicorp/golang-lru/v2"
+	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
+	"github.com/rs/zerolog"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
+
 	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/cmd/build"
 	"github.com/onflow/flow-go/engine/access/rpc/connection"
@@ -19,10 +24,6 @@ import (
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
-	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
-	"github.com/rs/zerolog"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 )
 
 // minExecutionNodesCnt is the minimum number of execution nodes expected to have sent the execution receipt for a block
@@ -90,142 +91,132 @@ type Config struct {
 	CircuitBreakerConfig      connection.CircuitBreakerConfig // the configuration for circuit breaker
 }
 
-type Params struct {
-	State                     protocol.State
-	CollectionRPC             accessproto.AccessAPIClient
-	HistoricalAccessNodes     []accessproto.AccessAPIClient
-	Blocks                    storage.Blocks
-	Headers                   storage.Headers
-	Collections               storage.Collections
-	Transactions              storage.Transactions
-	ExecutionReceipts         storage.ExecutionReceipts
-	ExecutionResults          storage.ExecutionResults
-	ChainID                   flow.ChainID
-	AccessMetrics             module.AccessMetrics
-	ConnFactory               connection.ConnectionFactory
-	RetryEnabled              bool
-	MaxHeightRange            uint
-	PreferredExecutionNodeIDs []string
-	FixedExecutionNodeIDs     []string
-	Log                       zerolog.Logger
-	SnapshotHistoryLimit      int
-	ArchiveAddressList        []string
-	Communicator              Communicator
-	ScriptExecValidation      bool
-	TxResultCacheSize         uint
-}
-
-// New creates backend instance
-func New(params Params) *Backend {
+func New(
+	state protocol.State,
+	collectionRPC accessproto.AccessAPIClient,
+	historicalAccessNodes []accessproto.AccessAPIClient,
+	blocks storage.Blocks,
+	headers storage.Headers,
+	collections storage.Collections,
+	transactions storage.Transactions,
+	executionReceipts storage.ExecutionReceipts,
+	executionResults storage.ExecutionResults,
+	chainID flow.ChainID,
+	accessMetrics module.AccessMetrics,
+	connFactory connection.ConnectionFactory,
+	retryEnabled bool,
+	maxHeightRange uint,
+	preferredExecutionNodeIDs []string,
+	fixedExecutionNodeIDs []string,
+	log zerolog.Logger,
+	snapshotHistoryLimit int,
+	archiveAddressList []string,
+	scriptExecValidation bool,
+	circuitBreakerEnabled bool,
+) *Backend {
 	retry := newRetry()
-	if params.RetryEnabled {
+	if retryEnabled {
 		retry.Activate()
 	}
 
 	loggedScripts, err := lru2.New[[md5.Size]byte, time.Time](DefaultLoggedScriptsCacheSize)
 	if err != nil {
-		params.Log.Fatal().Err(err).Msg("failed to initialize script logging cache")
+		log.Fatal().Err(err).Msg("failed to initialize script logging cache")
 	}
 
-	archivePorts := make([]uint, len(params.ArchiveAddressList))
-	for idx, addr := range params.ArchiveAddressList {
+	archivePorts := make([]uint, len(archiveAddressList))
+	for idx, addr := range archiveAddressList {
 		port, err := findPortFromAddress(addr)
 		if err != nil {
-			params.Log.Fatal().Err(err).Msg("failed to find archive node port")
+			log.Fatal().Err(err).Msg("failed to find archive node port")
 		}
 		archivePorts[idx] = port
 	}
 
-	var txResCache *lru2.Cache[flow.Identifier, *access.TransactionResult]
-	if params.TxResultCacheSize > 0 {
-		txResCache, err = lru2.New[flow.Identifier, *access.TransactionResult](int(params.TxResultCacheSize))
-		if err != nil {
-			params.Log.Fatal().Err(err).Msg("failed to init cache for transaction results")
-		}
-	}
+	// create node communicator, that will be used in sub-backend logic for interacting with API calls
+	nodeCommunicator := NewNodeCommunicator(circuitBreakerEnabled)
 
 	b := &Backend{
-		state: params.State,
+		state: state,
 		// create the sub-backends
 		backendScripts: backendScripts{
-			headers:              params.Headers,
-			executionReceipts:    params.ExecutionReceipts,
-			connFactory:          params.ConnFactory,
-			state:                params.State,
-			log:                  params.Log,
-			metrics:              params.AccessMetrics,
+			headers:              headers,
+			executionReceipts:    executionReceipts,
+			connFactory:          connFactory,
+			state:                state,
+			log:                  log,
+			metrics:              accessMetrics,
 			loggedScripts:        loggedScripts,
-			archiveAddressList:   params.ArchiveAddressList,
+			archiveAddressList:   archiveAddressList,
 			archivePorts:         archivePorts,
-			nodeCommunicator:     params.Communicator,
-			scriptExecValidation: params.ScriptExecValidation,
+			scriptExecValidation: scriptExecValidation,
+			nodeCommunicator:     nodeCommunicator,
 		},
 		backendTransactions: backendTransactions{
-			staticCollectionRPC:  params.CollectionRPC,
-			state:                params.State,
-			chainID:              params.ChainID,
-			collections:          params.Collections,
-			blocks:               params.Blocks,
-			transactions:         params.Transactions,
-			executionReceipts:    params.ExecutionReceipts,
-			transactionValidator: configureTransactionValidator(params.State, params.ChainID),
-			transactionMetrics:   params.AccessMetrics,
+			staticCollectionRPC:  collectionRPC,
+			state:                state,
+			chainID:              chainID,
+			collections:          collections,
+			blocks:               blocks,
+			transactions:         transactions,
+			executionReceipts:    executionReceipts,
+			transactionValidator: configureTransactionValidator(state, chainID),
+			transactionMetrics:   accessMetrics,
 			retry:                retry,
-			connFactory:          params.ConnFactory,
-			previousAccessNodes:  params.HistoricalAccessNodes,
-			log:                  params.Log,
-			nodeCommunicator:     params.Communicator,
-			txResultCache:        txResCache,
+			connFactory:          connFactory,
+			previousAccessNodes:  historicalAccessNodes,
+			log:                  log,
+			nodeCommunicator:     nodeCommunicator,
 		},
 		backendEvents: backendEvents{
-			state:             params.State,
-			headers:           params.Headers,
-			executionReceipts: params.ExecutionReceipts,
-			connFactory:       params.ConnFactory,
-			log:               params.Log,
-			maxHeightRange:    params.MaxHeightRange,
-			nodeCommunicator:  params.Communicator,
+			state:             state,
+			headers:           headers,
+			executionReceipts: executionReceipts,
+			connFactory:       connFactory,
+			log:               log,
+			maxHeightRange:    maxHeightRange,
+			nodeCommunicator:  nodeCommunicator,
 		},
 		backendBlockHeaders: backendBlockHeaders{
-			headers: params.Headers,
-			state:   params.State,
+			headers: headers,
+			state:   state,
 		},
 		backendBlockDetails: backendBlockDetails{
-			blocks: params.Blocks,
-			state:  params.State,
+			blocks: blocks,
+			state:  state,
 		},
 		backendAccounts: backendAccounts{
-			state:             params.State,
-			headers:           params.Headers,
-			executionReceipts: params.ExecutionReceipts,
-			connFactory:       params.ConnFactory,
-			log:               params.Log,
-			nodeCommunicator:  params.Communicator,
+			state:             state,
+			headers:           headers,
+			executionReceipts: executionReceipts,
+			connFactory:       connFactory,
+			log:               log,
+			nodeCommunicator:  nodeCommunicator,
 		},
 		backendExecutionResults: backendExecutionResults{
-			executionResults: params.ExecutionResults,
+			executionResults: executionResults,
 		},
 		backendNetwork: backendNetwork{
-			state:                params.State,
-			chainID:              params.ChainID,
-			snapshotHistoryLimit: params.SnapshotHistoryLimit,
+			state:                state,
+			chainID:              chainID,
+			snapshotHistoryLimit: snapshotHistoryLimit,
 		},
-		collections:       params.Collections,
-		executionReceipts: params.ExecutionReceipts,
-		connFactory:       params.ConnFactory,
-		chainID:           params.ChainID,
+		collections:       collections,
+		executionReceipts: executionReceipts,
+		connFactory:       connFactory,
+		chainID:           chainID,
 	}
 
 	retry.SetBackend(b)
 
-	preferredENIdentifiers, err = identifierList(params.PreferredExecutionNodeIDs)
+	preferredENIdentifiers, err = identifierList(preferredExecutionNodeIDs)
 	if err != nil {
-		params.Log.Fatal().Err(err).Msg("failed to convert node id string to Flow Identifier for preferred EN map")
+		log.Fatal().Err(err).Msg("failed to convert node id string to Flow Identifier for preferred EN map")
 	}
 
-	fixedENIdentifiers, err = identifierList(params.FixedExecutionNodeIDs)
+	fixedENIdentifiers, err = identifierList(fixedExecutionNodeIDs)
 	if err != nil {
-		params.Log.Fatal().Err(err).Msg("failed to convert node id string to Flow Identifier for fixed EN map")
+		log.Fatal().Err(err).Msg("failed to convert node id string to Flow Identifier for fixed EN map")
 	}
 
 	return b
@@ -237,13 +228,13 @@ func NewCache(
 	log zerolog.Logger,
 	accessMetrics module.AccessMetrics,
 	connectionPoolSize uint,
-) (*lru2.Cache[string, *connection.CachedClient], uint, error) {
+) (*lru2.Cache[flow.Identifier, *connection.CachedClient], uint, error) {
 
-	var cache *lru2.Cache[string, *connection.CachedClient]
+	var cache *lru2.Cache[flow.Identifier, *connection.CachedClient]
 	cacheSize := connectionPoolSize
 	if cacheSize > 0 {
 		var err error
-		cache, err = lru2.NewWithEvict[string, *connection.CachedClient](int(cacheSize), func(_ string, store *connection.CachedClient) {
+		cache, err = lru2.NewWithEvict[flow.Identifier, *connection.CachedClient](int(cacheSize), func(_ flow.Identifier, store *connection.CachedClient) {
 			store.Close()
 			log.Debug().Str("grpc_conn_evicted", store.Address).Msg("closing grpc connection evicted from pool")
 			if accessMetrics != nil {

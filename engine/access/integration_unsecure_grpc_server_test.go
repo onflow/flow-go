@@ -2,17 +2,17 @@ package access
 
 import (
 	"context"
+
 	"io"
 	"os"
 	"testing"
 	"time"
 
-	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
-	executiondataproto "github.com/onflow/flow/protobuf/go/flow/executiondata"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
+
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/insecure"
@@ -37,6 +37,9 @@ import (
 	storagemock "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/utils/grpcutils"
 	"github.com/onflow/flow-go/utils/unittest"
+
+	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
+	executiondataproto "github.com/onflow/flow/protobuf/go/flow/executiondata"
 )
 
 // SameGRPCPortTestSuite verifies both AccessAPI and ExecutionDataAPI client continue to work when configured
@@ -166,20 +169,29 @@ func (suite *SameGRPCPortTestSuite) SetupTest() {
 	block := unittest.BlockHeaderFixture()
 	suite.snapshot.On("Head").Return(block, nil)
 
-	bnd := backend.New(backend.Params{
-		State:                suite.state,
-		CollectionRPC:        suite.collClient,
-		Blocks:               suite.blocks,
-		Headers:              suite.headers,
-		Collections:          suite.collections,
-		Transactions:         suite.transactions,
-		ChainID:              suite.chainID,
-		AccessMetrics:        suite.metrics,
-		MaxHeightRange:       0,
-		Log:                  suite.log,
-		SnapshotHistoryLimit: 0,
-		Communicator:         backend.NewNodeCommunicator(false),
-	})
+	backend := backend.New(
+		suite.state,
+		suite.collClient,
+		nil,
+		suite.blocks,
+		suite.headers,
+		suite.collections,
+		suite.transactions,
+		nil,
+		nil,
+		suite.chainID,
+		suite.metrics,
+		nil,
+		false,
+		0,
+		nil,
+		nil,
+		suite.log,
+		0,
+		nil,
+		false,
+		false,
+	)
 
 	// create rpc engine builder
 	rpcEngBuilder, err := rpc.NewBuilder(
@@ -190,8 +202,8 @@ func (suite *SameGRPCPortTestSuite) SetupTest() {
 		suite.metrics,
 		false,
 		suite.me,
-		bnd,
-		bnd,
+		backend,
+		backend,
 		suite.secureGrpcServer,
 		suite.unsecureGrpcServer,
 	)

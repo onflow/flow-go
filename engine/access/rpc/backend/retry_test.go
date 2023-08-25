@@ -3,11 +3,12 @@ package backend
 import (
 	"context"
 
-	"github.com/onflow/flow/protobuf/go/flow/access"
-	"github.com/onflow/flow/protobuf/go/flow/execution"
 	"github.com/stretchr/testify/mock"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+
+	"github.com/onflow/flow/protobuf/go/flow/access"
+	"github.com/onflow/flow/protobuf/go/flow/execution"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
@@ -41,24 +42,28 @@ func (suite *Suite) TestTransactionRetry() {
 	// txID := transactionBody.ID()
 	// blockID := block.ID()
 	// Setup Handler + Retry
-	backend := New(
-		Params{
-			State:                suite.state,
-			CollectionRPC:        suite.colClient,
-			Blocks:               suite.blocks,
-			Headers:              suite.headers,
-			Collections:          suite.collections,
-			Transactions:         suite.transactions,
-			ExecutionReceipts:    suite.receipts,
-			ExecutionResults:     suite.results,
-			ChainID:              suite.chainID,
-			AccessMetrics:        metrics.NewNoopCollector(),
-			MaxHeightRange:       DefaultMaxHeightRange,
-			SnapshotHistoryLimit: DefaultSnapshotHistoryLimit,
-			Log:                  suite.log,
-			Communicator:         NewNodeCommunicator(false),
-		})
-
+	backend := New(suite.state,
+		suite.colClient,
+		nil,
+		suite.blocks,
+		suite.headers,
+		suite.collections,
+		suite.transactions,
+		suite.receipts,
+		suite.results,
+		suite.chainID,
+		metrics.NewNoopCollector(),
+		nil,
+		false,
+		DefaultMaxHeightRange,
+		nil,
+		nil,
+		suite.log,
+		DefaultSnapshotHistoryLimit,
+		nil,
+		false,
+		false,
+	)
 	retry := newRetry().SetBackend(backend).Activate()
 	backend.retry = retry
 
@@ -127,25 +132,29 @@ func (suite *Suite) TestSuccessfulTransactionsDontRetry() {
 	suite.snapshot.On("Identities", mock.Anything).Return(enIDs, nil)
 	connFactory := suite.setupConnectionFactory()
 
-	backend := New(
-		Params{
-			State:                suite.state,
-			CollectionRPC:        suite.colClient,
-			Blocks:               suite.blocks,
-			Headers:              suite.headers,
-			Collections:          suite.collections,
-			Transactions:         suite.transactions,
-			ExecutionReceipts:    suite.receipts,
-			ExecutionResults:     suite.results,
-			ChainID:              suite.chainID,
-			ConnFactory:          connFactory,
-			AccessMetrics:        metrics.NewNoopCollector(),
-			MaxHeightRange:       DefaultMaxHeightRange,
-			SnapshotHistoryLimit: DefaultSnapshotHistoryLimit,
-			Log:                  suite.log,
-			Communicator:         NewNodeCommunicator(false),
-		})
-
+	// Setup Handler + Retry
+	backend := New(suite.state,
+		suite.colClient,
+		nil,
+		suite.blocks,
+		suite.headers,
+		suite.collections,
+		suite.transactions,
+		suite.receipts,
+		suite.results,
+		suite.chainID,
+		metrics.NewNoopCollector(),
+		connFactory,
+		false,
+		DefaultMaxHeightRange,
+		nil,
+		nil,
+		suite.log,
+		DefaultSnapshotHistoryLimit,
+		nil,
+		false,
+		false,
+	)
 	retry := newRetry().SetBackend(backend).Activate()
 	backend.retry = retry
 
@@ -159,7 +168,7 @@ func (suite *Suite) TestSuccessfulTransactionsDontRetry() {
 	result, err := backend.GetTransactionResult(ctx, txID, flow.ZeroID, flow.ZeroID)
 	suite.checkResponse(result, err)
 
-	// status should be finalized since the sealed Blocks is smaller in height
+	// status should be finalized since the sealed blocks is smaller in height
 	suite.Assert().Equal(flow.TransactionStatusFinalized, result.Status)
 
 	// Don't retry now now that block is finalized
