@@ -81,6 +81,8 @@ network-config:
   gossipsub-rpc-validation-inspector-workers: 5
   # Max number of ihave messages in a sample to be inspected
   gossipsub-rpc-ihave-max-sample-size: 5000
+  # Max number of ihave message ids in a sample to be inspected per ihave
+  gossipsub-rpc-ihave-max-message-id-sample-size: 3000
   # Max number of control messages in a sample to be inspected when inspecting GRAFT and PRUNE message types
   gossipsub-rpc-control-message-max-sample-size: 1000
   # Max number of iwant messages in a sample to be inspected

@@ -14,12 +14,11 @@ type GossipSubRPCInspectorsConfig struct {
 type GossipSubRPCValidationInspectorConfigs struct {
 	ClusterPrefixedMessageConfig `mapstructure:",squash"`
 	IWantRPCInspectionConfig     `mapstructure:",squash"`
+	IHaveRPCInspectionConfig     `mapstructure:",squash"`
 	// NumberOfWorkers number of worker pool workers.
 	NumberOfWorkers int `validate:"gte=1" mapstructure:"gossipsub-rpc-validation-inspector-workers"`
 	// CacheSize size of the queue used by worker pool for the control message validation inspector.
 	CacheSize uint32 `validate:"gte=100" mapstructure:"gossipsub-rpc-validation-inspector-queue-cache-size"`
-	// IHaveMaxSampleSize the max number of ihave messages in a sample to be inspected.
-	IHaveMaxSampleSize int `validate:"gte=5000" mapstructure:"gossipsub-rpc-ihave-max-sample-size"`
 	// ControlMessageMaxSampleSize the max sample size used for control message validation of GRAFT and PRUNE.
 	ControlMessageMaxSampleSize int `validate:"gte=1000" mapstructure:"gossipsub-rpc-control-message-max-sample-size"`
 }
@@ -32,6 +31,14 @@ type IWantRPCInspectionConfig struct {
 	CacheMissThreshold float64 `validate:"gt=0" mapstructure:"gossipsub-rpc-iwant-cache-miss-threshold"`
 	// DuplicateMsgIDThreshold maximum allowed duplicate message IDs in a single iWant control message.
 	DuplicateMsgIDThreshold float64 `validate:"gt=0" mapstructure:"gossipsub-rpc-iwant-duplicate-message-id-threshold"`
+}
+
+// IHaveRPCInspectionConfig validation configuration for iHave RPC control messages.
+type IHaveRPCInspectionConfig struct {
+	// MaxSampleSize max inspection sample size to use.
+	MaxSampleSize int `validate:"gte=5000" mapstructure:"gossipsub-rpc-ihave-max-sample-size"`
+	// MaxMessageIDSampleSize max inspection sample size to use for iHave message ids.
+	MaxMessageIDSampleSize int `validate:"gte=3000" mapstructure:"gossipsub-rpc-ihave-max-message-id-sample-size"`
 }
 
 // ClusterPrefixedMessageConfig configuration values for cluster prefixed control message validation.

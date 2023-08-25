@@ -49,11 +49,13 @@ const (
 	validationInspectorClusterPrefixedTopicsReceivedCacheSize  = "gossipsub-cluster-prefix-tracker-cache-size"
 	validationInspectorClusterPrefixedTopicsReceivedCacheDecay = "gossipsub-cluster-prefix-tracker-cache-decay"
 	validationInspectorClusterPrefixHardThreshold              = "gossipsub-rpc-cluster-prefixed-hard-threshold"
-	ihaveMaxSampleSize                                         = "gossipsub-rpc-ihave-max-sample-size"
-	controlMessageMaxSampleSize                                = "gossipsub-rpc-control-message-max-sample-size"
-	iwantMaxSampleSize                                         = "gossipsub-rpc-iwant-max-sample-size"
-	iwantCacheMissThreshold                                    = "gossipsub-rpc-iwant-cache-miss-threshold"
-	iwantDuplicateMsgIDThreshold                               = "gossipsub-rpc-iwant-duplicate-message-id-threshold"
+
+	ihaveMaxSampleSize           = "gossipsub-rpc-ihave-max-sample-size"
+	ihaveMaxMessageIDSampleSize  = "gossipsub-rpc-ihave-max-message-id-sample-size "
+	controlMessageMaxSampleSize  = "gossipsub-rpc-control-message-max-sample-size"
+	iwantMaxSampleSize           = "gossipsub-rpc-iwant-max-sample-size"
+	iwantCacheMissThreshold      = "gossipsub-rpc-iwant-cache-miss-threshold"
+	iwantDuplicateMsgIDThreshold = "gossipsub-rpc-iwant-duplicate-message-id-threshold"
 
 	// gossipsub metrics inspector
 	metricsInspectorNumberOfWorkers = "gossipsub-rpc-metrics-inspector-workers"
@@ -73,7 +75,7 @@ func AllFlagNames() []string {
 		scoreTracerInterval, gossipSubRPCInspectorNotificationCacheSize, validationInspectorNumberOfWorkers, validationInspectorInspectMessageQueueCacheSize, validationInspectorClusterPrefixedTopicsReceivedCacheSize,
 		validationInspectorClusterPrefixedTopicsReceivedCacheDecay, validationInspectorClusterPrefixHardThreshold,
 		ihaveMaxSampleSize, metricsInspectorNumberOfWorkers, metricsInspectorCacheSize, alspDisabled, alspSpamRecordCacheSize, alspSpamRecordQueueSize, alspHearBeatInterval,
-		iwantMaxSampleSize, iwantCacheMissThreshold, controlMessageMaxSampleSize, iwantDuplicateMsgIDThreshold,
+		iwantMaxSampleSize, ihaveMaxMessageIDSampleSize, iwantCacheMissThreshold, controlMessageMaxSampleSize, iwantDuplicateMsgIDThreshold,
 	}
 }
 
@@ -130,7 +132,8 @@ func InitializeNetworkFlags(flags *pflag.FlagSet, config *Config) {
 	flags.Uint32(alspSpamRecordQueueSize, config.AlspConfig.SpamReportQueueSize, "size of spam report queue, recommended to be 100x the number of authorized nodes")
 	flags.Duration(alspHearBeatInterval, config.AlspConfig.HearBeatInterval, "interval between two consecutive heartbeat events at alsp, recommended to leave it as default unless you know what you are doing.")
 
-	flags.Int(ihaveMaxSampleSize, config.GossipSubConfig.GossipSubRPCInspectorsConfig.GossipSubRPCValidationInspectorConfigs.IHaveMaxSampleSize, "max number of ihaves to sample when performing validation")
+	flags.Int(ihaveMaxSampleSize, config.GossipSubConfig.GossipSubRPCInspectorsConfig.GossipSubRPCValidationInspectorConfigs.IHaveRPCInspectionConfig.MaxSampleSize, "max number of ihaves to sample when performing validation")
+	flags.Int(ihaveMaxMessageIDSampleSize, config.GossipSubConfig.GossipSubRPCInspectorsConfig.GossipSubRPCValidationInspectorConfigs.IHaveRPCInspectionConfig.MaxMessageIDSampleSize, "max number of message ids to sample when performing validation per ihave")
 	flags.Int(controlMessageMaxSampleSize, config.GossipSubConfig.GossipSubRPCInspectorsConfig.GossipSubRPCValidationInspectorConfigs.ControlMessageMaxSampleSize, "max number of control messages to sample when performing validation on GRAFT and PRUNE message types")
 	flags.Uint(iwantMaxSampleSize, config.GossipSubConfig.GossipSubRPCInspectorsConfig.GossipSubRPCValidationInspectorConfigs.IWantRPCInspectionConfig.MaxSampleSize, "max number of iwants to sample when performing validation")
 	flags.Float64(iwantCacheMissThreshold, config.GossipSubConfig.GossipSubRPCInspectorsConfig.GossipSubRPCValidationInspectorConfigs.IWantRPCInspectionConfig.CacheMissThreshold, "max number of iwants to sample when performing validation")

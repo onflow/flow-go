@@ -293,8 +293,8 @@ func (c *ControlMsgValidationInspector) inspectPrune(from peer.ID, prunes []*pub
 	return nil
 }
 
-// inspectIhave performs topic validation on all ihaves in the control message using the provided validateTopic func while tracking duplicates.
-func (c *ControlMsgValidationInspector) inspectIhave(from peer.ID, ihaves []*pubsub_pb.ControlIHave, activeClusterIDS flow.ChainIDList) error {
+// inspectIhaves performs topic validation on all ihaves in the control message using the provided validateTopic func while tracking duplicates.
+func (c *ControlMsgValidationInspector) inspectIhaves(from peer.ID, ihaves []*pubsub_pb.ControlIHave, activeClusterIDS flow.ChainIDList) error {
 	totalIHaves := len(ihaves)
 	if totalIHaves == 0 {
 		return nil
@@ -311,19 +311,40 @@ func (c *ControlMsgValidationInspector) inspectIhave(from peer.ID, ihaves []*pub
 		return fmt.Errorf("failed to sample ihave messages: %w", err)
 	}
 
-	tracker := make(duplicateStrTracker)
+	duplicateTopicTracker := make(duplicateStrTracker)
+	duplicateMessageIDTracker := make(duplicateStrTracker)
 	for _, ihave := range ihaves[:sampleSize] {
-		topic := channels.Topic(ihave.GetTopicID())
-		if tracker.isDuplicate(topic.String()) {
-			return NewDuplicateFoundErr(fmt.Errorf("duplicate topic found: %s", topic.String()))
+		topic := ihave.GetTopicID()
+		if duplicateTopicTracker.isDuplicate(topic) {
+			return NewDuplicateFoundErr(fmt.Errorf("duplicate topic found in ihave control message: %s", topic))
 		}
-		tracker.set(topic.String())
-		err = c.validateTopic(from, topic, activeClusterIDS)
+		duplicateTopicTracker.set(topic)
+		err = c.inspectIhave(from, ihave, activeClusterIDS)
 		if err != nil {
 			return err
 		}
 	}
 	return nil
+}
+
+func (c *ControlMsgValidationInspector) inspectIhave(from peer.ID, ihave *pubsub_pb.ControlIHave, activeClusterIDS flow.ChainIDList) error {
+	err := c.validateTopic(from, channels.Topic(ihave.GetTopicID()), activeClusterIDS)
+	if err != nil {
+		return err
+	}
+
+	messageIDs := ihave.GetMessageIDs()
+	if len(messageIDs) == 0 {
+		return nil
+	}
+
+	messageIDSampleSize := c.config.IHaveMaxSampleSize
+	err = c.performSample(p2pmsg.CtrlMsgIHave, uint(len(messageIDs)), uint(sampleSize), func(i, j uint) {
+		ihaves[i], ihaves[j] = ihaves[j], ihaves[i]
+	})
+	if err != nil {
+		return fmt.Errorf("failed to sample ihave messages: %w", err)
+	}
 }
 
 // Name returns the name of the rpc inspector.
@@ -371,12 +392,12 @@ func (c *ControlMsgValidationInspector) processInspectRPCReq(req *InspectRPCRequ
 				errs = multierror.Append(errs, err)
 			}
 		case p2pmsg.CtrlMsgIWant:
-			err := c.inspectIhave(req.Peer, req.rpc.GetControl().GetIhave(), activeClusterIDS)
+			err := c.inspectIhaves(req.Peer, req.rpc.GetControl().GetIhave(), activeClusterIDS)
 			if err != nil {
 				errs = multierror.Append(errs, err)
 			}
 		case p2pmsg.CtrlMsgIHave:
-			err := c.inspectIhave(req.Peer, req.rpc.GetControl().GetIhave(), activeClusterIDS)
+			err := c.inspectIhaves(req.Peer, req.rpc.GetControl().GetIhave(), activeClusterIDS)
 			if err != nil {
 				errs = multierror.Append(errs, err)
 			}
@@ -527,3 +548,6 @@ func (c *ControlMsgValidationInspector) logAndDistributeAsyncInspectErrs(req *In
 			Msg("failed to distribute invalid control message notification")
 	}
 }
+
+// sample size for ihave topics
+// max sample size of message IDS per topic to check for duplicates
