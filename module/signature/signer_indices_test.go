@@ -355,25 +355,14 @@ func Test_DecodeSignerIndicesToIdentities(t *testing.T) {
 		decodedSigners, err := signature.DecodeSignerIndicesToIdentities(identities.ToSkeleton(), signerIndices)
 		require.NoError(t, err)
 
-<<<<<<< HEAD
-		slices.SortFunc(signers, func(lhs, rhs *flow.IdentitySkeleton) bool {
-			return order.IdentifierCanonical(lhs.NodeID, rhs.NodeID)
-		})
-
-		slices.SortFunc(decodedSigners, func(lhs, rhs *flow.IdentitySkeleton) bool {
-			return order.IdentifierCanonical(lhs.NodeID, rhs.NodeID)
-		})
-
-=======
-		// Note that sampling from `identities` generates an _unordered_ list `signers`. Though,
-		// this is fine, as `EncodeSignersToIndices` as no ordering requirement on its input `signers`.
+		// Note that sampling from `identities` generates an _unordered_ list `signers`.
+		// This is fine, as `EncodeSignersToIndices` has no ordering requirement on its input `signers`.
 		// Nevertheless, note that the output of `DecodeSignerIndicesToIdentities` is _always_ canonically
 		// ordered. Therefore, we need to order the input `signers` (so far unordered) before comparing it
-		// to the decoded output (canonically ordered)
+		// to the decoded output (canonically ordered).
 		slices.SortFunc(signers, func(lhs, rhs *flow.IdentitySkeleton) bool {
 			return order.IdentifierCanonical(lhs.NodeID, rhs.NodeID)
 		})
->>>>>>> feature/dynamic-protocol-state
 		require.Equal(t, signers, decodedSigners)
 	})
 }
