@@ -1,8 +1,9 @@
 package storage
 
 import (
-	"github.com/onflow/flow-go/model/flow"
 	"io"
+
+	"github.com/onflow/flow-go/model/flow"
 )
 
 // Register defines methods for the register index.
