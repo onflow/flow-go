@@ -262,7 +262,7 @@ func TestWriteAndReadCheckpointV6EmptyTrie(t *testing.T) {
 		tries := []*trie.MTrie{trie.NewEmptyMTrie()}
 		fileName := "checkpoint-empty-trie"
 		logger := unittest.Logger()
-		require.NoErrorf(t, StoreCheckpointV6Concurrently(tries, dir, fileName, &logger), "fail to store checkpoint")
+		require.NoErrorf(t, StoreCheckpointV6Concurrently(tries, dir, fileName, logger), "fail to store checkpoint")
 		decoded, err := OpenAndReadCheckpointV6(dir, fileName, logger)
 		require.NoErrorf(t, err, "fail to read checkpoint %v/%v", dir, fileName)
 		requireTriesEqual(t, tries, decoded)
@@ -274,7 +274,7 @@ func TestWriteAndReadCheckpointV6SimpleTrie(t *testing.T) {
 		tries := createSimpleTrie(t)
 		fileName := "checkpoint"
 		logger := unittest.Logger()
-		require.NoErrorf(t, StoreCheckpointV6Concurrently(tries, dir, fileName, &logger), "fail to store checkpoint")
+		require.NoErrorf(t, StoreCheckpointV6Concurrently(tries, dir, fileName, logger), "fail to store checkpoint")
 		decoded, err := OpenAndReadCheckpointV6(dir, fileName, logger)
 		require.NoErrorf(t, err, "fail to read checkpoint %v/%v", dir, fileName)
 		requireTriesEqual(t, tries, decoded)
@@ -286,7 +286,7 @@ func TestWriteAndReadCheckpointV6MultipleTries(t *testing.T) {
 		tries := createMultipleRandomTries(t)
 		fileName := "checkpoint-multi-file"
 		logger := unittest.Logger()
-		require.NoErrorf(t, StoreCheckpointV6Concurrently(tries, dir, fileName, &logger), "fail to store checkpoint")
+		require.NoErrorf(t, StoreCheckpointV6Concurrently(tries, dir, fileName, logger), "fail to store checkpoint")
 		decoded, err := OpenAndReadCheckpointV6(dir, fileName, logger)
 		require.NoErrorf(t, err, "fail to read checkpoint %v/%v", dir, fileName)
 		requireTriesEqual(t, tries, decoded)
@@ -298,8 +298,8 @@ func TestCheckpointV6IsDeterminstic(t *testing.T) {
 	unittest.RunWithTempDir(t, func(dir string) {
 		tries := createMultipleRandomTries(t)
 		logger := unittest.Logger()
-		require.NoErrorf(t, StoreCheckpointV6Concurrently(tries, dir, "checkpoint1", &logger), "fail to store checkpoint")
-		require.NoErrorf(t, StoreCheckpointV6Concurrently(tries, dir, "checkpoint2", &logger), "fail to store checkpoint")
+		require.NoErrorf(t, StoreCheckpointV6Concurrently(tries, dir, "checkpoint1", logger), "fail to store checkpoint")
+		require.NoErrorf(t, StoreCheckpointV6Concurrently(tries, dir, "checkpoint2", logger), "fail to store checkpoint")
 		partFiles1 := filePaths(dir, "checkpoint1", subtrieLevel)
 		partFiles2 := filePaths(dir, "checkpoint2", subtrieLevel)
 		for i, partFile1 := range partFiles1 {
@@ -317,7 +317,7 @@ func TestWriteAndReadCheckpointV6LeafEmptyTrie(t *testing.T) {
 		tries := []*trie.MTrie{trie.NewEmptyMTrie()}
 		fileName := "checkpoint-empty-trie"
 		logger := unittest.Logger()
-		require.NoErrorf(t, StoreCheckpointV6Concurrently(tries, dir, fileName, &logger), "fail to store checkpoint")
+		require.NoErrorf(t, StoreCheckpointV6Concurrently(tries, dir, fileName, logger), "fail to store checkpoint")
 
 		bufSize := 10
 		leafNodesCh := make(chan *LeafNode, bufSize)
@@ -336,7 +336,7 @@ func TestWriteAndReadCheckpointV6LeafSimpleTrie(t *testing.T) {
 		tries := createSimpleTrie(t)
 		fileName := "checkpoint"
 		logger := unittest.Logger()
-		require.NoErrorf(t, StoreCheckpointV6Concurrently(tries, dir, fileName, &logger), "fail to store checkpoint")
+		require.NoErrorf(t, StoreCheckpointV6Concurrently(tries, dir, fileName, logger), "fail to store checkpoint")
 		bufSize := 1
 		leafNodesCh := make(chan *LeafNode, bufSize)
 		go func() {
@@ -359,7 +359,7 @@ func TestWriteAndReadCheckpointV6LeafMultipleTries(t *testing.T) {
 		fileName := "checkpoint-multi-leaf-file"
 		tries := createMultipleRandomTriesMini(t)
 		logger := unittest.Logger()
-		require.NoErrorf(t, StoreCheckpointV6Concurrently(tries, dir, fileName, &logger), "fail to store checkpoint")
+		require.NoErrorf(t, StoreCheckpointV6Concurrently(tries, dir, fileName, logger), "fail to store checkpoint")
 		bufSize := 5
 		leafNodesCh := make(chan *LeafNode, bufSize)
 		go func() {
@@ -447,7 +447,7 @@ func TestWriteAndReadCheckpointV6ThenBackToV5(t *testing.T) {
 		logger := unittest.Logger()
 
 		// store tries into v6 then read back, then store into v5
-		require.NoErrorf(t, StoreCheckpointV6Concurrently(tries, dir, "checkpoint-v6", &logger), "fail to store checkpoint")
+		require.NoErrorf(t, StoreCheckpointV6Concurrently(tries, dir, "checkpoint-v6", logger), "fail to store checkpoint")
 		decoded, err := OpenAndReadCheckpointV6(dir, "checkpoint-v6", logger)
 		require.NoErrorf(t, err, "fail to read checkpoint %v/checkpoint-v6", dir)
 		require.NoErrorf(t, storeCheckpointV5(decoded, dir, "checkpoint-v6-v5", logger), "fail to store checkpoint")
@@ -476,7 +476,7 @@ func TestCleanupOnErrorIfNotExist(t *testing.T) {
 			logger := unittest.Logger()
 
 			// store tries into v6 then read back, then store into v5
-			require.NoErrorf(t, StoreCheckpointV6Concurrently(tries, dir, "checkpoint-v6", &logger), "fail to store checkpoint")
+			require.NoErrorf(t, StoreCheckpointV6Concurrently(tries, dir, "checkpoint-v6", logger), "fail to store checkpoint")
 			require.NoError(t, deleteCheckpointFiles(dir, "checkpoint-v6"))
 
 			// verify all files are removed
@@ -505,7 +505,7 @@ func TestAllPartFileExist(t *testing.T) {
 			require.NoErrorf(t, err, "fail to find sub trie file path")
 
 			logger := unittest.Logger()
-			require.NoErrorf(t, StoreCheckpointV6Concurrently(tries, dir, fileName, &logger), "fail to store checkpoint")
+			require.NoErrorf(t, StoreCheckpointV6Concurrently(tries, dir, fileName, logger), "fail to store checkpoint")
 
 			// delete i-th part file, then the error should mention i-th file missing
 			err = os.Remove(fileToDelete)
@@ -533,7 +533,7 @@ func TestAllPartFileExistLeafReader(t *testing.T) {
 			require.NoErrorf(t, err, "fail to find sub trie file path")
 
 			logger := unittest.Logger()
-			require.NoErrorf(t, StoreCheckpointV6Concurrently(tries, dir, fileName, &logger), "fail to store checkpoint")
+			require.NoErrorf(t, StoreCheckpointV6Concurrently(tries, dir, fileName, logger), "fail to store checkpoint")
 
 			// delete i-th part file, then the error should mention i-th file missing
 			err = os.Remove(fileToDelete)
@@ -553,9 +553,9 @@ func TestCannotStoreTwice(t *testing.T) {
 		tries := createSimpleTrie(t)
 		fileName := "checkpoint"
 		logger := unittest.Logger()
-		require.NoErrorf(t, StoreCheckpointV6Concurrently(tries, dir, fileName, &logger), "fail to store checkpoint")
+		require.NoErrorf(t, StoreCheckpointV6Concurrently(tries, dir, fileName, logger), "fail to store checkpoint")
 		// checkpoint already exist, can't store again
-		require.Error(t, StoreCheckpointV6Concurrently(tries, dir, fileName, &logger))
+		require.Error(t, StoreCheckpointV6Concurrently(tries, dir, fileName, logger))
 	})
 }
 
@@ -580,7 +580,7 @@ func TestCopyCheckpointFileV6(t *testing.T) {
 		tries := createSimpleTrie(t)
 		fileName := "checkpoint"
 		logger := unittest.Logger()
-		require.NoErrorf(t, StoreCheckpointV6Concurrently(tries, dir, fileName, &logger), "fail to store checkpoint")
+		require.NoErrorf(t, StoreCheckpointV6Concurrently(tries, dir, fileName, logger), "fail to store checkpoint")
 		to := filepath.Join(dir, "newfolder")
 		newPaths, err := CopyCheckpointFile(fileName, dir, to)
 		require.NoError(t, err)

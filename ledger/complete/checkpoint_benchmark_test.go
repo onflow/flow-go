@@ -72,9 +72,9 @@ func benchmarkStoreCheckpoint(b *testing.B, version int, concurrent bool) {
 		err = wal.StoreCheckpointV5(outputDir, fileName, log, tries...)
 	case 6:
 		if concurrent {
-			err = wal.StoreCheckpointV6Concurrently(tries, outputDir, fileName, &log)
+			err = wal.StoreCheckpointV6Concurrently(tries, outputDir, fileName, log)
 		} else {
-			err = wal.StoreCheckpointV6SingleThread(tries, outputDir, fileName, &log)
+			err = wal.StoreCheckpointV6SingleThread(tries, outputDir, fileName, log)
 		}
 	}
 

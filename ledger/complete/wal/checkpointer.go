@@ -246,7 +246,7 @@ func (c *Checkpointer) Checkpoint(to int) (err error) {
 
 	fileName := NumberToFilename(to)
 
-	err = StoreCheckpointV6SingleThread(tries, c.wal.dir, fileName, &c.wal.log)
+	err = StoreCheckpointV6SingleThread(tries, c.wal.dir, fileName, c.wal.log)
 
 	if err != nil {
 		return fmt.Errorf("could not create checkpoint for %v: %w", to, err)

@@ -29,13 +29,13 @@ func subtrieCountByLevel(level uint16) int {
 
 // StoreCheckpointV6SingleThread stores checkpoint file in v6 in a single threaded manner,
 // useful when EN is executing block.
-func StoreCheckpointV6SingleThread(tries []*trie.MTrie, outputDir string, outputFile string, logger *zerolog.Logger) error {
+func StoreCheckpointV6SingleThread(tries []*trie.MTrie, outputDir string, outputFile string, logger zerolog.Logger) error {
 	return StoreCheckpointV6(tries, outputDir, outputFile, logger, 1)
 }
 
 // StoreCheckpointV6Concurrently stores checkpoint file in v6 in max workers,
 // useful during state extraction
-func StoreCheckpointV6Concurrently(tries []*trie.MTrie, outputDir string, outputFile string, logger *zerolog.Logger) error {
+func StoreCheckpointV6Concurrently(tries []*trie.MTrie, outputDir string, outputFile string, logger zerolog.Logger) error {
 	return StoreCheckpointV6(tries, outputDir, outputFile, logger, 16)
 }
 
@@ -49,7 +49,7 @@ func StoreCheckpointV6Concurrently(tries []*trie.MTrie, outputDir string, output
 //
 // nWorker specifies how many workers to encode subtrie concurrently, valid range [1,16]
 func StoreCheckpointV6(
-	tries []*trie.MTrie, outputDir string, outputFile string, logger *zerolog.Logger, nWorker uint) error {
+	tries []*trie.MTrie, outputDir string, outputFile string, logger zerolog.Logger, nWorker uint) error {
 	err := storeCheckpointV6(tries, outputDir, outputFile, logger, nWorker)
 	if err != nil {
 		cleanupErr := deleteCheckpointFiles(outputDir, outputFile)
@@ -63,7 +63,7 @@ func StoreCheckpointV6(
 }
 
 func storeCheckpointV6(
-	tries []*trie.MTrie, outputDir string, outputFile string, logger *zerolog.Logger, nWorker uint) error {
+	tries []*trie.MTrie, outputDir string, outputFile string, logger zerolog.Logger, nWorker uint) error {
 	if len(tries) == 0 {
 		logger.Info().Msg("no tries to be checkpointed")
 		return nil
