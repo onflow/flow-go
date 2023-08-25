@@ -24,13 +24,14 @@ type ProtocolState struct {
 
 var _ storage.ProtocolState = (*ProtocolState)(nil)
 
-// NewProtocolState Creates ProtocolState instance which is a database of protocol state entries
-// which supports storing, caching and retrieving by ID and additionally indexed block ID.
+// NewProtocolState creates a ProtocolState instance, which is a database of protocol state entries.
+// It supports storing, caching and retrieving by ID or the additionally indexed block ID.
 func NewProtocolState(collector module.CacheMetrics,
 	epochSetups storage.EpochSetups,
 	epochCommits storage.EpochCommits,
 	db *badger.DB,
-	cacheSize uint) *ProtocolState {
+	cacheSize uint,
+) *ProtocolState {
 	retrieve := func(key interface{}) func(tx *badger.Txn) (interface{}, error) {
 		protocolStateID := key.(flow.Identifier)
 		var protocolStateEntry flow.ProtocolStateEntry
