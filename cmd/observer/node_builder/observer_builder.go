@@ -13,6 +13,9 @@ import (
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/routing"
+	"github.com/rs/zerolog"
+	"github.com/spf13/pflag"
+
 	"github.com/onflow/flow-go/cmd"
 	"github.com/onflow/flow-go/consensus"
 	"github.com/onflow/flow-go/consensus/hotstuff"
@@ -70,8 +73,6 @@ import (
 	"github.com/onflow/flow-go/state/protocol/events/gadgets"
 	"github.com/onflow/flow-go/utils/grpcutils"
 	"github.com/onflow/flow-go/utils/io"
-	"github.com/rs/zerolog"
-	"github.com/spf13/pflag"
 )
 
 // ObserverBuilder extends cmd.NodeBuilder and declares additional functions needed to bootstrap an Access node
@@ -925,29 +926,27 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 				backendConfig.CircuitBreakerConfig,
 			),
 		}
-		
-		
 
 		accessBackend := backend.New(backend.Params{
-			State:node.State,
-			Blocks: node.Storage.Blocks,
-			Headers: node.Storage.Headers,
-			Collections: node.Storage.Collections,
-			Transactions: node.Storage.Transactions,
-			ExecutionReceipts: node.Storage.Receipts,
-			ExecutionResults: node.Storage.Results,
-			ChainID: node.RootChainID,
-			AccessMetrics: accessMetrics,
-			ConnFactory: connFactory,
-			RetryEnabled: false,
-			MaxHeightRange: backendConfig.MaxHeightRange,
+			State:                     node.State,
+			Blocks:                    node.Storage.Blocks,
+			Headers:                   node.Storage.Headers,
+			Collections:               node.Storage.Collections,
+			Transactions:              node.Storage.Transactions,
+			ExecutionReceipts:         node.Storage.Receipts,
+			ExecutionResults:          node.Storage.Results,
+			ChainID:                   node.RootChainID,
+			AccessMetrics:             accessMetrics,
+			ConnFactory:               connFactory,
+			RetryEnabled:              false,
+			MaxHeightRange:            backendConfig.MaxHeightRange,
 			PreferredExecutionNodeIDs: backendConfig.PreferredExecutionNodeIDs,
-			FixedExecutionNodeIDs: backendConfig.FixedExecutionNodeIDs,
-			Log:node.Logger,
-			SnapshotHistoryLimit: backend.DefaultSnapshotHistoryLimit,
-			ArchiveAddressList: backendConfig.ArchiveAddressList,
-			Communicator: backend.NewNodeCommunicator(backendConfig.CircuitBreakerConfig.Enabled),
-			ScriptExecValidation: backendConfig.ScriptExecValidation,
+			FixedExecutionNodeIDs:     backendConfig.FixedExecutionNodeIDs,
+			Log:                       node.Logger,
+			SnapshotHistoryLimit:      backend.DefaultSnapshotHistoryLimit,
+			ArchiveAddressList:        backendConfig.ArchiveAddressList,
+			Communicator:              backend.NewNodeCommunicator(backendConfig.CircuitBreakerConfig.Enabled),
+			ScriptExecValidation:      backendConfig.ScriptExecValidation,
 		})
 
 		observerCollector := metrics.NewObserverCollector()
