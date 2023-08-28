@@ -18,8 +18,8 @@ import (
 	"github.com/onflow/flow-go/network/p2p/unicast/protocols"
 )
 
-// P2PService service management capabilities
-type P2PService interface {
+// CoreP2P service management capabilities
+type CoreP2P interface {
 	// Start the libp2p node.
 	Start(ctx irrecoverable.SignalerContext)
 	// Stop terminates the libp2p node.
@@ -106,8 +106,8 @@ type LibP2PNode interface {
 	// DisallowListOracle exposes the disallow list oracle API for external consumers to query about the disallow list.
 	DisallowListOracle
 
-	// P2PService service management capabilities
-	P2PService
+	// CoreP2P service management capabilities
+	CoreP2P
 
 	// PeerManagement current peer management functions
 	PeerManagement
