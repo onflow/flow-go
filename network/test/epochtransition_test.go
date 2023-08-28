@@ -24,7 +24,6 @@ import (
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/internal/testutils"
-	"github.com/onflow/flow-go/network/mocknetwork"
 	"github.com/onflow/flow-go/network/p2p"
 	mockprotocol "github.com/onflow/flow-go/state/protocol/mock"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -199,8 +198,7 @@ func (suite *MutableIdentityTableSuite) addNodes(count int) {
 		suite.T(),
 		ids,
 		nodes,
-		testutils.MiddlewareConfigFixture(suite.T(), sporkId),
-		mocknetwork.NewViolationsConsumer(suite.T()))
+		testutils.MiddlewareConfigFixture(suite.T(), sporkId))
 	nets, _ := testutils.NetworksFixture(suite.T(), sporkId, ids, mws)
 	suite.cancels = append(suite.cancels, cancel)
 

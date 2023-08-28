@@ -14,7 +14,6 @@ import (
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/atomic"
 
-	"github.com/onflow/flow-go/network/mocknetwork"
 	"github.com/onflow/flow-go/network/p2p/connection"
 	"github.com/onflow/flow-go/network/p2p/dht"
 	p2pconfig "github.com/onflow/flow-go/network/p2p/p2pbuilder/config"
@@ -97,8 +96,7 @@ func (suite *BlobServiceTestSuite) SetupTest() {
 		suite.T(),
 		ids,
 		nodes,
-		testutils.MiddlewareConfigFixture(suite.T(), sporkId),
-		mocknetwork.NewViolationsConsumer(suite.T()))
+		testutils.MiddlewareConfigFixture(suite.T(), sporkId))
 	suite.networks, _ = testutils.NetworksFixture(suite.T(), sporkId, ids, mws)
 	testutils.StartNodesAndNetworks(signalerCtx, suite.T(), nodes, suite.networks, 100*time.Millisecond)
 

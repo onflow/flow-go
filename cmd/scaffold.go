@@ -59,6 +59,7 @@ import (
 	"github.com/onflow/flow-go/network/p2p/unicast/protocols"
 	"github.com/onflow/flow-go/network/p2p/unicast/ratelimit"
 	"github.com/onflow/flow-go/network/p2p/utils/ratelimiter"
+	"github.com/onflow/flow-go/network/slashing"
 	"github.com/onflow/flow-go/network/topology"
 	"github.com/onflow/flow-go/state/protocol"
 	badgerState "github.com/onflow/flow-go/state/protocol/badger"
@@ -444,6 +445,17 @@ func (fnb *FlowNodeBuilder) InitFlowNetworkWithConduitFactory(
 		UnicastMessageTimeout: fnb.FlowConfig.NetworkConfig.UnicastMessageTimeout,
 		IdTranslator:          fnb.IDTranslator,
 		Codec:                 fnb.CodecFactory(),
+		SlashingViolationConsumerFactory: func() network.ViolationsConsumer {
+			// this is temporary; we are in the process of removing the middleware; hence all this logic must be
+			// eventually moved to the network component.
+			// Network has two interfaces; Network which is exposed to the engines; Adapter which is exposed to the middleware.
+			// Here we are casting the Network to Adapter to get access to the misbehavior report consumer.
+			adapter, ok := fnb.Network.(network.Adapter)
+			if !ok {
+				fnb.Logger.Fatal().Msg("network must be an adapter to use slashing violations consumer")
+			}
+			return slashing.NewSlashingViolationsConsumer(fnb.Logger, fnb.Metrics.Network, adapter)
+		},
 	},
 		mwOpts...)
 

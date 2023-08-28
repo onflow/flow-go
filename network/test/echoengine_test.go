@@ -19,7 +19,6 @@ import (
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/internal/testutils"
-	"github.com/onflow/flow-go/network/mocknetwork"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -60,8 +59,7 @@ func (suite *EchoEngineTestSuite) SetupTest() {
 		suite.T(),
 		suite.ids,
 		nodes,
-		testutils.MiddlewareConfigFixture(suite.T(), sporkId),
-		mocknetwork.NewViolationsConsumer(suite.T()))
+		testutils.MiddlewareConfigFixture(suite.T(), sporkId))
 	suite.nets, _ = testutils.NetworksFixture(suite.T(), sporkId, suite.ids, suite.mws)
 	testutils.StartNodesAndNetworks(signalerCtx, suite.T(), nodes, suite.nets, 100*time.Millisecond)
 }

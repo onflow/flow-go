@@ -71,19 +71,18 @@ func (co *tagsObserver) OnComplete() {
 type MiddlewareTestSuite struct {
 	suite.Suite
 	sync.RWMutex
-	size                       int // used to determine number of middlewares under test
-	libP2PNodes                []p2p.LibP2PNode
-	networks                   []network.Network
-	mws                        []network.Middleware // used to keep track of middlewares under test
-	obs                        chan string          // used to keep track of Protect events tagged by pubsub messages
-	ids                        []*flow.Identity
-	metrics                    *metrics.NoopCollector // no-op performance monitoring simulation
-	logger                     zerolog.Logger
-	providers                  []*unittest.UpdatableIDProvider
-	sporkId                    flow.Identifier
-	mwCancel                   context.CancelFunc
-	mwCtx                      irrecoverable.SignalerContext
-	slashingViolationsConsumer network.ViolationsConsumer
+	size        int // used to determine number of middlewares under test
+	libP2PNodes []p2p.LibP2PNode
+	networks    []network.Network
+	mws         []network.Middleware // used to keep track of middlewares under test
+	obs         chan string          // used to keep track of Protect events tagged by pubsub messages
+	ids         []*flow.Identity
+	metrics     *metrics.NoopCollector // no-op performance monitoring simulation
+	logger      zerolog.Logger
+	providers   []*unittest.UpdatableIDProvider
+	sporkId     flow.Identifier
+	mwCancel    context.CancelFunc
+	mwCtx       irrecoverable.SignalerContext
 }
 
 // TestMiddlewareTestSuit runs all the test methods in this test suit
@@ -106,7 +105,6 @@ func (m *MiddlewareTestSuite) SetupTest() {
 		log:  m.logger,
 	}
 
-	m.slashingViolationsConsumer = mocknetwork.NewViolationsConsumer(m.T())
 	m.sporkId = unittest.IdentifierFixture()
 
 	libP2PNodes := make([]p2p.LibP2PNode, 0)
@@ -146,8 +144,7 @@ func (m *MiddlewareTestSuite) SetupTest() {
 		m.T(),
 		m.ids,
 		m.libP2PNodes,
-		testutils.MiddlewareConfigFixture(m.T(), m.sporkId),
-		m.slashingViolationsConsumer)
+		testutils.MiddlewareConfigFixture(m.T(), m.sporkId))
 
 	m.networks, m.providers = testutils.NetworksFixture(m.T(), m.sporkId, m.ids, m.mws)
 	for _, observableConnMgr := range tagObservables {
@@ -198,8 +195,7 @@ func (m *MiddlewareTestSuite) TestUpdateNodeAddresses() {
 		m.T(),
 		ids,
 		libP2PNodes,
-		testutils.MiddlewareConfigFixture(m.T(), m.sporkId),
-		m.slashingViolationsConsumer)
+		testutils.MiddlewareConfigFixture(m.T(), m.sporkId))
 	networkCfg := testutils.NetworkConfigFixture(
 		m.T(),
 		*ids[0],
@@ -305,7 +301,6 @@ func (m *MiddlewareTestSuite) TestUnicastRateLimit_Messages() {
 		ids,
 		libP2PNodes,
 		testutils.MiddlewareConfigFixture(m.T(), m.sporkId),
-		m.slashingViolationsConsumer,
 		middleware.WithUnicastRateLimiters(rateLimiters),
 		middleware.WithPeerManagerFilters([]p2p.PeerFilter{testutils.IsRateLimitedPeerFilter(messageRateLimiter)}))
 
@@ -448,7 +443,6 @@ func (m *MiddlewareTestSuite) TestUnicastRateLimit_Bandwidth() {
 		ids,
 		libP2PNodes,
 		testutils.MiddlewareConfigFixture(m.T(), m.sporkId),
-		m.slashingViolationsConsumer,
 		middleware.WithUnicastRateLimiters(rateLimiters),
 		middleware.WithPeerManagerFilters([]p2p.PeerFilter{testutils.IsRateLimitedPeerFilter(bandwidthRateLimiter)}))
 	require.Len(m.T(), ids, 1)

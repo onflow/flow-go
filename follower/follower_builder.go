@@ -56,6 +56,7 @@ import (
 	"github.com/onflow/flow-go/network/p2p/translator"
 	"github.com/onflow/flow-go/network/p2p/unicast/protocols"
 	"github.com/onflow/flow-go/network/p2p/utils"
+	"github.com/onflow/flow-go/network/slashing"
 	"github.com/onflow/flow-go/network/validator"
 	"github.com/onflow/flow-go/state/protocol"
 	badgerState "github.com/onflow/flow-go/state/protocol/badger"
@@ -765,6 +766,17 @@ func (builder *FollowerServiceBuilder) initMiddleware(nodeID flow.Identifier,
 		UnicastMessageTimeout: middleware.DefaultUnicastTimeout,
 		IdTranslator:          builder.IDTranslator,
 		Codec:                 builder.CodecFactory(),
+		SlashingViolationConsumerFactory: func() network.ViolationsConsumer {
+			// this is temporary; we are in the process of removing the middleware; hence all this logic must be
+			// eventually moved to the network component.
+			// Network has two interfaces; Network which is exposed to the engines; Adapter which is exposed to the middleware.
+			// Here we are casting the Network to Adapter to get access to the misbehavior report consumer.
+			adapter, ok := builder.Network.(network.Adapter)
+			if !ok {
+				builder.Logger.Fatal().Msg("network must be an adapter to use slashing violations consumer")
+			}
+			return slashing.NewSlashingViolationsConsumer(builder.Logger, builder.Metrics.Network, adapter)
+		},
 	},
 		middleware.WithMessageValidators(validators...),
 	)

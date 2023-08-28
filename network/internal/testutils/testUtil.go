@@ -27,6 +27,7 @@ import (
 	netcache "github.com/onflow/flow-go/network/cache"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/codec/cbor"
+	"github.com/onflow/flow-go/network/mocknetwork"
 	"github.com/onflow/flow-go/network/netconf"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/conduit"
@@ -176,13 +177,19 @@ func MiddlewareFixtures(
 	identities flow.IdentityList,
 	libP2PNodes []p2p.LibP2PNode,
 	cfg *middleware.Config,
-	consumer network.ViolationsConsumer,
 	opts ...middleware.OptionFn) ([]network.Middleware, []*unittest.UpdatableIDProvider) {
 
 	require.Equal(t, len(identities), len(libP2PNodes))
 
 	mws := make([]network.Middleware, len(identities))
 	idProviders := make([]*unittest.UpdatableIDProvider, len(identities))
+
+	if cfg.SlashingViolationConsumerFactory == nil {
+		// use a mock slashing violation consumer factory if not provided
+		cfg.SlashingViolationConsumerFactory = func() network.ViolationsConsumer {
+			return mocknetwork.NewViolationsConsumer(t)
+		}
+	}
 
 	for i := 0; i < len(identities); i++ {
 		i := i
@@ -191,7 +198,6 @@ func MiddlewareFixtures(
 		idProviders[i] = unittest.NewUpdatableIDProvider(identities)
 		cfg.IdTranslator = translator.NewIdentityProviderIDTranslator(idProviders[i])
 		mws[i] = middleware.NewMiddleware(cfg, opts...)
-		mws[i].SetSlashingViolationsConsumer(consumer)
 	}
 	return mws, idProviders
 }

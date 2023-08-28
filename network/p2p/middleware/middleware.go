@@ -131,14 +131,15 @@ func WithUnicastRateLimiters(rateLimiters *ratelimit.RateLimiters) OptionFn {
 
 // Config is the configuration for the middleware.
 type Config struct {
-	Logger                zerolog.Logger
-	Libp2pNode            p2p.LibP2PNode
-	FlowId                flow.Identifier // This node's Flow ID
-	BitSwapMetrics        module.BitswapMetrics
-	SporkId               flow.Identifier
-	UnicastMessageTimeout time.Duration
-	IdTranslator          p2p.IDTranslator
-	Codec                 network.Codec
+	Logger                           zerolog.Logger
+	Libp2pNode                       p2p.LibP2PNode
+	FlowId                           flow.Identifier // This node's Flow ID
+	BitSwapMetrics                   module.BitswapMetrics
+	SporkId                          flow.Identifier
+	UnicastMessageTimeout            time.Duration
+	IdTranslator                     p2p.IDTranslator
+	Codec                            network.Codec
+	SlashingViolationConsumerFactory func() network.ViolationsConsumer
 }
 
 // Validate validates the configuration, and sets default values for any missing fields.
@@ -162,15 +163,16 @@ func NewMiddleware(cfg *Config, opts ...OptionFn) *Middleware {
 
 	// create the node entity and inject dependencies & config
 	mw := &Middleware{
-		log:                   cfg.Logger,
-		libP2PNode:            cfg.Libp2pNode,
-		bitswapMetrics:        cfg.BitSwapMetrics,
-		sporkId:               cfg.SporkId,
-		validators:            DefaultValidators(cfg.Logger, cfg.FlowId),
-		unicastMessageTimeout: cfg.UnicastMessageTimeout,
-		idTranslator:          cfg.IdTranslator,
-		codec:                 cfg.Codec,
-		unicastRateLimiters:   ratelimit.NoopRateLimiters(),
+		log:                        cfg.Logger,
+		libP2PNode:                 cfg.Libp2pNode,
+		bitswapMetrics:             cfg.BitSwapMetrics,
+		sporkId:                    cfg.SporkId,
+		validators:                 DefaultValidators(cfg.Logger, cfg.FlowId),
+		unicastMessageTimeout:      cfg.UnicastMessageTimeout,
+		idTranslator:               cfg.IdTranslator,
+		codec:                      cfg.Codec,
+		unicastRateLimiters:        ratelimit.NoopRateLimiters(),
+		slashingViolationsConsumer: cfg.SlashingViolationConsumerFactory(),
 	}
 
 	for _, opt := range opts {
