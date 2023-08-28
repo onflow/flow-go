@@ -274,7 +274,6 @@ func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_UnknownMsgCode(
 	require.NoError(u.T(), err)
 
 	invalidMessageCode := codec.MessageCode(byte('X'))
-
 	// register a custom encoder that encodes the message with an invalid message code when encoding a string.
 	u.codec.RegisterEncoder(reflect.TypeOf(""), func(v interface{}) ([]byte, error) {
 		e, err := unittest.NetworkCodec().Encode(&libp2pmessage.TestMessage{
@@ -328,6 +327,13 @@ func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_WrongMsgCode() 
 	require.NoError(u.T(), err)
 
 	modifiedMessageCode := codec.CodeDKGMessage
+	// register a custom encoder that overrides the message code when encoding a TestMessage.
+	u.codec.RegisterEncoder(reflect.TypeOf(&libp2pmessage.TestMessage{}), func(v interface{}) ([]byte, error) {
+		e, err := unittest.NetworkCodec().Encode(v)
+		require.NoError(u.T(), err)
+		e[0] = modifiedMessageCode.Uint8()
+		return e, nil
+	})
 
 	expectedViolation := &network.Violation{
 		Identity: u.senderID,
@@ -339,49 +345,23 @@ func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_WrongMsgCode() 
 		Err:      message.ErrUnauthorizedMessageOnChannel,
 	}
 
-	slashingViolationsConsumer.On(
-		"OnUnAuthorizedSenderError",
-		expectedViolation,
-	).Return(nil).Once().Run(func(args mockery.Arguments) {
+	slashingViolationsConsumer.On("OnUnAuthorizedSenderError", expectedViolation).
+		Return(nil).Once().Run(func(args mockery.Arguments) {
 		close(u.waitCh)
 	})
 
-	overlay := mocknetwork.NewOverlay(u.T())
-	overlay.On("Identities").Maybe().Return(func() flow.IdentityList {
-		return u.providers[0].Identities(filter.Any)
-	})
-	overlay.On("Topology").Maybe().Return(func() flow.IdentityList {
-		return u.providers[0].Identities(filter.Any)
-	}, nil)
-	overlay.On("Identity", expectedSenderPeerID).Return(u.senderID, true)
+	u.startMiddlewares(nil)
 
-	// message will be rejected so assert overlay never receives it
-	defer overlay.AssertNotCalled(u.T(), "Receive", u.senderID.NodeID, mock.AnythingOfType("*message.Message"))
+	_, err = u.receiverNetwork.Register(channels.TestNetworkChannel, &mocknetwork.MessageProcessor{})
+	require.NoError(u.T(), err)
 
-	u.startMiddlewares(overlay)
-
-	require.NoError(u.T(), u.receiverMW.Subscribe(channels.TestNetworkChannel))
-	require.NoError(u.T(), u.senderMW.Subscribe(channels.TestNetworkChannel))
-
-	msg, err := message.NewOutgoingScope(
-		flow.IdentifierList{u.receiverID.NodeID},
-		channels.TopicFromChannel(channels.TestNetworkChannel, u.sporkId),
-		&libp2pmessage.TestMessage{
-			Text: "hello",
-		},
-		// we use a custom encoder that encodes the message with an invalid message code.
-		func(msg interface{}) ([]byte, error) {
-			e, err := unittest.NetworkCodec().Encode(msg)
-			require.NoError(u.T(), err)
-			// manipulate message code byte
-			e[0] = modifiedMessageCode.Uint8()
-			return e, nil
-		},
-		message.ProtocolTypeUnicast)
+	senderCon, err := u.senderNetwork.Register(channels.TestNetworkChannel, &mocknetwork.MessageProcessor{})
 	require.NoError(u.T(), err)
 
 	// send message via unicast
-	err = u.senderMW.SendDirect(msg)
+	err = senderCon.Unicast(&libp2pmessage.TestMessage{
+		Text: string("hello"),
+	}, u.receiverID.NodeID)
 	require.NoError(u.T(), err)
 
 	// wait for slashing violations consumer mock to invoke run func and close ch if expected method call happens
