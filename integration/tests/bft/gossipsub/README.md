@@ -18,7 +18,7 @@ The test confirms two main aspects:
 ## Signature Requirement Test
 The `TestGossipSubSignatureRequirement` method sets up a test environment consisting of three corrupted nodes:two attackers and one victim. 
 One attacker is configured without message signing, intending to send unsigned messages that should be rejected by the victim. 
-The other attacker sends valid signed messages that should be received by the victim.
+The other (benign) attacker sends valid signed messages that should be received by the victim.
 The test is broken down into the following main parts:
 1. **Unauthorized Messages Testing**: The victim node should not receive any messages sent without correct signatures from the unauthorized attacker. The test checks for zero unauthorized messages received by the victim.
 2. **Authorized Messages Testing**: Messages sent by the authorized attacker, with the correct signature, must pass the libp2p signature verification process and be delivered to the victim. The test checks for all authorized messages received by the victim within a certain time frame.
