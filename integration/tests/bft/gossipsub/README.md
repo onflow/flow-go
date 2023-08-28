@@ -17,7 +17,7 @@ The test confirms two main aspects:
 
 ## Signature Requirement Test
 The `TestGossipSubSignatureRequirement` method sets up a test environment consisting of three corrupted nodes:two attackers and one victim. 
-One attacker is configured without message signing, intending to send unsigned messages that should be rejected by the victim. 
+One (malicious) attacker is configured without message signing, intending to send unsigned messages that should be rejected by the victim.
 The other (benign) attacker sends valid signed messages that should be received by the victim.
 The test is broken down into the following main parts:
 1. **Unauthorized Messages Testing**: The victim node should not receive any messages sent without correct signatures from the unauthorized attacker. The test checks for zero unauthorized messages received by the victim.
