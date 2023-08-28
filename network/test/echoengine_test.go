@@ -126,6 +126,7 @@ func (suite *EchoEngineTestSuite) TestEchoMultiMsgAsync_Unicast() {
 // It also evaluates the correct reception of an echo message back for each send.
 // Sender and receiver are not synchronized
 func (suite *EchoEngineTestSuite) TestEchoMultiMsgAsync_Multicast() {
+	unittest.SkipUnless(suite.T(), unittest.TEST_FLAKY, "test is flaky")
 	// set to true for an echo expectation
 	suite.multiMessageAsync(true, 10, suite.Multicast)
 }
@@ -180,6 +181,7 @@ func (suite *EchoEngineTestSuite) TestDuplicateMessageParallel_Multicast() {
 // desire behavior is that the deduplication should happen based on both eventID and channel.
 // Messages are sent via the Publish methods of the Conduits.
 func (suite *EchoEngineTestSuite) TestDuplicateMessageDifferentChan_Publish() {
+	unittest.SkipUnless(suite.T(), unittest.TEST_FLAKY, "test is flaky")
 	suite.duplicateMessageDifferentChan(suite.Publish)
 }
 

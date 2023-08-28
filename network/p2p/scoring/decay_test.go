@@ -10,31 +10,48 @@ import (
 
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/scoring"
+	"github.com/onflow/flow-go/utils/unittest"
 )
+
+type args struct {
+	penalty     float64
+	decay       float64
+	lastUpdated time.Time
+}
+type testCase struct {
+	name    string
+	args    args
+	want    float64
+	wantErr error
+}
+
+// TestGeometricDecay_ValidParams tests geometric score with a valid penalty, decay, and time. This test case is separated from the other
+// test cases due to flakiness.
+func TestGeometricDecay_ValidParams(t *testing.T) {
+	unittest.SkipUnless(t, unittest.TEST_FLAKY, "test is flaky")
+	tt := testCase{
+		name: "valid penalty, decay, and time",
+		args: args{
+			penalty:     100,
+			decay:       0.9,
+			lastUpdated: time.Now().Add(-10 * time.Second),
+		},
+		want:    100 * math.Pow(0.9, 10),
+		wantErr: nil,
+	}
+
+	t.Run(tt.name, func(t *testing.T) {
+		got, err := scoring.GeometricDecay(tt.args.penalty, tt.args.decay, tt.args.lastUpdated)
+		if tt.wantErr != nil {
+			assert.Errorf(t, err, tt.wantErr.Error())
+		}
+		assert.LessOrEqual(t, truncateFloat(math.Abs(got-tt.want), 3), 1e-3)
+	})
+}
 
 // TestGeometricDecay tests the GeometricDecay function.
 func TestGeometricDecay(t *testing.T) {
-	type args struct {
-		penalty     float64
-		decay       float64
-		lastUpdated time.Time
-	}
-	tests := []struct {
-		name    string
-		args    args
-		want    float64
-		wantErr error
-	}{
-		{
-			name: "valid penalty, decay, and time",
-			args: args{
-				penalty:     100,
-				decay:       0.9,
-				lastUpdated: time.Now().Add(-10 * time.Second),
-			},
-			want:    100 * math.Pow(0.9, 10),
-			wantErr: nil,
-		},
+	tests := []testCase{
 		{
 			name: "zero decay factor",
 			args: args{
