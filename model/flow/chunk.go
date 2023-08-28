@@ -32,6 +32,7 @@ func NewChunk(
 	numberOfTransactions int,
 	eventCollection Identifier,
 	endState StateCommitment,
+	totalComputationUsed uint64,
 ) *Chunk {
 	return &Chunk{
 		ChunkBody: ChunkBody{
@@ -40,7 +41,7 @@ func NewChunk(
 			StartState:           startState,
 			NumberOfTransactions: uint64(numberOfTransactions),
 			EventCollection:      eventCollection,
-			TotalComputationUsed: 0, // TODO: record gas used
+			TotalComputationUsed: totalComputationUsed,
 		},
 		Index:    uint64(collectionIndex),
 		EndState: endState,

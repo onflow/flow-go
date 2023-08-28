@@ -16,6 +16,7 @@ import (
 	"github.com/onflow/cadence"
 
 	sdk "github.com/onflow/flow-go-sdk"
+	"github.com/onflow/flow-go/network/message"
 
 	hotstuff "github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/crypto"
@@ -41,7 +42,6 @@ import (
 	"github.com/onflow/flow-go/module/mempool/entity"
 	"github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/module/updatable_configs"
-	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/p2p/keyutils"
 	"github.com/onflow/flow-go/state/protocol"
@@ -2427,7 +2427,7 @@ func GetFlowProtocolEventID(
 ) flow.Identifier {
 	payload, err := NetworkCodec().Encode(event)
 	require.NoError(t, err)
-	eventIDHash, err := network.EventId(channel, payload)
+	eventIDHash, err := message.EventId(channel, payload)
 	require.NoError(t, err)
 	return flow.HashToID(eventIDHash)
 }

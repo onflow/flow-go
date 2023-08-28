@@ -62,8 +62,8 @@ func TestSpam_IHave(t *testing.T) {
 	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
 	defer cancel()
 	nodes := []p2p.LibP2PNode{gsrSpammer.SpammerNode, victimNode}
-	p2ptest.StartNodes(t, signalerCtx, nodes, 5*time.Second)
-	defer p2ptest.StopNodes(t, nodes, cancel, 5*time.Second)
+	p2ptest.StartNodes(t, signalerCtx, nodes)
+	defer p2ptest.StopNodes(t, nodes, cancel)
 
 	gsrSpammer.Start(t)
 

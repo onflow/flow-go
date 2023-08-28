@@ -419,7 +419,9 @@ func TestChunkIndexIsSet(t *testing.T) {
 		unittest.StateCommitmentFixture(),
 		21,
 		unittest.IdentifierFixture(),
-		unittest.StateCommitmentFixture())
+		unittest.StateCommitmentFixture(),
+		17995,
+	)
 
 	assert.Equal(t, i, int(chunk.Index))
 	assert.Equal(t, i, int(chunk.CollectionIndex))
@@ -434,9 +436,27 @@ func TestChunkNumberOfTxsIsSet(t *testing.T) {
 		unittest.StateCommitmentFixture(),
 		i,
 		unittest.IdentifierFixture(),
-		unittest.StateCommitmentFixture())
+		unittest.StateCommitmentFixture(),
+		17995,
+	)
 
 	assert.Equal(t, i, int(chunk.NumberOfTransactions))
+}
+
+func TestChunkTotalComputationUsedIsSet(t *testing.T) {
+
+	i := mathRand.Uint64()
+	chunk := flow.NewChunk(
+		unittest.IdentifierFixture(),
+		3,
+		unittest.StateCommitmentFixture(),
+		21,
+		unittest.IdentifierFixture(),
+		unittest.StateCommitmentFixture(),
+		i,
+	)
+
+	assert.Equal(t, i, chunk.TotalComputationUsed)
 }
 
 func TestExecuteOneBlock(t *testing.T) {
