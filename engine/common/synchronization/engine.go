@@ -56,8 +56,8 @@ type Engine struct {
 	core                 module.SyncCore
 	participantsProvider module.IdentifierProvider
 
-	requestHandler   *RequestHandler // component responsible for handling requests
-	spamReportConfig *SpamReportConfig
+	requestHandler      *RequestHandler // component responsible for handling requests
+	spamDetectionConfig *SpamDetectionConfig
 
 	pendingSyncResponses   engine.MessageStore    // message store for *message.SyncResponse
 	pendingBlockResponses  engine.MessageStore    // message store for *message.BlockResponse
@@ -78,6 +78,7 @@ func New(
 	comp consensus.Compliance,
 	core module.SyncCore,
 	participantsProvider module.IdentifierProvider,
+	spamDetectionConfig *SpamDetectionConfig,
 	opts ...OptionFunc,
 ) (*Engine, error) {
 
@@ -108,7 +109,7 @@ func New(
 		pollInterval:         opt.PollInterval,
 		scanInterval:         opt.ScanInterval,
 		participantsProvider: participantsProvider,
-		spamReportConfig:     NewSpamReportConfig(),
+		spamDetectionConfig:  spamDetectionConfig,
 	}
 
 	// register the engine with the network layer and store the conduit
@@ -524,8 +525,8 @@ func (e *Engine) validateSyncRequestForALSP(channel channels.Channel, originID f
 	}
 
 	// to avoid creating a misbehavior report for every sync request received, use a probabilistic approach.
-	// Create a report with a probability of spamReportConfig.syncRequestProbability
-	if float32(n) < e.spamReportConfig.syncRequestProbability*spamProbabilityMultiplier {
+	// Create a report with a probability of spamDetectionConfig.syncRequestProbability
+	if float32(n) < e.spamDetectionConfig.syncRequestProbability*spamProbabilityMultiplier {
 		// create a misbehavior report
 		e.log.Info().Str("originID", originID.String()).Msg("creating misbehavior report")
 		report, err := alsp.NewMisbehaviorReport(originID, alsp.ResourceIntensiveRequest)

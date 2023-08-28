@@ -176,7 +176,8 @@ func (ss *SyncSuite) SetupTest() {
 				filter.Not(filter.HasNodeID(ss.me.NodeID())),
 			),
 			idCache,
-		))
+		),
+		NewSpamDetectionConfig())
 	require.NoError(ss.T(), err, "should pass engine initialization")
 
 	ss.e = e
@@ -252,7 +253,7 @@ func (ss *SyncSuite) TestProcess_SyncRequest_HigherThanReceiver_OutsideTolerance
 
 	ss.con.AssertNotCalled(ss.T(), "Unicast", mock.Anything, mock.Anything)
 
-	ss.e.spamReportConfig.syncRequestProbability = 0.0 // force not creating misbehavior report
+	ss.e.spamDetectionConfig.syncRequestProbability = 0.0 // force not creating misbehavior report
 
 	require.NoError(ss.T(), ss.e.Process(channels.SyncCommittee, originID, req))
 
@@ -307,7 +308,7 @@ func (ss *SyncSuite) TestLoad_Process_SyncRequest_HigherThanReceiver_OutsideTole
 		)
 
 		// force creating misbehavior report by setting syncRequestProbability to 1.0 (i.e. report misbehavior 100% of the time)
-		ss.e.spamReportConfig.syncRequestProbability = 1.0
+		ss.e.spamDetectionConfig.syncRequestProbability = 1.0
 
 		require.NoError(ss.T(), ss.e.Process(channels.SyncCommittee, originID, req))
 	}
@@ -389,7 +390,7 @@ func (ss *SyncSuite) TestLoad_Process_SyncRequest_HigherThanReceiver_OutsideTole
 						misbehaviorsCounter++
 					},
 				)
-				ss.e.spamReportConfig.syncRequestProbability = loadGroup.syncRequestProbabilityFactor
+				ss.e.spamDetectionConfig.syncRequestProbability = loadGroup.syncRequestProbabilityFactor
 				require.NoError(ss.T(), ss.e.Process(channels.SyncCommittee, originID, req))
 			}
 
