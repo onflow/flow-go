@@ -138,8 +138,7 @@ func TestInvalidCtrlMsgScoringIntegration(t *testing.T) {
 		inspectorSuite1.consumer.OnInvalidControlMessageNotification(&p2p.InvCtrlMsgNotif{
 			PeerID:  node2.Host().ID(),
 			MsgType: p2pmsg.ControlMessageTypes()[rand.Intn(len(p2pmsg.ControlMessageTypes()))],
-			Count:   1,
-			Err:     fmt.Errorf("invalid control message"),
+			Error:   fmt.Errorf("invalid control message"),
 		})
 	}
 
