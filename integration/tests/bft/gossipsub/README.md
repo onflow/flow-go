@@ -24,7 +24,7 @@ The test is broken down into the following main parts:
 2. **Authorized Messages Testing**: Messages sent by the authorized attacker, with the correct signature, must pass the libp2p signature verification process and be delivered to the victim. The test checks for all authorized messages received by the victim within a certain time frame.
 
 ## RPC Inspector False Positive Test
-The `GossipsubRPCInspectorFalsePositiveNotificationsTestSuite` test within the `rpc_inspector` package test suite aims to ensure that the underlying libp2p libraries related to gossip sub RPC control message inspection do not trigger false positives during their validation processes.
+The `GossipsubRPCInspectorFalsePositiveNotificationsTestSuite` test within the `rpc_inspector` package test suite aims to ensure that the underlying libp2p libraries related to GossipSub RPC control message inspection do not trigger false positives during their validation processes.
 Here's a breakdown of the `TestGossipsubRPCInspectorFalsePositiveNotifications` method:
 1. **Configuration and Context Setup**: A specific duration for loading and intervals is defined, and a context with a timeout is created for the test scenario.
 2. **Simulating Network Activity**: The method triggers a "loader loop" with a specific number of test accounts and intervals, intending to create artificial network activity. It does this by submitting transactions to create Flow accounts, waiting for them to be sealed.
