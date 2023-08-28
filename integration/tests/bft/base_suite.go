@@ -48,7 +48,7 @@ func (b *BaseSuite) AccessClient() *testnet.Client {
 func (b *BaseSuite) SetupSuite() {
 	b.Log = unittest.LoggerForTest(b.Suite.T(), zerolog.InfoLevel)
 
-	// setup access nodes
+	// setup single access node
 	b.NodeConfigs = append(b.NodeConfigs,
 		testnet.NewNodeConfig(flow.RoleAccess, testnet.WithLogLevel(zerolog.FatalLevel)),
 	)
