@@ -7,8 +7,13 @@ import (
 // ChunkDataPacks represents persistent storage for chunk data packs.
 type ChunkDataPacks interface {
 
-	// Store inserts the chunk header, keyed by chunk ID.
-	Store(c *flow.ChunkDataPack) error
+	// Store stores multiple ChunkDataPacks cs keyed by their ChunkIDs in a batch.
+	// No errors are expected during normal operation, but it may return generic error
+	Store(cs []*flow.ChunkDataPack) error
+
+	// Remove removes multiple ChunkDataPacks cs keyed by their ChunkIDs in a batch.
+	// No errors are expected during normal operation, but it may return generic error
+	Remove(cs []flow.Identifier) error
 
 	// BatchStore inserts the chunk header, keyed by chunk ID into a given batch
 	BatchStore(c *flow.ChunkDataPack, batch BatchStorage) error
