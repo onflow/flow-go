@@ -241,8 +241,9 @@ func (r *GossipSubAppSpecificScoreRegistry) OnInvalidControlMessageNotification(
 	// we use mutex to ensure the method is concurrency safe.
 
 	lg := r.logger.With().
+		Err(notification.Errors().Error()).
 		Str("peer_id", notification.PeerID.String()).
-		Str("misbehavior_type", notification.MsgType.String()).Logger()
+		Logger()
 
 	// try initializing the application specific penalty for the peer if it is not yet initialized.
 	// this is done to avoid the case where the peer is not yet cached and the application specific penalty is not yet initialized.
@@ -253,23 +254,23 @@ func (r *GossipSubAppSpecificScoreRegistry) OnInvalidControlMessageNotification(
 	}
 
 	record, err := r.spamScoreCache.Update(notification.PeerID, func(record p2p.GossipSubSpamRecord) p2p.GossipSubSpamRecord {
-		switch notification.MsgType {
-		case p2pmsg.CtrlMsgGraft:
-			record.Penalty += r.penalty.Graft
-		case p2pmsg.CtrlMsgPrune:
-			record.Penalty += r.penalty.Prune
-		case p2pmsg.CtrlMsgIHave:
-			record.Penalty += r.penalty.IHave
-		case p2pmsg.CtrlMsgIWant:
-			record.Penalty += r.penalty.IWant
-		default:
-			// the error is considered fatal as it means that we have an unsupported misbehaviour type, we should crash the node to prevent routing attack vulnerability.
-			lg.Fatal().Str("misbehavior_type", notification.MsgType.String()).Msg("unknown misbehaviour type")
+		for controlMsgType := range notification.Errors() {
+			switch controlMsgType {
+			case p2pmsg.CtrlMsgGraft:
+				record.Penalty += r.penalty.Graft
+			case p2pmsg.CtrlMsgPrune:
+				record.Penalty += r.penalty.Prune
+			case p2pmsg.CtrlMsgIHave:
+				record.Penalty += r.penalty.IHave
+			case p2pmsg.CtrlMsgIWant:
+				record.Penalty += r.penalty.IWant
+			default:
+				// the error is considered fatal as it means that we have an unsupported misbehaviour type, we should crash the node to prevent routing attack vulnerability.
+				lg.Fatal().Str("misbehavior_type", controlMsgType.String()).Msg("unknown misbehaviour type")
+			}
 		}
-
 		return record
 	})
-
 	if err != nil {
 		// any returned error from adjust is non-recoverable and fatal, we crash the node.
 		lg.Fatal().Err(err).Msg("could not adjust application specific penalty for peer")

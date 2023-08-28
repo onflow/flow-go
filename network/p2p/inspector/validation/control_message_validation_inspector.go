@@ -8,6 +8,8 @@ import (
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	pubsub_pb "github.com/libp2p/go-libp2p-pubsub/pb"
 	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/rs/zerolog"
+
 	"github.com/onflow/flow-go/engine/common/worker"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
@@ -23,7 +25,6 @@ import (
 	"github.com/onflow/flow-go/state/protocol/events"
 	"github.com/onflow/flow-go/utils/logging"
 	flowrand "github.com/onflow/flow-go/utils/rand"
-	"github.com/rs/zerolog"
 )
 
 // ControlMsgValidationInspector RPC message inspector that inspects control messages and performs some validation on them,
@@ -143,11 +144,12 @@ func (c *ControlMsgValidationInspector) Inspect(from peer.ID, rpc *pubsub.RPC) e
 // - Each topic in the iWant sample is a valid topic.
 // If the number of iWants that do not have a corresponding iHave exceed the configured threshold an error is returned.
 // Args:
+// - from: peer ID of the sender.
 // - iWant: the list of iWant control messages.
 // Returns:
 // - DuplicateFoundErr: if there are any duplicate message ids found in any of the iWants.
 // - IWantCacheMissThresholdErr: if the rate of cache misses exceeds the configured allowed threshold.
-// - error: if any error occurs while sampling the iWants, all returned errors are benign and should not cause the node to crash.
+// - error: if any error occurs while sampling or validating topics, all returned errors are benign and should not cause the node to crash.
 func (c *ControlMsgValidationInspector) inspectIWant(from peer.ID, iWants []*pubsub_pb.ControlIWant) error {
 	lastHighest := c.rpcTracker.LastHighestIHaveRPCSize()
 	lg := c.logger.With().
@@ -228,6 +230,13 @@ func (c *ControlMsgValidationInspector) inspectIWant(from peer.ID, iWants []*pub
 }
 
 // inspectGraft performs topic validation on all grafts in the control message using the provided validateTopic func while tracking duplicates.
+// Args:
+// - from: peer ID of the sender.
+// - grafts: the list of grafts to inspect.
+// - activeClusterIDS: the list of active cluster ids.
+// Returns:
+// - DuplicateFoundErr: if there are any duplicate topics in the list of grafts
+// - error: if any error occurs while sampling or validating topics, all returned errors are benign and should not cause the node to crash.
 func (c *ControlMsgValidationInspector) inspectGraft(from peer.ID, grafts []*pubsub_pb.ControlGraft, activeClusterIDS flow.ChainIDList) error {
 	totalGrafts := len(grafts)
 	if totalGrafts == 0 {
@@ -261,6 +270,14 @@ func (c *ControlMsgValidationInspector) inspectGraft(from peer.ID, grafts []*pub
 }
 
 // inspectPrune performs topic validation on all prunes in the control message using the provided validateTopic func while tracking duplicates.
+// Args:
+// - from: peer ID of the sender.
+// - prunes: the list of iHaves to inspect.
+// - activeClusterIDS: the list of active cluster ids.
+// Returns:
+//   - DuplicateFoundErr: if there are any duplicate topics found in the list of iHaves
+//     or any duplicate message ids found inside a single iHave.
+//   - error: if any error occurs while sampling or validating topics, all returned errors are benign and should not cause the node to crash.
 func (c *ControlMsgValidationInspector) inspectPrune(from peer.ID, prunes []*pubsub_pb.ControlPrune, activeClusterIDS flow.ChainIDList) error {
 	totalPrunes := len(prunes)
 	if totalPrunes == 0 {
@@ -294,12 +311,20 @@ func (c *ControlMsgValidationInspector) inspectPrune(from peer.ID, prunes []*pub
 }
 
 // inspectIhaves performs topic validation on all ihaves in the control message using the provided validateTopic func while tracking duplicates.
+// Args:
+// - from: peer ID of the sender.
+// - iHaves: the list of iHaves to inspect.
+// - activeClusterIDS: the list of active cluster ids.
+// Returns:
+//   - DuplicateFoundErr: if there are any duplicate topics found in the list of iHaves
+//     or any duplicate message ids found inside a single iHave.
+//   - error: if any error occurs while sampling or validating topics, all returned errors are benign and should not cause the node to crash.
 func (c *ControlMsgValidationInspector) inspectIhaves(from peer.ID, ihaves []*pubsub_pb.ControlIHave, activeClusterIDS flow.ChainIDList) error {
 	totalIHaves := len(ihaves)
 	if totalIHaves == 0 {
 		return nil
 	}
-	sampleSize := c.config.IHaveMaxSampleSize
+	sampleSize := c.config.IHaveRPCInspectionConfig.MaxSampleSize
 	if sampleSize > totalIHaves {
 		sampleSize = totalIHaves
 	}
@@ -312,7 +337,6 @@ func (c *ControlMsgValidationInspector) inspectIhaves(from peer.ID, ihaves []*pu
 	}
 
 	duplicateTopicTracker := make(duplicateStrTracker)
-	duplicateMessageIDTracker := make(duplicateStrTracker)
 	for _, ihave := range ihaves[:sampleSize] {
 		topic := ihave.GetTopicID()
 		if duplicateTopicTracker.isDuplicate(topic) {
@@ -327,6 +351,17 @@ func (c *ControlMsgValidationInspector) inspectIhaves(from peer.ID, ihaves []*pu
 	return nil
 }
 
+// inspectIhave performs validation inspection for a single iHave ensuring that the following are true:
+// - The TopicID for the iHave message must be valid
+// - Each message ID in the iHave should be unique
+// This function validates the iHave topic ID and ensures that each message ID in the iHave is unique.
+// Args:
+// - from: peer ID of the sender.
+// - iHave: the iHave to inspect.
+// - activeClusterIDS: the list of active cluster ids.
+// Returns:
+// - DuplicateFoundErr: if there are any duplicate message ids found.
+// - error: if any error occurs while sampling the iWants, all returned errors are benign and should not cause the node to crash.
 func (c *ControlMsgValidationInspector) inspectIhave(from peer.ID, ihave *pubsub_pb.ControlIHave, activeClusterIDS flow.ChainIDList) error {
 	err := c.validateTopic(from, channels.Topic(ihave.GetTopicID()), activeClusterIDS)
 	if err != nil {
@@ -334,17 +369,34 @@ func (c *ControlMsgValidationInspector) inspectIhave(from peer.ID, ihave *pubsub
 	}
 
 	messageIDs := ihave.GetMessageIDs()
-	if len(messageIDs) == 0 {
+	totalMessageIDs := len(messageIDs)
+	if totalMessageIDs == 0 {
 		return nil
 	}
 
-	messageIDSampleSize := c.config.IHaveMaxSampleSize
-	err = c.performSample(p2pmsg.CtrlMsgIHave, uint(len(messageIDs)), uint(sampleSize), func(i, j uint) {
-		ihaves[i], ihaves[j] = ihaves[j], ihaves[i]
+	sampleSize := c.config.IHaveRPCInspectionConfig.MaxMessageIDSampleSize
+	if sampleSize > totalMessageIDs {
+		sampleSize = totalMessageIDs
+	}
+
+	tracker := make(duplicateStrTracker)
+	var duplicateTopicErrs *multierror.Error
+	err = c.performSample(p2pmsg.CtrlMsgIHave, uint(totalMessageIDs), uint(sampleSize), func(i, j uint) {
+		messageIDs[i], messageIDs[j] = messageIDs[j], messageIDs[i]
+		if tracker.isDuplicate(messageIDs[i]) {
+			duplicateTopicErrs = multierror.Append(duplicateTopicErrs, fmt.Errorf("duplicate message id found in ihave topic %s: %s", ihave.GetTopicID(), messageIDs[i]))
+		}
+		tracker.set(messageIDs[i])
 	})
 	if err != nil {
-		return fmt.Errorf("failed to sample ihave messages: %w", err)
+		return fmt.Errorf("failed to sample message ids for ihave on topic %s: %w", ihave.GetTopicID(), err)
 	}
+
+	if duplicateTopicErrs.ErrorOrNil() != nil {
+		return NewDuplicateFoundErr(duplicateTopicErrs.ErrorOrNil())
+	}
+
+	return nil
 }
 
 // Name returns the name of the rpc inspector.
@@ -377,34 +429,37 @@ func (c *ControlMsgValidationInspector) processInspectRPCReq(req *InspectRPCRequ
 	}()
 
 	activeClusterIDS := c.tracker.GetActiveClusterIds()
-	var errs *multierror.Error
+	errs := make(p2p.ControlMessageTypeErrs)
 	for _, ctrlMsgType := range p2pmsg.ControlMessageTypes() {
 		// iWant validation uses new sample size validation. This will be updated for all other control message types.
 		switch ctrlMsgType {
 		case p2pmsg.CtrlMsgGraft:
 			err := c.inspectGraft(req.Peer, req.rpc.GetControl().GetGraft(), activeClusterIDS)
 			if err != nil {
-				errs = multierror.Append(errs, err)
+				errs[p2pmsg.CtrlMsgGraft] = err
 			}
 		case p2pmsg.CtrlMsgPrune:
 			err := c.inspectPrune(req.Peer, req.rpc.GetControl().GetPrune(), activeClusterIDS)
 			if err != nil {
-				errs = multierror.Append(errs, err)
+				errs[p2pmsg.CtrlMsgPrune] = err
 			}
 		case p2pmsg.CtrlMsgIWant:
-			err := c.inspectIhaves(req.Peer, req.rpc.GetControl().GetIhave(), activeClusterIDS)
+			err := c.inspectIWant(req.Peer, req.rpc.GetControl().GetIwant())
 			if err != nil {
-				errs = multierror.Append(errs, err)
+				errs[p2pmsg.CtrlMsgIWant] = err
 			}
 		case p2pmsg.CtrlMsgIHave:
 			err := c.inspectIhaves(req.Peer, req.rpc.GetControl().GetIhave(), activeClusterIDS)
 			if err != nil {
-				errs = multierror.Append(errs, err)
+				errs[p2pmsg.CtrlMsgIHave] = err
 			}
 		}
 	}
 
-	c.logAndDistributeAsyncInspectErrs(req, errs)
+	if len(errs) > 0 {
+		c.logAndDistributeAsyncInspectErrs(req, errs)
+	}
+
 	return nil
 }
 
@@ -531,17 +586,17 @@ func (c *ControlMsgValidationInspector) checkClusterPrefixHardThreshold(nodeID f
 }
 
 // logAndDistributeErr logs the provided error and attempts to disseminate an invalid control message validation notification for the error.
-func (c *ControlMsgValidationInspector) logAndDistributeAsyncInspectErrs(req *InspectRPCRequest, errs *multierror.Error) {
+func (c *ControlMsgValidationInspector) logAndDistributeAsyncInspectErrs(req *InspectRPCRequest, errs p2p.ControlMessageTypeErrs) {
 	lg := c.logger.With().
 		Bool(logging.KeySuspicious, true).
 		Bool(logging.KeyNetworkingSecurity, true).
 		Str("peer_id", req.Peer.String()).
-		Int("error_count", errs.Len()).
+		Int("error_count", len(errs)).
 		Logger()
 
-	lg.Error().Err(errs).Msg("rpc control message async inspection failed")
+	lg.Error().Err(errs.Error()).Msg("rpc control message async inspection failed")
 
-	err := c.distributor.Distribute(p2p.NewInvalidControlMessageNotification(req.Peer, "", uint64(errs.Len()), errs))
+	err := c.distributor.Distribute(p2p.NewInvalidControlMessageNotification(req.Peer, errs))
 	if err != nil {
 		lg.Error().
 			Err(err).

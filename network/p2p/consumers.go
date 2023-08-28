@@ -1,6 +1,7 @@
 package p2p
 
 import (
+	"github.com/hashicorp/go-multierror"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/libp2p/go-libp2p/core/peer"
 
@@ -24,30 +25,42 @@ type GossipSubInspectorNotifDistributor interface {
 	AddConsumer(GossipSubInvCtrlMsgNotifConsumer)
 }
 
+// ControlMessageTypeErrs map of control message type => error used to track all errors encountered during a single RPC inspection.
+type ControlMessageTypeErrs map[p2pmsg.ControlMessageType]error
+
+// Error returns all errors in a single error.
+func (m ControlMessageTypeErrs) Error() error {
+	var errs *multierror.Error
+	for _, err := range m {
+		errs = multierror.Append(errs, err)
+	}
+	return errs.ErrorOrNil()
+}
+
 // InvCtrlMsgNotif is the notification sent to the consumer when an invalid control message is received.
 // It models the information that is available to the consumer about a misbehaving peer.
 type InvCtrlMsgNotif struct {
 	// PeerID is the ID of the peer that sent the invalid control message.
 	PeerID peer.ID
-	// MsgType is the type of control message that was received.
-	MsgType p2pmsg.ControlMessageType
-	// Count is the number of invalid control messages received from the peer that is reported in this notification.
-	Count uint64
-	// Err any error associated with the invalid control message.
-	Err error
+	// errs map of control message type -> error encountered during validation. Validation is immediately halted for a control message type
+	// when an error is encountered, thus we can expect a single error mapped to each control message type if one was encountered.
+	errs ControlMessageTypeErrs
+}
+
+// Errors returns the notification errors
+func (notif *InvCtrlMsgNotif) Errors() ControlMessageTypeErrs {
+	return notif.errs
 }
 
 // NewInvalidControlMessageNotification returns a new *InvCtrlMsgNotif
-func NewInvalidControlMessageNotification(peerID peer.ID, msgType p2pmsg.ControlMessageType, count uint64, err error) *InvCtrlMsgNotif {
+func NewInvalidControlMessageNotification(peerID peer.ID, errs ControlMessageTypeErrs) *InvCtrlMsgNotif {
 	return &InvCtrlMsgNotif{
-		PeerID:  peerID,
-		MsgType: msgType,
-		Count:   count,
-		Err:     err,
+		PeerID: peerID,
+		errs:   errs,
 	}
 }
 
-// GossipSubInvCtrlMsgNotifConsumer is the interface for the consumer that consumes gossip sub inspector notifications.
+// GossipSubInvCtrlMsgNotifConsumer is the interface for the consumer that consumes gossipsub inspector notifications.
 // It is used to consume notifications in an asynchronous manner.
 // The implementation must be concurrency safe, but can be blocking. This is due to the fact that the consumer is called
 // asynchronously by the distributor.
@@ -68,7 +81,7 @@ type GossipSubInspectorSuite interface {
 	// is called whenever a gossipsub rpc message is received.
 	InspectFunc() func(peer.ID, *pubsub.RPC) error
 
-	// AddInvCtrlMsgNotifConsumer adds a consumer to the invalid control message notification distributor.
+	// AddInvalidControlMessageConsumer AddInvCtrlMsgNotifConsumer adds a consumer to the invalid control message notification distributor.
 	// This consumer is notified when a misbehaving peer regarding gossipsub control messages is detected. This follows a pub/sub
 	// pattern where the consumer is notified when a new notification is published.
 	// A consumer is only notified once for each notification, and only receives notifications that were published after it was added.
