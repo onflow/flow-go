@@ -3,12 +3,14 @@ package rpc_inspector
 import (
 	"context"
 	"fmt"
+	"os"
 	"testing"
 	"time"
 
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	pb "github.com/libp2p/go-libp2p-pubsub/pb"
 	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/rs/zerolog"
 	mockery "github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/atomic"
@@ -483,23 +485,19 @@ func TestValidationInspector_ActiveClusterIdsNotSet_Graft_Detection(t *testing.T
 
 	count := atomic.NewInt64(0)
 	done := make(chan struct{})
-	expectedNumOfTotalNotif := 5
-	invGraftNotifCount := atomic.NewUint64(0)
-	inspectDisseminatedNotifyFunc := func(spammer *corruptlibp2p.GossipSubRouterSpammer) func(args mockery.Arguments) {
-		return func(args mockery.Arguments) {
-			count.Inc()
-			notification, ok := args[0].(*p2p.InvCtrlMsgNotif)
-			require.True(t, ok)
-			require.Equal(t, spammer.SpammerNode.Host().ID(), notification.PeerID)
-			require.True(t, validation.IsErrActiveClusterIDsNotSet(notification.Error))
-			require.True(t, notification.CtlMsgType == p2pmsg.CtrlMsgGraft, fmt.Sprintf("unexpected control message type %s error: %s", notification.CtlMsgType, notification.Error))
-			invGraftNotifCount.Inc()
+	expectedNumOfLogs := 5
 
-			if count.Load() == int64(expectedNumOfTotalNotif) {
-				close(done)
+	hook := zerolog.HookFunc(func(e *zerolog.Event, level zerolog.Level, message string) {
+		if level == zerolog.WarnLevel {
+			if message == "active cluster ids not set" {
+				count.Inc()
 			}
 		}
-	}
+		if count.Load() == int64(expectedNumOfLogs) {
+			close(done)
+		}
+	})
+	logger := zerolog.New(os.Stdout).Level(zerolog.WarnLevel).Hook(hook)
 
 	idProvider := mock.NewIdentityProvider(t)
 	spammer := corruptlibp2p.NewGossipSubRouterSpammer(t, sporkID, role, idProvider)
@@ -508,10 +506,9 @@ func TestValidationInspector_ActiveClusterIdsNotSet_Graft_Detection(t *testing.T
 
 	distributor := mockp2p.NewGossipSubInspectorNotificationDistributor(t)
 	mockDistributorReadyDoneAware(distributor)
-	withExpectedNotificationDissemination(expectedNumOfTotalNotif, inspectDisseminatedNotifyFunc)(distributor, spammer)
 	meshTracer := meshTracerFixture(flowConfig, idProvider)
 	validationInspector, err := validation.NewControlMsgValidationInspector(
-		unittest.Logger(),
+		logger,
 		sporkID,
 		&inspectorConfig,
 		distributor,
@@ -551,8 +548,6 @@ func TestValidationInspector_ActiveClusterIdsNotSet_Graft_Detection(t *testing.T
 	spammer.SpamControlMessage(t, victimNode, ctlMsgs)
 
 	unittest.RequireCloseBefore(t, done, 5*time.Second, "failed to inspect RPC messages on time")
-	// ensure we receive the expected number of invalid control message notifications
-	require.Equal(t, uint64(5), invGraftNotifCount.Load())
 }
 
 // TestValidationInspector_ActiveClusterIdsNotSet_Prune_Detection ensures that an error is returned only after the cluster prefixed topics received for a peer exceed the configured
@@ -571,23 +566,18 @@ func TestValidationInspector_ActiveClusterIdsNotSet_Prune_Detection(t *testing.T
 
 	count := atomic.NewInt64(0)
 	done := make(chan struct{})
-	expectedNumOfTotalNotif := 5
-	invPruneNotifCount := atomic.NewUint64(0)
-	inspectDisseminatedNotifyFunc := func(spammer *corruptlibp2p.GossipSubRouterSpammer) func(args mockery.Arguments) {
-		return func(args mockery.Arguments) {
-			count.Inc()
-			notification, ok := args[0].(*p2p.InvCtrlMsgNotif)
-			require.True(t, ok)
-			require.Equal(t, spammer.SpammerNode.Host().ID(), notification.PeerID)
-			require.True(t, validation.IsErrActiveClusterIDsNotSet(notification.Error))
-			require.True(t, notification.CtlMsgType == p2pmsg.CtrlMsgPrune, fmt.Sprintf("unexpected control message type %s error: %s", notification.CtlMsgType, notification.Error))
-			invPruneNotifCount.Inc()
-
-			if count.Load() == int64(expectedNumOfTotalNotif) {
-				close(done)
+	expectedNumOfLogs := 5
+	hook := zerolog.HookFunc(func(e *zerolog.Event, level zerolog.Level, message string) {
+		if level == zerolog.WarnLevel {
+			if message == "active cluster ids not set" {
+				count.Inc()
 			}
 		}
-	}
+		if count.Load() == int64(expectedNumOfLogs) {
+			close(done)
+		}
+	})
+	logger := zerolog.New(os.Stdout).Level(zerolog.WarnLevel).Hook(hook)
 
 	idProvider := mock.NewIdentityProvider(t)
 	spammer := corruptlibp2p.NewGossipSubRouterSpammer(t, sporkID, role, idProvider)
@@ -596,10 +586,9 @@ func TestValidationInspector_ActiveClusterIdsNotSet_Prune_Detection(t *testing.T
 
 	distributor := mockp2p.NewGossipSubInspectorNotificationDistributor(t)
 	mockDistributorReadyDoneAware(distributor)
-	withExpectedNotificationDissemination(expectedNumOfTotalNotif, inspectDisseminatedNotifyFunc)(distributor, spammer)
 	meshTracer := meshTracerFixture(flowConfig, idProvider)
 	validationInspector, err := validation.NewControlMsgValidationInspector(
-		unittest.Logger(),
+		logger,
 		sporkID,
 		&inspectorConfig,
 		distributor,
@@ -639,8 +628,6 @@ func TestValidationInspector_ActiveClusterIdsNotSet_Prune_Detection(t *testing.T
 	spammer.SpamControlMessage(t, victimNode, ctlMsgs)
 
 	unittest.RequireCloseBefore(t, done, 5*time.Second, "failed to inspect RPC messages on time")
-	// ensure we receive the expected number of invalid control message notifications
-	require.Equal(t, uint64(5), invPruneNotifCount.Load())
 }
 
 // TestValidationInspector_UnstakedNode_Detection ensures that RPC control message inspector disseminates an invalid control message notification when an unstaked peer
@@ -664,30 +651,18 @@ func TestValidationInspector_UnstakedNode_Detection(t *testing.T) {
 
 	count := atomic.NewInt64(0)
 	done := make(chan struct{})
-	expectedNumOfTotalNotif := 2
-	invGraftNotifCount := atomic.NewUint64(0)
-	invPruneNotifCount := atomic.NewUint64(0)
-	inspectDisseminatedNotifyFunc := func(spammer *corruptlibp2p.GossipSubRouterSpammer) func(args mockery.Arguments) {
-		return func(args mockery.Arguments) {
-			count.Inc()
-			notification, ok := args[0].(*p2p.InvCtrlMsgNotif)
-			require.True(t, ok)
-			require.Equal(t, spammer.SpammerNode.Host().ID(), notification.PeerID)
-			require.True(t, validation.IsErrUnstakedPeer(notification.Error))
-			switch notification.CtlMsgType {
-			case p2pmsg.CtrlMsgGraft:
-				invGraftNotifCount.Inc()
-			case p2pmsg.CtrlMsgPrune:
-				invPruneNotifCount.Inc()
-			default:
-				require.Fail(t, fmt.Sprintf("unexpected control message type %s error: %s", notification.CtlMsgType, notification.Error))
-			}
-
-			if count.Load() == int64(expectedNumOfTotalNotif) {
-				close(done)
+	expectedNumOfLogs := 2
+	hook := zerolog.HookFunc(func(e *zerolog.Event, level zerolog.Level, message string) {
+		if level == zerolog.ErrorLevel {
+			if message == "control message received from unstaked peer" {
+				count.Inc()
 			}
 		}
-	}
+		if count.Load() == int64(expectedNumOfLogs) {
+			close(done)
+		}
+	})
+	logger := zerolog.New(os.Stdout).Level(zerolog.ErrorLevel).Hook(hook)
 
 	idProvider := mock.NewIdentityProvider(t)
 	spammer := corruptlibp2p.NewGossipSubRouterSpammer(t, sporkID, role, idProvider)
@@ -696,10 +671,9 @@ func TestValidationInspector_UnstakedNode_Detection(t *testing.T) {
 
 	distributor := mockp2p.NewGossipSubInspectorNotificationDistributor(t)
 	mockDistributorReadyDoneAware(distributor)
-	withExpectedNotificationDissemination(expectedNumOfTotalNotif, inspectDisseminatedNotifyFunc)(distributor, spammer)
 	meshTracer := meshTracerFixture(flowConfig, idProvider)
 	validationInspector, err := validation.NewControlMsgValidationInspector(
-		unittest.Logger(),
+		logger,
 		sporkID,
 		&inspectorConfig,
 		distributor,
@@ -744,9 +718,6 @@ func TestValidationInspector_UnstakedNode_Detection(t *testing.T) {
 	spammer.SpamControlMessage(t, victimNode, pruneCtlMsgsDuplicateTopic)
 
 	unittest.RequireCloseBefore(t, done, 5*time.Second, "failed to inspect RPC messages on time")
-	// ensure we receive the expected number of invalid control message notifications
-	require.Equal(t, uint64(1), invGraftNotifCount.Load())
-	require.Equal(t, uint64(1), invPruneNotifCount.Load())
 }
 
 // TestValidationInspector_InspectIWants_CacheMissThreshold ensures that expected invalid control message notification is disseminated when the number of iWant message Ids
