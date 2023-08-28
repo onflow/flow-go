@@ -13,6 +13,8 @@ func TestFilter(t *testing.T) {
 	t.Run("filters by role", func(t *testing.T) {
 		configs := testnet.NewNodeConfigSet(5, flow.RoleAccess)
 
+		// add another role to the set to ensure it is filtered out
+		configs = append(configs, testnet.NewNodeConfig(flow.RoleExecution))
 		filters := configs.Filter(func(n testnet.NodeConfig) bool { return n.Role == flow.RoleAccess })
 		assert.Len(t, filters, 5) // should exclude execution node
 		for _, config := range filters {
