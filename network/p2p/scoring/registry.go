@@ -241,7 +241,7 @@ func (r *GossipSubAppSpecificScoreRegistry) OnInvalidControlMessageNotification(
 	// we use mutex to ensure the method is concurrency safe.
 
 	lg := r.logger.With().
-		Err(notification.Errors().Error()).
+		Err(notification.Error).
 		Str("peer_id", notification.PeerID.String()).
 		Logger()
 
@@ -254,20 +254,18 @@ func (r *GossipSubAppSpecificScoreRegistry) OnInvalidControlMessageNotification(
 	}
 
 	record, err := r.spamScoreCache.Update(notification.PeerID, func(record p2p.GossipSubSpamRecord) p2p.GossipSubSpamRecord {
-		for controlMsgType := range notification.Errors() {
-			switch controlMsgType {
-			case p2pmsg.CtrlMsgGraft:
-				record.Penalty += r.penalty.Graft
-			case p2pmsg.CtrlMsgPrune:
-				record.Penalty += r.penalty.Prune
-			case p2pmsg.CtrlMsgIHave:
-				record.Penalty += r.penalty.IHave
-			case p2pmsg.CtrlMsgIWant:
-				record.Penalty += r.penalty.IWant
-			default:
-				// the error is considered fatal as it means that we have an unsupported misbehaviour type, we should crash the node to prevent routing attack vulnerability.
-				lg.Fatal().Str("misbehavior_type", controlMsgType.String()).Msg("unknown misbehaviour type")
-			}
+		switch notification.CtlMsgType {
+		case p2pmsg.CtrlMsgGraft:
+			record.Penalty += r.penalty.Graft
+		case p2pmsg.CtrlMsgPrune:
+			record.Penalty += r.penalty.Prune
+		case p2pmsg.CtrlMsgIHave:
+			record.Penalty += r.penalty.IHave
+		case p2pmsg.CtrlMsgIWant:
+			record.Penalty += r.penalty.IWant
+		default:
+			// the error is considered fatal as it means that we have an unsupported misbehaviour type, we should crash the node to prevent routing attack vulnerability.
+			lg.Fatal().Str("misbehavior_type", notification.CtlMsgType.String()).Msg("unknown misbehaviour type")
 		}
 		return record
 	})

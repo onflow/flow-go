@@ -60,20 +60,17 @@ func TestValidationInspector_InvalidTopicId_Detection(t *testing.T) {
 			notification, ok := args[0].(*p2p.InvCtrlMsgNotif)
 			require.True(t, ok)
 			require.Equal(t, spammer.SpammerNode.Host().ID(), notification.PeerID)
-			for ctlMsgType, notifErr := range notification.Errors() {
-				require.True(t, channels.IsInvalidTopicErr(notifErr))
-				switch ctlMsgType {
-				case p2pmsg.CtrlMsgGraft:
-					invGraftNotifCount.Inc()
-				case p2pmsg.CtrlMsgPrune:
-					invPruneNotifCount.Inc()
-				case p2pmsg.CtrlMsgIHave:
-					invIHaveNotifCount.Inc()
-				default:
-					require.Fail(t, fmt.Sprintf("unexpected control message type %s error: %s", ctlMsgType, notifErr))
-				}
+			require.True(t, channels.IsInvalidTopicErr(notification.Error))
+			switch notification.CtlMsgType {
+			case p2pmsg.CtrlMsgGraft:
+				invGraftNotifCount.Inc()
+			case p2pmsg.CtrlMsgPrune:
+				invPruneNotifCount.Inc()
+			case p2pmsg.CtrlMsgIHave:
+				invIHaveNotifCount.Inc()
+			default:
+				require.Fail(t, fmt.Sprintf("unexpected control message type %s error: %s", notification.CtlMsgType, notification.Error))
 			}
-
 			if count.Load() == uint64(expectedNumOfTotalNotif) {
 				close(done)
 			}
@@ -192,18 +189,16 @@ func TestValidationInspector_DuplicateTopicId_Detection(t *testing.T) {
 			notification, ok := args[0].(*p2p.InvCtrlMsgNotif)
 			require.True(t, ok)
 			require.Equal(t, spammer.SpammerNode.Host().ID(), notification.PeerID)
-			for ctlMsgType, notifErr := range notification.Errors() {
-				require.True(t, validation.IsDuplicateFoundErr(notifErr))
-				switch ctlMsgType {
-				case p2pmsg.CtrlMsgGraft:
-					invGraftNotifCount.Inc()
-				case p2pmsg.CtrlMsgPrune:
-					invPruneNotifCount.Inc()
-				case p2pmsg.CtrlMsgIHave:
-					invIHaveNotifCount.Inc()
-				default:
-					require.Fail(t, fmt.Sprintf("unexpected control message type %s error: %s", ctlMsgType, notifErr))
-				}
+			require.True(t, validation.IsDuplicateFoundErr(notification.Error))
+			switch notification.CtlMsgType {
+			case p2pmsg.CtrlMsgGraft:
+				invGraftNotifCount.Inc()
+			case p2pmsg.CtrlMsgPrune:
+				invPruneNotifCount.Inc()
+			case p2pmsg.CtrlMsgIHave:
+				invIHaveNotifCount.Inc()
+			default:
+				require.Fail(t, fmt.Sprintf("unexpected control message type %s error: %s", notification.CtlMsgType, notification.Error))
 			}
 
 			if count.Load() == int64(expectedNumOfTotalNotif) {
@@ -295,11 +290,9 @@ func TestValidationInspector_IHaveDuplicateMessageId_Detection(t *testing.T) {
 			notification, ok := args[0].(*p2p.InvCtrlMsgNotif)
 			require.True(t, ok)
 			require.Equal(t, spammer.SpammerNode.Host().ID(), notification.PeerID)
-			for ctlMsgType, notifErr := range notification.Errors() {
-				require.True(t, validation.IsDuplicateFoundErr(notifErr))
-				require.True(t, ctlMsgType == p2pmsg.CtrlMsgIHave, fmt.Sprintf("unexpected control message type %s error: %s", ctlMsgType, notifErr))
-				invIHaveNotifCount.Inc()
-			}
+			require.True(t, validation.IsDuplicateFoundErr(notification.Error))
+			require.True(t, notification.CtlMsgType == p2pmsg.CtrlMsgIHave, fmt.Sprintf("unexpected control message type %s error: %s", notification.CtlMsgType, notification.Error))
+			invIHaveNotifCount.Inc()
 
 			if count.Load() == int64(expectedNumOfTotalNotif) {
 				close(done)
@@ -399,17 +392,16 @@ func TestValidationInspector_UnknownClusterId_Detection(t *testing.T) {
 			notification, ok := args[0].(*p2p.InvCtrlMsgNotif)
 			require.True(t, ok)
 			require.Equal(t, spammer.SpammerNode.Host().ID(), notification.PeerID)
-			for ctlMsgType, notifErr := range notification.Errors() {
-				require.True(t, channels.IsUnknownClusterIDErr(notifErr))
-				switch ctlMsgType {
-				case p2pmsg.CtrlMsgGraft:
-					invGraftNotifCount.Inc()
-				case p2pmsg.CtrlMsgPrune:
-					invPruneNotifCount.Inc()
-				default:
-					require.Fail(t, fmt.Sprintf("unexpected control message type %s error: %s", ctlMsgType, notifErr))
-				}
+			require.True(t, channels.IsUnknownClusterIDErr(notification.Error))
+			switch notification.CtlMsgType {
+			case p2pmsg.CtrlMsgGraft:
+				invGraftNotifCount.Inc()
+			case p2pmsg.CtrlMsgPrune:
+				invPruneNotifCount.Inc()
+			default:
+				require.Fail(t, fmt.Sprintf("unexpected control message type %s error: %s", notification.CtlMsgType, notification.Error))
 			}
+
 			if count.Load() == int64(expectedNumOfTotalNotif) {
 				close(done)
 			}
@@ -499,11 +491,10 @@ func TestValidationInspector_ActiveClusterIdsNotSet_Graft_Detection(t *testing.T
 			notification, ok := args[0].(*p2p.InvCtrlMsgNotif)
 			require.True(t, ok)
 			require.Equal(t, spammer.SpammerNode.Host().ID(), notification.PeerID)
-			for ctlMsgType, notifErr := range notification.Errors() {
-				require.True(t, validation.IsErrActiveClusterIDsNotSet(notifErr))
-				require.True(t, ctlMsgType == p2pmsg.CtrlMsgGraft, fmt.Sprintf("unexpected control message type %s error: %s", ctlMsgType, notifErr))
-				invGraftNotifCount.Inc()
-			}
+			require.True(t, validation.IsErrActiveClusterIDsNotSet(notification.Error))
+			require.True(t, notification.CtlMsgType == p2pmsg.CtrlMsgGraft, fmt.Sprintf("unexpected control message type %s error: %s", notification.CtlMsgType, notification.Error))
+			invGraftNotifCount.Inc()
+
 			if count.Load() == int64(expectedNumOfTotalNotif) {
 				close(done)
 			}
@@ -588,11 +579,10 @@ func TestValidationInspector_ActiveClusterIdsNotSet_Prune_Detection(t *testing.T
 			notification, ok := args[0].(*p2p.InvCtrlMsgNotif)
 			require.True(t, ok)
 			require.Equal(t, spammer.SpammerNode.Host().ID(), notification.PeerID)
-			for ctlMsgType, notifErr := range notification.Errors() {
-				require.True(t, validation.IsErrActiveClusterIDsNotSet(notifErr))
-				require.True(t, ctlMsgType == p2pmsg.CtrlMsgPrune, fmt.Sprintf("unexpected control message type %s error: %s", ctlMsgType, notifErr))
-				invPruneNotifCount.Inc()
-			}
+			require.True(t, validation.IsErrActiveClusterIDsNotSet(notification.Error))
+			require.True(t, notification.CtlMsgType == p2pmsg.CtrlMsgPrune, fmt.Sprintf("unexpected control message type %s error: %s", notification.CtlMsgType, notification.Error))
+			invPruneNotifCount.Inc()
+
 			if count.Load() == int64(expectedNumOfTotalNotif) {
 				close(done)
 			}
@@ -683,17 +673,16 @@ func TestValidationInspector_UnstakedNode_Detection(t *testing.T) {
 			notification, ok := args[0].(*p2p.InvCtrlMsgNotif)
 			require.True(t, ok)
 			require.Equal(t, spammer.SpammerNode.Host().ID(), notification.PeerID)
-			for ctlMsgType, notifErr := range notification.Errors() {
-				require.True(t, validation.IsErrUnstakedPeer(notifErr))
-				switch ctlMsgType {
-				case p2pmsg.CtrlMsgGraft:
-					invGraftNotifCount.Inc()
-				case p2pmsg.CtrlMsgPrune:
-					invPruneNotifCount.Inc()
-				default:
-					require.Fail(t, fmt.Sprintf("unexpected control message type %s error: %s", ctlMsgType, notifErr))
-				}
+			require.True(t, validation.IsErrUnstakedPeer(notification.Error))
+			switch notification.CtlMsgType {
+			case p2pmsg.CtrlMsgGraft:
+				invGraftNotifCount.Inc()
+			case p2pmsg.CtrlMsgPrune:
+				invPruneNotifCount.Inc()
+			default:
+				require.Fail(t, fmt.Sprintf("unexpected control message type %s error: %s", notification.CtlMsgType, notification.Error))
 			}
+
 			if count.Load() == int64(expectedNumOfTotalNotif) {
 				close(done)
 			}
@@ -782,10 +771,8 @@ func TestValidationInspector_InspectIWants_CacheMissThreshold(t *testing.T) {
 			notification, ok := args[0].(*p2p.InvCtrlMsgNotif)
 			require.True(t, ok)
 			require.Equal(t, spammer.SpammerNode.Host().ID(), notification.PeerID)
-			for ctlMsgType, notifErr := range notification.Errors() {
-				require.True(t, ctlMsgType == p2pmsg.CtrlMsgIWant, fmt.Sprintf("unexpected control message type %s error: %s", ctlMsgType, notifErr))
-				require.True(t, validation.IsIWantCacheMissThresholdErr(notifErr))
-			}
+			require.True(t, notification.CtlMsgType == p2pmsg.CtrlMsgIWant, fmt.Sprintf("unexpected control message type %s error: %s", notification.CtlMsgType, notification.Error))
+			require.True(t, validation.IsIWantCacheMissThresholdErr(notification.Error))
 
 			cacheMissThresholdNotifCount.Inc()
 			if cacheMissThresholdNotifCount.Load() == 1 {
@@ -882,10 +869,8 @@ func TestValidationInspector_InspectIWants_DuplicateMsgIDThreshold(t *testing.T)
 			notification, ok := args[0].(*p2p.InvCtrlMsgNotif)
 			require.True(t, ok)
 			require.Equal(t, spammer.SpammerNode.Host().ID(), notification.PeerID)
-			for ctlMsgType, notifErr := range notification.Errors() {
-				require.True(t, ctlMsgType == p2pmsg.CtrlMsgIWant, fmt.Sprintf("unexpected control message type %s error: %s", ctlMsgType, notifErr))
-				require.True(t, validation.IsIWantDuplicateMsgIDThresholdErr(notifErr))
-			}
+			require.True(t, notification.CtlMsgType == p2pmsg.CtrlMsgIWant, fmt.Sprintf("unexpected control message type %s error: %s", notification.CtlMsgType, notification.Error))
+			require.True(t, validation.IsIWantDuplicateMsgIDThresholdErr(notification.Error))
 		}
 	}
 

@@ -1,7 +1,6 @@
 package p2p
 
 import (
-	"github.com/hashicorp/go-multierror"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/libp2p/go-libp2p/core/peer"
 
@@ -25,38 +24,23 @@ type GossipSubInspectorNotifDistributor interface {
 	AddConsumer(GossipSubInvCtrlMsgNotifConsumer)
 }
 
-// ControlMessageTypeErrs map of control message type => error used to track all errors encountered during a single RPC inspection.
-type ControlMessageTypeErrs map[p2pmsg.ControlMessageType]error
-
-// Error returns all errors in a single error.
-func (m ControlMessageTypeErrs) Error() error {
-	var errs *multierror.Error
-	for _, err := range m {
-		errs = multierror.Append(errs, err)
-	}
-	return errs.ErrorOrNil()
-}
-
 // InvCtrlMsgNotif is the notification sent to the consumer when an invalid control message is received.
 // It models the information that is available to the consumer about a misbehaving peer.
 type InvCtrlMsgNotif struct {
 	// PeerID is the ID of the peer that sent the invalid control message.
 	PeerID peer.ID
-	// errs map of control message type -> error encountered during validation. Validation is immediately halted for a control message type
-	// when an error is encountered, thus we can expect a single error mapped to each control message type if one was encountered.
-	errs ControlMessageTypeErrs
-}
-
-// Errors returns the notification errors
-func (notif *InvCtrlMsgNotif) Errors() ControlMessageTypeErrs {
-	return notif.errs
+	// Error the error that occurred during validation.
+	Error error
+	// CtlMsgType the control message type.
+	CtlMsgType p2pmsg.ControlMessageType
 }
 
 // NewInvalidControlMessageNotification returns a new *InvCtrlMsgNotif
-func NewInvalidControlMessageNotification(peerID peer.ID, errs ControlMessageTypeErrs) *InvCtrlMsgNotif {
+func NewInvalidControlMessageNotification(peerID peer.ID, ctlMshType p2pmsg.ControlMessageType, err error) *InvCtrlMsgNotif {
 	return &InvCtrlMsgNotif{
-		PeerID: peerID,
-		errs:   errs,
+		PeerID:     peerID,
+		Error:      err,
+		CtlMsgType: ctlMshType,
 	}
 }
 
