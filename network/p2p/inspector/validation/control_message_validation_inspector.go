@@ -242,7 +242,7 @@ func (c *ControlMsgValidationInspector) inspectGraft(from peer.ID, grafts []*pub
 	if totalGrafts == 0 {
 		return nil
 	}
-	sampleSize := c.config.ControlMessageMaxSampleSize
+	sampleSize := c.config.GraftPruneMessageMaxSampleSize
 	if sampleSize > totalGrafts {
 		sampleSize = totalGrafts
 	}
@@ -283,7 +283,7 @@ func (c *ControlMsgValidationInspector) inspectPrune(from peer.ID, prunes []*pub
 	if totalPrunes == 0 {
 		return nil
 	}
-	sampleSize := c.config.ControlMessageMaxSampleSize
+	sampleSize := c.config.GraftPruneMessageMaxSampleSize
 	if sampleSize > totalPrunes {
 		sampleSize = totalPrunes
 	}

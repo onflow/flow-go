@@ -87,8 +87,9 @@ network-config:
   gossipsub-rpc-ihave-max-message-id-sample-size: 3000
   # Max number of control messages in a sample to be inspected when inspecting GRAFT and PRUNE message types. If the total number of control messages (GRAFT or PRUNE)
   # exceeds this max sample size then the respective message will be truncated before being processed.
-  gossipsub-rpc-control-message-max-sample-size: 1000
-  # Max number of iwant messages in a sample to be inspected
+  gossipsub-rpc-graft-and-prune-message-max-sample-size: 1000
+  # Max number of iwant messages in a sample to be inspected. If the total number of iWant control messages
+  # exceeds this max sample size then the respective message will be truncated before being processed.
   gossipsub-rpc-iwant-max-sample-size: 1_000_000
   # The allowed threshold of iWant messages received without a corresponding tracked iHave message that was sent. If the cache miss threshold is exceeded an
   # invalid control message notification is disseminated and the sender will be penalized.

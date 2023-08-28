@@ -19,25 +19,31 @@ type GossipSubRPCValidationInspectorConfigs struct {
 	NumberOfWorkers int `validate:"gte=1" mapstructure:"gossipsub-rpc-validation-inspector-workers"`
 	// CacheSize size of the queue used by worker pool for the control message validation inspector.
 	CacheSize uint32 `validate:"gte=100" mapstructure:"gossipsub-rpc-validation-inspector-queue-cache-size"`
-	// ControlMessageMaxSampleSize the max sample size used for control message validation of GRAFT and PRUNE.
-	ControlMessageMaxSampleSize int `validate:"gte=1000" mapstructure:"gossipsub-rpc-control-message-max-sample-size"`
+	// GraftPruneMessageMaxSampleSize the max sample size used for control message validation of GRAFT and PRUNE. If the total number of control messages (GRAFT or PRUNE)
+	// exceeds this max sample size then the respective message will be truncated before being processed.
+	GraftPruneMessageMaxSampleSize int `validate:"gte=1000" mapstructure:"gossipsub-rpc-graft-and-prune-message-max-sample-size"`
 }
 
 // IWantRPCInspectionConfig validation configuration for iWANT RPC control messages.
 type IWantRPCInspectionConfig struct {
-	// MaxSampleSize max inspection sample size to use.
+	// MaxSampleSize max inspection sample size to use. If the total number of iWant control messages
+	// exceeds this max sample size then the respective message will be truncated before being processed.
 	MaxSampleSize uint `validate:"gt=0" mapstructure:"gossipsub-rpc-iwant-max-sample-size"`
 	// CacheMissThreshold the threshold of missing corresponding iHave messages for iWant messages received before an invalid control message notification is disseminated.
+	// If the cache miss threshold is exceeded an invalid control message notification is disseminated and the sender will be penalized.
 	CacheMissThreshold float64 `validate:"gt=0" mapstructure:"gossipsub-rpc-iwant-cache-miss-threshold"`
 	// DuplicateMsgIDThreshold maximum allowed duplicate message IDs in a single iWant control message.
+	// If the duplicate message threshold is exceeded an invalid control message notification is disseminated and the sender will be penalized.
 	DuplicateMsgIDThreshold float64 `validate:"gt=0" mapstructure:"gossipsub-rpc-iwant-duplicate-message-id-threshold"`
 }
 
 // IHaveRPCInspectionConfig validation configuration for iHave RPC control messages.
 type IHaveRPCInspectionConfig struct {
-	// MaxSampleSize max inspection sample size to use.
+	// MaxSampleSize max inspection sample size to use. If the number of ihave messages exceeds this configured value
+	// the control message ihaves will be truncated to the max sample size. This sample is randomly selected.
 	MaxSampleSize int `validate:"gte=5000" mapstructure:"gossipsub-rpc-ihave-max-sample-size"`
-	// MaxMessageIDSampleSize max inspection sample size to use for iHave message ids.
+	// MaxMessageIDSampleSize max inspection sample size to use for iHave message ids. Each ihave message includes a list of message ids
+	// each, if the size of this list exceeds the configured max message id sample size the list of message ids will be truncated.
 	MaxMessageIDSampleSize int `validate:"gte=3000" mapstructure:"gossipsub-rpc-ihave-max-message-id-sample-size"`
 }
 
