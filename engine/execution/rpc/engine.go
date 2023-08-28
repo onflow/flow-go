@@ -247,7 +247,7 @@ func (h *handler) GetEventsForBlockIDs(
 	}
 
 	if len(blockIDs) > h.maxBlockRange {
-		return nil, status.Errorf(codes.InvalidArgument, "too many block IDs requested")
+		return nil, status.Errorf(codes.InvalidArgument, "too many block IDs requested: %d > %d", len(blockIDs), h.maxBlockRange)
 	}
 
 	results := make([]*execution.GetEventsForBlockIDsResponse_Result, len(blockIDs))
