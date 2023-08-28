@@ -116,7 +116,7 @@ func TestGeometricDecay(t *testing.T) {
 			wantErr: fmt.Errorf("last updated time cannot be in the future"),
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got, err := scoring.GeometricDecay(tt.args.penalty, tt.args.decay, tt.args.lastUpdated)
