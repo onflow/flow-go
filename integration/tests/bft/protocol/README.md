@@ -12,7 +12,7 @@ The entire suite assures that the disallow-listing command behaves as intended, 
 
 ## Wintermute Attack Test
 The `WintermuteTestSuite` in the `wintermute` package is focused on validating a specific attack scenario within the network, termed the "wintermute attack." 
-This attack involves an Attack Orchestrator corrupting an execution result and then leveraging corrupted verification nodes to verify it.
+This attack involves an Attack Orchestrator corrupting an execution result and then leveraging corrupt verification nodes to verify it.
 The suite includes a constant timeout to define the attack window and a detailed test sequence.
 The `TestWintermuteAttack` method carries out the attack process. 
 It first waits for an execution result to be corrupted and identifies the corresponding victim block. 
