@@ -12,6 +12,8 @@ import (
 	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/engine/execution"
 	"github.com/onflow/flow-go/engine/execution/computation/result"
+	exeState "github.com/onflow/flow-go/engine/execution/state"
+	"github.com/onflow/flow-go/engine/execution/storehouse"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/meter"
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
@@ -32,6 +34,7 @@ type ViewCommitter interface {
 	CommitView(
 		*snapshot.ExecutionSnapshot,
 		flow.StateCommitment,
+		snapshot.StorageSnapshot,
 	) (
 		flow.StateCommitment,
 		[]byte,
@@ -79,9 +82,10 @@ type resultCollector struct {
 	blockStats     module.ExecutionResultStats
 	blockMeter     *meter.Meter
 
-	currentCollectionStartTime time.Time
-	currentCollectionState     *state.ExecutionState
-	currentCollectionStats     module.ExecutionResultStats
+	currentCollectionStartTime       time.Time
+	currentCollectionState           *state.ExecutionState
+	currentCollectionStats           module.ExecutionResultStats
+	currentCollectionStorageSnapshot *storehouse.BlockStorageSnapshot
 }
 
 func newResultCollector(
@@ -122,6 +126,12 @@ func newResultCollector(
 		currentCollectionStats: module.ExecutionResultStats{
 			NumberOfCollections: 1,
 		},
+		currentCollectionStorageSnapshot: storehouse.NewBlockStorageSnapshot(
+			*block.StartState,
+			block.ID(),
+			block.Block.Header.Height,
+			nil, // the base snapshot has no change
+		),
 	}
 
 	go collector.runResultProcessor()
@@ -139,12 +149,18 @@ func (collector *resultCollector) commitCollection(
 		trace.EXECommitDelta).End()
 
 	startState := collector.result.CurrentEndState()
-	// baseStorageSnapshot := collector.result.CurrentStorageSnapshot()
 	endState, proof, trieUpdate, err := collector.committer.CommitView(
 		collectionExecutionSnapshot,
-		startState)
+		startState,
+		collector.currentCollectionStorageSnapshot,
+	)
 	if err != nil {
 		return fmt.Errorf("commit view failed: %w", err)
+	}
+
+	err = collector.mergeTrieUpdate(endState, trieUpdate)
+	if err != nil {
+		return fmt.Errorf("merge trie update failed endState %v: %w", endState, err)
 	}
 
 	execColRes := collector.result.CollectionExecutionResultAt(collection.collectionIndex)
@@ -217,6 +233,60 @@ func (collector *resultCollector) commitCollection(
 			return fmt.Errorf("consumer failed: %w", err)
 		}
 	}
+
+	return nil
+}
+
+// TODO: move it
+func KeyToRegisterID(key ledger.Key) (flow.RegisterID, error) {
+	if len(key.KeyParts) != 2 ||
+		key.KeyParts[0].Type != exeState.KeyPartOwner ||
+		key.KeyParts[1].Type != exeState.KeyPartKey {
+		return flow.RegisterID{}, fmt.Errorf("key not in expected format %s", key.String())
+	}
+
+	return flow.NewRegisterID(
+		string(key.KeyParts[0].Value),
+		string(key.KeyParts[1].Value),
+	), nil
+}
+
+// TODO: move it
+func PayloadToRegister(payload *ledger.Payload) (flow.RegisterID, flow.RegisterValue, error) {
+	key, err := payload.Key()
+	if err != nil {
+		return flow.RegisterID{}, flow.RegisterValue{}, fmt.Errorf("could not parse register key from payload: %w", err)
+	}
+	regID, err := KeyToRegisterID(key)
+	if err != nil {
+		return flow.RegisterID{}, flow.RegisterValue{}, fmt.Errorf("could not parse register key from payload: %w", err)
+	}
+
+	return regID, payload.Value(), nil
+
+}
+
+func (collector *resultCollector) mergeTrieUpdate(
+	commitment flow.StateCommitment,
+	trieUpdate *ledger.TrieUpdate,
+) error {
+
+	base := collector.currentCollectionStorageSnapshot.RegisterUpdates()
+	for _, payload := range trieUpdate.Payloads {
+		regID, regValue, err := PayloadToRegister(payload)
+		if err != nil {
+			return fmt.Errorf("could not parse register key from payload: %w", err)
+		}
+		base[regID] = regValue
+	}
+
+	// TODO: reuse readCache?
+	collector.currentCollectionStorageSnapshot = storehouse.NewBlockStorageSnapshot(
+		commitment,
+		collector.currentCollectionStorageSnapshot.BlockID(),
+		collector.currentCollectionStorageSnapshot.Height(),
+		base,
+	)
 
 	return nil
 }
