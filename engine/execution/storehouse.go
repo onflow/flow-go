@@ -44,11 +44,6 @@ type FinalizedReader interface {
 	GetFinalizedBlockIDAtHeight(height uint64) (flow.Identifier, error)
 }
 
-type RegisterStaging interface {
-	StageRegisters(blockID flow.Identifier, startState flow.StateCommitment, registers []flow.RegisterEntry) error
-	Finalize() error
-}
-
 type InMemoryRegisterStore interface {
 	// Init with last finalized and executed height, which will be set as pruned height
 	InitWithLatestHeight(height uint64) error
@@ -176,7 +171,7 @@ type collectionInfo struct {
 }
 
 type ResultCollector interface {
-	// Depend on ViewCommiter
+	// Depend on ViewCommiter.CommitView
 	CommitCollection(
 		collection collectionInfo,
 		startTime time.Time,
@@ -203,6 +198,8 @@ type ViewCommiter interface {
 	CommitView(
 		*snapshot.ExecutionSnapshot,
 		flow.StateCommitment,
+		// caller will create a new baseStorageSnapshot with trie updates up to the previous state
+		snapshot.StorageSnapshot,
 	) (
 		flow.StateCommitment,
 		[]byte, // proof

@@ -34,8 +34,7 @@ func NewLedgerViewCommitter(
 func (committer *LedgerViewCommitter) CommitView(
 	snapshot *snapshot.ExecutionSnapshot,
 	baseState flow.StateCommitment,
-	// caller will create a new baseStorageSnapshot with trie updates up to the previous state
-	// baseStorageSnapshot snapshot.StorageSnapshot,
+	baseStorageSnapshot *snapshot.StorageSnapshot,
 ) (
 	newCommit flow.StateCommitment,
 	proof []byte,
@@ -48,7 +47,6 @@ func (committer *LedgerViewCommitter) CommitView(
 	wg.Add(1)
 	go func() {
 		proof, err2 = committer.collectProofs(snapshot, baseState)
-		// proof, err2 = committer.collectProofs(snapshot, baseState, baseStorageSnapshot)
 		wg.Done()
 	}()
 
