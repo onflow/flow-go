@@ -528,7 +528,7 @@ func (e *Engine) validateSyncRequestForALSP(channel channels.Channel, originID f
 	if float32(n) < e.spamReportConfig.syncRequestProbability*spamProbabilityMultiplier {
 		// create a misbehavior report
 		e.log.Info().Str("originID", originID.String()).Msg("creating misbehavior report")
-		report, err := alsp.NewMisbehaviorReport(originID, alsp.PotentialSpam)
+		report, err := alsp.NewMisbehaviorReport(originID, alsp.ResourceIntensiveRequest)
 
 		if err != nil {
 			// failing to create the misbehavior report is unlikely. If an error is encountered while
