@@ -144,7 +144,16 @@ func TestInvalidCtrlMsgScoringIntegration(t *testing.T) {
 	}
 
 	// checks no GossipSub message exchange should no longer happen between node1 and node2.
-	p2ptest.EnsureNoPubsubExchangeBetweenGroups(t, ctx, []p2p.LibP2PNode{node1}, []p2p.LibP2PNode{node2}, blockTopic, 1, func() interface{} {
-		return unittest.ProposalFixture()
-	})
+	p2ptest.EnsureNoPubsubExchangeBetweenGroups(
+		t,
+		ctx,
+		[]p2p.LibP2PNode{node1},
+		flow.IdentifierList{id1.NodeID},
+		[]p2p.LibP2PNode{node2},
+		flow.IdentifierList{id2.NodeID},
+		blockTopic,
+		1,
+		func() interface{} {
+			return unittest.ProposalFixture()
+		})
 }
