@@ -6,7 +6,7 @@ The `TopicValidatorTestSuite` in the `topicvalidator` package is specifically de
 libp2p topic validator within a network scenario.
 This suite includes an end-to-end test to verify the topic validator's behavior in different situations, 
 focusing on both unauthorized and authorized message handling.
-The method `TestTopicValidatorE2E` is a comprehensive test that mimics an environment with a corrupted byzantine attacker node 
+The method `TestTopicValidatorE2E` is a comprehensive test that mimics an environment with a corrupt byzantine attacker node
 attempting to send unauthorized messages to a victim node. 
 These messages should be dropped by the topic validator, as they fail the message authorization validation. 
 The test simultaneously sends authorized messages to the victim node, ensuring that they are processed correctly, 
