@@ -518,6 +518,7 @@ func (e *Engine) validateSyncRequestForALSP(channel channels.Channel, originID f
 		// generating a random number it indicates a bug and processing can not proceed.
 		e.log.Fatal().
 			Err(err).
+			Bool(logging.KeyNetworkingSecurity, true).
 			Str("originID", originID.String()).
 			Msg("failed to generate random number")
 	}
@@ -534,6 +535,7 @@ func (e *Engine) validateSyncRequestForALSP(channel channels.Channel, originID f
 			// creating the misbehavior report it indicates a bug and processing can not proceed.
 			e.log.Fatal().
 				Err(err).
+				Bool(logging.KeyNetworkingSecurity, true).
 				Str("originID", originID.String()).
 				Msg("failed to create misbehavior report")
 		}
