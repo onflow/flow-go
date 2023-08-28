@@ -39,8 +39,6 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-var sporkID = unittest.IdentifierFixture()
-
 // RateLimitConsumer p2p.RateLimiterConsumer fixture that invokes a callback when rate limit event is consumed.
 type RateLimitConsumer struct {
 	callback func(pid peer.ID, role, msgType, topic, reason string) // callback func that will be invoked on rate limit
@@ -119,44 +117,32 @@ func NewTagWatchingConnManager(log zerolog.Logger, metrics module.LibP2PConnecti
 // Args:
 //
 //	t: testing.T- the test object
+//	sporkId: flow.Identifier - the spork id to use for the nodes
+//	n: int - number of nodes to create
 //
-// n: int - number of nodes to create
 // opts: []p2ptest.NodeFixtureParameterOption - options to configure the nodes
 // Returns:
 //
 //	flow.IdentityList - list of identities created for the nodes, one for each node.
 //
 // []p2p.LibP2PNode - list of libp2p nodes created.
-// []observable.Observable - list of observables created for each node.
-func LibP2PNodeForMiddlewareFixture(t *testing.T, n int, opts ...p2ptest.NodeFixtureParameterOption) (flow.IdentityList, []p2p.LibP2PNode, []observable.Observable) {
-
+func LibP2PNodeForMiddlewareFixture(t *testing.T, sporkId flow.Identifier, n int, opts ...p2ptest.NodeFixtureParameterOption) (flow.IdentityList, []p2p.LibP2PNode) {
 	libP2PNodes := make([]p2p.LibP2PNode, 0)
 	identities := make(flow.IdentityList, 0)
-	tagObservables := make([]observable.Observable, 0)
 	idProvider := unittest.NewUpdatableIDProvider(flow.IdentityList{})
-	defaultFlowConfig, err := config.DefaultConfig()
-	require.NoError(t, err)
-
 	opts = append(opts, p2ptest.WithUnicastHandlerFunc(nil))
 
 	for i := 0; i < n; i++ {
-		// TODO: generating a tag watching connection manager can be moved to a separate function, as only a few tests need this.
-		// For the rest of tests, the node can run on the default connection manager without setting and option.
-		connManager, err := NewTagWatchingConnManager(unittest.Logger(), metrics.NewNoopCollector(), &defaultFlowConfig.NetworkConfig.ConnectionManagerConfig)
-		require.NoError(t, err)
-
-		opts = append(opts, p2ptest.WithConnectionManager(connManager))
 		node, nodeId := p2ptest.NodeFixture(t,
-			sporkID,
+			sporkId,
 			t.Name(),
 			idProvider,
 			opts...)
 		libP2PNodes = append(libP2PNodes, node)
 		identities = append(identities, &nodeId)
-		tagObservables = append(tagObservables, connManager)
 	}
 	idProvider.SetIdentities(identities)
-	return identities, libP2PNodes, tagObservables
+	return identities, libP2PNodes
 }
 
 // MiddlewareConfigFixture is a test helper that generates a middleware config for testing.
@@ -164,11 +150,11 @@ func LibP2PNodeForMiddlewareFixture(t *testing.T, n int, opts ...p2ptest.NodeFix
 // - t: the test instance.
 // Returns:
 // - a middleware config.
-func MiddlewareConfigFixture(t *testing.T) *middleware.Config {
+func MiddlewareConfigFixture(t *testing.T, sporkId flow.Identifier) *middleware.Config {
 	return &middleware.Config{
 		Logger:                unittest.Logger(),
 		BitSwapMetrics:        metrics.NewNoopCollector(),
-		RootBlockID:           sporkID,
+		SporkId:               sporkId,
 		UnicastMessageTimeout: middleware.DefaultUnicastTimeout,
 		Codec:                 unittest.NetworkCodec(),
 	}
@@ -205,6 +191,7 @@ func MiddlewareFixtures(t *testing.T, identities flow.IdentityList, libP2PNodes 
 
 // NetworksFixture generates the network for the given middlewares
 func NetworksFixture(t *testing.T,
+	sporkId flow.Identifier,
 	ids flow.IdentityList,
 	mws []network.Middleware) []network.Network {
 
@@ -213,7 +200,7 @@ func NetworksFixture(t *testing.T,
 
 	for i := 0; i < count; i++ {
 
-		params := NetworkConfigFixture(t, *ids[i], ids, mws[i])
+		params := NetworkConfigFixture(t, *ids[i], ids, sporkId, mws[i])
 		net, err := p2p.NewNetwork(params)
 		require.NoError(t, err)
 
@@ -227,6 +214,7 @@ func NetworkConfigFixture(
 	t *testing.T,
 	myId flow.Identity,
 	allIds flow.IdentityList,
+	sporkId flow.Identifier,
 	mw network.Middleware,
 	opts ...p2p.NetworkConfigOption) *p2p.NetworkConfig {
 
@@ -254,6 +242,7 @@ func NetworkConfigFixture(
 		IdentityProvider:    id.NewFixedIdentityProvider(allIds),
 		ReceiveCache:        receiveCache,
 		ConduitFactory:      conduit.NewDefaultConduitFactory(),
+		SporkId:             sporkId,
 		AlspCfg: &alspmgr.MisbehaviorReportManagerConfig{
 			Logger:                  unittest.Logger(),
 			SpamRecordCacheSize:     defaultFlowConfig.NetworkConfig.AlspConfig.SpamRecordCacheSize,
