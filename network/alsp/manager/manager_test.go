@@ -307,11 +307,28 @@ func TestHandleReportedMisbehavior_And_SlashingViolationsConsumer_Integration(t 
 	// create 1 victim node, 1 honest node and a node for each slashing violation
 	ids, nodes := testutils.LibP2PNodeForMiddlewareFixture(t, sporkId, 7) // creates 7 nodes (1 victim, 1 honest, 5 spammer nodes one for each slashing violation).
 	idProvider := id.NewFixedIdentityProvider(ids)
+
+	// we want to override the middleware config to use the slashing violations consumer. However, we need the network
+	// instance to do that, but for the network instance we need the middleware config. So, we create the adapter first, which
+	// is a placeholder for the network instance, and then we create the network instance with the middleware config.
+	// Network adapter is a sub-interface of the network instance, so we can use it as a placeholder for the network instance.
+	// This is a bit of a chicken and egg problem; you see! that is why we must get rid of the middleware soon!
+	var adapter network.Adapter
+	middlewareConfig := testutils.MiddlewareConfigFixture(t, sporkId)
+
+	// also a placeholder for the slashing violations consumer.
+	var violationsConsumer network.ViolationsConsumer
+	middlewareConfig.SlashingViolationConsumerFactory = func() network.ViolationsConsumer {
+		violationsConsumer = slashing.NewSlashingViolationsConsumer(unittest.Logger(), metrics.NewNoopCollector(), adapter)
+		return violationsConsumer
+	}
+
 	mws, _ := testutils.MiddlewareFixtures(
 		t,
 		ids,
 		nodes,
-		testutils.MiddlewareConfigFixture(t, sporkId))
+		middlewareConfig,
+	)
 	networkCfg := testutils.NetworkConfigFixture(
 		t,
 		*ids[0],
@@ -321,10 +338,7 @@ func TestHandleReportedMisbehavior_And_SlashingViolationsConsumer_Integration(t 
 		p2p.WithAlspConfig(managerCfgFixture(t)))
 	victimNetwork, err := p2p.NewNetwork(networkCfg)
 	require.NoError(t, err)
-
-	// create slashing violations consumer with victim node network providing the network.MisbehaviorReportConsumer interface
-	violationsConsumer := slashing.NewSlashingViolationsConsumer(unittest.Logger(), metrics.NewNoopCollector(), victimNetwork)
-	mws[0].SetSlashingViolationsConsumer(violationsConsumer)
+	adapter = victimNetwork
 
 	ctx, cancel := context.WithCancel(context.Background())
 	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
