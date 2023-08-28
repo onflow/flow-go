@@ -37,7 +37,7 @@ func (a *AdminCommandDisallowListTestSuite) TestAdminCommandDisallowList() {
 		fmt.Sprintf("expected to receive %d authorized events got: %d", numOfAuthorizedEvents, a.Orchestrator.expectedBlockedEventsReceived.Load()))
 
 	// after disallow-listing node (a.senderVN) we should not receive any messages from that node.
-	// This is an asynchronous process with a number of sub processes involved including not limited to;
+	// This is an asynchronous process with a number of sub processes involved including but not limited to:
 	// - submitting request to admin server for node to be disallow-listed.
 	// - node disallow-list must update.
 	// - peer manager needs to prune the connection (takes at least 1 second).
