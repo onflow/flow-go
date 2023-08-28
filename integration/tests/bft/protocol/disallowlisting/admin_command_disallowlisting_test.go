@@ -57,7 +57,7 @@ func (a *AdminCommandDisallowListTestSuite) TestAdminCommandDisallowList() {
 	// so we sleep this approximate amount of time to ensure all messages were attempted, processed and dropped.
 	time.Sleep(3 * time.Second)
 
-	// messages sent after the node is block listed are considered unauthorized, we don't expect to receive any of them.
+	// messages sent after the node is disallow-listed are considered unauthorized, we don't expect to receive any of them.
 	require.Equal(
 		a.T(),
 		int64(0),
