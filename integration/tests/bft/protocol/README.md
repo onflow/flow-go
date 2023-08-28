@@ -16,7 +16,7 @@ This attack involves an Attack Orchestrator corrupting an execution result and t
 The suite includes a constant timeout to define the attack window and a detailed test sequence.
 The `TestWintermuteAttack` method carries out the attack process. 
 It first waits for an execution result to be corrupted and identifies the corresponding victim block. 
-It ensures that the corrupted execution nodes generate the correct result for the victim block and then waits for a specific number of approvals from corrupted verification nodes for each chunk of the corrupted result.
+It ensures that the corrupt execution nodes generate the correct result for the victim block and then waits for a specific number of approvals from corrupt verification nodes for each chunk of the corrupted result.
 Further, the test waits for a block height equal to the victim block height to be sealed and verifies that the original victim block is correctly identified. 
 Additional methods and logging information assist in detailing and controlling the flow of the attack.
 The entire suite is instrumental in evaluating the system's behavior under this specific attack condition and ensuring that the expected actions and responses are observed.
