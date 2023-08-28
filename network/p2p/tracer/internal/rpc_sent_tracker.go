@@ -127,6 +127,11 @@ func (t *RPCSentTracker) rpcSentWorkerLogic(work trackableRPC) error {
 	return nil
 }
 
+// updateLastHighestIHaveRPCSize updates the last highest if the provided size is larger than the current last highest or the reset interval has passed.
+// Args:
+// - size: size that was cached.
+// Returns:
+// - int64: the last highest size.
 func (t *RPCSentTracker) updateLastHighestIHaveRPCSize(size int64) int64 {
 	t.Lock()
 	defer t.Unlock()
