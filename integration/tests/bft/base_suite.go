@@ -65,7 +65,7 @@ func (b *BaseSuite) SetupSuite() {
 		b.NodeConfigs = append(b.NodeConfigs, nodeConfig)
 	}
 
-	// setup verification nodes
+	// setup single verification node
 	b.NodeConfigs = append(b.NodeConfigs,
 		testnet.NewNodeConfig(flow.RoleVerification, testnet.WithLogLevel(zerolog.FatalLevel)),
 	)
