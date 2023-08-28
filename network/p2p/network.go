@@ -148,6 +148,14 @@ func WithAlspConfig(cfg *alspmgr.MisbehaviorReportManagerConfig) NetworkConfigOp
 	}
 }
 
+// WithCodec overrides the default codec (i.e., encoder and decoder). It is mostly used for testing purposes.
+// Note: do not override the default codec in production unless you know what you are doing.
+func WithCodec(codec network.Codec) NetworkConfigOption {
+	return func(params *NetworkConfig) {
+		params.Codec = codec
+	}
+}
+
 // NetworkOption is a function that can be used to override network attributes.
 // It is mostly used for testing purposes.
 // Note: do not override network attributes in production unless you know what you are doing.

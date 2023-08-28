@@ -206,7 +206,8 @@ func MiddlewareFixtures(
 func NetworksFixture(t *testing.T,
 	sporkId flow.Identifier,
 	ids flow.IdentityList,
-	mws []network.Middleware) ([]network.Network, []*unittest.UpdatableIDProvider) {
+	mws []network.Middleware,
+	configOpts ...func(*p2p.NetworkConfig)) ([]network.Network, []*unittest.UpdatableIDProvider) {
 
 	count := len(ids)
 	nets := make([]network.Network, 0)
@@ -215,6 +216,11 @@ func NetworksFixture(t *testing.T,
 	for i := 0; i < count; i++ {
 		idProvider := unittest.NewUpdatableIDProvider(ids)
 		params := NetworkConfigFixture(t, *ids[i], idProvider, sporkId, mws[i])
+
+		for _, opt := range configOpts {
+			opt(params)
+		}
+
 		net, err := p2p.NewNetwork(params)
 		require.NoError(t, err)
 
