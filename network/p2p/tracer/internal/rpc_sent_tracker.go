@@ -141,6 +141,8 @@ func (t *RPCSentTracker) updateLastHighestIHaveRPCSize(size int64) int64 {
 // iHaveRPCSent caches a unique entity message ID for each message ID included in each rpc iHave control message.
 // Args:
 // - []*pb.ControlIHave: list of iHave control messages.
+// Returns:
+// - int: the number of message ids cached by the tracker.
 func (t *RPCSentTracker) iHaveRPCSent(iHaves []*pb.ControlIHave) int {
 	controlMsgType := p2pmsg.CtrlMsgIHave
 	messageIDCount := 0
