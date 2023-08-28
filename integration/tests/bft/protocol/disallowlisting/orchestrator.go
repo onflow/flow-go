@@ -17,9 +17,14 @@ import (
 
 const (
 	// numOfAuthorizedEvents number of events to send before disallow-listing the sender node via the disallow-list command.
+	// This threshold must be set to a low value to make the test conclude faster
+	// by waiting for fewer events, which is beneficial when running the test
 	numOfAuthorizedEvents = 5
 
 	// numOfUnauthorizedEvents number of events to send after disallow-listing the sender node via the disallow-list command.
+	// This threshold must be set to a low value to make the test conclude faster
+	// by waiting for fewer events, which is beneficial when running the test
+	// on an asynchronous network where event delivery can be unpredictable.
 	numOfUnauthorizedEvents = 5
 )
 
