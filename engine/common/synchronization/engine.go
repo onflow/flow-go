@@ -210,7 +210,11 @@ func (e *Engine) process(channel channels.Channel, originID flow.Identifier, eve
 		report, misbehavior := e.validateBatchRequestForALSP(channel, originID, event)
 		if misbehavior {
 			e.con.ReportMisbehavior(report) // report misbehavior to ALSP
-			e.log.Warn().Hex("origin_id", logging.ID(originID)).Str(logging.KeySuspicious, "true").Msgf("received invalid batch request from %x: %v", originID[:], misbehavior)
+			e.log.
+				Warn().
+				Hex("origin_id", logging.ID(originID)).
+				Str(logging.KeySuspicious, "true").
+				Msgf("received invalid batch request from %x: %v", originID[:], misbehavior)
 			e.metrics.InboundMessageDropped(metrics.EngineSynchronization, metrics.MessageBatchRequest)
 			return nil
 		}
@@ -219,7 +223,11 @@ func (e *Engine) process(channel channels.Channel, originID flow.Identifier, eve
 		report, misbehavior := e.validateRangeRequestForALSP(channel, originID, event)
 		if misbehavior {
 			e.con.ReportMisbehavior(report) // report misbehavior to ALSP
-			e.log.Warn().Hex("origin_id", logging.ID(originID)).Str(logging.KeySuspicious, "true").Msgf("received invalid range request from %x: %v", originID[:], misbehavior)
+			e.log.
+				Warn().
+				Hex("origin_id", logging.ID(originID)).
+				Str(logging.KeySuspicious, "true").
+				Msgf("received invalid range request from %x: %v", originID[:], misbehavior)
 			e.metrics.InboundMessageDropped(metrics.EngineSynchronization, metrics.MessageRangeRequest)
 			return nil
 		}
@@ -229,7 +237,11 @@ func (e *Engine) process(channel channels.Channel, originID flow.Identifier, eve
 		report, misbehavior := e.validateSyncRequestForALSP(channel, originID, event)
 		if misbehavior {
 			e.con.ReportMisbehavior(report) // report misbehavior to ALSP
-			e.log.Warn().Hex("origin_id", logging.ID(originID)).Str(logging.KeySuspicious, "true").Msgf("received invalid sync request from %x: %v", originID[:], misbehavior)
+			e.log.
+				Warn().
+				Hex("origin_id", logging.ID(originID)).
+				Str(logging.KeySuspicious, "true").
+				Msgf("received invalid sync request from %x: %v", originID[:], misbehavior)
 			e.metrics.InboundMessageDropped(metrics.EngineSynchronization, metrics.MessageSyncRequest)
 			return nil
 		}
@@ -239,7 +251,11 @@ func (e *Engine) process(channel channels.Channel, originID flow.Identifier, eve
 		report, misbehavior := e.validateBlockResponseForALSP(channel, originID, event)
 		if misbehavior {
 			e.con.ReportMisbehavior(report) // report misbehavior to ALSP
-			e.log.Warn().Hex("origin_id", logging.ID(originID)).Str(logging.KeySuspicious, "true").Msgf("received invalid block response from %x: %v", originID[:], misbehavior)
+			e.log.
+				Warn().
+				Hex("origin_id", logging.ID(originID)).
+				Str(logging.KeySuspicious, "true").
+				Msgf("received invalid block response from %x: %v", originID[:], misbehavior)
 			e.metrics.InboundMessageDropped(metrics.EngineSynchronization, metrics.MessageBlockResponse)
 			return nil
 		}
@@ -249,7 +265,11 @@ func (e *Engine) process(channel channels.Channel, originID flow.Identifier, eve
 		report, misbehavior := e.validateSyncResponseForALSP(channel, originID, event)
 		if misbehavior {
 			e.con.ReportMisbehavior(report) // report misbehavior to ALSP
-			e.log.Warn().Hex("origin_id", logging.ID(originID)).Str(logging.KeySuspicious, "true").Msgf("received invalid sync response from %x: %v", originID[:], misbehavior)
+			e.log.
+				Warn().
+				Hex("origin_id", logging.ID(originID)).
+				Str(logging.KeySuspicious, "true").
+				Msgf("received invalid sync response from %x: %v", originID[:], misbehavior)
 			e.metrics.InboundMessageDropped(metrics.EngineSynchronization, metrics.MessageSyncResponse)
 			return nil
 		}
