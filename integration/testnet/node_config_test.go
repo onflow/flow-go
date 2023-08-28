@@ -14,7 +14,7 @@ func TestFilter(t *testing.T) {
 		configs := testnet.NewNodeConfigSet(5, flow.RoleAccess)
 
 		filters := configs.Filter(func(n testnet.NodeConfig) bool { return n.Role == flow.RoleAccess })
-
+		assert.Len(t, filters, 5) // should exclude execution node
 		for _, config := range filters {
 			assert.Equal(t, flow.RoleAccess, config.Role)
 		}
