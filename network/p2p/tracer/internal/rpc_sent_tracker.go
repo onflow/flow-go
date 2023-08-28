@@ -169,7 +169,9 @@ func (t *RPCSentTracker) WasIHaveRPCSent(messageID string) bool {
 	return t.cache.has(messageID, p2pmsg.CtrlMsgIHave)
 }
 
-// LastHighestIHaveRPCSize returns the last highest size of iHaves sent in an rpc.
+// LastHighestIHaveRPCSize returns the last highest size of iHaves sent in a rpc.
+// Returns:
+// - int64: the last highest size.
 func (t *RPCSentTracker) LastHighestIHaveRPCSize() int64 {
 	t.RLock()
 	defer t.RUnlock()
