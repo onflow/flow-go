@@ -126,7 +126,7 @@ func TestValidationInspector_InvalidTopicId_Detection(t *testing.T) {
 	nodes := []p2p.LibP2PNode{victimNode, spammer.SpammerNode}
 	startNodesAndEnsureConnected(t, signalerCtx, nodes, sporkID)
 	spammer.Start(t)
-	defer stopTestComponents(t, cancel, nodes, validationInspector)
+	defer stopComponents(t, cancel, nodes, validationInspector)
 
 	// prepare to spam - generate control messages
 	graftCtlMsgsWithUnknownTopic := spammer.GenerateCtlMessages(int(controlMessageCount), corruptlibp2p.WithGraft(messageCount, unknownTopic.String()))
@@ -254,7 +254,7 @@ func TestValidationInspector_DuplicateTopicId_Detection(t *testing.T) {
 	nodes := []p2p.LibP2PNode{victimNode, spammer.SpammerNode}
 	startNodesAndEnsureConnected(t, signalerCtx, nodes, sporkID)
 	spammer.Start(t)
-	defer stopTestComponents(t, cancel, nodes, validationInspector)
+	defer stopComponents(t, cancel, nodes, validationInspector)
 
 	// prepare to spam - generate control messages
 	graftCtlMsgsDuplicateTopic := spammer.GenerateCtlMessages(int(controlMessageCount), corruptlibp2p.WithGraft(messageCount, duplicateTopic.String()))
@@ -346,7 +346,7 @@ func TestValidationInspector_IHaveDuplicateMessageId_Detection(t *testing.T) {
 	nodes := []p2p.LibP2PNode{victimNode, spammer.SpammerNode}
 	startNodesAndEnsureConnected(t, signalerCtx, nodes, sporkID)
 	spammer.Start(t)
-	defer stopTestComponents(t, cancel, nodes, validationInspector)
+	defer stopComponents(t, cancel, nodes, validationInspector)
 
 	// prepare to spam - generate control messages
 	pushBlocks := channels.Topic(fmt.Sprintf("%s/%s", channels.PushBlocks, sporkID))
@@ -459,7 +459,7 @@ func TestValidationInspector_UnknownClusterId_Detection(t *testing.T) {
 	nodes := []p2p.LibP2PNode{victimNode, spammer.SpammerNode}
 	startNodesAndEnsureConnected(t, signalerCtx, nodes, sporkID)
 	spammer.Start(t)
-	defer stopTestComponents(t, cancel, nodes, validationInspector)
+	defer stopComponents(t, cancel, nodes, validationInspector)
 
 	// prepare to spam - generate control messages
 	graftCtlMsgsDuplicateTopic := spammer.GenerateCtlMessages(int(controlMessageCount), corruptlibp2p.WithGraft(messageCount, unknownClusterID.String()))
@@ -550,7 +550,7 @@ func TestValidationInspector_ActiveClusterIdsNotSet_Graft_Detection(t *testing.T
 	nodes := []p2p.LibP2PNode{victimNode, spammer.SpammerNode}
 	startNodesAndEnsureConnected(t, signalerCtx, nodes, sporkID)
 	spammer.Start(t)
-	defer stopTestComponents(t, cancel, nodes, validationInspector)
+	defer stopComponents(t, cancel, nodes, validationInspector)
 	// generate multiple control messages with GRAFT's for randomly generated
 	// cluster prefixed channels, this ensures we do not encounter duplicate topic ID errors
 	ctlMsgs := spammer.GenerateCtlMessages(int(controlMessageCount),
@@ -639,7 +639,7 @@ func TestValidationInspector_ActiveClusterIdsNotSet_Prune_Detection(t *testing.T
 	nodes := []p2p.LibP2PNode{victimNode, spammer.SpammerNode}
 	startNodesAndEnsureConnected(t, signalerCtx, nodes, sporkID)
 	spammer.Start(t)
-	defer stopTestComponents(t, cancel, nodes, validationInspector)
+	defer stopComponents(t, cancel, nodes, validationInspector)
 	// generate multiple control messages with GRAFT's for randomly generated
 	// cluster prefixed channels, this ensures we do not encounter duplicate topic ID errors
 	ctlMsgs := spammer.GenerateCtlMessages(int(controlMessageCount),
@@ -744,7 +744,7 @@ func TestValidationInspector_UnstakedNode_Detection(t *testing.T) {
 	nodes := []p2p.LibP2PNode{victimNode, spammer.SpammerNode}
 	startNodesAndEnsureConnected(t, signalerCtx, nodes, sporkID)
 	spammer.Start(t)
-	defer stopTestComponents(t, cancel, nodes, validationInspector)
+	defer stopComponents(t, cancel, nodes, validationInspector)
 
 	// prepare to spam - generate control messages
 	graftCtlMsgsDuplicateTopic := spammer.GenerateCtlMessages(int(controlMessageCount), corruptlibp2p.WithGraft(messageCount, clusterIDTopic.String()))
@@ -844,7 +844,7 @@ func TestValidationInspector_InspectIWants_CacheMissThreshold(t *testing.T) {
 	startNodesAndEnsureConnected(t, signalerCtx, nodes, sporkID)
 	spammer.Start(t)
 	meshTracer.Start(signalerCtx)
-	defer stopTestComponents(t, cancel, nodes, validationInspector, meshTracer)
+	defer stopComponents(t, cancel, nodes, validationInspector, meshTracer)
 
 	// simulate tracking some message IDs
 	meshTracer.SendRPC(&pubsub.RPC{
@@ -939,7 +939,7 @@ func TestValidationInspector_InspectIWants_DuplicateMsgIDThreshold(t *testing.T)
 	startNodesAndEnsureConnected(t, signalerCtx, nodes, sporkID)
 	spammer.Start(t)
 	meshTracer.Start(signalerCtx)
-	defer stopTestComponents(t, cancel, nodes, validationInspector, meshTracer)
+	defer stopComponents(t, cancel, nodes, validationInspector, meshTracer)
 
 	// spam the victim with iWant message that contains 60% duplicate message ids more than the configured 50% allowed threshold
 	spammer.SpamControlMessage(t, victimNode, ctlMsg)

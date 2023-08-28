@@ -71,7 +71,7 @@ func TestMetricsInspector_ObserveRPC(t *testing.T) {
 	nodes := []p2p.LibP2PNode{victimNode, spammer.SpammerNode}
 	startNodesAndEnsureConnected(t, signalerCtx, nodes, sporkID)
 	spammer.Start(t)
-	defer stopTestComponents(t, cancel, nodes, metricsInspector)
+	defer stopComponents(t, cancel, nodes, metricsInspector)
 	// prepare to spam - generate control messages
 	ctlMsgs := spammer.GenerateCtlMessages(controlMessageCount,
 		corruptlibp2p.WithGraft(messageCount, channels.PushBlocks.String()),
