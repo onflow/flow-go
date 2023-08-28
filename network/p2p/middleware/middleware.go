@@ -295,11 +295,6 @@ func (m *Middleware) SetOverlay(ov network.Overlay) {
 	m.ov = ov
 }
 
-// SetSlashingViolationsConsumer sets the slashing violations consumer.
-func (m *Middleware) SetSlashingViolationsConsumer(consumer network.ViolationsConsumer) {
-	m.slashingViolationsConsumer = consumer
-}
-
 // authorizedPeers is a peer manager callback used by the underlying libp2p node that updates who can connect to this node (as
 // well as who this node can connect to).
 // and who is not allowed to connect to this node. This function is called by the peer manager and connection gater components
