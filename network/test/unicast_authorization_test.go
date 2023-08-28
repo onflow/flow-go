@@ -145,24 +145,12 @@ func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_UnstakedPeer() 
 		close(u.waitCh)
 	})
 
-	//overlay := mocknetwork.NewOverlay(u.T())
-	//overlay.On("Identities").Maybe().Return(func() flow.IdentityList {
-	//	return u.providers[0].Identities(filter.Any)
-	//})
-	//overlay.On("Topology").Maybe().Return(func() flow.IdentityList {
-	//	return u.providers[0].Identities(filter.Any)
-	//}, nil)
-	//
-	////NOTE: return (nil, false) simulating unstaked node
-	//overlay.On("Identity", mock.AnythingOfType("peer.ID")).Return(nil, false)
-	//// message will be rejected so assert overlay never receives it
-	//defer overlay.AssertNotCalled(u.T(), "Receive", mockery.Anything)
-
 	u.startMiddlewares(nil)
-	u.providers[1].SetIdentities(nil)
 
-	//require.NoError(u.T(), u.receiverMW.Subscribe(channels.TestNetworkChannel))
-	//require.NoError(u.T(), u.senderMW.Subscribe(channels.TestNetworkChannel))
+	// overriding the identity provide of the receiver node to return an empty identity list so that the
+	// sender node looks unstaked to its networking layer and hence it sends an UnAuthorizedSenderError upon receiving a message
+	// from the sender node
+	u.providers[1].SetIdentities(nil)
 
 	_, err = u.receiverNetwork.Register(channels.TestNetworkChannel, &mocknetwork.MessageProcessor{})
 	require.NoError(u.T(), err)
@@ -188,6 +176,11 @@ func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_EjectedPeer() {
 	//NOTE: setup ejected identity
 	u.senderID.Ejected = true
 
+	// overriding the identity provide of the receiver node to return the ejected identity so that the
+	// sender node looks ejected to its networking layer and hence it sends a SenderEjectedError upon receiving a message
+	// from the sender node
+	u.providers[1].SetIdentities(flow.IdentityList{u.senderID})
+
 	expectedSenderPeerID, err := unittest.PeerIDFromFlowID(u.senderID)
 	require.NoError(u.T(), err)
 
@@ -200,42 +193,23 @@ func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_EjectedPeer() {
 		Protocol: message.ProtocolTypeUnicast,
 		Err:      validator.ErrSenderEjected,
 	}
-	slashingViolationsConsumer.On(
-		"OnSenderEjectedError",
-		expectedViolation,
-	).Return(nil).Once().Run(func(args mockery.Arguments) {
+	slashingViolationsConsumer.On("OnSenderEjectedError", expectedViolation).
+		Return(nil).Once().Run(func(args mockery.Arguments) {
 		close(u.waitCh)
 	})
 
-	overlay := mocknetwork.NewOverlay(u.T())
-	overlay.On("Identities").Maybe().Return(func() flow.IdentityList {
-		return u.providers[0].Identities(filter.Any)
-	})
-	overlay.On("Topology").Maybe().Return(func() flow.IdentityList {
-		return u.providers[0].Identities(filter.Any)
-	}, nil)
-	//NOTE: return ejected identity causing validation to fail
-	overlay.On("Identity", mock.AnythingOfType("peer.ID")).Return(u.senderID, true)
-	// message will be rejected so assert overlay never receives it
-	defer overlay.AssertNotCalled(u.T(), "Receive", mockery.Anything)
+	u.startMiddlewares(nil)
 
-	u.startMiddlewares(overlay)
+	_, err = u.receiverNetwork.Register(channels.TestNetworkChannel, &mocknetwork.MessageProcessor{})
+	require.NoError(u.T(), err)
 
-	require.NoError(u.T(), u.receiverMW.Subscribe(channels.TestNetworkChannel))
-	require.NoError(u.T(), u.senderMW.Subscribe(channels.TestNetworkChannel))
-
-	msg, err := message.NewOutgoingScope(
-		flow.IdentifierList{u.receiverID.NodeID},
-		channels.TopicFromChannel(channels.TestNetworkChannel, u.sporkId),
-		&libp2pmessage.TestMessage{
-			Text: string("hello"),
-		},
-		unittest.NetworkCodec().Encode,
-		message.ProtocolTypeUnicast)
+	senderCon, err := u.senderNetwork.Register(channels.TestNetworkChannel, &mocknetwork.MessageProcessor{})
 	require.NoError(u.T(), err)
 
 	// send message via unicast
-	err = u.senderMW.SendDirect(msg)
+	err = senderCon.Unicast(&libp2pmessage.TestMessage{
+		Text: string("hello"),
+	}, u.receiverID.NodeID)
 	require.NoError(u.T(), err)
 
 	// wait for slashing violations consumer mock to invoke run func and close ch if expected method call happens
