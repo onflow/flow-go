@@ -81,7 +81,6 @@ func testPeerWithSpamRecord(t *testing.T, messageType p2pmsg.ControlMessageType,
 	reg.OnInvalidControlMessageNotification(&p2p.InvCtrlMsgNotif{
 		PeerID:  peerID,
 		MsgType: messageType,
-		Count:   1,
 	})
 
 	// the penalty should now be updated in the spamRecords
@@ -132,7 +131,6 @@ func testSpamRecordWithUnknownIdentity(t *testing.T, messageType p2pmsg.ControlM
 	reg.OnInvalidControlMessageNotification(&p2p.InvCtrlMsgNotif{
 		PeerID:  peerID,
 		MsgType: messageType,
-		Count:   1,
 	})
 
 	// the penalty should now be updated.
@@ -183,7 +181,6 @@ func testSpamRecordWithSubscriptionPenalty(t *testing.T, messageType p2pmsg.Cont
 	reg.OnInvalidControlMessageNotification(&p2p.InvCtrlMsgNotif{
 		PeerID:  peerID,
 		MsgType: messageType,
-		Count:   1,
 	})
 
 	// the penalty should now be updated.
@@ -210,7 +207,6 @@ func TestSpamPenaltyDecaysInCache(t *testing.T) {
 	reg.OnInvalidControlMessageNotification(&p2p.InvCtrlMsgNotif{
 		PeerID:  peerID,
 		MsgType: p2pmsg.CtrlMsgPrune,
-		Count:   1,
 	})
 
 	time.Sleep(1 * time.Second) // wait for the penalty to decay.
@@ -218,7 +214,6 @@ func TestSpamPenaltyDecaysInCache(t *testing.T) {
 	reg.OnInvalidControlMessageNotification(&p2p.InvCtrlMsgNotif{
 		PeerID:  peerID,
 		MsgType: p2pmsg.CtrlMsgGraft,
-		Count:   1,
 	})
 
 	time.Sleep(1 * time.Second) // wait for the penalty to decay.
@@ -226,7 +221,6 @@ func TestSpamPenaltyDecaysInCache(t *testing.T) {
 	reg.OnInvalidControlMessageNotification(&p2p.InvCtrlMsgNotif{
 		PeerID:  peerID,
 		MsgType: p2pmsg.CtrlMsgIHave,
-		Count:   1,
 	})
 
 	time.Sleep(1 * time.Second) // wait for the penalty to decay.
@@ -234,7 +228,6 @@ func TestSpamPenaltyDecaysInCache(t *testing.T) {
 	reg.OnInvalidControlMessageNotification(&p2p.InvCtrlMsgNotif{
 		PeerID:  peerID,
 		MsgType: p2pmsg.CtrlMsgIWant,
-		Count:   1,
 	})
 
 	time.Sleep(1 * time.Second) // wait for the penalty to decay.
@@ -276,7 +269,6 @@ func TestSpamPenaltyDecayToZero(t *testing.T) {
 	reg.OnInvalidControlMessageNotification(&p2p.InvCtrlMsgNotif{
 		PeerID:  peerID,
 		MsgType: p2pmsg.CtrlMsgGraft,
-		Count:   1,
 	})
 
 	// decays happen every second, so we wait for 1 second to make sure the penalty is updated.
@@ -326,7 +318,6 @@ func TestPersistingUnknownIdentityPenalty(t *testing.T) {
 	reg.OnInvalidControlMessageNotification(&p2p.InvCtrlMsgNotif{
 		PeerID:  peerID,
 		MsgType: p2pmsg.CtrlMsgGraft,
-		Count:   1,
 	})
 
 	// with reported spam, the app specific score should be the default unknown identity + the spam penalty.
@@ -379,7 +370,6 @@ func TestPersistingInvalidSubscriptionPenalty(t *testing.T) {
 	reg.OnInvalidControlMessageNotification(&p2p.InvCtrlMsgNotif{
 		PeerID:  peerID,
 		MsgType: p2pmsg.CtrlMsgGraft,
-		Count:   1,
 	})
 
 	// with reported spam, the app specific score should be the default invalid subscription penalty + the spam penalty.

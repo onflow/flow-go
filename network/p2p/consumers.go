@@ -31,16 +31,16 @@ type InvCtrlMsgNotif struct {
 	PeerID peer.ID
 	// Error the error that occurred during validation.
 	Error error
-	// CtlMsgType the control message type.
-	CtlMsgType p2pmsg.ControlMessageType
+	// MsgType the control message type.
+	MsgType p2pmsg.ControlMessageType
 }
 
 // NewInvalidControlMessageNotification returns a new *InvCtrlMsgNotif
 func NewInvalidControlMessageNotification(peerID peer.ID, ctlMshType p2pmsg.ControlMessageType, err error) *InvCtrlMsgNotif {
 	return &InvCtrlMsgNotif{
-		PeerID:     peerID,
-		Error:      err,
-		CtlMsgType: ctlMshType,
+		PeerID:  peerID,
+		Error:   err,
+		MsgType: ctlMshType,
 	}
 }
 

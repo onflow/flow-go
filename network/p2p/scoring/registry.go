@@ -254,7 +254,7 @@ func (r *GossipSubAppSpecificScoreRegistry) OnInvalidControlMessageNotification(
 	}
 
 	record, err := r.spamScoreCache.Update(notification.PeerID, func(record p2p.GossipSubSpamRecord) p2p.GossipSubSpamRecord {
-		switch notification.CtlMsgType {
+		switch notification.MsgType {
 		case p2pmsg.CtrlMsgGraft:
 			record.Penalty += r.penalty.Graft
 		case p2pmsg.CtrlMsgPrune:
@@ -265,7 +265,7 @@ func (r *GossipSubAppSpecificScoreRegistry) OnInvalidControlMessageNotification(
 			record.Penalty += r.penalty.IWant
 		default:
 			// the error is considered fatal as it means that we have an unsupported misbehaviour type, we should crash the node to prevent routing attack vulnerability.
-			lg.Fatal().Str("misbehavior_type", notification.CtlMsgType.String()).Msg("unknown misbehaviour type")
+			lg.Fatal().Str("misbehavior_type", notification.MsgType.String()).Msg("unknown misbehaviour type")
 		}
 		return record
 	})
