@@ -87,7 +87,11 @@ func TestFindPeerWithDHT(t *testing.T) {
 			// Try to create a stream from client i to client j. This should resort to a DHT
 			// lookup since client i does not know client j's address.
 			unittest.RequireReturnsBefore(t, func() {
-				_, err = dhtClientNodes[i].CreateStream(ctx, dhtClientNodes[j].Host().ID())
+				err = dhtClientNodes[i].OpenProtectedStream(ctx, dhtClientNodes[j].Host().ID(), t.Name(), func(stream network.Stream) error {
+					// do nothing
+					require.NotNil(t, stream)
+					return nil
+				})
 				require.NoError(t, err)
 			}, 1*time.Second, "could not create stream on time")
 		}
