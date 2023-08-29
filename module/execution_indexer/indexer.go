@@ -1,4 +1,4 @@
-package indexer
+package execution_indexer
 
 import (
 	"context"
@@ -12,18 +12,18 @@ import (
 	"github.com/onflow/flow-go/storage"
 )
 
-var _ module.ExecutionStateIndexer = &Indexer{}
-var _ scripts.ScriptExecutionState = &Indexer{}
+var _ module.ExecutionStateIndexer = &indexer{}
+var _ scripts.ScriptExecutionState = &indexer{}
 
-type Indexer struct {
+type indexer struct {
 	registers   storage.Registers
 	headers     storage.Headers
 	last        uint64                          // todo persist
 	commitments map[uint64]flow.StateCommitment // todo persist
 }
 
-func New(registers storage.Registers, headers storage.Headers) *Indexer {
-	return &Indexer{
+func New(registers storage.Registers, headers storage.Headers) *indexer {
+	return &indexer{
 		registers:   registers,
 		headers:     headers,
 		last:        0,
@@ -31,7 +31,7 @@ func New(registers storage.Registers, headers storage.Headers) *Indexer {
 	}
 }
 
-func (i *Indexer) NewStorageSnapshot(commitment flow.StateCommitment) snapshot.StorageSnapshot {
+func (i *indexer) NewStorageSnapshot(commitment flow.StateCommitment) snapshot.StorageSnapshot {
 	var height uint64
 	for h, commit := range i.commitments {
 		if commit == commitment {
@@ -39,14 +39,23 @@ func (i *Indexer) NewStorageSnapshot(commitment flow.StateCommitment) snapshot.S
 		}
 	}
 
+	if height == 0 {
+
+	}
+
 	reader := func(id flow.RegisterID) (flow.RegisterValue, error) {
-		return i.registers.Get(id, height)
+		entry, err := i.registers.Get(id, height)
+		if err != nil {
+			return nil, err
+		}
+
+		return entry.Value, nil
 	}
 
 	return snapshot.NewReadFuncStorageSnapshot(reader)
 }
 
-func (i *Indexer) StateCommitmentByBlockID(
+func (i *indexer) StateCommitmentByBlockID(
 	ctx context.Context,
 	identifier flow.Identifier,
 ) (flow.StateCommitment, error) {
@@ -63,7 +72,7 @@ func (i *Indexer) StateCommitmentByBlockID(
 	return commit, nil
 }
 
-func (i *Indexer) HasState(commitment flow.StateCommitment) bool {
+func (i *indexer) HasState(commitment flow.StateCommitment) bool {
 	for _, c := range i.commitments {
 		if c == commitment {
 			return true
@@ -73,16 +82,16 @@ func (i *Indexer) HasState(commitment flow.StateCommitment) bool {
 	return false
 }
 
-func (i *Indexer) Last() (uint64, error) {
+func (i *indexer) Last() (uint64, error) {
 	return i.last, nil
 }
 
-func (i *Indexer) StoreLast(last uint64) error {
+func (i *indexer) StoreLast(last uint64) error {
 	i.last = last
 	return nil
 }
 
-func (i *Indexer) HeightByBlockID(ID flow.Identifier) (uint64, error) {
+func (i *indexer) HeightByBlockID(ID flow.Identifier) (uint64, error) {
 	header, err := i.headers.ByBlockID(ID)
 	if err != nil {
 		return 0, err
@@ -91,7 +100,7 @@ func (i *Indexer) HeightByBlockID(ID flow.Identifier) (uint64, error) {
 	return header.Height, nil
 }
 
-func (i *Indexer) Commitment(height uint64) (flow.StateCommitment, error) {
+func (i *indexer) Commitment(height uint64) (flow.StateCommitment, error) {
 	val, ok := i.commitments[height]
 	if !ok {
 		return flow.DummyStateCommitment, fmt.Errorf("could not find commitment at height %d", height)
@@ -100,27 +109,27 @@ func (i *Indexer) Commitment(height uint64) (flow.StateCommitment, error) {
 	return val, nil
 }
 
-func (i *Indexer) StoreCommitment(commitment flow.StateCommitment, height uint64) error {
+func (i *indexer) StoreCommitment(commitment flow.StateCommitment, height uint64) error {
 	i.commitments[height] = commitment
 	return nil
 }
 
-func (i *Indexer) Values(IDs flow.RegisterIDs, height uint64) ([]flow.RegisterValue, error) {
+func (i *indexer) Values(IDs flow.RegisterIDs, height uint64) ([]flow.RegisterValue, error) {
 	values := make([]flow.RegisterValue, len(IDs))
 
 	for j, id := range IDs {
-		val, err := i.registers.Get(id, height)
+		entry, err := i.registers.Get(id, height)
 		if err != nil {
 			return nil, err
 		}
 
-		values[j] = val
+		values[j] = entry.Value
 	}
 
 	return values, nil
 }
 
-func (i *Indexer) StorePayloads(payloads []*ledger.Payload, height uint64) error {
+func (i *indexer) StorePayloads(payloads []*ledger.Payload, height uint64) error {
 
 	// TODO add batch store
 	for _, payload := range payloads {
@@ -136,12 +145,12 @@ func (i *Indexer) StorePayloads(payloads []*ledger.Payload, height uint64) error
 			return err
 		}
 
-		regEntry := flow.RegisterEntry{
+		regEntries := flow.RegisterEntries{{
 			Key:   id,
 			Value: payload.Value(),
-		}
+		}}
 
-		err = i.registers.Store(regEntry, height)
+		err = i.registers.Store(regEntries, height)
 		if err != nil {
 			return err
 		}

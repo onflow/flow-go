@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/onflow/flow-go/module/indexer"
+	"github.com/onflow/flow-go/module/execution_indexer"
 	"github.com/onflow/flow-go/storage/memory"
 	"os"
 	"path/filepath"
@@ -479,7 +479,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionDataRequester() *FlowAccessN
 		}).
 		Module("execution data indexer", func(node *cmd.NodeConfig) error {
 			registers := memory.NewRegisters()
-			exeIndexer = indexer.New(registers, node.Storage.Headers)
+			exeIndexer = execution_indexer.New(registers, node.Storage.Headers)
 			return nil
 		}).
 		Module("processed block height consumer progress", func(node *cmd.NodeConfig) error {
