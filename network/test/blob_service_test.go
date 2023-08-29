@@ -119,7 +119,7 @@ func (suite *BlobServiceTestSuite) SetupTest() {
 	suite.Require().Eventually(func() bool {
 		for i, libp2pNode := range nodes {
 			for j := i + 1; j < suite.numNodes; j++ {
-				connected, err := libp2pNode.IsConnected(nodes[j].Host().ID())
+				connected, err := libp2pNode.IsConnected(nodes[j].ID())
 				require.NoError(suite.T(), err)
 				if !connected {
 					return false

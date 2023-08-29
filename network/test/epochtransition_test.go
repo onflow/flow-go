@@ -332,7 +332,7 @@ func (suite *MutableIdentityTableSuite) assertConnected(thisNode p2p.LibP2PNode,
 				// we don't want to check if a node is connected to itself
 				continue
 			}
-			connected, err := thisNode.IsConnected(node.Host().ID())
+			connected, err := thisNode.IsConnected(node.ID())
 			require.NoError(t, err)
 			if connected {
 				connections++
@@ -352,7 +352,7 @@ func (suite *MutableIdentityTableSuite) assertDisconnected(thisNode p2p.LibP2PNo
 	t := suite.T()
 	require.Eventuallyf(t, func() bool {
 		for _, node := range allNodes {
-			connected, err := thisNode.IsConnected(node.Host().ID())
+			connected, err := thisNode.IsConnected(node.ID())
 			require.NoError(t, err)
 			if connected {
 				return false

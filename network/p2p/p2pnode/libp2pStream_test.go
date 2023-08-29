@@ -164,7 +164,7 @@ func testCreateStream(t *testing.T, sporkId flow.Identifier, unicasts []protocol
 	id2 := identities[1]
 
 	// Assert that there is no outbound stream to the target yet
-	require.Equal(t, 0, p2putils.CountStream(nodes[0].Host(), nodes[1].Host().ID(), protocolID, network.DirOutbound))
+	require.Equal(t, 0, p2putils.CountStream(nodes[0].Host(), nodes[1].ID(), protocolID, network.DirOutbound))
 
 	// Now attempt to create another 100 outbound stream to the same destination by calling CreateStream
 	streamCount := 100
@@ -190,7 +190,7 @@ func testCreateStream(t *testing.T, sporkId flow.Identifier, unicasts []protocol
 	}
 
 	require.Eventually(t, func() bool {
-		return streamCount == p2putils.CountStream(nodes[0].Host(), nodes[1].Host().ID(), protocolID, network.DirOutbound)
+		return streamCount == p2putils.CountStream(nodes[0].Host(), nodes[1].ID(), protocolID, network.DirOutbound)
 	}, 5*time.Second, 100*time.Millisecond, "could not create streams on time")
 
 	// checks that the number of connections is 1 despite the number of streams; i.e., all streams are created on the same connection
@@ -224,7 +224,7 @@ func TestCreateStream_FallBack(t *testing.T) {
 	identities := []flow.Identity{thisID, otherId}
 	nodes := []p2p.LibP2PNode{thisNode, otherNode}
 	for i, node := range nodes {
-		idProvider.On("ByPeerID", node.Host().ID()).Return(&identities[i], true).Maybe()
+		idProvider.On("ByPeerID", node.ID()).Return(&identities[i], true).Maybe()
 
 	}
 	p2ptest.StartNodes(t, signalerCtx, nodes, 1*time.Second)
@@ -232,8 +232,8 @@ func TestCreateStream_FallBack(t *testing.T) {
 	// Assert that there is no outbound stream to the target yet (neither default nor preferred)
 	defaultProtocolId := protocols.FlowProtocolID(sporkId)
 	preferredProtocolId := protocols.FlowGzipProtocolId(sporkId)
-	require.Equal(t, 0, p2putils.CountStream(thisNode.Host(), otherNode.Host().ID(), defaultProtocolId, network.DirOutbound))
-	require.Equal(t, 0, p2putils.CountStream(thisNode.Host(), otherNode.Host().ID(), preferredProtocolId, network.DirOutbound))
+	require.Equal(t, 0, p2putils.CountStream(thisNode.Host(), otherNode.ID(), defaultProtocolId, network.DirOutbound))
+	require.Equal(t, 0, p2putils.CountStream(thisNode.Host(), otherNode.ID(), preferredProtocolId, network.DirOutbound))
 
 	// Now attempt to create another 100 outbound stream to the same destination by calling CreateStream
 	streamCount := 10
@@ -262,11 +262,11 @@ func TestCreateStream_FallBack(t *testing.T) {
 
 	// wait for the stream to be created on the default protocol id.
 	require.Eventually(t, func() bool {
-		return streamCount == p2putils.CountStream(nodes[0].Host(), nodes[1].Host().ID(), defaultProtocolId, network.DirOutbound)
+		return streamCount == p2putils.CountStream(nodes[0].Host(), nodes[1].ID(), defaultProtocolId, network.DirOutbound)
 	}, 5*time.Second, 100*time.Millisecond, "could not create streams on time")
 
 	// no stream must be created on the preferred protocol id
-	require.Equal(t, 0, p2putils.CountStream(thisNode.Host(), otherNode.Host().ID(), preferredProtocolId, network.DirOutbound))
+	require.Equal(t, 0, p2putils.CountStream(thisNode.Host(), otherNode.ID(), preferredProtocolId, network.DirOutbound))
 
 	// checks that the number of connections is 1 despite the number of streams; i.e., all streams are created on the same connection
 	require.Len(t, nodes[0].Host().Network().Conns(), 1)
@@ -430,7 +430,7 @@ func testUnicastOverStream(t *testing.T, opts ...p2ptest.NodeFixtureParameterOpt
 	ids := flow.IdentityList{&id1, &id2}
 	nodes := []p2p.LibP2PNode{node1, node2}
 	for i, node := range nodes {
-		idProvider.On("ByPeerID", node.Host().ID()).Return(ids[i], true).Maybe()
+		idProvider.On("ByPeerID", node.ID()).Return(ids[i], true).Maybe()
 
 	}
 	p2ptest.StartNodes(t, signalerCtx, nodes, 100*time.Millisecond)
@@ -479,7 +479,7 @@ func TestUnicastOverStream_Fallback(t *testing.T) {
 	ids := flow.IdentityList{&id1, &id2}
 	nodes := []p2p.LibP2PNode{node1, node2}
 	for i, node := range nodes {
-		idProvider.On("ByPeerID", node.Host().ID()).Return(ids[i], true).Maybe()
+		idProvider.On("ByPeerID", node.ID()).Return(ids[i], true).Maybe()
 
 	}
 	p2ptest.StartNodes(t, signalerCtx, nodes, 100*time.Millisecond)

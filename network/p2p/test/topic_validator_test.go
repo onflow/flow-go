@@ -45,8 +45,8 @@ func TestTopicValidator_Unstaked(t *testing.T) {
 
 	sn1, identity1 := p2ptest.NodeFixture(t, sporkId, t.Name(), idProvider, p2ptest.WithRole(flow.RoleConsensus), p2ptest.WithLogger(logger))
 	sn2, identity2 := p2ptest.NodeFixture(t, sporkId, t.Name(), idProvider, p2ptest.WithRole(flow.RoleConsensus), p2ptest.WithLogger(logger))
-	idProvider.On("ByPeerID", sn1.Host().ID()).Return(&identity1, true).Maybe()
-	idProvider.On("ByPeerID", sn2.Host().ID()).Return(&identity2, true).Maybe()
+	idProvider.On("ByPeerID", sn1.ID()).Return(&identity1, true).Maybe()
+	idProvider.On("ByPeerID", sn2.ID()).Return(&identity2, true).Maybe()
 	nodes := []p2p.LibP2PNode{sn1, sn2}
 	p2ptest.StartNodes(t, signalerCtx, nodes, 100*time.Millisecond)
 	defer p2ptest.StopNodes(t, nodes, cancel, 100*time.Millisecond)
@@ -124,8 +124,8 @@ func TestTopicValidator_PublicChannel(t *testing.T) {
 
 	sn1, identity1 := p2ptest.NodeFixture(t, sporkId, t.Name(), idProvider, p2ptest.WithRole(flow.RoleConsensus), p2ptest.WithLogger(logger))
 	sn2, identity2 := p2ptest.NodeFixture(t, sporkId, t.Name(), idProvider, p2ptest.WithRole(flow.RoleConsensus), p2ptest.WithLogger(logger))
-	idProvider.On("ByPeerID", sn1.Host().ID()).Return(&identity1, true).Maybe()
-	idProvider.On("ByPeerID", sn2.Host().ID()).Return(&identity2, true).Maybe()
+	idProvider.On("ByPeerID", sn1.ID()).Return(&identity1, true).Maybe()
+	idProvider.On("ByPeerID", sn2.ID()).Return(&identity2, true).Maybe()
 	nodes := []p2p.LibP2PNode{sn1, sn2}
 	p2ptest.StartNodes(t, signalerCtx, nodes, 100*time.Millisecond)
 	defer p2ptest.StopNodes(t, nodes, cancel, 100*time.Millisecond)
@@ -194,8 +194,8 @@ func TestTopicValidator_TopicMismatch(t *testing.T) {
 
 	sn1, identity1 := p2ptest.NodeFixture(t, sporkId, t.Name(), idProvider, p2ptest.WithRole(flow.RoleConsensus), p2ptest.WithLogger(logger))
 	sn2, identity2 := p2ptest.NodeFixture(t, sporkId, t.Name(), idProvider, p2ptest.WithRole(flow.RoleConsensus), p2ptest.WithLogger(logger))
-	idProvider.On("ByPeerID", sn1.Host().ID()).Return(&identity1, true).Maybe()
-	idProvider.On("ByPeerID", sn2.Host().ID()).Return(&identity2, true).Maybe()
+	idProvider.On("ByPeerID", sn1.ID()).Return(&identity1, true).Maybe()
+	idProvider.On("ByPeerID", sn2.ID()).Return(&identity2, true).Maybe()
 	nodes := []p2p.LibP2PNode{sn1, sn2}
 	p2ptest.StartNodes(t, signalerCtx, nodes, 100*time.Millisecond)
 	defer p2ptest.StopNodes(t, nodes, cancel, 100*time.Millisecond)
@@ -256,8 +256,8 @@ func TestTopicValidator_InvalidTopic(t *testing.T) {
 
 	sn1, identity1 := p2ptest.NodeFixture(t, sporkId, t.Name(), idProvider, p2ptest.WithRole(flow.RoleConsensus), p2ptest.WithLogger(logger))
 	sn2, identity2 := p2ptest.NodeFixture(t, sporkId, t.Name(), idProvider, p2ptest.WithRole(flow.RoleConsensus), p2ptest.WithLogger(logger))
-	idProvider.On("ByPeerID", sn1.Host().ID()).Return(&identity1, true).Maybe()
-	idProvider.On("ByPeerID", sn2.Host().ID()).Return(&identity2, true).Maybe()
+	idProvider.On("ByPeerID", sn1.ID()).Return(&identity1, true).Maybe()
+	idProvider.On("ByPeerID", sn2.ID()).Return(&identity2, true).Maybe()
 	nodes := []p2p.LibP2PNode{sn1, sn2}
 	p2ptest.StartNodes(t, signalerCtx, nodes, 100*time.Millisecond)
 	defer p2ptest.StopNodes(t, nodes, cancel, 100*time.Millisecond)
@@ -326,9 +326,9 @@ func TestAuthorizedSenderValidator_Unauthorized(t *testing.T) {
 	sn1, identity1 := p2ptest.NodeFixture(t, sporkId, t.Name(), idProvider, p2ptest.WithRole(flow.RoleConsensus))
 	sn2, identity2 := p2ptest.NodeFixture(t, sporkId, t.Name(), idProvider, p2ptest.WithRole(flow.RoleConsensus))
 	an1, identity3 := p2ptest.NodeFixture(t, sporkId, t.Name(), idProvider, p2ptest.WithRole(flow.RoleAccess))
-	idProvider.On("ByPeerID", sn1.Host().ID()).Return(&identity1, true).Maybe()
-	idProvider.On("ByPeerID", sn2.Host().ID()).Return(&identity2, true).Maybe()
-	idProvider.On("ByPeerID", an1.Host().ID()).Return(&identity3, true).Maybe()
+	idProvider.On("ByPeerID", sn1.ID()).Return(&identity1, true).Maybe()
+	idProvider.On("ByPeerID", sn2.ID()).Return(&identity2, true).Maybe()
+	idProvider.On("ByPeerID", an1.ID()).Return(&identity3, true).Maybe()
 	nodes := []p2p.LibP2PNode{sn1, sn2, an1}
 	p2ptest.StartNodes(t, signalerCtx, nodes, 100*time.Millisecond)
 	defer p2ptest.StopNodes(t, nodes, cancel, 100*time.Millisecond)
@@ -343,7 +343,7 @@ func TestAuthorizedSenderValidator_Unauthorized(t *testing.T) {
 
 	violation := &network.Violation{
 		Identity: &identity3,
-		PeerID:   an1.Host().ID().String(),
+		PeerID:   an1.ID().String(),
 		OriginID: identity3.NodeID,
 		MsgType:  "*messages.BlockProposal",
 		Channel:  channel,
@@ -461,8 +461,8 @@ func TestAuthorizedSenderValidator_InvalidMsg(t *testing.T) {
 
 	sn1, identity1 := p2ptest.NodeFixture(t, sporkId, "consensus_1", idProvider, p2ptest.WithRole(flow.RoleConsensus))
 	sn2, identity2 := p2ptest.NodeFixture(t, sporkId, "consensus_2", idProvider, p2ptest.WithRole(flow.RoleConsensus))
-	idProvider.On("ByPeerID", sn1.Host().ID()).Return(&identity1, true).Maybe()
-	idProvider.On("ByPeerID", sn2.Host().ID()).Return(&identity2, true).Maybe()
+	idProvider.On("ByPeerID", sn1.ID()).Return(&identity1, true).Maybe()
+	idProvider.On("ByPeerID", sn2.ID()).Return(&identity2, true).Maybe()
 	nodes := []p2p.LibP2PNode{sn1, sn2}
 	p2ptest.StartNodes(t, signalerCtx, nodes, 100*time.Millisecond)
 	defer p2ptest.StopNodes(t, nodes, cancel, 100*time.Millisecond)
@@ -544,9 +544,9 @@ func TestAuthorizedSenderValidator_Ejected(t *testing.T) {
 	sn1, identity1 := p2ptest.NodeFixture(t, sporkId, "consensus_1", idProvider, p2ptest.WithRole(flow.RoleConsensus))
 	sn2, identity2 := p2ptest.NodeFixture(t, sporkId, "consensus_2", idProvider, p2ptest.WithRole(flow.RoleConsensus))
 	an1, identity3 := p2ptest.NodeFixture(t, sporkId, "access_1", idProvider, p2ptest.WithRole(flow.RoleAccess))
-	idProvider.On("ByPeerID", sn1.Host().ID()).Return(&identity1, true).Maybe()
-	idProvider.On("ByPeerID", sn2.Host().ID()).Return(&identity2, true).Maybe()
-	idProvider.On("ByPeerID", an1.Host().ID()).Return(&identity3, true).Maybe()
+	idProvider.On("ByPeerID", sn1.ID()).Return(&identity1, true).Maybe()
+	idProvider.On("ByPeerID", sn2.ID()).Return(&identity2, true).Maybe()
+	idProvider.On("ByPeerID", an1.ID()).Return(&identity3, true).Maybe()
 	nodes := []p2p.LibP2PNode{sn1, sn2, an1}
 	p2ptest.StartNodes(t, signalerCtx, nodes, 100*time.Millisecond)
 	defer p2ptest.StopNodes(t, nodes, cancel, 100*time.Millisecond)
@@ -659,9 +659,9 @@ func TestAuthorizedSenderValidator_ClusterChannel(t *testing.T) {
 	ln1, identity1 := p2ptest.NodeFixture(t, sporkId, "collection_1", idProvider, p2ptest.WithRole(flow.RoleCollection))
 	ln2, identity2 := p2ptest.NodeFixture(t, sporkId, "collection_2", idProvider, p2ptest.WithRole(flow.RoleCollection))
 	ln3, identity3 := p2ptest.NodeFixture(t, sporkId, "collection_3", idProvider, p2ptest.WithRole(flow.RoleCollection))
-	idProvider.On("ByPeerID", ln1.Host().ID()).Return(&identity1, true).Maybe()
-	idProvider.On("ByPeerID", ln2.Host().ID()).Return(&identity2, true).Maybe()
-	idProvider.On("ByPeerID", ln3.Host().ID()).Return(&identity3, true).Maybe()
+	idProvider.On("ByPeerID", ln1.ID()).Return(&identity1, true).Maybe()
+	idProvider.On("ByPeerID", ln2.ID()).Return(&identity2, true).Maybe()
+	idProvider.On("ByPeerID", ln3.ID()).Return(&identity3, true).Maybe()
 	nodes := []p2p.LibP2PNode{ln1, ln2, ln3}
 	p2ptest.StartNodes(t, signalerCtx, nodes, 100*time.Millisecond)
 	defer p2ptest.StopNodes(t, nodes, cancel, 100*time.Millisecond)

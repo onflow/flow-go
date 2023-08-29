@@ -135,7 +135,7 @@ func TestConnectionManager_Watermarking(t *testing.T) {
 
 	// connect this node to all other nodes.
 	for _, otherNode := range otherNodes {
-		require.NoError(t, thisNode.Host().Connect(ctx, otherNode.Host().Peerstore().PeerInfo(otherNode.Host().ID())))
+		require.NoError(t, thisNode.Host().Connect(ctx, otherNode.Host().Peerstore().PeerInfo(otherNode.ID())))
 	}
 
 	// ensures this node is connected to all other nodes (based on the number of connections).
@@ -153,8 +153,8 @@ func TestConnectionManager_Watermarking(t *testing.T) {
 
 	// connects this node to one of the other nodes that is pruned by connection manager.
 	for _, otherNode := range otherNodes {
-		if len(thisNode.Host().Network().ConnsToPeer(otherNode.Host().ID())) == 0 {
-			require.NoError(t, thisNode.Host().Connect(ctx, otherNode.Host().Peerstore().PeerInfo(otherNode.Host().ID())))
+		if len(thisNode.Host().Network().ConnsToPeer(otherNode.ID())) == 0 {
+			require.NoError(t, thisNode.Host().Connect(ctx, otherNode.Host().Peerstore().PeerInfo(otherNode.ID())))
 			break // we only need to connect to one node.
 		}
 	}

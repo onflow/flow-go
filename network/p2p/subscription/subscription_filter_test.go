@@ -68,7 +68,7 @@ func TestFilterSubscribe(t *testing.T) {
 	// check that node1 and node2 don't accept unstakedNode as a peer
 	require.Never(t, func() bool {
 		for _, pid := range node1.ListPeers(badTopic.String()) {
-			if pid == unstakedNode.Host().ID() {
+			if pid == unstakedNode.ID() {
 				return true
 			}
 		}

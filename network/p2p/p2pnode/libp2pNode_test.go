@@ -178,7 +178,7 @@ func TestConnGater(t *testing.T) {
 			}
 			return nil
 		})))
-	idProvider.On("ByPeerID", node1.Host().ID()).Return(&identity1, true).Maybe()
+	idProvider.On("ByPeerID", node1.ID()).Return(&identity1, true).Maybe()
 
 	p2ptest.StartNode(t, signalerCtx, node1, 100*time.Millisecond)
 	defer p2ptest.StopNode(t, node1, cancel, 100*time.Millisecond)
@@ -197,7 +197,7 @@ func TestConnGater(t *testing.T) {
 			}
 			return nil
 		})))
-	idProvider.On("ByPeerID", node2.Host().ID()).Return(&identity2,
+	idProvider.On("ByPeerID", node2.ID()).Return(&identity2,
 
 		true).Maybe()
 
@@ -369,8 +369,8 @@ func TestCreateStream_SinglePeerDial(t *testing.T) {
 		p2ptest.WithCreateStreamRetryDelay(10*time.Millisecond),
 		p2ptest.WithLogger(logger))
 
-	idProvider.On("ByPeerID", sender.Host().ID()).Return(&id1, true).Maybe()
-	idProvider.On("ByPeerID", receiver.Host().ID()).Return(&id2, true).Maybe()
+	idProvider.On("ByPeerID", sender.ID()).Return(&id1, true).Maybe()
+	idProvider.On("ByPeerID", receiver.ID()).Return(&id2, true).Maybe()
 
 	p2ptest.StartNodes(t, signalerCtx, []p2p.LibP2PNode{sender, receiver}, 100*time.Millisecond)
 	defer p2ptest.StopNodes(t, []p2p.LibP2PNode{sender, receiver}, cancel, 100*time.Millisecond)
@@ -380,14 +380,14 @@ func TestCreateStream_SinglePeerDial(t *testing.T) {
 	// attempt to create two concurrent streams
 	go func() {
 		defer wg.Done()
-		err := sender.OpenProtectedStream(ctx, receiver.Host().ID(), t.Name(), func(stream network.Stream) error {
+		err := sender.OpenProtectedStream(ctx, receiver.ID(), t.Name(), func(stream network.Stream) error {
 			return nil
 		})
 		require.Error(t, err)
 	}()
 	go func() {
 		defer wg.Done()
-		err := sender.OpenProtectedStream(ctx, receiver.Host().ID(), t.Name(), func(stream network.Stream) error {
+		err := sender.OpenProtectedStream(ctx, receiver.ID(), t.Name(), func(stream network.Stream) error {
 			return nil
 		})
 		require.Error(t, err)
@@ -432,8 +432,8 @@ func TestCreateStream_InboundConnResourceLimit(t *testing.T) {
 		p2ptest.WithDefaultResourceManager(),
 		p2ptest.WithCreateStreamRetryDelay(10*time.Millisecond))
 
-	idProvider.On("ByPeerID", sender.Host().ID()).Return(&id1, true).Maybe()
-	idProvider.On("ByPeerID", receiver.Host().ID()).Return(&id2, true).Maybe()
+	idProvider.On("ByPeerID", sender.ID()).Return(&id1, true).Maybe()
+	idProvider.On("ByPeerID", receiver.ID()).Return(&id2, true).Maybe()
 
 	p2ptest.StartNodes(t, signalerCtx, []p2p.LibP2PNode{sender, receiver}, 100*time.Millisecond)
 	defer p2ptest.StopNodes(t, []p2p.LibP2PNode{sender, receiver}, cancel, 100*time.Millisecond)
@@ -452,14 +452,14 @@ func TestCreateStream_InboundConnResourceLimit(t *testing.T) {
 		allStreamsCreated.Add(1)
 		go func() {
 			defer allStreamsCreated.Done()
-			_, err := sender.Host().NewStream(ctx, receiver.Host().ID(), defaultProtocolID)
+			_, err := sender.Host().NewStream(ctx, receiver.ID(), defaultProtocolID)
 			require.NoError(t, err)
 		}()
 	}
 
 	unittest.RequireReturnsBefore(t, allStreamsCreated.Wait, 2*time.Second, "could not create streams on time")
-	require.Len(t, receiver.Host().Network().ConnsToPeer(sender.Host().ID()), 1)
-	actualNumOfStreams := p2putils.CountStream(sender.Host(), receiver.Host().ID(), defaultProtocolID, network.DirOutbound)
+	require.Len(t, receiver.Host().Network().ConnsToPeer(sender.ID()), 1)
+	actualNumOfStreams := p2putils.CountStream(sender.Host(), receiver.ID(), defaultProtocolID, network.DirOutbound)
 	require.Equal(t, expectedNumOfStreams, int64(actualNumOfStreams), fmt.Sprintf("expected to create %d number of streams got %d", expectedNumOfStreams, actualNumOfStreams))
 }
 
@@ -506,7 +506,7 @@ func ensureSinglePairwiseConnection(t *testing.T, nodes []p2p.LibP2PNode) {
 			if this == other {
 				continue
 			}
-			require.Len(t, this.Host().Network().ConnsToPeer(other.Host().ID()), 1)
+			require.Len(t, this.Host().Network().ConnsToPeer(other.ID()), 1)
 		}
 	}
 }

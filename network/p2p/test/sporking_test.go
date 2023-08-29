@@ -69,7 +69,7 @@ func TestCrosstalkPreventionOnNetworkKeyChange(t *testing.T) {
 	defer p2ptest.StopNode(t, node1, cancel1, 100*time.Millisecond)
 
 	t.Logf(" %s node started on %s", id1.NodeID.String(), id1.Address)
-	t.Logf("libp2p ID for %s: %s", id1.NodeID.String(), node1.Host().ID())
+	t.Logf("libp2p ID for %s: %s", id1.NodeID.String(), node1.ID())
 
 	// create and start node 2 on localhost and random port
 	node2key := p2ptest.NetworkingKeyFixtures(t)
