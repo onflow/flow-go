@@ -382,9 +382,12 @@ func TestNoBackoffWhenCreatingStream(t *testing.T) {
 		ctx, cancel := context.WithTimeout(ctx, maxTimeToWait)
 
 		unittest.RequireReturnsBefore(t, func() {
-			_, err = node1.CreateStream(ctx, pInfo.ID)
+			err = node1.OpenProtectedStream(ctx, pInfo.ID, t.Name(), func(stream network.Stream) error {
+				// do nothing, this is a no-op stream writer, we just check that the stream was created
+				return nil
+			})
+			require.Error(t, err)
 		}, totalWaitTime, fmt.Sprintf("create stream did not error within %s", totalWaitTime.String()))
-		require.Error(t, err)
 		require.NotContainsf(t, err.Error(), swarm.ErrDialBackoff.Error(), "swarm dialer unexpectedly did a back off for a one-to-one connection")
 		cancel()
 	}
