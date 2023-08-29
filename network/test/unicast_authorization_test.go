@@ -8,13 +8,11 @@ import (
 	"time"
 
 	"github.com/rs/zerolog"
-	"github.com/stretchr/testify/mock"
 	mockery "github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/model/flow/filter"
 	libp2pmessage "github.com/onflow/flow-go/model/libp2p/message"
 	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module/irrecoverable"
@@ -491,50 +489,29 @@ func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_ReceiverHasSubs
 	// setup mock slashing violations consumer and middlewares
 	slashingViolationsConsumer := mocknetwork.NewViolationsConsumer(u.T())
 	u.setupMiddlewaresAndProviders(slashingViolationsConsumer)
-	channel := channels.RequestReceiptsByBlockID
+	u.startMiddlewares(nil)
 
-	msg, err := message.NewOutgoingScope(
-		flow.IdentifierList{u.receiverID.NodeID},
-		channels.TopicFromChannel(channel, u.sporkId),
-		&messages.EntityRequest{},
-		unittest.NetworkCodec().Encode,
-		message.ProtocolTypeUnicast)
-	require.NoError(u.T(), err)
+	msg := &messages.EntityRequest{
+		EntityIDs: unittest.IdentifierListFixture(10),
+	}
 
+	// both sender and receiver must have an authorized role to send and receive messages on the ConsensusCommittee channel.
 	u.senderID.Role = flow.RoleConsensus
 	u.receiverID.Role = flow.RoleExecution
 
-	overlay := mocknetwork.NewOverlay(u.T())
-	overlay.On("Identities").Maybe().Return(func() flow.IdentityList {
-		return u.providers[0].Identities(filter.Any)
-	})
-	overlay.On("Topology").Maybe().Return(func() flow.IdentityList {
-		return u.providers[0].Identities(filter.Any)
-	}, nil)
-	overlay.On("Identity", mock.AnythingOfType("peer.ID")).Return(u.senderID, true)
-
-	// we should receive the message on our overlay, at this point close the waitCh
-	overlay.On("Receive", mockery.Anything).Return(nil).
-		Once().
-		Run(func(args mockery.Arguments) {
+	receiverEngine := &mocknetwork.MessageProcessor{}
+	receiverEngine.On("Process", channels.RequestReceiptsByBlockID, u.senderID.NodeID, msg).Run(
+		func(args mockery.Arguments) {
 			close(u.waitCh)
+		}).Return(nil).Once()
+	_, err := u.receiverNetwork.Register(channels.RequestReceiptsByBlockID, receiverEngine)
+	require.NoError(u.T(), err)
 
-			msg, ok := args[0].(network.IncomingMessageScope)
-			require.True(u.T(), ok)
-
-			require.Equal(u.T(), channel, msg.Channel())                      // channel
-			require.Equal(u.T(), u.senderID.NodeID, msg.OriginId())           // sender id
-			require.Equal(u.T(), u.receiverID.NodeID, msg.TargetIDs()[0])     // target id
-			require.Equal(u.T(), message.ProtocolTypeUnicast, msg.Protocol()) // protocol
-		})
-
-	u.startMiddlewares(overlay)
-
-	require.NoError(u.T(), u.receiverMW.Subscribe(channel))
-	require.NoError(u.T(), u.senderMW.Subscribe(channel))
+	senderCon, err := u.senderNetwork.Register(channels.RequestReceiptsByBlockID, &mocknetwork.MessageProcessor{})
+	require.NoError(u.T(), err)
 
 	// send message via unicast
-	err = u.senderMW.SendDirect(msg)
+	err = senderCon.Unicast(msg, u.receiverID.NodeID)
 	require.NoError(u.T(), err)
 
 	// wait for slashing violations consumer mock to invoke run func and close ch if expected method call happens
