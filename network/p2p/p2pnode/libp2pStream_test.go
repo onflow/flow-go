@@ -567,7 +567,12 @@ func TestCreateStreamIsConcurrent(t *testing.T) {
 	blockedCallCh := unittest.RequireNeverReturnBefore(t,
 		func() {
 			goodNodes[0].Host().Peerstore().AddAddrs(silentNodeInfo.ID, silentNodeInfo.Addrs, peerstore.AddressTTL)
-			_, _ = goodNodes[0].CreateStream(ctx, silentNodeInfo.ID) // this call will block
+			// the subsequent call will be blocked
+			_ = goodNodes[0].OpenProtectedStream(ctx, silentNodeInfo.ID, t.Name(), func(stream network.Stream) error {
+				// do nothing, the stream creation will be blocked so this should never be called
+				require.Fail(t, "this should never be called")
+				return nil
+			})
 		},
 		1*time.Second,
 		"CreateStream attempt to the unresponsive peer did not block")
