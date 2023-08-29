@@ -35,7 +35,7 @@ type Engine struct {
 	events       storage.Events
 	transactions storage.Transactions
 
-	index module.ExecutionStateIndexer
+	executionIndexer module.ExecutionStateIndexer
 
 	execDataCache *cache.ExecutionDataCache
 
@@ -57,23 +57,38 @@ func New(
 	events storage.Events,
 	transactions storage.Transactions,
 	execDataCache *cache.ExecutionDataCache,
-	index module.ExecutionStateIndexer,
+	executionIndexer module.ExecutionStateIndexer,
 	lastFullyIndexedHeight uint64,
 	highestAvailableHeight uint64,
 ) (*Engine, error) {
+
+	// initialize the last index height and be very intentional so there's no unintentional
+	// behaviour. If we have last height persisted in the index we will use that, but if the height
+	// is also provided we must return an error and not allow unexpected behaviour. Only if no height
+	// was persisted we can use the provided height.
+	lastIndexed, err := executionIndexer.Last()
+	if err != nil {
+		if errors.Is(err, storage.ErrNotFound) {
+			lastIndexed = lastFullyIndexedHeight
+		} else {
+			return nil, err
+		}
+	} else if lastFullyIndexedHeight != 0 {
+		return nil, fmt.Errorf("prohibited to provide last index height if one is already persisted")
+	}
 
 	// initialize the propagation engine with its dependencies
 	e := &Engine{
 		log:     log.With().Str("engine", "index").Logger(),
 		metrics: accessMetrics,
 
-		collections:   collections,
-		events:        events,
-		transactions:  transactions,
-		execDataCache: execDataCache,
-		index:         index,
+		collections:      collections,
+		events:           events,
+		transactions:     transactions,
+		execDataCache:    execDataCache,
+		executionIndexer: executionIndexer,
 
-		lastFullyProcessedHeight: counters.NewSequentialCounter(lastFullyIndexedHeight),
+		lastFullyProcessedHeight: counters.NewSequentialCounter(lastIndexed),
 		highestHeight:            counters.NewMonotonousCounter(highestAvailableHeight),
 
 		executionDataNotifier: engine.NewNotifier(),
@@ -96,7 +111,7 @@ func (e *Engine) OnExecutionData(executionData *execution_data.BlockExecutionDat
 
 	lg.Trace().Msg("received execution data")
 
-	height, err := e.index.HeightByBlockID(executionData.BlockID)
+	height, err := e.executionIndexer.HeightByBlockID(executionData.BlockID)
 	if err != nil {
 		// if the execution data is available, the block must be locally finalized
 		lg.Fatal().Err(err).Msg("failed to get header for execution data")
@@ -167,7 +182,7 @@ func (e *Engine) processAvailableExecutionData(ctx context.Context) error {
 			return fmt.Errorf("could not set last processed height to %d", height)
 		}
 
-		err = e.index.StoreLast(height)
+		err = e.executionIndexer.StoreLast(height)
 		if err != nil {
 			return fmt.Errorf("could not persist last processed height to %d: %w", height, err)
 		}
@@ -277,17 +292,17 @@ func (e *Engine) handleTrieUpdate(blockID flow.Identifier, update *ledger.TrieUp
 		return fmt.Errorf("trie update paths and payloads have different lengths")
 	}
 
-	height, err := e.index.HeightByBlockID(blockID)
+	height, err := e.executionIndexer.HeightByBlockID(blockID)
 	if err != nil {
 		return err
 	}
 
-	err = e.index.StorePayloads(update.Payloads, height)
+	err = e.executionIndexer.StorePayloads(update.Payloads, height)
 	if err != nil {
 		return err
 	}
 
-	return e.index.StoreCommitment(flow.StateCommitment(update.RootHash), height)
+	return e.executionIndexer.StoreCommitment(flow.StateCommitment(update.RootHash), height)
 }
 
 // lookupCollection looks up the collection from the collection db with collID
