@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/peerstore"
 	"github.com/stretchr/testify/assert"
@@ -87,9 +88,11 @@ func TestCrosstalkPreventionOnNetworkKeyChange(t *testing.T) {
 
 	// create stream from node 1 to node 2
 	node1.Host().Peerstore().AddAddrs(peerInfo2.ID, peerInfo2.Addrs, peerstore.AddressTTL)
-	s, err := node1.CreateStream(context.Background(), peerInfo2.ID)
+	err = node1.OpenProtectedStream(context.Background(), peerInfo2.ID, t.Name(), func(stream network.Stream) error {
+		require.NotNil(t, stream)
+		return nil
+	})
 	require.NoError(t, err)
-	assert.NotNil(t, s)
 
 	// Simulate a hard-spoon: node1 is on the old chain, but node2 is moved from the old chain to the new chain
 	// stop node 2 and start it again with a different networking key but on the same IP and port
