@@ -43,7 +43,7 @@ func (_m *LibP2PNode) ActiveClustersChanged(_a0 flow.ChainIDList) {
 	_m.Called(_a0)
 }
 
-// AddPeer provides a mock function with given fields: ctx, peerInfo
+// ConnectToPeerAddrInfo provides a mock function with given fields: ctx, peerInfo
 func (_m *LibP2PNode) ConnectToPeerAddrInfo(ctx context.Context, peerInfo peer.AddrInfo) error {
 	ret := _m.Called(ctx, peerInfo)
 
