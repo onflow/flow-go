@@ -525,10 +525,13 @@ func TestCreateStreamTimeoutWithUnresponsiveNode(t *testing.T) {
 	unittest.AssertReturnsBefore(t,
 		func() {
 			nodes[0].Host().Peerstore().AddAddrs(silentNodeInfo.ID, silentNodeInfo.Addrs, peerstore.AddressTTL)
-			_, err = nodes[0].CreateStream(tctx, silentNodeInfo.ID)
+			err = nodes[0].OpenProtectedStream(tctx, silentNodeInfo.ID, t.Name(), func(stream network.Stream) error {
+				// do nothing, this is a no-op stream writer, we just check that the stream was created
+				return nil
+			})
+			require.Error(t, err)
 		},
 		timeout+grace)
-	assert.Error(t, err)
 }
 
 // TestCreateStreamIsConcurrent tests that CreateStream calls can be made concurrently such that one blocked call
