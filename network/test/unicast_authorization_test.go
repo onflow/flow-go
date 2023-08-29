@@ -39,16 +39,12 @@ type UnicastAuthorizationTestSuite struct {
 	codec *overridableMessageEncoder
 
 	libP2PNodes []p2p.LibP2PNode
-	// senderMW is the mw that will be sending the message
-	senderMW network.Middleware
 	// senderNetwork is the networking layer instance that will be used to send the message.
 	senderNetwork network.Network
 	// senderID the identity on the mw sending the message
 	senderID *flow.Identity
 	// receiverNetwork is the networking layer instance that will be used to receive the message.
 	receiverNetwork network.Network
-	// receiverMW is the mw that will be sending the message
-	receiverMW network.Middleware
 	// receiverID the identity on the mw sending the message
 	receiverID *flow.Identity
 	// providers id providers generated at beginning of a test run
@@ -78,15 +74,15 @@ func (u *UnicastAuthorizationTestSuite) TearDownTest() {
 	u.stopMiddlewares()
 }
 
-// setupMiddlewaresAndProviders will setup 2 middlewares that will be used as a sender and receiver in each suite test.
-func (u *UnicastAuthorizationTestSuite) setupMiddlewaresAndProviders(slashingViolationsConsumer network.ViolationsConsumer) {
+// setupNetworks will setup the sender and receiver networks with the given slashing violations consumer.
+func (u *UnicastAuthorizationTestSuite) setupNetworks(slashingViolationsConsumer network.ViolationsConsumer) {
 	u.sporkId = unittest.IdentifierFixture()
 	ids, libP2PNodes := testutils.LibP2PNodeForMiddlewareFixture(u.T(), u.sporkId, 2)
 	cfg := testutils.MiddlewareConfigFixture(u.T(), u.sporkId)
 	cfg.SlashingViolationConsumerFactory = func() network.ViolationsConsumer {
 		return slashingViolationsConsumer
 	}
-	u.codec = newUnknownMessageEncoder(u.T(), unittest.NetworkCodec())
+	u.codec = newOverridableMessageEncoder(unittest.NetworkCodec())
 	mws, _ := testutils.MiddlewareFixtures(u.T(), ids, libP2PNodes, cfg)
 	nets, providers := testutils.NetworksFixture(u.T(), u.sporkId, ids, mws, p2p.WithCodec(u.codec))
 	require.Len(u.T(), ids, 2)
@@ -97,9 +93,7 @@ func (u *UnicastAuthorizationTestSuite) setupMiddlewaresAndProviders(slashingVio
 	u.senderNetwork = nets[0]
 	u.receiverNetwork = nets[1]
 	u.senderID = ids[0]
-	u.senderMW = mws[0]
 	u.receiverID = ids[1]
-	u.receiverMW = mws[1]
 	u.providers = providers
 	u.libP2PNodes = libP2PNodes
 }
@@ -111,8 +105,6 @@ func (u *UnicastAuthorizationTestSuite) startMiddlewares(overlay *mocknetwork.Ov
 
 	testutils.StartNodes(sigCtx, u.T(), u.libP2PNodes, 1*time.Second)
 	testutils.StartNetworks(sigCtx, u.T(), []network.Network{u.senderNetwork, u.receiverNetwork}, 1*time.Second)
-
-	unittest.RequireComponentsReadyBefore(u.T(), 1*time.Second, u.senderMW, u.receiverMW)
 	unittest.RequireComponentsReadyBefore(u.T(), 1*time.Second, u.senderNetwork, u.receiverNetwork)
 
 	u.cancel = cancel
@@ -130,7 +122,7 @@ func (u *UnicastAuthorizationTestSuite) stopMiddlewares() {
 func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_UnstakedPeer() {
 	// setup mock slashing violations consumer and middlewares
 	slashingViolationsConsumer := mocknetwork.NewViolationsConsumer(u.T())
-	u.setupMiddlewaresAndProviders(slashingViolationsConsumer)
+	u.setupNetworks(slashingViolationsConsumer)
 
 	expectedSenderPeerID, err := unittest.PeerIDFromFlowID(u.senderID)
 	require.NoError(u.T(), err)
@@ -175,7 +167,7 @@ func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_UnstakedPeer() 
 func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_EjectedPeer() {
 	// setup mock slashing violations consumer and middlewares
 	slashingViolationsConsumer := mocknetwork.NewViolationsConsumer(u.T())
-	u.setupMiddlewaresAndProviders(slashingViolationsConsumer)
+	u.setupNetworks(slashingViolationsConsumer)
 	//NOTE: setup ejected identity
 	u.senderID.Ejected = true
 
@@ -223,7 +215,7 @@ func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_EjectedPeer() {
 func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_UnauthorizedPeer() {
 	// setup mock slashing violations consumer and middlewares
 	slashingViolationsConsumer := mocknetwork.NewViolationsConsumer(u.T())
-	u.setupMiddlewaresAndProviders(slashingViolationsConsumer)
+	u.setupNetworks(slashingViolationsConsumer)
 
 	expectedSenderPeerID, err := unittest.PeerIDFromFlowID(u.senderID)
 	require.NoError(u.T(), err)
@@ -266,7 +258,7 @@ func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_UnauthorizedPee
 func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_UnknownMsgCode() {
 	// setup mock slashing violations consumer and middlewares
 	slashingViolationsConsumer := mocknetwork.NewViolationsConsumer(u.T())
-	u.setupMiddlewaresAndProviders(slashingViolationsConsumer)
+	u.setupNetworks(slashingViolationsConsumer)
 
 	expectedSenderPeerID, err := unittest.PeerIDFromFlowID(u.senderID)
 	require.NoError(u.T(), err)
@@ -319,7 +311,7 @@ func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_UnknownMsgCode(
 func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_WrongMsgCode() {
 	// setup mock slashing violations consumer and middlewares
 	slashingViolationsConsumer := mocknetwork.NewViolationsConsumer(u.T())
-	u.setupMiddlewaresAndProviders(slashingViolationsConsumer)
+	u.setupNetworks(slashingViolationsConsumer)
 
 	expectedSenderPeerID, err := unittest.PeerIDFromFlowID(u.senderID)
 	require.NoError(u.T(), err)
@@ -370,7 +362,7 @@ func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_WrongMsgCode() 
 func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_PublicChannel() {
 	// setup mock slashing violations consumer and middlewares
 	slashingViolationsConsumer := mocknetwork.NewViolationsConsumer(u.T())
-	u.setupMiddlewaresAndProviders(slashingViolationsConsumer)
+	u.setupNetworks(slashingViolationsConsumer)
 	u.startMiddlewares(nil)
 
 	msg := &libp2pmessage.TestMessage{
@@ -403,7 +395,7 @@ func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_PublicChannel()
 func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_UnauthorizedUnicastOnChannel() {
 	// setup mock slashing violations consumer and middlewares
 	slashingViolationsConsumer := mocknetwork.NewViolationsConsumer(u.T())
-	u.setupMiddlewaresAndProviders(slashingViolationsConsumer)
+	u.setupNetworks(slashingViolationsConsumer)
 
 	// set sender id role to RoleConsensus to avoid unauthorized sender validation error
 	u.senderID.Role = flow.RoleConsensus
@@ -449,7 +441,7 @@ func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_UnauthorizedUni
 func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_ReceiverHasNoSubscription() {
 	// setup mock slashing violations consumer and middlewares
 	slashingViolationsConsumer := mocknetwork.NewViolationsConsumer(u.T())
-	u.setupMiddlewaresAndProviders(slashingViolationsConsumer)
+	u.setupNetworks(slashingViolationsConsumer)
 
 	expectedSenderPeerID, err := unittest.PeerIDFromFlowID(u.senderID)
 	require.NoError(u.T(), err)
@@ -488,7 +480,7 @@ func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_ReceiverHasNoSu
 func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_ReceiverHasSubscription() {
 	// setup mock slashing violations consumer and middlewares
 	slashingViolationsConsumer := mocknetwork.NewViolationsConsumer(u.T())
-	u.setupMiddlewaresAndProviders(slashingViolationsConsumer)
+	u.setupNetworks(slashingViolationsConsumer)
 	u.startMiddlewares(nil)
 
 	msg := &messages.EntityRequest{
@@ -518,24 +510,39 @@ func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_ReceiverHasSubs
 	unittest.RequireCloseBefore(u.T(), u.waitCh, u.channelCloseDuration, "could close ch on time")
 }
 
+// overridableMessageEncoder is a codec that allows to override the encoder for a specific type only for sake of testing.
+// We specifically use this to override the encoder for the TestMessage type to encode it with an invalid message code.
 type overridableMessageEncoder struct {
-	t               *testing.T
 	codec           network.Codec
 	specificEncoder map[reflect.Type]func(interface{}) ([]byte, error)
 }
 
+var _ network.Codec = (*overridableMessageEncoder)(nil)
+
+func newOverridableMessageEncoder(codec network.Codec) *overridableMessageEncoder {
+	return &overridableMessageEncoder{
+		codec:           codec,
+		specificEncoder: make(map[reflect.Type]func(interface{}) ([]byte, error)),
+	}
+}
+
+// RegisterEncoder registers an encoder for a specific type, overriding the default encoder for that type.
 func (u *overridableMessageEncoder) RegisterEncoder(t reflect.Type, encoder func(interface{}) ([]byte, error)) {
 	u.specificEncoder[t] = encoder
 }
 
+// NewEncoder creates a new encoder.
 func (u *overridableMessageEncoder) NewEncoder(w io.Writer) network.Encoder {
 	return u.codec.NewEncoder(w)
 }
 
+// NewDecoder creates a new decoder.
 func (u *overridableMessageEncoder) NewDecoder(r io.Reader) network.Decoder {
 	return u.codec.NewDecoder(r)
 }
 
+// Encode encodes a value into a byte slice. If a specific encoder is registered for the type of the value, it will be used.
+// Otherwise, the default encoder will be used.
 func (u *overridableMessageEncoder) Encode(v interface{}) ([]byte, error) {
 	if encoder, ok := u.specificEncoder[reflect.TypeOf(v)]; ok {
 		return encoder(v)
@@ -543,16 +550,7 @@ func (u *overridableMessageEncoder) Encode(v interface{}) ([]byte, error) {
 	return u.codec.Encode(v)
 }
 
+// Decode decodes a byte slice into a value. It uses the default decoder.
 func (u *overridableMessageEncoder) Decode(data []byte) (interface{}, error) {
 	return u.codec.Decode(data)
-}
-
-var _ network.Codec = (*overridableMessageEncoder)(nil)
-
-func newUnknownMessageEncoder(t *testing.T, codec network.Codec) *overridableMessageEncoder {
-	return &overridableMessageEncoder{
-		codec:           codec,
-		t:               t,
-		specificEncoder: make(map[reflect.Type]func(interface{}) ([]byte, error)),
-	}
 }
