@@ -162,16 +162,15 @@ func NewMiddleware(cfg *Config, opts ...OptionFn) *Middleware {
 
 	// create the node entity and inject dependencies & config
 	mw := &Middleware{
-		log:                        cfg.Logger,
-		libP2PNode:                 cfg.Libp2pNode,
-		bitswapMetrics:             cfg.BitSwapMetrics,
-		sporkId:                    cfg.SporkId,
-		validators:                 DefaultValidators(cfg.Logger, cfg.FlowId),
-		unicastMessageTimeout:      cfg.UnicastMessageTimeout,
-		idTranslator:               cfg.IdTranslator,
-		codec:                      cfg.Codec,
-		unicastRateLimiters:        ratelimit.NoopRateLimiters(),
-		slashingViolationsConsumer: cfg.SlashingViolationConsumerFactory(),
+		log:                   cfg.Logger,
+		libP2PNode:            cfg.Libp2pNode,
+		bitswapMetrics:        cfg.BitSwapMetrics,
+		sporkId:               cfg.SporkId,
+		validators:            DefaultValidators(cfg.Logger, cfg.FlowId),
+		unicastMessageTimeout: cfg.UnicastMessageTimeout,
+		idTranslator:          cfg.IdTranslator,
+		codec:                 cfg.Codec,
+		unicastRateLimiters:   ratelimit.NoopRateLimiters(),
 	}
 
 	for _, opt := range opts {
@@ -194,6 +193,10 @@ func NewMiddleware(cfg *Config, opts ...OptionFn) *Middleware {
 		if mw.ov == nil {
 			ctx.Throw(fmt.Errorf("overlay has not been set"))
 		}
+
+		// creation of slashing violations consumer should be postponed till here where the middleware
+		// is start and the overlay is set.
+		mw.slashingViolationsConsumer = cfg.SlashingViolationConsumerFactory()
 
 		mw.authorizedSenderValidator = validator.NewAuthorizedSenderValidator(
 			mw.log,
