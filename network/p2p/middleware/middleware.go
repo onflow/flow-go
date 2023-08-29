@@ -30,7 +30,6 @@ import (
 	"github.com/onflow/flow-go/network/message"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/blob"
-	"github.com/onflow/flow-go/network/p2p/p2pnode"
 	"github.com/onflow/flow-go/network/p2p/ping"
 	"github.com/onflow/flow-go/network/p2p/unicast/protocols"
 	"github.com/onflow/flow-go/network/p2p/unicast/ratelimit"
@@ -89,7 +88,7 @@ type Middleware struct {
 	libP2PNode                 p2p.LibP2PNode
 	preferredUnicasts          []protocols.ProtocolName
 	bitswapMetrics             module.BitswapMetrics
-	rootBlockID                flow.Identifier
+	sporkId                    flow.Identifier
 	validators                 []network.MessageValidator
 	peerManagerFilters         []p2p.PeerFilter
 	unicastMessageTimeout      time.Duration
@@ -136,7 +135,7 @@ type Config struct {
 	Libp2pNode            p2p.LibP2PNode
 	FlowId                flow.Identifier // This node's Flow ID
 	BitSwapMetrics        module.BitswapMetrics
-	RootBlockID           flow.Identifier
+	SporkId               flow.Identifier
 	UnicastMessageTimeout time.Duration
 	IdTranslator          p2p.IDTranslator
 	Codec                 network.Codec
@@ -166,7 +165,7 @@ func NewMiddleware(cfg *Config, opts ...OptionFn) *Middleware {
 		log:                   cfg.Logger,
 		libP2PNode:            cfg.Libp2pNode,
 		bitswapMetrics:        cfg.BitSwapMetrics,
-		rootBlockID:           cfg.RootBlockID,
+		sporkId:               cfg.SporkId,
 		validators:            DefaultValidators(cfg.Logger, cfg.FlowId),
 		unicastMessageTimeout: cfg.UnicastMessageTimeout,
 		idTranslator:          cfg.IdTranslator,
@@ -359,7 +358,7 @@ func (m *Middleware) OnAllowListNotification(notification *network.AllowListingU
 // - failed to send message to peer.
 //
 // All errors returned from this function can be considered benign.
-func (m *Middleware) SendDirect(msg *network.OutgoingMessageScope) error {
+func (m *Middleware) SendDirect(msg network.OutgoingMessageScope) error {
 	// since it is a unicast, we only need to get the first peer ID.
 	peerID, err := m.idTranslator.GetPeerID(msg.TargetIds()[0])
 	if err != nil {
@@ -382,7 +381,11 @@ func (m *Middleware) SendDirect(msg *network.OutgoingMessageScope) error {
 
 	// protect the underlying connection from being inadvertently pruned by the peer manager while the stream and
 	// connection creation is being attempted, and remove it from protected list once stream created.
-	tag := fmt.Sprintf("%v:%v", msg.Channel(), msg.PayloadType())
+	channel, ok := channels.ChannelFromTopic(msg.Topic())
+	if !ok {
+		return fmt.Errorf("could not find channel for topic %s", msg.Topic())
+	}
+	tag := fmt.Sprintf("%v:%v", channel, msg.PayloadType())
 	m.libP2PNode.Host().ConnManager().Protect(peerID, tag)
 	defer m.libP2PNode.Host().ConnManager().Unprotect(peerID, tag)
 
@@ -509,7 +512,7 @@ func (m *Middleware) handleIncomingStream(s libp2pnetwork.Stream) {
 		}
 
 		channel := channels.Channel(msg.ChannelID)
-		topic := channels.TopicFromChannel(channel, m.rootBlockID)
+		topic := channels.TopicFromChannel(channel, m.sporkId)
 
 		// ignore messages if node does not have subscription to topic
 		if !m.libP2PNode.HasSubscription(topic) {
@@ -556,7 +559,7 @@ func (m *Middleware) handleIncomingStream(s libp2pnetwork.Stream) {
 			remotePeer,
 			role,
 			msg.Size(),
-			network.MessageType(msg.Payload),
+			message.MessageType(msg.Payload),
 			channels.Topic(msg.ChannelID)) {
 			return
 		}
@@ -574,8 +577,7 @@ func (m *Middleware) handleIncomingStream(s libp2pnetwork.Stream) {
 // Subscribe subscribes the middleware to a channel.
 // No errors are expected during normal operation.
 func (m *Middleware) Subscribe(channel channels.Channel) error {
-
-	topic := channels.TopicFromChannel(channel, m.rootBlockID)
+	topic := channels.TopicFromChannel(channel, m.sporkId)
 
 	var peerFilter p2p.PeerFilter
 	var validators []validator.PubSubMessageValidator
@@ -625,16 +627,8 @@ func (m *Middleware) processPubSubMessages(msg *message.Message, peerID peer.ID)
 //
 // All errors returned from this function can be considered benign.
 func (m *Middleware) Unsubscribe(channel channels.Channel) error {
-	topic := channels.TopicFromChannel(channel, m.rootBlockID)
-	err := m.libP2PNode.UnSubscribe(topic)
-	if err != nil {
-		return fmt.Errorf("failed to unsubscribe from channel (%s): %w", channel, err)
-	}
-
-	// update peers to remove nodes subscribed to channel
-	m.libP2PNode.RequestPeerUpdate()
-
-	return nil
+	topic := channels.TopicFromChannel(channel, m.sporkId)
+	return m.libP2PNode.Unsubscribe(topic)
 }
 
 // processUnicastStreamMessage will decode, perform authorized sender validation and process a message
@@ -724,7 +718,7 @@ func (m *Middleware) processAuthenticatedMessage(msg *message.Message, peerID pe
 		return
 	}
 
-	scope, err := network.NewIncomingScope(originId, protocol, msg, decodedMsgPayload)
+	scope, err := message.NewIncomingScope(originId, protocol, msg, decodedMsgPayload)
 	if err != nil {
 		m.log.Error().
 			Err(err).
@@ -738,7 +732,7 @@ func (m *Middleware) processAuthenticatedMessage(msg *message.Message, peerID pe
 }
 
 // processMessage processes a message and eventually passes it to the overlay
-func (m *Middleware) processMessage(scope *network.IncomingMessageScope) {
+func (m *Middleware) processMessage(scope network.IncomingMessageScope) {
 	logger := m.log.With().
 		Str("channel", scope.Channel().String()).
 		Str("type", scope.Protocol().String()).
@@ -749,7 +743,7 @@ func (m *Middleware) processMessage(scope *network.IncomingMessageScope) {
 	// run through all the message validators
 	for _, v := range m.validators {
 		// if any one fails, stop message propagation
-		if !v.Validate(*scope) {
+		if !v.Validate(scope) {
 			logger.Debug().Msg("new message filtered by message validators")
 			return
 		}
@@ -773,52 +767,15 @@ func (m *Middleware) processMessage(scope *network.IncomingMessageScope) {
 // - the libP2P node fails to publish the message.
 //
 // All errors returned from this function can be considered benign.
-func (m *Middleware) Publish(msg *network.OutgoingMessageScope) error {
-	m.log.Debug().
-		Str("channel", msg.Channel().String()).
-		Interface("msg", msg.Proto()).
-		Str("type", msg.PayloadType()).
-		Int("msg_size", msg.Size()).
-		Msg("publishing new message")
-
-	// convert the message to bytes to be put on the wire.
-	data, err := msg.Proto().Marshal()
-	if err != nil {
-		return fmt.Errorf("failed to marshal the message: %w", err)
-	}
-
-	msgSize := len(data)
-	if msgSize > p2pnode.DefaultMaxPubSubMsgSize {
-		// libp2p pubsub will silently drop the message if its size is greater than the configured pubsub max message size
-		// hence return an error as this message is undeliverable
-		return fmt.Errorf("message size %d exceeds configured max message size %d", msgSize, p2pnode.DefaultMaxPubSubMsgSize)
-	}
-
-	topic := channels.TopicFromChannel(msg.Channel(), m.rootBlockID)
-
-	// publish the bytes on the topic
-	err = m.libP2PNode.Publish(m.ctx, topic, data)
-	if err != nil {
-		return fmt.Errorf("failed to publish the message: %w", err)
-	}
-
-	return nil
-}
-
-// IsConnected returns true if this node is connected to the node with id nodeID.
-// All errors returned from this function can be considered benign.
-func (m *Middleware) IsConnected(nodeID flow.Identifier) (bool, error) {
-	peerID, err := m.idTranslator.GetPeerID(nodeID)
-	if err != nil {
-		return false, fmt.Errorf("could not find peer id for target id: %w", err)
-	}
-	return m.libP2PNode.IsConnected(peerID)
+// TODO: DO NOT USE. Publish is ready to be removed from middleware. Use libp2pNode.Publish directly.
+func (m *Middleware) Publish(msg network.OutgoingMessageScope) error {
+	return m.libP2PNode.Publish(m.ctx, msg)
 }
 
 // unicastMaxMsgSize returns the max permissible size for a unicast message
 func unicastMaxMsgSize(messageType string) int {
 	switch messageType {
-	case "*messages.ChunkDataResponse":
+	case "*messages.ChunkDataResponse", "messages.ChunkDataResponse":
 		return LargeMsgMaxUnicastMsgSize
 	default:
 		return DefaultMaxUnicastMsgSize
@@ -843,7 +800,7 @@ func UnicastMaxMsgSizeByCode(payload []byte) (int, error) {
 // unicastMaxMsgDuration returns the max duration to allow for a unicast send to complete
 func (m *Middleware) unicastMaxMsgDuration(messageType string) time.Duration {
 	switch messageType {
-	case "messages.ChunkDataResponse":
+	case "*messages.ChunkDataResponse", "messages.ChunkDataResponse":
 		if LargeMsgUnicastTimeout > m.unicastMessageTimeout {
 			return LargeMsgUnicastTimeout
 		}

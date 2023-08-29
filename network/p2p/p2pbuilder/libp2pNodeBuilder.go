@@ -44,13 +44,6 @@ import (
 	"github.com/onflow/flow-go/network/p2p/utils"
 )
 
-type GossipSubFactoryFunc func(context.Context, zerolog.Logger, host.Host, p2p.PubSubAdapterConfig) (p2p.PubSubAdapter, error)
-type CreateNodeFunc func(logger zerolog.Logger,
-	host host.Host,
-	pCache *p2pnode.ProtocolPeerCache,
-	peerManager *connection.PeerManager) p2p.LibP2PNode
-type GossipSubAdapterConfigFunc func(*p2p.BasePubSubAdapterConfig) p2p.PubSubAdapterConfig
-
 type LibP2PNodeBuilder struct {
 	gossipSubBuilder p2p.GossipSubBuilder
 	sporkId          flow.Identifier
