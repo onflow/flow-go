@@ -227,8 +227,7 @@ func TestCreateStream_FallBack(t *testing.T) {
 		idProvider.On("ByPeerID", node.Host().ID()).Return(&identities[i], true).Maybe()
 
 	}
-	p2ptest.StartNodes(t, signalerCtx, nodes, 100*time.Millisecond)
-	defer p2ptest.StopNodes(t, nodes, cancel, 100*time.Millisecond)
+	p2ptest.StartNodes(t, signalerCtx, nodes, 1*time.Second)
 
 	// Assert that there is no outbound stream to the target yet (neither default nor preferred)
 	defaultProtocolId := protocols.FlowProtocolID(sporkId)
@@ -239,45 +238,44 @@ func TestCreateStream_FallBack(t *testing.T) {
 	// Now attempt to create another 100 outbound stream to the same destination by calling CreateStream
 	streamCount := 10
 	var streams []network.Stream
+	allStreamsClosedWg := sync.WaitGroup{}
 	for i := 0; i < streamCount; i++ {
+		allStreamsClosedWg.Add(1)
 		pInfo, err := utils.PeerAddressInfo(otherId)
 		require.NoError(t, err)
 		thisNode.Host().Peerstore().AddAddrs(pInfo.ID, pInfo.Addrs, peerstore.AddressTTL)
 
 		// a new stream must be created
-		anotherStream, err := thisNode.CreateStream(ctx, pInfo.ID)
-		require.NoError(t, err)
-		require.NotNil(t, anotherStream)
-
-		// number of default-protocol streams must be incremented, while preferred ones must be zero, since the other node
-		// only supports default ones.
-		require.Equal(t, i+1, p2putils.CountStream(thisNode.Host(), otherNode.Host().ID(), defaultProtocolId, network.DirOutbound))
-		require.Equal(t, 0, p2putils.CountStream(thisNode.Host(), otherNode.Host().ID(), preferredProtocolId, network.DirOutbound))
-
-		// assert that the same connection is reused
-		require.Len(t, thisNode.Host().Network().Conns(), 1)
-		streams = append(streams, anotherStream)
-	}
-
-	// reverse loop to close all the streams
-	for i := streamCount - 1; i >= 0; i-- {
-		fmt.Println("closing stream", i)
-		s := streams[i]
-		wg := sync.WaitGroup{}
-		wg.Add(1)
 		go func() {
-			// not checking the error as per upgrade of libp2p it returns stream reset error. This is not a problem
-			// as we are closing the stream anyway and counting the number of streams at the end.
-			_ = s.Close()
-			wg.Done()
-		}()
-		unittest.RequireReturnsBefore(t, wg.Wait, 1*time.Second, "could not close streams on time")
+			err = thisNode.OpenProtectedStream(ctx, pInfo.ID, t.Name(), func(stream network.Stream) error {
+				require.NotNil(t, stream)
+				streams = append(streams, stream)
 
-		// number of default-protocol streams must be decremented, while preferred ones must be zero, since the other node
-		// only supports default ones.
-		require.Equal(t, i, p2putils.CountStream(thisNode.Host(), otherNode.Host().ID(), defaultProtocolId, network.DirOutbound))
-		require.Equal(t, 0, p2putils.CountStream(thisNode.Host(), otherNode.Host().ID(), preferredProtocolId, network.DirOutbound))
+				// if we return this function, the stream will be closed, but we need to keep it open for the test
+				// hence we wait for the context to be done
+				<-ctx.Done()
+				allStreamsClosedWg.Done()
+				return nil
+			})
+		}()
 	}
+
+	// wait for the stream to be created on the default protocol id.
+	require.Eventually(t, func() bool {
+		return streamCount == p2putils.CountStream(nodes[0].Host(), nodes[1].Host().ID(), defaultProtocolId, network.DirOutbound)
+	}, 5*time.Second, 100*time.Millisecond, "could not create streams on time")
+
+	// no stream must be created on the preferred protocol id
+	require.Equal(t, 0, p2putils.CountStream(thisNode.Host(), otherNode.Host().ID(), preferredProtocolId, network.DirOutbound))
+
+	// checks that the number of connections is 1 despite the number of streams; i.e., all streams are created on the same connection
+	require.Len(t, nodes[0].Host().Network().Conns(), 1)
+
+	// we don't use defer as the moment we stop the nodes, the streams will be closed, and we want to assess the number of streams
+	p2ptest.StopNodes(t, nodes, cancel, 1*time.Second)
+
+	// wait for all streams to be closed
+	unittest.RequireReturnsBefore(t, allStreamsClosedWg.Wait, 1*time.Second, "could not close streams on time")
 }
 
 // TestCreateStreamIsConcurrencySafe tests that the CreateStream is concurrency safe
