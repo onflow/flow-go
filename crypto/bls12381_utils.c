@@ -21,9 +21,7 @@ const Fr BLS12_381_rR = {{
 }};
 
 // returns true if a == 0 and false otherwise
-bool Fr_is_zero(const Fr *a) {
-  return vec_is_zero(a, sizeof(Fr));
-}
+bool Fr_is_zero(const Fr *a) { return vec_is_zero(a, sizeof(Fr)); }
 
 // returns true if a == b and false otherwise
 bool Fr_is_equal(const Fr *a, const Fr *b) {
@@ -1057,7 +1055,7 @@ void xmd_sha256(byte *hash, int len_hash, byte *msg, int len_msg, byte *dst,
 }
 
 // DEBUG printing functions
-#ifdef DEBUG 
+#ifdef DEBUG
 void bytes_print_(char *s, byte *data, int len) {
   if (strlen(s))
     printf("[%s]:\n", s);
