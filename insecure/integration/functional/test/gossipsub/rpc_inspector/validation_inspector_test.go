@@ -623,8 +623,7 @@ func TestValidationInspector_DuplicateTopicId_Detection(t *testing.T) {
 			count.Inc()
 			notification, ok := args[0].(*p2p.InvCtrlMsgNotif)
 			require.True(t, ok)
-			require.Equal(t, spammer.SpammerNode..
-			ID(), notification.PeerID)
+			require.Equal(t, spammer.SpammerNode.ID(), notification.PeerID)
 			require.True(t, validation.IsDuplicateFoundErr(notification.Err))
 			require.Equal(t, messageCount, notification.Count)
 			switch notification.MsgType {
@@ -1132,8 +1131,7 @@ func TestValidationInspector_InspectIWants_CacheMissThreshold(t *testing.T) {
 		return func(args mockery.Arguments) {
 			notification, ok := args[0].(*p2p.InvCtrlMsgNotif)
 			require.True(t, ok)
-			require.Equal(t, spammer.SpammerNode..
-			ID(), notification.PeerID)
+			require.Equal(t, spammer.SpammerNode.ID(), notification.PeerID)
 			require.Equal(t, uint64(messageCount), notification.Count)
 			require.True(t, validation.IsIWantCacheMissThresholdErr(notification.Err))
 			cacheMissThresholdNotifCount.Inc()
@@ -1175,10 +1173,8 @@ func TestValidationInspector_InspectIWants_CacheMissThreshold(t *testing.T) {
 		internal.WithCorruptGossipSub(corruptlibp2p.CorruptGossipSubFactory(),
 			corruptlibp2p.CorruptGossipSubConfigFactoryWithInspector(corruptInspectorFunc)),
 	)
-	idProvider.On("ByPeerID", victimNode..
-	ID()).Return(&victimIdentity, true).Maybe()
-	idProvider.On("ByPeerID", spammer.SpammerNode..
-	ID()).Return(&spammer.SpammerId, true).Maybe()
+	idProvider.On("ByPeerID", victimNode.ID()).Return(&victimIdentity, true).Maybe()
+	idProvider.On("ByPeerID", spammer.SpammerNode.ID()).Return(&spammer.SpammerId, true).Maybe()
 
 	messageIDs := corruptlibp2p.GossipSubMessageIdsFixture(10)
 
@@ -1232,8 +1228,7 @@ func TestValidationInspector_InspectIWants_DuplicateMsgIDThreshold(t *testing.T)
 			defer close(done)
 			notification, ok := args[0].(*p2p.InvCtrlMsgNotif)
 			require.True(t, ok)
-			require.Equal(t, spammer.SpammerNode..
-			ID(), notification.PeerID)
+			require.Equal(t, spammer.SpammerNode.ID(), notification.PeerID)
 			require.Equal(t, uint64(messageCount), notification.Count)
 			require.True(t, validation.IsIWantDuplicateMsgIDThresholdErr(notification.Err))
 		}
@@ -1271,10 +1266,8 @@ func TestValidationInspector_InspectIWants_DuplicateMsgIDThreshold(t *testing.T)
 		internal.WithCorruptGossipSub(corruptlibp2p.CorruptGossipSubFactory(),
 			corruptlibp2p.CorruptGossipSubConfigFactoryWithInspector(corruptInspectorFunc)),
 	)
-	idProvider.On("ByPeerID", victimNode..
-	ID()).Return(&victimIdentity, true).Maybe()
-	idProvider.On("ByPeerID", spammer.SpammerNode..
-	ID()).Return(&spammer.SpammerId, true).Maybe()
+	idProvider.On("ByPeerID", victimNode.ID()).Return(&victimIdentity, true).Maybe()
+	idProvider.On("ByPeerID", spammer.SpammerNode.ID()).Return(&spammer.SpammerId, true).Maybe()
 
 	messageIDs := corruptlibp2p.GossipSubMessageIdsFixture(10)
 
