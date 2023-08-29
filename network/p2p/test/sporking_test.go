@@ -157,9 +157,11 @@ func TestOneToOneCrosstalkPrevention(t *testing.T) {
 
 	// create stream from node 1 to node 2
 	node2.Host().Peerstore().AddAddrs(peerInfo1.ID, peerInfo1.Addrs, peerstore.AddressTTL)
-	s, err := node2.CreateStream(context.Background(), peerInfo1.ID)
+	err = node2.OpenProtectedStream(context.Background(), peerInfo1.ID, t.Name(), func(stream network.Stream) error {
+		assert.NotNil(t, stream)
+		return nil
+	})
 	require.NoError(t, err)
-	assert.NotNil(t, s)
 
 	// Simulate a hard-spoon: node1 is on the old chain, but node2 is moved from the old chain to the new chain
 	// stop node 2 and start it again with a different libp2p protocol id to listen for
