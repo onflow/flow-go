@@ -27,5 +27,8 @@ type RegisterReader interface {
 // RegisterWriter defines write-only operations on the register index.
 type RegisterWriter interface {
 	// Store batch of register entries at the provided block height.
+	//
+	// If registers at height exists an error is returned. Expected errors:
+	// - storage.ErrAlreadyExists if the register at height already exists, prevents overwriting
 	Store(entries flow.RegisterEntries, height uint64) error
 }
