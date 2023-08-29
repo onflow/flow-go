@@ -66,8 +66,8 @@ func TestDisconnectingFromDisallowListedNode(t *testing.T) {
 	nodes := []p2p.LibP2PNode{node1, node2, node3}
 	ids := flow.IdentityList{&identity1, &identity2, &identity3}
 
-	p2ptest.StartNodes(t, signalerCtx, nodes, 100*time.Millisecond)
-	defer p2ptest.StopNodes(t, nodes, cancel, 100*time.Millisecond)
+	p2ptest.StartNodes(t, signalerCtx, nodes)
+	defer p2ptest.StopNodes(t, nodes, cancel)
 
 	p2ptest.LetNodesDiscoverEachOther(t, ctx, nodes, ids)
 

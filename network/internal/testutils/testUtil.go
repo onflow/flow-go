@@ -116,9 +116,9 @@ func NewTagWatchingConnManager(log zerolog.Logger, metrics module.LibP2PConnecti
 // If you want to create a standalone LibP2PNode without network and middleware components, please use p2ptest.NodeFixture.
 // Args:
 //
-//		t: testing.T- the test object
-//		sporkId: flow.Identifier - the spork id to use for the nodes
-//	 n: int - number of nodes to create
+//	t: testing.T- the test object
+//	sporkId: flow.Identifier - the spork id to use for the nodes
+//	n: int - number of nodes to create
 //
 // opts: []p2ptest.NodeFixtureParameterOption - options to configure the nodes
 // Returns:

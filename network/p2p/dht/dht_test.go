@@ -45,8 +45,8 @@ func TestFindPeerWithDHT(t *testing.T) {
 
 	nodes := append(dhtServerNodes, dhtClientNodes...)
 	idProvider.SetIdentities(append(serverIDs, clientIDs...))
-	p2ptest.StartNodes(t, signalerCtx, nodes, 100*time.Millisecond)
-	defer p2ptest.StopNodes(t, nodes, cancel, 100*time.Millisecond)
+	p2ptest.StartNodes(t, signalerCtx, nodes)
+	defer p2ptest.StopNodes(t, nodes, cancel)
 
 	getDhtServerAddr := func(i uint) peer.AddrInfo {
 		return peer.AddrInfo{ID: dhtServerNodes[i].ID(), Addrs: dhtServerNodes[i].Host().Addrs()}
@@ -141,8 +141,8 @@ func TestPubSubWithDHTDiscovery(t *testing.T) {
 		idProvider.On("ByPeerID", node.ID()).Return(&ids[i], true).Maybe()
 
 	}
-	p2ptest.StartNodes(t, signalerCtx, nodes, 100*time.Millisecond)
-	defer p2ptest.StopNodes(t, nodes, cancel, 100*time.Millisecond)
+	p2ptest.StartNodes(t, signalerCtx, nodes)
+	defer p2ptest.StopNodes(t, nodes, cancel)
 
 	// Step 2: Connect all nodes running a DHT client to the node running the DHT server
 	// This has to be done before subscribing to any topic, otherwise the node gives up on advertising

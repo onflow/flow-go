@@ -116,8 +116,8 @@ func TestGossipSubMeshTracer(t *testing.T) {
 	nodes := []p2p.LibP2PNode{tracerNode, otherNode1, otherNode2, unknownNode}
 	ids := flow.IdentityList{&tracerId, &otherId1, &otherId2, &unknownId}
 
-	p2ptest.StartNodes(t, signalerCtx, nodes, 1*time.Second)
-	defer p2ptest.StopNodes(t, nodes, cancel, 1*time.Second)
+	p2ptest.StartNodes(t, signalerCtx, nodes)
+	defer p2ptest.StopNodes(t, nodes, cancel)
 
 	p2ptest.LetNodesDiscoverEachOther(t, ctx, nodes, ids)
 

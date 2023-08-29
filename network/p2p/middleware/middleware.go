@@ -686,7 +686,7 @@ func (m *Middleware) processMessage(scope network.IncomingMessageScope) {
 // - the libP2P node fails to publish the message.
 //
 // All errors returned from this function can be considered benign.
-// TODO: publish has made ready to be removed from middleware, and instead the libp2pNode.Publish should be used directly.
+// TODO: DO NOT USE. Publish is ready to be removed from middleware. Use libp2pNode.Publish directly.
 func (m *Middleware) Publish(msg network.OutgoingMessageScope) error {
 	return m.libP2PNode.Publish(m.ctx, msg)
 }
@@ -694,7 +694,7 @@ func (m *Middleware) Publish(msg network.OutgoingMessageScope) error {
 // unicastMaxMsgSize returns the max permissible size for a unicast message
 func unicastMaxMsgSize(messageType string) int {
 	switch messageType {
-	case "*messages.ChunkDataResponse":
+	case "*messages.ChunkDataResponse", "messages.ChunkDataResponse":
 		return LargeMsgMaxUnicastMsgSize
 	default:
 		return DefaultMaxUnicastMsgSize
@@ -719,7 +719,7 @@ func UnicastMaxMsgSizeByCode(payload []byte) (int, error) {
 // unicastMaxMsgDuration returns the max duration to allow for a unicast send to complete
 func (m *Middleware) unicastMaxMsgDuration(messageType string) time.Duration {
 	switch messageType {
-	case "messages.ChunkDataResponse":
+	case "*messages.ChunkDataResponse", "messages.ChunkDataResponse":
 		if LargeMsgUnicastTimeout > m.unicastMessageTimeout {
 			return LargeMsgUnicastTimeout
 		}

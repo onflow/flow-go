@@ -208,8 +208,8 @@ func TestSubscriptionValidator_Integration(t *testing.T) {
 			return ok
 		})
 
-	p2ptest.StartNodes(t, signalerCtx, nodes, 100*time.Millisecond)
-	defer p2ptest.StopNodes(t, nodes, cancel, 100*time.Millisecond)
+	p2ptest.StartNodes(t, signalerCtx, nodes)
+	defer p2ptest.StopNodes(t, nodes, cancel)
 
 	blockTopic := channels.TopicFromChannel(channels.PushBlocks, sporkId)
 

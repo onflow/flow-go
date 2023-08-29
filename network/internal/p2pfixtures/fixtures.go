@@ -133,7 +133,8 @@ func CreateNode(t *testing.T, networkKey crypto.PrivateKey, sporkID flow.Identif
 		&p2p.DisallowListCacheConfig{
 			MaxSize: uint32(1000),
 			Metrics: metrics.NewNoopCollector(),
-		}).
+		},
+		meshTracer).
 		SetRoutingSystem(func(c context.Context, h host.Host) (routing.Routing, error) {
 			return p2pdht.NewDHT(c, h, protocols.FlowDHTProtocolID(sporkID), zerolog.Nop(), metrics.NewNoopCollector())
 		}).

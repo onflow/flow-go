@@ -130,8 +130,8 @@ func TestConnectionManager_Watermarking(t *testing.T) {
 
 	nodes := append(otherNodes, thisNode)
 
-	p2ptest.StartNodes(t, signalerCtx, nodes, 100*time.Millisecond)
-	defer p2ptest.StopNodes(t, nodes, cancel, 100*time.Millisecond)
+	p2ptest.StartNodes(t, signalerCtx, nodes)
+	defer p2ptest.StopNodes(t, nodes, cancel)
 
 	// connect this node to all other nodes.
 	for _, otherNode := range otherNodes {
