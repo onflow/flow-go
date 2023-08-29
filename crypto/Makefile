@@ -3,6 +3,9 @@ COVER_PROFILE := cover.out
 
 IMAGE_TAG := v0.0.7
 
+# OS
+UNAME := $(shell uname -s)
+
 # allows CI to specify whether to have race detection on / off
 ifeq ($(RACE_DETECTOR),1)
 	RACE_FLAG := -race
@@ -11,7 +14,7 @@ else
 endif
 
 # `ADX_SUPPORT` is 1 if ADX instructions are supported and 0 otherwise.
-ifeq ($(shell uname -s),Linux)
+ifeq ($(UNAME),Linux)
 # detect ADX support on the CURRENT linux machine.
 	ADX_SUPPORT := $(shell if ([ -f "/proc/cpuinfo" ] && grep -q -e '^flags.*\badx\b' /proc/cpuinfo); then echo 1; else echo 0; fi)
 else
@@ -40,16 +43,21 @@ c-format:
 
 # sanitize C code
 # cannot run on macos
-.PHONY: c-sanitize
+.SILENT: c-sanitize
 c-sanitize:
-# memory sanitization
-	$(CGO_FLAG) CC="clang -O -D__BLST_PORTABLE__ -O0 -g -fsanitize=memory -fno-omit-frame-pointer" \
-	LD="-fsanitize=memory" go test \
-	if [ $$? -ne 0 ]; then exit 1; fi
-# address sanitization and other checks
-	$(CGO_FLAG) CC="clang -O0 -g -fsanitize=address -fno-omit-frame-pointer -fsanitize=undefined -fno-sanitize-recover=all -fsanitize=float-divide-by-zero -fsanitize=float-cast-overflow -fno-sanitize=null -fno-sanitize=alignment" \
-	LD="-fsanitize=address" go test \
-	if [ $$? -ne 0 ]; then exit 1; fi
+# - memory sanitization (only on linux and using clang) - (could use go test -msan)
+# - address sanitization and other checks (only on linux)
+	if [ $(UNAME) = "Linux" ]; then \
+		$(CGO_FLAG) CC="clang -O0 -g -fsanitize=memory -fno-omit-frame-pointer -fsanitize-memory-track-origins" \
+		LD="-fsanitize=memory" go test; \
+		if [ $$? -ne 0 ]; then exit 1; fi; \
+		\
+		$(CGO_FLAG) CC="-O0 -g -fsanitize=address -fno-omit-frame-pointer -fsanitize=leak -fsanitize=undefined -fno-sanitize-recover=all -fsanitize=float-divide-by-zero -fsanitize=float-cast-overflow -fno-sanitize=null -fno-sanitize=alignment" \
+		LD="-fsanitize=address -fsanitize=leak" go test; \
+		if [ $$? -ne 0 ]; then exit 1; fi; \
+	else \
+		echo "sanitization is only supported on Linux"; \
+	fi; \
 
 # Go tidy
 .PHONY: go-tidy
