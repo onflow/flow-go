@@ -6,8 +6,8 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-// Register defines methods for the register index.
-type Register interface {
+// Registers defines methods for the register index.
+type Registers interface {
 	RegisterReader
 	RegisterWriter
 	io.Closer
