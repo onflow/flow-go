@@ -3,7 +3,6 @@
 package middleware
 
 import (
-	"bufio"
 	"context"
 	"errors"
 	"fmt"
@@ -359,102 +358,6 @@ func (m *Middleware) OnAllowListNotification(notification *network.AllowListingU
 // TODO: Remove this method in the future.
 func (m *Middleware) OpenProtectedStream(ctx context.Context, peerID peer.ID, protectionTag string, writingLogic func(stream libp2pnetwork.Stream) error) error {
 	return m.libP2PNode.OpenProtectedStream(ctx, peerID, protectionTag, writingLogic)
-}
-
-// SendDirect sends msg on a 1-1 direct connection to the target ID. It models a guaranteed delivery asynchronous
-// direct one-to-one connection on the underlying network. No intermediate node on the overlay is utilized
-// as the router.
-//
-// Dispatch should be used whenever guaranteed delivery to a specific target is required. Otherwise, Publish is
-// a more efficient candidate.
-//
-// The following benign errors can be returned:
-// - the peer ID for the target node ID cannot be found.
-// - the msg size was too large.
-// - failed to send message to peer.
-//
-// All errors returned from this function can be considered benign.
-func (m *Middleware) SendDirect(msg network.OutgoingMessageScope) error {
-	// since it is a unicast, we only need to get the first peer ID.
-	peerID, err := m.idTranslator.GetPeerID(msg.TargetIds()[0])
-	if err != nil {
-		return fmt.Errorf("could not find peer id for target id: %w", err)
-	}
-
-	maxMsgSize := unicastMaxMsgSize(msg.PayloadType())
-	if msg.Size() > maxMsgSize {
-		// message size goes beyond maximum size that the serializer can handle.
-		// proceeding with this message results in closing the connection by the target side, and
-		// delivery failure.
-		return fmt.Errorf("message size %d exceeds configured max message size %d", msg.Size(), maxMsgSize)
-	}
-
-	maxTimeout := m.unicastMaxMsgDuration(msg.PayloadType())
-
-	// pass in a context with timeout to make the unicast call fail fast
-	ctx, cancel := context.WithTimeout(m.ctx, maxTimeout)
-	defer cancel()
-
-	// protect the underlying connection from being inadvertently pruned by the peer manager while the stream and
-	// connection creation is being attempted, and remove it from protected list once stream created.
-	channel, ok := channels.ChannelFromTopic(msg.Topic())
-	if !ok {
-		return fmt.Errorf("could not find channel for topic %s", msg.Topic())
-	}
-	tag := fmt.Sprintf("%v:%v", channel, msg.PayloadType())
-	m.libP2PNode.Host().ConnManager().Protect(peerID, tag)
-	defer m.libP2PNode.Host().ConnManager().Unprotect(peerID, tag)
-
-	// create new stream
-	// streams don't need to be reused and are fairly inexpensive to be created for each send.
-	// A stream creation does NOT incur an RTT as stream negotiation happens as part of the first message
-	// sent out the receiver
-	stream, err := m.libP2PNode.CreateStream(ctx, peerID)
-	if err != nil {
-		return fmt.Errorf("failed to create stream for %s: %w", msg.TargetIds()[0], err)
-	}
-
-	success := false
-
-	defer func() {
-		if success {
-			// close the stream immediately
-			err = stream.Close()
-			if err != nil {
-				err = fmt.Errorf("failed to close the stream for %s: %w", msg.TargetIds()[0], err)
-			}
-		} else {
-			resetErr := stream.Reset()
-			if resetErr != nil {
-				m.log.Err(resetErr).Msg("failed to reset stream")
-			}
-		}
-	}()
-
-	deadline, _ := ctx.Deadline()
-	err = stream.SetWriteDeadline(deadline)
-	if err != nil {
-		return fmt.Errorf("failed to set write deadline for stream: %w", err)
-	}
-
-	// create a gogo protobuf writer
-	bufw := bufio.NewWriter(stream)
-	writer := ggio.NewDelimitedWriter(bufw)
-
-	err = writer.WriteMsg(msg.Proto())
-	if err != nil {
-		return fmt.Errorf("failed to send message to %s: %w", msg.TargetIds()[0], err)
-	}
-
-	// flush the stream
-	err = bufw.Flush()
-	if err != nil {
-		return fmt.Errorf("failed to flush stream for %s: %w", msg.TargetIds()[0], err)
-	}
-
-	success = true
-
-	return nil
 }
 
 // handleIncomingStream handles an incoming stream from a remote peer

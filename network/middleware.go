@@ -25,15 +25,6 @@ type Middleware interface {
 	// SetOverlay sets the overlay used by the middleware. This must be called before the middleware can be Started.
 	SetOverlay(Overlay)
 
-	// SendDirect sends msg on a 1-1 direct connection to the target ID. It models a guaranteed delivery asynchronous
-	// direct one-to-one connection on the underlying network. No intermediate node on the overlay is utilized
-	// as the router.
-	//
-	// Dispatch should be used whenever guaranteed delivery to a specific target is required. Otherwise, Publish is
-	// a more efficient candidate.
-	// All errors returned from this function can be considered benign.
-	SendDirect(msg OutgoingMessageScope) error
-
 	// OpenProtectedStream acts as a short-circuit method that delegates the opening of a protected stream to the underlying
 	// libP2PNode. This method is intended to be temporary and is going to be removed in the long term. Users should plan
 	// to interact with the libP2P node directly in the future.
