@@ -9,7 +9,7 @@ The traversal the walks `head <--> lowestBlock` (in either direction).
 There are a variety of ways to precisely specify `head` and `lowestBlock`:
  * At least one block, `head` or `lowestBlock`, must be specified by its ID
    to unambiguously identify the fork that should be traversed.
- * The other block an either be specified by ID or height.
+ * The other block can either be specified by ID or height.
  * If both `head` and `lowestBlock` are specified by their ID,
    they must both be on the same fork.
 
