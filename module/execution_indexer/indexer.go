@@ -128,31 +128,24 @@ func (i *Indexer) Values(IDs flow.RegisterIDs, height uint64) ([]flow.RegisterVa
 }
 
 func (i *Indexer) StorePayloads(payloads []*ledger.Payload, height uint64) error {
+	regEntries := make(flow.RegisterEntries, len(payloads))
 
-	// TODO add batch store
-	for _, payload := range payloads {
+	for j, payload := range payloads {
 		k, err := payload.Key()
 		if err != nil {
 			return err
 		}
 
-		// TODO make sure we can use the payload encKey instead of the paths,
-		// is the key encoded in the payload key convertable the same way?
 		id, err := migrations.KeyToRegisterID(k)
 		if err != nil {
 			return err
 		}
 
-		regEntries := flow.RegisterEntries{{
+		regEntries[j] = flow.RegisterEntry{
 			Key:   id,
 			Value: payload.Value(),
-		}}
-
-		err = i.registers.Store(regEntries, height)
-		if err != nil {
-			return err
 		}
 	}
 
-	return nil
+	return i.registers.Store(regEntries, height)
 }
