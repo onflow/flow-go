@@ -159,7 +159,7 @@ func testCreateStream(t *testing.T, sporkId flow.Identifier, unicasts []protocol
 		idProvider,
 		p2ptest.WithPreferredUnicasts(unicasts))
 	idProvider.SetIdentities(identities)
-	p2ptest.StartNodes(t, signalerCtx, nodes, 100*time.Millisecond)
+	p2ptest.StartNodes(t, signalerCtx, nodes)
 
 	id2 := identities[1]
 
@@ -197,7 +197,7 @@ func testCreateStream(t *testing.T, sporkId flow.Identifier, unicasts []protocol
 	require.Len(t, nodes[0].Host().Network().Conns(), 1)
 
 	// we don't use defer as the moment we stop the nodes, the streams will be closed, and we want to assess the number of streams
-	p2ptest.StopNodes(t, nodes, cancel, 1*time.Second)
+	p2ptest.StopNodes(t, nodes, cancel)
 
 	// wait for all streams to be closed
 	unittest.RequireReturnsBefore(t, allStreamsClosedWg.Wait, 1*time.Second, "could not close streams on time")
@@ -227,7 +227,7 @@ func TestCreateStream_FallBack(t *testing.T) {
 		idProvider.On("ByPeerID", node.ID()).Return(&identities[i], true).Maybe()
 
 	}
-	p2ptest.StartNodes(t, signalerCtx, nodes, 1*time.Second)
+	p2ptest.StartNodes(t, signalerCtx, nodes)
 
 	// Assert that there is no outbound stream to the target yet (neither default nor preferred)
 	defaultProtocolId := protocols.FlowProtocolID(sporkId)
