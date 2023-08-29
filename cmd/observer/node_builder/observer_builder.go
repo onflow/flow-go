@@ -493,6 +493,7 @@ func (builder *ObserverServiceBuilder) initNetwork(nodeID module.Local,
 		IdentityProvider:    builder.IdentityProvider,
 		ReceiveCache:        receiveCache,
 		ConduitFactory:      conduit.NewDefaultConduitFactory(),
+		SporkId:             builder.SporkID,
 		AlspCfg: &alspmgr.MisbehaviorReportManagerConfig{
 			Logger:                  builder.Logger,
 			SpamRecordCacheSize:     builder.FlowConfig.NetworkConfig.AlspConfig.SpamRecordCacheSize,
@@ -746,7 +747,8 @@ func (builder *ObserverServiceBuilder) initPublicLibp2pNode(networkKey crypto.Pr
 		&p2p.DisallowListCacheConfig{
 			MaxSize: builder.FlowConfig.NetworkConfig.DisallowListNotificationCacheSize,
 			Metrics: metrics.DisallowListCacheMetricsFactory(builder.HeroCacheMetricsFactory(), network.PublicNetwork),
-		}).
+		},
+		meshTracer).
 		SetSubscriptionFilter(
 			subscription.NewRoleBasedFilter(
 				subscription.UnstakedRole, builder.IdentityProvider,
@@ -1031,7 +1033,7 @@ func (builder *ObserverServiceBuilder) initMiddleware(nodeID flow.Identifier,
 		Libp2pNode:            libp2pNode,
 		FlowId:                nodeID,
 		BitSwapMetrics:        builder.Metrics.Bitswap,
-		RootBlockID:           builder.SporkID,
+		SporkId:               builder.SporkID,
 		UnicastMessageTimeout: middleware.DefaultUnicastTimeout,
 		IdTranslator:          builder.IDTranslator,
 		Codec:                 builder.CodecFactory(),

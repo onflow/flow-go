@@ -170,6 +170,12 @@ type SubscriptionFilter interface {
 type PubSubTracer interface {
 	component.Component
 	pubsub.RawTracer
+	RPCControlTracking
+}
+
+type RPCControlTracking interface {
+	LastHighestIHaveRPCSize() int64
+	WasIHaveRPCSent(messageID string) bool
 }
 
 // PeerScoreSnapshot is a snapshot of the overall peer score at a given time.

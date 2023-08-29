@@ -44,13 +44,6 @@ import (
 	"github.com/onflow/flow-go/network/p2p/utils"
 )
 
-type GossipSubFactoryFunc func(context.Context, zerolog.Logger, host.Host, p2p.PubSubAdapterConfig) (p2p.PubSubAdapter, error)
-type CreateNodeFunc func(logger zerolog.Logger,
-	host host.Host,
-	pCache *p2pnode.ProtocolPeerCache,
-	peerManager *connection.PeerManager) p2p.LibP2PNode
-type GossipSubAdapterConfigFunc func(*p2p.BasePubSubAdapterConfig) p2p.PubSubAdapterConfig
-
 type LibP2PNodeBuilder struct {
 	gossipSubBuilder p2p.GossipSubBuilder
 	sporkId          flow.Identifier
@@ -84,7 +77,8 @@ func NewNodeBuilder(
 	rCfg *p2pconf.ResourceManagerConfig,
 	rpcInspectorCfg *p2pconf.GossipSubRPCInspectorsConfig,
 	peerManagerConfig *p2pconfig.PeerManagerConfig,
-	disallowListCacheCfg *p2p.DisallowListCacheConfig) *LibP2PNodeBuilder {
+	disallowListCacheCfg *p2p.DisallowListCacheConfig,
+	rpcTracker p2p.RPCControlTracking) *LibP2PNodeBuilder {
 	return &LibP2PNodeBuilder{
 		logger:               logger,
 		sporkId:              sporkId,
@@ -100,7 +94,8 @@ func NewNodeBuilder(
 			networkingType,
 			sporkId,
 			idProvider,
-			rpcInspectorCfg),
+			rpcInspectorCfg,
+			rpcTracker),
 		peerManagerConfig: peerManagerConfig,
 	}
 }
@@ -462,6 +457,19 @@ func DefaultNodeBuilder(
 		connection.WithOnInterceptPeerDialFilters(append(peerFilters, connGaterCfg.InterceptPeerDialFilters...)),
 		connection.WithOnInterceptSecuredFilters(append(peerFilters, connGaterCfg.InterceptSecuredFilters...)))
 
+	meshTracerCfg := &tracer.GossipSubMeshTracerConfig{
+		Logger:                             logger,
+		Metrics:                            metricsCfg.Metrics,
+		IDProvider:                         idProvider,
+		LoggerInterval:                     gossipCfg.LocalMeshLogInterval,
+		RpcSentTrackerCacheSize:            gossipCfg.RPCSentTrackerCacheSize,
+		RpcSentTrackerWorkerQueueCacheSize: gossipCfg.RPCSentTrackerQueueCacheSize,
+		RpcSentTrackerNumOfWorkers:         gossipCfg.RpcSentTrackerNumOfWorkers,
+		HeroCacheMetricsFactory:            metricsCfg.HeroCacheFactory,
+		NetworkingType:                     flownet.PrivateNetwork,
+	}
+	meshTracer := tracer.NewGossipSubMeshTracer(meshTracerCfg)
+
 	builder := NewNodeBuilder(
 		logger,
 		metricsCfg,
@@ -473,7 +481,8 @@ func DefaultNodeBuilder(
 		rCfg,
 		rpcInspectorCfg,
 		peerManagerCfg,
-		disallowListCacheCfg).
+		disallowListCacheCfg,
+		meshTracer).
 		SetBasicResolver(resolver).
 		SetConnectionManager(connManager).
 		SetConnectionGater(connGater).
@@ -488,19 +497,6 @@ func DefaultNodeBuilder(
 		// In production, we never override the default scoring config.
 		builder.EnableGossipSubScoringWithOverride(p2p.PeerScoringConfigNoOverride)
 	}
-
-	meshTracerCfg := &tracer.GossipSubMeshTracerConfig{
-		Logger:                             logger,
-		Metrics:                            metricsCfg.Metrics,
-		IDProvider:                         idProvider,
-		LoggerInterval:                     gossipCfg.LocalMeshLogInterval,
-		RpcSentTrackerCacheSize:            gossipCfg.RPCSentTrackerCacheSize,
-		RpcSentTrackerWorkerQueueCacheSize: gossipCfg.RPCSentTrackerQueueCacheSize,
-		RpcSentTrackerNumOfWorkers:         gossipCfg.RpcSentTrackerNumOfWorkers,
-		HeroCacheMetricsFactory:            metricsCfg.HeroCacheFactory,
-		NetworkingType:                     flownet.PrivateNetwork,
-	}
-	meshTracer := tracer.NewGossipSubMeshTracer(meshTracerCfg)
 
 	builder.SetGossipSubTracer(meshTracer)
 	builder.SetGossipSubScoreTracerInterval(gossipCfg.ScoreTracerInterval)

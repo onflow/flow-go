@@ -43,12 +43,21 @@ func WithIHave(msgCount, msgSize int, topicId string) GossipSubCtrlOption {
 }
 
 // WithIWant adds iWant control messages of the given size and number to the control message.
-func WithIWant(msgCount, msgSize int) GossipSubCtrlOption {
+// The message IDs are generated randomly.
+// Args:
+//
+//	msgCount: number of iWant messages to add.
+//	msgIdsPerIWant: number of message IDs to add to each iWant message.
+//
+// Returns:
+// A GossipSubCtrlOption that adds iWant messages to the control message.
+// Example: WithIWant(2, 3) will add 2 iWant messages, each with 3 message IDs.
+func WithIWant(iWantCount int, msgIdsPerIWant int) GossipSubCtrlOption {
 	return func(msg *pubsubpb.ControlMessage) {
-		iWants := make([]*pubsubpb.ControlIWant, msgCount)
-		for i := 0; i < msgCount; i++ {
+		iWants := make([]*pubsubpb.ControlIWant, iWantCount)
+		for i := 0; i < iWantCount; i++ {
 			iWants[i] = &pubsubpb.ControlIWant{
-				MessageIDs: GossipSubMessageIdsFixture(msgSize),
+				MessageIDs: GossipSubMessageIdsFixture(msgIdsPerIWant),
 			}
 		}
 		msg.Iwant = iWants
