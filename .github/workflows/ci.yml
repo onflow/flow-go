@@ -42,8 +42,8 @@ jobs:
       uses: mxschmitt/action-tmate@v3
     - name: Install C formatter
       run: sudo apt-get install -y clang-format
-    - name: Run C formatter for ./crypto
-      run: make -C crypto c-format
+    - name: Run C formatter and sanitizer for ./crypto
+      run: make -C crypto c-format && make -C crypto c-sanitize
     - name: Run go generate
       run: go generate
       working-directory: ${{ matrix.dir }}
