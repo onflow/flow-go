@@ -24,7 +24,6 @@ import (
 	"github.com/onflow/flow-go/model/flow/filter"
 	libp2pmessage "github.com/onflow/flow-go/model/libp2p/message"
 	"github.com/onflow/flow-go/model/messages"
-	"github.com/onflow/flow-go/module/id"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/observable"
@@ -205,8 +204,8 @@ func (m *MiddlewareTestSuite) TestUpdateNodeAddresses() {
 
 	// create a new staked identity
 	ids, libP2PNodes := testutils.LibP2PNodeForMiddlewareFixture(m.T(), m.sporkId, 1)
-	idProvider := id.NewFixedIdentityProvider(ids)
-	mws, providers := testutils.MiddlewareFixtures(
+	idProvider := unittest.NewUpdatableIDProvider(ids)
+	mws, _ := testutils.MiddlewareFixtures(
 		m.T(),
 		ids,
 		libP2PNodes,
@@ -221,12 +220,11 @@ func (m *MiddlewareTestSuite) TestUpdateNodeAddresses() {
 	require.NoError(m.T(), err)
 
 	require.Len(m.T(), ids, 1)
-	require.Len(m.T(), providers, 1)
 	require.Len(m.T(), mws, 1)
 	newId := ids[0]
 	newMw := mws[0]
 
-	overlay := m.createOverlay(providers[0])
+	overlay := m.createOverlay(idProvider)
 	overlay.On("Receive", m.ids[0].NodeID, mockery.AnythingOfType("*message.Message")).Return(nil)
 	newMw.SetOverlay(overlay)
 
@@ -452,6 +450,7 @@ func (m *MiddlewareTestSuite) TestUnicastRateLimit_Bandwidth() {
 			return nil
 		})))
 	idProvider.SetIdentities(append(m.ids, ids...))
+	m.providers[0].SetIdentities(append(m.ids, ids...))
 
 	// create middleware
 	mws, providers := testutils.MiddlewareFixtures(m.T(),
