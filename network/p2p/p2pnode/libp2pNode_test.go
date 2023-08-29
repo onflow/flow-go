@@ -289,22 +289,19 @@ func TestCreateStream_SinglePairwiseConnection(t *testing.T) {
 	ctxWithTimeout, cancel := context.WithTimeout(ctx, 3*time.Second)
 	defer cancel()
 	done := make(chan struct{})
-	numOfStreamsPerNode := 100 // create large number of streams per node per connection to ensure the resource manager does not cause starvation of resources
+	numOfStreamsPerNode := 100 // create large number of streamChan per node per connection to ensure the resource manager does not cause starvation of resources
 	expectedTotalNumOfStreams := 600
 
-	// create a number of streams concurrently between each node
-	streams := make(chan network.Stream, expectedTotalNumOfStreams)
+	// create a number of streamChan concurrently between each node
+	streamChan := make(chan network.Stream, expectedTotalNumOfStreams)
 
-	go createConcurrentStreams(t, ctxWithTimeout, nodes, ids, numOfStreamsPerNode, streams, done)
-	unittest.RequireCloseBefore(t, done, 5*time.Second, "could not create streams on time")
-	require.Len(t, streams, expectedTotalNumOfStreams, fmt.Sprintf("expected %d total number of streams created got %d", expectedTotalNumOfStreams, len(streams)))
+	go createConcurrentStreams(t, ctxWithTimeout, nodes, ids, numOfStreamsPerNode, streamChan, done)
+	unittest.RequireCloseBefore(t, done, 5*time.Second, "could not create streamChan on time")
+	require.Len(t, streamChan, expectedTotalNumOfStreams, fmt.Sprintf("expected %d total number of streamChan created got %d", expectedTotalNumOfStreams, len(streamChan)))
 
 	// ensure only a single connection exists between all nodes
 	ensureSinglePairwiseConnection(t, nodes)
-	close(streams)
-	for s := range streams {
-		_ = s.Close()
-	}
+	close(streamChan)
 }
 
 // TestCreateStream_SinglePeerDial ensures that the unicast manager only attempts to dial a peer once, retries dialing a peer the expected max amount of times when an
@@ -383,12 +380,16 @@ func TestCreateStream_SinglePeerDial(t *testing.T) {
 	// attempt to create two concurrent streams
 	go func() {
 		defer wg.Done()
-		_, err := sender.CreateStream(ctx, receiver.Host().ID())
+		err := sender.OpenProtectedStream(ctx, receiver.Host().ID(), t.Name(), func(stream network.Stream) error {
+			return nil
+		})
 		require.Error(t, err)
 	}()
 	go func() {
 		defer wg.Done()
-		_, err := sender.CreateStream(ctx, receiver.Host().ID())
+		err := sender.OpenProtectedStream(ctx, receiver.Host().ID(), t.Name(), func(stream network.Stream) error {
+			return nil
+		})
 		require.Error(t, err)
 	}()
 
@@ -480,9 +481,14 @@ func createConcurrentStreams(t *testing.T, ctx context.Context, nodes []p2p.LibP
 				wg.Add(1)
 				go func(sender p2p.LibP2PNode) {
 					defer wg.Done()
-					s, err := sender.CreateStream(ctx, pInfo.ID)
+					err := sender.OpenProtectedStream(ctx, pInfo.ID, t.Name(), func(stream network.Stream) error {
+						streams <- stream
+
+						// wait for the done signal to close the stream
+						<-ctx.Done()
+						return nil
+					})
 					require.NoError(t, err)
-					streams <- s
 				}(this)
 			}
 		}
@@ -490,7 +496,7 @@ func createConcurrentStreams(t *testing.T, ctx context.Context, nodes []p2p.LibP
 		// in 2 connections 1 created by each node, this happens because we are calling CreateStream concurrently.
 		time.Sleep(500 * time.Millisecond)
 	}
-	wg.Wait()
+	unittest.RequireReturnsBefore(t, wg.Wait, 3*time.Second, "could not create streams on time")
 }
 
 // ensureSinglePairwiseConnection ensure each node in the list has exactly one connection to every other node in the list.

@@ -276,14 +276,18 @@ func EnsureMessageExchangeOverUnicast(t *testing.T, ctx context.Context, nodes [
 			if this == other {
 				continue
 			}
-			s, err := this.CreateStream(ctx, other.Host().ID())
-			require.NoError(t, err)
-			rw := bufio.NewReadWriter(bufio.NewReader(s), bufio.NewWriter(s))
-			_, err = rw.WriteString(msg)
+			err := this.OpenProtectedStream(ctx, other.Host().ID(), t.Name(), func(stream network.Stream) error {
+				rw := bufio.NewReadWriter(bufio.NewReader(stream), bufio.NewWriter(stream))
+				_, err := rw.WriteString(msg)
+				require.NoError(t, err)
+
+				// Flush the stream
+				require.NoError(t, rw.Flush())
+
+				return nil
+			})
 			require.NoError(t, err)
 
-			// Flush the stream
-			require.NoError(t, rw.Flush())
 		}
 
 		// wait for the message to be received by all other nodes
