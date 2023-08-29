@@ -39,9 +39,7 @@ func (i *Indexer) NewStorageSnapshot(commitment flow.StateCommitment) snapshot.S
 		}
 	}
 
-	if height == 0 {
-
-	}
+	// TODO what if commitment is not found
 
 	reader := func(id flow.RegisterID) (flow.RegisterValue, error) {
 		entry, err := i.registers.Get(id, height)
