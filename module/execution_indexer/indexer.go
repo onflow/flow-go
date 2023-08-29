@@ -12,18 +12,18 @@ import (
 	"github.com/onflow/flow-go/storage"
 )
 
-var _ module.ExecutionStateIndexer = &indexer{}
-var _ scripts.ScriptExecutionState = &indexer{}
+var _ module.ExecutionStateIndexer = &Indexer{}
+var _ scripts.ScriptExecutionState = &Indexer{}
 
-type indexer struct {
+type Indexer struct {
 	registers   storage.Registers
 	headers     storage.Headers
 	last        uint64                          // todo persist
 	commitments map[uint64]flow.StateCommitment // todo persist
 }
 
-func New(registers storage.Registers, headers storage.Headers) *indexer {
-	return &indexer{
+func New(registers storage.Registers, headers storage.Headers) *Indexer {
+	return &Indexer{
 		registers:   registers,
 		headers:     headers,
 		last:        0,
@@ -31,7 +31,7 @@ func New(registers storage.Registers, headers storage.Headers) *indexer {
 	}
 }
 
-func (i *indexer) NewStorageSnapshot(commitment flow.StateCommitment) snapshot.StorageSnapshot {
+func (i *Indexer) NewStorageSnapshot(commitment flow.StateCommitment) snapshot.StorageSnapshot {
 	var height uint64
 	for h, commit := range i.commitments {
 		if commit == commitment {
@@ -55,7 +55,7 @@ func (i *indexer) NewStorageSnapshot(commitment flow.StateCommitment) snapshot.S
 	return snapshot.NewReadFuncStorageSnapshot(reader)
 }
 
-func (i *indexer) StateCommitmentByBlockID(
+func (i *Indexer) StateCommitmentByBlockID(
 	ctx context.Context,
 	identifier flow.Identifier,
 ) (flow.StateCommitment, error) {
@@ -72,7 +72,7 @@ func (i *indexer) StateCommitmentByBlockID(
 	return commit, nil
 }
 
-func (i *indexer) HasState(commitment flow.StateCommitment) bool {
+func (i *Indexer) HasState(commitment flow.StateCommitment) bool {
 	for _, c := range i.commitments {
 		if c == commitment {
 			return true
@@ -82,16 +82,16 @@ func (i *indexer) HasState(commitment flow.StateCommitment) bool {
 	return false
 }
 
-func (i *indexer) Last() (uint64, error) {
+func (i *Indexer) Last() (uint64, error) {
 	return i.last, nil
 }
 
-func (i *indexer) StoreLast(last uint64) error {
+func (i *Indexer) StoreLast(last uint64) error {
 	i.last = last
 	return nil
 }
 
-func (i *indexer) HeightByBlockID(ID flow.Identifier) (uint64, error) {
+func (i *Indexer) HeightByBlockID(ID flow.Identifier) (uint64, error) {
 	header, err := i.headers.ByBlockID(ID)
 	if err != nil {
 		return 0, err
@@ -100,7 +100,7 @@ func (i *indexer) HeightByBlockID(ID flow.Identifier) (uint64, error) {
 	return header.Height, nil
 }
 
-func (i *indexer) Commitment(height uint64) (flow.StateCommitment, error) {
+func (i *Indexer) Commitment(height uint64) (flow.StateCommitment, error) {
 	val, ok := i.commitments[height]
 	if !ok {
 		return flow.DummyStateCommitment, fmt.Errorf("could not find commitment at height %d", height)
@@ -109,12 +109,12 @@ func (i *indexer) Commitment(height uint64) (flow.StateCommitment, error) {
 	return val, nil
 }
 
-func (i *indexer) StoreCommitment(commitment flow.StateCommitment, height uint64) error {
+func (i *Indexer) StoreCommitment(commitment flow.StateCommitment, height uint64) error {
 	i.commitments[height] = commitment
 	return nil
 }
 
-func (i *indexer) Values(IDs flow.RegisterIDs, height uint64) ([]flow.RegisterValue, error) {
+func (i *Indexer) Values(IDs flow.RegisterIDs, height uint64) ([]flow.RegisterValue, error) {
 	values := make([]flow.RegisterValue, len(IDs))
 
 	for j, id := range IDs {
@@ -129,7 +129,7 @@ func (i *indexer) Values(IDs flow.RegisterIDs, height uint64) ([]flow.RegisterVa
 	return values, nil
 }
 
-func (i *indexer) StorePayloads(payloads []*ledger.Payload, height uint64) error {
+func (i *Indexer) StorePayloads(payloads []*ledger.Payload, height uint64) error {
 
 	// TODO add batch store
 	for _, payload := range payloads {

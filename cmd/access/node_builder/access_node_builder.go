@@ -444,7 +444,7 @@ func (builder *FlowAccessNodeBuilder) BuildConsensusFollower() *FlowAccessNodeBu
 func (builder *FlowAccessNodeBuilder) BuildExecutionDataRequester() *FlowAccessNodeBuilder {
 	var ds *badger.Datastore
 	var bs network.BlobService
-	var exeIndexer module.ExecutionStateIndexer
+	var exeIndexer *execution_indexer.Indexer
 	var processedBlockHeight storage.ConsumerProgress
 	var processedNotifications storage.ConsumerProgress
 	var bsDependable *module.ProxiedReadyDoneAware
