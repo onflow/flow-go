@@ -35,7 +35,7 @@ type Engine struct {
 	events       storage.Events
 	transactions storage.Transactions
 
-	index module.Indexer
+	index module.ExecutionStateIndexer
 
 	execDataCache *cache.ExecutionDataCache
 
@@ -57,7 +57,7 @@ func New(
 	events storage.Events,
 	transactions storage.Transactions,
 	execDataCache *cache.ExecutionDataCache,
-	index module.Indexer,
+	index module.ExecutionStateIndexer,
 	lastFullyIndexedHeight uint64,
 	highestAvailableHeight uint64,
 ) (*Engine, error) {
@@ -96,7 +96,7 @@ func (e *Engine) OnExecutionData(executionData *execution_data.BlockExecutionDat
 
 	lg.Trace().Msg("received execution data")
 
-	height, err := e.index.HeightForBlock(executionData.BlockID)
+	height, err := e.index.HeightByBlockID(executionData.BlockID)
 	if err != nil {
 		// if the execution data is available, the block must be locally finalized
 		lg.Fatal().Err(err).Msg("failed to get header for execution data")
@@ -277,7 +277,7 @@ func (e *Engine) handleTrieUpdate(blockID flow.Identifier, update *ledger.TrieUp
 		return fmt.Errorf("trie update paths and payloads have different lengths")
 	}
 
-	height, err := e.index.HeightForBlock(blockID)
+	height, err := e.index.HeightByBlockID(blockID)
 	if err != nil {
 		return err
 	}

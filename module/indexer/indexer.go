@@ -12,7 +12,7 @@ import (
 	"github.com/onflow/flow-go/storage"
 )
 
-var _ module.Indexer = &Indexer{}
+var _ module.ExecutionStateIndexer = &Indexer{}
 var _ scripts.ScriptExecutionState = &Indexer{}
 
 type Indexer struct {
@@ -82,7 +82,7 @@ func (i *Indexer) StoreLast(last uint64) error {
 	return nil
 }
 
-func (i *Indexer) HeightForBlock(ID flow.Identifier) (uint64, error) {
+func (i *Indexer) HeightByBlockID(ID flow.Identifier) (uint64, error) {
 	header, err := i.headers.ByBlockID(ID)
 	if err != nil {
 		return 0, err

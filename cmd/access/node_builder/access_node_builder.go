@@ -443,7 +443,7 @@ func (builder *FlowAccessNodeBuilder) BuildConsensusFollower() *FlowAccessNodeBu
 func (builder *FlowAccessNodeBuilder) BuildExecutionDataRequester() *FlowAccessNodeBuilder {
 	var ds *badger.Datastore
 	var bs network.BlobService
-	var exeIndexer module.Indexer
+	var exeIndexer module.ExecutionStateIndexer
 	var processedBlockHeight storage.ConsumerProgress
 	var processedNotifications storage.ConsumerProgress
 	var bsDependable *module.ProxiedReadyDoneAware
