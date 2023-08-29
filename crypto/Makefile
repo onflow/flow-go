@@ -46,7 +46,7 @@ c-format:
 c-asan:
 # - address sanitization and other checks (only on linux)
 	if [ $(UNAME) = "Linux" ]; then \
-		$(CGO_FLAG) CC="-O0 -g -fsanitize=address -fno-omit-frame-pointer -fsanitize=leak -fsanitize=undefined -fno-sanitize-recover=all -fsanitize=float-divide-by-zero -fsanitize=float-cast-overflow -fno-sanitize=null -fno-sanitize=alignment" \
+		$(CGO_FLAG) CC="clang -O0 -g -fsanitize=address -fno-omit-frame-pointer -fsanitize=leak -fsanitize=undefined -fno-sanitize-recover=all -fsanitize=float-divide-by-zero -fsanitize=float-cast-overflow -fno-sanitize=null -fno-sanitize=alignment" \
 		LD="-fsanitize=address -fsanitize=leak" go test; \
 		if [ $$? -ne 0 ]; then exit 1; fi; \
 	else \
