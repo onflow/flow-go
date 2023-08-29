@@ -18,22 +18,28 @@ func NewRegisters() *Registers {
 	}
 }
 
-func (r Registers) Get(ID flow.RegisterID, height uint64) (flow.RegisterValue, error) {
+func (r Registers) Get(ID flow.RegisterID, height uint64) (flow.RegisterEntry, error) {
 	h, ok := r.registers[height]
 	if !ok {
-		return nil, fmt.Errorf("height %d for registers not indexed", height)
+		return flow.RegisterEntry{}, fmt.Errorf("height %d for registers not indexed", height)
 	}
 
 	entry, ok := h[ID]
 	if !ok {
-		return nil, fmt.Errorf("register by ID %s not found", ID.String())
+		return flow.RegisterEntry{}, fmt.Errorf("register by ID %s not found", ID.String())
 	}
 
-	return entry, nil
+	return flow.RegisterEntry{
+		Key:   ID,
+		Value: entry,
+	}, nil
 }
 
-func (r Registers) Store(entry flow.RegisterEntry, height uint64) error {
-	r.registers[height][entry.Key] = entry.Value
+func (r Registers) Store(entries flow.RegisterEntries, height uint64) error {
+	for _, e := range entries {
+		r.registers[height][e.Key] = e.Value
+	}
+
 	return nil
 }
 
