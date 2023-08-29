@@ -272,7 +272,7 @@ func TestCreateStream_FallBack(t *testing.T) {
 	require.Len(t, nodes[0].Host().Network().Conns(), 1)
 
 	// we don't use defer as the moment we stop the nodes, the streams will be closed, and we want to assess the number of streams
-	p2ptest.StopNodes(t, nodes, cancel, 1*time.Second)
+	p2ptest.StopNodes(t, nodes, cancel)
 
 	// wait for all streams to be closed
 	unittest.RequireReturnsBefore(t, allStreamsClosedWg.Wait, 1*time.Second, "could not close streams on time")
