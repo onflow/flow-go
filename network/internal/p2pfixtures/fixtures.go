@@ -335,7 +335,10 @@ func EnsureNoStreamCreation(t *testing.T, ctx context.Context, from []p2p.LibP2P
 			}
 			require.Empty(t, other.Host().Network().ConnsToPeer(thisId))
 
-			_, err := this.CreateStream(ctx, otherId)
+			err := this.OpenProtectedStream(ctx, otherId, t.Name(), func(stream network.Stream) error {
+				// no-op as the stream is never created.
+				return nil
+			})
 			// ensures that other node has never received a connection from this node.
 			require.Equal(t, other.Host().Network().Connectedness(thisId), network.NotConnected)
 			// a stream is established on top of a connection, so if there is no connection, there should be no stream.
@@ -357,9 +360,12 @@ func EnsureStreamCreation(t *testing.T, ctx context.Context, from []p2p.LibP2PNo
 				require.Fail(t, "node is in both from and to lists")
 			}
 			// stream creation should pass without error
-			s, err := this.CreateStream(ctx, other.Host().ID())
+			err := this.OpenProtectedStream(ctx, other.Host().ID(), t.Name(), func(stream network.Stream) error {
+				require.NotNil(t, stream)
+				return nil
+			})
 			require.NoError(t, err)
-			require.NotNil(t, s)
+
 		}
 	}
 }
