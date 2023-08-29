@@ -554,9 +554,13 @@ func EnsureStreamCreationInBothDirections(t *testing.T, ctx context.Context, nod
 				continue
 			}
 			// stream creation should pass without error
-			s, err := this.CreateStream(ctx, other.Host().ID())
+			err := this.OpenProtectedStream(ctx, other.Host().ID(), t.Name(), func(stream network.Stream) error {
+				// do nothing
+				require.NotNil(t, stream)
+				return nil
+			})
 			require.NoError(t, err)
-			require.NotNil(t, s)
+
 		}
 	}
 }
