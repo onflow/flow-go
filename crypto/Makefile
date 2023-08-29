@@ -41,23 +41,41 @@ c-format:
 	rm -f .clang-format
 	git diff --exit-code
 
-# sanitize C code
-# cannot run on macos
-.SILENT: c-sanitize
-c-sanitize:
-# - memory sanitization (only on linux and using clang) - (could use go test -msan)
+# address sanitization and other checks
+.SILENT: c-asan
+c-asan:
 # - address sanitization and other checks (only on linux)
 	if [ $(UNAME) = "Linux" ]; then \
-		$(CGO_FLAG) CC="clang -O0 -g -fsanitize=memory -fno-omit-frame-pointer -fsanitize-memory-track-origins" \
-		LD="-fsanitize=memory" go test; \
-		if [ $$? -ne 0 ]; then exit 1; fi; \
-		\
 		$(CGO_FLAG) CC="-O0 -g -fsanitize=address -fno-omit-frame-pointer -fsanitize=leak -fsanitize=undefined -fno-sanitize-recover=all -fsanitize=float-divide-by-zero -fsanitize=float-cast-overflow -fno-sanitize=null -fno-sanitize=alignment" \
 		LD="-fsanitize=address -fsanitize=leak" go test; \
 		if [ $$? -ne 0 ]; then exit 1; fi; \
 	else \
 		echo "sanitization is only supported on Linux"; \
 	fi; \
+
+# memory sanitization
+.SILENT: c-msan
+c-msan:
+# - memory sanitization (only on linux and using clang) - (could use go test -msan)
+# currently, this leads to many false positives, most likely because of assembly code not handled properly
+# by asan. If you would like to run this command, you can use `NO_MSAN` to diable msan in some C functions.
+# For instance "void NO_MSAN f() {...}" disables msan in function f. `NO_MSAN` is already defined in
+# bls12381_utils.h
+	if [ $(UNAME) = "Linux" ]; then \
+		$(CGO_FLAG) CC="clang -DMSAN -O0 -g -fsanitize=memory -fno-omit-frame-pointer -fsanitize-memory-track-origins" \
+		LD="-fsanitize=memory" go test; \
+		if [ $$? -ne 0 ]; then exit 1; fi; \
+	else \
+		echo "sanitization is only supported on Linux"; \
+	fi; \
+
+# sanitize C code
+.SILENT: c-sanitize
+c-sanitize: c-asan
+# - address sanitization and other checks (only on linux)
+# - memory sanitization (target m-san) is disabled because of multiple false positives
+
+
 
 # Go tidy
 .PHONY: go-tidy

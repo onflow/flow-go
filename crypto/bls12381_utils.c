@@ -540,13 +540,7 @@ ERROR E1_read_bytes(E1 *a, const byte *bin, const int len) {
 // uncompressed form. It assumes buffer is of length G1_SER_BYTES The
 // serialization follows:
 // https://www.ietf.org/archive/id/draft-irtf-cfrg-pairing-friendly-curves-08.html#name-zcash-serialization-format-)
-#if defined(__has_feature) && __has_feature(memory_sanitizer)
-// disable memory sanitization in this function because of a use-of-uninitialized-value
-// false positive.
-void __attribute__((no_sanitize("memory"))) E1_write_bytes(byte *bin, const E1 *a) {
-#else
 void E1_write_bytes(byte *bin, const E1 *a) {
-#endif
   if (E1_is_infty(a)) {
     // set the infinity bit
     bin[0] = (G1_SERIALIZATION << 7) | (1 << 6);
@@ -1063,7 +1057,7 @@ void xmd_sha256(byte *hash, int len_hash, byte *msg, int len_msg, byte *dst,
 }
 
 // DEBUG printing functions
-#if (DEBUG == 1)
+#ifdef DEBUG 
 void bytes_print_(char *s, byte *data, int len) {
   if (strlen(s))
     printf("[%s]:\n", s);

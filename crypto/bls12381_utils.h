@@ -129,8 +129,8 @@ void Fp12_multi_pairing(Fp12 *, const E1 *, const E2 *, const int);
 void xmd_sha256(byte *, int, byte *, int, byte *, int);
 
 // Debugging related functions
-#define DEBUG 1
-#if (DEBUG == 1)
+// DEBUG can be enabled directly from the Go command: CC="clang -DDEBUG" go test 
+#ifdef DEBUG
 #include <stdio.h>
 void bytes_print_(char *, byte *, int);
 void Fr_print_(char *, Fr *);
@@ -139,6 +139,21 @@ void Fp2_print_(char *, const Fp2 *);
 void Fp12_print_(char *, const Fp12 *);
 void E1_print_(char *, const E1 *, const int);
 void E2_print_(char *, const E2 *, const int);
+
 #endif /* DEBUG */
+
+// memory sanitization disabler
+#define NO_MSAN
+#ifdef MSAN
+/* add NO_MSAN to a function defintion to disable MSAN in that function ( void NO_MSAN f(..) {} ) */
+#if defined(__has_feature)
+#if __has_feature(memory_sanitizer)
+// disable memory sanitization in this function because of a use-of-uninitialized-value
+// false positive.
+#undef NO_MSAN
+#define NO_MSAN __attribute__((no_sanitize("memory")))
+#endif /* __has_feature(memory_sanitizer) */
+#endif /* __has_feature*/
+#endif /*MSAN*/
 
 #endif /* BLS12_381_UTILS */
