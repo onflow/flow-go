@@ -324,8 +324,9 @@ func TestHandleReportedMisbehavior_And_DisallowListing_RepeatOffender_Integratio
 
 	ids, nodes := testutils.LibP2PNodeForMiddlewareFixture(t, sporkId, 3,
 		p2ptest.WithPeerManagerEnabled(p2ptest.PeerManagerConfigFixture(p2ptest.WithZeroJitterAndZeroBackoff(t)), nil))
-	mws, _ := testutils.MiddlewareFixtures(t, ids, nodes, testutils.MiddlewareConfigFixture(t, sporkId), mocknetwork.NewViolationsConsumer(t))
-	networkCfg := testutils.NetworkConfigFixture(t, *ids[0], ids, sporkId, mws[0], p2p.WithAlspConfig(cfg))
+	mws, _ := testutils.MiddlewareFixtures(t, ids, nodes, testutils.MiddlewareConfigFixture(t, sporkId))
+	idProvider := unittest.NewUpdatableIDProvider(ids)
+	networkCfg := testutils.NetworkConfigFixture(t, *ids[0], idProvider, sporkId, mws[0], p2p.WithAlspConfig(cfg))
 
 	victimNetwork, err := p2p.NewNetwork(networkCfg)
 	require.NoError(t, err)

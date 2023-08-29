@@ -232,7 +232,7 @@ func (n *Node) OpenProtectedStream(ctx context.Context, peerID peer.ID, protecti
 	// close the stream immediately
 	err = s.Close()
 	if err != nil {
-		err = fmt.Errorf("failed to close the stream for %s: %w", peerID, err)
+		return fmt.Errorf("failed to close the stream for %s: %w", peerID, err)
 	}
 
 	return nil
