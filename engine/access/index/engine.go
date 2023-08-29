@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/onflow/flow-go/module/execution_indexer"
 
 	"github.com/rs/zerolog"
 
@@ -35,7 +36,7 @@ type Engine struct {
 	events       storage.Events
 	transactions storage.Transactions
 
-	executionIndexer module.ExecutionStateIndexer
+	executionIndexer execution_indexer.ExecutionStateIndexer
 
 	execDataCache *cache.ExecutionDataCache
 
@@ -57,7 +58,7 @@ func New(
 	events storage.Events,
 	transactions storage.Transactions,
 	execDataCache *cache.ExecutionDataCache,
-	executionIndexer module.ExecutionStateIndexer,
+	executionIndexer execution_indexer.ExecutionStateIndexer,
 	lastFullyIndexedHeight uint64,
 	highestAvailableHeight uint64,
 ) (*Engine, error) {
