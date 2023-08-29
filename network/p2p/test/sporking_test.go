@@ -313,9 +313,15 @@ func TestOneToKCrosstalkPrevention(t *testing.T) {
 func testOneToOneMessagingFails(t *testing.T, sourceNode p2p.LibP2PNode, peerInfo peer.AddrInfo) {
 	// create stream from source node to destination address
 	sourceNode.Host().Peerstore().AddAddrs(peerInfo.ID, peerInfo.Addrs, peerstore.AddressTTL)
-	_, err := sourceNode.CreateStream(context.Background(), peerInfo.ID)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	err := sourceNode.OpenProtectedStream(ctx, peerInfo.ID, t.Name(), func(stream network.Stream) error {
+		// this callback should never be called
+		assert.Fail(t, "stream creation should have failed")
+		return nil
+	})
 	// assert that stream creation failed
-	assert.Error(t, err)
+	require.Error(t, err)
 	// assert that it failed with the expected error
 	assert.Regexp(t, ".*failed to negotiate security protocol.*|.*protocols not supported.*", err)
 }
