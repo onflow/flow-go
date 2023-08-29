@@ -3,14 +3,21 @@
 package mocknetwork
 
 import (
-	datastore "github.com/ipfs/go-datastore"
+	context "context"
+
 	channels "github.com/onflow/flow-go/network/channels"
+
+	corenetwork "github.com/libp2p/go-libp2p/core/network"
+
+	datastore "github.com/ipfs/go-datastore"
 
 	irrecoverable "github.com/onflow/flow-go/module/irrecoverable"
 
 	mock "github.com/stretchr/testify/mock"
 
 	network "github.com/onflow/flow-go/network"
+
+	peer "github.com/libp2p/go-libp2p/core/peer"
 
 	protocol "github.com/libp2p/go-libp2p/core/protocol"
 )
@@ -85,6 +92,20 @@ func (_m *Middleware) OnDisallowListNotification(_a0 *network.DisallowListingUpd
 	_m.Called(_a0)
 }
 
+// OpenProtectedStream provides a mock function with given fields: ctx, peerID, protectionTag, writingLogic
+func (_m *Middleware) OpenProtectedStream(ctx context.Context, peerID peer.ID, protectionTag string, writingLogic func(corenetwork.Stream) error) error {
+	ret := _m.Called(ctx, peerID, protectionTag, writingLogic)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, peer.ID, string, func(corenetwork.Stream) error) error); ok {
+		r0 = rf(ctx, peerID, protectionTag, writingLogic)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
 // Publish provides a mock function with given fields: msg
 func (_m *Middleware) Publish(msg network.OutgoingMessageScope) error {
 	ret := _m.Called(msg)
@@ -115,27 +136,8 @@ func (_m *Middleware) Ready() <-chan struct{} {
 	return r0
 }
 
-// SendDirect provides a mock function with given fields: msg
-func (_m *Middleware) SendDirect(msg network.OutgoingMessageScope) error {
-	ret := _m.Called(msg)
-
-	var r0 error
-	if rf, ok := ret.Get(0).(func(network.OutgoingMessageScope) error); ok {
-		r0 = rf(msg)
-	} else {
-		r0 = ret.Error(0)
-	}
-
-	return r0
-}
-
 // SetOverlay provides a mock function with given fields: _a0
 func (_m *Middleware) SetOverlay(_a0 network.Overlay) {
-	_m.Called(_a0)
-}
-
-// SetSlashingViolationsConsumer provides a mock function with given fields: _a0
-func (_m *Middleware) SetSlashingViolationsConsumer(_a0 network.ViolationsConsumer) {
 	_m.Called(_a0)
 }
 

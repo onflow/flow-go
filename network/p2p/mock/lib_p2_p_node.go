@@ -252,6 +252,20 @@ func (_m *LibP2PNode) OnDisallowListNotification(id peer.ID, cause flow_gonetwor
 	_m.Called(id, cause)
 }
 
+// OpenProtectedStream provides a mock function with given fields: ctx, peerID, protectionTag, writingLogic
+func (_m *LibP2PNode) OpenProtectedStream(ctx context.Context, peerID peer.ID, protectionTag string, writingLogic func(network.Stream) error) error {
+	ret := _m.Called(ctx, peerID, protectionTag, writingLogic)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, peer.ID, string, func(network.Stream) error) error); ok {
+		r0 = rf(ctx, peerID, protectionTag, writingLogic)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
 // PeerManagerComponent provides a mock function with given fields:
 func (_m *LibP2PNode) PeerManagerComponent() component.Component {
 	ret := _m.Called()

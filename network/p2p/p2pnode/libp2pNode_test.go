@@ -210,19 +210,31 @@ func TestConnGater(t *testing.T) {
 	node1.Host().Peerstore().AddAddrs(node2Info.ID, node2Info.Addrs, peerstore.PermanentAddrTTL)
 	node2.Host().Peerstore().AddAddrs(node1Info.ID, node1Info.Addrs, peerstore.PermanentAddrTTL)
 
-	_, err = node1.CreateStream(ctx, node2Info.ID)
-	assert.Error(t, err, "connection should not be possible")
+	err = node1.OpenProtectedStream(ctx, node2Info.ID, t.Name(), func(stream network.Stream) error {
+		// no-op, as the connection should not be possible
+		return nil
+	})
+	require.ErrorContains(t, err, "target node is not on the approved list of nodes")
 
-	_, err = node2.CreateStream(ctx, node1Info.ID)
-	assert.Error(t, err, "connection should not be possible")
+	err = node2.OpenProtectedStream(ctx, node1Info.ID, t.Name(), func(stream network.Stream) error {
+		// no-op, as the connection should not be possible
+		return nil
+	})
+	require.ErrorContains(t, err, "target node is not on the approved list of nodes")
 
 	node1Peers.Add(node2Info.ID, struct{}{})
-	_, err = node1.CreateStream(ctx, node2Info.ID)
-	assert.Error(t, err, "connection should not be possible")
+	err = node1.OpenProtectedStream(ctx, node2Info.ID, t.Name(), func(stream network.Stream) error {
+		// no-op, as the connection should not be possible
+		return nil
+	})
+	require.Error(t, err)
 
 	node2Peers.Add(node1Info.ID, struct{}{})
-	_, err = node1.CreateStream(ctx, node2Info.ID)
-	assert.NoError(t, err, "connection should not be blocked")
+	err = node1.OpenProtectedStream(ctx, node2Info.ID, t.Name(), func(stream network.Stream) error {
+		// no-op, as the connection should not be possible
+		return nil
+	})
+	require.NoError(t, err)
 }
 
 // TestNode_HasSubscription checks that when a node subscribes to a topic HasSubscription should return true.
