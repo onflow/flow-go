@@ -12,25 +12,37 @@ type Registers struct {
 	mock.Mock
 }
 
-// ByID provides a mock function with given fields: ID
-func (_m *Registers) ByID(ID flow.RegisterID) (*flow.RegisterEntry, error) {
-	ret := _m.Called(ID)
+// Close provides a mock function with given fields:
+func (_m *Registers) Close() error {
+	ret := _m.Called()
 
-	var r0 *flow.RegisterEntry
-	var r1 error
-	if rf, ok := ret.Get(0).(func(flow.RegisterID) (*flow.RegisterEntry, error)); ok {
-		return rf(ID)
-	}
-	if rf, ok := ret.Get(0).(func(flow.RegisterID) *flow.RegisterEntry); ok {
-		r0 = rf(ID)
+	var r0 error
+	if rf, ok := ret.Get(0).(func() error); ok {
+		r0 = rf()
 	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*flow.RegisterEntry)
-		}
+		r0 = ret.Error(0)
 	}
 
-	if rf, ok := ret.Get(1).(func(flow.RegisterID) error); ok {
-		r1 = rf(ID)
+	return r0
+}
+
+// Get provides a mock function with given fields: ID, height
+func (_m *Registers) Get(ID flow.RegisterID, height uint64) (flow.RegisterEntry, error) {
+	ret := _m.Called(ID, height)
+
+	var r0 flow.RegisterEntry
+	var r1 error
+	if rf, ok := ret.Get(0).(func(flow.RegisterID, uint64) (flow.RegisterEntry, error)); ok {
+		return rf(ID, height)
+	}
+	if rf, ok := ret.Get(0).(func(flow.RegisterID, uint64) flow.RegisterEntry); ok {
+		r0 = rf(ID, height)
+	} else {
+		r0 = ret.Get(0).(flow.RegisterEntry)
+	}
+
+	if rf, ok := ret.Get(1).(func(flow.RegisterID, uint64) error); ok {
+		r1 = rf(ID, height)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -38,13 +50,13 @@ func (_m *Registers) ByID(ID flow.RegisterID) (*flow.RegisterEntry, error) {
 	return r0, r1
 }
 
-// Store provides a mock function with given fields: ID, value
-func (_m *Registers) Store(ID flow.RegisterID, value *flow.RegisterEntry) error {
-	ret := _m.Called(ID, value)
+// Store provides a mock function with given fields: entries, height
+func (_m *Registers) Store(entries flow.RegisterEntries, height uint64) error {
+	ret := _m.Called(entries, height)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(flow.RegisterID, *flow.RegisterEntry) error); ok {
-		r0 = rf(ID, value)
+	if rf, ok := ret.Get(0).(func(flow.RegisterEntries, uint64) error); ok {
+		r0 = rf(entries, height)
 	} else {
 		r0 = ret.Error(0)
 	}
