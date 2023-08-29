@@ -360,7 +360,7 @@ func TestContract_ContractRemoval(t *testing.T) {
 		// deploy contract with voucher
 		err = contractUpdater.SetContract(
 			location,
-			[]byte("pub contract TestContract {}"),
+			[]byte("access(all) contract TestContract {}"),
 			[]flow.Address{
 				flowAddress,
 			},
@@ -385,7 +385,7 @@ func TestContract_ContractRemoval(t *testing.T) {
 		// update should work
 		err = contractUpdater.SetContract(
 			location,
-			[]byte("pub contract TestContract {}"),
+			[]byte("access(all) contract TestContract {}"),
 			[]flow.Address{
 				flowAddress,
 			},
@@ -416,7 +416,7 @@ func TestContract_ContractRemoval(t *testing.T) {
 		// deploy contract with voucher
 		err = contractUpdater.SetContract(
 			location,
-			[]byte("pub contract TestContract {}"),
+			[]byte("access(all) contract TestContract {}"),
 			[]flow.Address{
 				flowAddress,
 			},
@@ -441,7 +441,7 @@ func TestContract_ContractRemoval(t *testing.T) {
 		// update should work
 		err = contractUpdater.SetContract(
 			location,
-			[]byte("pub contract TestContract {}"),
+			[]byte("access(all) contract TestContract {}"),
 			[]flow.Address{
 				flowAddress,
 			},

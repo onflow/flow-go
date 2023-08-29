@@ -92,7 +92,7 @@ type Main struct {
 }
 
 func (m Main) ToCadence() string {
-	return fmt.Sprintf("%s \npub fun main(): %s { %s }", m.Import.ToCadence(), m.ReturnType, m.Code)
+	return fmt.Sprintf("%s \naccess(all) fun main(): %s { %s }", m.Import.ToCadence(), m.ReturnType, m.Code)
 }
 
 type Code string

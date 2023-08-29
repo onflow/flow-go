@@ -4,7 +4,7 @@ import FlowToken from 0xFLOWTOKENADDRESS
 transaction(amount: UFix64) {
 
   let tokenAdmin: &FlowToken.Administrator
-  let tokenReceiver: &FlowToken.Vault{FungibleToken.Receiver}
+  let tokenReceiver: &FlowToken.Vault
 
   prepare(signer: AuthAccount) {
 	self.tokenAdmin = signer
@@ -13,7 +13,7 @@ transaction(amount: UFix64) {
 
 	self.tokenReceiver = signer
 	  .getCapability(/public/flowTokenReceiver)
-	  .borrow<&FlowToken.Vault{FungibleToken.Receiver}>()
+	  .borrow<&FlowToken.Vault>()
 	  ?? panic("Unable to borrow receiver reference for recipient")
   }
 

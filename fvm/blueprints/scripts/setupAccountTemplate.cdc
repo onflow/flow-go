@@ -15,14 +15,14 @@ transaction {
 
             // Create a public capability to the Vault that only exposes
             // the deposit function through the Receiver interface
-            signer.link<&FlowToken.Vault{FungibleToken.Receiver}>(
+            signer.link<&FlowToken.Vault>(
                 /public/flowTokenReceiver,
                 target: /storage/flowTokenVault
             )
 
             // Create a public capability to the Vault that only exposes
             // the balance field through the Balance interface
-            signer.link<&FlowToken.Vault{FungibleToken.Balance}>(
+            signer.link<&FlowToken.Vault>(
                 /public/flowTokenBalance,
                 target: /storage/flowTokenVault
             )

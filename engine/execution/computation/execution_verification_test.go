@@ -67,10 +67,10 @@ func Test_ExecutionMatchesVerification(t *testing.T) {
 	t.Run("single transaction event", func(t *testing.T) {
 
 		deployTx := blueprints.DeployContractTransaction(chain.ServiceAddress(), []byte(""+
-			`pub contract Foo {
-				pub event FooEvent(x: Int, y: Int)
+			`access(all) contract Foo {
+				access(all) event FooEvent(x: Int, y: Int)
 
-				pub fun event() { 
+				access(all) fun emitEvent() { 
 					emit FooEvent(x: 2, y: 1)
 				}
 			}`), "Foo")
@@ -81,7 +81,7 @@ func Test_ExecutionMatchesVerification(t *testing.T) {
 			transaction {
 				prepare() {}
 				execute {
-					Foo.event()
+					Foo.emitEvent()
 				}
 			}`, chain.ServiceAddress())),
 		}
@@ -111,10 +111,10 @@ func Test_ExecutionMatchesVerification(t *testing.T) {
 	t.Run("multiple collections events", func(t *testing.T) {
 
 		deployTx := blueprints.DeployContractTransaction(chain.ServiceAddress(), []byte(""+
-			`pub contract Foo {
-				pub event FooEvent(x: Int, y: Int)
+			`access(all) contract Foo {
+				access(all) event FooEvent(x: Int, y: Int)
 
-				pub fun event() { 
+				access(all) fun emitEvent() { 
 					emit FooEvent(x: 2, y: 1)
 				}
 			}`), "Foo")
@@ -125,7 +125,7 @@ func Test_ExecutionMatchesVerification(t *testing.T) {
 			transaction {
 				prepare() {}
 				execute {
-					Foo.event()
+					Foo.emitEvent()
 				}
 			}`, chain.ServiceAddress())),
 		}
@@ -205,7 +205,7 @@ func Test_ExecutionMatchesVerification(t *testing.T) {
 		err = testutil.SignTransaction(addKeyTx, accountAddress, accountPrivKey, 0)
 		require.NoError(t, err)
 
-		minimumStorage, err := cadence.NewUFix64("0.00010807")
+		minimumStorage, err := cadence.NewUFix64("0.00010902")
 		require.NoError(t, err)
 
 		cr := executeBlockAndVerify(t, [][]*flow.TransactionBody{
@@ -588,12 +588,12 @@ func TestTransactionFeeDeduction(t *testing.T) {
 							transaction(amount: UFix64, to: Address) {
 							
 								// The Vault resource that holds the tokens that are being transferred
-								let sentVault: @FungibleToken.Vault
+								let sentVault: @{FungibleToken.Vault}
 							
 								prepare(signer: AuthAccount) {
 							
 									// Get a reference to the signer's stored vault
-									let vaultRef = signer.borrow<&FlowToken.Vault>(from: /storage/flowTokenVault)
+									let vaultRef = signer.borrow<auth(FungibleToken.Withdrawable) &FlowToken.Vault>(from: /storage/flowTokenVault)
 										?? panic("Could not borrow reference to the owner's Vault!")
 							
 									// Withdraw tokens from the signer's stored vault
