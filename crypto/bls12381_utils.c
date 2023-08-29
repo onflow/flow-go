@@ -168,7 +168,7 @@ ERROR Fr_star_read_bytes(Fr *a, const byte *bin, int len) {
 
 // write Fr element `a` in big endian bytes.
 void Fr_write_bytes(byte *bin, const Fr *a) {
-  // be_bytes_from_limbs works for both limb endiannesses
+  // be_bytes_from_limbs works for both limb endianness types
   be_bytes_from_limbs(bin, (limb_t *)a, Fr_BYTES);
 }
 
@@ -302,7 +302,8 @@ ERROR Fp_read_bytes(Fp *a, const byte *bin, int len) {
   return VALID;
 }
 
-// write Fp element to bin and assume `bin` has  `Fp_BYTES` allocated bytes.
+// write Fp element to `bin`,
+// assuming `bin` has  `Fp_BYTES` allocated bytes.
 void Fp_write_bytes(byte *bin, const Fp *a) {
   be_bytes_from_limbs(bin, (limb_t *)a, Fp_BYTES);
 }
@@ -523,8 +524,8 @@ ERROR E1_read_bytes(E1 *a, const byte *bin, const int len) {
   Fp_squ_montg(&a->y, &a->x);
   Fp_mul_montg(&a->y, &a->y, &a->x); // x^3
   Fp_add(&a->y, &a->y, &B_E1);       // B_E1 is already in Montg form
-  if (!Fp_sqrt_montg(&a->y,
-                     &a->y)) { // check whether x^3+b is a quadratic residue
+  // check whether x^3+b is a quadratic residue
+  if (!Fp_sqrt_montg(&a->y, &a->y)) {
     return POINT_NOT_ON_CURVE;
   }
 
@@ -539,7 +540,13 @@ ERROR E1_read_bytes(E1 *a, const byte *bin, const int len) {
 // uncompressed form. It assumes buffer is of length G1_SER_BYTES The
 // serialization follows:
 // https://www.ietf.org/archive/id/draft-irtf-cfrg-pairing-friendly-curves-08.html#name-zcash-serialization-format-)
+#if defined(__has_feature) && __has_feature(memory_sanitizer)
+// disable memory sanitization in this function because of a use-of-uninitialized-value
+// false positive.
+void __attribute__((no_sanitize("memory"))) E1_write_bytes(byte *bin, const E1 *a) {
+#else
 void E1_write_bytes(byte *bin, const E1 *a) {
+#endif
   if (E1_is_infty(a)) {
     // set the infinity bit
     bin[0] = (G1_SERIALIZATION << 7) | (1 << 6);
