@@ -284,6 +284,12 @@ func (n *Node) createStream(ctx context.Context, peerID peer.ID) (libp2pnet.Stre
 	return stream, nil
 }
 
+// ID returns the peer.ID of the node, which is the unique identifier of the node at the libp2p level.
+// For other libp2p nodes, the current node is identified by this ID.
+func (n *Node) ID() peer.ID {
+	return n.host.ID()
+}
+
 // GetIPPort returns the IP and Port the libp2p node is listening on.
 // All errors returned from this function can be considered benign.
 func (n *Node) GetIPPort() (string, string, error) {
