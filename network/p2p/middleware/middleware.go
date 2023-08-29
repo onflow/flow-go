@@ -715,16 +715,3 @@ func UnicastMaxMsgSizeByCode(payload []byte) (int, error) {
 	maxSize := unicastMaxMsgSize(messageType)
 	return maxSize, nil
 }
-
-// unicastMaxMsgDuration returns the max duration to allow for a unicast send to complete
-func (m *Middleware) unicastMaxMsgDuration(messageType string) time.Duration {
-	switch messageType {
-	case "*messages.ChunkDataResponse", "messages.ChunkDataResponse":
-		if LargeMsgUnicastTimeout > m.unicastMessageTimeout {
-			return LargeMsgUnicastTimeout
-		}
-		return m.unicastMessageTimeout
-	default:
-		return m.unicastMessageTimeout
-	}
-}
