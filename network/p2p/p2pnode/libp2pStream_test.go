@@ -301,8 +301,11 @@ func TestCreateStreamIsConcurrencySafe(t *testing.T) {
 	createStream := func() {
 		<-gate
 		nodes[0].Host().Peerstore().AddAddrs(nodeInfo1.ID, nodeInfo1.Addrs, peerstore.AddressTTL)
-		_, err := nodes[0].CreateStream(ctx, nodeInfo1.ID)
-		assert.NoError(t, err) // assert that stream was successfully created
+		err := nodes[0].OpenProtectedStream(ctx, nodeInfo1.ID, t.Name(), func(stream network.Stream) error {
+			// no-op stream writer, we just check that the stream was created
+			return nil
+		})
+		require.NoError(t, err) // assert that stream was successfully created
 		wg.Done()
 	}
 
