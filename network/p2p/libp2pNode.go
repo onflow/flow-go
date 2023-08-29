@@ -73,8 +73,6 @@ type LibP2PNode interface {
 	// deadline, executing the writing logic, resetting the stream if the writing logic fails, or closing the stream.
 	// All returned errors during this process can be considered benign.
 	OpenProtectedStream(ctx context.Context, peerID peer.ID, protectionTag string, writingLogic func(stream libp2pnet.Stream) error) error
-	// CreateStream returns an existing stream connected to the peer if it exists, or creates a new stream with it.
-	CreateStream(ctx context.Context, peerID peer.ID) (libp2pnet.Stream, error)
 	// GetIPPort returns the IP and Port the libp2p node is listening on.
 	GetIPPort() (string, string, error)
 	// RoutingTable returns the node routing table

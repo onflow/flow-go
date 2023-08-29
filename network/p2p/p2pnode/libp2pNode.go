@@ -238,46 +238,16 @@ func (n *Node) OpenProtectedStream(ctx context.Context, peerID peer.ID, protecti
 	return nil
 }
 
+// createStream creates a new stream to the given peer.
+// Args:
+//   - ctx: The context used to control the stream's lifecycle.
+//   - peerID: The ID of the peer to open the stream to.
+//
+// Returns:
+//   - libp2pnet.Stream: The created stream.
+//   - error: An error, if any occurred during the process. This includes failure in creating the stream. All returned
+//     errors during this process can be considered benign.
 func (n *Node) createStream(ctx context.Context, peerID peer.ID) (libp2pnet.Stream, error) {
-	lg := n.logger.With().Str("peer_id", peerID.String()).Logger()
-
-	// If we do not currently have any addresses for the given peer, stream creation will almost
-	// certainly fail. If this Node was configured with a routing system, we can try to use it to
-	// look up the address of the peer.
-	if len(n.host.Peerstore().Addrs(peerID)) == 0 && n.routing != nil {
-		lg.Info().Msg("address not found in peer store, searching for peer in routing system")
-
-		var err error
-		func() {
-			timedCtx, cancel := context.WithTimeout(ctx, findPeerQueryTimeout)
-			defer cancel()
-			// try to find the peer using the routing system
-			_, err = n.routing.FindPeer(timedCtx, peerID)
-		}()
-
-		if err != nil {
-			lg.Warn().Err(err).Msg("address not found in both peer store and routing system")
-		} else {
-			lg.Debug().Msg("address not found in peer store, but found in routing system search")
-		}
-	}
-
-	stream, dialAddrs, err := n.uniMgr.CreateStream(ctx, peerID, MaxConnectAttempt)
-	if err != nil {
-		return nil, flownet.NewPeerUnreachableError(fmt.Errorf("could not create stream (peer_id: %s, dialing address(s): %v): %w", peerID,
-			dialAddrs, err))
-	}
-
-	lg.Info().
-		Str("networking_protocol_id", string(stream.Protocol())).
-		Str("dial_address", fmt.Sprintf("%v", dialAddrs)).
-		Msg("stream successfully created to remote peer")
-	return stream, nil
-}
-
-// CreateStream returns an existing stream connected to the peer if it exists, or creates a new stream with it.
-// All errors returned from this function can be considered benign.
-func (n *Node) CreateStream(ctx context.Context, peerID peer.ID) (libp2pnet.Stream, error) {
 	lg := n.logger.With().Str("peer_id", peerID.String()).Logger()
 
 	// If we do not currently have any addresses for the given peer, stream creation will almost
