@@ -1,7 +1,6 @@
 package module
 
 import (
-	"github.com/onflow/flow-go/engine/execution/scripts"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -9,7 +8,6 @@ import (
 type ExecutionStateIndexer interface {
 	ExecutionStateIndexReader
 	ExecutionStateIndexWriter
-	scripts.ScriptExecutionState
 }
 
 type ExecutionStateIndexReader interface {
