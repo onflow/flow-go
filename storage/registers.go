@@ -28,7 +28,6 @@ type RegisterReader interface {
 type RegisterWriter interface {
 	// Store batch of register entries at the provided block height.
 	//
-	// If registers at height exists an error is returned. Expected errors:
-	// - storage.ErrAlreadyExists if the register at height already exists, prevents overwriting
+	// If the registers already exists it overwrites them to make this action idempotent.
 	Store(entries flow.RegisterEntries, height uint64) error
 }
