@@ -160,7 +160,6 @@ func testCreateStream(t *testing.T, sporkId flow.Identifier, unicasts []protocol
 		p2ptest.WithPreferredUnicasts(unicasts))
 	idProvider.SetIdentities(identities)
 	p2ptest.StartNodes(t, signalerCtx, nodes, 100*time.Millisecond)
-	defer p2ptest.StopNodes(t, nodes, cancel, 100*time.Millisecond)
 
 	id2 := identities[1]
 
@@ -170,35 +169,38 @@ func testCreateStream(t *testing.T, sporkId flow.Identifier, unicasts []protocol
 	// Now attempt to create another 100 outbound stream to the same destination by calling CreateStream
 	streamCount := 100
 	var streams []network.Stream
+	allStreamsClosedWg := sync.WaitGroup{}
 	for i := 0; i < streamCount; i++ {
+		allStreamsClosedWg.Add(1)
 		pInfo, err := utils.PeerAddressInfo(*id2)
 		require.NoError(t, err)
 		nodes[0].Host().Peerstore().AddAddrs(pInfo.ID, pInfo.Addrs, peerstore.AddressTTL)
-		anotherStream, err := nodes[0].CreateStream(ctx, pInfo.ID)
-		// Assert that a stream was returned without error
-		require.NoError(t, err)
-		require.NotNil(t, anotherStream)
-		// assert that the stream count within libp2p incremented (a new stream was created)
-		require.Equal(t, i+1, p2putils.CountStream(nodes[0].Host(), nodes[1].Host().ID(), protocolID, network.DirOutbound))
-		// assert that the same connection is reused
-		require.Len(t, nodes[0].Host().Network().Conns(), 1)
-		streams = append(streams, anotherStream)
+		go func() {
+			err = nodes[0].OpenProtectedStream(ctx, pInfo.ID, t.Name(), func(stream network.Stream) error {
+				require.NotNil(t, stream)
+				streams = append(streams, stream)
+				// if we return this function, the stream will be closed, but we need to keep it open for the test
+				// hence we wait for the context to be done
+				<-ctx.Done()
+				allStreamsClosedWg.Done()
+				return nil
+			})
+			require.NoError(t, err)
+		}()
 	}
 
-	// reverse loop to close all the streams
-	for i := streamCount - 1; i >= 0; i-- {
-		s := streams[i]
-		wg := sync.WaitGroup{}
-		wg.Add(1)
-		go func() {
-			err := s.Close()
-			assert.NoError(t, err)
-			wg.Done()
-		}()
-		unittest.RequireReturnsBefore(t, wg.Wait, 1*time.Second, "could not close streams on time")
-		// assert that the stream count within libp2p decremented
-		require.Equal(t, i, p2putils.CountStream(nodes[0].Host(), nodes[1].Host().ID(), protocolID, network.DirOutbound))
-	}
+	require.Eventually(t, func() bool {
+		return streamCount == p2putils.CountStream(nodes[0].Host(), nodes[1].Host().ID(), protocolID, network.DirOutbound)
+	}, 5*time.Second, 100*time.Millisecond, "could not create streams on time")
+
+	// checks that the number of connections is 1 despite the number of streams; i.e., all streams are created on the same connection
+	require.Len(t, nodes[0].Host().Network().Conns(), 1)
+
+	// we don't use defer as the moment we stop the nodes, the streams will be closed, and we want to assess the number of streams
+	p2ptest.StopNodes(t, nodes, cancel, 1*time.Second)
+
+	// wait for all streams to be closed
+	unittest.RequireReturnsBefore(t, allStreamsClosedWg.Wait, 1*time.Second, "could not close streams on time")
 }
 
 // TestCreateStream_FallBack checks two libp2p nodes with conflicting supported unicast protocols fall back
