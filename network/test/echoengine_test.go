@@ -338,7 +338,7 @@ func (suite *EchoEngineTestSuite) duplicateMessageDifferentChan(send testutils.C
 	receiver2.RUnlock()
 }
 
-// singleMessage sends a single message from one network instance to the other one
+// singleMessage sends a single message from one network instance to the other 1
 // it evaluates the correctness of implementation against correct delivery of the message.
 // in case echo is true, it also evaluates correct reception of the echo message from the receiver side
 func (suite *EchoEngineTestSuite) singleMessage(echo bool, send testutils.ConduitSendWrapperFunc) {
