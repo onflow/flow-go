@@ -9,7 +9,7 @@ import (
 	"github.com/onflow/flow-go/engine/execution/scripts"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/storage/derived"
-	"github.com/onflow/flow-go/module/indexer"
+	"github.com/onflow/flow-go/module/execution_indexer"
 	"github.com/onflow/flow-go/storage/memory"
 	"os"
 	"path/filepath"
@@ -140,6 +140,7 @@ type AccessNodeConfig struct {
 	executionDataConfig          edrequester.ExecutionDataConfig
 	queryExecutorConfig          query.QueryConfig
 	PublicNetworkConfig          PublicNetworkConfig
+	executionIndexLastHeight     uint64
 }
 
 type PublicNetworkConfig struct {
@@ -450,7 +451,7 @@ func (builder *FlowAccessNodeBuilder) BuildConsensusFollower() *FlowAccessNodeBu
 func (builder *FlowAccessNodeBuilder) BuildExecutionDataRequester() *FlowAccessNodeBuilder {
 	var ds *badger.Datastore
 	var bs network.BlobService
-	var exeIndexer module.Indexer
+	var exeIndexer module.ExecutionStateIndexer
 	var processedBlockHeight storage.ConsumerProgress
 	var processedNotifications storage.ConsumerProgress
 	var bsDependable *module.ProxiedReadyDoneAware
@@ -486,7 +487,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionDataRequester() *FlowAccessN
 		}).
 		Module("execution data indexer", func(node *cmd.NodeConfig) error {
 			registers := memory.NewRegisters()
-			exeIndexer = indexer.New(registers, node.Storage.Headers)
+			exeIndexer = execution_indexer.New(registers, node.Storage.Headers)
 			return nil
 		}).
 		Module("processed block height consumer progress", func(node *cmd.NodeConfig) error {
@@ -634,8 +635,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionDataRequester() *FlowAccessN
 				node.Storage.Transactions,
 				localExecutionDataCache,
 				exeIndexer,
-				// TODO(sideninja): should highestAvailableHeight be removed altogether and retrieved using the indexer module?
-				highestAvailableHeight, // TODO: this should be persisted separately from highestAvailableHeight
+				builder.executionIndexLastHeight,
 				highestAvailableHeight,
 			)
 			if err != nil {
@@ -795,6 +795,9 @@ func (builder *FlowAccessNodeBuilder) extraFlags() {
 		flags.UintVar(&builder.stateStreamConf.ClientSendBufferSize, "state-stream-send-buffer-size", defaultConfig.stateStreamConf.ClientSendBufferSize, "maximum number of responses to buffer within a stream")
 		flags.Float64Var(&builder.stateStreamConf.ResponseLimit, "state-stream-response-limit", defaultConfig.stateStreamConf.ResponseLimit, "max number of responses per second to send over streaming endpoints. this helps manage resources consumed by each client querying data not in the cache e.g. 3 or 0.5. 0 means no limit")
 
+		// Execution Index
+		flags.Uint64Var(&builder.executionIndexLastHeight, "execution-index-last-height", 0, "block height to start indexing execution data from")
+
 		// Script Execution
 		flags.DurationVar(&builder.queryExecutorConfig.LogTimeThreshold, "script-log-threshold", query.DefaultLogTimeThreshold, "threshold for logging script execution")
 		flags.DurationVar(&builder.queryExecutorConfig.ExecutionTimeLimit, "script-execution-time-limit", query.DefaultExecutionTimeLimit, "script execution time limit")
@@ -880,6 +883,7 @@ func (builder *FlowAccessNodeBuilder) initNetwork(nodeID module.Local,
 		IdentityProvider:    builder.IdentityProvider,
 		ReceiveCache:        receiveCache,
 		ConduitFactory:      conduit.NewDefaultConduitFactory(),
+		SporkId:             builder.SporkID,
 		AlspCfg: &alspmgr.MisbehaviorReportManagerConfig{
 			Logger:                  builder.Logger,
 			SpamRecordCacheSize:     builder.FlowConfig.NetworkConfig.AlspConfig.SpamRecordCacheSize,
@@ -1482,7 +1486,7 @@ func (builder *FlowAccessNodeBuilder) initMiddleware(nodeID flow.Identifier,
 		Libp2pNode:            libp2pNode,
 		FlowId:                nodeID,
 		BitSwapMetrics:        builder.Metrics.Bitswap,
-		RootBlockID:           builder.SporkID,
+		SporkId:               builder.SporkID,
 		UnicastMessageTimeout: middleware.DefaultUnicastTimeout,
 		IdTranslator:          builder.IDTranslator,
 		Codec:                 builder.CodecFactory(),

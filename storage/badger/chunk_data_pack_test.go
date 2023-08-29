@@ -22,24 +22,39 @@ import (
 // It also evaluates that re-inserting is idempotent.
 func TestChunkDataPacks_Store(t *testing.T) {
 	WithChunkDataPacks(t, 100, func(t *testing.T, chunkDataPacks []*flow.ChunkDataPack, chunkDataPackStore *badgerstorage.ChunkDataPacks, _ *badger.DB) {
-		wg := sync.WaitGroup{}
-		wg.Add(len(chunkDataPacks))
+		require.NoError(t, chunkDataPackStore.Store(chunkDataPacks))
+		require.NoError(t, chunkDataPackStore.Store(chunkDataPacks))
+	})
+}
+
+func TestChunkDataPack_Remove(t *testing.T) {
+	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+		transactions := badgerstorage.NewTransactions(&metrics.NoopCollector{}, db)
+		collections := badgerstorage.NewCollections(db, transactions)
+		// keep the cache size at 1 to make sure that entries are written and read from storage itself.
+		chunkDataPackStore := badgerstorage.NewChunkDataPacks(&metrics.NoopCollector{}, db, collections, 1)
+
+		chunkDataPacks := unittest.ChunkDataPacksFixture(10)
 		for _, chunkDataPack := range chunkDataPacks {
-			go func(cdp flow.ChunkDataPack) {
-				err := chunkDataPackStore.Store(&cdp)
-				require.NoError(t, err)
-
-				wg.Done()
-			}(*chunkDataPack)
-		}
-
-		unittest.RequireReturnsBefore(t, wg.Wait, 1*time.Second, "could not store chunk data packs on time")
-
-		// re-insert - should be idempotent
-		for _, chunkDataPack := range chunkDataPacks {
-			err := chunkDataPackStore.Store(chunkDataPack)
+			// stores collection in Collections storage (which ChunkDataPacks store uses internally)
+			err := collections.Store(chunkDataPack.Collection)
 			require.NoError(t, err)
 		}
+
+		chunkIDs := make([]flow.Identifier, 0, len(chunkDataPacks))
+		for _, chunk := range chunkDataPacks {
+			chunkIDs = append(chunkIDs, chunk.ID())
+		}
+
+		require.NoError(t, chunkDataPackStore.Store(chunkDataPacks))
+		require.NoError(t, chunkDataPackStore.Remove(chunkIDs))
+
+		// verify it has been removed
+		_, err := chunkDataPackStore.ByChunkID(chunkIDs[0])
+		assert.True(t, errors.Is(err, storage.ErrNotFound))
+
+		// Removing again should not error
+		require.NoError(t, chunkDataPackStore.Remove(chunkIDs))
 	})
 }
 
@@ -76,6 +91,25 @@ func TestChunkDataPacks_MissingItem(t *testing.T) {
 		// attempt to get an invalid
 		_, err := store.ByChunkID(unittest.IdentifierFixture())
 		assert.True(t, errors.Is(err, storage.ErrNotFound))
+	})
+}
+
+// TestChunkDataPacks_StoreTwice evaluates that storing the same chunk data pack twice
+// does not result in an error.
+func TestChunkDataPacks_StoreTwice(t *testing.T) {
+	WithChunkDataPacks(t, 2, func(t *testing.T, chunkDataPacks []*flow.ChunkDataPack, chunkDataPackStore *badgerstorage.ChunkDataPacks, db *badger.DB) {
+		transactions := badgerstorage.NewTransactions(&metrics.NoopCollector{}, db)
+		collections := badgerstorage.NewCollections(db, transactions)
+		store := badgerstorage.NewChunkDataPacks(&metrics.NoopCollector{}, db, collections, 1)
+		require.NoError(t, store.Store(chunkDataPacks))
+
+		for _, c := range chunkDataPacks {
+			c2, err := store.ByChunkID(c.ChunkID)
+			require.NoError(t, err)
+			require.Equal(t, c, c2)
+		}
+
+		require.NoError(t, store.Store(chunkDataPacks))
 	})
 }
 
