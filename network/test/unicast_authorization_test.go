@@ -373,50 +373,28 @@ func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_PublicChannel()
 	// setup mock slashing violations consumer and middlewares
 	slashingViolationsConsumer := mocknetwork.NewViolationsConsumer(u.T())
 	u.setupMiddlewaresAndProviders(slashingViolationsConsumer)
+	u.startMiddlewares(nil)
 
-	expectedPayload := "hello"
-	msg, err := message.NewOutgoingScope(
-		flow.IdentifierList{u.receiverID.NodeID},
-		channels.TopicFromChannel(channels.TestNetworkChannel, u.sporkId),
-		&libp2pmessage.TestMessage{
-			Text: expectedPayload,
-		},
-		unittest.NetworkCodec().Encode,
-		message.ProtocolTypeUnicast)
+	msg := &libp2pmessage.TestMessage{
+		Text: string("hello"),
+	}
+
+	// mock a message processor that will receive the message.
+	receiverEngine := &mocknetwork.MessageProcessor{}
+	receiverEngine.On("Process", channels.TestNetworkChannel, u.senderID.NodeID, msg).Run(
+		func(args mockery.Arguments) {
+			close(u.waitCh)
+		}).Return(nil).Once()
+	_, err := u.receiverNetwork.Register(channels.TestNetworkChannel, receiverEngine)
 	require.NoError(u.T(), err)
 
-	overlay := mocknetwork.NewOverlay(u.T())
-	overlay.On("Identities").Maybe().Return(func() flow.IdentityList {
-		return u.providers[0].Identities(filter.Any)
-	})
-	overlay.On("Topology").Maybe().Return(func() flow.IdentityList {
-		return u.providers[0].Identities(filter.Any)
-	}, nil)
-	overlay.On("Identity", mock.AnythingOfType("peer.ID")).Return(u.senderID, true)
-
-	// we should receive the message on our overlay, at this point close the waitCh
-	overlay.On("Receive", mockery.Anything).Return(nil).
-		Once().
-		Run(func(args mockery.Arguments) {
-			close(u.waitCh)
-
-			msg, ok := args[0].(network.IncomingMessageScope)
-			require.True(u.T(), ok)
-
-			require.Equal(u.T(), channels.TestNetworkChannel, msg.Channel())                              // channel
-			require.Equal(u.T(), u.senderID.NodeID, msg.OriginId())                                       // sender id
-			require.Equal(u.T(), u.receiverID.NodeID, msg.TargetIDs()[0])                                 // target id
-			require.Equal(u.T(), message.ProtocolTypeUnicast, msg.Protocol())                             // protocol
-			require.Equal(u.T(), expectedPayload, msg.DecodedPayload().(*libp2pmessage.TestMessage).Text) // payload
-		})
-
-	u.startMiddlewares(overlay)
-
-	require.NoError(u.T(), u.receiverMW.Subscribe(channels.TestNetworkChannel))
-	require.NoError(u.T(), u.senderMW.Subscribe(channels.TestNetworkChannel))
+	senderCon, err := u.senderNetwork.Register(channels.TestNetworkChannel, &mocknetwork.MessageProcessor{})
+	require.NoError(u.T(), err)
 
 	// send message via unicast
-	err = u.senderMW.SendDirect(msg)
+	err = senderCon.Unicast(&libp2pmessage.TestMessage{
+		Text: string("hello"),
+	}, u.receiverID.NodeID)
 	require.NoError(u.T(), err)
 
 	// wait for slashing violations consumer mock to invoke run func and close ch if expected method call happens
