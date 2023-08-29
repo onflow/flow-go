@@ -64,20 +64,20 @@ func TestStreamClosing(t *testing.T) {
 		go func(i int) {
 			// Create stream from node 1 to node 2 (reuse if one already exists)
 			nodes[0].Host().Peerstore().AddAddrs(nodeInfo1.ID, nodeInfo1.Addrs, peerstore.AddressTTL)
-			s, err := nodes[0].CreateStream(ctx, nodeInfo1.ID)
-			assert.NoError(t, err)
-			w := bufio.NewWriter(s)
+			err := nodes[0].OpenProtectedStream(ctx, nodeInfo1.ID, t.Name(), func(s network.Stream) error {
+				w := bufio.NewWriter(s)
 
-			// Send message from node 1 to 2
-			msg := fmt.Sprintf("hello%d\n", i)
-			_, err = w.WriteString(msg)
-			assert.NoError(t, err)
+				// Send message from node 1 to 2
+				msg := fmt.Sprintf("hello%d\n", i)
+				_, err = w.WriteString(msg)
+				assert.NoError(t, err)
 
-			// Flush the stream
-			assert.NoError(t, w.Flush())
+				// Flush the stream
+				require.NoError(t, w.Flush())
 
-			// close the stream
-			err = s.Close()
+				// returning will close the stream
+				return nil
+			})
 			require.NoError(t, err)
 
 			senderWG.Done()
