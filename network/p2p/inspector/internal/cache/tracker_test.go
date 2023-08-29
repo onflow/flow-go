@@ -58,6 +58,7 @@ func TestClusterPrefixedMessagesReceivedTracker_ConcurrentIncAndLoad(t *testing.
 	id := unittest.IdentifierFixture()
 	var wg sync.WaitGroup
 	wg.Add(10)
+
 	go func() {
 		for i := float64(0); i < n; i++ {
 			go func() {
@@ -67,6 +68,9 @@ func TestClusterPrefixedMessagesReceivedTracker_ConcurrentIncAndLoad(t *testing.
 			}()
 		}
 	}()
+
+	// slight sleep so that each goroutine does not start at the same exact time
+	time.Sleep(500 * time.Millisecond)
 	go func() {
 		for i := float64(0); i < n; i++ {
 			go func() {
