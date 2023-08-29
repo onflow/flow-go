@@ -423,44 +423,23 @@ func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_UnauthorizedUni
 		Err:      message.ErrUnauthorizedUnicastOnChannel,
 	}
 
-	slashingViolationsConsumer.On(
-		"OnUnauthorizedUnicastOnChannel",
-		expectedViolation,
-	).Return(nil).Return(nil).Once().Run(func(args mockery.Arguments) {
+	slashingViolationsConsumer.On("OnUnauthorizedUnicastOnChannel", expectedViolation).
+		Return(nil).Once().Run(func(args mockery.Arguments) {
 		close(u.waitCh)
 	})
 
-	overlay := mocknetwork.NewOverlay(u.T())
-	overlay.On("Identities").Maybe().Return(func() flow.IdentityList {
-		return u.providers[0].Identities(filter.Any)
-	})
-	overlay.On("Topology").Maybe().Return(func() flow.IdentityList {
-		return u.providers[0].Identities(filter.Any)
-	}, nil)
-	overlay.On("Identity", expectedSenderPeerID).Return(u.senderID, true)
+	u.startMiddlewares(nil)
 
-	// message will be rejected so assert overlay never receives it
-	defer overlay.AssertNotCalled(u.T(), "Receive", u.senderID.NodeID, mock.AnythingOfType("*message.Message"))
+	_, err = u.receiverNetwork.Register(channels.ConsensusCommittee, &mocknetwork.MessageProcessor{})
+	require.NoError(u.T(), err)
 
-	u.startMiddlewares(overlay)
-
-	channel := channels.ConsensusCommittee
-	require.NoError(u.T(), u.receiverMW.Subscribe(channel))
-	require.NoError(u.T(), u.senderMW.Subscribe(channel))
+	senderCon, err := u.senderNetwork.Register(channels.ConsensusCommittee, &mocknetwork.MessageProcessor{})
+	require.NoError(u.T(), err)
 
 	// messages.BlockProposal is not authorized to be sent via unicast over the ConsensusCommittee channel
 	payload := unittest.ProposalFixture()
-
-	msg, err := message.NewOutgoingScope(
-		flow.IdentifierList{u.receiverID.NodeID},
-		channels.TopicFromChannel(channel, u.sporkId),
-		payload,
-		unittest.NetworkCodec().Encode,
-		message.ProtocolTypeUnicast)
-	require.NoError(u.T(), err)
-
 	// send message via unicast
-	err = u.senderMW.SendDirect(msg)
+	err = senderCon.Unicast(payload, u.receiverID.NodeID)
 	require.NoError(u.T(), err)
 
 	// wait for slashing violations consumer mock to invoke run func and close ch if expected method call happens
@@ -486,40 +465,20 @@ func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_ReceiverHasNoSu
 		Err:      middleware.ErrUnicastMsgWithoutSub,
 	}
 
-	slashingViolationsConsumer.On(
-		"OnUnauthorizedUnicastOnChannel",
-		expectedViolation,
-	).Return(nil).Return(nil).Once().Run(func(args mockery.Arguments) {
+	slashingViolationsConsumer.On("OnUnauthorizedUnicastOnChannel", expectedViolation).
+		Return(nil).Once().Run(func(args mockery.Arguments) {
 		close(u.waitCh)
 	})
 
-	overlay := mocknetwork.NewOverlay(u.T())
-	overlay.On("Identities").Maybe().Return(func() flow.IdentityList {
-		return u.providers[0].Identities(filter.Any)
-	})
-	overlay.On("Topology").Maybe().Return(func() flow.IdentityList {
-		return u.providers[0].Identities(filter.Any)
-	}, nil)
+	u.startMiddlewares(nil)
 
-	// message will be rejected so assert overlay never receives it
-	defer overlay.AssertNotCalled(u.T(), "Receive", u.senderID.NodeID, mock.AnythingOfType("*message.Message"))
-
-	u.startMiddlewares(overlay)
-
-	channel := channels.TestNetworkChannel
-
-	msg, err := message.NewOutgoingScope(
-		flow.IdentifierList{u.receiverID.NodeID},
-		channels.TopicFromChannel(channel, u.sporkId),
-		&libp2pmessage.TestMessage{
-			Text: "TestUnicastAuthorization_ReceiverHasNoSubscription",
-		},
-		unittest.NetworkCodec().Encode,
-		message.ProtocolTypeUnicast)
+	senderCon, err := u.senderNetwork.Register(channels.TestNetworkChannel, &mocknetwork.MessageProcessor{})
 	require.NoError(u.T(), err)
 
 	// send message via unicast
-	err = u.senderMW.SendDirect(msg)
+	err = senderCon.Unicast(&libp2pmessage.TestMessage{
+		Text: string("hello"),
+	}, u.receiverID.NodeID)
 	require.NoError(u.T(), err)
 
 	// wait for slashing violations consumer mock to invoke run func and close ch if expected method call happens
