@@ -123,7 +123,7 @@ func TestAddPeers(t *testing.T) {
 	for _, identity := range identities[1:] {
 		peerInfo, err := utils.PeerAddressInfo(*identity)
 		require.NoError(t, err)
-		require.NoError(t, nodes[0].AddPeer(ctx, peerInfo))
+		require.NoError(t, nodes[0].ConnectToPeerAddrInfo(ctx, peerInfo))
 	}
 
 	// Checks if both of the other nodes have been added as peers to the first node
@@ -146,7 +146,7 @@ func TestRemovePeers(t *testing.T) {
 
 	// add nodes two and three to the first node as its peers
 	for _, pInfo := range peerInfos[1:] {
-		require.NoError(t, nodes[0].AddPeer(ctx, pInfo))
+		require.NoError(t, nodes[0].ConnectToPeerAddrInfo(ctx, pInfo))
 	}
 
 	// check if all other nodes have been added as peers to the first node

@@ -239,7 +239,7 @@ func TestOneToKCrosstalkPrevention(t *testing.T) {
 	require.NoError(t, err)
 
 	// add node 2 as a peer of node 1
-	err = node1.AddPeer(ctx, pInfo2)
+	err = node1.ConnectToPeerAddrInfo(ctx, pInfo2)
 	require.NoError(t, err)
 
 	// let the two nodes form the mesh

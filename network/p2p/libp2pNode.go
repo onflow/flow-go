@@ -48,8 +48,9 @@ type LibP2PNode interface {
 	Start(ctx irrecoverable.SignalerContext)
 	// Stop terminates the libp2p node.
 	Stop() error
-	// AddPeer adds a peer to this node by adding it to this node's peerstore and connecting to it.
-	AddPeer(ctx context.Context, peerInfo peer.AddrInfo) error
+	// ConnectToPeerAddrInfo connects to the peer with the given peer address information.
+	// This method is used to connect to a peer that is not in the peer store.
+	ConnectToPeerAddrInfo(ctx context.Context, peerInfo peer.AddrInfo) error
 	// RemovePeer closes the connection with the peer.
 	RemovePeer(peerID peer.ID) error
 	// GetPeersForProtocol returns slice peer IDs for the specified protocol ID.
