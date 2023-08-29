@@ -747,7 +747,7 @@ func (m *MiddlewareTestSuite) TestEcho() {
 			require.Equal(m.T(), m.ids[last].NodeID, msgOriginID) // sender id
 
 			msgPayload, ok := args[2].(*libp2pmessage.TestMessage)
-			require.True(m.T(), ok
+			require.True(m.T(), ok)
 			require.Equal(m.T(), expectedReplyMsg, msgPayload.Text) // payload
 		}).Return(nil)
 
