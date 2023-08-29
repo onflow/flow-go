@@ -243,6 +243,7 @@ func (m *MiddlewareTestSuite) TestUpdateNodeAddresses() {
 
 	// unicast should fail to send because no address is known yet for the new identity
 	con, err := m.networks[0].Register(channels.TestNetworkChannel, &mocknetwork.MessageProcessor{})
+	require.NoError(m.T(), err)
 	err = con.Unicast(&libp2pmessage.TestMessage{
 		Text: "TestUpdateNodeAddresses",
 	}, newId.NodeID)
@@ -582,6 +583,7 @@ func (m *MiddlewareTestSuite) TestPing() {
 			require.Equal(m.T(), m.ids[senderNodeIndex].NodeID, msgOriginID) // sender id
 
 			msgPayload, ok := args[2].(*libp2pmessage.TestMessage)
+			require.True(m.T(), ok)
 			require.Equal(m.T(), expectedPayload, msgPayload.Text) // payload
 		}).Return(nil).Once()
 
@@ -721,6 +723,7 @@ func (m *MiddlewareTestSuite) TestEcho() {
 			require.Equal(m.T(), m.ids[first].NodeID, msgOriginID) // sender id
 
 			msgPayload, ok := args[2].(*libp2pmessage.TestMessage)
+			require.True(m.T(), ok
 			require.Equal(m.T(), expectedSendMsg, msgPayload.Text) // payload
 
 			// echos back the same message back to the sender
@@ -744,6 +747,7 @@ func (m *MiddlewareTestSuite) TestEcho() {
 			require.Equal(m.T(), m.ids[last].NodeID, msgOriginID) // sender id
 
 			msgPayload, ok := args[2].(*libp2pmessage.TestMessage)
+			require.True(m.T(), ok
 			require.Equal(m.T(), expectedReplyMsg, msgPayload.Text) // payload
 		}).Return(nil)
 
@@ -858,6 +862,7 @@ func (m *MiddlewareTestSuite) TestUnsubscribe() {
 
 	targetEngine := &mocknetwork.MessageProcessor{}
 	con2, err := m.networks[targetIndex].Register(channels.TestNetworkChannel, targetEngine)
+	require.NoError(m.T(), err)
 	targetEngine.On("Process", mockery.Anything, mockery.Anything, mockery.Anything).
 		Run(func(args mockery.Arguments) {
 			msgChannel, ok := args[0].(channels.Channel)
