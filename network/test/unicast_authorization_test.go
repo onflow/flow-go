@@ -381,14 +381,14 @@ func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_PublicChannel()
 
 	// mock a message processor that will receive the message.
 	receiverEngine := &mocknetwork.MessageProcessor{}
-	receiverEngine.On("Process", channels.TestNetworkChannel, u.senderID.NodeID, msg).Run(
+	receiverEngine.On("Process", channels.PublicPushBlocks, u.senderID.NodeID, msg).Run(
 		func(args mockery.Arguments) {
 			close(u.waitCh)
 		}).Return(nil).Once()
-	_, err := u.receiverNetwork.Register(channels.TestNetworkChannel, receiverEngine)
+	_, err := u.receiverNetwork.Register(channels.PublicPushBlocks, receiverEngine)
 	require.NoError(u.T(), err)
 
-	senderCon, err := u.senderNetwork.Register(channels.TestNetworkChannel, &mocknetwork.MessageProcessor{})
+	senderCon, err := u.senderNetwork.Register(channels.PublicPushBlocks, &mocknetwork.MessageProcessor{})
 	require.NoError(u.T(), err)
 
 	// send message via unicast
