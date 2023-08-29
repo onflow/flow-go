@@ -581,7 +581,10 @@ func TestCreateStreamIsConcurrent(t *testing.T) {
 	unittest.RequireReturnsBefore(t,
 		func() {
 			goodNodes[0].Host().Peerstore().AddAddrs(goodNodeInfo1.ID, goodNodeInfo1.Addrs, peerstore.AddressTTL)
-			_, err := goodNodes[0].CreateStream(ctx, goodNodeInfo1.ID)
+			err := goodNodes[0].OpenProtectedStream(ctx, goodNodeInfo1.ID, t.Name(), func(stream network.Stream) error {
+				// do nothing, this is a no-op stream writer, we just check that the stream was created
+				return nil
+			})
 			require.NoError(t, err)
 		},
 		1*time.Second, "creating stream to a responsive node failed while concurrently blocked on unresponsive node")
