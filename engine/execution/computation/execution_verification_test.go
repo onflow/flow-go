@@ -46,8 +46,6 @@ import (
 )
 
 const (
-	// TODO: enable parallel execution once cadence type equivalence check issue
-	// is resolved.
 	testVerifyMaxConcurrency = 2
 )
 
