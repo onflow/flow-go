@@ -21,7 +21,7 @@ type RegisterReader interface {
 	// height the register was indexed at.
 	// An error is returned if the register was not indexed at all. Expected errors:
 	// - storage.ErrNotFound if the register was not found in the db
-	Get(ID flow.RegisterID, height uint64) (flow.RegisterEntry, error)
+	Get(ID flow.RegisterID, height uint64) (flow.RegisterValue, error)
 }
 
 // RegisterWriter defines write-only operations on the register index.
