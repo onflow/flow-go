@@ -2,10 +2,12 @@ package execution_indexer
 
 import (
 	"fmt"
+
 	"github.com/onflow/flow-go/cmd/util/ledger/migrations"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	"github.com/onflow/flow-go/storage"
 )
 
@@ -55,11 +57,6 @@ func (i *ExecutionIndexer) Commitment(height uint64) (flow.StateCommitment, erro
 	return val, nil
 }
 
-func (i *ExecutionIndexer) IndexCommitment(commitment flow.StateCommitment, height uint64) error {
-	i.commitments[height] = commitment
-	return nil
-}
-
 func (i *ExecutionIndexer) Values(IDs flow.RegisterIDs, height uint64) ([]flow.RegisterValue, error) {
 	values := make([]flow.RegisterValue, len(IDs))
 
@@ -73,6 +70,38 @@ func (i *ExecutionIndexer) Values(IDs flow.RegisterIDs, height uint64) ([]flow.R
 	}
 
 	return values, nil
+}
+
+func (i *ExecutionIndexer) IndexBlockData(data *execution_data.BlockExecutionDataEntity) error {
+	block, err := i.headers.ByBlockID(data.BlockID)
+	if err != nil {
+		return fmt.Errorf("could not get the block by ID %s: %w", data.BlockID, err)
+	}
+
+	// TODO concurrently process
+	for j, chunk := range data.ChunkExecutionDatas {
+		err := i.IndexEvents(data.BlockID, chunk.Events)
+		if err != nil {
+			return fmt.Errorf("could not index events for chunk %d: %w", j, err)
+		}
+
+		err = i.IndexCommitment(flow.StateCommitment(chunk.TrieUpdate.RootHash), block.Height)
+		if err != nil {
+			return fmt.Errorf("could not index events for chunk %d: %w", j, err)
+		}
+
+		err = i.IndexPayloads(chunk.TrieUpdate.Payloads, block.Height)
+		if err != nil {
+			return fmt.Errorf("could not index registers for chunk %d: %w", j, err)
+		}
+	}
+
+	return nil
+}
+
+func (i *ExecutionIndexer) IndexCommitment(commitment flow.StateCommitment, height uint64) error {
+	i.commitments[height] = commitment
+	return nil
 }
 
 func (i *ExecutionIndexer) IndexEvents(blockID flow.Identifier, events flow.EventsList) error {
