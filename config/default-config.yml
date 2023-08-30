@@ -106,6 +106,13 @@ network-config:
   ihave-async-inspection-sample-size-percentage: .10
   # Max number of ihave messages in a sample to be inspected
   ihave-max-sample-size: 100
+
+  # Max number of iwant messages in a sample to be inspected
+  gossipsub-rpc-iwant-max-sample-size: 1_000_000
+  # The allowed threshold of iWant messages received without a corresponding tracked iHave message that was sent
+  gossipsub-rpc-iwant-cache-miss-threshold: .5
+  # The max allowed duplicate message IDs in a single iWant control message
+  gossipsub-rpc-iwant-duplicate-message-id-threshold: .15
   # RPC metrics observer inspector configs
   # The number of metrics inspector pool workers
   gossipsub-rpc-metrics-inspector-workers: 1
