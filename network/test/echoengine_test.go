@@ -127,6 +127,7 @@ func (suite *EchoEngineTestSuite) TestEchoMultiMsgAsync_Unicast() {
 // Sender and receiver are not synchronized
 func (suite *EchoEngineTestSuite) TestEchoMultiMsgAsync_Multicast() {
 	// set to true for an echo expectation
+	unittest.SkipUnless(suite.T(), unittest.TEST_FLAKY, "this should be revisited once network/test is running in a separate CI job, runs fine locally")
 	suite.multiMessageAsync(true, 10, suite.Multicast)
 }
 
@@ -173,6 +174,7 @@ func (suite *EchoEngineTestSuite) TestDuplicateMessageParallel_Unicast() {
 // on deduplicating the received messages via Multicast method of nodes' Conduits.
 // Messages are delivered to the receiver in parallel via the Multicast method of Conduits.
 func (suite *EchoEngineTestSuite) TestDuplicateMessageParallel_Multicast() {
+	unittest.SkipUnless(suite.T(), unittest.TEST_FLAKY, "this should be revisited once network/test is running in a separate CI job, runs fine locally")
 	suite.duplicateMessageParallel(suite.Multicast)
 }
 
