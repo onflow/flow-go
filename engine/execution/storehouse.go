@@ -14,7 +14,6 @@ import (
 )
 
 type RegisterStore interface {
-	// Depend on OnDiskRegisterStore.Init
 	Init() error
 
 	// GetRegister first try to get the register from InMemoryRegisterStore, then OnDiskRegisterStore
@@ -45,18 +44,20 @@ type FinalizedReader interface {
 }
 
 type InMemoryRegisterStore interface {
-	// Init with last finalized and executed height, which will be set as pruned height
-	InitWithLatestHeight(height uint64) error
 	Prune(finalizedHeight uint64, finalizedBlockID flow.Identifier) error
 	PrunedHeight() uint64
 
 	GetRegister(height uint64, blockID flow.Identifier, register flow.RegisterID) (flow.RegisterValue, error)
 	GetUpdatedRegisters(height uint64, blockID flow.Identifier) ([]flow.RegisterEntry, error)
-	SaveRegister(header *flow.Header, registers []flow.RegisterEntry) error
+	SaveRegister(
+		height uint64,
+		blockID flow.Identifier,
+		parentID flow.Identifier,
+		registers []flow.RegisterEntry,
+	) error
 }
 
 type OnDiskRegisterStore interface {
-	Init() error
 	GetRegister(height uint64, register flow.RegisterID) (flow.RegisterValue, error)
 	SaveRegister(height uint64, registers []flow.RegisterEntry) error
 	// latest finalized and executed height

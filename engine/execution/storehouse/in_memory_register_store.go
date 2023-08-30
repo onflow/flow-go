@@ -4,8 +4,11 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/onflow/flow-go/engine/execution"
 	"github.com/onflow/flow-go/model/flow"
 )
+
+var _ execution.InMemoryRegisterStore = &InMemoryRegisterStore{}
 
 type InMemoryRegisterStore struct {
 	sync.RWMutex
@@ -16,23 +19,25 @@ type InMemoryRegisterStore struct {
 	prunedID           flow.Identifier // to ensure all blocks are extending from pruned block (last finalized and executed block)
 }
 
-func (s *InMemoryRegisterStore) NewInMemoryRegisterStore(last *flow.Header) *InMemoryRegisterStore {
+func NewInMemoryRegisterStore(lastHeight uint64, lastID flow.Identifier) *InMemoryRegisterStore {
 	return &InMemoryRegisterStore{
 		registersByBlockID: make(map[flow.Identifier]map[flow.RegisterID]flow.RegisterValue),
 		parentByBlockID:    make(map[flow.Identifier]flow.Identifier),
 		blockIDsByHeight:   make(map[uint64]map[flow.Identifier]struct{}),
-		prunedHeight:       last.Height,
-		prunedID:           last.ID(),
+		prunedHeight:       lastHeight,
+		prunedID:           lastID,
 	}
 }
 
 // SaveRegister saves the registers of a block to InMemoryRegisterStore
 // It needs to ensure the block is above the pruned height and is connected to the pruned block
-func (s *InMemoryRegisterStore) SaveRegister(header *flow.Header, registers []flow.RegisterEntry) error {
+func (s *InMemoryRegisterStore) SaveRegister(
+	height uint64,
+	blockID flow.Identifier,
+	parentID flow.Identifier,
+	registers []flow.RegisterEntry,
+) error {
 	// preprocess data before acquiring the lock
-	height := header.Height
-	blockID := header.ID()
-
 	regs := make(map[flow.RegisterID]flow.RegisterValue)
 	for _, reg := range registers {
 		regs[reg.Key] = reg.Value
@@ -57,7 +62,7 @@ func (s *InMemoryRegisterStore) SaveRegister(header *flow.Header, registers []fl
 	s.registersByBlockID[blockID] = regs
 
 	// update index on parent
-	s.parentByBlockID[blockID] = header.ParentID
+	s.parentByBlockID[blockID] = parentID
 
 	// update index on height
 	sameHeight, ok := s.blockIDsByHeight[height]
@@ -97,10 +102,12 @@ func (s *InMemoryRegisterStore) GetRegister(height uint64, blockID flow.Identifi
 			// otherwise, it means the parent block index is not consistent, which is a bug
 			// we've reached the pruned block, so the register is not found
 			if block == s.prunedID {
-				return flow.RegisterValue{}, fmt.Errorf("cannot get register at height %d, block %s is pruned", height, blockID)
+				return flow.RegisterValue{}, fmt.Errorf("cannot get register at height %d, block %v is pruned", height, blockID)
 			}
 
-			return flow.RegisterValue{}, fmt.Errorf("inconsistent parent block index in in-memory-register-store, ancient block %s is not found when getting register at block %v", height, block, blockID)
+			return flow.RegisterValue{},
+				fmt.Errorf("inconsistent parent block index in in-memory-register-store, ancient block %v is not found when getting register at block %v",
+					block, blockID)
 		}
 
 		block = parent
@@ -166,6 +173,12 @@ func (s *InMemoryRegisterStore) Prune(height uint64, blockID flow.Identifier) er
 	}
 
 	return nil
+}
+
+func (s *InMemoryRegisterStore) PrunedHeight() uint64 {
+	s.RLock()
+	defer s.RUnlock()
+	return s.prunedHeight
 }
 
 func (s *InMemoryRegisterStore) findFinalizedFork(height uint64, blockID flow.Identifier) ([]flow.Identifier, error) {
