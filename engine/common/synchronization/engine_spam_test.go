@@ -95,19 +95,19 @@ func (ss *SyncSuite) TestLoad_Process_SyncRequest_HigherThanReceiver_OutsideTole
 	// expect to never get misbehavior report
 	loadGroups = append(loadGroups, loadGroup{0.0, 0, 0})
 
-	// expect to get misbehavior report between 10% of the time
-	loadGroups = append(loadGroups, loadGroup{0.1, 75, 140})
-
-	// expect to get misbehavior report between 1% of the time
-	loadGroups = append(loadGroups, loadGroup{0.01, 5, 15})
-
-	// expect to get misbehavior report between 0.1% of the time (1 in 1000 requests)
+	// expect to get misbehavior report about 0.1% of the time (1 in 1000 requests)
 	loadGroups = append(loadGroups, loadGroup{0.001, 0, 7})
 
-	// expect to get misbehavior report between 50% of the time
+	// expect to get misbehavior report about 1% of the time
+	loadGroups = append(loadGroups, loadGroup{0.01, 5, 15})
+
+	// expect to get misbehavior report about 10% of the time
+	loadGroups = append(loadGroups, loadGroup{0.1, 75, 140})
+
+	// expect to get misbehavior report about 50% of the time
 	loadGroups = append(loadGroups, loadGroup{0.5, 450, 550})
 
-	// expect to get misbehavior report between 90% of the time
+	// expect to get misbehavior report about 90% of the time
 	loadGroups = append(loadGroups, loadGroup{0.9, 850, 950})
 
 	// reset misbehavior report counter for each subtest
@@ -152,13 +152,12 @@ func (ss *SyncSuite) TestLoad_Process_SyncRequest_HigherThanReceiver_OutsideTole
 			ss.core.AssertExpectations(ss.T())
 			ss.con.AssertExpectations(ss.T())
 
-			// check that correct range of misbehavior reports were generated (between 1-2 reports per 1000 requests)
-			// since we're using a random method to generate misbehavior reports, we can't guarantee the exact number, so we
-			// check that it's within a larger range, but that at least 1 misbehavior report was generated
-
+			// check that correct range of misbehavior reports were generated
+			// since we're using a probabilistic approach to generate misbehavior reports, we can't guarantee the exact number,
+			// so we check that it's within an expected range
 			ss.T().Logf("misbehaviors counter after load test: %d (expected lower bound: %d expected upper bound: %d)", misbehaviorsCounter, loadGroup.expectedMisbehaviorsLower, loadGroup.expectedMisbehaviorsUpper)
 			assert.GreaterOrEqual(ss.T(), misbehaviorsCounter, loadGroup.expectedMisbehaviorsLower)
-			assert.LessOrEqual(ss.T(), misbehaviorsCounter, loadGroup.expectedMisbehaviorsUpper) // too many reports would indicate a bug
+			assert.LessOrEqual(ss.T(), misbehaviorsCounter, loadGroup.expectedMisbehaviorsUpper)
 
 			misbehaviorsCounter = 0 // reset counter for next subtest
 		})
