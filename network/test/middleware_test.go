@@ -102,7 +102,6 @@ type MiddlewareTestSuite struct {
 
 // TestMiddlewareTestSuit runs all the test methods in this test suit
 func TestMiddlewareTestSuite(t *testing.T) {
-	t.Parallel()
 	suite.Run(t, new(MiddlewareTestSuite))
 }
 

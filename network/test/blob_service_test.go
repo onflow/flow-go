@@ -59,7 +59,6 @@ type BlobServiceTestSuite struct {
 }
 
 func TestBlobService(t *testing.T) {
-	t.Parallel()
 	suite.Run(t, new(BlobServiceTestSuite))
 }
 
