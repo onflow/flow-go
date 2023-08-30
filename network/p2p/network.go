@@ -5,14 +5,15 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"sync"
 	"time"
 
 	ggio "github.com/gogo/protobuf/io"
-	libp2pnet "github.com/libp2p/go-libp2p/core/network"
-
 	"github.com/ipfs/go-datastore"
+	libp2pnet "github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/libp2p/go-libp2p/core/peerstore"
 	"github.com/libp2p/go-libp2p/core/protocol"
 	"github.com/rs/zerolog"
 
@@ -25,8 +26,18 @@ import (
 	alspmgr "github.com/onflow/flow-go/network/alsp/manager"
 	netcache "github.com/onflow/flow-go/network/cache"
 	"github.com/onflow/flow-go/network/channels"
+	"github.com/onflow/flow-go/network/codec"
+	"github.com/onflow/flow-go/network/internal/p2putils"
 	"github.com/onflow/flow-go/network/message"
+	"github.com/onflow/flow-go/network/p2p/blob"
+	"github.com/onflow/flow-go/network/p2p/internal"
+	"github.com/onflow/flow-go/network/p2p/ping"
+	"github.com/onflow/flow-go/network/p2p/unicast/protocols"
+	"github.com/onflow/flow-go/network/p2p/unicast/ratelimit"
+	"github.com/onflow/flow-go/network/p2p/utils"
 	"github.com/onflow/flow-go/network/queue"
+	"github.com/onflow/flow-go/network/validator"
+	flowpubsub "github.com/onflow/flow-go/network/validator/pubsub"
 	_ "github.com/onflow/flow-go/utils/binstat"
 	"github.com/onflow/flow-go/utils/logging"
 )
@@ -53,6 +64,13 @@ const (
 	LargeMsgUnicastTimeout = 1000 * time.Second
 )
 
+var (
+	// ErrUnicastMsgWithoutSub error is provided to the slashing violations consumer in the case where
+	// the network receives a message via unicast but does not have a corresponding subscription for
+	// the channel in that message.
+	ErrUnicastMsgWithoutSub = errors.New("networking layer does not have subscription for the channel ID indicated in the unicast message received")
+)
+
 // NotEjectedFilter is an identity filter that, when applied to the identity
 // table at a given snapshot, returns all nodes that we should communicate with
 // over the networking layer.
@@ -65,6 +83,12 @@ var NotEjectedFilter = filter.Not(filter.Ejected)
 // the protocols for handshakes, authentication, gossiping and heartbeats.
 type Network struct {
 	sync.RWMutex
+
+	// TODO: using a waitgroup here doesn't actually guarantee that we'll wait for all
+	// goroutines to exit, because new goroutines could be started after we've already
+	// returned from wg.Wait(). We need to solve this the right way using ComponentManager
+	// and worker routines.
+	wg sync.WaitGroup
 	*component.ComponentManager
 	ctx                         context.Context
 	sporkId                     flow.Identifier
@@ -73,7 +97,6 @@ type Network struct {
 	logger                      zerolog.Logger
 	codec                       network.Codec
 	me                          module.Local
-	mw                          network.Middleware
 	metrics                     module.NetworkCoreMetrics
 	receiveCache                *netcache.ReceiveCache // used to deduplicate incoming messages
 	queue                       network.MessageQueue
@@ -84,6 +107,17 @@ type Network struct {
 	registerBlobServiceRequests chan *registerBlobServiceRequest
 	misbehaviorReportManager    network.MisbehaviorReportManager
 	unicastMessageTimeout       time.Duration
+
+	libP2PNode                 LibP2PNode
+	idTranslator               IDTranslator
+	bitswapMetrics             module.BitswapMetrics
+	previousProtocolStatePeers []peer.AddrInfo
+	slashingViolationsConsumer network.ViolationsConsumer
+	peerManagerFilters         []PeerFilter
+	unicastRateLimiters        *ratelimit.RateLimiters
+	validators                 []network.MessageValidator
+	authorizedSenderValidator  *validator.AuthorizedSenderValidator
+	preferredUnicasts          []protocols.ProtocolName
 }
 
 var _ network.Network = &Network{}
@@ -117,20 +151,29 @@ var ErrNetworkShutdown = errors.New("network has already shutdown")
 // NetworkConfig is a configuration struct for the network. It contains all the
 // necessary components to create a new network.
 type NetworkConfig struct {
-	Logger                zerolog.Logger
-	Codec                 network.Codec
-	Me                    module.Local
-	MiddlewareFactory     func() (network.Middleware, error)
-	Topology              network.Topology
-	SubscriptionManager   network.SubscriptionManager
-	Metrics               module.NetworkCoreMetrics
-	IdentityProvider      module.IdentityProvider
-	IdentityTranslator    IDTranslator
-	ReceiveCache          *netcache.ReceiveCache
-	ConduitFactory        network.ConduitFactory
-	AlspCfg               *alspmgr.MisbehaviorReportManagerConfig
-	SporkId               flow.Identifier
-	UnicastMessageTimeout time.Duration
+	Logger                           zerolog.Logger
+	Codec                            network.Codec
+	Me                               module.Local
+	Topology                         network.Topology
+	SubscriptionManager              network.SubscriptionManager
+	Metrics                          module.NetworkCoreMetrics
+	IdentityProvider                 module.IdentityProvider
+	IdentityTranslator               IDTranslator
+	ReceiveCache                     *netcache.ReceiveCache
+	ConduitFactory                   network.ConduitFactory
+	AlspCfg                          *alspmgr.MisbehaviorReportManagerConfig
+	SporkId                          flow.Identifier
+	UnicastMessageTimeout            time.Duration
+	Libp2pNode                       LibP2PNode
+	BitSwapMetrics                   module.BitswapMetrics
+	SlashingViolationConsumerFactory func() network.ViolationsConsumer
+}
+
+// Validate validates the configuration, and sets default values for any missing fields.
+func (cfg *NetworkConfig) Validate() {
+	if cfg.UnicastMessageTimeout <= 0 {
+		cfg.UnicastMessageTimeout = DefaultUnicastTimeout
+	}
 }
 
 // NetworkConfigOption is a function that can be used to override network config parmeters.
@@ -184,20 +227,12 @@ func WithAlspManager(mgr network.MisbehaviorReportManager) NetworkOption {
 // using the given state & cache interfaces to track volatile information.
 // csize determines the size of the cache dedicated to keep track of received messages
 func NewNetwork(param *NetworkConfig, opts ...NetworkOption) (*Network, error) {
-	mw, err := param.MiddlewareFactory()
-	if err != nil {
-		return nil, fmt.Errorf("could not create middleware: %w", err)
-	}
-	misbehaviorMngr, err := alspmgr.NewMisbehaviorReportManager(param.AlspCfg, mw)
-	if err != nil {
-		return nil, fmt.Errorf("could not create misbehavior report manager: %w", err)
-	}
+	param.Validate()
 
 	n := &Network{
 		logger:                      param.Logger.With().Str("component", "network").Logger(),
 		codec:                       param.Codec,
 		me:                          param.Me,
-		mw:                          mw,
 		receiveCache:                param.ReceiveCache,
 		topology:                    param.Topology,
 		metrics:                     param.Metrics,
@@ -206,58 +241,102 @@ func NewNetwork(param *NetworkConfig, opts ...NetworkOption) (*Network, error) {
 		conduitFactory:              param.ConduitFactory,
 		registerEngineRequests:      make(chan *registerEngineRequest),
 		registerBlobServiceRequests: make(chan *registerBlobServiceRequest),
-		misbehaviorReportManager:    misbehaviorMngr,
 		sporkId:                     param.SporkId,
 		identityTranslator:          param.IdentityTranslator,
 		unicastMessageTimeout:       param.UnicastMessageTimeout,
 	}
 
+	misbehaviorMngr, err := alspmgr.NewMisbehaviorReportManager(param.AlspCfg, n)
+	if err != nil {
+		return nil, fmt.Errorf("could not create misbehavior report manager: %w", err)
+	}
+	n.misbehaviorReportManager = misbehaviorMngr
+
 	for _, opt := range opts {
 		opt(n)
 	}
-
-	n.mw.SetOverlay(n)
 
 	if err := n.conduitFactory.RegisterAdapter(n); err != nil {
 		return nil, fmt.Errorf("could not register network adapter: %w", err)
 	}
 
-	n.ComponentManager = component.NewComponentManagerBuilder().
-		AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
-			n.logger.Debug().Msg("starting misbehavior manager")
-			n.misbehaviorReportManager.Start(ctx)
+	builder := component.NewComponentManagerBuilder()
+	builder.AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+		n.logger.Debug().Msg("starting misbehavior manager")
+		n.misbehaviorReportManager.Start(ctx)
 
-			select {
-			case <-n.misbehaviorReportManager.Ready():
-				n.logger.Debug().Msg("misbehavior manager is ready")
-				ready()
-			case <-ctx.Done():
-				// jumps to the end of the select statement to let a graceful shutdown.
-			}
-
-			<-ctx.Done()
-			n.logger.Debug().Msg("stopping misbehavior manager")
-			<-n.misbehaviorReportManager.Done()
-			n.logger.Debug().Msg("misbehavior manager stopped")
-		}).
-		AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
-			n.logger.Debug().Msg("setting up network context")
-			n.ctx = ctx
-
+		select {
+		case <-n.misbehaviorReportManager.Ready():
+			n.logger.Debug().Msg("misbehavior manager is ready")
 			ready()
+		case <-ctx.Done():
+			// jumps to the end of the select statement to let a graceful shutdown.
+		}
 
-			<-ctx.Done()
-			n.logger.Debug().Msg("network context is done")
-		}).
-		AddWorker(n.runMiddleware).
-		AddWorker(n.processRegisterEngineRequests).
-		AddWorker(n.processRegisterBlobServiceRequests).Build()
+		<-ctx.Done()
+		n.logger.Debug().Msg("stopping misbehavior manager")
+		<-n.misbehaviorReportManager.Done()
+		n.logger.Debug().Msg("misbehavior manager stopped")
+	})
+	builder.AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+		n.logger.Debug().Msg("setting up network context")
+		n.ctx = ctx
 
+		ready()
+
+		<-ctx.Done()
+		n.logger.Debug().Msg("network context is done")
+	})
+
+	for _, limiter := range n.unicastRateLimiters.Limiters() {
+		rateLimiter := limiter
+		builder.AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+			ready()
+			rateLimiter.Start(ctx)
+			<-rateLimiter.Ready()
+			ready()
+			<-rateLimiter.Done()
+		})
+	}
+
+	builder.AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+		// creation of slashing violations consumer should be postponed till here where the middleware
+		// is start and the overlay is set.
+		n.slashingViolationsConsumer = param.SlashingViolationConsumerFactory()
+
+		n.authorizedSenderValidator = validator.NewAuthorizedSenderValidator(
+			n.logger,
+			n.slashingViolationsConsumer,
+			n.Identity)
+
+		err := n.libP2PNode.WithDefaultUnicastProtocol(n.handleIncomingStream, n.preferredUnicasts)
+		if err != nil {
+			ctx.Throw(fmt.Errorf("could not register preferred unicast protocols on libp2p node: %w", err))
+		}
+
+		n.UpdateNodeAddresses()
+		n.libP2PNode.WithPeersProvider(n.authorizedPeers)
+
+		ready()
+
+		<-ctx.Done()
+		n.logger.Info().Str("component", "middleware").Msg("stopping subroutines, blocking on read connection loops to end")
+
+		// wait for the readConnection and readSubscription routines to stop
+		n.wg.Wait()
+		n.logger.Info().Str("component", "middleware").Msg("stopped subroutines")
+	})
+
+	builder.AddWorker(n.createInboundMessageQueue)
+	builder.AddWorker(n.processRegisterEngineRequests)
+	builder.AddWorker(n.processRegisterBlobServiceRequests)
+
+	n.ComponentManager = builder.Build()
 	return n, nil
 }
 
 func (n *Network) processRegisterEngineRequests(parent irrecoverable.SignalerContext, ready component.ReadyFunc) {
-	<-n.mw.Ready()
+	<-n.libP2PNode.Ready()
 	ready()
 
 	for {
@@ -281,7 +360,7 @@ func (n *Network) processRegisterEngineRequests(parent irrecoverable.SignalerCon
 }
 
 func (n *Network) processRegisterBlobServiceRequests(parent irrecoverable.SignalerContext, ready component.ReadyFunc) {
-	<-n.mw.Ready()
+	<-n.libP2PNode.Ready()
 	ready()
 
 	for {
@@ -304,20 +383,12 @@ func (n *Network) processRegisterBlobServiceRequests(parent irrecoverable.Signal
 	}
 }
 
-func (n *Network) runMiddleware(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
-	// setup the message queue
-	// create priority queue
+// createInboundMessageQueue creates the queue that will be used to process incoming messages.
+func (n *Network) createInboundMessageQueue(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 	n.queue = queue.NewMessageQueue(ctx, queue.GetEventPriority, n.metrics)
-
-	// create workers to read from the queue and call queueSubmitFunc
 	queue.CreateQueueWorkers(ctx, queue.DefaultNumWorkers, n.queue, n.queueSubmitFunc)
 
-	n.mw.Start(ctx)
-	<-n.mw.Ready()
-
 	ready()
-
-	<-n.mw.Done()
 }
 
 func (n *Network) handleRegisterEngineRequest(parent irrecoverable.SignalerContext, channel channels.Channel, engine network.MessageProcessor) (network.Conduit, error) {
@@ -344,7 +415,7 @@ func (n *Network) handleRegisterEngineRequest(parent irrecoverable.SignalerConte
 }
 
 func (n *Network) handleRegisterBlobServiceRequest(parent irrecoverable.SignalerContext, channel channels.Channel, ds datastore.Batching, opts []network.BlobServiceOption) (network.BlobService, error) {
-	bs := n.mw.NewBlobService(channel, ds, opts...)
+	bs := blob.NewBlobService(n.libP2PNode.Host(), n.libP2PNode.Routing(), channel.String(), ds, n.bitswapMetrics, n.logger, opts...)
 
 	// start the blob service using the network's context
 	bs.Start(parent)
@@ -380,7 +451,7 @@ func (n *Network) RegisterPingService(pingProtocol protocol.ID, provider network
 	case <-n.ComponentManager.ShutdownSignal():
 		return nil, ErrNetworkShutdown
 	default:
-		return n.mw.NewPingService(pingProtocol, provider), nil
+		return ping.NewPingService(n.libP2PNode.Host(), pingProtocol, n.logger, provider), nil
 	}
 }
 
@@ -517,7 +588,7 @@ func (n *Network) UnicastOnChannel(channel channels.Channel, payload interface{}
 	}
 	streamProtectionTag := fmt.Sprintf("%v:%v", channel, msg.PayloadType())
 
-	err = n.mw.OpenProtectedStream(ctx, peerID, streamProtectionTag, func(stream libp2pnet.Stream) error {
+	err = n.libP2PNode.OpenProtectedStream(ctx, peerID, streamProtectionTag, func(stream libp2pnet.Stream) error {
 		bufw := bufio.NewWriter(stream)
 		writer := ggio.NewDelimitedWriter(bufw)
 
@@ -612,7 +683,7 @@ func (n *Network) sendOnChannel(channel channels.Channel, msg interface{}, targe
 
 	// publish the message through the channel, however, the message
 	// is only restricted to targetIDs (if they subscribed to channel).
-	err = n.mw.Publish(scope)
+	err = n.libP2PNode.Publish(n.ctx, scope)
 	if err != nil {
 		return fmt.Errorf("failed to send message on channel %s: %w", channel, err)
 	}
@@ -694,4 +765,452 @@ func (n *Network) unicastMaxMsgDuration(messageType string) time.Duration {
 	default:
 		return n.unicastMessageTimeout
 	}
+}
+
+func DefaultValidators(log zerolog.Logger, flowID flow.Identifier) []network.MessageValidator {
+	return []network.MessageValidator{
+		validator.ValidateNotSender(flowID),   // validator to filter out messages sent by this node itself
+		validator.ValidateTarget(log, flowID), // validator to filter out messages not intended for this node
+	}
+}
+
+// isProtocolParticipant returns a PeerFilter that returns true if a peer is a staked (i.e., authorized) node.
+func (n *Network) isProtocolParticipant() PeerFilter {
+	return func(p peer.ID) error {
+		if _, ok := n.Identity(p); !ok {
+			return fmt.Errorf("failed to get identity of unknown peer with peer id %s", p.String())
+		}
+		return nil
+	}
+}
+
+func (n *Network) peerIDs(flowIDs flow.IdentifierList) peer.IDSlice {
+	result := make([]peer.ID, 0, len(flowIDs))
+
+	for _, fid := range flowIDs {
+		pid, err := n.idTranslator.GetPeerID(fid)
+		if err != nil {
+			// We probably don't need to fail the entire function here, since the other
+			// translations may still succeed
+			n.logger.
+				Err(err).
+				Str(logging.KeySuspicious, "true").
+				Hex("node_id", logging.ID(fid)).
+				Msg("failed to translate to peer ID")
+			continue
+		}
+
+		result = append(result, pid)
+	}
+
+	return result
+}
+
+func (n *Network) UpdateNodeAddresses() {
+	n.logger.Info().Msg("updating protocol state node addresses")
+
+	ids := n.Identities()
+	newInfos, invalid := utils.PeerInfosFromIDs(ids)
+
+	for id, err := range invalid {
+		n.logger.
+			Err(err).
+			Bool(logging.KeySuspicious, true).
+			Hex("node_id", logging.ID(id)).
+			Msg("failed to extract peer info from identity")
+	}
+
+	n.Lock()
+	defer n.Unlock()
+
+	// set old addresses to expire
+	for _, oldInfo := range n.previousProtocolStatePeers {
+		n.libP2PNode.Host().Peerstore().SetAddrs(oldInfo.ID, oldInfo.Addrs, peerstore.TempAddrTTL)
+	}
+
+	for _, info := range newInfos {
+		n.libP2PNode.Host().Peerstore().SetAddrs(info.ID, info.Addrs, peerstore.PermanentAddrTTL)
+	}
+
+	n.previousProtocolStatePeers = newInfos
+}
+
+// authorizedPeers is a peer manager callback used by the underlying libp2p node that updates who can connect to this node (as
+// well as who this node can connect to).
+// and who is not allowed to connect to this node. This function is called by the peer manager and connection gater components
+// of libp2p.
+//
+// Args:
+// none
+// Returns:
+// - peer.IDSlice: a list of peer IDs that are allowed to connect to this node (and that this node can connect to). Any peer
+// not in this list is assumed to be disconnected from this node (if connected) and not allowed to connect to this node.
+// This is the guarantee that the underlying libp2p node implementation makes.
+func (n *Network) authorizedPeers() peer.IDSlice {
+	peerIDs := make([]peer.ID, 0)
+	for _, id := range n.peerIDs(n.Topology().NodeIDs()) {
+		peerAllowed := true
+		for _, filter := range n.peerManagerFilters {
+			if err := filter(id); err != nil {
+				n.logger.Debug().
+					Err(err).
+					Str("peer_id", id.String()).
+					Msg("filtering topology peer")
+
+				peerAllowed = false
+				break
+			}
+		}
+
+		if peerAllowed {
+			peerIDs = append(peerIDs, id)
+		}
+	}
+
+	return peerIDs
+}
+
+func (n *Network) OnDisallowListNotification(notification *network.DisallowListingUpdate) {
+	for _, pid := range n.peerIDs(notification.FlowIds) {
+		n.libP2PNode.OnDisallowListNotification(pid, notification.Cause)
+	}
+}
+
+func (n *Network) OnAllowListNotification(notification *network.AllowListingUpdate) {
+	for _, pid := range n.peerIDs(notification.FlowIds) {
+		n.libP2PNode.OnAllowListNotification(pid, notification.Cause)
+	}
+}
+
+// handleIncomingStream handles an incoming stream from a remote peer
+// it is a callback that gets called for each incoming stream by libp2p with a new stream object.
+// TODO: this should be eventually moved to libp2p node.
+func (n *Network) handleIncomingStream(s libp2pnet.Stream) {
+	// qualify the logger with local and remote address
+	log := p2putils.StreamLogger(n.logger, s)
+
+	log.Info().Msg("incoming stream received")
+
+	success := false
+
+	remotePeer := s.Conn().RemotePeer()
+
+	defer func() {
+		if success {
+			err := s.Close()
+			if err != nil {
+				log.Err(err).Msg("failed to close stream")
+			}
+		} else {
+			err := s.Reset()
+			if err != nil {
+				log.Err(err).Msg("failed to reset stream")
+			}
+		}
+	}()
+
+	// check if peer is currently rate limited before continuing to process stream.
+	if n.unicastRateLimiters.MessageRateLimiter.IsRateLimited(remotePeer) || n.unicastRateLimiters.BandWidthRateLimiter.IsRateLimited(remotePeer) {
+		log.Debug().
+			Bool(logging.KeySuspicious, true).
+			Msg("dropping unicast stream from rate limited peer")
+		return
+	}
+
+	// TODO: We need to allow per-topic timeouts and message size limits.
+	// This allows us to configure higher limits for topics on which we expect
+	// to receive large messages (e.g. Chunk Data Packs), and use the normal
+	// limits for other topics. In order to enable this, we will need to register
+	// a separate stream handler for each topic.
+	ctx, cancel := context.WithTimeout(n.ctx, LargeMsgUnicastTimeout)
+	defer cancel()
+
+	deadline, _ := ctx.Deadline()
+
+	err := s.SetReadDeadline(deadline)
+	if err != nil {
+		log.Err(err).Msg("failed to set read deadline for stream")
+		return
+	}
+
+	// create the reader
+	r := ggio.NewDelimitedReader(s, LargeMsgMaxUnicastMsgSize)
+	for {
+		if ctx.Err() != nil {
+			return
+		}
+
+		// Note: message fields must not be trusted until explicitly validated
+		var msg message.Message
+		// read the next message (blocking call)
+		err = r.ReadMsg(&msg)
+		if err != nil {
+			if err == io.EOF {
+				break
+			}
+
+			n.logger.Err(err).Msg("failed to read message")
+			return
+		}
+
+		channel := channels.Channel(msg.ChannelID)
+		topic := channels.TopicFromChannel(channel, n.sporkId)
+
+		// ignore messages if node does not have subscription to topic
+		if !n.libP2PNode.HasSubscription(topic) {
+			violation := &network.Violation{
+				Identity: nil, PeerID: remotePeer.String(), Channel: channel, Protocol: message.ProtocolTypeUnicast,
+			}
+
+			msgCode, err := codec.MessageCodeFromPayload(msg.Payload)
+			if err != nil {
+				violation.Err = err
+				n.slashingViolationsConsumer.OnUnknownMsgTypeError(violation)
+				return
+			}
+
+			// msg type is not guaranteed to be correct since it is set by the client
+			_, what, err := codec.InterfaceFromMessageCode(msgCode)
+			if err != nil {
+				violation.Err = err
+				n.slashingViolationsConsumer.OnUnknownMsgTypeError(violation)
+				return
+			}
+
+			violation.MsgType = what
+			violation.Err = ErrUnicastMsgWithoutSub
+			n.slashingViolationsConsumer.OnUnauthorizedUnicastOnChannel(violation)
+			return
+		}
+
+		// check if unicast messages have reached rate limit before processing next message
+		if !n.unicastRateLimiters.MessageAllowed(remotePeer) {
+			return
+		}
+
+		// check if we can get a role for logging and metrics label if this is not a public channel
+		role := ""
+		if !channels.IsPublicChannel(channels.Channel(msg.ChannelID)) {
+			if identity, ok := n.Identity(remotePeer); ok {
+				role = identity.Role.String()
+			}
+		}
+
+		// check unicast bandwidth rate limiter for peer
+		if !n.unicastRateLimiters.BandwidthAllowed(
+			remotePeer,
+			role,
+			msg.Size(),
+			message.MessageType(msg.Payload),
+			channels.Topic(msg.ChannelID)) {
+			return
+		}
+
+		n.wg.Add(1)
+		go func() {
+			defer n.wg.Done()
+			n.processUnicastStreamMessage(remotePeer, &msg)
+		}()
+	}
+
+	success = true
+}
+
+// Subscribe subscribes the middleware to a channel.
+// No errors are expected during normal operation.
+func (n *Network) Subscribe(channel channels.Channel) error {
+	topic := channels.TopicFromChannel(channel, n.sporkId)
+
+	var peerFilter PeerFilter
+	var validators []validator.PubSubMessageValidator
+	if channels.IsPublicChannel(channel) {
+		// NOTE: for public channels the callback used to check if a node is staked will
+		// return true for every node.
+		peerFilter = AllowAllPeerFilter()
+	} else {
+		// for channels used by the staked nodes, add the topic validator to filter out messages from non-staked nodes
+		validators = append(validators, n.authorizedSenderValidator.PubSubMessageValidator(channel))
+
+		// NOTE: For non-public channels the libP2P node topic validator will reject
+		// messages from unstaked nodes.
+		peerFilter = n.isProtocolParticipant()
+	}
+
+	topicValidator := flowpubsub.TopicValidator(n.logger, peerFilter, validators...)
+	s, err := n.libP2PNode.Subscribe(topic, topicValidator)
+	if err != nil {
+		return fmt.Errorf("could not subscribe to topic (%s): %w", topic, err)
+	}
+
+	// create a new readSubscription with the context of the middleware
+	rs := internal.NewReadSubscription(s, n.processPubSubMessages, n.logger)
+	n.wg.Add(1)
+
+	// kick off the receive loop to continuously receive messages
+	go func() {
+		defer n.wg.Done()
+		rs.ReceiveLoop(n.ctx)
+	}()
+
+	// update peers to add some nodes interested in the same topic as direct peers
+	n.libP2PNode.RequestPeerUpdate()
+
+	return nil
+}
+
+// processPubSubMessages processes messages received from the pubsub subscription.
+func (n *Network) processPubSubMessages(msg *message.Message, peerID peer.ID) {
+	n.processAuthenticatedMessage(msg, peerID, message.ProtocolTypePubSub)
+}
+
+// Unsubscribe unsubscribes the middleware from a channel.
+// The following benign errors are expected during normal operations from libP2P:
+// - the libP2P node fails to unsubscribe to the topic created from the provided channel.
+//
+// All errors returned from this function can be considered benign.
+func (n *Network) Unsubscribe(channel channels.Channel) error {
+	topic := channels.TopicFromChannel(channel, n.sporkId)
+	return n.libP2PNode.Unsubscribe(topic)
+}
+
+// processUnicastStreamMessage will decode, perform authorized sender validation and process a message
+// sent via unicast stream. This func should be invoked in a separate goroutine to avoid creating a message decoding bottleneck.
+func (n *Network) processUnicastStreamMessage(remotePeer peer.ID, msg *message.Message) {
+	channel := channels.Channel(msg.ChannelID)
+
+	// TODO: once we've implemented per topic message size limits per the TODO above,
+	// we can remove this check
+	maxSize, err := UnicastMaxMsgSizeByCode(msg.Payload)
+	if err != nil {
+		n.slashingViolationsConsumer.OnUnknownMsgTypeError(&network.Violation{
+			Identity: nil, PeerID: remotePeer.String(), MsgType: "", Channel: channel, Protocol: message.ProtocolTypeUnicast, Err: err,
+		})
+		return
+	}
+	if msg.Size() > maxSize {
+		// message size exceeded
+		n.logger.Error().
+			Str("peer_id", remotePeer.String()).
+			Str("channel", msg.ChannelID).
+			Int("max_size", maxSize).
+			Int("size", msg.Size()).
+			Bool(logging.KeySuspicious, true).
+			Msg("received message exceeded permissible message maxSize")
+		return
+	}
+
+	// if message channel is not public perform authorized sender validation
+	if !channels.IsPublicChannel(channel) {
+		messageType, err := n.authorizedSenderValidator.Validate(remotePeer, msg.Payload, channel, message.ProtocolTypeUnicast)
+		if err != nil {
+			n.logger.
+				Error().
+				Err(err).
+				Str("peer_id", remotePeer.String()).
+				Str("type", messageType).
+				Str("channel", msg.ChannelID).
+				Msg("unicast authorized sender validation failed")
+			return
+		}
+	}
+	n.processAuthenticatedMessage(msg, remotePeer, message.ProtocolTypeUnicast)
+}
+
+// processAuthenticatedMessage processes a message and a source (indicated by its peer ID) and eventually passes it to the overlay
+// In particular, it populates the `OriginID` field of the message with a Flow ID translated from this source.
+func (n *Network) processAuthenticatedMessage(msg *message.Message, peerID peer.ID, protocol message.ProtocolType) {
+	originId, err := n.idTranslator.GetFlowID(peerID)
+	if err != nil {
+		// this error should never happen. by the time the message gets here, the peer should be
+		// authenticated which means it must be known
+		n.logger.Error().
+			Err(err).
+			Str("peer_id", peerID.String()).
+			Bool(logging.KeySuspicious, true).
+			Msg("dropped message from unknown peer")
+		return
+	}
+
+	channel := channels.Channel(msg.ChannelID)
+	decodedMsgPayload, err := n.codec.Decode(msg.Payload)
+	switch {
+	case codec.IsErrUnknownMsgCode(err):
+		// slash peer if message contains unknown message code byte
+		violation := &network.Violation{
+			PeerID: peerID.String(), OriginID: originId, Channel: channel, Protocol: protocol, Err: err,
+		}
+		n.slashingViolationsConsumer.OnUnknownMsgTypeError(violation)
+		return
+	case codec.IsErrMsgUnmarshal(err) || codec.IsErrInvalidEncoding(err):
+		// slash if peer sent a message that could not be marshalled into the message type denoted by the message code byte
+		violation := &network.Violation{
+			PeerID: peerID.String(), OriginID: originId, Channel: channel, Protocol: protocol, Err: err,
+		}
+		n.slashingViolationsConsumer.OnInvalidMsgError(violation)
+		return
+	case err != nil:
+		// this condition should never happen and indicates there's a bug
+		// don't crash as a result of external inputs since that creates a DoS vector
+		// collect slashing data because this could potentially lead to slashing
+		err = fmt.Errorf("unexpected error during message validation: %w", err)
+		violation := &network.Violation{
+			PeerID: peerID.String(), OriginID: originId, Channel: channel, Protocol: protocol, Err: err,
+		}
+		n.slashingViolationsConsumer.OnUnexpectedError(violation)
+		return
+	}
+
+	scope, err := message.NewIncomingScope(originId, protocol, msg, decodedMsgPayload)
+	if err != nil {
+		n.logger.Error().
+			Err(err).
+			Str("peer_id", peerID.String()).
+			Str("origin_id", originId.String()).
+			Msg("could not create incoming message scope")
+		return
+	}
+
+	n.processMessage(scope)
+}
+
+// processMessage processes a message and eventually passes it to the overlay
+func (n *Network) processMessage(scope network.IncomingMessageScope) {
+	logger := n.logger.With().
+		Str("channel", scope.Channel().String()).
+		Str("type", scope.Protocol().String()).
+		Int("msg_size", scope.Size()).
+		Hex("origin_id", logging.ID(scope.OriginId())).
+		Logger()
+
+	// run through all the message validators
+	for _, v := range n.validators {
+		// if any one fails, stop message propagation
+		if !v.Validate(scope) {
+			logger.Debug().Msg("new message filtered by message validators")
+			return
+		}
+	}
+
+	logger.Debug().Msg("processing new message")
+
+	// if validation passed, send the message to the overlay
+	err := n.Receive(scope)
+	if err != nil {
+		n.logger.Error().Err(err).Msg("could not deliver payload")
+	}
+}
+
+// UnicastMaxMsgSizeByCode returns the max permissible size for a unicast message code
+func UnicastMaxMsgSizeByCode(payload []byte) (int, error) {
+	msgCode, err := codec.MessageCodeFromPayload(payload)
+	if err != nil {
+		return 0, err
+	}
+	_, messageType, err := codec.InterfaceFromMessageCode(msgCode)
+	if err != nil {
+		return 0, err
+	}
+
+	maxSize := unicastMaxMsgSize(messageType)
+	return maxSize, nil
 }
