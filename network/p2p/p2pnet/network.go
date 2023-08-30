@@ -1,4 +1,4 @@
-package p2p
+package p2pnet
 
 import (
 	"bufio"
@@ -29,6 +29,7 @@ import (
 	"github.com/onflow/flow-go/network/codec"
 	"github.com/onflow/flow-go/network/internal/p2putils"
 	"github.com/onflow/flow-go/network/message"
+	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/blob"
 	"github.com/onflow/flow-go/network/p2p/ping"
 	"github.com/onflow/flow-go/network/p2p/subscription"
@@ -93,7 +94,7 @@ type Network struct {
 	ctx                         context.Context
 	sporkId                     flow.Identifier
 	identityProvider            module.IdentityProvider
-	identityTranslator          IDTranslator
+	identityTranslator          p2p.IDTranslator
 	logger                      zerolog.Logger
 	codec                       network.Codec
 	me                          module.Local
@@ -107,11 +108,11 @@ type Network struct {
 	registerBlobServiceRequests chan *registerBlobServiceRequest
 	misbehaviorReportManager    network.MisbehaviorReportManager
 	unicastMessageTimeout       time.Duration
-	libP2PNode                  LibP2PNode
+	libP2PNode                  p2p.LibP2PNode
 	bitswapMetrics              module.BitswapMetrics
 	previousProtocolStatePeers  []peer.AddrInfo
 	slashingViolationsConsumer  network.ViolationsConsumer
-	peerManagerFilters          []PeerFilter
+	peerManagerFilters          []p2p.PeerFilter
 	unicastRateLimiters         *ratelimit.RateLimiters
 	validators                  []network.MessageValidator
 	authorizedSenderValidator   *validator.AuthorizedSenderValidator
@@ -156,13 +157,13 @@ type NetworkConfig struct {
 	Topology                         network.Topology
 	Metrics                          module.NetworkCoreMetrics
 	IdentityProvider                 module.IdentityProvider
-	IdentityTranslator               IDTranslator
+	IdentityTranslator               p2p.IDTranslator
 	ReceiveCache                     *netcache.ReceiveCache
 	ConduitFactory                   network.ConduitFactory
 	AlspCfg                          *alspmgr.MisbehaviorReportManagerConfig
 	SporkId                          flow.Identifier
 	UnicastMessageTimeout            time.Duration
-	Libp2pNode                       LibP2PNode
+	Libp2pNode                       p2p.LibP2PNode
 	BitSwapMetrics                   module.BitswapMetrics
 	SlashingViolationConsumerFactory func() network.ViolationsConsumer
 }
@@ -228,7 +229,7 @@ func WithAlspManager(mgr network.MisbehaviorReportManager) NetworkOption {
 
 // WithPeerManagerFilters sets the peer manager filters for the network. It overrides the default
 // peer manager filters that are created from the config.
-func WithPeerManagerFilters(filters ...PeerFilter) NetworkOption {
+func WithPeerManagerFilters(filters ...p2p.PeerFilter) NetworkOption {
 	return func(n *Network) {
 		n.peerManagerFilters = filters
 	}
@@ -816,7 +817,7 @@ func DefaultValidators(log zerolog.Logger, flowID flow.Identifier) []network.Mes
 }
 
 // isProtocolParticipant returns a PeerFilter that returns true if a peer is a staked (i.e., authorized) node.
-func (n *Network) isProtocolParticipant() PeerFilter {
+func (n *Network) isProtocolParticipant() p2p.PeerFilter {
 	return func(p peer.ID) error {
 		if _, ok := n.Identity(p); !ok {
 			return fmt.Errorf("failed to get identity of unknown peer with peer id %s", p.String())
@@ -1062,12 +1063,12 @@ func (n *Network) handleIncomingStream(s libp2pnet.Stream) {
 func (n *Network) Subscribe(channel channels.Channel) error {
 	topic := channels.TopicFromChannel(channel, n.sporkId)
 
-	var peerFilter PeerFilter
+	var peerFilter p2p.PeerFilter
 	var validators []validator.PubSubMessageValidator
 	if channels.IsPublicChannel(channel) {
 		// NOTE: for public channels the callback used to check if a node is staked will
 		// return true for every node.
-		peerFilter = AllowAllPeerFilter()
+		peerFilter = p2p.AllowAllPeerFilter()
 	} else {
 		// for channels used by the staked nodes, add the topic validator to filter out messages from non-staked nodes
 		validators = append(validators, n.authorizedSenderValidator.PubSubMessageValidator(channel))

@@ -74,6 +74,7 @@ import (
 	"github.com/onflow/flow-go/network/p2p/dht"
 	"github.com/onflow/flow-go/network/p2p/p2pbuilder"
 	p2pconfig "github.com/onflow/flow-go/network/p2p/p2pbuilder/config"
+	"github.com/onflow/flow-go/network/p2p/p2pnet"
 	"github.com/onflow/flow-go/network/p2p/subscription"
 	"github.com/onflow/flow-go/network/p2p/tracer"
 	"github.com/onflow/flow-go/network/p2p/translator"
@@ -789,7 +790,7 @@ func (builder *FlowAccessNodeBuilder) initNetwork(local module.Local,
 	networkMetrics module.NetworkCoreMetrics,
 	topology network.Topology,
 	receiveCache *netcache.ReceiveCache,
-) (*p2p.Network, error) {
+) (*p2pnet.Network, error) {
 
 }
 
@@ -838,7 +839,7 @@ func (builder *FlowAccessNodeBuilder) InitIDProviders() {
 				filter.And(
 					filter.HasRole(flow.RoleConsensus),
 					filter.Not(filter.HasNodeID(node.Me.NodeID())),
-					p2p.NotEjectedFilter,
+					p2pnet.NotEjectedFilter,
 				),
 				builder.IdentityProvider,
 			)
@@ -1255,7 +1256,7 @@ func (builder *FlowAccessNodeBuilder) enqueuePublicNetworkInit() {
 				return nil, fmt.Errorf("could not register networking receive cache metric: %w", err)
 			}
 
-			net, err := p2p.NewNetwork(&p2p.NetworkConfig{
+			net, err := p2pnet.NewNetwork(&p2pnet.NetworkConfig{
 				Logger:                builder.Logger.With().Str("module", "public-network").Logger(),
 				Libp2pNode:            publicLibp2pNode,
 				Codec:                 cborcodec.NewCodec(),
@@ -1267,7 +1268,7 @@ func (builder *FlowAccessNodeBuilder) enqueuePublicNetworkInit() {
 				ReceiveCache:          receiveCache,
 				ConduitFactory:        conduit.NewDefaultConduitFactory(),
 				SporkId:               builder.SporkID,
-				UnicastMessageTimeout: p2p.DefaultUnicastTimeout,
+				UnicastMessageTimeout: p2pnet.DefaultUnicastTimeout,
 				IdentityTranslator:    builder.IDTranslator,
 				AlspCfg: &alspmgr.MisbehaviorReportManagerConfig{
 					Logger:                  builder.Logger,
@@ -1290,7 +1291,7 @@ func (builder *FlowAccessNodeBuilder) enqueuePublicNetworkInit() {
 					}
 					return slashing.NewSlashingViolationsConsumer(builder.Logger, builder.Metrics.Network, adapter)
 				},
-			}, p2p.WithMessageValidators(msgValidators...))
+			}, p2pnet.WithMessageValidators(msgValidators...))
 			if err != nil {
 				return nil, fmt.Errorf("could not initialize network: %w", err)
 			}

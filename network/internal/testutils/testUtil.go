@@ -33,6 +33,7 @@ import (
 	"github.com/onflow/flow-go/network/p2p/conduit"
 	"github.com/onflow/flow-go/network/p2p/connection"
 	"github.com/onflow/flow-go/network/p2p/middleware"
+	"github.com/onflow/flow-go/network/p2p/p2pnet"
 	p2ptest "github.com/onflow/flow-go/network/p2p/test"
 	"github.com/onflow/flow-go/network/p2p/translator"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -184,7 +185,7 @@ func NetworksFixture(t *testing.T,
 	sporkId flow.Identifier,
 	ids flow.IdentityList,
 	libp2pNodes []p2p.LibP2PNode,
-	configOpts ...func(*p2p.NetworkConfig)) ([]network.Network, []*unittest.UpdatableIDProvider) {
+	configOpts ...func(*p2pnet.NetworkConfig)) ([]network.Network, []*unittest.UpdatableIDProvider) {
 
 	count := len(ids)
 	nets := make([]network.Network, 0)
@@ -200,7 +201,7 @@ func NetworksFixture(t *testing.T,
 			opt(params)
 		}
 
-		net, err := p2p.NewNetwork(params)
+		net, err := p2pnet.NewNetwork(params)
 		require.NoError(t, err)
 
 		nets = append(nets, net)
@@ -216,7 +217,7 @@ func NetworkConfigFixture(
 	idProvider module.IdentityProvider,
 	sporkId flow.Identifier,
 	libp2pNode p2p.LibP2PNode,
-	opts ...p2p.NetworkConfigOption) *p2p.NetworkConfig {
+	opts ...p2pnet.NetworkConfigOption) *p2pnet.NetworkConfig {
 
 	me := mock.NewLocal(t)
 	me.On("NodeID").Return(myId.NodeID).Maybe()
@@ -230,7 +231,7 @@ func NetworkConfigFixture(
 		defaultFlowConfig.NetworkConfig.NetworkReceivedMessageCacheSize,
 		unittest.Logger(),
 		metrics.NewNoopCollector())
-	params := &p2p.NetworkConfig{
+	params := &p2pnet.NetworkConfig{
 		Logger:                unittest.Logger(),
 		Codec:                 unittest.NetworkCodec(),
 		Libp2pNode:            libp2pNode,
@@ -242,7 +243,7 @@ func NetworkConfigFixture(
 		ReceiveCache:          receiveCache,
 		ConduitFactory:        conduit.NewDefaultConduitFactory(),
 		SporkId:               sporkId,
-		UnicastMessageTimeout: p2p.DefaultUnicastTimeout,
+		UnicastMessageTimeout: p2pnet.DefaultUnicastTimeout,
 		IdentityTranslator:    translator.NewIdentityProviderIDTranslator(idProvider),
 		AlspCfg: &alspmgr.MisbehaviorReportManagerConfig{
 			Logger:                  unittest.Logger(),

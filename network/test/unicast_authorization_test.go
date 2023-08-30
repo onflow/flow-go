@@ -24,6 +24,7 @@ import (
 	"github.com/onflow/flow-go/network/mocknetwork"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/middleware"
+	"github.com/onflow/flow-go/network/p2p/p2pnet"
 	"github.com/onflow/flow-go/network/validator"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -84,7 +85,7 @@ func (u *UnicastAuthorizationTestSuite) setupNetworks(slashingViolationsConsumer
 	}
 	u.codec = newOverridableMessageEncoder(unittest.NetworkCodec())
 	mws, _ := testutils.MiddlewareFixtures(u.T(), ids, libP2PNodes, cfg)
-	nets, providers := testutils.NetworksFixture(u.T(), u.sporkId, ids, mws, p2p.WithCodec(u.codec))
+	nets, providers := testutils.NetworksFixture(u.T(), u.sporkId, ids, mws, p2pnet.WithCodec(u.codec))
 	require.Len(u.T(), ids, 2)
 	require.Len(u.T(), providers, 2)
 	require.Len(u.T(), mws, 2)

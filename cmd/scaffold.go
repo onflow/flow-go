@@ -53,6 +53,7 @@ import (
 	"github.com/onflow/flow-go/network/p2p/dns"
 	"github.com/onflow/flow-go/network/p2p/p2pbuilder"
 	p2pconfig "github.com/onflow/flow-go/network/p2p/p2pbuilder/config"
+	"github.com/onflow/flow-go/network/p2p/p2pnet"
 	"github.com/onflow/flow-go/network/p2p/ping"
 	"github.com/onflow/flow-go/network/p2p/unicast/protocols"
 	"github.com/onflow/flow-go/network/p2p/unicast/ratelimit"
@@ -416,22 +417,22 @@ func (fnb *FlowNodeBuilder) InitFlowNetworkWithConduitFactory(
 	unicastRateLimiters *ratelimit.RateLimiters,
 	peerManagerFilters []p2p.PeerFilter) (network.Network, error) {
 
-	var networkOptions []p2p.NetworkOption
+	var networkOptions []p2pnet.NetworkOption
 	if len(fnb.MsgValidators) > 0 {
-		networkOptions = append(networkOptions, p2p.WithMessageValidators(fnb.MsgValidators...))
+		networkOptions = append(networkOptions, p2pnet.WithMessageValidators(fnb.MsgValidators...))
 	}
 
 	// by default if no rate limiter configuration was provided in the CLI args the default
 	// noop rate limiter will be used.
-	networkOptions = append(networkOptions, p2p.WithUnicastRateLimiters(unicastRateLimiters))
+	networkOptions = append(networkOptions, p2pnet.WithUnicastRateLimiters(unicastRateLimiters))
 
 	networkOptions = append(networkOptions,
-		p2p.WithPreferredUnicastProtocols(protocols.ToProtocolNames(fnb.FlowConfig.NetworkConfig.PreferredUnicastProtocols)...),
+		p2pnet.WithPreferredUnicastProtocols(protocols.ToProtocolNames(fnb.FlowConfig.NetworkConfig.PreferredUnicastProtocols)...),
 	)
 
 	// peerManagerFilters are used by the peerManager via the network to filter peers from the topology.
 	if len(peerManagerFilters) > 0 {
-		networkOptions = append(networkOptions, p2p.WithPeerManagerFilters(peerManagerFilters...))
+		networkOptions = append(networkOptions, p2pnet.WithPeerManagerFilters(peerManagerFilters...))
 	}
 
 	receiveCache := netcache.NewHeroReceiveCache(fnb.FlowConfig.NetworkConfig.NetworkReceivedMessageCacheSize,
@@ -444,7 +445,7 @@ func (fnb *FlowNodeBuilder) InitFlowNetworkWithConduitFactory(
 	}
 
 	// creates network instance
-	net, err := p2p.NewNetwork(&p2p.NetworkConfig{
+	net, err := p2pnet.NewNetwork(&p2pnet.NetworkConfig{
 		Logger:                fnb.Logger,
 		Libp2pNode:            fnb.LibP2PNode,
 		Codec:                 fnb.CodecFactory(),
@@ -1033,7 +1034,7 @@ func (fnb *FlowNodeBuilder) InitIDProviders() {
 			filter.And(
 				filter.HasRole(flow.RoleConsensus),
 				filter.Not(filter.HasNodeID(node.Me.NodeID())),
-				p2p.NotEjectedFilter,
+				p2pnet.NotEjectedFilter,
 			),
 			node.IdentityProvider,
 		)

@@ -34,6 +34,7 @@ import (
 	"github.com/onflow/flow-go/network/mocknetwork"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/middleware"
+	"github.com/onflow/flow-go/network/p2p/p2pnet"
 	"github.com/onflow/flow-go/network/p2p/p2pnode"
 	p2ptest "github.com/onflow/flow-go/network/p2p/test"
 	"github.com/onflow/flow-go/network/p2p/unicast/ratelimit"
@@ -216,7 +217,7 @@ func (m *MiddlewareTestSuite) TestUpdateNodeAddresses() {
 		idProvider,
 		m.sporkId,
 		mws[0])
-	newNet, err := p2p.NewNetwork(networkCfg)
+	newNet, err := p2pnet.NewNetwork(networkCfg)
 	require.NoError(m.T(), err)
 
 	require.Len(m.T(), ids, 1)

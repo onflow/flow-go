@@ -50,6 +50,7 @@ import (
 	"github.com/onflow/flow-go/network/p2p/keyutils"
 	"github.com/onflow/flow-go/network/p2p/p2pbuilder"
 	p2pconfig "github.com/onflow/flow-go/network/p2p/p2pbuilder/config"
+	"github.com/onflow/flow-go/network/p2p/p2pnet"
 	"github.com/onflow/flow-go/network/p2p/subscription"
 	"github.com/onflow/flow-go/network/p2p/tracer"
 	"github.com/onflow/flow-go/network/p2p/translator"
@@ -677,7 +678,7 @@ func (builder *FollowerServiceBuilder) enqueuePublicNetworkInit() {
 				return nil, fmt.Errorf("could not register networking receive cache metric: %w", err)
 			}
 
-			net, err := p2p.NewNetwork(&p2p.NetworkConfig{
+			net, err := p2pnet.NewNetwork(&p2pnet.NetworkConfig{
 				Logger:                builder.Logger.With().Str("component", "public-network").Logger(),
 				Codec:                 cborcodec.NewCodec(),
 				Me:                    builder.Me,
@@ -689,7 +690,7 @@ func (builder *FollowerServiceBuilder) enqueuePublicNetworkInit() {
 				ReceiveCache:          receiveCache,
 				ConduitFactory:        conduit.NewDefaultConduitFactory(),
 				SporkId:               builder.SporkID,
-				UnicastMessageTimeout: p2p.DefaultUnicastTimeout,
+				UnicastMessageTimeout: p2pnet.DefaultUnicastTimeout,
 				IdentityTranslator:    builder.IDTranslator,
 				AlspCfg: &alspmgr.MisbehaviorReportManagerConfig{
 					Logger:                  builder.Logger,
@@ -712,7 +713,7 @@ func (builder *FollowerServiceBuilder) enqueuePublicNetworkInit() {
 					}
 					return slashing.NewSlashingViolationsConsumer(builder.Logger, builder.Metrics.Network, adapter)
 				},
-			}, p2p.WithMessageValidators(publicNetworkMsgValidators(node.Logger, node.IdentityProvider, node.NodeID)...))
+			}, p2pnet.WithMessageValidators(publicNetworkMsgValidators(node.Logger, node.IdentityProvider, node.NodeID)...))
 			if err != nil {
 				return nil, fmt.Errorf("could not initialize network: %w", err)
 			}

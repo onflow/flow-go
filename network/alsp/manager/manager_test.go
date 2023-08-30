@@ -30,6 +30,7 @@ import (
 	"github.com/onflow/flow-go/network/internal/testutils"
 	"github.com/onflow/flow-go/network/mocknetwork"
 	"github.com/onflow/flow-go/network/p2p"
+	"github.com/onflow/flow-go/network/p2p/p2pnet"
 	p2ptest "github.com/onflow/flow-go/network/p2p/test"
 	"github.com/onflow/flow-go/network/slashing"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -59,7 +60,7 @@ func TestNetworkPassesReportedMisbehavior(t *testing.T) {
 	ids, nodes := testutils.LibP2PNodeForMiddlewareFixture(t, sporkId, 1)
 	idProvider := id.NewFixedIdentityProvider(ids)
 	networkCfg := testutils.NetworkConfigFixture(t, *ids[0], idProvider, sporkId, nodes[0])
-	net, err := p2p.NewNetwork(networkCfg, p2p.WithAlspManager(misbehaviorReportManger))
+	net, err := p2pnet.NewNetwork(networkCfg, p2pnet.WithAlspManager(misbehaviorReportManger))
 	require.NoError(t, err)
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -116,8 +117,8 @@ func TestHandleReportedMisbehavior_Cache_Integration(t *testing.T) {
 	sporkId := unittest.IdentifierFixture()
 	ids, nodes := testutils.LibP2PNodeForMiddlewareFixture(t, sporkId, 1)
 	idProvider := id.NewFixedIdentityProvider(ids)
-	networkCfg := testutils.NetworkConfigFixture(t, *ids[0], idProvider, sporkId, nodes[0], p2p.WithAlspConfig(cfg))
-	net, err := p2p.NewNetwork(networkCfg)
+	networkCfg := testutils.NetworkConfigFixture(t, *ids[0], idProvider, sporkId, nodes[0], p2pnet.WithAlspConfig(cfg))
+	net, err := p2pnet.NewNetwork(networkCfg)
 	require.NoError(t, err)
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -216,8 +217,8 @@ func TestHandleReportedMisbehavior_And_DisallowListing_Integration(t *testing.T)
 		p2ptest.WithPeerManagerEnabled(p2ptest.PeerManagerConfigFixture(), nil))
 
 	idProvider := id.NewFixedIdentityProvider(ids)
-	networkCfg := testutils.NetworkConfigFixture(t, *ids[0], idProvider, sporkId, nodes[0], p2p.WithAlspConfig(cfg))
-	victimNetwork, err := p2p.NewNetwork(networkCfg)
+	networkCfg := testutils.NetworkConfigFixture(t, *ids[0], idProvider, sporkId, nodes[0], p2pnet.WithAlspConfig(cfg))
+	victimNetwork, err := p2pnet.NewNetwork(networkCfg)
 	require.NoError(t, err)
 
 	// index of the victim node in the nodes slice.
@@ -309,9 +310,9 @@ func TestHandleReportedMisbehavior_And_DisallowListing_RepeatOffender_Integratio
 	ids, nodes := testutils.LibP2PNodeForMiddlewareFixture(t, sporkId, 3,
 		p2ptest.WithPeerManagerEnabled(p2ptest.PeerManagerConfigFixture(p2ptest.WithZeroJitterAndZeroBackoff(t)), nil))
 	idProvider := unittest.NewUpdatableIDProvider(ids)
-	networkCfg := testutils.NetworkConfigFixture(t, *ids[0], idProvider, sporkId, nodes[0], p2p.WithAlspConfig(cfg))
+	networkCfg := testutils.NetworkConfigFixture(t, *ids[0], idProvider, sporkId, nodes[0], p2pnet.WithAlspConfig(cfg))
 
-	victimNetwork, err := p2p.NewNetwork(networkCfg)
+	victimNetwork, err := p2pnet.NewNetwork(networkCfg)
 	require.NoError(t, err)
 
 	// index of the victim node in the nodes slice.
@@ -476,12 +477,12 @@ func TestHandleReportedMisbehavior_And_SlashingViolationsConsumer_Integration(t 
 		idProvider,
 		sporkId,
 		nodes[0],
-		p2p.WithAlspConfig(managerCfgFixture(t)),
-		p2p.WithSlashingViolationConsumerFactory(func() network.ViolationsConsumer {
+		p2pnet.WithAlspConfig(managerCfgFixture(t)),
+		p2pnet.WithSlashingViolationConsumerFactory(func() network.ViolationsConsumer {
 			violationsConsumer = slashing.NewSlashingViolationsConsumer(unittest.Logger(), metrics.NewNoopCollector(), adapter)
 			return violationsConsumer
 		}))
-	victimNetwork, err := p2p.NewNetwork(networkCfg)
+	victimNetwork, err := p2pnet.NewNetwork(networkCfg)
 	require.NoError(t, err)
 	adapter = victimNetwork
 
@@ -570,8 +571,8 @@ func TestMisbehaviorReportMetrics(t *testing.T) {
 	ids, nodes := testutils.LibP2PNodeForMiddlewareFixture(t, sporkId, 1)
 	idProvider := id.NewFixedIdentityProvider(ids)
 
-	networkCfg := testutils.NetworkConfigFixture(t, *ids[0], idProvider, sporkId, nodes[0], p2p.WithAlspConfig(cfg))
-	net, err := p2p.NewNetwork(networkCfg)
+	networkCfg := testutils.NetworkConfigFixture(t, *ids[0], idProvider, sporkId, nodes[0], p2pnet.WithAlspConfig(cfg))
+	net, err := p2pnet.NewNetwork(networkCfg)
 	require.NoError(t, err)
 
 	ctx, cancel := context.WithCancel(context.Background())
