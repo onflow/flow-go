@@ -179,7 +179,7 @@ func (m *MiddlewareTestSuite) SetupTest() {
 
 	m.mwCtx = irrecoverable.NewMockSignalerContext(m.T(), ctx)
 
-	testutils.StartNodes(m.mwCtx, m.T(), m.nodes, 100*time.Millisecond)
+	testutils.StartNodes(m.mwCtx, m.T(), m.nodes)
 
 	for i, mw := range m.mws {
 		mw.SetOverlay(m.ov[i])
@@ -227,7 +227,7 @@ func (m *MiddlewareTestSuite) TestUpdateNodeAddresses() {
 	newMw.SetOverlay(overlay)
 
 	// start up nodes and peer managers
-	testutils.StartNodes(irrecoverableCtx, m.T(), libP2PNodes, 100*time.Millisecond)
+	testutils.StartNodes(irrecoverableCtx, m.T(), libP2PNodes)
 	defer testutils.StopComponents(m.T(), libP2PNodes, 100*time.Millisecond)
 
 	newMw.Start(irrecoverableCtx)
@@ -342,7 +342,7 @@ func (m *MiddlewareTestSuite) TestUnicastRateLimit_Messages() {
 	ctx, cancel := context.WithCancel(m.mwCtx)
 	irrecoverableCtx := irrecoverable.NewMockSignalerContext(m.T(), ctx)
 
-	testutils.StartNodes(irrecoverableCtx, m.T(), libP2PNodes, 100*time.Millisecond)
+	testutils.StartNodes(irrecoverableCtx, m.T(), libP2PNodes)
 	defer testutils.StopComponents(m.T(), libP2PNodes, 100*time.Millisecond)
 
 	newMw.Start(irrecoverableCtx)
@@ -484,7 +484,7 @@ func (m *MiddlewareTestSuite) TestUnicastRateLimit_Bandwidth() {
 	ctx, cancel := context.WithCancel(m.mwCtx)
 	irrecoverableCtx := irrecoverable.NewMockSignalerContext(m.T(), ctx)
 
-	testutils.StartNodes(irrecoverableCtx, m.T(), libP2PNodes, 100*time.Millisecond)
+	testutils.StartNodes(irrecoverableCtx, m.T(), libP2PNodes)
 	defer testutils.StopComponents(m.T(), libP2PNodes, 100*time.Millisecond)
 
 	newMw.Start(irrecoverableCtx)

@@ -95,7 +95,7 @@ func (u *UnicastAuthorizationTestSuite) startMiddlewares(overlay *mocknetwork.Ov
 	ctx, cancel := context.WithCancel(context.Background())
 	sigCtx, _ := irrecoverable.WithSignaler(ctx)
 
-	testutils.StartNodes(sigCtx, u.T(), u.libP2PNodes, 100*time.Millisecond)
+	testutils.StartNodes(sigCtx, u.T(), u.libP2PNodes)
 
 	u.senderMW.SetOverlay(overlay)
 	u.senderMW.Start(sigCtx)

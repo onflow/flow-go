@@ -63,7 +63,7 @@ func (suite *EchoEngineTestSuite) SetupTest() {
 		testutils.MiddlewareConfigFixture(suite.T(), sporkId),
 		mocknetwork.NewViolationsConsumer(suite.T()))
 	suite.nets = testutils.NetworksFixture(suite.T(), sporkId, suite.ids, suite.mws)
-	testutils.StartNodesAndNetworks(signalerCtx, suite.T(), nodes, suite.nets, 100*time.Millisecond)
+	testutils.StartNodesAndNetworks(signalerCtx, suite.T(), nodes, suite.nets)
 }
 
 // TearDownTest closes the networks within a specified timeout
