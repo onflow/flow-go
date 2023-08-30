@@ -22,7 +22,7 @@ type RegisterStore interface {
 
 	// SaveRegister saves to InMemoryRegisterStore first, then trigger the same check as OnBlockFinalized
 	// Depend on InMemoryRegisterStore.SaveRegister
-	SaveRegister(height uint64, blockID flow.Identifier, registers []flow.RegisterEntry) error
+	SaveRegister(header *flow.Header, registers []flow.RegisterEntry) error
 
 	// Depend on FinalizedReader's GetFinalizedBlockIDAtHeight
 	// Depend on ExecutedFinalizedWAL.Append
@@ -37,7 +37,7 @@ type RegisterStore interface {
 
 	// FinalizedAndExecutedHeight returns the height of the last finalized and executed block,
 	// which has been saved in OnDiskRegisterStore
-	FinalizedAndExecutedHeight() (uint64, error)
+	FinalizedAndExecutedHeight() uint64
 }
 
 type FinalizedReader interface {
@@ -47,14 +47,16 @@ type FinalizedReader interface {
 type InMemoryRegisterStore interface {
 	// Init with last finalized and executed height, which will be set as pruned height
 	InitWithLatestHeight(height uint64) error
-	Prune(height uint64) error
+	Prune(finalizedHeight uint64, finalizedBlockID flow.Identifier) error
 	PrunedHeight() uint64
 
 	GetRegister(height uint64, blockID flow.Identifier, register flow.RegisterID) (flow.RegisterValue, error)
-	SaveRegister(height uint64, blockID flow.Identifier, registers []flow.RegisterEntry) error
+	GetUpdatedRegisters(height uint64, blockID flow.Identifier) ([]flow.RegisterEntry, error)
+	SaveRegister(header *flow.Header, registers []flow.RegisterEntry) error
 }
 
 type OnDiskRegisterStore interface {
+	Init() error
 	GetRegister(height uint64, register flow.RegisterID) (flow.RegisterValue, error)
 	SaveRegister(height uint64, registers []flow.RegisterEntry) error
 	// latest finalized and executed height
@@ -62,18 +64,18 @@ type OnDiskRegisterStore interface {
 }
 
 type ExecutedFinalizedWAL interface {
-	Append(height uint64, trieUpdates []*ledger.TrieUpdate) error
+	Append(height uint64, registers []flow.RegisterEntry) error
 
 	// GetLatest returns the latest height in the WAL.
 	Latest() (uint64, error)
 
-	GetReader(height uint64) (WALReader, error)
+	GetReader(height uint64) WALReader
 }
 
 type WALReader interface {
 	// Next returns the next height and trie updates in the WAL.
 	// It returns EOF when there are no more entries.
-	Next() (height uint64, trieUpdates []*ledger.TrieUpdate, err error)
+	Next() (height uint64, registers []flow.RegisterEntry, err error)
 }
 
 // Does not depend on Storehouse and Trie directly
@@ -106,7 +108,7 @@ type ReadyOnlyExecutionState interface {
 	// Return storehouse API
 	// Depend on ledger.GetSingleValue(statecommitment, registerID) (depcreated)
 	// Depend on Storehouse.GetRegister
-	// TODO: add height
+	// deprecated
 	NewStorageSnapshot(flow.StateCommitment) snapshot.StorageSnapshot
 
 	// NewBlockStorageSnapshot creates a new read-only view at the given block.

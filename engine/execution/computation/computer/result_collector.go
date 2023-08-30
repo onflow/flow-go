@@ -12,7 +12,6 @@ import (
 	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/engine/execution"
 	"github.com/onflow/flow-go/engine/execution/computation/result"
-	exeState "github.com/onflow/flow-go/engine/execution/state"
 	"github.com/onflow/flow-go/engine/execution/storehouse"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/meter"
@@ -85,7 +84,7 @@ type resultCollector struct {
 	currentCollectionStartTime       time.Time
 	currentCollectionState           *state.ExecutionState
 	currentCollectionStats           module.ExecutionResultStats
-	currentCollectionStorageSnapshot *storehouse.BlockStorageSnapshot
+	currentCollectionStorageSnapshot storehouse.ExtendableStorageSnapshot
 }
 
 func newResultCollector(
@@ -130,7 +129,6 @@ func newResultCollector(
 			*block.StartState,
 			block.ID(),
 			block.Block.Header.Height,
-			nil, // the base snapshot has no change
 		),
 	}
 
@@ -158,10 +156,12 @@ func (collector *resultCollector) commitCollection(
 		return fmt.Errorf("commit view failed: %w", err)
 	}
 
-	err = collector.mergeTrieUpdate(endState, trieUpdate)
+	newSnapshot, err := collector.currentCollectionStorageSnapshot.Extend(endState, trieUpdate)
 	if err != nil {
-		return fmt.Errorf("merge trie update failed endState %v: %w", endState, err)
+		return fmt.Errorf("extend snapshot failed: %w", err)
 	}
+
+	collector.currentCollectionStorageSnapshot = newSnapshot
 
 	execColRes := collector.result.CollectionExecutionResultAt(collection.collectionIndex)
 	execColRes.UpdateExecutionSnapshot(collectionExecutionSnapshot)
@@ -237,56 +237,17 @@ func (collector *resultCollector) commitCollection(
 	return nil
 }
 
-// TODO: move it
-func KeyToRegisterID(key ledger.Key) (flow.RegisterID, error) {
-	if len(key.KeyParts) != 2 ||
-		key.KeyParts[0].Type != exeState.KeyPartOwner ||
-		key.KeyParts[1].Type != exeState.KeyPartKey {
-		return flow.RegisterID{}, fmt.Errorf("key not in expected format %s", key.String())
-	}
-
-	return flow.NewRegisterID(
-		string(key.KeyParts[0].Value),
-		string(key.KeyParts[1].Value),
-	), nil
-}
-
-// TODO: move it
-func PayloadToRegister(payload *ledger.Payload) (flow.RegisterID, flow.RegisterValue, error) {
-	key, err := payload.Key()
-	if err != nil {
-		return flow.RegisterID{}, flow.RegisterValue{}, fmt.Errorf("could not parse register key from payload: %w", err)
-	}
-	regID, err := KeyToRegisterID(key)
-	if err != nil {
-		return flow.RegisterID{}, flow.RegisterValue{}, fmt.Errorf("could not parse register key from payload: %w", err)
-	}
-
-	return regID, payload.Value(), nil
-
-}
-
 func (collector *resultCollector) mergeTrieUpdate(
 	commitment flow.StateCommitment,
 	trieUpdate *ledger.TrieUpdate,
 ) error {
 
-	base := collector.currentCollectionStorageSnapshot.RegisterUpdates()
-	for _, payload := range trieUpdate.Payloads {
-		regID, regValue, err := PayloadToRegister(payload)
-		if err != nil {
-			return fmt.Errorf("could not parse register key from payload: %w", err)
-		}
-		base[regID] = regValue
+	newSnapshot, err := collector.currentCollectionStorageSnapshot.Extend(commitment, trieUpdate)
+	if err != nil {
+		return fmt.Errorf("extend snapshot failed: %w", err)
 	}
 
-	// TODO: reuse readCache?
-	collector.currentCollectionStorageSnapshot = storehouse.NewBlockStorageSnapshot(
-		commitment,
-		collector.currentCollectionStorageSnapshot.BlockID(),
-		collector.currentCollectionStorageSnapshot.Height(),
-		base,
-	)
+	collector.currentCollectionStorageSnapshot = newSnapshot
 
 	return nil
 }
