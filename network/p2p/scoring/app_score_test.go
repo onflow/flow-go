@@ -17,6 +17,7 @@ import (
 	"github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/internal/p2pfixtures"
+	"github.com/onflow/flow-go/network/message"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/scoring"
 	p2ptest "github.com/onflow/flow-go/network/p2p/test"
@@ -96,14 +97,22 @@ func TestFullGossipSubConnectivity(t *testing.T) {
 	// checks end-to-end message delivery works
 	// each node sends a distinct message to all and checks that all nodes receive it.
 	for _, node := range nodes {
-		proposalMsg := p2pfixtures.MustEncodeEvent(t, unittest.ProposalFixture(), channels.PushBlocks)
-		require.NoError(t, node.Publish(ctx, blockTopic, proposalMsg))
+		outgoingMessageScope, err := message.NewOutgoingScope(
+			ids.NodeIDs(),
+			channels.TopicFromChannel(channels.PushBlocks, sporkId),
+			unittest.ProposalFixture(),
+			unittest.NetworkCodec().Encode,
+			message.ProtocolTypePubSub)
+		require.NoError(t, err)
+		require.NoError(t, node.Publish(ctx, outgoingMessageScope))
 
 		// checks that the message is received by all nodes.
 		ctx1s, cancel1s := context.WithTimeout(ctx, 5*time.Second)
-		p2pfixtures.SubsMustReceiveMessage(t, ctx1s, proposalMsg, groupOneSubs)
-		p2pfixtures.SubsMustReceiveMessage(t, ctx1s, proposalMsg, accessNodeSubs)
-		p2pfixtures.SubsMustReceiveMessage(t, ctx1s, proposalMsg, groupTwoSubs)
+		expectedReceivedData, err := outgoingMessageScope.Proto().Marshal()
+		require.NoError(t, err)
+		p2pfixtures.SubsMustReceiveMessage(t, ctx1s, expectedReceivedData, groupOneSubs)
+		p2pfixtures.SubsMustReceiveMessage(t, ctx1s, expectedReceivedData, accessNodeSubs)
+		p2pfixtures.SubsMustReceiveMessage(t, ctx1s, expectedReceivedData, groupTwoSubs)
 
 		cancel1s()
 	}
@@ -157,7 +166,7 @@ func TestFullGossipSubConnectivityAmongHonestNodesWithMaliciousMajority(t *testi
 	)
 
 	allNodes := append([]p2p.LibP2PNode{con1Node, con2Node}, accessNodeGroup...)
-	allIds := append([]*flow.Identity{&con1Id, &con2Id}, accessNodeIds...)
+	allIds := append(flow.IdentityList{&con1Id, &con2Id}, accessNodeIds...)
 
 	provider := id.NewFixedIdentityProvider(allIds)
 	idProvider.On("ByPeerID", mocktestify.Anything).Return(

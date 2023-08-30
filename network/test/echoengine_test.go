@@ -62,7 +62,7 @@ func (suite *EchoEngineTestSuite) SetupTest() {
 		nodes,
 		testutils.MiddlewareConfigFixture(suite.T(), sporkId),
 		mocknetwork.NewViolationsConsumer(suite.T()))
-	suite.nets = testutils.NetworksFixture(suite.T(), suite.ids, suite.mws)
+	suite.nets = testutils.NetworksFixture(suite.T(), sporkId, suite.ids, suite.mws)
 	testutils.StartNodesAndNetworks(signalerCtx, suite.T(), nodes, suite.nets, 100*time.Millisecond)
 }
 
@@ -264,7 +264,10 @@ func (suite *EchoEngineTestSuite) duplicateMessageParallel(send testutils.Condui
 		}()
 	}
 	unittest.RequireReturnsBefore(suite.T(), wg.Wait, 3*time.Second, "could not send message on time")
-	time.Sleep(1 * time.Second)
+
+	require.Eventually(suite.T(), func() bool {
+		return len(receiver.seen) > 0
+	}, 3*time.Second, 500*time.Millisecond)
 
 	// receiver should only see the message once, and the rest should be dropped due to
 	// duplication
