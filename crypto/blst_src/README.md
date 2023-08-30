@@ -17,11 +17,13 @@ The folder contains:
 - this `README` file.
 
 To upgrade the BLST version:
-- [ ] delete all files in this folder but `blst_src.c` and `README.md`.
+- [ ] delete all files in this folder (`./blst_src`) but `blst_src.c` and `README.md`.
 - [ ] open BLST repository on the new version.
 - [ ] copy all `.c` and `.h` files from `<blst>/src/` into this folder.
 - [ ] delete `server.c` from this folder.
+- [ ] update `blst_src.c` if needed.
 - [ ] copy the folder `<blst>/build/` into this folder.
+- [ ] move `./blst_src/build/assembly.S` to `./blst_src/build/blst_assembly.S`.
 - [ ] copy `<blst>/bindings/blst.h` and `<blst>/bindings/blst_aux.h` into this folder.
 - [ ] solve all breaking changes that may occur.
 - [ ] update the commit version on this `README`.
