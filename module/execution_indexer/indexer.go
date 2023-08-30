@@ -14,6 +14,7 @@ var _ module.ExecutionStateIndexer = &ExecutionIndexer{}
 type ExecutionIndexer struct {
 	registers   storage.Registers
 	headers     storage.Headers
+	events      storage.Events
 	last        uint64                          // todo persist
 	commitments map[uint64]flow.StateCommitment // todo persist
 }
@@ -72,6 +73,12 @@ func (i *ExecutionIndexer) Values(IDs flow.RegisterIDs, height uint64) ([]flow.R
 	}
 
 	return values, nil
+}
+
+func (i *ExecutionIndexer) IndexEvents(blockID flow.Identifier, events flow.EventsList) error {
+	// Note: service events are currently not included in execution data
+	// see https://github.com/onflow/flow-go/issues/4624
+	return i.events.Store(blockID, []flow.EventsList{events})
 }
 
 func (i *ExecutionIndexer) StorePayloads(payloads []*ledger.Payload, height uint64) error {
