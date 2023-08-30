@@ -184,6 +184,7 @@ func NewGossipSubBuilder(
 	sporkId flow.Identifier,
 	idProvider module.IdentityProvider,
 	rpcInspectorConfig *p2pconf.GossipSubRPCInspectorsConfig,
+	rpcTracker p2p.RPCControlTracking,
 ) *Builder {
 	lg := logger.With().
 		Str("component", "gossipsub").
@@ -200,7 +201,7 @@ func NewGossipSubBuilder(
 		gossipSubConfigFunc:      defaultGossipSubAdapterConfig(),
 		scoreOptionConfig:        scoring.NewScoreOptionConfig(lg, idProvider),
 		rpcInspectorConfig:       rpcInspectorConfig,
-		rpcInspectorSuiteFactory: defaultInspectorSuite(),
+		rpcInspectorSuiteFactory: defaultInspectorSuite(rpcTracker),
 	}
 
 	return b
@@ -230,7 +231,7 @@ func defaultGossipSubAdapterConfig() p2p.GossipSubAdapterConfigFunc {
 // defaultInspectorSuite returns the default inspector suite factory function. It is used to create the default inspector suite.
 // Inspector suite is utilized to inspect the incoming gossipsub rpc messages from different perspectives.
 // Note: always use the default inspector suite factory function to create the inspector suite (unless you know what you are doing).
-func defaultInspectorSuite() p2p.GossipSubRpcInspectorSuiteFactoryFunc {
+func defaultInspectorSuite(rpcTracker p2p.RPCControlTracking) p2p.GossipSubRpcInspectorSuiteFactoryFunc {
 	return func(
 		logger zerolog.Logger,
 		sporkId flow.Identifier,
@@ -264,6 +265,7 @@ func defaultInspectorSuite() p2p.GossipSubRpcInspectorSuiteFactoryFunc {
 			clusterPrefixedCacheCollector,
 			idProvider,
 			gossipSubMetrics,
+			rpcTracker,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create new control message valiadation inspector: %w", err)
