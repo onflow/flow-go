@@ -107,17 +107,15 @@ type Network struct {
 	registerBlobServiceRequests chan *registerBlobServiceRequest
 	misbehaviorReportManager    network.MisbehaviorReportManager
 	unicastMessageTimeout       time.Duration
-
-	libP2PNode                 LibP2PNode
-	idTranslator               IDTranslator
-	bitswapMetrics             module.BitswapMetrics
-	previousProtocolStatePeers []peer.AddrInfo
-	slashingViolationsConsumer network.ViolationsConsumer
-	peerManagerFilters         []PeerFilter
-	unicastRateLimiters        *ratelimit.RateLimiters
-	validators                 []network.MessageValidator
-	authorizedSenderValidator  *validator.AuthorizedSenderValidator
-	preferredUnicasts          []protocols.ProtocolName
+	libP2PNode                  LibP2PNode
+	bitswapMetrics              module.BitswapMetrics
+	previousProtocolStatePeers  []peer.AddrInfo
+	slashingViolationsConsumer  network.ViolationsConsumer
+	peerManagerFilters          []PeerFilter
+	unicastRateLimiters         *ratelimit.RateLimiters
+	validators                  []network.MessageValidator
+	authorizedSenderValidator   *validator.AuthorizedSenderValidator
+	preferredUnicasts           []protocols.ProtocolName
 }
 
 var _ network.Network = &Network{}
@@ -222,6 +220,22 @@ func WithAlspManager(mgr network.MisbehaviorReportManager) NetworkOption {
 	}
 }
 
+// WithPeerManagerFilters sets the peer manager filters for the network. It overrides the default
+// peer manager filters that are created from the config.
+func WithPeerManagerFilters(filters ...PeerFilter) NetworkOption {
+	return func(n *Network) {
+		n.peerManagerFilters = filters
+	}
+}
+
+// WithUnicastRateLimiters sets the unicast rate limiters for the network. It overrides the default
+// unicast rate limiters that are created from the config.
+func WithUnicastRateLimiters(limiters *ratelimit.RateLimiters) NetworkOption {
+	return func(n *Network) {
+		n.unicastRateLimiters = limiters
+	}
+}
+
 // NewNetwork creates a new naive overlay network, using the given middleware to
 // communicate to direct peers, using the given codec for serialization, and
 // using the given state & cache interfaces to track volatile information.
@@ -236,6 +250,7 @@ func NewNetwork(param *NetworkConfig, opts ...NetworkOption) (*Network, error) {
 		receiveCache:                param.ReceiveCache,
 		topology:                    param.Topology,
 		metrics:                     param.Metrics,
+		bitswapMetrics:              param.BitSwapMetrics,
 		subscriptionManager:         param.SubscriptionManager,
 		identityProvider:            param.IdentityProvider,
 		conduitFactory:              param.ConduitFactory,
@@ -244,6 +259,8 @@ func NewNetwork(param *NetworkConfig, opts ...NetworkOption) (*Network, error) {
 		sporkId:                     param.SporkId,
 		identityTranslator:          param.IdentityTranslator,
 		unicastMessageTimeout:       param.UnicastMessageTimeout,
+		libP2PNode:                  param.Libp2pNode,
+		unicastRateLimiters:         ratelimit.NoopRateLimiters(),
 	}
 
 	misbehaviorMngr, err := alspmgr.NewMisbehaviorReportManager(param.AlspCfg, n)
@@ -788,7 +805,7 @@ func (n *Network) peerIDs(flowIDs flow.IdentifierList) peer.IDSlice {
 	result := make([]peer.ID, 0, len(flowIDs))
 
 	for _, fid := range flowIDs {
-		pid, err := n.idTranslator.GetPeerID(fid)
+		pid, err := n.identityTranslator.GetPeerID(fid)
 		if err != nil {
 			// We probably don't need to fail the entire function here, since the other
 			// translations may still succeed
@@ -1119,7 +1136,7 @@ func (n *Network) processUnicastStreamMessage(remotePeer peer.ID, msg *message.M
 // processAuthenticatedMessage processes a message and a source (indicated by its peer ID) and eventually passes it to the overlay
 // In particular, it populates the `OriginID` field of the message with a Flow ID translated from this source.
 func (n *Network) processAuthenticatedMessage(msg *message.Message, peerID peer.ID, protocol message.ProtocolType) {
-	originId, err := n.idTranslator.GetFlowID(peerID)
+	originId, err := n.identityTranslator.GetFlowID(peerID)
 	if err != nil {
 		// this error should never happen. by the time the message gets here, the peer should be
 		// authenticated which means it must be known
