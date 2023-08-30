@@ -8,7 +8,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-var _ execution.InMemoryRegisterStore = &InMemoryRegisterStore{}
+var _ execution.InMemoryRegisterStore = (*InMemoryRegisterStore)(nil)
 
 type InMemoryRegisterStore struct {
 	sync.RWMutex
@@ -29,9 +29,9 @@ func NewInMemoryRegisterStore(lastHeight uint64, lastID flow.Identifier) *InMemo
 	}
 }
 
-// SaveRegister saves the registers of a block to InMemoryRegisterStore
+// SaveRegisters saves the registers of a block to InMemoryRegisterStore
 // It needs to ensure the block is above the pruned height and is connected to the pruned block
-func (s *InMemoryRegisterStore) SaveRegister(
+func (s *InMemoryRegisterStore) SaveRegisters(
 	height uint64,
 	blockID flow.Identifier,
 	parentID flow.Identifier,
@@ -56,6 +56,15 @@ func (s *InMemoryRegisterStore) SaveRegister(
 	if ok {
 		// already exist
 		return fmt.Errorf("saving registers for block %s, but it already exists", blockID)
+	}
+
+	// make sure parent is a known block or the pruned block, which forms a fork
+	_, ok = s.registersByBlockID[parentID]
+	if !ok {
+		// parent doesn't exist, check if it is the pruned block
+		if parentID != s.prunedID {
+			return fmt.Errorf("saving registers for block %s, but its parent %s is not saved", blockID, parentID)
+		}
 	}
 
 	// update registers for the block
@@ -128,7 +137,7 @@ func (s *InMemoryRegisterStore) readRegisterAtBlockID(blockID flow.Identifier, r
 func (s *InMemoryRegisterStore) GetUpdatedRegisters(height uint64, blockID flow.Identifier) ([]flow.RegisterEntry, error) {
 	s.RLock()
 	defer s.RUnlock()
-	if height < s.prunedHeight {
+	if height <= s.prunedHeight {
 		return nil, fmt.Errorf("cannot get register at height %d, it is pruned %v", height, s.prunedHeight)
 	}
 
@@ -150,7 +159,7 @@ func (s *InMemoryRegisterStore) GetUpdatedRegisters(height uint64, blockID flow.
 }
 
 // Prune prunes the register store to the given height
-// The pruned height must be an executed block
+// The pruned height must be an executed block, the caller should ensure that by calling SaveRegisters before.
 // TODO: It does not block the caller, the pruning work is done async
 func (s *InMemoryRegisterStore) Prune(height uint64, blockID flow.Identifier) error {
 	finalizedFork, err := s.findFinalizedFork(height, blockID)
@@ -221,6 +230,11 @@ func (s *InMemoryRegisterStore) pruneByHeight(height uint64, finalized flow.Iden
 		s.pruneFork(height, blockID)
 	}
 
+	if len(s.blockIDsByHeight[height]) > 0 {
+		return fmt.Errorf("all forks on the same height should have been pruend, but actually not: %v", len(s.blockIDsByHeight[height]))
+	}
+
+	delete(s.blockIDsByHeight, height)
 	s.prunedHeight = height
 	s.prunedID = finalized
 	return nil

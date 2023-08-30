@@ -19,13 +19,13 @@ type RegisterStore interface {
 	// GetRegister first try to get the register from InMemoryRegisterStore, then OnDiskRegisterStore
 	GetRegister(height uint64, blockID flow.Identifier, register flow.RegisterID) (flow.RegisterValue, error)
 
-	// SaveRegister saves to InMemoryRegisterStore first, then trigger the same check as OnBlockFinalized
-	// Depend on InMemoryRegisterStore.SaveRegister
-	SaveRegister(header *flow.Header, registers []flow.RegisterEntry) error
+	// SaveRegisters saves to InMemoryRegisterStore first, then trigger the same check as OnBlockFinalized
+	// Depend on InMemoryRegisterStore.SaveRegisters
+	SaveRegisters(header *flow.Header, registers []flow.RegisterEntry) error
 
 	// Depend on FinalizedReader's GetFinalizedBlockIDAtHeight
 	// Depend on ExecutedFinalizedWAL.Append
-	// Depend on OnDiskRegisterStore.SaveRegister
+	// Depend on OnDiskRegisterStore.SaveRegisters
 	// OnBlockFinalized trigger the check of whether a block at the next height becomes finalized and executed.
 	// the next height is the existing finalized and executed block's height + 1.
 	// If a block at next height becomes finalized and executed, then:
@@ -49,7 +49,7 @@ type InMemoryRegisterStore interface {
 
 	GetRegister(height uint64, blockID flow.Identifier, register flow.RegisterID) (flow.RegisterValue, error)
 	GetUpdatedRegisters(height uint64, blockID flow.Identifier) ([]flow.RegisterEntry, error)
-	SaveRegister(
+	SaveRegisters(
 		height uint64,
 		blockID flow.Identifier,
 		parentID flow.Identifier,
@@ -59,7 +59,7 @@ type InMemoryRegisterStore interface {
 
 type OnDiskRegisterStore interface {
 	GetRegister(height uint64, register flow.RegisterID) (flow.RegisterValue, error)
-	SaveRegister(height uint64, registers []flow.RegisterEntry) error
+	SaveRegisters(height uint64, registers []flow.RegisterEntry) error
 	// latest finalized and executed height
 	Latest() (height uint64)
 }
