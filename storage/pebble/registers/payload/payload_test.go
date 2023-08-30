@@ -21,7 +21,7 @@ func Test_PayloadStorage_RoundTrip(t *testing.T) {
 	defer cache.Unref()
 
 	dbpath := path.Join(t.TempDir(), "roundtrip.db")
-	s, err := NewStorage(dbpath, cache)
+	s, err := NewPayloads(dbpath, cache)
 	require.NoError(t, err)
 	require.NotNil(t, s)
 
@@ -32,18 +32,18 @@ func Test_PayloadStorage_RoundTrip(t *testing.T) {
 	}
 
 	minHeight := uint64(2)
-	err = s.BatchSetPayload(minHeight, entries)
+	err = s.Store(minHeight, entries)
 	require.NoError(t, err)
 
-	value1, err := s.GetPayload(minHeight, key1)
-	require.NoError(t, err)
-	require.Equal(t, expectedValue1, value1)
-
-	value1, err = s.GetPayload(minHeight+1, key1)
+	value1, err := s.Get(minHeight, key1)
 	require.NoError(t, err)
 	require.Equal(t, expectedValue1, value1)
 
-	value1, err = s.GetPayload(minHeight-1, key1)
+	value1, err = s.Get(minHeight+1, key1)
+	require.NoError(t, err)
+	require.Equal(t, expectedValue1, value1)
+
+	value1, err = s.Get(minHeight-1, key1)
 	require.Nil(t, err)
 	require.Empty(t, value1)
 
@@ -58,7 +58,7 @@ func Test_PayloadStorage_Versioning(t *testing.T) {
 	defer cache.Unref()
 
 	dbpath := path.Join(t.TempDir(), "versionning.db")
-	s, err := NewStorage(dbpath, cache)
+	s, err := NewPayloads(dbpath, cache)
 	require.NoError(t, err)
 	require.NotNil(t, s)
 
@@ -75,12 +75,12 @@ func Test_PayloadStorage_Versioning(t *testing.T) {
 	}
 
 	height1 := uint64(1)
-	err = s.BatchSetPayload(height1, entries1)
+	err = s.Store(height1, entries1)
 	require.NoError(t, err)
 
 	// Test non-existent prefix.
 	key := flow.RegisterID{Owner: "owner", Key: "key"}
-	value0, err := s.GetPayload(height1, key)
+	value0, err := s.Get(height1, key)
 	require.Nil(t, err)
 	require.Empty(t, value0)
 
@@ -90,23 +90,23 @@ func Test_PayloadStorage_Versioning(t *testing.T) {
 	entries3 := flow.RegisterEntries{
 		{Key: key1, Value: expectedValue1ge3},
 	}
-	err = s.BatchSetPayload(height3, entries3)
+	err = s.Store(height3, entries3)
 	require.NoError(t, err)
 
-	value1, err := s.GetPayload(height1, key1)
+	value1, err := s.Get(height1, key1)
 	require.NoError(t, err)
 	require.Equal(t, expectedValue1, value1)
 
-	value1, err = s.GetPayload(height3-1, key1)
+	value1, err = s.Get(height3-1, key1)
 	require.NoError(t, err)
 	require.Equal(t, expectedValue1, value1)
 
 	// test new version
-	value1, err = s.GetPayload(height3, key1)
+	value1, err = s.Get(height3, key1)
 	require.NoError(t, err)
 	require.Equal(t, expectedValue1ge3, value1)
 
-	value1, err = s.GetPayload(height3+1, key1)
+	value1, err = s.Get(height3+1, key1)
 	require.NoError(t, err)
 	require.Equal(t, expectedValue1ge3, value1)
 
@@ -120,7 +120,7 @@ func Benchmark_PayloadStorage(b *testing.B) {
 	defer cache.Unref()
 
 	dbpath := path.Join(b.TempDir(), "benchmark1.db")
-	s, err := NewStorage(dbpath, cache)
+	s, err := NewPayloads(dbpath, cache)
 	require.NoError(b, err)
 	require.NotNil(b, s)
 
@@ -154,7 +154,7 @@ func Benchmark_PayloadStorage(b *testing.B) {
 		}
 		b.StartTimer()
 
-		err = s.BatchSetPayload(uint64(i), entries)
+		err = s.Store(uint64(i), entries)
 		require.NoError(b, err)
 	}
 
@@ -163,21 +163,21 @@ func Benchmark_PayloadStorage(b *testing.B) {
 	// verify written batches
 	for i := 0; i < b.N; i++ {
 		// get number of batches written for height
-		batchSizeBytes, err := s.GetPayload(uint64(i), batchSizeKey)
+		batchSizeBytes, err := s.Get(uint64(i), batchSizeKey)
 		require.NoError(b, err)
 		batchSize, err := strconv.Atoi(string(batchSizeBytes))
 		require.NoError(b, err)
 
 		// verify that all entries can be read with correct values
 		for j := 1; j < batchSize; j++ {
-			value, err := s.GetPayload(uint64(i), keyForBatchSize(j))
+			value, err := s.Get(uint64(i), keyForBatchSize(j))
 			require.NoError(b, err)
 			require.Equal(b, valueForHeightAndKey(i, j), value)
 		}
 
 		// verify that the rest of the batches either do not exist or have a previous height
 		for j := batchSize; j < maxBatchSize+1; j++ {
-			value, err := s.GetPayload(uint64(i), keyForBatchSize(j))
+			value, err := s.Get(uint64(i), keyForBatchSize(j))
 			require.Nil(b, err)
 
 			if len(value) > 0 {
@@ -196,5 +196,3 @@ func Benchmark_PayloadStorage(b *testing.B) {
 		}
 	}
 }
-
-// TODO(rbtz): add parallel benchmarks

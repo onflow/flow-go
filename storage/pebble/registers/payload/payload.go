@@ -9,35 +9,35 @@ import (
 	"github.com/onflow/flow-go/storage/pebble/registers/config"
 )
 
-type Storage struct {
+type Payloads struct {
 	db *pebble.DB
 }
 
-// NewStorage creates a pebble-backed payload storage.
+// NewPayloads creates a pebble-backed payload storage.
 // The reason we use a separate storage for payloads we need a Comparer with a custom Split function.
 //
 // It needs to access the last available payload with height less or equal to the requested height.
 // This means all point-lookups are range scans.
-func NewStorage(dbPath string, cache *pebble.Cache) (*Storage, error) {
+func NewPayloads(dbPath string, cache *pebble.Cache) (*Payloads, error) {
 	opts := config.DefaultPebbleOptions(cache, config.NewMVCCComparer())
 	db, err := pebble.Open(dbPath, opts)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open db: %w", err)
 	}
 
-	return &Storage{
+	return &Payloads{
 		db: db,
 	}, nil
 }
 
-// GetPayload returns the most recent updated payload for the given RegisterID.
+// Get returns the most recent updated payload for the given RegisterID.
 // "most recent" means the updates happens most recent up the given height.
 //
 // For example, if there are 2 values stored for register A at height 6 and 11, then
 // GetPayload(13, A) would return the value at height 11.
 //
 // If no payload is found, an empty byte slice is returned.
-func (s *Storage) GetPayload(
+func (s *Payloads) Get(
 	height uint64,
 	reg flow.RegisterID,
 ) ([]byte, error) {
@@ -66,8 +66,8 @@ func (s *Storage) GetPayload(
 	return valueCopy, nil
 }
 
-// BatchSetPayload sets the given entries in a batch.
-func (s *Storage) BatchSetPayload(
+// Store sets the given entries in a batch.
+func (s *Payloads) Store(
 	height uint64,
 	entries flow.RegisterEntries,
 ) error {
@@ -91,11 +91,11 @@ func (s *Storage) BatchSetPayload(
 	return nil
 }
 
-func (s *Storage) Checkpoint(dir string) error {
+func (s *Payloads) Checkpoint(dir string) error {
 	return s.db.Checkpoint(dir)
 }
 
 // Close closes the storage.
-func (s *Storage) Close() error {
+func (s *Payloads) Close() error {
 	return s.db.Close()
 }
