@@ -93,7 +93,7 @@ type MiddlewareTestSuite struct {
 	ids         []*flow.Identity
 	metrics     *metrics.NoopCollector // no-op performance monitoring simulation
 	logger      zerolog.Logger
-	provider    *unittest.UpdatableIDProvider
+	providers   []*unittest.UpdatableIDProvider
 	sporkId     flow.Identifier
 	mwCancel    context.CancelFunc
 	mwCtx       irrecoverable.SignalerContext
@@ -124,7 +124,7 @@ func (m *MiddlewareTestSuite) SetupTest() {
 	libP2PNodes := make([]p2p.LibP2PNode, 0)
 	identities := make(flow.IdentityList, 0)
 	tagObservables := make([]observable.Observable, 0)
-	m.provider = unittest.NewUpdatableIDProvider(flow.IdentityList{})
+	idProvider := unittest.NewUpdatableIDProvider(flow.IdentityList{})
 	defaultFlowConfig, err := config.DefaultConfig()
 	require.NoError(m.T(), err)
 
@@ -143,26 +143,24 @@ func (m *MiddlewareTestSuite) SetupTest() {
 		node, nodeId := p2ptest.NodeFixture(m.T(),
 			m.sporkId,
 			m.T().Name(),
-			m.provider,
+			idProvider,
 			opts...)
 		libP2PNodes = append(libP2PNodes, node)
 		identities = append(identities, &nodeId)
 		tagObservables = append(tagObservables, connManager)
 	}
-
-	m.provider.SetIdentities(identities)
+	idProvider.SetIdentities(identities)
 
 	m.ids = identities
 	m.libP2PNodes = libP2PNodes
 
-	m.mws = testutils.MiddlewareFixtures(
+	m.mws, _ = testutils.MiddlewareFixtures(
 		m.T(),
 		m.ids,
-		m.provider,
 		m.libP2PNodes,
 		testutils.MiddlewareConfigFixture(m.T(), m.sporkId))
 
-	m.networks = testutils.NetworksFixture(m.T(), m.sporkId, m.ids, m.provider, m.mws)
+	m.networks, m.providers = testutils.NetworksFixture(m.T(), m.sporkId, m.ids, m.mws)
 	for _, observableConnMgr := range tagObservables {
 		observableConnMgr.Subscribe(&ob)
 	}
@@ -207,10 +205,9 @@ func (m *MiddlewareTestSuite) TestUpdateNodeAddresses() {
 	// create a new staked identity
 	ids, libP2PNodes := testutils.LibP2PNodeForMiddlewareFixture(m.T(), m.sporkId, 1)
 	idProvider := unittest.NewUpdatableIDProvider(ids)
-	mws := testutils.MiddlewareFixtures(
+	mws, _ := testutils.MiddlewareFixtures(
 		m.T(),
 		ids,
-		idProvider,
 		libP2PNodes,
 		testutils.MiddlewareConfigFixture(m.T(), m.sporkId))
 	networkCfg := testutils.NetworkConfigFixture(
@@ -242,7 +239,7 @@ func (m *MiddlewareTestSuite) TestUpdateNodeAddresses() {
 	idList := flow.IdentityList(append(m.ids, newId))
 
 	// needed to enable ID translation
-	m.provider.SetIdentities(idList)
+	m.providers[0].SetIdentities(idList)
 
 	// unicast should fail to send because no address is known yet for the new identity
 	con, err := m.networks[0].Register(channels.TestNetworkChannel, &mocknetwork.MessageProcessor{})
@@ -314,20 +311,23 @@ func (m *MiddlewareTestSuite) TestUnicastRateLimit_Messages() {
 	idProvider.SetIdentities(append(m.ids, ids...))
 
 	// create middleware
-	mws := testutils.MiddlewareFixtures(m.T(),
+	mws, providers := testutils.MiddlewareFixtures(m.T(),
 		ids,
-		idProvider,
 		libP2PNodes,
 		testutils.MiddlewareConfigFixture(m.T(), m.sporkId),
 		middleware.WithUnicastRateLimiters(rateLimiters),
 		middleware.WithPeerManagerFilters([]p2p.PeerFilter{testutils.IsRateLimitedPeerFilter(messageRateLimiter)}))
 
 	require.Len(m.T(), ids, 1)
+	require.Len(m.T(), providers, 1)
 	require.Len(m.T(), mws, 1)
 	newId := ids[0]
 	newMw := mws[0]
 	idList := flow.IdentityList(append(m.ids, newId))
-	overlay := m.createOverlay(idProvider)
+
+	providers[0].SetIdentities(idList)
+
+	overlay := m.createOverlay(providers[0])
 
 	calls := atomic.NewUint64(0)
 	ch := make(chan struct{})
@@ -350,7 +350,7 @@ func (m *MiddlewareTestSuite) TestUnicastRateLimit_Messages() {
 	require.NoError(m.T(), newMw.Subscribe(channels.TestNetworkChannel))
 
 	// needed to enable ID translation
-	m.provider.SetIdentities(idList)
+	m.providers[0].SetIdentities(idList)
 
 	// update the addresses
 	m.mws[0].UpdateNodeAddresses()
@@ -369,13 +369,13 @@ func (m *MiddlewareTestSuite) TestUnicastRateLimit_Messages() {
 	// to be invoked at-least once. We send 10 messages due to the flakiness that is caused by async stream
 	// handling of streams.
 	for i := 0; i < 10; i++ {
-		_ = con0.Unicast(&libp2pmessage.TestMessage{
+		err = con0.Unicast(&libp2pmessage.TestMessage{
 			Text: fmt.Sprintf("hello-%d", i),
 		}, newId.NodeID)
-
+		require.NoError(m.T(), err)
 	}
 	// wait for all rate limits before shutting down middleware
-	unittest.RequireCloseBefore(m.T(), ch, 1*time.Second, "could not stop rate limit test ch on time")
+	unittest.RequireCloseBefore(m.T(), ch, 100*time.Millisecond, "could not stop rate limit test ch on time")
 
 	// sleep for 1 seconds to allow connection pruner to prune connections
 	time.Sleep(1 * time.Second)
@@ -394,8 +394,8 @@ func (m *MiddlewareTestSuite) TestUnicastRateLimit_Messages() {
 
 	// shutdown our middleware so that each message can be processed
 	cancel()
-	unittest.RequireCloseBefore(m.T(), libP2PNodes[0].Done(), 1*time.Second, "could not stop libp2p node on time")
-	unittest.RequireCloseBefore(m.T(), newMw.Done(), 1*time.Second, "could not stop middleware on time")
+	unittest.RequireCloseBefore(m.T(), libP2PNodes[0].Done(), 100*time.Millisecond, "could not stop libp2p node on time")
+	unittest.RequireCloseBefore(m.T(), newMw.Done(), 100*time.Millisecond, "could not stop middleware on time")
 
 	// expect our rate limited peer callback to be invoked once
 	require.True(m.T(), rateLimits.Load() > 0)
@@ -450,23 +450,23 @@ func (m *MiddlewareTestSuite) TestUnicastRateLimit_Bandwidth() {
 
 			return nil
 		})))
-	idList := append(m.ids, ids...)
-	idProvider.SetIdentities(idList)
+	idProvider.SetIdentities(append(m.ids, ids...))
+	m.providers[0].SetIdentities(append(m.ids, ids...))
 
 	// create middleware
-	mws := testutils.MiddlewareFixtures(m.T(),
+	mws, providers := testutils.MiddlewareFixtures(m.T(),
 		ids,
-		idProvider,
 		libP2PNodes,
 		testutils.MiddlewareConfigFixture(m.T(), m.sporkId),
 		middleware.WithUnicastRateLimiters(rateLimiters),
 		middleware.WithPeerManagerFilters([]p2p.PeerFilter{testutils.IsRateLimitedPeerFilter(bandwidthRateLimiter)}))
 	require.Len(m.T(), ids, 1)
+	require.Len(m.T(), providers, 1)
 	require.Len(m.T(), mws, 1)
 	newId := ids[0]
 	newMw := mws[0]
-	overlay := m.createOverlay(idProvider)
-	overlay.On("Receive", mockery.Anything).Return(nil)
+	overlay := m.createOverlay(providers[0])
+	overlay.On("Receive", m.ids[0].NodeID, mockery.AnythingOfType("*message.Message")).Return(nil)
 
 	newMw.SetOverlay(overlay)
 
@@ -480,7 +480,11 @@ func (m *MiddlewareTestSuite) TestUnicastRateLimit_Bandwidth() {
 	unittest.RequireComponentsReadyBefore(m.T(), 1*time.Second, newMw)
 	require.NoError(m.T(), newMw.Subscribe(channels.TestNetworkChannel))
 
-	m.provider.SetIdentities(idList)
+	idList := flow.IdentityList(append(m.ids, newId))
+
+	// needed to enable ID translation
+	m.providers[0].SetIdentities(idList)
+
 	// update the addresses
 	m.mws[0].UpdateNodeAddresses()
 
@@ -490,7 +494,7 @@ func (m *MiddlewareTestSuite) TestUnicastRateLimit_Bandwidth() {
 	// peer should be removed by the peer manager.
 	p2ptest.LetNodesDiscoverEachOther(m.T(), ctx, []p2p.LibP2PNode{libP2PNodes[0], m.libP2PNodes[0]}, flow.IdentityList{ids[0], m.ids[0]})
 
-	// create message with about 400bytes.
+	// create message with about 400bytes (300 random bytes + 100bytes message info)
 	b := make([]byte, 300)
 	for i := range b {
 		b[i] = byte('X')
@@ -507,7 +511,7 @@ func (m *MiddlewareTestSuite) TestUnicastRateLimit_Bandwidth() {
 	}
 
 	// wait for all rate limits before shutting down middleware
-	unittest.RequireCloseBefore(m.T(), ch, 1*time.Second, "could not stop on rate limit test ch on time")
+	unittest.RequireCloseBefore(m.T(), ch, 100*time.Millisecond, "could not stop on rate limit test ch on time")
 
 	// sleep for 1 seconds to allow connection pruner to prune connections
 	time.Sleep(1 * time.Second)

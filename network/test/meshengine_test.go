@@ -112,13 +112,12 @@ func (suite *MeshEngineTestSuite) SetupTest() {
 	idProvider.SetIdentities(identities)
 
 	suite.ids = identities
-	suite.mws = testutils.MiddlewareFixtures(
+	suite.mws, _ = testutils.MiddlewareFixtures(
 		suite.T(),
 		suite.ids,
-		idProvider,
 		libP2PNodes,
 		testutils.MiddlewareConfigFixture(suite.T(), sporkId))
-	suite.nets = testutils.NetworksFixture(suite.T(), sporkId, suite.ids, idProvider, suite.mws)
+	suite.nets, _ = testutils.NetworksFixture(suite.T(), sporkId, suite.ids, suite.mws)
 	testutils.StartNodesAndNetworks(signalerCtx, suite.T(), libP2PNodes, suite.nets, 100*time.Millisecond)
 
 	for _, observableConnMgr := range tagObservables {

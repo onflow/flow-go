@@ -16,6 +16,7 @@ import (
 	"github.com/onflow/flow-go/config"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/id"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
 	mockmodule "github.com/onflow/flow-go/module/mock"
@@ -56,11 +57,10 @@ func TestNetworkPassesReportedMisbehavior(t *testing.T) {
 	misbehaviorReportManger.On("Ready").Return(readyDoneChan).Once()
 	misbehaviorReportManger.On("Done").Return(readyDoneChan).Once()
 	ids, nodes := testutils.LibP2PNodeForMiddlewareFixture(t, sporkId, 1)
-	idProvider := unittest.NewUpdatableIDProvider(ids)
-	mws := testutils.MiddlewareFixtures(
+	idProvider := id.NewFixedIdentityProvider(ids)
+	mws, _ := testutils.MiddlewareFixtures(
 		t,
 		ids,
-		idProvider,
 		nodes,
 		testutils.MiddlewareConfigFixture(t, sporkId))
 
@@ -121,11 +121,10 @@ func TestHandleReportedMisbehavior_Cache_Integration(t *testing.T) {
 
 	sporkId := unittest.IdentifierFixture()
 	ids, nodes := testutils.LibP2PNodeForMiddlewareFixture(t, sporkId, 1)
-	idProvider := unittest.NewUpdatableIDProvider(ids)
-	mws := testutils.MiddlewareFixtures(
+	idProvider := id.NewFixedIdentityProvider(ids)
+	mws, _ := testutils.MiddlewareFixtures(
 		t,
 		ids,
-		idProvider,
 		nodes,
 		testutils.MiddlewareConfigFixture(t, sporkId))
 	networkCfg := testutils.NetworkConfigFixture(t, *ids[0], idProvider, sporkId, mws[0], p2p.WithAlspConfig(cfg))
@@ -226,14 +225,13 @@ func TestHandleReportedMisbehavior_And_DisallowListing_Integration(t *testing.T)
 		sporkId,
 		3,
 		p2ptest.WithPeerManagerEnabled(p2ptest.PeerManagerConfigFixture(), nil))
-	idProvider := unittest.NewUpdatableIDProvider(ids)
-	mws := testutils.MiddlewareFixtures(
+	mws, _ := testutils.MiddlewareFixtures(
 		t,
 		ids,
-		idProvider,
 		nodes,
 		testutils.MiddlewareConfigFixture(t, sporkId))
 
+	idProvider := id.NewFixedIdentityProvider(ids)
 	networkCfg := testutils.NetworkConfigFixture(t, *ids[0], idProvider, sporkId, mws[0], p2p.WithAlspConfig(cfg))
 	victimNetwork, err := p2p.NewNetwork(networkCfg)
 	require.NoError(t, err)
@@ -326,13 +324,8 @@ func TestHandleReportedMisbehavior_And_DisallowListing_RepeatOffender_Integratio
 
 	ids, nodes := testutils.LibP2PNodeForMiddlewareFixture(t, sporkId, 3,
 		p2ptest.WithPeerManagerEnabled(p2ptest.PeerManagerConfigFixture(p2ptest.WithZeroJitterAndZeroBackoff(t)), nil))
+	mws, _ := testutils.MiddlewareFixtures(t, ids, nodes, testutils.MiddlewareConfigFixture(t, sporkId))
 	idProvider := unittest.NewUpdatableIDProvider(ids)
-	mws := testutils.MiddlewareFixtures(t,
-		ids,
-		idProvider,
-		nodes,
-		testutils.MiddlewareConfigFixture(t, sporkId))
-
 	networkCfg := testutils.NetworkConfigFixture(t, *ids[0], idProvider, sporkId, mws[0], p2p.WithAlspConfig(cfg))
 
 	victimNetwork, err := p2p.NewNetwork(networkCfg)
@@ -483,7 +476,7 @@ func TestHandleReportedMisbehavior_And_SlashingViolationsConsumer_Integration(t 
 
 	// create 1 victim node, 1 honest node and a node for each slashing violation
 	ids, nodes := testutils.LibP2PNodeForMiddlewareFixture(t, sporkId, 7) // creates 7 nodes (1 victim, 1 honest, 5 spammer nodes one for each slashing violation).
-	idProvider := unittest.NewUpdatableIDProvider(ids)
+	idProvider := id.NewFixedIdentityProvider(ids)
 
 	// we want to override the middleware config to use the slashing violations consumer. However, we need the network
 	// instance to do that, but for the network instance we need the middleware config. So, we create the adapter first, which
@@ -500,10 +493,9 @@ func TestHandleReportedMisbehavior_And_SlashingViolationsConsumer_Integration(t 
 		return violationsConsumer
 	}
 
-	mws := testutils.MiddlewareFixtures(
+	mws, _ := testutils.MiddlewareFixtures(
 		t,
 		ids,
-		idProvider,
 		nodes,
 		middlewareConfig,
 	)
@@ -601,11 +593,10 @@ func TestMisbehaviorReportMetrics(t *testing.T) {
 
 	sporkId := unittest.IdentifierFixture()
 	ids, nodes := testutils.LibP2PNodeForMiddlewareFixture(t, sporkId, 1)
-	idProvider := unittest.NewUpdatableIDProvider(ids)
-	mws := testutils.MiddlewareFixtures(
+	idProvider := id.NewFixedIdentityProvider(ids)
+	mws, _ := testutils.MiddlewareFixtures(
 		t,
 		ids,
-		idProvider,
 		nodes,
 		testutils.MiddlewareConfigFixture(t, sporkId))
 	networkCfg := testutils.NetworkConfigFixture(t, *ids[0], idProvider, sporkId, mws[0], p2p.WithAlspConfig(cfg))

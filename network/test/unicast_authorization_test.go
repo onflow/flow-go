@@ -47,7 +47,8 @@ type UnicastAuthorizationTestSuite struct {
 	receiverNetwork network.Network
 	// receiverID the identity on the mw sending the message
 	receiverID *flow.Identity
-	provider   *unittest.UpdatableIDProvider
+	// providers id providers generated at beginning of a test run
+	providers []*unittest.UpdatableIDProvider
 	// cancel is the cancel func from the context that was used to start the middlewares in a test run
 	cancel  context.CancelFunc
 	sporkId flow.Identifier
@@ -82,15 +83,10 @@ func (u *UnicastAuthorizationTestSuite) setupNetworks(slashingViolationsConsumer
 		return slashingViolationsConsumer
 	}
 	u.codec = newOverridableMessageEncoder(unittest.NetworkCodec())
-	u.provider = unittest.NewUpdatableIDProvider(ids)
-	mws := testutils.MiddlewareFixtures(
-		u.T(),
-		ids,
-		u.provider,
-		libP2PNodes,
-		cfg)
-	nets := testutils.NetworksFixture(u.T(), u.sporkId, ids, u.provider, mws, p2p.WithCodec(u.codec))
+	mws, _ := testutils.MiddlewareFixtures(u.T(), ids, libP2PNodes, cfg)
+	nets, providers := testutils.NetworksFixture(u.T(), u.sporkId, ids, mws, p2p.WithCodec(u.codec))
 	require.Len(u.T(), ids, 2)
+	require.Len(u.T(), providers, 2)
 	require.Len(u.T(), mws, 2)
 	require.Len(u.T(), nets, 2)
 
@@ -98,6 +94,7 @@ func (u *UnicastAuthorizationTestSuite) setupNetworks(slashingViolationsConsumer
 	u.receiverNetwork = nets[1]
 	u.senderID = ids[0]
 	u.receiverID = ids[1]
+	u.providers = providers
 	u.libP2PNodes = libP2PNodes
 }
 
