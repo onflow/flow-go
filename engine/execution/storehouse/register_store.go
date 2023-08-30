@@ -10,19 +10,38 @@ import (
 )
 
 type RegisterStore struct {
-	memStore  execution.InMemoryRegisterStore
+	memStore  *InMemoryRegisterStore
 	diskStore execution.OnDiskRegisterStore
 	wal       execution.ExecutedFinalizedWAL
 	finalized execution.FinalizedReader
 }
 
-// Depend on OnDiskRegisterStore.Init
+func NewRegisterStore(
+	diskStore execution.OnDiskRegisterStore,
+	wal execution.ExecutedFinalizedWAL,
+	finalized execution.FinalizedReader,
+) *RegisterStore {
+	return &RegisterStore{
+		diskStore: diskStore,
+		wal:       wal,
+		finalized: finalized,
+	}
+}
+
 func (r *RegisterStore) Init() error {
+	// replay the executed and finalized blocks from the write ahead logs
+	// to the OnDiskRegisterStore
 	height, err := r.syncDiskStore()
 	if err != nil {
 		return fmt.Errorf("cannot sync disk store: %w", err)
 	}
-	r.memStore.InitWithLatestHeight(height)
+	// fetch the last executed and finalized block ID
+	finalizedID, err := r.finalized.GetFinalizedBlockIDAtHeight(height)
+	if err != nil {
+		return fmt.Errorf("cannot get finalized block ID at height %d: %w", height, err)
+	}
+	// init the memStore with the last executed and finalized block ID
+	r.memStore = NewInMemoryRegisterStore(height, finalizedID)
 	return nil
 }
 
@@ -42,7 +61,7 @@ func (r *RegisterStore) GetRegister(height uint64, blockID flow.Identifier, regi
 // SaveRegister saves to InMemoryRegisterStore first, then trigger the same check as OnBlockFinalized
 // Depend on InMemoryRegisterStore.SaveRegister
 func (r *RegisterStore) SaveRegister(header *flow.Header, registers []flow.RegisterEntry) error {
-	err := r.memStore.SaveRegister(header, registers)
+	err := r.memStore.SaveRegister(header.Height, header.ID(), header.ParentID, registers)
 	if err != nil {
 		return fmt.Errorf("cannot save register to memStore: %w", err)
 	}
@@ -101,12 +120,8 @@ func (r *RegisterStore) FinalizedAndExecutedHeight() uint64 {
 	return r.diskStore.Latest()
 }
 
+// syncDiskStore replay WAL to disk store
 func (r *RegisterStore) syncDiskStore() (uint64, error) {
-	err := r.diskStore.Init()
-	if err != nil {
-		return 0, fmt.Errorf("cannot init disk store: %w", err)
-	}
-
 	latest, err := r.wal.Latest()
 	if err != nil {
 		return 0, fmt.Errorf("cannot get latest height from write ahead logs: %w", err)
