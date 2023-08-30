@@ -1,0 +1,166 @@
+package synchronization
+
+import (
+	"context"
+	"fmt"
+	"testing"
+	"time"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
+
+	"github.com/onflow/flow-go/model/chainsync"
+	"github.com/onflow/flow-go/model/messages"
+	"github.com/onflow/flow-go/module/irrecoverable"
+	"github.com/onflow/flow-go/network/channels"
+	"github.com/onflow/flow-go/utils/rand"
+	"github.com/onflow/flow-go/utils/unittest"
+)
+
+// TestLoad_Process_SyncRequest_HigherThanReceiver_OutsideTolerance_AlwaysReportSpam tests that a sync request that's higher
+// than the receiver's height doesn't trigger a response, even if outside tolerance and generates ALSP
+// spamming misbehavior report (simulating the unlikely probability).
+// This load test ensures that a misbehavior report is generated every time when the probability factor is set to 1.0.
+func (ss *SyncSuite) TestLoad_Process_SyncRequest_HigherThanReceiver_OutsideTolerance_AlwaysReportSpam() {
+	ctx, cancel := irrecoverable.NewMockSignalerContextWithCancel(ss.T(), context.Background())
+	ss.e.Start(ctx)
+	unittest.AssertClosesBefore(ss.T(), ss.e.Ready(), time.Second)
+	defer cancel()
+
+	load := 1000
+
+	// reset misbehavior report counter for each subtest
+	misbehaviorsCounter := 0
+
+	for i := 0; i < load; i++ {
+		// generate origin and request message
+		originID := unittest.IdentifierFixture()
+
+		nonce, err := rand.Uint64()
+		require.NoError(ss.T(), err, "should generate nonce")
+
+		req := &messages.SyncRequest{
+			Nonce:  nonce,
+			Height: 0,
+		}
+
+		// if request height is higher than local finalized, we should not respond
+		req.Height = ss.head.Height + 1
+
+		// assert that HandleHeight, WithinTolerance are not called because misbehavior is reported
+		// also, check that response is never sent
+		ss.core.AssertNotCalled(ss.T(), "HandleHeight")
+		ss.core.AssertNotCalled(ss.T(), "WithinTolerance")
+		ss.con.AssertNotCalled(ss.T(), "Unicast", mock.Anything, mock.Anything)
+
+		// count misbehavior reports over the course of a load test
+		ss.con.On("ReportMisbehavior", mock.Anything).Return(mock.Anything).Run(
+			func(args mock.Arguments) {
+				misbehaviorsCounter++
+			},
+		)
+
+		// force creating misbehavior report by setting syncRequestProbability to 1.0 (i.e. report misbehavior 100% of the time)
+		ss.e.spamDetectionConfig.syncRequestProbability = 1.0
+
+		require.NoError(ss.T(), ss.e.Process(channels.SyncCommittee, originID, req))
+	}
+
+	ss.core.AssertExpectations(ss.T())
+	ss.con.AssertExpectations(ss.T())
+	assert.Equal(ss.T(), misbehaviorsCounter, load) // should generate misbehavior report every time
+}
+
+// TestLoad_Process_SyncRequest_HigherThanReceiver_OutsideTolerance_SometimesReportSpam load tests that a sync request that's higher
+// than the receiver's height doesn't trigger a response, even if outside tolerance. It checks that an ALSP
+// spam misbehavior report was generated and that the number of misbehavior reports is within a reasonable range.
+// This load test ensures that a misbehavior report is generated an appropriate range of times when the probability factor is set to different values.
+func (ss *SyncSuite) TestLoad_Process_SyncRequest_HigherThanReceiver_OutsideTolerance_SometimesReportSpam() {
+	ctx, cancel := irrecoverable.NewMockSignalerContextWithCancel(ss.T(), context.Background())
+	ss.e.Start(ctx)
+	unittest.AssertClosesBefore(ss.T(), ss.e.Ready(), time.Second)
+	defer cancel()
+
+	load := 1000
+
+	type loadGroup struct {
+		syncRequestProbabilityFactor float32
+		expectedMisbehaviorsLower    int
+		expectedMisbehaviorsUpper    int
+	}
+
+	loadGroups := []loadGroup{}
+
+	// expect to never get misbehavior report
+	loadGroups = append(loadGroups, loadGroup{0.0, 0, 0})
+
+	// expect to get misbehavior report between 10% of the time
+	loadGroups = append(loadGroups, loadGroup{0.1, 75, 140})
+
+	// expect to get misbehavior report between 1% of the time
+	loadGroups = append(loadGroups, loadGroup{0.01, 5, 15})
+
+	// expect to get misbehavior report between 0.1% of the time (1 in 1000 requests)
+	loadGroups = append(loadGroups, loadGroup{0.001, 0, 7})
+
+	// expect to get misbehavior report between 50% of the time
+	loadGroups = append(loadGroups, loadGroup{0.5, 450, 550})
+
+	// expect to get misbehavior report between 90% of the time
+	loadGroups = append(loadGroups, loadGroup{0.9, 850, 950})
+
+	// reset misbehavior report counter for each subtest
+	misbehaviorsCounter := 0
+
+	for _, loadGroup := range loadGroups {
+		ss.T().Run(fmt.Sprintf("load test; pfactor=%f lower=%d upper=%d", loadGroup.syncRequestProbabilityFactor, loadGroup.expectedMisbehaviorsLower, loadGroup.expectedMisbehaviorsUpper), func(t *testing.T) {
+			for i := 0; i < load; i++ {
+				ss.T().Log("load iteration", i)
+				nonce, err := rand.Uint64()
+				require.NoError(ss.T(), err, "should generate nonce")
+
+				// generate origin and request message
+				originID := unittest.IdentifierFixture()
+				req := &messages.SyncRequest{
+					Nonce:  nonce,
+					Height: 0,
+				}
+
+				// if request height is higher than local finalized, we should not respond
+				req.Height = ss.head.Height + 1
+
+				ss.core.On("HandleHeight", ss.head, req.Height)
+				ss.core.On("WithinTolerance", ss.head, req.Height).Return(false)
+				ss.con.AssertNotCalled(ss.T(), "Unicast", mock.Anything, mock.Anything)
+
+				// maybe function calls that might or might not occur over the course of the load test
+				ss.core.On("ScanPending", ss.head).Return([]chainsync.Range{}, []chainsync.Batch{}).Maybe()
+				ss.con.On("Multicast", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
+
+				// count misbehavior reports over the course of a load test
+				ss.con.On("ReportMisbehavior", mock.Anything).Return(mock.Anything).Maybe().Run(
+					func(args mock.Arguments) {
+						misbehaviorsCounter++
+					},
+				)
+				ss.e.spamDetectionConfig.syncRequestProbability = loadGroup.syncRequestProbabilityFactor
+				require.NoError(ss.T(), ss.e.Process(channels.SyncCommittee, originID, req))
+			}
+
+			// check function call expectations at the end of the load test; otherwise, load test would take much longer
+			ss.core.AssertExpectations(ss.T())
+			ss.con.AssertExpectations(ss.T())
+
+			// check that correct range of misbehavior reports were generated (between 1-2 reports per 1000 requests)
+			// since we're using a random method to generate misbehavior reports, we can't guarantee the exact number, so we
+			// check that it's within a larger range, but that at least 1 misbehavior report was generated
+
+			ss.T().Logf("misbehaviors counter after load test: %d (expected lower bound: %d expected upper bound: %d)", misbehaviorsCounter, loadGroup.expectedMisbehaviorsLower, loadGroup.expectedMisbehaviorsUpper)
+			assert.GreaterOrEqual(ss.T(), misbehaviorsCounter, loadGroup.expectedMisbehaviorsLower)
+			assert.LessOrEqual(ss.T(), misbehaviorsCounter, loadGroup.expectedMisbehaviorsUpper) // too many reports would indicate a bug
+
+			misbehaviorsCounter = 0 // reset counter for next subtest
+		})
+	}
+}
