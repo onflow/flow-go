@@ -445,6 +445,9 @@ func (ss *SyncSuite) TestProcessingMultipleItems() {
 		ss.core.On("HandleHeight", mock.Anything, msg.Height).Once()
 		ss.con.On("Unicast", mock.Anything, mock.Anything).Return(nil)
 
+		// misbehavior might or might not be reported
+		ss.con.On("ReportMisbehavior", mock.Anything).Return(mock.Anything).Maybe()
+
 		require.NoError(ss.T(), ss.e.Process(channels.SyncCommittee, originID, msg))
 	}
 

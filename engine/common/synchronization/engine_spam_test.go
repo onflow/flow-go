@@ -163,3 +163,66 @@ func (ss *SyncSuite) TestLoad_Process_SyncRequest_HigherThanReceiver_OutsideTole
 		})
 	}
 }
+
+func (ss *SyncSuite) TestLoad_Process_RangeRequest_SometimesReportSpam() {
+	ctx, cancel := irrecoverable.NewMockSignalerContextWithCancel(ss.T(), context.Background())
+	ss.e.Start(ctx)
+	unittest.AssertClosesBefore(ss.T(), ss.e.Ready(), time.Second)
+	defer cancel()
+
+	load := 1000
+
+	type loadGroup struct {
+		syncRequestProbabilityFactor float32
+		expectedMisbehaviorsLower    int
+		expectedMisbehaviorsUpper    int
+		fromHeight                   uint64
+		toHeight                     uint64
+	}
+
+	loadGroups := []loadGroup{}
+
+	// expect to never get misbehavior report
+	loadGroups = append(loadGroups, loadGroup{0.1, 0, 0, 9, 10})
+
+	// reset misbehavior report counter for each subtest
+	misbehaviorsCounter := 0
+
+	for _, loadGroup := range loadGroups {
+		for i := 0; i < load; i++ {
+			ss.T().Log("load iteration", i)
+
+			nonce, err := rand.Uint64()
+			require.NoError(ss.T(), err, "should generate nonce")
+
+			// generate origin and request message
+			originID := unittest.IdentifierFixture()
+			req := &messages.RangeRequest{
+				Nonce:      nonce,
+				FromHeight: loadGroup.fromHeight,
+				ToHeight:   loadGroup.toHeight,
+			}
+
+			// count misbehavior reports over the course of a load test
+			ss.con.On("ReportMisbehavior", mock.Anything).Return(mock.Anything).Maybe().Run(
+				func(args mock.Arguments) {
+					misbehaviorsCounter++
+				},
+			)
+			ss.e.spamDetectionConfig.syncRequestProbability = loadGroup.syncRequestProbabilityFactor
+			require.NoError(ss.T(), ss.e.Process(channels.SyncCommittee, originID, req))
+		}
+		// check function call expectations at the end of the load test; otherwise, load test would take much longer
+		ss.core.AssertExpectations(ss.T())
+		ss.con.AssertExpectations(ss.T())
+
+		// check that correct range of misbehavior reports were generated
+		// since we're using a probabilistic approach to generate misbehavior reports, we can't guarantee the exact number,
+		// so we check that it's within an expected range
+		ss.T().Logf("misbehaviors counter after load test: %d (expected lower bound: %d expected upper bound: %d)", misbehaviorsCounter, loadGroup.expectedMisbehaviorsLower, loadGroup.expectedMisbehaviorsUpper)
+		assert.GreaterOrEqual(ss.T(), misbehaviorsCounter, loadGroup.expectedMisbehaviorsLower)
+		assert.LessOrEqual(ss.T(), misbehaviorsCounter, loadGroup.expectedMisbehaviorsUpper)
+
+		misbehaviorsCounter = 0 // reset counter for next subtest
+	}
+}
