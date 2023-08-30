@@ -15,10 +15,6 @@ type ExecutionStateIndexReader interface {
 	//
 	// Expect an error if no value exists.
 	Last() (uint64, error)
-	// HeightByBlockID returns the block height by block ID.
-	//
-	// Expect an error if block by the ID was not indexed.
-	HeightByBlockID(ID flow.Identifier) (uint64, error)
 	// Commitment by the block height.
 	//
 	// Expect an error if commitment by block height was not indexed.
