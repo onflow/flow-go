@@ -290,48 +290,48 @@ func (m *MiddlewareTestSuite) TestUnicastRateLimit_Messages() {
 	idProvider.SetIdentities(append(m.ids, ids...))
 
 	// create middleware
-	mws, providers := testutils.MiddlewareFixtures(m.T(),
-		ids,
-		libP2PNodes,
-		testutils.MiddlewareConfigFixture(m.T(), m.sporkId),
-		middleware.WithUnicastRateLimiters(rateLimiters),
-		middleware.WithPeerManagerFilters([]p2p.PeerFilter{testutils.IsRateLimitedPeerFilter(messageRateLimiter)}))
+	netCfg := testutils.NetworkConfigFixture(
+		m.T(),
+		*ids[0],
+		idProvider,
+		m.sporkId,
+		libP2PNodes[0])
+	newNet, err := p2pnet.NewNetwork(
+		netCfg,
+		p2pnet.WithUnicastRateLimiters(rateLimiters),
+		p2pnet.WithPeerManagerFilters(testutils.IsRateLimitedPeerFilter(messageRateLimiter)))
+	require.NoError(m.T(), err)
 
 	require.Len(m.T(), ids, 1)
-	require.Len(m.T(), providers, 1)
-	require.Len(m.T(), mws, 1)
 	newId := ids[0]
 	idList := flow.IdentityList(append(m.ids, newId))
 
-	providers[0].SetIdentities(idList)
+	m.providers[0].SetIdentities(idList)
 
-	overlay := m.createOverlay(providers[0])
+	ctx, cancel := context.WithCancel(m.mwCtx)
+	irrecoverableCtx := irrecoverable.NewMockSignalerContext(m.T(), ctx)
+	testutils.StartNodes(irrecoverableCtx, m.T(), libP2PNodes, 1*time.Second)
+	defer testutils.StopComponents(m.T(), libP2PNodes, 1*time.Second)
+	testutils.StartNetworks(irrecoverableCtx, m.T(), []network.Network{newNet}, 1*time.Second)
 
 	calls := atomic.NewUint64(0)
 	ch := make(chan struct{})
-	overlay.On("Receive", mockery.AnythingOfType("*message.IncomingMessageScope")).Return(nil).Run(func(args mockery.Arguments) {
+	// registers an engine on the new network
+	newEngine := &mocknetwork.MessageProcessor{}
+	_, err = newNet.Register(channels.TestNetworkChannel, newEngine)
+	require.NoError(m.T(), err)
+	newEngine.On("Process", channels.TestNetworkChannel, m.ids[0].NodeID, mockery.Anything).Run(func(args mockery.Arguments) {
 		calls.Inc()
 		if calls.Load() >= 5 {
 			close(ch)
 		}
-	})
-	newMw.SetOverlay(overlay)
-
-	ctx, cancel := context.WithCancel(m.mwCtx)
-	irrecoverableCtx := irrecoverable.NewMockSignalerContext(m.T(), ctx)
-
-	testutils.StartNodes(irrecoverableCtx, m.T(), libP2PNodes, 1*time.Second)
-	defer testutils.StopComponents(m.T(), libP2PNodes, 1*time.Second)
-
-	newMw.Start(irrecoverableCtx)
-	unittest.RequireComponentsReadyBefore(m.T(), 1*time.Second, newMw)
-	require.NoError(m.T(), newMw.Subscribe(channels.TestNetworkChannel))
+	}).Return(nil)
 
 	// needed to enable ID translation
 	m.providers[0].SetIdentities(idList)
 
 	// update the addresses
-	m.mws[0].UpdateNodeAddresses()
+	m.networks[0].UpdateNodeAddresses()
 
 	// add our sender node as a direct peer to our receiving node, this allows us to ensure
 	// that connections to peers that are rate limited are completely prune. IsConnected will
@@ -373,7 +373,7 @@ func (m *MiddlewareTestSuite) TestUnicastRateLimit_Messages() {
 	// shutdown our middleware so that each message can be processed
 	cancel()
 	unittest.RequireCloseBefore(m.T(), libP2PNodes[0].Done(), 100*time.Millisecond, "could not stop libp2p node on time")
-	unittest.RequireCloseBefore(m.T(), newMw.Done(), 100*time.Millisecond, "could not stop middleware on time")
+	unittest.RequireCloseBefore(m.T(), newNet.Done(), 100*time.Millisecond, "could not stop middleware on time")
 
 	// expect our rate limited peer callback to be invoked once
 	require.True(m.T(), rateLimits.Load() > 0)
