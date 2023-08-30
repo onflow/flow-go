@@ -169,6 +169,32 @@ func (l *Ledger) GetSingleValue(query *ledger.QuerySingleValue) (value ledger.Va
 	return value, nil
 }
 
+// Get read the values of the given keys at the given state
+// it returns the values in the same order as given registerIDs and errors (if any)
+func (l *Ledger) Get(query *ledger.Query) (values []ledger.Value, err error) {
+	start := time.Now()
+	paths, err := pathfinder.KeysToPaths(query.Keys(), l.pathFinderVersion)
+	if err != nil {
+		return nil, err
+	}
+	trieRead := &ledger.TrieRead{RootHash: ledger.RootHash(query.State()), Paths: paths}
+	values, err = l.forest.Read(trieRead)
+	if err != nil {
+		return nil, err
+	}
+
+	l.metrics.ReadValuesNumber(uint64(len(paths)))
+	readDuration := time.Since(start)
+	l.metrics.ReadDuration(readDuration)
+
+	if len(paths) > 0 {
+		durationPerValue := time.Duration(readDuration.Nanoseconds()/int64(len(paths))) * time.Nanosecond
+		l.metrics.ReadDurationPerItem(durationPerValue)
+	}
+
+	return values, err
+}
+
 // Set updates the ledger given an update.
 // It returns the state after update and errors (if any)
 func (l *Ledger) Set(update *ledger.Update) (newState ledger.State, trieUpdate *ledger.TrieUpdate, err error) {

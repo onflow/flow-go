@@ -34,7 +34,7 @@ func NewLedgerViewCommitter(
 func (committer *LedgerViewCommitter) CommitView(
 	snapshot *snapshot.ExecutionSnapshot,
 	baseState flow.StateCommitment,
-	baseStorageSnapshot *snapshot.StorageSnapshot,
+	baseStorageSnapshot snapshot.StorageSnapshot,
 ) (
 	newCommit flow.StateCommitment,
 	proof []byte,
@@ -46,7 +46,7 @@ func (committer *LedgerViewCommitter) CommitView(
 	var wg sync.WaitGroup
 	wg.Add(1)
 	go func() {
-		proof, err2 = committer.collectProofs(snapshot, baseState)
+		proof, err2 = committer.collectProofs(snapshot, baseState, baseStorageSnapshot)
 		wg.Done()
 	}()
 
@@ -69,6 +69,7 @@ func (committer *LedgerViewCommitter) CommitView(
 func (committer *LedgerViewCommitter) collectProofs(
 	snapshot *snapshot.ExecutionSnapshot,
 	baseState flow.StateCommitment,
+	baseSnapshot snapshot.StorageSnapshot,
 ) (
 	proof []byte,
 	err error,
@@ -92,5 +93,8 @@ func (committer *LedgerViewCommitter) collectProofs(
 		return nil, fmt.Errorf("cannot create ledger query: %w", err)
 	}
 
+	// TODO: once the ledger is repaced with registerless trie,
+	// query the register from baseSnapshot (storehouse),
+	// add the payload to the proof.
 	return committer.ledger.Prove(query)
 }

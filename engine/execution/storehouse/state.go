@@ -1,54 +1,32 @@
 package storehouse
 
 import (
+	"fmt"
 	"sync"
 
 	"github.com/onflow/flow-go/engine/execution"
+	"github.com/onflow/flow-go/engine/execution/state"
+	"github.com/onflow/flow-go/fvm/storage/snapshot"
+	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/model/flow"
 )
 
-type BlockStorageSnapshot struct {
-	storage         execution.RegisterStore
-	commitment      flow.StateCommitment
-	blockID         flow.Identifier
-	height          uint64
-	registerUpdates map[flow.RegisterID]flow.RegisterValue
+type ExtendableStorageSnapshot interface {
+	snapshot.StorageSnapshot
+	Extend(commitment flow.StateCommitment, trieUpdate *ledger.TrieUpdate) (ExtendableStorageSnapshot, error)
+	Commitment() flow.StateCommitment
+}
+
+type baseSnapshot struct {
+	storage     execution.RegisterStore
+	baseBlockID flow.Identifier
+	baseHeight  uint64
 
 	mutex     sync.RWMutex
-	readCache map[flow.RegisterID]flow.RegisterValue // cache the reads from storage
+	readCache map[flow.RegisterID]flow.RegisterValue // cache the reads from storage at baseBlock
 }
 
-func NewBlockStorageSnapshot(
-	commitment flow.StateCommitment,
-	blockID flow.Identifier,
-	height uint64,
-	registerUpdates map[flow.RegisterID]flow.RegisterValue,
-) *BlockStorageSnapshot {
-	if registerUpdates == nil {
-		registerUpdates = make(map[flow.RegisterID]flow.RegisterValue)
-	}
-	return &BlockStorageSnapshot{
-		commitment:      commitment,
-		blockID:         blockID,
-		height:          height,
-		registerUpdates: registerUpdates,
-		readCache:       make(map[flow.RegisterID]flow.RegisterValue),
-	}
-}
-
-func (s *BlockStorageSnapshot) Commitment() flow.StateCommitment {
-	return s.commitment
-}
-
-func (s *BlockStorageSnapshot) BlockID() flow.Identifier {
-	return s.blockID
-}
-
-func (s *BlockStorageSnapshot) Height() uint64 {
-	return s.height
-}
-
-func (s *BlockStorageSnapshot) Get(id flow.RegisterID) (flow.RegisterValue, error) {
+func (s *baseSnapshot) Get(id flow.RegisterID) (flow.RegisterValue, error) {
 	value, ok := s.getFromCache(id)
 	if ok {
 		return value, nil
@@ -66,11 +44,7 @@ func (s *BlockStorageSnapshot) Get(id flow.RegisterID) (flow.RegisterValue, erro
 	return value, nil
 }
 
-func (s *BlockStorageSnapshot) RegisterUpdates() map[flow.RegisterID]flow.RegisterValue {
-	return s.registerUpdates
-}
-
-func (s *BlockStorageSnapshot) getFromCache(id flow.RegisterID) (flow.RegisterValue, bool) {
+func (s *baseSnapshot) getFromCache(id flow.RegisterID) (flow.RegisterValue, bool) {
 	s.mutex.RLock()
 	defer s.mutex.RUnlock()
 
@@ -78,6 +52,117 @@ func (s *BlockStorageSnapshot) getFromCache(id flow.RegisterID) (flow.RegisterVa
 	return value, ok
 }
 
-func (s *BlockStorageSnapshot) getFromStorage(id flow.RegisterID) (flow.RegisterValue, error) {
-	return s.storage.GetRegister(s.height, s.blockID, id)
+func (s *baseSnapshot) getFromStorage(id flow.RegisterID) (flow.RegisterValue, error) {
+	return s.storage.GetRegister(s.baseHeight, s.baseBlockID, id)
+}
+
+// BlockStorageSnapshot is a snapshot of the storage at an executed collection.
+// It starts with a storage snapshot at the base block at baseHeight
+// The register updates at the executed collection at baseHeight + 1 are cached in
+// a map, such that retrieving register values at the snapshot will first check
+// the cache, and then the storage.
+type BlockStorageSnapshot struct {
+	base *baseSnapshot
+
+	commitment      flow.StateCommitment
+	registerUpdates map[flow.RegisterID]flow.RegisterValue
+}
+
+// create a new storage snapshot for an executed collection
+// at the base block at height h - 1
+func NewBlockStorageSnapshot(
+	// the statecommitment of a block at height h
+	commitment flow.StateCommitment,
+	baseBlockID flow.Identifier,
+	baseHeight uint64,
+) *BlockStorageSnapshot {
+	base := &baseSnapshot{
+		baseBlockID: baseBlockID,
+		baseHeight:  baseHeight,
+		readCache:   make(map[flow.RegisterID]flow.RegisterValue),
+	}
+	return &BlockStorageSnapshot{
+		base:            base,
+		commitment:      commitment,
+		registerUpdates: make(map[flow.RegisterID]flow.RegisterValue),
+	}
+}
+
+// Get returns the register value at the snapshot.
+func (s *BlockStorageSnapshot) Get(id flow.RegisterID) (flow.RegisterValue, error) {
+	// get from latest updates first
+	value, ok := s.getFromUpdates(id)
+	if ok {
+		return value, nil
+	}
+
+	// get from baseSnapshot at base block
+	value, err := s.base.Get(id)
+	return value, err
+}
+
+func (s *BlockStorageSnapshot) getFromUpdates(id flow.RegisterID) (flow.RegisterValue, bool) {
+	value, ok := s.registerUpdates[id]
+	return value, ok
+}
+
+// Extend returns a new storage snapshot at the same block but but for a different state commitment,
+// which contains the given trieUpdate
+// Usually it's used to create a new storage snapshot at the next executed collection.
+// The trieUpdate contains the register updates at the executed collection.
+func (s *BlockStorageSnapshot) Extend(commitment flow.StateCommitment, trieUpdate *ledger.TrieUpdate) (ExtendableStorageSnapshot, error) {
+	updates := make(map[flow.RegisterID]flow.RegisterValue)
+
+	// add the old updates
+	for key, value := range s.registerUpdates {
+		updates[key] = value
+	}
+
+	// overwrite with new updates
+	for _, payload := range trieUpdate.Payloads {
+		regID, regValue, err := PayloadToRegister(payload)
+		if err != nil {
+			return nil, fmt.Errorf("could not parse register key from payload: %w", err)
+		}
+		updates[regID] = regValue
+	}
+
+	return &BlockStorageSnapshot{
+		base:            s.base, // reuse the base snapshot, so that the cache is reused as well
+		commitment:      commitment,
+		registerUpdates: updates,
+	}, nil
+}
+
+func (s *BlockStorageSnapshot) Commitment() flow.StateCommitment {
+	return s.commitment
+}
+
+// TODO: move it
+func KeyToRegisterID(key ledger.Key) (flow.RegisterID, error) {
+	if len(key.KeyParts) != 2 ||
+		key.KeyParts[0].Type != state.KeyPartOwner ||
+		key.KeyParts[1].Type != state.KeyPartKey {
+		return flow.RegisterID{}, fmt.Errorf("key not in expected format %s", key.String())
+	}
+
+	return flow.NewRegisterID(
+		string(key.KeyParts[0].Value),
+		string(key.KeyParts[1].Value),
+	), nil
+}
+
+// TODO: move it
+func PayloadToRegister(payload *ledger.Payload) (flow.RegisterID, flow.RegisterValue, error) {
+	key, err := payload.Key()
+	if err != nil {
+		return flow.RegisterID{}, flow.RegisterValue{}, fmt.Errorf("could not parse register key from payload: %w", err)
+	}
+	regID, err := KeyToRegisterID(key)
+	if err != nil {
+		return flow.RegisterID{}, flow.RegisterValue{}, fmt.Errorf("could not parse register key from payload: %w", err)
+	}
+
+	return regID, payload.Value(), nil
+
 }
