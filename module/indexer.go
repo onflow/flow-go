@@ -31,14 +31,14 @@ type ExecutionStateIndexReader interface {
 }
 
 type ExecutionStateIndexWriter interface {
-	// StorePayloads at the provided block height.
+	// IndexPayloads at the provided block height.
 	//
 	// Expect an error if we are trying to overwrite existing payloads at the provided height.
-	StorePayloads(payloads []*ledger.Payload, height uint64) error
-	// StoreCommitment at the provided block height.
+	IndexPayloads(payloads []*ledger.Payload, height uint64) error
+	// IndexCommitment at the provided block height.
 	//
 	// Expect an error if we are trying to overwrite existing commitments at provided height.
-	StoreCommitment(commitment flow.StateCommitment, height uint64) error
+	IndexCommitment(commitment flow.StateCommitment, height uint64) error
 	// StoreLast block height that was indexed.
 	// Normal operation shouldn't produce an error.
 	StoreLast(uint64) error

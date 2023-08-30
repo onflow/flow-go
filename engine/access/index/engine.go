@@ -297,12 +297,12 @@ func (e *Engine) handleTrieUpdate(blockID flow.Identifier, update *ledger.TrieUp
 		return err
 	}
 
-	err = e.executionIndexer.StorePayloads(update.Payloads, height)
+	err = e.executionIndexer.IndexPayloads(update.Payloads, height)
 	if err != nil {
 		return err
 	}
 
-	return e.executionIndexer.StoreCommitment(flow.StateCommitment(update.RootHash), height)
+	return e.executionIndexer.IndexCommitment(flow.StateCommitment(update.RootHash), height)
 }
 
 // lookupCollection looks up the collection from the collection db with collID

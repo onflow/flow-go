@@ -55,7 +55,7 @@ func (i *ExecutionIndexer) Commitment(height uint64) (flow.StateCommitment, erro
 	return val, nil
 }
 
-func (i *ExecutionIndexer) StoreCommitment(commitment flow.StateCommitment, height uint64) error {
+func (i *ExecutionIndexer) IndexCommitment(commitment flow.StateCommitment, height uint64) error {
 	i.commitments[height] = commitment
 	return nil
 }
@@ -81,7 +81,7 @@ func (i *ExecutionIndexer) IndexEvents(blockID flow.Identifier, events flow.Even
 	return i.events.Store(blockID, []flow.EventsList{events})
 }
 
-func (i *ExecutionIndexer) StorePayloads(payloads []*ledger.Payload, height uint64) error {
+func (i *ExecutionIndexer) IndexPayloads(payloads []*ledger.Payload, height uint64) error {
 	regEntries := make(flow.RegisterEntries, len(payloads))
 
 	for j, payload := range payloads {
