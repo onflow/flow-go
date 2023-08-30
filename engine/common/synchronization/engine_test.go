@@ -142,7 +142,6 @@ func (ss *SyncSuite) TestOnRangeRequest() {
 		req.ToHeight = ref - 1
 		err := ss.e.requestHandler.onRangeRequest(originID, req)
 		require.NoError(ss.T(), err, "empty range request should pass")
-		ss.con.AssertNumberOfCalls(ss.T(), "Unicast", 0)
 		ss.con.AssertNotCalled(ss.T(), "Unicast", mock.Anything, mock.Anything)
 	})
 
@@ -152,7 +151,7 @@ func (ss *SyncSuite) TestOnRangeRequest() {
 		req.ToHeight = ref + 3
 		err := ss.e.requestHandler.onRangeRequest(originID, req)
 		require.NoError(ss.T(), err, "unknown range request should pass")
-		ss.con.AssertNumberOfCalls(ss.T(), "Unicast", 0)
+		ss.con.AssertNotCalled(ss.T(), "Unicast", mock.Anything, mock.Anything)
 	})
 
 	// a request for same from and to should send single block
@@ -173,6 +172,9 @@ func (ss *SyncSuite) TestOnRangeRequest() {
 		err := ss.e.requestHandler.onRangeRequest(originID, req)
 		require.NoError(ss.T(), err, "range request with higher to height should pass")
 		ss.con.AssertNumberOfCalls(ss.T(), "Unicast", 1)
+
+		// clear any expectations for next test - otherwise, next subtest will fail due to increment of expected calls to Unicast
+		ss.con.Mock = mock.Mock{}
 	})
 
 	// a request for a range that we partially have should send partial response
@@ -191,6 +193,10 @@ func (ss *SyncSuite) TestOnRangeRequest() {
 		)
 		err := ss.e.requestHandler.onRangeRequest(originID, req)
 		require.NoError(ss.T(), err, "valid range with missing blocks should fail")
+		ss.con.AssertNumberOfCalls(ss.T(), "Unicast", 1)
+
+		// clear any expectations for next test - otherwise, next subtest will fail due to increment of expected calls to Unicast
+		ss.con.Mock = mock.Mock{}
 	})
 
 	// a request for a range we entirely have should send all blocks
@@ -209,6 +215,10 @@ func (ss *SyncSuite) TestOnRangeRequest() {
 		)
 		err := ss.e.requestHandler.onRangeRequest(originID, req)
 		require.NoError(ss.T(), err, "valid range request should pass")
+		ss.con.AssertNumberOfCalls(ss.T(), "Unicast", 1)
+
+		// clear any expectations for next test - otherwise, next subtest will fail due to increment of expected calls to Unicast
+		ss.con.Mock = mock.Mock{}
 	})
 
 	// a request for a range larger than MaxSize should be clamped
@@ -235,6 +245,10 @@ func (ss *SyncSuite) TestOnRangeRequest() {
 
 		err = ss.e.requestHandler.onRangeRequest(originID, req)
 		require.NoError(ss.T(), err, "valid range request exceeding max size should still pass")
+		ss.con.AssertNumberOfCalls(ss.T(), "Unicast", 1)
+
+		// clear any expectations for next test - otherwise, next subtest will fail due to increment of expected calls to Unicast
+		ss.con.Mock = mock.Mock{}
 	})
 }
 
