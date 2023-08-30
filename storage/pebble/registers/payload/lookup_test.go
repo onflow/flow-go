@@ -5,8 +5,9 @@ import (
 	"math"
 	"testing"
 
-	"github.com/onflow/flow-go/model/flow"
 	"github.com/stretchr/testify/require"
+
+	"github.com/onflow/flow-go/model/flow"
 )
 
 // Test_lookupKey_Bytes tests the lookup key encoding.

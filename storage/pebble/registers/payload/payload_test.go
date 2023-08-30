@@ -9,8 +9,9 @@ import (
 	"testing"
 
 	"github.com/cockroachdb/pebble"
-	"github.com/onflow/flow-go/model/flow"
 	"github.com/stretchr/testify/require"
+
+	"github.com/onflow/flow-go/model/flow"
 )
 
 // Test_PayloadStorage_RoundTrip tests the round trip of a payload storage.

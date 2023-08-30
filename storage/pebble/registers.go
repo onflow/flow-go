@@ -5,8 +5,9 @@ import (
 	"path"
 
 	"github.com/cockroachdb/pebble"
-	"github.com/onflow/flow-go/storage/pebble/registers/payload"
 	"go.uber.org/multierr"
+
+	"github.com/onflow/flow-go/storage/pebble/registers/payload"
 )
 
 // library that implements pebble storage for registers
