@@ -11,15 +11,18 @@ import (
 // ChannelSubscriptionManager manages subscriptions of engines running on the node to channels.
 // Each channel should be taken by at most a single engine.
 type ChannelSubscriptionManager struct {
-	mu      sync.RWMutex
-	engines map[channels.Channel]network.MessageProcessor
-	mw      network.Middleware
+	mu         sync.RWMutex
+	engines    map[channels.Channel]network.MessageProcessor
+	middleware network.Middleware
 }
 
-func NewChannelSubscriptionManager(mw network.Middleware) *ChannelSubscriptionManager {
+// NewChannelSubscriptionManager creates a new subscription manager.
+// Args:
+// - subscribeFunction: a function that subscribes to a channel.
+func NewChannelSubscriptionManager(middleware network.Middleware) *ChannelSubscriptionManager {
 	return &ChannelSubscriptionManager{
-		engines: make(map[channels.Channel]network.MessageProcessor),
-		mw:      mw,
+		engines:    make(map[channels.Channel]network.MessageProcessor),
+		middleware: middleware,
 	}
 }
 
@@ -35,7 +38,8 @@ func (sm *ChannelSubscriptionManager) Register(channel channels.Channel, engine 
 	}
 
 	// registers the channel with the middleware to let middleware start receiving messages
-	err := sm.mw.Subscribe(channel)
+	// TODO: subscribe function should be replaced by a better abstraction of the network.
+	err := sm.middleware.Subscribe(channel)
 	if err != nil {
 		return fmt.Errorf("subscriptionManager: failed to subscribe to channel %s: %w", channel, err)
 	}
@@ -58,7 +62,7 @@ func (sm *ChannelSubscriptionManager) Unregister(channel channels.Channel) error
 		return nil
 	}
 
-	err := sm.mw.Unsubscribe(channel)
+	err := sm.middleware.Unsubscribe(channel)
 	if err != nil {
 		return fmt.Errorf("subscriptionManager: failed to unregister from channel %s: %w", channel, err)
 	}

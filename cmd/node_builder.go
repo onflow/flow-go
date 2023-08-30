@@ -194,8 +194,8 @@ type NodeConfig struct {
 	ProtocolEvents    *events.Distributor
 	State             protocol.State
 	Resolver          madns.BasicResolver
-	Middleware        network.Middleware
 	Network           network.Network
+	Middleware        network.Middleware
 	ConduitFactory    network.ConduitFactory
 	PingService       network.PingService
 	MsgValidators     []network.MessageValidator

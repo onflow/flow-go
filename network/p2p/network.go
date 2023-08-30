@@ -30,8 +30,8 @@ import (
 	"github.com/onflow/flow-go/network/internal/p2putils"
 	"github.com/onflow/flow-go/network/message"
 	"github.com/onflow/flow-go/network/p2p/blob"
-	"github.com/onflow/flow-go/network/p2p/internal"
 	"github.com/onflow/flow-go/network/p2p/ping"
+	"github.com/onflow/flow-go/network/p2p/subscription"
 	"github.com/onflow/flow-go/network/p2p/unicast/protocols"
 	"github.com/onflow/flow-go/network/p2p/unicast/ratelimit"
 	"github.com/onflow/flow-go/network/p2p/utils"
@@ -120,6 +120,7 @@ type Network struct {
 
 var _ network.Network = &Network{}
 var _ network.Overlay = &Network{}
+var _ network.Middleware = &Network{}
 
 type registerEngineRequest struct {
 	channel          channels.Channel
@@ -153,7 +154,6 @@ type NetworkConfig struct {
 	Codec                            network.Codec
 	Me                               module.Local
 	Topology                         network.Topology
-	SubscriptionManager              network.SubscriptionManager
 	Metrics                          module.NetworkCoreMetrics
 	IdentityProvider                 module.IdentityProvider
 	IdentityTranslator               IDTranslator
@@ -197,6 +197,12 @@ func WithCodec(codec network.Codec) NetworkConfigOption {
 	}
 }
 
+func WithSlashingViolationConsumerFactory(factory func() network.ViolationsConsumer) NetworkConfigOption {
+	return func(params *NetworkConfig) {
+		params.SlashingViolationConsumerFactory = factory
+	}
+}
+
 // NetworkOption is a function that can be used to override network attributes.
 // It is mostly used for testing purposes.
 // Note: do not override network attributes in production unless you know what you are doing.
@@ -236,6 +242,22 @@ func WithUnicastRateLimiters(limiters *ratelimit.RateLimiters) NetworkOption {
 	}
 }
 
+// WithPreferredUnicastProtocols sets the preferred unicast protocols for the network. It overrides the default
+// preferred unicast.
+func WithPreferredUnicastProtocols(protocols ...protocols.ProtocolName) NetworkOption {
+	return func(n *Network) {
+		n.preferredUnicasts = protocols
+	}
+}
+
+// WithMessageValidators sets the message validators for the network. It overrides the default
+// message validators.
+func WithMessageValidators(validators ...network.MessageValidator) NetworkOption {
+	return func(n *Network) {
+		n.validators = validators
+	}
+}
+
 // NewNetwork creates a new naive overlay network, using the given middleware to
 // communicate to direct peers, using the given codec for serialization, and
 // using the given state & cache interfaces to track volatile information.
@@ -251,7 +273,6 @@ func NewNetwork(param *NetworkConfig, opts ...NetworkOption) (*Network, error) {
 		topology:                    param.Topology,
 		metrics:                     param.Metrics,
 		bitswapMetrics:              param.BitSwapMetrics,
-		subscriptionManager:         param.SubscriptionManager,
 		identityProvider:            param.IdentityProvider,
 		conduitFactory:              param.ConduitFactory,
 		registerEngineRequests:      make(chan *registerEngineRequest),
@@ -261,7 +282,10 @@ func NewNetwork(param *NetworkConfig, opts ...NetworkOption) (*Network, error) {
 		unicastMessageTimeout:       param.UnicastMessageTimeout,
 		libP2PNode:                  param.Libp2pNode,
 		unicastRateLimiters:         ratelimit.NoopRateLimiters(),
+		validators:                  DefaultValidators(param.Logger.With().Str("component", "network-validators").Logger(), param.Me.NodeID()),
 	}
+
+	n.subscriptionManager = subscription.NewChannelSubscriptionManager(n)
 
 	misbehaviorMngr, err := alspmgr.NewMisbehaviorReportManager(param.AlspCfg, n)
 	if err != nil {
@@ -1060,7 +1084,7 @@ func (n *Network) Subscribe(channel channels.Channel) error {
 	}
 
 	// create a new readSubscription with the context of the middleware
-	rs := internal.NewReadSubscription(s, n.processPubSubMessages, n.logger)
+	rs := NewReadSubscription(s, n.processPubSubMessages, n.logger)
 	n.wg.Add(1)
 
 	// kick off the receive loop to continuously receive messages

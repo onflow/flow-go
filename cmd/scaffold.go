@@ -51,11 +51,9 @@ import (
 	"github.com/onflow/flow-go/network/p2p/conduit"
 	"github.com/onflow/flow-go/network/p2p/connection"
 	"github.com/onflow/flow-go/network/p2p/dns"
-	"github.com/onflow/flow-go/network/p2p/middleware"
 	"github.com/onflow/flow-go/network/p2p/p2pbuilder"
 	p2pconfig "github.com/onflow/flow-go/network/p2p/p2pbuilder/config"
 	"github.com/onflow/flow-go/network/p2p/ping"
-	"github.com/onflow/flow-go/network/p2p/subscription"
 	"github.com/onflow/flow-go/network/p2p/unicast/protocols"
 	"github.com/onflow/flow-go/network/p2p/unicast/ratelimit"
 	"github.com/onflow/flow-go/network/p2p/utils/ratelimiter"
@@ -418,50 +416,23 @@ func (fnb *FlowNodeBuilder) InitFlowNetworkWithConduitFactory(
 	unicastRateLimiters *ratelimit.RateLimiters,
 	peerManagerFilters []p2p.PeerFilter) (network.Network, error) {
 
-	var mwOpts []middleware.OptionFn
+	var networkOptions []p2p.NetworkOption
 	if len(fnb.MsgValidators) > 0 {
-		mwOpts = append(mwOpts, middleware.WithMessageValidators(fnb.MsgValidators...))
+		networkOptions = append(networkOptions, p2p.WithMessageValidators(fnb.MsgValidators...))
 	}
 
 	// by default if no rate limiter configuration was provided in the CLI args the default
 	// noop rate limiter will be used.
-	mwOpts = append(mwOpts, middleware.WithUnicastRateLimiters(unicastRateLimiters))
+	networkOptions = append(networkOptions, p2p.WithUnicastRateLimiters(unicastRateLimiters))
 
-	mwOpts = append(mwOpts,
-		middleware.WithPreferredUnicastProtocols(protocols.ToProtocolNames(fnb.FlowConfig.NetworkConfig.PreferredUnicastProtocols)),
+	networkOptions = append(networkOptions,
+		p2p.WithPreferredUnicastProtocols(protocols.ToProtocolNames(fnb.FlowConfig.NetworkConfig.PreferredUnicastProtocols)...),
 	)
 
-	// peerManagerFilters are used by the peerManager via the middleware to filter peers from the topology.
+	// peerManagerFilters are used by the peerManager via the network to filter peers from the topology.
 	if len(peerManagerFilters) > 0 {
-		mwOpts = append(mwOpts, middleware.WithPeerManagerFilters(peerManagerFilters))
+		networkOptions = append(networkOptions, p2p.WithPeerManagerFilters(peerManagerFilters...))
 	}
-
-	mw := middleware.NewMiddleware(&middleware.Config{
-		Logger:                fnb.Logger,
-		Libp2pNode:            fnb.LibP2PNode,
-		FlowId:                fnb.Me.NodeID(),
-		BitSwapMetrics:        fnb.Metrics.Bitswap,
-		SporkId:               fnb.SporkID,
-		UnicastMessageTimeout: fnb.FlowConfig.NetworkConfig.UnicastMessageTimeout,
-		IdTranslator:          fnb.IDTranslator,
-		Codec:                 fnb.CodecFactory(),
-		SlashingViolationConsumerFactory: func() network.ViolationsConsumer {
-			// this is temporary; we are in the process of removing the middleware; hence all this logic must be
-			// eventually moved to the network component.
-			// Network has two interfaces; Network which is exposed to the engines; Adapter which is exposed to the middleware.
-			// Here we are casting the Network to Adapter to get access to the misbehavior report consumer.
-			adapter, ok := fnb.Network.(network.Adapter)
-			if !ok {
-				fnb.Logger.Fatal().Msg("network must be an adapter to use slashing violations consumer")
-			}
-			return slashing.NewSlashingViolationsConsumer(fnb.Logger, fnb.Metrics.Network, adapter)
-		},
-	},
-		mwOpts...)
-
-	fnb.Middleware = mw
-
-	subscriptionManager := subscription.NewChannelSubscriptionManager(fnb.Middleware)
 
 	receiveCache := netcache.NewHeroReceiveCache(fnb.FlowConfig.NetworkConfig.NetworkReceivedMessageCacheSize,
 		fnb.Logger,
@@ -475,13 +446,13 @@ func (fnb *FlowNodeBuilder) InitFlowNetworkWithConduitFactory(
 	// creates network instance
 	net, err := p2p.NewNetwork(&p2p.NetworkConfig{
 		Logger:                fnb.Logger,
+		Libp2pNode:            fnb.LibP2PNode,
 		Codec:                 fnb.CodecFactory(),
 		Me:                    fnb.Me,
 		SporkId:               fnb.SporkID,
-		MiddlewareFactory:     func() (network.Middleware, error) { return fnb.Middleware, nil },
 		Topology:              topology.NewFullyConnectedTopology(),
-		SubscriptionManager:   subscriptionManager,
 		Metrics:               fnb.Metrics.Network,
+		BitSwapMetrics:        fnb.Metrics.Bitswap,
 		IdentityProvider:      fnb.IdentityProvider,
 		ReceiveCache:          receiveCache,
 		ConduitFactory:        cf,
@@ -497,19 +468,31 @@ func (fnb *FlowNodeBuilder) InitFlowNetworkWithConduitFactory(
 			HeroCacheMetricsFactory: fnb.HeroCacheMetricsFactory(),
 			NetworkType:             network.PrivateNetwork,
 		},
-	})
+		SlashingViolationConsumerFactory: func() network.ViolationsConsumer {
+			// this is temporary; we are in the process of removing the middleware; hence all this logic must be
+			// eventually moved to the network component.
+			// Network has two interfaces; Network which is exposed to the engines; Adapter which is exposed to the middleware.
+			// Here we are casting the Network to Adapter to get access to the misbehavior report consumer.
+			adapter, ok := fnb.Network.(network.Adapter)
+			if !ok {
+				fnb.Logger.Fatal().Msg("network must be an adapter to use slashing violations consumer")
+			}
+			return slashing.NewSlashingViolationsConsumer(fnb.Logger, fnb.Metrics.Network, adapter)
+		},
+	}, networkOptions...)
 	if err != nil {
 		return nil, fmt.Errorf("could not initialize network: %w", err)
 	}
 
-	fnb.Network = net
+	fnb.Network = net    // setting network as the fnb.Network for the engine-level components
+	fnb.Middleware = net // setting network as the fnb.Middleware for the lower-level components
 
-	// register middleware's ReadyDoneAware interface so other components can depend on it for startup
+	// register network ReadyDoneAware interface so other components can depend on it for startup
 	if fnb.middlewareDependable != nil {
 		fnb.middlewareDependable.Init(fnb.Middleware)
 	}
 
-	idEvents := gadgets.NewIdentityDeltas(fnb.Middleware.UpdateNodeAddresses)
+	idEvents := gadgets.NewIdentityDeltas(net.UpdateNodeAddresses)
 	fnb.ProtocolEvents.AddConsumer(idEvents)
 
 	return net, nil

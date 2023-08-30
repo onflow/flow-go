@@ -1,4 +1,4 @@
-package internal
+package p2p
 
 import (
 	"context"
@@ -11,7 +11,6 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/network/message"
-	"github.com/onflow/flow-go/network/p2p"
 	validator "github.com/onflow/flow-go/network/validator/pubsub"
 	"github.com/onflow/flow-go/utils/logging"
 )
@@ -23,12 +22,12 @@ type ReadSubscriptionCallBackFunction func(msg *message.Message, peerID peer.ID)
 // the context of the subscription is cancelled.
 type ReadSubscription struct {
 	log      zerolog.Logger
-	sub      p2p.Subscription
+	sub      Subscription
 	callback ReadSubscriptionCallBackFunction
 }
 
 // NewReadSubscription reads the messages coming in on the subscription
-func NewReadSubscription(sub p2p.Subscription, callback ReadSubscriptionCallBackFunction, log zerolog.Logger) *ReadSubscription {
+func NewReadSubscription(sub Subscription, callback ReadSubscriptionCallBackFunction, log zerolog.Logger) *ReadSubscription {
 	r := ReadSubscription{
 		log:      log.With().Str("channel", sub.Topic()).Logger(),
 		sub:      sub,

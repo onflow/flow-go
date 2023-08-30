@@ -48,7 +48,6 @@ import (
 	"github.com/onflow/flow-go/network/p2p/conduit"
 	p2pdht "github.com/onflow/flow-go/network/p2p/dht"
 	"github.com/onflow/flow-go/network/p2p/keyutils"
-	"github.com/onflow/flow-go/network/p2p/middleware"
 	"github.com/onflow/flow-go/network/p2p/p2pbuilder"
 	p2pconfig "github.com/onflow/flow-go/network/p2p/p2pbuilder/config"
 	"github.com/onflow/flow-go/network/p2p/subscription"
@@ -359,47 +358,6 @@ func FlowConsensusFollowerService(opts ...FollowerOption) *FollowerServiceBuilde
 	// hence skip all the root snapshot validations that involved an identity address
 	ret.FlowNodeBuilder.SkipNwAddressBasedValidations = true
 	return ret
-}
-
-// initNetwork creates the network.Network implementation with the given metrics, middleware, initial list of network
-// participants and topology used to choose peers from the list of participants. The list of participants can later be
-// updated by calling network.SetIDs.
-func (builder *FollowerServiceBuilder) initNetwork(nodeID module.Local,
-	networkMetrics module.NetworkMetrics,
-	middleware network.Middleware,
-	topology network.Topology,
-	receiveCache *netcache.ReceiveCache,
-) (*p2p.Network, error) {
-	net, err := p2p.NewNetwork(&p2p.NetworkConfig{
-		Logger:                builder.Logger,
-		Codec:                 cborcodec.NewCodec(),
-		Me:                    nodeID,
-		MiddlewareFactory:     func() (network.Middleware, error) { return builder.Middleware, nil },
-		Topology:              topology,
-		SubscriptionManager:   subscription.NewChannelSubscriptionManager(middleware),
-		Metrics:               networkMetrics,
-		IdentityProvider:      builder.IdentityProvider,
-		ReceiveCache:          receiveCache,
-		ConduitFactory:        conduit.NewDefaultConduitFactory(),
-		SporkId:               builder.SporkID,
-		UnicastMessageTimeout: p2p.DefaultUnicastTimeout,
-		IdentityTranslator:    builder.IDTranslator,
-		AlspCfg: &alspmgr.MisbehaviorReportManagerConfig{
-			Logger:                  builder.Logger,
-			SpamRecordCacheSize:     builder.FlowConfig.NetworkConfig.AlspConfig.SpamRecordCacheSize,
-			SpamReportQueueSize:     builder.FlowConfig.NetworkConfig.AlspConfig.SpamReportQueueSize,
-			DisablePenalty:          builder.FlowConfig.NetworkConfig.AlspConfig.DisablePenalty,
-			HeartBeatInterval:       builder.FlowConfig.NetworkConfig.AlspConfig.HearBeatInterval,
-			AlspMetrics:             builder.Metrics.Network,
-			HeroCacheMetricsFactory: builder.HeroCacheMetricsFactory(),
-			NetworkType:             network.PublicNetwork,
-		},
-	})
-	if err != nil {
-		return nil, fmt.Errorf("could not initialize network: %w", err)
-	}
-
-	return net, nil
 }
 
 func publicNetworkMsgValidators(log zerolog.Logger, idProvider module.IdentityProvider, selfID flow.Identifier) []network.MessageValidator {
@@ -719,16 +677,47 @@ func (builder *FollowerServiceBuilder) enqueuePublicNetworkInit() {
 				return nil, fmt.Errorf("could not register networking receive cache metric: %w", err)
 			}
 
-			msgValidators := publicNetworkMsgValidators(node.Logger, node.IdentityProvider, node.NodeID)
-
-			builder.initMiddleware(node.NodeID, publicLibp2pNode, msgValidators...)
-
-			// topology is nil since it is automatically managed by libp2p
-			net, err := builder.initNetwork(builder.Me, builder.Metrics.Network, builder.Middleware, nil, receiveCache)
+			net, err := p2p.NewNetwork(&p2p.NetworkConfig{
+				Logger:                builder.Logger.With().Str("component", "public-network").Logger(),
+				Codec:                 cborcodec.NewCodec(),
+				Me:                    builder.Me,
+				Libp2pNode:            publicLibp2pNode,
+				Topology:              nil, // topology is nil since it is automatically managed by libp2p // TODO: can we use empty topology?
+				Metrics:               builder.Metrics.Network,
+				BitSwapMetrics:        builder.Metrics.Bitswap,
+				IdentityProvider:      builder.IdentityProvider,
+				ReceiveCache:          receiveCache,
+				ConduitFactory:        conduit.NewDefaultConduitFactory(),
+				SporkId:               builder.SporkID,
+				UnicastMessageTimeout: p2p.DefaultUnicastTimeout,
+				IdentityTranslator:    builder.IDTranslator,
+				AlspCfg: &alspmgr.MisbehaviorReportManagerConfig{
+					Logger:                  builder.Logger,
+					SpamRecordCacheSize:     builder.FlowConfig.NetworkConfig.AlspConfig.SpamRecordCacheSize,
+					SpamReportQueueSize:     builder.FlowConfig.NetworkConfig.AlspConfig.SpamReportQueueSize,
+					DisablePenalty:          builder.FlowConfig.NetworkConfig.AlspConfig.DisablePenalty,
+					HeartBeatInterval:       builder.FlowConfig.NetworkConfig.AlspConfig.HearBeatInterval,
+					AlspMetrics:             builder.Metrics.Network,
+					HeroCacheMetricsFactory: builder.HeroCacheMetricsFactory(),
+					NetworkType:             network.PublicNetwork,
+				},
+				SlashingViolationConsumerFactory: func() network.ViolationsConsumer {
+					// this is temporary; we are in the process of removing the middleware; hence all this logic must be
+					// eventually moved to the network component.
+					// Network has two interfaces; Network which is exposed to the engines; Adapter which is exposed to the middleware.
+					// Here we are casting the Network to Adapter to get access to the misbehavior report consumer.
+					adapter, ok := builder.Network.(network.Adapter)
+					if !ok {
+						builder.Logger.Fatal().Msg("network must be an adapter to use slashing violations consumer")
+					}
+					return slashing.NewSlashingViolationsConsumer(builder.Logger, builder.Metrics.Network, adapter)
+				},
+			}, p2p.WithMessageValidators(publicNetworkMsgValidators(node.Logger, node.IdentityProvider, node.NodeID)...))
 			if err != nil {
-				return nil, err
+				return nil, fmt.Errorf("could not initialize network: %w", err)
 			}
 
+			builder.Middleware = net
 			builder.Network = converter.NewNetwork(net, channels.SyncCommittee, channels.PublicSyncCommittee)
 
 			builder.Logger.Info().Msgf("network will run on address: %s", builder.BindAddr)
@@ -750,37 +739,4 @@ func (builder *FollowerServiceBuilder) enqueueConnectWithStakedAN() {
 	builder.Component("upstream connector", func(_ *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 		return upstream.NewUpstreamConnector(builder.bootstrapIdentities, builder.LibP2PNode, builder.Logger), nil
 	})
-}
-
-// initMiddleware creates the network.Middleware implementation with the libp2p factory function, metrics, peer update
-// interval, and validators. The network.Middleware is then passed into the initNetwork function.
-func (builder *FollowerServiceBuilder) initMiddleware(nodeID flow.Identifier,
-	libp2pNode p2p.LibP2PNode,
-	validators ...network.MessageValidator,
-) network.Middleware {
-	mw := middleware.NewMiddleware(&middleware.Config{
-		Logger:                builder.Logger,
-		Libp2pNode:            libp2pNode,
-		FlowId:                nodeID,
-		BitSwapMetrics:        builder.Metrics.Bitswap,
-		SporkId:               builder.SporkID,
-		UnicastMessageTimeout: middleware.DefaultUnicastTimeout,
-		IdTranslator:          builder.IDTranslator,
-		Codec:                 builder.CodecFactory(),
-		SlashingViolationConsumerFactory: func() network.ViolationsConsumer {
-			// this is temporary; we are in the process of removing the middleware; hence all this logic must be
-			// eventually moved to the network component.
-			// Network has two interfaces; Network which is exposed to the engines; Adapter which is exposed to the middleware.
-			// Here we are casting the Network to Adapter to get access to the misbehavior report consumer.
-			adapter, ok := builder.Network.(network.Adapter)
-			if !ok {
-				builder.Logger.Fatal().Msg("network must be an adapter to use slashing violations consumer")
-			}
-			return slashing.NewSlashingViolationsConsumer(builder.Logger, builder.Metrics.Network, adapter)
-		},
-	},
-		middleware.WithMessageValidators(validators...),
-	)
-	builder.Middleware = mw
-	return builder.Middleware
 }

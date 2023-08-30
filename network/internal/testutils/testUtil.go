@@ -33,7 +33,6 @@ import (
 	"github.com/onflow/flow-go/network/p2p/conduit"
 	"github.com/onflow/flow-go/network/p2p/connection"
 	"github.com/onflow/flow-go/network/p2p/middleware"
-	"github.com/onflow/flow-go/network/p2p/subscription"
 	p2ptest "github.com/onflow/flow-go/network/p2p/test"
 	"github.com/onflow/flow-go/network/p2p/translator"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -154,7 +153,6 @@ func LibP2PNodeForMiddlewareFixture(t *testing.T, sporkId flow.Identifier, n int
 func MiddlewareConfigFixture(t *testing.T, sporkId flow.Identifier) *middleware.Config {
 	return &middleware.Config{
 		Logger:                unittest.Logger(),
-		BitSwapMetrics:        metrics.NewNoopCollector(),
 		SporkId:               sporkId,
 		UnicastMessageTimeout: middleware.DefaultUnicastTimeout,
 		Codec:                 unittest.NetworkCodec(),
@@ -178,35 +176,14 @@ func MiddlewareFixtures(
 	libP2PNodes []p2p.LibP2PNode,
 	cfg *middleware.Config,
 	opts ...middleware.OptionFn) ([]network.Middleware, []*unittest.UpdatableIDProvider) {
-
-	require.Equal(t, len(identities), len(libP2PNodes))
-
-	mws := make([]network.Middleware, len(identities))
-	idProviders := make([]*unittest.UpdatableIDProvider, len(identities))
-
-	if cfg.SlashingViolationConsumerFactory == nil {
-		// use a mock slashing violation consumer factory if not provided
-		cfg.SlashingViolationConsumerFactory = func() network.ViolationsConsumer {
-			return mocknetwork.NewViolationsConsumer(t)
-		}
-	}
-
-	for i := 0; i < len(identities); i++ {
-		i := i
-		cfg.Libp2pNode = libP2PNodes[i]
-		cfg.FlowId = identities[i].NodeID
-		idProviders[i] = unittest.NewUpdatableIDProvider(identities)
-		cfg.IdTranslator = translator.NewIdentityProviderIDTranslator(idProviders[i])
-		mws[i] = middleware.NewMiddleware(cfg, opts...)
-	}
-	return mws, idProviders
+	return nil, nil
 }
 
 // NetworksFixture generates the network for the given middlewares
 func NetworksFixture(t *testing.T,
 	sporkId flow.Identifier,
 	ids flow.IdentityList,
-	mws []network.Middleware,
+	libp2pNodes []p2p.LibP2PNode,
 	configOpts ...func(*p2p.NetworkConfig)) ([]network.Network, []*unittest.UpdatableIDProvider) {
 
 	count := len(ids)
@@ -214,8 +191,10 @@ func NetworksFixture(t *testing.T,
 	idProviders := make([]*unittest.UpdatableIDProvider, 0)
 
 	for i := 0; i < count; i++ {
+		i := i // capture loop variable
+
 		idProvider := unittest.NewUpdatableIDProvider(ids)
-		params := NetworkConfigFixture(t, *ids[i], idProvider, sporkId, mws[i])
+		params := NetworkConfigFixture(t, *ids[i], idProvider, sporkId, libp2pNodes[i])
 
 		for _, opt := range configOpts {
 			opt(params)
@@ -236,7 +215,7 @@ func NetworkConfigFixture(
 	myId flow.Identity,
 	idProvider module.IdentityProvider,
 	sporkId flow.Identifier,
-	mw network.Middleware,
+	libp2pNode p2p.LibP2PNode,
 	opts ...p2p.NetworkConfigOption) *p2p.NetworkConfig {
 
 	me := mock.NewLocal(t)
@@ -251,14 +230,13 @@ func NetworkConfigFixture(
 		defaultFlowConfig.NetworkConfig.NetworkReceivedMessageCacheSize,
 		unittest.Logger(),
 		metrics.NewNoopCollector())
-	subMgr := subscription.NewChannelSubscriptionManager(mw)
 	params := &p2p.NetworkConfig{
 		Logger:                unittest.Logger(),
 		Codec:                 unittest.NetworkCodec(),
+		Libp2pNode:            libp2pNode,
 		Me:                    me,
-		MiddlewareFactory:     func() (network.Middleware, error) { return mw, nil },
+		BitSwapMetrics:        metrics.NewNoopCollector(),
 		Topology:              unittest.NetworkTopology(),
-		SubscriptionManager:   subMgr,
 		Metrics:               metrics.NewNoopCollector(),
 		IdentityProvider:      idProvider,
 		ReceiveCache:          receiveCache,
@@ -273,6 +251,9 @@ func NetworkConfigFixture(
 			HeartBeatInterval:       defaultFlowConfig.NetworkConfig.AlspConfig.HearBeatInterval,
 			AlspMetrics:             metrics.NewNoopCollector(),
 			HeroCacheMetricsFactory: metrics.NewNoopHeroCacheMetricsFactory(),
+		},
+		SlashingViolationConsumerFactory: func() network.ViolationsConsumer {
+			return mocknetwork.NewViolationsConsumer(t)
 		},
 	}
 
