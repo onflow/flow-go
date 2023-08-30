@@ -54,13 +54,15 @@ func (suite *EchoEngineTestSuite) SetupTest() {
 	// both nodes should be of the same role to get connected on epidemic dissemination
 	var nodes []p2p.LibP2PNode
 	sporkId := unittest.IdentifierFixture()
+	idProvider := unittest.NewUpdatableIDProvider(suite.ids)
 	suite.ids, nodes = testutils.LibP2PNodeForMiddlewareFixture(suite.T(), sporkId, count)
-	suite.mws, _ = testutils.MiddlewareFixtures(
+	suite.mws = testutils.MiddlewareFixtures(
 		suite.T(),
 		suite.ids,
+		idProvider,
 		nodes,
 		testutils.MiddlewareConfigFixture(suite.T(), sporkId))
-	suite.nets, _ = testutils.NetworksFixture(suite.T(), sporkId, suite.ids, suite.mws)
+	suite.nets = testutils.NetworksFixture(suite.T(), sporkId, suite.ids, idProvider, suite.mws)
 	testutils.StartNodesAndNetworks(signalerCtx, suite.T(), nodes, suite.nets, 100*time.Millisecond)
 }
 

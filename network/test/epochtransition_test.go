@@ -194,12 +194,14 @@ func (suite *MutableIdentityTableSuite) addNodes(count int) {
 	// create the ids, middlewares and networks
 	sporkId := unittest.IdentifierFixture()
 	ids, nodes := testutils.LibP2PNodeForMiddlewareFixture(suite.T(), sporkId, count)
-	mws, _ := testutils.MiddlewareFixtures(
+	idProvider := unittest.NewUpdatableIDProvider(ids)
+	mws := testutils.MiddlewareFixtures(
 		suite.T(),
 		ids,
+		idProvider,
 		nodes,
 		testutils.MiddlewareConfigFixture(suite.T(), sporkId))
-	nets, _ := testutils.NetworksFixture(suite.T(), sporkId, ids, mws)
+	nets := testutils.NetworksFixture(suite.T(), sporkId, ids, idProvider, mws)
 	suite.cancels = append(suite.cancels, cancel)
 
 	testutils.StartNodesAndNetworks(signalerCtx, suite.T(), nodes, nets, 100*time.Millisecond)

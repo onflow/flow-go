@@ -175,14 +175,14 @@ func MiddlewareConfigFixture(t *testing.T, sporkId flow.Identifier) *middleware.
 func MiddlewareFixtures(
 	t *testing.T,
 	identities flow.IdentityList,
+	idProvider *unittest.UpdatableIDProvider,
 	libP2PNodes []p2p.LibP2PNode,
 	cfg *middleware.Config,
-	opts ...middleware.OptionFn) ([]network.Middleware, []*unittest.UpdatableIDProvider) {
+	opts ...middleware.OptionFn) []network.Middleware {
 
 	require.Equal(t, len(identities), len(libP2PNodes))
 
 	mws := make([]network.Middleware, len(identities))
-	idProviders := make([]*unittest.UpdatableIDProvider, len(identities))
 
 	if cfg.SlashingViolationConsumerFactory == nil {
 		// use a mock slashing violation consumer factory if not provided
@@ -195,26 +195,24 @@ func MiddlewareFixtures(
 		i := i
 		cfg.Libp2pNode = libP2PNodes[i]
 		cfg.FlowId = identities[i].NodeID
-		idProviders[i] = unittest.NewUpdatableIDProvider(identities)
-		cfg.IdTranslator = translator.NewIdentityProviderIDTranslator(idProviders[i])
+		cfg.IdTranslator = translator.NewIdentityProviderIDTranslator(idProvider)
 		mws[i] = middleware.NewMiddleware(cfg, opts...)
 	}
-	return mws, idProviders
+	return mws
 }
 
 // NetworksFixture generates the network for the given middlewares
 func NetworksFixture(t *testing.T,
 	sporkId flow.Identifier,
 	ids flow.IdentityList,
+	idProvider *unittest.UpdatableIDProvider,
 	mws []network.Middleware,
-	configOpts ...func(*p2p.NetworkConfig)) ([]network.Network, []*unittest.UpdatableIDProvider) {
+	configOpts ...func(*p2p.NetworkConfig)) []network.Network {
 
 	count := len(ids)
 	nets := make([]network.Network, 0)
-	idProviders := make([]*unittest.UpdatableIDProvider, 0)
 
 	for i := 0; i < count; i++ {
-		idProvider := unittest.NewUpdatableIDProvider(ids)
 		params := NetworkConfigFixture(t, *ids[i], idProvider, sporkId, mws[i])
 
 		for _, opt := range configOpts {
@@ -225,10 +223,9 @@ func NetworksFixture(t *testing.T,
 		require.NoError(t, err)
 
 		nets = append(nets, net)
-		idProviders = append(idProviders, idProvider)
 	}
 
-	return nets, idProviders
+	return nets
 }
 
 func NetworkConfigFixture(
