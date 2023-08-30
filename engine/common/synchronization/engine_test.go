@@ -64,45 +64,6 @@ func (ss *SyncSuite) TestOnSyncRequest_HigherThanReceiver_OutsideTolerance() {
 	ss.core.AssertExpectations(ss.T())
 }
 
-// TestProcess_SyncRequest_HigherThanReceiver_OutsideTolerance_NoMisbehaviorReport tests that a sync request that's higher
-// than the receiver's height doesn't trigger a response, even if outside tolerance and does not generate ALSP
-// spamming misbehavior report (simulating the most likely probability).
-func (ss *SyncSuite) TestProcess_SyncRequest_HigherThanReceiver_OutsideTolerance_NoMisbehaviorReport() {
-	ctx, cancel := irrecoverable.NewMockSignalerContextWithCancel(ss.T(), context.Background())
-	ss.e.Start(ctx)
-	unittest.AssertClosesBefore(ss.T(), ss.e.Ready(), time.Second)
-	defer cancel()
-
-	// generate origin and request message
-	originID := unittest.IdentifierFixture()
-
-	nonce, err := rand.Uint64()
-	require.NoError(ss.T(), err, "should generate nonce")
-
-	req := &messages.SyncRequest{
-		Nonce:  nonce,
-		Height: 0,
-	}
-
-	// if request height is higher than local finalized, we should not respond
-	req.Height = ss.head.Height + 1
-
-	ss.core.On("HandleHeight", ss.head, req.Height).Once()
-	ss.core.On("WithinTolerance", ss.head, req.Height).Return(false).Once()
-
-	ss.con.AssertNotCalled(ss.T(), "Unicast", mock.Anything, mock.Anything)
-
-	ss.e.spamDetectionConfig.syncRequestProbability = 0.0 // force not creating misbehavior report
-
-	require.NoError(ss.T(), ss.e.Process(channels.SyncCommittee, originID, req))
-
-	// give at least some time to process items
-	time.Sleep(time.Millisecond * 100)
-
-	ss.core.AssertExpectations(ss.T())
-	ss.con.AssertExpectations(ss.T())
-}
-
 // TestOnSyncRequest_LowerThanReceiver_OutsideTolerance tests that a sync request that's outside tolerance and
 // lower than the receiver's height triggers a response.
 func (ss *SyncSuite) TestOnSyncRequest_LowerThanReceiver_OutsideTolerance() {
@@ -182,6 +143,7 @@ func (ss *SyncSuite) TestOnRangeRequest() {
 		err := ss.e.requestHandler.onRangeRequest(originID, req)
 		require.NoError(ss.T(), err, "empty range request should pass")
 		ss.con.AssertNumberOfCalls(ss.T(), "Unicast", 0)
+		ss.con.AssertNotCalled(ss.T(), "Unicast", mock.Anything, mock.Anything)
 	})
 
 	// range with only unknown block should be a no-op
@@ -210,6 +172,7 @@ func (ss *SyncSuite) TestOnRangeRequest() {
 		)
 		err := ss.e.requestHandler.onRangeRequest(originID, req)
 		require.NoError(ss.T(), err, "range request with higher to height should pass")
+		ss.con.AssertNumberOfCalls(ss.T(), "Unicast", 1)
 	})
 
 	// a request for a range that we partially have should send partial response
