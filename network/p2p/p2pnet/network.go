@@ -378,8 +378,12 @@ func NewNetwork(param *NetworkConfig, opts ...NetworkOption) (*Network, error) {
 }
 
 func (n *Network) processRegisterEngineRequests(parent irrecoverable.SignalerContext, ready component.ReadyFunc) {
-	<-n.libP2PNode.Ready()
 	ready()
+
+	// we need to wait for the libp2p node to be ready before we can register engines
+	n.logger.Debug().Msg("waiting for libp2p node to be ready")
+	<-n.libP2PNode.Ready()
+	n.logger.Debug().Msg("libp2p node is ready")
 
 	for {
 		select {
@@ -402,8 +406,11 @@ func (n *Network) processRegisterEngineRequests(parent irrecoverable.SignalerCon
 }
 
 func (n *Network) processRegisterBlobServiceRequests(parent irrecoverable.SignalerContext, ready component.ReadyFunc) {
-	<-n.libP2PNode.Ready()
 	ready()
+
+	n.logger.Debug().Msg("waiting for libp2p node to be ready")
+	<-n.libP2PNode.Ready()
+	n.logger.Debug().Msg("libp2p node is ready")
 
 	for {
 		select {
