@@ -185,10 +185,10 @@ func NetworksFixture(t *testing.T,
 	sporkId flow.Identifier,
 	ids flow.IdentityList,
 	libp2pNodes []p2p.LibP2PNode,
-	configOpts ...func(*p2pnet.NetworkConfig)) ([]network.Network, []*unittest.UpdatableIDProvider) {
+	configOpts ...func(*p2pnet.NetworkConfig)) ([]*p2pnet.Network, []*unittest.UpdatableIDProvider) {
 
 	count := len(ids)
-	nets := make([]network.Network, 0)
+	nets := make([]*p2pnet.Network, 0)
 	idProviders := make([]*unittest.UpdatableIDProvider, 0)
 
 	for i := 0; i < count; i++ {
