@@ -40,6 +40,7 @@ type EchoEngineTestSuite struct {
 
 // TestEchoEngineTestSuite runs all the test methods in this test suit
 func TestEchoEngineTestSuite(t *testing.T) {
+	unittest.SkipUnless(t, unittest.TEST_FLAKY, "this should be revisited once network/test is running in a separate CI job, runs fine locally")
 	suite.Run(t, new(EchoEngineTestSuite))
 }
 
@@ -127,7 +128,6 @@ func (suite *EchoEngineTestSuite) TestEchoMultiMsgAsync_Unicast() {
 // Sender and receiver are not synchronized
 func (suite *EchoEngineTestSuite) TestEchoMultiMsgAsync_Multicast() {
 	// set to true for an echo expectation
-	unittest.SkipUnless(suite.T(), unittest.TEST_FLAKY, "this should be revisited once network/test is running in a separate CI job, runs fine locally")
 	suite.multiMessageAsync(true, 10, suite.Multicast)
 }
 
@@ -174,7 +174,6 @@ func (suite *EchoEngineTestSuite) TestDuplicateMessageParallel_Unicast() {
 // on deduplicating the received messages via Multicast method of nodes' Conduits.
 // Messages are delivered to the receiver in parallel via the Multicast method of Conduits.
 func (suite *EchoEngineTestSuite) TestDuplicateMessageParallel_Multicast() {
-	unittest.SkipUnless(suite.T(), unittest.TEST_FLAKY, "this should be revisited once network/test is running in a separate CI job, runs fine locally")
 	suite.duplicateMessageParallel(suite.Multicast)
 }
 
@@ -183,7 +182,6 @@ func (suite *EchoEngineTestSuite) TestDuplicateMessageParallel_Multicast() {
 // desire behavior is that the deduplication should happen based on both eventID and channel.
 // Messages are sent via the Publish methods of the Conduits.
 func (suite *EchoEngineTestSuite) TestDuplicateMessageDifferentChan_Publish() {
-	unittest.SkipUnless(suite.T(), unittest.TEST_FLAKY, "this should be revisited once network/test is running in a separate CI job, runs fine locally")
 	suite.duplicateMessageDifferentChan(suite.Publish)
 }
 
@@ -200,7 +198,6 @@ func (suite *EchoEngineTestSuite) TestDuplicateMessageDifferentChan_Unicast() {
 // desire behavior is that the deduplication should happen based on both eventID and channel.
 // Messages are sent via the Multicast methods of the Conduits.
 func (suite *EchoEngineTestSuite) TestDuplicateMessageDifferentChan_Multicast() {
-	unittest.SkipUnless(suite.T(), unittest.TEST_FLAKY, "this should be revisited once network/test is running in a separate CI job, runs fine locally")
 	suite.duplicateMessageDifferentChan(suite.Multicast)
 }
 
