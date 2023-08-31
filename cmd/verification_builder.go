@@ -6,6 +6,8 @@ import (
 
 	"github.com/spf13/pflag"
 
+	"github.com/onflow/cadence/runtime"
+
 	flowconsensus "github.com/onflow/flow-go/consensus"
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/committees"
@@ -18,6 +20,7 @@ import (
 	"github.com/onflow/flow-go/engine/common/follower"
 	followereng "github.com/onflow/flow-go/engine/common/follower"
 	commonsync "github.com/onflow/flow-go/engine/common/synchronization"
+	"github.com/onflow/flow-go/engine/execution/computation"
 	"github.com/onflow/flow-go/engine/verification/assigner"
 	"github.com/onflow/flow-go/engine/verification/assigner/blockconsumer"
 	"github.com/onflow/flow-go/engine/verification/fetcher"
@@ -25,6 +28,7 @@ import (
 	"github.com/onflow/flow-go/engine/verification/requester"
 	"github.com/onflow/flow-go/engine/verification/verifier"
 	"github.com/onflow/flow-go/fvm"
+	reusableRuntime "github.com/onflow/flow-go/fvm/runtime"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/chainsync"
@@ -191,7 +195,23 @@ func (v *VerificationNodeBuilder) LoadComponentsAndModules() {
 
 			vm := fvm.NewVirtualMachine()
 			fvmOptions := append(
-				[]fvm.Option{fvm.WithLogger(node.Logger)},
+				[]fvm.Option{
+					fvm.WithLogger(node.Logger),
+					// this is a temporary solution to sync the cadence runtime pool settings.
+					// with the computation.Manager.
+					// TODO: this should be extracted to common settings.
+					fvm.WithReusableCadenceRuntimePool(
+						reusableRuntime.NewReusableCadenceRuntimePool(
+							computation.ReusableCadenceRuntimePoolSize,
+							runtime.Config{
+								AccountLinkingEnabled: true,
+								// Attachments are enabled everywhere except for Mainnet
+								AttachmentsEnabled: node.RootChainID != flow.Mainnet,
+								// Capability Controllers are enabled everywhere except for Mainnet
+								CapabilityControllersEnabled: node.RootChainID != flow.Mainnet,
+							},
+						)),
+				},
 				node.FvmOptions...,
 			)
 			vmCtx := fvm.NewContext(fvmOptions...)
