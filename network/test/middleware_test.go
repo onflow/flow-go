@@ -35,7 +35,6 @@ import (
 	"github.com/onflow/flow-go/network/message"
 	"github.com/onflow/flow-go/network/mocknetwork"
 	"github.com/onflow/flow-go/network/p2p"
-	"github.com/onflow/flow-go/network/p2p/middleware"
 	"github.com/onflow/flow-go/network/p2p/p2pnet"
 	"github.com/onflow/flow-go/network/p2p/p2pnode"
 	p2ptest "github.com/onflow/flow-go/network/p2p/test"
@@ -908,7 +907,7 @@ func TestChunkDataPackMaxMessageSize(t *testing.T) {
 	require.NoError(t, err)
 
 	// get the max message size for the message
-	size, err := middleware.UnicastMaxMsgSizeByCode(msg.Proto().Payload)
+	size, err := p2pnet.UnicastMaxMsgSizeByCode(msg.Proto().Payload)
 	require.NoError(t, err)
 	require.Equal(t, p2pnet.LargeMsgMaxUnicastMsgSize, size)
 }
