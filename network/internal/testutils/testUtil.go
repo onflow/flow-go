@@ -25,7 +25,6 @@ import (
 	"github.com/onflow/flow-go/network"
 	alspmgr "github.com/onflow/flow-go/network/alsp/manager"
 	netcache "github.com/onflow/flow-go/network/cache"
-	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/codec/cbor"
 	"github.com/onflow/flow-go/network/mocknetwork"
 	"github.com/onflow/flow-go/network/netconf"
@@ -262,17 +261,6 @@ func NetworkConfigFixture(
 	}
 
 	return params
-}
-
-// GenerateEngines generates MeshEngines for the given networks
-func GenerateEngines(t *testing.T, nets []network.Network) []*MeshEngine {
-	count := len(nets)
-	engs := make([]*MeshEngine, count)
-	for i, n := range nets {
-		eng := NewMeshEngine(t, n, 100, channels.TestNetworkChannel)
-		engs[i] = eng
-	}
-	return engs
 }
 
 // StartNodesAndNetworks starts the provided networks and libp2p nodes, returning the irrecoverable error channel.
