@@ -29,7 +29,6 @@ import (
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/internal/testutils"
 	"github.com/onflow/flow-go/network/p2p"
-	"github.com/onflow/flow-go/network/p2p/middleware"
 	"github.com/onflow/flow-go/network/p2p/p2pnet"
 	"github.com/onflow/flow-go/network/p2p/p2pnode"
 	p2ptest "github.com/onflow/flow-go/network/p2p/test"
@@ -175,7 +174,7 @@ func (suite *MeshEngineTestSuite) TestTargetedValidators_Publish() {
 // TestMaxMessageSize_Unicast evaluates the messageSizeScenario scenario using
 // the Unicast method of conduits.
 func (suite *MeshEngineTestSuite) TestMaxMessageSize_Unicast() {
-	suite.messageSizeScenario(suite.Unicast, middleware.DefaultMaxUnicastMsgSize)
+	suite.messageSizeScenario(suite.Unicast, p2pnet.DefaultMaxUnicastMsgSize)
 }
 
 // TestMaxMessageSize_Multicast evaluates the messageSizeScenario scenario using

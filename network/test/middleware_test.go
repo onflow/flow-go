@@ -3,6 +3,7 @@ package test
 import (
 	"context"
 	"fmt"
+	"math/rand"
 	"regexp"
 	"strings"
 	"sync"
@@ -31,6 +32,7 @@ import (
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/internal/p2pfixtures"
 	"github.com/onflow/flow-go/network/internal/testutils"
+	"github.com/onflow/flow-go/network/message"
 	"github.com/onflow/flow-go/network/mocknetwork"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/middleware"
@@ -749,7 +751,7 @@ func (m *MiddlewareTestSuite) TestMaxMessageSize_Unicast() {
 	// so the generated payload is 1000 bytes below the maximum unicast message size.
 	// We hence add up 1000 bytes to the input of network payload fixture to make
 	// sure that payload is beyond the permissible size.
-	payload := testutils.NetworkPayloadFixture(m.T(), uint(middleware.DefaultMaxUnicastMsgSize)+1000)
+	payload := testutils.NetworkPayloadFixture(m.T(), uint(p2pnet.DefaultMaxUnicastMsgSize)+1000)
 	event := &libp2pmessage.TestMessage{
 		Text: string(payload),
 	}
@@ -768,7 +770,7 @@ func (m *MiddlewareTestSuite) TestLargeMessageSize_SendDirect() {
 	targetId := m.ids[targetIndex].NodeID
 
 	// creates a network payload with a size greater than the default max size using a known large message type
-	targetSize := uint64(middleware.DefaultMaxUnicastMsgSize) + 1000
+	targetSize := uint64(p2pnet.DefaultMaxUnicastMsgSize) + 1000
 	event := unittest.ChunkDataResponseMsgFixture(unittest.IdentifierFixture(), unittest.WithApproximateSize(targetSize))
 
 	// expect one message to be received by the target
@@ -889,4 +891,24 @@ func (m *MiddlewareTestSuite) TestUnsubscribe() {
 
 	// assert that the new message is not received by the target node
 	unittest.RequireNeverReturnBefore(m.T(), msgRcvdFun, 2*time.Second, "message received unexpectedly")
+}
+
+// TestChunkDataPackMaxMessageSize tests that the max message size for a chunk data pack response is set to the large message size.
+func TestChunkDataPackMaxMessageSize(t *testing.T) {
+	// creates an outgoing chunk data pack response message (imitating an EN is sending a chunk data pack response to VN).
+	msg, err := message.NewOutgoingScope(
+		flow.IdentifierList{unittest.IdentifierFixture()},
+		channels.TopicFromChannel(channels.ProvideChunks, unittest.IdentifierFixture()),
+		&messages.ChunkDataResponse{
+			ChunkDataPack: *unittest.ChunkDataPackFixture(unittest.IdentifierFixture()),
+			Nonce:         rand.Uint64(),
+		},
+		unittest.NetworkCodec().Encode,
+		message.ProtocolTypeUnicast)
+	require.NoError(t, err)
+
+	// get the max message size for the message
+	size, err := middleware.UnicastMaxMsgSizeByCode(msg.Proto().Payload)
+	require.NoError(t, err)
+	require.Equal(t, p2pnet.LargeMsgMaxUnicastMsgSize, size)
 }
