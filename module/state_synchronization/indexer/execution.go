@@ -1,4 +1,4 @@
-package execution_indexer
+package indexer
 
 import (
 	"fmt"
@@ -11,9 +11,9 @@ import (
 	"github.com/onflow/flow-go/storage"
 )
 
-var _ module.ExecutionStateIndexer = &ExecutionIndexer{}
+var _ module.ExecutionStateIndexer = &ExecutionState{}
 
-type ExecutionIndexer struct {
+type ExecutionState struct {
 	registers   storage.Registers
 	headers     storage.Headers
 	events      storage.Events
@@ -21,8 +21,8 @@ type ExecutionIndexer struct {
 	commitments map[uint64]flow.StateCommitment // todo persist
 }
 
-func New(registers storage.Registers, headers storage.Headers) *ExecutionIndexer {
-	return &ExecutionIndexer{
+func New(registers storage.Registers, headers storage.Headers) *ExecutionState {
+	return &ExecutionState{
 		registers:   registers,
 		headers:     headers,
 		last:        0,
@@ -30,16 +30,16 @@ func New(registers storage.Registers, headers storage.Headers) *ExecutionIndexer
 	}
 }
 
-func (i *ExecutionIndexer) Last() (uint64, error) {
+func (i *ExecutionState) Last() (uint64, error) {
 	return i.last, nil
 }
 
-func (i *ExecutionIndexer) StoreLast(last uint64) error {
+func (i *ExecutionState) StoreLast(last uint64) error {
 	i.last = last
 	return nil
 }
 
-func (i *ExecutionIndexer) HeightByBlockID(ID flow.Identifier) (uint64, error) {
+func (i *ExecutionState) HeightByBlockID(ID flow.Identifier) (uint64, error) {
 	header, err := i.headers.ByBlockID(ID)
 	if err != nil {
 		return 0, err
@@ -48,7 +48,7 @@ func (i *ExecutionIndexer) HeightByBlockID(ID flow.Identifier) (uint64, error) {
 	return header.Height, nil
 }
 
-func (i *ExecutionIndexer) Commitment(height uint64) (flow.StateCommitment, error) {
+func (i *ExecutionState) Commitment(height uint64) (flow.StateCommitment, error) {
 	val, ok := i.commitments[height]
 	if !ok {
 		return flow.DummyStateCommitment, fmt.Errorf("could not find commitment at height %d", height)
@@ -57,7 +57,7 @@ func (i *ExecutionIndexer) Commitment(height uint64) (flow.StateCommitment, erro
 	return val, nil
 }
 
-func (i *ExecutionIndexer) Values(IDs flow.RegisterIDs, height uint64) ([]flow.RegisterValue, error) {
+func (i *ExecutionState) Values(IDs flow.RegisterIDs, height uint64) ([]flow.RegisterValue, error) {
 	values := make([]flow.RegisterValue, len(IDs))
 
 	for j, id := range IDs {
@@ -72,7 +72,7 @@ func (i *ExecutionIndexer) Values(IDs flow.RegisterIDs, height uint64) ([]flow.R
 	return values, nil
 }
 
-func (i *ExecutionIndexer) IndexBlockData(data *execution_data.BlockExecutionDataEntity) error {
+func (i *ExecutionState) IndexBlockData(data *execution_data.BlockExecutionDataEntity) error {
 	block, err := i.headers.ByBlockID(data.BlockID)
 	if err != nil {
 		return fmt.Errorf("could not get the block by ID %s: %w", data.BlockID, err)
@@ -99,18 +99,18 @@ func (i *ExecutionIndexer) IndexBlockData(data *execution_data.BlockExecutionDat
 	return nil
 }
 
-func (i *ExecutionIndexer) IndexCommitment(commitment flow.StateCommitment, height uint64) error {
+func (i *ExecutionState) IndexCommitment(commitment flow.StateCommitment, height uint64) error {
 	i.commitments[height] = commitment
 	return nil
 }
 
-func (i *ExecutionIndexer) IndexEvents(blockID flow.Identifier, events flow.EventsList) error {
+func (i *ExecutionState) IndexEvents(blockID flow.Identifier, events flow.EventsList) error {
 	// Note: service events are currently not included in execution data
 	// see https://github.com/onflow/flow-go/issues/4624
 	return i.events.Store(blockID, []flow.EventsList{events})
 }
 
-func (i *ExecutionIndexer) IndexPayloads(payloads []*ledger.Payload, height uint64) error {
+func (i *ExecutionState) IndexPayloads(payloads []*ledger.Payload, height uint64) error {
 	regEntries := make(flow.RegisterEntries, len(payloads))
 
 	for j, payload := range payloads {

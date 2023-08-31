@@ -4,12 +4,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/onflow/flow-go/module/execution_indexer"
-	"github.com/onflow/flow-go/storage/memory"
 	"os"
 	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/onflow/flow-go/module/state_synchronization/indexer"
+	"github.com/onflow/flow-go/storage/memory"
 
 	badger "github.com/ipfs/go-ds-badger2"
 	"github.com/libp2p/go-libp2p/core/host"
@@ -444,7 +445,7 @@ func (builder *FlowAccessNodeBuilder) BuildConsensusFollower() *FlowAccessNodeBu
 func (builder *FlowAccessNodeBuilder) BuildExecutionDataRequester() *FlowAccessNodeBuilder {
 	var ds *badger.Datastore
 	var bs network.BlobService
-	var exeIndexer *execution_indexer.ExecutionIndexer
+	var exeIndexer *indexer.ExecutionState
 	var processedBlockHeight storage.ConsumerProgress
 	var processedNotifications storage.ConsumerProgress
 	var bsDependable *module.ProxiedReadyDoneAware
@@ -480,7 +481,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionDataRequester() *FlowAccessN
 		}).
 		Module("execution data indexer", func(node *cmd.NodeConfig) error {
 			registers := memory.NewRegisters()
-			exeIndexer = execution_indexer.New(registers, node.Storage.Headers)
+			exeIndexer = indexer.New(registers, node.Storage.Headers)
 			return nil
 		}).
 		Module("processed block height consumer progress", func(node *cmd.NodeConfig) error {
