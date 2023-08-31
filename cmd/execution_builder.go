@@ -47,7 +47,6 @@ import (
 	"github.com/onflow/flow-go/engine/execution/checker"
 	"github.com/onflow/flow-go/engine/execution/computation"
 	"github.com/onflow/flow-go/engine/execution/computation/committer"
-	"github.com/onflow/flow-go/engine/execution/computation/query"
 	"github.com/onflow/flow-go/engine/execution/ingestion"
 	"github.com/onflow/flow-go/engine/execution/ingestion/stop"
 	"github.com/onflow/flow-go/engine/execution/ingestion/uploader"
@@ -57,7 +56,6 @@ import (
 	"github.com/onflow/flow-go/engine/execution/state"
 	"github.com/onflow/flow-go/engine/execution/state/bootstrap"
 	"github.com/onflow/flow-go/fvm"
-	"github.com/onflow/flow-go/fvm/storage/derived"
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/ledger/common/pathfinder"
@@ -903,30 +901,11 @@ func (exeNode *ExecutionNode) LoadIngestionEngine(
 
 // create scripts engine for handling script execution
 func (exeNode *ExecutionNode) LoadScriptsEngine(node *NodeConfig) (module.ReadyDoneAware, error) {
-	// for RPC to load it
-	vm := fvm.NewVirtualMachine()
-
-	options := computation.DefaultFVMOptions(node.RootChainID, false, false)
-	vmCtx := fvm.NewContext(options...)
-
-	derivedChainData, err := derived.NewDerivedChainData(derived.DefaultDerivedDataCacheSize)
-	if err != nil {
-		return nil, err
-	}
-
-	queryExecutor := query.NewQueryExecutor(
-		exeNode.exeConf.computationConfig.QueryConfig,
-		node.Logger,
-		metrics.NewExecutionCollector(node.Tracer),
-		vm,
-		vmCtx,
-		derivedChainData,
-	)
 
 	exeNode.scriptsEng = scripts.New(
 		node.Logger,
 		node.State,
-		queryExecutor,
+		exeNode.computationManager.QueryExecutor(),
 		exeNode.executionState,
 	)
 

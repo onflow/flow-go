@@ -106,7 +106,25 @@ func New(
 	}
 
 	chainID := vmCtx.Chain.ChainID()
-	options := DefaultFVMOptions(chainID, params.CadenceTracing, params.ExtensiveTracing)
+	options := []fvm.Option{
+		fvm.WithReusableCadenceRuntimePool(
+			reusableRuntime.NewReusableCadenceRuntimePool(
+				ReusableCadenceRuntimePoolSize,
+				runtime.Config{
+					TracingEnabled:        params.CadenceTracing,
+					AccountLinkingEnabled: true,
+					// Attachments are enabled everywhere except for Mainnet
+					AttachmentsEnabled: chainID != flow.Mainnet,
+					// Capability Controllers are enabled everywhere except for Mainnet
+					CapabilityControllersEnabled: chainID != flow.Mainnet,
+				},
+			)),
+	}
+
+	if params.ExtensiveTracing {
+		options = append(options, fvm.WithExtensiveTracing())
+	}
+
 	vmCtx = fvm.NewContextFromParent(vmCtx, options...)
 
 	blockComputer, err := computer.NewBlockComputer(
@@ -222,25 +240,6 @@ func (e *Manager) GetAccount(
 		snapshot)
 }
 
-func DefaultFVMOptions(chainID flow.ChainID, cadenceTracing bool, extensiveTracing bool) []fvm.Option {
-	options := []fvm.Option{
-		fvm.WithReusableCadenceRuntimePool(
-			reusableRuntime.NewReusableCadenceRuntimePool(
-				ReusableCadenceRuntimePoolSize,
-				runtime.Config{
-					TracingEnabled:        cadenceTracing,
-					AccountLinkingEnabled: true,
-					// Attachments are enabled everywhere except for Mainnet
-					AttachmentsEnabled: chainID != flow.Mainnet,
-					// Capability Controllers are enabled everywhere except for Mainnet
-					CapabilityControllersEnabled: chainID != flow.Mainnet,
-				},
-			)),
-	}
-
-	if extensiveTracing {
-		options = append(options, fvm.WithExtensiveTracing())
-	}
-
-	return options
+func (e *Manager) QueryExecutor() query.Executor {
+	return e.queryExecutor
 }
