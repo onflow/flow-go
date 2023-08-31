@@ -57,7 +57,6 @@ type UnicastAuthorizationTestSuite struct {
 
 // TestUnicastAuthorizationTestSuite runs all the test methods in this test suit
 func TestUnicastAuthorizationTestSuite(t *testing.T) {
-	t.Parallel()
 	suite.Run(t, new(UnicastAuthorizationTestSuite))
 }
 
@@ -95,7 +94,7 @@ func (u *UnicastAuthorizationTestSuite) startMiddlewares(overlay *mocknetwork.Ov
 	ctx, cancel := context.WithCancel(context.Background())
 	sigCtx, _ := irrecoverable.WithSignaler(ctx)
 
-	testutils.StartNodes(sigCtx, u.T(), u.libP2PNodes, 100*time.Millisecond)
+	testutils.StartNodes(sigCtx, u.T(), u.libP2PNodes)
 
 	u.senderMW.SetOverlay(overlay)
 	u.senderMW.Start(sigCtx)
