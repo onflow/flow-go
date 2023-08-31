@@ -14,6 +14,7 @@ import (
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/network"
+	flownet "github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/p2p/unicast/protocols"
 )
@@ -76,9 +77,9 @@ type PubSub interface {
 	// Subscribe subscribes the node to the given topic and returns the subscription
 	Subscribe(topic channels.Topic, topicValidator TopicValidatorFunc) (Subscription, error)
 	// UnSubscribe cancels the subscriber and closes the topic.
-	UnSubscribe(topic channels.Topic) error
+	Unsubscribe(topic channels.Topic) error
 	// Publish publishes the given payload on the topic.
-	Publish(ctx context.Context, topic channels.Topic, data []byte) error
+	Publish(ctx context.Context, messageScope flownet.OutgoingMessageScope) error
 	// SetPubSub sets the node's pubsub implementation.
 	// SetPubSub may be called at most once.
 	SetPubSub(ps PubSubAdapter)
