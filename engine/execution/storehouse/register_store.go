@@ -120,6 +120,27 @@ func (r *RegisterStore) FinalizedAndExecutedHeight() uint64 {
 	return r.diskStore.Latest()
 }
 
+// IsBlockExecuted returns true if the block is executed, false if not executed
+func (r *RegisterStore) IsBlockExecuted(height uint64, blockID flow.Identifier) (bool, error) {
+	executed, err := r.memStore.IsBlockExecuted(height, blockID)
+	if err != nil {
+		// if the block is below the pruned height, then only finalized blocks are executed and have
+		// been executed, so we just need to check whether the block is finalized.
+		executed, err = r.isBlockFinalized(height, blockID)
+		return executed, err
+	}
+
+	return executed, nil
+}
+
+func (r *RegisterStore) isBlockFinalized(height uint64, blockID flow.Identifier) (bool, error) {
+	finalizedID, err := r.finalized.GetFinalizedBlockIDAtHeight(height)
+	if err != nil {
+		return false, fmt.Errorf("cannot get finalized block ID at height %d: %w", height, err)
+	}
+	return finalizedID == blockID, nil
+}
+
 // syncDiskStore replay WAL to disk store
 func (r *RegisterStore) syncDiskStore() (uint64, error) {
 	latest, err := r.wal.Latest()
