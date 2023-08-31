@@ -796,6 +796,7 @@ func (builder *ObserverServiceBuilder) enqueuePublicNetworkInit() {
 				Codec:                 builder.CodecFactory(),
 				Me:                    builder.Me,
 				Topology:              nil, // topology is nil since it is managed by libp2p; //TODO: can we set empty topology?
+				Libp2pNode:            publicLibp2pNode,
 				Metrics:               builder.Metrics.Network,
 				BitSwapMetrics:        builder.Metrics.Bitswap,
 				IdentityProvider:      builder.IdentityProvider,
