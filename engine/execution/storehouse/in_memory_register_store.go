@@ -190,6 +190,19 @@ func (s *InMemoryRegisterStore) PrunedHeight() uint64 {
 	return s.prunedHeight
 }
 
+func (s *InMemoryRegisterStore) IsBlockExecuted(height uint64, blockID flow.Identifier) (bool, error) {
+	s.RLock()
+	defer s.RUnlock()
+
+	// finalized and executed blocks are pruned
+	if height <= s.prunedHeight {
+		return false, fmt.Errorf("below pruned height")
+	}
+
+	_, ok := s.registersByBlockID[blockID]
+	return ok, nil
+}
+
 func (s *InMemoryRegisterStore) findFinalizedFork(height uint64, blockID flow.Identifier) ([]flow.Identifier, error) {
 	s.RLock()
 	defer s.RUnlock()

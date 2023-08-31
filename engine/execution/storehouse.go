@@ -37,6 +37,8 @@ type RegisterStore interface {
 	// FinalizedAndExecutedHeight returns the height of the last finalized and executed block,
 	// which has been saved in OnDiskRegisterStore
 	FinalizedAndExecutedHeight() uint64
+
+	IsBlockExecuted(height uint64, blockID flow.Identifier) error
 }
 
 type FinalizedReader interface {
@@ -55,6 +57,8 @@ type InMemoryRegisterStore interface {
 		parentID flow.Identifier,
 		registers []flow.RegisterEntry,
 	) error
+
+	IsBlockExecuted(height uint64, blockID flow.Identifier) error
 }
 
 type OnDiskRegisterStore interface {
