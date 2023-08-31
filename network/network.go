@@ -5,6 +5,7 @@ import (
 	"github.com/libp2p/go-libp2p/core/protocol"
 
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/network/channels"
 )
@@ -78,7 +79,7 @@ type Adapter interface {
 // offers to lower level networking components such as libp2p. It is responsible for subscribing to and unsubscribing
 // from channels, as well as updating the addresses of all the authorized participants in the Flow protocol.
 type Middleware interface {
-	component.Component
+	module.ReadyDoneAware
 	DisallowListNotificationConsumer
 
 	// Subscribe subscribes the middleware to a channel.
