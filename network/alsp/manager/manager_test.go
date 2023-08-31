@@ -57,7 +57,7 @@ func TestNetworkPassesReportedMisbehavior(t *testing.T) {
 	sporkId := unittest.IdentifierFixture()
 	misbehaviorReportManger.On("Ready").Return(readyDoneChan).Once()
 	misbehaviorReportManger.On("Done").Return(readyDoneChan).Once()
-	ids, nodes := testutils.LibP2PNodeForMiddlewareFixture(t, sporkId, 1)
+	ids, nodes := testutils.LibP2PNodeForNetworkFixture(t, sporkId, 1)
 	idProvider := id.NewFixedIdentityProvider(ids)
 	networkCfg := testutils.NetworkConfigFixture(t, *ids[0], idProvider, sporkId, nodes[0])
 	net, err := p2pnet.NewNetwork(networkCfg, p2pnet.WithAlspManager(misbehaviorReportManger))
@@ -115,7 +115,7 @@ func TestHandleReportedMisbehavior_Cache_Integration(t *testing.T) {
 	}
 
 	sporkId := unittest.IdentifierFixture()
-	ids, nodes := testutils.LibP2PNodeForMiddlewareFixture(t, sporkId, 1)
+	ids, nodes := testutils.LibP2PNodeForNetworkFixture(t, sporkId, 1)
 	idProvider := id.NewFixedIdentityProvider(ids)
 	networkCfg := testutils.NetworkConfigFixture(t, *ids[0], idProvider, sporkId, nodes[0], p2pnet.WithAlspConfig(cfg))
 	net, err := p2pnet.NewNetwork(networkCfg)
@@ -210,7 +210,7 @@ func TestHandleReportedMisbehavior_And_DisallowListing_Integration(t *testing.T)
 	}
 
 	sporkId := unittest.IdentifierFixture()
-	ids, nodes := testutils.LibP2PNodeForMiddlewareFixture(
+	ids, nodes := testutils.LibP2PNodeForNetworkFixture(
 		t,
 		sporkId,
 		3,
@@ -307,7 +307,7 @@ func TestHandleReportedMisbehavior_And_DisallowListing_RepeatOffender_Integratio
 		alspmgr.WithDecayFunc(fastDecayFunc),
 	}
 
-	ids, nodes := testutils.LibP2PNodeForMiddlewareFixture(t, sporkId, 3,
+	ids, nodes := testutils.LibP2PNodeForNetworkFixture(t, sporkId, 3,
 		p2ptest.WithPeerManagerEnabled(p2ptest.PeerManagerConfigFixture(p2ptest.WithZeroJitterAndZeroBackoff(t)), nil))
 	idProvider := unittest.NewUpdatableIDProvider(ids)
 	networkCfg := testutils.NetworkConfigFixture(t, *ids[0], idProvider, sporkId, nodes[0], p2pnet.WithAlspConfig(cfg))
@@ -459,16 +459,14 @@ func TestHandleReportedMisbehavior_And_SlashingViolationsConsumer_Integration(t 
 	sporkId := unittest.IdentifierFixture()
 
 	// create 1 victim node, 1 honest node and a node for each slashing violation
-	ids, nodes := testutils.LibP2PNodeForMiddlewareFixture(t, sporkId, 7) // creates 7 nodes (1 victim, 1 honest, 5 spammer nodes one for each slashing violation).
+	ids, nodes := testutils.LibP2PNodeForNetworkFixture(t, sporkId, 7) // creates 7 nodes (1 victim, 1 honest, 5 spammer nodes one for each slashing violation).
 	idProvider := id.NewFixedIdentityProvider(ids)
 
-	// we want to override the middleware config to use the slashing violations consumer. However, we need the network
-	// instance to do that, but for the network instance we need the middleware config. So, we create the adapter first, which
-	// is a placeholder for the network instance, and then we create the network instance with the middleware config.
+	// we want to override the network config to use the slashing violations consumer. However, we need the network
+	// instance to do that, but for the network instance we need the network config. So, we create the adapter first, which
+	// is a placeholder for the network instance, and then we create the network instance with the network config.
 	// Network adapter is a sub-interface of the network instance, so we can use it as a placeholder for the network instance.
-	// This is a bit of a chicken and egg problem; you see! that is why we must get rid of the middleware soon!
 	var adapter network.Adapter
-
 	// also a placeholder for the slashing violations consumer.
 	var violationsConsumer network.ViolationsConsumer
 	networkCfg := testutils.NetworkConfigFixture(
@@ -568,7 +566,7 @@ func TestMisbehaviorReportMetrics(t *testing.T) {
 	cfg.AlspMetrics = alspMetrics
 
 	sporkId := unittest.IdentifierFixture()
-	ids, nodes := testutils.LibP2PNodeForMiddlewareFixture(t, sporkId, 1)
+	ids, nodes := testutils.LibP2PNodeForNetworkFixture(t, sporkId, 1)
 	idProvider := id.NewFixedIdentityProvider(ids)
 
 	networkCfg := testutils.NetworkConfigFixture(t, *ids[0], idProvider, sporkId, nodes[0], p2pnet.WithAlspConfig(cfg))

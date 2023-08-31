@@ -24,7 +24,7 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-// EchoEngineTestSuite tests the correctness of the entire pipeline of network -> middleware -> libp2p
+// EchoEngineTestSuite tests the correctness of the entire pipeline of network -> libp2p
 // protocol stack. It creates two instances of a stubengine, connects them through network, and sends a
 // single message from one engine to the other one through different scenarios.
 type EchoEngineTestSuite struct {
@@ -56,7 +56,7 @@ func (suite *EchoEngineTestSuite) SetupTest() {
 	var nodes []p2p.LibP2PNode
 	sporkId := unittest.IdentifierFixture()
 
-	suite.ids, nodes = testutils.LibP2PNodeForMiddlewareFixture(suite.T(), sporkId, count)
+	suite.ids, nodes = testutils.LibP2PNodeForNetworkFixture(suite.T(), sporkId, count)
 	suite.libp2pNodes = nodes
 	suite.networks, _ = testutils.NetworksFixture(suite.T(), sporkId, suite.ids, nodes)
 	// starts the nodes and networks

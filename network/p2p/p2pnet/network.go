@@ -120,7 +120,6 @@ type Network struct {
 }
 
 var _ network.Network = &Network{}
-var _ network.Overlay = &Network{}
 var _ network.Middleware = &Network{}
 
 type registerEngineRequest struct {
@@ -259,10 +258,12 @@ func WithMessageValidators(validators ...network.MessageValidator) NetworkOption
 	}
 }
 
-// NewNetwork creates a new naive overlay network, using the given middleware to
-// communicate to direct peers, using the given codec for serialization, and
-// using the given state & cache interfaces to track volatile information.
-// csize determines the size of the cache dedicated to keep track of received messages
+// NewNetwork creates a new network with the given configuration.
+// Args:
+// param: network configuration
+// opts: network options
+// Returns:
+// Network: a new network
 func NewNetwork(param *NetworkConfig, opts ...NetworkOption) (*Network, error) {
 	param.Validate()
 
@@ -342,7 +343,7 @@ func NewNetwork(param *NetworkConfig, opts ...NetworkOption) (*Network, error) {
 	}
 
 	builder.AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
-		// creation of slashing violations consumer should be postponed till here where the middleware
+		// creation of slashing violations consumer should be postponed till here where the network
 		// is start and the overlay is set.
 		n.slashingViolationsConsumer = param.SlashingViolationConsumerFactory()
 
@@ -362,11 +363,11 @@ func NewNetwork(param *NetworkConfig, opts ...NetworkOption) (*Network, error) {
 		ready()
 
 		<-ctx.Done()
-		n.logger.Info().Str("component", "middleware").Msg("stopping subroutines, blocking on read connection loops to end")
+		n.logger.Info().Str("component", "network").Msg("stopping subroutines, blocking on read connection loops to end")
 
 		// wait for the readConnection and readSubscription routines to stop
 		n.wg.Wait()
-		n.logger.Info().Str("component", "middleware").Msg("stopped subroutines")
+		n.logger.Info().Str("component", "network").Msg("stopped subroutines")
 	})
 
 	builder.AddWorker(n.createInboundMessageQueue)
@@ -1065,7 +1066,7 @@ func (n *Network) handleIncomingStream(s libp2pnet.Stream) {
 	success = true
 }
 
-// Subscribe subscribes the middleware to a channel.
+// Subscribe subscribes the network to a channel.
 // No errors are expected during normal operation.
 func (n *Network) Subscribe(channel channels.Channel) error {
 	topic := channels.TopicFromChannel(channel, n.sporkId)
@@ -1091,7 +1092,7 @@ func (n *Network) Subscribe(channel channels.Channel) error {
 		return fmt.Errorf("could not subscribe to topic (%s): %w", topic, err)
 	}
 
-	// create a new readSubscription with the context of the middleware
+	// create a new readSubscription with the context of the network
 	rs := NewReadSubscription(s, n.processPubSubMessages, n.logger)
 	n.wg.Add(1)
 
@@ -1112,7 +1113,7 @@ func (n *Network) processPubSubMessages(msg *message.Message, peerID peer.ID) {
 	n.processAuthenticatedMessage(msg, peerID, message.ProtocolTypePubSub)
 }
 
-// Unsubscribe unsubscribes the middleware from a channel.
+// Unsubscribe unsubscribes the network from a channel.
 // The following benign errors are expected during normal operations from libP2P:
 // - the libP2P node fails to unsubscribe to the topic created from the provided channel.
 //

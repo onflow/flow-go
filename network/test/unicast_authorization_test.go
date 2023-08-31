@@ -29,7 +29,7 @@ import (
 )
 
 // UnicastAuthorizationTestSuite tests that messages sent via unicast that are unauthenticated or unauthorized are correctly rejected. Each test on the test suite
-// uses 2 middlewares, a sender and receiver. A mock slashing violation's consumer is used to assert the messages were rejected. Middleware and the cancel func
+// uses 2 networks, a sender and receiver. A mock slashing violation's consumer is used to assert the messages were rejected. Networks and the cancel func
 // are set during each test run inside the test and remove after each test run in the TearDownTest callback.
 type UnicastAuthorizationTestSuite struct {
 	suite.Suite
@@ -49,10 +49,10 @@ type UnicastAuthorizationTestSuite struct {
 	receiverID *flow.Identity
 	// providers id providers generated at beginning of a test run
 	providers []*unittest.UpdatableIDProvider
-	// cancel is the cancel func from the context that was used to start the middlewares in a test run
+	// cancel is the cancel func from the context that was used to start the networks in a test run
 	cancel  context.CancelFunc
 	sporkId flow.Identifier
-	// waitCh is the channel used to wait for the middleware to perform authorization and invoke the slashing
+	// waitCh is the channel used to wait for the networks to perform authorization and invoke the slashing
 	//violation's consumer before making mock assertions and cleaning up resources
 	waitCh chan struct{}
 }
@@ -66,18 +66,18 @@ func TestUnicastAuthorizationTestSuite(t *testing.T) {
 func (u *UnicastAuthorizationTestSuite) SetupTest() {
 	u.logger = unittest.Logger()
 	u.channelCloseDuration = 100 * time.Millisecond
-	// this ch will allow us to wait until the expected method call happens before shutting down middleware
+	// this ch will allow us to wait until the expected method call happens before shutting down networks.
 	u.waitCh = make(chan struct{})
 }
 
 func (u *UnicastAuthorizationTestSuite) TearDownTest() {
-	u.stopMiddlewares()
+	u.stopNetworksAndLibp2pNodes()
 }
 
 // setupNetworks will setup the sender and receiver networks with the given slashing violations consumer.
 func (u *UnicastAuthorizationTestSuite) setupNetworks(slashingViolationsConsumer network.ViolationsConsumer) {
 	u.sporkId = unittest.IdentifierFixture()
-	ids, libP2PNodes := testutils.LibP2PNodeForMiddlewareFixture(u.T(), u.sporkId, 2)
+	ids, libP2PNodes := testutils.LibP2PNodeForNetworkFixture(u.T(), u.sporkId, 2)
 	u.codec = newOverridableMessageEncoder(unittest.NetworkCodec())
 	nets, providers := testutils.NetworksFixture(
 		u.T(),
@@ -100,8 +100,8 @@ func (u *UnicastAuthorizationTestSuite) setupNetworks(slashingViolationsConsumer
 	u.libP2PNodes = libP2PNodes
 }
 
-// startMiddlewares will start both sender and receiver middlewares with an irrecoverable signaler context and set the context cancel func.
-func (u *UnicastAuthorizationTestSuite) startMiddlewares(overlay *mocknetwork.Overlay) {
+// startNetworksAndLibp2pNodes will start both sender and receiver networks with an irrecoverable signaler context and set the context cancel func.
+func (u *UnicastAuthorizationTestSuite) startNetworksAndLibp2pNodes() {
 	ctx, cancel := context.WithCancel(context.Background())
 	sigCtx, _ := irrecoverable.WithSignaler(ctx)
 
@@ -112,9 +112,9 @@ func (u *UnicastAuthorizationTestSuite) startMiddlewares(overlay *mocknetwork.Ov
 	u.cancel = cancel
 }
 
-// stopMiddlewares will stop all middlewares.
-func (u *UnicastAuthorizationTestSuite) stopMiddlewares() {
-	u.cancel()
+// stopNetworksAndLibp2pNodes will stop all networks and libp2p nodes and wait for them to stop.
+func (u *UnicastAuthorizationTestSuite) stopNetworksAndLibp2pNodes() {
+	u.cancel() // cancel context to stop libp2p nodes.
 
 	testutils.StopComponents(u.T(), []network.Network{u.senderNetwork, u.receiverNetwork}, 1*time.Second)
 	unittest.RequireComponentsDoneBefore(u.T(), 1*time.Second, u.senderNetwork, u.receiverNetwork)
@@ -122,7 +122,6 @@ func (u *UnicastAuthorizationTestSuite) stopMiddlewares() {
 
 // TestUnicastAuthorization_UnstakedPeer tests that messages sent via unicast by an unstaked peer is correctly rejected.
 func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_UnstakedPeer() {
-	// setup mock slashing violations consumer and middlewares
 	slashingViolationsConsumer := mocknetwork.NewViolationsConsumer(u.T())
 	u.setupNetworks(slashingViolationsConsumer)
 
@@ -142,7 +141,7 @@ func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_UnstakedPeer() 
 		close(u.waitCh)
 	})
 
-	u.startMiddlewares(nil)
+	u.startNetworksAndLibp2pNodes()
 
 	// overriding the identity provide of the receiver node to return an empty identity list so that the
 	// sender node looks unstaked to its networking layer and hence it sends an UnAuthorizedSenderError upon receiving a message
@@ -167,7 +166,6 @@ func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_UnstakedPeer() 
 
 // TestUnicastAuthorization_EjectedPeer tests that messages sent via unicast by an ejected peer is correctly rejected.
 func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_EjectedPeer() {
-	// setup mock slashing violations consumer and middlewares
 	slashingViolationsConsumer := mocknetwork.NewViolationsConsumer(u.T())
 	u.setupNetworks(slashingViolationsConsumer)
 	//NOTE: setup ejected identity
@@ -195,7 +193,7 @@ func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_EjectedPeer() {
 		close(u.waitCh)
 	})
 
-	u.startMiddlewares(nil)
+	u.startNetworksAndLibp2pNodes()
 
 	_, err = u.receiverNetwork.Register(channels.TestNetworkChannel, &mocknetwork.MessageProcessor{})
 	require.NoError(u.T(), err)
@@ -215,7 +213,6 @@ func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_EjectedPeer() {
 
 // TestUnicastAuthorization_UnauthorizedPeer tests that messages sent via unicast by an unauthorized peer is correctly rejected.
 func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_UnauthorizedPeer() {
-	// setup mock slashing violations consumer and middlewares
 	slashingViolationsConsumer := mocknetwork.NewViolationsConsumer(u.T())
 	u.setupNetworks(slashingViolationsConsumer)
 
@@ -237,7 +234,7 @@ func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_UnauthorizedPee
 		close(u.waitCh)
 	})
 
-	u.startMiddlewares(nil)
+	u.startNetworksAndLibp2pNodes()
 
 	_, err = u.receiverNetwork.Register(channels.ConsensusCommittee, &mocknetwork.MessageProcessor{})
 	require.NoError(u.T(), err)
@@ -258,7 +255,6 @@ func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_UnauthorizedPee
 
 // TestUnicastAuthorization_UnknownMsgCode tests that messages sent via unicast with an unknown message code is correctly rejected.
 func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_UnknownMsgCode() {
-	// setup mock slashing violations consumer and middlewares
 	slashingViolationsConsumer := mocknetwork.NewViolationsConsumer(u.T())
 	u.setupNetworks(slashingViolationsConsumer)
 
@@ -293,7 +289,7 @@ func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_UnknownMsgCode(
 		close(u.waitCh)
 	})
 
-	u.startMiddlewares(nil)
+	u.startNetworksAndLibp2pNodes()
 
 	_, err = u.receiverNetwork.Register(channels.TestNetworkChannel, &mocknetwork.MessageProcessor{})
 	require.NoError(u.T(), err)
@@ -311,7 +307,6 @@ func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_UnknownMsgCode(
 
 // TestUnicastAuthorization_WrongMsgCode tests that messages sent via unicast with a message code that does not match the underlying message type are correctly rejected.
 func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_WrongMsgCode() {
-	// setup mock slashing violations consumer and middlewares
 	slashingViolationsConsumer := mocknetwork.NewViolationsConsumer(u.T())
 	u.setupNetworks(slashingViolationsConsumer)
 
@@ -342,7 +337,7 @@ func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_WrongMsgCode() 
 		close(u.waitCh)
 	})
 
-	u.startMiddlewares(nil)
+	u.startNetworksAndLibp2pNodes()
 
 	_, err = u.receiverNetwork.Register(channels.TestNetworkChannel, &mocknetwork.MessageProcessor{})
 	require.NoError(u.T(), err)
@@ -362,10 +357,9 @@ func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_WrongMsgCode() 
 
 // TestUnicastAuthorization_PublicChannel tests that messages sent via unicast on a public channel are not rejected for any reason.
 func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_PublicChannel() {
-	// setup mock slashing violations consumer and middlewares
 	slashingViolationsConsumer := mocknetwork.NewViolationsConsumer(u.T())
 	u.setupNetworks(slashingViolationsConsumer)
-	u.startMiddlewares(nil)
+	u.startNetworksAndLibp2pNodes()
 
 	msg := &libp2pmessage.TestMessage{
 		Text: string("hello"),
@@ -395,7 +389,6 @@ func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_PublicChannel()
 
 // TestUnicastAuthorization_UnauthorizedUnicastOnChannel tests that messages sent via unicast that are not authorized for unicast are rejected.
 func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_UnauthorizedUnicastOnChannel() {
-	// setup mock slashing violations consumer and middlewares
 	slashingViolationsConsumer := mocknetwork.NewViolationsConsumer(u.T())
 	u.setupNetworks(slashingViolationsConsumer)
 
@@ -420,7 +413,7 @@ func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_UnauthorizedUni
 		close(u.waitCh)
 	})
 
-	u.startMiddlewares(nil)
+	u.startNetworksAndLibp2pNodes()
 
 	_, err = u.receiverNetwork.Register(channels.ConsensusCommittee, &mocknetwork.MessageProcessor{})
 	require.NoError(u.T(), err)
@@ -441,7 +434,6 @@ func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_UnauthorizedUni
 // TestUnicastAuthorization_ReceiverHasNoSubscription tests that messages sent via unicast are rejected on the receiver end if the receiver does not have a subscription
 // to the channel of the message.
 func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_ReceiverHasNoSubscription() {
-	// setup mock slashing violations consumer and middlewares
 	slashingViolationsConsumer := mocknetwork.NewViolationsConsumer(u.T())
 	u.setupNetworks(slashingViolationsConsumer)
 
@@ -462,7 +454,7 @@ func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_ReceiverHasNoSu
 		close(u.waitCh)
 	})
 
-	u.startMiddlewares(nil)
+	u.startNetworksAndLibp2pNodes()
 
 	senderCon, err := u.senderNetwork.Register(channels.TestNetworkChannel, &mocknetwork.MessageProcessor{})
 	require.NoError(u.T(), err)
@@ -480,10 +472,9 @@ func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_ReceiverHasNoSu
 // TestUnicastAuthorization_ReceiverHasSubscription tests that messages sent via unicast are processed on the receiver end if the receiver does have a subscription
 // to the channel of the message.
 func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_ReceiverHasSubscription() {
-	// setup mock slashing violations consumer and middlewares
 	slashingViolationsConsumer := mocknetwork.NewViolationsConsumer(u.T())
 	u.setupNetworks(slashingViolationsConsumer)
-	u.startMiddlewares(nil)
+	u.startNetworksAndLibp2pNodes()
 
 	msg := &messages.EntityRequest{
 		EntityIDs: unittest.IdentifierListFixture(10),

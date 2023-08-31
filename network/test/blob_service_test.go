@@ -84,7 +84,7 @@ func (suite *BlobServiceTestSuite) SetupTest() {
 	signalerCtx := irrecoverable.NewMockSignalerContext(suite.T(), ctx)
 
 	sporkId := unittest.IdentifierFixture()
-	ids, nodes := testutils.LibP2PNodeForMiddlewareFixture(suite.T(),
+	ids, nodes := testutils.LibP2PNodeForNetworkFixture(suite.T(),
 		sporkId,
 		suite.numNodes,
 		p2ptest.WithDHTOptions(dht.AsServer()),

@@ -109,9 +109,9 @@ func NewTagWatchingConnManager(log zerolog.Logger, metrics module.LibP2PConnecti
 	}, nil
 }
 
-// LibP2PNodeForMiddlewareFixture is a test helper that generate flow identities with a valid port and libp2p nodes.
-// Note that the LibP2PNode created by this fixture is meant to used with a middleware component.
-// If you want to create a standalone LibP2PNode without network and middleware components, please use p2ptest.NodeFixture.
+// LibP2PNodeForNetworkFixture is a test helper that generate flow identities with a valid port and libp2p nodes.
+// Note that the LibP2PNode created by this fixture is meant to used with a network component.
+// If you want to create a standalone LibP2PNode without network component, please use p2ptest.NodeFixture.
 // Args:
 //
 //	t: testing.T- the test object
@@ -125,7 +125,7 @@ func NewTagWatchingConnManager(log zerolog.Logger, metrics module.LibP2PConnecti
 //
 // []p2p.LibP2PNode - list of libp2p nodes created.
 // TODO: several test cases only need a single node, consider encapsulating this function in a single node fixture.
-func LibP2PNodeForMiddlewareFixture(t *testing.T, sporkId flow.Identifier, n int, opts ...p2ptest.NodeFixtureParameterOption) (flow.IdentityList, []p2p.LibP2PNode) {
+func LibP2PNodeForNetworkFixture(t *testing.T, sporkId flow.Identifier, n int, opts ...p2ptest.NodeFixtureParameterOption) (flow.IdentityList, []p2p.LibP2PNode) {
 	libP2PNodes := make([]p2p.LibP2PNode, 0)
 	identities := make(flow.IdentityList, 0)
 	idProvider := unittest.NewUpdatableIDProvider(flow.IdentityList{})
@@ -144,41 +144,7 @@ func LibP2PNodeForMiddlewareFixture(t *testing.T, sporkId flow.Identifier, n int
 	return identities, libP2PNodes
 }
 
-//// MiddlewareConfigFixture is a test helper that generates a middleware config for testing.
-//// Args:
-//// - t: the test instance.
-//// Returns:
-//// - a middleware config.
-//func MiddlewareConfigFixture(t *testing.T, sporkId flow.Identifier) *middleware.Config {
-//	return &middleware.Config{
-//		Logger:                unittest.Logger(),
-//		SporkId:               sporkId,
-//		UnicastMessageTimeout: middleware.DefaultUnicastTimeout,
-//		Codec:                 unittest.NetworkCodec(),
-//	}
-//}
-
-//// MiddlewareFixtures is a test helper that generates middlewares with the given identities and libp2p nodes.
-//// It also generates a list of UpdatableIDProvider that can be used to update the identities of the middlewares.
-//// The number of identities and libp2p nodes must be the same.
-//// Args:
-//// - identities: a list of flow identities that correspond to the libp2p nodes.
-//// - libP2PNodes: a list of libp2p nodes that correspond to the identities.
-//// - cfg: the middleware config.
-//// - opts: a list of middleware option functions.
-//// Returns:
-//// - a list of middlewares - one for each identity.
-//// - a list of UpdatableIDProvider - one for each identity.
-//func MiddlewareFixtures(
-//	t *testing.T,
-//	identities flow.IdentityList,
-//	libP2PNodes []p2p.LibP2PNode,
-//	cfg *middleware.Config,
-//	opts ...middleware.OptionFn) ([]network.Middleware, []*unittest.UpdatableIDProvider) {
-//	return nil, nil
-//}
-
-// NetworksFixture generates the network for the given middlewares
+// NetworksFixture generates the network for the given libp2p nodes.
 func NetworksFixture(t *testing.T,
 	sporkId flow.Identifier,
 	ids flow.IdentityList,
@@ -288,7 +254,6 @@ func StartNodesAndNetworks(ctx irrecoverable.SignalerContext, t *testing.T, node
 //
 // This function fails the test if the networks do not start within the given timeout.
 func StartNetworks(ctx irrecoverable.SignalerContext, t *testing.T, nets []network.Network, duration time.Duration) {
-	// start up networks (this will implicitly start middlewares)
 	for _, net := range nets {
 		net.Start(ctx)
 		unittest.RequireComponentsReadyBefore(t, duration, net)

@@ -48,7 +48,7 @@ func (r *ReadSubscription) ReceiveLoop(ctx context.Context) {
 		rawMsg, err := r.sub.Next(ctx)
 
 		if err != nil {
-			// middleware may have cancelled the context
+			// network may have cancelled the context
 			if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
 				return
 			}
