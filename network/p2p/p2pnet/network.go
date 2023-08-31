@@ -120,6 +120,7 @@ type Network struct {
 
 var _ network.Network = &Network{}
 var _ network.Middleware = &Network{}
+var _ network.Adapter = &Network{}
 
 type registerEngineRequest struct {
 	channel          channels.Channel
@@ -163,7 +164,7 @@ type NetworkConfig struct {
 	UnicastMessageTimeout            time.Duration
 	Libp2pNode                       p2p.LibP2PNode
 	BitSwapMetrics                   module.BitswapMetrics
-	SlashingViolationConsumerFactory func() network.ViolationsConsumer
+	SlashingViolationConsumerFactory func(network.Adapter) network.ViolationsConsumer
 }
 
 // Validate validates the configuration, and sets default values for any missing fields.
@@ -196,7 +197,7 @@ func WithCodec(codec network.Codec) NetworkConfigOption {
 	}
 }
 
-func WithSlashingViolationConsumerFactory(factory func() network.ViolationsConsumer) NetworkConfigOption {
+func WithSlashingViolationConsumerFactory(factory func(adapter network.Adapter) network.ViolationsConsumer) NetworkConfigOption {
 	return func(params *NetworkConfig) {
 		params.SlashingViolationConsumerFactory = factory
 	}
@@ -344,7 +345,7 @@ func NewNetwork(param *NetworkConfig, opts ...NetworkOption) (*Network, error) {
 	builder.AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 		// creation of slashing violations consumer should be postponed till here where the network
 		// is start and the overlay is set.
-		n.slashingViolationsConsumer = param.SlashingViolationConsumerFactory()
+		n.slashingViolationsConsumer = param.SlashingViolationConsumerFactory(n)
 
 		n.authorizedSenderValidator = validator.NewAuthorizedSenderValidator(
 			n.logger,

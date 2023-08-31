@@ -814,15 +814,7 @@ func (builder *ObserverServiceBuilder) enqueuePublicNetworkInit() {
 					HeroCacheMetricsFactory: builder.HeroCacheMetricsFactory(),
 					NetworkType:             network.PublicNetwork,
 				},
-				SlashingViolationConsumerFactory: func() network.ViolationsConsumer {
-					// this is temporary; we are in the process of removing the middleware; hence all this logic must be
-					// eventually moved to the network component.
-					// Network has two interfaces; Network which is exposed to the engines; Adapter which is exposed to the middleware.
-					// Here we are casting the Network to Adapter to get access to the misbehavior report consumer.
-					adapter, ok := builder.Network.(network.Adapter)
-					if !ok {
-						builder.Logger.Fatal().Msg("network must be an adapter to use slashing violations consumer")
-					}
+				SlashingViolationConsumerFactory: func(adapter network.Adapter) network.ViolationsConsumer {
 					return slashing.NewSlashingViolationsConsumer(builder.Logger, builder.Metrics.Network, adapter)
 				},
 			}, p2pnet.WithMessageValidators(publicNetworkMsgValidators(node.Logger, node.IdentityProvider, node.NodeID)...))

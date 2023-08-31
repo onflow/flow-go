@@ -469,15 +469,7 @@ func (fnb *FlowNodeBuilder) InitFlowNetworkWithConduitFactory(
 			HeroCacheMetricsFactory: fnb.HeroCacheMetricsFactory(),
 			NetworkType:             network.PrivateNetwork,
 		},
-		SlashingViolationConsumerFactory: func() network.ViolationsConsumer {
-			// this is temporary; we are in the process of removing the middleware; hence all this logic must be
-			// eventually moved to the network component.
-			// Network has two interfaces; Network which is exposed to the engines; Adapter which is exposed to the middleware.
-			// Here we are casting the Network to Adapter to get access to the misbehavior report consumer.
-			adapter, ok := fnb.Network.(network.Adapter)
-			if !ok {
-				fnb.Logger.Fatal().Msg("network must be an adapter to use slashing violations consumer")
-			}
+		SlashingViolationConsumerFactory: func(adapter network.Adapter) network.ViolationsConsumer {
 			return slashing.NewSlashingViolationsConsumer(fnb.Logger, fnb.Metrics.Network, adapter)
 		},
 	}, networkOptions...)

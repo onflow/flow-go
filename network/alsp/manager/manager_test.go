@@ -462,11 +462,6 @@ func TestHandleReportedMisbehavior_And_SlashingViolationsConsumer_Integration(t 
 	ids, nodes := testutils.LibP2PNodeForNetworkFixture(t, sporkId, 7) // creates 7 nodes (1 victim, 1 honest, 5 spammer nodes one for each slashing violation).
 	idProvider := id.NewFixedIdentityProvider(ids)
 
-	// we want to override the network config to use the slashing violations consumer. However, we need the network
-	// instance to do that, but for the network instance we need the network config. So, we create the adapter first, which
-	// is a placeholder for the network instance, and then we create the network instance with the network config.
-	// Network adapter is a sub-interface of the network instance, so we can use it as a placeholder for the network instance.
-	var adapter network.Adapter
 	// also a placeholder for the slashing violations consumer.
 	var violationsConsumer network.ViolationsConsumer
 	networkCfg := testutils.NetworkConfigFixture(
@@ -476,13 +471,12 @@ func TestHandleReportedMisbehavior_And_SlashingViolationsConsumer_Integration(t 
 		sporkId,
 		nodes[0],
 		p2pnet.WithAlspConfig(managerCfgFixture(t)),
-		p2pnet.WithSlashingViolationConsumerFactory(func() network.ViolationsConsumer {
+		p2pnet.WithSlashingViolationConsumerFactory(func(adapter network.Adapter) network.ViolationsConsumer {
 			violationsConsumer = slashing.NewSlashingViolationsConsumer(unittest.Logger(), metrics.NewNoopCollector(), adapter)
 			return violationsConsumer
 		}))
 	victimNetwork, err := p2pnet.NewNetwork(networkCfg)
 	require.NoError(t, err)
-	adapter = victimNetwork
 
 	ctx, cancel := context.WithCancel(context.Background())
 	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
