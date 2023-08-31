@@ -1722,7 +1722,7 @@ func TestBlockContext_Random(t *testing.T) {
 	})
 
 	script_string := `
-	pub fun main() {
+	pub fun main(a: Int8) {
 		let rand = unsafeRandom()
 		log(rand)
 		let rand%d = unsafeRandom()
@@ -1730,9 +1730,10 @@ func TestBlockContext_Random(t *testing.T) {
 	}
 	`
 
-	getScriptRandoms := func(t *testing.T, codeSalt int) [2]uint64 {
+	getScriptRandoms := func(t *testing.T, codeSalt int, arg int) [2]uint64 {
 		script_code := []byte(fmt.Sprintf(script_string, codeSalt, codeSalt))
-		script := fvm.Script(script_code)
+		script := fvm.Script(script_code).WithArguments(
+			jsoncdc.MustEncode(cadence.Int8(arg)))
 
 		_, output, err := vm.Run(ctx, script, testutil.RootBootstrappedLedger(vm, ctx))
 		require.NoError(t, err)
@@ -1748,15 +1749,23 @@ func TestBlockContext_Random(t *testing.T) {
 	// - checks that unsafeRandom works on scripts
 	// - (sanity) checks that two successive randoms aren't equal
 	t.Run("single script", func(t *testing.T) {
-		randoms := getScriptRandoms(t, 1)
+		randoms := getScriptRandoms(t, 1, 0)
 		require.NotEqual(t, randoms[1], randoms[0], "extremely unlikely to be equal")
 	})
 
-	// checks that two scripts with different IDs do not generate the same randoms
-	t.Run("two scripts", func(t *testing.T) {
+	// checks that two scripts with different codes do not generate the same randoms
+	t.Run("two script codes", func(t *testing.T) {
 		// getScriptRandoms generates different scripts IDs using different codes
-		randoms1 := getScriptRandoms(t, 1)
-		randoms2 := getScriptRandoms(t, 2)
+		randoms1 := getScriptRandoms(t, 1, 0)
+		randoms2 := getScriptRandoms(t, 2, 0)
+		require.NotEqual(t, randoms1[0], randoms2[0], "extremely unlikely to be equal")
+	})
+
+	// checks that two scripts with same codes but different arguments do not generate the same randoms
+	t.Run("same script codes different arguments", func(t *testing.T) {
+		// getScriptRandoms generates different scripts IDs using different arguments
+		randoms1 := getScriptRandoms(t, 1, 0)
+		randoms2 := getScriptRandoms(t, 1, 1)
 		require.NotEqual(t, randoms1[0], randoms2[0], "extremely unlikely to be equal")
 	})
 
