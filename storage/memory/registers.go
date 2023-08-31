@@ -6,7 +6,7 @@ import (
 	"github.com/onflow/flow-go/storage"
 )
 
-var _ storage.Registers = Registers{}
+var _ storage.Registers = (*Registers)(nil)
 
 type Registers struct {
 	registers map[uint64]map[flow.RegisterID]flow.RegisterValue
