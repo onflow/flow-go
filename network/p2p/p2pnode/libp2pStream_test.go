@@ -176,7 +176,7 @@ func testCreateStream(t *testing.T, sporkId flow.Identifier, unicasts []protocol
 		require.NoError(t, err)
 		nodes[0].Host().Peerstore().AddAddrs(pInfo.ID, pInfo.Addrs, peerstore.AddressTTL)
 		go func() {
-			err = nodes[0].OpenProtectedStream(ctx, pInfo.ID, t.Name(), func(stream network.Stream) error {
+			err := nodes[0].OpenProtectedStream(ctx, pInfo.ID, t.Name(), func(stream network.Stream) error {
 				require.NotNil(t, stream)
 				streams = append(streams, stream)
 				// if we return this function, the stream will be closed, but we need to keep it open for the test
@@ -185,7 +185,10 @@ func testCreateStream(t *testing.T, sporkId flow.Identifier, unicasts []protocol
 				allStreamsClosedWg.Done()
 				return nil
 			})
-			require.NoError(t, err)
+			if err != nil {
+				// we omit errors due to closing the stream. This is because we close the stream in the test.
+				require.Contains(t, err.Error(), "failed to close the stream")
+			}
 		}()
 	}
 
