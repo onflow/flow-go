@@ -83,8 +83,6 @@ var NotEjectedFilter = filter.Not(filter.Ejected)
 // Network represents the overlay network of our peer-to-peer network, including
 // the protocols for handshakes, authentication, gossiping and heartbeats.
 type Network struct {
-	sync.RWMutex
-
 	// TODO: using a waitgroup here doesn't actually guarantee that we'll wait for all
 	// goroutines to exit, because new goroutines could be started after we've already
 	// returned from wg.Wait(). We need to solve this the right way using ComponentManager
@@ -110,6 +108,7 @@ type Network struct {
 	unicastMessageTimeout       time.Duration
 	libP2PNode                  p2p.LibP2PNode
 	bitswapMetrics              module.BitswapMetrics
+	peerUpdateLock              sync.Mutex // protects the peer update process
 	previousProtocolStatePeers  []peer.AddrInfo
 	slashingViolationsConsumer  network.ViolationsConsumer
 	peerManagerFilters          []p2p.PeerFilter
@@ -870,8 +869,8 @@ func (n *Network) UpdateNodeAddresses() {
 			Msg("failed to extract peer info from identity")
 	}
 
-	n.Lock()
-	defer n.Unlock()
+	n.peerUpdateLock.Lock()
+	defer n.peerUpdateLock.Unlock()
 
 	// set old addresses to expire
 	for _, oldInfo := range n.previousProtocolStatePeers {
