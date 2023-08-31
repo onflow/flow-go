@@ -204,7 +204,7 @@ func (suite *MutableIdentityTableSuite) addNodes(count int) {
 	nets := testutils.NetworksFixture(suite.T(), sporkId, ids, mws)
 	suite.cancels = append(suite.cancels, cancel)
 
-	testutils.StartNodesAndNetworks(signalerCtx, suite.T(), nodes, nets, 100*time.Millisecond)
+	testutils.StartNodesAndNetworks(signalerCtx, suite.T(), nodes, nets)
 
 	// create the engines for the new nodes
 	engines := testutils.GenerateEngines(suite.T(), nets)

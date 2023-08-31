@@ -296,6 +296,7 @@ func (builder *FollowerServiceBuilder) buildSyncEngine() *FollowerServiceBuilder
 			builder.FollowerEng,
 			builder.SyncCore,
 			builder.SyncEngineParticipantsProviderFactory(),
+			synceng.NewSpamDetectionConfig(),
 		)
 		if err != nil {
 			return nil, fmt.Errorf("could not create synchronization engine: %w", err)
