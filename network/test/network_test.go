@@ -169,7 +169,7 @@ func (suite *NetworkTestSuite) SetupTest() {
 
 	suite.mwCtx = irrecoverable.NewMockSignalerContext(suite.T(), ctx)
 
-	testutils.StartNodes(suite.mwCtx, suite.T(), suite.libP2PNodes, 1*time.Second)
+	testutils.StartNodes(suite.mwCtx, suite.T(), suite.libP2PNodes)
 
 	for i, net := range suite.networks {
 		unittest.RequireComponentsReadyBefore(suite.T(), 1*time.Second, libP2PNodes[i])
@@ -209,7 +209,7 @@ func (suite *NetworkTestSuite) TestUpdateNodeAddresses() {
 	newId := ids[0]
 
 	// start up nodes and peer managers
-	testutils.StartNodes(irrecoverableCtx, suite.T(), libP2PNodes, 1*time.Second)
+	testutils.StartNodes(irrecoverableCtx, suite.T(), libP2PNodes)
 	defer testutils.StopComponents(suite.T(), libP2PNodes, 1*time.Second)
 
 	newNet.Start(irrecoverableCtx)
@@ -310,9 +310,9 @@ func (suite *NetworkTestSuite) TestUnicastRateLimit_Messages() {
 
 	ctx, cancel := context.WithCancel(suite.mwCtx)
 	irrecoverableCtx := irrecoverable.NewMockSignalerContext(suite.T(), ctx)
-	testutils.StartNodes(irrecoverableCtx, suite.T(), libP2PNodes, 1*time.Second)
+	testutils.StartNodes(irrecoverableCtx, suite.T(), libP2PNodes)
 	defer testutils.StopComponents(suite.T(), libP2PNodes, 1*time.Second)
-	testutils.StartNetworks(irrecoverableCtx, suite.T(), []network.Network{newNet}, 1*time.Second)
+	testutils.StartNetworks(irrecoverableCtx, suite.T(), []network.Network{newNet})
 
 	calls := atomic.NewUint64(0)
 	ch := make(chan struct{})
@@ -448,10 +448,10 @@ func (suite *NetworkTestSuite) TestUnicastRateLimit_Bandwidth() {
 	ctx, cancel := context.WithCancel(suite.mwCtx)
 	irrecoverableCtx := irrecoverable.NewMockSignalerContext(suite.T(), ctx)
 
-	testutils.StartNodes(irrecoverableCtx, suite.T(), libP2PNodes, 1*time.Second)
+	testutils.StartNodes(irrecoverableCtx, suite.T(), libP2PNodes)
 	defer testutils.StopComponents(suite.T(), libP2PNodes, 1*time.Second)
 
-	testutils.StartNetworks(irrecoverableCtx, suite.T(), []network.Network{newNet}, 1*time.Second)
+	testutils.StartNetworks(irrecoverableCtx, suite.T(), []network.Network{newNet})
 	unittest.RequireComponentsReadyBefore(suite.T(), 1*time.Second, newNet)
 
 	// registers an engine on the new network so that it can receive messages on the TestNetworkChannel

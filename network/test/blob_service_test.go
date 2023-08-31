@@ -92,19 +92,12 @@ func (suite *BlobServiceTestSuite) SetupTest() {
 			ConnectionPruning: true,
 			ConnectorFactory:  connection.DefaultLibp2pBackoffConnectorFactory(),
 		}, nil))
-	mws, _ := testutils.MiddlewareFixtures(
-		suite.T(),
-		ids,
-		nodes,
-		testutils.MiddlewareConfigFixture(suite.T(), sporkId),
-		mocknetwork.NewViolationsConsumer(suite.T()))
-	suite.networks = testutils.NetworksFixture(suite.T(), sporkId, ids, mws)
-	testutils.StartNodesAndNetworks(signalerCtx, suite.T(), nodes, suite.networks)
+
 	suite.networks, _ = testutils.NetworksFixture(suite.T(), sporkId, ids, nodes)
 	// starts the nodes and networks
-	testutils.StartNodes(signalerCtx, suite.T(), nodes, 1*time.Second)
+	testutils.StartNodes(signalerCtx, suite.T(), nodes)
 	for _, net := range suite.networks {
-		testutils.StartNetworks(signalerCtx, suite.T(), []network.Network{net}, 1*time.Second)
+		testutils.StartNetworks(signalerCtx, suite.T(), []network.Network{net})
 		unittest.RequireComponentsReadyBefore(suite.T(), 1*time.Second, net)
 	}
 

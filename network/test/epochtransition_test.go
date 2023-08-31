@@ -199,9 +199,9 @@ func (suite *MutableIdentityTableSuite) addNodes(count int) {
 	suite.cancels = append(suite.cancels, cancel)
 
 	// starts the nodes and networks
-	testutils.StartNodes(signalerCtx, suite.T(), nodes, 1*time.Second)
+	testutils.StartNodes(signalerCtx, suite.T(), nodes)
 	for _, net := range nets {
-		testutils.StartNetworks(signalerCtx, suite.T(), []network.Network{net}, 1*time.Second)
+		testutils.StartNetworks(signalerCtx, suite.T(), []network.Network{net})
 		unittest.RequireComponentsReadyBefore(suite.T(), 1*time.Second, net)
 	}
 

@@ -104,8 +104,8 @@ func (u *UnicastAuthorizationTestSuite) startNetworksAndLibp2pNodes() {
 	ctx, cancel := context.WithCancel(context.Background())
 	sigCtx, _ := irrecoverable.WithSignaler(ctx)
 
-	testutils.StartNodes(sigCtx, u.T(), u.libP2PNodes, 1*time.Second)
-	testutils.StartNetworks(sigCtx, u.T(), []network.Network{u.senderNetwork, u.receiverNetwork}, 1*time.Second)
+	testutils.StartNodes(sigCtx, u.T(), u.libP2PNodes)
+	testutils.StartNetworks(sigCtx, u.T(), []network.Network{u.senderNetwork, u.receiverNetwork})
 	unittest.RequireComponentsReadyBefore(u.T(), 1*time.Second, u.senderNetwork, u.receiverNetwork)
 
 	u.cancel = cancel

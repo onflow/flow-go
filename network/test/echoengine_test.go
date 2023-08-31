@@ -56,23 +56,14 @@ func (suite *EchoEngineTestSuite) SetupTest() {
 	// both nodes should be of the same role to get connected on epidemic dissemination
 	var nodes []p2p.LibP2PNode
 	sporkId := unittest.IdentifierFixture()
-	suite.ids, nodes = testutils.LibP2PNodeForMiddlewareFixture(suite.T(), sporkId, count)
-	suite.mws, _ = testutils.MiddlewareFixtures(
-		suite.T(),
-		suite.ids,
-		nodes,
-		testutils.MiddlewareConfigFixture(suite.T(), sporkId),
-		mocknetwork.NewViolationsConsumer(suite.T()))
-	suite.nets = testutils.NetworksFixture(suite.T(), sporkId, suite.ids, suite.mws)
-	testutils.StartNodesAndNetworks(signalerCtx, suite.T(), nodes, suite.nets)
 
 	suite.ids, nodes = testutils.LibP2PNodeForNetworkFixture(suite.T(), sporkId, count)
 	suite.libp2pNodes = nodes
 	suite.networks, _ = testutils.NetworksFixture(suite.T(), sporkId, suite.ids, nodes)
 	// starts the nodes and networks
-	testutils.StartNodes(signalerCtx, suite.T(), nodes, 1*time.Second)
+	testutils.StartNodes(signalerCtx, suite.T(), nodes)
 	for _, net := range suite.networks {
-		testutils.StartNetworks(signalerCtx, suite.T(), []network.Network{net}, 1*time.Second)
+		testutils.StartNetworks(signalerCtx, suite.T(), []network.Network{net})
 		unittest.RequireComponentsReadyBefore(suite.T(), 1*time.Second, net)
 	}
 }
