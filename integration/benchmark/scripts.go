@@ -89,6 +89,13 @@ func LedgerHeavyScript(favContractAddress flowsdk.Address) []byte {
 	return []byte(fmt.Sprintf(ledgerHeavyScriptTemplate, favContractAddress))
 }
 
+//go:embed scripts/execDataHeavyTransaction.cdc
+var execDataHeavyScriptTemplate string
+
+func ExecDataHeavyScript(favContractAddress flowsdk.Address) []byte {
+	return []byte(fmt.Sprintf(execDataHeavyScriptTemplate, favContractAddress))
+}
+
 //go:embed scripts/constExecCostTransaction.cdc
 var constExecTransactionTemplate string
 
