@@ -173,6 +173,14 @@ func (fcv *ChunkVerifier) verifyTransactionsInContext(
 		return nil, nil, fmt.Errorf("missing chunk data pack")
 	}
 
+	// Consensus nodes already enforce some fundamental properties of ExecutionResults:
+	//   1. The result contains the correct number of chunks (compared to the block it pertains to).
+	//   2. The result contains chunks with strictly monotonically increasing `Chunk.Index` starting with index 0
+	//   3. for each chunk, the consistency requirement `Chunk.Index == Chunk.CollectionIndex` holds
+	// See `module/validation/receiptValidator` for implementation, which is used by the consensus nodes. 
+  // And issue https://github.com/dapperlabs/flow-go/issues/6864 for implementing 3.
+	// Hence, the following is a consistency check. Failing it means we have either encountered a critical bug,
+	// or a supermajority of byzantine nodes. In their case, continuing operations is impossible.  
 	if int(chIndex) >= len(result.Chunks) {
 		return nil, chmodels.NewCFInvalidVerifiableChunk("error constructing partial trie: ",
 				fmt.Errorf("chunk index out of bounds of ExecutionResult's chunk list"), chIndex, execResID),
@@ -303,7 +311,6 @@ func (fcv *ChunkVerifier) verifyTransactionsInContext(
 	}
 
 	expEndStateComm, trieUpdate, err := psmt.Set(update)
-
 	if err != nil {
 		if errors.Is(err, ledger.ErrMissingKeys{}) {
 			keys := err.(*ledger.ErrMissingKeys).Keys
@@ -347,7 +354,8 @@ func (fcv *ChunkVerifier) verifyTransactionsInContext(
 		return nil, nil, fmt.Errorf("failed to calculate CID of ChunkExecutionData: %w", err)
 	}
 
-	// 3. check that chunk execution data ID for our index is valid
+	// 3. check that with the chunk execution results that we created locally, 
+	// we can reproduce the ChunkExecutionData's ID, which the execution node is stating in its ChunkDataPack
 	if cedCID != chunkDataPack.ExecutionDataRoot.ChunkExecutionDataIDs[chIndex] {
 		return nil, chmodels.NewCFExecutionDataInvalidChunkCID(
 			chunkDataPack.ExecutionDataRoot.ChunkExecutionDataIDs[chIndex],
@@ -362,7 +370,6 @@ func (fcv *ChunkVerifier) verifyTransactionsInContext(
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to calculate ID of ExecutionDataRoot: %w", err)
 	}
-
 	if executionDataID != result.ExecutionDataID {
 		return nil, chmodels.NewCFInvalidExecutionDataID(result.ExecutionDataID, executionDataID, chIndex, execResID), nil
 	}
