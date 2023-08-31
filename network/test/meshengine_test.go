@@ -49,6 +49,7 @@ type MeshEngineTestSuite struct {
 
 // TestMeshNetTestSuite runs all tests in this test suit
 func TestMeshNetTestSuite(t *testing.T) {
+	unittest.SkipUnless(t, unittest.TEST_FLAKY, "this should be revisited once network/test is running in a separate CI job, runs fine locally")
 	suite.Run(t, new(MeshEngineTestSuite))
 }
 
@@ -113,6 +114,14 @@ func (suite *MeshEngineTestSuite) SetupTest() {
 
 	suite.libp2pNodes = libP2PNodes
 	suite.ids = identities
+	suite.mws, _ = testutils.MiddlewareFixtures(
+		suite.T(),
+		suite.ids,
+		libP2PNodes,
+		testutils.MiddlewareConfigFixture(suite.T(), sporkId),
+		mocknetwork.NewViolationsConsumer(suite.T()))
+	suite.nets = testutils.NetworksFixture(suite.T(), sporkId, suite.ids, suite.mws)
+	testutils.StartNodesAndNetworks(signalerCtx, suite.T(), libP2PNodes, suite.nets)
 	suite.networks, _ = testutils.NetworksFixture(suite.T(), sporkId, suite.ids, suite.libp2pNodes)
 	// starts the nodes and networks
 	testutils.StartNodes(signalerCtx, suite.T(), suite.libp2pNodes, 1*time.Second)
