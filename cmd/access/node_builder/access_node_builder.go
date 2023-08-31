@@ -782,18 +782,6 @@ func (builder *FlowAccessNodeBuilder) extraFlags() {
 	})
 }
 
-// initNetwork creates the network.Network implementation with the given metrics, middleware, initial list of network
-// participants and topology used to choose peers from the list of participants. The list of participants can later be
-// updated by calling network.SetIDs.
-func (builder *FlowAccessNodeBuilder) initNetwork(local module.Local,
-	libp2pNode p2p.LibP2PNode,
-	networkMetrics module.NetworkCoreMetrics,
-	topology network.Topology,
-	receiveCache *netcache.ReceiveCache,
-) (*p2pnet.Network, error) {
-
-}
-
 func publicNetworkMsgValidators(log zerolog.Logger, idProvider module.IdentityProvider, selfID flow.Identifier) []network.MessageValidator {
 	return []network.MessageValidator{
 		// filter out messages sent by this node itself
