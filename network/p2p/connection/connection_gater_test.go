@@ -145,10 +145,10 @@ func TestConnectionGating_ResourceAllocation_AllowListing(t *testing.T) {
 
 	// Libp2p control message validation metrics, these may or may not be called depending on the machine the test is running on and how long
 	// the nodes in the test run for.
-	node2Metrics.On("BlockingPreProcessingStarted", mock.Anything, mock.Anything)
-	node2Metrics.On("BlockingPreProcessingFinished", mock.Anything, mock.Anything, mock.Anything)
-	node2Metrics.On("AsyncProcessingStarted", mock.Anything)
-	node2Metrics.On("AsyncProcessingFinished", mock.Anything, mock.Anything)
+	node2Metrics.On("BlockingPreProcessingStarted", mock.Anything, mock.Anything).Maybe()
+	node2Metrics.On("BlockingPreProcessingFinished", mock.Anything, mock.Anything, mock.Anything).Maybe()
+	node2Metrics.On("AsyncProcessingStarted", mock.Anything).Maybe()
+	node2Metrics.On("AsyncProcessingFinished", mock.Anything, mock.Anything).Maybe()
 
 	// we create node2 with a connection gater that allows all connections and the mocked metrics collector.
 	node2, node2Id := p2ptest.NodeFixture(
