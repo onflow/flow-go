@@ -21,7 +21,14 @@ import (
 const workersCount = 4
 const searchAhead = 1
 
-type ExecutionDataWorker struct {
+// ExecutionStateWorker handles ingestion of new execution data available and uses the execution data indexer module
+// to index the data.
+// The processing of new available data is done by creating a jobqueue that uses the execution data reader to
+// obtain new jobs. The worker also implements the `highestConsecutiveHeight` method which is used by the execution
+// data reader, so it doesn't surpass the highest sealed block height when fetching the data.
+// The execution state worker has a callback that is used by the upstream queues which download new execution data to
+// notify new data is available and kick off indexing.
+type ExecutionStateWorker struct {
 	log             zerolog.Logger
 	exeDataReader   *jobs.ExecutionDataReader
 	exeDataNotifier engine.Notifier
@@ -30,14 +37,15 @@ type ExecutionDataWorker struct {
 	state           protocol.State
 }
 
-func NewRequester(
+// NewExecutionWorker creates a new execution worker.
+func NewExecutionStateWorker(
 	log zerolog.Logger,
 	initHeight uint64,
 	fetchTimeout time.Duration,
 	executionCache *cache.ExecutionDataCache,
 	processedHeight storage.ConsumerProgress,
-) *ExecutionDataWorker {
-	r := &ExecutionDataWorker{
+) *ExecutionStateWorker {
+	r := &ExecutionStateWorker{
 		exeDataNotifier: engine.NewNotifier(),
 	}
 
@@ -58,7 +66,9 @@ func NewRequester(
 	return r
 }
 
-func (r *ExecutionDataWorker) highestConsecutiveHeight() (uint64, error) {
+// highestConsecutiveHeight uses protocol state database to query the latest available sealed block height, this
+// method is being passed to the execution data reader as a limiter for latest height the reader is allowed to fetch.
+func (r *ExecutionStateWorker) highestConsecutiveHeight() (uint64, error) {
 	head, err := r.state.Sealed().Head()
 	if err != nil {
 		return 0, err
@@ -66,11 +76,14 @@ func (r *ExecutionDataWorker) highestConsecutiveHeight() (uint64, error) {
 	return head.Height, nil
 }
 
-func (r *ExecutionDataWorker) OnExecutionData(_ *execution_data.BlockExecutionDataEntity) {
+// OnExecutionData is used to notify when new execution data is downloaded by the execution data requester jobqueue.
+func (r *ExecutionStateWorker) OnExecutionData(_ *execution_data.BlockExecutionDataEntity) {
 	r.exeDataNotifier.Notify()
 }
 
-func (r *ExecutionDataWorker) processExecutionData(ctx irrecoverable.SignalerContext, job module.Job, done func()) {
+// processExecutionData is a worker method that is being called by the jobqueue when processing a new job.
+// The job data contains execution data which we provide to the execution indexer to index it.
+func (r *ExecutionStateWorker) processExecutionData(ctx irrecoverable.SignalerContext, job module.Job, done func()) {
 	entry, err := jobs.JobToBlockEntry(job)
 	if err != nil {
 		r.log.Error().Err(err).Str("job_id", string(job.ID())).Msg("error converting execution data job")
