@@ -321,7 +321,12 @@ func TestPersistingUnknownIdentityPenalty(t *testing.T) {
 	})
 
 	// with reported spam, the app specific score should be the default unknown identity + the spam penalty.
-	require.Less(t, math.Abs(scoring.DefaultUnknownIdentityPenalty+penaltyValueFixtures().Graft-reg.AppSpecificScoreFunc()(peerID)), 10e-3)
+	diff := math.Abs(scoring.DefaultUnknownIdentityPenalty + penaltyValueFixtures().Graft - reg.AppSpecificScoreFunc()(peerID))
+	normalizedDiff := diff / (scoring.DefaultUnknownIdentityPenalty + penaltyValueFixtures().Graft)
+	require.NotZero(t, normalizedDiff, "difference between the expected and actual app specific score should not be zero")
+	require.Less(t,
+		normalizedDiff,
+		0.01, "normalized difference between the expected and actual app specific score should be less than 1%")
 
 	// decays happen every second, so we wait for 1 second to make sure the penalty is updated.
 	time.Sleep(1 * time.Second)

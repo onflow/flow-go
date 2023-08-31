@@ -1,4 +1,4 @@
-package blocklist
+package disallowlisting
 
 import (
 	"context"
@@ -54,8 +54,8 @@ func (s *Suite) SetupSuite() {
 	)
 }
 
-// blockNode submit request to our EN admin server to block sender VN.
-func (s *Suite) blockNode(nodeID flow.Identifier) {
+// disallowListNode submit request to our EN admin server to block sender VN.
+func (s *Suite) disallowListNode(nodeID flow.Identifier) {
 	serverAddr := fmt.Sprintf("localhost:%s", s.Net.ContainerByID(s.receiverEN).Port(testnet.AdminPort))
 	adminClient := client.NewAdminClient(serverAddr)
 
