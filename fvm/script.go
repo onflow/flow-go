@@ -123,7 +123,7 @@ func newScriptExecutor(
 ) *scriptExecutor {
 	// update `ctx.EnvironmentParams` with the script info before
 	// creating the executor
-	scriptInfo := environment.NewScriptInfoParams(proc.ID, proc.Script)
+	scriptInfo := environment.NewScriptInfoParams(proc.Script, proc.Arguments)
 	ctx.EnvironmentParams.SetScriptInfoParams(scriptInfo)
 	return &scriptExecutor{
 		ctx:      ctx,
