@@ -21,9 +21,7 @@ const Fr BLS12_381_rR = {{
 }};
 
 // returns true if a == 0 and false otherwise
-bool Fr_is_zero(const Fr *a) {
-  return bytes_are_zero((const byte *)a, sizeof(Fr));
-}
+bool Fr_is_zero(const Fr *a) { return vec_is_zero(a, sizeof(Fr)); }
 
 // returns true if a == b and false otherwise
 bool Fr_is_equal(const Fr *a, const Fr *b) {
@@ -93,62 +91,6 @@ void Fr_inv_montg_eucl(Fr *res, const Fr *a) {
   vec512 temp;
   ct_inverse_mod_256(temp, (limb_t *)a, BLS12_381_r, rx2);
   redc_mont_256((limb_t *)res, temp, BLS12_381_r, r0);
-}
-
-// result is in Montgomery form if base is in montgomery form
-// if base = b*R, res = b^expo * R
-// In general, res = base^expo * R^(-expo+1)
-// `expo` is encoded as a little-endian limb_t table of length `expo_len`.
-// TODO: could be deleted
-void Fr_exp_montg(Fr *res, const Fr *base, const limb_t *expo,
-                  const int expo_len) {
-  // mask of the most significant bit
-  const limb_t msb_mask = (limb_t)1 << ((sizeof(limb_t) << 3) - 1);
-  limb_t mask = msb_mask;
-  int index = 0;
-
-  expo += expo_len;
-  // process most significant zero limbs
-  while ((index < expo_len) && (*(--expo) == 0)) {
-    index++;
-  }
-  // if expo is zero
-  if (index == expo_len) {
-    Fr_copy(res, base);
-    return;
-  }
-  // expo is non zero
-  // process the most significant zero bits
-  while ((*expo & mask) == 0) {
-    mask >>= 1;
-  }
-  Fr tmp;
-  // process the first `1` bit
-  Fr_copy(&tmp, base);
-  mask >>= 1;
-  // Scan all limbs of the exponent
-  for (; index < expo_len; expo--) {
-    // Scan all bits
-    for (; mask != 0; mask >>= 1) {
-      // square
-      Fr_squ_montg(&tmp, &tmp);
-      // multiply
-      if (*expo & mask) {
-        Fr_mul_montg(&tmp, &tmp, base);
-      }
-    }
-    mask = msb_mask;
-    index++;
-  }
-  Fr_copy(res, &tmp);
-}
-
-// TODO: could be deleted
-void Fr_inv_exp_montg(Fr *res, const Fr *a) {
-  Fr r_2;
-  Fr_copy(&r_2, (Fr *)BLS12_381_r);
-  r_2.limbs[0] -= 2;
-  Fr_exp_montg(res, a, (limb_t *)&r_2, 4);
 }
 
 // computes the sum of the array elements and writes the sum in jointx
@@ -224,7 +166,7 @@ ERROR Fr_star_read_bytes(Fr *a, const byte *bin, int len) {
 
 // write Fr element `a` in big endian bytes.
 void Fr_write_bytes(byte *bin, const Fr *a) {
-  // be_bytes_from_limbs works for both limb endiannesses
+  // be_bytes_from_limbs works for both limb endianness types
   be_bytes_from_limbs(bin, (limb_t *)a, Fr_BYTES);
 }
 
@@ -358,7 +300,8 @@ ERROR Fp_read_bytes(Fp *a, const byte *bin, int len) {
   return VALID;
 }
 
-// write Fp element to bin and assume `bin` has  `Fp_BYTES` allocated bytes.
+// write Fp element to `bin`,
+// assuming `bin` has  `Fp_BYTES` allocated bytes.
 void Fp_write_bytes(byte *bin, const Fp *a) {
   be_bytes_from_limbs(bin, (limb_t *)a, Fp_BYTES);
 }
@@ -579,8 +522,8 @@ ERROR E1_read_bytes(E1 *a, const byte *bin, const int len) {
   Fp_squ_montg(&a->y, &a->x);
   Fp_mul_montg(&a->y, &a->y, &a->x); // x^3
   Fp_add(&a->y, &a->y, &B_E1);       // B_E1 is already in Montg form
-  if (!Fp_sqrt_montg(&a->y,
-                     &a->y)) { // check whether x^3+b is a quadratic residue
+  // check whether x^3+b is a quadratic residue
+  if (!Fp_sqrt_montg(&a->y, &a->y)) {
     return POINT_NOT_ON_CURVE;
   }
 
@@ -1112,7 +1055,7 @@ void xmd_sha256(byte *hash, int len_hash, byte *msg, int len_msg, byte *dst,
 }
 
 // DEBUG printing functions
-#if (DEBUG == 1)
+#ifdef DEBUG
 void bytes_print_(char *s, byte *data, int len) {
   if (strlen(s))
     printf("[%s]:\n", s);

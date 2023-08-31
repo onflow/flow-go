@@ -16,8 +16,8 @@ package crypto
 // static void handler(int signum)
 // {	char text[1024] = "Caught SIGILL in blst_cgo_init, BLST library (used by flow-go/crypto) requires ADX support, build with CGO_CFLAGS=\"-O -D__BLST_PORTABLE__\"\n";
 //		ssize_t n = write(2, &text, strlen(text));
-//     _exit(128+SIGILL);
-//     (void)n;
+//      _exit(128+SIGILL);
+//      (void)n;
 // }
 // __attribute__((constructor)) static void flow_crypto_cgo_init()
 // {   Fp temp = { 0 };
