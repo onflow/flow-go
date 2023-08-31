@@ -1081,6 +1081,7 @@ func (exeNode *ExecutionNode) LoadSynchronizationEngine(
 		exeNode.followerEng,
 		exeNode.syncCore,
 		node.SyncEngineIdentifierProvider,
+		synchronization.NewSpamDetectionConfig(),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("could not initialize synchronization engine: %w", err)

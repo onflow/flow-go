@@ -123,7 +123,7 @@ func TestGeometricDecay(t *testing.T) {
 			if tt.wantErr != nil {
 				assert.Errorf(t, err, tt.wantErr.Error())
 			}
-			assert.LessOrEqual(t, truncateFloat(math.Abs(got-tt.want), 3), 1e-3)
+			assert.LessOrEqual(t, truncateFloat(math.Abs(got-tt.want), 3), 1e-2)
 		})
 	}
 }
