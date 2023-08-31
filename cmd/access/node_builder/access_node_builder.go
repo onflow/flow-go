@@ -9,9 +9,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/onflow/flow-go/module/state_synchronization/indexer"
-	"github.com/onflow/flow-go/storage/memory"
-
 	badger "github.com/ipfs/go-ds-badger2"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/routing"
@@ -38,7 +35,6 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/verification"
 	recovery "github.com/onflow/flow-go/consensus/recovery/protocol"
 	"github.com/onflow/flow-go/crypto"
-	"github.com/onflow/flow-go/engine/access/index"
 	"github.com/onflow/flow-go/engine/access/ingestion"
 	pingeng "github.com/onflow/flow-go/engine/access/ping"
 	"github.com/onflow/flow-go/engine/access/rest/routes"
@@ -254,7 +250,6 @@ type FlowAccessNodeBuilder struct {
 	// engines
 	IngestEng      *ingestion.Engine
 	RequestEng     *requester.Engine
-	IndexEng       *index.Engine
 	FollowerEng    *followereng.ComplianceEngine
 	SyncEng        *synceng.Engine
 	StateStreamEng *state_stream.Engine
@@ -445,7 +440,6 @@ func (builder *FlowAccessNodeBuilder) BuildConsensusFollower() *FlowAccessNodeBu
 func (builder *FlowAccessNodeBuilder) BuildExecutionDataRequester() *FlowAccessNodeBuilder {
 	var ds *badger.Datastore
 	var bs network.BlobService
-	var exeIndexer *indexer.ExecutionState
 	var processedBlockHeight storage.ConsumerProgress
 	var processedNotifications storage.ConsumerProgress
 	var bsDependable *module.ProxiedReadyDoneAware
@@ -477,11 +471,6 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionDataRequester() *FlowAccessN
 				return nil
 			})
 
-			return nil
-		}).
-		Module("execution data indexer", func(node *cmd.NodeConfig) error {
-			registers := memory.NewRegisters()
-			exeIndexer = indexer.New(registers, node.Storage.Headers)
 			return nil
 		}).
 		Module("processed block height consumer progress", func(node *cmd.NodeConfig) error {
@@ -604,41 +593,6 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionDataRequester() *FlowAccessN
 			}
 
 			return builder.ExecutionDataRequester, nil
-		}).
-		Component("index engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-			var err error
-
-			// Execution Data cache that uses a blobstore as the backend (instead of a downloader)
-			// This ensures that it simply returns a not found error if the blob doesn't exist
-			// instead of attempting to download it from the network. It shares a cache backend instance
-			// with the requester's implementation.
-			localExecutionDataCache = execdatacache.NewExecutionDataCache(
-				builder.ExecutionDataStore,
-				builder.Storage.Headers,
-				builder.Storage.Seals,
-				builder.Storage.Results,
-				execDataCacheBackend,
-			)
-
-			builder.IndexEng, err = index.New(
-				node.Logger,
-				builder.AccessMetrics,
-				node.Storage.Headers,
-				node.Storage.Collections,
-				node.Storage.Events,
-				node.Storage.Transactions,
-				localExecutionDataCache,
-				exeIndexer,
-				builder.executionIndexLastHeight,
-				highestAvailableHeight,
-			)
-			if err != nil {
-				return nil, fmt.Errorf("could not create index engine: %w", err)
-			}
-
-			execDataDistributor.AddOnExecutionDataReceivedConsumer(builder.IndexEng.OnExecutionData)
-
-			return builder.IndexEng, nil
 		})
 
 	if builder.stateStreamConf.ListenAddr != "" {
