@@ -8,13 +8,15 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
+var _ ChunkFault = (*CFExecutionDataBlockIDMismatch)(nil)
+
 // CFExecutionDataBlockIDMismatch is returned when the block ID contained in the execution data
 // root is different from chunk's block ID
 type CFExecutionDataBlockIDMismatch struct {
-	chunkIndex               uint64
-	execResID                flow.Identifier
-	executionDataRootBlockID flow.Identifier
-	chunkBlockID             flow.Identifier
+	chunkIndex               uint64          // chunk's index
+	execResID                flow.Identifier // chunk's ExecutionResult identifier
+	executionDataRootBlockID flow.Identifier // blockID from chunk's ExecutionDataRoot
+	chunkBlockID             flow.Identifier // chunk's blockID
 }
 
 func (cf CFExecutionDataBlockIDMismatch) String() string {
@@ -47,12 +49,14 @@ func NewCFExecutionDataBlockIDMismatch(
 	}
 }
 
+var _ ChunkFault = (*CFExecutionDataChunksLengthMismatch)(nil)
+
 // CFExecutionDataChunksLengthMismatch is returned when execution data chunks list has different length than number of chunks for a block
 type CFExecutionDataChunksLengthMismatch struct {
-	chunkIndex                     uint64
-	execResID                      flow.Identifier
-	executionDataRootChunkLength   int
-	executionResultChunkListLength int
+	chunkIndex                     uint64          // chunk's index
+	execResID                      flow.Identifier // chunk's ExecutionResult identifier
+	executionDataRootChunkLength   int             // number of ChunkExecutionDataIDs in ExecutionDataRoot
+	executionResultChunkListLength int             // number of chunks in ExecutionResult
 }
 
 func (cf CFExecutionDataChunksLengthMismatch) String() string {
@@ -85,12 +89,14 @@ func NewCFExecutionDataChunksLengthMismatch(
 	}
 }
 
+var _ ChunkFault = (*CFExecutionDataInvalidChunkCID)(nil)
+
 // CFExecutionDataInvalidChunkCID is returned when execution data chunk's CID is different from computed
 type CFExecutionDataInvalidChunkCID struct {
-	chunkIndex                uint64
-	execResID                 flow.Identifier
-	executionDataRootChunkCID cid.Cid
-	computedChunkCID          cid.Cid
+	chunkIndex                uint64          // chunk's index
+	execResID                 flow.Identifier // chunk's ExecutionResult identifier
+	executionDataRootChunkCID cid.Cid         // ExecutionDataRoot's CID for the chunk
+	computedChunkCID          cid.Cid         // computed CID for the chunk
 }
 
 func (cf CFExecutionDataInvalidChunkCID) String() string {
@@ -123,12 +129,14 @@ func NewCFExecutionDataInvalidChunkCID(
 	}
 }
 
+var _ ChunkFault = (*CFInvalidExecutionDataID)(nil)
+
 // CFInvalidExecutionDataID is returned when ExecutionResult's ExecutionDataID is different from computed
 type CFInvalidExecutionDataID struct {
-	chunkIndex              uint64
-	execResID               flow.Identifier
-	erExecutionDataID       flow.Identifier
-	computedExecutionDataID flow.Identifier
+	chunkIndex              uint64          // chunk's index
+	execResID               flow.Identifier // chunk's ExecutionResult identifier
+	erExecutionDataID       flow.Identifier // ExecutionResult's ExecutionDataID
+	computedExecutionDataID flow.Identifier // computed ExecutionDataID
 }
 
 func (cf CFInvalidExecutionDataID) String() string {

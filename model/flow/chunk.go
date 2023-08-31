@@ -61,14 +61,18 @@ func (ch *Chunk) Checksum() Identifier {
 // ChunkDataPack holds all register touches (any read, or write).
 //
 // Note that we have to capture a read proof for each write before updating the registers.
-// `Proof` includes proofs for all registers read to execute the chunck.
+// `Proof` includes proofs for all registers read to execute the chunk.
 // Register proofs order must not be correlated to the order of register reads during
 // the chunk execution in order to enforce the SPoCK secret high entropy.
 type ChunkDataPack struct {
-	ChunkID           Identifier
-	StartState        StateCommitment
-	Proof             StorageProof
-	Collection        *Collection
+	ChunkID    Identifier      // ID of the chunk this data pack is for
+	StartState StateCommitment // commitment for starting state
+	Proof      StorageProof    // proof for all registers read during the chunk execution
+	Collection *Collection     // collection executed in this chunk
+
+	// ExecutionDataRoot is the root data structure of an execution_data.BlockExecutionData.
+	// It contains the necessary information for a verification node to validate that the
+	// BlockExecutionData produced is valid.
 	ExecutionDataRoot BlockExecutionDataRoot
 }
 
