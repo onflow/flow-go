@@ -10,6 +10,7 @@ import (
 	"github.com/onflow/flow-go/storage"
 )
 
+// ExecutionState indexes the execution state.
 type ExecutionState struct {
 	registers   storage.Registers
 	headers     storage.Headers
@@ -25,15 +26,19 @@ func New(registers storage.Registers, headers storage.Headers) *ExecutionState {
 	}
 }
 
+// HeightByBlockID retrieves the height for block ID.
+// If a block is not found expect a `storage.ErrNotFound` error.
 func (i *ExecutionState) HeightByBlockID(ID flow.Identifier) (uint64, error) {
 	header, err := i.headers.ByBlockID(ID)
 	if err != nil {
-		return 0, err
+		return 0, fmt.Errorf("could not find block by ID %: %w", ID, err)
 	}
 
 	return header.Height, nil
 }
 
+// Commitment retrieves a commitment by provided block height.
+// If a commitment at height is not found expect a `storage.ErrNotFound` error.
 func (i *ExecutionState) Commitment(height uint64) (flow.StateCommitment, error) {
 	val, ok := i.commitments[height]
 	if !ok {
@@ -43,6 +48,7 @@ func (i *ExecutionState) Commitment(height uint64) (flow.StateCommitment, error)
 	return val, nil
 }
 
+// RegisterValues retrieves register values by the register IDs at provided height.
 func (i *ExecutionState) RegisterValues(IDs flow.RegisterIDs, height uint64) ([]flow.RegisterValue, error) {
 	values := make([]flow.RegisterValue, len(IDs))
 
