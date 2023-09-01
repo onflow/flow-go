@@ -286,9 +286,9 @@ func (e *Engine) handleBlock(ctx context.Context, block *flow.Block) error {
 	span, _ := e.tracer.StartBlockSpan(ctx, blockID, trace.EXEHandleBlock)
 	defer span.End()
 
-	executed, err := state.IsBlockExecuted(e.unit.Ctx(), e.execState, blockID)
+	executed, err := e.execState.IsBlockExecuted(block.Header.Height, blockID)
 	if err != nil {
-		return fmt.Errorf("could not check whether block is executed: %w", err)
+		return fmt.Errorf("could not check whether block is executed %v: %w", blockID, err)
 	}
 
 	if executed {
