@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"time"
 
 	"github.com/rs/zerolog"
 
@@ -14,12 +15,10 @@ import (
 	"github.com/onflow/flow-go/cmd/util/ledger/reporters"
 	"github.com/onflow/flow-go/cmd/util/ledger/util"
 	"github.com/onflow/flow-go/fvm/environment"
-	"github.com/onflow/flow-go/fvm/storage/derived"
-	"github.com/onflow/flow-go/fvm/storage/logical"
 	"github.com/onflow/flow-go/fvm/storage/state"
-	"github.com/onflow/flow-go/fvm/tracing"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/model/flow"
+	util2 "github.com/onflow/flow-go/module/util"
 )
 
 func MigrateAtreeRegisters(
@@ -46,10 +45,9 @@ func MigrateAtreeRegisters(
 type AtreeRegisterMigrator struct {
 	log zerolog.Logger
 
-	snapshot *util.PayloadSnapshot
-
+	sampler zerolog.Sampler
 	rw      reporters.ReportWriter
-	sampler zerolog.Logger
+	rwf     reporters.ReportWriterFactory
 }
 
 var _ AccountMigrator = (*AtreeRegisterMigrator)(nil)
@@ -58,21 +56,18 @@ var _ io.Closer = (*AtreeRegisterMigrator)(nil)
 func NewMigrator(
 	log zerolog.Logger,
 	rwf reporters.ReportWriterFactory,
-	allRegisters []ledger.Payload,
+	_ []ledger.Payload,
 ) (*AtreeRegisterMigrator, error) {
-	// creating a snapshot of all the registers will take a while
-	snapshot, err := util.NewPayloadSnapshot(allRegisters)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create payload snapshot: %w", err)
-	}
+
 	log.Info().Msgf("created snapshot")
+	sampler := util2.NewTimedSampler(30 * time.Second)
 
 	migrator := &AtreeRegisterMigrator{
-		snapshot: snapshot,
+		log:     log,
+		sampler: sampler,
 
-		log: log,
-
-		rw: rwf.ReportWriter("atree-register-migrator"),
+		rwf: rwf,
+		rw:  rwf.ReportWriter("atree-register-migrator"),
 	}
 
 	return migrator, nil
@@ -100,7 +95,7 @@ func (m *AtreeRegisterMigrator) MigratePayloads(
 	}
 
 	// Do the storage conversion
-	changes, err := m.migrateAccountStorage(address)
+	changes, err := m.migrateAccountStorage(address, payloads)
 	if err != nil {
 		return nil, fmt.Errorf("failed to convert storage for address %s: %w", address.Hex(), err)
 	}
@@ -110,10 +105,11 @@ func (m *AtreeRegisterMigrator) MigratePayloads(
 
 func (m *AtreeRegisterMigrator) migrateAccountStorage(
 	address common.Address,
+	payloads []ledger.Payload,
 ) (map[flow.RegisterID]flow.RegisterValue, error) {
 
 	// create all the runtime components we need for the migration
-	r, err := m.newMigratorRuntime()
+	r, err := m.newMigratorRuntime(payloads)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create migrator runtime: %w", err)
 	}
@@ -147,6 +143,7 @@ func (m *AtreeRegisterMigrator) convertStorageDomain(
 	inter *interpreter.Interpreter,
 	domain string,
 ) error {
+
 	storageMap := storage.GetStorageMap(address, domain, false)
 	if storageMap == nil {
 		// no storage for this domain
@@ -214,34 +211,25 @@ func (m *AtreeRegisterMigrator) convertStorageDomain(
 	return nil
 }
 
-func (m *AtreeRegisterMigrator) newMigratorRuntime() (
+func (m *AtreeRegisterMigrator) newMigratorRuntime(
+	payloads []ledger.Payload,
+) (
 	*migratorRuntime,
 	error,
 ) {
-	// the registers will be read concurrently by multiple workers, but won't be modified
-	transactionState := state.NewTransactionState(m.snapshot, state.DefaultParameters())
+	snapshot, err := util.NewPayloadSnapshot(payloads)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create payload snapshot: %w", err)
+	}
+	transactionState := state.NewTransactionState(snapshot, state.DefaultParameters())
 	accounts := environment.NewAccounts(transactionState)
-
-	derivedBlockData := derived.NewEmptyDerivedBlockData(logical.EndOfBlockExecutionTime)
-
-	programs :=
-		environment.NewPrograms(
-			tracing.NewMockTracerSpan(),
-			util.NopMeter{},
-			environment.NoopMetricsReporter{},
-			struct {
-				state.NestedTransactionPreparer
-				derived.DerivedTransactionPreparer
-			}{
-				NestedTransactionPreparer: transactionState,
-				// TODO: reuse this
-				DerivedTransactionPreparer: derivedBlockData.NewSnapshotReadDerivedTransactionData(),
-			},
-			accounts,
-		)
 
 	accountsAtreeLedger := util.NewAccountsAtreeLedger(accounts)
 	storage := runtime.NewStorage(accountsAtreeLedger, util.NopMemoryGauge{})
+
+	ri := &util.MigrationRuntimeInterface{
+		Accounts: accounts,
+	}
 
 	env := runtime.NewBaseInterpreterEnvironment(runtime.Config{
 		AccountLinkingEnabled: true,
@@ -250,19 +238,6 @@ func (m *AtreeRegisterMigrator) newMigratorRuntime() (
 		// Capability Controllers are enabled everywhere except for Mainnet
 		CapabilityControllersEnabled: true,
 	})
-
-	ri := util.MigrationRuntimeInterface{
-		Accounts: accounts,
-		Programs: programs,
-	}
-
-	ri.GetOrLoadProgramFunc = func(location runtime.Location, load func() (*interpreter.Program, error)) (*interpreter.Program, error) {
-		m.log.Info().
-			Stack().
-			Msg("GetOrLoadProgram")
-
-		return ri.Programs.GetOrLoadProgram(location, load)
-	}
 
 	env.Configure(
 		ri,
@@ -370,6 +345,21 @@ func (m *AtreeRegisterMigrator) validateChangesAndCreateNewRegisters(
 			Kind:    "not_migrated",
 			Msg:     fmt.Sprintf("%x", value),
 		})
+
+		if m.sampler.Sample(zerolog.InfoLevel) {
+			before := m.rwf.ReportWriter(fmt.Sprintf("account-before-%s", address.Hex()))
+			for _, p := range payloads {
+				before.Write(p)
+			}
+			before.Close()
+
+			after := m.rwf.ReportWriter(fmt.Sprintf("account-after-%s", address.Hex()))
+			for _, p := range newPayloads {
+				after.Write(p)
+			}
+			after.Close()
+		}
+
 	}
 	return newPayloads, nil
 }
