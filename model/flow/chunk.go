@@ -164,6 +164,12 @@ func (cl ChunkList) Len() int {
 // BlockExecutionDataRoot represents the root of a serialized execution_data.BlockExecutionData.
 // The hash of the serialized BlockExecutionDataRoot is the ExecutionDataID used within an
 // flow.ExecutionResult.
+// Context:
+//   - The trie updates in BlockExecutionDataRoot contain the _mutated_ registers only, which is
+//     helpful for clients to truslessly replicate the state.
+//   - In comparison, the chunk data packs contains all the register values at the chunk's starting
+//     state that were _touched_ (written and/or read). This is necessary for Verification Nodes to
+//     re-run the chunk the computation.
 type BlockExecutionDataRoot struct {
 	// BlockID is the ID of the block, whose result this execution data is for.
 	BlockID Identifier
