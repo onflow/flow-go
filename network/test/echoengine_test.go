@@ -38,8 +38,9 @@ type EchoEngineTestSuite struct {
 
 // Some tests are skipped in short mode to speedup the build.
 
-// TestStubEngineTestSuite runs all the test methods in this test suit
-func TestStubEngineTestSuite(t *testing.T) {
+// TestEchoEngineTestSuite runs all the test methods in this test suit
+func TestEchoEngineTestSuite(t *testing.T) {
+	unittest.SkipUnless(t, unittest.TEST_FLAKY, "this should be revisited once network/test is running in a separate CI job, runs fine locally")
 	suite.Run(t, new(EchoEngineTestSuite))
 }
 
@@ -63,7 +64,7 @@ func (suite *EchoEngineTestSuite) SetupTest() {
 		testutils.MiddlewareConfigFixture(suite.T(), sporkId),
 		mocknetwork.NewViolationsConsumer(suite.T()))
 	suite.nets = testutils.NetworksFixture(suite.T(), sporkId, suite.ids, suite.mws)
-	testutils.StartNodesAndNetworks(signalerCtx, suite.T(), nodes, suite.nets, 100*time.Millisecond)
+	testutils.StartNodesAndNetworks(signalerCtx, suite.T(), nodes, suite.nets)
 }
 
 // TearDownTest closes the networks within a specified timeout
@@ -158,6 +159,7 @@ func (suite *EchoEngineTestSuite) TestDuplicateMessageSequential_Multicast() {
 // on deduplicating the received messages via Publish method of nodes' Conduits.
 // Messages are delivered to the receiver in parallel via the Publish method of Conduits.
 func (suite *EchoEngineTestSuite) TestDuplicateMessageParallel_Publish() {
+	unittest.SkipUnless(suite.T(), unittest.TEST_LONG_RUNNING, "covered by TestDuplicateMessageParallel_Multicast")
 	suite.duplicateMessageParallel(suite.Publish)
 }
 

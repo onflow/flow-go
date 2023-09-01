@@ -405,6 +405,7 @@ func (v *VerificationNodeBuilder) LoadComponentsAndModules() {
 				followerEng,
 				syncCore,
 				node.SyncEngineIdentifierProvider,
+				commonsync.NewSpamDetectionConfig(),
 			)
 			if err != nil {
 				return nil, fmt.Errorf("could not create synchronization engine: %w", err)
