@@ -1,8 +1,6 @@
 package storage
 
 import (
-	"io"
-
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -10,7 +8,6 @@ import (
 type Registers interface {
 	RegisterReader
 	RegisterWriter
-	io.Closer
 }
 
 // RegisterReader defines read-only operations on the register index.
