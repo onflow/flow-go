@@ -13,6 +13,8 @@ import (
 	"github.com/onflow/flow-go/module/mempool/entity"
 )
 
+// RegisterStore is the interface for register store
+// see implementation in engine/execution/storehouse/register_store.go
 type RegisterStore interface {
 	Init() error
 
@@ -45,6 +47,7 @@ type FinalizedReader interface {
 	GetFinalizedBlockIDAtHeight(height uint64) (flow.Identifier, error)
 }
 
+// see implementation in engine/execution/storehouse/in_memory_register_store.go
 type InMemoryRegisterStore interface {
 	Prune(finalizedHeight uint64, finalizedBlockID flow.Identifier) error
 	PrunedHeight() uint64
