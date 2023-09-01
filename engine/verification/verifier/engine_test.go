@@ -211,40 +211,40 @@ func (suite *VerifierEngineTestSuite) TestVerifyUnhappyPaths() {
 type ChunkVerifierMock struct {
 }
 
-func (v ChunkVerifierMock) Verify(vc *verification.VerifiableChunkData) ([]byte, chmodel.ChunkFault, error) {
+func (v ChunkVerifierMock) Verify(vc *verification.VerifiableChunkData) ([]byte, error) {
 	if vc.IsSystemChunk {
-		return nil, nil, nil
+		return nil, nil
 	}
 
 	switch vc.Chunk.Index {
 	case 0:
-		return []byte{}, nil, nil
+		return []byte{}, nil
 	// return error
 	case 1:
 		return nil, chmodel.NewCFMissingRegisterTouch(
 			[]string{"test missing register touch"},
 			vc.Chunk.Index,
 			vc.Result.ID(),
-			unittest.TransactionFixture().ID()), nil
+			unittest.TransactionFixture().ID())
 
 	case 2:
 		return nil, chmodel.NewCFInvalidVerifiableChunk(
 			"test",
 			errors.New("test invalid verifiable chunk"),
 			vc.Chunk.Index,
-			vc.Result.ID()), nil
+			vc.Result.ID())
 
 	case 3:
 		return nil, chmodel.NewCFNonMatchingFinalState(
 			unittest.StateCommitmentFixture(),
 			unittest.StateCommitmentFixture(),
 			vc.Chunk.Index,
-			vc.Result.ID()), nil
+			vc.Result.ID())
 
 	// TODO add cases for challenges
 	// return successful by default
 	default:
-		return nil, nil, nil
+		return nil, nil
 	}
 
 }

@@ -50,7 +50,6 @@ func (fcv *ChunkVerifier) Verify(
 	vc *verification.VerifiableChunkData,
 ) (
 	[]byte,
-	chmodels.ChunkFault,
 	error,
 ) {
 
@@ -71,7 +70,7 @@ func (fcv *ChunkVerifier) Verify(
 
 		txBody, err := blueprints.SystemChunkTransaction(fcv.vmCtx.Chain)
 		if err != nil {
-			return nil, nil, fmt.Errorf("could not get system chunk transaction: %w", err)
+			return nil, fmt.Errorf("could not get system chunk transaction: %w", err)
 		}
 
 		transactions = []*fvm.TransactionProcedure{
@@ -158,7 +157,6 @@ func (fcv *ChunkVerifier) verifyTransactionsInContext(
 	systemChunk bool,
 ) (
 	[]byte,
-	chmodels.ChunkFault,
 	error,
 ) {
 
@@ -170,7 +168,7 @@ func (fcv *ChunkVerifier) verifyTransactionsInContext(
 	execResID := result.ID()
 
 	if chunkDataPack == nil {
-		return nil, nil, fmt.Errorf("missing chunk data pack")
+		return nil, fmt.Errorf("missing chunk data pack")
 	}
 
 	// Consensus nodes already enforce some fundamental properties of ExecutionResults:
@@ -183,8 +181,7 @@ func (fcv *ChunkVerifier) verifyTransactionsInContext(
 	// or a super majority of byzantine nodes. In their case, continuing operations is impossible.
 	if int(chIndex) >= len(result.Chunks) {
 		return nil, chmodels.NewCFInvalidVerifiableChunk("error constructing partial trie: ",
-				fmt.Errorf("chunk index out of bounds of ExecutionResult's chunk list"), chIndex, execResID),
-			nil
+			fmt.Errorf("chunk index out of bounds of ExecutionResult's chunk list"), chIndex, execResID)
 	}
 
 	var events flow.EventsList = nil
@@ -196,11 +193,10 @@ func (fcv *ChunkVerifier) verifyTransactionsInContext(
 	if err != nil {
 		// TODO provide more details based on the error type
 		return nil, chmodels.NewCFInvalidVerifiableChunk(
-				"error constructing partial trie: ",
-				err,
-				chIndex,
-				execResID),
-			nil
+			"error constructing partial trie: ",
+			err,
+			chIndex,
+			execResID)
 	}
 
 	context = fvm.NewContextFromParent(
@@ -231,7 +227,7 @@ func (fcv *ChunkVerifier) verifyTransactionsInContext(
 		if err != nil {
 			// this covers unexpected and very rare cases (e.g. system memory issues...),
 			// so we shouldn't be here even if transaction naturally fails (e.g. permission, runtime ... )
-			return nil, nil, fmt.Errorf("failed to execute transaction: %d (%w)", i, err)
+			return nil, fmt.Errorf("failed to execute transaction: %d (%w)", i, err)
 		}
 
 		if len(unknownRegTouch) > 0 {
@@ -244,7 +240,7 @@ func (fcv *ChunkVerifier) verifyTransactionsInContext(
 		snapshotTree = snapshotTree.Append(executionSnapshot)
 		err = chunkState.Merge(executionSnapshot)
 		if err != nil {
-			return nil, nil, fmt.Errorf("failed to merge: %d (%w)", i, err)
+			return nil, fmt.Errorf("failed to merge: %d (%w)", i, err)
 		}
 	}
 
@@ -254,12 +250,12 @@ func (fcv *ChunkVerifier) verifyTransactionsInContext(
 		for id := range unknownRegTouch {
 			missingRegs = append(missingRegs, id.String())
 		}
-		return nil, chmodels.NewCFMissingRegisterTouch(missingRegs, chIndex, execResID, problematicTx), nil
+		return nil, chmodels.NewCFMissingRegisterTouch(missingRegs, chIndex, execResID, problematicTx)
 	}
 
 	eventsHash, err := flow.EventsMerkleRootHash(events)
 	if err != nil {
-		return nil, nil, fmt.Errorf("cannot calculate events collection hash: %w", err)
+		return nil, fmt.Errorf("cannot calculate events collection hash: %w", err)
 	}
 	if chunk.EventCollection != eventsHash {
 		collectionID := ""
@@ -282,16 +278,16 @@ func (fcv *ChunkVerifier) verifyTransactionsInContext(
 				Msg("not matching events debug")
 		}
 
-		return nil, chmodels.NewCFInvalidEventsCollection(chunk.EventCollection, eventsHash, chIndex, execResID, events), nil
+		return nil, chmodels.NewCFInvalidEventsCollection(chunk.EventCollection, eventsHash, chIndex, execResID, events)
 	}
 
 	if systemChunk {
 		equal, err := result.ServiceEvents.EqualTo(serviceEvents)
 		if err != nil {
-			return nil, nil, fmt.Errorf("error while comparing service events: %w", err)
+			return nil, fmt.Errorf("error while comparing service events: %w", err)
 		}
 		if !equal {
-			return nil, chmodels.CFInvalidServiceSystemEventsEmitted(result.ServiceEvents, serviceEvents, chIndex, execResID), nil
+			return nil, chmodels.CFInvalidServiceSystemEventsEmitted(result.ServiceEvents, serviceEvents, chIndex, execResID)
 		}
 	}
 
@@ -307,7 +303,7 @@ func (fcv *ChunkVerifier) verifyTransactionsInContext(
 		keys,
 		values)
 	if err != nil {
-		return nil, nil, fmt.Errorf("cannot create ledger update: %w", err)
+		return nil, fmt.Errorf("cannot create ledger update: %w", err)
 	}
 
 	expEndStateComm, trieUpdate, err := psmt.Set(update)
@@ -318,26 +314,26 @@ func (fcv *ChunkVerifier) verifyTransactionsInContext(
 			for i, key := range keys {
 				stringKeys[i] = key.String()
 			}
-			return nil, chmodels.NewCFMissingRegisterTouch(stringKeys, chIndex, execResID, problematicTx), nil
+			return nil, chmodels.NewCFMissingRegisterTouch(stringKeys, chIndex, execResID, problematicTx)
 		}
-		return nil, chmodels.NewCFMissingRegisterTouch(nil, chIndex, execResID, problematicTx), nil
+		return nil, chmodels.NewCFMissingRegisterTouch(nil, chIndex, execResID, problematicTx)
 	}
 
 	// TODO check if exec node provided register touches that was not used (no read and no update)
 	// check if the end state commitment mentioned in the chunk matches
 	// what the partial trie is providing.
 	if flow.StateCommitment(expEndStateComm) != endState {
-		return nil, chmodels.NewCFNonMatchingFinalState(flow.StateCommitment(expEndStateComm), endState, chIndex, execResID), nil
+		return nil, chmodels.NewCFNonMatchingFinalState(flow.StateCommitment(expEndStateComm), endState, chIndex, execResID)
 	}
 
 	// verify the execution data ID included in the ExecutionResult
 	// 1. check basic execution data root fields
 	if chunk.BlockID != chunkDataPack.ExecutionDataRoot.BlockID {
-		return nil, chmodels.NewCFExecutionDataBlockIDMismatch(chunkDataPack.ExecutionDataRoot.BlockID, chunk.BlockID, chIndex, execResID), nil
+		return nil, chmodels.NewCFExecutionDataBlockIDMismatch(chunkDataPack.ExecutionDataRoot.BlockID, chunk.BlockID, chIndex, execResID)
 	}
 
 	if len(chunkDataPack.ExecutionDataRoot.ChunkExecutionDataIDs) != len(result.Chunks) {
-		return nil, chmodels.NewCFExecutionDataChunksLengthMismatch(len(chunkDataPack.ExecutionDataRoot.ChunkExecutionDataIDs), len(result.Chunks), chIndex, execResID), nil
+		return nil, chmodels.NewCFExecutionDataChunksLengthMismatch(len(chunkDataPack.ExecutionDataRoot.ChunkExecutionDataIDs), len(result.Chunks), chIndex, execResID)
 	}
 
 	// 2. build our chunk's chunk execution data using the locally calculated values, and calculate
@@ -351,10 +347,10 @@ func (fcv *ChunkVerifier) verifyTransactionsInContext(
 	cidProvider := provider.NewExecutionDataCIDProvider(execution_data.DefaultSerializer)
 	cedCID, err := cidProvider.CalculateChunkExecutionDataID(gocontext.Background(), chunkExecutionData)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to calculate CID of ChunkExecutionData: %w", err)
+		return nil, fmt.Errorf("failed to calculate CID of ChunkExecutionData: %w", err)
 	}
 
-	// 3. check that with the chunk execution results that we created locally, 
+	// 3. check that with the chunk execution results that we created locally,
 	// we can reproduce the ChunkExecutionData's ID, which the execution node is stating in its ChunkDataPack
 	if cedCID != chunkDataPack.ExecutionDataRoot.ChunkExecutionDataIDs[chIndex] {
 		return nil, chmodels.NewCFExecutionDataInvalidChunkCID(
@@ -362,17 +358,17 @@ func (fcv *ChunkVerifier) verifyTransactionsInContext(
 			cedCID,
 			chIndex,
 			execResID,
-		), nil
+		)
 	}
 
 	// 4. check the execution data root ID by calculating it using the provided execution data root
 	executionDataID, err := cidProvider.CalculateExecutionDataRootID(gocontext.Background(), chunkDataPack.ExecutionDataRoot)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to calculate ID of ExecutionDataRoot: %w", err)
+		return nil, fmt.Errorf("failed to calculate ID of ExecutionDataRoot: %w", err)
 	}
 	if executionDataID != result.ExecutionDataID {
-		return nil, chmodels.NewCFInvalidExecutionDataID(result.ExecutionDataID, executionDataID, chIndex, execResID), nil
+		return nil, chmodels.NewCFInvalidExecutionDataID(result.ExecutionDataID, executionDataID, chIndex, execResID)
 	}
 
-	return chunkExecutionSnapshot.SpockSecret, nil, nil
+	return chunkExecutionSnapshot.SpockSecret, nil
 }

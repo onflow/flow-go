@@ -96,9 +96,8 @@ func (s *ChunkVerifierTestSuite) TestHappyPath() {
 	vch, _ := GetBaselineVerifiableChunk(s.T(), "", false)
 	require.NotNil(s.T(), vch)
 
-	spockSecret, chFaults, err := s.verifier.Verify(vch)
+	spockSecret, err := s.verifier.Verify(vch)
 	assert.NoError(s.T(), err)
-	assert.Nil(s.T(), chFaults)
 	assert.NotNil(s.T(), spockSecret)
 }
 
@@ -111,12 +110,10 @@ func (s *ChunkVerifierTestSuite) TestMissingRegisterTouchForUpdate() {
 
 	// remove the second register touch
 	// vch.ChunkDataPack.RegisterTouches = vch.ChunkDataPack.RegisterTouches[:1]
-	spockSecret, chFaults, err := s.verifier.Verify(vch)
-	assert.NoError(s.T(), err)
-	assert.NotNil(s.T(), chFaults)
+	spockSecret, err := s.verifier.Verify(vch)
+	assert.True(s.T(), chunksmodels.IsChunkFaultError(err))
+	assert.IsType(s.T(), &chunksmodels.CFMissingRegisterTouch{}, err)
 	assert.Nil(s.T(), spockSecret)
-	_, ok := chFaults.(*chunksmodels.CFMissingRegisterTouch)
-	assert.True(s.T(), ok)
 }
 
 // TestMissingRegisterTouchForRead tests verification given a chunkdatapack missing a register touch (read)
@@ -128,12 +125,10 @@ func (s *ChunkVerifierTestSuite) TestMissingRegisterTouchForRead() {
 
 	// remove the second register touch
 	// vch.ChunkDataPack.RegisterTouches = vch.ChunkDataPack.RegisterTouches[1:]
-	spockSecret, chFaults, err := s.verifier.Verify(vch)
-	assert.NoError(s.T(), err)
-	assert.NotNil(s.T(), chFaults)
+	spockSecret, err := s.verifier.Verify(vch)
+	assert.True(s.T(), chunksmodels.IsChunkFaultError(err))
+	assert.IsType(s.T(), &chunksmodels.CFMissingRegisterTouch{}, err)
 	assert.Nil(s.T(), spockSecret)
-	_, ok := chFaults.(*chunksmodels.CFMissingRegisterTouch)
-	assert.True(s.T(), ok)
 }
 
 // TestWrongEndState tests verification covering the case
@@ -175,11 +170,10 @@ func (s *ChunkVerifierTestSuite) TestWrongEndState() {
 
 	updateExecutionData(s.T(), vch, vch.ChunkDataPack.Collection, chunkEvents, update, vch.Result.BlockID)
 
-	spockSecret, chFaults, err := s.verifier.Verify(vch)
-	assert.NoError(s.T(), err)
-	assert.NotNil(s.T(), chFaults)
+	spockSecret, err := s.verifier.Verify(vch)
+	assert.True(s.T(), chunksmodels.IsChunkFaultError(err))
+	assert.IsType(s.T(), &chunksmodels.CFNonMatchingFinalState{}, err)
 	assert.Nil(s.T(), spockSecret)
-	assert.IsType(s.T(), &chunksmodels.CFNonMatchingFinalState{}, chFaults)
 }
 
 // TestFailedTx tests verification behavior in case
@@ -189,9 +183,8 @@ func (s *ChunkVerifierTestSuite) TestFailedTx() {
 	vch, _ := GetBaselineVerifiableChunk(s.T(), "failedTx", false)
 	require.NotNil(s.T(), vch)
 
-	spockSecret, chFaults, err := s.verifier.Verify(vch)
+	spockSecret, err := s.verifier.Verify(vch)
 	assert.NoError(s.T(), err)
-	assert.Nil(s.T(), chFaults)
 	assert.NotNil(s.T(), spockSecret)
 }
 
@@ -201,10 +194,10 @@ func (s *ChunkVerifierTestSuite) TestEventsMismatch() {
 	vch, _ := GetBaselineVerifiableChunk(s.T(), "eventsMismatch", false)
 	require.NotNil(s.T(), vch)
 
-	_, chFault, err := s.verifier.Verify(vch)
-	assert.NoError(s.T(), err)
-	assert.NotNil(s.T(), chFault)
-	assert.IsType(s.T(), &chunksmodels.CFInvalidEventsCollection{}, chFault)
+	_, err := s.verifier.Verify(vch)
+	assert.Error(s.T(), err)
+	assert.True(s.T(), chunksmodels.IsChunkFaultError(err))
+	assert.IsType(s.T(), &chunksmodels.CFInvalidEventsCollection{}, err)
 }
 
 // TestServiceEventsMismatch tests verification behavior in case
@@ -213,10 +206,10 @@ func (s *ChunkVerifierTestSuite) TestServiceEventsMismatch() {
 	vch, _ := GetBaselineVerifiableChunk(s.T(), "doesn't matter", true)
 	require.NotNil(s.T(), vch)
 
-	_, chFault, err := s.systemBadVerifier.Verify(vch)
-	assert.NoError(s.T(), err)
-	assert.NotNil(s.T(), chFault)
-	assert.IsType(s.T(), &chunksmodels.CFInvalidServiceEventsEmitted{}, chFault)
+	_, err := s.systemBadVerifier.Verify(vch)
+	assert.Error(s.T(), err)
+	assert.True(s.T(), chunksmodels.IsChunkFaultError(err))
+	assert.IsType(s.T(), &chunksmodels.CFInvalidServiceEventsEmitted{}, err)
 }
 
 // TestServiceEventsAreChecked ensures that service events are in fact checked
@@ -224,9 +217,8 @@ func (s *ChunkVerifierTestSuite) TestServiceEventsAreChecked() {
 	vch, _ := GetBaselineVerifiableChunk(s.T(), "doesn't matter", true)
 	require.NotNil(s.T(), vch)
 
-	_, chFault, err := s.systemOkVerifier.Verify(vch)
+	_, err := s.systemOkVerifier.Verify(vch)
 	assert.NoError(s.T(), err)
-	assert.Nil(s.T(), chFault)
 }
 
 // TestEmptyCollection tests verification behaviour if a
@@ -247,9 +239,8 @@ func (s *ChunkVerifierTestSuite) TestEmptyCollection() {
 	require.NoError(s.T(), err)
 	updateExecutionData(s.T(), vch, &col, nil, update, vch.Result.BlockID)
 
-	spockSecret, chFaults, err := s.verifier.Verify(vch)
+	spockSecret, err := s.verifier.Verify(vch)
 	assert.NoError(s.T(), err)
-	assert.Nil(s.T(), chFaults)
 	assert.NotNil(s.T(), spockSecret)
 }
 
@@ -274,10 +265,10 @@ func (s *ChunkVerifierTestSuite) TestExecutionDataBlockMismatch() {
 
 	updateExecutionData(s.T(), vch, &col, flow.EventsList{}, update, wrongBlock)
 
-	_, chFaults, err := s.verifier.Verify(vch)
-	assert.NoError(s.T(), err)
-	assert.NotNil(s.T(), chFaults)
-	assert.IsType(s.T(), &chunksmodels.CFExecutionDataBlockIDMismatch{}, chFaults)
+	_, err = s.verifier.Verify(vch)
+	assert.Error(s.T(), err)
+	assert.True(s.T(), chunksmodels.IsChunkFaultError(err))
+	assert.IsType(s.T(), &chunksmodels.CFExecutionDataBlockIDMismatch{}, err)
 }
 
 func (s *ChunkVerifierTestSuite) TestExecutionDataChunkIdsLengthDiffers() {
@@ -286,11 +277,11 @@ func (s *ChunkVerifierTestSuite) TestExecutionDataChunkIdsLengthDiffers() {
 
 	vch.ChunkDataPack.ExecutionDataRoot.ChunkExecutionDataIDs = append(vch.ChunkDataPack.ExecutionDataRoot.ChunkExecutionDataIDs, cid.Undef)
 
-	_, chFaults, err := s.verifier.Verify(vch)
+	_, err := s.verifier.Verify(vch)
 
-	assert.NoError(s.T(), err)
-	assert.NotNil(s.T(), chFaults)
-	assert.IsType(s.T(), &chunksmodels.CFExecutionDataChunksLengthMismatch{}, chFaults)
+	assert.Error(s.T(), err)
+	assert.True(s.T(), chunksmodels.IsChunkFaultError(err))
+	assert.IsType(s.T(), &chunksmodels.CFExecutionDataChunksLengthMismatch{}, err)
 }
 
 func (s *ChunkVerifierTestSuite) TestExecutionDataChunkIdMismatch() {
@@ -299,11 +290,11 @@ func (s *ChunkVerifierTestSuite) TestExecutionDataChunkIdMismatch() {
 
 	vch.ChunkDataPack.ExecutionDataRoot.ChunkExecutionDataIDs[0] = cid.Undef // substitute invalid CID
 
-	_, chFaults, err := s.verifier.Verify(vch)
+	_, err := s.verifier.Verify(vch)
 
-	assert.NoError(s.T(), err)
-	assert.NotNil(s.T(), chFaults)
-	assert.IsType(s.T(), &chunksmodels.CFExecutionDataInvalidChunkCID{}, chFaults)
+	assert.Error(s.T(), err)
+	assert.True(s.T(), chunksmodels.IsChunkFaultError(err))
+	assert.IsType(s.T(), &chunksmodels.CFExecutionDataInvalidChunkCID{}, err)
 }
 
 func (s *ChunkVerifierTestSuite) TestExecutionDataIdMismatch() {
@@ -312,11 +303,11 @@ func (s *ChunkVerifierTestSuite) TestExecutionDataIdMismatch() {
 
 	vch.Result.ExecutionDataID[5]++ //wraparounds
 
-	_, chFaults, err := s.verifier.Verify(vch)
+	_, err := s.verifier.Verify(vch)
 
-	assert.NoError(s.T(), err)
-	assert.NotNil(s.T(), chFaults)
-	assert.IsType(s.T(), &chunksmodels.CFInvalidExecutionDataID{}, chFaults)
+	assert.Error(s.T(), err)
+	assert.True(s.T(), chunksmodels.IsChunkFaultError(err))
+	assert.IsType(s.T(), &chunksmodels.CFInvalidExecutionDataID{}, err)
 }
 
 // updateExecutionData the VerifiableChunkData with a new execution data containing the execution

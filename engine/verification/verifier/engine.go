@@ -188,47 +188,46 @@ func (e *Engine) verify(ctx context.Context, originID flow.Identifier,
 	// execute the assigned chunk
 	span, _ := e.tracer.StartSpanFromContext(ctx, trace.VERVerChunkVerify)
 
-	spockSecret, chFault, err := e.chVerif.Verify(vc)
+	spockSecret, err := e.chVerif.Verify(vc)
 	span.End()
-	// Any err means that something went wrong when verify the chunk
-	// the outcome of the verification is captured inside the chFault and not the err
-	if err != nil {
-		return fmt.Errorf("cannot verify chunk: %w", err)
-	}
 
-	// if any fault found with the chunk
-	if chFault != nil {
-		switch chFault.(type) {
+	if err != nil {
+		if !chmodels.IsChunkFaultError(err) {
+			return fmt.Errorf("cannot verify chunk: %w", err)
+		}
+
+		// if any fault found with the chunk
+		switch chFault := err.(type) {
 		case *chmodels.CFMissingRegisterTouch:
 			e.log.Warn().
 				Str("chunk_fault_type", "missing_register_touch").
-				Str("chunk_fault", chFault.String()).
+				Str("chunk_fault", chFault.Error()).
 				Msg("chunk fault found, could not verify chunk")
 			// still create approvals for this case
 		case *chmodels.CFNonMatchingFinalState:
 			// TODO raise challenge
 			e.log.Warn().
 				Str("chunk_fault_type", "final_state_mismatch").
-				Str("chunk_fault", chFault.String()).
+				Str("chunk_fault", chFault.Error()).
 				Msg("chunk fault found, could not verify chunk")
 			return nil
 		case *chmodels.CFInvalidVerifiableChunk:
 			// TODO raise challenge
 			e.log.Error().
 				Str("chunk_fault_type", "invalid_verifiable_chunk").
-				Str("chunk_fault", chFault.String()).
+				Str("chunk_fault", chFault.Error()).
 				Msg("chunk fault found, could not verify chunk")
 			return nil
 		case *chmodels.CFInvalidEventsCollection:
 			// TODO raise challenge
 			e.log.Error().
 				Str("chunk_fault_type", "invalid_event_collection").
-				Str("chunk_fault", chFault.String()).
+				Str("chunk_fault", chFault.Error()).
 				Msg("chunk fault found, could not verify chunk")
 			return nil
 		default:
 			return engine.NewInvalidInputErrorf("unknown type of chunk fault is received (type: %T) : %v",
-				chFault, chFault.String())
+				chFault, chFault.Error())
 		}
 	}
 
