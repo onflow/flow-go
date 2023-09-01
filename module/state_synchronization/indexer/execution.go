@@ -6,18 +6,14 @@ import (
 	"github.com/onflow/flow-go/cmd/util/ledger/migrations"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	"github.com/onflow/flow-go/storage"
 )
-
-var _ module.ExecutionStateIndexer = &ExecutionState{}
 
 type ExecutionState struct {
 	registers   storage.Registers
 	headers     storage.Headers
 	events      storage.Events
-	last        uint64                          // todo persist
 	commitments map[uint64]flow.StateCommitment // todo persist
 }
 
@@ -25,18 +21,8 @@ func New(registers storage.Registers, headers storage.Headers) *ExecutionState {
 	return &ExecutionState{
 		registers:   registers,
 		headers:     headers,
-		last:        0,
 		commitments: make(map[uint64]flow.StateCommitment),
 	}
-}
-
-func (i *ExecutionState) Last() (uint64, error) {
-	return i.last, nil
-}
-
-func (i *ExecutionState) StoreLast(last uint64) error {
-	i.last = last
-	return nil
 }
 
 func (i *ExecutionState) HeightByBlockID(ID flow.Identifier) (uint64, error) {
@@ -57,7 +43,7 @@ func (i *ExecutionState) Commitment(height uint64) (flow.StateCommitment, error)
 	return val, nil
 }
 
-func (i *ExecutionState) Values(IDs flow.RegisterIDs, height uint64) ([]flow.RegisterValue, error) {
+func (i *ExecutionState) RegisterValues(IDs flow.RegisterIDs, height uint64) ([]flow.RegisterValue, error) {
 	values := make([]flow.RegisterValue, len(IDs))
 
 	for j, id := range IDs {
@@ -90,7 +76,7 @@ func (i *ExecutionState) IndexBlockData(data *execution_data.BlockExecutionDataE
 			return fmt.Errorf("could not index events for chunk %d: %w", j, err)
 		}
 
-		err = i.IndexPayloads(chunk.TrieUpdate.Payloads, block.Height)
+		err = i.IndexRegisterPayloads(chunk.TrieUpdate.Payloads, block.Height)
 		if err != nil {
 			return fmt.Errorf("could not index registers for chunk %d: %w", j, err)
 		}
@@ -105,12 +91,11 @@ func (i *ExecutionState) IndexCommitment(commitment flow.StateCommitment, height
 }
 
 func (i *ExecutionState) IndexEvents(blockID flow.Identifier, events flow.EventsList) error {
-	// Note: service events are currently not included in execution data
-	// see https://github.com/onflow/flow-go/issues/4624
+	// Note: service events are currently not included in execution data: https://github.com/onflow/flow-go/issues/4624
 	return i.events.Store(blockID, []flow.EventsList{events})
 }
 
-func (i *ExecutionState) IndexPayloads(payloads []*ledger.Payload, height uint64) error {
+func (i *ExecutionState) IndexRegisterPayloads(payloads []*ledger.Payload, height uint64) error {
 	regEntries := make(flow.RegisterEntries, len(payloads))
 
 	for j, payload := range payloads {

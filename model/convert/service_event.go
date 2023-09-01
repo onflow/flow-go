@@ -987,7 +987,7 @@ func convertVersionBoundaries(array cadence.Array) (
 
 	for i, cadenceVal := range array.Values {
 		boundary, err := DecodeCadenceValue(
-			fmt.Sprintf(".Values[%d]", i),
+			fmt.Sprintf(".RegisterValues[%d]", i),
 			cadenceVal,
 			func(structVal cadence.Struct) (
 				flow.VersionBoundary,
