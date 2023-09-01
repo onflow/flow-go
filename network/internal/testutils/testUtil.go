@@ -112,7 +112,7 @@ func NewTagWatchingConnManager(log zerolog.Logger, metrics module.LibP2PConnecti
 }
 
 // LibP2PNodeForMiddlewareFixture is a test helper that generate flow identities with a valid port and libp2p nodes.
-// Note that the LibP2PNode created by this fixture is meant to used with a middleware component.
+// Note that the LibP2PNode created by this fixture is meant to be used with a middleware component.
 // If you want to create a standalone LibP2PNode without network and middleware components, please use p2ptest.NodeFixture.
 // Args:
 //
@@ -280,11 +280,11 @@ func GenerateEngines(t *testing.T, nets []network.Network) []*MeshEngine {
 // - timeout: the timeout to use for waiting for the nodes and networks to start.
 //
 // This function fails the test if the nodes or networks do not start within the given timeout.
-func StartNodesAndNetworks(ctx irrecoverable.SignalerContext, t *testing.T, nodes []p2p.LibP2PNode, nets []network.Network, timeout time.Duration) {
-	StartNetworks(ctx, t, nets, timeout)
+func StartNodesAndNetworks(ctx irrecoverable.SignalerContext, t *testing.T, nodes []p2p.LibP2PNode, nets []network.Network) {
+	StartNetworks(ctx, t, nets)
 
 	// start up nodes and Peer managers
-	StartNodes(ctx, t, nodes, timeout)
+	StartNodes(ctx, t, nodes)
 }
 
 // StartNetworks starts the provided networks using the provided irrecoverable context
@@ -295,23 +295,23 @@ func StartNodesAndNetworks(ctx irrecoverable.SignalerContext, t *testing.T, node
 // - duration: the timeout to use for waiting for the networks to start.
 //
 // This function fails the test if the networks do not start within the given timeout.
-func StartNetworks(ctx irrecoverable.SignalerContext, t *testing.T, nets []network.Network, duration time.Duration) {
+func StartNetworks(ctx irrecoverable.SignalerContext, t *testing.T, nets []network.Network) {
 	// start up networks (this will implicitly start middlewares)
 	for _, net := range nets {
 		net.Start(ctx)
-		unittest.RequireComponentsReadyBefore(t, duration, net)
+		unittest.RequireComponentsReadyBefore(t, 5*time.Second, net)
 	}
 }
 
 // StartNodes starts the provided nodes and their peer managers using the provided irrecoverable context
-func StartNodes(ctx irrecoverable.SignalerContext, t *testing.T, nodes []p2p.LibP2PNode, duration time.Duration) {
+func StartNodes(ctx irrecoverable.SignalerContext, t *testing.T, nodes []p2p.LibP2PNode) {
 	for _, node := range nodes {
 		node.Start(ctx)
-		unittest.RequireComponentsReadyBefore(t, duration, node)
+		unittest.RequireComponentsReadyBefore(t, 5*time.Second, node)
 
 		pm := node.PeerManagerComponent()
 		pm.Start(ctx)
-		unittest.RequireComponentsReadyBefore(t, duration, pm)
+		unittest.RequireComponentsReadyBefore(t, 5*time.Second, pm)
 	}
 }
 

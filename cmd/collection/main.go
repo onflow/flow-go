@@ -366,6 +366,7 @@ func main() {
 				followerEng,
 				mainChainSyncCore,
 				node.SyncEngineIdentifierProvider,
+				consync.NewSpamDetectionConfig(),
 			)
 			if err != nil {
 				return nil, fmt.Errorf("could not create synchronization engine: %w", err)
