@@ -237,21 +237,6 @@ func (collector *resultCollector) commitCollection(
 	return nil
 }
 
-func (collector *resultCollector) mergeTrieUpdate(
-	commitment flow.StateCommitment,
-	trieUpdate *ledger.TrieUpdate,
-) error {
-
-	newSnapshot, err := collector.currentCollectionStorageSnapshot.Extend(commitment, trieUpdate)
-	if err != nil {
-		return fmt.Errorf("extend snapshot failed: %w", err)
-	}
-
-	collector.currentCollectionStorageSnapshot = newSnapshot
-
-	return nil
-}
-
 func (collector *resultCollector) processTransactionResult(
 	txn TransactionRequest,
 	txnExecutionSnapshot *snapshot.ExecutionSnapshot,

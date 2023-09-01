@@ -16,43 +16,43 @@ type ViewCommitter struct {
 	mock.Mock
 }
 
-// CommitView provides a mock function with given fields: _a0, _a1
-func (_m *ViewCommitter) CommitView(_a0 *snapshot.ExecutionSnapshot, _a1 flow.StateCommitment) (flow.StateCommitment, []byte, *ledger.TrieUpdate, error) {
-	ret := _m.Called(_a0, _a1)
+// CommitView provides a mock function with given fields: _a0, _a1, _a2
+func (_m *ViewCommitter) CommitView(_a0 *snapshot.ExecutionSnapshot, _a1 flow.StateCommitment, _a2 snapshot.StorageSnapshot) (flow.StateCommitment, []byte, *ledger.TrieUpdate, error) {
+	ret := _m.Called(_a0, _a1, _a2)
 
 	var r0 flow.StateCommitment
 	var r1 []byte
 	var r2 *ledger.TrieUpdate
 	var r3 error
-	if rf, ok := ret.Get(0).(func(*snapshot.ExecutionSnapshot, flow.StateCommitment) (flow.StateCommitment, []byte, *ledger.TrieUpdate, error)); ok {
-		return rf(_a0, _a1)
+	if rf, ok := ret.Get(0).(func(*snapshot.ExecutionSnapshot, flow.StateCommitment, snapshot.StorageSnapshot) (flow.StateCommitment, []byte, *ledger.TrieUpdate, error)); ok {
+		return rf(_a0, _a1, _a2)
 	}
-	if rf, ok := ret.Get(0).(func(*snapshot.ExecutionSnapshot, flow.StateCommitment) flow.StateCommitment); ok {
-		r0 = rf(_a0, _a1)
+	if rf, ok := ret.Get(0).(func(*snapshot.ExecutionSnapshot, flow.StateCommitment, snapshot.StorageSnapshot) flow.StateCommitment); ok {
+		r0 = rf(_a0, _a1, _a2)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(flow.StateCommitment)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(*snapshot.ExecutionSnapshot, flow.StateCommitment) []byte); ok {
-		r1 = rf(_a0, _a1)
+	if rf, ok := ret.Get(1).(func(*snapshot.ExecutionSnapshot, flow.StateCommitment, snapshot.StorageSnapshot) []byte); ok {
+		r1 = rf(_a0, _a1, _a2)
 	} else {
 		if ret.Get(1) != nil {
 			r1 = ret.Get(1).([]byte)
 		}
 	}
 
-	if rf, ok := ret.Get(2).(func(*snapshot.ExecutionSnapshot, flow.StateCommitment) *ledger.TrieUpdate); ok {
-		r2 = rf(_a0, _a1)
+	if rf, ok := ret.Get(2).(func(*snapshot.ExecutionSnapshot, flow.StateCommitment, snapshot.StorageSnapshot) *ledger.TrieUpdate); ok {
+		r2 = rf(_a0, _a1, _a2)
 	} else {
 		if ret.Get(2) != nil {
 			r2 = ret.Get(2).(*ledger.TrieUpdate)
 		}
 	}
 
-	if rf, ok := ret.Get(3).(func(*snapshot.ExecutionSnapshot, flow.StateCommitment) error); ok {
-		r3 = rf(_a0, _a1)
+	if rf, ok := ret.Get(3).(func(*snapshot.ExecutionSnapshot, flow.StateCommitment, snapshot.StorageSnapshot) error); ok {
+		r3 = rf(_a0, _a1, _a2)
 	} else {
 		r3 = ret.Error(3)
 	}

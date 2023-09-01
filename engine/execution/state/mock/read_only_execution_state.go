@@ -68,37 +68,18 @@ func (_m *ReadOnlyExecutionState) GetExecutionResultID(_a0 context.Context, _a1 
 	return r0, r1
 }
 
-// GetHighestExecutedBlockID provides a mock function with given fields: _a0
-func (_m *ReadOnlyExecutionState) GetHighestExecutedBlockID(_a0 context.Context) (uint64, flow.Identifier, error) {
-	ret := _m.Called(_a0)
+// GetHighestFinalizedExecuted provides a mock function with given fields:
+func (_m *ReadOnlyExecutionState) GetHighestFinalizedExecuted() uint64 {
+	ret := _m.Called()
 
 	var r0 uint64
-	var r1 flow.Identifier
-	var r2 error
-	if rf, ok := ret.Get(0).(func(context.Context) (uint64, flow.Identifier, error)); ok {
-		return rf(_a0)
-	}
-	if rf, ok := ret.Get(0).(func(context.Context) uint64); ok {
-		r0 = rf(_a0)
+	if rf, ok := ret.Get(0).(func() uint64); ok {
+		r0 = rf()
 	} else {
 		r0 = ret.Get(0).(uint64)
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context) flow.Identifier); ok {
-		r1 = rf(_a0)
-	} else {
-		if ret.Get(1) != nil {
-			r1 = ret.Get(1).(flow.Identifier)
-		}
-	}
-
-	if rf, ok := ret.Get(2).(func(context.Context) error); ok {
-		r2 = rf(_a0)
-	} else {
-		r2 = ret.Error(2)
-	}
-
-	return r0, r1, r2
+	return r0
 }
 
 // HasState provides a mock function with given fields: _a0
@@ -115,13 +96,37 @@ func (_m *ReadOnlyExecutionState) HasState(_a0 flow.StateCommitment) bool {
 	return r0
 }
 
-// NewStorageSnapshot provides a mock function with given fields: _a0
-func (_m *ReadOnlyExecutionState) NewStorageSnapshot(_a0 flow.StateCommitment) snapshot.StorageSnapshot {
-	ret := _m.Called(_a0)
+// IsBlockExecuted provides a mock function with given fields: height, blockID
+func (_m *ReadOnlyExecutionState) IsBlockExecuted(height uint64, blockID flow.Identifier) (bool, error) {
+	ret := _m.Called(height, blockID)
+
+	var r0 bool
+	var r1 error
+	if rf, ok := ret.Get(0).(func(uint64, flow.Identifier) (bool, error)); ok {
+		return rf(height, blockID)
+	}
+	if rf, ok := ret.Get(0).(func(uint64, flow.Identifier) bool); ok {
+		r0 = rf(height, blockID)
+	} else {
+		r0 = ret.Get(0).(bool)
+	}
+
+	if rf, ok := ret.Get(1).(func(uint64, flow.Identifier) error); ok {
+		r1 = rf(height, blockID)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// NewBlockStorageSnapshot provides a mock function with given fields: commit, blockID, height
+func (_m *ReadOnlyExecutionState) NewBlockStorageSnapshot(commit flow.StateCommitment, blockID flow.Identifier, height uint64) snapshot.StorageSnapshot {
+	ret := _m.Called(commit, blockID, height)
 
 	var r0 snapshot.StorageSnapshot
-	if rf, ok := ret.Get(0).(func(flow.StateCommitment) snapshot.StorageSnapshot); ok {
-		r0 = rf(_a0)
+	if rf, ok := ret.Get(0).(func(flow.StateCommitment, flow.Identifier, uint64) snapshot.StorageSnapshot); ok {
+		r0 = rf(commit, blockID, height)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(snapshot.StorageSnapshot)
