@@ -5,7 +5,6 @@ import (
 	"sync"
 
 	"github.com/onflow/flow-go/engine/execution"
-	"github.com/onflow/flow-go/engine/execution/state"
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/model/flow"
@@ -138,11 +137,20 @@ func (s *BlockStorageSnapshot) Commitment() flow.StateCommitment {
 	return s.commitment
 }
 
+// TODO: move it, copied from engine/execution/state/state.go to prevent cycle import
+const (
+	KeyPartOwner = uint16(0)
+	// @deprecated - controller was used only by the very first
+	// version of cadence for access controll which was retired later on
+	// KeyPartController = uint16(1)
+	KeyPartKey = uint16(2)
+)
+
 // TODO: move it
 func KeyToRegisterID(key ledger.Key) (flow.RegisterID, error) {
 	if len(key.KeyParts) != 2 ||
-		key.KeyParts[0].Type != state.KeyPartOwner ||
-		key.KeyParts[1].Type != state.KeyPartKey {
+		key.KeyParts[0].Type != KeyPartOwner ||
+		key.KeyParts[1].Type != KeyPartKey {
 		return flow.RegisterID{}, fmt.Errorf("key not in expected format %s", key.String())
 	}
 

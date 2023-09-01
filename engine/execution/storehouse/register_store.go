@@ -7,6 +7,7 @@ import (
 	"github.com/onflow/flow-go/engine/execution"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/storage"
+	"github.com/rs/zerolog"
 )
 
 type RegisterStore struct {
@@ -14,24 +15,46 @@ type RegisterStore struct {
 	diskStore execution.OnDiskRegisterStore
 	wal       execution.ExecutedFinalizedWAL
 	finalized execution.FinalizedReader
+	log       zerolog.Logger
 }
 
 func NewRegisterStore(
 	diskStore execution.OnDiskRegisterStore,
 	wal execution.ExecutedFinalizedWAL,
 	finalized execution.FinalizedReader,
+	log zerolog.Logger,
 ) *RegisterStore {
 	return &RegisterStore{
 		diskStore: diskStore,
 		wal:       wal,
 		finalized: finalized,
+		log:       log.With().Str("module", "register-store").Logger(),
 	}
+}
+
+func (r *RegisterStore) Ready() <-chan struct{} {
+	ready := make(chan struct{})
+	go func() {
+		defer close(ready)
+		err := r.Init()
+		if err != nil {
+			r.log.Fatal().Err(err).Msg("cannot init register store")
+		}
+
+	}()
+	return ready
+}
+func (r *RegisterStore) Done() <-chan struct{} {
+	done := make(chan struct{})
+	close(done)
+	return done
 }
 
 func (r *RegisterStore) Init() error {
 	// replay the executed and finalized blocks from the write ahead logs
 	// to the OnDiskRegisterStore
-	height, err := r.syncDiskStore()
+	// TODO: to use syncDiskStore
+	height, err := r.syncDiskStoreMock()
 	if err != nil {
 		return fmt.Errorf("cannot sync disk store: %w", err)
 	}
@@ -98,10 +121,11 @@ func (r *RegisterStore) OnBlockFinalized() error {
 		return nil
 	}
 
-	err = r.wal.Append(next, regs)
-	if err != nil {
-		return fmt.Errorf("cannot write %v registers to write ahead logs for height %v: %w", len(regs), next, err)
-	}
+	// TODO: append WAL
+	// err = r.wal.Append(next, regs)
+	// if err != nil {
+	// 	return fmt.Errorf("cannot write %v registers to write ahead logs for height %v: %w", len(regs), next, err)
+	// }
 
 	err = r.diskStore.SaveRegisters(next, regs)
 	if err != nil {
@@ -139,6 +163,10 @@ func (r *RegisterStore) isBlockFinalized(height uint64, blockID flow.Identifier)
 		return false, fmt.Errorf("cannot get finalized block ID at height %d: %w", height, err)
 	}
 	return finalizedID == blockID, nil
+}
+
+func (r *RegisterStore) syncDiskStoreMock() (uint64, error) {
+	return r.diskStore.Latest(), nil
 }
 
 // syncDiskStore replay WAL to disk store

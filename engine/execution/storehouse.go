@@ -121,9 +121,10 @@ type ReadyOnlyExecutionState interface {
 
 	// NewBlockStorageSnapshot creates a new read-only view at the given block.
 	// Depend on Storehouse.GetRegister
-	NewBlockStorageSnapshot(height uint64, blockID flow.Identifier) snapshot.StorageSnapshot
+	NewBlockStorageSnapshot(commit flow.StateCommitment, height uint64, blockID flow.Identifier) snapshot.StorageSnapshot
 
 	// StateCommitmentByBlockID returns the final state commitment for the provided block ID.
+	// deprecated
 	StateCommitmentByBlockID(context.Context, flow.Identifier) (flow.StateCommitment, error)
 
 	// HasState returns true if the state with the given state commitment exists in memory
