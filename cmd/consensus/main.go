@@ -849,6 +849,7 @@ func main() {
 				comp,
 				syncCore,
 				node.SyncEngineIdentifierProvider,
+				synceng.NewSpamDetectionConfig(),
 			)
 			if err != nil {
 				return nil, fmt.Errorf("could not initialize synchronization engine: %w", err)
