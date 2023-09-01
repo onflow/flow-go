@@ -1,8 +1,6 @@
 package storage
 
 import (
-	"io"
-
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -10,7 +8,6 @@ import (
 type Registers interface {
 	RegisterReader
 	RegisterWriter
-	io.Closer
 }
 
 // RegisterReader defines read-only operations on the register index.
@@ -21,14 +18,13 @@ type RegisterReader interface {
 	// height the register was indexed at.
 	// An error is returned if the register was not indexed at all. Expected errors:
 	// - storage.ErrNotFound if the register was not found in the db
-	Get(ID flow.RegisterID, height uint64) (flow.RegisterEntry, error)
+	Get(ID flow.RegisterID, height uint64) (flow.RegisterValue, error)
 }
 
 // RegisterWriter defines write-only operations on the register index.
 type RegisterWriter interface {
 	// Store batch of register entries at the provided block height.
 	//
-	// If registers at height exists an error is returned. Expected errors:
-	// - storage.ErrAlreadyExists if the register at height already exists, prevents overwriting
+	// If the registers already exists it overwrites them to make this action idempotent.
 	Store(entries flow.RegisterEntries, height uint64) error
 }
