@@ -258,7 +258,7 @@ func (e *executionDataRequester) HighestConsecutiveHeight() (uint64, error) {
 		return 0, fmt.Errorf("HighestConsecutiveHeight must not be called before the component is ready")
 	}
 
-	return e.blockConsumer.LastProcessedIndex(), nil
+	return e.blockConsumer.LastProcessedIndex()
 }
 
 // AddOnExecutionDataReceivedConsumer adds a callback to be called when a new ExecutionData is received
