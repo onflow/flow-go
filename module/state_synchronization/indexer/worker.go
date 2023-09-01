@@ -37,7 +37,7 @@ type ExecutionStateWorker struct {
 	state           protocol.State
 }
 
-// NewExecutionWorker creates a new execution worker.
+// NewExecutionStateWorker creates a new execution worker.
 func NewExecutionStateWorker(
 	log zerolog.Logger,
 	initHeight uint64,
