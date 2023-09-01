@@ -29,10 +29,10 @@ const searchAhead = 1
 // The execution state worker has a callback that is used by the upstream queues which download new execution data to
 // notify new data is available and kick off indexing.
 type ExecutionStateWorker struct {
+	*jobqueue.ComponentConsumer
 	log             zerolog.Logger
 	exeDataReader   *jobs.ExecutionDataReader
 	exeDataNotifier engine.Notifier
-	consumer        *jobqueue.ComponentConsumer
 	indexer         *ExecutionState
 	state           protocol.State
 }
@@ -42,17 +42,19 @@ func NewExecutionStateWorker(
 	log zerolog.Logger,
 	initHeight uint64,
 	fetchTimeout time.Duration,
+	indexer *ExecutionState,
 	executionCache *cache.ExecutionDataCache,
 	processedHeight storage.ConsumerProgress,
 ) *ExecutionStateWorker {
 	r := &ExecutionStateWorker{
 		exeDataNotifier: engine.NewNotifier(),
+		indexer:         indexer,
 	}
 
 	// todo note: alternative would be to use the sealed header reader, and then in the worker actually fetch the execution data
 	r.exeDataReader = jobs.NewExecutionDataReader(executionCache, fetchTimeout, r.highestConsecutiveHeight)
 
-	r.consumer = jobqueue.NewComponentConsumer(
+	r.ComponentConsumer = jobqueue.NewComponentConsumer(
 		log.With().Str("module", "execution_indexer").Logger(),
 		r.exeDataNotifier.Channel(),
 		processedHeight,
