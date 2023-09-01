@@ -16,9 +16,10 @@ import (
 	"github.com/onflow/flow-go/storage"
 )
 
-const workersCount = 4
-
-const searchAhead = 1
+const (
+	workersCount = 4 // how many workers will concurrently process the tasks in the jobqueue
+	searchAhead  = 1 // how many block heights ahead of the current will be requested and tasked for jobqueue
+)
 
 // ExecutionStateWorker handles ingestion of new execution data available and uses the execution data indexer module
 // to index the data.
@@ -53,6 +54,8 @@ func NewExecutionStateWorker(
 	// todo note: alternative would be to use the sealed header reader, and then in the worker actually fetch the execution data
 	r.exeDataReader = jobs.NewExecutionDataReader(executionCache, fetchTimeout, r.highestConsecutiveHeight)
 
+	// create a jobqueue that will process new available block execution data. The `exeDataNotifier` is used to
+	// signal new work, which is being triggered on the `OnExecutionData` handler.
 	r.ComponentConsumer = jobqueue.NewComponentConsumer(
 		log.With().Str("module", "execution_indexer").Logger(),
 		r.exeDataNotifier.Channel(),
