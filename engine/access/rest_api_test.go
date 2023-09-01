@@ -24,6 +24,7 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	accessmock "github.com/onflow/flow-go/engine/access/mock"
+	"github.com/onflow/flow-go/engine/access/rest"
 	"github.com/onflow/flow-go/engine/access/rest/request"
 	"github.com/onflow/flow-go/engine/access/rest/routes"
 	"github.com/onflow/flow-go/engine/access/rpc"
@@ -125,7 +126,9 @@ func (suite *RestAPITestSuite) SetupTest() {
 		UnsecureGRPCListenAddr: unittest.DefaultAddress,
 		SecureGRPCListenAddr:   unittest.DefaultAddress,
 		HTTPListenAddr:         unittest.DefaultAddress,
-		RESTListenAddr:         unittest.DefaultAddress,
+		RestConfig: rest.Config{
+			ListenAddress: unittest.DefaultAddress,
+		},
 	}
 
 	// generate a server certificate that will be served by the GRPC server
