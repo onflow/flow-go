@@ -221,7 +221,7 @@ type CFSystemChunkIncludedCollection struct {
 var _ ChunkFaultError = (*CFSystemChunkIncludedCollection)(nil)
 
 func (cf CFSystemChunkIncludedCollection) String() string {
-	return fmt.Sprint("system chunk data pack included a collection, but must not")
+	return fmt.Sprintf("system chunk data pack must not include a collection but did for chunk %d with result ID %s", cf.chunkIndex, cf.execResID)
 }
 
 func (cf CFSystemChunkIncludedCollection) Error() string {
