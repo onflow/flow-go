@@ -59,7 +59,6 @@ type BlobServiceTestSuite struct {
 }
 
 func TestBlobService(t *testing.T) {
-	t.Parallel()
 	suite.Run(t, new(BlobServiceTestSuite))
 }
 
@@ -100,7 +99,7 @@ func (suite *BlobServiceTestSuite) SetupTest() {
 		testutils.MiddlewareConfigFixture(suite.T(), sporkId),
 		mocknetwork.NewViolationsConsumer(suite.T()))
 	suite.networks = testutils.NetworksFixture(suite.T(), sporkId, ids, mws)
-	testutils.StartNodesAndNetworks(signalerCtx, suite.T(), nodes, suite.networks, 100*time.Millisecond)
+	testutils.StartNodesAndNetworks(signalerCtx, suite.T(), nodes, suite.networks)
 
 	blobExchangeChannel := channels.Channel("blob-exchange")
 
