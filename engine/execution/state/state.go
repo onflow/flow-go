@@ -29,8 +29,6 @@ type ReadOnlyExecutionState interface {
 	ChunkDataPackByChunkID(flow.Identifier) (*flow.ChunkDataPack, error)
 
 	GetExecutionResultID(context.Context, flow.Identifier) (flow.Identifier, error)
-
-	GetHighestExecutedBlockID(context.Context) (uint64, flow.Identifier, error)
 }
 
 // ScriptExecutionState is a subset of the `state.ExecutionState` interface purposed to only access the state
@@ -45,6 +43,8 @@ type ScriptExecutionState interface {
 
 	// HasState returns true if the state with the given state commitment exists in memory
 	HasState(flow.StateCommitment) bool
+
+	GetHighestFinalizedExecuted() uint64
 }
 
 // TODO Many operations here are should be transactional, so we need to refactor this
@@ -401,6 +401,10 @@ func (s *state) GetHighestExecutedBlockID(ctx context.Context) (uint64, flow.Ide
 	}
 
 	return height, blockID, nil
+}
+
+func (s *state) GetHighestFinalizedExecuted() uint64 {
+	return s.registerStore.FinalizedAndExecutedHeight()
 }
 
 // IsBlockExecuted returns true if the block is executed, which means registers, events,
