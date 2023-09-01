@@ -63,17 +63,17 @@ func TestListTargetSubPackages(t *testing.T) {
 
 func TestListOtherPackages(t *testing.T) {
 	var seenPackages = make(map[string]string)
-	seenPackages[flowPackagePrefix+"abc"] = flowPackagePrefix + "abc"
+	seenPackages[flowPackagePrefix+"abc/def"] = flowPackagePrefix + "abc/def"
+	seenPackages[flowPackagePrefix+"abc/def/ghi"] = flowPackagePrefix + "abc/def/ghi"
 	seenPackages[flowPackagePrefix+"ghi"] = flowPackagePrefix + "ghi"
 	seenPackages[flowPackagePrefix+"mno/abc"] = flowPackagePrefix + "mno/abc"
 	seenPackages[flowPackagePrefix+"stu"] = flowPackagePrefix + "stu"
 
 	otherPackages := listOtherPackages(getAllFlowPackages(), seenPackages)
 
-	require.Equal(t, 9, len(otherPackages))
+	require.Equal(t, 8, len(otherPackages))
 
-	require.Contains(t, otherPackages, flowPackagePrefix+"abc/def")
-	require.Contains(t, otherPackages, flowPackagePrefix+"abc/def/ghi")
+	require.Contains(t, otherPackages, flowPackagePrefix+"abc")
 	require.Contains(t, otherPackages, flowPackagePrefix+"def")
 	require.Contains(t, otherPackages, flowPackagePrefix+"def/abc")
 	require.Contains(t, otherPackages, flowPackagePrefix+"jkl")
