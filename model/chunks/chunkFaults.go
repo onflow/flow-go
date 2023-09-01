@@ -211,3 +211,37 @@ func NewCFInvalidVerifiableChunk(reason string, err error, chInx uint64, execRes
 		chunkIndex: chInx,
 		execResID:  execResID}
 }
+
+// CFSystemChunkIncludedCollection is returned when a system chunk includes a collection
+type CFSystemChunkIncludedCollection struct {
+	chunkIndex uint64
+	execResID  flow.Identifier
+}
+
+var _ ChunkFaultError = (*CFSystemChunkIncludedCollection)(nil)
+
+func (cf CFSystemChunkIncludedCollection) String() string {
+	return fmt.Sprint("system chunk data pack included a collection, but must not")
+}
+
+func (cf CFSystemChunkIncludedCollection) Error() string {
+	return cf.String()
+}
+
+// ChunkIndex returns chunk index of the faulty chunk
+func (cf CFSystemChunkIncludedCollection) ChunkIndex() uint64 {
+	return cf.chunkIndex
+}
+
+// ExecutionResultID returns the execution result identifier including the faulty chunk
+func (cf CFSystemChunkIncludedCollection) ExecutionResultID() flow.Identifier {
+	return cf.execResID
+}
+
+// NewCFSystemChunkIncludedCollection creates a new instance of Chunk Fault (SystemChunkIncludedCollection)
+func NewCFSystemChunkIncludedCollection(chInx uint64, execResID flow.Identifier) *CFSystemChunkIncludedCollection {
+	return &CFSystemChunkIncludedCollection{
+		chunkIndex: chInx,
+		execResID:  execResID,
+	}
+}

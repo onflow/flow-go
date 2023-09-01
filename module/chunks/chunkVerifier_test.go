@@ -14,6 +14,7 @@ import (
 
 	executionState "github.com/onflow/flow-go/engine/execution/state"
 	"github.com/onflow/flow-go/fvm"
+	"github.com/onflow/flow-go/fvm/blueprints"
 	fvmErrors "github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/storage"
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
@@ -219,6 +220,20 @@ func (s *ChunkVerifierTestSuite) TestServiceEventsAreChecked() {
 
 	_, err := s.systemOkVerifier.Verify(vch)
 	assert.NoError(s.T(), err)
+}
+
+// TestSystemChunkWithCollectionFails ensures verification fails for system chunks with collections
+func (s *ChunkVerifierTestSuite) TestSystemChunkWithCollectionFails() {
+	vch, _ := GetBaselineVerifiableChunk(s.T(), "doesn't matter", true)
+	require.NotNil(s.T(), vch)
+
+	collection := unittest.CollectionFixture(1)
+	vch.ChunkDataPack.Collection = &collection
+
+	_, err := s.systemBadVerifier.Verify(vch)
+	assert.Error(s.T(), err)
+	assert.True(s.T(), chunksmodels.IsChunkFaultError(err))
+	assert.IsType(s.T(), &chunksmodels.CFSystemChunkIncludedCollection{}, err)
 }
 
 // TestEmptyCollection tests verification behaviour if a
@@ -437,6 +452,15 @@ func GetBaselineVerifiableChunk(t *testing.T, script string, system bool) (*veri
 	if system {
 		chunkEvents = nil
 		erServiceEvents = serviceEventsList
+
+		// the system chunk's data pack does not include the collection, but the execution data does.
+		// we must include the correct collection in the execution data, otherwise verification will fail.
+		txBody, err := blueprints.SystemChunkTransaction(testChain.Chain())
+		require.NoError(t, err)
+
+		coll = flow.Collection{
+			Transactions: []*flow.TransactionBody{txBody},
+		}
 	} else {
 		for i := 0; i < collectionSize; i++ {
 			if i == magicTxIndex {
@@ -488,6 +512,11 @@ func GetBaselineVerifiableChunk(t *testing.T, script string, system bool) (*veri
 		Proof:             proof,
 		Collection:        &coll,
 		ExecutionDataRoot: executionDataRoot,
+	}
+
+	// ENs don't include the system collection in the data pack.
+	if system {
+		chunkDataPack.Collection = nil
 	}
 
 	// ExecutionResult setup

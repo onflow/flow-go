@@ -76,14 +76,6 @@ func (fcv *ChunkVerifier) Verify(
 		transactions = []*fvm.TransactionProcedure{
 			fvm.Transaction(txBody, vc.TransactionOffset+uint32(0)),
 		}
-
-		// enhance ChDP with collection if this is a system chunk. the collection is required to verify
-		// the chunk's execution data
-		if vc.ChunkDataPack.Collection == nil {
-			vc.ChunkDataPack.Collection = &flow.Collection{
-				Transactions: []*flow.TransactionBody{txBody},
-			}
-		}
 	} else {
 		ctx = fvm.NewContextFromParent(
 			fcv.vmCtx,
@@ -169,6 +161,11 @@ func (fcv *ChunkVerifier) verifyTransactionsInContext(
 
 	if chunkDataPack == nil {
 		return nil, fmt.Errorf("missing chunk data pack")
+	}
+
+	// Execution nodes must not include a collection for system chunks.
+	if systemChunk && chunkDataPack.Collection != nil {
+		return nil, chmodels.NewCFSystemChunkIncludedCollection(chIndex, execResID)
 	}
 
 	// Consensus nodes already enforce some fundamental properties of ExecutionResults:
@@ -336,10 +333,20 @@ func (fcv *ChunkVerifier) verifyTransactionsInContext(
 		return nil, chmodels.NewCFExecutionDataChunksLengthMismatch(len(chunkDataPack.ExecutionDataRoot.ChunkExecutionDataIDs), len(result.Chunks), chIndex, execResID)
 	}
 
+	cedCollection := chunkDataPack.Collection
+	// the system chunk collection is not included in the chunkDataPack, but is included in the
+	// ChunkExecutionData. Create the collection here using the transaction body from the
+	// transactions list
+	if systemChunk {
+		cedCollection = &flow.Collection{
+			Transactions: []*flow.TransactionBody{transactions[0].Transaction},
+		}
+	}
+
 	// 2. build our chunk's chunk execution data using the locally calculated values, and calculate
 	// its CID
 	chunkExecutionData := execution_data.ChunkExecutionData{
-		Collection: chunkDataPack.Collection,
+		Collection: cedCollection,
 		Events:     events,
 		TrieUpdate: trieUpdate,
 	}
