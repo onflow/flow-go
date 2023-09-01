@@ -73,6 +73,8 @@ func (i *ExecutionState) RegisterValues(IDs flow.RegisterIDs, height uint64) ([]
 	return values, nil
 }
 
+// IndexBlockData indexes all execution block data by height.
+// If the height was already indexed the operation will be ignored.
 func (i *ExecutionState) IndexBlockData(ctx context.Context, data *execution_data.BlockExecutionDataEntity) error {
 	select {
 	case <-ctx.Done():
@@ -85,10 +87,12 @@ func (i *ExecutionState) IndexBlockData(ctx context.Context, data *execution_dat
 		return fmt.Errorf("could not get the block by ID %s: %w", data.BlockID, err)
 	}
 
+	// todo note: should we silently drop already existing heights or should we fail - look into jobqueue worker failure handling
 	if !i.lastIndexedHeight.Set(block.Height) {
-		return nil // todo note: should we silently drop already existing heights or should we fail - look into jobqueue worker failure handling
+		return nil
 	}
 
+	// concurrently process indexing of block data
 	g, ctx := errgroup.WithContext(ctx)
 	for j, chunk := range data.ChunkExecutionDatas {
 		g.Go(func() error {
