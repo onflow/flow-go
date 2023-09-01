@@ -194,7 +194,7 @@ func (impl *contractUpdaterStubsImpl) getIsContractDeploymentRestricted() (
 		common.MustBytesToAddress(service.Bytes()),
 		blueprints.IsContractDeploymentRestrictedPath)
 	if err != nil {
-		impl.logger.Logger().
+		impl.logger.
 			Debug().
 			Msg("Failed to read IsContractDeploymentRestricted from the " +
 				"service account. Using value from context instead.")
@@ -202,7 +202,7 @@ func (impl *contractUpdaterStubsImpl) getIsContractDeploymentRestricted() (
 	}
 	restrictedCadence, ok := value.(cadence.Bool)
 	if !ok {
-		impl.logger.Logger().
+		impl.logger.
 			Debug().
 			Msg("Failed to parse IsContractDeploymentRestricted from the " +
 				"service account. Using value from context instead.")
@@ -244,12 +244,12 @@ func (impl *contractUpdaterStubsImpl) GetAuthorizedAccounts(
 		"service account. using default behaviour instead."
 
 	if err != nil {
-		impl.logger.Logger().Warn().Msg(warningMsg)
+		impl.logger.Warn().Msg(warningMsg)
 		return defaultAccounts
 	}
 	addresses, ok := cadenceValueToAddressSlice(value)
 	if !ok {
-		impl.logger.Logger().Warn().Msg(warningMsg)
+		impl.logger.Warn().Msg(warningMsg)
 		return defaultAccounts
 	}
 	return addresses
