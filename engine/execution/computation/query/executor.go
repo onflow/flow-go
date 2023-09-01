@@ -16,6 +16,7 @@ import (
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/utils/debug"
 	"github.com/onflow/flow-go/utils/rand"
 )
@@ -71,6 +72,7 @@ type QueryExecutor struct {
 	vmCtx            fvm.Context
 	derivedChainData *derived.DerivedChainData
 	rngLock          *sync.Mutex
+	protocolState    protocol.State
 }
 
 var _ Executor = &QueryExecutor{}
@@ -82,6 +84,7 @@ func NewQueryExecutor(
 	vm fvm.VM,
 	vmCtx fvm.Context,
 	derivedChainData *derived.DerivedChainData,
+	state protocol.State,
 ) *QueryExecutor {
 	return &QueryExecutor{
 		config:           config,
@@ -91,6 +94,7 @@ func NewQueryExecutor(
 		vmCtx:            vmCtx,
 		derivedChainData: derivedChainData,
 		rngLock:          &sync.Mutex{},
+		protocolState:    state,
 	}
 }
 
@@ -162,6 +166,7 @@ func (e *QueryExecutor) ExecuteScript(
 		fvm.NewContextFromParent(
 			e.vmCtx,
 			fvm.WithBlockHeader(blockHeader),
+			fvm.WithEntropyProvider(e.protocolState.AtBlockID(blockHeader.ID())),
 			fvm.WithDerivedBlockData(
 				e.derivedChainData.NewDerivedBlockDataForScript(blockHeader.ID()))),
 		fvm.NewScriptWithContextAndArgs(script, requestCtx, arguments...),

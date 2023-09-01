@@ -157,6 +157,7 @@ func New(
 		vm,
 		vmCtx,
 		derivedChainData,
+		protoState,
 	)
 
 	e := Manager{
