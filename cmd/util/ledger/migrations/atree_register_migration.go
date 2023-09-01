@@ -306,6 +306,8 @@ func (m *AtreeRegisterMigrator) validateChangesAndCreateNewRegisters(
 		newPayloads = append(newPayloads, *ledger.NewPayload(util.RegisterIDToKey(id), value))
 	}
 
+	hasMissingKeys := false
+
 	// add all values that were not changed
 	for id, value := range originalPayloads {
 		if len(value) == 0 {
@@ -345,21 +347,21 @@ func (m *AtreeRegisterMigrator) validateChangesAndCreateNewRegisters(
 			Kind:    "not_migrated",
 			Msg:     fmt.Sprintf("%x", value),
 		})
+		hasMissingKeys = true
+	}
 
-		if m.sampler.Sample(zerolog.InfoLevel) {
-			before := m.rwf.ReportWriter(fmt.Sprintf("account-before-%s", address.Hex()))
-			for _, p := range payloads {
-				before.Write(p)
-			}
-			before.Close()
-
-			after := m.rwf.ReportWriter(fmt.Sprintf("account-after-%s", address.Hex()))
-			for _, p := range newPayloads {
-				after.Write(p)
-			}
-			after.Close()
+	if hasMissingKeys && m.sampler.Sample(zerolog.InfoLevel) {
+		before := m.rwf.ReportWriter(fmt.Sprintf("account-before-%s", address.Hex()))
+		for _, p := range payloads {
+			before.Write(p)
 		}
+		before.Close()
 
+		after := m.rwf.ReportWriter(fmt.Sprintf("account-after-%s", address.Hex()))
+		for _, p := range newPayloads {
+			after.Write(p)
+		}
+		after.Close()
 	}
 	return newPayloads, nil
 }
