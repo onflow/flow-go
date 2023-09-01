@@ -73,6 +73,8 @@ func (i *ExecutionState) RegisterValues(IDs flow.RegisterIDs, height uint64) ([]
 	return values, nil
 }
 
+// IndexBlockData indexes all execution block data by height.
+// If the height was already indexed the operation will be ignored.
 func (i *ExecutionState) IndexBlockData(ctx context.Context, data *execution_data.BlockExecutionDataEntity) error {
 	select {
 	case <-ctx.Done():
