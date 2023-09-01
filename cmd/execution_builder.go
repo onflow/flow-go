@@ -44,6 +44,7 @@ import (
 	"github.com/onflow/flow-go/engine/common/provider"
 	"github.com/onflow/flow-go/engine/common/requester"
 	"github.com/onflow/flow-go/engine/common/synchronization"
+	"github.com/onflow/flow-go/engine/execution"
 	"github.com/onflow/flow-go/engine/execution/checker"
 	"github.com/onflow/flow-go/engine/execution/computation"
 	"github.com/onflow/flow-go/engine/execution/computation/committer"
@@ -57,6 +58,7 @@ import (
 	"github.com/onflow/flow-go/engine/execution/scripts"
 	"github.com/onflow/flow-go/engine/execution/state"
 	"github.com/onflow/flow-go/engine/execution/state/bootstrap"
+	"github.com/onflow/flow-go/engine/execution/storehouse"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/fvm/systemcontracts"
@@ -74,6 +76,7 @@ import (
 	exedataprovider "github.com/onflow/flow-go/module/executiondatasync/provider"
 	"github.com/onflow/flow-go/module/executiondatasync/pruner"
 	"github.com/onflow/flow-go/module/executiondatasync/tracker"
+	"github.com/onflow/flow-go/module/finalizedreader"
 	finalizer "github.com/onflow/flow-go/module/finalizer/consensus"
 	"github.com/onflow/flow-go/module/mempool/queue"
 	"github.com/onflow/flow-go/module/metrics"
@@ -124,6 +127,7 @@ type ExecutionNode struct {
 	followerState          protocol.FollowerState
 	committee              hotstuff.DynamicCommittee
 	ledgerStorage          *ledger.Ledger
+	registerStore          *storehouse.RegisterStore
 	events                 *storage.Events
 	serviceEvents          *storage.ServiceEvents
 	txResults              *storage.TransactionResults
@@ -541,7 +545,13 @@ func (exeNode *ExecutionNode) LoadProviderEngine(
 			err)
 	}
 	blockID := lastExecutedBlock.ID()
-	blockSnapshot := exeNode.executionState.NewStorageSnapshot(stateCommit)
+	stateCommit, err := exeNode.executionState.StateCommitmentByBlockID(context.Background(), blockID)
+	if err != nil {
+		return nil, fmt.Errorf(
+			"cannot get the state commitment for block %s: %w",
+		)
+	}
+	blockSnapshot := exeNode.executionState.NewBlockStorageSnapshot(stateCommit, blockID, lastExecutedBlock.Height)
 
 	// Get the epoch counter from the smart contract at the last executed block.
 	contractEpochCounter, err := getContractEpochCounter(
@@ -686,6 +696,7 @@ func (exeNode *ExecutionNode) LoadExecutionState(
 		exeNode.txResults,
 		node.DB,
 		node.Tracer,
+		exeNode.registerStore,
 	)
 
 	return &module.NoopReadyDoneAware{}, nil
@@ -755,6 +766,20 @@ func (exeNode *ExecutionNode) LoadExecutionStateLedger(
 	exeNode.ledgerStorage, err = ledger.NewLedger(exeNode.diskWAL, int(exeNode.exeConf.mTrieCacheSize), exeNode.collector, node.Logger.With().Str("subcomponent",
 		"ledger").Logger(), ledger.DefaultPathFinderVersion)
 	return exeNode.ledgerStorage, err
+}
+
+func (exeNode *ExecutionNode) LoadRegisterStore(
+	node *NodeConfig,
+) (
+	module.ReadyDoneAware,
+	error,
+) {
+	// TODO: initialize
+	var diskStore execution.OnDiskRegisterStore
+	var wal execution.ExecutedFinalizedWAL
+	reader := finalizedreader.NewFinalizedReader(node.Storage.Headers)
+	exeNode.registerStore = storehouse.NewRegisterStore(diskStore, wal, reader, node.Logger)
+	return exeNode.registerStore, nil
 }
 
 func (exeNode *ExecutionNode) LoadExecutionStateLedgerWALCompactor(

@@ -8,6 +8,7 @@ import (
 	"github.com/dgraph-io/badger/v2"
 
 	"github.com/onflow/flow-go/engine/execution"
+	"github.com/onflow/flow-go/engine/execution/storehouse"
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/convert"
@@ -34,10 +35,12 @@ type ReadOnlyExecutionState interface {
 // used for script execution and not mutate the execution state of the blockchain.
 type ScriptExecutionState interface {
 	// NewStorageSnapshot creates a new ready-only view at the given state commitment.
+	// deprecated
 	NewStorageSnapshot(flow.StateCommitment) snapshot.StorageSnapshot
 
+	NewBlockStorageSnapshot(commit flow.StateCommitment, blockID flow.Identifier, height uint64) snapshot.StorageSnapshot
+
 	// StateCommitmentByBlockID returns the final state commitment for the provided block ID.
-	// deprecated
 	StateCommitmentByBlockID(context.Context, flow.Identifier) (flow.StateCommitment, error)
 
 	// HasState returns true if the state with the given state commitment exists in memory
@@ -220,6 +223,12 @@ func (s *state) NewStorageSnapshot(
 	commitment flow.StateCommitment,
 ) snapshot.StorageSnapshot {
 	return NewLedgerStorageSnapshot(s.ls, commitment)
+}
+
+func (s *state) NewBlockStorageSnapshot(
+	commit flow.StateCommitment, blockID flow.Identifier, height uint64) snapshot.StorageSnapshot {
+	// TODO: query statecommitment
+	return storehouse.NewBlockStorageSnapshot(commit, blockID, height)
 }
 
 type RegisterUpdatesHolder interface {
