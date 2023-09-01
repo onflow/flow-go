@@ -40,7 +40,7 @@ type RegisterStore interface {
 	// which has been saved in OnDiskRegisterStore
 	FinalizedAndExecutedHeight() uint64
 
-	IsBlockExecuted(height uint64, blockID flow.Identifier) error
+	IsBlockExecuted(height uint64, blockID flow.Identifier) (bool, error)
 }
 
 type FinalizedReader interface {
@@ -61,7 +61,7 @@ type InMemoryRegisterStore interface {
 		registers []flow.RegisterEntry,
 	) error
 
-	IsBlockExecuted(height uint64, blockID flow.Identifier) error
+	IsBlockExecuted(height uint64, blockID flow.Identifier) (bool, error)
 }
 
 type OnDiskRegisterStore interface {

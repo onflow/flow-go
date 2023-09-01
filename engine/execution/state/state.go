@@ -368,9 +368,6 @@ func (s *state) saveExecutionResults(
 		return fmt.Errorf("could not persist execution result: %w", err)
 	}
 
-	// the state commitment is the last data item to be stored, so that
-	// IsBlockExecuted can be implemented by checking whether state commitment exists
-	// in the database
 	err = s.commits.BatchStore(blockID, result.CurrentEndState(), batch)
 	if err != nil {
 		return fmt.Errorf("cannot store state commitment: %w", err)
@@ -406,4 +403,8 @@ func (s *state) GetHighestExecutedBlockID(ctx context.Context) (uint64, flow.Ide
 
 func (s *state) GetHighestFinalizedExecuted() uint64 {
 	return s.registerStore.FinalizedAndExecutedHeight()
+}
+
+func (s *state) IsBlockExecuted(height uint64, blockID flow.Identifier) (bool, error) {
+	return s.registerStore.IsBlockExecuted(height, blockID)
 }
