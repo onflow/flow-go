@@ -132,7 +132,10 @@ func (r *RegisterStore) OnBlockFinalized() error {
 		return fmt.Errorf("cannot save %v registers to disk store for height %v: %w", len(regs), next, err)
 	}
 
-	r.memStore.Prune(next, blockID)
+	err = r.memStore.Prune(next, blockID)
+	if err != nil {
+		return fmt.Errorf("cannot prune memStore for height %v: %w", next, err)
+	}
 
 	return nil
 }
