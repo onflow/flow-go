@@ -35,49 +35,11 @@ func NewLoader(
 }
 
 func (e *Loader) LoadUnexecuted(ctx context.Context) ([]flow.Identifier, error) {
-	// saving an executed block is currently not transactional, so it's possible
-	// the block is marked as executed but the receipt might not be saved during a crash.
-	// in order to mitigate this problem, we always re-execute the last executed and finalized
-	// block.
-	// there is an exception, if the last executed block is a root block, then don't execute it,
-	// because the root has already been executed during bootstrapping phase. And re-executing
-	// a root block will fail, because the root block doesn't have a parent block, and could not
-	// get the result of it.
-	// TODO: remove this, when saving a executed block is transactional
-	lastExecutedHeight, lastExecutedID, err := e.execState.GetHighestExecutedBlockID(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("could not get last executed: %w", err)
-	}
+	lastExecuted := e.execState.GetHighestFinalizedExecuted()
 
-	last, err := e.headers.ByBlockID(lastExecutedID)
-	if err != nil {
-		return nil, fmt.Errorf("could not get last executed final by ID: %w", err)
-	}
+	// TODO: check dynamic bootstrapping
 
-	// don't reload root block
-	rootBlock, err := e.state.Params().SealedRoot()
-	if err != nil {
-		return nil, fmt.Errorf("failed to retrieve root block: %w", err)
-	}
-
-	blockIDs := make([]flow.Identifier, 0)
-	isRoot := rootBlock.ID() == last.ID()
-	if !isRoot {
-		executed, err := state.IsBlockExecuted(ctx, e.execState, lastExecutedID)
-		if err != nil {
-			return nil, fmt.Errorf("cannot check is last exeucted final block has been executed %v: %w", lastExecutedID, err)
-		}
-		if !executed {
-			// this should not happen, but if it does, execution should still work
-			e.log.Warn().
-				Hex("block_id", lastExecutedID[:]).
-				Msg("block marked as highest executed one, but not executable - internal inconsistency")
-
-			blockIDs = append(blockIDs, lastExecutedID)
-		}
-	}
-
-	finalized, pending, err := e.unexecutedBlocks(ctx)
+	finalized, pending, err := e.unexecutedBlocks(lastExecuted)
 	if err != nil {
 		return nil, fmt.Errorf("could not reload unexecuted blocks: %w", err)
 	}
@@ -88,20 +50,12 @@ func (e *Loader) LoadUnexecuted(ctx context.Context) ([]flow.Identifier, error) 
 		Int("total", len(unexecuted)).
 		Int("finalized", len(finalized)).
 		Int("pending", len(pending)).
-		Uint64("last_executed", lastExecutedHeight).
-		Hex("last_executed_id", lastExecutedID[:]).
+		Uint64("last_executed", lastExecuted).
 		Logger()
 
 	log.Info().Msg("reloading unexecuted blocks")
 
-	for _, blockID := range unexecuted {
-		blockIDs = append(blockIDs, blockID)
-		e.log.Debug().Hex("block_id", blockID[:]).Msg("reloaded block")
-	}
-
-	log.Info().Msg("all unexecuted have been successfully reloaded")
-
-	return blockIDs, nil
+	return unexecuted, nil
 }
 
 func (e *Loader) unexecutedBlocks(ctx context.Context) (

@@ -193,6 +193,8 @@ func (e *Engine) reloadUnexecutedBlocks() error {
 		blockByCollection *stdmap.BlockByCollectionBackdata,
 		executionQueues *stdmap.QueuesBackdata,
 	) error {
+		e.log.Info().Msg("reloading unexecuted finalized blocks and pending blocks")
+
 		for _, blockID := range unexecuted {
 			err := e.reloadBlock(blockByCollection, executionQueues, blockID)
 			if err != nil {
