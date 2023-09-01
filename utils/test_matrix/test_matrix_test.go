@@ -46,6 +46,21 @@ func TestListTargetPackages(t *testing.T) {
 	require.Contains(t, seenPackages, flowPackagePrefix+"ghi")
 }
 
+// TestListTargetSubPackages tests that if a subpackage is specified as a target package, then the sub package and
+// all children of the sub package are also included in the target packages.
+func TestListTargetSubPackages(t *testing.T) {
+	targetPackages, seenPackages := listTargetPackages([]string{"abc/def"}, getAllFlowPackages())
+	require.Equal(t, 1, len(targetPackages))
+	require.Equal(t, 2, len(seenPackages))
+
+	// there should be 2 packages that starts with "abc/def"
+	require.Equal(t, 2, len(targetPackages["abc/def"]))
+	require.Contains(t, targetPackages["abc/def"], flowPackagePrefix+"abc/def")
+
+	require.Contains(t, seenPackages, flowPackagePrefix+"abc/def")
+	require.Contains(t, seenPackages, flowPackagePrefix+"abc/def/ghi")
+}
+
 func TestListOtherPackages(t *testing.T) {
 	var seenPackages = make(map[string]string)
 	seenPackages[flowPackagePrefix+"abc"] = flowPackagePrefix + "abc"
