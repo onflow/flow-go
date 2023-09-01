@@ -533,22 +533,14 @@ func (exeNode *ExecutionNode) LoadProviderEngine(
 	}
 
 	// Get latest executed block and a view at that block
-	ctx := context.Background()
-	_, blockID, err := exeNode.executionState.GetHighestExecutedBlockID(ctx)
+	lastExecuted := exeNode.executionState.GetHighestFinalizedExecuted()
+	lastExecutedBlock, err := node.State.AtHeight(lastExecuted).Head()
 	if err != nil {
 		return nil, fmt.Errorf(
 			"cannot get the latest executed block id: %w",
 			err)
 	}
-	stateCommit, err := exeNode.executionState.StateCommitmentByBlockID(
-		ctx,
-		blockID)
-	if err != nil {
-		return nil, fmt.Errorf(
-			"cannot get the state commitment at latest executed block id %s: %w",
-			blockID.String(),
-			err)
-	}
+	blockID := lastExecutedBlock.ID()
 	blockSnapshot := exeNode.executionState.NewStorageSnapshot(stateCommit)
 
 	// Get the epoch counter from the smart contract at the last executed block.
