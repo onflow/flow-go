@@ -187,7 +187,7 @@ func verifyAndConvertToAccessEvents(
 
 		events, err := convert.MessagesToEventsFromVersion(result.GetEvents(), version)
 		if err != nil {
-			return nil, fmt.Errorf("failed to unmarshall events in event %d with encoding version %s: %w",
+			return nil, fmt.Errorf("failed to unmarshal events in event %d with encoding version %s: %w",
 				i, version.String(), err)
 		}
 

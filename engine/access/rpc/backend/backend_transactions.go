@@ -798,9 +798,6 @@ func (b *backendTransactions) getTransactionResultFromAnyExeNode(
 				Msg("Successfully got transaction results from any node")
 			return resp, nil
 		}
-		if status.Code(err) == codes.NotFound {
-			return nil, err
-		}
 		errs = multierror.Append(errs, err)
 	}
 
@@ -856,9 +853,6 @@ func (b *backendTransactions) getTransactionResultsByBlockIDFromAnyExeNode(
 				Hex("block_id", req.GetBlockId()).
 				Msg("Successfully got transaction results from any node")
 			return resp, nil
-		}
-		if status.Code(err) == codes.NotFound {
-			return nil, err
 		}
 		errs = multierror.Append(errs, err)
 	}
@@ -916,9 +910,6 @@ func (b *backendTransactions) getTransactionResultByIndexFromAnyExeNode(
 				Uint32("index", req.GetIndex()).
 				Msg("Successfully got transaction results from any node")
 			return resp, nil
-		}
-		if status.Code(err) == codes.NotFound {
-			return nil, err
 		}
 		errs = multierror.Append(errs, err)
 	}
