@@ -177,10 +177,10 @@ func (fcv *ChunkVerifier) verifyTransactionsInContext(
 	//   1. The result contains the correct number of chunks (compared to the block it pertains to).
 	//   2. The result contains chunks with strictly monotonically increasing `Chunk.Index` starting with index 0
 	//   3. for each chunk, the consistency requirement `Chunk.Index == Chunk.CollectionIndex` holds
-	// See `module/validation/receiptValidator` for implementation, which is used by the consensus nodes. 
-  // And issue https://github.com/dapperlabs/flow-go/issues/6864 for implementing 3.
+	// See `module/validation/receiptValidator` for implementation, which is used by the consensus nodes.
+	// And issue https://github.com/dapperlabs/flow-go/issues/6864 for implementing 3.
 	// Hence, the following is a consistency check. Failing it means we have either encountered a critical bug,
-	// or a supermajority of byzantine nodes. In their case, continuing operations is impossible.  
+	// or a super majority of byzantine nodes. In their case, continuing operations is impossible.
 	if int(chIndex) >= len(result.Chunks) {
 		return nil, chmodels.NewCFInvalidVerifiableChunk("error constructing partial trie: ",
 				fmt.Errorf("chunk index out of bounds of ExecutionResult's chunk list"), chIndex, execResID),

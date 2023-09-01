@@ -14,7 +14,7 @@ type ExecutionResult struct {
 	BlockID          Identifier // commit of the current block
 	Chunks           ChunkList
 	ServiceEvents    ServiceEventList
-	ExecutionDataID  Identifier // hash commitment to `flow.BlockExecutionDataRoot`
+	ExecutionDataID  Identifier // hash commitment to flow.BlockExecutionDataRoot
 }
 
 func NewExecutionResult(
