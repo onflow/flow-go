@@ -1,7 +1,10 @@
 package indexer
 
 import (
+	"context"
 	"fmt"
+
+	"golang.org/x/sync/errgroup"
 
 	"github.com/onflow/flow-go/cmd/util/ledger/migrations"
 	"github.com/onflow/flow-go/ledger"
@@ -70,7 +73,13 @@ func (i *ExecutionState) RegisterValues(IDs flow.RegisterIDs, height uint64) ([]
 	return values, nil
 }
 
-func (i *ExecutionState) IndexBlockData(data *execution_data.BlockExecutionDataEntity) error {
+func (i *ExecutionState) IndexBlockData(ctx context.Context, data *execution_data.BlockExecutionDataEntity) error {
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	default:
+	}
+
 	block, err := i.headers.ByBlockID(data.BlockID)
 	if err != nil {
 		return fmt.Errorf("could not get the block by ID %s: %w", data.BlockID, err)
@@ -80,25 +89,32 @@ func (i *ExecutionState) IndexBlockData(data *execution_data.BlockExecutionDataE
 		return nil // todo note: should we silently drop already existing heights or should we fail - look into jobqueue worker failure handling
 	}
 
-	// TODO concurrently process
+	g, ctx := errgroup.WithContext(ctx)
 	for j, chunk := range data.ChunkExecutionDatas {
-		err := i.indexEvents(data.BlockID, chunk.Events)
-		if err != nil {
-			return fmt.Errorf("could not index events for chunk %d: %w", j, err)
-		}
-
-		err = i.indexCommitment(flow.StateCommitment(chunk.TrieUpdate.RootHash), block.Height)
-		if err != nil {
-			return fmt.Errorf("could not index events for chunk %d: %w", j, err)
-		}
-
-		err = i.indexRegisterPayload(chunk.TrieUpdate.Payloads, block.Height)
-		if err != nil {
-			return fmt.Errorf("could not index registers for chunk %d: %w", j, err)
-		}
+		g.Go(func() error {
+			err := i.indexEvents(data.BlockID, chunk.Events)
+			if err != nil {
+				return fmt.Errorf("could not index events for chunk %d: %w", j, err)
+			}
+			return nil
+		})
+		g.Go(func() error {
+			err = i.indexCommitment(flow.StateCommitment(chunk.TrieUpdate.RootHash), block.Height)
+			if err != nil {
+				return fmt.Errorf("could not index events for chunk %d: %w", j, err)
+			}
+			return nil
+		})
+		g.Go(func() error {
+			err = i.indexRegisterPayload(chunk.TrieUpdate.Payloads, block.Height)
+			if err != nil {
+				return fmt.Errorf("could not index registers for chunk %d: %w", j, err)
+			}
+			return nil
+		})
 	}
 
-	return nil
+	return g.Wait()
 }
 
 func (i *ExecutionState) indexCommitment(commitment flow.StateCommitment, height uint64) error {

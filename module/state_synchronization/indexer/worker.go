@@ -3,22 +3,21 @@ package indexer
 import (
 	"time"
 
-	"github.com/onflow/flow-go/module/executiondatasync/execution_data/cache"
-
-	"github.com/onflow/flow-go/state/protocol"
-
-	"github.com/onflow/flow-go/module"
-	"github.com/onflow/flow-go/module/irrecoverable"
+	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/engine"
+	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
+	"github.com/onflow/flow-go/module/executiondatasync/execution_data/cache"
+	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/jobqueue"
 	"github.com/onflow/flow-go/module/state_synchronization/requester/jobs"
+	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
-	"github.com/rs/zerolog"
 )
 
 const workersCount = 4
+
 const searchAhead = 1
 
 // ExecutionStateWorker handles ingestion of new execution data available and uses the execution data indexer module
@@ -92,7 +91,7 @@ func (r *ExecutionStateWorker) processExecutionData(ctx irrecoverable.SignalerCo
 		ctx.Throw(err)
 	}
 
-	err = r.indexer.IndexBlockData(entry.ExecutionData)
+	err = r.indexer.IndexBlockData(ctx, entry.ExecutionData)
 	if err != nil {
 		r.log.Error().Err(err).Str("job_id", string(job.ID())).Msg("error during execution data index processing job")
 		ctx.Throw(err)
