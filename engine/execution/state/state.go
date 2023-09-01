@@ -40,6 +40,7 @@ type ScriptExecutionState interface {
 	NewStorageSnapshot(flow.StateCommitment) snapshot.StorageSnapshot
 
 	// StateCommitmentByBlockID returns the final state commitment for the provided block ID.
+	// deprecated
 	StateCommitmentByBlockID(context.Context, flow.Identifier) (flow.StateCommitment, error)
 
 	// HasState returns true if the state with the given state commitment exists in memory
@@ -76,6 +77,7 @@ type state struct {
 	serviceEvents      storage.ServiceEvents
 	transactionResults storage.TransactionResults
 	db                 *badger.DB
+	registerStore      execution.RegisterStore
 }
 
 // NewExecutionState returns a new execution state access layer for the given ledger storage.
@@ -93,6 +95,7 @@ func NewExecutionState(
 	transactionResults storage.TransactionResults,
 	db *badger.DB,
 	tracer module.Tracer,
+	registerStore execution.RegisterStore,
 ) ExecutionState {
 	return &state{
 		tracer:             tracer,
@@ -108,6 +111,7 @@ func NewExecutionState(
 		serviceEvents:      serviceEvents,
 		transactionResults: transactionResults,
 		db:                 db,
+		registerStore:      registerStore,
 	}
 
 }
@@ -278,6 +282,16 @@ func (s *state) SaveExecutionResults(
 	err := s.saveExecutionResults(ctx, result)
 	if err != nil {
 		return fmt.Errorf("could not save execution results: %w", err)
+	}
+
+	// save registers to register store
+	err = s.registerStore.SaveRegisters(
+		result.BlockExecutionResult.ExecutableBlock.Block.Header,
+		result.BlockExecutionResult.AllUpdatedRegisters(),
+	)
+
+	if err != nil {
+		return fmt.Errorf("could not save updated registers: %w", err)
 	}
 
 	//outside batch because it requires read access
