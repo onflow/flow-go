@@ -87,7 +87,7 @@ func (i *ExecutionState) IndexBlockData(ctx context.Context, data *execution_dat
 		return fmt.Errorf("could not get the block by ID %s: %w", data.BlockID, err)
 	}
 
-	// todo note: should we silently drop already existing heights or should we fail - look into jobqueue worker failure handling
+	// todo note: should we silently drop already existing heights or should we fail - look into jobqueue worker failure handling, if nothing else we should log
 	if !i.lastIndexedHeight.Set(block.Height) {
 		return nil
 	}

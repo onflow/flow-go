@@ -2,6 +2,7 @@ package memory
 
 import (
 	"fmt"
+
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/storage"
 )
@@ -18,21 +19,18 @@ func NewRegisters() *Registers {
 	}
 }
 
-func (r Registers) Get(ID flow.RegisterID, height uint64) (flow.RegisterEntry, error) {
+func (r Registers) Get(ID flow.RegisterID, height uint64) (flow.RegisterValue, error) {
 	h, ok := r.registers[height]
 	if !ok {
-		return flow.RegisterEntry{}, fmt.Errorf("height %d for registers not indexed", height)
+		return nil, fmt.Errorf("height %d for registers not indexed", height)
 	}
 
 	entry, ok := h[ID]
 	if !ok {
-		return flow.RegisterEntry{}, fmt.Errorf("register by ID %s not found", ID.String())
+		return nil, fmt.Errorf("register by ID %s not found", ID.String())
 	}
 
-	return flow.RegisterEntry{
-		Key:   ID,
-		Value: entry,
-	}, nil
+	return entry, nil
 }
 
 func (r Registers) Store(entries flow.RegisterEntries, height uint64) error {
