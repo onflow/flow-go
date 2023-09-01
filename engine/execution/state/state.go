@@ -2,7 +2,6 @@ package state
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"sync"
 
@@ -45,6 +44,8 @@ type ScriptExecutionState interface {
 	HasState(flow.StateCommitment) bool
 
 	GetHighestFinalizedExecuted() uint64
+	// Any error returned is exception
+	IsBlockExecuted(height uint64, blockID flow.Identifier) (bool, error)
 }
 
 // TODO Many operations here are should be transactional, so we need to refactor this
@@ -405,23 +406,4 @@ func (s *state) GetHighestExecutedBlockID(ctx context.Context) (uint64, flow.Ide
 
 func (s *state) GetHighestFinalizedExecuted() uint64 {
 	return s.registerStore.FinalizedAndExecutedHeight()
-}
-
-// IsBlockExecuted returns true if the block is executed, which means registers, events,
-// results, statecommitment etc are all stored.
-// otherwise returns false
-func IsBlockExecuted(ctx context.Context, state ReadOnlyExecutionState, block flow.Identifier) (bool, error) {
-	_, err := state.StateCommitmentByBlockID(ctx, block)
-
-	// statecommitment exists means the block has been executed
-	if err == nil {
-		return true, nil
-	}
-
-	// statecommitment not exists means the block hasn't been executed yet
-	if errors.Is(err, storage.ErrNotFound) {
-		return false, nil
-	}
-
-	return false, err
 }
