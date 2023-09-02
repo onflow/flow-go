@@ -708,6 +708,8 @@ const E2 *BLS12_381_minus_g2 = (const E2 *)&BLS12_381_NEG_G2;
 // E2_read_bytes imports a E2(Fp^2) point from a buffer in a compressed or
 // uncompressed form. The resulting point is guaranteed to be on curve E2 (no G2
 // check is included).
+// E2 point is in affine coordinates. This avoids further conversions
+// when the point is used in multiple pairing computation.
 //
 // returns:
 //    - BAD_ENCODING if the length is invalid or serialization header bits are
@@ -878,7 +880,7 @@ void E2_add(E2 *res, const E2 *a, const E2 *b) {
 }
 
 // generic point double that must handle point at infinity
-void E2_double(E2 *res, const E2 *a) {
+static void E2_double(E2 *res, const E2 *a) {
   POINTonE2_double((POINTonE2 *)res, (POINTonE2 *)a);
 }
 
@@ -934,6 +936,15 @@ void G2_mult_gen(E2 *res, const Fr *expo) {
   vec_zero(&tmp, sizeof(tmp));
 }
 
+// Exponentiation of generator g2 of G2, res = expo.g2
+//
+// This is useful for results being used multiple times in pairings.
+// Conversion to affine saves later pre-pairing conversions.
+void G2_mult_gen_to_affine(E2 *res, const Fr *expo) {
+  G2_mult_gen(res, expo);
+  E2_to_affine(res, res);
+}
+
 // checks if input E2 point is on the subgroup G2.
 // It assumes input `p` is on E2.
 bool E2_in_G2(const E2 *p) {
@@ -947,6 +958,16 @@ void E2_sum_vector(E2 *sum, const E2 *y, const int len) {
   for (int i = 0; i < len; i++) {
     E2_add(sum, sum, &y[i]);
   }
+}
+
+// computes the sum of the E2 array elements `y[i]`, converts it
+// to affine coordinates, and writes it in `sum`.
+//
+// This is useful for results being used multiple times in pairings.
+// Conversion to affine saves later pre-pairing conversions.
+void E2_sum_vector_to_affine(E2 *sum, const E2 *y, const int len) {
+  E2_sum_vector(sum, y, len);
+  E2_to_affine(sum, sum);
 }
 
 // Subtracts all G2 array elements `y` from an element `x` and writes the
@@ -1014,7 +1035,7 @@ void Fp12_multi_pairing(Fp12 *res, const E1 *p, const E2 *q, const int len) {
       continue;
     }
     // `miller_loop_n` expects affine coordinates in a `POINTonEx_affine` array.
-    // `POINTonEx_affine` has a different size than `POINTonEx` or `Ex` !
+    // `POINTonEx_affine` has a different size than `POINTonEx` and `Ex` !
     E1 tmp1;
     E1_to_affine(&tmp1, p + i);
     vec_copy(p_aff + n, &tmp1, sizeof(POINTonE1_affine));
@@ -1022,7 +1043,7 @@ void Fp12_multi_pairing(Fp12 *res, const E1 *p, const E2 *q, const int len) {
     E2_to_affine(&tmp2, q + i);
     vec_copy(q_aff + n, &tmp2, sizeof(POINTonE2_affine));
     n++;
-    if (n == N_MAX) { // if p_ and q_ are filled, batch `N_MAX` miller loops
+    if (n == N_MAX) { // if p_aff and q_aff are filled, batch `N_MAX` miller loops
       if (!init_flag) {
         miller_loop_n(res_vec, q_aff, p_aff, N_MAX);
         init_flag = 1;
@@ -1034,8 +1055,8 @@ void Fp12_multi_pairing(Fp12 *res, const E1 *p, const E2 *q, const int len) {
       n = 0;
     }
   }
-  // if p_ and q_ aren't empty,
-  // remaining couples are also batched in `n` miller loops
+  // if p_aff and q_aff aren't empty,
+  // the remaining couples are also batched in `n` miller loops
   if (n > 0) {
     if (!init_flag) {
       miller_loop_n(res_vec, q_aff, p_aff, n);

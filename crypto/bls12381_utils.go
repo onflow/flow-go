@@ -112,8 +112,13 @@ func generatorScalarMultG1(res *pointE1, expo *scalar) {
 }
 
 // Scalar multiplication of generator g2 in G2
+//
+// This often results in a public key that is used in
+// multiple pairing computation. Therefore, convert the
+// resulting point to affine coordinate to save pre-pairing
+// conversions.
 func generatorScalarMultG2(res *pointE2, expo *scalar) {
-	C.G2_mult_gen((*C.E2)(res), (*C.Fr)(expo))
+	C.G2_mult_gen_to_affine((*C.E2)(res), (*C.Fr)(expo))
 }
 
 // comparison in Fr where r is the group order of G1/G2
