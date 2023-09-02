@@ -716,7 +716,7 @@ func (suite *Suite) TestTransactionStatusTransition() {
 	suite.execClient.
 		On("GetTransactionResult", ctx, exeEventReq).
 		Return(exeEventResp, status.Errorf(codes.NotFound, "not found")).
-		Once()
+		Times(len(fixedENIDs)) // should call each EN once
 
 	// first call - when block under test is greater height than the sealed head, but execution node does not know about Tx
 	result, err := backend.GetTransactionResult(ctx, txID, flow.ZeroID, flow.ZeroID)
@@ -966,7 +966,7 @@ func (suite *Suite) TestTransactionPendingToFinalizedStatusTransition() {
 	suite.execClient.
 		On("GetTransactionResult", ctx, exeEventReq).
 		Return(exeEventResp, status.Errorf(codes.NotFound, "not found")).
-		Once()
+		Times(len(enIDs)) // should call each EN once
 
 	// create a mock connection factory
 	connFactory := suite.setupConnectionFactory()

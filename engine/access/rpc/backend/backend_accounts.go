@@ -114,11 +114,11 @@ func (b *backendAccounts) getAccountFromAnyExeNode(ctx context.Context, execNode
 		execNodes,
 		func(node *flow.Identity) error {
 			var err error
-			// TODO: use the GRPC Client interceptor
 			start := time.Now()
 
 			resp, err = b.tryGetAccount(ctx, node, req)
 			duration := time.Since(start)
+
 			if err == nil {
 				// return if any execution node replied successfully
 				b.log.Debug().
@@ -129,6 +129,7 @@ func (b *backendAccounts) getAccountFromAnyExeNode(ctx context.Context, execNode
 					Msg("Successfully got account info")
 				return nil
 			}
+
 			b.log.Error().
 				Str("execution_node", node.String()).
 				Hex("block_id", req.GetBlockId()).
@@ -136,6 +137,7 @@ func (b *backendAccounts) getAccountFromAnyExeNode(ctx context.Context, execNode
 				Int64("rtt_ms", duration.Milliseconds()).
 				Err(err).
 				Msg("failed to execute GetAccount")
+
 			return err
 		},
 		nil,

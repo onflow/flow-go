@@ -812,9 +812,7 @@ func (b *backendTransactions) getTransactionResultFromAnyExeNode(
 			}
 			return err
 		},
-		func(_ *flow.Identity, err error) bool {
-			return status.Code(err) == codes.NotFound
-		},
+		nil,
 	)
 
 	return resp, errToReturn
@@ -873,9 +871,7 @@ func (b *backendTransactions) getTransactionResultsByBlockIDFromAnyExeNode(
 			}
 			return err
 		},
-		func(_ *flow.Identity, err error) bool {
-			return status.Code(err) == codes.NotFound
-		},
+		nil,
 	)
 
 	return resp, errToReturn
@@ -932,9 +928,7 @@ func (b *backendTransactions) getTransactionResultByIndexFromAnyExeNode(
 			}
 			return err
 		},
-		func(_ *flow.Identity, err error) bool {
-			return status.Code(err) == codes.NotFound
-		},
+		nil,
 	)
 
 	return resp, errToReturn
