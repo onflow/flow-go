@@ -31,7 +31,7 @@ typedef vec384 Fp;
 // curve E_1 (over F_p)
 // E_1 points are represented in Jacobian coordinates (x,y,z),
 // where x, y, x are elements of F_p (type `Fp`).
-// `E1` is equivelent to type `POINTonE1` (used internally by BLST for Jacobian
+// `E1` is equivalent to type `POINTonE1` (used internally by BLST for Jacobian
 // E1 elements) `E1` is defined as a struct to be exportable through cgo to the
 // Go layer. `E1` is also used to represent all subgroup G_1 elements.
 typedef struct {

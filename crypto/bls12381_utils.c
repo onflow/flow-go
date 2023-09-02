@@ -9,6 +9,13 @@
 // compile all blst C src along with this file
 #include "blst_src.c"
 
+// make sure flow crypto types are consistent with BLST types
+void types_sanity(void) {
+  assert(sizeof(Fp)==sizeof(vec384));
+  assert(sizeof(E1)==sizeof(POINTonE1));
+  assert(sizeof(E2)==sizeof(POINTonE2));
+}
+
 // ------------------- Fr utilities
 
 // Montgomery constant R related to the curve order r

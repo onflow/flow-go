@@ -51,6 +51,9 @@ typedef enum {
 #define G1_SER_BYTES (G1_SERIALIZATION==UNCOMPRESSED ? G1_BYTES : (G1_BYTES/2))
 #define G2_SER_BYTES (G2_SERIALIZATION==UNCOMPRESSED ? G2_BYTES : (G2_BYTES/2))
 
+// init-related functions
+void types_sanity(void);
+
 // Fr utilities
 extern const Fr BLS12_381_rR;
 bool Fr_is_zero(const Fr *a);
