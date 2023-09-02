@@ -9,6 +9,7 @@ import (
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/protocol"
 	"github.com/libp2p/go-libp2p/core/routing"
+
 	"github.com/onflow/flow-go/engine/collection"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/component"
