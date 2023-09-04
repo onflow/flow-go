@@ -14,6 +14,8 @@ type Registers interface {
 type RegisterReader interface {
 	// LatestHeight at which we indexed registers.
 	LatestHeight() (uint64, error)
+	// FirstHeight at which we started to index the registers.
+	FirstHeight() (uint64, error)
 	// Get register by the register ID at a given block height.
 	//
 	// If the register at the given height was not indexed, returns the highest
