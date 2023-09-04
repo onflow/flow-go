@@ -12,8 +12,8 @@ type Registers interface {
 
 // RegisterReader defines read-only operations on the register index.
 type RegisterReader interface {
-	// LastHeight at which we indexed registers.
-	LastHeight() (uint64, error)
+	// LatestHeight at which we indexed registers.
+	LatestHeight() (uint64, error)
 	// Get register by the register ID at a given block height.
 	//
 	// If the register at the given height was not indexed, returns the highest
