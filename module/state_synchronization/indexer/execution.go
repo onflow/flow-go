@@ -20,6 +20,7 @@ type ExecutionState struct {
 	headers           storage.Headers
 	events            storage.Events
 	commitments       map[uint64]flow.StateCommitment // todo persist
+	startIndexHeight  uint64
 	lastIndexedHeight counters.SequentialCounter
 }
 
@@ -28,6 +29,7 @@ func New(registers storage.Registers, headers storage.Headers, startIndexHeight 
 		registers:         registers,
 		headers:           headers,
 		commitments:       make(map[uint64]flow.StateCommitment),
+		startIndexHeight:  startIndexHeight,
 		lastIndexedHeight: counters.NewSequentialCounter(startIndexHeight),
 	}
 }
@@ -59,6 +61,15 @@ func (i *ExecutionState) Commitment(height uint64) (flow.StateCommitment, error)
 // An error is returned if the register was not indexed at all. Expected errors:
 // - storage.ErrNotFound if the register was not found in the db
 func (i *ExecutionState) RegisterValues(IDs flow.RegisterIDs, height uint64) ([]flow.RegisterValue, error) {
+	if height < i.startIndexHeight || height > i.lastIndexedHeight.Value() {
+		return nil, fmt.Errorf(
+			"register out of indexed height bounds, current height range: [%d, %d], requested height: %d",
+			i.startIndexHeight,
+			i.lastIndexedHeight,
+			height,
+		)
+	}
+
 	values := make([]flow.RegisterValue, len(IDs))
 
 	for j, id := range IDs {
