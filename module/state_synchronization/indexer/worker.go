@@ -12,7 +12,6 @@ import (
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/jobqueue"
 	"github.com/onflow/flow-go/module/state_synchronization/requester/jobs"
-	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
 )
 
@@ -34,7 +33,6 @@ type ExecutionStateWorker struct {
 	exeDataReader   *jobs.ExecutionDataReader
 	exeDataNotifier engine.Notifier
 	indexer         *ExecutionState
-	state           protocol.State
 }
 
 // NewExecutionStateWorker creates a new execution worker.
@@ -44,6 +42,7 @@ func NewExecutionStateWorker(
 	fetchTimeout time.Duration,
 	indexer *ExecutionState,
 	executionCache *cache.ExecutionDataCache,
+	executionDataLatestHeight func() (uint64, error),
 	processedHeight storage.ConsumerProgress,
 ) *ExecutionStateWorker {
 	r := &ExecutionStateWorker{
@@ -51,8 +50,7 @@ func NewExecutionStateWorker(
 		indexer:         indexer,
 	}
 
-	// todo note: alternative would be to use the sealed header reader, and then in the worker actually fetch the execution data
-	r.exeDataReader = jobs.NewExecutionDataReader(executionCache, fetchTimeout, r.highestConsecutiveHeight)
+	r.exeDataReader = jobs.NewExecutionDataReader(executionCache, fetchTimeout, executionDataLatestHeight)
 
 	// create a jobqueue that will process new available block execution data. The `exeDataNotifier` is used to
 	// signal new work, which is being triggered on the `OnExecutionData` handler.
@@ -70,18 +68,8 @@ func NewExecutionStateWorker(
 	return r
 }
 
-// highestConsecutiveHeight uses protocol state database to query the latest available sealed block height, this
-// method is being passed to the execution data reader as a limiter for latest height the reader is allowed to fetch.
-func (r *ExecutionStateWorker) highestConsecutiveHeight() (uint64, error) {
-	head, err := r.state.Sealed().Head() // use the one from the data requester
-	if err != nil {
-		return 0, err
-	}
-	return head.Height, nil
-}
-
 // OnExecutionData is used to notify when new execution data is downloaded by the execution data requester jobqueue.
-func (r *ExecutionStateWorker) OnExecutionData(_ *execution_data.BlockExecutionDataEntity) {
+func (r *ExecutionStateWorker) OnExecutionData(data *execution_data.BlockExecutionDataEntity) {
 	r.exeDataNotifier.Notify()
 }
 

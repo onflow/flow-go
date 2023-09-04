@@ -9,21 +9,16 @@ import (
 	"strings"
 	"time"
 
-	"github.com/onflow/flow-go/storage/memory"
-
-	"github.com/onflow/flow-go/module/state_synchronization/indexer"
-
 	badger "github.com/ipfs/go-ds-badger2"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/routing"
+	"github.com/onflow/flow/protobuf/go/flow/access"
+	"github.com/onflow/go-bitswap"
 	"github.com/rs/zerolog"
 	"github.com/spf13/pflag"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/insecure"
-
-	"github.com/onflow/flow/protobuf/go/flow/access"
-	"github.com/onflow/go-bitswap"
 
 	"github.com/onflow/flow-go/admin/commands"
 	stateSyncCommands "github.com/onflow/flow-go/admin/commands/state_synchronization"
@@ -64,6 +59,7 @@ import (
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/metrics/unstaked"
 	"github.com/onflow/flow-go/module/state_synchronization"
+	"github.com/onflow/flow-go/module/state_synchronization/indexer"
 	edrequester "github.com/onflow/flow-go/module/state_synchronization/requester"
 	"github.com/onflow/flow-go/network"
 	alspmgr "github.com/onflow/flow-go/network/alsp/manager"
@@ -91,6 +87,7 @@ import (
 	"github.com/onflow/flow-go/state/protocol/blocktimer"
 	"github.com/onflow/flow-go/storage"
 	bstorage "github.com/onflow/flow-go/storage/badger"
+	"github.com/onflow/flow-go/storage/memory"
 	"github.com/onflow/flow-go/utils/grpcutils"
 )
 
@@ -626,6 +623,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionDataRequester() *FlowAccessN
 				5*time.Second,
 				exeIndexer,
 				executionDataCache,
+				builder.ExecutionDataRequester.HighestConsecutiveHeight,
 				indexedBlockHeight,
 			)
 
