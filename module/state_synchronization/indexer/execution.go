@@ -48,6 +48,15 @@ func (i *ExecutionState) HeightByBlockID(ID flow.Identifier) (uint64, error) {
 // Commitment retrieves a commitment at the provided block height.
 // If a commitment at height is not found expect a `storage.ErrNotFound` error.
 func (i *ExecutionState) Commitment(height uint64) (flow.StateCommitment, error) {
+	if height < i.startIndexHeight || height > i.lastIndexedHeight.Value() {
+		return flow.DummyStateCommitment, fmt.Errorf(
+			"state commitment out of indexed height bounds, current height range: [%d, %d], requested height: %d",
+			i.startIndexHeight,
+			i.lastIndexedHeight.Value(),
+			height,
+		)
+	}
+
 	val, ok := i.commitments[height]
 	if !ok {
 		return flow.DummyStateCommitment, fmt.Errorf("could not find commitment at height %d", height)
@@ -57,9 +66,8 @@ func (i *ExecutionState) Commitment(height uint64) (flow.StateCommitment, error)
 }
 
 // RegisterValues retrieves register values by the register IDs at the provided block height.
-// If the register at the given height was not indexed, returns the highest height the register was indexed at.
-// An error is returned if the register was not indexed at all. Expected errors:
-// - storage.ErrNotFound if the register was not found in the db
+// Even if the register wasn't indexed at the provided height, returns the highest height the register was indexed at.
+// If the register was not found the storage.ErrNotFound error is returned.
 func (i *ExecutionState) RegisterValues(IDs flow.RegisterIDs, height uint64) ([]flow.RegisterValue, error) {
 	if height < i.startIndexHeight || height > i.lastIndexedHeight.Value() {
 		return nil, fmt.Errorf(
