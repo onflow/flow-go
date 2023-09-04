@@ -17,7 +17,7 @@ import (
 )
 
 const (
-	workersCount = 4 // how many workers will concurrently process the tasks in the jobqueue
+	workersCount = 1 // how many workers will concurrently process the tasks in the jobqueue
 	searchAhead  = 1 // how many block heights ahead of the current will be requested and tasked for jobqueue
 )
 
@@ -73,7 +73,7 @@ func NewExecutionStateWorker(
 // highestConsecutiveHeight uses protocol state database to query the latest available sealed block height, this
 // method is being passed to the execution data reader as a limiter for latest height the reader is allowed to fetch.
 func (r *ExecutionStateWorker) highestConsecutiveHeight() (uint64, error) {
-	head, err := r.state.Sealed().Head()
+	head, err := r.state.Sealed().Head() // use the one from the data requester
 	if err != nil {
 		return 0, err
 	}
