@@ -172,6 +172,7 @@ func (e *ProtocolStateEntry) Copy() *ProtocolStateEntry {
 }
 
 // Copy returns a full copy of rich protocol state entry.
+// Embedded service events are copied by reference (not deep-copied).
 func (e *RichProtocolStateEntry) Copy() *RichProtocolStateEntry {
 	if e == nil {
 		return nil
@@ -243,7 +244,7 @@ func (ll DynamicIdentityEntryList) Copy() DynamicIdentityEntryList {
 	return dup
 }
 
-// Sort sorts the list by the input ordering.
+// Sort sorts the list by the input ordering. Returns a new, sorted list without modifying the input.
 func (ll DynamicIdentityEntryList) Sort(less IdentifierOrder) DynamicIdentityEntryList {
 	dup := ll.Copy()
 	sort.Slice(dup, func(i int, j int) bool {
