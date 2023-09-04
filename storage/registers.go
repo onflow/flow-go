@@ -26,11 +26,8 @@ type RegisterReader interface {
 
 // RegisterWriter defines write-only operations on the register index.
 type RegisterWriter interface {
-	// SetLastHeight at which we indexed registers.
-	// The provided height should either be one higher than the current height or the same to ensure idempotency.
-	// If the height is invalid this will panic!
-	SetLastHeight(height uint64) error
 	// Store batch of register entries at the provided block height.
-	// If the registers already exists it overwrites them to make this action idempotent.
+	// The provided height should either be one higher than the current height or the same to ensure idempotency.
+	// If the height is not within those bounds it will panic!
 	Store(entries flow.RegisterEntries, height uint64) error
 }
