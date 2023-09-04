@@ -96,32 +96,13 @@ func FromSnapshot(from protocol.Snapshot) (*Snapshot, error) {
 // FromParams converts any protocol.GlobalParams to a memory-backed Params.
 // TODO error docs
 func FromParams(from protocol.GlobalParams) (*Params, error) {
-	var (
-		params EncodableParams
-		err    error
-	)
-
-	params.ChainID = from.ChainID()
-	if err != nil {
-		return nil, fmt.Errorf("could not get chain id: %w", err)
+	params := EncodableParams{
+		ChainID:                    from.ChainID(),
+		SporkID:                    from.SporkID(),
+		SporkRootBlockHeight:       from.SporkRootBlockHeight(),
+		ProtocolVersion:            from.ProtocolVersion(),
+		EpochCommitSafetyThreshold: from.EpochCommitSafetyThreshold(),
 	}
-	params.SporkID = from.SporkID()
-	if err != nil {
-		return nil, fmt.Errorf("could not get spork id: %w", err)
-	}
-	params.SporkRootBlockHeight = from.SporkRootBlockHeight()
-	if err != nil {
-		return nil, fmt.Errorf("could not get spork root block height: %w", err)
-	}
-	params.ProtocolVersion = from.ProtocolVersion()
-	if err != nil {
-		return nil, fmt.Errorf("could not get protocol version: %w", err)
-	}
-	params.EpochCommitSafetyThreshold = from.EpochCommitSafetyThreshold()
-	if err != nil {
-		return nil, fmt.Errorf("could not get protocol version: %w", err)
-	}
-
 	return &Params{params}, nil
 }
 
