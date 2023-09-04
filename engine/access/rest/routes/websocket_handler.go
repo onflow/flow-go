@@ -1,10 +1,10 @@
 package routes
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net/http"
-	"sync"
 	"sync/atomic"
 	"time"
 
@@ -28,9 +28,9 @@ const (
 	writeWait = 10 * time.Second
 )
 
-// WebsocketContext holds the necessary components and parameters for handling a WebSocket subscription.
+// WebsocketController holds the necessary components and parameters for handling a WebSocket subscription.
 // It manages the communication between the server and the WebSocket client for subscribing.
-type WebsocketContext struct {
+type WebsocketController struct {
 	logger            zerolog.Logger
 	conn              *websocket.Conn                // the WebSocket connection for communication with the client
 	api               state_stream.API               // the state_stream.API instance for managing event subscriptions
@@ -38,25 +38,23 @@ type WebsocketContext struct {
 	maxStreams        int32                          // the maximum number of streams allowed
 	streamCount       *atomic.Int32                  // the current number of active streams
 	send              chan interface{}               // channel for sending messages to the client
-
-	wg sync.WaitGroup
 }
 
 // SetWebsocketConf used to set read and write deadlines for WebSocket connections and establishes a Pong handler to
 // manage incoming Pong messages. These methods allow to specify a time limit for reading from or writing to a WebSocket
 // connection. If the operation (reading or writing) takes longer than the specified deadline, the connection will be closed.
-func (ctx *WebsocketContext) SetWebsocketConf() error {
-	err := ctx.conn.SetWriteDeadline(time.Now().Add(writeWait)) // Set the initial write deadline for the first ping message
+func (wsController *WebsocketController) SetWebsocketConf() error {
+	err := wsController.conn.SetWriteDeadline(time.Now().Add(writeWait)) // Set the initial write deadline for the first ping message
 	if err != nil {
 		return models.NewRestError(http.StatusInternalServerError, "Set the initial write deadline error: ", err)
 	}
-	err = ctx.conn.SetReadDeadline(time.Now().Add(pongWait)) // Set the initial read deadline for the first pong message
+	err = wsController.conn.SetReadDeadline(time.Now().Add(pongWait)) // Set the initial read deadline for the first pong message
 	if err != nil {
 		return models.NewRestError(http.StatusInternalServerError, "Set the initial read deadline error: ", err)
 	}
 	// Establish a Pong handler
-	ctx.conn.SetPongHandler(func(string) error {
-		err := ctx.conn.SetReadDeadline(time.Now().Add(pongWait))
+	wsController.conn.SetPongHandler(func(string) error {
+		err := wsController.conn.SetReadDeadline(time.Now().Add(pongWait))
 		if err != nil {
 			return err
 		}
@@ -75,7 +73,7 @@ func (ctx *WebsocketContext) SetWebsocketConf() error {
 // The connection is then closed using WriteControl to send a CloseMessage with the
 // constructed close code and message. Any errors that occur during the closing
 // process are logged using the provided logger.
-func (ctx *WebsocketContext) wsErrorHandler(err error) {
+func (wsController *WebsocketController) wsErrorHandler(err error) {
 	// rest status type error should be returned with status and user message provided
 	var statusErr models.StatusError
 	var wsCode int
@@ -99,17 +97,57 @@ func (ctx *WebsocketContext) wsErrorHandler(err error) {
 	}
 
 	// Close the connection with the CloseError message
-	err = ctx.conn.WriteControl(websocket.CloseMessage, websocket.FormatCloseMessage(wsCode, wsMsg), time.Now().Add(time.Second))
+	err = wsController.conn.WriteControl(websocket.CloseMessage, websocket.FormatCloseMessage(wsCode, wsMsg), time.Now().Add(time.Second))
 	if err != nil {
-		ctx.logger.Error().Err(err).Msg(fmt.Sprintf("error sending WebSocket error: %v", err))
+		wsController.logger.Error().Err(err).Msg(fmt.Sprintf("error sending WebSocket error: %v", err))
+	}
+}
+
+// writeEvents use for writes events and pings to the WebSocket connection. It listens to a subscription's channel for
+// events and writes them to the connection. If an error occurs or the subscription channel is closed, it handles the
+// error or termination accordingly.
+// The function uses a ticker to periodically send ping messages to the client to maintain the connection.
+func (wsController *WebsocketController) writeEvents() {
+	ticker := time.NewTicker(pingPeriod)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case v, ok := <-wsController.send:
+			err := wsController.conn.SetWriteDeadline(time.Now().Add(writeWait))
+			if err != nil {
+				wsController.wsErrorHandler(models.NewRestError(http.StatusInternalServerError, "Set the initial write deadline error: ", err))
+				return
+			}
+			if !ok {
+				return
+			}
+			// Write the response to the WebSocket connection
+			err = wsController.conn.WriteJSON(v)
+			if err != nil {
+				wsController.wsErrorHandler(err)
+				return
+			}
+		case <-ticker.C:
+			err := wsController.conn.SetWriteDeadline(time.Now().Add(writeWait))
+			if err != nil {
+				wsController.wsErrorHandler(models.NewRestError(http.StatusInternalServerError, "Set the initial write deadline error: ", err))
+				return
+			}
+			if err := wsController.conn.WriteMessage(websocket.PingMessage, nil); err != nil {
+				wsController.wsErrorHandler(err)
+				return
+			}
+		}
 	}
 }
 
 // SubscribeHandlerFunc is a function that contains endpoint handling logic for subscribes, fetches necessary resources
 type SubscribeHandlerFunc func(
 	request *request.Request,
-	wsCtx *WebsocketContext,
-)
+	ctx context.Context,
+	wsController *WebsocketController,
+) (state_stream.Subscription, error)
 
 // WSHandler is websocket handler implementing custom websocket handler function and allows easier handling of errors and
 // responses as it wraps functionality for handling error and responses outside of endpoint handling.
@@ -162,7 +200,7 @@ func (h *WSHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	wsCtx := &WebsocketContext{
+	wsController := &WebsocketController{
 		logger:            logger,
 		conn:              conn,
 		api:               h.api,
@@ -170,50 +208,58 @@ func (h *WSHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		maxStreams:        h.maxStreams,
 		streamCount:       h.streamCount,
 		send:              make(chan interface{}),
-		wg:                sync.WaitGroup{},
 	}
 
-	err = wsCtx.SetWebsocketConf()
+	err = wsController.SetWebsocketConf()
 	if err != nil {
-		wsCtx.wsErrorHandler(err)
+		wsController.wsErrorHandler(err)
 		conn.Close()
 	}
 
-	wsCtx.wg.Add(1)
-	go wsCtx.writeEvents()
-	wsCtx.wg.Wait()
+	if wsController.streamCount.Load() >= wsController.maxStreams {
+		err := fmt.Errorf("maximum number of streams reached")
+		wsController.wsErrorHandler(models.NewRestError(http.StatusServiceUnavailable, err.Error(), err))
+	}
+	wsController.streamCount.Add(1)
 
-	h.subscribeFunc(request.Decorate(r, h.HttpHandler.Chain), wsCtx)
-}
-
-// writeEvents use for writes events and pings to the WebSocket connection. It listens to a subscription's channel for
-// events and writes them to the connection. If an error occurs or the subscription channel is closed, it handles the
-// error or termination accordingly.
-// The function uses a ticker to periodically send ping messages to the client to maintain the connection.
-func (ctx *WebsocketContext) writeEvents() {
-	ticker := time.NewTicker(pingPeriod)
-
+	ctx, cancel := context.WithCancel(context.Background())
 	defer func() {
-		ticker.Stop()
-		ctx.streamCount.Add(-1)
-		ctx.conn.Close()
+		wsController.streamCount.Add(-1)
+		wsController.conn.Close()
+		cancel()
 	}()
 
-	ctx.wg.Done()
-	for {
-		select {
-		case v := <-ctx.send:
-			// Write the response to the WebSocket connection
-			err := ctx.conn.WriteJSON(v)
-			if err != nil {
-				ctx.wsErrorHandler(err)
-				return
-			}
-		case <-ticker.C:
-			if err := ctx.conn.WriteMessage(websocket.PingMessage, nil); err != nil {
-				ctx.wsErrorHandler(err)
-				return
-			}
-		}
+	sub, err := h.subscribeFunc(request.Decorate(r, h.HttpHandler.Chain), ctx, wsController)
+	if err != nil {
+		wsController.wsErrorHandler(err)
+		return
+	}
+
+	go h.handleSubscription(sub, wsController)
+	wsController.writeEvents()
+}
+
+// handleSubscription is responsible for managing event subscriptions and sending events to the WebSocket connection.
+// It continuously listens to the provided `state_stream.Subscription` channel, processes incoming events,
+// and sends them to the WebSocket client via the `WebsocketController`.
+//
+// This function runs as a goroutine and handles various scenarios, including the receipt of events,
+// errors in the subscription, and closure of the subscription channel. In case of an error or channel closure,
+// appropriate error handling and cleanup are performed.
+func (h *WSHandler) handleSubscription(sub state_stream.Subscription, wsController *WebsocketController) {
+	defer close(wsController.send)
+
+	for event := range sub.Channel() {
+		wsController.send <- event
+	}
+
+	// The loop will keep running until there's a channel closure.
+	// Handle any potential errors or channel closure here
+	if sub.Err() != nil {
+		err := fmt.Errorf("stream encountered an error: %v", sub.Err())
+		wsController.wsErrorHandler(models.NewBadRequestError(err))
+	} else {
+		err := fmt.Errorf("subscription channel closed, no error occurred")
+		wsController.wsErrorHandler(models.NewRestError(http.StatusRequestTimeout, "subscription channel closed", err))
 	}
 }

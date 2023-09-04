@@ -188,8 +188,10 @@ func (b *StateStreamBackend) getStartHeight(startBlockID flow.Identifier, startH
 	// begin from the next block.
 	// Note: we can skip the block lookup since it was already done in the constructor
 	if startBlockID == b.rootBlockID ||
-		// Note: when startBlockID is provided and startHeight no needed then startHeight should be 0, otherwise, an
-		// InvalidArgument error is returned above, so we need also check if startBlockID provided before skip it.
+		// Note: there is a corner case when rootBlockHeight == 0:
+		// since the default value of an uint64 is 0, when checking if startHeight matches the root block
+		// we also need to check that startBlockID is unset, otherwise we may incorrectly set the start height
+		// for non-matching startBlockIDs.
 		(startHeight == b.rootBlockHeight && startBlockID == flow.ZeroID) {
 		return b.rootBlockHeight + 1, nil
 	}

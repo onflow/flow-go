@@ -118,7 +118,6 @@ type AccessNodeConfig struct {
 	apiRatelimits                map[string]int
 	apiBurstlimits               map[string]int
 	rpcConf                      rpc.Config
-	stateStreamBackend           *state_stream.StateStreamBackend
 	stateStreamConf              state_stream.Config
 	stateStreamFilterConf        map[string]int
 	ExecutionNodeAddress         string // deprecated
@@ -183,7 +182,6 @@ func DefaultAccessNodeConfig() *AccessNodeConfig {
 			EventFilterConfig:       state_stream.DefaultEventFilterConfig,
 			ResponseLimit:           state_stream.DefaultResponseLimit,
 		},
-		stateStreamBackend:           nil,
 		stateStreamFilterConf:        nil,
 		ExecutionNodeAddress:         "localhost:9000",
 		logTxTimeToFinalized:         false,
@@ -260,6 +258,8 @@ type FlowAccessNodeBuilder struct {
 	secureGrpcServer      *grpcserver.GrpcServer
 	unsecureGrpcServer    *grpcserver.GrpcServer
 	stateStreamGrpcServer *grpcserver.GrpcServer
+
+	stateStreamBackend *state_stream.StateStreamBackend
 }
 
 func (builder *FlowAccessNodeBuilder) buildFollowerState() *FlowAccessNodeBuilder {
@@ -439,7 +439,7 @@ func (builder *FlowAccessNodeBuilder) BuildConsensusFollower() *FlowAccessNodeBu
 	return builder
 }
 
-func (builder *FlowAccessNodeBuilder) BuildStateStreamPipeline() *FlowAccessNodeBuilder {
+func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccessNodeBuilder {
 	var ds *badger.Datastore
 	var bs network.BlobService
 	var processedBlockHeight storage.ConsumerProgress
@@ -940,7 +940,7 @@ func (builder *FlowAccessNodeBuilder) enqueueRelayNetwork() {
 
 func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 	if builder.executionDataSyncEnabled {
-		builder.BuildStateStreamPipeline()
+		builder.BuildExecutionSyncComponents()
 	}
 
 	builder.

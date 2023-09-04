@@ -7,11 +7,11 @@ import (
 
 type EventType string
 
+var basicEventRe = regexp.MustCompile(`[A-Z]\.[a-f0-9]{16}\.[\w+]*\.[\w+]*`)
+var flowEventRe = regexp.MustCompile(`flow\.[\w]*`)
+
 func (e *EventType) Parse(raw string) error {
-	basic, _ := regexp.MatchString(`[A-Z]\.[a-f0-9]{16}\.[\w+]*\.[\w+]*`, raw)
-	// match core events flow.event
-	core, _ := regexp.MatchString(`flow\.[\w]*`, raw)
-	if !core && !basic {
+	if !basicEventRe.MatchString(raw) && !flowEventRe.MatchString(raw) {
 		return fmt.Errorf("invalid event type format")
 	}
 	*e = EventType(raw)
@@ -28,10 +28,11 @@ func (e *EventTypes) Parse(raw []string) error {
 	// make a map to have only unique values as keys
 	eventTypes := make(EventTypes, 0)
 	uniqueTypes := make(map[string]bool)
-	for _, r := range raw {
+	for i, r := range raw {
 		var eType EventType
 		err := eType.Parse(r)
 		if err != nil {
+			err = fmt.Errorf("%v at index %d ", i, err)
 			return err
 		}
 
