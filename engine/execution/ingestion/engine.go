@@ -698,6 +698,8 @@ func (e *Engine) executeBlock(
 		Hex("result_id", logging.Entity(receipt.ExecutionResult)).
 		Hex("execution_data_id", receipt.ExecutionResult.ExecutionDataID[:]).
 		Bool("sealed", isExecutedBlockSealed).
+		Bool("state_changed", finalEndState != *executableBlock.StartState).
+		Uint64("num_txs", transactionCount(receipt.ExecutionResult)).
 		Bool("broadcasted", broadcasted).
 		Int64("timeSpentInMS", time.Since(startedAt).Milliseconds()).
 		Msg("block executed")
@@ -715,6 +717,14 @@ func (e *Engine) executeBlock(
 
 	e.unit.Ctx()
 
+}
+
+func transactionCount(result flow.ExecutionResult) uint64 {
+	count := uint64(0)
+	for _, chunk := range result.Chunks {
+		count += chunk.NumberOfTransactions
+	}
+	return count
 }
 
 // we've executed the block, now we need to check:
