@@ -794,29 +794,6 @@ func (n *Network) ReportMisbehaviorOnChannel(channel channels.Channel, report ne
 	n.misbehaviorReportManager.HandleMisbehaviorReport(channel, report)
 }
 
-// unicastMaxMsgSize returns the max permissible size for a unicast message
-func unicastMaxMsgSize(messageType string) int {
-	switch messageType {
-	case "*messages.ChunkDataResponse":
-		return LargeMsgMaxUnicastMsgSize
-	default:
-		return DefaultMaxUnicastMsgSize
-	}
-}
-
-// unicastMaxMsgDuration returns the max duration to allow for a unicast send to complete
-func (n *Network) unicastMaxMsgDuration(messageType string) time.Duration {
-	switch messageType {
-	case "messages.ChunkDataResponse":
-		if LargeMsgUnicastTimeout > n.unicastMessageTimeout {
-			return LargeMsgUnicastTimeout
-		}
-		return n.unicastMessageTimeout
-	default:
-		return n.unicastMessageTimeout
-	}
-}
-
 func DefaultValidators(log zerolog.Logger, flowID flow.Identifier) []network.MessageValidator {
 	return []network.MessageValidator{
 		validator.ValidateNotSender(flowID),   // validator to filter out messages sent by this node itself
@@ -1263,4 +1240,27 @@ func UnicastMaxMsgSizeByCode(payload []byte) (int, error) {
 
 	maxSize := unicastMaxMsgSize(messageType)
 	return maxSize, nil
+}
+
+// unicastMaxMsgSize returns the max permissible size for a unicast message
+func unicastMaxMsgSize(messageType string) int {
+	switch messageType {
+	case "*messages.ChunkDataResponse", "messages.ChunkDataResponse":
+		return LargeMsgMaxUnicastMsgSize
+	default:
+		return DefaultMaxUnicastMsgSize
+	}
+}
+
+// unicastMaxMsgDuration returns the max duration to allow for a unicast send to complete
+func (n *Network) unicastMaxMsgDuration(messageType string) time.Duration {
+	switch messageType {
+	case "*messages.ChunkDataResponse", "messages.ChunkDataResponse":
+		if LargeMsgUnicastTimeout > n.unicastMessageTimeout {
+			return LargeMsgUnicastTimeout
+		}
+		return n.unicastMessageTimeout
+	default:
+		return n.unicastMessageTimeout
+	}
 }
