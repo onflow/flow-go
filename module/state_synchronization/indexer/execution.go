@@ -16,7 +16,7 @@ import (
 
 // ExecutionState indexes the execution state.
 type ExecutionState struct {
-	registers         storage.Registers
+	registers         storage.RegisterIndex
 	headers           storage.Headers
 	events            storage.Events
 	commitments       map[uint64]flow.StateCommitment // todo persist
@@ -24,7 +24,7 @@ type ExecutionState struct {
 	lastIndexedHeight counters.SequentialCounter
 }
 
-func New(registers storage.Registers, headers storage.Headers, startIndexHeight uint64) *ExecutionState {
+func New(registers storage.RegisterIndex, headers storage.Headers, startIndexHeight uint64) *ExecutionState {
 	return &ExecutionState{
 		registers:         registers,
 		headers:           headers,
