@@ -9,28 +9,23 @@ import (
 	"github.com/onflow/flow-go/cmd/util/ledger/migrations"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/module/counters"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	"github.com/onflow/flow-go/storage"
 )
 
 // ExecutionState indexes the execution state.
 type ExecutionState struct {
-	registers         storage.RegisterIndex
-	headers           storage.Headers
-	events            storage.Events
-	commitments       map[uint64]flow.StateCommitment // todo persist
-	startIndexHeight  uint64
-	lastIndexedHeight counters.SequentialCounter
+	registers   storage.RegisterIndex
+	headers     storage.Headers
+	events      storage.Events
+	commitments map[uint64]flow.StateCommitment // todo persist
 }
 
 func New(registers storage.RegisterIndex, headers storage.Headers, startIndexHeight uint64) *ExecutionState {
 	return &ExecutionState{
-		registers:         registers,
-		headers:           headers,
-		commitments:       make(map[uint64]flow.StateCommitment),
-		startIndexHeight:  startIndexHeight,
-		lastIndexedHeight: counters.NewSequentialCounter(startIndexHeight),
+		registers:   registers,
+		headers:     headers,
+		commitments: make(map[uint64]flow.StateCommitment),
 	}
 }
 
@@ -48,14 +43,15 @@ func (i *ExecutionState) HeightByBlockID(ID flow.Identifier) (uint64, error) {
 // Commitment retrieves a commitment at the provided block height.
 // If a commitment at height is not found expect a `storage.ErrNotFound` error.
 func (i *ExecutionState) Commitment(height uint64) (flow.StateCommitment, error) {
-	if height < i.startIndexHeight || height > i.lastIndexedHeight.Value() {
-		return flow.DummyStateCommitment, fmt.Errorf(
-			"state commitment out of indexed height bounds, current height range: [%d, %d], requested height: %d",
-			i.startIndexHeight,
-			i.lastIndexedHeight.Value(),
-			height,
-		)
-	}
+	// todo use the commitment storage to read heights
+	//if height < i.startIndexHeight || height > i.lastIndexedHeight.Value() {
+	//	return flow.DummyStateCommitment, fmt.Errorf(
+	//		"state commitment out of indexed height bounds, current height range: [%d, %d], requested height: %d",
+	//		i.startIndexHeight,
+	//		i.lastIndexedHeight.Value(),
+	//		height,
+	//	)
+	//}
 
 	val, ok := i.commitments[height]
 	if !ok {
@@ -69,13 +65,18 @@ func (i *ExecutionState) Commitment(height uint64) (flow.StateCommitment, error)
 // Even if the register wasn't indexed at the provided height, returns the highest height the register was indexed at.
 // If the register was not found the storage.ErrNotFound error is returned.
 func (i *ExecutionState) RegisterValues(IDs flow.RegisterIDs, height uint64) ([]flow.RegisterValue, error) {
-	if height < i.startIndexHeight || height > i.lastIndexedHeight.Value() {
-		return nil, fmt.Errorf(
-			"register out of indexed height bounds, current height range: [%d, %d], requested height: %d",
-			i.startIndexHeight,
-			i.lastIndexedHeight,
-			height,
-		)
+	first, err := i.registers.FirstHeight()
+	if err != nil {
+		return nil, fmt.Errorf("failed to read first index height: %w", err)
+	}
+
+	last, err := i.registers.LatestHeight()
+	if err != nil {
+		return nil, fmt.Errorf("failed to read last index height: %w", err)
+	}
+
+	if height < first || height > last {
+		return nil, fmt.Errorf("register out of indexed height bounds, current height range: [%d, %d], requested height: %d", first, last, height)
 	}
 
 	values := make([]flow.RegisterValue, len(IDs))
@@ -106,9 +107,11 @@ func (i *ExecutionState) IndexBlockData(ctx context.Context, data *execution_dat
 		return fmt.Errorf("could not get the block by ID %s: %w", data.BlockID, err)
 	}
 
-	// todo note: should we silently drop already existing heights or should we fail - look into jobqueue worker failure handling, if nothing else we should log
-	if !i.lastIndexedHeight.Set(block.Height) {
-		return nil
+	// progress height in storage first, if the height is incorrect the index storage will panic
+	// this is due to unrecoverable bug in the implementation
+	err = i.registers.SetLatestHeight(block.Height)
+	if err != nil {
+		return fmt.Errorf("failed to progress index height to %d: %w", block.Height, err)
 	}
 
 	// concurrently process indexing of block data
@@ -139,11 +142,10 @@ func (i *ExecutionState) IndexBlockData(ctx context.Context, data *execution_dat
 
 	err = g.Wait()
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to index block data at height %d: %w", block.Height, err)
 	}
 
-	// progress height in storage before finishing
-	return i.registers.SetLatestHeight(block.Height)
+	return nil
 }
 
 func (i *ExecutionState) indexCommitment(commitment flow.StateCommitment, height uint64) error {

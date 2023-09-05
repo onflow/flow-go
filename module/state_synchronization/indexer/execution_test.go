@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
+	"github.com/onflow/flow-go/ledger/common/testutils"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/counters"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
@@ -74,11 +75,13 @@ func TestExecutionState_Commitment(t *testing.T) {
 type indexBlockDataTest struct {
 	indexer         ExecutionState
 	registers       *storagemock.Registers
+	events          *storagemock.Events
 	ctx             context.Context
 	data            *execution_data.BlockExecutionDataEntity
 	expectErr       error
 	storeRegisters  func(t *testing.T, ID flow.Identifier, height uint64) error
 	setLatestHeight func(t *testing.T, height uint64) error
+	storeEvents     func(t *testing.T, ID flow.Identifier, events []flow.EventsList) error
 }
 
 func (i *indexBlockDataTest) run(t *testing.T) {
@@ -86,8 +89,8 @@ func (i *indexBlockDataTest) run(t *testing.T) {
 	if i.storeRegisters != nil {
 		i.registers.
 			On("Store", mock.AnythingOfType("flow.RegisterEntries"), mock.AnythingOfType("uint64")).
-			Return(func(id flow.Identifier, height uint64) error {
-				return i.storeRegisters(t, id, height)
+			Return(func(ID flow.Identifier, height uint64) error {
+				return i.storeRegisters(t, ID, height)
 			})
 	}
 
@@ -96,6 +99,14 @@ func (i *indexBlockDataTest) run(t *testing.T) {
 			On("SetLatestHeight", mock.AnythingOfType("uint64")).
 			Return(func(height uint64) error {
 				return i.setLatestHeight(t, height)
+			})
+	}
+
+	if i.storeEvents != nil {
+		i.events.
+			On("Store", mock.AnythingOfType("flow.Identifier"), mock.AnythingOfType("[]flow.EventsList")).
+			Return(func(ID flow.Identifier, events []flow.EventsList) error {
+				return i.storeEvents(t, ID, events)
 			})
 	}
 
@@ -134,8 +145,16 @@ func TestExecutionState_IndexBlockData(t *testing.T) {
 		lastIndexedHeight: counters.NewSequentialCounter(end),
 	}
 
+	collection := unittest.CollectionFixture(5)
+	ced := &execution_data.ChunkExecutionData{
+		Collection: &collection,
+		Events:     flow.EventsList{},
+		TrieUpdate: testutils.TrieUpdateFixture(2, 1, 8),
+	}
+
 	bed := unittest.BlockExecutionDatEntityFixture(
 		unittest.WithBlockExecutionDataBlockID(block.ID()),
+		unittest.WithChunkExecutionDatas(ced),
 	)
 
 	test := indexBlockDataTest{
@@ -145,6 +164,13 @@ func TestExecutionState_IndexBlockData(t *testing.T) {
 		data:      bed,
 		setLatestHeight: func(t *testing.T, height uint64) error {
 			assert.Equal(t, height, block.Header.Height)
+			return nil
+		},
+		storeRegisters: func(t *testing.T, ID flow.Identifier, height uint64) error {
+			assert.Equal(t, height, block.Header.Height)
+			return nil
+		},
+		storeEvents: func(t *testing.T, ID flow.Identifier, events []flow.EventsList) error {
 			return nil
 		},
 	}
