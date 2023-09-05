@@ -10,13 +10,32 @@ import (
 var _ storage.Registers = (*Registers)(nil)
 
 type Registers struct {
-	registers map[uint64]map[flow.RegisterID]flow.RegisterValue
+	registers    map[uint64]map[flow.RegisterID]flow.RegisterValue
+	latestHeight uint64
+	firstHeight  uint64
 }
 
 func NewRegisters() *Registers {
 	return &Registers{
 		registers: make(map[uint64]map[flow.RegisterID]flow.RegisterValue),
 	}
+}
+
+func (r Registers) LatestHeight() (uint64, error) {
+	return r.latestHeight, nil
+}
+
+func (r Registers) FirstHeight() (uint64, error) {
+	return r.firstHeight, nil
+}
+
+func (r Registers) SetLatestHeight(height uint64) error {
+	if height-r.latestHeight > 1 || height-r.latestHeight < 0 {
+		panic("invalid height")
+	}
+
+	r.latestHeight = height
+	return nil
 }
 
 func (r Registers) Get(ID flow.RegisterID, height uint64) (flow.RegisterValue, error) {
@@ -38,9 +57,5 @@ func (r Registers) Store(entries flow.RegisterEntries, height uint64) error {
 		r.registers[height][e.Key] = e.Value
 	}
 
-	return nil
-}
-
-func (r Registers) Close() error {
 	return nil
 }
