@@ -137,7 +137,13 @@ func (i *ExecutionState) IndexBlockData(ctx context.Context, data *execution_dat
 		})
 	}
 
-	return g.Wait()
+	err = g.Wait()
+	if err != nil {
+		return err
+	}
+
+	// progress height in storage before finishing
+	return i.registers.SetLatestHeight(block.Height)
 }
 
 func (i *ExecutionState) indexCommitment(commitment flow.StateCommitment, height uint64) error {
