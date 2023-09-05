@@ -24,7 +24,7 @@ type backendAccounts struct {
 	executionReceipts storage.ExecutionReceipts
 	connFactory       connection.ConnectionFactory
 	log               zerolog.Logger
-	nodeCommunicator  *NodeCommunicator
+	nodeCommunicator  Communicator
 }
 
 func (b *backendAccounts) GetAccount(ctx context.Context, address flow.Address) (*flow.Account, error) {
