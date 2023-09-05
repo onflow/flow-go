@@ -37,7 +37,7 @@ type WebsocketController struct {
 	eventFilterConfig state_stream.EventFilterConfig // the configuration for filtering events
 	maxStreams        int32                          // the maximum number of streams allowed
 	streamCount       *atomic.Int32                  // the current number of active streams
-	send              chan interface{}               // channel for sending messages to the client
+	read              chan interface{}               // channel for read close message from the client
 }
 
 // SetWebsocketConf used to set read and write deadlines for WebSocket connections and establishes a Pong handler to
@@ -60,6 +60,21 @@ func (wsController *WebsocketController) SetWebsocketConf() error {
 		}
 		return nil
 	})
+
+	// Start a goroutine to handle the WebSocket connection
+	go func() {
+		defer close(wsController.read) // notify websocket about closed connection
+
+		wsController.conn.SetReadDeadline(time.Now().Add(pongWait))
+		wsController.conn.SetPongHandler(func(string) error { wsController.conn.SetReadDeadline(time.Now().Add(pongWait)); return nil })
+
+		for {
+			_, _, err := wsController.conn.ReadMessage()
+			if err != nil {
+				return
+			}
+		}
+	}()
 	return nil
 }
 
@@ -106,24 +121,36 @@ func (wsController *WebsocketController) wsErrorHandler(err error) {
 // writeEvents use for writes events and pings to the WebSocket connection. It listens to a subscription's channel for
 // events and writes them to the connection. If an error occurs or the subscription channel is closed, it handles the
 // error or termination accordingly.
+// TODO: comment for added part
 // The function uses a ticker to periodically send ping messages to the client to maintain the connection.
-func (wsController *WebsocketController) writeEvents() {
+func (wsController *WebsocketController) writeEvents(sub state_stream.Subscription) {
 	ticker := time.NewTicker(pingPeriod)
 	defer ticker.Stop()
 
 	for {
 		select {
-		case v, ok := <-wsController.send:
+		case _, ok := <-wsController.read:
+			if !ok {
+				return
+			}
+		case event, ok := <-sub.Channel():
+			if !ok {
+				if sub.Err() != nil {
+					err := fmt.Errorf("stream encountered an error: %v", sub.Err())
+					wsController.wsErrorHandler(models.NewBadRequestError(err))
+					return
+				}
+				err := fmt.Errorf("subscription channel closed, no error occurred")
+				wsController.wsErrorHandler(models.NewRestError(http.StatusRequestTimeout, "subscription channel closed", err))
+				return
+			}
 			err := wsController.conn.SetWriteDeadline(time.Now().Add(writeWait))
 			if err != nil {
 				wsController.wsErrorHandler(models.NewRestError(http.StatusInternalServerError, "Set the initial write deadline error: ", err))
 				return
 			}
-			if !ok {
-				return
-			}
 			// Write the response to the WebSocket connection
-			err = wsController.conn.WriteJSON(v)
+			err = wsController.conn.WriteJSON(event)
 			if err != nil {
 				wsController.wsErrorHandler(err)
 				return
@@ -207,7 +234,7 @@ func (h *WSHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		eventFilterConfig: h.eventFilterConfig,
 		maxStreams:        h.maxStreams,
 		streamCount:       h.streamCount,
-		send:              make(chan interface{}),
+		read:              make(chan interface{}),
 	}
 
 	err = wsController.SetWebsocketConf()
@@ -235,31 +262,5 @@ func (h *WSHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	go h.handleSubscription(sub, wsController)
-	wsController.writeEvents()
-}
-
-// handleSubscription is responsible for managing event subscriptions and sending events to the WebSocket connection.
-// It continuously listens to the provided `state_stream.Subscription` channel, processes incoming events,
-// and sends them to the WebSocket client via the `WebsocketController`.
-//
-// This function runs as a goroutine and handles various scenarios, including the receipt of events,
-// errors in the subscription, and closure of the subscription channel. In case of an error or channel closure,
-// appropriate error handling and cleanup are performed.
-func (h *WSHandler) handleSubscription(sub state_stream.Subscription, wsController *WebsocketController) {
-	defer close(wsController.send)
-
-	for event := range sub.Channel() {
-		wsController.send <- event
-	}
-
-	// The loop will keep running until there's a channel closure.
-	// Handle any potential errors or channel closure here
-	if sub.Err() != nil {
-		err := fmt.Errorf("stream encountered an error: %v", sub.Err())
-		wsController.wsErrorHandler(models.NewBadRequestError(err))
-	} else {
-		err := fmt.Errorf("subscription channel closed, no error occurred")
-		wsController.wsErrorHandler(models.NewRestError(http.StatusRequestTimeout, "subscription channel closed", err))
-	}
+	wsController.writeEvents(sub)
 }

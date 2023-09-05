@@ -122,7 +122,12 @@ func executeRequest(req *http.Request, backend *mock.API, stateStreamApi *mock_s
 	}
 
 	resp := NewHijackResponseRecorder()
+	go func() {
+		time.Sleep(5 * time.Second)
+		//close(resp.closed)
+	}()
 	router.ServeHTTP(resp, req)
+	//<-resp.closed
 	return resp, nil
 }
 
