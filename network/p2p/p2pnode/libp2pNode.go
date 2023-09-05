@@ -213,8 +213,7 @@ func (n *Node) OpenProtectedStream(ctx context.Context, peerID peer.ID, protecti
 	if err != nil {
 		return fmt.Errorf("failed to set write deadline for stream: %w", err)
 	}
-
-	// create a gogo protobuf writer
+	
 	err = writingLogic(s)
 	if err != nil {
 		// reset the stream to ensure that the next stream creation is not affected by the error.
