@@ -1,30 +1,25 @@
 package indexer
 
 import (
+	"context"
 	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/counters"
 	synctest "github.com/onflow/flow-go/module/state_synchronization/requester/unittest"
+	"github.com/onflow/flow-go/storage"
+	storagemock "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
 func TestExecutionState_HeightByBlockID(t *testing.T) {
-	blocks := buildBlocks(5)
-	blocksByID := make(map[flow.Identifier]*flow.Block, 0)
-	for _, b := range blocks {
-		blocksByID[b.ID()] = b
-	}
-
-	indexer := ExecutionState{
-		headers: synctest.MockBlockHeaderStorage(
-			synctest.WithByID(blocksByID),
-		),
-	}
+	blocks := generateBlocks(5)
+	indexer := ExecutionState{headers: buildHeaders(blocks)}
 
 	for _, b := range blocks {
 		ret, err := indexer.HeightByBlockID(b.ID())
@@ -75,18 +70,81 @@ func TestExecutionState_Commitment(t *testing.T) {
 	})
 }
 
-func indexCommitments(indexer *ExecutionState, start uint64, end uint64, t *testing.T) map[uint64]flow.StateCommitment {
-	comms := make(map[uint64]flow.StateCommitment)
-	for i := start; i <= end; i++ {
-		commitment := flow.StateCommitment(unittest.IdentifierFixture())
-		comms[i] = commitment
-		err := indexer.indexCommitment(commitment, i)
-		require.NoError(t, err)
+func TestExecutionState_IndexBlockData(t *testing.T) {
+	registers := storagemock.NewRegisters(t)
+	events := storagemock.NewEvents(t)
+	blocks := generateBlocks(1)
+	headers := buildHeaders(blocks)
+	block := blocks[0]
+	start, end := block.Header.Height-5, block.Header.Height-1
+
+	indexer := ExecutionState{
+		registers:         registers,
+		headers:           headers,
+		events:            events,
+		commitments:       make(map[uint64]flow.StateCommitment),
+		startIndexHeight:  start,
+		lastIndexedHeight: counters.NewSequentialCounter(end),
 	}
-	return comms
+
+	bed := unittest.BlockExecutionDatEntityFixture(
+		unittest.WithBlockExecutionDataBlockID(block.ID()),
+	)
+
+	registers.
+		On("Store", mock.AnythingOfType("flow.RegisterEntries"), mock.AnythingOfType("uint64")).
+		Return(func(id flow.Identifier, height uint64) error {
+			assert.Equal(t, block.Header.Height, height)
+			return nil
+		})
+
+	err := indexer.IndexBlockData(context.Background(), bed)
+	require.NoError(t, err)
+
 }
 
-func buildBlocks(n int) []*flow.Block {
+func indexCommitments(indexer *ExecutionState, start uint64, end uint64, t *testing.T) map[uint64]flow.StateCommitment {
+	commits := generateCommitments(int(end - start))
+	commitsHeight := make(map[uint64]flow.StateCommitment)
+
+	for j, i := 0, start; i <= end; i++ {
+		commitsHeight[i] = commits[j]
+		err := indexer.indexCommitment(commits[j], i)
+		require.NoError(t, err)
+		j++
+	}
+
+	return commitsHeight
+}
+
+//func buildEvents() storage.Events {
+//	events := storagemock.Events{}
+//	events.
+//		On("Store", mock.AnythingOfType("flow.Identifier"), mock.AnythingOfType("[]flow.EventsList")).
+//		Return(func(id flow.Identifier, events []flow.EventsList) {
+//
+//	})
+//}
+
+func buildHeaders(blocks []*flow.Block) storage.Headers {
+	blocksByID := make(map[flow.Identifier]*flow.Block, 0)
+	for _, b := range blocks {
+		blocksByID[b.ID()] = b
+	}
+
+	return synctest.MockBlockHeaderStorage(synctest.WithByID(blocksByID))
+}
+
+func generateCommitments(n int) []flow.StateCommitment {
+	commits := make([]flow.StateCommitment, n)
+	for i := 0; i < n; i++ {
+		commits[i] = flow.StateCommitment(unittest.IdentifierFixture())
+	}
+
+	return commits
+}
+
+func generateBlocks(n int) []*flow.Block {
 	blocks := make([]*flow.Block, n)
 
 	genesis := unittest.BlockFixture()
