@@ -4,14 +4,14 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-// Registers defines methods for the register index.
-type Registers interface {
-	RegisterReader
-	RegisterWriter
+// RegisterIndex defines methods for the register index.
+type RegisterIndex interface {
+	RegisterIndexReader
+	RegisterIndexWriter
 }
 
-// RegisterReader defines read-only operations on the register index.
-type RegisterReader interface {
+// RegisterIndexReader defines read-only operations on the register index.
+type RegisterIndexReader interface {
 	// LatestHeight at which we indexed registers.
 	LatestHeight() (uint64, error)
 	// FirstHeight at which we started to index the registers.
@@ -27,8 +27,8 @@ type RegisterReader interface {
 	Get(ID flow.RegisterID, height uint64) (flow.RegisterValue, error)
 }
 
-// RegisterWriter defines write-only operations on the register index.
-type RegisterWriter interface {
+// RegisterIndexWriter defines write-only operations on the register index.
+type RegisterIndexWriter interface {
 	// Store batch of register entries at the provided block height.
 	// The provided height should either be one higher than the current height or the same to ensure idempotency.
 	// If the height is not within those bounds it will panic!
