@@ -11,6 +11,7 @@ import (
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/counters"
+	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	synctest "github.com/onflow/flow-go/module/state_synchronization/requester/unittest"
 	"github.com/onflow/flow-go/storage"
 	storagemock "github.com/onflow/flow-go/storage/mock"
@@ -70,6 +71,42 @@ func TestExecutionState_Commitment(t *testing.T) {
 	})
 }
 
+type indexBlockDataTest struct {
+	indexer         ExecutionState
+	registers       *storagemock.Registers
+	ctx             context.Context
+	data            *execution_data.BlockExecutionDataEntity
+	expectErr       error
+	storeRegisters  func(t *testing.T, ID flow.Identifier, height uint64) error
+	setLatestHeight func(t *testing.T, height uint64) error
+}
+
+func (i *indexBlockDataTest) run(t *testing.T) {
+
+	if i.storeRegisters != nil {
+		i.registers.
+			On("Store", mock.AnythingOfType("flow.RegisterEntries"), mock.AnythingOfType("uint64")).
+			Return(func(id flow.Identifier, height uint64) error {
+				return i.storeRegisters(t, id, height)
+			})
+	}
+
+	if i.setLatestHeight != nil {
+		i.registers.
+			On("SetLatestHeight", mock.AnythingOfType("uint64")).
+			Return(func(height uint64) error {
+				return i.setLatestHeight(t, height)
+			})
+	}
+
+	err := i.indexer.IndexBlockData(i.ctx, i.data)
+	if i.expectErr != nil {
+		assert.Equal(t, i.expectErr, err)
+	} else {
+		assert.NoError(t, err)
+	}
+}
+
 func TestExecutionState_IndexBlockData(t *testing.T) {
 	registers := storagemock.NewRegisters(t)
 	events := storagemock.NewEvents(t)
@@ -77,6 +114,16 @@ func TestExecutionState_IndexBlockData(t *testing.T) {
 	headers := buildHeaders(blocks)
 	block := blocks[0]
 	start, end := block.Header.Height-5, block.Header.Height-1
+
+	// test cases:
+	// - no chunk data
+	// - no registers data
+	// - multiple inserts, same height
+	// - smaller invalid height
+	// - bigger invalid height
+	// - error on register updates
+	// - error on events
+	// - full register data, events, collections...
 
 	indexer := ExecutionState{
 		registers:         registers,
@@ -91,15 +138,18 @@ func TestExecutionState_IndexBlockData(t *testing.T) {
 		unittest.WithBlockExecutionDataBlockID(block.ID()),
 	)
 
-	registers.
-		On("Store", mock.AnythingOfType("flow.RegisterEntries"), mock.AnythingOfType("uint64")).
-		Return(func(id flow.Identifier, height uint64) error {
-			assert.Equal(t, block.Header.Height, height)
+	test := indexBlockDataTest{
+		indexer:   indexer,
+		registers: registers,
+		ctx:       context.Background(),
+		data:      bed,
+		setLatestHeight: func(t *testing.T, height uint64) error {
+			assert.Equal(t, height, block.Header.Height)
 			return nil
-		})
+		},
+	}
 
-	err := indexer.IndexBlockData(context.Background(), bed)
-	require.NoError(t, err)
+	test.run(t)
 
 }
 
