@@ -87,7 +87,8 @@ func TestGetCollections(t *testing.T) {
 			Once()
 
 		req := getCollectionReq(col.ID().String(), true)
-		rr, err := executeRequest(req, backend, nil)
+		rr := NewHijackResponseRecorder()
+		err := executeRequest(req, backend, nil, rr)
 		assert.NoError(t, err)
 
 		assert.Equal(t, http.StatusOK, rr.Code)

@@ -39,14 +39,17 @@ const (
 )
 
 type fakeNetConn struct {
-	io.Reader
 	io.Writer
 	closed chan struct{}
 }
 
 // Close closes the fakeNetConn and signals its closure by closing the "closed" channel.
 func (c fakeNetConn) Close() error {
-	close(c.closed)
+	select {
+	case <-c.closed:
+	default:
+		close(c.closed)
+	}
 	return nil
 }
 func (c fakeNetConn) LocalAddr() net.Addr                { return localAddr }
@@ -54,6 +57,10 @@ func (c fakeNetConn) RemoteAddr() net.Addr               { return remoteAddr }
 func (c fakeNetConn) SetDeadline(t time.Time) error      { return nil }
 func (c fakeNetConn) SetReadDeadline(t time.Time) error  { return nil }
 func (c fakeNetConn) SetWriteDeadline(t time.Time) error { return nil }
+func (c fakeNetConn) Read(p []byte) (n int, err error) {
+	<-c.closed
+	return 0, fmt.Errorf("closed")
+}
 
 type fakeAddr int
 
@@ -86,14 +93,14 @@ func (w *HijackResponseRecorder) Hijack() (net.Conn, *bufio.ReadWriter, error) {
 	w.responseBuff = bytes.NewBuffer(make([]byte, 0))
 	w.closed = make(chan struct{}, 1)
 
-	return fakeNetConn{strings.NewReader(""), w.responseBuff, w.closed}, bufio.NewReadWriter(br, bw), nil
+	return fakeNetConn{w.responseBuff, w.closed}, bufio.NewReadWriter(br, bw), nil
 }
 
 // NewHijackResponseRecorder creates a new instance of HijackResponseRecorder.
 func NewHijackResponseRecorder() *HijackResponseRecorder {
-	responseRecorder := &HijackResponseRecorder{}
-	responseRecorder.ResponseRecorder = httptest.NewRecorder()
-	return responseRecorder
+	return &HijackResponseRecorder{
+		ResponseRecorder: httptest.NewRecorder(),
+	}
 }
 
 func newRouter(backend *mock.API, stateStreamApi *mock_state_stream.API) (*mux.Router, error) {
@@ -115,20 +122,13 @@ func newRouter(backend *mock.API, stateStreamApi *mock_state_stream.API) (*mux.R
 		stateStreamConfig.MaxGlobalStreams)
 }
 
-func executeRequest(req *http.Request, backend *mock.API, stateStreamApi *mock_state_stream.API) (*HijackResponseRecorder, error) {
+func executeRequest(req *http.Request, backend *mock.API, stateStreamApi *mock_state_stream.API, responseRecorder *HijackResponseRecorder) error {
 	router, err := newRouter(backend, stateStreamApi)
 	if err != nil {
-		return nil, err
+		return err
 	}
-
-	resp := NewHijackResponseRecorder()
-	go func() {
-		time.Sleep(5 * time.Second)
-		//close(resp.closed)
-	}()
-	router.ServeHTTP(resp, req)
-	//<-resp.closed
-	return resp, nil
+	router.ServeHTTP(responseRecorder, req)
+	return nil
 }
 
 func assertOKResponse(t *testing.T, req *http.Request, expectedRespBody string, backend *mock.API, stateStreamApi *mock_state_stream.API) {
@@ -136,7 +136,8 @@ func assertOKResponse(t *testing.T, req *http.Request, expectedRespBody string, 
 }
 
 func assertResponse(t *testing.T, req *http.Request, status int, expectedRespBody string, backend *mock.API, stateStreamApi *mock_state_stream.API) {
-	rr, err := executeRequest(req, backend, stateStreamApi)
+	rr := NewHijackResponseRecorder()
+	err := executeRequest(req, backend, stateStreamApi, rr)
 	assert.NoError(t, err)
 	actualResponseBody := rr.Body.String()
 	require.JSONEq(t,

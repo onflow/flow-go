@@ -261,7 +261,8 @@ func TestGetAccountKeyByIndex(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			req, _ := http.NewRequest("GET", test.url, nil)
-			rr, err := executeRequest(req, backend, nil)
+			rr := NewHijackResponseRecorder()
+			err := executeRequest(req, backend, nil, rr)
 			assert.NoError(t, err)
 
 			assert.Equal(t, http.StatusBadRequest, rr.Code)

@@ -149,7 +149,8 @@ func TestAccessGetBlocks(t *testing.T) {
 	testVectors := prepareTestVectors(t, blockIDs, heights, blocks, executionResults, blkCnt)
 
 	for _, tv := range testVectors {
-		responseRec, err := executeRequest(tv.request, backend, nil)
+		responseRec := NewHijackResponseRecorder()
+		err := executeRequest(tv.request, backend, nil, responseRec)
 		assert.NoError(t, err)
 		require.Equal(t, tv.expectedStatus, responseRec.Code, "failed test %s: incorrect response code", tv.description)
 		actualResp := responseRec.Body.String()

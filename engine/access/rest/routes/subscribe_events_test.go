@@ -180,7 +180,13 @@ func (s *SubscribeEventsSuite) TestSubscribeEvents() {
 
 			req, err := getSubscribeEventsRequest(s.T(), test.startBlockID, test.startHeight, test.eventTypes, test.addresses, test.contracts)
 			assert.NoError(s.T(), err)
-			respRecorder, err := executeRequest(req, backend, stateStreamBackend)
+			respRecorder := NewHijackResponseRecorder()
+			// closing the connection after 5 seconds
+			go func() {
+				time.Sleep(5 * time.Second)
+				close(respRecorder.closed)
+			}()
+			err = executeRequest(req, backend, stateStreamBackend, respRecorder)
 			assert.NoError(s.T(), err)
 			requireResponse(s.T(), respRecorder, expectedEventsResponses)
 		})
@@ -194,7 +200,8 @@ func (s *SubscribeEventsSuite) TestSubscribeEventsHandlesErrors() {
 
 		req, err := getSubscribeEventsRequest(s.T(), s.blocks[0].ID(), s.blocks[0].Header.Height, nil, nil, nil)
 		assert.NoError(s.T(), err)
-		respRecorder, err := executeRequest(req, backend, stateStreamBackend)
+		respRecorder := NewHijackResponseRecorder()
+		err = executeRequest(req, backend, stateStreamBackend, respRecorder)
 		assert.NoError(s.T(), err)
 		requireError(s.T(), respRecorder, "can only provide either block ID or start height")
 	})
@@ -219,7 +226,8 @@ func (s *SubscribeEventsSuite) TestSubscribeEventsHandlesErrors() {
 
 		req, err := getSubscribeEventsRequest(s.T(), invalidBlock.ID(), request.EmptyHeight, nil, nil, nil)
 		assert.NoError(s.T(), err)
-		respRecorder, err := executeRequest(req, backend, stateStreamBackend)
+		respRecorder := NewHijackResponseRecorder()
+		err = executeRequest(req, backend, stateStreamBackend, respRecorder)
 		assert.NoError(s.T(), err)
 		requireError(s.T(), respRecorder, "stream encountered an error: subscription error")
 	})
@@ -243,7 +251,8 @@ func (s *SubscribeEventsSuite) TestSubscribeEventsHandlesErrors() {
 
 		req, err := getSubscribeEventsRequest(s.T(), s.blocks[0].ID(), request.EmptyHeight, nil, nil, nil)
 		assert.NoError(s.T(), err)
-		respRecorder, err := executeRequest(req, backend, stateStreamBackend)
+		respRecorder := NewHijackResponseRecorder()
+		err = executeRequest(req, backend, stateStreamBackend, respRecorder)
 		assert.NoError(s.T(), err)
 		requireError(s.T(), respRecorder, "subscription channel closed")
 	})
@@ -304,7 +313,7 @@ func requireError(t *testing.T, recorder *HijackResponseRecorder, expected strin
 }
 
 func requireResponse(t *testing.T, recorder *HijackResponseRecorder, expected []*state_stream.EventsResponse) {
-	time.Sleep(1 * time.Second)
+	<-recorder.closed
 	// Convert the actual response from respRecorder to JSON bytes
 	actualJSON := recorder.responseBuff.Bytes()
 	// Define a regular expression pattern to match JSON objects
