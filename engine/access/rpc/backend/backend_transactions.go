@@ -759,7 +759,7 @@ func (b *backendTransactions) getTransactionResultFromExecutionNode(
 
 	resp, err := b.getTransactionResultFromAnyExeNode(ctx, execNodes, req)
 	if err != nil {
-		return nil, 0, "", err
+		return nil, 0, "", rpc.ConvertError(err, "failed to get transaction result from execution nodes", codes.Internal)
 	}
 
 	events, err := convert.MessagesToEventsFromVersion(resp.GetEvents(), resp.GetEventEncodingVersion())
