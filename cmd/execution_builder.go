@@ -545,13 +545,7 @@ func (exeNode *ExecutionNode) LoadProviderEngine(
 			err)
 	}
 	blockID := lastExecutedBlock.ID()
-	stateCommit, err := exeNode.executionState.StateCommitmentByBlockID(context.Background(), blockID)
-	if err != nil {
-		return nil, fmt.Errorf(
-			"cannot get the state commitment for block %s: %w",
-		)
-	}
-	blockSnapshot := exeNode.executionState.NewBlockStorageSnapshot(stateCommit, blockID, lastExecutedBlock.Height)
+	blockSnapshot := storehouse.NewBlockEndStateSnapshot(blockID, lastExecutedBlock.Height)
 
 	// Get the epoch counter from the smart contract at the last executed block.
 	contractEpochCounter, err := getContractEpochCounter(
