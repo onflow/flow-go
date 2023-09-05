@@ -45,7 +45,7 @@ import (
 
 // libp2p emits a call to `Protect` with a topic-specific tag upon establishing each peering connection in a GossipSub mesh, see:
 // https://github.com/libp2p/go-libp2p-pubsub/blob/master/tag_tracer.go
-// One way to make sure such a mesh has formed, asynchronously, in unit tests, is to wait for libp2p.GossipSubD such calls,
+// One way to make sure such a mesh has formed, asynchronously, in unit tests, is to wait for libp2p.GossipSub such calls,
 // and that's what we do with tagsObserver.
 // Usage:
 // The tagsObserver struct observes the OnNext, OnError, and OnComplete events related to peer tags.
