@@ -4,10 +4,11 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/rs/zerolog"
+
 	"github.com/onflow/flow-go/engine/execution"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/storage"
-	"github.com/rs/zerolog"
 )
 
 type RegisterStore struct {
@@ -54,7 +55,7 @@ func (r *RegisterStore) Init() error {
 	// replay the executed and finalized blocks from the write ahead logs
 	// to the OnDiskRegisterStore
 	// TODO: to use syncDiskStore
-	height, err := r.syncDiskStoreMock()
+	height, err := r.syncDiskStore()
 	if err != nil {
 		return fmt.Errorf("cannot sync disk store: %w", err)
 	}
@@ -168,13 +169,12 @@ func (r *RegisterStore) isBlockFinalized(height uint64, blockID flow.Identifier)
 	return finalizedID == blockID, nil
 }
 
-func (r *RegisterStore) syncDiskStoreMock() (uint64, error) {
-	return r.diskStore.Latest(), nil
-}
-
 // syncDiskStore replay WAL to disk store
 func (r *RegisterStore) syncDiskStore() (uint64, error) {
-	latest, err := r.wal.Latest()
+	// TODO: replace diskStore.Latest with wal.Latest
+	// latest, err := r.wal.Latest()
+	var err error
+	latest := r.diskStore.Latest()
 	if err != nil {
 		return 0, fmt.Errorf("cannot get latest height from write ahead logs: %w", err)
 	}
