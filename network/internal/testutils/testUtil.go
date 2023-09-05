@@ -156,8 +156,6 @@ func NetworksFixture(t *testing.T,
 	idProviders := make([]*unittest.UpdatableIDProvider, 0)
 
 	for i := 0; i < count; i++ {
-		i := i // capture loop variable
-
 		idProvider := unittest.NewUpdatableIDProvider(ids)
 		params := NetworkConfigFixture(t, *ids[i], idProvider, sporkId, libp2pNodes[i])
 
