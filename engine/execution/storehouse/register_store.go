@@ -149,11 +149,13 @@ func (r *RegisterStore) FinalizedAndExecutedHeight() uint64 {
 }
 
 // IsBlockExecuted returns true if the block is executed, false if not executed
+// Note: it returns (true, nil) even if the block has been pruned from on disk register store,
 func (r *RegisterStore) IsBlockExecuted(height uint64, blockID flow.Identifier) (bool, error) {
 	executed, err := r.memStore.IsBlockExecuted(height, blockID)
 	if err != nil {
-		// if the block is below the pruned height, then only finalized blocks are executed and have
-		// been executed, so we just need to check whether the block is finalized.
+		// the only error memStore would return is when the given height is lower than the pruned height in memStore.
+		// Since the pruned height in memStore is a finalized and executed height, in order to know if the block
+		// is executed, we just need to check if this block is the finalized blcok at the given height.
 		executed, err = r.isBlockFinalized(height, blockID)
 		return executed, err
 	}

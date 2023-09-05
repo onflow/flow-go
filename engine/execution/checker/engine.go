@@ -21,7 +21,7 @@ type Engine struct {
 	unit      *engine.Unit
 	log       zerolog.Logger
 	state     protocol.State
-	execState state.ExecutionState
+	execState state.ExecutionState // TODO: can be replaced by commits
 	sealsDB   storage.Seals
 }
 

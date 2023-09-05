@@ -8,7 +8,6 @@ import (
 	"github.com/dgraph-io/badger/v2"
 
 	"github.com/onflow/flow-go/engine/execution"
-	"github.com/onflow/flow-go/engine/execution/storehouse"
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/convert"
@@ -43,6 +42,7 @@ type ScriptExecutionState interface {
 	// StateCommitmentByBlockID returns the final state commitment for the provided block ID.
 	StateCommitmentByBlockID(context.Context, flow.Identifier) (flow.StateCommitment, error)
 
+	// deprecated
 	// HasState returns true if the state with the given state commitment exists in memory
 	HasState(flow.StateCommitment) bool
 
@@ -223,12 +223,6 @@ func (s *state) NewStorageSnapshot(
 	commitment flow.StateCommitment,
 ) snapshot.StorageSnapshot {
 	return NewLedgerStorageSnapshot(s.ls, commitment)
-}
-
-func (s *state) NewBlockStorageSnapshot(
-	commit flow.StateCommitment, blockID flow.Identifier, height uint64) snapshot.StorageSnapshot {
-	// TODO: query statecommitment
-	return storehouse.NewBlockStorageSnapshot(commit, blockID, height)
 }
 
 type RegisterUpdatesHolder interface {

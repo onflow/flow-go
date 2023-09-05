@@ -2,7 +2,6 @@ package scripts
 
 import (
 	"context"
-	"encoding/hex"
 	"fmt"
 
 	"github.com/rs/zerolog"
@@ -11,11 +10,17 @@ import (
 	"github.com/onflow/flow-go/engine/execution"
 	"github.com/onflow/flow-go/engine/execution/computation/query"
 	"github.com/onflow/flow-go/engine/execution/state"
+	"github.com/onflow/flow-go/engine/execution/storehouse"
+	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/state/protocol"
 )
 
-var ErrStateCommitmentPruned = fmt.Errorf("state commitment not found")
+// ScriptExecutionState is a subset of the `state.ExecutionState` interface purposed to only access the state
+// used for script execution and not mutate the execution state of the blockchain.
+type ScriptExecutionState interface {
+	IsBlockExecuted(height uint64, blockID flow.Identifier) (bool, error)
+}
 
 type Engine struct {
 	unit          *engine.Unit
@@ -56,32 +61,10 @@ func (e *Engine) ExecuteScriptAtBlockID(
 	arguments [][]byte,
 	blockID flow.Identifier,
 ) ([]byte, error) {
-
-	stateCommit, err := e.execState.StateCommitmentByBlockID(ctx, blockID)
+	blockSnapshot, header, err := e.getSnapshotAtBlockID(blockID)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get state commitment for block (%s): %w", blockID, err)
+		return nil, err
 	}
-
-	// return early if state with the given state commitment is not in memory
-	// and already purged. This reduces allocations for scripts targeting old blocks.
-	if !e.execState.HasState(stateCommit) {
-		return nil, fmt.Errorf(
-			"failed to execute script at block (%s): %w (%s). "+
-				"this error usually happens if the reference "+
-				"block for this script is not set to a recent block.",
-			blockID.String(),
-			ErrStateCommitmentPruned,
-			hex.EncodeToString(stateCommit[:]),
-		)
-	}
-
-	header, err := e.state.AtBlockID(blockID).Head()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get header (%s): %w", blockID, err)
-	}
-
-	// create a snapshot powered by register store
-	blockSnapshot := e.execState.NewBlockStorageSnapshot(stateCommit, blockID, header.Height)
 
 	return e.queryExecutor.ExecuteScript(
 		ctx,
@@ -97,17 +80,10 @@ func (e *Engine) GetRegisterAtBlockID(
 	blockID flow.Identifier,
 ) ([]byte, error) {
 
-	stateCommit, err := e.execState.StateCommitmentByBlockID(ctx, blockID)
+	blockSnapshot, _, err := e.getSnapshotAtBlockID(blockID)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get state commitment for block (%s): %w", blockID, err)
+		return nil, err
 	}
-
-	block, err := e.state.AtBlockID(blockID).Head()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get block (%s): %w", blockID, err)
-	}
-
-	blockSnapshot := e.execState.NewBlockStorageSnapshot(stateCommit, blockID, block.Height)
 
 	id := flow.NewRegisterID(string(owner), string(key))
 	data, err := blockSnapshot.Get(id)
@@ -123,29 +99,30 @@ func (e *Engine) GetAccount(
 	addr flow.Address,
 	blockID flow.Identifier,
 ) (*flow.Account, error) {
-	stateCommit, err := e.execState.StateCommitmentByBlockID(ctx, blockID)
+	blockSnapshot, header, err := e.getSnapshotAtBlockID(blockID)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get state commitment for block (%s): %w", blockID, err)
+		return nil, err
 	}
 
-	// return early if state with the given state commitment is not in memory
-	// and already purged. This reduces allocations for get accounts targeting old blocks.
-	if !e.execState.HasState(stateCommit) {
-		return nil, fmt.Errorf(
-			"failed to get account at block (%s): %w (%s). "+
-				"this error usually happens if the reference "+
-				"block for this script is not set to a recent block.",
-			blockID.String(),
-			ErrStateCommitmentPruned,
-			hex.EncodeToString(stateCommit[:]))
-	}
+	return e.queryExecutor.GetAccount(ctx, addr, header, blockSnapshot)
+}
 
-	block, err := e.state.AtBlockID(blockID).Head()
+func (e *Engine) getSnapshotAtBlockID(blockID flow.Identifier) (snapshot.StorageSnapshot, *flow.Header, error) {
+	header, err := e.state.AtBlockID(blockID).Head()
 	if err != nil {
-		return nil, fmt.Errorf("failed to get block (%s): %w", blockID, err)
+		return nil, nil, fmt.Errorf("failed to get block (%s): %w", blockID, err)
 	}
 
-	blockSnapshot := e.execState.NewBlockStorageSnapshot(stateCommit, blockID, block.Height)
+	executed, err := e.execState.IsBlockExecuted(header.Height, blockID)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to check if block (%s) is executed: %w", blockID, err)
+	}
 
-	return e.queryExecutor.GetAccount(ctx, addr, block, blockSnapshot)
+	if !executed {
+		return nil, nil, fmt.Errorf("block (%s) is not executed", blockID)
+	}
+
+	// create a snapshot powered by register store
+	blockSnapshot := storehouse.NewBlockEndStateSnapshot(blockID, header.Height)
+	return blockSnapshot, header, nil
 }

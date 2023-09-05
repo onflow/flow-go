@@ -16,16 +16,26 @@ type ExtendableStorageSnapshot interface {
 	Commitment() flow.StateCommitment
 }
 
-type baseSnapshot struct {
-	storage     execution.RegisterStore
-	baseBlockID flow.Identifier
-	baseHeight  uint64
+// BlockEndStateSnapshot represents the storage at the end of a block.
+type BlockEndStateSnapshot struct {
+	storage execution.RegisterStore
+
+	blockID flow.Identifier
+	height  uint64
 
 	mutex     sync.RWMutex
 	readCache map[flow.RegisterID]flow.RegisterValue // cache the reads from storage at baseBlock
 }
 
-func (s *baseSnapshot) Get(id flow.RegisterID) (flow.RegisterValue, error) {
+// the caller must ensure the block height is for the given block
+func NewBlockEndStateSnapshot(blockID flow.Identifier, height uint64) *BlockEndStateSnapshot {
+	return &BlockEndStateSnapshot{
+		blockID: blockID,
+		height:  height,
+	}
+}
+
+func (s *BlockEndStateSnapshot) Get(id flow.RegisterID) (flow.RegisterValue, error) {
 	value, ok := s.getFromCache(id)
 	if ok {
 		return value, nil
@@ -43,7 +53,7 @@ func (s *baseSnapshot) Get(id flow.RegisterID) (flow.RegisterValue, error) {
 	return value, nil
 }
 
-func (s *baseSnapshot) getFromCache(id flow.RegisterID) (flow.RegisterValue, bool) {
+func (s *BlockEndStateSnapshot) getFromCache(id flow.RegisterID) (flow.RegisterValue, bool) {
 	s.mutex.RLock()
 	defer s.mutex.RUnlock()
 
@@ -51,17 +61,18 @@ func (s *baseSnapshot) getFromCache(id flow.RegisterID) (flow.RegisterValue, boo
 	return value, ok
 }
 
-func (s *baseSnapshot) getFromStorage(id flow.RegisterID) (flow.RegisterValue, error) {
-	return s.storage.GetRegister(s.baseHeight, s.baseBlockID, id)
+func (s *BlockEndStateSnapshot) getFromStorage(id flow.RegisterID) (flow.RegisterValue, error) {
+	return s.storage.GetRegister(s.height, s.blockID, id)
 }
 
-// BlockStorageSnapshot is a snapshot of the storage at an executed collection.
-// It starts with a storage snapshot at the base block at baseHeight
+// ExecutingBlockSnapshot is a snapshot of the storage at an executed collection.
+// It starts with a storage snapshot at the end of previous block,
 // The register updates at the executed collection at baseHeight + 1 are cached in
 // a map, such that retrieving register values at the snapshot will first check
 // the cache, and then the storage.
-type BlockStorageSnapshot struct {
-	base *baseSnapshot
+type ExecutingBlockSnapshot struct {
+	// the snapshot at the end of previous block
+	previous snapshot.StorageSnapshot
 
 	commitment      flow.StateCommitment
 	registerUpdates map[flow.RegisterID]flow.RegisterValue
@@ -69,38 +80,32 @@ type BlockStorageSnapshot struct {
 
 // create a new storage snapshot for an executed collection
 // at the base block at height h - 1
-func NewBlockStorageSnapshot(
+func NewExecutingBlockSnapshot(
+	previous snapshot.StorageSnapshot,
 	// the statecommitment of a block at height h
 	commitment flow.StateCommitment,
-	baseBlockID flow.Identifier,
-	baseHeight uint64,
-) *BlockStorageSnapshot {
-	base := &baseSnapshot{
-		baseBlockID: baseBlockID,
-		baseHeight:  baseHeight,
-		readCache:   make(map[flow.RegisterID]flow.RegisterValue),
-	}
-	return &BlockStorageSnapshot{
-		base:            base,
+) *ExecutingBlockSnapshot {
+	return &ExecutingBlockSnapshot{
+		previous:        previous,
 		commitment:      commitment,
 		registerUpdates: make(map[flow.RegisterID]flow.RegisterValue),
 	}
 }
 
 // Get returns the register value at the snapshot.
-func (s *BlockStorageSnapshot) Get(id flow.RegisterID) (flow.RegisterValue, error) {
+func (s *ExecutingBlockSnapshot) Get(id flow.RegisterID) (flow.RegisterValue, error) {
 	// get from latest updates first
 	value, ok := s.getFromUpdates(id)
 	if ok {
 		return value, nil
 	}
 
-	// get from baseSnapshot at base block
-	value, err := s.base.Get(id)
+	// get from BlockEndStateSnapshot at previous block
+	value, err := s.previous.Get(id)
 	return value, err
 }
 
-func (s *BlockStorageSnapshot) getFromUpdates(id flow.RegisterID) (flow.RegisterValue, bool) {
+func (s *ExecutingBlockSnapshot) getFromUpdates(id flow.RegisterID) (flow.RegisterValue, bool) {
 	value, ok := s.registerUpdates[id]
 	return value, ok
 }
@@ -109,7 +114,7 @@ func (s *BlockStorageSnapshot) getFromUpdates(id flow.RegisterID) (flow.Register
 // which contains the given trieUpdate
 // Usually it's used to create a new storage snapshot at the next executed collection.
 // The trieUpdate contains the register updates at the executed collection.
-func (s *BlockStorageSnapshot) Extend(commitment flow.StateCommitment, trieUpdate *ledger.TrieUpdate) (ExtendableStorageSnapshot, error) {
+func (s *ExecutingBlockSnapshot) Extend(commitment flow.StateCommitment, trieUpdate *ledger.TrieUpdate) (ExtendableStorageSnapshot, error) {
 	updates := make(map[flow.RegisterID]flow.RegisterValue)
 
 	// add the old updates
@@ -126,14 +131,14 @@ func (s *BlockStorageSnapshot) Extend(commitment flow.StateCommitment, trieUpdat
 		updates[regID] = regValue
 	}
 
-	return &BlockStorageSnapshot{
-		base:            s.base, // reuse the base snapshot, so that the cache is reused as well
+	return &ExecutingBlockSnapshot{
+		previous:        s.previous,
 		commitment:      commitment,
 		registerUpdates: updates,
 	}, nil
 }
 
-func (s *BlockStorageSnapshot) Commitment() flow.StateCommitment {
+func (s *ExecutingBlockSnapshot) Commitment() flow.StateCommitment {
 	return s.commitment
 }
 

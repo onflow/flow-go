@@ -100,6 +100,7 @@ func newResultCollector(
 	block *entity.ExecutableBlock,
 	numTransactions int,
 	consumers []result.ExecutedCollectionConsumer,
+	previousBlockSnapshot snapshot.StorageSnapshot,
 ) *resultCollector {
 	numCollections := len(block.Collections()) + 1
 	now := time.Now()
@@ -125,10 +126,9 @@ func newResultCollector(
 		currentCollectionStats: module.ExecutionResultStats{
 			NumberOfCollections: 1,
 		},
-		currentCollectionStorageSnapshot: storehouse.NewBlockStorageSnapshot(
+		currentCollectionStorageSnapshot: storehouse.NewExecutingBlockSnapshot(
+			previousBlockSnapshot,
 			*block.StartState,
-			block.ID(),
-			block.Block.Header.Height,
 		),
 	}
 

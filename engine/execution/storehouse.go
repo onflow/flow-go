@@ -110,10 +110,6 @@ type WALReader interface {
 // 	// deprecated
 // 	NewStorageSnapshot(flow.StateCommitment) snapshot.StorageSnapshot
 //
-// 	// NewBlockStorageSnapshot creates a new read-only view at the given block.
-// 	// Depend on Storehouse.GetRegister
-// 	NewBlockStorageSnapshot(commit flow.StateCommitment, height uint64, blockID flow.Identifier) snapshot.StorageSnapshot
-//
 // 	// StateCommitmentByBlockID returns the final state commitment for the provided block ID.
 // 	// deprecated
 // 	StateCommitmentByBlockID(context.Context, flow.Identifier) (flow.StateCommitment, error)
