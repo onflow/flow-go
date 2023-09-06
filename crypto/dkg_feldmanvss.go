@@ -1,6 +1,5 @@
 package crypto
 
-// #cgo CFLAGS:
 // #include "dkg_include.h"
 import "C"
 
@@ -398,7 +397,7 @@ func (s *feldmanVSSstate) receiveShare(origin index, data []byte) {
 
 // receives the public vector from the
 func (s *feldmanVSSstate) receiveVerifVector(origin index, data []byte) {
-	// only accept the verification vector from the .
+	// only accept the verification vector from the dealer.
 	if origin != s.dealerIndex {
 		return
 	}
@@ -457,10 +456,10 @@ func writeVerifVector(dest []byte, A []pointE2) {
 	)
 }
 
-// readVerifVector imports A vector from an array of bytes,
-// assuming the slice length matches the vector length
+// readVerifVector imports A vector (G2 points) from an array of bytes,
+// assuming the slice length matches the vector length.
 func readVerifVector(A []pointE2, src []byte) error {
-	read := C.E2_vector_read_bytes(
+	read := C.G2_vector_read_bytes(
 		(*C.E2)(&A[0]),
 		(*C.uchar)(&src[0]),
 		(C.int)(len(A)))
@@ -468,7 +467,7 @@ func readVerifVector(A []pointE2, src []byte) error {
 		return nil
 	}
 	// invalid A vector
-	return invalidInputsErrorf("the verifcation vector does not serialize valid E2 points: error code %d", read)
+	return invalidInputsErrorf("the verification vector does not serialize valid G2 points: error code %d", read)
 }
 
 func (s *feldmanVSSstate) verifyShare() bool {

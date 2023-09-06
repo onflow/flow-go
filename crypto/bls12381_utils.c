@@ -9,6 +9,13 @@
 // compile all blst C src along with this file
 #include "blst_src.c"
 
+// make sure flow crypto types are consistent with BLST types
+void types_sanity(void) {
+  assert(sizeof(Fp) == sizeof(vec384));
+  assert(sizeof(E1) == sizeof(POINTonE1));
+  assert(sizeof(E2) == sizeof(POINTonE2));
+}
+
 // ------------------- Fr utilities
 
 // Montgomery constant R related to the curve order r
@@ -133,16 +140,15 @@ ERROR Fr_read_bytes(Fr *a, const byte *bin, int len) {
   if (len != Fr_BYTES) {
     return BAD_ENCODING;
   }
+  // compare to r using the BLST tool
   pow256 tmp;
-  // compare to r using the provided tool from BLST
-  pow256_from_be_bytes(tmp, bin); // TODO: check endianness!!
-  if (!check_mod_256(
-          tmp,
-          BLS12_381_r)) { // check_mod_256 compares pow256 against a vec256!
+  pow256_from_be_bytes(tmp, bin);
+  // (check_mod_256 compares pow256 against a vec256!)
+  if (!check_mod_256(tmp, BLS12_381_r)) {
     return BAD_VALUE;
   }
   vec_zero(tmp, sizeof(tmp));
-  limbs_from_be_bytes((limb_t *)a, bin, Fr_BYTES); // TODO: check endianness!!
+  limbs_from_be_bytes((limb_t *)a, bin, Fr_BYTES);
   return VALID;
 }
 
@@ -170,11 +176,16 @@ void Fr_write_bytes(byte *bin, const Fr *a) {
   be_bytes_from_limbs(bin, (limb_t *)a, Fr_BYTES);
 }
 
-// maps big-endian bytes into an Fr element using modular reduction
-// Input is byte-big-endian, output is Fr (internally vec256)
-// TODO: check redc_mont_256(vec256 ret, const vec512 a, const vec256 p, limb_t
-// n0);
+// maps big-endian bytes of any size into an Fr element using modular reduction.
+// Input is byte-big-endian, output is Fr (internally vec256).
+//
+// Note: could use redc_mont_256(vec256 ret, const vec512 a, const vec256 p,
+// limb_t n0) to reduce 512 bits at a time.
 static void Fr_from_be_bytes(Fr *out, const byte *bytes, size_t n) {
+  // input can be written in base 2^|R|, with R the Montgomery constant
+  // N = l_1 + L_2*2^|R| .. + L_n*2^(|R|*(n-1))
+  // Therefore N mod p can be expressed using R as:
+  // N mod p = l_1 + L_2*R .. + L_n*R^(n-1)
   Fr digit, radix;
   Fr_set_zero(out);
   Fr_copy(&radix, (Fr *)BLS12_381_rRR); // R^2
@@ -193,7 +204,7 @@ static void Fr_from_be_bytes(Fr *out, const byte *bytes, size_t n) {
   limbs_from_be_bytes((limb_t *)&digit, p - n, n);
   Fr_mul_montg(&digit, &digit, &radix);
   Fr_add(out, out, &digit);
-  // at this point : out = l_1*R + L_2*R^2 .. + L_n*R^n
+  // at this point : out = l_1*R + L_2*R^2 .. + L_n*R^n,
   // reduce the extra R
   Fr_from_montg(out, out);
   // clean up possible sensitive data
@@ -456,8 +467,8 @@ bool E1_in_G1(const E1 *p) {
 //    - POINT_NOT_ON_CURVE if deserialized point isn't on E1
 //    - VALID if deserialization is valid
 
-// TODO: replace with POINTonE1_Deserialize_BE and POINTonE1_Uncompress_Z,
-//       and update logic with G2 subgroup check?
+// Note: could use POINTonE1_Deserialize_BE and POINTonE1_Uncompress_Z,
+//       but needs to update the logic around G2 subgroup check
 ERROR E1_read_bytes(E1 *a, const byte *bin, const int len) {
   // check the length
   if (len != G1_SER_BYTES) {
@@ -701,6 +712,8 @@ const E2 *BLS12_381_minus_g2 = (const E2 *)&BLS12_381_NEG_G2;
 // E2_read_bytes imports a E2(Fp^2) point from a buffer in a compressed or
 // uncompressed form. The resulting point is guaranteed to be on curve E2 (no G2
 // check is included).
+// E2 point is in affine coordinates. This avoids further conversions
+// when the point is used in multiple pairing computation.
 //
 // returns:
 //    - BAD_ENCODING if the length is invalid or serialization header bits are
@@ -708,9 +721,9 @@ const E2 *BLS12_381_minus_g2 = (const E2 *)&BLS12_381_NEG_G2;
 //    - BAD_VALUE if Fp^2 coordinates couldn't deserialize
 //    - POINT_NOT_ON_CURVE if deserialized point isn't on E2
 //    - VALID if deserialization is valid
-
-// TODO: replace with POINTonE2_Deserialize_BE and POINTonE2_Uncompress_Z,
-//       and update logic with G2 subgroup check?
+//
+// Note: can use with POINTonE2_Deserialize_BE and POINTonE2_Uncompress_Z,
+//       and update the logic around G2 subgroup check.
 ERROR E2_read_bytes(E2 *a, const byte *bin, const int len) {
   // check the length
   if (len != G2_SER_BYTES) {
@@ -871,7 +884,7 @@ void E2_add(E2 *res, const E2 *a, const E2 *b) {
 }
 
 // generic point double that must handle point at infinity
-void E2_double(E2 *res, const E2 *a) {
+static void E2_double(E2 *res, const E2 *a) {
   POINTonE2_double((POINTonE2 *)res, (POINTonE2 *)a);
 }
 
@@ -927,6 +940,15 @@ void G2_mult_gen(E2 *res, const Fr *expo) {
   vec_zero(&tmp, sizeof(tmp));
 }
 
+// Exponentiation of generator g2 of G2, res = expo.g2
+//
+// This is useful for results being used multiple times in pairings.
+// Conversion to affine saves later pre-pairing conversions.
+void G2_mult_gen_to_affine(E2 *res, const Fr *expo) {
+  G2_mult_gen(res, expo);
+  E2_to_affine(res, res);
+}
+
 // checks if input E2 point is on the subgroup G2.
 // It assumes input `p` is on E2.
 bool E2_in_G2(const E2 *p) {
@@ -940,6 +962,16 @@ void E2_sum_vector(E2 *sum, const E2 *y, const int len) {
   for (int i = 0; i < len; i++) {
     E2_add(sum, sum, &y[i]);
   }
+}
+
+// computes the sum of the E2 array elements `y[i]`, converts it
+// to affine coordinates, and writes it in `sum`.
+//
+// This is useful for results being used multiple times in pairings.
+// Conversion to affine saves later pre-pairing conversions.
+void E2_sum_vector_to_affine(E2 *sum, const E2 *y, const int len) {
+  E2_sum_vector(sum, y, len);
+  E2_to_affine(sum, sum);
 }
 
 // Subtracts all G2 array elements `y` from an element `x` and writes the
@@ -1007,7 +1039,7 @@ void Fp12_multi_pairing(Fp12 *res, const E1 *p, const E2 *q, const int len) {
       continue;
     }
     // `miller_loop_n` expects affine coordinates in a `POINTonEx_affine` array.
-    // `POINTonEx_affine` has a different size than `POINTonEx` or `Ex` !
+    // `POINTonEx_affine` has a different size than `POINTonEx` and `Ex` !
     E1 tmp1;
     E1_to_affine(&tmp1, p + i);
     vec_copy(p_aff + n, &tmp1, sizeof(POINTonE1_affine));
@@ -1015,7 +1047,8 @@ void Fp12_multi_pairing(Fp12 *res, const E1 *p, const E2 *q, const int len) {
     E2_to_affine(&tmp2, q + i);
     vec_copy(q_aff + n, &tmp2, sizeof(POINTonE2_affine));
     n++;
-    if (n == N_MAX) { // if p_ and q_ are filled, batch `N_MAX` miller loops
+    // if p_aff and q_aff are filled, batch `N_MAX` miller loops
+    if (n == N_MAX) {
       if (!init_flag) {
         miller_loop_n(res_vec, q_aff, p_aff, N_MAX);
         init_flag = 1;
@@ -1027,8 +1060,8 @@ void Fp12_multi_pairing(Fp12 *res, const E1 *p, const E2 *q, const int len) {
       n = 0;
     }
   }
-  // if p_ and q_ aren't empty,
-  // remaining couples are also batched in `n` miller loops
+  // if p_aff and q_aff aren't empty,
+  // the remaining couples are also batched in `n` miller loops
   if (n > 0) {
     if (!init_flag) {
       miller_loop_n(res_vec, q_aff, p_aff, n);

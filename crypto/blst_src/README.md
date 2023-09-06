@@ -25,6 +25,7 @@ To upgrade the BLST version:
 - [ ] copy the folder `<blst>/build/` into this folder.
 - [ ] move `./blst_src/build/assembly.S` to `./blst_src/build/blst_assembly.S`.
 - [ ] copy `<blst>/bindings/blst.h` and `<blst>/bindings/blst_aux.h` into this folder.
+- [ ] check that C flags in `./bls12381_utils.go` still match the C flags in `<blst>/bindings/go/blst.go`.
 - [ ] solve all breaking changes that may occur.
 - [ ] update the commit version on this `README`.
 

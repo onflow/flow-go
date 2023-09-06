@@ -44,12 +44,17 @@ typedef enum {
 #define G2_BYTES (2 * Fp2_BYTES)
 
 // Compressed and uncompressed points
-#define COMPRESSED 1
 #define UNCOMPRESSED 0
+#define COMPRESSED (UNCOMPRESSED ^ 1)
 #define G1_SERIALIZATION (COMPRESSED)
 #define G2_SERIALIZATION (COMPRESSED)
-#define G1_SER_BYTES (G1_BYTES / (G1_SERIALIZATION + 1))
-#define G2_SER_BYTES (G2_BYTES / (G2_SERIALIZATION + 1))
+#define G1_SER_BYTES                                                           \
+  (G1_SERIALIZATION == UNCOMPRESSED ? G1_BYTES : (G1_BYTES / 2))
+#define G2_SER_BYTES                                                           \
+  (G2_SERIALIZATION == UNCOMPRESSED ? G2_BYTES : (G2_BYTES / 2))
+
+// init-related functions
+void types_sanity(void);
 
 // Fr utilities
 extern const Fr BLS12_381_rR;
@@ -109,12 +114,13 @@ void E2_to_affine(E2 *, const E2 *);
 ERROR E2_read_bytes(E2 *, const byte *, const int);
 void E2_write_bytes(byte *, const E2 *);
 void G2_mult_gen(E2 *, const Fr *);
+void G2_mult_gen_to_affine(E2 *, const Fr *);
 void E2_mult(E2 *, const E2 *, const Fr *);
 void E2_mult_small_expo(E2 *, const E2 *, const byte);
 void E2_add(E2 *res, const E2 *a, const E2 *b);
-void E2_double(E2 *res, const E2 *a);
 void E2_neg(E2 *, const E2 *);
 void E2_sum_vector(E2 *, const E2 *, const int);
+void E2_sum_vector_to_affine(E2 *, const E2 *, const int);
 void E2_subtract_vector(E2 *res, const E2 *x, const E2 *y, const int len);
 bool E2_in_G2(const E2 *);
 void unsafe_map_bytes_to_G2(E2 *, const byte *, int);

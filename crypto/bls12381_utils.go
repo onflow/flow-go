@@ -4,7 +4,7 @@ package crypto
 // these tools are shared by the BLS signature scheme, the BLS based threshold signature
 // and the BLS distributed key generation protocols
 
-// #cgo CFLAGS: -I${SRCDIR}/ -I${SRCDIR}/blst_src -I${SRCDIR}/blst_src/build -D__BLST_CGO__ -fno-builtin-memcpy -fno-builtin-memset -Wall -Wno-unused-function -Wno-unused-macros
+// #cgo CFLAGS: -I${SRCDIR}/ -I${SRCDIR}/blst_src -I${SRCDIR}/blst_src/build -D__BLST_CGO__ -Wall -fno-builtin-memcpy -fno-builtin-memset -Wno-unused-function -Wno-unused-macros -Wno-unused-variable
 // #cgo amd64 CFLAGS: -D__ADX__ -mno-avx
 // #cgo mips64 mips64le ppc64 ppc64le riscv64 s390x CFLAGS: -D__BLST_NO_ASM__
 // #include "bls12381_utils.h"
@@ -71,6 +71,8 @@ var g2PublicKey pubKeyBLSBLS12381
 
 // initialization of BLS12-381 curve
 func initBLS12381() {
+	C.types_sanity()
+
 	if isG1Compressed() {
 		g1SerHeader = 0xC0
 	} else {
@@ -110,8 +112,13 @@ func generatorScalarMultG1(res *pointE1, expo *scalar) {
 }
 
 // Scalar multiplication of generator g2 in G2
+//
+// This often results in a public key that is used in
+// multiple pairing computation. Therefore, convert the
+// resulting point to affine coordinate to save pre-pairing
+// conversions.
 func generatorScalarMultG2(res *pointE2, expo *scalar) {
-	C.G2_mult_gen((*C.E2)(res), (*C.Fr)(expo))
+	C.G2_mult_gen_to_affine((*C.E2)(res), (*C.Fr)(expo))
 }
 
 // comparison in Fr where r is the group order of G1/G2

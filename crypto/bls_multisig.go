@@ -184,7 +184,7 @@ func AggregateBLSPublicKeys(keys []PublicKey) (PublicKey, error) {
 	}
 
 	var sum pointE2
-	C.E2_sum_vector((*C.E2)(&sum), (*C.E2)(&points[0]),
+	C.E2_sum_vector_to_affine((*C.E2)(&sum), (*C.E2)(&points[0]),
 		(C.int)(len(points)))
 
 	sumKey := newPubKeyBLSBLS12381(&sum)
