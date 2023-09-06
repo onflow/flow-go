@@ -10,12 +10,6 @@ import (
 	"testing"
 	"time"
 
-	"google.golang.org/grpc/credentials"
-
-	"github.com/onflow/flow-go/engine/access/state_stream"
-	"github.com/onflow/flow-go/module/grpcserver"
-	"github.com/onflow/flow-go/utils/grpcutils"
-
 	"github.com/antihax/optional"
 	restclient "github.com/onflow/flow/openapi/go-client-generated"
 	"github.com/rs/zerolog"
@@ -23,13 +17,17 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
+	"google.golang.org/grpc/credentials"
 
 	accessmock "github.com/onflow/flow-go/engine/access/mock"
+	"github.com/onflow/flow-go/engine/access/rest"
 	"github.com/onflow/flow-go/engine/access/rest/request"
 	"github.com/onflow/flow-go/engine/access/rest/routes"
 	"github.com/onflow/flow-go/engine/access/rpc"
 	"github.com/onflow/flow-go/engine/access/rpc/backend"
+	"github.com/onflow/flow-go/engine/access/state_stream"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/grpcserver"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
 	module "github.com/onflow/flow-go/module/mock"
@@ -37,6 +35,7 @@ import (
 	protocol "github.com/onflow/flow-go/state/protocol/mock"
 	"github.com/onflow/flow-go/storage"
 	storagemock "github.com/onflow/flow-go/storage/mock"
+	"github.com/onflow/flow-go/utils/grpcutils"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -126,7 +125,9 @@ func (suite *RestAPITestSuite) SetupTest() {
 		UnsecureGRPCListenAddr: unittest.DefaultAddress,
 		SecureGRPCListenAddr:   unittest.DefaultAddress,
 		HTTPListenAddr:         unittest.DefaultAddress,
-		RESTListenAddr:         unittest.DefaultAddress,
+		RestConfig: rest.Config{
+			ListenAddress: unittest.DefaultAddress,
+		},
 	}
 
 	// generate a server certificate that will be served by the GRPC server
@@ -152,28 +153,22 @@ func (suite *RestAPITestSuite) SetupTest() {
 		nil,
 		nil).Build()
 
-	backend := backend.New(suite.state,
-		suite.collClient,
-		nil,
-		suite.blocks,
-		suite.headers,
-		suite.collections,
-		suite.transactions,
-		nil,
-		suite.executionResults,
-		suite.chainID,
-		suite.metrics,
-		nil,
-		false,
-		0,
-		nil,
-		nil,
-		suite.log,
-		0,
-		nil,
-		false,
-		false,
-	)
+	bnd := backend.New(
+		backend.Params{
+			State:                suite.state,
+			CollectionRPC:        suite.collClient,
+			Blocks:               suite.blocks,
+			Headers:              suite.headers,
+			Collections:          suite.collections,
+			Transactions:         suite.transactions,
+			ExecutionResults:     suite.executionResults,
+			ChainID:              suite.chainID,
+			AccessMetrics:        suite.metrics,
+			MaxHeightRange:       0,
+			Log:                  suite.log,
+			SnapshotHistoryLimit: 0,
+			Communicator:         backend.NewNodeCommunicator(false),
+		})
 
 	rpcEngBuilder, err := rpc.NewBuilder(
 		suite.log,
@@ -183,8 +178,8 @@ func (suite *RestAPITestSuite) SetupTest() {
 		suite.metrics,
 		false,
 		suite.me,
-		backend,
-		backend,
+		bnd,
+		bnd,
 		suite.secureGrpcServer,
 		suite.unsecureGrpcServer,
 		nil,

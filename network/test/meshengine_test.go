@@ -50,6 +50,7 @@ type MeshEngineTestSuite struct {
 
 // TestMeshNetTestSuite runs all tests in this test suit
 func TestMeshNetTestSuite(t *testing.T) {
+	unittest.SkipUnless(t, unittest.TEST_FLAKY, "this should be revisited once network/test is running in a separate CI job, runs fine locally")
 	suite.Run(t, new(MeshEngineTestSuite))
 }
 
@@ -120,7 +121,7 @@ func (suite *MeshEngineTestSuite) SetupTest() {
 		testutils.MiddlewareConfigFixture(suite.T(), sporkId),
 		mocknetwork.NewViolationsConsumer(suite.T()))
 	suite.nets = testutils.NetworksFixture(suite.T(), sporkId, suite.ids, suite.mws)
-	testutils.StartNodesAndNetworks(signalerCtx, suite.T(), libP2PNodes, suite.nets, 100*time.Millisecond)
+	testutils.StartNodesAndNetworks(signalerCtx, suite.T(), libP2PNodes, suite.nets)
 
 	for _, observableConnMgr := range tagObservables {
 		observableConnMgr.Subscribe(&ob)

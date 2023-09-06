@@ -114,7 +114,7 @@ func Uint() (uint, error) {
 	return uint(r), err
 }
 
-// returns a random uint strictly less than `n`.
+// Uintn returns a random uint strictly less than `n`.
 // `n` has to be a strictly positive integer.
 //
 // It returns an error:

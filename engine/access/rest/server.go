@@ -14,9 +14,27 @@ import (
 	"github.com/onflow/flow-go/module"
 )
 
+const (
+	// DefaultReadTimeout is the default read timeout for the HTTP server
+	DefaultReadTimeout = time.Second * 15
+
+	// DefaultWriteTimeout is the default write timeout for the HTTP server
+	DefaultWriteTimeout = time.Second * 30
+
+	// DefaultIdleTimeout is the default idle timeout for the HTTP server
+	DefaultIdleTimeout = time.Second * 60
+)
+
+type Config struct {
+	ListenAddress string
+	WriteTimeout  time.Duration
+	ReadTimeout   time.Duration
+	IdleTimeout   time.Duration
+}
+
 // NewServer returns an HTTP server initialized with the REST API handler
 func NewServer(serverAPI access.API,
-	listenAddress string,
+	config Config,
 	logger zerolog.Logger,
 	chain flow.Chain,
 	restCollector module.RestMetrics,
@@ -40,10 +58,10 @@ func NewServer(serverAPI access.API,
 	})
 
 	return &http.Server{
-		Addr:         listenAddress,
 		Handler:      c.Handler(router),
-		WriteTimeout: time.Second * 15,
-		ReadTimeout:  time.Second * 15,
-		IdleTimeout:  time.Second * 60,
+		Addr:         config.ListenAddress,
+		WriteTimeout: config.WriteTimeout,
+		ReadTimeout:  config.ReadTimeout,
+		IdleTimeout:  config.IdleTimeout,
 	}, nil
 }
