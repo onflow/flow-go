@@ -146,7 +146,7 @@ func (n *Node) Stop() error {
 	return nil
 }
 
-// AddPeer adds a peer to this node by adding it to this node's peerstore and connecting to it.
+// ConnectToPeerAddrInfo adds a peer to this node by adding it to this node's peerstore and connecting to it.
 // All errors returned from this function can be considered benign.
 func (n *Node) ConnectToPeerAddrInfo(ctx context.Context, peerInfo peer.AddrInfo) error {
 	return n.host.Connect(ctx, peerInfo)
