@@ -50,7 +50,6 @@ type MeshEngineTestSuite struct {
 
 // TestMeshNetTestSuite runs all tests in this test suit
 func TestMeshNetTestSuite(t *testing.T) {
-	unittest.SkipUnless(t, unittest.TEST_FLAKY, "this should be revisited once network/test is running in a separate CI job, runs fine locally")
 	suite.Run(t, new(MeshEngineTestSuite))
 }
 
