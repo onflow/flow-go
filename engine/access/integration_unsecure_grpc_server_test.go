@@ -88,10 +88,12 @@ func (suite *SameGRPCPortTestSuite) SetupTest() {
 	suite.net = new(network.Network)
 	suite.state = new(protocol.State)
 	suite.snapshot = new(protocol.Snapshot)
+	params := new(protocol.Params)
 
 	suite.epochQuery = new(protocol.EpochQuery)
 	suite.state.On("Sealed").Return(suite.snapshot, nil).Maybe()
 	suite.state.On("Final").Return(suite.snapshot, nil).Maybe()
+	suite.state.On("Params").Return(params)
 	suite.snapshot.On("Epochs").Return(suite.epochQuery).Maybe()
 	suite.blocks = new(storagemock.Blocks)
 	suite.headers = new(storagemock.Headers)
@@ -140,6 +142,9 @@ func (suite *SameGRPCPortTestSuite) SetupTest() {
 		block := unittest.BlockWithParentFixture(parent)
 		suite.blockMap[block.Header.Height] = block
 	}
+
+	params.On("SporkRootBlockHeight").Return(rootBlock.Header.Height, nil)
+	params.On("SealedRoot").Return(rootBlock.Header, nil)
 
 	// generate a server certificate that will be served by the GRPC server
 	networkingKey := unittest.NetworkingPrivKeyFixture()

@@ -83,8 +83,14 @@ func (suite *RestAPITestSuite) SetupTest() {
 	suite.sealedBlock = unittest.BlockHeaderFixture(unittest.WithHeaderHeight(0))
 	suite.finalizedBlock = unittest.BlockHeaderWithParentFixture(suite.sealedBlock)
 
+	rootHeader := unittest.BlockHeaderFixture()
+	params := new(protocol.Params)
+	params.On("SporkRootBlockHeight").Return(rootHeader.Height, nil)
+	params.On("SealedRoot").Return(rootHeader, nil)
+
 	suite.state.On("Sealed").Return(suite.sealedSnaphost, nil)
 	suite.state.On("Final").Return(suite.finalizedSnapshot, nil)
+	suite.state.On("Params").Return(params)
 	suite.sealedSnaphost.On("Head").Return(
 		func() *flow.Header {
 			return suite.sealedBlock

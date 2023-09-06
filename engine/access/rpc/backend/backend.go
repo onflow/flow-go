@@ -76,6 +76,9 @@ type Backend struct {
 	collections       storage.Collections
 	executionReceipts storage.ExecutionReceipts
 	connFactory       connection.ConnectionFactory
+
+	sporkRootBlockHeight uint64
+	nodeRootBlockHeight  uint64
 }
 
 // Config defines the configurable options for creating Backend
@@ -145,6 +148,16 @@ func New(params Params) (*Backend, error) {
 		}
 	}
 
+	sporkRootBlockHeight, err := params.State.Params().SporkRootBlockHeight()
+	if err != nil {
+		return nil, fmt.Errorf("failed to read spork root block height: %w", err)
+	}
+
+	nodeRootBlockHeader, err := params.State.Params().SealedRoot()
+	if err != nil {
+		return nil, fmt.Errorf("failed to read node root block: %w", err)
+	}
+
 	b := &Backend{
 		state: params.State,
 		// create the sub-backends
@@ -211,10 +224,12 @@ func New(params Params) (*Backend, error) {
 			chainID:              params.ChainID,
 			snapshotHistoryLimit: params.SnapshotHistoryLimit,
 		},
-		collections:       params.Collections,
-		executionReceipts: params.ExecutionReceipts,
-		connFactory:       params.ConnFactory,
-		chainID:           params.ChainID,
+		collections:          params.Collections,
+		executionReceipts:    params.ExecutionReceipts,
+		connFactory:          params.ConnFactory,
+		chainID:              params.ChainID,
+		sporkRootBlockHeight: sporkRootBlockHeight,
+		nodeRootBlockHeight:  nodeRootBlockHeader.Height,
 	}
 
 	retry.SetBackend(b)
@@ -303,9 +318,9 @@ func (b *Backend) Ping(ctx context.Context) error {
 }
 
 // GetNodeVersionInfo returns node version information such as semver, commit, sporkID, protocolVersion, etc
-func (b *Backend) GetNodeVersionInfo(ctx context.Context) (*access.NodeVersionInfo, error) {
+func (b *Backend) GetNodeVersionInfo(_ context.Context) (*access.NodeVersionInfo, error) {
 	stateParams := b.state.Params()
-	sporkId, err := stateParams.SporkID()
+	sporkID, err := stateParams.SporkID()
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to read spork ID: %v", err)
 	}
@@ -316,10 +331,12 @@ func (b *Backend) GetNodeVersionInfo(ctx context.Context) (*access.NodeVersionIn
 	}
 
 	return &access.NodeVersionInfo{
-		Semver:          build.Version(),
-		Commit:          build.Commit(),
-		SporkId:         sporkId,
-		ProtocolVersion: uint64(protocolVersion),
+		Semver:               build.Version(),
+		Commit:               build.Commit(),
+		SporkId:              sporkID,
+		ProtocolVersion:      uint64(protocolVersion),
+		SporkRootBlockHeight: b.sporkRootBlockHeight,
+		NodeRootBlockHeight:  b.nodeRootBlockHeight,
 	}, nil
 }
 
