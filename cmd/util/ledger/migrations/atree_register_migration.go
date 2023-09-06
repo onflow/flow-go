@@ -4,10 +4,12 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"strings"
 	"time"
 
 	"github.com/rs/zerolog"
 
+	"github.com/onflow/atree"
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/onflow/cadence/runtime/interpreter"
@@ -306,7 +308,7 @@ func (m *AtreeRegisterMigrator) validateChangesAndCreateNewRegisters(
 		newPayloads = append(newPayloads, *ledger.NewPayload(util.RegisterIDToKey(id), value))
 	}
 
-	hasMissingKeys := false
+	//hasMissingKeys := false
 
 	// add all values that were not changed
 	for id, value := range originalPayloads {
@@ -347,22 +349,22 @@ func (m *AtreeRegisterMigrator) validateChangesAndCreateNewRegisters(
 			Kind:    "not_migrated",
 			Msg:     fmt.Sprintf("%x", value),
 		})
-		hasMissingKeys = true
+		//hasMissingKeys = true
 	}
 
-	if hasMissingKeys && m.sampler.Sample(zerolog.InfoLevel) {
-		before := m.rwf.ReportWriter(fmt.Sprintf("account-before-%s", address.Hex()))
-		for _, p := range payloads {
-			before.Write(p)
-		}
-		before.Close()
-
-		after := m.rwf.ReportWriter(fmt.Sprintf("account-after-%s", address.Hex()))
-		for _, p := range newPayloads {
-			after.Write(p)
-		}
-		after.Close()
-	}
+	//if hasMissingKeys && m.sampler.Sample(zerolog.InfoLevel) {
+	//	before := m.rwf.ReportWriter(fmt.Sprintf("account-before-%s", address.Hex()))
+	//	for _, p := range payloads {
+	//		before.Write(p)
+	//	}
+	//	before.Close()
+	//
+	//	after := m.rwf.ReportWriter(fmt.Sprintf("account-after-%s", address.Hex()))
+	//	for _, p := range newPayloads {
+	//		after.Write(p)
+	//	}
+	//	after.Close()
+	//}
 	return newPayloads, nil
 }
 
@@ -370,6 +372,34 @@ func (m *AtreeRegisterMigrator) checkStorageHealth(
 	address common.Address,
 	payloads []ledger.Payload,
 ) error {
+
+	storageIDs := make([]atree.StorageID, 0, len(payloads))
+
+	for _, payload := range payloads {
+		key, err := payload.Key()
+		if err != nil {
+			return fmt.Errorf("failed to get payload key: %w", err)
+		}
+
+		id, err := util.KeyToRegisterID(key)
+		if err != nil {
+			return fmt.Errorf("failed to convert key to register ID: %w", err)
+		}
+
+		if id.IsInternalState() {
+			continue
+		}
+
+		if !strings.HasPrefix(id.Key, atree.LedgerBaseStorageSlabPrefix) {
+			continue
+		}
+
+		storageIDs = append(storageIDs, atree.StorageID{
+			Address: atree.Address([]byte(id.Owner)),
+			Index:   atree.StorageIndex([]byte(id.Key)[1:]),
+		})
+	}
+
 	snapshot, err := util.NewPayloadSnapshot(payloads)
 	if err != nil {
 		return fmt.Errorf("failed to create payload snapshot: %w", err)
@@ -380,6 +410,16 @@ func (m *AtreeRegisterMigrator) checkStorageHealth(
 
 	accountsAtreeLedger := util.NewAccountsAtreeLedger(accounts)
 	storage := runtime.NewStorage(accountsAtreeLedger, util.NopMemoryGauge{})
+
+	// load (but don't create) storage map in Cadence storage
+	_ = storage.GetStorageMap(address, "public", false)
+	_ = storage.GetStorageMap(address, "private", false)
+	_ = storage.GetStorageMap(address, "storage", false)
+
+	// load slabs in atree storage
+	for _, id := range storageIDs {
+		_, _, _ = storage.Retrieve(id)
+	}
 
 	err = storage.CheckHealth()
 	if err != nil {
