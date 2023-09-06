@@ -72,7 +72,7 @@ func (chain *DerivedChainData) GetOrCreateDerivedBlockData(
 	if ok {
 		current = parentEntry.(*DerivedBlockData).NewChildDerivedBlockData()
 	} else {
-		current = NewEmptyDerivedBlockData()
+		current = NewEmptyDerivedBlockData(0)
 	}
 
 	chain.lru.Add(currentBlockId, current)
@@ -87,5 +87,5 @@ func (chain *DerivedChainData) NewDerivedBlockDataForScript(
 		return block.NewChildDerivedBlockData()
 	}
 
-	return NewEmptyDerivedBlockData()
+	return NewEmptyDerivedBlockData(0)
 }

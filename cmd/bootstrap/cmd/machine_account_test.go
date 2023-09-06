@@ -31,6 +31,7 @@ func TestMachineAccountHappyPath(t *testing.T) {
 		flagRole = "consensus"
 		flagAddress = "189.123.123.42:3869"
 		addr, err := flow.Mainnet.Chain().AddressAtIndex(uint64(rand.Intn(1_000_000)))
+		t.Logf("address is %s", addr)
 		require.NoError(t, err)
 		flagMachineAccountAddress = addr.HexWithPrefix()
 

@@ -1,8 +1,7 @@
 package execution
 
 import (
-	"github.com/onflow/flow-go/fvm/meter"
-	"github.com/onflow/flow-go/fvm/storage/state"
+	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	"github.com/onflow/flow-go/module/mempool/entity"
@@ -13,9 +12,6 @@ type BlockExecutionResult struct {
 	*entity.ExecutableBlock
 
 	collectionExecutionResults []CollectionExecutionResult
-
-	// TODO(patrick): switch this to execution snapshot
-	ComputationIntensities meter.MeteredComputationIntensities
 }
 
 // NewPopulatedBlockExecutionResult constructs a new BlockExecutionResult,
@@ -25,7 +21,6 @@ func NewPopulatedBlockExecutionResult(eb *entity.ExecutableBlock) *BlockExecutio
 	return &BlockExecutionResult{
 		ExecutableBlock:            eb,
 		collectionExecutionResults: make([]CollectionExecutionResult, chunkCounts),
-		ComputationIntensities:     make(meter.MeteredComputationIntensities),
 	}
 }
 
@@ -79,8 +74,8 @@ func (er *BlockExecutionResult) AllTransactionResults() flow.TransactionResults 
 	return res
 }
 
-func (er *BlockExecutionResult) AllExecutionSnapshots() []*state.ExecutionSnapshot {
-	res := make([]*state.ExecutionSnapshot, 0)
+func (er *BlockExecutionResult) AllExecutionSnapshots() []*snapshot.ExecutionSnapshot {
+	res := make([]*snapshot.ExecutionSnapshot, 0)
 	for _, ce := range er.collectionExecutionResults {
 		es := ce.ExecutionSnapshot()
 		res = append(res, es)
@@ -177,6 +172,7 @@ func (ar *BlockAttestationResult) ChunkAt(index int) *flow.Chunk {
 		len(execRes.TransactionResults()),
 		attestRes.eventCommit,
 		attestRes.endStateCommit,
+		execRes.executionSnapshot.TotalComputationUsed(),
 	)
 }
 

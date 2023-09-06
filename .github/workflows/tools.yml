@@ -18,6 +18,8 @@ jobs:
     name: Build boot tools
     runs-on: ubuntu-latest
     steps:
+    - name: Print all input variables
+      run: echo '${{ toJson(inputs) }}' | jq
     - id: auth
       uses: google-github-actions/auth@v1
       with:
@@ -25,7 +27,7 @@ jobs:
     - name: Setup Go
       uses: actions/setup-go@v2
       with:
-        go-version: '1.19'
+        go-version: "1.20"
     - name: Set up Google Cloud SDK
       uses: google-github-actions/setup-gcloud@v1
       with:
@@ -51,6 +53,9 @@ jobs:
         if [[ "${{ inputs.promote }}" = true ]]; then
           echo "promoting boot-tools.tar"
           gsutil cp boot-tools.tar gs://flow-genesis-bootstrap/boot-tools.tar
+          SUMMARY=$'# Tool Build and Upload Summary \n Your tools were uploaded to the following GCS objects \n * Boot Tools gs://flow-genesis-bootstrap/boot-tools.tar \n * Util util.tar gs://flow-genesis-bootstrap/tools/${{ inputs.tag }}/util.tar'
         else
           echo "not promoting boot-tools.tar"
+          SUMMARY=$'# Tool Build and Upload Summary \n Your tools were uploaded to the following GCS objects \n * Boot Tools gs://flow-genesis-bootstrap/tools/${{ inputs.tag }}/boot-tools.tar \n * Util util.tar gs://flow-genesis-bootstrap/tools/${{ inputs.tag }}/util.tar'
         fi
+        echo "$SUMMARY" >> $GITHUB_STEP_SUMMARY

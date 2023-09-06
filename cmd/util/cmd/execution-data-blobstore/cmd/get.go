@@ -45,7 +45,7 @@ func run(*cobra.Command, []string) {
 
 	edID := flow.HashToID(b)
 
-	ed, err := eds.GetExecutionData(context.Background(), edID)
+	ed, err := eds.Get(context.Background(), edID)
 	if err != nil {
 		logger.Fatal().Err(err).Msg("failed to get execution data")
 	}

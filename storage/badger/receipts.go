@@ -18,14 +18,13 @@ import (
 type ExecutionReceipts struct {
 	db      *badger.DB
 	results *ExecutionResults
-	cache   *Cache
+	cache   *Cache[flow.Identifier, *flow.ExecutionReceipt]
 }
 
 // NewExecutionReceipts Creates ExecutionReceipts instance which is a database of receipts which
 // supports storing and indexing receipts by receipt ID and block ID.
 func NewExecutionReceipts(collector module.CacheMetrics, db *badger.DB, results *ExecutionResults, cacheSize uint) *ExecutionReceipts {
-	store := func(key interface{}, val interface{}) func(*transaction.Tx) error {
-		receipt := val.(*flow.ExecutionReceipt)
+	store := func(receiptTD flow.Identifier, receipt *flow.ExecutionReceipt) func(*transaction.Tx) error {
 		receiptID := receipt.ID()
 
 		// assemble DB operations to store result (no execution)
@@ -54,9 +53,8 @@ func NewExecutionReceipts(collector module.CacheMetrics, db *badger.DB, results 
 		}
 	}
 
-	retrieve := func(key interface{}) func(tx *badger.Txn) (interface{}, error) {
-		receiptID := key.(flow.Identifier)
-		return func(tx *badger.Txn) (interface{}, error) {
+	retrieve := func(receiptID flow.Identifier) func(tx *badger.Txn) (*flow.ExecutionReceipt, error) {
+		return func(tx *badger.Txn) (*flow.ExecutionReceipt, error) {
 			var meta flow.ExecutionReceiptMeta
 			err := operation.RetrieveExecutionReceiptMeta(receiptID, &meta)(tx)
 			if err != nil {
@@ -73,8 +71,8 @@ func NewExecutionReceipts(collector module.CacheMetrics, db *badger.DB, results 
 	return &ExecutionReceipts{
 		db:      db,
 		results: results,
-		cache: newCache(collector, metrics.ResourceReceipt,
-			withLimit(cacheSize),
+		cache: newCache[flow.Identifier, *flow.ExecutionReceipt](collector, metrics.ResourceReceipt,
+			withLimit[flow.Identifier, *flow.ExecutionReceipt](cacheSize),
 			withStore(store),
 			withRetrieve(retrieve)),
 	}
@@ -92,7 +90,7 @@ func (r *ExecutionReceipts) byID(receiptID flow.Identifier) func(*badger.Txn) (*
 		if err != nil {
 			return nil, err
 		}
-		return val.(*flow.ExecutionReceipt), nil
+		return val, nil
 	}
 }
 

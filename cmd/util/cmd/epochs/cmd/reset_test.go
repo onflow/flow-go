@@ -37,39 +37,6 @@ func TestReset_LocalSnapshot(t *testing.T) {
 
 			// set initial flag values
 			flagBootDir = bootDir
-			flagPayout = ""
-
-			// run command with overwritten stdout
-			stdout := bytes.NewBuffer(nil)
-			resetCmd.SetOut(stdout)
-			resetRun(resetCmd, nil)
-
-			// read output from stdout
-			var outputTxArgs []interface{}
-			err = json.NewDecoder(stdout).Decode(&outputTxArgs)
-			require.NoError(t, err)
-
-			// compare to expected values
-			expectedArgs := extractResetEpochArgs(rootSnapshot)
-			verifyArguments(t, expectedArgs, outputTxArgs)
-		})
-	})
-
-	// tests that given the root snapshot file and payout, the command
-	// writes the expected arguments to stdout.
-	t.Run("with payout flag set", func(t *testing.T) {
-		unittest.RunWithTempDir(t, func(bootDir string) {
-
-			// create a root snapshot
-			rootSnapshot := unittest.RootSnapshotFixture(unittest.IdentityListFixture(10, unittest.WithAllRoles()))
-
-			// write snapshot to correct path in bootDir
-			err := writeRootSnapshot(bootDir, rootSnapshot)
-			require.NoError(t, err)
-
-			// set initial flag values
-			flagBootDir = bootDir
-			flagPayout = "10.0"
 
 			// run command with overwritten stdout
 			stdout := bytes.NewBuffer(nil)
@@ -97,7 +64,6 @@ func TestReset_LocalSnapshot(t *testing.T) {
 
 			// set initial flag values
 			flagBootDir = bootDir
-			flagPayout = ""
 
 			// run command
 			resetRun(resetCmd, nil)
@@ -117,7 +83,6 @@ func TestReset_BucketSnapshot(t *testing.T) {
 	t.Run("happy path", func(t *testing.T) {
 		// set initial flag values
 		flagBucketNetworkName = "mainnet-13"
-		flagPayout = ""
 
 		// run command with overwritten stdout
 		stdout := bytes.NewBuffer(nil)
@@ -140,7 +105,6 @@ func TestReset_BucketSnapshot(t *testing.T) {
 	t.Run("happy path - with payout", func(t *testing.T) {
 		// set initial flag values
 		flagBucketNetworkName = "mainnet-13"
-		flagPayout = "10.0"
 
 		// run command with overwritten stdout
 		stdout := bytes.NewBuffer(nil)
@@ -167,7 +131,6 @@ func TestReset_BucketSnapshot(t *testing.T) {
 
 		// set initial flag values
 		flagBucketNetworkName = "not-a-real-network-name"
-		flagPayout = ""
 
 		// run command
 		resetRun(resetCmd, nil)

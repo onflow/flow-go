@@ -48,6 +48,25 @@ func (h *Handler) GetNetworkParameters(
 	}, nil
 }
 
+func (h *Handler) GetNodeVersionInfo(
+	ctx context.Context,
+	request *access.GetNodeVersionInfoRequest,
+) (*access.GetNodeVersionInfoResponse, error) {
+	nodeVersionInfo, err := h.api.GetNodeVersionInfo(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	return &access.GetNodeVersionInfoResponse{
+		Info: &entities.NodeVersionInfo{
+			Semver:          nodeVersionInfo.Semver,
+			Commit:          nodeVersionInfo.Commit,
+			SporkId:         nodeVersionInfo.SporkId[:],
+			ProtocolVersion: nodeVersionInfo.ProtocolVersion,
+		},
+	}, nil
+}
+
 // GetLatestProtocolStateSnapshot returns the latest serializable Snapshot
 func (h *Handler) GetLatestProtocolStateSnapshot(ctx context.Context, req *access.GetLatestProtocolStateSnapshotRequest) (*access.ProtocolStateSnapshotResponse, error) {
 	snapshot, err := h.api.GetLatestProtocolStateSnapshot(ctx)

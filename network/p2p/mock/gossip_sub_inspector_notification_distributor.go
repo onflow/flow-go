@@ -15,16 +15,16 @@ type GossipSubInspectorNotificationDistributor struct {
 }
 
 // AddConsumer provides a mock function with given fields: _a0
-func (_m *GossipSubInspectorNotificationDistributor) AddConsumer(_a0 p2p.GossipSubInvalidControlMessageNotificationConsumer) {
+func (_m *GossipSubInspectorNotificationDistributor) AddConsumer(_a0 p2p.GossipSubInvCtrlMsgNotifConsumer) {
 	_m.Called(_a0)
 }
 
 // DistributeInvalidControlMessageNotification provides a mock function with given fields: notification
-func (_m *GossipSubInspectorNotificationDistributor) DistributeInvalidControlMessageNotification(notification *p2p.InvalidControlMessageNotification) error {
+func (_m *GossipSubInspectorNotificationDistributor) Distribute(notification *p2p.InvCtrlMsgNotif) error {
 	ret := _m.Called(notification)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(*p2p.InvalidControlMessageNotification) error); ok {
+	if rf, ok := ret.Get(0).(func(*p2p.InvCtrlMsgNotif) error); ok {
 		r0 = rf(notification)
 	} else {
 		r0 = ret.Error(0)

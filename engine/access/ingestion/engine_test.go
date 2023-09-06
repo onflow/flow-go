@@ -9,16 +9,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/onflow/flow-go/consensus/hotstuff/notifications/pubsub"
-	synceng "github.com/onflow/flow-go/engine/common/synchronization"
-
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
 	hotmodel "github.com/onflow/flow-go/consensus/hotstuff/model"
-	"github.com/onflow/flow-go/engine/access/rpc"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module/component"
@@ -116,21 +112,9 @@ func (suite *Suite) SetupTest() {
 	blocksToMarkExecuted, err := stdmap.NewTimes(100)
 	require.NoError(suite.T(), err)
 
-	finalizationDistributor := pubsub.NewFinalizationDistributor()
-
-	finalizedHeaderCache, err := synceng.NewFinalizedHeaderCache(log, suite.proto.state, finalizationDistributor)
-	require.NoError(suite.T(), err)
-
-	rpcEngBuilder, err := rpc.NewBuilder(log, suite.proto.state, rpc.Config{}, nil, nil, suite.blocks, suite.headers, suite.collections,
-		suite.transactions, suite.receipts, suite.results, flow.Testnet, metrics.NewNoopCollector(), metrics.NewNoopCollector(), 0,
-		0, false, false, nil, nil, suite.me)
-	require.NoError(suite.T(), err)
-	rpcEng, err := rpcEngBuilder.WithLegacy().WithFinalizedHeaderCache(finalizedHeaderCache).Build()
-	require.NoError(suite.T(), err)
-
 	eng, err := New(log, net, suite.proto.state, suite.me, suite.request, suite.blocks, suite.headers, suite.collections,
 		suite.transactions, suite.results, suite.receipts, metrics.NewNoopCollector(), collectionsToMarkFinalized, collectionsToMarkExecuted,
-		blocksToMarkExecuted, rpcEng)
+		blocksToMarkExecuted)
 	require.NoError(suite.T(), err)
 
 	suite.blocks.On("GetLastFullBlockHeight").Once().Return(uint64(0), errors.New("do nothing"))
@@ -579,7 +563,7 @@ func (suite *Suite) TestUpdateLastFullBlockReceivedIndex() {
 		// simulate the absence of the full block height index
 		lastFullBlockHeight = 0
 		rtnErr = storerr.ErrNotFound
-		suite.proto.params.On("Root").Return(rootBlk.Header, nil)
+		suite.proto.params.On("FinalizedRoot").Return(rootBlk.Header, nil)
 		suite.blocks.On("UpdateLastFullBlockHeight", finalizedHeight).Return(nil).Once()
 
 		suite.eng.updateLastFullBlockReceivedIndex()

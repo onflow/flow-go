@@ -10,7 +10,7 @@ import (
 	dssync "github.com/ipfs/go-datastore/sync"
 	blockstore "github.com/ipfs/go-ipfs-blockstore"
 	"github.com/onflow/cadence"
-	jsoncdc "github.com/onflow/cadence/encoding/json"
+	"github.com/onflow/cadence/encoding/ccf"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -21,8 +21,8 @@ import (
 	"github.com/onflow/flow-go/engine/execution/computation/computer"
 	"github.com/onflow/flow-go/engine/execution/testutil"
 	"github.com/onflow/flow-go/fvm"
-	"github.com/onflow/flow-go/fvm/storage"
 	"github.com/onflow/flow-go/fvm/storage/derived"
+	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	"github.com/onflow/flow-go/module/executiondatasync/provider"
@@ -33,6 +33,10 @@ import (
 	requesterunit "github.com/onflow/flow-go/module/state_synchronization/requester/unittest"
 	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/utils/unittest"
+)
+
+const (
+	testMaxConcurrency = 2
 )
 
 func TestPrograms_TestContractUpdates(t *testing.T) {
@@ -133,7 +137,9 @@ func TestPrograms_TestContractUpdates(t *testing.T) {
 		committer.NewNoopViewCommitter(),
 		me,
 		prov,
-		nil)
+		nil,
+		testutil.ProtocolStateWithSourceFixture(nil),
+		testMaxConcurrency)
 	require.NoError(t, err)
 
 	derivedChainData, err := derived.NewDerivedChainData(10)
@@ -243,7 +249,9 @@ func TestPrograms_TestBlockForks(t *testing.T) {
 		committer.NewNoopViewCommitter(),
 		me,
 		prov,
-		nil)
+		nil,
+		testutil.ProtocolStateWithSourceFixture(nil),
+		testMaxConcurrency)
 	require.NoError(t, err)
 
 	derivedChainData, err := derived.NewDerivedChainData(10)
@@ -261,7 +269,7 @@ func TestPrograms_TestBlockForks(t *testing.T) {
 		block1111, block12, block121, block1211 *flow.Block
 
 		block1Snapshot, block11Snapshot, block111Snapshot, block112Snapshot,
-		block12Snapshot, block121Snapshot storage.SnapshotTree
+		block12Snapshot, block121Snapshot snapshot.SnapshotTree
 	)
 
 	t.Run("executing block1 (no collection)", func(t *testing.T) {
@@ -478,11 +486,11 @@ func createTestBlockAndRun(
 	engine *Manager,
 	parentBlock *flow.Block,
 	col flow.Collection,
-	snapshotTree storage.SnapshotTree,
+	snapshotTree snapshot.SnapshotTree,
 ) (
 	*flow.Block,
 	*execution.ComputationResult,
-	storage.SnapshotTree,
+	snapshot.SnapshotTree,
 ) {
 	guarantee := flow.CollectionGuarantee{
 		CollectionID: col.ID(),
@@ -543,7 +551,7 @@ func prepareTx(t *testing.T,
 }
 
 func hasValidEventValue(t *testing.T, event flow.Event, value int) {
-	data, err := jsoncdc.Decode(nil, event.Payload)
+	data, err := ccf.Decode(nil, event.Payload)
 	require.NoError(t, err)
 	assert.Equal(t, int16(value), data.(cadence.Event).Fields[0].ToGoValue())
 }

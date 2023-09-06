@@ -12,7 +12,6 @@ import (
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/meter"
 	"github.com/onflow/flow-go/fvm/storage"
-	"github.com/onflow/flow-go/fvm/storage/derived"
 	"github.com/onflow/flow-go/fvm/storage/logical"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/epochs"
@@ -246,13 +245,9 @@ func Bootstrap(
 
 func (b *BootstrapProcedure) NewExecutor(
 	ctx Context,
-	txnState storage.Transaction,
+	txnState storage.TransactionPreparer,
 ) ProcedureExecutor {
 	return newBootstrapExecutor(b.BootstrapParams, ctx, txnState)
-}
-
-func (BootstrapProcedure) SetOutput(output ProcedureOutput) {
-	// do nothing
 }
 
 func (proc *BootstrapProcedure) ComputationLimit(_ Context) uint64 {
@@ -279,7 +274,7 @@ type bootstrapExecutor struct {
 	BootstrapParams
 
 	ctx      Context
-	txnState storage.Transaction
+	txnState storage.TransactionPreparer
 
 	accountCreator environment.BootstrapAccountCreator
 }
@@ -287,7 +282,7 @@ type bootstrapExecutor struct {
 func newBootstrapExecutor(
 	params BootstrapParams,
 	ctx Context,
-	txnState storage.Transaction,
+	txnState storage.TransactionPreparer,
 ) *bootstrapExecutor {
 	return &bootstrapExecutor{
 		BootstrapParams: params,
@@ -323,7 +318,9 @@ func (b *bootstrapExecutor) Execute() error {
 	service := b.createServiceAccount()
 
 	fungibleToken := b.deployFungibleToken()
-	flowToken := b.deployFlowToken(service, fungibleToken)
+	nonFungibleToken := b.deployNonFungibleToken(service)
+	b.deployMetadataViews(fungibleToken, nonFungibleToken)
+	flowToken := b.deployFlowToken(service, fungibleToken, nonFungibleToken)
 	storageFees := b.deployStorageFees(service, fungibleToken, flowToken)
 	feeContract := b.deployFlowFees(service, fungibleToken, flowToken, storageFees)
 
@@ -416,7 +413,46 @@ func (b *bootstrapExecutor) deployFungibleToken() flow.Address {
 	return fungibleToken
 }
 
-func (b *bootstrapExecutor) deployFlowToken(service, fungibleToken flow.Address) flow.Address {
+func (b *bootstrapExecutor) deployNonFungibleToken(deployTo flow.Address) flow.Address {
+
+	txError, err := b.invokeMetaTransaction(
+		b.ctx,
+		Transaction(
+			blueprints.DeployNonFungibleTokenContractTransaction(deployTo),
+			0),
+	)
+	panicOnMetaInvokeErrf("failed to deploy non-fungible token contract: %s", txError, err)
+	return deployTo
+}
+
+func (b *bootstrapExecutor) deployMetadataViews(fungibleToken, nonFungibleToken flow.Address) {
+
+	txError, err := b.invokeMetaTransaction(
+		b.ctx,
+		Transaction(
+			blueprints.DeployMetadataViewsContractTransaction(fungibleToken, nonFungibleToken),
+			0),
+	)
+	panicOnMetaInvokeErrf("failed to deploy metadata views contract: %s", txError, err)
+
+	txError, err = b.invokeMetaTransaction(
+		b.ctx,
+		Transaction(
+			blueprints.DeployViewResolverContractTransaction(nonFungibleToken),
+			0),
+	)
+	panicOnMetaInvokeErrf("failed to deploy view resolver contract: %s", txError, err)
+
+	txError, err = b.invokeMetaTransaction(
+		b.ctx,
+		Transaction(
+			blueprints.DeployFungibleTokenMetadataViewsContractTransaction(fungibleToken, nonFungibleToken),
+			0),
+	)
+	panicOnMetaInvokeErrf("failed to deploy fungible token metadata views contract: %s", txError, err)
+}
+
+func (b *bootstrapExecutor) deployFlowToken(service, fungibleToken, metadataViews flow.Address) flow.Address {
 	flowToken := b.createAccount(b.accountKeys.FlowTokenAccountPublicKeys)
 	txError, err := b.invokeMetaTransaction(
 		b.ctx,
@@ -424,6 +460,7 @@ func (b *bootstrapExecutor) deployFlowToken(service, fungibleToken flow.Address)
 			blueprints.DeployFlowTokenContractTransaction(
 				service,
 				fungibleToken,
+				metadataViews,
 				flowToken),
 			0),
 	)
@@ -926,21 +963,8 @@ func (b *bootstrapExecutor) invokeMetaTransaction(
 		WithComputationLimit(math.MaxUint64),
 	)
 
-	// use new derived transaction data for each meta transaction.
-	// It's not necessary to cache during bootstrapping and most transactions are contract deploys anyway.
-	prog, err := derived.NewEmptyDerivedBlockData().
-		NewDerivedTransactionData(0, 0)
+	executor := tx.NewExecutor(ctx, b.txnState)
+	err := Run(executor)
 
-	if err != nil {
-		return nil, err
-	}
-
-	txn := &storage.SerialTransaction{
-		NestedTransaction:           b.txnState,
-		DerivedTransactionCommitter: prog,
-	}
-
-	err = Run(tx.NewExecutor(ctx, txn))
-
-	return tx.Err, err
+	return executor.Output().Err, err
 }

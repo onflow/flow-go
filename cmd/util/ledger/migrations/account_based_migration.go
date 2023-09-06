@@ -70,7 +70,7 @@ func MigrateByAccount(migrator AccountMigrator, allPayloads []ledger.Payload, nW
 	log.Info().Msgf("start grouping for a total of %v payloads", len(allPayloads))
 
 	var err error
-	logGrouping := util.LogProgress("grouping payload", len(allPayloads), &log.Logger)
+	logGrouping := util.LogProgress("grouping payload", len(allPayloads), log.Logger)
 	for i, payload := range allPayloads {
 		groups, err = PayloadGrouping(groups, payload)
 		if err != nil {
@@ -107,7 +107,7 @@ func MigrateGroupSequentially(
 ) (
 	[]ledger.Payload, error) {
 
-	logAccount := util.LogProgress("processing account group", len(payloadsByAccount), &log.Logger)
+	logAccount := util.LogProgress("processing account group", len(payloadsByAccount), log.Logger)
 
 	i := 0
 	migrated := make([]ledger.Payload, 0)
@@ -170,7 +170,7 @@ func MigrateGroupConcurrently(
 	}
 
 	// read job results
-	logAccount := util.LogProgress("processing account group", len(payloadsByAccount), &log.Logger)
+	logAccount := util.LogProgress("processing account group", len(payloadsByAccount), log.Logger)
 
 	migrated := make([]ledger.Payload, 0)
 

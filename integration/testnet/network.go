@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	gonet "net"
+	"net/http"
 	"os"
 	"path/filepath"
 	"sort"
@@ -18,13 +19,15 @@ import (
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	dockerclient "github.com/docker/docker/client"
-	"github.com/onflow/cadence"
+	io_prometheus_client "github.com/prometheus/client_model/go"
+	"github.com/prometheus/common/expfmt"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/onflow/flow-go-sdk/crypto"
+	"github.com/onflow/cadence"
 
+	"github.com/onflow/flow-go-sdk/crypto"
 	"github.com/onflow/flow-go/cmd/bootstrap/dkg"
 	"github.com/onflow/flow-go/cmd/bootstrap/run"
 	"github.com/onflow/flow-go/cmd/bootstrap/utils"
@@ -72,6 +75,8 @@ const (
 	DefaultExecutionRootDir = "/data/exedb"
 	// DefaultExecutionDataServiceDir for the execution data service blobstore.
 	DefaultExecutionDataServiceDir = "/data/execution_data"
+	// DefaultChunkDataPackDir for the chunk data packs
+	DefaultChunkDataPackDir = "/data/chunk_data_pack"
 	// DefaultProfilerDir is the default directory for the profiler
 	DefaultProfilerDir = "/data/profiler"
 
@@ -317,9 +322,9 @@ func (net *FlowNetwork) ContainerByName(name string) *Container {
 func (net *FlowNetwork) PrintPorts() {
 	var builder strings.Builder
 	builder.WriteString("endpoints by container name:\n")
-	for containerName, container := range net.Containers {
-		builder.WriteString(fmt.Sprintf("\t%s\n", containerName))
-		for portName, port := range container.Ports {
+	for cName, c := range net.Containers {
+		builder.WriteString(fmt.Sprintf("\t%s\n", cName))
+		for portName, port := range c.Ports {
 			switch portName {
 			case MetricsPort:
 				builder.WriteString(fmt.Sprintf("\t\t%s: localhost:%s/metrics\n", portName, port))
@@ -329,6 +334,57 @@ func (net *FlowNetwork) PrintPorts() {
 		}
 	}
 	fmt.Print(builder.String())
+}
+
+// PortsByContainerName returns the specified port for each container in the network.
+// Args:
+//   - portName: name of the port.
+//   - withGhost: when set to true will include urls's for ghost containers, otherwise ghost containers will be filtered.
+//
+// Returns:
+//   - map[string]string: a map of container name to the specified port on the host machine.
+func (net *FlowNetwork) PortsByContainerName(portName string, withGhost bool) map[string]string {
+	portsByContainer := make(map[string]string)
+	for cName, c := range net.Containers {
+		if !withGhost && c.Config.Ghost {
+			continue
+		}
+		portsByContainer[cName] = c.Ports[portName]
+	}
+	return portsByContainer
+}
+
+// GetMetricFromContainers returns the specified metric for all containers.
+// Args:
+//
+//		t: testing pointer
+//		metricName: name of the metric
+//	 metricsURLs: map of container name to metrics url
+//
+// Returns:
+//
+//	map[string][]*io_prometheus_client.Metric map of container name to metric result.
+func (net *FlowNetwork) GetMetricFromContainers(t *testing.T, metricName string, metricsURLs map[string]string) map[string][]*io_prometheus_client.Metric {
+	allMetrics := make(map[string][]*io_prometheus_client.Metric, len(metricsURLs))
+	for containerName, metricsURL := range metricsURLs {
+		allMetrics[containerName] = net.GetMetricFromContainer(t, containerName, metricsURL, metricName)
+	}
+	return allMetrics
+}
+
+// GetMetricFromContainer makes an HTTP GET request to the metrics url and returns the metric families for each container.
+func (net *FlowNetwork) GetMetricFromContainer(t *testing.T, containerName, metricsURL, metricName string) []*io_prometheus_client.Metric {
+	// download root snapshot from provided URL
+	res, err := http.Get(metricsURL)
+	require.NoError(t, err, fmt.Sprintf("failed to get metrics for container %s at url %s: %s", containerName, metricsURL, err))
+	defer res.Body.Close()
+
+	var parser expfmt.TextParser
+	mf, err := parser.TextToMetricFamilies(res.Body)
+	require.NoError(t, err, fmt.Sprintf("failed to parse metrics for container %s at url %s: %s", containerName, metricsURL, err))
+	m, ok := mf[metricName]
+	require.True(t, ok, "failed to get metric %s for container %s at url %s metric does not exist", metricName, containerName, metricsURL)
+	return m.GetMetric()
 }
 
 type ConsensusFollowerConfig struct {
@@ -714,6 +770,9 @@ func (net *FlowNetwork) addObserver(t *testing.T, conf ObserverConfig) {
 	nodeContainer.exposePort(AdminPort, testingdock.RandomPort(t))
 	nodeContainer.AddFlag("admin-addr", nodeContainer.ContainerAddr(AdminPort))
 
+	nodeContainer.exposePort(RESTPort, testingdock.RandomPort(t))
+	nodeContainer.AddFlag("rest-addr", nodeContainer.ContainerAddr(RESTPort))
+
 	nodeContainer.opts.HealthCheck = testingdock.HealthCheckCustom(nodeContainer.HealthcheckCallback())
 
 	suiteContainer := net.suite.Container(containerOpts)
@@ -804,6 +863,7 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 
 			nodeContainer.AddFlag("triedir", DefaultExecutionRootDir)
 			nodeContainer.AddFlag("execution-data-dir", DefaultExecutionDataServiceDir)
+			nodeContainer.AddFlag("chunk-data-pack-dir", DefaultChunkDataPackDir)
 
 		case flow.RoleAccess:
 			nodeContainer.exposePort(GRPCPort, testingdock.RandomPort(t))
@@ -961,7 +1021,6 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string, chainID fl
 
 	// Sort so that access nodes start up last
 	sort.Sort(&networkConf)
-
 	// generate staking and networking keys for each configured node
 	stakedConfs, err := setupKeys(networkConf)
 	if err != nil {
@@ -1184,7 +1243,6 @@ func setupKeys(networkConf NetworkConfig) ([]ContainerConfig, error) {
 	// create node container configs and corresponding public identities
 	confs := make([]ContainerConfig, 0, nNodes)
 	for i, conf := range networkConf.Nodes {
-
 		// define the node's name <role>_<n> and address <name>:<port>
 		name := fmt.Sprintf("%s_%d", conf.Role.String(), roleCounter[conf.Role]+1)
 
@@ -1201,13 +1259,14 @@ func setupKeys(networkConf NetworkConfig) ([]ContainerConfig, error) {
 		)
 
 		containerConf := ContainerConfig{
-			NodeInfo:        info,
-			ContainerName:   name,
-			LogLevel:        conf.LogLevel,
-			Ghost:           conf.Ghost,
-			AdditionalFlags: conf.AdditionalFlags,
-			Debug:           conf.Debug,
-			Corrupted:       conf.Corrupted,
+			NodeInfo:            info,
+			ContainerName:       name,
+			LogLevel:            conf.LogLevel,
+			Ghost:               conf.Ghost,
+			AdditionalFlags:     conf.AdditionalFlags,
+			Debug:               conf.Debug,
+			Corrupted:           conf.Corrupted,
+			EnableMetricsServer: conf.EnableMetricsServer,
 		}
 
 		confs = append(confs, containerConf)
@@ -1231,7 +1290,7 @@ func runBeaconKG(confs []ContainerConfig) (dkgmod.DKGData, error) {
 		return dkgmod.DKGData{}, err
 	}
 
-	dkg, err := dkg.RunFastKG(nConsensusNodes, dkgSeed)
+	dkg, err := dkg.RandomBeaconKG(nConsensusNodes, dkgSeed)
 	if err != nil {
 		return dkgmod.DKGData{}, err
 	}

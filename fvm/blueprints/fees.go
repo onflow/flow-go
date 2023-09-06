@@ -15,15 +15,15 @@ import (
 )
 
 var TransactionFeesExecutionEffortWeightsPath = cadence.Path{
-	Domain:     common.PathDomainStorage.Identifier(),
+	Domain:     common.PathDomainStorage,
 	Identifier: "executionEffortWeights",
 }
 var TransactionFeesExecutionMemoryWeightsPath = cadence.Path{
-	Domain:     common.PathDomainStorage.Identifier(),
+	Domain:     common.PathDomainStorage,
 	Identifier: "executionMemoryWeights",
 }
 var TransactionFeesExecutionMemoryLimitPath = cadence.Path{
-	Domain:     common.PathDomainStorage.Identifier(),
+	Domain:     common.PathDomainStorage,
 	Identifier: "executionMemoryLimit",
 }
 

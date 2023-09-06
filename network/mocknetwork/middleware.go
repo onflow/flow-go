@@ -6,8 +6,6 @@ import (
 	datastore "github.com/ipfs/go-datastore"
 	channels "github.com/onflow/flow-go/network/channels"
 
-	flow "github.com/onflow/flow-go/model/flow"
-
 	irrecoverable "github.com/onflow/flow-go/module/irrecoverable"
 
 	mock "github.com/stretchr/testify/mock"
@@ -36,30 +34,6 @@ func (_m *Middleware) Done() <-chan struct{} {
 	}
 
 	return r0
-}
-
-// IsConnected provides a mock function with given fields: nodeID
-func (_m *Middleware) IsConnected(nodeID flow.Identifier) (bool, error) {
-	ret := _m.Called(nodeID)
-
-	var r0 bool
-	var r1 error
-	if rf, ok := ret.Get(0).(func(flow.Identifier) (bool, error)); ok {
-		return rf(nodeID)
-	}
-	if rf, ok := ret.Get(0).(func(flow.Identifier) bool); ok {
-		r0 = rf(nodeID)
-	} else {
-		r0 = ret.Get(0).(bool)
-	}
-
-	if rf, ok := ret.Get(1).(func(flow.Identifier) error); ok {
-		r1 = rf(nodeID)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
 }
 
 // NewBlobService provides a mock function with given fields: channel, store, opts
@@ -101,12 +75,22 @@ func (_m *Middleware) NewPingService(pingProtocol protocol.ID, provider network.
 	return r0
 }
 
+// OnAllowListNotification provides a mock function with given fields: _a0
+func (_m *Middleware) OnAllowListNotification(_a0 *network.AllowListingUpdate) {
+	_m.Called(_a0)
+}
+
+// OnDisallowListNotification provides a mock function with given fields: _a0
+func (_m *Middleware) OnDisallowListNotification(_a0 *network.DisallowListingUpdate) {
+	_m.Called(_a0)
+}
+
 // Publish provides a mock function with given fields: msg
-func (_m *Middleware) Publish(msg *network.OutgoingMessageScope) error {
+func (_m *Middleware) Publish(msg network.OutgoingMessageScope) error {
 	ret := _m.Called(msg)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(*network.OutgoingMessageScope) error); ok {
+	if rf, ok := ret.Get(0).(func(network.OutgoingMessageScope) error); ok {
 		r0 = rf(msg)
 	} else {
 		r0 = ret.Error(0)
@@ -132,11 +116,11 @@ func (_m *Middleware) Ready() <-chan struct{} {
 }
 
 // SendDirect provides a mock function with given fields: msg
-func (_m *Middleware) SendDirect(msg *network.OutgoingMessageScope) error {
+func (_m *Middleware) SendDirect(msg network.OutgoingMessageScope) error {
 	ret := _m.Called(msg)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(*network.OutgoingMessageScope) error); ok {
+	if rf, ok := ret.Get(0).(func(network.OutgoingMessageScope) error); ok {
 		r0 = rf(msg)
 	} else {
 		r0 = ret.Error(0)
@@ -147,6 +131,11 @@ func (_m *Middleware) SendDirect(msg *network.OutgoingMessageScope) error {
 
 // SetOverlay provides a mock function with given fields: _a0
 func (_m *Middleware) SetOverlay(_a0 network.Overlay) {
+	_m.Called(_a0)
+}
+
+// SetSlashingViolationsConsumer provides a mock function with given fields: _a0
+func (_m *Middleware) SetSlashingViolationsConsumer(_a0 network.ViolationsConsumer) {
 	_m.Called(_a0)
 }
 

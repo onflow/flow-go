@@ -58,6 +58,14 @@ func WithLengthObserver(callback QueueLengthObserver) ConstructorOption {
 	}
 }
 
+// WithLengthMetricObserver attaches a length observer which calls the given observe function.
+// It can be used to concisely bind a metrics observer implementing module.MempoolMetrics to the queue.
+func WithLengthMetricObserver(resource string, observe func(resource string, length uint)) ConstructorOption {
+	return WithLengthObserver(func(l int) {
+		observe(resource, uint(l))
+	})
+}
+
 // NewFifoQueue is the Constructor for FifoQueue
 func NewFifoQueue(maxCapacity int, options ...ConstructorOption) (*FifoQueue, error) {
 	if maxCapacity < 1 {

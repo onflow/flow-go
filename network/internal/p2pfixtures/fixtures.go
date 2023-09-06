@@ -21,25 +21,24 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 
+	"github.com/onflow/flow-go/config"
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/id"
 	"github.com/onflow/flow-go/module/metrics"
+	flownet "github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/internal/p2putils"
-	"github.com/onflow/flow-go/network/internal/testutils"
 	"github.com/onflow/flow-go/network/message"
 	"github.com/onflow/flow-go/network/p2p"
 	p2pdht "github.com/onflow/flow-go/network/p2p/dht"
-	"github.com/onflow/flow-go/network/p2p/distributor"
 	"github.com/onflow/flow-go/network/p2p/keyutils"
 	"github.com/onflow/flow-go/network/p2p/p2pbuilder"
-	inspectorbuilder "github.com/onflow/flow-go/network/p2p/p2pbuilder/inspector"
+	p2pconfig "github.com/onflow/flow-go/network/p2p/p2pbuilder/config"
 	"github.com/onflow/flow-go/network/p2p/tracer"
 	"github.com/onflow/flow-go/network/p2p/unicast"
 	"github.com/onflow/flow-go/network/p2p/unicast/protocols"
 	"github.com/onflow/flow-go/network/p2p/utils"
-	validator "github.com/onflow/flow-go/network/validator/pubsub"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -98,33 +97,51 @@ func WithSubscriptionFilter(filter pubsub.SubscriptionFilter) nodeOpt {
 	}
 }
 
+// TODO: this should be replaced by node fixture: https://github.com/onflow/flow-go/blob/master/network/p2p/test/fixtures.go
 func CreateNode(t *testing.T, networkKey crypto.PrivateKey, sporkID flow.Identifier, logger zerolog.Logger, nodeIds flow.IdentityList, opts ...nodeOpt) p2p.LibP2PNode {
 	idProvider := id.NewFixedIdentityProvider(nodeIds)
-
-	meshTracer := tracer.NewGossipSubMeshTracer(
-		logger,
-		metrics.NewNoopCollector(),
-		idProvider,
-		p2pbuilder.DefaultGossipSubConfig().LocalMeshLogInterval)
-
-	rpcInspectors, err := inspectorbuilder.NewGossipSubInspectorBuilder(logger, sporkID, inspectorbuilder.DefaultGossipSubRPCInspectorsConfig(), distributor.DefaultGossipSubInspectorNotificationDistributor(logger)).Build()
+	defaultFlowConfig, err := config.DefaultConfig()
 	require.NoError(t, err)
+
+	meshTracerCfg := &tracer.GossipSubMeshTracerConfig{
+		Logger:                             logger,
+		Metrics:                            metrics.NewNoopCollector(),
+		IDProvider:                         idProvider,
+		LoggerInterval:                     defaultFlowConfig.NetworkConfig.GossipSubConfig.LocalMeshLogInterval,
+		RpcSentTrackerCacheSize:            defaultFlowConfig.NetworkConfig.GossipSubConfig.RPCSentTrackerCacheSize,
+		RpcSentTrackerWorkerQueueCacheSize: defaultFlowConfig.NetworkConfig.GossipSubConfig.RPCSentTrackerQueueCacheSize,
+		RpcSentTrackerNumOfWorkers:         defaultFlowConfig.NetworkConfig.GossipSubConfig.RpcSentTrackerNumOfWorkers,
+		HeroCacheMetricsFactory:            metrics.NewNoopHeroCacheMetricsFactory(),
+		NetworkingType:                     flownet.PublicNetwork,
+	}
+	meshTracer := tracer.NewGossipSubMeshTracer(meshTracerCfg)
 
 	builder := p2pbuilder.NewNodeBuilder(
 		logger,
-		metrics.NewNoopCollector(),
+		&p2pconfig.MetricsConfig{
+			HeroCacheFactory: metrics.NewNoopHeroCacheMetricsFactory(),
+			Metrics:          metrics.NewNoopCollector(),
+		},
+		flownet.PrivateNetwork,
 		unittest.DefaultAddress,
 		networkKey,
 		sporkID,
-		p2pbuilder.DefaultResourceManagerConfig()).
+		idProvider,
+		&defaultFlowConfig.NetworkConfig.ResourceManagerConfig,
+		&defaultFlowConfig.NetworkConfig.GossipSubRPCInspectorsConfig,
+		p2pconfig.PeerManagerDisableConfig(),
+		&p2p.DisallowListCacheConfig{
+			MaxSize: uint32(1000),
+			Metrics: metrics.NewNoopCollector(),
+		},
+		meshTracer).
 		SetRoutingSystem(func(c context.Context, h host.Host) (routing.Routing, error) {
 			return p2pdht.NewDHT(c, h, protocols.FlowDHTProtocolID(sporkID), zerolog.Nop(), metrics.NewNoopCollector())
 		}).
-		SetResourceManager(testutils.NewResourceManager(t)).
+		SetResourceManager(&network.NullResourceManager{}).
 		SetStreamCreationRetryInterval(unicast.DefaultRetryDelay).
 		SetGossipSubTracer(meshTracer).
-		SetGossipSubScoreTracerInterval(p2pbuilder.DefaultGossipSubConfig().ScoreTracerInterval).
-		SetGossipSubRPCInspectors(rpcInspectors...)
+		SetGossipSubScoreTracerInterval(defaultFlowConfig.NetworkConfig.GossipSubConfig.ScoreTracerInterval)
 
 	for _, opt := range opts {
 		opt(builder)
@@ -241,64 +258,10 @@ func EnsureNotConnected(t *testing.T, ctx context.Context, from []p2p.LibP2PNode
 			// Hence, we instead check for any trace of the connection being established in the receiver side.
 			_ = this.Host().Connect(ctx, other.Host().Peerstore().PeerInfo(other.Host().ID()))
 			// ensures that other node has never received a connection from this node.
-			require.Equal(t, other.Host().Network().Connectedness(thisId), network.NotConnected)
+			require.Equal(t, network.NotConnected, other.Host().Network().Connectedness(thisId))
 			require.Empty(t, other.Host().Network().ConnsToPeer(thisId))
 		}
 	}
-}
-
-// EnsureNotConnectedBetweenGroups ensures no connection exists between the given groups of nodes.
-func EnsureNotConnectedBetweenGroups(t *testing.T, ctx context.Context, groupA []p2p.LibP2PNode, groupB []p2p.LibP2PNode) {
-	// ensure no connection from group A to group B
-	EnsureNotConnected(t, ctx, groupA, groupB)
-	// ensure no connection from group B to group A
-	EnsureNotConnected(t, ctx, groupB, groupA)
-}
-
-// EnsureNoPubsubMessageExchange ensures that the no pubsub message is exchanged "from" the given nodes "to" the given nodes.
-func EnsureNoPubsubMessageExchange(t *testing.T, ctx context.Context, from []p2p.LibP2PNode, to []p2p.LibP2PNode, messageFactory func() (interface{}, channels.Topic)) {
-	_, topic := messageFactory()
-
-	subs := make([]p2p.Subscription, len(to))
-	tv := validator.TopicValidator(
-		unittest.Logger(),
-		unittest.AllowAllPeerFilter())
-	var err error
-	for _, node := range from {
-		_, err = node.Subscribe(topic, tv)
-		require.NoError(t, err)
-	}
-
-	for i, node := range to {
-		s, err := node.Subscribe(topic, tv)
-		require.NoError(t, err)
-		subs[i] = s
-	}
-
-	// let subscriptions propagate
-	time.Sleep(1 * time.Second)
-
-	for _, node := range from {
-		// creates a unique message to be published by the node.
-		msg, _ := messageFactory()
-		channel, ok := channels.ChannelFromTopic(topic)
-		require.True(t, ok)
-		data := MustEncodeEvent(t, msg, channel)
-
-		// ensure the message is NOT received by any of the nodes.
-		require.NoError(t, node.Publish(ctx, topic, data))
-		ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
-		SubsMustNeverReceiveAnyMessage(t, ctx, subs)
-		cancel()
-	}
-}
-
-// EnsureNoPubsubExchangeBetweenGroups ensures that no pubsub message is exchanged between the given groups of nodes.
-func EnsureNoPubsubExchangeBetweenGroups(t *testing.T, ctx context.Context, groupA []p2p.LibP2PNode, groupB []p2p.LibP2PNode, messageFactory func() (interface{}, channels.Topic)) {
-	// ensure no message exchange from group A to group B
-	EnsureNoPubsubMessageExchange(t, ctx, groupA, groupB, messageFactory)
-	// ensure no message exchange from group B to group A
-	EnsureNoPubsubMessageExchange(t, ctx, groupB, groupA, messageFactory)
 }
 
 // EnsureMessageExchangeOverUnicast ensures that the given nodes exchange arbitrary messages on through unicasting (i.e., stream creation).

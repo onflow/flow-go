@@ -466,6 +466,30 @@ func (_m *Environment) FlushPendingUpdates() (environment.ContractUpdates, error
 	return r0, r1
 }
 
+// GenerateAccountID provides a mock function with given fields: address
+func (_m *Environment) GenerateAccountID(address common.Address) (uint64, error) {
+	ret := _m.Called(address)
+
+	var r0 uint64
+	var r1 error
+	if rf, ok := ret.Get(0).(func(common.Address) (uint64, error)); ok {
+		return rf(address)
+	}
+	if rf, ok := ret.Get(0).(func(common.Address) uint64); ok {
+		r0 = rf(address)
+	} else {
+		r0 = ret.Get(0).(uint64)
+	}
+
+	if rf, ok := ret.Get(1).(func(common.Address) error); ok {
+		r1 = rf(address)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // GenerateUUID provides a mock function with given fields:
 func (_m *Environment) GenerateUUID() (uint64, error) {
 	ret := _m.Called()
@@ -958,16 +982,14 @@ func (_m *Environment) LimitAccountStorage() bool {
 }
 
 // Logger provides a mock function with given fields:
-func (_m *Environment) Logger() *zerolog.Logger {
+func (_m *Environment) Logger() zerolog.Logger {
 	ret := _m.Called()
 
-	var r0 *zerolog.Logger
-	if rf, ok := ret.Get(0).(func() *zerolog.Logger); ok {
+	var r0 zerolog.Logger
+	if rf, ok := ret.Get(0).(func() zerolog.Logger); ok {
 		r0 = rf()
 	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*zerolog.Logger)
-		}
+		r0 = ret.Get(0).(zerolog.Logger)
 	}
 
 	return r0

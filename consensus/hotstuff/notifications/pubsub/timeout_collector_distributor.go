@@ -4,13 +4,13 @@ import (
 	"sync"
 
 	"github.com/onflow/flow-go/consensus/hotstuff"
+	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/model/flow"
 )
 
-// TimeoutCollectorDistributor ingests events from hotstuff and distributes them to subscribers.
-// Concurrently safe
-// TODO: investigate if this can be updated using atomics to prevent locking on mutex since we always add all consumers
-// before delivering events.
+// TimeoutCollectorDistributor ingests notifications about timeout aggregation and
+// distributes them to consumers. Such notifications are produced by the timeout aggregation logic.
+// Concurrently safe.
 type TimeoutCollectorDistributor struct {
 	lock      sync.RWMutex
 	consumers []hotstuff.TimeoutCollectorConsumer
@@ -19,12 +19,10 @@ type TimeoutCollectorDistributor struct {
 var _ hotstuff.TimeoutCollectorConsumer = (*TimeoutCollectorDistributor)(nil)
 
 func NewTimeoutCollectorDistributor() *TimeoutCollectorDistributor {
-	return &TimeoutCollectorDistributor{
-		consumers: make([]hotstuff.TimeoutCollectorConsumer, 0),
-	}
+	return &TimeoutCollectorDistributor{}
 }
 
-func (d *TimeoutCollectorDistributor) AddConsumer(consumer hotstuff.TimeoutCollectorConsumer) {
+func (d *TimeoutCollectorDistributor) AddTimeoutCollectorConsumer(consumer hotstuff.TimeoutCollectorConsumer) {
 	d.lock.Lock()
 	defer d.lock.Unlock()
 	d.consumers = append(d.consumers, consumer)
@@ -59,5 +57,13 @@ func (d *TimeoutCollectorDistributor) OnNewTcDiscovered(tc *flow.TimeoutCertific
 	defer d.lock.RUnlock()
 	for _, consumer := range d.consumers {
 		consumer.OnNewTcDiscovered(tc)
+	}
+}
+
+func (d *TimeoutCollectorDistributor) OnTimeoutProcessed(timeout *model.TimeoutObject) {
+	d.lock.RLock()
+	defer d.lock.RUnlock()
+	for _, subscriber := range d.consumers {
+		subscriber.OnTimeoutProcessed(timeout)
 	}
 }

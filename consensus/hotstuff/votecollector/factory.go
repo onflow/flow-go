@@ -28,7 +28,7 @@ type baseFactory func(log zerolog.Logger, block *model.Block) (hotstuff.Verifyin
 // * delegates the creation of the actual instances to baseFactory
 // * adds the logic to verify the proposer's vote for its own block
 // Thereby, VoteProcessorFactory guarantees that only proposals with valid proposer
-// vote are accepted (as per API specification). Otherwise, an `model.InvalidBlockError`
+// vote are accepted (as per API specification). Otherwise, an `model.InvalidProposalError`
 // is returned.
 type VoteProcessorFactory struct {
 	baseFactory baseFactory
@@ -39,7 +39,7 @@ var _ hotstuff.VoteProcessorFactory = (*VoteProcessorFactory)(nil)
 // Create instantiates a VerifyingVoteProcessor for the given block proposal.
 // A VerifyingVoteProcessor are only created for proposals with valid proposer votes.
 // Expected error returns during normal operations:
-// * model.InvalidBlockError - proposal has invalid proposer vote
+// * model.InvalidProposalError - proposal has invalid proposer vote
 func (f *VoteProcessorFactory) Create(log zerolog.Logger, proposal *model.Proposal) (hotstuff.VerifyingVoteProcessor, error) {
 	processor, err := f.baseFactory(log, proposal.Block)
 	if err != nil {
@@ -49,11 +49,7 @@ func (f *VoteProcessorFactory) Create(log zerolog.Logger, proposal *model.Propos
 	err = processor.Process(proposal.ProposerVote())
 	if err != nil {
 		if model.IsInvalidVoteError(err) {
-			return nil, model.InvalidBlockError{
-				BlockID: proposal.Block.BlockID,
-				View:    proposal.Block.View,
-				Err:     fmt.Errorf("invalid proposer vote: %w", err),
-			}
+			return nil, model.NewInvalidProposalErrorf(proposal, "invalid proposer vote: %w", err)
 		}
 		return nil, fmt.Errorf("processing proposer's vote for block %v failed: %w", proposal.Block.BlockID, err)
 	}

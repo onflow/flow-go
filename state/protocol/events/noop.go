@@ -14,14 +14,16 @@ func NewNoop() *Noop {
 	return &Noop{}
 }
 
-func (n Noop) BlockFinalized(block *flow.Header) {}
+func (n Noop) BlockFinalized(*flow.Header) {}
 
-func (n Noop) BlockProcessable(block *flow.Header, certifyingQC *flow.QuorumCertificate) {}
+func (n Noop) BlockProcessable(*flow.Header, *flow.QuorumCertificate) {}
 
-func (n Noop) EpochTransition(newEpoch uint64, first *flow.Header) {}
+func (n Noop) EpochTransition(uint64, *flow.Header) {}
 
-func (n Noop) EpochSetupPhaseStarted(epoch uint64, first *flow.Header) {}
+func (n Noop) EpochSetupPhaseStarted(uint64, *flow.Header) {}
 
-func (n Noop) EpochCommittedPhaseStarted(epoch uint64, first *flow.Header) {}
+func (n Noop) EpochCommittedPhaseStarted(uint64, *flow.Header) {}
 
 func (n Noop) EpochEmergencyFallbackTriggered() {}
+
+func (n Noop) ActiveClustersChanged(flow.ChainIDList) {}

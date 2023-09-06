@@ -33,14 +33,12 @@ type TimeoutAggregatorTestSuite struct {
 	highestKnownView   uint64
 	aggregator         *TimeoutAggregator
 	collectors         *mocks.TimeoutCollectors
-	consumer           *mocks.Consumer
 	stopAggregator     context.CancelFunc
 }
 
 func (s *TimeoutAggregatorTestSuite) SetupTest() {
 	var err error
 	s.collectors = mocks.NewTimeoutCollectors(s.T())
-	s.consumer = mocks.NewConsumer(s.T())
 
 	s.lowestRetainedView = 100
 
@@ -51,7 +49,6 @@ func (s *TimeoutAggregatorTestSuite) SetupTest() {
 		metricsCollector,
 		metricsCollector,
 		metricsCollector,
-		s.consumer,
 		s.lowestRetainedView,
 		s.collectors,
 	)

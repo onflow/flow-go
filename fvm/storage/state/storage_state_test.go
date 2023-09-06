@@ -5,6 +5,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -49,7 +50,7 @@ func TestStorageStateGetFromBase(t *testing.T) {
 	baseValue := flow.RegisterValue([]byte("base"))
 
 	state := newStorageState(
-		MapStorageSnapshot{
+		snapshot.MapStorageSnapshot{
 			registerId: baseValue,
 		})
 
@@ -129,7 +130,7 @@ func TestStorageStateMerge(t *testing.T) {
 	childRegisterId2 := flow.NewRegisterID("child", "2")
 
 	parent := newStorageState(
-		MapStorageSnapshot{
+		snapshot.MapStorageSnapshot{
 			baseRegisterId: baseValue,
 		})
 

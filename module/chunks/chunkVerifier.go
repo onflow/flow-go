@@ -12,8 +12,9 @@ import (
 	"github.com/onflow/flow-go/engine/execution/computation/computer"
 	executionState "github.com/onflow/flow-go/engine/execution/state"
 	"github.com/onflow/flow-go/fvm"
-	"github.com/onflow/flow-go/fvm/storage"
 	"github.com/onflow/flow-go/fvm/storage/derived"
+	"github.com/onflow/flow-go/fvm/storage/logical"
+	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	fvmState "github.com/onflow/flow-go/fvm/storage/state"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/partial"
@@ -56,7 +57,15 @@ func (fcv *ChunkVerifier) Verify(
 	if vc.IsSystemChunk {
 		ctx = fvm.NewContextFromParent(
 			fcv.systemChunkCtx,
-			fvm.WithBlockHeader(vc.Header))
+			fvm.WithBlockHeader(vc.Header),
+			// `protocol.Snapshot` implements `EntropyProvider` interface
+			// Note that `Snapshot` possible errors for RandomSource() are:
+			// - storage.ErrNotFound if the QC is unknown.
+			// - state.ErrUnknownSnapshotReference if the snapshot reference block is unknown
+			// However, at this stage, snapshot reference block should be known and the QC should also be known,
+			// so no error is expected in normal operations, as required by `EntropyProvider`.
+			fvm.WithEntropyProvider(vc.Snapshot),
+		)
 
 		txBody, err := blueprints.SystemChunkTransaction(fcv.vmCtx.Chain)
 		if err != nil {
@@ -69,7 +78,15 @@ func (fcv *ChunkVerifier) Verify(
 	} else {
 		ctx = fvm.NewContextFromParent(
 			fcv.vmCtx,
-			fvm.WithBlockHeader(vc.Header))
+			fvm.WithBlockHeader(vc.Header),
+			// `protocol.Snapshot` implements `EntropyProvider` interface
+			// Note that `Snapshot` possible errors for RandomSource() are:
+			// - storage.ErrNotFound if the QC is unknown.
+			// - state.ErrUnknownSnapshotReference if the snapshot reference block is unknown
+			// However, at this stage, snapshot reference block should be known and the QC should also be known,
+			// so no error is expected in normal operations, as required by `EntropyProvider`.
+			fvm.WithEntropyProvider(vc.Snapshot),
+		)
 
 		transactions = make(
 			[]*fvm.TransactionProcedure,
@@ -93,7 +110,7 @@ func (fcv *ChunkVerifier) Verify(
 }
 
 type partialLedgerStorageSnapshot struct {
-	snapshot fvmState.StorageSnapshot
+	snapshot snapshot.StorageSnapshot
 
 	unknownRegTouch map[flow.RegisterID]struct{}
 }
@@ -165,14 +182,13 @@ func (fcv *ChunkVerifier) verifyTransactionsInContext(
 	context = fvm.NewContextFromParent(
 		context,
 		fvm.WithDerivedBlockData(
-			derived.NewEmptyDerivedBlockDataWithTransactionOffset(
-				transactionOffset)))
+			derived.NewEmptyDerivedBlockData(logical.Time(transactionOffset))))
 
 	// chunk view construction
 	// unknown register tracks access to parts of the partial trie which
 	// are not expanded and values are unknown.
 	unknownRegTouch := make(map[flow.RegisterID]struct{})
-	snapshotTree := storage.NewSnapshotTree(
+	snapshotTree := snapshot.NewSnapshotTree(
 		&partialLedgerStorageSnapshot{
 			snapshot: executionState.NewLedgerStorageSnapshot(
 				psmt,

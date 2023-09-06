@@ -2,9 +2,7 @@ package protocol
 
 import (
 	"context"
-	"math/rand"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/suite"
 
@@ -37,7 +35,6 @@ func TestHandler(t *testing.T) {
 }
 
 func (suite *Suite) SetupTest() {
-	rand.Seed(time.Now().UnixNano())
 	suite.snapshot = new(protocol.Snapshot)
 
 	suite.state = new(protocol.State)

@@ -2,6 +2,7 @@ package network
 
 import (
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/network/channels"
 )
 
@@ -35,7 +36,7 @@ type MisbehaviorReport interface {
 	Reason() Misbehavior
 
 	// Penalty returns the penalty value of the misbehavior.
-	Penalty() int
+	Penalty() float64
 }
 
 // MisbehaviorReportManager abstracts the semantics of handling misbehavior reports.
@@ -43,6 +44,7 @@ type MisbehaviorReport interface {
 // The misbehavior report manager is responsible for penalizing the misbehaving node and disallow-listing the node
 // if the overall penalty of the misbehaving node drops below the disallow-listing threshold.
 type MisbehaviorReportManager interface {
+	component.Component
 	// HandleMisbehaviorReport handles the misbehavior report that is sent by the engine.
 	// The implementation of this function should penalize the misbehaving node and report the node to be
 	// disallow-listed if the overall penalty of the misbehaving node drops below the disallow-listing threshold.

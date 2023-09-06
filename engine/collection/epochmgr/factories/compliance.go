@@ -26,7 +26,7 @@ type ComplianceEngineFactory struct {
 	mempoolMetrics module.MempoolMetrics
 	protoState     protocol.State
 	transactions   storage.Transactions
-	complianceOpts []modulecompliance.Opt
+	config         modulecompliance.Config
 }
 
 // NewComplianceEngineFactory returns a new collection compliance engine factory.
@@ -39,7 +39,7 @@ func NewComplianceEngineFactory(
 	mempoolMetrics module.MempoolMetrics,
 	protoState protocol.State,
 	transactions storage.Transactions,
-	complianceOpts ...modulecompliance.Opt,
+	config modulecompliance.Config,
 ) (*ComplianceEngineFactory, error) {
 
 	factory := &ComplianceEngineFactory{
@@ -51,13 +51,14 @@ func NewComplianceEngineFactory(
 		mempoolMetrics: mempoolMetrics,
 		protoState:     protoState,
 		transactions:   transactions,
-		complianceOpts: complianceOpts,
+		config:         config,
 	}
 	return factory, nil
 }
 
 func (f *ComplianceEngineFactory) Create(
 	hotstuffMetrics module.HotstuffMetrics,
+	notifier hotstuff.ProposalViolationConsumer,
 	clusterState cluster.MutableState,
 	headers storage.Headers,
 	payloads storage.ClusterPayloads,
@@ -75,6 +76,7 @@ func (f *ComplianceEngineFactory) Create(
 		f.mempoolMetrics,
 		hotstuffMetrics,
 		f.colMetrics,
+		notifier,
 		headers,
 		clusterState,
 		cache,
@@ -83,7 +85,7 @@ func (f *ComplianceEngineFactory) Create(
 		hot,
 		voteAggregator,
 		timeoutAggregator,
-		f.complianceOpts...,
+		f.config,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("could create cluster compliance core: %w", err)

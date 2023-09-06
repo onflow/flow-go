@@ -45,6 +45,12 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
+const (
+	// TODO: enable parallel execution once cadence type equivalence check issue
+	// is resolved.
+	testVerifyMaxConcurrency = 1
+)
+
 var chain = flow.Emulator.Chain()
 
 // In the following tests the system transaction is expected to fail, as the epoch related things are not set up properly.
@@ -774,7 +780,9 @@ func executeBlockAndVerifyWithParameters(t *testing.T,
 		ledgerCommiter,
 		me,
 		prov,
-		nil)
+		nil,
+		testutil.ProtocolStateWithSourceFixture(nil),
+		testVerifyMaxConcurrency)
 	require.NoError(t, err)
 
 	executableBlock := unittest.ExecutableBlockFromTransactions(chain.ChainID(), txs)
@@ -788,7 +796,7 @@ func executeBlockAndVerifyWithParameters(t *testing.T,
 		state.NewLedgerStorageSnapshot(
 			ledger,
 			initialCommit),
-		derived.NewEmptyDerivedBlockData())
+		derived.NewEmptyDerivedBlockData(0))
 	require.NoError(t, err)
 
 	spockHasher := utils.NewSPOCKHasher()

@@ -10,9 +10,6 @@ VERSION := $(shell git describe --tags --abbrev=2 --match "v*" --match "secure-c
 # dynamically split up CI jobs into smaller jobs that can be run in parallel
 GO_TEST_PACKAGES := ./...
 
-FLOW_GO_TAG := v0.28.15
-
-
 # Image tag: if image tag is not set, set it with version (or short commit if empty)
 ifeq (${IMAGE_TAG},)
 IMAGE_TAG := ${VERSION}
@@ -22,7 +19,7 @@ ifeq (${IMAGE_TAG},)
 IMAGE_TAG := ${SHORT_COMMIT}
 endif
 
-IMAGE_TAG_NO_NETGO := $(IMAGE_TAG)-without_netgo
+IMAGE_TAG_NO_NETGO := $(IMAGE_TAG)-without-netgo
 
 # Name of the cover profile
 COVER_PROFILE := coverage.txt
@@ -94,10 +91,27 @@ install-tools: check-go-version install-mock-generators
 	go install golang.org/x/tools/cmd/stringer@master;
 
 .PHONY: verify-mocks
-verify-mocks: generate-mocks
+verify-mocks: tidy generate-mocks
 	git diff --exit-code
 
 ############################################################################################
+
+.SILENT: go-math-rand-check
+go-math-rand-check:
+	# check that the insecure math/rand Go package isn't used by production code.
+	# `exclude` should only specify non production code (test, bench..).
+	# If this check fails, try updating your code by using:
+	#   - "crypto/rand" or "flow-go/utils/rand" for non-deterministic randomness
+	#   - "flow-go/crypto/random" for deterministic randomness
+	grep --include=\*.go \
+	--exclude=*test* --exclude=*helper* --exclude=*example* --exclude=*fixture* --exclude=*benchmark* --exclude=*profiler* \
+    --exclude-dir=*test* --exclude-dir=*helper* --exclude-dir=*example* --exclude-dir=*fixture* --exclude-dir=*benchmark* --exclude-dir=*profiler* -rnw '"math/rand"'; \
+    if [ $$? -ne 1 ]; then \
+       echo "[Error] Go production code should not use math/rand package"; exit 1; \
+    fi
+
+.PHONY: code-sanity-check
+code-sanity-check: go-math-rand-check
 
 .PHONY: fuzz-fvm
 fuzz-fvm:
@@ -155,6 +169,7 @@ generate-mocks: install-mock-generators
 	mockery --name 'ExecutionState' --dir=engine/execution/state --case=underscore --output="engine/execution/state/mock" --outpkg="mock"
 	mockery --name 'BlockComputer' --dir=engine/execution/computation/computer --case=underscore --output="engine/execution/computation/computer/mock" --outpkg="mock"
 	mockery --name 'ComputationManager' --dir=engine/execution/computation --case=underscore --output="engine/execution/computation/mock" --outpkg="mock"
+	mockery --name 'Executor' --dir=engine/execution/computation/query --case=underscore --output="engine/execution/computation/query/mock" --outpkg="mock"
 	mockery --name 'EpochComponentsFactory' --dir=engine/collection/epochmgr --case=underscore --output="engine/collection/epochmgr/mock" --outpkg="mock"
 	mockery --name 'Backend' --dir=engine/collection/rpc --case=underscore --output="engine/collection/rpc/mock" --outpkg="mock"
 	mockery --name 'ProviderEngine' --dir=engine/execution/provider --case=underscore --output="engine/execution/provider/mock" --outpkg="mock"
@@ -179,16 +194,18 @@ generate-mocks: install-mock-generators
 	rm -rf ./fvm/environment/mock
 	mockery --name '.*' --dir=fvm/environment --case=underscore --output="./fvm/environment/mock" --outpkg="mock"
 	mockery --name '.*' --dir=ledger --case=underscore --output="./ledger/mock" --outpkg="mock"
-	mockery --name 'ViolationsConsumer' --dir=network/slashing --case=underscore --output="./network/mocknetwork" --outpkg="mocknetwork"
+	mockery --name 'ViolationsConsumer' --dir=network --case=underscore --output="./network/mocknetwork" --outpkg="mocknetwork"
 	mockery --name '.*' --dir=network/p2p/ --case=underscore --output="./network/p2p/mock" --outpkg="mockp2p"
+	mockery --name '.*' --dir=network/alsp --case=underscore --output="./network/alsp/mock" --outpkg="mockalsp"
 	mockery --name 'Vertex' --dir="./module/forest" --case=underscore --output="./module/forest/mock" --outpkg="mock"
 	mockery --name '.*' --dir="./consensus/hotstuff" --case=underscore --output="./consensus/hotstuff/mocks" --outpkg="mocks"
 	mockery --name '.*' --dir="./engine/access/wrapper" --case=underscore --output="./engine/access/mock" --outpkg="mock"
 	mockery --name 'API' --dir="./access" --case=underscore --output="./access/mock" --outpkg="mock"
 	mockery --name 'API' --dir="./engine/protocol" --case=underscore --output="./engine/protocol/mock" --outpkg="mock"
-	mockery --name 'API' --dir="./engine/access/state_stream" --case=underscore --output="./engine/access/state_stream/mock" --outpkg="mock"
-	mockery --name 'ConnectionFactory' --dir="./engine/access/rpc/backend" --case=underscore --output="./engine/access/rpc/backend/mock" --outpkg="mock"
-	mockery --name 'IngestRPC' --dir="./engine/execution/ingestion" --case=underscore --output="./engine/execution/ingestion/mock" --outpkg="mock"
+	mockery --name '.*' --dir="./engine/access/state_stream" --case=underscore --output="./engine/access/state_stream/mock" --outpkg="mock"
+	mockery --name 'ConnectionFactory' --dir="./engine/access/rpc/connection" --case=underscore --output="./engine/access/rpc/connection/mock" --outpkg="mock"
+	mockery --name 'Communicator' --dir="./engine/access/rpc/backend" --case=underscore --output="./engine/access/rpc/backend/mock" --outpkg="mock"
+
 	mockery --name '.*' --dir=model/fingerprint --case=underscore --output="./model/fingerprint/mock" --outpkg="mock"
 	mockery --name 'ExecForkActor' --structname 'ExecForkActorMock' --dir=module/mempool/consensus/mock/ --case=underscore --output="./module/mempool/consensus/mock/" --outpkg="mock"
 	mockery --name '.*' --dir=engine/verification/fetcher/ --case=underscore --output="./engine/verification/fetcher/mock" --outpkg="mockfetcher"
@@ -263,7 +280,7 @@ docker-build-collection:
 	docker build -f cmd/Dockerfile  --build-arg TARGET=./cmd/collection --build-arg COMMIT=$(COMMIT)  --build-arg VERSION=$(IMAGE_TAG) --build-arg GOARCH=$(GOARCH) --build-arg CGO_FLAG=$(CRYPTO_FLAG) --target production \
 		--secret id=git_creds,env=GITHUB_CREDS --build-arg GOPRIVATE=$(GOPRIVATE) \
 		--label "git_commit=${COMMIT}" --label "git_tag=${IMAGE_TAG}" \
-		-t "$(CONTAINER_REGISTRY)/collection:latest" -t "$(CONTAINER_REGISTRY)/collection:$(SHORT_COMMIT)" -t "$(CONTAINER_REGISTRY)/collection:$(IMAGE_TAG)" -t  "$(CONTAINER_REGISTRY)/collection:$(FLOW_GO_TAG)" .
+		-t "$(CONTAINER_REGISTRY)/collection:latest" -t "$(CONTAINER_REGISTRY)/collection:$(SHORT_COMMIT)" -t "$(CONTAINER_REGISTRY)/collection:$(IMAGE_TAG)" .
 
 .PHONY: docker-build-collection-without-netgo
 docker-build-collection-without-netgo:
@@ -282,7 +299,7 @@ docker-build-consensus:
 	docker build -f cmd/Dockerfile  --build-arg TARGET=./cmd/consensus --build-arg COMMIT=$(COMMIT)  --build-arg VERSION=$(IMAGE_TAG) --build-arg GOARCH=$(GOARCH) --build-arg CGO_FLAG=$(CRYPTO_FLAG) --target production \
 		--secret id=git_creds,env=GITHUB_CREDS --build-arg GOPRIVATE=$(GOPRIVATE) \
 		--label "git_commit=${COMMIT}" --label "git_tag=${IMAGE_TAG}" \
-		-t "$(CONTAINER_REGISTRY)/consensus:latest" -t "$(CONTAINER_REGISTRY)/consensus:$(SHORT_COMMIT)" -t "$(CONTAINER_REGISTRY)/consensus:$(IMAGE_TAG)" -t  "$(CONTAINER_REGISTRY)/consensus:$(FLOW_GO_TAG)" .
+		-t "$(CONTAINER_REGISTRY)/consensus:latest" -t "$(CONTAINER_REGISTRY)/consensus:$(SHORT_COMMIT)" -t "$(CONTAINER_REGISTRY)/consensus:$(IMAGE_TAG)"  .
 
 .PHONY: docker-build-consensus-without-netgo
 docker-build-consensus-without-netgo:
@@ -301,7 +318,7 @@ docker-build-execution:
 	docker build -f cmd/Dockerfile  --build-arg TARGET=./cmd/execution --build-arg COMMIT=$(COMMIT)  --build-arg VERSION=$(IMAGE_TAG) --build-arg GOARCH=$(GOARCH) --build-arg CGO_FLAG=$(CRYPTO_FLAG) --target production \
 		--secret id=git_creds,env=GITHUB_CREDS --build-arg GOPRIVATE=$(GOPRIVATE) \
 		--label "git_commit=${COMMIT}" --label "git_tag=${IMAGE_TAG}" \
-		-t "$(CONTAINER_REGISTRY)/execution:latest" -t "$(CONTAINER_REGISTRY)/execution:$(SHORT_COMMIT)" -t "$(CONTAINER_REGISTRY)/execution:$(IMAGE_TAG)" -t  "$(CONTAINER_REGISTRY)/execution:$(FLOW_GO_TAG)" .
+		-t "$(CONTAINER_REGISTRY)/execution:latest" -t "$(CONTAINER_REGISTRY)/execution:$(SHORT_COMMIT)" -t "$(CONTAINER_REGISTRY)/execution:$(IMAGE_TAG)" .
 
 .PHONY: docker-build-execution-without-netgo
 docker-build-execution-without-netgo:
@@ -330,7 +347,7 @@ docker-build-verification:
 	docker build -f cmd/Dockerfile  --build-arg TARGET=./cmd/verification --build-arg COMMIT=$(COMMIT)  --build-arg VERSION=$(IMAGE_TAG) --build-arg GOARCH=$(GOARCH) --build-arg CGO_FLAG=$(CRYPTO_FLAG) --target production \
 		--secret id=git_creds,env=GITHUB_CREDS --build-arg GOPRIVATE=$(GOPRIVATE) \
 		--label "git_commit=${COMMIT}" --label "git_tag=${IMAGE_TAG}" \
-		-t "$(CONTAINER_REGISTRY)/verification:latest" -t "$(CONTAINER_REGISTRY)/verification:$(SHORT_COMMIT)" -t "$(CONTAINER_REGISTRY)/verification:$(IMAGE_TAG)" -t  "$(CONTAINER_REGISTRY)/verification:$(FLOW_GO_TAG)" .
+		-t "$(CONTAINER_REGISTRY)/verification:latest" -t "$(CONTAINER_REGISTRY)/verification:$(SHORT_COMMIT)" -t "$(CONTAINER_REGISTRY)/verification:$(IMAGE_TAG)" .
 
 .PHONY: docker-build-verification-without-netgo
 docker-build-verification-without-netgo:
@@ -359,7 +376,7 @@ docker-build-access:
 	docker build -f cmd/Dockerfile  --build-arg TARGET=./cmd/access --build-arg COMMIT=$(COMMIT)  --build-arg VERSION=$(IMAGE_TAG) --build-arg GOARCH=$(GOARCH) --build-arg CGO_FLAG=$(CRYPTO_FLAG) --target production \
 		--secret id=git_creds,env=GITHUB_CREDS --build-arg GOPRIVATE=$(GOPRIVATE) \
 		--label "git_commit=${COMMIT}" --label "git_tag=${IMAGE_TAG}" \
-		-t "$(CONTAINER_REGISTRY)/access:latest" -t "$(CONTAINER_REGISTRY)/access:$(SHORT_COMMIT)" -t "$(CONTAINER_REGISTRY)/access:$(IMAGE_TAG)" -t  "$(CONTAINER_REGISTRY)/access:$(FLOW_GO_TAG)" .
+		-t "$(CONTAINER_REGISTRY)/access:latest" -t "$(CONTAINER_REGISTRY)/access:$(SHORT_COMMIT)" -t "$(CONTAINER_REGISTRY)/access:$(IMAGE_TAG)" .
 
 .PHONY: docker-build-access-without-netgo
 docker-build-access-without-netgo:
@@ -451,7 +468,6 @@ docker-build-benchnet: docker-build-flow docker-build-loader
 docker-push-collection:
 	docker push "$(CONTAINER_REGISTRY)/collection:$(SHORT_COMMIT)"
 	docker push "$(CONTAINER_REGISTRY)/collection:$(IMAGE_TAG)"
-	docker push "$(CONTAINER_REGISTRY)/collection:$(FLOW_GO_TAG)"
 
 .PHONY: docker-push-collection-without-netgo
 docker-push-collection-without-netgo:
@@ -465,7 +481,6 @@ docker-push-collection-latest: docker-push-collection
 docker-push-consensus:
 	docker push "$(CONTAINER_REGISTRY)/consensus:$(SHORT_COMMIT)"
 	docker push "$(CONTAINER_REGISTRY)/consensus:$(IMAGE_TAG)"
-	docker push "$(CONTAINER_REGISTRY)/consensus:$(FLOW_GO_TAG)"
 
 .PHONY: docker-push-consensus-without-netgo
 docker-push-consensus-without-netgo:
@@ -479,7 +494,6 @@ docker-push-consensus-latest: docker-push-consensus
 docker-push-execution:
 	docker push "$(CONTAINER_REGISTRY)/execution:$(SHORT_COMMIT)"
 	docker push "$(CONTAINER_REGISTRY)/execution:$(IMAGE_TAG)"
-	docker push "$(CONTAINER_REGISTRY)/execution:$(FLOW_GO_TAG)"
 
 .PHONY: docker-push-execution-corrupt
 docker-push-execution-corrupt:
@@ -499,7 +513,6 @@ docker-push-execution-latest: docker-push-execution
 docker-push-verification:
 	docker push "$(CONTAINER_REGISTRY)/verification:$(SHORT_COMMIT)"
 	docker push "$(CONTAINER_REGISTRY)/verification:$(IMAGE_TAG)"
-	docker push "$(CONTAINER_REGISTRY)/verification:$(FLOW_GO_TAG)"
 
 .PHONY: docker-push-verification-corrupt
 docker-push-verification-corrupt:
@@ -518,7 +531,6 @@ docker-push-verification-latest: docker-push-verification
 docker-push-access:
 	docker push "$(CONTAINER_REGISTRY)/access:$(SHORT_COMMIT)"
 	docker push "$(CONTAINER_REGISTRY)/access:$(IMAGE_TAG)"
-	docker push "$(CONTAINER_REGISTRY)/access:$(FLOW_GO_TAG)"
 
 .PHONY: docker-push-access-corrupt
 docker-push-access-corrupt:
@@ -532,7 +544,7 @@ docker-push-access-without-netgo:
 .PHONY: docker-push-access-latest
 docker-push-access-latest: docker-push-access
 	docker push "$(CONTAINER_REGISTRY)/access:latest"
-	
+
 
 .PHONY: docker-push-observer
 docker-push-observer:

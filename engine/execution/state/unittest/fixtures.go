@@ -3,14 +3,17 @@ package unittest
 import (
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/engine/execution"
-	"github.com/onflow/flow-go/fvm/storage/state"
+	"github.com/onflow/flow-go/fvm/meter"
+	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/mempool/entity"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-func StateInteractionsFixture() *state.ExecutionSnapshot {
-	return &state.ExecutionSnapshot{}
+func StateInteractionsFixture() *snapshot.ExecutionSnapshot {
+	return &snapshot.ExecutionSnapshot{
+		Meter: meter.NewMeter(meter.DefaultParameters()),
+	}
 }
 
 func ComputationResultFixture(
@@ -46,11 +49,21 @@ func ComputationResultForBlockFixture(
 
 	}
 
+	_, serviceEventEpochCommitProtocol := unittest.EpochCommitFixtureByChainID(flow.Localnet)
+	_, serviceEventEpochSetupProtocol := unittest.EpochSetupFixtureByChainID(flow.Localnet)
+	_, serviceEventVersionBeaconProtocol := unittest.VersionBeaconFixtureByChainID(flow.Localnet)
+
+	convertedServiceEvents := flow.ServiceEventList{
+		serviceEventEpochCommitProtocol.ServiceEvent(),
+		serviceEventEpochSetupProtocol.ServiceEvent(),
+		serviceEventVersionBeaconProtocol.ServiceEvent(),
+	}
+
 	executionResult := flow.NewExecutionResult(
 		parentBlockExecutionResultID,
 		completeBlock.ID(),
 		computationResult.AllChunks(),
-		nil,
+		convertedServiceEvents,
 		flow.ZeroID)
 
 	computationResult.ExecutionReceipt = &flow.ExecutionReceipt{

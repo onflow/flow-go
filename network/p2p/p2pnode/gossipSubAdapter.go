@@ -9,9 +9,11 @@ import (
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/rs/zerolog"
 
+	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/network/p2p"
+	"github.com/onflow/flow-go/network/p2p/utils"
 	"github.com/onflow/flow-go/utils/logging"
 )
 
@@ -20,12 +22,24 @@ import (
 type GossipSubAdapter struct {
 	component.Component
 	gossipSub *pubsub.PubSub
-	logger    zerolog.Logger
+	// topicScoreParamFunc is a function that returns the topic score params for a given topic.
+	// If no function is provided the node will join the topic with no scoring params. As the
+	// node will not be able to score other peers in the topic, it may be vulnerable to routing
+	// attacks on the topic that may also affect the overall function of the node.
+	// It is not recommended to use this adapter without a topicScoreParamFunc. Also in mature
+	// implementations of the Flow network, the topicScoreParamFunc must be a required parameter.
+	topicScoreParamFunc func(topic *pubsub.Topic) *pubsub.TopicScoreParams
+	logger              zerolog.Logger
+	peerScoreExposer    p2p.PeerScoreExposer
+	// clusterChangeConsumer is a callback that is invoked when the set of active clusters of collection nodes changes.
+	// This callback is implemented by the rpc inspector suite of the GossipSubAdapter, and consumes the cluster changes
+	// to update the rpc inspector state of the recent topics (i.e., channels).
+	clusterChangeConsumer p2p.CollectionClusterChangesConsumer
 }
 
 var _ p2p.PubSubAdapter = (*GossipSubAdapter)(nil)
 
-func NewGossipSubAdapter(ctx context.Context, logger zerolog.Logger, h host.Host, cfg p2p.PubSubAdapterConfig) (p2p.PubSubAdapter, error) {
+func NewGossipSubAdapter(ctx context.Context, logger zerolog.Logger, h host.Host, cfg p2p.PubSubAdapterConfig, clusterChangeConsumer p2p.CollectionClusterChangesConsumer) (p2p.PubSubAdapter, error) {
 	gossipSubConfig, ok := cfg.(*GossipSubAdapterConfig)
 	if !ok {
 		return nil, fmt.Errorf("invalid gossipsub config type: %T", cfg)
@@ -39,8 +53,16 @@ func NewGossipSubAdapter(ctx context.Context, logger zerolog.Logger, h host.Host
 	builder := component.NewComponentManagerBuilder()
 
 	a := &GossipSubAdapter{
-		gossipSub: gossipSub,
-		logger:    logger,
+		gossipSub:             gossipSub,
+		logger:                logger.With().Str("component", "gossipsub-adapter").Logger(),
+		clusterChangeConsumer: clusterChangeConsumer,
+	}
+
+	topicScoreParamFunc, ok := gossipSubConfig.TopicScoreParamFunc()
+	if ok {
+		a.topicScoreParamFunc = topicScoreParamFunc
+	} else {
+		a.logger.Warn().Msg("no topic score param func provided")
 	}
 
 	if scoreTracer := gossipSubConfig.ScoreTracer(); scoreTracer != nil {
@@ -53,6 +75,7 @@ func NewGossipSubAdapter(ctx context.Context, logger zerolog.Logger, h host.Host
 			<-scoreTracer.Done()
 			a.logger.Debug().Str("component", "gossipsub_score_tracer").Msg("score tracer stopped")
 		})
+		a.peerScoreExposer = scoreTracer
 	}
 
 	if tracer := gossipSubConfig.PubSubTracer(); tracer != nil {
@@ -67,17 +90,22 @@ func NewGossipSubAdapter(ctx context.Context, logger zerolog.Logger, h host.Host
 		})
 	}
 
-	for _, inspector := range gossipSubConfig.RPCInspectors() {
-		rpcInspector := inspector
+	if inspectorSuite := gossipSubConfig.InspectorSuiteComponent(); inspectorSuite != nil {
 		builder.AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
-			ready()
-			componentName := rpcInspector.Name()
-			a.logger.Debug().Str("component", componentName).Msg("starting rpc inspector")
-			rpcInspector.Start(ctx)
-			a.logger.Debug().Str("component", componentName).Msg("rpc inspector started")
+			a.logger.Debug().Str("component", "gossipsub_inspector_suite").Msg("starting inspector suite")
+			inspectorSuite.Start(ctx)
+			a.logger.Debug().Str("component", "gossipsub_inspector_suite").Msg("inspector suite started")
 
-			<-rpcInspector.Done()
-			a.logger.Debug().Str("component", componentName).Msg("rpc inspector stopped")
+			select {
+			case <-ctx.Done():
+				a.logger.Debug().Str("component", "gossipsub_inspector_suite").Msg("inspector suite context done")
+			case <-inspectorSuite.Ready():
+				ready()
+				a.logger.Debug().Str("component", "gossipsub_inspector_suite").Msg("inspector suite ready")
+			}
+
+			<-inspectorSuite.Done()
+			a.logger.Debug().Str("component", "gossipsub_inspector_suite").Msg("inspector suite stopped")
 		})
 	}
 
@@ -119,6 +147,21 @@ func (g *GossipSubAdapter) Join(topic string) (p2p.Topic, error) {
 	if err != nil {
 		return nil, fmt.Errorf("could not join topic %s: %w", topic, err)
 	}
+
+	if g.topicScoreParamFunc != nil {
+		topicParams := g.topicScoreParamFunc(t)
+		err = t.SetScoreParams(topicParams)
+		if err != nil {
+			return nil, fmt.Errorf("could not set score params for topic %s: %w", topic, err)
+		}
+		topicParamsLogger := utils.TopicScoreParamsLogger(g.logger, topic, topicParams)
+		topicParamsLogger.Info().Msg("joined topic with score params set")
+	} else {
+		g.logger.Warn().
+			Bool(logging.KeyNetworkingSecurity, true).
+			Str("topic", topic).
+			Msg("joining topic without score params, this is not recommended from a security perspective")
+	}
 	return NewGossipSubTopic(t), nil
 }
 
@@ -128,4 +171,30 @@ func (g *GossipSubAdapter) GetTopics() []string {
 
 func (g *GossipSubAdapter) ListPeers(topic string) []peer.ID {
 	return g.gossipSub.ListPeers(topic)
+}
+
+// PeerScoreExposer returns the peer score exposer for the gossipsub adapter. The exposer is a read-only interface
+// for querying peer scores and returns the local scoring table of the underlying gossipsub node.
+// The exposer is only available if the gossipsub adapter was configured with a score tracer.
+// If the gossipsub adapter was not configured with a score tracer, the exposer will be nil.
+// Args:
+//
+//	None.
+//
+// Returns:
+//
+//	The peer score exposer for the gossipsub adapter.
+func (g *GossipSubAdapter) PeerScoreExposer() p2p.PeerScoreExposer {
+	return g.peerScoreExposer
+}
+
+// ActiveClustersChanged is called when the active clusters of collection nodes changes.
+// GossipSubAdapter implements this method to forward the call to the clusterChangeConsumer (rpc inspector),
+// which will then update the cluster state of the rpc inspector.
+// Args:
+// - lst: the list of active clusters
+// Returns:
+// - void
+func (g *GossipSubAdapter) ActiveClustersChanged(lst flow.ChainIDList) {
+	g.clusterChangeConsumer.ActiveClustersChanged(lst)
 }

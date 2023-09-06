@@ -31,6 +31,12 @@ func (s *Suite) Ghost() *client.GhostClient {
 	return client
 }
 
+func (s *Suite) AccessClient() *testnet.Client {
+	client, err := s.net.ContainerByName(testnet.PrimaryAN).TestnetClient()
+	s.NoError(err, "could not get access client")
+	return client
+}
+
 func (s *Suite) SetupTest() {
 	s.log = unittest.LoggerForTest(s.Suite.T(), zerolog.InfoLevel)
 	s.log.Info().Msg("================> SetupTest")
@@ -39,12 +45,12 @@ func (s *Suite) SetupTest() {
 	}()
 
 	collectionConfigs := []func(*testnet.NodeConfig){
-		testnet.WithAdditionalFlag("--block-rate-delay=10ms"),
+		testnet.WithAdditionalFlag("--hotstuff-proposal-duration=10ms"),
 		testnet.WithLogLevel(zerolog.WarnLevel),
 	}
 
 	consensusConfigs := []func(config *testnet.NodeConfig){
-		testnet.WithAdditionalFlag("--block-rate-delay=10ms"),
+		testnet.WithAdditionalFlag("--cruise-ctl-fallback-proposal-duration=10ms"),
 		testnet.WithAdditionalFlag(
 			fmt.Sprintf(
 				"--required-verification-seal-approvals=%d",

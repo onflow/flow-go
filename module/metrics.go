@@ -1,10 +1,12 @@
 package module
 
 import (
+	"context"
 	"time"
 
 	"github.com/libp2p/go-libp2p/core/peer"
 	rcmgr "github.com/libp2p/go-libp2p/p2p/host/resource-manager"
+	httpmetrics "github.com/slok/go-http-metrics/metrics"
 
 	"github.com/onflow/flow-go/model/chainsync"
 	"github.com/onflow/flow-go/model/cluster"
@@ -40,6 +42,10 @@ type NetworkSecurityMetrics interface {
 
 	// OnRateLimitedPeer tracks the number of rate limited unicast messages seen on the network.
 	OnRateLimitedPeer(pid peer.ID, role, msgType, topic, reason string)
+
+	// OnViolationReportSkipped tracks the number of slashing violations consumer violations that were not
+	// reported for misbehavior when the identity of the sender not known.
+	OnViolationReportSkipped()
 }
 
 // GossipSubRouterMetrics encapsulates the metrics collectors for GossipSubRouter module of the networking layer.
@@ -112,6 +118,7 @@ type GossipSubMetrics interface {
 	GossipSubScoringMetrics
 	GossipSubRouterMetrics
 	GossipSubLocalMeshMetrics
+	GossipSubRpcValidationInspectorMetrics
 }
 
 type LibP2PMetrics interface {
@@ -148,6 +155,20 @@ type GossipSubScoringMetrics interface {
 	SetWarningStateCount(uint)
 }
 
+// GossipSubRpcValidationInspectorMetrics encapsulates the metrics collectors for the gossipsub rpc validation control message inspectors.
+type GossipSubRpcValidationInspectorMetrics interface {
+	// BlockingPreProcessingStarted increments the metric tracking the number of messages being pre-processed by the rpc validation inspector.
+	BlockingPreProcessingStarted(msgType string, sampleSize uint)
+	// BlockingPreProcessingFinished tracks the time spent by the rpc validation inspector to pre-process a message and decrements the metric tracking
+	// the number of messages being pre-processed by the rpc validation inspector.
+	BlockingPreProcessingFinished(msgType string, sampleSize uint, duration time.Duration)
+	// AsyncProcessingStarted increments the metric tracking the number of inspect message request being processed by workers in the rpc validator worker pool.
+	AsyncProcessingStarted(msgType string)
+	// AsyncProcessingFinished tracks the time spent by a rpc validation inspector worker to process an inspect message request asynchronously and decrements the metric tracking
+	// the number of inspect message requests  being processed asynchronously by the rpc validation inspector workers.
+	AsyncProcessingFinished(msgType string, duration time.Duration)
+}
+
 // NetworkInboundQueueMetrics encapsulates the metrics collectors for the inbound queue of the networking layer.
 type NetworkInboundQueueMetrics interface {
 
@@ -165,6 +186,8 @@ type NetworkInboundQueueMetrics interface {
 type NetworkCoreMetrics interface {
 	NetworkInboundQueueMetrics
 	AlspMetrics
+	NetworkSecurityMetrics
+
 	// OutboundMessageSent collects metrics related to a message sent by the node.
 	OutboundMessageSent(sizeBytes int, topic string, protocol string, messageType string)
 	// InboundMessageReceived collects metrics related to a message received by the node.
@@ -206,7 +229,6 @@ type AlspMetrics interface {
 // NetworkMetrics is the blanket abstraction that encapsulates the metrics collectors for the networking layer.
 type NetworkMetrics interface {
 	LibP2PMetrics
-	NetworkSecurityMetrics
 	NetworkCoreMetrics
 }
 
@@ -324,6 +346,26 @@ type HotstuffMetrics interface {
 	// PayloadProductionDuration measures the time which the HotStuff's core logic
 	// spends in the module.Builder component, i.e. the with generating block payloads.
 	PayloadProductionDuration(duration time.Duration)
+
+	// TimeoutCollectorsRange collects information from the node's `TimeoutAggregator` component.
+	// Specifically, it measurers the number of views for which we are currently collecting timeouts
+	// (i.e. the number of `TimeoutCollector` instances we are maintaining) and their lowest/highest view.
+	TimeoutCollectorsRange(lowestRetainedView uint64, newestViewCreatedCollector uint64, activeCollectors int)
+}
+
+type CruiseCtlMetrics interface {
+
+	// PIDError measures the current error values for the proportional, integration,
+	// and derivative terms of the PID controller.
+	PIDError(p, i, d float64)
+
+	// TargetProposalDuration measures the current value of the Block Time Controller output:
+	// the target duration from parent to child proposal.
+	TargetProposalDuration(duration time.Duration)
+
+	// ControllerOutput measures the output of the cruise control PID controller.
+	// Concretely, this is the quantity to subtract from the baseline view duration.
+	ControllerOutput(duration time.Duration)
 }
 
 type CollectionMetrics interface {
@@ -569,7 +611,14 @@ type ExecutionDataPrunerMetrics interface {
 	Pruned(height uint64, duration time.Duration)
 }
 
-type AccessMetrics interface {
+type RestMetrics interface {
+	// Example recorder taken from:
+	// https://github.com/slok/go-http-metrics/blob/master/metrics/prometheus/prometheus.go
+	httpmetrics.Recorder
+	AddTotalRequests(ctx context.Context, method string, routeName string)
+}
+
+type GRPCConnectionPoolMetrics interface {
 	// TotalConnectionsInPool updates the number connections to collection/execution nodes stored in the pool, and the size of the pool
 	TotalConnectionsInPool(connectionCount uint, connectionPoolSize uint)
 
@@ -590,6 +639,19 @@ type AccessMetrics interface {
 
 	// ConnectionFromPoolEvicted tracks the number of times a cached connection is evicted from the cache
 	ConnectionFromPoolEvicted()
+}
+
+type AccessMetrics interface {
+	RestMetrics
+	GRPCConnectionPoolMetrics
+	TransactionMetrics
+	BackendScriptsMetrics
+
+	// UpdateExecutionReceiptMaxHeight is called whenever we store an execution receipt from a block from a newer height
+	UpdateExecutionReceiptMaxHeight(height uint64)
+
+	// UpdateLastFullBlockHeight tracks the height of the last block for which all collections were received
+	UpdateLastFullBlockHeight(height uint64)
 }
 
 type ExecutionResultStats struct {
@@ -647,9 +709,13 @@ type ExecutionMetrics interface {
 	ExecutionCollectionExecuted(dur time.Duration, stats ExecutionResultStats)
 
 	// ExecutionTransactionExecuted reports stats on executing a single transaction
-	ExecutionTransactionExecuted(dur time.Duration,
-		compUsed, memoryUsed, actualMemoryUsed uint64,
-		eventCounts, eventSize int,
+	ExecutionTransactionExecuted(
+		dur time.Duration,
+		numTxnConflictRetries int,
+		compUsed uint64,
+		memoryUsed uint64,
+		eventCounts int,
+		eventSize int,
 		failed bool)
 
 	// ExecutionChunkDataPackGenerated reports stats on chunk data pack generation
@@ -679,11 +745,23 @@ type ExecutionMetrics interface {
 type BackendScriptsMetrics interface {
 	// Record the round trip time while executing a script
 	ScriptExecuted(dur time.Duration, size int)
+
+	// ScriptExecutionErrorOnExecutionNode records script execution failures on Execution Nodes
+	ScriptExecutionErrorOnArchiveNode()
+
+	// ScriptExecutionErrorOnArchiveNode records script execution failures in Archive Nodes
+	ScriptExecutionErrorOnExecutionNode()
+
+	ScriptExecutionResultMismatch()
+
+	ScriptExecutionResultMatch()
+
+	ScriptExecutionErrorMismatch()
+
+	ScriptExecutionErrorMatch()
 }
 
 type TransactionMetrics interface {
-	BackendScriptsMetrics
-
 	// Record the round trip time while getting a transaction result
 	TransactionResultFetched(dur time.Duration, size int)
 
@@ -703,9 +781,6 @@ type TransactionMetrics interface {
 
 	// TransactionSubmissionFailed should be called whenever we try to submit a transaction and it fails
 	TransactionSubmissionFailed()
-
-	// UpdateExecutionReceiptMaxHeight is called whenever we store an execution receipt from a block from a newer height
-	UpdateExecutionReceiptMaxHeight(height uint64)
 }
 
 type PingMetrics interface {

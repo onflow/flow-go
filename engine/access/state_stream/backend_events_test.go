@@ -62,6 +62,18 @@ func (s *BackendEventsSuite) TestSubscribeEvents() {
 			startBlockID:    s.blocks[0].ID(),
 			startHeight:     0,
 		},
+		{
+			name:            "happy path - start from root block by height",
+			highestBackfill: len(s.blocks) - 1, // backfill all blocks
+			startBlockID:    flow.ZeroID,
+			startHeight:     s.backend.rootBlockHeight, // start from root block
+		},
+		{
+			name:            "happy path - start from root block by id",
+			highestBackfill: len(s.blocks) - 1,     // backfill all blocks
+			startBlockID:    s.backend.rootBlockID, // start from root block
+			startHeight:     0,
+		},
 	}
 
 	// supports simple address comparisions for testing
@@ -96,8 +108,7 @@ func (s *BackendEventsSuite) TestSubscribeEvents() {
 			// this simulates a subscription on a past block
 			for i := 0; i <= test.highestBackfill; i++ {
 				s.T().Logf("backfilling block %d", i)
-				execData := s.execDataMap[s.blocks[i].ID()]
-				s.execDataDistributor.OnExecutionDataReceived(execData)
+				s.backend.setHighestHeight(s.blocks[i].Header.Height)
 			}
 
 			subCtx, subCancel := context.WithCancel(ctx)
@@ -105,13 +116,12 @@ func (s *BackendEventsSuite) TestSubscribeEvents() {
 
 			// loop over all of the blocks
 			for i, b := range s.blocks {
-				execData := s.execDataMap[b.ID()]
 				s.T().Logf("checking block %d %v", i, b.ID())
 
 				// simulate new exec data received.
 				// exec data for all blocks with index <= highestBackfill were already received
 				if i > test.highestBackfill {
-					s.execDataDistributor.OnExecutionDataReceived(execData)
+					s.backend.setHighestHeight(b.Header.Height)
 					s.broadcaster.Publish()
 				}
 
@@ -167,22 +177,30 @@ func (s *BackendExecutionDataSuite) TestSubscribeEventsHandlesErrors() {
 		assert.Equal(s.T(), codes.InvalidArgument, status.Code(sub.Err()))
 	})
 
+	s.Run("returns error for start height before root height", func() {
+		subCtx, subCancel := context.WithCancel(ctx)
+		defer subCancel()
+
+		sub := s.backend.SubscribeEvents(subCtx, flow.ZeroID, s.backend.rootBlockHeight-1, EventFilter{})
+		assert.Equal(s.T(), codes.InvalidArgument, status.Code(sub.Err()), "expected InvalidArgument, got %v: %v", status.Code(sub.Err()).String(), sub.Err())
+	})
+
 	s.Run("returns error for unindexed start blockID", func() {
 		subCtx, subCancel := context.WithCancel(ctx)
 		defer subCancel()
 
 		sub := s.backend.SubscribeEvents(subCtx, unittest.IdentifierFixture(), 0, EventFilter{})
-		assert.Equal(s.T(), codes.NotFound, status.Code(sub.Err()), "exepected NotFound, got %v: %v", status.Code(sub.Err()).String(), sub.Err())
+		assert.Equal(s.T(), codes.NotFound, status.Code(sub.Err()), "expected NotFound, got %v: %v", status.Code(sub.Err()).String(), sub.Err())
 	})
 
 	// make sure we're starting with a fresh cache
-	s.execDataCache.Clear()
+	s.execDataHeroCache.Clear()
 
 	s.Run("returns error for unindexed start height", func() {
 		subCtx, subCancel := context.WithCancel(ctx)
 		defer subCancel()
 
 		sub := s.backend.SubscribeEvents(subCtx, flow.ZeroID, s.blocks[len(s.blocks)-1].Header.Height+10, EventFilter{})
-		assert.Equal(s.T(), codes.NotFound, status.Code(sub.Err()), "exepected NotFound, got %v: %v", status.Code(sub.Err()).String(), sub.Err())
+		assert.Equal(s.T(), codes.NotFound, status.Code(sub.Err()), "expected NotFound, got %v: %v", status.Code(sub.Err()).String(), sub.Err())
 	})
 }

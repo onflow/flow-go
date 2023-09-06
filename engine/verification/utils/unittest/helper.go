@@ -494,7 +494,11 @@ func withConsumers(t *testing.T,
 		builder.clusterCommittee = participants.Filter(filter.HasRole(flow.RoleCollection))
 	})
 
-	completeERs := CompleteExecutionReceiptChainFixture(t, root, blockCount, ops...)
+	// random sources for all blocks:
+	//  - root block (block[0]) is executed with sources[0] (included in QC of child block[1])
+	//  - block[i] is executed with sources[i] (included in QC of child block[i+1])
+	sources := unittest.RandomSourcesFixture(30)
+	completeERs := CompleteExecutionReceiptChainFixture(t, root, blockCount, sources, ops...)
 	blocks := ExtendStateWithFinalizedBlocks(t, completeERs, s.State)
 
 	// chunk assignment
@@ -591,10 +595,10 @@ func withConsumers(t *testing.T,
 	}
 
 	// verifies memory resources are cleaned up all over pipeline
-	assert.True(t, verNode.BlockConsumer.Size() == 0)
-	assert.True(t, verNode.ChunkConsumer.Size() == 0)
-	assert.True(t, verNode.ChunkStatuses.Size() == 0)
-	assert.True(t, verNode.ChunkRequests.Size() == 0)
+	assert.Zero(t, verNode.BlockConsumer.Size())
+	assert.Zero(t, verNode.ChunkConsumer.Size())
+	assert.Zero(t, verNode.ChunkStatuses.Size())
+	assert.Zero(t, verNode.ChunkRequests.Size())
 }
 
 // bootstrapSystem is a test helper that bootstraps a flow system with node of each main roles (except execution nodes that are two).

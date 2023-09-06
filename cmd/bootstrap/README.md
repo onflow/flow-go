@@ -97,8 +97,12 @@ Each input is a config file specified as a command line parameter:
 
 #### Example
 ```bash
+<<<<<<< HEAD
 go run ./cmd/bootstrap finalize \
  --fast-kg \
+=======
+go run -tags relic ./cmd/bootstrap finalize \
+>>>>>>> master
   --root-chain main \
   --root-height 0 \
   --root-parent 0000000000000000000000000000000000000000000000000000000000000000 \

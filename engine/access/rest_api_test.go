@@ -3,10 +3,6 @@ package access
 import (
 	"context"
 	"fmt"
-
-	"github.com/onflow/flow-go/consensus/hotstuff/notifications/pubsub"
-	synceng "github.com/onflow/flow-go/engine/common/synchronization"
-
 	"math/rand"
 	"net/http"
 	"os"
@@ -21,18 +17,24 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
+	"google.golang.org/grpc/credentials"
 
 	accessmock "github.com/onflow/flow-go/engine/access/mock"
 	"github.com/onflow/flow-go/engine/access/rest"
 	"github.com/onflow/flow-go/engine/access/rest/request"
+	"github.com/onflow/flow-go/engine/access/rest/routes"
 	"github.com/onflow/flow-go/engine/access/rpc"
+	"github.com/onflow/flow-go/engine/access/rpc/backend"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/grpcserver"
+	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
 	module "github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/network"
 	protocol "github.com/onflow/flow-go/state/protocol/mock"
 	"github.com/onflow/flow-go/storage"
 	storagemock "github.com/onflow/flow-go/storage/mock"
+	"github.com/onflow/flow-go/utils/grpcutils"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -63,6 +65,13 @@ type RestAPITestSuite struct {
 	transactions     *storagemock.Transactions
 	receipts         *storagemock.ExecutionReceipts
 	executionResults *storagemock.ExecutionResults
+
+	ctx    irrecoverable.SignalerContext
+	cancel context.CancelFunc
+
+	// grpc servers
+	secureGrpcServer   *grpcserver.GrpcServer
+	unsecureGrpcServer *grpcserver.GrpcServer
 }
 
 func (suite *RestAPITestSuite) SetupTest() {
@@ -115,27 +124,88 @@ func (suite *RestAPITestSuite) SetupTest() {
 		UnsecureGRPCListenAddr: unittest.DefaultAddress,
 		SecureGRPCListenAddr:   unittest.DefaultAddress,
 		HTTPListenAddr:         unittest.DefaultAddress,
-		RESTListenAddr:         unittest.DefaultAddress,
+		RestConfig: rest.Config{
+			ListenAddress: unittest.DefaultAddress,
+		},
 	}
 
-	finalizationDistributor := pubsub.NewFinalizationDistributor()
-
-	var err error
-	finalizedHeaderCache, err := synceng.NewFinalizedHeaderCache(suite.log, suite.state, finalizationDistributor)
-	require.NoError(suite.T(), err)
-
-	rpcEngBuilder, err := rpc.NewBuilder(suite.log, suite.state, config, suite.collClient, nil, suite.blocks, suite.headers, suite.collections, suite.transactions,
-		nil, suite.executionResults, suite.chainID, suite.metrics, suite.metrics, 0, 0, false,
-		false, nil, nil, suite.me)
+	// generate a server certificate that will be served by the GRPC server
+	networkingKey := unittest.NetworkingPrivKeyFixture()
+	x509Certificate, err := grpcutils.X509Certificate(networkingKey)
 	assert.NoError(suite.T(), err)
-	suite.rpcEng, err = rpcEngBuilder.WithLegacy().WithFinalizedHeaderCache(finalizedHeaderCache).Build()
+	tlsConfig := grpcutils.DefaultServerTLSConfig(x509Certificate)
+	// set the transport credentials for the server to use
+	config.TransportCredentials = credentials.NewTLS(tlsConfig)
+
+	suite.secureGrpcServer = grpcserver.NewGrpcServerBuilder(suite.log,
+		config.SecureGRPCListenAddr,
+		grpcutils.DefaultMaxMsgSize,
+		false,
+		nil,
+		nil,
+		grpcserver.WithTransportCredentials(config.TransportCredentials)).Build()
+
+	suite.unsecureGrpcServer = grpcserver.NewGrpcServerBuilder(suite.log,
+		config.UnsecureGRPCListenAddr,
+		grpcutils.DefaultMaxMsgSize,
+		false,
+		nil,
+		nil).Build()
+
+	bnd := backend.New(
+		backend.Params{
+			State:                suite.state,
+			CollectionRPC:        suite.collClient,
+			Blocks:               suite.blocks,
+			Headers:              suite.headers,
+			Collections:          suite.collections,
+			Transactions:         suite.transactions,
+			ExecutionResults:     suite.executionResults,
+			ChainID:              suite.chainID,
+			AccessMetrics:        suite.metrics,
+			MaxHeightRange:       0,
+			Log:                  suite.log,
+			SnapshotHistoryLimit: 0,
+			Communicator:         backend.NewNodeCommunicator(false),
+		})
+
+	rpcEngBuilder, err := rpc.NewBuilder(
+		suite.log,
+		suite.state,
+		config,
+		suite.chainID,
+		suite.metrics,
+		false,
+		suite.me,
+		bnd,
+		bnd,
+		suite.secureGrpcServer,
+		suite.unsecureGrpcServer,
+	)
 	assert.NoError(suite.T(), err)
+	suite.rpcEng, err = rpcEngBuilder.WithLegacy().Build()
+	assert.NoError(suite.T(), err)
+
+	suite.ctx, suite.cancel = irrecoverable.NewMockSignalerContextWithCancel(suite.T(), context.Background())
+
+	suite.rpcEng.Start(suite.ctx)
+
+	suite.secureGrpcServer.Start(suite.ctx)
+	suite.unsecureGrpcServer.Start(suite.ctx)
+
+	// wait for the servers to startup
+	unittest.AssertClosesBefore(suite.T(), suite.secureGrpcServer.Ready(), 2*time.Second)
+	unittest.AssertClosesBefore(suite.T(), suite.unsecureGrpcServer.Ready(), 2*time.Second)
+
+	// wait for the engine to startup
 	unittest.AssertClosesBefore(suite.T(), suite.rpcEng.Ready(), 2*time.Second)
+}
 
-	// wait for the server to startup
-	assert.Eventually(suite.T(), func() bool {
-		return suite.rpcEng.RestApiAddress() != nil
-	}, 5*time.Second, 10*time.Millisecond)
+func (suite *RestAPITestSuite) TearDownTest() {
+	suite.cancel()
+	unittest.AssertClosesBefore(suite.T(), suite.secureGrpcServer.Done(), 2*time.Second)
+	unittest.AssertClosesBefore(suite.T(), suite.unsecureGrpcServer.Done(), 2*time.Second)
+	unittest.AssertClosesBefore(suite.T(), suite.rpcEng.Done(), 2*time.Second)
 }
 
 func TestRestAPI(t *testing.T) {
@@ -308,7 +378,6 @@ func (suite *RestAPITestSuite) TestGetBlock() {
 		defer cancel()
 
 		// replace one ID with a block ID for which the storage returns a not found error
-		rand.Seed(time.Now().Unix())
 		invalidBlockIndex := rand.Intn(len(testBlocks))
 		invalidID := unittest.IdentifierFixture()
 		suite.blocks.On("ByID", invalidID).Return(nil, storage.ErrNotFound).Once()
@@ -340,19 +409,12 @@ func (suite *RestAPITestSuite) TestRequestSizeRestriction() {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
 	// make a request of size larger than the max permitted size
-	requestBytes := make([]byte, rest.MaxRequestSize+1)
+	requestBytes := make([]byte, routes.MaxRequestSize+1)
 	script := restclient.ScriptsBody{
 		Script: string(requestBytes),
 	}
 	_, resp, err := client.ScriptsApi.ScriptsPost(ctx, script, nil)
 	assertError(suite.T(), resp, err, http.StatusBadRequest, "request body too large")
-}
-
-func (suite *RestAPITestSuite) TearDownTest() {
-	// close the server
-	if suite.rpcEng != nil {
-		unittest.AssertClosesBefore(suite.T(), suite.rpcEng.Done(), 2*time.Second)
-	}
 }
 
 // restAPIClient creates a REST API client
@@ -374,13 +436,13 @@ func assertError(t *testing.T, resp *http.Response, err error, expectedCode int,
 
 func optionsForBlockByID() *restclient.BlocksApiBlocksIdGetOpts {
 	return &restclient.BlocksApiBlocksIdGetOpts{
-		Expand:  optional.NewInterface([]string{rest.ExpandableFieldPayload}),
+		Expand:  optional.NewInterface([]string{routes.ExpandableFieldPayload}),
 		Select_: optional.NewInterface([]string{"header.id"}),
 	}
 }
 func optionsForBlockByStartEndHeight(startHeight, endHeight uint64) *restclient.BlocksApiBlocksGetOpts {
 	return &restclient.BlocksApiBlocksGetOpts{
-		Expand:      optional.NewInterface([]string{rest.ExpandableFieldPayload}),
+		Expand:      optional.NewInterface([]string{routes.ExpandableFieldPayload}),
 		Select_:     optional.NewInterface([]string{"header.id", "header.height"}),
 		StartHeight: optional.NewInterface(startHeight),
 		EndHeight:   optional.NewInterface(endHeight),
@@ -389,7 +451,7 @@ func optionsForBlockByStartEndHeight(startHeight, endHeight uint64) *restclient.
 
 func optionsForBlockByHeights(heights []uint64) *restclient.BlocksApiBlocksGetOpts {
 	return &restclient.BlocksApiBlocksGetOpts{
-		Expand:  optional.NewInterface([]string{rest.ExpandableFieldPayload}),
+		Expand:  optional.NewInterface([]string{routes.ExpandableFieldPayload}),
 		Select_: optional.NewInterface([]string{"header.id", "header.height"}),
 		Height:  optional.NewInterface(heights),
 	}
@@ -397,7 +459,7 @@ func optionsForBlockByHeights(heights []uint64) *restclient.BlocksApiBlocksGetOp
 
 func optionsForFinalizedBlock(finalOrSealed string) *restclient.BlocksApiBlocksGetOpts {
 	return &restclient.BlocksApiBlocksGetOpts{
-		Expand:  optional.NewInterface([]string{rest.ExpandableFieldPayload}),
+		Expand:  optional.NewInterface([]string{routes.ExpandableFieldPayload}),
 		Select_: optional.NewInterface([]string{"header.id", "header.height"}),
 		Height:  optional.NewInterface(finalOrSealed),
 	}

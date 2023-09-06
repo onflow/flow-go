@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/rs/zerolog/log"
+
 	"github.com/onflow/flow-go/admin"
 	"github.com/onflow/flow-go/admin/commands"
 	"github.com/onflow/flow-go/model/flow"
@@ -27,6 +29,8 @@ func (r *ReadBlocksCommand) Handler(ctx context.Context, req *admin.CommandReque
 	data := req.ValidatorData.(*readBlocksRequest)
 	var result []*flow.Block
 	var blockID flow.Identifier
+
+	log.Info().Str("module", "admin-tool").Msgf("read blocks, data: %v", data)
 
 	if header, err := getBlockHeader(r.state, data.blocksRequest); err != nil {
 		return nil, fmt.Errorf("failed to get block header: %w", err)

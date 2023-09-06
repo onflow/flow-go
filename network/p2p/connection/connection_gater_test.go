@@ -17,9 +17,10 @@ import (
 	mockmodule "github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/internal/p2pfixtures"
-	"github.com/onflow/flow-go/network/internal/testutils"
 	"github.com/onflow/flow-go/network/p2p"
+	"github.com/onflow/flow-go/network/p2p/connection"
 	mockp2p "github.com/onflow/flow-go/network/p2p/mock"
+	p2pconfig "github.com/onflow/flow-go/network/p2p/p2pbuilder/config"
 	p2ptest "github.com/onflow/flow-go/network/p2p/test"
 	"github.com/onflow/flow-go/network/p2p/unicast/stream"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -38,7 +39,8 @@ func TestConnectionGating(t *testing.T) {
 		t,
 		sporkID,
 		t.Name(),
-		p2ptest.WithConnectionGater(testutils.NewConnectionGater(idProvider, func(p peer.ID) error {
+		idProvider,
+		p2ptest.WithConnectionGater(p2ptest.NewConnectionGater(idProvider, func(p peer.ID) error {
 			if !node1Peers.Has(p) {
 				return fmt.Errorf("id not found: %s", p.String())
 			}
@@ -51,7 +53,8 @@ func TestConnectionGating(t *testing.T) {
 		t,
 		sporkID,
 		t.Name(),
-		p2ptest.WithConnectionGater(testutils.NewConnectionGater(idProvider, func(p peer.ID) error {
+		idProvider,
+		p2ptest.WithConnectionGater(p2ptest.NewConnectionGater(idProvider, func(p peer.ID) error {
 			if !node2Peers.Has(p) {
 				return fmt.Errorf("id not found: %s", p.String())
 			}
@@ -61,8 +64,8 @@ func TestConnectionGating(t *testing.T) {
 
 	nodes := []p2p.LibP2PNode{node1, node2}
 	ids := flow.IdentityList{&node1Id, &node2Id}
-	p2ptest.StartNodes(t, signalerCtx, nodes, 100*time.Millisecond)
-	defer p2ptest.StopNodes(t, nodes, cancel, 100*time.Millisecond)
+	p2ptest.StartNodes(t, signalerCtx, nodes)
+	defer p2ptest.StopNodes(t, nodes, cancel)
 
 	p2pfixtures.AddNodesToEachOthersPeerStore(t, nodes, ids)
 
@@ -117,6 +120,7 @@ func TestConnectionGating_ResourceAllocation_AllowListing(t *testing.T) {
 		t,
 		sporkID,
 		t.Name(),
+		idProvider,
 		p2ptest.WithRole(flow.RoleConsensus))
 
 	node2Metrics := mockmodule.NewNetworkMetrics(t)
@@ -139,16 +143,24 @@ func TestConnectionGating_ResourceAllocation_AllowListing(t *testing.T) {
 	node2Metrics.On("InboundConnections", mock.Anything).Return()
 	node2Metrics.On("OutboundConnections", mock.Anything).Return()
 
+	// Libp2p control message validation metrics, these may or may not be called depending on the machine the test is running on and how long
+	// the nodes in the test run for.
+	node2Metrics.On("BlockingPreProcessingStarted", mock.Anything, mock.Anything).Maybe()
+	node2Metrics.On("BlockingPreProcessingFinished", mock.Anything, mock.Anything, mock.Anything).Maybe()
+	node2Metrics.On("AsyncProcessingStarted", mock.Anything).Maybe()
+	node2Metrics.On("AsyncProcessingFinished", mock.Anything, mock.Anything).Maybe()
+
 	// we create node2 with a connection gater that allows all connections and the mocked metrics collector.
 	node2, node2Id := p2ptest.NodeFixture(
 		t,
 		sporkID,
 		t.Name(),
+		idProvider,
 		p2ptest.WithRole(flow.RoleConsensus),
 		p2ptest.WithMetricsCollector(node2Metrics),
 		// we use default resource manager rather than the test resource manager to ensure that the metrics are called.
 		p2ptest.WithDefaultResourceManager(),
-		p2ptest.WithConnectionGater(testutils.NewConnectionGater(idProvider, func(p peer.ID) error {
+		p2ptest.WithConnectionGater(p2ptest.NewConnectionGater(idProvider, func(p peer.ID) error {
 			return nil // allow all connections.
 		})))
 	idProvider.On("ByPeerID", node1.Host().ID()).Return(&node1Id, true).Maybe()
@@ -156,8 +168,8 @@ func TestConnectionGating_ResourceAllocation_AllowListing(t *testing.T) {
 
 	nodes := []p2p.LibP2PNode{node1, node2}
 	ids := flow.IdentityList{&node1Id, &node2Id}
-	p2ptest.StartNodes(t, signalerCtx, nodes, 100*time.Millisecond)
-	defer p2ptest.StopNodes(t, nodes, cancel, 100*time.Millisecond)
+	p2ptest.StartNodes(t, signalerCtx, nodes)
+	defer p2ptest.StopNodes(t, nodes, cancel)
 
 	p2pfixtures.AddNodesToEachOthersPeerStore(t, nodes, ids)
 
@@ -179,6 +191,7 @@ func TestConnectionGating_ResourceAllocation_DisAllowListing(t *testing.T) {
 		t,
 		sporkID,
 		t.Name(),
+		idProvider,
 		p2ptest.WithRole(flow.RoleConsensus))
 
 	node2Metrics := mockmodule.NewNetworkMetrics(t)
@@ -187,11 +200,12 @@ func TestConnectionGating_ResourceAllocation_DisAllowListing(t *testing.T) {
 		t,
 		sporkID,
 		t.Name(),
+		idProvider,
 		p2ptest.WithRole(flow.RoleConsensus),
 		p2ptest.WithMetricsCollector(node2Metrics),
 		// we use default resource manager rather than the test resource manager to ensure that the metrics are called.
 		p2ptest.WithDefaultResourceManager(),
-		p2ptest.WithConnectionGater(testutils.NewConnectionGater(idProvider, func(p peer.ID) error {
+		p2ptest.WithConnectionGater(p2ptest.NewConnectionGater(idProvider, func(p peer.ID) error {
 			return fmt.Errorf("disallowed connection") // rejecting all connections.
 		})))
 	idProvider.On("ByPeerID", node1.Host().ID()).Return(&node1Id, true).Maybe()
@@ -199,8 +213,8 @@ func TestConnectionGating_ResourceAllocation_DisAllowListing(t *testing.T) {
 
 	nodes := []p2p.LibP2PNode{node1, node2}
 	ids := flow.IdentityList{&node1Id, &node2Id}
-	p2ptest.StartNodes(t, signalerCtx, nodes, 100*time.Millisecond)
-	defer p2ptest.StopNodes(t, nodes, cancel, 100*time.Millisecond)
+	p2ptest.StartNodes(t, signalerCtx, nodes)
+	defer p2ptest.StopNodes(t, nodes, cancel)
 
 	p2pfixtures.AddNodesToEachOthersPeerStore(t, nodes, ids)
 
@@ -228,21 +242,27 @@ func TestConnectionGater_InterceptUpgrade(t *testing.T) {
 	count := 5
 	nodes := make([]p2p.LibP2PNode, 0, count)
 	inbounds := make([]chan string, 0, count)
+	identities := make(flow.IdentityList, 0, count)
 
 	disallowedPeerIds := unittest.NewProtectedMap[peer.ID, struct{}]()
 	allPeerIds := make(peer.IDSlice, 0, count)
-
+	idProvider := mockmodule.NewIdentityProvider(t)
 	connectionGater := mockp2p.NewConnectionGater(t)
 	for i := 0; i < count; i++ {
 		handler, inbound := p2ptest.StreamHandlerFixture(t)
-		node, _ := p2ptest.NodeFixture(
+		node, id := p2ptest.NodeFixture(
 			t,
 			sporkId,
 			t.Name(),
+			idProvider,
 			p2ptest.WithRole(flow.RoleConsensus),
 			p2ptest.WithDefaultStreamHandler(handler),
 			// enable peer manager, with a 1-second refresh rate, and connection pruning enabled.
-			p2ptest.WithPeerManagerEnabled(true, 1*time.Second, func() peer.IDSlice {
+			p2ptest.WithPeerManagerEnabled(&p2pconfig.PeerManagerConfig{
+				ConnectionPruning: true,
+				UpdateInterval:    1 * time.Second,
+				ConnectorFactory:  connection.DefaultLibp2pBackoffConnectorFactory(),
+			}, func() peer.IDSlice {
 				list := make(peer.IDSlice, 0)
 				for _, pid := range allPeerIds {
 					if !disallowedPeerIds.Has(pid) {
@@ -252,8 +272,9 @@ func TestConnectionGater_InterceptUpgrade(t *testing.T) {
 				return list
 			}),
 			p2ptest.WithConnectionGater(connectionGater))
-
+		idProvider.On("ByPeerID", node.Host().ID()).Return(&id, true).Maybe()
 		nodes = append(nodes, node)
+		identities = append(identities, &id)
 		allPeerIds = append(allPeerIds, node.Host().ID())
 		inbounds = append(inbounds, inbound)
 	}
@@ -275,8 +296,8 @@ func TestConnectionGater_InterceptUpgrade(t *testing.T) {
 	disallowedPeerIds.Add(nodes[0].Host().ID(), struct{}{})
 
 	// starts the nodes
-	p2ptest.StartNodes(t, signalerCtx, nodes, 1*time.Second)
-	defer p2ptest.StopNodes(t, nodes, cancel, 1*time.Second)
+	p2ptest.StartNodes(t, signalerCtx, nodes)
+	defer p2ptest.StopNodes(t, nodes, cancel)
 
 	// Checks that only an allowed REMOTE node can establish an upgradable connection.
 	connectionGater.On("InterceptUpgraded", mock.Anything).Run(func(args mock.Arguments) {
@@ -289,7 +310,7 @@ func TestConnectionGater_InterceptUpgrade(t *testing.T) {
 		require.False(t, disallowedPeerIds.Has(remote))
 	}).Return(true, control.DisconnectReason(0))
 
-	ensureCommunicationSilenceAmongGroups(t, ctx, sporkId, nodes[:1], nodes[1:])
+	ensureCommunicationSilenceAmongGroups(t, ctx, sporkId, nodes[:1], identities[:1].NodeIDs(), nodes[1:], identities[1:].NodeIDs())
 	ensureCommunicationOverAllProtocols(t, ctx, sporkId, nodes[1:], inbounds[1:])
 }
 
@@ -316,10 +337,15 @@ func TestConnectionGater_Disallow_Integration(t *testing.T) {
 			t,
 			sporkId,
 			t.Name(),
+			idProvider,
 			p2ptest.WithRole(flow.RoleConsensus),
 			p2ptest.WithDefaultStreamHandler(handler),
 			// enable peer manager, with a 1-second refresh rate, and connection pruning enabled.
-			p2ptest.WithPeerManagerEnabled(true, 1*time.Second, func() peer.IDSlice {
+			p2ptest.WithPeerManagerEnabled(&p2pconfig.PeerManagerConfig{
+				ConnectionPruning: true,
+				UpdateInterval:    1 * time.Second,
+				ConnectorFactory:  connection.DefaultLibp2pBackoffConnectorFactory(),
+			}, func() peer.IDSlice {
 				list := make(peer.IDSlice, 0)
 				for _, id := range ids {
 					if disallowedList.Has(id) {
@@ -333,7 +359,7 @@ func TestConnectionGater_Disallow_Integration(t *testing.T) {
 				}
 				return list
 			}),
-			p2ptest.WithConnectionGater(testutils.NewConnectionGater(idProvider, func(pid peer.ID) error {
+			p2ptest.WithConnectionGater(p2ptest.NewConnectionGater(idProvider, func(pid peer.ID) error {
 				return disallowedList.ForEach(func(id *flow.Identity, _ struct{}) error {
 					bid, err := unittest.PeerIDFromFlowID(id)
 					require.NoError(t, err)
@@ -350,8 +376,8 @@ func TestConnectionGater_Disallow_Integration(t *testing.T) {
 		inbounds = append(inbounds, inbound)
 	}
 
-	p2ptest.StartNodes(t, signalerCtx, nodes, 1*time.Second)
-	defer p2ptest.StopNodes(t, nodes, cancel, 1*time.Second)
+	p2ptest.StartNodes(t, signalerCtx, nodes)
+	defer p2ptest.StopNodes(t, nodes, cancel)
 
 	p2ptest.LetNodesDiscoverEachOther(t, ctx, nodes, ids)
 
@@ -363,35 +389,52 @@ func TestConnectionGater_Disallow_Integration(t *testing.T) {
 	// let peer manager prune the connections to the disallow-listed node.
 	time.Sleep(1 * time.Second)
 	// ensures no connection, unicast, or pubsub going to or coming from the disallow-listed node.
-	ensureCommunicationSilenceAmongGroups(t, ctx, sporkId, nodes[:count-1], nodes[count-1:])
+	ensureCommunicationSilenceAmongGroups(t, ctx, sporkId, nodes[:count-1], ids[:count-1].NodeIDs(), nodes[count-1:], ids[count-1:].NodeIDs())
 
 	// now we add another node (the second last node) to the disallowed list.
 	disallowedList.Add(ids[len(ids)-2], struct{}{})
 	// let peer manager prune the connections to the disallow-listed node.
 	time.Sleep(1 * time.Second)
 	// ensures no connection, unicast, or pubsub going to and coming from the disallow-listed nodes.
-	ensureCommunicationSilenceAmongGroups(t, ctx, sporkId, nodes[:count-2], nodes[count-2:])
+	ensureCommunicationSilenceAmongGroups(t, ctx, sporkId, nodes[:count-2], ids[:count-2].NodeIDs(), nodes[count-2:], ids[count-2:].NodeIDs())
 	// ensures that all nodes are other non-disallow-listed nodes can exchange messages over the pubsub and unicast.
 	ensureCommunicationOverAllProtocols(t, ctx, sporkId, nodes[:count-2], inbounds[:count-2])
 }
 
 // ensureCommunicationSilenceAmongGroups ensures no connection, unicast, or pubsub going to or coming from between the two groups of nodes.
-func ensureCommunicationSilenceAmongGroups(t *testing.T, ctx context.Context, sporkId flow.Identifier, groupA []p2p.LibP2PNode, groupB []p2p.LibP2PNode) {
+func ensureCommunicationSilenceAmongGroups(
+	t *testing.T,
+	ctx context.Context,
+	sporkId flow.Identifier,
+	groupANodes []p2p.LibP2PNode,
+	groupAIdentifiers flow.IdentifierList,
+	groupBNodes []p2p.LibP2PNode,
+	groupBIdentifiers flow.IdentifierList) {
 	// ensures no connection, unicast, or pubsub going to the disallow-listed nodes
-	p2pfixtures.EnsureNotConnectedBetweenGroups(t, ctx, groupA, groupB)
-	p2pfixtures.EnsureNoPubsubExchangeBetweenGroups(t, ctx, groupA, groupB, func() (interface{}, channels.Topic) {
-		blockTopic := channels.TopicFromChannel(channels.PushBlocks, sporkId)
-		return unittest.ProposalFixture(), blockTopic
-	})
-	p2pfixtures.EnsureNoStreamCreationBetweenGroups(t, ctx, groupA, groupB)
+	p2ptest.EnsureNotConnectedBetweenGroups(t, ctx, groupANodes, groupBNodes)
+
+	blockTopic := channels.TopicFromChannel(channels.PushBlocks, sporkId)
+	p2ptest.EnsureNoPubsubExchangeBetweenGroups(
+		t,
+		ctx,
+		groupANodes,
+		groupAIdentifiers,
+		groupBNodes,
+		groupBIdentifiers,
+		blockTopic,
+		1,
+		func() interface{} {
+			return unittest.ProposalFixture()
+		})
+	p2pfixtures.EnsureNoStreamCreationBetweenGroups(t, ctx, groupANodes, groupBNodes)
 }
 
 // ensureCommunicationOverAllProtocols ensures that all nodes are connected to each other, and they can exchange messages over the pubsub and unicast.
 func ensureCommunicationOverAllProtocols(t *testing.T, ctx context.Context, sporkId flow.Identifier, nodes []p2p.LibP2PNode, inbounds []chan string) {
-	p2ptest.EnsureConnected(t, ctx, nodes)
-	p2ptest.EnsurePubsubMessageExchange(t, ctx, nodes, func() (interface{}, channels.Topic) {
-		blockTopic := channels.TopicFromChannel(channels.PushBlocks, sporkId)
-		return unittest.ProposalFixture(), blockTopic
+	blockTopic := channels.TopicFromChannel(channels.PushBlocks, sporkId)
+	p2ptest.TryConnectionAndEnsureConnected(t, ctx, nodes)
+	p2ptest.EnsurePubsubMessageExchange(t, ctx, nodes, blockTopic, 1, func() interface{} {
+		return unittest.ProposalFixture()
 	})
 	p2pfixtures.EnsureMessageExchangeOverUnicast(t, ctx, nodes, inbounds, p2pfixtures.LongStringMessageFactoryFixture(t))
 }

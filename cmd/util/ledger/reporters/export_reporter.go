@@ -24,18 +24,15 @@ type ExportReport struct {
 // ExportReporter writes data that can be leveraged outside of extraction
 type ExportReporter struct {
 	logger                   zerolog.Logger
-	chain                    flow.Chain
 	getBeforeMigrationSCFunc GetStateCommitmentFunc
 }
 
 func NewExportReporter(
 	logger zerolog.Logger,
-	chain flow.Chain,
 	getBeforeMigrationSCFunc GetStateCommitmentFunc,
 ) *ExportReporter {
 	return &ExportReporter{
 		logger:                   logger,
-		chain:                    chain,
 		getBeforeMigrationSCFunc: getBeforeMigrationSCFunc,
 	}
 }

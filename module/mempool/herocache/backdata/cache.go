@@ -118,6 +118,11 @@ func NewCache(sizeLimit uint32,
 	// total buckets.
 	capacity := uint64(sizeLimit * oversizeFactor)
 	bucketNum := capacity / slotsPerBucket
+	if bucketNum == 0 {
+		// we panic here because we don't want to continue with a zero bucketNum (it can cause a DoS attack).
+		panic("bucketNum cannot be zero, choose a bigger sizeLimit or a smaller oversizeFactor")
+	}
+
 	if capacity%slotsPerBucket != 0 {
 		// accounting for remainder.
 		bucketNum++
@@ -130,7 +135,7 @@ func NewCache(sizeLimit uint32,
 		sizeLimit:              sizeLimit,
 		buckets:                make([]slotBucket, bucketNum),
 		ejectionMode:           ejectionMode,
-		entities:               heropool.NewHeroPool(sizeLimit, ejectionMode),
+		entities:               heropool.NewHeroPool(sizeLimit, ejectionMode, logger),
 		availableSlotHistogram: make([]uint64, slotsPerBucket+1), // +1 is to account for empty buckets as well.
 		interactionCounter:     atomic.NewUint64(0),
 		lastTelemetryDump:      atomic.NewInt64(0),
@@ -205,7 +210,7 @@ func (c *Cache) ByID(entityID flow.Identifier) (flow.Entity, bool) {
 }
 
 // Size returns the size of the backdata, i.e., total number of stored (entityId, entity) pairs.
-func (c Cache) Size() uint {
+func (c *Cache) Size() uint {
 	defer c.logTelemetry()
 
 	return uint(c.entities.Size())
@@ -213,12 +218,12 @@ func (c Cache) Size() uint {
 
 // Head returns the head of queue.
 // Boolean return value determines whether there is a head available.
-func (c Cache) Head() (flow.Entity, bool) {
+func (c *Cache) Head() (flow.Entity, bool) {
 	return c.entities.Head()
 }
 
 // All returns all entities stored in the backdata.
-func (c Cache) All() map[flow.Identifier]flow.Entity {
+func (c *Cache) All() map[flow.Identifier]flow.Entity {
 	defer c.logTelemetry()
 
 	entitiesList := c.entities.All()
@@ -234,7 +239,7 @@ func (c Cache) All() map[flow.Identifier]flow.Entity {
 }
 
 // Identifiers returns the list of identifiers of entities stored in the backdata.
-func (c Cache) Identifiers() flow.IdentifierList {
+func (c *Cache) Identifiers() flow.IdentifierList {
 	defer c.logTelemetry()
 
 	ids := make(flow.IdentifierList, c.entities.Size())
@@ -246,7 +251,7 @@ func (c Cache) Identifiers() flow.IdentifierList {
 }
 
 // Entities returns the list of entities stored in the backdata.
-func (c Cache) Entities() []flow.Entity {
+func (c *Cache) Entities() []flow.Entity {
 	defer c.logTelemetry()
 
 	entities := make([]flow.Entity, c.entities.Size())
@@ -262,7 +267,7 @@ func (c *Cache) Clear() {
 	defer c.logTelemetry()
 
 	c.buckets = make([]slotBucket, c.bucketNum)
-	c.entities = heropool.NewHeroPool(c.sizeLimit, c.ejectionMode)
+	c.entities = heropool.NewHeroPool(c.sizeLimit, c.ejectionMode, c.logger)
 	c.availableSlotHistogram = make([]uint64, slotsPerBucket+1)
 	c.interactionCounter = atomic.NewUint64(0)
 	c.lastTelemetryDump = atomic.NewInt64(0)
@@ -350,7 +355,7 @@ func (c *Cache) get(entityID flow.Identifier) (flow.Entity, bucketIndex, slotInd
 
 // entityId32of256AndBucketIndex determines the id prefix as well as the bucket index corresponding to the
 // given identifier.
-func (c Cache) entityId32of256AndBucketIndex(id flow.Identifier) (sha32of256, bucketIndex) {
+func (c *Cache) entityId32of256AndBucketIndex(id flow.Identifier) (sha32of256, bucketIndex) {
 	// uint64(id[0:8]) used to compute bucket index for which this identifier belongs to
 	b := binary.LittleEndian.Uint64(id[0:8]) % c.bucketNum
 
@@ -361,7 +366,7 @@ func (c Cache) entityId32of256AndBucketIndex(id flow.Identifier) (sha32of256, bu
 }
 
 // expiryThreshold returns the threshold for which all slots with index below threshold are considered old enough for eviction.
-func (c Cache) expiryThreshold() uint64 {
+func (c *Cache) expiryThreshold() uint64 {
 	var expiryThreshold uint64 = 0
 	if c.slotCount > uint64(c.sizeLimit) {
 		// total number of slots written are above the predefined limit
@@ -425,7 +430,7 @@ func (c *Cache) slotIndexInBucket(b bucketIndex, slotId sha32of256, entityId flo
 // ownerIndexOf maps the (bucketIndex, slotIndex) pair to a canonical unique (scalar) index.
 // This scalar index is used to represent this (bucketIndex, slotIndex) pair in the underlying
 // entities list.
-func (c Cache) ownerIndexOf(b bucketIndex, s slotIndex) uint64 {
+func (c *Cache) ownerIndexOf(b bucketIndex, s slotIndex) uint64 {
 	return (uint64(b) * slotsPerBucket) + uint64(s)
 }
 

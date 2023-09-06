@@ -3,7 +3,6 @@ package requester
 import (
 	"fmt"
 	"math"
-	"math/rand"
 	"time"
 
 	"github.com/rs/zerolog"
@@ -20,6 +19,7 @@ import (
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/utils/logging"
+	"github.com/onflow/flow-go/utils/rand"
 )
 
 // HandleFunc is a function provided to the requester engine to handle an entity
@@ -51,7 +51,6 @@ type Engine struct {
 	items                 map[flow.Identifier]*Item
 	requests              map[uint64]*messages.EntityRequest
 	forcedDispatchOngoing *atomic.Bool // to ensure only trigger dispatching logic once at any time
-	rng                   *rand.Rand
 }
 
 // New creates a new requester engine, operating on the provided network channel, and requesting entities from a node
@@ -117,7 +116,6 @@ func New(log zerolog.Logger, metrics module.EngineMetrics, net network.Network, 
 		items:                 make(map[flow.Identifier]*Item),          // holds all pending items
 		requests:              make(map[uint64]*messages.EntityRequest), // holds all sent requests
 		forcedDispatchOngoing: atomic.NewBool(false),
-		rng:                   rand.New(rand.NewSource(time.Now().UnixNano())),
 	}
 
 	// register the engine with the network layer and store the conduit
@@ -319,7 +317,12 @@ func (e *Engine) dispatchRequest() (bool, error) {
 	for k := range e.items {
 		rndItems = append(rndItems, e.items[k].EntityID)
 	}
-	e.rng.Shuffle(len(rndItems), func(i, j int) { rndItems[i], rndItems[j] = rndItems[j], rndItems[i] })
+	err = rand.Shuffle(uint(len(rndItems)), func(i, j uint) {
+		rndItems[i], rndItems[j] = rndItems[j], rndItems[i]
+	})
+	if err != nil {
+		return false, fmt.Errorf("shuffle failed: %w", err)
+	}
 
 	// go through each item and decide if it should be requested again
 	now := time.Now().UTC()
@@ -364,7 +367,11 @@ func (e *Engine) dispatchRequest() (bool, error) {
 			if len(providers) == 0 {
 				return false, fmt.Errorf("no valid providers available")
 			}
-			providerID = providers.Sample(1)[0].NodeID
+			id, err := providers.Sample(1)
+			if err != nil {
+				return false, fmt.Errorf("sampling failed: %w", err)
+			}
+			providerID = id[0].NodeID
 		}
 
 		// add item to list and set retry parameters
@@ -396,9 +403,14 @@ func (e *Engine) dispatchRequest() (bool, error) {
 		return false, nil
 	}
 
+	nonce, err := rand.Uint64()
+	if err != nil {
+		return false, fmt.Errorf("nonce generation failed: %w", err)
+	}
+
 	// create a batch request, send it and store it for reference
 	req := &messages.EntityRequest{
-		Nonce:     e.rng.Uint64(),
+		Nonce:     nonce,
 		EntityIDs: entityIDs,
 	}
 

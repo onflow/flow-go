@@ -60,7 +60,7 @@ func (s *ApprovalProcessingCoreTestSuite) SetupTest() {
 	params := new(mockstate.Params)
 	s.State.On("Sealed").Return(unittest.StateSnapshotForKnownBlock(s.ParentBlock, nil)).Maybe()
 	s.State.On("Params").Return(params)
-	params.On("Root").Return(
+	params.On("FinalizedRoot").Return(
 		func() *flow.Header { return s.rootHeader },
 		func() error { return nil },
 	)

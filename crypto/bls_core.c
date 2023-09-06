@@ -391,7 +391,7 @@ static void bls_batch_verify_tree(const node *root, const int len,
 //  indices mixup.
 // - optimize the verification by verifying an aggregated signature against an
 // aggregated
-//  public key, and use a recursive verification to find invalid signatures.
+//  public key, and use a top-down recursive verification to find invalid signatures.
 void bls_batch_verify(const int sigs_len, byte *results, const E2 *pks_input,
                       const byte *sigs_bytes, const byte *data,
                       const int data_len, const byte *seed) {
@@ -438,7 +438,7 @@ void bls_batch_verify(const int sigs_len, byte *results, const E2 *pks_input,
       E1_mult(&sigs[i], &sigs[i], &r);
     }
   }
-  // build a binary tree of aggreagtions
+  // build a binary tree of aggregations
   node *root = build_tree(sigs_len, &pks[0], &sigs[0]);
   if (!root)
     goto out;

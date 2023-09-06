@@ -2,7 +2,6 @@ package network_test
 
 import (
 	"fmt"
-	"math/rand"
 
 	"github.com/rs/zerolog"
 
@@ -20,10 +19,11 @@ func Example() {
 	logger := zerolog.Nop()
 	splitterNet := splitterNetwork.NewNetwork(net, logger)
 
-	// generate a random origin ID
-	var id flow.Identifier
-	rand.Seed(0)
-	rand.Read(id[:])
+	// generate an origin ID
+	id, err := flow.HexStringToIdentifier("0194fdc2fa2ffcc041d3ff12045b73c86e4ff95ff662a5eee82abdf44a2d0b75")
+	if err != nil {
+		fmt.Println(err)
+	}
 
 	// create engines
 	engineProcessFunc := func(engineID int) testnet.EngineProcessFunc {
@@ -38,7 +38,7 @@ func Example() {
 
 	// register engines with splitter network
 	channel := channels.Channel("foo-channel")
-	_, err := splitterNet.Register(channel, engine1)
+	_, err = splitterNet.Register(channel, engine1)
 	if err != nil {
 		fmt.Println(err)
 	}

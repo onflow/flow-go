@@ -4,14 +4,8 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/rs/zerolog"
-
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/module"
-	"github.com/onflow/flow-go/module/component"
-	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/network"
-	"github.com/onflow/flow-go/network/alsp"
 	"github.com/onflow/flow-go/network/channels"
 )
 
@@ -19,51 +13,21 @@ import (
 // It directly passes the incoming messages to the corresponding methods of the
 // network Adapter.
 type DefaultConduitFactory struct {
-	*component.ComponentManager
-	adapter            network.Adapter
-	misbehaviorManager network.MisbehaviorReportManager
+	adapter network.Adapter
 }
 
-// DefaultConduitFactoryOpt is a function that applies an option to the DefaultConduitFactory.
-type DefaultConduitFactoryOpt func(*DefaultConduitFactory)
-
-// WithMisbehaviorManager overrides the misbehavior manager for the conduit factory.
-func WithMisbehaviorManager(misbehaviorManager network.MisbehaviorReportManager) DefaultConduitFactoryOpt {
-	return func(d *DefaultConduitFactory) {
-		d.misbehaviorManager = misbehaviorManager
-	}
-}
+var _ network.ConduitFactory = (*DefaultConduitFactory)(nil)
 
 // NewDefaultConduitFactory creates a new DefaultConduitFactory, this is the default conduit factory used by the node.
 // Args:
 //
-//	logger: zerolog.Logger, the logger used by the conduit factory.
-//	metrics: module.AlspMetrics (an instance of module.NetworkMetrics can be used).
-//	opts: DefaultConduitFactoryOpt, optional arguments to override the default behavior of the conduit factory.
+//	none
 //
 // Returns:
 //
-//	*DefaultConduitFactory, the created conduit factory.
-func NewDefaultConduitFactory(logger zerolog.Logger, metrics module.AlspMetrics, opts ...DefaultConduitFactoryOpt) *DefaultConduitFactory {
-	d := &DefaultConduitFactory{
-		misbehaviorManager: alsp.NewMisbehaviorReportManager(logger, metrics),
-	}
-
-	for _, apply := range opts {
-		apply(d)
-	}
-
-	// worker added so conduit factory doesn't immediately shut down when it's started
-	cm := component.NewComponentManagerBuilder().
-		AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
-			ready()
-
-			<-ctx.Done()
-		}).Build()
-
-	d.ComponentManager = cm
-
-	return d
+//	a new instance of the DefaultConduitFactory.
+func NewDefaultConduitFactory() *DefaultConduitFactory {
+	return &DefaultConduitFactory{}
 }
 
 // RegisterAdapter sets the Adapter component of the factory.
@@ -89,11 +53,10 @@ func (d *DefaultConduitFactory) NewConduit(ctx context.Context, channel channels
 	child, cancel := context.WithCancel(ctx)
 
 	return &Conduit{
-		ctx:                child,
-		cancel:             cancel,
-		channel:            channel,
-		adapter:            d.adapter,
-		misbehaviorManager: d.misbehaviorManager,
+		ctx:     child,
+		cancel:  cancel,
+		channel: channel,
+		adapter: d.adapter,
 	}, nil
 }
 
@@ -101,11 +64,10 @@ func (d *DefaultConduitFactory) NewConduit(ctx context.Context, channel channels
 // sending messages within a single engine process. It sends all messages to
 // what can be considered a bus reserved for that specific engine.
 type Conduit struct {
-	ctx                context.Context
-	cancel             context.CancelFunc
-	channel            channels.Channel
-	adapter            network.Adapter
-	misbehaviorManager network.MisbehaviorReportManager
+	ctx     context.Context
+	cancel  context.CancelFunc
+	channel channels.Channel
+	adapter network.Adapter
 }
 
 var _ network.Conduit = (*Conduit)(nil)
@@ -145,7 +107,7 @@ func (c *Conduit) Multicast(event interface{}, num uint, targetIDs ...flow.Ident
 // The misbehavior is reported to the networking layer to penalize the misbehaving node.
 // The implementation must be thread-safe and non-blocking.
 func (c *Conduit) ReportMisbehavior(report network.MisbehaviorReport) {
-	c.misbehaviorManager.HandleMisbehaviorReport(c.channel, report)
+	c.adapter.ReportMisbehaviorOnChannel(c.channel, report)
 }
 
 func (c *Conduit) Close() error {

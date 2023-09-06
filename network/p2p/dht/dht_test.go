@@ -11,8 +11,10 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/onflow/flow-go/model/flow"
 	libp2pmsg "github.com/onflow/flow-go/model/libp2p/message"
 	"github.com/onflow/flow-go/module/irrecoverable"
+	mockmodule "github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/message"
 	"github.com/onflow/flow-go/network/p2p"
@@ -35,14 +37,16 @@ func TestFindPeerWithDHT(t *testing.T) {
 	golog.SetAllLoggers(golog.LevelFatal) // change this to Debug if libp2p logs are needed
 
 	sporkId := unittest.IdentifierFixture()
-	dhtServerNodes, _ := p2ptest.NodesFixture(t, sporkId, "dht_test", 2, p2ptest.WithDHTOptions(dht.AsServer()))
+	idProvider := unittest.NewUpdatableIDProvider(flow.IdentityList{})
+	dhtServerNodes, serverIDs := p2ptest.NodesFixture(t, sporkId, "dht_test", 2, idProvider, p2ptest.WithDHTOptions(dht.AsServer()))
 	require.Len(t, dhtServerNodes, 2)
 
-	dhtClientNodes, _ := p2ptest.NodesFixture(t, sporkId, "dht_test", count-2, p2ptest.WithDHTOptions(dht.AsClient()))
+	dhtClientNodes, clientIDs := p2ptest.NodesFixture(t, sporkId, "dht_test", count-2, idProvider, p2ptest.WithDHTOptions(dht.AsClient()))
 
 	nodes := append(dhtServerNodes, dhtClientNodes...)
-	p2ptest.StartNodes(t, signalerCtx, nodes, 100*time.Millisecond)
-	defer p2ptest.StopNodes(t, nodes, cancel, 100*time.Millisecond)
+	idProvider.SetIdentities(append(serverIDs, clientIDs...))
+	p2ptest.StartNodes(t, signalerCtx, nodes)
+	defer p2ptest.StopNodes(t, nodes, cancel)
 
 	getDhtServerAddr := func(i uint) peer.AddrInfo {
 		return peer.AddrInfo{ID: dhtServerNodes[i].Host().ID(), Addrs: dhtServerNodes[i].Host().Addrs()}
@@ -98,7 +102,6 @@ func TestPubSubWithDHTDiscovery(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
 
-	topic := channels.Topic("/flow/" + unittest.IdentifierFixture().String())
 	count := 5
 	golog.SetAllLoggers(golog.LevelFatal) // change this to Debug if libp2p logs are needed
 
@@ -118,17 +121,24 @@ func TestPubSubWithDHTDiscovery(t *testing.T) {
 	//   N4     N5                      N4-----N5
 
 	sporkId := unittest.IdentifierFixture()
+	topic := channels.TopicFromChannel(channels.TestNetworkChannel, sporkId)
+	idProvider := mockmodule.NewIdentityProvider(t)
 	// create one node running the DHT Server (mimicking the staked AN)
-	dhtServerNodes, _ := p2ptest.NodesFixture(t, sporkId, "dht_test", 1, p2ptest.WithDHTOptions(dht.AsServer()))
+	dhtServerNodes, serverIDs := p2ptest.NodesFixture(t, sporkId, "dht_test", 1, idProvider, p2ptest.WithDHTOptions(dht.AsServer()))
 	require.Len(t, dhtServerNodes, 1)
 	dhtServerNode := dhtServerNodes[0]
 
 	// crate other nodes running the DHT Client (mimicking the unstaked ANs)
-	dhtClientNodes, _ := p2ptest.NodesFixture(t, sporkId, "dht_test", count-1, p2ptest.WithDHTOptions(dht.AsClient()))
+	dhtClientNodes, clientIDs := p2ptest.NodesFixture(t, sporkId, "dht_test", count-1, idProvider, p2ptest.WithDHTOptions(dht.AsClient()))
 
+	ids := append(serverIDs, clientIDs...)
 	nodes := append(dhtServerNodes, dhtClientNodes...)
-	p2ptest.StartNodes(t, signalerCtx, nodes, 100*time.Millisecond)
-	defer p2ptest.StopNodes(t, nodes, cancel, 100*time.Millisecond)
+	for i, node := range nodes {
+		idProvider.On("ByPeerID", node.Host().ID()).Return(&ids[i], true).Maybe()
+
+	}
+	p2ptest.StartNodes(t, signalerCtx, nodes)
+	defer p2ptest.StopNodes(t, nodes, cancel)
 
 	// Step 2: Connect all nodes running a DHT client to the node running the DHT server
 	// This has to be done before subscribing to any topic, otherwise the node gives up on advertising
@@ -145,18 +155,15 @@ func TestPubSubWithDHTDiscovery(t *testing.T) {
 	// hence expect count and not count - 1 messages to be received (one by each node, including the sender)
 	ch := make(chan peer.ID, count)
 
-	codec := unittest.NetworkCodec()
-
-	payload, _ := codec.Encode(&libp2pmsg.TestMessage{})
-	msg := &message.Message{
-		Payload: payload,
-	}
-
-	data, err := msg.Marshal()
+	messageScope, err := message.NewOutgoingScope(
+		ids.NodeIDs(),
+		topic,
+		&libp2pmsg.TestMessage{},
+		unittest.NetworkCodec().Encode,
+		message.ProtocolTypePubSub)
 	require.NoError(t, err)
 
 	logger := unittest.Logger()
-
 	topicValidator := flowpubsub.TopicValidator(logger, unittest.AllowAllPeerFilter())
 	for _, n := range nodes {
 		s, err := n.Subscribe(topic, topicValidator)
@@ -166,7 +173,7 @@ func TestPubSubWithDHTDiscovery(t *testing.T) {
 			msg, err := s.Next(ctx)
 			require.NoError(t, err)
 			require.NotNil(t, msg)
-			assert.Equal(t, data, msg.Data)
+			assert.Equal(t, messageScope.Proto().Payload, msg.Data)
 			ch <- nodeID
 		}(s, n.Host().ID())
 	}
@@ -186,7 +193,7 @@ func TestPubSubWithDHTDiscovery(t *testing.T) {
 	require.Eventually(t, fullyConnectedGraph, time.Second*5, ticksForAssertEventually, "nodes failed to discover each other")
 
 	// Step 4: publish a message to the topic
-	require.NoError(t, dhtServerNode.Publish(ctx, topic, data))
+	require.NoError(t, dhtServerNode.Publish(ctx, messageScope))
 
 	// Step 5: By now, all peers would have been discovered and the message should have been successfully published
 	// A hash set to keep track of the nodes who received the message
@@ -211,6 +218,6 @@ loop:
 
 	// Step 6: unsubscribes all nodes from the topic
 	for _, n := range nodes {
-		assert.NoError(t, n.UnSubscribe(topic))
+		assert.NoError(t, n.Unsubscribe(topic))
 	}
 }

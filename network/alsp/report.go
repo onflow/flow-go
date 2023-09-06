@@ -5,6 +5,7 @@ import (
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/network/alsp/model"
 )
 
 // MisbehaviorReport is a report that is sent to the networking layer to penalize the misbehaving node.
@@ -19,7 +20,7 @@ import (
 type MisbehaviorReport struct {
 	id      flow.Identifier     // the ID of the misbehaving node
 	reason  network.Misbehavior // the reason of the misbehavior
-	penalty int                 // the penalty value of the misbehavior
+	penalty float64             // the penalty value of the misbehavior
 }
 
 var _ network.MisbehaviorReport = (*MisbehaviorReport)(nil)
@@ -32,10 +33,10 @@ type MisbehaviorReportOpt func(r *MisbehaviorReport) error
 // If the value is not in the range, an error is returned.
 // The returned error by this option indicates that the option is not applied. In BFT setup, the returned error
 // should be treated as a fatal error.
-func WithPenaltyAmplification(v int) MisbehaviorReportOpt {
+func WithPenaltyAmplification(v float64) MisbehaviorReportOpt {
 	return func(r *MisbehaviorReport) error {
 		if v <= 0 || v > 100 {
-			return fmt.Errorf("penalty value should be between 1-100: %d", v)
+			return fmt.Errorf("penalty value should be between 1-100: %v", v)
 		}
 		r.penalty *= v
 		return nil
@@ -53,7 +54,7 @@ func (r MisbehaviorReport) Reason() network.Misbehavior {
 }
 
 // Penalty returns the penalty value of the misbehavior.
-func (r MisbehaviorReport) Penalty() int {
+func (r MisbehaviorReport) Penalty() float64 {
 	return r.penalty
 }
 
@@ -66,7 +67,7 @@ func NewMisbehaviorReport(misbehavingId flow.Identifier, reason network.Misbehav
 	m := &MisbehaviorReport{
 		id:      misbehavingId,
 		reason:  reason,
-		penalty: defaultPenaltyValue,
+		penalty: model.DefaultPenaltyValue,
 	}
 
 	for _, opt := range opts {

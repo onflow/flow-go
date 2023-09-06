@@ -17,9 +17,9 @@ import (
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/consensus"
 	"github.com/onflow/flow-go/engine/consensus/approvals"
-	"github.com/onflow/flow-go/engine/consensus/sealing/counters"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/counters"
 	"github.com/onflow/flow-go/module/mempool"
 	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/network"
@@ -137,7 +137,7 @@ func (c *Core) RepopulateAssignmentCollectorTree(payloads storage.Payloads) erro
 
 	// Get the root block of our local state - we allow references to unknown
 	// blocks below the root height
-	rootHeader, err := c.state.Params().Root()
+	rootHeader, err := c.state.Params().FinalizedRoot()
 	if err != nil {
 		return fmt.Errorf("could not retrieve root header: %w", err)
 	}

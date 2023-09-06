@@ -8,6 +8,7 @@ import (
 
 	"github.com/dgraph-io/badger/v2"
 
+	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/model/flow/mapfunc"
@@ -16,7 +17,6 @@ import (
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/inmem"
 	"github.com/onflow/flow-go/state/protocol/invalid"
-	"github.com/onflow/flow-go/state/protocol/seed"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/badger/operation"
 	"github.com/onflow/flow-go/storage/badger/procedure"
@@ -33,7 +33,15 @@ type Snapshot struct {
 	blockID flow.Identifier // reference block for this snapshot
 }
 
+// FinalizedSnapshot represents a read-only immutable snapshot of the protocol state
+// at a finalized block. It is guaranteed to have a header available.
+type FinalizedSnapshot struct {
+	Snapshot
+	header *flow.Header
+}
+
 var _ protocol.Snapshot = (*Snapshot)(nil)
+var _ protocol.Snapshot = (*FinalizedSnapshot)(nil)
 
 // newSnapshotWithIncorporatedReferenceBlock creates a new state snapshot with the given reference block.
 // CAUTION: The caller is responsible for ensuring that the reference block has been incorporated.
@@ -42,6 +50,22 @@ func newSnapshotWithIncorporatedReferenceBlock(state *State, blockID flow.Identi
 		state:   state,
 		blockID: blockID,
 	}
+}
+
+// NewFinalizedSnapshot instantiates a `FinalizedSnapshot`.
+// CAUTION: the header's ID _must_ match `blockID` (not checked)
+func NewFinalizedSnapshot(state *State, blockID flow.Identifier, header *flow.Header) *FinalizedSnapshot {
+	return &FinalizedSnapshot{
+		Snapshot: Snapshot{
+			state:   state,
+			blockID: blockID,
+		},
+		header: header,
+	}
+}
+
+func (s *FinalizedSnapshot) Head() (*flow.Header, error) {
+	return s.header, nil
 }
 
 func (s *Snapshot) Head() (*flow.Header, error) {
@@ -215,7 +239,7 @@ func (s *Snapshot) SealingSegment() (*flow.SealingSegment, error) {
 	if err != nil {
 		return nil, fmt.Errorf("could not get snapshot's reference block: %w", err)
 	}
-	if head.Header.Height < s.state.rootHeight {
+	if head.Header.Height < s.state.finalizedRootHeight {
 		return nil, protocol.ErrSealingSegmentBelowRootBlock
 	}
 
@@ -353,7 +377,7 @@ func (s *Snapshot) descendants(blockID flow.Identifier) ([]flow.Identifier, erro
 	return descendantIDs, nil
 }
 
-// RandomSource returns the seed for the current block snapshot.
+// RandomSource returns the seed for the current block's snapshot.
 // Expected error returns:
 // * storage.ErrNotFound is returned if the QC is unknown.
 func (s *Snapshot) RandomSource() ([]byte, error) {
@@ -361,7 +385,7 @@ func (s *Snapshot) RandomSource() ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	randomSource, err := seed.FromParentQCSignature(qc.SigData)
+	randomSource, err := model.BeaconSignature(qc)
 	if err != nil {
 		return nil, fmt.Errorf("could not create seed from QC's signature: %w", err)
 	}
@@ -376,6 +400,15 @@ func (s *Snapshot) Epochs() protocol.EpochQuery {
 
 func (s *Snapshot) Params() protocol.GlobalParams {
 	return s.state.Params()
+}
+
+func (s *Snapshot) VersionBeacon() (*flow.SealedVersionBeacon, error) {
+	head, err := s.state.headers.ByBlockID(s.blockID)
+	if err != nil {
+		return nil, err
+	}
+
+	return s.state.versionBeacons.Highest(head.Height)
 }
 
 // EpochQuery encapsulates querying epochs w.r.t. a snapshot.

@@ -149,6 +149,25 @@ func WithByID(blocksByID map[flow.Identifier]*flow.Block) BlockHeaderMockOptions
 	}
 }
 
+func WithBlockIDByHeight(blocksByHeight map[uint64]*flow.Block) BlockHeaderMockOptions {
+	return func(blocks *storagemock.Headers) {
+		blocks.On("BlockIDByHeight", mock.AnythingOfType("uint64")).Return(
+			func(height uint64) flow.Identifier {
+				if _, has := blocksByHeight[height]; !has {
+					return flow.ZeroID
+				}
+				return blocksByHeight[height].Header.ID()
+			},
+			func(height uint64) error {
+				if _, has := blocksByHeight[height]; !has {
+					return fmt.Errorf("block %d not found: %w", height, storage.ErrNotFound)
+				}
+				return nil
+			},
+		)
+	}
+}
+
 func MockBlockHeaderStorage(opts ...BlockHeaderMockOptions) *storagemock.Headers {
 	headers := new(storagemock.Headers)
 

@@ -4,7 +4,6 @@ import (
 	"errors"
 	"math/rand"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -31,7 +30,6 @@ func TestBeaconKeyStore(t *testing.T) {
 }
 
 func (suite *BeaconKeyStore) SetupTest() {
-	rand.Seed(time.Now().Unix())
 	suite.epochLookup = mockmodule.NewEpochLookup(suite.T())
 	suite.beaconKeys = mockstorage.NewSafeBeaconKeys(suite.T())
 	suite.store = NewEpochAwareRandomBeaconKeyStore(suite.epochLookup, suite.beaconKeys)
