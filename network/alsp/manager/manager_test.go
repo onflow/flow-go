@@ -471,7 +471,7 @@ func TestHandleReportedMisbehavior_And_SlashingViolationsConsumer_Integration(t 
 		sporkId,
 		nodes[0],
 		p2pnet.WithAlspConfig(managerCfgFixture(t)),
-		p2pnet.WithSlashingViolationConsumerFactory(func(adapter network.Adapter) network.ViolationsConsumer {
+		p2pnet.WithSlashingViolationConsumerFactory(func(adapter network.ConduitAdapter) network.ViolationsConsumer {
 			violationsConsumer = slashing.NewSlashingViolationsConsumer(unittest.Logger(), metrics.NewNoopCollector(), adapter)
 			return violationsConsumer
 		}))

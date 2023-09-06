@@ -121,7 +121,7 @@ type Network struct {
 
 var _ network.EngineRegistry = &Network{}
 var _ network.Middleware = &Network{}
-var _ network.Adapter = &Network{}
+var _ network.ConduitAdapter = &Network{}
 
 type registerEngineRequest struct {
 	channel          channels.Channel
@@ -165,7 +165,7 @@ type NetworkConfig struct {
 	UnicastMessageTimeout            time.Duration
 	Libp2pNode                       p2p.LibP2PNode
 	BitSwapMetrics                   module.BitswapMetrics
-	SlashingViolationConsumerFactory func(network.Adapter) network.ViolationsConsumer
+	SlashingViolationConsumerFactory func(network.ConduitAdapter) network.ViolationsConsumer
 }
 
 // Validate validates the configuration, and sets default values for any missing fields.
@@ -198,7 +198,7 @@ func WithCodec(codec network.Codec) NetworkConfigOption {
 	}
 }
 
-func WithSlashingViolationConsumerFactory(factory func(adapter network.Adapter) network.ViolationsConsumer) NetworkConfigOption {
+func WithSlashingViolationConsumerFactory(factory func(adapter network.ConduitAdapter) network.ViolationsConsumer) NetworkConfigOption {
 	return func(params *NetworkConfig) {
 		params.SlashingViolationConsumerFactory = factory
 	}

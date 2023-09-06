@@ -84,7 +84,7 @@ func (u *UnicastAuthorizationTestSuite) setupNetworks(slashingViolationsConsumer
 		ids,
 		libP2PNodes,
 		p2pnet.WithCodec(u.codec),
-		p2pnet.WithSlashingViolationConsumerFactory(func(_ network.Adapter) network.ViolationsConsumer {
+		p2pnet.WithSlashingViolationConsumerFactory(func(_ network.ConduitAdapter) network.ViolationsConsumer {
 			return slashingViolationsConsumer
 		}))
 	require.Len(u.T(), ids, 2)

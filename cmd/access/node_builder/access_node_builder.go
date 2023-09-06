@@ -1283,7 +1283,7 @@ func (builder *FlowAccessNodeBuilder) enqueuePublicNetworkInit() {
 					NetworkType:             network.PublicNetwork,
 					HeroCacheMetricsFactory: builder.HeroCacheMetricsFactory(),
 				},
-				SlashingViolationConsumerFactory: func(adapter network.Adapter) network.ViolationsConsumer {
+				SlashingViolationConsumerFactory: func(adapter network.ConduitAdapter) network.ViolationsConsumer {
 					return slashing.NewSlashingViolationsConsumer(builder.Logger, builder.Metrics.Network, adapter)
 				},
 			}, p2pnet.WithMessageValidators(msgValidators...))

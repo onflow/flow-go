@@ -703,7 +703,7 @@ func (builder *FollowerServiceBuilder) enqueuePublicNetworkInit() {
 					HeroCacheMetricsFactory: builder.HeroCacheMetricsFactory(),
 					NetworkType:             network.PublicNetwork,
 				},
-				SlashingViolationConsumerFactory: func(adapter network.Adapter) network.ViolationsConsumer {
+				SlashingViolationConsumerFactory: func(adapter network.ConduitAdapter) network.ViolationsConsumer {
 					return slashing.NewSlashingViolationsConsumer(builder.Logger, builder.Metrics.Network, adapter)
 				},
 			}, p2pnet.WithMessageValidators(publicNetworkMsgValidators(node.Logger, node.IdentityProvider, node.NodeID)...))

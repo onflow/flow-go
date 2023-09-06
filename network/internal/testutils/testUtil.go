@@ -215,7 +215,7 @@ func NetworkConfigFixture(
 			AlspMetrics:             metrics.NewNoopCollector(),
 			HeroCacheMetricsFactory: metrics.NewNoopHeroCacheMetricsFactory(),
 		},
-		SlashingViolationConsumerFactory: func(_ network.Adapter) network.ViolationsConsumer {
+		SlashingViolationConsumerFactory: func(_ network.ConduitAdapter) network.ViolationsConsumer {
 			return mocknetwork.NewViolationsConsumer(t)
 		},
 	}
