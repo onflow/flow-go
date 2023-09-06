@@ -24,7 +24,7 @@ import (
 // splitter engine. As a result, multiple engines can register with the splitter network on
 // the same channel and will each receive all events on that channel.
 type Network struct {
-	net       network.Network
+	net       network.EngineRegistry
 	mu        sync.RWMutex
 	log       zerolog.Logger
 	splitters map[channels.Channel]*splitterEngine.Engine // stores splitters for each channel
@@ -32,11 +32,11 @@ type Network struct {
 	*component.ComponentManager
 }
 
-var _ network.Network = (*Network)(nil)
+var _ network.EngineRegistry = (*Network)(nil)
 
 // NewNetwork returns a new splitter network.
 func NewNetwork(
-	net network.Network,
+	net network.EngineRegistry,
 	log zerolog.Logger,
 ) *Network {
 	n := &Network{

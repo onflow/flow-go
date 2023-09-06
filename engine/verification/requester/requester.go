@@ -67,7 +67,7 @@ type Engine struct {
 
 func New(log zerolog.Logger,
 	state protocol.State,
-	net network.Network,
+	net network.EngineRegistry,
 	tracer module.Tracer,
 	metrics module.VerificationMetrics,
 	pendingRequests mempool.ChunkRequests,

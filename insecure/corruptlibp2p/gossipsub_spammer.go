@@ -64,7 +64,7 @@ func NewGossipSubRouterSpammerWithRpcInspector(t *testing.T, sporkId flow.Identi
 // ctlMessages is the list of spam messages to send to the victim node.
 func (s *GossipSubRouterSpammer) SpamControlMessage(t *testing.T, victim p2p.LibP2PNode, ctlMessages []pb.ControlMessage, msgs ...*pb.Message) {
 	for _, ctlMessage := range ctlMessages {
-		require.True(t, s.router.Get().SendControl(victim.Host().ID(), &ctlMessage, msgs...))
+		require.True(t, s.router.Get().SendControl(victim.ID(), &ctlMessage, msgs...))
 	}
 }
 

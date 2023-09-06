@@ -23,9 +23,10 @@ import (
 	"github.com/onflow/flow-go/model/libp2p/message"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/internal/testutils"
-	"github.com/onflow/flow-go/network/mocknetwork"
 	"github.com/onflow/flow-go/network/p2p"
+	"github.com/onflow/flow-go/network/p2p/p2pnet"
 	mockprotocol "github.com/onflow/flow-go/state/protocol/mock"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -46,13 +47,12 @@ type MutableIdentityTableSuite struct {
 	cancels          []context.CancelFunc
 }
 
-// testNode encapsulates the node state which includes its identity, middleware, network,
+// testNode encapsulates the node state which includes its identity, libp2p node, network,
 // mesh engine and the id refresher
 type testNode struct {
 	id         *flow.Identity
 	libp2pNode p2p.LibP2PNode
-	mw         network.Middleware
-	net        network.Network
+	network    *p2pnet.Network
 	engine     *testutils.MeshEngine
 }
 
@@ -112,12 +112,12 @@ func (t *testNodeList) engines() []*testutils.MeshEngine {
 	return engs
 }
 
-func (t *testNodeList) networks() []network.Network {
+func (t *testNodeList) networks() []network.EngineRegistry {
 	t.RLock()
 	defer t.RUnlock()
-	nets := make([]network.Network, len(t.nodes))
+	nets := make([]network.EngineRegistry, len(t.nodes))
 	for i, node := range t.nodes {
-		nets[i] = node.net
+		nets[i] = node.network
 	}
 	return nets
 }
@@ -140,7 +140,7 @@ func TestMutableIdentityTable(t *testing.T) {
 // signalIdentityChanged update IDs for all the current set of nodes (simulating an epoch)
 func (suite *MutableIdentityTableSuite) signalIdentityChanged() {
 	for _, n := range suite.testNodes.nodes {
-		n.mw.UpdateNodeAddresses()
+		n.network.UpdateNodeAddresses()
 	}
 }
 
@@ -191,31 +191,31 @@ func (suite *MutableIdentityTableSuite) setupStateMock() {
 func (suite *MutableIdentityTableSuite) addNodes(count int) {
 	ctx, cancel := context.WithCancel(context.Background())
 	signalerCtx := irrecoverable.NewMockSignalerContext(suite.T(), ctx)
-
-	// create the ids, middlewares and networks
 	sporkId := unittest.IdentifierFixture()
-	ids, nodes := testutils.LibP2PNodeForMiddlewareFixture(suite.T(), sporkId, count)
-	mws, _ := testutils.MiddlewareFixtures(
-		suite.T(),
-		ids,
-		nodes,
-		testutils.MiddlewareConfigFixture(suite.T(), sporkId),
-		mocknetwork.NewViolationsConsumer(suite.T()))
-	nets := testutils.NetworksFixture(suite.T(), sporkId, ids, mws)
+	ids, nodes := testutils.LibP2PNodeForNetworkFixture(suite.T(), sporkId, count)
+	nets, _ := testutils.NetworksFixture(suite.T(), sporkId, ids, nodes)
 	suite.cancels = append(suite.cancels, cancel)
 
-	testutils.StartNodesAndNetworks(signalerCtx, suite.T(), nodes, nets)
+	// starts the nodes and networks
+	testutils.StartNodes(signalerCtx, suite.T(), nodes)
+	for _, net := range nets {
+		testutils.StartNetworks(signalerCtx, suite.T(), []network.EngineRegistry{net})
+		unittest.RequireComponentsReadyBefore(suite.T(), 1*time.Second, net)
+	}
 
 	// create the engines for the new nodes
-	engines := testutils.GenerateEngines(suite.T(), nets)
+	engines := make([]*testutils.MeshEngine, count)
+	for i, n := range nets {
+		eng := testutils.NewMeshEngine(suite.T(), n, 100, channels.TestNetworkChannel)
+		engines[i] = eng
+	}
 
 	// create the test engines
 	for i := 0; i < count; i++ {
 		node := testNode{
 			id:         ids[i],
 			libp2pNode: nodes[i],
-			mw:         mws[i],
-			net:        nets[i],
+			network:    nets[i],
 			engine:     engines[i],
 		}
 		suite.testNodes.append(node)
@@ -322,7 +322,7 @@ func (suite *MutableIdentityTableSuite) TestNodesAddedAndRemoved() {
 	suite.assertNetworkPrimitives(remainingIDs, remainingEngs, removedIDs, removedEngines)
 }
 
-// assertConnected checks that the middleware of a node is directly connected
+// assertConnected checks that a libp2p node is directly connected
 // to at least half of the other nodes.
 func (suite *MutableIdentityTableSuite) assertConnected(thisNode p2p.LibP2PNode, allNodes []p2p.LibP2PNode) {
 	t := suite.T()
@@ -334,7 +334,7 @@ func (suite *MutableIdentityTableSuite) assertConnected(thisNode p2p.LibP2PNode,
 				// we don't want to check if a node is connected to itself
 				continue
 			}
-			connected, err := thisNode.IsConnected(node.Host().ID())
+			connected, err := thisNode.IsConnected(node.ID())
 			require.NoError(t, err)
 			if connected {
 				connections++
@@ -348,13 +348,13 @@ func (suite *MutableIdentityTableSuite) assertConnected(thisNode p2p.LibP2PNode,
 	}, 5*time.Second, 100*time.Millisecond, "node is not connected to enough nodes")
 }
 
-// assertDisconnected checks that the middleware of a node is not connected to any of the other nodes specified in the
-// ids list
+// assertDisconnected checks that a libp2p node is not connected to any of the other nodes specified in the
+// ids list.
 func (suite *MutableIdentityTableSuite) assertDisconnected(thisNode p2p.LibP2PNode, allNodes []p2p.LibP2PNode) {
 	t := suite.T()
 	require.Eventuallyf(t, func() bool {
 		for _, node := range allNodes {
-			connected, err := thisNode.IsConnected(node.Host().ID())
+			connected, err := thisNode.IsConnected(node.ID())
 			require.NoError(t, err)
 			if connected {
 				return false
