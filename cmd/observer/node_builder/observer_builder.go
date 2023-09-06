@@ -28,6 +28,7 @@ import (
 	recovery "github.com/onflow/flow-go/consensus/recovery/protocol"
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/engine/access/apiproxy"
+	"github.com/onflow/flow-go/engine/access/rest"
 	restapiproxy "github.com/onflow/flow-go/engine/access/rest/apiproxy"
 	"github.com/onflow/flow-go/engine/access/rest/routes"
 	"github.com/onflow/flow-go/engine/access/rpc"
@@ -116,7 +117,6 @@ func DefaultObserverServiceConfig() *ObserverServiceConfig {
 			UnsecureGRPCListenAddr: "0.0.0.0:9000",
 			SecureGRPCListenAddr:   "0.0.0.0:9001",
 			HTTPListenAddr:         "0.0.0.0:8000",
-			RESTListenAddr:         "",
 			CollectionAddr:         "",
 			HistoricalAccessAddrs:  "",
 			BackendConfig: backend.Config{
@@ -127,6 +127,12 @@ func DefaultObserverServiceConfig() *ObserverServiceConfig {
 				PreferredExecutionNodeIDs: nil,
 				FixedExecutionNodeIDs:     nil,
 				ArchiveAddressList:        nil,
+			},
+			RestConfig: rest.Config{
+				ListenAddress: "",
+				WriteTimeout:  rest.DefaultWriteTimeout,
+				ReadTimeout:   rest.DefaultReadTimeout,
+				IdleTimeout:   rest.DefaultIdleTimeout,
 			},
 			MaxMsgSize: grpcutils.DefaultMaxMsgSize,
 		},
@@ -458,7 +464,10 @@ func (builder *ObserverServiceBuilder) extraFlags() {
 		flags.StringVarP(&builder.rpcConf.UnsecureGRPCListenAddr, "rpc-addr", "r", defaultConfig.rpcConf.UnsecureGRPCListenAddr, "the address the unsecured gRPC server listens on")
 		flags.StringVar(&builder.rpcConf.SecureGRPCListenAddr, "secure-rpc-addr", defaultConfig.rpcConf.SecureGRPCListenAddr, "the address the secure gRPC server listens on")
 		flags.StringVarP(&builder.rpcConf.HTTPListenAddr, "http-addr", "h", defaultConfig.rpcConf.HTTPListenAddr, "the address the http proxy server listens on")
-		flags.StringVar(&builder.rpcConf.RESTListenAddr, "rest-addr", defaultConfig.rpcConf.RESTListenAddr, "the address the REST server listens on (if empty the REST server will not be started)")
+		flags.StringVar(&builder.rpcConf.RestConfig.ListenAddress, "rest-addr", defaultConfig.rpcConf.RestConfig.ListenAddress, "the address the REST server listens on (if empty the REST server will not be started)")
+		flags.DurationVar(&builder.rpcConf.RestConfig.WriteTimeout, "rest-write-timeout", defaultConfig.rpcConf.RestConfig.WriteTimeout, "timeout to use when writing REST response")
+		flags.DurationVar(&builder.rpcConf.RestConfig.ReadTimeout, "rest-read-timeout", defaultConfig.rpcConf.RestConfig.ReadTimeout, "timeout to use when reading REST request headers")
+		flags.DurationVar(&builder.rpcConf.RestConfig.IdleTimeout, "rest-idle-timeout", defaultConfig.rpcConf.RestConfig.IdleTimeout, "idle timeout for REST connections")
 		flags.UintVar(&builder.rpcConf.MaxMsgSize, "rpc-max-message-size", defaultConfig.rpcConf.MaxMsgSize, "the maximum message size in bytes for messages sent or received over grpc")
 		flags.UintVar(&builder.rpcConf.BackendConfig.ConnectionPoolSize, "connection-pool-size", defaultConfig.rpcConf.BackendConfig.ConnectionPoolSize, "maximum number of connections allowed in the connection pool, size of 0 disables the connection pooling, and anything less than the default size will be overridden to use the default size")
 		flags.UintVar(&builder.rpcConf.BackendConfig.MaxHeightRange, "rpc-max-height-range", defaultConfig.rpcConf.BackendConfig.MaxHeightRange, "maximum size for height range requests")
@@ -929,28 +938,27 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 			),
 		}
 
-		accessBackend := backend.New(
-			node.State,
-			nil,
-			nil,
-			node.Storage.Blocks,
-			node.Storage.Headers,
-			node.Storage.Collections,
-			node.Storage.Transactions,
-			node.Storage.Receipts,
-			node.Storage.Results,
-			node.RootChainID,
-			accessMetrics,
-			connFactory,
-			false,
-			backendConfig.MaxHeightRange,
-			backendConfig.PreferredExecutionNodeIDs,
-			backendConfig.FixedExecutionNodeIDs,
-			node.Logger,
-			backend.DefaultSnapshotHistoryLimit,
-			backendConfig.ArchiveAddressList,
-			backendConfig.ScriptExecValidation,
-			backendConfig.CircuitBreakerConfig.Enabled)
+		accessBackend := backend.New(backend.Params{
+			State:                     node.State,
+			Blocks:                    node.Storage.Blocks,
+			Headers:                   node.Storage.Headers,
+			Collections:               node.Storage.Collections,
+			Transactions:              node.Storage.Transactions,
+			ExecutionReceipts:         node.Storage.Receipts,
+			ExecutionResults:          node.Storage.Results,
+			ChainID:                   node.RootChainID,
+			AccessMetrics:             accessMetrics,
+			ConnFactory:               connFactory,
+			RetryEnabled:              false,
+			MaxHeightRange:            backendConfig.MaxHeightRange,
+			PreferredExecutionNodeIDs: backendConfig.PreferredExecutionNodeIDs,
+			FixedExecutionNodeIDs:     backendConfig.FixedExecutionNodeIDs,
+			Log:                       node.Logger,
+			SnapshotHistoryLimit:      backend.DefaultSnapshotHistoryLimit,
+			ArchiveAddressList:        backendConfig.ArchiveAddressList,
+			Communicator:              backend.NewNodeCommunicator(backendConfig.CircuitBreakerConfig.Enabled),
+			ScriptExecValidation:      backendConfig.ScriptExecValidation,
+		})
 
 		observerCollector := metrics.NewObserverCollector()
 		restHandler, err := restapiproxy.NewRestProxyHandler(
