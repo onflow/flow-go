@@ -11,9 +11,9 @@
 
 // make sure flow crypto types are consistent with BLST types
 void types_sanity(void) {
-  assert(sizeof(Fp)==sizeof(vec384));
-  assert(sizeof(E1)==sizeof(POINTonE1));
-  assert(sizeof(E2)==sizeof(POINTonE2));
+  assert(sizeof(Fp) == sizeof(vec384));
+  assert(sizeof(E1) == sizeof(POINTonE1));
+  assert(sizeof(E2) == sizeof(POINTonE2));
 }
 
 // ------------------- Fr utilities
@@ -140,11 +140,11 @@ ERROR Fr_read_bytes(Fr *a, const byte *bin, int len) {
   if (len != Fr_BYTES) {
     return BAD_ENCODING;
   }
-  // compare to r using the BLST tool 
+  // compare to r using the BLST tool
   pow256 tmp;
   pow256_from_be_bytes(tmp, bin);
   // (check_mod_256 compares pow256 against a vec256!)
-  if (!check_mod_256(tmp, BLS12_381_r)) { 
+  if (!check_mod_256(tmp, BLS12_381_r)) {
     return BAD_VALUE;
   }
   vec_zero(tmp, sizeof(tmp));
@@ -179,8 +179,8 @@ void Fr_write_bytes(byte *bin, const Fr *a) {
 // maps big-endian bytes of any size into an Fr element using modular reduction.
 // Input is byte-big-endian, output is Fr (internally vec256).
 //
-// Note: could use redc_mont_256(vec256 ret, const vec512 a, const vec256 p, limb_t
-// n0) to reduce 512 bits at a time.
+// Note: could use redc_mont_256(vec256 ret, const vec512 a, const vec256 p,
+// limb_t n0) to reduce 512 bits at a time.
 static void Fr_from_be_bytes(Fr *out, const byte *bytes, size_t n) {
   // input can be written in base 2^|R|, with R the Montgomery constant
   // N = l_1 + L_2*2^|R| .. + L_n*2^(|R|*(n-1))
@@ -1047,7 +1047,8 @@ void Fp12_multi_pairing(Fp12 *res, const E1 *p, const E2 *q, const int len) {
     E2_to_affine(&tmp2, q + i);
     vec_copy(q_aff + n, &tmp2, sizeof(POINTonE2_affine));
     n++;
-    if (n == N_MAX) { // if p_aff and q_aff are filled, batch `N_MAX` miller loops
+    // if p_aff and q_aff are filled, batch `N_MAX` miller loops
+    if (n == N_MAX) {
       if (!init_flag) {
         miller_loop_n(res_vec, q_aff, p_aff, N_MAX);
         init_flag = 1;

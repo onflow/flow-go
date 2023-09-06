@@ -45,11 +45,13 @@ typedef enum {
 
 // Compressed and uncompressed points
 #define UNCOMPRESSED 0
-#define COMPRESSED (UNCOMPRESSED^1)
+#define COMPRESSED (UNCOMPRESSED ^ 1)
 #define G1_SERIALIZATION (COMPRESSED)
 #define G2_SERIALIZATION (COMPRESSED)
-#define G1_SER_BYTES (G1_SERIALIZATION==UNCOMPRESSED ? G1_BYTES : (G1_BYTES/2))
-#define G2_SER_BYTES (G2_SERIALIZATION==UNCOMPRESSED ? G2_BYTES : (G2_BYTES/2))
+#define G1_SER_BYTES                                                           \
+  (G1_SERIALIZATION == UNCOMPRESSED ? G1_BYTES : (G1_BYTES / 2))
+#define G2_SER_BYTES                                                           \
+  (G2_SERIALIZATION == UNCOMPRESSED ? G2_BYTES : (G2_BYTES / 2))
 
 // init-related functions
 void types_sanity(void);
