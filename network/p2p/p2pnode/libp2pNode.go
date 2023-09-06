@@ -90,8 +90,6 @@ func NewNode(
 	}
 }
 
-var _ p2p.LibP2PNode = (*Node)(nil)
-
 func (n *Node) Start(ctx irrecoverable.SignalerContext) {
 	n.Component.Start(ctx)
 }
