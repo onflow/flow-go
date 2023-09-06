@@ -68,13 +68,26 @@ void G2_vector_write_bytes(byte *out, const E2 *A, const int len) {
 // The function imports an array of `n` E2 points from a concatenated array of
 // bytes. The bytes array is supposed to be of size (n * G2_SER_BYTES).
 // 
-// If return is `VALID`, output vector is guaranteed to be in E2.
-ERROR E2_vector_read_bytes(E2 *A, const byte *src, const int n) {
+// If return is `VALID`, output vector is guaranteed to be in G2.
+// It returns other errors if at least one input isn't a serialization of a E2 
+// point, or an input E2 point isn't in G2.
+// returns:
+//    - BAD_ENCODING if the serialization header bits of at least one input are invalid.
+//    - BAD_VALUE if Fp^2 coordinates of at least one input couldn't deserialize.
+//    - POINT_NOT_ON_CURVE if  at least one input deserialized point isn't on E2.
+//    - POINT_NOT_IN_GROUP if at least one E2 point isn't in G2.
+//    - VALID if deserialization of all points to G2 is valid.
+ERROR G2_vector_read_bytes(E2 *A, const byte *src, const int n) {
   byte *p = (byte *)src;
   for (int i = 0; i < n; i++) {
     int read_ret = E2_read_bytes(&A[i], p, G2_SER_BYTES);
-    if (read_ret != VALID)
+    if (read_ret != VALID) {
       return read_ret;
+    }
+    if (!E2_in_G2(&A[i])) {
+      return POINT_NOT_IN_GROUP;
+    }
+
     p += G2_SER_BYTES;
   }
   // TODO: add G2 subgroup check?
