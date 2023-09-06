@@ -366,7 +366,6 @@ func EnsureStreamCreation(t *testing.T, ctx context.Context, from []p2p.LibP2PNo
 				return nil
 			})
 			require.NoError(t, err)
-
 		}
 	}
 }
