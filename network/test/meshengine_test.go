@@ -14,9 +14,7 @@ import (
 	"github.com/ipfs/go-log"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/rs/zerolog"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/stretchr/testify/suite"
 
 	"github.com/onflow/flow-go/config"
 	"github.com/onflow/flow-go/model/flow"
@@ -35,27 +33,10 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-// MeshEngineTestSuite evaluates the message delivery functionality for the overlay
-// of engines over a complete graph
-type MeshEngineTestSuite struct {
-	suite.Suite
-	testutils.ConduitWrapper                   // used as a wrapper around conduit methods
-	networks                 []*p2pnet.Network // used to keep track of the networks
-	libp2pNodes              []p2p.LibP2PNode  // used to keep track of the libp2p nodes
-	ids                      flow.IdentityList // used to keep track of the identifiers associated with networks
-	obs                      chan string       // used to keep track of Protect events tagged by pubsub messages
-	cancel                   context.CancelFunc
-}
-
-// TestMeshNetTestSuite runs all tests in this test suit
-func TestMeshNetTestSuite(t *testing.T) {
-	suite.Run(t, new(MeshEngineTestSuite))
-}
-
-// SetupTest is executed prior to each test in this test suite. It creates and initializes
+// setupNodesAndNetworks is executed prior to each test in this test suite. It creates and initializes
 // a set of network instances, sets up connection managers, nodes, identities, observables, etc.
 // This setup ensures that all necessary configurations are in place before running the tests.
-func (suite *MeshEngineTestSuite) SetupTest() {
+func setupNodesAndNetworks(t *testing.T, ctx context.Context) ([]*p2pnet.Network, []p2p.LibP2PNode, flow.IdentityList, chan string) {
 	// defines total number of nodes in our network (minimum 3 needed to use 1-k messaging)
 	const count = 10
 	logger := zerolog.New(os.Stderr).Level(zerolog.ErrorLevel)
@@ -78,10 +59,7 @@ func (suite *MeshEngineTestSuite) SetupTest() {
 		log:  logger,
 	}
 
-	ctx, cancel := context.WithCancel(context.Background())
-	suite.cancel = cancel
-
-	signalerCtx := irrecoverable.NewMockSignalerContext(suite.T(), ctx)
+	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
 
 	sporkId := unittest.IdentifierFixture()
 	libP2PNodes := make([]p2p.LibP2PNode, 0)
@@ -89,7 +67,7 @@ func (suite *MeshEngineTestSuite) SetupTest() {
 	tagObservables := make([]observable.Observable, 0)
 	idProvider := unittest.NewUpdatableIDProvider(flow.IdentityList{})
 	defaultFlowConfig, err := config.DefaultConfig()
-	require.NoError(suite.T(), err)
+	require.NoError(t, err)
 	opts := []p2ptest.NodeFixtureParameterOption{p2ptest.WithUnicastHandlerFunc(nil)}
 
 	for i := 0; i < count; i++ {
@@ -97,12 +75,12 @@ func (suite *MeshEngineTestSuite) SetupTest() {
 			unittest.Logger(),
 			metrics.NewNoopCollector(),
 			&defaultFlowConfig.NetworkConfig.ConnectionManagerConfig)
-		require.NoError(suite.T(), err)
+		require.NoError(t, err)
 
 		opts = append(opts, p2ptest.WithConnectionManager(connManager))
-		node, nodeId := p2ptest.NodeFixture(suite.T(),
+		node, nodeId := p2ptest.NodeFixture(t,
 			sporkId,
-			suite.T().Name(),
+			t.Name(),
 			idProvider,
 			opts...)
 		libP2PNodes = append(libP2PNodes, node)
@@ -110,102 +88,199 @@ func (suite *MeshEngineTestSuite) SetupTest() {
 		tagObservables = append(tagObservables, connManager)
 	}
 	idProvider.SetIdentities(identities)
-
-	suite.libp2pNodes = libP2PNodes
-	suite.ids = identities
-
-	suite.networks, _ = testutils.NetworksFixture(suite.T(), sporkId, suite.ids, suite.libp2pNodes)
+	networks, _ := testutils.NetworksFixture(t, sporkId, identities, libP2PNodes)
 	// starts the nodes and networks
-	testutils.StartNodes(signalerCtx, suite.T(), suite.libp2pNodes)
-	for _, net := range suite.networks {
-		testutils.StartNetworks(signalerCtx, suite.T(), []network.EngineRegistry{net})
-		unittest.RequireComponentsReadyBefore(suite.T(), 1*time.Second, net)
+	testutils.StartNodes(signalerCtx, t, libP2PNodes)
+	for _, net := range networks {
+		testutils.StartNetworks(signalerCtx, t, []network.EngineRegistry{net})
+		unittest.RequireComponentsReadyBefore(t, 1*time.Second, net)
 	}
 
 	for _, observableConnMgr := range tagObservables {
 		observableConnMgr.Subscribe(&ob)
 	}
-	suite.obs = peerChannel
-}
-
-// TearDownTest closes the networks within a specified timeout
-func (suite *MeshEngineTestSuite) TearDownTest() {
-	suite.cancel()
-	testutils.StopComponents(suite.T(), suite.networks, 3*time.Second)
-	testutils.StopComponents(suite.T(), suite.libp2pNodes, 3*time.Second)
+	return networks, libP2PNodes, identities, peerChannel
 }
 
 // TestAllToAll_Publish evaluates the network of mesh engines against allToAllScenario scenario.
 // Network instances during this test use their Publish method to disseminate messages.
-func (suite *MeshEngineTestSuite) TestAllToAll_Publish() {
-	suite.allToAllScenario(suite.Publish)
+func TestAllToAll_Publish(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	networks, libp2pNodes, ids, obs := setupNodesAndNetworks(t, ctx)
+	conduit := testutils.ConduitWrapper{}
+	allToAllScenario(t, conduit.Publish, networks, ids, obs)
+
+	defer func() {
+		cancel()
+		testutils.StopComponents(t, networks, 3*time.Second)
+		testutils.StopComponents(t, libp2pNodes, 3*time.Second)
+	}()
 }
 
 // TestAllToAll_Multicast evaluates the network of mesh engines against allToAllScenario scenario.
 // Network instances during this test use their Multicast method to disseminate messages.
-func (suite *MeshEngineTestSuite) TestAllToAll_Multicast() {
-	suite.allToAllScenario(suite.Multicast)
+func TestAllToAll_Multicast(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	networks, libp2pNodes, ids, obs := setupNodesAndNetworks(t, ctx)
+	conduit := testutils.ConduitWrapper{}
+	allToAllScenario(t, conduit.Multicast, networks, ids, obs)
+
+	defer func() {
+		cancel()
+		testutils.StopComponents(t, networks, 3*time.Second)
+		testutils.StopComponents(t, libp2pNodes, 3*time.Second)
+	}()
 }
 
 // TestAllToAll_Unicast evaluates the network of mesh engines against allToAllScenario scenario.
 // Network instances during this test use their Unicast method to disseminate messages.
-func (suite *MeshEngineTestSuite) TestAllToAll_Unicast() {
-	suite.allToAllScenario(suite.Unicast)
+func TestAllToAll_Unicast(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	networks, libp2pNodes, ids, obs := setupNodesAndNetworks(t, ctx)
+	conduit := testutils.ConduitWrapper{}
+	allToAllScenario(t, conduit.Unicast, networks, ids, obs)
+
+	defer func() {
+		cancel()
+		testutils.StopComponents(t, networks, 3*time.Second)
+		testutils.StopComponents(t, libp2pNodes, 3*time.Second)
+	}()
 }
 
 // TestTargetedValidators_Unicast tests if only the intended recipients in a 1-k messaging actually receive the message.
 // The messages are disseminated through the Unicast method of conduits.
-func (suite *MeshEngineTestSuite) TestTargetedValidators_Unicast() {
-	suite.targetValidatorScenario(suite.Unicast)
+func TestTargetedValidators_Unicast(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	networks, libp2pNodes, ids, obs := setupNodesAndNetworks(t, ctx)
+	conduit := testutils.ConduitWrapper{}
+	targetValidatorScenario(t, conduit.Unicast, networks, ids, obs)
+
+	defer func() {
+		cancel()
+		testutils.StopComponents(t, networks, 3*time.Second)
+		testutils.StopComponents(t, libp2pNodes, 3*time.Second)
+	}()
 }
 
 // TestTargetedValidators_Multicast tests if only the intended recipients in a 1-k messaging actually receive the
 // message.
 // The messages are disseminated through the Multicast method of conduits.
-func (suite *MeshEngineTestSuite) TestTargetedValidators_Multicast() {
-	suite.targetValidatorScenario(suite.Multicast)
+func TestTargetedValidators_Multicast(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	networks, libp2pNodes, ids, obs := setupNodesAndNetworks(t, ctx)
+	conduit := testutils.ConduitWrapper{}
+	targetValidatorScenario(t, conduit.Multicast, networks, ids, obs)
+
+	defer func() {
+		cancel()
+		testutils.StopComponents(t, networks, 3*time.Second)
+		testutils.StopComponents(t, libp2pNodes, 3*time.Second)
+	}()
 }
 
 // TestTargetedValidators_Publish tests if only the intended recipients in a 1-k messaging actually receive the message.
 // The messages are disseminated through the Multicast method of conduits.
-func (suite *MeshEngineTestSuite) TestTargetedValidators_Publish() {
-	suite.targetValidatorScenario(suite.Publish)
+func TestTargetedValidators_Publish(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	networks, libp2pNodes, ids, obs := setupNodesAndNetworks(t, ctx)
+	conduit := testutils.ConduitWrapper{}
+	targetValidatorScenario(t, conduit.Publish, networks, ids, obs)
+
+	defer func() {
+		cancel()
+		testutils.StopComponents(t, networks, 3*time.Second)
+		testutils.StopComponents(t, libp2pNodes, 3*time.Second)
+	}()
 }
 
 // TestMaxMessageSize_Unicast evaluates the messageSizeScenario scenario using
 // the Unicast method of conduits.
-func (suite *MeshEngineTestSuite) TestMaxMessageSize_Unicast() {
-	suite.messageSizeScenario(suite.Unicast, p2pnet.DefaultMaxUnicastMsgSize)
+func TestMaxMessageSize_Unicast(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	networks, libp2pNodes, ids, obs := setupNodesAndNetworks(t, ctx)
+	conduit := testutils.ConduitWrapper{}
+	messageSizeScenario(t, p2pnode.DefaultMaxPubSubMsgSize, conduit.Unicast, networks, ids, obs)
+
+	defer func() {
+		cancel()
+		testutils.StopComponents(t, networks, 3*time.Second)
+		testutils.StopComponents(t, libp2pNodes, 3*time.Second)
+	}()
 }
 
 // TestMaxMessageSize_Multicast evaluates the messageSizeScenario scenario using
 // the Multicast method of conduits.
-func (suite *MeshEngineTestSuite) TestMaxMessageSize_Multicast() {
-	suite.messageSizeScenario(suite.Multicast, p2pnode.DefaultMaxPubSubMsgSize)
+func TestMaxMessageSize_Multicast(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	networks, libp2pNodes, ids, obs := setupNodesAndNetworks(t, ctx)
+	conduit := testutils.ConduitWrapper{}
+	messageSizeScenario(t, p2pnode.DefaultMaxPubSubMsgSize, conduit.Multicast, networks, ids, obs)
+
+	defer func() {
+		cancel()
+		testutils.StopComponents(t, networks, 3*time.Second)
+		testutils.StopComponents(t, libp2pNodes, 3*time.Second)
+	}()
 }
 
 // TestMaxMessageSize_Publish evaluates the messageSizeScenario scenario using the
 // Publish method of conduits.
-func (suite *MeshEngineTestSuite) TestMaxMessageSize_Publish() {
-	suite.messageSizeScenario(suite.Publish, p2pnode.DefaultMaxPubSubMsgSize)
+func TestMaxMessageSize_Publish(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	networks, libp2pNodes, ids, obs := setupNodesAndNetworks(t, ctx)
+	conduit := testutils.ConduitWrapper{}
+	messageSizeScenario(t, p2pnode.DefaultMaxPubSubMsgSize, conduit.Publish, networks, ids, obs)
+
+	defer func() {
+		cancel()
+		testutils.StopComponents(t, networks, 3*time.Second)
+		testutils.StopComponents(t, libp2pNodes, 3*time.Second)
+	}()
 }
 
 // TestUnregister_Publish tests that an engine cannot send any message using Publish
 // or receive any messages after the conduit is closed
-func (suite *MeshEngineTestSuite) TestUnregister_Publish() {
-	suite.conduitCloseScenario(suite.Publish)
+func TestUnregister_Publish(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	networks, libp2pNodes, ids, obs := setupNodesAndNetworks(t, ctx)
+	conduit := testutils.ConduitWrapper{}
+	conduitCloseScenario(t, conduit.Publish, networks, ids, obs)
+
+	defer func() {
+		cancel()
+		testutils.StopComponents(t, networks, 3*time.Second)
+		testutils.StopComponents(t, libp2pNodes, 3*time.Second)
+	}()
 }
 
 // TestUnregister_Publish tests that an engine cannot send any message using Multicast
 // or receive any messages after the conduit is closed
-func (suite *MeshEngineTestSuite) TestUnregister_Multicast() {
-	suite.conduitCloseScenario(suite.Multicast)
+func TestUnregister_Multicast(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	networks, libp2pNodes, ids, obs := setupNodesAndNetworks(t, ctx)
+	conduit := testutils.ConduitWrapper{}
+	conduitCloseScenario(t, conduit.Multicast, networks, ids, obs)
+
+	defer func() {
+		cancel()
+		testutils.StopComponents(t, networks, 3*time.Second)
+		testutils.StopComponents(t, libp2pNodes, 3*time.Second)
+	}()
 }
 
 // TestUnregister_Publish tests that an engine cannot send any message using Unicast
 // or receive any messages after the conduit is closed
-func (suite *MeshEngineTestSuite) TestUnregister_Unicast() {
-	suite.conduitCloseScenario(suite.Unicast)
+func TestUnregister_Unicast(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	networks, libp2pNodes, ids, obs := setupNodesAndNetworks(t, ctx)
+	conduit := testutils.ConduitWrapper{}
+	conduitCloseScenario(t, conduit.Unicast, networks, ids, obs)
+
+	defer func() {
+		cancel()
+		testutils.StopComponents(t, networks, 3*time.Second)
+		testutils.StopComponents(t, libp2pNodes, 3*time.Second)
+	}()
 }
 
 // allToAllScenario creates a complete mesh of the engines, where each engine x sends a
@@ -213,19 +288,19 @@ func (suite *MeshEngineTestSuite) TestUnregister_Unicast() {
 // delivery as well as the content of the messages. This scenario tests the capability of
 // the engines to communicate in a fully connected graph, ensuring both the reachability
 // of messages and the integrity of their contents.
-func (suite *MeshEngineTestSuite) allToAllScenario(send testutils.ConduitSendWrapperFunc) {
+func allToAllScenario(t *testing.T, send testutils.ConduitSendWrapperFunc, networks []*p2pnet.Network, ids flow.IdentityList, obs chan string) {
 	// allows nodes to find each other in case of Mulitcast and Publish
 	testutils.OptionalSleep(send)
 
 	// creating engines
-	count := len(suite.networks)
+	count := len(networks)
 	engs := make([]*testutils.MeshEngine, 0)
 	wg := sync.WaitGroup{}
 
 	// logs[i][j] keeps the message that node i sends to node j
 	logs := make(map[int][]string)
-	for i := range suite.networks {
-		eng := testutils.NewMeshEngine(suite.Suite.T(), suite.networks[i], count-1, channels.TestNetworkChannel)
+	for i := range networks {
+		eng := testutils.NewMeshEngine(t, networks[i], count-1, channels.TestNetworkChannel)
 		engs = append(engs, eng)
 		logs[i] = make([]string, 0)
 	}
@@ -234,26 +309,26 @@ func (suite *MeshEngineTestSuite) allToAllScenario(send testutils.ConduitSendWra
 	// each node will register ~D protect messages, where D is the default out-degree
 	for i := 0; i < pubsub.GossipSubD*count; i++ {
 		select {
-		case <-suite.obs:
+		case <-obs:
 		case <-time.After(8 * time.Second):
-			assert.FailNow(suite.T(), "could not receive pubsub tag indicating mesh formed")
+			require.FailNow(t, "could not receive pubsub tag indicating mesh formed")
 		}
 	}
 
 	// Each node broadcasting a message to all others
-	for i := range suite.networks {
+	for i := range networks {
 		event := &message.TestMessage{
 			Text: fmt.Sprintf("hello from node %v", i),
 		}
 
 		// others keeps the identifier of all nodes except ith node
-		others := suite.ids.Filter(filter.Not(filter.HasNodeID(suite.ids[i].NodeID))).NodeIDs()
-		require.NoError(suite.Suite.T(), send(event, engs[i].Con, others...))
+		others := ids.Filter(filter.Not(filter.HasNodeID(ids[i].NodeID))).NodeIDs()
+		require.NoError(t, send(event, engs[i].Con, others...))
 		wg.Add(count - 1)
 	}
 
 	// fires a goroutine for each engine that listens to incoming messages
-	for i := range suite.networks {
+	for i := range networks {
 		go func(e *testutils.MeshEngine) {
 			for x := 0; x < count-1; x++ {
 				<-e.Received
@@ -262,32 +337,34 @@ func (suite *MeshEngineTestSuite) allToAllScenario(send testutils.ConduitSendWra
 		}(engs[i])
 	}
 
-	unittest.AssertReturnsBefore(suite.Suite.T(), wg.Wait, 30*time.Second)
+	unittest.RequireReturnsBefore(t, wg.Wait, 30*time.Second, "message not received")
 
 	// evaluates that all messages are received
 	for index, e := range engs {
 		// confirms the number of received messages at each node
 		if len(e.Event) != (count - 1) {
-			assert.Fail(suite.Suite.T(),
+			require.Fail(t,
 				fmt.Sprintf("Message reception mismatch at node %v. Expected: %v, Got: %v", index, count-1, len(e.Event)))
 		}
 
 		for i := 0; i < count-1; i++ {
-			assertChannelReceived(suite.T(), e, channels.TestNetworkChannel)
+			unittest.RequireReturnsBefore(t, func() {
+				require.Equal(t, channels.TestNetworkChannel, <-e.Channel)
+			}, 1*time.Second, "channel mismatch")
 		}
 
 		// extracts failed messages
 		receivedIndices, err := extractSenderID(count, e.Event, "hello from node")
-		require.NoError(suite.Suite.T(), err)
+		require.NoError(t, err)
 
 		for j := 0; j < count; j++ {
 			// evaluates self-gossip
 			if j == index {
-				assert.False(suite.Suite.T(), (receivedIndices)[index], fmt.Sprintf("self gossiped for node %v detected", index))
+				require.False(t, (receivedIndices)[index], fmt.Sprintf("self gossiped for node %v detected", index))
 			}
 			// evaluates content
 			if !(receivedIndices)[j] {
-				assert.False(suite.Suite.T(), (receivedIndices)[index],
+				require.False(t, (receivedIndices)[index],
 					fmt.Sprintf("Message not found in node #%v's messages. Expected: Message from node %v. Got: No message", index, j))
 			}
 		}
@@ -298,29 +375,29 @@ func (suite *MeshEngineTestSuite) allToAllScenario(send testutils.ConduitSendWra
 // based on identifiers list.
 // It then verifies that only the intended recipients receive the message.
 // Message dissemination is done using the send wrapper of conduit.
-func (suite *MeshEngineTestSuite) targetValidatorScenario(send testutils.ConduitSendWrapperFunc) {
+func targetValidatorScenario(t *testing.T, send testutils.ConduitSendWrapperFunc, networks []*p2pnet.Network, ids flow.IdentityList, obs chan string) {
 	// creating engines
-	count := len(suite.networks)
-	engs := make([]*testutils.MeshEngine, 0)
+	count := len(networks)
+	meshEngines := make([]*testutils.MeshEngine, 0)
 	wg := sync.WaitGroup{}
 
-	for i := range suite.networks {
-		eng := testutils.NewMeshEngine(suite.Suite.T(), suite.networks[i], count-1, channels.TestNetworkChannel)
-		engs = append(engs, eng)
+	for i := range networks {
+		eng := testutils.NewMeshEngine(t, networks[i], count-1, channels.TestNetworkChannel)
+		meshEngines = append(meshEngines, eng)
 	}
 
 	// allow nodes to heartbeat and discover each other
 	// each node will register ~D protect messages, where D is the default out-degree
 	for i := 0; i < pubsub.GossipSubD*count; i++ {
 		select {
-		case <-suite.obs:
+		case <-obs:
 		case <-time.After(2 * time.Second):
-			assert.FailNow(suite.T(), "could not receive pubsub tag indicating mesh formed")
+			require.FailNow(t, "could not receive pubsub tag indicating mesh formed")
 		}
 	}
 
 	// choose half of the nodes as target
-	allIds := suite.ids.NodeIDs()
+	allIds := ids.NodeIDs()
 	var targets []flow.Identifier
 	// create a target list of half of the nodes
 	for i := 0; i < len(allIds)/2; i++ {
@@ -331,7 +408,7 @@ func (suite *MeshEngineTestSuite) targetValidatorScenario(send testutils.Conduit
 	event := &message.TestMessage{
 		Text: "hello from node 0",
 	}
-	require.NoError(suite.Suite.T(), send(event, engs[len(engs)-1].Con, targets...))
+	require.NoError(t, send(event, meshEngines[len(meshEngines)-1].Con, targets...))
 
 	// fires a goroutine for all engines to listens for the incoming message
 	for i := 0; i < len(allIds)/2; i++ {
@@ -339,18 +416,20 @@ func (suite *MeshEngineTestSuite) targetValidatorScenario(send testutils.Conduit
 		go func(e *testutils.MeshEngine) {
 			<-e.Received
 			wg.Done()
-		}(engs[i])
+		}(meshEngines[i])
 	}
 
-	unittest.AssertReturnsBefore(suite.T(), wg.Wait, 10*time.Second)
+	unittest.RequireReturnsBefore(t, wg.Wait, 10*time.Second, "message not received")
 
 	// evaluates that all messages are received
-	for index, e := range engs {
-		if index < len(engs)/2 {
-			assert.Len(suite.Suite.T(), e.Event, 1, fmt.Sprintf("message not received %v", index))
-			assertChannelReceived(suite.T(), e, channels.TestNetworkChannel)
+	for index, e := range meshEngines {
+		if index < len(meshEngines)/2 {
+			require.Len(t, e.Event, 1, fmt.Sprintf("message not received %v", index))
+			unittest.RequireReturnsBefore(t, func() {
+				require.Equal(t, channels.TestNetworkChannel, <-e.Channel)
+			}, 1*time.Second, "channel mismatch")
 		} else {
-			assert.Len(suite.Suite.T(), e.Event, 0, fmt.Sprintf("message received when none was expected %v", index))
+			require.Len(t, e.Event, 0, fmt.Sprintf("message received when none was expected %v", index))
 		}
 	}
 }
@@ -358,39 +437,39 @@ func (suite *MeshEngineTestSuite) targetValidatorScenario(send testutils.Conduit
 // messageSizeScenario provides a scenario to check if a message of maximum permissible size can be sent
 // successfully.
 // It broadcasts a message from the first node to all the nodes in the identifiers list using send wrapper function.
-func (suite *MeshEngineTestSuite) messageSizeScenario(send testutils.ConduitSendWrapperFunc, size uint) {
+func messageSizeScenario(t *testing.T, size uint, send testutils.ConduitSendWrapperFunc, networks []*p2pnet.Network, ids flow.IdentityList, obs chan string) {
 	// creating engines
-	count := len(suite.networks)
-	engs := make([]*testutils.MeshEngine, 0)
+	count := len(networks)
+	meshEngines := make([]*testutils.MeshEngine, 0)
 	wg := sync.WaitGroup{}
 
-	for i := range suite.networks {
-		eng := testutils.NewMeshEngine(suite.Suite.T(), suite.networks[i], count-1, channels.TestNetworkChannel)
-		engs = append(engs, eng)
+	for i := range networks {
+		eng := testutils.NewMeshEngine(t, networks[i], count-1, channels.TestNetworkChannel)
+		meshEngines = append(meshEngines, eng)
 	}
 
 	// allow nodes to heartbeat and discover each other
 	// each node will register ~D protect messages per mesh setup, where D is the default out-degree
 	for i := 0; i < pubsub.GossipSubD*count; i++ {
 		select {
-		case <-suite.obs:
+		case <-obs:
 		case <-time.After(8 * time.Second):
-			assert.FailNow(suite.T(), "could not receive pubsub tag indicating mesh formed")
+			require.FailNow(t, "could not receive pubsub tag indicating mesh formed")
 		}
 	}
 	// others keeps the identifier of all nodes except node that is sender.
-	others := suite.ids.Filter(filter.Not(filter.HasNodeID(suite.ids[0].NodeID))).NodeIDs()
+	others := ids.Filter(filter.Not(filter.HasNodeID(ids[0].NodeID))).NodeIDs()
 
 	// generates and sends an event of custom size to the network
-	payload := testutils.NetworkPayloadFixture(suite.T(), size)
+	payload := testutils.NetworkPayloadFixture(t, size)
 	event := &message.TestMessage{
 		Text: string(payload),
 	}
 
-	require.NoError(suite.T(), send(event, engs[0].Con, others...))
+	require.NoError(t, send(event, meshEngines[0].Con, others...))
 
 	// fires a goroutine for all engines (except sender) to listen for the incoming message
-	for _, eng := range engs[1:] {
+	for _, eng := range meshEngines[1:] {
 		wg.Add(1)
 		go func(e *testutils.MeshEngine) {
 			<-e.Received
@@ -398,27 +477,28 @@ func (suite *MeshEngineTestSuite) messageSizeScenario(send testutils.ConduitSend
 		}(eng)
 	}
 
-	unittest.AssertReturnsBefore(suite.Suite.T(), wg.Wait, 30*time.Second)
+	unittest.RequireReturnsBefore(t, wg.Wait, 30*time.Second, "message not received")
 
 	// evaluates that all messages are received
-	for index, e := range engs[1:] {
-		assert.Len(suite.Suite.T(), e.Event, 1, "message not received by engine %d", index+1)
-		assertChannelReceived(suite.T(), e, channels.TestNetworkChannel)
+	for index, e := range meshEngines[1:] {
+		require.Len(t, e.Event, 1, "message not received by engine %d", index+1)
+		unittest.RequireReturnsBefore(t, func() {
+			require.Equal(t, channels.TestNetworkChannel, <-e.Channel)
+		}, 1*time.Second, "channel mismatch")
 	}
 }
 
 // conduitCloseScenario tests after a Conduit is closed, an engine cannot send or receive a message for that channel.
-func (suite *MeshEngineTestSuite) conduitCloseScenario(send testutils.ConduitSendWrapperFunc) {
-
+func conduitCloseScenario(t *testing.T, send testutils.ConduitSendWrapperFunc, networks []*p2pnet.Network, ids flow.IdentityList, obs chan string) {
 	testutils.OptionalSleep(send)
 
 	// creating engines
-	count := len(suite.networks)
+	count := len(networks)
 	engs := make([]*testutils.MeshEngine, 0)
 	wg := sync.WaitGroup{}
 
-	for i := range suite.networks {
-		eng := testutils.NewMeshEngine(suite.Suite.T(), suite.networks[i], count-1, channels.TestNetworkChannel)
+	for i := range networks {
+		eng := testutils.NewMeshEngine(t, networks[i], count-1, channels.TestNetworkChannel)
 		engs = append(engs, eng)
 	}
 
@@ -426,16 +506,16 @@ func (suite *MeshEngineTestSuite) conduitCloseScenario(send testutils.ConduitSen
 	// each node will register ~D protect messages, where D is the default out-degree
 	for i := 0; i < pubsub.GossipSubD*count; i++ {
 		select {
-		case <-suite.obs:
+		case <-obs:
 		case <-time.After(2 * time.Second):
-			assert.FailNow(suite.T(), "could not receive pubsub tag indicating mesh formed")
+			require.FailNow(t, "could not receive pubsub tag indicating mesh formed")
 		}
 	}
 
 	// unregister a random engine from the test topic by calling close on it's conduit
 	unregisterIndex := rand.Intn(count)
 	err := engs[unregisterIndex].Con.Close()
-	assert.NoError(suite.T(), err)
+	require.NoError(t, err)
 
 	// waits enough for peer manager to unsubscribe the node from the topic
 	// while libp2p is unsubscribing the node, the topology gets unstable
@@ -443,26 +523,26 @@ func (suite *MeshEngineTestSuite) conduitCloseScenario(send testutils.ConduitSen
 	time.Sleep(2 * time.Second)
 
 	// each node attempts to broadcast a message to all others
-	for i := range suite.networks {
+	for i := range networks {
 		event := &message.TestMessage{
 			Text: fmt.Sprintf("hello from node %v", i),
 		}
 
 		// others keeps the identifier of all nodes except ith node and the node that unregistered from the topic.
 		// nodes without valid topic registration for a channel will reject messages on that channel via unicast.
-		others := suite.ids.Filter(filter.Not(filter.HasNodeID(suite.ids[i].NodeID, suite.ids[unregisterIndex].NodeID))).NodeIDs()
+		others := ids.Filter(filter.Not(filter.HasNodeID(ids[i].NodeID, ids[unregisterIndex].NodeID))).NodeIDs()
 
 		if i == unregisterIndex {
-			// assert that unsubscribed engine cannot publish on that topic
-			require.Error(suite.Suite.T(), send(event, engs[i].Con, others...))
+			// require that unsubscribed engine cannot publish on that topic
+			require.Error(t, send(event, engs[i].Con, others...))
 			continue
 		}
 
-		require.NoError(suite.Suite.T(), send(event, engs[i].Con, others...))
+		require.NoError(t, send(event, engs[i].Con, others...))
 	}
 
 	// fire a goroutine to listen for incoming messages for each engine except for the one which unregistered
-	for i := range suite.networks {
+	for i := range networks {
 		if i == unregisterIndex {
 			continue
 		}
@@ -476,19 +556,12 @@ func (suite *MeshEngineTestSuite) conduitCloseScenario(send testutils.ConduitSen
 		}(engs[i])
 	}
 
-	// assert every one except the unsubscribed engine received the message
-	unittest.AssertReturnsBefore(suite.Suite.T(), wg.Wait, 2*time.Second)
+	// require every one except the unsubscribed engine received the message
+	unittest.RequireReturnsBefore(t, wg.Wait, 2*time.Second, "message not received")
 
-	// assert that the unregistered engine did not receive the message
+	// asserts that the unregistered engine did not receive the message
 	unregisteredEng := engs[unregisterIndex]
-	assert.Emptyf(suite.T(), unregisteredEng.Received, "unregistered engine received the topic message")
-}
-
-// assertChannelReceived asserts that the given channel was received on the given engine
-func assertChannelReceived(t *testing.T, e *testutils.MeshEngine, channel channels.Channel) {
-	unittest.AssertReturnsBefore(t, func() {
-		assert.Equal(t, channel, <-e.Channel)
-	}, 100*time.Millisecond)
+	require.Emptyf(t, unregisteredEng.Received, "unregistered engine received the topic message")
 }
 
 // extractSenderID returns a bool array with the index i true if there is a message from node i in the provided messages.
