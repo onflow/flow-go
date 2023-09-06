@@ -457,7 +457,7 @@ func main() {
 				node.Metrics.Engine,
 				node.Metrics.Mempool,
 				sealingTracker,
-				node.Network,
+				node.EngineRegistry,
 				node.Me,
 				node.Storage.Headers,
 				node.Storage.Payloads,
@@ -480,7 +480,7 @@ func main() {
 			receiptRequester, err = requester.New(
 				node.Logger,
 				node.Metrics.Engine,
-				node.Network,
+				node.EngineRegistry,
 				node.Me,
 				node.State,
 				channels.RequestReceiptsByBlockID,
@@ -511,7 +511,7 @@ func main() {
 
 			e, err := matching.NewEngine(
 				node.Logger,
-				node.Network,
+				node.EngineRegistry,
 				node.Me,
 				node.Metrics.Engine,
 				node.Metrics.Mempool,
@@ -544,7 +544,7 @@ func main() {
 			ing, err := ingestion.New(
 				node.Logger,
 				node.Metrics.Engine,
-				node.Network,
+				node.EngineRegistry,
 				node.Me,
 				core,
 			)
@@ -823,7 +823,7 @@ func main() {
 			messageHub, err := message_hub.NewMessageHub(
 				createLogger(node.Logger, node.RootChainID),
 				node.Metrics.Engine,
-				node.Network,
+				node.EngineRegistry,
 				node.Me,
 				comp,
 				hot,
@@ -842,7 +842,7 @@ func main() {
 			sync, err := synceng.New(
 				node.Logger,
 				node.Metrics.Engine,
-				node.Network,
+				node.EngineRegistry,
 				node.Me,
 				node.State,
 				node.Storage.Blocks,
@@ -872,7 +872,7 @@ func main() {
 			// exchange private DKG messages
 			messagingEngine, err := dkgeng.NewMessagingEngine(
 				node.Logger,
-				node.Network,
+				node.EngineRegistry,
 				node.Me,
 				dkgBrokerTunnel,
 				node.Metrics.Mempool,

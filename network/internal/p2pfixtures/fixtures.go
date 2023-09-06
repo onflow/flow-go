@@ -252,11 +252,11 @@ func EnsureNotConnected(t *testing.T, ctx context.Context, from []p2p.LibP2PNode
 			if this == other {
 				require.Fail(t, "overlapping nodes in from and to lists")
 			}
-			thisId := this.Host().ID()
+			thisId := this.ID()
 			// we intentionally do not check the error here, with libp2p v0.24 connection gating at the "InterceptSecured" level
 			// does not cause the nodes to complain about the connection being rejected at the dialer side.
 			// Hence, we instead check for any trace of the connection being established in the receiver side.
-			_ = this.Host().Connect(ctx, other.Host().Peerstore().PeerInfo(other.Host().ID()))
+			_ = this.Host().Connect(ctx, other.Host().Peerstore().PeerInfo(other.ID()))
 			// ensures that other node has never received a connection from this node.
 			require.Equal(t, network.NotConnected, other.Host().Network().Connectedness(thisId))
 			require.Empty(t, other.Host().Network().ConnsToPeer(thisId))
@@ -277,14 +277,18 @@ func EnsureMessageExchangeOverUnicast(t *testing.T, ctx context.Context, nodes [
 			if this == other {
 				continue
 			}
-			s, err := this.CreateStream(ctx, other.Host().ID())
-			require.NoError(t, err)
-			rw := bufio.NewReadWriter(bufio.NewReader(s), bufio.NewWriter(s))
-			_, err = rw.WriteString(msg)
+			err := this.OpenProtectedStream(ctx, other.ID(), t.Name(), func(stream network.Stream) error {
+				rw := bufio.NewReadWriter(bufio.NewReader(stream), bufio.NewWriter(stream))
+				_, err := rw.WriteString(msg)
+				require.NoError(t, err)
+
+				// Flush the stream
+				require.NoError(t, rw.Flush())
+
+				return nil
+			})
 			require.NoError(t, err)
 
-			// Flush the stream
-			require.NoError(t, rw.Flush())
 		}
 
 		// wait for the message to be received by all other nodes
@@ -323,8 +327,8 @@ func EnsureNoStreamCreation(t *testing.T, ctx context.Context, from []p2p.LibP2P
 			// we intentionally do not check the error here, with libp2p v0.24 connection gating at the "InterceptSecured" level
 			// does not cause the nodes to complain about the connection being rejected at the dialer side.
 			// Hence, we instead check for any trace of the connection being established in the receiver side.
-			otherId := other.Host().ID()
-			thisId := this.Host().ID()
+			otherId := other.ID()
+			thisId := this.ID()
 
 			// closes all connections from other node to this node in order to isolate the connection attempt.
 			for _, conn := range other.Host().Network().ConnsToPeer(thisId) {
@@ -332,7 +336,10 @@ func EnsureNoStreamCreation(t *testing.T, ctx context.Context, from []p2p.LibP2P
 			}
 			require.Empty(t, other.Host().Network().ConnsToPeer(thisId))
 
-			_, err := this.CreateStream(ctx, otherId)
+			err := this.OpenProtectedStream(ctx, otherId, t.Name(), func(stream network.Stream) error {
+				// no-op as the stream is never created.
+				return nil
+			})
 			// ensures that other node has never received a connection from this node.
 			require.Equal(t, other.Host().Network().Connectedness(thisId), network.NotConnected)
 			// a stream is established on top of a connection, so if there is no connection, there should be no stream.
@@ -354,9 +361,11 @@ func EnsureStreamCreation(t *testing.T, ctx context.Context, from []p2p.LibP2PNo
 				require.Fail(t, "node is in both from and to lists")
 			}
 			// stream creation should pass without error
-			s, err := this.CreateStream(ctx, other.Host().ID())
+			err := this.OpenProtectedStream(ctx, other.ID(), t.Name(), func(stream network.Stream) error {
+				require.NotNil(t, stream)
+				return nil
+			})
 			require.NoError(t, err)
-			require.NotNil(t, s)
 		}
 	}
 }
