@@ -851,8 +851,9 @@ func executeBlockAndVerifyWithParameters(t *testing.T,
 	require.Len(t, vcds, len(txs)+1) // +1 for system chunk
 
 	for _, vcd := range vcds {
-		_, err := verifier.Verify(vcd)
+		spockSecret, err := verifier.Verify(vcd)
 		assert.NoError(t, err)
+		assert.NotNil(t, spockSecret)
 	}
 
 	return computationResult

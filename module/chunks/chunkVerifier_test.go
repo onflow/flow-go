@@ -1,7 +1,6 @@
 package chunks_test
 
 import (
-	"context"
 	"fmt"
 	"testing"
 
@@ -342,7 +341,7 @@ func updateExecutionData(t *testing.T, vch *verification.VerifiableChunkData, co
 		TrieUpdate: trieUpdate,
 	}
 
-	cedCID, err := executionDataCIDProvider.CalculateChunkExecutionDataID(context.Background(), ced)
+	cedCID, err := executionDataCIDProvider.CalculateChunkExecutionDataID(ced)
 	require.NoError(t, err)
 
 	bedr := flow.BlockExecutionDataRoot{
@@ -351,7 +350,7 @@ func updateExecutionData(t *testing.T, vch *verification.VerifiableChunkData, co
 	}
 	vch.ChunkDataPack.ExecutionDataRoot = bedr
 
-	vch.Result.ExecutionDataID, err = executionDataCIDProvider.CalculateExecutionDataRootID(context.Background(), bedr)
+	vch.Result.ExecutionDataID, err = executionDataCIDProvider.CalculateExecutionDataRootID(bedr)
 	require.NoError(t, err)
 }
 
@@ -484,7 +483,7 @@ func GetBaselineVerifiableChunk(t *testing.T, script string, system bool) (*veri
 		Events:     chunkEvents,
 		TrieUpdate: trieUpdate,
 	}
-	chunkCid, err := executionDataCIDProvider.CalculateChunkExecutionDataID(context.Background(), chunkExecutionData)
+	chunkCid, err := executionDataCIDProvider.CalculateChunkExecutionDataID(chunkExecutionData)
 	require.NoError(t, err)
 
 	executionDataRoot := flow.BlockExecutionDataRoot{
@@ -492,7 +491,7 @@ func GetBaselineVerifiableChunk(t *testing.T, script string, system bool) (*veri
 		ChunkExecutionDataIDs: []cid.Cid{chunkCid},
 	}
 
-	executionDataID, err := executionDataCIDProvider.CalculateExecutionDataRootID(context.Background(), executionDataRoot)
+	executionDataID, err := executionDataCIDProvider.CalculateExecutionDataRootID(executionDataRoot)
 	require.NoError(t, err)
 
 	// Chunk setup

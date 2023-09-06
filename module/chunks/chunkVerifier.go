@@ -1,7 +1,6 @@
 package chunks
 
 import (
-	gocontext "context"
 	"errors"
 	"fmt"
 
@@ -352,7 +351,7 @@ func (fcv *ChunkVerifier) verifyTransactionsInContext(
 	}
 
 	cidProvider := provider.NewExecutionDataCIDProvider(execution_data.DefaultSerializer)
-	cedCID, err := cidProvider.CalculateChunkExecutionDataID(gocontext.Background(), chunkExecutionData)
+	cedCID, err := cidProvider.CalculateChunkExecutionDataID(chunkExecutionData)
 	if err != nil {
 		return nil, fmt.Errorf("failed to calculate CID of ChunkExecutionData: %w", err)
 	}
@@ -369,7 +368,7 @@ func (fcv *ChunkVerifier) verifyTransactionsInContext(
 	}
 
 	// 4. check the execution data root ID by calculating it using the provided execution data root
-	executionDataID, err := cidProvider.CalculateExecutionDataRootID(gocontext.Background(), chunkDataPack.ExecutionDataRoot)
+	executionDataID, err := cidProvider.CalculateExecutionDataRootID(chunkDataPack.ExecutionDataRoot)
 	if err != nil {
 		return nil, fmt.Errorf("failed to calculate ID of ExecutionDataRoot: %w", err)
 	}

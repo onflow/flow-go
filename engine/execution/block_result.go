@@ -12,7 +12,7 @@ type BlockExecutionResult struct {
 	*entity.ExecutableBlock
 
 	collectionExecutionResults []CollectionExecutionResult
-	ExecutionDataRoot          *flow.BlockExecutionDataRoot
+	ExecutionDataRoot          *flow.BlockExecutionDataRoot // full root data structure produced from block
 }
 
 // NewPopulatedBlockExecutionResult constructs a new BlockExecutionResult,

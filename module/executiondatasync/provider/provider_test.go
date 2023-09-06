@@ -137,7 +137,7 @@ func TestCalculateExecutionDataRootID(t *testing.T) {
 	}
 
 	cidProvider := provider.NewExecutionDataCIDProvider(execution_data.DefaultSerializer)
-	actual, err := cidProvider.CalculateExecutionDataRootID(context.Background(), edRoot)
+	actual, err := cidProvider.CalculateExecutionDataRootID(edRoot)
 	require.NoError(t, err)
 
 	assert.Equal(t, expected, actual)
@@ -166,7 +166,7 @@ func TestCalculateChunkExecutionDataID(t *testing.T) {
 	}
 
 	cidProvider := provider.NewExecutionDataCIDProvider(execution_data.DefaultSerializer)
-	actual, err := cidProvider.CalculateChunkExecutionDataID(context.Background(), ced)
+	actual, err := cidProvider.CalculateChunkExecutionDataID(ced)
 	require.NoError(t, err)
 
 	assert.Equal(t, expected, actual)

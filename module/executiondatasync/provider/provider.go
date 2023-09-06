@@ -152,7 +152,7 @@ func (p *ExecutionDataProvider) provide(ctx context.Context, blockHeight uint64,
 	defer close(blobCh)
 
 	errCh := p.storeBlobs(ctx, blockHeight, blobCh)
-	g, gCtx := errgroup.WithContext(ctx)
+	g := new(errgroup.Group)
 
 	chunkDataIDs := make([]cid.Cid, len(executionData.ChunkExecutionDatas))
 	for i, chunkExecutionData := range executionData.ChunkExecutionDatas {
@@ -161,7 +161,7 @@ func (p *ExecutionDataProvider) provide(ctx context.Context, blockHeight uint64,
 
 		g.Go(func() error {
 			logger.Debug().Int("chunk_index", i).Msg("adding chunk execution data")
-			cedID, err := p.cidsProvider.addChunkExecutionData(gCtx, chunkExecutionData, blobCh)
+			cedID, err := p.cidsProvider.addChunkExecutionData(chunkExecutionData, blobCh)
 			if err != nil {
 				return fmt.Errorf("failed to add chunk execution data at index %d: %w", i, err)
 			}
@@ -180,7 +180,7 @@ func (p *ExecutionDataProvider) provide(ctx context.Context, blockHeight uint64,
 		BlockID:               executionData.BlockID,
 		ChunkExecutionDataIDs: chunkDataIDs,
 	}
-	rootID, err := p.cidsProvider.addExecutionDataRoot(ctx, edRoot, blobCh)
+	rootID, err := p.cidsProvider.addExecutionDataRoot(edRoot, blobCh)
 	if err != nil {
 		return flow.ZeroID, nil, errCh, fmt.Errorf("failed to add execution data root: %w", err)
 	}
@@ -205,21 +205,18 @@ type ExecutionDataCIDProvider struct {
 }
 
 func (p *ExecutionDataCIDProvider) CalculateExecutionDataRootID(
-	ctx context.Context,
 	edRoot flow.BlockExecutionDataRoot,
 ) (flow.Identifier, error) {
-	return p.addExecutionDataRoot(ctx, &edRoot, nil)
+	return p.addExecutionDataRoot(&edRoot, nil)
 }
 
 func (p *ExecutionDataCIDProvider) CalculateChunkExecutionDataID(
-	ctx context.Context,
 	ced execution_data.ChunkExecutionData,
 ) (cid.Cid, error) {
-	return p.addChunkExecutionData(ctx, &ced, nil)
+	return p.addChunkExecutionData(&ced, nil)
 }
 
 func (p *ExecutionDataCIDProvider) addExecutionDataRoot(
-	ctx context.Context,
 	edRoot *flow.BlockExecutionDataRoot,
 	blobCh chan<- blobs.Blob,
 ) (flow.Identifier, error) {
@@ -246,11 +243,10 @@ func (p *ExecutionDataCIDProvider) addExecutionDataRoot(
 }
 
 func (p *ExecutionDataCIDProvider) addChunkExecutionData(
-	ctx context.Context,
 	ced *execution_data.ChunkExecutionData,
 	blobCh chan<- blobs.Blob,
 ) (cid.Cid, error) {
-	cids, err := p.addBlobs(ctx, ced, blobCh)
+	cids, err := p.addBlobs(ced, blobCh)
 	if err != nil {
 		return cid.Undef, fmt.Errorf("failed to add chunk execution data blobs: %w", err)
 	}
@@ -260,14 +256,14 @@ func (p *ExecutionDataCIDProvider) addChunkExecutionData(
 			return cids[0], nil
 		}
 
-		if cids, err = p.addBlobs(ctx, cids, blobCh); err != nil {
+		if cids, err = p.addBlobs(cids, blobCh); err != nil {
 			return cid.Undef, fmt.Errorf("failed to add cid blobs: %w", err)
 		}
 	}
 }
 
 // addBlobs serializes the given object, splits the serialized data into blobs, and sends them to the given channel.
-func (p *ExecutionDataCIDProvider) addBlobs(ctx context.Context, v interface{}, blobCh chan<- blobs.Blob) ([]cid.Cid, error) {
+func (p *ExecutionDataCIDProvider) addBlobs(v interface{}, blobCh chan<- blobs.Blob) ([]cid.Cid, error) {
 	bcw := blobs.NewBlobChannelWriter(blobCh, p.maxBlobSize)
 	defer bcw.Close()
 

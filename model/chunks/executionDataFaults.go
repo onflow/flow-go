@@ -1,5 +1,7 @@
 package chunks
 
+// This file contains the ChunkFaultErrors returned during chunk verification of ExecutionData.
+
 import (
 	"fmt"
 
@@ -64,7 +66,7 @@ type CFExecutionDataChunksLengthMismatch struct {
 var _ ChunkFaultError = (*CFExecutionDataChunksLengthMismatch)(nil)
 
 func (cf CFExecutionDataChunksLengthMismatch) String() string {
-	return fmt.Sprintf("execution data root chunk length (%d) is different then execution result chunk list length (%d) for chunk %d with result ID %s",
+	return fmt.Sprintf("execution data root chunk length (%d) is different than execution result chunk list length (%d) for chunk %d with result ID %s",
 		cf.executionDataRootChunkLength, cf.executionResultChunkListLength, cf.chunkIndex, cf.execResID.String())
 }
 
@@ -108,7 +110,7 @@ type CFExecutionDataInvalidChunkCID struct {
 var _ ChunkFaultError = (*CFExecutionDataInvalidChunkCID)(nil)
 
 func (cf CFExecutionDataInvalidChunkCID) String() string {
-	return fmt.Sprintf("execution data chunk CID (%s) is different then computed (%s) for chunk %d with result ID %s",
+	return fmt.Sprintf("execution data chunk CID (%s) is different than computed (%s) for chunk %d with result ID %s",
 		cf.executionDataRootChunkCID, cf.computedChunkCID, cf.chunkIndex, cf.execResID.String())
 }
 
@@ -129,7 +131,7 @@ func (cf CFExecutionDataInvalidChunkCID) ExecutionResultID() flow.Identifier {
 // NewCFExecutionDataInvalidChunkCID creates a new instance of Chunk Fault (NewCFExecutionDataInvalidChunkCID)
 func NewCFExecutionDataInvalidChunkCID(
 	executionDataRootChunkCID cid.Cid,
-	computedChunkCIO cid.Cid,
+	computedChunkCID cid.Cid,
 	chInx uint64,
 	execResID flow.Identifier,
 ) *CFExecutionDataInvalidChunkCID {
@@ -137,7 +139,7 @@ func NewCFExecutionDataInvalidChunkCID(
 		chunkIndex:                chInx,
 		execResID:                 execResID,
 		executionDataRootChunkCID: executionDataRootChunkCID,
-		computedChunkCID:          computedChunkCIO,
+		computedChunkCID:          computedChunkCID,
 	}
 }
 
@@ -152,7 +154,7 @@ type CFInvalidExecutionDataID struct {
 var _ ChunkFaultError = (*CFInvalidExecutionDataID)(nil)
 
 func (cf CFInvalidExecutionDataID) String() string {
-	return fmt.Sprintf("execution data ID (%s) is different then computed (%s) for chunk %d with result ID %s",
+	return fmt.Sprintf("execution data ID (%s) is different than computed (%s) for chunk %d with result ID %s",
 		cf.erExecutionDataID, cf.computedExecutionDataID, cf.chunkIndex, cf.execResID.String())
 }
 
