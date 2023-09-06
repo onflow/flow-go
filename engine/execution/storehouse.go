@@ -7,8 +7,6 @@ import (
 // RegisterStore is the interface for register store
 // see implementation in engine/execution/storehouse/register_store.go
 type RegisterStore interface {
-	Init() error
-
 	// GetRegister first try to get the register from InMemoryRegisterStore, then OnDiskRegisterStore
 	GetRegister(height uint64, blockID flow.Identifier, register flow.RegisterID) (flow.RegisterValue, error)
 

@@ -24,49 +24,30 @@ func NewRegisterStore(
 	wal execution.ExecutedFinalizedWAL,
 	finalized execution.FinalizedReader,
 	log zerolog.Logger,
-) *RegisterStore {
+) (*RegisterStore, error) {
+	// replay the executed and finalized blocks from the write ahead logs
+	// to the OnDiskRegisterStore
+	height, err := syncDiskStore(wal, diskStore, log)
+	if err != nil {
+		return nil, fmt.Errorf("cannot sync disk store: %w", err)
+	}
+
+	// fetch the last executed and finalized block ID
+	finalizedID, err := finalized.GetFinalizedBlockIDAtHeight(height)
+	if err != nil {
+		return nil, fmt.Errorf("cannot get finalized block ID at height %d: %w", height, err)
+	}
+
+	// init the memStore with the last executed and finalized block ID
+	memStore := NewInMemoryRegisterStore(height, finalizedID)
+
 	return &RegisterStore{
+		memStore:  memStore,
 		diskStore: diskStore,
 		wal:       wal,
 		finalized: finalized,
 		log:       log.With().Str("module", "register-store").Logger(),
-	}
-}
-
-func (r *RegisterStore) Ready() <-chan struct{} {
-	ready := make(chan struct{})
-	go func() {
-		defer close(ready)
-		err := r.Init()
-		if err != nil {
-			r.log.Fatal().Err(err).Msg("cannot init register store")
-		}
-
-	}()
-	return ready
-}
-func (r *RegisterStore) Done() <-chan struct{} {
-	done := make(chan struct{})
-	close(done)
-	return done
-}
-
-func (r *RegisterStore) Init() error {
-	// replay the executed and finalized blocks from the write ahead logs
-	// to the OnDiskRegisterStore
-	// TODO: to use syncDiskStore
-	height, err := r.syncDiskStore()
-	if err != nil {
-		return fmt.Errorf("cannot sync disk store: %w", err)
-	}
-	// fetch the last executed and finalized block ID
-	finalizedID, err := r.finalized.GetFinalizedBlockIDAtHeight(height)
-	if err != nil {
-		return fmt.Errorf("cannot get finalized block ID at height %d: %w", height, err)
-	}
-	// init the memStore with the last executed and finalized block ID
-	r.memStore = NewInMemoryRegisterStore(height, finalizedID)
-	return nil
+	}, nil
 }
 
 // GetRegister first try to get the register from InMemoryRegisterStore, then OnDiskRegisterStore
@@ -171,16 +152,20 @@ func (r *RegisterStore) isBlockFinalized(height uint64, blockID flow.Identifier)
 }
 
 // syncDiskStore replay WAL to disk store
-func (r *RegisterStore) syncDiskStore() (uint64, error) {
+func syncDiskStore(
+	wal execution.ExecutedFinalizedWAL,
+	diskStore execution.OnDiskRegisterStore,
+	log zerolog.Logger,
+) (uint64, error) {
 	// TODO: replace diskStore.Latest with wal.Latest
 	// latest, err := r.wal.Latest()
 	var err error
-	latest := r.diskStore.Latest()
+	latest := diskStore.Latest()
 	if err != nil {
 		return 0, fmt.Errorf("cannot get latest height from write ahead logs: %w", err)
 	}
 
-	stored := r.diskStore.Latest()
+	stored := diskStore.Latest()
 
 	if stored > latest {
 		return 0, fmt.Errorf("latest height in storehouse %v is larger than latest height %v in write ahead logs", stored, latest)
@@ -188,7 +173,7 @@ func (r *RegisterStore) syncDiskStore() (uint64, error) {
 
 	if stored < latest {
 		// replay
-		reader := r.wal.GetReader(stored + 1)
+		reader := wal.GetReader(stored + 1)
 		for {
 			height, registers, err := reader.Next()
 			// TODO: to rename
@@ -199,7 +184,7 @@ func (r *RegisterStore) syncDiskStore() (uint64, error) {
 				return 0, fmt.Errorf("cannot read registers from write ahead logs: %w", err)
 			}
 
-			err = r.diskStore.SaveRegisters(height, registers)
+			err = diskStore.SaveRegisters(height, registers)
 			if err != nil {
 				return 0, fmt.Errorf("cannot save registers to disk store at height %v : %w", height, err)
 			}
