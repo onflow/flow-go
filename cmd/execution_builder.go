@@ -194,6 +194,7 @@ func (builder *ExecutionNodeBuilder) LoadComponentsAndModules() {
 		Module("execution data getter", exeNode.LoadExecutionDataGetter).
 		Module("blobservice peer manager dependencies", exeNode.LoadBlobservicePeerManagerDependencies).
 		Module("bootstrap", exeNode.LoadBootstrapper).
+		Module("register store", exeNode.LoadRegisterStore).
 		Component("execution state ledger", exeNode.LoadExecutionStateLedger).
 
 		// TODO: Modules should be able to depends on components
@@ -764,16 +765,21 @@ func (exeNode *ExecutionNode) LoadExecutionStateLedger(
 
 func (exeNode *ExecutionNode) LoadRegisterStore(
 	node *NodeConfig,
-) (
-	module.ReadyDoneAware,
-	error,
-) {
-	// TODO: initialize
+) error {
+	// TODO: replace with OnDiskRegisterStore implementation
 	var diskStore execution.OnDiskRegisterStore
-	var wal execution.ExecutedFinalizedWAL
 	reader := finalizedreader.NewFinalizedReader(node.Storage.Headers)
-	exeNode.registerStore = storehouse.NewRegisterStore(diskStore, wal, reader, node.Logger)
-	return exeNode.registerStore, nil
+	registerStore, err := storehouse.NewRegisterStore(
+		diskStore,
+		nil, // TODO: replace with real WAL
+		reader,
+		node.Logger,
+	)
+	if err != nil {
+		return err
+	}
+	exeNode.registerStore = registerStore
+	return nil
 }
 
 func (exeNode *ExecutionNode) LoadExecutionStateLedgerWALCompactor(
