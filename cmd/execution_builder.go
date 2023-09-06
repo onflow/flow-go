@@ -901,11 +901,11 @@ func (exeNode *ExecutionNode) LoadIngestionEngine(
 
 // create scripts engine for handling script execution
 func (exeNode *ExecutionNode) LoadScriptsEngine(node *NodeConfig) (module.ReadyDoneAware, error) {
-	// for RPC to load it
+
 	exeNode.scriptsEng = scripts.New(
 		node.Logger,
 		node.State,
-		exeNode.computationManager,
+		exeNode.computationManager.QueryExecutor(),
 		exeNode.executionState,
 	)
 
