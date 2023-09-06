@@ -205,6 +205,8 @@ jobs:
       with:
         go-version: ${{ env.GO_VERSION }}
         cache: true
+    - name: Setup tmate session
+      uses: mxschmitt/action-tmate@v3
     - name: Docker build
       run: make docker-build-flow docker-build-flow-corrupt
     - name: Run tests
