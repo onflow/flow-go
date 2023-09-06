@@ -81,8 +81,11 @@ var (
 // be included in network communication. We omit any nodes that have been ejected.
 var NotEjectedFilter = filter.Not(filter.Ejected)
 
-// Network represents the overlay network of our peer-to-peer network, including
-// the protocols for handshakes, authentication, gossiping and heartbeats.
+// Network serves as the comprehensive networking layer that integrates three interfaces within Flow; Underlay, EngineRegistry, and ConduitAdapter.
+// It is responsible for creating conduits through which engines can send and receive messages to and from other engines on the network, as well as registering other services
+// such as BlobService and PingService. It also provides a set of APIs that can be used to send messages to other nodes on the network.
+// Network is also responsible for managing the topology of the network, i.e., the set of nodes that are connected to each other.
+// It is also responsible for managing the set of nodes that are connected to each other.
 type Network struct {
 	// TODO: using a waitgroup here doesn't actually guarantee that we'll wait for all
 	// goroutines to exit, because new goroutines could be started after we've already
