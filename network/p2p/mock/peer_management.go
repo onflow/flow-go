@@ -32,8 +32,8 @@ type PeerManagement struct {
 	mock.Mock
 }
 
-// ConnectToPeerAddrInfo provides a mock function with given fields: ctx, peerInfo
-func (_m *PeerManagement) ConnectToPeerAddrInfo(ctx context.Context, peerInfo peer.AddrInfo) error {
+// ConnectToPeer provides a mock function with given fields: ctx, peerInfo
+func (_m *PeerManagement) ConnectToPeer(ctx context.Context, peerInfo peer.AddrInfo) error {
 	ret := _m.Called(ctx, peerInfo)
 
 	var r0 error

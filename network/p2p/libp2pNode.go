@@ -37,9 +37,9 @@ type CoreP2P interface {
 
 // PeerManagement set of node traits related to its lifecycle and metadata retrieval
 type PeerManagement interface {
-	// ConnectToPeerAddrInfo connects to the peer with the given peer address information.
+	// ConnectToPeer connects to the peer with the given peer address information.
 	// This method is used to connect to a peer that is not in the peer store.
-	ConnectToPeerAddrInfo(ctx context.Context, peerInfo peer.AddrInfo) error
+	ConnectToPeer(ctx context.Context, peerInfo peer.AddrInfo) error
 	// RemovePeer closes the connection with the peer.
 	RemovePeer(peerID peer.ID) error
 	// ListPeers returns list of peer IDs for peers subscribed to the topic.

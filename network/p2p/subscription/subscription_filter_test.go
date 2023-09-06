@@ -42,8 +42,8 @@ func TestFilterSubscribe(t *testing.T) {
 	unstakedKey := unittest.NetworkingPrivKeyFixture()
 	unstakedNode := p2pfixtures.CreateNode(t, unstakedKey, sporkId, zerolog.Nop(), ids)
 
-	require.NoError(t, node1.ConnectToPeerAddrInfo(context.TODO(), *host.InfoFromHost(node2.Host())))
-	require.NoError(t, node1.ConnectToPeerAddrInfo(context.TODO(), *host.InfoFromHost(unstakedNode.Host())))
+	require.NoError(t, node1.ConnectToPeer(context.TODO(), *host.InfoFromHost(node2.Host())))
+	require.NoError(t, node1.ConnectToPeer(context.TODO(), *host.InfoFromHost(unstakedNode.Host())))
 
 	badTopic := channels.TopicFromChannel(channels.SyncCommittee, sporkId)
 

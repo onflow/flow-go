@@ -78,7 +78,7 @@ func TestTopicValidator_Unstaked(t *testing.T) {
 
 	// node1 is connected to node2
 	// sn1 <-> sn2
-	require.NoError(t, sn1.ConnectToPeerAddrInfo(ctx, pInfo2))
+	require.NoError(t, sn1.ConnectToPeer(ctx, pInfo2))
 
 	// sn1 will subscribe with is staked callback that should force the TopicValidator to drop the message received from sn2
 	sub1, err := sn1.Subscribe(topic, flowpubsub.TopicValidator(logger, isStaked))
@@ -139,7 +139,7 @@ func TestTopicValidator_PublicChannel(t *testing.T) {
 
 	// node1 is connected to node2
 	// sn1 <-> sn2
-	require.NoError(t, sn1.ConnectToPeerAddrInfo(ctx, pInfo2))
+	require.NoError(t, sn1.ConnectToPeer(ctx, pInfo2))
 
 	// sn1 & sn2 will subscribe with unauthenticated callback to allow it to send and receive unauthenticated messages
 	sub1, err := sn1.Subscribe(topic, flowpubsub.TopicValidator(logger, unittest.AllowAllPeerFilter()))
@@ -208,7 +208,7 @@ func TestTopicValidator_TopicMismatch(t *testing.T) {
 
 	// node1 is connected to node2
 	// sn1 <-> sn2
-	require.NoError(t, sn1.ConnectToPeerAddrInfo(ctx, pInfo2))
+	require.NoError(t, sn1.ConnectToPeer(ctx, pInfo2))
 
 	// sn2 will subscribe with an unauthenticated callback to allow processing of message after the authorization check
 	_, err = sn1.Subscribe(topic, flowpubsub.TopicValidator(logger, unittest.AllowAllPeerFilter()))
@@ -269,7 +269,7 @@ func TestTopicValidator_InvalidTopic(t *testing.T) {
 
 	// node1 is connected to node2
 	// sn1 <-> sn2
-	require.NoError(t, sn1.ConnectToPeerAddrInfo(ctx, pInfo2))
+	require.NoError(t, sn1.ConnectToPeer(ctx, pInfo2))
 
 	// sn2 will subscribe with an unauthenticated callback to allow processing of message after the authorization check
 	_, err = sn1.Subscribe(topic, flowpubsub.TopicValidator(logger, unittest.AllowAllPeerFilter()))
@@ -369,8 +369,8 @@ func TestAuthorizedSenderValidator_Unauthorized(t *testing.T) {
 
 	// node1 is connected to node2, and the an1 is connected to node1
 	// an1 <-> sn1 <-> sn2
-	require.NoError(t, sn1.ConnectToPeerAddrInfo(ctx, pInfo2))
-	require.NoError(t, an1.ConnectToPeerAddrInfo(ctx, pInfo1))
+	require.NoError(t, sn1.ConnectToPeer(ctx, pInfo2))
+	require.NoError(t, an1.ConnectToPeer(ctx, pInfo1))
 
 	// sn1 and sn2 subscribe to the topic with the topic validator
 	sub1, err := sn1.Subscribe(topic, flowpubsub.TopicValidator(logger, unittest.AllowAllPeerFilter(), pubsubMessageValidator))
@@ -494,7 +494,7 @@ func TestAuthorizedSenderValidator_InvalidMsg(t *testing.T) {
 
 	// node1 is connected to node2
 	// sn1 <-> sn2
-	require.NoError(t, sn1.ConnectToPeerAddrInfo(ctx, pInfo2))
+	require.NoError(t, sn1.ConnectToPeer(ctx, pInfo2))
 
 	// sn1 subscribe to the topic with the topic validator, while sn2 will subscribe without the topic validator to allow sn2 to publish unauthorized messages
 	sub1, err := sn1.Subscribe(topic, flowpubsub.TopicValidator(logger, unittest.AllowAllPeerFilter(), pubsubMessageValidator))
@@ -580,8 +580,8 @@ func TestAuthorizedSenderValidator_Ejected(t *testing.T) {
 
 	// node1 is connected to node2, and the an1 is connected to node1
 	// an1 <-> sn1 <-> sn2
-	require.NoError(t, sn1.ConnectToPeerAddrInfo(ctx, pInfo2))
-	require.NoError(t, an1.ConnectToPeerAddrInfo(ctx, pInfo1))
+	require.NoError(t, sn1.ConnectToPeer(ctx, pInfo2))
+	require.NoError(t, an1.ConnectToPeer(ctx, pInfo1))
 
 	// sn1 subscribe to the topic with the topic validator, while sn2 will subscribe without the topic validator to allow sn2 to publish unauthorized messages
 	sub1, err := sn1.Subscribe(topic, flowpubsub.TopicValidator(logger, unittest.AllowAllPeerFilter(), pubsubMessageValidator))
@@ -693,8 +693,8 @@ func TestAuthorizedSenderValidator_ClusterChannel(t *testing.T) {
 	require.NoError(t, err)
 
 	// ln3 <-> sn1 <-> sn2
-	require.NoError(t, ln1.ConnectToPeerAddrInfo(ctx, pInfo2))
-	require.NoError(t, ln3.ConnectToPeerAddrInfo(ctx, pInfo1))
+	require.NoError(t, ln1.ConnectToPeer(ctx, pInfo2))
+	require.NoError(t, ln3.ConnectToPeer(ctx, pInfo1))
 
 	sub1, err := ln1.Subscribe(topic, flowpubsub.TopicValidator(logger, unittest.AllowAllPeerFilter(), pubsubMessageValidator))
 	require.NoError(t, err)
