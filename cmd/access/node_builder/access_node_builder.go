@@ -821,7 +821,7 @@ func (builder *FlowAccessNodeBuilder) InitIDProviders() {
 		// The following wrapper allows to disallow-list byzantine nodes via an admin command:
 		// the wrapper overrides the 'Ejected' flag of disallow-listed nodes to true
 		disallowListWrapper, err := cache.NewNodeDisallowListWrapper(idCache, node.DB, func() network.DisallowListNotificationConsumer {
-			return builder.UnderlayNetwork
+			return builder.NetworkUnderlay
 		})
 		if err != nil {
 			return fmt.Errorf("could not initialize NodeBlockListWrapper: %w", err)
@@ -1291,7 +1291,7 @@ func (builder *FlowAccessNodeBuilder) enqueuePublicNetworkInit() {
 				return nil, fmt.Errorf("could not initialize network: %w", err)
 			}
 
-			builder.UnderlayNetwork = net
+			builder.NetworkUnderlay = net
 			builder.AccessNodeConfig.PublicNetworkConfig.Network = net
 
 			node.Logger.Info().Msgf("network will run on address: %s", builder.PublicNetworkConfig.BindAddress)

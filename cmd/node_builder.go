@@ -195,7 +195,7 @@ type NodeConfig struct {
 	State             protocol.State
 	Resolver          madns.BasicResolver
 	EngineRegistry    network.EngineRegistry
-	UnderlayNetwork   network.Underlay
+	NetworkUnderlay   network.Underlay
 	ConduitFactory    network.ConduitFactory
 	PingService       network.PingService
 	MsgValidators     []network.MessageValidator

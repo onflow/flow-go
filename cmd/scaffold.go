@@ -478,11 +478,11 @@ func (fnb *FlowNodeBuilder) InitFlowNetworkWithConduitFactory(
 	}
 
 	fnb.EngineRegistry = net  // setting network as the fnb.Network for the engine-level components
-	fnb.UnderlayNetwork = net // setting network as the fnb.Underlay for the lower-level components
+	fnb.NetworkUnderlay = net // setting network as the fnb.Underlay for the lower-level components
 
 	// register network ReadyDoneAware interface so other components can depend on it for startup
 	if fnb.networkUnderlayDependable != nil {
-		fnb.networkUnderlayDependable.Init(fnb.UnderlayNetwork)
+		fnb.networkUnderlayDependable.Init(fnb.NetworkUnderlay)
 	}
 
 	idEvents := gadgets.NewIdentityDeltas(net.UpdateNodeAddresses)
@@ -1008,7 +1008,7 @@ func (fnb *FlowNodeBuilder) InitIDProviders() {
 		// The following wrapper allows to disallow-list byzantine nodes via an admin command:
 		// the wrapper overrides the 'Ejected' flag of disallow-listed nodes to true
 		disallowListWrapper, err := cache.NewNodeDisallowListWrapper(idCache, node.DB, func() network.DisallowListNotificationConsumer {
-			return fnb.UnderlayNetwork
+			return fnb.NetworkUnderlay
 		})
 		if err != nil {
 			return fmt.Errorf("could not initialize NodeBlockListWrapper: %w", err)
