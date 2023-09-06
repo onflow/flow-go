@@ -1,4 +1,4 @@
-package payload
+package pebble
 
 import (
 	"bytes"
@@ -22,7 +22,7 @@ func Test_PayloadStorage_RoundTrip(t *testing.T) {
 	defer cache.Unref()
 
 	dbpath := path.Join(t.TempDir(), "roundtrip.db")
-	s, err := NewPayloads(dbpath, cache)
+	s, err := NewRegisters(dbpath, cache)
 	require.NoError(t, err)
 	require.NotNil(t, s)
 
@@ -59,7 +59,7 @@ func Test_PayloadStorage_Versioning(t *testing.T) {
 	defer cache.Unref()
 
 	dbpath := path.Join(t.TempDir(), "versionning.db")
-	s, err := NewPayloads(dbpath, cache)
+	s, err := payload.NewPayloads(dbpath, cache)
 	require.NoError(t, err)
 	require.NotNil(t, s)
 
@@ -121,7 +121,7 @@ func Benchmark_PayloadStorage(b *testing.B) {
 	defer cache.Unref()
 
 	dbpath := path.Join(b.TempDir(), "benchmark1.db")
-	s, err := NewPayloads(dbpath, cache)
+	s, err := NewRegisters(dbpath, cache)
 	require.NoError(b, err)
 	require.NotNil(b, s)
 
