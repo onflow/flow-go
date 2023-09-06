@@ -23,9 +23,6 @@ package crypto
 //  - SPoCK scheme based on BLS: verifies two signatures are generated from the same message,
 //    even though the message is unknown to the verifier.
 
-// future features:
-//  - implement a G1/G2 swap (minimal-pubkey-size variant)
-
 // #include "bls_include.h"
 import "C"
 

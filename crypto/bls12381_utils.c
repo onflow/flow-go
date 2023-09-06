@@ -140,16 +140,15 @@ ERROR Fr_read_bytes(Fr *a, const byte *bin, int len) {
   if (len != Fr_BYTES) {
     return BAD_ENCODING;
   }
+  // compare to r using the BLST tool 
   pow256 tmp;
-  // compare to r using the provided tool from BLST
-  pow256_from_be_bytes(tmp, bin); // TODO: check endianness!!
-  if (!check_mod_256(
-          tmp,
-          BLS12_381_r)) { // check_mod_256 compares pow256 against a vec256!
+  pow256_from_be_bytes(tmp, bin);
+  // (check_mod_256 compares pow256 against a vec256!)
+  if (!check_mod_256(tmp, BLS12_381_r)) { 
     return BAD_VALUE;
   }
   vec_zero(tmp, sizeof(tmp));
-  limbs_from_be_bytes((limb_t *)a, bin, Fr_BYTES); // TODO: check endianness!!
+  limbs_from_be_bytes((limb_t *)a, bin, Fr_BYTES);
   return VALID;
 }
 
@@ -177,11 +176,16 @@ void Fr_write_bytes(byte *bin, const Fr *a) {
   be_bytes_from_limbs(bin, (limb_t *)a, Fr_BYTES);
 }
 
-// maps big-endian bytes into an Fr element using modular reduction
-// Input is byte-big-endian, output is Fr (internally vec256)
-// TODO: check redc_mont_256(vec256 ret, const vec512 a, const vec256 p, limb_t
-// n0);
+// maps big-endian bytes of any size into an Fr element using modular reduction.
+// Input is byte-big-endian, output is Fr (internally vec256).
+//
+// Note: could use redc_mont_256(vec256 ret, const vec512 a, const vec256 p, limb_t
+// n0) to reduce 512 bits at a time.
 static void Fr_from_be_bytes(Fr *out, const byte *bytes, size_t n) {
+  // input can be written in base 2^|R|, with R the Montgomery constant
+  // N = l_1 + L_2*2^|R| .. + L_n*2^(|R|*(n-1))
+  // Therefore N mod p can be expressed using R as:
+  // N mod p = l_1 + L_2*R .. + L_n*R^(n-1)
   Fr digit, radix;
   Fr_set_zero(out);
   Fr_copy(&radix, (Fr *)BLS12_381_rRR); // R^2
@@ -200,7 +204,7 @@ static void Fr_from_be_bytes(Fr *out, const byte *bytes, size_t n) {
   limbs_from_be_bytes((limb_t *)&digit, p - n, n);
   Fr_mul_montg(&digit, &digit, &radix);
   Fr_add(out, out, &digit);
-  // at this point : out = l_1*R + L_2*R^2 .. + L_n*R^n
+  // at this point : out = l_1*R + L_2*R^2 .. + L_n*R^n,
   // reduce the extra R
   Fr_from_montg(out, out);
   // clean up possible sensitive data
@@ -463,8 +467,8 @@ bool E1_in_G1(const E1 *p) {
 //    - POINT_NOT_ON_CURVE if deserialized point isn't on E1
 //    - VALID if deserialization is valid
 
-// TODO: replace with POINTonE1_Deserialize_BE and POINTonE1_Uncompress_Z,
-//       and update logic with G2 subgroup check?
+// Note: could use POINTonE1_Deserialize_BE and POINTonE1_Uncompress_Z,
+//       but needs to update the logic around G2 subgroup check
 ERROR E1_read_bytes(E1 *a, const byte *bin, const int len) {
   // check the length
   if (len != G1_SER_BYTES) {
@@ -717,9 +721,9 @@ const E2 *BLS12_381_minus_g2 = (const E2 *)&BLS12_381_NEG_G2;
 //    - BAD_VALUE if Fp^2 coordinates couldn't deserialize
 //    - POINT_NOT_ON_CURVE if deserialized point isn't on E2
 //    - VALID if deserialization is valid
-
-// TODO: replace with POINTonE2_Deserialize_BE and POINTonE2_Uncompress_Z,
-//       and update logic with G2 subgroup check?
+//
+// Note: can use with POINTonE2_Deserialize_BE and POINTonE2_Uncompress_Z,
+//       and update the logic around G2 subgroup check.
 ERROR E2_read_bytes(E2 *a, const byte *bin, const int len) {
   // check the length
   if (len != G2_SER_BYTES) {

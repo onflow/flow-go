@@ -62,9 +62,6 @@ All signature schemes use the generic interfaces of `PrivateKey` and `PublicKey`
     public keys, using a binary tree of aggregations.
     * SPoCK scheme based on BLS: verifies two signatures have been generated from the same message that is unknown to the verifier.
 
- * Future features:
-    * support minimal-pubkey-size variant
-
 ### PRNG
 
  * ChaCha20-based CSPRNG
