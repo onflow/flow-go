@@ -152,22 +152,22 @@ func (suite *RestAPITestSuite) SetupTest() {
 		nil,
 		nil).Build()
 
-	bnd := backend.New(
-		backend.Params{
-			State:                suite.state,
-			CollectionRPC:        suite.collClient,
-			Blocks:               suite.blocks,
-			Headers:              suite.headers,
-			Collections:          suite.collections,
-			Transactions:         suite.transactions,
-			ExecutionResults:     suite.executionResults,
-			ChainID:              suite.chainID,
-			AccessMetrics:        suite.metrics,
-			MaxHeightRange:       0,
-			Log:                  suite.log,
-			SnapshotHistoryLimit: 0,
-			Communicator:         backend.NewNodeCommunicator(false),
-		})
+	bnd, err := backend.New(backend.Params{
+		State:                suite.state,
+		CollectionRPC:        suite.collClient,
+		Blocks:               suite.blocks,
+		Headers:              suite.headers,
+		Collections:          suite.collections,
+		Transactions:         suite.transactions,
+		ExecutionResults:     suite.executionResults,
+		ChainID:              suite.chainID,
+		AccessMetrics:        suite.metrics,
+		MaxHeightRange:       0,
+		Log:                  suite.log,
+		SnapshotHistoryLimit: 0,
+		Communicator:         backend.NewNodeCommunicator(false),
+	})
+	require.NoError(suite.T(), err)
 
 	rpcEngBuilder, err := rpc.NewBuilder(
 		suite.log,
