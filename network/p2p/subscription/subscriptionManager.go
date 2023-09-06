@@ -11,20 +11,20 @@ import (
 // ChannelSubscriptionManager manages subscriptions of engines running on the node to channels.
 // Each channel should be taken by at most a single engine.
 type ChannelSubscriptionManager struct {
-	mu         sync.RWMutex
-	engines    map[channels.Channel]network.MessageProcessor
-	middleware network.Underlay // the Underlay interface of the network layer
+	mu              sync.RWMutex
+	engines         map[channels.Channel]network.MessageProcessor
+	networkUnderlay network.Underlay // the Underlay interface of the network layer
 }
 
 // NewChannelSubscriptionManager creates a new subscription manager.
 // Args:
-// - middleware: the Underlay interface of the network layer.
+// - networkUnderlay: the Underlay interface of the network layer.
 // Returns:
 // - a new subscription manager.
-func NewChannelSubscriptionManager(middleware network.Underlay) *ChannelSubscriptionManager {
+func NewChannelSubscriptionManager(underlay network.Underlay) *ChannelSubscriptionManager {
 	return &ChannelSubscriptionManager{
-		engines:    make(map[channels.Channel]network.MessageProcessor),
-		middleware: middleware,
+		engines:         make(map[channels.Channel]network.MessageProcessor),
+		networkUnderlay: underlay,
 	}
 }
 
@@ -39,9 +39,9 @@ func (sm *ChannelSubscriptionManager) Register(channel channels.Channel, engine 
 		return fmt.Errorf("subscriptionManager: channel already registered: %s", channel)
 	}
 
-	// registers the channel with the middleware to let middleware start receiving messages
+	// registers the channel with the networkUnderlay to let networkUnderlay start receiving messages
 	// TODO: subscribe function should be replaced by a better abstraction of the network.
-	err := sm.middleware.Subscribe(channel)
+	err := sm.networkUnderlay.Subscribe(channel)
 	if err != nil {
 		return fmt.Errorf("subscriptionManager: failed to subscribe to channel %s: %w", channel, err)
 	}
@@ -64,7 +64,7 @@ func (sm *ChannelSubscriptionManager) Unregister(channel channels.Channel) error
 		return nil
 	}
 
-	err := sm.middleware.Unsubscribe(channel)
+	err := sm.networkUnderlay.Unsubscribe(channel)
 	if err != nil {
 		return fmt.Errorf("subscriptionManager: failed to unregister from channel %s: %w", channel, err)
 	}
