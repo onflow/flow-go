@@ -231,7 +231,7 @@ func (fnb *FlowNodeBuilder) EnqueuePingService() {
 			}
 		}
 
-		pingService, err := node.Network.RegisterPingService(pingLibP2PProtocolID, pingInfoProvider)
+		pingService, err := node.EngineRegistry.RegisterPingService(pingLibP2PProtocolID, pingInfoProvider)
 
 		node.PingService = pingService
 
@@ -389,9 +389,9 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 			peerManagerFilters)
 	})
 
-	fnb.Module("middleware dependency", func(node *NodeConfig) error {
-		fnb.middlewareDependable = module.NewProxiedReadyDoneAware()
-		fnb.PeerManagerDependencies.Add(fnb.middlewareDependable)
+	fnb.Module("network underlay dependency", func(node *NodeConfig) error {
+		fnb.networkUnderlayDependable = module.NewProxiedReadyDoneAware()
+		fnb.PeerManagerDependencies.Add(fnb.networkUnderlayDependable)
 		return nil
 	})
 
@@ -477,12 +477,12 @@ func (fnb *FlowNodeBuilder) InitFlowNetworkWithConduitFactory(
 		return nil, fmt.Errorf("could not initialize network: %w", err)
 	}
 
-	fnb.Network = net    // setting network as the fnb.Network for the engine-level components
-	fnb.Middleware = net // setting network as the fnb.Middleware for the lower-level components
+	fnb.EngineRegistry = net  // setting network as the fnb.Network for the engine-level components
+	fnb.UnderlayNetwork = net // setting network as the fnb.Underlay for the lower-level components
 
 	// register network ReadyDoneAware interface so other components can depend on it for startup
-	if fnb.middlewareDependable != nil {
-		fnb.middlewareDependable.Init(fnb.Middleware)
+	if fnb.networkUnderlayDependable != nil {
+		fnb.networkUnderlayDependable.Init(fnb.UnderlayNetwork)
 	}
 
 	idEvents := gadgets.NewIdentityDeltas(net.UpdateNodeAddresses)
@@ -1008,7 +1008,7 @@ func (fnb *FlowNodeBuilder) InitIDProviders() {
 		// The following wrapper allows to disallow-list byzantine nodes via an admin command:
 		// the wrapper overrides the 'Ejected' flag of disallow-listed nodes to true
 		disallowListWrapper, err := cache.NewNodeDisallowListWrapper(idCache, node.DB, func() network.DisallowListNotificationConsumer {
-			return fnb.Middleware
+			return fnb.UnderlayNetwork
 		})
 		if err != nil {
 			return fmt.Errorf("could not initialize NodeBlockListWrapper: %w", err)

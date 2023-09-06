@@ -34,7 +34,7 @@ const (
 	PublicNetwork
 )
 
-// EngineRegistry is one of the networking layer interfaces in Flow (i.e., EngineRegistry, ConduitAdapter, and Middleware). It represents the interface that networking layer
+// EngineRegistry is one of the networking layer interfaces in Flow (i.e., EngineRegistry, ConduitAdapter, and Underlay). It represents the interface that networking layer
 // offers to the Flow protocol layer, i.e., engines. It is responsible for creating conduits through which engines
 // can send and receive messages to and from other engines on the network, as well as registering other services
 // such as BlobService and PingService.
@@ -55,7 +55,7 @@ type EngineRegistry interface {
 	RegisterPingService(pingProtocolID protocol.ID, pingInfoProvider PingInfoProvider) (PingService, error)
 }
 
-// ConduitAdapter is one of the networking layer interfaces in Flow (i.e., EngineRegistry, ConduitAdapter, and Middleware). It represents the interface that networking layer
+// ConduitAdapter is one of the networking layer interfaces in Flow (i.e., EngineRegistry, ConduitAdapter, and Underlay). It represents the interface that networking layer
 // offers to a single conduit which enables the conduit to send different types of messages i.e., unicast, multicast,
 // and publish, to other conduits on the network.
 type ConduitAdapter interface {
@@ -75,18 +75,18 @@ type ConduitAdapter interface {
 	UnRegisterChannel(channel channels.Channel) error
 }
 
-// Middleware is one of the networking layer interfaces in Flow (i.e., EngineRegistry, ConduitAdapter, and Middleware). It represents the interface that networking layer
+// Underlay is one of the networking layer interfaces in Flow (i.e., EngineRegistry, ConduitAdapter, and Underlay). It represents the interface that networking layer
 // offers to lower level networking components such as libp2p. It is responsible for subscribing to and unsubscribing
 // from channels, as well as updating the addresses of all the authorized participants in the Flow protocol.
-type Middleware interface {
+type Underlay interface {
 	module.ReadyDoneAware
 	DisallowListNotificationConsumer
 
-	// Subscribe subscribes the middleware to a channel.
+	// Subscribe subscribes the network Underlay to a channel.
 	// No errors are expected during normal operation.
 	Subscribe(channel channels.Channel) error
 
-	// Unsubscribe unsubscribes the middleware from a channel.
+	// Unsubscribe unsubscribes the network Underlay from a channel.
 	// All errors returned from this function can be considered benign.
 	Unsubscribe(channel channels.Channel) error
 

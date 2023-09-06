@@ -252,7 +252,6 @@ func StartNodesAndNetworks(ctx irrecoverable.SignalerContext, t *testing.T, node
 //
 // This function fails the test if the networks do not start within the given timeout.
 func StartNetworks(ctx irrecoverable.SignalerContext, t *testing.T, nets []network.EngineRegistry) {
-	// start up networks (this will implicitly start middlewares)
 	for _, net := range nets {
 		net.Start(ctx)
 		unittest.RequireComponentsReadyBefore(t, 5*time.Second, net)

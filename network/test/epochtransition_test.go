@@ -191,8 +191,6 @@ func (suite *MutableIdentityTableSuite) setupStateMock() {
 func (suite *MutableIdentityTableSuite) addNodes(count int) {
 	ctx, cancel := context.WithCancel(context.Background())
 	signalerCtx := irrecoverable.NewMockSignalerContext(suite.T(), ctx)
-
-	// create the ids, middlewares and networks
 	sporkId := unittest.IdentifierFixture()
 	ids, nodes := testutils.LibP2PNodeForNetworkFixture(suite.T(), sporkId, count)
 	nets, _ := testutils.NetworksFixture(suite.T(), sporkId, ids, nodes)

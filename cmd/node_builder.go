@@ -194,8 +194,8 @@ type NodeConfig struct {
 	ProtocolEvents    *events.Distributor
 	State             protocol.State
 	Resolver          madns.BasicResolver
-	Network           network.EngineRegistry
-	Middleware        network.Middleware
+	EngineRegistry    network.EngineRegistry
+	UnderlayNetwork   network.Underlay
 	ConduitFactory    network.ConduitFactory
 	PingService       network.PingService
 	MsgValidators     []network.MessageValidator
@@ -206,7 +206,7 @@ type NodeConfig struct {
 	// list of dependencies for network peer manager startup
 	PeerManagerDependencies *DependencyList
 	// ReadyDoneAware implementation of the network middleware for DependableComponents
-	middlewareDependable *module.ProxiedReadyDoneAware
+	networkUnderlayDependable *module.ProxiedReadyDoneAware
 
 	// ID providers
 	IdentityProvider             module.IdentityProvider

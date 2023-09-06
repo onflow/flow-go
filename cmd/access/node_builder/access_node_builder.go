@@ -387,7 +387,7 @@ func (builder *FlowAccessNodeBuilder) buildFollowerEngine() *FlowAccessNodeBuild
 
 		builder.FollowerEng, err = followereng.NewComplianceLayer(
 			node.Logger,
-			node.Network,
+			node.EngineRegistry,
 			node.Me,
 			node.Metrics.Engine,
 			node.Storage.Headers,
@@ -411,7 +411,7 @@ func (builder *FlowAccessNodeBuilder) buildSyncEngine() *FlowAccessNodeBuilder {
 		sync, err := synceng.New(
 			node.Logger,
 			node.Metrics.Engine,
-			node.Network,
+			node.EngineRegistry,
 			node.Me,
 			node.State,
 			node.Storage.Blocks,
@@ -514,7 +514,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionDataRequester() *FlowAccessN
 			}
 
 			var err error
-			bs, err = node.Network.RegisterBlobService(channels.ExecutionDataService, ds, opts...)
+			bs, err = node.EngineRegistry.RegisterBlobService(channels.ExecutionDataService, ds, opts...)
 			if err != nil {
 				return nil, fmt.Errorf("could not register blob service: %w", err)
 			}
@@ -821,7 +821,7 @@ func (builder *FlowAccessNodeBuilder) InitIDProviders() {
 		// The following wrapper allows to disallow-list byzantine nodes via an admin command:
 		// the wrapper overrides the 'Ejected' flag of disallow-listed nodes to true
 		disallowListWrapper, err := cache.NewNodeDisallowListWrapper(idCache, node.DB, func() network.DisallowListNotificationConsumer {
-			return builder.Middleware
+			return builder.UnderlayNetwork
 		})
 		if err != nil {
 			return fmt.Errorf("could not initialize NodeBlockListWrapper: %w", err)
@@ -885,14 +885,14 @@ func (builder *FlowAccessNodeBuilder) Initialize() error {
 func (builder *FlowAccessNodeBuilder) enqueueRelayNetwork() {
 	builder.Component("relay network", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 		relayNet := relaynet.NewRelayNetwork(
-			node.Network,
+			node.EngineRegistry,
 			builder.AccessNodeConfig.PublicNetworkConfig.Network,
 			node.Logger,
 			map[channels.Channel]channels.Channel{
 				channels.ReceiveBlocks: channels.PublicReceiveBlocks,
 			},
 		)
-		node.Network = relayNet
+		node.EngineRegistry = relayNet
 		return relayNet, nil
 	})
 }
@@ -1125,7 +1125,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 			builder.RequestEng, err = requester.New(
 				node.Logger,
 				node.Metrics.Engine,
-				node.Network,
+				node.EngineRegistry,
 				node.Me,
 				node.State,
 				channels.RequestCollections,
@@ -1138,7 +1138,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 
 			builder.IngestEng, err = ingestion.New(
 				node.Logger,
-				node.Network,
+				node.EngineRegistry,
 				node.State,
 				node.Me,
 				builder.RequestEng,
@@ -1291,7 +1291,7 @@ func (builder *FlowAccessNodeBuilder) enqueuePublicNetworkInit() {
 				return nil, fmt.Errorf("could not initialize network: %w", err)
 			}
 
-			builder.Middleware = net
+			builder.UnderlayNetwork = net
 			builder.AccessNodeConfig.PublicNetworkConfig.Network = net
 
 			node.Logger.Info().Msgf("network will run on address: %s", builder.PublicNetworkConfig.BindAddress)

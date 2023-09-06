@@ -120,7 +120,7 @@ type Network struct {
 }
 
 var _ network.EngineRegistry = &Network{}
-var _ network.Middleware = &Network{}
+var _ network.Underlay = &Network{}
 var _ network.ConduitAdapter = &Network{}
 
 type registerEngineRequest struct {

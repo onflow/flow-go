@@ -370,7 +370,7 @@ func (builder *ObserverServiceBuilder) buildFollowerEngine() *ObserverServiceBui
 
 		builder.FollowerEng, err = follower.NewComplianceLayer(
 			node.Logger,
-			node.Network,
+			node.EngineRegistry,
 			node.Me,
 			node.Metrics.Engine,
 			node.Storage.Headers,
@@ -395,7 +395,7 @@ func (builder *ObserverServiceBuilder) buildSyncEngine() *ObserverServiceBuilder
 		sync, err := synceng.New(
 			node.Logger,
 			node.Metrics.Engine,
-			node.Network,
+			node.EngineRegistry,
 			node.Me,
 			node.State,
 			node.Storage.Blocks,
@@ -568,7 +568,7 @@ func (builder *ObserverServiceBuilder) InitIDProviders() {
 		// The following wrapper allows to black-list byzantine nodes via an admin command:
 		// the wrapper overrides the 'Ejected' flag of disallow-listed nodes to true
 		builder.IdentityProvider, err = cache.NewNodeDisallowListWrapper(idCache, node.DB, func() network.DisallowListNotificationConsumer {
-			return builder.Middleware
+			return builder.UnderlayNetwork
 		})
 		if err != nil {
 			return fmt.Errorf("could not initialize NodeBlockListWrapper: %w", err)
@@ -832,15 +832,15 @@ func (builder *ObserverServiceBuilder) enqueuePublicNetworkInit() {
 				return nil, fmt.Errorf("could not initialize network: %w", err)
 			}
 
-			builder.Middleware = net
-			builder.Network = converter.NewNetwork(net, channels.SyncCommittee, channels.PublicSyncCommittee)
+			builder.UnderlayNetwork = net
+			builder.EngineRegistry = converter.NewNetwork(net, channels.SyncCommittee, channels.PublicSyncCommittee)
 
 			builder.Logger.Info().Msgf("network will run on address: %s", builder.BindAddr)
 
-			idEvents := gadgets.NewIdentityDeltas(builder.Middleware.UpdateNodeAddresses)
+			idEvents := gadgets.NewIdentityDeltas(builder.UnderlayNetwork.UpdateNodeAddresses)
 			builder.ProtocolEvents.AddConsumer(idEvents)
 
-			return builder.Network, nil
+			return builder.EngineRegistry, nil
 		})
 }
 

@@ -13,15 +13,15 @@ import (
 type ChannelSubscriptionManager struct {
 	mu         sync.RWMutex
 	engines    map[channels.Channel]network.MessageProcessor
-	middleware network.Middleware // the Middleware interface of the network layer
+	middleware network.Underlay // the Underlay interface of the network layer
 }
 
 // NewChannelSubscriptionManager creates a new subscription manager.
 // Args:
-// - middleware: the Middleware interface of the network layer.
+// - middleware: the Underlay interface of the network layer.
 // Returns:
 // - a new subscription manager.
-func NewChannelSubscriptionManager(middleware network.Middleware) *ChannelSubscriptionManager {
+func NewChannelSubscriptionManager(middleware network.Underlay) *ChannelSubscriptionManager {
 	return &ChannelSubscriptionManager{
 		engines:    make(map[channels.Channel]network.MessageProcessor),
 		middleware: middleware,
