@@ -922,28 +922,27 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 			),
 		}
 
-		accessBackend := backend.New(
-			node.State,
-			nil,
-			nil,
-			node.Storage.Blocks,
-			node.Storage.Headers,
-			node.Storage.Collections,
-			node.Storage.Transactions,
-			node.Storage.Receipts,
-			node.Storage.Results,
-			node.RootChainID,
-			accessMetrics,
-			connFactory,
-			false,
-			backendConfig.MaxHeightRange,
-			backendConfig.PreferredExecutionNodeIDs,
-			backendConfig.FixedExecutionNodeIDs,
-			node.Logger,
-			backend.DefaultSnapshotHistoryLimit,
-			backendConfig.ArchiveAddressList,
-			backendConfig.ScriptExecValidation,
-			backendConfig.CircuitBreakerConfig.Enabled)
+		accessBackend := backend.New(backend.Params{
+			State:                     node.State,
+			Blocks:                    node.Storage.Blocks,
+			Headers:                   node.Storage.Headers,
+			Collections:               node.Storage.Collections,
+			Transactions:              node.Storage.Transactions,
+			ExecutionReceipts:         node.Storage.Receipts,
+			ExecutionResults:          node.Storage.Results,
+			ChainID:                   node.RootChainID,
+			AccessMetrics:             accessMetrics,
+			ConnFactory:               connFactory,
+			RetryEnabled:              false,
+			MaxHeightRange:            backendConfig.MaxHeightRange,
+			PreferredExecutionNodeIDs: backendConfig.PreferredExecutionNodeIDs,
+			FixedExecutionNodeIDs:     backendConfig.FixedExecutionNodeIDs,
+			Log:                       node.Logger,
+			SnapshotHistoryLimit:      backend.DefaultSnapshotHistoryLimit,
+			ArchiveAddressList:        backendConfig.ArchiveAddressList,
+			Communicator:              backend.NewNodeCommunicator(backendConfig.CircuitBreakerConfig.Enabled),
+			ScriptExecValidation:      backendConfig.ScriptExecValidation,
+		})
 
 		observerCollector := metrics.NewObserverCollector()
 		restHandler, err := restapiproxy.NewRestProxyHandler(
