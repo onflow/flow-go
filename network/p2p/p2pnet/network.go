@@ -31,6 +31,7 @@ import (
 	"github.com/onflow/flow-go/network/message"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/blob"
+	"github.com/onflow/flow-go/network/p2p/p2pnet/internal"
 	"github.com/onflow/flow-go/network/p2p/ping"
 	"github.com/onflow/flow-go/network/p2p/subscription"
 	"github.com/onflow/flow-go/network/p2p/unicast/protocols"
@@ -1070,7 +1071,7 @@ func (n *Network) Subscribe(channel channels.Channel) error {
 	}
 
 	// create a new readSubscription with the context of the network
-	rs := NewReadSubscription(s, n.processPubSubMessages, n.logger)
+	rs := internal.NewReadSubscription(s, n.processPubSubMessages, n.logger)
 	n.wg.Add(1)
 
 	// kick off the receive loop to continuously receive messages

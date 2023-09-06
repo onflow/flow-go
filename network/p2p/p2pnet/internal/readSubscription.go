@@ -1,4 +1,4 @@
-package p2pnet
+package internal
 
 import (
 	"context"
