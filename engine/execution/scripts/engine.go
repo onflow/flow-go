@@ -9,18 +9,31 @@ import (
 
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/execution"
-	"github.com/onflow/flow-go/engine/execution/computation"
-	"github.com/onflow/flow-go/engine/execution/state"
+	"github.com/onflow/flow-go/engine/execution/computation/query"
+	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/state/protocol"
 )
 
+// ScriptExecutionState is a subset of the `state.ExecutionState` interface purposed to only access the state
+// used for script execution and not mutate the execution state of the blockchain.
+type ScriptExecutionState interface {
+	// NewStorageSnapshot creates a new ready-only view at the given state commitment.
+	NewStorageSnapshot(flow.StateCommitment) snapshot.StorageSnapshot
+
+	// StateCommitmentByBlockID returns the final state commitment for the provided block ID.
+	StateCommitmentByBlockID(context.Context, flow.Identifier) (flow.StateCommitment, error)
+
+	// HasState returns true if the state with the given state commitment exists in memory
+	HasState(flow.StateCommitment) bool
+}
+
 type Engine struct {
-	unit               *engine.Unit
-	log                zerolog.Logger
-	state              protocol.State
-	computationManager computation.ComputationManager
-	execState          state.ExecutionState
+	unit          *engine.Unit
+	log           zerolog.Logger
+	state         protocol.State
+	queryExecutor query.Executor
+	execState     ScriptExecutionState
 }
 
 var _ execution.ScriptExecutor = (*Engine)(nil)
@@ -28,15 +41,15 @@ var _ execution.ScriptExecutor = (*Engine)(nil)
 func New(
 	logger zerolog.Logger,
 	state protocol.State,
-	computationManager computation.ComputationManager,
-	execState state.ExecutionState,
+	queryExecutor query.Executor,
+	execState ScriptExecutionState,
 ) *Engine {
 	return &Engine{
-		unit:               engine.NewUnit(),
-		log:                logger.With().Str("engine", "scripts").Logger(),
-		state:              state,
-		execState:          execState,
-		computationManager: computationManager,
+		unit:          engine.NewUnit(),
+		log:           logger.With().Str("engine", "scripts").Logger(),
+		state:         state,
+		execState:     execState,
+		queryExecutor: queryExecutor,
 	}
 }
 
@@ -73,7 +86,7 @@ func (e *Engine) ExecuteScriptAtBlockID(
 
 	blockSnapshot := e.execState.NewStorageSnapshot(stateCommit)
 
-	return e.computationManager.ExecuteScript(
+	return e.queryExecutor.ExecuteScript(
 		ctx,
 		script,
 		arguments,
@@ -131,5 +144,5 @@ func (e *Engine) GetAccount(
 
 	blockSnapshot := e.execState.NewStorageSnapshot(stateCommit)
 
-	return e.computationManager.GetAccount(ctx, addr, block, blockSnapshot)
+	return e.queryExecutor.GetAccount(ctx, addr, block, blockSnapshot)
 }

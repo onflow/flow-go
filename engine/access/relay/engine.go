@@ -21,8 +21,8 @@ type Engine struct {
 func New(
 	log zerolog.Logger,
 	channelList channels.ChannelList,
-	net network.Network,
-	unstakedNet network.Network,
+	net network.EngineRegistry,
+	unstakedNet network.EngineRegistry,
 ) (*Engine, error) {
 	e := &Engine{
 		unit:     engine.NewUnit(),
