@@ -1,6 +1,5 @@
 package crypto
 
-// #cgo CFLAGS:
 // #include "bls_thresholdsign_include.h"
 import "C"
 

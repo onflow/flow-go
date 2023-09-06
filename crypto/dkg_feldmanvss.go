@@ -1,6 +1,5 @@
 package crypto
 
-// #cgo CFLAGS:
 // #include "dkg_include.h"
 import "C"
 

@@ -90,10 +90,8 @@ ERROR G2_vector_read_bytes(E2 *A, const byte *src, const int n) {
     if (!E2_in_G2(&A[i])) {
       return POINT_NOT_IN_GROUP;
     }
-
     p += G2_SER_BYTES;
   }
-  // TODO: add G2 subgroup check?
   return VALID;
 }
 
