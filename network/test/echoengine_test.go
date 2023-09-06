@@ -63,7 +63,7 @@ func (suite *EchoEngineTestSuite) SetupTest() {
 	// starts the nodes and networks
 	testutils.StartNodes(signalerCtx, suite.T(), nodes)
 	for _, net := range suite.networks {
-		testutils.StartNetworks(signalerCtx, suite.T(), []network.Network{net})
+		testutils.StartNetworks(signalerCtx, suite.T(), []network.EngineRegistry{net})
 		unittest.RequireComponentsReadyBefore(suite.T(), 1*time.Second, net)
 	}
 }

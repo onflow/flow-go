@@ -236,7 +236,7 @@ func NetworkConfigFixture(
 // - timeout: the timeout to use for waiting for the nodes and networks to start.
 //
 // This function fails the test if the nodes or networks do not start within the given timeout.
-func StartNodesAndNetworks(ctx irrecoverable.SignalerContext, t *testing.T, nodes []p2p.LibP2PNode, nets []network.Network) {
+func StartNodesAndNetworks(ctx irrecoverable.SignalerContext, t *testing.T, nodes []p2p.LibP2PNode, nets []network.EngineRegistry) {
 	StartNetworks(ctx, t, nets)
 
 	// start up nodes and Peer managers
@@ -251,7 +251,7 @@ func StartNodesAndNetworks(ctx irrecoverable.SignalerContext, t *testing.T, node
 // - duration: the timeout to use for waiting for the networks to start.
 //
 // This function fails the test if the networks do not start within the given timeout.
-func StartNetworks(ctx irrecoverable.SignalerContext, t *testing.T, nets []network.Network) {
+func StartNetworks(ctx irrecoverable.SignalerContext, t *testing.T, nets []network.EngineRegistry) {
 	// start up networks (this will implicitly start middlewares)
 	for _, net := range nets {
 		net.Start(ctx)

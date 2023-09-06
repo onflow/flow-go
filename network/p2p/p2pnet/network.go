@@ -119,7 +119,7 @@ type Network struct {
 	preferredUnicasts           []protocols.ProtocolName
 }
 
-var _ network.Network = &Network{}
+var _ network.EngineRegistry = &Network{}
 var _ network.Middleware = &Network{}
 var _ network.Adapter = &Network{}
 

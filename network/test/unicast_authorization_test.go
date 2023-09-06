@@ -40,11 +40,11 @@ type UnicastAuthorizationTestSuite struct {
 
 	libP2PNodes []p2p.LibP2PNode
 	// senderNetwork is the networking layer instance that will be used to send the message.
-	senderNetwork network.Network
+	senderNetwork network.EngineRegistry
 	// senderID the identity on the mw sending the message
 	senderID *flow.Identity
 	// receiverNetwork is the networking layer instance that will be used to receive the message.
-	receiverNetwork network.Network
+	receiverNetwork network.EngineRegistry
 	// receiverID the identity on the mw sending the message
 	receiverID *flow.Identity
 	// providers id providers generated at beginning of a test run
@@ -105,7 +105,7 @@ func (u *UnicastAuthorizationTestSuite) startNetworksAndLibp2pNodes() {
 	sigCtx, _ := irrecoverable.WithSignaler(ctx)
 
 	testutils.StartNodes(sigCtx, u.T(), u.libP2PNodes)
-	testutils.StartNetworks(sigCtx, u.T(), []network.Network{u.senderNetwork, u.receiverNetwork})
+	testutils.StartNetworks(sigCtx, u.T(), []network.EngineRegistry{u.senderNetwork, u.receiverNetwork})
 	unittest.RequireComponentsReadyBefore(u.T(), 1*time.Second, u.senderNetwork, u.receiverNetwork)
 
 	u.cancel = cancel
@@ -115,7 +115,7 @@ func (u *UnicastAuthorizationTestSuite) startNetworksAndLibp2pNodes() {
 func (u *UnicastAuthorizationTestSuite) stopNetworksAndLibp2pNodes() {
 	u.cancel() // cancel context to stop libp2p nodes.
 
-	testutils.StopComponents(u.T(), []network.Network{u.senderNetwork, u.receiverNetwork}, 1*time.Second)
+	testutils.StopComponents(u.T(), []network.EngineRegistry{u.senderNetwork, u.receiverNetwork}, 1*time.Second)
 	unittest.RequireComponentsDoneBefore(u.T(), 1*time.Second, u.senderNetwork, u.receiverNetwork)
 }
 

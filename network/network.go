@@ -34,11 +34,11 @@ const (
 	PublicNetwork
 )
 
-// Network is one of the networking layer interfaces in Flow (i.e., Network, Adapter, and Middleware). It represents the interface that networking layer
+// EngineRegistry is one of the networking layer interfaces in Flow (i.e., EngineRegistry, Adapter, and Middleware). It represents the interface that networking layer
 // offers to the Flow protocol layer, i.e., engines. It is responsible for creating conduits through which engines
 // can send and receive messages to and from other engines on the network, as well as registering other services
 // such as BlobService and PingService.
-type Network interface {
+type EngineRegistry interface {
 	component.Component
 	// Register will subscribe to the channel with the given engine and
 	// the engine will be notified with incoming messages on the channel.
@@ -55,7 +55,7 @@ type Network interface {
 	RegisterPingService(pingProtocolID protocol.ID, pingInfoProvider PingInfoProvider) (PingService, error)
 }
 
-// Adapter is one of the networking layer interfaces in Flow (i.e., Network, Adapter, and Middleware). It represents the interface that networking layer
+// Adapter is one of the networking layer interfaces in Flow (i.e., EngineRegistry, Adapter, and Middleware). It represents the interface that networking layer
 // offers to a single conduit which enables the conduit to send different types of messages i.e., unicast, multicast,
 // and publish, to other conduits on the network.
 type Adapter interface {
@@ -75,7 +75,7 @@ type Adapter interface {
 	UnRegisterChannel(channel channels.Channel) error
 }
 
-// Middleware is one of the networking layer interfaces in Flow (i.e., Network, Adapter, and Middleware). It represents the interface that networking layer
+// Middleware is one of the networking layer interfaces in Flow (i.e., EngineRegistry, Adapter, and Middleware). It represents the interface that networking layer
 // offers to lower level networking components such as libp2p. It is responsible for subscribing to and unsubscribing
 // from channels, as well as updating the addresses of all the authorized participants in the Flow protocol.
 type Middleware interface {

@@ -213,7 +213,7 @@ func (suite *NetworkTestSuite) TestUpdateNodeAddresses() {
 	defer testutils.StopComponents(suite.T(), libP2PNodes, 1*time.Second)
 
 	newNet.Start(irrecoverableCtx)
-	defer testutils.StopComponents(suite.T(), []network.Network{newNet}, 1*time.Second)
+	defer testutils.StopComponents(suite.T(), []network.EngineRegistry{newNet}, 1*time.Second)
 	unittest.RequireComponentsReadyBefore(suite.T(), 1*time.Second, newNet)
 
 	idList := flow.IdentityList(append(suite.ids, newId))
@@ -312,7 +312,7 @@ func (suite *NetworkTestSuite) TestUnicastRateLimit_Messages() {
 	irrecoverableCtx := irrecoverable.NewMockSignalerContext(suite.T(), ctx)
 	testutils.StartNodes(irrecoverableCtx, suite.T(), libP2PNodes)
 	defer testutils.StopComponents(suite.T(), libP2PNodes, 1*time.Second)
-	testutils.StartNetworks(irrecoverableCtx, suite.T(), []network.Network{newNet})
+	testutils.StartNetworks(irrecoverableCtx, suite.T(), []network.EngineRegistry{newNet})
 
 	calls := atomic.NewUint64(0)
 	ch := make(chan struct{})
@@ -451,7 +451,7 @@ func (suite *NetworkTestSuite) TestUnicastRateLimit_Bandwidth() {
 	testutils.StartNodes(irrecoverableCtx, suite.T(), libP2PNodes)
 	defer testutils.StopComponents(suite.T(), libP2PNodes, 1*time.Second)
 
-	testutils.StartNetworks(irrecoverableCtx, suite.T(), []network.Network{newNet})
+	testutils.StartNetworks(irrecoverableCtx, suite.T(), []network.EngineRegistry{newNet})
 	unittest.RequireComponentsReadyBefore(suite.T(), 1*time.Second, newNet)
 
 	// registers an engine on the new network so that it can receive messages on the TestNetworkChannel

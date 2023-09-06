@@ -138,7 +138,7 @@ type AccessNodeConfig struct {
 type PublicNetworkConfig struct {
 	// NetworkKey crypto.PublicKey // TODO: do we need a different key for the public network?
 	BindAddress string
-	Network     network.Network
+	Network     network.EngineRegistry
 	Metrics     module.NetworkMetrics
 }
 

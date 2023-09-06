@@ -112,10 +112,10 @@ func (t *testNodeList) engines() []*testutils.MeshEngine {
 	return engs
 }
 
-func (t *testNodeList) networks() []network.Network {
+func (t *testNodeList) networks() []network.EngineRegistry {
 	t.RLock()
 	defer t.RUnlock()
-	nets := make([]network.Network, len(t.nodes))
+	nets := make([]network.EngineRegistry, len(t.nodes))
 	for i, node := range t.nodes {
 		nets[i] = node.network
 	}
@@ -201,7 +201,7 @@ func (suite *MutableIdentityTableSuite) addNodes(count int) {
 	// starts the nodes and networks
 	testutils.StartNodes(signalerCtx, suite.T(), nodes)
 	for _, net := range nets {
-		testutils.StartNetworks(signalerCtx, suite.T(), []network.Network{net})
+		testutils.StartNetworks(signalerCtx, suite.T(), []network.EngineRegistry{net})
 		unittest.RequireComponentsReadyBefore(suite.T(), 1*time.Second, net)
 	}
 

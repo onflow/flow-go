@@ -415,7 +415,7 @@ func (fnb *FlowNodeBuilder) InitFlowNetworkWithConduitFactory(
 	node *NodeConfig,
 	cf network.ConduitFactory,
 	unicastRateLimiters *ratelimit.RateLimiters,
-	peerManagerFilters []p2p.PeerFilter) (network.Network, error) {
+	peerManagerFilters []p2p.PeerFilter) (network.EngineRegistry, error) {
 
 	var networkOptions []p2pnet.NetworkOption
 	if len(fnb.MsgValidators) > 0 {

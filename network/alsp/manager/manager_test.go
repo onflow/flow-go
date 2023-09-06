@@ -65,7 +65,7 @@ func TestNetworkPassesReportedMisbehavior(t *testing.T) {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
-	testutils.StartNodesAndNetworks(signalerCtx, t, nodes, []network.Network{net})
+	testutils.StartNodesAndNetworks(signalerCtx, t, nodes, []network.EngineRegistry{net})
 	defer testutils.StopComponents[p2p.LibP2PNode](t, nodes, 100*time.Millisecond)
 	defer cancel()
 
@@ -123,7 +123,7 @@ func TestHandleReportedMisbehavior_Cache_Integration(t *testing.T) {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
-	testutils.StartNodesAndNetworks(signalerCtx, t, nodes, []network.Network{net})
+	testutils.StartNodesAndNetworks(signalerCtx, t, nodes, []network.EngineRegistry{net})
 	defer testutils.StopComponents[p2p.LibP2PNode](t, nodes, 100*time.Millisecond)
 	defer cancel()
 
@@ -230,7 +230,7 @@ func TestHandleReportedMisbehavior_And_DisallowListing_Integration(t *testing.T)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
-	testutils.StartNodesAndNetworks(signalerCtx, t, nodes, []network.Network{victimNetwork})
+	testutils.StartNodesAndNetworks(signalerCtx, t, nodes, []network.EngineRegistry{victimNetwork})
 	defer testutils.StopComponents[p2p.LibP2PNode](t, nodes, 100*time.Millisecond)
 	defer cancel()
 
@@ -324,7 +324,7 @@ func TestHandleReportedMisbehavior_And_DisallowListing_RepeatOffender_Integratio
 
 	ctx, cancel := context.WithCancel(context.Background())
 	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
-	testutils.StartNodesAndNetworks(signalerCtx, t, nodes, []network.Network{victimNetwork})
+	testutils.StartNodesAndNetworks(signalerCtx, t, nodes, []network.EngineRegistry{victimNetwork})
 	defer testutils.StopComponents[p2p.LibP2PNode](t, nodes, 100*time.Millisecond)
 	defer cancel()
 
@@ -480,7 +480,7 @@ func TestHandleReportedMisbehavior_And_SlashingViolationsConsumer_Integration(t 
 
 	ctx, cancel := context.WithCancel(context.Background())
 	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
-	testutils.StartNodesAndNetworks(signalerCtx, t, nodes, []network.Network{victimNetwork})
+	testutils.StartNodesAndNetworks(signalerCtx, t, nodes, []network.EngineRegistry{victimNetwork})
 	defer testutils.StopComponents[p2p.LibP2PNode](t, nodes, 100*time.Millisecond)
 	defer cancel()
 
@@ -570,7 +570,7 @@ func TestMisbehaviorReportMetrics(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
-	testutils.StartNodesAndNetworks(signalerCtx, t, nodes, []network.Network{net})
+	testutils.StartNodesAndNetworks(signalerCtx, t, nodes, []network.EngineRegistry{net})
 	defer testutils.StopComponents[p2p.LibP2PNode](t, nodes, 100*time.Millisecond)
 	defer cancel()
 

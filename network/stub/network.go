@@ -41,7 +41,7 @@ func WithConduitFactory(factory network.ConduitFactory) func(*Network) {
 	}
 }
 
-var _ network.Network = (*Network)(nil)
+var _ network.EngineRegistry = (*Network)(nil)
 var _ network.Adapter = (*Network)(nil)
 
 // NewNetwork create a mocked Network.
