@@ -71,7 +71,7 @@ var _ component.Component = (*Engine)(nil)
 func New(
 	log zerolog.Logger,
 	metrics module.EngineMetrics,
-	net network.Network,
+	net network.EngineRegistry,
 	me module.Local,
 	state protocol.State,
 	blocks storage.Blocks,

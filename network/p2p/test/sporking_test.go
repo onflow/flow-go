@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/peerstore"
 	"github.com/stretchr/testify/assert"
@@ -68,7 +69,7 @@ func TestCrosstalkPreventionOnNetworkKeyChange(t *testing.T) {
 	defer p2ptest.StopNode(t, node1, cancel1)
 
 	t.Logf(" %s node started on %s", id1.NodeID.String(), id1.Address)
-	t.Logf("libp2p ID for %s: %s", id1.NodeID.String(), node1.Host().ID())
+	t.Logf("libp2p ID for %s: %s", id1.NodeID.String(), node1.ID())
 
 	// create and start node 2 on localhost and random port
 	node2key := p2ptest.NetworkingKeyFixtures(t)
@@ -87,9 +88,11 @@ func TestCrosstalkPreventionOnNetworkKeyChange(t *testing.T) {
 
 	// create stream from node 1 to node 2
 	node1.Host().Peerstore().AddAddrs(peerInfo2.ID, peerInfo2.Addrs, peerstore.AddressTTL)
-	s, err := node1.CreateStream(context.Background(), peerInfo2.ID)
+	err = node1.OpenProtectedStream(context.Background(), peerInfo2.ID, t.Name(), func(stream network.Stream) error {
+		require.NotNil(t, stream)
+		return nil
+	})
 	require.NoError(t, err)
-	assert.NotNil(t, s)
 
 	// Simulate a hard-spoon: node1 is on the old chain, but node2 is moved from the old chain to the new chain
 	// stop node 2 and start it again with a different networking key but on the same IP and port
@@ -154,9 +157,11 @@ func TestOneToOneCrosstalkPrevention(t *testing.T) {
 
 	// create stream from node 1 to node 2
 	node2.Host().Peerstore().AddAddrs(peerInfo1.ID, peerInfo1.Addrs, peerstore.AddressTTL)
-	s, err := node2.CreateStream(context.Background(), peerInfo1.ID)
+	err = node2.OpenProtectedStream(context.Background(), peerInfo1.ID, t.Name(), func(stream network.Stream) error {
+		assert.NotNil(t, stream)
+		return nil
+	})
 	require.NoError(t, err)
-	assert.NotNil(t, s)
 
 	// Simulate a hard-spoon: node1 is on the old chain, but node2 is moved from the old chain to the new chain
 	// stop node 2 and start it again with a different libp2p protocol id to listen for
@@ -234,7 +239,7 @@ func TestOneToKCrosstalkPrevention(t *testing.T) {
 	require.NoError(t, err)
 
 	// add node 2 as a peer of node 1
-	err = node1.AddPeer(ctx, pInfo2)
+	err = node1.ConnectToPeer(ctx, pInfo2)
 	require.NoError(t, err)
 
 	// let the two nodes form the mesh
@@ -308,9 +313,15 @@ func TestOneToKCrosstalkPrevention(t *testing.T) {
 func testOneToOneMessagingFails(t *testing.T, sourceNode p2p.LibP2PNode, peerInfo peer.AddrInfo) {
 	// create stream from source node to destination address
 	sourceNode.Host().Peerstore().AddAddrs(peerInfo.ID, peerInfo.Addrs, peerstore.AddressTTL)
-	_, err := sourceNode.CreateStream(context.Background(), peerInfo.ID)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	err := sourceNode.OpenProtectedStream(ctx, peerInfo.ID, t.Name(), func(stream network.Stream) error {
+		// this callback should never be called
+		assert.Fail(t, "stream creation should have failed")
+		return nil
+	})
 	// assert that stream creation failed
-	assert.Error(t, err)
+	require.Error(t, err)
 	// assert that it failed with the expected error
 	assert.Regexp(t, ".*failed to negotiate security protocol.*|.*protocols not supported.*", err)
 }

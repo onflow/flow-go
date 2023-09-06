@@ -14,7 +14,7 @@ import (
 type UnicastManager interface {
 	// WithDefaultHandler sets the default stream handler for this unicast manager. The default handler is utilized
 	// as the core handler for other unicast protocols, e.g., compressions.
-	WithDefaultHandler(defaultHandler libp2pnet.StreamHandler)
+	SetDefaultHandler(defaultHandler libp2pnet.StreamHandler)
 	// Register registers given protocol name as preferred unicast. Each invocation of register prioritizes the current protocol
 	// over previously registered ones.
 	// All errors returned from this function can be considered benign.

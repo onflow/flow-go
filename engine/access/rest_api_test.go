@@ -47,7 +47,7 @@ type RestAPITestSuite struct {
 	sealedSnaphost    *protocol.Snapshot
 	finalizedSnapshot *protocol.Snapshot
 	log               zerolog.Logger
-	net               *network.Network
+	net               *network.EngineRegistry
 	request           *module.Requester
 	collClient        *accessmock.AccessAPIClient
 	execClient        *accessmock.ExecutionAPIClient
@@ -76,7 +76,7 @@ type RestAPITestSuite struct {
 
 func (suite *RestAPITestSuite) SetupTest() {
 	suite.log = zerolog.New(os.Stdout)
-	suite.net = new(network.Network)
+	suite.net = new(network.EngineRegistry)
 	suite.state = new(protocol.State)
 	suite.sealedSnaphost = new(protocol.Snapshot)
 	suite.finalizedSnapshot = new(protocol.Snapshot)
