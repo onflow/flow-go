@@ -57,10 +57,12 @@ func TestListTargetSubPackages(t *testing.T) {
 	targetPackages, seenPackages := listTargetPackages([]string{"abc/def"}, getAllFlowPackages())
 	require.Equal(t, 1, len(targetPackages))
 
-	// there should be 2 packages that starts with "abc/def"
+	// there should be 2 target subpackages that starts with "abc/def"
 	require.Equal(t, 2, len(targetPackages["abc/def"]))
 	require.Contains(t, targetPackages["abc/def"], flowPackagePrefix+"abc/def")
+	require.Contains(t, targetPackages["abc/def"], flowPackagePrefix+"abc/def/ghi")
 
+	// there should be 2 seen subpackages that start with "abc/def"
 	require.Equal(t, 2, len(seenPackages))
 	require.Contains(t, seenPackages, flowPackagePrefix+"abc/def")
 	require.Contains(t, seenPackages, flowPackagePrefix+"abc/def/ghi")
