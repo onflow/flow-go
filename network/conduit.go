@@ -13,13 +13,13 @@ import (
 
 // ConduitFactory is an interface type that is utilized by the Network to create conduits for the channels.
 type ConduitFactory interface {
-	// RegisterAdapter sets the Adapter component of the factory.
-	// The Adapter is a wrapper around the Network layer that only exposes the set of methods
+	// RegisterAdapter sets the ConduitAdapter component of the factory.
+	// The ConduitAdapter is a wrapper around the Network layer that only exposes the set of methods
 	// that are needed by a conduit.
-	RegisterAdapter(Adapter) error
+	RegisterAdapter(ConduitAdapter) error
 
 	// NewConduit creates a conduit on the specified channel.
-	// Prior to creating any conduit, the factory requires an Adapter to be registered with it.
+	// Prior to creating any conduit, the factory requires an ConduitAdapter to be registered with it.
 	NewConduit(context.Context, channels.Channel) (Conduit, error)
 }
 

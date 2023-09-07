@@ -10,13 +10,14 @@ import (
 	"github.com/ipfs/go-datastore"
 	"github.com/ipfs/go-datastore/sync"
 	blockstore "github.com/ipfs/go-ipfs-blockstore"
+	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/atomic"
 
-	"github.com/onflow/flow-go/network/mocknetwork"
 	"github.com/onflow/flow-go/network/p2p/connection"
 	"github.com/onflow/flow-go/network/p2p/dht"
 	p2pconfig "github.com/onflow/flow-go/network/p2p/p2pbuilder/config"
+	"github.com/onflow/flow-go/network/p2p/p2pnet"
 	p2ptest "github.com/onflow/flow-go/network/p2p/test"
 	"github.com/onflow/flow-go/utils/unittest"
 
@@ -50,7 +51,7 @@ type BlobServiceTestSuite struct {
 	suite.Suite
 
 	cancel       context.CancelFunc
-	networks     []network.Network
+	networks     []*p2pnet.Network
 	blobServices []network.BlobService
 	datastores   []datastore.Batching
 	blobCids     []cid.Cid
@@ -58,7 +59,6 @@ type BlobServiceTestSuite struct {
 }
 
 func TestBlobService(t *testing.T) {
-	t.Parallel()
 	suite.Run(t, new(BlobServiceTestSuite))
 }
 
@@ -82,7 +82,9 @@ func (suite *BlobServiceTestSuite) SetupTest() {
 
 	signalerCtx := irrecoverable.NewMockSignalerContext(suite.T(), ctx)
 
-	ids, nodes, _ := testutils.LibP2PNodeForMiddlewareFixture(suite.T(),
+	sporkId := unittest.IdentifierFixture()
+	ids, nodes := testutils.LibP2PNodeForNetworkFixture(suite.T(),
+		sporkId,
 		suite.numNodes,
 		p2ptest.WithDHTOptions(dht.AsServer()),
 		p2ptest.WithPeerManagerEnabled(&p2pconfig.PeerManagerConfig{
@@ -90,9 +92,14 @@ func (suite *BlobServiceTestSuite) SetupTest() {
 			ConnectionPruning: true,
 			ConnectorFactory:  connection.DefaultLibp2pBackoffConnectorFactory(),
 		}, nil))
-	mws, _ := testutils.MiddlewareFixtures(suite.T(), ids, nodes, testutils.MiddlewareConfigFixture(suite.T()), mocknetwork.NewViolationsConsumer(suite.T()))
-	suite.networks = testutils.NetworksFixture(suite.T(), ids, mws)
-	testutils.StartNodesAndNetworks(signalerCtx, suite.T(), nodes, suite.networks, 100*time.Millisecond)
+
+	suite.networks, _ = testutils.NetworksFixture(suite.T(), sporkId, ids, nodes)
+	// starts the nodes and networks
+	testutils.StartNodes(signalerCtx, suite.T(), nodes)
+	for _, net := range suite.networks {
+		testutils.StartNetworks(signalerCtx, suite.T(), []network.EngineRegistry{net})
+		unittest.RequireComponentsReadyBefore(suite.T(), 1*time.Second, net)
+	}
 
 	blobExchangeChannel := channels.Channel("blob-exchange")
 
@@ -111,10 +118,10 @@ func (suite *BlobServiceTestSuite) SetupTest() {
 	// let nodes connect to each other only after they are all listening on Bitswap
 	topologyActive.Store(true)
 	suite.Require().Eventually(func() bool {
-		for i, mw := range mws {
+		for i, libp2pNode := range nodes {
 			for j := i + 1; j < suite.numNodes; j++ {
-				connected, err := mw.IsConnected(ids[j].NodeID)
-				suite.Require().NoError(err)
+				connected, err := libp2pNode.IsConnected(nodes[j].ID())
+				require.NoError(suite.T(), err)
 				if !connected {
 					return false
 				}

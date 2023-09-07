@@ -4,12 +4,11 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/onflow/flow-go/cmd/build"
-
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
 	"github.com/onflow/flow-go/access"
+	"github.com/onflow/flow-go/cmd/build"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/state/protocol"
@@ -57,7 +56,7 @@ func (b *backendNetwork) GetNodeVersionInfo(ctx context.Context) (*access.NodeVe
 	}
 
 	return &access.NodeVersionInfo{
-		Semver:          build.Semver(),
+		Semver:          build.Version(),
 		Commit:          build.Commit(),
 		SporkId:         sporkId,
 		ProtocolVersion: uint64(protocolVersion),

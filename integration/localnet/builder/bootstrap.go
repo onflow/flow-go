@@ -395,6 +395,7 @@ func prepareExecutionService(container testnet.ContainerConfig, i int, n int) Se
 		fmt.Sprintf("--cadence-tracing=%t", cadenceTracing),
 		fmt.Sprintf("--extensive-tracing=%t", extesiveTracing),
 		"--execution-data-dir=/data/execution-data",
+		"--chunk-data-pack-dir=/data/chunk-data-pack",
 	)
 
 	service.Volumes = append(service.Volumes,
@@ -518,7 +519,7 @@ func defaultService(name, role, dataDir, profilerDir string, i int) Service {
 			Dockerfile: "cmd/Dockerfile",
 			Args: map[string]string{
 				"TARGET":  fmt.Sprintf("./cmd/%s", role),
-				"VERSION": build.Semver(),
+				"VERSION": build.Version(),
 				"COMMIT":  build.Commit(),
 				"GOARCH":  runtime.GOARCH,
 			},
