@@ -8,6 +8,7 @@ import (
 	"github.com/dgraph-io/badger/v2"
 
 	"github.com/onflow/flow-go/engine/execution"
+	"github.com/onflow/flow-go/engine/execution/storehouse"
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/convert"
@@ -229,21 +230,32 @@ type RegisterUpdatesHolder interface {
 	UpdatedRegisters() flow.RegisterEntries
 }
 
-func CommitDelta(ldg ledger.Ledger, ruh RegisterUpdatesHolder, baseState flow.StateCommitment) (flow.StateCommitment, *ledger.TrieUpdate, error) {
+func CommitDelta(
+	ldg ledger.Ledger,
+	ruh RegisterUpdatesHolder,
+	baseStorageSnapshot storehouse.ExtendableStorageSnapshot,
+) (flow.StateCommitment, *ledger.TrieUpdate, storehouse.ExtendableStorageSnapshot, error) {
 	keys, values := RegisterEntriesToKeysValues(ruh.UpdatedRegisters())
+	baseState := ledger.State(baseStorageSnapshot.Commitment())
 
-	update, err := ledger.NewUpdate(ledger.State(baseState), keys, values)
+	update, err := ledger.NewUpdate(baseState, keys, values)
 
 	if err != nil {
-		return flow.DummyStateCommitment, nil, fmt.Errorf("cannot create ledger update: %w", err)
+		return flow.DummyStateCommitment, nil, nil, fmt.Errorf("cannot create ledger update: %w", err)
 	}
 
-	commit, trieUpdate, err := ldg.Set(update)
+	_, trieUpdate, err := ldg.Set(update)
 	if err != nil {
-		return flow.DummyStateCommitment, nil, err
+		return flow.DummyStateCommitment, nil, nil, err
 	}
 
-	return flow.StateCommitment(commit), trieUpdate, nil
+	// TODO(leo): concurrent
+	newStorageSnapshot, err := baseStorageSnapshot.Extend(trieUpdate)
+	if err != nil {
+		return flow.DummyStateCommitment, nil, nil, fmt.Errorf("cannot extend storage snapshot: %w", err)
+	}
+
+	return flow.StateCommitment(trieUpdate.RootHash), trieUpdate, newStorageSnapshot, nil
 }
 
 func (s *state) HasState(commitment flow.StateCommitment) bool {

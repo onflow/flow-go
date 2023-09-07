@@ -32,12 +32,12 @@ type ViewCommitter interface {
 	// CommitView commits an execution snapshot and collects proofs
 	CommitView(
 		*snapshot.ExecutionSnapshot,
-		flow.StateCommitment,
-		snapshot.StorageSnapshot,
+		storehouse.ExtendableStorageSnapshot,
 	) (
-		flow.StateCommitment,
+		flow.StateCommitment, // TODO(leo): deprecate. see storehouse.ExtendableStorageSnapshot.Commitment()
 		[]byte,
 		*ledger.TrieUpdate,
+		storehouse.ExtendableStorageSnapshot,
 		error,
 	)
 }
@@ -146,20 +146,17 @@ func (collector *resultCollector) commitCollection(
 		collector.blockSpan,
 		trace.EXECommitDelta).End()
 
-	startState := collector.result.CurrentEndState()
-	endState, proof, trieUpdate, err := collector.committer.CommitView(
+	startState := collector.currentCollectionStorageSnapshot.Commitment()
+
+	_, proof, trieUpdate, newSnapshot, err := collector.committer.CommitView(
 		collectionExecutionSnapshot,
-		startState,
 		collector.currentCollectionStorageSnapshot,
 	)
 	if err != nil {
 		return fmt.Errorf("commit view failed: %w", err)
 	}
 
-	newSnapshot, err := collector.currentCollectionStorageSnapshot.Extend(endState, trieUpdate)
-	if err != nil {
-		return fmt.Errorf("extend snapshot failed: %w", err)
-	}
+	endState := newSnapshot.Commitment()
 
 	collector.currentCollectionStorageSnapshot = newSnapshot
 
