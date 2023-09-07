@@ -27,6 +27,7 @@ import (
 	"github.com/onflow/flow-go/engine/execution/computation/committer"
 	"github.com/onflow/flow-go/engine/execution/computation/computer"
 	computermock "github.com/onflow/flow-go/engine/execution/computation/computer/mock"
+	"github.com/onflow/flow-go/engine/execution/storehouse"
 	"github.com/onflow/flow-go/engine/execution/testutil"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/environment"
@@ -69,22 +70,29 @@ type fakeCommitter struct {
 
 func (committer *fakeCommitter) CommitView(
 	view *snapshot.ExecutionSnapshot,
-	startState flow.StateCommitment,
+	baseStorageSnapshot storehouse.ExtendableStorageSnapshot,
 ) (
 	flow.StateCommitment,
 	[]byte,
 	*ledger.TrieUpdate,
+	storehouse.ExtendableStorageSnapshot,
 	error,
 ) {
 	committer.callCount++
 
-	endState := incStateCommitment(startState)
-
 	trieUpdate := &ledger.TrieUpdate{}
 	trieUpdate.RootHash[0] = byte(committer.callCount)
-	return endState,
+
+	newStorageSnapshot, err := baseStorageSnapshot.Extend(trieUpdate)
+	if err != nil {
+		return flow.DummyStateCommitment, nil, nil, nil, err
+	}
+
+	// endState := incStateCommitment(startState)
+	return newStorageSnapshot.Commitment(),
 		[]byte{byte(committer.callCount)},
 		trieUpdate,
+		newStorageSnapshot,
 		nil
 }
 
