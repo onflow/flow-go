@@ -221,7 +221,7 @@ func (e *Engine) process(channel channels.Channel, originID flow.Identifier, eve
 		}
 		return e.requestHandler.Process(channel, originID, event)
 	case *messages.RangeRequest:
-		report, misbehavior := e.validateRangeRequestForALSP(channel, originID, event)
+		report, misbehavior := e.validateRangeRequestForALSP(originID, event)
 		if misbehavior {
 			e.con.ReportMisbehavior(report) // report misbehavior to ALSP
 			e.log.
@@ -235,7 +235,7 @@ func (e *Engine) process(channel channels.Channel, originID flow.Identifier, eve
 		return e.requestHandler.Process(channel, originID, event)
 
 	case *messages.SyncRequest:
-		report, misbehavior := e.validateSyncRequestForALSP(channel, originID, event)
+		report, misbehavior := e.validateSyncRequestForALSP(originID)
 		if misbehavior {
 			e.con.ReportMisbehavior(report) // report misbehavior to ALSP
 			e.log.
@@ -505,12 +505,54 @@ func (e *Engine) validateBlockResponseForALSP(channel channels.Channel, id flow.
 }
 
 // TODO: implement spam reporting similar to validateSyncRequestForALSP
-func (e *Engine) validateRangeRequestForALSP(channel channels.Channel, id flow.Identifier, event interface{}) (*alsp.MisbehaviorReport, bool) {
+func (e *Engine) validateRangeRequestForALSP(originID flow.Identifier, event interface{}) (*alsp.MisbehaviorReport, bool) {
+	// Generate a random integer between 1 and spamProbabilityMultiplier (exclusive)
+	n, err := rand.Uint32n(spamProbabilityMultiplier)
+
+	if err != nil {
+		// failing to generate a random number is unlikely. If an error is encountered while
+		// generating a random number it indicates a bug and processing can not proceed.
+		e.log.Fatal().
+			Err(err).
+			Bool(logging.KeyNetworkingSecurity, true).
+			Str("originID", originID.String()).
+			Msg("failed to generate random number")
+	}
+
+	rangeRequest, ok := event.(*messages.RangeRequest)
+	if !ok {
+		e.log.Fatal().
+			Err(err).
+			Bool(logging.KeyNetworkingSecurity, true).
+			Str("originID", originID.String()).
+			Msg("failed to extract RangeRequest")
+	}
+
+	// to avoid creating a misbehavior report for every range request received, use a probabilistic approach.
+
+	probReport := e.spamDetectionConfig.rangeRequestProbability * (float32(rangeRequest.ToHeight-rangeRequest.FromHeight) + 1) / float32(synccore.DefaultConfig().MaxSize)
+	if float32(n) < probReport {
+		// create a misbehavior report
+		e.log.Info().Str("originID", originID.String()).Msg("creating misbehavior report")
+		report, err := alsp.NewMisbehaviorReport(originID, alsp.ResourceIntensiveRequest)
+
+		if err != nil {
+			// failing to create the misbehavior report is unlikely. If an error is encountered while
+			// creating the misbehavior report it indicates a bug and processing can not proceed.
+			e.log.Fatal().
+				Err(err).
+				Bool(logging.KeyNetworkingSecurity, true).
+				Str("originID", originID.String()).
+				Msg("failed to create misbehavior report")
+		}
+		return report, true
+	}
+
 	return nil, false
 }
 
 // validateSyncRequestForALSP checks if a sync request should be reported as spam. It returns a misbehavior report and a boolean indicating whether the request should be reported.
-func (e *Engine) validateSyncRequestForALSP(channel channels.Channel, originID flow.Identifier, event interface{}) (*alsp.MisbehaviorReport, bool) {
+func (e *Engine) validateSyncRequestForALSP(originID flow.Identifier) (*alsp.MisbehaviorReport, bool) {
 	// Generate a random integer between 1 and spamProbabilityMultiplier (exclusive)
 	n, err := rand.Uint32n(spamProbabilityMultiplier)
 

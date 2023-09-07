@@ -42,7 +42,8 @@ func WithScanInterval(interval time.Duration) OptionFunc {
 const spamProbabilityMultiplier = 1001
 
 type SpamDetectionConfig struct {
-	syncRequestProbability float32
+	syncRequestProbability  float32
+	rangeRequestProbability float32
 }
 
 func NewSpamDetectionConfig() *SpamDetectionConfig {
