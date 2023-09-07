@@ -7,6 +7,7 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/onflow/flow-go/network/channels"
+	p2pmsg "github.com/onflow/flow-go/network/p2p/message"
 )
 
 // TestErrActiveClusterIDsNotSetRoundTrip ensures correct error formatting for ErrActiveClusterIdsNotSet.
@@ -26,22 +27,34 @@ func TestErrActiveClusterIDsNotSetRoundTrip(t *testing.T) {
 	assert.False(t, IsErrActiveClusterIDsNotSet(dummyErr), "IsErrActiveClusterIDsNotSet should return false for non-ErrActiveClusterIdsNotSet error")
 }
 
-// TestErrDuplicateTopicRoundTrip ensures correct error formatting for DuplicateFoundErr.
-func TestErrDuplicateTopicRoundTrip(t *testing.T) {
-	topic := channels.Topic("topic")
-	e := fmt.Errorf("duplicate topic found: %s", topic.String())
-	err := NewDuplicateFoundErr(e)
-
-	// tests the error message formatting.
-	expectedErrMsg := e.Error()
-	assert.Equal(t, expectedErrMsg, err.Error(), "the error message should be correctly formatted")
-
-	// tests the IsDuplicateFoundErr function.
-	assert.True(t, IsDuplicateFoundErr(err), "IsDuplicateFoundErr should return true for DuplicateFoundErr error")
-
-	// test IsDuplicateFoundErr with a different error type.
+// TestErrDuplicateTopicRoundTrip ensures correct error formatting for DuplicateTopicErr.
+func TestDuplicateTopicErrRoundTrip(t *testing.T) {
+	e := fmt.Sprintf("duplicate topic foud in %s control message type: %s", p2pmsg.CtrlMsgGraft, channels.TestNetworkChannel)
+	err := NewDuplicateTopicErr(channels.TestNetworkChannel.String(), p2pmsg.CtrlMsgGraft)
+	assert.Equal(t, e, err.Error(), "the error message should be correctly formatted")
+	// tests the IsDuplicateTopicErr function.
+	assert.True(t, IsDuplicateTopicErr(err), "IsDuplicateTopicErr should return true for DuplicateTopicErr error")
+	// test IsDuplicateTopicErr with a different error type.
 	dummyErr := fmt.Errorf("dummy error")
-	assert.False(t, IsDuplicateFoundErr(dummyErr), "IsDuplicateFoundErr should return false for non-DuplicateFoundErr error")
+	assert.False(t, IsDuplicateTopicErr(dummyErr), "IsDuplicateTopicErr should return false for non-DuplicateTopicErr error")
+}
+
+// TestErrDuplicateTopicRoundTrip ensures correct error formatting for DuplicateTopicErr.
+func TestDuplicateMessageIDErrRoundTrip(t *testing.T) {
+	msgID := "flow-1804flkjnafo"
+	e1 := fmt.Sprintf("duplicate message ID foud in %s control message type: %s", p2pmsg.CtrlMsgIHave, msgID)
+	e2 := fmt.Sprintf("duplicate message ID foud in %s control message type: %s", p2pmsg.CtrlMsgIWant, msgID)
+	err := NewDuplicateMessageIDErr(msgID, p2pmsg.CtrlMsgIHave)
+	assert.Equal(t, e1, err.Error(), "the error message should be correctly formatted")
+	// tests the IsDuplicateTopicErr function.
+	assert.True(t, IsDuplicateMessageIDErr(err), "IsDuplicateMessageIDErr should return true for DuplicateMessageIDErr error")
+	err = NewDuplicateMessageIDErr(msgID, p2pmsg.CtrlMsgIWant)
+	assert.Equal(t, e2, err.Error(), "the error message should be correctly formatted")
+	// tests the IsDuplicateTopicErr function.
+	assert.True(t, IsDuplicateMessageIDErr(err), "IsDuplicateMessageIDErr should return true for DuplicateMessageIDErr error")
+	// test IsDuplicateMessageIDErr with a different error type.
+	dummyErr := fmt.Errorf("dummy error")
+	assert.False(t, IsDuplicateMessageIDErr(dummyErr), "IsDuplicateMessageIDErr should return false for non-DuplicateMessageIDErr error")
 }
 
 // TestIWantCacheMissThresholdErrRoundTrip ensures correct error formatting for IWantCacheMissThresholdErr.
@@ -71,7 +84,7 @@ func TestIWantDuplicateMsgIDThresholdErrRoundTrip(t *testing.T) {
 	// tests the IsIWantDuplicateMsgIDThresholdErr function.
 	assert.True(t, IsIWantDuplicateMsgIDThresholdErr(err), "IsIWantDuplicateMsgIDThresholdErr should return true for IWantDuplicateMsgIDThresholdErr error")
 
-	// test IsDuplicateFoundErr with a different error type.
+	// test IsDuplicateTopicErr with a different error type.
 	dummyErr := fmt.Errorf("dummy error")
 	assert.False(t, IsIWantDuplicateMsgIDThresholdErr(dummyErr), "IsIWantDuplicateMsgIDThresholdErr should return false for non-IWantDuplicateMsgIDThresholdErr error")
 }

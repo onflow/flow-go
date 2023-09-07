@@ -191,7 +191,7 @@ func TestValidationInspector_DuplicateTopicId_Detection(t *testing.T) {
 			notification, ok := args[0].(*p2p.InvCtrlMsgNotif)
 			require.True(t, ok)
 			require.Equal(t, spammer.SpammerNode.Host().ID(), notification.PeerID)
-			require.True(t, validation.IsDuplicateFoundErr(notification.Error))
+			require.True(t, validation.IsDuplicateTopicErr(notification.Error))
 			switch notification.MsgType {
 			case p2pmsg.CtrlMsgGraft:
 				invGraftNotifCount.Inc()
@@ -292,7 +292,7 @@ func TestValidationInspector_IHaveDuplicateMessageId_Detection(t *testing.T) {
 			notification, ok := args[0].(*p2p.InvCtrlMsgNotif)
 			require.True(t, ok)
 			require.Equal(t, spammer.SpammerNode.Host().ID(), notification.PeerID)
-			require.True(t, validation.IsDuplicateFoundErr(notification.Error))
+			require.True(t, validation.IsDuplicateTopicErr(notification.Error))
 			require.True(t, notification.MsgType == p2pmsg.CtrlMsgIHave, fmt.Sprintf("unexpected control message type %s error: %s", notification.MsgType, notification.Error))
 			invIHaveNotifCount.Inc()
 

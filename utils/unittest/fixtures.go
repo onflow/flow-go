@@ -9,6 +9,8 @@ import (
 	"testing"
 	"time"
 
+	pubsub "github.com/libp2p/go-libp2p-pubsub"
+	pubsub_pb "github.com/libp2p/go-libp2p-pubsub/pb"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/stretchr/testify/require"
 
@@ -2544,4 +2546,123 @@ func CreateSendTxHttpPayload(tx flow.TransactionBody) map[string]interface{} {
 			"signature": util.ToBase64(tx.EnvelopeSignatures[0].Signature),
 		}},
 	}
+}
+
+// P2PRPCGraftFixtures returns n number of control message rpc Graft fixtures.
+// The number of topics must match the number of grafts to ensure validity.
+// This default behavior guarantees valid grafts when using a list of unique valid topics.
+func P2PRPCGraftFixtures(t *testing.T, n int, topics []string) []*pubsub_pb.ControlGraft {
+	require.Equal(t, n, len(topics), "number of topics should match the number of grafts to create")
+	grafts := make([]*pubsub_pb.ControlGraft, n)
+	for i := 0; i < n; i++ {
+		grafts[i] = P2PRPCGraftFixture(&topics[i])
+	}
+	return grafts
+}
+
+// P2PRPCGraftFixture returns a control message rpc Graft fixture.
+func P2PRPCGraftFixture(topic *string) *pubsub_pb.ControlGraft {
+	return &pubsub_pb.ControlGraft{
+		TopicID: topic,
+	}
+}
+
+// P2PRPCPruneFixtures returns n number of control message rpc Prune fixtures.
+// The number of topics must match the number of prunes to ensure validity.
+// This default behavior guarantees valid prunes when using a list of unique valid topics.
+func P2PRPCPruneFixtures(t *testing.T, n int, topics []string) []*pubsub_pb.ControlPrune {
+	require.Equal(t, n, len(topics), "number of topics should match the number of prunes to create")
+	prunes := make([]*pubsub_pb.ControlPrune, n)
+	for i := 0; i < n; i++ {
+		prunes[i] = P2PRPCPruneFixture(&topics[i])
+	}
+	return prunes
+}
+
+// P2PRPCPruneFixture returns a control message rpc Prune fixture.
+func P2PRPCPruneFixture(topic *string) *pubsub_pb.ControlPrune {
+	return &pubsub_pb.ControlPrune{
+		TopicID: topic,
+	}
+}
+
+// P2PRPCIHaveFixtures returns n number of control message rpc iHave fixtures with m number of message ids each.
+// The number of topics must match the number of iHaves to ensure validity.
+// This default behavior guarantees valid iHaves when using a list of unique valid topics.
+func P2PRPCIHaveFixtures(t *testing.T, n, m int, topics []string) []*pubsub_pb.ControlIHave {
+	require.Equal(t, n, len(topics), "number of topics should match the number of ihaves to create")
+	ihaves := make([]*pubsub_pb.ControlIHave, n)
+	for i := 0; i < n; i++ {
+		ihaves[i] = P2PRPCIHaveFixture(&topics[i], IdentifierListFixture(m).Strings())
+	}
+	return ihaves
+}
+
+// P2PRPCIHaveFixture returns a control message rpc iHave fixture.
+func P2PRPCIHaveFixture(topic *string, messageIds []string) *pubsub_pb.ControlIHave {
+	return &pubsub_pb.ControlIHave{
+		TopicID:    topic,
+		MessageIDs: messageIds,
+	}
+}
+
+// P2PRPCIWantFixtures returns n number of control message rpc iWant fixtures with m number of message ids each.
+func P2PRPCIWantFixtures(n, m int) []*pubsub_pb.ControlIWant {
+	iwants := make([]*pubsub_pb.ControlIWant, n)
+	for i := 0; i < n; i++ {
+		iwants[i] = P2PRPCIWantFixture(IdentifierListFixture(m).Strings())
+	}
+	return iwants
+}
+
+// P2PRPCIWantFixture returns a control message rpc iWant fixture.
+func P2PRPCIWantFixture(messageIds []string) *pubsub_pb.ControlIWant {
+	return &pubsub_pb.ControlIWant{
+		MessageIDs: messageIds,
+	}
+}
+
+type RPCFixtureOpt func(rpc *pubsub.RPC)
+
+// WithGrafts sets the grafts on the rpc control message.
+func WithGrafts(grafts ...*pubsub_pb.ControlGraft) RPCFixtureOpt {
+	return func(rpc *pubsub.RPC) {
+		rpc.Control.Graft = grafts
+	}
+}
+
+// WithPrunes sets the prunes on the rpc control message.
+func WithPrunes(prunes ...*pubsub_pb.ControlPrune) RPCFixtureOpt {
+	return func(rpc *pubsub.RPC) {
+		rpc.Control.Prune = prunes
+	}
+}
+
+// WithIHaves sets the iHaves on the rpc control message.
+func WithIHaves(iHaves ...*pubsub_pb.ControlIHave) RPCFixtureOpt {
+	return func(rpc *pubsub.RPC) {
+		rpc.Control.Ihave = iHaves
+	}
+}
+
+// WithIWants sets the iWants on the rpc control message.
+func WithIWants(iWants ...*pubsub_pb.ControlIWant) RPCFixtureOpt {
+	return func(rpc *pubsub.RPC) {
+		rpc.Control.Iwant = iWants
+	}
+}
+
+// P2PRPCFixture returns a pubsub RPC fixture. Currently, this fixture only sets the ControlMessage field.
+func P2PRPCFixture(opts ...RPCFixtureOpt) *pubsub.RPC {
+	rpc := &pubsub.RPC{
+		RPC: pubsub_pb.RPC{
+			Control: &pubsub_pb.ControlMessage{},
+		},
+	}
+
+	for _, opt := range opts {
+		opt(rpc)
+	}
+
+	return rpc
 }
