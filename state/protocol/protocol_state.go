@@ -89,6 +89,8 @@ type StateUpdater interface {
 	ProcessEpochCommit(epochCommit *flow.EpochCommit) error
 	// UpdateIdentity updates identity table with new identity entry.
 	// Should pass identity which is already present in the table, otherwise an exception will be raised.
+	// TODO: This function currently modifies both current+next identities based on input.
+	//       This is incompatible with the design doc, and needs to be updated to modify current/next epoch separately
 	// No errors are expected during normal operations.
 	UpdateIdentity(updated *flow.DynamicIdentityEntry) error
 	// SetInvalidStateTransitionAttempted sets a flag indicating that invalid state transition was attempted.
