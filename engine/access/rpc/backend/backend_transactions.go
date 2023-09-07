@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"time"
 
+	lru2 "github.com/hashicorp/golang-lru/v2"
 	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
 	"github.com/onflow/flow/protobuf/go/flow/entities"
 	execproto "github.com/onflow/flow/protobuf/go/flow/execution"
@@ -39,7 +40,8 @@ type backendTransactions struct {
 
 	previousAccessNodes []accessproto.AccessAPIClient
 	log                 zerolog.Logger
-	nodeCommunicator    *NodeCommunicator
+	nodeCommunicator    Communicator
+	txResultCache       *lru2.Cache[flow.Identifier, *access.TransactionResult]
 }
 
 // SendTransaction forwards the transaction to the collection node
@@ -93,7 +95,7 @@ func (b *backendTransactions) trySendTransaction(ctx context.Context, tx *flow.T
 	var sendError error
 	logAnyError := func() {
 		if sendError != nil {
-			b.log.Info().Err(err).Msg("failed to send transactions to collector nodes")
+			b.log.Info().Err(err).Msg("failed to send transactions  to collector nodes")
 		}
 	}
 	defer logAnyError()
@@ -229,25 +231,41 @@ func (b *backendTransactions) GetTransactionResult(
 ) (*access.TransactionResult, error) {
 	// look up transaction from storage
 	start := time.Now()
-	tx, err := b.transactions.ByID(txID)
 
+	tx, err := b.transactions.ByID(txID)
 	if err != nil {
 		txErr := rpc.ConvertStorageError(err)
-		if status.Code(txErr) == codes.NotFound {
-			// Tx not found. If we have historical Sporks setup, lets look through those as well
-			historicalTxResult, err := b.getHistoricalTransactionResult(ctx, txID)
-			if err != nil {
-				// if tx not found in old access nodes either, then assume that the tx was submitted to a different AN
-				// and return status as unknown
-				txStatus := flow.TransactionStatusUnknown
-				return &access.TransactionResult{
-					Status:     txStatus,
-					StatusCode: uint(txStatus),
-				}, nil
-			}
-			return historicalTxResult, nil
+
+		if status.Code(txErr) != codes.NotFound {
+			return nil, txErr
 		}
-		return nil, txErr
+
+		// Tx not found. If we have historical Sporks setup, lets look through those as well
+		if b.txResultCache != nil {
+			val, ok := b.txResultCache.Get(txID)
+			if ok {
+				return val, nil
+			}
+		}
+		historicalTxResult, err := b.getHistoricalTransactionResult(ctx, txID)
+		if err != nil {
+			// if tx not found in old access nodes either, then assume that the tx was submitted to a different AN
+			// and return status as unknown
+			txStatus := flow.TransactionStatusUnknown
+			result := &access.TransactionResult{
+				Status:     txStatus,
+				StatusCode: uint(txStatus),
+			}
+			if b.txResultCache != nil {
+				b.txResultCache.Add(txID, result)
+			}
+			return result, nil
+		}
+
+		if b.txResultCache != nil {
+			b.txResultCache.Add(txID, historicalTxResult)
+		}
+		return historicalTxResult, nil
 	}
 
 	block, err := b.retrieveBlock(blockID, collectionID, txID)
@@ -395,7 +413,7 @@ func (b *backendTransactions) GetTransactionResultsByBlockID(
 	i := 0
 	errInsufficientResults := status.Errorf(
 		codes.Internal,
-		"number of transaction results returned by execution node is less than the number of transactions in the block",
+		"number of transaction results returned by execution node is less than the number of transactions  in the block",
 	)
 
 	for _, guarantee := range block.Payload.Guarantees {
@@ -405,7 +423,7 @@ func (b *backendTransactions) GetTransactionResultsByBlockID(
 		}
 
 		for _, txID := range collection.Transactions {
-			// bounds check. this means the EN returned fewer transaction results than the transactions in the block
+			// bounds check. this means the EN returned fewer transaction results than the transactions  in the block
 			if i >= len(resp.TransactionResults) {
 				return nil, errInsufficientResults
 			}
@@ -438,8 +456,8 @@ func (b *backendTransactions) GetTransactionResultsByBlockID(
 		}
 	}
 
-	// after iterating through all transactions in each collection, i equals the total number of
-	// user transactions in the block
+	// after iterating through all transactions  in each collection, i equals the total number of
+	// user transactions  in the block
 	txCount := i
 
 	sporkRootBlockHeight, err := b.state.Params().SporkRootBlockHeight()
@@ -459,7 +477,7 @@ func (b *backendTransactions) GetTransactionResultsByBlockID(
 			}
 			// otherwise there are extra results
 			// TODO(bft): slashable offense
-			return nil, status.Errorf(codes.Internal, "number of transaction results returned by execution node is more than the number of transactions in the block")
+			return nil, status.Errorf(codes.Internal, "number of transaction results returned by execution node is more than the number of transactions  in the block")
 		}
 
 		systemTx, err := blueprints.SystemChunkTransaction(b.chainID.Chain())
@@ -491,8 +509,8 @@ func (b *backendTransactions) GetTransactionResultsByBlockID(
 	return results, nil
 }
 
-// GetTransactionResultByIndex returns TransactionsResults for an index in a block that is executed,
-// pending or finalized transactions return errors
+// GetTransactionResultByIndex returns transactions Results for an index in a block that is executed,
+// pending or finalized transactions  return errors
 func (b *backendTransactions) GetTransactionResultByIndex(
 	ctx context.Context,
 	blockID flow.Identifier,
@@ -572,20 +590,20 @@ func (b *backendTransactions) deriveTransactionStatus(
 		}
 
 		// At this point, we have seen the expiry block for the transaction.
-		// This means that, if no collections prior to the expiry block contain
+		// This means that, if no collections  prior to the expiry block contain
 		// the transaction, it can never be included and is expired.
 		//
-		// To ensure this, we need to have received all collections up to the
+		// To ensure this, we need to have received all collections  up to the
 		// expiry block to ensure the transaction did not appear in any.
 
 		// the last full height is the height where we have received all
-		// collections for all blocks with a lower height
+		// collections  for all blocks with a lower height
 		fullHeight, err := b.blocks.GetLastFullBlockHeight()
 		if err != nil {
 			return flow.TransactionStatusUnknown, err
 		}
 
-		// if we have received collections for all blocks up to the expiry block, the transaction is expired
+		// if we have received collections  for all blocks up to the expiry block, the transaction is expired
 		if b.isExpired(refHeight, fullHeight) {
 			return flow.TransactionStatusExpired, nil
 		}
@@ -603,7 +621,7 @@ func (b *backendTransactions) deriveTransactionStatus(
 
 	// From this point on, we know for sure this transaction has at least been executed
 
-	// get the latest sealed block from the state
+	// get the latest sealed block from the State
 	sealed, err := b.state.Sealed().Head()
 	if err != nil {
 		return flow.TransactionStatusUnknown, err
@@ -702,7 +720,7 @@ func (b *backendTransactions) getHistoricalTransactionResult(
 			}
 
 			if result.GetStatus() == entities.TransactionStatus_PENDING {
-				// This is on a historical node. No transactions from it will ever be
+				// This is on a historical node. No transactions  from it will ever be
 				// executed, therefore we should consider this expired
 				result.Status = entities.TransactionStatus_EXPIRED
 			}
@@ -794,9 +812,7 @@ func (b *backendTransactions) getTransactionResultFromAnyExeNode(
 			}
 			return err
 		},
-		func(_ *flow.Identity, err error) bool {
-			return status.Code(err) == codes.NotFound
-		},
+		nil,
 	)
 
 	return resp, errToReturn
@@ -855,9 +871,7 @@ func (b *backendTransactions) getTransactionResultsByBlockIDFromAnyExeNode(
 			}
 			return err
 		},
-		func(_ *flow.Identity, err error) bool {
-			return status.Code(err) == codes.NotFound
-		},
+		nil,
 	)
 
 	return resp, errToReturn
@@ -914,9 +928,7 @@ func (b *backendTransactions) getTransactionResultByIndexFromAnyExeNode(
 			}
 			return err
 		},
-		func(_ *flow.Identity, err error) bool {
-			return status.Code(err) == codes.NotFound
-		},
+		nil,
 	)
 
 	return resp, errToReturn

@@ -133,7 +133,7 @@ func runWithEngine(t *testing.T, f func(testingContext)) {
 
 	ctrl := gomock.NewController(t)
 
-	net := mocknetwork.NewMockNetwork(ctrl)
+	net := mocknetwork.NewMockEngineRegistry(ctrl)
 	request := module.NewMockRequester(ctrl)
 
 	// initialize the mocks and engine
@@ -283,6 +283,7 @@ func (ctx *testingContext) assertSuccessfulBlockComputation(
 ) *protocol.Snapshot {
 	if computationResult == nil {
 		computationResult = executionUnittest.ComputationResultForBlockFixture(
+			ctx.t,
 			previousExecutionResultID,
 			executableBlock)
 	}
@@ -1319,6 +1320,7 @@ func TestExecutionGenerationResultsAreChained(t *testing.T) {
 	previousExecutionResultID := unittest.IdentifierFixture()
 
 	cr := executionUnittest.ComputationResultFixture(
+		t,
 		previousExecutionResultID,
 		nil)
 	cr.ExecutableBlock = executableBlock
@@ -1490,7 +1492,7 @@ func newIngestionEngine(t *testing.T, ps *mocks.ProtocolState, es *mockExecution
 	tracer, err := trace.NewTracer(log, "test", "test", trace.SensitivityCaptureAll)
 	require.NoError(t, err)
 	ctrl := gomock.NewController(t)
-	net := mocknetwork.NewMockNetwork(ctrl)
+	net := mocknetwork.NewMockEngineRegistry(ctrl)
 	request := module.NewMockRequester(ctrl)
 	var engine *Engine
 
@@ -1826,6 +1828,7 @@ func TestExecutedBlockIsUploaded(t *testing.T) {
 
 		parentBlockExecutionResultID := unittest.IdentifierFixture()
 		computationResultB := executionUnittest.ComputationResultForBlockFixture(
+			t,
 			parentBlockExecutionResultID,
 			blockB)
 
@@ -1886,6 +1889,7 @@ func TestExecutedBlockUploadedFailureDoesntBlock(t *testing.T) {
 		previousExecutionResultID := unittest.IdentifierFixture()
 
 		computationResultB := executionUnittest.ComputationResultForBlockFixture(
+			t,
 			previousExecutionResultID,
 			blockB)
 

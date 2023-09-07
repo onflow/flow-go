@@ -9,18 +9,18 @@ import (
 
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/execution"
-	"github.com/onflow/flow-go/engine/execution/computation"
+	"github.com/onflow/flow-go/engine/execution/computation/query"
 	"github.com/onflow/flow-go/engine/execution/state"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/state/protocol"
 )
 
 type Engine struct {
-	unit               *engine.Unit
-	log                zerolog.Logger
-	state              protocol.State
-	computationManager computation.ComputationManager
-	execState          state.ExecutionState
+	unit          *engine.Unit
+	log           zerolog.Logger
+	state         protocol.State
+	queryExecutor query.Executor
+	execState     state.ScriptExecutionState
 }
 
 var _ execution.ScriptExecutor = (*Engine)(nil)
@@ -28,15 +28,15 @@ var _ execution.ScriptExecutor = (*Engine)(nil)
 func New(
 	logger zerolog.Logger,
 	state protocol.State,
-	computationManager computation.ComputationManager,
-	execState state.ExecutionState,
+	queryExecutor query.Executor,
+	execState state.ScriptExecutionState,
 ) *Engine {
 	return &Engine{
-		unit:               engine.NewUnit(),
-		log:                logger.With().Str("engine", "scripts").Logger(),
-		state:              state,
-		execState:          execState,
-		computationManager: computationManager,
+		unit:          engine.NewUnit(),
+		log:           logger.With().Str("engine", "scripts").Logger(),
+		state:         state,
+		execState:     execState,
+		queryExecutor: queryExecutor,
 	}
 }
 
@@ -73,7 +73,7 @@ func (e *Engine) ExecuteScriptAtBlockID(
 
 	blockSnapshot := e.execState.NewStorageSnapshot(stateCommit)
 
-	return e.computationManager.ExecuteScript(
+	return e.queryExecutor.ExecuteScript(
 		ctx,
 		script,
 		arguments,
@@ -131,5 +131,5 @@ func (e *Engine) GetAccount(
 
 	blockSnapshot := e.execState.NewStorageSnapshot(stateCommit)
 
-	return e.computationManager.GetAccount(ctx, addr, block, blockSnapshot)
+	return e.queryExecutor.GetAccount(ctx, addr, block, blockSnapshot)
 }

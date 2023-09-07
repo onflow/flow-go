@@ -32,7 +32,7 @@ type Environment interface {
 	TransactionInfo
 
 	// ProgramLogger
-	Logger() *zerolog.Logger
+	Logger() zerolog.Logger
 	Logs() []string
 
 	// EventEmitter

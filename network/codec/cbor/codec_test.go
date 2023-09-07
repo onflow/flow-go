@@ -12,12 +12,8 @@ import (
 )
 
 func TestCodec_Decode(t *testing.T) {
-	t.Parallel()
-
 	c := cbor.NewCodec()
-
 	t.Run("decodes message successfully", func(t *testing.T) {
-		t.Parallel()
 
 		data := unittest.ProposalFixture()
 		encoded, err := c.Encode(data)
@@ -29,8 +25,6 @@ func TestCodec_Decode(t *testing.T) {
 	})
 
 	t.Run("returns error when data is empty", func(t *testing.T) {
-		t.Parallel()
-
 		decoded, err := c.Decode(nil)
 		assert.Nil(t, decoded)
 		assert.True(t, codec.IsErrInvalidEncoding(err))
@@ -41,8 +35,6 @@ func TestCodec_Decode(t *testing.T) {
 	})
 
 	t.Run("returns error when message code is invalid", func(t *testing.T) {
-		t.Parallel()
-
 		decoded, err := c.Decode([]byte{codec.CodeMin.Uint8()})
 		assert.Nil(t, decoded)
 		assert.True(t, codec.IsErrUnknownMsgCode(err))
@@ -61,16 +53,12 @@ func TestCodec_Decode(t *testing.T) {
 	})
 
 	t.Run("returns error when unmarshalling fails - empty", func(t *testing.T) {
-		t.Parallel()
-
 		decoded, err := c.Decode([]byte{codec.CodeBlockProposal.Uint8()})
 		assert.Nil(t, decoded)
 		assert.True(t, codec.IsErrMsgUnmarshal(err))
 	})
 
 	t.Run("returns error when unmarshalling fails - wrong type", func(t *testing.T) {
-		t.Parallel()
-
 		data := unittest.ProposalFixture()
 		encoded, err := c.Encode(data)
 		require.NoError(t, err)
@@ -83,8 +71,6 @@ func TestCodec_Decode(t *testing.T) {
 	})
 
 	t.Run("returns error when unmarshalling fails - corrupt", func(t *testing.T) {
-		t.Parallel()
-
 		data := unittest.ProposalFixture()
 		encoded, err := c.Encode(data)
 		require.NoError(t, err)
