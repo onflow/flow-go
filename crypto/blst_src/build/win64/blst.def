@@ -152,6 +152,7 @@ EXPORTS
 	blst_sk_to_pk_in_g2
 	blst_sign_pk_in_g2
 	blst_miller_loop
+	blst_miller_loop_n
 	blst_final_exp
 	blst_precompute_lines
 	blst_miller_loop_lines
@@ -180,6 +181,8 @@ EXPORTS
 	BLS12_381_NEG_G1
 	BLS12_381_G2
 	BLS12_381_NEG_G2
+	blst_fr_ct_bfly
+	blst_fr_gs_bfly
 	blst_fr_to
 	blst_fr_from
 	blst_fp_to
@@ -214,4 +217,5 @@ EXPORTS
 	blst_p2_sizeof
 	blst_p2_affine_sizeof
 	blst_fp12_sizeof
+	blst_sha256
 

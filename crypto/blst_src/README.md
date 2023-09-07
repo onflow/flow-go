@@ -1,5 +1,5 @@
-All files in this folder contain source files copied from the BLST repo https://github.com/supranational/blst
-specifically from the commit <92c12ac58095de04e776cec5ef5ce5bdf242b693>. 
+All files in this folder contain source files copied from the BLST repo https://github.com/supranational/blst, 
+specifically from the tagged version v0.3.11.
 
  Copyright Supranational LLC
  Licensed under the Apache License, Version 2.0, see LICENSE for details.
@@ -10,10 +10,8 @@ While BLST exports multiple functions and tools, the implementation in Flow cryp
 The folder contains:
 - BLST LICENSE file
 - all `<blst>/src/*.c` and `<blst>/src/*.h` files (C source files) but `server.c`.
-- `server.c` is replaced by `blst_src.c` (which lists only the files needed by Flow crypto).
+- `server.c` is replaced by `./blst_src.c` (which lists only the files needed by Flow crypto).
 - all `<blst>/build`   (assembly generated files).
-- `<blst>/bindings/blst.h`  (headers of external functions).
-- `<blst>/bindings/blst_aux.h` (headers of external aux functions).
 - this `README` file.
 
 To upgrade the BLST version:
@@ -23,7 +21,6 @@ To upgrade the BLST version:
 - [ ] delete `./blst_src/server.c`.
 - [ ] copy the folder `<blst>/build/` into this folder `./blst_src`.
 - [ ] move `./blst_src/build/assembly.S` to `./blst_assembly.S`.
-- [ ] copy `<blst>/bindings/blst.h` and `<blst>/bindings/blst_aux.h` into `./blst_src`.
 - [ ] update `./blst_src/blst_src.c` if needed.
 - [ ] check that C flags in `./bls12381_utils.go` still include the C flags in `<blst>/bindings/go/blst.go`.
 - [ ] solve all breaking changes that may occur.
