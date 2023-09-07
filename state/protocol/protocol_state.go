@@ -68,6 +68,7 @@ type ProtocolState interface {
 
 // StateUpdater is a dedicated interface for updating protocol state.
 // It is used by the compliance layer to update protocol state when certain events that are stored in blocks are observed.
+// CAUTION: The compliance layer is responsible for validating events before passing them to StateUpdater.
 type StateUpdater interface {
 	// Build returns updated protocol state entry, state ID and a flag indicating if there were any changes.
 	Build() (updatedState *flow.ProtocolStateEntry, stateID flow.Identifier, hasChanges bool)
@@ -76,12 +77,14 @@ type StateUpdater interface {
 	// Observing an epoch setup event, transitions protocol state from staking to setup phase, we stop returning
 	// identities from previous+current epochs and start returning identities from current+next epochs.
 	// As a result of this operation protocol state for the next epoch will be created.
+	// CAUTION: Caller must validate input event.
 	// No errors are expected during normal operations.
 	ProcessEpochSetup(epochSetup *flow.EpochSetup) error
 	// ProcessEpochCommit updates current protocol state with data from epoch commit event.
 	// Observing an epoch setup commit, transitions protocol state from setup to commit phase, at this point we have
 	// finished construction of the next epoch.
 	// As a result of this operation protocol state for next epoch will be committed.
+	// CAUTION: Caller must validate input event.
 	// No errors are expected during normal operations.
 	ProcessEpochCommit(epochCommit *flow.EpochCommit) error
 	// UpdateIdentity updates identity table with new identity entry.
