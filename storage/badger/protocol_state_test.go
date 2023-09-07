@@ -90,7 +90,7 @@ func TestProtocolStateStoreInvalidProtocolState(t *testing.T) {
 
 // TestProtocolStateMergeParticipants tests that merging participants between epochs works correctly. We always take participants
 // from current epoch and additionally add participants from previous epoch if they are not present in current epoch.
-// If there is participant in previous and current epochs we should see it only once in the merged list and the entity has to be from current epoch.
+// If the same participant is in the previous and current epochs, we should see it only once in the merged list and the dynamic portion has to be from current epoch.
 func TestProtocolStateMergeParticipants(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		metrics := metrics.NewNoopCollector()
@@ -137,7 +137,8 @@ func TestProtocolStateMergeParticipants(t *testing.T) {
 	})
 }
 
-// TestProtocolStateRootSnapshot tests that storing and retrieving root protocol state(in case of bootstrap) works as expected.
+// TestProtocolStateRootSnapshot tests that storing and retrieving root protocol state (in case of bootstrap) works as expected.
+// Specifically, this means that no prior epoch exists (situation after a spork) from the perspective of the freshly-sporked network.
 func TestProtocolStateRootSnapshot(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		metrics := metrics.NewNoopCollector()
