@@ -17,16 +17,16 @@ The folder contains:
 - this `README` file.
 
 To upgrade the BLST version:
-- [ ] delete all files in this folder (`./blst_src`) but `blst_src.c` and `README.md`.
+- [ ] delete all files in this folder `./blst_src/` but `blst_src.c` and `README.md`.
 - [ ] open BLST repository on the new version.
-- [ ] copy all `.c` and `.h` files from `<blst>/src/` into this folder.
-- [ ] delete `server.c` from this folder.
-- [ ] update `blst_src.c` if needed.
-- [ ] copy the folder `<blst>/build/` into this folder.
-- [ ] move `./blst_src/build/assembly.S` to `./blst_src/build/blst_assembly.S`.
-- [ ] copy `<blst>/bindings/blst.h` and `<blst>/bindings/blst_aux.h` into this folder.
-- [ ] check that C flags in `./bls12381_utils.go` still match the C flags in `<blst>/bindings/go/blst.go`.
+- [ ] copy all `.c` and `.h` files from `<blst>/src/` into `./blst_src/`.
+- [ ] delete `./blst_src/server.c`.
+- [ ] copy the folder `<blst>/build/` into this folder `./blst_src`.
+- [ ] move `./blst_src/build/assembly.S` to `./blst_assembly.S`.
+- [ ] copy `<blst>/bindings/blst.h` and `<blst>/bindings/blst_aux.h` into `./blst_src`.
+- [ ] update `./blst_src/blst_src.c` if needed.
+- [ ] check that C flags in `./bls12381_utils.go` still include the C flags in `<blst>/bindings/go/blst.go`.
 - [ ] solve all breaking changes that may occur.
-- [ ] update the commit version on this `README`.
+- [ ] update the commit version on this `./blst_src/README`.
 
 Remember that Flow crypto is using non exported internal functions from BLST. Checking for interfaces breaking changes in BLST should made along with auditing changes between the old and new versions. This includes checking logical changes and assumptions beyond interfaces, and assessing their security and performance impact on protocols implemented in Flow crypto. 
