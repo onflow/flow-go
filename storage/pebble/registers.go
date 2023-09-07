@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/cockroachdb/pebble"
+
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -79,7 +80,7 @@ func (s *Registers) Store(
 	return nil
 }
 
-// TODO: Finish implementation after deciding prefixes
+// TODO: Finish implementation after deciding prefixes and/or badger use
 
 // LatestHeight Gets the latest height of complete registers available
 func (s *Registers) LatestHeight() (uint64, error) {
