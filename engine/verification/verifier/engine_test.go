@@ -200,6 +200,7 @@ func (suite *VerifierEngineTestSuite) TestVerifyHappyPath() {
 
 					// note: mock includes each variadic argument as a separate element in slice
 					node, ok := args[1].(flow.Identifier)
+					suite.Require().True(ok)
 					suite.Assert().Equal(consensusNodes.NodeIDs()[0], node)
 					suite.Assert().Len(args, 2) // only a single node should be in the list
 				}).
