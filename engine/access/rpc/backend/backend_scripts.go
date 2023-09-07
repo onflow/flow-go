@@ -37,7 +37,7 @@ type backendScripts struct {
 	archiveAddressList   []string
 	archivePorts         []uint
 	scriptExecValidation bool
-	nodeCommunicator     *NodeCommunicator
+	nodeCommunicator     Communicator
 }
 
 func (b *backendScripts) ExecuteScriptAtLatestBlock(
@@ -219,7 +219,7 @@ func (b *backendScripts) executeScriptOnAvailableArchiveNodes(
 						Msg("script failed to execute on the execution node")
 					return nil, err
 				case codes.NotFound:
-					// failures due to unavailable blocks are explicitly marked Not found
+					// failures due to unavailable blocks  are explicitly marked Not found
 					b.metrics.ScriptExecutionErrorOnArchiveNode()
 					b.log.Error().Err(err).Msg("script execution failed for archive node")
 					return nil, err

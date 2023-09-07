@@ -74,7 +74,7 @@ var onlyOnflowRegex = regexp.MustCompile(`.*\.onflow\.org:3569$`)
 func New(
 	unit *engine.Unit,
 	logger zerolog.Logger,
-	net network.Network,
+	net network.EngineRegistry,
 	me module.Local,
 	request module.Requester,
 	state protocol.State,
