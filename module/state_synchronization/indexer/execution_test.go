@@ -3,15 +3,22 @@ package indexer
 import (
 	"context"
 	"fmt"
+	"math/rand"
+	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	"github.com/onflow/flow-go/ledger/common/testutils"
+	"github.com/onflow/flow-go/cmd/util/ledger/migrations"
+	"github.com/onflow/flow-go/engine/execution/state"
+	"github.com/onflow/flow-go/fvm"
+	"github.com/onflow/flow-go/fvm/storage/snapshot"
+	"github.com/onflow/flow-go/ledger"
+	"github.com/onflow/flow-go/ledger/common/pathfinder"
+	"github.com/onflow/flow-go/ledger/complete"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/module/counters"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	synctest "github.com/onflow/flow-go/module/state_synchronization/requester/unittest"
 	"github.com/onflow/flow-go/storage"
@@ -20,8 +27,8 @@ import (
 )
 
 func TestExecutionState_HeightByBlockID(t *testing.T) {
-	blocks := generateBlocks(5)
-	indexer := ExecutionState{headers: buildHeaders(blocks)}
+	blocks := blocksFixture(5)
+	indexer := ExecutionState{headers: newBlockHeadersStorage(blocks)}
 
 	for _, b := range blocks {
 		ret, err := indexer.HeightByBlockID(b.ID())
@@ -35,9 +42,7 @@ func TestExecutionState_Commitment(t *testing.T) {
 
 	t.Run("success", func(t *testing.T) {
 		indexer := ExecutionState{
-			commitments:       make(map[uint64]flow.StateCommitment),
-			startIndexHeight:  start,
-			lastIndexedHeight: counters.NewSequentialCounter(end),
+			commitments: make(map[uint64]flow.StateCommitment),
 		}
 
 		commitments := indexCommitments(&indexer, start, end, t)
@@ -50,9 +55,7 @@ func TestExecutionState_Commitment(t *testing.T) {
 
 	t.Run("invalid heights", func(t *testing.T) {
 		indexer := ExecutionState{
-			commitments:       make(map[uint64]flow.StateCommitment),
-			startIndexHeight:  start,
-			lastIndexedHeight: counters.NewSequentialCounter(end),
+			commitments: make(map[uint64]flow.StateCommitment),
 		}
 
 		_ = indexCommitments(&indexer, start, end, t)
@@ -73,114 +76,185 @@ func TestExecutionState_Commitment(t *testing.T) {
 }
 
 type indexBlockDataTest struct {
-	indexer         ExecutionState
-	registers       *storagemock.Registers
-	events          *storagemock.Events
-	ctx             context.Context
-	data            *execution_data.BlockExecutionDataEntity
-	expectErr       error
-	storeRegisters  func(t *testing.T, ID flow.Identifier, height uint64) error
-	setLatestHeight func(t *testing.T, height uint64) error
-	storeEvents     func(t *testing.T, ID flow.Identifier, events []flow.EventsList) error
+	t              *testing.T
+	indexer        ExecutionState
+	registers      *storagemock.Registers
+	events         *storagemock.Events
+	ctx            context.Context
+	data           *execution_data.BlockExecutionDataEntity
+	expectErr      error
+	storeMux       sync.Mutex
+	latestHeight   func(t *testing.T, height uint64) error
+	registersStore func(t *testing.T, entries flow.RegisterEntries, height uint64) error
+	eventsStore    func(t *testing.T, ID flow.Identifier, events []flow.EventsList) error
 }
 
-func (i *indexBlockDataTest) run(t *testing.T) {
+func newIndexBlockDataTest(
+	t *testing.T,
+	headers storage.Headers,
+	exeData *execution_data.BlockExecutionDataEntity,
+) *indexBlockDataTest {
+	registers := storagemock.NewRegisters(t)
+	events := storagemock.NewEvents(t)
 
-	if i.storeRegisters != nil {
+	indexer := ExecutionState{
+		registers:   registers,
+		headers:     headers,
+		events:      events,
+		commitments: make(map[uint64]flow.StateCommitment),
+	}
+
+	return &indexBlockDataTest{
+		t:         t,
+		indexer:   indexer,
+		registers: registers,
+		events:    events,
+		ctx:       context.Background(),
+		data:      exeData,
+		storeMux:  sync.Mutex{},
+	}
+}
+
+func (i *indexBlockDataTest) setLatestHeight(f func(t *testing.T, height uint64) error) *indexBlockDataTest {
+	i.latestHeight = f
+	return i
+}
+
+func (i *indexBlockDataTest) setStoreRegisters(f func(t *testing.T, entries flow.RegisterEntries, height uint64) error) *indexBlockDataTest {
+	i.registersStore = f
+	return i
+}
+
+func (i *indexBlockDataTest) setStoreEvents(f func(t *testing.T, ID flow.Identifier, events []flow.EventsList) error) *indexBlockDataTest {
+	i.eventsStore = f
+	return i
+}
+
+func (i *indexBlockDataTest) run() {
+
+	if i.registersStore != nil {
 		i.registers.
 			On("Store", mock.AnythingOfType("flow.RegisterEntries"), mock.AnythingOfType("uint64")).
-			Return(func(ID flow.Identifier, height uint64) error {
-				return i.storeRegisters(t, ID, height)
+			Return(func(entries flow.RegisterEntries, height uint64) error {
+				i.storeMux.Lock()
+				defer i.storeMux.Unlock()
+				return i.registersStore(i.t, entries, height)
 			})
 	}
 
-	if i.setLatestHeight != nil {
+	if i.latestHeight != nil {
 		i.registers.
 			On("SetLatestHeight", mock.AnythingOfType("uint64")).
 			Return(func(height uint64) error {
-				return i.setLatestHeight(t, height)
+				return i.latestHeight(i.t, height)
 			})
 	}
 
-	if i.storeEvents != nil {
+	if i.eventsStore != nil {
 		i.events.
 			On("Store", mock.AnythingOfType("flow.Identifier"), mock.AnythingOfType("[]flow.EventsList")).
 			Return(func(ID flow.Identifier, events []flow.EventsList) error {
-				return i.storeEvents(t, ID, events)
+				return i.eventsStore(i.t, ID, events)
 			})
 	}
 
 	err := i.indexer.IndexBlockData(i.ctx, i.data)
 	if i.expectErr != nil {
-		assert.Equal(t, i.expectErr, err)
+		assert.Equal(i.t, i.expectErr, err)
 	} else {
-		assert.NoError(t, err)
+		assert.NoError(i.t, err)
 	}
 }
 
+// test cases:
+// - no chunk data
+// - no registers data
+// - multiple inserts, same height
+// - smaller invalid height
+// - bigger invalid height
+// - error on register updates
+// - error on events
+// - full register data, events, collections...
+
 func TestExecutionState_IndexBlockData(t *testing.T) {
-	registers := storagemock.NewRegisters(t)
-	events := storagemock.NewEvents(t)
-	blocks := generateBlocks(1)
-	headers := buildHeaders(blocks)
+	blocks := blocksFixture(1)
 	block := blocks[0]
-	start, end := block.Header.Height-5, block.Header.Height-1
+	headers := newBlockHeadersStorage(blocks)
 
-	// test cases:
-	// - no chunk data
-	// - no registers data
-	// - multiple inserts, same height
-	// - smaller invalid height
-	// - bigger invalid height
-	// - error on register updates
-	// - error on events
-	// - full register data, events, collections...
+	t.Run("Index Single Chunk and Single Register", func(t *testing.T) {
+		trie := trieUpdateFixture()
+		ed := &execution_data.BlockExecutionData{
+			BlockID: block.ID(),
+			ChunkExecutionDatas: []*execution_data.ChunkExecutionData{
+				{TrieUpdate: trie},
+			},
+		}
+		execData := execution_data.NewBlockExecutionDataEntity(block.ID(), ed)
 
-	indexer := ExecutionState{
-		registers:         registers,
-		headers:           headers,
-		events:            events,
-		commitments:       make(map[uint64]flow.StateCommitment),
-		startIndexHeight:  start,
-		lastIndexedHeight: counters.NewSequentialCounter(end),
-	}
+		newIndexBlockDataTest(t, headers, execData).
+			setLatestHeight(func(t *testing.T, height uint64) error {
+				assert.Equal(t, height, block.Header.Height)
+				return nil
+			}).
+			// make sure update registers match in length and are same as block data ledger payloads
+			setStoreRegisters(func(t *testing.T, entries flow.RegisterEntries, height uint64) error {
+				assert.Equal(t, height, block.Header.Height)
+				assert.Len(t, trie.Payloads, entries.Len())
 
-	collection := unittest.CollectionFixture(5)
-	ced := &execution_data.ChunkExecutionData{
-		Collection: &collection,
-		Events:     flow.EventsList{},
-		TrieUpdate: testutils.TrieUpdateFixture(2, 1, 8),
-	}
+				for i, id := range entries.IDs() {
+					k, _ := trie.Payloads[i].Key()
+					regKey, _ := migrations.KeyToRegisterID(k)
+					assert.Equal(t, id, regKey)
+				}
+				return nil
+			}).
+			run()
+	})
 
-	bed := unittest.BlockExecutionDatEntityFixture(
-		unittest.WithBlockExecutionDataBlockID(block.ID()),
-		unittest.WithChunkExecutionDatas(ced),
-	)
+	t.Run("Index Multiple Chunks", func(t *testing.T) {
+		tries := []*ledger.TrieUpdate{trieUpdateFixture(), trieUpdateFixture()}
 
-	test := indexBlockDataTest{
-		indexer:   indexer,
-		registers: registers,
-		ctx:       context.Background(),
-		data:      bed,
-		setLatestHeight: func(t *testing.T, height uint64) error {
-			assert.Equal(t, height, block.Header.Height)
-			return nil
-		},
-		storeRegisters: func(t *testing.T, ID flow.Identifier, height uint64) error {
-			assert.Equal(t, height, block.Header.Height)
-			return nil
-		},
-		storeEvents: func(t *testing.T, ID flow.Identifier, events []flow.EventsList) error {
-			return nil
-		},
-	}
+		ed := &execution_data.BlockExecutionData{
+			BlockID: block.ID(),
+			ChunkExecutionDatas: []*execution_data.ChunkExecutionData{
+				{TrieUpdate: tries[0]},
+				{TrieUpdate: tries[1]},
+			},
+		}
+		execData := execution_data.NewBlockExecutionDataEntity(block.ID(), ed)
 
-	test.run(t)
+		storeCalled := 0
+
+		newIndexBlockDataTest(t, headers, execData).
+			setLatestHeight(func(t *testing.T, height uint64) error {
+				assert.Equal(t, height, block.Header.Height)
+				return nil
+			}).
+			// make sure update registers match in length and are same as block data ledger payloads
+			setStoreRegisters(func(t *testing.T, entries flow.RegisterEntries, height uint64) error {
+				fmt.Println("Set store called: ", storeCalled, height, entries)
+				assert.Equal(t, height, block.Header.Height)
+				assert.Len(t, tries[storeCalled].Payloads, entries.Len())
+
+				for i, id := range entries.IDs() {
+					k, _ := tries[storeCalled].Payloads[i].Key()
+					regKey, _ := migrations.KeyToRegisterID(k)
+					assert.Equal(t, id, regKey, fmt.Sprintf("register key doens't match the trie updates at index %d, at %d time calling store", i, storeCalled))
+				}
+
+				storeCalled++
+
+				return nil
+			}).
+			run()
+
+		assert.Len(t, ed.ChunkExecutionDatas, storeCalled)
+	})
 
 }
 
 func indexCommitments(indexer *ExecutionState, start uint64, end uint64, t *testing.T) map[uint64]flow.StateCommitment {
-	commits := generateCommitments(int(end - start))
+	commits := commitmentsFixture(int(end - start))
 	commitsHeight := make(map[uint64]flow.StateCommitment)
 
 	for j, i := 0, start; i <= end; i++ {
@@ -202,7 +276,7 @@ func indexCommitments(indexer *ExecutionState, start uint64, end uint64, t *test
 //	})
 //}
 
-func buildHeaders(blocks []*flow.Block) storage.Headers {
+func newBlockHeadersStorage(blocks []*flow.Block) storage.Headers {
 	blocksByID := make(map[flow.Identifier]*flow.Block, 0)
 	for _, b := range blocks {
 		blocksByID[b.ID()] = b
@@ -211,7 +285,7 @@ func buildHeaders(blocks []*flow.Block) storage.Headers {
 	return synctest.MockBlockHeaderStorage(synctest.WithByID(blocksByID))
 }
 
-func generateCommitments(n int) []flow.StateCommitment {
+func commitmentsFixture(n int) []flow.StateCommitment {
 	commits := make([]flow.StateCommitment, n)
 	for i := 0; i < n; i++ {
 		commits[i] = flow.StateCommitment(unittest.IdentifierFixture())
@@ -220,7 +294,7 @@ func generateCommitments(n int) []flow.StateCommitment {
 	return commits
 }
 
-func generateBlocks(n int) []*flow.Block {
+func blocksFixture(n int) []*flow.Block {
 	blocks := make([]*flow.Block, n)
 
 	genesis := unittest.BlockFixture()
@@ -230,4 +304,93 @@ func generateBlocks(n int) []*flow.Block {
 	}
 
 	return blocks
+}
+
+func bootstrapTrieUpdates() *ledger.TrieUpdate {
+	opts := []fvm.Option{
+		fvm.WithChain(flow.Testnet.Chain()),
+	}
+	ctx := fvm.NewContext(opts...)
+	vm := fvm.NewVirtualMachine()
+
+	snapshotTree := snapshot.NewSnapshotTree(nil)
+
+	bootstrapOpts := []fvm.BootstrapProcedureOption{
+		fvm.WithInitialTokenSupply(unittest.GenesisTokenSupply),
+	}
+
+	executionSnapshot, _, _ := vm.Run(
+		ctx,
+		fvm.Bootstrap(unittest.ServiceAccountPublicKey, bootstrapOpts...),
+		snapshotTree)
+
+	payloads := make([]*ledger.Payload, 0)
+	for regID, regVal := range executionSnapshot.WriteSet {
+		key := ledger.Key{
+			KeyParts: []ledger.KeyPart{
+				{
+					Type:  state.KeyPartOwner,
+					Value: []byte(regID.Owner),
+				},
+				{
+					Type:  state.KeyPartKey,
+					Value: []byte(regID.Key),
+				},
+			},
+		}
+
+		payloads = append(payloads, ledger.NewPayload(key, regVal))
+	}
+
+	return trieUpdateWithPayloadsFixture(payloads)
+}
+
+func trieUpdateWithPayloadsFixture(payloads []*ledger.Payload) *ledger.TrieUpdate {
+	keys := make([]ledger.Key, 0)
+	values := make([]ledger.Value, 0)
+	for _, payload := range payloads {
+		key, _ := payload.Key()
+		keys = append(keys, key)
+		values = append(values, payload.Value())
+	}
+
+	update, _ := ledger.NewUpdate(ledger.DummyState, keys, values)
+	trie, _ := pathfinder.UpdateToTrieUpdate(update, complete.DefaultPathFinderVersion)
+	return trie
+}
+
+func trieUpdateFixture() *ledger.TrieUpdate {
+	return trieUpdateWithPayloadsFixture(
+		[]*ledger.Payload{
+			ledgerPayloadFixture(),
+			ledgerPayloadFixture(),
+			ledgerPayloadFixture(),
+			ledgerPayloadFixture(),
+		})
+}
+
+func ledgerPayloadFixture() *ledger.Payload {
+	owner := unittest.RandomAddressFixture()
+	key := make([]byte, 8)
+	rand.Read(key)
+	val := make([]byte, 8)
+	rand.Read(val)
+	return ledgerPayloadWithValuesFixture(owner.String(), fmt.Sprintf("%x", key), val)
+}
+
+func ledgerPayloadWithValuesFixture(owner string, key string, value []byte) *ledger.Payload {
+	k := ledger.Key{
+		KeyParts: []ledger.KeyPart{
+			{
+				Type:  state.KeyPartOwner,
+				Value: []byte(owner),
+			},
+			{
+				Type:  state.KeyPartKey,
+				Value: []byte(key),
+			},
+		},
+	}
+
+	return ledger.NewPayload(k, value)
 }

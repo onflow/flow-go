@@ -117,22 +117,25 @@ func (i *ExecutionState) IndexBlockData(ctx context.Context, data *execution_dat
 	// concurrently process indexing of block data
 	g, ctx := errgroup.WithContext(ctx)
 	for j, chunk := range data.ChunkExecutionDatas {
+		ch := chunk
+		if len(ch.Events) > 0 {
+			g.Go(func() error {
+				err := i.indexEvents(data.BlockID, ch.Events)
+				if err != nil {
+					return fmt.Errorf("could not index events for chunk %d: %w", j, err)
+				}
+				return nil
+			})
+		}
 		g.Go(func() error {
-			err := i.indexEvents(data.BlockID, chunk.Events)
+			err = i.indexCommitment(flow.StateCommitment(ch.TrieUpdate.RootHash), block.Height)
 			if err != nil {
 				return fmt.Errorf("could not index events for chunk %d: %w", j, err)
 			}
 			return nil
 		})
 		g.Go(func() error {
-			err = i.indexCommitment(flow.StateCommitment(chunk.TrieUpdate.RootHash), block.Height)
-			if err != nil {
-				return fmt.Errorf("could not index events for chunk %d: %w", j, err)
-			}
-			return nil
-		})
-		g.Go(func() error {
-			err = i.indexRegisterPayload(chunk.TrieUpdate.Payloads, block.Height)
+			err = i.indexRegisterPayload(ch.TrieUpdate.Payloads, block.Height)
 			if err != nil {
 				return fmt.Errorf("could not index registers for chunk %d: %w", j, err)
 			}
