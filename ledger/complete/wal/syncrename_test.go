@@ -34,7 +34,7 @@ func Test_RenameHappensAfterClosing(t *testing.T) {
 			file:       file,
 			targetName: fullFileName,
 			Writer:     writer,
-			logger:     &logger,
+			logger:     logger,
 		}
 
 		sampleBytes := []byte{2, 1, 3, 7}

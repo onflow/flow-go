@@ -103,8 +103,8 @@ func TestValidationInspector_SafetyThreshold(t *testing.T) {
 		internal.WithCorruptGossipSub(corruptlibp2p.CorruptGossipSubFactory(),
 			corruptlibp2p.CorruptGossipSubConfigFactoryWithInspector(corruptInspectorFunc)),
 	)
-	idProvider.On("ByPeerID", victimNode.Host().ID()).Return(&victimIdentity, true).Maybe()
-	idProvider.On("ByPeerID", spammer.SpammerNode.Host().ID()).Return(&spammer.SpammerId, true).Maybe()
+	idProvider.On("ByPeerID", victimNode.ID()).Return(&victimIdentity, true).Maybe()
+	idProvider.On("ByPeerID", spammer.SpammerNode.ID()).Return(&spammer.SpammerId, true).Maybe()
 
 	defer distributor.AssertNotCalled(t, "Distribute", mockery.Anything)
 
@@ -157,7 +157,7 @@ func TestValidationInspector_HardThreshold_Detection(t *testing.T) {
 			count.Inc()
 			notification, ok := args[0].(*p2p.InvCtrlMsgNotif)
 			require.True(t, ok)
-			require.Equal(t, spammer.SpammerNode.Host().ID(), notification.PeerID)
+			require.Equal(t, spammer.SpammerNode.ID(), notification.PeerID)
 			require.Equal(t, uint64(messageCount), notification.Count)
 			switch notification.MsgType {
 			case p2pmsg.CtrlMsgGraft:
@@ -205,8 +205,8 @@ func TestValidationInspector_HardThreshold_Detection(t *testing.T) {
 		internal.WithCorruptGossipSub(corruptlibp2p.CorruptGossipSubFactory(),
 			corruptlibp2p.CorruptGossipSubConfigFactoryWithInspector(corruptInspectorFunc)),
 	)
-	idProvider.On("ByPeerID", victimNode.Host().ID()).Return(&victimIdentity, true).Maybe()
-	idProvider.On("ByPeerID", spammer.SpammerNode.Host().ID()).Return(&spammer.SpammerId, true).Maybe()
+	idProvider.On("ByPeerID", victimNode.ID()).Return(&victimIdentity, true).Maybe()
+	idProvider.On("ByPeerID", spammer.SpammerNode.ID()).Return(&spammer.SpammerId, true).Maybe()
 
 	validationInspector.Start(signalerCtx)
 	nodes := []p2p.LibP2PNode{victimNode, spammer.SpammerNode}
@@ -257,7 +257,7 @@ func TestValidationInspector_HardThresholdIHave_Detection(t *testing.T) {
 			count.Inc()
 			notification, ok := args[0].(*p2p.InvCtrlMsgNotif)
 			require.True(t, ok)
-			require.Equal(t, spammer.SpammerNode.Host().ID(), notification.PeerID)
+			require.Equal(t, spammer.SpammerNode.ID(), notification.PeerID)
 			require.Equal(t, uint64(messageCount), notification.Count)
 			require.True(t, channels.IsInvalidTopicErr(notification.Err))
 			switch notification.MsgType {
@@ -304,8 +304,8 @@ func TestValidationInspector_HardThresholdIHave_Detection(t *testing.T) {
 		internal.WithCorruptGossipSub(corruptlibp2p.CorruptGossipSubFactory(),
 			corruptlibp2p.CorruptGossipSubConfigFactoryWithInspector(corruptInspectorFunc)),
 	)
-	idProvider.On("ByPeerID", victimNode.Host().ID()).Return(&victimIdentity, true).Maybe()
-	idProvider.On("ByPeerID", spammer.SpammerNode.Host().ID()).Return(&spammer.SpammerId, true).Maybe()
+	idProvider.On("ByPeerID", victimNode.ID()).Return(&victimIdentity, true).Maybe()
+	idProvider.On("ByPeerID", spammer.SpammerNode.ID()).Return(&spammer.SpammerId, true).Maybe()
 
 	validationInspector.Start(signalerCtx)
 	nodes := []p2p.LibP2PNode{victimNode, spammer.SpammerNode}
@@ -353,7 +353,7 @@ func TestValidationInspector_RateLimitedPeer_Detection(t *testing.T) {
 			count.Inc()
 			notification, ok := args[0].(*p2p.InvCtrlMsgNotif)
 			require.True(t, ok)
-			require.Equal(t, spammer.SpammerNode.Host().ID(), notification.PeerID)
+			require.Equal(t, spammer.SpammerNode.ID(), notification.PeerID)
 			require.True(t, validation.IsErrRateLimitedControlMsg(notification.Err))
 			require.Equal(t, uint64(messageCount), notification.Count)
 			switch notification.MsgType {
@@ -402,8 +402,8 @@ func TestValidationInspector_RateLimitedPeer_Detection(t *testing.T) {
 		internal.WithCorruptGossipSub(corruptlibp2p.CorruptGossipSubFactory(),
 			corruptlibp2p.CorruptGossipSubConfigFactoryWithInspector(corruptInspectorFunc)),
 	)
-	idProvider.On("ByPeerID", victimNode.Host().ID()).Return(&victimIdentity, true).Maybe()
-	idProvider.On("ByPeerID", spammer.SpammerNode.Host().ID()).Return(&spammer.SpammerId, true).Maybe()
+	idProvider.On("ByPeerID", victimNode.ID()).Return(&victimIdentity, true).Maybe()
+	idProvider.On("ByPeerID", spammer.SpammerNode.ID()).Return(&spammer.SpammerId, true).Maybe()
 
 	validationInspector.Start(signalerCtx)
 	nodes := []p2p.LibP2PNode{victimNode, spammer.SpammerNode}
@@ -483,7 +483,7 @@ func TestValidationInspector_InvalidTopicId_Detection(t *testing.T) {
 			count.Inc()
 			notification, ok := args[0].(*p2p.InvCtrlMsgNotif)
 			require.True(t, ok)
-			require.Equal(t, spammer.SpammerNode.Host().ID(), notification.PeerID)
+			require.Equal(t, spammer.SpammerNode.ID(), notification.PeerID)
 			require.True(t, channels.IsInvalidTopicErr(notification.Err))
 			switch notification.MsgType {
 			case p2pmsg.CtrlMsgGraft:
@@ -536,8 +536,8 @@ func TestValidationInspector_InvalidTopicId_Detection(t *testing.T) {
 		internal.WithCorruptGossipSub(corruptlibp2p.CorruptGossipSubFactory(),
 			corruptlibp2p.CorruptGossipSubConfigFactoryWithInspector(corruptInspectorFunc)),
 	)
-	idProvider.On("ByPeerID", victimNode.Host().ID()).Return(&victimIdentity, true).Maybe()
-	idProvider.On("ByPeerID", spammer.SpammerNode.Host().ID()).Return(&spammer.SpammerId, true).Maybe()
+	idProvider.On("ByPeerID", victimNode.ID()).Return(&victimIdentity, true).Maybe()
+	idProvider.On("ByPeerID", spammer.SpammerNode.ID()).Return(&spammer.SpammerId, true).Maybe()
 
 	// create unknown topic
 	unknownTopic := channels.Topic(fmt.Sprintf("%s/%s", corruptlibp2p.GossipSubTopicIdFixture(), sporkID))
@@ -623,7 +623,7 @@ func TestValidationInspector_DuplicateTopicId_Detection(t *testing.T) {
 			count.Inc()
 			notification, ok := args[0].(*p2p.InvCtrlMsgNotif)
 			require.True(t, ok)
-			require.Equal(t, spammer.SpammerNode.Host().ID(), notification.PeerID)
+			require.Equal(t, spammer.SpammerNode.ID(), notification.PeerID)
 			require.True(t, validation.IsDuplicateFoundErr(notification.Err))
 			require.Equal(t, messageCount, notification.Count)
 			switch notification.MsgType {
@@ -672,8 +672,8 @@ func TestValidationInspector_DuplicateTopicId_Detection(t *testing.T) {
 		internal.WithCorruptGossipSub(corruptlibp2p.CorruptGossipSubFactory(),
 			corruptlibp2p.CorruptGossipSubConfigFactoryWithInspector(corruptInspectorFunc)),
 	)
-	idProvider.On("ByPeerID", victimNode.Host().ID()).Return(&victimIdentity, true).Maybe()
-	idProvider.On("ByPeerID", spammer.SpammerNode.Host().ID()).Return(&spammer.SpammerId, true).Maybe()
+	idProvider.On("ByPeerID", victimNode.ID()).Return(&victimIdentity, true).Maybe()
+	idProvider.On("ByPeerID", spammer.SpammerNode.ID()).Return(&spammer.SpammerId, true).Maybe()
 
 	// a topics spork ID is considered invalid if it does not match the current spork ID
 	duplicateTopic := channels.Topic(fmt.Sprintf("%s/%s", channels.PushBlocks, sporkID))
@@ -733,7 +733,7 @@ func TestValidationInspector_UnknownClusterId_Detection(t *testing.T) {
 			count.Inc()
 			notification, ok := args[0].(*p2p.InvCtrlMsgNotif)
 			require.True(t, ok)
-			require.Equal(t, spammer.SpammerNode.Host().ID(), notification.PeerID)
+			require.Equal(t, spammer.SpammerNode.ID(), notification.PeerID)
 			require.True(t, channels.IsUnknownClusterIDErr(notification.Err))
 			require.Equal(t, messageCount, notification.Count)
 			switch notification.MsgType {
@@ -781,8 +781,8 @@ func TestValidationInspector_UnknownClusterId_Detection(t *testing.T) {
 		internal.WithCorruptGossipSub(corruptlibp2p.CorruptGossipSubFactory(),
 			corruptlibp2p.CorruptGossipSubConfigFactoryWithInspector(corruptInspectorFunc)),
 	)
-	idProvider.On("ByPeerID", victimNode.Host().ID()).Return(&victimIdentity, true).Maybe()
-	idProvider.On("ByPeerID", spammer.SpammerNode.Host().ID()).Return(&spammer.SpammerId, true).Times(3)
+	idProvider.On("ByPeerID", victimNode.ID()).Return(&victimIdentity, true).Maybe()
+	idProvider.On("ByPeerID", spammer.SpammerNode.ID()).Return(&spammer.SpammerId, true).Times(3)
 
 	// setup cluster prefixed topic with an invalid cluster ID
 	unknownClusterID := channels.Topic(channels.SyncCluster("unknown-cluster-ID"))
@@ -836,7 +836,7 @@ func TestValidationInspector_ActiveClusterIdsNotSet_Graft_Detection(t *testing.T
 			notification, ok := args[0].(*p2p.InvCtrlMsgNotif)
 			require.True(t, ok)
 			require.True(t, validation.IsErrActiveClusterIDsNotSet(notification.Err))
-			require.Equal(t, spammer.SpammerNode.Host().ID(), notification.PeerID)
+			require.Equal(t, spammer.SpammerNode.ID(), notification.PeerID)
 			switch notification.MsgType {
 			case p2pmsg.CtrlMsgGraft:
 				invGraftNotifCount.Inc()
@@ -881,8 +881,8 @@ func TestValidationInspector_ActiveClusterIdsNotSet_Graft_Detection(t *testing.T
 		internal.WithCorruptGossipSub(corruptlibp2p.CorruptGossipSubFactory(),
 			corruptlibp2p.CorruptGossipSubConfigFactoryWithInspector(corruptInspectorFunc)),
 	)
-	idProvider.On("ByPeerID", victimNode.Host().ID()).Return(&victimIdentity, true).Maybe()
-	idProvider.On("ByPeerID", spammer.SpammerNode.Host().ID()).Return(&spammer.SpammerId, true).Times(int(controlMessageCount + 1))
+	idProvider.On("ByPeerID", victimNode.ID()).Return(&victimIdentity, true).Maybe()
+	idProvider.On("ByPeerID", spammer.SpammerNode.ID()).Return(&spammer.SpammerId, true).Times(int(controlMessageCount + 1))
 
 	// we deliberately avoid setting the cluster IDs so that we eventually receive errors after we have exceeded the allowed cluster
 	// prefixed hard threshold
@@ -931,7 +931,7 @@ func TestValidationInspector_ActiveClusterIdsNotSet_Prune_Detection(t *testing.T
 			notification, ok := args[0].(*p2p.InvCtrlMsgNotif)
 			require.True(t, ok)
 			require.True(t, validation.IsErrActiveClusterIDsNotSet(notification.Err))
-			require.Equal(t, spammer.SpammerNode.Host().ID(), notification.PeerID)
+			require.Equal(t, spammer.SpammerNode.ID(), notification.PeerID)
 			switch notification.MsgType {
 			case p2pmsg.CtrlMsgPrune:
 				invPruneNotifCount.Inc()
@@ -976,8 +976,8 @@ func TestValidationInspector_ActiveClusterIdsNotSet_Prune_Detection(t *testing.T
 		internal.WithCorruptGossipSub(corruptlibp2p.CorruptGossipSubFactory(),
 			corruptlibp2p.CorruptGossipSubConfigFactoryWithInspector(corruptInspectorFunc)),
 	)
-	idProvider.On("ByPeerID", victimNode.Host().ID()).Return(&victimIdentity, true).Maybe()
-	idProvider.On("ByPeerID", spammer.SpammerNode.Host().ID()).Return(&spammer.SpammerId, true).Times(int(controlMessageCount + 1))
+	idProvider.On("ByPeerID", victimNode.ID()).Return(&victimIdentity, true).Maybe()
+	idProvider.On("ByPeerID", spammer.SpammerNode.ID()).Return(&spammer.SpammerId, true).Times(int(controlMessageCount + 1))
 
 	// we deliberately avoid setting the cluster IDs so that we eventually receive errors after we have exceeded the allowed cluster
 	// prefixed hard threshold
@@ -1033,7 +1033,7 @@ func TestValidationInspector_UnstakedNode_Detection(t *testing.T) {
 			count.Inc()
 			notification, ok := args[0].(*p2p.InvCtrlMsgNotif)
 			require.True(t, ok)
-			require.Equal(t, spammer.SpammerNode.Host().ID(), notification.PeerID)
+			require.Equal(t, spammer.SpammerNode.ID(), notification.PeerID)
 			require.True(t, validation.IsErrUnstakedPeer(notification.Err))
 			require.Equal(t, messageCount, notification.Count)
 			switch notification.MsgType {
@@ -1081,8 +1081,8 @@ func TestValidationInspector_UnstakedNode_Detection(t *testing.T) {
 		internal.WithCorruptGossipSub(corruptlibp2p.CorruptGossipSubFactory(),
 			corruptlibp2p.CorruptGossipSubConfigFactoryWithInspector(corruptInspectorFunc)),
 	)
-	idProvider.On("ByPeerID", victimNode.Host().ID()).Return(&victimIdentity, true).Maybe()
-	idProvider.On("ByPeerID", spammer.SpammerNode.Host().ID()).Return(nil, false).Times(3)
+	idProvider.On("ByPeerID", victimNode.ID()).Return(&victimIdentity, true).Maybe()
+	idProvider.On("ByPeerID", spammer.SpammerNode.ID()).Return(nil, false).Times(3)
 
 	// setup cluster prefixed topic with an invalid cluster ID
 	clusterID := flow.ChainID("known-cluster-id")
@@ -1131,7 +1131,7 @@ func TestValidationInspector_InspectIWants_CacheMissThreshold(t *testing.T) {
 		return func(args mockery.Arguments) {
 			notification, ok := args[0].(*p2p.InvCtrlMsgNotif)
 			require.True(t, ok)
-			require.Equal(t, spammer.SpammerNode.Host().ID(), notification.PeerID)
+			require.Equal(t, spammer.SpammerNode.ID(), notification.PeerID)
 			require.Equal(t, uint64(messageCount), notification.Count)
 			require.True(t, validation.IsIWantCacheMissThresholdErr(notification.Err))
 			cacheMissThresholdNotifCount.Inc()
@@ -1173,8 +1173,8 @@ func TestValidationInspector_InspectIWants_CacheMissThreshold(t *testing.T) {
 		internal.WithCorruptGossipSub(corruptlibp2p.CorruptGossipSubFactory(),
 			corruptlibp2p.CorruptGossipSubConfigFactoryWithInspector(corruptInspectorFunc)),
 	)
-	idProvider.On("ByPeerID", victimNode.Host().ID()).Return(&victimIdentity, true).Maybe()
-	idProvider.On("ByPeerID", spammer.SpammerNode.Host().ID()).Return(&spammer.SpammerId, true).Maybe()
+	idProvider.On("ByPeerID", victimNode.ID()).Return(&victimIdentity, true).Maybe()
+	idProvider.On("ByPeerID", spammer.SpammerNode.ID()).Return(&spammer.SpammerId, true).Maybe()
 
 	messageIDs := corruptlibp2p.GossipSubMessageIdsFixture(10)
 
@@ -1228,7 +1228,7 @@ func TestValidationInspector_InspectIWants_DuplicateMsgIDThreshold(t *testing.T)
 			defer close(done)
 			notification, ok := args[0].(*p2p.InvCtrlMsgNotif)
 			require.True(t, ok)
-			require.Equal(t, spammer.SpammerNode.Host().ID(), notification.PeerID)
+			require.Equal(t, spammer.SpammerNode.ID(), notification.PeerID)
 			require.Equal(t, uint64(messageCount), notification.Count)
 			require.True(t, validation.IsIWantDuplicateMsgIDThresholdErr(notification.Err))
 		}
@@ -1266,8 +1266,8 @@ func TestValidationInspector_InspectIWants_DuplicateMsgIDThreshold(t *testing.T)
 		internal.WithCorruptGossipSub(corruptlibp2p.CorruptGossipSubFactory(),
 			corruptlibp2p.CorruptGossipSubConfigFactoryWithInspector(corruptInspectorFunc)),
 	)
-	idProvider.On("ByPeerID", victimNode.Host().ID()).Return(&victimIdentity, true).Maybe()
-	idProvider.On("ByPeerID", spammer.SpammerNode.Host().ID()).Return(&spammer.SpammerId, true).Maybe()
+	idProvider.On("ByPeerID", victimNode.ID()).Return(&victimIdentity, true).Maybe()
+	idProvider.On("ByPeerID", spammer.SpammerNode.ID()).Return(&spammer.SpammerId, true).Maybe()
 
 	messageIDs := corruptlibp2p.GossipSubMessageIdsFixture(10)
 
@@ -1319,9 +1319,9 @@ func TestGossipSubSpamMitigationIntegration(t *testing.T) {
 	idProvider.On("ByPeerID", mockery.Anything).Return(
 		func(peerId peer.ID) *flow.Identity {
 			switch peerId {
-			case victimNode.Host().ID():
+			case victimNode.ID():
 				return &victimId
-			case spammer.SpammerNode.Host().ID():
+			case spammer.SpammerNode.ID():
 				return &spammer.SpammerId
 			default:
 				return nil
@@ -1329,9 +1329,9 @@ func TestGossipSubSpamMitigationIntegration(t *testing.T) {
 
 		}, func(peerId peer.ID) bool {
 			switch peerId {
-			case victimNode.Host().ID():
+			case victimNode.ID():
 				fallthrough
-			case spammer.SpammerNode.Host().ID():
+			case spammer.SpammerNode.ID():
 				return true
 			default:
 				return false
