@@ -24,7 +24,6 @@ import (
 	"github.com/onflow/flow-go/network/mocknetwork"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/middleware"
-	"github.com/onflow/flow-go/network/slashing"
 	"github.com/onflow/flow-go/network/validator"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -47,9 +46,10 @@ type UnicastAuthorizationTestSuite struct {
 	// receiverID the identity on the mw sending the message
 	receiverID *flow.Identity
 	// providers id providers generated at beginning of a test run
-	providers []*testutils.UpdatableIDProvider
+	providers []*unittest.UpdatableIDProvider
 	// cancel is the cancel func from the context that was used to start the middlewares in a test run
-	cancel context.CancelFunc
+	cancel  context.CancelFunc
+	sporkId flow.Identifier
 	// waitCh is the channel used to wait for the middleware to perform authorization and invoke the slashing
 	//violation's consumer before making mock assertions and cleaning up resources
 	waitCh chan struct{}
@@ -57,7 +57,6 @@ type UnicastAuthorizationTestSuite struct {
 
 // TestUnicastAuthorizationTestSuite runs all the test methods in this test suit
 func TestUnicastAuthorizationTestSuite(t *testing.T) {
-	t.Parallel()
 	suite.Run(t, new(UnicastAuthorizationTestSuite))
 }
 
@@ -73,9 +72,11 @@ func (u *UnicastAuthorizationTestSuite) TearDownTest() {
 }
 
 // setupMiddlewaresAndProviders will setup 2 middlewares that will be used as a sender and receiver in each suite test.
-func (u *UnicastAuthorizationTestSuite) setupMiddlewaresAndProviders(slashingViolationsConsumer slashing.ViolationsConsumer) {
-	ids, libP2PNodes, _ := testutils.GenerateIDs(u.T(), u.logger, 2)
-	mws, providers := testutils.GenerateMiddlewares(u.T(), u.logger, ids, libP2PNodes, unittest.NetworkCodec(), slashingViolationsConsumer)
+func (u *UnicastAuthorizationTestSuite) setupMiddlewaresAndProviders(slashingViolationsConsumer network.ViolationsConsumer) {
+	u.sporkId = unittest.IdentifierFixture()
+	ids, libP2PNodes := testutils.LibP2PNodeForMiddlewareFixture(u.T(), u.sporkId, 2)
+	cfg := testutils.MiddlewareConfigFixture(u.T(), u.sporkId)
+	mws, providers := testutils.MiddlewareFixtures(u.T(), ids, libP2PNodes, cfg, slashingViolationsConsumer)
 	require.Len(u.T(), ids, 2)
 	require.Len(u.T(), providers, 2)
 	require.Len(u.T(), mws, 2)
@@ -93,7 +94,7 @@ func (u *UnicastAuthorizationTestSuite) startMiddlewares(overlay *mocknetwork.Ov
 	ctx, cancel := context.WithCancel(context.Background())
 	sigCtx, _ := irrecoverable.WithSignaler(ctx)
 
-	testutils.StartNodes(sigCtx, u.T(), u.libP2PNodes, 100*time.Millisecond)
+	testutils.StartNodes(sigCtx, u.T(), u.libP2PNodes)
 
 	u.senderMW.SetOverlay(overlay)
 	u.senderMW.Start(sigCtx)
@@ -123,7 +124,7 @@ func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_UnstakedPeer() 
 	require.NoError(u.T(), err)
 
 	var nilID *flow.Identity
-	expectedViolation := &slashing.Violation{
+	expectedViolation := &network.Violation{
 		Identity: nilID, // because the peer will be unverified this identity will be nil
 		PeerID:   expectedSenderPeerID.String(),
 		MsgType:  "",                          // message will not be decoded before OnSenderEjectedError is logged, we won't log message type
@@ -134,7 +135,7 @@ func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_UnstakedPeer() 
 	slashingViolationsConsumer.On(
 		"OnUnAuthorizedSenderError",
 		expectedViolation,
-	).Once().Run(func(args mockery.Arguments) {
+	).Return(nil).Once().Run(func(args mockery.Arguments) {
 		close(u.waitCh)
 	})
 
@@ -153,12 +154,12 @@ func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_UnstakedPeer() 
 
 	u.startMiddlewares(overlay)
 
-	require.NoError(u.T(), u.receiverMW.Subscribe(testChannel))
-	require.NoError(u.T(), u.senderMW.Subscribe(testChannel))
+	require.NoError(u.T(), u.receiverMW.Subscribe(channels.TestNetworkChannel))
+	require.NoError(u.T(), u.senderMW.Subscribe(channels.TestNetworkChannel))
 
-	msg, err := network.NewOutgoingScope(
+	msg, err := message.NewOutgoingScope(
 		flow.IdentifierList{u.receiverID.NodeID},
-		testChannel,
+		channels.TopicFromChannel(channels.TestNetworkChannel, u.sporkId),
 		&libp2pmessage.TestMessage{
 			Text: string("hello"),
 		},
@@ -185,8 +186,9 @@ func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_EjectedPeer() {
 	expectedSenderPeerID, err := unittest.PeerIDFromFlowID(u.senderID)
 	require.NoError(u.T(), err)
 
-	expectedViolation := &slashing.Violation{
+	expectedViolation := &network.Violation{
 		Identity: u.senderID, // we expect this method to be called with the ejected identity
+		OriginID: u.senderID.NodeID,
 		PeerID:   expectedSenderPeerID.String(),
 		MsgType:  "",                          // message will not be decoded before OnSenderEjectedError is logged, we won't log message type
 		Channel:  channels.TestNetworkChannel, // message will not be decoded before OnSenderEjectedError is logged, we won't log peer ID
@@ -196,7 +198,7 @@ func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_EjectedPeer() {
 	slashingViolationsConsumer.On(
 		"OnSenderEjectedError",
 		expectedViolation,
-	).Once().Run(func(args mockery.Arguments) {
+	).Return(nil).Once().Run(func(args mockery.Arguments) {
 		close(u.waitCh)
 	})
 
@@ -214,12 +216,12 @@ func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_EjectedPeer() {
 
 	u.startMiddlewares(overlay)
 
-	require.NoError(u.T(), u.receiverMW.Subscribe(testChannel))
-	require.NoError(u.T(), u.senderMW.Subscribe(testChannel))
+	require.NoError(u.T(), u.receiverMW.Subscribe(channels.TestNetworkChannel))
+	require.NoError(u.T(), u.senderMW.Subscribe(channels.TestNetworkChannel))
 
-	msg, err := network.NewOutgoingScope(
+	msg, err := message.NewOutgoingScope(
 		flow.IdentifierList{u.receiverID.NodeID},
-		testChannel,
+		channels.TopicFromChannel(channels.TestNetworkChannel, u.sporkId),
 		&libp2pmessage.TestMessage{
 			Text: string("hello"),
 		},
@@ -244,8 +246,9 @@ func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_UnauthorizedPee
 	expectedSenderPeerID, err := unittest.PeerIDFromFlowID(u.senderID)
 	require.NoError(u.T(), err)
 
-	expectedViolation := &slashing.Violation{
+	expectedViolation := &network.Violation{
 		Identity: u.senderID,
+		OriginID: u.senderID.NodeID,
 		PeerID:   expectedSenderPeerID.String(),
 		MsgType:  "*message.TestMessage",
 		Channel:  channels.ConsensusCommittee,
@@ -256,7 +259,7 @@ func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_UnauthorizedPee
 	slashingViolationsConsumer.On(
 		"OnUnAuthorizedSenderError",
 		expectedViolation,
-	).Once().Run(func(args mockery.Arguments) {
+	).Return(nil).Once().Run(func(args mockery.Arguments) {
 		close(u.waitCh)
 	})
 
@@ -277,9 +280,9 @@ func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_UnauthorizedPee
 	require.NoError(u.T(), u.receiverMW.Subscribe(channel))
 	require.NoError(u.T(), u.senderMW.Subscribe(channel))
 
-	msg, err := network.NewOutgoingScope(
+	msg, err := message.NewOutgoingScope(
 		flow.IdentifierList{u.receiverID.NodeID},
-		channel,
+		channels.TopicFromChannel(channels.ConsensusCommittee, u.sporkId),
 		&libp2pmessage.TestMessage{
 			Text: string("hello"),
 		},
@@ -307,7 +310,7 @@ func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_UnknownMsgCode(
 	invalidMessageCode := codec.MessageCode(byte('X'))
 
 	var nilID *flow.Identity
-	expectedViolation := &slashing.Violation{
+	expectedViolation := &network.Violation{
 		Identity: nilID,
 		PeerID:   expectedSenderPeerID.String(),
 		MsgType:  "",
@@ -319,7 +322,7 @@ func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_UnknownMsgCode(
 	slashingViolationsConsumer.On(
 		"OnUnknownMsgTypeError",
 		expectedViolation,
-	).Once().Run(func(args mockery.Arguments) {
+	).Return(nil).Once().Run(func(args mockery.Arguments) {
 		close(u.waitCh)
 	})
 
@@ -337,12 +340,12 @@ func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_UnknownMsgCode(
 
 	u.startMiddlewares(overlay)
 
-	require.NoError(u.T(), u.receiverMW.Subscribe(testChannel))
-	require.NoError(u.T(), u.senderMW.Subscribe(testChannel))
+	require.NoError(u.T(), u.receiverMW.Subscribe(channels.TestNetworkChannel))
+	require.NoError(u.T(), u.senderMW.Subscribe(channels.TestNetworkChannel))
 
-	msg, err := network.NewOutgoingScope(
+	msg, err := message.NewOutgoingScope(
 		flow.IdentifierList{u.receiverID.NodeID},
-		testChannel,
+		channels.TopicFromChannel(channels.TestNetworkChannel, u.sporkId),
 		&libp2pmessage.TestMessage{
 			Text: "hello",
 		},
@@ -376,8 +379,9 @@ func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_WrongMsgCode() 
 
 	modifiedMessageCode := codec.CodeDKGMessage
 
-	expectedViolation := &slashing.Violation{
+	expectedViolation := &network.Violation{
 		Identity: u.senderID,
+		OriginID: u.senderID.NodeID,
 		PeerID:   expectedSenderPeerID.String(),
 		MsgType:  "*messages.DKGMessage",
 		Channel:  channels.TestNetworkChannel,
@@ -388,7 +392,7 @@ func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_WrongMsgCode() 
 	slashingViolationsConsumer.On(
 		"OnUnAuthorizedSenderError",
 		expectedViolation,
-	).Once().Run(func(args mockery.Arguments) {
+	).Return(nil).Once().Run(func(args mockery.Arguments) {
 		close(u.waitCh)
 	})
 
@@ -406,12 +410,12 @@ func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_WrongMsgCode() 
 
 	u.startMiddlewares(overlay)
 
-	require.NoError(u.T(), u.receiverMW.Subscribe(testChannel))
-	require.NoError(u.T(), u.senderMW.Subscribe(testChannel))
+	require.NoError(u.T(), u.receiverMW.Subscribe(channels.TestNetworkChannel))
+	require.NoError(u.T(), u.senderMW.Subscribe(channels.TestNetworkChannel))
 
-	msg, err := network.NewOutgoingScope(
+	msg, err := message.NewOutgoingScope(
 		flow.IdentifierList{u.receiverID.NodeID},
-		testChannel,
+		channels.TopicFromChannel(channels.TestNetworkChannel, u.sporkId),
 		&libp2pmessage.TestMessage{
 			Text: "hello",
 		},
@@ -441,9 +445,9 @@ func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_PublicChannel()
 	u.setupMiddlewaresAndProviders(slashingViolationsConsumer)
 
 	expectedPayload := "hello"
-	msg, err := network.NewOutgoingScope(
+	msg, err := message.NewOutgoingScope(
 		flow.IdentifierList{u.receiverID.NodeID},
-		testChannel,
+		channels.TopicFromChannel(channels.TestNetworkChannel, u.sporkId),
 		&libp2pmessage.TestMessage{
 			Text: expectedPayload,
 		},
@@ -466,10 +470,10 @@ func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_PublicChannel()
 		Run(func(args mockery.Arguments) {
 			close(u.waitCh)
 
-			msg, ok := args[0].(*network.IncomingMessageScope)
+			msg, ok := args[0].(network.IncomingMessageScope)
 			require.True(u.T(), ok)
 
-			require.Equal(u.T(), testChannel, msg.Channel())                                              // channel
+			require.Equal(u.T(), channels.TestNetworkChannel, msg.Channel())                              // channel
 			require.Equal(u.T(), u.senderID.NodeID, msg.OriginId())                                       // sender id
 			require.Equal(u.T(), u.receiverID.NodeID, msg.TargetIDs()[0])                                 // target id
 			require.Equal(u.T(), message.ProtocolTypeUnicast, msg.Protocol())                             // protocol
@@ -478,8 +482,8 @@ func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_PublicChannel()
 
 	u.startMiddlewares(overlay)
 
-	require.NoError(u.T(), u.receiverMW.Subscribe(testChannel))
-	require.NoError(u.T(), u.senderMW.Subscribe(testChannel))
+	require.NoError(u.T(), u.receiverMW.Subscribe(channels.TestNetworkChannel))
+	require.NoError(u.T(), u.senderMW.Subscribe(channels.TestNetworkChannel))
 
 	// send message via unicast
 	err = u.senderMW.SendDirect(msg)
@@ -501,8 +505,9 @@ func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_UnauthorizedUni
 	expectedSenderPeerID, err := unittest.PeerIDFromFlowID(u.senderID)
 	require.NoError(u.T(), err)
 
-	expectedViolation := &slashing.Violation{
+	expectedViolation := &network.Violation{
 		Identity: u.senderID,
+		OriginID: u.senderID.NodeID,
 		PeerID:   expectedSenderPeerID.String(),
 		MsgType:  "*messages.BlockProposal",
 		Channel:  channels.ConsensusCommittee,
@@ -513,7 +518,7 @@ func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_UnauthorizedUni
 	slashingViolationsConsumer.On(
 		"OnUnauthorizedUnicastOnChannel",
 		expectedViolation,
-	).Once().Run(func(args mockery.Arguments) {
+	).Return(nil).Return(nil).Once().Run(func(args mockery.Arguments) {
 		close(u.waitCh)
 	})
 
@@ -538,9 +543,9 @@ func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_UnauthorizedUni
 	// messages.BlockProposal is not authorized to be sent via unicast over the ConsensusCommittee channel
 	payload := unittest.ProposalFixture()
 
-	msg, err := network.NewOutgoingScope(
+	msg, err := message.NewOutgoingScope(
 		flow.IdentifierList{u.receiverID.NodeID},
-		channel,
+		channels.TopicFromChannel(channel, u.sporkId),
 		payload,
 		unittest.NetworkCodec().Encode,
 		message.ProtocolTypeUnicast)
@@ -564,7 +569,7 @@ func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_ReceiverHasNoSu
 	expectedSenderPeerID, err := unittest.PeerIDFromFlowID(u.senderID)
 	require.NoError(u.T(), err)
 
-	expectedViolation := &slashing.Violation{
+	expectedViolation := &network.Violation{
 		Identity: nil,
 		PeerID:   expectedSenderPeerID.String(),
 		MsgType:  "*message.TestMessage",
@@ -576,7 +581,7 @@ func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_ReceiverHasNoSu
 	slashingViolationsConsumer.On(
 		"OnUnauthorizedUnicastOnChannel",
 		expectedViolation,
-	).Once().Run(func(args mockery.Arguments) {
+	).Return(nil).Return(nil).Once().Run(func(args mockery.Arguments) {
 		close(u.waitCh)
 	})
 
@@ -595,9 +600,9 @@ func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_ReceiverHasNoSu
 
 	channel := channels.TestNetworkChannel
 
-	msg, err := network.NewOutgoingScope(
+	msg, err := message.NewOutgoingScope(
 		flow.IdentifierList{u.receiverID.NodeID},
-		channel,
+		channels.TopicFromChannel(channel, u.sporkId),
 		&libp2pmessage.TestMessage{
 			Text: "TestUnicastAuthorization_ReceiverHasNoSubscription",
 		},
@@ -621,9 +626,9 @@ func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_ReceiverHasSubs
 	u.setupMiddlewaresAndProviders(slashingViolationsConsumer)
 	channel := channels.RequestReceiptsByBlockID
 
-	msg, err := network.NewOutgoingScope(
+	msg, err := message.NewOutgoingScope(
 		flow.IdentifierList{u.receiverID.NodeID},
-		channel,
+		channels.TopicFromChannel(channel, u.sporkId),
 		&messages.EntityRequest{},
 		unittest.NetworkCodec().Encode,
 		message.ProtocolTypeUnicast)
@@ -647,7 +652,7 @@ func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_ReceiverHasSubs
 		Run(func(args mockery.Arguments) {
 			close(u.waitCh)
 
-			msg, ok := args[0].(*network.IncomingMessageScope)
+			msg, ok := args[0].(network.IncomingMessageScope)
 			require.True(u.T(), ok)
 
 			require.Equal(u.T(), channel, msg.Channel())                      // channel

@@ -433,8 +433,11 @@ func VerifyBLSSignatureManyMessages(
 // Each signature at index (i) of the input signature slice is verified against
 // the public key of the same index (i) in the input key slice.
 // The input hasher is the same used to generate all signatures.
-// The returned boolean slice is a slice so that the value at index (i) is true
-// if signature (i) verifies against public key (i), and false otherwise.
+// The returned boolean slice is of the same length of the signatures slice,
+// where the boolean at index (i) is true if signature (i) verifies against
+// public key (i), and false otherwise.
+// In the case where an error occurs during the execution of the function,
+// all the returned boolean values are `false`.
 //
 // The caller must make sure the input public keys's proofs of possession have been
 // verified prior to calling this function (or each input key is sum of public
@@ -472,10 +475,6 @@ func BatchVerifyBLSSignaturesOneMessage(
 			len(sigs))
 	}
 
-	returnBool := make([]bool, len(sigs))
-	for i := range returnBool {
-		returnBool[i] = true // default to true
-	}
 	if err := checkBLSHasher(kmac); err != nil {
 		return falseSlice, err
 	}
@@ -489,6 +488,7 @@ func BatchVerifyBLSSignaturesOneMessage(
 		return pk.point
 	}
 
+	returnBool := make([]bool, len(sigs))
 	for i, pk := range pks {
 		pkBLS, ok := pk.(*pubKeyBLSBLS12381)
 		if !ok {
@@ -503,6 +503,7 @@ func BatchVerifyBLSSignaturesOneMessage(
 			pkPoints = append(pkPoints, getIdentityPoint())
 			flatSigs = append(flatSigs, g1Serialization...)
 		} else {
+			returnBool[i] = true // default to true
 			pkPoints = append(pkPoints, pkBLS.point)
 			flatSigs = append(flatSigs, sigs[i]...)
 		}
@@ -537,7 +538,6 @@ func BatchVerifyBLSSignaturesOneMessage(
 			returnBool[i] = ((C.int)(v) == valid)
 		}
 	}
-
 	return returnBool, nil
 }
 

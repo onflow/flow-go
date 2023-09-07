@@ -2,7 +2,6 @@ package message_hub
 
 import (
 	"context"
-	"math/rand"
 	"sync"
 	"testing"
 	"time"
@@ -68,9 +67,6 @@ type MessageHubSuite struct {
 }
 
 func (s *MessageHubSuite) SetupTest() {
-	// seed the RNG
-	rand.Seed(time.Now().UnixNano())
-
 	// initialize the paramaters
 	s.cluster = unittest.IdentityListFixture(3,
 		unittest.WithRole(flow.RoleCollection),

@@ -6,11 +6,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/onflow/flow-go/module"
-
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/metrics"
 
 	"github.com/onflow/flow-go/crypto"
 	dkgeng "github.com/onflow/flow-go/engine/consensus/dkg"
@@ -123,6 +124,8 @@ func createNode(
 		core.Net,
 		core.Me,
 		brokerTunnel,
+		metrics.NewNoopCollector(),
+		dkgeng.DefaultMessagingEngineConfig(),
 	)
 	require.NoError(t, err)
 
@@ -164,6 +167,7 @@ func createNode(
 	safeBeaconKeys := badger.NewSafeBeaconPrivateKeys(dkgState)
 
 	node := node{
+		t:               t,
 		GenericNode:     core,
 		dkgState:        dkgState,
 		safeBeaconKeys:  safeBeaconKeys,
@@ -174,6 +178,7 @@ func createNode(
 	return &node
 }
 
+// TestWithWhiteboard tests the DKG protocol against a mocked out DKG smart contract (whiteboard).
 func TestWithWhiteboard(t *testing.T) {
 
 	// hub is an in-memory test network that enables nodes to communicate using
@@ -244,10 +249,10 @@ func TestWithWhiteboard(t *testing.T) {
 		nextEpochSetup,
 		firstBlock)
 
-	for _, n := range nodes {
-		n.Ready()
+	for _, node := range nodes {
+		node.Start()
+		unittest.RequireCloseBefore(t, node.Ready(), time.Second, "failed to start up")
 	}
-
 	// trigger the EpochSetupPhaseStarted event for all nodes, effectively
 	// starting the next DKG run
 	for _, n := range nodes {
@@ -265,7 +270,8 @@ func TestWithWhiteboard(t *testing.T) {
 	}
 
 	for _, n := range nodes {
-		n.Done()
+		n.Stop()
+		unittest.RequireCloseBefore(t, n.Done(), time.Second, "nodes did not shutdown")
 	}
 
 	t.Logf("there are %d result(s)", len(whiteboard.results))

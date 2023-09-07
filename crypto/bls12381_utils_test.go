@@ -3,7 +3,6 @@ package crypto
 import (
 	"crypto/rand"
 	"encoding/hex"
-	mrand "math/rand"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -166,7 +165,7 @@ func TestSubgroupCheck(t *testing.T) {
 // subgroup membership check bench
 func BenchmarkSubgroupCheck(b *testing.B) {
 	seed := make([]byte, g2BytesLen)
-	_, err := mrand.Read(seed)
+	_, err := rand.Read(seed)
 	require.NoError(b, err)
 
 	b.Run("G1", func(b *testing.B) {

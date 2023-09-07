@@ -114,6 +114,13 @@ func invalidSK(t *testing.T) PrivateKey {
 	return sk
 }
 
+// Utility function that flips a point sign bit to negate the point
+// this is shortcut which works only for zcash BLS12-381 compressed serialization
+// Applicable to both signatures and public keys
+func negatePoint(pointbytes []byte) {
+	pointbytes[0] ^= 0x20
+}
+
 // BLS tests
 func TestBLSBLS12381Hasher(t *testing.T) {
 	rand := getPRG(t)
@@ -699,6 +706,25 @@ func TestBLSBatchVerify(t *testing.T) {
 		expectedValid[i], expectedValid[j] = true, true
 	})
 
+	// valid signatures but indices aren't correct: sig[i] is correct under pks[j]
+	// and sig[j] is correct under pks[j].
+	// implementations simply aggregating all signatures and keys would fail this test.
+	t.Run("valid signatures with incorrect indices", func(t *testing.T) {
+		i := mrand.Intn(sigsNum-1) + 1
+		j := mrand.Intn(i)
+		// swap correct keys
+		pks[i], pks[j] = pks[j], pks[i]
+
+		valid, err := BatchVerifyBLSSignaturesOneMessage(pks, sigs, input, kmac)
+		require.NoError(t, err)
+		expectedValid[i], expectedValid[j] = false, false
+		assert.Equal(t, valid, expectedValid)
+
+		// restore keys
+		pks[i], pks[j] = pks[j], pks[i]
+		expectedValid[i], expectedValid[j] = true, true
+	})
+
 	// one valid signature
 	t.Run("one valid signature", func(t *testing.T) {
 		valid, err := BatchVerifyBLSSignaturesOneMessage(pks[:1], sigs[:1], input, kmac)
@@ -720,7 +746,6 @@ func TestBLSBatchVerify(t *testing.T) {
 
 	// some signatures are invalid
 	t.Run("some signatures are invalid", func(t *testing.T) {
-
 		for i := 0; i < invalidSigsNum; i++ { // alter invalidSigsNum random signatures
 			alterSignature(sigs[indices[i]])
 			expectedValid[indices[i]] = false
@@ -1050,7 +1075,7 @@ func TestBLSErrorTypes(t *testing.T) {
 
 // VerifyBLSSignatureManyMessages bench
 // Bench the slowest case where all messages and public keys are distinct.
-// (2*n) pairings without aggrgetion Vs (n+1) pairings with aggregation.
+// (2*n) pairings without aggregation Vs (n+1) pairings with aggregation.
 // The function is faster whenever there are redundant messages or public keys.
 func BenchmarkVerifySignatureManyMessages(b *testing.B) {
 	// inputs

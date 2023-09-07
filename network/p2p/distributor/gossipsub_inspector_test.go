@@ -14,6 +14,7 @@ import (
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/distributor"
+	p2pmsg "github.com/onflow/flow-go/network/p2p/message"
 	mockp2p "github.com/onflow/flow-go/network/p2p/mock"
 	p2ptest "github.com/onflow/flow-go/network/p2p/test"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -37,7 +38,7 @@ func TestGossipSubInspectorNotification(t *testing.T) {
 	c1Done.Add(len(tt))
 	c1Seen := unittest.NewProtectedMap[peer.ID, struct{}]()
 	c1.On("OnInvalidControlMessageNotification", mock.Anything).Run(func(args mock.Arguments) {
-		notification, ok := args.Get(0).(*p2p.InvalidControlMessageNotification)
+		notification, ok := args.Get(0).(*p2p.InvCtrlMsgNotif)
 		require.True(t, ok)
 
 		require.Contains(t, tt, notification)
@@ -53,7 +54,7 @@ func TestGossipSubInspectorNotification(t *testing.T) {
 	c2Done.Add(len(tt))
 	c2Seen := unittest.NewProtectedMap[peer.ID, struct{}]()
 	c2.On("OnInvalidControlMessageNotification", mock.Anything).Run(func(args mock.Arguments) {
-		notification, ok := args.Get(0).(*p2p.InvalidControlMessageNotification)
+		notification, ok := args.Get(0).(*p2p.InvCtrlMsgNotif)
 		require.True(t, ok)
 
 		require.Contains(t, tt, notification)
@@ -73,7 +74,7 @@ func TestGossipSubInspectorNotification(t *testing.T) {
 
 	for i := 0; i < len(tt); i++ {
 		go func(i int) {
-			require.NoError(t, g.DistributeInvalidControlMessageNotification(tt[i]))
+			require.NoError(t, g.Distribute(tt[i]))
 		}(i)
 	}
 
@@ -83,18 +84,18 @@ func TestGossipSubInspectorNotification(t *testing.T) {
 	unittest.RequireCloseBefore(t, g.Done(), 100*time.Millisecond, "could not stop distributor")
 }
 
-func invalidControlMessageNotificationListFixture(t *testing.T, n int) []*p2p.InvalidControlMessageNotification {
-	list := make([]*p2p.InvalidControlMessageNotification, n)
+func invalidControlMessageNotificationListFixture(t *testing.T, n int) []*p2p.InvCtrlMsgNotif {
+	list := make([]*p2p.InvCtrlMsgNotif, n)
 	for i := 0; i < n; i++ {
 		list[i] = invalidControlMessageNotificationFixture(t)
 	}
 	return list
 }
 
-func invalidControlMessageNotificationFixture(t *testing.T) *p2p.InvalidControlMessageNotification {
-	return &p2p.InvalidControlMessageNotification{
+func invalidControlMessageNotificationFixture(t *testing.T) *p2p.InvCtrlMsgNotif {
+	return &p2p.InvCtrlMsgNotif{
 		PeerID:  p2ptest.PeerIdFixture(t),
-		MsgType: []p2p.ControlMessageType{p2p.CtrlMsgGraft, p2p.CtrlMsgPrune, p2p.CtrlMsgIHave, p2p.CtrlMsgIWant}[rand.Intn(4)],
+		MsgType: []p2pmsg.ControlMessageType{p2pmsg.CtrlMsgGraft, p2pmsg.CtrlMsgPrune, p2pmsg.CtrlMsgIHave, p2pmsg.CtrlMsgIWant}[rand.Intn(4)],
 		Count:   rand.Uint64(),
 	}
 }

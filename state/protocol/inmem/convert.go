@@ -82,6 +82,14 @@ func FromSnapshot(from protocol.Snapshot) (*Snapshot, error) {
 	}
 	snap.Params = params.enc
 
+	// convert version beacon
+	versionBeacon, err := from.VersionBeacon()
+	if err != nil {
+		return nil, fmt.Errorf("could not get version beacon: %w", err)
+	}
+
+	snap.SealedVersionBeacon = versionBeacon
+
 	return &Snapshot{snap}, nil
 }
 
@@ -330,10 +338,11 @@ func SnapshotFromBootstrapStateWithParams(
 			FirstSeal:        seal,
 			ExtraBlocks:      make([]*flow.Block, 0),
 		},
-		QuorumCertificate: qc,
-		Phase:             flow.EpochPhaseStaking,
-		Epochs:            epochs,
-		Params:            params,
+		QuorumCertificate:   qc,
+		Phase:               flow.EpochPhaseStaking,
+		Epochs:              epochs,
+		Params:              params,
+		SealedVersionBeacon: nil,
 	})
 	return snap, nil
 }

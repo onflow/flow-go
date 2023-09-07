@@ -5,10 +5,8 @@ package operation
 import (
 	"bytes"
 	"fmt"
-	"math/rand"
 	"reflect"
 	"testing"
-	"time"
 
 	"github.com/dgraph-io/badger/v2"
 	"github.com/stretchr/testify/assert"
@@ -19,10 +17,6 @@ import (
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/utils/unittest"
 )
-
-func init() {
-	rand.Seed(time.Now().UnixNano())
-}
 
 type Entity struct {
 	ID uint64
@@ -612,5 +606,99 @@ func TestIterateBoundaries(t *testing.T) {
 		}
 		require.NoError(t, err, "should iterate backward without error")
 		assert.ElementsMatch(t, keysInRange, found, "backward iteration should go over correct keys")
+	})
+}
+
+func TestFindHighestAtOrBelow(t *testing.T) {
+	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+		prefix := []byte("test_prefix")
+
+		type Entity struct {
+			Value uint64
+		}
+
+		entity1 := Entity{Value: 41}
+		entity2 := Entity{Value: 42}
+		entity3 := Entity{Value: 43}
+
+		err := db.Update(func(tx *badger.Txn) error {
+			key := append(prefix, b(uint64(15))...)
+			val, err := msgpack.Marshal(entity3)
+			if err != nil {
+				return err
+			}
+			err = tx.Set(key, val)
+			if err != nil {
+				return err
+			}
+
+			key = append(prefix, b(uint64(5))...)
+			val, err = msgpack.Marshal(entity1)
+			if err != nil {
+				return err
+			}
+			err = tx.Set(key, val)
+			if err != nil {
+				return err
+			}
+
+			key = append(prefix, b(uint64(10))...)
+			val, err = msgpack.Marshal(entity2)
+			if err != nil {
+				return err
+			}
+			err = tx.Set(key, val)
+			if err != nil {
+				return err
+			}
+			return nil
+		})
+		require.NoError(t, err)
+
+		var entity Entity
+
+		t.Run("target height exists", func(t *testing.T) {
+			err = findHighestAtOrBelow(
+				prefix,
+				10,
+				&entity)(db.NewTransaction(false))
+			require.NoError(t, err)
+			require.Equal(t, uint64(42), entity.Value)
+		})
+
+		t.Run("target height above", func(t *testing.T) {
+			err = findHighestAtOrBelow(
+				prefix,
+				11,
+				&entity)(db.NewTransaction(false))
+			require.NoError(t, err)
+			require.Equal(t, uint64(42), entity.Value)
+		})
+
+		t.Run("target height above highest", func(t *testing.T) {
+			err = findHighestAtOrBelow(
+				prefix,
+				20,
+				&entity)(db.NewTransaction(false))
+			require.NoError(t, err)
+			require.Equal(t, uint64(43), entity.Value)
+		})
+
+		t.Run("target height below lowest", func(t *testing.T) {
+			err = findHighestAtOrBelow(
+				prefix,
+				4,
+				&entity)(db.NewTransaction(false))
+			require.ErrorIs(t, err, storage.ErrNotFound)
+		})
+
+		t.Run("empty prefix", func(t *testing.T) {
+			err = findHighestAtOrBelow(
+				[]byte{},
+				5,
+				&entity)(db.NewTransaction(false))
+			require.Error(t, err)
+			require.Contains(t, err.Error(), "prefix must not be empty")
+		})
 	})
 }

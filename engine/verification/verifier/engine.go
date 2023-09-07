@@ -200,19 +200,31 @@ func (e *Engine) verify(ctx context.Context, originID flow.Identifier,
 	if chFault != nil {
 		switch chFault.(type) {
 		case *chmodels.CFMissingRegisterTouch:
-			e.log.Warn().Msg(chFault.String())
+			e.log.Warn().
+				Str("chunk_fault_type", "missing_register_touch").
+				Str("chunk_fault", chFault.String()).
+				Msg("chunk fault found, could not verify chunk")
 			// still create approvals for this case
 		case *chmodels.CFNonMatchingFinalState:
 			// TODO raise challenge
-			e.log.Warn().Msg(chFault.String())
+			e.log.Warn().
+				Str("chunk_fault_type", "final_state_mismatch").
+				Str("chunk_fault", chFault.String()).
+				Msg("chunk fault found, could not verify chunk")
 			return nil
 		case *chmodels.CFInvalidVerifiableChunk:
 			// TODO raise challenge
-			e.log.Error().Msg(chFault.String())
+			e.log.Error().
+				Str("chunk_fault_type", "invalid_verifiable_chunk").
+				Str("chunk_fault", chFault.String()).
+				Msg("chunk fault found, could not verify chunk")
 			return nil
 		case *chmodels.CFInvalidEventsCollection:
 			// TODO raise challenge
-			e.log.Error().Msg(chFault.String())
+			e.log.Error().
+				Str("chunk_fault_type", "invalid_event_collection").
+				Str("chunk_fault", chFault.String()).
+				Msg("chunk fault found, could not verify chunk")
 			return nil
 		default:
 			return engine.NewInvalidInputErrorf("unknown type of chunk fault is received (type: %T) : %v",

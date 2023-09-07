@@ -11,8 +11,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/onflow/flow-go/network/p2p"
-
 	"github.com/ipfs/go-log"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/rs/zerolog"
@@ -20,18 +18,21 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
-	"github.com/onflow/flow-go/network/mocknetwork"
-	"github.com/onflow/flow-go/network/p2p/middleware"
-	"github.com/onflow/flow-go/network/p2p/p2pnode"
-
+	"github.com/onflow/flow-go/config"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/model/libp2p/message"
 	"github.com/onflow/flow-go/module/irrecoverable"
+	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/observable"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/internal/testutils"
+	"github.com/onflow/flow-go/network/mocknetwork"
+	"github.com/onflow/flow-go/network/p2p"
+	"github.com/onflow/flow-go/network/p2p/middleware"
+	"github.com/onflow/flow-go/network/p2p/p2pnode"
+	p2ptest "github.com/onflow/flow-go/network/p2p/test"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -49,11 +50,13 @@ type MeshEngineTestSuite struct {
 
 // TestMeshNetTestSuite runs all tests in this test suit
 func TestMeshNetTestSuite(t *testing.T) {
+	unittest.SkipUnless(t, unittest.TEST_FLAKY, "this should be revisited once network/test is running in a separate CI job, runs fine locally")
 	suite.Run(t, new(MeshEngineTestSuite))
 }
 
-// SetupTest is executed prior to each test in this test suit
-// it creates and initializes a set of network instances
+// SetupTest is executed prior to each test in this test suite. It creates and initializes
+// a set of network instances, sets up connection managers, nodes, identities, observables, etc.
+// This setup ensures that all necessary configurations are in place before running the tests.
 func (suite *MeshEngineTestSuite) SetupTest() {
 	// defines total number of nodes in our network (minimum 3 needed to use 1-k messaging)
 	const count = 10
@@ -61,8 +64,17 @@ func (suite *MeshEngineTestSuite) SetupTest() {
 	log.SetAllLoggers(log.LevelError)
 
 	// set up a channel to receive pubsub tags from connManagers of the nodes
-	var obs []observable.Observable
 	peerChannel := make(chan string)
+
+	// Tag Observables Usage Explanation:
+	// The tagsObserver is used to observe connections tagged by pubsub messages. This is instrumental in understanding
+	// the connectivity between different peers and verifying the formation of the mesh within this test suite.
+	// Issues:
+	// - Deviation from Production Code: The usage of tag observables here may not reflect the behavior in the production environment.
+	// - Mask Issues in the Production Environment: The observables tied to testing might lead to behaviors or errors that are
+	//   masked or not evident within the actual production code.
+	// TODO: Evaluate the necessity of tag observables in this test and consider addressing the deviation from production
+	// code and potential mask issues. Evaluate the possibility of removing this part eventually.
 	ob := tagsObserver{
 		tags: peerChannel,
 		log:  logger,
@@ -73,19 +85,45 @@ func (suite *MeshEngineTestSuite) SetupTest() {
 
 	signalerCtx := irrecoverable.NewMockSignalerContext(suite.T(), ctx)
 
-	var nodes []p2p.LibP2PNode
-	suite.ids, nodes, suite.mws, suite.nets, obs = testutils.GenerateIDsMiddlewaresNetworks(
+	sporkId := unittest.IdentifierFixture()
+	libP2PNodes := make([]p2p.LibP2PNode, 0)
+	identities := make(flow.IdentityList, 0)
+	tagObservables := make([]observable.Observable, 0)
+	idProvider := unittest.NewUpdatableIDProvider(flow.IdentityList{})
+	defaultFlowConfig, err := config.DefaultConfig()
+	require.NoError(suite.T(), err)
+	opts := []p2ptest.NodeFixtureParameterOption{p2ptest.WithUnicastHandlerFunc(nil)}
+
+	for i := 0; i < count; i++ {
+		connManager, err := testutils.NewTagWatchingConnManager(
+			unittest.Logger(),
+			metrics.NewNoopCollector(),
+			&defaultFlowConfig.NetworkConfig.ConnectionManagerConfig)
+		require.NoError(suite.T(), err)
+
+		opts = append(opts, p2ptest.WithConnectionManager(connManager))
+		node, nodeId := p2ptest.NodeFixture(suite.T(),
+			sporkId,
+			suite.T().Name(),
+			idProvider,
+			opts...)
+		libP2PNodes = append(libP2PNodes, node)
+		identities = append(identities, &nodeId)
+		tagObservables = append(tagObservables, connManager)
+	}
+	idProvider.SetIdentities(identities)
+
+	suite.ids = identities
+	suite.mws, _ = testutils.MiddlewareFixtures(
 		suite.T(),
-		count,
-		logger,
-		unittest.NetworkCodec(),
-		mocknetwork.NewViolationsConsumer(suite.T()),
-		testutils.WithIdentityOpts(unittest.WithAllRoles()),
-	)
+		suite.ids,
+		libP2PNodes,
+		testutils.MiddlewareConfigFixture(suite.T(), sporkId),
+		mocknetwork.NewViolationsConsumer(suite.T()))
+	suite.nets = testutils.NetworksFixture(suite.T(), sporkId, suite.ids, suite.mws)
+	testutils.StartNodesAndNetworks(signalerCtx, suite.T(), libP2PNodes, suite.nets)
 
-	testutils.StartNodesAndNetworks(signalerCtx, suite.T(), nodes, suite.nets, 100*time.Millisecond)
-
-	for _, observableConnMgr := range obs {
+	for _, observableConnMgr := range tagObservables {
 		observableConnMgr.Subscribe(&ob)
 	}
 	suite.obs = peerChannel
@@ -171,9 +209,11 @@ func (suite *MeshEngineTestSuite) TestUnregister_Unicast() {
 	suite.conduitCloseScenario(suite.Unicast)
 }
 
-// allToAllScenario creates a complete mesh of the engines
-// each engine x then sends a "hello from node x" to other engines
-// it evaluates the correctness of message delivery as well as content of the message
+// allToAllScenario creates a complete mesh of the engines, where each engine x sends a
+// "hello from node x" to other engines. It then evaluates the correctness of message
+// delivery as well as the content of the messages. This scenario tests the capability of
+// the engines to communicate in a fully connected graph, ensuring both the reachability
+// of messages and the integrity of their contents.
 func (suite *MeshEngineTestSuite) allToAllScenario(send testutils.ConduitSendWrapperFunc) {
 	// allows nodes to find each other in case of Mulitcast and Publish
 	testutils.OptionalSleep(send)

@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/onflow/cadence"
+	"github.com/onflow/cadence/encoding/ccf"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
 	"github.com/onflow/cadence/runtime"
 	"github.com/stretchr/testify/mock"
@@ -22,8 +23,7 @@ import (
 	"github.com/onflow/flow-go/fvm/blueprints"
 	envMock "github.com/onflow/flow-go/fvm/environment/mock"
 	errors "github.com/onflow/flow-go/fvm/errors"
-	"github.com/onflow/flow-go/fvm/storage"
-	"github.com/onflow/flow-go/fvm/storage/state"
+	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -946,7 +946,7 @@ func TestBlockContext_ExecuteTransaction_StorageLimit(t *testing.T) {
 
 	t.Run("Storing too much data fails", newVMTest().withBootstrapProcedureOptions(bootstrapOptions...).
 		run(
-			func(t *testing.T, vm fvm.VM, chain flow.Chain, ctx fvm.Context, snapshotTree storage.SnapshotTree) {
+			func(t *testing.T, vm fvm.VM, chain flow.Chain, ctx fvm.Context, snapshotTree snapshot.SnapshotTree) {
 				// this test requires storage limits to be enforced
 				ctx.LimitAccountStorage = true
 
@@ -993,7 +993,7 @@ func TestBlockContext_ExecuteTransaction_StorageLimit(t *testing.T) {
 			}))
 	t.Run("Increasing storage capacity works", newVMTest().withBootstrapProcedureOptions(bootstrapOptions...).
 		run(
-			func(t *testing.T, vm fvm.VM, chain flow.Chain, ctx fvm.Context, snapshotTree storage.SnapshotTree) {
+			func(t *testing.T, vm fvm.VM, chain flow.Chain, ctx fvm.Context, snapshotTree snapshot.SnapshotTree) {
 				ctx.LimitAccountStorage = true // this test requires storage limits to be enforced
 
 				// Create an account private key.
@@ -1080,7 +1080,7 @@ func TestBlockContext_ExecuteTransaction_InteractionLimitReached(t *testing.T) {
 	t.Run("Using to much interaction fails", newVMTest().withBootstrapProcedureOptions(bootstrapOptions...).
 		withContextOptions(fvm.WithTransactionFeesEnabled(true)).
 		run(
-			func(t *testing.T, vm fvm.VM, chain flow.Chain, ctx fvm.Context, snapshotTree storage.SnapshotTree) {
+			func(t *testing.T, vm fvm.VM, chain flow.Chain, ctx fvm.Context, snapshotTree snapshot.SnapshotTree) {
 				ctx.MaxStateInteractionSize = 500_000
 
 				// Create an account private key.
@@ -1161,7 +1161,7 @@ func TestBlockContext_ExecuteTransaction_InteractionLimitReached(t *testing.T) {
 	t.Run("Using to much interaction but not failing because of service account", newVMTest().withBootstrapProcedureOptions(bootstrapOptions...).
 		withContextOptions(fvm.WithTransactionFeesEnabled(true)).
 		run(
-			func(t *testing.T, vm fvm.VM, chain flow.Chain, ctx fvm.Context, snapshotTree storage.SnapshotTree) {
+			func(t *testing.T, vm fvm.VM, chain flow.Chain, ctx fvm.Context, snapshotTree snapshot.SnapshotTree) {
 				ctx.MaxStateInteractionSize = 500_000
 
 				// Create an account private key.
@@ -1209,7 +1209,7 @@ func TestBlockContext_ExecuteTransaction_InteractionLimitReached(t *testing.T) {
 			fvm.WithSequenceNumberCheckAndIncrementEnabled(false),
 		).
 		run(
-			func(t *testing.T, vm fvm.VM, chain flow.Chain, ctx fvm.Context, snapshotTree storage.SnapshotTree) {
+			func(t *testing.T, vm fvm.VM, chain flow.Chain, ctx fvm.Context, snapshotTree snapshot.SnapshotTree) {
 				ctx.MaxStateInteractionSize = 50_000
 
 				// Create an account private key.
@@ -1614,7 +1614,7 @@ func TestBlockContext_GetAccount(t *testing.T) {
 
 		// read the address of the account created (e.g. "0x01" and convert it
 		// to flow.address)
-		data, err := jsoncdc.Decode(nil, accountCreatedEvents[0].Payload)
+		data, err := ccf.Decode(nil, accountCreatedEvents[0].Payload)
 		require.NoError(t, err)
 		address := flow.ConvertAddress(
 			data.(cadence.Event).Fields[0].(cadence.Address))
@@ -1664,17 +1664,19 @@ func TestBlockContext_GetAccount(t *testing.T) {
 	})
 }
 
-func TestBlockContext_UnsafeRandom(t *testing.T) {
+func TestBlockContext_Random(t *testing.T) {
 
 	t.Parallel()
 
 	chain, vm := createChainAndVm(flow.Mainnet)
 
 	header := &flow.Header{Height: 42}
+	source := testutil.EntropyProviderFixture(nil)
 
 	ctx := fvm.NewContext(
 		fvm.WithChain(chain),
 		fvm.WithBlockHeader(header),
+		fvm.WithEntropyProvider(source),
 		fvm.WithCadenceLogging(true),
 	)
 
@@ -1701,9 +1703,10 @@ func TestBlockContext_UnsafeRandom(t *testing.T) {
 
 		require.Len(t, output.Logs, 1)
 
-		num, err := strconv.ParseUint(output.Logs[0], 10, 64)
+		// output cannot be deterministic because transaction signature is not deterministic
+		// (which makes the tx hash and the PRG seed used by the execution not deterministic)
+		_, err = strconv.ParseUint(output.Logs[0], 10, 64)
 		require.NoError(t, err)
-		require.Equal(t, uint64(0x7515f254adc6f8af), num)
 	})
 }
 
@@ -1735,7 +1738,7 @@ func TestBlockContext_ExecuteTransaction_CreateAccount_WithMonotonicAddresses(t 
 
 	require.Len(t, accountCreatedEvents, 1)
 
-	data, err := jsoncdc.Decode(nil, accountCreatedEvents[0].Payload)
+	data, err := ccf.Decode(nil, accountCreatedEvents[0].Payload)
 	require.NoError(t, err)
 	address := flow.ConvertAddress(
 		data.(cadence.Event).Fields[0].(cadence.Address))
@@ -1748,7 +1751,7 @@ func TestBlockContext_ExecuteTransaction_FailingTransactions(t *testing.T) {
 		vm fvm.VM,
 		chain flow.Chain,
 		ctx fvm.Context,
-		storageSnapshot state.StorageSnapshot,
+		storageSnapshot snapshot.StorageSnapshot,
 		address flow.Address,
 	) uint64 {
 
@@ -1781,7 +1784,7 @@ func TestBlockContext_ExecuteTransaction_FailingTransactions(t *testing.T) {
 		fvm.WithStorageMBPerFLOW(fvm.DefaultStorageMBPerFLOW),
 		fvm.WithExecutionMemoryLimit(math.MaxUint64),
 	).run(
-		func(t *testing.T, vm fvm.VM, chain flow.Chain, ctx fvm.Context, snapshotTree storage.SnapshotTree) {
+		func(t *testing.T, vm fvm.VM, chain flow.Chain, ctx fvm.Context, snapshotTree snapshot.SnapshotTree) {
 			ctx.LimitAccountStorage = true // this test requires storage limits to be enforced
 
 			// Create an account private key.
@@ -1843,7 +1846,7 @@ func TestBlockContext_ExecuteTransaction_FailingTransactions(t *testing.T) {
 		fvm.WithStorageMBPerFLOW(fvm.DefaultStorageMBPerFLOW),
 		fvm.WithExecutionMemoryLimit(math.MaxUint64),
 	).run(
-		func(t *testing.T, vm fvm.VM, chain flow.Chain, ctx fvm.Context, snapshotTree storage.SnapshotTree) {
+		func(t *testing.T, vm fvm.VM, chain flow.Chain, ctx fvm.Context, snapshotTree snapshot.SnapshotTree) {
 			ctx.LimitAccountStorage = true // this test requires storage limits to be enforced
 
 			// Create an account private key.
@@ -1908,7 +1911,7 @@ func TestBlockContext_ExecuteTransaction_FailingTransactions(t *testing.T) {
 		fvm.WithAccountCreationFee(fvm.DefaultAccountCreationFee),
 	).
 		run(
-			func(t *testing.T, vm fvm.VM, chain flow.Chain, ctx fvm.Context, snapshotTree storage.SnapshotTree) {
+			func(t *testing.T, vm fvm.VM, chain flow.Chain, ctx fvm.Context, snapshotTree snapshot.SnapshotTree) {
 				// this test requires storage limits to be enforced
 				ctx.LimitAccountStorage = true
 
@@ -1967,7 +1970,7 @@ func TestBlockContext_ExecuteTransaction_FailingTransactions(t *testing.T) {
 		fvm.WithStorageMBPerFLOW(fvm.DefaultStorageMBPerFLOW),
 	).
 		run(
-			func(t *testing.T, vm fvm.VM, chain flow.Chain, ctx fvm.Context, snapshotTree storage.SnapshotTree) {
+			func(t *testing.T, vm fvm.VM, chain flow.Chain, ctx fvm.Context, snapshotTree snapshot.SnapshotTree) {
 				// this test requires storage limits to be enforced
 				ctx.LimitAccountStorage = true
 

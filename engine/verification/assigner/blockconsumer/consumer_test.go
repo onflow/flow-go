@@ -146,10 +146,11 @@ func withConsumer(
 		// blocks (i.e., containing guarantees), and Cs are container blocks for their preceding reference block,
 		// Container blocks only contain receipts of their preceding reference blocks. But they do not
 		// hold any guarantees.
-		root, err := s.State.Params().Root()
+		root, err := s.State.Params().FinalizedRoot()
 		require.NoError(t, err)
 		clusterCommittee := participants.Filter(filter.HasRole(flow.RoleCollection))
-		results := vertestutils.CompleteExecutionReceiptChainFixture(t, root, blockCount/2, vertestutils.WithClusterCommittee(clusterCommittee))
+		sources := unittest.RandomSourcesFixture(110)
+		results := vertestutils.CompleteExecutionReceiptChainFixture(t, root, blockCount/2, sources, vertestutils.WithClusterCommittee(clusterCommittee))
 		blocks := vertestutils.ExtendStateWithFinalizedBlocks(t, results, s.State)
 		// makes sure that we generated a block chain of requested length.
 		require.Len(t, blocks, blockCount)

@@ -27,6 +27,7 @@ type StopAtHeightRequest struct {
 }
 
 func (s *TestStopAtHeightSuite) TestStopAtHeight() {
+
 	enContainer := s.net.ContainerByID(s.exe1ID)
 
 	serverAddr := fmt.Sprintf("localhost:%s", enContainer.Port(testnet.AdminPort))

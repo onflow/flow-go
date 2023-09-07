@@ -32,8 +32,8 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/voteaggregator"
 	"github.com/onflow/flow-go/consensus/hotstuff/votecollector"
 	"github.com/onflow/flow-go/crypto"
-	"github.com/onflow/flow-go/engine/consensus/sealing/counters"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/counters"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
 	module "github.com/onflow/flow-go/module/mock"
@@ -84,7 +84,8 @@ type Instance struct {
 }
 
 type MockedCommunicatorConsumer struct {
-	notifications.NoopPartialConsumer
+	notifications.NoopProposalViolationConsumer
+	notifications.NoopParticipantConsumer
 	notifications.NoopFinalizationConsumer
 	*mocks.CommunicatorConsumer
 }
@@ -390,7 +391,7 @@ func NewInstance(t *testing.T, options ...Option) *Instance {
 
 	// initialize the pacemaker
 	controller := timeout.NewController(cfg.Timeouts)
-	in.pacemaker, err = pacemaker.New(controller, notifier, in.persist)
+	in.pacemaker, err = pacemaker.New(controller, pacemaker.NoProposalDelay(), notifier, in.persist)
 	require.NoError(t, err)
 
 	// initialize the forks handler
@@ -431,7 +432,8 @@ func NewInstance(t *testing.T, options ...Option) *Instance {
 			)
 		}, nil).Maybe()
 
-	createCollectorFactoryMethod := votecollector.NewStateMachineFactory(log, notifier, voteProcessorFactory.Create)
+	voteAggregationDistributor := pubsub.NewVoteAggregationDistributor()
+	createCollectorFactoryMethod := votecollector.NewStateMachineFactory(log, voteAggregationDistributor, voteProcessorFactory.Create)
 	voteCollectors := voteaggregator.NewVoteCollectors(log, livenessData.CurrentView, workerpool.New(2), createCollectorFactoryMethod)
 
 	metricsCollector := metrics.NewNoopCollector()
@@ -442,14 +444,14 @@ func NewInstance(t *testing.T, options ...Option) *Instance {
 		metricsCollector,
 		metricsCollector,
 		metricsCollector,
-		notifier,
+		voteAggregationDistributor,
 		livenessData.CurrentView,
 		voteCollectors,
 	)
 	require.NoError(t, err)
 
 	// initialize factories for timeout collector and timeout processor
-	collectorDistributor := pubsub.NewTimeoutCollectorDistributor()
+	timeoutAggregationDistributor := pubsub.NewTimeoutAggregationDistributor()
 	timeoutProcessorFactory := mocks.NewTimeoutProcessorFactory(t)
 	timeoutProcessorFactory.On("Create", mock.Anything).Return(
 		func(view uint64) hotstuff.TimeoutProcessor {
@@ -490,18 +492,22 @@ func NewInstance(t *testing.T, options ...Option) *Instance {
 				in.committee,
 				in.validator,
 				aggregator,
-				collectorDistributor,
+				timeoutAggregationDistributor,
 			)
 			require.NoError(t, err)
 			return p
 		}, nil).Maybe()
 	timeoutCollectorFactory := timeoutcollector.NewTimeoutCollectorFactory(
 		unittest.Logger(),
-		notifier,
-		collectorDistributor,
+		timeoutAggregationDistributor,
 		timeoutProcessorFactory,
 	)
-	timeoutCollectors := timeoutaggregator.NewTimeoutCollectors(log, livenessData.CurrentView, timeoutCollectorFactory)
+	timeoutCollectors := timeoutaggregator.NewTimeoutCollectors(
+		log,
+		metricsCollector,
+		livenessData.CurrentView,
+		timeoutCollectorFactory,
+	)
 
 	// initialize the timeout aggregator
 	in.timeoutAggregator, err = timeoutaggregator.NewTimeoutAggregator(
@@ -509,7 +515,6 @@ func NewInstance(t *testing.T, options ...Option) *Instance {
 		metricsCollector,
 		metricsCollector,
 		metricsCollector,
-		notifier,
 		livenessData.CurrentView,
 		timeoutCollectors,
 	)
@@ -538,8 +543,10 @@ func NewInstance(t *testing.T, options ...Option) *Instance {
 	)
 	require.NoError(t, err)
 
-	collectorDistributor.AddConsumer(logConsumer)
-	collectorDistributor.AddConsumer(&in)
+	timeoutAggregationDistributor.AddTimeoutCollectorConsumer(logConsumer)
+	timeoutAggregationDistributor.AddTimeoutCollectorConsumer(&in)
+
+	voteAggregationDistributor.AddVoteCollectorConsumer(logConsumer)
 
 	return &in
 }
@@ -664,3 +671,5 @@ func (in *Instance) OnNewQcDiscovered(qc *flow.QuorumCertificate) {
 func (in *Instance) OnNewTcDiscovered(tc *flow.TimeoutCertificate) {
 	in.queue <- tc
 }
+
+func (in *Instance) OnTimeoutProcessed(*model.TimeoutObject) {}

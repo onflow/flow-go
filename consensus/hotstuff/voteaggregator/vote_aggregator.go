@@ -12,9 +12,9 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/common/fifoqueue"
-	"github.com/onflow/flow-go/engine/consensus/sealing/counters"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/component"
+	"github.com/onflow/flow-go/module/counters"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/mempool"
 	"github.com/onflow/flow-go/module/metrics"
@@ -37,7 +37,7 @@ type VoteAggregator struct {
 	log                        zerolog.Logger
 	hotstuffMetrics            module.HotstuffMetrics
 	engineMetrics              module.EngineMetrics
-	notifier                   hotstuff.Consumer
+	notifier                   hotstuff.VoteAggregationViolationConsumer
 	lowestRetainedView         counters.StrictMonotonousCounter // lowest view, for which we still process votes
 	collectors                 hotstuff.VoteCollectors
 	queuedMessagesNotifier     engine.Notifier
@@ -58,7 +58,7 @@ func NewVoteAggregator(
 	hotstuffMetrics module.HotstuffMetrics,
 	engineMetrics module.EngineMetrics,
 	mempoolMetrics module.MempoolMetrics,
-	notifier hotstuff.Consumer,
+	notifier hotstuff.VoteAggregationViolationConsumer,
 	lowestRetainedView uint64,
 	collectors hotstuff.VoteCollectors,
 ) (*VoteAggregator, error) {
@@ -246,7 +246,7 @@ func (va *VoteAggregator) processQueuedBlock(block *model.Proposal) error {
 
 	err = collector.ProcessBlock(block)
 	if err != nil {
-		if model.IsInvalidBlockError(err) {
+		if model.IsInvalidProposalError(err) {
 			// We are attempting process a block which is invalid
 			// This should never happen, because any component that feeds blocks into VoteAggregator
 			// needs to make sure that it's submitting for processing ONLY valid blocks.

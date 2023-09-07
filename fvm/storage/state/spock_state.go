@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/onflow/flow-go/crypto/hash"
+	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -29,7 +30,7 @@ type spockState struct {
 	finalizedSpockSecret []byte
 }
 
-func newSpockState(base StorageSnapshot) *spockState {
+func newSpockState(base snapshot.StorageSnapshot) *spockState {
 	return &spockState{
 		storageState:      newStorageState(base),
 		spockSecretHasher: hash.NewSHA3_256(),
@@ -43,7 +44,7 @@ func (state *spockState) NewChild() *spockState {
 	}
 }
 
-func (state *spockState) Finalize() *ExecutionSnapshot {
+func (state *spockState) Finalize() *snapshot.ExecutionSnapshot {
 	if state.finalizedSpockSecret == nil {
 		state.finalizedSpockSecret = state.spockSecretHasher.SumHash()
 	}
@@ -53,7 +54,7 @@ func (state *spockState) Finalize() *ExecutionSnapshot {
 	return snapshot
 }
 
-func (state *spockState) Merge(snapshot *ExecutionSnapshot) error {
+func (state *spockState) Merge(snapshot *snapshot.ExecutionSnapshot) error {
 	if state.finalizedSpockSecret != nil {
 		return fmt.Errorf("cannot Merge on a finalized state")
 	}

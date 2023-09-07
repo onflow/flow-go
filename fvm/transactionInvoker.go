@@ -15,6 +15,7 @@ import (
 	reusableRuntime "github.com/onflow/flow-go/fvm/runtime"
 	"github.com/onflow/flow-go/fvm/storage"
 	"github.com/onflow/flow-go/fvm/storage/derived"
+	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/fvm/storage/state"
 	"github.com/onflow/flow-go/module/trace"
 )
@@ -53,7 +54,7 @@ type transactionExecutor struct {
 
 	ctx      Context
 	proc     *TransactionProcedure
-	txnState storage.Transaction
+	txnState storage.TransactionPreparer
 
 	span otelTrace.Span
 	env  environment.Environment
@@ -72,7 +73,7 @@ type transactionExecutor struct {
 func newTransactionExecutor(
 	ctx Context,
 	proc *TransactionProcedure,
-	txnState storage.Transaction,
+	txnState storage.TransactionPreparer,
 ) *transactionExecutor {
 	span := ctx.StartChildSpan(trace.FVMExecuteTransaction)
 	span.SetAttributes(attribute.String("transaction_id", proc.ID.String()))
@@ -285,7 +286,8 @@ func (executor *transactionExecutor) deductTransactionFees() (err error) {
 
 // logExecutionIntensities logs execution intensities of the transaction
 func (executor *transactionExecutor) logExecutionIntensities() {
-	if !executor.env.Logger().Debug().Enabled() {
+	log := executor.env.Logger()
+	if !log.Debug().Enabled() {
 		return
 	}
 
@@ -297,7 +299,7 @@ func (executor *transactionExecutor) logExecutionIntensities() {
 	for s, u := range executor.txnState.MemoryIntensities() {
 		memory.Uint(strconv.FormatUint(uint64(s), 10), u)
 	}
-	executor.env.Logger().Debug().
+	log.Debug().
 		Uint64("ledgerInteractionUsed", executor.txnState.InteractionUsed()).
 		Uint64("computationUsed", executor.txnState.TotalComputationUsed()).
 		Uint64("memoryEstimate", executor.txnState.TotalMemoryEstimate()).
@@ -348,7 +350,7 @@ func (executor *transactionExecutor) normalExecution() (
 		return
 	}
 
-	var bodySnapshot *state.ExecutionSnapshot
+	var bodySnapshot *snapshot.ExecutionSnapshot
 	bodySnapshot, err = executor.txnState.CommitNestedTransaction(bodyTxnId)
 	if err != nil {
 		return
@@ -390,7 +392,8 @@ func (executor *transactionExecutor) normalExecution() (
 // Clear changes and try to deduct fees again.
 func (executor *transactionExecutor) errorExecution() {
 	// log transaction as failed
-	executor.env.Logger().Info().
+	log := executor.env.Logger()
+	log.Info().
 		Err(executor.errs.ErrorOrNil()).
 		Msg("transaction executed with error")
 
@@ -407,7 +410,7 @@ func (executor *transactionExecutor) errorExecution() {
 
 	// if fee deduction fails just do clean up and exit
 	if feesError != nil {
-		executor.env.Logger().Info().
+		log.Info().
 			Err(feesError).
 			Msg("transaction fee deduction executed with error")
 

@@ -13,75 +13,101 @@ import (
 	fcrypto "github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/metrics"
+	"github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/network/netconf"
 	"github.com/onflow/flow-go/network/p2p"
-	"github.com/onflow/flow-go/network/p2p/distributor"
 	"github.com/onflow/flow-go/network/p2p/p2pbuilder"
-	inspectorbuilder "github.com/onflow/flow-go/network/p2p/p2pbuilder/inspector"
+	p2pconfig "github.com/onflow/flow-go/network/p2p/p2pbuilder/config"
 )
 
-// NewCorruptLibP2PNodeFactory wrapper around the original DefaultLibP2PNodeFactory. Nodes returned from this factory func will be corrupted libp2p nodes.
-func NewCorruptLibP2PNodeFactory(
+// InitCorruptLibp2pNode initializes and returns a corrupt libp2p node that should only be used for BFT testing in
+// the BFT testnet. This node is corrupt in the sense that it uses a forked version of the go-libp2p-pubsub library and
+// is not compatible with the go-libp2p-pubsub library used by the other nodes in the network. This node should only be
+// used for testing purposes.
+// Args:
+// - log: logger
+// - chainID: chain id of the network this node is being used for (should be BFT testnet)
+// - address: address of the node in the form of /ip4/ ... /tcp/ ... /p2p/ ... (see libp2p documentation for more info)
+// - flowKey: private key of the node used for signing messages and establishing secure connections
+// - sporkId: spork id of the network this node is being used for.
+// - idProvider: identity provider used for translating peer ids to flow ids.
+// - metricsCfg: metrics configuration used for initializing the metrics collector
+// - resolver: resolver used for resolving multiaddresses to ip addresses
+// - role: role of the node (a valid Flow role).
+// - connGaterCfg: connection gater configuration used for initializing the connection gater
+// - peerManagerCfg: peer manager configuration used for initializing the peer manager
+// - uniCfg: unicast configuration used for initializing the unicast
+// - gossipSubCfg: gossipsub configuration used for initializing the gossipsub
+// - topicValidatorDisabled: whether or not topic validator is disabled
+// - withMessageSigning: whether or not message signing is enabled
+// - withStrictSignatureVerification: whether or not strict signature verification is enabled
+// Returns:
+// - p2p.LibP2PNode: initialized corrupt libp2p node
+// - error: error if any. Any error returned from this function is fatal.
+func InitCorruptLibp2pNode(
 	log zerolog.Logger,
 	chainID flow.ChainID,
 	address string,
 	flowKey fcrypto.PrivateKey,
 	sporkId flow.Identifier,
 	idProvider module.IdentityProvider,
-	metrics module.LibP2PMetrics,
+	metricsCfg module.NetworkMetrics,
 	resolver madns.BasicResolver,
 	role string,
-	connGaterCfg *p2pbuilder.ConnectionGaterConfig,
-	peerManagerCfg *p2pbuilder.PeerManagerConfig,
-	uniCfg *p2pbuilder.UnicastConfig,
-	gossipSubCfg *p2pbuilder.GossipSubConfig,
+	connGaterCfg *p2pconfig.ConnectionGaterConfig,
+	peerManagerCfg *p2pconfig.PeerManagerConfig,
+	uniCfg *p2pconfig.UnicastConfig,
+	netConfig *netconf.Config,
+	disallowListCacheCfg *p2p.DisallowListCacheConfig,
 	topicValidatorDisabled,
 	withMessageSigning,
 	withStrictSignatureVerification bool,
-) p2p.LibP2PFactoryFunc {
-	return func() (p2p.LibP2PNode, error) {
-		if chainID != flow.BftTestnet {
-			panic("illegal chain id for using corrupt libp2p node")
-		}
-
-		rpcInspectorBuilder := inspectorbuilder.NewGossipSubInspectorBuilder(log, sporkId, inspectorbuilder.DefaultGossipSubRPCInspectorsConfig(), distributor.DefaultGossipSubInspectorNotificationDistributor(log))
-		rpcInspectors, err := rpcInspectorBuilder.Build()
-		if err != nil {
-			return nil, fmt.Errorf("failed to create gossipsub rpc inspectors for public libp2p node: %w", err)
-		}
-		gossipSubCfg.RPCInspectors = rpcInspectors
-
-		builder, err := p2pbuilder.DefaultNodeBuilder(
-			log,
-			address,
-			flowKey,
-			sporkId,
-			idProvider,
-			metrics,
-			resolver,
-			role,
-			connGaterCfg,
-			peerManagerCfg,
-			gossipSubCfg,
-			p2pbuilder.DefaultResourceManagerConfig(),
-			uniCfg)
-
-		if err != nil {
-			return nil, fmt.Errorf("could not create corrupt libp2p node builder: %w", err)
-		}
-		if topicValidatorDisabled {
-			builder.SetCreateNode(NewCorruptLibP2PNode)
-		}
-
-		overrideWithCorruptGossipSub(builder, WithMessageSigning(withMessageSigning), WithStrictSignatureVerification(withStrictSignatureVerification))
-		return builder.Build()
+) (p2p.LibP2PNode, error) {
+	if chainID != flow.BftTestnet {
+		panic("illegal chain id for using corrupt libp2p node")
 	}
+
+	metCfg := &p2pconfig.MetricsConfig{
+		HeroCacheFactory: metrics.NewNoopHeroCacheMetricsFactory(),
+		Metrics:          metricsCfg,
+	}
+
+	builder, err := p2pbuilder.DefaultNodeBuilder(
+		log,
+		address,
+		network.PrivateNetwork,
+		flowKey,
+		sporkId,
+		idProvider,
+		metCfg,
+		resolver,
+		role,
+		connGaterCfg,
+		peerManagerCfg,
+		&netConfig.GossipSubConfig,
+		&netConfig.GossipSubRPCInspectorsConfig,
+		&netConfig.ResourceManagerConfig,
+		uniCfg,
+		&netConfig.ConnectionManagerConfig,
+		disallowListCacheCfg)
+
+	if err != nil {
+		return nil, fmt.Errorf("could not create corrupt libp2p node builder: %w", err)
+	}
+	if topicValidatorDisabled {
+		builder.SetCreateNode(NewCorruptLibP2PNode)
+	}
+
+	overrideWithCorruptGossipSub(builder, WithMessageSigning(withMessageSigning), WithStrictSignatureVerification(withStrictSignatureVerification))
+	return builder.Build()
 }
 
 // CorruptGossipSubFactory returns a factory function that creates a new instance of the forked gossipsub module from
 // github.com/yhassanzadeh13/go-libp2p-pubsub for the purpose of BFT testing and attack vector implementation.
 func CorruptGossipSubFactory(routerOpts ...func(*corrupt.GossipSubRouter)) p2p.GossipSubFactoryFunc {
-	factory := func(ctx context.Context, logger zerolog.Logger, host host.Host, cfg p2p.PubSubAdapterConfig) (p2p.PubSubAdapter, error) {
-		adapter, router, err := NewCorruptGossipSubAdapter(ctx, logger, host, cfg)
+	factory := func(ctx context.Context, logger zerolog.Logger, host host.Host, cfg p2p.PubSubAdapterConfig, clusterChangeConsumer p2p.CollectionClusterChangesConsumer) (p2p.PubSubAdapter, error) {
+		adapter, router, err := NewCorruptGossipSubAdapter(ctx, logger, host, cfg, clusterChangeConsumer)
 		for _, opt := range routerOpts {
 			opt(router)
 		}

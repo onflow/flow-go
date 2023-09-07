@@ -8,18 +8,19 @@ import (
 
 	"github.com/onflow/flow-go/fvm/storage/errors"
 	"github.com/onflow/flow-go/fvm/storage/logical"
+	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/fvm/storage/state"
 )
 
 // ValueComputer is used by DerivedDataTable's GetOrCompute to compute the
 // derived value when the value is not in DerivedDataTable (i.e., "cache miss").
 type ValueComputer[TKey any, TVal any] interface {
-	Compute(txnState state.NestedTransaction, key TKey) (TVal, error)
+	Compute(txnState state.NestedTransactionPreparer, key TKey) (TVal, error)
 }
 
 type invalidatableEntry[TVal any] struct {
-	Value             TVal                     // immutable after initialization.
-	ExecutionSnapshot *state.ExecutionSnapshot // immutable after initialization.
+	Value             TVal                        // immutable after initialization.
+	ExecutionSnapshot *snapshot.ExecutionSnapshot // immutable after initialization.
 
 	isInvalid bool // Guarded by DerivedDataTable' lock.
 }
@@ -78,29 +79,17 @@ type TableTransaction[TKey comparable, TVal any] struct {
 	invalidators              chainedTableInvalidators[TKey, TVal]
 }
 
-func newEmptyTable[TKey comparable, TVal any](
-	latestCommit logical.Time,
-) *DerivedDataTable[TKey, TVal] {
-	return &DerivedDataTable[TKey, TVal]{
-		items:                     map[TKey]*invalidatableEntry[TVal]{},
-		latestCommitExecutionTime: latestCommit,
-		invalidators:              nil,
-	}
-}
-
-func NewEmptyTable[TKey comparable, TVal any]() *DerivedDataTable[TKey, TVal] {
-	return newEmptyTable[TKey, TVal](logical.ParentBlockTime)
-}
-
-// This variant is needed by the chunk verifier, which does not start at the
-// beginning of the block.
-func NewEmptyTableWithOffset[
+func NewEmptyTable[
 	TKey comparable,
 	TVal any,
 ](
-	offset uint32,
+	initialSnapshotTime logical.Time,
 ) *DerivedDataTable[TKey, TVal] {
-	return newEmptyTable[TKey, TVal](logical.Time(offset) - 1)
+	return &DerivedDataTable[TKey, TVal]{
+		items:                     map[TKey]*invalidatableEntry[TVal]{},
+		latestCommitExecutionTime: initialSnapshotTime - 1,
+		invalidators:              nil,
+	}
 }
 
 func (table *DerivedDataTable[TKey, TVal]) NewChildTable() *DerivedDataTable[TKey, TVal] {
@@ -359,7 +348,7 @@ func (table *DerivedDataTable[TKey, TVal]) NewTableTransaction(
 // Note: use GetOrCompute instead of Get/Set whenever possible.
 func (txn *TableTransaction[TKey, TVal]) get(key TKey) (
 	TVal,
-	*state.ExecutionSnapshot,
+	*snapshot.ExecutionSnapshot,
 	bool,
 ) {
 
@@ -385,7 +374,7 @@ func (txn *TableTransaction[TKey, TVal]) get(key TKey) (
 
 func (txn *TableTransaction[TKey, TVal]) GetForTestingOnly(key TKey) (
 	TVal,
-	*state.ExecutionSnapshot,
+	*snapshot.ExecutionSnapshot,
 	bool,
 ) {
 	return txn.get(key)
@@ -394,7 +383,7 @@ func (txn *TableTransaction[TKey, TVal]) GetForTestingOnly(key TKey) (
 func (txn *TableTransaction[TKey, TVal]) set(
 	key TKey,
 	value TVal,
-	snapshot *state.ExecutionSnapshot,
+	snapshot *snapshot.ExecutionSnapshot,
 ) {
 	txn.writeSet[key] = &invalidatableEntry[TVal]{
 		Value:             value,
@@ -410,7 +399,7 @@ func (txn *TableTransaction[TKey, TVal]) set(
 func (txn *TableTransaction[TKey, TVal]) SetForTestingOnly(
 	key TKey,
 	value TVal,
-	snapshot *state.ExecutionSnapshot,
+	snapshot *snapshot.ExecutionSnapshot,
 ) {
 	txn.set(key, value, snapshot)
 }
@@ -423,7 +412,7 @@ func (txn *TableTransaction[TKey, TVal]) SetForTestingOnly(
 // Note: valFunc must be an idempotent function and it must not modify
 // txnState's values.
 func (txn *TableTransaction[TKey, TVal]) GetOrCompute(
-	txnState state.NestedTransaction,
+	txnState state.NestedTransactionPreparer,
 	key TKey,
 	computer ValueComputer[TKey, TVal],
 ) (

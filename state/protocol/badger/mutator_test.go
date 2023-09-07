@@ -40,10 +40,6 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-func init() {
-	rand.Seed(time.Now().UnixNano())
-}
-
 var participants = unittest.IdentityListFixture(5, unittest.WithAllRoles())
 
 func TestBootstrapValid(t *testing.T) {
@@ -103,7 +99,20 @@ func TestExtendValid(t *testing.T) {
 		rootSnapshot, err := inmem.SnapshotFromBootstrapState(block, result, seal, qc)
 		require.NoError(t, err)
 
-		state, err := protocol.Bootstrap(metrics, db, all.Headers, all.Seals, all.Results, all.Blocks, all.QuorumCertificates, all.Setups, all.EpochCommits, all.Statuses, rootSnapshot)
+		state, err := protocol.Bootstrap(
+			metrics,
+			db,
+			all.Headers,
+			all.Seals,
+			all.Results,
+			all.Blocks,
+			all.QuorumCertificates,
+			all.Setups,
+			all.EpochCommits,
+			all.Statuses,
+			all.VersionBeacons,
+			rootSnapshot,
+		)
 		require.NoError(t, err)
 
 		fullState, err := protocol.NewFullConsensusState(
@@ -259,6 +268,173 @@ func TestSealedIndex(t *testing.T) {
 		require.Equal(t, b3Seal, s3)
 	})
 
+}
+
+func TestVersionBeaconIndex(t *testing.T) {
+	rootSnapshot := unittest.RootSnapshotFixture(participants)
+	util.RunWithFullProtocolState(t, rootSnapshot, func(db *badger.DB, state *protocol.ParticipantState) {
+		rootHeader, err := rootSnapshot.Head()
+		require.NoError(t, err)
+
+		// build a chain:
+		// G <- B1 <- B2 (resultB1(vb1)) <- B3 <- B4 (resultB2(vb2), resultB3(vb3)) <- B5 (sealB1) <- B6 (sealB2, sealB3)
+		// up until and including finalization of B5 there should be no VBs indexed
+		//    when B5 is finalized, index VB1
+		//    when B6 is finalized, we can index VB2 and VB3, but (only) the last one should be indexed by seal height
+
+		// block 1
+		b1 := unittest.BlockWithParentFixture(rootHeader)
+		b1.SetPayload(flow.EmptyPayload())
+		err = state.Extend(context.Background(), b1)
+		require.NoError(t, err)
+
+		vb1 := unittest.VersionBeaconFixture(
+			unittest.WithBoundaries(
+				flow.VersionBoundary{
+					BlockHeight: rootHeader.Height,
+					Version:     "0.21.37",
+				},
+				flow.VersionBoundary{
+					BlockHeight: rootHeader.Height + 100,
+					Version:     "0.21.38",
+				},
+			),
+		)
+		vb2 := unittest.VersionBeaconFixture(
+			unittest.WithBoundaries(
+				flow.VersionBoundary{
+					BlockHeight: rootHeader.Height,
+					Version:     "0.21.37",
+				},
+				flow.VersionBoundary{
+					BlockHeight: rootHeader.Height + 101,
+					Version:     "0.21.38",
+				},
+				flow.VersionBoundary{
+					BlockHeight: rootHeader.Height + 201,
+					Version:     "0.21.39",
+				},
+			),
+		)
+		vb3 := unittest.VersionBeaconFixture(
+			unittest.WithBoundaries(
+				flow.VersionBoundary{
+					BlockHeight: rootHeader.Height,
+					Version:     "0.21.37",
+				},
+				flow.VersionBoundary{
+					BlockHeight: rootHeader.Height + 99,
+					Version:     "0.21.38",
+				},
+				flow.VersionBoundary{
+					BlockHeight: rootHeader.Height + 199,
+					Version:     "0.21.39",
+				},
+				flow.VersionBoundary{
+					BlockHeight: rootHeader.Height + 299,
+					Version:     "0.21.40",
+				},
+			),
+		)
+
+		b1Receipt := unittest.ReceiptForBlockFixture(b1)
+		b1Receipt.ExecutionResult.ServiceEvents = []flow.ServiceEvent{vb1.ServiceEvent()}
+		b2 := unittest.BlockWithParentFixture(b1.Header)
+		b2.SetPayload(unittest.PayloadFixture(unittest.WithReceipts(b1Receipt)))
+		err = state.Extend(context.Background(), b2)
+		require.NoError(t, err)
+
+		// block 3
+		b3 := unittest.BlockWithParentFixture(b2.Header)
+		b3.SetPayload(flow.EmptyPayload())
+		err = state.Extend(context.Background(), b3)
+		require.NoError(t, err)
+
+		// block 4 (resultB2, resultB3)
+		b2Receipt := unittest.ReceiptForBlockFixture(b2)
+		b2Receipt.ExecutionResult.ServiceEvents = []flow.ServiceEvent{vb2.ServiceEvent()}
+
+		b3Receipt := unittest.ReceiptForBlockFixture(b3)
+		b3Receipt.ExecutionResult.ServiceEvents = []flow.ServiceEvent{vb3.ServiceEvent()}
+
+		b4 := unittest.BlockWithParentFixture(b3.Header)
+		b4.SetPayload(flow.Payload{
+			Receipts: []*flow.ExecutionReceiptMeta{b2Receipt.Meta(), b3Receipt.Meta()},
+			Results:  []*flow.ExecutionResult{&b2Receipt.ExecutionResult, &b3Receipt.ExecutionResult},
+		})
+		err = state.Extend(context.Background(), b4)
+		require.NoError(t, err)
+
+		// block 5 (sealB1)
+		b1Seal := unittest.Seal.Fixture(unittest.Seal.WithResult(&b1Receipt.ExecutionResult))
+		b5 := unittest.BlockWithParentFixture(b4.Header)
+		b5.SetPayload(flow.Payload{
+			Seals: []*flow.Seal{b1Seal},
+		})
+		err = state.Extend(context.Background(), b5)
+		require.NoError(t, err)
+
+		// block 6 (sealB2, sealB3)
+		b2Seal := unittest.Seal.Fixture(unittest.Seal.WithResult(&b2Receipt.ExecutionResult))
+		b3Seal := unittest.Seal.Fixture(unittest.Seal.WithResult(&b3Receipt.ExecutionResult))
+		b6 := unittest.BlockWithParentFixture(b5.Header)
+		b6.SetPayload(flow.Payload{
+			Seals: []*flow.Seal{b2Seal, b3Seal},
+		})
+		err = state.Extend(context.Background(), b6)
+		require.NoError(t, err)
+
+		versionBeacons := bstorage.NewVersionBeacons(db)
+
+		// No VB can be found before finalizing anything
+		vb, err := versionBeacons.Highest(b6.Header.Height)
+		require.NoError(t, err)
+		require.Nil(t, vb)
+
+		// finalizing b1 - b5
+		err = state.Finalize(context.Background(), b1.ID())
+		require.NoError(t, err)
+		err = state.Finalize(context.Background(), b2.ID())
+		require.NoError(t, err)
+		err = state.Finalize(context.Background(), b3.ID())
+		require.NoError(t, err)
+		err = state.Finalize(context.Background(), b4.ID())
+		require.NoError(t, err)
+
+		// No VB can be found after finalizing B4
+		vb, err = versionBeacons.Highest(b6.Header.Height)
+		require.NoError(t, err)
+		require.Nil(t, vb)
+
+		// once B5 is finalized, B1 and VB1 are sealed, hence index should now find it
+		err = state.Finalize(context.Background(), b5.ID())
+		require.NoError(t, err)
+
+		versionBeacon, err := versionBeacons.Highest(b6.Header.Height)
+		require.NoError(t, err)
+		require.Equal(t,
+			&flow.SealedVersionBeacon{
+				VersionBeacon: vb1,
+				SealHeight:    b5.Header.Height,
+			},
+			versionBeacon,
+		)
+
+		// finalizing B6 should index events sealed by B6, so VB2 and VB3
+		// while we don't expect multiple VBs in one block, we index newest, so last one emitted - VB3
+		err = state.Finalize(context.Background(), b6.ID())
+		require.NoError(t, err)
+
+		versionBeacon, err = versionBeacons.Highest(b6.Header.Height)
+		require.NoError(t, err)
+		require.Equal(t,
+			&flow.SealedVersionBeacon{
+				VersionBeacon: vb3,
+				SealHeight:    b6.Header.Height,
+			},
+			versionBeacon,
+		)
+	})
 }
 
 func TestExtendSealedBoundary(t *testing.T) {
@@ -639,7 +815,20 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 		tracer := trace.NewNoopTracer()
 		log := zerolog.Nop()
 		all := storeutil.StorageLayer(t, db)
-		protoState, err := protocol.Bootstrap(metrics, db, all.Headers, all.Seals, all.Results, all.Blocks, all.QuorumCertificates, all.Setups, all.EpochCommits, all.Statuses, rootSnapshot)
+		protoState, err := protocol.Bootstrap(
+			metrics,
+			db,
+			all.Headers,
+			all.Seals,
+			all.Results,
+			all.Blocks,
+			all.QuorumCertificates,
+			all.Setups,
+			all.EpochCommits,
+			all.Statuses,
+			all.VersionBeacons,
+			rootSnapshot,
+		)
 		require.NoError(t, err)
 		receiptValidator := util.MockReceiptValidator()
 		sealValidator := util.MockSealValidator(all.Seals)
@@ -1732,7 +1921,20 @@ func TestExtendInvalidSealsInBlock(t *testing.T) {
 
 		rootSnapshot := unittest.RootSnapshotFixture(participants)
 
-		state, err := protocol.Bootstrap(metrics, db, all.Headers, all.Seals, all.Results, all.Blocks, all.QuorumCertificates, all.Setups, all.EpochCommits, all.Statuses, rootSnapshot)
+		state, err := protocol.Bootstrap(
+			metrics,
+			db,
+			all.Headers,
+			all.Seals,
+			all.Results,
+			all.Blocks,
+			all.QuorumCertificates,
+			all.Setups,
+			all.EpochCommits,
+			all.Statuses,
+			all.VersionBeacons,
+			rootSnapshot,
+		)
 		require.NoError(t, err)
 
 		head, err := rootSnapshot.Head()
@@ -2249,7 +2451,20 @@ func TestHeaderInvalidTimestamp(t *testing.T) {
 		rootSnapshot, err := inmem.SnapshotFromBootstrapState(block, result, seal, qc)
 		require.NoError(t, err)
 
-		state, err := protocol.Bootstrap(metrics, db, all.Headers, all.Seals, all.Results, all.Blocks, all.QuorumCertificates, all.Setups, all.EpochCommits, all.Statuses, rootSnapshot)
+		state, err := protocol.Bootstrap(
+			metrics,
+			db,
+			all.Headers,
+			all.Seals,
+			all.Results,
+			all.Blocks,
+			all.QuorumCertificates,
+			all.Setups,
+			all.EpochCommits,
+			all.Statuses,
+			all.VersionBeacons,
+			rootSnapshot,
+		)
 		require.NoError(t, err)
 
 		blockTimer := &mockprotocol.BlockTimer{}

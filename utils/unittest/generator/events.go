@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	"github.com/onflow/cadence"
-	encoding "github.com/onflow/cadence/encoding/json"
+	"github.com/onflow/cadence/encoding/ccf"
 	"github.com/onflow/cadence/runtime/common"
 
 	"github.com/onflow/flow-go/model/flow"
@@ -53,7 +53,7 @@ func (g *Events) New() flow.Event {
 			fooString,
 		}).WithType(testEventType)
 
-	payload, err := encoding.Encode(testEvent)
+	payload, err := ccf.Encode(testEvent)
 	if err != nil {
 		panic(fmt.Sprintf("unexpected error while encoding events: %s", err))
 	}

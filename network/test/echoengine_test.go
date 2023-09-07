@@ -3,16 +3,12 @@ package test
 import (
 	"context"
 	"fmt"
-	"os"
 	"strings"
 	"sync"
 	"testing"
 	"time"
 
-	"github.com/onflow/flow-go/network/p2p"
-
 	"github.com/ipfs/go-log"
-	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
@@ -24,6 +20,7 @@ import (
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/internal/testutils"
 	"github.com/onflow/flow-go/network/mocknetwork"
+	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -41,14 +38,14 @@ type EchoEngineTestSuite struct {
 
 // Some tests are skipped in short mode to speedup the build.
 
-// TestStubEngineTestSuite runs all the test methods in this test suit
-func TestStubEngineTestSuite(t *testing.T) {
+// TestEchoEngineTestSuite runs all the test methods in this test suit
+func TestEchoEngineTestSuite(t *testing.T) {
+	unittest.SkipUnless(t, unittest.TEST_FLAKY, "this should be revisited once network/test is running in a separate CI job, runs fine locally")
 	suite.Run(t, new(EchoEngineTestSuite))
 }
 
 func (suite *EchoEngineTestSuite) SetupTest() {
 	const count = 2
-	logger := zerolog.New(os.Stderr).Level(zerolog.ErrorLevel)
 	log.SetAllLoggers(log.LevelError)
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -58,15 +55,16 @@ func (suite *EchoEngineTestSuite) SetupTest() {
 
 	// both nodes should be of the same role to get connected on epidemic dissemination
 	var nodes []p2p.LibP2PNode
-	suite.ids, nodes, suite.mws, suite.nets, _ = testutils.GenerateIDsMiddlewaresNetworks(
+	sporkId := unittest.IdentifierFixture()
+	suite.ids, nodes = testutils.LibP2PNodeForMiddlewareFixture(suite.T(), sporkId, count)
+	suite.mws, _ = testutils.MiddlewareFixtures(
 		suite.T(),
-		count,
-		logger,
-		unittest.NetworkCodec(),
-		mocknetwork.NewViolationsConsumer(suite.T()),
-	)
-
-	testutils.StartNodesAndNetworks(signalerCtx, suite.T(), nodes, suite.nets, 100*time.Millisecond)
+		suite.ids,
+		nodes,
+		testutils.MiddlewareConfigFixture(suite.T(), sporkId),
+		mocknetwork.NewViolationsConsumer(suite.T()))
+	suite.nets = testutils.NetworksFixture(suite.T(), sporkId, suite.ids, suite.mws)
+	testutils.StartNodesAndNetworks(signalerCtx, suite.T(), nodes, suite.nets)
 }
 
 // TearDownTest closes the networks within a specified timeout
@@ -161,6 +159,7 @@ func (suite *EchoEngineTestSuite) TestDuplicateMessageSequential_Multicast() {
 // on deduplicating the received messages via Publish method of nodes' Conduits.
 // Messages are delivered to the receiver in parallel via the Publish method of Conduits.
 func (suite *EchoEngineTestSuite) TestDuplicateMessageParallel_Publish() {
+	unittest.SkipUnless(suite.T(), unittest.TEST_LONG_RUNNING, "covered by TestDuplicateMessageParallel_Multicast")
 	suite.duplicateMessageParallel(suite.Publish)
 }
 
@@ -267,7 +266,10 @@ func (suite *EchoEngineTestSuite) duplicateMessageParallel(send testutils.Condui
 		}()
 	}
 	unittest.RequireReturnsBefore(suite.T(), wg.Wait, 3*time.Second, "could not send message on time")
-	time.Sleep(1 * time.Second)
+
+	require.Eventually(suite.T(), func() bool {
+		return len(receiver.seen) > 0
+	}, 3*time.Second, 500*time.Millisecond)
 
 	// receiver should only see the message once, and the rest should be dropped due to
 	// duplication

@@ -16,6 +16,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/cadence"
+	"github.com/onflow/cadence/encoding/ccf"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
 	"github.com/onflow/cadence/runtime"
 
@@ -32,7 +33,7 @@ import (
 	"github.com/onflow/flow-go/fvm"
 	reusableRuntime "github.com/onflow/flow-go/fvm/runtime"
 	"github.com/onflow/flow-go/fvm/storage/derived"
-	"github.com/onflow/flow-go/fvm/storage/state"
+	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	completeLedger "github.com/onflow/flow-go/ledger/complete"
 	"github.com/onflow/flow-go/ledger/complete/wal/fixtures"
 	"github.com/onflow/flow-go/model/flow"
@@ -132,7 +133,7 @@ func (account *TestBenchAccount) AddArrayToStorage(b *testing.B, blockExec TestB
 type BasicBlockExecutor struct {
 	blockComputer         computer.BlockComputer
 	derivedChainData      *derived.DerivedChainData
-	activeSnapshot        state.StorageSnapshot
+	activeSnapshot        snapshot.SnapshotTree
 	activeStateCommitment flow.StateCommitment
 	chain                 flow.Chain
 	serviceAccount        *TestBenchAccount
@@ -208,6 +209,8 @@ func NewBasicBlockExecutor(tb testing.TB, chain flow.Chain, logger zerolog.Logge
 	)
 
 	me := new(moduleMock.Local)
+	me.On("NodeID").Return(unittest.IdentifierFixture())
+	me.On("Sign", mock.Anything, mock.Anything).Return(nil, nil)
 	me.On("SignFunc", mock.Anything, mock.Anything, mock.Anything).
 		Return(nil, nil)
 
@@ -221,10 +224,13 @@ func NewBasicBlockExecutor(tb testing.TB, chain flow.Chain, logger zerolog.Logge
 		ledgerCommitter,
 		me,
 		prov,
-		nil)
+		nil,
+		nil,
+		1) // We're interested in fvm's serial execution time
 	require.NoError(tb, err)
 
-	snapshot := exeState.NewLedgerStorageSnapshot(ledger, initialCommit)
+	activeSnapshot := snapshot.NewSnapshotTree(
+		exeState.NewLedgerStorageSnapshot(ledger, initialCommit))
 
 	derivedChainData, err := derived.NewDerivedChainData(
 		derived.DefaultDerivedDataCacheSize)
@@ -234,7 +240,7 @@ func NewBasicBlockExecutor(tb testing.TB, chain flow.Chain, logger zerolog.Logge
 		blockComputer:         blockComputer,
 		derivedChainData:      derivedChainData,
 		activeStateCommitment: initialCommit,
-		activeSnapshot:        snapshot,
+		activeSnapshot:        activeSnapshot,
 		chain:                 chain,
 		serviceAccount:        serviceAccount,
 		onStopFunc:            onStopFunc,
@@ -266,6 +272,10 @@ func (b *BasicBlockExecutor) ExecuteCollections(tb testing.TB, collections [][]*
 	require.NoError(tb, err)
 
 	b.activeStateCommitment = computationResult.CurrentEndState()
+
+	for _, snapshot := range computationResult.AllExecutionSnapshots() {
+		b.activeSnapshot = b.activeSnapshot.Append(snapshot)
+	}
 
 	return computationResult
 }
@@ -301,7 +311,7 @@ func (b *BasicBlockExecutor) SetupAccounts(tb testing.TB, privateKeys []flow.Acc
 
 		for _, event := range computationResult.AllEvents() {
 			if event.Type == flow.EventAccountCreated {
-				data, err := jsoncdc.Decode(nil, event.Payload)
+				data, err := ccf.Decode(nil, event.Payload)
 				if err != nil {
 					tb.Fatal("setup account failed, error decoding events")
 				}
@@ -439,7 +449,9 @@ func BenchmarkRuntimeTransaction(b *testing.B) {
 			computationResult := blockExecutor.ExecuteCollections(b, [][]*flow.TransactionBody{transactions})
 			totalInteractionUsed := uint64(0)
 			totalComputationUsed := uint64(0)
-			for _, txRes := range computationResult.AllTransactionResults() {
+			results := computationResult.AllTransactionResults()
+			// not interested in the system transaction
+			for _, txRes := range results[0 : len(results)-1] {
 				require.Empty(b, txRes.ErrorMessage)
 				totalInteractionUsed += logE.InteractionUsed[txRes.ID().String()]
 				totalComputationUsed += txRes.ComputationUsed
@@ -684,7 +696,9 @@ func BenchRunNFTBatchTransfer(b *testing.B,
 		}
 
 		computationResult = blockExecutor.ExecuteCollections(b, [][]*flow.TransactionBody{transactions})
-		for _, txRes := range computationResult.AllTransactionResults() {
+		results := computationResult.AllTransactionResults()
+		// not interested in the system transaction
+		for _, txRes := range results[0 : len(results)-1] {
 			require.Empty(b, txRes.ErrorMessage)
 		}
 	}

@@ -179,7 +179,7 @@ func init() {
 		ContractNameEpoch:             stakingContractAddressMainnet,
 		ContractNameClusterQC:         stakingContractAddressMainnet,
 		ContractNameDKG:               stakingContractAddressMainnet,
-		ContractNameNodeVersionBeacon: flow.Emulator.Chain().ServiceAddress(),
+		ContractNameNodeVersionBeacon: flow.Mainnet.Chain().ServiceAddress(),
 	}
 	contractAddressesByChainID[flow.Mainnet] = mainnet
 
@@ -189,7 +189,7 @@ func init() {
 		ContractNameEpoch:             stakingContractAddressTestnet,
 		ContractNameClusterQC:         stakingContractAddressTestnet,
 		ContractNameDKG:               stakingContractAddressTestnet,
-		ContractNameNodeVersionBeacon: flow.Emulator.Chain().ServiceAddress(),
+		ContractNameNodeVersionBeacon: flow.Testnet.Chain().ServiceAddress(),
 	}
 	contractAddressesByChainID[flow.Testnet] = testnet
 
@@ -199,7 +199,7 @@ func init() {
 		ContractNameEpoch:             flow.Sandboxnet.Chain().ServiceAddress(),
 		ContractNameClusterQC:         flow.Sandboxnet.Chain().ServiceAddress(),
 		ContractNameDKG:               flow.Sandboxnet.Chain().ServiceAddress(),
-		ContractNameNodeVersionBeacon: flow.Emulator.Chain().ServiceAddress(),
+		ContractNameNodeVersionBeacon: flow.Sandboxnet.Chain().ServiceAddress(),
 	}
 	contractAddressesByChainID[flow.Sandboxnet] = sandboxnet
 

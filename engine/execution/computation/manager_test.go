@@ -30,8 +30,9 @@ import (
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/environment"
 	fvmErrors "github.com/onflow/flow-go/fvm/errors"
+	"github.com/onflow/flow-go/fvm/storage"
 	"github.com/onflow/flow-go/fvm/storage/derived"
-	"github.com/onflow/flow-go/fvm/storage/state"
+	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/ledger/complete"
 	"github.com/onflow/flow-go/ledger/complete/wal/fixtures"
 	"github.com/onflow/flow-go/model/flow"
@@ -141,7 +142,9 @@ func TestComputeBlockWithStorage(t *testing.T) {
 		committer.NewNoopViewCommitter(),
 		me,
 		prov,
-		nil)
+		nil,
+		testutil.ProtocolStateWithSourceFixture(nil),
+		testMaxConcurrency)
 	require.NoError(t, err)
 
 	derivedChainData, err := derived.NewDerivedChainData(10)
@@ -267,6 +270,7 @@ func TestExecuteScript(t *testing.T) {
 		ComputationConfig{
 			QueryConfig:          query.NewDefaultConfig(),
 			DerivedDataCacheSize: derived.DefaultDerivedDataCacheSize,
+			MaxConcurrency:       1,
 		},
 	)
 	require.NoError(t, err)
@@ -295,7 +299,7 @@ func TestExecuteScript_BalanceScriptFailsIfViewIsEmpty(t *testing.T) {
 	me.On("SignFunc", mock.Anything, mock.Anything, mock.Anything).
 		Return(nil, nil)
 
-	snapshot := state.NewReadFuncStorageSnapshot(
+	snapshot := snapshot.NewReadFuncStorageSnapshot(
 		func(id flow.RegisterID) (flow.RegisterValue, error) {
 			return nil, fmt.Errorf("error getting register")
 		})
@@ -331,6 +335,7 @@ func TestExecuteScript_BalanceScriptFailsIfViewIsEmpty(t *testing.T) {
 		ComputationConfig{
 			QueryConfig:          query.NewDefaultConfig(),
 			DerivedDataCacheSize: derived.DefaultDerivedDataCacheSize,
+			MaxConcurrency:       1,
 		},
 	)
 	require.NoError(t, err)
@@ -376,6 +381,7 @@ func TestExecuteScripPanicsAreHandled(t *testing.T) {
 		ComputationConfig{
 			QueryConfig:          query.NewDefaultConfig(),
 			DerivedDataCacheSize: derived.DefaultDerivedDataCacheSize,
+			MaxConcurrency:       1,
 			NewCustomVirtualMachine: func() fvm.VM {
 				return &PanickingVM{}
 			},
@@ -429,6 +435,7 @@ func TestExecuteScript_LongScriptsAreLogged(t *testing.T) {
 				ExecutionTimeLimit: query.DefaultExecutionTimeLimit,
 			},
 			DerivedDataCacheSize: 10,
+			MaxConcurrency:       1,
 			NewCustomVirtualMachine: func() fvm.VM {
 				return &LongRunningVM{duration: 2 * time.Millisecond}
 			},
@@ -482,6 +489,7 @@ func TestExecuteScript_ShortScriptsAreNotLogged(t *testing.T) {
 				ExecutionTimeLimit: query.DefaultExecutionTimeLimit,
 			},
 			DerivedDataCacheSize: derived.DefaultDerivedDataCacheSize,
+			MaxConcurrency:       1,
 			NewCustomVirtualMachine: func() fvm.VM {
 				return &LongRunningVM{duration: 0}
 			},
@@ -501,14 +509,38 @@ func TestExecuteScript_ShortScriptsAreNotLogged(t *testing.T) {
 	require.NotContains(t, buffer.String(), "exceeded threshold")
 }
 
+type PanickingExecutor struct{}
+
+func (PanickingExecutor) Cleanup() {}
+
+func (PanickingExecutor) Preprocess() error {
+	return nil
+}
+
+func (PanickingExecutor) Execute() error {
+	panic("panic, but expected with sentinel for test: Verunsicherung ")
+}
+
+func (PanickingExecutor) Output() fvm.ProcedureOutput {
+	return fvm.ProcedureOutput{}
+}
+
 type PanickingVM struct{}
+
+func (p *PanickingVM) NewExecutor(
+	f fvm.Context,
+	procedure fvm.Procedure,
+	txn storage.TransactionPreparer,
+) fvm.ProcedureExecutor {
+	return PanickingExecutor{}
+}
 
 func (p *PanickingVM) Run(
 	f fvm.Context,
 	procedure fvm.Procedure,
-	storageSnapshot state.StorageSnapshot,
+	storageSnapshot snapshot.StorageSnapshot,
 ) (
-	*state.ExecutionSnapshot,
+	*snapshot.ExecutionSnapshot,
 	fvm.ProcedureOutput,
 	error,
 ) {
@@ -518,7 +550,7 @@ func (p *PanickingVM) Run(
 func (p *PanickingVM) GetAccount(
 	ctx fvm.Context,
 	address flow.Address,
-	storageSnapshot state.StorageSnapshot,
+	storageSnapshot snapshot.StorageSnapshot,
 ) (
 	*flow.Account,
 	error,
@@ -526,22 +558,53 @@ func (p *PanickingVM) GetAccount(
 	panic("not expected")
 }
 
+type LongRunningExecutor struct {
+	duration time.Duration
+}
+
+func (LongRunningExecutor) Cleanup() {}
+
+func (LongRunningExecutor) Preprocess() error {
+	return nil
+}
+
+func (l LongRunningExecutor) Execute() error {
+	time.Sleep(l.duration)
+	return nil
+}
+
+func (LongRunningExecutor) Output() fvm.ProcedureOutput {
+	return fvm.ProcedureOutput{
+		Value: cadence.NewVoid(),
+	}
+}
+
 type LongRunningVM struct {
 	duration time.Duration
+}
+
+func (l *LongRunningVM) NewExecutor(
+	f fvm.Context,
+	procedure fvm.Procedure,
+	txn storage.TransactionPreparer,
+) fvm.ProcedureExecutor {
+	return LongRunningExecutor{
+		duration: l.duration,
+	}
 }
 
 func (l *LongRunningVM) Run(
 	f fvm.Context,
 	procedure fvm.Procedure,
-	storageSnapshot state.StorageSnapshot,
+	storageSnapshot snapshot.StorageSnapshot,
 ) (
-	*state.ExecutionSnapshot,
+	*snapshot.ExecutionSnapshot,
 	fvm.ProcedureOutput,
 	error,
 ) {
 	time.Sleep(l.duration)
 
-	snapshot := &state.ExecutionSnapshot{}
+	snapshot := &snapshot.ExecutionSnapshot{}
 	output := fvm.ProcedureOutput{
 		Value: cadence.NewVoid(),
 	}
@@ -551,7 +614,7 @@ func (l *LongRunningVM) Run(
 func (l *LongRunningVM) GetAccount(
 	ctx fvm.Context,
 	address flow.Address,
-	storageSnapshot state.StorageSnapshot,
+	storageSnapshot snapshot.StorageSnapshot,
 ) (
 	*flow.Account,
 	error,
@@ -567,7 +630,7 @@ func (f *FakeBlockComputer) ExecuteBlock(
 	context.Context,
 	flow.Identifier,
 	*entity.ExecutableBlock,
-	state.StorageSnapshot,
+	snapshot.StorageSnapshot,
 	*derived.DerivedBlockData,
 ) (
 	*execution.ComputationResult,
@@ -594,6 +657,7 @@ func TestExecuteScriptTimeout(t *testing.T) {
 				ExecutionTimeLimit: timeout,
 			},
 			DerivedDataCacheSize: derived.DefaultDerivedDataCacheSize,
+			MaxConcurrency:       1,
 		},
 	)
 
@@ -640,6 +704,7 @@ func TestExecuteScriptCancelled(t *testing.T) {
 				ExecutionTimeLimit: timeout,
 			},
 			DerivedDataCacheSize: derived.DefaultDerivedDataCacheSize,
+			MaxConcurrency:       1,
 		},
 	)
 
@@ -771,7 +836,8 @@ func Test_EventEncodingFailsOnlyTxAndCarriesOn(t *testing.T) {
 		me,
 		prov,
 		nil,
-	)
+		testutil.ProtocolStateWithSourceFixture(nil),
+		testMaxConcurrency)
 	require.NoError(t, err)
 
 	derivedChainData, err := derived.NewDerivedChainData(10)
@@ -849,6 +915,7 @@ func TestScriptStorageMutationsDiscarded(t *testing.T) {
 				ExecutionTimeLimit: timeout,
 			},
 			DerivedDataCacheSize: derived.DefaultDerivedDataCacheSize,
+			MaxConcurrency:       1,
 		},
 	)
 	vm := manager.vm
@@ -893,11 +960,10 @@ func TestScriptStorageMutationsDiscarded(t *testing.T) {
 	rt := env.BorrowCadenceRuntime()
 	defer env.ReturnCadenceRuntime(rt)
 
-	v, err := rt.ReadStored(
-		commonAddress,
-		cadence.NewPath("storage", "x"),
-	)
+	path, err := cadence.NewPath(common.PathDomainStorage, "x")
+	require.NoError(t, err)
 
+	v, err := rt.ReadStored(commonAddress, path)
 	// the save should not update account storage by writing the updates
 	// back to the snapshotTree
 	require.NoError(t, err)

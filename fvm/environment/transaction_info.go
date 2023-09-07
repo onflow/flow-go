@@ -48,12 +48,12 @@ type TransactionInfo interface {
 }
 
 type ParseRestrictedTransactionInfo struct {
-	txnState state.NestedTransaction
+	txnState state.NestedTransactionPreparer
 	impl     TransactionInfo
 }
 
 func NewParseRestrictedTransactionInfo(
-	txnState state.NestedTransaction,
+	txnState state.NestedTransactionPreparer,
 	impl TransactionInfo,
 ) TransactionInfo {
 	return ParseRestrictedTransactionInfo{

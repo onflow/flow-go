@@ -2,13 +2,14 @@ package badger
 
 import (
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
+	"github.com/onflow/flow-go/state/protocol"
+	"github.com/onflow/flow-go/state/protocol/mock"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -29,9 +30,10 @@ func TestEpochSetupValidity(t *testing.T) {
 		_, result, _ := unittest.BootstrapFixture(participants)
 		setup := result.ServiceEvents[0].Event.(*flow.EpochSetup)
 		// randomly shuffle the identities so they are not canonically ordered
-		setup.Participants = setup.Participants.DeterministicShuffle(time.Now().UnixNano())
-
-		err := verifyEpochSetup(setup, true)
+		var err error
+		setup.Participants, err = setup.Participants.Shuffle()
+		require.NoError(t, err)
+		err = verifyEpochSetup(setup, true)
 		require.Error(t, err)
 	})
 
@@ -143,5 +145,90 @@ func TestEntityExpirySnapshotValidation(t *testing.T) {
 		rootSnapshot.Encodable().SealingSegment.ExtraBlocks = unittest.BlockFixtures(flow.DefaultTransactionExpiry * 2)
 		err := ValidRootSnapshotContainsEntityExpiryRange(rootSnapshot)
 		require.NoError(t, err)
+	})
+}
+
+func TestValidateVersionBeacon(t *testing.T) {
+	t.Run("no version beacon is ok", func(t *testing.T) {
+		snap := new(mock.Snapshot)
+
+		snap.On("VersionBeacon").Return(nil, nil)
+
+		err := validateVersionBeacon(snap)
+		require.NoError(t, err)
+	})
+	t.Run("valid version beacon is ok", func(t *testing.T) {
+		snap := new(mock.Snapshot)
+		block := unittest.BlockFixture()
+		block.Header.Height = 100
+
+		vb := &flow.SealedVersionBeacon{
+			VersionBeacon: &flow.VersionBeacon{
+				VersionBoundaries: []flow.VersionBoundary{
+					{
+						BlockHeight: 1000,
+						Version:     "1.0.0",
+					},
+				},
+				Sequence: 50,
+			},
+			SealHeight: uint64(37),
+		}
+
+		snap.On("Head").Return(block.Header, nil)
+		snap.On("VersionBeacon").Return(vb, nil)
+
+		err := validateVersionBeacon(snap)
+		require.NoError(t, err)
+	})
+	t.Run("height must be below highest block", func(t *testing.T) {
+		snap := new(mock.Snapshot)
+		block := unittest.BlockFixture()
+		block.Header.Height = 12
+
+		vb := &flow.SealedVersionBeacon{
+			VersionBeacon: &flow.VersionBeacon{
+				VersionBoundaries: []flow.VersionBoundary{
+					{
+						BlockHeight: 1000,
+						Version:     "1.0.0",
+					},
+				},
+				Sequence: 50,
+			},
+			SealHeight: uint64(37),
+		}
+
+		snap.On("Head").Return(block.Header, nil)
+		snap.On("VersionBeacon").Return(vb, nil)
+
+		err := validateVersionBeacon(snap)
+		require.Error(t, err)
+		require.True(t, protocol.IsInvalidServiceEventError(err))
+	})
+	t.Run("version beacon must be valid", func(t *testing.T) {
+		snap := new(mock.Snapshot)
+		block := unittest.BlockFixture()
+		block.Header.Height = 12
+
+		vb := &flow.SealedVersionBeacon{
+			VersionBeacon: &flow.VersionBeacon{
+				VersionBoundaries: []flow.VersionBoundary{
+					{
+						BlockHeight: 0,
+						Version:     "asdf", // invalid semver - hence will be considered invalid
+					},
+				},
+				Sequence: 50,
+			},
+			SealHeight: uint64(1),
+		}
+
+		snap.On("Head").Return(block.Header, nil)
+		snap.On("VersionBeacon").Return(vb, nil)
+
+		err := validateVersionBeacon(snap)
+		require.Error(t, err)
+		require.True(t, protocol.IsInvalidServiceEventError(err))
 	})
 }

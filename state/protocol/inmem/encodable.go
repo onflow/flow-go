@@ -8,15 +8,16 @@ import (
 
 // EncodableSnapshot is the encoding format for protocol.Snapshot
 type EncodableSnapshot struct {
-	Head              *flow.Header
-	Identities        flow.IdentityList
-	LatestSeal        *flow.Seal
-	LatestResult      *flow.ExecutionResult
-	SealingSegment    *flow.SealingSegment
-	QuorumCertificate *flow.QuorumCertificate
-	Phase             flow.EpochPhase
-	Epochs            EncodableEpochs
-	Params            EncodableParams
+	Head                *flow.Header
+	Identities          flow.IdentityList
+	LatestSeal          *flow.Seal
+	LatestResult        *flow.ExecutionResult
+	SealingSegment      *flow.SealingSegment
+	QuorumCertificate   *flow.QuorumCertificate
+	Phase               flow.EpochPhase
+	Epochs              EncodableEpochs
+	Params              EncodableParams
+	SealedVersionBeacon *flow.SealedVersionBeacon
 }
 
 // EncodableEpochs is the encoding format for protocol.EpochQuery

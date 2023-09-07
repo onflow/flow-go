@@ -7,7 +7,7 @@ import (
 	"github.com/onflow/cadence/runtime/interpreter"
 
 	"github.com/onflow/flow-go/fvm/storage"
-	"github.com/onflow/flow-go/fvm/storage/derived"
+	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/fvm/storage/state"
 	"github.com/onflow/flow-go/fvm/tracing"
 )
@@ -24,7 +24,7 @@ type facadeEnvironment struct {
 	*ProgramLogger
 	EventEmitter
 
-	UnsafeRandomGenerator
+	RandomGenerator
 	CryptoLibrary
 
 	BlockInfo
@@ -36,6 +36,7 @@ type facadeEnvironment struct {
 	*SystemContracts
 
 	UUIDGenerator
+	AccountLocalIDGenerator
 
 	AccountCreator
 
@@ -47,13 +48,13 @@ type facadeEnvironment struct {
 	*Programs
 
 	accounts Accounts
-	txnState storage.Transaction
+	txnState storage.TransactionPreparer
 }
 
 func newFacadeEnvironment(
 	tracer tracing.TracerSpan,
 	params EnvironmentParams,
-	txnState storage.Transaction,
+	txnState storage.TransactionPreparer,
 	meter Meter,
 ) *facadeEnvironment {
 	accounts := NewAccounts(txnState)
@@ -74,10 +75,6 @@ func newFacadeEnvironment(
 		ProgramLogger: logger,
 		EventEmitter:  NoEventEmitter{},
 
-		UnsafeRandomGenerator: NewUnsafeRandomGenerator(
-			tracer,
-			params.BlockHeader,
-		),
 		CryptoLibrary: NewCryptoLibrary(tracer, meter),
 
 		BlockInfo: NewBlockInfo(
@@ -105,8 +102,16 @@ func newFacadeEnvironment(
 
 		UUIDGenerator: NewUUIDGenerator(
 			tracer,
+			params.Logger,
 			meter,
-			txnState),
+			txnState,
+			params.BlockHeader,
+			params.TxIndex),
+		AccountLocalIDGenerator: NewAccountLocalIDGenerator(
+			tracer,
+			meter,
+			accounts,
+		),
 
 		AccountCreator: NoAccountCreator{},
 
@@ -143,46 +148,37 @@ func newFacadeEnvironment(
 // testing.
 func NewScriptEnvironmentFromStorageSnapshot(
 	params EnvironmentParams,
-	storageSnapshot state.StorageSnapshot,
+	storageSnapshot snapshot.StorageSnapshot,
 ) *facadeEnvironment {
-	derivedBlockData := derived.NewEmptyDerivedBlockData()
-	derivedTxn := derivedBlockData.NewSnapshotReadDerivedTransactionData()
-
-	txn := storage.SerialTransaction{
-		NestedTransaction: state.NewTransactionState(
-			storageSnapshot,
-			state.DefaultParameters()),
-		DerivedTransactionCommitter: derivedTxn,
-	}
+	blockDatabase := storage.NewBlockDatabase(storageSnapshot, 0, nil)
 
 	return NewScriptEnv(
 		context.Background(),
 		tracing.NewTracerSpan(),
 		params,
-		txn)
+		blockDatabase.NewSnapshotReadTransaction(state.DefaultParameters()))
 }
 
 func NewScriptEnv(
 	ctx context.Context,
 	tracer tracing.TracerSpan,
 	params EnvironmentParams,
-	txnState storage.Transaction,
+	txnState storage.TransactionPreparer,
 ) *facadeEnvironment {
 	env := newFacadeEnvironment(
 		tracer,
 		params,
 		txnState,
 		NewCancellableMeter(ctx, txnState))
-
+	env.RandomGenerator = NewDummyRandomGenerator()
 	env.addParseRestrictedChecks()
-
 	return env
 }
 
 func NewTransactionEnvironment(
 	tracer tracing.TracerSpan,
 	params EnvironmentParams,
-	txnState storage.Transaction,
+	txnState storage.TransactionPreparer,
 ) *facadeEnvironment {
 	env := newFacadeEnvironment(
 		tracer,
@@ -230,6 +226,12 @@ func NewTransactionEnvironment(
 		txnState,
 		env)
 
+	env.RandomGenerator = NewRandomGenerator(
+		tracer,
+		params.EntropyProvider,
+		params.TxId,
+	)
+
 	env.addParseRestrictedChecks()
 
 	return env
@@ -270,12 +272,15 @@ func (env *facadeEnvironment) addParseRestrictedChecks() {
 	env.TransactionInfo = NewParseRestrictedTransactionInfo(
 		env.txnState,
 		env.TransactionInfo)
-	env.UnsafeRandomGenerator = NewParseRestrictedUnsafeRandomGenerator(
+	env.RandomGenerator = NewParseRestrictedRandomGenerator(
 		env.txnState,
-		env.UnsafeRandomGenerator)
+		env.RandomGenerator)
 	env.UUIDGenerator = NewParseRestrictedUUIDGenerator(
 		env.txnState,
 		env.UUIDGenerator)
+	env.AccountLocalIDGenerator = NewParseRestrictedAccountLocalIDGenerator(
+		env.txnState,
+		env.AccountLocalIDGenerator)
 	env.ValueStore = NewParseRestrictedValueStore(
 		env.txnState,
 		env.ValueStore)
@@ -308,5 +313,11 @@ func (env *facadeEnvironment) SetInterpreterSharedState(state *interpreter.Share
 }
 
 func (env *facadeEnvironment) GetInterpreterSharedState() *interpreter.SharedState {
+	return nil
+}
+
+func (env *facadeEnvironment) ReadRandom(buffer []byte) error {
+	// NO-OP for now, to unblock certain downstream dependencies.
+	// E.g. cadence-tools/test
 	return nil
 }

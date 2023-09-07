@@ -8,7 +8,9 @@ import (
 	"testing"
 
 	"github.com/onflow/cadence"
+	"github.com/onflow/cadence/encoding/ccf"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/crypto"
@@ -16,13 +18,17 @@ import (
 	"github.com/onflow/flow-go/engine/execution"
 	"github.com/onflow/flow-go/engine/execution/utils"
 	"github.com/onflow/flow-go/fvm"
-	"github.com/onflow/flow-go/fvm/storage"
+	"github.com/onflow/flow-go/fvm/environment"
+	envMock "github.com/onflow/flow-go/fvm/environment/mock"
+	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/pathfinder"
 	"github.com/onflow/flow-go/ledger/complete"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/epochs"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
+	"github.com/onflow/flow-go/state/protocol"
+	protocolMock "github.com/onflow/flow-go/state/protocol/mock"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -192,11 +198,11 @@ func GenerateAccountPrivateKey() (flow.AccountPrivateKey, error) {
 // CreateAccounts inserts accounts into the ledger using the provided private keys.
 func CreateAccounts(
 	vm fvm.VM,
-	snapshotTree storage.SnapshotTree,
+	snapshotTree snapshot.SnapshotTree,
 	privateKeys []flow.AccountPrivateKey,
 	chain flow.Chain,
 ) (
-	storage.SnapshotTree,
+	snapshot.SnapshotTree,
 	[]flow.Address,
 	error,
 ) {
@@ -209,11 +215,11 @@ func CreateAccounts(
 
 func CreateAccountsWithSimpleAddresses(
 	vm fvm.VM,
-	snapshotTree storage.SnapshotTree,
+	snapshotTree snapshot.SnapshotTree,
 	privateKeys []flow.AccountPrivateKey,
 	chain flow.Chain,
 ) (
-	storage.SnapshotTree,
+	snapshot.SnapshotTree,
 	[]flow.Address,
 	error,
 ) {
@@ -281,7 +287,7 @@ func CreateAccountsWithSimpleAddresses(
 
 		for _, event := range output.Events {
 			if event.Type == flow.EventAccountCreated {
-				data, err := jsoncdc.Decode(nil, event.Payload)
+				data, err := ccf.Decode(nil, event.Payload)
 				if err != nil {
 					return snapshotTree, nil, errors.New(
 						"error decoding events")
@@ -305,7 +311,7 @@ func RootBootstrappedLedger(
 	vm fvm.VM,
 	ctx fvm.Context,
 	additionalOptions ...fvm.BootstrapProcedureOption,
-) storage.SnapshotTree {
+) snapshot.SnapshotTree {
 	// set 0 clusters to pass n_collectors >= n_clusters check
 	epochConfig := epochs.DefaultEpochConfig()
 	epochConfig.NumCollectorClusters = 0
@@ -322,11 +328,11 @@ func RootBootstrappedLedger(
 		options...,
 	)
 
-	snapshot, _, err := vm.Run(ctx, bootstrap, nil)
+	executionSnapshot, _, err := vm.Run(ctx, bootstrap, nil)
 	if err != nil {
 		panic(err)
 	}
-	return storage.NewSnapshotTree(nil).Append(snapshot)
+	return snapshot.NewSnapshotTree(nil).Append(executionSnapshot)
 }
 
 func BytesToCadenceArray(l []byte) cadence.Array {
@@ -624,4 +630,31 @@ func ComputationResultFixture(t *testing.T) *execution.ComputationResult {
 			},
 		},
 	}
+}
+
+// EntropyProviderFixture returns an entropy provider mock that
+// supports RandomSource().
+// If input is nil, a random source fixture is generated.
+func EntropyProviderFixture(source []byte) environment.EntropyProvider {
+	if source == nil {
+		source = unittest.SignatureFixture()
+	}
+	provider := envMock.EntropyProvider{}
+	provider.On("RandomSource").Return(source, nil)
+	return &provider
+}
+
+// ProtocolStateWithSourceFixture returns a protocol state mock that only
+// supports AtBlockID to return a snapshot mock.
+// The snapshot mock only supports RandomSource().
+// If input is nil, a random source fixture is generated.
+func ProtocolStateWithSourceFixture(source []byte) protocol.State {
+	if source == nil {
+		source = unittest.SignatureFixture()
+	}
+	snapshot := &protocolMock.Snapshot{}
+	snapshot.On("RandomSource").Return(source, nil)
+	state := protocolMock.State{}
+	state.On("AtBlockID", mock.Anything).Return(snapshot)
+	return &state
 }

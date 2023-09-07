@@ -43,6 +43,11 @@ type MatchFunc func(*Message) bool
 
 type MapFunc func(*Message) (*Message, bool)
 
+func MatchType[T any](m *Message) bool {
+	_, ok := m.Payload.(T)
+	return ok
+}
+
 type MessageHandler struct {
 	log      zerolog.Logger
 	notifier Notifier

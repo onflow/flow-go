@@ -9,7 +9,7 @@ import (
 	"github.com/dgraph-io/badger/v2"
 
 	"github.com/onflow/flow-go/engine/execution"
-	fvmState "github.com/onflow/flow-go/fvm/storage/state"
+	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
@@ -23,7 +23,7 @@ import (
 // ReadOnlyExecutionState allows to read the execution state
 type ReadOnlyExecutionState interface {
 	// NewStorageSnapshot creates a new ready-only view at the given state commitment.
-	NewStorageSnapshot(flow.StateCommitment) fvmState.StorageSnapshot
+	NewStorageSnapshot(flow.StateCommitment) snapshot.StorageSnapshot
 
 	// StateCommitmentByBlockID returns the final state commitment for the provided block ID.
 	StateCommitmentByBlockID(context.Context, flow.Identifier) (flow.StateCommitment, error)
@@ -141,8 +141,6 @@ func RegisterEntriesToKeysValues(
 	return keys, values
 }
 
-// TODO(patrick): revisit caching.  readCache needs to be mutex guarded for
-// parallel execution.
 type LedgerStorageSnapshot struct {
 	ledger     ledger.Ledger
 	commitment flow.StateCommitment
@@ -154,7 +152,7 @@ type LedgerStorageSnapshot struct {
 func NewLedgerStorageSnapshot(
 	ldg ledger.Ledger,
 	commitment flow.StateCommitment,
-) fvmState.StorageSnapshot {
+) snapshot.StorageSnapshot {
 	return &LedgerStorageSnapshot{
 		ledger:     ldg,
 		commitment: commitment,
@@ -223,7 +221,7 @@ func (storage *LedgerStorageSnapshot) Get(
 
 func (s *state) NewStorageSnapshot(
 	commitment flow.StateCommitment,
-) fvmState.StorageSnapshot {
+) snapshot.StorageSnapshot {
 	return NewLedgerStorageSnapshot(s.ls, commitment)
 }
 
@@ -285,27 +283,49 @@ func (s *state) SaveExecutionResults(
 		trace.EXEStateSaveExecutionResults)
 	defer span.End()
 
+	err := s.saveExecutionResults(ctx, result)
+	if err != nil {
+		return fmt.Errorf("could not save execution results: %w", err)
+	}
+
+	//outside batch because it requires read access
+	err = s.UpdateHighestExecutedBlockIfHigher(childCtx, result.ExecutableBlock.Block.Header)
+	if err != nil {
+		return fmt.Errorf("cannot update highest executed block: %w", err)
+	}
+	return nil
+}
+
+func (s *state) saveExecutionResults(
+	ctx context.Context,
+	result *execution.ComputationResult,
+) (err error) {
 	header := result.ExecutableBlock.Block.Header
 	blockID := header.ID()
 
+	err = s.chunkDataPacks.Store(result.AllChunkDataPacks())
+	if err != nil {
+		return fmt.Errorf("can not store multiple chunk data pack: %w", err)
+	}
+
 	// Write Batch is BadgerDB feature designed for handling lots of writes
-	// in efficient and automatic manner, hence pushing all the updates we can
+	// in efficient and atomic manner, hence pushing all the updates we can
 	// as tightly as possible to let Badger manage it.
 	// Note, that it does not guarantee atomicity as transactions has size limit,
 	// but it's the closest thing to atomicity we could have
 	batch := badgerstorage.NewBatch(s.db)
 
-	for _, chunkDataPack := range result.AllChunkDataPacks() {
-		err := s.chunkDataPacks.BatchStore(chunkDataPack, batch)
+	defer func() {
+		// Rollback if an error occurs during batch operations
 		if err != nil {
-			return fmt.Errorf("cannot store chunk data pack: %w", err)
+			chunks := result.AllChunkDataPacks()
+			chunkIDs := make([]flow.Identifier, 0, len(chunks))
+			for _, chunk := range chunks {
+				chunkIDs = append(chunkIDs, chunk.ID())
+			}
+			_ = s.chunkDataPacks.Remove(chunkIDs)
 		}
-	}
-
-	err := s.commits.BatchStore(blockID, result.CurrentEndState(), batch)
-	if err != nil {
-		return fmt.Errorf("cannot store state commitment: %w", err)
-	}
+	}()
 
 	err = s.events.BatchStore(blockID, []flow.EventsList{result.AllEvents()}, batch)
 	if err != nil {
@@ -341,16 +361,19 @@ func (s *state) SaveExecutionResults(
 		return fmt.Errorf("could not persist execution result: %w", err)
 	}
 
+	// the state commitment is the last data item to be stored, so that
+	// IsBlockExecuted can be implemented by checking whether state commitment exists
+	// in the database
+	err = s.commits.BatchStore(blockID, result.CurrentEndState(), batch)
+	if err != nil {
+		return fmt.Errorf("cannot store state commitment: %w", err)
+	}
+
 	err = batch.Flush()
 	if err != nil {
 		return fmt.Errorf("batch flush error: %w", err)
 	}
 
-	//outside batch because it requires read access
-	err = s.UpdateHighestExecutedBlockIfHigher(childCtx, header)
-	if err != nil {
-		return fmt.Errorf("cannot update highest executed block: %w", err)
-	}
 	return nil
 }
 

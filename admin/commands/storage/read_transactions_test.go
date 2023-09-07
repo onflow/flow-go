@@ -1,6 +1,7 @@
 package storage
 
 import (
+	"context"
 	"fmt"
 	"testing"
 
@@ -14,13 +15,18 @@ func TestReadTransactionsRangeTooWide(t *testing.T) {
 
 	data := map[string]interface{}{
 		"start-height": float64(1),
-		"end-height":   float64(1001),
+		"end-height":   float64(10002),
 	}
-	err := c.Validator(&admin.CommandRequest{
+
+	req := &admin.CommandRequest{
 		Data: data,
-	})
+	}
+	err := c.Validator(req)
+	require.NoError(t, err)
+
+	_, err = c.Handler(context.Background(), req)
 	require.Error(t, err)
-	require.Contains(t, fmt.Sprintf("%v", err), "more than 1000 blocks")
+	require.Contains(t, fmt.Sprintf("%v", err), "more than 10001 blocks")
 }
 
 func TestReadTransactionsRangeInvalid(t *testing.T) {

@@ -13,9 +13,9 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/notifications"
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/common/fifoqueue"
-	"github.com/onflow/flow-go/engine/consensus/sealing/counters"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/component"
+	"github.com/onflow/flow-go/module/counters"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/mempool"
 	"github.com/onflow/flow-go/module/metrics"
@@ -35,7 +35,6 @@ type TimeoutAggregator struct {
 	log                    zerolog.Logger
 	hotstuffMetrics        module.HotstuffMetrics
 	engineMetrics          module.EngineMetrics
-	notifier               hotstuff.Consumer
 	lowestRetainedView     counters.StrictMonotonousCounter // lowest view, for which we still process timeouts
 	collectors             hotstuff.TimeoutCollectors
 	queuedTimeoutsNotifier engine.Notifier
@@ -52,7 +51,6 @@ func NewTimeoutAggregator(log zerolog.Logger,
 	hotstuffMetrics module.HotstuffMetrics,
 	engineMetrics module.EngineMetrics,
 	mempoolMetrics module.MempoolMetrics,
-	notifier hotstuff.Consumer,
 	lowestRetainedView uint64,
 	collectors hotstuff.TimeoutCollectors,
 ) (*TimeoutAggregator, error) {
@@ -66,7 +64,6 @@ func NewTimeoutAggregator(log zerolog.Logger,
 		log:                    log.With().Str("component", "hotstuff.timeout_aggregator").Logger(),
 		hotstuffMetrics:        hotstuffMetrics,
 		engineMetrics:          engineMetrics,
-		notifier:               notifier,
 		lowestRetainedView:     counters.NewMonotonousCounter(lowestRetainedView),
 		collectors:             collectors,
 		queuedTimeoutsNotifier: engine.NewNotifier(),

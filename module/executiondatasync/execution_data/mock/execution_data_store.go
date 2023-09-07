@@ -16,8 +16,8 @@ type ExecutionDataStore struct {
 	mock.Mock
 }
 
-// AddExecutionData provides a mock function with given fields: ctx, executionData
-func (_m *ExecutionDataStore) AddExecutionData(ctx context.Context, executionData *execution_data.BlockExecutionData) (flow.Identifier, error) {
+// Add provides a mock function with given fields: ctx, executionData
+func (_m *ExecutionDataStore) Add(ctx context.Context, executionData *execution_data.BlockExecutionData) (flow.Identifier, error) {
 	ret := _m.Called(ctx, executionData)
 
 	var r0 flow.Identifier
@@ -42,8 +42,8 @@ func (_m *ExecutionDataStore) AddExecutionData(ctx context.Context, executionDat
 	return r0, r1
 }
 
-// GetExecutionData provides a mock function with given fields: ctx, rootID
-func (_m *ExecutionDataStore) GetExecutionData(ctx context.Context, rootID flow.Identifier) (*execution_data.BlockExecutionData, error) {
+// Get provides a mock function with given fields: ctx, rootID
+func (_m *ExecutionDataStore) Get(ctx context.Context, rootID flow.Identifier) (*execution_data.BlockExecutionData, error) {
 	ret := _m.Called(ctx, rootID)
 
 	var r0 *execution_data.BlockExecutionData

@@ -14,11 +14,14 @@ const SystemChunkTransactionGasLimit = 100_000_000
 
 // TODO (Ramtin) after changes to this method are merged into master move them here.
 
+// systemChunkTransactionTemplate looks for the epoch and version beacon heartbeat resources
+// and calls them.
+//
 //go:embed scripts/systemChunkTransactionTemplate.cdc
 var systemChunkTransactionTemplate string
 
-// SystemChunkTransaction creates and returns the transaction corresponding to the system chunk
-// for the given chain.
+// SystemChunkTransaction creates and returns the transaction corresponding to the
+// system chunk for the given chain.
 func SystemChunkTransaction(chain flow.Chain) (*flow.TransactionBody, error) {
 	contracts, err := systemcontracts.SystemContractsForChain(chain.ChainID())
 	if err != nil {
@@ -35,7 +38,9 @@ func SystemChunkTransaction(chain flow.Chain) (*flow.TransactionBody, error) {
 				},
 			)),
 		).
-		AddAuthorizer(contracts.Epoch.Address).
+		// The heartbeat resources needed by the system tx have are on the service account,
+		// therefore, the service account is the only authorizer needed.
+		AddAuthorizer(chain.ServiceAddress()).
 		SetGasLimit(SystemChunkTransactionGasLimit)
 
 	return tx, nil

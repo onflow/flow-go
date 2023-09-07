@@ -6,6 +6,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/rand"
 )
@@ -27,8 +28,8 @@ func testSpock(
 ) []*spockState {
 	resultStates := []*spockState{}
 	for _, experiment := range counterfactualExperiments {
-		run1 := newSpockState(MapStorageSnapshot{})
-		run2 := newSpockState(MapStorageSnapshot{})
+		run1 := newSpockState(snapshot.MapStorageSnapshot{})
+		run2 := newSpockState(snapshot.MapStorageSnapshot{})
 
 		if experiment != nil {
 			experiment(t, run1)
@@ -99,12 +100,12 @@ func TestSpockStateGetDifferentUnderlyingStorage(t *testing.T) {
 	value2 := flow.RegisterValue([]byte("blah"))
 
 	state1 := newSpockState(
-		MapStorageSnapshot{
+		snapshot.MapStorageSnapshot{
 			badRegisterId: value1,
 		})
 
 	state2 := newSpockState(
-		MapStorageSnapshot{
+		snapshot.MapStorageSnapshot{
 			badRegisterId: value2,
 		})
 
@@ -223,7 +224,7 @@ func TestSpockStateMerge(t *testing.T) {
 			// primary experiment
 			func(t *testing.T, state *spockState) {
 				err := state.Merge(
-					&ExecutionSnapshot{
+					&snapshot.ExecutionSnapshot{
 						ReadSet:     readSet,
 						SpockSecret: []byte("secret"),
 					})
@@ -232,13 +233,13 @@ func TestSpockStateMerge(t *testing.T) {
 			// duplicate calls result in different spock
 			func(t *testing.T, state *spockState) {
 				err := state.Merge(
-					&ExecutionSnapshot{
+					&snapshot.ExecutionSnapshot{
 						ReadSet:     readSet,
 						SpockSecret: []byte("secret"),
 					})
 				require.NoError(t, err)
 				err = state.Merge(
-					&ExecutionSnapshot{
+					&snapshot.ExecutionSnapshot{
 						ReadSet:     readSet,
 						SpockSecret: []byte("secret"),
 					})
@@ -248,7 +249,7 @@ func TestSpockStateMerge(t *testing.T) {
 			// different spock
 			func(t *testing.T, state *spockState) {
 				err := state.Merge(
-					&ExecutionSnapshot{
+					&snapshot.ExecutionSnapshot{
 						ReadSet:     readSet,
 						SpockSecret: []byte("secreT"),
 					})
@@ -260,7 +261,7 @@ func TestSpockStateMerge(t *testing.T) {
 	require.Equal(t, readSet, states[1].Finalize().ReadSet)
 
 	// Sanity check finalized state is no longer accessible.
-	err := states[1].Merge(&ExecutionSnapshot{})
+	err := states[1].Merge(&snapshot.ExecutionSnapshot{})
 	require.ErrorContains(t, err, "cannot Merge on a finalized state")
 }
 func TestSpockStateDropChanges(t *testing.T) {
@@ -360,7 +361,7 @@ func TestSpockStateRandomOps(t *testing.T) {
 					chain[len(chain)-1],
 					func(t *testing.T, state *spockState) {
 						err := state.Merge(
-							&ExecutionSnapshot{
+							&snapshot.ExecutionSnapshot{
 								SpockSecret: []byte(fmt.Sprintf("%d", spock)),
 							})
 						require.NoError(t, err)
@@ -396,7 +397,7 @@ func TestSpockStateNewChild(t *testing.T) {
 	childRegisterId2 := flow.NewRegisterID("child", "2")
 
 	parent := newSpockState(
-		MapStorageSnapshot{
+		snapshot.MapStorageSnapshot{
 			baseRegisterId: baseValue,
 		})
 

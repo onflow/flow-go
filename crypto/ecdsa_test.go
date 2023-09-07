@@ -156,7 +156,7 @@ func TestECDSAUtils(t *testing.T) {
 
 // TestScalarMult is a unit test of the scalar multiplication
 // This is only a sanity check meant to make sure the curve implemented
-// is checked against an independant test vector
+// is checked against an independent test vector
 func TestScalarMultP256_secp256k1(t *testing.T) {
 	secp256k1 := secp256k1Instance.curve
 	p256 := p256Instance.curve

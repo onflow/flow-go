@@ -13,7 +13,7 @@ import (
 	"github.com/onflow/flow-go/fvm"
 	reusableRuntime "github.com/onflow/flow-go/fvm/runtime"
 	"github.com/onflow/flow-go/fvm/storage/derived"
-	"github.com/onflow/flow-go/fvm/storage/state"
+	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/executiondatasync/provider"
@@ -32,7 +32,7 @@ type ComputationManager interface {
 		script []byte,
 		arguments [][]byte,
 		blockHeader *flow.Header,
-		snapshot state.StorageSnapshot,
+		snapshot snapshot.StorageSnapshot,
 	) (
 		[]byte,
 		error,
@@ -42,7 +42,7 @@ type ComputationManager interface {
 		ctx context.Context,
 		parentBlockExecutionResultID flow.Identifier,
 		block *entity.ExecutableBlock,
-		snapshot state.StorageSnapshot,
+		snapshot snapshot.StorageSnapshot,
 	) (
 		*execution.ComputationResult,
 		error,
@@ -52,7 +52,7 @@ type ComputationManager interface {
 		ctx context.Context,
 		addr flow.Address,
 		header *flow.Header,
-		snapshot state.StorageSnapshot,
+		snapshot snapshot.StorageSnapshot,
 	) (
 		*flow.Account,
 		error,
@@ -64,6 +64,7 @@ type ComputationConfig struct {
 	CadenceTracing       bool
 	ExtensiveTracing     bool
 	DerivedDataCacheSize uint
+	MaxConcurrency       int
 
 	// When NewCustomVirtualMachine is nil, the manager will create a standard
 	// fvm virtual machine via fvm.NewVirtualMachine.  Otherwise, the manager
@@ -105,7 +106,6 @@ func New(
 	}
 
 	chainID := vmCtx.Chain.ChainID()
-
 	options := []fvm.Option{
 		fvm.WithReusableCadenceRuntimePool(
 			reusableRuntime.NewReusableCadenceRuntimePool(
@@ -115,10 +115,12 @@ func New(
 					AccountLinkingEnabled: true,
 					// Attachments are enabled everywhere except for Mainnet
 					AttachmentsEnabled: chainID != flow.Mainnet,
+					// Capability Controllers are enabled everywhere except for Mainnet
+					CapabilityControllersEnabled: chainID != flow.Mainnet,
 				},
-			),
-		),
+			)),
 	}
+
 	if params.ExtensiveTracing {
 		options = append(options, fvm.WithExtensiveTracing())
 	}
@@ -135,6 +137,8 @@ func New(
 		me,
 		executionDataProvider,
 		nil, // TODO(ramtin): update me with proper consumers
+		protoState,
+		params.MaxConcurrency,
 	)
 
 	if err != nil {
@@ -174,7 +178,7 @@ func (e *Manager) ComputeBlock(
 	ctx context.Context,
 	parentBlockExecutionResultID flow.Identifier,
 	block *entity.ExecutableBlock,
-	snapshot state.StorageSnapshot,
+	snapshot snapshot.StorageSnapshot,
 ) (*execution.ComputationResult, error) {
 
 	e.log.Debug().
@@ -211,7 +215,7 @@ func (e *Manager) ExecuteScript(
 	code []byte,
 	arguments [][]byte,
 	blockHeader *flow.Header,
-	snapshot state.StorageSnapshot,
+	snapshot snapshot.StorageSnapshot,
 ) ([]byte, error) {
 	return e.queryExecutor.ExecuteScript(ctx,
 		code,
@@ -224,7 +228,7 @@ func (e *Manager) GetAccount(
 	ctx context.Context,
 	address flow.Address,
 	blockHeader *flow.Header,
-	snapshot state.StorageSnapshot,
+	snapshot snapshot.StorageSnapshot,
 ) (
 	*flow.Account,
 	error,
@@ -234,4 +238,8 @@ func (e *Manager) GetAccount(
 		address,
 		blockHeader,
 		snapshot)
+}
+
+func (e *Manager) QueryExecutor() query.Executor {
+	return e.queryExecutor
 }

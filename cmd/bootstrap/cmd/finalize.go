@@ -1,7 +1,7 @@
 package cmd
 
 import (
-	"encoding/binary"
+	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
@@ -48,9 +48,6 @@ var (
 	flagNumViewsInStakingAuction    uint64
 	flagNumViewsInDKGPhase          uint64
 	flagEpochCommitSafetyThreshold  uint64
-
-	// this flag is used to seed the DKG, clustering and cluster QC generation
-	flagBootstrapRandomSeed []byte
 )
 
 // PartnerWeights is the format of the JSON file specifying partner node weights.
@@ -101,7 +98,6 @@ func addFinalizeCmdFlags() {
 	finalizeCmd.Flags().Uint64Var(&flagNumViewsInStakingAuction, "epoch-staking-phase-length", 100, "length of the epoch staking phase measured in views")
 	finalizeCmd.Flags().Uint64Var(&flagNumViewsInDKGPhase, "epoch-dkg-phase-length", 1000, "length of each DKG phase measured in views")
 	finalizeCmd.Flags().Uint64Var(&flagEpochCommitSafetyThreshold, "epoch-commit-safety-threshold", 500, "defines epoch commitment deadline")
-	finalizeCmd.Flags().BytesHexVar(&flagBootstrapRandomSeed, "random-seed", GenerateRandomSeed(flow.EpochSetupRandomSourceLength), "The seed used to for DKG, Clustering and Cluster QC generation")
 	finalizeCmd.Flags().UintVar(&flagProtocolVersion, "protocol-version", flow.DefaultProtocolVersion, "major software version used for the duration of this spork")
 
 	cmd.MarkFlagRequired(finalizeCmd, "root-block")
@@ -142,14 +138,6 @@ func finalize(cmd *cobra.Command, args []string) {
 	if err != nil {
 		log.Fatal().Err(err).Msg("invalid or unsafe epoch commit threshold config")
 	}
-
-	if len(flagBootstrapRandomSeed) != flow.EpochSetupRandomSourceLength {
-		log.Error().Int("expected", flow.EpochSetupRandomSourceLength).Int("actual", len(flagBootstrapRandomSeed)).Msg("random seed provided length is not valid")
-		return
-	}
-
-	log.Info().Str("seed", hex.EncodeToString(flagBootstrapRandomSeed)).Msg("deterministic bootstrapping random seed")
-	log.Info().Msg("")
 
 	log.Info().Msg("collecting partner network and staking keys")
 	partnerNodes := readPartnerNodeInfos()
@@ -195,8 +183,10 @@ func finalize(cmd *cobra.Command, args []string) {
 	log.Info().Msg("")
 
 	log.Info().Msg("computing collection node clusters")
-	clusterAssignmentSeed := binary.BigEndian.Uint64(flagBootstrapRandomSeed)
-	assignments, clusters := constructClusterAssignment(partnerNodes, internalNodes, int64(clusterAssignmentSeed))
+	assignments, clusters, err := constructClusterAssignment(partnerNodes, internalNodes)
+	if err != nil {
+		log.Fatal().Err(err).Msg("unable to generate cluster assignment")
+	}
 	log.Info().Msg("")
 
 	log.Info().Msg("constructing root blocks for collection node clusters")
@@ -211,7 +201,6 @@ func finalize(cmd *cobra.Command, args []string) {
 	if flagRootCommit == "0000000000000000000000000000000000000000000000000000000000000000" {
 		generateEmptyExecutionState(
 			block.Header.ChainID,
-			flagBootstrapRandomSeed,
 			assignments,
 			clusterQCs,
 			dkgData,
@@ -587,7 +576,6 @@ func loadRootProtocolSnapshot(path string) (*inmem.Snapshot, error) {
 // given configuration. Sets the flagRootCommit variable for future reads.
 func generateEmptyExecutionState(
 	chainID flow.ChainID,
-	randomSource []byte,
 	assignments flow.AssignmentList,
 	clusterQCs []*flow.QuorumCertificate,
 	dkgData dkg.DKGData,
@@ -606,6 +594,10 @@ func generateEmptyExecutionState(
 		log.Fatal().Err(err).Msg("invalid genesis token supply")
 	}
 
+	randomSource := make([]byte, flow.EpochSetupRandomSourceLength)
+	if _, err = rand.Read(randomSource); err != nil {
+		log.Fatal().Err(err).Msg("failed to generate a random source")
+	}
 	cdcRandomSource, err := cadence.NewString(hex.EncodeToString(randomSource))
 	if err != nil {
 		log.Fatal().Err(err).Msg("invalid random source")

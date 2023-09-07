@@ -37,12 +37,12 @@ type BootstrapAccountCreator interface {
 // This ensures cadence can't access unexpected operations while parsing
 // programs.
 type ParseRestrictedAccountCreator struct {
-	txnState state.NestedTransaction
+	txnState state.NestedTransactionPreparer
 	impl     AccountCreator
 }
 
 func NewParseRestrictedAccountCreator(
-	txnState state.NestedTransaction,
+	txnState state.NestedTransactionPreparer,
 	creator AccountCreator,
 ) AccountCreator {
 	return ParseRestrictedAccountCreator{
@@ -88,7 +88,7 @@ func (NoAccountCreator) CreateAccount(
 // updates the state when next address is called (This secondary functionality
 // is only used in utility command line).
 type accountCreator struct {
-	txnState state.NestedTransaction
+	txnState state.NestedTransactionPreparer
 	chain    flow.Chain
 	accounts Accounts
 
@@ -102,7 +102,7 @@ type accountCreator struct {
 }
 
 func NewAddressGenerator(
-	txnState state.NestedTransaction,
+	txnState state.NestedTransactionPreparer,
 	chain flow.Chain,
 ) AddressGenerator {
 	return &accountCreator{
@@ -112,7 +112,7 @@ func NewAddressGenerator(
 }
 
 func NewBootstrapAccountCreator(
-	txnState state.NestedTransaction,
+	txnState state.NestedTransactionPreparer,
 	chain flow.Chain,
 	accounts Accounts,
 ) BootstrapAccountCreator {
@@ -124,7 +124,7 @@ func NewBootstrapAccountCreator(
 }
 
 func NewAccountCreator(
-	txnState state.NestedTransaction,
+	txnState state.NestedTransactionPreparer,
 	chain flow.Chain,
 	accounts Accounts,
 	isServiceAccountEnabled bool,

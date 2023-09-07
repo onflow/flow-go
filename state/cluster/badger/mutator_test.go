@@ -7,7 +7,6 @@ import (
 	"math/rand"
 	"os"
 	"testing"
-	"time"
 
 	"github.com/dgraph-io/badger/v2"
 	"github.com/rs/zerolog"
@@ -38,8 +37,9 @@ type MutatorSuite struct {
 	db    *badger.DB
 	dbdir string
 
-	genesis *model.Block
-	chainID flow.ChainID
+	genesis      *model.Block
+	chainID      flow.ChainID
+	epochCounter uint64
 
 	// protocol state for reference blocks for transactions
 	protoState   protocol.FollowerState
@@ -51,9 +51,6 @@ type MutatorSuite struct {
 // runs before each test runs
 func (suite *MutatorSuite) SetupTest() {
 	var err error
-
-	// seed the RNG
-	rand.Seed(time.Now().UnixNano())
 
 	suite.genesis = model.Genesis()
 	suite.chainID = suite.genesis.Header.ChainID
@@ -67,40 +64,41 @@ func (suite *MutatorSuite) SetupTest() {
 	all := util.StorageLayer(suite.T(), suite.db)
 	colPayloads := storage.NewClusterPayloads(metrics, suite.db)
 
-	clusterStateRoot, err := NewStateRoot(suite.genesis, unittest.QuorumCertificateFixture())
+	// just bootstrap with a genesis block, we'll use this as reference
+	genesis, result, seal := unittest.BootstrapFixture(unittest.IdentityListFixture(5, unittest.WithAllRoles()))
+	// ensure we don't enter a new epoch for tests that build many blocks
+	result.ServiceEvents[0].Event.(*flow.EpochSetup).FinalView = genesis.Header.View + 100_000
+	seal.ResultID = result.ID()
+	qc := unittest.QuorumCertificateFixture(unittest.QCWithRootBlockID(genesis.ID()))
+	rootSnapshot, err := inmem.SnapshotFromBootstrapState(genesis, result, seal, qc)
+	require.NoError(suite.T(), err)
+	suite.epochCounter = rootSnapshot.Encodable().Epochs.Current.Counter
+
+	suite.protoGenesis = genesis.Header
+	state, err := pbadger.Bootstrap(
+		metrics,
+		suite.db,
+		all.Headers,
+		all.Seals,
+		all.Results,
+		all.Blocks,
+		all.QuorumCertificates,
+		all.Setups,
+		all.EpochCommits,
+		all.Statuses,
+		all.VersionBeacons,
+		rootSnapshot,
+	)
+	require.NoError(suite.T(), err)
+	suite.protoState, err = pbadger.NewFollowerState(log, tracer, events.NewNoop(), state, all.Index, all.Payloads, protocolutil.MockBlockTimer())
+	require.NoError(suite.T(), err)
+
+	clusterStateRoot, err := NewStateRoot(suite.genesis, unittest.QuorumCertificateFixture(), suite.epochCounter)
 	suite.NoError(err)
 	clusterState, err := Bootstrap(suite.db, clusterStateRoot)
 	suite.Assert().Nil(err)
 	suite.state, err = NewMutableState(clusterState, tracer, all.Headers, colPayloads)
 	suite.Assert().Nil(err)
-	consumer := events.NewNoop()
-
-	// just bootstrap with a genesis block, we'll use this as reference
-	participants := unittest.IdentityListFixture(5, unittest.WithAllRoles())
-	genesis, result, seal := unittest.BootstrapFixture(participants)
-	qc := unittest.QuorumCertificateFixture(unittest.QCWithRootBlockID(genesis.ID()))
-	// ensure we don't enter a new epoch for tests that build many blocks
-	result.ServiceEvents[0].Event.(*flow.EpochSetup).FinalView = genesis.Header.View + 100000
-	seal.ResultID = result.ID()
-
-	rootSnapshot, err := inmem.SnapshotFromBootstrapState(genesis, result, seal, qc)
-	require.NoError(suite.T(), err)
-
-	suite.protoGenesis = genesis.Header
-
-	state, err := pbadger.Bootstrap(metrics, suite.db, all.Headers, all.Seals, all.Results, all.Blocks, all.QuorumCertificates, all.Setups, all.EpochCommits, all.Statuses, rootSnapshot)
-	require.NoError(suite.T(), err)
-
-	suite.protoState, err = pbadger.NewFollowerState(
-		log,
-		tracer,
-		consumer,
-		state,
-		all.Index,
-		all.Payloads,
-		protocolutil.MockBlockTimer(),
-	)
-	require.NoError(suite.T(), err)
 }
 
 // runs after each test finishes
@@ -175,24 +173,24 @@ func TestMutator(t *testing.T) {
 	suite.Run(t, new(MutatorSuite))
 }
 
-func (suite *MutatorSuite) TestBootstrap_InvalidNumber() {
+func (suite *MutatorSuite) TestBootstrap_InvalidHeight() {
 	suite.genesis.Header.Height = 1
 
-	_, err := NewStateRoot(suite.genesis, unittest.QuorumCertificateFixture())
+	_, err := NewStateRoot(suite.genesis, unittest.QuorumCertificateFixture(), suite.epochCounter)
 	suite.Assert().Error(err)
 }
 
 func (suite *MutatorSuite) TestBootstrap_InvalidParentHash() {
 	suite.genesis.Header.ParentID = unittest.IdentifierFixture()
 
-	_, err := NewStateRoot(suite.genesis, unittest.QuorumCertificateFixture())
+	_, err := NewStateRoot(suite.genesis, unittest.QuorumCertificateFixture(), suite.epochCounter)
 	suite.Assert().Error(err)
 }
 
 func (suite *MutatorSuite) TestBootstrap_InvalidPayloadHash() {
 	suite.genesis.Header.PayloadHash = unittest.IdentifierFixture()
 
-	_, err := NewStateRoot(suite.genesis, unittest.QuorumCertificateFixture())
+	_, err := NewStateRoot(suite.genesis, unittest.QuorumCertificateFixture(), suite.epochCounter)
 	suite.Assert().Error(err)
 }
 
@@ -200,7 +198,7 @@ func (suite *MutatorSuite) TestBootstrap_InvalidPayload() {
 	// this is invalid because genesis collection should be empty
 	suite.genesis.Payload = unittest.ClusterPayloadFixture(2)
 
-	_, err := NewStateRoot(suite.genesis, unittest.QuorumCertificateFixture())
+	_, err := NewStateRoot(suite.genesis, unittest.QuorumCertificateFixture(), suite.epochCounter)
 	suite.Assert().Error(err)
 }
 
@@ -258,7 +256,7 @@ func (suite *MutatorSuite) TestExtend_InvalidChainID() {
 	suite.Assert().True(state.IsInvalidExtensionError(err))
 }
 
-func (suite *MutatorSuite) TestExtend_InvalidBlockNumber() {
+func (suite *MutatorSuite) TestExtend_InvalidBlockHeight() {
 	block := suite.Block()
 	// change the block height
 	block.Header.Height = block.Header.Height - 1
@@ -394,6 +392,69 @@ func (suite *MutatorSuite) TestExtend_WithReferenceBlockFromClusterChain() {
 	block.SetPayload(model.EmptyPayload(suite.genesis.ID()))
 	err := suite.state.Extend(&block)
 	suite.Assert().Error(err)
+}
+
+// TestExtend_WithReferenceBlockFromDifferentEpoch tests extending the cluster state
+// using a reference block in a different epoch than the cluster's epoch.
+func (suite *MutatorSuite) TestExtend_WithReferenceBlockFromDifferentEpoch() {
+	// build and complete the current epoch, then use a reference block from next epoch
+	eb := unittest.NewEpochBuilder(suite.T(), suite.protoState)
+	eb.BuildEpoch().CompleteEpoch()
+	heights, ok := eb.EpochHeights(1)
+	require.True(suite.T(), ok)
+	nextEpochHeader, err := suite.protoState.AtHeight(heights.FinalHeight() + 1).Head()
+	require.NoError(suite.T(), err)
+
+	block := suite.Block()
+	block.SetPayload(model.EmptyPayload(nextEpochHeader.ID()))
+	err = suite.state.Extend(&block)
+	suite.Assert().Error(err)
+	suite.Assert().True(state.IsInvalidExtensionError(err))
+}
+
+// TestExtend_WithUnfinalizedReferenceBlock tests that extending the cluster state
+// with a reference block which is un-finalized and above the finalized boundary
+// should be considered an unverifiable extension. It's possible that this reference
+// block has been finalized, we just haven't processed it yet.
+func (suite *MutatorSuite) TestExtend_WithUnfinalizedReferenceBlock() {
+	unfinalized := unittest.BlockWithParentFixture(suite.protoGenesis)
+	unfinalized.Payload.Guarantees = nil
+	unfinalized.SetPayload(*unfinalized.Payload)
+	err := suite.protoState.ExtendCertified(context.Background(), unfinalized, unittest.CertifyBlock(unfinalized.Header))
+	suite.Require().NoError(err)
+
+	block := suite.Block()
+	block.SetPayload(model.EmptyPayload(unfinalized.ID()))
+	err = suite.state.Extend(&block)
+	suite.Assert().Error(err)
+	suite.Assert().True(state.IsUnverifiableExtensionError(err))
+}
+
+// TestExtend_WithOrphanedReferenceBlock tests that extending the cluster state
+// with a un-finalized reference block below the finalized boundary
+// (i.e. orphaned) should be considered an invalid extension. As the proposer is supposed
+// to only use finalized blocks as reference, the proposer knowingly generated an invalid
+func (suite *MutatorSuite) TestExtend_WithOrphanedReferenceBlock() {
+	// create a block extending genesis which is not finalized
+	orphaned := unittest.BlockWithParentFixture(suite.protoGenesis)
+	err := suite.protoState.ExtendCertified(context.Background(), orphaned, unittest.CertifyBlock(orphaned.Header))
+	suite.Require().NoError(err)
+
+	// create a block extending genesis (conflicting with previous) which is finalized
+	finalized := unittest.BlockWithParentFixture(suite.protoGenesis)
+	finalized.Payload.Guarantees = nil
+	finalized.SetPayload(*finalized.Payload)
+	err = suite.protoState.ExtendCertified(context.Background(), finalized, unittest.CertifyBlock(finalized.Header))
+	suite.Require().NoError(err)
+	err = suite.protoState.Finalize(context.Background(), finalized.ID())
+	suite.Require().NoError(err)
+
+	// test referencing the orphaned block
+	block := suite.Block()
+	block.SetPayload(model.EmptyPayload(orphaned.ID()))
+	err = suite.state.Extend(&block)
+	suite.Assert().Error(err)
+	suite.Assert().True(state.IsInvalidExtensionError(err))
 }
 
 func (suite *MutatorSuite) TestExtend_UnfinalizedBlockWithDupeTx() {

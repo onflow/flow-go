@@ -4,17 +4,18 @@ import (
 	"context"
 	"time"
 
+	"google.golang.org/grpc/codes"
+
 	"github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/protocol"
+	httpmetrics "github.com/slok/go-http-metrics/metrics"
 
 	"github.com/onflow/flow-go/model/chainsync"
 	"github.com/onflow/flow-go/model/cluster"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/network/channels"
-
-	httpmetrics "github.com/slok/go-http-metrics/metrics"
 )
 
 type NoopCollector struct{}
@@ -32,6 +33,9 @@ func (nc *NoopCollector) UnicastMessageSendingCompleted(topic string)           
 func (nc *NoopCollector) BlockProposed(*flow.Block)                              {}
 func (nc *NoopCollector) BlockProposalDuration(duration time.Duration)           {}
 
+// interface check
+var _ module.BackendScriptsMetrics = (*NoopCollector)(nil)
+var _ module.TransactionMetrics = (*NoopCollector)(nil)
 var _ module.HotstuffMetrics = (*NoopCollector)(nil)
 var _ module.EngineMetrics = (*NoopCollector)(nil)
 var _ module.HeroCacheMetrics = (*NoopCollector)(nil)
@@ -116,6 +120,7 @@ func (nc *NoopCollector) CommitteeProcessingDuration(duration time.Duration)    
 func (nc *NoopCollector) SignerProcessingDuration(duration time.Duration)                        {}
 func (nc *NoopCollector) ValidatorProcessingDuration(duration time.Duration)                     {}
 func (nc *NoopCollector) PayloadProductionDuration(duration time.Duration)                       {}
+func (nc *NoopCollector) TimeoutCollectorsRange(uint64, uint64, int)                             {}
 func (nc *NoopCollector) TransactionIngested(txID flow.Identifier)                               {}
 func (nc *NoopCollector) ClusterBlockProposed(*cluster.Block)                                    {}
 func (nc *NoopCollector) ClusterBlockFinalized(*cluster.Block)                                   {}
@@ -162,7 +167,7 @@ func (nc *NoopCollector) ExecutionCollectionExecuted(_ time.Duration, _ module.E
 }
 func (nc *NoopCollector) ExecutionBlockExecutionEffortVectorComponent(_ string, _ uint) {}
 func (nc *NoopCollector) ExecutionBlockCachedPrograms(programs int)                     {}
-func (nc *NoopCollector) ExecutionTransactionExecuted(_ time.Duration, _, _, _ uint64, _, _ int, _ bool) {
+func (nc *NoopCollector) ExecutionTransactionExecuted(_ time.Duration, _ int, _, _ uint64, _, _ int, _ bool) {
 }
 func (nc *NoopCollector) ExecutionChunkDataPackGenerated(_, _ int)                         {}
 func (nc *NoopCollector) ExecutionScriptExecuted(dur time.Duration, compUsed, _, _ uint64) {}
@@ -192,6 +197,12 @@ func (nc *NoopCollector) RuntimeSetNumberOfAccounts(count uint64)               
 func (nc *NoopCollector) RuntimeTransactionProgramsCacheMiss()                             {}
 func (nc *NoopCollector) RuntimeTransactionProgramsCacheHit()                              {}
 func (nc *NoopCollector) ScriptExecuted(dur time.Duration, size int)                       {}
+func (nc *NoopCollector) ScriptExecutionErrorOnArchiveNode()                               {}
+func (nc *NoopCollector) ScriptExecutionErrorOnExecutionNode()                             {}
+func (nc *NoopCollector) ScriptExecutionResultMismatch()                                   {}
+func (nc *NoopCollector) ScriptExecutionResultMatch()                                      {}
+func (nc *NoopCollector) ScriptExecutionErrorMismatch()                                    {}
+func (nc *NoopCollector) ScriptExecutionErrorMatch()                                       {}
 func (nc *NoopCollector) TransactionResultFetched(dur time.Duration, size int)             {}
 func (nc *NoopCollector) TransactionReceived(txID flow.Identifier, when time.Time)         {}
 func (nc *NoopCollector) TransactionFinalized(txID flow.Identifier, when time.Time)        {}
@@ -199,6 +210,7 @@ func (nc *NoopCollector) TransactionExecuted(txID flow.Identifier, when time.Tim
 func (nc *NoopCollector) TransactionExpired(txID flow.Identifier)                          {}
 func (nc *NoopCollector) TransactionSubmissionFailed()                                     {}
 func (nc *NoopCollector) UpdateExecutionReceiptMaxHeight(height uint64)                    {}
+func (nc *NoopCollector) UpdateLastFullBlockHeight(height uint64)                          {}
 func (nc *NoopCollector) ChunkDataPackRequestProcessed()                                   {}
 func (nc *NoopCollector) ExecutionSync(syncing bool)                                       {}
 func (nc *NoopCollector) ExecutionBlockDataUploadStarted()                                 {}
@@ -290,4 +302,15 @@ func (nc *NoopCollector) OnBehaviourPenaltyUpdated(f float64)                   
 func (nc *NoopCollector) OnIPColocationFactorUpdated(f float64)                            {}
 func (nc *NoopCollector) OnAppSpecificScoreUpdated(f float64)                              {}
 func (nc *NoopCollector) OnOverallPeerScoreUpdated(f float64)                              {}
-func (nc *NoopCollector) OnMisbehaviorReported(string, string)                             {}
+
+func (nc *NoopCollector) BlockingPreProcessingStarted(string, uint)                 {}
+func (nc *NoopCollector) BlockingPreProcessingFinished(string, uint, time.Duration) {}
+func (nc *NoopCollector) AsyncProcessingStarted(string)                             {}
+func (nc *NoopCollector) AsyncProcessingFinished(string, time.Duration)             {}
+
+func (nc *NoopCollector) OnMisbehaviorReported(string, string) {}
+func (nc *NoopCollector) OnViolationReportSkipped()            {}
+
+var _ ObserverMetrics = (*NoopCollector)(nil)
+
+func (nc *NoopCollector) RecordRPC(handler, rpc string, code codes.Code) {}

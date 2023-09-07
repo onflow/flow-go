@@ -15,6 +15,7 @@ const (
 	namespaceExecutionDataSync = "execution_data_sync"
 	namespaceChainsync         = "chainsync"
 	namespaceFollowerEngine    = "follower"
+	namespaceRestAPI           = "access_rest_api"
 )
 
 // Network subsystems represent the various layers of networking.
@@ -28,6 +29,7 @@ const (
 	subsystemAuth         = "authorization"
 	subsystemRateLimiting = "ratelimit"
 	subsystemAlsp         = "alsp"
+	subsystemSecurity     = "security"
 )
 
 // Storage subsystems represent the various components of the storage layer.
@@ -42,6 +44,7 @@ const (
 	subsystemTransactionTiming     = "transaction_timing"
 	subsystemTransactionSubmission = "transaction_submission"
 	subsystemConnectionPool        = "connection_pool"
+	subsystemHTTP                  = "http"
 )
 
 // Observer subsystem
@@ -58,6 +61,7 @@ const (
 const (
 	subsystemCompliance  = "compliance"
 	subsystemHotstuff    = "hotstuff"
+	subsystemCruiseCtl   = "cruisectl"
 	subsystemMatchEngine = "match"
 )
 

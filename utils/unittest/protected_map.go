@@ -57,3 +57,10 @@ func (p *ProtectedMap[K, V]) ForEach(fn func(k K, v V) error) error {
 	}
 	return nil
 }
+
+// Size returns the size of the map.
+func (p *ProtectedMap[K, V]) Size() int {
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+	return len(p.m)
+}

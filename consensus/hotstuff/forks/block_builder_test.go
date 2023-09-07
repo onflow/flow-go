@@ -75,9 +75,9 @@ func (bb *BlockBuilder) AddVersioned(qcView uint64, blockView uint64, qcVersion 
 	return bb
 }
 
-// Blocks returns a list of all blocks added to the BlockBuilder.
+// Proposals returns a list of all proposals added to the BlockBuilder.
 // Returns an error if the blocks do not form a connected tree rooted at genesis.
-func (bb *BlockBuilder) Blocks() ([]*model.Proposal, error) {
+func (bb *BlockBuilder) Proposals() ([]*model.Proposal, error) {
 	blocks := make([]*model.Proposal, 0, len(bb.blockViews))
 
 	genesisBlock := makeGenesis()
@@ -124,6 +124,16 @@ func (bb *BlockBuilder) Blocks() ([]*model.Proposal, error) {
 	return blocks, nil
 }
 
+// Blocks returns a list of all blocks added to the BlockBuilder.
+// Returns an error if the blocks do not form a connected tree rooted at genesis.
+func (bb *BlockBuilder) Blocks() ([]*model.Block, error) {
+	proposals, err := bb.Proposals()
+	if err != nil {
+		return nil, fmt.Errorf("BlockBuilder failed to generate proposals: %w", err)
+	}
+	return toBlocks(proposals), nil
+}
+
 func makePayloadHash(view uint64, qc *flow.QuorumCertificate, blockVersion int) flow.Identifier {
 	return flow.MakeID(struct {
 		View         uint64
@@ -164,4 +174,13 @@ func makeGenesis() *model.CertifiedBlock {
 		panic(fmt.Sprintf("combining genesis block and genensis QC to certified block failed: %s", err.Error()))
 	}
 	return &certifiedGenesisBlock
+}
+
+// toBlocks converts the given proposals to slice of blocks
+func toBlocks(proposals []*model.Proposal) []*model.Block {
+	blocks := make([]*model.Block, 0, len(proposals))
+	for _, b := range proposals {
+		blocks = append(blocks, b.Block)
+	}
+	return blocks
 }

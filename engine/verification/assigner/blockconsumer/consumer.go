@@ -98,12 +98,6 @@ func (c *BlockConsumer) OnFinalizedBlock(*model.Block) {
 	c.unit.Launch(c.consumer.Check)
 }
 
-// OnBlockIncorporated is to implement FinalizationConsumer
-func (c *BlockConsumer) OnBlockIncorporated(*model.Block) {}
-
-// OnDoubleProposeDetected is to implement FinalizationConsumer
-func (c *BlockConsumer) OnDoubleProposeDetected(*model.Block, *model.Block) {}
-
 func (c *BlockConsumer) Ready() <-chan struct{} {
 	err := c.consumer.Start(c.defaultIndex)
 	if err != nil {

@@ -521,6 +521,43 @@ func traverse(prefix []byte, iteration iterationFunc) func(*badger.Txn) error {
 	}
 }
 
+// findHighestAtOrBelow searches for the highest key with the given prefix and a height
+// at or below the target height, and retrieves and decodes the value associated with the
+// key into the given entity.
+// If no key is found, the function returns storage.ErrNotFound.
+func findHighestAtOrBelow(
+	prefix []byte,
+	height uint64,
+	entity interface{},
+) func(*badger.Txn) error {
+	return func(tx *badger.Txn) error {
+		if len(prefix) == 0 {
+			return fmt.Errorf("prefix must not be empty")
+		}
+
+		opts := badger.DefaultIteratorOptions
+		opts.Prefix = prefix
+		opts.Reverse = true
+
+		it := tx.NewIterator(opts)
+		defer it.Close()
+
+		it.Seek(append(prefix, b(height)...))
+
+		if !it.Valid() {
+			return storage.ErrNotFound
+		}
+
+		return it.Item().Value(func(val []byte) error {
+			err := msgpack.Unmarshal(val, entity)
+			if err != nil {
+				return fmt.Errorf("could not decode entity: %w", err)
+			}
+			return nil
+		})
+	}
+}
+
 // Fail returns a DB operation function that always fails with the given error.
 func Fail(err error) func(*badger.Txn) error {
 	return func(_ *badger.Txn) error {

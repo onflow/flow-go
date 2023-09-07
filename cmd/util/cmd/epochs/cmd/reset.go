@@ -7,7 +7,6 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
-	"strings"
 
 	"github.com/spf13/cobra"
 
@@ -44,7 +43,6 @@ func init() {
 }
 
 func addResetCmdFlags() {
-	resetCmd.Flags().StringVar(&flagPayout, "payout", "", "the payout eg. 10000.0")
 	resetCmd.Flags().StringVar(&flagBucketNetworkName, "bucket-network-name", "", "when retrieving the root snapshot from a GCP bucket, the network name portion of the URL (eg. \"mainnet-13\")")
 }
 
@@ -132,7 +130,7 @@ func extractResetEpochArgs(snapshot *inmem.Snapshot) []cadence.Value {
 		log.Fatal().Err(err).Msg("could not get final view from epoch")
 	}
 
-	return convertResetEpochArgs(epochCounter, randomSource, flagPayout, firstView, stakingEndView, finalView)
+	return convertResetEpochArgs(epochCounter, randomSource, firstView, stakingEndView, finalView)
 }
 
 // getStakingAuctionEndView determines the staking auction end view from the
@@ -169,7 +167,7 @@ func getStakingAuctionEndView(epoch protocol.Epoch) (uint64, error) {
 // convertResetEpochArgs converts the arguments required by `resetEpoch` to cadence representations
 // Contract Method: https://github.com/onflow/flow-core-contracts/blob/master/contracts/epochs/FlowEpoch.cdc#L413
 // Transaction: https://github.com/onflow/flow-core-contracts/blob/master/transactions/epoch/admin/reset_epoch.cdc
-func convertResetEpochArgs(epochCounter uint64, randomSource []byte, payout string, firstView, stakingEndView, finalView uint64) []cadence.Value {
+func convertResetEpochArgs(epochCounter uint64, randomSource []byte, firstView, stakingEndView, finalView uint64) []cadence.Value {
 
 	args := make([]cadence.Value, 0)
 
@@ -182,23 +180,6 @@ func convertResetEpochArgs(epochCounter uint64, randomSource []byte, payout stri
 		log.Fatal().Err(err).Msg("could not convert random source to cadence type")
 	}
 	args = append(args, cdcRandomSource)
-
-	// add payout
-	var cdcPayout cadence.Value
-	if payout != "" {
-		index := strings.Index(payout, ".")
-		if index == -1 {
-			log.Fatal().Msg("invalid --payout, eg: 10000.0")
-		}
-
-		cdcPayout, err = cadence.NewUFix64(payout)
-		if err != nil {
-			log.Fatal().Err(err).Msg("could not convert payout to cadence type")
-		}
-	} else {
-		cdcPayout = cadence.NewOptional(nil)
-	}
-	args = append(args, cdcPayout)
 
 	// add first view
 	args = append(args, cadence.NewUInt64(firstView))

@@ -65,8 +65,6 @@ func (s *Suite) SetupSuite() {
 	s.log = unittest.LoggerForTest(s.Suite.T(), zerolog.InfoLevel)
 	s.log.Info().Msg("================> SetupTest")
 
-	blockRateFlag := "--block-rate-delay=1ms"
-
 	s.nodeConfigs = append(s.nodeConfigs, testnet.NewNodeConfig(flow.RoleAccess, testnet.WithLogLevel(zerolog.FatalLevel)))
 
 	// generate the four consensus identities
@@ -77,7 +75,7 @@ func (s *Suite) SetupSuite() {
 			testnet.WithLogLevel(zerolog.FatalLevel),
 			testnet.WithAdditionalFlag("--required-verification-seal-approvals=1"),
 			testnet.WithAdditionalFlag("--required-construction-seal-approvals=1"),
-			testnet.WithAdditionalFlag(blockRateFlag),
+			testnet.WithAdditionalFlag("cruise-ctl-fallback-proposal-duration=1ms"),
 		)
 		s.nodeConfigs = append(s.nodeConfigs, nodeConfig)
 	}
@@ -111,11 +109,11 @@ func (s *Suite) SetupSuite() {
 	// generates two collection node
 	coll1Config := testnet.NewNodeConfig(flow.RoleCollection,
 		testnet.WithLogLevel(zerolog.FatalLevel),
-		testnet.WithAdditionalFlag(blockRateFlag),
+		testnet.WithAdditionalFlag("--hotstuff-proposal-duration=1ms"),
 	)
 	coll2Config := testnet.NewNodeConfig(flow.RoleCollection,
 		testnet.WithLogLevel(zerolog.FatalLevel),
-		testnet.WithAdditionalFlag(blockRateFlag),
+		testnet.WithAdditionalFlag("--hotstuff-proposal-duration=1ms"),
 	)
 	s.nodeConfigs = append(s.nodeConfigs, coll1Config, coll2Config)
 

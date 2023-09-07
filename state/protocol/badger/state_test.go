@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 	"testing"
-	"time"
 
 	"github.com/dgraph-io/badger/v2"
 	"github.com/stretchr/testify/assert"
@@ -74,12 +73,17 @@ func TestBootstrapAndOpen(t *testing.T) {
 			all.Setups,
 			all.EpochCommits,
 			all.Statuses,
+			all.VersionBeacons,
 		)
 		require.NoError(t, err)
 
 		complianceMetrics.AssertExpectations(t)
 
 		unittest.AssertSnapshotsEqual(t, rootSnapshot, state.Final())
+
+		vb, err := state.Final().VersionBeacon()
+		require.NoError(t, err)
+		require.Nil(t, vb)
 	})
 }
 
@@ -154,6 +158,7 @@ func TestBootstrapAndOpen_EpochCommitted(t *testing.T) {
 			all.Setups,
 			all.EpochCommits,
 			all.Statuses,
+			all.VersionBeacons,
 		)
 		require.NoError(t, err)
 
@@ -420,7 +425,9 @@ func TestBootstrap_InvalidIdentities(t *testing.T) {
 		root := unittest.RootSnapshotFixture(participants)
 		// randomly shuffle the identities so they are not canonically ordered
 		encodable := root.Encodable()
-		encodable.Identities = participants.DeterministicShuffle(time.Now().UnixNano())
+		var err error
+		encodable.Identities, err = participants.Shuffle()
+		require.NoError(t, err)
 		root = inmem.SnapshotFromEncodable(encodable)
 		bootstrap(t, root, func(state *bprotocol.State, err error) {
 			assert.Error(t, err)
@@ -524,7 +531,20 @@ func bootstrap(t *testing.T, rootSnapshot protocol.Snapshot, f func(*bprotocol.S
 	db := unittest.BadgerDB(t, dir)
 	defer db.Close()
 	all := storutil.StorageLayer(t, db)
-	state, err := bprotocol.Bootstrap(metrics, db, all.Headers, all.Seals, all.Results, all.Blocks, all.QuorumCertificates, all.Setups, all.EpochCommits, all.Statuses, rootSnapshot)
+	state, err := bprotocol.Bootstrap(
+		metrics,
+		db,
+		all.Headers,
+		all.Seals,
+		all.Results,
+		all.Blocks,
+		all.QuorumCertificates,
+		all.Setups,
+		all.EpochCommits,
+		all.Statuses,
+		all.VersionBeacons,
+		rootSnapshot,
+	)
 	f(state, err)
 }
 
@@ -565,7 +585,7 @@ func assertSealingSegmentBlocksQueryableAfterBootstrap(t *testing.T, snapshot pr
 		segment, err := state.Final().SealingSegment()
 		require.NoError(t, err)
 
-		rootBlock, err := state.Params().Root()
+		rootBlock, err := state.Params().FinalizedRoot()
 		require.NoError(t, err)
 
 		// root block should be the highest block from the sealing segment

@@ -220,3 +220,6 @@ func (f FakeAccounts) SetValue(_ flow.RegisterID, _ []byte) error             { 
 func (f FakeAccounts) AllocateStorageIndex(_ flow.Address) (atree.StorageIndex, error) {
 	return atree.StorageIndex{}, nil
 }
+func (f FakeAccounts) GenerateAccountLocalID(address flow.Address) (uint64, error) {
+	return 0, nil
+}

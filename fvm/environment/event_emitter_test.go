@@ -7,7 +7,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/cadence"
-	jsoncdc "github.com/onflow/cadence/encoding/json"
+	"github.com/onflow/cadence/encoding/ccf"
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/onflow/cadence/runtime/stdlib"
 
@@ -179,7 +179,7 @@ func createTestEventEmitterWithLimit(chain flow.ChainID, address flow.Address, e
 }
 
 func getCadenceEventPayloadByteSize(event cadence.Event) uint64 {
-	payload, err := jsoncdc.Encode(event)
+	payload, err := ccf.Encode(event)
 	if err != nil {
 		panic(err)
 	}

@@ -82,7 +82,7 @@ func (suite *CollectorSuite) SetupTest(name string, nNodes, nClusters uint) {
 	}
 	colNodes := testnet.NewNodeConfigSet(nNodes, flow.RoleCollection,
 		testnet.WithLogLevel(zerolog.InfoLevel),
-		testnet.WithAdditionalFlag("--block-rate-delay=1ms"),
+		testnet.WithAdditionalFlag("--hotstuff-proposal-duration=1ms"),
 	)
 
 	suite.nClusters = nClusters
@@ -320,8 +320,7 @@ func (suite *CollectorSuite) AwaitTransactionsIncluded(txIDs ...flow.Identifier)
 	suite.T().Fatalf("missing transactions: %v", missing)
 }
 
-// Collector returns the collector node with the given index in the
-// given cluster.
+// Collector returns the collector node with the given index in the given cluster.
 func (suite *CollectorSuite) Collector(clusterIdx, nodeIdx uint) *testnet.Container {
 
 	clusters := suite.Clusters()
@@ -335,8 +334,7 @@ func (suite *CollectorSuite) Collector(clusterIdx, nodeIdx uint) *testnet.Contai
 	return suite.net.ContainerByID(node.ID())
 }
 
-// ClusterStateFor returns a cluster state instance for the collector node
-// with the given ID.
+// ClusterStateFor returns a cluster state instance for the collector node with the given ID.
 func (suite *CollectorSuite) ClusterStateFor(id flow.Identifier) *clusterstateimpl.State {
 
 	myCluster, _, ok := suite.Clusters().ByNodeID(id)
@@ -351,9 +349,9 @@ func (suite *CollectorSuite) ClusterStateFor(id flow.Identifier) *clusterstateim
 	require.Nil(suite.T(), err, "could not get node db")
 
 	rootQC := unittest.QuorumCertificateFixture(unittest.QCWithRootBlockID(rootBlock.ID()))
-	clusterStateRoot, err := clusterstateimpl.NewStateRoot(rootBlock, rootQC)
+	clusterStateRoot, err := clusterstateimpl.NewStateRoot(rootBlock, rootQC, setup.Counter)
 	suite.NoError(err)
-	clusterState, err := clusterstateimpl.OpenState(db, nil, nil, nil, clusterStateRoot.ClusterID())
+	clusterState, err := clusterstateimpl.OpenState(db, nil, nil, nil, clusterStateRoot.ClusterID(), clusterStateRoot.EpochCounter())
 	require.NoError(suite.T(), err, "could not get cluster state")
 
 	return clusterState
