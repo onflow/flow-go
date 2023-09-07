@@ -87,6 +87,13 @@ type EngineRegistry interface {
 }
 ```
 
+This proposal requires the `LibP2PNode` implementation extract the individual envelopes (i.e., `*pb.Message`) from the incoming GossipSub RPCs. This is done using the
+RPC inspector dependency injection. We need to implement a new inspector that extract the envelopes in a non-blocking approach. We should not block an incoming RPC to 
+extract its messages, as it is interfering with the GossipSub router operation and can harm the message delivery rate of the router. The extracted envelopes are then required to be stored persistently
+in a forensic component with proper ejection mechanism, which is exposed to the `GetGossipSubMessageForEvent` to query the envelope corresponding to a `(event, originId)` pair. This solution also requires
+replicating the signature verification logic of the GossipSub in `VerifyGossipSubMessage` so that it is accessible to the engines. We need to extend the signature verification mechanism to account for
+translation of `originId` from `flow.Identifier` to a `peer.ID`. As the engines are operating based on the `flow.Identifier`, while the GossipSub signatures are generated using the Networking Key of the node.
+
 ### Advantages
 1. The GossipSub authentication data is shared with the Flow protocol.
 2. The interface is easy to use, as it abstracts the complexity of translating the origin Flow identifier to the GossipSub peer id, and
@@ -113,6 +120,8 @@ type EngineRegistry interface {
      then the attacker can send an invalid message and get away from detection, as when there is no GossipSub envelope available, the Flow protocol engines cannot
      have forensic evidence to attribute the protocol-level violation to the malicious sender.
    - On a happy path when all nodes are honest, the GossipSub envelopes are not needed, and extracting and maintaining them poses a performance overhead. 
+3. This solution requires replicating the signature verification logic of the GossipSub router at the engine level (i.e., `VerifyGossipSubMessage`). Changes to the GossipSub signature 
+    verification procedure may pose as breaking changes and be a blocker for upgrading and keeping up with GossipSub upgrades.
 
 ## Proposal-2: Enforced Flow-level Signing Policy For All Messages
 In this proposal, we propose to enforce a Flow-level signing policy for all messages. The idea is to refactor the `Conduit` interface, so that instead of 
@@ -177,7 +186,7 @@ sent the message.
 6. On the long term outlook, we may omit the signature field from individual `Entity` structures of Flow codebase, and instead rely on the `Envelope` signature field. This is a potential optimization that
     we may need to research further. 
 
-## Disadvantages
+### Disadvantages
 1. The implementation is a breaking change and is not backward compatible with the current state of the Flow protocol. We change the `Conduit` interface, which is used by
    all the Flow protocol engines to send messages to the networking layer. Hence, all the Flow protocol engines must be refactored to sign the messages that are sent through
    the `Conduit` interface. 
@@ -187,6 +196,11 @@ sent the message.
    Assuming that we are using ECDSA with `secp521r1` curve and SHA-512 for hashing, the signature size is ~132 bytes (in theory). Hence, we are adding ~132 bytes to the size of data sent over the wire.
    Nevertheless, the performance overhead and the size of data sent over the wire may be an acceptable trade-off for the security guarantees that this approach provides.
 
+### Do we still need GossipSub router signature?
+Yes, even when going with the Proposal-2, we still need the GossipSub router signature. This is because the GossipSub router signature is used to verify the authenticity of the message at the GossipSub level.
+That is a performant way to filter out the invalid messages at the lower level, and avoid delivering them to the application layer or relaying them to other nodes. One can conceptualize the GossipSub-level signatures
+to the ephemeral signatures that are used in secure sessions (e.g., TLS, SSL) to verify the authenticity of the messages at the session level. The ephemeral signatures are used to verify the authenticity of the messages
+at the session level, but are not persisted and are not used to attribute a message to the original sender post session. Application context-based signatures are used to attribute a message to the original sender post session.
 
 ## References
 [1] [Conduit Interface]()
