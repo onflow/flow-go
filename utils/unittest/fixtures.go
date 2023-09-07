@@ -10,12 +10,10 @@ import (
 	"time"
 
 	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/onflow/cadence"
 	"github.com/stretchr/testify/require"
 
-	"github.com/onflow/cadence"
-
 	sdk "github.com/onflow/flow-go-sdk"
-
 	hotstuff "github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/crypto/hash"
@@ -2556,10 +2554,17 @@ func RootProtocolStateFixture() *flow.RichProtocolStateEntry {
 	}
 }
 
-// ProtocolStateFixture creates a fixture with correctly structured data that passes basic sanity checks.
-// Epoch setup and commit counters are set to match.
-// Identities are constructed from setup events.
-// Identities are sorted in canonical order.
+// ProtocolStateFixture creates a fixture with correctly structured data. The returned Identity Table
+// represents the common situation during the staking phase of Epoch N+1:
+//   - we are currently in Epoch N
+//   - previous epoch N-1 is known (specifically EpochSetup and EpochCommit events)
+//   - network is currently in the staking phase to setup the next epoch, hence no service
+//     events for the next epoch exist
+//
+// In particular, the following consistency requirements hold:
+//   - Epoch setup and commit counters are set to match.
+//   - Identities are constructed from setup events.
+//   - Identities are sorted in canonical order.
 func ProtocolStateFixture(options ...func(*flow.RichProtocolStateEntry)) *flow.RichProtocolStateEntry {
 	prevEpochSetup := EpochSetupFixture()
 	prevEpochCommit := EpochCommitFixture(func(commit *flow.EpochCommit) {
@@ -2607,6 +2612,10 @@ func ProtocolStateFixture(options ...func(*flow.RichProtocolStateEntry)) *flow.R
 }
 
 // WithNextEpochProtocolState creates a fixture with correctly structured data for next epoch.
+// The resulting Identity Table represents the common situation during the epoch commit phase for Epoch N+1:
+//   - We are currently in Epoch N.
+//   - The previous epoch N-1 is known (specifically EpochSetup and EpochCommit events).
+//   - The network has completed the epoch setup phase, i.e. published the EpochSetup and EpochCommit events for epoch N+1.
 func WithNextEpochProtocolState() func(entry *flow.RichProtocolStateEntry) {
 	return func(entry *flow.RichProtocolStateEntry) {
 		nextEpochSetup := EpochSetupFixture(func(setup *flow.EpochSetup) {
