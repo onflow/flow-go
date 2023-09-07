@@ -133,7 +133,7 @@ func runWithEngine(t *testing.T, f func(testingContext)) {
 
 	ctrl := gomock.NewController(t)
 
-	net := mocknetwork.NewMockNetwork(ctrl)
+	net := mocknetwork.NewMockEngineRegistry(ctrl)
 	request := module.NewMockRequester(ctrl)
 
 	// initialize the mocks and engine
@@ -1490,7 +1490,7 @@ func newIngestionEngine(t *testing.T, ps *mocks.ProtocolState, es *mockExecution
 	tracer, err := trace.NewTracer(log, "test", "test", trace.SensitivityCaptureAll)
 	require.NoError(t, err)
 	ctrl := gomock.NewController(t)
-	net := mocknetwork.NewMockNetwork(ctrl)
+	net := mocknetwork.NewMockEngineRegistry(ctrl)
 	request := module.NewMockRequester(ctrl)
 	var engine *Engine
 
