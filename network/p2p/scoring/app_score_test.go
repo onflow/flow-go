@@ -216,7 +216,7 @@ func TestFullGossipSubConnectivityAmongHonestNodesWithMaliciousMajority(t *testi
 		case <-ticker.C:
 			con1BlockTopicPeers := con1NodeTracer.GetMeshPeers(blockTopic.String())
 			for _, p := range con1BlockTopicPeers {
-				if p == con2Node.Host().ID() {
+				if p == con2Node.ID() {
 					con2HasCon1 = true
 					break // con1 has con2 in its mesh, break out of the current loop
 				}
@@ -224,7 +224,7 @@ func TestFullGossipSubConnectivityAmongHonestNodesWithMaliciousMajority(t *testi
 
 			con2BlockTopicPeers := con2NodeTracer.GetMeshPeers(blockTopic.String())
 			for _, p := range con2BlockTopicPeers {
-				if p == con1Node.Host().ID() {
+				if p == con1Node.ID() {
 					con1HasCon2 = true
 					break // con2 has con1 in its mesh, break out of the current loop
 				}

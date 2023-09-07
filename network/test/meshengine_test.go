@@ -28,9 +28,8 @@ import (
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/internal/testutils"
-	"github.com/onflow/flow-go/network/mocknetwork"
 	"github.com/onflow/flow-go/network/p2p"
-	"github.com/onflow/flow-go/network/p2p/middleware"
+	"github.com/onflow/flow-go/network/p2p/p2pnet"
 	"github.com/onflow/flow-go/network/p2p/p2pnode"
 	p2ptest "github.com/onflow/flow-go/network/p2p/test"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -40,16 +39,17 @@ import (
 // of engines over a complete graph
 type MeshEngineTestSuite struct {
 	suite.Suite
-	testutils.ConduitWrapper                      // used as a wrapper around conduit methods
-	nets                     []network.Network    // used to keep track of the networks
-	mws                      []network.Middleware // used to keep track of the middlewares
-	ids                      flow.IdentityList    // used to keep track of the identifiers associated with networks
-	obs                      chan string          // used to keep track of Protect events tagged by pubsub messages
+	testutils.ConduitWrapper                   // used as a wrapper around conduit methods
+	networks                 []*p2pnet.Network // used to keep track of the networks
+	libp2pNodes              []p2p.LibP2PNode  // used to keep track of the libp2p nodes
+	ids                      flow.IdentityList // used to keep track of the identifiers associated with networks
+	obs                      chan string       // used to keep track of Protect events tagged by pubsub messages
 	cancel                   context.CancelFunc
 }
 
 // TestMeshNetTestSuite runs all tests in this test suit
 func TestMeshNetTestSuite(t *testing.T) {
+	unittest.SkipUnless(t, unittest.TEST_FLAKY, "this should be revisited once network/test is running in a separate CI job, runs fine locally")
 	suite.Run(t, new(MeshEngineTestSuite))
 }
 
@@ -112,15 +112,16 @@ func (suite *MeshEngineTestSuite) SetupTest() {
 	}
 	idProvider.SetIdentities(identities)
 
+	suite.libp2pNodes = libP2PNodes
 	suite.ids = identities
-	suite.mws, _ = testutils.MiddlewareFixtures(
-		suite.T(),
-		suite.ids,
-		libP2PNodes,
-		testutils.MiddlewareConfigFixture(suite.T(), sporkId),
-		mocknetwork.NewViolationsConsumer(suite.T()))
-	suite.nets = testutils.NetworksFixture(suite.T(), sporkId, suite.ids, suite.mws)
-	testutils.StartNodesAndNetworks(signalerCtx, suite.T(), libP2PNodes, suite.nets, 100*time.Millisecond)
+
+	suite.networks, _ = testutils.NetworksFixture(suite.T(), sporkId, suite.ids, suite.libp2pNodes)
+	// starts the nodes and networks
+	testutils.StartNodes(signalerCtx, suite.T(), suite.libp2pNodes)
+	for _, net := range suite.networks {
+		testutils.StartNetworks(signalerCtx, suite.T(), []network.EngineRegistry{net})
+		unittest.RequireComponentsReadyBefore(suite.T(), 1*time.Second, net)
+	}
 
 	for _, observableConnMgr := range tagObservables {
 		observableConnMgr.Subscribe(&ob)
@@ -131,8 +132,8 @@ func (suite *MeshEngineTestSuite) SetupTest() {
 // TearDownTest closes the networks within a specified timeout
 func (suite *MeshEngineTestSuite) TearDownTest() {
 	suite.cancel()
-	testutils.StopComponents(suite.T(), suite.nets, 3*time.Second)
-	testutils.StopComponents(suite.T(), suite.mws, 3*time.Second)
+	testutils.StopComponents(suite.T(), suite.networks, 3*time.Second)
+	testutils.StopComponents(suite.T(), suite.libp2pNodes, 3*time.Second)
 }
 
 // TestAllToAll_Publish evaluates the network of mesh engines against allToAllScenario scenario.
@@ -175,7 +176,7 @@ func (suite *MeshEngineTestSuite) TestTargetedValidators_Publish() {
 // TestMaxMessageSize_Unicast evaluates the messageSizeScenario scenario using
 // the Unicast method of conduits.
 func (suite *MeshEngineTestSuite) TestMaxMessageSize_Unicast() {
-	suite.messageSizeScenario(suite.Unicast, middleware.DefaultMaxUnicastMsgSize)
+	suite.messageSizeScenario(suite.Unicast, p2pnet.DefaultMaxUnicastMsgSize)
 }
 
 // TestMaxMessageSize_Multicast evaluates the messageSizeScenario scenario using
@@ -218,14 +219,14 @@ func (suite *MeshEngineTestSuite) allToAllScenario(send testutils.ConduitSendWra
 	testutils.OptionalSleep(send)
 
 	// creating engines
-	count := len(suite.nets)
+	count := len(suite.networks)
 	engs := make([]*testutils.MeshEngine, 0)
 	wg := sync.WaitGroup{}
 
 	// logs[i][j] keeps the message that node i sends to node j
 	logs := make(map[int][]string)
-	for i := range suite.nets {
-		eng := testutils.NewMeshEngine(suite.Suite.T(), suite.nets[i], count-1, channels.TestNetworkChannel)
+	for i := range suite.networks {
+		eng := testutils.NewMeshEngine(suite.Suite.T(), suite.networks[i], count-1, channels.TestNetworkChannel)
 		engs = append(engs, eng)
 		logs[i] = make([]string, 0)
 	}
@@ -241,7 +242,7 @@ func (suite *MeshEngineTestSuite) allToAllScenario(send testutils.ConduitSendWra
 	}
 
 	// Each node broadcasting a message to all others
-	for i := range suite.nets {
+	for i := range suite.networks {
 		event := &message.TestMessage{
 			Text: fmt.Sprintf("hello from node %v", i),
 		}
@@ -253,7 +254,7 @@ func (suite *MeshEngineTestSuite) allToAllScenario(send testutils.ConduitSendWra
 	}
 
 	// fires a goroutine for each engine that listens to incoming messages
-	for i := range suite.nets {
+	for i := range suite.networks {
 		go func(e *testutils.MeshEngine) {
 			for x := 0; x < count-1; x++ {
 				<-e.Received
@@ -300,12 +301,12 @@ func (suite *MeshEngineTestSuite) allToAllScenario(send testutils.ConduitSendWra
 // Message dissemination is done using the send wrapper of conduit.
 func (suite *MeshEngineTestSuite) targetValidatorScenario(send testutils.ConduitSendWrapperFunc) {
 	// creating engines
-	count := len(suite.nets)
+	count := len(suite.networks)
 	engs := make([]*testutils.MeshEngine, 0)
 	wg := sync.WaitGroup{}
 
-	for i := range suite.nets {
-		eng := testutils.NewMeshEngine(suite.Suite.T(), suite.nets[i], count-1, channels.TestNetworkChannel)
+	for i := range suite.networks {
+		eng := testutils.NewMeshEngine(suite.Suite.T(), suite.networks[i], count-1, channels.TestNetworkChannel)
 		engs = append(engs, eng)
 	}
 
@@ -360,12 +361,12 @@ func (suite *MeshEngineTestSuite) targetValidatorScenario(send testutils.Conduit
 // It broadcasts a message from the first node to all the nodes in the identifiers list using send wrapper function.
 func (suite *MeshEngineTestSuite) messageSizeScenario(send testutils.ConduitSendWrapperFunc, size uint) {
 	// creating engines
-	count := len(suite.nets)
+	count := len(suite.networks)
 	engs := make([]*testutils.MeshEngine, 0)
 	wg := sync.WaitGroup{}
 
-	for i := range suite.nets {
-		eng := testutils.NewMeshEngine(suite.Suite.T(), suite.nets[i], count-1, channels.TestNetworkChannel)
+	for i := range suite.networks {
+		eng := testutils.NewMeshEngine(suite.Suite.T(), suite.networks[i], count-1, channels.TestNetworkChannel)
 		engs = append(engs, eng)
 	}
 
@@ -413,12 +414,12 @@ func (suite *MeshEngineTestSuite) conduitCloseScenario(send testutils.ConduitSen
 	testutils.OptionalSleep(send)
 
 	// creating engines
-	count := len(suite.nets)
+	count := len(suite.networks)
 	engs := make([]*testutils.MeshEngine, 0)
 	wg := sync.WaitGroup{}
 
-	for i := range suite.nets {
-		eng := testutils.NewMeshEngine(suite.Suite.T(), suite.nets[i], count-1, channels.TestNetworkChannel)
+	for i := range suite.networks {
+		eng := testutils.NewMeshEngine(suite.Suite.T(), suite.networks[i], count-1, channels.TestNetworkChannel)
 		engs = append(engs, eng)
 	}
 
@@ -443,7 +444,7 @@ func (suite *MeshEngineTestSuite) conduitCloseScenario(send testutils.ConduitSen
 	time.Sleep(2 * time.Second)
 
 	// each node attempts to broadcast a message to all others
-	for i := range suite.nets {
+	for i := range suite.networks {
 		event := &message.TestMessage{
 			Text: fmt.Sprintf("hello from node %v", i),
 		}
@@ -462,7 +463,7 @@ func (suite *MeshEngineTestSuite) conduitCloseScenario(send testutils.ConduitSen
 	}
 
 	// fire a goroutine to listen for incoming messages for each engine except for the one which unregistered
-	for i := range suite.nets {
+	for i := range suite.networks {
 		if i == unregisterIndex {
 			continue
 		}

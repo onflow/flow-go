@@ -46,7 +46,7 @@ func TestConnectionGating(t *testing.T) {
 			}
 			return nil
 		})))
-	idProvider.On("ByPeerID", node1.Host().ID()).Return(&node1Id, true).Maybe()
+	idProvider.On("ByPeerID", node1.ID()).Return(&node1Id, true).Maybe()
 
 	node2Peers := unittest.NewProtectedMap[peer.ID, struct{}]()
 	node2, node2Id := p2ptest.NodeFixture(
@@ -60,7 +60,7 @@ func TestConnectionGating(t *testing.T) {
 			}
 			return nil
 		})))
-	idProvider.On("ByPeerID", node2.Host().ID()).Return(&node2Id, true).Maybe()
+	idProvider.On("ByPeerID", node2.ID()).Return(&node2Id, true).Maybe()
 
 	nodes := []p2p.LibP2PNode{node1, node2}
 	ids := flow.IdentityList{&node1Id, &node2Id}
@@ -83,7 +83,7 @@ func TestConnectionGating(t *testing.T) {
 		// the connection gater on the listening node is checking the allow-list upon accepting the connection.
 
 		// add node2 to node1's allow list, but not the other way around.
-		node1Peers.Add(node2.Host().ID(), struct{}{})
+		node1Peers.Add(node2.ID(), struct{}{})
 
 		// from node2 -> node1 should also NOT work, since node 1 is not in node2's allow list for dialing!
 		p2pfixtures.EnsureNoStreamCreation(t, ctx, []p2p.LibP2PNode{node2}, []p2p.LibP2PNode{node1}, func(t *testing.T, err error) {
@@ -98,8 +98,8 @@ func TestConnectionGating(t *testing.T) {
 
 	t.Run("outbound connection to an approved node is allowed", func(t *testing.T) {
 		// adding both nodes to each other's allow lists.
-		node1Peers.Add(node2.Host().ID(), struct{}{})
-		node2Peers.Add(node1.Host().ID(), struct{}{})
+		node1Peers.Add(node2.ID(), struct{}{})
+		node2Peers.Add(node1.ID(), struct{}{})
 
 		// now both nodes should be able to connect to each other.
 		p2ptest.EnsureStreamCreationInBothDirections(t, ctx, []p2p.LibP2PNode{node1, node2})
@@ -130,11 +130,11 @@ func TestConnectionGating_ResourceAllocation_AllowListing(t *testing.T) {
 	// we expect the libp2p.identify service to be used to establish the connection.
 	node2Metrics.On("AllowService", "libp2p.identify").Return()
 	// we expect the node2 attaching node1 to the incoming connection.
-	node2Metrics.On("AllowPeer", node1.Host().ID()).Return()
+	node2Metrics.On("AllowPeer", node1.ID()).Return()
 	// we expect node2 allocate memory for the incoming connection.
 	node2Metrics.On("AllowMemory", mock.Anything)
 	// we expect node2 to allow the stream to be created.
-	node2Metrics.On("AllowStream", node1.Host().ID(), mock.Anything)
+	node2Metrics.On("AllowStream", node1.ID(), mock.Anything)
 	// we expect node2 to attach protocol to the created stream.
 	node2Metrics.On("AllowProtocol", mock.Anything).Return()
 
@@ -142,6 +142,13 @@ func TestConnectionGating_ResourceAllocation_AllowListing(t *testing.T) {
 	// We expect both of the following to be called as they are called together in the same function.
 	node2Metrics.On("InboundConnections", mock.Anything).Return()
 	node2Metrics.On("OutboundConnections", mock.Anything).Return()
+
+	// Libp2p control message validation metrics, these may or may not be called depending on the machine the test is running on and how long
+	// the nodes in the test run for.
+	node2Metrics.On("BlockingPreProcessingStarted", mock.Anything, mock.Anything).Maybe()
+	node2Metrics.On("BlockingPreProcessingFinished", mock.Anything, mock.Anything, mock.Anything).Maybe()
+	node2Metrics.On("AsyncProcessingStarted", mock.Anything).Maybe()
+	node2Metrics.On("AsyncProcessingFinished", mock.Anything, mock.Anything).Maybe()
 
 	// we create node2 with a connection gater that allows all connections and the mocked metrics collector.
 	node2, node2Id := p2ptest.NodeFixture(
@@ -156,8 +163,8 @@ func TestConnectionGating_ResourceAllocation_AllowListing(t *testing.T) {
 		p2ptest.WithConnectionGater(p2ptest.NewConnectionGater(idProvider, func(p peer.ID) error {
 			return nil // allow all connections.
 		})))
-	idProvider.On("ByPeerID", node1.Host().ID()).Return(&node1Id, true).Maybe()
-	idProvider.On("ByPeerID", node2.Host().ID()).Return(&node2Id, true).Maybe()
+	idProvider.On("ByPeerID", node1.ID()).Return(&node1Id, true).Maybe()
+	idProvider.On("ByPeerID", node2.ID()).Return(&node2Id, true).Maybe()
 
 	nodes := []p2p.LibP2PNode{node1, node2}
 	ids := flow.IdentityList{&node1Id, &node2Id}
@@ -201,8 +208,8 @@ func TestConnectionGating_ResourceAllocation_DisAllowListing(t *testing.T) {
 		p2ptest.WithConnectionGater(p2ptest.NewConnectionGater(idProvider, func(p peer.ID) error {
 			return fmt.Errorf("disallowed connection") // rejecting all connections.
 		})))
-	idProvider.On("ByPeerID", node1.Host().ID()).Return(&node1Id, true).Maybe()
-	idProvider.On("ByPeerID", node2.Host().ID()).Return(&node2Id, true).Maybe()
+	idProvider.On("ByPeerID", node1.ID()).Return(&node1Id, true).Maybe()
+	idProvider.On("ByPeerID", node2.ID()).Return(&node2Id, true).Maybe()
 
 	nodes := []p2p.LibP2PNode{node1, node2}
 	ids := flow.IdentityList{&node1Id, &node2Id}
@@ -265,10 +272,10 @@ func TestConnectionGater_InterceptUpgrade(t *testing.T) {
 				return list
 			}),
 			p2ptest.WithConnectionGater(connectionGater))
-		idProvider.On("ByPeerID", node.Host().ID()).Return(&id, true).Maybe()
+		idProvider.On("ByPeerID", node.ID()).Return(&id, true).Maybe()
 		nodes = append(nodes, node)
 		identities = append(identities, &id)
-		allPeerIds = append(allPeerIds, node.Host().ID())
+		allPeerIds = append(allPeerIds, node.ID())
 		inbounds = append(inbounds, inbound)
 	}
 
@@ -286,7 +293,7 @@ func TestConnectionGater_InterceptUpgrade(t *testing.T) {
 	connectionGater.On("InterceptAccept", mock.Anything).Return(true)
 
 	// adds first node to disallowed list
-	disallowedPeerIds.Add(nodes[0].Host().ID(), struct{}{})
+	disallowedPeerIds.Add(nodes[0].ID(), struct{}{})
 
 	// starts the nodes
 	p2ptest.StartNodes(t, signalerCtx, nodes)
@@ -362,7 +369,7 @@ func TestConnectionGater_Disallow_Integration(t *testing.T) {
 					return nil
 				})
 			})))
-		idProvider.On("ByPeerID", node.Host().ID()).Return(&id, true).Maybe()
+		idProvider.On("ByPeerID", node.ID()).Return(&id, true).Maybe()
 
 		nodes = append(nodes, node)
 		ids = append(ids, &id)

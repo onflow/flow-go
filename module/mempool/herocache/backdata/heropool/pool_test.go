@@ -380,17 +380,17 @@ func testInvalidatingHead(t *testing.T, pool *Pool, entities []*unittest.MockEnt
 		// size of list should be decremented after each invalidation.
 		require.Equal(t, uint32(totalEntitiesStored-i-1), pool.Size())
 		// invalidated head should be appended to free entities
-		require.Equal(t, pool.free.tail, EIndex(i))
+		require.Equal(t, pool.states[stateFree].tail, EIndex(i))
 
 		if freeListInitialSize != 0 {
 			// number of entities is below limit, hence free list is not empty.
 			// invalidating used head must not change the free head.
-			require.Equal(t, EIndex(totalEntitiesStored), pool.free.head)
+			require.Equal(t, EIndex(totalEntitiesStored), pool.states[stateFree].head)
 		} else {
 			// number of entities is greater than or equal to limit, hence free list is empty.
 			// free head must be updated to the first invalidated head (index 0),
 			// and must be kept there for entire test (as we invalidate head not tail).
-			require.Equal(t, EIndex(0), pool.free.head)
+			require.Equal(t, EIndex(0), pool.states[stateFree].head)
 		}
 
 		// except when the list is empty, head must be updated after invalidation,
@@ -399,14 +399,14 @@ func testInvalidatingHead(t *testing.T, pool *Pool, entities []*unittest.MockEnt
 		if i != totalEntitiesStored-1 {
 			// used linked-list
 			tailAccessibleFromHead(t,
-				pool.used.head,
-				pool.used.tail,
+				pool.states[stateUsed].head,
+				pool.states[stateUsed].tail,
 				pool,
 				pool.Size())
 
 			headAccessibleFromTail(t,
-				pool.used.head,
-				pool.used.tail,
+				pool.states[stateUsed].head,
+				pool.states[stateUsed].tail,
 				pool,
 				pool.Size())
 
@@ -414,14 +414,14 @@ func testInvalidatingHead(t *testing.T, pool *Pool, entities []*unittest.MockEnt
 			//
 			// after invalidating each item, size of free linked-list is incremented by one.
 			tailAccessibleFromHead(t,
-				pool.free.head,
-				pool.free.tail,
+				pool.states[stateFree].head,
+				pool.states[stateFree].tail,
 				pool,
 				uint32(i+1+freeListInitialSize))
 
 			headAccessibleFromTail(t,
-				pool.free.head,
-				pool.free.tail,
+				pool.states[stateFree].head,
+				pool.states[stateFree].tail,
 				pool,
 				uint32(i+1+freeListInitialSize))
 		}
@@ -435,21 +435,21 @@ func testInvalidatingHead(t *testing.T, pool *Pool, entities []*unittest.MockEnt
 			// used tail should point to the last element in pool, since we are
 			// invalidating head.
 			require.Equal(t, entities[totalEntitiesStored-1].ID(), usedTail.id)
-			require.Equal(t, EIndex(totalEntitiesStored-1), pool.used.tail)
+			require.Equal(t, EIndex(totalEntitiesStored-1), pool.states[stateUsed].tail)
 
 			// used head must point to the next element in the pool,
 			// i.e., invalidating head moves it forward.
 			require.Equal(t, entities[i+1].ID(), usedHead.id)
-			require.Equal(t, EIndex(i+1), pool.used.head)
+			require.Equal(t, EIndex(i+1), pool.states[stateUsed].head)
 		} else {
 			// pool is empty
 			// used head and tail must be nil and their corresponding
 			// pointer indices must be undefined.
 			require.Nil(t, usedHead)
 			require.Nil(t, usedTail)
-			require.True(t, pool.used.size == 0)
-			require.Equal(t, pool.used.tail, InvalidIndex)
-			require.Equal(t, pool.used.head, InvalidIndex)
+			require.True(t, pool.states[stateUsed].size == 0)
+			require.Equal(t, pool.states[stateUsed].tail, InvalidIndex)
+			require.Equal(t, pool.states[stateUsed].head, InvalidIndex)
 		}
 		checkEachEntityIsInFreeOrUsedState(t, pool)
 	}
@@ -461,25 +461,25 @@ func testInvalidatingTail(t *testing.T, pool *Pool, entities []*unittest.MockEnt
 	offset := len(pool.poolEntities) - size
 	for i := 0; i < size; i++ {
 		// invalidates tail index
-		tailIndex := pool.used.tail
+		tailIndex := pool.states[stateUsed].tail
 		require.Equal(t, EIndex(size-1-i), tailIndex)
 
 		pool.invalidateEntityAtIndex(tailIndex)
 		// old head index must be invalidated
 		require.True(t, pool.isInvalidated(tailIndex))
 		// unclaimed head should be appended to free entities
-		require.Equal(t, pool.free.tail, tailIndex)
+		require.Equal(t, pool.states[stateFree].tail, tailIndex)
 
 		if offset != 0 {
 			// number of entities is below limit
 			// free must head keeps pointing to first empty index after
 			// adding all entities.
-			require.Equal(t, EIndex(size), pool.free.head)
+			require.Equal(t, EIndex(size), pool.states[stateFree].head)
 		} else {
 			// number of entities is greater than or equal to limit
 			// free head must be updated to last element in the pool (size - 1),
 			// and must be kept there for entire test (as we invalidate tail not head).
-			require.Equal(t, EIndex(size-1), pool.free.head)
+			require.Equal(t, EIndex(size-1), pool.states[stateFree].head)
 		}
 
 		// size of pool should be shrunk after each invalidation.
@@ -492,27 +492,27 @@ func testInvalidatingTail(t *testing.T, pool *Pool, entities []*unittest.MockEnt
 
 			// used linked-list
 			tailAccessibleFromHead(t,
-				pool.used.head,
-				pool.used.tail,
+				pool.states[stateUsed].head,
+				pool.states[stateUsed].tail,
 				pool,
 				pool.Size())
 
 			headAccessibleFromTail(t,
-				pool.used.head,
-				pool.used.tail,
+				pool.states[stateUsed].head,
+				pool.states[stateUsed].tail,
 				pool,
 				pool.Size())
 
 			// free linked-list
 			tailAccessibleFromHead(t,
-				pool.free.head,
-				pool.free.tail,
+				pool.states[stateFree].head,
+				pool.states[stateFree].tail,
 				pool,
 				uint32(i+1+offset))
 
 			headAccessibleFromTail(t,
-				pool.free.head,
-				pool.free.tail,
+				pool.states[stateFree].head,
+				pool.states[stateFree].tail,
 				pool,
 				uint32(i+1+offset))
 		}
@@ -524,20 +524,20 @@ func testInvalidatingTail(t *testing.T, pool *Pool, entities []*unittest.MockEnt
 			//
 			// used tail should move backward after each invalidation
 			require.Equal(t, entities[size-i-2].ID(), usedTail.id)
-			require.Equal(t, EIndex(size-i-2), pool.used.tail)
+			require.Equal(t, EIndex(size-i-2), pool.states[stateUsed].tail)
 
 			// used head must point to the first element in the pool,
 			require.Equal(t, entities[0].ID(), usedHead.id)
-			require.Equal(t, EIndex(0), pool.used.head)
+			require.Equal(t, EIndex(0), pool.states[stateUsed].head)
 		} else {
 			// pool is empty
 			// used head and tail must be nil and their corresponding
 			// pointer indices must be undefined.
 			require.Nil(t, usedHead)
 			require.Nil(t, usedTail)
-			require.True(t, pool.used.size == 0)
-			require.Equal(t, pool.used.head, InvalidIndex)
-			require.Equal(t, pool.used.tail, InvalidIndex)
+			require.True(t, pool.states[stateUsed].size == 0)
+			require.Equal(t, pool.states[stateUsed].head, InvalidIndex)
+			require.Equal(t, pool.states[stateUsed].tail, InvalidIndex)
 		}
 		checkEachEntityIsInFreeOrUsedState(t, pool)
 	}
@@ -546,14 +546,14 @@ func testInvalidatingTail(t *testing.T, pool *Pool, entities []*unittest.MockEnt
 // testInitialization evaluates the state of an initialized pool before adding any element to it.
 func testInitialization(t *testing.T, pool *Pool, _ []*unittest.MockEntity) {
 	// "used" linked-list must have a zero size, since we have no elements in the list.
-	require.True(t, pool.used.size == 0)
-	require.Equal(t, pool.used.head, InvalidIndex)
-	require.Equal(t, pool.used.tail, InvalidIndex)
+	require.True(t, pool.states[stateUsed].size == 0)
+	require.Equal(t, pool.states[stateUsed].head, InvalidIndex)
+	require.Equal(t, pool.states[stateUsed].tail, InvalidIndex)
 
 	for i := 0; i < len(pool.poolEntities); i++ {
 		if i == 0 {
 			// head of "free" linked-list should point to InvalidIndex of entities slice.
-			require.Equal(t, EIndex(i), pool.free.head)
+			require.Equal(t, EIndex(i), pool.states[stateFree].head)
 			// previous element of head must be undefined (linked-list head feature).
 			require.Equal(t, pool.poolEntities[i].node.prev, InvalidIndex)
 		}
@@ -570,7 +570,7 @@ func testInitialization(t *testing.T, pool *Pool, _ []*unittest.MockEntity) {
 
 		if i == len(pool.poolEntities)-1 {
 			// tail of "free" linked-list should point to the last index in entities slice.
-			require.Equal(t, EIndex(i), pool.free.tail)
+			require.Equal(t, EIndex(i), pool.states[stateFree].tail)
 			// next element of tail must be undefined.
 			require.Equal(t, pool.poolEntities[i].node.next, InvalidIndex)
 		}
@@ -690,7 +690,7 @@ func testAddingEntities(t *testing.T, pool *Pool, entitiesToBeAdded []*unittest.
 		if i < len(pool.poolEntities)-1 {
 			// as long as we are below limit, after adding i element, free head
 			// should move to i+1 element.
-			require.Equal(t, EIndex(i+1), pool.free.head)
+			require.Equal(t, EIndex(i+1), pool.states[stateFree].head)
 			// head must be healthy and point back to undefined.
 			require.Equal(t, freeHead.node.prev, InvalidIndex)
 		} else {
@@ -706,7 +706,7 @@ func testAddingEntities(t *testing.T, pool *Pool, entitiesToBeAdded []*unittest.
 			// must keep pointing to last index of the array-based linked-list. In other
 			// words, adding element must not change free tail (since only free head is
 			// updated).
-			require.Equal(t, EIndex(len(pool.poolEntities)-1), pool.free.tail)
+			require.Equal(t, EIndex(len(pool.poolEntities)-1), pool.states[stateFree].tail)
 			// head tail be healthy and point next to undefined.
 			require.Equal(t, freeTail.node.next, InvalidIndex)
 		} else {
@@ -726,13 +726,13 @@ func testAddingEntities(t *testing.T, pool *Pool, entitiesToBeAdded []*unittest.
 			usedTraverseStep = uint32(len(pool.poolEntities))
 		}
 		tailAccessibleFromHead(t,
-			pool.used.head,
-			pool.used.tail,
+			pool.states[stateUsed].head,
+			pool.states[stateUsed].tail,
 			pool,
 			usedTraverseStep)
 		headAccessibleFromTail(t,
-			pool.used.head,
-			pool.used.tail,
+			pool.states[stateUsed].head,
+			pool.states[stateUsed].tail,
 			pool,
 			usedTraverseStep)
 
@@ -750,13 +750,13 @@ func testAddingEntities(t *testing.T, pool *Pool, entitiesToBeAdded []*unittest.
 			freeTraverseStep = uint32(0)
 		}
 		tailAccessibleFromHead(t,
-			pool.free.head,
-			pool.free.tail,
+			pool.states[stateFree].head,
+			pool.states[stateFree].tail,
 			pool,
 			freeTraverseStep)
 		headAccessibleFromTail(t,
-			pool.free.head,
-			pool.free.tail,
+			pool.states[stateFree].head,
+			pool.states[stateFree].tail,
 			pool,
 			freeTraverseStep)
 
@@ -804,7 +804,7 @@ func withTestScenario(t *testing.T,
 	pool := NewHeroPool(limit, ejectionMode, unittest.Logger())
 
 	// head on underlying linked-list value should be uninitialized
-	require.True(t, pool.used.size == 0)
+	require.True(t, pool.states[stateUsed].size == 0)
 	require.Equal(t, pool.Size(), uint32(0))
 
 	entities := unittest.EntityListFixture(uint(entityCount))
@@ -857,7 +857,7 @@ func headAccessibleFromTail(t *testing.T, headSliceIndex EIndex, tailSliceIndex 
 func checkEachEntityIsInFreeOrUsedState(t *testing.T, pool *Pool) {
 	pool_capacity := len(pool.poolEntities)
 	// check size
-	require.Equal(t, int(pool.free.size+pool.used.size), pool_capacity, "Pool capacity is not equal to the sum of used and free sizes")
+	require.Equal(t, int(pool.states[stateFree].size+pool.states[stateUsed].size), pool_capacity, "Pool capacity is not equal to the sum of used and free sizes")
 	// check elelments
 	nodesInFree := discoverEntitiesBelongingToStateList(t, pool, stateFree)
 	nodesInUsed := discoverEntitiesBelongingToStateList(t, pool, stateUsed)
@@ -868,18 +868,9 @@ func checkEachEntityIsInFreeOrUsedState(t *testing.T, pool *Pool) {
 }
 
 // discoverEntitiesBelongingToStateList discovers all entities in the pool that belong to the given list.
-func discoverEntitiesBelongingToStateList(t *testing.T, pool *Pool, stateType StateType) []bool {
-	var s *state = nil
-	switch stateType {
-	case stateFree:
-		s = &pool.free
-	case stateUsed:
-		s = &pool.used
-	default:
-		panic(fmt.Sprintf("unknown state type: %s", stateType))
-	}
+func discoverEntitiesBelongingToStateList(t *testing.T, pool *Pool, stateType StateIndex) []bool {
 	result := make([]bool, len(pool.poolEntities))
-	for node_index := s.head; node_index != InvalidIndex; {
+	for node_index := pool.states[stateType].head; node_index != InvalidIndex; {
 		require.False(t, result[node_index], "A node is present two times in the same state list")
 		result[node_index] = true
 		node_index = pool.poolEntities[node_index].node.next

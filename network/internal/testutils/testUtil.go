@@ -18,7 +18,6 @@ import (
 	"github.com/onflow/flow-go/model/flow/filter"
 	libp2pmessage "github.com/onflow/flow-go/model/libp2p/message"
 	"github.com/onflow/flow-go/module"
-	"github.com/onflow/flow-go/module/id"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/mock"
@@ -26,14 +25,13 @@ import (
 	"github.com/onflow/flow-go/network"
 	alspmgr "github.com/onflow/flow-go/network/alsp/manager"
 	netcache "github.com/onflow/flow-go/network/cache"
-	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/codec/cbor"
+	"github.com/onflow/flow-go/network/mocknetwork"
 	"github.com/onflow/flow-go/network/netconf"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/conduit"
 	"github.com/onflow/flow-go/network/p2p/connection"
-	"github.com/onflow/flow-go/network/p2p/middleware"
-	"github.com/onflow/flow-go/network/p2p/subscription"
+	"github.com/onflow/flow-go/network/p2p/p2pnet"
 	p2ptest "github.com/onflow/flow-go/network/p2p/test"
 	"github.com/onflow/flow-go/network/p2p/translator"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -111,9 +109,9 @@ func NewTagWatchingConnManager(log zerolog.Logger, metrics module.LibP2PConnecti
 	}, nil
 }
 
-// LibP2PNodeForMiddlewareFixture is a test helper that generate flow identities with a valid port and libp2p nodes.
-// Note that the LibP2PNode created by this fixture is meant to be used with a middleware component.
-// If you want to create a standalone LibP2PNode without network and middleware components, please use p2ptest.NodeFixture.
+// LibP2PNodeForNetworkFixture is a test helper that generate flow identities with a valid port and libp2p nodes.
+// Note that the LibP2PNode created by this fixture is meant to used with a network component.
+// If you want to create a standalone LibP2PNode without network component, please use p2ptest.NodeFixture.
 // Args:
 //
 //	t: testing.T- the test object
@@ -126,7 +124,8 @@ func NewTagWatchingConnManager(log zerolog.Logger, metrics module.LibP2PConnecti
 //	flow.IdentityList - list of identities created for the nodes, one for each node.
 //
 // []p2p.LibP2PNode - list of libp2p nodes created.
-func LibP2PNodeForMiddlewareFixture(t *testing.T, sporkId flow.Identifier, n int, opts ...p2ptest.NodeFixtureParameterOption) (flow.IdentityList, []p2p.LibP2PNode) {
+// TODO: several test cases only need a single node, consider encapsulating this function in a single node fixture.
+func LibP2PNodeForNetworkFixture(t *testing.T, sporkId flow.Identifier, n int, opts ...p2ptest.NodeFixtureParameterOption) (flow.IdentityList, []p2p.LibP2PNode) {
 	libP2PNodes := make([]p2p.LibP2PNode, 0)
 	identities := make(flow.IdentityList, 0)
 	idProvider := unittest.NewUpdatableIDProvider(flow.IdentityList{})
@@ -145,78 +144,42 @@ func LibP2PNodeForMiddlewareFixture(t *testing.T, sporkId flow.Identifier, n int
 	return identities, libP2PNodes
 }
 
-// MiddlewareConfigFixture is a test helper that generates a middleware config for testing.
-// Args:
-// - t: the test instance.
-// Returns:
-// - a middleware config.
-func MiddlewareConfigFixture(t *testing.T, sporkId flow.Identifier) *middleware.Config {
-	return &middleware.Config{
-		Logger:                unittest.Logger(),
-		BitSwapMetrics:        metrics.NewNoopCollector(),
-		SporkId:               sporkId,
-		UnicastMessageTimeout: middleware.DefaultUnicastTimeout,
-		Codec:                 unittest.NetworkCodec(),
-	}
-}
-
-// MiddlewareFixtures is a test helper that generates middlewares with the given identities and libp2p nodes.
-// It also generates a list of UpdatableIDProvider that can be used to update the identities of the middlewares.
-// The number of identities and libp2p nodes must be the same.
-// Args:
-// - identities: a list of flow identities that correspond to the libp2p nodes.
-// - libP2PNodes: a list of libp2p nodes that correspond to the identities.
-// - cfg: the middleware config.
-// - opts: a list of middleware option functions.
-// Returns:
-// - a list of middlewares - one for each identity.
-// - a list of UpdatableIDProvider - one for each identity.
-func MiddlewareFixtures(t *testing.T, identities flow.IdentityList, libP2PNodes []p2p.LibP2PNode, cfg *middleware.Config, consumer network.ViolationsConsumer, opts ...middleware.OptionFn) ([]network.Middleware, []*unittest.UpdatableIDProvider) {
-	require.Equal(t, len(identities), len(libP2PNodes))
-
-	mws := make([]network.Middleware, len(identities))
-	idProviders := make([]*unittest.UpdatableIDProvider, len(identities))
-
-	for i := 0; i < len(identities); i++ {
-		i := i
-		cfg.Libp2pNode = libP2PNodes[i]
-		cfg.FlowId = identities[i].NodeID
-		idProviders[i] = unittest.NewUpdatableIDProvider(identities)
-		cfg.IdTranslator = translator.NewIdentityProviderIDTranslator(idProviders[i])
-		mws[i] = middleware.NewMiddleware(cfg, opts...)
-		mws[i].SetSlashingViolationsConsumer(consumer)
-	}
-	return mws, idProviders
-}
-
-// NetworksFixture generates the network for the given middlewares
+// NetworksFixture generates the network for the given libp2p nodes.
 func NetworksFixture(t *testing.T,
 	sporkId flow.Identifier,
 	ids flow.IdentityList,
-	mws []network.Middleware) []network.Network {
+	libp2pNodes []p2p.LibP2PNode,
+	configOpts ...func(*p2pnet.NetworkConfig)) ([]*p2pnet.Network, []*unittest.UpdatableIDProvider) {
 
 	count := len(ids)
-	nets := make([]network.Network, 0)
+	nets := make([]*p2pnet.Network, 0)
+	idProviders := make([]*unittest.UpdatableIDProvider, 0)
 
 	for i := 0; i < count; i++ {
+		idProvider := unittest.NewUpdatableIDProvider(ids)
+		params := NetworkConfigFixture(t, *ids[i], idProvider, sporkId, libp2pNodes[i])
 
-		params := NetworkConfigFixture(t, *ids[i], ids, sporkId, mws[i])
-		net, err := p2p.NewNetwork(params)
+		for _, opt := range configOpts {
+			opt(params)
+		}
+
+		net, err := p2pnet.NewNetwork(params)
 		require.NoError(t, err)
 
 		nets = append(nets, net)
+		idProviders = append(idProviders, idProvider)
 	}
 
-	return nets
+	return nets, idProviders
 }
 
 func NetworkConfigFixture(
 	t *testing.T,
 	myId flow.Identity,
-	allIds flow.IdentityList,
+	idProvider module.IdentityProvider,
 	sporkId flow.Identifier,
-	mw network.Middleware,
-	opts ...p2p.NetworkConfigOption) *p2p.NetworkConfig {
+	libp2pNode p2p.LibP2PNode,
+	opts ...p2pnet.NetworkConfigOption) *p2pnet.NetworkConfig {
 
 	me := mock.NewLocal(t)
 	me.On("NodeID").Return(myId.NodeID).Maybe()
@@ -230,19 +193,20 @@ func NetworkConfigFixture(
 		defaultFlowConfig.NetworkConfig.NetworkReceivedMessageCacheSize,
 		unittest.Logger(),
 		metrics.NewNoopCollector())
-	subMgr := subscription.NewChannelSubscriptionManager(mw)
-	params := &p2p.NetworkConfig{
-		Logger:              unittest.Logger(),
-		Codec:               unittest.NetworkCodec(),
-		Me:                  me,
-		MiddlewareFactory:   func() (network.Middleware, error) { return mw, nil },
-		Topology:            unittest.NetworkTopology(),
-		SubscriptionManager: subMgr,
-		Metrics:             metrics.NewNoopCollector(),
-		IdentityProvider:    id.NewFixedIdentityProvider(allIds),
-		ReceiveCache:        receiveCache,
-		ConduitFactory:      conduit.NewDefaultConduitFactory(),
-		SporkId:             sporkId,
+	params := &p2pnet.NetworkConfig{
+		Logger:                unittest.Logger(),
+		Codec:                 unittest.NetworkCodec(),
+		Libp2pNode:            libp2pNode,
+		Me:                    me,
+		BitSwapMetrics:        metrics.NewNoopCollector(),
+		Topology:              unittest.NetworkTopology(),
+		Metrics:               metrics.NewNoopCollector(),
+		IdentityProvider:      idProvider,
+		ReceiveCache:          receiveCache,
+		ConduitFactory:        conduit.NewDefaultConduitFactory(),
+		SporkId:               sporkId,
+		UnicastMessageTimeout: p2pnet.DefaultUnicastTimeout,
+		IdentityTranslator:    translator.NewIdentityProviderIDTranslator(idProvider),
 		AlspCfg: &alspmgr.MisbehaviorReportManagerConfig{
 			Logger:                  unittest.Logger(),
 			SpamRecordCacheSize:     defaultFlowConfig.NetworkConfig.AlspConfig.SpamRecordCacheSize,
@@ -251,6 +215,9 @@ func NetworkConfigFixture(
 			AlspMetrics:             metrics.NewNoopCollector(),
 			HeroCacheMetricsFactory: metrics.NewNoopHeroCacheMetricsFactory(),
 		},
+		SlashingViolationConsumerFactory: func(_ network.ConduitAdapter) network.ViolationsConsumer {
+			return mocknetwork.NewViolationsConsumer(t)
+		},
 	}
 
 	for _, opt := range opts {
@@ -258,17 +225,6 @@ func NetworkConfigFixture(
 	}
 
 	return params
-}
-
-// GenerateEngines generates MeshEngines for the given networks
-func GenerateEngines(t *testing.T, nets []network.Network) []*MeshEngine {
-	count := len(nets)
-	engs := make([]*MeshEngine, count)
-	for i, n := range nets {
-		eng := NewMeshEngine(t, n, 100, channels.TestNetworkChannel)
-		engs[i] = eng
-	}
-	return engs
 }
 
 // StartNodesAndNetworks starts the provided networks and libp2p nodes, returning the irrecoverable error channel.
@@ -280,11 +236,11 @@ func GenerateEngines(t *testing.T, nets []network.Network) []*MeshEngine {
 // - timeout: the timeout to use for waiting for the nodes and networks to start.
 //
 // This function fails the test if the nodes or networks do not start within the given timeout.
-func StartNodesAndNetworks(ctx irrecoverable.SignalerContext, t *testing.T, nodes []p2p.LibP2PNode, nets []network.Network, timeout time.Duration) {
-	StartNetworks(ctx, t, nets, timeout)
+func StartNodesAndNetworks(ctx irrecoverable.SignalerContext, t *testing.T, nodes []p2p.LibP2PNode, nets []network.EngineRegistry) {
+	StartNetworks(ctx, t, nets)
 
 	// start up nodes and Peer managers
-	StartNodes(ctx, t, nodes, timeout)
+	StartNodes(ctx, t, nodes)
 }
 
 // StartNetworks starts the provided networks using the provided irrecoverable context
@@ -295,23 +251,22 @@ func StartNodesAndNetworks(ctx irrecoverable.SignalerContext, t *testing.T, node
 // - duration: the timeout to use for waiting for the networks to start.
 //
 // This function fails the test if the networks do not start within the given timeout.
-func StartNetworks(ctx irrecoverable.SignalerContext, t *testing.T, nets []network.Network, duration time.Duration) {
-	// start up networks (this will implicitly start middlewares)
+func StartNetworks(ctx irrecoverable.SignalerContext, t *testing.T, nets []network.EngineRegistry) {
 	for _, net := range nets {
 		net.Start(ctx)
-		unittest.RequireComponentsReadyBefore(t, duration, net)
+		unittest.RequireComponentsReadyBefore(t, 5*time.Second, net)
 	}
 }
 
 // StartNodes starts the provided nodes and their peer managers using the provided irrecoverable context
-func StartNodes(ctx irrecoverable.SignalerContext, t *testing.T, nodes []p2p.LibP2PNode, duration time.Duration) {
+func StartNodes(ctx irrecoverable.SignalerContext, t *testing.T, nodes []p2p.LibP2PNode) {
 	for _, node := range nodes {
 		node.Start(ctx)
-		unittest.RequireComponentsReadyBefore(t, duration, node)
+		unittest.RequireComponentsReadyBefore(t, 5*time.Second, node)
 
 		pm := node.PeerManagerComponent()
 		pm.Start(ctx)
-		unittest.RequireComponentsReadyBefore(t, duration, pm)
+		unittest.RequireComponentsReadyBefore(t, 5*time.Second, pm)
 	}
 }
 
