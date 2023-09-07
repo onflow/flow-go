@@ -163,6 +163,7 @@ type BaseConfig struct {
 	debugLogLimit               uint32
 	metricsPort                 uint
 	BootstrapDir                string
+	NumCompactors               uint
 	profilerConfig              profiler.ProfilerConfig
 	tracerEnabled               bool
 	tracerSensitivity           uint
@@ -354,6 +355,7 @@ func DefaultBaseConfig() *BaseConfig {
 		AdminMaxMsgSize:  grpcutils.DefaultMaxMsgSize,
 		BindAddr:         NotSet,
 		BootstrapDir:     "bootstrap",
+		NumCompactors:    2,
 		datadir:          datadir,
 		secretsdir:       NotSet,
 		secretsDBEnabled: true,
