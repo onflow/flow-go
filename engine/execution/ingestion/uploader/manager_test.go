@@ -28,6 +28,7 @@ func TestManagerSetEnabled(t *testing.T) {
 
 func TestManagerUploadsWithAllUploaders(t *testing.T) {
 	result := executionUnittest.ComputationResultFixture(
+		t,
 		flow.ZeroID,
 		[][]flow.Identifier{
 			{flow.ZeroID},
