@@ -63,19 +63,52 @@ func TestErrRateLimitedControlMsgRoundTrip(t *testing.T) {
 	assert.False(t, IsErrRateLimitedControlMsg(dummyErr), "IsErrRateLimitedControlMsg should return false for non-ErrRateLimitedControlMsg error")
 }
 
-// TestErrDuplicateTopicRoundTrip ensures correct error formatting for ErrDuplicateTopic.
+// TestErrDuplicateTopicRoundTrip ensures correct error formatting for DuplicateFoundErr.
 func TestErrDuplicateTopicRoundTrip(t *testing.T) {
 	topic := channels.Topic("topic")
-	err := NewDuplicateTopicErr(topic)
+	e := fmt.Errorf("duplicate topic found: %s", topic.String())
+	err := NewDuplicateFoundErr(e)
 
 	// tests the error message formatting.
-	expectedErrMsg := fmt.Errorf("duplicate topic %s", topic).Error()
+	expectedErrMsg := e.Error()
 	assert.Equal(t, expectedErrMsg, err.Error(), "the error message should be correctly formatted")
 
-	// tests the IsErrDuplicateTopic function.
-	assert.True(t, IsErrDuplicateTopic(err), "IsErrDuplicateTopic should return true for ErrDuplicateTopic error")
+	// tests the IsDuplicateFoundErr function.
+	assert.True(t, IsDuplicateFoundErr(err), "IsDuplicateFoundErr should return true for DuplicateFoundErr error")
 
-	// test IsErrDuplicateTopic with a different error type.
+	// test IsDuplicateFoundErr with a different error type.
 	dummyErr := fmt.Errorf("dummy error")
-	assert.False(t, IsErrDuplicateTopic(dummyErr), "IsErrDuplicateTopic should return false for non-ErrDuplicateTopic error")
+	assert.False(t, IsDuplicateFoundErr(dummyErr), "IsDuplicateFoundErr should return false for non-DuplicateFoundErr error")
+}
+
+// TestIWantCacheMissThresholdErrRoundTrip ensures correct error formatting for IWantCacheMissThresholdErr.
+func TestIWantCacheMissThresholdErrRoundTrip(t *testing.T) {
+	err := NewIWantCacheMissThresholdErr(5, 10, .4)
+
+	// tests the error message formatting.
+	expectedErrMsg := "5/10 iWant cache misses exceeds the allowed threshold: 0.400000"
+	assert.Equal(t, expectedErrMsg, err.Error(), "the error message should be correctly formatted")
+
+	// tests the IsIWantCacheMissThresholdErr function.
+	assert.True(t, IsIWantCacheMissThresholdErr(err), "IsIWantCacheMissThresholdErr should return true for IWantCacheMissThresholdErr error")
+
+	// test IsIWantCacheMissThresholdErr with a different error type.
+	dummyErr := fmt.Errorf("dummy error")
+	assert.False(t, IsIWantCacheMissThresholdErr(dummyErr), "IsIWantCacheMissThresholdErr should return false for non-IWantCacheMissThresholdErr error")
+}
+
+// TestIWantDuplicateMsgIDThresholdErrRoundTrip ensures correct error formatting for IWantDuplicateMsgIDThresholdErr.
+func TestIWantDuplicateMsgIDThresholdErrRoundTrip(t *testing.T) {
+	err := NewIWantDuplicateMsgIDThresholdErr(5, 10, .4)
+
+	// tests the error message formatting.
+	expectedErrMsg := "5/10 iWant duplicate message ids exceeds the allowed threshold: 0.400000"
+	assert.Equal(t, expectedErrMsg, err.Error(), "the error message should be correctly formatted")
+
+	// tests the IsIWantDuplicateMsgIDThresholdErr function.
+	assert.True(t, IsIWantDuplicateMsgIDThresholdErr(err), "IsIWantDuplicateMsgIDThresholdErr should return true for IWantDuplicateMsgIDThresholdErr error")
+
+	// test IsDuplicateFoundErr with a different error type.
+	dummyErr := fmt.Errorf("dummy error")
+	assert.False(t, IsIWantDuplicateMsgIDThresholdErr(dummyErr), "IsIWantDuplicateMsgIDThresholdErr should return false for non-IWantDuplicateMsgIDThresholdErr error")
 }
