@@ -78,8 +78,8 @@ func scanCheckpoint(checkpoint string, trieIndex int, log zerolog.Logger) (resul
 	}
 
 	log.Info().
-	    Int("total_tries", len(tries)).
-	    Msg("checkpoint loaded")
+		Int("total_tries", len(tries)).
+		Msg("checkpoint loaded")
 
 	t, err := readTrie(tries, trieIndex)
 	if err != nil {
