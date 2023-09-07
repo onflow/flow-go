@@ -16,6 +16,7 @@ type lookupKey struct {
 
 // newLookupKey takes a height and registerID, returns the key for storing the register value in storage
 func newLookupKey(height uint64, reg flow.RegisterID) *lookupKey {
+	// Todo: Add prefixes for extensibility
 	key := lookupKey{
 		encoded: make([]byte, 0, len(reg.Owner)+1+len(reg.Key)+1+config.HeightSuffixLen),
 	}

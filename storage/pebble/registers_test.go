@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/cockroachdb/pebble"
+	"github.com/onflow/flow-go/storage/pebble/registers/config"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/model/flow"
@@ -20,9 +21,12 @@ func Test_PayloadStorage_RoundTrip(t *testing.T) {
 
 	cache := pebble.NewCache(1 << 20)
 	defer cache.Unref()
+	opts := config.DefaultPebbleOptions(cache, config.NewMVCCComparer())
 
 	dbpath := path.Join(t.TempDir(), "roundtrip.db")
-	s, err := NewRegisters(dbpath, cache)
+	db, err := pebble.Open(dbpath, opts)
+	require.NoError(t, err)
+	s, err := NewRegisters(db)
 	require.NoError(t, err)
 	require.NotNil(t, s)
 
@@ -48,7 +52,7 @@ func Test_PayloadStorage_RoundTrip(t *testing.T) {
 	require.Nil(t, err)
 	require.Empty(t, value1)
 
-	err = s.Close()
+	err = db.Close()
 	require.NoError(t, err)
 }
 
@@ -57,9 +61,12 @@ func Test_PayloadStorage_Versioning(t *testing.T) {
 
 	cache := pebble.NewCache(1 << 20)
 	defer cache.Unref()
+	opts := config.DefaultPebbleOptions(cache, config.NewMVCCComparer())
 
-	dbpath := path.Join(t.TempDir(), "versionning.db")
-	s, err := payload.NewPayloads(dbpath, cache)
+	dbpath := path.Join(t.TempDir(), "versioning.db")
+	db, err := pebble.Open(dbpath, opts)
+	require.NoError(t, err)
+	s, err := NewRegisters(db)
 	require.NoError(t, err)
 	require.NotNil(t, s)
 
@@ -111,7 +118,7 @@ func Test_PayloadStorage_Versioning(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, expectedValue1ge3, value1)
 
-	err = s.Close()
+	err = db.Close()
 	require.NoError(t, err)
 }
 
@@ -119,9 +126,12 @@ func Test_PayloadStorage_Versioning(t *testing.T) {
 func Benchmark_PayloadStorage(b *testing.B) {
 	cache := pebble.NewCache(32 << 20)
 	defer cache.Unref()
+	opts := config.DefaultPebbleOptions(cache, config.NewMVCCComparer())
 
 	dbpath := path.Join(b.TempDir(), "benchmark1.db")
-	s, err := NewRegisters(dbpath, cache)
+	db, err := pebble.Open(dbpath, opts)
+	require.NoError(b, err)
+	s, err := NewRegisters(db)
 	require.NoError(b, err)
 	require.NotNil(b, s)
 

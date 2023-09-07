@@ -80,19 +80,19 @@ func (s *Registers) Store(
 }
 
 // TODO: Finish implementation after deciding prefixes
+
+// LatestHeight Gets the latest height of complete registers available
 func (s *Registers) LatestHeight() (uint64, error) {
 	return 0, nil
 }
 
-// FirstHeight at which we started to index. Returns the first indexed height found in the store.
+// FirstHeight first indexed height found in the store, typically root block for the spork
 func (s *Registers) FirstHeight() (uint64, error) {
 	return 0, nil
 }
 
-// SetLatestHeight updates the latest height.
-// The provided height should either be one higher than the current height or the same to ensure idempotency.
-// If the height is not within those bounds it will panic!
-// An error might get returned if there are problems with persisting the height.
+// SetLatestHeight updates the LatestHeight if height to LatestHeight + 1
+// idempotent if the value of height is between FirstHeight and LatestHeight
 func (s *Registers) SetLatestHeight(height uint64) error {
 	return nil
 }
