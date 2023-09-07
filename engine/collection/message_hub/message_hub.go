@@ -157,9 +157,6 @@ func NewMessageHub(log zerolog.Logger,
 
 	// register network conduit
 	chainID := clusterState.Params().ChainID()
-	if err != nil {
-		return nil, fmt.Errorf("could not get chain ID: %w", err)
-	}
 	conduit, err := net.Register(channels.ConsensusCluster(chainID), hub)
 	if err != nil {
 		return nil, fmt.Errorf("could not register engine: %w", err)

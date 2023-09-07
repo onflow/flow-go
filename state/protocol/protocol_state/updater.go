@@ -182,19 +182,16 @@ func (u *Updater) ProcessEpochCommit(epochCommit *flow.EpochCommit) error {
 // No errors are expected during normal operations.
 func (u *Updater) UpdateIdentity(updated *flow.DynamicIdentityEntry) error {
 	u.ensureLookupPopulated()
-
-	newData := updated.Dynamic
-
 	currentEpochIdentity, found := u.currentEpochIdentitiesLookup[updated.NodeID]
 	if !found {
 		return fmt.Errorf("expected to find identity for current epoch, but (%v) not found", updated.NodeID)
 	}
-	currentEpochIdentity.Dynamic = newData
 
+	currentEpochIdentity.Dynamic = updated.Dynamic
 	if u.state.NextEpochProtocolState != nil {
 		nextEpochIdentity, found := u.nextEpochIdentitiesLookup[updated.NodeID]
 		if found {
-			nextEpochIdentity.Dynamic = newData
+			nextEpochIdentity.Dynamic = updated.Dynamic
 		}
 	}
 	return nil

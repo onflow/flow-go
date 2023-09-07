@@ -361,13 +361,17 @@ func (il IdentityList) Map(f IdentityMapFunc) IdentityList {
 	return dup
 }
 
-// Copy returns a copy of the receiver. The resulting slice uses a different
+// Copy returns a copy of IdentityList. The resulting slice uses a different
 // backing array, meaning appends and insert operations on either slice are
 // guaranteed to only affect that slice.
 //
 // Copy should be used when modifying an existing identity list by either
 // appending new elements, re-ordering, or inserting new elements in an
 // existing index.
+//
+// CAUTION:
+// All Identity fields are deep-copied, _except_ for their keys, which
+// are copied by reference.
 func (il IdentityList) Copy() IdentityList {
 	dup := make(IdentityList, 0, len(il))
 
@@ -570,6 +574,7 @@ func (il IdentityList) SamplePct(pct float64) (IdentityList, error) {
 // Union returns a new identity list containing every identity that occurs in
 // either `il`, or `other`, or both. There are no duplicates in the output,
 // where duplicates are identities with the same node ID.
+// Receiver `il` and/or method input `other` can be nil or empty.
 // The returned IdentityList is sorted in canonical order.
 func (il IdentityList) Union(other IdentityList) IdentityList {
 	maxLen := len(il) + len(other)

@@ -1204,9 +1204,6 @@ func (fnb *FlowNodeBuilder) setRootSnapshot(rootSnapshot protocol.Snapshot) erro
 
 	fnb.RootChainID = fnb.FinalizedRootBlock.Header.ChainID
 	fnb.SporkID = fnb.RootSnapshot.Params().SporkID()
-	if err != nil {
-		return fmt.Errorf("failed to read spork ID: %w", err)
-	}
 
 	return nil
 }
