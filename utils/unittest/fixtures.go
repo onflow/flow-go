@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ipfs/go-cid"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/stretchr/testify/require"
 
@@ -1620,6 +1621,10 @@ func ChunkDataPackFixture(
 		StartState: StateCommitmentFixture(),
 		Proof:      []byte{'p'},
 		Collection: &coll,
+		ExecutionDataRoot: flow.BlockExecutionDataRoot{
+			BlockID:               IdentifierFixture(),
+			ChunkExecutionDataIDs: []cid.Cid{flow.IdToCid(IdentifierFixture())},
+		},
 	}
 
 	for _, opt := range opts {
