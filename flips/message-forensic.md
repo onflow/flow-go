@@ -103,8 +103,90 @@ type EngineRegistry interface {
    GossipSub envelope is not available at the time of the message delivery, then the attacker can send an invalid message and get away from detection, as when
    there is no GossipSub envelope available, the Flow protocol engines cannot have forensic evidence to attribute the protocol-level violation to the malicious
    sender.
-2. 
-   
+2. Maintaining the GossipSub envelopes poses several challenges:
+   - There must be an eviction policy to remove the GossipSub envelopes from the memory (or disk) after a certain period of time. Lack of an eviction policy may
+     lead to memory (or disk) exhaustion attacks.
+   - Existence of eviction policy may lead to data loss, as the GossipSub envelope may be evicted from the memory (or disk) before the Flow protocol engines
+     can use it to attribute a protocol-level violation to the malicious sender.
+   - Existence of eviction policy may also lead to attacks; if an attacker can time the message delivery to the application layer in a way that the GossipSub
+     envelope is evicted from the memory (or disk) before the Flow protocol engines can use it to attribute a protocol-level violation to the malicious sender,
+     then the attacker can send an invalid message and get away from detection, as when there is no GossipSub envelope available, the Flow protocol engines cannot
+     have forensic evidence to attribute the protocol-level violation to the malicious sender.
+   - On a happy path when all nodes are honest, the GossipSub envelopes are not needed, and extracting and maintaining them poses a performance overhead. 
+
+## Proposal-2: Enforced Flow-level Signing Policy For All Messages
+In this proposal, we propose to enforce a Flow-level signing policy for all messages. The idea is to refactor the `Conduit` interface, so that instead of 
+taking an `interface{}` type event, it takes an `Envelope` type event. The `Envelope` type event is a wrapper around the `interface{}` type event, and contains
+the Staking Key signature of the sender on the event. The `Envelope` type is defined as follows:
+```go
+type Envelope struct {
+    // The event that is wrapped by the envelope.
+    Event interface{}
+    // The Staking Key signature of the sender on the event.
+    Signature []byte
+}
+```
+
+Accordingly, the `Conduit` interface is refactored as follows:
+```go
+type Conduit interface {
+	Publish(envelope *Envelope, targetIDs ...flow.Identifier) error
+	
+	Unicast(envelope *Envelope, targetID flow.Identifier) error
+	
+	Multicast(event *Envelope, num uint, targetIDs ...flow.Identifier) error
+	
+	// Other methods are omitted for brevity
+	// ...
+}
+```
+
+In this design, as a safety mechanism, the engines are required to sign all the messages that are sent through the `Conduit` interface. The `Conduit` interface 
+rejects any message that is not signed by the sender. On the other hand, the `Engine` (i.e., `MessageProcessor`) interface is refactored to receive an `Envelope` 
+type event instead of an `interface{}` type event. The `Engine` interface is refactored as follows:
+```go
+// MessageProcessor represents a component which receives messages from the
+// networking layer. Since these messages come from other nodes, which may
+// be Byzantine, implementations must expect and handle arbitrary message inputs
+// (including invalid message types, malformed messages, etc.). Because of this,
+// node-internal messages should NEVER be submitted to a component using Process.
+type MessageProcessor interface {
+	// Process is exposed by engines to accept messages from the networking layer.
+	// Implementations of Process should be non-blocking. In general, Process should
+	// only queue the message internally by the engine for later async processing.
+	Process(channel channels.Channel, originID flow.Identifier, envelope *Envelope) error
+}
+```
+Prior to delivering the message to the engine (i.e., `MessageProcessor`), the networking layer will verify the signature of the Envelope against the Staking Key of the
+sender. If the signature is valid, the message will be delivered to the engine. Otherwise, the message will be rejected and reported to the Application Layer Spam Prevention (ALSP system).
+In this way, when an engine's `Process` method is called, the engine can be sure that the message is signed by the sender. Hence, the engine can attribute a protocol-level violation to the malicious sender that originally
+sent the message.
+
+### Advantages
+1. The Flow protocol can attribute a protocol-level violation to the malicious sender that originally sent the message.
+2. The implementation is simple; contrary to the GMF proposal, there is no need to extract and maintain the GossipSub envelopes, no extra processing and memory overhead is
+   needed.
+3. The signature and event are encapsulated together and are passed to the engine as a single object. Hence, the engine does not need to worry about the signature and event
+   being out of sync. The lifecycle of the signature and event are managed by the engine itself, than dividing the responsibility between the engine and the networking layer.
+4. This solution not only covers the GossipSub messages, but also covers all the messages that are sent through the `Conduit` interface. Hence, it is a more general solution
+   that can be used to attribute a protocol-level violation to the malicious sender that originally sent the message, regardless of the protocol that is used to send the message.
+   For example, the current state of codebase does not enforce signature policy for the `ChunkDataPack` responses that Execution Nodes send to the Verification Nodes over unicast. Hence,
+   a verification node does not have any forensic evidence to attribute a protocol-level violation to the malicious Execution Node that originally sent the message.
+5. The entire authentication data is at the Flow protocol level (i.e., Staking Key) and is not dependent on the GossipSub protocol. Hence, the Flow protocol can attribute a
+   protocol-level violation to the malicious sender that originally sent the message, regardless of the protocol that is used to send the message.
+6. On the long term outlook, we may omit the signature field from individual `Entity` structures of Flow codebase, and instead rely on the `Envelope` signature field. This is a potential optimization that
+    we may need to research further. 
+
+## Disadvantages
+1. The implementation is a breaking change and is not backward compatible with the current state of the Flow protocol. We change the `Conduit` interface, which is used by
+   all the Flow protocol engines to send messages to the networking layer. Hence, all the Flow protocol engines must be refactored to sign the messages that are sent through
+   the `Conduit` interface. 
+2. This approach adds a computation overhead to the Flow protocol engines, as the engines must sign all the messages that are sent through the `Conduit` interface, and on the receiving side, the 
+   the networking layer must verify the signature of the message against the Staking Key of the sender. This overhead is not negligible, as the Flow protocol engines are the most performance critical components of the Flow blockchain. 
+   Hence, we must carefully evaluate the performance overhead of this approach. Moreover, with this approach, we are extending the size of data sent over the wire by piggybacking the signature.
+   Assuming that we are using ECDSA with `secp521r1` curve and SHA-512 for hashing, the signature size is ~132 bytes (in theory). Hence, we are adding ~132 bytes to the size of data sent over the wire.
+   Nevertheless, the performance overhead and the size of data sent over the wire may be an acceptable trade-off for the security guarantees that this approach provides.
+
 
 ## References
 [1] [Conduit Interface]()
