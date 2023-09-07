@@ -14,6 +14,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	sdk "github.com/onflow/flow-go-sdk"
+
 	hotstuff "github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/crypto/hash"
@@ -38,8 +39,8 @@ import (
 	"github.com/onflow/flow-go/module/mempool/entity"
 	"github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/module/updatable_configs"
-	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/channels"
+	"github.com/onflow/flow-go/network/message"
 	"github.com/onflow/flow-go/network/p2p/keyutils"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/inmem"
@@ -2433,7 +2434,7 @@ func GetFlowProtocolEventID(
 ) flow.Identifier {
 	payload, err := NetworkCodec().Encode(event)
 	require.NoError(t, err)
-	eventIDHash, err := network.EventId(channel, payload)
+	eventIDHash, err := message.EventId(channel, payload)
 	require.NoError(t, err)
 	return flow.HashToID(eventIDHash)
 }
@@ -2483,12 +2484,18 @@ func WithChunkEvents(events flow.EventsList) func(*execution_data.ChunkExecution
 	}
 }
 
+func WithTrieUpdate(trieUpdate *ledger.TrieUpdate) func(*execution_data.ChunkExecutionData) {
+	return func(conf *execution_data.ChunkExecutionData) {
+		conf.TrieUpdate = trieUpdate
+	}
+}
+
 func ChunkExecutionDataFixture(t *testing.T, minSize int, opts ...func(*execution_data.ChunkExecutionData)) *execution_data.ChunkExecutionData {
 	collection := CollectionFixture(5)
 	ced := &execution_data.ChunkExecutionData{
 		Collection: &collection,
 		Events:     flow.EventsList{},
-		TrieUpdate: testutils.TrieUpdateFixture(1, 1, 8),
+		TrieUpdate: testutils.TrieUpdateFixture(2, 1, 8),
 	}
 
 	for _, opt := range opts {

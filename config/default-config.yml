@@ -66,6 +66,10 @@ network-config:
   # The default RPC sent tracker cache size. The RPC sent tracker is used to track RPC control messages sent from the local node.
   # Note: this cache size must be large enough to keep a history of sent messages in a reasonable time window of past history.
   gossipsub-rpc-sent-tracker-cache-size: 1_000_000
+  # Cache size of the rpc sent tracker queue used for async tracking.
+  gossipsub-rpc-sent-tracker-queue-cache-size: 100_000
+  # Number of workers for rpc sent tracker worker pool.
+  gossipsub-rpc-sent-tracker-workers: 5
   # Peer scoring is the default value for enabling peer scoring
   gossipsub-peer-scoring-enabled: true
   # Gossipsub rpc inspectors configs
@@ -102,6 +106,13 @@ network-config:
   ihave-async-inspection-sample-size-percentage: .10
   # Max number of ihave messages in a sample to be inspected
   ihave-max-sample-size: 100
+
+  # Max number of iwant messages in a sample to be inspected
+  gossipsub-rpc-iwant-max-sample-size: 1_000_000
+  # The allowed threshold of iWant messages received without a corresponding tracked iHave message that was sent
+  gossipsub-rpc-iwant-cache-miss-threshold: .5
+  # The max allowed duplicate message IDs in a single iWant control message
+  gossipsub-rpc-iwant-duplicate-message-id-threshold: .15
   # RPC metrics observer inspector configs
   # The number of metrics inspector pool workers
   gossipsub-rpc-metrics-inspector-workers: 1

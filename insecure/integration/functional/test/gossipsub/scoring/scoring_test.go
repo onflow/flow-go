@@ -116,13 +116,13 @@ func testGossipSubInvalidMessageDeliveryScoring(t *testing.T, spamMsgFactory fun
 		p2ptest.EnablePeerScoringWithOverride(p2p.PeerScoringConfigNoOverride),
 	)
 
-	idProvider.On("ByPeerID", victimNode.Host().ID()).Return(&victimIdentity, true).Maybe()
-	idProvider.On("ByPeerID", spammer.SpammerNode.Host().ID()).Return(&spammer.SpammerId, true).Maybe()
+	idProvider.On("ByPeerID", victimNode.ID()).Return(&victimIdentity, true).Maybe()
+	idProvider.On("ByPeerID", spammer.SpammerNode.ID()).Return(&spammer.SpammerId, true).Maybe()
 	ids := flow.IdentityList{&spammer.SpammerId, &victimIdentity}
 	nodes := []p2p.LibP2PNode{spammer.SpammerNode, victimNode}
 
-	p2ptest.StartNodes(t, signalerCtx, nodes, 100*time.Millisecond)
-	defer p2ptest.StopNodes(t, nodes, cancel, 2*time.Second)
+	p2ptest.StartNodes(t, signalerCtx, nodes)
+	defer p2ptest.StopNodes(t, nodes, cancel)
 
 	p2ptest.LetNodesDiscoverEachOther(t, ctx, nodes, ids)
 	p2ptest.TryConnectionAndEnsureConnected(t, ctx, nodes)
@@ -136,14 +136,14 @@ func testGossipSubInvalidMessageDeliveryScoring(t *testing.T, spamMsgFactory fun
 	for i := 0; i <= totalSpamMessages; i++ {
 		spammer.SpamControlMessage(t, victimNode,
 			spammer.GenerateCtlMessages(1),
-			spamMsgFactory(spammer.SpammerNode.Host().ID(), victimNode.Host().ID(), blockTopic))
+			spamMsgFactory(spammer.SpammerNode.ID(), victimNode.ID(), blockTopic))
 	}
 
 	// wait for at most 3 seconds for the victim node to penalize the spammer node.
 	// Each heartbeat is 1 second, so 3 heartbeats should be enough to penalize the spammer node.
 	// Ideally, we should wait for 1 heartbeat, but the score may not be updated immediately after the heartbeat.
 	require.Eventually(t, func() bool {
-		spammerScore, ok := victimNode.PeerScoreExposer().GetScore(spammer.SpammerNode.Host().ID())
+		spammerScore, ok := victimNode.PeerScoreExposer().GetScore(spammer.SpammerNode.ID())
 		if !ok {
 			return false
 		}
@@ -163,7 +163,7 @@ func testGossipSubInvalidMessageDeliveryScoring(t *testing.T, spamMsgFactory fun
 		return true
 	}, 3*time.Second, 100*time.Millisecond)
 
-	topicsSnapshot, ok := victimNode.PeerScoreExposer().GetTopicScores(spammer.SpammerNode.Host().ID())
+	topicsSnapshot, ok := victimNode.PeerScoreExposer().GetTopicScores(spammer.SpammerNode.ID())
 	require.True(t, ok)
 	require.NotNil(t, topicsSnapshot, "topic scores must not be nil")
 	require.NotEmpty(t, topicsSnapshot, "topic scores must not be empty")
@@ -173,9 +173,18 @@ func testGossipSubInvalidMessageDeliveryScoring(t *testing.T, spamMsgFactory fun
 	// ensure that the topic snapshot of the spammer contains a record of at least (60%) of the spam messages sent. The 60% is to account for the messages that were delivered before the score was updated, after the spammer is PRUNED, as well as to account for decay.
 	require.True(t, blkTopicSnapshot.InvalidMessageDeliveries > 0.6*float64(totalSpamMessages), "invalid message deliveries must be greater than %f. invalid message deliveries: %f", 0.9*float64(totalSpamMessages), blkTopicSnapshot.InvalidMessageDeliveries)
 
-	p2ptest.EnsureNoPubsubExchangeBetweenGroups(t, ctx, []p2p.LibP2PNode{victimNode}, []p2p.LibP2PNode{spammer.SpammerNode}, blockTopic, 1, func() interface{} {
-		return unittest.ProposalFixture()
-	})
+	p2ptest.EnsureNoPubsubExchangeBetweenGroups(
+		t,
+		ctx,
+		[]p2p.LibP2PNode{victimNode},
+		flow.IdentifierList{victimIdentity.NodeID},
+		[]p2p.LibP2PNode{spammer.SpammerNode},
+		flow.IdentifierList{spammer.SpammerId.NodeID},
+		blockTopic,
+		1,
+		func() interface{} {
+			return unittest.ProposalFixture()
+		})
 }
 
 // TestGossipSubMeshDeliveryScoring_UnderDelivery_SingleTopic tests that when a peer is under-performing in a topic mesh, its score is (slightly) penalized.
@@ -218,13 +227,13 @@ func TestGossipSubMeshDeliveryScoring_UnderDelivery_SingleTopic(t *testing.T) {
 		p2ptest.WithRole(role),
 	)
 
-	idProvider.On("ByPeerID", thisNode.Host().ID()).Return(&thisId, true).Maybe()
-	idProvider.On("ByPeerID", underPerformerNode.Host().ID()).Return(&underPerformerId, true).Maybe()
+	idProvider.On("ByPeerID", thisNode.ID()).Return(&thisId, true).Maybe()
+	idProvider.On("ByPeerID", underPerformerNode.ID()).Return(&underPerformerId, true).Maybe()
 	ids := flow.IdentityList{&underPerformerId, &thisId}
 	nodes := []p2p.LibP2PNode{underPerformerNode, thisNode}
 
-	p2ptest.StartNodes(t, signalerCtx, nodes, 100*time.Millisecond)
-	defer p2ptest.StopNodes(t, nodes, cancel, 2*time.Second)
+	p2ptest.StartNodes(t, signalerCtx, nodes)
+	defer p2ptest.StopNodes(t, nodes, cancel)
 
 	p2ptest.LetNodesDiscoverEachOther(t, ctx, nodes, ids)
 	p2ptest.TryConnectionAndEnsureConnected(t, ctx, nodes)
@@ -238,7 +247,7 @@ func TestGossipSubMeshDeliveryScoring_UnderDelivery_SingleTopic(t *testing.T) {
 	// The reason is in our scoring system, we reward the staked nodes by MaxAppSpecificReward, and the under-performing node is considered staked
 	// as it is in the id provider of thisNode.
 	require.Eventually(t, func() bool {
-		underPerformingNodeScore, ok := thisNode.PeerScoreExposer().GetScore(underPerformerNode.Host().ID())
+		underPerformingNodeScore, ok := thisNode.PeerScoreExposer().GetScore(underPerformerNode.ID())
 		if !ok {
 			return false
 		}
@@ -253,7 +262,7 @@ func TestGossipSubMeshDeliveryScoring_UnderDelivery_SingleTopic(t *testing.T) {
 	// however, after one decay interval, we expect the score of the under-performing node to be penalized by -0.05 * MaxAppSpecificReward as
 	// it has not been able to deliver messages to this node in the topic mesh since the past decay interval.
 	require.Eventually(t, func() bool {
-		underPerformingNodeScore, ok := thisNode.PeerScoreExposer().GetScore(underPerformerNode.Host().ID())
+		underPerformingNodeScore, ok := thisNode.PeerScoreExposer().GetScore(underPerformerNode.ID())
 		if !ok {
 			return false
 		}
@@ -324,13 +333,13 @@ func TestGossipSubMeshDeliveryScoring_UnderDelivery_TwoTopics(t *testing.T) {
 		p2ptest.WithRole(role),
 	)
 
-	idProvider.On("ByPeerID", thisNode.Host().ID()).Return(&thisId, true).Maybe()
-	idProvider.On("ByPeerID", underPerformerNode.Host().ID()).Return(&underPerformerId, true).Maybe()
+	idProvider.On("ByPeerID", thisNode.ID()).Return(&thisId, true).Maybe()
+	idProvider.On("ByPeerID", underPerformerNode.ID()).Return(&underPerformerId, true).Maybe()
 	ids := flow.IdentityList{&underPerformerId, &thisId}
 	nodes := []p2p.LibP2PNode{underPerformerNode, thisNode}
 
-	p2ptest.StartNodes(t, signalerCtx, nodes, 100*time.Millisecond)
-	defer p2ptest.StopNodes(t, nodes, cancel, 2*time.Second)
+	p2ptest.StartNodes(t, signalerCtx, nodes)
+	defer p2ptest.StopNodes(t, nodes, cancel)
 
 	p2ptest.LetNodesDiscoverEachOther(t, ctx, nodes, ids)
 	p2ptest.TryConnectionAndEnsureConnected(t, ctx, nodes)
@@ -347,7 +356,7 @@ func TestGossipSubMeshDeliveryScoring_UnderDelivery_TwoTopics(t *testing.T) {
 	// The reason is in our scoring system, we reward the staked nodes by MaxAppSpecificReward, and the under-performing node is considered staked
 	// as it is in the id provider of thisNode.
 	require.Eventually(t, func() bool {
-		underPerformingNodeScore, ok := thisNode.PeerScoreExposer().GetScore(underPerformerNode.Host().ID())
+		underPerformingNodeScore, ok := thisNode.PeerScoreExposer().GetScore(underPerformerNode.ID())
 		if !ok {
 			return false
 		}
@@ -363,7 +372,7 @@ func TestGossipSubMeshDeliveryScoring_UnderDelivery_TwoTopics(t *testing.T) {
 
 	// however, after one decay interval, we expect the score of the under-performing node to be penalized by ~ 2 * -0.05 * MaxAppSpecificReward.
 	require.Eventually(t, func() bool {
-		underPerformingNodeScore, ok := thisNode.PeerScoreExposer().GetScore(underPerformerNode.Host().ID())
+		underPerformingNodeScore, ok := thisNode.PeerScoreExposer().GetScore(underPerformerNode.ID())
 		if !ok {
 			return false
 		}
@@ -433,13 +442,13 @@ func TestGossipSubMeshDeliveryScoring_Replay_Will_Not_Counted(t *testing.T) {
 		p2ptest.WithRole(role),
 	)
 
-	idProvider.On("ByPeerID", thisNode.Host().ID()).Return(&thisId, true).Maybe()
-	idProvider.On("ByPeerID", replayingNode.Host().ID()).Return(&replayingId, true).Maybe()
+	idProvider.On("ByPeerID", thisNode.ID()).Return(&thisId, true).Maybe()
+	idProvider.On("ByPeerID", replayingNode.ID()).Return(&replayingId, true).Maybe()
 	ids := flow.IdentityList{&replayingId, &thisId}
 	nodes := []p2p.LibP2PNode{replayingNode, thisNode}
 
-	p2ptest.StartNodes(t, signalerCtx, nodes, 100*time.Millisecond)
-	defer p2ptest.StopNodes(t, nodes, cancel, 2*time.Second)
+	p2ptest.StartNodes(t, signalerCtx, nodes)
+	defer p2ptest.StopNodes(t, nodes, cancel)
 
 	p2ptest.LetNodesDiscoverEachOther(t, ctx, nodes, ids)
 	p2ptest.TryConnectionAndEnsureConnected(t, ctx, nodes)
@@ -454,7 +463,7 @@ func TestGossipSubMeshDeliveryScoring_Replay_Will_Not_Counted(t *testing.T) {
 	// as it is in the id provider of thisNode.
 	initialReplayingNodeScore := float64(0)
 	require.Eventually(t, func() bool {
-		replayingNodeScore, ok := thisNode.PeerScoreExposer().GetScore(replayingNode.Host().ID())
+		replayingNodeScore, ok := thisNode.PeerScoreExposer().GetScore(replayingNode.ID())
 		if !ok {
 			return false
 		}
@@ -474,14 +483,14 @@ func TestGossipSubMeshDeliveryScoring_Replay_Will_Not_Counted(t *testing.T) {
 		proposalList[i] = unittest.ProposalFixture()
 	}
 	i := -1
-	p2ptest.EnsurePubsubMessageExchangeFromNode(t, ctx, replayingNode, thisNode, blockTopic, len(proposalList), func() interface{} {
+	p2ptest.EnsurePubsubMessageExchangeFromNode(t, ctx, replayingNode, thisNode, thisId.NodeID, blockTopic, len(proposalList), func() interface{} {
 		i += 1
 		return proposalList[i]
 	})
 
 	// as the replaying node is not penalized, we expect its score to be equal to the initial score.
 	require.Eventually(t, func() bool {
-		replayingNodeScore, ok := thisNode.PeerScoreExposer().GetScore(replayingNode.Host().ID())
+		replayingNodeScore, ok := thisNode.PeerScoreExposer().GetScore(replayingNode.ID())
 		if !ok {
 			return false
 		}
@@ -500,14 +509,22 @@ func TestGossipSubMeshDeliveryScoring_Replay_Will_Not_Counted(t *testing.T) {
 
 	// now the replaying node acts maliciously and just replays the same messages again.
 	i = -1
-	p2ptest.EnsureNoPubsubMessageExchange(t, ctx, []p2p.LibP2PNode{replayingNode}, []p2p.LibP2PNode{thisNode}, blockTopic, len(proposalList), func() interface{} {
-		i += 1
-		return proposalList[i]
-	})
+	p2ptest.EnsureNoPubsubMessageExchange(
+		t,
+		ctx,
+		[]p2p.LibP2PNode{replayingNode},
+		[]p2p.LibP2PNode{thisNode},
+		flow.IdentifierList{thisId.NodeID},
+		blockTopic,
+		len(proposalList),
+		func() interface{} {
+			i += 1
+			return proposalList[i]
+		})
 
 	// since the last decay interval, the replaying node has not delivered anything new, so its score should be penalized for under-performing.
 	require.Eventually(t, func() bool {
-		replayingNodeScore, ok := thisNode.PeerScoreExposer().GetScore(replayingNode.Host().ID())
+		replayingNodeScore, ok := thisNode.PeerScoreExposer().GetScore(replayingNode.ID())
 		if !ok {
 			return false
 		}

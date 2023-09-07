@@ -31,7 +31,7 @@ var ErrEOFNotReached = errors.New("expect to reach EOF, but actually didn't")
 // it returns (nil, os.ErrNotExist) if a certain file is missing, use (os.IsNotExist to check)
 // it returns (nil, ErrEOFNotReached) if a certain part file is malformed
 // it returns (nil, err) if running into any exception
-func readCheckpointV6(headerFile *os.File, logger *zerolog.Logger) ([]*trie.MTrie, error) {
+func readCheckpointV6(headerFile *os.File, logger zerolog.Logger) ([]*trie.MTrie, error) {
 	// the full path of header file
 	headerPath := headerFile.Name()
 	dir, fileName := filepath.Split(headerPath)
@@ -53,7 +53,7 @@ func readCheckpointV6(headerFile *os.File, logger *zerolog.Logger) ([]*trie.MTri
 
 	// TODO making number of goroutine configable for reading subtries, which can help us
 	// test the code on machines that don't have as much RAM as EN by using fewer goroutines.
-	subtrieNodes, err := readSubTriesConcurrently(dir, fileName, subtrieChecksums, &lg)
+	subtrieNodes, err := readSubTriesConcurrently(dir, fileName, subtrieChecksums, lg)
 	if err != nil {
 		return nil, fmt.Errorf("could not read subtrie from dir: %w", err)
 	}
@@ -61,7 +61,7 @@ func readCheckpointV6(headerFile *os.File, logger *zerolog.Logger) ([]*trie.MTri
 	lg.Info().Uint32("topsum", topTrieChecksum).
 		Msg("finish reading all v6 subtrie files, start reading top level tries")
 
-	tries, err := readTopLevelTries(dir, fileName, subtrieNodes, topTrieChecksum, &lg)
+	tries, err := readTopLevelTries(dir, fileName, subtrieNodes, topTrieChecksum, lg)
 	if err != nil {
 		return nil, fmt.Errorf("could not read top level nodes or tries: %w", err)
 	}
@@ -83,7 +83,7 @@ func readCheckpointV6(headerFile *os.File, logger *zerolog.Logger) ([]*trie.MTri
 }
 
 // OpenAndReadCheckpointV6 open the checkpoint file and read it with readCheckpointV6
-func OpenAndReadCheckpointV6(dir string, fileName string, logger *zerolog.Logger) (
+func OpenAndReadCheckpointV6(dir string, fileName string, logger zerolog.Logger) (
 	tries []*trie.MTrie,
 	errToReturn error,
 ) {
@@ -127,7 +127,7 @@ func filePathPattern(dir string, fileName string) string {
 
 // readCheckpointHeader takes a file path and returns subtrieChecksums and topTrieChecksum
 // any error returned are exceptions
-func readCheckpointHeader(filepath string, logger *zerolog.Logger) (
+func readCheckpointHeader(filepath string, logger zerolog.Logger) (
 	checksumsOfSubtries []uint32,
 	checksumOfTopTrie uint32,
 	errToReturn error,
@@ -278,7 +278,7 @@ type resultReadSubTrie struct {
 	Err   error
 }
 
-func readSubTriesConcurrently(dir string, fileName string, subtrieChecksums []uint32, logger *zerolog.Logger) ([][]*node.Node, error) {
+func readSubTriesConcurrently(dir string, fileName string, subtrieChecksums []uint32, logger zerolog.Logger) ([][]*node.Node, error) {
 
 	numOfSubTries := len(subtrieChecksums)
 	jobs := make(chan jobReadSubtrie, numOfSubTries)
@@ -325,7 +325,7 @@ func readSubTriesConcurrently(dir string, fileName string, subtrieChecksums []ui
 	return nodesGroups, nil
 }
 
-func readCheckpointSubTrie(dir string, fileName string, index int, checksum uint32, logger *zerolog.Logger) (
+func readCheckpointSubTrie(dir string, fileName string, index int, checksum uint32, logger zerolog.Logger) (
 	[]*node.Node,
 	error,
 ) {
@@ -372,7 +372,7 @@ func processCheckpointSubTrie(
 	fileName string,
 	index int,
 	checksum uint32,
-	logger *zerolog.Logger,
+	logger zerolog.Logger,
 	processNode func(*Crc32Reader, uint64) error,
 ) (
 	errToReturn error,
@@ -498,7 +498,7 @@ func readSubTriesFooter(f *os.File) (uint64, uint32, error) {
 // 5. node count
 // 6. trie count
 // 7. checksum
-func readTopLevelTries(dir string, fileName string, subtrieNodes [][]*node.Node, topTrieChecksum uint32, logger *zerolog.Logger) (
+func readTopLevelTries(dir string, fileName string, subtrieNodes [][]*node.Node, topTrieChecksum uint32, logger zerolog.Logger) (
 	rootTries []*trie.MTrie,
 	errToReturn error,
 ) {
