@@ -60,6 +60,7 @@ const (
 	ResourceQC                                         = "qc"
 	ResourceMyReceipt                                  = "my_receipt"
 	ResourceCollection                                 = "collection"
+	ResourceProtocolState                              = "protocol_state"
 	ResourceApproval                                   = "approval"
 	ResourceSeal                                       = "seal"
 	ResourcePendingIncorporatedSeal                    = "pending_incorporated_seal"

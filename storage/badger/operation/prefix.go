@@ -46,6 +46,7 @@ const (
 	codeExecutionReceiptMeta = 36
 	codeResultApproval       = 37
 	codeChunk                = 38
+	codeProtocolState        = 39
 
 	// codes for indexing single identifier by identifier/integeter
 	codeHeightToBlock              = 40 // index mapping height to block ID
@@ -54,6 +55,7 @@ const (
 	codeRefHeightToClusterBlock    = 43 // index reference block height to cluster block IDs
 	codeBlockIDToFinalizedSeal     = 44 // index _finalized_ seal by sealed block ID
 	codeBlockIDToQuorumCertificate = 45 // index of quorum certificates by block ID
+	codeProtocolStateByBlockID     = 46 // index of protocol state entry by block ID
 
 	// codes for indexing multiple identifiers by identifier
 	// NOTE: 51 was used for identity indexes before epochs

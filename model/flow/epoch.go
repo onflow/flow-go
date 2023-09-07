@@ -434,6 +434,11 @@ type EventIDs struct {
 	CommitID Identifier
 }
 
+// ID returns hash of the event IDs.
+func (e *EventIDs) ID() Identifier {
+	return MakeID(e)
+}
+
 func NewEpochStatus(previousSetup, previousCommit, currentSetup, currentCommit, nextSetup, nextCommit Identifier) (*EpochStatus, error) {
 	status := &EpochStatus{
 		PreviousEpoch: EventIDs{

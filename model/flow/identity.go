@@ -570,7 +570,8 @@ func (il IdentityList) SamplePct(pct float64) (IdentityList, error) {
 // Union returns a new identity list containing every identity that occurs in
 // either `il`, or `other`, or both. There are no duplicates in the output,
 // where duplicates are identities with the same node ID.
-// The returned IdentityList is sorted
+// Receiver `il` and/or method input `other` can be nil or empty.
+// The returned IdentityList is sorted in canonical order.
 func (il IdentityList) Union(other IdentityList) IdentityList {
 	maxLen := len(il) + len(other)
 
