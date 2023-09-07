@@ -5,7 +5,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/rs/zerolog"
+	"github.com/ipfs/go-cid"
 	"github.com/stretchr/testify/mock"
 	testifymock "github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -32,18 +32,19 @@ import (
 
 type VerifierEngineTestSuite struct {
 	suite.Suite
-	net       *mocknetwork.Network
-	tracer    realModule.Tracer
-	state     *protocol.State
-	ss        *protocol.Snapshot
-	me        *mocklocal.MockLocal
-	sk        crypto.PrivateKey
-	hasher    hash.Hasher
-	chain     flow.Chain
-	pushCon   *mocknetwork.Conduit // mocks con for submitting result approvals
-	pullCon   *mocknetwork.Conduit
-	metrics   *mockmodule.VerificationMetrics // mocks performance monitoring metrics
-	approvals *mockstorage.ResultApprovals
+	net           *mocknetwork.Network
+	tracer        realModule.Tracer
+	state         *protocol.State
+	ss            *protocol.Snapshot
+	me            *mocklocal.MockLocal
+	sk            crypto.PrivateKey
+	hasher        hash.Hasher
+	chain         flow.Chain
+	pushCon       *mocknetwork.Conduit // mocks con for submitting result approvals
+	pullCon       *mocknetwork.Conduit
+	metrics       *mockmodule.VerificationMetrics // mocks performance monitoring metrics
+	approvals     *mockstorage.ResultApprovals
+	chunkVerifier *mockmodule.ChunkVerifier
 }
 
 func TestVerifierEngine(t *testing.T) {
@@ -52,15 +53,16 @@ func TestVerifierEngine(t *testing.T) {
 
 func (suite *VerifierEngineTestSuite) SetupTest() {
 
-	suite.state = &protocol.State{}
-	suite.net = &mocknetwork.Network{}
+	suite.state = new(protocol.State)
+	suite.net = mocknetwork.NewNetwork(suite.T())
 	suite.tracer = trace.NewNoopTracer()
-	suite.ss = &protocol.Snapshot{}
-	suite.pushCon = &mocknetwork.Conduit{}
-	suite.pullCon = &mocknetwork.Conduit{}
-	suite.metrics = &mockmodule.VerificationMetrics{}
+	suite.ss = new(protocol.Snapshot)
+	suite.pushCon = mocknetwork.NewConduit(suite.T())
+	suite.pullCon = mocknetwork.NewConduit(suite.T())
+	suite.metrics = mockmodule.NewVerificationMetrics(suite.T())
 	suite.chain = flow.Testnet.Chain()
-	suite.approvals = &mockstorage.ResultApprovals{}
+	suite.approvals = mockstorage.NewResultApprovals(suite.T())
+	suite.chunkVerifier = mockmodule.NewChunkVerifier(suite.T())
 
 	suite.approvals.On("Store", mock.Anything).Return(nil)
 	suite.approvals.On("Index", mock.Anything, mock.Anything, mock.Anything).Return(nil)
@@ -97,15 +99,15 @@ func (suite *VerifierEngineTestSuite) SetupTest() {
 	suite.me = mocklocal.NewMockLocal(sk, verIdentity.NodeID, suite.T())
 }
 
-func (suite *VerifierEngineTestSuite) TestNewEngine() *verifier.Engine {
+func (suite *VerifierEngineTestSuite) getTestNewEngine() *verifier.Engine {
 	e, err := verifier.New(
-		zerolog.Logger{},
+		unittest.Logger(),
 		suite.metrics,
 		suite.tracer,
 		suite.net,
 		suite.state,
 		suite.me,
-		ChunkVerifierMock{},
+		suite.chunkVerifier,
 		suite.approvals)
 	require.Nil(suite.T(), err)
 
@@ -114,21 +116,19 @@ func (suite *VerifierEngineTestSuite) TestNewEngine() *verifier.Engine {
 
 }
 
-func (suite *VerifierEngineTestSuite) TestIncorrectResult() {
-	// TODO when ERs are verified
-}
-
 // TestVerifyHappyPath tests the verification path for a single verifiable chunk, which is
 // assigned to the verifier node, and is passed by the ingest engine
 // The tests evaluates that a result approval is emitted to all consensus nodes
 // about the input execution receipt
 func (suite *VerifierEngineTestSuite) TestVerifyHappyPath() {
 
-	eng := suite.TestNewEngine()
+	eng := suite.getTestNewEngine()
 	myID := unittest.IdentifierFixture()
 	consensusNodes := unittest.IdentityListFixture(1, unittest.WithRole(flow.RoleConsensus))
 	// creates a verifiable chunk
 	vChunk := unittest.VerifiableChunkDataFixture(uint64(0))
+
+	suite.chunkVerifier.On("Verify", vChunk).Return(nil, nil)
 
 	// mocking node ID using the LocalMock
 	suite.me.MockNodeID(myID)
@@ -168,7 +168,7 @@ func (suite *VerifierEngineTestSuite) TestVerifyHappyPath() {
 }
 
 func (suite *VerifierEngineTestSuite) TestVerifyUnhappyPaths() {
-	eng := suite.TestNewEngine()
+	eng := suite.getTestNewEngine()
 	myID := unittest.IdentifierFixture()
 	consensusNodes := unittest.IdentityListFixture(1, unittest.WithRole(flow.RoleConsensus))
 
@@ -185,7 +185,7 @@ func (suite *VerifierEngineTestSuite) TestVerifyUnhappyPaths() {
 		On("Publish", testifymock.Anything, testifymock.Anything).
 		Return(nil).
 		Run(func(args testifymock.Arguments) {
-			// TODO change this to check challeneges
+			// TODO change this to check challenges
 			_, ok := args[0].(*flow.ResultApproval)
 			// TODO change this to false when missing register is rolled back
 			suite.Assert().True(ok)
@@ -195,56 +195,102 @@ func (suite *VerifierEngineTestSuite) TestVerifyUnhappyPaths() {
 	suite.metrics.On("OnResultApprovalDispatchedInNetworkByVerifier").Return()
 
 	var tests = []struct {
-		vc          *verification.VerifiableChunkData
-		expectedErr error
+		errFn func(vc *verification.VerifiableChunkData) error
 	}{
-		{unittest.VerifiableChunkDataFixture(uint64(1)), nil},
-		{unittest.VerifiableChunkDataFixture(uint64(2)), nil},
-		{unittest.VerifiableChunkDataFixture(uint64(3)), nil},
+		{
+			errFn: func(vc *verification.VerifiableChunkData) error {
+				return chmodel.NewCFMissingRegisterTouch(
+					[]string{"test missing register touch"},
+					vc.Chunk.Index,
+					vc.Result.ID(),
+					unittest.TransactionFixture().ID())
+			},
+		},
+		{
+			errFn: func(vc *verification.VerifiableChunkData) error {
+				return chmodel.NewCFInvalidVerifiableChunk(
+					"test",
+					errors.New("test invalid verifiable chunk"),
+					vc.Chunk.Index,
+					vc.Result.ID())
+			},
+		},
+		{
+			errFn: func(vc *verification.VerifiableChunkData) error {
+				return chmodel.NewCFNonMatchingFinalState(
+					unittest.StateCommitmentFixture(),
+					unittest.StateCommitmentFixture(),
+					vc.Chunk.Index,
+					vc.Result.ID())
+			},
+		},
+		{
+			errFn: func(vc *verification.VerifiableChunkData) error {
+				return chmodel.NewCFInvalidEventsCollection(
+					unittest.IdentifierFixture(),
+					unittest.IdentifierFixture(),
+					vc.Chunk.Index,
+					vc.Result.ID(),
+					flow.EventsList{})
+			},
+		},
+		{
+			errFn: func(vc *verification.VerifiableChunkData) error {
+				return chmodel.NewCFSystemChunkIncludedCollection(vc.Chunk.Index, vc.Result.ID())
+			},
+		},
+		{
+			errFn: func(vc *verification.VerifiableChunkData) error {
+				return chmodel.NewCFExecutionDataBlockIDMismatch(
+					unittest.IdentifierFixture(),
+					unittest.IdentifierFixture(),
+					vc.Chunk.Index,
+					vc.Result.ID())
+			},
+		},
+		{
+			errFn: func(vc *verification.VerifiableChunkData) error {
+				return chmodel.NewCFExecutionDataChunksLengthMismatch(
+					0,
+					0,
+					vc.Chunk.Index,
+					vc.Result.ID())
+			},
+		},
+		{
+			errFn: func(vc *verification.VerifiableChunkData) error {
+				return chmodel.NewCFExecutionDataInvalidChunkCID(
+					cid.Cid{},
+					cid.Cid{},
+					vc.Chunk.Index,
+					vc.Result.ID())
+			},
+		},
+		{
+			errFn: func(vc *verification.VerifiableChunkData) error {
+				return chmodel.NewCFInvalidExecutionDataID(
+					unittest.IdentifierFixture(),
+					unittest.IdentifierFixture(),
+					vc.Chunk.Index,
+					vc.Result.ID())
+			},
+		},
+		{
+			errFn: func(vc *verification.VerifiableChunkData) error {
+				return errors.New("test error")
+			},
+		},
 	}
-	for _, test := range tests {
-		err := eng.ProcessLocal(test.vc)
+
+	for i, test := range tests {
+		vc := unittest.VerifiableChunkDataFixture(uint64(i))
+		expectedErr := test.errFn(vc)
+
+		suite.chunkVerifier.On("Verify", vc).Return(nil, expectedErr).Once()
+
+		err := eng.ProcessLocal(vc)
+
+		// no error returned from the engine
 		suite.Assert().NoError(err)
 	}
-}
-
-type ChunkVerifierMock struct {
-}
-
-func (v ChunkVerifierMock) Verify(vc *verification.VerifiableChunkData) ([]byte, error) {
-	if vc.IsSystemChunk {
-		return nil, nil
-	}
-
-	switch vc.Chunk.Index {
-	case 0:
-		return []byte{}, nil
-	// return error
-	case 1:
-		return nil, chmodel.NewCFMissingRegisterTouch(
-			[]string{"test missing register touch"},
-			vc.Chunk.Index,
-			vc.Result.ID(),
-			unittest.TransactionFixture().ID())
-
-	case 2:
-		return nil, chmodel.NewCFInvalidVerifiableChunk(
-			"test",
-			errors.New("test invalid verifiable chunk"),
-			vc.Chunk.Index,
-			vc.Result.ID())
-
-	case 3:
-		return nil, chmodel.NewCFNonMatchingFinalState(
-			unittest.StateCommitmentFixture(),
-			unittest.StateCommitmentFixture(),
-			vc.Chunk.Index,
-			vc.Result.ID())
-
-	// TODO add cases for challenges
-	// return successful by default
-	default:
-		return nil, nil
-	}
-
 }

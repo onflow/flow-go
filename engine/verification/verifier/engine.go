@@ -192,6 +192,7 @@ func (e *Engine) verify(ctx context.Context, originID flow.Identifier,
 	span.End()
 
 	if err != nil {
+		// any error besides a ChunkFaultError is a system error
 		if !chmodels.IsChunkFaultError(err) {
 			return fmt.Errorf("cannot verify chunk: %w", err)
 		}
@@ -222,6 +223,36 @@ func (e *Engine) verify(ctx context.Context, originID flow.Identifier,
 			// TODO raise challenge
 			e.log.Error().
 				Str("chunk_fault_type", "invalid_event_collection").
+				Str("chunk_fault", chFault.Error()).
+				Msg("chunk fault found, could not verify chunk")
+			return nil
+		case *chmodels.CFSystemChunkIncludedCollection:
+			e.log.Error().
+				Str("chunk_fault_type", "system_chunk_includes_collection").
+				Str("chunk_fault", chFault.Error()).
+				Msg("chunk fault found, could not verify chunk")
+			return nil
+		case *chmodels.CFExecutionDataBlockIDMismatch:
+			e.log.Error().
+				Str("chunk_fault_type", "execution_data_block_id_mismatch").
+				Str("chunk_fault", chFault.Error()).
+				Msg("chunk fault found, could not verify chunk")
+			return nil
+		case *chmodels.CFExecutionDataChunksLengthMismatch:
+			e.log.Error().
+				Str("chunk_fault_type", "execution_data_chunks_count_mismatch").
+				Str("chunk_fault", chFault.Error()).
+				Msg("chunk fault found, could not verify chunk")
+			return nil
+		case *chmodels.CFExecutionDataInvalidChunkCID:
+			e.log.Error().
+				Str("chunk_fault_type", "execution_data_chunk_cid_mismatch").
+				Str("chunk_fault", chFault.Error()).
+				Msg("chunk fault found, could not verify chunk")
+			return nil
+		case *chmodels.CFInvalidExecutionDataID:
+			e.log.Error().
+				Str("chunk_fault_type", "execution_data_root_cid_mismatch").
 				Str("chunk_fault", chFault.Error()).
 				Msg("chunk fault found, could not verify chunk")
 			return nil
