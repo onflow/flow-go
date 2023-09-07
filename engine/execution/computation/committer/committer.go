@@ -7,6 +7,7 @@ import (
 	"github.com/hashicorp/go-multierror"
 
 	execState "github.com/onflow/flow-go/engine/execution/state"
+	"github.com/onflow/flow-go/engine/execution/storehouse"
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/convert"
@@ -33,27 +34,33 @@ func NewLedgerViewCommitter(
 // the execution snapshot is the result of executing a collection.
 func (committer *LedgerViewCommitter) CommitView(
 	snapshot *snapshot.ExecutionSnapshot,
-	baseState flow.StateCommitment,
-	baseStorageSnapshot snapshot.StorageSnapshot,
+	baseStorageSnapshot storehouse.ExtendableStorageSnapshot,
 ) (
 	newCommit flow.StateCommitment,
 	proof []byte,
 	trieUpdate *ledger.TrieUpdate,
+	newStorageSnapshot storehouse.ExtendableStorageSnapshot,
 	err error,
 ) {
-	// storageSnapshot
 	var err1, err2 error
 	var wg sync.WaitGroup
 	wg.Add(1)
 	go func() {
-		proof, err2 = committer.collectProofs(snapshot, baseState, baseStorageSnapshot)
+		// reads register updates from snapshot, find the trie from ledger with baseState,
+		// read the payloads from baseStorageSnapshot, create proofs for the updated registers.
+		// at base snapshot.
+		proof, err2 = committer.collectProofs(snapshot, baseStorageSnapshot)
 		wg.Done()
 	}()
 
-	newCommit, trieUpdate, err1 = execState.CommitDelta(
+	// read register updates from snapshot, find the trie from ledger with
+	// baseState, save the trie update in both ExtendableStorageSnapshot and
+	// ledger.
+	newCommit, trieUpdate, newStorageSnapshot, err1 = execState.CommitDelta(
 		committer.ledger,
 		snapshot,
-		baseState)
+		baseStorageSnapshot,
+	)
 	wg.Wait()
 
 	if err1 != nil {
@@ -68,12 +75,12 @@ func (committer *LedgerViewCommitter) CommitView(
 
 func (committer *LedgerViewCommitter) collectProofs(
 	snapshot *snapshot.ExecutionSnapshot,
-	baseState flow.StateCommitment,
-	baseSnapshot snapshot.StorageSnapshot,
+	baseStorageSnapshot storehouse.ExtendableStorageSnapshot,
 ) (
 	proof []byte,
 	err error,
 ) {
+	baseState := baseStorageSnapshot.Commitment()
 	// Reason for including AllRegisterIDs (read and written registers) instead of ReadRegisterIDs (only read registers):
 	// AllRegisterIDs returns deduplicated register IDs that were touched by both
 	// reads and writes during the block execution.
