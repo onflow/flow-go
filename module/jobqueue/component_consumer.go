@@ -135,8 +135,8 @@ func (c *ComponentConsumer) Head() (uint64, error) {
 }
 
 // LastProcessedIndex returns the last processed job index
-func (c *ComponentConsumer) LastProcessedIndex() (uint64, error) {
-	return c.consumer.LastProcessedIndex(), nil
+func (c *ComponentConsumer) LastProcessedIndex() uint64 {
+	return c.consumer.LastProcessedIndex()
 }
 
 func (c *ComponentConsumer) processingLoop(ctx irrecoverable.SignalerContext) {
