@@ -65,9 +65,9 @@ func NewUnicastManager(logger zerolog.Logger,
 	}
 }
 
-// WithDefaultHandler sets the default stream handler for this unicast manager. The default handler is utilized
+// SetDefaultHandler sets the default stream handler for this unicast manager. The default handler is utilized
 // as the core handler for other unicast protocols, e.g., compressions.
-func (m *Manager) WithDefaultHandler(defaultHandler libp2pnet.StreamHandler) {
+func (m *Manager) SetDefaultHandler(defaultHandler libp2pnet.StreamHandler) {
 	defaultProtocolID := protocols.FlowProtocolID(m.sporkId)
 	if len(m.protocols) > 0 {
 		panic("default handler must be set only once before any unicast registration")

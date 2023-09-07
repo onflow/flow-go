@@ -37,14 +37,32 @@ type CoreP2P interface {
 
 // PeerManagement set of node traits related to its lifecycle and metadata retrieval
 type PeerManagement interface {
-	// AddPeer adds a peer to this node by adding it to this node's peerstore and connecting to it.
-	AddPeer(ctx context.Context, peerInfo peer.AddrInfo) error
+	// ConnectToPeer connects to the peer with the given peer address information.
+	// This method is used to connect to a peer that is not in the peer store.
+	ConnectToPeer(ctx context.Context, peerInfo peer.AddrInfo) error
 	// RemovePeer closes the connection with the peer.
 	RemovePeer(peerID peer.ID) error
 	// ListPeers returns list of peer IDs for peers subscribed to the topic.
 	ListPeers(topic string) []peer.ID
 	// GetPeersForProtocol returns slice peer IDs for the specified protocol ID.
 	GetPeersForProtocol(pid protocol.ID) peer.IDSlice
+	// GetIPPort returns the IP and Port the libp2p node is listening on.
+	GetIPPort() (string, string, error)
+	// RoutingTable returns the node routing table
+	RoutingTable() *kbucket.RoutingTable
+	// Subscribe subscribes the node to the given topic and returns the subscription
+	Subscribe(topic channels.Topic, topicValidator TopicValidatorFunc) (Subscription, error)
+	// Unsubscribe cancels the subscriber and closes the topic corresponding to the given channel.
+	Unsubscribe(topic channels.Topic) error
+	// Publish publishes the given payload on the topic.
+	Publish(ctx context.Context, messageScope network.OutgoingMessageScope) error
+	// Host returns pointer to host object of node.
+	Host() host.Host
+	// ID returns the peer.ID of the node, which is the unique identifier of the node at the libp2p level.
+	// For other libp2p nodes, the current node is identified by this ID.
+	ID() peer.ID
+	// WithDefaultUnicastProtocol overrides the default handler of the unicast manager and registers all preferred protocols.
+	WithDefaultUnicastProtocol(defaultHandler libp2pnet.StreamHandler, preferred []protocols.ProtocolName) error
 	// WithPeersProvider sets the PeersProvider for the peer manager.
 	// If a peer manager factory is set, this method will set the peer manager's PeersProvider.
 	WithPeersProvider(peersProvider PeersProvider)
@@ -65,10 +83,27 @@ type Routable interface {
 	Routing() routing.Routing
 }
 
-// StreamManagement peer to peer stream management functions
+// UnicastManagement abstracts the unicast management capabilities of the node.
 type UnicastManagement interface {
-	// CreateStream returns an existing stream connected to the peer if it exists, or creates a new stream with it.
-	CreateStream(ctx context.Context, peerID peer.ID) (libp2pnet.Stream, error)
+	// OpenProtectedStream opens a new stream to a peer with a protection tag. The protection tag can be used to ensure
+	// that the connection to the peer is maintained for a particular purpose. The stream is opened to the given peerID
+	// and writingLogic is executed on the stream. The created stream does not need to be reused and can be inexpensively
+	// created for each send. Moreover, the stream creation does not incur a round-trip time as the stream negotiation happens
+	// on an existing connection.
+	//
+	// Args:
+	// - ctx: The context used to control the stream's lifecycle.
+	// - peerID: The ID of the peer to open the stream to.
+	// - protectionTag: A tag that protects the connection and ensures that the connection manager keeps it alive, and
+	//   won't prune the connection while the tag is active.
+	// - writingLogic: A callback function that contains the logic for writing to the stream. It allows an external caller to
+	//   write to the stream without having to worry about the stream creation and management.
+	//
+	// Returns:
+	// error: An error, if any occurred during the process. This includes failure in creating the stream, setting the write
+	// deadline, executing the writing logic, resetting the stream if the writing logic fails, or closing the stream.
+	// All returned errors during this process can be considered benign.
+	OpenProtectedStream(ctx context.Context, peerID peer.ID, protectionTag string, writingLogic func(stream libp2pnet.Stream) error) error
 	// WithDefaultUnicastProtocol overrides the default handler of the unicast manager and registers all preferred protocols.
 	WithDefaultUnicastProtocol(defaultHandler libp2pnet.StreamHandler, preferred []protocols.ProtocolName) error
 }

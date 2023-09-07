@@ -16,13 +16,13 @@ import (
 type MessageHubFactory struct {
 	log           zerolog.Logger
 	me            module.Local
-	net           network.Network
+	net           network.EngineRegistry
 	protoState    protocol.State
 	engineMetrics module.EngineMetrics
 }
 
 func NewMessageHubFactory(log zerolog.Logger,
-	net network.Network,
+	net network.EngineRegistry,
 	me module.Local,
 	engineMetrics module.EngineMetrics,
 	protoState protocol.State) *MessageHubFactory {
