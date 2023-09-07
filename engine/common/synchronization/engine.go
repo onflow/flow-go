@@ -24,9 +24,11 @@ import (
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/network/alsp"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
+	"github.com/onflow/flow-go/utils/logging"
 	"github.com/onflow/flow-go/utils/rand"
 )
 
@@ -54,7 +56,8 @@ type Engine struct {
 	core                 module.SyncCore
 	participantsProvider module.IdentifierProvider
 
-	requestHandler *RequestHandler // component responsible for handling requests
+	requestHandler      *RequestHandler // component responsible for handling requests
+	spamDetectionConfig *SpamDetectionConfig
 
 	pendingSyncResponses   engine.MessageStore    // message store for *message.SyncResponse
 	pendingBlockResponses  engine.MessageStore    // message store for *message.BlockResponse
@@ -68,13 +71,14 @@ var _ component.Component = (*Engine)(nil)
 func New(
 	log zerolog.Logger,
 	metrics module.EngineMetrics,
-	net network.Network,
+	net network.EngineRegistry,
 	me module.Local,
 	state protocol.State,
 	blocks storage.Blocks,
 	comp consensus.Compliance,
 	core module.SyncCore,
 	participantsProvider module.IdentifierProvider,
+	spamDetectionConfig *SpamDetectionConfig,
 	opts ...OptionFunc,
 ) (*Engine, error) {
 
@@ -105,6 +109,7 @@ func New(
 		pollInterval:         opt.PollInterval,
 		scanInterval:         opt.ScanInterval,
 		participantsProvider: participantsProvider,
+		spamDetectionConfig:  spamDetectionConfig,
 	}
 
 	// register the engine with the network layer and store the conduit
@@ -202,9 +207,73 @@ func (e *Engine) Process(channel channels.Channel, originID flow.Identifier, eve
 //   - All other errors are potential symptoms of internal state corruption or bugs (fatal).
 func (e *Engine) process(channel channels.Channel, originID flow.Identifier, event interface{}) error {
 	switch event.(type) {
-	case *messages.RangeRequest, *messages.BatchRequest, *messages.SyncRequest:
+	case *messages.BatchRequest:
+		report, misbehavior := e.validateBatchRequestForALSP(channel, originID, event)
+		if misbehavior {
+			e.con.ReportMisbehavior(report) // report misbehavior to ALSP
+			e.log.
+				Warn().
+				Hex("origin_id", logging.ID(originID)).
+				Str(logging.KeySuspicious, "true").
+				Msgf("received invalid batch request from %x: %v", originID[:], misbehavior)
+			e.metrics.InboundMessageDropped(metrics.EngineSynchronization, metrics.MessageBatchRequest)
+			return nil
+		}
 		return e.requestHandler.Process(channel, originID, event)
-	case *messages.SyncResponse, *messages.BlockResponse:
+	case *messages.RangeRequest:
+		report, misbehavior := e.validateRangeRequestForALSP(channel, originID, event)
+		if misbehavior {
+			e.con.ReportMisbehavior(report) // report misbehavior to ALSP
+			e.log.
+				Warn().
+				Hex("origin_id", logging.ID(originID)).
+				Str(logging.KeySuspicious, "true").
+				Msgf("received invalid range request from %x: %v", originID[:], misbehavior)
+			e.metrics.InboundMessageDropped(metrics.EngineSynchronization, metrics.MessageRangeRequest)
+			return nil
+		}
+		return e.requestHandler.Process(channel, originID, event)
+
+	case *messages.SyncRequest:
+		report, misbehavior := e.validateSyncRequestForALSP(channel, originID, event)
+		if misbehavior {
+			e.con.ReportMisbehavior(report) // report misbehavior to ALSP
+			e.log.
+				Warn().
+				Hex("origin_id", logging.ID(originID)).
+				Str(logging.KeySuspicious, "true").
+				Msgf("received invalid sync request from %x: %v", originID[:], misbehavior)
+			e.metrics.InboundMessageDropped(metrics.EngineSynchronization, metrics.MessageSyncRequest)
+			return nil
+		}
+		return e.requestHandler.Process(channel, originID, event)
+
+	case *messages.BlockResponse:
+		report, misbehavior := e.validateBlockResponseForALSP(channel, originID, event)
+		if misbehavior {
+			e.con.ReportMisbehavior(report) // report misbehavior to ALSP
+			e.log.
+				Warn().
+				Hex("origin_id", logging.ID(originID)).
+				Str(logging.KeySuspicious, "true").
+				Msgf("received invalid block response from %x: %v", originID[:], misbehavior)
+			e.metrics.InboundMessageDropped(metrics.EngineSynchronization, metrics.MessageBlockResponse)
+			return nil
+		}
+		return e.responseMessageHandler.Process(originID, event)
+
+	case *messages.SyncResponse:
+		report, misbehavior := e.validateSyncResponseForALSP(channel, originID, event)
+		if misbehavior {
+			e.con.ReportMisbehavior(report) // report misbehavior to ALSP
+			e.log.
+				Warn().
+				Hex("origin_id", logging.ID(originID)).
+				Str(logging.KeySuspicious, "true").
+				Msgf("received invalid sync response from %x: %v", originID[:], misbehavior)
+			e.metrics.InboundMessageDropped(metrics.EngineSynchronization, metrics.MessageSyncResponse)
+			return nil
+		}
 		return e.responseMessageHandler.Process(originID, event)
 	default:
 		return fmt.Errorf("received input with type %T from %x: %w", event, originID[:], engine.IncompatibleInputTypeError)
@@ -423,4 +492,62 @@ func (e *Engine) sendRequests(participants flow.IdentifierList, ranges []chainsy
 	if err := errs.ErrorOrNil(); err != nil {
 		e.log.Warn().Err(err).Msg("sending range and batch requests failed")
 	}
+}
+
+// TODO: implement spam reporting similar to validateSyncRequestForALSP
+func (e *Engine) validateBatchRequestForALSP(channel channels.Channel, id flow.Identifier, event interface{}) (*alsp.MisbehaviorReport, bool) {
+	return nil, false
+}
+
+// TODO: implement spam reporting similar to validateSyncRequestForALSP
+func (e *Engine) validateBlockResponseForALSP(channel channels.Channel, id flow.Identifier, event interface{}) (*alsp.MisbehaviorReport, bool) {
+	return nil, false
+}
+
+// TODO: implement spam reporting similar to validateSyncRequestForALSP
+func (e *Engine) validateRangeRequestForALSP(channel channels.Channel, id flow.Identifier, event interface{}) (*alsp.MisbehaviorReport, bool) {
+	return nil, false
+}
+
+// validateSyncRequestForALSP checks if a sync request should be reported as spam. It returns a misbehavior report and a boolean indicating whether the request should be reported.
+func (e *Engine) validateSyncRequestForALSP(channel channels.Channel, originID flow.Identifier, event interface{}) (*alsp.MisbehaviorReport, bool) {
+	// Generate a random integer between 1 and spamProbabilityMultiplier (exclusive)
+	n, err := rand.Uint32n(spamProbabilityMultiplier)
+
+	if err != nil {
+		// failing to generate a random number is unlikely. If an error is encountered while
+		// generating a random number it indicates a bug and processing can not proceed.
+		e.log.Fatal().
+			Err(err).
+			Bool(logging.KeyNetworkingSecurity, true).
+			Str("originID", originID.String()).
+			Msg("failed to generate random number")
+	}
+
+	// to avoid creating a misbehavior report for every sync request received, use a probabilistic approach.
+	// Create a report with a probability of spamDetectionConfig.syncRequestProbability
+	if float32(n) < e.spamDetectionConfig.syncRequestProbability*spamProbabilityMultiplier {
+		// create a misbehavior report
+		e.log.Info().Str("originID", originID.String()).Msg("creating misbehavior report")
+		report, err := alsp.NewMisbehaviorReport(originID, alsp.ResourceIntensiveRequest)
+
+		if err != nil {
+			// failing to create the misbehavior report is unlikely. If an error is encountered while
+			// creating the misbehavior report it indicates a bug and processing can not proceed.
+			e.log.Fatal().
+				Err(err).
+				Bool(logging.KeyNetworkingSecurity, true).
+				Str("originID", originID.String()).
+				Msg("failed to create misbehavior report")
+		}
+		return report, true
+	}
+
+	// most of the time, don't report a misbehavior
+	return nil, false
+}
+
+// TODO: implement spam reporting similar to validateSyncRequestForALSP
+func (e *Engine) validateSyncResponseForALSP(channel channels.Channel, id flow.Identifier, event interface{}) (*alsp.MisbehaviorReport, bool) {
+	return nil, false
 }

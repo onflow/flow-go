@@ -79,12 +79,12 @@ func NewProgramLogger(
 	}
 }
 
-func (logger *ProgramLogger) Logger() *zerolog.Logger {
-	return &logger.ProgramLoggerParams.Logger
+func (logger *ProgramLogger) Logger() zerolog.Logger {
+	return logger.ProgramLoggerParams.Logger
 }
 
 func (logger *ProgramLogger) ImplementationDebugLog(message string) error {
-	logger.Logger().Debug().Msgf("Cadence: %s", message)
+	logger.Debug().Msgf("Cadence: %s", message)
 	return nil
 }
 
@@ -98,7 +98,7 @@ func (logger *ProgramLogger) ProgramLog(message string) error {
 		// emulator or emulator based tools),
 		// we log the message to the zerolog logger so that they can be tracked
 		// while stepping through a transaction/script.
-		logger.Logger().
+		logger.
 			Debug().
 			Msgf("Cadence log: %s", message)
 

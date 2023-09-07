@@ -77,13 +77,13 @@ func TestGossipSubIHaveBrokenPromises_Below_Threshold(t *testing.T) {
 		}),
 	)
 
-	idProvider.On("ByPeerID", victimNode.Host().ID()).Return(&victimIdentity, true).Maybe()
-	idProvider.On("ByPeerID", spammer.SpammerNode.Host().ID()).Return(&spammer.SpammerId, true).Maybe()
+	idProvider.On("ByPeerID", victimNode.ID()).Return(&victimIdentity, true).Maybe()
+	idProvider.On("ByPeerID", spammer.SpammerNode.ID()).Return(&spammer.SpammerId, true).Maybe()
 	ids := flow.IdentityList{&spammer.SpammerId, &victimIdentity}
 	nodes := []p2p.LibP2PNode{spammer.SpammerNode, victimNode}
 
-	p2ptest.StartNodes(t, signalerCtx, nodes, 100*time.Millisecond)
-	defer p2ptest.StopNodes(t, nodes, cancel, 2*time.Second)
+	p2ptest.StartNodes(t, signalerCtx, nodes)
+	defer p2ptest.StopNodes(t, nodes, cancel)
 
 	p2ptest.LetNodesDiscoverEachOther(t, ctx, nodes, ids)
 	p2ptest.TryConnectionAndEnsureConnected(t, ctx, nodes)
@@ -99,7 +99,7 @@ func TestGossipSubIHaveBrokenPromises_Below_Threshold(t *testing.T) {
 	// wait till victim counts the spam iHaves as broken promises (one per RPC for a total of 10).
 	initialBehavioralPenalty := float64(0) // keeps track of the initial behavioral penalty of the spammer node for decay testing.
 	require.Eventually(t, func() bool {
-		behavioralPenalty, ok := victimNode.PeerScoreExposer().GetBehaviourPenalty(spammer.SpammerNode.Host().ID())
+		behavioralPenalty, ok := victimNode.PeerScoreExposer().GetBehaviourPenalty(spammer.SpammerNode.ID())
 		if !ok {
 			return false
 		}
@@ -113,7 +113,7 @@ func TestGossipSubIHaveBrokenPromises_Below_Threshold(t *testing.T) {
 		// seconds to be on the safe side.
 	}, 10*time.Second, 100*time.Millisecond)
 
-	spammerScore, ok := victimNode.PeerScoreExposer().GetScore(spammer.SpammerNode.Host().ID())
+	spammerScore, ok := victimNode.PeerScoreExposer().GetScore(spammer.SpammerNode.ID())
 	require.True(t, ok, "sanity check failed, we should have a score for the spammer node")
 	// since spammer is not yet considered to be penalized, its score must be greater than the gossipsub health thresholds.
 	require.Greaterf(t, spammerScore, scoring.DefaultGossipThreshold, "sanity check failed, the score of the spammer node must be greater than gossip threshold: %f, actual: %f", scoring.DefaultGossipThreshold, spammerScore)
@@ -122,7 +122,7 @@ func TestGossipSubIHaveBrokenPromises_Below_Threshold(t *testing.T) {
 
 	// eventually, after a heartbeat the spammer behavioral counter must be decayed
 	require.Eventually(t, func() bool {
-		behavioralPenalty, ok := victimNode.PeerScoreExposer().GetBehaviourPenalty(spammer.SpammerNode.Host().ID())
+		behavioralPenalty, ok := victimNode.PeerScoreExposer().GetBehaviourPenalty(spammer.SpammerNode.ID())
 		if !ok {
 			return false
 		}
@@ -193,13 +193,13 @@ func TestGossipSubIHaveBrokenPromises_Above_Threshold(t *testing.T) {
 		}),
 	)
 
-	idProvider.On("ByPeerID", victimNode.Host().ID()).Return(&victimIdentity, true).Maybe()
-	idProvider.On("ByPeerID", spammer.SpammerNode.Host().ID()).Return(&spammer.SpammerId, true).Maybe()
+	idProvider.On("ByPeerID", victimNode.ID()).Return(&victimIdentity, true).Maybe()
+	idProvider.On("ByPeerID", spammer.SpammerNode.ID()).Return(&spammer.SpammerId, true).Maybe()
 	ids := flow.IdentityList{&spammer.SpammerId, &victimIdentity}
 	nodes := []p2p.LibP2PNode{spammer.SpammerNode, victimNode}
 
-	p2ptest.StartNodes(t, signalerCtx, nodes, 100*time.Millisecond)
-	defer p2ptest.StopNodes(t, nodes, cancel, 2*time.Second)
+	p2ptest.StartNodes(t, signalerCtx, nodes)
+	defer p2ptest.StopNodes(t, nodes, cancel)
 
 	p2ptest.LetNodesDiscoverEachOther(t, ctx, nodes, ids)
 	p2ptest.TryConnectionAndEnsureConnected(t, ctx, nodes)
@@ -209,7 +209,7 @@ func TestGossipSubIHaveBrokenPromises_Above_Threshold(t *testing.T) {
 		return unittest.ProposalFixture()
 	})
 
-	initScore, ok := victimNode.PeerScoreExposer().GetScore(spammer.SpammerNode.Host().ID())
+	initScore, ok := victimNode.PeerScoreExposer().GetScore(spammer.SpammerNode.ID())
 	require.True(t, ok, "score for spammer node must be present")
 
 	// FIRST ROUND OF ATTACK: spammer sends 10 RPCs to the victim node, each containing 500 iHave messages.
@@ -217,7 +217,7 @@ func TestGossipSubIHaveBrokenPromises_Above_Threshold(t *testing.T) {
 
 	// wait till victim counts the spam iHaves as broken promises for the second round of attack (one per RPC for a total of 10).
 	require.Eventually(t, func() bool {
-		behavioralPenalty, ok := victimNode.PeerScoreExposer().GetBehaviourPenalty(spammer.SpammerNode.Host().ID())
+		behavioralPenalty, ok := victimNode.PeerScoreExposer().GetBehaviourPenalty(spammer.SpammerNode.ID())
 		if !ok {
 			return false
 		}
@@ -232,7 +232,7 @@ func TestGossipSubIHaveBrokenPromises_Above_Threshold(t *testing.T) {
 		// seconds to be on the safe side.
 	}, 10*time.Second, 100*time.Millisecond)
 
-	scoreAfterFirstRound, ok := victimNode.PeerScoreExposer().GetScore(spammer.SpammerNode.Host().ID())
+	scoreAfterFirstRound, ok := victimNode.PeerScoreExposer().GetScore(spammer.SpammerNode.ID())
 	require.True(t, ok, "score for spammer node must be present")
 	// spammer score after first round must not be decreased severely, we account for 10% drop due to under-performing
 	// (on sending fresh new messages since that is not part of the test).
@@ -243,7 +243,7 @@ func TestGossipSubIHaveBrokenPromises_Above_Threshold(t *testing.T) {
 
 	// wait till victim counts the spam iHaves as broken promises for the second round of attack (one per RPC for a total of 10).
 	require.Eventually(t, func() bool {
-		behavioralPenalty, ok := victimNode.PeerScoreExposer().GetBehaviourPenalty(spammer.SpammerNode.Host().ID())
+		behavioralPenalty, ok := victimNode.PeerScoreExposer().GetBehaviourPenalty(spammer.SpammerNode.ID())
 		if !ok {
 			return false
 		}
@@ -259,7 +259,7 @@ func TestGossipSubIHaveBrokenPromises_Above_Threshold(t *testing.T) {
 		// seconds to be on the safe side.
 	}, 10*time.Second, 100*time.Millisecond)
 
-	spammerScore, ok := victimNode.PeerScoreExposer().GetScore(spammer.SpammerNode.Host().ID())
+	spammerScore, ok := victimNode.PeerScoreExposer().GetScore(spammer.SpammerNode.ID())
 	require.True(t, ok, "sanity check failed, we should have a score for the spammer node")
 	// with the second round of the attack, the spammer is about 10 broken promises above the threshold (total ~20 broken promises, but the first 10 are not counted).
 	// we expect the score to be dropped to initScore - 10 * 10 * 0.01 * scoring.MaxAppSpecificReward, however, instead of 10, we consider 8 about the threshold, to account for decays.
@@ -278,7 +278,7 @@ func TestGossipSubIHaveBrokenPromises_Above_Threshold(t *testing.T) {
 
 	// wait till victim counts the spam iHaves as broken promises for the third round of attack (one per RPC for a total of 10).
 	require.Eventually(t, func() bool {
-		behavioralPenalty, ok := victimNode.PeerScoreExposer().GetBehaviourPenalty(spammer.SpammerNode.Host().ID())
+		behavioralPenalty, ok := victimNode.PeerScoreExposer().GetBehaviourPenalty(spammer.SpammerNode.ID())
 		if !ok {
 			return false
 		}
@@ -293,7 +293,7 @@ func TestGossipSubIHaveBrokenPromises_Above_Threshold(t *testing.T) {
 		// seconds to be on the safe side.
 	}, 10*time.Second, 100*time.Millisecond)
 
-	spammerScore, ok = victimNode.PeerScoreExposer().GetScore(spammer.SpammerNode.Host().ID())
+	spammerScore, ok = victimNode.PeerScoreExposer().GetScore(spammer.SpammerNode.ID())
 	require.True(t, ok, "sanity check failed, we should have a score for the spammer node")
 	// with the third round of the attack, the spammer is about 20 broken promises above the threshold (total ~30 broken promises), hence its overall score must be below the gossip, publish, and graylist thresholds, meaning that
 	// victim will not exchange messages with it anymore, and also that it will be graylisted meaning all incoming and outgoing RPCs to and from the spammer will be dropped by the victim.
@@ -302,9 +302,18 @@ func TestGossipSubIHaveBrokenPromises_Above_Threshold(t *testing.T) {
 	require.Lessf(t, spammerScore, scoring.DefaultGraylistThreshold, "sanity check failed, the score of the spammer node must be less than graylist threshold: %f, actual: %f", scoring.DefaultGraylistThreshold, spammerScore)
 
 	// since the spammer score is below the gossip, graylist and publish thresholds, it should not be able to exchange messages with victim anymore.
-	p2ptest.EnsureNoPubsubExchangeBetweenGroups(t, ctx, []p2p.LibP2PNode{spammer.SpammerNode}, []p2p.LibP2PNode{victimNode}, blockTopic, 1, func() interface{} {
-		return unittest.ProposalFixture()
-	})
+	p2ptest.EnsureNoPubsubExchangeBetweenGroups(
+		t,
+		ctx,
+		[]p2p.LibP2PNode{spammer.SpammerNode},
+		flow.IdentifierList{spammer.SpammerId.NodeID},
+		[]p2p.LibP2PNode{victimNode},
+		flow.IdentifierList{victimIdentity.NodeID},
+		blockTopic,
+		1,
+		func() interface{} {
+			return unittest.ProposalFixture()
+		})
 }
 
 // spamIHaveBrokenPromises is a test utility function that is exclusive for the TestGossipSubIHaveBrokenPromises tests.

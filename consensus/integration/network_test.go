@@ -67,7 +67,7 @@ type Network struct {
 	mocknetwork.Network
 }
 
-var _ network.Network = (*Network)(nil)
+var _ network.EngineRegistry = (*Network)(nil)
 
 // Register registers an Engine of the attached node to the channel via a Conduit, and returns the
 // Conduit instance.
