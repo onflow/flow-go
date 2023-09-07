@@ -453,11 +453,7 @@ func (b *backendTransactions) GetTransactionResultsByBlockID(
 	// after iterating through all transactions in each collection, i equals the total number of
 	// user transactions in the block
 	txCount := i
-
 	sporkRootBlockHeight := b.state.Params().SporkRootBlockHeight()
-	if err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to retrieve root block: %v", err)
-	}
 
 	// root block has no system transaction result
 	if block.Header.Height > sporkRootBlockHeight {

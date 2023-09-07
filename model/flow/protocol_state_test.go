@@ -12,6 +12,9 @@ import (
 // TestNewRichProtocolStateEntry checks that NewRichProtocolStateEntry creates valid identity tables depending on the state
 // of epoch which is derived from the protocol state entry.
 func TestNewRichProtocolStateEntry(t *testing.T) {
+	// Conditions right after a spork:
+	//  * no previous epoch exists from the perspective of the freshly-sporked protocol state
+	//  * network is currently in the staking phase for the next epoch, hence no service events for the next epoch exist
 	t.Run("staking-root-protocol-state", func(t *testing.T) {
 		currentEpochSetup := unittest.EpochSetupFixture()
 		currentEpochCommit := unittest.EpochCommitFixture()
@@ -37,6 +40,11 @@ func TestNewRichProtocolStateEntry(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Equal(t, currentEpochSetup.Participants, entry.Identities, "should be equal to current epoch setup participants")
 	})
+
+	// Common situation during the staking phase for epoch N+1
+	//  * we are currently in Epoch N
+	//  * previous epoch N-1 is known (specifically EpochSetup and EpochCommit events)
+	//  * network is currently in the staking phase for the next epoch, hence no service events for the next epoch exist
 	t.Run("staking-phase", func(t *testing.T) {
 		stateEntry := unittest.ProtocolStateFixture()
 		richEntry, err := flow.NewRichProtocolStateEntry(
@@ -53,6 +61,11 @@ func TestNewRichProtocolStateEntry(t *testing.T) {
 		assert.Equal(t, expectedIdentities, richEntry.Identities, "should be equal to current epoch setup participants + previous epoch setup participants")
 		assert.Nil(t, richEntry.NextEpochProtocolState)
 	})
+
+	// Common situation during the epoch setup phase for epoch N+1
+	//  * we are currently in Epoch N
+	//  * previous epoch N-1 is known (specifically EpochSetup and EpochCommit events)
+	//  * network is currently in the setup phase for the next epoch, i.e. EpochSetup event (starting setup phase) has already been observed
 	t.Run("setup-phase", func(t *testing.T) {
 		stateEntry := unittest.ProtocolStateFixture(unittest.WithNextEpochProtocolState(), func(entry *flow.RichProtocolStateEntry) {
 			entry.NextEpochProtocolState.CurrentEpochCommit = nil
@@ -75,6 +88,13 @@ func TestNewRichProtocolStateEntry(t *testing.T) {
 		expectedIdentities = stateEntry.NextEpochProtocolState.CurrentEpochSetup.Participants.Union(stateEntry.CurrentEpochSetup.Participants)
 		assert.Equal(t, expectedIdentities, richEntry.NextEpochProtocolState.Identities, "should be equal to next epoch setup participants + current epoch setup participants")
 	})
+
+	// TODO: include test for epoch setup phase where no prior epoch exist (i.e. first epoch setup phase after spork)
+
+	// Common situation during the epoch commit phase for epoch N+1
+	//  * we are currently in Epoch N
+	//  * previous epoch N-1 is known (specifically EpochSetup and EpochCommit events)
+	//  * The network has completed the epoch setup phase, i.e. published the EpochSetup and EpochCommit events for epoch N+1.
 	t.Run("commit-phase", func(t *testing.T) {
 		stateEntry := unittest.ProtocolStateFixture(unittest.WithNextEpochProtocolState())
 
@@ -93,6 +113,9 @@ func TestNewRichProtocolStateEntry(t *testing.T) {
 		expectedIdentities = stateEntry.NextEpochProtocolState.CurrentEpochSetup.Participants.Union(stateEntry.CurrentEpochSetup.Participants)
 		assert.Equal(t, expectedIdentities, richEntry.NextEpochProtocolState.Identities, "should be equal to next epoch setup participants + current epoch setup participants")
 	})
+
+	// TODO: include test for epoch commit phase where no prior epoch exist (i.e. first epoch commit phase after spork)
+
 }
 
 // TestProtocolStateEntry_Copy tests if the copy method returns a deep copy of the entry. All changes to cpy shouldn't affect the original entry.
