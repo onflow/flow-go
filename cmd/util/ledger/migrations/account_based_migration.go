@@ -21,7 +21,7 @@ import (
 // AccountMigrator takes all the Payloads that belong to the given account
 // and return the migrated Payloads
 type AccountMigrator interface {
-	MigratePayloads(ctx context.Context, address common.Address, payloads []ledger.Payload) ([]ledger.Payload, error)
+	MigratePayloads(ctx context.Context, address common.Address, payloads []*ledger.Payload) ([]*ledger.Payload, error)
 }
 
 // AccountMigratorFactory creates an AccountMigrator
@@ -42,6 +42,9 @@ func CreateAccountBasedMigration(
 	}
 }
 
+// totalExpectedAccounts is just used to preallocate the account group  map
+const totalExpectedAccounts = 40_000_000
+
 // MigrateByAccount teaks a migrator function and all the Payloads, and return the migrated Payloads
 func MigrateByAccount(
 	log zerolog.Logger,
@@ -53,8 +56,8 @@ func MigrateByAccount(
 	error,
 ) {
 	groups := &payloadGroup{
-		NonAccountPayloads: make([]ledger.Payload, 0),
-		Accounts:           make(map[common.Address][]ledger.Payload),
+		NonAccountPayloads: make([]*ledger.Payload, 0),
+		Accounts:           make(map[common.Address][]*ledger.Payload, totalExpectedAccounts),
 	}
 
 	log.Info().Msgf("start grouping for a total of %v Payloads", len(allPayloads))
@@ -103,9 +106,14 @@ func MigrateByAccount(
 	// add the non accounts which don't need to be migrated
 	migrated = append(migrated, groups.NonAccountPayloads...)
 
+	final := make([]ledger.Payload, 0, len(migrated))
+	for _, p := range migrated {
+		final = append(final, *p)
+	}
+
 	log.Info().Msgf("finished migrating all account based Payloads, total migrated Payloads: %v", len(migrated))
 
-	return migrated, nil
+	return final, nil
 }
 
 // MigrateGroupConcurrently migrate the Payloads in the given payloadsByAccount map which
@@ -114,9 +122,9 @@ func MigrateByAccount(
 func MigrateGroupConcurrently(
 	log zerolog.Logger,
 	migrator AccountMigrator,
-	payloadsByAccount map[common.Address][]ledger.Payload,
+	payloadsByAccount map[common.Address][]*ledger.Payload,
 	nWorker int,
-) ([]ledger.Payload, error) {
+) ([]*ledger.Payload, error) {
 
 	const logTopNDurations = 20
 
@@ -175,7 +183,7 @@ func MigrateGroupConcurrently(
 	// read job results
 	logAccount := moduleUtil.LogProgress("processing account group", len(payloadsByAccount), log)
 
-	migrated := make([]ledger.Payload, 0)
+	migrated := make([]*ledger.Payload, 0)
 
 	durations := &migrationDurations{}
 	var err error
@@ -220,13 +228,13 @@ func MigrateGroupConcurrently(
 
 type jobMigrateAccountGroup struct {
 	Address  common.Address
-	Payloads []ledger.Payload
+	Payloads []*ledger.Payload
 }
 
 type migrationResult struct {
 	migrationDuration
 
-	Migrated []ledger.Payload
+	Migrated []*ledger.Payload
 	Err      error
 }
 
@@ -234,7 +242,7 @@ type migrationResult struct {
 // - (address, true, nil) if the payload is for an account, the account address is returned
 // - ("", false, nil) if the payload is not for an account
 // - ("", false, err) if running into any exception
-func payloadToAccount(p ledger.Payload) (common.Address, bool, error) {
+func payloadToAccount(p *ledger.Payload) (common.Address, bool, error) {
 	k, err := p.Key()
 	if err != nil {
 		return common.Address{}, false, fmt.Errorf("could not find key for payload: %w", err)
@@ -254,28 +262,39 @@ func payloadToAccount(p ledger.Payload) (common.Address, bool, error) {
 		return common.Address{}, false, fmt.Errorf("invalid account address: %w", err)
 	}
 
+	// The zero address is used for global Payloads and is not an account
+	if address == common.ZeroAddress {
+		return address, false, nil
+	}
+
 	return address, true, nil
 }
 
 // payloadGroup groups Payloads by account.
 // For global Payloads, it's stored under NonAccountPayloads field
 type payloadGroup struct {
-	NonAccountPayloads []ledger.Payload
-	Accounts           map[common.Address][]ledger.Payload
+	NonAccountPayloads []*ledger.Payload
+	Accounts           map[common.Address][]*ledger.Payload
 }
 
 // payloadGrouping is a reducer function that adds the given payload to the corresponding
 // group under its account
 func payloadGrouping(groups *payloadGroup, payload ledger.Payload) (*payloadGroup, error) {
-	address, isAccount, err := payloadToAccount(payload)
+	address, isAccount, err := payloadToAccount(&payload)
 	if err != nil {
 		return nil, err
 	}
 
 	if isAccount {
-		groups.Accounts[address] = append(groups.Accounts[address], payload)
+		_, exist := groups.Accounts[address]
+		if !exist {
+			// preallocate the slice to avoid reallocation
+			// most accounts should have the 4 domains + a few special registers
+			groups.Accounts[address] = make([]*ledger.Payload, 0, 10)
+		}
+		groups.Accounts[address] = append(groups.Accounts[address], &payload)
 	} else {
-		groups.NonAccountPayloads = append(groups.NonAccountPayloads, payload)
+		groups.NonAccountPayloads = append(groups.NonAccountPayloads, &payload)
 	}
 
 	return groups, nil

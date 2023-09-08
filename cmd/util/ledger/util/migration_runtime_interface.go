@@ -24,19 +24,6 @@ type MigrationRuntimeInterface struct {
 	GetOrLoadProgramFunc func(location runtime.Location, load func() (*interpreter.Program, error)) (*interpreter.Program, error)
 }
 
-func newMigrationRuntimeInterface(
-	Accounts environment.Accounts,
-	Programs *environment.Programs,
-) MigrationRuntimeInterface {
-
-	mri := MigrationRuntimeInterface{
-		Accounts: Accounts,
-		Programs: Programs,
-	}
-
-	return mri
-}
-
 func (m MigrationRuntimeInterface) ResolveLocation(
 	identifiers []runtime.Identifier,
 	location runtime.Location,

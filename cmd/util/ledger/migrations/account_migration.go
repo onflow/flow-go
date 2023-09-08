@@ -15,6 +15,8 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
+// MigrateAccountUsage iterates through each payload, and calculate the storage usage
+// and update the accoutns status with the updated storage usage
 func MigrateAccountUsage(log zerolog.Logger, nWorker int) func([]ledger.Payload) ([]ledger.Payload, error) {
 	return CreateAccountBasedMigration(
 		log,
@@ -25,7 +27,7 @@ func MigrateAccountUsage(log zerolog.Logger, nWorker int) func([]ledger.Payload)
 	)
 }
 
-func payloadSize(key ledger.Key, payload ledger.Payload) (uint64, error) {
+func payloadSize(key ledger.Key, payload *ledger.Payload) (uint64, error) {
 	id, err := util.KeyToRegisterID(key)
 	if err != nil {
 		return 0, err
@@ -40,9 +42,11 @@ func isAccountKey(key ledger.Key) bool {
 
 type AccountUsageMigrator struct{}
 
-// AccountUsageMigrator iterate through each payload, and calculate the storage usage
-// and update the accoutns status with the updated storage usage
-func (m AccountUsageMigrator) MigratePayloads(ctx context.Context, address common.Address, payloads []ledger.Payload) ([]ledger.Payload, error) {
+func (m AccountUsageMigrator) MigratePayloads(
+	ctx context.Context,
+	address common.Address,
+	payloads []*ledger.Payload,
+) ([]*ledger.Payload, error) {
 	var status *environment.AccountStatus
 	var statusIndex int
 	totalSize := uint64(0)
@@ -85,7 +89,7 @@ func (m AccountUsageMigrator) MigratePayloads(ctx context.Context, address commo
 		return nil, fmt.Errorf("cannot create new payload with value: %w", err)
 	}
 
-	payloads[statusIndex] = newPayload
+	payloads[statusIndex] = &newPayload
 
 	return payloads, nil
 }
@@ -100,7 +104,7 @@ func compareUsage(status *environment.AccountStatus, totalSize uint64) error {
 
 // newPayloadWithValue returns a new payload with the key from the given payload, and
 // the value from the argument
-func newPayloadWithValue(payload ledger.Payload, value ledger.Value) (ledger.Payload, error) {
+func newPayloadWithValue(payload *ledger.Payload, value ledger.Value) (ledger.Payload, error) {
 	key, err := payload.Key()
 	if err != nil {
 		return ledger.Payload{}, err

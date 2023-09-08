@@ -54,10 +54,10 @@ func incrementStorageUsed(p ledger.Payload, used map[string]uint64) error {
 	if _, ok := used[id.Owner]; !ok {
 		used[id.Owner] = 0
 	}
-	used[id.Owner] = used[id.Owner] + uint64(registerSize(id, p))
+	used[id.Owner] = used[id.Owner] + uint64(registerSize(id, &p))
 	return nil
 }
 
-func registerSize(id flow.RegisterID, p ledger.Payload) int {
+func registerSize(id flow.RegisterID, p *ledger.Payload) int {
 	return fvm.RegisterSize(id, p.Value())
 }

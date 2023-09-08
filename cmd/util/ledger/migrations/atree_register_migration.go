@@ -83,55 +83,50 @@ func (m *AtreeRegisterMigrator) Close() error {
 func (m *AtreeRegisterMigrator) MigratePayloads(
 	_ context.Context,
 	address common.Address,
-	payloads []ledger.Payload,
-) ([]ledger.Payload, error) {
-	// don't migrate the zero address
-	// these are the non-account registers and are not atrees
-	if address == common.ZeroAddress {
-		return payloads, nil
+	payloads []*ledger.Payload,
+) ([]*ledger.Payload, error) {
+
+	// create all the runtime components we need for the migration
+	mr, err := m.newMigratorRuntime(address, payloads)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create migrator runtime: %w", err)
 	}
 
-	err := m.checkStorageHealth(address, payloads)
+	// check the storage health
+	healthOk, err := m.checkStorageHealth(mr)
 	if err != nil {
 		return nil, fmt.Errorf("storage health issues for address %s: %w", address.Hex(), err)
 	}
 
 	// Do the storage conversion
-	changes, err := m.migrateAccountStorage(address, payloads)
+	changes, err := m.migrateAccountStorage(mr)
 	if err != nil {
 		return nil, fmt.Errorf("failed to convert storage for address %s: %w", address.Hex(), err)
 	}
 
-	return m.validateChangesAndCreateNewRegisters(payloads, address, changes)
+	return m.validateChangesAndCreateNewRegisters(mr, changes, healthOk)
 }
 
 func (m *AtreeRegisterMigrator) migrateAccountStorage(
-	address common.Address,
-	payloads []ledger.Payload,
+	mr *migratorRuntime,
 ) (map[flow.RegisterID]flow.RegisterValue, error) {
-
-	// create all the runtime components we need for the migration
-	r, err := m.newMigratorRuntime(payloads)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create migrator runtime: %w", err)
-	}
 
 	// iterate through all domains and migrate them
 	for _, domain := range domains {
-		err := m.convertStorageDomain(address, r.Storage, r.Interpreter, domain)
+		err := m.convertStorageDomain(mr.Address, mr.Storage, mr.Interpreter, domain)
 		if err != nil {
 			return nil, fmt.Errorf("failed to convert storage domain %s : %w", domain, err)
 		}
 	}
 
 	// commit the storage changes
-	err = r.Storage.Commit(r.Interpreter, true)
+	err := mr.Storage.Commit(mr.Interpreter, true)
 	if err != nil {
 		return nil, fmt.Errorf("failed to commit storage: %w", err)
 	}
 
 	// finalize the transaction
-	result, err := r.TransactionState.FinalizeMainTransaction()
+	result, err := mr.TransactionState.FinalizeMainTransaction()
 	if err != nil {
 		return nil, fmt.Errorf("failed to finalize main transaction: %w", err)
 	}
@@ -214,7 +209,8 @@ func (m *AtreeRegisterMigrator) convertStorageDomain(
 }
 
 func (m *AtreeRegisterMigrator) newMigratorRuntime(
-	payloads []ledger.Payload,
+	address common.Address,
+	payloads []*ledger.Payload,
 ) (
 	*migratorRuntime,
 	error,
@@ -257,6 +253,9 @@ func (m *AtreeRegisterMigrator) newMigratorRuntime(
 	}
 
 	return &migratorRuntime{
+		Address:          address,
+		Payloads:         payloads,
+		Snapshot:         snapshot,
 		TransactionState: transactionState,
 		Interpreter:      inter,
 		Storage:          storage,
@@ -264,62 +263,67 @@ func (m *AtreeRegisterMigrator) newMigratorRuntime(
 }
 
 type migratorRuntime struct {
+	Snapshot         *util.PayloadSnapshot
 	TransactionState state.NestedTransactionPreparer
 	Interpreter      *interpreter.Interpreter
 	Storage          *runtime.Storage
+	Payloads         []*ledger.Payload
+	Address          common.Address
 }
 
 func (m *AtreeRegisterMigrator) validateChangesAndCreateNewRegisters(
-	payloads []ledger.Payload,
-	address common.Address,
+	mr *migratorRuntime,
 	changes map[flow.RegisterID]flow.RegisterValue,
-) ([]ledger.Payload, error) {
-	originalPayloadsSnapshot, err := util.NewPayloadSnapshot(payloads)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create payload snapshot: %w", err)
-	}
+	storageHealthOk bool,
+) (
+	[]*ledger.Payload,
+	error,
+) {
+	originalPayloadsSnapshot := mr.Snapshot
 	originalPayloads := originalPayloadsSnapshot.Payloads
-	newPayloads := make([]ledger.Payload, 0, len(originalPayloads))
+	newPayloads := make([]*ledger.Payload, 0, len(originalPayloads))
 
 	for id, value := range changes {
-		// delete all values that were changed from the original payloads
+		// delete all values that were changed from the original payloads so that we can
+		// check what remains
 		delete(originalPayloads, id)
 
 		if len(value) == 0 {
 			// value was deleted
 			continue
 		}
+
 		ownerAddress, err := common.BytesToAddress([]byte(id.Owner))
 		if err != nil {
 			return nil, fmt.Errorf("failed to convert owner address: %w", err)
 		}
 
-		if ownerAddress.Hex() != address.Hex() {
+		if ownerAddress.Hex() != mr.Address.Hex() {
 			// something was changed that does not belong to this account. Log it.
 			m.log.Error().
 				Str("key", id.String()).
 				Str("owner_address", ownerAddress.Hex()).
-				Str("account", address.Hex()).
+				Str("account", mr.Address.Hex()).
 				Msg("key is part of the change set, but is for a different account")
 
 			return nil, fmt.Errorf("register for a different account was produced during migration")
 		}
 
-		newPayloads = append(newPayloads, *ledger.NewPayload(util.RegisterIDToKey(id), value))
+		newPayloads = append(newPayloads, ledger.NewPayload(util.RegisterIDToKey(id), value))
 	}
 
 	//hasMissingKeys := false
 
 	// add all values that were not changed
 	for id, value := range originalPayloads {
-		if len(value) == 0 {
+		if len(value.Value()) == 0 {
 			// this is strange, but we don't want to add empty values. Log it.
 			m.log.Warn().Msgf("empty value for key %s", id)
 			continue
 		}
 		if id.IsInternalState() {
 			// this is expected. Move it to the new payload
-			newPayloads = append(newPayloads, *ledger.NewPayload(util.RegisterIDToKey(id), value))
+			newPayloads = append(newPayloads, value)
 			continue
 		}
 
@@ -333,18 +337,22 @@ func (m *AtreeRegisterMigrator) validateChangesAndCreateNewRegisters(
 		if isADomainKey {
 			// TODO: check if this is really expected
 			// this is expected. Move it to the new payload
-			newPayloads = append(newPayloads, *ledger.NewPayload(util.RegisterIDToKey(id), value))
+			newPayloads = append(newPayloads, value)
 			continue
 		}
 
-		// something was not moved. Log it.
+		// something was not moved. Log it if we don't expect any storage health issues
+		if !storageHealthOk {
+			continue
+		}
+
 		m.log.Debug().
 			Str("key", id.String()).
-			Str("account", address.Hex()).
+			Str("account", mr.Address.Hex()).
 			Str("value", fmt.Sprintf("%x", value)).
 			Msg("Key was not migrated")
 		m.rw.Write(migrationError{
-			Address: address.Hex(),
+			Address: mr.Address.Hex(),
 			Key:     id.String(),
 			Kind:    "not_migrated",
 			Msg:     fmt.Sprintf("%x", value),
@@ -369,21 +377,24 @@ func (m *AtreeRegisterMigrator) validateChangesAndCreateNewRegisters(
 }
 
 func (m *AtreeRegisterMigrator) checkStorageHealth(
-	address common.Address,
-	payloads []ledger.Payload,
-) error {
+	mr *migratorRuntime,
+) (
+	healthOk bool,
+	err error,
+) {
+	healthOk = true
 
-	storageIDs := make([]atree.StorageID, 0, len(payloads))
+	storageIDs := make([]atree.StorageID, 0, len(mr.Payloads))
 
-	for _, payload := range payloads {
+	for _, payload := range mr.Payloads {
 		key, err := payload.Key()
 		if err != nil {
-			return fmt.Errorf("failed to get payload key: %w", err)
+			return false, fmt.Errorf("failed to get payload key: %w", err)
 		}
 
 		id, err := util.KeyToRegisterID(key)
 		if err != nil {
-			return fmt.Errorf("failed to convert key to register ID: %w", err)
+			return false, fmt.Errorf("failed to convert key to register ID: %w", err)
 		}
 
 		if id.IsInternalState() {
@@ -400,41 +411,32 @@ func (m *AtreeRegisterMigrator) checkStorageHealth(
 		})
 	}
 
-	snapshot, err := util.NewPayloadSnapshot(payloads)
-	if err != nil {
-		return fmt.Errorf("failed to create payload snapshot: %w", err)
-	}
-
-	transactionState := state.NewTransactionState(snapshot, state.DefaultParameters())
-	accounts := environment.NewAccounts(transactionState)
-
-	accountsAtreeLedger := util.NewAccountsAtreeLedger(accounts)
-	storage := runtime.NewStorage(accountsAtreeLedger, util.NopMemoryGauge{})
-
 	// load (but don't create) storage map in Cadence storage
-	_ = storage.GetStorageMap(address, "public", false)
-	_ = storage.GetStorageMap(address, "private", false)
-	_ = storage.GetStorageMap(address, "storage", false)
+	for _, domain := range domains {
+		_ = mr.Storage.GetStorageMap(mr.Address, domain, false)
+
+	}
 
 	// load slabs in atree storage
 	for _, id := range storageIDs {
-		_, _, _ = storage.Retrieve(id)
+		_, _, _ = mr.Storage.Retrieve(id)
 	}
 
-	err = storage.CheckHealth()
+	err = mr.Storage.CheckHealth()
 	if err != nil {
-		m.log.Info().
+		m.log.Debug().
 			Err(err).
-			Str("account", address.Hex()).
+			Str("account", mr.Address.Hex()).
 			Msg("Account storage health issue")
 		m.rw.Write(migrationError{
-			Address: address.Hex(),
+			Address: mr.Address.Hex(),
 			Key:     "",
 			Kind:    "storage_health_problem",
 			Msg:     err.Error(),
 		})
+		healthOk = false
 	}
-	return nil
+	return healthOk, nil
 
 }
 

@@ -1,6 +1,7 @@
 package migrations_test
 
 import (
+	"github.com/onflow/flow-go/model/flow"
 	"testing"
 
 	"github.com/rs/zerolog"
@@ -29,20 +30,32 @@ func TestAtreeRegisterMigration(t *testing.T) {
 			migrations.MigrateAtreeRegisters(log, reporters.NewReportFileWriterFactory(dir, log), 2),
 			func(t *testing.T, oldPayloads []ledger.Payload, newPayloads []ledger.Payload) {
 
-				newSnapshot, err := util.NewPayloadSnapshot(oldPayloads)
-				require.NoError(t, err)
+				oldPayloadsMap := make(map[flow.RegisterID]*ledger.Payload, len(oldPayloads))
 
 				for _, payload := range oldPayloads {
 					key, err := payload.Key()
 					require.NoError(t, err)
-					regId, err := util.KeyToRegisterID(key)
+					id, err := util.KeyToRegisterID(key)
 					require.NoError(t, err)
-					value, err := newSnapshot.Get(regId)
+					oldPayloadsMap[id] = &payload
+				}
+
+				newPayloadsMap := make(map[flow.RegisterID]*ledger.Payload, len(newPayloads))
+
+				for _, payload := range newPayloads {
+					key, err := payload.Key()
 					require.NoError(t, err)
+					id, err := util.KeyToRegisterID(key)
+					require.NoError(t, err)
+					newPayloadsMap[id] = &payload
+				}
+
+				for key, payload := range newPayloadsMap {
+					value := newPayloadsMap[key].Value()
 
 					// TODO: currently the migration does not change the payload values because
 					// the atree version is not changed. This should be changed in the future.
-					require.Equal(t, []byte(payload.Value()), value)
+					require.Equal(t, payload.Value(), value)
 				}
 
 				// commented out helper code to dump the payloads to csv files for manual inspection
