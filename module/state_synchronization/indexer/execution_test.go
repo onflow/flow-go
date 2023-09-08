@@ -81,6 +81,15 @@ func (i *indexTest) useDefaultLastHeight() *indexTest {
 	return i
 }
 
+func (i *indexTest) useDefaultFirstHeight() *indexTest {
+	i.registers.
+		On("FirstHeight").
+		Return(func() (uint64, error) {
+			return i.blocks[0].Header.Height, nil
+		})
+	return i
+}
+
 func (i *indexTest) setFirstHeight(f func(t *testing.T) (uint64, error)) *indexTest {
 	i.registers.
 		On("FirstHeight", mock.AnythingOfType("uint64")).
@@ -274,6 +283,8 @@ func TestExecutionState_RegisterValues(t *testing.T) {
 			setGetRegisters(func(t *testing.T, ID flow.RegisterID, height uint64) (flow.RegisterValue, error) {
 				return val, nil
 			}).
+			useDefaultLastHeight().
+			useDefaultFirstHeight().
 			runGetRegisters(ids, height)
 
 		assert.NoError(t, err)
