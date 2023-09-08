@@ -35,7 +35,7 @@ func (b *Bootstrapper) BootstrapLedger(
 	servicePublicKey flow.AccountPublicKey,
 	chain flow.Chain,
 	opts ...fvm.BootstrapProcedureOption,
-) (flow.StateCommitment, error) {
+) (flow.StateCommitment, *snapshot.ExecutionSnapshot, error) {
 	storageSnapshot := state.NewLedgerStorageSnapshot(
 		ledger,
 		flow.StateCommitment(ledger.InitialState()))
@@ -55,7 +55,7 @@ func (b *Bootstrapper) BootstrapLedger(
 
 	executionSnapshot, _, err := vm.Run(ctx, bootstrap, storageSnapshot)
 	if err != nil {
-		return flow.DummyStateCommitment, err
+		return flow.DummyStateCommitment, nil, err
 	}
 
 	newStateCommitment, _, err := state.CommitDelta(
@@ -63,10 +63,10 @@ func (b *Bootstrapper) BootstrapLedger(
 		executionSnapshot,
 		flow.StateCommitment(ledger.InitialState()))
 	if err != nil {
-		return flow.DummyStateCommitment, err
+		return flow.DummyStateCommitment, nil, err
 	}
 
-	return newStateCommitment, nil
+	return newStateCommitment, executionSnapshot, nil
 }
 
 // IsBootstrapped returns whether the execution database has been bootstrapped, if yes, returns the
