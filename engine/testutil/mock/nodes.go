@@ -9,7 +9,6 @@ import (
 
 	"github.com/dgraph-io/badger/v2"
 	"github.com/rs/zerolog"
-	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/engine/collection/epochmgr"
 	collectioningest "github.com/onflow/flow-go/engine/collection/ingest"
@@ -246,14 +245,14 @@ func (en ExecutionNode) Done(cancelFunc context.CancelFunc) {
 	en.GenericNode.Done()
 }
 
-func (en ExecutionNode) AssertHighestExecutedBlock(t *testing.T, header *flow.Header) {
-
-	height, blockID, err := en.ExecutionState.GetHighestExecutedBlockID(context.Background())
-	require.NoError(t, err)
-
-	require.Equal(t, header.ID(), blockID)
-	require.Equal(t, header.Height, height)
-}
+// func (en ExecutionNode) AssertHighestExecutedBlock(t *testing.T, header *flow.Header) {
+//
+// 	height, blockID, err := en.ExecutionState.GetHighestExecutedBlockID(context.Background())
+// 	require.NoError(t, err)
+//
+// 	require.Equal(t, header.ID(), blockID)
+// 	require.Equal(t, header.Height, height)
+// }
 
 // VerificationNode implements an in-process verification node for tests.
 type VerificationNode struct {
