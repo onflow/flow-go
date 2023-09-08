@@ -15,14 +15,17 @@ The folder contains:
 - this `README` file.
 
 To upgrade the BLST version:
+- [ ] audit all BLST updated, with focus on `<blst>/src`: https://github.com/supranational/blst/compare/v0.3.11...<new_version>
 - [ ] delete all files in this folder `./blst_src/` but `blst_src.c` and `README.md`.
+- [ ] delete all files in `./internal/blst/`.
 - [ ] open BLST repository on the new version.
 - [ ] copy all `.c` and `.h` files from `<blst>/src/` into `./blst_src/`.
-- [ ] delete `./blst_src/server.c`.
+- [ ] delete newly copied `./blst_src/server.c`.
 - [ ] copy the folder `<blst>/build/` into this folder `./blst_src`.
-- [ ] update `./blst_src/blst_src.c` if needed.
+- [ ] copy `<blst>/bindings/blst.h`, `<blst>/bindings/blst_aux.h`, and `<blst>/bindings/go/blst.go` into `./internal/blst/.`.
 - [ ] check that C flags in `./bls12381_utils.go` still include the C flags in `<blst>/bindings/go/blst.go`.
+- [ ] update `./blst_src/blst_src.c` if needed.
 - [ ] solve all breaking changes that may occur.
 - [ ] update the commit version on this `./blst_src/README`.
 
-Remember that Flow crypto is using non exported internal functions from BLST. Checking for interfaces breaking changes in BLST should made along with auditing changes between the old and new versions. This includes checking logical changes and assumptions beyond interfaces, and assessing their security and performance impact on protocols implemented in Flow crypto. 
+Note that Flow crypto is using non exported internal functions from BLST. Checking for interfaces breaking changes in BLST should done along with auditing changes between the old and new versions. This includes checking logical changes and assumptions beyond interfaces, and assessing their security and performance impact on protocols implemented in Flow crypto.
