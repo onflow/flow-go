@@ -341,7 +341,7 @@ func BytesToCadenceArray(l []byte) cadence.Array {
 		values[i] = cadence.NewUInt8(b)
 	}
 
-	return cadence.NewArray(values).WithType(cadence.NewVariableSizedArrayType(cadence.NewUInt8Type()))
+	return cadence.NewArray(values).WithType(cadence.NewVariableSizedArrayType(cadence.UInt8Type))
 }
 
 // CreateAccountCreationTransaction creates a transaction which will create a new account.
