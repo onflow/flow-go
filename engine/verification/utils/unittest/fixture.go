@@ -247,7 +247,7 @@ func ExecutionResultFixture(t *testing.T,
 		// set 0 clusters to pass n_collectors >= n_clusters check
 		epochConfig := epochs.DefaultEpochConfig()
 		epochConfig.NumCollectorClusters = 0
-		startStateCommitment, err := bootstrap.NewBootstrapper(log).BootstrapLedger(
+		startStateCommitment, _, err := bootstrap.NewBootstrapper(log).BootstrapLedger(
 			led,
 			unittest.ServiceAccountPublicKey,
 			chain,
