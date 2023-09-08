@@ -182,8 +182,13 @@ func (ss *SyncSuite) TestLoad_Process_RangeRequest_SometimesReportSpam() {
 
 	loadGroups := []loadGroup{}
 
-	// expect to get misbehavior report about 10% of the time
-	loadGroups = append(loadGroups, loadGroup{0.1, 75, 140, 9, 10})
+	// using a very small range, expect to almost never get misbehavior report, about 0.003% of the time (3 in 1000 requests)
+	// expected probability factor: 0.1 * ((10-9) + 1)/64 = 0.003125
+	loadGroups = append(loadGroups, loadGroup{0.1, 0, 15, 9, 10})
+
+	// using a large range (99), expect to get misbehavior report about 15% of the time (150 in 1000 requests)
+	// expected probability factor: 0.1 * ((100-1) + 1)/64 = 0.15625
+	loadGroups = append(loadGroups, loadGroup{0.1, 110, 200, 1, 100})
 
 	// reset misbehavior report counter for each subtest
 	misbehaviorsCounter := 0
