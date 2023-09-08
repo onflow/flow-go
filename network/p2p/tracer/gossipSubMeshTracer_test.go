@@ -86,7 +86,7 @@ func TestGossipSubMeshTracer(t *testing.T) {
 		p2ptest.WithGossipSubTracer(meshTracer),
 		p2ptest.WithRole(flow.RoleConsensus))
 
-	idProvider.On("ByPeerID", tracerNode.Host().ID()).Return(&tracerId, true).Maybe()
+	idProvider.On("ByPeerID", tracerNode.ID()).Return(&tracerId, true).Maybe()
 
 	otherNode1, otherId1 := p2ptest.NodeFixture(
 		t,
@@ -94,7 +94,7 @@ func TestGossipSubMeshTracer(t *testing.T) {
 		t.Name(),
 		idProvider,
 		p2ptest.WithRole(flow.RoleConsensus))
-	idProvider.On("ByPeerID", otherNode1.Host().ID()).Return(&otherId1, true).Maybe()
+	idProvider.On("ByPeerID", otherNode1.ID()).Return(&otherId1, true).Maybe()
 
 	otherNode2, otherId2 := p2ptest.NodeFixture(
 		t,
@@ -102,7 +102,7 @@ func TestGossipSubMeshTracer(t *testing.T) {
 		t.Name(),
 		idProvider,
 		p2ptest.WithRole(flow.RoleConsensus))
-	idProvider.On("ByPeerID", otherNode2.Host().ID()).Return(&otherId2, true).Maybe()
+	idProvider.On("ByPeerID", otherNode2.ID()).Return(&otherId2, true).Maybe()
 
 	// create a node that does not have a valid flow identity to test whether mesh tracer logs a warning.
 	unknownNode, unknownId := p2ptest.NodeFixture(
@@ -111,7 +111,7 @@ func TestGossipSubMeshTracer(t *testing.T) {
 		t.Name(),
 		idProvider,
 		p2ptest.WithRole(flow.RoleConsensus))
-	idProvider.On("ByPeerID", unknownNode.Host().ID()).Return(nil, false).Maybe()
+	idProvider.On("ByPeerID", unknownNode.ID()).Return(nil, false).Maybe()
 
 	nodes := []p2p.LibP2PNode{tracerNode, otherNode1, otherNode2, unknownNode}
 	ids := flow.IdentityList{&tracerId, &otherId1, &otherId2, &unknownId}
@@ -153,14 +153,14 @@ func TestGossipSubMeshTracer(t *testing.T) {
 	assert.Eventually(t, func() bool {
 		topic1MeshSize := 0
 		for _, peer := range meshTracer.GetMeshPeers(topic1.String()) {
-			if peer == otherNode1.Host().ID() || peer == otherNode2.Host().ID() {
+			if peer == otherNode1.ID() || peer == otherNode2.ID() {
 				topic1MeshSize++
 			}
 		}
 
 		topic2MeshSize := 0
 		for _, peer := range meshTracer.GetMeshPeers(topic2.String()) {
-			if peer == otherNode1.Host().ID() {
+			if peer == otherNode1.ID() {
 				topic2MeshSize++
 			}
 		}
@@ -185,14 +185,14 @@ func TestGossipSubMeshTracer(t *testing.T) {
 	assert.Eventually(t, func() bool {
 		// eventually, the tracerNode should not have the other node in its mesh for topic1.
 		for _, peer := range meshTracer.GetMeshPeers(topic1.String()) {
-			if peer == otherNode1.Host().ID() || peer == otherNode2.Host().ID() || peer == unknownNode.Host().ID() {
+			if peer == otherNode1.ID() || peer == otherNode2.ID() || peer == unknownNode.ID() {
 				return false
 			}
 		}
 
 		// but the tracerNode should still have the otherNode1 in its mesh for topic2.
 		for _, peer := range meshTracer.GetMeshPeers(topic2.String()) {
-			if peer != otherNode1.Host().ID() {
+			if peer != otherNode1.ID() {
 				return false
 			}
 		}

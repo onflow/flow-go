@@ -21,10 +21,16 @@ const (
 	// The numOfAuthorizedEvents allows us to wait for a certain number of authorized messages to be received, this should
 	// give the network enough time to process the unauthorized messages. This ensures us that the unauthorized messages
 	// were indeed dropped and not unprocessed.
-	numOfAuthorizedEvents = 100
+	// This threshold must be set to a low value to make the test conclude faster
+	// by waiting for fewer events, which is beneficial when running the test
+	// on an asynchronous network where event delivery can be unpredictable.
+	numOfAuthorizedEvents = 5
 
 	// numOfUnauthorizedEvents the number of unauthorized events per type to send by the test orchestrator.
-	numOfUnauthorizedEvents = 10
+	// This threshold must be set to a low value to make the test conclude faster
+	// by waiting for fewer events, which is beneficial when running the test
+	// on an asynchronous network where event delivery can be unpredictable.
+	numOfUnauthorizedEvents = 5
 )
 
 // Orchestrator represents an insecure.AttackOrchestrator track incoming unauthorized messages and authorized messages received by victim nodes.

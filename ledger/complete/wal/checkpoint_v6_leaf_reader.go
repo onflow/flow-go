@@ -29,7 +29,7 @@ func nodeToLeaf(leaf *node.Node) *LeafNode {
 // OpenAndReadLeafNodesFromCheckpointV6 takes a channel for pushing the leaf nodes that are read from
 // the given checkpoint file specified by dir and fileName.
 // It returns when finish reading the checkpoint file and the input channel can be closed.
-func OpenAndReadLeafNodesFromCheckpointV6(allLeafNodesCh chan<- *LeafNode, dir string, fileName string, logger *zerolog.Logger) (errToReturn error) {
+func OpenAndReadLeafNodesFromCheckpointV6(allLeafNodesCh chan<- *LeafNode, dir string, fileName string, logger zerolog.Logger) (errToReturn error) {
 	// we are the only sender of the channel, closing it after done
 	defer func() {
 		close(allLeafNodesCh)
@@ -68,7 +68,7 @@ func OpenAndReadLeafNodesFromCheckpointV6(allLeafNodesCh chan<- *LeafNode, dir s
 	return nil
 }
 
-func readCheckpointSubTrieLeafNodes(leafNodesCh chan<- *LeafNode, dir string, fileName string, index int, checksum uint32, logger *zerolog.Logger) error {
+func readCheckpointSubTrieLeafNodes(leafNodesCh chan<- *LeafNode, dir string, fileName string, index int, checksum uint32, logger zerolog.Logger) error {
 	return processCheckpointSubTrie(dir, fileName, index, checksum, logger,
 		func(reader *Crc32Reader, nodesCount uint64) error {
 			scratch := make([]byte, 1024*4) // must not be less than 1024

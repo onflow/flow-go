@@ -53,8 +53,9 @@ func TestLedger_Update(t *testing.T) {
 		up, err := ledger.NewEmptyUpdate(currentState)
 		require.NoError(t, err)
 
-		newState, _, err := l.Set(up)
+		newState, trieUpdate, err := l.Set(up)
 		require.NoError(t, err)
+		require.Nil(t, trieUpdate)
 
 		// state shouldn't change
 		assert.Equal(t, currentState, newState)

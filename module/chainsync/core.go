@@ -112,7 +112,7 @@ func (c *Core) HandleBlock(header *flow.Header) bool {
 }
 
 // HandleHeight handles receiving a new highest finalized height from another node.
-// If the height difference between local and the reported height, we do nothing.
+// If the height difference between local and the reported height is outside tolerance, we do nothing.
 // Otherwise, we queue each missing height.
 func (c *Core) HandleHeight(final *flow.Header, height uint64) {
 	log := c.log.With().Uint64("final_height", final.Height).Uint64("recv_height", height).Logger()

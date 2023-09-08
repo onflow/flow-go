@@ -48,14 +48,15 @@ import (
 	"github.com/onflow/flow-go/network/p2p/conduit"
 	p2pdht "github.com/onflow/flow-go/network/p2p/dht"
 	"github.com/onflow/flow-go/network/p2p/keyutils"
-	"github.com/onflow/flow-go/network/p2p/middleware"
 	"github.com/onflow/flow-go/network/p2p/p2pbuilder"
 	p2pconfig "github.com/onflow/flow-go/network/p2p/p2pbuilder/config"
+	"github.com/onflow/flow-go/network/p2p/p2pnet"
 	"github.com/onflow/flow-go/network/p2p/subscription"
 	"github.com/onflow/flow-go/network/p2p/tracer"
 	"github.com/onflow/flow-go/network/p2p/translator"
 	"github.com/onflow/flow-go/network/p2p/unicast/protocols"
 	"github.com/onflow/flow-go/network/p2p/utils"
+	"github.com/onflow/flow-go/network/slashing"
 	"github.com/onflow/flow-go/network/validator"
 	"github.com/onflow/flow-go/state/protocol"
 	badgerState "github.com/onflow/flow-go/state/protocol/badger"
@@ -264,7 +265,7 @@ func (builder *FollowerServiceBuilder) buildFollowerEngine() *FollowerServiceBui
 
 		builder.FollowerEng, err = follower.NewComplianceLayer(
 			node.Logger,
-			node.Network,
+			node.EngineRegistry,
 			node.Me,
 			node.Metrics.Engine,
 			node.Storage.Headers,
@@ -289,13 +290,14 @@ func (builder *FollowerServiceBuilder) buildSyncEngine() *FollowerServiceBuilder
 		sync, err := synceng.New(
 			node.Logger,
 			node.Metrics.Engine,
-			node.Network,
+			node.EngineRegistry,
 			node.Me,
 			node.State,
 			node.Storage.Blocks,
 			builder.FollowerEng,
 			builder.SyncCore,
 			builder.SyncEngineParticipantsProviderFactory(),
+			synceng.NewSpamDetectionConfig(),
 		)
 		if err != nil {
 			return nil, fmt.Errorf("could not create synchronization engine: %w", err)
@@ -358,45 +360,6 @@ func FlowConsensusFollowerService(opts ...FollowerOption) *FollowerServiceBuilde
 	// hence skip all the root snapshot validations that involved an identity address
 	ret.FlowNodeBuilder.SkipNwAddressBasedValidations = true
 	return ret
-}
-
-// initNetwork creates the network.Network implementation with the given metrics, middleware, initial list of network
-// participants and topology used to choose peers from the list of participants. The list of participants can later be
-// updated by calling network.SetIDs.
-func (builder *FollowerServiceBuilder) initNetwork(nodeID module.Local,
-	networkMetrics module.NetworkMetrics,
-	middleware network.Middleware,
-	topology network.Topology,
-	receiveCache *netcache.ReceiveCache,
-) (*p2p.Network, error) {
-	net, err := p2p.NewNetwork(&p2p.NetworkConfig{
-		Logger:              builder.Logger,
-		Codec:               cborcodec.NewCodec(),
-		Me:                  nodeID,
-		MiddlewareFactory:   func() (network.Middleware, error) { return builder.Middleware, nil },
-		Topology:            topology,
-		SubscriptionManager: subscription.NewChannelSubscriptionManager(middleware),
-		Metrics:             networkMetrics,
-		IdentityProvider:    builder.IdentityProvider,
-		ReceiveCache:        receiveCache,
-		ConduitFactory:      conduit.NewDefaultConduitFactory(),
-		SporkId:             builder.SporkID,
-		AlspCfg: &alspmgr.MisbehaviorReportManagerConfig{
-			Logger:                  builder.Logger,
-			SpamRecordCacheSize:     builder.FlowConfig.NetworkConfig.AlspConfig.SpamRecordCacheSize,
-			SpamReportQueueSize:     builder.FlowConfig.NetworkConfig.AlspConfig.SpamReportQueueSize,
-			DisablePenalty:          builder.FlowConfig.NetworkConfig.AlspConfig.DisablePenalty,
-			HeartBeatInterval:       builder.FlowConfig.NetworkConfig.AlspConfig.HearBeatInterval,
-			AlspMetrics:             builder.Metrics.Network,
-			HeroCacheMetricsFactory: builder.HeroCacheMetricsFactory(),
-			NetworkType:             network.PublicNetwork,
-		},
-	})
-	if err != nil {
-		return nil, fmt.Errorf("could not initialize network: %w", err)
-	}
-
-	return net, nil
 }
 
 func publicNetworkMsgValidators(log zerolog.Logger, idProvider module.IdentityProvider, selfID flow.Identifier) []network.MessageValidator {
@@ -487,7 +450,7 @@ func (builder *FollowerServiceBuilder) InitIDProviders() {
 		// The following wrapper allows to disallow-list byzantine nodes via an admin command:
 		// the wrapper overrides the 'Ejected' flag of the disallow-listed nodes to true
 		builder.IdentityProvider, err = cache.NewNodeDisallowListWrapper(idCache, node.DB, func() network.DisallowListNotificationConsumer {
-			return builder.Middleware
+			return builder.NetworkUnderlay
 		})
 		if err != nil {
 			return fmt.Errorf("could not initialize NodeBlockListWrapper: %w", err)
@@ -577,7 +540,6 @@ func (builder *FollowerServiceBuilder) validateParams() error {
 }
 
 // initPublicLibp2pNode creates a libp2p node for the follower service in public (unstaked) network.
-// The factory function is later passed into the initMiddleware function to eventually instantiate the p2p.LibP2PNode instance
 // The LibP2P host is created with the following options:
 //   - DHT as client and seeded with the given bootstrap peers
 //   - The specified bind address as the listen address
@@ -716,24 +678,47 @@ func (builder *FollowerServiceBuilder) enqueuePublicNetworkInit() {
 				return nil, fmt.Errorf("could not register networking receive cache metric: %w", err)
 			}
 
-			msgValidators := publicNetworkMsgValidators(node.Logger, node.IdentityProvider, node.NodeID)
-
-			builder.initMiddleware(node.NodeID, publicLibp2pNode, msgValidators...)
-
-			// topology is nil since it is automatically managed by libp2p
-			net, err := builder.initNetwork(builder.Me, builder.Metrics.Network, builder.Middleware, nil, receiveCache)
+			net, err := p2pnet.NewNetwork(&p2pnet.NetworkConfig{
+				Logger:                builder.Logger.With().Str("component", "public-network").Logger(),
+				Codec:                 cborcodec.NewCodec(),
+				Me:                    builder.Me,
+				Libp2pNode:            publicLibp2pNode,
+				Topology:              nil, // topology is nil since it is automatically managed by libp2p // TODO: can we use empty topology?
+				Metrics:               builder.Metrics.Network,
+				BitSwapMetrics:        builder.Metrics.Bitswap,
+				IdentityProvider:      builder.IdentityProvider,
+				ReceiveCache:          receiveCache,
+				ConduitFactory:        conduit.NewDefaultConduitFactory(),
+				SporkId:               builder.SporkID,
+				UnicastMessageTimeout: p2pnet.DefaultUnicastTimeout,
+				IdentityTranslator:    builder.IDTranslator,
+				AlspCfg: &alspmgr.MisbehaviorReportManagerConfig{
+					Logger:                  builder.Logger,
+					SpamRecordCacheSize:     builder.FlowConfig.NetworkConfig.AlspConfig.SpamRecordCacheSize,
+					SpamReportQueueSize:     builder.FlowConfig.NetworkConfig.AlspConfig.SpamReportQueueSize,
+					DisablePenalty:          builder.FlowConfig.NetworkConfig.AlspConfig.DisablePenalty,
+					HeartBeatInterval:       builder.FlowConfig.NetworkConfig.AlspConfig.HearBeatInterval,
+					AlspMetrics:             builder.Metrics.Network,
+					HeroCacheMetricsFactory: builder.HeroCacheMetricsFactory(),
+					NetworkType:             network.PublicNetwork,
+				},
+				SlashingViolationConsumerFactory: func(adapter network.ConduitAdapter) network.ViolationsConsumer {
+					return slashing.NewSlashingViolationsConsumer(builder.Logger, builder.Metrics.Network, adapter)
+				},
+			}, p2pnet.WithMessageValidators(publicNetworkMsgValidators(node.Logger, node.IdentityProvider, node.NodeID)...))
 			if err != nil {
-				return nil, err
+				return nil, fmt.Errorf("could not initialize network: %w", err)
 			}
 
-			builder.Network = converter.NewNetwork(net, channels.SyncCommittee, channels.PublicSyncCommittee)
+			builder.NetworkUnderlay = net
+			builder.EngineRegistry = converter.NewNetwork(net, channels.SyncCommittee, channels.PublicSyncCommittee)
 
 			builder.Logger.Info().Msgf("network will run on address: %s", builder.BindAddr)
 
-			idEvents := gadgets.NewIdentityDeltas(builder.Middleware.UpdateNodeAddresses)
+			idEvents := gadgets.NewIdentityDeltas(builder.NetworkUnderlay.UpdateNodeAddresses)
 			builder.ProtocolEvents.AddConsumer(idEvents)
 
-			return builder.Network, nil
+			return builder.EngineRegistry, nil
 		})
 }
 
@@ -747,26 +732,4 @@ func (builder *FollowerServiceBuilder) enqueueConnectWithStakedAN() {
 	builder.Component("upstream connector", func(_ *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 		return upstream.NewUpstreamConnector(builder.bootstrapIdentities, builder.LibP2PNode, builder.Logger), nil
 	})
-}
-
-// initMiddleware creates the network.Middleware implementation with the libp2p factory function, metrics, peer update
-// interval, and validators. The network.Middleware is then passed into the initNetwork function.
-func (builder *FollowerServiceBuilder) initMiddleware(nodeID flow.Identifier,
-	libp2pNode p2p.LibP2PNode,
-	validators ...network.MessageValidator,
-) network.Middleware {
-	mw := middleware.NewMiddleware(&middleware.Config{
-		Logger:                builder.Logger,
-		Libp2pNode:            libp2pNode,
-		FlowId:                nodeID,
-		BitSwapMetrics:        builder.Metrics.Bitswap,
-		SporkId:               builder.SporkID,
-		UnicastMessageTimeout: middleware.DefaultUnicastTimeout,
-		IdTranslator:          builder.IDTranslator,
-		Codec:                 builder.CodecFactory(),
-	},
-		middleware.WithMessageValidators(validators...),
-	)
-	builder.Middleware = mw
-	return builder.Middleware
 }
