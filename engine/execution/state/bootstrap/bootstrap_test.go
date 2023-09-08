@@ -32,7 +32,7 @@ func TestBootstrapLedger(t *testing.T) {
 			<-compactor.Done()
 		}()
 
-		stateCommitment, err := NewBootstrapper(zerolog.Nop()).BootstrapLedger(
+		stateCommitment, _, err := NewBootstrapper(zerolog.Nop()).BootstrapLedger(
 			ls,
 			unittest.ServiceAccountPublicKey,
 			chain,
@@ -72,7 +72,7 @@ func TestBootstrapLedger_ZeroTokenSupply(t *testing.T) {
 			<-compactor.Done()
 		}()
 
-		stateCommitment, err := NewBootstrapper(zerolog.Nop()).BootstrapLedger(
+		stateCommitment, _, err := NewBootstrapper(zerolog.Nop()).BootstrapLedger(
 			ls,
 			unittest.ServiceAccountPublicKey,
 			chain,
