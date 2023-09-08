@@ -42,7 +42,7 @@ func TestMetricsInspector_ObserveRPC(t *testing.T) {
 		Run(func(args mock.Arguments) {
 			peerID, ok := args.Get(0).(peer.ID)
 			require.True(t, ok)
-			require.Equal(t, spammer.SpammerNode.Host().ID(), peerID)
+			require.Equal(t, spammer.SpammerNode.ID(), peerID)
 			rpc, ok := args.Get(1).(*pubsub.RPC)
 			require.True(t, ok)
 			// there are some default rpc messages exchanged between the nodes on startup
@@ -71,7 +71,7 @@ func TestMetricsInspector_ObserveRPC(t *testing.T) {
 	nodes := []p2p.LibP2PNode{victimNode, spammer.SpammerNode}
 	startNodesAndEnsureConnected(t, signalerCtx, nodes, sporkID)
 	spammer.Start(t)
-	defer stopNodesAndInspector(t, cancel, nodes, metricsInspector)
+	defer stopTestComponents(t, cancel, nodes, metricsInspector)
 	// prepare to spam - generate control messages
 	ctlMsgs := spammer.GenerateCtlMessages(controlMessageCount,
 		corruptlibp2p.WithGraft(messageCount, channels.PushBlocks.String()),
