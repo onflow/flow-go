@@ -15,7 +15,7 @@ The folder contains:
 - this `README` file.
 
 To upgrade the BLST version:
-- [ ] audit all BLST updated, with focus on `<blst>/src`: https://github.com/supranational/blst/compare/v0.3.11...<new_version>
+- [ ] audit all BLST updates, with focus on `<blst>/src`: https://github.com/supranational/blst/compare/v0.3.11...<new_version>
 - [ ] delete all files in this folder `./blst_src/` but `blst_src.c` and `README.md`.
 - [ ] delete all files in `./internal/blst/`.
 - [ ] open BLST repository on the new version.
