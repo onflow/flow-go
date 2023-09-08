@@ -79,6 +79,10 @@ func (i *ExecutionState) IndexBlockData(ctx context.Context, data *execution_dat
 		return fmt.Errorf("could not get the block by ID %s: %w", data.BlockID, err)
 	}
 
+	if err := i.checkIndexHeight(block.Height); err != nil {
+		return err
+	}
+
 	// concurrently process indexing of block data
 	g, ctx := errgroup.WithContext(ctx)
 
@@ -170,6 +174,26 @@ func (i *ExecutionState) readBoundaryCheck(height uint64) error {
 
 	if height < first || height > last {
 		return fmt.Errorf("height %d is out of boundary [%d - %d]: %w", height, first, last, ErrHeightBoundary)
+	}
+
+	return nil
+}
+
+var ErrIndexHeight = fmt.Errorf("invalid index height")
+
+// checkIndexHeight will validate the new height we are indexing is the same as last height,
+// or it is incremented by exactly one.
+// Expected errors:
+// - ErrIndexHeight if the height is not incremented by one or equal to last height
+func (i *ExecutionState) checkIndexHeight(height uint64) error {
+	lastHeight, err := i.registers.LatestHeight()
+	if err != nil {
+		return err
+	}
+
+	diff := height - lastHeight
+	if diff < 0 || diff > 1 {
+		return fmt.Errorf("height %d should be equal or incremented by one from the last height: %d: %w", height, lastHeight, ErrIndexHeight)
 	}
 
 	return nil
