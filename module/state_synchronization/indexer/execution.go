@@ -41,8 +41,14 @@ func (i *ExecutionState) HeightByBlockID(ID flow.Identifier) (uint64, error) {
 
 // RegisterValues retrieves register values by the register IDs at the provided block height.
 // Even if the register wasn't indexed at the provided height, returns the highest height the register was indexed at.
-// If the register was not found the storage.ErrNotFound error is returned.
+// Expected errors:
+// - storage.ErrNotFound if the register by the ID was never indexed
+// - ErrHeightBoundary if the height is out of indexed height boundary
 func (i *ExecutionState) RegisterValues(IDs flow.RegisterIDs, height uint64) ([]flow.RegisterValue, error) {
+	err := i.readBoundaryCheck(height)
+	if err != nil {
+		return nil, err
+	}
 
 	values := make([]flow.RegisterValue, len(IDs))
 
