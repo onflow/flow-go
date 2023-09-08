@@ -173,22 +173,30 @@ func (ss *SyncSuite) TestLoad_Process_RangeRequest_SometimesReportSpam() {
 	load := 1000
 
 	type loadGroup struct {
-		rangeRequestProbabilityFactor float32
-		expectedMisbehaviorsLower     int
-		expectedMisbehaviorsUpper     int
-		fromHeight                    uint64
-		toHeight                      uint64
+		rangeRequestBaseProbFactor float32
+		expectedMisbehaviorsLower  int
+		expectedMisbehaviorsUpper  int
+		fromHeight                 uint64
+		toHeight                   uint64
 	}
 
 	loadGroups := []loadGroup{}
 
-	// using a very small range, expect to almost never get misbehavior report, about 0.003% of the time (3 in 1000 requests)
+	// using a very small range with a 10% base probability factor, expect to almost never get misbehavior report, about 0.003% of the time (3 in 1000 requests)
 	// expected probability factor: 0.1 * ((10-9) + 1)/64 = 0.003125
 	loadGroups = append(loadGroups, loadGroup{0.1, 0, 15, 9, 10})
 
-	// using a large range (99), expect to get misbehavior report about 15% of the time (150 in 1000 requests)
+	// using a large range (99) with a 10% base probability factor, expect to get misbehavior report about 15% of the time (150 in 1000 requests)
 	// expected probability factor: 0.1 * ((100-1) + 1)/64 = 0.15625
 	loadGroups = append(loadGroups, loadGroup{0.1, 110, 200, 1, 100})
+
+	// using a very large range (999) with a 10% base probability factor, expect to get misbehavior report 100% of the time (1000 in 1000 requests)
+	// expected probability factor: 0.1 * ((1000-1) + 1)/64 = 1.5625
+	loadGroups = append(loadGroups, loadGroup{0.1, 1000, 1000, 1, 1000})
+
+	// using a very large range (999) with a 1% base probability factor, expect to get misbehavior report about 15% of the time (150 in 1000 requests)
+	// expected probability factor: 0.01 * ((1000-1) + 1)/64 = 0.15625
+	loadGroups = append(loadGroups, loadGroup{0.01, 110, 200, 1, 1000})
 
 	// reset misbehavior report counter for each subtest
 	misbehaviorsCounter := 0
@@ -214,7 +222,7 @@ func (ss *SyncSuite) TestLoad_Process_RangeRequest_SometimesReportSpam() {
 					misbehaviorsCounter++
 				},
 			)
-			ss.e.spamDetectionConfig.rangeRequestProbability = loadGroup.rangeRequestProbabilityFactor
+			ss.e.spamDetectionConfig.rangeRequestProbability = loadGroup.rangeRequestBaseProbFactor
 			require.NoError(ss.T(), ss.e.Process(channels.SyncCommittee, originID, req))
 		}
 		// check function call expectations at the end of the load test; otherwise, load test would take much longer
