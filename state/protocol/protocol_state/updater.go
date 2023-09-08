@@ -96,7 +96,7 @@ func (u *Updater) ProcessEpochSetup(epochSetup *flow.EpochSetup) error {
 	// For an `identity` participating in the upcoming epoch, we effectively perform steps 2 and 3 from above within a single loop.
 	for _, identity := range epochSetup.Participants {
 		// Step 2: node is _not_ participating in the current epoch, but joining in the upcoming epoch.
-		// The node is allowed to join the network already in this epoch's Setup Phase, but has weight 0. 
+		// The node is allowed to join the network already in this epoch's Setup Phase, but has weight 0.
 		if _, found := currentEpochIdentitiesLookup[identity.NodeID]; !found {
 			currentEpochIdentities = append(currentEpochIdentities, &flow.DynamicIdentityEntry{
 				NodeID: identity.NodeID,
@@ -119,9 +119,9 @@ func (u *Updater) ProcessEpochSetup(epochSetup *flow.EpochSetup) error {
 	}
 
 	nextEpochIdentitiesLookup := nextEpochIdentities.Lookup()
-	// Step 4: we need to extend the next epoch's identities by adding identities that are leaving at the end of 
-	// the current epoch. Specifically, each identity from the current epoch that is _not_ listed in the 
-	// Setup Event for the next epoch is added with 0 weight and the _current_ value of the Ejected flag. 
+	// Step 4: we need to extend the next epoch's identities by adding identities that are leaving at the end of
+	// the current epoch. Specifically, each identity from the current epoch that is _not_ listed in the
+	// Setup Event for the next epoch is added with 0 weight and the _current_ value of the Ejected flag.
 	for _, identity := range currentEpochSetupParticipants {
 		if _, found := nextEpochIdentitiesLookup[identity.NodeID]; !found {
 			identityParentState := identitiesStateLookup[identity.NodeID]
@@ -135,7 +135,7 @@ func (u *Updater) ProcessEpochSetup(epochSetup *flow.EpochSetup) error {
 		}
 	}
 
-	// IMPORTANT: per convention, identities must be listed on canonical order! 
+	// IMPORTANT: per convention, identities must be listed on canonical order!
 	u.state.Identities = currentEpochIdentities.Sort(order.IdentifierCanonical)
 
 	// construct protocol state entry for next epoch
@@ -212,6 +212,7 @@ func (u *Updater) SetInvalidStateTransitionAttempted() {
 // Epoch transition is only allowed when:
 // - next epoch has been set up,
 // - next epoch has been committed,
+// - invalid state transition has not been attempted,
 // - candidate block is in the next epoch.
 // No errors are expected during normal operations.
 func (u *Updater) TransitionToNextEpoch() error {
@@ -223,6 +224,9 @@ func (u *Updater) TransitionToNextEpoch() error {
 	// Check if there is a commit event for next epoch
 	if nextEpochState.CurrentEpochEventIDs.CommitID == flow.ZeroID {
 		return fmt.Errorf("protocol state has not been committed yet")
+	}
+	if nextEpochState.InvalidStateTransitionAttempted {
+		return fmt.Errorf("invalid state transition has been attempted, no transition is allowed")
 	}
 	// Check if we are at the next epoch, only then a transition is allowed
 	if u.candidate.View < u.parentState.NextEpochProtocolState.CurrentEpochSetup.FirstView {

@@ -1,6 +1,7 @@
 package protocol_state
 
 import (
+	"github.com/onflow/flow-go/model/flow/mapfunc"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -80,6 +81,17 @@ func (s *UpdaterSuite) TestTransitionToNextEpochNotAllowed() {
 		updater := newUpdater(candidate, protocolState)
 		err := updater.TransitionToNextEpoch()
 		require.Error(s.T(), err, "should not allow transition to next epoch if it is not committed")
+	})
+	s.Run("invalid state transition has been attempted", func() {
+		protocolState := unittest.ProtocolStateFixture(unittest.WithNextEpochProtocolState(), func(entry *flow.RichProtocolStateEntry) {
+			entry.InvalidStateTransitionAttempted = true
+			entry.NextEpochProtocolState.InvalidStateTransitionAttempted = true
+		})
+		candidate := unittest.BlockHeaderFixture(
+			unittest.HeaderWithView(protocolState.CurrentEpochSetup.FinalView + 1))
+		updater := newUpdater(candidate, protocolState)
+		err := updater.TransitionToNextEpoch()
+		require.Error(s.T(), err, "should not allow transition to next epoch if next block is not first block from next epoch")
 	})
 	s.Run("candidate block is not from next epoch", func() {
 		protocolState := unittest.ProtocolStateFixture(unittest.WithNextEpochProtocolState())
@@ -371,12 +383,18 @@ func (s *UpdaterSuite) TestProcessEpochSetupWithSameParticipants() {
 	err = s.updater.ProcessEpochSetup(setup)
 	require.NoError(s.T(), err)
 	updatedState, _, _ := s.updater.Build()
-	expectedLen := len(s.parentProtocolState.CurrentEpochSetup.Participants) + len(setup.Participants) - len(overlappingNodes)
-	require.Len(s.T(), updatedState.Identities,
-		expectedLen,
+	expectedParticipants := flow.DynamicIdentityEntryListFromIdentities(
+		s.parentProtocolState.CurrentEpochSetup.Participants.Union(setup.Participants.Map(mapfunc.WithWeight(0))),
+	)
+	require.Equal(s.T(), updatedState.Identities,
+		expectedParticipants,
 		"should have all participants from current epoch and next epoch, but without duplicates")
-	require.Len(s.T(), updatedState.NextEpochProtocolState.Identities,
-		expectedLen,
+
+	nextEpochParticipants := flow.DynamicIdentityEntryListFromIdentities(
+		setup.Participants.Union(s.parentProtocolState.CurrentEpochSetup.Participants.Map(mapfunc.WithWeight(0))),
+	)
+	require.Equal(s.T(), updatedState.NextEpochProtocolState.Identities,
+		nextEpochParticipants,
 		"should have all participants from previous epoch and current epoch, but without duplicates")
 }
 
