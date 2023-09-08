@@ -283,6 +283,7 @@ func (ctx *testingContext) assertSuccessfulBlockComputation(
 ) *protocol.Snapshot {
 	if computationResult == nil {
 		computationResult = executionUnittest.ComputationResultForBlockFixture(
+			ctx.t,
 			previousExecutionResultID,
 			executableBlock)
 	}
@@ -1319,6 +1320,7 @@ func TestExecutionGenerationResultsAreChained(t *testing.T) {
 	previousExecutionResultID := unittest.IdentifierFixture()
 
 	cr := executionUnittest.ComputationResultFixture(
+		t,
 		previousExecutionResultID,
 		nil)
 	cr.ExecutableBlock = executableBlock
@@ -1826,6 +1828,7 @@ func TestExecutedBlockIsUploaded(t *testing.T) {
 
 		parentBlockExecutionResultID := unittest.IdentifierFixture()
 		computationResultB := executionUnittest.ComputationResultForBlockFixture(
+			t,
 			parentBlockExecutionResultID,
 			blockB)
 
@@ -1886,6 +1889,7 @@ func TestExecutedBlockUploadedFailureDoesntBlock(t *testing.T) {
 		previousExecutionResultID := unittest.IdentifierFixture()
 
 		computationResultB := executionUnittest.ComputationResultForBlockFixture(
+			t,
 			previousExecutionResultID,
 			blockB)
 
