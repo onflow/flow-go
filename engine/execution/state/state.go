@@ -52,6 +52,14 @@ type ScriptExecutionState interface {
 	IsBlockExecuted(height uint64, blockID flow.Identifier) (bool, error)
 }
 
+func IsParentExecuted(state ReadOnlyExecutionState, header *flow.Header) (bool, error) {
+	// sanity check, caller should not pass a root block
+	if header.Height == 0 {
+		return false, fmt.Errorf("root block does not have parent block")
+	}
+	return state.IsBlockExecuted(header.Height-1, header.ParentID)
+}
+
 // TODO Many operations here are should be transactional, so we need to refactor this
 // to store a reference to DB and compose operations and procedures rather then
 // just being amalgamate of proxies for single transactions operation
