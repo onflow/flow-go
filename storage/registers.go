@@ -8,7 +8,6 @@ import (
 type RegisterIndex interface {
 	RegisterIndexReader
 	RegisterIndexWriter
-	HeightIndex
 }
 
 // RegisterIndexReader defines read-only operations on the register index.
@@ -21,14 +20,24 @@ type RegisterIndexReader interface {
 	// Expected errors:
 	// - storage.ErrNotFound if the register was not found in the db or is out of bounds.
 	Get(ID flow.RegisterID, height uint64) (flow.RegisterValue, error)
+	// LatestHeight returns the latest indexed height.
+	// Expected errors:
+	// - storage.ErrNotFound if no heights have been indexed. This should only happen when the database is first initialized.
+	LatestHeight() (uint64, error)
+	// FirstHeight at which we started to index. Returns the first indexed height found in the store.
+	// Expected errors:
+	// - storage.ErrNotFound if no heights have been indexed. This should only happen when the database is first initialized.
+	FirstHeight() (uint64, error)
 }
 
 // RegisterIndexWriter defines write-only operations on the register index.
 type RegisterIndexWriter interface {
 	// Store batch of register entries at the provided block height.
-	// The provided height should either be one higher than the current height or the same to ensure idempotency.
-	// If the height is not within those bounds it will panic!
-	// Store should be used with the SetLatestHeight to progress the indexing.
-	// An error might get returned if there are problems with persisting the registers.
+	//
+	// The provided height must either be one higher than the current height or the same to ensure idempotency,
+	// otherwise and error is returned. If the height is not within those bounds there is either a bug
+	// or state corruption.
+	//
+	// No errors are expected during normal operation.
 	Store(entries flow.RegisterEntries, height uint64) error
 }
