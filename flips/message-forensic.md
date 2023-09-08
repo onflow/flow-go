@@ -39,6 +39,11 @@ This eradication obstructs the Flow protocol's ability to trace a message back t
 
 
 ## Proposal-1: GossipSub Message Forensic (GMF)
+As the first option to (partially) mitigate the gap in the network to hold the malicious senders accountable,
+we introduce the GossipSub Message Forensic (GMF) mechanism designed to integrate GossipSub authentication data seamlessly with the 
+Flow protocol engines. The principal aim is to enhance message authenticity verification through multicast and publish,
+focusing on origin identification and event association. Here, we elucidate the method, its interface, and delve into the operational specifics, 
+weighing its pros and cons against potential alternatives.
 In this proposal, we propose a mechanism to share the GossipSub authentication data with the Flow protocol. We call this mechanism
 GossipSub Message Forensic (GMF). The idea is to add a new interface method to the `EngineRegistry` interface. The `EngineRegistry` was
 previously known as the `Network` interface, and is exposed to individual Flow protocol engines who are interested in receiving the
@@ -48,9 +53,8 @@ identifier as well as an event as input, and returns the GossipSub envelope of t
 is sent by the origin identifier.
 The `VerifyGossipSubMessage` method takes a origin identifier as well as a GossipSub message as input, and verifies the signature of
 the message against the networking public key of the origin id. 
-The method returns true if the signature is valid, and false otherwise. The `GetGossipSubMessageForEvent` method is
+The method returns true if the signature is valid, and false otherwise. 
 The event is the scrapped message that is delivered to the application layer by the GossipSub router. The GossipSub envelope
-message. The event is the scrapped message that is delivered to the application layer by the GossipSub router. The GossipSub envelope
 contains the signature of the message, as well as all the other GossipSub metadata that is needed to verify the signature. 
 ```go
 
@@ -82,35 +86,27 @@ type EngineRegistry interface {
 }
 ```
 
-This proposal requires the `LibP2PNode` implementation extract the individual envelopes (i.e., `*pb.Message`) from the incoming GossipSub RPCs. This is done using the
-RPC inspector dependency injection. We need to implement a new inspector that extract the envelopes in a non-blocking approach. We should not block an incoming RPC to 
-extract its messages, as it is interfering with the GossipSub router operation and can harm the message delivery rate of the router. The extracted envelopes are then required to be stored persistently
-in a forensic component with proper ejection mechanism, which is exposed to the `GetGossipSubMessageForEvent` to query the envelope corresponding to a `(event, originId)` pair. This solution also requires
-replicating the signature verification logic of the GossipSub in `VerifyGossipSubMessage` so that it is accessible to the engines. We need to extend the signature verification mechanism to account for
-translation of `originId` from `flow.Identifier` to a `peer.ID`. As the engines are operating based on the `flow.Identifier`, while the GossipSub signatures are generated using the Networking Key of the node.
-Upon reception of a new gossiped message, the receiver verifies the signature prior to delivering it to the application
-layer (i.e., Flow protocol engines) or forwarding it to the other nodes (as part of the GossipSub protocol).
-There are several cases where we need the GossipSub authentication data to be shared with the Flow protocol as part of the protocol-level decision makings,
-e.g., to attribute a protocol-level violation to the malicious sender that originally sent it. The challenge is the signature
-is done on the message payload at the GossipSub level, which is not available to the Flow protocol. In this FLIP we propose
-a mechanism to share the GossipSub authentication data with the Flow protocol. We call this mechanism GossipSub Message
-Forensic (GMF). We also discuss the use cases of GMF in the Flow protocol, its interface, and the implementation details.
-Moreover, we articulate the advantages and disadvantages of GMF, and propose a set of alternatives to GMF and compare
-them with GMF. The purpose of this FLIP is to provide a fair comparison between all the alternatives and GMF, and to
-evaluate the feasibility of the suitable option considering the implementation complexity, performance overhead, and the security
-guarantees.
+### Implementation Complexities
+- This proposal requires the `LibP2PNode` implementation extract the individual envelopes (i.e., `*pb.Message`) from the incoming GossipSub RPCs. 
+  This is done using the RPC inspector dependency injection. We need to implement a new inspector that extract the envelopes in a non-blocking approach. 
+  We should not block an incoming RPC to extract its messages, as it is interfering with the GossipSub router operation and can harm the message delivery rate of the router. 
+- The extracted envelopes are then required to stored persistently by their event id in a forensic component with proper ejection mechanism, 
+  which is exposed to the `GetGossipSubMessageForEvent` to query the envelope corresponding to a `(event, originId)` pair. 
+- This solution also requires replicating the signature verification logic of the GossipSub in `VerifyGossipSubMessage` so that it is accessible to the engines. 
+  We need to extend the signature verification mechanism to account for translation of `originId` from `flow.Identifier` to networking key and `peer.ID` (i.e., LibP2P level identifier).
+  As the engines are operating based on the `flow.Identifier`, while the GossipSub signatures are generated using the Networking Key of the node.
 
 ### Advantages
-1. The GossipSub authentication data is shared with the Flow protocol.
-2. The interface is easy to use, as it abstracts the complexity of translating the origin Flow identifier to the GossipSub peer id, and
+1. The GossipSub authentication data is shared with the Flow protocol, providing attribution for `Multicast` and `Publish` messages.
+2. The interface is easy to use for the engines, as it abstracts the complexity of translating the origin Flow identifier to the GossipSub peer id, and
    verifying the signature of the message against the networking public key of the origin id.
 3. The implementation is not a breaking change and is backward compatible with the current state of the Flow protocol.
 
 ### Disadvantages
 1. The GossipSub envelope is extractable through an RPC inspector dependency injection, which must be non-blocking and fast (a principle condition
    imposed by GossipSub). This means that the GossipSub envelope extraction must be done in a separate goroutine _asynchronously_ to the message delivery to the
-   application layer. This entails that there can be a glitch between the message delivery to the application layer and the GossipSub envelope extraction, which
-   means that the GossipSub envelope may not be available at the time of the message delivery to the application layer. The glitch implies higher complexity in
+   application layer. This entails that there can be a glitch between the message delivery to the application layer and the GossipSub envelope extraction. The potential glitch
+   means that the GossipSub envelope may not be available at the time of the message delivery to the application layer. Accounting for the glitch implies higher complexity in
    the implementation of the Flow protocol engines (e.g., timeout queries, etc.). Moreover, the glitch may be exploited by the malicious nodes to perform timing
    attacks on the Flow protocol engines and get away from detection. If an attacker can time the message delivery to the application layer in a way that the 
    GossipSub envelope is not available at the time of the message delivery, then the attacker can send an invalid message and get away from detection, as when
