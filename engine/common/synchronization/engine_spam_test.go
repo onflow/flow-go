@@ -198,6 +198,15 @@ func (ss *SyncSuite) TestLoad_Process_RangeRequest_SometimesReportSpam() {
 	// expected probability factor: 0.01 * ((1000-1) + 1)/64 = 0.15625
 	loadGroups = append(loadGroups, loadGroup{0.01, 110, 200, 1, 1000})
 
+	// INVALID RANGE REQUESTS
+	// the following range requests are invalid and should always result in a misbehavior report
+
+	// using an inverted range (from height > to height) always results in a misbehavior report, no matter how small the range is or what the base probability factor is
+	loadGroups = append(loadGroups, loadGroup{0.001, 1000, 1000, 2, 1})
+
+	// using a flat range (from height == to height) always results in a misbehavior report, no matter how small the range is or what the base probability factor is
+	loadGroups = append(loadGroups, loadGroup{0.001, 1000, 1000, 1, 1})
+
 	// reset misbehavior report counter for each subtest
 	misbehaviorsCounter := 0
 

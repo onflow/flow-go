@@ -528,13 +528,28 @@ func (e *Engine) validateRangeRequestForALSP(originID flow.Identifier, event int
 			Msg("failed to extract RangeRequest")
 	}
 
+	// check if range request is valid
+	if rangeRequest.ToHeight <= rangeRequest.FromHeight {
+		e.log.Info().Str("originID", originID.String()).Msg("creating misbehavior report (invalid range request)")
+		report, err := alsp.NewMisbehaviorReport(originID, alsp.InvalidMessage)
+		if err != nil {
+			// failing to create the misbehavior report is unlikely. If an error is encountered while
+			// creating the misbehavior report it indicates a bug and processing can not proceed.
+			e.log.Fatal().
+				Err(err).
+				Bool(logging.KeyNetworkingSecurity, true).
+				Str("originID", originID.String()).
+				Msg("failed to create misbehavior report")
+		}
+		return report, true
+	}
+
 	// to avoid creating a misbehavior report for every range request received, use a probabilistic approach.
 	// The higher the range request, the higher the probability of creating a misbehavior report.
-
 	rangeRequestProb := e.spamDetectionConfig.rangeRequestBaseProb * (float32(rangeRequest.ToHeight-rangeRequest.FromHeight) + 1) / float32(synccore.DefaultConfig().MaxSize)
 	if float32(n) < rangeRequestProb*spamProbabilityMultiplier {
 		// create a misbehavior report
-		e.log.Info().Str("originID", originID.String()).Msg("creating misbehavior report")
+		e.log.Info().Str("originID", originID.String()).Msg("creating misbehavior report (probabilistic)")
 		report, err := alsp.NewMisbehaviorReport(originID, alsp.ResourceIntensiveRequest)
 
 		if err != nil {
