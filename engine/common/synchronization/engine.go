@@ -504,7 +504,7 @@ func (e *Engine) validateBlockResponseForALSP(channel channels.Channel, id flow.
 	return nil, false
 }
 
-// TODO: implement spam reporting similar to validateSyncRequestForALSP
+// validateRangeRequestForALSP checks if a range request should be reported as a misbehavior. It returns a misbehavior report and a boolean indicating whether the request should be reported.
 func (e *Engine) validateRangeRequestForALSP(originID flow.Identifier, event interface{}) (*alsp.MisbehaviorReport, bool) {
 	// Generate a random integer between 1 and spamProbabilityMultiplier (exclusive)
 	n, err := rand.Uint32n(spamProbabilityMultiplier)
@@ -545,7 +545,7 @@ func (e *Engine) validateRangeRequestForALSP(originID flow.Identifier, event int
 	}
 
 	// to avoid creating a misbehavior report for every range request received, use a probabilistic approach.
-	// The higher the range request, the higher the probability of creating a misbehavior report.
+	// The higher the range request and base probability, the higher the probability of creating a misbehavior report.
 	rangeRequestProb := e.spamDetectionConfig.rangeRequestBaseProb * (float32(rangeRequest.ToHeight-rangeRequest.FromHeight) + 1) / float32(synccore.DefaultConfig().MaxSize)
 	if float32(n) < rangeRequestProb*spamProbabilityMultiplier {
 		// create a misbehavior report
