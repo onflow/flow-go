@@ -197,6 +197,7 @@ func (storage *LedgerStorageSnapshot) getFromLedger(
 	return value, nil
 }
 
+// TODO (leo): deprecated
 func (storage *LedgerStorageSnapshot) Get(
 	id flow.RegisterID,
 ) (
