@@ -10,8 +10,9 @@ import (
 )
 
 // Mutator implements protocol.StateMutator interface.
-// It has to be used for each block to update the protocol state, even if there are no changes incorporated in candidate block.
-// Such requirement is due to the fact that protocol state is indexed by block ID, and we need to maintain such index.
+// It has to be used for each block to update the protocol state, even if there are no state-changing
+// service events sealed in candidate block. This requirement is due to the fact that protocol state
+// is indexed by block ID, and we need to maintain such index.
 type Mutator struct {
 	protocolStateDB storage.ProtocolState
 }
