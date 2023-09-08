@@ -118,7 +118,8 @@ func TestNewRichProtocolStateEntry(t *testing.T) {
 
 }
 
-// TestProtocolStateEntry_Copy tests if the copy method returns a deep copy of the entry. All changes to cpy shouldn't affect the original entry.
+// TestProtocolStateEntry_Copy tests if the copy method returns a deep copy of the entry.
+// All changes to copy shouldn't affect the original entry -- except for key changes.
 func TestProtocolStateEntry_Copy(t *testing.T) {
 	entry := unittest.ProtocolStateFixture(unittest.WithNextEpochProtocolState()).ProtocolStateEntry
 	cpy := entry.Copy()

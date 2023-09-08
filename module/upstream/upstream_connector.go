@@ -102,7 +102,7 @@ func (connector *upstreamConnector) connect(ctx context.Context, bootstrapPeer f
 	}
 
 	// try and connect to the bootstrap server
-	return connector.unstakedNode.AddPeer(ctx, peerAddrInfo)
+	return connector.unstakedNode.ConnectToPeer(ctx, peerAddrInfo)
 }
 
 func (connector *upstreamConnector) Done() <-chan struct{} {

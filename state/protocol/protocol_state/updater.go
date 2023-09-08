@@ -10,7 +10,7 @@ import (
 
 // Updater is a dedicated structure that encapsulates all logic for updating protocol state.
 // Only protocol state updater knows how to update protocol state in a way that is consistent with the protocol.
-// Protocol state updater supports processing next types of changes:
+// Protocol state updater implements the following state changes:
 // - epoch setup: transitions current epoch from staking to setup phase, creates next epoch protocol state when processed.
 // - epoch commit: transitions current epoch from setup to commit phase, commits next epoch protocol state when processed.
 // - identity changes: updates identity table for current and next epoch(if available).
@@ -46,10 +46,11 @@ func (u *Updater) Build() (updatedState *flow.ProtocolStateEntry, stateID flow.I
 	return
 }
 
-// ProcessEpochSetup updates current protocol state with data from epoch setup event.
-// Processing epoch setup event also affects identity table for current epoch.
-// Observing an epoch setup event, transitions protocol state from staking to setup phase, we stop returning
-// identities from previous+current epochs and start returning identities from current+next epochs.
+// ProcessEpochSetup updates the protocol state with data from the epoch setup event.
+// Observing an epoch setup event also affects the identity table for current epoch:
+//   - it transitions the protocol state from Staking to Epoch Setup phase
+//   - we stop returning identities from previous+current epochs and instead returning identities from current+next epochs.
+//
 // As a result of this operation protocol state for the next epoch will be created.
 // No errors are expected during normal operations.
 func (u *Updater) ProcessEpochSetup(epochSetup *flow.EpochSetup) error {
@@ -69,10 +70,10 @@ func (u *Updater) ProcessEpochSetup(epochSetup *flow.EpochSetup) error {
 	// We will do this in next steps:
 	// 1. Add identities from current epoch setup event to currentEpochIdentities.
 	// 2. Add identities from next epoch setup event to currentEpochIdentities, with 0 weight,
-	// but only if they are not present in currentEpochIdentities.
+	//     but only if they are not present in currentEpochIdentities.
 	// 3. Add identities from next epoch setup event to nextEpochIdentities.
 	// 4. Add identities from current epoch setup event to nextEpochIdentities, with 0 weight,
-	// but only if they are not present in nextEpochIdentities.
+	//    but only if they are not present in nextEpochIdentities.
 
 	// lookup of dynamic data for current protocol state identities
 	// by definition, this will include identities from current epoch + identities from previous epoch with 0 weight.
@@ -92,9 +93,10 @@ func (u *Updater) ProcessEpochSetup(epochSetup *flow.EpochSetup) error {
 
 	nextEpochIdentities := make(flow.DynamicIdentityEntryList, 0, len(currentEpochIdentities))
 	currentEpochIdentitiesLookup := currentEpochIdentities.Lookup()
-	// in this loop, we will fill participants for both current and next epochs, effectively performing steps 2 and 3 from above.
+	// For an `identity` participating in the upcoming epoch, we effectively perform steps 2 and 3 from above within a single loop.
 	for _, identity := range epochSetup.Participants {
-		// if present in current epoch, skip
+		// Step 2: node is _not_ participating in the current epoch, but joining in the upcoming epoch.
+		// The node is allowed to join the network already in this epoch's Setup Phase, but has weight 0.
 		if _, found := currentEpochIdentitiesLookup[identity.NodeID]; !found {
 			currentEpochIdentities = append(currentEpochIdentities, &flow.DynamicIdentityEntry{
 				NodeID: identity.NodeID,
@@ -105,7 +107,7 @@ func (u *Updater) ProcessEpochSetup(epochSetup *flow.EpochSetup) error {
 			})
 		}
 
-		// for the next epoch we include identities from setup event,
+		// Step 3: for the next epoch we include every identity from its setup event;
 		// we give authority to epoch smart contract to decide who should be included in the next epoch and with what flags.
 		nextEpochIdentities = append(nextEpochIdentities, &flow.DynamicIdentityEntry{
 			NodeID: identity.NodeID,
@@ -117,9 +119,9 @@ func (u *Updater) ProcessEpochSetup(epochSetup *flow.EpochSetup) error {
 	}
 
 	nextEpochIdentitiesLookup := nextEpochIdentities.Lookup()
-	// Finally, we need to augment next epoch identities with identities from current epoch with 0 weight,
-	// effectively performing step 4 from above.
-	// For the next epoch, we include identities(with 0 weight) from setup event but take the ejected flag from parent protocol state.
+	// Step 4: we need to extend the next epoch's identities by adding identities that are leaving at the end of
+	// the current epoch. Specifically, each identity from the current epoch that is _not_ listed in the
+	// Setup Event for the next epoch is added with 0 weight and the _current_ value of the Ejected flag.
 	for _, identity := range currentEpochSetupParticipants {
 		if _, found := nextEpochIdentitiesLookup[identity.NodeID]; !found {
 			identityParentState := identitiesStateLookup[identity.NodeID]
@@ -133,6 +135,7 @@ func (u *Updater) ProcessEpochSetup(epochSetup *flow.EpochSetup) error {
 		}
 	}
 
+	// IMPORTANT: per convention, identities must be listed on canonical order!
 	u.state.Identities = currentEpochIdentities.Sort(order.IdentifierCanonical)
 
 	// construct protocol state entry for next epoch
@@ -209,6 +212,7 @@ func (u *Updater) SetInvalidStateTransitionAttempted() {
 // Epoch transition is only allowed when:
 // - next epoch has been set up,
 // - next epoch has been committed,
+// - invalid state transition has not been attempted,
 // - candidate block is in the next epoch.
 // No errors are expected during normal operations.
 func (u *Updater) TransitionToNextEpoch() error {
@@ -220,6 +224,9 @@ func (u *Updater) TransitionToNextEpoch() error {
 	// Check if there is a commit event for next epoch
 	if nextEpochState.CurrentEpochEventIDs.CommitID == flow.ZeroID {
 		return fmt.Errorf("protocol state has not been committed yet")
+	}
+	if nextEpochState.InvalidStateTransitionAttempted {
+		return fmt.Errorf("invalid state transition has been attempted, no transition is allowed")
 	}
 	// Check if we are at the next epoch, only then a transition is allowed
 	if u.candidate.View < u.parentState.NextEpochProtocolState.CurrentEpochSetup.FirstView {
@@ -250,7 +257,8 @@ func (u *Updater) ensureLookupPopulated() {
 	u.invalidateLookup()
 }
 
-// invalidateLookup invalidates current and next epoch identities lookup.
+// rebuildIdentityLookup re-generates `currentEpochIdentitiesLookup` and `nextEpochIdentitiesLookup` from the
+// underlying identity lists `state.Identities` and `state.NextEpochProtocolState.Identities`, respectively.
 func (u *Updater) invalidateLookup() {
 	u.currentEpochIdentitiesLookup = u.state.Identities.Lookup()
 	if u.state.NextEpochProtocolState != nil {

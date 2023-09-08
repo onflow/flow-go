@@ -638,6 +638,7 @@ func createNode(
 		comp,
 		syncCore,
 		idProvider,
+		synceng.NewSpamDetectionConfig(),
 		func(cfg *synceng.Config) {
 			// use a small pool and scan interval for sync engine
 			cfg.ScanInterval = 500 * time.Millisecond
