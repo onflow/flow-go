@@ -99,7 +99,8 @@ var verifyPayersBalanceForTransactionExecutionSpec = ContractFunctionSpec{
 	LocationName:     systemcontracts.ContractNameFlowFees,
 	FunctionName:     systemcontracts.ContractServiceAccountFunction_verifyPayersBalanceForTransactionExecution,
 	ArgumentTypes: []sema.Type{
-		sema.AuthAccountType,
+		// TODO: pass proper authorization
+		sema.NewReferenceType(nil, sema.UnauthorizedAccess, sema.AccountType),
 		sema.UInt64Type,
 		sema.UInt64Type,
 	},
@@ -131,7 +132,8 @@ var deductTransactionFeeSpec = ContractFunctionSpec{
 	LocationName:     systemcontracts.ContractNameFlowFees,
 	FunctionName:     systemcontracts.ContractServiceAccountFunction_deductTransactionFee,
 	ArgumentTypes: []sema.Type{
-		sema.AuthAccountType,
+		// TODO: pass proper authorization
+		sema.NewReferenceType(nil, sema.UnauthorizedAccess, sema.AccountType),
 		sema.UInt64Type,
 		sema.UInt64Type,
 	},
@@ -160,8 +162,10 @@ var setupNewAccountSpec = ContractFunctionSpec{
 	LocationName:     systemcontracts.ContractNameServiceAccount,
 	FunctionName:     systemcontracts.ContractServiceAccountFunction_setupNewAccount,
 	ArgumentTypes: []sema.Type{
-		sema.AuthAccountType,
-		sema.AuthAccountType,
+		// TODO: pass proper authorization
+		sema.NewReferenceType(nil, sema.UnauthorizedAccess, sema.AccountType),
+		// TODO: pass proper authorization
+		sema.NewReferenceType(nil, sema.UnauthorizedAccess, sema.AccountType),
 	},
 }
 
@@ -207,7 +211,8 @@ var accountBalanceInvocationSpec = ContractFunctionSpec{
 	LocationName:     systemcontracts.ContractNameServiceAccount,
 	FunctionName:     systemcontracts.ContractServiceAccountFunction_defaultTokenBalance,
 	ArgumentTypes: []sema.Type{
-		sema.PublicAccountType,
+		// TODO: pass proper authorization
+		sema.NewReferenceType(nil, sema.UnauthorizedAccess, sema.AccountType),
 	},
 }
 

@@ -1897,11 +1897,12 @@ github.com/olekukonko/tablewriter v0.0.0-20170122224234-a0225b3f23b5/go.mod h1:v
 github.com/olekukonko/tablewriter v0.0.1/go.mod h1:vsDQFd/mU46D+Z4whnwzcISnGGzXWMclvtLoiIKAKIo=
 github.com/olekukonko/tablewriter v0.0.2-0.20190409134802-7e037d187b0c/go.mod h1:vsDQFd/mU46D+Z4whnwzcISnGGzXWMclvtLoiIKAKIo=
 github.com/onflow/atree v0.5.0/go.mod h1:gBHU0M05qCbv9NN0kijLWMgC47gHVNBIp4KmsVFi0tc=
-github.com/onflow/atree v0.6.0 h1:j7nQ2r8npznx4NX39zPpBYHmdy45f4xwoi+dm37Jk7c=
 github.com/onflow/atree v0.6.0/go.mod h1:gBHU0M05qCbv9NN0kijLWMgC47gHVNBIp4KmsVFi0tc=
+github.com/onflow/atree v0.6.1-0.20230711151834-86040b30171f h1:Z8/PgTqOgOg02MTRpTBYO2k16FE6z4wEOtaC2WBR9Xo=
+github.com/onflow/atree v0.6.1-0.20230711151834-86040b30171f/go.mod h1:xvP61FoOs95K7IYdIYRnNcYQGf4nbF/uuJ0tHf4DRuM=
 github.com/onflow/cadence v0.39.13-stable-cadence/go.mod h1:SxT8/IEkS1drFj2ofUEK9S6KyJ5GQbrm0LX4EFCp/7Q=
-github.com/onflow/cadence v0.41.0-stable-cadence.1 h1:ATWDm7WaxogV3f99wCEnVcQWZ36FAHya/4dI7ffw2u8=
-github.com/onflow/cadence v0.41.0-stable-cadence.1/go.mod h1:SxT8/IEkS1drFj2ofUEK9S6KyJ5GQbrm0LX4EFCp/7Q=
+github.com/onflow/cadence v0.41.0-stable-cadence.1.0.20230908213403-8f1134670ed0 h1:8Mniwp17wrjLAv/KgCcZ6JH47/EjgCgkX0AXLfSXJEM=
+github.com/onflow/cadence v0.41.0-stable-cadence.1.0.20230908213403-8f1134670ed0/go.mod h1:Q5Up9Kt+J6zuAFmgrsiKz6t//E/hR5/iuVjH62pdztk=
 github.com/onflow/flow-core-contracts/lib/go/contracts v1.2.4-0.20230822191436-8a95802475f4 h1:MyiN3RknOanPPiDpBIdJ43ZrQNppgQUZgy5njPDdF7w=
 github.com/onflow/flow-core-contracts/lib/go/contracts v1.2.4-0.20230822191436-8a95802475f4/go.mod h1:IRraF/nm1xiefjSIkQ6w6ZNzZbUGfB14bzMUNXjrMmo=
 github.com/onflow/flow-core-contracts/lib/go/templates v1.2.4-0.20230808220007-f00e74ca675b h1:f+5TwXPwlvtaDwn0ZlMIxibuPwbvmtlnSkeZgAm38Yw=
@@ -1911,8 +1912,8 @@ github.com/onflow/flow-emulator v0.53.1-0.20230801165926-9fd4af1cce5b/go.mod h1:
 github.com/onflow/flow-ft/lib/go/contracts v0.7.1-0.20230818200853-ab1b03e98a95 h1:mtQIjtnUQ2axR74YRMSG4rYo5PzWIbToGCdbu0oZjGs=
 github.com/onflow/flow-ft/lib/go/contracts v0.7.1-0.20230818200853-ab1b03e98a95/go.mod h1:kTMFIySzEJJeupk+7EmXs0EJ6CBWY/MV9fv9iYQk+RU=
 github.com/onflow/flow-go-sdk v0.41.7-stable-cadence/go.mod h1:ejVN+bqcsTHVvRpDDJDoBNdmcxUfFMW4IvdTbMeQ/hQ=
-github.com/onflow/flow-go-sdk v0.44.0-stable-cadence.1 h1:6WjkZS1S0nYdphBsdZcU48mrLpccgfuCNX06ry4/c8c=
-github.com/onflow/flow-go-sdk v0.44.0-stable-cadence.1/go.mod h1:aWDwdlvZeX0LTR2buq9D+uPytaZ3hvzxEAMPfLhZCm0=
+github.com/onflow/flow-go-sdk v0.44.0-stable-cadence.1.0.20230908213602-5ef23b063461 h1:t6Hnp8hiKH6oV2Yi52M2yNu+dlvOhJrWB6WX15Gro+0=
+github.com/onflow/flow-go-sdk v0.44.0-stable-cadence.1.0.20230908213602-5ef23b063461/go.mod h1:qvQGtWac9KAX3GerNiMX/b1DncYIVYbvKPRAuLHmiF0=
 github.com/onflow/flow-go/crypto v0.24.7/go.mod h1:fqCzkIBBMRRkciVrvW21rECKq1oD7Q6u+bCI78lfNX0=
 github.com/onflow/flow-go/crypto v0.24.9 h1:0EQp+kSZYJepMIiSypfJVe7tzsPcb6UXOdOtsTCDhBs=
 github.com/onflow/flow-go/crypto v0.24.9/go.mod h1:fqCzkIBBMRRkciVrvW21rECKq1oD7Q6u+bCI78lfNX0=

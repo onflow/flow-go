@@ -2283,9 +2283,7 @@ func TestAuthAccountCapabilities(t *testing.T) {
 					fvm.WithReusableCadenceRuntimePool(
 						reusableRuntime.NewReusableCadenceRuntimePool(
 							1,
-							runtime.Config{
-								AccountLinkingEnabled: true,
-							},
+							runtime.Config{},
 						),
 					),
 				).
@@ -2375,9 +2373,7 @@ func TestAuthAccountCapabilities(t *testing.T) {
 					fvm.WithReusableCadenceRuntimePool(
 						reusableRuntime.NewReusableCadenceRuntimePool(
 							1,
-							runtime.Config{
-								AccountLinkingEnabled: true,
-							},
+							runtime.Config{},
 						),
 					),
 					fvm.WithContractDeploymentRestricted(false),
@@ -2570,9 +2566,7 @@ func TestCapabilityControllers(t *testing.T) {
 				fvm.WithReusableCadenceRuntimePool(
 					reusableRuntime.NewReusableCadenceRuntimePool(
 						1,
-						runtime.Config{
-							CapabilityControllersEnabled: capabilityControllersEnabled,
-						},
+						runtime.Config{},
 					),
 				),
 			).
@@ -2640,9 +2634,7 @@ func TestStorageIterationWithBrokenValues(t *testing.T) {
 			fvm.WithReusableCadenceRuntimePool(
 				reusableRuntime.NewReusableCadenceRuntimePool(
 					1,
-					runtime.Config{
-						AccountLinkingEnabled: true,
-					},
+					runtime.Config{},
 				),
 			),
 			fvm.WithContractDeploymentRestricted(false),

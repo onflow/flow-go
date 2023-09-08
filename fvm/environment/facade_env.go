@@ -315,3 +315,8 @@ func (env *facadeEnvironment) SetInterpreterSharedState(state *interpreter.Share
 func (env *facadeEnvironment) GetInterpreterSharedState() *interpreter.SharedState {
 	return nil
 }
+
+func (env *facadeEnvironment) ReadRandom(bytes []byte) error {
+	//TODO: proper implementation is in: https://github.com/onflow/flow-go/pull/4648
+	panic("not supported yet")
+}
