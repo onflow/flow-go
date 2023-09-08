@@ -43,19 +43,6 @@ func (i *ExecutionState) HeightByBlockID(ID flow.Identifier) (uint64, error) {
 // Even if the register wasn't indexed at the provided height, returns the highest height the register was indexed at.
 // If the register was not found the storage.ErrNotFound error is returned.
 func (i *ExecutionState) RegisterValues(IDs flow.RegisterIDs, height uint64) ([]flow.RegisterValue, error) {
-	first, err := i.registers.FirstHeight()
-	if err != nil {
-		return nil, fmt.Errorf("failed to read first index height: %w", err)
-	}
-
-	last, err := i.registers.LatestHeight()
-	if err != nil {
-		return nil, fmt.Errorf("failed to read last index height: %w", err)
-	}
-
-	if height < first || height > last {
-		return nil, fmt.Errorf("register out of indexed height bounds, current height range: [%d, %d], requested height: %d", first, last, height)
-	}
 
 	values := make([]flow.RegisterValue, len(IDs))
 
@@ -84,13 +71,6 @@ func (i *ExecutionState) IndexBlockData(ctx context.Context, data *execution_dat
 	block, err := i.headers.ByBlockID(data.BlockID)
 	if err != nil {
 		return fmt.Errorf("could not get the block by ID %s: %w", data.BlockID, err)
-	}
-
-	// progress height in storage first, if the height is incorrect the index storage will panic
-	// this is due to unrecoverable bug in the implementation
-	err = i.registers.SetLatestHeight(block.Height)
-	if err != nil {
-		return fmt.Errorf("failed to progress index height to %d: %w", block.Height, err)
 	}
 
 	// concurrently process indexing of block data
@@ -167,4 +147,24 @@ func (i *ExecutionState) indexRegisterPayloads(payloads []*ledger.Payload, heigh
 	}
 
 	return i.registers.Store(regEntries, height)
+}
+
+var ErrHeightBoundary = fmt.Errorf("the height is not within the heights of the indexed interval")
+
+func (i *ExecutionState) readBoundaryCheck(height uint64) error {
+	first, err := i.registers.FirstHeight()
+	if err != nil {
+		return fmt.Errorf("failed to read first index height: %w", err)
+	}
+
+	last, err := i.registers.LatestHeight()
+	if err != nil {
+		return fmt.Errorf("failed to read last index height: %w", err)
+	}
+
+	if height < first || height > last {
+		return fmt.Errorf("height %d is out of boundary [%d - %d]: %w", height, first, last, ErrHeightBoundary)
+	}
+
+	return nil
 }
