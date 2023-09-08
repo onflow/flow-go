@@ -37,44 +37,6 @@ func TestExecutionState_HeightByBlockID(t *testing.T) {
 	}
 }
 
-func TestExecutionState_Commitment(t *testing.T) {
-	const start, end = 10, 20
-
-	t.Run("success", func(t *testing.T) {
-		indexer := ExecutionState{
-			commitments: make(map[uint64]flow.StateCommitment),
-		}
-
-		commitments := indexCommitments(&indexer, start, end, t)
-		for i := start; i <= end; i++ {
-			ret, err := indexer.Commitment(uint64(i))
-			require.NoError(t, err)
-			assert.Equal(t, commitments[uint64(i)], ret)
-		}
-	})
-
-	t.Run("invalid heights", func(t *testing.T) {
-		indexer := ExecutionState{
-			commitments: make(map[uint64]flow.StateCommitment),
-		}
-
-		_ = indexCommitments(&indexer, start, end, t)
-		tests := []struct {
-			height uint64
-			err    string
-		}{
-			{height: end + 1, err: "state commitment out of indexed height bounds, current height range: [10, 20], requested height: 21"},
-			{height: start - 1, err: "state commitment out of indexed height bounds, current height range: [10, 20], requested height: 9"},
-		}
-
-		for i, test := range tests {
-			c, err := indexer.Commitment(test.height)
-			assert.Equal(t, flow.DummyStateCommitment, c)
-			assert.EqualError(t, err, test.err, fmt.Sprintf("invalid height test number %d failed", i))
-		}
-	})
-}
-
 type indexBlockDataTest struct {
 	t              *testing.T
 	indexer        ExecutionState
@@ -98,10 +60,9 @@ func newIndexBlockDataTest(
 	events := storagemock.NewEvents(t)
 
 	indexer := ExecutionState{
-		registers:   registers,
-		headers:     headers,
-		events:      events,
-		commitments: make(map[uint64]flow.StateCommitment),
+		registers: registers,
+		headers:   headers,
+		events:    events,
 	}
 
 	return &indexBlockDataTest{
@@ -142,12 +103,13 @@ func (i *indexBlockDataTest) run() {
 			})
 	}
 
+	height := i.registers.On("SetLatestHeight", mock.AnythingOfType("uint64"))
 	if i.latestHeight != nil {
-		i.registers.
-			On("SetLatestHeight", mock.AnythingOfType("uint64")).
-			Return(func(height uint64) error {
-				return i.latestHeight(i.t, height)
-			})
+		height.Return(func(height uint64) error {
+			return i.latestHeight(i.t, height)
+		})
+	} else {
+		height.Return(func(height uint64) error { return nil })
 	}
 
 	if i.eventsStore != nil {
@@ -192,10 +154,6 @@ func TestExecutionState_IndexBlockData(t *testing.T) {
 		execData := execution_data.NewBlockExecutionDataEntity(block.ID(), ed)
 
 		newIndexBlockDataTest(t, headers, execData).
-			setLatestHeight(func(t *testing.T, height uint64) error {
-				assert.Equal(t, height, block.Header.Height)
-				return nil
-			}).
 			// make sure update registers match in length and are same as block data ledger payloads
 			setStoreRegisters(func(t *testing.T, entries flow.RegisterEntries, height uint64) error {
 				assert.Equal(t, height, block.Header.Height)
@@ -211,8 +169,16 @@ func TestExecutionState_IndexBlockData(t *testing.T) {
 			run()
 	})
 
-	t.Run("Index Multiple Chunks", func(t *testing.T) {
+	t.Run("Index Multiple Chunks and Merge Same Register Updates", func(t *testing.T) {
 		tries := []*ledger.TrieUpdate{trieUpdateFixture(), trieUpdateFixture()}
+		// make sure we have two register updates that are updating the same value, so we can check
+		// if the value from the second update is being persisted instead of first
+		tries[1].Paths[0] = tries[0].Paths[0]
+		testValue := tries[1].Payloads[0]
+		key, err := testValue.Key()
+		require.NoError(t, err)
+		testRegisterID, err := migrations.KeyToRegisterID(key)
+		require.NoError(t, err)
 
 		ed := &execution_data.BlockExecutionData{
 			BlockID: block.ID(),
@@ -223,58 +189,27 @@ func TestExecutionState_IndexBlockData(t *testing.T) {
 		}
 		execData := execution_data.NewBlockExecutionDataEntity(block.ID(), ed)
 
-		storeCalled := 0
-
+		testRegisterFound := false
 		newIndexBlockDataTest(t, headers, execData).
-			setLatestHeight(func(t *testing.T, height uint64) error {
-				assert.Equal(t, height, block.Header.Height)
-				return nil
-			}).
 			// make sure update registers match in length and are same as block data ledger payloads
 			setStoreRegisters(func(t *testing.T, entries flow.RegisterEntries, height uint64) error {
-				fmt.Println("Set store called: ", storeCalled, height, entries)
-				assert.Equal(t, height, block.Header.Height)
-				assert.Len(t, tries[storeCalled].Payloads, entries.Len())
-
-				for i, id := range entries.IDs() {
-					k, _ := tries[storeCalled].Payloads[i].Key()
-					regKey, _ := migrations.KeyToRegisterID(k)
-					assert.Equal(t, id, regKey, fmt.Sprintf("register key doens't match the trie updates at index %d, at %d time calling store", i, storeCalled))
+				for _, entry := range entries {
+					if entry.Key.String() == testRegisterID.String() {
+						testRegisterFound = true
+						assert.True(t, testValue.Value().Equals(entry.Value))
+					}
 				}
-
-				storeCalled++
-
+				// we should make sure the register updates are equal to both payloads' length -1 since we don't
+				// duplicate the same register
+				assert.Equal(t, len(tries[0].Payloads)+len(tries[1].Payloads)-1, len(entries))
 				return nil
 			}).
 			run()
 
-		assert.Len(t, ed.ChunkExecutionDatas, storeCalled)
+		assert.True(t, testRegisterFound)
 	})
 
 }
-
-func indexCommitments(indexer *ExecutionState, start uint64, end uint64, t *testing.T) map[uint64]flow.StateCommitment {
-	commits := commitmentsFixture(int(end - start))
-	commitsHeight := make(map[uint64]flow.StateCommitment)
-
-	for j, i := 0, start; i <= end; i++ {
-		commitsHeight[i] = commits[j]
-		err := indexer.indexCommitment(commits[j], i)
-		require.NoError(t, err)
-		j++
-	}
-
-	return commitsHeight
-}
-
-//func buildEvents() storage.Events {
-//	events := storagemock.Events{}
-//	events.
-//		On("Store", mock.AnythingOfType("flow.Identifier"), mock.AnythingOfType("[]flow.EventsList")).
-//		Return(func(id flow.Identifier, events []flow.EventsList) {
-//
-//	})
-//}
 
 func newBlockHeadersStorage(blocks []*flow.Block) storage.Headers {
 	blocksByID := make(map[flow.Identifier]*flow.Block, 0)
@@ -283,15 +218,6 @@ func newBlockHeadersStorage(blocks []*flow.Block) storage.Headers {
 	}
 
 	return synctest.MockBlockHeaderStorage(synctest.WithByID(blocksByID))
-}
-
-func commitmentsFixture(n int) []flow.StateCommitment {
-	commits := make([]flow.StateCommitment, n)
-	for i := 0; i < n; i++ {
-		commits[i] = flow.StateCommitment(unittest.IdentifierFixture())
-	}
-
-	return commits
 }
 
 func blocksFixture(n int) []*flow.Block {
