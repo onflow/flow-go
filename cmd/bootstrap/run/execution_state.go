@@ -59,7 +59,6 @@ func GenerateExecutionState(
 		NewBootstrapper(zerolog.Nop()).
 		BootstrapLedger(
 			ledgerStorage,
-			// registerStore,
 			accountKey,
 			chain,
 			bootstrapOptions...,
