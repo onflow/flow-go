@@ -132,7 +132,6 @@ func NewRichProtocolStateEntry(
 
 		// if next epoch is available, it means that we have observed epoch setup event and we are not anymore in staking phase,
 		// so we need to build the identity table using current and next epoch setup events.
-		// so we need to build the identity table using current and next epoch setup events.
 		result.Identities, err = buildIdentityTable(
 			protocolState.Identities,
 			currentEpochSetup.Participants,
