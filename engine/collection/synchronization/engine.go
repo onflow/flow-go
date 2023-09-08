@@ -100,11 +100,7 @@ func New(
 	if err != nil {
 		return nil, fmt.Errorf("could not setup message handler")
 	}
-
-	chainID, err := state.Params().ChainID()
-	if err != nil {
-		return nil, fmt.Errorf("could not get chain ID: %w", err)
-	}
+	chainID := state.Params().ChainID()
 
 	// register the engine with the network layer and store the conduit
 	con, err := net.Register(channels.SyncCluster(chainID), e)

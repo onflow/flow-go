@@ -361,13 +361,17 @@ func (il IdentityList) Map(f IdentityMapFunc) IdentityList {
 	return dup
 }
 
-// Copy returns a copy of the receiver. The resulting slice uses a different
+// Copy returns a copy of IdentityList. The resulting slice uses a different
 // backing array, meaning appends and insert operations on either slice are
 // guaranteed to only affect that slice.
 //
 // Copy should be used when modifying an existing identity list by either
 // appending new elements, re-ordering, or inserting new elements in an
 // existing index.
+//
+// CAUTION:
+// All Identity fields are deep-copied, _except_ for their keys, which
+// are copied by reference.
 func (il IdentityList) Copy() IdentityList {
 	dup := make(IdentityList, 0, len(il))
 

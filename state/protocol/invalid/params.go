@@ -9,22 +9,22 @@ type Params struct {
 	err error
 }
 
-func (p Params) ChainID() (flow.ChainID, error) {
-	return "", p.err
+func (p Params) ChainID() flow.ChainID {
+	return ""
 }
 
-func (p Params) SporkID() (flow.Identifier, error) {
-	return flow.ZeroID, p.err
+func (p Params) SporkID() flow.Identifier {
+	return flow.ZeroID
 }
 
-func (p Params) SporkRootBlockHeight() (uint64, error) {
-	return 0, p.err
+func (p Params) SporkRootBlockHeight() uint64 {
+	return 0
 }
 
-func (p Params) ProtocolVersion() (uint, error) {
-	return 0, p.err
+func (p Params) ProtocolVersion() uint {
+	return 0
 }
 
-func (p Params) EpochCommitSafetyThreshold() (uint64, error) {
-	return 0, p.err
+func (p Params) EpochCommitSafetyThreshold() uint64 {
+	return 0
 }

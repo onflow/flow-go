@@ -544,37 +544,25 @@ func (state *State) bootstrapSporkInfo(root protocol.Snapshot) func(*badger.Txn)
 	return func(tx *badger.Txn) error {
 		params := root.Params()
 
-		sporkID, err := params.SporkID()
-		if err != nil {
-			return fmt.Errorf("could not get spork ID: %w", err)
-		}
-		err = operation.InsertSporkID(sporkID)(tx)
+		sporkID := params.SporkID()
+		err := operation.InsertSporkID(sporkID)(tx)
 		if err != nil {
 			return fmt.Errorf("could not insert spork ID: %w", err)
 		}
 
-		sporkRootBlockHeight, err := params.SporkRootBlockHeight()
-		if err != nil {
-			return fmt.Errorf("could not get spork root block height: %w", err)
-		}
+		sporkRootBlockHeight := params.SporkRootBlockHeight()
 		err = operation.InsertSporkRootBlockHeight(sporkRootBlockHeight)(tx)
 		if err != nil {
 			return fmt.Errorf("could not insert spork root block height: %w", err)
 		}
 
-		version, err := params.ProtocolVersion()
-		if err != nil {
-			return fmt.Errorf("could not get protocol version: %w", err)
-		}
+		version := params.ProtocolVersion()
 		err = operation.InsertProtocolVersion(version)(tx)
 		if err != nil {
 			return fmt.Errorf("could not insert protocol version: %w", err)
 		}
 
-		threshold, err := params.EpochCommitSafetyThreshold()
-		if err != nil {
-			return fmt.Errorf("could not get epoch commit safety threshold: %w", err)
-		}
+		threshold := params.EpochCommitSafetyThreshold()
 		err = operation.InsertEpochCommitSafetyThreshold(threshold)(tx)
 		if err != nil {
 			return fmt.Errorf("could not insert epoch commit safety threshold: %w", err)
@@ -667,7 +655,14 @@ func OpenState(
 }
 
 func (state *State) Params() protocol.Params {
-	return Params{state: state}
+	globalParams, err := ReadGlobalParams(state)
+	if err != nil {
+		panic("failed to read global params: " + err.Error())
+	}
+	return Params{
+		GlobalParams: globalParams,
+		state:        state,
+	}
 }
 
 // Sealed returns a snapshot for the latest sealed block. A latest sealed block

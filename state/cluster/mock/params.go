@@ -13,27 +13,17 @@ type Params struct {
 }
 
 // ChainID provides a mock function with given fields:
-func (_m *Params) ChainID() (flow.ChainID, error) {
+func (_m *Params) ChainID() flow.ChainID {
 	ret := _m.Called()
 
 	var r0 flow.ChainID
-	var r1 error
-	if rf, ok := ret.Get(0).(func() (flow.ChainID, error)); ok {
-		return rf()
-	}
 	if rf, ok := ret.Get(0).(func() flow.ChainID); ok {
 		r0 = rf()
 	} else {
 		r0 = ret.Get(0).(flow.ChainID)
 	}
 
-	if rf, ok := ret.Get(1).(func() error); ok {
-		r1 = rf()
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
+	return r0
 }
 
 type mockConstructorTestingTNewParams interface {

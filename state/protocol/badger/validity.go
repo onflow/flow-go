@@ -414,12 +414,7 @@ func ValidRootSnapshotContainsEntityExpiryRange(snapshot protocol.Snapshot) erro
 	if err != nil {
 		return fmt.Errorf("could not query root snapshot head: %w", err)
 	}
-
-	sporkRootBlockHeight, err := snapshot.Params().SporkRootBlockHeight()
-	if err != nil {
-		return fmt.Errorf("could not query spork root block height: %w", err)
-	}
-
+	sporkRootBlockHeight := snapshot.Params().SporkRootBlockHeight()
 	sealingSegment, err := snapshot.SealingSegment()
 	if err != nil {
 		return fmt.Errorf("could not query sealing segment: %w", err)

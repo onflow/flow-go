@@ -720,10 +720,7 @@ func (fnb *FlowNodeBuilder) initMetrics() error {
 		// metrics enabled, report node info metrics as post init event
 		fnb.PostInit(func(nodeConfig *NodeConfig) error {
 			nodeInfoMetrics := metrics.NewNodeInfoCollector()
-			protocolVersion, err := fnb.RootSnapshot.Params().ProtocolVersion()
-			if err != nil {
-				return fmt.Errorf("could not query root snapshoot protocol version: %w", err)
-			}
+			protocolVersion := fnb.RootSnapshot.Params().ProtocolVersion()
 			nodeInfoMetrics.NodeInfo(build.Version(), build.Commit(), nodeConfig.SporkID.String(), protocolVersion)
 			return nil
 		})
@@ -1195,10 +1192,7 @@ func (fnb *FlowNodeBuilder) setRootSnapshot(rootSnapshot protocol.Snapshot) erro
 	}
 
 	fnb.RootChainID = fnb.FinalizedRootBlock.Header.ChainID
-	fnb.SporkID, err = fnb.RootSnapshot.Params().SporkID()
-	if err != nil {
-		return fmt.Errorf("failed to read spork ID: %w", err)
-	}
+	fnb.SporkID = fnb.RootSnapshot.Params().SporkID()
 
 	return nil
 }

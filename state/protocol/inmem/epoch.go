@@ -3,7 +3,6 @@ package inmem
 import (
 	"fmt"
 
-	"github.com/onflow/flow-go/model/encodable"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/factory"
 	"github.com/onflow/flow-go/model/flow/filter"
@@ -256,20 +255,11 @@ func (es *committedEpoch) ClusterByChainID(chainID flow.ChainID) (protocol.Clust
 }
 
 func (es *committedEpoch) DKG() (protocol.DKG, error) {
-	// filter initial participants to valid DKG participants
-	participants := es.setupEvent.Participants.Filter(filter.IsValidDKGParticipant)
-	lookup, err := flow.ToDKGParticipantLookup(participants, es.commitEvent.DKGParticipantKeys)
+	encodable, err := EncodableDKGFromEvents(es.setupEvent, es.commitEvent)
 	if err != nil {
-		return nil, fmt.Errorf("could not construct dkg lookup: %w", err)
+		return nil, fmt.Errorf("could not build encodable DKG from epoch events")
 	}
-
-	dkg, err := DKGFromEncodable(EncodableDKG{
-		GroupKey: encodable.RandomBeaconPubKey{
-			PublicKey: es.commitEvent.DKGGroupKey,
-		},
-		Participants: lookup,
-	})
-	return dkg, err
+	return DKGFromEncodable(encodable)
 }
 
 // startedEpoch represents an epoch (with counter N) that has started, but there is no _finalized_ transition

@@ -1686,7 +1686,7 @@ func TestEmergencyEpochFallback(t *testing.T) {
 			require.NoError(t, err)
 			result, _, err := rootSnapshot.SealedResult()
 			require.NoError(t, err)
-			safetyThreshold, err := rootSnapshot.Params().EpochCommitSafetyThreshold()
+			safetyThreshold := rootSnapshot.Params().EpochCommitSafetyThreshold()
 			require.NoError(t, err)
 
 			epoch1Setup := result.ServiceEvents[0].Event.(*flow.EpochSetup)
@@ -1744,7 +1744,7 @@ func TestEmergencyEpochFallback(t *testing.T) {
 			require.NoError(t, err)
 			result, _, err := rootSnapshot.SealedResult()
 			require.NoError(t, err)
-			safetyThreshold, err := rootSnapshot.Params().EpochCommitSafetyThreshold()
+			safetyThreshold := rootSnapshot.Params().EpochCommitSafetyThreshold()
 			require.NoError(t, err)
 
 			// add a block for the first seal to reference

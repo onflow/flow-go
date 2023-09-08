@@ -96,32 +96,13 @@ func FromSnapshot(from protocol.Snapshot) (*Snapshot, error) {
 // FromParams converts any protocol.GlobalParams to a memory-backed Params.
 // TODO error docs
 func FromParams(from protocol.GlobalParams) (*Params, error) {
-	var (
-		params EncodableParams
-		err    error
-	)
-
-	params.ChainID, err = from.ChainID()
-	if err != nil {
-		return nil, fmt.Errorf("could not get chain id: %w", err)
+	params := EncodableParams{
+		ChainID:                    from.ChainID(),
+		SporkID:                    from.SporkID(),
+		SporkRootBlockHeight:       from.SporkRootBlockHeight(),
+		ProtocolVersion:            from.ProtocolVersion(),
+		EpochCommitSafetyThreshold: from.EpochCommitSafetyThreshold(),
 	}
-	params.SporkID, err = from.SporkID()
-	if err != nil {
-		return nil, fmt.Errorf("could not get spork id: %w", err)
-	}
-	params.SporkRootBlockHeight, err = from.SporkRootBlockHeight()
-	if err != nil {
-		return nil, fmt.Errorf("could not get spork root block height: %w", err)
-	}
-	params.ProtocolVersion, err = from.ProtocolVersion()
-	if err != nil {
-		return nil, fmt.Errorf("could not get protocol version: %w", err)
-	}
-	params.EpochCommitSafetyThreshold, err = from.EpochCommitSafetyThreshold()
-	if err != nil {
-		return nil, fmt.Errorf("could not get protocol version: %w", err)
-	}
-
 	return &Params{params}, nil
 }
 
@@ -252,6 +233,24 @@ func FromDKG(from protocol.DKG, participants flow.IdentityList) (*DKG, error) {
 // DKGFromEncodable returns a DKG backed by the given encodable representation.
 func DKGFromEncodable(enc EncodableDKG) (*DKG, error) {
 	return &DKG{enc}, nil
+}
+
+// EncodableDKGFromEvents returns an EncodableDKG constructed from epoch setup and commit events.
+// No errors are expected during normal operations.
+func EncodableDKGFromEvents(setup *flow.EpochSetup, commit *flow.EpochCommit) (EncodableDKG, error) {
+	// filter initial participants to valid DKG participants
+	participants := setup.Participants.Filter(filter.IsValidDKGParticipant)
+	lookup, err := flow.ToDKGParticipantLookup(participants, commit.DKGParticipantKeys)
+	if err != nil {
+		return EncodableDKG{}, fmt.Errorf("could not construct dkg lookup: %w", err)
+	}
+
+	return EncodableDKG{
+		GroupKey: encodable.RandomBeaconPubKey{
+			PublicKey: commit.DKGGroupKey,
+		},
+		Participants: lookup,
+	}, nil
 }
 
 // ClusterFromEncodable returns a Cluster backed by the given encodable representation.

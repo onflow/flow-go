@@ -1,6 +1,9 @@
 package flow
 
-import "fmt"
+import (
+	"fmt"
+	"sort"
+)
 
 // DynamicIdentityEntry encapsulates nodeID and dynamic portion of identity.
 type DynamicIdentityEntry struct {
@@ -167,6 +170,61 @@ func (e *ProtocolStateEntry) ID() Identifier {
 	return MakeID(body)
 }
 
+// Copy returns a full copy of the entry.
+// Embedded Identities are deep-copied, _except_ for their keys, which are copied by reference.
+func (e *ProtocolStateEntry) Copy() *ProtocolStateEntry {
+	if e == nil {
+		return nil
+	}
+	return &ProtocolStateEntry{
+		CurrentEpochEventIDs:            e.CurrentEpochEventIDs,
+		PreviousEpochEventIDs:           e.PreviousEpochEventIDs,
+		Identities:                      e.Identities.Copy(),
+		InvalidStateTransitionAttempted: e.InvalidStateTransitionAttempted,
+		NextEpochProtocolState:          e.NextEpochProtocolState.Copy(),
+	}
+}
+
+// Copy returns a full copy of rich protocol state entry.
+//   - Embedded service events are copied by reference (not deep-copied).
+//   - Identities are deep-copied, _except_ for their keys, which are copied by reference.
+func (e *RichProtocolStateEntry) Copy() *RichProtocolStateEntry {
+	if e == nil {
+		return nil
+	}
+	return &RichProtocolStateEntry{
+		ProtocolStateEntry:     e.ProtocolStateEntry.Copy(),
+		CurrentEpochSetup:      e.CurrentEpochSetup,
+		CurrentEpochCommit:     e.CurrentEpochCommit,
+		PreviousEpochSetup:     e.PreviousEpochSetup,
+		PreviousEpochCommit:    e.PreviousEpochCommit,
+		Identities:             e.Identities.Copy(),
+		NextEpochProtocolState: e.NextEpochProtocolState.Copy(),
+	}
+}
+
+// EpochStatus returns epoch status for the current protocol state.
+func (e *ProtocolStateEntry) EpochStatus() *EpochStatus {
+	var nextEpoch EventIDs
+	if e.NextEpochProtocolState != nil {
+		nextEpoch = e.NextEpochProtocolState.CurrentEpochEventIDs
+	}
+	return &EpochStatus{
+		PreviousEpoch:                   e.PreviousEpochEventIDs,
+		CurrentEpoch:                    e.CurrentEpochEventIDs,
+		NextEpoch:                       nextEpoch,
+		InvalidServiceEventIncorporated: e.InvalidStateTransitionAttempted,
+	}
+}
+
+func (ll DynamicIdentityEntryList) Lookup() map[Identifier]*DynamicIdentityEntry {
+	result := make(map[Identifier]*DynamicIdentityEntry, len(ll))
+	for _, entry := range ll {
+		result[entry.NodeID] = entry
+	}
+	return result
+}
+
 // Sorted returns whether the list is sorted by the input ordering.
 func (ll DynamicIdentityEntryList) Sorted(less IdentifierOrder) bool {
 	for i := 0; i < len(ll)-1; i++ {
@@ -177,6 +235,50 @@ func (ll DynamicIdentityEntryList) Sorted(less IdentifierOrder) bool {
 		}
 	}
 	return true
+}
+
+// ByNodeID gets a node from the list by node ID.
+func (ll DynamicIdentityEntryList) ByNodeID(nodeID Identifier) (*DynamicIdentityEntry, bool) {
+	for _, identity := range ll {
+		if identity.NodeID == nodeID {
+			return identity, true
+		}
+	}
+	return nil, false
+}
+
+// Copy returns a copy of the DynamicIdentityEntryList. The resulting slice uses
+// a different backing array, meaning appends and insert operations on either slice
+// are guaranteed to only affect that slice.
+//
+// Copy should be used when modifying an existing identity list by either
+// appending new elements, re-ordering, or inserting new elements in an
+// existing index.
+//
+// CAUTION:
+// All Identity fields are deep-copied, _except_ for their keys, which
+// are copied by reference.
+func (ll DynamicIdentityEntryList) Copy() DynamicIdentityEntryList {
+	dup := make(DynamicIdentityEntryList, 0, len(ll))
+
+	lenList := len(ll)
+	for i := 0; i < lenList; i++ {
+		// copy the object
+		next := *(ll[i])
+		dup = append(dup, &next)
+	}
+	return dup
+}
+
+// Sort sorts the list by the input ordering. Returns a new, sorted list without modifying the input.
+// CAUTION:
+// All Identity fields are deep-copied, _except_ for their keys, which are copied by reference.
+func (ll DynamicIdentityEntryList) Sort(less IdentifierOrder) DynamicIdentityEntryList {
+	dup := ll.Copy()
+	sort.Slice(dup, func(i int, j int) bool {
+		return less(dup[i].NodeID, dup[j].NodeID)
+	})
+	return dup
 }
 
 // buildIdentityTable constructs the full identity table for the target epoch by combining data from:

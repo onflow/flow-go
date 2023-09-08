@@ -2627,6 +2627,8 @@ func WithNextEpochProtocolState() func(entry *flow.RichProtocolStateEntry) {
 	return func(entry *flow.RichProtocolStateEntry) {
 		nextEpochSetup := EpochSetupFixture(func(setup *flow.EpochSetup) {
 			setup.Counter = entry.CurrentEpochSetup.Counter + 1
+			setup.FirstView = entry.CurrentEpochSetup.FinalView + 1
+			setup.FinalView = setup.FirstView + 1000
 			// reuse same participant for current epoch
 			sameParticipant := *entry.CurrentEpochSetup.Participants[1]
 			setup.Participants[1] = &sameParticipant
@@ -2658,6 +2660,19 @@ func WithNextEpochProtocolState() func(entry *flow.RichProtocolStateEntry) {
 			PreviousEpochCommit:    entry.CurrentEpochCommit,
 			Identities:             allIdentities,
 			NextEpochProtocolState: nil,
+		}
+	}
+}
+
+// WithValidDKG updated protocol state with correctly structured data for DKG.
+func WithValidDKG() func(*flow.RichProtocolStateEntry) {
+	return func(entry *flow.RichProtocolStateEntry) {
+		commit := entry.CurrentEpochCommit
+		dkgParticipants := entry.CurrentEpochSetup.Participants.Filter(filter.IsValidDKGParticipant)
+		lookup := DKGParticipantLookup(dkgParticipants)
+		commit.DKGParticipantKeys = make([]crypto.PublicKey, len(lookup))
+		for _, participant := range lookup {
+			commit.DKGParticipantKeys[participant.Index] = participant.KeyShare
 		}
 	}
 }
