@@ -1,6 +1,7 @@
 package protocol_state
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/onflow/flow-go/model/flow"
@@ -44,7 +45,7 @@ func (m *Mutator) CommitProtocolState(updater protocol.StateUpdater) func(tx *tr
 		updatedState, updatedStateID, hasChanges := updater.Build()
 		if hasChanges {
 			err := m.protocolStateDB.StoreTx(updatedStateID, updatedState)(tx)
-			if err != nil {
+			if err != nil && !errors.Is(err, storage.ErrAlreadyExists) {
 				return fmt.Errorf("could not store protocol state (%v): %w", updatedStateID, err)
 			}
 		}
