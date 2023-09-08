@@ -7,6 +7,7 @@ import (
 	"github.com/dgraph-io/badger/v2"
 	"github.com/stretchr/testify/require"
 
+	"github.com/onflow/flow-go/engine/execution"
 	"github.com/onflow/flow-go/engine/execution/state"
 	"github.com/onflow/flow-go/engine/execution/state/bootstrap"
 	"github.com/onflow/flow-go/engine/execution/testutil"
@@ -46,6 +47,8 @@ func TestReExecuteBlock(t *testing.T) {
 		err = headers.Store(genesis)
 		require.NoError(t, err)
 
+		// TODO(leo): registerStore
+		var registerStore execution.RegisterStore
 		// create execution state module
 		es := state.NewExecutionState(
 			nil,
@@ -61,6 +64,7 @@ func TestReExecuteBlock(t *testing.T) {
 			txResults,
 			db,
 			trace.NewNoopTracer(),
+			registerStore,
 		)
 		require.NotNil(t, es)
 
@@ -168,6 +172,8 @@ func TestReExecuteBlockWithDifferentResult(t *testing.T) {
 		err = headers.Store(genesis)
 		require.NoError(t, err)
 
+		// TODO(leo): registerStore
+		var registerStore execution.RegisterStore
 		// create execution state module
 		es := state.NewExecutionState(
 			nil,
@@ -183,6 +189,7 @@ func TestReExecuteBlockWithDifferentResult(t *testing.T) {
 			txResults,
 			db,
 			trace.NewNoopTracer(),
+			registerStore,
 		)
 		require.NotNil(t, es)
 
