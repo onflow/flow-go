@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"golang.org/x/exp/maps"
 	"golang.org/x/sync/errgroup"
 
 	"github.com/onflow/flow-go/cmd/util/ledger/migrations"
@@ -15,17 +16,15 @@ import (
 
 // ExecutionState indexes the execution state.
 type ExecutionState struct {
-	registers   storage.RegisterIndex
-	headers     storage.Headers
-	events      storage.Events
-	commitments map[uint64]flow.StateCommitment // todo persist
+	registers storage.RegisterIndex
+	headers   storage.Headers
+	events    storage.Events
 }
 
 func New(registers storage.RegisterIndex, headers storage.Headers, startIndexHeight uint64) *ExecutionState {
 	return &ExecutionState{
-		registers:   registers,
-		headers:     headers,
-		commitments: make(map[uint64]flow.StateCommitment),
+		registers: registers,
+		headers:   headers,
 	}
 }
 
@@ -38,27 +37,6 @@ func (i *ExecutionState) HeightByBlockID(ID flow.Identifier) (uint64, error) {
 	}
 
 	return header.Height, nil
-}
-
-// Commitment retrieves a commitment at the provided block height.
-// If a commitment at height is not found expect a `storage.ErrNotFound` error.
-func (i *ExecutionState) Commitment(height uint64) (flow.StateCommitment, error) {
-	// todo use the commitment storage to read heights
-	//if height < i.startIndexHeight || height > i.lastIndexedHeight.Value() {
-	//	return flow.DummyStateCommitment, fmt.Errorf(
-	//		"state commitment out of indexed height bounds, current height range: [%d, %d], requested height: %d",
-	//		i.startIndexHeight,
-	//		i.lastIndexedHeight.Value(),
-	//		height,
-	//	)
-	//}
-
-	val, ok := i.commitments[height]
-	if !ok {
-		return flow.DummyStateCommitment, fmt.Errorf("could not find commitment at height %d", height)
-	}
-
-	return val, nil
 }
 
 // RegisterValues retrieves register values by the register IDs at the provided block height.
@@ -95,6 +73,7 @@ func (i *ExecutionState) RegisterValues(IDs flow.RegisterIDs, height uint64) ([]
 
 // IndexBlockData indexes all execution block data by height.
 // If the height was already indexed the operation will be ignored.
+// This method shouldn't be used concurrently.
 func (i *ExecutionState) IndexBlockData(ctx context.Context, data *execution_data.BlockExecutionDataEntity) error {
 	select {
 	case <-ctx.Done():
@@ -116,32 +95,43 @@ func (i *ExecutionState) IndexBlockData(ctx context.Context, data *execution_dat
 
 	// concurrently process indexing of block data
 	g, ctx := errgroup.WithContext(ctx)
-	for j, chunk := range data.ChunkExecutionDatas {
-		ch := chunk
-		if len(ch.Events) > 0 {
-			g.Go(func() error {
-				err := i.indexEvents(data.BlockID, ch.Events)
-				if err != nil {
-					return fmt.Errorf("could not index events for chunk %d: %w", j, err)
-				}
-				return nil
-			})
+
+	payloads := make(map[ledger.Path]*ledger.Payload)
+	events := make([]flow.Event, 0)
+	collections := make([]*flow.Collection, 0)
+
+	for _, chunk := range data.ChunkExecutionDatas {
+		// we are iterating all the registers and overwrite any existing register at the same path
+		// this will make sure if we have multiple register changes only the last change will get persisted
+		// if block has two chucks:
+		// first chunk updates: { X: 1, Y: 2 }
+		// second chunk updates: { X: 2 }
+		// then we should persist only {X: 2: Y: 2}
+		for i, path := range chunk.TrieUpdate.Paths {
+			payloads[path] = chunk.TrieUpdate.Payloads[i] // todo should we use TrieUpdate.Paths or TrieUpdate.Payload.Key
 		}
+
+		events = append(events, chunk.Events...)
+		collections = append(collections, chunk.Collection)
+	}
+
+	if len(events) > 0 {
 		g.Go(func() error {
-			err = i.indexCommitment(flow.StateCommitment(ch.TrieUpdate.RootHash), block.Height)
+			err := i.indexEvents(data.BlockID, events)
 			if err != nil {
-				return fmt.Errorf("could not index events for chunk %d: %w", j, err)
-			}
-			return nil
-		})
-		g.Go(func() error {
-			err = i.indexRegisterPayload(ch.TrieUpdate.Payloads, block.Height)
-			if err != nil {
-				return fmt.Errorf("could not index registers for chunk %d: %w", j, err)
+				return fmt.Errorf("could not index events at height %d: %w", block.Height, err)
 			}
 			return nil
 		})
 	}
+
+	g.Go(func() error {
+		err = i.indexRegisterPayloads(maps.Values(payloads), block.Height)
+		if err != nil {
+			return fmt.Errorf("could not index register payloads at height %d: %w", block.Height, err)
+		}
+		return nil
+	})
 
 	err = g.Wait()
 	if err != nil {
@@ -151,17 +141,12 @@ func (i *ExecutionState) IndexBlockData(ctx context.Context, data *execution_dat
 	return nil
 }
 
-func (i *ExecutionState) indexCommitment(commitment flow.StateCommitment, height uint64) error {
-	i.commitments[height] = commitment
-	return nil
-}
-
 func (i *ExecutionState) indexEvents(blockID flow.Identifier, events flow.EventsList) error {
 	// Note: service events are currently not included in execution data: https://github.com/onflow/flow-go/issues/4624
 	return i.events.Store(blockID, []flow.EventsList{events})
 }
 
-func (i *ExecutionState) indexRegisterPayload(payloads []*ledger.Payload, height uint64) error {
+func (i *ExecutionState) indexRegisterPayloads(payloads []*ledger.Payload, height uint64) error {
 	regEntries := make(flow.RegisterEntries, len(payloads))
 
 	for j, payload := range payloads {
