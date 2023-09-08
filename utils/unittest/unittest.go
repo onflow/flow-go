@@ -13,7 +13,6 @@ import (
 	"time"
 
 	"github.com/dgraph-io/badger/v2"
-	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -22,7 +21,6 @@ import (
 	"github.com/onflow/flow-go/module/util"
 	"github.com/onflow/flow-go/network"
 	cborcodec "github.com/onflow/flow-go/network/codec/cbor"
-	"github.com/onflow/flow-go/network/slashing"
 	"github.com/onflow/flow-go/network/topology"
 )
 
@@ -435,9 +433,4 @@ func GenerateRandomStringWithLen(commentLen uint) string {
 		bytes[i] = letterBytes[rand.Intn(len(letterBytes))]
 	}
 	return string(bytes)
-}
-
-// NetworkSlashingViolationsConsumer returns a slashing violations consumer for network middleware
-func NetworkSlashingViolationsConsumer(logger zerolog.Logger, metrics module.NetworkSecurityMetrics) slashing.ViolationsConsumer {
-	return slashing.NewSlashingViolationsConsumer(logger, metrics)
 }

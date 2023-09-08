@@ -14,11 +14,14 @@ on:
       - 'auto-cadence-upgrade/**'
       - 'feature/**'
       - 'v[0-9]+.[0-9]+'
+  merge_group:
+    branches:
+      - master
 
 env:
-  GO_VERSION: 1.19
+  GO_VERSION: "1.20"
 
-concurrency: 
+concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
   cancel-in-progress: true
 
@@ -47,7 +50,7 @@ jobs:
       uses: golangci/golangci-lint-action@v3
       with:
         # Required: the version of golangci-lint is required and must be specified without patch version: we always use the latest patch version.
-        version: v1.49
+        version: v1.51
         args: -v --build-tags relic
         working-directory: ${{ matrix.dir }}
         # https://github.com/golangci/golangci-lint-action/issues/244
@@ -66,8 +69,8 @@ jobs:
           cache: true
       - name: Run tidy
         run: make tidy
-      - name: Emulator no relic check
-        run: make emulator-norelic-check
+      - name: code sanity check
+        run: make code-sanity-check
 
   shell-check:
     name: ShellCheck
@@ -96,7 +99,7 @@ jobs:
           cache: true
       - name: Set Test Matrix
         id: set-test-matrix
-        run: go run utils/test_matrix/test_matrix.go access admin cmd consensus engine fvm ledger module network utils
+        run: go run utils/test_matrix/test_matrix.go admin cmd consensus engine fvm ledger module network/test network/p2p utils
 
   unit-test:
     name: Unit Tests (${{ matrix.targets.name }})
@@ -115,7 +118,7 @@ jobs:
       with:
         go-version: ${{ env.GO_VERSION }}
         cache: true
-    - name: Setup tests (${{ matrix.targets.name }}
+    - name: Setup tests (${{ matrix.targets.name }})
       run: VERBOSE=1 make -e GO_TEST_PACKAGES="${{ matrix.targets.packages }}" install-tools
     - name: Run tests (${{ matrix.targets.name }})
       uses: nick-fields/retry@v2
@@ -189,10 +192,13 @@ jobs:
       matrix:
         make:
           - make -C integration access-tests
-          - make -C integration bft-tests
+          - make -C integration bft-framework-tests
+          - make -C integration bft-protocol-tests
+          - make -C integration bft-gossipsub-tests
           - make -C integration collection-tests
           - make -C integration consensus-tests
-          - make -C integration epochs-tests
+          - make -C integration epochs-cohort1-tests
+          - make -C integration epochs-cohort2-tests
           - make -C integration execution-tests
           - make -C integration ghost-tests
           - make -C integration mvp-tests
@@ -203,6 +209,9 @@ jobs:
     steps:
     - name: Checkout repo
       uses: actions/checkout@v3
+      with:
+          # all tags are needed for integration tests
+          fetch-depth: 0
     - name: Setup Go
       uses: actions/setup-go@v3
       with:

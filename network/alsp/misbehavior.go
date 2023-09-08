@@ -24,6 +24,25 @@ const (
 	// the message is not valid according to the engine's validation logic. The decision to consider a message invalid
 	// is up to the engine.
 	InvalidMessage network.Misbehavior = "misbehavior-invalid-message"
+
+	// UnExpectedValidationError is a misbehavior that is reported when a validation error is encountered during message validation before the message
+	// is processed by an engine.
+	UnExpectedValidationError network.Misbehavior = "unexpected-validation-error"
+
+	// UnknownMsgType is a misbehavior that is reported when a message of unknown type is received from a peer.
+	UnknownMsgType network.Misbehavior = "unknown-message-type"
+
+	// SenderEjected is a misbehavior that is reported when a message is received from an ejected peer.
+	SenderEjected network.Misbehavior = "sender-ejected"
+
+	// UnauthorizedUnicastOnChannel is a misbehavior that is reported when a message not authorized to be sent via unicast is received via unicast.
+	UnauthorizedUnicastOnChannel network.Misbehavior = "unauthorized-unicast-on-channel"
+
+	// UnAuthorizedSender is a misbehavior that is reported when a message is sent by an unauthorized role.
+	UnAuthorizedSender network.Misbehavior = "unauthorized-sender"
+
+	// UnauthorizedPublishOnChannel is a misbehavior that is reported when a message not authorized to be sent via pubsub is received via pubsub.
+	UnauthorizedPublishOnChannel network.Misbehavior = "unauthorized-pubsub-on-channel"
 )
 
 func AllMisbehaviorTypes() []network.Misbehavior {
@@ -33,5 +52,11 @@ func AllMisbehaviorTypes() []network.Misbehavior {
 		RedundantMessage,
 		UnsolicitedMessage,
 		InvalidMessage,
+		UnExpectedValidationError,
+		UnknownMsgType,
+		SenderEjected,
+		UnauthorizedUnicastOnChannel,
+		UnauthorizedPublishOnChannel,
+		UnAuthorizedSender,
 	}
 }

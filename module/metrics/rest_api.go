@@ -2,14 +2,13 @@ package metrics
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
+	httpmetrics "github.com/slok/go-http-metrics/metrics"
 
 	"github.com/onflow/flow-go/module"
-
-	httpmetrics "github.com/slok/go-http-metrics/metrics"
-	metricsProm "github.com/slok/go-http-metrics/metrics/prometheus"
 )
 
 type RestCollector struct {
@@ -17,97 +16,98 @@ type RestCollector struct {
 	httpResponseSizeHistogram *prometheus.HistogramVec
 	httpRequestsInflight      *prometheus.GaugeVec
 	httpRequestsTotal         *prometheus.GaugeVec
+
+	// urlToRouteMapper is a callback that converts a URL to a route name
+	urlToRouteMapper func(string) (string, error)
 }
 
 var _ module.RestMetrics = (*RestCollector)(nil)
 
 // NewRestCollector returns a new metrics RestCollector that implements the RestCollector
 // using Prometheus as the backend.
-func NewRestCollector(cfg metricsProm.Config) module.RestMetrics {
-	if len(cfg.DurationBuckets) == 0 {
-		cfg.DurationBuckets = prometheus.DefBuckets
-	}
-
-	if len(cfg.SizeBuckets) == 0 {
-		cfg.SizeBuckets = prometheus.ExponentialBuckets(100, 10, 8)
-	}
-
-	if cfg.Registry == nil {
-		cfg.Registry = prometheus.DefaultRegisterer
-	}
-
-	if cfg.HandlerIDLabel == "" {
-		cfg.HandlerIDLabel = "handler"
-	}
-
-	if cfg.StatusCodeLabel == "" {
-		cfg.StatusCodeLabel = "code"
-	}
-
-	if cfg.MethodLabel == "" {
-		cfg.MethodLabel = "method"
-	}
-
-	if cfg.ServiceLabel == "" {
-		cfg.ServiceLabel = "service"
+func NewRestCollector(urlToRouteMapper func(string) (string, error), registerer prometheus.Registerer) (*RestCollector, error) {
+	if urlToRouteMapper == nil {
+		return nil, fmt.Errorf("urlToRouteMapper cannot be nil")
 	}
 
 	r := &RestCollector{
+		urlToRouteMapper: urlToRouteMapper,
 		httpRequestDurHistogram: prometheus.NewHistogramVec(prometheus.HistogramOpts{
-			Namespace: cfg.Prefix,
-			Subsystem: "http",
+			Namespace: namespaceRestAPI,
+			Subsystem: subsystemHTTP,
 			Name:      "request_duration_seconds",
 			Help:      "The latency of the HTTP requests.",
-			Buckets:   cfg.DurationBuckets,
-		}, []string{cfg.ServiceLabel, cfg.HandlerIDLabel, cfg.MethodLabel, cfg.StatusCodeLabel}),
+			Buckets:   prometheus.DefBuckets,
+		}, []string{LabelService, LabelHandler, LabelMethod, LabelStatusCode}),
 
 		httpResponseSizeHistogram: prometheus.NewHistogramVec(prometheus.HistogramOpts{
-			Namespace: cfg.Prefix,
-			Subsystem: "http",
+			Namespace: namespaceRestAPI,
+			Subsystem: subsystemHTTP,
 			Name:      "response_size_bytes",
 			Help:      "The size of the HTTP responses.",
-			Buckets:   cfg.SizeBuckets,
-		}, []string{cfg.ServiceLabel, cfg.HandlerIDLabel, cfg.MethodLabel, cfg.StatusCodeLabel}),
+			Buckets:   prometheus.ExponentialBuckets(100, 10, 8),
+		}, []string{LabelService, LabelHandler, LabelMethod, LabelStatusCode}),
 
 		httpRequestsInflight: prometheus.NewGaugeVec(prometheus.GaugeOpts{
-			Namespace: cfg.Prefix,
-			Subsystem: "http",
+			Namespace: namespaceRestAPI,
+			Subsystem: subsystemHTTP,
 			Name:      "requests_inflight",
 			Help:      "The number of inflight requests being handled at the same time.",
-		}, []string{cfg.ServiceLabel, cfg.HandlerIDLabel}),
+		}, []string{LabelService, LabelHandler}),
 
 		httpRequestsTotal: prometheus.NewGaugeVec(prometheus.GaugeOpts{
-			Namespace: cfg.Prefix,
-			Subsystem: "http",
+			Namespace: namespaceRestAPI,
+			Subsystem: subsystemHTTP,
 			Name:      "requests_total",
 			Help:      "The number of requests handled over time.",
-		}, []string{cfg.ServiceLabel, cfg.HandlerIDLabel}),
+		}, []string{LabelMethod, LabelHandler}),
 	}
 
-	cfg.Registry.MustRegister(
+	registerer.MustRegister(
 		r.httpRequestDurHistogram,
 		r.httpResponseSizeHistogram,
 		r.httpRequestsInflight,
 		r.httpRequestsTotal,
 	)
 
-	return r
+	return r, nil
 }
 
-// These methods are called automatically by go-http-metrics/middleware
+// ObserveHTTPRequestDuration records the duration of the REST request.
+// This method is called automatically by go-http-metrics/middleware
 func (r *RestCollector) ObserveHTTPRequestDuration(_ context.Context, p httpmetrics.HTTPReqProperties, duration time.Duration) {
-	r.httpRequestDurHistogram.WithLabelValues(p.Service, p.ID, p.Method, p.Code).Observe(duration.Seconds())
+	handler := r.mapURLToRoute(p.ID)
+	r.httpRequestDurHistogram.WithLabelValues(p.Service, handler, p.Method, p.Code).Observe(duration.Seconds())
 }
 
+// ObserveHTTPResponseSize records the response size of the REST request.
+// This method is called automatically by go-http-metrics/middleware
 func (r *RestCollector) ObserveHTTPResponseSize(_ context.Context, p httpmetrics.HTTPReqProperties, sizeBytes int64) {
-	r.httpResponseSizeHistogram.WithLabelValues(p.Service, p.ID, p.Method, p.Code).Observe(float64(sizeBytes))
+	handler := r.mapURLToRoute(p.ID)
+	r.httpResponseSizeHistogram.WithLabelValues(p.Service, handler, p.Method, p.Code).Observe(float64(sizeBytes))
 }
 
+// AddInflightRequests increments and decrements the number of inflight request being processed.
+// This method is called automatically by go-http-metrics/middleware
 func (r *RestCollector) AddInflightRequests(_ context.Context, p httpmetrics.HTTPProperties, quantity int) {
-	r.httpRequestsInflight.WithLabelValues(p.Service, p.ID).Add(float64(quantity))
+	handler := r.mapURLToRoute(p.ID)
+	r.httpRequestsInflight.WithLabelValues(p.Service, handler).Add(float64(quantity))
 }
 
-// New custom method to track all requests made for every REST API request
-func (r *RestCollector) AddTotalRequests(_ context.Context, method string, id string) {
-	r.httpRequestsTotal.WithLabelValues(method, id).Inc()
+// AddTotalRequests records all REST requests
+// This is a custom method called by the REST handler
+func (r *RestCollector) AddTotalRequests(_ context.Context, method, path string) {
+	handler := r.mapURLToRoute(path)
+	r.httpRequestsTotal.WithLabelValues(method, handler).Inc()
+}
+
+// mapURLToRoute uses the urlToRouteMapper callback to convert a URL to a route name
+// This normalizes the URL, removing dynamic information converting it to a static string
+func (r *RestCollector) mapURLToRoute(url string) string {
+	route, err := r.urlToRouteMapper(url)
+	if err != nil {
+		return "unknown"
+	}
+
+	return route
 }

@@ -16,8 +16,8 @@ import (
 	mocks "github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/mocknetwork"
-	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/cache"
+	"github.com/onflow/flow-go/network/p2p/p2pnet"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -143,7 +143,8 @@ func (s *NodeDisallowListWrapperTestSuite) TestDisallowListNode() {
 		blocklistLookup := blocklist.Lookup()
 		honestIdentities := unittest.IdentityListFixture(8)
 		combinedIdentities := honestIdentities.Union(blocklist)
-		combinedIdentities = combinedIdentities.DeterministicShuffle(1234)
+		combinedIdentities, err = combinedIdentities.Shuffle()
+		require.NoError(s.T(), err)
 		numIdentities := len(combinedIdentities)
 
 		s.provider.On("Identities", mock.Anything).Return(combinedIdentities)
@@ -170,12 +171,13 @@ func (s *NodeDisallowListWrapperTestSuite) TestDisallowListNode() {
 		blocklistLookup := blocklist.Lookup()
 		honestIdentities := unittest.IdentityListFixture(8)
 		combinedIdentities := honestIdentities.Union(blocklist)
-		combinedIdentities = combinedIdentities.DeterministicShuffle(1234)
+		combinedIdentities, err = combinedIdentities.Shuffle()
+		require.NoError(s.T(), err)
 		numIdentities := len(combinedIdentities)
 
 		s.provider.On("Identities", mock.Anything).Return(combinedIdentities)
 
-		identities := s.wrapper.Identities(p2p.NotEjectedFilter)
+		identities := s.wrapper.Identities(p2pnet.NotEjectedFilter)
 
 		require.Equal(s.T(), len(honestIdentities), len(identities)) // expected only honest nodes to be returned
 		for _, i := range identities {

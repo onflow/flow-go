@@ -93,7 +93,7 @@ func New(
 	protoState protocol.State,
 	vmCtx fvm.Context,
 	committer computer.ViewCommitter,
-	executionDataProvider *provider.Provider,
+	executionDataProvider provider.Provider,
 	params ComputationConfig,
 ) (*Manager, error) {
 	log := logger.With().Str("engine", "computation").Logger()
@@ -106,7 +106,6 @@ func New(
 	}
 
 	chainID := vmCtx.Chain.ChainID()
-
 	options := []fvm.Option{
 		fvm.WithReusableCadenceRuntimePool(
 			reusableRuntime.NewReusableCadenceRuntimePool(
@@ -119,9 +118,9 @@ func New(
 					// Capability Controllers are enabled everywhere except for Mainnet
 					CapabilityControllersEnabled: chainID != flow.Mainnet,
 				},
-			),
-		),
+			)),
 	}
+
 	if params.ExtensiveTracing {
 		options = append(options, fvm.WithExtensiveTracing())
 	}
@@ -138,6 +137,7 @@ func New(
 		me,
 		executionDataProvider,
 		nil, // TODO(ramtin): update me with proper consumers
+		protoState,
 		params.MaxConcurrency,
 	)
 
@@ -238,4 +238,8 @@ func (e *Manager) GetAccount(
 		address,
 		blockHeader,
 		snapshot)
+}
+
+func (e *Manager) QueryExecutor() query.Executor {
+	return e.queryExecutor
 }

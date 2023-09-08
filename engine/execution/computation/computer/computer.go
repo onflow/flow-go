@@ -24,6 +24,7 @@ import (
 	"github.com/onflow/flow-go/module/executiondatasync/provider"
 	"github.com/onflow/flow-go/module/mempool/entity"
 	"github.com/onflow/flow-go/module/trace"
+	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/utils/logging"
 )
 
@@ -108,11 +109,12 @@ type blockComputer struct {
 	log                   zerolog.Logger
 	systemChunkCtx        fvm.Context
 	committer             ViewCommitter
-	executionDataProvider *provider.Provider
+	executionDataProvider provider.Provider
 	signer                module.Local
 	spockHasher           hash.Hasher
 	receiptHasher         hash.Hasher
 	colResCons            []result.ExecutedCollectionConsumer
+	protocolState         protocol.State
 	maxConcurrency        int
 }
 
@@ -139,8 +141,9 @@ func NewBlockComputer(
 	logger zerolog.Logger,
 	committer ViewCommitter,
 	signer module.Local,
-	executionDataProvider *provider.Provider,
+	executionDataProvider provider.Provider,
 	colResCons []result.ExecutedCollectionConsumer,
+	state protocol.State,
 	maxConcurrency int,
 ) (BlockComputer, error) {
 	if maxConcurrency < 1 {
@@ -164,6 +167,7 @@ func NewBlockComputer(
 		spockHasher:           utils.NewSPOCKHasher(),
 		receiptHasher:         utils.NewExecutionReceiptHasher(),
 		colResCons:            colResCons,
+		protocolState:         state,
 		maxConcurrency:        maxConcurrency,
 	}, nil
 }
@@ -204,7 +208,15 @@ func (e *blockComputer) queueTransactionRequests(
 
 	collectionCtx := fvm.NewContextFromParent(
 		e.vmCtx,
-		fvm.WithBlockHeader(blockHeader))
+		fvm.WithBlockHeader(blockHeader),
+		// `protocol.Snapshot` implements `EntropyProvider` interface
+		// Note that `Snapshot` possible errors for RandomSource() are:
+		// - storage.ErrNotFound if the QC is unknown.
+		// - state.ErrUnknownSnapshotReference if the snapshot reference block is unknown
+		// However, at this stage, snapshot reference block should be known and the QC should also be known,
+		// so no error is expected in normal operations, as required by `EntropyProvider`.
+		fvm.WithEntropyProvider(e.protocolState.AtBlockID(blockId)),
+	)
 
 	for idx, collection := range rawCollections {
 		collectionLogger := collectionCtx.Logger.With().
@@ -237,7 +249,15 @@ func (e *blockComputer) queueTransactionRequests(
 
 	systemCtx := fvm.NewContextFromParent(
 		e.systemChunkCtx,
-		fvm.WithBlockHeader(blockHeader))
+		fvm.WithBlockHeader(blockHeader),
+		// `protocol.Snapshot` implements `EntropyProvider` interface
+		// Note that `Snapshot` possible errors for RandomSource() are:
+		// - storage.ErrNotFound if the QC is unknown.
+		// - state.ErrUnknownSnapshotReference if the snapshot reference block is unknown
+		// However, at this stage, snapshot reference block should be known and the QC should also be known,
+		// so no error is expected in normal operations, as required by `EntropyProvider`.
+		fvm.WithEntropyProvider(e.protocolState.AtBlockID(blockId)),
+	)
 	systemCollectionLogger := systemCtx.Logger.With().
 		Str("block_id", blockIdStr).
 		Uint64("height", blockHeader.Height).

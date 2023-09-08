@@ -3,7 +3,7 @@ package connection
 import (
 	"context"
 	"fmt"
-	mrand "math/rand"
+
 	"sync"
 	"time"
 
@@ -14,6 +14,7 @@ import (
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/utils/logging"
+	"github.com/onflow/flow-go/utils/rand"
 )
 
 // DefaultPeerUpdateInterval is default duration for which the peer manager waits in between attempts to update peer connections.
@@ -31,7 +32,7 @@ type PeerManager struct {
 	logger             zerolog.Logger
 	peersProvider      p2p.PeersProvider // callback to retrieve list of peers to connect to
 	peerRequestQ       chan struct{}     // a channel to queue a peer update request
-	connector          p2p.Connector     // connector to connect or disconnect from peers
+	connector          p2p.PeerUpdater   // connector to connect or disconnect from peers
 	peerUpdateInterval time.Duration     // interval the peer manager runs on
 
 	peersProviderMu sync.RWMutex
@@ -39,9 +40,9 @@ type PeerManager struct {
 
 // NewPeerManager creates a new peer manager which calls the peersProvider callback to get a list of peers to connect to
 // and it uses the connector to actually connect or disconnect from peers.
-func NewPeerManager(logger zerolog.Logger, updateInterval time.Duration, connector p2p.Connector) *PeerManager {
+func NewPeerManager(logger zerolog.Logger, updateInterval time.Duration, connector p2p.PeerUpdater) *PeerManager {
 	pm := &PeerManager{
-		logger:             logger,
+		logger:             logger.With().Str("component", "peer-manager").Logger(),
 		connector:          connector,
 		peerRequestQ:       make(chan struct{}, 1),
 		peerUpdateInterval: updateInterval,
@@ -86,7 +87,11 @@ func (pm *PeerManager) updateLoop(ctx irrecoverable.SignalerContext) {
 func (pm *PeerManager) periodicLoop(ctx irrecoverable.SignalerContext) {
 	// add a random delay to initial launch to avoid synchronizing this
 	// potentially expensive operation across the network
-	delay := time.Duration(mrand.Int63n(pm.peerUpdateInterval.Nanoseconds()))
+	r, err := rand.Uint64n(uint64(pm.peerUpdateInterval.Nanoseconds()))
+	if err != nil {
+		ctx.Throw(fmt.Errorf("unable to generate random interval: %w", err))
+	}
+	delay := time.Duration(r)
 
 	ticker := time.NewTicker(pm.peerUpdateInterval)
 	defer ticker.Stop()

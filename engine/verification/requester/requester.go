@@ -67,7 +67,7 @@ type Engine struct {
 
 func New(log zerolog.Logger,
 	state protocol.State,
-	net network.Network,
+	net network.EngineRegistry,
 	tracer module.Tracer,
 	metrics module.VerificationMetrics,
 	pendingRequests mempool.ChunkRequests,
@@ -331,8 +331,11 @@ func (e *Engine) requestChunkDataPack(request *verification.ChunkDataPackRequest
 	}
 
 	// publishes the chunk data request to the network
-	targetIDs := request.SampleTargets(int(e.requestTargets))
-	err := e.con.Publish(req, targetIDs...)
+	targetIDs, err := request.SampleTargets(int(e.requestTargets))
+	if err != nil {
+		return fmt.Errorf("target sampling failed: %w", err)
+	}
+	err = e.con.Publish(req, targetIDs...)
 	if err != nil {
 		return fmt.Errorf("could not publish chunk data pack request for chunk (id=%s): %w", request.ChunkID, err)
 	}

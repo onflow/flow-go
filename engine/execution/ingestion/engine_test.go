@@ -18,6 +18,7 @@ import (
 
 	"github.com/onflow/flow-go/crypto"
 
+	enginePkg "github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/execution"
 	computation "github.com/onflow/flow-go/engine/execution/computation/mock"
 	"github.com/onflow/flow-go/engine/execution/ingestion/stop"
@@ -132,7 +133,7 @@ func runWithEngine(t *testing.T, f func(testingContext)) {
 
 	ctrl := gomock.NewController(t)
 
-	net := mocknetwork.NewMockNetwork(ctrl)
+	net := mocknetwork.NewMockEngineRegistry(ctrl)
 	request := module.NewMockRequester(ctrl)
 
 	// initialize the mocks and engine
@@ -202,7 +203,10 @@ func runWithEngine(t *testing.T, f func(testingContext)) {
 		return stateProtocol.IsNodeAuthorizedAt(protocolState.AtBlockID(blockID), myIdentity.NodeID)
 	}
 
+	unit := enginePkg.NewUnit()
 	stopControl := stop.NewStopControl(
+		unit,
+		time.Second,
 		zerolog.Nop(),
 		executionState,
 		headers,
@@ -216,6 +220,7 @@ func runWithEngine(t *testing.T, f func(testingContext)) {
 	uploadMgr := uploader.NewManager(trace.NewNoopTracer())
 
 	engine, err = New(
+		unit,
 		log,
 		net,
 		me,
@@ -237,6 +242,7 @@ func runWithEngine(t *testing.T, f func(testingContext)) {
 		nil,
 		uploadMgr,
 		stopControl,
+		false,
 	)
 	require.NoError(t, err)
 
@@ -277,6 +283,7 @@ func (ctx *testingContext) assertSuccessfulBlockComputation(
 ) *protocol.Snapshot {
 	if computationResult == nil {
 		computationResult = executionUnittest.ComputationResultForBlockFixture(
+			ctx.t,
 			previousExecutionResultID,
 			executableBlock)
 	}
@@ -412,7 +419,9 @@ func TestChunkIndexIsSet(t *testing.T) {
 		unittest.StateCommitmentFixture(),
 		21,
 		unittest.IdentifierFixture(),
-		unittest.StateCommitmentFixture())
+		unittest.StateCommitmentFixture(),
+		17995,
+	)
 
 	assert.Equal(t, i, int(chunk.Index))
 	assert.Equal(t, i, int(chunk.CollectionIndex))
@@ -427,9 +436,27 @@ func TestChunkNumberOfTxsIsSet(t *testing.T) {
 		unittest.StateCommitmentFixture(),
 		i,
 		unittest.IdentifierFixture(),
-		unittest.StateCommitmentFixture())
+		unittest.StateCommitmentFixture(),
+		17995,
+	)
 
 	assert.Equal(t, i, int(chunk.NumberOfTransactions))
+}
+
+func TestChunkTotalComputationUsedIsSet(t *testing.T) {
+
+	i := mathRand.Uint64()
+	chunk := flow.NewChunk(
+		unittest.IdentifierFixture(),
+		3,
+		unittest.StateCommitmentFixture(),
+		21,
+		unittest.IdentifierFixture(),
+		unittest.StateCommitmentFixture(),
+		i,
+	)
+
+	assert.Equal(t, i, chunk.TotalComputationUsed)
 }
 
 func TestExecuteOneBlock(t *testing.T) {
@@ -1293,6 +1320,7 @@ func TestExecutionGenerationResultsAreChained(t *testing.T) {
 	previousExecutionResultID := unittest.IdentifierFixture()
 
 	cr := executionUnittest.ComputationResultFixture(
+		t,
 		previousExecutionResultID,
 		nil)
 	cr.ExecutableBlock = executableBlock
@@ -1464,7 +1492,7 @@ func newIngestionEngine(t *testing.T, ps *mocks.ProtocolState, es *mockExecution
 	tracer, err := trace.NewTracer(log, "test", "test", trace.SensitivityCaptureAll)
 	require.NoError(t, err)
 	ctrl := gomock.NewController(t)
-	net := mocknetwork.NewMockNetwork(ctrl)
+	net := mocknetwork.NewMockEngineRegistry(ctrl)
 	request := module.NewMockRequester(ctrl)
 	var engine *Engine
 
@@ -1492,7 +1520,9 @@ func newIngestionEngine(t *testing.T, ps *mocks.ProtocolState, es *mockExecution
 		return stateProtocol.IsNodeAuthorizedAt(ps.AtBlockID(blockID), myIdentity.NodeID)
 	}
 
+	unit := enginePkg.NewUnit()
 	engine, err = New(
+		unit,
 		log,
 		net,
 		me,
@@ -1514,6 +1544,8 @@ func newIngestionEngine(t *testing.T, ps *mocks.ProtocolState, es *mockExecution
 		nil,
 		nil,
 		stop.NewStopControl(
+			unit,
+			time.Second,
 			zerolog.Nop(),
 			nil,
 			headers,
@@ -1523,6 +1555,7 @@ func newIngestionEngine(t *testing.T, ps *mocks.ProtocolState, es *mockExecution
 			false,
 			false,
 		),
+		false,
 	)
 
 	require.NoError(t, err)
@@ -1795,6 +1828,7 @@ func TestExecutedBlockIsUploaded(t *testing.T) {
 
 		parentBlockExecutionResultID := unittest.IdentifierFixture()
 		computationResultB := executionUnittest.ComputationResultForBlockFixture(
+			t,
 			parentBlockExecutionResultID,
 			blockB)
 
@@ -1855,6 +1889,7 @@ func TestExecutedBlockUploadedFailureDoesntBlock(t *testing.T) {
 		previousExecutionResultID := unittest.IdentifierFixture()
 
 		computationResultB := executionUnittest.ComputationResultForBlockFixture(
+			t,
 			previousExecutionResultID,
 			blockB)
 

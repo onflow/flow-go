@@ -42,6 +42,10 @@ type NetworkSecurityMetrics interface {
 
 	// OnRateLimitedPeer tracks the number of rate limited unicast messages seen on the network.
 	OnRateLimitedPeer(pid peer.ID, role, msgType, topic, reason string)
+
+	// OnViolationReportSkipped tracks the number of slashing violations consumer violations that were not
+	// reported for misbehavior when the identity of the sender not known.
+	OnViolationReportSkipped()
 }
 
 // GossipSubRouterMetrics encapsulates the metrics collectors for GossipSubRouter module of the networking layer.
@@ -182,6 +186,8 @@ type NetworkInboundQueueMetrics interface {
 type NetworkCoreMetrics interface {
 	NetworkInboundQueueMetrics
 	AlspMetrics
+	NetworkSecurityMetrics
+
 	// OutboundMessageSent collects metrics related to a message sent by the node.
 	OutboundMessageSent(sizeBytes int, topic string, protocol string, messageType string)
 	// InboundMessageReceived collects metrics related to a message received by the node.
@@ -223,7 +229,6 @@ type AlspMetrics interface {
 // NetworkMetrics is the blanket abstraction that encapsulates the metrics collectors for the networking layer.
 type NetworkMetrics interface {
 	LibP2PMetrics
-	NetworkSecurityMetrics
 	NetworkCoreMetrics
 }
 
@@ -610,7 +615,7 @@ type RestMetrics interface {
 	// Example recorder taken from:
 	// https://github.com/slok/go-http-metrics/blob/master/metrics/prometheus/prometheus.go
 	httpmetrics.Recorder
-	AddTotalRequests(ctx context.Context, service string, id string)
+	AddTotalRequests(ctx context.Context, method string, routeName string)
 }
 
 type GRPCConnectionPoolMetrics interface {
@@ -740,6 +745,20 @@ type ExecutionMetrics interface {
 type BackendScriptsMetrics interface {
 	// Record the round trip time while executing a script
 	ScriptExecuted(dur time.Duration, size int)
+
+	// ScriptExecutionErrorOnExecutionNode records script execution failures on Execution Nodes
+	ScriptExecutionErrorOnArchiveNode()
+
+	// ScriptExecutionErrorOnArchiveNode records script execution failures in Archive Nodes
+	ScriptExecutionErrorOnExecutionNode()
+
+	ScriptExecutionResultMismatch()
+
+	ScriptExecutionResultMatch()
+
+	ScriptExecutionErrorMismatch()
+
+	ScriptExecutionErrorMatch()
 }
 
 type TransactionMetrics interface {

@@ -8,7 +8,9 @@ import (
 
 	context "context"
 
-	flow_gonetwork "github.com/onflow/flow-go/network"
+	corenetwork "github.com/libp2p/go-libp2p/core/network"
+
+	flow "github.com/onflow/flow-go/model/flow"
 
 	host "github.com/libp2p/go-libp2p/core/host"
 
@@ -18,7 +20,7 @@ import (
 
 	mock "github.com/stretchr/testify/mock"
 
-	network "github.com/libp2p/go-libp2p/core/network"
+	network "github.com/onflow/flow-go/network"
 
 	p2p "github.com/onflow/flow-go/network/p2p"
 
@@ -36,8 +38,13 @@ type LibP2PNode struct {
 	mock.Mock
 }
 
-// AddPeer provides a mock function with given fields: ctx, peerInfo
-func (_m *LibP2PNode) AddPeer(ctx context.Context, peerInfo peer.AddrInfo) error {
+// ActiveClustersChanged provides a mock function with given fields: _a0
+func (_m *LibP2PNode) ActiveClustersChanged(_a0 flow.ChainIDList) {
+	_m.Called(_a0)
+}
+
+// ConnectToPeer provides a mock function with given fields: ctx, peerInfo
+func (_m *LibP2PNode) ConnectToPeer(ctx context.Context, peerInfo peer.AddrInfo) error {
 	ret := _m.Called(ctx, peerInfo)
 
 	var r0 error
@@ -48,32 +55,6 @@ func (_m *LibP2PNode) AddPeer(ctx context.Context, peerInfo peer.AddrInfo) error
 	}
 
 	return r0
-}
-
-// CreateStream provides a mock function with given fields: ctx, peerID
-func (_m *LibP2PNode) CreateStream(ctx context.Context, peerID peer.ID) (network.Stream, error) {
-	ret := _m.Called(ctx, peerID)
-
-	var r0 network.Stream
-	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, peer.ID) (network.Stream, error)); ok {
-		return rf(ctx, peerID)
-	}
-	if rf, ok := ret.Get(0).(func(context.Context, peer.ID) network.Stream); ok {
-		r0 = rf(ctx, peerID)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(network.Stream)
-		}
-	}
-
-	if rf, ok := ret.Get(1).(func(context.Context, peer.ID) error); ok {
-		r1 = rf(ctx, peerID)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
 }
 
 // Done provides a mock function with given fields:
@@ -169,6 +150,20 @@ func (_m *LibP2PNode) Host() host.Host {
 	return r0
 }
 
+// ID provides a mock function with given fields:
+func (_m *LibP2PNode) ID() peer.ID {
+	ret := _m.Called()
+
+	var r0 peer.ID
+	if rf, ok := ret.Get(0).(func() peer.ID); ok {
+		r0 = rf()
+	} else {
+		r0 = ret.Get(0).(peer.ID)
+	}
+
+	return r0
+}
+
 // IsConnected provides a mock function with given fields: peerID
 func (_m *LibP2PNode) IsConnected(peerID peer.ID) (bool, error) {
 	ret := _m.Called(peerID)
@@ -194,19 +189,19 @@ func (_m *LibP2PNode) IsConnected(peerID peer.ID) (bool, error) {
 }
 
 // IsDisallowListed provides a mock function with given fields: peerId
-func (_m *LibP2PNode) IsDisallowListed(peerId peer.ID) ([]flow_gonetwork.DisallowListedCause, bool) {
+func (_m *LibP2PNode) IsDisallowListed(peerId peer.ID) ([]network.DisallowListedCause, bool) {
 	ret := _m.Called(peerId)
 
-	var r0 []flow_gonetwork.DisallowListedCause
+	var r0 []network.DisallowListedCause
 	var r1 bool
-	if rf, ok := ret.Get(0).(func(peer.ID) ([]flow_gonetwork.DisallowListedCause, bool)); ok {
+	if rf, ok := ret.Get(0).(func(peer.ID) ([]network.DisallowListedCause, bool)); ok {
 		return rf(peerId)
 	}
-	if rf, ok := ret.Get(0).(func(peer.ID) []flow_gonetwork.DisallowListedCause); ok {
+	if rf, ok := ret.Get(0).(func(peer.ID) []network.DisallowListedCause); ok {
 		r0 = rf(peerId)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]flow_gonetwork.DisallowListedCause)
+			r0 = ret.Get(0).([]network.DisallowListedCause)
 		}
 	}
 
@@ -236,13 +231,27 @@ func (_m *LibP2PNode) ListPeers(topic string) []peer.ID {
 }
 
 // OnAllowListNotification provides a mock function with given fields: id, cause
-func (_m *LibP2PNode) OnAllowListNotification(id peer.ID, cause flow_gonetwork.DisallowListedCause) {
+func (_m *LibP2PNode) OnAllowListNotification(id peer.ID, cause network.DisallowListedCause) {
 	_m.Called(id, cause)
 }
 
 // OnDisallowListNotification provides a mock function with given fields: id, cause
-func (_m *LibP2PNode) OnDisallowListNotification(id peer.ID, cause flow_gonetwork.DisallowListedCause) {
+func (_m *LibP2PNode) OnDisallowListNotification(id peer.ID, cause network.DisallowListedCause) {
 	_m.Called(id, cause)
+}
+
+// OpenProtectedStream provides a mock function with given fields: ctx, peerID, protectionTag, writingLogic
+func (_m *LibP2PNode) OpenProtectedStream(ctx context.Context, peerID peer.ID, protectionTag string, writingLogic func(corenetwork.Stream) error) error {
+	ret := _m.Called(ctx, peerID, protectionTag, writingLogic)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, peer.ID, string, func(corenetwork.Stream) error) error); ok {
+		r0 = rf(ctx, peerID, protectionTag, writingLogic)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
 }
 
 // PeerManagerComponent provides a mock function with given fields:
@@ -262,14 +271,10 @@ func (_m *LibP2PNode) PeerManagerComponent() component.Component {
 }
 
 // PeerScoreExposer provides a mock function with given fields:
-func (_m *LibP2PNode) PeerScoreExposer() (p2p.PeerScoreExposer, bool) {
+func (_m *LibP2PNode) PeerScoreExposer() p2p.PeerScoreExposer {
 	ret := _m.Called()
 
 	var r0 p2p.PeerScoreExposer
-	var r1 bool
-	if rf, ok := ret.Get(0).(func() (p2p.PeerScoreExposer, bool)); ok {
-		return rf()
-	}
 	if rf, ok := ret.Get(0).(func() p2p.PeerScoreExposer); ok {
 		r0 = rf()
 	} else {
@@ -278,22 +283,16 @@ func (_m *LibP2PNode) PeerScoreExposer() (p2p.PeerScoreExposer, bool) {
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func() bool); ok {
-		r1 = rf()
-	} else {
-		r1 = ret.Get(1).(bool)
-	}
-
-	return r0, r1
+	return r0
 }
 
-// Publish provides a mock function with given fields: ctx, topic, data
-func (_m *LibP2PNode) Publish(ctx context.Context, topic channels.Topic, data []byte) error {
-	ret := _m.Called(ctx, topic, data)
+// Publish provides a mock function with given fields: ctx, messageScope
+func (_m *LibP2PNode) Publish(ctx context.Context, messageScope network.OutgoingMessageScope) error {
+	ret := _m.Called(ctx, messageScope)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, channels.Topic, []byte) error); ok {
-		r0 = rf(ctx, topic, data)
+	if rf, ok := ret.Get(0).(func(context.Context, network.OutgoingMessageScope) error); ok {
+		r0 = rf(ctx, messageScope)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -373,11 +372,6 @@ func (_m *LibP2PNode) SetComponentManager(cm *component.ComponentManager) {
 	_m.Called(cm)
 }
 
-// SetPeerScoreExposer provides a mock function with given fields: e
-func (_m *LibP2PNode) SetPeerScoreExposer(e p2p.PeerScoreExposer) {
-	_m.Called(e)
-}
-
 // SetPubSub provides a mock function with given fields: ps
 func (_m *LibP2PNode) SetPubSub(ps p2p.PubSubAdapter) {
 	_m.Called(ps)
@@ -438,8 +432,8 @@ func (_m *LibP2PNode) Subscribe(topic channels.Topic, topicValidator p2p.TopicVa
 	return r0, r1
 }
 
-// UnSubscribe provides a mock function with given fields: topic
-func (_m *LibP2PNode) UnSubscribe(topic channels.Topic) error {
+// Unsubscribe provides a mock function with given fields: topic
+func (_m *LibP2PNode) Unsubscribe(topic channels.Topic) error {
 	ret := _m.Called(topic)
 
 	var r0 error
@@ -453,11 +447,11 @@ func (_m *LibP2PNode) UnSubscribe(topic channels.Topic) error {
 }
 
 // WithDefaultUnicastProtocol provides a mock function with given fields: defaultHandler, preferred
-func (_m *LibP2PNode) WithDefaultUnicastProtocol(defaultHandler network.StreamHandler, preferred []protocols.ProtocolName) error {
+func (_m *LibP2PNode) WithDefaultUnicastProtocol(defaultHandler corenetwork.StreamHandler, preferred []protocols.ProtocolName) error {
 	ret := _m.Called(defaultHandler, preferred)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(network.StreamHandler, []protocols.ProtocolName) error); ok {
+	if rf, ok := ret.Get(0).(func(corenetwork.StreamHandler, []protocols.ProtocolName) error); ok {
 		r0 = rf(defaultHandler, preferred)
 	} else {
 		r0 = ret.Error(0)

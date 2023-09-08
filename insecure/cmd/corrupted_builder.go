@@ -14,6 +14,7 @@ import (
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/p2p"
+	"github.com/onflow/flow-go/network/p2p/connection"
 	p2pconfig "github.com/onflow/flow-go/network/p2p/p2pbuilder/config"
 	"github.com/onflow/flow-go/network/p2p/unicast/ratelimit"
 	"github.com/onflow/flow-go/utils/logging"
@@ -85,6 +86,7 @@ func (cnb *CorruptedNodeBuilder) enqueueNetworkingLayer() {
 		peerManagerCfg := &p2pconfig.PeerManagerConfig{
 			ConnectionPruning: cnb.FlowConfig.NetworkConfig.NetworkConnectionPruning,
 			UpdateInterval:    cnb.FlowConfig.NetworkConfig.PeerUpdateInterval,
+			ConnectorFactory:  connection.DefaultLibp2pBackoffConnectorFactory(),
 		}
 
 		// create default libp2p factory if corrupt node should enable the topic validator
@@ -160,7 +162,7 @@ func (cnb *CorruptedNodeBuilder) enqueueNetworkingLayer() {
 		cnb.Logger.Info().Hex("node_id", logging.ID(cnb.NodeID)).Str("address", address).Msg("corruptible network initiated")
 
 		// override the original flow network with the corruptible network.
-		cnb.Network = corruptibleNetwork
+		cnb.EngineRegistry = corruptibleNetwork
 
 		return corruptibleNetwork, nil
 	})

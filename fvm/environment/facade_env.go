@@ -24,7 +24,7 @@ type facadeEnvironment struct {
 	*ProgramLogger
 	EventEmitter
 
-	UnsafeRandomGenerator
+	RandomGenerator
 	CryptoLibrary
 
 	BlockInfo
@@ -75,11 +75,6 @@ func newFacadeEnvironment(
 		ProgramLogger: logger,
 		EventEmitter:  NoEventEmitter{},
 
-		UnsafeRandomGenerator: NewUnsafeRandomGenerator(
-			tracer,
-			params.BlockHeader,
-			params.TxIndex,
-		),
 		CryptoLibrary: NewCryptoLibrary(tracer, meter),
 
 		BlockInfo: NewBlockInfo(
@@ -107,8 +102,11 @@ func newFacadeEnvironment(
 
 		UUIDGenerator: NewUUIDGenerator(
 			tracer,
+			params.Logger,
 			meter,
-			txnState),
+			txnState,
+			params.BlockHeader,
+			params.TxIndex),
 		AccountLocalIDGenerator: NewAccountLocalIDGenerator(
 			tracer,
 			meter,
@@ -172,9 +170,8 @@ func NewScriptEnv(
 		params,
 		txnState,
 		NewCancellableMeter(ctx, txnState))
-
+	env.RandomGenerator = NewDummyRandomGenerator()
 	env.addParseRestrictedChecks()
-
 	return env
 }
 
@@ -229,6 +226,12 @@ func NewTransactionEnvironment(
 		txnState,
 		env)
 
+	env.RandomGenerator = NewRandomGenerator(
+		tracer,
+		params.EntropyProvider,
+		params.TxId,
+	)
+
 	env.addParseRestrictedChecks()
 
 	return env
@@ -269,9 +272,9 @@ func (env *facadeEnvironment) addParseRestrictedChecks() {
 	env.TransactionInfo = NewParseRestrictedTransactionInfo(
 		env.txnState,
 		env.TransactionInfo)
-	env.UnsafeRandomGenerator = NewParseRestrictedUnsafeRandomGenerator(
+	env.RandomGenerator = NewParseRestrictedRandomGenerator(
 		env.txnState,
-		env.UnsafeRandomGenerator)
+		env.RandomGenerator)
 	env.UUIDGenerator = NewParseRestrictedUUIDGenerator(
 		env.txnState,
 		env.UUIDGenerator)
@@ -310,5 +313,11 @@ func (env *facadeEnvironment) SetInterpreterSharedState(state *interpreter.Share
 }
 
 func (env *facadeEnvironment) GetInterpreterSharedState() *interpreter.SharedState {
+	return nil
+}
+
+func (env *facadeEnvironment) ReadRandom(buffer []byte) error {
+	// NO-OP for now, to unblock certain downstream dependencies.
+	// E.g. cadence-tools/test
 	return nil
 }

@@ -16,6 +16,7 @@ import (
 	"github.com/onflow/flow-go/config"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/id"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
 	mockmodule "github.com/onflow/flow-go/module/mock"
@@ -29,7 +30,9 @@ import (
 	"github.com/onflow/flow-go/network/internal/testutils"
 	"github.com/onflow/flow-go/network/mocknetwork"
 	"github.com/onflow/flow-go/network/p2p"
+	"github.com/onflow/flow-go/network/p2p/p2pnet"
 	p2ptest "github.com/onflow/flow-go/network/p2p/test"
+	"github.com/onflow/flow-go/network/slashing"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -51,24 +54,18 @@ func TestNetworkPassesReportedMisbehavior(t *testing.T) {
 		return ch
 	}()
 
+	sporkId := unittest.IdentifierFixture()
 	misbehaviorReportManger.On("Ready").Return(readyDoneChan).Once()
 	misbehaviorReportManger.On("Done").Return(readyDoneChan).Once()
-
-	ids, nodes, mws, _, _ := testutils.GenerateIDsAndMiddlewares(
-		t,
-		1,
-		unittest.Logger(),
-		unittest.NetworkCodec(),
-		unittest.NetworkSlashingViolationsConsumer(unittest.Logger(), metrics.NewNoopCollector()))
-	sms := testutils.GenerateSubscriptionManagers(t, mws)
-
-	networkCfg := testutils.NetworkConfigFixture(t, unittest.Logger(), *ids[0], ids, mws[0], sms[0])
-	net, err := p2p.NewNetwork(networkCfg, p2p.WithAlspManager(misbehaviorReportManger))
+	ids, nodes := testutils.LibP2PNodeForNetworkFixture(t, sporkId, 1)
+	idProvider := id.NewFixedIdentityProvider(ids)
+	networkCfg := testutils.NetworkConfigFixture(t, *ids[0], idProvider, sporkId, nodes[0])
+	net, err := p2pnet.NewNetwork(networkCfg, p2pnet.WithAlspManager(misbehaviorReportManger))
 	require.NoError(t, err)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
-	testutils.StartNodesAndNetworks(signalerCtx, t, nodes, []network.Network{net}, 100*time.Millisecond)
+	testutils.StartNodesAndNetworks(signalerCtx, t, nodes, []network.EngineRegistry{net})
 	defer testutils.StopComponents[p2p.LibP2PNode](t, nodes, 100*time.Millisecond)
 	defer cancel()
 
@@ -117,20 +114,16 @@ func TestHandleReportedMisbehavior_Cache_Integration(t *testing.T) {
 		}),
 	}
 
-	ids, nodes, mws, _, _ := testutils.GenerateIDsAndMiddlewares(
-		t,
-		1,
-		unittest.Logger(),
-		unittest.NetworkCodec(),
-		unittest.NetworkSlashingViolationsConsumer(unittest.Logger(), metrics.NewNoopCollector()))
-	sms := testutils.GenerateSubscriptionManagers(t, mws)
-	networkCfg := testutils.NetworkConfigFixture(t, unittest.Logger(), *ids[0], ids, mws[0], sms[0], p2p.WithAlspConfig(cfg))
-	net, err := p2p.NewNetwork(networkCfg)
+	sporkId := unittest.IdentifierFixture()
+	ids, nodes := testutils.LibP2PNodeForNetworkFixture(t, sporkId, 1)
+	idProvider := id.NewFixedIdentityProvider(ids)
+	networkCfg := testutils.NetworkConfigFixture(t, *ids[0], idProvider, sporkId, nodes[0], p2pnet.WithAlspConfig(cfg))
+	net, err := p2pnet.NewNetwork(networkCfg)
 	require.NoError(t, err)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
-	testutils.StartNodesAndNetworks(signalerCtx, t, nodes, []network.Network{net}, 100*time.Millisecond)
+	testutils.StartNodesAndNetworks(signalerCtx, t, nodes, []network.EngineRegistry{net})
 	defer testutils.StopComponents[p2p.LibP2PNode](t, nodes, 100*time.Millisecond)
 	defer cancel()
 
@@ -195,7 +188,7 @@ func TestHandleReportedMisbehavior_Cache_Integration(t *testing.T) {
 // TestHandleReportedMisbehavior_And_DisallowListing_Integration implements an end-to-end integration test for the
 // handling of reported misbehavior and disallow listing.
 //
-// The test sets up 3 nodes, one victim, one honest, and one (alledged) spammer.
+// The test sets up 3 nodes, one victim, one honest, and one (alleged) spammer.
 // Initially, the test ensures that all nodes are connected to each other.
 // Then, test imitates that victim node reports the spammer node for spamming.
 // The test generates enough spam reports to trigger the disallow-listing of the victim node.
@@ -208,23 +201,24 @@ func TestHandleReportedMisbehavior_And_DisallowListing_Integration(t *testing.T)
 	// this test is assessing the integration of the ALSP manager with the network. As the ALSP manager is an attribute
 	// of the network, we need to configure the ALSP manager via the network configuration, and let the network create
 	// the ALSP manager.
-	var victimSpamRecordCacheCache alsp.SpamRecordCache
+	var victimSpamRecordCache alsp.SpamRecordCache
 	cfg.Opts = []alspmgr.MisbehaviorReportManagerOption{
 		alspmgr.WithSpamRecordsCacheFactory(func(logger zerolog.Logger, size uint32, metrics module.HeroCacheMetrics) alsp.SpamRecordCache {
-			victimSpamRecordCacheCache = internal.NewSpamRecordCache(size, logger, metrics, model.SpamRecordFactory())
-			return victimSpamRecordCacheCache
+			victimSpamRecordCache = internal.NewSpamRecordCache(size, logger, metrics, model.SpamRecordFactory())
+			return victimSpamRecordCache
 		}),
 	}
 
-	ids, nodes, mws, _, _ := testutils.GenerateIDsAndMiddlewares(
+	sporkId := unittest.IdentifierFixture()
+	ids, nodes := testutils.LibP2PNodeForNetworkFixture(
 		t,
+		sporkId,
 		3,
-		unittest.Logger(),
-		unittest.NetworkCodec(),
-		unittest.NetworkSlashingViolationsConsumer(unittest.Logger(), metrics.NewNoopCollector()))
-	sms := testutils.GenerateSubscriptionManagers(t, mws)
-	networkCfg := testutils.NetworkConfigFixture(t, unittest.Logger(), *ids[0], ids, mws[0], sms[0], p2p.WithAlspConfig(cfg))
-	victimNetwork, err := p2p.NewNetwork(networkCfg)
+		p2ptest.WithPeerManagerEnabled(p2ptest.PeerManagerConfigFixture(), nil))
+
+	idProvider := id.NewFixedIdentityProvider(ids)
+	networkCfg := testutils.NetworkConfigFixture(t, *ids[0], idProvider, sporkId, nodes[0], p2pnet.WithAlspConfig(cfg))
+	victimNetwork, err := p2pnet.NewNetwork(networkCfg)
 	require.NoError(t, err)
 
 	// index of the victim node in the nodes slice.
@@ -236,7 +230,7 @@ func TestHandleReportedMisbehavior_And_DisallowListing_Integration(t *testing.T)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
-	testutils.StartNodesAndNetworks(signalerCtx, t, nodes, []network.Network{victimNetwork}, 100*time.Millisecond)
+	testutils.StartNodesAndNetworks(signalerCtx, t, nodes, []network.EngineRegistry{victimNetwork})
 	defer testutils.StopComponents[p2p.LibP2PNode](t, nodes, 100*time.Millisecond)
 	defer cancel()
 
@@ -271,7 +265,7 @@ func TestHandleReportedMisbehavior_And_DisallowListing_Integration(t *testing.T)
 	unittest.RequireReturnsBefore(t, wg.Wait, 100*time.Millisecond, "not all misbehavior reports have been processed")
 
 	// ensures that the spammer is disallow-listed by the victim
-	p2ptest.RequireEventuallyNotConnected(t, []p2p.LibP2PNode{nodes[victimIndex]}, []p2p.LibP2PNode{nodes[spammerIndex]}, 100*time.Millisecond, 2*time.Second)
+	p2ptest.RequireEventuallyNotConnected(t, []p2p.LibP2PNode{nodes[victimIndex]}, []p2p.LibP2PNode{nodes[spammerIndex]}, 100*time.Millisecond, 5*time.Second)
 
 	// despite disallow-listing spammer, ensure that (victim and honest) and (honest and spammer) are still connected.
 	p2ptest.RequireConnectedEventually(t, []p2p.LibP2PNode{nodes[spammerIndex], nodes[honestIndex]}, 1*time.Millisecond, 100*time.Millisecond)
@@ -279,7 +273,278 @@ func TestHandleReportedMisbehavior_And_DisallowListing_Integration(t *testing.T)
 
 	// while the spammer node is disallow-listed, it cannot connect to the victim node. Also, the victim node  cannot directly dial and connect to the spammer node, unless
 	// it is allow-listed again.
-	p2ptest.EnsureNotConnectedBetweenGroups(t, ctx, []p2p.LibP2PNode{nodes[victimIndex]}, []p2p.LibP2PNode{nodes[spammerIndex]})
+	p2ptest.RequireEventuallyNotConnected(t, []p2p.LibP2PNode{nodes[victimIndex]}, []p2p.LibP2PNode{nodes[spammerIndex]}, 100*time.Millisecond, 2*time.Second)
+}
+
+// TestHandleReportedMisbehavior_And_DisallowListing_RepeatOffender_Integration implements an end-to-end integration test for the
+// handling of repeated reported misbehavior and disallow listing.
+func TestHandleReportedMisbehavior_And_DisallowListing_RepeatOffender_Integration(t *testing.T) {
+	cfg := managerCfgFixture(t)
+	sporkId := unittest.IdentifierFixture()
+	fastDecay := false
+	fastDecayFunc := func(record model.ProtocolSpamRecord) float64 {
+		t.Logf("decayFuc called with record: %+v", record)
+		if fastDecay {
+			// decay to zero in a single heart beat
+			t.Log("fastDecay is true, so decay to zero")
+			return 0
+		} else {
+			// decay as usual
+			t.Log("fastDecay is false, so decay as usual")
+			return math.Min(record.Penalty+record.Decay, 0)
+		}
+	}
+
+	// this test is assessing the integration of the ALSP manager with the network. As the ALSP manager is an attribute
+	// of the network, we need to configure the ALSP manager via the network configuration, and let the network create
+	// the ALSP manager.
+	var victimSpamRecordCache alsp.SpamRecordCache
+	cfg.Opts = []alspmgr.MisbehaviorReportManagerOption{
+		alspmgr.WithSpamRecordsCacheFactory(func(logger zerolog.Logger, size uint32, metrics module.HeroCacheMetrics) alsp.SpamRecordCache {
+			victimSpamRecordCache = internal.NewSpamRecordCache(size, logger, metrics, model.SpamRecordFactory())
+			return victimSpamRecordCache
+		}),
+		alspmgr.WithDecayFunc(fastDecayFunc),
+	}
+
+	ids, nodes := testutils.LibP2PNodeForNetworkFixture(t, sporkId, 3,
+		p2ptest.WithPeerManagerEnabled(p2ptest.PeerManagerConfigFixture(p2ptest.WithZeroJitterAndZeroBackoff(t)), nil))
+	idProvider := unittest.NewUpdatableIDProvider(ids)
+	networkCfg := testutils.NetworkConfigFixture(t, *ids[0], idProvider, sporkId, nodes[0], p2pnet.WithAlspConfig(cfg))
+
+	victimNetwork, err := p2pnet.NewNetwork(networkCfg)
+	require.NoError(t, err)
+
+	// index of the victim node in the nodes slice.
+	victimIndex := 0
+	// index of the spammer node in the nodes slice (the node that will be reported for misbehavior and disallow-listed by victim).
+	spammerIndex := 1
+	// other node (not victim and not spammer) that we have to ensure is not affected by the disallow-listing of the spammer.
+	honestIndex := 2
+
+	ctx, cancel := context.WithCancel(context.Background())
+	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
+	testutils.StartNodesAndNetworks(signalerCtx, t, nodes, []network.EngineRegistry{victimNetwork})
+	defer testutils.StopComponents[p2p.LibP2PNode](t, nodes, 100*time.Millisecond)
+	defer cancel()
+
+	p2ptest.LetNodesDiscoverEachOther(t, ctx, nodes, ids)
+	// initially victim and spammer should be able to connect to each other.
+	p2ptest.TryConnectionAndEnsureConnected(t, ctx, nodes)
+
+	e := mocknetwork.NewEngine(t)
+	con, err := victimNetwork.Register(channels.TestNetworkChannel, e)
+	require.NoError(t, err)
+
+	// creates a misbehavior report for the spammer
+	report := misbehaviorReportFixtureWithPenalty(t, ids[spammerIndex].NodeID, model.DefaultPenaltyValue)
+
+	expectedDecays := []float64{1000, 100, 10, 1, 1, 1} // list of expected decay values after each disallow listing
+
+	t.Log("resetting cutoff counter")
+	expectedCutoffCounter := uint64(0)
+
+	// keep misbehaving until the spammer is disallow-listed and check that the decay is as expected
+	for expectedDecayIndex := range expectedDecays {
+		t.Logf("starting iteration %d with expected decay index %f", expectedDecayIndex, expectedDecays[expectedDecayIndex])
+
+		// reset the decay function to the default
+		fastDecay = false
+
+		// simulates the victim node reporting the spammer node misbehavior 120 times
+		// as each report has the default penalty, ideally the spammer should be disallow-listed after
+		// 100 reports (each having 0.01 * disallow-listing penalty). But we take 120 as a safe number to ensure that
+		// the spammer is definitely disallow-listed.
+		reportCount := 120
+		wg := sync.WaitGroup{}
+		for reportCounter := 0; reportCounter < reportCount; reportCounter++ {
+			wg.Add(1)
+			// reports the misbehavior
+			r := report // capture range variable
+			go func() {
+				defer wg.Done()
+
+				con.ReportMisbehavior(r)
+			}()
+		}
+
+		unittest.RequireReturnsBefore(t, wg.Wait, 100*time.Millisecond, "not all misbehavior reports have been processed")
+
+		expectedCutoffCounter++ // cutoff counter is expected to be incremented after each disallow listing
+
+		// ensures that the spammer is disallow-listed by the victim
+		// while the spammer node is disallow-listed, it cannot connect to the victim node. Also, the victim node  cannot directly dial and connect to the spammer node, unless
+		// it is allow-listed again.
+		p2ptest.RequireEventuallyNotConnected(t, []p2p.LibP2PNode{nodes[victimIndex]}, []p2p.LibP2PNode{nodes[spammerIndex]}, 100*time.Millisecond, 3*time.Second)
+
+		// ensures that the spammer is not disallow-listed by the honest node
+		p2ptest.RequireConnectedEventually(t, []p2p.LibP2PNode{nodes[honestIndex], nodes[spammerIndex]}, 1*time.Millisecond, 100*time.Millisecond)
+
+		// ensures that the spammer is disallow-listed for the expected amount of time
+		record, ok := victimSpamRecordCache.Get(ids[spammerIndex].NodeID)
+		require.True(t, ok)
+		require.NotNil(t, record)
+
+		// check the penalty of the spammer node, which should be below the disallow-listing threshold.
+		// i.e. spammer penalty should be more negative than the disallow-listing threshold, hence disallow-listed.
+		require.Less(t, record.Penalty, float64(model.DisallowListingThreshold))
+		require.Equal(t, expectedDecays[expectedDecayIndex], record.Decay)
+
+		require.Equal(t, expectedDecays[expectedDecayIndex], record.Decay)
+		// when a node is disallow-listed, it remains disallow-listed until its penalty decays back to zero.
+		require.Equal(t, true, record.DisallowListed)
+		require.Equal(t, expectedCutoffCounter, record.CutoffCounter)
+
+		penalty1 := record.Penalty
+
+		// wait for one heartbeat to be processed.
+		time.Sleep(1 * time.Second)
+
+		record, ok = victimSpamRecordCache.Get(ids[spammerIndex].NodeID)
+		require.True(t, ok)
+		require.NotNil(t, record)
+
+		// check the penalty of the spammer node, which should be below the disallow-listing threshold.
+		// i.e. spammer penalty should be more negative than the disallow-listing threshold, hence disallow-listed.
+		require.Less(t, record.Penalty, float64(model.DisallowListingThreshold))
+		require.Equal(t, expectedDecays[expectedDecayIndex], record.Decay)
+
+		require.Equal(t, expectedDecays[expectedDecayIndex], record.Decay)
+		// when a node is disallow-listed, it remains disallow-listed until its penalty decays back to zero.
+		require.Equal(t, true, record.DisallowListed)
+		require.Equal(t, expectedCutoffCounter, record.CutoffCounter)
+		penalty2 := record.Penalty
+
+		// check that the penalty has decayed by the expected amount in one heartbeat
+		require.Equal(t, expectedDecays[expectedDecayIndex], penalty2-penalty1)
+
+		// decay the disallow-listing penalty of the spammer node to zero.
+		t.Log("about to decay the disallow-listing penalty of the spammer node to zero")
+		fastDecay = true
+		t.Log("decayed the disallow-listing penalty of the spammer node to zero")
+
+		// after serving the disallow-listing period, the spammer should be able to connect to the victim node again.
+		p2ptest.RequireConnectedEventually(t, []p2p.LibP2PNode{nodes[spammerIndex], nodes[victimIndex]}, 1*time.Millisecond, 3*time.Second)
+		t.Log("spammer node is able to connect to the victim node again")
+
+		// all the nodes should be able to connect to each other again.
+		p2ptest.TryConnectionAndEnsureConnected(t, ctx, nodes)
+
+		record, ok = victimSpamRecordCache.Get(ids[spammerIndex].NodeID)
+		require.True(t, ok)
+		require.NotNil(t, record)
+
+		require.Equal(t, float64(0), record.Penalty)
+		require.Equal(t, expectedDecays[expectedDecayIndex], record.Decay)
+		require.Equal(t, false, record.DisallowListed)
+		require.Equal(t, expectedCutoffCounter, record.CutoffCounter)
+
+		// go back to regular decay to prepare for the next set of misbehavior reports.
+		fastDecay = false
+		t.Log("about to report misbehavior again")
+	}
+}
+
+// TestHandleReportedMisbehavior_And_SlashingViolationsConsumer_Integration implements an end-to-end integration test for the
+// handling of reported misbehavior from the slashing.ViolationsConsumer.
+//
+// The test sets up one victim, one honest, and one (alleged) spammer for each of the current slashing violations.
+// Initially, the test ensures that all nodes are connected to each other.
+// Then, test imitates the slashing violations consumer on the victim node reporting misbehavior's for each slashing violation.
+// The test generates enough slashing violations to trigger the connection to each of the spamming nodes to be eventually pruned.
+// The test ensures that the victim node is disconnected from all spammer nodes.
+// The test ensures that despite attempting on connections, no inbound or outbound connections between the victim and
+// the pruned spammer nodes are established.
+func TestHandleReportedMisbehavior_And_SlashingViolationsConsumer_Integration(t *testing.T) {
+	sporkId := unittest.IdentifierFixture()
+
+	// create 1 victim node, 1 honest node and a node for each slashing violation
+	ids, nodes := testutils.LibP2PNodeForNetworkFixture(t, sporkId, 7) // creates 7 nodes (1 victim, 1 honest, 5 spammer nodes one for each slashing violation).
+	idProvider := id.NewFixedIdentityProvider(ids)
+
+	// also a placeholder for the slashing violations consumer.
+	var violationsConsumer network.ViolationsConsumer
+	networkCfg := testutils.NetworkConfigFixture(
+		t,
+		*ids[0],
+		idProvider,
+		sporkId,
+		nodes[0],
+		p2pnet.WithAlspConfig(managerCfgFixture(t)),
+		p2pnet.WithSlashingViolationConsumerFactory(func(adapter network.ConduitAdapter) network.ViolationsConsumer {
+			violationsConsumer = slashing.NewSlashingViolationsConsumer(unittest.Logger(), metrics.NewNoopCollector(), adapter)
+			return violationsConsumer
+		}))
+	victimNetwork, err := p2pnet.NewNetwork(networkCfg)
+	require.NoError(t, err)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
+	testutils.StartNodesAndNetworks(signalerCtx, t, nodes, []network.EngineRegistry{victimNetwork})
+	defer testutils.StopComponents[p2p.LibP2PNode](t, nodes, 100*time.Millisecond)
+	defer cancel()
+
+	p2ptest.LetNodesDiscoverEachOther(t, ctx, nodes, ids)
+	// initially victim and misbehaving nodes should be able to connect to each other.
+	p2ptest.TryConnectionAndEnsureConnected(t, ctx, nodes)
+
+	// each slashing violation func is mapped to a violation with the identity of one of the misbehaving nodes
+	// index of the victim node in the nodes slice.
+	victimIndex := 0
+	honestNodeIndex := 1
+	invalidMessageIndex := 2
+	senderEjectedIndex := 3
+	unauthorizedUnicastOnChannelIndex := 4
+	unauthorizedPublishOnChannelIndex := 5
+	unknownMsgTypeIndex := 6
+	slashingViolationTestCases := []struct {
+		violationsConsumerFunc func(violation *network.Violation)
+		violation              *network.Violation
+	}{
+		{violationsConsumer.OnUnAuthorizedSenderError, &network.Violation{Identity: ids[invalidMessageIndex]}},
+		{violationsConsumer.OnSenderEjectedError, &network.Violation{Identity: ids[senderEjectedIndex]}},
+		{violationsConsumer.OnUnauthorizedUnicastOnChannel, &network.Violation{Identity: ids[unauthorizedUnicastOnChannelIndex]}},
+		{violationsConsumer.OnUnauthorizedPublishOnChannel, &network.Violation{Identity: ids[unauthorizedPublishOnChannelIndex]}},
+		{violationsConsumer.OnUnknownMsgTypeError, &network.Violation{Identity: ids[unknownMsgTypeIndex]}},
+	}
+
+	violationsWg := sync.WaitGroup{}
+	violationCount := 120
+	for _, testCase := range slashingViolationTestCases {
+		for i := 0; i < violationCount; i++ {
+			testCase := testCase
+			violationsWg.Add(1)
+			go func() {
+				defer violationsWg.Done()
+				testCase.violationsConsumerFunc(testCase.violation)
+			}()
+		}
+	}
+	unittest.RequireReturnsBefore(t, violationsWg.Wait, 100*time.Millisecond, "slashing violations not reported in time")
+
+	forEachMisbehavingNode := func(f func(i int)) {
+		for misbehavingNodeIndex := 2; misbehavingNodeIndex <= len(nodes)-1; misbehavingNodeIndex++ {
+			f(misbehavingNodeIndex)
+		}
+	}
+
+	// ensures all misbehaving nodes are disconnected from the victim node
+	forEachMisbehavingNode(func(misbehavingNodeIndex int) {
+		p2ptest.RequireEventuallyNotConnected(t, []p2p.LibP2PNode{nodes[victimIndex]}, []p2p.LibP2PNode{nodes[misbehavingNodeIndex]}, 100*time.Millisecond, 2*time.Second)
+	})
+
+	// despite being disconnected from the victim node, misbehaving nodes and the honest node are still connected.
+	forEachMisbehavingNode(func(misbehavingNodeIndex int) {
+		p2ptest.RequireConnectedEventually(t, []p2p.LibP2PNode{nodes[honestNodeIndex], nodes[misbehavingNodeIndex]}, 1*time.Millisecond, 100*time.Millisecond)
+	})
+
+	// despite disconnecting misbehaving nodes, ensure that (victim and honest) are still connected.
+	p2ptest.RequireConnectedEventually(t, []p2p.LibP2PNode{nodes[honestNodeIndex], nodes[victimIndex]}, 1*time.Millisecond, 100*time.Millisecond)
+
+	// while misbehaving nodes are disconnected, they cannot connect to the victim node. Also, the victim node  cannot directly dial and connect to the misbehaving nodes until each node's peer score decays.
+	forEachMisbehavingNode(func(misbehavingNodeIndex int) {
+		p2ptest.EnsureNotConnectedBetweenGroups(t, ctx, []p2p.LibP2PNode{nodes[victimIndex]}, []p2p.LibP2PNode{nodes[misbehavingNodeIndex]})
+	})
 }
 
 // TestMisbehaviorReportMetrics tests the recording of misbehavior report metrics.
@@ -294,22 +559,18 @@ func TestMisbehaviorReportMetrics(t *testing.T) {
 	alspMetrics := mockmodule.NewAlspMetrics(t)
 	cfg.AlspMetrics = alspMetrics
 
-	ids, nodes, mws, _, _ := testutils.GenerateIDsAndMiddlewares(
-		t,
-		1,
-		unittest.Logger(),
-		unittest.NetworkCodec(),
-		unittest.NetworkSlashingViolationsConsumer(unittest.Logger(), metrics.NewNoopCollector()))
-	sms := testutils.GenerateSubscriptionManagers(t, mws)
+	sporkId := unittest.IdentifierFixture()
+	ids, nodes := testutils.LibP2PNodeForNetworkFixture(t, sporkId, 1)
+	idProvider := id.NewFixedIdentityProvider(ids)
 
-	networkCfg := testutils.NetworkConfigFixture(t, unittest.Logger(), *ids[0], ids, mws[0], sms[0], p2p.WithAlspConfig(cfg))
-	net, err := p2p.NewNetwork(networkCfg)
+	networkCfg := testutils.NetworkConfigFixture(t, *ids[0], idProvider, sporkId, nodes[0], p2pnet.WithAlspConfig(cfg))
+	net, err := p2pnet.NewNetwork(networkCfg)
 	require.NoError(t, err)
 
 	ctx, cancel := context.WithCancel(context.Background())
 
 	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
-	testutils.StartNodesAndNetworks(signalerCtx, t, nodes, []network.Network{net}, 100*time.Millisecond)
+	testutils.StartNodesAndNetworks(signalerCtx, t, nodes, []network.EngineRegistry{net})
 	defer testutils.StopComponents[p2p.LibP2PNode](t, nodes, 100*time.Millisecond)
 	defer cancel()
 
@@ -1306,7 +1567,7 @@ func TestDecayMisbehaviorPenalty_DecayToZero(t *testing.T) {
 	require.True(t, ok) // the record should be in the cache
 	require.NotNil(t, record)
 
-	require.False(t, record.DisallowListed) // the peer should not be disallow listed yet.
+	require.False(t, record.DisallowListed) // the peer should not be disallow listed.
 	// with a single heartbeat and decay speed of 1000, the penalty should be decayed to zero.
 	require.Equal(t, float64(0), record.Penalty)
 	// the decay should be the default decay value.
@@ -1371,25 +1632,29 @@ func TestDecayMisbehaviorPenalty_DecayToZero_AllowListing(t *testing.T) {
 	require.Eventually(t, func() bool {
 		record, ok = cache.Get(originId)
 		if !ok {
+			t.Log("spam record not found in cache")
 			return false
 		}
 		if record.DisallowListed {
+			t.Logf("peer %s is still disallow-listed", originId)
 			return false // the peer should not be allow-listed yet.
 		}
 		if record.Penalty != float64(0) {
+			t.Log("penalty is not decayed to zero")
 			return false // the penalty should be decayed to zero.
 		}
 		if record.CutoffCounter != 1 {
+			t.Logf("cutoff counter is %d, expected 1", record.CutoffCounter)
 			return false // the cutoff counter should be incremented.
 		}
 		if record.Decay != model.SpamRecordFactory()(unittest.IdentifierFixture()).Decay {
+			t.Logf("decay is %f, expected %f", record.Decay, model.SpamRecordFactory()(unittest.IdentifierFixture()).Decay)
 			return false // the decay should be the default decay value.
 		}
 
 		return true
 
 	}, 2*time.Second, 10*time.Millisecond, "penalty was not decayed to zero")
-
 }
 
 // TestDisallowListNotification tests the emission of the allow list notification to the network layer when the misbehavior
@@ -1466,38 +1731,19 @@ func TestDisallowListNotification(t *testing.T) {
 			return false
 		}
 		require.True(t, record.DisallowListed) // the peer should be disallow-listed.
-		// cuttoff counter should be incremented since the penalty is above the disallowlisting threshold.
+		// cutoff counter should be incremented since the penalty is above the disallow-listing threshold.
 		require.Equal(t, uint64(1), record.CutoffCounter)
 		// the decay should be the default decay value.
 		require.Equal(t, model.SpamRecordFactory()(unittest.IdentifierFixture()).Decay, record.Decay)
 
 		return true
-	}, 1*time.Second, 10*time.Millisecond, "ALSP manager did not handle the misbehavior report")
+	}, 2*time.Second, 10*time.Millisecond, "ALSP manager did not handle the misbehavior report")
 }
 
-// misbehaviorReportFixture creates a mock misbehavior report for a single origin id.
-// Args:
-// - t: the testing.T instance
-// - originID: the origin id of the misbehavior report
-// Returns:
-// - network.MisbehaviorReport: the misbehavior report
-// Note: the penalty of the misbehavior report is randomly chosen between -1 and -10.
-func misbehaviorReportFixture(t *testing.T, originID flow.Identifier) network.MisbehaviorReport {
-	return misbehaviorReportFixtureWithPenalty(t, originID, math.Min(-1, float64(-1-rand.Intn(10))))
-}
-
-func misbehaviorReportFixtureWithDefaultPenalty(t *testing.T, originID flow.Identifier) network.MisbehaviorReport {
-	return misbehaviorReportFixtureWithPenalty(t, originID, model.DefaultPenaltyValue)
-}
-
-func misbehaviorReportFixtureWithPenalty(t *testing.T, originID flow.Identifier, penalty float64) network.MisbehaviorReport {
-	report := mocknetwork.NewMisbehaviorReport(t)
-	report.On("OriginId").Return(originID)
-	report.On("Reason").Return(alsp.AllMisbehaviorTypes()[rand.Intn(len(alsp.AllMisbehaviorTypes()))])
-	report.On("Penalty").Return(penalty)
-
-	return report
-}
+////////////////////////////// TEST HELPERS ///////////////////////////////////////////////////////////////////////////////
+// The following functions are helpers for the tests. It wasn't feasible to put them in a helper file in the alspmgr_test
+// package because that would break encapsulation of the ALSP manager and require making some fields exportable.
+// Putting them in alspmgr package would cause a circular import cycle. Therefore, they are put in the internal test package here.
 
 // createRandomMisbehaviorReportsForOriginId creates a slice of random misbehavior reports for a single origin id.
 // Args:
@@ -1546,4 +1792,28 @@ func managerCfgFixture(t *testing.T) *alspmgr.MisbehaviorReportManagerConfig {
 		AlspMetrics:             metrics.NewNoopCollector(),
 		HeroCacheMetricsFactory: metrics.NewNoopHeroCacheMetricsFactory(),
 	}
+}
+
+// misbehaviorReportFixture creates a mock misbehavior report for a single origin id.
+// Args:
+// - t: the testing.T instance
+// - originID: the origin id of the misbehavior report
+// Returns:
+// - network.MisbehaviorReport: the misbehavior report
+// Note: the penalty of the misbehavior report is randomly chosen between -1 and -10.
+func misbehaviorReportFixture(t *testing.T, originID flow.Identifier) network.MisbehaviorReport {
+	return misbehaviorReportFixtureWithPenalty(t, originID, math.Min(-1, float64(-1-rand.Intn(10))))
+}
+
+func misbehaviorReportFixtureWithDefaultPenalty(t *testing.T, originID flow.Identifier) network.MisbehaviorReport {
+	return misbehaviorReportFixtureWithPenalty(t, originID, model.DefaultPenaltyValue)
+}
+
+func misbehaviorReportFixtureWithPenalty(t *testing.T, originID flow.Identifier, penalty float64) network.MisbehaviorReport {
+	report := mocknetwork.NewMisbehaviorReport(t)
+	report.On("OriginId").Return(originID)
+	report.On("Reason").Return(alsp.AllMisbehaviorTypes()[rand.Intn(len(alsp.AllMisbehaviorTypes()))])
+	report.On("Penalty").Return(penalty)
+
+	return report
 }

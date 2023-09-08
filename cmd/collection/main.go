@@ -47,7 +47,6 @@ import (
 	"github.com/onflow/flow-go/module/mempool/queue"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network/channels"
-	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/state/protocol"
 	badgerState "github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/blocktimer"
@@ -339,7 +338,7 @@ func main() {
 
 			followerEng, err = followereng.NewComplianceLayer(
 				node.Logger,
-				node.Network,
+				node.EngineRegistry,
 				node.Me,
 				node.Metrics.Engine,
 				node.Storage.Headers,
@@ -360,13 +359,14 @@ func main() {
 			sync, err := consync.New(
 				node.Logger,
 				node.Metrics.Engine,
-				node.Network,
+				node.EngineRegistry,
 				node.Me,
 				node.State,
 				node.Storage.Blocks,
 				followerEng,
 				mainChainSyncCore,
 				node.SyncEngineIdentifierProvider,
+				consync.NewSpamDetectionConfig(),
 			)
 			if err != nil {
 				return nil, fmt.Errorf("could not create synchronization engine: %w", err)
@@ -378,7 +378,7 @@ func main() {
 		Component("ingestion engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			ing, err = ingest.New(
 				node.Logger,
-				node.Network,
+				node.EngineRegistry,
 				node.State,
 				node.Metrics.Engine,
 				node.Metrics.Mempool,
@@ -416,7 +416,7 @@ func main() {
 			return provider.New(
 				node.Logger,
 				node.Metrics.Engine,
-				node.Network,
+				node.EngineRegistry,
 				node.Me,
 				node.State,
 				collectionRequestQueue,
@@ -432,7 +432,7 @@ func main() {
 		Component("pusher engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			push, err = pusher.New(
 				node.Logger,
-				node.Network,
+				node.EngineRegistry,
 				node.State,
 				node.Metrics.Engine,
 				colMetrics,
@@ -479,7 +479,7 @@ func main() {
 
 			complianceEngineFactory, err := factories.NewComplianceEngineFactory(
 				node.Logger,
-				node.Network,
+				node.EngineRegistry,
 				node.Me,
 				colMetrics,
 				node.Metrics.Engine,
@@ -500,7 +500,7 @@ func main() {
 			syncFactory, err := factories.NewSyncEngineFactory(
 				node.Logger,
 				node.Metrics.Engine,
-				node.Network,
+				node.EngineRegistry,
 				node.Me,
 			)
 			if err != nil {
@@ -554,7 +554,7 @@ func main() {
 
 			messageHubFactory := factories.NewMessageHubFactory(
 				node.Logger,
-				node.Network,
+				node.EngineRegistry,
 				node.Me,
 				node.Metrics.Engine,
 				node.State,
@@ -593,13 +593,7 @@ func main() {
 
 			// register the manager for protocol events
 			node.ProtocolEvents.AddConsumer(manager)
-
-			for _, rpcInspector := range node.GossipSubRpcInspectorSuite.Inspectors() {
-				if r, ok := rpcInspector.(p2p.GossipSubMsgValidationRpcInspector); ok {
-					clusterEvents.AddConsumer(r)
-				}
-			}
-
+			clusterEvents.AddConsumer(node.LibP2PNode)
 			return manager, err
 		})
 

@@ -5,7 +5,6 @@ import (
 	"crypto/x509"
 	"errors"
 	"fmt"
-	"math/rand"
 	"os"
 	"runtime"
 	"strings"
@@ -50,13 +49,12 @@ import (
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/cache"
 	"github.com/onflow/flow-go/network/p2p/conduit"
+	"github.com/onflow/flow-go/network/p2p/connection"
 	"github.com/onflow/flow-go/network/p2p/dns"
-	"github.com/onflow/flow-go/network/p2p/middleware"
 	"github.com/onflow/flow-go/network/p2p/p2pbuilder"
 	p2pconfig "github.com/onflow/flow-go/network/p2p/p2pbuilder/config"
-	"github.com/onflow/flow-go/network/p2p/p2pbuilder/inspector"
+	"github.com/onflow/flow-go/network/p2p/p2pnet"
 	"github.com/onflow/flow-go/network/p2p/ping"
-	"github.com/onflow/flow-go/network/p2p/subscription"
 	"github.com/onflow/flow-go/network/p2p/unicast/protocols"
 	"github.com/onflow/flow-go/network/p2p/unicast/ratelimit"
 	"github.com/onflow/flow-go/network/p2p/utils/ratelimiter"
@@ -204,7 +202,7 @@ func (fnb *FlowNodeBuilder) EnqueuePingService() {
 		// setup the Ping provider to return the software version and the sealed block height
 		pingInfoProvider := &ping.InfoProvider{
 			SoftwareVersionFun: func() string {
-				return build.Semver()
+				return build.Version()
 			},
 			SealedBlockHeightFun: func() (uint64, error) {
 				head, err := node.State.Sealed().Head()
@@ -233,7 +231,7 @@ func (fnb *FlowNodeBuilder) EnqueuePingService() {
 			}
 		}
 
-		pingService, err := node.Network.RegisterPingService(pingLibP2PProtocolID, pingInfoProvider)
+		pingService, err := node.EngineRegistry.RegisterPingService(pingLibP2PProtocolID, pingInfoProvider)
 
 		node.PingService = pingService
 
@@ -336,6 +334,7 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 	peerManagerCfg := &p2pconfig.PeerManagerConfig{
 		ConnectionPruning: fnb.FlowConfig.NetworkConfig.NetworkConnectionPruning,
 		UpdateInterval:    fnb.FlowConfig.NetworkConfig.PeerUpdateInterval,
+		ConnectorFactory:  connection.DefaultLibp2pBackoffConnectorFactory(),
 	}
 
 	fnb.Component(LibP2PNodeComponent, func(node *NodeConfig) (module.ReadyDoneAware, error) {
@@ -344,34 +343,23 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 			myAddr = fnb.BaseConfig.BindAddr
 		}
 
-		metricsCfg := &p2pconfig.MetricsConfig{
-			Metrics:          fnb.Metrics.Network,
-			HeroCacheFactory: fnb.HeroCacheMetricsFactory(),
-		}
-
-		rpcInspectorSuite, err := inspector.NewGossipSubInspectorBuilder(fnb.Logger, fnb.SporkID, &fnb.FlowConfig.NetworkConfig.GossipSubConfig.GossipSubRPCInspectorsConfig, fnb.IdentityProvider, fnb.Metrics.Network).
-			SetNetworkType(network.PrivateNetwork).
-			SetMetrics(metricsCfg).
-			Build()
-		if err != nil {
-			return nil, fmt.Errorf("failed to create gossipsub rpc inspectors for default libp2p node: %w", err)
-		}
-
-		fnb.GossipSubRpcInspectorSuite = rpcInspectorSuite
-
 		builder, err := p2pbuilder.DefaultNodeBuilder(
 			fnb.Logger,
 			myAddr,
+			network.PrivateNetwork,
 			fnb.NetworkKey,
 			fnb.SporkID,
 			fnb.IdentityProvider,
-			metricsCfg,
+			&p2pconfig.MetricsConfig{
+				Metrics:          fnb.Metrics.Network,
+				HeroCacheFactory: fnb.HeroCacheMetricsFactory(),
+			},
 			fnb.Resolver,
 			fnb.BaseConfig.NodeRole,
 			connGaterCfg,
 			peerManagerCfg,
 			&fnb.FlowConfig.NetworkConfig.GossipSubConfig,
-			fnb.GossipSubRpcInspectorSuite,
+			&fnb.FlowConfig.NetworkConfig.GossipSubRPCInspectorsConfig,
 			&fnb.FlowConfig.NetworkConfig.ResourceManagerConfig,
 			uniCfg,
 			&fnb.FlowConfig.NetworkConfig.ConnectionManagerConfig,
@@ -401,9 +389,9 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 			peerManagerFilters)
 	})
 
-	fnb.Module("middleware dependency", func(node *NodeConfig) error {
-		fnb.middlewareDependable = module.NewProxiedReadyDoneAware()
-		fnb.PeerManagerDependencies.Add(fnb.middlewareDependable)
+	fnb.Module("network underlay dependency", func(node *NodeConfig) error {
+		fnb.networkUnderlayDependable = module.NewProxiedReadyDoneAware()
+		fnb.PeerManagerDependencies.Add(fnb.networkUnderlayDependable)
 		return nil
 	})
 
@@ -427,43 +415,25 @@ func (fnb *FlowNodeBuilder) InitFlowNetworkWithConduitFactory(
 	node *NodeConfig,
 	cf network.ConduitFactory,
 	unicastRateLimiters *ratelimit.RateLimiters,
-	peerManagerFilters []p2p.PeerFilter) (network.Network, error) {
+	peerManagerFilters []p2p.PeerFilter) (network.EngineRegistry, error) {
 
-	var mwOpts []middleware.OptionFn
+	var networkOptions []p2pnet.NetworkOption
 	if len(fnb.MsgValidators) > 0 {
-		mwOpts = append(mwOpts, middleware.WithMessageValidators(fnb.MsgValidators...))
+		networkOptions = append(networkOptions, p2pnet.WithMessageValidators(fnb.MsgValidators...))
 	}
 
 	// by default if no rate limiter configuration was provided in the CLI args the default
 	// noop rate limiter will be used.
-	mwOpts = append(mwOpts, middleware.WithUnicastRateLimiters(unicastRateLimiters))
+	networkOptions = append(networkOptions, p2pnet.WithUnicastRateLimiters(unicastRateLimiters))
 
-	mwOpts = append(mwOpts,
-		middleware.WithPreferredUnicastProtocols(protocols.ToProtocolNames(fnb.FlowConfig.NetworkConfig.PreferredUnicastProtocols)),
+	networkOptions = append(networkOptions,
+		p2pnet.WithPreferredUnicastProtocols(protocols.ToProtocolNames(fnb.FlowConfig.NetworkConfig.PreferredUnicastProtocols)...),
 	)
 
-	// peerManagerFilters are used by the peerManager via the middleware to filter peers from the topology.
+	// peerManagerFilters are used by the peerManager via the network to filter peers from the topology.
 	if len(peerManagerFilters) > 0 {
-		mwOpts = append(mwOpts, middleware.WithPeerManagerFilters(peerManagerFilters))
+		networkOptions = append(networkOptions, p2pnet.WithPeerManagerFilters(peerManagerFilters...))
 	}
-
-	slashingViolationsConsumer := slashing.NewSlashingViolationsConsumer(fnb.Logger, fnb.Metrics.Network)
-	mw := middleware.NewMiddleware(&middleware.Config{
-		Logger:                     fnb.Logger,
-		Libp2pNode:                 fnb.LibP2PNode,
-		FlowId:                     fnb.Me.NodeID(),
-		BitSwapMetrics:             fnb.Metrics.Bitswap,
-		RootBlockID:                fnb.SporkID,
-		UnicastMessageTimeout:      fnb.BaseConfig.FlowConfig.NetworkConfig.UnicastMessageTimeout,
-		IdTranslator:               fnb.IDTranslator,
-		Codec:                      fnb.CodecFactory(),
-		SlashingViolationsConsumer: slashingViolationsConsumer,
-	},
-		mwOpts...)
-
-	fnb.Middleware = mw
-
-	subscriptionManager := subscription.NewChannelSubscriptionManager(fnb.Middleware)
 
 	receiveCache := netcache.NewHeroReceiveCache(fnb.FlowConfig.NetworkConfig.NetworkReceivedMessageCacheSize,
 		fnb.Logger,
@@ -475,17 +445,20 @@ func (fnb *FlowNodeBuilder) InitFlowNetworkWithConduitFactory(
 	}
 
 	// creates network instance
-	net, err := p2p.NewNetwork(&p2p.NetworkConfig{
-		Logger:              fnb.Logger,
-		Codec:               fnb.CodecFactory(),
-		Me:                  fnb.Me,
-		MiddlewareFactory:   func() (network.Middleware, error) { return fnb.Middleware, nil },
-		Topology:            topology.NewFullyConnectedTopology(),
-		SubscriptionManager: subscriptionManager,
-		Metrics:             fnb.Metrics.Network,
-		IdentityProvider:    fnb.IdentityProvider,
-		ReceiveCache:        receiveCache,
-		ConduitFactory:      cf,
+	net, err := p2pnet.NewNetwork(&p2pnet.NetworkConfig{
+		Logger:                fnb.Logger,
+		Libp2pNode:            fnb.LibP2PNode,
+		Codec:                 fnb.CodecFactory(),
+		Me:                    fnb.Me,
+		SporkId:               fnb.SporkID,
+		Topology:              topology.NewFullyConnectedTopology(),
+		Metrics:               fnb.Metrics.Network,
+		BitSwapMetrics:        fnb.Metrics.Bitswap,
+		IdentityProvider:      fnb.IdentityProvider,
+		ReceiveCache:          receiveCache,
+		ConduitFactory:        cf,
+		UnicastMessageTimeout: fnb.FlowConfig.NetworkConfig.UnicastMessageTimeout,
+		IdentityTranslator:    fnb.IDTranslator,
 		AlspCfg: &alspmgr.MisbehaviorReportManagerConfig{
 			Logger:                  fnb.Logger,
 			SpamRecordCacheSize:     fnb.FlowConfig.NetworkConfig.AlspConfig.SpamRecordCacheSize,
@@ -496,19 +469,23 @@ func (fnb *FlowNodeBuilder) InitFlowNetworkWithConduitFactory(
 			HeroCacheMetricsFactory: fnb.HeroCacheMetricsFactory(),
 			NetworkType:             network.PrivateNetwork,
 		},
-	})
+		SlashingViolationConsumerFactory: func(adapter network.ConduitAdapter) network.ViolationsConsumer {
+			return slashing.NewSlashingViolationsConsumer(fnb.Logger, fnb.Metrics.Network, adapter)
+		},
+	}, networkOptions...)
 	if err != nil {
 		return nil, fmt.Errorf("could not initialize network: %w", err)
 	}
 
-	fnb.Network = net
+	fnb.EngineRegistry = net  // setting network as the fnb.Network for the engine-level components
+	fnb.NetworkUnderlay = net // setting network as the fnb.Underlay for the lower-level components
 
-	// register middleware's ReadyDoneAware interface so other components can depend on it for startup
-	if fnb.middlewareDependable != nil {
-		fnb.middlewareDependable.Init(fnb.Middleware)
+	// register network ReadyDoneAware interface so other components can depend on it for startup
+	if fnb.networkUnderlayDependable != nil {
+		fnb.networkUnderlayDependable.Init(fnb.NetworkUnderlay)
 	}
 
-	idEvents := gadgets.NewIdentityDeltas(fnb.Middleware.UpdateNodeAddresses)
+	idEvents := gadgets.NewIdentityDeltas(net.UpdateNodeAddresses)
 	fnb.ProtocolEvents.AddConsumer(idEvents)
 
 	return net, nil
@@ -624,7 +601,7 @@ func (fnb *FlowNodeBuilder) ValidateFlags(f func() error) NodeBuilder {
 }
 
 func (fnb *FlowNodeBuilder) PrintBuildVersionDetails() {
-	fnb.Logger.Info().Str("version", build.Semver()).Str("commit", build.Commit()).Msg("build details")
+	fnb.Logger.Info().Str("version", build.Version()).Str("commit", build.Commit()).Msg("build details")
 }
 
 func (fnb *FlowNodeBuilder) initNodeInfo() error {
@@ -747,7 +724,7 @@ func (fnb *FlowNodeBuilder) initMetrics() error {
 			if err != nil {
 				return fmt.Errorf("could not query root snapshoot protocol version: %w", err)
 			}
-			nodeInfoMetrics.NodeInfo(build.Semver(), build.Commit(), nodeConfig.SporkID.String(), protocolVersion)
+			nodeInfoMetrics.NodeInfo(build.Version(), build.Commit(), nodeConfig.SporkID.String(), protocolVersion)
 			return nil
 		})
 	}
@@ -775,7 +752,7 @@ func (fnb *FlowNodeBuilder) createGCEProfileUploader(client *gcemd.Client, opts 
 		ProjectID: projectID,
 		ChainID:   chainID,
 		Role:      fnb.NodeConfig.NodeRole,
-		Version:   build.Semver(),
+		Version:   build.Version(),
 		Commit:    build.Commit(),
 		Instance:  instance,
 	}
@@ -1031,7 +1008,7 @@ func (fnb *FlowNodeBuilder) InitIDProviders() {
 		// The following wrapper allows to disallow-list byzantine nodes via an admin command:
 		// the wrapper overrides the 'Ejected' flag of disallow-listed nodes to true
 		disallowListWrapper, err := cache.NewNodeDisallowListWrapper(idCache, node.DB, func() network.DisallowListNotificationConsumer {
-			return fnb.Middleware
+			return fnb.NetworkUnderlay
 		})
 		if err != nil {
 			return fmt.Errorf("could not initialize NodeBlockListWrapper: %w", err)
@@ -1049,7 +1026,7 @@ func (fnb *FlowNodeBuilder) InitIDProviders() {
 			filter.And(
 				filter.HasRole(flow.RoleConsensus),
 				filter.Not(filter.HasNodeID(node.Me.NodeID())),
-				p2p.NotEjectedFilter,
+				p2pnet.NotEjectedFilter,
 			),
 			node.IdentityProvider,
 		)
@@ -1786,10 +1763,6 @@ func (fnb *FlowNodeBuilder) Build() (Node, error) {
 }
 
 func (fnb *FlowNodeBuilder) onStart() error {
-
-	// seed random generator
-	rand.Seed(time.Now().UnixNano())
-
 	// init nodeinfo by reading the private bootstrap file if not already set
 	if fnb.NodeID == flow.ZeroID {
 		if err := fnb.initNodeInfo(); err != nil {

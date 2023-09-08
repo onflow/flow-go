@@ -172,6 +172,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			me,
 			prov,
 			nil,
+			testutil.ProtocolStateWithSourceFixture(nil),
 			testMaxConcurrency)
 		require.NoError(t, err)
 
@@ -306,6 +307,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			me,
 			prov,
 			nil,
+			testutil.ProtocolStateWithSourceFixture(nil),
 			testMaxConcurrency)
 		require.NoError(t, err)
 
@@ -403,6 +405,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			me,
 			prov,
 			nil,
+			testutil.ProtocolStateWithSourceFixture(nil),
 			testMaxConcurrency)
 		require.NoError(t, err)
 
@@ -462,6 +465,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			me,
 			prov,
 			nil,
+			testutil.ProtocolStateWithSourceFixture(nil),
 			testMaxConcurrency)
 		require.NoError(t, err)
 
@@ -678,6 +682,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 				me,
 				prov,
 				nil,
+				testutil.ProtocolStateWithSourceFixture(nil),
 				testMaxConcurrency)
 			require.NoError(t, err)
 
@@ -788,6 +793,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			me,
 			prov,
 			nil,
+			testutil.ProtocolStateWithSourceFixture(nil),
 			testMaxConcurrency)
 		require.NoError(t, err)
 
@@ -900,6 +906,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			me,
 			prov,
 			nil,
+			testutil.ProtocolStateWithSourceFixture(nil),
 			testMaxConcurrency)
 		require.NoError(t, err)
 
@@ -944,6 +951,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			me,
 			prov,
 			nil,
+			testutil.ProtocolStateWithSourceFixture(nil),
 			testMaxConcurrency)
 		require.NoError(t, err)
 
@@ -1253,6 +1261,8 @@ func Test_ExecutingSystemCollection(t *testing.T) {
 	me.On("SignFunc", mock.Anything, mock.Anything, mock.Anything).
 		Return(nil, nil)
 
+	constRandomSource := make([]byte, 32)
+
 	exe, err := computer.NewBlockComputer(
 		vm,
 		execCtx,
@@ -1263,6 +1273,7 @@ func Test_ExecutingSystemCollection(t *testing.T) {
 		me,
 		prov,
 		nil,
+		testutil.ProtocolStateWithSourceFixture(constRandomSource),
 		testMaxConcurrency)
 	require.NoError(t, err)
 

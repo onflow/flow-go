@@ -23,6 +23,11 @@ func (_m *NetworkSecurityMetrics) OnUnauthorizedMessage(role string, msgType str
 	_m.Called(role, msgType, topic, offense)
 }
 
+// OnViolationReportSkipped provides a mock function with given fields:
+func (_m *NetworkSecurityMetrics) OnViolationReportSkipped() {
+	_m.Called()
+}
+
 type mockConstructorTestingTNewNetworkSecurityMetrics interface {
 	mock.TestingT
 	Cleanup(func())

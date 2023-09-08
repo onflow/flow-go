@@ -43,6 +43,15 @@ var (
 
 type SpamRecordCacheFactory func(zerolog.Logger, uint32, module.HeroCacheMetrics) alsp.SpamRecordCache
 
+// SpamRecordDecayFunc is the function that calculates the decay of the spam record.
+type SpamRecordDecayFunc func(model.ProtocolSpamRecord) float64
+
+func defaultSpamRecordDecayFunc() SpamRecordDecayFunc {
+	return func(record model.ProtocolSpamRecord) float64 {
+		return math.Min(record.Penalty+record.Decay, 0)
+	}
+}
+
 // defaultSpamRecordCacheFactory is the default spam record cache factory. It creates a new spam record cache with the given parameter.
 func defaultSpamRecordCacheFactory() SpamRecordCacheFactory {
 	return func(logger zerolog.Logger, size uint32, cacheMetrics module.HeroCacheMetrics) alsp.SpamRecordCache {
@@ -79,6 +88,9 @@ type MisbehaviorReportManager struct {
 
 	// workerPool is the worker pool for handling the misbehavior reports in a thread-safe and non-blocking manner.
 	workerPool *worker.Pool[internal.ReportedMisbehaviorWork]
+
+	// decayFunc is the function that calculates the decay of the spam record.
+	decayFunc SpamRecordDecayFunc
 }
 
 var _ network.MisbehaviorReportManager = (*MisbehaviorReportManager)(nil)
@@ -135,23 +147,6 @@ func (c MisbehaviorReportManagerConfig) validate() error {
 
 type MisbehaviorReportManagerOption func(*MisbehaviorReportManager)
 
-// WithSpamRecordsCacheFactory sets the spam record cache factory for the MisbehaviorReportManager.
-// Args:
-//
-//	f: the spam record cache factory.
-//
-// Returns:
-//
-//	a MisbehaviorReportManagerOption that sets the spam record cache for the MisbehaviorReportManager.
-//
-// Note: this option is useful primarily for testing purposes. The default factory should be sufficient for the production, and
-// do not change it unless you are confident that you know what you are doing.
-func WithSpamRecordsCacheFactory(f SpamRecordCacheFactory) MisbehaviorReportManagerOption {
-	return func(m *MisbehaviorReportManager) {
-		m.cacheFactory = f
-	}
-}
-
 // NewMisbehaviorReportManager creates a new instance of the MisbehaviorReportManager.
 // Args:
 // cfg: the configuration for the MisbehaviorReportManager.
@@ -176,6 +171,7 @@ func NewMisbehaviorReportManager(cfg *MisbehaviorReportManagerConfig, consumer n
 		disablePenalty:          cfg.DisablePenalty,
 		disallowListingConsumer: consumer,
 		cacheFactory:            defaultSpamRecordCacheFactory(),
+		decayFunc:               defaultSpamRecordDecayFunc(),
 	}
 
 	store := queue.NewHeroStore(
@@ -230,6 +226,7 @@ func (m *MisbehaviorReportManager) HandleMisbehaviorReport(channel channels.Chan
 		Hex("misbehaving_id", logging.ID(report.OriginId())).
 		Str("reason", report.Reason().String()).
 		Float64("penalty", report.Penalty()).Logger()
+	lg.Trace().Msg("received misbehavior report")
 	m.metrics.OnMisbehaviorReported(channel.String(), report.Reason().String())
 
 	nonce := [internal.NonceSize]byte{}
@@ -302,6 +299,7 @@ func (m *MisbehaviorReportManager) onHeartbeat() error {
 	allIds := m.cache.Identities()
 
 	for _, id := range allIds {
+		m.logger.Trace().Hex("identifier", logging.ID(id)).Msg("onHeartbeat - looping through spam records")
 		penalty, err := m.cache.Adjust(id, func(record model.ProtocolSpamRecord) (model.ProtocolSpamRecord, error) {
 			if record.Penalty > 0 {
 				// sanity check; this should never happen.
@@ -313,7 +311,7 @@ func (m *MisbehaviorReportManager) onHeartbeat() error {
 			}
 
 			// TODO: this can be done in batch but at this stage let's send individual notifications.
-			//       (it requires enabling the batch mode end-to-end including the cache in middleware).
+			//       (it requires enabling the batch mode end-to-end including the cache in network).
 			// as long as record.Penalty is NOT below model.DisallowListingThreshold,
 			// the node is considered allow-listed and can conduct inbound and outbound connections.
 			// Once it falls below model.DisallowListingThreshold, it needs to be disallow listed.
@@ -321,28 +319,43 @@ func (m *MisbehaviorReportManager) onHeartbeat() error {
 				// cutoff counter keeps track of how many times the penalty has been below the threshold.
 				record.CutoffCounter++
 				record.DisallowListed = true
+				// Adjusts decay dynamically based on how many times the node was disallow-listed (cutoff).
+				record.Decay = m.adjustDecayFunc(record.CutoffCounter)
 				m.logger.Warn().
 					Str("key", logging.KeySuspicious).
 					Hex("identifier", logging.ID(id)).
+					Float64("penalty", record.Penalty).
 					Uint64("cutoff_counter", record.CutoffCounter).
 					Float64("decay_speed", record.Decay).
 					Bool("disallow_listed", record.DisallowListed).
-					Msg("node penalty is below threshold, disallow listing")
+					Msg("node penalty dropped below threshold, initiating disallow listing")
 				m.disallowListingConsumer.OnDisallowListNotification(&network.DisallowListingUpdate{
 					FlowIds: flow.IdentifierList{id},
 					Cause:   network.DisallowListedCauseAlsp, // sets the ALSP disallow listing cause on node
 				})
 			}
-
 			// each time we decay the penalty by the decay speed, the penalty is a negative number, and the decay speed
 			// is a positive number. So the penalty is getting closer to zero.
 			// We use math.Min() to make sure the penalty is never positive.
-			record.Penalty = math.Min(record.Penalty+record.Decay, 0)
+			m.logger.Trace().
+				Hex("identifier", logging.ID(id)).
+				Uint64("cutoff_counter", record.CutoffCounter).
+				Bool("disallow_listed", record.DisallowListed).
+				Float64("penalty", record.Penalty).
+				Msg("heartbeat interval, pulled the spam record for decaying")
+			record.Penalty = m.decayFunc(record)
+			m.logger.Trace().
+				Hex("identifier", logging.ID(id)).
+				Uint64("cutoff_counter", record.CutoffCounter).
+				Bool("disallow_listed", record.DisallowListed).
+				Float64("penalty", record.Penalty).
+				Msg("heartbeat interval, spam record penalty adjusted by decay function")
 
 			// TODO: this can be done in batch but at this stage let's send individual notifications.
-			//       (it requires enabling the batch mode end-to-end including the cache in middleware).
+			//       (it requires enabling the batch mode end-to-end including the cache in network).
 			if record.Penalty == float64(0) && record.DisallowListed {
 				record.DisallowListed = false
+
 				m.logger.Info().
 					Hex("identifier", logging.ID(id)).
 					Uint64("cutoff_counter", record.CutoffCounter).
@@ -418,6 +431,12 @@ func (m *MisbehaviorReportManager) processMisbehaviorReport(report internal.Repo
 			return record, fmt.Errorf("penalty value is positive, expected negative %f", report.Penalty)
 		}
 		record.Penalty += report.Penalty // penalty value is negative. We add it to the current penalty.
+		lg = lg.With().
+			Float64("penalty_before_update", record.Penalty).
+			Uint64("cutoff_counter", record.CutoffCounter).
+			Float64("decay_speed", record.Decay).
+			Bool("disallow_listed", record.DisallowListed).
+			Logger()
 		return record, nil
 	})
 	if err != nil {
@@ -425,7 +444,68 @@ func (m *MisbehaviorReportManager) processMisbehaviorReport(report internal.Repo
 		// we should crash the node in this case to prevent further misbehavior reports from being lost and fix the bug.
 		return fmt.Errorf("failed to apply penalty to the spam record: %w", err)
 	}
-
 	lg.Debug().Float64("updated_penalty", updatedPenalty).Msg("misbehavior report handled")
 	return nil
+}
+
+// adjustDecayFunc calculates the decay value of the spam record cache. This allows the decay to be different on subsequent disallow listings.
+// It returns the decay speed for the given cutoff counter.
+// The cutoff counter is the number of times that the node has been disallow-listed.
+// Args:
+// cutoffCounter: the number of times that the node has been disallow-listed including the current time. Note that the cutoff counter
+// must always be updated before calling this function.
+//
+// Returns:
+//
+//	float64: the decay speed for the given cutoff counter.
+func (m *MisbehaviorReportManager) adjustDecayFunc(cutoffCounter uint64) float64 {
+	// decaySpeeds illustrates the decay speeds for different cutoff counters.
+	// The first cutoff does not reduce the decay speed (1000 -> 1000). However, the second, third,
+	// and forth cutoffs reduce the decay speed by 90% (1000 -> 100, 100 -> 10, 10 -> 1).
+	// All subsequent cutoffs after the fourth cutoff use the last decay speed (1).
+	// This is to prevent the decay speed from becoming too small and the spam record from taking too long to decay.
+	switch {
+	case cutoffCounter == 1:
+		return 1000
+	case cutoffCounter == 2:
+		return 100
+	case cutoffCounter == 3:
+		return 10
+	case cutoffCounter >= 4:
+		return 1
+	default:
+		panic(fmt.Sprintf("illegal-state cutoff counter must be positive, it should include the current time: %d", cutoffCounter))
+	}
+}
+
+// WithSpamRecordsCacheFactory sets the spam record cache factory for the MisbehaviorReportManager.
+// Args:
+//
+//	f: the spam record cache factory.
+//
+// Returns:
+//
+//	a MisbehaviorReportManagerOption that sets the spam record cache for the MisbehaviorReportManager.
+//
+// Note: this option is useful primarily for testing purposes. The default factory should be sufficient for production.
+func WithSpamRecordsCacheFactory(f SpamRecordCacheFactory) MisbehaviorReportManagerOption {
+	return func(m *MisbehaviorReportManager) {
+		m.cacheFactory = f
+	}
+}
+
+// WithDecayFunc sets the decay function for the MisbehaviorReportManager. Useful for testing purposes to simulate the decay of the penalty without waiting for the actual decay.
+// Args:
+//
+//	f: the decay function.
+//
+// Returns:
+//
+//	a MisbehaviorReportManagerOption that sets the decay function for the MisbehaviorReportManager.
+//
+// Note: this option is useful primarily for testing purposes. The default decay function should be used for production.
+func WithDecayFunc(f SpamRecordDecayFunc) MisbehaviorReportManagerOption {
+	return func(m *MisbehaviorReportManager) {
+		m.decayFunc = f
+	}
 }

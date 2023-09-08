@@ -75,6 +75,8 @@ const (
 	DefaultExecutionRootDir = "/data/exedb"
 	// DefaultExecutionDataServiceDir for the execution data service blobstore.
 	DefaultExecutionDataServiceDir = "/data/execution_data"
+	// DefaultChunkDataPackDir for the chunk data packs
+	DefaultChunkDataPackDir = "/data/chunk_data_pack"
 	// DefaultProfilerDir is the default directory for the profiler
 	DefaultProfilerDir = "/data/profiler"
 
@@ -768,6 +770,9 @@ func (net *FlowNetwork) addObserver(t *testing.T, conf ObserverConfig) {
 	nodeContainer.exposePort(AdminPort, testingdock.RandomPort(t))
 	nodeContainer.AddFlag("admin-addr", nodeContainer.ContainerAddr(AdminPort))
 
+	nodeContainer.exposePort(RESTPort, testingdock.RandomPort(t))
+	nodeContainer.AddFlag("rest-addr", nodeContainer.ContainerAddr(RESTPort))
+
 	nodeContainer.opts.HealthCheck = testingdock.HealthCheckCustom(nodeContainer.HealthcheckCallback())
 
 	suiteContainer := net.suite.Container(containerOpts)
@@ -858,6 +863,7 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 
 			nodeContainer.AddFlag("triedir", DefaultExecutionRootDir)
 			nodeContainer.AddFlag("execution-data-dir", DefaultExecutionDataServiceDir)
+			nodeContainer.AddFlag("chunk-data-pack-dir", DefaultChunkDataPackDir)
 
 		case flow.RoleAccess:
 			nodeContainer.exposePort(GRPCPort, testingdock.RandomPort(t))

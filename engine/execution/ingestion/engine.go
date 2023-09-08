@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"regexp"
 	"sync"
 	"time"
 
@@ -60,11 +61,20 @@ type Engine struct {
 	executionDataPruner    *pruner.Pruner
 	uploader               *uploader.Manager
 	stopControl            *stop.StopControl
+
+	// This is included to temporarily work around an issue observed on a small number of ENs.
+	// It works around an issue where some collection nodes are not configured with enough
+	// this works around an issue where some collection nodes are not configured with enough
+	// file descriptors causing connection failures.
+	onflowOnlyLNs bool
 }
 
+var onlyOnflowRegex = regexp.MustCompile(`.*\.onflow\.org:3569$`)
+
 func New(
+	unit *engine.Unit,
 	logger zerolog.Logger,
-	net network.Network,
+	net network.EngineRegistry,
 	me module.Local,
 	request module.Requester,
 	state protocol.State,
@@ -84,13 +94,14 @@ func New(
 	pruner *pruner.Pruner,
 	uploader *uploader.Manager,
 	stopControl *stop.StopControl,
+	onflowOnlyLNs bool,
 ) (*Engine, error) {
 	log := logger.With().Str("engine", "ingestion").Logger()
 
 	mempool := newMempool()
 
 	eng := Engine{
-		unit:                   engine.NewUnit(),
+		unit:                   unit,
 		log:                    log,
 		me:                     me,
 		request:                request,
@@ -113,6 +124,7 @@ func New(
 		executionDataPruner:    pruner,
 		uploader:               uploader,
 		stopControl:            stopControl,
+		onflowOnlyLNs:          onflowOnlyLNs,
 	}
 
 	return &eng, nil
@@ -686,6 +698,8 @@ func (e *Engine) executeBlock(
 		Hex("result_id", logging.Entity(receipt.ExecutionResult)).
 		Hex("execution_data_id", receipt.ExecutionResult.ExecutionDataID[:]).
 		Bool("sealed", isExecutedBlockSealed).
+		Bool("state_changed", finalEndState != *executableBlock.StartState).
+		Uint64("num_txs", nonSystemTransactionCount(receipt.ExecutionResult)).
 		Bool("broadcasted", broadcasted).
 		Int64("timeSpentInMS", time.Since(startedAt).Milliseconds()).
 		Msg("block executed")
@@ -703,6 +717,14 @@ func (e *Engine) executeBlock(
 
 	e.unit.Ctx()
 
+}
+
+func nonSystemTransactionCount(result flow.ExecutionResult) uint64 {
+	count := uint64(0)
+	for _, chunk := range result.Chunks {
+		count += chunk.NumberOfTransactions
+	}
+	return count
 }
 
 // we've executed the block, now we need to check:
@@ -1205,9 +1227,26 @@ func (e *Engine) fetchCollection(
 		)
 		return fmt.Errorf("could not find guarantors: %w", err)
 	}
+
+	filters := []flow.IdentityFilter{
+		filter.HasNodeID(guarantors...),
+	}
+
+	// This is included to temporarily work around an issue observed on a small number of ENs.
+	// It works around an issue where some collection nodes are not configured with enough
+	// file descriptors causing connection failures. This will be removed once a
+	// proper fix is in place.
+	if e.onflowOnlyLNs {
+		// func(Identity("verification-049.mainnet20.nodes.onflow.org:3569")) => true
+		// func(Identity("verification-049.hello.org:3569")) => false
+		filters = append(filters, func(identity *flow.Identity) bool {
+			return onlyOnflowRegex.MatchString(identity.Address)
+		})
+	}
+
 	// queue the collection to be requested from one of the guarantors
 	e.request.EntityByID(guarantee.ID(), filter.And(
-		filter.HasNodeID(guarantors...),
+		filters...,
 	))
 
 	return nil

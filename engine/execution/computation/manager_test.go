@@ -143,6 +143,7 @@ func TestComputeBlockWithStorage(t *testing.T) {
 		me,
 		prov,
 		nil,
+		testutil.ProtocolStateWithSourceFixture(nil),
 		testMaxConcurrency)
 	require.NoError(t, err)
 
@@ -194,6 +195,7 @@ func TestComputeBlock_Uploader(t *testing.T) {
 		Return(nil, nil)
 
 	computationResult := unittest2.ComputationResultFixture(
+		t,
 		unittest.IdentifierFixture(),
 		[][]flow.Identifier{
 			{unittest.IdentifierFixture()},
@@ -835,6 +837,7 @@ func Test_EventEncodingFailsOnlyTxAndCarriesOn(t *testing.T) {
 		me,
 		prov,
 		nil,
+		testutil.ProtocolStateWithSourceFixture(nil),
 		testMaxConcurrency)
 	require.NoError(t, err)
 
