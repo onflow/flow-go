@@ -171,6 +171,7 @@ func (e *ProtocolStateEntry) ID() Identifier {
 }
 
 // Copy returns a full copy of the entry.
+// Embedded Identities are deep-copied, _except_ for their keys, which are copied by reference.
 func (e *ProtocolStateEntry) Copy() *ProtocolStateEntry {
 	if e == nil {
 		return nil
@@ -185,7 +186,8 @@ func (e *ProtocolStateEntry) Copy() *ProtocolStateEntry {
 }
 
 // Copy returns a full copy of rich protocol state entry.
-// Embedded service events are copied by reference (not deep-copied).
+//   - Embedded service events are copied by reference (not deep-copied).
+//   - Identities are deep-copied, _except_ for their keys, which are copied by reference.
 func (e *RichProtocolStateEntry) Copy() *RichProtocolStateEntry {
 	if e == nil {
 		return nil
@@ -245,6 +247,17 @@ func (ll DynamicIdentityEntryList) ByNodeID(nodeID Identifier) (*DynamicIdentity
 	return nil, false
 }
 
+// Copy returns a copy of the DynamicIdentityEntryList. The resulting slice uses
+// a different backing array, meaning appends and insert operations on either slice
+// are guaranteed to only affect that slice.
+//
+// Copy should be used when modifying an existing identity list by either
+// appending new elements, re-ordering, or inserting new elements in an
+// existing index.
+//
+// CAUTION:
+// All Identity fields are deep-copied, _except_ for their keys, which
+// are copied by reference.
 func (ll DynamicIdentityEntryList) Copy() DynamicIdentityEntryList {
 	dup := make(DynamicIdentityEntryList, 0, len(ll))
 
@@ -258,6 +271,8 @@ func (ll DynamicIdentityEntryList) Copy() DynamicIdentityEntryList {
 }
 
 // Sort sorts the list by the input ordering. Returns a new, sorted list without modifying the input.
+// CAUTION:
+// All Identity fields are deep-copied, _except_ for their keys, which are copied by reference.
 func (ll DynamicIdentityEntryList) Sort(less IdentifierOrder) DynamicIdentityEntryList {
 	dup := ll.Copy()
 	sort.Slice(dup, func(i int, j int) bool {
