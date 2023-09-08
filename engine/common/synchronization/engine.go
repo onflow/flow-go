@@ -529,9 +529,10 @@ func (e *Engine) validateRangeRequestForALSP(originID flow.Identifier, event int
 	}
 
 	// to avoid creating a misbehavior report for every range request received, use a probabilistic approach.
+	// The higher the range request, the higher the probability of creating a misbehavior report.
 
-	probFactor := e.spamDetectionConfig.rangeRequestProbability * (float32(rangeRequest.ToHeight-rangeRequest.FromHeight) + 1) / float32(synccore.DefaultConfig().MaxSize)
-	if float32(n) < probFactor*spamProbabilityMultiplier {
+	rangeRequestProb := e.spamDetectionConfig.rangeRequestBaseProb * (float32(rangeRequest.ToHeight-rangeRequest.FromHeight) + 1) / float32(synccore.DefaultConfig().MaxSize)
+	if float32(n) < rangeRequestProb*spamProbabilityMultiplier {
 		// create a misbehavior report
 		e.log.Info().Str("originID", originID.String()).Msg("creating misbehavior report")
 		report, err := alsp.NewMisbehaviorReport(originID, alsp.ResourceIntensiveRequest)

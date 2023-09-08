@@ -173,11 +173,11 @@ func (ss *SyncSuite) TestLoad_Process_RangeRequest_SometimesReportSpam() {
 	load := 1000
 
 	type loadGroup struct {
-		rangeRequestBaseProbFactor float32
-		expectedMisbehaviorsLower  int
-		expectedMisbehaviorsUpper  int
-		fromHeight                 uint64
-		toHeight                   uint64
+		rangeRequestBaseProb      float32
+		expectedMisbehaviorsLower int
+		expectedMisbehaviorsUpper int
+		fromHeight                uint64
+		toHeight                  uint64
 	}
 
 	loadGroups := []loadGroup{}
@@ -222,7 +222,7 @@ func (ss *SyncSuite) TestLoad_Process_RangeRequest_SometimesReportSpam() {
 					misbehaviorsCounter++
 				},
 			)
-			ss.e.spamDetectionConfig.rangeRequestProbability = loadGroup.rangeRequestBaseProbFactor
+			ss.e.spamDetectionConfig.rangeRequestBaseProb = loadGroup.rangeRequestBaseProb
 			require.NoError(ss.T(), ss.e.Process(channels.SyncCommittee, originID, req))
 		}
 		// check function call expectations at the end of the load test; otherwise, load test would take much longer
