@@ -380,10 +380,10 @@ func (s *UpdaterSuite) TestProcessEpochSetupWithSameParticipants() {
 		"should have all participants from previous epoch and current epoch, but without duplicates")
 }
 
-// TestEpochSetupAfterIdentityChange tests that after processing epoch setup event all previously made changes to the identity table
+// TestEpochSetupAfterIdentityChange tests that after processing epoch an setup event, all previously made changes to the identity table
 // are preserved and reflected in the resulting protocol state.
 func (s *UpdaterSuite) TestEpochSetupAfterIdentityChange() {
-	currentEpochParticipants := s.parentProtocolState.CurrentEpochSetup.Participants.Copy()
+	currentEpochParticipants := s.parentProtocolState.CurrentEpochSetup.Participants.Copy() // DEEP copy of Identity List
 	weightChanges, err := currentEpochParticipants.Sample(2)
 	require.NoError(s.T(), err)
 	ejectedChanges, err := currentEpochParticipants.Sample(2)
