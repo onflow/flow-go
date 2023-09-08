@@ -72,7 +72,7 @@ func readTrie(tries []*trie.MTrie, index int) (*trie.MTrie, error) {
 }
 
 func scanCheckpoint(checkpoint string, trieIndex int, log zerolog.Logger) (result, error) {
-	tries, err := wal.LoadCheckpoint(flagCheckpoint, &log)
+	tries, err := wal.LoadCheckpoint(flagCheckpoint, log)
 	if err != nil {
 		return result{}, fmt.Errorf("error while loading checkpoint: %w", err)
 	}
