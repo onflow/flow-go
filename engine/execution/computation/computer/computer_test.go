@@ -1118,14 +1118,6 @@ func (e *testRuntime) ReadStored(
 	return e.readStored(a, p, c)
 }
 
-func (*testRuntime) ReadLinked(
-	_ common.Address,
-	_ cadence.Path,
-	_ runtime.Context,
-) (cadence.Value, error) {
-	panic("ReadLinked not expected")
-}
-
 func (*testRuntime) SetDebugger(_ *interpreter.Debugger) {
 	panic("SetDebugger not expected")
 }

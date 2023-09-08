@@ -85,10 +85,6 @@ func (t *TestInterpreterRuntime) ReadStored(address common.Address, path cadence
 	return t.ReadStoredFunc(address, path, context)
 }
 
-func (t *TestInterpreterRuntime) ReadLinked(common.Address, cadence.Path, runtime.Context) (cadence.Value, error) {
-	panic("ReadLinked not defined")
-}
-
 func (*TestInterpreterRuntime) Storage(runtime.Context) (*runtime.Storage, *interpreter.Interpreter, error) {
 	panic("not implemented")
 }
