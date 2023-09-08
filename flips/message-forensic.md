@@ -19,6 +19,12 @@ offering a generalized solution that doesn’t hinge on a specific external prot
 steering clear of the complexities tied to maintaining GossipSub envelopes and dodging the necessity of duplicating GossipSub 
 router’s signature verification procedure at the engine level. Furthermore, it meshes well with the Flow protocol’s existing state.
 
+## Review Guide
+This FLIP is presented as a Pull Request (PR) in the `flow-go` repository. We welcome reviewers to express their opinions and share feedback directly on the PR page, aiming for a structured and productive discussion. To aid this, please adhere to one of the following response frameworks:
+1. I favor the "Enforced Flow-level Signing Policy For All Messages" and here are my thoughts:
+2. I support the "GossipSub Message Forensic (GMF)" approach, articulating my views as follows.
+3. I find both propositions unsatisfactory, elucidating my stance with.
+
 ## Problem Overview
 Within the Flow protocol, nodes converse through a networking layer, a medium which undertakes the dispatch and receipt of messages among nodes
 via different communication methods: unicast, multicast, and publish. Unicast messages are transmitted to a single recipient over a direct connection.
