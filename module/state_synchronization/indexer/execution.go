@@ -29,7 +29,8 @@ func New(registers storage.RegisterIndex, headers storage.Headers, startIndexHei
 }
 
 // HeightByBlockID retrieves the height for block ID.
-// If a block is not found expect a storage.ErrNotFound error.
+// Expected errors:
+// - storage.ErrNotFound if a block is not found in the storage.
 func (i *ExecutionState) HeightByBlockID(ID flow.Identifier) (uint64, error) {
 	header, err := i.headers.ByBlockID(ID)
 	if err != nil {

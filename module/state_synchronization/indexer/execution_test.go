@@ -26,17 +26,6 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-func TestExecutionState_HeightByBlockID(t *testing.T) {
-	blocks := blocksFixture(5)
-	indexer := ExecutionState{headers: newBlockHeadersStorage(blocks)}
-
-	for _, b := range blocks {
-		ret, err := indexer.HeightByBlockID(b.ID())
-		require.NoError(t, err)
-		require.Equal(t, b.Header.Height, ret)
-	}
-}
-
 type indexBlockDataTest struct {
 	t              *testing.T
 	indexer        ExecutionState
@@ -125,6 +114,17 @@ func (i *indexBlockDataTest) run() {
 		assert.Equal(i.t, i.expectErr, err)
 	} else {
 		assert.NoError(i.t, err)
+	}
+}
+
+func TestExecutionState_HeightByBlockID(t *testing.T) {
+	blocks := blocksFixture(5)
+	indexer := ExecutionState{headers: newBlockHeadersStorage(blocks)}
+
+	for _, b := range blocks {
+		ret, err := indexer.HeightByBlockID(b.ID())
+		require.NoError(t, err)
+		require.Equal(t, b.Header.Height, ret)
 	}
 }
 
