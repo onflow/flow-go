@@ -48,6 +48,8 @@ var eventsList = flow.EventsList{
 	},
 }
 
+const computationUsed = uint64(100)
+
 var id0 = flow.NewRegisterID("00", "")
 var id5 = flow.NewRegisterID("05", "")
 
@@ -209,7 +211,8 @@ func (s *ChunkVerifierTestSuite) TestFailedTx() {
 		},
 	}
 	s.outputs["failedTx"] = fvm.ProcedureOutput{
-		Err: fvmErrors.NewCadenceRuntimeError(runtime.Error{}), // inside the runtime (e.g. div by zero, access account)
+		ComputationUsed: computationUsed,
+		Err:             fvmErrors.NewCadenceRuntimeError(runtime.Error{}), // inside the runtime (e.g. div by zero, access account)
 	}
 
 	spockSecret, err := s.verifier.Verify(vch)
@@ -253,6 +256,7 @@ func (s *ChunkVerifierTestSuite) TestServiceEventsMismatch() {
 
 	s.snapshots[string(serviceTxBody.Script)] = &snapshot.ExecutionSnapshot{}
 	s.outputs[string(serviceTxBody.Script)] = fvm.ProcedureOutput{
+		ComputationUsed:        computationUsed,
 		ConvertedServiceEvents: flow.ServiceEventList{*epochCommitServiceEvent},
 		Events:                 meta.ChunkEvents,
 	}
@@ -303,6 +307,7 @@ func (s *ChunkVerifierTestSuite) TestEmptyCollection() {
 	collection := unittest.CollectionFixture(0)
 	meta.Collection = &collection
 	meta.ChunkEvents = nil
+	meta.TxResults = nil
 
 	// update the Update to not change the state
 	update, err := ledger.NewEmptyUpdate(meta.StartState)
@@ -481,6 +486,25 @@ func generateEvents(t *testing.T, isSystemChunk bool, collection *flow.Collectio
 	return chunkEvents, serviceEvents
 }
 
+func generateTransactionResults(t *testing.T, collection *flow.Collection) []execution_data.TransactionResult {
+	txResults := make([]execution_data.TransactionResult, len(collection.Transactions))
+	for i, tx := range collection.Transactions {
+		txResults[i] = execution_data.TransactionResult{
+			TransactionID:   tx.ID(),
+			ComputationUsed: computationUsed,
+			HasError:        false,
+		}
+
+		switch string(tx.Script) {
+		case "failedTx":
+			txResults[i].HasError = true
+			continue
+		}
+	}
+
+	return txResults
+}
+
 func generateCollection(t *testing.T, isSystemChunk bool, script string) *flow.Collection {
 	if isSystemChunk {
 		// the system chunk's data pack does not include the collection, but the execution data does.
@@ -515,8 +539,9 @@ func generateDefaultSnapshot() *snapshot.ExecutionSnapshot {
 
 func generateDefaultOutput() fvm.ProcedureOutput {
 	return fvm.ProcedureOutput{
-		Logs:   []string{"log1", "log2"},
-		Events: eventsList,
+		ComputationUsed: computationUsed,
+		Logs:            []string{"log1", "log2"},
+		Events:          eventsList,
 	}
 }
 
@@ -524,8 +549,25 @@ func (s *ChunkVerifierTestSuite) GetTestSetup(t *testing.T, script string, syste
 	collection := generateCollection(t, system, script)
 	block := blockFixture(collection)
 
+	// transaction results
+	txResults := generateTransactionResults(t, collection)
+	// make sure this includes results even for the service tx
+	if system {
+		require.Len(t, txResults, 1)
+	} else {
+		require.Len(t, txResults, len(collection.Transactions))
+	}
+
 	// events
 	chunkEvents, serviceEvents := generateEvents(t, system, collection)
+	// make sure this includes events even for the service tx
+	if system {
+		require.Len(t, serviceEvents, 1)
+		require.Nil(t, chunkEvents)
+	} else {
+		require.NotEmpty(t, chunkEvents)
+		require.Empty(t, serviceEvents)
+	}
 
 	// registerTouch and State setup
 	startState, proof, update := generateStateUpdates(t, s.ledger)
@@ -538,6 +580,7 @@ func (s *ChunkVerifierTestSuite) GetTestSetup(t *testing.T, script string, syste
 		IsSystemChunk: system,
 		Header:        block.Header,
 		Collection:    collection,
+		TxResults:     txResults,
 		ChunkEvents:   chunkEvents,
 		ServiceEvents: serviceEvents,
 		StartState:    startState,
@@ -556,6 +599,7 @@ type testMetadata struct {
 	IsSystemChunk bool
 	Header        *flow.Header
 	Collection    *flow.Collection
+	TxResults     []execution_data.TransactionResult
 	ChunkEvents   flow.EventsList
 	ServiceEvents []flow.ServiceEvent
 	StartState    ledger.State
@@ -586,9 +630,10 @@ func (m *testMetadata) RefreshChunkData(t *testing.T) *verification.VerifiableCh
 	require.NoError(t, err)
 
 	chunkExecutionData := &execution_data.ChunkExecutionData{
-		Collection: cedCollection,
-		Events:     m.ChunkEvents,
-		TrieUpdate: trieUpdate,
+		Collection:         cedCollection,
+		Events:             m.ChunkEvents,
+		TrieUpdate:         trieUpdate,
+		TransactionResults: m.TxResults,
 	}
 
 	executionDataID, executionDataRoot := generateExecutionData(t, m.ExecDataBlockID, chunkExecutionData)

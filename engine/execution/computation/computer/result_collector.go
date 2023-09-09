@@ -155,11 +155,15 @@ func (collector *resultCollector) commitCollection(
 		return fmt.Errorf("hash events failed: %w", err)
 	}
 
+	txResults := execColRes.TransactionResults()
+	transactionResults := execution_data.ConvertTransactionResults(txResults)
+
 	col := collection.Collection()
 	chunkExecData := &execution_data.ChunkExecutionData{
-		Collection: &col,
-		Events:     events,
-		TrieUpdate: trieUpdate,
+		Collection:         &col,
+		Events:             events,
+		TrieUpdate:         trieUpdate,
+		TransactionResults: transactionResults,
 	}
 
 	collector.result.AppendCollectionAttestationResult(
