@@ -41,7 +41,7 @@ type Tracer struct {
 	tracer      trace.Tracer
 	shutdown    func(context.Context) error
 	log         zerolog.Logger
-	spanCache   *lru.Cache
+	spanCache   *lru.Cache[flow.Identifier, trace.Span]
 	chainID     string
 	sensitivity uint
 }
@@ -88,7 +88,7 @@ func NewTracer(
 		log.Debug().Err(err).Msg("tracing error")
 	}))
 
-	spanCache, err := lru.New(int(DefaultEntityCacheSize))
+	spanCache, err := lru.New[flow.Identifier, trace.Span](int(DefaultEntityCacheSize))
 	if err != nil {
 		return nil, err
 	}
