@@ -2,13 +2,13 @@ package backend
 
 import (
 	"context"
+	"crypto/md5" //nolint:gosec
 	"fmt"
 	"net"
 	"strconv"
 	"time"
 
-	lru "github.com/hashicorp/golang-lru"
-	lru2 "github.com/hashicorp/golang-lru/v2"
+	lru "github.com/hashicorp/golang-lru/v2"
 	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
 	"github.com/rs/zerolog"
 	"google.golang.org/grpc/codes"
@@ -123,7 +123,7 @@ func New(params Params) *Backend {
 		retry.Activate()
 	}
 
-	loggedScripts, err := lru.New(DefaultLoggedScriptsCacheSize)
+	loggedScripts, err := lru.New[[md5.Size]byte, time.Time](DefaultLoggedScriptsCacheSize)
 	if err != nil {
 		params.Log.Fatal().Err(err).Msg("failed to initialize script logging cache")
 	}
@@ -137,9 +137,9 @@ func New(params Params) *Backend {
 		archivePorts[idx] = port
 	}
 
-	var txResCache *lru2.Cache[flow.Identifier, *access.TransactionResult]
+	var txResCache *lru.Cache[flow.Identifier, *access.TransactionResult]
 	if params.TxResultCacheSize > 0 {
-		txResCache, err = lru2.New[flow.Identifier, *access.TransactionResult](int(params.TxResultCacheSize))
+		txResCache, err = lru.New[flow.Identifier, *access.TransactionResult](int(params.TxResultCacheSize))
 		if err != nil {
 			params.Log.Fatal().Err(err).Msg("failed to init cache for transaction results")
 		}
@@ -238,14 +238,13 @@ func NewCache(
 	log zerolog.Logger,
 	accessMetrics module.AccessMetrics,
 	connectionPoolSize uint,
-) (*lru.Cache, uint, error) {
+) (*lru.Cache[string, *connection.CachedClient], uint, error) {
 
-	var cache *lru.Cache
+	var cache *lru.Cache[string, *connection.CachedClient]
 	cacheSize := connectionPoolSize
 	if cacheSize > 0 {
 		var err error
-		cache, err = lru.NewWithEvict(int(cacheSize), func(_, evictedValue interface{}) {
-			store := evictedValue.(*connection.CachedClient)
+		cache, err = lru.NewWithEvict(int(cacheSize), func(_ string, store *connection.CachedClient) {
 			store.Close()
 			log.Debug().Str("grpc_conn_evicted", store.Address).Msg("closing grpc connection evicted from pool")
 			if accessMetrics != nil {
