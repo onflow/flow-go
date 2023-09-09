@@ -656,7 +656,7 @@ func TestCircuitBreakerExecutionNode(t *testing.T) {
 	cacheSize := 1
 	connectionCache, err := lru.New[string, *CachedClient](cacheSize)
 	require.NoError(t, err)
-	
+
 	connectionFactory.Manager = NewManager(
 		NewCache(connectionCache, cacheSize),
 		unittest.Logger(),
@@ -739,7 +739,8 @@ func TestCircuitBreakerCollectionNode(t *testing.T) {
 
 	// Set the connection pool cache size.
 	cacheSize := 1
-	connectionCache, _ := lru.New[string, *CachedClient](cacheSize)
+	connectionCache, err := lru.New[string, *CachedClient](cacheSize)
+	require.NoError(t, err)
 
 	connectionFactory.Manager = NewManager(
 		NewCache(connectionCache, cacheSize),
