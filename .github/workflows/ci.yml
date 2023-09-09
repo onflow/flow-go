@@ -111,6 +111,8 @@ jobs:
         cache: true
     - name: Setup tests (${{ matrix.targets.name }})
       run: VERBOSE=1 make -e GO_TEST_PACKAGES="${{ matrix.targets.packages }}" install-tools
+    - name: Setup tmate session
+      uses: mxschmitt/action-tmate@v3
     - name: Run tests (${{ matrix.targets.name }})
       uses: nick-fields/retry@v2
       with:
