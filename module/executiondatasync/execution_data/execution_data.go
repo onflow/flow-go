@@ -23,7 +23,7 @@ type ChunkExecutionData struct {
 
 	// TransactionResults are the results of executing the transactions in the collection
 	// This includes all of the data from flow.TransactionResult, except uses a boolean
-	// value for the transaction's success instead of a full error message.
+	// value to indicate if an error occurred instead of a full error message.
 	TransactionResults []TransactionResult
 }
 
@@ -41,11 +41,11 @@ type BlockExecutionData struct {
 // including the error and risking execution forks if an undetected bug is introduced, we simplify
 // it to just a boolean value.
 type TransactionResult struct {
-	// TransactionID is the ID of the transaction this error was emitted from.
+	// TransactionID is the ID of the transaction this result was emitted from.
 	TransactionID flow.Identifier
-	// HasError is true if the transaction failed, false otherwise.
+	// HasError is true if the transaction's execution resulted in an error, false otherwise.
 	HasError bool
-	// Computation used
+	// ComputationUsed is amount of computation used while executing the transaction.
 	ComputationUsed uint64
 }
 
