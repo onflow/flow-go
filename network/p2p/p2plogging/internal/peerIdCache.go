@@ -11,7 +11,7 @@ type PeerIdCache struct {
 	// TODO: Note that we use lru.Cache as there is an inherent import cycle when using the HeroCache.
 	//	 Moving forward we should consider moving the HeroCache to a separate repository and transition
 	// 	to using it here.
-	// 	This PeerIdCache is using extensively across the codebase, so any minor import cycle will cause
+	// 	This PeerIdCache is used extensively across the codebase, so any minor import cycle will cause
 	// 	a lot of trouble.
 	peerCache *lru.Cache
 }
