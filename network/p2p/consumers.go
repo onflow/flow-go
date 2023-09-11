@@ -40,7 +40,7 @@ func NewInvalidControlMessageNotification(peerID peer.ID, ctlMsgType p2pmsg.Cont
 	return &InvCtrlMsgNotif{
 		PeerID:  peerID,
 		Error:   err,
-		MsgType: ctlMshType,
+		MsgType: ctlMsgType,
 	}
 }
 
