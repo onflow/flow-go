@@ -14,7 +14,8 @@ import (
 // is created successfully.
 func TestNewPeerIdCache(t *testing.T) {
 	cacheSize := 100
-	cache := internal.NewPeerIdCache(cacheSize)
+	cache, err := internal.NewPeerIdCache(cacheSize)
+	assert.NoError(t, err)
 	assert.NotNil(t, cache)
 }
 
@@ -22,7 +23,8 @@ func TestNewPeerIdCache(t *testing.T) {
 // returns the same string as the peer.ID.String() method.
 func TestPeerIdCache_PeerIdString(t *testing.T) {
 	cacheSize := 100
-	cache := internal.NewPeerIdCache(cacheSize)
+	cache, err := internal.NewPeerIdCache(cacheSize)
+	assert.NoError(t, err)
 
 	t.Run("existing peer ID", func(t *testing.T) {
 		pid := p2ptest.PeerIdFixture(t)
@@ -58,7 +60,8 @@ func TestPeerIdCache_PeerIdString(t *testing.T) {
 // evicts the least recently added peer ID when the cache is full.
 func TestPeerIdCache_EjectionScenarios(t *testing.T) {
 	cacheSize := 3
-	cache := internal.NewPeerIdCache(cacheSize)
+	cache, err := internal.NewPeerIdCache(cacheSize)
+	assert.NoError(t, err)
 	assert.Equal(t, 0, cache.Size())
 
 	// add peer IDs to fill the cache

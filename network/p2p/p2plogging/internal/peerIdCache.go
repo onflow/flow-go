@@ -16,14 +16,14 @@ type PeerIdCache struct {
 	peerCache *lru.Cache
 }
 
-func NewPeerIdCache(size int) *PeerIdCache {
+func NewPeerIdCache(size int) (*PeerIdCache, error) {
 	c, err := lru.New(size)
 	if err != nil {
-		panic(fmt.Sprintf("failed to create lru cache for peer ids: %v", err))
+		return nil, fmt.Errorf("failed to create peer id cache: %w", err)
 	}
 	return &PeerIdCache{
 		peerCache: c,
-	}
+	}, nil
 }
 
 // PeerIdString returns the base58 encoded peer id string, it looks up the peer id in a cache to avoid
