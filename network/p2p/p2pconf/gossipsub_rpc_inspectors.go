@@ -46,7 +46,7 @@ type IHaveRPCInspectionConfig struct {
 	// the control message ihaves will be truncated to the max sample size. This sample is randomly selected.
 	MaxSampleSize int `validate:"gte=5000" mapstructure:"gossipsub-rpc-ihave-max-sample-size"`
 	// MaxMessageIDSampleSize max inspection sample size to use for iHave message ids. Each ihave message includes a list of message ids
-	// each, if the size of this list exceeds the configured max message id sample size the list of message ids will be truncated.
+	// each, if the size of this list in a single iHave message exceeds the configured max message id sample size the list of message ids will be truncated.
 	MaxMessageIDSampleSize int `validate:"gte=3000" mapstructure:"gossipsub-rpc-ihave-max-message-id-sample-size"`
 }
 
