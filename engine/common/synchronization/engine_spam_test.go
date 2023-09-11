@@ -182,7 +182,7 @@ func (ss *SyncSuite) TestLoad_Process_RangeRequest_SometimesReportSpam() {
 
 	loadGroups := []loadGroup{}
 
-	// using a very small range with a 10% base probability factor, expect to almost never get misbehavior report, about 0.003% of the time (3 in 1000 requests)
+	// using a very small range (1) with a 10% base probability factor, expect to almost never get misbehavior report, about 0.003% of the time (3 in 1000 requests)
 	// expected probability factor: 0.1 * ((10-9) + 1)/64 = 0.003125
 	loadGroups = append(loadGroups, loadGroup{0.1, 0, 15, 9, 10})
 
@@ -198,13 +198,17 @@ func (ss *SyncSuite) TestLoad_Process_RangeRequest_SometimesReportSpam() {
 	// expected probability factor: 0.01 * ((1000-1) + 1)/64 = 0.15625
 	loadGroups = append(loadGroups, loadGroup{0.01, 110, 200, 1, 1000})
 
+	// using a small range (10) with a 1% base probability factor, expect to almost never get misbehavior report, about 0.17% of the time (2 in 1000 requests)
+	// expected probability factor: 0.01 * ((11-1) + 1)/64 = 0.00171875
+	loadGroups = append(loadGroups, loadGroup{0.01, 0, 7, 1, 11})
+
 	// INVALID RANGE REQUESTS
 	// the following range requests are invalid and should always result in a misbehavior report
 
-	// using an inverted range (from height > to height) always results in a misbehavior report, no matter how small the range is or what the base probability factor is
+	// using an inverted range (from height > to height) always results in a misbehavior report, no matter how small the range is or how small the base probability factor is
 	loadGroups = append(loadGroups, loadGroup{0.001, 1000, 1000, 2, 1})
 
-	// using a flat range (from height == to height) always results in a misbehavior report, no matter how small the range is or what the base probability factor is
+	// using a flat range (from height == to height) always results in a misbehavior report, no matter how small the range is or how small the base probability factor is
 	loadGroups = append(loadGroups, loadGroup{0.001, 1000, 1000, 1, 1})
 
 	// reset misbehavior report counter for each subtest
