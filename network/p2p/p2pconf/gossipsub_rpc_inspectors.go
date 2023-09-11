@@ -30,7 +30,7 @@ type IWantRPCInspectionConfig struct {
 	// exceeds this max sample size then the respective message will be truncated before being processed.
 	MaxSampleSize uint `validate:"gt=0" mapstructure:"gossipsub-rpc-iwant-max-sample-size"`
 	// MaxMessageIDSampleSize max inspection sample size to use for iWant message ids. Each iWant message includes a list of message ids
-	// each, if the size of this list exceeds the configured max message id sample size the list of message ids will be truncated.
+	// each, if the size of this list in an iWant message exceeds the configured max message id sample size the list of message ids will be truncated.
 	MaxMessageIDSampleSize int `validate:"gte=3000" mapstructure:"gossipsub-rpc-iwant-max-message-id-sample-size"`
 	// CacheMissThreshold the threshold of missing corresponding iHave messages for iWant messages received before an invalid control message notification is disseminated.
 	// If the cache miss threshold is exceeded an invalid control message notification is disseminated and the sender will be penalized.
