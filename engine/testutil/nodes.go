@@ -720,9 +720,6 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 		node.Headers,
 		node.Blocks,
 		collectionsStorage,
-		eventsStorage,
-		serviceEventsStorage,
-		txResultStorage,
 		computationEngine,
 		pusherEngine,
 		execState,
@@ -790,6 +787,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 			),
 			idCache,
 		),
+		synchronization.NewSpamDetectionConfig(),
 		synchronization.WithPollInterval(time.Duration(0)),
 	)
 	require.NoError(t, err)

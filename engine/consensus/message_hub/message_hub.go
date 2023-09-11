@@ -100,7 +100,7 @@ var _ hotstuff.CommunicatorConsumer = (*MessageHub)(nil)
 // No errors are expected during normal operations.
 func NewMessageHub(log zerolog.Logger,
 	engineMetrics module.EngineMetrics,
-	net network.Network,
+	net network.EngineRegistry,
 	me module.Local,
 	compliance consensus.Compliance,
 	hotstuff module.HotStuff,

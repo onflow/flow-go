@@ -5,6 +5,7 @@ import (
 	"github.com/libp2p/go-libp2p/core/protocol"
 
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/network/channels"
 )
@@ -33,11 +34,11 @@ const (
 	PublicNetwork
 )
 
-// Network represents the network layer of the node. It allows processes that
-// work across the peer-to-peer network to register themselves as an engine with
-// a unique engine ID. The returned conduit allows the process to communicate to
-// the same engine on other nodes across the network in a network-agnostic way.
-type Network interface {
+// EngineRegistry is one of the networking layer interfaces in Flow (i.e., EngineRegistry, ConduitAdapter, and Underlay). It represents the interface that networking layer
+// offers to the Flow protocol layer, i.e., engines. It is responsible for creating conduits through which engines
+// can send and receive messages to and from other engines on the network, as well as registering other services
+// such as BlobService and PingService.
+type EngineRegistry interface {
 	component.Component
 	// Register will subscribe to the channel with the given engine and
 	// the engine will be notified with incoming messages on the channel.
@@ -54,10 +55,10 @@ type Network interface {
 	RegisterPingService(pingProtocolID protocol.ID, pingInfoProvider PingInfoProvider) (PingService, error)
 }
 
-// Adapter is a wrapper around the Network implementation. It only exposes message dissemination functionalities.
-// Adapter is meant to be utilized by the Conduit interface to send messages to the Network layer to be
-// delivered to the remote targets.
-type Adapter interface {
+// ConduitAdapter is one of the networking layer interfaces in Flow (i.e., EngineRegistry, ConduitAdapter, and Underlay). It represents the interface that networking layer
+// offers to a single conduit which enables the conduit to send different types of messages i.e., unicast, multicast,
+// and publish, to other conduits on the network.
+type ConduitAdapter interface {
 	MisbehaviorReportConsumer
 	// UnicastOnChannel sends the message in a reliable way to the given recipient.
 	UnicastOnChannel(channels.Channel, interface{}, flow.Identifier) error
@@ -72,6 +73,32 @@ type Adapter interface {
 	// UnRegisterChannel unregisters the engine for the specified channel. The engine will no longer be able to send or
 	// receive messages from that channel.
 	UnRegisterChannel(channel channels.Channel) error
+}
+
+// Underlay is one of the networking layer interfaces in Flow (i.e., EngineRegistry, ConduitAdapter, and Underlay). It represents the interface that networking layer
+// offers to lower level networking components such as libp2p. It is responsible for subscribing to and unsubscribing
+// from channels, as well as updating the addresses of all the authorized participants in the Flow protocol.
+type Underlay interface {
+	module.ReadyDoneAware
+	DisallowListNotificationConsumer
+
+	// Subscribe subscribes the network Underlay to a channel.
+	// No errors are expected during normal operation.
+	Subscribe(channel channels.Channel) error
+
+	// Unsubscribe unsubscribes the network Underlay from a channel.
+	// All errors returned from this function can be considered benign.
+	Unsubscribe(channel channels.Channel) error
+
+	// UpdateNodeAddresses fetches and updates the addresses of all the authorized participants
+	// in the Flow protocol.
+	UpdateNodeAddresses()
+}
+
+// Connection represents an interface to read from & write to a connection.
+type Connection interface {
+	Send(msg interface{}) error
+	Receive() (interface{}, error)
 }
 
 // MisbehaviorReportConsumer set of funcs used to handle MisbehaviorReport disseminated from misbehavior reporters.
