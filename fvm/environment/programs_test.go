@@ -855,7 +855,7 @@ func contractDeployTx(name, code string, address flow.Address) *flow.Transaction
 
 	return flow.NewTransactionBody().SetScript(
 		[]byte(fmt.Sprintf(`transaction {
-              prepare(signer: AuthAccount) {
+              prepare(signer: auth(AddContract) &Account) {
                 signer.contracts.add(name: "%s", code: "%s".decodeHex())
               }
             }`, name, encoded)),
@@ -867,8 +867,8 @@ func updateContractTx(name, code string, address flow.Address) *flow.Transaction
 
 	return flow.NewTransactionBody().SetScript([]byte(
 		fmt.Sprintf(`transaction {
-             prepare(signer: AuthAccount) {
-               signer.contracts.update__experimental(name: "%s", code: "%s".decodeHex())
+             prepare(signer: auth(UpdateContract) &Account) {
+               signer.contracts.update(name: "%s", code: "%s".decodeHex())
              }
            }`, name, encoded)),
 	).AddAuthorizer(address)

@@ -1,5 +1,5 @@
 transaction(addresses: [Address], path: StoragePath) {
-	prepare(signer: AuthAccount) {
+	prepare(signer: auth(Storage) &Account) {
 		signer.load<[Address]>(from: path)
 		signer.save(addresses, to: path)
 	}

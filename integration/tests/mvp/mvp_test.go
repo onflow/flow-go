@@ -206,15 +206,15 @@ func runMVPTest(t *testing.T, ctx context.Context, net *testnet.FlowNetwork) {
 
 			transaction(amount: UFix64, recipient: Address) {
 			  let sentVault: @{FungibleToken.Vault}
-			  prepare(signer: AuthAccount) {
+			  prepare(signer: &Account) {
 				let vaultRef = signer.borrow<auth(FungibleToken.Withdrawable) &FlowToken.Vault>(from: /storage/flowTokenVault)
 				  ?? panic("failed to borrow reference to sender vault")
 				self.sentVault <- vaultRef.withdraw(amount: amount)
 			  }
 			  execute {
 				let receiverRef =  getAccount(recipient)
-				  .getCapability(/public/flowTokenReceiver)
-				  .borrow<&{FungibleToken.Receiver}>()
+				  .capabilities.get<&{FungibleToken.Receiver}>(/public/flowTokenReceiver)!
+				  .borrow()
 					?? panic("failed to borrow reference to recipient vault")
 				receiverRef.deposit(from: <-self.sentVault)
 			  }

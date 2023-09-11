@@ -24,7 +24,8 @@ func DeployFungibleTokenContractTransaction(fungibleToken, viewResolver flow.Add
 	return DeployContractTransaction(
 		fungibleToken,
 		contract,
-		contractName)
+		contractName,
+	)
 }
 
 func DeployNonFungibleTokenContractTransaction(nonFungibleToken, viewResolver flow.Address) *flow.TransactionBody {
@@ -33,7 +34,8 @@ func DeployNonFungibleTokenContractTransaction(nonFungibleToken, viewResolver fl
 	return DeployContractTransaction(
 		nonFungibleToken,
 		contract,
-		contractName)
+		contractName,
+	)
 }
 
 func DeployMetadataViewsContractTransaction(fungibleToken, nonFungibleToken, viewResolver flow.Address) *flow.TransactionBody {
@@ -42,7 +44,8 @@ func DeployMetadataViewsContractTransaction(fungibleToken, nonFungibleToken, vie
 	return DeployContractTransaction(
 		nonFungibleToken,
 		contract,
-		contractName)
+		contractName,
+	)
 }
 
 func DeployViewResolverContractTransaction(nonFungibleToken flow.Address) *flow.TransactionBody {
@@ -51,7 +54,8 @@ func DeployViewResolverContractTransaction(nonFungibleToken flow.Address) *flow.
 	return DeployContractTransaction(
 		nonFungibleToken,
 		contract,
-		contractName)
+		contractName,
+	)
 }
 
 func DeployMultipleNFTContractTransaction(deployTo, nonFungibleToken flow.Address) *flow.TransactionBody {
@@ -70,7 +74,8 @@ func DeployFungibleTokenMetadataViewsContractTransaction(fungibleToken, nonFungi
 	return DeployContractTransaction(
 		fungibleToken,
 		contract,
-		contractName)
+		contractName,
+	)
 }
 
 //go:embed scripts/deployFlowTokenTransactionTemplate.cdc

@@ -1,5 +1,5 @@
 transaction(keys: [[UInt8]]) {
-  prepare(signer: AuthAccount) {
+  prepare(signer: auth(AddContract) &Account) {
     for key in keys {
       let publicKey = PublicKey(
         publicKey: key,

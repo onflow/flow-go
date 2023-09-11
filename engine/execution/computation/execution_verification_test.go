@@ -590,10 +590,10 @@ func TestTransactionFeeDeduction(t *testing.T) {
 								// The Vault resource that holds the tokens that are being transferred
 								let sentVault: @{FungibleToken.Vault}
 							
-								prepare(signer: AuthAccount) {
+								prepare(signer: auth(Storage) &Account) {
 							
 									// Get a reference to the signer's stored vault
-									let vaultRef = signer.borrow<auth(FungibleToken.Withdrawable) &FlowToken.Vault>(from: /storage/flowTokenVault)
+									let vaultRef = signer.storage.borrow<auth(FungibleToken.Withdrawable) &FlowToken.Vault>(from: /storage/flowTokenVault)
 										?? panic("Could not borrow reference to the owner's Vault!")
 							
 									// Withdraw tokens from the signer's stored vault
@@ -606,8 +606,8 @@ func TestTransactionFeeDeduction(t *testing.T) {
 									let recipient = getAccount(to)
 							
 									// Get a reference to the recipient's Receiver
-									let receiverRef = recipient.getCapability(/public/flowTokenReceiver)
-										.borrow<&{FungibleToken.Receiver}>()
+									let receiverRef = recipient.capabilities.get<&{FungibleToken.Receiver}>(/public/flowTokenReceiver)!
+										.borrow()
 										?? panic("Could not borrow receiver reference to the recipient's Vault")
 							
 									// Deposit the withdrawn tokens in the recipient's receiver

@@ -802,7 +802,7 @@ func TestBlockContext_ExecuteTransaction_WithArguments(t *testing.T) {
 			label: "Parameters and authorizer",
 			script: `
                 transaction(x: Int, y: String) {
-                    prepare(acct: AuthAccount) { log(acct.address) }
+                    prepare(acct: &Account) { log(acct.address) }
                     execute { log(x); log(y) }
                 }`,
 			args:        [][]byte{arg1, arg2},

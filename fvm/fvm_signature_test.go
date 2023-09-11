@@ -551,7 +551,7 @@ func TestBLSMultiSignature(t *testing.T) {
 							Values: signatures,
 							ArrayType: &cadence.VariableSizedArrayType{
 								ElementType: &cadence.VariableSizedArrayType{
-									ElementType: cadence.UInt8Type{},
+									ElementType: cadence.UInt8Type,
 								},
 							},
 						}),
@@ -583,7 +583,7 @@ func TestBLSMultiSignature(t *testing.T) {
 							Values: signatures,
 							ArrayType: &cadence.VariableSizedArrayType{
 								ElementType: &cadence.VariableSizedArrayType{
-									ElementType: cadence.UInt8Type{},
+									ElementType: cadence.UInt8Type,
 								},
 							},
 						}),
@@ -606,7 +606,7 @@ func TestBLSMultiSignature(t *testing.T) {
 							Values: signatures,
 							ArrayType: &cadence.VariableSizedArrayType{
 								ElementType: &cadence.VariableSizedArrayType{
-									ElementType: cadence.UInt8Type{},
+									ElementType: cadence.UInt8Type,
 								},
 							},
 						}),
@@ -676,7 +676,7 @@ func TestBLSMultiSignature(t *testing.T) {
 							Values: publicKeys,
 							ArrayType: &cadence.VariableSizedArrayType{
 								ElementType: &cadence.VariableSizedArrayType{
-									ElementType: cadence.UInt8Type{},
+									ElementType: cadence.UInt8Type,
 								},
 							},
 						}),
@@ -710,7 +710,7 @@ func TestBLSMultiSignature(t *testing.T) {
 								Values: publicKeys,
 								ArrayType: &cadence.VariableSizedArrayType{
 									ElementType: &cadence.VariableSizedArrayType{
-										ElementType: cadence.UInt8Type{},
+										ElementType: cadence.UInt8Type,
 									},
 								},
 							}),
@@ -730,7 +730,7 @@ func TestBLSMultiSignature(t *testing.T) {
 							Values: publicKeys,
 							ArrayType: &cadence.VariableSizedArrayType{
 								ElementType: &cadence.VariableSizedArrayType{
-									ElementType: cadence.UInt8Type{},
+									ElementType: cadence.UInt8Type,
 								},
 							},
 						}),
@@ -810,7 +810,7 @@ func TestBLSMultiSignature(t *testing.T) {
 						Values: publicKeys,
 						ArrayType: &cadence.VariableSizedArrayType{
 							ElementType: &cadence.VariableSizedArrayType{
-								ElementType: cadence.UInt8Type{},
+								ElementType: cadence.UInt8Type,
 							},
 						},
 					}),
@@ -818,7 +818,7 @@ func TestBLSMultiSignature(t *testing.T) {
 						Values: signatures,
 						ArrayType: &cadence.VariableSizedArrayType{
 							ElementType: &cadence.VariableSizedArrayType{
-								ElementType: cadence.UInt8Type{},
+								ElementType: cadence.UInt8Type,
 							},
 						},
 					}),

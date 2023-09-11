@@ -7,7 +7,7 @@ transaction(id: String) {
     // Local variable for a reference to the ID Table Admin object
     let adminRef: &FlowIDTableStaking.Admin
 
-    prepare(acct: AuthAccount) {
+    prepare(acct: &Account) {
         // borrow a reference to the admin object
         self.adminRef = acct.borrow<&FlowIDTableStaking.Admin>(from: FlowIDTableStaking.StakingAdminStoragePath)
             ?? panic("Could not borrow reference to staking admin")

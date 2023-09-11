@@ -19,7 +19,7 @@ func CreateTokenTransferTransaction(chain flow.Chain, amount int, to flow.Addres
 		transaction(amount: UFix64, to: Address) {
 			let sentVault: @{FungibleToken.Vault}
 
-			prepare(signer: AuthAccount) {
+			prepare(signer: &Account) {
 				let vaultRef = signer.borrow<auth(FungibleToken.Withdrawable) &FlowToken.Vault>(from: /storage/flowTokenVault)
 					?? panic("Could not borrow reference to the owner's Vault!")
 				self.sentVault <- vaultRef.withdraw(amount: amount)
@@ -27,8 +27,8 @@ func CreateTokenTransferTransaction(chain flow.Chain, amount int, to flow.Addres
 
 			execute {
 				let receiverRef = getAccount(to)
-					.getCapability(/public/flowTokenReceiver)
-					.borrow<&{FungibleToken.Receiver}>()
+					.capabilities.get<&{FungibleToken.Receiver}>(/public/flowTokenReceiver)!
+					.borrow()
 					?? panic("Could not borrow receiver reference to the recipient's Vault")
 				receiverRef.deposit(from: <-self.sentVault)
 			}

@@ -2,7 +2,7 @@ import FlowEpoch from 0xEPOCHADDRESS
 import NodeVersionBeacon from 0xNODEVERSIONBEACONADDRESS
 
 transaction {
-    prepare(serviceAccount: AuthAccount) {
+    prepare(serviceAccount: &Account) {
         let epochHeartbeat = serviceAccount.borrow<&FlowEpoch.Heartbeat>(from: FlowEpoch.heartbeatStoragePath)
             ?? panic("Could not borrow heartbeat from storage path")
         epochHeartbeat.advanceBlock()

@@ -285,3 +285,8 @@ require (
 	lukechampine.com/blake3 v1.2.1 // indirect
 	nhooyr.io/websocket v1.8.7 // indirect
 )
+
+replace (
+	github.com/onflow/flow-core-contracts/lib/go/contracts => ../flow-core-contracts/lib/go/contracts
+	github.com/onflow/flow-nft/lib/go/contracts => ../flow-nft/lib/go/contracts
+)

@@ -91,7 +91,7 @@ func TestFungibleTokenTracker(t *testing.T) {
 
 	deployingTestContractScript := []byte(fmt.Sprintf(`
 	transaction {
-		prepare(signer: AuthAccount) {
+		prepare(signer: auth(AddContract) &Account) {
 				signer.contracts.add(name: "%s", code: "%s".decodeHex())
 		}
 	}
@@ -115,8 +115,8 @@ func TestFungibleTokenTracker(t *testing.T) {
 							import WrappedToken from 0x%s
 
 							transaction(amount: UFix64) {
-								prepare(signer: AuthAccount) {
-									let vaultRef = signer.borrow<auth(FungibleToken.Withdrawable) &FlowToken.Vault>(from: /storage/flowTokenVault)
+								prepare(signer: auth(Storage) &Account) {
+									let vaultRef = signer.storage.borrow<auth(FungibleToken.Withdrawable) &FlowToken.Vault>(from: /storage/flowTokenVault)
 										?? panic("Could not borrow reference to the owner's Vault!")
 
 									let sentVault <- vaultRef.withdraw(amount: amount)

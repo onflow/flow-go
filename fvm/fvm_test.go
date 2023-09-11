@@ -515,7 +515,7 @@ func TestEventLimits(t *testing.T) {
 		SetScript([]byte(fmt.Sprintf(`
 		import TestContract from 0x%s
 			transaction {
-			prepare(acct: AuthAccount) {}
+			prepare(acct: &Account) {}
 			execute {
 				TestContract.EmitEvent()
 			}
@@ -2319,7 +2319,7 @@ func TestAuthAccountCapabilities(t *testing.T) {
 							`
 							%s
 							transaction {
-								prepare(acct: AuthAccount) {
+								prepare(acct: &Account) {
 									acct.linkAccount(/private/foo)
 								}
 							}
@@ -2450,7 +2450,7 @@ func TestAuthAccountCapabilities(t *testing.T) {
 							%s
 							import AccountLinker from %s
 							transaction {
-								prepare(acct: AuthAccount) {
+								prepare(acct: &Account) {
 									AccountLinker.link(acct)
 								}
 							}

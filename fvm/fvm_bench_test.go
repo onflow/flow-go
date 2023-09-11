@@ -97,7 +97,7 @@ func (account *TestBenchAccount) AddArrayToStorage(b *testing.B, blockExec TestB
 	txBody := flow.NewTransactionBody().
 		SetScript([]byte(`
 		transaction(list: [String]) {
-		  prepare(acct: AuthAccount) {
+		  prepare(acct: &Account) {
 			acct.load<[String]>(from: /storage/test)
 			acct.save(list, to: /storage/test)
 		  }
@@ -595,7 +595,7 @@ const TransferTxTemplate = `
 		transaction(testTokenIDs: [UInt64], recipientAddress: Address) {
 			let transferTokens: @NonFungibleToken.Collection
 
-			prepare(acct: AuthAccount) {
+			prepare(acct: &Account) {
 				let ref = acct.borrow<&BatchNFT.Collection>(from: /storage/TestTokenCollection)!
 				self.transferTokens <- ref.batchWithdraw(ids: testTokenIDs)
 			}
