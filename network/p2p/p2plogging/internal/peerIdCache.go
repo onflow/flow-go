@@ -48,6 +48,20 @@ func (p *PeerIdCache) PeerIdString(pid peer.ID) string {
 	return pidEntity.(peerIdCacheEntry).Str
 }
 
+func (p *PeerIdCache) Size() uint {
+	return p.peerCache.Size()
+}
+
+func (p *PeerIdCache) ByPeerId(pid peer.ID) (peer.ID, bool) {
+	id := flow.MakeIDFromFingerPrint([]byte(pid))
+	pidEntity, ok := p.peerCache.ByID(id)
+	if ok {
+		// return the cached peer id
+		return pidEntity.(peerIdCacheEntry).Pid, true
+	}
+	return "", false
+}
+
 type peerIdCacheEntry struct {
 	id  flow.Identifier // cache the id for fast lookup
 	Pid peer.ID         // peer id
