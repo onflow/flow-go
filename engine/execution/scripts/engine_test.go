@@ -13,6 +13,7 @@ import (
 	stateMock "github.com/onflow/flow-go/engine/execution/state/mock"
 	"github.com/onflow/flow-go/model/flow"
 	protocol "github.com/onflow/flow-go/state/protocol/mock"
+	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -25,15 +26,25 @@ type testingContext struct {
 	mu             *sync.Mutex
 }
 
-func (ctx *testingContext) BlockExist(header *flow.Header) {
+func (ctx *testingContext) BlockExist(header *flow.Header, exist bool) {
 	snapshot := new(protocol.Snapshot)
-	snapshot.On("Head").Return(header, nil)
+	if exist {
+		snapshot.On("Head").Return(header, nil)
+	} else {
+		snapshot.On("Head").Return(nil, storage.ErrNotFound)
+	}
 	ctx.state.On("AtBlockID", header.ID()).Return(snapshot)
-	ctx.executionState.On("NewStorageSnapshot", header.ID(), header.Height).Return(nil)
 }
 
 func (ctx *testingContext) BlockExecuted(height uint64, blockID flow.Identifier, executed bool) {
 	ctx.executionState.On("IsBlockExecuted", height, blockID).Return(executed, nil)
+}
+
+func (ctx *testingContext) AssertCalled(t *testing.T) {
+	// Assert other components were called as expected
+	ctx.queryExecutor.AssertExpectations(t)
+	ctx.executionState.AssertExpectations(t)
+	ctx.state.AssertExpectations(t)
 }
 
 func runWithEngine(t *testing.T, fn func(ctx testingContext)) {
@@ -64,10 +75,13 @@ func TestExecuteScriptAtBlockID(t *testing.T) {
 			blockA := unittest.BlockHeaderFixture()
 
 			// Ensure block exists
-			ctx.BlockExist(blockA)
+			ctx.BlockExist(blockA, true)
 
 			// Ensure block is executed
 			ctx.BlockExecuted(blockA.Height, blockA.ID(), true)
+
+			// snapshot will be created
+			ctx.executionState.On("NewStorageSnapshot", blockA.ID(), blockA.Height).Return(nil)
 
 			// Successful call to computation manager
 			// TODO(leo): assert query executor received a call to ExecuteScript with
@@ -82,13 +96,11 @@ func TestExecuteScriptAtBlockID(t *testing.T) {
 			assert.Equal(t, scriptResult, res)
 
 			// Assert other components were called as expected
-			ctx.queryExecutor.AssertExpectations(t)
-			ctx.executionState.AssertExpectations(t)
-			ctx.state.AssertExpectations(t)
+			ctx.AssertCalled(t)
 		})
 	})
 
-	t.Run("execute script on existing, but un-executed block", func(t *testing.T) {
+	t.Run("execute script on existing but un-executed block", func(t *testing.T) {
 		runWithEngine(t, func(ctx testingContext) {
 			// Meaningless script
 			script := []byte{1, 1, 2, 3, 5, 8, 11}
@@ -97,7 +109,7 @@ func TestExecuteScriptAtBlockID(t *testing.T) {
 			blockA := unittest.BlockHeaderFixture()
 
 			// Ensure block exists
-			ctx.BlockExist(blockA)
+			ctx.BlockExist(blockA, true)
 
 			// Ensure block we're about to query against is not executed
 			ctx.BlockExecuted(blockA.Height, blockA.ID(), false)
@@ -105,11 +117,10 @@ func TestExecuteScriptAtBlockID(t *testing.T) {
 			// Execute our script and expect no error
 			_, err := ctx.engine.ExecuteScriptAtBlockID(context.Background(), script, nil, blockA.ID())
 			assert.Error(t, err)
-			assert.True(t, strings.Contains(err.Error(), "state commitment not found"))
+			assert.True(t, strings.Contains(err.Error(), "is not executed"), err.Error())
 
 			// Assert other components were called as expected
-			ctx.executionState.AssertExpectations(t)
-			ctx.state.AssertExpectations(t)
+			ctx.AssertCalled(t)
 		})
 	})
 
@@ -121,10 +132,13 @@ func TestExecuteScriptAtBlockID(t *testing.T) {
 			// Ensure block we're about to query against is executable
 			blockA := unittest.BlockHeaderFixture()
 
+			// Ensure block does not exist
+			ctx.BlockExist(blockA, false)
+
 			// Execute our script and expect no error
 			_, err := ctx.engine.ExecuteScriptAtBlockID(context.Background(), script, nil, blockA.ID())
 			assert.Error(t, err)
-			assert.True(t, strings.Contains(err.Error(), "state commitment not found"))
+			assert.True(t, strings.Contains(err.Error(), "key not found"), err.Error())
 
 			// Assert other components were called as expected
 			ctx.executionState.AssertExpectations(t)
