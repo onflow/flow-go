@@ -439,7 +439,6 @@ func (c *ControlMsgValidationInspector) truncateIHaveMessages(rpc *pubsub.RPC) {
 // MaxMessageIDSampleSize the list of message ids will be truncated. Before message ids are truncated the iHave control messages should have been truncated themselves.
 // Args:
 //   - rpc: the rpc message to truncate.
-//
 func (c *ControlMsgValidationInspector) truncateIHaveMessageIds(rpc *pubsub.RPC) {
 	for _, ihave := range rpc.GetControl().GetIhave() {
 		messageIDs := ihave.GetMessageIDs()
@@ -454,6 +453,7 @@ func (c *ControlMsgValidationInspector) truncateIHaveMessageIds(rpc *pubsub.RPC)
 		c.performSample(p2pmsg.CtrlMsgIHave, uint(totalMessageIDs), uint(sampleSize), func(i, j uint) {
 			messageIDs[i], messageIDs[j] = messageIDs[j], messageIDs[i]
 		})
+		ihave.MessageIDs = messageIDs[:sampleSize]
 	}
 }
 
