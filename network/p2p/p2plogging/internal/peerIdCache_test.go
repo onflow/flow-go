@@ -10,12 +10,16 @@ import (
 	p2ptest "github.com/onflow/flow-go/network/p2p/test"
 )
 
+// TestNewPeerIdCache tests the basic functionality of the peer ID cache. It ensures that the cache
+// is created successfully.
 func TestNewPeerIdCache(t *testing.T) {
 	cacheSize := 100
 	cache := internal.NewPeerIdCache(cacheSize)
 	assert.NotNil(t, cache)
 }
 
+// TestPeerIdCache_PeerIdString tests the basic functionality of the peer ID cache. It ensures that the cache
+// returns the same string as the peer.ID.String() method.
 func TestPeerIdCache_PeerIdString(t *testing.T) {
 	cacheSize := 100
 	cache := internal.NewPeerIdCache(cacheSize)
@@ -50,6 +54,8 @@ func TestPeerIdCache_PeerIdString(t *testing.T) {
 	})
 }
 
+// TestPeerIdCache_EjectionScenarios tests the eviction logic of the peer ID cache. It ensures that the cache
+// evicts the least recently added peer ID when the cache is full.
 func TestPeerIdCache_EjectionScenarios(t *testing.T) {
 	cacheSize := 3
 	cache := internal.NewPeerIdCache(cacheSize)
