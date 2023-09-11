@@ -89,16 +89,7 @@ func TestValidationInspector_InvalidTopicId_Detection(t *testing.T) {
 	mockDistributorReadyDoneAware(distributor)
 	withExpectedNotificationDissemination(expectedNumOfTotalNotif, inspectDisseminatedNotifyFunc)(distributor, spammer)
 	meshTracer := meshTracerFixture(flowConfig, idProvider)
-	validationInspector, err := validation.NewControlMsgValidationInspector(
-		unittest.Logger(),
-		sporkID,
-		&inspectorConfig,
-		distributor,
-		metrics.NewNoopCollector(),
-		metrics.NewNoopCollector(),
-		idProvider,
-		metrics.NewNoopCollector(),
-		meshTracer)
+	validationInspector, err := validation.NewControlMsgValidationInspector(signalerCtx, unittest.Logger(), sporkID, &inspectorConfig, distributor, metrics.NewNoopCollector(), metrics.NewNoopCollector(), idProvider, metrics.NewNoopCollector(), meshTracer)
 	require.NoError(t, err)
 	corruptInspectorFunc := corruptlibp2p.CorruptInspectorFunc(validationInspector)
 	victimNode, victimIdentity := p2ptest.NodeFixture(
@@ -219,16 +210,7 @@ func TestValidationInspector_DuplicateTopicId_Detection(t *testing.T) {
 	mockDistributorReadyDoneAware(distributor)
 	withExpectedNotificationDissemination(expectedNumOfTotalNotif, inspectDisseminatedNotifyFunc)(distributor, spammer)
 	meshTracer := meshTracerFixture(flowConfig, idProvider)
-	validationInspector, err := validation.NewControlMsgValidationInspector(
-		unittest.Logger(),
-		sporkID,
-		&inspectorConfig,
-		distributor,
-		metrics.NewNoopCollector(),
-		metrics.NewNoopCollector(),
-		idProvider,
-		metrics.NewNoopCollector(),
-		meshTracer)
+	validationInspector, err := validation.NewControlMsgValidationInspector(signalerCtx, unittest.Logger(), sporkID, &inspectorConfig, distributor, metrics.NewNoopCollector(), metrics.NewNoopCollector(), idProvider, metrics.NewNoopCollector(), meshTracer)
 	require.NoError(t, err)
 	corruptInspectorFunc := corruptlibp2p.CorruptInspectorFunc(validationInspector)
 	victimNode, victimIdentity := p2ptest.NodeFixture(
@@ -312,16 +294,7 @@ func TestValidationInspector_IHaveDuplicateMessageId_Detection(t *testing.T) {
 	mockDistributorReadyDoneAware(distributor)
 	withExpectedNotificationDissemination(expectedNumOfTotalNotif, inspectDisseminatedNotifyFunc)(distributor, spammer)
 	meshTracer := meshTracerFixture(flowConfig, idProvider)
-	validationInspector, err := validation.NewControlMsgValidationInspector(
-		unittest.Logger(),
-		sporkID,
-		&inspectorConfig,
-		distributor,
-		metrics.NewNoopCollector(),
-		metrics.NewNoopCollector(),
-		idProvider,
-		metrics.NewNoopCollector(),
-		meshTracer)
+	validationInspector, err := validation.NewControlMsgValidationInspector(signalerCtx, unittest.Logger(), sporkID, &inspectorConfig, distributor, metrics.NewNoopCollector(), metrics.NewNoopCollector(), idProvider, metrics.NewNoopCollector(), meshTracer)
 	require.NoError(t, err)
 	corruptInspectorFunc := corruptlibp2p.CorruptInspectorFunc(validationInspector)
 	victimNode, victimIdentity := p2ptest.NodeFixture(
@@ -419,16 +392,7 @@ func TestValidationInspector_UnknownClusterId_Detection(t *testing.T) {
 	mockDistributorReadyDoneAware(distributor)
 	withExpectedNotificationDissemination(expectedNumOfTotalNotif, inspectDisseminatedNotifyFunc)(distributor, spammer)
 	meshTracer := meshTracerFixture(flowConfig, idProvider)
-	validationInspector, err := validation.NewControlMsgValidationInspector(
-		unittest.Logger(),
-		sporkID,
-		&inspectorConfig,
-		distributor,
-		metrics.NewNoopCollector(),
-		metrics.NewNoopCollector(),
-		idProvider,
-		metrics.NewNoopCollector(),
-		meshTracer)
+	validationInspector, err := validation.NewControlMsgValidationInspector(signalerCtx, unittest.Logger(), sporkID, &inspectorConfig, distributor, metrics.NewNoopCollector(), metrics.NewNoopCollector(), idProvider, metrics.NewNoopCollector(), meshTracer)
 	require.NoError(t, err)
 	corruptInspectorFunc := corruptlibp2p.CorruptInspectorFunc(validationInspector)
 	victimNode, victimIdentity := p2ptest.NodeFixture(
@@ -507,16 +471,7 @@ func TestValidationInspector_ActiveClusterIdsNotSet_Graft_Detection(t *testing.T
 	distributor := mockp2p.NewGossipSubInspectorNotificationDistributor(t)
 	mockDistributorReadyDoneAware(distributor)
 	meshTracer := meshTracerFixture(flowConfig, idProvider)
-	validationInspector, err := validation.NewControlMsgValidationInspector(
-		logger,
-		sporkID,
-		&inspectorConfig,
-		distributor,
-		metrics.NewNoopCollector(),
-		metrics.NewNoopCollector(),
-		idProvider,
-		metrics.NewNoopCollector(),
-		meshTracer)
+	validationInspector, err := validation.NewControlMsgValidationInspector(signalerCtx, logger, sporkID, &inspectorConfig, distributor, metrics.NewNoopCollector(), metrics.NewNoopCollector(), idProvider, metrics.NewNoopCollector(), meshTracer)
 	require.NoError(t, err)
 	corruptInspectorFunc := corruptlibp2p.CorruptInspectorFunc(validationInspector)
 	victimNode, victimIdentity := p2ptest.NodeFixture(
@@ -587,16 +542,7 @@ func TestValidationInspector_ActiveClusterIdsNotSet_Prune_Detection(t *testing.T
 	distributor := mockp2p.NewGossipSubInspectorNotificationDistributor(t)
 	mockDistributorReadyDoneAware(distributor)
 	meshTracer := meshTracerFixture(flowConfig, idProvider)
-	validationInspector, err := validation.NewControlMsgValidationInspector(
-		logger,
-		sporkID,
-		&inspectorConfig,
-		distributor,
-		metrics.NewNoopCollector(),
-		metrics.NewNoopCollector(),
-		idProvider,
-		metrics.NewNoopCollector(),
-		meshTracer)
+	validationInspector, err := validation.NewControlMsgValidationInspector(signalerCtx, logger, sporkID, &inspectorConfig, distributor, metrics.NewNoopCollector(), metrics.NewNoopCollector(), idProvider, metrics.NewNoopCollector(), meshTracer)
 	require.NoError(t, err)
 	corruptInspectorFunc := corruptlibp2p.CorruptInspectorFunc(validationInspector)
 	victimNode, victimIdentity := p2ptest.NodeFixture(
@@ -672,16 +618,7 @@ func TestValidationInspector_UnstakedNode_Detection(t *testing.T) {
 	distributor := mockp2p.NewGossipSubInspectorNotificationDistributor(t)
 	mockDistributorReadyDoneAware(distributor)
 	meshTracer := meshTracerFixture(flowConfig, idProvider)
-	validationInspector, err := validation.NewControlMsgValidationInspector(
-		logger,
-		sporkID,
-		&inspectorConfig,
-		distributor,
-		metrics.NewNoopCollector(),
-		metrics.NewNoopCollector(),
-		idProvider,
-		metrics.NewNoopCollector(),
-		meshTracer)
+	validationInspector, err := validation.NewControlMsgValidationInspector(signalerCtx, logger, sporkID, &inspectorConfig, distributor, metrics.NewNoopCollector(), metrics.NewNoopCollector(), idProvider, metrics.NewNoopCollector(), meshTracer)
 	require.NoError(t, err)
 	corruptInspectorFunc := corruptlibp2p.CorruptInspectorFunc(validationInspector)
 	victimNode, victimIdentity := p2ptest.NodeFixture(
@@ -762,16 +699,7 @@ func TestValidationInspector_InspectIWants_CacheMissThreshold(t *testing.T) {
 	mockDistributorReadyDoneAware(distributor)
 	withExpectedNotificationDissemination(1, inspectDisseminatedNotifyFunc)(distributor, spammer)
 	meshTracer := meshTracerFixture(flowConfig, idProvider)
-	validationInspector, err := validation.NewControlMsgValidationInspector(
-		unittest.Logger(),
-		sporkID,
-		&inspectorConfig,
-		distributor,
-		metrics.NewNoopCollector(),
-		metrics.NewNoopCollector(),
-		idProvider,
-		metrics.NewNoopCollector(),
-		meshTracer)
+	validationInspector, err := validation.NewControlMsgValidationInspector(signalerCtx, unittest.Logger(), sporkID, &inspectorConfig, distributor, metrics.NewNoopCollector(), metrics.NewNoopCollector(), idProvider, metrics.NewNoopCollector(), meshTracer)
 	require.NoError(t, err)
 	corruptInspectorFunc := corruptlibp2p.CorruptInspectorFunc(validationInspector)
 	victimNode, victimIdentity := p2ptest.NodeFixture(
@@ -855,16 +783,7 @@ func TestValidationInspector_InspectIWants_DuplicateMsgIDThreshold(t *testing.T)
 	mockDistributorReadyDoneAware(distributor)
 	withExpectedNotificationDissemination(1, inspectDisseminatedNotifyFunc)(distributor, spammer)
 	meshTracer := meshTracerFixture(flowConfig, idProvider)
-	validationInspector, err := validation.NewControlMsgValidationInspector(
-		unittest.Logger(),
-		sporkID,
-		&inspectorConfig,
-		distributor,
-		metrics.NewNoopCollector(),
-		metrics.NewNoopCollector(),
-		idProvider,
-		metrics.NewNoopCollector(),
-		meshTracer)
+	validationInspector, err := validation.NewControlMsgValidationInspector(signalerCtx, unittest.Logger(), sporkID, &inspectorConfig, distributor, metrics.NewNoopCollector(), metrics.NewNoopCollector(), idProvider, metrics.NewNoopCollector(), meshTracer)
 	require.NoError(t, err)
 	corruptInspectorFunc := corruptlibp2p.CorruptInspectorFunc(validationInspector)
 	victimNode, victimIdentity := p2ptest.NodeFixture(

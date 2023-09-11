@@ -31,6 +31,7 @@ import (
 type ControlMsgValidationInspector struct {
 	component.Component
 	events.Noop
+	ctx     irrecoverable.SignalerContext
 	logger  zerolog.Logger
 	sporkID flow.Identifier
 	metrics module.GossipSubRpcValidationInspectorMetrics
@@ -70,16 +71,7 @@ var _ protocol.Consumer = (*ControlMsgValidationInspector)(nil)
 // Returns:
 //   - *ControlMsgValidationInspector: a new control message validation inspector.
 //   - error: an error if there is any error while creating the inspector. All errors are irrecoverable and unexpected.
-func NewControlMsgValidationInspector(
-	logger zerolog.Logger,
-	sporkID flow.Identifier,
-	config *p2pconf.GossipSubRPCValidationInspectorConfigs,
-	distributor p2p.GossipSubInspectorNotifDistributor,
-	inspectMsgQueueCacheCollector module.HeroCacheMetrics,
-	clusterPrefixedCacheCollector module.HeroCacheMetrics,
-	idProvider module.IdentityProvider,
-	inspectorMetrics module.GossipSubRpcValidationInspectorMetrics,
-	rpcTracker p2p.RpcControlTracking) (*ControlMsgValidationInspector, error) {
+func NewControlMsgValidationInspector(ctx irrecoverable.SignalerContext, logger zerolog.Logger, sporkID flow.Identifier, config *p2pconf.GossipSubRPCValidationInspectorConfigs, distributor p2p.GossipSubInspectorNotifDistributor, inspectMsgQueueCacheCollector module.HeroCacheMetrics, clusterPrefixedCacheCollector module.HeroCacheMetrics, idProvider module.IdentityProvider, inspectorMetrics module.GossipSubRpcValidationInspectorMetrics, rpcTracker p2p.RpcControlTracking) (*ControlMsgValidationInspector, error) {
 	lg := logger.With().Str("component", "gossip_sub_rpc_validation_inspector").Logger()
 
 	clusterPrefixedTracker, err := cache.NewClusterPrefixedMessagesReceivedTracker(logger, config.ClusterPrefixedControlMsgsReceivedCacheSize, clusterPrefixedCacheCollector, config.ClusterPrefixedControlMsgsReceivedCacheDecay)
@@ -88,6 +80,7 @@ func NewControlMsgValidationInspector(
 	}
 
 	c := &ControlMsgValidationInspector{
+		ctx:          ctx,
 		logger:       lg,
 		sporkID:      sporkID,
 		config:       config,
@@ -127,10 +120,8 @@ func (c *ControlMsgValidationInspector) Inspect(from peer.ID, rpc *pubsub.RPC) e
 	// first truncate rpc
 	err := c.truncateRPC(from, rpc)
 	if err != nil {
-		c.logger.Fatal().
-			Err(fmt.Errorf("failed to get inspect RPC request could not perform truncation: %w", err)).
-			Str("peer_id", from.String()).
-			Msg("failed to truncate rpc")
+		// irrecoverable error encountered
+		c.logAndThrowError(fmt.Errorf("failed to get inspect RPC request could not perform truncation: %w", err))
 	}
 	// queue further async inspection
 	req, err := NewInspectRPCRequest(from, rpc)
@@ -358,7 +349,7 @@ func (c *ControlMsgValidationInspector) truncateRPC(from peer.ID, rpc *pubsub.RP
 			c.truncateIWantMessages(from, rpc)
 		default:
 			// sanity check this should never happen
-			c.logger.Fatal().Msg("unknown control message type encountered during RPC truncation")
+			c.logAndThrowError(fmt.Errorf("unknown control message type encountered during RPC truncation"))
 		}
 	}
 	return nil
@@ -535,7 +526,7 @@ func (c *ControlMsgValidationInspector) ActiveClustersChanged(clusterIDList flow
 func (c *ControlMsgValidationInspector) performSample(ctrlMsg p2pmsg.ControlMessageType, totalSize, sampleSize uint, swap func(i, j uint)) {
 	err := flowrand.Samples(totalSize, sampleSize, swap)
 	if err != nil {
-		c.logger.Fatal().Err(fmt.Errorf("failed to get random sample of %s control messages: %w", ctrlMsg, err)).Msg("failed to sample control messages")
+		c.logAndThrowError(fmt.Errorf("failed to get random sample of %s control messages: %w", ctrlMsg, err))
 	}
 }
 
@@ -575,7 +566,7 @@ func (c *ControlMsgValidationInspector) validateTopic(from peer.ID, topic channe
 // In the case where an ErrActiveClusterIdsNotSet or UnknownClusterIDErr is encountered and the cluster prefixed topic received
 // tracker for the peer is less than or equal to the configured ClusterPrefixHardThreshold an error will only be logged and not returned.
 // At the point where the hard threshold is crossed the error will be returned and the sender will start to be penalized.
-// Any errors encountered while incrementing or loading the cluster prefixed control message gauge for a peer will result in a fatal log, these
+// Any errors encountered while incrementing or loading the cluster prefixed control message gauge for a peer will result in an irrecoverable error being thrown, these
 // errors are unexpected and irrecoverable indicating a bug.
 func (c *ControlMsgValidationInspector) validateClusterPrefixedTopic(from peer.ID, topic channels.Topic, activeClusterIds flow.ChainIDList) error {
 	lg := c.logger.With().
@@ -592,9 +583,7 @@ func (c *ControlMsgValidationInspector) validateClusterPrefixedTopic(from peer.I
 		_, incErr := c.tracker.Inc(nodeID)
 		if incErr != nil {
 			// irrecoverable error encountered
-			c.logger.Fatal().Err(incErr).
-				Str("node_id", nodeID.String()).
-				Msg("unexpected irrecoverable error encountered while incrementing the cluster prefixed control message gauge")
+			c.logAndThrowError(fmt.Errorf("error encountered while incrementing the cluster prefixed control message gauge %s: %w", nodeID, err))
 		}
 
 		// if the amount of messages received is below our hard threshold log the error and return nil.
@@ -616,10 +605,7 @@ func (c *ControlMsgValidationInspector) validateClusterPrefixedTopic(from peer.I
 			// behind and needs to catchup increment to topics received cache.
 			_, incErr := c.tracker.Inc(nodeID)
 			if incErr != nil {
-				// irrecoverable error encountered
-				c.logger.Fatal().Err(incErr).
-					Str("node_id", nodeID.String()).
-					Msg("unexpected irrecoverable error encountered while incrementing the cluster prefixed control message gauge")
+				c.logAndThrowError(fmt.Errorf("error encountered while incrementing the cluster prefixed control message gauge %s: %w", nodeID, err))
 			}
 			// if the amount of messages received is below our hard threshold log the error and return nil.
 			if c.checkClusterPrefixHardThreshold(nodeID) {
@@ -651,23 +637,18 @@ func (c *ControlMsgValidationInspector) getFlowIdentifier(peerID peer.ID) (flow.
 
 // checkClusterPrefixHardThreshold returns true if the cluster prefix received tracker count is less than
 // the configured ClusterPrefixHardThreshold, false otherwise.
-// If any error is encountered while loading from the tracker this func will emit a fatal level log, these errors
+// If any error is encountered while loading from the tracker this func will throw an error on the signaler context, these errors
 // are unexpected and irrecoverable indicating a bug.
 func (c *ControlMsgValidationInspector) checkClusterPrefixHardThreshold(nodeID flow.Identifier) bool {
 	gauge, err := c.tracker.Load(nodeID)
 	if err != nil {
 		// irrecoverable error encountered
-		c.logger.Fatal().Err(err).
-			Str("node_id", nodeID.String()).
-			Msg("unexpected irrecoverable error encountered while loading the cluster prefixed control message gauge during hard threshold check")
+		c.logAndThrowError(fmt.Errorf("cluster prefixed control message gauge during hard threshold check failed for node %s: %w", nodeID, err))
 	}
 	return gauge <= c.config.ClusterPrefixHardThreshold
 }
 
 // logAndDistributeErr logs the provided error and attempts to disseminate an invalid control message validation notification for the error.
-// Args:
-//
-//	-
 func (c *ControlMsgValidationInspector) logAndDistributeAsyncInspectErrs(req *InspectRPCRequest, ctlMsgType p2pmsg.ControlMessageType, err error) {
 	lg := c.logger.With().
 		Bool(logging.KeySuspicious, true).
@@ -689,4 +670,13 @@ func (c *ControlMsgValidationInspector) logAndDistributeAsyncInspectErrs(req *In
 		}
 		lg.Error().Err(err).Msg("rpc control message async inspection failed")
 	}
+}
+
+func (c *ControlMsgValidationInspector) logAndThrowError(err error) {
+	c.logger.Error().
+		Err(err).
+		Bool(logging.KeySuspicious, true).
+		Bool(logging.KeyNetworkingSecurity, true).
+		Msg("unexpected irrecoverable error encountered")
+	c.ctx.Throw(err)
 }

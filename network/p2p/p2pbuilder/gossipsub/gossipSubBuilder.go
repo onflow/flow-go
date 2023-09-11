@@ -233,6 +233,7 @@ func defaultGossipSubAdapterConfig() p2p.GossipSubAdapterConfigFunc {
 // Note: always use the default inspector suite factory function to create the inspector suite (unless you know what you are doing).
 func defaultInspectorSuite(rpcTracker p2p.RpcControlTracking) p2p.GossipSubRpcInspectorSuiteFactoryFunc {
 	return func(
+		ctx irrecoverable.SignalerContext,
 		logger zerolog.Logger,
 		sporkId flow.Identifier,
 		inspectorCfg *p2pconf.GossipSubRPCInspectorsConfig,
@@ -257,6 +258,7 @@ func defaultInspectorSuite(rpcTracker p2p.RpcControlTracking) p2p.GossipSubRpcIn
 		inspectMsgQueueCacheCollector := metrics.GossipSubRPCInspectorQueueMetricFactory(heroCacheMetricsFactory, networkType)
 		clusterPrefixedCacheCollector := metrics.GossipSubRPCInspectorClusterPrefixedCacheMetricFactory(heroCacheMetricsFactory, networkType)
 		rpcValidationInspector, err := validation.NewControlMsgValidationInspector(
+			ctx,
 			logger,
 			sporkId,
 			&inspectorCfg.GossipSubRPCValidationInspectorConfigs,
@@ -301,6 +303,7 @@ func (g *Builder) Build(ctx irrecoverable.SignalerContext) (p2p.PubSubAdapter, e
 	}
 
 	inspectorSuite, err := g.rpcInspectorSuiteFactory(
+		ctx,
 		g.logger,
 		g.sporkId,
 		g.rpcInspectorConfig,
