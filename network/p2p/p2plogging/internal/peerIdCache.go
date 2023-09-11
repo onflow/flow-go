@@ -33,7 +33,8 @@ func NewPeerIdCache(size uint32) *PeerIdCache {
 func (p *PeerIdCache) PeerIdString(pid peer.ID) string {
 	id := flow.MakeIDFromFingerPrint([]byte(pid))
 	pidEntity, ok := p.peerCache.ByID(id)
-	if !ok {
+	if ok {
+		// return the cached peer id string
 		return pidEntity.(peerIdCacheEntry).Str
 	}
 	pidEntity = peerIdCacheEntry{
