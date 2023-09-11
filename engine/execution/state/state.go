@@ -244,7 +244,7 @@ func CommitDelta(
 	ruh RegisterUpdatesHolder,
 	baseStorageSnapshot storehouse.ExtendableStorageSnapshot,
 ) (flow.StateCommitment, *ledger.TrieUpdate, storehouse.ExtendableStorageSnapshot, error) {
-	trieUpdate, err := updateLedger(ldg, baseStorageSnapshot.Commitment(), ruh)
+	newCommit, trieUpdate, err := updateLedger(ldg, baseStorageSnapshot.Commitment(), ruh)
 	if err != nil {
 		return flow.DummyStateCommitment, nil, nil, fmt.Errorf("cannot create ledger update: %w", err)
 	}
@@ -254,22 +254,24 @@ func CommitDelta(
 		return flow.DummyStateCommitment, nil, nil, fmt.Errorf("cannot extend storage snapshot: %w", err)
 	}
 
-	return flow.StateCommitment(trieUpdate.RootHash), trieUpdate, newStorageSnapshot, nil
+	return newCommit, trieUpdate, newStorageSnapshot, nil
 }
 
-func updateLedger(ldg ledger.Ledger, baseState flow.StateCommitment, ruh RegisterUpdatesHolder) (*ledger.TrieUpdate, error) {
+// updateLedger takes a ledger and a set of register updates and returns a new ledger and a trie update.
+// Note the returned trie update contains the root hash of the trie before the update
+func updateLedger(ldg ledger.Ledger, baseState flow.StateCommitment, ruh RegisterUpdatesHolder) (flow.StateCommitment, *ledger.TrieUpdate, error) {
 	keys, values := RegisterEntriesToKeysValues(ruh.UpdatedRegisters())
 	update, err := ledger.NewUpdate(ledger.State(baseState), keys, values)
 
 	if err != nil {
-		return nil, fmt.Errorf("cannot create ledger update: %w", err)
+		return flow.DummyStateCommitment, nil, fmt.Errorf("cannot create ledger update: %w", err)
 	}
 
-	_, trieUpdate, err := ldg.Set(update)
+	newCommit, trieUpdate, err := ldg.Set(update)
 	if err != nil {
-		return nil, err
+		return flow.DummyStateCommitment, nil, err
 	}
-	return trieUpdate, nil
+	return flow.StateCommitment(newCommit), trieUpdate, nil
 }
 
 func (s *state) HasState(commitment flow.StateCommitment) bool {
