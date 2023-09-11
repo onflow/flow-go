@@ -51,7 +51,7 @@ type ControlMsgValidationInspector struct {
 	tracker      *cache.ClusterPrefixedMessagesReceivedTracker
 	idProvider   module.IdentityProvider
 	rateLimiters map[p2pmsg.ControlMessageType]p2p.BasicRateLimiter
-	rpcTracker   p2p.RPCControlTracking
+	rpcTracker   p2p.RpcControlTracking
 }
 
 var _ component.Component = (*ControlMsgValidationInspector)(nil)
@@ -79,7 +79,7 @@ func NewControlMsgValidationInspector(
 	clusterPrefixedCacheCollector module.HeroCacheMetrics,
 	idProvider module.IdentityProvider,
 	inspectorMetrics module.GossipSubRpcValidationInspectorMetrics,
-	rpcTracker p2p.RPCControlTracking) (*ControlMsgValidationInspector, error) {
+	rpcTracker p2p.RpcControlTracking) (*ControlMsgValidationInspector, error) {
 	lg := logger.With().Str("component", "gossip_sub_rpc_validation_inspector").Logger()
 
 	clusterPrefixedTracker, err := cache.NewClusterPrefixedMessagesReceivedTracker(logger, config.ClusterPrefixedControlMsgsReceivedCacheSize, clusterPrefixedCacheCollector, config.ClusterPrefixedControlMsgsReceivedCacheDecay)

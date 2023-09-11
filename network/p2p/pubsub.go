@@ -170,7 +170,7 @@ type SubscriptionFilter interface {
 type PubSubTracer interface {
 	component.Component
 	pubsub.RawTracer
-	RPCControlTracking
+	RpcControlTracking
 }
 
 // RpcControlTracking is the abstraction of the underlying libp2p control message tracker used to track message ids advertised by the iHave control messages.
