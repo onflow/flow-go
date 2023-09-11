@@ -9,8 +9,8 @@ import (
 
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	executionDataMock "github.com/onflow/flow-go/module/executiondatasync/execution_data/mock"
+	"github.com/onflow/flow-go/module/executiondatasync/execution_data/model"
 	"github.com/onflow/flow-go/module/mempool/entity"
 	"github.com/onflow/flow-go/module/metrics"
 
@@ -112,7 +112,7 @@ func Test_ReconstructComputationResultFromStorage(t *testing.T) {
 	testTrieUpdate := &ledger.TrieUpdate{
 		RootHash: testTrieUpdateRootHash,
 	}
-	testChunkExecutionDatas := []*execution_data.ChunkExecutionData{
+	testChunkExecutionDatas := []*model.ChunkExecutionData{
 		{
 			TrieUpdate: testTrieUpdate,
 		},
@@ -170,7 +170,7 @@ func Test_ReconstructComputationResultFromStorage(t *testing.T) {
 
 	mockExecutionDataDowloader := new(executionDataMock.Downloader)
 	mockExecutionDataDowloader.On("Get", mock.Anything, testEDID).Return(
-		&execution_data.BlockExecutionData{
+		&model.BlockExecutionData{
 			BlockID:             testBlockID,
 			ChunkExecutionDatas: testChunkExecutionDatas,
 		}, nil)
@@ -260,9 +260,9 @@ func createTestBadgerRetryableUploaderWrapper(asyncUploader *AsyncUploader) *Bad
 
 	mockExecutionDataDowloader := new(executionDataMock.Downloader)
 	mockExecutionDataDowloader.On("Get", mock.Anything, mock.Anything).Return(
-		&execution_data.BlockExecutionData{
+		&model.BlockExecutionData{
 			BlockID:             flow.ZeroID,
-			ChunkExecutionDatas: make([]*execution_data.ChunkExecutionData, 0),
+			ChunkExecutionDatas: make([]*model.ChunkExecutionData, 0),
 		}, nil)
 
 	return NewBadgerRetryableUploaderWrapper(

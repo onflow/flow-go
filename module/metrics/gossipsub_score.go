@@ -7,6 +7,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promauto"
 
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/metrics/internal"
 	"github.com/onflow/flow-go/network/channels"
 )
 
@@ -38,8 +39,8 @@ func NewGossipSubScoreMetrics(prefix string) *GossipSubScoreMetrics {
 
 	gs.peerScore = promauto.NewHistogram(
 		prometheus.HistogramOpts{
-			Namespace: namespaceNetwork,
-			Subsystem: subsystemGossip,
+			Namespace: internal.NamespaceNetwork,
+			Subsystem: internal.SubsystemGossip,
 			Name:      prefix + "gossipsub_overall_peer_score",
 			Help:      "overall peer score from gossipsub peer scoring",
 			Buckets:   gossipSubScoreBuckets,
@@ -48,8 +49,8 @@ func NewGossipSubScoreMetrics(prefix string) *GossipSubScoreMetrics {
 
 	gs.appSpecificScore = promauto.NewHistogram(
 		prometheus.HistogramOpts{
-			Namespace: namespaceNetwork,
-			Subsystem: subsystemGossip,
+			Namespace: internal.NamespaceNetwork,
+			Subsystem: internal.SubsystemGossip,
 			Name:      prefix + "gossipsub_app_specific_score",
 			Help:      "app specific score from gossipsub peer scoring",
 			Buckets:   gossipSubScoreBuckets,
@@ -58,8 +59,8 @@ func NewGossipSubScoreMetrics(prefix string) *GossipSubScoreMetrics {
 
 	gs.behaviourPenalty = promauto.NewHistogram(
 		prometheus.HistogramOpts{
-			Namespace: namespaceNetwork,
-			Subsystem: subsystemGossip,
+			Namespace: internal.NamespaceNetwork,
+			Subsystem: internal.SubsystemGossip,
 			Name:      prefix + "gossipsub_behaviour_penalty_score",
 			Help:      "behaviour penalty from gossipsub peer scoring",
 			Buckets:   gossipSubScoreBuckets,
@@ -68,8 +69,8 @@ func NewGossipSubScoreMetrics(prefix string) *GossipSubScoreMetrics {
 
 	gs.ipCollocationFactor = promauto.NewHistogram(
 		prometheus.HistogramOpts{
-			Namespace: namespaceNetwork,
-			Subsystem: subsystemGossip,
+			Namespace: internal.NamespaceNetwork,
+			Subsystem: internal.SubsystemGossip,
 			Name:      prefix + "gossipsub_ip_collocation_factor_score",
 			Help:      "ip collocation factor from gossipsub peer scoring",
 			Buckets:   gossipSubScoreBuckets,
@@ -78,8 +79,8 @@ func NewGossipSubScoreMetrics(prefix string) *GossipSubScoreMetrics {
 
 	gs.timeInMesh = *promauto.NewHistogramVec(
 		prometheus.HistogramOpts{
-			Namespace: namespaceNetwork,
-			Subsystem: subsystemGossip,
+			Namespace: internal.NamespaceNetwork,
+			Subsystem: internal.SubsystemGossip,
 			Name:      prefix + "gossipsub_time_in_mesh_score",
 			Help:      "time in mesh from gossipsub scoring",
 			Buckets:   gossipSubScoreBuckets,
@@ -89,8 +90,8 @@ func NewGossipSubScoreMetrics(prefix string) *GossipSubScoreMetrics {
 
 	gs.meshMessageDelivery = *promauto.NewHistogramVec(
 		prometheus.HistogramOpts{
-			Namespace: namespaceNetwork,
-			Subsystem: subsystemGossip,
+			Namespace: internal.NamespaceNetwork,
+			Subsystem: internal.SubsystemGossip,
 			Name:      prefix + "gossipsub_mesh_message_delivery_score",
 			Help:      "mesh message delivery from gossipsub peer scoring",
 		},
@@ -99,8 +100,8 @@ func NewGossipSubScoreMetrics(prefix string) *GossipSubScoreMetrics {
 
 	gs.invalidMessageDelivery = *promauto.NewHistogramVec(
 		prometheus.HistogramOpts{
-			Namespace: namespaceNetwork,
-			Subsystem: subsystemGossip,
+			Namespace: internal.NamespaceNetwork,
+			Subsystem: internal.SubsystemGossip,
 			Name:      prefix + "gossipsub_invalid_message_delivery_score",
 			Help:      "invalid message delivery from gossipsub peer scoring",
 		},
@@ -109,8 +110,8 @@ func NewGossipSubScoreMetrics(prefix string) *GossipSubScoreMetrics {
 
 	gs.firstMessageDelivery = *promauto.NewHistogramVec(
 		prometheus.HistogramOpts{
-			Namespace: namespaceNetwork,
-			Subsystem: subsystemGossip,
+			Namespace: internal.NamespaceNetwork,
+			Subsystem: internal.SubsystemGossip,
 			Name:      prefix + "gossipsub_first_message_delivery_score",
 			Help:      "first message delivery from gossipsub peer scoring",
 		},
@@ -119,8 +120,8 @@ func NewGossipSubScoreMetrics(prefix string) *GossipSubScoreMetrics {
 
 	gs.warningStateGauge = promauto.NewGauge(
 		prometheus.GaugeOpts{
-			Namespace: namespaceNetwork,
-			Subsystem: subsystemGossip,
+			Namespace: internal.NamespaceNetwork,
+			Subsystem: internal.SubsystemGossip,
 			Name:      prefix + "gossipsub_warning_state_peers_total",
 			Help:      "number of peers in the warning state",
 		},

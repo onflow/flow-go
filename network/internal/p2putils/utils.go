@@ -14,8 +14,8 @@ import (
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/network/p2p/keyutils"
-	"github.com/onflow/flow-go/network/p2p/p2plogging"
 	"github.com/onflow/flow-go/network/p2p/unicast/protocols"
+	"github.com/onflow/flow-go/utils/p2plogging"
 )
 
 // FlowStream returns the Flow protocol Stream in the connection if one exist, else it returns nil

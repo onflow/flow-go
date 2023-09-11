@@ -20,6 +20,7 @@ import (
 	"github.com/onflow/flow-go/module/blobs"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data/cache"
+	"github.com/onflow/flow-go/module/executiondatasync/execution_data/model"
 	"github.com/onflow/flow-go/module/mempool/herocache"
 	"github.com/onflow/flow-go/module/metrics"
 	protocolmock "github.com/onflow/flow-go/state/protocol/mock"
@@ -53,7 +54,7 @@ type BackendExecutionDataSuite struct {
 
 	blocks      []*flow.Block
 	blockEvents map[flow.Identifier]flow.EventsList
-	execDataMap map[flow.Identifier]*execution_data.BlockExecutionDataEntity
+	execDataMap map[flow.Identifier]*model.BlockExecutionDataEntity
 	blockMap    map[uint64]*flow.Block
 	sealMap     map[flow.Identifier]*flow.Seal
 	resultMap   map[flow.Identifier]*flow.ExecutionResult
@@ -89,7 +90,7 @@ func (s *BackendExecutionDataSuite) SetupTest() {
 	var err error
 
 	blockCount := 5
-	s.execDataMap = make(map[flow.Identifier]*execution_data.BlockExecutionDataEntity, blockCount)
+	s.execDataMap = make(map[flow.Identifier]*model.BlockExecutionDataEntity, blockCount)
 	s.blockEvents = make(map[flow.Identifier]flow.EventsList, blockCount)
 	s.blockMap = make(map[uint64]*flow.Block, blockCount)
 	s.sealMap = make(map[flow.Identifier]*flow.Seal, blockCount)
@@ -113,7 +114,7 @@ func (s *BackendExecutionDataSuite) SetupTest() {
 		blockEvents := unittest.BlockEventsFixture(block.Header, (i%len(testEventTypes))*3+1, testEventTypes...)
 
 		numChunks := 5
-		chunkDatas := make([]*execution_data.ChunkExecutionData, 0, numChunks)
+		chunkDatas := make([]*model.ChunkExecutionData, 0, numChunks)
 		for i := 0; i < numChunks; i++ {
 			var events flow.EventsList
 			switch {
@@ -124,7 +125,7 @@ func (s *BackendExecutionDataSuite) SetupTest() {
 			default:
 				events = flow.EventsList{blockEvents.Events[i]}
 			}
-			chunkDatas = append(chunkDatas, unittest.ChunkExecutionDataFixture(s.T(), execution_data.DefaultMaxBlobSize/5, unittest.WithChunkEvents(events)))
+			chunkDatas = append(chunkDatas, unittest.ChunkExecutionDataFixture(s.T(), model.DefaultMaxBlobSize/5, unittest.WithChunkEvents(events)))
 		}
 		execData := unittest.BlockExecutionDataFixture(
 			unittest.WithBlockExecutionDataBlockID(block.ID()),
@@ -135,7 +136,7 @@ func (s *BackendExecutionDataSuite) SetupTest() {
 		assert.NoError(s.T(), err)
 
 		s.blocks = append(s.blocks, block)
-		s.execDataMap[block.ID()] = execution_data.NewBlockExecutionDataEntity(result.ExecutionDataID, execData)
+		s.execDataMap[block.ID()] = model.NewBlockExecutionDataEntity(result.ExecutionDataID, execData)
 		s.blockEvents[block.ID()] = blockEvents.Events
 		s.blockMap[block.Header.Height] = block
 		s.sealMap[block.ID()] = seal

@@ -10,6 +10,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/mempool"
+	"github.com/onflow/flow-go/module/metrics/internal"
 )
 
 type TransactionCollector struct {
@@ -50,8 +51,8 @@ func NewTransactionCollector(
 		logTimeToFinalizedExecuted: logTimeToFinalizedExecuted,
 		timeToFinalized: promauto.NewSummary(prometheus.SummaryOpts{
 			Name:      "time_to_finalized_seconds",
-			Namespace: namespaceAccess,
-			Subsystem: subsystemTransactionTiming,
+			Namespace: internal.NamespaceAccess,
+			Subsystem: internal.SubsystemTransactionTiming,
 			Help:      "the duration of how long it took between the transaction was received until it was finalized",
 			Objectives: map[float64]float64{
 				0.01: 0.001,
@@ -64,8 +65,8 @@ func NewTransactionCollector(
 		}),
 		timeToExecuted: promauto.NewSummary(prometheus.SummaryOpts{
 			Name:      "time_to_executed_seconds",
-			Namespace: namespaceAccess,
-			Subsystem: subsystemTransactionTiming,
+			Namespace: internal.NamespaceAccess,
+			Subsystem: internal.SubsystemTransactionTiming,
 			Help:      "the duration of how long it took between the transaction was received until it was executed",
 			Objectives: map[float64]float64{
 				0.01: 0.001,
@@ -78,8 +79,8 @@ func NewTransactionCollector(
 		}),
 		timeToFinalizedExecuted: promauto.NewSummary(prometheus.SummaryOpts{
 			Name:      "time_to_finalized_executed_seconds",
-			Namespace: namespaceAccess,
-			Subsystem: subsystemTransactionTiming,
+			Namespace: internal.NamespaceAccess,
+			Subsystem: internal.SubsystemTransactionTiming,
 			Help: "the duration of how long it took between the transaction was received until it was both " +
 				"finalized and executed",
 			Objectives: map[float64]float64{
@@ -93,46 +94,46 @@ func NewTransactionCollector(
 		}),
 		transactionSubmission: promauto.NewCounterVec(prometheus.CounterOpts{
 			Name:      "transaction_submission",
-			Namespace: namespaceAccess,
-			Subsystem: subsystemTransactionSubmission,
+			Namespace: internal.NamespaceAccess,
+			Subsystem: internal.SubsystemTransactionSubmission,
 			Help:      "counter for the success/failure of transaction submissions",
 		}, []string{"result"}),
 		scriptExecutedDuration: promauto.NewHistogramVec(prometheus.HistogramOpts{
 			Name:      "script_executed_duration",
-			Namespace: namespaceAccess,
-			Subsystem: subsystemTransactionSubmission,
+			Namespace: internal.NamespaceAccess,
+			Subsystem: internal.SubsystemTransactionSubmission,
 			Help:      "histogram for the duration in ms of the round trip time for executing a script",
 			Buckets:   []float64{1, 100, 500, 1000, 2000, 5000},
 		}, []string{"script_size"}),
 		scriptExecutionErrorOnExecutor: promauto.NewCounterVec(prometheus.CounterOpts{
 			Name:      "script_execution_error_archive",
-			Namespace: namespaceAccess,
-			Subsystem: subsystemTransactionSubmission,
+			Namespace: internal.NamespaceAccess,
+			Subsystem: internal.SubsystemTransactionSubmission,
 			Help:      "histogram for the internal errors for executing a script for a block on the archive node",
 		}, []string{"source"}),
 		scriptExecutionComparison: promauto.NewCounterVec(prometheus.CounterOpts{
 			Name:      "script_execution_comparison",
-			Namespace: namespaceAccess,
-			Subsystem: subsystemTransactionSubmission,
+			Namespace: internal.NamespaceAccess,
+			Subsystem: internal.SubsystemTransactionSubmission,
 			Help:      "histogram for the comparison outcomes of executing a script on the archive and execution node",
 		}, []string{"outcome"}),
 		transactionResultDuration: promauto.NewHistogramVec(prometheus.HistogramOpts{
 			Name:      "transaction_result_fetched_duration",
-			Namespace: namespaceAccess,
-			Subsystem: subsystemTransactionSubmission,
+			Namespace: internal.NamespaceAccess,
+			Subsystem: internal.SubsystemTransactionSubmission,
 			Help:      "histogram for the duration in ms of the round trip time for getting a transaction result",
 			Buckets:   []float64{1, 100, 500, 1000, 2000, 5000},
 		}, []string{"payload_size"}),
 		scriptSize: promauto.NewHistogram(prometheus.HistogramOpts{
 			Name:      "script_size",
-			Namespace: namespaceAccess,
-			Subsystem: subsystemTransactionSubmission,
+			Namespace: internal.NamespaceAccess,
+			Subsystem: internal.SubsystemTransactionSubmission,
 			Help:      "histogram for the script size in kb of scripts used in ExecuteScript",
 		}),
 		transactionSize: promauto.NewHistogram(prometheus.HistogramOpts{
 			Name:      "transaction_size",
-			Namespace: namespaceAccess,
-			Subsystem: subsystemTransactionSubmission,
+			Namespace: internal.NamespaceAccess,
+			Subsystem: internal.SubsystemTransactionSubmission,
 			Help:      "histogram for the transaction size in kb of scripts used in GetTransactionResult",
 		}),
 	}

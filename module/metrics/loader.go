@@ -5,6 +5,8 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
+
+	"github.com/onflow/flow-go/module/metrics/internal"
 )
 
 type LoaderCollector struct {
@@ -21,27 +23,27 @@ func NewLoaderCollector() *LoaderCollector {
 	cc := &LoaderCollector{
 		transactionsSent: promauto.NewCounter(prometheus.CounterOpts{
 			Name:      "transactions_sent",
-			Namespace: namespaceLoader,
+			Namespace: internal.NamespaceLoader,
 			Help:      "transactions sent by the loader",
 		}),
 		transactionsLost: promauto.NewCounter(prometheus.CounterOpts{
 			Name:      "transactions_lost",
-			Namespace: namespaceLoader,
+			Namespace: internal.NamespaceLoader,
 			Help:      "transaction that took too long to return",
 		}),
 		tpsConfigured: promauto.NewGauge(prometheus.GaugeOpts{
 			Name:      "transactions_per_second_configured",
-			Namespace: namespaceLoader,
+			Namespace: internal.NamespaceLoader,
 			Help:      "transactions per second that the loader should send",
 		}),
 		transactionsExecuted: promauto.NewCounter(prometheus.CounterOpts{
 			Name:      "transactions_executed",
-			Namespace: namespaceLoader,
+			Namespace: internal.NamespaceLoader,
 			Help:      "transaction successfully executed by the loader",
 		}),
 		tteInSeconds: promauto.NewHistogram(prometheus.HistogramOpts{
 			Name:      "transactions_executed_in_seconds",
-			Namespace: namespaceLoader,
+			Namespace: internal.NamespaceLoader,
 			Help:      "Time To Execute histogram for transactions (in seconds)",
 			Buckets:   prometheus.ExponentialBuckets(2, 2, 8),
 		}),

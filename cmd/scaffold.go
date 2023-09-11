@@ -39,6 +39,7 @@ import (
 	"github.com/onflow/flow-go/module/local"
 	"github.com/onflow/flow-go/module/mempool/herocache"
 	"github.com/onflow/flow-go/module/metrics"
+	"github.com/onflow/flow-go/module/metrics/network"
 	"github.com/onflow/flow-go/module/profiler"
 	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/module/updatable_configs"
@@ -244,8 +245,8 @@ func (fnb *FlowNodeBuilder) EnqueueResolver() {
 		var dnsIpCacheMetricsCollector module.HeroCacheMetrics = metrics.NewNoopCollector()
 		var dnsTxtCacheMetricsCollector module.HeroCacheMetrics = metrics.NewNoopCollector()
 		if fnb.HeroCacheMetricsEnable {
-			dnsIpCacheMetricsCollector = metrics.NetworkDnsIpCacheMetricsFactory(fnb.MetricsRegisterer)
-			dnsTxtCacheMetricsCollector = metrics.NetworkDnsTxtCacheMetricsFactory(fnb.MetricsRegisterer)
+			dnsIpCacheMetricsCollector = networkmetrics.NetworkDnsIpCacheMetricsFactory(fnb.MetricsRegisterer)
+			dnsTxtCacheMetricsCollector = networkmetrics.NetworkDnsTxtCacheMetricsFactory(fnb.MetricsRegisterer)
 		}
 
 		cache := herocache.NewDNSCache(
@@ -365,7 +366,7 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 			&fnb.FlowConfig.NetworkConfig.ConnectionManagerConfig,
 			&p2p.DisallowListCacheConfig{
 				MaxSize: fnb.FlowConfig.NetworkConfig.DisallowListNotificationCacheSize,
-				Metrics: metrics.DisallowListCacheMetricsFactory(fnb.HeroCacheMetricsFactory(), network.PrivateNetwork),
+				Metrics: networkmetrics.DisallowListCacheMetricsFactory(fnb.HeroCacheMetricsFactory(), network.PrivateNetwork),
 			})
 
 		if err != nil {
@@ -437,7 +438,7 @@ func (fnb *FlowNodeBuilder) InitFlowNetworkWithConduitFactory(
 
 	receiveCache := netcache.NewHeroReceiveCache(fnb.FlowConfig.NetworkConfig.NetworkReceivedMessageCacheSize,
 		fnb.Logger,
-		metrics.NetworkReceiveCacheMetricsFactory(fnb.HeroCacheMetricsFactory(), network.PrivateNetwork))
+		networkmetrics.NetworkReceiveCacheMetricsFactory(fnb.HeroCacheMetricsFactory(), network.PrivateNetwork))
 
 	err := node.Metrics.Mempool.Register(metrics.ResourceNetworkingReceiveCache, receiveCache.Size)
 	if err != nil {

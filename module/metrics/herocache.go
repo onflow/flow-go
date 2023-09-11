@@ -6,7 +6,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/onflow/flow-go/module"
-	"github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/module/metrics/internal"
 )
 
 const subsystemHeroCache = "hero_cache"
@@ -64,143 +64,24 @@ func NewNoopHeroCacheMetricsFactory() HeroCacheMetricsFactory {
 	}
 }
 
-func NetworkReceiveCacheMetricsFactory(f HeroCacheMetricsFactory, networkType network.NetworkingType) module.HeroCacheMetrics {
-	r := ResourceNetworkingReceiveCache
-	if networkType == network.PublicNetwork {
-		r = PrependPublicPrefix(r)
-	}
-	return f(namespaceNetwork, r)
-}
-
-// DisallowListCacheMetricsFactory is the factory method for creating a new HeroCacheCollector for the disallow list cache.
-// The disallow-list cache is used to keep track of peers that are disallow-listed and the reasons for it.
-// Args:
-// - f: the HeroCacheMetricsFactory to create the collector
-// - networkingType: the networking type of the cache, i.e., whether it is used for the public or the private network
-// Returns:
-// - a HeroCacheMetrics for the disallow list cache
-func DisallowListCacheMetricsFactory(f HeroCacheMetricsFactory, networkingType network.NetworkingType) module.HeroCacheMetrics {
-	r := ResourceNetworkingDisallowListCache
-	if networkingType == network.PublicNetwork {
-		r = PrependPublicPrefix(r)
-	}
-	return f(namespaceNetwork, r)
-}
-
-func NetworkDnsTxtCacheMetricsFactory(registrar prometheus.Registerer) *HeroCacheCollector {
-	return NewHeroCacheCollector(namespaceNetwork, ResourceNetworkingDnsTxtCache, registrar)
-}
-
-func NetworkDnsIpCacheMetricsFactory(registrar prometheus.Registerer) *HeroCacheCollector {
-	return NewHeroCacheCollector(namespaceNetwork, ResourceNetworkingDnsIpCache, registrar)
-}
-
 func ChunkDataPackRequestQueueMetricsFactory(registrar prometheus.Registerer) *HeroCacheCollector {
-	return NewHeroCacheCollector(namespaceExecution, ResourceChunkDataPackRequests, registrar)
+	return NewHeroCacheCollector(internal.NamespaceExecution, ResourceChunkDataPackRequests, registrar)
 }
 
 func ReceiptRequestsQueueMetricFactory(registrar prometheus.Registerer) *HeroCacheCollector {
-	return NewHeroCacheCollector(namespaceExecution, ResourceReceipt, registrar)
+	return NewHeroCacheCollector(internal.NamespaceExecution, ResourceReceipt, registrar)
 }
 
 func CollectionRequestsQueueMetricFactory(registrar prometheus.Registerer) *HeroCacheCollector {
-	return NewHeroCacheCollector(namespaceCollection, ResourceCollection, registrar)
-}
-
-func DisallowListNotificationQueueMetricFactory(registrar prometheus.Registerer) *HeroCacheCollector {
-	return NewHeroCacheCollector(namespaceNetwork, ResourceNetworkingDisallowListNotificationQueue, registrar)
-}
-
-func ApplicationLayerSpamRecordCacheMetricFactory(f HeroCacheMetricsFactory, networkType network.NetworkingType) module.HeroCacheMetrics {
-	r := ResourceNetworkingApplicationLayerSpamRecordCache
-	if networkType == network.PublicNetwork {
-		r = PrependPublicPrefix(r)
-	}
-
-	return f(namespaceNetwork, r)
-}
-
-func ApplicationLayerSpamRecordQueueMetricsFactory(f HeroCacheMetricsFactory, networkType network.NetworkingType) module.HeroCacheMetrics {
-	r := ResourceNetworkingApplicationLayerSpamReportQueue
-	if networkType == network.PublicNetwork {
-		r = PrependPublicPrefix(r)
-	}
-	return f(namespaceNetwork, r)
-}
-
-func GossipSubRPCMetricsObserverInspectorQueueMetricFactory(f HeroCacheMetricsFactory, networkType network.NetworkingType) module.HeroCacheMetrics {
-	// we don't use the public prefix for the metrics here for sake of backward compatibility of metric name.
-	r := ResourceNetworkingRpcMetricsObserverInspectorQueue
-	if networkType == network.PublicNetwork {
-		r = PrependPublicPrefix(r)
-	}
-	return f(namespaceNetwork, r)
-}
-
-func GossipSubRPCInspectorQueueMetricFactory(f HeroCacheMetricsFactory, networkType network.NetworkingType) module.HeroCacheMetrics {
-	// we don't use the public prefix for the metrics here for sake of backward compatibility of metric name.
-	r := ResourceNetworkingRpcValidationInspectorQueue
-	if networkType == network.PublicNetwork {
-		r = PrependPublicPrefix(r)
-	}
-	return f(namespaceNetwork, r)
-}
-
-func GossipSubRPCSentTrackerMetricFactory(f HeroCacheMetricsFactory, networkType network.NetworkingType) module.HeroCacheMetrics {
-	// we don't use the public prefix for the metrics here for sake of backward compatibility of metric name.
-	r := ResourceNetworkingRPCSentTrackerCache
-	if networkType == network.PublicNetwork {
-		r = PrependPublicPrefix(r)
-	}
-	return f(namespaceNetwork, r)
-}
-
-func GossipSubRPCSentTrackerQueueMetricFactory(f HeroCacheMetricsFactory, networkType network.NetworkingType) module.HeroCacheMetrics {
-	// we don't use the public prefix for the metrics here for sake of backward compatibility of metric name.
-	r := ResourceNetworkingRPCSentTrackerQueue
-	if networkType == network.PublicNetwork {
-		r = PrependPublicPrefix(r)
-	}
-	return f(namespaceNetwork, r)
-}
-
-func RpcInspectorNotificationQueueMetricFactory(f HeroCacheMetricsFactory, networkType network.NetworkingType) module.HeroCacheMetrics {
-	r := ResourceNetworkingRpcInspectorNotificationQueue
-	if networkType == network.PublicNetwork {
-		r = PrependPublicPrefix(r)
-	}
-	return f(namespaceNetwork, r)
-}
-
-func GossipSubRPCInspectorClusterPrefixedCacheMetricFactory(f HeroCacheMetricsFactory, networkType network.NetworkingType) module.HeroCacheMetrics {
-	// we don't use the public prefix for the metrics here for sake of backward compatibility of metric name.
-	r := ResourceNetworkingRpcClusterPrefixReceivedCache
-	if networkType == network.PublicNetwork {
-		r = PrependPublicPrefix(r)
-	}
-	return f(namespaceNetwork, r)
+	return NewHeroCacheCollector(internal.NamespaceCollection, ResourceCollection, registrar)
 }
 
 func CollectionNodeTransactionsCacheMetrics(registrar prometheus.Registerer, epoch uint64) *HeroCacheCollector {
-	return NewHeroCacheCollector(namespaceCollection, fmt.Sprintf("%s_%d", ResourceTransaction, epoch), registrar)
-}
-
-func FollowerCacheMetrics(registrar prometheus.Registerer) *HeroCacheCollector {
-	return NewHeroCacheCollector(namespaceFollowerEngine, ResourceFollowerPendingBlocksCache, registrar)
+	return NewHeroCacheCollector(internal.NamespaceCollection, fmt.Sprintf("%s_%d", ResourceTransaction, epoch), registrar)
 }
 
 func AccessNodeExecutionDataCacheMetrics(registrar prometheus.Registerer) *HeroCacheCollector {
-	return NewHeroCacheCollector(namespaceAccess, ResourceExecutionDataCache, registrar)
-}
-
-// PrependPublicPrefix prepends the string "public" to the given string.
-// This is used to distinguish between public and private metrics.
-// Args:
-// - str: the string to prepend, example: "my_metric"
-// Returns:
-// - the prepended string, example: "public_my_metric"
-func PrependPublicPrefix(str string) string {
-	return fmt.Sprintf("%s_%s", "public", str)
+	return NewHeroCacheCollector(internal.NamespaceAccess, ResourceExecutionDataCache, registrar)
 }
 
 func NewHeroCacheCollector(nameSpace string, cacheName string, registrar prometheus.Registerer) *HeroCacheCollector {

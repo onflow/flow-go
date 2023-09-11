@@ -4,6 +4,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/metrics/internal"
 )
 
 type VerificationCollector struct {
@@ -48,109 +49,109 @@ func NewVerificationCollector(tracer module.Tracer, registerer prometheus.Regist
 	// Job Consumers
 	lastProcessedBlockJobIndexBlockConsumer := prometheus.NewGauge(prometheus.GaugeOpts{
 		Name:      "last_processed_block_job_index",
-		Namespace: namespaceVerification,
-		Subsystem: subsystemBlockConsumer,
+		Namespace: internal.NamespaceVerification,
+		Subsystem: internal.SubsystemBlockConsumer,
 		Help:      "the last block job index processed by block consumer",
 	})
 
 	lastProcessedChunkJobIndexChunkConsumer := prometheus.NewGauge(prometheus.GaugeOpts{
 		Name:      "last_processed_chunk_job_index",
-		Namespace: namespaceVerification,
-		Subsystem: subsystemChunkConsumer,
+		Namespace: internal.NamespaceVerification,
+		Subsystem: internal.SubsystemChunkConsumer,
 		Help:      "the last chunk job index processed by chunk consumer",
 	})
 
 	// Assigner Engine
 	receivedFinalizedHeightAssigner := prometheus.NewGauge(prometheus.GaugeOpts{
 		Name:      "finalized_height",
-		Namespace: namespaceVerification,
-		Subsystem: subsystemAssignerEngine,
+		Namespace: internal.NamespaceVerification,
+		Subsystem: internal.SubsystemAssignerEngine,
 		Help:      "the last finalized height received by assigner engine",
 	})
 
 	receivedResultsTotalAssigner := prometheus.NewGauge(prometheus.GaugeOpts{
 		Name:      "received_result_total",
-		Namespace: namespaceVerification,
-		Subsystem: subsystemAssignerEngine,
+		Namespace: internal.NamespaceVerification,
+		Subsystem: internal.SubsystemAssignerEngine,
 		Help:      "total number of execution results received by assigner engine",
 	})
 
 	assignedChunksTotalAssigner := prometheus.NewCounter(prometheus.CounterOpts{
 		Name:      "chunk_assigned_total",
-		Namespace: namespaceVerification,
-		Subsystem: subsystemAssignerEngine,
+		Namespace: internal.NamespaceVerification,
+		Subsystem: internal.SubsystemAssignerEngine,
 		Help:      "total number of chunks assigned to verification node",
 	})
 
 	sentChunksTotalAssigner := prometheus.NewCounter(prometheus.CounterOpts{
 		Name:      "processed_chunk_sent_total",
-		Namespace: namespaceVerification,
-		Subsystem: subsystemAssignerEngine,
+		Namespace: internal.NamespaceVerification,
+		Subsystem: internal.SubsystemAssignerEngine,
 		Help:      "total number chunks sent by assigner engine to chunk consumer",
 	})
 
 	// Fetcher Engine
 	receivedAssignedChunksTotalFetcher := prometheus.NewCounter(prometheus.CounterOpts{
 		Name:      "assigned_chunk_received_total",
-		Namespace: namespaceVerification,
-		Subsystem: subsystemFetcherEngine,
+		Namespace: internal.NamespaceVerification,
+		Subsystem: internal.SubsystemFetcherEngine,
 		Help:      "total number of chunks received by fetcher engine from assigner engine through chunk consumer",
 	})
 
 	// Requester Engine
 	receivedChunkDataPackRequestsTotalRequester := prometheus.NewCounter(prometheus.CounterOpts{
 		Name:      "chunk_data_pack_request_received_total",
-		Namespace: namespaceVerification,
-		Subsystem: subsystemRequesterEngine,
+		Namespace: internal.NamespaceVerification,
+		Subsystem: internal.SubsystemRequesterEngine,
 		Help:      "total number of chunk data pack requests received by requester engine from fetcher engine",
 	})
 
 	sentChunkDataRequestMessagesTotalRequester := prometheus.NewCounter(prometheus.CounterOpts{
 		Name:      "chunk_data_pack_request_message_sent_total",
-		Namespace: namespaceVerification,
-		Subsystem: subsystemRequesterEngine,
+		Namespace: internal.NamespaceVerification,
+		Subsystem: internal.SubsystemRequesterEngine,
 		Help:      "total number of chunk data pack request messages sent in the network by requester engine",
 	})
 
 	receivedChunkDataResponseMessagesTotalRequester := prometheus.NewCounter(prometheus.CounterOpts{
 		Name:      "chunk_data_response_message_received_total",
-		Namespace: namespaceVerification,
-		Subsystem: subsystemRequesterEngine,
+		Namespace: internal.NamespaceVerification,
+		Subsystem: internal.SubsystemRequesterEngine,
 		Help:      "total number of chunk data response messages received from network by requester engine",
 	})
 
 	sentChunkDataPackByRequesterTotal := prometheus.NewCounter(prometheus.CounterOpts{
 		Name:      "chunk_data_pack_sent_total",
-		Namespace: namespaceVerification,
-		Subsystem: subsystemRequesterEngine,
+		Namespace: internal.NamespaceVerification,
+		Subsystem: internal.SubsystemRequesterEngine,
 		Help:      "total number of chunk data packs sent by requester engine to fetcher engine",
 	})
 
 	sentVerifiableChunksTotalFetcher := prometheus.NewCounter(prometheus.CounterOpts{
 		Name:      "verifiable_chunk_sent_total",
-		Namespace: namespaceVerification,
-		Subsystem: subsystemFetcherEngine,
+		Namespace: internal.NamespaceVerification,
+		Subsystem: internal.SubsystemFetcherEngine,
 		Help:      "total number of verifiable chunks sent by fetcher engine to verifier engine",
 	})
 
 	receivedChunkDataPackTotalFetcher := prometheus.NewCounter(prometheus.CounterOpts{
 		Name:      "chunk_data_pack_received_total",
-		Namespace: namespaceVerification,
-		Subsystem: subsystemFetcherEngine,
+		Namespace: internal.NamespaceVerification,
+		Subsystem: internal.SubsystemFetcherEngine,
 		Help:      "total number of chunk data packs received by fetcher engine",
 	})
 
 	requestedChunkDataPackTotalFetcher := prometheus.NewCounter(prometheus.CounterOpts{
 		Name:      "chunk_data_pack_requested_total",
-		Namespace: namespaceVerification,
-		Subsystem: subsystemFetcherEngine,
+		Namespace: internal.NamespaceVerification,
+		Subsystem: internal.SubsystemFetcherEngine,
 		Help:      "total number of chunk data packs requested by fetcher engine",
 	})
 
 	maxChunkDataPackRequestAttemptForNextUnsealedHeight := prometheus.NewGauge(prometheus.GaugeOpts{
 		Name:      "next_unsealed_height_max_chunk_data_pack_request_attempt_times",
-		Namespace: namespaceVerification,
-		Subsystem: subsystemRequesterEngine,
+		Namespace: internal.NamespaceVerification,
+		Subsystem: internal.SubsystemRequesterEngine,
 		// an indicator for when execution nodes is unresponsive to chunk data pack requests,
 		// in which case verification node will keep requesting the chunk data pack, and this
 		// metrics number will go up.
@@ -161,15 +162,15 @@ func NewVerificationCollector(tracer module.Tracer, registerer prometheus.Regist
 	// Verifier Engine
 	receivedVerifiableChunksTotalVerifier := prometheus.NewCounter(prometheus.CounterOpts{
 		Name:      "verifiable_chunk_received_total",
-		Namespace: namespaceVerification,
-		Subsystem: subsystemVerifierEngine,
+		Namespace: internal.NamespaceVerification,
+		Subsystem: internal.SubsystemVerifierEngine,
 		Help:      "total number verifiable chunks received by verifier engine from fetcher engine",
 	})
 
 	sentResultApprovalTotalVerifier := prometheus.NewCounter(prometheus.CounterOpts{
 		Name:      "result_approvals_total",
-		Namespace: namespaceVerification,
-		Subsystem: subsystemVerifierEngine,
+		Namespace: internal.NamespaceVerification,
+		Subsystem: internal.SubsystemVerifierEngine,
 		Help:      "total number of emitted result approvals by verifier engine",
 	})
 

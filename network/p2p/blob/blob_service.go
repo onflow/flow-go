@@ -30,8 +30,8 @@ import (
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network"
-	"github.com/onflow/flow-go/network/p2p/p2plogging"
 	"github.com/onflow/flow-go/utils/logging"
+	"github.com/onflow/flow-go/utils/p2plogging"
 
 	ipld "github.com/ipfs/go-ipld-format"
 )

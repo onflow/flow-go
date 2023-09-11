@@ -8,6 +8,7 @@ import (
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/metrics/internal"
 )
 
 type ExecutionCollector struct {
@@ -87,436 +88,436 @@ type ExecutionCollector struct {
 func NewExecutionCollector(tracer module.Tracer) *ExecutionCollector {
 
 	forestApproxMemorySize := promauto.NewGauge(prometheus.GaugeOpts{
-		Namespace: namespaceExecution,
-		Subsystem: subsystemMTrie,
+		Namespace: internal.NamespaceExecution,
+		Subsystem: internal.SubsystemMTrie,
 		Name:      "forest_approx_memory_size",
 		Help:      "an approximate size of in-memory forest in bytes",
 	})
 
 	forestNumberOfTrees := promauto.NewGauge(prometheus.GaugeOpts{
-		Namespace: namespaceExecution,
-		Subsystem: subsystemMTrie,
+		Namespace: internal.NamespaceExecution,
+		Subsystem: internal.SubsystemMTrie,
 		Name:      "forest_number_of_trees",
 		Help:      "the number of trees in memory",
 	})
 
 	latestTrieRegCount := promauto.NewGauge(prometheus.GaugeOpts{
-		Namespace: namespaceExecution,
-		Subsystem: subsystemMTrie,
+		Namespace: internal.NamespaceExecution,
+		Subsystem: internal.SubsystemMTrie,
 		Name:      "latest_trie_reg_count",
 		Help:      "the number of allocated registers (latest created trie)",
 	})
 
 	latestTrieRegCountDiff := promauto.NewGauge(prometheus.GaugeOpts{
-		Namespace: namespaceExecution,
-		Subsystem: subsystemMTrie,
+		Namespace: internal.NamespaceExecution,
+		Subsystem: internal.SubsystemMTrie,
 		Name:      "latest_trie_reg_count_diff",
 		Help:      "the difference between number of unique register allocated of the latest created trie and parent trie",
 	})
 
 	latestTrieRegSize := promauto.NewGauge(prometheus.GaugeOpts{
-		Namespace: namespaceExecution,
-		Subsystem: subsystemMTrie,
+		Namespace: internal.NamespaceExecution,
+		Subsystem: internal.SubsystemMTrie,
 		Name:      "latest_trie_reg_size",
 		Help:      "the size of allocated registers (latest created trie)",
 	})
 
 	latestTrieRegSizeDiff := promauto.NewGauge(prometheus.GaugeOpts{
-		Namespace: namespaceExecution,
-		Subsystem: subsystemMTrie,
+		Namespace: internal.NamespaceExecution,
+		Subsystem: internal.SubsystemMTrie,
 		Name:      "latest_trie_reg_size_diff",
 		Help:      "the difference between size of unique register allocated of the latest created trie and parent trie",
 	})
 
 	latestTrieMaxDepthTouched := promauto.NewGauge(prometheus.GaugeOpts{
-		Namespace: namespaceExecution,
-		Subsystem: subsystemMTrie,
+		Namespace: internal.NamespaceExecution,
+		Subsystem: internal.SubsystemMTrie,
 		Name:      "latest_trie_max_depth_touched",
 		Help:      "the maximum depth touched of the latest created trie",
 	})
 
 	updatedCount := promauto.NewCounter(prometheus.CounterOpts{
-		Namespace: namespaceExecution,
-		Subsystem: subsystemMTrie,
+		Namespace: internal.NamespaceExecution,
+		Subsystem: internal.SubsystemMTrie,
 		Name:      "updates_counted",
 		Help:      "the number of updates",
 	})
 
 	proofSize := promauto.NewGauge(prometheus.GaugeOpts{
-		Namespace: namespaceExecution,
-		Subsystem: subsystemMTrie,
+		Namespace: internal.NamespaceExecution,
+		Subsystem: internal.SubsystemMTrie,
 		Name:      "average_proof_size",
 		Help:      "the average size of a single generated proof in bytes",
 	})
 
 	updatedValuesNumber := promauto.NewCounter(prometheus.CounterOpts{
-		Namespace: namespaceExecution,
-		Subsystem: subsystemMTrie,
+		Namespace: internal.NamespaceExecution,
+		Subsystem: internal.SubsystemMTrie,
 		Name:      "update_values_number",
 		Help:      "the total number of values updated",
 	})
 
 	updatedValuesSize := promauto.NewGauge(prometheus.GaugeOpts{
-		Namespace: namespaceExecution,
-		Subsystem: subsystemMTrie,
+		Namespace: internal.NamespaceExecution,
+		Subsystem: internal.SubsystemMTrie,
 		Name:      "update_values_size",
 		Help:      "the total size of values for single update in bytes",
 	})
 
 	updatedDuration := promauto.NewHistogram(prometheus.HistogramOpts{
-		Namespace: namespaceExecution,
-		Subsystem: subsystemMTrie,
+		Namespace: internal.NamespaceExecution,
+		Subsystem: internal.SubsystemMTrie,
 		Name:      "update_duration",
 		Help:      "the duration of update operation",
 		Buckets:   []float64{0.05, 0.2, 0.5, 1, 2, 5},
 	})
 
 	updatedDurationPerValue := promauto.NewHistogram(prometheus.HistogramOpts{
-		Namespace: namespaceExecution,
-		Subsystem: subsystemMTrie,
+		Namespace: internal.NamespaceExecution,
+		Subsystem: internal.SubsystemMTrie,
 		Name:      "update_duration_per_value",
 		Help:      "the duration of update operation per value",
 		Buckets:   []float64{0.05, 0.2, 0.5, 1, 2, 5},
 	})
 
 	readValuesNumber := promauto.NewCounter(prometheus.CounterOpts{
-		Namespace: namespaceExecution,
-		Subsystem: subsystemMTrie,
+		Namespace: internal.NamespaceExecution,
+		Subsystem: internal.SubsystemMTrie,
 		Name:      "read_values_number",
 		Help:      "the total number of values read",
 	})
 
 	readValuesSize := promauto.NewGauge(prometheus.GaugeOpts{
-		Namespace: namespaceExecution,
-		Subsystem: subsystemMTrie,
+		Namespace: internal.NamespaceExecution,
+		Subsystem: internal.SubsystemMTrie,
 		Name:      "read_values_size",
 		Help:      "the total size of values for single read in bytes",
 	})
 
 	readDuration := promauto.NewHistogram(prometheus.HistogramOpts{
-		Namespace: namespaceExecution,
-		Subsystem: subsystemMTrie,
+		Namespace: internal.NamespaceExecution,
+		Subsystem: internal.SubsystemMTrie,
 		Name:      "read_duration",
 		Help:      "the duration of read operation",
 		Buckets:   []float64{0.05, 0.2, 0.5, 1, 2, 5},
 	})
 
 	readDurationPerValue := promauto.NewHistogram(prometheus.HistogramOpts{
-		Namespace: namespaceExecution,
-		Subsystem: subsystemMTrie,
+		Namespace: internal.NamespaceExecution,
+		Subsystem: internal.SubsystemMTrie,
 		Name:      "read_duration_per_value",
 		Help:      "the duration of read operation per value",
 		Buckets:   []float64{0.05, 0.2, 0.5, 1, 2, 5},
 	})
 
 	blockExecutionTime := promauto.NewHistogram(prometheus.HistogramOpts{
-		Namespace: namespaceExecution,
-		Subsystem: subsystemRuntime,
+		Namespace: internal.NamespaceExecution,
+		Subsystem: internal.SubsystemRuntime,
 		Name:      "block_execution_time_milliseconds",
 		Help:      "the total time spent on block execution in milliseconds",
 		Buckets:   []float64{100, 500, 1000, 1500, 2000, 2500, 3000, 6000},
 	})
 
 	blockComputationUsed := promauto.NewHistogram(prometheus.HistogramOpts{
-		Namespace: namespaceExecution,
-		Subsystem: subsystemRuntime,
+		Namespace: internal.NamespaceExecution,
+		Subsystem: internal.SubsystemRuntime,
 		Name:      "block_computation_used",
 		Help:      "the total amount of computation used by a block",
 		Buckets:   []float64{1000, 10000, 100000, 500000, 1000000, 5000000, 10000000},
 	})
 
 	blockMemoryUsed := promauto.NewHistogram(prometheus.HistogramOpts{
-		Namespace: namespaceExecution,
-		Subsystem: subsystemRuntime,
+		Namespace: internal.NamespaceExecution,
+		Subsystem: internal.SubsystemRuntime,
 		Name:      "block_memory_used",
 		Help:      "the total amount of memory (cadence estimate) used by a block",
 		Buckets:   []float64{100_000_000, 1_000_000_000, 5_000_000_000, 10_000_000_000, 50_000_000_000, 100_000_000_000, 500_000_000_000, 1_000_000_000_000, 5_000_000_000_000, 10_000_000_000_000},
 	})
 
 	blockEventCounts := promauto.NewHistogram(prometheus.HistogramOpts{
-		Namespace: namespaceExecution,
-		Subsystem: subsystemRuntime,
+		Namespace: internal.NamespaceExecution,
+		Subsystem: internal.SubsystemRuntime,
 		Name:      "block_event_counts",
 		Help:      "the total number of events emitted during a block execution",
 		Buckets:   []float64{10, 20, 50, 100, 200, 500, 1000, 2000, 5000, 10000},
 	})
 
 	blockEventSize := promauto.NewHistogram(prometheus.HistogramOpts{
-		Namespace: namespaceExecution,
-		Subsystem: subsystemRuntime,
+		Namespace: internal.NamespaceExecution,
+		Subsystem: internal.SubsystemRuntime,
 		Name:      "block_event_size",
 		Help:      "the total number of bytes used by events emitted during a block execution",
 		Buckets:   []float64{1_000, 10_000, 100_000, 500_000, 1_000_000, 5_000_000, 10_000_000, 50_000_000, 100_000_000, 500_000_000},
 	})
 
 	blockComputationVector := promauto.NewGaugeVec(prometheus.GaugeOpts{
-		Namespace: namespaceExecution,
-		Subsystem: subsystemRuntime,
+		Namespace: internal.NamespaceExecution,
+		Subsystem: internal.SubsystemRuntime,
 		Name:      "block_execution_effort_vector",
 		Help:      "execution effort vector of the last executed block by computation kind",
 	}, []string{LabelComputationKind})
 
 	blockCachedPrograms := promauto.NewGauge(prometheus.GaugeOpts{
-		Namespace: namespaceExecution,
-		Subsystem: subsystemRuntime,
+		Namespace: internal.NamespaceExecution,
+		Subsystem: internal.SubsystemRuntime,
 		Name:      "block_execution_cached_programs",
 		Help:      "Number of cached programs at the end of block execution",
 	})
 
 	blockTransactionCounts := promauto.NewHistogram(prometheus.HistogramOpts{
-		Namespace: namespaceExecution,
-		Subsystem: subsystemRuntime,
+		Namespace: internal.NamespaceExecution,
+		Subsystem: internal.SubsystemRuntime,
 		Name:      "block_transaction_counts",
 		Help:      "the total number of transactions per block",
 		Buckets:   prometheus.ExponentialBuckets(4, 2, 10),
 	})
 
 	blockCollectionCounts := promauto.NewHistogram(prometheus.HistogramOpts{
-		Namespace: namespaceExecution,
-		Subsystem: subsystemRuntime,
+		Namespace: internal.NamespaceExecution,
+		Subsystem: internal.SubsystemRuntime,
 		Name:      "block_collection_counts",
 		Help:      "the total number of collections per block",
 		Buckets:   prometheus.ExponentialBuckets(1, 2, 8),
 	})
 
 	collectionExecutionTime := promauto.NewHistogram(prometheus.HistogramOpts{
-		Namespace: namespaceExecution,
-		Subsystem: subsystemRuntime,
+		Namespace: internal.NamespaceExecution,
+		Subsystem: internal.SubsystemRuntime,
 		Name:      "collection_execution_time_milliseconds",
 		Help:      "the total time spent on collection execution in milliseconds",
 		Buckets:   []float64{100, 200, 500, 1000, 1500, 2000},
 	})
 
 	collectionComputationUsed := promauto.NewHistogram(prometheus.HistogramOpts{
-		Namespace: namespaceExecution,
-		Subsystem: subsystemRuntime,
+		Namespace: internal.NamespaceExecution,
+		Subsystem: internal.SubsystemRuntime,
 		Name:      "collection_computation_used",
 		Help:      "the total amount of computation used by a collection",
 		Buckets:   []float64{1000, 10000, 50000, 100000, 500000, 1000000},
 	})
 
 	collectionMemoryUsed := promauto.NewHistogram(prometheus.HistogramOpts{
-		Namespace: namespaceExecution,
-		Subsystem: subsystemRuntime,
+		Namespace: internal.NamespaceExecution,
+		Subsystem: internal.SubsystemRuntime,
 		Name:      "collection_memory_used",
 		Help:      "the total amount of memory used (cadence estimate) by a collection",
 		Buckets:   []float64{10_000_000, 100_000_000, 1_000_000_000, 5_000_000_000, 10_000_000_000, 50_000_000_000, 100_000_000_000, 500_000_000_000, 1_000_000_000_000, 5_000_000_000_000},
 	})
 
 	collectionEventSize := promauto.NewHistogram(prometheus.HistogramOpts{
-		Namespace: namespaceExecution,
-		Subsystem: subsystemRuntime,
+		Namespace: internal.NamespaceExecution,
+		Subsystem: internal.SubsystemRuntime,
 		Name:      "collection_event_size",
 		Help:      "the total byte size used by all events generated during a collection execution",
 		Buckets:   []float64{100, 1000, 10000, 100000, 10000000, 100000000, 1000000000},
 	})
 
 	collectionEventCounts := promauto.NewHistogram(prometheus.HistogramOpts{
-		Namespace: namespaceExecution,
-		Subsystem: subsystemRuntime,
+		Namespace: internal.NamespaceExecution,
+		Subsystem: internal.SubsystemRuntime,
 		Name:      "collection_event_counts",
 		Help:      "the total number of events emitted per collection",
 		Buckets:   prometheus.ExponentialBuckets(4, 2, 8),
 	})
 
 	collectionNumberOfRegistersTouched := promauto.NewHistogram(prometheus.HistogramOpts{
-		Namespace: namespaceExecution,
-		Subsystem: subsystemRuntime,
+		Namespace: internal.NamespaceExecution,
+		Subsystem: internal.SubsystemRuntime,
 		Name:      "collection_number_of_registers_touched",
 		Help:      "the total number of registers touched during collection execution",
 		Buckets:   prometheus.ExponentialBuckets(10, 2, 12),
 	})
 
 	collectionTotalBytesWrittenToRegisters := promauto.NewHistogram(prometheus.HistogramOpts{
-		Namespace: namespaceExecution,
-		Subsystem: subsystemRuntime,
+		Namespace: internal.NamespaceExecution,
+		Subsystem: internal.SubsystemRuntime,
 		Name:      "collection_total_number_of_bytes_written_to_registers",
 		Help:      "the total number of bytes written to registers during collection execution",
 		Buckets:   prometheus.ExponentialBuckets(1000, 2, 16),
 	})
 
 	collectionTransactionCounts := promauto.NewHistogram(prometheus.HistogramOpts{
-		Namespace: namespaceExecution,
-		Subsystem: subsystemRuntime,
+		Namespace: internal.NamespaceExecution,
+		Subsystem: internal.SubsystemRuntime,
 		Name:      "collection_transaction_counts",
 		Help:      "the total number of transactions per collection",
 		Buckets:   prometheus.ExponentialBuckets(4, 2, 8),
 	})
 
 	collectionRequestsSent := promauto.NewCounter(prometheus.CounterOpts{
-		Namespace: namespaceExecution,
-		Subsystem: subsystemIngestion,
+		Namespace: internal.NamespaceExecution,
+		Subsystem: internal.SubsystemIngestion,
 		Name:      "collection_requests_sent",
 		Help:      "the number of collection requests sent",
 	})
 
 	collectionRequestsRetries := promauto.NewCounter(prometheus.CounterOpts{
-		Namespace: namespaceExecution,
-		Subsystem: subsystemIngestion,
+		Namespace: internal.NamespaceExecution,
+		Subsystem: internal.SubsystemIngestion,
 		Name:      "collection_requests_retries",
 		Help:      "the number of collection requests retried",
 	})
 
 	transactionParseTime := promauto.NewHistogram(prometheus.HistogramOpts{
-		Namespace: namespaceExecution,
-		Subsystem: subsystemRuntime,
+		Namespace: internal.NamespaceExecution,
+		Subsystem: internal.SubsystemRuntime,
 		Name:      "transaction_parse_time_nanoseconds",
 		Help:      "the parse time for a transaction in nanoseconds",
 		Buckets:   prometheus.ExponentialBuckets(10, 10, 8),
 	})
 
 	transactionCheckTime := promauto.NewHistogram(prometheus.HistogramOpts{
-		Namespace: namespaceExecution,
-		Subsystem: subsystemRuntime,
+		Namespace: internal.NamespaceExecution,
+		Subsystem: internal.SubsystemRuntime,
 		Name:      "transaction_check_time_nanoseconds",
 		Help:      "the checking time for a transaction in nanoseconds",
 		Buckets:   prometheus.ExponentialBuckets(10, 10, 8),
 	})
 
 	transactionInterpretTime := promauto.NewHistogram(prometheus.HistogramOpts{
-		Namespace: namespaceExecution,
-		Subsystem: subsystemRuntime,
+		Namespace: internal.NamespaceExecution,
+		Subsystem: internal.SubsystemRuntime,
 		Name:      "transaction_interpret_time_nanoseconds",
 		Help:      "the interpretation time for a transaction in nanoseconds",
 		Buckets:   prometheus.ExponentialBuckets(10, 10, 8),
 	})
 
 	transactionExecutionTime := promauto.NewHistogram(prometheus.HistogramOpts{
-		Namespace: namespaceExecution,
-		Subsystem: subsystemRuntime,
+		Namespace: internal.NamespaceExecution,
+		Subsystem: internal.SubsystemRuntime,
 		Name:      "transaction_execution_time_milliseconds",
 		Help:      "the total time spent on transaction execution in milliseconds",
 		Buckets:   prometheus.ExponentialBuckets(2, 2, 10),
 	})
 
 	transactionConflictRetries := promauto.NewHistogram(prometheus.HistogramOpts{
-		Namespace: namespaceExecution,
-		Subsystem: subsystemRuntime,
+		Namespace: internal.NamespaceExecution,
+		Subsystem: internal.SubsystemRuntime,
 		Name:      "transaction_conflict_retries",
 		Help:      "the number of conflict retries needed to successfully commit a transaction.  If retry count is high, consider reducing concurrency",
 		Buckets:   []float64{0, 1, 2, 3, 4, 5, 10, 20, 30, 40, 50, 100},
 	})
 
 	transactionComputationUsed := promauto.NewHistogram(prometheus.HistogramOpts{
-		Namespace: namespaceExecution,
-		Subsystem: subsystemRuntime,
+		Namespace: internal.NamespaceExecution,
+		Subsystem: internal.SubsystemRuntime,
 		Name:      "transaction_computation_used",
 		Help:      "the total amount of computation used by a transaction",
 		Buckets:   []float64{50, 100, 500, 1000, 5000, 10000},
 	})
 
 	transactionMemoryEstimate := promauto.NewHistogram(prometheus.HistogramOpts{
-		Namespace: namespaceExecution,
-		Subsystem: subsystemRuntime,
+		Namespace: internal.NamespaceExecution,
+		Subsystem: internal.SubsystemRuntime,
 		Name:      "transaction_memory_estimate",
 		Help:      "the estimated memory used by a transaction",
 		Buckets:   []float64{1_000_000, 10_000_000, 100_000_000, 1_000_000_000, 5_000_000_000, 10_000_000_000, 50_000_000_000, 100_000_000_000},
 	})
 
 	transactionEmittedEvents := promauto.NewHistogram(prometheus.HistogramOpts{
-		Namespace: namespaceExecution,
-		Subsystem: subsystemRuntime,
+		Namespace: internal.NamespaceExecution,
+		Subsystem: internal.SubsystemRuntime,
 		Name:      "transaction_emitted_events",
 		Help:      "the total number of events emitted by a transaction",
 		Buckets:   prometheus.ExponentialBuckets(2, 2, 10),
 	})
 
 	transactionEventSize := promauto.NewHistogram(prometheus.HistogramOpts{
-		Namespace: namespaceExecution,
-		Subsystem: subsystemRuntime,
+		Namespace: internal.NamespaceExecution,
+		Subsystem: internal.SubsystemRuntime,
 		Name:      "transaction_event_size",
 		Help:      "the total number bytes used of events emitted during a transaction execution",
 		Buckets:   prometheus.ExponentialBuckets(100, 2, 12),
 	})
 
 	scriptExecutionTime := promauto.NewHistogram(prometheus.HistogramOpts{
-		Namespace: namespaceExecution,
-		Subsystem: subsystemRuntime,
+		Namespace: internal.NamespaceExecution,
+		Subsystem: internal.SubsystemRuntime,
 		Name:      "script_execution_time_milliseconds",
 		Help:      "the total time spent on script execution in milliseconds",
 		Buckets:   []float64{2, 4, 8, 16, 32, 64, 100, 250, 500},
 	})
 
 	scriptComputationUsed := promauto.NewHistogram(prometheus.HistogramOpts{
-		Namespace: namespaceExecution,
-		Subsystem: subsystemRuntime,
+		Namespace: internal.NamespaceExecution,
+		Subsystem: internal.SubsystemRuntime,
 		Name:      "script_computation_used",
 		Help:      "the total amount of computation used by an script",
 		Buckets:   []float64{50, 100, 500, 1000, 5000, 10000},
 	})
 
 	scriptMemoryUsage := promauto.NewHistogram(prometheus.HistogramOpts{
-		Namespace: namespaceExecution,
-		Subsystem: subsystemRuntime,
+		Namespace: internal.NamespaceExecution,
+		Subsystem: internal.SubsystemRuntime,
 		Name:      "script_memory_usage",
 		Help:      "the total amount of memory allocated by a script",
 		Buckets:   []float64{100_000, 1_000_000, 10_000_000, 50_000_000, 100_000_000, 500_000_000, 1_000_000_000},
 	})
 
 	scriptMemoryEstimate := promauto.NewHistogram(prometheus.HistogramOpts{
-		Namespace: namespaceExecution,
-		Subsystem: subsystemRuntime,
+		Namespace: internal.NamespaceExecution,
+		Subsystem: internal.SubsystemRuntime,
 		Name:      "script_memory_estimate",
 		Help:      "the estimated memory used by a script",
 		Buckets:   []float64{1_000_000, 10_000_000, 100_000_000, 1_000_000_000, 5_000_000_000, 10_000_000_000, 50_000_000_000, 100_000_000_000},
 	})
 
 	scriptMemoryDifference := promauto.NewHistogram(prometheus.HistogramOpts{
-		Namespace: namespaceExecution,
-		Subsystem: subsystemRuntime,
+		Namespace: internal.NamespaceExecution,
+		Subsystem: internal.SubsystemRuntime,
 		Name:      "script_memory_difference",
 		Help:      "the difference in actual memory usage and estimate for a script",
 		Buckets:   []float64{-1, 0, 10_000_000, 100_000_000, 1_000_000_000},
 	})
 
 	chunkDataPackRequestProcessedTotal := promauto.NewCounter(prometheus.CounterOpts{
-		Namespace: namespaceExecution,
-		Subsystem: subsystemProvider,
+		Namespace: internal.NamespaceExecution,
+		Subsystem: internal.SubsystemProvider,
 		Name:      "chunk_data_packs_requested_total",
 		Help:      "the total number of chunk data pack requests processed by provider engine",
 	})
 
 	chunkDataPackProofSize := promauto.NewHistogram(prometheus.HistogramOpts{
-		Namespace: namespaceExecution,
-		Subsystem: subsystemIngestion,
+		Namespace: internal.NamespaceExecution,
+		Subsystem: internal.SubsystemIngestion,
 		Name:      "chunk_data_pack_proof_size",
 		Help:      "the total number bytes used for storing proof part of chunk data pack",
 		Buckets:   prometheus.ExponentialBuckets(1000, 2, 16),
 	})
 
 	chunkDataPackCollectionSize := promauto.NewHistogram(prometheus.HistogramOpts{
-		Namespace: namespaceExecution,
-		Subsystem: subsystemIngestion,
+		Namespace: internal.NamespaceExecution,
+		Subsystem: internal.SubsystemIngestion,
 		Name:      "chunk_data_pack_collection_size",
 		Help:      "the total number transactions in the collection",
 		Buckets:   prometheus.ExponentialBuckets(1, 2, 10),
 	})
 
 	blockDataUploadsInProgress := promauto.NewGauge(prometheus.GaugeOpts{
-		Namespace: namespaceExecution,
-		Subsystem: subsystemBlockDataUploader,
+		Namespace: internal.NamespaceExecution,
+		Subsystem: internal.SubsystemBlockDataUploader,
 		Name:      "block_data_upload_in_progress",
 		Help:      "number of concurrently running Block Data upload operations",
 	})
 
 	blockDataUploadsDuration := promauto.NewHistogram(prometheus.HistogramOpts{
-		Namespace: namespaceExecution,
-		Subsystem: subsystemBlockDataUploader,
+		Namespace: internal.NamespaceExecution,
+		Subsystem: internal.SubsystemBlockDataUploader,
 		Name:      "block_data_upload_duration_ms",
 		Help:      "the duration of update upload operation",
 		Buckets:   []float64{1, 100, 500, 1000, 2000},
 	})
 
 	computationResultUploadedCount := promauto.NewCounter(prometheus.CounterOpts{
-		Namespace: namespaceExecution,
-		Subsystem: subsystemProvider,
+		Namespace: internal.NamespaceExecution,
+		Subsystem: internal.SubsystemProvider,
 		Name:      "computation_result_uploaded_count",
 		Help:      "the total count of computation result uploaded",
 	})
 
 	computationResultUploadRetriedCount := promauto.NewCounter(prometheus.CounterOpts{
-		Namespace: namespaceExecution,
-		Subsystem: subsystemProvider,
+		Namespace: internal.NamespaceExecution,
+		Subsystem: internal.SubsystemProvider,
 		Name:      "computation_result_upload_retried_count",
 		Help:      "the total count of computation result upload retried",
 	})
@@ -582,93 +583,93 @@ func NewExecutionCollector(tracer module.Tracer) *ExecutionCollector {
 		computationResultUploadedCount:         computationResultUploadedCount,
 		computationResultUploadRetriedCount:    computationResultUploadRetriedCount,
 		totalExecutedBlocksCounter: promauto.NewCounter(prometheus.CounterOpts{
-			Namespace: namespaceExecution,
-			Subsystem: subsystemRuntime,
+			Namespace: internal.NamespaceExecution,
+			Subsystem: internal.SubsystemRuntime,
 			Name:      "total_executed_blocks",
 			Help:      "the total number of blocks that have been executed",
 		}),
 
 		totalExecutedCollectionsCounter: promauto.NewCounter(prometheus.CounterOpts{
-			Namespace: namespaceExecution,
-			Subsystem: subsystemRuntime,
+			Namespace: internal.NamespaceExecution,
+			Subsystem: internal.SubsystemRuntime,
 			Name:      "total_executed_collections",
 			Help:      "the total number of collections that have been executed",
 		}),
 
 		totalExecutedTransactionsCounter: promauto.NewCounter(prometheus.CounterOpts{
-			Namespace: namespaceExecution,
-			Subsystem: subsystemRuntime,
+			Namespace: internal.NamespaceExecution,
+			Subsystem: internal.SubsystemRuntime,
 			Name:      "total_executed_transactions",
 			Help:      "the total number of transactions that have been executed",
 		}),
 
 		totalFailedTransactionsCounter: promauto.NewCounter(prometheus.CounterOpts{
-			Namespace: namespaceExecution,
-			Subsystem: subsystemRuntime,
+			Namespace: internal.NamespaceExecution,
+			Subsystem: internal.SubsystemRuntime,
 			Name:      "total_failed_transactions",
 			Help:      "the total number of transactions that has failed when executed",
 		}),
 
 		totalExecutedScriptsCounter: promauto.NewCounter(prometheus.CounterOpts{
-			Namespace: namespaceExecution,
-			Subsystem: subsystemRuntime,
+			Namespace: internal.NamespaceExecution,
+			Subsystem: internal.SubsystemRuntime,
 			Name:      "total_executed_scripts",
 			Help:      "the total number of scripts that have been executed",
 		}),
 
 		lastExecutedBlockHeightGauge: promauto.NewGauge(prometheus.GaugeOpts{
-			Namespace: namespaceExecution,
-			Subsystem: subsystemRuntime,
+			Namespace: internal.NamespaceExecution,
+			Subsystem: internal.SubsystemRuntime,
 			Name:      "last_executed_block_height",
 			Help:      "the last height that was executed",
 		}),
 
 		stateStorageDiskTotal: promauto.NewGauge(prometheus.GaugeOpts{
-			Namespace: namespaceExecution,
-			Subsystem: subsystemStateStorage,
+			Namespace: internal.NamespaceExecution,
+			Subsystem: internal.SubsystemStateStorage,
 			Name:      "data_size_bytes",
 			Help:      "the execution state size on disk in bytes",
 		}),
 
 		storageStateCommitment: promauto.NewGauge(prometheus.GaugeOpts{
-			Namespace: namespaceExecution,
-			Subsystem: subsystemStateStorage,
+			Namespace: internal.NamespaceExecution,
+			Subsystem: internal.SubsystemStateStorage,
 			Name:      "commitment_size_bytes",
 			Help:      "the storage size of a state commitment in bytes",
 		}),
 
 		stateSyncActive: promauto.NewGauge(prometheus.GaugeOpts{
-			Namespace: namespaceExecution,
-			Subsystem: subsystemIngestion,
+			Namespace: internal.NamespaceExecution,
+			Subsystem: internal.SubsystemIngestion,
 			Name:      "state_sync_active",
 			Help:      "indicates if the state sync is active",
 		}),
 
 		numberOfAccounts: promauto.NewGauge(prometheus.GaugeOpts{
-			Namespace: namespaceExecution,
-			Subsystem: subsystemRuntime,
+			Namespace: internal.NamespaceExecution,
+			Subsystem: internal.SubsystemRuntime,
 			Name:      "number_of_accounts",
 			Help:      "the number of existing accounts on the network",
 		}),
 
 		programsCacheMiss: promauto.NewCounter(prometheus.CounterOpts{
-			Namespace: namespaceExecution,
-			Subsystem: subsystemRuntime,
+			Namespace: internal.NamespaceExecution,
+			Subsystem: internal.SubsystemRuntime,
 			Name:      "programs_cache_miss",
 			Help:      "the number of times a program was not found in the cache and had to be loaded",
 		}),
 
 		programsCacheHit: promauto.NewCounter(prometheus.CounterOpts{
-			Namespace: namespaceExecution,
-			Subsystem: subsystemRuntime,
+			Namespace: internal.NamespaceExecution,
+			Subsystem: internal.SubsystemRuntime,
 			Name:      "programs_cache_hit",
 			Help:      "the number of times a program was found in the cache",
 		}),
 
 		maxCollectionHeight: prometheus.NewGauge(prometheus.GaugeOpts{
 			Name:      "max_collection_height",
-			Namespace: namespaceExecution,
-			Subsystem: subsystemIngestion,
+			Namespace: internal.NamespaceExecution,
+			Subsystem: internal.SubsystemIngestion,
 			Help:      "gauge to track the maximum block height of collections received",
 		}),
 	}

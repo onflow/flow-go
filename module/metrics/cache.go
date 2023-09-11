@@ -5,6 +5,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promauto"
 
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/metrics/internal"
 )
 
 type CacheCollector struct {
@@ -20,32 +21,32 @@ func NewCacheCollector(chain flow.ChainID) *CacheCollector {
 
 		entries: promauto.NewGaugeVec(prometheus.GaugeOpts{
 			Name:        "entries_total",
-			Namespace:   namespaceStorage,
-			Subsystem:   subsystemCache,
+			Namespace:   internal.NamespaceStorage,
+			Subsystem:   internal.SubsystemCache,
 			Help:        "the number of entries in the cache",
 			ConstLabels: prometheus.Labels{LabelChain: chain.String()},
 		}, []string{LabelResource}),
 
 		hits: promauto.NewCounterVec(prometheus.CounterOpts{
 			Name:        "hits_total",
-			Namespace:   namespaceStorage,
-			Subsystem:   subsystemCache,
+			Namespace:   internal.NamespaceStorage,
+			Subsystem:   internal.SubsystemCache,
 			Help:        "the number of hits for the cache",
 			ConstLabels: prometheus.Labels{LabelChain: chain.String()},
 		}, []string{LabelResource}),
 
 		notfounds: promauto.NewCounterVec(prometheus.CounterOpts{
 			Name:        "notfounds_total",
-			Namespace:   namespaceStorage,
-			Subsystem:   subsystemCache,
+			Namespace:   internal.NamespaceStorage,
+			Subsystem:   internal.SubsystemCache,
 			Help:        "the number of times the queried item was not found in either cache or database",
 			ConstLabels: prometheus.Labels{LabelChain: chain.String()},
 		}, []string{LabelResource}),
 
 		misses: promauto.NewCounterVec(prometheus.CounterOpts{
 			Name:        "misses_total",
-			Namespace:   namespaceStorage,
-			Subsystem:   subsystemCache,
+			Namespace:   internal.NamespaceStorage,
+			Subsystem:   internal.SubsystemCache,
 			Help:        "the number of times the queried item was not found in cache, but found in database",
 			ConstLabels: prometheus.Labels{LabelChain: chain.String()},
 		}, []string{LabelResource}),

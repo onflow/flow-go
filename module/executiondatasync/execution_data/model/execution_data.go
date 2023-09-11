@@ -1,4 +1,4 @@
-package execution_data
+package model
 
 import (
 	"github.com/onflow/flow-go/ledger"

@@ -8,6 +8,7 @@ import (
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/metrics/internal"
 )
 
 type ComplianceCollector struct {
@@ -38,105 +39,105 @@ func NewComplianceCollector() *ComplianceCollector {
 
 		currentEpochCounter: promauto.NewGauge(prometheus.GaugeOpts{
 			Name:      "current_epoch_counter",
-			Namespace: namespaceConsensus,
-			Subsystem: subsystemCompliance,
+			Namespace: internal.NamespaceConsensus,
+			Subsystem: internal.SubsystemCompliance,
 			Help:      "the current epoch's counter",
 		}),
 
 		currentEpochPhase: promauto.NewGauge(prometheus.GaugeOpts{
 			Name:      "current_epoch_phase",
-			Namespace: namespaceConsensus,
-			Subsystem: subsystemCompliance,
+			Namespace: internal.NamespaceConsensus,
+			Subsystem: internal.SubsystemCompliance,
 			Help:      "the current epoch's phase",
 		}),
 
 		committedEpochFinalView: promauto.NewGauge(prometheus.GaugeOpts{
 			Name:      "committed_epoch_final_view",
-			Namespace: namespaceConsensus,
-			Subsystem: subsystemCompliance,
+			Namespace: internal.NamespaceConsensus,
+			Subsystem: internal.SubsystemCompliance,
 			Help:      "the final view of the committed epoch with the greatest counter",
 		}),
 
 		lastEpochTransitionHeight: promauto.NewGauge(prometheus.GaugeOpts{
 			Name:      "last_epoch_transition_height",
-			Namespace: namespaceConsensus,
-			Subsystem: subsystemCompliance,
+			Namespace: internal.NamespaceConsensus,
+			Subsystem: internal.SubsystemCompliance,
 			Help:      "the height of the most recent finalized epoch transition; in other words the height of the first block of the current epoch",
 		}),
 
 		currentEpochFinalView: promauto.NewGauge(prometheus.GaugeOpts{
 			Name:      "current_epoch_final_view",
-			Namespace: namespaceConsensus,
-			Subsystem: subsystemCompliance,
+			Namespace: internal.NamespaceConsensus,
+			Subsystem: internal.SubsystemCompliance,
 			Help:      "the final view of the current epoch",
 		}),
 
 		currentDKGPhase1FinalView: promauto.NewGauge(prometheus.GaugeOpts{
 			Name:      "current_dkg_phase1_final_view",
-			Namespace: namespaceConsensus,
-			Subsystem: subsystemCompliance,
+			Namespace: internal.NamespaceConsensus,
+			Subsystem: internal.SubsystemCompliance,
 			Help:      "the final view of phase 1 of the current epochs DKG",
 		}),
 		currentDKGPhase2FinalView: promauto.NewGauge(prometheus.GaugeOpts{
 			Name:      "current_dkg_phase2_final_view",
-			Namespace: namespaceConsensus,
-			Subsystem: subsystemCompliance,
+			Namespace: internal.NamespaceConsensus,
+			Subsystem: internal.SubsystemCompliance,
 			Help:      "the final view of phase 2 of current epochs DKG",
 		}),
 
 		currentDKGPhase3FinalView: promauto.NewGauge(prometheus.GaugeOpts{
 			Name:      "current_dkg_phase3_final_view",
-			Namespace: namespaceConsensus,
-			Subsystem: subsystemCompliance,
+			Namespace: internal.NamespaceConsensus,
+			Subsystem: internal.SubsystemCompliance,
 			Help:      "the final view of phase 3 of the current epochs DKG (a successful DKG will end shortly after this view)",
 		}),
 
 		finalizedHeight: promauto.NewGauge(prometheus.GaugeOpts{
 			Name:      "finalized_height",
-			Namespace: namespaceConsensus,
-			Subsystem: subsystemCompliance,
+			Namespace: internal.NamespaceConsensus,
+			Subsystem: internal.SubsystemCompliance,
 			Help:      "the last finalized height",
 		}),
 
 		sealedHeight: promauto.NewGauge(prometheus.GaugeOpts{
 			Name:      "sealed_height",
-			Namespace: namespaceConsensus,
-			Subsystem: subsystemCompliance,
+			Namespace: internal.NamespaceConsensus,
+			Subsystem: internal.SubsystemCompliance,
 			Help:      "the last sealed height",
 		}),
 
 		finalizedBlocks: promauto.NewCounterVec(prometheus.CounterOpts{
 			Name:      "finalized_blocks_total",
-			Namespace: namespaceConsensus,
-			Subsystem: subsystemCompliance,
+			Namespace: internal.NamespaceConsensus,
+			Subsystem: internal.SubsystemCompliance,
 			Help:      "the number of finalized blocks",
 		}, []string{LabelProposer}),
 
 		sealedBlocks: promauto.NewCounter(prometheus.CounterOpts{
 			Name:      "sealed_blocks_total",
-			Namespace: namespaceConsensus,
-			Subsystem: subsystemCompliance,
+			Namespace: internal.NamespaceConsensus,
+			Subsystem: internal.SubsystemCompliance,
 			Help:      "the number of sealed blocks",
 		}),
 
 		finalizedPayload: promauto.NewCounterVec(prometheus.CounterOpts{
 			Name:      "finalized_payload_total",
-			Namespace: namespaceConsensus,
-			Subsystem: subsystemCompliance,
+			Namespace: internal.NamespaceConsensus,
+			Subsystem: internal.SubsystemCompliance,
 			Help:      "the number of resources in finalized blocks",
 		}, []string{LabelResource}),
 
 		sealedPayload: promauto.NewCounterVec(prometheus.CounterOpts{
 			Name:      "sealed_payload_total",
-			Namespace: namespaceConsensus,
-			Subsystem: subsystemCompliance,
+			Namespace: internal.NamespaceConsensus,
+			Subsystem: internal.SubsystemCompliance,
 			Help:      "the number of resources in sealed blocks",
 		}, []string{LabelResource}),
 
 		finalizedBlocksPerSecond: promauto.NewSummary(prometheus.SummaryOpts{
 			Name:      "finalized_blocks_per_second",
-			Namespace: namespaceConsensus,
-			Subsystem: subsystemCompliance,
+			Namespace: internal.NamespaceConsensus,
+			Subsystem: internal.SubsystemCompliance,
 			Help:      "the number of finalized blocks per second/the finalized block rate",
 			Objectives: map[float64]float64{
 				0.01: 0.001,
@@ -152,8 +153,8 @@ func NewComplianceCollector() *ComplianceCollector {
 
 		epochEmergencyFallbackTriggered: promauto.NewGauge(prometheus.GaugeOpts{
 			Name:      "epoch_fallback_triggered",
-			Namespace: namespaceConsensus,
-			Subsystem: subsystemCompliance,
+			Namespace: internal.NamespaceConsensus,
+			Subsystem: internal.SubsystemCompliance,
 			Help:      "indicates whether epoch emergency fallback is triggered; if >0, the fallback is triggered",
 		}),
 	}

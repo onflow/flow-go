@@ -9,7 +9,7 @@ import (
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/ledger/common/testutils"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
+	"github.com/onflow/flow-go/module/executiondatasync/execution_data/model"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -20,7 +20,7 @@ func TestConvertBlockExecutionData(t *testing.T) {
 	events := unittest.EventsFixture(5)
 
 	chunks := 5
-	chunkData := make([]*execution_data.ChunkExecutionData, 0, chunks)
+	chunkData := make([]*model.ChunkExecutionData, 0, chunks)
 	for i := 0; i < chunks-1; i++ {
 		ced := unittest.ChunkExecutionDataFixture(t,
 			0, // updates set explicitly to target 160-320KB per chunk
@@ -29,7 +29,7 @@ func TestConvertBlockExecutionData(t *testing.T) {
 		)
 		chunkData = append(chunkData, ced)
 	}
-	makeServiceTx := func(ced *execution_data.ChunkExecutionData) {
+	makeServiceTx := func(ced *model.ChunkExecutionData) {
 		// proposal key and payer are empty addresses for service tx
 		collection := unittest.CollectionFixture(1)
 		collection.Transactions[0].ProposalKey.Address = flow.EmptyAddress
@@ -39,7 +39,7 @@ func TestConvertBlockExecutionData(t *testing.T) {
 		// the service chunk sometimes does not have any trie updates
 		ced.TrieUpdate = nil
 	}
-	chunk := unittest.ChunkExecutionDataFixture(t, execution_data.DefaultMaxBlobSize/5, unittest.WithChunkEvents(events), makeServiceTx)
+	chunk := unittest.ChunkExecutionDataFixture(t, model.DefaultMaxBlobSize/5, unittest.WithChunkEvents(events), makeServiceTx)
 	chunkData = append(chunkData, chunk)
 
 	blockData := unittest.BlockExecutionDataFixture(unittest.WithChunkExecutionDatas(chunkData...))

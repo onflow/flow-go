@@ -11,6 +11,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/mempool/herocache/backdata/heropool"
+	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/utils/logging"
 )
 
@@ -147,6 +148,12 @@ func NewCache(sizeLimit uint32,
 	}
 
 	return bd
+}
+
+// NewCacheWithNoopLoggerAndMetrics is a helper function to create a new Cache with a no-op logger and metrics collector.
+// This is useful for lower-level components that do not need to log or collect metrics, and want to avoid the overhead of import cycles.
+func NewCacheWithNoopLoggerAndMetrics(sizeLimit uint32, oversizeFactor uint32, ejectionMode heropool.EjectionMode, opts ...CacheOpt) *Cache {
+	return NewCache(sizeLimit, oversizeFactor, ejectionMode, zerolog.Nop(), metrics.NewNoopCollector(), opts...)
 }
 
 // Has checks if backdata already contains the entity with the given identifier.

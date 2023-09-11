@@ -6,6 +6,8 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
+
+	"github.com/onflow/flow-go/module/metrics/internal"
 )
 
 type ExecutionDataRequesterV2Collector struct {
@@ -24,20 +26,20 @@ func NewExecutionDataRequesterV2Collector() *ExecutionDataRequesterV2Collector {
 	return &ExecutionDataRequesterV2Collector{
 		fulfilledHeight: promauto.NewGauge(prometheus.GaugeOpts{
 			Name:      "fulfilled_height",
-			Namespace: namespaceExecutionDataSync,
-			Subsystem: subsystemExeDataRequester,
+			Namespace: internal.NamespaceExecutionDataSync,
+			Subsystem: internal.SubsystemExeDataRequester,
 			Help:      "the latest sealed height for which all execution data has been retrieved and stored locally",
 		}),
 		receiptsSkipped: promauto.NewCounter(prometheus.CounterOpts{
 			Name:      "receipts_skipped",
-			Namespace: namespaceExecutionDataSync,
-			Subsystem: subsystemExeDataRequester,
+			Namespace: internal.NamespaceExecutionDataSync,
+			Subsystem: internal.SubsystemExeDataRequester,
 			Help:      "the number of skipped receipts",
 		}),
 		requestDurations: promauto.NewSummary(prometheus.SummaryOpts{
 			Name:      "request_durations_ms",
-			Namespace: namespaceExecutionDataSync,
-			Subsystem: subsystemExeDataRequester,
+			Namespace: internal.NamespaceExecutionDataSync,
+			Subsystem: internal.SubsystemExeDataRequester,
 			Help:      "the durations of requests in milliseconds",
 			Objectives: map[float64]float64{
 				0.01: 0.001,
@@ -51,14 +53,14 @@ func NewExecutionDataRequesterV2Collector() *ExecutionDataRequesterV2Collector {
 		}),
 		latestSuccessfulRequestHeight: promauto.NewGauge(prometheus.GaugeOpts{
 			Name:      "latest_successful_request_height",
-			Namespace: namespaceExecutionDataSync,
-			Subsystem: subsystemExeDataRequester,
+			Namespace: internal.NamespaceExecutionDataSync,
+			Subsystem: internal.SubsystemExeDataRequester,
 			Help:      "the block height of the latest successful request",
 		}),
 		executionDataSizes: promauto.NewSummary(prometheus.SummaryOpts{
 			Name:      "execution_data_sizes_bytes",
-			Namespace: namespaceExecutionDataSync,
-			Subsystem: subsystemExeDataRequester,
+			Namespace: internal.NamespaceExecutionDataSync,
+			Subsystem: internal.SubsystemExeDataRequester,
 			Help:      "the sizes of Block Execution Data in bytes",
 			Objectives: map[float64]float64{
 				0.01: 0.001,
@@ -72,27 +74,27 @@ func NewExecutionDataRequesterV2Collector() *ExecutionDataRequesterV2Collector {
 		}),
 		requestAttempts: promauto.NewHistogram(prometheus.HistogramOpts{
 			Name:      "request_attempts",
-			Namespace: namespaceExecutionDataSync,
-			Subsystem: subsystemExeDataRequester,
+			Namespace: internal.NamespaceExecutionDataSync,
+			Subsystem: internal.SubsystemExeDataRequester,
 			Buckets:   []float64{1, 2, 3, 4, 5},
 			Help:      "the number of attempts before a request succeeded",
 		}),
 		requestsFailed: promauto.NewCounterVec(prometheus.CounterOpts{
 			Name:      "requests_failed",
-			Namespace: namespaceExecutionDataSync,
-			Subsystem: subsystemExeDataRequester,
+			Namespace: internal.NamespaceExecutionDataSync,
+			Subsystem: internal.SubsystemExeDataRequester,
 			Help:      "the number of failed requests",
 		}, []string{ExecutionDataRequestRetryable}),
 		requestsCancelled: promauto.NewCounter(prometheus.CounterOpts{
 			Name:      "requests_cancelled",
-			Namespace: namespaceExecutionDataSync,
-			Subsystem: subsystemExeDataRequester,
+			Namespace: internal.NamespaceExecutionDataSync,
+			Subsystem: internal.SubsystemExeDataRequester,
 			Help:      "the number of cancelled requests",
 		}),
 		responsesDropped: promauto.NewCounter(prometheus.CounterOpts{
 			Name:      "responses_dropped",
-			Namespace: namespaceExecutionDataSync,
-			Subsystem: subsystemExeDataRequester,
+			Namespace: internal.NamespaceExecutionDataSync,
+			Subsystem: internal.SubsystemExeDataRequester,
 			Help:      "the number of dropped responses",
 		}),
 	}
@@ -138,8 +140,8 @@ func NewExecutionDataProviderCollector() *ExecutionDataProviderCollector {
 	return &ExecutionDataProviderCollector{
 		computeRootIDDurations: promauto.NewSummary(prometheus.SummaryOpts{
 			Name:      "compute_root_id_durations_ms",
-			Namespace: namespaceExecutionDataSync,
-			Subsystem: subsystemExeDataProvider,
+			Namespace: internal.NamespaceExecutionDataSync,
+			Subsystem: internal.SubsystemExeDataProvider,
 			Help:      "the durations of computing root IDs in milliseconds",
 			Objectives: map[float64]float64{
 				0.01: 0.001,
@@ -153,15 +155,15 @@ func NewExecutionDataProviderCollector() *ExecutionDataProviderCollector {
 		}),
 		numberOfChunks: promauto.NewHistogram(prometheus.HistogramOpts{
 			Name:      "number_of_chunks",
-			Namespace: namespaceExecutionDataSync,
-			Subsystem: subsystemExeDataProvider,
+			Namespace: internal.NamespaceExecutionDataSync,
+			Subsystem: internal.SubsystemExeDataProvider,
 			Buckets:   []float64{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25},
 			Help:      "the number of chunks in a Block Execution Data",
 		}),
 		addBlobsDurations: promauto.NewSummary(prometheus.SummaryOpts{
 			Name:      "add_blobs_durations_ms",
-			Namespace: namespaceExecutionDataSync,
-			Subsystem: subsystemExeDataProvider,
+			Namespace: internal.NamespaceExecutionDataSync,
+			Subsystem: internal.SubsystemExeDataProvider,
 			Help:      "the durations of adding blobs in milliseconds",
 			Objectives: map[float64]float64{
 				0.01: 0.001,
@@ -175,8 +177,8 @@ func NewExecutionDataProviderCollector() *ExecutionDataProviderCollector {
 		}),
 		executionDataSizes: promauto.NewSummary(prometheus.SummaryOpts{
 			Name:      "execution_data_sizes_bytes",
-			Namespace: namespaceExecutionDataSync,
-			Subsystem: subsystemExeDataProvider,
+			Namespace: internal.NamespaceExecutionDataSync,
+			Subsystem: internal.SubsystemExeDataProvider,
 			Help:      "the sizes of Block Execution Data in bytes",
 			Objectives: map[float64]float64{
 				0.01: 0.001,
@@ -190,8 +192,8 @@ func NewExecutionDataProviderCollector() *ExecutionDataProviderCollector {
 		}),
 		addBlobsFailed: promauto.NewCounter(prometheus.CounterOpts{
 			Name:      "add_blobs_failed",
-			Namespace: namespaceExecutionDataSync,
-			Subsystem: subsystemExeDataProvider,
+			Namespace: internal.NamespaceExecutionDataSync,
+			Subsystem: internal.SubsystemExeDataProvider,
 			Help:      "the number of failed attempts to add blobs",
 		}),
 	}
@@ -220,8 +222,8 @@ func NewExecutionDataPrunerCollector() *ExecutionDataPrunerCollector {
 	return &ExecutionDataPrunerCollector{
 		pruneDurations: promauto.NewSummary(prometheus.SummaryOpts{
 			Name:      "prune_durations_ms",
-			Namespace: namespaceExecutionDataSync,
-			Subsystem: subsystemExeDataPruner,
+			Namespace: internal.NamespaceExecutionDataSync,
+			Subsystem: internal.SubsystemExeDataPruner,
 			Help:      "the durations of pruning in milliseconds",
 			Objectives: map[float64]float64{
 				0.01: 0.001,
@@ -235,8 +237,8 @@ func NewExecutionDataPrunerCollector() *ExecutionDataPrunerCollector {
 		}),
 		latestHeightPruned: promauto.NewGauge(prometheus.GaugeOpts{
 			Name:      "latest_height_pruned",
-			Namespace: namespaceExecutionDataSync,
-			Subsystem: subsystemExeDataPruner,
+			Namespace: internal.NamespaceExecutionDataSync,
+			Subsystem: internal.SubsystemExeDataPruner,
 			Help:      "the latest height pruned",
 		}),
 	}

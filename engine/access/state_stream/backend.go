@@ -15,6 +15,7 @@ import (
 	"github.com/onflow/flow-go/module/counters"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data/cache"
+	"github.com/onflow/flow-go/module/executiondatasync/execution_data/model"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
 )
@@ -35,11 +36,11 @@ const (
 	DefaultResponseLimit = float64(0)
 )
 
-type GetExecutionDataFunc func(context.Context, uint64) (*execution_data.BlockExecutionDataEntity, error)
+type GetExecutionDataFunc func(context.Context, uint64) (*model.BlockExecutionDataEntity, error)
 type GetStartHeightFunc func(flow.Identifier, uint64) (uint64, error)
 
 type API interface {
-	GetExecutionDataByBlockID(ctx context.Context, blockID flow.Identifier) (*execution_data.BlockExecutionData, error)
+	GetExecutionDataByBlockID(ctx context.Context, blockID flow.Identifier) (*model.BlockExecutionData, error)
 	SubscribeExecutionData(ctx context.Context, startBlockID flow.Identifier, startBlockHeight uint64) Subscription
 	SubscribeEvents(ctx context.Context, startBlockID flow.Identifier, startHeight uint64, filter EventFilter) Subscription
 }
@@ -126,7 +127,7 @@ func New(
 // getExecutionData returns the execution data for the given block height.
 // Expected errors during normal operation:
 // - storage.ErrNotFound or execution_data.BlobNotFoundError: execution data for the given block height is not available.
-func (b *StateStreamBackend) getExecutionData(ctx context.Context, height uint64) (*execution_data.BlockExecutionDataEntity, error) {
+func (b *StateStreamBackend) getExecutionData(ctx context.Context, height uint64) (*model.BlockExecutionDataEntity, error) {
 	// fail early if no notification has been received for the given block height.
 	// note: it's possible for the data to exist in the data store before the notification is
 	// received. this ensures a consistent view is available to all streams.

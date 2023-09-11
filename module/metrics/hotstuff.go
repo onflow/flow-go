@@ -8,6 +8,7 @@ import (
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/metrics/internal"
 )
 
 // HotStuff Metrics
@@ -55,8 +56,8 @@ func NewHotstuffCollector(chain flow.ChainID) *HotstuffCollector {
 
 		busyDuration: promauto.NewHistogramVec(prometheus.HistogramOpts{
 			Name:        "busy_duration_seconds",
-			Namespace:   namespaceConsensus,
-			Subsystem:   subsystemHotstuff,
+			Namespace:   internal.NamespaceConsensus,
+			Subsystem:   internal.SubsystemHotstuff,
 			Help:        "duration [seconds; measured with float64 precision] of how long HotStuff's event loop has been busy processing one event",
 			Buckets:     []float64{0.05, 0.2, 0.5, 1, 2, 5},
 			ConstLabels: prometheus.Labels{LabelChain: chain.String()},
@@ -64,8 +65,8 @@ func NewHotstuffCollector(chain flow.ChainID) *HotstuffCollector {
 
 		idleDuration: promauto.NewHistogram(prometheus.HistogramOpts{
 			Name:        "idle_duration_seconds",
-			Namespace:   namespaceConsensus,
-			Subsystem:   subsystemHotstuff,
+			Namespace:   internal.NamespaceConsensus,
+			Subsystem:   internal.SubsystemHotstuff,
 			Help:        "duration [seconds; measured with float64 precision] of how long HotStuff's event loop has been idle without processing any event",
 			Buckets:     []float64{0.05, 0.2, 0.5, 1, 2, 5},
 			ConstLabels: prometheus.Labels{LabelChain: chain.String()},
@@ -73,8 +74,8 @@ func NewHotstuffCollector(chain flow.ChainID) *HotstuffCollector {
 
 		waitDuration: promauto.NewHistogramVec(prometheus.HistogramOpts{
 			Name:        "wait_duration_seconds",
-			Namespace:   namespaceConsensus,
-			Subsystem:   subsystemHotstuff,
+			Namespace:   internal.NamespaceConsensus,
+			Subsystem:   internal.SubsystemHotstuff,
 			Help:        "duration [seconds; measured with float64 precision] of how long an event has been waited in the HotStuff event loop queue before being processed.",
 			Buckets:     []float64{0.05, 0.2, 0.5, 1, 2, 5},
 			ConstLabels: prometheus.Labels{LabelChain: chain.String()},
@@ -82,56 +83,56 @@ func NewHotstuffCollector(chain flow.ChainID) *HotstuffCollector {
 
 		curView: promauto.NewGauge(prometheus.GaugeOpts{
 			Name:        "cur_view",
-			Namespace:   namespaceConsensus,
-			Subsystem:   subsystemHotstuff,
+			Namespace:   internal.NamespaceConsensus,
+			Subsystem:   internal.SubsystemHotstuff,
 			Help:        "the current view that the event handler has entered",
 			ConstLabels: prometheus.Labels{LabelChain: chain.String()},
 		}),
 
 		qcView: promauto.NewGauge(prometheus.GaugeOpts{
 			Name:        "qc_view",
-			Namespace:   namespaceConsensus,
-			Subsystem:   subsystemHotstuff,
+			Namespace:   internal.NamespaceConsensus,
+			Subsystem:   internal.SubsystemHotstuff,
 			Help:        "The view of the newest known QC from HotStuff",
 			ConstLabels: prometheus.Labels{LabelChain: chain.String()},
 		}),
 
 		tcView: promauto.NewGauge(prometheus.GaugeOpts{
 			Name:        "tc_view",
-			Namespace:   namespaceConsensus,
-			Subsystem:   subsystemHotstuff,
+			Namespace:   internal.NamespaceConsensus,
+			Subsystem:   internal.SubsystemHotstuff,
 			Help:        "The view of the newest known TC from HotStuff",
 			ConstLabels: prometheus.Labels{LabelChain: chain.String()},
 		}),
 
 		skips: promauto.NewCounter(prometheus.CounterOpts{
 			Name:        "skips_total",
-			Namespace:   namespaceConsensus,
-			Subsystem:   subsystemHotstuff,
+			Namespace:   internal.NamespaceConsensus,
+			Subsystem:   internal.SubsystemHotstuff,
 			Help:        "The number of times we skipped ahead some views",
 			ConstLabels: prometheus.Labels{LabelChain: chain.String()},
 		}),
 
 		timeouts: promauto.NewCounter(prometheus.CounterOpts{
 			Name:        "timeouts_total",
-			Namespace:   namespaceConsensus,
-			Subsystem:   subsystemHotstuff,
+			Namespace:   internal.NamespaceConsensus,
+			Subsystem:   internal.SubsystemHotstuff,
 			Help:        "The number of views that this replica left due to observing a TC",
 			ConstLabels: prometheus.Labels{LabelChain: chain.String()},
 		}),
 
 		timeoutDuration: promauto.NewGauge(prometheus.GaugeOpts{
 			Name:        "timeout_seconds",
-			Namespace:   namespaceConsensus,
-			Subsystem:   subsystemHotstuff,
+			Namespace:   internal.NamespaceConsensus,
+			Subsystem:   internal.SubsystemHotstuff,
 			Help:        "The current length of the timeout",
 			ConstLabels: prometheus.Labels{LabelChain: chain.String()},
 		}),
 
 		committeeComputationsDuration: promauto.NewHistogram(prometheus.HistogramOpts{
 			Name:        "committee_computations_seconds",
-			Namespace:   namespaceConsensus,
-			Subsystem:   subsystemHotstuff,
+			Namespace:   internal.NamespaceConsensus,
+			Subsystem:   internal.SubsystemHotstuff,
 			Help:        "duration [seconds; measured with float64 precision] of how long HotStuff sends computing consensus committee relations",
 			Buckets:     []float64{0.02, 0.05, 0.1, 0.2, 0.5, 1, 2},
 			ConstLabels: prometheus.Labels{LabelChain: chain.String()},
@@ -139,8 +140,8 @@ func NewHotstuffCollector(chain flow.ChainID) *HotstuffCollector {
 
 		signerComputationsDuration: promauto.NewHistogram(prometheus.HistogramOpts{
 			Name:        "crypto_computations_seconds",
-			Namespace:   namespaceConsensus,
-			Subsystem:   subsystemHotstuff,
+			Namespace:   internal.NamespaceConsensus,
+			Subsystem:   internal.SubsystemHotstuff,
 			Help:        "duration [seconds; measured with float64 precision] of how long HotStuff sends with crypto-related operations",
 			Buckets:     []float64{0.02, 0.05, 0.1, 0.2, 0.5, 1, 2},
 			ConstLabels: prometheus.Labels{LabelChain: chain.String()},
@@ -148,8 +149,8 @@ func NewHotstuffCollector(chain flow.ChainID) *HotstuffCollector {
 
 		validatorComputationsDuration: promauto.NewHistogram(prometheus.HistogramOpts{
 			Name:        "message_validation_seconds",
-			Namespace:   namespaceConsensus,
-			Subsystem:   subsystemHotstuff,
+			Namespace:   internal.NamespaceConsensus,
+			Subsystem:   internal.SubsystemHotstuff,
 			Help:        "duration [seconds; measured with float64 precision] of how long HotStuff sends with message-validation",
 			Buckets:     []float64{0.02, 0.05, 0.1, 0.2, 0.5, 1, 2},
 			ConstLabels: prometheus.Labels{LabelChain: chain.String()},
@@ -157,47 +158,47 @@ func NewHotstuffCollector(chain flow.ChainID) *HotstuffCollector {
 
 		payloadProductionDuration: promauto.NewHistogram(prometheus.HistogramOpts{
 			Name:        "payload_production_seconds",
-			Namespace:   namespaceConsensus,
-			Subsystem:   subsystemHotstuff,
+			Namespace:   internal.NamespaceConsensus,
+			Subsystem:   internal.SubsystemHotstuff,
 			Help:        "duration [seconds; measured with float64 precision] of how long HotStuff sends with payload production",
 			Buckets:     []float64{0.02, 0.05, 0.1, 0.2, 0.5, 1, 2},
 			ConstLabels: prometheus.Labels{LabelChain: chain.String()},
 		}),
 		blockProcessingDuration: promauto.NewHistogram(prometheus.HistogramOpts{
 			Name:        "block_processing_seconds",
-			Namespace:   namespaceConsensus,
-			Subsystem:   subsystemHotstuff,
+			Namespace:   internal.NamespaceConsensus,
+			Subsystem:   internal.SubsystemHotstuff,
 			Help:        "duration [seconds; measured with float64 precision] of how long compliance engine processes one block",
 			Buckets:     []float64{0.02, 0.05, 0.1, 0.2, 0.5, 1, 2},
 			ConstLabels: prometheus.Labels{LabelChain: chain.String()},
 		}),
 		voteProcessingDuration: promauto.NewHistogram(prometheus.HistogramOpts{
 			Name:        "vote_processing_seconds",
-			Namespace:   namespaceConsensus,
-			Subsystem:   subsystemHotstuff,
+			Namespace:   internal.NamespaceConsensus,
+			Subsystem:   internal.SubsystemHotstuff,
 			Help:        "duration [seconds; measured with float64 precision] of how long VoteAggregator processes one message",
 			Buckets:     []float64{0.02, 0.05, 0.1, 0.2, 0.5, 1, 2},
 			ConstLabels: prometheus.Labels{LabelChain: chain.String()},
 		}),
 		timeoutProcessingDuration: promauto.NewHistogram(prometheus.HistogramOpts{
 			Name:        "timeout_object_processing_seconds",
-			Namespace:   namespaceConsensus,
-			Subsystem:   subsystemHotstuff,
+			Namespace:   internal.NamespaceConsensus,
+			Subsystem:   internal.SubsystemHotstuff,
 			Help:        "duration [seconds; measured with float64 precision] of how long TimeoutAggregator processes one message",
 			Buckets:     []float64{0.02, 0.05, 0.1, 0.2, 0.5, 1, 2},
 			ConstLabels: prometheus.Labels{LabelChain: chain.String()},
 		}),
 		timeoutCollectorsRange: promauto.NewGaugeVec(prometheus.GaugeOpts{
 			Name:        "timeout_collectors_range",
-			Namespace:   namespaceConsensus,
-			Subsystem:   subsystemHotstuff,
+			Namespace:   internal.NamespaceConsensus,
+			Subsystem:   internal.SubsystemHotstuff,
 			Help:        "lowest and highest views that we are maintaining TimeoutCollectors for",
 			ConstLabels: prometheus.Labels{LabelChain: chain.String()},
 		}, []string{"prefix"}),
 		numberOfActiveCollectors: promauto.NewGauge(prometheus.GaugeOpts{
 			Name:        "active_collectors",
-			Namespace:   namespaceConsensus,
-			Subsystem:   subsystemHotstuff,
+			Namespace:   internal.NamespaceConsensus,
+			Subsystem:   internal.SubsystemHotstuff,
 			Help:        "number of active TimeoutCollectors that the TimeoutAggregator component currently maintains",
 			ConstLabels: prometheus.Labels{LabelChain: chain.String()},
 		}),

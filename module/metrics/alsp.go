@@ -4,6 +4,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/metrics/internal"
 )
 
 // AlspMetrics is a struct that contains all the metrics related to the ALSP module.
@@ -25,8 +26,8 @@ func NewAlspMetrics() *AlspMetrics {
 
 	alsp.reportedMisbehaviorCount = prometheus.NewCounterVec(
 		prometheus.CounterOpts{
-			Namespace: namespaceNetwork,
-			Subsystem: subsystemAlsp,
+			Namespace: internal.NamespaceNetwork,
+			Subsystem: internal.SubsystemAlsp,
 			Name:      "reported_misbehavior_total",
 			Help:      "number of reported spamming misbehavior received by alsp",
 		}, []string{LabelChannel, LabelMisbehavior},

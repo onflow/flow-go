@@ -20,6 +20,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/verification"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
+	"github.com/onflow/flow-go/module/executiondatasync/execution_data/model"
 	"github.com/onflow/flow-go/module/executiondatasync/provider"
 )
 
@@ -344,7 +345,7 @@ func (fcv *ChunkVerifier) verifyTransactionsInContext(
 
 	// 2. build our chunk's chunk execution data using the locally calculated values, and calculate
 	// its CID
-	chunkExecutionData := execution_data.ChunkExecutionData{
+	chunkExecutionData := model.ChunkExecutionData{
 		Collection: cedCollection,
 		Events:     events,
 		TrieUpdate: trieUpdate,

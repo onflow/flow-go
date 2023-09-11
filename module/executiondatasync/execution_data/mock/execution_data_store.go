@@ -6,7 +6,7 @@ import (
 	context "context"
 
 	flow "github.com/onflow/flow-go/model/flow"
-	execution_data "github.com/onflow/flow-go/module/executiondatasync/execution_data"
+	execution_data "github.com/onflow/flow-go/module/executiondatasync/execution_data/model"
 
 	mock "github.com/stretchr/testify/mock"
 )

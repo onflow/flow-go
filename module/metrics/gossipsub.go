@@ -5,6 +5,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promauto"
 
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/metrics/internal"
 )
 
 type GossipSubMetrics struct {
@@ -27,8 +28,8 @@ func NewGossipSubMetrics(prefix string) *GossipSubMetrics {
 
 	gs.receivedIHaveCount = promauto.NewCounter(
 		prometheus.CounterOpts{
-			Namespace: namespaceNetwork,
-			Subsystem: subsystemGossip,
+			Namespace: internal.NamespaceNetwork,
+			Subsystem: internal.SubsystemGossip,
 			Name:      gs.prefix + "gossipsub_received_ihave_total",
 			Help:      "number of received ihave messages from gossipsub protocol",
 		},
@@ -36,8 +37,8 @@ func NewGossipSubMetrics(prefix string) *GossipSubMetrics {
 
 	gs.receivedIWantCount = promauto.NewCounter(
 		prometheus.CounterOpts{
-			Namespace: namespaceNetwork,
-			Subsystem: subsystemGossip,
+			Namespace: internal.NamespaceNetwork,
+			Subsystem: internal.SubsystemGossip,
 			Name:      gs.prefix + "gossipsub_received_iwant_total",
 			Help:      "number of received iwant messages from gossipsub protocol",
 		},
@@ -45,8 +46,8 @@ func NewGossipSubMetrics(prefix string) *GossipSubMetrics {
 
 	gs.receivedGraftCount = promauto.NewCounter(
 		prometheus.CounterOpts{
-			Namespace: namespaceNetwork,
-			Subsystem: subsystemGossip,
+			Namespace: internal.NamespaceNetwork,
+			Subsystem: internal.SubsystemGossip,
 			Name:      gs.prefix + "gossipsub_received_graft_total",
 			Help:      "number of received graft messages from gossipsub protocol",
 		},
@@ -54,8 +55,8 @@ func NewGossipSubMetrics(prefix string) *GossipSubMetrics {
 
 	gs.receivedPruneCount = promauto.NewCounter(
 		prometheus.CounterOpts{
-			Namespace: namespaceNetwork,
-			Subsystem: subsystemGossip,
+			Namespace: internal.NamespaceNetwork,
+			Subsystem: internal.SubsystemGossip,
 			Name:      gs.prefix + "gossipsub_received_prune_total",
 			Help:      "number of received prune messages from gossipsub protocol",
 		},
@@ -63,8 +64,8 @@ func NewGossipSubMetrics(prefix string) *GossipSubMetrics {
 
 	gs.incomingRpcAcceptedFullyCount = promauto.NewCounter(
 		prometheus.CounterOpts{
-			Namespace: namespaceNetwork,
-			Subsystem: subsystemGossip,
+			Namespace: internal.NamespaceNetwork,
+			Subsystem: internal.SubsystemGossip,
 			Name:      gs.prefix + "gossipsub_incoming_rpc_accepted_fully_total",
 			Help:      "number of incoming rpc messages accepted fully by gossipsub protocol",
 		},
@@ -72,8 +73,8 @@ func NewGossipSubMetrics(prefix string) *GossipSubMetrics {
 
 	gs.incomingRpcAcceptedOnlyControlCount = promauto.NewCounter(
 		prometheus.CounterOpts{
-			Namespace: namespaceNetwork,
-			Subsystem: subsystemGossip,
+			Namespace: internal.NamespaceNetwork,
+			Subsystem: internal.SubsystemGossip,
 			Name:      gs.prefix + "gossipsub_incoming_rpc_accepted_only_control_total",
 			Help:      "number of incoming rpc messages accepted only control messages by gossipsub protocol",
 		},
@@ -81,8 +82,8 @@ func NewGossipSubMetrics(prefix string) *GossipSubMetrics {
 
 	gs.incomingRpcRejectedCount = promauto.NewCounter(
 		prometheus.CounterOpts{
-			Namespace: namespaceNetwork,
-			Subsystem: subsystemGossip,
+			Namespace: internal.NamespaceNetwork,
+			Subsystem: internal.SubsystemGossip,
 			Name:      gs.prefix + "gossipsub_incoming_rpc_rejected_total",
 			Help:      "number of incoming rpc messages rejected by gossipsub protocol",
 		},
@@ -90,8 +91,8 @@ func NewGossipSubMetrics(prefix string) *GossipSubMetrics {
 
 	gs.receivedPublishMessageCount = promauto.NewCounter(
 		prometheus.CounterOpts{
-			Namespace: namespaceNetwork,
-			Subsystem: subsystemGossip,
+			Namespace: internal.NamespaceNetwork,
+			Subsystem: internal.SubsystemGossip,
 			Name:      gs.prefix + "gossipsub_received_publish_message_total",
 			Help:      "number of received publish messages from gossipsub protocol",
 		},
@@ -161,8 +162,8 @@ func NewGossipSubLocalMeshMetrics(prefix string) *GossipSubLocalMeshMetrics {
 	return &GossipSubLocalMeshMetrics{
 		localMeshSize: *promauto.NewGaugeVec(
 			prometheus.GaugeOpts{
-				Namespace: namespaceNetwork,
-				Subsystem: subsystemGossip,
+				Namespace: internal.NamespaceNetwork,
+				Subsystem: internal.SubsystemGossip,
 				Name:      prefix + "gossipsub_local_mesh_size",
 				Help:      "number of peers in the local mesh of the node",
 			},

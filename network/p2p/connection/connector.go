@@ -8,8 +8,8 @@ import (
 
 	"github.com/onflow/flow-go/network/internal/p2putils"
 	"github.com/onflow/flow-go/network/p2p"
-	"github.com/onflow/flow-go/network/p2p/p2plogging"
 	"github.com/onflow/flow-go/utils/logging"
+	"github.com/onflow/flow-go/utils/p2plogging"
 	"github.com/onflow/flow-go/utils/rand"
 )
 

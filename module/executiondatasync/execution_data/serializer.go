@@ -11,6 +11,7 @@ import (
 	"github.com/onflow/flow-go/model/encoding"
 	"github.com/onflow/flow-go/model/encoding/cbor"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/executiondatasync/execution_data/model"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/compressor"
 )
@@ -53,7 +54,7 @@ func getCode(v interface{}) (byte, error) {
 	switch v.(type) {
 	case *flow.BlockExecutionDataRoot:
 		return codeExecutionDataRoot, nil
-	case *ChunkExecutionData:
+	case *model.ChunkExecutionData:
 		return codeChunkExecutionData, nil
 	case []cid.Cid:
 		return codeRecursiveCIDs, nil
@@ -69,7 +70,7 @@ func getPrototype(code byte) (interface{}, error) {
 	case codeExecutionDataRoot:
 		return &flow.BlockExecutionDataRoot{}, nil
 	case codeChunkExecutionData:
-		return &ChunkExecutionData{}, nil
+		return &model.ChunkExecutionData{}, nil
 	case codeRecursiveCIDs:
 		return &[]cid.Cid{}, nil
 	default:

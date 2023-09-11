@@ -10,6 +10,7 @@ import (
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/blobs"
+	"github.com/onflow/flow-go/module/executiondatasync/execution_data/model"
 )
 
 // ExecutionDataGetter handles getting execution data from a blobstore
@@ -19,7 +20,7 @@ type ExecutionDataGetter interface {
 	// - BlobNotFoundError if some CID in the blob tree could not be found from the blobstore
 	// - MalformedDataError if some level of the blob tree cannot be properly deserialized
 	// - BlobSizeLimitExceededError if some blob in the blob tree exceeds the maximum allowed size
-	Get(ctx context.Context, rootID flow.Identifier) (*BlockExecutionData, error)
+	Get(ctx context.Context, rootID flow.Identifier) (*model.BlockExecutionData, error)
 }
 
 // ExecutionDataStore handles adding / getting execution data to / from a blobstore
@@ -29,7 +30,7 @@ type ExecutionDataStore interface {
 	// Add constructs a blob tree for the given BlockExecutionData, adds it to the blobstore,
 	// then returns the root CID.
 	// No errors are expected during normal operation.
-	Add(ctx context.Context, executionData *BlockExecutionData) (flow.Identifier, error)
+	Add(ctx context.Context, executionData *model.BlockExecutionData) (flow.Identifier, error)
 }
 
 type ExecutionDataStoreOption func(*store)
@@ -54,7 +55,7 @@ func NewExecutionDataStore(blobstore blobs.Blobstore, serializer Serializer, opt
 	s := &store{
 		blobstore:   blobstore,
 		serializer:  serializer,
-		maxBlobSize: DefaultMaxBlobSize,
+		maxBlobSize: model.DefaultMaxBlobSize,
 	}
 
 	for _, opt := range opts {
@@ -67,7 +68,7 @@ func NewExecutionDataStore(blobstore blobs.Blobstore, serializer Serializer, opt
 // Add constructs a blob tree for the given BlockExecutionData, adds it to the blobstore,
 // then returns the rootID.
 // No errors are expected during normal operation.
-func (s *store) Add(ctx context.Context, executionData *BlockExecutionData) (flow.Identifier, error) {
+func (s *store) Add(ctx context.Context, executionData *model.BlockExecutionData) (flow.Identifier, error) {
 	executionDataRoot := &flow.BlockExecutionDataRoot{
 		BlockID:               executionData.BlockID,
 		ChunkExecutionDataIDs: make([]cid.Cid, len(executionData.ChunkExecutionDatas)),
@@ -114,7 +115,7 @@ func (s *store) Add(ctx context.Context, executionData *BlockExecutionData) (flo
 // addChunkExecutionData constructs a blob tree for the given ChunkExecutionData, adds it to the
 // blobstore, and returns the root CID.
 // No errors are expected during normal operation.
-func (s *store) addChunkExecutionData(ctx context.Context, chunkExecutionData *ChunkExecutionData) (cid.Cid, error) {
+func (s *store) addChunkExecutionData(ctx context.Context, chunkExecutionData *model.ChunkExecutionData) (cid.Cid, error) {
 	var v interface{} = chunkExecutionData
 
 	// given an arbitrarily large v, split it into blobs of size up to maxBlobSize, adding them to
@@ -177,7 +178,7 @@ func (s *store) addBlobs(ctx context.Context, v interface{}) ([]cid.Cid, error) 
 // Expected errors during normal operations:
 // - BlobNotFoundError if some CID in the blob tree could not be found from the blobstore
 // - MalformedDataError if some level of the blob tree cannot be properly deserialized
-func (s *store) Get(ctx context.Context, rootID flow.Identifier) (*BlockExecutionData, error) {
+func (s *store) Get(ctx context.Context, rootID flow.Identifier) (*model.BlockExecutionData, error) {
 	rootCid := flow.IdToCid(rootID)
 
 	// first, get the root blob. it will contain a list of blobs, one for each chunk
@@ -201,9 +202,9 @@ func (s *store) Get(ctx context.Context, rootID flow.Identifier) (*BlockExecutio
 	}
 
 	// next, get each chunk blob and deserialize it
-	blockExecutionData := &BlockExecutionData{
+	blockExecutionData := &model.BlockExecutionData{
 		BlockID:             executionDataRoot.BlockID,
-		ChunkExecutionDatas: make([]*ChunkExecutionData, len(executionDataRoot.ChunkExecutionDataIDs)),
+		ChunkExecutionDatas: make([]*model.ChunkExecutionData, len(executionDataRoot.ChunkExecutionDataIDs)),
 	}
 
 	for i, chunkExecutionDataID := range executionDataRoot.ChunkExecutionDataIDs {
@@ -222,7 +223,7 @@ func (s *store) Get(ctx context.Context, rootID flow.Identifier) (*BlockExecutio
 // Expected errors during normal operations:
 // - BlobNotFoundError if some CID in the blob tree could not be found from the blobstore
 // - MalformedDataError if some level of the blob tree cannot be properly deserialized
-func (s *store) getChunkExecutionData(ctx context.Context, chunkExecutionDataID cid.Cid) (*ChunkExecutionData, error) {
+func (s *store) getChunkExecutionData(ctx context.Context, chunkExecutionDataID cid.Cid) (*model.ChunkExecutionData, error) {
 	cids := []cid.Cid{chunkExecutionDataID}
 
 	// given a root CID, get the blob tree level by level, until we reach the full ChunkExecutionData
@@ -233,7 +234,7 @@ func (s *store) getChunkExecutionData(ctx context.Context, chunkExecutionDataID 
 		}
 
 		switch v := v.(type) {
-		case *ChunkExecutionData:
+		case *model.ChunkExecutionData:
 			return v, nil
 		case *[]cid.Cid:
 			cids = *v

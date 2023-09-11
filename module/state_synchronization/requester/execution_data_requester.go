@@ -17,6 +17,7 @@ import (
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data/cache"
+	model2 "github.com/onflow/flow-go/module/executiondatasync/execution_data/model"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/jobqueue"
 	"github.com/onflow/flow-go/module/state_synchronization"
@@ -440,7 +441,7 @@ func (e *executionDataRequester) processNotificationJob(ctx irrecoverable.Signal
 	e.metrics.NotificationSent(entry.Height)
 }
 
-func (e *executionDataRequester) notifyConsumers(executionData *execution_data.BlockExecutionDataEntity) {
+func (e *executionDataRequester) notifyConsumers(executionData *model2.BlockExecutionDataEntity) {
 	e.consumerMu.RLock()
 	defer e.consumerMu.RUnlock()
 

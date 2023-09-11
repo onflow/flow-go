@@ -21,9 +21,9 @@ import (
 	"github.com/onflow/flow-go/network/p2p/connection"
 	mockp2p "github.com/onflow/flow-go/network/p2p/mock"
 	p2pconfig "github.com/onflow/flow-go/network/p2p/p2pbuilder/config"
-	"github.com/onflow/flow-go/network/p2p/p2plogging"
 	p2ptest "github.com/onflow/flow-go/network/p2p/test"
 	"github.com/onflow/flow-go/network/p2p/unicast/stream"
+	"github.com/onflow/flow-go/utils/p2plogging"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 

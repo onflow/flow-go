@@ -7,6 +7,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promauto"
 
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/metrics/internal"
 )
 
 // GossipSubRpcValidationInspectorMetrics metrics collector for the gossipsub RPC validation inspector.
@@ -25,16 +26,16 @@ func NewGossipSubRPCValidationInspectorMetrics(prefix string) *GossipSubRpcValid
 	gc := &GossipSubRpcValidationInspectorMetrics{prefix: prefix}
 	gc.rpcCtrlMsgInBlockingPreProcessingGauge = promauto.NewGaugeVec(
 		prometheus.GaugeOpts{
-			Namespace: namespaceNetwork,
-			Subsystem: subsystemGossip,
+			Namespace: internal.NamespaceNetwork,
+			Subsystem: internal.SubsystemGossip,
 			Name:      gc.prefix + "control_message_in_blocking_preprocess_total",
 			Help:      "the number of rpc control messages currently being pre-processed",
 		}, []string{LabelCtrlMsgType},
 	)
 	gc.rpcCtrlMsgBlockingProcessingTimeHistogram = promauto.NewHistogramVec(
 		prometheus.HistogramOpts{
-			Namespace: namespaceNetwork,
-			Subsystem: subsystemGossip,
+			Namespace: internal.NamespaceNetwork,
+			Subsystem: internal.SubsystemGossip,
 			Name:      gc.prefix + "rpc_control_message_validator_blocking_preprocessing_time_seconds",
 			Help:      "duration [seconds; measured with float64 precision] of how long the rpc control message validator blocked  pre-processing an rpc control message",
 			Buckets:   []float64{.1, .25, .5, 1, 2.5, 5, 7.5, 10, 20},
@@ -42,16 +43,16 @@ func NewGossipSubRPCValidationInspectorMetrics(prefix string) *GossipSubRpcValid
 	)
 	gc.rpcCtrlMsgInAsyncPreProcessingGauge = promauto.NewGaugeVec(
 		prometheus.GaugeOpts{
-			Namespace: namespaceNetwork,
-			Subsystem: subsystemGossip,
+			Namespace: internal.NamespaceNetwork,
+			Subsystem: internal.SubsystemGossip,
 			Name:      gc.prefix + "control_messages_in_async_processing_total",
 			Help:      "the number of rpc control messages currently being processed asynchronously by workers from the rpc validator worker pool",
 		}, []string{LabelCtrlMsgType},
 	)
 	gc.rpcCtrlMsgAsyncProcessingTimeHistogram = promauto.NewHistogramVec(
 		prometheus.HistogramOpts{
-			Namespace: namespaceNetwork,
-			Subsystem: subsystemGossip,
+			Namespace: internal.NamespaceNetwork,
+			Subsystem: internal.SubsystemGossip,
 			Name:      gc.prefix + "rpc_control_message_validator_async_processing_time_seconds",
 			Help:      "duration [seconds; measured with float64 precision] of how long it takes rpc control message validator to asynchronously process a rpc message",
 			Buckets:   []float64{.1, .25, .5, 1, 2.5, 5, 7.5, 10, 20},

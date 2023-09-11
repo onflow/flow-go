@@ -12,8 +12,8 @@ import (
 
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/network/p2p"
-	"github.com/onflow/flow-go/network/p2p/p2plogging"
 	"github.com/onflow/flow-go/utils/logging"
+	"github.com/onflow/flow-go/utils/p2plogging"
 )
 
 var _ p2p.ConnectionGater = (*ConnGater)(nil)

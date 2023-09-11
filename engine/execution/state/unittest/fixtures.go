@@ -12,6 +12,7 @@ import (
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
+	"github.com/onflow/flow-go/module/executiondatasync/execution_data/model"
 	"github.com/onflow/flow-go/module/mempool/entity"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -45,7 +46,7 @@ func ComputationResultForBlockFixture(
 	computationResult := execution.NewEmptyComputationResult(completeBlock)
 
 	numberOfChunks := len(collections) + 1
-	ceds := make([]*execution_data.ChunkExecutionData, numberOfChunks)
+	ceds := make([]*model.ChunkExecutionData, numberOfChunks)
 	for i := 0; i < numberOfChunks; i++ {
 		ceds[i] = unittest.ChunkExecutionDataFixture(t, 1024)
 		computationResult.CollectionExecutionResultAt(i).UpdateExecutionSnapshot(StateInteractionsFixture())

@@ -13,9 +13,9 @@ import (
 
 	"github.com/onflow/flow-go/engine/access/state_stream"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data/cache"
 	exedatamock "github.com/onflow/flow-go/module/executiondatasync/execution_data/mock"
+	"github.com/onflow/flow-go/module/executiondatasync/execution_data/model"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/mempool/herocache"
 	"github.com/onflow/flow-go/module/metrics"
@@ -36,7 +36,7 @@ type ExecutionDataReaderSuite struct {
 	fetchTimeout time.Duration
 
 	executionDataID flow.Identifier
-	executionData   *execution_data.BlockExecutionData
+	executionData   *model.BlockExecutionData
 	block           *flow.Block
 	blocksByHeight  map[uint64]*flow.Block
 
@@ -106,9 +106,9 @@ func (suite *ExecutionDataReaderSuite) reset() {
 }
 
 func (suite *ExecutionDataReaderSuite) TestAtIndex() {
-	setExecutionDataGet := func(executionData *execution_data.BlockExecutionData, err error) {
+	setExecutionDataGet := func(executionData *model.BlockExecutionData, err error) {
 		suite.downloader.On("Get", mock.Anything, suite.executionDataID).Return(
-			func(ctx context.Context, id flow.Identifier) *execution_data.BlockExecutionData {
+			func(ctx context.Context, id flow.Identifier) *model.BlockExecutionData {
 				return executionData
 			},
 			func(ctx context.Context, id flow.Identifier) error {
@@ -139,7 +139,7 @@ func (suite *ExecutionDataReaderSuite) TestAtIndex() {
 			ed := unittest.BlockExecutionDataFixture()
 			setExecutionDataGet(ed, nil)
 
-			edEntity := execution_data.NewBlockExecutionDataEntity(suite.executionDataID, ed)
+			edEntity := model.NewBlockExecutionDataEntity(suite.executionDataID, ed)
 
 			job, err := suite.reader.AtIndex(suite.block.Header.Height)
 			require.NoError(suite.T(), err)

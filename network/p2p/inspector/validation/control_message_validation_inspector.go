@@ -23,10 +23,10 @@ import (
 	"github.com/onflow/flow-go/network/p2p/inspector/internal/ratelimit"
 	p2pmsg "github.com/onflow/flow-go/network/p2p/message"
 	"github.com/onflow/flow-go/network/p2p/p2pconf"
-	"github.com/onflow/flow-go/network/p2p/p2plogging"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/events"
 	"github.com/onflow/flow-go/utils/logging"
+	"github.com/onflow/flow-go/utils/p2plogging"
 	flowrand "github.com/onflow/flow-go/utils/rand"
 )
 
