@@ -62,17 +62,16 @@ func NewProtocolState(collector module.CacheMetrics,
 // Expected error returns during normal operations:
 //   - storage.ErrAlreadyExists if an Identity Table with the given id is already stored
 func (s *ProtocolState) StoreTx(id flow.Identifier, protocolState *flow.ProtocolStateEntry) func(*transaction.Tx) error {
-	return func(tx *transaction.Tx) error {
-		if !protocolState.Identities.Sorted(order.IdentifierCanonical) {
-			return fmt.Errorf("sanity check failed: identities are not sorted")
-		}
-		if protocolState.NextEpochProtocolState != nil {
-			if !protocolState.NextEpochProtocolState.Identities.Sorted(order.IdentifierCanonical) {
-				return fmt.Errorf("sanity check failed: next epoch identities are not sorted")
-			}
-		}
-		return transaction.WithTx(operation.InsertProtocolState(id, protocolState))(tx)
+	// front-load sanity checks:
+	if !protocolState.Identities.Sorted(order.IdentifierCanonical) {
+		return transaction.Fail(fmt.Errorf("sanity check failed: identities are not sorted"))
 	}
+	if protocolState.NextEpochProtocolState != nil && !protocolState.NextEpochProtocolState.Identities.Sorted(order.IdentifierCanonical) {
+		return transaction.Fail(fmt.Errorf("sanity check failed: next epoch identities are not sorted"))
+	}
+
+	// happy path: return anonymous function, whose future execution (as part of a transaction) will store the protocolState
+	return transaction.WithTx(operation.InsertProtocolState(id, protocolState))
 }
 
 // Index indexes the identity table by block ID.

@@ -43,9 +43,26 @@ func Update(db *dbbadger.DB, f func(*Tx) error) error {
 	return nil
 }
 
+// Fail returns an anonymous function, whose future execution returns the error e. This
+// is useful for front-loading sanity checks. On the happy path (dominant), this function
+// will generally not be used. However, if one of the front-loaded sanity checks fails,
+// we include `transaction.Fail(e)` in place of the business logic handling the happy path.
+func Fail(e error) func(*Tx) error {
+	return func(tx *Tx) error {
+		return e
+	}
+}
+
 // WithTx is useful when transaction is used without adding callback.
 func WithTx(f func(*dbbadger.Txn) error) func(*Tx) error {
 	return func(tx *Tx) error {
 		return f(tx.DBTxn)
+	}
+}
+
+// WithBadgerTx adapts a function that takes a *Tx to one that takes a *badger.Txn.
+func WithBadgerTx(f func(*Tx) error) func(*dbbadger.Txn) error {
+	return func(txn *dbbadger.Txn) error {
+		return f(&Tx{DBTxn: txn})
 	}
 }

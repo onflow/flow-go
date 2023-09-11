@@ -524,18 +524,40 @@ func (m *FollowerState) insert(ctx context.Context, candidate *flow.Block, certi
 	}
 
 	updatedState, updatedStateID, hasChanges := protocolStateUpdater.Build()
+
 	// TODO: check if updatedStateID corresponds to the root protocol state ID stored in payload
 	// if updatedStateID != payload.ProtocolStateID {
 	// 	return state.NewInvalidExtension("invalid protocol state transition detected expected (%x) got %x", payload.ProtocolStateID, updatedStateID)
 	// }
 
-	qc := candidate.Header.QuorumCertificate()
+	if hasChanges {
+		dbUpdates = append(dbUpdates, transaction.WithTx(
+			operation.SkipDuplicates(
+				transaction.WithBadgerTx(
+					m.protocolStateSnapshotsDB.StoreTx(updatedStateID, updatedState),
+				),
+			),
+		),
+		)
+	}
+	dbUpdates = append(dbUpdates, m.protocolStateSnapshotsDB.Index(blockID, updatedStateID))
 
+	// events is a queue of node-internal events (aka notifications) that are emitted after the database write succeeded
 	var events []func()
+
+	if certifyingQC != nil {
+		dbUpdates = append(dbUpdates, m.qcs.StoreTx(certifyingQC))
+
+		// queue an BlockProcessable event for candidate block, since it is certified
+		events = append(events, func() {
+			m.consumer.BlockProcessable(candidate.Header, certifyingQC)
+		})
+	}
 
 	// Both the header itself and its payload are in compliance with the protocol state.
 	// We can now store the candidate block, as well as adding its final seal
 	// to the seal index and initializing its children index.
+	qc := candidate.Header.QuorumCertificate()
 	err = operation.RetryOnConflictTx(m.db, transaction.Update, func(tx *transaction.Tx) error {
 		// insert the block into the database AND cache
 		err := m.blocks.StoreTx(candidate)(tx)
@@ -557,18 +579,6 @@ func (m *FollowerState) insert(ctx context.Context, candidate *flow.Block, certi
 			}
 		}
 
-		if certifyingQC != nil {
-			err = m.qcs.StoreTx(certifyingQC)(tx)
-			if err != nil {
-				return fmt.Errorf("could not store certifying qc: %w", err)
-			}
-
-			// trigger BlockProcessable for candidate block if it's certified
-			events = append(events, func() {
-				m.consumer.BlockProcessable(candidate.Header, certifyingQC)
-			})
-		}
-
 		// index the latest sealed block in this fork
 		err = transaction.WithTx(operation.IndexLatestSealAtBlock(blockID, latestSealID))(tx)
 		if err != nil {
@@ -588,21 +598,6 @@ func (m *FollowerState) insert(ctx context.Context, candidate *flow.Block, certi
 				return fmt.Errorf("could not apply operation: %w", err)
 			}
 		}
-
-		if hasChanges {
-			err = m.protocolStateSnapshotsDB.StoreTx(updatedStateID, updatedState)(tx)
-			// in case of fork, the protocol state may already exist
-			if err != nil && !errors.Is(err, storage.ErrAlreadyExists) {
-				return fmt.Errorf("could not store protocol state (%v): %w", updatedStateID, err)
-			}
-		}
-
-		err = m.protocolStateSnapshotsDB.Index(blockID, updatedStateID)(tx)
-		if err != nil {
-			return fmt.Errorf("could not index protocol state (%v) for block (%v): %w",
-				updatedStateID, blockID, err)
-		}
-
 		return nil
 	})
 	if err != nil {
