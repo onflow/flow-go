@@ -20,7 +20,7 @@ type GossipSubRPCValidationInspectorConfigs struct {
 	// CacheSize size of the queue used by worker pool for the control message validation inspector.
 	CacheSize uint32 `validate:"gte=100" mapstructure:"gossipsub-rpc-validation-inspector-queue-cache-size"`
 	// GraftPruneMessageMaxSampleSize the max sample size used for control message validation of GRAFT and PRUNE. If the total number of control messages (GRAFT or PRUNE)
-	// exceeds this max sample size then the respective message will be truncated before being processed.
+	// exceeds this max sample size then the respective message will be truncated to this value before being processed.
 	GraftPruneMessageMaxSampleSize int `validate:"gte=1000" mapstructure:"gossipsub-rpc-graft-and-prune-message-max-sample-size"`
 }
 
