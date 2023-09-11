@@ -28,7 +28,8 @@ func NewMutator(protocolStateDB storage.ProtocolState) *Mutator {
 
 // CreateUpdater creates a new protocol state updater for the given candidate block.
 // Has to be called for each block to correctly index the protocol state.
-// No errors are expected during normal operations.
+// Expected errors during normal operations:
+//   - `storage.ErrNotFound` if no protocol state for parent block is known.
 func (m *Mutator) CreateUpdater(candidate *flow.Header) (protocol.StateUpdater, error) {
 	parentState, err := m.protocolStateDB.ByBlockID(candidate.ParentID)
 	if err != nil {

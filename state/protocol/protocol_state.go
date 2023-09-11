@@ -118,7 +118,8 @@ type StateUpdater interface {
 type StateMutator interface {
 	// CreateUpdater creates a protocol state updater based on previous protocol state.
 	// Has to be called for each block to correctly index the protocol state.
-	// No errors are expected during normal operations.
+	// Expected errors during normal operations:
+	//  * `storage.ErrNotFound` if no protocol state for parent block is known.
 	CreateUpdater(candidate *flow.Header) (StateUpdater, error)
 	// CommitProtocolState commits the protocol state to the database.
 	// Has to be called for each block to correctly index the protocol state.
