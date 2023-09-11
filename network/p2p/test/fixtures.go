@@ -452,7 +452,7 @@ func EnsurePubsubMessageExchange(t *testing.T, ctx context.Context, nodes []p2p.
 
 // PeerIdFixture returns a random peer ID for testing.
 // peer ID is the identifier of a node on the libp2p network.
-func PeerIdFixture(t *testing.T) peer.ID {
+func PeerIdFixture(t testing.TB) peer.ID {
 	buf := make([]byte, 16)
 	n, err := rand.Read(buf)
 	require.NoError(t, err)
