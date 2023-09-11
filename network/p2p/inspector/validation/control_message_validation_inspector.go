@@ -440,8 +440,6 @@ func (c *ControlMsgValidationInspector) truncateIHaveMessages(rpc *pubsub.RPC) {
 // Args:
 //   - rpc: the rpc message to truncate.
 //
-// Returns:
-//   - error: if any error encountered while sampling the messages, all errors are considered irrecoverable.
 func (c *ControlMsgValidationInspector) truncateIHaveMessageIds(rpc *pubsub.RPC) {
 	for _, ihave := range rpc.GetControl().GetIhave() {
 		messageIDs := ihave.GetMessageIDs()
