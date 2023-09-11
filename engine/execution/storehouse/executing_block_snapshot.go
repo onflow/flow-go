@@ -11,7 +11,7 @@ import (
 // TODO(leo): move it to upper level
 type ExtendableStorageSnapshot interface {
 	snapshot.StorageSnapshot
-	Extend(trieUpdate *ledger.TrieUpdate) (ExtendableStorageSnapshot, error)
+	Extend(newCommit flow.StateCommitment, trieUpdate *ledger.TrieUpdate) (ExtendableStorageSnapshot, error)
 	Commitment() flow.StateCommitment
 }
 
@@ -66,8 +66,11 @@ func (s *ExecutingBlockSnapshot) getFromUpdates(id flow.RegisterID) (flow.Regist
 // which contains the given trieUpdate
 // Usually it's used to create a new storage snapshot at the next executed collection.
 // The trieUpdate contains the register updates at the executed collection.
-func (s *ExecutingBlockSnapshot) Extend(trieUpdate *ledger.TrieUpdate) (ExtendableStorageSnapshot, error) {
-	commitment := flow.StateCommitment(trieUpdate.RootHash)
+func (s *ExecutingBlockSnapshot) Extend(newCommit flow.StateCommitment, trieUpdate *ledger.TrieUpdate) (ExtendableStorageSnapshot, error) {
+	if flow.StateCommitment(trieUpdate.RootHash) != s.commitment {
+		return nil, fmt.Errorf("Extending block snapshot with a mismatching trie update: %s != %s", trieUpdate.RootHash, s.commitment)
+	}
+
 	updates := make(map[flow.RegisterID]flow.RegisterValue)
 
 	// add the old updates
@@ -86,7 +89,7 @@ func (s *ExecutingBlockSnapshot) Extend(trieUpdate *ledger.TrieUpdate) (Extendab
 
 	return &ExecutingBlockSnapshot{
 		previous:        s.previous,
-		commitment:      commitment,
+		commitment:      newCommit,
 		registerUpdates: updates,
 	}, nil
 }

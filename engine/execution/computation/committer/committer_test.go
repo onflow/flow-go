@@ -30,7 +30,7 @@ func TestLedgerViewCommitter(t *testing.T) {
 		// mock ledger.Set
 		expectedStateCommitment := unittest.StateCommitmentFixture()
 		ledger.On("Set", mock.Anything).
-			Return(expectedStateCommitment, nil, nil).
+			Return(led.State(expectedStateCommitment), nil, nil).
 			Once()
 
 			// mock ledger.Prove
@@ -62,7 +62,7 @@ func TestLedgerViewCommitter(t *testing.T) {
 		require.NoError(t, err)
 
 		// verify CommitView returns expected proof and statecommitment
-		require.Equal(t, newCommit, flow.StateCommitment(trieUpdate.RootHash))
+		require.Equal(t, previousBlockSnapshot.Commitment(), flow.StateCommitment(trieUpdate.RootHash))
 		require.Equal(t, newCommit, newStorageSnapshot.Commitment())
 		require.Equal(t, flow.StateCommitment(expectedStateCommitment), newCommit)
 		require.Equal(t, []uint8(expectedProof), proof)
