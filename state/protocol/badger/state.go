@@ -39,9 +39,9 @@ type State struct {
 		setups  storage.EpochSetups
 		commits storage.EpochCommits
 	}
-	protocolState       storage.ProtocolState
-	protocolStateReader protocol.ProtocolState
-	versionBeacons      storage.VersionBeacons
+	protocolStateSnapshotsDB storage.ProtocolState
+	protocolState            protocol.ProtocolState
+	versionBeacons           storage.VersionBeacons
 
 	// rootHeight marks the cutoff of the history this node knows about. We cache it in the state
 	// because it cannot change over the lifecycle of a protocol state instance. It is frequently
@@ -91,7 +91,7 @@ func Bootstrap(
 	qcs storage.QuorumCertificates,
 	setups storage.EpochSetups,
 	commits storage.EpochCommits,
-	protocolState storage.ProtocolState,
+	protocolStateSnapshotsDB storage.ProtocolState,
 	versionBeacons storage.VersionBeacons,
 	root protocol.Snapshot,
 	options ...BootstrapConfigOptions,
@@ -110,7 +110,7 @@ func Bootstrap(
 		return nil, fmt.Errorf("expected empty database")
 	}
 
-	protocolStateReader := protocol_state.NewProtocolState(protocolState, root.Params())
+	protocolState := protocol_state.NewProtocolState(protocolStateSnapshotsDB, root.Params())
 	state := newState(
 		metrics,
 		db,
@@ -121,8 +121,8 @@ func Bootstrap(
 		qcs,
 		setups,
 		commits,
+		protocolStateSnapshotsDB,
 		protocolState,
-		protocolStateReader,
 		versionBeacons,
 	)
 
@@ -196,7 +196,7 @@ func Bootstrap(
 		}
 
 		// 7) bootstrap dynamic protocol state
-		err = state.bootstrapProtocolState(segment, root, protocolState)(tx)
+		err = state.bootstrapProtocolState(segment, root, protocolStateSnapshotsDB)(tx)
 		if err != nil {
 			return fmt.Errorf("could not bootstrap protocol state: %w", err)
 		}
@@ -691,7 +691,7 @@ func OpenState(
 
 func (state *State) Params() protocol.Params {
 	return Params{
-		GlobalParams: state.protocolStateReader.GlobalParams(),
+		GlobalParams: state.protocolState.GlobalParams(),
 		state:        state,
 	}
 }
@@ -786,11 +786,11 @@ func newState(
 			setups:  setups,
 			commits: commits,
 		},
-		protocolState:       protocolState,
-		protocolStateReader: protocolStateReader,
-		versionBeacons:      versionBeacons,
-		cachedFinal:         new(atomic.Pointer[cachedHeader]),
-		cachedSealed:        new(atomic.Pointer[cachedHeader]),
+		protocolStateSnapshotsDB: protocolState,
+		protocolState:            protocolStateReader,
+		versionBeacons:           versionBeacons,
+		cachedFinal:              new(atomic.Pointer[cachedHeader]),
+		cachedSealed:             new(atomic.Pointer[cachedHeader]),
 	}
 }
 

@@ -511,13 +511,13 @@ func (m *FollowerState) insert(ctx context.Context, candidate *flow.Block, certi
 		return fmt.Errorf("could not retrieve block header for %x: %w", parentID, err)
 	}
 
-	parentProtocolState, err := m.protocolState.ByBlockID(candidate.Header.ParentID)
+	parentProtocolState, err := m.protocolStateSnapshotsDB.ByBlockID(candidate.Header.ParentID)
 	if err != nil {
 		return fmt.Errorf("could not retrieve protocol state for block (%v): %w", candidate.Header.ParentID, err)
 	}
 	protocolStateUpdater := protocol_state.NewUpdater(candidate.Header, parentProtocolState)
 
-	// apply any state changes from service events sealed by this block's parent
+	// apply any state changes from service events sealed by this block
 	dbUpdates, err := m.handleEpochServiceEvents(candidate, protocolStateUpdater)
 	if err != nil {
 		return fmt.Errorf("could not process service events: %w", err)
@@ -590,14 +590,14 @@ func (m *FollowerState) insert(ctx context.Context, candidate *flow.Block, certi
 		}
 
 		if hasChanges {
-			err = m.protocolState.StoreTx(updatedStateID, updatedState)(tx)
+			err = m.protocolStateSnapshotsDB.StoreTx(updatedStateID, updatedState)(tx)
 			// in case of fork, the protocol state may already exist
 			if err != nil && !errors.Is(err, storage.ErrAlreadyExists) {
 				return fmt.Errorf("could not store protocol state (%v): %w", updatedStateID, err)
 			}
 		}
 
-		err = m.protocolState.Index(blockID, updatedStateID)(tx)
+		err = m.protocolStateSnapshotsDB.Index(blockID, updatedStateID)(tx)
 		if err != nil {
 			return fmt.Errorf("could not index protocol state (%v) for block (%v): %w",
 				updatedStateID, blockID, err)
@@ -668,12 +668,12 @@ func (m *FollowerState) Finalize(ctx context.Context, blockID flow.Identifier) e
 
 	// We update metrics and emit protocol events for epoch state changes when
 	// the block corresponding to the state change is finalized
-	protocolState, err := m.protocolStateReader.AtBlockID(blockID)
+	psSnapshot, err := m.protocolState.AtBlockID(blockID)
 	if err != nil {
-		return fmt.Errorf("could not retrieve protocol state: %w", err)
+		return fmt.Errorf("could not retrieve protocol state snapshot: %w", err)
 	}
-	epochStatus := protocolState.EpochStatus()
-	currentEpochSetup := protocolState.EpochSetup()
+	epochStatus := psSnapshot.EpochStatus()
+	currentEpochSetup := psSnapshot.EpochSetup()
 	epochFallbackTriggered, err := m.isEpochEmergencyFallbackTriggered()
 	if err != nil {
 		return fmt.Errorf("could not check persisted epoch emergency fallback flag: %w", err)
