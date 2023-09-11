@@ -214,11 +214,6 @@ func (fcv *ChunkVerifier) verifyTransactionsInContext(
 	chunkState := fvmState.NewExecutionState(nil, fvmState.DefaultParameters())
 
 	var problematicTx flow.Identifier
-
-	// collect service events emitted by system chunk as flow.EventsList for use during
-	// execution data verification
-	var rawServiceEvents flow.EventsList
-
 	// executes all transactions in this chunk
 	for i, tx := range transactions {
 		executionSnapshot, output, err := fcv.vm.Run(
@@ -237,7 +232,6 @@ func (fcv *ChunkVerifier) verifyTransactionsInContext(
 
 		events = append(events, output.Events...)
 		serviceEvents = append(serviceEvents, output.ConvertedServiceEvents...)
-		rawServiceEvents = append(rawServiceEvents, output.ServiceEvents...)
 
 		snapshotTree = snapshotTree.Append(executionSnapshot)
 		err = chunkState.Merge(executionSnapshot)
@@ -339,7 +333,6 @@ func (fcv *ChunkVerifier) verifyTransactionsInContext(
 	}
 
 	cedCollection := chunkDataPack.Collection
-	cedEvents := events
 	// the system chunk collection is not included in the chunkDataPack, but is included in the
 	// ChunkExecutionData. Create the collection here using the transaction body from the
 	// transactions list
@@ -347,14 +340,13 @@ func (fcv *ChunkVerifier) verifyTransactionsInContext(
 		cedCollection = &flow.Collection{
 			Transactions: []*flow.TransactionBody{transactions[0].Transaction},
 		}
-		cedEvents = rawServiceEvents
 	}
 
 	// 2. build our chunk's chunk execution data using the locally calculated values, and calculate
 	// its CID
 	chunkExecutionData := execution_data.ChunkExecutionData{
 		Collection: cedCollection,
-		Events:     cedEvents,
+		Events:     events,
 		TrieUpdate: trieUpdate,
 	}
 

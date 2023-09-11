@@ -48,9 +48,6 @@ var eventsList = flow.EventsList{
 	},
 }
 
-const computationUsed = uint64(100)
-const memoryEstimate = uint64(100)
-
 var id0 = flow.NewRegisterID("00", "")
 var id5 = flow.NewRegisterID("05", "")
 
@@ -212,9 +209,7 @@ func (s *ChunkVerifierTestSuite) TestFailedTx() {
 		},
 	}
 	s.outputs["failedTx"] = fvm.ProcedureOutput{
-		ComputationUsed: computationUsed,
-		MemoryEstimate:  memoryEstimate,
-		Err:             fvmErrors.NewCadenceRuntimeError(runtime.Error{}), // inside the runtime (e.g. div by zero, access account)
+		Err: fvmErrors.NewCadenceRuntimeError(runtime.Error{}), // inside the runtime (e.g. div by zero, access account)
 	}
 
 	spockSecret, err := s.verifier.Verify(vch)
@@ -259,8 +254,7 @@ func (s *ChunkVerifierTestSuite) TestServiceEventsMismatch() {
 	s.snapshots[string(serviceTxBody.Script)] = &snapshot.ExecutionSnapshot{}
 	s.outputs[string(serviceTxBody.Script)] = fvm.ProcedureOutput{
 		ConvertedServiceEvents: flow.ServiceEventList{*epochCommitServiceEvent},
-		ComputationUsed:        computationUsed,
-		MemoryEstimate:         memoryEstimate,
+		Events:                 meta.ChunkEvents,
 	}
 
 	_, err = s.verifier.Verify(vch)
@@ -277,8 +271,7 @@ func (s *ChunkVerifierTestSuite) TestServiceEventsAreChecked() {
 	// setup the verifier output to include the correct data for the service events
 	output := generateDefaultOutput()
 	output.ConvertedServiceEvents = meta.ServiceEvents
-	output.ServiceEvents = systemEventsList
-	output.Events = nil
+	output.Events = meta.ChunkEvents
 	s.outputs[string(serviceTxBody.Script)] = output
 
 	_, err := s.verifier.Verify(vch)
@@ -462,19 +455,21 @@ func generateExecutionData(t *testing.T, blockID flow.Identifier, ced *execution
 }
 
 func generateEvents(t *testing.T, isSystemChunk bool, collection *flow.Collection) (flow.EventsList, []flow.ServiceEvent) {
+	var chunkEvents flow.EventsList
+	serviceEvents := make([]flow.ServiceEvent, 0)
+
+	// service events are also included as regular events
 	if isSystemChunk {
-		serviceEvents := make([]flow.ServiceEvent, len(systemEventsList))
-		for i, e := range systemEventsList {
+		for _, e := range systemEventsList {
 			e := e
 			event, err := convert.ServiceEvent(testChain, e)
 			require.NoError(t, err)
 
-			serviceEvents[i] = *event
+			serviceEvents = append(serviceEvents, *event)
+			chunkEvents = append(chunkEvents, e)
 		}
-		return nil, serviceEvents
 	}
 
-	var chunkEvents flow.EventsList
 	for _, coll := range collection.Transactions {
 		switch string(coll.Script) {
 		case "failedTx":
@@ -483,7 +478,7 @@ func generateEvents(t *testing.T, isSystemChunk bool, collection *flow.Collectio
 		chunkEvents = append(chunkEvents, eventsList...)
 	}
 
-	return chunkEvents, make([]flow.ServiceEvent, 0)
+	return chunkEvents, serviceEvents
 }
 
 func generateCollection(t *testing.T, isSystemChunk bool, script string) *flow.Collection {
@@ -520,10 +515,8 @@ func generateDefaultSnapshot() *snapshot.ExecutionSnapshot {
 
 func generateDefaultOutput() fvm.ProcedureOutput {
 	return fvm.ProcedureOutput{
-		ComputationUsed: computationUsed,
-		MemoryEstimate:  memoryEstimate,
-		Logs:            []string{"log1", "log2"},
-		Events:          eventsList,
+		Logs:   []string{"log1", "log2"},
+		Events: eventsList,
 	}
 }
 
@@ -577,7 +570,6 @@ type testMetadata struct {
 
 func (m *testMetadata) RefreshChunkData(t *testing.T) *verification.VerifiableChunkData {
 	cedCollection := m.Collection
-	cedEvents := m.ChunkEvents
 
 	if m.IsSystemChunk {
 		// the system chunk's data pack does not include the collection, but the execution data does.
@@ -585,8 +577,6 @@ func (m *testMetadata) RefreshChunkData(t *testing.T) *verification.VerifiableCh
 		cedCollection = &flow.Collection{
 			Transactions: []*flow.TransactionBody{serviceTxBody},
 		}
-
-		cedEvents = systemEventsList
 	}
 
 	endState, trieUpdate, err := m.ledger.Set(m.Update)
@@ -597,7 +587,7 @@ func (m *testMetadata) RefreshChunkData(t *testing.T) *verification.VerifiableCh
 
 	chunkExecutionData := &execution_data.ChunkExecutionData{
 		Collection: cedCollection,
-		Events:     cedEvents,
+		Events:     m.ChunkEvents,
 		TrieUpdate: trieUpdate,
 	}
 
