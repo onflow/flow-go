@@ -50,6 +50,8 @@ type ScriptExecutionState interface {
 	GetHighestFinalizedExecuted() uint64
 	// Any error returned is exception
 	IsBlockExecuted(height uint64, blockID flow.Identifier) (bool, error)
+
+	NewStorageSnapshot(blockID flow.Identifier, height uint64) snapshot.StorageSnapshot
 }
 
 func IsParentExecuted(state ReadOnlyExecutionState, header *flow.Header) (bool, error) {
@@ -229,10 +231,8 @@ func (storage *LedgerStorageSnapshot) Get(
 	return value, nil
 }
 
-func (s *state) NewStorageSnapshot(
-	commitment flow.StateCommitment,
-) snapshot.StorageSnapshot {
-	return NewLedgerStorageSnapshot(s.ls, commitment)
+func (s *state) NewStorageSnapshot(blockID flow.Identifier, height uint64) snapshot.StorageSnapshot {
+	return storehouse.NewBlockEndStateSnapshot(s.registerStore, blockID, height)
 }
 
 type RegisterUpdatesHolder interface {

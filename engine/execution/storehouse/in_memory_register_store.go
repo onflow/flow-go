@@ -91,6 +91,7 @@ func (s *InMemoryRegisterStore) GetRegister(height uint64, blockID flow.Identifi
 	if height < s.prunedHeight {
 		return flow.RegisterValue{}, fmt.Errorf("cannot get register at height %d, it is pruned %v", height, s.prunedHeight)
 	}
+	// TODO(leo): check if block is executed
 
 	// traverse the fork to find the latest updated value of the given register
 	// if not found, it means the register is not updated from the pruned block to the given block
