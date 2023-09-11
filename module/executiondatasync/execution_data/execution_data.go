@@ -35,10 +35,11 @@ type BlockExecutionData struct {
 
 // TransactionResult represents a flow.TransactionResult that's encoded within a ChunkExecutionData.
 //
-// The primary difference is this version includes a boolean value for the transaction's success
-// instead of a full error message. Error messages are prone to non-determinism due to bugs in the
-// execution and verification code. Rather than including the error and risking execution forks if
-// an undetected bug is introduced, we simplify it to just a boolean value.
+// The primary difference is this version includes a boolean value indicated if the transaction's
+// execution resulted in an error, instead of the full error message. Error messages are prone to
+// non-determinism due to (undiscovered) bugs in the execution and verification code. Rather than
+// including the error and risking execution forks if an undetected bug is introduced, we simplify
+// it to just a boolean value.
 type TransactionResult struct {
 	// TransactionID is the ID of the transaction this error was emitted from.
 	TransactionID flow.Identifier
@@ -48,8 +49,8 @@ type TransactionResult struct {
 	ComputationUsed uint64
 }
 
-// ConvertTransactionResults converts a list of flow.TransactionResults into a list of execution_data.TransactionResults
-// to be included in a ChunkExecutionData.
+// ConvertTransactionResults converts a list of flow.TransactionResults into a list of
+// execution_data.TransactionResults to be included in a ChunkExecutionData.
 func ConvertTransactionResults(results flow.TransactionResults) []TransactionResult {
 	if len(results) == 0 {
 		return nil

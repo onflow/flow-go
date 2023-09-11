@@ -561,11 +561,10 @@ func (s *ChunkVerifierTestSuite) GetTestSetup(t *testing.T, script string, syste
 	// events
 	chunkEvents, serviceEvents := generateEvents(t, system, collection)
 	// make sure this includes events even for the service tx
+	require.NotEmpty(t, chunkEvents)
 	if system {
 		require.Len(t, serviceEvents, 1)
-		require.Nil(t, chunkEvents)
 	} else {
-		require.NotEmpty(t, chunkEvents)
 		require.Empty(t, serviceEvents)
 	}
 
