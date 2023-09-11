@@ -8,6 +8,7 @@ import (
 
 	"github.com/onflow/flow-go/network/p2p/p2plogging"
 	p2ptest "github.com/onflow/flow-go/network/p2p/test"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 // TestPeerIdLogging checks the end-to-end functionality of the PeerId logger helper.
@@ -20,7 +21,7 @@ func TestPeerIdLogging(t *testing.T) {
 
 // BenchmarkPeerIdString benchmarks the peer.ID.String() method.
 func BenchmarkPeerIdString(b *testing.B) {
-	// unittest.SkipBenchmarkUnless(b, unittest.BENCHMARK_EXPERIMENT, "skips peer id string benchmarking, set environment variable to enable")
+	unittest.SkipBenchmarkUnless(b, unittest.BENCHMARK_EXPERIMENT, "skips peer id string benchmarking, set environment variable to enable")
 
 	count := 100
 	pids := make([]peer.ID, 0, count)
@@ -37,7 +38,7 @@ func BenchmarkPeerIdString(b *testing.B) {
 // BenchmarkPeerIdLogging benchmarks the PeerId logger helper, which is expected to be faster than the peer.ID.String() method,
 // as it caches the base58 encoded peer ID strings.
 func BenchmarkPeerIdLogging(b *testing.B) {
-	// unittest.SkipBenchmarkUnless(b, unittest.BENCHMARK_EXPERIMENT, "skips peer id logging benchmarking, set environment variable to enable")
+	unittest.SkipBenchmarkUnless(b, unittest.BENCHMARK_EXPERIMENT, "skips peer id logging benchmarking, set environment variable to enable")
 
 	count := 100
 	pids := make([]peer.ID, 0, count)

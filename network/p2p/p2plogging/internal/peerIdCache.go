@@ -11,8 +11,8 @@ type PeerIdCache struct {
 	peerCache *lru.Cache
 }
 
-func NewPeerIdCache(size uint32) *PeerIdCache {
-	c, err := lru.New(int(size))
+func NewPeerIdCache(size int) *PeerIdCache {
+	c, err := lru.New(size)
 	if err != nil {
 		panic(fmt.Sprintf("failed to create lru cache for peer ids: %v", err))
 	}
@@ -36,10 +36,10 @@ func (p *PeerIdCache) Size() int {
 	return p.peerCache.Len()
 }
 
-func (p *PeerIdCache) ByPeerId(pid peer.ID) (peer.ID, bool) {
+func (p *PeerIdCache) ByPeerId(pid peer.ID) (string, bool) {
 	pidStr, ok := p.peerCache.Get(pid)
 	if ok {
-		return pidStr.(peer.ID), ok
+		return pidStr.(string), true
 	}
-	return "", ok
+	return "", false
 }
