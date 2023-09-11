@@ -35,5 +35,7 @@ func (s *GossipSubSignatureRequirementTestSuite) TestGossipSubSignatureRequireme
 	require.Equal(s.T(), int64(0), s.Orchestrator.unauthorizedEventsReceived.Load(), fmt.Sprintf("expected to not receive any unauthorized messages instead got: %d", s.Orchestrator.unauthorizedEventsReceived.Load()))
 
 	// messages with correct message signatures are expected to always pass libp2p signature verification and be delivered to the victim EN.
-	require.Equal(s.T(), int64(numOfAuthorizedEvents), s.Orchestrator.authorizedEventsReceived.Load(), fmt.Sprintf("expected to receive %d authorized events got: %d", numOfAuthorizedEvents, s.Orchestrator.unauthorizedEventsReceived.Load()))
+	require.Eventually(s.T(), func() bool {
+		return s.Orchestrator.authorizedEventsReceived.Load() == int64(numOfAuthorizedEvents)
+	}, 5*time.Second, 500*time.Millisecond, fmt.Sprintf("expected to receive %d authorized events got: %d", numOfAuthorizedEvents, s.Orchestrator.unauthorizedEventsReceived.Load()))
 }

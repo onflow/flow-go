@@ -44,7 +44,7 @@ type Engine struct {
 
 func NewEngine(
 	log zerolog.Logger,
-	net network.Network,
+	net network.EngineRegistry,
 	me module.Local,
 	engineMetrics module.EngineMetrics,
 	mempool module.MempoolMetrics,

@@ -138,26 +138,23 @@ func (suite *Suite) RunTest(
 	unittest.RunWithBadgerDB(suite.T(), func(db *badger.DB) {
 		all := util.StorageLayer(suite.T(), db)
 
-		suite.backend = backend.New(suite.state,
-			suite.collClient,
-			nil,
-			all.Blocks,
-			all.Headers,
-			all.Collections,
-			all.Transactions,
-			all.Receipts,
-			all.Results,
-			suite.chainID,
-			suite.metrics,
-			nil,
-			false,
-			backend.DefaultMaxHeightRange,
-			nil,
-			nil,
-			suite.log,
-			backend.DefaultSnapshotHistoryLimit,
-			nil,
-		)
+		suite.backend = backend.New(
+			backend.Params{
+				State:                suite.state,
+				CollectionRPC:        suite.collClient,
+				Blocks:               all.Blocks,
+				Headers:              all.Headers,
+				Collections:          all.Collections,
+				Transactions:         all.Transactions,
+				ExecutionResults:     all.Results,
+				ExecutionReceipts:    all.Receipts,
+				ChainID:              suite.chainID,
+				AccessMetrics:        suite.metrics,
+				MaxHeightRange:       backend.DefaultMaxHeightRange,
+				Log:                  suite.log,
+				SnapshotHistoryLimit: backend.DefaultSnapshotHistoryLimit,
+				Communicator:         backend.NewNodeCommunicator(false),
+			})
 		handler := access.NewHandler(suite.backend, suite.chainID.Chain(), suite.finalizedHeaderCache, suite.me, access.WithBlockSignerDecoder(suite.signerIndicesDecoder))
 		f(handler, db, all)
 	})
@@ -310,28 +307,19 @@ func (suite *Suite) TestSendTransactionToRandomCollectionNode() {
 		connFactory.On("GetAccessAPIClient", collNode1.Address).Return(col1ApiClient, &mockCloser{}, nil)
 		connFactory.On("GetAccessAPIClient", collNode2.Address).Return(col2ApiClient, &mockCloser{}, nil)
 
-		backend := backend.New(suite.state,
-			nil,
-			nil,
-			nil,
-			nil,
-			collections,
-			transactions,
-			nil,
-			nil,
-			suite.chainID,
-			metrics,
-			connFactory,
-			false,
-			backend.DefaultMaxHeightRange,
-			nil,
-			nil,
-			suite.log,
-			backend.DefaultSnapshotHistoryLimit,
-			nil,
-		)
+		bnd := backend.New(backend.Params{State: suite.state,
+			Collections:          collections,
+			Transactions:         transactions,
+			ChainID:              suite.chainID,
+			AccessMetrics:        metrics,
+			ConnFactory:          connFactory,
+			MaxHeightRange:       backend.DefaultMaxHeightRange,
+			Log:                  suite.log,
+			SnapshotHistoryLimit: backend.DefaultSnapshotHistoryLimit,
+			Communicator:         backend.NewNodeCommunicator(false),
+		})
 
-		handler := access.NewHandler(backend, suite.chainID.Chain(), suite.finalizedHeaderCache, suite.me)
+		handler := access.NewHandler(bnd, suite.chainID.Chain(), suite.finalizedHeaderCache, suite.me)
 
 		// Send transaction 1
 		resp, err := handler.SendTransaction(context.Background(), sendReq1)
@@ -636,28 +624,25 @@ func (suite *Suite) TestGetSealedTransaction() {
 		blocksToMarkExecuted, err := stdmap.NewTimes(100)
 		require.NoError(suite.T(), err)
 
-		backend := backend.New(suite.state,
-			suite.collClient,
-			nil,
-			all.Blocks,
-			all.Headers,
-			collections,
-			transactions,
-			receipts,
-			results,
-			suite.chainID,
-			suite.metrics,
-			connFactory,
-			false,
-			backend.DefaultMaxHeightRange,
-			nil,
-			enNodeIDs.Strings(),
-			suite.log,
-			backend.DefaultSnapshotHistoryLimit,
-			nil,
-		)
+		bnd := backend.New(backend.Params{State: suite.state,
+			CollectionRPC:             suite.collClient,
+			Blocks:                    all.Blocks,
+			Headers:                   all.Headers,
+			Collections:               collections,
+			Transactions:              transactions,
+			ExecutionReceipts:         receipts,
+			ExecutionResults:          results,
+			ChainID:                   suite.chainID,
+			AccessMetrics:             suite.metrics,
+			ConnFactory:               connFactory,
+			MaxHeightRange:            backend.DefaultMaxHeightRange,
+			PreferredExecutionNodeIDs: enNodeIDs.Strings(),
+			Log:                       suite.log,
+			SnapshotHistoryLimit:      backend.DefaultSnapshotHistoryLimit,
+			Communicator:              backend.NewNodeCommunicator(false),
+		})
 
-		handler := access.NewHandler(backend, suite.chainID.Chain(), suite.finalizedHeaderCache, suite.me)
+		handler := access.NewHandler(bnd, suite.chainID.Chain(), suite.finalizedHeaderCache, suite.me)
 
 		// create the ingest engine
 		ingestEng, err := ingestion.New(suite.log, suite.net, suite.state, suite.me, suite.request, all.Blocks, all.Headers, collections,
@@ -775,28 +760,25 @@ func (suite *Suite) TestGetTransactionResult() {
 		blocksToMarkExecuted, err := stdmap.NewTimes(100)
 		require.NoError(suite.T(), err)
 
-		backend := backend.New(suite.state,
-			suite.collClient,
-			nil,
-			all.Blocks,
-			all.Headers,
-			collections,
-			transactions,
-			receipts,
-			results,
-			suite.chainID,
-			suite.metrics,
-			connFactory,
-			false,
-			backend.DefaultMaxHeightRange,
-			nil,
-			enNodeIDs.Strings(),
-			suite.log,
-			backend.DefaultSnapshotHistoryLimit,
-			nil,
-		)
+		bnd := backend.New(backend.Params{State: suite.state,
+			CollectionRPC:             suite.collClient,
+			Blocks:                    all.Blocks,
+			Headers:                   all.Headers,
+			Collections:               collections,
+			Transactions:              transactions,
+			ExecutionReceipts:         receipts,
+			ExecutionResults:          results,
+			ChainID:                   suite.chainID,
+			AccessMetrics:             suite.metrics,
+			ConnFactory:               connFactory,
+			MaxHeightRange:            backend.DefaultMaxHeightRange,
+			PreferredExecutionNodeIDs: enNodeIDs.Strings(),
+			Log:                       suite.log,
+			SnapshotHistoryLimit:      backend.DefaultSnapshotHistoryLimit,
+			Communicator:              backend.NewNodeCommunicator(false),
+		})
 
-		handler := access.NewHandler(backend, suite.chainID.Chain(), suite.finalizedHeaderCache, suite.me)
+		handler := access.NewHandler(bnd, suite.chainID.Chain(), suite.finalizedHeaderCache, suite.me)
 
 		// create the ingest engine
 		ingestEng, err := ingestion.New(suite.log, suite.net, suite.state, suite.me, suite.request, all.Blocks, all.Headers, collections,
@@ -966,26 +948,23 @@ func (suite *Suite) TestExecuteScript() {
 		connFactory := new(factorymock.ConnectionFactory)
 		connFactory.On("GetExecutionAPIClient", mock.Anything).Return(suite.execClient, &mockCloser{}, nil)
 
-		suite.backend = backend.New(suite.state,
-			suite.collClient,
-			nil,
-			all.Blocks,
-			all.Headers,
-			collections,
-			transactions,
-			receipts,
-			results,
-			suite.chainID,
-			suite.metrics,
-			connFactory,
-			false,
-			backend.DefaultMaxHeightRange,
-			nil,
-			flow.IdentifierList(identities.NodeIDs()).Strings(),
-			suite.log,
-			backend.DefaultSnapshotHistoryLimit,
-			nil,
-		)
+		suite.backend = backend.New(backend.Params{State: suite.state,
+			CollectionRPC:         suite.collClient,
+			Blocks:                all.Blocks,
+			Headers:               all.Headers,
+			Collections:           collections,
+			Transactions:          transactions,
+			ExecutionReceipts:     receipts,
+			ExecutionResults:      results,
+			ChainID:               suite.chainID,
+			AccessMetrics:         suite.metrics,
+			ConnFactory:           connFactory,
+			MaxHeightRange:        backend.DefaultMaxHeightRange,
+			FixedExecutionNodeIDs: (identities.NodeIDs()).Strings(),
+			Log:                   suite.log,
+			SnapshotHistoryLimit:  backend.DefaultSnapshotHistoryLimit,
+			Communicator:          backend.NewNodeCommunicator(false),
+		})
 
 		handler := access.NewHandler(suite.backend, suite.chainID.Chain(), suite.finalizedHeaderCache, suite.me)
 
@@ -1137,7 +1116,7 @@ func (suite *Suite) TestAPICallNodeVersionInfo() {
 
 		respNodeVersionInfo := resp.Info
 		suite.Require().Equal(respNodeVersionInfo, &entitiesproto.NodeVersionInfo{
-			Semver:          build.Semver(),
+			Semver:          build.Version(),
 			Commit:          build.Commit(),
 			SporkId:         sporkId[:],
 			ProtocolVersion: uint64(protocolVersion),

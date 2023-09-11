@@ -123,7 +123,7 @@ func TestGossipSubScoreTracer(t *testing.T) {
 		}),
 		p2ptest.WithRole(flow.RoleConsensus))
 
-	idProvider.On("ByPeerID", tracerNode.Host().ID()).Return(&tracerId, true).Maybe()
+	idProvider.On("ByPeerID", tracerNode.ID()).Return(&tracerId, true).Maybe()
 
 	consensusNode, consensusId := p2ptest.NodeFixture(
 		t,
@@ -131,7 +131,7 @@ func TestGossipSubScoreTracer(t *testing.T) {
 		t.Name(),
 		idProvider,
 		p2ptest.WithRole(flow.RoleConsensus))
-	idProvider.On("ByPeerID", consensusNode.Host().ID()).Return(&consensusId, true).Maybe()
+	idProvider.On("ByPeerID", consensusNode.ID()).Return(&consensusId, true).Maybe()
 
 	accessNode, accessId := p2ptest.NodeFixture(
 		t,
@@ -139,14 +139,14 @@ func TestGossipSubScoreTracer(t *testing.T) {
 		t.Name(),
 		idProvider,
 		p2ptest.WithRole(flow.RoleAccess))
-	idProvider.On("ByPeerID", accessNode.Host().ID()).Return(&accessId, true).Maybe()
+	idProvider.On("ByPeerID", accessNode.ID()).Return(&accessId, true).Maybe()
 
 	nodes := []p2p.LibP2PNode{tracerNode, consensusNode, accessNode}
 	ids := flow.IdentityList{&tracerId, &consensusId, &accessId}
 
 	// 5. Starts the nodes and lets them discover each other.
-	p2ptest.StartNodes(t, signalerCtx, nodes, 1*time.Second)
-	defer p2ptest.StopNodes(t, nodes, cancel, 1*time.Second)
+	p2ptest.StartNodes(t, signalerCtx, nodes)
+	defer p2ptest.StopNodes(t, nodes, cancel)
 
 	p2ptest.LetNodesDiscoverEachOther(t, ctx, nodes, ids)
 
@@ -189,50 +189,50 @@ func TestGossipSubScoreTracer(t *testing.T) {
 	assert.Eventually(t, func() bool {
 		// we expect the tracerNode to have the consensusNodes and accessNodes with the correct app scores.
 		exposer := tracerNode.PeerScoreExposer()
-		score, ok := exposer.GetAppScore(consensusNode.Host().ID())
+		score, ok := exposer.GetAppScore(consensusNode.ID())
 		if !ok || score != consensusScore {
 			return false
 		}
 
-		score, ok = exposer.GetAppScore(accessNode.Host().ID())
+		score, ok = exposer.GetAppScore(accessNode.ID())
 		if !ok || score != accessScore {
 			return false
 		}
 
 		// we expect the tracerNode to have the consensusNodes and accessNodes with a non-zero score.
-		score, ok = exposer.GetScore(consensusNode.Host().ID())
+		score, ok = exposer.GetScore(consensusNode.ID())
 		if !ok || score == 0 {
 			return false
 		}
 
-		score, ok = exposer.GetScore(accessNode.Host().ID())
+		score, ok = exposer.GetScore(accessNode.ID())
 		if !ok || score == 0 {
 			return false
 		}
 
 		// we expect the tracerNode to have the consensusNodes and accessNodes with an existing behaviour score and ip score.
-		_, ok = exposer.GetBehaviourPenalty(consensusNode.Host().ID())
+		_, ok = exposer.GetBehaviourPenalty(consensusNode.ID())
 		if !ok {
 			return false
 		}
 
-		_, ok = exposer.GetIPColocationFactor(consensusNode.Host().ID())
+		_, ok = exposer.GetIPColocationFactor(consensusNode.ID())
 		if !ok {
 			return false
 		}
 
-		_, ok = exposer.GetBehaviourPenalty(accessNode.Host().ID())
+		_, ok = exposer.GetBehaviourPenalty(accessNode.ID())
 		if !ok {
 			return false
 		}
 
-		_, ok = exposer.GetIPColocationFactor(accessNode.Host().ID())
+		_, ok = exposer.GetIPColocationFactor(accessNode.ID())
 		if !ok {
 			return false
 		}
 
 		// we expect the tracerNode to have the consensusNodes and accessNodes with an existing mesh score.
-		consensusMeshScores, ok := exposer.GetTopicScores(consensusNode.Host().ID())
+		consensusMeshScores, ok := exposer.GetTopicScores(consensusNode.ID())
 		if !ok {
 			return false
 		}
@@ -241,7 +241,7 @@ func TestGossipSubScoreTracer(t *testing.T) {
 			return false
 		}
 
-		accessMeshScore, ok := exposer.GetTopicScores(accessNode.Host().ID())
+		accessMeshScore, ok := exposer.GetTopicScores(accessNode.ID())
 		if !ok {
 			return false
 		}

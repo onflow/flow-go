@@ -37,10 +37,12 @@ const (
 	gracePeriod   = "libp2p-grace-period"
 	silencePeriod = "libp2p-silence-period"
 	// gossipsub
-	peerScoring             = "gossipsub-peer-scoring-enabled"
-	localMeshLogInterval    = "gossipsub-local-mesh-logging-interval"
-	rpcSentTrackerCacheSize = "gossipsub-rpc-sent-tracker-cache-size"
-	scoreTracerInterval     = "gossipsub-score-tracer-interval"
+	peerScoring                  = "gossipsub-peer-scoring-enabled"
+	localMeshLogInterval         = "gossipsub-local-mesh-logging-interval"
+	rpcSentTrackerCacheSize      = "gossipsub-rpc-sent-tracker-cache-size"
+	rpcSentTrackerQueueCacheSize = "gossipsub-rpc-sent-tracker-queue-cache-size"
+	rpcSentTrackerNumOfWorkers   = "gossipsub-rpc-sent-tracker-workers"
+	scoreTracerInterval          = "gossipsub-score-tracer-interval"
 	// gossipsub validation inspector
 	gossipSubRPCInspectorNotificationCacheSize                 = "gossipsub-rpc-inspector-notification-cache-size"
 	validationInspectorNumberOfWorkers                         = "gossipsub-rpc-validation-inspector-workers"
@@ -57,6 +59,10 @@ const (
 	metricsInspectorNumberOfWorkers = "gossipsub-rpc-metrics-inspector-workers"
 	metricsInspectorCacheSize       = "gossipsub-rpc-metrics-inspector-cache-size"
 
+	iwantMaxSampleSize           = "gossipsub-rpc-iwant-max-sample-size"
+	iwantCacheMissThreshold      = "gossipsub-rpc-iwant-cache-miss-threshold"
+	iwantDuplicateMsgIDThreshold = "gossipsub-rpc-iwant-duplicate-message-id-threshold"
+
 	alspDisabled            = "alsp-disable-penalty"
 	alspSpamRecordCacheSize = "alsp-spam-record-cache-size"
 	alspSpamRecordQueueSize = "alsp-spam-report-queue-size"
@@ -67,10 +73,11 @@ func AllFlagNames() []string {
 	return []string{
 		networkingConnectionPruning, preferredUnicastsProtocols, receivedMessageCacheSize, peerUpdateInterval, unicastMessageTimeout, unicastCreateStreamRetryDelay,
 		dnsCacheTTL, disallowListNotificationCacheSize, dryRun, lockoutDuration, messageRateLimit, bandwidthRateLimit, bandwidthBurstLimit, memoryLimitRatio,
-		fileDescriptorsRatio, peerBaseLimitConnsInbound, highWatermark, lowWatermark, gracePeriod, silencePeriod, peerScoring, localMeshLogInterval, rpcSentTrackerCacheSize, scoreTracerInterval,
-		gossipSubRPCInspectorNotificationCacheSize, validationInspectorNumberOfWorkers, validationInspectorInspectMessageQueueCacheSize, validationInspectorClusterPrefixedTopicsReceivedCacheSize,
+		fileDescriptorsRatio, peerBaseLimitConnsInbound, highWatermark, lowWatermark, gracePeriod, silencePeriod, peerScoring, localMeshLogInterval, rpcSentTrackerCacheSize, rpcSentTrackerQueueCacheSize, rpcSentTrackerNumOfWorkers,
+		scoreTracerInterval, gossipSubRPCInspectorNotificationCacheSize, validationInspectorNumberOfWorkers, validationInspectorInspectMessageQueueCacheSize, validationInspectorClusterPrefixedTopicsReceivedCacheSize,
 		validationInspectorClusterPrefixedTopicsReceivedCacheDecay, validationInspectorClusterPrefixHardThreshold, ihaveSyncSampleSizePercentage, ihaveAsyncSampleSizePercentage,
 		ihaveMaxSampleSize, metricsInspectorNumberOfWorkers, metricsInspectorCacheSize, alspDisabled, alspSpamRecordCacheSize, alspSpamRecordQueueSize, alspHearBeatInterval,
+		iwantMaxSampleSize, iwantCacheMissThreshold, iwantDuplicateMsgIDThreshold,
 	}
 }
 
@@ -109,6 +116,8 @@ func InitializeNetworkFlags(flags *pflag.FlagSet, config *Config) {
 	flags.Duration(localMeshLogInterval, config.GossipSubConfig.LocalMeshLogInterval, "logging interval for local mesh in gossipsub")
 	flags.Duration(scoreTracerInterval, config.GossipSubConfig.ScoreTracerInterval, "logging interval for peer score tracer in gossipsub, set to 0 to disable")
 	flags.Uint32(rpcSentTrackerCacheSize, config.GossipSubConfig.RPCSentTrackerCacheSize, "cache size of the rpc sent tracker used by the gossipsub mesh tracer.")
+	flags.Uint32(rpcSentTrackerQueueCacheSize, config.GossipSubConfig.RPCSentTrackerQueueCacheSize, "cache size of the rpc sent tracker worker queue.")
+	flags.Int(rpcSentTrackerNumOfWorkers, config.GossipSubConfig.RpcSentTrackerNumOfWorkers, "number of workers for the rpc sent tracker worker pool.")
 	// gossipsub RPC control message validation limits used for validation configuration and rate limiting
 	flags.Int(validationInspectorNumberOfWorkers, config.GossipSubConfig.GossipSubRPCInspectorsConfig.GossipSubRPCValidationInspectorConfigs.NumberOfWorkers, "number of gossupsub RPC control message validation inspector component workers")
 	flags.Uint32(validationInspectorInspectMessageQueueCacheSize, config.GossipSubConfig.GossipSubRPCInspectorsConfig.GossipSubRPCValidationInspectorConfigs.CacheSize, "cache size for gossipsub RPC validation inspector events worker pool queue.")
@@ -129,6 +138,10 @@ func InitializeNetworkFlags(flags *pflag.FlagSet, config *Config) {
 	flags.Float64(ihaveSyncSampleSizePercentage, config.GossipSubConfig.GossipSubRPCInspectorsConfig.GossipSubRPCValidationInspectorConfigs.IHaveSyncInspectSampleSizePercentage, "percentage of ihave messages to sample during synchronous validation")
 	flags.Float64(ihaveAsyncSampleSizePercentage, config.GossipSubConfig.GossipSubRPCInspectorsConfig.GossipSubRPCValidationInspectorConfigs.IHaveAsyncInspectSampleSizePercentage, "percentage of ihave messages to sample during asynchronous validation")
 	flags.Float64(ihaveMaxSampleSize, config.GossipSubConfig.GossipSubRPCInspectorsConfig.GossipSubRPCValidationInspectorConfigs.IHaveInspectionMaxSampleSize, "max number of ihaves to sample when performing validation")
+
+	flags.Uint(iwantMaxSampleSize, config.GossipSubConfig.GossipSubRPCInspectorsConfig.GossipSubRPCValidationInspectorConfigs.IWantRPCInspectionConfig.MaxSampleSize, "max number of iwants to sample when performing validation")
+	flags.Float64(iwantCacheMissThreshold, config.GossipSubConfig.GossipSubRPCInspectorsConfig.GossipSubRPCValidationInspectorConfigs.IWantRPCInspectionConfig.CacheMissThreshold, "max number of iwants to sample when performing validation")
+	flags.Float64(iwantDuplicateMsgIDThreshold, config.GossipSubConfig.GossipSubRPCInspectorsConfig.GossipSubRPCValidationInspectorConfigs.IWantRPCInspectionConfig.DuplicateMsgIDThreshold, "max allowed duplicate message IDs in a single iWant control message")
 }
 
 // rpcInspectorValidationLimits utility func that adds flags for each of the validation limits for each control message type.
