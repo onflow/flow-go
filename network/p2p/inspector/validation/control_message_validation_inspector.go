@@ -456,6 +456,7 @@ func (c *ControlMsgValidationInspector) truncateIHaveMessageIds(rpc *pubsub.RPC)
 		c.performSample(p2pmsg.CtrlMsgIHave, uint(totalMessageIDs), uint(sampleSize), func(i, j uint) {
 			messageIDs[i], messageIDs[j] = messageIDs[j], messageIDs[i]
 		})
+		ihave.MessageIDs = messageIDs[:sampleSize]
 	}
 }
 
