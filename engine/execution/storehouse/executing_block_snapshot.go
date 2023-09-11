@@ -2,68 +2,20 @@ package storehouse
 
 import (
 	"fmt"
-	"sync"
 
-	"github.com/onflow/flow-go/engine/execution"
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/model/flow"
 )
 
+// TODO(leo): move it to upper level
 type ExtendableStorageSnapshot interface {
 	snapshot.StorageSnapshot
 	Extend(trieUpdate *ledger.TrieUpdate) (ExtendableStorageSnapshot, error)
 	Commitment() flow.StateCommitment
 }
 
-// BlockEndStateSnapshot represents the storage at the end of a block.
-type BlockEndStateSnapshot struct {
-	storage execution.RegisterStore
-
-	blockID flow.Identifier
-	height  uint64
-
-	mutex     sync.RWMutex
-	readCache map[flow.RegisterID]flow.RegisterValue // cache the reads from storage at baseBlock
-}
-
-// the caller must ensure the block height is for the given block
-func NewBlockEndStateSnapshot(blockID flow.Identifier, height uint64) *BlockEndStateSnapshot {
-	return &BlockEndStateSnapshot{
-		blockID: blockID,
-		height:  height,
-	}
-}
-
-func (s *BlockEndStateSnapshot) Get(id flow.RegisterID) (flow.RegisterValue, error) {
-	value, ok := s.getFromCache(id)
-	if ok {
-		return value, nil
-	}
-
-	value, err := s.getFromStorage(id)
-	if err != nil {
-		return nil, err
-	}
-
-	s.mutex.Lock()
-	defer s.mutex.Unlock()
-
-	s.readCache[id] = value
-	return value, nil
-}
-
-func (s *BlockEndStateSnapshot) getFromCache(id flow.RegisterID) (flow.RegisterValue, bool) {
-	s.mutex.RLock()
-	defer s.mutex.RUnlock()
-
-	value, ok := s.readCache[id]
-	return value, ok
-}
-
-func (s *BlockEndStateSnapshot) getFromStorage(id flow.RegisterID) (flow.RegisterValue, error) {
-	return s.storage.GetRegister(s.height, s.blockID, id)
-}
+var _ ExtendableStorageSnapshot = (*ExecutingBlockSnapshot)(nil)
 
 // ExecutingBlockSnapshot is a snapshot of the storage at an executed collection.
 // It starts with a storage snapshot at the end of previous block,
@@ -143,7 +95,7 @@ func (s *ExecutingBlockSnapshot) Commitment() flow.StateCommitment {
 	return s.commitment
 }
 
-// TODO: move it, copied from engine/execution/state/state.go to prevent cycle import
+// TODO(leo): move it, copied from engine/execution/state/state.go to prevent cycle import
 const (
 	KeyPartOwner = uint16(0)
 	// @deprecated - controller was used only by the very first
@@ -152,7 +104,7 @@ const (
 	KeyPartKey = uint16(2)
 )
 
-// TODO: move it
+// TODO(leo): move it
 func KeyToRegisterID(key ledger.Key) (flow.RegisterID, error) {
 	if len(key.KeyParts) != 2 ||
 		key.KeyParts[0].Type != KeyPartOwner ||
@@ -166,7 +118,7 @@ func KeyToRegisterID(key ledger.Key) (flow.RegisterID, error) {
 	), nil
 }
 
-// TODO: move it
+// TODO(leo): move it
 func PayloadToRegister(payload *ledger.Payload) (flow.RegisterID, flow.RegisterValue, error) {
 	key, err := payload.Key()
 	if err != nil {

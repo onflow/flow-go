@@ -23,7 +23,7 @@ import (
 //     GetRegister(B, Y) should return 3, because Y is updated in B
 //     GetRegister(A, Y) should return 2, because the query queries the value at A, not B
 //     GetRegister(B, Z) should return NotFound, because register is unknown
-//     GetRegister(C, X) should return NotFound, because block is unknown (unexecuted)
+//     GetRegister(C, X) should return BlockNotExecuted, because block is not executed (unexecuted)
 //
 // 8. GetRegister should return out of range error if the queried height is below pruned height
 //

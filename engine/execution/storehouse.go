@@ -29,6 +29,8 @@ type RegisterStore interface {
 	// which has been saved in OnDiskRegisterStore
 	FinalizedAndExecutedHeight() uint64
 
+	// IsBlockExecuted returns whether the given block is executed.
+	// If a block is not executed, it does not distinguish whether the block exists or not.
 	IsBlockExecuted(height uint64, blockID flow.Identifier) (bool, error)
 }
 

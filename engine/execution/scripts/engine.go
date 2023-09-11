@@ -10,16 +10,20 @@ import (
 	"github.com/onflow/flow-go/engine/execution"
 	"github.com/onflow/flow-go/engine/execution/computation/query"
 	"github.com/onflow/flow-go/engine/execution/state"
-	"github.com/onflow/flow-go/engine/execution/storehouse"
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/state/protocol"
 )
 
+// TODO(leo): move it.
+
 // ScriptExecutionState is a subset of the `state.ExecutionState` interface purposed to only access the state
 // used for script execution and not mutate the execution state of the blockchain.
 type ScriptExecutionState interface {
 	IsBlockExecuted(height uint64, blockID flow.Identifier) (bool, error)
+	// NewStorageSnapshot returns a storage snapshot at the end of the given block for retrieving registers,
+	// the caller needs to ensure the block is executed, otherwise BlockNotExecuted would be returned.
+	NewStorageSnapshot(blockID flow.Identifier, height uint64) snapshot.StorageSnapshot
 }
 
 type Engine struct {
@@ -123,6 +127,6 @@ func (e *Engine) getSnapshotAtBlockID(blockID flow.Identifier) (snapshot.Storage
 	}
 
 	// create a snapshot powered by register store
-	blockSnapshot := storehouse.NewBlockEndStateSnapshot(blockID, header.Height)
+	blockSnapshot := e.execState.NewBlockStorageSnapshot(blockID, header.Height)
 	return blockSnapshot, header, nil
 }
