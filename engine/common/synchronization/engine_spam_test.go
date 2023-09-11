@@ -198,13 +198,13 @@ func (ss *SyncSuite) TestLoad_Process_RangeRequest_SometimesReportSpam() {
 	// expected probability factor: 0.1 * ((1000-1) + 1)/64 = 1.5625
 	loadGroups = append(loadGroups, loadGroup{0.1, 1000, 1000, 1, 1000})
 
-	// using a very large range (999) with a 1% base probability factor, expect to get misbehavior report about 15% of the time (150 in 1000 requests)
-	// expected probability factor: 0.01 * ((1000-1) + 1)/64 = 0.15625
-	loadGroups = append(loadGroups, loadGroup{0.01, 110, 200, 1, 1000})
-
 	// using a small range (10) with a 1% base probability factor, expect to almost never get misbehavior report, about 0.17% of the time (2 in 1000 requests)
 	// expected probability factor: 0.01 * ((11-1) + 1)/64 = 0.00171875
 	loadGroups = append(loadGroups, loadGroup{0.01, 0, 7, 1, 11})
+
+	// using a very large range (999) with a 1% base probability factor, expect to get misbehavior report about 15% of the time (150 in 1000 requests)
+	// expected probability factor: 0.01 * ((1000-1) + 1)/64 = 0.15625
+	loadGroups = append(loadGroups, loadGroup{0.01, 110, 200, 1, 1000})
 
 	// INVALID RANGE REQUESTS
 	// the following range requests are invalid and should always result in a misbehavior report
