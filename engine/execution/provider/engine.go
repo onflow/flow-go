@@ -73,7 +73,7 @@ type Engine struct {
 func New(
 	logger zerolog.Logger,
 	tracer module.Tracer,
-	net network.Network,
+	net network.EngineRegistry,
 	state protocol.State,
 	execState state.ReadOnlyExecutionState,
 	metrics module.ExecutionMetrics,

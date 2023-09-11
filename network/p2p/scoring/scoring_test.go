@@ -138,7 +138,7 @@ func TestInvalidCtrlMsgScoringIntegration(t *testing.T) {
 	// now simulates node2 spamming node1 with invalid gossipsub control messages.
 	for i := 0; i < 30; i++ {
 		inspectorSuite1.consumer.OnInvalidControlMessageNotification(&p2p.InvCtrlMsgNotif{
-			PeerID:  node2.Host().ID(),
+			PeerID:  node2.ID(),
 			MsgType: p2pmsg.ControlMessageTypes()[rand.Intn(len(p2pmsg.ControlMessageTypes()))],
 			Error:   fmt.Errorf("invalid control message"),
 		})

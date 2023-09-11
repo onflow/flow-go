@@ -12,13 +12,20 @@ import (
 // maxFailedRequestCount represents the maximum number of failed requests before returning errors.
 const maxFailedRequestCount = 3
 
-// NodeAction is a callback function type that represents an action to be performed on a node.
-// It takes a node as input and returns an error indicating the result of the action.
-type NodeAction func(node *flow.Identity) error
+type Communicator interface {
+	CallAvailableNode(
+		//List of node identifiers to execute callback on
+		nodes flow.IdentityList,
+		//Callback function that represents an action to be performed on a node.
+		//It takes a node as input and returns an error indicating the result of the action.
+		call func(node *flow.Identity) error,
+		// Callback function that determines whether an error should terminate further execution.
+		// It takes an error as input and returns a boolean value indicating whether the error should be considered terminal.
+		shouldTerminateOnError func(node *flow.Identity, err error) bool,
+	) error
+}
 
-// ErrorTerminator is a callback function that determines whether an error should terminate further execution.
-// It takes an error as input and returns a boolean value indicating whether the error should be considered terminal.
-type ErrorTerminator func(node *flow.Identity, err error) bool
+var _ Communicator = (*NodeCommunicator)(nil)
 
 // NodeCommunicator is responsible for calling available nodes in the backend.
 type NodeCommunicator struct {
@@ -38,9 +45,14 @@ func NewNodeCommunicator(circuitBreakerEnabled bool) *NodeCommunicator {
 // If the error occurs in circuit breaker, it continues to the next node.
 // If the maximum failed request count is reached, it returns the accumulated errors.
 func (b *NodeCommunicator) CallAvailableNode(
+	//List of node identifiers to execute callback on
 	nodes flow.IdentityList,
-	call NodeAction,
-	shouldTerminateOnError ErrorTerminator,
+	//Callback function that determines whether an error should terminate further execution.
+	// It takes an error as input and returns a boolean value indicating whether the error should be considered terminal.
+	call func(id *flow.Identity) error,
+	// Callback function that determines whether an error should terminate further execution.
+	// It takes an error as input and returns a boolean value indicating whether the error should be considered terminal.
+	shouldTerminateOnError func(node *flow.Identity, err error) bool,
 ) error {
 	var errs *multierror.Error
 	nodeSelector, err := b.nodeSelectorFactory.SelectNodes(nodes)

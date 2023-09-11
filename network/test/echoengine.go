@@ -34,7 +34,7 @@ type EchoEngine struct {
 	mockcomponent.Component
 }
 
-func NewEchoEngine(t *testing.T, net network.Network, cap int, channel channels.Channel, echo bool, send testutils.ConduitSendWrapperFunc) *EchoEngine {
+func NewEchoEngine(t *testing.T, net network.EngineRegistry, cap int, channel channels.Channel, echo bool, send testutils.ConduitSendWrapperFunc) *EchoEngine {
 	te := &EchoEngine{
 		t:        t,
 		echomsg:  "this is an echo",
