@@ -7,7 +7,6 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promauto"
 
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/module/metrics/internal"
 )
 
 type PingCollector struct {
@@ -20,20 +19,20 @@ func NewPingCollector() *PingCollector {
 	pc := &PingCollector{
 		reachable: promauto.NewGaugeVec(prometheus.GaugeOpts{
 			Name:      "node_reachable",
-			Namespace: internal.NamespaceNetwork,
-			Subsystem: internal.SubsystemGossip,
+			Namespace: namespaceNetwork,
+			Subsystem: subsystemGossip,
 			Help:      "report whether a node is reachable",
 		}, []string{LabelNodeID, LabelNodeAddress, LabelNodeRole, LabelNodeInfo}),
 		sealedHeight: promauto.NewGaugeVec(prometheus.GaugeOpts{
 			Name:      "sealed_height",
-			Namespace: internal.NamespaceNetwork,
-			Subsystem: internal.SubsystemGossip,
+			Namespace: namespaceNetwork,
+			Subsystem: subsystemGossip,
 			Help:      "the last sealed height of a node",
 		}, []string{LabelNodeID, LabelNodeAddress, LabelNodeRole, LabelNodeInfo, LabelNodeVersion}),
 		hotstuffCurView: promauto.NewGaugeVec(prometheus.GaugeOpts{
 			Name:      "hotstuff_curview",
-			Namespace: internal.NamespaceNetwork,
-			Subsystem: internal.SubsystemGossip,
+			Namespace: namespaceNetwork,
+			Subsystem: subsystemGossip,
 			Help:      "the hotstuff current view",
 		}, []string{LabelNodeID, LabelNodeAddress, LabelNodeInfo}),
 	}

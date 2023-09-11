@@ -7,7 +7,6 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promauto"
 
 	"github.com/onflow/flow-go/module"
-	"github.com/onflow/flow-go/module/metrics/internal"
 )
 
 // UnicastManagerMetrics metrics collector for the unicast manager.
@@ -35,8 +34,8 @@ func NewUnicastManagerMetrics(prefix string) *UnicastManagerMetrics {
 
 	uc.createStreamRetriesDueToDialBackoff = promauto.NewHistogramVec(
 		prometheus.HistogramOpts{
-			Namespace: internal.NamespaceNetwork,
-			Subsystem: internal.SubsystemGossip,
+			Namespace: namespaceNetwork,
+			Subsystem: subsystemGossip,
 			Name:      uc.prefix + "attempts_to_create_stream_due_to_in_progress_dial_total",
 			Help:      "the number of times a stream creation is retried due to a dial in progress",
 			Buckets:   []float64{1, 2, 3},
@@ -45,8 +44,8 @@ func NewUnicastManagerMetrics(prefix string) *UnicastManagerMetrics {
 
 	uc.createStreamTimeDueToDialBackoff = promauto.NewHistogramVec(
 		prometheus.HistogramOpts{
-			Namespace: internal.NamespaceNetwork,
-			Subsystem: internal.SubsystemGossip,
+			Namespace: namespaceNetwork,
+			Subsystem: subsystemGossip,
 			Name:      uc.prefix + "overall_time_to_create_stream_seconds",
 			Help:      "the amount of time it takes to create a stream successfully in seconds including the time to create a connection when needed",
 			Buckets:   []float64{0.01, 0.1, 0.5, 1, 2, 5},
@@ -55,8 +54,8 @@ func NewUnicastManagerMetrics(prefix string) *UnicastManagerMetrics {
 
 	uc.dialPeerRetries = promauto.NewHistogramVec(
 		prometheus.HistogramOpts{
-			Namespace: internal.NamespaceNetwork,
-			Subsystem: internal.SubsystemGossip,
+			Namespace: namespaceNetwork,
+			Subsystem: subsystemGossip,
 			Name:      uc.prefix + "attempts_to_dial_peer_total",
 			Help:      "number of retry attempts before a connection is established successfully",
 			Buckets:   []float64{1, 2, 3},
@@ -65,8 +64,8 @@ func NewUnicastManagerMetrics(prefix string) *UnicastManagerMetrics {
 
 	uc.dialPeerTime = promauto.NewHistogramVec(
 		prometheus.HistogramOpts{
-			Namespace: internal.NamespaceNetwork,
-			Subsystem: internal.SubsystemGossip,
+			Namespace: namespaceNetwork,
+			Subsystem: subsystemGossip,
 			Name:      uc.prefix + "time_to_dial_peer_seconds",
 			Help:      "the amount of time it takes to dial a peer and establish a connection during stream creation",
 			Buckets:   []float64{0.01, 0.1, 0.5, 1, 2, 5},
@@ -75,8 +74,8 @@ func NewUnicastManagerMetrics(prefix string) *UnicastManagerMetrics {
 
 	uc.createStreamOnConnRetries = promauto.NewHistogramVec(
 		prometheus.HistogramOpts{
-			Namespace: internal.NamespaceNetwork,
-			Subsystem: internal.SubsystemGossip,
+			Namespace: namespaceNetwork,
+			Subsystem: subsystemGossip,
 			Name:      uc.prefix + "attempts_to_create_stream_on_connection_total",
 			Help:      "number of retry attempts before a stream is created on the available connection between two peers",
 			Buckets:   []float64{1, 2, 3},
@@ -85,8 +84,8 @@ func NewUnicastManagerMetrics(prefix string) *UnicastManagerMetrics {
 
 	uc.createStreamOnConnTime = promauto.NewHistogramVec(
 		prometheus.HistogramOpts{
-			Namespace: internal.NamespaceNetwork,
-			Subsystem: internal.SubsystemGossip,
+			Namespace: namespaceNetwork,
+			Subsystem: subsystemGossip,
 			Name:      uc.prefix + "time_to_create_stream_on_connection_seconds",
 			Help:      "the amount of time it takes to create a stream on the available connection between two peers",
 			Buckets:   []float64{0.01, 0.1, 0.5, 1, 2, 5},

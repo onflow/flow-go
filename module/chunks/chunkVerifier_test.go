@@ -28,7 +28,6 @@ import (
 	"github.com/onflow/flow-go/model/verification"
 	"github.com/onflow/flow-go/module/chunks"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
-	"github.com/onflow/flow-go/module/executiondatasync/execution_data/model"
 	"github.com/onflow/flow-go/module/executiondatasync/provider"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -336,7 +335,7 @@ func updateExecutionData(t *testing.T, vch *verification.VerifiableChunkData, co
 		require.NoError(t, err)
 	}
 
-	ced := model.ChunkExecutionData{
+	ced := execution_data.ChunkExecutionData{
 		Collection: collection,
 		Events:     chunkEvents,
 		TrieUpdate: trieUpdate,
@@ -479,7 +478,7 @@ func GetBaselineVerifiableChunk(t *testing.T, script string, system bool) (*veri
 	trieUpdate, err := pathfinder.UpdateToTrieUpdate(update, partial.DefaultPathFinderVersion)
 	require.NoError(t, err)
 
-	chunkExecutionData := model.ChunkExecutionData{
+	chunkExecutionData := execution_data.ChunkExecutionData{
 		Collection: &coll,
 		Events:     chunkEvents,
 		TrieUpdate: trieUpdate,

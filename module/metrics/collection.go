@@ -7,7 +7,6 @@ import (
 	"github.com/onflow/flow-go/model/cluster"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
-	"github.com/onflow/flow-go/module/metrics/internal"
 )
 
 type CollectionCollector struct {
@@ -24,29 +23,29 @@ func NewCollectionCollector(tracer module.Tracer) *CollectionCollector {
 		tracer: tracer,
 
 		transactionsIngested: promauto.NewCounter(prometheus.CounterOpts{
-			Namespace: internal.NamespaceCollection,
+			Namespace: namespaceCollection,
 			Name:      "ingested_transactions_total",
 			Help:      "count of transactions ingested by this node",
 		}),
 
 		finalizedHeight: promauto.NewGaugeVec(prometheus.GaugeOpts{
-			Namespace: internal.NamespaceCollection,
-			Subsystem: internal.SubsystemProposal,
+			Namespace: namespaceCollection,
+			Subsystem: subsystemProposal,
 			Name:      "finalized_height",
 			Help:      "tracks the latest finalized height",
 		}, []string{LabelChain}),
 
 		proposals: promauto.NewHistogramVec(prometheus.HistogramOpts{
-			Namespace: internal.NamespaceCollection,
-			Subsystem: internal.SubsystemProposal,
+			Namespace: namespaceCollection,
+			Subsystem: subsystemProposal,
 			Buckets:   []float64{1, 2, 5, 10, 20},
 			Name:      "proposals_size_transactions",
 			Help:      "size/number of proposed collections",
 		}, []string{LabelChain}),
 
 		guarantees: promauto.NewHistogramVec(prometheus.HistogramOpts{
-			Namespace: internal.NamespaceCollection,
-			Subsystem: internal.SubsystemProposal,
+			Namespace: namespaceCollection,
+			Subsystem: subsystemProposal,
 			Buckets:   []float64{1, 2, 5, 10, 20},
 			Name:      "guarantees_size_transactions",
 			Help:      "size/number of guaranteed/finalized collections",

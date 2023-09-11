@@ -23,9 +23,9 @@ import (
 	"github.com/onflow/flow-go/network/message"
 	"github.com/onflow/flow-go/network/mocknetwork"
 	"github.com/onflow/flow-go/network/p2p"
+	"github.com/onflow/flow-go/network/p2p/p2plogging"
 	"github.com/onflow/flow-go/network/p2p/p2pnet"
 	"github.com/onflow/flow-go/network/validator"
-	"github.com/onflow/flow-go/utils/p2plogging"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 

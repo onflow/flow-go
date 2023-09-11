@@ -5,7 +5,6 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promauto"
 
 	"github.com/onflow/flow-go/module"
-	"github.com/onflow/flow-go/module/metrics/internal"
 )
 
 type RateLimitedBlockstoreCollector struct {
@@ -15,8 +14,8 @@ type RateLimitedBlockstoreCollector struct {
 func NewRateLimitedBlockstoreCollector(prefix string) module.RateLimitedBlockstoreMetrics {
 	return &RateLimitedBlockstoreCollector{
 		bytesRead: promauto.NewCounter(prometheus.CounterOpts{
-			Namespace: internal.NamespaceStateSync,
-			Subsystem: internal.SubsystemExeDataBlobstore,
+			Namespace: namespaceStateSync,
+			Subsystem: subsystemExeDataBlobstore,
 			Name:      prefix + "_bytes_read",
 			Help:      "number of bytes read from the blockstore",
 		}),

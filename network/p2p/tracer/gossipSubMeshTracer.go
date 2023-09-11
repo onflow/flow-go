@@ -14,12 +14,11 @@ import (
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
-	"github.com/onflow/flow-go/module/metrics/network"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/p2p"
+	"github.com/onflow/flow-go/network/p2p/p2plogging"
 	"github.com/onflow/flow-go/network/p2p/tracer/internal"
 	"github.com/onflow/flow-go/utils/logging"
-	"github.com/onflow/flow-go/utils/p2plogging"
 )
 
 const (
@@ -81,8 +80,8 @@ func NewGossipSubMeshTracer(config *GossipSubMeshTracerConfig) *GossipSubMeshTra
 	rpcSentTracker := internal.NewRPCSentTracker(&internal.RPCSentTrackerConfig{
 		Logger:                             lg,
 		RPCSentCacheSize:                   config.RpcSentTrackerCacheSize,
-		RPCSentCacheCollector:              networkmetrics.GossipSubRPCSentTrackerMetricFactory(config.HeroCacheMetricsFactory, config.NetworkingType),
-		WorkerQueueCacheCollector:          networkmetrics.GossipSubRPCSentTrackerQueueMetricFactory(config.HeroCacheMetricsFactory, config.NetworkingType),
+		RPCSentCacheCollector:              metrics.GossipSubRPCSentTrackerMetricFactory(config.HeroCacheMetricsFactory, config.NetworkingType),
+		WorkerQueueCacheCollector:          metrics.GossipSubRPCSentTrackerQueueMetricFactory(config.HeroCacheMetricsFactory, config.NetworkingType),
 		WorkerQueueCacheSize:               config.RpcSentTrackerWorkerQueueCacheSize,
 		NumOfWorkers:                       config.RpcSentTrackerNumOfWorkers,
 		LastHighestIhavesSentResetInterval: defaultLastHighestIHaveRPCSizeResetInterval,

@@ -8,7 +8,6 @@ import (
 
 	"github.com/onflow/flow-go/model/chainsync"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/module/metrics/internal"
 )
 
 type ChainSyncCollector struct {
@@ -26,40 +25,40 @@ func NewChainSyncCollector(chainID flow.ChainID) *ChainSyncCollector {
 		chainID: chainID,
 		timeToPruned: prometheus.NewHistogramVec(prometheus.HistogramOpts{
 			Name:      "time_to_pruned_seconds",
-			Namespace: internal.NamespaceChainsync,
-			Subsystem: internal.SubsystemSyncCore,
+			Namespace: namespaceChainsync,
+			Subsystem: subsystemSyncCore,
 			Help:      "the time between queueing and pruning a block in seconds",
 			Buckets:   []float64{.1, .25, .5, 1, 2.5, 5, 7.5, 10, 20},
 		}, []string{"status", "requested_by"}),
 		timeToReceived: prometheus.NewHistogramVec(prometheus.HistogramOpts{
 			Name:      "time_to_received_seconds",
-			Namespace: internal.NamespaceChainsync,
-			Subsystem: internal.SubsystemSyncCore,
+			Namespace: namespaceChainsync,
+			Subsystem: subsystemSyncCore,
 			Help:      "the time between queueing and receiving a block in seconds",
 			Buckets:   []float64{.1, .25, .5, 1, 2.5, 5, 7.5, 10, 20},
 		}, []string{"requested_by"}),
 		totalPruned: prometheus.NewCounterVec(prometheus.CounterOpts{
 			Name:      "blocks_pruned_total",
-			Namespace: internal.NamespaceChainsync,
-			Subsystem: internal.SubsystemSyncCore,
+			Namespace: namespaceChainsync,
+			Subsystem: subsystemSyncCore,
 			Help:      "the total number of blocks pruned by 'id' or 'height'",
 		}, []string{"requested_by"}),
 		storedBlocks: prometheus.NewGaugeVec(prometheus.GaugeOpts{
 			Name:      "blocks_stored_total",
-			Namespace: internal.NamespaceChainsync,
-			Subsystem: internal.SubsystemSyncCore,
+			Namespace: namespaceChainsync,
+			Subsystem: subsystemSyncCore,
 			Help:      "the total number of blocks currently stored by 'id' or 'height'",
 		}, []string{"requested_by"}),
 		totalHeightsRequested: prometheus.NewCounter(prometheus.CounterOpts{
 			Name:      "block_heights_requested_total",
-			Namespace: internal.NamespaceChainsync,
-			Subsystem: internal.SubsystemSyncCore,
+			Namespace: namespaceChainsync,
+			Subsystem: subsystemSyncCore,
 			Help:      "the total number of blocks requested by height, including retried requests for the same heights. Eg: a range of 1-10 would increase the counter by 10",
 		}),
 		totalIdsRequested: prometheus.NewCounter(prometheus.CounterOpts{
 			Name:      "block_ids_requested_total",
-			Namespace: internal.NamespaceChainsync,
-			Subsystem: internal.SubsystemSyncCore,
+			Namespace: namespaceChainsync,
+			Subsystem: subsystemSyncCore,
 			Help:      "the total number of blocks requested by id",
 		}),
 	}

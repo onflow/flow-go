@@ -16,7 +16,6 @@ import (
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/mempool/queue"
 	"github.com/onflow/flow-go/module/metrics"
-	"github.com/onflow/flow-go/module/metrics/network"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/alsp"
 	"github.com/onflow/flow-go/network/alsp/internal"
@@ -178,7 +177,7 @@ func NewMisbehaviorReportManager(cfg *MisbehaviorReportManagerConfig, consumer n
 	store := queue.NewHeroStore(
 		cfg.SpamReportQueueSize,
 		lg.With().Str("component", "spam_record_queue").Logger(),
-		networkmetrics.ApplicationLayerSpamRecordQueueMetricsFactory(cfg.HeroCacheMetricsFactory, cfg.NetworkType))
+		metrics.ApplicationLayerSpamRecordQueueMetricsFactory(cfg.HeroCacheMetricsFactory, cfg.NetworkType))
 
 	m.workerPool = worker.NewWorkerPoolBuilder[internal.ReportedMisbehaviorWork](
 		cfg.Logger,
@@ -192,7 +191,7 @@ func NewMisbehaviorReportManager(cfg *MisbehaviorReportManagerConfig, consumer n
 	m.cache = m.cacheFactory(
 		lg,
 		cfg.SpamRecordCacheSize,
-		networkmetrics.ApplicationLayerSpamRecordCacheMetricFactory(cfg.HeroCacheMetricsFactory, cfg.NetworkType))
+		metrics.ApplicationLayerSpamRecordCacheMetricFactory(cfg.HeroCacheMetricsFactory, cfg.NetworkType))
 
 	builder := component.NewComponentManagerBuilder()
 	builder.AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {

@@ -46,7 +46,6 @@ import (
 	"github.com/onflow/flow-go/module/mempool/herocache"
 	"github.com/onflow/flow-go/module/mempool/queue"
 	"github.com/onflow/flow-go/module/metrics"
-	"github.com/onflow/flow-go/module/metrics/network"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/state/protocol"
 	badgerState "github.com/onflow/flow-go/state/protocol/badger"
@@ -319,7 +318,7 @@ func main() {
 
 			var heroCacheCollector module.HeroCacheMetrics = metrics.NewNoopCollector()
 			if node.HeroCacheMetricsEnable {
-				heroCacheCollector = networkmetrics.FollowerCacheMetrics(node.MetricsRegisterer)
+				heroCacheCollector = metrics.FollowerCacheMetrics(node.MetricsRegisterer)
 			}
 
 			core, err := followereng.NewComplianceCore(

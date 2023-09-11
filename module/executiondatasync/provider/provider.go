@@ -15,7 +15,6 @@ import (
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/blobs"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
-	"github.com/onflow/flow-go/module/executiondatasync/execution_data/model"
 	"github.com/onflow/flow-go/module/executiondatasync/tracker"
 	"github.com/onflow/flow-go/network"
 )
@@ -30,7 +29,7 @@ func WithBlobSizeLimit(size int) ProviderOption {
 
 // Provider is used to provide execution data blobs over the network via a blob service.
 type Provider interface {
-	Provide(ctx context.Context, blockHeight uint64, executionData *model.BlockExecutionData) (flow.Identifier, *flow.BlockExecutionDataRoot, error)
+	Provide(ctx context.Context, blockHeight uint64, executionData *execution_data.BlockExecutionData) (flow.Identifier, *flow.BlockExecutionDataRoot, error)
 }
 
 type ExecutionDataProvider struct {
@@ -55,7 +54,7 @@ func NewProvider(
 	p := &ExecutionDataProvider{
 		logger:       logger.With().Str("component", "execution_data_provider").Logger(),
 		metrics:      metrics,
-		maxBlobSize:  model.DefaultMaxBlobSize,
+		maxBlobSize:  execution_data.DefaultMaxBlobSize,
 		cidsProvider: NewExecutionDataCIDProvider(serializer),
 		blobService:  blobService,
 		storage:      storage,
@@ -124,7 +123,7 @@ func (p *ExecutionDataProvider) storeBlobs(parent context.Context, blockHeight u
 // It computes and returns the root CID of the execution data blob tree.
 // This function returns once the root CID has been computed, and all blobs are successfully stored
 // in the Bitswap Blobstore.
-func (p *ExecutionDataProvider) Provide(ctx context.Context, blockHeight uint64, executionData *model.BlockExecutionData) (flow.Identifier, *flow.BlockExecutionDataRoot, error) {
+func (p *ExecutionDataProvider) Provide(ctx context.Context, blockHeight uint64, executionData *execution_data.BlockExecutionData) (flow.Identifier, *flow.BlockExecutionDataRoot, error) {
 	rootID, rootData, errCh, err := p.provide(ctx, blockHeight, executionData)
 	storeErr, ok := <-errCh
 
@@ -143,7 +142,7 @@ func (p *ExecutionDataProvider) Provide(ctx context.Context, blockHeight uint64,
 	return rootID, rootData, nil
 }
 
-func (p *ExecutionDataProvider) provide(ctx context.Context, blockHeight uint64, executionData *model.BlockExecutionData) (flow.Identifier, *flow.BlockExecutionDataRoot, <-chan error, error) {
+func (p *ExecutionDataProvider) provide(ctx context.Context, blockHeight uint64, executionData *execution_data.BlockExecutionData) (flow.Identifier, *flow.BlockExecutionDataRoot, <-chan error, error) {
 	logger := p.logger.With().Uint64("height", blockHeight).Str("block_id", executionData.BlockID.String()).Logger()
 	logger.Debug().Msg("providing execution data")
 
@@ -196,7 +195,7 @@ func (p *ExecutionDataProvider) provide(ctx context.Context, blockHeight uint64,
 func NewExecutionDataCIDProvider(serializer execution_data.Serializer) *ExecutionDataCIDProvider {
 	return &ExecutionDataCIDProvider{
 		serializer:  serializer,
-		maxBlobSize: model.DefaultMaxBlobSize,
+		maxBlobSize: execution_data.DefaultMaxBlobSize,
 	}
 }
 
@@ -212,7 +211,7 @@ func (p *ExecutionDataCIDProvider) CalculateExecutionDataRootID(
 }
 
 func (p *ExecutionDataCIDProvider) CalculateChunkExecutionDataID(
-	ced model.ChunkExecutionData,
+	ced execution_data.ChunkExecutionData,
 ) (cid.Cid, error) {
 	return p.addChunkExecutionData(&ced, nil)
 }
@@ -244,7 +243,7 @@ func (p *ExecutionDataCIDProvider) addExecutionDataRoot(
 }
 
 func (p *ExecutionDataCIDProvider) addChunkExecutionData(
-	ced *model.ChunkExecutionData,
+	ced *execution_data.ChunkExecutionData,
 	blobCh chan<- blobs.Blob,
 ) (cid.Cid, error) {
 	cids, err := p.addBlobs(ced, blobCh)

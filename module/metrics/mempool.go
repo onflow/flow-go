@@ -9,7 +9,6 @@ import (
 
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/module"
-	"github.com/onflow/flow-go/module/metrics/internal"
 )
 
 type MempoolCollector struct {
@@ -30,8 +29,8 @@ func NewMempoolCollector(interval time.Duration) *MempoolCollector {
 
 		entries: promauto.NewGaugeVec(prometheus.GaugeOpts{
 			Name:      "entries_total",
-			Namespace: internal.NamespaceStorage,
-			Subsystem: internal.SubsystemMempool,
+			Namespace: namespaceStorage,
+			Subsystem: subsystemMempool,
 			Help:      "the number of entries in the mempool",
 		}, []string{LabelResource}),
 	}

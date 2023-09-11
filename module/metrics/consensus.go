@@ -7,7 +7,6 @@ import (
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
-	"github.com/onflow/flow-go/module/metrics/internal"
 )
 
 // ConsensusCollector ...
@@ -31,26 +30,26 @@ type ConsensusCollector struct {
 func NewConsensusCollector(tracer module.Tracer, registerer prometheus.Registerer) *ConsensusCollector {
 	onReceiptDuration := prometheus.NewCounter(prometheus.CounterOpts{
 		Name:      "push_receipts_on_receipt_duration_seconds_total",
-		Namespace: internal.NamespaceConsensus,
-		Subsystem: internal.SubsystemMatchEngine,
+		Namespace: namespaceConsensus,
+		Subsystem: subsystemMatchEngine,
 		Help:      "time spent in consensus matching engine's onReceipt method in seconds",
 	})
 	onApprovalDuration := prometheus.NewCounter(prometheus.CounterOpts{
 		Name:      "on_approval_duration_seconds_total",
-		Namespace: internal.NamespaceConsensus,
-		Subsystem: internal.SubsystemMatchEngine,
+		Namespace: namespaceConsensus,
+		Subsystem: subsystemMatchEngine,
 		Help:      "time spent in consensus matching engine's onApproval method in seconds",
 	})
 	checkSealingDuration := prometheus.NewCounter(prometheus.CounterOpts{
 		Name:      "check_sealing_duration_seconds_total",
-		Namespace: internal.NamespaceConsensus,
-		Subsystem: internal.SubsystemMatchEngine,
+		Namespace: namespaceConsensus,
+		Subsystem: subsystemMatchEngine,
 		Help:      "time spent in consensus matching engine's checkSealing method in seconds",
 	})
 	emergencySealedBlocks := prometheus.NewCounter(prometheus.CounterOpts{
 		Name:      "emergency_sealed_blocks_total",
-		Namespace: internal.NamespaceConsensus,
-		Subsystem: internal.SubsystemCompliance,
+		Namespace: namespaceConsensus,
+		Subsystem: subsystemCompliance,
 		Help:      "the number of blocks sealed in emergency mode",
 	})
 	registerer.MustRegister(

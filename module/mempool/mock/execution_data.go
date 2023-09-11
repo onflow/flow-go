@@ -4,7 +4,7 @@ package mempool
 
 import (
 	flow "github.com/onflow/flow-go/model/flow"
-	execution_data "github.com/onflow/flow-go/module/executiondatasync/execution_data/model"
+	execution_data "github.com/onflow/flow-go/module/executiondatasync/execution_data"
 
 	mock "github.com/stretchr/testify/mock"
 )

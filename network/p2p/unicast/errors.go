@@ -6,7 +6,7 @@ import (
 
 	"github.com/libp2p/go-libp2p/core/peer"
 
-	"github.com/onflow/flow-go/utils/p2plogging"
+	"github.com/onflow/flow-go/network/p2p/p2plogging"
 )
 
 // ErrDialInProgress indicates that the libp2p node is currently dialing the peer.

@@ -10,9 +10,8 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/module"
-	"github.com/onflow/flow-go/module/metrics/internal"
+	"github.com/onflow/flow-go/network/p2p/p2plogging"
 	"github.com/onflow/flow-go/utils/logging"
-	"github.com/onflow/flow-go/utils/p2plogging"
 )
 
 const (
@@ -84,8 +83,8 @@ func NewNetworkCollector(logger zerolog.Logger, opts ...NetworkCollectorOpt) *Ne
 
 	nc.outboundMessageSize = promauto.NewHistogramVec(
 		prometheus.HistogramOpts{
-			Namespace: internal.NamespaceNetwork,
-			Subsystem: internal.SubsystemGossip,
+			Namespace: namespaceNetwork,
+			Subsystem: subsystemGossip,
 			Name:      nc.prefix + "outbound_message_size_bytes",
 			Help:      "size of the outbound network message",
 			Buckets:   []float64{KiB, 100 * KiB, 500 * KiB, 1 * MiB, 2 * MiB, 4 * MiB},
@@ -94,8 +93,8 @@ func NewNetworkCollector(logger zerolog.Logger, opts ...NetworkCollectorOpt) *Ne
 
 	nc.inboundMessageSize = promauto.NewHistogramVec(
 		prometheus.HistogramOpts{
-			Namespace: internal.NamespaceNetwork,
-			Subsystem: internal.SubsystemGossip,
+			Namespace: namespaceNetwork,
+			Subsystem: subsystemGossip,
 			Name:      nc.prefix + "inbound_message_size_bytes",
 			Help:      "size of the inbound network message",
 			Buckets:   []float64{KiB, 100 * KiB, 500 * KiB, 1 * MiB, 2 * MiB, 4 * MiB},
@@ -104,8 +103,8 @@ func NewNetworkCollector(logger zerolog.Logger, opts ...NetworkCollectorOpt) *Ne
 
 	nc.duplicateMessagesDropped = promauto.NewCounterVec(
 		prometheus.CounterOpts{
-			Namespace: internal.NamespaceNetwork,
-			Subsystem: internal.SubsystemGossip,
+			Namespace: namespaceNetwork,
+			Subsystem: subsystemGossip,
 			Name:      nc.prefix + "duplicate_messages_dropped",
 			Help:      "number of duplicate messages dropped",
 		}, []string{LabelChannel, LabelProtocol, LabelMessage},
@@ -113,8 +112,8 @@ func NewNetworkCollector(logger zerolog.Logger, opts ...NetworkCollectorOpt) *Ne
 
 	nc.dnsLookupDuration = promauto.NewHistogram(
 		prometheus.HistogramOpts{
-			Namespace: internal.NamespaceNetwork,
-			Subsystem: internal.SubsystemGossip,
+			Namespace: namespaceNetwork,
+			Subsystem: subsystemGossip,
 			Name:      nc.prefix + "dns_lookup_duration_ms",
 			Buckets:   []float64{1, 10, 100, 500, 1000, 2000},
 			Help:      "the time spent on resolving a dns lookup (including cache hits)",
@@ -123,8 +122,8 @@ func NewNetworkCollector(logger zerolog.Logger, opts ...NetworkCollectorOpt) *Ne
 
 	nc.dnsCacheMissCount = promauto.NewCounter(
 		prometheus.CounterOpts{
-			Namespace: internal.NamespaceNetwork,
-			Subsystem: internal.SubsystemGossip,
+			Namespace: namespaceNetwork,
+			Subsystem: subsystemGossip,
 			Name:      nc.prefix + "dns_cache_miss_total",
 			Help:      "the number of dns lookups that miss the cache and made through network",
 		},
@@ -132,8 +131,8 @@ func NewNetworkCollector(logger zerolog.Logger, opts ...NetworkCollectorOpt) *Ne
 
 	nc.dnsCacheInvalidationCount = promauto.NewCounter(
 		prometheus.CounterOpts{
-			Namespace: internal.NamespaceNetwork,
-			Subsystem: internal.SubsystemGossip,
+			Namespace: namespaceNetwork,
+			Subsystem: subsystemGossip,
 			Name:      nc.prefix + "dns_cache_invalidation_total",
 			Help:      "the number of times dns cache is invalidated for an entry",
 		},
@@ -141,8 +140,8 @@ func NewNetworkCollector(logger zerolog.Logger, opts ...NetworkCollectorOpt) *Ne
 
 	nc.dnsCacheHitCount = promauto.NewCounter(
 		prometheus.CounterOpts{
-			Namespace: internal.NamespaceNetwork,
-			Subsystem: internal.SubsystemGossip,
+			Namespace: namespaceNetwork,
+			Subsystem: subsystemGossip,
 			Name:      nc.prefix + "dns_cache_hit_total",
 			Help:      "the number of dns cache hits",
 		},
@@ -150,8 +149,8 @@ func NewNetworkCollector(logger zerolog.Logger, opts ...NetworkCollectorOpt) *Ne
 
 	nc.dnsLookupRequestDroppedCount = promauto.NewCounter(
 		prometheus.CounterOpts{
-			Namespace: internal.NamespaceNetwork,
-			Subsystem: internal.SubsystemGossip,
+			Namespace: namespaceNetwork,
+			Subsystem: subsystemGossip,
 			Name:      nc.prefix + "dns_lookup_requests_dropped_total",
 			Help:      "the number of dns lookup requests dropped",
 		},
@@ -159,8 +158,8 @@ func NewNetworkCollector(logger zerolog.Logger, opts ...NetworkCollectorOpt) *Ne
 
 	nc.queueSize = promauto.NewGaugeVec(
 		prometheus.GaugeOpts{
-			Namespace: internal.NamespaceNetwork,
-			Subsystem: internal.SubsystemQueue,
+			Namespace: namespaceNetwork,
+			Subsystem: subsystemQueue,
 			Name:      nc.prefix + "message_queue_size",
 			Help:      "the number of elements in the message receive queue",
 		}, []string{LabelPriority},
@@ -168,8 +167,8 @@ func NewNetworkCollector(logger zerolog.Logger, opts ...NetworkCollectorOpt) *Ne
 
 	nc.queueDuration = promauto.NewHistogramVec(
 		prometheus.HistogramOpts{
-			Namespace: internal.NamespaceNetwork,
-			Subsystem: internal.SubsystemQueue,
+			Namespace: namespaceNetwork,
+			Subsystem: subsystemQueue,
 			Name:      nc.prefix + "message_queue_duration_seconds",
 			Help:      "duration [seconds; measured with float64 precision] of how long a message spent in the queue before delivered to an engine.",
 			Buckets:   []float64{0.01, 0.1, 0.5, 1, 2, 5}, // 10ms, 100ms, 500ms, 1s, 2s, 5s
@@ -178,8 +177,8 @@ func NewNetworkCollector(logger zerolog.Logger, opts ...NetworkCollectorOpt) *Ne
 
 	nc.numMessagesProcessing = promauto.NewGaugeVec(
 		prometheus.GaugeOpts{
-			Namespace: internal.NamespaceNetwork,
-			Subsystem: internal.SubsystemQueue,
+			Namespace: namespaceNetwork,
+			Subsystem: subsystemQueue,
 			Name:      nc.prefix + "current_messages_processing",
 			Help:      "the number of messages currently being processed",
 		}, []string{LabelChannel},
@@ -187,8 +186,8 @@ func NewNetworkCollector(logger zerolog.Logger, opts ...NetworkCollectorOpt) *Ne
 
 	nc.numDirectMessagesSending = promauto.NewGaugeVec(
 		prometheus.GaugeOpts{
-			Namespace: internal.NamespaceNetwork,
-			Subsystem: internal.SubsystemGossip,
+			Namespace: namespaceNetwork,
+			Subsystem: subsystemGossip,
 			Name:      nc.prefix + "direct_messages_in_progress",
 			Help:      "the number of direct messages currently in the process of sending",
 		}, []string{LabelChannel},
@@ -196,8 +195,8 @@ func NewNetworkCollector(logger zerolog.Logger, opts ...NetworkCollectorOpt) *Ne
 
 	nc.inboundProcessTime = promauto.NewCounterVec(
 		prometheus.CounterOpts{
-			Namespace: internal.NamespaceNetwork,
-			Subsystem: internal.SubsystemQueue,
+			Namespace: namespaceNetwork,
+			Subsystem: subsystemQueue,
 			Name:      nc.prefix + "engine_message_processing_time_seconds",
 			Help:      "duration [seconds; measured with float64 precision] of how long a queue worker blocked for an engine processing message",
 		}, []string{LabelChannel},
@@ -205,8 +204,8 @@ func NewNetworkCollector(logger zerolog.Logger, opts ...NetworkCollectorOpt) *Ne
 
 	nc.outboundConnectionCount = promauto.NewGauge(
 		prometheus.GaugeOpts{
-			Namespace: internal.NamespaceNetwork,
-			Subsystem: internal.SubsystemQueue,
+			Namespace: namespaceNetwork,
+			Subsystem: subsystemQueue,
 			Name:      nc.prefix + "outbound_connection_count",
 			Help:      "the number of outbound connections of this node",
 		},
@@ -214,8 +213,8 @@ func NewNetworkCollector(logger zerolog.Logger, opts ...NetworkCollectorOpt) *Ne
 
 	nc.inboundConnectionCount = promauto.NewGauge(
 		prometheus.GaugeOpts{
-			Namespace: internal.NamespaceNetwork,
-			Subsystem: internal.SubsystemQueue,
+			Namespace: namespaceNetwork,
+			Subsystem: subsystemQueue,
 			Name:      nc.prefix + "inbound_connection_count",
 			Help:      "the number of inbound connections of this node",
 		},
@@ -224,16 +223,16 @@ func NewNetworkCollector(logger zerolog.Logger, opts ...NetworkCollectorOpt) *Ne
 	nc.routingTableSize = promauto.NewGauge(
 		prometheus.GaugeOpts{
 			Name:      nc.prefix + "routing_table_size",
-			Namespace: internal.NamespaceNetwork,
-			Subsystem: internal.SubsystemDHT,
+			Namespace: namespaceNetwork,
+			Subsystem: subsystemDHT,
 			Help:      "the size of the DHT routing table",
 		},
 	)
 
 	nc.unAuthorizedMessagesCount = promauto.NewCounterVec(
 		prometheus.CounterOpts{
-			Namespace: internal.NamespaceNetwork,
-			Subsystem: internal.SubsystemAuth,
+			Namespace: namespaceNetwork,
+			Subsystem: subsystemAuth,
 			Name:      nc.prefix + "unauthorized_messages_count",
 			Help:      "number of messages that failed authorization validation",
 		}, []string{LabelNodeRole, LabelMessage, LabelChannel, LabelViolationReason},
@@ -241,8 +240,8 @@ func NewNetworkCollector(logger zerolog.Logger, opts ...NetworkCollectorOpt) *Ne
 
 	nc.rateLimitedUnicastMessagesCount = promauto.NewCounterVec(
 		prometheus.CounterOpts{
-			Namespace: internal.NamespaceNetwork,
-			Subsystem: internal.SubsystemRateLimiting,
+			Namespace: namespaceNetwork,
+			Subsystem: subsystemRateLimiting,
 			Name:      nc.prefix + "rate_limited_unicast_messages_count",
 			Help:      "number of messages sent via unicast that have been rate limited",
 		}, []string{LabelNodeRole, LabelMessage, LabelChannel, LabelRateLimitReason},
@@ -250,8 +249,8 @@ func NewNetworkCollector(logger zerolog.Logger, opts ...NetworkCollectorOpt) *Ne
 
 	nc.violationReportSkippedCount = promauto.NewCounter(
 		prometheus.CounterOpts{
-			Namespace: internal.NamespaceNetwork,
-			Subsystem: internal.SubsystemSecurity,
+			Namespace: namespaceNetwork,
+			Subsystem: subsystemSecurity,
 			Name:      nc.prefix + "slashing_violation_reports_skipped_count",
 			Help:      "number of slashing violations consumer violations that were not reported for misbehavior because the identity of the sender not known",
 		},

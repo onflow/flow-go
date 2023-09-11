@@ -5,8 +5,6 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
-
-	"github.com/onflow/flow-go/module/metrics/internal"
 )
 
 // CruiseCtlMetrics captures metrics about the Block Rate Controller, which adjusts
@@ -23,32 +21,32 @@ func NewCruiseCtlMetrics() *CruiseCtlMetrics {
 	return &CruiseCtlMetrics{
 		proportionalErr: promauto.NewGauge(prometheus.GaugeOpts{
 			Name:      "proportional_err_s",
-			Namespace: internal.NamespaceConsensus,
-			Subsystem: internal.SubsystemCruiseCtl,
+			Namespace: namespaceConsensus,
+			Subsystem: subsystemCruiseCtl,
 			Help:      "The current proportional error measured by the controller",
 		}),
 		integralErr: promauto.NewGauge(prometheus.GaugeOpts{
 			Name:      "integral_err_s",
-			Namespace: internal.NamespaceConsensus,
-			Subsystem: internal.SubsystemCruiseCtl,
+			Namespace: namespaceConsensus,
+			Subsystem: subsystemCruiseCtl,
 			Help:      "The current integral error measured by the controller",
 		}),
 		derivativeErr: promauto.NewGauge(prometheus.GaugeOpts{
 			Name:      "derivative_err_per_s",
-			Namespace: internal.NamespaceConsensus,
-			Subsystem: internal.SubsystemCruiseCtl,
+			Namespace: namespaceConsensus,
+			Subsystem: subsystemCruiseCtl,
 			Help:      "The current derivative error measured by the controller",
 		}),
 		targetProposalDur: promauto.NewGauge(prometheus.GaugeOpts{
 			Name:      "target_proposal_dur_s",
-			Namespace: internal.NamespaceConsensus,
-			Subsystem: internal.SubsystemCruiseCtl,
+			Namespace: namespaceConsensus,
+			Subsystem: subsystemCruiseCtl,
 			Help:      "The current target duration from parent to child proposal",
 		}),
 		controllerOutput: promauto.NewGauge(prometheus.GaugeOpts{
 			Name:      "controller_output_s",
-			Namespace: internal.NamespaceConsensus,
-			Subsystem: internal.SubsystemCruiseCtl,
+			Namespace: namespaceConsensus,
+			Subsystem: subsystemCruiseCtl,
 			Help:      "The most recent output of the controller; the adjustment to subtract from the baseline proposal duration",
 		}),
 	}

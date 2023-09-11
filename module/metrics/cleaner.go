@@ -5,8 +5,6 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
-
-	"github.com/onflow/flow-go/module/metrics/internal"
 )
 
 type CleanerCollector struct {
@@ -16,8 +14,8 @@ type CleanerCollector struct {
 func NewCleanerCollector() *CleanerCollector {
 	cc := &CleanerCollector{
 		gcDuration: promauto.NewHistogram(prometheus.HistogramOpts{
-			Namespace: internal.NamespaceStorage,
-			Subsystem: internal.SubsystemBadger,
+			Namespace: namespaceStorage,
+			Subsystem: subsystemBadger,
 			Name:      "garbage_collection_runtime_s",
 			Buckets:   []float64{1, 10, 60, 60 * 5, 60 * 15},
 			Help:      "the time spent on badger garbage collection",

@@ -9,7 +9,6 @@ import (
 	httpmetrics "github.com/slok/go-http-metrics/metrics"
 
 	"github.com/onflow/flow-go/module"
-	"github.com/onflow/flow-go/module/metrics/internal"
 )
 
 type RestCollector struct {
@@ -34,31 +33,31 @@ func NewRestCollector(urlToRouteMapper func(string) (string, error), registerer 
 	r := &RestCollector{
 		urlToRouteMapper: urlToRouteMapper,
 		httpRequestDurHistogram: prometheus.NewHistogramVec(prometheus.HistogramOpts{
-			Namespace: internal.NamespaceRestAPI,
-			Subsystem: internal.SubsystemHTTP,
+			Namespace: namespaceRestAPI,
+			Subsystem: subsystemHTTP,
 			Name:      "request_duration_seconds",
 			Help:      "The latency of the HTTP requests.",
 			Buckets:   prometheus.DefBuckets,
 		}, []string{LabelService, LabelHandler, LabelMethod, LabelStatusCode}),
 
 		httpResponseSizeHistogram: prometheus.NewHistogramVec(prometheus.HistogramOpts{
-			Namespace: internal.NamespaceRestAPI,
-			Subsystem: internal.SubsystemHTTP,
+			Namespace: namespaceRestAPI,
+			Subsystem: subsystemHTTP,
 			Name:      "response_size_bytes",
 			Help:      "The size of the HTTP responses.",
 			Buckets:   prometheus.ExponentialBuckets(100, 10, 8),
 		}, []string{LabelService, LabelHandler, LabelMethod, LabelStatusCode}),
 
 		httpRequestsInflight: prometheus.NewGaugeVec(prometheus.GaugeOpts{
-			Namespace: internal.NamespaceRestAPI,
-			Subsystem: internal.SubsystemHTTP,
+			Namespace: namespaceRestAPI,
+			Subsystem: subsystemHTTP,
 			Name:      "requests_inflight",
 			Help:      "The number of inflight requests being handled at the same time.",
 		}, []string{LabelService, LabelHandler}),
 
 		httpRequestsTotal: prometheus.NewGaugeVec(prometheus.GaugeOpts{
-			Namespace: internal.NamespaceRestAPI,
-			Subsystem: internal.SubsystemHTTP,
+			Namespace: namespaceRestAPI,
+			Subsystem: subsystemHTTP,
 			Name:      "requests_total",
 			Help:      "The number of requests handled over time.",
 		}, []string{LabelMethod, LabelHandler}),

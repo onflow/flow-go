@@ -15,7 +15,6 @@ import (
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/mempool/queue"
 	"github.com/onflow/flow-go/module/metrics"
-	"github.com/onflow/flow-go/module/metrics/network"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/distributor"
@@ -247,16 +246,16 @@ func defaultInspectorSuite(rpcTracker p2p.RPCControlTracking) p2p.GossipSubRpcIn
 			inspectorCfg.GossipSubRPCMetricsInspectorConfigs.NumberOfWorkers,
 			[]queue.HeroStoreConfigOption{
 				queue.WithHeroStoreSizeLimit(inspectorCfg.GossipSubRPCMetricsInspectorConfigs.CacheSize),
-				queue.WithHeroStoreCollector(networkmetrics.GossipSubRPCMetricsObserverInspectorQueueMetricFactory(heroCacheMetricsFactory, networkType)),
+				queue.WithHeroStoreCollector(metrics.GossipSubRPCMetricsObserverInspectorQueueMetricFactory(heroCacheMetricsFactory, networkType)),
 			}...)
 		notificationDistributor := distributor.DefaultGossipSubInspectorNotificationDistributor(
 			logger,
 			[]queue.HeroStoreConfigOption{
 				queue.WithHeroStoreSizeLimit(inspectorCfg.GossipSubRPCInspectorNotificationCacheSize),
-				queue.WithHeroStoreCollector(networkmetrics.RpcInspectorNotificationQueueMetricFactory(heroCacheMetricsFactory, networkType))}...)
+				queue.WithHeroStoreCollector(metrics.RpcInspectorNotificationQueueMetricFactory(heroCacheMetricsFactory, networkType))}...)
 
-		inspectMsgQueueCacheCollector := networkmetrics.GossipSubRPCInspectorQueueMetricFactory(heroCacheMetricsFactory, networkType)
-		clusterPrefixedCacheCollector := networkmetrics.GossipSubRPCInspectorClusterPrefixedCacheMetricFactory(heroCacheMetricsFactory, networkType)
+		inspectMsgQueueCacheCollector := metrics.GossipSubRPCInspectorQueueMetricFactory(heroCacheMetricsFactory, networkType)
+		clusterPrefixedCacheCollector := metrics.GossipSubRPCInspectorClusterPrefixedCacheMetricFactory(heroCacheMetricsFactory, networkType)
 		rpcValidationInspector, err := validation.NewControlMsgValidationInspector(
 			logger,
 			sporkId,

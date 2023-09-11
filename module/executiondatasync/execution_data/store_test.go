@@ -20,7 +20,6 @@ import (
 	"github.com/onflow/flow-go/ledger/common/testutils"
 	"github.com/onflow/flow-go/module/blobs"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
-	"github.com/onflow/flow-go/module/executiondatasync/execution_data/model"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -32,8 +31,8 @@ func getExecutionDataStore(blobstore blobs.Blobstore, serializer execution_data.
 	return execution_data.NewExecutionDataStore(blobstore, serializer)
 }
 
-func generateChunkExecutionData(t *testing.T, minSerializedSize uint64) *model.ChunkExecutionData {
-	ced := &model.ChunkExecutionData{
+func generateChunkExecutionData(t *testing.T, minSerializedSize uint64) *execution_data.ChunkExecutionData {
+	ced := &execution_data.ChunkExecutionData{
 		TrieUpdate: testutils.TrieUpdateFixture(1, 1, 8),
 	}
 
@@ -59,10 +58,10 @@ func generateChunkExecutionData(t *testing.T, minSerializedSize uint64) *model.C
 	}
 }
 
-func generateBlockExecutionData(t *testing.T, numChunks int, minSerializedSizePerChunk uint64) *model.BlockExecutionData {
-	bed := &model.BlockExecutionData{
+func generateBlockExecutionData(t *testing.T, numChunks int, minSerializedSizePerChunk uint64) *execution_data.BlockExecutionData {
+	bed := &execution_data.BlockExecutionData{
 		BlockID:             unittest.IdentifierFixture(),
-		ChunkExecutionDatas: make([]*model.ChunkExecutionData, numChunks),
+		ChunkExecutionDatas: make([]*execution_data.ChunkExecutionData, numChunks),
 	}
 
 	for i := 0; i < numChunks; i++ {
@@ -85,7 +84,7 @@ func getAllKeys(t *testing.T, bs blobs.Blobstore) []cid.Cid {
 	return cids
 }
 
-func deepEqual(t *testing.T, expected, actual *model.BlockExecutionData) {
+func deepEqual(t *testing.T, expected, actual *execution_data.BlockExecutionData) {
 	assert.Equal(t, expected.BlockID, actual.BlockID)
 	assert.Equal(t, len(expected.ChunkExecutionDatas), len(actual.ChunkExecutionDatas))
 
@@ -112,8 +111,8 @@ func TestHappyPath(t *testing.T) {
 		deepEqual(t, expected, actual)
 	}
 
-	test(1, 0)                          // small execution data (single level blob tree)
-	test(5, 5*model.DefaultMaxBlobSize) // large execution data (multi level blob tree)
+	test(1, 0)                                   // small execution data (single level blob tree)
+	test(5, 5*execution_data.DefaultMaxBlobSize) // large execution data (multi level blob tree)
 }
 
 type randomSerializer struct{}
@@ -141,7 +140,7 @@ func newCorruptedTailSerializer(numChunks int) *corruptedTailSerializer {
 }
 
 func (cts *corruptedTailSerializer) Serialize(w io.Writer, v interface{}) error {
-	if _, ok := v.(*model.ChunkExecutionData); ok {
+	if _, ok := v.(*execution_data.ChunkExecutionData); ok {
 		cts.i++
 		if cts.i == cts.corruptedChunk {
 			buf := &bytes.Buffer{}
@@ -169,7 +168,7 @@ func (cts *corruptedTailSerializer) Deserialize(r io.Reader) (interface{}, error
 func TestMalformedData(t *testing.T) {
 	t.Parallel()
 
-	test := func(bed *model.BlockExecutionData, serializer execution_data.Serializer) {
+	test := func(bed *execution_data.BlockExecutionData, serializer execution_data.Serializer) {
 		blobstore := getBlobstore()
 		defaultEds := getExecutionDataStore(blobstore, execution_data.DefaultSerializer)
 		malformedEds := getExecutionDataStore(blobstore, serializer)
@@ -180,7 +179,7 @@ func TestMalformedData(t *testing.T) {
 	}
 
 	numChunks := 5
-	bed := generateBlockExecutionData(t, numChunks, 10*model.DefaultMaxBlobSize)
+	bed := generateBlockExecutionData(t, numChunks, 10*execution_data.DefaultMaxBlobSize)
 
 	test(bed, &randomSerializer{})                   // random bytes
 	test(bed, newCorruptedTailSerializer(numChunks)) // serialized execution data with random bytes replaced at the end of a random chunk
@@ -192,7 +191,7 @@ func TestGetIncompleteData(t *testing.T) {
 	blobstore := getBlobstore()
 	eds := getExecutionDataStore(blobstore, execution_data.DefaultSerializer)
 
-	bed := generateBlockExecutionData(t, 5, 10*model.DefaultMaxBlobSize)
+	bed := generateBlockExecutionData(t, 5, 10*execution_data.DefaultMaxBlobSize)
 	rootID, err := eds.Add(context.Background(), bed)
 	require.NoError(t, err)
 

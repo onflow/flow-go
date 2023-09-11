@@ -12,7 +12,6 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/blobs"
-	"github.com/onflow/flow-go/module/executiondatasync/execution_data/model"
 	"github.com/onflow/flow-go/network"
 )
 
@@ -43,7 +42,7 @@ func WithSerializer(serializer Serializer) DownloaderOption {
 func NewDownloader(blobService network.BlobService, opts ...DownloaderOption) *downloader {
 	d := &downloader{
 		blobService,
-		model.DefaultMaxBlobSize,
+		DefaultMaxBlobSize,
 		DefaultSerializer,
 	}
 
@@ -70,7 +69,7 @@ func (d *downloader) Done() <-chan struct{} {
 // - BlobNotFoundError if some CID in the blob tree could not be found from the blob service
 // - MalformedDataError if some level of the blob tree cannot be properly deserialized
 // - BlobSizeLimitExceededError if some blob in the blob tree exceeds the maximum allowed size
-func (d *downloader) Get(ctx context.Context, executionDataID flow.Identifier) (*model.BlockExecutionData, error) {
+func (d *downloader) Get(ctx context.Context, executionDataID flow.Identifier) (*BlockExecutionData, error) {
 	blobGetter := d.blobService.GetSession(ctx)
 
 	// First, download the root execution data record which contains a list of chunk execution data
@@ -83,7 +82,7 @@ func (d *downloader) Get(ctx context.Context, executionDataID flow.Identifier) (
 	g, gCtx := errgroup.WithContext(ctx)
 
 	// Next, download each of the chunk execution data blobs
-	chunkExecutionDatas := make([]*model.ChunkExecutionData, len(edRoot.ChunkExecutionDataIDs))
+	chunkExecutionDatas := make([]*ChunkExecutionData, len(edRoot.ChunkExecutionDataIDs))
 	for i, chunkDataID := range edRoot.ChunkExecutionDataIDs {
 		i := i
 		chunkDataID := chunkDataID
@@ -110,7 +109,7 @@ func (d *downloader) Get(ctx context.Context, executionDataID flow.Identifier) (
 	}
 
 	// Finally, recombine data into original record.
-	bed := &model.BlockExecutionData{
+	bed := &BlockExecutionData{
 		BlockID:             edRoot.BlockID,
 		ChunkExecutionDatas: chunkExecutionDatas,
 	}
@@ -172,7 +171,7 @@ func (d *downloader) getChunkExecutionData(
 	ctx context.Context,
 	chunkExecutionDataID cid.Cid,
 	blobGetter network.BlobGetter,
-) (*model.ChunkExecutionData, error) {
+) (*ChunkExecutionData, error) {
 	cids := []cid.Cid{chunkExecutionDataID}
 
 	// iteratively process each level of the blob tree until a ChunkExecutionData is returned or an
@@ -184,7 +183,7 @@ func (d *downloader) getChunkExecutionData(
 		}
 
 		switch v := v.(type) {
-		case *model.ChunkExecutionData:
+		case *ChunkExecutionData:
 			return v, nil
 		case *[]cid.Cid:
 			cids = *v

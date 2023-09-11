@@ -7,7 +7,7 @@ import (
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
-	"github.com/onflow/flow-go/module/executiondatasync/execution_data/model"
+	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	herocache "github.com/onflow/flow-go/module/mempool/herocache/backdata"
 	"github.com/onflow/flow-go/module/mempool/herocache/backdata/heropool"
 	"github.com/onflow/flow-go/module/mempool/herocache/internal"
@@ -39,14 +39,14 @@ func (t *BlockExecutionData) Has(blockID flow.Identifier) bool {
 
 // Add adds a block execution data to the mempool, keyed by block ID.
 // It returns false if the execution data was already in the mempool.
-func (t *BlockExecutionData) Add(ed *model.BlockExecutionDataEntity) bool {
+func (t *BlockExecutionData) Add(ed *execution_data.BlockExecutionDataEntity) bool {
 	entity := internal.NewWrappedEntity(ed.BlockID, ed)
 	return t.c.Add(*entity)
 }
 
 // ByID returns the block execution data for the given block ID from the mempool.
 // It returns false if the execution data was not found in the mempool.
-func (t *BlockExecutionData) ByID(blockID flow.Identifier) (*model.BlockExecutionDataEntity, bool) {
+func (t *BlockExecutionData) ByID(blockID flow.Identifier) (*execution_data.BlockExecutionDataEntity, bool) {
 	entity, exists := t.c.ByID(blockID)
 	if !exists {
 		return nil, false
@@ -57,9 +57,9 @@ func (t *BlockExecutionData) ByID(blockID flow.Identifier) (*model.BlockExecutio
 
 // All returns all block execution data from the mempool. Since it is using the HeroCache, All guarantees returning
 // all block execution data in the same order as they are added.
-func (t *BlockExecutionData) All() []*model.BlockExecutionDataEntity {
+func (t *BlockExecutionData) All() []*execution_data.BlockExecutionDataEntity {
 	entities := t.c.All()
-	eds := make([]*model.BlockExecutionDataEntity, 0, len(entities))
+	eds := make([]*execution_data.BlockExecutionDataEntity, 0, len(entities))
 	for _, entity := range entities {
 		eds = append(eds, unwrap(entity))
 	}
@@ -83,13 +83,13 @@ func (t *BlockExecutionData) Remove(blockID flow.Identifier) bool {
 }
 
 // unwrap converts an internal.WrappedEntity to a BlockExecutionDataEntity.
-func unwrap(entity flow.Entity) *model.BlockExecutionDataEntity {
+func unwrap(entity flow.Entity) *execution_data.BlockExecutionDataEntity {
 	wrappedEntity, ok := entity.(internal.WrappedEntity)
 	if !ok {
 		panic(fmt.Sprintf("invalid wrapped entity in block execution data pool (%T)", entity))
 	}
 
-	ed, ok := wrappedEntity.Entity.(*model.BlockExecutionDataEntity)
+	ed, ok := wrappedEntity.Entity.(*execution_data.BlockExecutionDataEntity)
 	if !ok {
 		panic(fmt.Sprintf("invalid entity in block execution data pool (%T)", wrappedEntity.Entity))
 	}

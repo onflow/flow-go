@@ -16,7 +16,6 @@ import (
 	"github.com/onflow/cadence"
 
 	sdk "github.com/onflow/flow-go-sdk"
-	"github.com/onflow/flow-go/module/executiondatasync/execution_data/model"
 	"github.com/onflow/flow-go/network/message"
 
 	hotstuff "github.com/onflow/flow-go/consensus/hotstuff/model"
@@ -2433,22 +2432,22 @@ func GetFlowProtocolEventID(
 	return flow.HashToID(eventIDHash)
 }
 
-func WithBlockExecutionDataBlockID(blockID flow.Identifier) func(*model.BlockExecutionData) {
-	return func(bed *model.BlockExecutionData) {
+func WithBlockExecutionDataBlockID(blockID flow.Identifier) func(*execution_data.BlockExecutionData) {
+	return func(bed *execution_data.BlockExecutionData) {
 		bed.BlockID = blockID
 	}
 }
 
-func WithChunkExecutionDatas(chunks ...*model.ChunkExecutionData) func(*model.BlockExecutionData) {
-	return func(bed *model.BlockExecutionData) {
+func WithChunkExecutionDatas(chunks ...*execution_data.ChunkExecutionData) func(*execution_data.BlockExecutionData) {
+	return func(bed *execution_data.BlockExecutionData) {
 		bed.ChunkExecutionDatas = chunks
 	}
 }
 
-func BlockExecutionDataFixture(opts ...func(*model.BlockExecutionData)) *model.BlockExecutionData {
-	bed := &model.BlockExecutionData{
+func BlockExecutionDataFixture(opts ...func(*execution_data.BlockExecutionData)) *execution_data.BlockExecutionData {
+	bed := &execution_data.BlockExecutionData{
 		BlockID:             IdentifierFixture(),
-		ChunkExecutionDatas: []*model.ChunkExecutionData{},
+		ChunkExecutionDatas: []*execution_data.ChunkExecutionData{},
 	}
 
 	for _, opt := range opts {
@@ -2458,13 +2457,13 @@ func BlockExecutionDataFixture(opts ...func(*model.BlockExecutionData)) *model.B
 	return bed
 }
 
-func BlockExecutionDatEntityFixture(opts ...func(*model.BlockExecutionData)) *model.BlockExecutionDataEntity {
+func BlockExecutionDatEntityFixture(opts ...func(*execution_data.BlockExecutionData)) *execution_data.BlockExecutionDataEntity {
 	execData := BlockExecutionDataFixture(opts...)
-	return model.NewBlockExecutionDataEntity(IdentifierFixture(), execData)
+	return execution_data.NewBlockExecutionDataEntity(IdentifierFixture(), execData)
 }
 
-func BlockExecutionDatEntityListFixture(n int) []*model.BlockExecutionDataEntity {
-	l := make([]*model.BlockExecutionDataEntity, n)
+func BlockExecutionDatEntityListFixture(n int) []*execution_data.BlockExecutionDataEntity {
+	l := make([]*execution_data.BlockExecutionDataEntity, n)
 	for i := 0; i < n; i++ {
 		l[i] = BlockExecutionDatEntityFixture()
 	}
@@ -2472,21 +2471,21 @@ func BlockExecutionDatEntityListFixture(n int) []*model.BlockExecutionDataEntity
 	return l
 }
 
-func WithChunkEvents(events flow.EventsList) func(*model.ChunkExecutionData) {
-	return func(conf *model.ChunkExecutionData) {
+func WithChunkEvents(events flow.EventsList) func(*execution_data.ChunkExecutionData) {
+	return func(conf *execution_data.ChunkExecutionData) {
 		conf.Events = events
 	}
 }
 
-func WithTrieUpdate(trieUpdate *ledger.TrieUpdate) func(*model.ChunkExecutionData) {
-	return func(conf *model.ChunkExecutionData) {
+func WithTrieUpdate(trieUpdate *ledger.TrieUpdate) func(*execution_data.ChunkExecutionData) {
+	return func(conf *execution_data.ChunkExecutionData) {
 		conf.TrieUpdate = trieUpdate
 	}
 }
 
-func ChunkExecutionDataFixture(t *testing.T, minSize int, opts ...func(*model.ChunkExecutionData)) *model.ChunkExecutionData {
+func ChunkExecutionDataFixture(t *testing.T, minSize int, opts ...func(*execution_data.ChunkExecutionData)) *execution_data.ChunkExecutionData {
 	collection := CollectionFixture(5)
-	ced := &model.ChunkExecutionData{
+	ced := &execution_data.ChunkExecutionData{
 		Collection: &collection,
 		Events:     flow.EventsList{},
 		TrieUpdate: testutils.TrieUpdateFixture(2, 1, 8),

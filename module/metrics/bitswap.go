@@ -3,8 +3,6 @@ package metrics
 import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
-
-	"github.com/onflow/flow-go/module/metrics/internal"
 )
 
 type BitswapCollector struct {
@@ -23,56 +21,56 @@ func NewBitswapCollector() *BitswapCollector {
 	bc := &BitswapCollector{
 		peers: promauto.NewGaugeVec(prometheus.GaugeOpts{
 			Name:      "num_peers",
-			Namespace: internal.NamespaceNetwork,
-			Subsystem: internal.SubsystemBitswap,
+			Namespace: namespaceNetwork,
+			Subsystem: subsystemBitswap,
 			Help:      "the number of connected peers",
 		}, []string{"prefix"}),
 		wantlist: promauto.NewGaugeVec(prometheus.GaugeOpts{
 			Name:      "wantlist_size",
-			Namespace: internal.NamespaceNetwork,
-			Subsystem: internal.SubsystemBitswap,
+			Namespace: namespaceNetwork,
+			Subsystem: subsystemBitswap,
 			Help:      "the wantlist size",
 		}, []string{"prefix"}),
 		blobsReceived: promauto.NewGaugeVec(prometheus.GaugeOpts{
 			Name:      "blobs_received",
-			Namespace: internal.NamespaceNetwork,
-			Subsystem: internal.SubsystemBitswap,
+			Namespace: namespaceNetwork,
+			Subsystem: subsystemBitswap,
 			Help:      "the number of received blobs",
 		}, []string{"prefix"}),
 		dataReceived: promauto.NewGaugeVec(prometheus.GaugeOpts{
 			Name:      "data_received",
-			Namespace: internal.NamespaceNetwork,
-			Subsystem: internal.SubsystemBitswap,
+			Namespace: namespaceNetwork,
+			Subsystem: subsystemBitswap,
 			Help:      "the amount of data received",
 		}, []string{"prefix"}),
 		blobsSent: promauto.NewGaugeVec(prometheus.GaugeOpts{
 			Name:      "blobs_sent",
-			Namespace: internal.NamespaceNetwork,
-			Subsystem: internal.SubsystemBitswap,
+			Namespace: namespaceNetwork,
+			Subsystem: subsystemBitswap,
 			Help:      "the number of sent blobs",
 		}, []string{"prefix"}),
 		dataSent: promauto.NewGaugeVec(prometheus.GaugeOpts{
 			Name:      "data_sent",
-			Namespace: internal.NamespaceNetwork,
-			Subsystem: internal.SubsystemBitswap,
+			Namespace: namespaceNetwork,
+			Subsystem: subsystemBitswap,
 			Help:      "the amount of data sent",
 		}, []string{"prefix"}),
 		dupBlobsReceived: promauto.NewGaugeVec(prometheus.GaugeOpts{
 			Name:      "dup_blobs_received",
-			Namespace: internal.NamespaceNetwork,
-			Subsystem: internal.SubsystemBitswap,
+			Namespace: namespaceNetwork,
+			Subsystem: subsystemBitswap,
 			Help:      "the number of duplicate blobs received",
 		}, []string{"prefix"}),
 		dupDataReceived: promauto.NewGaugeVec(prometheus.GaugeOpts{
 			Name:      "dup_data_received",
-			Namespace: internal.NamespaceNetwork,
-			Subsystem: internal.SubsystemBitswap,
+			Namespace: namespaceNetwork,
+			Subsystem: subsystemBitswap,
 			Help:      "the amount of duplicate data received",
 		}, []string{"prefix"}),
 		messagesReceived: promauto.NewGaugeVec(prometheus.GaugeOpts{
 			Name:      "messages_received",
-			Namespace: internal.NamespaceNetwork,
-			Subsystem: internal.SubsystemBitswap,
+			Namespace: namespaceNetwork,
+			Subsystem: subsystemBitswap,
 			Help:      "the number of messages received",
 		}, []string{"prefix"}),
 	}

@@ -7,7 +7,6 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promauto"
 
 	"github.com/onflow/flow-go/module"
-	"github.com/onflow/flow-go/module/metrics/internal"
 )
 
 type ExecutionDataRequesterCollector struct {
@@ -26,51 +25,51 @@ type ExecutionDataRequesterCollector struct {
 func NewExecutionDataRequesterCollector() module.ExecutionDataRequesterMetrics {
 
 	fetchDuration := promauto.NewHistogram(prometheus.HistogramOpts{
-		Namespace: internal.NamespaceStateSync,
-		Subsystem: internal.SubsystemExecutionDataRequester,
+		Namespace: namespaceStateSync,
+		Subsystem: subsystemExecutionDataRequester,
 		Name:      "execution_requester_download_duration_ms",
 		Help:      "the duration of execution data download operation",
 		Buckets:   []float64{1, 100, 500, 1000, 2000, 5000},
 	})
 
 	downloadsInProgress := promauto.NewGauge(prometheus.GaugeOpts{
-		Namespace: internal.NamespaceStateSync,
-		Subsystem: internal.SubsystemExecutionDataRequester,
+		Namespace: namespaceStateSync,
+		Subsystem: subsystemExecutionDataRequester,
 		Name:      "execution_requester_in_progress_downloads",
 		Help:      "number of concurrently running execution data download operations",
 	})
 
 	outstandingNotifications := promauto.NewGauge(prometheus.GaugeOpts{
-		Namespace: internal.NamespaceStateSync,
-		Subsystem: internal.SubsystemExecutionDataRequester,
+		Namespace: namespaceStateSync,
+		Subsystem: subsystemExecutionDataRequester,
 		Name:      "execution_requester_outstanding_notifications",
 		Help:      "number of execution data received notifications waiting to be processed",
 	})
 
 	highestDownloadHeight := promauto.NewGauge(prometheus.GaugeOpts{
-		Namespace: internal.NamespaceStateSync,
-		Subsystem: internal.SubsystemExecutionDataRequester,
+		Namespace: namespaceStateSync,
+		Subsystem: subsystemExecutionDataRequester,
 		Name:      "execution_requester_highest_download_height",
 		Help:      "highest block height for which execution data has been received",
 	})
 
 	highestNotificationHeight := promauto.NewGauge(prometheus.GaugeOpts{
-		Namespace: internal.NamespaceStateSync,
-		Subsystem: internal.SubsystemExecutionDataRequester,
+		Namespace: namespaceStateSync,
+		Subsystem: subsystemExecutionDataRequester,
 		Name:      "execution_requester_highest_notification_height",
 		Help:      "highest block height for which execution data notifications have been sent",
 	})
 
 	downloadRetries := promauto.NewCounter(prometheus.CounterOpts{
-		Namespace: internal.NamespaceStateSync,
-		Subsystem: internal.SubsystemExecutionDataRequester,
+		Namespace: namespaceStateSync,
+		Subsystem: subsystemExecutionDataRequester,
 		Name:      "execution_requester_download_retries_total",
 		Help:      "number of execution data download retries",
 	})
 
 	failedDownloads := promauto.NewCounter(prometheus.CounterOpts{
-		Namespace: internal.NamespaceStateSync,
-		Subsystem: internal.SubsystemExecutionDataRequester,
+		Namespace: namespaceStateSync,
+		Subsystem: subsystemExecutionDataRequester,
 		Name:      "execution_data_failed_downloads_total",
 		Help:      "number of failed execution data downloads",
 	})

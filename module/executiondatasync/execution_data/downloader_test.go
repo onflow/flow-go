@@ -14,7 +14,6 @@ import (
 
 	"github.com/onflow/flow-go/module/blobs"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
-	"github.com/onflow/flow-go/module/executiondatasync/execution_data/model"
 	"github.com/onflow/flow-go/network/mocknetwork"
 )
 
@@ -23,7 +22,7 @@ func TestCIDNotFound(t *testing.T) {
 	blobService := new(mocknetwork.BlobService)
 	downloader := execution_data.NewDownloader(blobService)
 	edStore := execution_data.NewExecutionDataStore(blobstore, execution_data.DefaultSerializer)
-	bed := generateBlockExecutionData(t, 10, 3*model.DefaultMaxBlobSize)
+	bed := generateBlockExecutionData(t, 10, 3*execution_data.DefaultMaxBlobSize)
 	edID, err := edStore.Add(context.Background(), bed)
 	require.NoError(t, err)
 

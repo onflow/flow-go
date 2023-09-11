@@ -6,7 +6,6 @@ import (
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
-	"github.com/onflow/flow-go/module/executiondatasync/execution_data/model"
 	"github.com/onflow/flow-go/module/mempool"
 	"github.com/onflow/flow-go/storage"
 )
@@ -45,13 +44,13 @@ func NewExecutionDataCache(
 // - BlobNotFoundError if some CID in the blob tree could not be found from the blobstore
 // - MalformedDataError if some level of the blob tree cannot be properly deserialized
 // - BlobSizeLimitExceededError if some blob in the blob tree exceeds the maximum allowed size
-func (c *ExecutionDataCache) ByID(ctx context.Context, executionDataID flow.Identifier) (*model.BlockExecutionDataEntity, error) {
+func (c *ExecutionDataCache) ByID(ctx context.Context, executionDataID flow.Identifier) (*execution_data.BlockExecutionDataEntity, error) {
 	execData, err := c.backend.Get(ctx, executionDataID)
 	if err != nil {
 		return nil, err
 	}
 
-	return model.NewBlockExecutionDataEntity(executionDataID, execData), nil
+	return execution_data.NewBlockExecutionDataEntity(executionDataID, execData), nil
 }
 
 // ByBlockID returns the execution data for the given block ID.
@@ -61,7 +60,7 @@ func (c *ExecutionDataCache) ByID(ctx context.Context, executionDataID flow.Iden
 // - BlobNotFoundError if some CID in the blob tree could not be found from the blobstore
 // - MalformedDataError if some level of the blob tree cannot be properly deserialized
 // - BlobSizeLimitExceededError if some blob in the blob tree exceeds the maximum allowed size
-func (c *ExecutionDataCache) ByBlockID(ctx context.Context, blockID flow.Identifier) (*model.BlockExecutionDataEntity, error) {
+func (c *ExecutionDataCache) ByBlockID(ctx context.Context, blockID flow.Identifier) (*execution_data.BlockExecutionDataEntity, error) {
 	if execData, ok := c.cache.ByID(blockID); ok {
 		return execData, nil
 	}
@@ -76,7 +75,7 @@ func (c *ExecutionDataCache) ByBlockID(ctx context.Context, blockID flow.Identif
 		return nil, err
 	}
 
-	execDataEntity := model.NewBlockExecutionDataEntity(executionDataID, execData)
+	execDataEntity := execution_data.NewBlockExecutionDataEntity(executionDataID, execData)
 
 	_ = c.cache.Add(execDataEntity)
 
@@ -90,7 +89,7 @@ func (c *ExecutionDataCache) ByBlockID(ctx context.Context, blockID flow.Identif
 // - BlobNotFoundError if some CID in the blob tree could not be found from the blobstore
 // - MalformedDataError if some level of the blob tree cannot be properly deserialized
 // - BlobSizeLimitExceededError if some blob in the blob tree exceeds the maximum allowed size
-func (c *ExecutionDataCache) ByHeight(ctx context.Context, height uint64) (*model.BlockExecutionDataEntity, error) {
+func (c *ExecutionDataCache) ByHeight(ctx context.Context, height uint64) (*execution_data.BlockExecutionDataEntity, error) {
 	blockID, err := c.headers.BlockIDByHeight(height)
 	if err != nil {
 		return nil, err

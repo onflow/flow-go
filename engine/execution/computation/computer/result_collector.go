@@ -19,7 +19,7 @@ import (
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
-	"github.com/onflow/flow-go/module/executiondatasync/execution_data/model"
+	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	"github.com/onflow/flow-go/module/executiondatasync/provider"
 	"github.com/onflow/flow-go/module/mempool/entity"
 	"github.com/onflow/flow-go/module/trace"
@@ -156,7 +156,7 @@ func (collector *resultCollector) commitCollection(
 	}
 
 	col := collection.Collection()
-	chunkExecData := &model.ChunkExecutionData{
+	chunkExecData := &execution_data.ChunkExecutionData{
 		Collection: &col,
 		Events:     events,
 		TrieUpdate: trieUpdate,

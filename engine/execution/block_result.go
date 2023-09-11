@@ -3,7 +3,7 @@ package execution
 import (
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/module/executiondatasync/execution_data/model"
+	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	"github.com/onflow/flow-go/module/mempool/entity"
 )
 
@@ -104,7 +104,7 @@ type BlockAttestationResult struct {
 	// should be available as part of computation result and most likely trieUpdate
 	// was the reason this is kept here, long term we don't need this data and should
 	// act based on register deltas
-	*model.BlockExecutionData
+	*execution_data.BlockExecutionData
 }
 
 func NewEmptyBlockAttestationResult(
@@ -114,10 +114,10 @@ func NewEmptyBlockAttestationResult(
 	return &BlockAttestationResult{
 		BlockExecutionResult:         blockExecutionResult,
 		collectionAttestationResults: make([]CollectionAttestationResult, 0, colSize),
-		BlockExecutionData: &model.BlockExecutionData{
+		BlockExecutionData: &execution_data.BlockExecutionData{
 			BlockID: blockExecutionResult.ID(),
 			ChunkExecutionDatas: make(
-				[]*model.ChunkExecutionData,
+				[]*execution_data.ChunkExecutionData,
 				0,
 				colSize),
 		},
@@ -137,7 +137,7 @@ func (ar *BlockAttestationResult) AppendCollectionAttestationResult(
 	endStateCommit flow.StateCommitment,
 	stateProof flow.StorageProof,
 	eventCommit flow.Identifier,
-	chunkExecutionDatas *model.ChunkExecutionData,
+	chunkExecutionDatas *execution_data.ChunkExecutionData,
 ) {
 	ar.collectionAttestationResults = append(ar.collectionAttestationResults,
 		CollectionAttestationResult{

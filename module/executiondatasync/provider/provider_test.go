@@ -17,7 +17,6 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/blobs"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
-	"github.com/onflow/flow-go/module/executiondatasync/execution_data/model"
 	"github.com/onflow/flow-go/module/executiondatasync/provider"
 	mocktracker "github.com/onflow/flow-go/module/executiondatasync/tracker/mock"
 	"github.com/onflow/flow-go/module/metrics"
@@ -53,8 +52,8 @@ func getProvider(blobService network.BlobService) provider.Provider {
 	)
 }
 
-func generateBlockExecutionData(t *testing.T, numChunks int, minSerializedSizePerChunk uint64) *model.BlockExecutionData {
-	chunkData := make([]*model.ChunkExecutionData, 0, numChunks)
+func generateBlockExecutionData(t *testing.T, numChunks int, minSerializedSizePerChunk uint64) *execution_data.BlockExecutionData {
+	chunkData := make([]*execution_data.ChunkExecutionData, 0, numChunks)
 	for i := 0; i < numChunks; i++ {
 		chunkData = append(chunkData, unittest.ChunkExecutionDataFixture(t, int(minSerializedSizePerChunk)))
 	}
@@ -62,7 +61,7 @@ func generateBlockExecutionData(t *testing.T, numChunks int, minSerializedSizePe
 	return unittest.BlockExecutionDataFixture(unittest.WithChunkExecutionDatas(chunkData...))
 }
 
-func deepEqual(t *testing.T, expected, actual *model.BlockExecutionData) {
+func deepEqual(t *testing.T, expected, actual *execution_data.BlockExecutionData) {
 	assert.Equal(t, expected.BlockID, actual.BlockID)
 	assert.Equal(t, len(expected.ChunkExecutionDatas), len(actual.ChunkExecutionDatas))
 
@@ -95,14 +94,14 @@ func TestHappyPath(t *testing.T) {
 		assert.Len(t, executionDataRoot.ChunkExecutionDataIDs, numChunks)
 	}
 
-	test(1, 0)                          // small execution data (single level blob tree)
-	test(5, 5*model.DefaultMaxBlobSize) // large execution data (multi level blob tree)
+	test(1, 0)                                   // small execution data (single level blob tree)
+	test(5, 5*execution_data.DefaultMaxBlobSize) // large execution data (multi level blob tree)
 }
 
 func TestProvideContextCanceled(t *testing.T) {
 	t.Parallel()
 
-	bed := generateBlockExecutionData(t, 5, 5*model.DefaultMaxBlobSize)
+	bed := generateBlockExecutionData(t, 5, 5*execution_data.DefaultMaxBlobSize)
 
 	provider := getProvider(getBlobservice(getDatastore()))
 	_, _, err := provider.Provide(context.Background(), 0, bed)
@@ -152,7 +151,7 @@ func TestCalculateChunkExecutionDataID(t *testing.T) {
 	require.NoError(t, err)
 
 	expected := cid.MustParse("QmYSvEvCYCaMJXjCdWLzFYqMBzxgiE5GzEGQCKqHKM8KkP")
-	ced := model.ChunkExecutionData{
+	ced := execution_data.ChunkExecutionData{
 		Collection: &flow.Collection{
 			Transactions: []*flow.TransactionBody{
 				{Script: []byte("pub fun main() {}")},

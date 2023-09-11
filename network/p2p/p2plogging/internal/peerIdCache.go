@@ -2,11 +2,13 @@ package internal
 
 import (
 	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/model/flow"
 	herocache "github.com/onflow/flow-go/module/mempool/herocache/backdata"
 	"github.com/onflow/flow-go/module/mempool/herocache/backdata/heropool"
 	"github.com/onflow/flow-go/module/mempool/stdmap"
+	"github.com/onflow/flow-go/module/metrics"
 )
 
 var _ flow.Entity = (*peerIdCacheEntry)(nil)
@@ -19,10 +21,12 @@ func NewPeerIdCache(size uint32) *PeerIdCache {
 	return &PeerIdCache{
 		peerCache: stdmap.NewBackend(
 			stdmap.WithBackData(
-				herocache.NewCacheWithNoopLoggerAndMetrics(
+				herocache.NewCache(
 					size,
 					herocache.DefaultOversizeFactor,
-					heropool.LRUEjection))),
+					heropool.LRUEjection,
+					zerolog.Nop(),
+					metrics.NewNoopCollector()))),
 	}
 }
 

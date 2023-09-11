@@ -10,11 +10,11 @@ import (
 
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/module/executiondatasync/execution_data/model"
+	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 )
 
 // BlockExecutionDataToMessage converts a BlockExecutionData to a protobuf message
-func BlockExecutionDataToMessage(data *model.BlockExecutionData) (
+func BlockExecutionDataToMessage(data *execution_data.BlockExecutionData) (
 	*entities.BlockExecutionData,
 	error,
 ) {
@@ -36,11 +36,11 @@ func BlockExecutionDataToMessage(data *model.BlockExecutionData) (
 func MessageToBlockExecutionData(
 	m *entities.BlockExecutionData,
 	chain flow.Chain,
-) (*model.BlockExecutionData, error) {
+) (*execution_data.BlockExecutionData, error) {
 	if m == nil {
 		return nil, ErrEmptyMessage
 	}
-	chunks := make([]*model.ChunkExecutionData, len(m.ChunkExecutionData))
+	chunks := make([]*execution_data.ChunkExecutionData, len(m.ChunkExecutionData))
 	for i, chunk := range m.GetChunkExecutionData() {
 		convertedChunk, err := MessageToChunkExecutionData(chunk, chain)
 		if err != nil {
@@ -49,14 +49,14 @@ func MessageToBlockExecutionData(
 		chunks[i] = convertedChunk
 	}
 
-	return &model.BlockExecutionData{
+	return &execution_data.BlockExecutionData{
 		BlockID:             MessageToIdentifier(m.GetBlockId()),
 		ChunkExecutionDatas: chunks,
 	}, nil
 }
 
 // ChunkExecutionDataToMessage converts a ChunkExecutionData to a protobuf message
-func ChunkExecutionDataToMessage(data *model.ChunkExecutionData) (
+func ChunkExecutionDataToMessage(data *execution_data.ChunkExecutionData) (
 	*entities.ChunkExecutionData,
 	error,
 ) {
@@ -88,7 +88,7 @@ func ChunkExecutionDataToMessage(data *model.ChunkExecutionData) (
 func MessageToChunkExecutionData(
 	m *entities.ChunkExecutionData,
 	chain flow.Chain,
-) (*model.ChunkExecutionData, error) {
+) (*execution_data.ChunkExecutionData, error) {
 	collection, err := messageToTrustedCollection(m.GetCollection(), chain)
 	if err != nil {
 		return nil, err
@@ -107,7 +107,7 @@ func MessageToChunkExecutionData(
 		events = nil
 	}
 
-	return &model.ChunkExecutionData{
+	return &execution_data.ChunkExecutionData{
 		Collection: collection,
 		Events:     events,
 		TrieUpdate: trieUpdate,

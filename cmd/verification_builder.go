@@ -33,7 +33,6 @@ import (
 	"github.com/onflow/flow-go/module/mempool"
 	"github.com/onflow/flow-go/module/mempool/stdmap"
 	"github.com/onflow/flow-go/module/metrics"
-	"github.com/onflow/flow-go/module/metrics/network"
 	"github.com/onflow/flow-go/state/protocol"
 	badgerState "github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/blocktimer"
@@ -360,7 +359,7 @@ func (v *VerificationNodeBuilder) LoadComponentsAndModules() {
 
 			var heroCacheCollector module.HeroCacheMetrics = metrics.NewNoopCollector()
 			if node.HeroCacheMetricsEnable {
-				heroCacheCollector = networkmetrics.FollowerCacheMetrics(node.MetricsRegisterer)
+				heroCacheCollector = metrics.FollowerCacheMetrics(node.MetricsRegisterer)
 			}
 
 			core, err := followereng.NewComplianceCore(

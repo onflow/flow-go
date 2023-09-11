@@ -2,7 +2,6 @@ package metrics
 
 import (
 	"github.com/onflow/flow-go/module"
-	"github.com/onflow/flow-go/module/metrics/internal"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
@@ -24,36 +23,36 @@ func NewEngineCollector() *EngineCollector {
 
 		sent: promauto.NewCounterVec(prometheus.CounterOpts{
 			Name:      "messages_sent_total",
-			Namespace: internal.NamespaceNetwork,
-			Subsystem: internal.SubsystemEngine,
+			Namespace: namespaceNetwork,
+			Subsystem: subsystemEngine,
 			Help:      "the number of messages sent by engines",
 		}, []string{EngineLabel, LabelMessage}),
 
 		received: promauto.NewCounterVec(prometheus.CounterOpts{
 			Name:      "messages_received_total",
-			Namespace: internal.NamespaceNetwork,
-			Subsystem: internal.SubsystemEngine,
+			Namespace: namespaceNetwork,
+			Subsystem: subsystemEngine,
 			Help:      "the number of messages received by engines",
 		}, []string{EngineLabel, LabelMessage}),
 
 		handled: promauto.NewCounterVec(prometheus.CounterOpts{
 			Name:      "messages_handled_total",
-			Namespace: internal.NamespaceNetwork,
-			Subsystem: internal.SubsystemEngine,
+			Namespace: namespaceNetwork,
+			Subsystem: subsystemEngine,
 			Help:      "the number of messages handled by engines",
 		}, []string{EngineLabel, LabelMessage}),
 
 		inboundDropped: promauto.NewCounterVec(prometheus.CounterOpts{
 			Name:      "inbound_messages_dropped_total",
-			Namespace: internal.NamespaceNetwork,
-			Subsystem: internal.SubsystemEngine,
+			Namespace: namespaceNetwork,
+			Subsystem: subsystemEngine,
 			Help:      "the number of inbound messages dropped by engines",
 		}, []string{EngineLabel, LabelMessage}),
 
 		outboundDropped: promauto.NewCounterVec(prometheus.CounterOpts{
 			Name:      "outbound_messages_dropped_total",
-			Namespace: internal.NamespaceNetwork,
-			Subsystem: internal.SubsystemEngine,
+			Namespace: namespaceNetwork,
+			Subsystem: subsystemEngine,
 			Help:      "the number of outbound messages dropped by engines",
 		}, []string{EngineLabel, LabelMessage}),
 	}

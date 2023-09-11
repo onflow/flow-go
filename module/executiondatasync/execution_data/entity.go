@@ -1,4 +1,4 @@
-package model
+package execution_data
 
 import (
 	"github.com/onflow/flow-go/model/flow"

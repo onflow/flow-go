@@ -8,7 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/onflow/flow-go/module/executiondatasync/execution_data/model"
+	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	"github.com/onflow/flow-go/module/mempool/herocache"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -70,7 +70,7 @@ func TestBlockExecutionDataConcurrentWriteAndRead(t *testing.T) {
 
 	// storing all cache
 	for i := 0; i < total; i++ {
-		go func(ed *model.BlockExecutionDataEntity) {
+		go func(ed *execution_data.BlockExecutionDataEntity) {
 			require.True(t, cache.Add(ed))
 
 			wg.Done()
@@ -83,7 +83,7 @@ func TestBlockExecutionDataConcurrentWriteAndRead(t *testing.T) {
 	wg.Add(total)
 	// reading all cache
 	for i := 0; i < total; i++ {
-		go func(ed *model.BlockExecutionDataEntity) {
+		go func(ed *execution_data.BlockExecutionDataEntity) {
 			actual, ok := cache.ByID(ed.BlockID)
 			require.True(t, ok)
 			require.Equal(t, ed, actual)

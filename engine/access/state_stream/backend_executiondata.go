@@ -14,13 +14,12 @@ import (
 	"github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
-	"github.com/onflow/flow-go/module/executiondatasync/execution_data/model"
 	"github.com/onflow/flow-go/storage"
 )
 
 type ExecutionDataResponse struct {
 	Height        uint64
-	ExecutionData *model.BlockExecutionData
+	ExecutionData *execution_data.BlockExecutionData
 }
 
 type ExecutionDataBackend struct {
@@ -35,7 +34,7 @@ type ExecutionDataBackend struct {
 	getStartHeight   GetStartHeightFunc
 }
 
-func (b *ExecutionDataBackend) GetExecutionDataByBlockID(ctx context.Context, blockID flow.Identifier) (*model.BlockExecutionData, error) {
+func (b *ExecutionDataBackend) GetExecutionDataByBlockID(ctx context.Context, blockID flow.Identifier) (*execution_data.BlockExecutionData, error) {
 	header, err := b.headers.ByBlockID(blockID)
 	if err != nil {
 		return nil, fmt.Errorf("could not get block header for %s: %w", blockID, err)

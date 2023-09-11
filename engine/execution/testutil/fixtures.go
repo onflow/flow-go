@@ -26,7 +26,7 @@ import (
 	"github.com/onflow/flow-go/ledger/complete"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/epochs"
-	"github.com/onflow/flow-go/module/executiondatasync/execution_data/model"
+	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	"github.com/onflow/flow-go/state/protocol"
 	protocolMock "github.com/onflow/flow-go/state/protocol/mock"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -610,8 +610,8 @@ func ComputationResultFixture(t *testing.T) *execution.ComputationResult {
 	return &execution.ComputationResult{
 		BlockExecutionResult: blockExecResult,
 		BlockAttestationResult: &execution.BlockAttestationResult{
-			BlockExecutionData: &model.BlockExecutionData{
-				ChunkExecutionDatas: []*model.ChunkExecutionData{
+			BlockExecutionData: &execution_data.BlockExecutionData{
+				ChunkExecutionDatas: []*execution_data.ChunkExecutionData{
 					{TrieUpdate: trieUpdate1},
 					{TrieUpdate: trieUpdate2},
 					{TrieUpdate: trieUpdate3},

@@ -6,7 +6,6 @@ import (
 
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/counters"
-	"github.com/onflow/flow-go/module/metrics/internal"
 )
 
 type AccessCollectorOpts func(*AccessCollector)
@@ -54,56 +53,56 @@ func NewAccessCollector(opts ...AccessCollectorOpts) *AccessCollector {
 	ac := &AccessCollector{
 		connectionReused: promauto.NewCounter(prometheus.CounterOpts{
 			Name:      "connection_reused",
-			Namespace: internal.NamespaceAccess,
-			Subsystem: internal.SubsystemConnectionPool,
+			Namespace: namespaceAccess,
+			Subsystem: subsystemConnectionPool,
 			Help:      "counter for the number of times connections get reused",
 		}),
 		connectionsInPool: promauto.NewGaugeVec(prometheus.GaugeOpts{
 			Name:      "connections_in_pool",
-			Namespace: internal.NamespaceAccess,
-			Subsystem: internal.SubsystemConnectionPool,
+			Namespace: namespaceAccess,
+			Subsystem: subsystemConnectionPool,
 			Help:      "counter for the number of connections in the pool against max number tne pool can hold",
 		}, []string{"result"}),
 		connectionAdded: promauto.NewCounter(prometheus.CounterOpts{
 			Name:      "connection_added",
-			Namespace: internal.NamespaceAccess,
-			Subsystem: internal.SubsystemConnectionPool,
+			Namespace: namespaceAccess,
+			Subsystem: subsystemConnectionPool,
 			Help:      "counter for the number of times connections are added to the pool",
 		}),
 		connectionEstablished: promauto.NewCounter(prometheus.CounterOpts{
 			Name:      "connection_established",
-			Namespace: internal.NamespaceAccess,
-			Subsystem: internal.SubsystemConnectionPool,
+			Namespace: namespaceAccess,
+			Subsystem: subsystemConnectionPool,
 			Help:      "counter for the number of times connections are established",
 		}),
 		connectionInvalidated: promauto.NewCounter(prometheus.CounterOpts{
 			Name:      "connection_invalidated",
-			Namespace: internal.NamespaceAccess,
-			Subsystem: internal.SubsystemConnectionPool,
+			Namespace: namespaceAccess,
+			Subsystem: subsystemConnectionPool,
 			Help:      "counter for the number of times connections are invalidated",
 		}),
 		connectionUpdated: promauto.NewCounter(prometheus.CounterOpts{
 			Name:      "connection_updated",
-			Namespace: internal.NamespaceAccess,
-			Subsystem: internal.SubsystemConnectionPool,
+			Namespace: namespaceAccess,
+			Subsystem: subsystemConnectionPool,
 			Help:      "counter for the number of times existing connections from the pool are updated",
 		}),
 		connectionEvicted: promauto.NewCounter(prometheus.CounterOpts{
 			Name:      "connection_evicted",
-			Namespace: internal.NamespaceAccess,
-			Subsystem: internal.SubsystemConnectionPool,
+			Namespace: namespaceAccess,
+			Subsystem: subsystemConnectionPool,
 			Help:      "counter for the number of times a cached connection is evicted from the connection pool",
 		}),
 		lastFullBlockHeight: promauto.NewGauge(prometheus.GaugeOpts{
 			Name:      "last_full_finalized_block_height",
-			Namespace: internal.NamespaceAccess,
-			Subsystem: internal.SubsystemIngestion,
+			Namespace: namespaceAccess,
+			Subsystem: subsystemIngestion,
 			Help:      "gauge to track the highest consecutive finalized block height with all collections indexed",
 		}),
 		maxReceiptHeight: promauto.NewGauge(prometheus.GaugeOpts{
 			Name:      "max_receipt_height",
-			Namespace: internal.NamespaceAccess,
-			Subsystem: internal.SubsystemIngestion,
+			Namespace: namespaceAccess,
+			Subsystem: subsystemIngestion,
 			Help:      "gauge to track the maximum block height of execution receipts received",
 		}),
 		maxReceiptHeightValue: counters.NewMonotonousCounter(0),

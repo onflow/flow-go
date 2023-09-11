@@ -7,8 +7,8 @@ import (
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data/cache"
-	"github.com/onflow/flow-go/module/executiondatasync/execution_data/model"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/storage"
 )
@@ -17,7 +17,7 @@ import (
 type BlockEntry struct {
 	BlockID       flow.Identifier
 	Height        uint64
-	ExecutionData *model.BlockExecutionDataEntity
+	ExecutionData *execution_data.BlockExecutionDataEntity
 }
 
 var _ module.Jobs = (*ExecutionDataReader)(nil)
