@@ -2,6 +2,7 @@ package protocol
 
 import (
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/storage/badger/transaction"
 )
 
 // InitialProtocolState returns constant data for given epoch.
@@ -108,4 +109,20 @@ type StateUpdater interface {
 	Block() *flow.Header
 	// ParentState returns parent protocol state that is associated with this state updater.
 	ParentState() *flow.RichProtocolStateEntry
+}
+
+// StateMutator is an interface for creating protocol state updaters and committing protocol state to the database.
+// It is used by the compliance layer to update protocol state when certain events that are stored in blocks are observed.
+// It has to be used for each block that is added to the block tree to maintain a correct protocol state on a block-by-block basis.
+// TODO: this should be a stand-alone interface to support evolving the protocol state in the compliance layer (already possible) as well as during block construction (complex with the current implementation).
+type StateMutator interface {
+	// CreateUpdater creates a protocol state updater based on previous protocol state.
+	// Has to be called for each block to correctly index the protocol state.
+	// Expected errors during normal operations:
+	//  * `storage.ErrNotFound` if no protocol state for parent block is known.
+	CreateUpdater(candidate *flow.Header) (StateUpdater, error)
+	// CommitProtocolState commits the protocol state to the database.
+	// Has to be called for each block to correctly index the protocol state.
+	// No errors are expected during normal operations.
+	CommitProtocolState(updater StateUpdater) func(tx *transaction.Tx) error
 }
