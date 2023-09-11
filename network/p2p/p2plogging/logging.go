@@ -13,7 +13,11 @@ var peerIdCache *internal.PeerIdCache
 // the peer id cache before any other code is run, so that the cache is ready
 // to use.
 func init() {
-	peerIdCache = internal.NewPeerIdCache(10_000)
+	cache, err := internal.NewPeerIdCache(10_000)
+	if err != nil {
+		panic(err)
+	}
+	peerIdCache = cache
 }
 
 // PeerId is a logger helper that returns the base58 encoded peer id string, it looks up the peer id in a cache to avoid
