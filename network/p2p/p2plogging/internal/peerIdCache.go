@@ -1,77 +1,45 @@
 package internal
 
 import (
-	"github.com/libp2p/go-libp2p/core/peer"
-	"github.com/rs/zerolog"
+	"fmt"
 
-	"github.com/onflow/flow-go/model/flow"
-	herocache "github.com/onflow/flow-go/module/mempool/herocache/backdata"
-	"github.com/onflow/flow-go/module/mempool/herocache/backdata/heropool"
-	"github.com/onflow/flow-go/module/mempool/stdmap"
-	"github.com/onflow/flow-go/module/metrics"
+	lru "github.com/hashicorp/golang-lru"
+	"github.com/libp2p/go-libp2p/core/peer"
 )
 
-var _ flow.Entity = (*peerIdCacheEntry)(nil)
-
 type PeerIdCache struct {
-	peerCache *stdmap.Backend
+	peerCache *lru.Cache
 }
 
 func NewPeerIdCache(size uint32) *PeerIdCache {
+	c, err := lru.New(int(size))
+	if err != nil {
+		panic(fmt.Sprintf("failed to create lru cache for peer ids: %v", err))
+	}
 	return &PeerIdCache{
-		peerCache: stdmap.NewBackend(
-			stdmap.WithBackData(
-				herocache.NewCache(
-					size,
-					herocache.DefaultOversizeFactor,
-					heropool.LRUEjection,
-					zerolog.Nop(),
-					metrics.NewNoopCollector()))),
+		peerCache: c,
 	}
 }
 
 func (p *PeerIdCache) PeerIdString(pid peer.ID) string {
-	id := flow.MakeIDFromFingerPrint([]byte(pid))
-	pidEntity, ok := p.peerCache.ByID(id)
+	pidStr, ok := p.peerCache.Get(pid)
 	if ok {
-		// return the cached peer id string
-		return pidEntity.(peerIdCacheEntry).Str
-	}
-	pidEntity = peerIdCacheEntry{
-		id:  id,
-		Pid: pid,
-		Str: pid.String(),
+		return pidStr.(string)
 	}
 
-	p.peerCache.Add(pidEntity)
-
-	return pidEntity.(peerIdCacheEntry).Str
+	pidStr0 := pid.String()
+	p.peerCache.Add(pid, pidStr0)
+	return pidStr0
 }
 
-func (p *PeerIdCache) Size() uint {
-	return p.peerCache.Size()
+func (p *PeerIdCache) Size() int {
+	return p.peerCache.Len()
 }
 
 func (p *PeerIdCache) ByPeerId(pid peer.ID) (peer.ID, bool) {
-	id := flow.MakeIDFromFingerPrint([]byte(pid))
-	pidEntity, ok := p.peerCache.ByID(id)
+	pidStr, ok := p.peerCache.Get(pid)
 	if ok {
-		// return the cached peer id
-		return pidEntity.(peerIdCacheEntry).Pid, true
+		return pidStr.(peer.ID), ok
 	}
-	return "", false
-}
-
-type peerIdCacheEntry struct {
-	id  flow.Identifier // cache the id for fast lookup
-	Pid peer.ID         // peer id
-	Str string          // base58 encoded peer id string
-}
-
-func (p peerIdCacheEntry) ID() flow.Identifier {
-	return p.id
-}
-
-func (p peerIdCacheEntry) Checksum() flow.Identifier {
-	return p.id
+	return "", ok
 }
