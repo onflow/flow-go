@@ -249,7 +249,7 @@ func CommitDelta(
 		return flow.DummyStateCommitment, nil, nil, fmt.Errorf("cannot create ledger update: %w", err)
 	}
 
-	newStorageSnapshot, err := baseStorageSnapshot.Extend(trieUpdate)
+	newStorageSnapshot, err := baseStorageSnapshot.Extend(newCommit, trieUpdate)
 	if err != nil {
 		return flow.DummyStateCommitment, nil, nil, fmt.Errorf("cannot extend storage snapshot: %w", err)
 	}
