@@ -109,7 +109,7 @@ type blockComputer struct {
 	log                   zerolog.Logger
 	systemChunkCtx        fvm.Context
 	committer             ViewCommitter
-	executionDataProvider *provider.Provider
+	executionDataProvider provider.Provider
 	signer                module.Local
 	spockHasher           hash.Hasher
 	receiptHasher         hash.Hasher
@@ -141,7 +141,7 @@ func NewBlockComputer(
 	logger zerolog.Logger,
 	committer ViewCommitter,
 	signer module.Local,
-	executionDataProvider *provider.Provider,
+	executionDataProvider provider.Provider,
 	colResCons []result.ExecutedCollectionConsumer,
 	state protocol.State,
 	maxConcurrency int,
