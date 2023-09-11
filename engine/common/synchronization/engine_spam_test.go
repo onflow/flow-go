@@ -186,6 +186,10 @@ func (ss *SyncSuite) TestLoad_Process_RangeRequest_SometimesReportSpam() {
 	// expected probability factor: 0.1 * ((10-9) + 1)/64 = 0.003125
 	loadGroups = append(loadGroups, loadGroup{0.1, 0, 15, 9, 10})
 
+	// using a small range (10) with a 10% base probability factor, expect to get misbehavior report about 1.7% of the time (17 in 1000 requests)
+	// expected probability factor: 0.1 * ((11-1) + 1)/64 = 0.0171875
+	loadGroups = append(loadGroups, loadGroup{0.1, 5, 31, 1, 11})
+
 	// using a large range (99) with a 10% base probability factor, expect to get misbehavior report about 15% of the time (150 in 1000 requests)
 	// expected probability factor: 0.1 * ((100-1) + 1)/64 = 0.15625
 	loadGroups = append(loadGroups, loadGroup{0.1, 110, 200, 1, 100})
