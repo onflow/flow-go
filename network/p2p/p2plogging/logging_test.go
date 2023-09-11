@@ -3,6 +3,7 @@ package p2plogging_test
 import (
 	"testing"
 
+	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/network/p2p/p2plogging"
@@ -15,4 +16,33 @@ func TestPeerIdLogging(t *testing.T) {
 	pid := p2ptest.PeerIdFixture(t)
 	pidStr := p2plogging.PeerId(pid)
 	require.Equal(t, pid.String(), pidStr)
+}
+
+// BenchmarkPeerIdString benchmarks the peer.ID.String() method.
+func BenchmarkPeerIdString(b *testing.B) {
+	count := 100
+	pids := make([]peer.ID, 0, count)
+	for i := 0; i < count; i++ {
+		pids = append(pids, p2ptest.PeerIdFixture(b))
+	}
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_ = pids[i%count].String()
+	}
+}
+
+// BenchmarkPeerIdLogging benchmarks the PeerId logger helper, which is expected to be faster than the peer.ID.String() method,
+// as it caches the base58 encoded peer ID strings.
+func BenchmarkPeerIdLogging(b *testing.B) {
+	count := 100
+	pids := make([]peer.ID, 0, count)
+	for i := 0; i < count; i++ {
+		pids = append(pids, p2ptest.PeerIdFixture(b))
+	}
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_ = p2plogging.PeerId(pids[i%count])
+	}
 }
