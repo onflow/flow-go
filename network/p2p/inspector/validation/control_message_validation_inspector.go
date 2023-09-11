@@ -126,8 +126,10 @@ func (c *ControlMsgValidationInspector) Inspect(from peer.ID, rpc *pubsub.RPC) e
 	// queue further async inspection
 	req, err := NewInspectRPCRequest(from, rpc)
 	if err != nil {
+
 		c.logger.Error().
 			Err(err).
+			Bool(logging.KeyNetworkingSecurity, true).
 			Str("peer_id", from.String()).
 			Msg("failed to get inspect RPC request")
 		return fmt.Errorf("failed to get inspect RPC request: %w", err)
