@@ -46,9 +46,6 @@ type Engine struct {
 	headers                storage.Headers // see comments on getHeaderByHeight for why we need it
 	blocks                 storage.Blocks
 	collections            storage.Collections
-	events                 storage.Events
-	serviceEvents          storage.ServiceEvents
-	transactionResults     storage.TransactionResults
 	computationManager     computation.ComputationManager
 	providerEngine         provider.ProviderEngine
 	mempool                *Mempool
@@ -81,9 +78,6 @@ func New(
 	headers storage.Headers,
 	blocks storage.Blocks,
 	collections storage.Collections,
-	events storage.Events,
-	serviceEvents storage.ServiceEvents,
-	transactionResults storage.TransactionResults,
 	executionEngine computation.ComputationManager,
 	providerEngine provider.ProviderEngine,
 	execState state.ExecutionState,
@@ -109,9 +103,6 @@ func New(
 		headers:                headers,
 		blocks:                 blocks,
 		collections:            collections,
-		events:                 events,
-		serviceEvents:          serviceEvents,
-		transactionResults:     transactionResults,
 		computationManager:     executionEngine,
 		providerEngine:         providerEngine,
 		mempool:                mempool,
