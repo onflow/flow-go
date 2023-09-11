@@ -92,7 +92,9 @@ func TestInvalidCtrlMsgScoringIntegration(t *testing.T) {
 		idProvider,
 		p2ptest.WithRole(flow.RoleConsensus),
 		p2ptest.EnablePeerScoringWithOverride(p2p.PeerScoringConfigNoOverride),
-		p2ptest.OverrideGossipSubRpcInspectorSuiteFactory(func(zerolog.Logger,
+		p2ptest.OverrideGossipSubRpcInspectorSuiteFactory(func(
+			irrecoverable.SignalerContext,
+			zerolog.Logger,
 			flow.Identifier,
 			*p2pconf.GossipSubRPCInspectorsConfig,
 			module.GossipSubMetrics,

@@ -36,11 +36,11 @@ type InvCtrlMsgNotif struct {
 }
 
 // NewInvalidControlMessageNotification returns a new *InvCtrlMsgNotif
-func NewInvalidControlMessageNotification(peerID peer.ID, ctlMshType p2pmsg.ControlMessageType, err error) *InvCtrlMsgNotif {
+func NewInvalidControlMessageNotification(peerID peer.ID, ctlMsgType p2pmsg.ControlMessageType, err error) *InvCtrlMsgNotif {
 	return &InvCtrlMsgNotif{
 		PeerID:  peerID,
 		Error:   err,
-		MsgType: ctlMshType,
+		MsgType: ctlMsgType,
 	}
 }
 
