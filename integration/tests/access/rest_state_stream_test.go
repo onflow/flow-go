@@ -114,16 +114,18 @@ func (s *RestStateStreamSuite) TestRestEventStreaming() {
 
 		client, err := getWSClient(ctx, url)
 		require.NoError(t, err)
-		var receivedEventsResponse []*state_stream.EventsResponse
-		eventChan := make(chan *state_stream.EventsResponse)
 
-		// Start the timeout goroutine
-		timeoutChan := make(chan struct{})
+		var receivedEventsResponse []*state_stream.EventsResponse
+
 		go func() {
-			time.Sleep(10 * time.Second) // Sleep for 10 seconds
-			close(timeoutChan)           // Signal the timeout
+			time.Sleep(10 * time.Second)
+			// close connection after 10 seconds
+			client.Close()
+			// check events
+			s.requireEvents(receivedEventsResponse)
 		}()
 
+		eventChan := make(chan *state_stream.EventsResponse)
 		go func() {
 			for {
 				resp := &state_stream.EventsResponse{}
@@ -139,21 +141,12 @@ func (s *RestStateStreamSuite) TestRestEventStreaming() {
 			}
 		}()
 
-		// Wait for events or timeout
+		// collect received events during 10 seconds
 		for {
 			select {
-			case <-timeoutChan:
-				// Handle the timeout and close the client connection
-				client.Close()
-				s.T().Log("Client connection closed")
-				s.requireEvents(receivedEventsResponse)
-				return
 			case eventResponse, ok := <-eventChan:
+				// Event channel closed
 				if !ok {
-					// Event channel closed, events received
-					s.T().Log(" Event channel closed, events received")
-					client.Close()
-					require.Equal(s.T(), len(receivedEventsResponse) > 0, "expect some events ")
 					return
 				}
 				receivedEventsResponse = append(receivedEventsResponse, eventResponse)
@@ -197,8 +190,8 @@ func (s *RestStateStreamSuite) requireEvents(receivedEventsResponse []*state_str
 			require.Equal(s.T(), len(expectedEventsResult.Events), len(receivedEventList), "expect the same count of events")
 
 			for i, event := range receivedEventList {
-				require.Equal(s.T(), expectedEventsResult.Events[i].EventIndex, event.EventIndex, "expect the same EventIndex")
-				require.Equal(s.T(), convert.MessageToIdentifier(expectedEventsResult.Events[i].TransactionId), event.TransactionID, "expect the same TransactionId")
+				require.Equal(s.T(), expectedEventsResult.Events[i].EventIndex, event.EventIndex, "expect the same event index")
+				require.Equal(s.T(), convert.MessageToIdentifier(expectedEventsResult.Events[i].TransactionId), event.TransactionID, "expect the same transaction id")
 			}
 		}
 	}

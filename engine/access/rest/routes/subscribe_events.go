@@ -11,8 +11,8 @@ import (
 
 // SubscribeEvents create websocket connection and write to it requested events.
 func SubscribeEvents(
-	request *request.Request,
 	ctx context.Context,
+	request *request.Request,
 	wsController *WebsocketController) (state_stream.Subscription, error) {
 	req, err := request.SubscribeEventsRequest()
 	if err != nil {

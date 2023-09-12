@@ -37,7 +37,7 @@ type WebsocketController struct {
 	eventFilterConfig state_stream.EventFilterConfig // the configuration for filtering events
 	maxStreams        int32                          // the maximum number of streams allowed
 	streamCount       *atomic.Int32                  // the current number of active streams
-	readChannel       chan interface{}               // channel which notify closing connection by the client
+	readChannel       chan struct{}                  // channel which notify closing connection by the client
 }
 
 // SetWebsocketConf used to set read and write deadlines for WebSocket connections and establishes a Pong handler to
@@ -130,7 +130,7 @@ func (wsController *WebsocketController) writeEvents(sub state_stream.Subscripti
 			}
 			err := wsController.conn.SetWriteDeadline(time.Now().Add(writeWait))
 			if err != nil {
-				wsController.wsErrorHandler(models.NewRestError(http.StatusInternalServerError, "Set the initial write deadline error: ", err))
+				wsController.wsErrorHandler(models.NewRestError(http.StatusInternalServerError, "failed to set the initial write deadline error: ", err))
 				return
 			}
 			// Write the response to the WebSocket connection
@@ -142,7 +142,7 @@ func (wsController *WebsocketController) writeEvents(sub state_stream.Subscripti
 		case <-ticker.C:
 			err := wsController.conn.SetWriteDeadline(time.Now().Add(writeWait))
 			if err != nil {
-				wsController.wsErrorHandler(models.NewRestError(http.StatusInternalServerError, "Set the initial write deadline error: ", err))
+				wsController.wsErrorHandler(models.NewRestError(http.StatusInternalServerError, "failed to set the initial write deadline error: ", err))
 				return
 			}
 			if err := wsController.conn.WriteMessage(websocket.PingMessage, nil); err != nil {
@@ -155,7 +155,8 @@ func (wsController *WebsocketController) writeEvents(sub state_stream.Subscripti
 
 // read function handles WebSocket messages from the client.
 // It continuously reads messages from the WebSocket connection and closes
-// the associated read channel when the connection is closed.
+// the associated read channel when the connection is closed by client or when an
+// any additional message is received from the client.
 //
 // This method should be called after establishing the WebSocket connection
 // to handle incoming messages asynchronously.
@@ -164,8 +165,16 @@ func (wsController *WebsocketController) read() {
 	defer close(wsController.readChannel) // notify websocket about closed connection
 
 	for {
-		_, _, err := wsController.conn.ReadMessage()
+		// reads messages from the WebSocket connection when the connection is closed by client or when an
+		// 1) when the connection is closed by client
+		// 2) when an any additional message is received from the client
+		_, msg, err := wsController.conn.ReadMessage()
 		if err != nil {
+			return
+		}
+
+		// Check the message from the client, if is any just close the connection
+		if len(msg) > 0 {
 			return
 		}
 	}
@@ -173,8 +182,8 @@ func (wsController *WebsocketController) read() {
 
 // SubscribeHandlerFunc is a function that contains endpoint handling logic for subscribes, fetches necessary resources
 type SubscribeHandlerFunc func(
-	request *request.Request,
 	ctx context.Context,
+	request *request.Request,
 	wsController *WebsocketController,
 ) (state_stream.Subscription, error)
 
@@ -228,6 +237,7 @@ func (h *WSHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		h.errorHandler(w, models.NewRestError(http.StatusInternalServerError, "webSocket upgrade error: ", err), logger)
 		return
 	}
+	defer conn.Close()
 
 	wsController := &WebsocketController{
 		logger:            logger,
@@ -236,29 +246,29 @@ func (h *WSHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		eventFilterConfig: h.eventFilterConfig,
 		maxStreams:        h.maxStreams,
 		streamCount:       h.streamCount,
-		readChannel:       make(chan interface{}),
+		readChannel:       make(chan struct{}),
 	}
 
 	err = wsController.SetWebsocketConf()
 	if err != nil {
 		wsController.wsErrorHandler(err)
-		conn.Close()
+		return
 	}
 
 	if wsController.streamCount.Load() >= wsController.maxStreams {
 		err := fmt.Errorf("maximum number of streams reached")
 		wsController.wsErrorHandler(models.NewRestError(http.StatusServiceUnavailable, err.Error(), err))
+		return
 	}
 	wsController.streamCount.Add(1)
+	defer wsController.streamCount.Add(-1)
 
+	// cancelling the context passed into the `subscribeFunc` to ensure when the client disconnect it's time the shutdown
+	// gorountines setup by the backend are cleaned up if the client disconnects first.
 	ctx, cancel := context.WithCancel(context.Background())
-	defer func() {
-		wsController.streamCount.Add(-1)
-		wsController.conn.Close()
-		cancel()
-	}()
+	defer cancel()
 
-	sub, err := h.subscribeFunc(request.Decorate(r, h.HttpHandler.Chain), ctx, wsController)
+	sub, err := h.subscribeFunc(ctx, request.Decorate(r, h.HttpHandler.Chain), wsController)
 	if err != nil {
 		wsController.wsErrorHandler(err)
 		return

@@ -12,6 +12,8 @@ import (
 	"testing"
 	"time"
 
+	"golang.org/x/exp/slices"
+
 	"github.com/stretchr/testify/assert"
 	mocks "github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -121,19 +123,6 @@ func (s *SubscribeEventsSuite) TestSubscribeEvents() {
 			var expectedEventsResponses []*state_stream.EventsResponse
 			startBlockFound := test.startBlockID == flow.ZeroID
 
-			// Helper function to check if a string is present in a slice
-			addExpectedEvent := func(slice []string, item string) bool {
-				if slice == nil {
-					return true // Include all events when test.eventTypes is nil
-				}
-				for _, s := range slice {
-					if s == item {
-						return true
-					}
-				}
-				return false
-			}
-
 			// construct expected event responses based on the provided test configuration
 			for _, block := range s.blocks {
 				if startBlockFound || block.ID() == test.startBlockID {
@@ -141,7 +130,8 @@ func (s *SubscribeEventsSuite) TestSubscribeEvents() {
 					if test.startHeight == request.EmptyHeight || block.Header.Height >= test.startHeight {
 						eventsForBlock := flow.EventsList{}
 						for _, event := range s.blockEvents[block.ID()] {
-							if addExpectedEvent(test.eventTypes, string(event.Type)) {
+							if slices.Contains(test.eventTypes, string(event.Type)) ||
+								len(test.eventTypes) == 0 { //Include all events
 								eventsForBlock = append(eventsForBlock, event)
 							}
 						}

@@ -32,8 +32,7 @@ func (e *EventTypes) Parse(raw []string) error {
 		var eType EventType
 		err := eType.Parse(r)
 		if err != nil {
-			err = fmt.Errorf("%v at index %d ", i, err)
-			return err
+			return fmt.Errorf("error at index %d: %w", i, err)
 		}
 
 		if !uniqueTypes[eType.Flow()] {
