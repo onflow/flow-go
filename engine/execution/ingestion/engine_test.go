@@ -154,9 +154,6 @@ func runWithEngine(t *testing.T, f func(testingContext)) {
 	blocks := storage.NewMockBlocks(ctrl)
 	payloads := storage.NewMockPayloads(ctrl)
 	collections := storage.NewMockCollections(ctrl)
-	events := storage.NewMockEvents(ctrl)
-	serviceEvents := storage.NewMockServiceEvents(ctrl)
-	txResults := storage.NewMockTransactionResults(ctrl)
 
 	computationManager := new(computation.ComputationManager)
 	providerEngine := new(provider.ProviderEngine)
@@ -188,7 +185,6 @@ func runWithEngine(t *testing.T, f func(testingContext)) {
 		return identity
 	}, nil)
 
-	txResults.EXPECT().BatchStore(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
 	payloads.EXPECT().Store(gomock.Any(), gomock.Any()).AnyTimes()
 
 	log := unittest.Logger()
@@ -229,9 +225,6 @@ func runWithEngine(t *testing.T, f func(testingContext)) {
 		headers,
 		blocks,
 		collections,
-		events,
-		serviceEvents,
-		txResults,
 		computationManager,
 		providerEngine,
 		executionState,
@@ -1509,9 +1502,6 @@ func newIngestionEngine(t *testing.T, ps *mocks.ProtocolState, es *mockExecution
 	headers := storage.NewMockHeaders(ctrl)
 	blocks := storage.NewMockBlocks(ctrl)
 	collections := storage.NewMockCollections(ctrl)
-	events := storage.NewMockEvents(ctrl)
-	serviceEvents := storage.NewMockServiceEvents(ctrl)
-	txResults := storage.NewMockTransactionResults(ctrl)
 
 	computationManager := new(computation.ComputationManager)
 	providerEngine := new(provider.ProviderEngine)
@@ -1531,9 +1521,6 @@ func newIngestionEngine(t *testing.T, ps *mocks.ProtocolState, es *mockExecution
 		headers,
 		blocks,
 		collections,
-		events,
-		serviceEvents,
-		txResults,
 		computationManager,
 		providerEngine,
 		es,
