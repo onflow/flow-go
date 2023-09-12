@@ -24,6 +24,7 @@ import (
 	"github.com/onflow/flow-go/network/mocknetwork"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/middleware"
+	"github.com/onflow/flow-go/network/p2p/p2plogging"
 	"github.com/onflow/flow-go/network/slashing"
 	"github.com/onflow/flow-go/network/validator"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -125,7 +126,7 @@ func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_UnstakedPeer() 
 	var nilID *flow.Identity
 	expectedViolation := &slashing.Violation{
 		Identity: nilID, // because the peer will be unverified this identity will be nil
-		PeerID:   expectedSenderPeerID.String(),
+		PeerID:   p2plogging.PeerId(expectedSenderPeerID),
 		MsgType:  "",                          // message will not be decoded before OnSenderEjectedError is logged, we won't log message type
 		Channel:  channels.TestNetworkChannel, // message will not be decoded before OnSenderEjectedError is logged, we won't log peer ID
 		Protocol: message.ProtocolTypeUnicast,
@@ -187,7 +188,7 @@ func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_EjectedPeer() {
 
 	expectedViolation := &slashing.Violation{
 		Identity: u.senderID, // we expect this method to be called with the ejected identity
-		PeerID:   expectedSenderPeerID.String(),
+		PeerID:   p2plogging.PeerId(expectedSenderPeerID),
 		MsgType:  "",                          // message will not be decoded before OnSenderEjectedError is logged, we won't log message type
 		Channel:  channels.TestNetworkChannel, // message will not be decoded before OnSenderEjectedError is logged, we won't log peer ID
 		Protocol: message.ProtocolTypeUnicast,
@@ -246,7 +247,7 @@ func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_UnauthorizedPee
 
 	expectedViolation := &slashing.Violation{
 		Identity: u.senderID,
-		PeerID:   expectedSenderPeerID.String(),
+		PeerID:   p2plogging.PeerId(expectedSenderPeerID),
 		MsgType:  "*message.TestMessage",
 		Channel:  channels.ConsensusCommittee,
 		Protocol: message.ProtocolTypeUnicast,
@@ -309,7 +310,7 @@ func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_UnknownMsgCode(
 	var nilID *flow.Identity
 	expectedViolation := &slashing.Violation{
 		Identity: nilID,
-		PeerID:   expectedSenderPeerID.String(),
+		PeerID:   p2plogging.PeerId(expectedSenderPeerID),
 		MsgType:  "",
 		Channel:  channels.TestNetworkChannel,
 		Protocol: message.ProtocolTypeUnicast,
@@ -378,7 +379,7 @@ func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_WrongMsgCode() 
 
 	expectedViolation := &slashing.Violation{
 		Identity: u.senderID,
-		PeerID:   expectedSenderPeerID.String(),
+		PeerID:   p2plogging.PeerId(expectedSenderPeerID),
 		MsgType:  "*messages.DKGMessage",
 		Channel:  channels.TestNetworkChannel,
 		Protocol: message.ProtocolTypeUnicast,
@@ -503,7 +504,7 @@ func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_UnauthorizedUni
 
 	expectedViolation := &slashing.Violation{
 		Identity: u.senderID,
-		PeerID:   expectedSenderPeerID.String(),
+		PeerID:   p2plogging.PeerId(expectedSenderPeerID),
 		MsgType:  "*messages.BlockProposal",
 		Channel:  channels.ConsensusCommittee,
 		Protocol: message.ProtocolTypeUnicast,
@@ -566,7 +567,7 @@ func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_ReceiverHasNoSu
 
 	expectedViolation := &slashing.Violation{
 		Identity: nil,
-		PeerID:   expectedSenderPeerID.String(),
+		PeerID:   p2plogging.PeerId(expectedSenderPeerID),
 		MsgType:  "*message.TestMessage",
 		Channel:  channels.TestNetworkChannel,
 		Protocol: message.ProtocolTypeUnicast,

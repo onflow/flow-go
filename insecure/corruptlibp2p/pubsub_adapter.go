@@ -14,6 +14,7 @@ import (
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/network/p2p"
+	"github.com/onflow/flow-go/network/p2p/p2plogging"
 	"github.com/onflow/flow-go/utils/logging"
 )
 
@@ -62,7 +63,7 @@ func (c *CorruptGossipSubAdapter) RegisterTopicValidator(topic string, topicVali
 			c.logger.Fatal().
 				Bool(logging.KeySuspicious, true).
 				Str("topic", topic).
-				Str("origin_peer", from.String()).
+				Str("origin_peer", p2plogging.PeerId(from)).
 				Str("result", fmt.Sprintf("%v", result)).
 				Str("message_type", fmt.Sprintf("%T", message.Data)).
 				Msgf("invalid validation result, should be a bug in the topic validator")
@@ -71,7 +72,7 @@ func (c *CorruptGossipSubAdapter) RegisterTopicValidator(topic string, topicVali
 		c.logger.Warn().
 			Bool(logging.KeySuspicious, true).
 			Str("topic", topic).
-			Str("origin_peer", from.String()).
+			Str("origin_peer", p2plogging.PeerId(from)).
 			Str("result", fmt.Sprintf("%v", result)).
 			Str("message_type", fmt.Sprintf("%T", message.Data)).
 			Msg("invalid validation result, returning reject")

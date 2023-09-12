@@ -26,6 +26,7 @@ import (
 	"github.com/onflow/flow-go/network/internal/p2putils"
 	"github.com/onflow/flow-go/network/internal/testutils"
 	"github.com/onflow/flow-go/network/p2p"
+	"github.com/onflow/flow-go/network/p2p/p2plogging"
 	"github.com/onflow/flow-go/network/p2p/p2pnode"
 	p2ptest "github.com/onflow/flow-go/network/p2p/test"
 	"github.com/onflow/flow-go/network/p2p/unicast/protocols"
@@ -175,7 +176,7 @@ func TestConnGater(t *testing.T) {
 		idProvider,
 		p2ptest.WithConnectionGater(testutils.NewConnectionGater(idProvider, func(pid peer.ID) error {
 			if !node1Peers.Has(pid) {
-				return fmt.Errorf("peer id not found: %s", pid.String())
+				return fmt.Errorf("peer id not found: %s", p2plogging.PeerId(pid))
 			}
 			return nil
 		})))
@@ -194,7 +195,7 @@ func TestConnGater(t *testing.T) {
 		idProvider,
 		p2ptest.WithConnectionGater(testutils.NewConnectionGater(idProvider, func(pid peer.ID) error {
 			if !node2Peers.Has(pid) {
-				return fmt.Errorf("id not found: %s", pid.String())
+				return fmt.Errorf("id not found: %s", p2plogging.PeerId(pid))
 			}
 			return nil
 		})))

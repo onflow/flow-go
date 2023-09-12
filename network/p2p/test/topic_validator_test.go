@@ -19,6 +19,7 @@ import (
 	"github.com/onflow/flow-go/network/internal/p2pfixtures"
 	"github.com/onflow/flow-go/network/message"
 	"github.com/onflow/flow-go/network/p2p"
+	"github.com/onflow/flow-go/network/p2p/p2plogging"
 	p2ptest "github.com/onflow/flow-go/network/p2p/test"
 	"github.com/onflow/flow-go/network/p2p/translator"
 	"github.com/onflow/flow-go/network/p2p/utils"
@@ -58,7 +59,7 @@ func TestTopicValidator_Unstaked(t *testing.T) {
 	isStaked := func(pid peer.ID) error {
 		fid, err := translator.GetFlowID(pid)
 		if err != nil {
-			return fmt.Errorf("could not translate the peer_id %s to a Flow identifier: %w", pid.String(), err)
+			return fmt.Errorf("could not translate the peer_id %s to a Flow identifier: %w", p2plogging.PeerId(pid), err)
 		}
 
 		if _, ok := ids.ByNodeID(fid); !ok {
