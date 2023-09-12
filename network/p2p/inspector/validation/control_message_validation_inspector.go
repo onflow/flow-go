@@ -23,6 +23,7 @@ import (
 	"github.com/onflow/flow-go/network/p2p/inspector/internal/ratelimit"
 	p2pmsg "github.com/onflow/flow-go/network/p2p/message"
 	"github.com/onflow/flow-go/network/p2p/p2pconf"
+	"github.com/onflow/flow-go/network/p2p/p2plogging"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/events"
 	"github.com/onflow/flow-go/utils/logging"
@@ -153,7 +154,7 @@ func (c *ControlMsgValidationInspector) Inspect(from peer.ID, rpc *pubsub.RPC) e
 	control := rpc.GetControl()
 	for _, ctrlMsgType := range p2pmsg.ControlMessageTypes() {
 		lg := c.logger.With().
-			Str("peer_id", from.String()).
+			Str("peer_id", p2plogging.PeerId(from)).
 			Str("ctrl_msg_type", string(ctrlMsgType)).Logger()
 		validationConfig, ok := c.config.GetCtrlMsgValidationConfig(ctrlMsgType)
 		if !ok {
@@ -188,7 +189,7 @@ func (c *ControlMsgValidationInspector) Inspect(from peer.ID, rpc *pubsub.RPC) e
 		if err != nil {
 			lg.Error().
 				Err(err).
-				Str("peer_id", from.String()).
+				Str("peer_id", p2plogging.PeerId(from)).
 				Str("ctrl_msg_type", string(ctrlMsgType)).
 				Msg("failed to get inspect message request")
 			return fmt.Errorf("failed to get inspect message request: %w", err)
@@ -213,7 +214,7 @@ func (c *ControlMsgValidationInspector) Inspect(from peer.ID, rpc *pubsub.RPC) e
 func (c *ControlMsgValidationInspector) inspectIWant(from peer.ID, iWants []*pubsub_pb.ControlIWant) error {
 	lastHighest := c.rpcTracker.LastHighestIHaveRPCSize()
 	lg := c.logger.With().
-		Str("peer_id", from.String()).
+		Str("peer_id", p2plogging.PeerId(from)).
 		Uint("max_sample_size", c.config.IWantRPCInspectionConfig.MaxSampleSize).
 		Int64("last_highest_ihave_rpc_size", lastHighest).
 		Logger()
@@ -311,7 +312,7 @@ func (c *ControlMsgValidationInspector) blockingPreprocessingRpc(from peer.ID, v
 	count := c.getCtrlMsgCount(validationConfig.ControlMsg, controlMessage)
 	lg := c.logger.With().
 		Uint64("ctrl_msg_count", count).
-		Str("peer_id", from.String()).
+		Str("peer_id", p2plogging.PeerId(from)).
 		Str("ctrl_msg_type", string(validationConfig.ControlMsg)).Logger()
 
 	c.metrics.BlockingPreProcessingStarted(validationConfig.ControlMsg.String(), uint(count))
@@ -375,7 +376,7 @@ func (c *ControlMsgValidationInspector) blockingPreprocessingSampleRpc(from peer
 	count := c.getCtrlMsgCount(validationConfig.ControlMsg, controlMessage)
 	lg := c.logger.With().
 		Uint64("ctrl_msg_count", count).
-		Str("peer_id", from.String()).
+		Str("peer_id", p2plogging.PeerId(from)).
 		Str("ctrl_msg_type", string(validationConfig.ControlMsg)).Logger()
 	// if count greater than hard threshold perform synchronous topic validation on random subset of the iHave messages
 	if count > validationConfig.HardThreshold {
@@ -449,7 +450,7 @@ func (c *ControlMsgValidationInspector) processInspectMsgReq(req *InspectMsgRequ
 				Error().
 				Err(err).
 				Bool(logging.KeySuspicious, true).
-				Str("peer_id", req.Peer.String()).
+				Str("peer_id", p2plogging.PeerId(req.Peer)).
 				Str("ctrl_msg_type", p2pmsg.CtrlMsgIWant.String()).
 				Uint64("ctrl_msg_count", count).
 				Msg("unexpected error encountered while performing iwant validation")
@@ -458,7 +459,7 @@ func (c *ControlMsgValidationInspector) processInspectMsgReq(req *InspectMsgRequ
 	}
 
 	lg := c.logger.With().
-		Str("peer_id", req.Peer.String()).
+		Str("peer_id", p2plogging.PeerId(req.Peer)).
 		Str("ctrl_msg_type", string(req.validationConfig.ControlMsg)).
 		Uint64("ctrl_msg_count", count).Logger()
 
@@ -639,7 +640,7 @@ func (c *ControlMsgValidationInspector) validateTopic(from peer.ID, topic channe
 // errors are unexpected and irrecoverable indicating a bug.
 func (c *ControlMsgValidationInspector) validateClusterPrefixedTopic(from peer.ID, topic channels.Topic, activeClusterIds flow.ChainIDList) error {
 	lg := c.logger.With().
-		Str("from", from.String()).
+		Str("from", p2plogging.PeerId(from)).
 		Logger()
 	// reject messages from unstaked nodes for cluster prefixed topics
 	nodeID, err := c.getFlowIdentifier(from)
@@ -726,7 +727,7 @@ func (c *ControlMsgValidationInspector) logAndDistributeAsyncInspectErr(req *Ins
 	lg := c.logger.With().
 		Bool(logging.KeySuspicious, true).
 		Bool(logging.KeyNetworkingSecurity, true).
-		Str("peer_id", req.Peer.String()).
+		Str("peer_id", p2plogging.PeerId(req.Peer)).
 		Str("ctrl_msg_type", string(req.validationConfig.ControlMsg)).
 		Uint64("ctrl_msg_count", count).Logger()
 
