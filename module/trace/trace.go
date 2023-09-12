@@ -157,8 +157,7 @@ func (t *Tracer) entityRootSpan(
 	trace.Span,
 ) {
 	if c, ok := t.spanCache.Get(entityID); ok {
-		span := c.(trace.Span)
-		return trace.ContextWithSpan(ctx, span), span
+		return trace.ContextWithSpan(ctx, c), c
 	}
 
 	traceID := (*trace.TraceID)(entityID[:16])
