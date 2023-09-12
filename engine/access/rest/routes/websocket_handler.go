@@ -121,7 +121,7 @@ func (wsController *WebsocketController) writeEvents(sub state_stream.Subscripti
 			if !ok {
 				if sub.Err() != nil {
 					err := fmt.Errorf("stream encountered an error: %v", sub.Err())
-					wsController.wsErrorHandler(models.NewBadRequestError(err))
+					wsController.wsErrorHandler(err)
 					return
 				}
 				err := fmt.Errorf("subscription channel closed, no error occurred")
