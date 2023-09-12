@@ -2,14 +2,13 @@ package migrations
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
-	"strings"
 	"time"
 
 	"github.com/rs/zerolog"
 
-	"github.com/onflow/atree"
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/onflow/cadence/runtime/interpreter"
@@ -27,14 +26,13 @@ func MigrateAtreeRegisters(
 	log zerolog.Logger,
 	rwf reporters.ReportWriterFactory,
 	nWorker int,
-) func([]ledger.Payload) ([]ledger.Payload, error) {
+) func([]*ledger.Payload) ([]*ledger.Payload, error) {
 	return CreateAccountBasedMigration(
 		log,
-		func(allRegisters []ledger.Payload, nWorker int) (AccountMigrator, error) {
+		func(_ []*ledger.Payload, nWorker int) (AccountMigrator, error) {
 			return NewMigrator(
 				log.With().Str("component", "atree-register-migrator").Logger(),
 				rwf,
-				allRegisters,
 			)
 		},
 		nWorker,
@@ -58,7 +56,6 @@ var _ io.Closer = (*AtreeRegisterMigrator)(nil)
 func NewMigrator(
 	log zerolog.Logger,
 	rwf reporters.ReportWriterFactory,
-	_ []ledger.Payload,
 ) (*AtreeRegisterMigrator, error) {
 
 	log.Info().Msgf("created snapshot")
@@ -80,11 +77,17 @@ func (m *AtreeRegisterMigrator) Close() error {
 	return nil
 }
 
+var skippableAccountError = errors.New("account is skippable")
+
 func (m *AtreeRegisterMigrator) MigratePayloads(
 	_ context.Context,
 	address common.Address,
 	payloads []*ledger.Payload,
 ) ([]*ledger.Payload, error) {
+
+	if address == common.ZeroAddress {
+		return payloads, nil
+	}
 
 	// create all the runtime components we need for the migration
 	mr, err := m.newMigratorRuntime(address, payloads)
@@ -92,19 +95,31 @@ func (m *AtreeRegisterMigrator) MigratePayloads(
 		return nil, fmt.Errorf("failed to create migrator runtime: %w", err)
 	}
 
-	// check the storage health
-	healthOk, err := m.checkStorageHealth(mr)
-	if err != nil {
-		return nil, fmt.Errorf("storage health issues for address %s: %w", address.Hex(), err)
-	}
+	//// check the storage health
+	//healthOk, err := m.checkStorageHealth(mr)
+	//if err != nil {
+	//	return nil, fmt.Errorf("storage health issues for address %s: %w", address.Hex(), err)
+	//}
 
 	// Do the storage conversion
 	changes, err := m.migrateAccountStorage(mr)
 	if err != nil {
+		if errors.Is(err, skippableAccountError) {
+			return payloads, nil
+		}
 		return nil, fmt.Errorf("failed to convert storage for address %s: %w", address.Hex(), err)
 	}
 
-	return m.validateChangesAndCreateNewRegisters(mr, changes, healthOk)
+	newRegisters, err := m.validateChangesAndCreateNewRegisters(mr, changes)
+
+	if err != nil {
+		if errors.Is(err, skippableAccountError) {
+			return payloads, nil
+		}
+		return nil, err
+	}
+
+	return newRegisters, nil
 }
 
 func (m *AtreeRegisterMigrator) migrateAccountStorage(
@@ -196,12 +211,13 @@ func (m *AtreeRegisterMigrator) convertStorageDomain(
 		if err != nil {
 			m.log.Debug().Err(err).Msgf("failed to migrate key %s", key)
 
-			m.rw.Write(migrationError{
+			m.rw.Write(migrationProblem{
 				Address: address.Hex(),
 				Key:     string(key),
 				Kind:    "migration_failure",
 				Msg:     err.Error(),
 			})
+			return skippableAccountError
 		}
 	}
 
@@ -274,7 +290,6 @@ type migratorRuntime struct {
 func (m *AtreeRegisterMigrator) validateChangesAndCreateNewRegisters(
 	mr *migratorRuntime,
 	changes map[flow.RegisterID]flow.RegisterValue,
-	storageHealthOk bool,
 ) (
 	[]*ledger.Payload,
 	error,
@@ -341,23 +356,19 @@ func (m *AtreeRegisterMigrator) validateChangesAndCreateNewRegisters(
 			continue
 		}
 
-		// something was not moved. Log it if we don't expect any storage health issues
-		if !storageHealthOk {
-			continue
-		}
-
 		m.log.Debug().
 			Str("key", id.String()).
 			Str("account", mr.Address.Hex()).
 			Str("value", fmt.Sprintf("%x", value)).
 			Msg("Key was not migrated")
-		m.rw.Write(migrationError{
+		m.rw.Write(migrationProblem{
 			Address: mr.Address.Hex(),
 			Key:     id.String(),
 			Kind:    "not_migrated",
 			Msg:     fmt.Sprintf("%x", value),
 		})
-		//hasMissingKeys = true
+
+		return nil, skippableAccountError
 	}
 
 	//if hasMissingKeys && m.sampler.Sample(zerolog.InfoLevel) {
@@ -376,69 +387,69 @@ func (m *AtreeRegisterMigrator) validateChangesAndCreateNewRegisters(
 	return newPayloads, nil
 }
 
-func (m *AtreeRegisterMigrator) checkStorageHealth(
-	mr *migratorRuntime,
-) (
-	healthOk bool,
-	err error,
-) {
-	healthOk = true
-
-	storageIDs := make([]atree.StorageID, 0, len(mr.Payloads))
-
-	for _, payload := range mr.Payloads {
-		key, err := payload.Key()
-		if err != nil {
-			return false, fmt.Errorf("failed to get payload key: %w", err)
-		}
-
-		id, err := util.KeyToRegisterID(key)
-		if err != nil {
-			return false, fmt.Errorf("failed to convert key to register ID: %w", err)
-		}
-
-		if id.IsInternalState() {
-			continue
-		}
-
-		if !strings.HasPrefix(id.Key, atree.LedgerBaseStorageSlabPrefix) {
-			continue
-		}
-
-		storageIDs = append(storageIDs, atree.StorageID{
-			Address: atree.Address([]byte(id.Owner)),
-			Index:   atree.StorageIndex([]byte(id.Key)[1:]),
-		})
-	}
-
-	// load (but don't create) storage map in Cadence storage
-	for _, domain := range domains {
-		_ = mr.Storage.GetStorageMap(mr.Address, domain, false)
-
-	}
-
-	// load slabs in atree storage
-	for _, id := range storageIDs {
-		_, _, _ = mr.Storage.Retrieve(id)
-	}
-
-	err = mr.Storage.CheckHealth()
-	if err != nil {
-		m.log.Debug().
-			Err(err).
-			Str("account", mr.Address.Hex()).
-			Msg("Account storage health issue")
-		m.rw.Write(migrationError{
-			Address: mr.Address.Hex(),
-			Key:     "",
-			Kind:    "storage_health_problem",
-			Msg:     err.Error(),
-		})
-		healthOk = false
-	}
-	return healthOk, nil
-
-}
+//
+//func (m *AtreeRegisterMigrator) checkStorageHealth(
+//	mr *migratorRuntime,
+//) (
+//	err error,
+//) {
+//
+//	storageIDs := make([]atree.StorageID, 0, len(mr.Payloads))
+//
+//	for _, payload := range mr.Payloads {
+//		key, err := payload.Key()
+//		if err != nil {
+//			return fmt.Errorf("failed to get payload key: %w", err)
+//		}
+//
+//		id, err := util.KeyToRegisterID(key)
+//		if err != nil {
+//			return fmt.Errorf("failed to convert key to register ID: %w", err)
+//		}
+//
+//		if id.IsInternalState() {
+//			continue
+//		}
+//
+//		if !strings.HasPrefix(id.Key, atree.LedgerBaseStorageSlabPrefix) {
+//			continue
+//		}
+//
+//		storageIDs = append(storageIDs, atree.StorageID{
+//			Address: atree.Address([]byte(id.Owner)),
+//			Index:   atree.StorageIndex([]byte(id.Key)[1:]),
+//		})
+//	}
+//
+//	// load (but don't create) storage map in Cadence storage
+//	for _, domain := range domains {
+//		_ = mr.Storage.GetStorageMap(mr.Address, domain, false)
+//
+//	}
+//
+//	// load slabs in atree storage
+//	for _, id := range storageIDs {
+//		_, _, _ = mr.Storage.Retrieve(id)
+//	}
+//
+//	err = mr.Storage.CheckHealth()
+//	if err != nil {
+//		m.log.Debug().
+//			Err(err).
+//			Str("account", mr.Address.Hex()).
+//			Msg("Account storage health issue")
+//		m.rw.Write(migrationProblem{
+//			Address: mr.Address.Hex(),
+//			Key:     "",
+//			Kind:    "storage_health_problem",
+//			Msg:     err.Error(),
+//		})
+//
+//		return skippableAccountError
+//	}
+//	return nil
+//
+//}
 
 // capturePanic captures panics and converts them to errors
 // this is needed for some cadence functions that panic on error
@@ -462,8 +473,8 @@ var domains = []string{
 	runtime.StorageDomainContract,
 }
 
-// migrationError is a struct for reporting errors
-type migrationError struct {
+// migrationProblem is a struct for reporting errors
+type migrationProblem struct {
 	Address string
 	Key     string
 	Kind    string

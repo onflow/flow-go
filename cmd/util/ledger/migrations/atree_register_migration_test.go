@@ -28,7 +28,7 @@ func TestAtreeRegisterMigration(t *testing.T) {
 			log,
 			"test-data/bootstrapped_v0.31",
 			migrations.MigrateAtreeRegisters(log, reporters.NewReportFileWriterFactory(dir, log), 2),
-			func(t *testing.T, oldPayloads []ledger.Payload, newPayloads []ledger.Payload) {
+			func(t *testing.T, oldPayloads []*ledger.Payload, newPayloads []*ledger.Payload) {
 
 				oldPayloadsMap := make(map[flow.RegisterID]*ledger.Payload, len(oldPayloads))
 
@@ -37,7 +37,7 @@ func TestAtreeRegisterMigration(t *testing.T) {
 					require.NoError(t, err)
 					id, err := util.KeyToRegisterID(key)
 					require.NoError(t, err)
-					oldPayloadsMap[id] = &payload
+					oldPayloadsMap[id] = payload
 				}
 
 				newPayloadsMap := make(map[flow.RegisterID]*ledger.Payload, len(newPayloads))
@@ -47,7 +47,7 @@ func TestAtreeRegisterMigration(t *testing.T) {
 					require.NoError(t, err)
 					id, err := util.KeyToRegisterID(key)
 					require.NoError(t, err)
-					newPayloadsMap[id] = &payload
+					newPayloadsMap[id] = payload
 				}
 
 				for key, payload := range newPayloadsMap {
@@ -87,8 +87,8 @@ func testWithExistingState(
 	migration ledger.Migration,
 	f func(
 		t *testing.T,
-		oldPayloads []ledger.Payload,
-		newPayloads []ledger.Payload,
+		oldPayloads []*ledger.Payload,
+		newPayloads []*ledger.Payload,
 	),
 ) func(t *testing.T) {
 	return func(t *testing.T) {
@@ -111,20 +111,20 @@ func testWithExistingState(
 			complete.DefaultPathFinderVersion)
 		require.NoError(t, err)
 
-		var oldPayloads []ledger.Payload
+		var oldPayloads []*ledger.Payload
 
 		// we sandwitch the migration between two identity migrations
 		// so we can capture the Payloads before and after the migration
 		var mig = []ledger.Migration{
-			func(payloads []ledger.Payload) ([]ledger.Payload, error) {
-				oldPayloads = make([]ledger.Payload, len(payloads))
+			func(payloads []*ledger.Payload) ([]*ledger.Payload, error) {
+				oldPayloads = make([]*ledger.Payload, len(payloads))
 				copy(oldPayloads, payloads)
 				return payloads, nil
 			},
 
 			migration,
 
-			func(newPayloads []ledger.Payload) ([]ledger.Payload, error) {
+			func(newPayloads []*ledger.Payload) ([]*ledger.Payload, error) {
 
 				f(t, oldPayloads, newPayloads)
 

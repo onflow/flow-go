@@ -17,10 +17,10 @@ import (
 
 // MigrateAccountUsage iterates through each payload, and calculate the storage usage
 // and update the accoutns status with the updated storage usage
-func MigrateAccountUsage(log zerolog.Logger, nWorker int) func([]ledger.Payload) ([]ledger.Payload, error) {
+func MigrateAccountUsage(log zerolog.Logger, nWorker int) func([]*ledger.Payload) ([]*ledger.Payload, error) {
 	return CreateAccountBasedMigration(
 		log,
-		func(allPayloads []ledger.Payload, nWorker int) (AccountMigrator, error) {
+		func(allPayloads []*ledger.Payload, nWorker int) (AccountMigrator, error) {
 			return AccountUsageMigrator{}, nil
 		},
 		nWorker,

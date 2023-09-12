@@ -1,10 +1,12 @@
 package migrations
 
 import (
+	"bytes"
 	"container/heap"
 	"context"
 	"fmt"
 	"io"
+	"sort"
 	"sync"
 	"time"
 
@@ -25,14 +27,14 @@ type AccountMigrator interface {
 }
 
 // AccountMigratorFactory creates an AccountMigrator
-type AccountMigratorFactory func(allPayloads []ledger.Payload, nWorker int) (AccountMigrator, error)
+type AccountMigratorFactory func(allPayloads []*ledger.Payload, nWorker int) (AccountMigrator, error)
 
 func CreateAccountBasedMigration(
 	log zerolog.Logger,
 	migratorFactory AccountMigratorFactory,
 	nWorker int,
-) func(payloads []ledger.Payload) ([]ledger.Payload, error) {
-	return func(payloads []ledger.Payload) ([]ledger.Payload, error) {
+) func(payloads []*ledger.Payload) ([]*ledger.Payload, error) {
+	return func(payloads []*ledger.Payload) ([]*ledger.Payload, error) {
 		return MigrateByAccount(
 			log,
 			migratorFactory,
@@ -49,31 +51,30 @@ const totalExpectedAccounts = 40_000_000
 func MigrateByAccount(
 	log zerolog.Logger,
 	migratorFactory AccountMigratorFactory,
-	allPayloads []ledger.Payload,
+	allPayloads []*ledger.Payload,
 	nWorker int,
 ) (
-	[]ledger.Payload,
+	[]*ledger.Payload,
 	error,
 ) {
-	groups := &payloadGroup{
-		NonAccountPayloads: make([]*ledger.Payload, 0),
-		Accounts:           make(map[common.Address][]*ledger.Payload, totalExpectedAccounts),
+	if len(allPayloads) == 0 {
+		return allPayloads, nil
 	}
 
-	log.Info().Msgf("start grouping for a total of %v Payloads", len(allPayloads))
+	payloads := sortablePayloads(allPayloads)
+	sort.Sort(payloads)
 
-	var err error
-	logGrouping := moduleUtil.LogProgress("grouping payload", len(allPayloads), log)
-	for i, payload := range allPayloads {
-		groups, err = payloadGrouping(groups, payload)
-		if err != nil {
-			return nil, err
+	i := 0
+	accountIndexes := make([]int, 0, totalExpectedAccounts)
+	accountIndexes = append(accountIndexes, i)
+	for {
+		j := payloads.FindLastOfTheSameKey(i)
+		if j == len(payloads)-1 {
+			break
 		}
-		logGrouping(i)
+		accountIndexes = append(accountIndexes, j+1)
+		i = j + 1
 	}
-
-	log.Info().Msgf("finish grouping for Payloads by account: %v groups in total, %v NonAccountPayloads",
-		len(groups.Accounts), len(groups.NonAccountPayloads))
 
 	migrator, err := migratorFactory(allPayloads, nWorker)
 	if err != nil {
@@ -95,25 +96,18 @@ func MigrateByAccount(
 	}()
 
 	// migrate the Payloads under accounts
-	migrated, err := MigrateGroupConcurrently(log, migrator, groups.Accounts, nWorker)
+	migrated, err := MigrateGroupConcurrently(log, migrator, payloads, accountIndexes, nWorker)
 
 	if err != nil {
 		return nil, fmt.Errorf("could not migrate group: %w", err)
 	}
 
-	log.Info().Msgf("finished migrating Payloads for %v account", len(groups.Accounts))
+	log.Info().
+		Int("account_count", len(accountIndexes)).
+		Int("payload_count", len(payloads)).
+		Msgf("finished migrating Payloads")
 
-	// add the non accounts which don't need to be migrated
-	migrated = append(migrated, groups.NonAccountPayloads...)
-
-	final := make([]ledger.Payload, 0, len(migrated))
-	for _, p := range migrated {
-		final = append(final, *p)
-	}
-
-	log.Info().Msgf("finished migrating all account based Payloads, total migrated Payloads: %v", len(migrated))
-
-	return final, nil
+	return migrated, nil
 }
 
 // MigrateGroupConcurrently migrate the Payloads in the given payloadsByAccount map which
@@ -122,21 +116,22 @@ func MigrateByAccount(
 func MigrateGroupConcurrently(
 	log zerolog.Logger,
 	migrator AccountMigrator,
-	payloadsByAccount map[common.Address][]*ledger.Payload,
+	payloads sortablePayloads,
+	accountIndexes []int,
 	nWorker int,
 ) ([]*ledger.Payload, error) {
 
 	const logTopNDurations = 20
 
 	ctx := context.Background()
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
+	ctx, cancel := context.WithCancelCause(ctx)
+	defer cancel(nil)
 
-	jobs := make(chan jobMigrateAccountGroup, len(payloadsByAccount))
+	jobs := make(chan jobMigrateAccountGroup, len(accountIndexes))
 
 	wg := sync.WaitGroup{}
 	wg.Add(nWorker)
-	resultCh := make(chan *migrationResult, len(payloadsByAccount))
+	resultCh := make(chan *migrationResult, len(accountIndexes))
 	for i := 0; i < int(nWorker); i++ {
 		go func() {
 
@@ -168,32 +163,51 @@ func MigrateGroupConcurrently(
 	}
 
 	go func() {
-		for address, payloads := range payloadsByAccount {
+		for i, accountStartIdex := range accountIndexes {
+			accountEndIndex := 0
+			if i == len(accountIndexes)-1 {
+				accountEndIndex = len(payloads)
+			} else {
+				accountEndIndex = accountIndexes[i+1]
+			}
+
+			address, err := payloadToAddress(payloads[accountStartIdex])
+			if err != nil {
+				cancel(fmt.Errorf("could not get key for payload: %w", err))
+				return
+			}
+
+			job := jobMigrateAccountGroup{
+				Address:  address,
+				Payloads: payloads[accountStartIdex:accountEndIndex],
+			}
+
 			select {
 			case <-ctx.Done():
 				return
-			case jobs <- jobMigrateAccountGroup{
-				Address:  address,
-				Payloads: payloads,
-			}:
+			case jobs <- job:
 			}
 		}
 	}()
 
 	// read job results
-	logAccount := moduleUtil.LogProgress("processing account group", len(payloadsByAccount), log)
+	logAccount := moduleUtil.LogProgress("processing account group", len(accountIndexes), log)
 
 	migrated := make([]*ledger.Payload, 0)
 
 	durations := &migrationDurations{}
-	var err error
-	for i := 0; i < len(payloadsByAccount); i++ {
+	for i := 0; i < len(accountIndexes); i++ {
+		select {
+		case <-ctx.Done():
+			break
+		default:
+		}
+
 		result := <-resultCh
-		err = result.Err
-		if err != nil {
-			cancel()
+		if result.Err != nil {
+			cancel(result.Err)
 			log.Error().
-				Err(err).
+				Err(result.Err).
 				Msg("error migrating account")
 			break
 		}
@@ -207,7 +221,7 @@ func MigrateGroupConcurrently(
 
 		accountMigrated := result.Migrated
 		migrated = append(migrated, accountMigrated...)
-		logAccount(i)
+		logAccount(1)
 	}
 	close(jobs)
 
@@ -219,8 +233,8 @@ func MigrateGroupConcurrently(
 		Array("top_longest_migrations", durations.Array()).
 		Msgf("Top longest migrations")
 
-	if err != nil {
-		return nil, fmt.Errorf("fail to migrate payload: %w", err)
+	if ctx.Err() != nil {
+		return nil, fmt.Errorf("fail to migrate payload: %w", ctx.Err())
 	}
 
 	return migrated, nil
@@ -238,66 +252,32 @@ type migrationResult struct {
 	Err      error
 }
 
-// payloadToAccount takes a payload and return:
+// payloadToAddress takes a payload and return:
 // - (address, true, nil) if the payload is for an account, the account address is returned
 // - ("", false, nil) if the payload is not for an account
 // - ("", false, err) if running into any exception
-func payloadToAccount(p *ledger.Payload) (common.Address, bool, error) {
+// The zero address is used for global Payloads and is not an account
+func payloadToAddress(p *ledger.Payload) (common.Address, error) {
 	k, err := p.Key()
 	if err != nil {
-		return common.Address{}, false, fmt.Errorf("could not find key for payload: %w", err)
+		return common.ZeroAddress, fmt.Errorf("could not find key for payload: %w", err)
 	}
 
 	id, err := util.KeyToRegisterID(k)
 	if err != nil {
-		return common.Address{}, false, fmt.Errorf("error converting key to register ID")
+		return common.ZeroAddress, fmt.Errorf("error converting key to register ID")
 	}
 
 	if len([]byte(id.Owner)) != flow.AddressLength {
-		return common.Address{}, false, nil
+		return common.ZeroAddress, nil
 	}
 
 	address, err := common.BytesToAddress([]byte(id.Owner))
 	if err != nil {
-		return common.Address{}, false, fmt.Errorf("invalid account address: %w", err)
+		return common.ZeroAddress, fmt.Errorf("invalid account address: %w", err)
 	}
 
-	// The zero address is used for global Payloads and is not an account
-	if address == common.ZeroAddress {
-		return address, false, nil
-	}
-
-	return address, true, nil
-}
-
-// payloadGroup groups Payloads by account.
-// For global Payloads, it's stored under NonAccountPayloads field
-type payloadGroup struct {
-	NonAccountPayloads []*ledger.Payload
-	Accounts           map[common.Address][]*ledger.Payload
-}
-
-// payloadGrouping is a reducer function that adds the given payload to the corresponding
-// group under its account
-func payloadGrouping(groups *payloadGroup, payload ledger.Payload) (*payloadGroup, error) {
-	address, isAccount, err := payloadToAccount(&payload)
-	if err != nil {
-		return nil, err
-	}
-
-	if isAccount {
-		_, exist := groups.Accounts[address]
-		if !exist {
-			// preallocate the slice to avoid reallocation
-			// most accounts should have the 4 domains + a few special registers
-			groups.Accounts[address] = make([]*ledger.Payload, 0, 10)
-		}
-		groups.Accounts[address] = append(groups.Accounts[address], &payload)
-	} else {
-		groups.NonAccountPayloads = append(groups.NonAccountPayloads, &payload)
-	}
-
-	return groups, nil
+	return address, nil
 }
 
 type migrationDuration struct {
@@ -332,4 +312,56 @@ func (h *migrationDurations) Array() zerolog.LogArrayMarshaler {
 		array = array.Str(fmt.Sprintf("%s: %s", result.Address.Hex(), result.Duration.String()))
 	}
 	return array
+}
+
+// EncodedKeyAddressPrefixLength is the length of the address prefix in the encoded key
+// 2 for uint16 of number of key parts
+// 4 for uint32 of the length of the first key part
+// 8 for the address which is the actual length of the first key part
+const EncodedKeyAddressPrefixLength = 2 + 4 + 8
+
+type sortablePayloads []*ledger.Payload
+
+func (s sortablePayloads) Len() int {
+	return len(s)
+}
+
+func (s sortablePayloads) Less(i, j int) bool {
+	return s.Compare(i, j) < 0
+}
+
+func (s sortablePayloads) Compare(i, j int) int {
+	return bytes.Compare(
+		s[i].EncodedKey()[:EncodedKeyAddressPrefixLength],
+		s[j].EncodedKey()[:EncodedKeyAddressPrefixLength],
+	)
+}
+
+func (s sortablePayloads) Swap(i, j int) {
+	s[i], s[j] = s[j], s[i]
+}
+
+func (s sortablePayloads) FindLastOfTheSameKey(i int) int {
+	low := i
+	step := 1
+	for low+step < len(s) && s.Compare(low+step, i) == 0 {
+		low += step
+		step *= 2
+	}
+
+	high := low + step
+	if high > len(s) {
+		high = len(s)
+	}
+
+	for low < high {
+		mid := (low + high) / 2
+		if s.Compare(mid, i) == 0 {
+			low = mid + 1
+		} else {
+			high = mid
+		}
+	}
+
+	return low - 1
 }

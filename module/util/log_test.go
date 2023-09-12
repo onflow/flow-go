@@ -15,7 +15,7 @@ func TestLogProgress40(t *testing.T) {
 	total := 40
 	logger := LogProgress("test", total, lg)
 	for i := 0; i < total; i++ {
-		logger(i)
+		logger(1)
 	}
 
 	expectedLogs := []string{
@@ -43,7 +43,7 @@ func TestLogProgress1000(t *testing.T) {
 		lg := zerolog.New(buf)
 		logger := LogProgress("test", total, lg)
 		for i := 0; i < total; i++ {
-			logger(i)
+			logger(1)
 		}
 
 		expectedLogs := []string{

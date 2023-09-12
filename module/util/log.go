@@ -2,6 +2,7 @@ package util
 
 import (
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/rs/zerolog"
@@ -11,7 +12,7 @@ import (
 // it prints the progress from 0% to 100% to indicate the index from 0 to (total - 1) has been
 // processed.
 // useful to report the progress of processing the index from 0 to (total - 1)
-func LogProgress(msg string, total int, log zerolog.Logger) func(currentIndex int) {
+func LogProgress(msg string, total int, log zerolog.Logger) func(add int) {
 	nth := uint32(total / 10) // sample every 10% by default
 	if nth == 0 {
 		nth = 1
@@ -20,23 +21,28 @@ func LogProgress(msg string, total int, log zerolog.Logger) func(currentIndex in
 	sampler := log.Sample(newProgressLogsSampler(nth, 60*time.Second))
 
 	start := time.Now()
-	return func(currentIndex int) {
+	currentIndex := uint64(0)
+	return func(add int) {
+		current := atomic.AddUint64(&currentIndex, uint64(add))
+
 		percentage := float64(100)
 		if total > 0 {
-			percentage = (float64(currentIndex+1) / float64(total)) * 100. // currentIndex+1 assuming zero based indexing
+			percentage = (float64(current) / float64(total)) * 100. // currentIndex+1 assuming zero based indexing
 		}
+		elapsed := time.Since(start)
+		elapsedString := elapsed.Round(1 * time.Second).String()
 
 		etaString := "unknown"
 		if percentage > 0 {
-			eta := time.Duration(float64(time.Since(start)) / percentage * (100 - percentage))
-			etaString = eta.String()
+			eta := time.Duration(float64(elapsed) / percentage * (100 - percentage))
+			etaString = eta.Round(1 * time.Second).String()
 
 		}
 
-		if currentIndex+1 != total {
-			sampler.Info().Msgf("%s progress %d/%d (%.1f%%) eta %s", msg, currentIndex+1, total, percentage, etaString)
+		if current != uint64(total) {
+			sampler.Info().Msgf("%s progress %d/%d (%.1f%%) elapsed: %s, eta %s", msg, current, total, percentage, elapsedString, etaString)
 		} else {
-			log.Info().Msgf("%s progress %d/%d (%.1f%%) total time %s", msg, currentIndex+1, total, percentage, time.Since(start))
+			log.Info().Msgf("%s progress %d/%d (%.1f%%) total time %s", msg, current, total, percentage, elapsedString)
 		}
 	}
 }
