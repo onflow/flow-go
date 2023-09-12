@@ -9,10 +9,10 @@ import (
 	"testing"
 
 	"github.com/cockroachdb/pebble"
+	"github.com/onflow/flow-go/storage/pebble/registers"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/storage/pebble/registers/config"
 )
 
 // Test_PayloadStorage_RoundTrip tests the round trip of a payload storage.
@@ -21,7 +21,7 @@ func Test_PayloadStorage_RoundTrip(t *testing.T) {
 
 	cache := pebble.NewCache(1 << 20)
 	defer cache.Unref()
-	opts := config.DefaultPebbleOptions(cache, config.NewMVCCComparer())
+	opts := DefaultPebbleOptions(cache, registers.NewMVCCComparer())
 
 	dbpath := path.Join(t.TempDir(), "roundtrip.db")
 	db, err := pebble.Open(dbpath, opts)
@@ -40,14 +40,17 @@ func Test_PayloadStorage_RoundTrip(t *testing.T) {
 	err = s.Store(minHeight, entries)
 	require.NoError(t, err)
 
+	// lookup with exact height returns the correct value
 	value1, err := s.Get(minHeight, key1)
 	require.NoError(t, err)
 	require.Equal(t, expectedValue1, value1)
 
+	// lookup with a higher height returns the correct value
 	value1, err = s.Get(minHeight+1, key1)
 	require.NoError(t, err)
 	require.Equal(t, expectedValue1, value1)
 
+	// lookup with a lower height returns no results
 	value1, err = s.Get(minHeight-1, key1)
 	require.Nil(t, err)
 	require.Empty(t, value1)
@@ -61,7 +64,7 @@ func Test_PayloadStorage_Versioning(t *testing.T) {
 
 	cache := pebble.NewCache(1 << 20)
 	defer cache.Unref()
-	opts := config.DefaultPebbleOptions(cache, config.NewMVCCComparer())
+	opts := DefaultPebbleOptions(cache, registers.NewMVCCComparer())
 
 	dbpath := path.Join(t.TempDir(), "versioning.db")
 	db, err := pebble.Open(dbpath, opts)
@@ -126,7 +129,7 @@ func Test_PayloadStorage_Versioning(t *testing.T) {
 func Benchmark_PayloadStorage(b *testing.B) {
 	cache := pebble.NewCache(32 << 20)
 	defer cache.Unref()
-	opts := config.DefaultPebbleOptions(cache, config.NewMVCCComparer())
+	opts := DefaultPebbleOptions(cache, registers.NewMVCCComparer())
 
 	dbpath := path.Join(b.TempDir(), "benchmark1.db")
 	db, err := pebble.Open(dbpath, opts)

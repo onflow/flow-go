@@ -1,4 +1,4 @@
-package config
+package pebble
 
 import (
 	"github.com/cockroachdb/pebble"

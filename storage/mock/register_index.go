@@ -86,20 +86,6 @@ func (_m *RegisterIndex) LatestHeight() (uint64, error) {
 	return r0, r1
 }
 
-// SetLatestHeight provides a mock function with given fields: height
-func (_m *RegisterIndex) SetLatestHeight(height uint64) error {
-	ret := _m.Called(height)
-
-	var r0 error
-	if rf, ok := ret.Get(0).(func(uint64) error); ok {
-		r0 = rf(height)
-	} else {
-		r0 = ret.Error(0)
-	}
-
-	return r0
-}
-
 // Store provides a mock function with given fields: entries, height
 func (_m *RegisterIndex) Store(entries flow.RegisterEntries, height uint64) error {
 	ret := _m.Called(entries, height)

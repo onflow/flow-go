@@ -91,9 +91,3 @@ func (s *Registers) LatestHeight() (uint64, error) {
 func (s *Registers) FirstHeight() (uint64, error) {
 	return 0, nil
 }
-
-// SetLatestHeight updates the LatestHeight if height to LatestHeight + 1
-// idempotent if the value of height is between FirstHeight and LatestHeight
-func (s *Registers) SetLatestHeight(height uint64) error {
-	return nil
-}

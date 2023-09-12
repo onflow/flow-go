@@ -6,7 +6,7 @@ import (
 	"fmt"
 
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/storage/pebble/registers/config"
+	"github.com/onflow/flow-go/storage/pebble/registers"
 )
 
 // lookupKey is the encoded format of the storage key for looking up register value
@@ -18,7 +18,7 @@ type lookupKey struct {
 func newLookupKey(height uint64, reg flow.RegisterID) *lookupKey {
 	// Todo: Add prefixes for extensibility
 	key := lookupKey{
-		encoded: make([]byte, 0, len(reg.Owner)+1+len(reg.Key)+1+config.HeightSuffixLen),
+		encoded: make([]byte, 0, len(reg.Owner)+1+len(reg.Key)+1+registers.HeightSuffixLen),
 	}
 
 	// The lookup key used to find most recent value for a register.
@@ -32,7 +32,14 @@ func newLookupKey(height uint64, reg flow.RegisterID) *lookupKey {
 	key.encoded = append(key.encoded, '/')
 
 	// Encode the height getting it to 1s compliment (all bits flipped) and big-endian byte order.
-	// (Prefix iteration in pebble does not support reverse iteration.)
+	//
+	// Registers are a sparse dataset stored with a single entry per update. To find the value at a particular
+	// height, we need to do a scan across the entries to find the highest height that is less than or equal
+	// to the target height.
+	//
+	// Pebble does not support reverse iteration, so we use the height's one's complement to effectively
+	// reverse sort on the height. This allows us to use a bitwise forward scan for the next most recent
+	// entry.
 	onesCompliment := ^height
 	key.encoded = binary.BigEndian.AppendUint64(key.encoded, onesCompliment)
 
@@ -41,7 +48,7 @@ func newLookupKey(height uint64, reg flow.RegisterID) *lookupKey {
 
 // lookupKeyToRegisterID takes a lookup key and decode it into height and RegisterID
 func lookupKeyToRegisterID(lookupKey []byte) (uint64, flow.RegisterID, error) {
-	const minLookupKeyLen = 2 + config.HeightSuffixLen
+	const minLookupKeyLen = 2 + registers.HeightSuffixLen
 	if len(lookupKey) < minLookupKeyLen {
 		return 0, flow.RegisterID{}, fmt.Errorf("invalid lookup key format: expected >= %d bytes, got %d bytes",
 			minLookupKeyLen, len(lookupKey))
@@ -61,10 +68,10 @@ func lookupKeyToRegisterID(lookupKey []byte) (uint64, flow.RegisterID, error) {
 		return 0, flow.RegisterID{}, fmt.Errorf("invalid lookup key format: expected 2 separators, got 1 separator")
 	}
 	encodedHeightPos := lastSlashPos + 1
-	if len(lookupKey)-encodedHeightPos != config.HeightSuffixLen {
+	if len(lookupKey)-encodedHeightPos != registers.HeightSuffixLen {
 		return 0, flow.RegisterID{},
 			fmt.Errorf("invalid lookup key format: expected %d bytes of encoded height, got %d bytes",
-				config.HeightSuffixLen, len(lookupKey)-encodedHeightPos)
+				registers.HeightSuffixLen, len(lookupKey)-encodedHeightPos)
 	}
 
 	// Decode height.
