@@ -24,6 +24,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/engine/execution"
+	"github.com/onflow/flow-go/engine/execution/computation/committer"
 	"github.com/onflow/flow-go/engine/execution/computation/computer"
 	computermock "github.com/onflow/flow-go/engine/execution/computation/computer/mock"
 	"github.com/onflow/flow-go/engine/execution/storehouse"
@@ -700,17 +701,13 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 				trackerStorage,
 			)
 
-			committer := &fakeCommitter{
-				callCount: 0,
-			}
-
 			exe, err := computer.NewBlockComputer(
 				vm,
 				execCtx,
 				metrics.NewNoopCollector(),
 				trace.NewNoopTracer(),
 				zerolog.Nop(),
-				committer,
+				committer.NewNoopViewCommitter(),
 				me,
 				prov,
 				nil,
@@ -815,16 +812,13 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			trackerStorage,
 		)
 
-		committer := &fakeCommitter{
-			callCount: 0,
-		}
 		exe, err := computer.NewBlockComputer(
 			vm,
 			execCtx,
 			metrics.NewNoopCollector(),
 			trace.NewNoopTracer(),
 			zerolog.Nop(),
-			committer,
+			committer.NewNoopViewCommitter(),
 			me,
 			prov,
 			nil,
