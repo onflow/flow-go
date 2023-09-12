@@ -18,10 +18,9 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-// TestLoad_Process_SyncRequest_HigherThanReceiver_OutsideTolerance_AlwaysReportSpam tests that a sync request that's higher
-// than the receiver's height doesn't trigger a response, even if outside tolerance and generates ALSP
-// spamming misbehavior report (simulating the unlikely probability).
-// This load test ensures that a misbehavior report is generated every time when the probability factor is set to 1.0.
+// TestLoad_Process_SyncRequest_HigherThanReceiver_OutsideTolerance_AlwaysReportSpam is a load test that ensures that
+// a misbehavior report is generated every time when the probability factor is set to 1.0.
+// It checks that a sync request that's higher than the receiver's height doesn't trigger a response, even if outside tolerance.
 func (ss *SyncSuite) TestLoad_Process_SyncRequest_HigherThanReceiver_OutsideTolerance_AlwaysReportSpam() {
 	ctx, cancel := irrecoverable.NewMockSignalerContextWithCancel(ss.T(), context.Background())
 	ss.e.Start(ctx)
@@ -72,10 +71,10 @@ func (ss *SyncSuite) TestLoad_Process_SyncRequest_HigherThanReceiver_OutsideTole
 	assert.Equal(ss.T(), misbehaviorsCounter, load) // should generate misbehavior report every time
 }
 
-// TestLoad_Process_SyncRequest_HigherThanReceiver_OutsideTolerance_SometimesReportSpam load tests that a sync request that's higher
-// than the receiver's height doesn't trigger a response, even if outside tolerance. It checks that an ALSP
-// spam misbehavior report was generated and that the number of misbehavior reports is within a reasonable range.
-// This load test ensures that a misbehavior report is generated an appropriate range of times when the probability factor is set to different values.
+// TestLoad_Process_SyncRequest_HigherThanReceiver_OutsideTolerance_SometimesReportSpam is a load test that ensures that a
+// misbehavior report is generated an appropriate range of times when the probability factor is set to different values.
+// It checks that a sync request that's higher than the receiver's height doesn't trigger a response, even if
+// outside tolerance.
 func (ss *SyncSuite) TestLoad_Process_SyncRequest_HigherThanReceiver_OutsideTolerance_SometimesReportSpam() {
 	ctx, cancel := irrecoverable.NewMockSignalerContextWithCancel(ss.T(), context.Background())
 	ss.e.Start(ctx)
@@ -164,6 +163,8 @@ func (ss *SyncSuite) TestLoad_Process_SyncRequest_HigherThanReceiver_OutsideTole
 	}
 }
 
+// TestLoad_Process_RangeRequest_SometimesReportSpam is a load test that ensures that a misbehavior report is generated
+// an appropriate range of times when the base probability factor and range are set to different values.
 func (ss *SyncSuite) TestLoad_Process_RangeRequest_SometimesReportSpam() {
 	ctx, cancel := irrecoverable.NewMockSignalerContextWithCancel(ss.T(), context.Background())
 	ss.e.Start(ctx)
