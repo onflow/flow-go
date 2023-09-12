@@ -41,6 +41,7 @@ import (
 	"github.com/onflow/flow-go/fvm/storage/state"
 	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/ledger"
+	"github.com/onflow/flow-go/ledger/common/testutils"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/epochs"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
@@ -336,8 +337,13 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			Return(noOpExecutor{}).
 			Once() // just system chunk
 
+		newCommit := unittest.StateCommitmentFixture()
+		trieUpdate := testutils.TrieUpdateFixture(1, 10, 20)
+		snapshot := storehouse.NewExecutingBlockSnapshot(snapshot.EmptyStorageSnapshot{}, flow.StateCommitment(trieUpdate.RootHash))
+		newSnapshot, err := snapshot.Extend(newCommit, trieUpdate)
+		require.NoError(t, err)
 		committer.On("CommitView", mock.Anything, mock.Anything).
-			Return(nil, nil, nil, nil).
+			Return(newCommit, nil, trieUpdate, newSnapshot, nil).
 			Once() // just system chunk
 
 		result, err := exe.ExecuteBlock(
@@ -430,7 +436,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		block := generateBlock(0, 0, rag)
 
 		comm.On("CommitView", mock.Anything, mock.Anything).
-			Return(nil, nil, nil, nil).
+			Return(flow.DummyStateCommitment, nil, nil, nil, nil).
 			Once() // just system chunk
 
 		result, err := exe.ExecuteBlock(
@@ -497,7 +503,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		derivedBlockData := derived.NewEmptyDerivedBlockData(0)
 
 		committer.On("CommitView", mock.Anything, mock.Anything).
-			Return(nil, nil, nil, nil).
+			Return(flow.DummyStateCommitment, nil, nil, nil, nil).
 			Times(collectionCount + 1)
 
 		result, err := exe.ExecuteBlock(
@@ -980,7 +986,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		block := generateBlock(collectionCount, transactionsPerCollection, rag)
 
 		committer.On("CommitView", mock.Anything, mock.Anything).
-			Return(nil, nil, nil, nil).
+			Return(flow.DummyStateCommitment, nil, nil, nil, nil).
 			Times(collectionCount + 1)
 
 		_, err = exe.ExecuteBlock(
