@@ -28,6 +28,7 @@ import (
 	recovery "github.com/onflow/flow-go/consensus/recovery/protocol"
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/engine/access/apiproxy"
+	"github.com/onflow/flow-go/engine/access/rest"
 	restapiproxy "github.com/onflow/flow-go/engine/access/rest/apiproxy"
 	"github.com/onflow/flow-go/engine/access/rest/routes"
 	"github.com/onflow/flow-go/engine/access/rpc"
@@ -51,21 +52,22 @@ import (
 	alspmgr "github.com/onflow/flow-go/network/alsp/manager"
 	netcache "github.com/onflow/flow-go/network/cache"
 	"github.com/onflow/flow-go/network/channels"
-	cborcodec "github.com/onflow/flow-go/network/codec/cbor"
 	"github.com/onflow/flow-go/network/converter"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/cache"
 	"github.com/onflow/flow-go/network/p2p/conduit"
 	p2pdht "github.com/onflow/flow-go/network/p2p/dht"
 	"github.com/onflow/flow-go/network/p2p/keyutils"
-	"github.com/onflow/flow-go/network/p2p/middleware"
 	"github.com/onflow/flow-go/network/p2p/p2pbuilder"
 	p2pconfig "github.com/onflow/flow-go/network/p2p/p2pbuilder/config"
+	"github.com/onflow/flow-go/network/p2p/p2plogging"
+	"github.com/onflow/flow-go/network/p2p/p2pnet"
 	"github.com/onflow/flow-go/network/p2p/subscription"
 	"github.com/onflow/flow-go/network/p2p/tracer"
 	"github.com/onflow/flow-go/network/p2p/translator"
 	"github.com/onflow/flow-go/network/p2p/unicast/protocols"
 	"github.com/onflow/flow-go/network/p2p/utils"
+	"github.com/onflow/flow-go/network/slashing"
 	"github.com/onflow/flow-go/network/validator"
 	stateprotocol "github.com/onflow/flow-go/state/protocol"
 	badgerState "github.com/onflow/flow-go/state/protocol/badger"
@@ -116,7 +118,6 @@ func DefaultObserverServiceConfig() *ObserverServiceConfig {
 			UnsecureGRPCListenAddr: "0.0.0.0:9000",
 			SecureGRPCListenAddr:   "0.0.0.0:9001",
 			HTTPListenAddr:         "0.0.0.0:8000",
-			RESTListenAddr:         "",
 			CollectionAddr:         "",
 			HistoricalAccessAddrs:  "",
 			BackendConfig: backend.Config{
@@ -127,6 +128,12 @@ func DefaultObserverServiceConfig() *ObserverServiceConfig {
 				PreferredExecutionNodeIDs: nil,
 				FixedExecutionNodeIDs:     nil,
 				ArchiveAddressList:        nil,
+			},
+			RestConfig: rest.Config{
+				ListenAddress: "",
+				WriteTimeout:  rest.DefaultWriteTimeout,
+				ReadTimeout:   rest.DefaultReadTimeout,
+				IdleTimeout:   rest.DefaultIdleTimeout,
 			},
 			MaxMsgSize: grpcutils.DefaultMaxMsgSize,
 		},
@@ -364,7 +371,7 @@ func (builder *ObserverServiceBuilder) buildFollowerEngine() *ObserverServiceBui
 
 		builder.FollowerEng, err = follower.NewComplianceLayer(
 			node.Logger,
-			node.Network,
+			node.EngineRegistry,
 			node.Me,
 			node.Metrics.Engine,
 			node.Storage.Headers,
@@ -389,13 +396,14 @@ func (builder *ObserverServiceBuilder) buildSyncEngine() *ObserverServiceBuilder
 		sync, err := synceng.New(
 			node.Logger,
 			node.Metrics.Engine,
-			node.Network,
+			node.EngineRegistry,
 			node.Me,
 			node.State,
 			node.Storage.Blocks,
 			builder.FollowerEng,
 			builder.SyncCore,
 			builder.SyncEngineParticipantsProviderFactory(),
+			synceng.NewSpamDetectionConfig(),
 		)
 		if err != nil {
 			return nil, fmt.Errorf("could not create synchronization engine: %w", err)
@@ -457,7 +465,10 @@ func (builder *ObserverServiceBuilder) extraFlags() {
 		flags.StringVarP(&builder.rpcConf.UnsecureGRPCListenAddr, "rpc-addr", "r", defaultConfig.rpcConf.UnsecureGRPCListenAddr, "the address the unsecured gRPC server listens on")
 		flags.StringVar(&builder.rpcConf.SecureGRPCListenAddr, "secure-rpc-addr", defaultConfig.rpcConf.SecureGRPCListenAddr, "the address the secure gRPC server listens on")
 		flags.StringVarP(&builder.rpcConf.HTTPListenAddr, "http-addr", "h", defaultConfig.rpcConf.HTTPListenAddr, "the address the http proxy server listens on")
-		flags.StringVar(&builder.rpcConf.RESTListenAddr, "rest-addr", defaultConfig.rpcConf.RESTListenAddr, "the address the REST server listens on (if empty the REST server will not be started)")
+		flags.StringVar(&builder.rpcConf.RestConfig.ListenAddress, "rest-addr", defaultConfig.rpcConf.RestConfig.ListenAddress, "the address the REST server listens on (if empty the REST server will not be started)")
+		flags.DurationVar(&builder.rpcConf.RestConfig.WriteTimeout, "rest-write-timeout", defaultConfig.rpcConf.RestConfig.WriteTimeout, "timeout to use when writing REST response")
+		flags.DurationVar(&builder.rpcConf.RestConfig.ReadTimeout, "rest-read-timeout", defaultConfig.rpcConf.RestConfig.ReadTimeout, "timeout to use when reading REST request headers")
+		flags.DurationVar(&builder.rpcConf.RestConfig.IdleTimeout, "rest-idle-timeout", defaultConfig.rpcConf.RestConfig.IdleTimeout, "idle timeout for REST connections")
 		flags.UintVar(&builder.rpcConf.MaxMsgSize, "rpc-max-message-size", defaultConfig.rpcConf.MaxMsgSize, "the maximum message size in bytes for messages sent or received over grpc")
 		flags.UintVar(&builder.rpcConf.BackendConfig.ConnectionPoolSize, "connection-pool-size", defaultConfig.rpcConf.BackendConfig.ConnectionPoolSize, "maximum number of connections allowed in the connection pool, size of 0 disables the connection pooling, and anything less than the default size will be overridden to use the default size")
 		flags.UintVar(&builder.rpcConf.BackendConfig.MaxHeightRange, "rpc-max-height-range", defaultConfig.rpcConf.BackendConfig.MaxHeightRange, "maximum size for height range requests")
@@ -471,45 +482,6 @@ func (builder *ObserverServiceBuilder) extraFlags() {
 		flags.StringSliceVar(&builder.upstreamNodePublicKeys, "upstream-node-public-keys", defaultConfig.upstreamNodePublicKeys, "the networking public key of the upstream access node (in the same order as the upstream node addresses) e.g. \"d57a5e9c5.....\",\"44ded42d....\"")
 		flags.BoolVar(&builder.rpcMetricsEnabled, "rpc-metrics-enabled", defaultConfig.rpcMetricsEnabled, "whether to enable the rpc metrics")
 	})
-}
-
-// initNetwork creates the network.Network implementation with the given metrics, middleware, initial list of network
-// participants and topology used to choose peers from the list of participants. The list of participants can later be
-// updated by calling network.SetIDs.
-func (builder *ObserverServiceBuilder) initNetwork(nodeID module.Local,
-	networkMetrics module.NetworkCoreMetrics,
-	middleware network.Middleware,
-	topology network.Topology,
-	receiveCache *netcache.ReceiveCache,
-) (*p2p.Network, error) {
-	net, err := p2p.NewNetwork(&p2p.NetworkConfig{
-		Logger:              builder.Logger,
-		Codec:               cborcodec.NewCodec(),
-		Me:                  nodeID,
-		MiddlewareFactory:   func() (network.Middleware, error) { return builder.Middleware, nil },
-		Topology:            topology,
-		SubscriptionManager: subscription.NewChannelSubscriptionManager(middleware),
-		Metrics:             networkMetrics,
-		IdentityProvider:    builder.IdentityProvider,
-		ReceiveCache:        receiveCache,
-		ConduitFactory:      conduit.NewDefaultConduitFactory(),
-		SporkId:             builder.SporkID,
-		AlspCfg: &alspmgr.MisbehaviorReportManagerConfig{
-			Logger:                  builder.Logger,
-			SpamRecordCacheSize:     builder.FlowConfig.NetworkConfig.AlspConfig.SpamRecordCacheSize,
-			SpamReportQueueSize:     builder.FlowConfig.NetworkConfig.AlspConfig.SpamReportQueueSize,
-			DisablePenalty:          builder.FlowConfig.NetworkConfig.AlspConfig.DisablePenalty,
-			HeartBeatInterval:       builder.FlowConfig.NetworkConfig.AlspConfig.HearBeatInterval,
-			AlspMetrics:             builder.Metrics.Network,
-			HeroCacheMetricsFactory: builder.HeroCacheMetricsFactory(),
-			NetworkType:             network.PublicNetwork,
-		},
-	})
-	if err != nil {
-		return nil, fmt.Errorf("could not initialize network: %w", err)
-	}
-
-	return net, nil
 }
 
 func publicNetworkMsgValidators(log zerolog.Logger, idProvider module.IdentityProvider, selfID flow.Identifier) []network.MessageValidator {
@@ -597,7 +569,7 @@ func (builder *ObserverServiceBuilder) InitIDProviders() {
 		// The following wrapper allows to black-list byzantine nodes via an admin command:
 		// the wrapper overrides the 'Ejected' flag of disallow-listed nodes to true
 		builder.IdentityProvider, err = cache.NewNodeDisallowListWrapper(idCache, node.DB, func() network.DisallowListNotificationConsumer {
-			return builder.Middleware
+			return builder.NetworkUnderlay
 		})
 		if err != nil {
 			return fmt.Errorf("could not initialize NodeBlockListWrapper: %w", err)
@@ -617,7 +589,7 @@ func (builder *ObserverServiceBuilder) InitIDProviders() {
 
 					if flowID, err := builder.IDTranslator.GetFlowID(pid); err != nil {
 						// TODO: this is an instance of "log error and continue with best effort" anti-pattern
-						builder.Logger.Err(err).Str("peer", pid.String()).Msg("failed to translate to Flow ID")
+						builder.Logger.Err(err).Str("peer", p2plogging.PeerId(pid)).Msg("failed to translate to Flow ID")
 					} else {
 						result = append(result, flowID)
 					}
@@ -747,7 +719,8 @@ func (builder *ObserverServiceBuilder) initPublicLibp2pNode(networkKey crypto.Pr
 		&p2p.DisallowListCacheConfig{
 			MaxSize: builder.FlowConfig.NetworkConfig.DisallowListNotificationCacheSize,
 			Metrics: metrics.DisallowListCacheMetricsFactory(builder.HeroCacheMetricsFactory(), network.PublicNetwork),
-		}).
+		},
+		meshTracer).
 		SetSubscriptionFilter(
 			subscription.NewRoleBasedFilter(
 				subscription.UnstakedRole, builder.IdentityProvider,
@@ -828,24 +801,47 @@ func (builder *ObserverServiceBuilder) enqueuePublicNetworkInit() {
 				return nil, fmt.Errorf("could not register networking receive cache metric: %w", err)
 			}
 
-			msgValidators := publicNetworkMsgValidators(node.Logger, node.IdentityProvider, node.NodeID)
-
-			builder.initMiddleware(node.NodeID, publicLibp2pNode, msgValidators...)
-
-			// topology is nil since it is automatically managed by libp2p
-			net, err := builder.initNetwork(builder.Me, builder.Metrics.Network, builder.Middleware, nil, receiveCache)
+			net, err := p2pnet.NewNetwork(&p2pnet.NetworkConfig{
+				Logger:                builder.Logger.With().Str("component", "public-network").Logger(),
+				Codec:                 builder.CodecFactory(),
+				Me:                    builder.Me,
+				Topology:              nil, // topology is nil since it is managed by libp2p; //TODO: can we set empty topology?
+				Libp2pNode:            publicLibp2pNode,
+				Metrics:               builder.Metrics.Network,
+				BitSwapMetrics:        builder.Metrics.Bitswap,
+				IdentityProvider:      builder.IdentityProvider,
+				ReceiveCache:          receiveCache,
+				ConduitFactory:        conduit.NewDefaultConduitFactory(),
+				SporkId:               builder.SporkID,
+				UnicastMessageTimeout: p2pnet.DefaultUnicastTimeout,
+				IdentityTranslator:    builder.IDTranslator,
+				AlspCfg: &alspmgr.MisbehaviorReportManagerConfig{
+					Logger:                  builder.Logger,
+					SpamRecordCacheSize:     builder.FlowConfig.NetworkConfig.AlspConfig.SpamRecordCacheSize,
+					SpamReportQueueSize:     builder.FlowConfig.NetworkConfig.AlspConfig.SpamReportQueueSize,
+					DisablePenalty:          builder.FlowConfig.NetworkConfig.AlspConfig.DisablePenalty,
+					HeartBeatInterval:       builder.FlowConfig.NetworkConfig.AlspConfig.HearBeatInterval,
+					AlspMetrics:             builder.Metrics.Network,
+					HeroCacheMetricsFactory: builder.HeroCacheMetricsFactory(),
+					NetworkType:             network.PublicNetwork,
+				},
+				SlashingViolationConsumerFactory: func(adapter network.ConduitAdapter) network.ViolationsConsumer {
+					return slashing.NewSlashingViolationsConsumer(builder.Logger, builder.Metrics.Network, adapter)
+				},
+			}, p2pnet.WithMessageValidators(publicNetworkMsgValidators(node.Logger, node.IdentityProvider, node.NodeID)...))
 			if err != nil {
-				return nil, err
+				return nil, fmt.Errorf("could not initialize network: %w", err)
 			}
 
-			builder.Network = converter.NewNetwork(net, channels.SyncCommittee, channels.PublicSyncCommittee)
+			builder.NetworkUnderlay = net
+			builder.EngineRegistry = converter.NewNetwork(net, channels.SyncCommittee, channels.PublicSyncCommittee)
 
 			builder.Logger.Info().Msgf("network will run on address: %s", builder.BindAddr)
 
-			idEvents := gadgets.NewIdentityDeltas(builder.Middleware.UpdateNodeAddresses)
+			idEvents := gadgets.NewIdentityDeltas(builder.NetworkUnderlay.UpdateNodeAddresses)
 			builder.ProtocolEvents.AddConsumer(idEvents)
 
-			return builder.Network, nil
+			return builder.EngineRegistry, nil
 		})
 }
 
@@ -927,28 +923,27 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 			),
 		}
 
-		accessBackend := backend.New(
-			node.State,
-			nil,
-			nil,
-			node.Storage.Blocks,
-			node.Storage.Headers,
-			node.Storage.Collections,
-			node.Storage.Transactions,
-			node.Storage.Receipts,
-			node.Storage.Results,
-			node.RootChainID,
-			accessMetrics,
-			connFactory,
-			false,
-			backendConfig.MaxHeightRange,
-			backendConfig.PreferredExecutionNodeIDs,
-			backendConfig.FixedExecutionNodeIDs,
-			node.Logger,
-			backend.DefaultSnapshotHistoryLimit,
-			backendConfig.ArchiveAddressList,
-			backendConfig.ScriptExecValidation,
-			backendConfig.CircuitBreakerConfig.Enabled)
+		accessBackend := backend.New(backend.Params{
+			State:                     node.State,
+			Blocks:                    node.Storage.Blocks,
+			Headers:                   node.Storage.Headers,
+			Collections:               node.Storage.Collections,
+			Transactions:              node.Storage.Transactions,
+			ExecutionReceipts:         node.Storage.Receipts,
+			ExecutionResults:          node.Storage.Results,
+			ChainID:                   node.RootChainID,
+			AccessMetrics:             accessMetrics,
+			ConnFactory:               connFactory,
+			RetryEnabled:              false,
+			MaxHeightRange:            backendConfig.MaxHeightRange,
+			PreferredExecutionNodeIDs: backendConfig.PreferredExecutionNodeIDs,
+			FixedExecutionNodeIDs:     backendConfig.FixedExecutionNodeIDs,
+			Log:                       node.Logger,
+			SnapshotHistoryLimit:      backend.DefaultSnapshotHistoryLimit,
+			ArchiveAddressList:        backendConfig.ArchiveAddressList,
+			Communicator:              backend.NewNodeCommunicator(backendConfig.CircuitBreakerConfig.Enabled),
+			ScriptExecValidation:      backendConfig.ScriptExecValidation,
+		})
 
 		observerCollector := metrics.NewObserverCollector()
 		restHandler, err := restapiproxy.NewRestProxyHandler(
@@ -1019,28 +1014,6 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 	builder.Component("unsecure grpc server", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 		return builder.unsecureGrpcServer, nil
 	})
-}
-
-// initMiddleware creates the network.Middleware implementation with the libp2p factory function, metrics, peer update
-// interval, and validators. The network.Middleware is then passed into the initNetwork function.
-func (builder *ObserverServiceBuilder) initMiddleware(nodeID flow.Identifier,
-	libp2pNode p2p.LibP2PNode,
-	validators ...network.MessageValidator,
-) network.Middleware {
-	mw := middleware.NewMiddleware(&middleware.Config{
-		Logger:                builder.Logger,
-		Libp2pNode:            libp2pNode,
-		FlowId:                nodeID,
-		BitSwapMetrics:        builder.Metrics.Bitswap,
-		SporkId:               builder.SporkID,
-		UnicastMessageTimeout: middleware.DefaultUnicastTimeout,
-		IdTranslator:          builder.IDTranslator,
-		Codec:                 builder.CodecFactory(),
-	},
-		middleware.WithMessageValidators(validators...), // use default identifier provider
-	)
-	builder.Middleware = mw
-	return builder.Middleware
 }
 
 func loadNetworkingKey(path string) (crypto.PrivateKey, error) {
