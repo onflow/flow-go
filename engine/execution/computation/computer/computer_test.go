@@ -89,12 +89,11 @@ func (committer *fakeCommitter) CommitView(
 	var newCommit flow.StateCommitment
 	copy(newCommit[:], h)
 
-	newStorageSnapshot, err := baseStorageSnapshot.Extend(newCommit, trieUpdate)
+	newStorageSnapshot, err := baseStorageSnapshot.Extend(newCommit, flow.RegisterEntries{})
 	if err != nil {
 		return flow.DummyStateCommitment, nil, nil, nil, err
 	}
 
-	// endState := incStateCommitment(startState)
 	return newStorageSnapshot.Commitment(),
 		[]byte{byte(committer.callCount)},
 		trieUpdate,
@@ -339,11 +338,10 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 
 		newCommit := unittest.StateCommitmentFixture()
 		trieUpdate := testutils.TrieUpdateFixture(1, 10, 20)
-		snapshot := storehouse.NewExecutingBlockSnapshot(snapshot.EmptyStorageSnapshot{}, flow.StateCommitment(trieUpdate.RootHash))
-		newSnapshot, err := snapshot.Extend(newCommit, trieUpdate)
+		snapshot := storehouse.NewExecutingBlockSnapshot(snapshot.EmptyStorageSnapshot{}, newCommit)
 		require.NoError(t, err)
 		committer.On("CommitView", mock.Anything, mock.Anything).
-			Return(newCommit, nil, trieUpdate, newSnapshot, nil).
+			Return(newCommit, nil, trieUpdate, snapshot, nil).
 			Once() // just system chunk
 
 		result, err := exe.ExecuteBlock(
