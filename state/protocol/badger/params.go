@@ -128,25 +128,29 @@ func ReadGlobalParams(db *badger.DB, headers storage.Headers) (*inmem.Params, er
 	), nil
 }
 
-func ReadFinalizedRoot(db *badger.DB, headers storage.Headers) (*flow.Header, error) {
+// ReadFinalizedRoot retrieves the root block's header from the database.
+// This information is immutable for the runtime of the software and may be cached. 
+func ReadFinalizedRoot(db *badger.DB) (*flow.Header, error) {
 	var finalizedRootHeight uint64
-	err := db.View(operation.RetrieveRootHeight(&finalizedRootHeight))
-	if err != nil {
-		return nil, fmt.Errorf("could not get finalized root height: %w", err)
-	}
-
-	// look up root block ID
 	var rootID flow.Identifier
-	err = db.View(operation.LookupBlockHeight(finalizedRootHeight, &rootID))
+	var rootHeader flow.Header
+	err := db.View(func(tx *badger.Txn) error {
+		err := operation.RetrieveRootHeight(&finalizedRootHeight)(tx)
+		if err != nil {
+			return fmt.Errorf("could not retrieve finalized root height: %w", err)
+		}
+		err = operation.LookupBlockHeight(finalizedRootHeight, &rootID)(tx) // look up root block ID
+		if err != nil {
+			return fmt.Errorf("could not retrieve root header's ID by height: %w", err)
+		}
+		err = operation.RetrieveHeader(rootID, &rootHeader)(tx) // retrieve root header
+		if err != nil {
+			return fmt.Errorf("could not retrieve root header: %w", err)
+		}
+		return nil
+	})
 	if err != nil {
-		return nil, fmt.Errorf("could not look up root header: %w", err)
+		return nil, fmt.Errorf("failed to read root information from database: %w", err)
 	}
-
-	// retrieve root header
-	header, err := headers.ByBlockID(rootID)
-	if err != nil {
-		return nil, fmt.Errorf("could not retrieve root header: %w", err)
-	}
-
-	return header, nil
+	return &rootHeader, nil
 }
