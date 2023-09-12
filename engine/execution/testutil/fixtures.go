@@ -233,7 +233,7 @@ func CreateAccountsWithSimpleAddresses(
 
 	scriptTemplate := `
         transaction(publicKey: [UInt8]) {
-            prepare(signer: auth(AddKey) &Account) {
+            prepare(signer: auth(AddKey, BorrowValue) &Account) {
                 let acct = Account(payer: signer)
                 let publicKey2 = PublicKey(
                     publicKey: publicKey,
@@ -398,7 +398,7 @@ func CreateMultiAccountCreationTransaction(t *testing.T, chain flow.Chain, n int
 	// define the cadence script
 	script := fmt.Sprintf(`
         transaction(publicKey: [UInt8]) {
-            prepare(signer: auth(AddKey) &Account) {
+            prepare(signer: auth(AddKey, BorrowValue) &Account) {
                 var i = 0
                 while i < %d {
                     let account = Account(payer: signer)

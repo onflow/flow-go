@@ -423,7 +423,7 @@ func TestWithServiceAccount(t *testing.T) {
 	snapshotTree := snapshot.NewSnapshotTree(nil)
 
 	txBody := flow.NewTransactionBody().
-		SetScript([]byte(`transaction { prepare(signer: AuthAccount) { AuthAccount(payer: signer) } }`)).
+		SetScript([]byte(`transaction { prepare(signer: auth(BorrowValue) &Account) { Account(payer: signer) } }`)).
 		AddAuthorizer(chain.ServiceAddress())
 
 	t.Run("With service account enabled", func(t *testing.T) {
@@ -483,7 +483,7 @@ func TestEventLimits(t *testing.T) {
 
 	deployingContractScriptTemplate := `
 		transaction {
-			prepare(signer: AuthAccount) {
+			prepare(signer: auth(AddContract) &Account) {
 				let code = "%s".decodeHex()
 				signer.contracts.add(
 					name: "TestContract",
@@ -1072,7 +1072,7 @@ func TestSettingExecutionWeights(t *testing.T) {
 			txBody := flow.NewTransactionBody().
 				SetScript([]byte(`
 				transaction {
-                  prepare(signer: AuthAccount) {
+                  prepare(signer: &Account) {
 					var a = 0
 					while a < 100 {
 						a = a + 1
@@ -1132,7 +1132,7 @@ func TestSettingExecutionWeights(t *testing.T) {
 			txBody := flow.NewTransactionBody().
 				SetScript([]byte(`
 				transaction {
-                  prepare(signer: AuthAccount) {
+                  prepare(signer: &Account) {
 					var a = 1
                   }
                 }
@@ -1170,7 +1170,7 @@ func TestSettingExecutionWeights(t *testing.T) {
 			txBody := flow.NewTransactionBody().
 				SetScript([]byte(`
 				transaction {
-                  prepare(signer: AuthAccount) {
+                  prepare(signer: &Account) {
 					var a = 1
                   }
                 }
@@ -1226,7 +1226,7 @@ func TestSettingExecutionWeights(t *testing.T) {
 			txBody := flow.NewTransactionBody().
 				SetScript([]byte(`
 				transaction {
-					prepare(signer: AuthAccount) {
+					prepare(signer: &Account) {
 						while true {break};while true {break};while true {break};while true {break};while true {break};
 						while true {break};while true {break};while true {break};while true {break};while true {break};
 						while true {break};while true {break};while true {break};while true {break};while true {break};
@@ -1280,8 +1280,8 @@ func TestSettingExecutionWeights(t *testing.T) {
 			txBody := flow.NewTransactionBody().
 				SetScript([]byte(`
 				transaction {
-                  prepare(signer: AuthAccount) {
-					AuthAccount(payer: signer)
+                  prepare(signer: auth(BorrowValue) &Account) {
+					Account(payer: signer)
                   }
                 }
 			`)).
@@ -1317,8 +1317,8 @@ func TestSettingExecutionWeights(t *testing.T) {
 			txBody := flow.NewTransactionBody().
 				SetScript([]byte(`
 				transaction {
-                  prepare(signer: AuthAccount) {
-					AuthAccount(payer: signer)
+                  prepare(signer: auth(BorrowValue) &Account) {
+					Account(payer: signer)
                   }
                 }
 			`)).
@@ -1353,8 +1353,8 @@ func TestSettingExecutionWeights(t *testing.T) {
 			txBody := flow.NewTransactionBody().
 				SetScript([]byte(`
 				transaction {
-                  prepare(signer: AuthAccount) {
-					AuthAccount(payer: signer)
+                  prepare(signer: auth(BorrowValue) &Account) {
+					Account(payer: signer)
                   }
                 }
 			`)).
@@ -1711,10 +1711,10 @@ func TestStorageCapacity(t *testing.T) {
 					import FlowToken from 0x%s
 
 					transaction(target: Address) {
-						prepare(signer: AuthAccount) {
+						prepare(signer: auth(BorrowValue) &Account) {
 							let receiverRef = getAccount(target)
-								.getCapability(/public/flowTokenReceiver)
-								.borrow<&{FungibleToken.Receiver}>()
+								.capabilities.get<&{FungibleToken.Receiver}>(/public/flowTokenReceiver)!
+								.borrow()
 								?? panic("Could not borrow receiver reference to the recipient''s Vault")
 
 							let vaultRef = signer
@@ -2409,7 +2409,7 @@ func TestAuthAccountCapabilities(t *testing.T) {
 
 						deployingContractScriptTemplate := `
 							transaction {
-								prepare(signer: AuthAccount) {
+								prepare(signer: auth(AddContract) &Account) {
 									signer.contracts.add(
 										name: "AccountLinker",
 										code: "%s".decodeHex()
@@ -2580,7 +2580,7 @@ func TestCapabilityControllers(t *testing.T) {
 				txBody := flow.NewTransactionBody().
 					SetScript([]byte(`
 						transaction {
-						  prepare(signer: AuthAccount) {
+						  prepare(signer: auth(Storage) &Account) {
 							let cap = signer.capabilities.storage.issue<&Int>(/storage/foo)
 							assert(cap.id == 1)
 
@@ -2769,18 +2769,27 @@ func TestStorageIterationWithBrokenValues(t *testing.T) {
 					import B from %s
 
 					transaction {
-						prepare(signer: AuthAccount) {
-							signer.save("Hello, World!", to: /storage/first)
-							signer.save(["one", "two", "three"], to: /storage/second)
-							signer.save(D.Bar(), to: /storage/third)
-							signer.save(C.Bar(), to: /storage/fourth)
-							signer.save(B.Bar(), to: /storage/fifth)
+						prepare(signer: auth(Capabilities, Storage) &Account) {
+							signer.storage.save("Hello, World!", to: /storage/a)
+							signer.storage.save(["one", "two", "three"], to: /storage/b)
+							signer.storage.save(D.Bar(), to: /storage/c)
+							signer.storage.save(C.Bar(), to: /storage/d)
+							signer.storage.save(B.Bar(), to: /storage/e)
 
-							signer.link<&String>(/private/a, target:/storage/first)
-							signer.link<&[String]>(/private/b, target:/storage/second)
-							signer.link<&D.Bar>(/private/c, target:/storage/third)
-							signer.link<&C.Bar>(/private/d, target:/storage/fourth)
-							signer.link<&B.Bar>(/private/e, target:/storage/fifth)
+							let aCap = signer.capabilities.storage.issue<&String>(/storage/a)
+							signer.capabilities.publish(aCap, at: /public/a)
+
+							let bCap = signer.capabilities.storage.issue<&[String]>(/storage/b)
+							signer.capabilities.publish(bCap, at: /public/b)
+
+							let cCap = signer.capabilities.storage.issue<&D.Bar>(/storage/c)
+							signer.capabilities.publish(cCap, at: /public/c)
+
+							let dCap = signer.capabilities.storage.issue<&C.Bar>(/storage/d)
+							signer.capabilities.publish(dCap, at: /public/d)
+
+							let eCap = signer.capabilities.storage.issue<&B.Bar>(/storage/e)
+							signer.capabilities.publish(eCap, at: /public/e)
 						}
 					}`,
 					accounts[0].HexWithPrefix(),
@@ -2798,12 +2807,12 @@ func TestStorageIterationWithBrokenValues(t *testing.T) {
 				runTransaction([]byte(
 					`
 					transaction {
-						prepare(account: AuthAccount) {
+						prepare(account: &Account) {
 							var total = 0
-							account.forEachPrivate(fun (path: PrivatePath, type: Type): Bool {
-								account.getCapability<&AnyStruct>(path).borrow()!
+							account.storage.forEachPublic(fun (path: PublicPath, type: Type): Bool {
+								account.capabilities.get<&AnyStruct>(path)?.borrow()
 								total = total + 1
-                              return true
+                                return true
 							})
 
 							assert(total == 2, message:"found ".concat(total.toString()))

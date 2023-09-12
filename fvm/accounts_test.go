@@ -181,7 +181,7 @@ func removeAccountCreator(
 
 const createAccountTransaction = `
 transaction {
-  prepare(signer: &Account) {
+  prepare(signer: auth(BorrowValue) &Account) {
     let account = Account(payer: signer)
   }
 }
@@ -189,7 +189,7 @@ transaction {
 
 const createMultipleAccountsTransaction = `
 transaction {
-  prepare(signer: &Account) {
+  prepare(signer: auth(BorrowValue) &Account) {
     let accountA = Account(payer: signer)
     let accountB = Account(payer: signer)
     let accountC = Account(payer: signer)
@@ -258,10 +258,10 @@ const removeAccountCreatorTransactionTemplate = `
 import FlowServiceAccount from 0x%s
 transaction {
 	let serviceAccountAdmin: &FlowServiceAccount.Administrator
-	prepare(signer: &Account) {
+	prepare(signer: auth(BorrowValue) &Account) {
 		// Borrow reference to FlowServiceAccount Administrator resource.
 		//
-		self.serviceAccountAdmin = signer.borrow<&FlowServiceAccount.Administrator>(from: /storage/flowServiceAdmin)
+		self.serviceAccountAdmin = signer.storage.borrow<&FlowServiceAccount.Administrator>(from: /storage/flowServiceAdmin)
 			?? panic("Unable to borrow reference to administrator resource")
 	}
 	execute {
@@ -278,10 +278,10 @@ const addAccountCreatorTransactionTemplate = `
 import FlowServiceAccount from 0x%s
 transaction {
 	let serviceAccountAdmin: &FlowServiceAccount.Administrator
-	prepare(signer: &Account) {
+	prepare(signer: auth(BorrowValue) &Account) {
 		// Borrow reference to FlowServiceAccount Administrator resource.
 		//
-		self.serviceAccountAdmin = signer.borrow<&FlowServiceAccount.Administrator>(from: /storage/flowServiceAdmin)
+		self.serviceAccountAdmin = signer.storage.borrow<&FlowServiceAccount.Administrator>(from: /storage/flowServiceAdmin)
 			?? panic("Unable to borrow reference to administrator resource")
 	}
 	execute {
@@ -1663,7 +1663,7 @@ func TestGetStorageCapacity(t *testing.T) {
 				script := fvm.Script([]byte(fmt.Sprintf(`
 					access(all) fun main(): UInt64 {
 						let acc = getAccount(0x%s)
-						return acc.storageCapacity
+						return acc.storage.capacity
 					}
 				`, account)))
 
@@ -1692,7 +1692,7 @@ func TestGetStorageCapacity(t *testing.T) {
 				script := fvm.Script([]byte(fmt.Sprintf(`
 					access(all) fun main(): UInt64 {
 						let acc = getAccount(0x%s)
-						return acc.storageCapacity
+						return acc.storage.capacity
 					}
 				`, nonExistentAddress)))
 
@@ -1720,7 +1720,7 @@ func TestGetStorageCapacity(t *testing.T) {
 				script := fvm.Script([]byte(fmt.Sprintf(`
 					access(all) fun main(): UInt64 {
 						let acc = getAccount(0x%s)
-						return acc.storageCapacity
+						return acc.storage.capacity
 					}
 				`, address)))
 

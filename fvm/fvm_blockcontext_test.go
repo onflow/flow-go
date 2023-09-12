@@ -46,10 +46,10 @@ func transferTokensTx(chain flow.Chain) *flow.TransactionBody {
 								// The Vault resource that holds the tokens that are being transferred
 								let sentVault: @{FungibleToken.Vault}
 
-								prepare(signer: AuthAccount) {
+								prepare(signer: auth(BorrowValue) &Account) {
 
 									// Get a reference to the signer's stored vault
-									let vaultRef = signer.borrow<auth(FungibleToken.Withdrawable) &FlowToken.Vault>(from: /storage/flowTokenVault)
+									let vaultRef = signer.storage.borrow<auth(FungibleToken.Withdrawable) &FlowToken.Vault>(from: /storage/flowTokenVault)
 										?? panic("Could not borrow reference to the owner's Vault!")
 
 									// Withdraw tokens from the signer's stored vault
@@ -62,8 +62,8 @@ func transferTokensTx(chain flow.Chain) *flow.TransactionBody {
 									let recipient = getAccount(to)
 
 									// Get a reference to the recipient's Receiver
-									let receiverRef = recipient.getCapability(/public/flowTokenReceiver)
-										.borrow<&{FungibleToken.Receiver}>()
+									let receiverRef = recipient.capabilities.get<&{FungibleToken.Receiver}>(/public/flowTokenReceiver)!
+										.borrow()
 										?? panic("Could not borrow receiver reference to the recipient's Vault")
 
 									// Deposit the withdrawn tokens in the recipient's receiver
@@ -100,7 +100,7 @@ func TestBlockContext_ExecuteTransaction(t *testing.T) {
 		txBody := flow.NewTransactionBody().
 			SetScript([]byte(`
 	            transaction {
-	              prepare(signer: AuthAccount) {}
+	              prepare(signer: &Account) {}
 	            }
 	        `)).
 			AddAuthorizer(unittest.AddressFixture())
@@ -122,7 +122,7 @@ func TestBlockContext_ExecuteTransaction(t *testing.T) {
                 transaction {
                   var x: Int
 
-                  prepare(signer: AuthAccount) {
+                  prepare(signer: &Account) {
                     self.x = 0
                   }
 
@@ -175,8 +175,8 @@ func TestBlockContext_ExecuteTransaction(t *testing.T) {
 		txBody := flow.NewTransactionBody().
 			SetScript([]byte(`
                 transaction {
-                  prepare(signer: AuthAccount) {
-                    AuthAccount(payer: signer)
+                  prepare(signer: auth(BorrowValue) &Account) {
+                    Account(payer: signer)
                   }
                 }
             `)).
@@ -286,7 +286,7 @@ func TestBlockContext_DeployContract(t *testing.T) {
 		txBody = flow.NewTransactionBody().
 			SetScript([]byte(`
 				transaction {
-					prepare(signer: AuthAccount) {
+					prepare(signer: &Account) {
 						var s : String = ""
 						for name in signer.contracts.names {
 							s = s.concat(name).concat(",")
@@ -1255,8 +1255,8 @@ func TestBlockContext_ExecuteTransaction_InteractionLimitReached(t *testing.T) {
 
 var createAccountScript = []byte(`
     transaction {
-        prepare(signer: AuthAccount) {
-            let acct = AuthAccount(payer: signer)
+        prepare(signer: auth(BorrowValue) &Account) {
+            let acct = Account(payer: signer)
         }
     }
 `)

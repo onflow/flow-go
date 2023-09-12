@@ -162,10 +162,27 @@ var setupNewAccountSpec = ContractFunctionSpec{
 	LocationName:     systemcontracts.ContractNameServiceAccount,
 	FunctionName:     systemcontracts.ContractServiceAccountFunction_setupNewAccount,
 	ArgumentTypes: []sema.Type{
-		// TODO: pass proper authorization
-		sema.NewReferenceType(nil, sema.UnauthorizedAccess, sema.AccountType),
-		// TODO: pass proper authorization
-		sema.NewReferenceType(nil, sema.UnauthorizedAccess, sema.AccountType),
+		sema.NewReferenceType(nil,
+			sema.NewEntitlementSetAccess(
+				[]*sema.EntitlementType{
+					sema.SaveValueType,
+					sema.BorrowValueType,
+					sema.CapabilitiesType,
+				},
+				sema.Conjunction,
+			),
+			sema.AccountType,
+		),
+		sema.NewReferenceType(
+			nil,
+			sema.NewEntitlementSetAccess(
+				[]*sema.EntitlementType{
+					sema.BorrowValueType,
+				},
+				sema.Conjunction,
+			),
+			sema.AccountType,
+		),
 	},
 }
 

@@ -712,14 +712,10 @@ func setupReceiver(b *testing.B, be TestBenchBlockExecutor, nftAccount, batchNFT
 	import BatchNFT from 0x%s
 	
 	transaction {
-		prepare(signer: AuthAccount) {
+		prepare(signer: auth(SaveValue) &Account) {
 			signer.save(
 				<-BatchNFT.createEmptyCollection(),
 				to: /storage/TestTokenCollection
-			)
-			signer.link<&BatchNFT.Collection>(
-				/public/TestTokenCollection,
-				target: /storage/TestTokenCollection
 			)
 		}
 	}`
@@ -747,15 +743,15 @@ func mintNFTs(b *testing.B, be TestBenchBlockExecutor, batchNFTAccount *TestBenc
 	mintScriptTemplate := `
 	import BatchNFT from 0x%s
 	transaction {
-		prepare(signer: AuthAccount) {
-			let adminRef = signer.borrow<&BatchNFT.Admin>(from: /storage/BatchNFTAdmin)!
+		prepare(signer: auth(BorrowValue) &Account) {
+			let adminRef = signer.storage.borrow<&BatchNFT.Admin>(from: /storage/BatchNFTAdmin)!
 			let playID = adminRef.createPlay(metadata: {"name": "Test"})
 			let setID = BatchNFT.nextSetID
 			adminRef.createSet(name: "Test")
 			let setRef = adminRef.borrowSet(setID: setID)
 			setRef.addPlay(playID: playID)
 			let testTokens <- setRef.batchMintTestToken(playID: playID, quantity: %d)
-			signer.borrow<&BatchNFT.Collection>(from: /storage/TestTokenCollection)!
+			signer.storage.borrow<&BatchNFT.Collection>(from: /storage/TestTokenCollection)!
 				.batchDeposit(tokens: <-testTokens)
 		}
 	}`

@@ -288,5 +288,6 @@ require (
 
 replace (
 	github.com/onflow/flow-core-contracts/lib/go/contracts => ../flow-core-contracts/lib/go/contracts
+	github.com/onflow/flow-core-contracts/lib/go/templates => ../flow-core-contracts/lib/go/templates
 	github.com/onflow/flow-nft/lib/go/contracts => ../flow-nft/lib/go/contracts
 )
