@@ -529,7 +529,7 @@ func (e *Engine) validateRangeRequestForALSP(originID flow.Identifier, event int
 	}
 
 	// check if range request is valid
-	if rangeRequest.ToHeight <= rangeRequest.FromHeight {
+	if rangeRequest.ToHeight < rangeRequest.FromHeight {
 		e.log.Info().Str("originID", originID.String()).Msg("creating misbehavior report (invalid range request)")
 		report, err := alsp.NewMisbehaviorReport(originID, alsp.InvalidMessage)
 		if err != nil {

@@ -194,9 +194,9 @@ func (ss *SyncSuite) TestLoad_Process_RangeRequest_SometimesReportSpam() {
 	// expected probability factor: 0.1 * ((100-1) + 1)/64 = 0.15625
 	loadGroups = append(loadGroups, loadGroup{0.1, 110, 200, 1, 100})
 
-	// using a very large range (999) with a 10% base probability factor, expect to get misbehavior report 100% of the time (1000 in 1000 requests)
-	// expected probability factor: 0.1 * ((1000-1) + 1)/64 = 1.5625
-	loadGroups = append(loadGroups, loadGroup{0.1, 1000, 1000, 1, 1000})
+	// using a flat range (0) (from height == to height) with a 1% base probability factor, expect to almost never get a misbehavior report, about 0.16% of the time (2 in 1000 requests)
+	// expected probability factor: 0.01 * ((1-1) + 1)/64 = 0.0015625
+	loadGroups = append(loadGroups, loadGroup{0.01, 0, 5, 1, 1})
 
 	// using a small range (10) with a 1% base probability factor, expect to almost never get misbehavior report, about 0.17% of the time (2 in 1000 requests)
 	// expected probability factor: 0.01 * ((11-1) + 1)/64 = 0.00171875
@@ -206,14 +206,14 @@ func (ss *SyncSuite) TestLoad_Process_RangeRequest_SometimesReportSpam() {
 	// expected probability factor: 0.01 * ((1000-1) + 1)/64 = 0.15625
 	loadGroups = append(loadGroups, loadGroup{0.01, 110, 200, 1, 1000})
 
-	// INVALID RANGE REQUESTS
-	// the following range requests are invalid and should always result in a misbehavior report
+	// ALWAYS REPORT SPAM FOR INVALID RANGE REQUESTS OR RANGE REQUESTS THAT ARE FAR OUTSIDE OF THE TOLERANCE
 
 	// using an inverted range (from height > to height) always results in a misbehavior report, no matter how small the range is or how small the base probability factor is
 	loadGroups = append(loadGroups, loadGroup{0.001, 1000, 1000, 2, 1})
 
-	// using a flat range (from height == to height) always results in a misbehavior report, no matter how small the range is or how small the base probability factor is
-	loadGroups = append(loadGroups, loadGroup{0.001, 1000, 1000, 1, 1})
+	// using a very large range (999) with a 10% base probability factor, expect to get misbehavior report 100% of the time (1000 in 1000 requests)
+	// expected probability factor: 0.1 * ((1000-1) + 1)/64 = 1.5625
+	loadGroups = append(loadGroups, loadGroup{0.1, 1000, 1000, 1, 1000})
 
 	// reset misbehavior report counter for each subtest
 	misbehaviorsCounter := 0
