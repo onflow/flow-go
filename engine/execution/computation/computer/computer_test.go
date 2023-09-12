@@ -191,6 +191,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 
 		// create a block with 1 collection with 2 transactions
 		block := generateBlock(1, 2, rag)
+		// block.StartState = &flow.StateCommitment{0}
 
 		parentBlockExecutionResultID := unittest.IdentifierFixture()
 		result, err := exe.ExecuteBlock(
@@ -282,12 +283,12 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			chunkDataPack1.Collection,
 			chunkExecutionData1.Collection)
 		assert.NotNil(t, chunkExecutionData1.TrieUpdate)
-		assert.Equal(t, byte(1), chunkExecutionData1.TrieUpdate.RootHash[0])
+		assert.Equal(t, byte(0), chunkExecutionData1.TrieUpdate.RootHash[0])
 
 		chunkExecutionData2 := result.ChunkExecutionDatas[1]
 		assert.NotNil(t, chunkExecutionData2.Collection)
 		assert.NotNil(t, chunkExecutionData2.TrieUpdate)
-		assert.Equal(t, byte(2), chunkExecutionData2.TrieUpdate.RootHash[0])
+		assert.Equal(t, byte(1), chunkExecutionData2.TrieUpdate.RootHash[0])
 
 		assert.GreaterOrEqual(t, vm.CallCount(), 3)
 		// if every transaction is retried once, then the call count should be
@@ -1351,7 +1352,7 @@ func generateBlockWithVisitor(
 	return &entity.ExecutableBlock{
 		Block:               &block,
 		CompleteCollections: completeCollections,
-		StartState:          unittest.StateCommitmentPointerFixture(),
+		StartState:          &flow.StateCommitment{0},
 	}
 }
 
