@@ -100,7 +100,7 @@ type TrieReadSingleValue struct {
 
 // TrieUpdate holds all data for a trie update
 type TrieUpdate struct {
-	RootHash RootHash
+	RootHash RootHash // the root hash of the trie to be updated
 	Paths    []Path
 	Payloads []*Payload
 }
