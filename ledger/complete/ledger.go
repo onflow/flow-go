@@ -200,11 +200,6 @@ func (l *Ledger) Get(query *ledger.Query) (values []ledger.Value, err error) {
 func (l *Ledger) Set(update *ledger.Update) (newState ledger.State, trieUpdate *ledger.TrieUpdate, err error) {
 	start := time.Now()
 
-	if update.Size() == 0 {
-		// return current state root unchanged
-		return update.State(), nil, nil
-	}
-
 	trieUpdate, err = pathfinder.UpdateToTrieUpdate(update, l.pathFinderVersion)
 	if err != nil {
 		return ledger.State(hash.DummyHash), nil, err
