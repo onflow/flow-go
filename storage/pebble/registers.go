@@ -30,6 +30,7 @@ func (s *Registers) Get(
 	height uint64,
 	reg flow.RegisterID,
 ) ([]byte, error) {
+	// TODO: add range check once LatestHeight and FirstHeight are implemented
 	iter, err := s.db.NewIter(&pebble.IterOptions{
 		UseL6Filters: true,
 	})
@@ -60,6 +61,7 @@ func (s *Registers) Store(
 	height uint64,
 	entries flow.RegisterEntries,
 ) error {
+	//  TODO: add value check once LatestHeight is implemented
 	batch := s.db.NewBatch()
 	defer batch.Close()
 
