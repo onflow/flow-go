@@ -8,12 +8,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/onflow/flow-go/engine/access/mock"
-	"github.com/onflow/flow-go/utils/unittest"
 	"github.com/onflow/flow/protobuf/go/flow/access"
 	"github.com/onflow/flow/protobuf/go/flow/execution"
 	"github.com/stretchr/testify/assert"
 	"google.golang.org/grpc"
+
+	"github.com/onflow/flow-go/engine/access/mock"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 // node mocks a flow node that runs a GRPC server
