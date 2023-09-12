@@ -3,6 +3,7 @@ package synchronization
 import (
 	"context"
 	"fmt"
+	"github.com/onflow/flow-go/model/flow"
 	"testing"
 	"time"
 
@@ -241,6 +242,67 @@ func (ss *SyncSuite) TestLoad_Process_RangeRequest_SometimesReportSpam() {
 				},
 			)
 			ss.e.spamDetectionConfig.rangeRequestBaseProb = loadGroup.rangeRequestBaseProb
+			require.NoError(ss.T(), ss.e.Process(channels.SyncCommittee, originID, req))
+		}
+		// check function call expectations at the end of the load test; otherwise, load test would take much longer
+		ss.core.AssertExpectations(ss.T())
+		ss.con.AssertExpectations(ss.T())
+
+		// check that correct range of misbehavior reports were generated
+		// since we're using a probabilistic approach to generate misbehavior reports, we can't guarantee the exact number,
+		// so we check that it's within an expected range
+		ss.T().Logf("misbehaviors counter after load test: %d (expected lower bound: %d expected upper bound: %d)", misbehaviorsCounter, loadGroup.expectedMisbehaviorsLower, loadGroup.expectedMisbehaviorsUpper)
+		assert.GreaterOrEqual(ss.T(), misbehaviorsCounter, loadGroup.expectedMisbehaviorsLower)
+		assert.LessOrEqual(ss.T(), misbehaviorsCounter, loadGroup.expectedMisbehaviorsUpper)
+
+		misbehaviorsCounter = 0 // reset counter for next subtest
+	}
+}
+
+// TestLoad_Process_BatchRequest_SometimesReportSpam is a load test that ensures that a misbehavior report is generated
+// an appropriate range of times when the base probability factor and range are set to different values.
+func (ss *SyncSuite) TestLoad_Process_BatchRequest_SometimesReportSpam() {
+	ctx, cancel := irrecoverable.NewMockSignalerContextWithCancel(ss.T(), context.Background())
+	ss.e.Start(ctx)
+	unittest.AssertClosesBefore(ss.T(), ss.e.Ready(), time.Second)
+	defer cancel()
+
+	load := 1000
+
+	type loadGroup struct {
+		batchRequestBaseProb      float32
+		expectedMisbehaviorsLower int
+		expectedMisbehaviorsUpper int
+		fromHeight                uint64
+		toHeight                  uint64
+	}
+
+	loadGroups := []loadGroup{}
+
+	// reset misbehavior report counter for each subtest
+	misbehaviorsCounter := 0
+
+	for _, loadGroup := range loadGroups {
+		for i := 0; i < load; i++ {
+			ss.T().Log("load iteration", i)
+
+			nonce, err := rand.Uint64()
+			require.NoError(ss.T(), err, "should generate nonce")
+
+			// generate origin and request message
+			originID := unittest.IdentifierFixture()
+			req := &messages.BatchRequest{
+				Nonce:    nonce,
+				BlockIDs: make([]flow.Identifier, 0),
+			}
+
+			// count misbehavior reports over the course of a load test
+			ss.con.On("ReportMisbehavior", mock.Anything).Return(mock.Anything).Maybe().Run(
+				func(args mock.Arguments) {
+					misbehaviorsCounter++
+				},
+			)
+			ss.e.spamDetectionConfig.batchRequestBaseProb = loadGroup.batchRequestBaseProb
 			require.NoError(ss.T(), ss.e.Process(channels.SyncCommittee, originID, req))
 		}
 		// check function call expectations at the end of the load test; otherwise, load test would take much longer
