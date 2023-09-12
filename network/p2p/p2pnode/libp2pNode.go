@@ -151,7 +151,7 @@ func (n *Node) RemovePeer(peerID peer.ID) error {
 	// logging with suspicious level as we only expect to disconnect from a peer if it is not part of the
 	// protocol state.
 	n.logger.Warn().
-		Str("peer_id", peerID.String()).
+		Str("peer_id", p2plogging.PeerId(peerID)).
 		Bool(logging.KeySuspicious, true).
 		Msg("disconnected from peer")
 

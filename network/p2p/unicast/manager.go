@@ -17,6 +17,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/network/p2p"
+	"github.com/onflow/flow-go/network/p2p/p2plogging"
 	"github.com/onflow/flow-go/network/p2p/unicast/protocols"
 	"github.com/onflow/flow-go/network/p2p/unicast/stream"
 )
@@ -148,7 +149,7 @@ func (m *Manager) tryCreateStream(ctx context.Context, peerID peer.ID, maxAttemp
 			if IsErrDialInProgress(err) {
 				m.logger.Warn().
 					Err(err).
-					Str("peer_id", peerID.String()).
+					Str("peer_id", p2plogging.PeerId(peerID)).
 					Int("attempt", attempts).
 					Uint64("max_attempts", maxAttempts).
 					Msg("retrying create stream, dial to peer in progress")
@@ -270,7 +271,7 @@ func (m *Manager) dialPeer(ctx context.Context, peerID peer.ID, maxAttempts uint
 			}
 			m.logger.Warn().
 				Err(err).
-				Str("peer_id", peerID.String()).
+				Str("peer_id", p2plogging.PeerId(peerID)).
 				Int("attempt", dialAttempts).
 				Uint64("max_attempts", maxAttempts).
 				Msg("retrying peer dialing")
