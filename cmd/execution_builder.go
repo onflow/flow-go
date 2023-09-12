@@ -546,7 +546,7 @@ func (exeNode *ExecutionNode) LoadProviderEngine(
 			err)
 	}
 	blockID := lastExecutedBlock.ID()
-	blockSnapshot := storehouse.NewBlockEndStateSnapshot(exeNode.registerStore, blockID, lastExecutedBlock.Height)
+	blockSnapshot := exeNode.executionState.NewStorageSnapshot(blockID, lastExecutedBlock.Height)
 
 	// Get the epoch counter from the smart contract at the last executed block.
 	contractEpochCounter, err := getContractEpochCounter(
