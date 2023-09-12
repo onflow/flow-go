@@ -17,7 +17,6 @@ import (
 	"github.com/onflow/flow-go/engine/execution/ingestion/uploader"
 	"github.com/onflow/flow-go/engine/execution/provider"
 	"github.com/onflow/flow-go/engine/execution/state"
-	"github.com/onflow/flow-go/engine/execution/storehouse"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/executiondatasync/pruner"
@@ -433,7 +432,7 @@ func (e *Engine) executeBlock(
 	}
 
 	// powered by register store
-	snapshot := storehouse.NewBlockEndStateSnapshot(
+	snapshot := e.execState.NewStorageSnapshot(
 		executableBlock.Block.Header.ParentID,
 		executableBlock.Block.Header.Height-1,
 	)
