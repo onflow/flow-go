@@ -99,8 +99,16 @@ var verifyPayersBalanceForTransactionExecutionSpec = ContractFunctionSpec{
 	LocationName:     systemcontracts.ContractNameFlowFees,
 	FunctionName:     systemcontracts.ContractServiceAccountFunction_verifyPayersBalanceForTransactionExecution,
 	ArgumentTypes: []sema.Type{
-		// TODO: pass proper authorization
-		sema.NewReferenceType(nil, sema.UnauthorizedAccess, sema.AccountType),
+		sema.NewReferenceType(
+			nil,
+			sema.NewEntitlementSetAccess(
+				[]*sema.EntitlementType{
+					sema.BorrowValueType,
+				},
+				sema.Conjunction,
+			),
+			sema.AccountType,
+		),
 		sema.UInt64Type,
 		sema.UInt64Type,
 	},
@@ -132,8 +140,16 @@ var deductTransactionFeeSpec = ContractFunctionSpec{
 	LocationName:     systemcontracts.ContractNameFlowFees,
 	FunctionName:     systemcontracts.ContractServiceAccountFunction_deductTransactionFee,
 	ArgumentTypes: []sema.Type{
-		// TODO: pass proper authorization
-		sema.NewReferenceType(nil, sema.UnauthorizedAccess, sema.AccountType),
+		sema.NewReferenceType(
+			nil,
+			sema.NewEntitlementSetAccess(
+				[]*sema.EntitlementType{
+					sema.BorrowValueType,
+				},
+				sema.Conjunction,
+			),
+			sema.AccountType,
+		),
 		sema.UInt64Type,
 		sema.UInt64Type,
 	},
@@ -162,7 +178,8 @@ var setupNewAccountSpec = ContractFunctionSpec{
 	LocationName:     systemcontracts.ContractNameServiceAccount,
 	FunctionName:     systemcontracts.ContractServiceAccountFunction_setupNewAccount,
 	ArgumentTypes: []sema.Type{
-		sema.NewReferenceType(nil,
+		sema.NewReferenceType(
+			nil,
 			sema.NewEntitlementSetAccess(
 				[]*sema.EntitlementType{
 					sema.SaveValueType,
@@ -229,7 +246,11 @@ var accountBalanceInvocationSpec = ContractFunctionSpec{
 	FunctionName:     systemcontracts.ContractServiceAccountFunction_defaultTokenBalance,
 	ArgumentTypes: []sema.Type{
 		// TODO: pass proper authorization
-		sema.NewReferenceType(nil, sema.UnauthorizedAccess, sema.AccountType),
+		sema.NewReferenceType(
+			nil,
+			sema.UnauthorizedAccess,
+			sema.AccountType,
+		),
 	},
 }
 

@@ -37,7 +37,7 @@ func CreateContractDeploymentTransaction(contractName string, contract string, a
 	encoded := hex.EncodeToString([]byte(contract))
 
 	script := []byte(fmt.Sprintf(`transaction {
-              prepare(signer: AuthAccount, service: AuthAccount) {
+              prepare(signer: auth(AddContract) &Account, service: &Account) {
                 signer.contracts.add(name: "%s", code: "%s".decodeHex())
               }
             }`, contractName, encoded))
@@ -55,8 +55,8 @@ func UpdateContractDeploymentTransaction(contractName string, contract string, a
 
 	return flow.NewTransactionBody().
 		SetScript([]byte(fmt.Sprintf(`transaction {
-              prepare(signer: AuthAccount, service: AuthAccount) {
-                signer.contracts.update__experimental(name: "%s", code: "%s".decodeHex())
+              prepare(signer: auth(UpdateContract) &Account, service: &Account) {
+                signer.contracts.update(name: "%s", code: "%s".decodeHex())
               }
             }`, contractName, encoded)),
 		).
@@ -80,7 +80,7 @@ func UpdateContractUnathorizedDeploymentTransaction(contractName string, contrac
 func RemoveContractDeploymentTransaction(contractName string, authorizer flow.Address, chain flow.Chain) *flow.TransactionBody {
 	return flow.NewTransactionBody().
 		SetScript([]byte(fmt.Sprintf(`transaction {
-              prepare(signer: AuthAccount, service: AuthAccount) {
+              prepare(signer: auth(RemoveContract) &Account, service: &Account) {
                 signer.contracts.remove(name: "%s")
               }
             }`, contractName)),
@@ -358,7 +358,7 @@ func CreateAccountCreationTransaction(t testing.TB, chain flow.Chain) (flow.Acco
 	// define the cadence script
 	script := fmt.Sprintf(`
         transaction(publicKey: [UInt8]) {
-            prepare(signer: auth(AddKey) &Account) {
+            prepare(signer: auth(AddKey, BorrowValue) &Account) {
 				let acct = Account(payer: signer)
                 let publicKey2 = PublicKey(
                     publicKey: publicKey,

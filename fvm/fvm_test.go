@@ -604,8 +604,8 @@ func TestTransactionFeeDeduction(t *testing.T) {
 
 					access(all) fun main(account: Address): UFix64 {
 						let acct = getAccount(account)
-						let vaultRef = acct.getCapability(/public/flowTokenBalance)
-							.borrow<&FlowToken.Vault>()
+						let vaultRef = acct.capabilities.get<&FlowToken.Vault>(/public/flowTokenBalance)!
+							.borrow()
 							?? panic("Could not borrow Balance reference to the Vault")
 
 						return vaultRef.getBalance()
@@ -1398,7 +1398,7 @@ func TestSettingExecutionWeights(t *testing.T) {
 			maxExecutionEffort := uint64(997)
 			txBody := flow.NewTransactionBody().
 				SetScript([]byte(fmt.Sprintf(`
-				transaction() {prepare(signer: AuthAccount){var i=0;  while i < %d {i = i +1 } } execute{}}
+				transaction() {prepare(signer: &Account){var i=0;  while i < %d {i = i +1 } } execute{}}
 			`, loops))).
 				SetProposalKey(chain.ServiceAddress(), 0, 0).
 				AddAuthorizer(chain.ServiceAddress()).
@@ -1424,7 +1424,7 @@ func TestSettingExecutionWeights(t *testing.T) {
 			loops = loops + 1
 			txBody = flow.NewTransactionBody().
 				SetScript([]byte(fmt.Sprintf(`
-				transaction() {prepare(signer: AuthAccount){var i=0;  while i < %d {i = i +1 } } execute{}}
+				transaction() {prepare(signer: &Account){var i=0;  while i < %d {i = i +1 } } execute{}}
 			`, loops))).
 				SetProposalKey(chain.ServiceAddress(), 0, 1).
 				AddAuthorizer(chain.ServiceAddress()).
@@ -1499,7 +1499,7 @@ func TestStorageUsed(t *testing.T) {
             var storageUsed: UInt64 = 0
             for address in addresses {
                 let account = getAccount(address)
-                storageUsed = account.storageUsed
+                storageUsed = account.storage.used
             }
 
             return storageUsed
@@ -1717,15 +1717,15 @@ func TestStorageCapacity(t *testing.T) {
 								.borrow()
 								?? panic("Could not borrow receiver reference to the recipient''s Vault")
 
-							let vaultRef = signer
+							let vaultRef = signer.storage
 								.borrow<auth(FungibleToken.Withdrawable) &FlowToken.Vault>(from: /storage/flowTokenVault)
 								?? panic("Could not borrow reference to the owner''s Vault!")
 
-							var cap0: UInt64 = signer.storageCapacity
+							var cap0: UInt64 = signer.storage.capacity
 
 							receiverRef.deposit(from: <- vaultRef.withdraw(amount: 0.0000001))
 
-							var cap1: UInt64 = signer.storageCapacity
+							var cap1: UInt64 = signer.storage.capacity
 
 							log(cap0 - cap1)
 						}
@@ -1776,7 +1776,7 @@ func TestScriptContractMutationsFailure(t *testing.T) {
 
 				script := fvm.Script([]byte(fmt.Sprintf(`
 				access(all) fun main(account: Address) {
-					let acc = getAuthAccount(account)
+					let acc = getAuthAccount<auth(AddContract) &Account>(account)
 					acc.contracts.add(name: "Foo", code: "%s".decodeHex())
 				}`, hex.EncodeToString([]byte(contract))),
 				)).WithArguments(
@@ -1818,7 +1818,7 @@ func TestScriptContractMutationsFailure(t *testing.T) {
 
 				txBody := flow.NewTransactionBody().SetScript([]byte(fmt.Sprintf(`
 					transaction {
-						prepare(signer: AuthAccount, service: AuthAccount) {
+						prepare(signer: auth(AddContract) &Account, service: &Account) {
 							signer.contracts.add(name: "Foo", code: "%s".decodeHex())
 						}
 					}
@@ -1845,7 +1845,7 @@ func TestScriptContractMutationsFailure(t *testing.T) {
 
 				script := fvm.Script([]byte(`
 				access(all) fun main(account: Address) {
-					let acc = getAuthAccount(account)
+					let acc = getAuthAccount<auth(RemoveContract) &Account>(account)
 					let n = acc.contracts.names[0]
 					acc.contracts.remove(name: n)
 				}`,
@@ -1888,7 +1888,7 @@ func TestScriptContractMutationsFailure(t *testing.T) {
 
 				txBody := flow.NewTransactionBody().SetScript([]byte(fmt.Sprintf(`
 					transaction {
-						prepare(signer: AuthAccount, service: AuthAccount) {
+						prepare(signer: auth(AddContract) &Account, service: &Account) {
 							signer.contracts.add(name: "Foo", code: "%s".decodeHex())
 						}
 					}
@@ -1915,9 +1915,9 @@ func TestScriptContractMutationsFailure(t *testing.T) {
 
 				script := fvm.Script([]byte(fmt.Sprintf(`
 				access(all) fun main(account: Address) {
-					let acc = getAuthAccount(account)
+					let acc = getAuthAccount<auth(UpdateContract) &Account>(account)
 					let n = acc.contracts.names[0]
-					acc.contracts.update__experimental(name: n, code: "%s".decodeHex())
+					acc.contracts.update(name: n, code: "%s".decodeHex())
 				}`, hex.EncodeToString([]byte(contract))))).WithArguments(
 					jsoncdc.MustEncode(address),
 				)
@@ -1963,7 +1963,7 @@ func TestScriptAccountKeyMutationsFailure(t *testing.T) {
 
 				script := fvm.Script([]byte(`
 					access(all) fun main(account: Address, k: [UInt8]) {
-						let acc = getAuthAccount(account)
+						let acc = getAuthAccount<auth(AddKey) &Account>(account)
 						acc.keys.add(
 							publicKey: PublicKey(
                                 publicKey: k,
@@ -2012,7 +2012,7 @@ func TestScriptAccountKeyMutationsFailure(t *testing.T) {
 
 				script := fvm.Script([]byte(`
 				access(all) fun main(account: Address) {
-					let acc = getAuthAccount(account)
+					let acc = getAuthAccount<auth(RevokeKey) &Account>(account)
 					acc.keys.revoke(keyIndex: 0)
 				}`,
 				)).WithArguments(
@@ -2268,236 +2268,6 @@ func TestInteractionLimit(t *testing.T) {
 	}
 }
 
-func TestAuthAccountCapabilities(t *testing.T) {
-
-	t.Parallel()
-
-	t.Run("transaction", func(t *testing.T) {
-
-		t.Parallel()
-
-		test := func(t *testing.T, allowAccountLinking bool) {
-			newVMTest().
-				withBootstrapProcedureOptions().
-				withContextOptions(
-					fvm.WithReusableCadenceRuntimePool(
-						reusableRuntime.NewReusableCadenceRuntimePool(
-							1,
-							runtime.Config{},
-						),
-					),
-				).
-				run(
-					func(
-						t *testing.T,
-						vm fvm.VM,
-						chain flow.Chain,
-						ctx fvm.Context,
-						snapshotTree snapshot.SnapshotTree,
-					) {
-						// Create an account private key.
-						privateKeys, err := testutil.GenerateAccountPrivateKeys(1)
-						privateKey := privateKeys[0]
-						require.NoError(t, err)
-
-						// Bootstrap a ledger, creating accounts with the
-						// provided private keys and the root account.
-						snapshotTree, accounts, err := testutil.CreateAccounts(
-							vm,
-							snapshotTree,
-							privateKeys,
-							chain)
-						require.NoError(t, err)
-						account := accounts[0]
-
-						var pragma string
-						if allowAccountLinking {
-							pragma = "#allowAccountLinking"
-						}
-
-						code := fmt.Sprintf(
-							`
-							%s
-							transaction {
-								prepare(acct: &Account) {
-									acct.linkAccount(/private/foo)
-								}
-							}
-							`,
-							pragma,
-						)
-
-						txBody := flow.NewTransactionBody().
-							SetScript([]byte(code)).
-							AddAuthorizer(account).
-							SetPayer(chain.ServiceAddress()).
-							SetProposalKey(chain.ServiceAddress(), 0, 0)
-
-						_ = testutil.SignPayload(txBody, account, privateKey)
-						_ = testutil.SignEnvelope(
-							txBody,
-							chain.ServiceAddress(),
-							unittest.ServiceAccountPrivateKey)
-
-						_, output, err := vm.Run(
-							ctx,
-							fvm.Transaction(txBody, 0),
-							snapshotTree)
-						require.NoError(t, err)
-						if allowAccountLinking {
-							require.NoError(t, output.Err)
-						} else {
-							require.Error(t, output.Err)
-						}
-					},
-				)(t)
-		}
-
-		t.Run("account linking allowed", func(t *testing.T) {
-			test(t, true)
-		})
-
-		t.Run("account linking disallowed", func(t *testing.T) {
-			test(t, false)
-		})
-	})
-
-	t.Run("contract", func(t *testing.T) {
-
-		t.Parallel()
-
-		test := func(t *testing.T, allowAccountLinking bool) {
-			newVMTest().
-				withBootstrapProcedureOptions().
-				withContextOptions(
-					fvm.WithReusableCadenceRuntimePool(
-						reusableRuntime.NewReusableCadenceRuntimePool(
-							1,
-							runtime.Config{},
-						),
-					),
-					fvm.WithContractDeploymentRestricted(false),
-				).
-				run(
-					func(
-						t *testing.T,
-						vm fvm.VM,
-						chain flow.Chain,
-						ctx fvm.Context,
-						snapshotTree snapshot.SnapshotTree,
-					) {
-						// Create two private keys
-						privateKeys, err := testutil.GenerateAccountPrivateKeys(2)
-						require.NoError(t, err)
-
-						// Bootstrap a ledger, creating accounts with the provided private keys and the root account.
-						snapshotTree, accounts, err := testutil.CreateAccounts(
-							vm,
-							snapshotTree,
-							privateKeys,
-							chain)
-						require.NoError(t, err)
-
-						// Deploy contract
-						contractCode := `
-							access(all) contract AccountLinker {
-								access(all) fun link(_ account: AuthAccount) {
-									account.linkAccount(/private/acct)
-								}
-							}
-						`
-
-						deployingContractScriptTemplate := `
-							transaction {
-								prepare(signer: auth(AddContract) &Account) {
-									signer.contracts.add(
-										name: "AccountLinker",
-										code: "%s".decodeHex()
-									)
-								}
-							}
-						`
-
-						txBody := flow.NewTransactionBody().
-							SetScript([]byte(fmt.Sprintf(
-								deployingContractScriptTemplate,
-								hex.EncodeToString([]byte(contractCode)),
-							))).
-							SetPayer(chain.ServiceAddress()).
-							SetProposalKey(chain.ServiceAddress(), 0, 0).
-							AddAuthorizer(accounts[0])
-						_ = testutil.SignPayload(txBody, accounts[0], privateKeys[0])
-						_ = testutil.SignEnvelope(txBody, chain.ServiceAddress(), unittest.ServiceAccountPrivateKey)
-
-						executionSnapshot, output, err := vm.Run(
-							ctx,
-							fvm.Transaction(txBody, 0),
-							snapshotTree)
-						require.NoError(t, err)
-						require.NoError(t, output.Err)
-
-						snapshotTree = snapshotTree.Append(executionSnapshot)
-
-						// Use contract
-
-						var pragma string
-						if allowAccountLinking {
-							pragma = "#allowAccountLinking"
-						}
-
-						code := fmt.Sprintf(
-							`
-							%s
-							import AccountLinker from %s
-							transaction {
-								prepare(acct: &Account) {
-									AccountLinker.link(acct)
-								}
-							}
-							`,
-							pragma,
-							accounts[0].HexWithPrefix(),
-						)
-
-						txBody = flow.NewTransactionBody().
-							SetScript([]byte(code)).
-							AddAuthorizer(accounts[1]).
-							SetPayer(chain.ServiceAddress()).
-							SetProposalKey(chain.ServiceAddress(), 0, 1)
-
-						_ = testutil.SignPayload(txBody, accounts[1], privateKeys[1])
-						_ = testutil.SignEnvelope(txBody, chain.ServiceAddress(), unittest.ServiceAccountPrivateKey)
-
-						_, output, err = vm.Run(
-							ctx,
-							fvm.Transaction(txBody, 1),
-							snapshotTree)
-						require.NoError(t, err)
-						if allowAccountLinking {
-							require.NoError(t, output.Err)
-
-							require.Len(t, output.Events, 1)
-							require.Equal(
-								t,
-								flow.EventType("flow.AccountLinked"),
-								output.Events[0].Type)
-						} else {
-							require.Error(t, output.Err)
-						}
-					},
-				)(t)
-		}
-
-		t.Run("account linking allowed", func(t *testing.T) {
-			test(t, true)
-		})
-
-		t.Run("account linking disallowed", func(t *testing.T) {
-			test(t, false)
-		})
-	})
-}
-
 func TestAttachments(t *testing.T) {
 	test := func(t *testing.T, attachmentsEnabled bool) {
 		newVMTest().
@@ -2559,7 +2329,7 @@ func TestAttachments(t *testing.T) {
 }
 
 func TestCapabilityControllers(t *testing.T) {
-	test := func(t *testing.T, capabilityControllersEnabled bool) {
+	test := func(t *testing.T) {
 		newVMTest().
 			withBootstrapProcedureOptions().
 			withContextOptions(
@@ -2580,12 +2350,12 @@ func TestCapabilityControllers(t *testing.T) {
 				txBody := flow.NewTransactionBody().
 					SetScript([]byte(`
 						transaction {
-						  prepare(signer: auth(Storage) &Account) {
+						  prepare(signer: auth(Capabilities) &Account) {
 							let cap = signer.capabilities.storage.issue<&Int>(/storage/foo)
-							assert(cap.id == 1)
+							assert(cap.id == 6)
 
 							let cap2 = signer.capabilities.storage.issue<&String>(/storage/bar)
-							assert(cap2.id == 2)
+							assert(cap2.id == 7)
 						  }
 						}
 					`)).
@@ -2601,27 +2371,13 @@ func TestCapabilityControllers(t *testing.T) {
 					fvm.Transaction(txBody, 0),
 					snapshotTree)
 				require.NoError(t, err)
-
-				if capabilityControllersEnabled {
-					require.NoError(t, output.Err)
-				} else {
-					require.Error(t, output.Err)
-					require.ErrorContains(
-						t,
-						output.Err,
-						"`AuthAccount` has no member `capabilities`")
-				}
+				require.NoError(t, output.Err)
 			},
 			)(t)
 	}
 
-	t.Run("enabled", func(t *testing.T) {
-		test(t, true)
-	})
+	test(t)
 
-	t.Run("disabled", func(t *testing.T) {
-		test(t, false)
-	})
 }
 
 func TestStorageIterationWithBrokenValues(t *testing.T) {
@@ -2797,7 +2553,7 @@ func TestStorageIterationWithBrokenValues(t *testing.T) {
 					accounts[0].HexWithPrefix(),
 				)))
 
-				// Update `A`. `B`, `C` and `D` are now broken.
+				// Update `A`, such that `B`, `C` and `D` are now broken.
 				runTransaction(utils.UpdateTransaction(
 					"A",
 					[]byte(updatedContractA),
@@ -2807,11 +2563,23 @@ func TestStorageIterationWithBrokenValues(t *testing.T) {
 				runTransaction([]byte(
 					`
 					transaction {
-						prepare(account: &Account) {
+						prepare(account: auth(Storage) &Account) {
 							var total = 0
 							account.storage.forEachPublic(fun (path: PublicPath, type: Type): Bool {
-								account.capabilities.get<&AnyStruct>(path)?.borrow()
-								total = total + 1
+								if let cap = account.capabilities.get<&AnyStruct>(path) {
+								    cap.borrow()
+								    total = total + 1
+								}
+                                return true
+							})
+							assert(total == 2, message:"found ".concat(total.toString()))
+
+							total = 0
+							account.storage.forEachStored(fun (path: StoragePath, type: Type): Bool {
+								if account.storage.check<AnyStruct>(from: path) {
+								    account.storage.copy<AnyStruct>(from: path)
+								    total = total + 1
+								}
                                 return true
 							})
 

@@ -288,7 +288,11 @@ func TestBlockContext_DeployContract(t *testing.T) {
 				transaction {
 					prepare(signer: &Account) {
 						var s : String = ""
-						for name in signer.contracts.names {
+						let names = signer.contracts.names
+						var i = 0
+						while i < names.length {
+						    let name = names[i]
+						    i = i + 1
 							s = s.concat(name).concat(",")
 						}
 						if s != "Container," {
@@ -1016,14 +1020,14 @@ func TestBlockContext_ExecuteTransaction_StorageLimit(t *testing.T) {
 					import FlowToken from %s
 
 					transaction {
-						prepare(signer: AuthAccount, service: AuthAccount) {
+						prepare(signer: auth(AddContract) &Account, service: auth(BorrowValue) &Account) {
 							signer.contracts.add(name: "%s", code: "%s".decodeHex())
 
-							let vaultRef = service.borrow<auth(FungibleToken.Withdrawable) &FlowToken.Vault>(from: /storage/flowTokenVault)!
+							let vaultRef = service.storage.borrow<auth(FungibleToken.Withdrawable) &FlowToken.Vault>(from: /storage/flowTokenVault)!
 							// deposit additional flow
 							let payment <- vaultRef.withdraw(amount: 10.0) as! @FlowToken.Vault
 
-							let receiver = signer.getCapability(/public/flowTokenReceiver)!.borrow<&{FungibleToken.Receiver}>()
+							let receiver = signer.capabilities.get<&{FungibleToken.Receiver}>(/public/flowTokenReceiver)!.borrow()
 								?? panic("Could not borrow receiver reference to the recipient's Vault")
 							receiver.deposit(from: <-payment)
 						}
@@ -1761,8 +1765,8 @@ func TestBlockContext_ExecuteTransaction_FailingTransactions(t *testing.T) {
 
 					access(all) fun main(account: Address): UFix64 {
 						let acct = getAccount(account)
-						let vaultRef = acct.getCapability(/public/flowTokenBalance)
-							.borrow<&FlowToken.Vault>()
+						let vaultRef = acct.capabilities.get<&FlowToken.Vault>(/public/flowTokenBalance)!
+							.borrow()
 							?? panic("Could not borrow Balance reference to the Vault")
 
 						return vaultRef.getBalance()

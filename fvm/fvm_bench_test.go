@@ -503,12 +503,12 @@ func BenchmarkRuntimeTransaction(b *testing.B) {
 		benchTransaction(b, templateTx(100, `getAccount(signer.address).storageUsed`))
 	})
 	b.Run("get account and get storage capacity", func(b *testing.B) {
-		benchTransaction(b, templateTx(100, `getAccount(signer.address).storageCapacity`))
+		benchTransaction(b, templateTx(100, `getAccount(signer.address).storage.capacity`))
 	})
 	b.Run("get signer vault", func(b *testing.B) {
 		benchTransaction(
 			b,
-			templateTx(100, `let vaultRef = signer.borrow<&FlowToken.Vault>(from: /storage/flowTokenVault)!`),
+			templateTx(100, `let vaultRef = signer.storage.borrow<&FlowToken.Vault>(from: /storage/flowTokenVault)!`),
 		)
 	})
 	b.Run("get signer receiver", func(b *testing.B) {
@@ -527,7 +527,7 @@ func BenchmarkRuntimeTransaction(b *testing.B) {
 					.getCapability(/public/flowTokenReceiver)
 					.borrow<&{FungibleToken.Receiver}>()!
 
-				let vaultRef = signer.borrow<auth(FungibleToken.Withdrawable) &FlowToken.Vault>(from: /storage/flowTokenVault)!
+				let vaultRef = signer.storage.borrow<auth(FungibleToken.Withdrawable) &FlowToken.Vault>(from: /storage/flowTokenVault)!
 
 				receiverRef.deposit(from: <-vaultRef.withdraw(amount: 0.00001))
 			`),
@@ -564,7 +564,7 @@ func BenchmarkRuntimeTransaction(b *testing.B) {
 		benchTransaction(
 			b,
 			templateTx(100, `
-				let strings = signer.borrow<&[String]>(from: /storage/test)!
+				let strings = signer.storage.borrow<&[String]>(from: /storage/test)!
 				var i = 0
 				while (i < strings.length) {
 				  log(strings[i])

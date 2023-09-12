@@ -176,8 +176,8 @@ func newAccountDataProcessor(
 				import FlowToken from 0x%s
 				access(all) fun main(account: Address): UFix64 {
 					let acct = getAccount(account)
-					let vaultRef = acct.getCapability(/public/flowTokenBalance)
-						.borrow<&FlowToken.Vault{FungibleToken.Balance}>()
+					let vaultRef = acct.capabilities.get<&FlowToken.Vault{FungibleToken.Balance}>(/public/flowTokenBalance)!
+						.borrow()
 						?? panic("Could not borrow Balance reference to the Vault")
 					return vaultRef.balance
 				}
