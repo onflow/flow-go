@@ -24,5 +24,9 @@ func (NoopViewCommitter) CommitView(
 	storehouse.ExtendableStorageSnapshot,
 	error,
 ) {
-	return baseStorageSnapshot.Commitment(), nil, nil, nil, nil
+
+	trieUpdate := &ledger.TrieUpdate{
+		RootHash: ledger.RootHash(baseStorageSnapshot.Commitment()),
+	}
+	return baseStorageSnapshot.Commitment(), []byte{}, trieUpdate, baseStorageSnapshot, nil
 }
