@@ -59,7 +59,6 @@ import (
 	p2pconfig "github.com/onflow/flow-go/network/p2p/p2pbuilder/config"
 	"github.com/onflow/flow-go/network/p2p/p2pbuilder/inspector"
 	"github.com/onflow/flow-go/network/p2p/p2plogging"
-	"github.com/onflow/flow-go/network/p2p/p2pnet"
 	"github.com/onflow/flow-go/network/p2p/subscription"
 	"github.com/onflow/flow-go/network/p2p/tracer"
 	"github.com/onflow/flow-go/network/p2p/translator"
