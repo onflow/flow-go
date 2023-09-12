@@ -78,12 +78,17 @@ func (committer *fakeCommitter) CommitView(
 	storehouse.ExtendableStorageSnapshot,
 	error,
 ) {
+	trieUpdate := &ledger.TrieUpdate{}
+	trieUpdate.RootHash = ledger.RootHash(baseStorageSnapshot.Commitment())
+
 	committer.callCount++
 
-	trieUpdate := &ledger.TrieUpdate{}
-	trieUpdate.RootHash[0] = byte(committer.callCount)
+	h := make([]byte, 32)
+	h[0] = byte(committer.callCount)
+	var newCommit flow.StateCommitment
+	copy(newCommit[:], h)
 
-	newStorageSnapshot, err := baseStorageSnapshot.Extend(trieUpdate)
+	newStorageSnapshot, err := baseStorageSnapshot.Extend(newCommit, trieUpdate)
 	if err != nil {
 		return flow.DummyStateCommitment, nil, nil, nil, err
 	}
@@ -608,17 +613,17 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			// events to emit for each iteration/transaction
 			events := map[common.Location][]cadence.Event{
 				common.TransactionLocation(transactions[0].ID()): nil,
-				common.TransactionLocation(transactions[1].ID()): []cadence.Event{
+				common.TransactionLocation(transactions[1].ID()): {
 					serviceEventA,
-					cadence.Event{
+					{
 						EventType: &cadence.EventType{
 							Location:            stdlib.FlowLocation{},
 							QualifiedIdentifier: "what.ever",
 						},
 					},
 				},
-				common.TransactionLocation(transactions[2].ID()): []cadence.Event{
-					cadence.Event{
+				common.TransactionLocation(transactions[2].ID()): {
+					{
 						EventType: &cadence.EventType{
 							Location:            stdlib.FlowLocation{},
 							QualifiedIdentifier: "what.ever",
