@@ -12,20 +12,6 @@ type RegisterIndexWriter struct {
 	mock.Mock
 }
 
-// SetLatestHeight provides a mock function with given fields: height
-func (_m *RegisterIndexWriter) SetLatestHeight(height uint64) error {
-	ret := _m.Called(height)
-
-	var r0 error
-	if rf, ok := ret.Get(0).(func(uint64) error); ok {
-		r0 = rf(height)
-	} else {
-		r0 = ret.Error(0)
-	}
-
-	return r0
-}
-
 // Store provides a mock function with given fields: entries, height
 func (_m *RegisterIndexWriter) Store(entries flow.RegisterEntries, height uint64) error {
 	ret := _m.Called(entries, height)
