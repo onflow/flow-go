@@ -157,7 +157,7 @@ func New(
 		vm,
 		vmCtx,
 		derivedChainData,
-		protoState,
+		query.NewProtocolStateWrapper(protoState),
 	)
 
 	e := Manager{
