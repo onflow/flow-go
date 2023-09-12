@@ -201,10 +201,6 @@ func (on *Network) processIngressMessage(message *insecure.IngressMessage) error
 		return fmt.Errorf("could not convert corrupted target id to flow identifier: %w", err)
 	}
 
-	// making sure events are sent sequentially to orchestrator.
-	on.orchestratorMutex.Lock()
-	defer on.orchestratorMutex.Unlock()
-
 	channel := channels.Channel(message.ChannelID)
 	ingressEventIDHash, err := flownetmsg.EventId(channel, message.Payload)
 	if err != nil {
@@ -212,6 +208,10 @@ func (on *Network) processIngressMessage(message *insecure.IngressMessage) error
 	}
 
 	ingressEventID := flow.HashToID(ingressEventIDHash)
+
+	// making sure events are sent sequentially to orchestrator.
+	on.orchestratorMutex.Lock()
+	defer on.orchestratorMutex.Unlock()
 
 	err = on.orchestrator.HandleIngressEvent(&insecure.IngressEvent{
 		OriginID:            senderId,
