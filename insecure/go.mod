@@ -9,7 +9,7 @@ require (
 	github.com/libp2p/go-libp2p v0.28.1
 	github.com/libp2p/go-libp2p-pubsub v0.9.3
 	github.com/multiformats/go-multiaddr-dns v0.3.1
-	github.com/onflow/flow-go v0.31.1-0.20230801162100-85890d2bf9bb
+	github.com/onflow/flow-go v0.31.1-0.20230912223233-26a5aeb2636a
 	github.com/onflow/flow-go/crypto v0.24.9
 	github.com/rs/zerolog v1.29.0
 	github.com/spf13/pflag v1.0.5
@@ -183,14 +183,14 @@ require (
 	github.com/multiformats/go-varint v0.0.7 // indirect
 	github.com/onflow/atree v0.6.1-0.20230711151834-86040b30171f // indirect
 	github.com/onflow/cadence v0.41.0-stable-cadence.1.0.20230908213403-8f1134670ed0 // indirect
-	github.com/onflow/flow-core-contracts/lib/go/contracts v1.2.4-0.20230912213425-e944757e5498 // indirect
-	github.com/onflow/flow-core-contracts/lib/go/templates v1.2.4-0.20230912213425-e944757e5498 // indirect
-	github.com/onflow/flow-ft/lib/go/contracts v0.7.1-0.20230906165834-daca6600a634 // indirect
-	github.com/onflow/flow-go-sdk v0.44.0-stable-cadence.1.0.20230908221325-06f28e649c30 // indirect
-	github.com/onflow/flow-nft/lib/go/contracts v1.1.1-0.20230906170014-ac628577704c // indirect
+	github.com/onflow/flow-core-contracts/lib/go/contracts v1.2.4-0.20230913195300-f4efd4c46624 // indirect
+	github.com/onflow/flow-core-contracts/lib/go/templates v1.2.4-0.20230913195300-f4efd4c46624 // indirect
+	github.com/onflow/flow-ft/lib/go/contracts v0.7.1-0.20230913160646-09adc7d3b513 // indirect
+	github.com/onflow/flow-go-sdk v0.44.0-stable-cadence.1.0.20230912230115-25ad6f515ce6 // indirect
+	github.com/onflow/flow-nft/lib/go/contracts v1.1.1-0.20230913160722-e4f5f3f4b87a // indirect
 	github.com/onflow/flow/protobuf/go/flow v0.3.2-0.20230628215638-83439d22e0ce // indirect
 	github.com/onflow/go-bitswap v0.0.0-20230703214630-6d3db958c73d // indirect
-	github.com/onflow/sdks v0.5.0 // indirect
+	github.com/onflow/sdks v0.5.1-0.20230912225508-b35402f12bba // indirect
 	github.com/onflow/wal v0.0.0-20230529184820-bc9f8244608d // indirect
 	github.com/onsi/ginkgo/v2 v2.9.7 // indirect
 	github.com/opencontainers/runtime-spec v1.0.2 // indirect
@@ -202,10 +202,10 @@ require (
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/polydawn/refmt v0.89.0 // indirect
 	github.com/power-devops/perfstat v0.0.0-20210106213030-5aafc221ea8c // indirect
-	github.com/prometheus/client_golang v1.14.0 // indirect
+	github.com/prometheus/client_golang v1.16.0 // indirect
 	github.com/prometheus/client_model v0.4.0 // indirect
 	github.com/prometheus/common v0.42.0 // indirect
-	github.com/prometheus/procfs v0.9.0 // indirect
+	github.com/prometheus/procfs v0.10.1 // indirect
 	github.com/psiemens/sconfig v0.1.0 // indirect
 	github.com/quic-go/qpack v0.4.0 // indirect
 	github.com/quic-go/qtls-go1-19 v0.3.2 // indirect

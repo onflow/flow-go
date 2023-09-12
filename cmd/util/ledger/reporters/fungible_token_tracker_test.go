@@ -121,7 +121,7 @@ func TestFungibleTokenTracker(t *testing.T) {
 
 									let sentVault <- vaultRef.withdraw(amount: amount)
 									let wrappedFlow <- WrappedToken.CreateWrappedVault(inp :<- sentVault)
-									signer.save(<-wrappedFlow, to: /storage/wrappedToken)
+									signer.storage.save(<-wrappedFlow, to: /storage/wrappedToken)
 								}
 							}`, fvm.FungibleTokenAddress(chain), fvm.FlowTokenAddress(chain), chain.ServiceAddress()))
 
