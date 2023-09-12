@@ -22,11 +22,11 @@ type RegisterIndexReader interface {
 	Get(ID flow.RegisterID, height uint64) (flow.RegisterValue, error)
 	// LatestHeight returns the latest indexed height.
 	// Expected errors:
-	// - storage.ErrNotFound if no heights have been indexed. This should only happen when the database is first initialized.
+	// - storage.ErrHeightNotIndexed if no heights have been indexed. This should only happen when the database is first initialized.
 	LatestHeight() (uint64, error)
 	// FirstHeight at which we started to index. Returns the first indexed height found in the store.
 	// Expected errors:
-	// - storage.ErrNotFound if no heights have been indexed. This should only happen when the database is first initialized.
+	// - storage.ErrHeightNotIndexed if no heights have been indexed. This should only happen when the database is first initialized.
 	FirstHeight() (uint64, error)
 }
 
