@@ -12,6 +12,7 @@ import (
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/message"
 	"github.com/onflow/flow-go/network/p2p"
+	"github.com/onflow/flow-go/network/p2p/p2plogging"
 	"github.com/onflow/flow-go/network/validator"
 	_ "github.com/onflow/flow-go/utils/binstat"
 	"github.com/onflow/flow-go/utils/logging"
@@ -85,7 +86,7 @@ func TopicValidator(log zerolog.Logger, peerFilter func(peer.ID) error, validato
 		}
 
 		lg := log.With().
-			Str("peer_id", from.String()).
+			Str("peer_id", p2plogging.PeerId(from)).
 			Str("topic", rawMsg.GetTopic()).
 			Int("raw_msg_size", len(rawMsg.Data)).
 			Int("msg_size", msg.Size()).

@@ -5,6 +5,8 @@ import (
 	"fmt"
 
 	"github.com/libp2p/go-libp2p/core/peer"
+
+	"github.com/onflow/flow-go/network/p2p/p2plogging"
 )
 
 // ErrDialInProgress indicates that the libp2p node is currently dialing the peer.
@@ -13,7 +15,7 @@ type ErrDialInProgress struct {
 }
 
 func (e ErrDialInProgress) Error() string {
-	return fmt.Sprintf("dialing to peer %s already in progress", e.pid.String())
+	return fmt.Sprintf("dialing to peer %s already in progress", p2plogging.PeerId(e.pid))
 }
 
 // NewDialInProgressErr returns a new ErrDialInProgress.
