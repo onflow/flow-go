@@ -531,14 +531,9 @@ func (m *FollowerState) insert(ctx context.Context, candidate *flow.Block, certi
 	// }
 
 	if hasChanges {
-		dbUpdates = append(dbUpdates, transaction.WithTx(
-			operation.SkipDuplicates(
-				transaction.WithBadgerTx(
-					m.protocolStateSnapshotsDB.StoreTx(updatedStateID, updatedState),
-				),
-			),
-		),
-		)
+		dbUpdates = append(dbUpdates, operation.SkipDuplicatesTx(
+			m.protocolStateSnapshotsDB.StoreTx(updatedStateID, updatedState),
+		))
 	}
 	dbUpdates = append(dbUpdates, m.protocolStateSnapshotsDB.Index(blockID, updatedStateID))
 

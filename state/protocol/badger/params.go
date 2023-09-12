@@ -112,7 +112,7 @@ func ReadGlobalParams(db *badger.DB, headers storage.Headers) (*inmem.Params, er
 
 	// retrieve root header
 
-	root, err := ReadFinalizedRoot(db, headers)
+	root, err := ReadFinalizedRoot(db)
 	if err != nil {
 		return nil, fmt.Errorf("could not get root: %w", err)
 	}
@@ -129,7 +129,7 @@ func ReadGlobalParams(db *badger.DB, headers storage.Headers) (*inmem.Params, er
 }
 
 // ReadFinalizedRoot retrieves the root block's header from the database.
-// This information is immutable for the runtime of the software and may be cached. 
+// This information is immutable for the runtime of the software and may be cached.
 func ReadFinalizedRoot(db *badger.DB) (*flow.Header, error) {
 	var finalizedRootHeight uint64
 	var rootID flow.Identifier
