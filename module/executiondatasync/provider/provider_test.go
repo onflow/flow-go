@@ -33,9 +33,9 @@ func getExecutionDataStore(ds datastore.Batching) execution_data.ExecutionDataSt
 	return execution_data.NewExecutionDataStore(blobs.NewBlobstore(ds), execution_data.DefaultSerializer)
 }
 
-func getBlobservice(ds datastore.Batching) network.BlobService {
+func getBlobservice(t *testing.T, ds datastore.Batching) network.BlobService {
 	blobstore := blobs.NewBlobstore(ds)
-	blobService := new(mocknetwork.BlobService)
+	blobService := mocknetwork.NewBlobService(t)
 	blobService.On("AddBlobs", mock.Anything, mock.AnythingOfType("[]blocks.Block")).Return(blobstore.PutMany)
 	return blobService
 }
@@ -78,7 +78,7 @@ func TestHappyPath(t *testing.T) {
 	t.Parallel()
 
 	ds := getDatastore()
-	provider := getProvider(getBlobservice(ds))
+	provider := getProvider(getBlobservice(t, ds))
 	store := getExecutionDataStore(ds)
 
 	test := func(numChunks int, minSerializedSizePerChunk uint64) {
@@ -103,11 +103,11 @@ func TestProvideContextCanceled(t *testing.T) {
 
 	bed := generateBlockExecutionData(t, 5, 5*execution_data.DefaultMaxBlobSize)
 
-	provider := getProvider(getBlobservice(getDatastore()))
+	provider := getProvider(getBlobservice(t, getDatastore()))
 	_, _, err := provider.Provide(context.Background(), 0, bed)
 	require.NoError(t, err)
 
-	blobService := new(mocknetwork.BlobService)
+	blobService := mocknetwork.NewBlobService(t)
 	blobService.On("AddBlobs", mock.Anything, mock.AnythingOfType("[]blocks.Block")).
 		Return(func(ctx context.Context, blobs []blobs.Blob) error {
 			<-ctx.Done()
