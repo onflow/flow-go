@@ -244,34 +244,27 @@ func CommitDelta(
 	ruh RegisterUpdatesHolder,
 	baseStorageSnapshot storehouse.ExtendableStorageSnapshot,
 ) (flow.StateCommitment, *ledger.TrieUpdate, storehouse.ExtendableStorageSnapshot, error) {
-	newCommit, trieUpdate, err := updateLedger(ldg, baseStorageSnapshot.Commitment(), ruh)
+	updatedRegisters := ruh.UpdatedRegisters()
+	keys, values := RegisterEntriesToKeysValues(ruh.UpdatedRegisters())
+	baseState := baseStorageSnapshot.Commitment()
+	update, err := ledger.NewUpdate(ledger.State(baseState), keys, values)
 	if err != nil {
 		return flow.DummyStateCommitment, nil, nil, fmt.Errorf("cannot create ledger update: %w", err)
 	}
 
-	newStorageSnapshot, err := baseStorageSnapshot.Extend(newCommit, trieUpdate)
+	newState, trieUpdate, err := ldg.Set(update)
+	if err != nil {
+		return flow.DummyStateCommitment, nil, nil, fmt.Errorf("could not update ledger: %w", err)
+	}
+
+	newCommit := flow.StateCommitment(newState)
+
+	newStorageSnapshot, err := baseStorageSnapshot.Extend(newCommit, updatedRegisters)
 	if err != nil {
 		return flow.DummyStateCommitment, nil, nil, fmt.Errorf("cannot extend storage snapshot: %w", err)
 	}
 
 	return newCommit, trieUpdate, newStorageSnapshot, nil
-}
-
-// updateLedger takes a ledger and a set of register updates and returns a new ledger and a trie update.
-// Note the returned trie update contains the root hash of the trie before the update
-func updateLedger(ldg ledger.Ledger, baseState flow.StateCommitment, ruh RegisterUpdatesHolder) (flow.StateCommitment, *ledger.TrieUpdate, error) {
-	keys, values := RegisterEntriesToKeysValues(ruh.UpdatedRegisters())
-	update, err := ledger.NewUpdate(ledger.State(baseState), keys, values)
-
-	if err != nil {
-		return flow.DummyStateCommitment, nil, fmt.Errorf("cannot create ledger update: %w", err)
-	}
-
-	newCommit, trieUpdate, err := ldg.Set(update)
-	if err != nil {
-		return flow.DummyStateCommitment, nil, err
-	}
-	return flow.StateCommitment(newCommit), trieUpdate, nil
 }
 
 func (s *state) HasState(commitment flow.StateCommitment) bool {

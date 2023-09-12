@@ -11,7 +11,7 @@ import (
 // TODO(leo): move it to upper level
 type ExtendableStorageSnapshot interface {
 	snapshot.StorageSnapshot
-	Extend(newCommit flow.StateCommitment, trieUpdate *ledger.TrieUpdate) (ExtendableStorageSnapshot, error)
+	Extend(newCommit flow.StateCommitment, updatedRegisters flow.RegisterEntries) (ExtendableStorageSnapshot, error)
 	Commitment() flow.StateCommitment
 }
 
@@ -66,25 +66,13 @@ func (s *ExecutingBlockSnapshot) getFromUpdates(id flow.RegisterID) (flow.Regist
 // which contains the given trieUpdate
 // Usually it's used to create a new storage snapshot at the next executed collection.
 // The trieUpdate contains the register updates at the executed collection.
-func (s *ExecutingBlockSnapshot) Extend(newCommit flow.StateCommitment, trieUpdate *ledger.TrieUpdate) (ExtendableStorageSnapshot, error) {
-	if flow.StateCommitment(trieUpdate.RootHash) != s.commitment {
-		return nil, fmt.Errorf("Extending block snapshot with a mismatching trie update: %s != %s", trieUpdate.RootHash, s.commitment)
-	}
-
+func (s *ExecutingBlockSnapshot) Extend(newCommit flow.StateCommitment, updatedRegisters flow.RegisterEntries) (ExtendableStorageSnapshot, error) {
 	updates := make(map[flow.RegisterID]flow.RegisterValue)
 
 	// add the old updates
-	for key, value := range s.registerUpdates {
-		updates[key] = value
-	}
-
 	// overwrite with new updates
-	for _, payload := range trieUpdate.Payloads {
-		regID, regValue, err := PayloadToRegister(payload)
-		if err != nil {
-			return nil, fmt.Errorf("could not parse register key from payload: %w", err)
-		}
-		updates[regID] = regValue
+	for _, entry := range updatedRegisters {
+		updates[entry.Key] = entry.Value
 	}
 
 	return &ExecutingBlockSnapshot{
