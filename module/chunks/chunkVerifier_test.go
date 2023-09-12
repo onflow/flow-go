@@ -495,10 +495,8 @@ func generateTransactionResults(t *testing.T, collection *flow.Collection) []exe
 			HasError:        false,
 		}
 
-		switch string(tx.Script) {
-		case "failedTx":
+		if string(tx.Script) == "failedTx" {
 			txResults[i].HasError = true
-			continue
 		}
 	}
 
