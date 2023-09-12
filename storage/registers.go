@@ -18,15 +18,11 @@ type RegisterIndexReader interface {
 	// height the register was indexed at.
 	// An error is returned if the register was not indexed at all or if the height is out of bounds.
 	// Expected errors:
-	// - storage.ErrNotFound if the register was not found in the db or is out of bounds.
+	// - storage.ErrHeightNotIndexed if the register was not found in the db or is out of bounds.
 	Get(ID flow.RegisterID, height uint64) (flow.RegisterValue, error)
 	// LatestHeight returns the latest indexed height.
-	// Expected errors:
-	// - storage.ErrHeightNotIndexed if no heights have been indexed. This should only happen when the database is first initialized.
 	LatestHeight() (uint64, error)
 	// FirstHeight at which we started to index. Returns the first indexed height found in the store.
-	// Expected errors:
-	// - storage.ErrHeightNotIndexed if no heights have been indexed. This should only happen when the database is first initialized.
 	FirstHeight() (uint64, error)
 }
 
