@@ -24,7 +24,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/engine/execution"
-	"github.com/onflow/flow-go/engine/execution/computation/committer"
 	"github.com/onflow/flow-go/engine/execution/computation/computer"
 	computermock "github.com/onflow/flow-go/engine/execution/computation/computer/mock"
 	"github.com/onflow/flow-go/engine/execution/storehouse"
@@ -339,7 +338,6 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		newCommit := unittest.StateCommitmentFixture()
 		trieUpdate := testutils.TrieUpdateFixture(1, 10, 20)
 		snapshot := storehouse.NewExecutingBlockSnapshot(snapshot.EmptyStorageSnapshot{}, newCommit)
-		require.NoError(t, err)
 		committer.On("CommitView", mock.Anything, mock.Anything).
 			Return(newCommit, nil, trieUpdate, snapshot, nil).
 			Once() // just system chunk
@@ -433,8 +431,11 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		// create an empty block
 		block := generateBlock(0, 0, rag)
 
+		newCommit := unittest.StateCommitmentFixture()
+		trieUpdate := testutils.TrieUpdateFixture(1, 10, 20)
+		snapshot := storehouse.NewExecutingBlockSnapshot(snapshot.EmptyStorageSnapshot{}, newCommit)
 		comm.On("CommitView", mock.Anything, mock.Anything).
-			Return(flow.DummyStateCommitment, nil, nil, nil, nil).
+			Return(newCommit, nil, trieUpdate, snapshot, nil).
 			Once() // just system chunk
 
 		result, err := exe.ExecuteBlock(
@@ -500,8 +501,11 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		block := generateBlock(collectionCount, transactionsPerCollection, rag)
 		derivedBlockData := derived.NewEmptyDerivedBlockData(0)
 
+		newCommit := unittest.StateCommitmentFixture()
+		trieUpdate := testutils.TrieUpdateFixture(1, 10, 20)
+		snapshot := storehouse.NewExecutingBlockSnapshot(snapshot.EmptyStorageSnapshot{}, newCommit)
 		committer.On("CommitView", mock.Anything, mock.Anything).
-			Return(flow.DummyStateCommitment, nil, nil, nil, nil).
+			Return(newCommit, nil, trieUpdate, snapshot, nil).
 			Times(collectionCount + 1)
 
 		result, err := exe.ExecuteBlock(
@@ -696,13 +700,17 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 				trackerStorage,
 			)
 
+			committer := &fakeCommitter{
+				callCount: 0,
+			}
+
 			exe, err := computer.NewBlockComputer(
 				vm,
 				execCtx,
 				metrics.NewNoopCollector(),
 				trace.NewNoopTracer(),
 				zerolog.Nop(),
-				committer.NewNoopViewCommitter(),
+				committer,
 				me,
 				prov,
 				nil,
@@ -807,13 +815,16 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			trackerStorage,
 		)
 
+		committer := &fakeCommitter{
+			callCount: 0,
+		}
 		exe, err := computer.NewBlockComputer(
 			vm,
 			execCtx,
 			metrics.NewNoopCollector(),
 			trace.NewNoopTracer(),
 			zerolog.Nop(),
-			committer.NewNoopViewCommitter(),
+			committer,
 			me,
 			prov,
 			nil,
@@ -926,7 +937,9 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			metrics.NewNoopCollector(),
 			trace.NewNoopTracer(),
 			zerolog.Nop(),
-			committer.NewNoopViewCommitter(),
+			&fakeCommitter{
+				callCount: 0,
+			},
 			me,
 			prov,
 			nil,
@@ -983,8 +996,11 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		transactionsPerCollection := 3
 		block := generateBlock(collectionCount, transactionsPerCollection, rag)
 
+		newCommit := unittest.StateCommitmentFixture()
+		trieUpdate := testutils.TrieUpdateFixture(1, 10, 20)
+		snapshot := storehouse.NewExecutingBlockSnapshot(snapshot.EmptyStorageSnapshot{}, newCommit)
 		committer.On("CommitView", mock.Anything, mock.Anything).
-			Return(flow.DummyStateCommitment, nil, nil, nil, nil).
+			Return(newCommit, nil, trieUpdate, snapshot, nil).
 			Times(collectionCount + 1)
 
 		_, err = exe.ExecuteBlock(
@@ -1214,8 +1230,11 @@ func Test_ExecutingSystemCollection(t *testing.T) {
 	ledger := testutil.RootBootstrappedLedger(vm, execCtx)
 
 	committer := new(computermock.ViewCommitter)
+	newCommit := unittest.StateCommitmentFixture()
+	trieUpdate := testutils.TrieUpdateFixture(1, 10, 20)
+	snapshot := storehouse.NewExecutingBlockSnapshot(snapshot.EmptyStorageSnapshot{}, newCommit)
 	committer.On("CommitView", mock.Anything, mock.Anything).
-		Return(nil, nil, nil, nil).
+		Return(newCommit, nil, trieUpdate, snapshot, nil).
 		Times(1) // only system chunk
 
 	noopCollector := metrics.NewNoopCollector()
