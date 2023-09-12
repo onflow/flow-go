@@ -7,7 +7,7 @@ import FlowToken from 0xFLOWTOKENADDRESS
 
 transaction {
 
-    prepare(signer: auth(Storage) &Account) {
+    prepare(signer: auth(Storage, Capabilities) &Account) {
 
         if signer.storage.borrow<&FlowToken.Vault>(from: /storage/flowTokenVault) == nil {
             // Create a new flowToken Vault and put it in storage
