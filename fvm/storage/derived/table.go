@@ -209,7 +209,7 @@ func (table *DerivedDataTable[TKey, TVal]) unsafeValidate(
 			// for example:
 			// two transactions are run concurrently, first loads (cadence contracts)
 			// A and B where B depends on A. The second transaction also loads A and C,
-			// where C depends on A. The firs transaction commits first.
+			// where C depends on A. The first transaction commits first.
 			// The A from the second transaction is equivalent to the A from
 			// the first transaction but it is not the same object.
 			//
