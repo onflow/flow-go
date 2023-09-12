@@ -188,8 +188,8 @@ func newAccountDataProcessor(
 			import FUSD from 0x%s
 			access(all) fun main(address: Address): UFix64 {
 				let account = getAccount(address)
-				let vaultRef = account.getCapability(/public/fusdBalance)!
-					.borrow<&FUSD.Vault{FungibleToken.Balance}>()
+				let vaultRef = account.capabilities.get<&FUSD.Vault{FungibleToken.Balance}>(/public/fusdBalance)!
+					.borrow()
 					?? panic("Could not borrow Balance reference to the Vault")
 				return vaultRef.balance
 			}
@@ -199,8 +199,8 @@ func newAccountDataProcessor(
 			import TopShot from 0x0b2a3299cc857e29
 			access(all) fun main(account: Address): Int {
 				let acct = getAccount(account)
-				let collectionRef = acct.getCapability(/public/MomentCollection)
-										.borrow<&{TopShot.MomentCollectionPublic}>()!
+				let collectionRef = acct.capabilities.get<&{TopShot.MomentCollectionPublic}>(/public/MomentCollection)!
+										.borrow()!
 				return collectionRef.getIDs().length
 			}
 			`)

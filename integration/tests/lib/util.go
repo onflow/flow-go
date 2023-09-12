@@ -80,8 +80,8 @@ func ReadCounterScript(contractAddress sdk.Address, accountAddress sdk.Address) 
 		Code: fmt.Sprintf(
 			`
 			  let account = getAccount(0x%s)
-			  let cap = account.getCapability(/public/counter)
-              return cap.borrow<&Testing.Counter>()?.count ?? -3
+			  let cap = account.capabilities.get<&Testing.Counter>(/public/counter)!
+              return cap.borrow()?.count ?? -3
             `,
 			accountAddress.Hex(),
 		),

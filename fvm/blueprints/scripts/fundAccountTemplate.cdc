@@ -5,7 +5,7 @@ transaction(amount: UFix64, recipient: Address) {
 
 	let sentVault: @{FungibleToken.Vault}
 
-	prepare(signer: &Account) {
+	prepare(signer: auth(BorrowValue) &Account) {
 	    let vaultRef = signer.storage.borrow<auth(FungibleToken.Withdrawable) &FlowToken.Vault>(from: /storage/flowTokenVault)
 		    ?? panic("failed to borrow reference to sender vault")
 	    self.sentVault <- vaultRef.withdraw(amount: amount)
@@ -13,8 +13,8 @@ transaction(amount: UFix64, recipient: Address) {
 
 	execute {
 	    let receiverRef =  getAccount(recipient)
-		    .getCapability(/public/flowTokenReceiver)
-		    .borrow<&FlowToken.Vault>()
+		    .capabilities.get<&FlowToken.Vault>(/public/flowTokenReceiver)!
+		    .borrow()
 		        ?? panic("failed to borrow reference to recipient vault")
 	    receiverRef.deposit(from: <-self.sentVault)
 	}

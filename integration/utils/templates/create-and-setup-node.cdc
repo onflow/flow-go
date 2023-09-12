@@ -14,38 +14,40 @@ transaction(
     stakingKey: String,
     machineAcctKey: Crypto.KeyListEntry?) {
 
-    prepare(service: AuthAccount) {
+    prepare(service: auth(BorrowValue) &Account) {
         // 1 - create the staking account for the new node.
         //
-        let stakingAccount = AuthAccount(payer: service)
+        let stakingAccount = Account(payer: service)
         stakingAccount.keys.add(publicKey: stakingAcctKey.publicKey, hashAlgorithm: stakingAcctKey.hashAlgorithm, weight: stakingAcctKey.weight)
 
         // 2 - fund the new staking account
         //
-        let stakeDst = stakingAccount.getCapability(/public/flowTokenReceiver).borrow<&{FungibleToken.Receiver}>()
+        let stakeDst = stakingAccount.capabilities.get<&{FungibleToken.Receiver}>(/public/flowTokenReceiver)!.borrow()
             ?? panic("Could not borrow receiver reference to the recipient's Vault")
         // withdraw stake from service account
-        let stakeSrc = service.borrow<auth(FungibleToken.Withdrawable) &FlowToken.Vault>(from: /storage/flowTokenVault)
+        let stakeSrc = service.storage.borrow<auth(FungibleToken.Withdrawable) &FlowToken.Vault>(from: /storage/flowTokenVault)
             ?? panic("Could not borrow reference to the owner's Vault!")
         stakeDst.deposit(from: <-stakeSrc.withdraw(amount: stake))
 
         // 3 - set up the staking collection
         //
-        let flowToken = stakingAccount.link<auth(FungibleToken.Withdrawable) &FlowToken.Vault>(/private/flowTokenVault, target: /storage/flowTokenVault)!
+        let vaultCap = stakingAccount.capabilities.storage.issue<auth(FungibleToken.Withdrawable) &FlowToken.Vault>(/storage/flowTokenVault)
+
         // Create a new Staking Collection and put it in storage
-        let stakingCollection <-FlowStakingCollection.createStakingCollection(unlockedVault: flowToken, tokenHolder: nil)
+        let stakingCollection <-FlowStakingCollection.createStakingCollection(unlockedVault: vaultCap, tokenHolder: nil)
         stakingAccount.save(<-stakingCollection, to: FlowStakingCollection.StakingCollectionStoragePath)
 
         // Reference must be taken after storing in the storage.
         // Otherwise the reference gets invalidated upon move.
-        let stakingCollectionRef = stakingAccount.borrow<auth(FlowStakingCollection.CollectionOwner) &FlowStakingCollection.StakingCollection>(from: FlowStakingCollection.StakingCollectionStoragePath)
+        let stakingCollectionRef = stakingAccount.storage.borrow<auth(FlowStakingCollection.CollectionOwner) &FlowStakingCollection.StakingCollection>(from: FlowStakingCollection.StakingCollectionStoragePath)
             ?? panic("Could not borrow reference to the staking collection")
 
+        // TODO: Is this needed?
         // Create a public link to the staking collection
-        stakingAccount.link<&FlowStakingCollection.StakingCollection> (
-            FlowStakingCollection.StakingCollectionPublicPath,
-            target: FlowStakingCollection.StakingCollectionStoragePath
-        )
+        // stakingAccount.link<&FlowStakingCollection.StakingCollection> (
+        //    FlowStakingCollection.StakingCollectionPublicPath,
+        //    target: FlowStakingCollection.StakingCollectionStoragePath
+        // )
 
         // 4 - register the node
         //

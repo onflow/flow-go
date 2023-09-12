@@ -515,8 +515,8 @@ func BenchmarkRuntimeTransaction(b *testing.B) {
 		benchTransaction(
 			b,
 			templateTx(100, `let receiverRef =  getAccount(signer.address)
-				.getCapability(/public/flowTokenReceiver)
-				.borrow<&{FungibleToken.Receiver}>()!`),
+				.capabilities.get<&{FungibleToken.Receiver}>(/public/flowTokenReceiver)!
+				.borrow()!`),
 		)
 	})
 	b.Run("transfer tokens", func(b *testing.B) {
@@ -524,8 +524,8 @@ func BenchmarkRuntimeTransaction(b *testing.B) {
 			b,
 			templateTx(100, `
 				let receiverRef =  getAccount(signer.address)
-					.getCapability(/public/flowTokenReceiver)
-					.borrow<&{FungibleToken.Receiver}>()!
+					.capabilities.get<&{FungibleToken.Receiver}>(/public/flowTokenReceiver)!
+					.borrow()!
 
 				let vaultRef = signer.storage.borrow<auth(FungibleToken.Withdrawable) &FlowToken.Vault>(from: /storage/flowTokenVault)!
 
@@ -537,8 +537,8 @@ func BenchmarkRuntimeTransaction(b *testing.B) {
 		benchTransaction(
 			b,
 			templateTx(100, `
-				signer.load<String>(from: /storage/testpath)
-				signer.save("", to: /storage/testpath)
+				signer.storage.load<String>(from: /storage/testpath)
+				signer.storage.save("", to: /storage/testpath)
 			`),
 		)
 	})
@@ -546,8 +546,8 @@ func BenchmarkRuntimeTransaction(b *testing.B) {
 		benchTransaction(
 			b,
 			templateTx(100, fmt.Sprintf(`
-				signer.load<String>(from: /storage/testpath)
-				signer.save("%s", to: /storage/testpath)
+				signer.storage.load<String>(from: /storage/testpath)
+				signer.storage.save("%s", to: /storage/testpath)
 			`, longString)),
 		)
 	})
@@ -577,7 +577,7 @@ func BenchmarkRuntimeTransaction(b *testing.B) {
 		benchTransaction(
 			b,
 			templateTx(100, `
-				let strings = signer.copy<[String]>(from: /storage/test)!
+				let strings = signer.storage.copy<[String]>(from: /storage/test)!
 				var i = 0
 				while (i < strings.length) {
 				  log(strings[i])
@@ -595,8 +595,8 @@ const TransferTxTemplate = `
 		transaction(testTokenIDs: [UInt64], recipientAddress: Address) {
 			let transferTokens: @NonFungibleToken.Collection
 
-			prepare(acct: &Account) {
-				let ref = acct.borrow<&BatchNFT.Collection>(from: /storage/TestTokenCollection)!
+			prepare(acct: auth(BorrowValue) &Account) {
+				let ref = acct.storage.borrow<&BatchNFT.Collection>(from: /storage/TestTokenCollection)!
 				self.transferTokens <- ref.batchWithdraw(ids: testTokenIDs)
 			}
 
@@ -604,8 +604,8 @@ const TransferTxTemplate = `
 				// get the recipient's public account object
 				let recipient = getAccount(recipientAddress)
 				// get the Collection reference for the receiver
-				let receiverRef = recipient.getCapability(/public/TestTokenCollection)
-					.borrow<&{BatchNFT.TestTokenCollectionPublic}>()!
+				let receiverRef = recipient.capabilities.get<&{BatchNFT.TestTokenCollectionPublic}>(/public/TestTokenCollection)!
+					.borrow()!
 				// deposit the NFT in the receivers collection
 				receiverRef.batchDeposit(tokens: <-self.transferTokens)
 			}

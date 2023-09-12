@@ -590,7 +590,7 @@ func TestTransactionFeeDeduction(t *testing.T) {
 								// The Vault resource that holds the tokens that are being transferred
 								let sentVault: @{FungibleToken.Vault}
 							
-								prepare(signer: auth(Storage) &Account) {
+								prepare(signer: auth(BorrowValue) &Account) {
 							
 									// Get a reference to the signer's stored vault
 									let vaultRef = signer.storage.borrow<auth(FungibleToken.Withdrawable) &FlowToken.Vault>(from: /storage/flowTokenVault)
