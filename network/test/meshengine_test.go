@@ -100,7 +100,8 @@ func setupNodesAndNetworks(t *testing.T, ctx context.Context) ([]*p2pnet.Network
 		observableConnMgr.Subscribe(&ob)
 	}
 
-	ctx10s, _ := context.WithTimeout(ctx, 10*time.Second)
+	ctx10s, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
 	p2ptest.LetNodesDiscoverEachOther(t, ctx10s, libP2PNodes, identities)
 
 	return networks, libP2PNodes, identities, peerChannel
