@@ -51,6 +51,7 @@ jobs:
         run: |
           (for i in {1..${{ steps.settings.outputs.benchmark_repetitions }}}; do go test ./fvm ./engine/execution/computation --bench . --tags relic -shuffle=on --benchmem --run ^$; done) | tee new.txt
 
+      # stash in case of go.mod/go.sum modifications
       - name: Checkout base branch
         run: git stash && git checkout ${{ github.event.pull_request.base.sha }}
 
