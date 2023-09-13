@@ -21,4 +21,5 @@ type All struct {
 	Collections        Collections
 	Events             Events
 	VersionBeacons     VersionBeacons
+	RegisterIndex      RegisterIndex
 }
