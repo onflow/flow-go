@@ -86,10 +86,10 @@ func (s *Registers) Store(
 
 // LatestHeight Gets the latest height of complete registers available
 func (s *Registers) LatestHeight() (uint64, error) {
-	return 0, nil
+	panic("not implemented")
 }
 
 // FirstHeight first indexed height found in the store, typically root block for the spork
 func (s *Registers) FirstHeight() (uint64, error) {
-	return 0, nil
+	panic("not implemented")
 }
