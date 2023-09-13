@@ -303,10 +303,8 @@ func (nc *NoopCollector) OnIPColocationFactorUpdated(f float64)                 
 func (nc *NoopCollector) OnAppSpecificScoreUpdated(f float64)                              {}
 func (nc *NoopCollector) OnOverallPeerScoreUpdated(f float64)                              {}
 
-func (nc *NoopCollector) BlockingPreProcessingStarted(string, uint)                 {}
-func (nc *NoopCollector) BlockingPreProcessingFinished(string, uint, time.Duration) {}
-func (nc *NoopCollector) AsyncProcessingStarted(string)                             {}
-func (nc *NoopCollector) AsyncProcessingFinished(string, time.Duration)             {}
+func (nc *NoopCollector) AsyncProcessingStarted()               {}
+func (nc *NoopCollector) AsyncProcessingFinished(time.Duration) {}
 
 func (nc *NoopCollector) OnMisbehaviorReported(string, string) {}
 func (nc *NoopCollector) OnViolationReportSkipped()            {}
