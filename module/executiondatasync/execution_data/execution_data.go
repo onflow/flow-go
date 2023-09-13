@@ -22,7 +22,7 @@ type ChunkExecutionData struct {
 	TrieUpdate *ledger.TrieUpdate
 
 	// TransactionResults are the results of executing the transactions in the collection
-	// This includes all of the data from flow.TransactionResult, except uses a boolean
+	// This includes all of the data from flow.TransactionResult, except that it uses a boolean
 	// value to indicate if an error occurred instead of a full error message.
 	TransactionResults []TransactionResult
 }
@@ -35,7 +35,7 @@ type BlockExecutionData struct {
 
 // TransactionResult represents a flow.TransactionResult that's encoded within a ChunkExecutionData.
 //
-// The primary difference is this version includes a boolean value indicated if the transaction's
+// The only difference is this version includes a boolean value indicated if the transaction's
 // execution resulted in an error, instead of the full error message. Error messages are prone to
 // non-determinism due to (undiscovered) bugs in the execution and verification code. Rather than
 // including the error and risking execution forks if an undetected bug is introduced, we simplify
