@@ -39,7 +39,8 @@ type BlockExecutionData struct {
 // execution resulted in an error, instead of the full error message. Error messages are prone to
 // non-determinism due to (undiscovered) bugs in the execution and verification code. Rather than
 // including the error and risking execution forks if an undetected bug is introduced, we simplify
-// it to just a boolean value.
+// it to just a boolean value. This will likely change in the future to include some additional
+// information about the error.
 type TransactionResult struct {
 	// TransactionID is the ID of the transaction this result was emitted from.
 	TransactionID flow.Identifier

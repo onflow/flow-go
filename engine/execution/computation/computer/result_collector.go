@@ -156,14 +156,14 @@ func (collector *resultCollector) commitCollection(
 	}
 
 	txResults := execColRes.TransactionResults()
-	transactionResults := execution_data.ConvertTransactionResults(txResults)
+	convertedTxResults := execution_data.ConvertTransactionResults(txResults)
 
 	col := collection.Collection()
 	chunkExecData := &execution_data.ChunkExecutionData{
 		Collection:         &col,
 		Events:             events,
 		TrieUpdate:         trieUpdate,
-		TransactionResults: transactionResults,
+		TransactionResults: convertedTxResults,
 	}
 
 	collector.result.AppendCollectionAttestationResult(
