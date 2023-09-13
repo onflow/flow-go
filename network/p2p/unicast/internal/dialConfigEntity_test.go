@@ -5,7 +5,6 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/onflow/flow-go/model/flow"
 	p2ptest "github.com/onflow/flow-go/network/p2p/test"
 	"github.com/onflow/flow-go/network/p2p/unicast/internal"
 )
@@ -23,7 +22,7 @@ func TestDialConfigEntity(t *testing.T) {
 
 	t.Run("Test ID and Checksum", func(t *testing.T) {
 		// id and checksum methods must return the same value as expected.
-		expectedID := flow.MakeIDFromFingerPrint([]byte(d.PeerId))
+		expectedID := internal.PeerIdToFlowId(peerID)
 		require.Equal(t, expectedID, d.ID())
 		require.Equal(t, expectedID, d.Checksum())
 	})
