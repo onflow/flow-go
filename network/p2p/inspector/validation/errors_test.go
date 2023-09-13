@@ -84,7 +84,7 @@ func TestIWantDuplicateMsgIDThresholdErrRoundTrip(t *testing.T) {
 	// tests the IsIWantDuplicateMsgIDThresholdErr function.
 	assert.True(t, IsIWantDuplicateMsgIDThresholdErr(err), "IsIWantDuplicateMsgIDThresholdErr should return true for IWantDuplicateMsgIDThresholdErr error")
 
-	// test IsDuplicateTopicErr with a different error type.
+	// test IsIWantDuplicateMsgIDThresholdErr with a different error type.
 	dummyErr := fmt.Errorf("dummy error")
 	assert.False(t, IsIWantDuplicateMsgIDThresholdErr(dummyErr), "IsIWantDuplicateMsgIDThresholdErr should return false for non-IWantDuplicateMsgIDThresholdErr error")
 }
