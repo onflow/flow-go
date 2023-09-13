@@ -7,7 +7,7 @@ transaction {
             ?? panic("Could not borrow heartbeat from storage path")
         epochHeartbeat.advanceBlock()
 
-        let versionBeaconHeartbeat = serviceAccount.borrow<&NodeVersionBeacon.Heartbeat>(
+        let versionBeaconHeartbeat = serviceAccount.storage.borrow<&NodeVersionBeacon.Heartbeat>(
             from: NodeVersionBeacon.HeartbeatStoragePath)
                 ?? panic("Couldn't borrow NodeVersionBeacon.Heartbeat Resource")
         versionBeaconHeartbeat.heartbeat()

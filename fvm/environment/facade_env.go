@@ -317,6 +317,7 @@ func (env *facadeEnvironment) GetInterpreterSharedState() *interpreter.SharedSta
 }
 
 func (env *facadeEnvironment) ReadRandom(bytes []byte) error {
-	//TODO: proper implementation is in: https://github.com/onflow/flow-go/pull/4648
-	panic("not supported yet")
+	// NO-OP for now, to unblock certain downstream dependencies.
+	// E.g. cadence-tools/test
+	return nil
 }

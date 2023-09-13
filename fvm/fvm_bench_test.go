@@ -97,9 +97,9 @@ func (account *TestBenchAccount) AddArrayToStorage(b *testing.B, blockExec TestB
 	txBody := flow.NewTransactionBody().
 		SetScript([]byte(`
 		transaction(list: [String]) {
-		  prepare(acct: &Account) {
-			acct.load<[String]>(from: /storage/test)
-			acct.save(list, to: /storage/test)
+		  prepare(acct: auth(Storage) &Account) {
+			acct.storage.load<[String]>(from: /storage/test)
+			acct.storage.save(list, to: /storage/test)
 		  }
 		  execute {}
 		}
@@ -468,7 +468,7 @@ func BenchmarkRuntimeTransaction(b *testing.B) {
 			import TestContract from 0x%s
 
 			transaction(){
-				prepare(signer: AuthAccount){
+				prepare(signer: auth(Storage, Capabilities) &Account){
 					var i = 0
 					while i < %d {
 						i = i + 1
@@ -1168,9 +1168,12 @@ func deployBatchNFT(b *testing.B, be TestBenchBlockExecutor, owner *TestBenchAcc
 					self.nextSetID = 1
 					self.totalSupply = 0
 
-					self.account.save<@Collection>(<- create Collection(), to: /storage/TestTokenCollection)
-					self.account.link<&{TestTokenCollectionPublic}>(/public/TestTokenCollection, target: /storage/TestTokenCollection)
-					self.account.save<@Admin>(<- create Admin(), to: /storage/BatchNFTAdmin)
+					self.account.storage.save<@Collection>(<- create Collection(), to: /storage/TestTokenCollection)
+
+					let collectionCap = self.account.capabilities.storage.issue<&{TestTokenCollectionPublic}>(/storage/TestTokenCollection)
+					self.account.capabilities.publish(collectionCap, at: /public/TestTokenCollection)
+
+					self.account.storage.save<@Admin>(<- create Admin(), to: /storage/BatchNFTAdmin)
 					emit ContractInitialized()
 				}
 			}

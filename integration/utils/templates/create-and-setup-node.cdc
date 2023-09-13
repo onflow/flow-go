@@ -35,7 +35,7 @@ transaction(
 
         // Create a new Staking Collection and put it in storage
         let stakingCollection <-FlowStakingCollection.createStakingCollection(unlockedVault: vaultCap, tokenHolder: nil)
-        stakingAccount.save(<-stakingCollection, to: FlowStakingCollection.StakingCollectionStoragePath)
+        stakingAccount.storage.save(<-stakingCollection, to: FlowStakingCollection.StakingCollectionStoragePath)
 
         // Reference must be taken after storing in the storage.
         // Otherwise the reference gets invalidated upon move.

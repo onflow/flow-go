@@ -205,7 +205,7 @@ func Test_ExecutionMatchesVerification(t *testing.T) {
 		err = testutil.SignTransaction(addKeyTx, accountAddress, accountPrivKey, 0)
 		require.NoError(t, err)
 
-		minimumStorage, err := cadence.NewUFix64("0.00010902")
+		minimumStorage, err := cadence.NewUFix64("0.00011444")
 		require.NoError(t, err)
 
 		cr := executeBlockAndVerify(t, [][]*flow.TransactionBody{
@@ -221,7 +221,7 @@ func Test_ExecutionMatchesVerification(t *testing.T) {
 		txResults := colResult.TransactionResults()
 		// storage limit error
 		assert.Len(t, txResults, 1)
-		assert.Equal(t, txResults[0].ErrorMessage, "")
+		assert.Equal(t, "", txResults[0].ErrorMessage)
 		// ensure events from the first transaction is emitted
 		require.Len(t, colResult.Events(), 10)
 

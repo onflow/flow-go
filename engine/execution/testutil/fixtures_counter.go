@@ -72,14 +72,14 @@ func CreateCounterTransaction(counter, signer flow.Address) *flow.TransactionBod
 			import 0x%s
 
 			transaction {
-				prepare(acc: AuthAccount) {
-					var maybeCounter <- acc.load<@Container.Counter>(from: /storage/counter)
+				prepare(acc: auth(Storage) &Account) {
+					var maybeCounter <- acc.storage.load<@Container.Counter>(from: /storage/counter)
 
 					if maybeCounter == nil {
 						maybeCounter <-! Container.createCounter(3)
 					}
 
-					acc.save(<-maybeCounter!, to: /storage/counter)
+					acc.storage.save(<-maybeCounter!, to: /storage/counter)
 				}
 			}`, counter)),
 		).
@@ -94,8 +94,8 @@ func CreateCounterPanicTransaction(counter, signer flow.Address) *flow.Transacti
 			import 0x%s
 
 			transaction {
-				prepare(acc: AuthAccount) {
-					if let existing <- acc.load<@Container.Counter>(from: /storage/counter) {
+				prepare(acc: auth(Storage) &Account) {
+					if let existing <- acc.storage.load<@Container.Counter>(from: /storage/counter) {
 						destroy existing
             		}
 
@@ -112,8 +112,8 @@ func AddToCounterTransaction(counter, signer flow.Address) *flow.TransactionBody
 			import 0x%s
 
 			transaction {
-				prepare(acc: AuthAccount) {
-					let counter = acc.borrow<&Container.Counter>(from: /storage/counter)
+				prepare(acc: auth(Storage) &Account) {
+					let counter = acc.storage.borrow<&Container.Counter>(from: /storage/counter)
 					counter?.add(2)
 				}
 			}`, counter)),
