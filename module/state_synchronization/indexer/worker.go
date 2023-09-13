@@ -7,13 +7,11 @@ import (
 
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/module"
-	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data/cache"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/jobqueue"
 	"github.com/onflow/flow-go/module/state_synchronization/requester/jobs"
-	"github.com/onflow/flow-go/module/util"
 	"github.com/onflow/flow-go/storage"
 )
 
@@ -30,7 +28,6 @@ const (
 // The execution state worker has a callback that is used by the upstream queues which download new execution data to
 // notify new data is available and kick off indexing.
 type ExecutionStateWorker struct {
-	component.Component
 	*jobqueue.ComponentConsumer
 	log             zerolog.Logger
 	exeDataReader   *jobs.ExecutionDataReader
@@ -68,23 +65,7 @@ func NewExecutionStateWorker(
 		searchAhead,
 	)
 
-	r.Component = component.NewComponentManagerBuilder().
-		AddWorker(r.run).
-		Build()
-
 	return r
-}
-
-func (r *ExecutionStateWorker) run(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
-	r.exeDataReader.AddContext(ctx)
-	r.Start(ctx)
-
-	err := util.WaitClosed(ctx, r.Ready())
-	if err == nil {
-		ready()
-	}
-
-	<-r.Done()
 }
 
 // OnExecutionData is used to notify when new execution data is downloaded by the execution data requester jobqueue.
