@@ -7,6 +7,7 @@ import (
 
 	p2ptest "github.com/onflow/flow-go/network/p2p/test"
 	"github.com/onflow/flow-go/network/p2p/unicast/internal"
+	"github.com/onflow/flow-go/network/p2p/unicast/model"
 )
 
 // TestDialConfigEntity tests the DialConfigEntity struct and its methods.
@@ -14,10 +15,12 @@ func TestDialConfigEntity(t *testing.T) {
 	peerID := p2ptest.PeerIdFixture(t)
 
 	d := &internal.DialConfigEntity{
-		PeerId:             peerID,
-		DialBackoff:        10,
-		StreamBackoff:      20,
-		LastSuccessfulDial: 30,
+		PeerId: peerID,
+		DialConfig: model.DialConfig{
+			DialBackoff:        10,
+			StreamBackoff:      20,
+			LastSuccessfulDial: 30,
+		},
 	}
 
 	t.Run("Test ID and Checksum", func(t *testing.T) {

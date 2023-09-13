@@ -97,6 +97,7 @@ const (
 	ResourceNetworkingDisallowListCache                = "disallow_list_cache"
 	ResourceNetworkingRPCSentTrackerCache              = "gossipsub_rpc_sent_tracker_cache"
 	ResourceNetworkingRPCSentTrackerQueue              = "gossipsub_rpc_sent_tracker_queue"
+	ResourceNetworkingDialConfigCache                  = "dial_config_cache"
 
 	ResourceFollowerPendingBlocksCache         = "follower_pending_block_cache"           // follower engine
 	ResourceFollowerLoopCertifiedBlocksChannel = "follower_loop_certified_blocks_channel" // follower loop, certified blocks buffered channel

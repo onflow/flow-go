@@ -52,6 +52,20 @@ type Manager struct {
 
 	// MaxStreamBackoffTimes is the maximum number of times to retry creating a stream to a peer.
 	MaxStreamBackoffTimes uint64
+
+	// peerReliabilityThreshold is the threshold for the dial history to a remote peer that is considered reliable. When
+	// the last time we dialed a peer is less than this threshold, we will assume the remote peer is not reliable. Otherwise,
+	// we will assume the remote peer is reliable.
+	//
+	// For example, with peerReliabilityThreshold set to 5 minutes, if the last time we dialed a peer was 5 minutes ago, we will
+	// assume the remote peer is reliable and will attempt to dial again with more flexible dial options. However, if the last time
+	// we dialed a peer was 3 minutes ago, we will assume the remote peer is not reliable and will attempt to dial again with
+	// more strict dial options.
+	//
+	// Note in Flow, we only dial a peer when we need to send a message to it; and we assume two nodes that are supposed to
+	// exchange unicast messages will do it frequently. Therefore, the dial history is a good indicator
+	// of the reliability of the peer.
+	peerReliabilityThreshold time.Duration
 }
 
 type ManagerConfig struct {
@@ -63,6 +77,7 @@ type ManagerConfig struct {
 	Metrics                   module.UnicastManagerMetrics
 	MaxConnectionBackoffTimes uint64
 	MaxStreamBackoffTimes     uint64
+	PeerReliabilityThreshold  time.Duration
 }
 
 // NewUnicastManager creates a new unicast manager.
@@ -86,6 +101,8 @@ func NewUnicastManager(cfg *ManagerConfig) (*Manager, error) {
 		createStreamRetryDelay:    cfg.CreateStreamRetryDelay,
 		metrics:                   cfg.Metrics,
 		MaxConnectionBackoffTimes: cfg.MaxConnectionBackoffTimes,
+		MaxStreamBackoffTimes:     cfg.MaxStreamBackoffTimes,
+		peerReliabilityThreshold:  cfg.PeerReliabilityThreshold,
 	}, nil
 }
 
