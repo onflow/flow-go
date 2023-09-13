@@ -19,7 +19,6 @@ import (
 	"github.com/onflow/flow-go/engine/execution/provider"
 	"github.com/onflow/flow-go/engine/execution/state"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/executiondatasync/pruner"
 	"github.com/onflow/flow-go/module/mempool/entity"
@@ -41,7 +40,7 @@ type Engine struct {
 	unit                   *engine.Unit
 	log                    zerolog.Logger
 	me                     module.Local
-	request                module.Requester // used to request collections
+	collectionFetcher      CollectionFetcher
 	state                  protocol.State
 	headers                storage.Headers // see comments on getHeaderByHeight for why we need it
 	blocks                 storage.Blocks
@@ -73,7 +72,7 @@ func New(
 	logger zerolog.Logger,
 	net network.EngineRegistry,
 	me module.Local,
-	request module.Requester,
+	collectionFetcher CollectionFetcher,
 	state protocol.State,
 	headers storage.Headers,
 	blocks storage.Blocks,
@@ -98,7 +97,7 @@ func New(
 		unit:                   unit,
 		log:                    log,
 		me:                     me,
-		request:                request,
+		collectionFetcher:      collectionFetcher,
 		state:                  state,
 		headers:                headers,
 		blocks:                 blocks,
@@ -1177,7 +1176,7 @@ func (e *Engine) fetchAndHandleCollection(
 			return fmt.Errorf("error while querying for collection: %w", err)
 		}
 
-		err = e.fetchCollection(blockID, height, guarantee)
+		err = e.collectionFetcher.FetchCollection(blockID, height, guarantee)
 		if err != nil {
 			return fmt.Errorf("could not fetch collection: %w", err)
 		}
@@ -1186,59 +1185,9 @@ func (e *Engine) fetchAndHandleCollection(
 
 	// make sure that the requests are dispatched immediately by the requester
 	if fetched {
-		e.request.Force()
+		e.collectionFetcher.Force()
 		e.metrics.ExecutionCollectionRequestSent()
 	}
-
-	return nil
-}
-
-// fetchCollection takes a guarantee and forwards to requester engine for fetching the collection
-// any error returned are fatal error
-func (e *Engine) fetchCollection(
-	blockID flow.Identifier,
-	height uint64,
-	guarantee *flow.CollectionGuarantee,
-) error {
-	e.log.Debug().
-		Hex("block", blockID[:]).
-		Hex("collection_id", logging.ID(guarantee.ID())).
-		Msg("requesting collection")
-
-	guarantors, err := protocol.FindGuarantors(e.state, guarantee)
-	if err != nil {
-		// execution node executes certified blocks, which means there is a quorum of consensus nodes who
-		// have validated the block payload. And that validation includes checking the guarantors are correct.
-		// Based on that assumption, failing to find guarantors for guarantees contained in an incorporated block
-		// should be treated as fatal error
-		e.log.Fatal().Err(err).Msgf("failed to find guarantors for guarantee %v at block %v, height %v",
-			guarantee.ID(),
-			blockID,
-			height,
-		)
-		return fmt.Errorf("could not find guarantors: %w", err)
-	}
-
-	filters := []flow.IdentityFilter{
-		filter.HasNodeID(guarantors...),
-	}
-
-	// This is included to temporarily work around an issue observed on a small number of ENs.
-	// It works around an issue where some collection nodes are not configured with enough
-	// file descriptors causing connection failures. This will be removed once a
-	// proper fix is in place.
-	if e.onflowOnlyLNs {
-		// func(Identity("verification-049.mainnet20.nodes.onflow.org:3569")) => true
-		// func(Identity("verification-049.hello.org:3569")) => false
-		filters = append(filters, func(identity *flow.Identity) bool {
-			return onlyOnflowRegex.MatchString(identity.Address)
-		})
-	}
-
-	// queue the collection to be requested from one of the guarantors
-	e.request.EntityByID(guarantee.ID(), filter.And(
-		filters...,
-	))
 
 	return nil
 }
