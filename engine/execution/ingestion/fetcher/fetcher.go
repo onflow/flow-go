@@ -4,11 +4,12 @@ import (
 	"fmt"
 	"regexp"
 
+	"github.com/rs/zerolog"
+
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/state/protocol"
-	"github.com/rs/zerolog"
 )
 
 var onlyOnflowRegex = regexp.MustCompile(`.*\.onflow\.org:3569$`)

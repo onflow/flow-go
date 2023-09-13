@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"regexp"
 	"sync"
 	"time"
 
@@ -58,8 +57,6 @@ type Engine struct {
 	uploader               *uploader.Manager
 	stopControl            *stop.StopControl
 }
-
-var onlyOnflowRegex = regexp.MustCompile(`.*\.onflow\.org:3569$`)
 
 func New(
 	unit *engine.Unit,
