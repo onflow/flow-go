@@ -311,7 +311,7 @@ func (m *MisbehaviorReportManager) onHeartbeat() error {
 			}
 
 			// TODO: this can be done in batch but at this stage let's send individual notifications.
-			//       (it requires enabling the batch mode end-to-end including the cache in middleware).
+			//       (it requires enabling the batch mode end-to-end including the cache in network).
 			// as long as record.Penalty is NOT below model.DisallowListingThreshold,
 			// the node is considered allow-listed and can conduct inbound and outbound connections.
 			// Once it falls below model.DisallowListingThreshold, it needs to be disallow listed.
@@ -352,7 +352,7 @@ func (m *MisbehaviorReportManager) onHeartbeat() error {
 				Msg("heartbeat interval, spam record penalty adjusted by decay function")
 
 			// TODO: this can be done in batch but at this stage let's send individual notifications.
-			//       (it requires enabling the batch mode end-to-end including the cache in middleware).
+			//       (it requires enabling the batch mode end-to-end including the cache in network).
 			if record.Penalty == float64(0) && record.DisallowListed {
 				record.DisallowListed = false
 

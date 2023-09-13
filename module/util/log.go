@@ -8,7 +8,7 @@ import (
 // it prints the progress from 0% to 100% to indicate the index from 0 to (total - 1) has been
 // processed.
 // useful to report the progress of processing the index from 0 to (total - 1)
-func LogProgress(msg string, total int, logger *zerolog.Logger) func(currentIndex int) {
+func LogProgress(msg string, total int, logger zerolog.Logger) func(currentIndex int) {
 	logThreshold := float64(0)
 	return func(currentIndex int) {
 		percentage := float64(100)

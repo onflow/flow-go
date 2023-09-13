@@ -170,13 +170,13 @@ type SubscriptionFilter interface {
 type PubSubTracer interface {
 	component.Component
 	pubsub.RawTracer
-	RPCControlTracking
+	RpcControlTracking
 }
 
-// RPCControlTracking is the abstraction of the underlying libp2p control message tracker used to track message ids broadcast in ihave control messages.
-// This collection of methods can be used to ensure an iWant control message for a message id corresponds to a broadcast ihave message id. Implementations
+// RpcControlTracking is the abstraction of the underlying libp2p control message tracker used to track message ids advertised by the iHave control messages.
+// This collection of methods can ensure an iWant control message for a message-id corresponds to a broadcast iHave message id. Implementations
 // must be non-blocking and concurrency safe.
-type RPCControlTracking interface {
+type RpcControlTracking interface {
 	// LastHighestIHaveRPCSize returns the last highest size of iHaves sent in a rpc.
 	LastHighestIHaveRPCSize() int64
 	// WasIHaveRPCSent checks if an iHave control message with the provided message ID was sent.

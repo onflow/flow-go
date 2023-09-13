@@ -27,6 +27,8 @@ import (
 	"github.com/onflow/flow-go/storage"
 )
 
+const DefaultMaxBlockRange = 300
+
 // Config defines the configurable options for the gRPC server.
 type Config struct {
 	ListenAddr        string
@@ -98,6 +100,7 @@ func New(
 			transactionResults:   txResults,
 			commits:              commits,
 			log:                  log,
+			maxBlockRange:        DefaultMaxBlockRange,
 		},
 		server: server,
 		config: config,
@@ -157,12 +160,16 @@ type handler struct {
 	transactionResults   storage.TransactionResults
 	log                  zerolog.Logger
 	commits              storage.Commits
+	maxBlockRange        int
 }
 
 var _ execution.ExecutionAPIServer = &handler{}
 
 // Ping responds to requests when the server is up.
-func (h *handler) Ping(_ context.Context, _ *execution.PingRequest) (*execution.PingResponse, error) {
+func (h *handler) Ping(
+	_ context.Context,
+	_ *execution.PingRequest,
+) (*execution.PingResponse, error) {
 	return &execution.PingResponse{}, nil
 }
 
@@ -174,6 +181,14 @@ func (h *handler) ExecuteScriptAtBlockID(
 	blockID, err := convert.BlockID(req.GetBlockId())
 	if err != nil {
 		return nil, err
+	}
+
+	// return a more user friendly error if block has not been executed
+	if _, err = h.commits.ByBlockID(blockID); err != nil {
+		if errors.Is(err, storage.ErrNotFound) {
+			return nil, status.Errorf(codes.NotFound, "block %s has not been executed by node or was pruned", blockID)
+		}
+		return nil, status.Errorf(codes.Internal, "state commitment for block ID %s could not be retrieved", blockID)
 	}
 
 	value, err := h.engine.ExecuteScriptAtBlockID(ctx, req.GetScript(), req.GetArguments(), blockID)
@@ -214,8 +229,10 @@ func (h *handler) GetRegisterAtBlockID(
 	return res, nil
 }
 
-func (h *handler) GetEventsForBlockIDs(_ context.Context,
-	req *execution.GetEventsForBlockIDsRequest) (*execution.GetEventsForBlockIDsResponse, error) {
+func (h *handler) GetEventsForBlockIDs(
+	_ context.Context,
+	req *execution.GetEventsForBlockIDsRequest,
+) (*execution.GetEventsForBlockIDsResponse, error) {
 
 	// validate request
 	blockIDs := req.GetBlockIds()
@@ -229,6 +246,10 @@ func (h *handler) GetEventsForBlockIDs(_ context.Context,
 		return nil, err
 	}
 
+	if len(blockIDs) > h.maxBlockRange {
+		return nil, status.Errorf(codes.InvalidArgument, "too many block IDs requested: %d > %d", len(blockIDs), h.maxBlockRange)
+	}
+
 	results := make([]*execution.GetEventsForBlockIDsResponse_Result, len(blockIDs))
 
 	// collect all the events and create a EventsResponse_Result for each block
@@ -236,7 +257,7 @@ func (h *handler) GetEventsForBlockIDs(_ context.Context,
 		// Check if block has been executed
 		if _, err := h.commits.ByBlockID(bID); err != nil {
 			if errors.Is(err, storage.ErrNotFound) {
-				return nil, status.Errorf(codes.NotFound, "state commitment for block ID %s does not exist", bID)
+				return nil, status.Errorf(codes.NotFound, "block %s has not been executed by node or was pruned", bID)
 			}
 			return nil, status.Errorf(codes.Internal, "state commitment for block ID %s could not be retrieved", bID)
 		}
@@ -394,6 +415,15 @@ func (h *handler) GetTransactionResultsByBlockID(
 		return nil, status.Errorf(codes.InvalidArgument, "invalid blockID: %v", err)
 	}
 
+	// must verify block was locally executed first since transactionResults.ByBlockID will return
+	// an empty slice if block does not exist
+	if _, err = h.commits.ByBlockID(blockID); err != nil {
+		if errors.Is(err, storage.ErrNotFound) {
+			return nil, status.Errorf(codes.NotFound, "block %s has not been executed by node or was pruned", blockID)
+		}
+		return nil, status.Errorf(codes.Internal, "state commitment for block ID %s could not be retrieved", blockID)
+	}
+
 	// Get all tx results
 	txResults, err := h.transactionResults.ByBlockID(blockID)
 	if err != nil {
@@ -461,8 +491,10 @@ func (h *handler) GetTransactionResultsByBlockID(
 }
 
 // eventResult creates EventsResponse_Result from flow.Event for the given blockID
-func (h *handler) eventResult(blockID flow.Identifier,
-	flowEvents []flow.Event) (*execution.GetEventsForBlockIDsResponse_Result, error) {
+func (h *handler) eventResult(
+	blockID flow.Identifier,
+	flowEvents []flow.Event,
+) (*execution.GetEventsForBlockIDsResponse_Result, error) {
 
 	// convert events to event message
 	events := convert.EventsToMessages(flowEvents)
@@ -494,6 +526,14 @@ func (h *handler) GetAccountAtBlockID(
 	flowAddress, err := convert.Address(req.GetAddress(), h.chain.Chain())
 	if err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, "invalid address: %v", err)
+	}
+
+	// return a more user friendly error if block has not been executed
+	if _, err = h.commits.ByBlockID(blockFlowID); err != nil {
+		if errors.Is(err, storage.ErrNotFound) {
+			return nil, status.Errorf(codes.NotFound, "block %s has not been executed by node or was pruned", blockFlowID)
+		}
+		return nil, status.Errorf(codes.Internal, "state commitment for block ID %s could not be retrieved", blockFlowID)
 	}
 
 	value, err := h.engine.GetAccount(ctx, flowAddress, blockFlowID)
@@ -540,7 +580,10 @@ func (h *handler) GetLatestBlockHeader(
 		header, err = h.state.Final().Head()
 	}
 	if err != nil {
-		return nil, status.Errorf(codes.NotFound, "not found: %v", err)
+		// this header MUST exist in the db, otherwise the node likely has inconsistent state.
+		// Don't crash as a result of an external API request, but other components will likely panic.
+		h.log.Err(err).Msg("failed to get latest block header. potentially inconsistent protocol state.")
+		return nil, status.Errorf(codes.Internal, "unable to get latest header: %v", err)
 	}
 
 	return h.blockHeaderResponse(header)

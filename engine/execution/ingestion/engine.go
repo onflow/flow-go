@@ -46,9 +46,6 @@ type Engine struct {
 	headers                storage.Headers // see comments on getHeaderByHeight for why we need it
 	blocks                 storage.Blocks
 	collections            storage.Collections
-	events                 storage.Events
-	serviceEvents          storage.ServiceEvents
-	transactionResults     storage.TransactionResults
 	computationManager     computation.ComputationManager
 	providerEngine         provider.ProviderEngine
 	mempool                *Mempool
@@ -74,16 +71,13 @@ var onlyOnflowRegex = regexp.MustCompile(`.*\.onflow\.org:3569$`)
 func New(
 	unit *engine.Unit,
 	logger zerolog.Logger,
-	net network.Network,
+	net network.EngineRegistry,
 	me module.Local,
 	request module.Requester,
 	state protocol.State,
 	headers storage.Headers,
 	blocks storage.Blocks,
 	collections storage.Collections,
-	events storage.Events,
-	serviceEvents storage.ServiceEvents,
-	transactionResults storage.TransactionResults,
 	executionEngine computation.ComputationManager,
 	providerEngine provider.ProviderEngine,
 	execState state.ExecutionState,
@@ -109,9 +103,6 @@ func New(
 		headers:                headers,
 		blocks:                 blocks,
 		collections:            collections,
-		events:                 events,
-		serviceEvents:          serviceEvents,
-		transactionResults:     transactionResults,
 		computationManager:     executionEngine,
 		providerEngine:         providerEngine,
 		mempool:                mempool,
@@ -698,6 +689,8 @@ func (e *Engine) executeBlock(
 		Hex("result_id", logging.Entity(receipt.ExecutionResult)).
 		Hex("execution_data_id", receipt.ExecutionResult.ExecutionDataID[:]).
 		Bool("sealed", isExecutedBlockSealed).
+		Bool("state_changed", finalEndState != *executableBlock.StartState).
+		Uint64("num_txs", nonSystemTransactionCount(receipt.ExecutionResult)).
 		Bool("broadcasted", broadcasted).
 		Int64("timeSpentInMS", time.Since(startedAt).Milliseconds()).
 		Msg("block executed")
@@ -715,6 +708,14 @@ func (e *Engine) executeBlock(
 
 	e.unit.Ctx()
 
+}
+
+func nonSystemTransactionCount(result flow.ExecutionResult) uint64 {
+	count := uint64(0)
+	for _, chunk := range result.Chunks {
+		count += chunk.NumberOfTransactions
+	}
+	return count
 }
 
 // we've executed the block, now we need to check:

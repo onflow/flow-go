@@ -42,7 +42,7 @@ func TestMetricsInspector_ObserveRPC(t *testing.T) {
 		Run(func(args mock.Arguments) {
 			peerID, ok := args.Get(0).(peer.ID)
 			require.True(t, ok)
-			require.Equal(t, spammer.SpammerNode.Host().ID(), peerID)
+			require.Equal(t, spammer.SpammerNode.ID(), peerID)
 			rpc, ok := args.Get(1).(*pubsub.RPC)
 			require.True(t, ok)
 			// there are some default rpc messages exchanged between the nodes on startup

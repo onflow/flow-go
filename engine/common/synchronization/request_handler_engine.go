@@ -68,7 +68,7 @@ var _ hotstuff.FinalizationConsumer = (*RequestHandlerEngine)(nil)
 func NewRequestHandlerEngine(
 	logger zerolog.Logger,
 	metrics module.EngineMetrics,
-	net network.Network,
+	net network.EngineRegistry,
 	me module.Local,
 	state protocol.State,
 	blocks storage.Blocks,

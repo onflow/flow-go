@@ -70,7 +70,7 @@ var _ component.Component = (*MessagingEngine)(nil)
 // NewMessagingEngine returns a new MessagingEngine.
 func NewMessagingEngine(
 	log zerolog.Logger,
-	net network.Network,
+	net network.EngineRegistry,
 	me module.Local,
 	tunnel *dkg.BrokerTunnel,
 	collector module.MempoolMetrics,

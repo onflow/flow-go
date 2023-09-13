@@ -338,7 +338,7 @@ func main() {
 
 			followerEng, err = followereng.NewComplianceLayer(
 				node.Logger,
-				node.Network,
+				node.EngineRegistry,
 				node.Me,
 				node.Metrics.Engine,
 				node.Storage.Headers,
@@ -359,7 +359,7 @@ func main() {
 			sync, err := consync.New(
 				node.Logger,
 				node.Metrics.Engine,
-				node.Network,
+				node.EngineRegistry,
 				node.Me,
 				node.State,
 				node.Storage.Blocks,
@@ -378,7 +378,7 @@ func main() {
 		Component("ingestion engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			ing, err = ingest.New(
 				node.Logger,
-				node.Network,
+				node.EngineRegistry,
 				node.State,
 				node.Metrics.Engine,
 				node.Metrics.Mempool,
@@ -416,7 +416,7 @@ func main() {
 			return provider.New(
 				node.Logger,
 				node.Metrics.Engine,
-				node.Network,
+				node.EngineRegistry,
 				node.Me,
 				node.State,
 				collectionRequestQueue,
@@ -432,7 +432,7 @@ func main() {
 		Component("pusher engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			push, err = pusher.New(
 				node.Logger,
-				node.Network,
+				node.EngineRegistry,
 				node.State,
 				node.Metrics.Engine,
 				colMetrics,
@@ -479,7 +479,7 @@ func main() {
 
 			complianceEngineFactory, err := factories.NewComplianceEngineFactory(
 				node.Logger,
-				node.Network,
+				node.EngineRegistry,
 				node.Me,
 				colMetrics,
 				node.Metrics.Engine,
@@ -500,7 +500,7 @@ func main() {
 			syncFactory, err := factories.NewSyncEngineFactory(
 				node.Logger,
 				node.Metrics.Engine,
-				node.Network,
+				node.EngineRegistry,
 				node.Me,
 			)
 			if err != nil {
@@ -554,7 +554,7 @@ func main() {
 
 			messageHubFactory := factories.NewMessageHubFactory(
 				node.Logger,
-				node.Network,
+				node.EngineRegistry,
 				node.Me,
 				node.Metrics.Engine,
 				node.State,

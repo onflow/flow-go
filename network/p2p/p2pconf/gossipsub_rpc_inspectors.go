@@ -20,7 +20,7 @@ type GossipSubRPCValidationInspectorConfigs struct {
 	// CacheSize size of the queue used by worker pool for the control message validation inspector.
 	CacheSize uint32 `validate:"gte=100" mapstructure:"gossipsub-rpc-validation-inspector-queue-cache-size"`
 	// GraftPruneMessageMaxSampleSize the max sample size used for control message validation of GRAFT and PRUNE. If the total number of control messages (GRAFT or PRUNE)
-	// exceeds this max sample size then the respective message will be truncated before being processed.
+	// exceeds this max sample size then the respective message will be truncated to this value before being processed.
 	GraftPruneMessageMaxSampleSize int `validate:"gte=1000" mapstructure:"gossipsub-rpc-graft-and-prune-message-max-sample-size"`
 }
 
@@ -31,7 +31,7 @@ type IWantRPCInspectionConfig struct {
 	MaxSampleSize uint `validate:"gt=0" mapstructure:"gossipsub-rpc-iwant-max-sample-size"`
 	// MaxMessageIDSampleSize max inspection sample size to use for iWant message ids. Each iWant message includes a list of message ids
 	// each, if the size of this list exceeds the configured max message id sample size the list of message ids will be truncated.
-	MaxMessageIDSampleSize int `validate:"gte=3000" mapstructure:"gossipsub-rpc-iwant-max-message-id-sample-size"`
+	MaxMessageIDSampleSize int `validate:"gte=1000" mapstructure:"gossipsub-rpc-iwant-max-message-id-sample-size"`
 	// CacheMissThreshold the threshold of missing corresponding iHave messages for iWant messages received before an invalid control message notification is disseminated.
 	// If the cache miss threshold is exceeded an invalid control message notification is disseminated and the sender will be penalized.
 	CacheMissThreshold float64 `validate:"gt=0" mapstructure:"gossipsub-rpc-iwant-cache-miss-threshold"`
@@ -44,10 +44,10 @@ type IWantRPCInspectionConfig struct {
 type IHaveRPCInspectionConfig struct {
 	// MaxSampleSize max inspection sample size to use. If the number of ihave messages exceeds this configured value
 	// the control message ihaves will be truncated to the max sample size. This sample is randomly selected.
-	MaxSampleSize int `validate:"gte=5000" mapstructure:"gossipsub-rpc-ihave-max-sample-size"`
+	MaxSampleSize int `validate:"gte=1000" mapstructure:"gossipsub-rpc-ihave-max-sample-size"`
 	// MaxMessageIDSampleSize max inspection sample size to use for iHave message ids. Each ihave message includes a list of message ids
 	// each, if the size of this list exceeds the configured max message id sample size the list of message ids will be truncated.
-	MaxMessageIDSampleSize int `validate:"gte=3000" mapstructure:"gossipsub-rpc-ihave-max-message-id-sample-size"`
+	MaxMessageIDSampleSize int `validate:"gte=1000" mapstructure:"gossipsub-rpc-ihave-max-message-id-sample-size"`
 }
 
 // ClusterPrefixedMessageConfig configuration values for cluster prefixed control message validation.

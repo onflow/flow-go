@@ -92,7 +92,9 @@ func TestInvalidCtrlMsgScoringIntegration(t *testing.T) {
 		idProvider,
 		p2ptest.WithRole(flow.RoleConsensus),
 		p2ptest.EnablePeerScoringWithOverride(p2p.PeerScoringConfigNoOverride),
-		p2ptest.OverrideGossipSubRpcInspectorSuiteFactory(func(zerolog.Logger,
+		p2ptest.OverrideGossipSubRpcInspectorSuiteFactory(func(
+			irrecoverable.SignalerContext,
+			zerolog.Logger,
 			flow.Identifier,
 			*p2pconf.GossipSubRPCInspectorsConfig,
 			module.GossipSubMetrics,
@@ -136,7 +138,7 @@ func TestInvalidCtrlMsgScoringIntegration(t *testing.T) {
 	// now simulates node2 spamming node1 with invalid gossipsub control messages.
 	for i := 0; i < 30; i++ {
 		inspectorSuite1.consumer.OnInvalidControlMessageNotification(&p2p.InvCtrlMsgNotif{
-			PeerID:  node2.Host().ID(),
+			PeerID:  node2.ID(),
 			MsgType: p2pmsg.ControlMessageTypes()[rand.Intn(len(p2pmsg.ControlMessageTypes()))],
 			Error:   fmt.Errorf("invalid control message"),
 		})
