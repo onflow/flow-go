@@ -46,27 +46,43 @@ type Manager struct {
 	peerDialing            sync.Map
 	createStreamRetryDelay time.Duration
 	metrics                module.UnicastManagerMetrics
+
+	// MaxConnectionBackoffTimes is the maximum number of times to retry creating a connection to a peer.
+	MaxConnectionBackoffTimes uint8
 }
 
 type ManagerConfig struct {
-	Logger                 zerolog.Logger
-	StreamFactory          stream.Factory
-	SporkId                flow.Identifier
-	ConnStatus             p2p.PeerConnections
-	CreateStreamRetryDelay time.Duration
-	Metrics                module.UnicastManagerMetrics
+	Logger                    zerolog.Logger
+	StreamFactory             stream.Factory
+	SporkId                   flow.Identifier
+	ConnStatus                p2p.PeerConnections
+	CreateStreamRetryDelay    time.Duration
+	Metrics                   module.UnicastManagerMetrics
+	MaxConnectionBackoffTimes uint8
 }
 
-func NewUnicastManager(cfg *ManagerConfig) *Manager {
-	return &Manager{
-		logger:                 cfg.Logger.With().Str("module", "unicast-manager").Logger(),
-		streamFactory:          cfg.StreamFactory,
-		sporkId:                cfg.SporkId,
-		connStatus:             cfg.ConnStatus,
-		peerDialing:            sync.Map{},
-		createStreamRetryDelay: cfg.CreateStreamRetryDelay,
-		metrics:                cfg.Metrics,
+// NewUnicastManager creates a new unicast manager.
+// Args:
+//   - cfg: configuration for the unicast manager.
+//
+// Returns:
+//   - a new unicast manager.
+//   - an error if the configuration is invalid, any error is irrecoverable.
+func NewUnicastManager(cfg *ManagerConfig) (*Manager, error) {
+	if cfg.MaxConnectionBackoffTimes == 0 {
+		return nil, fmt.Errorf("max connection backoff times must be greater than 0")
 	}
+
+	return &Manager{
+		logger:                    cfg.Logger.With().Str("module", "unicast-manager").Logger(),
+		streamFactory:             cfg.StreamFactory,
+		sporkId:                   cfg.SporkId,
+		connStatus:                cfg.ConnStatus,
+		peerDialing:               sync.Map{},
+		createStreamRetryDelay:    cfg.CreateStreamRetryDelay,
+		metrics:                   cfg.Metrics,
+		MaxConnectionBackoffTimes: cfg.MaxConnectionBackoffTimes,
+	}, nil
 }
 
 // SetDefaultHandler sets the default stream handler for this unicast manager. The default handler is utilized
