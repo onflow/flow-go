@@ -168,7 +168,7 @@ func TestCalculateChunkExecutionDataID(t *testing.T) {
 			{
 				TransactionID:   flow.MustHexStringToIdentifier("0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"),
 				ComputationUsed: 100,
-				HasError:        true,
+				Failed:          true,
 			},
 		},
 	}
@@ -202,7 +202,7 @@ func generateChunkExecutionDataID(t *testing.T) {
 			{
 				TransactionID:   flow.MustHexStringToIdentifier("0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"),
 				ComputationUsed: 100,
-				HasError:        true,
+				Failed:          true,
 			},
 		},
 	}

@@ -492,11 +492,11 @@ func generateTransactionResults(t *testing.T, collection *flow.Collection) []exe
 		txResults[i] = execution_data.TransactionResult{
 			TransactionID:   tx.ID(),
 			ComputationUsed: computationUsed,
-			HasError:        false,
+			Failed:          false,
 		}
 
 		if string(tx.Script) == "failedTx" {
-			txResults[i].HasError = true
+			txResults[i].Failed = true
 		}
 	}
 

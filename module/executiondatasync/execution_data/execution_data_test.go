@@ -40,12 +40,12 @@ func TestConvertTransactionResults(t *testing.T) {
 			{
 				TransactionID:   flow.Identifier{1, 2, 3},
 				ComputationUsed: 100,
-				HasError:        false,
+				Failed:          false,
 			},
 			{
 				TransactionID:   flow.Identifier{4, 5, 6},
 				ComputationUsed: 200,
-				HasError:        true,
+				Failed:          true,
 			},
 		}
 
@@ -56,7 +56,7 @@ func TestConvertTransactionResults(t *testing.T) {
 			assert.Equal(t, e, converted[i])
 			assert.Equal(t, e.TransactionID, converted[i].TransactionID)
 			assert.Equal(t, e.ComputationUsed, converted[i].ComputationUsed)
-			assert.Equal(t, e.HasError, converted[i].HasError)
+			assert.Equal(t, e.Failed, converted[i].Failed)
 		}
 	})
 }

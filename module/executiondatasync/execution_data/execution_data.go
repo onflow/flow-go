@@ -44,8 +44,8 @@ type BlockExecutionData struct {
 type TransactionResult struct {
 	// TransactionID is the ID of the transaction this result was emitted from.
 	TransactionID flow.Identifier
-	// HasError is true if the transaction's execution resulted in an error, false otherwise.
-	HasError bool
+	// Failed is true if the transaction's execution failed resulting in an error, false otherwise.
+	Failed bool
 	// ComputationUsed is amount of computation used while executing the transaction.
 	ComputationUsed uint64
 }
@@ -62,7 +62,7 @@ func ConvertTransactionResults(results flow.TransactionResults) []TransactionRes
 		converted[i] = TransactionResult{
 			TransactionID:   txResult.TransactionID,
 			ComputationUsed: txResult.ComputationUsed,
-			HasError:        txResult.ErrorMessage != "",
+			Failed:          txResult.ErrorMessage != "",
 		}
 	}
 	return converted

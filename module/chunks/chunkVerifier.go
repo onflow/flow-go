@@ -249,7 +249,7 @@ func (fcv *ChunkVerifier) verifyTransactionsInContext(
 		txResults[i] = execution_data.TransactionResult{
 			TransactionID:   tx.ID,
 			ComputationUsed: output.ComputationUsed,
-			HasError:        output.Err != nil,
+			Failed:          output.Err != nil,
 		}
 	}
 

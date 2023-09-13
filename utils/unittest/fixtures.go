@@ -2489,7 +2489,7 @@ func ChunkExecutionDataFixture(t *testing.T, minSize int, opts ...func(*executio
 	for i, tx := range collection.Transactions {
 		results[i] = execution_data.TransactionResult{
 			TransactionID:   tx.ID(),
-			HasError:        false,
+			Failed:          false,
 			ComputationUsed: uint64(i * 100),
 		}
 	}
