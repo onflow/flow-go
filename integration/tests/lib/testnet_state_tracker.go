@@ -113,10 +113,9 @@ func (tst *TestnetStateTracker) Track(t *testing.T, ctx context.Context, ghost *
 					len(m.ExecutionResult.Chunks))
 			case *messages.ChunkDataResponse:
 				// consuming this explicitly to avoid logging full msg which is usually very large because of proof
-				t.Logf("%x chunk data pack received from %x for collection %x, checksum %v\n",
+				t.Logf("%x chunk data pack received from %x, checksum %v\n",
 					m.ChunkDataPack.ChunkID,
 					sender,
-					m.ChunkDataPack.Collection.ID(),
 					m.ChunkDataPack.Checksum())
 
 			default:
