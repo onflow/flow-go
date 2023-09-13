@@ -125,7 +125,7 @@ func TestGetEvents(t *testing.T) {
 
 	for _, test := range testVectors {
 		t.Run(test.description, func(t *testing.T) {
-			assertResponse(t, test.request, test.expectedStatus, test.expectedResponse, backend, nil)
+			assertResponse(t, test.request, test.expectedStatus, test.expectedResponse, backend)
 		})
 	}
 

@@ -48,7 +48,7 @@ func TestGetResultByID(t *testing.T) {
 		req := getResultByIDReq(id.String(), nil)
 
 		expected := executionResultExpectedStr(result)
-		assertOKResponse(t, req, expected, backend, nil)
+		assertOKResponse(t, req, expected, backend)
 		mocks.AssertExpectationsForObjects(t, backend)
 	})
 
@@ -61,7 +61,7 @@ func TestGetResultByID(t *testing.T) {
 			Once()
 
 		req := getResultByIDReq(id.String(), nil)
-		assertResponse(t, req, http.StatusNotFound, `{"code":404,"message":"Flow resource not found: block not found"}`, backend, nil)
+		assertResponse(t, req, http.StatusNotFound, `{"code":404,"message":"Flow resource not found: block not found"}`, backend)
 		mocks.AssertExpectationsForObjects(t, backend)
 	})
 }
@@ -81,7 +81,7 @@ func TestGetResultBlockID(t *testing.T) {
 		req := getResultByIDReq("", []string{blockID.String()})
 
 		expected := fmt.Sprintf(`[%s]`, executionResultExpectedStr(result))
-		assertOKResponse(t, req, expected, backend, nil)
+		assertOKResponse(t, req, expected, backend)
 		mocks.AssertExpectationsForObjects(t, backend)
 	})
 
@@ -94,7 +94,7 @@ func TestGetResultBlockID(t *testing.T) {
 			Once()
 
 		req := getResultByIDReq("", []string{blockID.String()})
-		assertResponse(t, req, http.StatusNotFound, `{"code":404,"message":"Flow resource not found: block not found"}`, backend, nil)
+		assertResponse(t, req, http.StatusNotFound, `{"code":404,"message":"Flow resource not found: block not found"}`, backend)
 		mocks.AssertExpectationsForObjects(t, backend)
 	})
 }

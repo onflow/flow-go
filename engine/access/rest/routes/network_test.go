@@ -38,7 +38,7 @@ func TestGetNetworkParameters(t *testing.T) {
 
 		expected := networkParametersExpectedStr(flow.Mainnet)
 
-		assertOKResponse(t, req, expected, backend, nil)
+		assertOKResponse(t, req, expected, backend)
 		mocktestify.AssertExpectationsForObjects(t, backend)
 	})
 }

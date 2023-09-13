@@ -19,7 +19,6 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
-	"github.com/onflow/flow-go/access/mock"
 	"github.com/onflow/flow-go/engine/access/rest/request"
 	"github.com/onflow/flow-go/engine/access/state_stream"
 	mockstatestream "github.com/onflow/flow-go/engine/access/state_stream/mock"
@@ -113,8 +112,7 @@ func (s *SubscribeEventsSuite) TestSubscribeEvents() {
 
 	for _, test := range tests {
 		s.Run(test.name, func() {
-			stateStreamBackend := &mockstatestream.API{}
-			backend := &mock.API{}
+			stateStreamBackend := mockstatestream.NewAPI(s.T())
 			subscription := &mockstatestream.Subscription{}
 
 			filter, err := state_stream.NewEventFilter(state_stream.DefaultEventFilterConfig, chain, test.eventTypes, test.addresses, test.contracts)
@@ -176,7 +174,7 @@ func (s *SubscribeEventsSuite) TestSubscribeEvents() {
 				time.Sleep(5 * time.Second)
 				close(respRecorder.closed)
 			}()
-			err = executeRequest(req, backend, stateStreamBackend, respRecorder)
+			executeWsRequest(req, stateStreamBackend, respRecorder)
 			assert.NoError(s.T(), err)
 			requireResponse(s.T(), respRecorder, expectedEventsResponses)
 		})
@@ -186,20 +184,16 @@ func (s *SubscribeEventsSuite) TestSubscribeEvents() {
 func (s *SubscribeEventsSuite) TestSubscribeEventsHandlesErrors() {
 	s.Run("returns error for block id and height", func() {
 		stateStreamBackend := &mockstatestream.API{}
-		backend := &mock.API{}
-
 		req, err := getSubscribeEventsRequest(s.T(), s.blocks[0].ID(), s.blocks[0].Header.Height, nil, nil, nil)
 		assert.NoError(s.T(), err)
 		respRecorder := NewHijackResponseRecorder()
-		err = executeRequest(req, backend, stateStreamBackend, respRecorder)
+		executeWsRequest(req, stateStreamBackend, respRecorder)
 		assert.NoError(s.T(), err)
 		requireError(s.T(), respRecorder, "can only provide either block ID or start height")
 	})
 
 	s.Run("returns error for invalid block id", func() {
 		stateStreamBackend := &mockstatestream.API{}
-		backend := &mock.API{}
-
 		invalidBlock := unittest.BlockFixture()
 		subscription := &mockstatestream.Subscription{}
 
@@ -217,14 +211,13 @@ func (s *SubscribeEventsSuite) TestSubscribeEventsHandlesErrors() {
 		req, err := getSubscribeEventsRequest(s.T(), invalidBlock.ID(), request.EmptyHeight, nil, nil, nil)
 		assert.NoError(s.T(), err)
 		respRecorder := NewHijackResponseRecorder()
-		err = executeRequest(req, backend, stateStreamBackend, respRecorder)
+		executeWsRequest(req, stateStreamBackend, respRecorder)
 		assert.NoError(s.T(), err)
 		requireError(s.T(), respRecorder, "stream encountered an error: subscription error")
 	})
 
 	s.Run("returns error when channel closed", func() {
 		stateStreamBackend := &mockstatestream.API{}
-		backend := &mock.API{}
 		subscription := &mockstatestream.Subscription{}
 
 		ch := make(chan interface{})
@@ -242,7 +235,7 @@ func (s *SubscribeEventsSuite) TestSubscribeEventsHandlesErrors() {
 		req, err := getSubscribeEventsRequest(s.T(), s.blocks[0].ID(), request.EmptyHeight, nil, nil, nil)
 		assert.NoError(s.T(), err)
 		respRecorder := NewHijackResponseRecorder()
-		err = executeRequest(req, backend, stateStreamBackend, respRecorder)
+		executeWsRequest(req, stateStreamBackend, respRecorder)
 		assert.NoError(s.T(), err)
 		requireError(s.T(), respRecorder, "subscription channel closed")
 	})

@@ -12,16 +12,14 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gorilla/mux"
-	"github.com/rs/zerolog"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/access/mock"
 	"github.com/onflow/flow-go/engine/access/state_stream"
-	mock_state_stream "github.com/onflow/flow-go/engine/access/state_stream/mock"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 const (
@@ -38,10 +36,13 @@ const (
 	contractsQueryParams      = "contracts"
 )
 
+// fakeNetConn implements a mocked ws connection that can be injected in testing logic.
 type fakeNetConn struct {
 	io.Writer
 	closed chan struct{}
 }
+
+var _ net.Conn = (*fakeNetConn)(nil)
 
 // Close closes the fakeNetConn and signals its closure by closing the "closed" channel.
 func (c fakeNetConn) Close() error {
@@ -103,42 +104,37 @@ func NewHijackResponseRecorder() *HijackResponseRecorder {
 	}
 }
 
-func newRouter(backend *mock.API, stateStreamApi *mock_state_stream.API) (*mux.Router, error) {
-	var b bytes.Buffer
-	logger := zerolog.New(&b)
-	restCollector := metrics.NewNoopCollector()
-
-	stateStreamConfig := state_stream.Config{
-		EventFilterConfig: state_stream.DefaultEventFilterConfig,
-		MaxGlobalStreams:  state_stream.DefaultMaxGlobalStreams,
-	}
-
-	return NewRouter(backend,
-		logger,
+func executeRequest(req *http.Request, backend access.API) *httptest.ResponseRecorder {
+	router := NewRouterBuilder(
+		unittest.Logger(),
+		metrics.NewNoopCollector(),
+	).AddRestRoutes(
+		backend,
 		flow.Testnet.Chain(),
-		restCollector,
+	).Build()
+
+	rr := httptest.NewRecorder()
+	router.ServeHTTP(rr, req)
+	return rr
+}
+
+func executeWsRequest(req *http.Request, stateStreamApi state_stream.API, responseRecorder *HijackResponseRecorder) {
+	restCollector := metrics.NewNoopCollector()
+	router := NewRouterBuilder(unittest.Logger(), restCollector).AddWsRoutes(
+		flow.Testnet.Chain(),
 		stateStreamApi,
-		stateStreamConfig.EventFilterConfig,
-		stateStreamConfig.MaxGlobalStreams)
-}
-
-func executeRequest(req *http.Request, backend *mock.API, stateStreamApi *mock_state_stream.API, responseRecorder *HijackResponseRecorder) error {
-	router, err := newRouter(backend, stateStreamApi)
-	if err != nil {
-		return err
-	}
+		state_stream.DefaultEventFilterConfig,
+		state_stream.DefaultMaxGlobalStreams,
+	).Build()
 	router.ServeHTTP(responseRecorder, req)
-	return nil
 }
 
-func assertOKResponse(t *testing.T, req *http.Request, expectedRespBody string, backend *mock.API, stateStreamApi *mock_state_stream.API) {
-	assertResponse(t, req, http.StatusOK, expectedRespBody, backend, stateStreamApi)
+func assertOKResponse(t *testing.T, req *http.Request, expectedRespBody string, backend *mock.API) {
+	assertResponse(t, req, http.StatusOK, expectedRespBody, backend)
 }
 
-func assertResponse(t *testing.T, req *http.Request, status int, expectedRespBody string, backend *mock.API, stateStreamApi *mock_state_stream.API) {
-	rr := NewHijackResponseRecorder()
-	err := executeRequest(req, backend, stateStreamApi, rr)
-	assert.NoError(t, err)
+func assertResponse(t *testing.T, req *http.Request, status int, expectedRespBody string, backend *mock.API) {
+	rr := executeRequest(req, backend)
 	actualResponseBody := rr.Body.String()
 	require.JSONEq(t,
 		expectedRespBody,

@@ -55,7 +55,7 @@ func TestScripts(t *testing.T) {
 		assertOKResponse(t, req, fmt.Sprintf(
 			"\"%s\"",
 			base64.StdEncoding.EncodeToString([]byte(`hello world`)),
-		), backend, nil)
+		), backend)
 	})
 
 	t.Run("get by height", func(t *testing.T) {
@@ -70,7 +70,7 @@ func TestScripts(t *testing.T) {
 		assertOKResponse(t, req, fmt.Sprintf(
 			"\"%s\"",
 			base64.StdEncoding.EncodeToString([]byte(`hello world`)),
-		), backend, nil)
+		), backend)
 	})
 
 	t.Run("get by ID", func(t *testing.T) {
@@ -85,7 +85,7 @@ func TestScripts(t *testing.T) {
 		assertOKResponse(t, req, fmt.Sprintf(
 			"\"%s\"",
 			base64.StdEncoding.EncodeToString([]byte(`hello world`)),
-		), backend, nil)
+		), backend)
 	})
 
 	t.Run("get error", func(t *testing.T) {
@@ -101,7 +101,6 @@ func TestScripts(t *testing.T) {
 			http.StatusBadRequest,
 			`{"code":400, "message":"Invalid Flow request: internal server error"}`,
 			backend,
-			nil,
 		)
 	})
 
@@ -126,7 +125,7 @@ func TestScripts(t *testing.T) {
 
 		for _, test := range tests {
 			req := scriptReq(test.id, test.height, test.body)
-			assertResponse(t, req, http.StatusBadRequest, test.out, backend, nil)
+			assertResponse(t, req, http.StatusBadRequest, test.out, backend)
 		}
 	})
 }

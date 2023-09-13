@@ -48,7 +48,7 @@ func TestGetAccountKeyByIndex(t *testing.T) {
 
 		expected := expectedAccountKeyResponse(account)
 
-		assertOKResponse(t, req, expected, backend, nil)
+		assertOKResponse(t, req, expected, backend)
 		mocktestify.AssertExpectationsForObjects(t, backend)
 	})
 
@@ -69,7 +69,7 @@ func TestGetAccountKeyByIndex(t *testing.T) {
 
 		expected := expectedAccountKeyResponse(account)
 
-		assertOKResponse(t, req, expected, backend, nil)
+		assertOKResponse(t, req, expected, backend)
 		mocktestify.AssertExpectationsForObjects(t, backend)
 	})
 
@@ -97,7 +97,7 @@ func TestGetAccountKeyByIndex(t *testing.T) {
           }
 		`, statusCode, index)
 
-		assertResponse(t, req, statusCode, expected, backend, nil)
+		assertResponse(t, req, statusCode, expected, backend)
 		mocktestify.AssertExpectationsForObjects(t, backend)
 	})
 
@@ -125,7 +125,7 @@ func TestGetAccountKeyByIndex(t *testing.T) {
           }
 		`, statusCode, index)
 
-		assertResponse(t, req, statusCode, expected, backend, nil)
+		assertResponse(t, req, statusCode, expected, backend)
 		mocktestify.AssertExpectationsForObjects(t, backend)
 	})
 
@@ -154,7 +154,7 @@ func TestGetAccountKeyByIndex(t *testing.T) {
           }
 		`, statusCode, account.Address)
 
-		assertResponse(t, req, statusCode, expected, backend, nil)
+		assertResponse(t, req, statusCode, expected, backend)
 		mocktestify.AssertExpectationsForObjects(t, backend)
 	})
 
@@ -183,7 +183,7 @@ func TestGetAccountKeyByIndex(t *testing.T) {
           }
 		`, statusCode, account.Address)
 
-		assertResponse(t, req, statusCode, expected, backend, nil)
+		assertResponse(t, req, statusCode, expected, backend)
 		mocktestify.AssertExpectationsForObjects(t, backend)
 	})
 
@@ -198,7 +198,7 @@ func TestGetAccountKeyByIndex(t *testing.T) {
 
 		expected := expectedAccountKeyResponse(account)
 
-		assertOKResponse(t, req, expected, backend, nil)
+		assertOKResponse(t, req, expected, backend)
 		mocktestify.AssertExpectationsForObjects(t, backend)
 	})
 
@@ -222,7 +222,7 @@ func TestGetAccountKeyByIndex(t *testing.T) {
 			  }
 			`, statusCode, finalHeight)
 
-		assertResponse(t, req, statusCode, expected, backend, nil)
+		assertResponse(t, req, statusCode, expected, backend)
 		mocktestify.AssertExpectationsForObjects(t, backend)
 	})
 
@@ -261,10 +261,7 @@ func TestGetAccountKeyByIndex(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			req, _ := http.NewRequest("GET", test.url, nil)
-			rr := NewHijackResponseRecorder()
-			err := executeRequest(req, backend, nil, rr)
-			assert.NoError(t, err)
-
+			rr := executeRequest(req, backend)
 			assert.Equal(t, http.StatusBadRequest, rr.Code)
 			assert.JSONEq(t, test.out, rr.Body.String())
 		})

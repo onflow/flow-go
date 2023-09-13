@@ -5,11 +5,11 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"sync/atomic"
 	"time"
 
 	"github.com/gorilla/websocket"
 	"github.com/rs/zerolog"
+	"go.uber.org/atomic"
 
 	"github.com/onflow/flow-go/engine/access/rest/models"
 	"github.com/onflow/flow-go/engine/access/rest/request"
@@ -36,7 +36,7 @@ type WebsocketController struct {
 	api               state_stream.API               // the state_stream.API instance for managing event subscriptions
 	eventFilterConfig state_stream.EventFilterConfig // the configuration for filtering events
 	maxStreams        int32                          // the maximum number of streams allowed
-	streamCount       *atomic.Int32                  // the current number of active streams
+	activeStreamCount *atomic.Int32                  // the current number of active streams
 	readChannel       chan struct{}                  // channel which notify closing connection by the client
 }
 
@@ -103,7 +103,7 @@ func (wsController *WebsocketController) wsErrorHandler(err error) {
 	}
 }
 
-// writeEvents use for writes events and pings to the WebSocket connection for a given subscription.
+// writeEvents is used for writing events and pings to the WebSocket connection for a given subscription.
 // It listens to the subscription's channel for events and writes them to the WebSocket connection.
 // If an error occurs or the subscription channel is closed, it handles the error or termination accordingly.
 // The function uses a ticker to periodically send ping messages to the client to maintain the connection.
@@ -114,6 +114,8 @@ func (wsController *WebsocketController) writeEvents(sub state_stream.Subscripti
 	for {
 		select {
 		case _, ok := <-wsController.readChannel:
+			// we use `readChannel` as indicator of client's status, when `readChannel` closes it means that client
+			// connection has been terminated and we need to stop this goroutine to avoid memory leak.
 			if !ok {
 				return
 			}
@@ -196,8 +198,10 @@ type WSHandler struct {
 	api               state_stream.API
 	eventFilterConfig state_stream.EventFilterConfig
 	maxStreams        int32
-	streamCount       *atomic.Int32
+	activeStreamCount *atomic.Int32
 }
+
+var _ http.Handler = (*WSHandler)(nil)
 
 func NewWSHandler(
 	logger zerolog.Logger,
@@ -212,7 +216,7 @@ func NewWSHandler(
 		api:               api,
 		eventFilterConfig: eventFilterConfig,
 		maxStreams:        int32(maxGlobalStreams),
-		streamCount:       &atomic.Int32{},
+		activeStreamCount: atomic.NewInt32(0),
 		HttpHandler:       NewHttpHandler(logger, chain),
 	}
 
@@ -245,7 +249,7 @@ func (h *WSHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		api:               h.api,
 		eventFilterConfig: h.eventFilterConfig,
 		maxStreams:        h.maxStreams,
-		streamCount:       h.streamCount,
+		activeStreamCount: h.activeStreamCount,
 		readChannel:       make(chan struct{}),
 	}
 
@@ -255,13 +259,13 @@ func (h *WSHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if wsController.streamCount.Load() >= wsController.maxStreams {
+	if wsController.activeStreamCount.Load() >= wsController.maxStreams {
 		err := fmt.Errorf("maximum number of streams reached")
 		wsController.wsErrorHandler(models.NewRestError(http.StatusServiceUnavailable, err.Error(), err))
 		return
 	}
-	wsController.streamCount.Add(1)
-	defer wsController.streamCount.Add(-1)
+	wsController.activeStreamCount.Add(1)
+	defer wsController.activeStreamCount.Add(-1)
 
 	// cancelling the context passed into the `subscribeFunc` to ensure when the client disconnect it's time the shutdown
 	// gorountines setup by the backend are cleaned up if the client disconnects first.

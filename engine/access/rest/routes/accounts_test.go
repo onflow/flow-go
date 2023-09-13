@@ -61,7 +61,7 @@ func TestAccessGetAccount(t *testing.T) {
 
 		expected := expectedExpandedResponse(account)
 
-		assertOKResponse(t, req, expected, backend, nil)
+		assertOKResponse(t, req, expected, backend)
 		mocktestify.AssertExpectationsForObjects(t, backend)
 	})
 
@@ -81,7 +81,7 @@ func TestAccessGetAccount(t *testing.T) {
 
 		expected := expectedExpandedResponse(account)
 
-		assertOKResponse(t, req, expected, backend, nil)
+		assertOKResponse(t, req, expected, backend)
 		mocktestify.AssertExpectationsForObjects(t, backend)
 	})
 
@@ -96,7 +96,7 @@ func TestAccessGetAccount(t *testing.T) {
 
 		expected := expectedExpandedResponse(account)
 
-		assertOKResponse(t, req, expected, backend, nil)
+		assertOKResponse(t, req, expected, backend)
 		mocktestify.AssertExpectationsForObjects(t, backend)
 	})
 
@@ -111,7 +111,7 @@ func TestAccessGetAccount(t *testing.T) {
 
 		expected := expectedCondensedResponse(account)
 
-		assertOKResponse(t, req, expected, backend, nil)
+		assertOKResponse(t, req, expected, backend)
 		mocktestify.AssertExpectationsForObjects(t, backend)
 	})
 
@@ -126,9 +126,7 @@ func TestAccessGetAccount(t *testing.T) {
 
 		for i, test := range tests {
 			req, _ := http.NewRequest("GET", test.url, nil)
-			rr := NewHijackResponseRecorder()
-			err := executeRequest(req, backend, nil, rr)
-			assert.NoError(t, err)
+			rr := executeRequest(req, backend)
 
 			assert.Equal(t, http.StatusBadRequest, rr.Code)
 			assert.JSONEq(t, test.out, rr.Body.String(), fmt.Sprintf("test #%d failed: %v", i, test))

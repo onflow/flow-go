@@ -62,7 +62,7 @@ func TestGetCollections(t *testing.T) {
 			}`, col.ID(), col.ID(), transactionsStr)
 
 			req := getCollectionReq(col.ID().String(), false)
-			assertOKResponse(t, req, expected, backend, nil)
+			assertOKResponse(t, req, expected, backend)
 			mocks.AssertExpectationsForObjects(t, backend)
 		}
 	})
@@ -87,16 +87,14 @@ func TestGetCollections(t *testing.T) {
 			Once()
 
 		req := getCollectionReq(col.ID().String(), true)
-		rr := NewHijackResponseRecorder()
-		err := executeRequest(req, backend, nil, rr)
-		assert.NoError(t, err)
+		rr := executeRequest(req, backend)
 
 		assert.Equal(t, http.StatusOK, rr.Code)
 		// really hacky but we can't build whole response since it's really complex
 		// so we just make sure the transactions are included and have defined values
 		// anyhow we already test transaction responses in transaction tests
 		var res map[string]interface{}
-		err = json.Unmarshal(rr.Body.Bytes(), &res)
+		err := json.Unmarshal(rr.Body.Bytes(), &res)
 		assert.NoError(t, err)
 		resTx := res["transactions"].([]interface{})
 		for i, r := range resTx {
@@ -147,7 +145,7 @@ func TestGetCollections(t *testing.T) {
 					Return(test.mockValue, test.mockErr)
 			}
 			req := getCollectionReq(test.id, false)
-			assertResponse(t, req, test.status, test.response, backend, nil)
+			assertResponse(t, req, test.status, test.response, backend)
 		}
 	})
 }

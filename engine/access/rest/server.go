@@ -42,9 +42,9 @@ func NewServer(serverAPI access.API,
 	eventFilterConfig state_stream.EventFilterConfig,
 	maxGlobalStreams uint32,
 ) (*http.Server, error) {
-	router, err := routes.NewRouter(serverAPI, logger, chain, restCollector, stateStreamApi, eventFilterConfig, maxGlobalStreams)
-	if err != nil {
-		return nil, err
+	builder := routes.NewRouterBuilder(logger, restCollector).AddRestRoutes(serverAPI, chain)
+	if stateStreamApi != nil {
+		builder.AddWsRoutes(chain, stateStreamApi, eventFilterConfig, maxGlobalStreams)
 	}
 
 	c := cors.New(cors.Options{
@@ -58,7 +58,7 @@ func NewServer(serverAPI access.API,
 	})
 
 	return &http.Server{
-		Handler:      c.Handler(router),
+		Handler:      c.Handler(builder.Build()),
 		Addr:         config.ListenAddress,
 		WriteTimeout: config.WriteTimeout,
 		ReadTimeout:  config.ReadTimeout,

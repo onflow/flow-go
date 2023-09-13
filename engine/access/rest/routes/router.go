@@ -17,13 +17,15 @@ import (
 	"github.com/onflow/flow-go/module"
 )
 
-func NewRouter(backend access.API,
+type RouterBuilder struct {
+	logger      zerolog.Logger
+	router      *mux.Router
+	v1SubRouter *mux.Router
+}
+
+func NewRouterBuilder(
 	logger zerolog.Logger,
-	chain flow.Chain,
-	restCollector module.RestMetrics,
-	stateStreamApi state_stream.API,
-	eventFilterConfig state_stream.EventFilterConfig,
-	maxGlobalStreams uint32) (*mux.Router, error) {
+	restCollector module.RestMetrics) *RouterBuilder {
 	router := mux.NewRouter().StrictSlash(true)
 	v1SubRouter := router.PathPrefix("/v1").Subrouter()
 
@@ -33,30 +35,46 @@ func NewRouter(backend access.API,
 	v1SubRouter.Use(middleware.QuerySelect())
 	v1SubRouter.Use(middleware.MetricsMiddleware(restCollector))
 
-	linkGenerator := models.NewLinkGeneratorImpl(v1SubRouter)
+	return &RouterBuilder{
+		logger:      logger,
+		router:      router,
+		v1SubRouter: v1SubRouter,
+	}
+}
 
+func (b *RouterBuilder) AddRestRoutes(backend access.API, chain flow.Chain) *RouterBuilder {
+	linkGenerator := models.NewLinkGeneratorImpl(b.v1SubRouter)
 	for _, r := range Routes {
-		h := NewHandler(logger, backend, r.Handler, linkGenerator, chain)
-		v1SubRouter.
+		h := NewHandler(b.logger, backend, r.Handler, linkGenerator, chain)
+		b.v1SubRouter.
+			Methods(r.Method).
+			Path(r.Pattern).
+			Name(r.Name).
+			Handler(h)
+	}
+	return b
+}
+
+func (b *RouterBuilder) AddWsRoutes(
+	chain flow.Chain,
+	stateStreamApi state_stream.API,
+	eventFilterConfig state_stream.EventFilterConfig,
+	maxGlobalStreams uint32) *RouterBuilder {
+
+	for _, r := range WSRoutes {
+		h := NewWSHandler(b.logger, r.Handler, chain, stateStreamApi, eventFilterConfig, maxGlobalStreams)
+		b.v1SubRouter.
 			Methods(r.Method).
 			Path(r.Pattern).
 			Name(r.Name).
 			Handler(h)
 	}
 
-	// Note: we add subscribe routes only if stateStreamApi is available
-	if stateStreamApi != nil {
-		for _, r := range WSRoutes {
-			h := NewWSHandler(logger, r.Handler, chain, stateStreamApi, eventFilterConfig, maxGlobalStreams)
-			v1SubRouter.
-				Methods(r.Method).
-				Path(r.Pattern).
-				Name(r.Name).
-				Handler(h)
-		}
-	}
+	return b
+}
 
-	return router, nil
+func (b *RouterBuilder) Build() *mux.Router {
+	return b.router
 }
 
 type route struct {

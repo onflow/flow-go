@@ -121,8 +121,6 @@ func (s *RestStateStreamSuite) TestRestEventStreaming() {
 			time.Sleep(10 * time.Second)
 			// close connection after 10 seconds
 			client.Close()
-			// check events
-			s.requireEvents(receivedEventsResponse)
 		}()
 
 		eventChan := make(chan *state_stream.EventsResponse)
@@ -142,16 +140,12 @@ func (s *RestStateStreamSuite) TestRestEventStreaming() {
 		}()
 
 		// collect received events during 10 seconds
-		for {
-			select {
-			case eventResponse, ok := <-eventChan:
-				// Event channel closed
-				if !ok {
-					return
-				}
-				receivedEventsResponse = append(receivedEventsResponse, eventResponse)
-			}
+		for eventResponse := range eventChan {
+			receivedEventsResponse = append(receivedEventsResponse, eventResponse)
 		}
+
+		// check events
+		s.requireEvents(receivedEventsResponse)
 	})
 }
 

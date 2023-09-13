@@ -41,7 +41,7 @@ func TestGetNodeVersionInfo(t *testing.T) {
 
 		expected := nodeVersionInfoExpectedStr(params)
 
-		assertOKResponse(t, req, expected, backend, nil)
+		assertOKResponse(t, req, expected, backend)
 		mocktestify.AssertExpectationsForObjects(t, backend)
 	})
 }

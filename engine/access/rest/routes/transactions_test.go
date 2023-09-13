@@ -112,7 +112,7 @@ func TestGetTransactions(t *testing.T) {
 			}`,
 			tx.ID(), tx.ReferenceBlockID, util.ToBase64(tx.EnvelopeSignatures[0].Signature), tx.ID(), tx.ID())
 
-		assertOKResponse(t, req, expected, backend, nil)
+		assertOKResponse(t, req, expected, backend)
 	})
 
 	t.Run("Get by ID with results", func(t *testing.T) {
@@ -182,7 +182,7 @@ func TestGetTransactions(t *testing.T) {
 			   }
 			}`,
 			tx.ID(), tx.ReferenceBlockID, util.ToBase64(tx.EnvelopeSignatures[0].Signature), tx.ReferenceBlockID, txr.CollectionID, tx.ID(), tx.ID(), tx.ID())
-		assertOKResponse(t, req, expected, backend, nil)
+		assertOKResponse(t, req, expected, backend)
 	})
 
 	t.Run("get by ID Invalid", func(t *testing.T) {
@@ -190,7 +190,7 @@ func TestGetTransactions(t *testing.T) {
 
 		req := getTransactionReq("invalid", false, "", "")
 		expected := `{"code":400, "message":"invalid ID format"}`
-		assertResponse(t, req, http.StatusBadRequest, expected, backend, nil)
+		assertResponse(t, req, http.StatusBadRequest, expected, backend)
 	})
 
 	t.Run("get by ID non-existing", func(t *testing.T) {
@@ -204,7 +204,7 @@ func TestGetTransactions(t *testing.T) {
 			Return(nil, status.Error(codes.NotFound, "transaction not found"))
 
 		expected := `{"code":404, "message":"Flow resource not found: transaction not found"}`
-		assertResponse(t, req, http.StatusNotFound, expected, backend, nil)
+		assertResponse(t, req, http.StatusNotFound, expected, backend)
 	})
 }
 
@@ -253,7 +253,7 @@ func TestGetTransactionResult(t *testing.T) {
 			On("GetTransactionResult", mocks.Anything, id, flow.ZeroID, flow.ZeroID).
 			Return(txr, nil)
 
-		assertOKResponse(t, req, expected, backend, nil)
+		assertOKResponse(t, req, expected, backend)
 	})
 
 	t.Run("get by block ID", func(t *testing.T) {
@@ -265,7 +265,7 @@ func TestGetTransactionResult(t *testing.T) {
 			On("GetTransactionResult", mocks.Anything, id, bid, flow.ZeroID).
 			Return(txr, nil)
 
-		assertOKResponse(t, req, expected, backend, nil)
+		assertOKResponse(t, req, expected, backend)
 	})
 
 	t.Run("get by collection ID", func(t *testing.T) {
@@ -276,7 +276,7 @@ func TestGetTransactionResult(t *testing.T) {
 			On("GetTransactionResult", mocks.Anything, id, flow.ZeroID, cid).
 			Return(txr, nil)
 
-		assertOKResponse(t, req, expected, backend, nil)
+		assertOKResponse(t, req, expected, backend)
 	})
 
 	t.Run("get execution statuses", func(t *testing.T) {
@@ -324,7 +324,7 @@ func TestGetTransactionResult(t *testing.T) {
 					"_self": "/v1/transaction_results/%s"
 				}
 			}`, bid.String(), cid.String(), err, cases.Title(language.English).String(strings.ToLower(txResult.Status.String())), txResult.ErrorMessage, id.String())
-			assertOKResponse(t, req, expectedResp, backend, nil)
+			assertOKResponse(t, req, expectedResp, backend)
 		}
 	})
 
@@ -334,7 +334,7 @@ func TestGetTransactionResult(t *testing.T) {
 		req := getTransactionResultReq("invalid", "", "")
 
 		expected := `{"code":400, "message":"invalid ID format"}`
-		assertResponse(t, req, http.StatusBadRequest, expected, backend, nil)
+		assertResponse(t, req, http.StatusBadRequest, expected, backend)
 	})
 }
 
@@ -389,7 +389,7 @@ func TestCreateTransaction(t *testing.T) {
 			   }
 			}`,
 			tx.ID(), tx.ReferenceBlockID, util.ToBase64(tx.PayloadSignatures[0].Signature), util.ToBase64(tx.EnvelopeSignatures[0].Signature), tx.ID(), tx.ID())
-		assertOKResponse(t, req, expected, backend, nil)
+		assertOKResponse(t, req, expected, backend)
 	})
 
 	t.Run("post invalid transaction", func(t *testing.T) {
@@ -416,7 +416,7 @@ func TestCreateTransaction(t *testing.T) {
 			testTx[test.inputField] = test.inputValue
 			req := createTransactionReq(testTx)
 
-			assertResponse(t, req, http.StatusBadRequest, test.output, backend, nil)
+			assertResponse(t, req, http.StatusBadRequest, test.output, backend)
 		}
 	})
 }
