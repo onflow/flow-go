@@ -89,6 +89,14 @@ func (m *AtreeRegisterMigrator) MigratePayloads(
 		return payloads, nil
 	}
 
+	if reason, ok := knownProblematicAccounts[address]; ok {
+		m.log.Info().
+			Str("account", address.Hex()).
+			Str("reason", reason).
+			Msg("Account is known to have issues. Skipping it.")
+		return payloads, nil
+	}
+
 	// create all the runtime components we need for the migration
 	mr, err := m.newMigratorRuntime(address, payloads)
 	if err != nil {
@@ -110,13 +118,25 @@ func (m *AtreeRegisterMigrator) MigratePayloads(
 		return nil, fmt.Errorf("failed to convert storage for address %s: %w", address.Hex(), err)
 	}
 
-	newRegisters, err := m.validateChangesAndCreateNewRegisters(mr, changes)
+	originalLen := len(payloads)
 
+	newRegisters, err := m.validateChangesAndCreateNewRegisters(mr, changes)
 	if err != nil {
 		if errors.Is(err, skippableAccountError) {
 			return payloads, nil
 		}
 		return nil, err
+	}
+
+	newLen := len(newRegisters)
+
+	if newLen > originalLen {
+		m.rw.Write(migrationProblem{
+			Address: address.Hex(),
+			Key:     "",
+			Kind:    "More registers after migration",
+			Msg:     fmt.Sprintf("original: %d, new: %d", originalLen, newLen),
+		})
 	}
 
 	return newRegisters, nil
@@ -209,8 +229,6 @@ func (m *AtreeRegisterMigrator) convertStorageDomain(
 			return nil
 		}()
 		if err != nil {
-			m.log.Debug().Err(err).Msgf("failed to migrate key %s", key)
-
 			m.rw.Write(migrationProblem{
 				Address: address.Hex(),
 				Key:     string(key),
@@ -356,11 +374,6 @@ func (m *AtreeRegisterMigrator) validateChangesAndCreateNewRegisters(
 			continue
 		}
 
-		m.log.Debug().
-			Str("key", id.String()).
-			Str("account", mr.Address.Hex()).
-			Str("value", fmt.Sprintf("%x", value)).
-			Msg("Key was not migrated")
 		m.rw.Write(migrationProblem{
 			Address: mr.Address.Hex(),
 			Key:     id.String(),
@@ -434,10 +447,6 @@ func (m *AtreeRegisterMigrator) validateChangesAndCreateNewRegisters(
 //
 //	err = mr.Storage.CheckHealth()
 //	if err != nil {
-//		m.log.Debug().
-//			Err(err).
-//			Str("account", mr.Address.Hex()).
-//			Msg("Account storage health issue")
 //		m.rw.Write(migrationProblem{
 //			Address: mr.Address.Hex(),
 //			Key:     "",
@@ -479,4 +488,24 @@ type migrationProblem struct {
 	Key     string
 	Kind    string
 	Msg     string
+}
+
+var knownProblematicAccounts = map[common.Address]string{
+	// Testnet accounts with broken contracts
+	mustHexToAddress("434a1f199a7ae3ba"): "Broken contract FanTopPermission",
+	mustHexToAddress("454c9991c2b8d947"): "Broken contract Test",
+	mustHexToAddress("48602d8056ff9d93"): "Broken contract FanTopPermission",
+	mustHexToAddress("5d63c34d7f05e5a4"): "Broken contract FanTopPermission",
+	mustHexToAddress("5e3448b3cffb97f2"): "Broken contract FanTopPermission",
+	mustHexToAddress("7d8c7e050c694eaa"): "Broken contract Test",
+	mustHexToAddress("ba53f16ede01972d"): "Broken contract FanTopPermission",
+	mustHexToAddress("c843c1f5a4805c3a"): "Broken contract FanTopPermission",
+}
+
+func mustHexToAddress(hex string) common.Address {
+	address, err := common.HexToAddress(hex)
+	if err != nil {
+		panic(err)
+	}
+	return address
 }

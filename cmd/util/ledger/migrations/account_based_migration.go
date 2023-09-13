@@ -61,20 +61,7 @@ func MigrateByAccount(
 		return allPayloads, nil
 	}
 
-	payloads := sortablePayloads(allPayloads)
-	sort.Sort(payloads)
-
-	i := 0
-	accountIndexes := make([]int, 0, totalExpectedAccounts)
-	accountIndexes = append(accountIndexes, i)
-	for {
-		j := payloads.FindLastOfTheSameKey(i)
-		if j == len(payloads)-1 {
-			break
-		}
-		accountIndexes = append(accountIndexes, j+1)
-		i = j + 1
-	}
+	payloads, accountIndexes := sortPayloadsAndFindAccountIndexes(log, allPayloads)
 
 	migrator, err := migratorFactory(allPayloads, nWorker)
 	if err != nil {
@@ -108,6 +95,36 @@ func MigrateByAccount(
 		Msgf("finished migrating Payloads")
 
 	return migrated, nil
+}
+
+func sortPayloadsAndFindAccountIndexes(
+	log zerolog.Logger,
+	allPayloads []*ledger.Payload,
+) (
+	sortablePayloads,
+	[]int,
+) {
+	log.Info().Msgf("sorting %d payloads", len(allPayloads))
+	defer func() {
+		log.Info().Msgf("finished sorting %d payloads", len(allPayloads))
+	}()
+
+	payloads := sortablePayloads(allPayloads)
+	sort.Sort(payloads)
+
+	i := 0
+	accountIndexes := make([]int, 0, totalExpectedAccounts)
+	accountIndexes = append(accountIndexes, i)
+	for {
+		j := payloads.FindLastOfTheSameKey(i)
+		if j == len(payloads)-1 {
+			break
+		}
+		accountIndexes = append(accountIndexes, j+1)
+		i = j + 1
+	}
+
+	return payloads, accountIndexes
 }
 
 // MigrateGroupConcurrently migrate the Payloads in the given payloadsByAccount map which
@@ -317,8 +334,9 @@ func (h *migrationDurations) Array() zerolog.LogArrayMarshaler {
 // EncodedKeyAddressPrefixLength is the length of the address prefix in the encoded key
 // 2 for uint16 of number of key parts
 // 4 for uint32 of the length of the first key part
+// 2 for uint32 of the key part type
 // 8 for the address which is the actual length of the first key part
-const EncodedKeyAddressPrefixLength = 2 + 4 + 8
+const EncodedKeyAddressPrefixLength = 2 + 4 + 2 + 8
 
 type sortablePayloads []*ledger.Payload
 
