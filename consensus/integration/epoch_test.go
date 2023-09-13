@@ -13,6 +13,7 @@ import (
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/model/flow/mapfunc"
 	"github.com/onflow/flow-go/model/flow/order"
+	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/inmem"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -254,6 +255,27 @@ func withNextEpoch(
 			Filter(filter.Not(filter.In(encodableSnapshot.Identities))).
 			Map(mapfunc.WithWeight(0))...,
 	).Sort(order.Canonical)
+
+	// update protocol state
+	protocolState := encodableSnapshot.ProtocolState
+	// update protocol state identities since we are in committed phase
+	protocolState.Identities = flow.DynamicIdentityEntryListFromIdentities(encodableSnapshot.Identities)
+	// setup ID has changed, need to update it
+	convertedEpochSetup, _ := protocol.ToEpochSetup(inmem.NewEpoch(*currEpoch))
+	protocolState.CurrentEpochEventIDs.SetupID = convertedEpochSetup.ID()
+	// create next epoch protocol state
+	convertedEpochSetup, _ = protocol.ToEpochSetup(inmem.NewEpoch(*encodableSnapshot.Epochs.Next))
+	convertedEpochCommit, _ := protocol.ToEpochCommit(inmem.NewEpoch(*encodableSnapshot.Epochs.Next))
+	protocolState.NextEpochProtocolState = &flow.ProtocolStateEntry{
+		CurrentEpochEventIDs: flow.EventIDs{
+			SetupID:  convertedEpochSetup.ID(),
+			CommitID: convertedEpochCommit.ID(),
+		},
+		PreviousEpochEventIDs:           protocolState.CurrentEpochEventIDs,
+		Identities:                      flow.DynamicIdentityEntryListFromIdentities(encodableSnapshot.Identities),
+		InvalidStateTransitionAttempted: false,
+		NextEpochProtocolState:          nil,
+	}
 
 	return inmem.SnapshotFromEncodable(encodableSnapshot)
 }

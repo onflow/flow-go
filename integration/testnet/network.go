@@ -648,10 +648,11 @@ func (net *FlowNetwork) addConsensusFollower(t *testing.T, rootProtocolSnapshotP
 
 	// create a follower-specific directory for the bootstrap files
 	followerBootstrapDir := makeDir(t, tmpdir, DefaultBootstrapDir)
+	makeDir(t, followerBootstrapDir, bootstrap.DirnamePublicBootstrap)
 
-	// strip out the node addresses from root-protocol-state-snapshot.json and copy it to the follower-specific
+	// copy root protocol snapshot to the follower-specific folder
 	// bootstrap/public-root-information directory
-	err := rootProtocolJsonWithoutAddresses(rootProtocolSnapshotPath, filepath.Join(followerBootstrapDir, bootstrap.PathRootProtocolStateSnapshot))
+	err := io.Copy(rootProtocolSnapshotPath, filepath.Join(followerBootstrapDir, bootstrap.PathRootProtocolStateSnapshot))
 	require.NoError(t, err)
 
 	// consensus follower

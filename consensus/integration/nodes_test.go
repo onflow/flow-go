@@ -375,7 +375,7 @@ func createNode(
 	qcsDB := storage.NewQuorumCertificates(metricsCollector, db, storage.DefaultCacheSize)
 	setupsDB := storage.NewEpochSetups(metricsCollector, db)
 	commitsDB := storage.NewEpochCommits(metricsCollector, db)
-	statusesDB := storage.NewEpochStatuses(metricsCollector, db)
+	protocolStateDB := storage.NewProtocolState(metricsCollector, setupsDB, commitsDB, db, storage.DefaultCacheSize)
 	versionBeaconDB := storage.NewVersionBeacons(db)
 	protocolStateEvents := events.NewDistributor()
 
@@ -396,7 +396,7 @@ func createNode(
 		qcsDB,
 		setupsDB,
 		commitsDB,
-		statusesDB,
+		protocolStateDB,
 		versionBeaconDB,
 		rootSnapshot,
 	)

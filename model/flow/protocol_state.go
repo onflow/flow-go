@@ -82,23 +82,47 @@ func NewRichProtocolStateEntry(
 		NextEpochProtocolState: nil,
 	}
 
+	// ensure data is consistent
+	if protocolState.PreviousEpochEventIDs.SetupID != ZeroID {
+		if protocolState.PreviousEpochEventIDs.SetupID != previousEpochSetup.ID() {
+			return nil, fmt.Errorf("supplied previous epoch setup (%x) does not match protocol state (%x)",
+				previousEpochSetup.ID(),
+				protocolState.PreviousEpochEventIDs.SetupID)
+		}
+		if protocolState.PreviousEpochEventIDs.CommitID != previousEpochCommit.ID() {
+			return nil, fmt.Errorf("supplied previous epoch commit (%x) does not match protocol state (%x)",
+				previousEpochCommit.ID(),
+				protocolState.PreviousEpochEventIDs.CommitID)
+		}
+	}
+	if protocolState.CurrentEpochEventIDs.SetupID != currentEpochSetup.ID() {
+		return nil, fmt.Errorf("supplied current epoch setup (%x) does not match protocol state (%x)",
+			currentEpochSetup.ID(),
+			protocolState.CurrentEpochEventIDs.SetupID)
+	}
+	if protocolState.CurrentEpochEventIDs.CommitID != currentEpochCommit.ID() {
+		return nil, fmt.Errorf("supplied current epoch commit (%x) does not match protocol state (%x)",
+			currentEpochCommit.ID(),
+			protocolState.CurrentEpochEventIDs.CommitID)
+	}
+
 	var err error
+	nextEpochProtocolState := protocolState.NextEpochProtocolState
 	// if next epoch has been already committed, fill in data for it as well.
-	if protocolState.NextEpochProtocolState != nil {
+	if nextEpochProtocolState != nil {
 		// sanity check consistency of input data
-		if protocolState.NextEpochProtocolState.CurrentEpochEventIDs.SetupID != nextEpochSetup.ID() {
+		if nextEpochProtocolState.CurrentEpochEventIDs.SetupID != nextEpochSetup.ID() {
 			return nil, fmt.Errorf("inconsistent EpochSetup for constucting RichProtocolStateEntry, next protocol state states ID %v while input event has ID %v",
 				protocolState.NextEpochProtocolState.CurrentEpochEventIDs.SetupID, nextEpochSetup.ID())
 		}
-		if protocolState.NextEpochProtocolState.CurrentEpochEventIDs.CommitID != ZeroID {
-			if protocolState.NextEpochProtocolState.CurrentEpochEventIDs.CommitID != nextEpochCommit.ID() {
+		if nextEpochProtocolState.CurrentEpochEventIDs.CommitID != ZeroID {
+			if nextEpochProtocolState.CurrentEpochEventIDs.CommitID != nextEpochCommit.ID() {
 				return nil, fmt.Errorf("inconsistent EpochCommit for constucting RichProtocolStateEntry, next protocol state states ID %v while input event has ID %v",
 					protocolState.NextEpochProtocolState.CurrentEpochEventIDs.CommitID, nextEpochCommit.ID())
 			}
 		}
 
 		// if next epoch is available, it means that we have observed epoch setup event and we are not anymore in staking phase,
-		// so we need to build the identity table using current and next epoch setup events.
 		// so we need to build the identity table using current and next epoch setup events.
 		result.Identities, err = buildIdentityTable(
 			protocolState.Identities,
@@ -109,7 +133,6 @@ func NewRichProtocolStateEntry(
 			return nil, fmt.Errorf("could not build identity table for setup/commit phase: %w", err)
 		}
 
-		nextEpochProtocolState := protocolState.NextEpochProtocolState
 		nextEpochIdentityTable, err := buildIdentityTable(
 			nextEpochProtocolState.Identities,
 			nextEpochSetup.Participants,

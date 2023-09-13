@@ -28,8 +28,8 @@ type Updater struct {
 
 var _ protocol.StateUpdater = (*Updater)(nil)
 
-// newUpdater creates a new protocol state updater.
-func newUpdater(candidate *flow.Header, parentState *flow.RichProtocolStateEntry) *Updater {
+// NewUpdater creates a new protocol state updater.
+func NewUpdater(candidate *flow.Header, parentState *flow.RichProtocolStateEntry) *Updater {
 	updater := &Updater{
 		parentState: parentState,
 		state:       parentState.ProtocolStateEntry.Copy(),

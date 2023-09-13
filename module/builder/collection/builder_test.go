@@ -108,7 +108,7 @@ func (suite *BuilderSuite) SetupTest() {
 		all.QuorumCertificates,
 		all.Setups,
 		all.EpochCommits,
-		all.Statuses,
+		all.ProtocolState,
 		all.VersionBeacons,
 		rootSnapshot,
 	)

@@ -82,6 +82,12 @@ func FromSnapshot(from protocol.Snapshot) (*Snapshot, error) {
 	}
 	snap.Params = params.enc
 
+	protocolState, err := from.ProtocolState()
+	if err != nil {
+		return nil, fmt.Errorf("could not get protocol state: %w", err)
+	}
+	snap.ProtocolState = protocolState.Entry().ProtocolStateEntry
+
 	// convert version beacon
 	versionBeacon, err := from.VersionBeacon()
 	if err != nil {
@@ -325,6 +331,17 @@ func SnapshotFromBootstrapStateWithParams(
 		EpochCommitSafetyThreshold: epochCommitSafetyThreshold, // see protocol.Params for details
 	}
 
+	protocolState := &flow.ProtocolStateEntry{
+		CurrentEpochEventIDs: flow.EventIDs{
+			SetupID:  setup.ID(),
+			CommitID: commit.ID(),
+		},
+		PreviousEpochEventIDs:           flow.EventIDs{},
+		Identities:                      flow.DynamicIdentityEntryListFromIdentities(setup.Participants),
+		InvalidStateTransitionAttempted: false,
+		NextEpochProtocolState:          nil,
+	}
+
 	snap := SnapshotFromEncodable(EncodableSnapshot{
 		Head:         root.Header,
 		Identities:   setup.Participants,
@@ -341,6 +358,7 @@ func SnapshotFromBootstrapStateWithParams(
 		Phase:               flow.EpochPhaseStaking,
 		Epochs:              epochs,
 		Params:              params,
+		ProtocolState:       protocolState,
 		SealedVersionBeacon: nil,
 	})
 	return snap, nil

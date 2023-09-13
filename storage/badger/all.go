@@ -20,6 +20,7 @@ func InitAll(metrics module.CacheMetrics, db *badger.DB) *storage.All {
 	setups := NewEpochSetups(metrics, db)
 	epochCommits := NewEpochCommits(metrics, db)
 	statuses := NewEpochStatuses(metrics, db)
+	protocolState := NewProtocolState(metrics, setups, epochCommits, db, DefaultCacheSize)
 	versionBeacons := NewVersionBeacons(db)
 
 	commits := NewCommits(metrics, db)
@@ -40,6 +41,7 @@ func InitAll(metrics module.CacheMetrics, db *badger.DB) *storage.All {
 		Setups:             setups,
 		EpochCommits:       epochCommits,
 		Statuses:           statuses,
+		ProtocolState:      protocolState,
 		VersionBeacons:     versionBeacons,
 		Results:            results,
 		Receipts:           receipts,
