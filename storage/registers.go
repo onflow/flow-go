@@ -13,9 +13,13 @@ type RegisterIndex interface {
 // RegisterIndexReader defines read-only operations on the register index.
 type RegisterIndexReader interface {
 	// LatestHeight at which we indexed registers.
+	// Expected errors:
+	// - storage.ErrNotFound if the height was not found.
 	LatestHeight() (uint64, error)
 	// FirstHeight at which we started to index the registers.
 	// Returns the first indexed height found in the store.
+	// Expected errors:
+	// - storage.ErrNotFound if the height was not found.
 	FirstHeight() (uint64, error)
 	// Get register by the register ID at a given block height.
 	//
