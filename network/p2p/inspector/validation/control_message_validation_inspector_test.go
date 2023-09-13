@@ -31,7 +31,9 @@ func TestControlMessageValidationInspector_truncateRPC(t *testing.T) {
 		inspector.config.GraftPruneMessageMaxSampleSize = 100
 		// topic validation not performed so we can use random strings
 		graftsGreaterThanMaxSampleSize := unittest.P2PRPCFixture(unittest.WithGrafts(unittest.P2PRPCGraftFixtures(unittest.IdentifierListFixture(200).Strings()...)...))
+		require.Greater(t, len(graftsGreaterThanMaxSampleSize.GetControl().GetGraft()), inspector.config.GraftPruneMessageMaxSampleSize)
 		graftsLessThanMaxSampleSize := unittest.P2PRPCFixture(unittest.WithGrafts(unittest.P2PRPCGraftFixtures(unittest.IdentifierListFixture(50).Strings()...)...))
+		require.Less(t, len(graftsLessThanMaxSampleSize.GetControl().GetGraft()), inspector.config.GraftPruneMessageMaxSampleSize)
 		inspector.truncateGraftMessages(graftsGreaterThanMaxSampleSize)
 		inspector.truncateGraftMessages(graftsLessThanMaxSampleSize)
 		// rpc with grafts greater than configured max sample size should be truncated to GraftPruneMessageMaxSampleSize
@@ -45,7 +47,9 @@ func TestControlMessageValidationInspector_truncateRPC(t *testing.T) {
 		inspector.config.GraftPruneMessageMaxSampleSize = 100
 		// topic validation not performed so we can use random strings
 		prunesGreaterThanMaxSampleSize := unittest.P2PRPCFixture(unittest.WithPrunes(unittest.P2PRPCPruneFixtures(unittest.IdentifierListFixture(200).Strings()...)...))
+		require.Greater(t, len(prunesGreaterThanMaxSampleSize.GetControl().GetPrune()), inspector.config.GraftPruneMessageMaxSampleSize)
 		prunesLessThanMaxSampleSize := unittest.P2PRPCFixture(unittest.WithPrunes(unittest.P2PRPCPruneFixtures(unittest.IdentifierListFixture(50).Strings()...)...))
+		require.Less(t, len(prunesLessThanMaxSampleSize.GetControl().GetPrune()), inspector.config.GraftPruneMessageMaxSampleSize)
 		inspector.truncatePruneMessages(prunesGreaterThanMaxSampleSize)
 		inspector.truncatePruneMessages(prunesLessThanMaxSampleSize)
 		// rpc with prunes greater than configured max sample size should be truncated to GraftPruneMessageMaxSampleSize
@@ -59,7 +63,9 @@ func TestControlMessageValidationInspector_truncateRPC(t *testing.T) {
 		inspector.config.IHaveRPCInspectionConfig.MaxSampleSize = 100
 		// topic validation not performed so we can use random strings
 		iHavesGreaterThanMaxSampleSize := unittest.P2PRPCFixture(unittest.WithIHaves(unittest.P2PRPCIHaveFixtures(200, unittest.IdentifierListFixture(200).Strings()...)...))
+		require.Greater(t, len(iHavesGreaterThanMaxSampleSize.GetControl().GetIhave()), inspector.config.IHaveRPCInspectionConfig.MaxSampleSize)
 		iHavesLessThanMaxSampleSize := unittest.P2PRPCFixture(unittest.WithIHaves(unittest.P2PRPCIHaveFixtures(200, unittest.IdentifierListFixture(50).Strings()...)...))
+		require.Less(t, len(iHavesLessThanMaxSampleSize.GetControl().GetIhave()), inspector.config.IHaveRPCInspectionConfig.MaxSampleSize)
 		inspector.truncateIHaveMessages(iHavesGreaterThanMaxSampleSize)
 		inspector.truncateIHaveMessages(iHavesLessThanMaxSampleSize)
 		// rpc with iHaves greater than configured max sample size should be truncated to MaxSampleSize
@@ -90,7 +96,9 @@ func TestControlMessageValidationInspector_truncateRPC(t *testing.T) {
 		inspector, _, rpcTracker, _, _ := inspectorFixture(t)
 		inspector.config.IWantRPCInspectionConfig.MaxSampleSize = 100
 		iWantsGreaterThanMaxSampleSize := unittest.P2PRPCFixture(unittest.WithIWants(unittest.P2PRPCIWantFixtures(200, 200)...))
+		require.Greater(t, uint(len(iWantsGreaterThanMaxSampleSize.GetControl().GetIwant())), inspector.config.IWantRPCInspectionConfig.MaxSampleSize)
 		iWantsLessThanMaxSampleSize := unittest.P2PRPCFixture(unittest.WithIWants(unittest.P2PRPCIWantFixtures(50, 200)...))
+		require.Less(t, uint(len(iWantsLessThanMaxSampleSize.GetControl().GetIwant())), inspector.config.IWantRPCInspectionConfig.MaxSampleSize)
 		peerID := peer.ID("peer")
 		rpcTracker.On("LastHighestIHaveRPCSize").Return(int64(100)).Twice()
 		inspector.truncateIWantMessages(peerID, iWantsGreaterThanMaxSampleSize)
