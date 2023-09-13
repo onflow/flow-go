@@ -83,7 +83,7 @@ func (i *SequentialIndexRange) Contained(val uint64) (bool, error) {
 	last := i.Last()
 
 	if val < first || val > last {
-		return false, fmt.Errorf("value %d is out of boundary [%d - %d]: %w", val, i.first, i.last, ErrIndexBoundary)
+		return false, fmt.Errorf("value %d is out of boundary [%d - %d]: %w", val, i.first, last, ErrIndexBoundary)
 	}
 
 	return true, nil
