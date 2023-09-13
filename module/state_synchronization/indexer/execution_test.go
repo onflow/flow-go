@@ -31,6 +31,7 @@ type indexTest struct {
 	indexer          *ExecutionState
 	registers        *storagemock.Registers
 	events           *storagemock.Events
+	headers          *storagemock.Headers
 	ctx              context.Context
 	blocks           []*flow.Block
 	data             *execution_data.BlockExecutionDataEntity
@@ -132,6 +133,7 @@ func (i *indexTest) initIndexer() {
 	i.useDefaultHeights()
 	indexer, err := New(i.registers, headers, i.blocks[0].Header.Height)
 	require.NoError(i.t, err)
+	indexer.headers = headers
 	i.indexer = indexer
 }
 
