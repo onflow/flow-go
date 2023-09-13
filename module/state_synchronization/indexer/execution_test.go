@@ -28,7 +28,7 @@ import (
 
 type indexTest struct {
 	t                *testing.T
-	indexer          ExecutionState
+	indexer          *ExecutionState
 	registers        *storagemock.Registers
 	events           *storagemock.Events
 	ctx              context.Context
@@ -48,17 +48,9 @@ func newIndexTest(
 ) *indexTest {
 	registers := storagemock.NewRegisters(t)
 	events := storagemock.NewEvents(t)
-	headers := newBlockHeadersStorage(blocks)
-
-	indexer := ExecutionState{
-		registers: registers,
-		headers:   headers,
-		events:    events,
-	}
 
 	return &indexTest{
 		t:         t,
-		indexer:   indexer,
 		registers: registers,
 		events:    events,
 		blocks:    blocks,
@@ -68,7 +60,11 @@ func newIndexTest(
 }
 
 func (i *indexTest) setLastHeight(f func(t *testing.T) (uint64, error)) *indexTest {
-	i.lastHeightStore = f
+	i.registers.
+		On("LatestHeight").
+		Return(func() (uint64, error) {
+			return f(i.t)
+		})
 	return i
 }
 
@@ -90,9 +86,14 @@ func (i *indexTest) useDefaultFirstHeight() *indexTest {
 	return i
 }
 
+func (i *indexTest) useDefaultHeights() *indexTest {
+	i.useDefaultFirstHeight()
+	return i.useDefaultLastHeight()
+}
+
 func (i *indexTest) setFirstHeight(f func(t *testing.T) (uint64, error)) *indexTest {
 	i.registers.
-		On("FirstHeight", mock.AnythingOfType("uint64")).
+		On("FirstHeight").
 		Return(func() (uint64, error) {
 			return f(i.t)
 		})
@@ -126,11 +127,21 @@ func (i *indexTest) setGetRegisters(f func(t *testing.T, ID flow.RegisterID, hei
 	return i
 }
 
+func (i *indexTest) initIndexer() {
+	headers := newBlockHeadersStorage(i.blocks)
+	i.useDefaultHeights()
+	indexer, err := New(i.registers, headers, i.blocks[0].Header.Height)
+	require.NoError(i.t, err)
+	i.indexer = indexer
+}
+
 func (i *indexTest) runIndexBlockData() error {
+	i.initIndexer()
 	return i.indexer.IndexBlockData(i.ctx, i.data)
 }
 
 func (i *indexTest) runGetRegisters(IDs flow.RegisterIDs, height uint64) ([]flow.RegisterValue, error) {
+	i.initIndexer()
 	return i.indexer.RegisterValues(IDs, height)
 }
 
@@ -252,7 +263,7 @@ func TestExecutionState_IndexBlockData(t *testing.T) {
 			}).
 			runIndexBlockData()
 
-		assert.True(t, errors.Is(err, ErrIndexHeight))
+		assert.True(t, errors.Is(err, ErrIndexValue))
 	})
 
 	t.Run("Unknown block ID", func(t *testing.T) {
