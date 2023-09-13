@@ -667,6 +667,8 @@ func TestValidationInspector_InspectIWants_CacheMissThreshold(t *testing.T) {
 	flowConfig, err := config.DefaultConfig()
 	require.NoError(t, err)
 	inspectorConfig := flowConfig.NetworkConfig.GossipSubConfig.GossipSubRPCInspectorsConfig.GossipSubRPCValidationInspectorConfigs
+	// force all cache miss checks
+	inspectorConfig.IWantRPCInspectionConfig.CacheMissCheckSize = 0
 	inspectorConfig.NumberOfWorkers = 1
 	inspectorConfig.IWantRPCInspectionConfig.CacheMissThreshold = .5 // set cache miss threshold to 50%
 	messageCount := 1
