@@ -82,11 +82,11 @@ var skippableAccountError = errors.New("account is skippable")
 func (m *AtreeRegisterMigrator) MigratePayloads(
 	_ context.Context,
 	address common.Address,
-	payloads []*ledger.Payload,
+	oldPayloads []*ledger.Payload,
 ) ([]*ledger.Payload, error) {
 
 	if address == common.ZeroAddress {
-		return payloads, nil
+		return oldPayloads, nil
 	}
 
 	if reason, ok := knownProblematicAccounts[address]; ok {
@@ -94,11 +94,11 @@ func (m *AtreeRegisterMigrator) MigratePayloads(
 			Str("account", address.Hex()).
 			Str("reason", reason).
 			Msg("Account is known to have issues. Skipping it.")
-		return payloads, nil
+		return oldPayloads, nil
 	}
 
 	// create all the runtime components we need for the migration
-	mr, err := m.newMigratorRuntime(address, payloads)
+	mr, err := m.newMigratorRuntime(address, oldPayloads)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create migrator runtime: %w", err)
 	}
@@ -113,22 +113,22 @@ func (m *AtreeRegisterMigrator) MigratePayloads(
 	changes, err := m.migrateAccountStorage(mr)
 	if err != nil {
 		if errors.Is(err, skippableAccountError) {
-			return payloads, nil
+			return oldPayloads, nil
 		}
 		return nil, fmt.Errorf("failed to convert storage for address %s: %w", address.Hex(), err)
 	}
 
-	originalLen := len(payloads)
+	originalLen := len(oldPayloads)
 
-	newRegisters, err := m.validateChangesAndCreateNewRegisters(mr, changes)
+	newPayloads, err := m.validateChangesAndCreateNewRegisters(mr, changes)
 	if err != nil {
 		if errors.Is(err, skippableAccountError) {
-			return payloads, nil
+			return oldPayloads, nil
 		}
 		return nil, err
 	}
 
-	newLen := len(newRegisters)
+	newLen := len(newPayloads)
 
 	if newLen > originalLen {
 		m.rw.Write(migrationProblem{
@@ -139,7 +139,11 @@ func (m *AtreeRegisterMigrator) MigratePayloads(
 		})
 	}
 
-	return newRegisters, nil
+	if _, ok := accountsToLog[address]; ok {
+		m.dumpAccount(mr.Address, oldPayloads, newPayloads)
+	}
+
+	return newPayloads, nil
 }
 
 func (m *AtreeRegisterMigrator) migrateAccountStorage(
@@ -229,6 +233,7 @@ func (m *AtreeRegisterMigrator) convertStorageDomain(
 			return nil
 		}()
 		if err != nil {
+
 			m.rw.Write(migrationProblem{
 				Address: address.Hex(),
 				Key:     string(key),
@@ -385,19 +390,23 @@ func (m *AtreeRegisterMigrator) validateChangesAndCreateNewRegisters(
 	}
 
 	//if hasMissingKeys && m.sampler.Sample(zerolog.InfoLevel) {
-	//	before := m.rwf.ReportWriter(fmt.Sprintf("account-before-%s", address.Hex()))
-	//	for _, p := range payloads {
-	//		before.Write(p)
-	//	}
-	//	before.Close()
-	//
-	//	after := m.rwf.ReportWriter(fmt.Sprintf("account-after-%s", address.Hex()))
-	//	for _, p := range newPayloads {
-	//		after.Write(p)
-	//	}
-	//	after.Close()
+	//	m.dumpAccount(mr.Address, mr.Payloads, newPayloads)
 	//}
 	return newPayloads, nil
+}
+
+func (m *AtreeRegisterMigrator) dumpAccount(address common.Address, before, after []*ledger.Payload) {
+	beforeWriter := m.rwf.ReportWriter(fmt.Sprintf("account-before-%s", address.Hex()))
+	for _, p := range before {
+		beforeWriter.Write(p)
+	}
+	beforeWriter.Close()
+
+	afterWriter := m.rwf.ReportWriter(fmt.Sprintf("account-after-%s", address.Hex()))
+	for _, p := range after {
+		afterWriter.Write(p)
+	}
+	afterWriter.Close()
 }
 
 //
@@ -500,6 +509,12 @@ var knownProblematicAccounts = map[common.Address]string{
 	mustHexToAddress("7d8c7e050c694eaa"): "Broken contract Test",
 	mustHexToAddress("ba53f16ede01972d"): "Broken contract FanTopPermission",
 	mustHexToAddress("c843c1f5a4805c3a"): "Broken contract FanTopPermission",
+	mustHexToAddress("48d3be92e6e4a973"): "Broken contract FanTopPermission",
+}
+
+var accountsToLog = map[common.Address]string{
+	// Testnet accounts
+	mustHexToAddress("ff8bbaa2905b7bd6"): "Small account that increased in size",
 }
 
 func mustHexToAddress(hex string) common.Address {
