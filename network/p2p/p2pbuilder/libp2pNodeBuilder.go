@@ -309,12 +309,14 @@ func (builder *LibP2PNodeBuilder) Build() (p2p.LibP2PNode, error) {
 		builder.connGater.SetDisallowListOracle(node)
 	}
 
-	unicastManager := unicast.NewUnicastManager(builder.logger,
-		stream.NewLibP2PStreamFactory(h),
-		builder.sporkId,
-		builder.createStreamRetryInterval,
-		node,
-		builder.metrics)
+	unicastManager := unicast.NewUnicastManager(&unicast.ManagerConfig{
+		Logger:                 builder.logger,
+		StreamFactory:          stream.NewLibP2PStreamFactory(h),
+		SporkId:                builder.sporkId,
+		ConnStatus:             node,
+		CreateStreamRetryDelay: builder.createStreamRetryInterval,
+		Metrics:                builder.metrics,
+	})
 	node.SetUnicastManager(unicastManager)
 
 	cm := component.NewComponentManagerBuilder().

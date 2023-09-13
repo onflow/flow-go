@@ -48,21 +48,24 @@ type Manager struct {
 	metrics                module.UnicastManagerMetrics
 }
 
-func NewUnicastManager(logger zerolog.Logger,
-	streamFactory stream.Factory,
-	sporkId flow.Identifier,
-	createStreamRetryDelay time.Duration,
-	connStatus p2p.PeerConnections,
-	metrics module.UnicastManagerMetrics,
-) *Manager {
+type ManagerConfig struct {
+	Logger                 zerolog.Logger
+	StreamFactory          stream.Factory
+	SporkId                flow.Identifier
+	ConnStatus             p2p.PeerConnections
+	CreateStreamRetryDelay time.Duration
+	Metrics                module.UnicastManagerMetrics
+}
+
+func NewUnicastManager(cfg *ManagerConfig) *Manager {
 	return &Manager{
-		logger:                 logger.With().Str("module", "unicast-manager").Logger(),
-		streamFactory:          streamFactory,
-		sporkId:                sporkId,
-		connStatus:             connStatus,
+		logger:                 cfg.Logger.With().Str("module", "unicast-manager").Logger(),
+		streamFactory:          cfg.StreamFactory,
+		sporkId:                cfg.SporkId,
+		connStatus:             cfg.ConnStatus,
 		peerDialing:            sync.Map{},
-		createStreamRetryDelay: createStreamRetryDelay,
-		metrics:                metrics,
+		createStreamRetryDelay: cfg.CreateStreamRetryDelay,
+		metrics:                cfg.Metrics,
 	}
 }
 
