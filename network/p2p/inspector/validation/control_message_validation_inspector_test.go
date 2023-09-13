@@ -304,6 +304,8 @@ func TestControlMessageValidationInspector_processInspectRPCReq(t *testing.T) {
 
 	t.Run("inspectIWantMessages should disseminate invalid control message notification for iWant messages when cache misses exceeds allowed threshold", func(t *testing.T) {
 		inspector, distributor, rpcTracker, _, _ := inspectorFixture(t)
+		// set cache miss check size to 0 forcing the inspector to check the cache misses with only a single iWant
+		inspector.config.CacheMissCheckSize = 0
 		// set high cache miss threshold to ensure we only disseminate notification when it is exceeded
 		inspector.config.IWantRPCInspectionConfig.CacheMissThreshold = .9
 		msgIds := unittest.IdentifierListFixture(100).Strings()
@@ -313,6 +315,26 @@ func TestControlMessageValidationInspector_processInspectRPCReq(t *testing.T) {
 
 		checkNotif := checkNotifFunc(t, expectedPeerID, p2pmsg.CtrlMsgIWant, IsIWantCacheMissThresholdErr)
 		distributor.On("Distribute", mock.AnythingOfType("*p2p.InvCtrlMsgNotif")).Return(nil).Once().Run(checkNotif)
+		rpcTracker.On("LastHighestIHaveRPCSize").Return(int64(100)).Maybe()
+		// return false each time to eventually force a notification to be disseminated when the cache miss count finally exceeds the 90% threshold
+		rpcTracker.On("WasIHaveRPCSent", mock.AnythingOfType("string")).Return(false).Run(func(args mock.Arguments) {
+			id, ok := args[0].(string)
+			require.True(t, ok)
+			require.Contains(t, msgIds, id)
+		})
+		require.NoError(t, inspector.processInspectRPCReq(inspectMsgReq))
+	})
+	t.Run("inspectIWantMessages should not disseminate invalid control message notification for iWant messages when cache misses exceeds allowed threshold if cache miss check size not exceeded", func(t *testing.T) {
+		inspector, distributor, rpcTracker, _, _ := inspectorFixture(t)
+		defer distributor.AssertNotCalled(t, "Distribute")
+		// if size of iwants not greater than 10 cache misses will not be checked
+		inspector.config.CacheMissCheckSize = 10
+		// set high cache miss threshold to ensure we only disseminate notification when it is exceeded
+		inspector.config.IWantRPCInspectionConfig.CacheMissThreshold = .9
+		msgIds := unittest.IdentifierListFixture(100).Strings()
+		expectedPeerID := peer.ID("peerID987654321")
+		inspectMsgReq, err := NewInspectRPCRequest(expectedPeerID, unittest.P2PRPCFixture(unittest.WithIWants(unittest.P2PRPCIWantFixture(msgIds))))
+		require.NoError(t, err, "failed to get inspect message request")
 		rpcTracker.On("LastHighestIHaveRPCSize").Return(int64(100)).Maybe()
 		// return false each time to eventually force a notification to be disseminated when the cache miss count finally exceeds the 90% threshold
 		rpcTracker.On("WasIHaveRPCSent", mock.AnythingOfType("string")).Return(false).Run(func(args mock.Arguments) {

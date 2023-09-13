@@ -298,7 +298,7 @@ func (c *ControlMsgValidationInspector) inspectIWantMessages(from peer.ID, iWant
 	allowedCacheMissesThreshold := float64(sampleSize) * c.config.IWantRPCInspectionConfig.CacheMissThreshold
 	duplicates := 0
 	allowedDuplicatesThreshold := float64(sampleSize) * c.config.IWantRPCInspectionConfig.DuplicateMsgIDThreshold
-
+	checkCacheMisses := len(iWants) > c.config.IWantRPCInspectionConfig.CacheMissCheckSize
 	lg = lg.With().
 		Uint("iwant_sample_size", sampleSize).
 		Float64("allowed_cache_misses_threshold", allowedCacheMissesThreshold).
@@ -321,8 +321,10 @@ func (c *ControlMsgValidationInspector) inspectIWantMessages(from peer.ID, iWant
 			// check cache miss threshold
 			if !c.rpcTracker.WasIHaveRPCSent(messageID) {
 				cacheMisses++
-				if float64(cacheMisses) > allowedCacheMissesThreshold {
-					return NewIWantCacheMissThresholdErr(cacheMisses, messageIDCount, c.config.IWantRPCInspectionConfig.CacheMissThreshold)
+				if checkCacheMisses {
+					if float64(cacheMisses) > allowedCacheMissesThreshold {
+						return NewIWantCacheMissThresholdErr(cacheMisses, messageIDCount, c.config.IWantRPCInspectionConfig.CacheMissThreshold)
+					}
 				}
 			}
 			tracker.set(messageID)
