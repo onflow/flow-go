@@ -427,7 +427,7 @@ func TestControlMessageValidationInspector_ActiveClustersChanged(t *testing.T) {
 		metrics.NewNoopCollector(),
 		mockp2p.NewRpcControlTracking(t),
 	)
-
+	require.NoError(t, err)
 	activeClusterIds := make(flow.ChainIDList, 0)
 	for _, id := range unittest.IdentifierListFixture(5) {
 		activeClusterIds = append(activeClusterIds, flow.ChainID(id.String()))
