@@ -23,12 +23,15 @@ type ExecutionState struct {
 	indexRange *SequentialIndexRange
 }
 
-func New(registers storage.RegisterIndex, headers storage.Headers, defaultStartHeight uint64) (*ExecutionState, error) {
+// New execution state indexer with provided storage access for registers and headers as well as initial height.
+// This method will initialize the index starting height and end height to that found in the register storage,
+// if no height was previously persisted it will use the provided initHeight.
+func New(registers storage.RegisterIndex, headers storage.Headers, initHeight uint64) (*ExecutionState, error) {
 	// get the first indexed height from the register storage, if not found use the default start index height provided
 	first, err := registers.FirstHeight()
 	if err != nil {
 		if errors.Is(err, storage.ErrNotFound) {
-			first = defaultStartHeight
+			first = initHeight
 		} else {
 			return nil, err
 		}
