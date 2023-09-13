@@ -83,7 +83,7 @@ func ChunkExecutionDataToMessage(data *execution_data.ChunkExecutionData) (
 		for i, result := range data.TransactionResults {
 			results[i] = &entities.ExecutionDataTransactionResult{
 				TransactionId:   IdentifierToMessage(result.TransactionID),
-				HasError:        result.HasError,
+				Failed:          result.Failed,
 				ComputationUsed: result.ComputationUsed,
 			}
 		}
@@ -126,7 +126,7 @@ func MessageToChunkExecutionData(
 		for i, result := range m.GetTransactionResults() {
 			results[i] = execution_data.TransactionResult{
 				TransactionID:   MessageToIdentifier(result.GetTransactionId()),
-				HasError:        result.GetHasError(),
+				Failed:          result.GetFailed(),
 				ComputationUsed: result.GetComputationUsed(),
 			}
 		}
