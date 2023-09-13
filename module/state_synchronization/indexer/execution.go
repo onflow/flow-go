@@ -43,10 +43,15 @@ func New(registers storage.RegisterIndex, headers storage.Headers, defaultStartH
 		}
 	}
 
+	indexRange, err := NewSequentialIndexRange(first, last)
+	if err != nil {
+		return nil, err
+	}
+
 	return &ExecutionState{
 		registers:  registers,
 		headers:    headers,
-		indexRange: NewSequentialIndexRange(first, last),
+		indexRange: indexRange,
 	}, nil
 }
 
