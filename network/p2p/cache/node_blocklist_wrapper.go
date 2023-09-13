@@ -45,8 +45,8 @@ type NodeDisallowListingWrapper struct {
 
 	// updateConsumerOracle is called whenever the disallow-list is updated.
 	// Note that we do not use the `updateConsumer` directly due to the circular dependency between the
-	// middleware (i.e., updateConsumer), and the wrapper (i.e., NodeDisallowListingWrapper).
-	// Middleware needs identity provider to be initialized, and identity provider needs this wrapper to be initialized.
+	// networking layer Underlay interface (i.e., updateConsumer), and the wrapper (i.e., NodeDisallowListingWrapper).
+	// Underlay needs identity provider to be initialized, and identity provider needs this wrapper to be initialized.
 	// Hence, if we pass the updateConsumer by the interface value, it will be nil at the time of initialization.
 	// Instead, we use the oracle function to get the updateConsumer whenever we need it.
 	updateConsumerOracle func() network.DisallowListNotificationConsumer

@@ -336,7 +336,7 @@ func (exeNode *ExecutionNode) LoadBlobService(
 		opts = append(opts, blob.WithRateLimit(float64(exeNode.exeConf.blobstoreRateLimit), exeNode.exeConf.blobstoreBurstLimit))
 	}
 
-	bs, err := node.Network.RegisterBlobService(channels.ExecutionDataService, exeNode.executionDataDatastore, opts...)
+	bs, err := node.EngineRegistry.RegisterBlobService(channels.ExecutionDataService, exeNode.executionDataDatastore, opts...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to register blob service: %w", err)
 	}
@@ -515,7 +515,7 @@ func (exeNode *ExecutionNode) LoadProviderEngine(
 	exeNode.providerEngine, err = exeprovider.New(
 		node.Logger,
 		node.Tracer,
-		node.Network,
+		node.EngineRegistry,
 		node.State,
 		exeNode.executionState,
 		exeNode.collector,
@@ -849,7 +849,7 @@ func (exeNode *ExecutionNode) LoadIngestionEngine(
 	error,
 ) {
 	var err error
-	exeNode.collectionRequester, err = requester.New(node.Logger, node.Metrics.Engine, node.Network, node.Me, node.State,
+	exeNode.collectionRequester, err = requester.New(node.Logger, node.Metrics.Engine, node.EngineRegistry, node.Me, node.State,
 		channels.RequestCollections,
 		filter.Any,
 		func() flow.Entity { return &flow.Collection{} },
@@ -867,16 +867,13 @@ func (exeNode *ExecutionNode) LoadIngestionEngine(
 	exeNode.ingestionEng, err = ingestion.New(
 		exeNode.ingestionUnit,
 		node.Logger,
-		node.Network,
+		node.EngineRegistry,
 		node.Me,
 		exeNode.collectionRequester,
 		node.State,
 		node.Storage.Headers,
 		node.Storage.Blocks,
 		node.Storage.Collections,
-		exeNode.events,
-		exeNode.serviceEvents,
-		exeNode.txResults,
 		exeNode.computationManager,
 		exeNode.providerEngine,
 		exeNode.executionState,
@@ -1001,7 +998,7 @@ func (exeNode *ExecutionNode) LoadFollowerEngine(
 
 	exeNode.followerEng, err = followereng.NewComplianceLayer(
 		node.Logger,
-		node.Network,
+		node.EngineRegistry,
 		node.Me,
 		node.Metrics.Engine,
 		node.Storage.Headers,
@@ -1048,7 +1045,7 @@ func (exeNode *ExecutionNode) LoadReceiptProviderEngine(
 	eng, err := provider.New(
 		node.Logger,
 		node.Metrics.Engine,
-		node.Network,
+		node.EngineRegistry,
 		node.Me,
 		node.State,
 		receiptRequestQueue,
@@ -1074,7 +1071,7 @@ func (exeNode *ExecutionNode) LoadSynchronizationEngine(
 	exeNode.syncEngine, err = synchronization.New(
 		node.Logger,
 		node.Metrics.Engine,
-		node.Network,
+		node.EngineRegistry,
 		node.Me,
 		node.State,
 		node.Storage.Blocks,

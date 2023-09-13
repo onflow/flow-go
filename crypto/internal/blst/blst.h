@@ -95,10 +95,6 @@ void blst_fr_sqr(blst_fr *ret, const blst_fr *a);
 void blst_fr_cneg(blst_fr *ret, const blst_fr *a, bool flag);
 void blst_fr_eucl_inverse(blst_fr *ret, const blst_fr *a);
 void blst_fr_inverse(blst_fr *ret, const blst_fr *a);
-#ifdef BLST_FR_PENTAROOT
-void blst_fr_pentaroot(blst_fr *ret, const blst_fr *a);
-void blst_fr_pentapow(blst_fr *ret, const blst_fr *a);
-#endif
 
 void blst_fr_from_uint64(blst_fr *ret, const uint64_t a[4]);
 void blst_uint64_from_fr(uint64_t ret[4], const blst_fr *a);
@@ -341,6 +337,9 @@ void blst_sign_pk_in_g2(blst_p1 *out_sig, const blst_p1 *hash,
 #ifndef SWIG
 void blst_miller_loop(blst_fp12 *ret, const blst_p2_affine *Q,
                                       const blst_p1_affine *P);
+void blst_miller_loop_n(blst_fp12 *ret, const blst_p2_affine *const Qs[],
+                                        const blst_p1_affine *const Ps[],
+                                        size_t n);
 void blst_final_exp(blst_fp12 *ret, const blst_fp12 *f);
 void blst_precompute_lines(blst_fp6 Qlines[68], const blst_p2_affine *Q);
 void blst_miller_loop_lines(blst_fp12 *ret, const blst_fp6 Qlines[68],

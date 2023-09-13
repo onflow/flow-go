@@ -61,7 +61,7 @@ typedef unsigned char byte;
 typedef byte pow256[256/8];
 
 /*
- * Internal Boolean type, Bolean by value, hence safe to cast to or
+ * Internal Boolean type, Boolean by value, hence safe to cast to or
  * reinterpret as 'bool'.
  */
 typedef limb_t bool_t;
@@ -147,7 +147,6 @@ bool_t ct_is_square_mod_384(const vec384 inp, const vec384 mod);
 # define mul_mont_384x mulx_mont_384x
 # define sqr_mont_384x sqrx_mont_384x
 # define sqr_mont_382x sqrx_mont_382x
-# define sqr_n_mul_mont_384x sqrx_n_mul_mont_384x
 # define mul_382x mulx_382x
 # define sqr_382x sqrx_382x
 #endif
@@ -156,8 +155,6 @@ void mul_mont_384x(vec384x ret, const vec384x a, const vec384x b,
                    const vec384 p, limb_t n0);
 void sqr_mont_384x(vec384x ret, const vec384x a, const vec384 p, limb_t n0);
 void sqr_mont_382x(vec384x ret, const vec384x a, const vec384 p, limb_t n0);
-void sqr_n_mul_mont_384x(vec384x ret, const vec384x a, size_t count,
-                         const vec384 p, limb_t n0, const vec384x b);
 void mul_382x(vec768 ret[2], const vec384x a, const vec384x b, const vec384 p);
 void sqr_382x(vec768 ret[2], const vec384x a, const vec384 p);
 
@@ -214,7 +211,7 @@ typedef const void *uptr_t;
 #endif
 
 #if defined(__GNUC__) || defined(__clang__)
-# define launder(var) asm volatile("" : "+r"(var))
+# define launder(var) __asm__ __volatile__("" : "+r"(var))
 #else
 # define launder(var)
 #endif
@@ -249,8 +246,11 @@ static inline void vec_cswap(void *restrict a, void *restrict b, size_t num,
 {
     limb_t ai, *ap = (limb_t *)a;
     limb_t bi, *bp = (limb_t *)b;
-    limb_t xorm, mask = (limb_t)0 - cbit;
+    limb_t xorm, mask;
     size_t i;
+
+    launder(cbit);
+    mask = (limb_t)0 - cbit;
 
     num /= sizeof(limb_t);
 
@@ -377,7 +377,7 @@ static inline void vec_zero(void *ret, size_t num)
         rp[i] = 0;
 
 #if defined(__GNUC__) || defined(__clang__)
-    asm volatile("" : : "r"(ret) : "memory");
+    __asm__ __volatile__("" : : "r"(ret) : "memory");
 #endif
 }
 
@@ -398,7 +398,7 @@ static inline void vec_zero(void *ret, size_t num)
 # pragma warning(disable: 4127 4189)
 #endif
 
-#if !defined(__wasm__)
+#if !defined(__wasm__) && __STDC_HOSTED__-0 != 0
 # include <stdlib.h>
 #endif
 
