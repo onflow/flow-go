@@ -26,10 +26,6 @@ func FromSnapshot(from protocol.Snapshot) (*Snapshot, error) {
 	if err != nil {
 		return nil, fmt.Errorf("could not get head: %w", err)
 	}
-	snap.Identities, err = from.Identities(filter.Any)
-	if err != nil {
-		return nil, fmt.Errorf("could not get identities: %w", err)
-	}
 	snap.LatestResult, snap.LatestSeal, err = from.SealedResult()
 	if err != nil {
 		return nil, fmt.Errorf("could not get seal: %w", err)
@@ -42,10 +38,6 @@ func FromSnapshot(from protocol.Snapshot) (*Snapshot, error) {
 	snap.QuorumCertificate, err = from.QuorumCertificate()
 	if err != nil {
 		return nil, fmt.Errorf("could not get qc: %w", err)
-	}
-	snap.Phase, err = from.Phase()
-	if err != nil {
-		return nil, fmt.Errorf("could not get phase: %w", err)
 	}
 
 	// convert epochs
@@ -344,7 +336,6 @@ func SnapshotFromBootstrapStateWithParams(
 
 	snap := SnapshotFromEncodable(EncodableSnapshot{
 		Head:         root.Header,
-		Identities:   setup.Participants,
 		LatestSeal:   seal,
 		LatestResult: result,
 		SealingSegment: &flow.SealingSegment{
@@ -355,7 +346,6 @@ func SnapshotFromBootstrapStateWithParams(
 			ExtraBlocks:      make([]*flow.Block, 0),
 		},
 		QuorumCertificate:   qc,
-		Phase:               flow.EpochPhaseStaking,
 		Epochs:              epochs,
 		Params:              params,
 		ProtocolState:       protocolState,

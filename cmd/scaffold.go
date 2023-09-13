@@ -968,7 +968,6 @@ func (fnb *FlowNodeBuilder) initStorage() error {
 	collections := bstorage.NewCollections(fnb.DB, transactions)
 	setups := bstorage.NewEpochSetups(fnb.Metrics.Cache, fnb.DB)
 	epochCommits := bstorage.NewEpochCommits(fnb.Metrics.Cache, fnb.DB)
-	statuses := bstorage.NewEpochStatuses(fnb.Metrics.Cache, fnb.DB)
 	commits := bstorage.NewCommits(fnb.Metrics.Cache, fnb.DB)
 	protocolState := bstorage.NewProtocolState(fnb.Metrics.Cache, setups, epochCommits, fnb.DB, bstorage.DefaultCacheSize)
 	versionBeacons := bstorage.NewVersionBeacons(fnb.DB)
@@ -989,7 +988,6 @@ func (fnb *FlowNodeBuilder) initStorage() error {
 		EpochCommits:       epochCommits,
 		VersionBeacons:     versionBeacons,
 		ProtocolState:      protocolState,
-		Statuses:           statuses,
 		Commits:            commits,
 	}
 

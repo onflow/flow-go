@@ -441,6 +441,7 @@ func (state *State) bootstrapStatePointers(root protocol.Snapshot) func(*badger.
 
 // bootstrapEpoch bootstraps the protocol state database with information about
 // the previous, current, and next epochs as of the root snapshot.
+// This has to be bootstrapped before dynamic protocol state.
 // TODO(yuraolex): This information can be bootstrapped from dynamic protocol state.
 func (state *State) bootstrapEpoch(epochs protocol.EpochQuery, verifyNetworkAddress bool) func(*transaction.Tx) error {
 	return func(tx *transaction.Tx) error {
@@ -550,6 +551,7 @@ func (state *State) bootstrapEpoch(epochs protocol.EpochQuery, verifyNetworkAddr
 		}
 
 		// insert all epoch setup/commit service events
+		// dynamic protocol state relies on these events being stored
 		for _, setup := range setups {
 			err = state.epoch.setups.StoreTx(setup)(tx)
 			if err != nil {

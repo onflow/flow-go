@@ -2536,7 +2536,8 @@ func assertEpochEmergencyFallbackTriggered(t *testing.T, state realprotocol.Stat
 // metrics which are set during bootstrapping and building blocks.
 func mockMetricsForRootSnapshot(metricsMock *mockmodule.ComplianceMetrics, rootSnapshot *inmem.Snapshot) {
 	metricsMock.On("CurrentEpochCounter", rootSnapshot.Encodable().Epochs.Current.Counter)
-	metricsMock.On("CurrentEpochPhase", rootSnapshot.Encodable().Phase)
+	phase, _ := rootSnapshot.Phase()
+	metricsMock.On("CurrentEpochPhase", phase)
 	metricsMock.On("CurrentEpochFinalView", rootSnapshot.Encodable().Epochs.Current.FinalView)
 	metricsMock.On("CommittedEpochFinalView", rootSnapshot.Encodable().Epochs.Current.FinalView)
 	metricsMock.On("CurrentDKGPhase1FinalView", rootSnapshot.Encodable().Epochs.Current.DKGPhase1FinalView)

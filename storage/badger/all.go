@@ -19,7 +19,6 @@ func InitAll(metrics module.CacheMetrics, db *badger.DB) *storage.All {
 	qcs := NewQuorumCertificates(metrics, db, DefaultCacheSize)
 	setups := NewEpochSetups(metrics, db)
 	epochCommits := NewEpochCommits(metrics, db)
-	statuses := NewEpochStatuses(metrics, db)
 	protocolState := NewProtocolState(metrics, setups, epochCommits, db, DefaultCacheSize)
 	versionBeacons := NewVersionBeacons(db)
 
@@ -40,7 +39,6 @@ func InitAll(metrics module.CacheMetrics, db *badger.DB) *storage.All {
 		QuorumCertificates: qcs,
 		Setups:             setups,
 		EpochCommits:       epochCommits,
-		Statuses:           statuses,
 		ProtocolState:      protocolState,
 		VersionBeacons:     versionBeacons,
 		Results:            results,

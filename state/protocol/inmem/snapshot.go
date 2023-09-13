@@ -6,6 +6,7 @@ import (
 
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/state/protocol"
 )
 
@@ -27,15 +28,25 @@ func (s Snapshot) QuorumCertificate() (*flow.QuorumCertificate, error) {
 }
 
 func (s Snapshot) Identities(selector flow.IdentityFilter) (flow.IdentityList, error) {
-	return s.enc.Identities.Filter(selector), nil
+	protocolState, err := s.ProtocolState()
+	if err != nil {
+		return nil, fmt.Errorf("could not access protocol state: %w", err)
+	}
+	return protocolState.Identities().Filter(selector), nil
 }
 
 func (s Snapshot) Identity(nodeID flow.Identifier) (*flow.Identity, error) {
-	identity, ok := s.enc.Identities.ByNodeID(nodeID)
-	if !ok {
+	// filter identities at snapshot for node ID
+	identities, err := s.Identities(filter.HasNodeID(nodeID))
+	if err != nil {
+		return nil, fmt.Errorf("could not get identities: %w", err)
+	}
+
+	// check if node ID is part of identities
+	if len(identities) == 0 {
 		return nil, protocol.IdentityNotFoundError{NodeID: nodeID}
 	}
-	return identity, nil
+	return identities[0], nil
 }
 
 func (s Snapshot) Commit() (flow.StateCommitment, error) {
@@ -56,7 +67,7 @@ func (s Snapshot) Descendants() ([]flow.Identifier, error) {
 }
 
 func (s Snapshot) Phase() (flow.EpochPhase, error) {
-	return s.enc.Phase, nil
+	return s.enc.ProtocolState.EpochStatus().Phase()
 }
 
 func (s Snapshot) RandomSource() ([]byte, error) {

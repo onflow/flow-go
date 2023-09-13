@@ -33,9 +33,11 @@ func TestUnweightedNode(t *testing.T) {
 	// * same collection node from epoch 1, so cluster QCs are consistent
 	// * 1 new consensus node, joining at epoch 2
 	// * random nodes with other roles
+	currentEpochCollectionNodes, err := rootSnapshot.Identities(filter.HasRole(flow.RoleCollection))
+	require.NoError(t, err)
 	nextEpochIdentities := unittest.CompleteIdentitySet(
 		append(
-			rootSnapshot.Encodable().Identities.Filter(filter.HasRole(flow.RoleCollection)),
+			currentEpochCollectionNodes,
 			nextEpochParticipantsData.Identities()...)...,
 	)
 	rootSnapshot = withNextEpoch(
@@ -217,9 +219,10 @@ func withNextEpoch(
 	// convert to encodable representation for simple modification
 	encodableSnapshot := snapshot.Encodable()
 
+	currEpoch := &encodableSnapshot.Epochs.Current // take pointer so assignments apply
+	currentEpochIdentities := currEpoch.InitialIdentities
 	nextEpochIdentities = nextEpochIdentities.Sort(order.Canonical)
 
-	currEpoch := &encodableSnapshot.Epochs.Current                // take pointer so assignments apply
 	currEpoch.FinalView = currEpoch.FirstView + curEpochViews - 1 // first epoch lasts curEpochViews
 	encodableSnapshot.Epochs.Next = &inmem.EncodableEpoch{
 		Counter:           currEpoch.Counter + 1,
@@ -241,25 +244,32 @@ func withNextEpoch(
 
 	participantsCache.Update(encodableSnapshot.Epochs.Next.Counter, nextEpochParticipantData)
 
-	// we must start the current epoch in committed phase so we can transition to the next epoch
-	encodableSnapshot.Phase = flow.EpochPhaseCommitted
 	encodableSnapshot.LatestSeal.ResultID = encodableSnapshot.LatestResult.ID()
-
-	// set identities for root snapshot to include next epoch identities,
-	// since we are in committed phase
-	encodableSnapshot.Identities = append(
-		// all the current epoch identities
-		encodableSnapshot.Identities,
-		// and all the NEW identities in next epoch, with 0 weight
-		nextEpochIdentities.
-			Filter(filter.Not(filter.In(encodableSnapshot.Identities))).
-			Map(mapfunc.WithWeight(0))...,
-	).Sort(order.Canonical)
 
 	// update protocol state
 	protocolState := encodableSnapshot.ProtocolState
-	// update protocol state identities since we are in committed phase
-	protocolState.Identities = flow.DynamicIdentityEntryListFromIdentities(encodableSnapshot.Identities)
+
+	// set identities for root snapshot to include next epoch identities,
+	// since we are in committed phase
+	protocolState.Identities = flow.DynamicIdentityEntryListFromIdentities(
+		append(
+			// all the current epoch identities
+			currentEpochIdentities,
+			// and all the NEW identities in next epoch, with 0 weight
+			nextEpochIdentities.
+				Filter(filter.Not(filter.In(currentEpochIdentities))).
+				Map(mapfunc.WithWeight(0))...,
+		).Sort(order.Canonical))
+
+	nextEpochIdentities = append(
+		// all the next epoch identities
+		nextEpochIdentities,
+		// and all identities from current epoch, with 0 weight
+		currentEpochIdentities.
+			Filter(filter.Not(filter.In(nextEpochIdentities))).
+			Map(mapfunc.WithWeight(0))...,
+	).Sort(order.Canonical)
+
 	// setup ID has changed, need to update it
 	convertedEpochSetup, _ := protocol.ToEpochSetup(inmem.NewEpoch(*currEpoch))
 	protocolState.CurrentEpochEventIDs.SetupID = convertedEpochSetup.ID()
@@ -272,7 +282,7 @@ func withNextEpoch(
 			CommitID: convertedEpochCommit.ID(),
 		},
 		PreviousEpochEventIDs:           protocolState.CurrentEpochEventIDs,
-		Identities:                      flow.DynamicIdentityEntryListFromIdentities(encodableSnapshot.Identities),
+		Identities:                      flow.DynamicIdentityEntryListFromIdentities(nextEpochIdentities),
 		InvalidStateTransitionAttempted: false,
 		NextEpochProtocolState:          nil,
 	}

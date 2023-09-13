@@ -17,7 +17,7 @@ func BatchInsertExecutionReceiptMeta(receiptID flow.Identifier, meta *flow.Execu
 	return batchWrite(makePrefix(codeExecutionReceiptMeta, receiptID), meta)
 }
 
-// RetrieveExecutionReceipt retrieves a execution receipt meta by ID.
+// RetrieveExecutionReceiptMeta retrieves a execution receipt meta by ID.
 func RetrieveExecutionReceiptMeta(receiptID flow.Identifier, meta *flow.ExecutionReceiptMeta) func(*badger.Txn) error {
 	return retrieve(makePrefix(codeExecutionReceiptMeta, receiptID), meta)
 }
