@@ -1073,6 +1073,8 @@ func (m *FollowerState) handleEpochServiceEvents(candidate *flow.Block, updater 
 	}
 	if phase == flow.EpochPhaseCommitted {
 		if candidate.Header.View > activeSetup.FinalView {
+			// TODO: this is a temporary workaround to allow for the epoch transition to be triggered
+			// most likely it will be not needed when we refactor protocol state entries and define strict safety rules.
 			err = updater.TransitionToNextEpoch()
 			if err != nil {
 				return nil, fmt.Errorf("could not transition protocol state to next epoch: %w", err)

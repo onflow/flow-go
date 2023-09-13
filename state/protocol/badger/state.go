@@ -691,8 +691,8 @@ func OpenState(
 
 func (state *State) Params() protocol.Params {
 	return Params{
-		GlobalParams: state.protocolState.GlobalParams(),
-		state:        state,
+		GlobalParams:   state.protocolState.GlobalParams(),
+		InstanceParams: &InstanceParams{state: state},
 	}
 }
 

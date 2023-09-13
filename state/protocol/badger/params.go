@@ -14,13 +14,20 @@ import (
 
 type Params struct {
 	protocol.GlobalParams
+	protocol.InstanceParams
+}
+
+var _ protocol.Params = (*Params)(nil)
+
+// InstanceParams implements the interface protocol.InstanceParams. All functions
+// are served on demand directly from the database, _without_ any caching.
+type InstanceParams struct {
 	state *State
 }
 
-var _ protocol.InstanceParams = (*Params)(nil)
-var _ protocol.GlobalParams = (*Params)(nil) // TODO(yuraolex): probably this is temporary since protocol state will be serving global params
+var _ protocol.InstanceParams = (*InstanceParams)(nil)
 
-func (p Params) EpochFallbackTriggered() (bool, error) {
+func (p *InstanceParams) EpochFallbackTriggered() (bool, error) {
 	var triggered bool
 	err := p.state.db.View(operation.CheckEpochEmergencyFallbackTriggered(&triggered))
 	if err != nil {
@@ -29,7 +36,7 @@ func (p Params) EpochFallbackTriggered() (bool, error) {
 	return triggered, nil
 }
 
-func (p Params) FinalizedRoot() (*flow.Header, error) {
+func (p *InstanceParams) FinalizedRoot() (*flow.Header, error) {
 
 	// look up root block ID
 	var rootID flow.Identifier
@@ -47,7 +54,7 @@ func (p Params) FinalizedRoot() (*flow.Header, error) {
 	return header, nil
 }
 
-func (p Params) SealedRoot() (*flow.Header, error) {
+func (p *InstanceParams) SealedRoot() (*flow.Header, error) {
 	// look up root block ID
 	var rootID flow.Identifier
 	err := p.state.db.View(operation.LookupBlockHeight(p.state.sealedRootHeight, &rootID))
@@ -65,7 +72,7 @@ func (p Params) SealedRoot() (*flow.Header, error) {
 	return header, nil
 }
 
-func (p Params) Seal() (*flow.Seal, error) {
+func (p *InstanceParams) Seal() (*flow.Seal, error) {
 
 	// look up root header
 	var rootID flow.Identifier
