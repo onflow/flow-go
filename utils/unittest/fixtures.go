@@ -2554,10 +2554,8 @@ func CreateSendTxHttpPayload(tx flow.TransactionBody) map[string]interface{} {
 }
 
 // P2PRPCGraftFixtures returns n number of control message rpc Graft fixtures.
-// The number of topics must match the number of grafts to ensure validity.
-// This default behavior guarantees valid grafts when using a list of unique valid topics.
-func P2PRPCGraftFixtures(t *testing.T, n int, topics []string) []*pubsub_pb.ControlGraft {
-	require.Equal(t, n, len(topics), "number of topics should match the number of grafts to create")
+func P2PRPCGraftFixtures(topics []string) []*pubsub_pb.ControlGraft {
+	n := len(topics)
 	grafts := make([]*pubsub_pb.ControlGraft, n)
 	for i := 0; i < n; i++ {
 		grafts[i] = P2PRPCGraftFixture(&topics[i])
@@ -2573,10 +2571,8 @@ func P2PRPCGraftFixture(topic *string) *pubsub_pb.ControlGraft {
 }
 
 // P2PRPCPruneFixtures returns n number of control message rpc Prune fixtures.
-// The number of topics must match the number of prunes to ensure validity.
-// This default behavior guarantees valid prunes when using a list of unique valid topics.
-func P2PRPCPruneFixtures(t *testing.T, n int, topics []string) []*pubsub_pb.ControlPrune {
-	require.Equal(t, n, len(topics), "number of topics should match the number of prunes to create")
+func P2PRPCPruneFixtures(topics []string) []*pubsub_pb.ControlPrune {
+	n := len(topics)
 	prunes := make([]*pubsub_pb.ControlPrune, n)
 	for i := 0; i < n; i++ {
 		prunes[i] = P2PRPCPruneFixture(&topics[i])
@@ -2592,10 +2588,8 @@ func P2PRPCPruneFixture(topic *string) *pubsub_pb.ControlPrune {
 }
 
 // P2PRPCIHaveFixtures returns n number of control message rpc iHave fixtures with m number of message ids each.
-// The number of topics must match the number of iHaves to ensure validity.
-// This default behavior guarantees valid iHaves when using a list of unique valid topics.
-func P2PRPCIHaveFixtures(t *testing.T, n, m int, topics []string) []*pubsub_pb.ControlIHave {
-	require.Equal(t, n, len(topics), "number of topics should match the number of ihaves to create")
+func P2PRPCIHaveFixtures(m int, topics []string) []*pubsub_pb.ControlIHave {
+	n := len(topics)
 	ihaves := make([]*pubsub_pb.ControlIHave, n)
 	for i := 0; i < n; i++ {
 		ihaves[i] = P2PRPCIHaveFixture(&topics[i], IdentifierListFixture(m).Strings())

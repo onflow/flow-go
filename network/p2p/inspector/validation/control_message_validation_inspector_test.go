@@ -1,6 +1,7 @@
 package validation
 
 import (
+	"context"
 	"fmt"
 	"testing"
 
@@ -11,6 +12,7 @@ import (
 
 	"github.com/onflow/flow-go/config"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
 	mockmodule "github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/network/channels"
@@ -28,8 +30,8 @@ func TestControlMessageValidationInspector_truncateRPC(t *testing.T) {
 		inspector, _, _, _, _ := inspectorFixture(t)
 		inspector.config.GraftPruneMessageMaxSampleSize = 100
 		// topic validation not performed so we can use random strings
-		graftsGreaterThanMaxSampleSize := unittest.P2PRPCFixture(unittest.WithGrafts(unittest.P2PRPCGraftFixtures(t, 200, unittest.IdentifierListFixture(200).Strings())...))
-		graftsLessThanMaxSampleSize := unittest.P2PRPCFixture(unittest.WithGrafts(unittest.P2PRPCGraftFixtures(t, 50, unittest.IdentifierListFixture(50).Strings())...))
+		graftsGreaterThanMaxSampleSize := unittest.P2PRPCFixture(unittest.WithGrafts(unittest.P2PRPCGraftFixtures(unittest.IdentifierListFixture(200).Strings())...))
+		graftsLessThanMaxSampleSize := unittest.P2PRPCFixture(unittest.WithGrafts(unittest.P2PRPCGraftFixtures(unittest.IdentifierListFixture(50).Strings())...))
 		inspector.truncateGraftMessages(graftsGreaterThanMaxSampleSize)
 		inspector.truncateGraftMessages(graftsLessThanMaxSampleSize)
 		// rpc with grafts greater than configured max sample size should be truncated to GraftPruneMessageMaxSampleSize
@@ -42,8 +44,8 @@ func TestControlMessageValidationInspector_truncateRPC(t *testing.T) {
 		inspector, _, _, _, _ := inspectorFixture(t)
 		inspector.config.GraftPruneMessageMaxSampleSize = 100
 		// topic validation not performed so we can use random strings
-		prunesGreaterThanMaxSampleSize := unittest.P2PRPCFixture(unittest.WithPrunes(unittest.P2PRPCPruneFixtures(t, 200, unittest.IdentifierListFixture(200).Strings())...))
-		prunesLessThanMaxSampleSize := unittest.P2PRPCFixture(unittest.WithPrunes(unittest.P2PRPCPruneFixtures(t, 50, unittest.IdentifierListFixture(50).Strings())...))
+		prunesGreaterThanMaxSampleSize := unittest.P2PRPCFixture(unittest.WithPrunes(unittest.P2PRPCPruneFixtures(unittest.IdentifierListFixture(200).Strings())...))
+		prunesLessThanMaxSampleSize := unittest.P2PRPCFixture(unittest.WithPrunes(unittest.P2PRPCPruneFixtures(unittest.IdentifierListFixture(50).Strings())...))
 		inspector.truncatePruneMessages(prunesGreaterThanMaxSampleSize)
 		inspector.truncatePruneMessages(prunesLessThanMaxSampleSize)
 		// rpc with prunes greater than configured max sample size should be truncated to GraftPruneMessageMaxSampleSize
@@ -56,8 +58,8 @@ func TestControlMessageValidationInspector_truncateRPC(t *testing.T) {
 		inspector, _, _, _, _ := inspectorFixture(t)
 		inspector.config.IHaveRPCInspectionConfig.MaxSampleSize = 100
 		// topic validation not performed so we can use random strings
-		iHavesGreaterThanMaxSampleSize := unittest.P2PRPCFixture(unittest.WithIHaves(unittest.P2PRPCIHaveFixtures(t, 200, 200, unittest.IdentifierListFixture(200).Strings())...))
-		iHavesLessThanMaxSampleSize := unittest.P2PRPCFixture(unittest.WithIHaves(unittest.P2PRPCIHaveFixtures(t, 50, 200, unittest.IdentifierListFixture(50).Strings())...))
+		iHavesGreaterThanMaxSampleSize := unittest.P2PRPCFixture(unittest.WithIHaves(unittest.P2PRPCIHaveFixtures(200, unittest.IdentifierListFixture(200).Strings())...))
+		iHavesLessThanMaxSampleSize := unittest.P2PRPCFixture(unittest.WithIHaves(unittest.P2PRPCIHaveFixtures(200, unittest.IdentifierListFixture(50).Strings())...))
 		inspector.truncateIHaveMessages(iHavesGreaterThanMaxSampleSize)
 		inspector.truncateIHaveMessages(iHavesLessThanMaxSampleSize)
 		// rpc with iHaves greater than configured max sample size should be truncated to MaxSampleSize
@@ -70,8 +72,8 @@ func TestControlMessageValidationInspector_truncateRPC(t *testing.T) {
 		inspector, _, _, _, _ := inspectorFixture(t)
 		inspector.config.IHaveRPCInspectionConfig.MaxMessageIDSampleSize = 100
 		// topic validation not performed so we can use random strings
-		iHavesGreaterThanMaxSampleSize := unittest.P2PRPCFixture(unittest.WithIHaves(unittest.P2PRPCIHaveFixtures(t, 10, 200, unittest.IdentifierListFixture(10).Strings())...))
-		iHavesLessThanMaxSampleSize := unittest.P2PRPCFixture(unittest.WithIHaves(unittest.P2PRPCIHaveFixtures(t, 10, 50, unittest.IdentifierListFixture(10).Strings())...))
+		iHavesGreaterThanMaxSampleSize := unittest.P2PRPCFixture(unittest.WithIHaves(unittest.P2PRPCIHaveFixtures(200, unittest.IdentifierListFixture(10).Strings())...))
+		iHavesLessThanMaxSampleSize := unittest.P2PRPCFixture(unittest.WithIHaves(unittest.P2PRPCIHaveFixtures(50, unittest.IdentifierListFixture(10).Strings())...))
 		inspector.truncateIHaveMessageIds(iHavesGreaterThanMaxSampleSize)
 		inspector.truncateIHaveMessageIds(iHavesLessThanMaxSampleSize)
 		for _, iHave := range iHavesGreaterThanMaxSampleSize.GetControl().GetIhave() {
@@ -132,9 +134,9 @@ func TestControlMessageValidationInspector_processInspectRPCReq(t *testing.T) {
 			fmt.Sprintf("%s/%s", channels.SyncCommittee, sporkID),
 			fmt.Sprintf("%s/%s", channels.RequestChunks, sporkID),
 		}
-		grafts := unittest.P2PRPCGraftFixtures(t, 4, topics)
-		prunes := unittest.P2PRPCPruneFixtures(t, 4, topics)
-		ihaves := unittest.P2PRPCIHaveFixtures(t, 4, 50, topics)
+		grafts := unittest.P2PRPCGraftFixtures(topics)
+		prunes := unittest.P2PRPCPruneFixtures(topics)
+		ihaves := unittest.P2PRPCIHaveFixtures(50, topics)
 		iwants := unittest.P2PRPCIWantFixtures(2, 5)
 
 		// avoid cache misses for iwant messages.
@@ -379,7 +381,9 @@ func TestControlMessageValidationInspector_ActiveClustersChanged(t *testing.T) {
 	flowConfig, err := config.DefaultConfig()
 	require.NoError(t, err, "failed to get default flow config")
 	distributor := mockp2p.NewGossipSubInspectorNotifDistributor(t)
+	signalerCtx := irrecoverable.NewMockSignalerContext(t, context.Background())
 	inspector, err := NewControlMsgValidationInspector(
+		signalerCtx,
 		unittest.Logger(),
 		sporkID,
 		&flowConfig.NetworkConfig.GossipSubRPCValidationInspectorConfigs,
@@ -388,7 +392,7 @@ func TestControlMessageValidationInspector_ActiveClustersChanged(t *testing.T) {
 		metrics.NewNoopCollector(),
 		mockmodule.NewIdentityProvider(t),
 		metrics.NewNoopCollector(),
-		mockp2p.NewRPCControlTracking(t),
+		mockp2p.NewRpcControlTracking(t),
 	)
 
 	activeClusterIds := make(flow.ChainIDList, 0)
@@ -401,13 +405,15 @@ func TestControlMessageValidationInspector_ActiveClustersChanged(t *testing.T) {
 }
 
 // inspectorFixture returns a *ControlMsgValidationInspector fixture.
-func inspectorFixture(t *testing.T) (*ControlMsgValidationInspector, *mockp2p.GossipSubInspectorNotifDistributor, *mockp2p.RPCControlTracking, *mockmodule.IdentityProvider, flow.Identifier) {
+func inspectorFixture(t *testing.T) (*ControlMsgValidationInspector, *mockp2p.GossipSubInspectorNotifDistributor, *mockp2p.RpcControlTracking, *mockmodule.IdentityProvider, flow.Identifier) {
 	sporkID := unittest.IdentifierFixture()
 	flowConfig, err := config.DefaultConfig()
 	require.NoError(t, err, "failed to get default flow config")
 	distributor := mockp2p.NewGossipSubInspectorNotifDistributor(t)
 	idProvider := mockmodule.NewIdentityProvider(t)
+	signalerCtx := irrecoverable.NewMockSignalerContext(t, context.Background())
 	inspector, err := NewControlMsgValidationInspector(
+		signalerCtx,
 		unittest.Logger(),
 		sporkID,
 		&flowConfig.NetworkConfig.GossipSubRPCValidationInspectorConfigs,
@@ -416,10 +422,10 @@ func inspectorFixture(t *testing.T) (*ControlMsgValidationInspector, *mockp2p.Go
 		metrics.NewNoopCollector(),
 		idProvider,
 		metrics.NewNoopCollector(),
-		mockp2p.NewRPCControlTracking(t),
+		mockp2p.NewRpcControlTracking(t),
 	)
 	require.NoError(t, err, "failed to create control message validation inspector fixture")
-	rpcTracker := mockp2p.NewRPCControlTracking(t)
+	rpcTracker := mockp2p.NewRpcControlTracking(t)
 	inspector.rpcTracker = rpcTracker
 	return inspector, distributor, rpcTracker, idProvider, sporkID
 }
