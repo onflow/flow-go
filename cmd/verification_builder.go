@@ -201,7 +201,7 @@ func (v *VerificationNodeBuilder) LoadComponentsAndModules() {
 				node.Logger,
 				collector,
 				node.Tracer,
-				node.Network,
+				node.EngineRegistry,
 				node.State,
 				node.Me,
 				chunkVerifier,
@@ -214,7 +214,7 @@ func (v *VerificationNodeBuilder) LoadComponentsAndModules() {
 			requesterEngine, err = requester.New(
 				node.Logger,
 				node.State,
-				node.Network,
+				node.EngineRegistry,
 				node.Tracer,
 				collector,
 				chunkRequests,
@@ -379,7 +379,7 @@ func (v *VerificationNodeBuilder) LoadComponentsAndModules() {
 
 			followerEng, err = followereng.NewComplianceLayer(
 				node.Logger,
-				node.Network,
+				node.EngineRegistry,
 				node.Me,
 				node.Metrics.Engine,
 				node.Storage.Headers,
@@ -398,7 +398,7 @@ func (v *VerificationNodeBuilder) LoadComponentsAndModules() {
 			sync, err := commonsync.New(
 				node.Logger,
 				node.Metrics.Engine,
-				node.Network,
+				node.EngineRegistry,
 				node.Me,
 				node.State,
 				node.Storage.Blocks,

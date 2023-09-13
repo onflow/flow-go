@@ -66,7 +66,7 @@ type resultCollector struct {
 	spockHasher   hash.Hasher
 	receiptHasher hash.Hasher
 
-	executionDataProvider *provider.Provider
+	executionDataProvider provider.Provider
 
 	parentBlockExecutionResultID flow.Identifier
 
@@ -90,7 +90,7 @@ func newResultCollector(
 	metrics module.ExecutionMetrics,
 	committer ViewCommitter,
 	signer module.Local,
-	executionDataProvider *provider.Provider,
+	executionDataProvider provider.Provider,
 	spockHasher hash.Hasher,
 	receiptHasher hash.Hasher,
 	parentBlockExecutionResultID flow.Identifier,
@@ -358,7 +358,7 @@ func (collector *resultCollector) Finalize(
 		return nil, collector.processorError
 	}
 
-	executionDataID, err := collector.executionDataProvider.Provide(
+	executionDataID, executionDataRoot, err := collector.executionDataProvider.Provide(
 		ctx,
 		collector.result.Height(),
 		collector.result.BlockExecutionData)
@@ -383,6 +383,7 @@ func (collector *resultCollector) Finalize(
 	}
 
 	collector.result.ExecutionReceipt = executionReceipt
+	collector.result.ExecutionDataRoot = executionDataRoot
 
 	collector.metrics.ExecutionBlockExecuted(
 		time.Since(collector.blockStartTime),

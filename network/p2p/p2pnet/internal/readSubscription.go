@@ -1,4 +1,4 @@
-package middleware
+package internal
 
 import (
 	"context"
@@ -19,17 +19,17 @@ import (
 // ReadSubscriptionCallBackFunction the callback called when a new message is received on the read subscription
 type ReadSubscriptionCallBackFunction func(msg *message.Message, peerID peer.ID)
 
-// readSubscription reads the messages coming in on the subscription and calls the given callback until
+// ReadSubscription reads the messages coming in on the subscription and calls the given callback until
 // the context of the subscription is cancelled.
-type readSubscription struct {
+type ReadSubscription struct {
 	log      zerolog.Logger
 	sub      p2p.Subscription
 	callback ReadSubscriptionCallBackFunction
 }
 
-// newReadSubscription reads the messages coming in on the subscription
-func newReadSubscription(sub p2p.Subscription, callback ReadSubscriptionCallBackFunction, log zerolog.Logger) *readSubscription {
-	r := readSubscription{
+// NewReadSubscription reads the messages coming in on the subscription
+func NewReadSubscription(sub p2p.Subscription, callback ReadSubscriptionCallBackFunction, log zerolog.Logger) *ReadSubscription {
+	r := ReadSubscription{
 		log:      log.With().Str("channel", sub.Topic()).Logger(),
 		sub:      sub,
 		callback: callback,
@@ -38,9 +38,9 @@ func newReadSubscription(sub p2p.Subscription, callback ReadSubscriptionCallBack
 	return &r
 }
 
-// receiveLoop must be run in a goroutine. It continuously receives
+// ReceiveLoop must be run in a goroutine. It continuously receives
 // messages for the topic and calls the callback synchronously
-func (r *readSubscription) receiveLoop(ctx context.Context) {
+func (r *ReadSubscription) ReceiveLoop(ctx context.Context) {
 	defer r.log.Debug().Msg("exiting receive routine")
 
 	for {
@@ -48,7 +48,7 @@ func (r *readSubscription) receiveLoop(ctx context.Context) {
 		rawMsg, err := r.sub.Next(ctx)
 
 		if err != nil {
-			// middleware may have cancelled the context
+			// network may have cancelled the context
 			if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
 				return
 			}
