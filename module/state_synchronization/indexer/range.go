@@ -16,18 +16,22 @@ var (
 // SequentialIndexRange makes all the mutations atomic, so it can be considered concurrent-safe.
 type SequentialIndexRange struct {
 	first uint64 // we never allow changing first so no need to be atomic
-	last  *atomic.Uint64
+	last  atomic.Uint64
 }
 
 // NewSequentialIndexRange creates new index range with the provided first and last values.
-func NewSequentialIndexRange(first uint64, last uint64) *SequentialIndexRange {
-	var lastAtomic *atomic.Uint64
+func NewSequentialIndexRange(first uint64, last uint64) (*SequentialIndexRange, error) {
+	if first > last {
+		return nil, fmt.Errorf("first value can not be higher than the last value")
+	}
+
+	var lastAtomic atomic.Uint64
 	lastAtomic.Store(last)
 
 	return &SequentialIndexRange{
 		first: first,
 		last:  lastAtomic,
-	}
+	}, nil
 }
 
 // First return the first index in the range.
