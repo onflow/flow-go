@@ -317,6 +317,7 @@ func (builder *LibP2PNodeBuilder) Build() (p2p.LibP2PNode, error) {
 		CreateStreamRetryDelay:    builder.createStreamRetryInterval,
 		Metrics:                   builder.metrics,
 		MaxConnectionBackoffTimes: p2pnode.MaxConnectAttempt,
+		MaxStreamBackoffTimes:     p2pnode.MaxStreamCreationAttempt,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("could not create unicast manager: %w", err)

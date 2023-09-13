@@ -38,8 +38,11 @@ const (
 )
 
 const (
-	// MaxConnectAttempt is the maximum number of attempts to be made to connect to a remote node for 1-1 direct communication
+	// MaxConnectAttempt is the maximum number of attempts to be made to connect to a remote node to establish a unicast (1:1) connection.
 	MaxConnectAttempt = 3
+
+	// MaxStreamCreationAttempt is the maximum number of attempts to be made to create a stream to a remote node over a direct unicast (1:1) connection.
+	MaxStreamCreationAttempt = 3
 
 	// DefaultMaxPubSubMsgSize defines the maximum message size in publish and multicast modes
 	DefaultMaxPubSubMsgSize = 5 * mb // 5 mb
@@ -269,7 +272,7 @@ func (n *Node) createStream(ctx context.Context, peerID peer.ID) (libp2pnet.Stre
 		}
 	}
 
-	stream, dialAddrs, err := n.uniMgr.CreateStream(ctx, peerID, MaxConnectAttempt)
+	stream, dialAddrs, err := n.uniMgr.CreateStream(ctx, peerID)
 	if err != nil {
 		return nil, flownet.NewPeerUnreachableError(fmt.Errorf("could not create stream (peer_id: %s, dialing address(s): %v): %w", peerID,
 			dialAddrs, err))

@@ -23,5 +23,5 @@ type UnicastManager interface {
 	// it either creates a successful stream or runs out of options. Creating stream on each protocol is tried at most `maxAttempts`, and then falls
 	// back to the less preferred one.
 	// All errors returned from this function can be considered benign.
-	CreateStream(ctx context.Context, peerID peer.ID, maxAttempts int) (libp2pnet.Stream, []multiaddr.Multiaddr, error)
+	CreateStream(ctx context.Context, peerID peer.ID) (libp2pnet.Stream, []multiaddr.Multiaddr, error)
 }
