@@ -102,6 +102,9 @@ func (i *ExecutionState) IndexBlockData(ctx context.Context, data *execution_dat
 		// second chunk updates: { X: 2 }
 		// then we should persist only {X: 2: Y: 2}
 		for i, path := range chunk.TrieUpdate.Paths {
+			if chunk.TrieUpdate == nil {
+				continue
+			}
 			payloads[path] = chunk.TrieUpdate.Payloads[i] // todo should we use TrieUpdate.Paths or TrieUpdate.Payload.Key?
 		}
 
