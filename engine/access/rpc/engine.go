@@ -9,7 +9,6 @@ import (
 	"sync"
 
 	"github.com/rs/zerolog"
-
 	"google.golang.org/grpc/credentials"
 
 	"github.com/onflow/flow-go/access"
@@ -33,11 +32,11 @@ type Config struct {
 	SecureGRPCListenAddr   string                           // the secure GRPC server address as ip:port
 	TransportCredentials   credentials.TransportCredentials // the secure GRPC credentials
 	HTTPListenAddr         string                           // the HTTP web proxy address as ip:port
-	RESTListenAddr         string                           // the REST server address as ip:port (if empty the REST server will not be started)
 	CollectionAddr         string                           // the address of the upstream collection node
 	HistoricalAccessAddrs  string                           // the list of all access nodes from previous spork
 
 	BackendConfig backend.Config // configurable options for creating Backend
+	RestConfig    rest.Config    // the REST server configuration
 	MaxMsgSize    uint           // GRPC max message size
 }
 
@@ -204,15 +203,15 @@ func (e *Engine) serveGRPCWebProxyWorker(ctx irrecoverable.SignalerContext, read
 // serveREST is a worker routine which starts the HTTP REST server.
 // The ready callback is called after the server address is bound and set.
 func (e *Engine) serveREST(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
-	if e.config.RESTListenAddr == "" {
+	if e.config.RestConfig.ListenAddress == "" {
 		e.log.Debug().Msg("no REST API address specified - not starting the server")
 		ready()
 		return
 	}
 
-	e.log.Info().Str("rest_api_address", e.config.RESTListenAddr).Msg("starting REST server on address")
+	e.log.Info().Str("rest_api_address", e.config.RestConfig.ListenAddress).Msg("starting REST server on address")
 
-	r, err := rest.NewServer(e.restHandler, e.config.RESTListenAddr, e.log, e.chain, e.restCollector)
+	r, err := rest.NewServer(e.restHandler, e.config.RestConfig, e.log, e.chain, e.restCollector)
 	if err != nil {
 		e.log.Err(err).Msg("failed to initialize the REST server")
 		ctx.Throw(err)
@@ -220,7 +219,7 @@ func (e *Engine) serveREST(ctx irrecoverable.SignalerContext, ready component.Re
 	}
 	e.restServer = r
 
-	l, err := net.Listen("tcp", e.config.RESTListenAddr)
+	l, err := net.Listen("tcp", e.config.RestConfig.ListenAddress)
 	if err != nil {
 		e.log.Err(err).Msg("failed to start the REST server")
 		ctx.Throw(err)

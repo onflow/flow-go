@@ -155,37 +155,3 @@ func SnapshotFromEncodable(enc EncodableSnapshot) *Snapshot {
 		enc: enc,
 	}
 }
-
-// StrippedInmemSnapshot removes all the networking address in the snapshot
-func StrippedInmemSnapshot(snapshot EncodableSnapshot) EncodableSnapshot {
-	removeAddress := func(ids flow.IdentityList) {
-		for _, identity := range ids {
-			identity.Address = ""
-		}
-	}
-
-	removeAddressFromEpoch := func(epoch *EncodableEpoch) {
-		if epoch == nil {
-			return
-		}
-		removeAddress(epoch.InitialIdentities)
-		for _, cluster := range epoch.Clustering {
-			removeAddress(cluster)
-		}
-		for _, c := range epoch.Clusters {
-			removeAddress(c.Members)
-		}
-	}
-
-	removeAddressFromEpoch(snapshot.Epochs.Previous)
-	removeAddressFromEpoch(&snapshot.Epochs.Current)
-	removeAddressFromEpoch(snapshot.Epochs.Next)
-
-	for _, event := range snapshot.LatestResult.ServiceEvents {
-		switch event.Type {
-		case flow.ServiceEventSetup:
-			removeAddress(event.Event.(*flow.EpochSetup).Participants)
-		}
-	}
-	return snapshot
-}

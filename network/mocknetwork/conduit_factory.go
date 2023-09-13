@@ -44,11 +44,11 @@ func (_m *ConduitFactory) NewConduit(_a0 context.Context, _a1 channels.Channel) 
 }
 
 // RegisterAdapter provides a mock function with given fields: _a0
-func (_m *ConduitFactory) RegisterAdapter(_a0 network.Adapter) error {
+func (_m *ConduitFactory) RegisterAdapter(_a0 network.ConduitAdapter) error {
 	ret := _m.Called(_a0)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(network.Adapter) error); ok {
+	if rf, ok := ret.Get(0).(func(network.ConduitAdapter) error); ok {
 		r0 = rf(_a0)
 	} else {
 		r0 = ret.Error(0)

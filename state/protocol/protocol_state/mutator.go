@@ -1,6 +1,7 @@
 package protocol_state
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/onflow/flow-go/model/flow"
@@ -10,8 +11,9 @@ import (
 )
 
 // Mutator implements protocol.StateMutator interface.
-// It has to be used for each block to update the protocol state, even if there are no changes incorporated in candidate block.
-// Such requirement is due to the fact that protocol state is indexed by block ID, and we need to maintain such index.
+// It has to be used for each block to update the protocol state, even if there are no state-changing
+// service events sealed in candidate block. This requirement is due to the fact that protocol state
+// is indexed by block ID, and we need to maintain such index.
 type Mutator struct {
 	protocolStateDB storage.ProtocolState
 }
@@ -26,7 +28,8 @@ func NewMutator(protocolStateDB storage.ProtocolState) *Mutator {
 
 // CreateUpdater creates a new protocol state updater for the given candidate block.
 // Has to be called for each block to correctly index the protocol state.
-// No errors are expected during normal operations.
+// Expected errors during normal operations:
+//   - `storage.ErrNotFound` if no protocol state for parent block is known.
 func (m *Mutator) CreateUpdater(candidate *flow.Header) (protocol.StateUpdater, error) {
 	parentState, err := m.protocolStateDB.ByBlockID(candidate.ParentID)
 	if err != nil {
@@ -43,7 +46,7 @@ func (m *Mutator) CommitProtocolState(updater protocol.StateUpdater) func(tx *tr
 		updatedState, updatedStateID, hasChanges := updater.Build()
 		if hasChanges {
 			err := m.protocolStateDB.StoreTx(updatedStateID, updatedState)(tx)
-			if err != nil {
+			if err != nil && !errors.Is(err, storage.ErrAlreadyExists) {
 				return fmt.Errorf("could not store protocol state (%v): %w", updatedStateID, err)
 			}
 		}

@@ -75,6 +75,8 @@ const (
 	DefaultExecutionRootDir = "/data/exedb"
 	// DefaultExecutionDataServiceDir for the execution data service blobstore.
 	DefaultExecutionDataServiceDir = "/data/execution_data"
+	// DefaultChunkDataPackDir for the chunk data packs
+	DefaultChunkDataPackDir = "/data/chunk_data_pack"
 	// DefaultProfilerDir is the default directory for the profiler
 	DefaultProfilerDir = "/data/profiler"
 
@@ -646,10 +648,11 @@ func (net *FlowNetwork) addConsensusFollower(t *testing.T, rootProtocolSnapshotP
 
 	// create a follower-specific directory for the bootstrap files
 	followerBootstrapDir := makeDir(t, tmpdir, DefaultBootstrapDir)
+	makeDir(t, followerBootstrapDir, bootstrap.DirnamePublicBootstrap)
 
-	// strip out the node addresses from root-protocol-state-snapshot.json and copy it to the follower-specific
+	// copy root protocol snapshot to the follower-specific folder
 	// bootstrap/public-root-information directory
-	err := rootProtocolJsonWithoutAddresses(rootProtocolSnapshotPath, filepath.Join(followerBootstrapDir, bootstrap.PathRootProtocolStateSnapshot))
+	err := io.Copy(rootProtocolSnapshotPath, filepath.Join(followerBootstrapDir, bootstrap.PathRootProtocolStateSnapshot))
 	require.NoError(t, err)
 
 	// consensus follower
@@ -861,6 +864,7 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 
 			nodeContainer.AddFlag("triedir", DefaultExecutionRootDir)
 			nodeContainer.AddFlag("execution-data-dir", DefaultExecutionDataServiceDir)
+			nodeContainer.AddFlag("chunk-data-pack-dir", DefaultChunkDataPackDir)
 
 		case flow.RoleAccess:
 			nodeContainer.exposePort(GRPCPort, testingdock.RandomPort(t))

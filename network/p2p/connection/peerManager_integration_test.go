@@ -36,8 +36,8 @@ func TestPeerManager_Integration(t *testing.T) {
 	idProvider := unittest.NewUpdatableIDProvider(flow.IdentityList{})
 	nodes, identities := p2ptest.NodesFixture(t, unittest.IdentifierFixture(), "test_peer_manager", count, idProvider)
 	idProvider.SetIdentities(identities)
-	p2ptest.StartNodes(t, signalerCtx, nodes, 100*time.Millisecond)
-	defer p2ptest.StopNodes(t, nodes, cancel, 100*time.Millisecond)
+	p2ptest.StartNodes(t, signalerCtx, nodes)
+	defer p2ptest.StopNodes(t, nodes, cancel)
 
 	thisNode := nodes[0]
 	topologyPeers := identities[1:]

@@ -20,7 +20,7 @@ import (
 // TODO: update naming to IdentityTable
 type ProtocolState struct {
 	db    *badger.DB
-	cache *Cache
+	cache *Cache[flow.Identifier, *flow.RichProtocolStateEntry]
 }
 
 var _ storage.ProtocolState = (*ProtocolState)(nil)
@@ -33,10 +33,9 @@ func NewProtocolState(collector module.CacheMetrics,
 	db *badger.DB,
 	cacheSize uint,
 ) *ProtocolState {
-	retrieve := func(key interface{}) func(tx *badger.Txn) (interface{}, error) {
-		protocolStateID := key.(flow.Identifier)
-		return func(tx *badger.Txn) (interface{}, error) {
-			var protocolStateEntry flow.ProtocolStateEntry
+	retrieve := func(protocolStateID flow.Identifier) func(tx *badger.Txn) (*flow.RichProtocolStateEntry, error) {
+		var protocolStateEntry flow.ProtocolStateEntry
+		return func(tx *badger.Txn) (*flow.RichProtocolStateEntry, error) {
 			err := operation.RetrieveProtocolState(protocolStateID, &protocolStateEntry)(tx)
 			if err != nil {
 				return nil, err
@@ -51,9 +50,9 @@ func NewProtocolState(collector module.CacheMetrics,
 
 	return &ProtocolState{
 		db: db,
-		cache: newCache(collector, metrics.ResourceProtocolState,
-			withLimit(cacheSize),
-			withStore(noopStore),
+		cache: newCache[flow.Identifier, *flow.RichProtocolStateEntry](collector, metrics.ResourceProtocolState,
+			withLimit[flow.Identifier, *flow.RichProtocolStateEntry](cacheSize),
+			withStore(noopStore[flow.Identifier, *flow.RichProtocolStateEntry]),
 			withRetrieve(retrieve)),
 	}
 }
@@ -63,17 +62,16 @@ func NewProtocolState(collector module.CacheMetrics,
 // Expected error returns during normal operations:
 //   - storage.ErrAlreadyExists if an Identity Table with the given id is already stored
 func (s *ProtocolState) StoreTx(id flow.Identifier, protocolState *flow.ProtocolStateEntry) func(*transaction.Tx) error {
-	return func(tx *transaction.Tx) error {
-		if !protocolState.Identities.Sorted(order.IdentifierCanonical) {
-			return fmt.Errorf("sanity check failed: identities are not sorted")
-		}
-		if protocolState.NextEpochProtocolState != nil {
-			if !protocolState.NextEpochProtocolState.Identities.Sorted(order.IdentifierCanonical) {
-				return fmt.Errorf("sanity check failed: next epoch identities are not sorted")
-			}
-		}
-		return transaction.WithTx(operation.InsertProtocolState(id, protocolState))(tx)
+	// front-load sanity checks:
+	if !protocolState.Identities.Sorted(order.IdentifierCanonical) {
+		return transaction.Fail(fmt.Errorf("sanity check failed: identities are not sorted"))
 	}
+	if protocolState.NextEpochProtocolState != nil && !protocolState.NextEpochProtocolState.Identities.Sorted(order.IdentifierCanonical) {
+		return transaction.Fail(fmt.Errorf("sanity check failed: next epoch identities are not sorted"))
+	}
+
+	// happy path: return anonymous function, whose future execution (as part of a transaction) will store the protocolState
+	return transaction.WithTx(operation.InsertProtocolState(id, protocolState))
 }
 
 // Index indexes the identity table by block ID.
@@ -111,13 +109,7 @@ func (s *ProtocolState) ByBlockID(blockID flow.Identifier) (*flow.RichProtocolSt
 // byID retrieves the identity table by its ID. Error returns:
 //   - storage.ErrNotFound if no identity table with the given ID exists
 func (s *ProtocolState) byID(protocolStateID flow.Identifier) func(*badger.Txn) (*flow.RichProtocolStateEntry, error) {
-	return func(tx *badger.Txn) (*flow.RichProtocolStateEntry, error) {
-		val, err := s.cache.Get(protocolStateID)(tx)
-		if err != nil {
-			return nil, err
-		}
-		return val.(*flow.RichProtocolStateEntry), nil
-	}
+	return s.cache.Get(protocolStateID)
 }
 
 // byBlockID retrieves the identity table by the respective block ID.

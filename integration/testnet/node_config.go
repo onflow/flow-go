@@ -32,12 +32,15 @@ type NodeConfig struct {
 func (n NodeConfigs) Filter(filters ...NodeConfigFilter) NodeConfigs {
 	nodeConfigs := make(NodeConfigs, 0)
 	for _, config := range n {
-		filter := false
+		passedAllFilters := true
 		for _, f := range filters {
-			filter = f(config)
+			if !f(config) {
+				passedAllFilters = false
+				break
+			}
 		}
 
-		if filter {
+		if passedAllFilters {
 			nodeConfigs = append(nodeConfigs, config)
 		}
 	}

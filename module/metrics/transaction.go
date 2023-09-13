@@ -25,6 +25,7 @@ type TransactionCollector struct {
 	transactionSize                prometheus.Histogram
 	scriptExecutedDuration         *prometheus.HistogramVec
 	scriptExecutionErrorOnExecutor *prometheus.CounterVec
+	scriptExecutionComparison      *prometheus.CounterVec
 	scriptSize                     prometheus.Histogram
 	transactionResultDuration      *prometheus.HistogramVec
 }
@@ -109,6 +110,12 @@ func NewTransactionCollector(
 			Subsystem: subsystemTransactionSubmission,
 			Help:      "histogram for the internal errors for executing a script for a block on the archive node",
 		}, []string{"source"}),
+		scriptExecutionComparison: promauto.NewCounterVec(prometheus.CounterOpts{
+			Name:      "script_execution_comparison",
+			Namespace: namespaceAccess,
+			Subsystem: subsystemTransactionSubmission,
+			Help:      "histogram for the comparison outcomes of executing a script on the archive and execution node",
+		}, []string{"outcome"}),
 		transactionResultDuration: promauto.NewHistogramVec(prometheus.HistogramOpts{
 			Name:      "transaction_result_fetched_duration",
 			Namespace: namespaceAccess,
@@ -144,13 +151,32 @@ func (tc *TransactionCollector) ScriptExecuted(dur time.Duration, size int) {
 }
 
 func (tc *TransactionCollector) ScriptExecutionErrorOnArchiveNode() {
-	// record the execution error along with blockID and scriptHash for Archive node
+	// record the execution error count
 	tc.scriptExecutionErrorOnExecutor.WithLabelValues("archive").Inc()
 }
 
 func (tc *TransactionCollector) ScriptExecutionErrorOnExecutionNode() {
-	// record the execution error along with blockID and scriptHash for Execution node
+	// record the execution error count
 	tc.scriptExecutionErrorOnExecutor.WithLabelValues("execution").Inc()
+}
+
+func (tc *TransactionCollector) ScriptExecutionResultMismatch() {
+	// record the execution error count
+	tc.scriptExecutionComparison.WithLabelValues("result_mismatch").Inc()
+}
+
+func (tc *TransactionCollector) ScriptExecutionResultMatch() {
+	// record the execution error count
+	tc.scriptExecutionComparison.WithLabelValues("result_match").Inc()
+}
+func (tc *TransactionCollector) ScriptExecutionErrorMismatch() {
+	// record the execution error count
+	tc.scriptExecutionComparison.WithLabelValues("error_mismatch").Inc()
+}
+
+func (tc *TransactionCollector) ScriptExecutionErrorMatch() {
+	// record the execution error count
+	tc.scriptExecutionComparison.WithLabelValues("error_match").Inc()
 }
 
 // TransactionResult metrics

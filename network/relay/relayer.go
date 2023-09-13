@@ -25,7 +25,7 @@ func (n *noopProcessor) Process(channel channels.Channel, originID flow.Identifi
 
 var _ network.MessageProcessor = (*Relayer)(nil)
 
-func NewRelayer(destinationNetwork network.Network, channel channels.Channel, processor network.MessageProcessor) (*Relayer, error) {
+func NewRelayer(destinationNetwork network.EngineRegistry, channel channels.Channel, processor network.MessageProcessor) (*Relayer, error) {
 	conduit, err := destinationNetwork.Register(channel, &noopProcessor{})
 
 	if err != nil {
