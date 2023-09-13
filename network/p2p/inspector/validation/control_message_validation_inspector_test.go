@@ -214,8 +214,8 @@ func TestControlMessageValidationInspector_processInspectRPCReq(t *testing.T) {
 		invalidSporkIDTopicReq, err := NewInspectRPCRequest(expectedPeerID, unittest.P2PRPCFixture(unittest.WithGrafts(invalidSporkIDTopicGraft)))
 		require.NoError(t, err, "failed to get inspect message request")
 
-		checkNotif := checkNotifFunc(t, expectedPeerID, p2pmsg.CtrlMsgGraft, channels.IsInvalidTopicErr)
-		distributor.On("Distribute", mock.AnythingOfType("*p2p.InvCtrlMsgNotif")).Return(nil).Times(3).Run(checkNotif)
+		checkNotification := checkNotificationFunc(t, expectedPeerID, p2pmsg.CtrlMsgGraft, channels.IsInvalidTopicErr)
+		distributor.On("Distribute", mock.AnythingOfType("*p2p.InvCtrlMsgNotif")).Return(nil).Times(3).Run(checkNotification)
 
 		require.NoError(t, inspector.processInspectRPCReq(unknownTopicReq))
 		require.NoError(t, inspector.processInspectRPCReq(malformedTopicReq))
@@ -238,8 +238,8 @@ func TestControlMessageValidationInspector_processInspectRPCReq(t *testing.T) {
 		invalidSporkIDTopicReq, err := NewInspectRPCRequest(expectedPeerID, unittest.P2PRPCFixture(unittest.WithPrunes(invalidSporkIDTopicPrune)))
 		require.NoError(t, err, "failed to get inspect message request")
 
-		checkNotif := checkNotifFunc(t, expectedPeerID, p2pmsg.CtrlMsgPrune, channels.IsInvalidTopicErr)
-		distributor.On("Distribute", mock.AnythingOfType("*p2p.InvCtrlMsgNotif")).Return(nil).Times(3).Run(checkNotif)
+		checkNotification := checkNotificationFunc(t, expectedPeerID, p2pmsg.CtrlMsgPrune, channels.IsInvalidTopicErr)
+		distributor.On("Distribute", mock.AnythingOfType("*p2p.InvCtrlMsgNotif")).Return(nil).Times(3).Run(checkNotification)
 
 		require.NoError(t, inspector.processInspectRPCReq(unknownTopicReq))
 		require.NoError(t, inspector.processInspectRPCReq(malformedTopicReq))
@@ -262,8 +262,8 @@ func TestControlMessageValidationInspector_processInspectRPCReq(t *testing.T) {
 		invalidSporkIDTopicReq, err := NewInspectRPCRequest(expectedPeerID, unittest.P2PRPCFixture(unittest.WithIHaves(invalidSporkIDTopicIhave)))
 		require.NoError(t, err, "failed to get inspect message request")
 
-		checkNotif := checkNotifFunc(t, expectedPeerID, p2pmsg.CtrlMsgIHave, channels.IsInvalidTopicErr)
-		distributor.On("Distribute", mock.AnythingOfType("*p2p.InvCtrlMsgNotif")).Return(nil).Times(3).Run(checkNotif)
+		checkNotification := checkNotificationFunc(t, expectedPeerID, p2pmsg.CtrlMsgIHave, channels.IsInvalidTopicErr)
+		distributor.On("Distribute", mock.AnythingOfType("*p2p.InvCtrlMsgNotif")).Return(nil).Times(3).Run(checkNotification)
 
 		require.NoError(t, inspector.processInspectRPCReq(unknownTopicReq))
 		require.NoError(t, inspector.processInspectRPCReq(malformedTopicReq))
@@ -281,8 +281,8 @@ func TestControlMessageValidationInspector_processInspectRPCReq(t *testing.T) {
 		duplicateMsgIDReq, err := NewInspectRPCRequest(expectedPeerID, unittest.P2PRPCFixture(unittest.WithIHaves(duplicateMsgIDIHave)))
 		require.NoError(t, err, "failed to get inspect message request")
 
-		checkNotif := checkNotifFunc(t, expectedPeerID, p2pmsg.CtrlMsgIHave, IsDuplicateTopicErr)
-		distributor.On("Distribute", mock.AnythingOfType("*p2p.InvCtrlMsgNotif")).Return(nil).Once().Run(checkNotif)
+		checkNotification := checkNotificationFunc(t, expectedPeerID, p2pmsg.CtrlMsgIHave, IsDuplicateTopicErr)
+		distributor.On("Distribute", mock.AnythingOfType("*p2p.InvCtrlMsgNotif")).Return(nil).Once().Run(checkNotification)
 		require.NoError(t, inspector.processInspectRPCReq(duplicateMsgIDReq))
 	})
 
@@ -297,8 +297,8 @@ func TestControlMessageValidationInspector_processInspectRPCReq(t *testing.T) {
 		duplicateMsgIDReq, err := NewInspectRPCRequest(expectedPeerID, unittest.P2PRPCFixture(unittest.WithIWants(duplicateMsgIDIWant)))
 		require.NoError(t, err, "failed to get inspect message request")
 
-		checkNotif := checkNotifFunc(t, expectedPeerID, p2pmsg.CtrlMsgIWant, IsIWantDuplicateMsgIDThresholdErr)
-		distributor.On("Distribute", mock.AnythingOfType("*p2p.InvCtrlMsgNotif")).Return(nil).Once().Run(checkNotif)
+		checkNotification := checkNotificationFunc(t, expectedPeerID, p2pmsg.CtrlMsgIWant, IsIWantDuplicateMsgIDThresholdErr)
+		distributor.On("Distribute", mock.AnythingOfType("*p2p.InvCtrlMsgNotif")).Return(nil).Once().Run(checkNotification)
 		rpcTracker.On("LastHighestIHaveRPCSize").Return(int64(100)).Maybe()
 		rpcTracker.On("WasIHaveRPCSent", mock.AnythingOfType("string")).Return(true).Run(func(args mock.Arguments) {
 			id, ok := args[0].(string)
@@ -319,8 +319,8 @@ func TestControlMessageValidationInspector_processInspectRPCReq(t *testing.T) {
 		inspectMsgReq, err := NewInspectRPCRequest(expectedPeerID, unittest.P2PRPCFixture(unittest.WithIWants(unittest.P2PRPCIWantFixture(msgIds...))))
 		require.NoError(t, err, "failed to get inspect message request")
 
-		checkNotif := checkNotifFunc(t, expectedPeerID, p2pmsg.CtrlMsgIWant, IsIWantCacheMissThresholdErr)
-		distributor.On("Distribute", mock.AnythingOfType("*p2p.InvCtrlMsgNotif")).Return(nil).Once().Run(checkNotif)
+		checkNotification := checkNotificationFunc(t, expectedPeerID, p2pmsg.CtrlMsgIWant, IsIWantCacheMissThresholdErr)
+		distributor.On("Distribute", mock.AnythingOfType("*p2p.InvCtrlMsgNotif")).Return(nil).Once().Run(checkNotification)
 		rpcTracker.On("LastHighestIHaveRPCSize").Return(int64(100)).Maybe()
 		// return false each time to eventually force a notification to be disseminated when the cache miss count finally exceeds the 90% threshold
 		rpcTracker.On("WasIHaveRPCSent", mock.AnythingOfType("string")).Return(false).Run(func(args mock.Arguments) {
@@ -477,8 +477,8 @@ func invalidTopics(sporkID flow.Identifier) (string, string, string) {
 	return unknownTopic, malformedTopic, invalidSporkIDTopic
 }
 
-// checkNotifFunc returns util func used to ensure invalid control message notification disseminated contains expected information.
-func checkNotifFunc(t *testing.T, expectedPeerID peer.ID, expectedMsgType p2pmsg.ControlMessageType, isExpectedErr func(err error) bool) func(args mock.Arguments) {
+// checkNotificationFunc returns util func used to ensure invalid control message notification disseminated contains expected information.
+func checkNotificationFunc(t *testing.T, expectedPeerID peer.ID, expectedMsgType p2pmsg.ControlMessageType, isExpectedErr func(err error) bool) func(args mock.Arguments) {
 	return func(args mock.Arguments) {
 		notification, ok := args[0].(*p2p.InvCtrlMsgNotif)
 		require.True(t, ok)
