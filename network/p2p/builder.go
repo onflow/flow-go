@@ -102,6 +102,7 @@ type GossipSubBuilder interface {
 // - p2p.GossipSubInspectorSuite: new RPC inspector suite
 // - error: error if any, any returned error is irrecoverable.
 type GossipSubRpcInspectorSuiteFactoryFunc func(
+	irrecoverable.SignalerContext,
 	zerolog.Logger,
 	flow.Identifier,
 	*p2pconf.GossipSubRPCInspectorsConfig,

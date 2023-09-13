@@ -2,6 +2,7 @@ package distributor_test
 
 import (
 	"context"
+	"fmt"
 	"math/rand"
 	"sync"
 	"testing"
@@ -96,6 +97,6 @@ func invalidControlMessageNotificationFixture(t *testing.T) *p2p.InvCtrlMsgNotif
 	return &p2p.InvCtrlMsgNotif{
 		PeerID:  p2ptest.PeerIdFixture(t),
 		MsgType: []p2pmsg.ControlMessageType{p2pmsg.CtrlMsgGraft, p2pmsg.CtrlMsgPrune, p2pmsg.CtrlMsgIHave, p2pmsg.CtrlMsgIWant}[rand.Intn(4)],
-		Count:   rand.Uint64(),
+		Error:   fmt.Errorf("this is an error"),
 	}
 }

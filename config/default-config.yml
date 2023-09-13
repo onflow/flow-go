@@ -72,12 +72,34 @@ network-config:
   gossipsub-rpc-sent-tracker-workers: 5
   # Peer scoring is the default value for enabling peer scoring
   gossipsub-peer-scoring-enabled: true
+
   # Gossipsub rpc inspectors configs
   # The size of the queue for notifications about invalid RPC messages
   gossipsub-rpc-inspector-notification-cache-size: 10000
   # RPC control message validation inspector configs
   # Rpc validation inspector number of pool workers
   gossipsub-rpc-validation-inspector-workers: 5
+  # Max number of ihave messages in a sample to be inspected. If the number of ihave messages exceeds this configured value
+  # the control message ihaves will be truncated to the max sample size. This sample is randomly selected.
+  gossipsub-rpc-ihave-max-sample-size: 1000
+  # Max number of ihave message ids in a sample to be inspected per ihave. Each ihave message includes a list of message ids
+  # each. If the size of the message ids list for a single ihave message exceeds the configured max message id sample size the list of message ids will be truncated.
+  gossipsub-rpc-ihave-max-message-id-sample-size: 1000
+  # Max number of control messages in a sample to be inspected when inspecting GRAFT and PRUNE message types. If the total number of control messages (GRAFT or PRUNE)
+  # exceeds this max sample size then the respective message will be truncated before being processed.
+  gossipsub-rpc-graft-and-prune-message-max-sample-size: 1000
+  # Max number of iwant messages in a sample to be inspected. If the total number of iWant control messages
+  # exceeds this max sample size then the respective message will be truncated before being processed.
+  gossipsub-rpc-iwant-max-sample-size: 1000
+  # Max number of iwant message ids in a sample to be inspected per iwant. Each iwant message includes a list of message ids
+  # each, if the size of this list exceeds the configured max message id sample size the list of message ids will be truncated.
+  gossipsub-rpc-iwant-max-message-id-sample-size: 1000
+  # The allowed threshold of iWant messages received without a corresponding tracked iHave message that was sent. If the cache miss threshold is exceeded an
+  # invalid control message notification is disseminated and the sender will be penalized.
+  gossipsub-rpc-iwant-cache-miss-threshold: .5
+  # The max allowed duplicate message IDs in a single iWant control message. If the duplicate message threshold is exceeded an invalid control message
+  # notification is disseminated and the sender will be penalized.
+  gossipsub-rpc-iwant-duplicate-message-id-threshold: .15
   # The size of the queue used by worker pool for the control message validation inspector
   gossipsub-rpc-validation-inspector-queue-cache-size: 100
   # Cluster prefixed control message validation configs
@@ -87,32 +109,7 @@ network-config:
   gossipsub-cluster-prefix-tracker-cache-decay: 0.99
   # The upper bound on the amount of cluster prefixed control messages that will be processed
   gossipsub-rpc-cluster-prefixed-hard-threshold: 100
-  # GRAFT libp2p control message validation limits
-  gossipsub-rpc-graft-hard-threshold: 30
-  gossipsub-rpc-graft-safety-threshold: 15
-  gossipsub-rpc-graft-rate-limit: 30
-  # PRUNE libp2p control message validation limits
-  gossipsub-rpc-prune-hard-threshold: 30
-  gossipsub-rpc-prune-safety-threshold: 15
-  gossipsub-rpc-prune-rate-limit: 30
-  # IHAVE libp2p control message validation limits
-  gossipsub-rpc-ihave-hard-threshold: 100
-  gossipsub-rpc-ihave-safety-threshold: 50
-  # Rate limiting is disabled for ihave control messages
-  gossipsub-rpc-ihave-rate-limit: 0
-  # Percentage of ihaves to use as the sample size for synchronous inspection 25%
-  ihave-sync-inspection-sample-size-percentage: .25
-  # Percentage of ihaves to use as the sample size for asynchronous inspection 10%
-  ihave-async-inspection-sample-size-percentage: .10
-  # Max number of ihave messages in a sample to be inspected
-  ihave-max-sample-size: 100
 
-  # Max number of iwant messages in a sample to be inspected
-  gossipsub-rpc-iwant-max-sample-size: 1_000_000
-  # The allowed threshold of iWant messages received without a corresponding tracked iHave message that was sent
-  gossipsub-rpc-iwant-cache-miss-threshold: .5
-  # The max allowed duplicate message IDs in a single iWant control message
-  gossipsub-rpc-iwant-duplicate-message-id-threshold: .15
   # RPC metrics observer inspector configs
   # The number of metrics inspector pool workers
   gossipsub-rpc-metrics-inspector-workers: 1

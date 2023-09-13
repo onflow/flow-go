@@ -6,8 +6,6 @@ import (
 
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
-
-	p2pmsg "github.com/onflow/flow-go/network/p2p/message"
 )
 
 const (
@@ -43,6 +41,7 @@ const (
 	rpcSentTrackerQueueCacheSize = "gossipsub-rpc-sent-tracker-queue-cache-size"
 	rpcSentTrackerNumOfWorkers   = "gossipsub-rpc-sent-tracker-workers"
 	scoreTracerInterval          = "gossipsub-score-tracer-interval"
+
 	// gossipsub validation inspector
 	gossipSubRPCInspectorNotificationCacheSize                 = "gossipsub-rpc-inspector-notification-cache-size"
 	validationInspectorNumberOfWorkers                         = "gossipsub-rpc-validation-inspector-workers"
@@ -51,17 +50,17 @@ const (
 	validationInspectorClusterPrefixedTopicsReceivedCacheDecay = "gossipsub-cluster-prefix-tracker-cache-decay"
 	validationInspectorClusterPrefixHardThreshold              = "gossipsub-rpc-cluster-prefixed-hard-threshold"
 
-	ihaveSyncSampleSizePercentage  = "ihave-sync-inspection-sample-size-percentage"
-	ihaveAsyncSampleSizePercentage = "ihave-async-inspection-sample-size-percentage"
-	ihaveMaxSampleSize             = "ihave-max-sample-size"
+	ihaveMaxSampleSize           = "gossipsub-rpc-ihave-max-sample-size"
+	ihaveMaxMessageIDSampleSize  = "gossipsub-rpc-ihave-max-message-id-sample-size"
+	controlMessageMaxSampleSize  = "gossipsub-rpc-graft-and-prune-message-max-sample-size"
+	iwantMaxSampleSize           = "gossipsub-rpc-iwant-max-sample-size"
+	iwantMaxMessageIDSampleSize  = "gossipsub-rpc-iwant-max-message-id-sample-size"
+	iwantCacheMissThreshold      = "gossipsub-rpc-iwant-cache-miss-threshold"
+	iwantDuplicateMsgIDThreshold = "gossipsub-rpc-iwant-duplicate-message-id-threshold"
 
 	// gossipsub metrics inspector
 	metricsInspectorNumberOfWorkers = "gossipsub-rpc-metrics-inspector-workers"
 	metricsInspectorCacheSize       = "gossipsub-rpc-metrics-inspector-cache-size"
-
-	iwantMaxSampleSize           = "gossipsub-rpc-iwant-max-sample-size"
-	iwantCacheMissThreshold      = "gossipsub-rpc-iwant-cache-miss-threshold"
-	iwantDuplicateMsgIDThreshold = "gossipsub-rpc-iwant-duplicate-message-id-threshold"
 
 	alspDisabled            = "alsp-disable-penalty"
 	alspSpamRecordCacheSize = "alsp-spam-record-cache-size"
@@ -75,9 +74,9 @@ func AllFlagNames() []string {
 		dnsCacheTTL, disallowListNotificationCacheSize, dryRun, lockoutDuration, messageRateLimit, bandwidthRateLimit, bandwidthBurstLimit, memoryLimitRatio,
 		fileDescriptorsRatio, peerBaseLimitConnsInbound, highWatermark, lowWatermark, gracePeriod, silencePeriod, peerScoring, localMeshLogInterval, rpcSentTrackerCacheSize, rpcSentTrackerQueueCacheSize, rpcSentTrackerNumOfWorkers,
 		scoreTracerInterval, gossipSubRPCInspectorNotificationCacheSize, validationInspectorNumberOfWorkers, validationInspectorInspectMessageQueueCacheSize, validationInspectorClusterPrefixedTopicsReceivedCacheSize,
-		validationInspectorClusterPrefixedTopicsReceivedCacheDecay, validationInspectorClusterPrefixHardThreshold, ihaveSyncSampleSizePercentage, ihaveAsyncSampleSizePercentage,
+		validationInspectorClusterPrefixedTopicsReceivedCacheDecay, validationInspectorClusterPrefixHardThreshold,
 		ihaveMaxSampleSize, metricsInspectorNumberOfWorkers, metricsInspectorCacheSize, alspDisabled, alspSpamRecordCacheSize, alspSpamRecordQueueSize, alspHearBeatInterval,
-		iwantMaxSampleSize, iwantCacheMissThreshold, iwantDuplicateMsgIDThreshold,
+		iwantMaxSampleSize, iwantMaxMessageIDSampleSize, ihaveMaxMessageIDSampleSize, iwantCacheMissThreshold, controlMessageMaxSampleSize, iwantDuplicateMsgIDThreshold,
 	}
 }
 
@@ -87,7 +86,6 @@ func AllFlagNames() []string {
 //	*pflag.FlagSet: the pflag set of the Flow node.
 //	*Config: the default network config used to set default values on the flags
 func InitializeNetworkFlags(flags *pflag.FlagSet, config *Config) {
-	initRpcInspectorValidationLimitsFlags(flags, config)
 	flags.Bool(networkingConnectionPruning, config.NetworkConnectionPruning, "enabling connection trimming")
 	flags.Duration(dnsCacheTTL, config.DNSCacheTTL, "time-to-live for dns cache")
 	flags.StringSlice(preferredUnicastsProtocols, config.PreferredUnicastProtocols, "preferred unicast protocols in ascending order of preference")
@@ -135,32 +133,13 @@ func InitializeNetworkFlags(flags *pflag.FlagSet, config *Config) {
 	flags.Uint32(alspSpamRecordQueueSize, config.AlspConfig.SpamReportQueueSize, "size of spam report queue, recommended to be 100x the number of authorized nodes")
 	flags.Duration(alspHearBeatInterval, config.AlspConfig.HearBeatInterval, "interval between two consecutive heartbeat events at alsp, recommended to leave it as default unless you know what you are doing.")
 
-	flags.Float64(ihaveSyncSampleSizePercentage, config.GossipSubConfig.GossipSubRPCInspectorsConfig.GossipSubRPCValidationInspectorConfigs.IHaveSyncInspectSampleSizePercentage, "percentage of ihave messages to sample during synchronous validation")
-	flags.Float64(ihaveAsyncSampleSizePercentage, config.GossipSubConfig.GossipSubRPCInspectorsConfig.GossipSubRPCValidationInspectorConfigs.IHaveAsyncInspectSampleSizePercentage, "percentage of ihave messages to sample during asynchronous validation")
-	flags.Float64(ihaveMaxSampleSize, config.GossipSubConfig.GossipSubRPCInspectorsConfig.GossipSubRPCValidationInspectorConfigs.IHaveInspectionMaxSampleSize, "max number of ihaves to sample when performing validation")
-
+	flags.Int(ihaveMaxSampleSize, config.GossipSubConfig.GossipSubRPCInspectorsConfig.GossipSubRPCValidationInspectorConfigs.IHaveRPCInspectionConfig.MaxSampleSize, "max number of ihaves to sample when performing validation")
+	flags.Int(ihaveMaxMessageIDSampleSize, config.GossipSubConfig.GossipSubRPCInspectorsConfig.GossipSubRPCValidationInspectorConfigs.IHaveRPCInspectionConfig.MaxMessageIDSampleSize, "max number of message ids to sample when performing validation per ihave")
+	flags.Int(controlMessageMaxSampleSize, config.GossipSubConfig.GossipSubRPCInspectorsConfig.GossipSubRPCValidationInspectorConfigs.GraftPruneMessageMaxSampleSize, "max number of control messages to sample when performing validation on GRAFT and PRUNE message types")
 	flags.Uint(iwantMaxSampleSize, config.GossipSubConfig.GossipSubRPCInspectorsConfig.GossipSubRPCValidationInspectorConfigs.IWantRPCInspectionConfig.MaxSampleSize, "max number of iwants to sample when performing validation")
+	flags.Int(iwantMaxMessageIDSampleSize, config.GossipSubConfig.GossipSubRPCInspectorsConfig.GossipSubRPCValidationInspectorConfigs.IWantRPCInspectionConfig.MaxMessageIDSampleSize, "max number of message ids to sample when performing validation per iwant")
 	flags.Float64(iwantCacheMissThreshold, config.GossipSubConfig.GossipSubRPCInspectorsConfig.GossipSubRPCValidationInspectorConfigs.IWantRPCInspectionConfig.CacheMissThreshold, "max number of iwants to sample when performing validation")
 	flags.Float64(iwantDuplicateMsgIDThreshold, config.GossipSubConfig.GossipSubRPCInspectorsConfig.GossipSubRPCValidationInspectorConfigs.IWantRPCInspectionConfig.DuplicateMsgIDThreshold, "max allowed duplicate message IDs in a single iWant control message")
-}
-
-// rpcInspectorValidationLimits utility func that adds flags for each of the validation limits for each control message type.
-func initRpcInspectorValidationLimitsFlags(flags *pflag.FlagSet, defaultNetConfig *Config) {
-	hardThresholdflagStrFmt := "gossipsub-rpc-%s-hard-threshold"
-	safetyThresholdflagStrFmt := "gossipsub-rpc-%s-safety-threshold"
-	rateLimitflagStrFmt := "gossipsub-rpc-%s-rate-limit"
-	validationInspectorConfig := defaultNetConfig.GossipSubConfig.GossipSubRPCInspectorsConfig.GossipSubRPCValidationInspectorConfigs
-
-	for _, ctrlMsgValidationConfig := range validationInspectorConfig.AllCtrlMsgValidationConfig() {
-		ctrlMsgType := ctrlMsgValidationConfig.ControlMsg
-		if ctrlMsgValidationConfig.ControlMsg == p2pmsg.CtrlMsgIWant {
-			continue
-		}
-		s := strings.ToLower(ctrlMsgType.String())
-		flags.Uint64(fmt.Sprintf(hardThresholdflagStrFmt, s), ctrlMsgValidationConfig.HardThreshold, fmt.Sprintf("discard threshold limit for gossipsub RPC %s message validation", ctrlMsgType))
-		flags.Uint64(fmt.Sprintf(safetyThresholdflagStrFmt, s), ctrlMsgValidationConfig.SafetyThreshold, fmt.Sprintf("safety threshold limit for gossipsub RPC %s message validation", ctrlMsgType))
-		flags.Int(fmt.Sprintf(rateLimitflagStrFmt, s), ctrlMsgValidationConfig.RateLimit, fmt.Sprintf("rate limit for gossipsub RPC %s message validation", ctrlMsgType))
-	}
 }
 
 // SetAliases this func sets an aliases for each CLI flag defined for network config overrides to it's corresponding
