@@ -201,7 +201,6 @@ func TestExecutionState_IndexBlockData(t *testing.T) {
 				}
 				return nil
 			}).
-			useDefaultLastHeight().
 			runIndexBlockData()
 
 		assert.NoError(t, err)
@@ -242,7 +241,6 @@ func TestExecutionState_IndexBlockData(t *testing.T) {
 				assert.Equal(t, len(tries[0].Payloads)+len(tries[1].Payloads)-1, len(entries))
 				return nil
 			}).
-			useDefaultLastHeight().
 			runIndexBlockData()
 
 		assert.NoError(t, err)
@@ -294,8 +292,6 @@ func TestExecutionState_RegisterValues(t *testing.T) {
 			setGetRegisters(func(t *testing.T, ID flow.RegisterID, height uint64) (flow.RegisterValue, error) {
 				return val, nil
 			}).
-			useDefaultLastHeight().
-			useDefaultFirstHeight().
 			runGetRegisters(ids, height)
 
 		assert.NoError(t, err)
