@@ -42,14 +42,14 @@ func TestDuplicateTopicErrRoundTrip(t *testing.T) {
 // TestErrDuplicateTopicRoundTrip ensures correct error formatting for DuplicateTopicErr.
 func TestDuplicateMessageIDErrRoundTrip(t *testing.T) {
 	msgID := "flow-1804flkjnafo"
-	e1 := fmt.Sprintf("duplicate message ID foud in %s control message type: %s", p2pmsg.CtrlMsgIHave, msgID)
-	e2 := fmt.Sprintf("duplicate message ID foud in %s control message type: %s", p2pmsg.CtrlMsgIWant, msgID)
+	expectedErrMsg1 := fmt.Sprintf("duplicate message ID foud in %s control message type: %s", p2pmsg.CtrlMsgIHave, msgID)
+	expectedErrMsg2 := fmt.Sprintf("duplicate message ID foud in %s control message type: %s", p2pmsg.CtrlMsgIWant, msgID)
 	err := NewDuplicateMessageIDErr(msgID, p2pmsg.CtrlMsgIHave)
-	assert.Equal(t, e1, err.Error(), "the error message should be correctly formatted")
+	assert.Equal(t, expectedErrMsg1, err.Error(), "the error message should be correctly formatted")
 	// tests the IsDuplicateTopicErr function.
 	assert.True(t, IsDuplicateMessageIDErr(err), "IsDuplicateMessageIDErr should return true for DuplicateMessageIDErr error")
 	err = NewDuplicateMessageIDErr(msgID, p2pmsg.CtrlMsgIWant)
-	assert.Equal(t, e2, err.Error(), "the error message should be correctly formatted")
+	assert.Equal(t, expectedErrMsg2, err.Error(), "the error message should be correctly formatted")
 	// tests the IsDuplicateTopicErr function.
 	assert.True(t, IsDuplicateMessageIDErr(err), "IsDuplicateMessageIDErr should return true for DuplicateMessageIDErr error")
 	// test IsDuplicateMessageIDErr with a different error type.
