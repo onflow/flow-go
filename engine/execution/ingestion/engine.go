@@ -57,12 +57,6 @@ type Engine struct {
 	executionDataPruner    *pruner.Pruner
 	uploader               *uploader.Manager
 	stopControl            *stop.StopControl
-
-	// This is included to temporarily work around an issue observed on a small number of ENs.
-	// It works around an issue where some collection nodes are not configured with enough
-	// this works around an issue where some collection nodes are not configured with enough
-	// file descriptors causing connection failures.
-	onflowOnlyLNs bool
 }
 
 var onlyOnflowRegex = regexp.MustCompile(`.*\.onflow\.org:3569$`)
@@ -87,7 +81,6 @@ func New(
 	pruner *pruner.Pruner,
 	uploader *uploader.Manager,
 	stopControl *stop.StopControl,
-	onflowOnlyLNs bool,
 ) (*Engine, error) {
 	log := logger.With().Str("engine", "ingestion").Logger()
 
@@ -114,7 +107,6 @@ func New(
 		executionDataPruner:    pruner,
 		uploader:               uploader,
 		stopControl:            stopControl,
-		onflowOnlyLNs:          onflowOnlyLNs,
 	}
 
 	return &eng, nil
