@@ -127,7 +127,6 @@ func (c *ControlMsgValidationInspector) Inspect(from peer.ID, rpc *pubsub.RPC) e
 	// queue further async inspection
 	req, err := NewInspectRPCRequest(from, rpc)
 	if err != nil {
-
 		c.logger.Error().
 			Err(err).
 			Bool(logging.KeyNetworkingSecurity, true).

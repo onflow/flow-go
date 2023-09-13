@@ -599,7 +599,7 @@ func TestValidationInspector_UnstakedNode_Detection(t *testing.T) {
 	done := make(chan struct{})
 	expectedNumOfLogs := 2
 	hook := zerolog.HookFunc(func(e *zerolog.Event, level zerolog.Level, message string) {
-		if level == zerolog.ErrorLevel {
+		if level == zerolog.WarnLevel {
 			if message == "control message received from unstaked peer" {
 				count.Inc()
 			}
@@ -608,7 +608,7 @@ func TestValidationInspector_UnstakedNode_Detection(t *testing.T) {
 			close(done)
 		}
 	})
-	logger := zerolog.New(os.Stdout).Level(zerolog.ErrorLevel).Hook(hook)
+	logger := zerolog.New(os.Stdout).Level(zerolog.WarnLevel).Hook(hook)
 
 	idProvider := mock.NewIdentityProvider(t)
 	spammer := corruptlibp2p.NewGossipSubRouterSpammer(t, sporkID, role, idProvider)
