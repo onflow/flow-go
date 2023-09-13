@@ -162,7 +162,6 @@ func TestControlMessageValidationInspector_processInspectRPCReq(t *testing.T) {
 		)
 		require.NoError(t, err, "failed to get inspect message request")
 		rpcTracker.On("LastHighestIHaveRPCSize").Return(int64(100)).Maybe()
-		// return false each time to eventually force a notification to be disseminated when the cache miss count finally exceeds the 90% threshold
 		rpcTracker.On("WasIHaveRPCSent", mock.AnythingOfType("string")).Return(true).Run(func(args mock.Arguments) {
 			id, ok := args[0].(string)
 			require.True(t, ok)
