@@ -19,14 +19,14 @@ type SequentialIndexRange struct {
 	last  *atomic.Uint64
 }
 
-// NewSequentialIndexRange creates new index range.
-func NewSequentialIndexRange(start uint64) *SequentialIndexRange {
-	var last *atomic.Uint64
-	last.Store(start)
+// NewSequentialIndexRange creates new index range with the provided first and last values.
+func NewSequentialIndexRange(first uint64, last uint64) *SequentialIndexRange {
+	var lastAtomic *atomic.Uint64
+	lastAtomic.Store(last)
 
 	return &SequentialIndexRange{
-		first: start,
-		last:  last,
+		first: first,
+		last:  lastAtomic,
 	}
 }
 
