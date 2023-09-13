@@ -2554,7 +2554,7 @@ func CreateSendTxHttpPayload(tx flow.TransactionBody) map[string]interface{} {
 }
 
 // P2PRPCGraftFixtures returns n number of control message rpc Graft fixtures.
-func P2PRPCGraftFixtures(topics []string) []*pubsub_pb.ControlGraft {
+func P2PRPCGraftFixtures(topics ...string) []*pubsub_pb.ControlGraft {
 	n := len(topics)
 	grafts := make([]*pubsub_pb.ControlGraft, n)
 	for i := 0; i < n; i++ {
@@ -2571,7 +2571,7 @@ func P2PRPCGraftFixture(topic *string) *pubsub_pb.ControlGraft {
 }
 
 // P2PRPCPruneFixtures returns n number of control message rpc Prune fixtures.
-func P2PRPCPruneFixtures(topics []string) []*pubsub_pb.ControlPrune {
+func P2PRPCPruneFixtures(topics ...string) []*pubsub_pb.ControlPrune {
 	n := len(topics)
 	prunes := make([]*pubsub_pb.ControlPrune, n)
 	for i := 0; i < n; i++ {
@@ -2588,17 +2588,17 @@ func P2PRPCPruneFixture(topic *string) *pubsub_pb.ControlPrune {
 }
 
 // P2PRPCIHaveFixtures returns n number of control message rpc iHave fixtures with m number of message ids each.
-func P2PRPCIHaveFixtures(m int, topics []string) []*pubsub_pb.ControlIHave {
+func P2PRPCIHaveFixtures(m int, topics ...string) []*pubsub_pb.ControlIHave {
 	n := len(topics)
 	ihaves := make([]*pubsub_pb.ControlIHave, n)
 	for i := 0; i < n; i++ {
-		ihaves[i] = P2PRPCIHaveFixture(&topics[i], IdentifierListFixture(m).Strings())
+		ihaves[i] = P2PRPCIHaveFixture(&topics[i], IdentifierListFixture(m).Strings()...)
 	}
 	return ihaves
 }
 
 // P2PRPCIHaveFixture returns a control message rpc iHave fixture.
-func P2PRPCIHaveFixture(topic *string, messageIds []string) *pubsub_pb.ControlIHave {
+func P2PRPCIHaveFixture(topic *string, messageIds ...string) *pubsub_pb.ControlIHave {
 	return &pubsub_pb.ControlIHave{
 		TopicID:    topic,
 		MessageIDs: messageIds,
@@ -2609,13 +2609,13 @@ func P2PRPCIHaveFixture(topic *string, messageIds []string) *pubsub_pb.ControlIH
 func P2PRPCIWantFixtures(n, m int) []*pubsub_pb.ControlIWant {
 	iwants := make([]*pubsub_pb.ControlIWant, n)
 	for i := 0; i < n; i++ {
-		iwants[i] = P2PRPCIWantFixture(IdentifierListFixture(m).Strings())
+		iwants[i] = P2PRPCIWantFixture(IdentifierListFixture(m).Strings()...)
 	}
 	return iwants
 }
 
 // P2PRPCIWantFixture returns a control message rpc iWant fixture.
-func P2PRPCIWantFixture(messageIds []string) *pubsub_pb.ControlIWant {
+func P2PRPCIWantFixture(messageIds ...string) *pubsub_pb.ControlIWant {
 	return &pubsub_pb.ControlIWant{
 		MessageIDs: messageIds,
 	}

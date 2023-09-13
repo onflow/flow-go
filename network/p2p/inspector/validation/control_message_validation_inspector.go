@@ -240,6 +240,9 @@ func (c *ControlMsgValidationInspector) inspectPruneMessages(from peer.ID, prune
 //     or any duplicate message ids found inside a single iHave.
 //   - error: if any error occurs while sampling or validating topics, all returned errors are benign and should not cause the node to crash.
 func (c *ControlMsgValidationInspector) inspectIHaveMessages(from peer.ID, ihaves []*pubsub_pb.ControlIHave, activeClusterIDS flow.ChainIDList) error {
+	if len(ihaves) == 0 {
+		return nil
+	}
 	lg := c.logger.With().
 		Str("peer_id", p2plogging.PeerId(from)).
 		Int("sample_size", len(ihaves)).
@@ -286,6 +289,9 @@ func (c *ControlMsgValidationInspector) inspectIHaveMessages(from peer.ID, ihave
 // - IWantCacheMissThresholdErr: if the rate of cache misses exceeds the configured allowed threshold.
 // - error: if any error occurs while sampling or validating topics, all returned errors are benign and should not cause the node to crash.
 func (c *ControlMsgValidationInspector) inspectIWantMessages(from peer.ID, iWants []*pubsub_pb.ControlIWant) error {
+	if len(iWants) == 0 {
+		return nil
+	}
 	lastHighest := c.rpcTracker.LastHighestIHaveRPCSize()
 	lg := c.logger.With().
 		Str("peer_id", p2plogging.PeerId(from)).
