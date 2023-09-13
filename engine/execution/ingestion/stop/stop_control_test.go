@@ -91,9 +91,6 @@ func TestCannotSetNewValuesAfterStoppingCommenced(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, stop, sc.GetStopParameters())
 
-		// make execution check pretends block has been executed
-		execState.On("StateCommitmentByBlockID", testifyMock.Anything, testifyMock.Anything).Return(nil, nil)
-
 		// no stopping has started yet, block below stop height
 		header := unittest.BlockHeaderFixture(unittest.WithHeaderHeight(20))
 		sc.BlockFinalizedForTesting(header)
@@ -105,6 +102,10 @@ func TestCannotSetNewValuesAfterStoppingCommenced(t *testing.T) {
 
 		// block at stop height, it should be triggered stop
 		header = unittest.BlockHeaderFixture(unittest.WithHeaderHeight(37))
+
+		// make execution check pretends block has been executed
+		execState.On("IsBlockExecuted", header.Height-1, header.ParentID).Return(true, nil)
+
 		sc.BlockFinalizedForTesting(header)
 
 		// since we set shouldCrash to false, execution should be stopped
