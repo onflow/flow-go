@@ -2,7 +2,6 @@ package validation
 
 import (
 	"fmt"
-	"github.com/onflow/flow-go/network/p2p/p2plogging"
 	"time"
 
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
@@ -21,6 +20,7 @@ import (
 	"github.com/onflow/flow-go/network/p2p/inspector/internal/cache"
 	p2pmsg "github.com/onflow/flow-go/network/p2p/message"
 	"github.com/onflow/flow-go/network/p2p/p2pconf"
+	"github.com/onflow/flow-go/network/p2p/p2plogging"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/events"
 	"github.com/onflow/flow-go/utils/logging"
