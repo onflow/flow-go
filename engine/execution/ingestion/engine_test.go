@@ -21,6 +21,7 @@ import (
 	enginePkg "github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/execution"
 	computation "github.com/onflow/flow-go/engine/execution/computation/mock"
+	"github.com/onflow/flow-go/engine/execution/ingestion/fetcher"
 	"github.com/onflow/flow-go/engine/execution/ingestion/stop"
 	"github.com/onflow/flow-go/engine/execution/ingestion/uploader"
 	uploadermock "github.com/onflow/flow-go/engine/execution/ingestion/uploader/mock"
@@ -215,12 +216,14 @@ func runWithEngine(t *testing.T, f func(testingContext)) {
 
 	uploadMgr := uploader.NewManager(trace.NewNoopTracer())
 
+	fetcher := fetcher.NewCollectionFetcher(request, protocolState, false, log)
+
 	engine, err = New(
 		unit,
 		log,
 		net,
 		me,
-		request,
+		fetcher,
 		protocolState,
 		headers,
 		blocks,
@@ -235,7 +238,6 @@ func runWithEngine(t *testing.T, f func(testingContext)) {
 		nil,
 		uploadMgr,
 		stopControl,
-		false,
 	)
 	require.NoError(t, err)
 
@@ -1510,13 +1512,15 @@ func newIngestionEngine(t *testing.T, ps *mocks.ProtocolState, es *mockExecution
 		return stateProtocol.IsNodeAuthorizedAt(ps.AtBlockID(blockID), myIdentity.NodeID)
 	}
 
+	fetcher := fetcher.NewCollectionFetcher(request, ps, false, log)
+
 	unit := enginePkg.NewUnit()
 	engine, err = New(
 		unit,
 		log,
 		net,
 		me,
-		request,
+		fetcher,
 		ps,
 		headers,
 		blocks,
@@ -1542,7 +1546,6 @@ func newIngestionEngine(t *testing.T, ps *mocks.ProtocolState, es *mockExecution
 			false,
 			false,
 		),
-		false,
 	)
 
 	require.NoError(t, err)
