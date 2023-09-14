@@ -867,7 +867,7 @@ func (exeNode *ExecutionNode) LoadIngestionEngine(
 	}
 
 	fetcher := fetcher.NewCollectionFetcher(node.Logger, exeNode.collectionRequester, node.State, exeNode.exeConf.onflowOnlyLNs)
-	loader := loader.NewLoader(node.State, node.Storage.Headers, node.Storage.Blocks, exeNode.executionState, node.Logger)
+	loader := loader.NewLoader(node.Logger, node.State, node.Storage.Headers, exeNode.executionState)
 
 	exeNode.ingestionEng, err = ingestion.New(
 		exeNode.ingestionUnit,

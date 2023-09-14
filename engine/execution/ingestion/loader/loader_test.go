@@ -6,6 +6,9 @@ import (
 	"testing"
 
 	"github.com/golang/mock/gomock"
+	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
+
 	"github.com/onflow/flow-go/engine/execution/ingestion"
 	"github.com/onflow/flow-go/engine/execution/ingestion/loader"
 	"github.com/onflow/flow-go/engine/execution/state"
@@ -15,8 +18,6 @@ import (
 	storage "github.com/onflow/flow-go/storage/mocks"
 	"github.com/onflow/flow-go/utils/unittest"
 	"github.com/onflow/flow-go/utils/unittest/mocks"
-	"github.com/stretchr/testify/mock"
-	"github.com/stretchr/testify/require"
 )
 
 var _ ingestion.BlockLoader = (*loader.Loader)(nil)

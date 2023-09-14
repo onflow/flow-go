@@ -1516,7 +1516,7 @@ func newIngestionEngine(t *testing.T, ps *mocks.ProtocolState, es *mockExecution
 	}
 
 	fetcher := fetcher.NewCollectionFetcher(log, request, ps, false)
-	loader := loader.NewLoader(ps, headers, es, log)
+	loader := loader.NewLoader(log, ps, headers, es)
 
 	unit := enginePkg.NewUnit()
 	engine, err = New(
