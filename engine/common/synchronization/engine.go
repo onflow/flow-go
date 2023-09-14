@@ -571,6 +571,17 @@ func (e *Engine) validateRangeRequestForALSP(originID flow.Identifier, rangeRequ
 
 	// to avoid creating a misbehavior report for every range request received, use a probabilistic approach.
 	// The higher the range request and base probability, the higher the probability of creating a misbehavior report.
+
+	// rangeRequestProb is calculated as follows:
+	// rangeRequestBaseProb * ((rangeRequest.ToHeight-rangeRequest.FromHeight) + 1) / synccore.DefaultConfig().MaxSize
+	// Example 1 (small range) if the range request is for 10 blocks and rangeRequestBaseProb is 0.01, then the probability of
+	// creating a misbehavior report is:
+	// rangeRequestBaseProb * (10+1) / synccore.DefaultConfig().MaxSize
+	// = 0.01 * 11 / 64 = 0.00171875 = 0.171875%
+	// Example 2 (large range) if the range request is for 1000 blocks and rangeRequestBaseProb is 0.01, then the probability of
+	// creating a misbehavior report is:
+	// rangeRequestBaseProb * (1000+1) / synccore.DefaultConfig().MaxSize
+	// = 0.01 * 1001 / 64 = 0.15640625 = 15.640625%
 	rangeRequestProb := e.spamDetectionConfig.rangeRequestBaseProb * (float32(rangeRequest.ToHeight-rangeRequest.FromHeight) + 1) / float32(synccore.DefaultConfig().MaxSize)
 	if float32(n) < rangeRequestProb*spamProbabilityMultiplier {
 		// create a misbehavior report
