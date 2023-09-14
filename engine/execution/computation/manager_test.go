@@ -244,7 +244,7 @@ func TestExecuteScript(t *testing.T) {
 		`
 			import FungibleToken from %s
 
-			pub fun main() {}
+			access(all) fun main() {}
 		`,
 		fvm.FungibleTokenAddress(execCtx.Chain).HexWithPrefix(),
 	))
@@ -307,7 +307,7 @@ func TestExecuteScript_BalanceScriptFailsIfViewIsEmpty(t *testing.T) {
 
 	script := []byte(fmt.Sprintf(
 		`
-			pub fun main(): UFix64 {
+			access(all) fun main(): UFix64 {
 				return getAccount(%s).balance
 			}
 		`,
@@ -665,7 +665,7 @@ func TestExecuteScriptTimeout(t *testing.T) {
 	require.NoError(t, err)
 
 	script := []byte(`
-	pub fun main(): Int {
+	access(all) fun main(): Int {
 		var i = 0
 		while i < 10000 {
 			i = i + 1
@@ -712,7 +712,7 @@ func TestExecuteScriptCancelled(t *testing.T) {
 	require.NoError(t, err)
 
 	script := []byte(`
-	pub fun main(): Int {
+	access(all) fun main(): Int {
 		var i = 0
 		var j = 0 
 		while i < 10000000 {
@@ -938,7 +938,7 @@ func TestScriptStorageMutationsDiscarded(t *testing.T) {
 	commonAddress, _ := common.HexToAddress(address.Hex())
 
 	script := []byte(`
-	pub fun main(account: Address) {
+	access(all) fun main(account: Address) {
 		let acc = getAuthAccount(account)
 		acc.save(3, to: /storage/x)
 	}

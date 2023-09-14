@@ -29,17 +29,17 @@ var (
 			dsl.Resource{
 				Name: "Counter",
 				Code: `
-				pub var count: Int
+				access(all) var count: Int
 
 				init() {
 					self.count = 0
 				}
-				pub fun add(_ count: Int) {
+				access(all) fun add(_ count: Int) {
 					self.count = self.count + count
 				}`,
 			},
 			dsl.Code(`
-				pub fun createCounter(): @Counter {
+				access(all) fun createCounter(): @Counter {
 					return <-create Counter()
 				}`,
 			),
@@ -163,7 +163,7 @@ func RandomPrivateKey() sdkcrypto.PrivateKey {
 
 func SDKTransactionFixture(opts ...func(*sdk.Transaction)) sdk.Transaction {
 	tx := sdk.Transaction{
-		Script:             []byte("pub fun main() {}"),
+		Script:             []byte("access(all) fun main() {}"),
 		ReferenceBlockID:   sdk.Identifier(unittest.IdentifierFixture()),
 		GasLimit:           10,
 		ProposalKey:        convert.ToSDKProposalKey(unittest.ProposalKeyFixture()),

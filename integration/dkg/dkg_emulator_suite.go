@@ -208,9 +208,9 @@ func (s *EmulatorSuite) createAndFundAccount(netID *flow.Identity) *nodeAccount 
 				import FlowToken from 0x%s
 
 				transaction(amount: UFix64, recipient: Address) {
-				  let sentVault: @FungibleToken.Vault
+				  let sentVault: @{FungibleToken.Vault}
 				  prepare(signer: AuthAccount) {
-					let vaultRef = signer.borrow<&FlowToken.Vault>(from: /storage/flowTokenVault)
+					let vaultRef = signer.borrow<auth(FungibleToken.Withdrawable) &FlowToken.Vault>(from: /storage/flowTokenVault)
 					  ?? panic("failed to borrow reference to sender vault")
 					self.sentVault <- vaultRef.withdraw(amount: amount)
 				  }
@@ -397,7 +397,7 @@ func (s *EmulatorSuite) getResult() []string {
 	script := fmt.Sprintf(`
 	import FlowDKG from 0x%s
 
-	pub fun main(): [String?]? {
+	access(all) fun main(): [String?]? {
 		return FlowDKG.dkgCompleted()
 	} `,
 		s.env.DkgAddress,

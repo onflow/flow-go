@@ -317,9 +317,15 @@ func (b *bootstrapExecutor) Execute() error {
 
 	service := b.createServiceAccount()
 
-	fungibleToken := b.deployFungibleToken()
-	nonFungibleToken := b.deployNonFungibleToken(service)
-	b.deployMetadataViews(fungibleToken, nonFungibleToken)
+	b.deployViewResolver(service)
+
+	fungibleToken := b.deployFungibleToken(service)
+	nonFungibleToken := b.deployNonFungibleToken(service, service)
+
+	b.deployMultipleNFT(service, nonFungibleToken)
+
+	b.deployMetadataViews(fungibleToken, nonFungibleToken, service)
+
 	flowToken := b.deployFlowToken(service, fungibleToken, nonFungibleToken)
 	storageFees := b.deployStorageFees(service, fungibleToken, flowToken)
 	feeContract := b.deployFlowFees(service, fungibleToken, flowToken, storageFees)
@@ -400,37 +406,59 @@ func (b *bootstrapExecutor) createServiceAccount() flow.Address {
 	return address
 }
 
-func (b *bootstrapExecutor) deployFungibleToken() flow.Address {
+func (b *bootstrapExecutor) deployFungibleToken(viewResolver flow.Address) flow.Address {
 	fungibleToken := b.createAccount(b.accountKeys.FungibleTokenAccountPublicKeys)
 
 	txError, err := b.invokeMetaTransaction(
 		b.ctx,
 		Transaction(
-			blueprints.DeployFungibleTokenContractTransaction(fungibleToken),
+			blueprints.DeployFungibleTokenContractTransaction(fungibleToken, viewResolver),
 			0),
 	)
 	panicOnMetaInvokeErrf("failed to deploy fungible token contract: %s", txError, err)
 	return fungibleToken
 }
 
-func (b *bootstrapExecutor) deployNonFungibleToken(deployTo flow.Address) flow.Address {
+func (b *bootstrapExecutor) deployNonFungibleToken(deployTo, viewResolver flow.Address) flow.Address {
 
 	txError, err := b.invokeMetaTransaction(
 		b.ctx,
 		Transaction(
-			blueprints.DeployNonFungibleTokenContractTransaction(deployTo),
+			blueprints.DeployNonFungibleTokenContractTransaction(deployTo, viewResolver),
 			0),
 	)
 	panicOnMetaInvokeErrf("failed to deploy non-fungible token contract: %s", txError, err)
 	return deployTo
 }
 
-func (b *bootstrapExecutor) deployMetadataViews(fungibleToken, nonFungibleToken flow.Address) {
+func (b *bootstrapExecutor) deployViewResolver(deployTo flow.Address) {
 
 	txError, err := b.invokeMetaTransaction(
 		b.ctx,
 		Transaction(
-			blueprints.DeployMetadataViewsContractTransaction(fungibleToken, nonFungibleToken),
+			blueprints.DeployViewResolverContractTransaction(deployTo),
+			0),
+	)
+	panicOnMetaInvokeErrf("failed to deploy view resolver contract: %s", txError, err)
+}
+
+func (b *bootstrapExecutor) deployMultipleNFT(deployTo, nonFungibleToken flow.Address) {
+
+	txError, err := b.invokeMetaTransaction(
+		b.ctx,
+		Transaction(
+			blueprints.DeployMultipleNFTContractTransaction(deployTo, nonFungibleToken),
+			0),
+	)
+	panicOnMetaInvokeErrf("failed to deploy MultipleNFT contract: %s", txError, err)
+}
+
+func (b *bootstrapExecutor) deployMetadataViews(fungibleToken, nonFungibleToken, viewResolver flow.Address) {
+
+	txError, err := b.invokeMetaTransaction(
+		b.ctx,
+		Transaction(
+			blueprints.DeployMetadataViewsContractTransaction(fungibleToken, nonFungibleToken, viewResolver),
 			0),
 	)
 	panicOnMetaInvokeErrf("failed to deploy metadata views contract: %s", txError, err)
@@ -438,15 +466,7 @@ func (b *bootstrapExecutor) deployMetadataViews(fungibleToken, nonFungibleToken 
 	txError, err = b.invokeMetaTransaction(
 		b.ctx,
 		Transaction(
-			blueprints.DeployViewResolverContractTransaction(nonFungibleToken),
-			0),
-	)
-	panicOnMetaInvokeErrf("failed to deploy view resolver contract: %s", txError, err)
-
-	txError, err = b.invokeMetaTransaction(
-		b.ctx,
-		Transaction(
-			blueprints.DeployFungibleTokenMetadataViewsContractTransaction(fungibleToken, nonFungibleToken),
+			blueprints.DeployFungibleTokenMetadataViewsContractTransaction(fungibleToken, nonFungibleToken, viewResolver),
 			0),
 	)
 	panicOnMetaInvokeErrf("failed to deploy fungible token metadata views contract: %s", txError, err)
@@ -810,6 +830,7 @@ func (b *bootstrapExecutor) registerNodes(service, fungibleToken, flowToken flow
 			b.ctx,
 			Transaction(blueprints.RegisterNodeTransaction(service,
 				flowToken,
+				fungibleToken,
 				nodeAddress,
 				id),
 				0),
