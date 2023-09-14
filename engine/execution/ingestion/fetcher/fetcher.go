@@ -24,7 +24,12 @@ type CollectionFetcher struct {
 	onflowOnlyLNs bool
 }
 
-func NewCollectionFetcher(log zerolog.Logger, request module.Requester, state protocol.State, onflowOnlyLNs bool) *CollectionFetcher {
+func NewCollectionFetcher(
+	log zerolog.Logger,
+	request module.Requester,
+	state protocol.State,
+	onflowOnlyLNs bool,
+) *CollectionFetcher {
 	return &CollectionFetcher{
 		log:           log.With().Str("component", "ingestion_engine_collection_fetcher").Logger(),
 		request:       request,
