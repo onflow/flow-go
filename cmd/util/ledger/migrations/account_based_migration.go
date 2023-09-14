@@ -105,12 +105,12 @@ func sortPayloadsAndFindAccountIndexes(
 	[]int,
 ) {
 	log.Info().Msgf("sorting %d payloads", len(allPayloads))
-	defer func() {
-		log.Info().Msgf("finished sorting %d payloads", len(allPayloads))
-	}()
 
 	payloads := sortablePayloads(allPayloads)
 	sort.Sort(payloads)
+	log.Info().Msgf("finished sorting %d payloads", len(allPayloads))
+
+	log.Info().Msgf("finding account indexes")
 
 	i := 0
 	accountIndexes := make([]int, 0, totalExpectedAccounts)
@@ -124,6 +124,7 @@ func sortPayloadsAndFindAccountIndexes(
 		i = j + 1
 	}
 
+	log.Info().Msgf("done finding account indexes")
 	return payloads, accountIndexes
 }
 
