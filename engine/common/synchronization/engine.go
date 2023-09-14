@@ -208,7 +208,12 @@ func (e *Engine) Process(channel channels.Channel, originID flow.Identifier, eve
 func (e *Engine) process(channel channels.Channel, originID flow.Identifier, event interface{}) error {
 	switch event.(type) {
 	case *messages.BatchRequest:
-		report, misbehavior := e.validateBatchRequestForALSP(channel, originID, event)
+		batchRequest, ok := event.(*messages.BatchRequest)
+		if !ok {
+			return fmt.Errorf("failed to extract BatchRequest for originID %s", originID.String())
+		}
+
+		report, misbehavior := e.validateBatchRequestForALSP(channel, originID, batchRequest)
 		if misbehavior {
 			e.con.ReportMisbehavior(report) // report misbehavior to ALSP
 			e.log.
@@ -221,7 +226,12 @@ func (e *Engine) process(channel channels.Channel, originID flow.Identifier, eve
 		}
 		return e.requestHandler.Process(channel, originID, event)
 	case *messages.RangeRequest:
-		report, misbehavior := e.validateRangeRequestForALSP(originID, event)
+		rangeRequest, ok := event.(*messages.RangeRequest)
+		if !ok {
+			return fmt.Errorf("failed to extract RangeRequest for originID %s", originID.String())
+		}
+
+		report, misbehavior := e.validateRangeRequestForALSP(originID, rangeRequest)
 		if misbehavior {
 			e.con.ReportMisbehavior(report) // report misbehavior to ALSP
 			e.log.
@@ -249,7 +259,12 @@ func (e *Engine) process(channel channels.Channel, originID flow.Identifier, eve
 		return e.requestHandler.Process(channel, originID, event)
 
 	case *messages.BlockResponse:
-		report, misbehavior := e.validateBlockResponseForALSP(channel, originID, event)
+		blockResponse, ok := event.(*messages.BlockResponse)
+		if !ok {
+			return fmt.Errorf("failed to extract BlockResponse for originID %s", originID.String())
+		}
+
+		report, misbehavior := e.validateBlockResponseForALSP(channel, originID, blockResponse)
 		if misbehavior {
 			e.con.ReportMisbehavior(report) // report misbehavior to ALSP
 			e.log.
@@ -263,7 +278,12 @@ func (e *Engine) process(channel channels.Channel, originID flow.Identifier, eve
 		return e.responseMessageHandler.Process(originID, event)
 
 	case *messages.SyncResponse:
-		report, misbehavior := e.validateSyncResponseForALSP(channel, originID, event)
+		syncResponse, ok := event.(*messages.SyncResponse)
+		if !ok {
+			return fmt.Errorf("failed to extract SyncResponse for originID %s", originID.String())
+		}
+
+		report, misbehavior := e.validateSyncResponseForALSP(channel, originID, syncResponse)
 		if misbehavior {
 			e.con.ReportMisbehavior(report) // report misbehavior to ALSP
 			e.log.
@@ -495,17 +515,17 @@ func (e *Engine) sendRequests(participants flow.IdentifierList, ranges []chainsy
 }
 
 // TODO: implement spam reporting similar to validateSyncRequestForALSP
-func (e *Engine) validateBatchRequestForALSP(channel channels.Channel, id flow.Identifier, event interface{}) (*alsp.MisbehaviorReport, bool) {
+func (e *Engine) validateBatchRequestForALSP(channel channels.Channel, id flow.Identifier, batchRequest *messages.BatchRequest) (*alsp.MisbehaviorReport, bool) {
 	return nil, false
 }
 
 // TODO: implement spam reporting similar to validateSyncRequestForALSP
-func (e *Engine) validateBlockResponseForALSP(channel channels.Channel, id flow.Identifier, event interface{}) (*alsp.MisbehaviorReport, bool) {
+func (e *Engine) validateBlockResponseForALSP(channel channels.Channel, id flow.Identifier, blockResponse *messages.BlockResponse) (*alsp.MisbehaviorReport, bool) {
 	return nil, false
 }
 
 // validateRangeRequestForALSP checks if a range request should be reported as a misbehavior. It returns a misbehavior report and a boolean indicating whether the request should be reported.
-func (e *Engine) validateRangeRequestForALSP(originID flow.Identifier, event interface{}) (*alsp.MisbehaviorReport, bool) {
+func (e *Engine) validateRangeRequestForALSP(originID flow.Identifier, rangeRequest *messages.RangeRequest) (*alsp.MisbehaviorReport, bool) {
 	// Generate a random integer between 1 and spamProbabilityMultiplier (exclusive)
 	n, err := rand.Uint32n(spamProbabilityMultiplier)
 
@@ -517,15 +537,6 @@ func (e *Engine) validateRangeRequestForALSP(originID flow.Identifier, event int
 			Bool(logging.KeyNetworkingSecurity, true).
 			Str("originID", originID.String()).
 			Msg("failed to generate random number")
-	}
-
-	rangeRequest, ok := event.(*messages.RangeRequest)
-	if !ok {
-		e.log.Fatal().
-			Err(err).
-			Bool(logging.KeyNetworkingSecurity, true).
-			Str("originID", originID.String()).
-			Msg("failed to extract RangeRequest")
 	}
 
 	// check if range request is valid
@@ -606,6 +617,6 @@ func (e *Engine) validateSyncRequestForALSP(originID flow.Identifier) (*alsp.Mis
 }
 
 // TODO: implement spam reporting similar to validateSyncRequestForALSP
-func (e *Engine) validateSyncResponseForALSP(channel channels.Channel, id flow.Identifier, event interface{}) (*alsp.MisbehaviorReport, bool) {
+func (e *Engine) validateSyncResponseForALSP(channel channels.Channel, id flow.Identifier, syncResponse *messages.SyncResponse) (*alsp.MisbehaviorReport, bool) {
 	return nil, false
 }
