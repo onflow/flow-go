@@ -1,9 +1,11 @@
 package pebble
 
 import (
+	"encoding/binary"
 	"fmt"
 
 	"github.com/cockroachdb/pebble"
+	"github.com/onflow/flow-go/storage"
 
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -30,7 +32,13 @@ func (s *Registers) Get(
 	height uint64,
 	reg flow.RegisterID,
 ) ([]byte, error) {
-	// TODO: add range check once LatestHeight and FirstHeight are implemented
+	firstHeight, latestHeight, err := s.getHeightRange()
+	if err != nil {
+		return nil, fmt.Errorf("unable to perform height validation: %w", err)
+	}
+	if height > latestHeight || height < firstHeight {
+		return nil, storage.ErrHeightNotIndexed
+	}
 	iter, err := s.db.NewIter(&pebble.IterOptions{
 		UseL6Filters: true,
 	})
@@ -47,7 +55,7 @@ func (s *Registers) Get(
 
 	binaryValue, err := iter.ValueAndErr()
 	if err != nil {
-		return nil, fmt.Errorf("failed to get value: %w", err)
+		return nil, storage.ErrNotFound
 	}
 	// preventing caller from modifying the iterator's value slices
 	valueCopy := make([]byte, len(binaryValue))
@@ -61,7 +69,14 @@ func (s *Registers) Store(
 	height uint64,
 	entries flow.RegisterEntries,
 ) error {
-	//  TODO: add value check once LatestHeight is implemented
+	// value check
+	firstHeight, latestHeight, err := s.getHeightRange()
+	if err != nil {
+		return fmt.Errorf("unable to perform height validation: %w", err)
+	}
+	if height > latestHeight+1 || height < firstHeight {
+		return storage.ErrHeightNotIndexed
+	}
 	batch := s.db.NewBatch()
 	defer batch.Close()
 
@@ -74,7 +89,7 @@ func (s *Registers) Store(
 		}
 	}
 
-	err := batch.Commit(pebble.Sync)
+	err = batch.Commit(pebble.Sync)
 	if err != nil {
 		return fmt.Errorf("failed to commit batch: %w", err)
 	}
@@ -82,14 +97,47 @@ func (s *Registers) Store(
 	return nil
 }
 
-// TODO: Finish implementation after deciding prefixes and/or badger use
-
 // LatestHeight Gets the latest height of complete registers available
 func (s *Registers) LatestHeight() (uint64, error) {
-	panic("not implemented")
+	return s.heightLookup(latestHeightKey())
 }
 
 // FirstHeight first indexed height found in the store, typically root block for the spork
 func (s *Registers) FirstHeight() (uint64, error) {
-	panic("not implemented")
+	return s.heightLookup(firstHeightKey())
+}
+
+func (s *Registers) heightLookup(key []byte) (uint64, error) {
+	res, closer, err := s.db.Get(key)
+	defer closer.Close()
+	if err != nil {
+		return 0, err
+	}
+	return binary.BigEndian.Uint64(res), nil
+}
+
+func (s *Registers) SetFirstHeight(height uint64) error {
+	return s.indexHeightWithKey(firstHeightKey(), height)
+}
+
+func (s *Registers) SetLatestHeight(height uint64) error {
+	return s.indexHeightWithKey(latestHeightKey(), height)
+}
+
+func (s *Registers) indexHeightWithKey(key []byte, height uint64) error {
+	payload := make([]byte, 0, 0)
+	encoded := binary.BigEndian.AppendUint64(payload, height)
+	return s.db.Set(key, encoded, nil)
+}
+
+func (s *Registers) getHeightRange() (uint64, uint64, error) {
+	latestHeight, err := s.LatestHeight()
+	if err != nil {
+		return 0, 0, fmt.Errorf("unable to get latest height: %w", err)
+	}
+	firstHeight, err := s.FirstHeight()
+	if err != nil {
+		return 0, 0, fmt.Errorf("unable to get first height: %w", err)
+	}
+	return firstHeight, latestHeight, nil
 }

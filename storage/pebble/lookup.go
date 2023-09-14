@@ -14,12 +14,22 @@ type lookupKey struct {
 	encoded []byte
 }
 
+func latestHeightKey() []byte {
+	return []byte{keyLatestBlockHeight}
+}
+
+func firstHeightKey() []byte {
+	return []byte{keyFirstBlockHeight}
+}
+
 // newLookupKey takes a height and registerID, returns the key for storing the register value in storage
 func newLookupKey(height uint64, reg flow.RegisterID) *lookupKey {
-	// Todo: Add prefixes for extensibility
 	key := lookupKey{
-		encoded: make([]byte, 0, len(reg.Owner)+1+len(reg.Key)+1+registers.HeightSuffixLen),
+		encoded: make([]byte, 0, 1+len(reg.Owner)+1+len(reg.Key)+1+registers.HeightSuffixLen),
 	}
+
+	// append DB prefix
+	key.encoded = append(key.encoded, codeRegisterValue)
 
 	// The lookup key used to find most recent value for a register.
 	//
@@ -48,11 +58,14 @@ func newLookupKey(height uint64, reg flow.RegisterID) *lookupKey {
 
 // lookupKeyToRegisterID takes a lookup key and decode it into height and RegisterID
 func lookupKeyToRegisterID(lookupKey []byte) (uint64, flow.RegisterID, error) {
-	const minLookupKeyLen = 2 + registers.HeightSuffixLen
+	const minLookupKeyLen = 3 + registers.HeightSuffixLen
 	if len(lookupKey) < minLookupKeyLen {
 		return 0, flow.RegisterID{}, fmt.Errorf("invalid lookup key format: expected >= %d bytes, got %d bytes",
 			minLookupKeyLen, len(lookupKey))
 	}
+
+	// exclude db prefix
+	lookupKey = lookupKey[1:]
 
 	// Find the first slash to split the lookup key and decode the owner.
 	firstSlash := bytes.IndexByte(lookupKey, '/')

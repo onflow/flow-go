@@ -15,8 +15,8 @@ import (
 	"github.com/onflow/flow-go/storage/pebble/registers"
 )
 
-// Test_PayloadStorage_RoundTrip tests the round trip of a payload storage.
-func Test_PayloadStorage_RoundTrip(t *testing.T) {
+// TestRegisters_Storage_RoundTrip tests the round trip of a payload storage.
+func TestRegisters_Storage_RoundTrip(t *testing.T) {
 	t.Parallel()
 
 	cache := pebble.NewCache(1 << 20)
@@ -37,6 +37,10 @@ func Test_PayloadStorage_RoundTrip(t *testing.T) {
 	}
 
 	minHeight := uint64(2)
+	err = s.SetFirstHeight(minHeight)
+	require.NoError(t, err)
+	err = s.SetLatestHeight(minHeight + 2)
+	require.NoError(t, err)
 	err = s.Store(minHeight, entries)
 	require.NoError(t, err)
 
@@ -52,14 +56,15 @@ func Test_PayloadStorage_RoundTrip(t *testing.T) {
 
 	// lookup with a lower height returns no results
 	value1, err = s.Get(minHeight-1, key1)
-	require.Nil(t, err)
+	require.Error(t, err)
 	require.Empty(t, value1)
 
 	err = db.Close()
 	require.NoError(t, err)
 }
 
-func Test_PayloadStorage_Versioning(t *testing.T) {
+// TestRegisters_Store_Versioning tests the scan functionality for the most recent value
+func TestRegisters_Store_Versioning(t *testing.T) {
 	t.Parallel()
 
 	cache := pebble.NewCache(1 << 20)
@@ -86,6 +91,10 @@ func Test_PayloadStorage_Versioning(t *testing.T) {
 	}
 
 	height1 := uint64(1)
+	err = s.SetFirstHeight(height1)
+	require.NoError(t, err)
+	err = s.SetLatestHeight(height1)
+	require.NoError(t, err)
 	err = s.Store(height1, entries1)
 	require.NoError(t, err)
 
@@ -97,6 +106,8 @@ func Test_PayloadStorage_Versioning(t *testing.T) {
 
 	// Add new version of key1.
 	height3 := uint64(3)
+	err = s.SetLatestHeight(height3 + 2)
+	require.NoError(t, err)
 	expectedValue1ge3 := []byte("value1ge3")
 	entries3 := flow.RegisterEntries{
 		{Key: key1, Value: expectedValue1ge3},
@@ -123,6 +134,78 @@ func Test_PayloadStorage_Versioning(t *testing.T) {
 
 	err = db.Close()
 	require.NoError(t, err)
+}
+
+func TestRegisters_LatestHeight(t *testing.T) {
+	t.Parallel()
+	cache := pebble.NewCache(1 << 20)
+	defer cache.Unref()
+	opts := DefaultPebbleOptions(cache, registers.NewMVCCComparer())
+
+	dbpath := path.Join(t.TempDir(), "versioning.db")
+	db, err := pebble.Open(dbpath, opts)
+	require.NoError(t, err)
+	s, err := NewRegisters(db)
+	require.NoError(t, err)
+	require.NotNil(t, s)
+
+	// happy path
+	expected := uint64(1)
+	err = s.SetLatestHeight(expected)
+	require.NoError(t, err)
+	got, err := s.LatestHeight()
+	require.NoError(t, err)
+	require.Equal(t, got, expected)
+
+	// updating first height should not affect latest
+	firstHeight := uint64(0)
+	err = s.SetFirstHeight(firstHeight)
+	got, err = s.LatestHeight()
+	require.NoError(t, err)
+	require.Equal(t, got, expected)
+
+	// check update
+	expected2 := uint64(3)
+	err = s.SetLatestHeight(expected2)
+	got2, err := s.LatestHeight()
+	require.NoError(t, err)
+	require.Equal(t, got2, expected2)
+}
+
+func TestRegisters_FirstHeight(t *testing.T) {
+	t.Parallel()
+	cache := pebble.NewCache(1 << 20)
+	defer cache.Unref()
+	opts := DefaultPebbleOptions(cache, registers.NewMVCCComparer())
+
+	dbpath := path.Join(t.TempDir(), "versioning.db")
+	db, err := pebble.Open(dbpath, opts)
+	require.NoError(t, err)
+	s, err := NewRegisters(db)
+	require.NoError(t, err)
+	require.NotNil(t, s)
+
+	// happy path
+	expected := uint64(1)
+	err = s.SetFirstHeight(expected)
+	require.NoError(t, err)
+	got, err := s.FirstHeight()
+	require.NoError(t, err)
+	require.Equal(t, got, expected)
+
+	// updating the latest height should not affect first
+	latestHeight := uint64(0)
+	err = s.SetLatestHeight(latestHeight)
+	got, err = s.FirstHeight()
+	require.NoError(t, err)
+	require.Equal(t, got, expected)
+
+	// check update
+	expected2 := uint64(3)
+	err = s.SetFirstHeight(expected2)
+	got2, err := s.FirstHeight()
+	require.NoError(t, err)
+	require.Equal(t, got2, expected2)
 }
 
 // Benchmark_PayloadStorage benchmarks the SetBatch method.
