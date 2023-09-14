@@ -22,6 +22,19 @@ import (
 
 // ReadOnlyExecutionState allows to read the execution state
 type ReadOnlyExecutionState interface {
+	ScriptExecutionState
+
+	// ChunkDataPackByChunkID retrieve a chunk data pack given the chunk ID.
+	ChunkDataPackByChunkID(flow.Identifier) (*flow.ChunkDataPack, error)
+
+	GetExecutionResultID(context.Context, flow.Identifier) (flow.Identifier, error)
+
+	GetHighestExecutedBlockID(context.Context) (uint64, flow.Identifier, error)
+}
+
+// ScriptExecutionState is a subset of the `state.ExecutionState` interface purposed to only access the state
+// used for script execution and not mutate the execution state of the blockchain.
+type ScriptExecutionState interface {
 	// NewStorageSnapshot creates a new ready-only view at the given state commitment.
 	NewStorageSnapshot(flow.StateCommitment) snapshot.StorageSnapshot
 
@@ -30,13 +43,6 @@ type ReadOnlyExecutionState interface {
 
 	// HasState returns true if the state with the given state commitment exists in memory
 	HasState(flow.StateCommitment) bool
-
-	// ChunkDataPackByChunkID retrieve a chunk data pack given the chunk ID.
-	ChunkDataPackByChunkID(flow.Identifier) (*flow.ChunkDataPack, error)
-
-	GetExecutionResultID(context.Context, flow.Identifier) (flow.Identifier, error)
-
-	GetHighestExecutedBlockID(context.Context) (uint64, flow.Identifier, error)
 }
 
 // TODO Many operations here are should be transactional, so we need to refactor this

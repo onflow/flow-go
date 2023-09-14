@@ -26,7 +26,7 @@ type MeshEngine struct {
 	mockcomponent.Component
 }
 
-func NewMeshEngine(t *testing.T, net network.Network, cap int, channel channels.Channel) *MeshEngine {
+func NewMeshEngine(t *testing.T, net network.EngineRegistry, cap int, channel channels.Channel) *MeshEngine {
 	te := &MeshEngine{
 		t:        t,
 		Event:    make(chan interface{}, cap),

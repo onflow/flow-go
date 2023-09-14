@@ -10,7 +10,7 @@ import (
 // CalculateID calculates the root ID of the given execution data without storing any data.
 // No errors are expected during normal operation.
 func CalculateID(ctx context.Context, execData *BlockExecutionData, serializer Serializer) (flow.Identifier, error) {
-	executionDatastore := NewExecutionDataStore(&blobs.NoopBlobstore{}, serializer)
+	executionDatastore := NewExecutionDataStore(blobs.NewNoopBlobstore(), serializer)
 
 	id, err := executionDatastore.Add(ctx, execData)
 	if err != nil {

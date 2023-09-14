@@ -25,6 +25,7 @@ import (
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/internal/p2putils"
 	"github.com/onflow/flow-go/network/p2p"
+	"github.com/onflow/flow-go/network/p2p/p2plogging"
 	"github.com/onflow/flow-go/network/p2p/p2pnode/internal"
 	"github.com/onflow/flow-go/network/p2p/unicast/protocols"
 	"github.com/onflow/flow-go/utils/logging"
@@ -90,8 +91,6 @@ func NewNode(
 	}
 }
 
-var _ p2p.LibP2PNode = (*Node)(nil)
-
 func (n *Node) Start(ctx irrecoverable.SignalerContext) {
 	n.Component.Start(ctx)
 }
@@ -146,9 +145,9 @@ func (n *Node) Stop() error {
 	return nil
 }
 
-// AddPeer adds a peer to this node by adding it to this node's peerstore and connecting to it.
+// ConnectToPeerAddrInfo adds a peer to this node by adding it to this node's peerstore and connecting to it.
 // All errors returned from this function can be considered benign.
-func (n *Node) AddPeer(ctx context.Context, peerInfo peer.AddrInfo) error {
+func (n *Node) ConnectToPeer(ctx context.Context, peerInfo peer.AddrInfo) error {
 	return n.host.Connect(ctx, peerInfo)
 }
 
@@ -162,7 +161,7 @@ func (n *Node) RemovePeer(peerID peer.ID) error {
 	// logging with suspicious level as we only expect to disconnect from a peer if it is not part of the
 	// protocol state.
 	n.logger.Warn().
-		Str("peer_id", peerID.String()).
+		Str("peer_id", p2plogging.PeerId(peerID)).
 		Bool(logging.KeySuspicious, true).
 		Msg("disconnected from peer")
 
@@ -179,10 +178,75 @@ func (n *Node) GetPeersForProtocol(pid protocol.ID) peer.IDSlice {
 	return peers
 }
 
-// CreateStream returns an existing stream connected to the peer if it exists, or creates a new stream with it.
-// All errors returned from this function can be considered benign.
-func (n *Node) CreateStream(ctx context.Context, peerID peer.ID) (libp2pnet.Stream, error) {
-	lg := n.logger.With().Str("peer_id", peerID.String()).Logger()
+// OpenProtectedStream opens a new stream to a peer with a protection tag. The protection tag can be used to ensure
+// that the connection to the peer is maintained for a particular purpose. The stream is opened to the given peerID
+// and writingLogic is executed on the stream. The created stream does not need to be reused and can be inexpensively
+// created for each send. Moreover, the stream creation does not incur a round-trip time as the stream negotiation happens
+// on an existing connection.
+//
+// Args:
+//   - ctx: The context used to control the stream's lifecycle.
+//   - peerID: The ID of the peer to open the stream to.
+//   - protectionTag: A tag that protects the connection and ensures that the connection manager keeps it alive, and
+//     won't prune the connection while the tag is active.
+//   - writingLogic: A callback function that contains the logic for writing to the stream. It allows an external caller to
+//     write to the stream without having to worry about the stream creation and management.
+//
+// Returns:
+// error: An error, if any occurred during the process. This includes failure in creating the stream, setting the write
+// deadline, executing the writing logic, resetting the stream if the writing logic fails, or closing the stream.
+// All returned errors during this process can be considered benign.
+func (n *Node) OpenProtectedStream(ctx context.Context, peerID peer.ID, protectionTag string, writingLogic func(stream libp2pnet.Stream) error) error {
+	n.host.ConnManager().Protect(peerID, protectionTag)
+	defer n.host.ConnManager().Unprotect(peerID, protectionTag)
+
+	// streams don't need to be reused and are fairly inexpensive to be created for each send.
+	// A stream creation does NOT incur an RTT as stream negotiation happens on an existing connection.
+	s, err := n.createStream(ctx, peerID)
+	if err != nil {
+		return fmt.Errorf("failed to create stream for %s: %w", peerID, err)
+	}
+
+	deadline, _ := ctx.Deadline()
+	err = s.SetWriteDeadline(deadline)
+	if err != nil {
+		return fmt.Errorf("failed to set write deadline for stream: %w", err)
+	}
+
+	err = writingLogic(s)
+	if err != nil {
+		// reset the stream to ensure that the next stream creation is not affected by the error.
+		resetErr := s.Reset()
+		if resetErr != nil {
+			n.logger.Error().
+				Str("target_peer_id", p2plogging.PeerId(peerID)).
+				Err(resetErr).
+				Msg("failed to reset stream")
+		}
+
+		return fmt.Errorf("writing logic failed for %s: %w", peerID, err)
+	}
+
+	// close the stream immediately
+	err = s.Close()
+	if err != nil {
+		return fmt.Errorf("failed to close the stream for %s: %w", peerID, err)
+	}
+
+	return nil
+}
+
+// createStream creates a new stream to the given peer.
+// Args:
+//   - ctx: The context used to control the stream's lifecycle.
+//   - peerID: The ID of the peer to open the stream to.
+//
+// Returns:
+//   - libp2pnet.Stream: The created stream.
+//   - error: An error, if any occurred during the process. This includes failure in creating the stream. All returned
+//     errors during this process can be considered benign.
+func (n *Node) createStream(ctx context.Context, peerID peer.ID) (libp2pnet.Stream, error) {
+	lg := n.logger.With().Str("peer_id", p2plogging.PeerId(peerID)).Logger()
 
 	// If we do not currently have any addresses for the given peer, stream creation will almost
 	// certainly fail. If this Node was configured with a routing system, we can try to use it to
@@ -216,6 +280,12 @@ func (n *Node) CreateStream(ctx context.Context, peerID peer.ID) (libp2pnet.Stre
 		Str("dial_address", fmt.Sprintf("%v", dialAddrs)).
 		Msg("stream successfully created to remote peer")
 	return stream, nil
+}
+
+// ID returns the peer.ID of the node, which is the unique identifier of the node at the libp2p level.
+// For other libp2p nodes, the current node is identified by this ID.
+func (n *Node) ID() peer.ID {
+	return n.host.ID()
 }
 
 // GetIPPort returns the IP and Port the libp2p node is listening on.
@@ -320,14 +390,13 @@ func (n *Node) unsubscribeTopic(topic channels.Topic) error {
 	}
 
 	if err := n.pubSub.UnregisterTopicValidator(topic.String()); err != nil {
-		n.logger.Err(err).Str("topic", topic.String()).Msg("failed to unregister topic validator")
+		return fmt.Errorf("failed to unregister topic validator: %w", err)
 	}
 
 	// attempt to close the topic
 	err := tp.Close()
 	if err != nil {
-		err = fmt.Errorf("could not close topic (%s): %w", topic, err)
-		return err
+		return fmt.Errorf("could not close topic (%s): %w", topic, err)
 	}
 	n.topics[topic] = nil
 	delete(n.topics, topic)
@@ -390,7 +459,7 @@ func (n *Node) Host() host.Host {
 
 // WithDefaultUnicastProtocol overrides the default handler of the unicast manager and registers all preferred protocols.
 func (n *Node) WithDefaultUnicastProtocol(defaultHandler libp2pnet.StreamHandler, preferred []protocols.ProtocolName) error {
-	n.uniMgr.WithDefaultHandler(defaultHandler)
+	n.uniMgr.SetDefaultHandler(defaultHandler)
 	for _, p := range preferred {
 		err := n.uniMgr.Register(p)
 		if err != nil {
@@ -415,7 +484,7 @@ func (n *Node) WithPeersProvider(peersProvider p2p.PeersProvider) {
 					causes, disallowListed := n.disallowListedCache.IsDisallowListed(peerId)
 					if disallowListed {
 						n.logger.Warn().
-							Str("peer_id", peerId.String()).
+							Str("peer_id", p2plogging.PeerId(peerId)).
 							Str("causes", fmt.Sprintf("%v", causes)).
 							Msg("peer is disallowed for a cause, removing from authorized peers of peer manager")
 
@@ -524,12 +593,12 @@ func (n *Node) OnDisallowListNotification(peerId peer.ID, cause flownet.Disallow
 	causes, err := n.disallowListedCache.DisallowFor(peerId, cause)
 	if err != nil {
 		// returned error is fatal.
-		n.logger.Fatal().Err(err).Str("peer_id", peerId.String()).Msg("failed to add peer to disallow list")
+		n.logger.Fatal().Err(err).Str("peer_id", p2plogging.PeerId(peerId)).Msg("failed to add peer to disallow list")
 	}
 
 	// TODO: this code should further be refactored to also log the Flow id.
 	n.logger.Warn().
-		Str("peer_id", peerId.String()).
+		Str("peer_id", p2plogging.PeerId(peerId)).
 		Str("notification_cause", cause.String()).
 		Str("causes", fmt.Sprintf("%v", causes)).
 		Msg("peer added to disallow list cache")
@@ -550,7 +619,7 @@ func (n *Node) OnAllowListNotification(peerId peer.ID, cause flownet.DisallowLis
 	remainingCauses := n.disallowListedCache.AllowFor(peerId, cause)
 
 	n.logger.Info().
-		Str("peer_id", peerId.String()).
+		Str("peer_id", p2plogging.PeerId(peerId)).
 		Str("causes", fmt.Sprintf("%v", cause)).
 		Str("remaining_causes", fmt.Sprintf("%v", remainingCauses)).
 		Msg("peer is allow-listed for cause")

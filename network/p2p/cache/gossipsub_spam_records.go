@@ -13,6 +13,7 @@ import (
 	"github.com/onflow/flow-go/module/mempool/herocache/backdata/heropool"
 	"github.com/onflow/flow-go/module/mempool/stdmap"
 	"github.com/onflow/flow-go/network/p2p"
+	"github.com/onflow/flow-go/network/p2p/p2plogging"
 )
 
 // GossipSubSpamRecordCache is a cache for storing the gossipsub spam records of peers. It is thread-safe.
@@ -187,10 +188,10 @@ func (a *GossipSubSpamRecordCache) Get(peerID peer.ID) (*p2p.GossipSubSpamRecord
 		return e
 	})
 	if err != nil {
-		return nil, fmt.Errorf("error while applying pre-processing functions to cache record for peer %s: %w", peerID.String(), err), false
+		return nil, fmt.Errorf("error while applying pre-processing functions to cache record for peer %s: %w", p2plogging.PeerId(peerID), err), false
 	}
 	if !updated {
-		return nil, fmt.Errorf("could not decay cache record for peer %s", peerID.String()), false
+		return nil, fmt.Errorf("could not decay cache record for peer %s", p2plogging.PeerId(peerID)), false
 	}
 
 	r := record.(gossipsubSpamRecordEntity).GossipSubSpamRecord

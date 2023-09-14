@@ -195,6 +195,7 @@ func TestComputeBlock_Uploader(t *testing.T) {
 		Return(nil, nil)
 
 	computationResult := unittest2.ComputationResultFixture(
+		t,
 		unittest.IdentifierFixture(),
 		[][]flow.Identifier{
 			{unittest.IdentifierFixture()},
