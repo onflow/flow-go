@@ -583,8 +583,8 @@ func (e *Engine) validateSyncRequestForALSP(originID flow.Identifier) (*alsp.Mis
 	}
 
 	// to avoid creating a misbehavior report for every sync request received, use a probabilistic approach.
-	// Create a report with a probability of spamDetectionConfig.syncRequestProbability
-	if float32(n) < e.spamDetectionConfig.syncRequestProbability*spamProbabilityMultiplier {
+	// Create a report with a probability of spamDetectionConfig.syncRequestProb
+	if float32(n) < e.spamDetectionConfig.syncRequestProb*spamProbabilityMultiplier {
 		// create a misbehavior report
 		e.log.Info().Str("originID", originID.String()).Msg("creating misbehavior report")
 		report, err := alsp.NewMisbehaviorReport(originID, alsp.ResourceIntensiveRequest)

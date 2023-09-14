@@ -60,8 +60,8 @@ func (ss *SyncSuite) TestLoad_Process_SyncRequest_HigherThanReceiver_OutsideTole
 			},
 		)
 
-		// force creating misbehavior report by setting syncRequestProbability to 1.0 (i.e. report misbehavior 100% of the time)
-		ss.e.spamDetectionConfig.syncRequestProbability = 1.0
+		// force creating misbehavior report by setting syncRequestProb to 1.0 (i.e. report misbehavior 100% of the time)
+		ss.e.spamDetectionConfig.syncRequestProb = 1.0
 
 		require.NoError(ss.T(), ss.e.Process(channels.SyncCommittee, originID, req))
 	}
@@ -143,7 +143,7 @@ func (ss *SyncSuite) TestLoad_Process_SyncRequest_HigherThanReceiver_OutsideTole
 						misbehaviorsCounter++
 					},
 				)
-				ss.e.spamDetectionConfig.syncRequestProbability = loadGroup.syncRequestProbabilityFactor
+				ss.e.spamDetectionConfig.syncRequestProb = loadGroup.syncRequestProbabilityFactor
 				require.NoError(ss.T(), ss.e.Process(channels.SyncCommittee, originID, req))
 			}
 
