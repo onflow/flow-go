@@ -20,14 +20,13 @@ type CollectionFetcher struct {
 	state   protocol.State
 	// This is included to temporarily work around an issue observed on a small number of ENs.
 	// It works around an issue where some collection nodes are not configured with enough
-	// this works around an issue where some collection nodes are not configured with enough
 	// file descriptors causing connection failures.
 	onflowOnlyLNs bool
 }
 
 func NewCollectionFetcher(log zerolog.Logger, request module.Requester, state protocol.State, onflowOnlyLNs bool) *CollectionFetcher {
 	return &CollectionFetcher{
-		log:           log.With().Str("component", "ingestion_engine_collecition_fetcher").Logger(),
+		log:           log.With().Str("component", "ingestion_engine_collection_fetcher").Logger(),
 		request:       request,
 		state:         state,
 		onflowOnlyLNs: onflowOnlyLNs,
@@ -41,12 +40,12 @@ func (e *CollectionFetcher) FetchCollection(blockID flow.Identifier, height uint
 		// have validated the block payload. And that validation includes checking the guarantors are correct.
 		// Based on that assumption, failing to find guarantors for guarantees contained in an incorporated block
 		// should be treated as fatal error
-		e.log.Fatal().Err(err).Msgf("failed to find guarantors for guarantee %v at block %v, height %v",
+		return fmt.Errorf("failed to find guarantors for guarantee %v at block %v, height %v: %w",
 			guarantee.ID(),
 			blockID,
 			height,
+			err,
 		)
-		return fmt.Errorf("could not find guarantors: %w", err)
 	}
 
 	filters := []flow.IdentityFilter{
