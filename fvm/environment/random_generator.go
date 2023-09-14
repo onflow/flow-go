@@ -1,7 +1,6 @@
 package environment
 
 import (
-	"encoding/binary"
 	"fmt"
 
 	"github.com/onflow/flow-go/crypto/random"
@@ -22,9 +21,9 @@ type EntropyProvider interface {
 }
 
 type RandomGenerator interface {
-	// UnsafeRandom returns a random uint64
+	// ReadRandom reads pseudo-random bytes into the input slice, using distributed randomness.
 	// The name follows Cadence interface
-	UnsafeRandom() (uint64, error)
+	ReadRandom([]byte) error
 }
 
 var _ RandomGenerator = (*randomGenerator)(nil)
@@ -54,14 +53,12 @@ func NewParseRestrictedRandomGenerator(
 	}
 }
 
-func (gen ParseRestrictedRandomGenerator) UnsafeRandom() (
-	uint64,
-	error,
-) {
-	return parseRestrict1Ret(
+func (gen ParseRestrictedRandomGenerator) ReadRandom(buf []byte) error {
+	return parseRestrict1Arg(
 		gen.txnState,
 		trace.FVMEnvRandom,
-		gen.impl.UnsafeRandom)
+		gen.impl.ReadRandom,
+		buf)
 }
 
 func NewRandomGenerator(
@@ -103,12 +100,12 @@ func (gen *randomGenerator) createPRG() (random.Rand, error) {
 	return csprg, nil
 }
 
-// UnsafeRandom returns a random uint64 using the underlying PRG (currently
+// ReadRandom reads pseudo-random bytes into the input slice using the underlying PRG (currently
 // using a crypto-secure one). This function is not thread safe, due to the gen.prg
 // instance currently used. This is fine because a
 // single transaction has a single RandomGenerator and is run in a single
 // thread.
-func (gen *randomGenerator) UnsafeRandom() (uint64, error) {
+func (gen *randomGenerator) ReadRandom(buf []byte) error {
 	defer gen.tracer.StartExtensiveTracingChildSpan(
 		trace.FVMEnvRandom).End()
 
@@ -116,13 +113,12 @@ func (gen *randomGenerator) UnsafeRandom() (uint64, error) {
 	if !gen.isPRGCreated {
 		newPRG, err := gen.createPRG()
 		if err != nil {
-			return 0, err
+			return err
 		}
 		gen.prg = newPRG
 		gen.isPRGCreated = true
 	}
 
-	buf := make([]byte, 8)
-	gen.prg.Read(buf) // Note: prg.Read does not return error
-	return binary.LittleEndian.Uint64(buf), nil
+	gen.prg.Read(buf)
+	return nil
 }
