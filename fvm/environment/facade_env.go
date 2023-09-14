@@ -315,3 +315,7 @@ func (env *facadeEnvironment) SetInterpreterSharedState(state *interpreter.Share
 func (env *facadeEnvironment) GetInterpreterSharedState() *interpreter.SharedState {
 	return nil
 }
+
+func (env *facadeEnvironment) UnsafeRandom() (uint64, error) {
+	return 0, nil
+}
