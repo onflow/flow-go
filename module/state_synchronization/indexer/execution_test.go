@@ -183,13 +183,6 @@ func TestExecutionState_IndexBlockData(t *testing.T) {
 			},
 		}
 		execData := execution_data.NewBlockExecutionDataEntity(block.ID(), ed)
-		// crate a lookup map that matches flow register ID to index in the payloads slice
-		payloadRegID := make(map[flow.RegisterID]int)
-		for i, p := range trie.Payloads {
-			k, _ := p.Key()
-			regKey, _ := migrations.KeyToRegisterID(k)
-			payloadRegID[regKey] = i
-		}
 
 		err := newIndexTest(t, blocks, execData).
 			// make sure update registers match in length and are same as block data ledger payloads
@@ -198,11 +191,7 @@ func TestExecutionState_IndexBlockData(t *testing.T) {
 				assert.Len(t, trie.Payloads, entries.Len())
 
 				// make sure all the registers from the execution data have been stored as well the value matches
-				for _, entry := range entries {
-					index, ok := payloadRegID[entry.Key]
-					assert.True(t, ok)
-					assert.True(t, trie.Payloads[index].Value().Equals(entry.Value))
-				}
+				assert.True(t, trieRegistersPayloadComparer(trie.Payloads, entries))
 				return nil
 			}).
 			runIndexBlockData()
@@ -413,11 +402,13 @@ func ledgerPayloadWithValuesFixture(owner string, key string, value []byte) *led
 	return ledger.NewPayload(k, value)
 }
 
+// trieRegistersPayloadComparer checks that trie payloads and register payloads are same, used for testing.
 func trieRegistersPayloadComparer(triePayloads []*ledger.Payload, registerPayloads flow.RegisterEntries) bool {
 	if len(triePayloads) != len(registerPayloads) {
 		return false
 	}
 
+	// crate a lookup map that matches flow register ID to index in the payloads slice
 	payloadRegID := make(map[flow.RegisterID]int)
 	for i, p := range triePayloads {
 		k, _ := p.Key()
