@@ -554,7 +554,10 @@ func (e *Engine) validateRangeRequestForALSP(originID flow.Identifier, rangeRequ
 
 	// check if range request is valid
 	if rangeRequest.ToHeight < rangeRequest.FromHeight {
-		e.log.Info().Str("originID", originID.String()).Msg("creating misbehavior report (invalid range request)")
+		e.log.Warn().
+			Hex("origin_id", logging.ID(originID)).
+			Str(logging.KeySuspicious, "true").
+			Msgf("received invalid range request from height %d is not less than the to height %d, creating ALSP report", rangeRequest.FromHeight, rangeRequest.ToHeight)
 		report, err := alsp.NewMisbehaviorReport(originID, alsp.InvalidMessage)
 
 		if err != nil {
@@ -571,7 +574,10 @@ func (e *Engine) validateRangeRequestForALSP(originID flow.Identifier, rangeRequ
 	rangeRequestProb := e.spamDetectionConfig.rangeRequestBaseProb * (float32(rangeRequest.ToHeight-rangeRequest.FromHeight) + 1) / float32(synccore.DefaultConfig().MaxSize)
 	if float32(n) < rangeRequestProb*spamProbabilityMultiplier {
 		// create a misbehavior report
-		e.log.Info().Str("originID", originID.String()).Msg("creating misbehavior report (probabilistic)")
+		e.log.Warn().
+			Hex("origin_id", logging.ID(originID)).
+			Str(logging.KeySuspicious, "true").
+			Msgf("from height %d to height %d, creating probabilistic ALSP report", rangeRequest.FromHeight, rangeRequest.ToHeight)
 		report, err := alsp.NewMisbehaviorReport(originID, alsp.ResourceIntensiveRequest)
 
 		if err != nil {
@@ -603,8 +609,13 @@ func (e *Engine) validateSyncRequestForALSP(originID flow.Identifier) (*alsp.Mis
 	// to avoid creating a misbehavior report for every sync request received, use a probabilistic approach.
 	// Create a report with a probability of spamDetectionConfig.syncRequestProb
 	if float32(n) < e.spamDetectionConfig.syncRequestProb*spamProbabilityMultiplier {
+
 		// create a misbehavior report
-		e.log.Info().Str("originID", originID.String()).Msg("creating misbehavior report")
+		e.log.Warn().
+			Hex("origin_id", logging.ID(originID)).
+			Str(logging.KeySuspicious, "true").
+			Msg("creating probabilistic ALSP report")
+
 		report, err := alsp.NewMisbehaviorReport(originID, alsp.ResourceIntensiveRequest)
 
 		if err != nil {
