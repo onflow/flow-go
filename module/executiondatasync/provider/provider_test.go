@@ -151,7 +151,7 @@ func TestCalculateChunkExecutionDataID(t *testing.T) {
 	rootHash, err := ledger.ToRootHash([]byte("0123456789acbdef0123456789acbdef"))
 	require.NoError(t, err)
 
-	expected := cid.MustParse("QmVKVS2XmoCnpJz551YJsoMg9PffnuK2feu4cB2JKdtoKN")
+	expected := cid.MustParse("QmXrbSY6XkrrVGvQzprLKSW6ixp64YHXDhUGKMGHkA862p")
 	ced := execution_data.ChunkExecutionData{
 		Collection: &flow.Collection{
 			Transactions: []*flow.TransactionBody{
