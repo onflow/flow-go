@@ -47,12 +47,12 @@ func (e *CollectionFetcher) FetchCollection(blockID flow.Identifier, height uint
 		// have validated the block payload. And that validation includes checking the guarantors are correct.
 		// Based on that assumption, failing to find guarantors for guarantees contained in an incorporated block
 		// should be treated as fatal error
-		return fmt.Errorf("failed to find guarantors for guarantee %v at block %v, height %v: %w",
+		e.log.Fatal().Err(err).Msgf("failed to find guarantors for guarantee %v at block %v, height %v",
 			guarantee.ID(),
 			blockID,
 			height,
-			err,
 		)
+		return fmt.Errorf("could not find guarantors: %w", err)
 	}
 
 	filters := []flow.IdentityFilter{
