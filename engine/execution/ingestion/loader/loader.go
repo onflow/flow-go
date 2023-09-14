@@ -23,7 +23,7 @@ type Loader struct {
 func NewLoader(
 	state protocol.State,
 	headers storage.Headers,
-	blocks storage.Blocks,
+	blocks storage.Blocks, // to remove
 	execState state.ExecutionState,
 	log zerolog.Logger,
 ) *Loader {
