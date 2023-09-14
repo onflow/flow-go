@@ -210,7 +210,7 @@ func (e *Engine) process(channel channels.Channel, originID flow.Identifier, eve
 	case *messages.BatchRequest:
 		batchRequest, ok := event.(*messages.BatchRequest)
 		if !ok {
-			return fmt.Errorf("failed to extract BatchRequest for originID %s", originID.String())
+			return fmt.Errorf("failed to extract BatchRequest from %x", originID[:])
 		}
 
 		report, misbehavior := e.validateBatchRequestForALSP(channel, originID, batchRequest)
@@ -228,17 +228,20 @@ func (e *Engine) process(channel channels.Channel, originID flow.Identifier, eve
 	case *messages.RangeRequest:
 		rangeRequest, ok := event.(*messages.RangeRequest)
 		if !ok {
-			return fmt.Errorf("failed to extract RangeRequest for originID %s", originID.String())
+			return fmt.Errorf("failed to extract RangeRequest from %x", originID[:])
 		}
 
-		report, misbehavior := e.validateRangeRequestForALSP(originID, rangeRequest)
-		if misbehavior {
+		report, valid, err := e.validateRangeRequestForALSP(originID, rangeRequest)
+		if err != nil {
+			return fmt.Errorf("failed to validate range request from %x: %w", originID[:], err)
+		}
+		if !valid {
 			e.con.ReportMisbehavior(report) // report misbehavior to ALSP
 			e.log.
 				Warn().
 				Hex("origin_id", logging.ID(originID)).
 				Str(logging.KeySuspicious, "true").
-				Msgf("received invalid range request from %x: %v", originID[:], misbehavior)
+				Msgf("received invalid range request from %x: %v", originID[:], valid)
 			e.metrics.InboundMessageDropped(metrics.EngineSynchronization, metrics.MessageRangeRequest)
 			return nil
 		}
@@ -261,7 +264,7 @@ func (e *Engine) process(channel channels.Channel, originID flow.Identifier, eve
 	case *messages.BlockResponse:
 		blockResponse, ok := event.(*messages.BlockResponse)
 		if !ok {
-			return fmt.Errorf("failed to extract BlockResponse for originID %s", originID.String())
+			return fmt.Errorf("failed to extract BlockResponse from %x", originID[:])
 		}
 
 		report, misbehavior := e.validateBlockResponseForALSP(channel, originID, blockResponse)
@@ -280,7 +283,7 @@ func (e *Engine) process(channel channels.Channel, originID flow.Identifier, eve
 	case *messages.SyncResponse:
 		syncResponse, ok := event.(*messages.SyncResponse)
 		if !ok {
-			return fmt.Errorf("failed to extract SyncResponse for originID %s", originID.String())
+			return fmt.Errorf("failed to extract SyncResponse for originID %x", originID[:])
 		}
 
 		report, misbehavior := e.validateSyncResponseForALSP(channel, originID, syncResponse)
@@ -525,34 +528,29 @@ func (e *Engine) validateBlockResponseForALSP(channel channels.Channel, id flow.
 }
 
 // validateRangeRequestForALSP checks if a range request should be reported as a misbehavior. It returns a misbehavior report and a boolean indicating whether the request should be reported.
-func (e *Engine) validateRangeRequestForALSP(originID flow.Identifier, rangeRequest *messages.RangeRequest) (*alsp.MisbehaviorReport, bool) {
+// Returns an error that is assumed to be irrecoverable because of internal processes that didn't allow validation to complete.
+// Returns true if the range request is valid and should not be reported as misbehavior.
+// Returns false if either a) the range request is invalid or b) if the range request is valid but should be reported as misbehavior anyway (due to probabilities) or c) if an error is encountered.
+func (e *Engine) validateRangeRequestForALSP(originID flow.Identifier, rangeRequest *messages.RangeRequest) (*alsp.MisbehaviorReport, bool, error) {
 	// Generate a random integer between 1 and spamProbabilityMultiplier (exclusive)
 	n, err := rand.Uint32n(spamProbabilityMultiplier)
 
 	if err != nil {
-		// failing to generate a random number is unlikely. If an error is encountered while
-		// generating a random number it indicates a bug and processing can not proceed.
-		e.log.Fatal().
-			Err(err).
-			Bool(logging.KeyNetworkingSecurity, true).
-			Str("originID", originID.String()).
-			Msg("failed to generate random number")
+		return nil, false, fmt.Errorf("failed to generate random number from %x: %w", originID[:], err)
 	}
 
 	// check if range request is valid
 	if rangeRequest.ToHeight < rangeRequest.FromHeight {
 		e.log.Info().Str("originID", originID.String()).Msg("creating misbehavior report (invalid range request)")
 		report, err := alsp.NewMisbehaviorReport(originID, alsp.InvalidMessage)
+
 		if err != nil {
 			// failing to create the misbehavior report is unlikely. If an error is encountered while
 			// creating the misbehavior report it indicates a bug and processing can not proceed.
-			e.log.Fatal().
-				Err(err).
-				Bool(logging.KeyNetworkingSecurity, true).
-				Str("originID", originID.String()).
-				Msg("failed to create misbehavior report")
+			return nil, false, fmt.Errorf("failed to create misbehavior report (invalid range request) from %x: %w", originID[:], err)
 		}
-		return report, true
+		// failed validation check and should be reported as misbehavior
+		return report, false, nil
 	}
 
 	// to avoid creating a misbehavior report for every range request received, use a probabilistic approach.
@@ -566,16 +564,14 @@ func (e *Engine) validateRangeRequestForALSP(originID flow.Identifier, rangeRequ
 		if err != nil {
 			// failing to create the misbehavior report is unlikely. If an error is encountered while
 			// creating the misbehavior report it indicates a bug and processing can not proceed.
-			e.log.Fatal().
-				Err(err).
-				Bool(logging.KeyNetworkingSecurity, true).
-				Str("originID", originID.String()).
-				Msg("failed to create misbehavior report")
+			return nil, false, fmt.Errorf("failed to create misbehavior report from %x: %w", originID[:], err)
 		}
-		return report, true
+		// failed validation check and should be reported as misbehavior
+		return report, false, nil
 	}
 
-	return nil, false
+	// passed all validation checks with no misbehavior detected
+	return nil, true, nil
 }
 
 // validateSyncRequestForALSP checks if a sync request should be reported as spam. It returns a misbehavior report and a boolean indicating whether the request should be reported.
