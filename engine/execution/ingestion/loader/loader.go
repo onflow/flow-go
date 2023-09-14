@@ -13,26 +13,23 @@ import (
 )
 
 type Loader struct {
+	log       zerolog.Logger
 	state     protocol.State
 	headers   storage.Headers // see comments on getHeaderByHeight for why we need it
-	blocks    storage.Blocks
 	execState state.ExecutionState
-	log       zerolog.Logger
 }
 
 func NewLoader(
+	log zerolog.Logger,
 	state protocol.State,
 	headers storage.Headers,
-	blocks storage.Blocks, // to remove
 	execState state.ExecutionState,
-	log zerolog.Logger,
 ) *Loader {
 	return &Loader{
+		log:       log.With().Str("component", "ingestion_engine_block_loader").Logger(),
 		state:     state,
 		headers:   headers,
-		blocks:    blocks,
 		execState: execState,
-		log:       log.With().Str("component", "ingestion_engine_block_loader").Logger(),
 	}
 }
 

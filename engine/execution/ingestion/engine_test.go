@@ -217,8 +217,8 @@ func runWithEngine(t *testing.T, f func(testingContext)) {
 
 	uploadMgr := uploader.NewManager(trace.NewNoopTracer())
 
-	fetcher := fetcher.NewCollectionFetcher(log, request, protocolState, false, log)
-	loader := loader.NewLoader(protocolState, headers, blocks, executionState, log)
+	fetcher := fetcher.NewCollectionFetcher(log, request, protocolState, false)
+	loader := loader.NewLoader(log, protocolState, headers, executionState)
 
 	engine, err = New(
 		unit,
@@ -1516,7 +1516,7 @@ func newIngestionEngine(t *testing.T, ps *mocks.ProtocolState, es *mockExecution
 	}
 
 	fetcher := fetcher.NewCollectionFetcher(log, request, ps, false)
-	loader := loader.NewLoader(ps, headers, blocks, es, log)
+	loader := loader.NewLoader(ps, headers, es, log)
 
 	unit := enginePkg.NewUnit()
 	engine, err = New(
