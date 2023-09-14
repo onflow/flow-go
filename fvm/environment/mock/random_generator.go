@@ -9,28 +9,18 @@ type RandomGenerator struct {
 	mock.Mock
 }
 
-// UnsafeRandom provides a mock function with given fields:
-func (_m *RandomGenerator) UnsafeRandom() (uint64, error) {
-	ret := _m.Called()
+// ReadRandom provides a mock function with given fields: _a0
+func (_m *RandomGenerator) ReadRandom(_a0 []byte) error {
+	ret := _m.Called(_a0)
 
-	var r0 uint64
-	var r1 error
-	if rf, ok := ret.Get(0).(func() (uint64, error)); ok {
-		return rf()
-	}
-	if rf, ok := ret.Get(0).(func() uint64); ok {
-		r0 = rf()
+	var r0 error
+	if rf, ok := ret.Get(0).(func([]byte) error); ok {
+		r0 = rf(_a0)
 	} else {
-		r0 = ret.Get(0).(uint64)
+		r0 = ret.Error(0)
 	}
 
-	if rf, ok := ret.Get(1).(func() error); ok {
-		r1 = rf()
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
+	return r0
 }
 
 type mockConstructorTestingTNewRandomGenerator interface {

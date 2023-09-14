@@ -117,7 +117,7 @@ type Params struct {
 }
 
 // New creates backend instance
-func New(params Params) *Backend {
+func New(params Params) (*Backend, error) {
 	retry := newRetry()
 	if params.RetryEnabled {
 		retry.Activate()
@@ -125,14 +125,14 @@ func New(params Params) *Backend {
 
 	loggedScripts, err := lru.New[[md5.Size]byte, time.Time](DefaultLoggedScriptsCacheSize)
 	if err != nil {
-		params.Log.Fatal().Err(err).Msg("failed to initialize script logging cache")
+		return nil, fmt.Errorf("failed to initialize script logging cache: %w", err)
 	}
 
 	archivePorts := make([]uint, len(params.ArchiveAddressList))
 	for idx, addr := range params.ArchiveAddressList {
 		port, err := findPortFromAddress(addr)
 		if err != nil {
-			params.Log.Fatal().Err(err).Msg("failed to find archive node port")
+			return nil, fmt.Errorf("failed to find archive node port: %w", err)
 		}
 		archivePorts[idx] = port
 	}
@@ -141,7 +141,7 @@ func New(params Params) *Backend {
 	if params.TxResultCacheSize > 0 {
 		txResCache, err = lru.New[flow.Identifier, *access.TransactionResult](int(params.TxResultCacheSize))
 		if err != nil {
-			params.Log.Fatal().Err(err).Msg("failed to init cache for transaction results")
+			return nil, fmt.Errorf("failed to init cache for transaction results: %w", err)
 		}
 	}
 
@@ -221,15 +221,15 @@ func New(params Params) *Backend {
 
 	preferredENIdentifiers, err = identifierList(params.PreferredExecutionNodeIDs)
 	if err != nil {
-		params.Log.Fatal().Err(err).Msg("failed to convert node id string to Flow Identifier for preferred EN map")
+		return nil, fmt.Errorf("failed to convert node id string to Flow Identifier for preferred EN map: %w", err)
 	}
 
 	fixedENIdentifiers, err = identifierList(params.FixedExecutionNodeIDs)
 	if err != nil {
-		params.Log.Fatal().Err(err).Msg("failed to convert node id string to Flow Identifier for fixed EN map")
+		return nil, fmt.Errorf("failed to convert node id string to Flow Identifier for fixed EN map: %w", err)
 	}
 
-	return b
+	return b, nil
 }
 
 // NewCache constructs cache for storing connections to other nodes.
