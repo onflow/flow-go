@@ -15,6 +15,7 @@ import (
 	storage "github.com/onflow/flow-go/storage/mocks"
 	"github.com/onflow/flow-go/utils/unittest"
 	"github.com/onflow/flow-go/utils/unittest/mocks"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
 
@@ -28,12 +29,14 @@ type mockExecutionState struct {
 	commits map[flow.Identifier]flow.StateCommitment
 }
 
-func newMockExecutionState(seal *flow.Seal) *mockExecutionState {
+func newMockExecutionState(seal *flow.Seal, genesis *flow.Header) *mockExecutionState {
 	commits := make(map[flow.Identifier]flow.StateCommitment)
 	commits[seal.BlockID] = seal.FinalState
-	return &mockExecutionState{
+	es := &mockExecutionState{
 		commits: commits,
 	}
+	es.On("GetHighestExecutedBlockID", mock.Anything).Return(genesis.Height, genesis.ID(), nil)
+	return es
 }
 
 func (es *mockExecutionState) StateCommitmentByBlockID(
@@ -84,9 +87,10 @@ func TestLoadingUnexecutedBlocks(t *testing.T) {
 
 		require.NoError(t, ps.Bootstrap(genesis, result, seal))
 
-		es := newMockExecutionState(seal)
+		es := newMockExecutionState(seal, genesis.Header)
 		ctrl := gomock.NewController(t)
 		headers := storage.NewMockHeaders(ctrl)
+		headers.EXPECT().ByBlockID(genesis.ID()).Return(genesis.Header, nil)
 		blocks := storage.NewMockBlocks(ctrl)
 		log := unittest.Logger()
 		loader := loader.NewLoader(ps, headers, blocks, es, log)
@@ -112,9 +116,10 @@ func TestLoadingUnexecutedBlocks(t *testing.T) {
 		require.NoError(t, ps.Extend(blockC))
 		require.NoError(t, ps.Extend(blockD))
 
-		es := newMockExecutionState(seal)
+		es := newMockExecutionState(seal, genesis.Header)
 		ctrl := gomock.NewController(t)
 		headers := storage.NewMockHeaders(ctrl)
+		headers.EXPECT().ByBlockID(genesis.ID()).Return(genesis.Header, nil)
 		blocks := storage.NewMockBlocks(ctrl)
 		log := unittest.Logger()
 		loader := loader.NewLoader(ps, headers, blocks, es, log)
@@ -140,9 +145,10 @@ func TestLoadingUnexecutedBlocks(t *testing.T) {
 		require.NoError(t, ps.Extend(blockC))
 		require.NoError(t, ps.Extend(blockD))
 
-		es := newMockExecutionState(seal)
+		es := newMockExecutionState(seal, genesis.Header)
 		ctrl := gomock.NewController(t)
 		headers := storage.NewMockHeaders(ctrl)
+		headers.EXPECT().ByBlockID(genesis.ID()).Return(genesis.Header, nil)
 		blocks := storage.NewMockBlocks(ctrl)
 		log := unittest.Logger()
 		loader := loader.NewLoader(ps, headers, blocks, es, log)
@@ -173,9 +179,10 @@ func TestLoadingUnexecutedBlocks(t *testing.T) {
 
 		require.NoError(t, ps.Finalize(blockC.ID()))
 
-		es := newMockExecutionState(seal)
+		es := newMockExecutionState(seal, genesis.Header)
 		ctrl := gomock.NewController(t)
 		headers := storage.NewMockHeaders(ctrl)
+		headers.EXPECT().ByBlockID(genesis.ID()).Return(genesis.Header, nil)
 		blocks := storage.NewMockBlocks(ctrl)
 		log := unittest.Logger()
 		loader := loader.NewLoader(ps, headers, blocks, es, log)
@@ -210,9 +217,10 @@ func TestLoadingUnexecutedBlocks(t *testing.T) {
 
 		require.NoError(t, ps.Finalize(blockC.ID()))
 
-		es := newMockExecutionState(seal)
+		es := newMockExecutionState(seal, genesis.Header)
 		ctrl := gomock.NewController(t)
 		headers := storage.NewMockHeaders(ctrl)
+		headers.EXPECT().ByBlockID(genesis.ID()).Return(genesis.Header, nil)
 		blocks := storage.NewMockBlocks(ctrl)
 		log := unittest.Logger()
 		loader := loader.NewLoader(ps, headers, blocks, es, log)
@@ -246,9 +254,10 @@ func TestLoadingUnexecutedBlocks(t *testing.T) {
 		require.NoError(t, ps.Extend(blockD))
 		require.NoError(t, ps.Finalize(blockA.ID()))
 
-		es := newMockExecutionState(seal)
+		es := newMockExecutionState(seal, genesis.Header)
 		ctrl := gomock.NewController(t)
 		headers := storage.NewMockHeaders(ctrl)
+		headers.EXPECT().ByBlockID(genesis.ID()).Return(genesis.Header, nil)
 		blocks := storage.NewMockBlocks(ctrl)
 		log := unittest.Logger()
 		loader := loader.NewLoader(ps, headers, blocks, es, log)
@@ -307,9 +316,10 @@ func TestLoadingUnexecutedBlocks(t *testing.T) {
 
 		require.NoError(t, ps.Finalize(blockC.ID()))
 
-		es := newMockExecutionState(seal)
+		es := newMockExecutionState(seal, genesis.Header)
 		ctrl := gomock.NewController(t)
 		headers := storage.NewMockHeaders(ctrl)
+		headers.EXPECT().ByBlockID(genesis.ID()).Return(genesis.Header, nil)
 		blocks := storage.NewMockBlocks(ctrl)
 		log := unittest.Logger()
 		loader := loader.NewLoader(ps, headers, blocks, es, log)
