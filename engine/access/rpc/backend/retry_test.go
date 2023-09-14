@@ -10,7 +10,6 @@ import (
 	"google.golang.org/grpc/status"
 
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/module/metrics"
 	protocol "github.com/onflow/flow-go/state/protocol/mock"
 	realstorage "github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -38,26 +37,11 @@ func (suite *Suite) TestTransactionRetry() {
 	// collection storage returns a not found error
 	suite.collections.On("LightByTransactionID", transactionBody.ID()).Return(nil, realstorage.ErrNotFound)
 
-	// txID := transactionBody.ID()
-	// blockID := block.ID()
+	params := suite.defaultBackendParams()
+
 	// Setup Handler + Retry
-	backend := New(
-		Params{
-			State:                suite.state,
-			CollectionRPC:        suite.colClient,
-			Blocks:               suite.blocks,
-			Headers:              suite.headers,
-			Collections:          suite.collections,
-			Transactions:         suite.transactions,
-			ExecutionReceipts:    suite.receipts,
-			ExecutionResults:     suite.results,
-			ChainID:              suite.chainID,
-			AccessMetrics:        metrics.NewNoopCollector(),
-			MaxHeightRange:       DefaultMaxHeightRange,
-			SnapshotHistoryLimit: DefaultSnapshotHistoryLimit,
-			Log:                  suite.log,
-			Communicator:         NewNodeCommunicator(false),
-		})
+	backend, err := New(params)
+	suite.Require().NoError(err)
 
 	retry := newRetry().SetBackend(backend).Activate()
 	backend.retry = retry
@@ -127,24 +111,11 @@ func (suite *Suite) TestSuccessfulTransactionsDontRetry() {
 	suite.snapshot.On("Identities", mock.Anything).Return(enIDs, nil)
 	connFactory := suite.setupConnectionFactory()
 
-	backend := New(
-		Params{
-			State:                suite.state,
-			CollectionRPC:        suite.colClient,
-			Blocks:               suite.blocks,
-			Headers:              suite.headers,
-			Collections:          suite.collections,
-			Transactions:         suite.transactions,
-			ExecutionReceipts:    suite.receipts,
-			ExecutionResults:     suite.results,
-			ChainID:              suite.chainID,
-			ConnFactory:          connFactory,
-			AccessMetrics:        metrics.NewNoopCollector(),
-			MaxHeightRange:       DefaultMaxHeightRange,
-			SnapshotHistoryLimit: DefaultSnapshotHistoryLimit,
-			Log:                  suite.log,
-			Communicator:         NewNodeCommunicator(false),
-		})
+	params := suite.defaultBackendParams()
+	params.ConnFactory = connFactory
+
+	backend, err := New(params)
+	suite.Require().NoError(err)
 
 	retry := newRetry().SetBackend(backend).Activate()
 	backend.retry = retry

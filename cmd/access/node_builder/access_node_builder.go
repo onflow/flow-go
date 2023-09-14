@@ -1066,7 +1066,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				),
 			}
 
-			nodeBackend := backend.New(backend.Params{
+			nodeBackend, err := backend.New(backend.Params{
 				State:                     node.State,
 				CollectionRPC:             builder.CollectionRPC,
 				HistoricalAccessNodes:     builder.HistoricalAccessRPCs,
@@ -1090,6 +1090,9 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				ScriptExecValidation:      backendConfig.ScriptExecValidation,
 				TxResultCacheSize:         builder.TxResultCacheSize,
 			})
+			if err != nil {
+				return nil, fmt.Errorf("could not initialize backend: %w", err)
+			}
 
 			engineBuilder, err := rpc.NewBuilder(
 				node.Logger,
