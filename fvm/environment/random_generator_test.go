@@ -1,6 +1,7 @@
 package environment_test
 
 import (
+	"encoding/binary"
 	"math"
 	mrand "math/rand"
 	"testing"
@@ -27,9 +28,10 @@ func TestRandomGenerator(t *testing.T) {
 			txId)
 		numbers := make([]uint64, N)
 		for i := 0; i < N; i++ {
-			u, err := urg.UnsafeRandom()
+			var buffer [8]byte
+			err := urg.ReadRandom(buffer[:])
 			require.NoError(t, err)
-			numbers[i] = u
+			numbers[i] = binary.LittleEndian.Uint64(buffer[:])
 		}
 		return numbers
 	}
@@ -48,7 +50,14 @@ func TestRandomGenerator(t *testing.T) {
 			// n is a random power of 2 (from 2 to 2^10)
 			n := 1 << (1 + mrand.Intn(10))
 			classWidth := (math.MaxUint64 / uint64(n)) + 1
-			random.BasicDistributionTest(t, uint64(n), uint64(classWidth), urg.UnsafeRandom)
+			random.BasicDistributionTest(t, uint64(n), uint64(classWidth), func() (uint64, error) {
+				var buffer [8]byte
+				err := urg.ReadRandom(buffer[:])
+				if err != nil {
+					return 0, err
+				}
+				return binary.LittleEndian.Uint64(buffer[:]), nil
+			})
 		}
 	})
 
