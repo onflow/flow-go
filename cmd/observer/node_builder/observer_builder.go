@@ -924,7 +924,7 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 			),
 		}
 
-		accessBackend := backend.New(backend.Params{
+		accessBackend, err := backend.New(backend.Params{
 			State:                     node.State,
 			Blocks:                    node.Storage.Blocks,
 			Headers:                   node.Storage.Headers,
@@ -945,6 +945,9 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 			Communicator:              backend.NewNodeCommunicator(backendConfig.CircuitBreakerConfig.Enabled),
 			ScriptExecValidation:      backendConfig.ScriptExecValidation,
 		})
+		if err != nil {
+			return nil, fmt.Errorf("could not initialize backend: %w", err)
+		}
 
 		observerCollector := metrics.NewObserverCollector()
 		restHandler, err := restapiproxy.NewRestProxyHandler(

@@ -148,7 +148,7 @@ func (suite *RateLimitTestSuite) SetupTest() {
 	block := unittest.BlockHeaderFixture()
 	suite.snapshot.On("Head").Return(block, nil)
 
-	bnd := backend.New(backend.Params{
+	bnd, err := backend.New(backend.Params{
 		State:                suite.state,
 		CollectionRPC:        suite.collClient,
 		Blocks:               suite.blocks,
@@ -162,6 +162,7 @@ func (suite *RateLimitTestSuite) SetupTest() {
 		SnapshotHistoryLimit: 0,
 		Communicator:         backend.NewNodeCommunicator(false),
 	})
+	suite.Require().NoError(err)
 
 	rpcEngBuilder, err := NewBuilder(
 		suite.log,

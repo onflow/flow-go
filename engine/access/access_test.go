@@ -138,23 +138,25 @@ func (suite *Suite) RunTest(
 	unittest.RunWithBadgerDB(suite.T(), func(db *badger.DB) {
 		all := util.StorageLayer(suite.T(), db)
 
-		suite.backend = backend.New(
-			backend.Params{
-				State:                suite.state,
-				CollectionRPC:        suite.collClient,
-				Blocks:               all.Blocks,
-				Headers:              all.Headers,
-				Collections:          all.Collections,
-				Transactions:         all.Transactions,
-				ExecutionResults:     all.Results,
-				ExecutionReceipts:    all.Receipts,
-				ChainID:              suite.chainID,
-				AccessMetrics:        suite.metrics,
-				MaxHeightRange:       backend.DefaultMaxHeightRange,
-				Log:                  suite.log,
-				SnapshotHistoryLimit: backend.DefaultSnapshotHistoryLimit,
-				Communicator:         backend.NewNodeCommunicator(false),
-			})
+		var err error
+		suite.backend, err = backend.New(backend.Params{
+			State:                suite.state,
+			CollectionRPC:        suite.collClient,
+			Blocks:               all.Blocks,
+			Headers:              all.Headers,
+			Collections:          all.Collections,
+			Transactions:         all.Transactions,
+			ExecutionResults:     all.Results,
+			ExecutionReceipts:    all.Receipts,
+			ChainID:              suite.chainID,
+			AccessMetrics:        suite.metrics,
+			MaxHeightRange:       backend.DefaultMaxHeightRange,
+			Log:                  suite.log,
+			SnapshotHistoryLimit: backend.DefaultSnapshotHistoryLimit,
+			Communicator:         backend.NewNodeCommunicator(false),
+		})
+		require.NoError(suite.T(), err)
+
 		handler := access.NewHandler(suite.backend, suite.chainID.Chain(), suite.finalizedHeaderCache, suite.me, access.WithBlockSignerDecoder(suite.signerIndicesDecoder))
 		f(handler, db, all)
 	})
@@ -307,7 +309,7 @@ func (suite *Suite) TestSendTransactionToRandomCollectionNode() {
 		connFactory.On("GetAccessAPIClient", collNode1.Address).Return(col1ApiClient, &mockCloser{}, nil)
 		connFactory.On("GetAccessAPIClient", collNode2.Address).Return(col2ApiClient, &mockCloser{}, nil)
 
-		bnd := backend.New(backend.Params{State: suite.state,
+		bnd, err := backend.New(backend.Params{State: suite.state,
 			Collections:          collections,
 			Transactions:         transactions,
 			ChainID:              suite.chainID,
@@ -318,6 +320,7 @@ func (suite *Suite) TestSendTransactionToRandomCollectionNode() {
 			SnapshotHistoryLimit: backend.DefaultSnapshotHistoryLimit,
 			Communicator:         backend.NewNodeCommunicator(false),
 		})
+		require.NoError(suite.T(), err)
 
 		handler := access.NewHandler(bnd, suite.chainID.Chain(), suite.finalizedHeaderCache, suite.me)
 
@@ -624,7 +627,7 @@ func (suite *Suite) TestGetSealedTransaction() {
 		blocksToMarkExecuted, err := stdmap.NewTimes(100)
 		require.NoError(suite.T(), err)
 
-		bnd := backend.New(backend.Params{State: suite.state,
+		bnd, err := backend.New(backend.Params{State: suite.state,
 			CollectionRPC:             suite.collClient,
 			Blocks:                    all.Blocks,
 			Headers:                   all.Headers,
@@ -641,6 +644,7 @@ func (suite *Suite) TestGetSealedTransaction() {
 			SnapshotHistoryLimit:      backend.DefaultSnapshotHistoryLimit,
 			Communicator:              backend.NewNodeCommunicator(false),
 		})
+		require.NoError(suite.T(), err)
 
 		handler := access.NewHandler(bnd, suite.chainID.Chain(), suite.finalizedHeaderCache, suite.me)
 
@@ -760,7 +764,7 @@ func (suite *Suite) TestGetTransactionResult() {
 		blocksToMarkExecuted, err := stdmap.NewTimes(100)
 		require.NoError(suite.T(), err)
 
-		bnd := backend.New(backend.Params{State: suite.state,
+		bnd, err := backend.New(backend.Params{State: suite.state,
 			CollectionRPC:             suite.collClient,
 			Blocks:                    all.Blocks,
 			Headers:                   all.Headers,
@@ -777,6 +781,7 @@ func (suite *Suite) TestGetTransactionResult() {
 			SnapshotHistoryLimit:      backend.DefaultSnapshotHistoryLimit,
 			Communicator:              backend.NewNodeCommunicator(false),
 		})
+		require.NoError(suite.T(), err)
 
 		handler := access.NewHandler(bnd, suite.chainID.Chain(), suite.finalizedHeaderCache, suite.me)
 
@@ -948,7 +953,8 @@ func (suite *Suite) TestExecuteScript() {
 		connFactory := new(factorymock.ConnectionFactory)
 		connFactory.On("GetExecutionAPIClient", mock.Anything).Return(suite.execClient, &mockCloser{}, nil)
 
-		suite.backend = backend.New(backend.Params{State: suite.state,
+		var err error
+		suite.backend, err = backend.New(backend.Params{State: suite.state,
 			CollectionRPC:         suite.collClient,
 			Blocks:                all.Blocks,
 			Headers:               all.Headers,
@@ -965,6 +971,7 @@ func (suite *Suite) TestExecuteScript() {
 			SnapshotHistoryLimit:  backend.DefaultSnapshotHistoryLimit,
 			Communicator:          backend.NewNodeCommunicator(false),
 		})
+		require.NoError(suite.T(), err)
 
 		handler := access.NewHandler(suite.backend, suite.chainID.Chain(), suite.finalizedHeaderCache, suite.me)
 
