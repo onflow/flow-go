@@ -14,7 +14,6 @@ import (
 
 	"golang.org/x/exp/slices"
 
-	"github.com/stretchr/testify/assert"
 	mocks "github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
@@ -113,10 +112,10 @@ func (s *SubscribeEventsSuite) TestSubscribeEvents() {
 	for _, test := range tests {
 		s.Run(test.name, func() {
 			stateStreamBackend := mockstatestream.NewAPI(s.T())
-			subscription := &mockstatestream.Subscription{}
+			subscription := mockstatestream.NewSubscription(s.T())
 
 			filter, err := state_stream.NewEventFilter(state_stream.DefaultEventFilterConfig, chain, test.eventTypes, test.addresses, test.contracts)
-			assert.NoError(s.T(), err)
+			require.NoError(s.T(), err)
 
 			var expectedEventsResponses []*state_stream.EventsResponse
 			startBlockFound := test.startBlockID == flow.ZeroID
@@ -156,7 +155,6 @@ func (s *SubscribeEventsSuite) TestSubscribeEvents() {
 
 			chReadOnly = ch
 			subscription.Mock.On("Channel").Return(chReadOnly)
-			subscription.Mock.On("Err").Return(nil)
 
 			var startHeight uint64
 			if test.startHeight == request.EmptyHeight {
@@ -167,15 +165,14 @@ func (s *SubscribeEventsSuite) TestSubscribeEvents() {
 			stateStreamBackend.Mock.On("SubscribeEvents", mocks.Anything, test.startBlockID, startHeight, filter).Return(subscription)
 
 			req, err := getSubscribeEventsRequest(s.T(), test.startBlockID, test.startHeight, test.eventTypes, test.addresses, test.contracts)
-			assert.NoError(s.T(), err)
-			respRecorder := NewHijackResponseRecorder()
-			// closing the connection after 5 seconds
+			require.NoError(s.T(), err)
+			respRecorder := newTestHijackResponseRecorder()
+			// closing the connection after 1 second
 			go func() {
-				time.Sleep(5 * time.Second)
+				time.Sleep(1 * time.Second)
 				close(respRecorder.closed)
 			}()
 			executeWsRequest(req, stateStreamBackend, respRecorder)
-			assert.NoError(s.T(), err)
 			requireResponse(s.T(), respRecorder, expectedEventsResponses)
 		})
 	}
@@ -183,19 +180,18 @@ func (s *SubscribeEventsSuite) TestSubscribeEvents() {
 
 func (s *SubscribeEventsSuite) TestSubscribeEventsHandlesErrors() {
 	s.Run("returns error for block id and height", func() {
-		stateStreamBackend := &mockstatestream.API{}
+		stateStreamBackend := mockstatestream.NewAPI(s.T())
 		req, err := getSubscribeEventsRequest(s.T(), s.blocks[0].ID(), s.blocks[0].Header.Height, nil, nil, nil)
-		assert.NoError(s.T(), err)
-		respRecorder := NewHijackResponseRecorder()
+		require.NoError(s.T(), err)
+		respRecorder := newTestHijackResponseRecorder()
 		executeWsRequest(req, stateStreamBackend, respRecorder)
-		assert.NoError(s.T(), err)
 		requireError(s.T(), respRecorder, "can only provide either block ID or start height")
 	})
 
 	s.Run("returns error for invalid block id", func() {
-		stateStreamBackend := &mockstatestream.API{}
+		stateStreamBackend := mockstatestream.NewAPI(s.T())
 		invalidBlock := unittest.BlockFixture()
-		subscription := &mockstatestream.Subscription{}
+		subscription := mockstatestream.NewSubscription(s.T())
 
 		ch := make(chan interface{})
 		var chReadOnly <-chan interface{}
@@ -209,16 +205,24 @@ func (s *SubscribeEventsSuite) TestSubscribeEventsHandlesErrors() {
 		stateStreamBackend.Mock.On("SubscribeEvents", mocks.Anything, invalidBlock.ID(), uint64(0), mocks.Anything).Return(subscription)
 
 		req, err := getSubscribeEventsRequest(s.T(), invalidBlock.ID(), request.EmptyHeight, nil, nil, nil)
-		assert.NoError(s.T(), err)
-		respRecorder := NewHijackResponseRecorder()
+		require.NoError(s.T(), err)
+		respRecorder := newTestHijackResponseRecorder()
 		executeWsRequest(req, stateStreamBackend, respRecorder)
-		assert.NoError(s.T(), err)
 		requireError(s.T(), respRecorder, "stream encountered an error: subscription error")
 	})
 
+	s.Run("returns error for invalid event filter", func() {
+		stateStreamBackend := mockstatestream.NewAPI(s.T())
+		req, err := getSubscribeEventsRequest(s.T(), s.blocks[0].ID(), request.EmptyHeight, []string{"foo"}, nil, nil)
+		require.NoError(s.T(), err)
+		respRecorder := newTestHijackResponseRecorder()
+		executeWsRequest(req, stateStreamBackend, respRecorder)
+		requireError(s.T(), respRecorder, "invalid event type format")
+	})
+
 	s.Run("returns error when channel closed", func() {
-		stateStreamBackend := &mockstatestream.API{}
-		subscription := &mockstatestream.Subscription{}
+		stateStreamBackend := mockstatestream.NewAPI(s.T())
+		subscription := mockstatestream.NewSubscription(s.T())
 
 		ch := make(chan interface{})
 		var chReadOnly <-chan interface{}
@@ -233,10 +237,9 @@ func (s *SubscribeEventsSuite) TestSubscribeEventsHandlesErrors() {
 		stateStreamBackend.Mock.On("SubscribeEvents", mocks.Anything, s.blocks[0].ID(), uint64(0), mocks.Anything).Return(subscription)
 
 		req, err := getSubscribeEventsRequest(s.T(), s.blocks[0].ID(), request.EmptyHeight, nil, nil, nil)
-		assert.NoError(s.T(), err)
-		respRecorder := NewHijackResponseRecorder()
+		require.NoError(s.T(), err)
+		respRecorder := newTestHijackResponseRecorder()
 		executeWsRequest(req, stateStreamBackend, respRecorder)
-		assert.NoError(s.T(), err)
 		requireError(s.T(), respRecorder, "subscription channel closed")
 	})
 }
@@ -290,12 +293,12 @@ func generateWebSocketKey() (string, error) {
 	return base64.StdEncoding.EncodeToString(keyBytes), nil
 }
 
-func requireError(t *testing.T, recorder *HijackResponseRecorder, expected string) {
+func requireError(t *testing.T, recorder *testHijackResponseRecorder, expected string) {
 	<-recorder.closed
 	require.Contains(t, recorder.responseBuff.String(), expected)
 }
 
-func requireResponse(t *testing.T, recorder *HijackResponseRecorder, expected []*state_stream.EventsResponse) {
+func requireResponse(t *testing.T, recorder *testHijackResponseRecorder, expected []*state_stream.EventsResponse) {
 	<-recorder.closed
 	// Convert the actual response from respRecorder to JSON bytes
 	actualJSON := recorder.responseBuff.Bytes()
@@ -313,14 +316,23 @@ func requireResponse(t *testing.T, recorder *HijackResponseRecorder, expected []
 	}
 
 	// Compare the count of expected and actual responses
-	assert.Equal(t, len(expected), len(actual))
+	require.Equal(t, len(expected), len(actual))
 
 	// Compare the BlockID and Events count for each response
-	for i := 0; i < len(expected); i++ {
-		expected := expected[i]
-		actual := actual[i]
+	for responseIndex := range expected {
+		expectedEventsResponse := expected[responseIndex]
+		actualEventsResponse := actual[responseIndex]
 
-		assert.Equal(t, expected.BlockID, actual.BlockID)
-		assert.Equal(t, len(expected.Events), len(actual.Events))
+		require.Equal(t, expectedEventsResponse.BlockID, actualEventsResponse.BlockID)
+		require.Equal(t, len(expectedEventsResponse.Events), len(actualEventsResponse.Events))
+
+		for eventIndex, expectedEvent := range expectedEventsResponse.Events {
+			actualEvent := actualEventsResponse.Events[eventIndex]
+			require.Equal(t, expectedEvent.Type, actualEvent.Type)
+			require.Equal(t, expectedEvent.TransactionID, actualEvent.TransactionID)
+			require.Equal(t, expectedEvent.TransactionIndex, actualEvent.TransactionIndex)
+			require.Equal(t, expectedEvent.EventIndex, actualEvent.EventIndex)
+			require.Equal(t, expectedEvent.Payload, actualEvent.Payload)
+		}
 	}
 }

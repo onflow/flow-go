@@ -2,7 +2,6 @@ package routes
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/onflow/flow-go/engine/access/rest/models"
 	"github.com/onflow/flow-go/engine/access/rest/request"
@@ -27,7 +26,6 @@ func SubscribeEvents(
 		req.Contracts,
 	)
 	if err != nil {
-		err := fmt.Errorf("invalid event filter")
 		return nil, models.NewBadRequestError(err)
 	}
 

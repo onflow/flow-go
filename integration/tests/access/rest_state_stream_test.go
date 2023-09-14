@@ -102,9 +102,6 @@ func (s *RestStateStreamSuite) SetupTest() {
 
 // TestRestEventStreaming tests event streaming route on REST
 func (s *RestStateStreamSuite) TestRestEventStreaming() {
-	ctx, cancel := context.WithTimeout(s.ctx, 1*time.Second)
-	defer cancel()
-
 	restAddr := s.net.ContainerByName(testnet.PrimaryAN).Addr(testnet.RESTPort)
 
 	s.T().Run("subscribe events", func(t *testing.T) {
@@ -112,7 +109,7 @@ func (s *RestStateStreamSuite) TestRestEventStreaming() {
 		startHeight := uint64(0)
 		url := getSubscribeEventsRequest(restAddr, startBlockId, startHeight, nil, nil, nil)
 
-		client, err := getWSClient(ctx, url)
+		client, err := getWSClient(s.ctx, url)
 		require.NoError(t, err)
 
 		var receivedEventsResponse []*state_stream.EventsResponse
@@ -131,6 +128,7 @@ func (s *RestStateStreamSuite) TestRestEventStreaming() {
 				if err != nil {
 					if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway) {
 						s.T().Logf("unexpected close error: %v", err)
+						require.NoError(s.T(), err)
 					}
 					close(eventChan) // Close the event channel when the client connection is closed
 					return
@@ -152,6 +150,9 @@ func (s *RestStateStreamSuite) TestRestEventStreaming() {
 // requireEvents is a helper function that encapsulates logic for comparing received events from rest state streaming and
 // events which received from grpc api
 func (s *RestStateStreamSuite) requireEvents(receivedEventsResponse []*state_stream.EventsResponse) {
+	// make sure there are received events
+	require.GreaterOrEqual(s.T(), len(receivedEventsResponse), 1, "expect received events")
+
 	grpcCtx, grpcCancel := context.WithCancel(s.ctx)
 	defer grpcCancel()
 

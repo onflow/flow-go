@@ -78,9 +78,9 @@ func (a fakeAddr) String() string {
 	return "str"
 }
 
-// HijackResponseRecorder is a custom ResponseRecorder that implements the http.Hijacker interface
+// testHijackResponseRecorder is a custom ResponseRecorder that implements the http.Hijacker interface
 // for testing WebSocket connections and hijacking.
-type HijackResponseRecorder struct {
+type testHijackResponseRecorder struct {
 	*httptest.ResponseRecorder
 	closed       chan struct{}
 	responseBuff *bytes.Buffer
@@ -88,7 +88,7 @@ type HijackResponseRecorder struct {
 
 // Hijack implements the http.Hijacker interface by returning a fakeNetConn and a bufio.ReadWriter
 // that simulate a hijacked connection.
-func (w *HijackResponseRecorder) Hijack() (net.Conn, *bufio.ReadWriter, error) {
+func (w *testHijackResponseRecorder) Hijack() (net.Conn, *bufio.ReadWriter, error) {
 	br := bufio.NewReaderSize(strings.NewReader(""), state_stream.DefaultSendBufferSize)
 	bw := bufio.NewWriterSize(&bytes.Buffer{}, state_stream.DefaultSendBufferSize)
 	w.responseBuff = bytes.NewBuffer(make([]byte, 0))
@@ -97,9 +97,9 @@ func (w *HijackResponseRecorder) Hijack() (net.Conn, *bufio.ReadWriter, error) {
 	return fakeNetConn{w.responseBuff, w.closed}, bufio.NewReadWriter(br, bw), nil
 }
 
-// NewHijackResponseRecorder creates a new instance of HijackResponseRecorder.
-func NewHijackResponseRecorder() *HijackResponseRecorder {
-	return &HijackResponseRecorder{
+// newTestHijackResponseRecorder creates a new instance of testHijackResponseRecorder.
+func newTestHijackResponseRecorder() *testHijackResponseRecorder {
+	return &testHijackResponseRecorder{
 		ResponseRecorder: httptest.NewRecorder(),
 	}
 }
@@ -118,11 +118,11 @@ func executeRequest(req *http.Request, backend access.API) *httptest.ResponseRec
 	return rr
 }
 
-func executeWsRequest(req *http.Request, stateStreamApi state_stream.API, responseRecorder *HijackResponseRecorder) {
+func executeWsRequest(req *http.Request, stateStreamApi state_stream.API, responseRecorder *testHijackResponseRecorder) {
 	restCollector := metrics.NewNoopCollector()
 	router := NewRouterBuilder(unittest.Logger(), restCollector).AddWsRoutes(
-		flow.Testnet.Chain(),
 		stateStreamApi,
+		flow.Testnet.Chain(),
 		state_stream.DefaultEventFilterConfig,
 		state_stream.DefaultMaxGlobalStreams,
 	).Build()

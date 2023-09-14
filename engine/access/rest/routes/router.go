@@ -56,13 +56,13 @@ func (b *RouterBuilder) AddRestRoutes(backend access.API, chain flow.Chain) *Rou
 }
 
 func (b *RouterBuilder) AddWsRoutes(
-	chain flow.Chain,
 	stateStreamApi state_stream.API,
+	chain flow.Chain,
 	eventFilterConfig state_stream.EventFilterConfig,
 	maxGlobalStreams uint32) *RouterBuilder {
 
 	for _, r := range WSRoutes {
-		h := NewWSHandler(b.logger, r.Handler, chain, stateStreamApi, eventFilterConfig, maxGlobalStreams)
+		h := NewWSHandler(b.logger, r.Handler, stateStreamApi, chain, eventFilterConfig, maxGlobalStreams)
 		b.v1SubRouter.
 			Methods(r.Method).
 			Path(r.Pattern).
