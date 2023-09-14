@@ -78,7 +78,7 @@ func NewNodeBuilder(
 	rpcInspectorCfg *p2pconf.GossipSubRPCInspectorsConfig,
 	peerManagerConfig *p2pconfig.PeerManagerConfig,
 	disallowListCacheCfg *p2p.DisallowListCacheConfig,
-	rpcTracker p2p.RPCControlTracking) *LibP2PNodeBuilder {
+	rpcTracker p2p.RpcControlTracking) *LibP2PNodeBuilder {
 	return &LibP2PNodeBuilder{
 		logger:               logger,
 		sporkId:              sporkId,
