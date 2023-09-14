@@ -27,6 +27,10 @@ func TestConvertBlockExecutionData(t *testing.T) {
 			unittest.WithChunkEvents(events),
 			unittest.WithTrieUpdate(testutils.TrieUpdateFixture(5, 32*1024, 64*1024)),
 		)
+
+		// TODO: remove this line after adding TransactionResult to the ChunkExecutionData entity
+		ced.TransactionResults = nil
+
 		chunkData = append(chunkData, ced)
 	}
 	makeServiceTx := func(ced *execution_data.ChunkExecutionData) {
@@ -40,6 +44,8 @@ func TestConvertBlockExecutionData(t *testing.T) {
 		ced.TrieUpdate = nil
 	}
 	chunk := unittest.ChunkExecutionDataFixture(t, execution_data.DefaultMaxBlobSize/5, unittest.WithChunkEvents(events), makeServiceTx)
+	// TODO: remove this line after adding TransactionResult to the ChunkExecutionData entity
+	chunk.TransactionResults = nil
 	chunkData = append(chunkData, chunk)
 
 	blockData := unittest.BlockExecutionDataFixture(unittest.WithChunkExecutionDatas(chunkData...))
