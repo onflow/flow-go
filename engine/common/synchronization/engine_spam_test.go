@@ -197,6 +197,9 @@ func (ss *SyncSuite) TestLoad_Process_RangeRequest_SometimesReportSpam() {
 
 	// using a flat range (0) (from height == to height) with a 1% base probability factor, expect to almost never get a misbehavior report, about 0.16% of the time (2 in 1000 requests)
 	// expected probability factor: 0.01 * ((1-1) + 1)/64 = 0.0015625
+	// Note: the expected upper misbehavior count is 5 even though the expected probability is close to 0 to cover outlier cases during the load test to avoid flakiness in CI.
+	// Due of the probabilistic nature of the load tests, you sometimes get edge cases (that cover outliers where out of a 1000 messages, up to 5 could be reported as spam.
+	// 5/1000 = 0.005 and the calculated probability is 0.00171875 which 2.9x as small.
 	loadGroups = append(loadGroups, loadGroup{0.01, 0, 5, 1, 1})
 
 	// using a small range (10) with a 1% base probability factor, expect to almost never get misbehavior report, about 0.17% of the time (2 in 1000 requests)
