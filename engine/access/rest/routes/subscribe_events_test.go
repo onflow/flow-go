@@ -76,6 +76,20 @@ func (s *SubscribeEventsSuite) SetupTest() {
 	}
 }
 
+// TestSubscribeEvents is a happy cases tests for the SubscribeEvents functionality.
+// This test function covers various scenarios for subscribing to events via WebSocket.
+//
+// It tests scenarios:
+//   - Subscribing to events from the root height.
+//   - Subscribing to events from a specific start height.
+//   - Subscribing to events from a specific start block ID.
+//
+// Every scenario covers the following aspects:
+//   - Subscribing to all events.
+//   - Subscribing to events of a specific type (some events).
+//
+// For each scenario, this test function creates WebSocket requests, simulates WebSocket responses with mock data,
+// and validates that the received WebSocket response matches the expected EventsResponses.
 func (s *SubscribeEventsSuite) TestSubscribeEvents() {
 	testVectors := []testType{
 		{
@@ -114,7 +128,12 @@ func (s *SubscribeEventsSuite) TestSubscribeEvents() {
 			stateStreamBackend := mockstatestream.NewAPI(s.T())
 			subscription := mockstatestream.NewSubscription(s.T())
 
-			filter, err := state_stream.NewEventFilter(state_stream.DefaultEventFilterConfig, chain, test.eventTypes, test.addresses, test.contracts)
+			filter, err := state_stream.NewEventFilter(
+				state_stream.DefaultEventFilterConfig,
+				chain,
+				test.eventTypes,
+				test.addresses,
+				test.contracts)
 			require.NoError(s.T(), err)
 
 			var expectedEventsResponses []*state_stream.EventsResponse
@@ -162,7 +181,9 @@ func (s *SubscribeEventsSuite) TestSubscribeEvents() {
 			} else {
 				startHeight = test.startHeight
 			}
-			stateStreamBackend.Mock.On("SubscribeEvents", mocks.Anything, test.startBlockID, startHeight, filter).Return(subscription)
+			stateStreamBackend.Mock.
+				On("SubscribeEvents", mocks.Anything, test.startBlockID, startHeight, filter).
+				Return(subscription)
 
 			req, err := getSubscribeEventsRequest(s.T(), test.startBlockID, test.startHeight, test.eventTypes, test.addresses, test.contracts)
 			require.NoError(s.T(), err)
@@ -202,7 +223,9 @@ func (s *SubscribeEventsSuite) TestSubscribeEventsHandlesErrors() {
 
 		subscription.Mock.On("Channel").Return(chReadOnly)
 		subscription.Mock.On("Err").Return(fmt.Errorf("subscription error"))
-		stateStreamBackend.Mock.On("SubscribeEvents", mocks.Anything, invalidBlock.ID(), uint64(0), mocks.Anything).Return(subscription)
+		stateStreamBackend.Mock.
+			On("SubscribeEvents", mocks.Anything, invalidBlock.ID(), uint64(0), mocks.Anything).
+			Return(subscription)
 
 		req, err := getSubscribeEventsRequest(s.T(), invalidBlock.ID(), request.EmptyHeight, nil, nil, nil)
 		require.NoError(s.T(), err)
@@ -234,7 +257,9 @@ func (s *SubscribeEventsSuite) TestSubscribeEventsHandlesErrors() {
 
 		subscription.Mock.On("Channel").Return(chReadOnly)
 		subscription.Mock.On("Err").Return(nil)
-		stateStreamBackend.Mock.On("SubscribeEvents", mocks.Anything, s.blocks[0].ID(), uint64(0), mocks.Anything).Return(subscription)
+		stateStreamBackend.Mock.
+			On("SubscribeEvents", mocks.Anything, s.blocks[0].ID(), uint64(0), mocks.Anything).
+			Return(subscription)
 
 		req, err := getSubscribeEventsRequest(s.T(), s.blocks[0].ID(), request.EmptyHeight, nil, nil, nil)
 		require.NoError(s.T(), err)
@@ -244,7 +269,13 @@ func (s *SubscribeEventsSuite) TestSubscribeEventsHandlesErrors() {
 	})
 }
 
-func getSubscribeEventsRequest(t *testing.T, startBlockId flow.Identifier, startHeight uint64, eventTypes []string, addresses []string, contracts []string) (*http.Request, error) {
+func getSubscribeEventsRequest(t *testing.T,
+	startBlockId flow.Identifier,
+	startHeight uint64,
+	eventTypes []string,
+	addresses []string,
+	contracts []string,
+) (*http.Request, error) {
 	u, _ := url.Parse("/v1/subscribe_events")
 	q := u.Query()
 
@@ -298,6 +329,9 @@ func requireError(t *testing.T, recorder *testHijackResponseRecorder, expected s
 	require.Contains(t, recorder.responseBuff.String(), expected)
 }
 
+// requireResponse validates that the response received from WebSocket communication matches the expected EventsResponses.
+// This function compares the BlockID, Events count, and individual event properties for each expected and actual
+// EventsResponse. It ensures that the response received from WebSocket matches the expected structure and content.
 func requireResponse(t *testing.T, recorder *testHijackResponseRecorder, expected []*state_stream.EventsResponse) {
 	<-recorder.closed
 	// Convert the actual response from respRecorder to JSON bytes

@@ -17,12 +17,14 @@ import (
 	"github.com/onflow/flow-go/module"
 )
 
+// RouterBuilder is a utility for building HTTP routers with common middleware and routes.
 type RouterBuilder struct {
 	logger      zerolog.Logger
 	router      *mux.Router
 	v1SubRouter *mux.Router
 }
 
+// NewRouterBuilder creates a new RouterBuilder instance with common middleware and a v1 sub-router.
 func NewRouterBuilder(
 	logger zerolog.Logger,
 	restCollector module.RestMetrics) *RouterBuilder {
@@ -42,6 +44,7 @@ func NewRouterBuilder(
 	}
 }
 
+// AddRestRoutes adds rest routes to the router.
 func (b *RouterBuilder) AddRestRoutes(backend access.API, chain flow.Chain) *RouterBuilder {
 	linkGenerator := models.NewLinkGeneratorImpl(b.v1SubRouter)
 	for _, r := range Routes {
@@ -55,6 +58,7 @@ func (b *RouterBuilder) AddRestRoutes(backend access.API, chain flow.Chain) *Rou
 	return b
 }
 
+// AddWsRoutes adds WebSocket routes to the router.
 func (b *RouterBuilder) AddWsRoutes(
 	stateStreamApi state_stream.API,
 	chain flow.Chain,
