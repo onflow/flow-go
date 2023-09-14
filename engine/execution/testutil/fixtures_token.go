@@ -27,8 +27,7 @@ func CreateTokenTransferTransaction(chain flow.Chain, amount int, to flow.Addres
 
 			execute {
 				let receiverRef = getAccount(to)
-					.capabilities.get<&{FungibleToken.Receiver}>(/public/flowTokenReceiver)!
-					.borrow()
+					.capabilities.borrow<&{FungibleToken.Receiver}>(/public/flowTokenReceiver)
 					?? panic("Could not borrow receiver reference to the recipient's Vault")
 				receiverRef.deposit(from: <-self.sentVault)
 			}

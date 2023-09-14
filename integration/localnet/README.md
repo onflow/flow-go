@@ -315,7 +315,7 @@ import FlowToken from 0x0ae53cb6e3f42a79
 
 pub fun main(address: Address): UFix64 {
 	let acct = getAccount(address)
-	let vaultRef = acct.capabilities.get<&FlowToken.Vault{FungibleToken.Balance}>(/public/flowTokenBalance)!.borrow()
+	let vaultRef = acct.capabilities.borrow<&FlowToken.Vault{FungibleToken.Balance}>(/public/flowTokenBalance)
 		?? panic("Could not borrow Balance reference to the Vault")
 	return vaultRef.balance
 }

@@ -62,8 +62,7 @@ func transferTokensTx(chain flow.Chain) *flow.TransactionBody {
 									let recipient = getAccount(to)
 
 									// Get a reference to the recipient's Receiver
-									let receiverRef = recipient.capabilities.get<&{FungibleToken.Receiver}>(/public/flowTokenReceiver)!
-										.borrow()
+									let receiverRef = recipient.capabilities.borrow<&{FungibleToken.Receiver}>(/public/flowTokenReceiver)
 										?? panic("Could not borrow receiver reference to the recipient's Vault")
 
 									// Deposit the withdrawn tokens in the recipient's receiver
@@ -1027,7 +1026,7 @@ func TestBlockContext_ExecuteTransaction_StorageLimit(t *testing.T) {
 							// deposit additional flow
 							let payment <- vaultRef.withdraw(amount: 10.0) as! @FlowToken.Vault
 
-							let receiver = signer.capabilities.get<&{FungibleToken.Receiver}>(/public/flowTokenReceiver)!.borrow()
+							let receiver = signer.capabilities.borrow<&{FungibleToken.Receiver}>(/public/flowTokenReceiver)
 								?? panic("Could not borrow receiver reference to the recipient's Vault")
 							receiver.deposit(from: <-payment)
 						}
@@ -1765,8 +1764,7 @@ func TestBlockContext_ExecuteTransaction_FailingTransactions(t *testing.T) {
 
 					access(all) fun main(account: Address): UFix64 {
 						let acct = getAccount(account)
-						let vaultRef = acct.capabilities.get<&FlowToken.Vault>(/public/flowTokenBalance)!
-							.borrow()
+						let vaultRef = acct.capabilities.borrow<&FlowToken.Vault>(/public/flowTokenBalance)
 							?? panic("Could not borrow Balance reference to the Vault")
 
 						return vaultRef.getBalance()

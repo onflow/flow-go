@@ -216,8 +216,7 @@ func (s *EmulatorSuite) createAndFundAccount(netID *flow.Identity) *nodeAccount 
 				  }
 				  execute {
 					let receiverRef =  getAccount(recipient)
-					  .capabilities.get<&{FungibleToken.Receiver}>(/public/flowTokenReceiver)!
-					  .borrow()
+					  .capabilities.borrow<&{FungibleToken.Receiver}>(/public/flowTokenReceiver)
 						?? panic("failed to borrow reference to recipient vault")
 					receiverRef.deposit(from: <-self.sentVault)
 				  }

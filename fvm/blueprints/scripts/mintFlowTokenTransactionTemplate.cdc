@@ -12,8 +12,7 @@ transaction(amount: UFix64) {
 	  ?? panic("Signer is not the token admin")
 
 	self.tokenReceiver = signer
-	  .capabilities.get<&FlowToken.Vault>(/public/flowTokenReceiver)!
-	  .borrow()
+	  .capabilities.borrow<&FlowToken.Vault>(/public/flowTokenReceiver)
 	  ?? panic("Unable to borrow receiver reference for recipient")
   }
 

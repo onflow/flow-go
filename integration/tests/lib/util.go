@@ -81,12 +81,8 @@ func ReadCounterScript(contractAddress sdk.Address, accountAddress sdk.Address) 
 		Code: fmt.Sprintf(
 			`
 			  let account = getAccount(0x%s)
-              if let cap = account.capabilities.get<&Testing.Counter>(/public/counter) {
-                  if let counter = cap.borrow() {
-                      return counter.count
-                  }
-              }
-              return -3
+              let counter = account.capabilities.borrow<&Testing.Counter>(/public/counter)
+              return counter?.count ?? -3
             `,
 			accountAddress.Hex(),
 		),

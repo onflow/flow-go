@@ -25,7 +25,7 @@ transaction() {
                 FlowServiceAccount.initDefaultToken(account)
             }
 
-            let receiver = account.capabilities.get<&{FungibleToken.Receiver}>(/public/flowTokenReceiver)!.borrow()
+            let receiver = account.capabilities.borrow<&{FungibleToken.Receiver}>(/public/flowTokenReceiver)
                 ?? panic("Could not borrow receiver reference to the recipient's Vault")
 
             receiver.deposit(from: <-storageReservation)

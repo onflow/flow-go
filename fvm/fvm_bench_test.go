@@ -514,9 +514,11 @@ func BenchmarkRuntimeTransaction(b *testing.B) {
 	b.Run("get signer receiver", func(b *testing.B) {
 		benchTransaction(
 			b,
-			templateTx(100, `let receiverRef =  getAccount(signer.address)
-				.capabilities.get<&{FungibleToken.Receiver}>(/public/flowTokenReceiver)!
-				.borrow()!`),
+			templateTx(
+				100,
+				`let receiverRef =  getAccount(signer.address)
+				.capabilities.borrow<&{FungibleToken.Receiver}>(/public/flowTokenReceiver)!`,
+			),
 		)
 	})
 	b.Run("transfer tokens", func(b *testing.B) {
@@ -524,8 +526,7 @@ func BenchmarkRuntimeTransaction(b *testing.B) {
 			b,
 			templateTx(100, `
 				let receiverRef =  getAccount(signer.address)
-					.capabilities.get<&{FungibleToken.Receiver}>(/public/flowTokenReceiver)!
-					.borrow()!
+					.capabilities.borrow<&{FungibleToken.Receiver}>(/public/flowTokenReceiver)!
 
 				let vaultRef = signer.storage.borrow<auth(FungibleToken.Withdrawable) &FlowToken.Vault>(from: /storage/flowTokenVault)!
 
@@ -604,8 +605,7 @@ const TransferTxTemplate = `
 				// get the recipient's public account object
 				let recipient = getAccount(recipientAddress)
 				// get the Collection reference for the receiver
-				let receiverRef = recipient.capabilities.get<&{BatchNFT.TestTokenCollectionPublic}>(/public/TestTokenCollection)!
-					.borrow()!
+				let receiverRef = recipient.capabilities.borrow<&{BatchNFT.TestTokenCollectionPublic}>(/public/TestTokenCollection)!
 				// deposit the NFT in the receivers collection
 				receiverRef.batchDeposit(tokens: <-self.transferTokens)
 			}

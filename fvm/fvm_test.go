@@ -604,8 +604,7 @@ func TestTransactionFeeDeduction(t *testing.T) {
 
 					access(all) fun main(account: Address): UFix64 {
 						let acct = getAccount(account)
-						let vaultRef = acct.capabilities.get<&FlowToken.Vault>(/public/flowTokenBalance)!
-							.borrow()
+						let vaultRef = acct.capabilities.borrow<&FlowToken.Vault>(/public/flowTokenBalance)
 							?? panic("Could not borrow Balance reference to the Vault")
 
 						return vaultRef.getBalance()
@@ -1713,8 +1712,7 @@ func TestStorageCapacity(t *testing.T) {
 					transaction(target: Address) {
 						prepare(signer: auth(BorrowValue) &Account) {
 							let receiverRef = getAccount(target)
-								.capabilities.get<&{FungibleToken.Receiver}>(/public/flowTokenReceiver)!
-								.borrow()
+								.capabilities.borrow<&{FungibleToken.Receiver}>(/public/flowTokenReceiver)
 								?? panic("Could not borrow receiver reference to the recipient''s Vault")
 
 							let vaultRef = signer.storage
