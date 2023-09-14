@@ -206,14 +206,9 @@ func (e *Engine) Process(channel channels.Channel, originID flow.Identifier, eve
 //   - IncompatibleInputTypeError if input has unexpected type
 //   - All other errors are potential symptoms of internal state corruption or bugs (fatal).
 func (e *Engine) process(channel channels.Channel, originID flow.Identifier, event interface{}) error {
-	switch event.(type) {
+	switch message := event.(type) {
 	case *messages.BatchRequest:
-		batchRequest, ok := event.(*messages.BatchRequest)
-		if !ok {
-			return fmt.Errorf("failed to extract BatchRequest from %x", originID[:])
-		}
-
-		report, valid, err := e.validateBatchRequestForALSP(channel, originID, batchRequest)
+		report, valid, err := e.validateBatchRequestForALSP(channel, originID, message)
 		if err != nil {
 			return fmt.Errorf("failed to validate batch request from %x: %w", originID[:], err)
 		}
@@ -229,12 +224,7 @@ func (e *Engine) process(channel channels.Channel, originID flow.Identifier, eve
 		}
 		return e.requestHandler.Process(channel, originID, event)
 	case *messages.RangeRequest:
-		rangeRequest, ok := event.(*messages.RangeRequest)
-		if !ok {
-			return fmt.Errorf("failed to extract RangeRequest from %x", originID[:])
-		}
-
-		report, valid, err := e.validateRangeRequestForALSP(originID, rangeRequest)
+		report, valid, err := e.validateRangeRequestForALSP(originID, message)
 		if err != nil {
 			return fmt.Errorf("failed to validate range request from %x: %w", originID[:], err)
 		}
@@ -268,12 +258,7 @@ func (e *Engine) process(channel channels.Channel, originID flow.Identifier, eve
 		return e.requestHandler.Process(channel, originID, event)
 
 	case *messages.BlockResponse:
-		blockResponse, ok := event.(*messages.BlockResponse)
-		if !ok {
-			return fmt.Errorf("failed to extract BlockResponse from %x", originID[:])
-		}
-
-		report, valid, err := e.validateBlockResponseForALSP(channel, originID, blockResponse)
+		report, valid, err := e.validateBlockResponseForALSP(channel, originID, message)
 		if err != nil {
 			return fmt.Errorf("failed to validate block response from %x: %w", originID[:], err)
 		}
@@ -290,12 +275,7 @@ func (e *Engine) process(channel channels.Channel, originID flow.Identifier, eve
 		return e.responseMessageHandler.Process(originID, event)
 
 	case *messages.SyncResponse:
-		syncResponse, ok := event.(*messages.SyncResponse)
-		if !ok {
-			return fmt.Errorf("failed to extract SyncResponse for originID %x", originID[:])
-		}
-
-		report, valid, err := e.validateSyncResponseForALSP(channel, originID, syncResponse)
+		report, valid, err := e.validateSyncResponseForALSP(channel, originID, message)
 		if err != nil {
 			return fmt.Errorf("failed to validate sync response from %x: %w", originID[:], err)
 		}
