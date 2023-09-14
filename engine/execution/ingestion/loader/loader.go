@@ -16,8 +16,24 @@ type Loader struct {
 	state     protocol.State
 	headers   storage.Headers // see comments on getHeaderByHeight for why we need it
 	blocks    storage.Blocks
-	log       zerolog.Logger
 	execState state.ExecutionState
+	log       zerolog.Logger
+}
+
+func NewLoader(
+	state protocol.State,
+	headers storage.Headers,
+	blocks storage.Blocks,
+	execState state.ExecutionState,
+	log zerolog.Logger,
+) *Loader {
+	return &Loader{
+		state:     state,
+		headers:   headers,
+		blocks:    blocks,
+		execState: execState,
+		log:       log.With().Str("component", "ingestion_engine_block_loader").Logger(),
+	}
 }
 
 func (e *Loader) LoadUnexecuted(ctx context.Context) ([]flow.Identifier, error) {
