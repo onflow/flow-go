@@ -537,6 +537,7 @@ func (e *Engine) validateRangeRequestForALSP(originID flow.Identifier, rangeRequ
 		e.log.Warn().
 			Hex("origin_id", logging.ID(originID)).
 			Str(logging.KeySuspicious, "true").
+			Str("reason", alsp.InvalidMessage.String()).
 			Msgf("received invalid range request from height %d is not less than the to height %d, creating ALSP report", rangeRequest.FromHeight, rangeRequest.ToHeight)
 		report, err := alsp.NewMisbehaviorReport(originID, alsp.InvalidMessage)
 
@@ -568,6 +569,7 @@ func (e *Engine) validateRangeRequestForALSP(originID flow.Identifier, rangeRequ
 		e.log.Warn().
 			Hex("origin_id", logging.ID(originID)).
 			Str(logging.KeySuspicious, "true").
+			Str("reason", alsp.ResourceIntensiveRequest.String()).
 			Msgf("from height %d to height %d, creating probabilistic ALSP report", rangeRequest.FromHeight, rangeRequest.ToHeight)
 		report, err := alsp.NewMisbehaviorReport(originID, alsp.ResourceIntensiveRequest)
 
@@ -601,10 +603,11 @@ func (e *Engine) validateSyncRequestForALSP(originID flow.Identifier) (*alsp.Mis
 	// Create a report with a probability of spamDetectionConfig.syncRequestProb
 	if float32(n) < e.spamDetectionConfig.syncRequestProb*spamProbabilityMultiplier {
 
-		// create a misbehavior report
+		// create misbehavior report
 		e.log.Warn().
 			Hex("origin_id", logging.ID(originID)).
 			Str(logging.KeySuspicious, "true").
+			Str("reason", alsp.ResourceIntensiveRequest.String()).
 			Msg("creating probabilistic ALSP report")
 
 		report, err := alsp.NewMisbehaviorReport(originID, alsp.ResourceIntensiveRequest)
