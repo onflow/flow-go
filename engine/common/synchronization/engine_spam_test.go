@@ -83,10 +83,14 @@ func (ss *SyncSuite) TestLoad_Process_SyncRequest_HigherThanReceiver_OutsideTole
 
 	load := 1000
 
+	// each load test is a load group that contains a set of factors with unique values to test how many misbehavior reports are generated
+	// Due to the probabilistic nature of how misbehavior reports are generated, we use an expected lower and
+	// upper range of expected misbehaviors to determine if the load test passed or failed. As long as the number of misbehavior reports
+	// falls within the expected range, the load test passes.
 	type loadGroup struct {
-		syncRequestProbabilityFactor float32
-		expectedMisbehaviorsLower    int
-		expectedMisbehaviorsUpper    int
+		syncRequestProbabilityFactor float32 // probability factor that will be used to generate misbehavior reports
+		expectedMisbehaviorsLower    int     // lower range of expected misbehavior reports
+		expectedMisbehaviorsUpper    int     // upper range of expected misbehavior reports
 	}
 
 	loadGroups := []loadGroup{}
@@ -173,12 +177,16 @@ func (ss *SyncSuite) TestLoad_Process_RangeRequest_SometimesReportSpam() {
 
 	load := 1000
 
+	// each load test is a load group that contains a set of factors with unique values to test how many misbehavior reports are generated.
+	// Due to the probabilistic nature of how misbehavior reports are generated, we use an expected lower and
+	// upper range of expected misbehaviors to determine if the load test passed or failed. As long as the number of misbehavior reports
+	// falls within the expected range, the load test passes.
 	type loadGroup struct {
-		rangeRequestBaseProb      float32
-		expectedMisbehaviorsLower int
-		expectedMisbehaviorsUpper int
-		fromHeight                uint64
-		toHeight                  uint64
+		rangeRequestBaseProb      float32 // base probability factor that will be used to calculate the final probability factor
+		expectedMisbehaviorsLower int     // lower range of expected misbehavior reports
+		expectedMisbehaviorsUpper int     // upper range of expected misbehavior reports
+		fromHeight                uint64  // from height of the range request
+		toHeight                  uint64  // to height of the range request
 	}
 
 	loadGroups := []loadGroup{}
