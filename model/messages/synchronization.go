@@ -31,7 +31,7 @@ type RangeRequest struct {
 	ToHeight   uint64
 }
 
-// BatchRequest is part of the sychronization protocol and represents an active
+// BatchRequest is part of the synchronization protocol and represents an active
 // (pulling) attempt to synchronize with the consensus state of the network. It
 // requests finalized or unfinalized blocks by a list of block IDs.
 type BatchRequest struct {
