@@ -78,6 +78,8 @@ func (suite *RateLimitTestSuite) SetupTest() {
 
 	rootHeader := unittest.BlockHeaderFixture()
 	params := new(protocol.Params)
+	params.On("SporkID").Return(unittest.IdentifierFixture(), nil)
+	params.On("ProtocolVersion").Return(uint(unittest.Uint64InRange(10, 30)), nil)
 	params.On("SporkRootBlockHeight").Return(rootHeader.Height, nil)
 	params.On("SealedRoot").Return(rootHeader, nil)
 

@@ -11,8 +11,6 @@ import (
 	lru2 "github.com/hashicorp/golang-lru/v2"
 	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
 	"github.com/rs/zerolog"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 
 	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/cmd/build"
@@ -77,8 +75,8 @@ type Backend struct {
 	executionReceipts storage.ExecutionReceipts
 	connFactory       connection.ConnectionFactory
 
-	sporkRootBlockHeight uint64
-	nodeRootBlockHeight  uint64
+	// cache the response to GetNodeVersionInfo since it doesn't change
+	nodeInfo *access.NodeVersionInfo
 }
 
 // Config defines the configurable options for creating Backend
@@ -148,14 +146,10 @@ func New(params Params) (*Backend, error) {
 		}
 	}
 
-	sporkRootBlockHeight, err := params.State.Params().SporkRootBlockHeight()
+	// initialize node version info
+	nodeInfo, err := getNodeVersionInfo(params.State.Params())
 	if err != nil {
-		return nil, fmt.Errorf("failed to read spork root block height: %w", err)
-	}
-
-	nodeRootBlockHeader, err := params.State.Params().SealedRoot()
-	if err != nil {
-		return nil, fmt.Errorf("failed to read node root block: %w", err)
+		return nil, fmt.Errorf("failed to initialize node version info: %w", err)
 	}
 
 	b := &Backend{
@@ -224,12 +218,11 @@ func New(params Params) (*Backend, error) {
 			chainID:              params.ChainID,
 			snapshotHistoryLimit: params.SnapshotHistoryLimit,
 		},
-		collections:          params.Collections,
-		executionReceipts:    params.ExecutionReceipts,
-		connFactory:          params.ConnFactory,
-		chainID:              params.ChainID,
-		sporkRootBlockHeight: sporkRootBlockHeight,
-		nodeRootBlockHeight:  nodeRootBlockHeader.Height,
+		collections:       params.Collections,
+		executionReceipts: params.ExecutionReceipts,
+		connFactory:       params.ConnFactory,
+		chainID:           params.ChainID,
+		nodeInfo:          nodeInfo,
 	}
 
 	retry.SetBackend(b)
@@ -319,25 +312,42 @@ func (b *Backend) Ping(ctx context.Context) error {
 
 // GetNodeVersionInfo returns node version information such as semver, commit, sporkID, protocolVersion, etc
 func (b *Backend) GetNodeVersionInfo(_ context.Context) (*access.NodeVersionInfo, error) {
-	stateParams := b.state.Params()
+	return b.nodeInfo, nil
+}
+
+// getNodeVersionInfo returns the NodeVersionInfo for the node.
+// Since these values are static while the node is running, it is safe to cache.
+func getNodeVersionInfo(stateParams protocol.Params) (*access.NodeVersionInfo, error) {
 	sporkID, err := stateParams.SporkID()
 	if err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to read spork ID: %v", err)
+		return nil, fmt.Errorf("failed to read spork ID: %v", err)
 	}
 
 	protocolVersion, err := stateParams.ProtocolVersion()
 	if err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to read protocol version: %v", err)
+		return nil, fmt.Errorf("failed to read protocol version: %v", err)
 	}
 
-	return &access.NodeVersionInfo{
+	sporkRootBlockHeight, err := stateParams.SporkRootBlockHeight()
+	if err != nil {
+		return nil, fmt.Errorf("failed to read spork root block height: %w", err)
+	}
+
+	nodeRootBlockHeader, err := stateParams.SealedRoot()
+	if err != nil {
+		return nil, fmt.Errorf("failed to read node root block: %w", err)
+	}
+
+	nodeInfo := &access.NodeVersionInfo{
 		Semver:               build.Version(),
 		Commit:               build.Commit(),
 		SporkId:              sporkID,
 		ProtocolVersion:      uint64(protocolVersion),
-		SporkRootBlockHeight: b.sporkRootBlockHeight,
-		NodeRootBlockHeight:  b.nodeRootBlockHeight,
-	}, nil
+		SporkRootBlockHeight: sporkRootBlockHeight,
+		NodeRootBlockHeight:  nodeRootBlockHeader.Height,
+	}
+
+	return nodeInfo, nil
 }
 
 func (b *Backend) GetCollectionByID(_ context.Context, colID flow.Identifier) (*flow.LightCollection, error) {

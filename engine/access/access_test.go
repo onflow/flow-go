@@ -70,6 +70,8 @@ type Suite struct {
 	metrics              *metrics.NoopCollector
 	finalizedHeaderCache module.FinalizedHeaderCache
 	backend              *backend.Backend
+	sporkID              flow.Identifier
+	protocolVersion      uint
 }
 
 // TestAccess tests scenarios which exercise multiple API calls using both the RPC handler and the ingest engine
@@ -84,6 +86,8 @@ func (suite *Suite) SetupTest() {
 	suite.state = new(protocol.State)
 	suite.finalSnapshot = new(protocol.Snapshot)
 	suite.sealedSnapshot = new(protocol.Snapshot)
+	suite.sporkID = unittest.IdentifierFixture()
+	suite.protocolVersion = uint(unittest.Uint64InRange(10, 30))
 
 	suite.rootBlock = unittest.BlockHeaderFixture(unittest.WithHeaderHeight(0))
 	suite.sealedBlock = suite.rootBlock
@@ -108,6 +112,8 @@ func (suite *Suite) SetupTest() {
 
 	suite.params = new(protocol.Params)
 	suite.params.On("FinalizedRoot").Return(suite.rootBlock, nil)
+	suite.params.On("SporkID").Return(suite.sporkID, nil)
+	suite.params.On("ProtocolVersion").Return(suite.protocolVersion, nil)
 	suite.params.On("SporkRootBlockHeight").Return(suite.rootBlock.Height, nil)
 	suite.params.On("SealedRoot").Return(suite.rootBlock, nil)
 	suite.state.On("Params").Return(suite.params).Maybe()
@@ -1111,12 +1117,6 @@ func (suite *Suite) TestExecuteScript() {
 // information
 func (suite *Suite) TestAPICallNodeVersionInfo() {
 	suite.RunTest(func(handler *access.Handler, db *badger.DB, all *storage.All) {
-		sporkId := unittest.IdentifierFixture()
-		protocolVersion := uint(unittest.Uint64InRange(10, 30))
-
-		suite.params.On("SporkID").Return(sporkId, nil)
-		suite.params.On("ProtocolVersion").Return(protocolVersion, nil)
-
 		req := &accessproto.GetNodeVersionInfoRequest{}
 		resp, err := handler.GetNodeVersionInfo(context.Background(), req)
 		require.NoError(suite.T(), err)
@@ -1126,8 +1126,8 @@ func (suite *Suite) TestAPICallNodeVersionInfo() {
 		suite.Require().Equal(respNodeVersionInfo, &entitiesproto.NodeVersionInfo{
 			Semver:          build.Version(),
 			Commit:          build.Commit(),
-			SporkId:         sporkId[:],
-			ProtocolVersion: uint64(protocolVersion),
+			SporkId:         suite.sporkID[:],
+			ProtocolVersion: uint64(suite.protocolVersion),
 		})
 	})
 }

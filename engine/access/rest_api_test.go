@@ -85,6 +85,8 @@ func (suite *RestAPITestSuite) SetupTest() {
 
 	rootHeader := unittest.BlockHeaderFixture()
 	params := new(protocol.Params)
+	params.On("SporkID").Return(unittest.IdentifierFixture(), nil)
+	params.On("ProtocolVersion").Return(uint(unittest.Uint64InRange(10, 30)), nil)
 	params.On("SporkRootBlockHeight").Return(rootHeader.Height, nil)
 	params.On("SealedRoot").Return(rootHeader, nil)
 
@@ -208,10 +210,12 @@ func (suite *RestAPITestSuite) SetupTest() {
 }
 
 func (suite *RestAPITestSuite) TearDownTest() {
-	suite.cancel()
-	unittest.AssertClosesBefore(suite.T(), suite.secureGrpcServer.Done(), 2*time.Second)
-	unittest.AssertClosesBefore(suite.T(), suite.unsecureGrpcServer.Done(), 2*time.Second)
-	unittest.AssertClosesBefore(suite.T(), suite.rpcEng.Done(), 2*time.Second)
+	if suite.cancel != nil {
+		suite.cancel()
+		unittest.AssertClosesBefore(suite.T(), suite.secureGrpcServer.Done(), 2*time.Second)
+		unittest.AssertClosesBefore(suite.T(), suite.unsecureGrpcServer.Done(), 2*time.Second)
+		unittest.AssertClosesBefore(suite.T(), suite.rpcEng.Done(), 2*time.Second)
+	}
 }
 
 func TestRestAPI(t *testing.T) {
