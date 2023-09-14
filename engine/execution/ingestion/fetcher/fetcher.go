@@ -15,6 +15,7 @@ import (
 var onlyOnflowRegex = regexp.MustCompile(`.*\.onflow\.org:3569$`)
 
 type CollectionFetcher struct {
+	log     zerolog.Logger
 	request module.Requester // used to request collections
 	state   protocol.State
 	// This is included to temporarily work around an issue observed on a small number of ENs.
@@ -22,15 +23,14 @@ type CollectionFetcher struct {
 	// this works around an issue where some collection nodes are not configured with enough
 	// file descriptors causing connection failures.
 	onflowOnlyLNs bool
-	log           zerolog.Logger
 }
 
-func NewCollectionFetcher(request module.Requester, state protocol.State, onflowOnlyLNs bool, log zerolog.Logger) *CollectionFetcher {
+func NewCollectionFetcher(log zerolog.Logger, request module.Requester, state protocol.State, onflowOnlyLNs bool) *CollectionFetcher {
 	return &CollectionFetcher{
+		log:           log.With().Str("component", "ingestion_engine_collecition_fetcher").Logger(),
 		request:       request,
 		state:         state,
 		onflowOnlyLNs: onflowOnlyLNs,
-		log:           log.With().Str("component", "ingestion_engine_collecition_fetcher").Logger(),
 	}
 }
 

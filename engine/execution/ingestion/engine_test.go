@@ -216,7 +216,7 @@ func runWithEngine(t *testing.T, f func(testingContext)) {
 
 	uploadMgr := uploader.NewManager(trace.NewNoopTracer())
 
-	fetcher := fetcher.NewCollectionFetcher(request, protocolState, false, log)
+	fetcher := fetcher.NewCollectionFetcher(log, request, protocolState, false)
 
 	engine, err = New(
 		unit,
@@ -1512,7 +1512,7 @@ func newIngestionEngine(t *testing.T, ps *mocks.ProtocolState, es *mockExecution
 		return stateProtocol.IsNodeAuthorizedAt(ps.AtBlockID(blockID), myIdentity.NodeID)
 	}
 
-	fetcher := fetcher.NewCollectionFetcher(request, ps, false, log)
+	fetcher := fetcher.NewCollectionFetcher(log, request, ps, false)
 
 	unit := enginePkg.NewUnit()
 	engine, err = New(

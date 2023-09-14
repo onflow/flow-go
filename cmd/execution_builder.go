@@ -865,7 +865,7 @@ func (exeNode *ExecutionNode) LoadIngestionEngine(
 		return nil, fmt.Errorf("could not create requester engine: %w", err)
 	}
 
-	fetcher := fetcher.NewCollectionFetcher(exeNode.collectionRequester, node.State, exeNode.exeConf.onflowOnlyLNs, node.Logger)
+	fetcher := fetcher.NewCollectionFetcher(node.Logger, exeNode.collectionRequester, node.State, exeNode.exeConf.onflowOnlyLNs)
 
 	exeNode.ingestionEng, err = ingestion.New(
 		exeNode.ingestionUnit,
