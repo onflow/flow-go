@@ -213,14 +213,17 @@ func (e *Engine) process(channel channels.Channel, originID flow.Identifier, eve
 			return fmt.Errorf("failed to extract BatchRequest from %x", originID[:])
 		}
 
-		report, misbehavior := e.validateBatchRequestForALSP(channel, originID, batchRequest)
-		if misbehavior {
+		report, valid, err := e.validateBatchRequestForALSP(channel, originID, batchRequest)
+		if err != nil {
+			return fmt.Errorf("failed to validate batch request from %x: %w", originID[:], err)
+		}
+		if !valid {
 			e.con.ReportMisbehavior(report) // report misbehavior to ALSP
 			e.log.
 				Warn().
 				Hex("origin_id", logging.ID(originID)).
 				Str(logging.KeySuspicious, "true").
-				Msgf("received invalid batch request from %x: %v", originID[:], misbehavior)
+				Msgf("received invalid batch request from %x: %v", originID[:], valid)
 			e.metrics.InboundMessageDropped(metrics.EngineSynchronization, metrics.MessageBatchRequest)
 			return nil
 		}
@@ -270,14 +273,17 @@ func (e *Engine) process(channel channels.Channel, originID flow.Identifier, eve
 			return fmt.Errorf("failed to extract BlockResponse from %x", originID[:])
 		}
 
-		report, misbehavior := e.validateBlockResponseForALSP(channel, originID, blockResponse)
-		if misbehavior {
+		report, valid, err := e.validateBlockResponseForALSP(channel, originID, blockResponse)
+		if err != nil {
+			return fmt.Errorf("failed to validate block response from %x: %w", originID[:], err)
+		}
+		if !valid {
 			e.con.ReportMisbehavior(report) // report misbehavior to ALSP
 			e.log.
 				Warn().
 				Hex("origin_id", logging.ID(originID)).
 				Str(logging.KeySuspicious, "true").
-				Msgf("received invalid block response from %x: %v", originID[:], misbehavior)
+				Msgf("received invalid block response from %x: %v", originID[:], valid)
 			e.metrics.InboundMessageDropped(metrics.EngineSynchronization, metrics.MessageBlockResponse)
 			return nil
 		}
@@ -289,14 +295,17 @@ func (e *Engine) process(channel channels.Channel, originID flow.Identifier, eve
 			return fmt.Errorf("failed to extract SyncResponse for originID %x", originID[:])
 		}
 
-		report, misbehavior := e.validateSyncResponseForALSP(channel, originID, syncResponse)
-		if misbehavior {
+		report, valid, err := e.validateSyncResponseForALSP(channel, originID, syncResponse)
+		if err != nil {
+			return fmt.Errorf("failed to validate sync response from %x: %w", originID[:], err)
+		}
+		if !valid {
 			e.con.ReportMisbehavior(report) // report misbehavior to ALSP
 			e.log.
 				Warn().
 				Hex("origin_id", logging.ID(originID)).
 				Str(logging.KeySuspicious, "true").
-				Msgf("received invalid sync response from %x: %v", originID[:], misbehavior)
+				Msgf("received invalid sync response from %x: %v", originID[:], valid)
 			e.metrics.InboundMessageDropped(metrics.EngineSynchronization, metrics.MessageSyncResponse)
 			return nil
 		}
@@ -521,13 +530,13 @@ func (e *Engine) sendRequests(participants flow.IdentifierList, ranges []chainsy
 }
 
 // TODO: implement spam reporting similar to validateSyncRequestForALSP
-func (e *Engine) validateBatchRequestForALSP(channel channels.Channel, id flow.Identifier, batchRequest *messages.BatchRequest) (*alsp.MisbehaviorReport, bool) {
-	return nil, false
+func (e *Engine) validateBatchRequestForALSP(channel channels.Channel, id flow.Identifier, batchRequest *messages.BatchRequest) (*alsp.MisbehaviorReport, bool, error) {
+	return nil, true, nil
 }
 
 // TODO: implement spam reporting similar to validateSyncRequestForALSP
-func (e *Engine) validateBlockResponseForALSP(channel channels.Channel, id flow.Identifier, blockResponse *messages.BlockResponse) (*alsp.MisbehaviorReport, bool) {
-	return nil, false
+func (e *Engine) validateBlockResponseForALSP(channel channels.Channel, id flow.Identifier, blockResponse *messages.BlockResponse) (*alsp.MisbehaviorReport, bool, error) {
+	return nil, true, nil
 }
 
 // validateRangeRequestForALSP checks if a range request should be reported as a misbehavior.
@@ -611,6 +620,6 @@ func (e *Engine) validateSyncRequestForALSP(originID flow.Identifier) (*alsp.Mis
 }
 
 // TODO: implement spam reporting similar to validateSyncRequestForALSP
-func (e *Engine) validateSyncResponseForALSP(channel channels.Channel, id flow.Identifier, syncResponse *messages.SyncResponse) (*alsp.MisbehaviorReport, bool) {
-	return nil, false
+func (e *Engine) validateSyncResponseForALSP(channel channels.Channel, id flow.Identifier, syncResponse *messages.SyncResponse) (*alsp.MisbehaviorReport, bool, error) {
+	return nil, true, nil
 }
