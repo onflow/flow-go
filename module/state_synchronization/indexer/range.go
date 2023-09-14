@@ -67,8 +67,8 @@ func (i *SequentialIndexRange) Increase(new uint64) error {
 // - ErrIndexValue if the value is not incremented by one or equal to the last value
 func (i *SequentialIndexRange) CanIncrease(new uint64) (bool, error) {
 	last := i.Last()
-	diff := new - last
-	if diff < 0 || diff > 1 {
+	// if difference between new and last is bigger than 1 then fail, if new is smaller than last it will overflow and value will be bigger than 1
+	if new-last > 1 {
 		return false, fmt.Errorf("value %d should be equal or incremented by one from the last indexed value: %d: %w", new, last, ErrIndexValue)
 	}
 
