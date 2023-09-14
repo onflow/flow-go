@@ -56,6 +56,7 @@ type Engine struct {
 	executionDataPruner    *pruner.Pruner
 	uploader               *uploader.Manager
 	stopControl            *stop.StopControl
+	loader                 BlockLoader
 }
 
 func New(
@@ -78,6 +79,7 @@ func New(
 	pruner *pruner.Pruner,
 	uploader *uploader.Manager,
 	stopControl *stop.StopControl,
+	loader BlockLoader,
 ) (*Engine, error) {
 	log := logger.With().Str("engine", "ingestion").Logger()
 
@@ -104,6 +106,7 @@ func New(
 		executionDataPruner:    pruner,
 		uploader:               uploader,
 		stopControl:            stopControl,
+		loader:                 loader,
 	}
 
 	return &eng, nil
@@ -299,6 +302,10 @@ func (e *Engine) unexecutedBlocks() (
 // on nodes startup, we need to load all the unexecuted blocks to the execution queues.
 // blocks have to be loaded in the way that the parent has been loaded before loading its children
 func (e *Engine) reloadUnexecutedBlocks() error {
+	unexecuted, err := e.loader.LoadUnexecuted(e.unit.Ctx())
+	if err != nil {
+		return fmt.Errorf("could not load unexecuted blocks: %w", err)
+	}
 	// it's possible the BlockProcessable is called during the reloading, as the follower engine
 	// will receive blocks before ingestion engine is ready.
 	// The problem with that is, since the reloading hasn't finished yet, enqueuing the new block from
@@ -310,68 +317,6 @@ func (e *Engine) reloadUnexecutedBlocks() error {
 		blockByCollection *stdmap.BlockByCollectionBackdata,
 		executionQueues *stdmap.QueuesBackdata,
 	) error {
-
-		// saving an executed block is currently not transactional, so it's possible
-		// the block is marked as executed but the receipt might not be saved during a crash.
-		// in order to mitigate this problem, we always re-execute the last executed and finalized
-		// block.
-		// there is an exception, if the last executed block is a root block, then don't execute it,
-		// because the root has already been executed during bootstrapping phase. And re-executing
-		// a root block will fail, because the root block doesn't have a parent block, and could not
-		// get the result of it.
-		// TODO: remove this, when saving a executed block is transactional
-		lastExecutedHeight, lastExecutedID, err := e.execState.GetHighestExecutedBlockID(e.unit.Ctx())
-		if err != nil {
-			return fmt.Errorf("could not get last executed: %w", err)
-		}
-
-		last, err := e.headers.ByBlockID(lastExecutedID)
-		if err != nil {
-			return fmt.Errorf("could not get last executed final by ID: %w", err)
-		}
-
-		// don't reload root block
-		rootBlock, err := e.state.Params().SealedRoot()
-		if err != nil {
-			return fmt.Errorf("failed to retrieve root block: %w", err)
-		}
-
-		isRoot := rootBlock.ID() == last.ID()
-		if !isRoot {
-			executed, err := state.IsBlockExecuted(e.unit.Ctx(), e.execState, lastExecutedID)
-			if err != nil {
-				return fmt.Errorf("cannot check is last exeucted final block has been executed %v: %w", lastExecutedID, err)
-			}
-			if !executed {
-				// this should not happen, but if it does, execution should still work
-				e.log.Warn().
-					Hex("block_id", lastExecutedID[:]).
-					Msg("block marked as highest executed one, but not executable - internal inconsistency")
-
-				err = e.reloadBlock(blockByCollection, executionQueues, lastExecutedID)
-				if err != nil {
-					return fmt.Errorf("could not reload the last executed final block: %v, %w", lastExecutedID, err)
-				}
-			}
-		}
-
-		finalized, pending, err := e.unexecutedBlocks()
-		if err != nil {
-			return fmt.Errorf("could not reload unexecuted blocks: %w", err)
-		}
-
-		unexecuted := append(finalized, pending...)
-
-		log := e.log.With().
-			Int("total", len(unexecuted)).
-			Int("finalized", len(finalized)).
-			Int("pending", len(pending)).
-			Uint64("last_executed", lastExecutedHeight).
-			Hex("last_executed_id", lastExecutedID[:]).
-			Logger()
-
-		log.Info().Msg("reloading unexecuted blocks")
-
 		for _, blockID := range unexecuted {
 			err := e.reloadBlock(blockByCollection, executionQueues, blockID)
 			if err != nil {
@@ -1179,15 +1124,6 @@ func (e *Engine) fetchAndHandleCollection(
 	}
 
 	return nil
-}
-
-// if the EN is dynamically bootstrapped, the finalized blocks at height range:
-// [ sealedRoot.Height, finalizedRoot.Height - 1] can not be retrieved from
-// protocol state, but only from headers
-func (e *Engine) getHeaderByHeight(height uint64) (*flow.Header, error) {
-	// we don't use protocol state because for dynamic boostrapped execution node
-	// the last executed and sealed block is below the finalized root block
-	return e.headers.ByHeight(height)
 }
 
 func logQueueState(log zerolog.Logger, queues *stdmap.QueuesBackdata, blockID flow.Identifier) {
