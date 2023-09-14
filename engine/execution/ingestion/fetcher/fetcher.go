@@ -33,6 +33,8 @@ func NewCollectionFetcher(log zerolog.Logger, request module.Requester, state pr
 	}
 }
 
+// FetchCollection decides which collection nodes to fetch the collection from
+// No error is expected during normal operation
 func (e *CollectionFetcher) FetchCollection(blockID flow.Identifier, height uint64, guarantee *flow.CollectionGuarantee) error {
 	guarantors, err := protocol.FindGuarantors(e.state, guarantee)
 	if err != nil {
