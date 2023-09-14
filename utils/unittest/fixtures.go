@@ -2487,10 +2487,20 @@ func WithTrieUpdate(trieUpdate *ledger.TrieUpdate) func(*execution_data.ChunkExe
 
 func ChunkExecutionDataFixture(t *testing.T, minSize int, opts ...func(*execution_data.ChunkExecutionData)) *execution_data.ChunkExecutionData {
 	collection := CollectionFixture(5)
+	results := make([]execution_data.TransactionResult, len(collection.Transactions))
+	for i, tx := range collection.Transactions {
+		results[i] = execution_data.TransactionResult{
+			TransactionID:   tx.ID(),
+			Failed:          false,
+			ComputationUsed: uint64(i * 100),
+		}
+	}
+
 	ced := &execution_data.ChunkExecutionData{
-		Collection: &collection,
-		Events:     flow.EventsList{},
-		TrieUpdate: testutils.TrieUpdateFixture(2, 1, 8),
+		Collection:         &collection,
+		Events:             flow.EventsList{},
+		TrieUpdate:         testutils.TrieUpdateFixture(2, 1, 8),
+		TransactionResults: results,
 	}
 
 	for _, opt := range opts {
