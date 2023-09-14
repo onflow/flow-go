@@ -18,7 +18,6 @@ const (
 	LabelConnectionDirection = "direction"
 	LabelConnectionUseFD     = "usefd" // whether the connection is using a file descriptor
 	LabelSuccess             = "success"
-	LabelCtrlMsgType         = "control_message"
 	LabelMisbehavior         = "misbehavior"
 	LabelHandler             = "handler"
 	LabelStatusCode          = "code"

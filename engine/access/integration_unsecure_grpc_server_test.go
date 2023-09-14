@@ -12,6 +12,7 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
@@ -166,7 +167,7 @@ func (suite *SameGRPCPortTestSuite) SetupTest() {
 	block := unittest.BlockHeaderFixture()
 	suite.snapshot.On("Head").Return(block, nil)
 
-	bnd := backend.New(backend.Params{
+	bnd, err := backend.New(backend.Params{
 		State:                suite.state,
 		CollectionRPC:        suite.collClient,
 		Blocks:               suite.blocks,
@@ -180,6 +181,7 @@ func (suite *SameGRPCPortTestSuite) SetupTest() {
 		SnapshotHistoryLimit: 0,
 		Communicator:         backend.NewNodeCommunicator(false),
 	})
+	require.NoError(suite.T(), err)
 
 	// create rpc engine builder
 	rpcEngBuilder, err := rpc.NewBuilder(
