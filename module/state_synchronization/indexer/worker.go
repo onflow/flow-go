@@ -68,6 +68,12 @@ func NewExecutionStateWorker(
 	return r
 }
 
+func (r *ExecutionStateWorker) Start(ctx irrecoverable.SignalerContext) {
+	// todo should we protect this to only be called once - albeit start on the consumer being called that has the protection
+	r.exeDataReader.AddContext(ctx)
+	r.ComponentConsumer.Start(ctx)
+}
+
 // OnExecutionData is used to notify when new execution data is downloaded by the execution data requester jobqueue.
 func (r *ExecutionStateWorker) OnExecutionData(_ *execution_data.BlockExecutionDataEntity) {
 	r.exeDataNotifier.Notify()
