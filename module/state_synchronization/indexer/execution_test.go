@@ -49,6 +49,7 @@ func newIndexTest(
 ) *indexTest {
 	registers := storagemock.NewRegisters(t)
 	events := storagemock.NewEvents(t)
+	headers := newBlockHeadersStorage(blocks)
 
 	return &indexTest{
 		t:         t,
@@ -57,6 +58,7 @@ func newIndexTest(
 		blocks:    blocks,
 		ctx:       context.Background(),
 		data:      exeData,
+		headers:   headers.(*storagemock.Headers), // convert it back to mock type for tests
 	}
 }
 
@@ -129,11 +131,11 @@ func (i *indexTest) setGetRegisters(f func(t *testing.T, ID flow.RegisterID, hei
 }
 
 func (i *indexTest) initIndexer() {
-	headers := newBlockHeadersStorage(i.blocks)
-	i.useDefaultHeights()
-	indexer, err := New(i.registers, headers, i.blocks[0].Header.Height)
+	if len(i.registers.ExpectedCalls) == 0 {
+		i.useDefaultHeights() // only set when no other were set
+	}
+	indexer, err := New(i.registers, i.headers, i.blocks[0].Header.Height)
 	require.NoError(i.t, err)
-	indexer.headers = headers
 	i.indexer = indexer
 }
 
@@ -199,7 +201,7 @@ func TestExecutionState_IndexBlockData(t *testing.T) {
 				for _, entry := range entries {
 					index, ok := payloadRegID[entry.Key]
 					assert.True(t, ok)
-					trie.Payloads[index].Value().Equals(entry.Value)
+					assert.True(t, trie.Payloads[index].Value().Equals(entry.Value))
 				}
 				return nil
 			}).
@@ -409,4 +411,29 @@ func ledgerPayloadWithValuesFixture(owner string, key string, value []byte) *led
 	}
 
 	return ledger.NewPayload(k, value)
+}
+
+func trieRegistersPayloadComparer(triePayloads []*ledger.Payload, registerPayloads flow.RegisterEntries) bool {
+	if len(triePayloads) != len(registerPayloads) {
+		return false
+	}
+
+	payloadRegID := make(map[flow.RegisterID]int)
+	for i, p := range triePayloads {
+		k, _ := p.Key()
+		regKey, _ := migrations.KeyToRegisterID(k)
+		payloadRegID[regKey] = i
+	}
+
+	for _, entry := range registerPayloads {
+		index, ok := payloadRegID[entry.Key]
+		if !ok {
+			return false
+		}
+		if triePayloads[index].Value().Equals(entry.Value) {
+			return false
+		}
+	}
+
+	return true
 }
