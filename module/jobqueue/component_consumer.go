@@ -31,7 +31,7 @@ func NewComponentConsumer(
 	progress storage.ConsumerProgress,
 	jobs module.Jobs,
 	defaultIndex uint64,
-	processor JobProcessor, // method used to process jobs
+	processor JobProcessor,
 	maxProcessing uint64,
 	maxSearchAhead uint64,
 ) *ComponentConsumer {
