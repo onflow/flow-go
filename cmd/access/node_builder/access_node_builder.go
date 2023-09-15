@@ -612,7 +612,10 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionDataRequester() *FlowAccessN
 			)
 
 			registers := memory.NewRegisters() // temporarily use the in-memory db
-			exeIndexer := indexer.New(registers, builder.Storage.Headers, builder.executionDataConfig.InitialBlockHeight)
+			exeIndexer, err := indexer.New(registers, builder.Storage.Headers, builder.executionDataConfig.InitialBlockHeight)
+			if err != nil {
+				return nil, err
+			}
 
 			// execution state worker uses a jobqueue to process new execution data and indexes it by using the indexer.
 			worker := indexer.NewExecutionStateWorker(
