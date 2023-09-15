@@ -10,10 +10,10 @@ import (
 	"testing"
 
 	"github.com/cockroachdb/pebble"
-	"github.com/onflow/flow-go/storage"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/pebble/registers"
 )
 
