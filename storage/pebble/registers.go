@@ -5,22 +5,37 @@ import (
 	"fmt"
 
 	"github.com/cockroachdb/pebble"
-	"github.com/onflow/flow-go/storage"
 
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/storage"
 )
 
-// library that implements pebble storage for registers
+// Registers library that implements pebble storage for registers
+// given a pebble instance with root block and root height populated
 type Registers struct {
 	db           *pebble.DB
 	firstHeight  uint64
 	latestHeight uint64
 }
 
+// NewRegisters takes a populated pebble instance with LatestHeight and FirstHeight set.
+// Will fail if they those two keys are unavailable as it implies a corrupted or uninitialized state
 func NewRegisters(db *pebble.DB) (*Registers, error) {
-	return &Registers{
+	registers := &Registers{
 		db: db,
-	}, nil
+	}
+	// check height keys and populate cache. These two variables will have been set
+	firstHeight, err := registers.FirstHeight()
+	if err != nil {
+		// this means that the DB is either in a corrupted state or has not been initialized with a set of registers
+		// and firstHeight
+		return nil, fmt.Errorf("unable to initialize register storage, first height unavailable in db: %w", err)
+	}
+	// since we assume the state of the DB has complete registers as of FirstHeight indexed
+	registers.firstHeight = firstHeight
+	registers.latestHeight = firstHeight
+
+	return registers, nil
 }
 
 // Get returns the most recent updated payload for the given RegisterID.
@@ -69,7 +84,7 @@ func (s *Registers) Store(
 ) error {
 	// value check
 	upperBound := s.latestHeight + 1
-	if height > upperBound || height < s.latestHeight {
+	if height < s.latestHeight || height-s.latestHeight > 1 {
 		return fmt.Errorf("requested height out of bounds [%d, %d]", s.latestHeight, upperBound)
 	}
 	batch := s.db.NewBatch()
@@ -83,19 +98,20 @@ func (s *Registers) Store(
 			return fmt.Errorf("failed to set key: %w", err)
 		}
 	}
+	// increment height if necessary
+	if height > s.latestHeight {
+		err := batch.Set(latestHeightKey(), s.getEncodedHeight(height), nil)
+		if err != nil {
+			return fmt.Errorf("failed to update latest height %d", height)
+		}
+		s.latestHeight = height
+	}
 
 	err := batch.Commit(pebble.Sync)
 	if err != nil {
 		return fmt.Errorf("failed to commit batch: %w", err)
 	}
 
-	// increment height if necessary
-	if height > s.latestHeight {
-		err = s.updateLatestHeight(height)
-		if err != nil {
-			return err
-		}
-	}
 	return nil
 }
 
@@ -118,26 +134,7 @@ func (s *Registers) heightLookup(key []byte) (uint64, error) {
 	return binary.BigEndian.Uint64(res), nil
 }
 
-func (s *Registers) indexHeightWithKey(key []byte, height uint64) error {
-	payload := make([]byte, 0)
-	encoded := binary.BigEndian.AppendUint64(payload, height)
-	return s.db.Set(key, encoded, nil)
-}
-
-func (s *Registers) updateFirstHeight(height uint64) error {
-	err := s.indexHeightWithKey(firstHeightKey(), height)
-	if err != nil {
-		return fmt.Errorf("failed to update first height: %w", err)
-	}
-	s.firstHeight = height
-	return nil
-}
-
-func (s *Registers) updateLatestHeight(height uint64) error {
-	err := s.indexHeightWithKey(latestHeightKey(), height)
-	if err != nil {
-		return fmt.Errorf("failed to update latest height: %w", err)
-	}
-	s.latestHeight = height
-	return nil
+func (s *Registers) getEncodedHeight(height uint64) []byte {
+	payload := make([]byte, 0, 8)
+	return binary.BigEndian.AppendUint64(payload, height)
 }
