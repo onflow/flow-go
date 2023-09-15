@@ -2,7 +2,6 @@ package indexer
 
 import (
 	"context"
-	"fmt"
 	"testing"
 	"time"
 
@@ -47,7 +46,6 @@ func (w *mockProgress) ProcessedIndex() (uint64, error) {
 }
 
 func (w *mockProgress) SetProcessedIndex(index uint64) error {
-	fmt.Println("index", index)
 	w.index = index
 	return nil
 }
@@ -58,38 +56,28 @@ func (w *mockProgress) InitProcessedIndex(index uint64) error {
 }
 
 func TestWorker(t *testing.T) {
-
 	blocks := blocksFixture(10)
-	fmt.Println("blocks range", blocks[0].Header.Height, blocks[len(blocks)-1].Header.Height)
-
+	// we use 5th index as the latest indexed height so we leave 5 more blocks to be indexed by the indexer in this test
 	lastIndexedHeight := blocks[5].Header.Height
-	fmt.Println("already indexed range", blocks[0].Header.Height, lastIndexedHeight)
 	progress := &mockProgress{index: lastIndexedHeight}
 	test := workerTest{
 		blocks:   blocks,
 		progress: progress,
 	}
 
-	indexerTest := newIndexTest(t, blocks, nil)
-	indexerTest.useDefaultFirstHeight()
-	indexerTest.setLastHeight(func(t *testing.T) (uint64, error) {
-		return lastIndexedHeight, nil
-	})
-	indexerTest.initIndexer()
+	indexerTest := newIndexTest(t, blocks, nil).
+		useDefaultFirstHeight().
+		setLastHeight(func(t *testing.T) (uint64, error) {
+			return lastIndexedHeight, nil
+		}).
+		initIndexer()
 
 	blockDataCache := mempool.NewExecutionData(t)
 	exeDatastore := mock.NewExecutionDataStore(t)
 
 	indexerTest.headers.
 		On("BlockIDByHeight", mocks.AnythingOfType("uint64")).
-		Return(func(height uint64) (flow.Identifier, error) {
-			for _, b := range blocks {
-				if b.Header.Height == height {
-					return b.ID(), nil
-				}
-			}
-			return flow.Identifier{}, fmt.Errorf("not found")
-		})
+		Return(indexerTest.blockIDByHeight)
 
 	blockDataCache.
 		On("ByID", mocks.AnythingOfType("flow.Identifier")).
@@ -102,6 +90,9 @@ func TestWorker(t *testing.T) {
 				},
 			}
 
+			// create this to capture the closure of the creation of block execution data, so we can for each returned
+			// block execution data make sure the store of registers will match what the execution data returned and
+			// also that the height was correct
 			indexerTest.setStoreRegisters(func(t *testing.T, entries flow.RegisterEntries, height uint64) error {
 				var blockHeight uint64
 				for _, b := range blocks {
@@ -109,10 +100,9 @@ func TestWorker(t *testing.T) {
 						blockHeight = b.Header.Height
 					}
 				}
+
 				assert.Equal(t, blockHeight, height)
-				for j, e := range entries {
-					assert.True(t, trie.Payloads[j].Value().Equals(e.Value))
-				}
+				trieRegistersPayloadComparer(t, trie.Payloads, entries)
 				return nil
 			})
 
@@ -131,16 +121,17 @@ func TestWorker(t *testing.T) {
 		progress,
 	)
 
-	ctx, _ := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(context.Background())
 	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
 
 	worker.Start(signalerCtx)
 
-	unittest.RequireComponentsReadyBefore(t, testTimeout*1000, worker.ComponentConsumer)
+	unittest.RequireComponentsReadyBefore(t, testTimeout, worker.ComponentConsumer)
 
 	worker.OnExecutionData(nil)
 
-	//cancel()
-	unittest.RequireCloseBefore(t, worker.Done(), testTimeout*1000, "timeout waiting for the consumer to be done")
-
+	// give it a bit of time to process all the blocks
+	time.Sleep(testTimeout - 50)
+	cancel()
+	unittest.RequireCloseBefore(t, worker.Done(), testTimeout, "timeout waiting for the consumer to be done")
 }
