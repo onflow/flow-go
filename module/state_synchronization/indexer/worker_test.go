@@ -58,7 +58,8 @@ func (w *mockProgress) InitProcessedIndex(index uint64) error {
 func TestWorker_Success(t *testing.T) {
 	blocks := blocksFixture(10)
 	// we use 5th index as the latest indexed height, so we leave 5 more blocks to be indexed by the indexer in this test
-	lastIndexedHeight := blocks[5].Header.Height
+	lastIndexedIndex := 5
+	lastIndexedHeight := blocks[lastIndexedIndex].Header.Height
 	progress := &mockProgress{index: lastIndexedHeight}
 	test := workerTest{
 		blocks:   blocks,
@@ -131,4 +132,7 @@ func TestWorker_Success(t *testing.T) {
 	time.Sleep(testTimeout - 50)
 	cancel()
 	unittest.RequireCloseBefore(t, worker.Done(), testTimeout, "timeout waiting for the consumer to be done")
+
+	// make sure store was called correct number of times
+	indexerTest.registers.AssertNumberOfCalls(t, "Store", len(blocks)-lastIndexedIndex-1)
 }
