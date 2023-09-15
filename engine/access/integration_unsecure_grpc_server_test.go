@@ -203,6 +203,9 @@ func (suite *SameGRPCPortTestSuite) SetupTest() {
 		bnd,
 		suite.secureGrpcServer,
 		suite.unsecureGrpcServer,
+		nil,
+		state_stream.DefaultEventFilterConfig,
+		0,
 	)
 	assert.NoError(suite.T(), err)
 	suite.rpcEng, err = rpcEngBuilder.WithLegacy().Build()
@@ -229,20 +232,31 @@ func (suite *SameGRPCPortTestSuite) SetupTest() {
 		ClientSendBufferSize: state_stream.DefaultSendBufferSize,
 	}
 
-	// create state stream engine
-	suite.stateStreamEng, err = state_stream.NewEng(
+	stateStreamBackend, err := state_stream.New(
 		suite.log,
 		conf,
-		nil,
-		suite.execDataCache,
 		suite.state,
 		suite.headers,
 		suite.seals,
 		suite.results,
+		nil,
+		suite.execDataCache,
+		nil,
+		rootBlock.Header.Height,
+		rootBlock.Header.Height,
+	)
+	assert.NoError(suite.T(), err)
+
+	// create state stream engine
+	suite.stateStreamEng, err = state_stream.NewEng(
+		suite.log,
+		conf,
+		suite.execDataCache,
+		suite.headers,
 		suite.chainID,
-		rootBlock.Header.Height,
-		rootBlock.Header.Height,
 		suite.unsecureGrpcServer,
+		stateStreamBackend,
+		nil,
 	)
 	assert.NoError(suite.T(), err)
 
