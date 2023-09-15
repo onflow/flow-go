@@ -71,7 +71,24 @@ func TestIWantDuplicateMsgIDThresholdErrRoundTrip(t *testing.T) {
 	// tests the IsIWantDuplicateMsgIDThresholdErr function.
 	assert.True(t, IsIWantDuplicateMsgIDThresholdErr(err), "IsIWantDuplicateMsgIDThresholdErr should return true for IWantDuplicateMsgIDThresholdErr error")
 
-	// test IsDuplicateFoundErr with a different error type.
+	// test IsIWantDuplicateMsgIDThresholdErr with a different error type.
 	dummyErr := fmt.Errorf("dummy error")
 	assert.False(t, IsIWantDuplicateMsgIDThresholdErr(dummyErr), "IsIWantDuplicateMsgIDThresholdErr should return false for non-IWantDuplicateMsgIDThresholdErr error")
+}
+
+// TestInvalidRpcPublishMessagesErrRoundTrip ensures correct error formatting for InvalidRpcPublishMessagesErr.
+func TestInvalidRpcPublishMessagesErrRoundTrip(t *testing.T) {
+	wrappedErr := fmt.Errorf("invalid topic")
+	err := NewInvalidRpcPublishMessagesErr(wrappedErr)
+
+	// tests the error message formatting.
+	expectedErrMsg := "rpc publish messages validation failed: invalid topic"
+	assert.Equal(t, expectedErrMsg, err.Error(), "the error message should be correctly formatted")
+
+	// tests the IsInvalidRpcPublishMessagesErr function.
+	assert.True(t, IsInvalidRpcPublishMessagesErr(err), "IsInvalidRpcPublishMessagesErr should return true for InvalidRpcPublishMessagesErr error")
+
+	// test IsInvalidRpcPublishMessagesErr with a different error type.
+	dummyErr := fmt.Errorf("dummy error")
+	assert.False(t, IsInvalidRpcPublishMessagesErr(dummyErr), "IsInvalidRpcPublishMessagesErr should return false for non-InvalidRpcPublishMessagesErr error")
 }
