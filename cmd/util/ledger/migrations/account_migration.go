@@ -75,7 +75,7 @@ func (m AccountUsageMigrator) MigratePayloads(
 		totalSize += size
 	}
 
-	err := compareUsage(status, totalSize)
+	err := compareUsage(payloads[statusIndex], status, totalSize)
 	if err != nil {
 		m.log.Info().
 			Err(err).
@@ -100,8 +100,19 @@ func (m AccountUsageMigrator) MigratePayloads(
 	return payloads, nil
 }
 
-func compareUsage(status *environment.AccountStatus, totalSize uint64) error {
+func compareUsage(
+	payload *ledger.Payload,
+	status *environment.AccountStatus,
+	totalSize uint64,
+) error {
+	const oldAccountStatusSize = 25
 	oldSize := status.StorageUsed()
+	if len(payload.Value()) == oldAccountStatusSize {
+		// size will be reported as 8 bytes larger than the actual size due to on-the-fly
+		// migration of account status in AccountStatusFromBytes
+		oldSize -= 8
+	}
+
 	if oldSize != totalSize {
 		return fmt.Errorf("old size: %v, new size: %v", oldSize, totalSize)
 	}
