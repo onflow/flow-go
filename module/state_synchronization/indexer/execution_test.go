@@ -108,7 +108,7 @@ func (i *indexTest) setStoreRegisters(f func(t *testing.T, entries flow.Register
 		On("Store", mock.AnythingOfType("flow.RegisterEntries"), mock.AnythingOfType("uint64")).
 		Return(func(entries flow.RegisterEntries, height uint64) error {
 			return f(i.t, entries, height)
-		})
+		}).Once()
 	return i
 }
 
@@ -130,13 +130,14 @@ func (i *indexTest) setGetRegisters(f func(t *testing.T, ID flow.RegisterID, hei
 	return i
 }
 
-func (i *indexTest) initIndexer() {
+func (i *indexTest) initIndexer() *indexTest {
 	if len(i.registers.ExpectedCalls) == 0 {
 		i.useDefaultHeights() // only set when no other were set
 	}
 	indexer, err := New(i.registers, i.headers, i.blocks[0].Header.Height)
 	require.NoError(i.t, err)
 	i.indexer = indexer
+	return i
 }
 
 func (i *indexTest) runIndexBlockData() error {
@@ -185,13 +186,14 @@ func TestExecutionState_IndexBlockData(t *testing.T) {
 		execData := execution_data.NewBlockExecutionDataEntity(block.ID(), ed)
 
 		err := newIndexTest(t, blocks, execData).
+			initIndexer().
 			// make sure update registers match in length and are same as block data ledger payloads
 			setStoreRegisters(func(t *testing.T, entries flow.RegisterEntries, height uint64) error {
 				assert.Equal(t, height, block.Header.Height)
 				assert.Len(t, trie.Payloads, entries.Len())
 
 				// make sure all the registers from the execution data have been stored as well the value matches
-				assert.True(t, trieRegistersPayloadComparer(trie.Payloads, entries))
+				trieRegistersPayloadComparer(t, trie.Payloads, entries)
 				return nil
 			}).
 			runIndexBlockData()
@@ -221,6 +223,7 @@ func TestExecutionState_IndexBlockData(t *testing.T) {
 
 		testRegisterFound := false
 		err = newIndexTest(t, blocks, execData).
+			initIndexer().
 			// make sure update registers match in length and are same as block data ledger payloads
 			setStoreRegisters(func(t *testing.T, entries flow.RegisterEntries, height uint64) error {
 				for _, entry := range entries {
@@ -252,6 +255,7 @@ func TestExecutionState_IndexBlockData(t *testing.T) {
 			setLastHeight(func(t *testing.T) (uint64, error) {
 				return blocks[len(blocks)-3].Header.Height, nil
 			}).
+			useDefaultFirstHeight().
 			runIndexBlockData()
 
 		assert.True(t, errors.Is(err, ErrIndexValue))
@@ -282,6 +286,7 @@ func TestExecutionState_RegisterValues(t *testing.T) {
 		val := flow.RegisterValue("0x1")
 
 		values, err := newIndexTest(t, blocks, nil).
+			initIndexer().
 			setGetRegisters(func(t *testing.T, ID flow.RegisterID, height uint64) (flow.RegisterValue, error) {
 				return val, nil
 			}).
@@ -403,10 +408,8 @@ func ledgerPayloadWithValuesFixture(owner string, key string, value []byte) *led
 }
 
 // trieRegistersPayloadComparer checks that trie payloads and register payloads are same, used for testing.
-func trieRegistersPayloadComparer(triePayloads []*ledger.Payload, registerPayloads flow.RegisterEntries) bool {
-	if len(triePayloads) != len(registerPayloads) {
-		return false
-	}
+func trieRegistersPayloadComparer(t *testing.T, triePayloads []*ledger.Payload, registerPayloads flow.RegisterEntries) {
+	assert.Equal(t, len(triePayloads), len(registerPayloads.Values()), "registers length should equal")
 
 	// crate a lookup map that matches flow register ID to index in the payloads slice
 	payloadRegID := make(map[flow.RegisterID]int)
@@ -418,13 +421,8 @@ func trieRegistersPayloadComparer(triePayloads []*ledger.Payload, registerPayloa
 
 	for _, entry := range registerPayloads {
 		index, ok := payloadRegID[entry.Key]
-		if !ok {
-			return false
-		}
-		if triePayloads[index].Value().Equals(entry.Value) {
-			return false
-		}
+		assert.True(t, ok, fmt.Sprintf("register entry not found for key %s", entry.Key.String()))
+		val := triePayloads[index].Value()
+		assert.True(t, val.Equals(entry.Value), fmt.Sprintf("payload values not same %s - %s", val, entry.Value))
 	}
-
-	return true
 }
