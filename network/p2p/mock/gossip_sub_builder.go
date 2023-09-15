@@ -93,6 +93,11 @@ func (_m *GossipSubBuilder) SetSubscriptionFilter(_a0 pubsub.SubscriptionFilter)
 	_m.Called(_a0)
 }
 
+// SetSubscriptions provides a mock function with given fields: subscriptions
+func (_m *GossipSubBuilder) SetSubscriptions(subscriptions p2p.Subscriptions) {
+	_m.Called(subscriptions)
+}
+
 type mockConstructorTestingTNewGossipSubBuilder interface {
 	mock.TestingT
 	Cleanup(func())

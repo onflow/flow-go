@@ -326,7 +326,7 @@ func (builder *LibP2PNodeBuilder) Build() (p2p.LibP2PNode, error) {
 			}
 			node.SetRouting(routingSystem)
 			builder.gossipSubBuilder.SetRoutingSystem(routingSystem)
-
+			builder.gossipSubBuilder.SetSubscriptions(node)
 			// gossipsub is created here, because it needs to be created during the node startup.
 			gossipSub, err := builder.gossipSubBuilder.Build(ctx)
 			if err != nil {

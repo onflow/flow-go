@@ -50,6 +50,7 @@ type Builder struct {
 	routingSystem            routing.Routing
 	rpcInspectorConfig       *p2pconf.GossipSubRPCInspectorsConfig
 	rpcInspectorSuiteFactory p2p.GossipSubRpcInspectorSuiteFactoryFunc
+	subscriptions            p2p.Subscriptions
 }
 
 var _ p2p.GossipSubBuilder = (*Builder)(nil)
@@ -71,6 +72,15 @@ func (g *Builder) SetSubscriptionFilter(subscriptionFilter pubsub.SubscriptionFi
 		g.logger.Fatal().Msg("subscription filter has already been set")
 	}
 	g.subscriptionFilter = subscriptionFilter
+}
+
+// SetSubscriptions sets the subscriptions interface of the builder.
+// If the subscriptions interface has already been set, a fatal error is logged.
+func (g *Builder) SetSubscriptions(subscriptions p2p.Subscriptions) {
+	if g.subscriptions != nil {
+		g.logger.Fatal().Msg("subscriptions interface has already been set")
+	}
+	g.subscriptions = subscriptions
 }
 
 // SetGossipSubFactory sets the gossipsub factory of the builder.
@@ -240,7 +250,8 @@ func defaultInspectorSuite(rpcTracker p2p.RpcControlTracking) p2p.GossipSubRpcIn
 		gossipSubMetrics module.GossipSubMetrics,
 		heroCacheMetricsFactory metrics.HeroCacheMetricsFactory,
 		networkType network.NetworkingType,
-		idProvider module.IdentityProvider) (p2p.GossipSubInspectorSuite, error) {
+		idProvider module.IdentityProvider,
+		subscriptions p2p.Subscriptions) (p2p.GossipSubInspectorSuite, error) {
 		metricsInspector := inspector.NewControlMsgMetricsInspector(
 			logger,
 			p2pnode.NewGossipSubControlMessageMetrics(gossipSubMetrics, logger),
@@ -268,6 +279,7 @@ func defaultInspectorSuite(rpcTracker p2p.RpcControlTracking) p2p.GossipSubRpcIn
 			idProvider,
 			gossipSubMetrics,
 			rpcTracker,
+			subscriptions,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create new control message valiadation inspector: %w", err)
@@ -310,7 +322,8 @@ func (g *Builder) Build(ctx irrecoverable.SignalerContext) (p2p.PubSubAdapter, e
 		g.metricsCfg.Metrics,
 		g.metricsCfg.HeroCacheFactory,
 		g.networkType,
-		g.idProvider)
+		g.idProvider,
+		g.subscriptions)
 	if err != nil {
 		return nil, fmt.Errorf("could not create gossipsub inspector suite: %w", err)
 	}
