@@ -3,8 +3,8 @@ package migrations
 import (
 	"context"
 	"fmt"
-
 	"github.com/rs/zerolog"
+
 	"github.com/rs/zerolog/log"
 
 	"github.com/onflow/cadence/runtime/common"
@@ -14,18 +14,6 @@ import (
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/model/flow"
 )
-
-// MigrateAccountUsage iterates through each payload, and calculate the storage usage
-// and update the accoutns status with the updated storage usage
-func MigrateAccountUsage(log zerolog.Logger, nWorker int) func([]*ledger.Payload) ([]*ledger.Payload, error) {
-	return CreateAccountBasedMigration(
-		log,
-		func(allPayloads []*ledger.Payload, nWorker int) (AccountMigrator, error) {
-			return AccountUsageMigrator{}, nil
-		},
-		nWorker,
-	)
-}
 
 func payloadSize(key ledger.Key, payload *ledger.Payload) (uint64, error) {
 	id, err := util.KeyToRegisterID(key)
@@ -40,13 +28,27 @@ func isAccountKey(key ledger.Key) bool {
 	return string(key.KeyParts[1].Value) == flow.AccountStatusKey
 }
 
+// AccountUsageMigrator iterates through each payload, and calculate the storage usage
+// and update the accoutns status with the updated storage usage
 type AccountUsageMigrator struct{}
+
+func NewAccountUsageMigrator(
+	_ zerolog.Logger,
+	_ []*ledger.Payload,
+	_ int,
+) (AccountMigrator, error) {
+	return AccountUsageMigrator{}, nil
+}
 
 func (m AccountUsageMigrator) MigratePayloads(
 	ctx context.Context,
 	address common.Address,
 	payloads []*ledger.Payload,
 ) ([]*ledger.Payload, error) {
+	if address == common.ZeroAddress {
+		return payloads, nil
+	}
+
 	var status *environment.AccountStatus
 	var statusIndex int
 	totalSize := uint64(0)

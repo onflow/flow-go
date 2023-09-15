@@ -22,23 +22,6 @@ import (
 	util2 "github.com/onflow/flow-go/module/util"
 )
 
-func MigrateAtreeRegisters(
-	log zerolog.Logger,
-	rwf reporters.ReportWriterFactory,
-	nWorker int,
-) func([]*ledger.Payload) ([]*ledger.Payload, error) {
-	return CreateAccountBasedMigration(
-		log,
-		func(_ []*ledger.Payload, nWorker int) (AccountMigrator, error) {
-			return NewMigrator(
-				log.With().Str("component", "atree-register-migrator").Logger(),
-				rwf,
-			)
-		},
-		nWorker,
-	)
-}
-
 // AtreeRegisterMigrator is a migrator that converts the storage of an account from the
 // old atree format to the new atree format.
 // Account "storage used" should be correctly updated after the migration.
@@ -53,23 +36,24 @@ type AtreeRegisterMigrator struct {
 var _ AccountMigrator = (*AtreeRegisterMigrator)(nil)
 var _ io.Closer = (*AtreeRegisterMigrator)(nil)
 
-func NewMigrator(
-	log zerolog.Logger,
+func NewAtreeRegisterMigrator(
 	rwf reporters.ReportWriterFactory,
-) (*AtreeRegisterMigrator, error) {
+) AccountMigratorFactory {
+	return func(log zerolog.Logger, payloads []*ledger.Payload, i int) (AccountMigrator, error) {
+		log = log.With().Str("migration", "atree-register-migration").Logger()
 
-	log.Info().Msgf("created snapshot")
-	sampler := util2.NewTimedSampler(30 * time.Second)
+		sampler := util2.NewTimedSampler(30 * time.Second)
 
-	migrator := &AtreeRegisterMigrator{
-		log:     log,
-		sampler: sampler,
+		migrator := &AtreeRegisterMigrator{
+			log:     log,
+			sampler: sampler,
 
-		rwf: rwf,
-		rw:  rwf.ReportWriter("atree-register-migrator"),
+			rwf: rwf,
+			rw:  rwf.ReportWriter("atree-register-migrator"),
+		}
+
+		return migrator, nil
 	}
-
-	return migrator, nil
 }
 
 func (m *AtreeRegisterMigrator) Close() error {
@@ -77,7 +61,7 @@ func (m *AtreeRegisterMigrator) Close() error {
 	return nil
 }
 
-var skippableAccountError = errors.New("account is skippable")
+var skippableAccountError = errors.New("account can be skipped")
 
 func (m *AtreeRegisterMigrator) MigratePayloads(
 	_ context.Context,
@@ -134,7 +118,8 @@ func (m *AtreeRegisterMigrator) MigratePayloads(
 		m.rw.Write(migrationProblem{
 			Address: address.Hex(),
 			Key:     "",
-			Kind:    "More registers after migration",
+			Size:    len(mr.Snapshot.Payloads),
+			Kind:    "more_registers_after_migration",
 			Msg:     fmt.Sprintf("original: %d, new: %d", originalLen, newLen),
 		})
 	}
@@ -152,7 +137,7 @@ func (m *AtreeRegisterMigrator) migrateAccountStorage(
 
 	// iterate through all domains and migrate them
 	for _, domain := range domains {
-		err := m.convertStorageDomain(mr.Address, mr.Storage, mr.Interpreter, domain)
+		err := m.convertStorageDomain(mr, domain)
 		if err != nil {
 			return nil, fmt.Errorf("failed to convert storage domain %s : %w", domain, err)
 		}
@@ -174,13 +159,11 @@ func (m *AtreeRegisterMigrator) migrateAccountStorage(
 }
 
 func (m *AtreeRegisterMigrator) convertStorageDomain(
-	address common.Address,
-	storage *runtime.Storage,
-	inter *interpreter.Interpreter,
+	mr *migratorRuntime,
 	domain string,
 ) error {
 
-	storageMap := storage.GetStorageMap(address, domain, false)
+	storageMap := mr.Storage.GetStorageMap(mr.Address, domain, false)
 	if storageMap == nil {
 		// no storage for this domain
 		return nil
@@ -216,7 +199,7 @@ func (m *AtreeRegisterMigrator) convertStorageDomain(
 
 			err = capturePanic(func() {
 				// force the value to be read entirely
-				value = value.Clone(inter)
+				value = value.Clone(mr.Interpreter)
 			})
 			if err != nil {
 				return fmt.Errorf("failed to clone value for key %s: %w", key, err)
@@ -224,7 +207,7 @@ func (m *AtreeRegisterMigrator) convertStorageDomain(
 
 			err = capturePanic(func() {
 				// set value will first purge the old value
-				storageMap.SetValue(inter, key, value)
+				storageMap.SetValue(mr.Interpreter, key, value)
 			})
 			if err != nil {
 				return fmt.Errorf("failed to set value for key %s: %w", key, err)
@@ -235,7 +218,8 @@ func (m *AtreeRegisterMigrator) convertStorageDomain(
 		if err != nil {
 
 			m.rw.Write(migrationProblem{
-				Address: address.Hex(),
+				Address: mr.Address.Hex(),
+				Size:    len(mr.Snapshot.Payloads),
 				Key:     string(key),
 				Kind:    "migration_failure",
 				Msg:     err.Error(),
@@ -382,6 +366,7 @@ func (m *AtreeRegisterMigrator) validateChangesAndCreateNewRegisters(
 		m.rw.Write(migrationProblem{
 			Address: mr.Address.Hex(),
 			Key:     id.String(),
+			Size:    len(mr.Snapshot.Payloads),
 			Kind:    "not_migrated",
 			Msg:     fmt.Sprintf("%x", value),
 		})
@@ -494,9 +479,11 @@ var domains = []string{
 // migrationProblem is a struct for reporting errors
 type migrationProblem struct {
 	Address string
-	Key     string
-	Kind    string
-	Msg     string
+	// Size is the account size in register count
+	Size int
+	Key  string
+	Kind string
+	Msg  string
 }
 
 var knownProblematicAccounts = map[common.Address]string{

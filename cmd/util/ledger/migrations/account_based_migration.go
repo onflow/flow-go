@@ -1,12 +1,10 @@
 package migrations
 
 import (
-	"bytes"
 	"container/heap"
 	"context"
 	"fmt"
 	"io"
-	"sort"
 	"sync"
 	"time"
 
@@ -16,7 +14,6 @@ import (
 
 	"github.com/onflow/flow-go/cmd/util/ledger/util"
 	"github.com/onflow/flow-go/ledger"
-	"github.com/onflow/flow-go/model/flow"
 	moduleUtil "github.com/onflow/flow-go/module/util"
 )
 
@@ -27,32 +24,34 @@ type AccountMigrator interface {
 }
 
 // AccountMigratorFactory creates an AccountMigrator
-type AccountMigratorFactory func(allPayloads []*ledger.Payload, nWorker int) (AccountMigrator, error)
-
-func CreateAccountBasedMigration(
+type AccountMigratorFactory func(
 	log zerolog.Logger,
-	migratorFactory AccountMigratorFactory,
+	allPayloads []*ledger.Payload,
 	nWorker int,
+) (AccountMigrator, error)
+
+func CreateAccountBasedMigrations(
+	log zerolog.Logger,
+	nWorker int,
+	migratorFactories []AccountMigratorFactory,
 ) func(payloads []*ledger.Payload) ([]*ledger.Payload, error) {
 	return func(payloads []*ledger.Payload) ([]*ledger.Payload, error) {
 		return MigrateByAccount(
 			log,
-			migratorFactory,
-			payloads,
 			nWorker,
+			payloads,
+			migratorFactories,
 		)
 	}
 }
 
-// totalExpectedAccounts is just used to preallocate the account group  map
-const totalExpectedAccounts = 40_000_000
-
-// MigrateByAccount teaks a migrator function and all the Payloads, and return the migrated Payloads
+// MigrateByAccount teaks a migrator function and all the Payloads,
+// and return the migrated Payloads
 func MigrateByAccount(
 	log zerolog.Logger,
-	migratorFactory AccountMigratorFactory,
-	allPayloads []*ledger.Payload,
 	nWorker int,
+	allPayloads []*ledger.Payload,
+	migratorFactories []AccountMigratorFactory,
 ) (
 	[]*ledger.Payload,
 	error,
@@ -61,71 +60,49 @@ func MigrateByAccount(
 		return allPayloads, nil
 	}
 
-	payloads, accountIndexes := sortPayloadsAndFindAccountIndexes(log, allPayloads)
+	accountGroups := util.GroupPayloadsByAccount(log, allPayloads, nWorker)
 
-	migrator, err := migratorFactory(allPayloads, nWorker)
-	if err != nil {
-		return nil, fmt.Errorf("could not create account migrator: %w", err)
+	migrators := make([]AccountMigrator, len(migratorFactories))
+	for i, migratorFactory := range migratorFactories {
+		migrator, err := migratorFactory(
+			log,
+			allPayloads,
+			nWorker)
+		if err != nil {
+			return nil, fmt.Errorf("could not create account migrator: %w", err)
+		}
+		migrators[i] = migrator
 	}
 
 	log.Info().
-		Str("migrator", fmt.Sprintf("%T", migrator)).
+		Int("inner_migrations", len(migrators)).
 		Int("nWorker", nWorker).
-		Msgf("created migrator")
+		Msgf("created account migrator")
 
 	defer func() {
-		// close the migrator if it's a Closer
-		if migrator, ok := migrator.(io.Closer); ok {
-			if err := migrator.Close(); err != nil {
-				log.Error().Err(err).Msg("error closing migrator")
+		for _, migrator := range migrators {
+			// close the migrator if it's a Closer
+			if migrator, ok := migrator.(io.Closer); ok {
+				if err := migrator.Close(); err != nil {
+					log.Error().Err(err).Msg("error closing migrator")
+				}
 			}
 		}
 	}()
 
 	// migrate the Payloads under accounts
-	migrated, err := MigrateGroupConcurrently(log, migrator, payloads, accountIndexes, nWorker)
+	migrated, err := MigrateGroupConcurrently(log, migrators, accountGroups, nWorker)
 
 	if err != nil {
 		return nil, fmt.Errorf("could not migrate group: %w", err)
 	}
 
 	log.Info().
-		Int("account_count", len(accountIndexes)).
-		Int("payload_count", len(payloads)).
+		Int("account_count", accountGroups.Len()).
+		Int("payload_count", len(allPayloads)).
 		Msgf("finished migrating Payloads")
 
 	return migrated, nil
-}
-
-func sortPayloadsAndFindAccountIndexes(
-	log zerolog.Logger,
-	allPayloads []*ledger.Payload,
-) (
-	sortablePayloads,
-	[]int,
-) {
-	log.Info().Msgf("sorting %d payloads", len(allPayloads))
-
-	payloads := sortablePayloads(allPayloads)
-	sort.Sort(payloads)
-	log.Info().Msgf("finished sorting %d payloads", len(allPayloads))
-
-	log.Info().Msgf("finding account indexes")
-
-	i := 0
-	accountIndexes := make([]int, 0, totalExpectedAccounts)
-	accountIndexes = append(accountIndexes, i)
-	for {
-		j := payloads.FindLastOfTheSameKey(i)
-		if j == len(payloads)-1 {
-			break
-		}
-		accountIndexes = append(accountIndexes, j+1)
-		i = j + 1
-	}
-
-	log.Info().Msgf("done finding account indexes")
-	return payloads, accountIndexes
 }
 
 // MigrateGroupConcurrently migrate the Payloads in the given payloadsByAccount map which
@@ -133,9 +110,8 @@ func sortPayloadsAndFindAccountIndexes(
 // It's similar to MigrateGroupSequentially, except it will migrate different groups concurrently
 func MigrateGroupConcurrently(
 	log zerolog.Logger,
-	migrator AccountMigrator,
-	payloads sortablePayloads,
-	accountIndexes []int,
+	migrators []AccountMigrator,
+	accountGroups *util.PayloadAccountGrouping,
 	nWorker int,
 ) ([]*ledger.Payload, error) {
 
@@ -145,14 +121,13 @@ func MigrateGroupConcurrently(
 	ctx, cancel := context.WithCancelCause(ctx)
 	defer cancel(nil)
 
-	jobs := make(chan jobMigrateAccountGroup, len(accountIndexes))
+	jobs := make(chan jobMigrateAccountGroup, accountGroups.Len())
 
 	wg := sync.WaitGroup{}
 	wg.Add(nWorker)
-	resultCh := make(chan *migrationResult, len(accountIndexes))
+	resultCh := make(chan *migrationResult, accountGroups.Len())
 	for i := 0; i < int(nWorker); i++ {
 		go func() {
-
 			defer wg.Done()
 
 			for {
@@ -165,7 +140,14 @@ func MigrateGroupConcurrently(
 					}
 					start := time.Now()
 
-					accountMigrated, err := migrator.MigratePayloads(ctx, job.Address, job.Payloads)
+					var err error
+					accountMigrated := job.Payloads
+					for _, migrator := range migrators {
+						accountMigrated, err = migrator.MigratePayloads(ctx, job.Address, accountMigrated)
+						if err != nil {
+							break
+						}
+					}
 
 					resultCh <- &migrationResult{
 						migrationDuration: migrationDuration{
@@ -181,23 +163,20 @@ func MigrateGroupConcurrently(
 	}
 
 	go func() {
-		for i, accountStartIdex := range accountIndexes {
-			accountEndIndex := 0
-			if i == len(accountIndexes)-1 {
-				accountEndIndex = len(payloads)
-			} else {
-				accountEndIndex = accountIndexes[i+1]
-			}
-
-			address, err := payloadToAddress(payloads[accountStartIdex])
+		for {
+			g, err := accountGroups.Next()
 			if err != nil {
-				cancel(fmt.Errorf("could not get key for payload: %w", err))
+				cancel(fmt.Errorf("could not get next account group: %w", err))
 				return
 			}
 
+			if g == nil {
+				break
+			}
+
 			job := jobMigrateAccountGroup{
-				Address:  address,
-				Payloads: payloads[accountStartIdex:accountEndIndex],
+				Address:  g.Address,
+				Payloads: g.Payloads,
 			}
 
 			select {
@@ -209,12 +188,12 @@ func MigrateGroupConcurrently(
 	}()
 
 	// read job results
-	logAccount := moduleUtil.LogProgress("processing account group", len(accountIndexes), log)
+	logAccount := moduleUtil.LogProgress("processing account group", accountGroups.Len(), log)
 
 	migrated := make([]*ledger.Payload, 0)
 
 	durations := &migrationDurations{}
-	for i := 0; i < len(accountIndexes); i++ {
+	for i := 0; i < accountGroups.Len(); i++ {
 		select {
 		case <-ctx.Done():
 			break
@@ -270,34 +249,6 @@ type migrationResult struct {
 	Err      error
 }
 
-// payloadToAddress takes a payload and return:
-// - (address, true, nil) if the payload is for an account, the account address is returned
-// - ("", false, nil) if the payload is not for an account
-// - ("", false, err) if running into any exception
-// The zero address is used for global Payloads and is not an account
-func payloadToAddress(p *ledger.Payload) (common.Address, error) {
-	k, err := p.Key()
-	if err != nil {
-		return common.ZeroAddress, fmt.Errorf("could not find key for payload: %w", err)
-	}
-
-	id, err := util.KeyToRegisterID(k)
-	if err != nil {
-		return common.ZeroAddress, fmt.Errorf("error converting key to register ID")
-	}
-
-	if len([]byte(id.Owner)) != flow.AddressLength {
-		return common.ZeroAddress, nil
-	}
-
-	address, err := common.BytesToAddress([]byte(id.Owner))
-	if err != nil {
-		return common.ZeroAddress, fmt.Errorf("invalid account address: %w", err)
-	}
-
-	return address, nil
-}
-
 type migrationDuration struct {
 	Address  common.Address
 	Duration time.Duration
@@ -330,57 +281,4 @@ func (h *migrationDurations) Array() zerolog.LogArrayMarshaler {
 		array = array.Str(fmt.Sprintf("%s: %s", result.Address.Hex(), result.Duration.String()))
 	}
 	return array
-}
-
-// EncodedKeyAddressPrefixLength is the length of the address prefix in the encoded key
-// 2 for uint16 of number of key parts
-// 4 for uint32 of the length of the first key part
-// 2 for uint32 of the key part type
-// 8 for the address which is the actual length of the first key part
-const EncodedKeyAddressPrefixLength = 2 + 4 + 2 + 8
-
-type sortablePayloads []*ledger.Payload
-
-func (s sortablePayloads) Len() int {
-	return len(s)
-}
-
-func (s sortablePayloads) Less(i, j int) bool {
-	return s.Compare(i, j) < 0
-}
-
-func (s sortablePayloads) Compare(i, j int) int {
-	return bytes.Compare(
-		s[i].EncodedKey()[:EncodedKeyAddressPrefixLength],
-		s[j].EncodedKey()[:EncodedKeyAddressPrefixLength],
-	)
-}
-
-func (s sortablePayloads) Swap(i, j int) {
-	s[i], s[j] = s[j], s[i]
-}
-
-func (s sortablePayloads) FindLastOfTheSameKey(i int) int {
-	low := i
-	step := 1
-	for low+step < len(s) && s.Compare(low+step, i) == 0 {
-		low += step
-		step *= 2
-	}
-
-	high := low + step
-	if high > len(s) {
-		high = len(s)
-	}
-
-	for low < high {
-		mid := (low + high) / 2
-		if s.Compare(mid, i) == 0 {
-			low = mid + 1
-		} else {
-			high = mid
-		}
-	}
-
-	return low - 1
 }

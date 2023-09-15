@@ -27,7 +27,11 @@ func TestAtreeRegisterMigration(t *testing.T) {
 
 			log,
 			"test-data/bootstrapped_v0.31",
-			migrations.MigrateAtreeRegisters(log, reporters.NewReportFileWriterFactory(dir, log), 2),
+			migrations.CreateAccountBasedMigrations(log, 2,
+				[]migrations.AccountMigratorFactory{
+					migrations.NewAtreeRegisterMigrator(reporters.NewReportFileWriterFactory(dir, log)),
+				},
+			),
 			func(t *testing.T, oldPayloads []*ledger.Payload, newPayloads []*ledger.Payload) {
 
 				oldPayloadsMap := make(map[flow.RegisterID]*ledger.Payload, len(oldPayloads))

@@ -84,10 +84,17 @@ func extractExecutionState(
 	}()
 
 	var migrations = []ledger.Migration{
-		migrators.MigrateAtreeRegisters(
+		migrators.CreateAccountBasedMigrations(
 			log,
-			reporters.NewReportFileWriterFactory(dir, log),
-			nWorker),
+			nWorker,
+			[]migrators.AccountMigratorFactory{
+				// do account usage migration before and after as a sanity check.
+				migrators.NewAccountUsageMigrator,
+				migrators.NewAtreeRegisterMigrator(
+					reporters.NewReportFileWriterFactory(dir, log),
+				),
+				migrators.NewAccountUsageMigrator,
+			}),
 	}
 	newState := ledger.State(targetHash)
 
