@@ -2,6 +2,7 @@ package badger
 
 import (
 	"fmt"
+	"github.com/onflow/flow-go/module/irrecoverable"
 
 	"github.com/dgraph-io/badger/v2"
 
@@ -63,10 +64,10 @@ func NewProtocolState(collector module.CacheMetrics,
 //   - storage.ErrAlreadyExists if an Identity Table with the given id is already stored
 func (s *ProtocolState) StoreTx(id flow.Identifier, protocolState *flow.ProtocolStateEntry) func(*transaction.Tx) error {
 	// front-load sanity checks:
-	if !protocolState.Identities.Sorted(order.IdentifierCanonical) {
+	if !protocolState.CurrentEpoch.Identities.Sorted(order.IdentifierCanonical) {
 		return transaction.Fail(fmt.Errorf("sanity check failed: identities are not sorted"))
 	}
-	if protocolState.NextEpochProtocolState != nil && !protocolState.NextEpochProtocolState.Identities.Sorted(order.IdentifierCanonical) {
+	if protocolState.NextEpoch != nil && !protocolState.NextEpoch.Identities.Sorted(order.IdentifierCanonical) {
 		return transaction.Fail(fmt.Errorf("sanity check failed: next epoch identities are not sorted"))
 	}
 
@@ -154,31 +155,31 @@ func newRichProtocolStateEntry(
 		}
 	}
 
-	currentEpochSetup, err := setups.ByID(protocolState.CurrentEpochEventIDs.SetupID)
+	currentEpochSetup, err := setups.ByID(protocolState.CurrentEpoch.SetupID)
 	if err != nil {
 		return nil, fmt.Errorf("could not retrieve current epoch setup: %w", err)
 	}
-	currentEpochCommit, err := commits.ByID(protocolState.CurrentEpochEventIDs.CommitID)
+	currentEpochCommit, err := commits.ByID(protocolState.CurrentEpoch.CommitID)
 	if err != nil {
 		return nil, fmt.Errorf("could not retrieve current epoch commit: %w", err)
 	}
 
-	// if next epoch has been already committed, fill in data for it as well.
-	if protocolState.NextEpochProtocolState != nil {
-		nextEpochProtocolState := *protocolState.NextEpochProtocolState
-		nextEpochSetup, err = setups.ByID(nextEpochProtocolState.CurrentEpochEventIDs.SetupID)
+	// if next epoch has been setup, fill in data for it as well.
+	if protocolState.NextEpoch != nil {
+		nextEpoch := protocolState.NextEpoch
+		nextEpochSetup, err = setups.ByID(nextEpoch.SetupID)
 		if err != nil {
 			return nil, fmt.Errorf("could not retrieve next epoch setup: %w", err)
 		}
-		if nextEpochProtocolState.CurrentEpochEventIDs.CommitID != flow.ZeroID {
-			nextEpochCommit, err = commits.ByID(nextEpochProtocolState.CurrentEpochEventIDs.CommitID)
+		if nextEpoch.CommitID != flow.ZeroID {
+			nextEpochCommit, err = commits.ByID(nextEpoch.CommitID)
 			if err != nil {
 				return nil, fmt.Errorf("could not retrieve next epoch commit: %w", err)
 			}
 		}
 	}
 
-	return flow.NewRichProtocolStateEntry(
+	result, err := flow.NewRichProtocolStateEntry(
 		protocolState,
 		previousEpochSetup,
 		previousEpochCommit,
@@ -187,4 +188,10 @@ func newRichProtocolStateEntry(
 		nextEpochSetup,
 		nextEpochCommit,
 	)
+	if err != nil {
+		// observing an error here would be an indication of severe data corruption or bug in our code since
+		// all data should be available and correctly structured at this point.
+		return nil, irrecoverable.NewExceptionf("could not create rich protocol state entry from storage: %w", err)
+	}
+	return result, nil
 }
