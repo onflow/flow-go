@@ -5,8 +5,6 @@ import (
 	"fmt"
 	"github.com/rs/zerolog"
 
-	"github.com/rs/zerolog/log"
-
 	"github.com/onflow/cadence/runtime/common"
 
 	"github.com/onflow/flow-go/cmd/util/ledger/util"
@@ -30,14 +28,18 @@ func isAccountKey(key ledger.Key) bool {
 
 // AccountUsageMigrator iterates through each payload, and calculate the storage usage
 // and update the accoutns status with the updated storage usage
-type AccountUsageMigrator struct{}
+type AccountUsageMigrator struct {
+	log zerolog.Logger
+}
 
 func NewAccountUsageMigrator(
-	_ zerolog.Logger,
+	log zerolog.Logger,
 	_ []*ledger.Payload,
 	_ int,
 ) (AccountMigrator, error) {
-	return AccountUsageMigrator{}, nil
+	return AccountUsageMigrator{
+		log: log,
+	}, nil
 }
 
 func (m AccountUsageMigrator) MigratePayloads(
@@ -75,7 +77,9 @@ func (m AccountUsageMigrator) MigratePayloads(
 
 	err := compareUsage(status, totalSize)
 	if err != nil {
-		log.Error().Msgf("%v", err)
+		m.log.Info().
+			Err(err).
+			Msg("account storage used usage mismatch")
 	}
 
 	if status == nil {

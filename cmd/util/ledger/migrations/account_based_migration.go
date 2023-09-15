@@ -65,7 +65,7 @@ func MigrateByAccount(
 	migrators := make([]AccountMigrator, len(migratorFactories))
 	for i, migratorFactory := range migratorFactories {
 		migrator, err := migratorFactory(
-			log,
+			log.With().Int("account_migration_sequence", i).Logger(),
 			allPayloads,
 			nWorker)
 		if err != nil {
