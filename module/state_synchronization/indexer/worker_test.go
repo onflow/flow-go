@@ -2,6 +2,7 @@ package indexer
 
 import (
 	"context"
+	"fmt"
 	"testing"
 	"time"
 
@@ -135,4 +136,80 @@ func TestWorker_Success(t *testing.T) {
 
 	// make sure store was called correct number of times
 	indexerTest.registers.AssertNumberOfCalls(t, "Store", len(blocks)-lastIndexedIndex-1)
+}
+
+func TestWorker_Failure(t *testing.T) {
+	blocks := blocksFixture(10)
+	// we use 5th index as the latest indexed height, so we leave 5 more blocks to be indexed by the indexer in this test
+	lastIndexedIndex := 5
+	lastIndexedHeight := blocks[lastIndexedIndex].Header.Height
+	progress := &mockProgress{index: lastIndexedHeight}
+	test := workerTest{
+		blocks:   blocks,
+		progress: progress,
+	}
+
+	indexerTest := newIndexTest(t, blocks, nil).
+		useDefaultFirstHeight().
+		setLastHeight(func(t *testing.T) (uint64, error) {
+			return lastIndexedHeight, nil
+		}).
+		useDefaultBlockByHeight().
+		initIndexer()
+
+	blockDataCache := mempool.NewExecutionData(t)
+	exeDatastore := mock.NewExecutionDataStore(t)
+
+	blockDataCache.
+		On("ByID", mocks.AnythingOfType("flow.Identifier")).
+		Return(func(ID flow.Identifier) (*execution_data.BlockExecutionDataEntity, bool) {
+			trie := trieUpdateFixture()
+			ed := &execution_data.BlockExecutionData{
+				BlockID: ID,
+				ChunkExecutionDatas: []*execution_data.ChunkExecutionData{
+					{TrieUpdate: trie},
+				},
+			}
+
+			// fail when trying to persist registers
+			indexerTest.setStoreRegisters(func(t *testing.T, entries flow.RegisterEntries, height uint64) error {
+				return fmt.Errorf("error persisting data")
+			})
+
+			return execution_data.NewBlockExecutionDataEntity(ID, ed), true
+		})
+
+	exeCache := cache.NewExecutionDataCache(exeDatastore, indexerTest.indexer.headers, nil, nil, blockDataCache)
+
+	worker := NewExecutionStateWorker(
+		zerolog.Nop(),
+		test.first().Header.Height,
+		testTimeout,
+		indexerTest.indexer,
+		exeCache,
+		test.LatestHeight,
+		progress,
+	)
+
+	expectedErr := fmt.Errorf(
+		"failed to index block data at height %d: could not index register payloads at height %d: error persisting data",
+		lastIndexedHeight+1,
+		lastIndexedHeight+1,
+	)
+	ctx, cancel := context.WithCancel(context.Background())
+	signalerCtx := irrecoverable.NewMockSignalerContextExpectError(t, ctx, expectedErr)
+
+	worker.Start(signalerCtx)
+
+	unittest.RequireComponentsReadyBefore(t, testTimeout, worker.ComponentConsumer)
+
+	worker.OnExecutionData(nil)
+
+	// give it a bit of time to process all the blocks
+	time.Sleep(testTimeout - 50)
+	cancel()
+	unittest.RequireCloseBefore(t, worker.Done(), testTimeout, "timeout waiting for the consumer to be done")
+
+	// make sure store was called correct number of times
+	indexerTest.registers.AssertNumberOfCalls(t, "Store", 1) // it fails after first run
 }
