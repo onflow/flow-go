@@ -1,4 +1,4 @@
-package internal
+package unicastcache
 
 import (
 	"fmt"
@@ -12,7 +12,7 @@ import (
 	"github.com/onflow/flow-go/module/mempool/herocache/backdata/heropool"
 	"github.com/onflow/flow-go/module/mempool/stdmap"
 	"github.com/onflow/flow-go/network/p2p/unicast"
-	"github.com/onflow/flow-go/network/p2p/unicast/model"
+	"github.com/onflow/flow-go/network/p2p/unicast/unicastmodel"
 )
 
 // ErrDialConfigNotFound is a benign error that indicates that the dial config does not exist in the cache. It is not a fatal error.
@@ -20,7 +20,7 @@ var ErrDialConfigNotFound = fmt.Errorf("dial config not found")
 
 type DialConfigCache struct {
 	peerCache  *stdmap.Backend
-	cfgFactory func() model.DialConfig // factory function that creates a new dial config.
+	cfgFactory func() unicastmodel.DialConfig // factory function that creates a new dial config.
 }
 
 var _ unicast.DialConfigCache = (*DialConfigCache)(nil)
@@ -37,7 +37,7 @@ var _ unicast.DialConfigCache = (*DialConfigCache)(nil)
 // expected to be small, size must be large enough to hold all the dial configs of the authorized nodes.
 // To avoid any crash-failure, the cache is configured to eject the least recently used configs when the cache is full.
 // Hence, we recommend setting the size to a large value to minimize the ejections.
-func NewDialConfigCache(size uint32, logger zerolog.Logger, collector module.HeroCacheMetrics, cfgFactory func() model.DialConfig) *DialConfigCache {
+func NewDialConfigCache(size uint32, logger zerolog.Logger, collector module.HeroCacheMetrics, cfgFactory func() unicastmodel.DialConfig) *DialConfigCache {
 	return &DialConfigCache{
 		peerCache: stdmap.NewBackend(
 			stdmap.WithBackData(
@@ -60,7 +60,7 @@ func NewDialConfigCache(size uint32, logger zerolog.Logger, collector module.Her
 // - adjustFunc: the function that adjusts the dial config.
 // Returns:
 //   - error any returned error should be considered as an irrecoverable error and indicates a bug.
-func (d *DialConfigCache) Adjust(peerID peer.ID, adjustFunc model.DialConfigAdjustFunc) (*model.DialConfig, error) {
+func (d *DialConfigCache) Adjust(peerID peer.ID, adjustFunc unicastmodel.DialConfigAdjustFunc) (*unicastmodel.DialConfig, error) {
 	// first we translate the peer id to a flow id (taking
 	flowPeerId := PeerIdToFlowId(peerID)
 	adjustedDialCfg, err := d.adjust(flowPeerId, adjustFunc)
@@ -96,7 +96,7 @@ func (d *DialConfigCache) Adjust(peerID peer.ID, adjustFunc model.DialConfigAdju
 // Returns:
 //   - error if the adjustFunc returns an error or if the config does not exist (ErrDialConfigNotFound). Except the ErrDialConfigNotFound,
 //     any other error should be treated as an irrecoverable error and indicates a bug.
-func (d *DialConfigCache) adjust(peerIdHash flow.Identifier, adjustFunc model.DialConfigAdjustFunc) (*model.DialConfig, error) {
+func (d *DialConfigCache) adjust(peerIdHash flow.Identifier, adjustFunc unicastmodel.DialConfigAdjustFunc) (*unicastmodel.DialConfig, error) {
 	var rErr error
 	adjustedEntity, adjusted := d.peerCache.Adjust(peerIdHash, func(entity flow.Entity) flow.Entity {
 		cfgEntity, ok := entity.(DialConfigEntity)
@@ -126,7 +126,7 @@ func (d *DialConfigCache) adjust(peerIdHash flow.Identifier, adjustFunc model.Di
 		return nil, ErrDialConfigNotFound
 	}
 
-	return &model.DialConfig{
+	return &unicastmodel.DialConfig{
 		DialBackoff:        adjustedEntity.(DialConfigEntity).DialBackoff,
 		StreamBackoff:      adjustedEntity.(DialConfigEntity).StreamBackoff,
 		LastSuccessfulDial: adjustedEntity.(DialConfigEntity).LastSuccessfulDial,
@@ -140,7 +140,7 @@ func (d *DialConfigCache) adjust(peerIdHash flow.Identifier, adjustFunc model.Di
 // Returns:
 //   - *DialConfig, the dial config for the given peer id.
 //   - error if the factory function returns an error. Any error should be treated as an irrecoverable error and indicates a bug.
-func (d *DialConfigCache) GetOrInit(peerID peer.ID) (*model.DialConfig, error) {
+func (d *DialConfigCache) GetOrInit(peerID peer.ID) (*unicastmodel.DialConfig, error) {
 	// first we translate the peer id to a flow id (taking
 	flowPeerId := PeerIdToFlowId(peerID)
 	cfg, ok := d.get(flowPeerId)
@@ -158,7 +158,7 @@ func (d *DialConfigCache) GetOrInit(peerID peer.ID) (*model.DialConfig, error) {
 }
 
 // Get returns the dial config of the given peer ID.
-func (d *DialConfigCache) get(peerIDHash flow.Identifier) (*model.DialConfig, bool) {
+func (d *DialConfigCache) get(peerIDHash flow.Identifier) (*unicastmodel.DialConfig, bool) {
 	entity, ok := d.peerCache.ByID(peerIDHash)
 	if !ok {
 		return nil, false
@@ -172,7 +172,7 @@ func (d *DialConfigCache) get(peerIDHash flow.Identifier) (*model.DialConfig, bo
 	}
 
 	// return a copy of the config (we do not want the caller to modify the config).
-	return &model.DialConfig{
+	return &unicastmodel.DialConfig{
 		DialBackoff:        cfg.DialBackoff,
 		StreamBackoff:      cfg.StreamBackoff,
 		LastSuccessfulDial: cfg.LastSuccessfulDial,

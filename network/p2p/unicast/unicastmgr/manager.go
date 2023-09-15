@@ -1,4 +1,4 @@
-package unicast
+package unicastmgr
 
 import (
 	"context"
@@ -18,6 +18,7 @@ import (
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/p2plogging"
+	"github.com/onflow/flow-go/network/p2p/unicast"
 	"github.com/onflow/flow-go/network/p2p/unicast/protocols"
 	"github.com/onflow/flow-go/network/p2p/unicast/stream"
 )
@@ -35,6 +36,8 @@ var (
 	_ p2p.UnicastManager = (*Manager)(nil)
 )
 
+type DialConfigCacheFactory func() unicast.DialConfigCache
+
 // Manager manages libp2p stream negotiation and creation, which is utilized for unicast dispatches.
 type Manager struct {
 	logger                 zerolog.Logger
@@ -46,6 +49,7 @@ type Manager struct {
 	peerDialing            sync.Map
 	createStreamRetryDelay time.Duration
 	metrics                module.UnicastManagerMetrics
+	dialConfigCache        unicast.DialConfigCache
 
 	// MaxConnectionBackoffTimes is the maximum number of times to retry creating a connection to a peer.
 	MaxConnectionBackoffTimes uint64
@@ -65,6 +69,7 @@ type Manager struct {
 	// Note in Flow, we only dial a peer when we need to send a message to it; and we assume two nodes that are supposed to
 	// exchange unicast messages will do it frequently. Therefore, the dial history is a good indicator
 	// of the reliability of the peer.
+	// TODO: rename to peer backoff rest period
 	peerReliabilityThreshold time.Duration
 }
 
@@ -78,6 +83,7 @@ type ManagerConfig struct {
 	MaxConnectionBackoffTimes uint64
 	MaxStreamBackoffTimes     uint64
 	PeerReliabilityThreshold  time.Duration
+	DialConfigCacheFactory    DialConfigCacheFactory
 }
 
 // NewUnicastManager creates a new unicast manager.
@@ -94,6 +100,7 @@ func NewUnicastManager(cfg *ManagerConfig) (*Manager, error) {
 
 	return &Manager{
 		logger:                    cfg.Logger.With().Str("module", "unicast-manager").Logger(),
+		dialConfigCache:           cfg.DialConfigCacheFactory(),
 		streamFactory:             cfg.StreamFactory,
 		sporkId:                   cfg.SporkId,
 		connStatus:                cfg.ConnStatus,
@@ -117,10 +124,7 @@ func (m *Manager) SetDefaultHandler(defaultHandler libp2pnet.StreamHandler) {
 	m.defaultHandler = defaultHandler
 
 	m.protocols = []protocols.Protocol{
-		&PlainStream{
-			protocolId: defaultProtocolID,
-			handler:    defaultHandler,
-		},
+		stream.NewPlainStream(defaultHandler, defaultProtocolID),
 	}
 
 	m.streamFactory.SetStreamHandler(defaultProtocolID, defaultHandler)
@@ -156,14 +160,15 @@ func (m *Manager) Register(protocol protocols.ProtocolName) error {
 func (m *Manager) CreateStream(ctx context.Context, peerID peer.ID) (libp2pnet.Stream, []multiaddr.Multiaddr, error) {
 	var errs error
 	for i := len(m.protocols) - 1; i >= 0; i-- {
-		s, addrs, err := m.tryCreateStream(ctx, peerID, m.protocols[i])
+		s, addresses, err := m.tryCreateStream(ctx, peerID, m.protocols[i])
 		if err != nil {
+			fmt.Println("err", err)
 			errs = multierror.Append(errs, err)
 			continue
 		}
 
 		// return first successful stream
-		return s, addrs, nil
+		return s, addresses, nil
 	}
 
 	return nil, nil, fmt.Errorf("could not create stream on any available unicast protocol: %w", errs)
@@ -192,7 +197,7 @@ func (m *Manager) tryCreateStream(ctx context.Context, peerID peer.ID, protocol 
 		attempts++
 		s, addrs, err = m.createStream(ctx, peerID, protocol)
 		if err != nil {
-			if IsErrDialInProgress(err) {
+			if unicast.IsErrDialInProgress(err) {
 				m.logger.Warn().
 					Err(err).
 					Str("peer_id", p2plogging.PeerId(peerID)).
@@ -260,7 +265,7 @@ func (m *Manager) rawStreamWithProtocol(ctx context.Context, protocolID protocol
 	if !isConnected {
 		// return error if we can't start dialing
 		if m.dialingInProgress(peerID) {
-			return nil, nil, NewDialInProgressErr(peerID)
+			return nil, nil, unicast.NewDialInProgressErr(peerID)
 		}
 		defer m.dialingComplete(peerID)
 		dialAddr, err := m.dialPeer(ctx, peerID)
@@ -393,7 +398,7 @@ func retryBackoff(maxAttempts uint64) retry.Backoff {
 // retryFailedError wraps the given error in a ErrMaxRetries if maxAttempts were made.
 func retryFailedError(dialAttempts, maxAttempts uint64, err error) error {
 	if dialAttempts == maxAttempts {
-		return NewMaxRetriesErr(dialAttempts, err)
+		return unicast.NewMaxRetriesErr(dialAttempts, err)
 	}
 	return err
 }

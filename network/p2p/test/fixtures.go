@@ -37,8 +37,8 @@ import (
 	"github.com/onflow/flow-go/network/p2p/p2pbuilder"
 	p2pconfig "github.com/onflow/flow-go/network/p2p/p2pbuilder/config"
 	"github.com/onflow/flow-go/network/p2p/tracer"
-	"github.com/onflow/flow-go/network/p2p/unicast"
 	"github.com/onflow/flow-go/network/p2p/unicast/protocols"
+	"github.com/onflow/flow-go/network/p2p/unicast/unicastmgr"
 	"github.com/onflow/flow-go/network/p2p/utils"
 	validator "github.com/onflow/flow-go/network/validator/pubsub"
 	"github.com/onflow/flow-go/utils/logging"
@@ -106,7 +106,7 @@ func NodeFixture(
 		Address:                unittest.DefaultAddress,
 		Logger:                 logger,
 		Role:                   flow.RoleCollection,
-		CreateStreamRetryDelay: unicast.DefaultRetryDelay,
+		CreateStreamRetryDelay: unicastmgr.DefaultRetryDelay,
 		IdProvider:             idProvider,
 		MetricsCfg: &p2pconfig.MetricsConfig{
 			HeroCacheFactory: metrics.NewNoopHeroCacheMetricsFactory(),

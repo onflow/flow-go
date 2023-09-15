@@ -26,6 +26,7 @@ import (
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/irrecoverable"
+	"github.com/onflow/flow-go/module/metrics"
 	flownet "github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/netconf"
 	"github.com/onflow/flow-go/network/p2p"
@@ -39,8 +40,11 @@ import (
 	"github.com/onflow/flow-go/network/p2p/subscription"
 	"github.com/onflow/flow-go/network/p2p/tracer"
 	"github.com/onflow/flow-go/network/p2p/unicast"
+	unicastcache "github.com/onflow/flow-go/network/p2p/unicast/cache"
 	"github.com/onflow/flow-go/network/p2p/unicast/protocols"
 	"github.com/onflow/flow-go/network/p2p/unicast/stream"
+	"github.com/onflow/flow-go/network/p2p/unicast/unicastmgr"
+	"github.com/onflow/flow-go/network/p2p/unicast/unicastmodel"
 	"github.com/onflow/flow-go/network/p2p/utils"
 )
 
@@ -50,7 +54,7 @@ type LibP2PNodeBuilder struct {
 	address          string
 	networkKey       fcrypto.PrivateKey
 	logger           zerolog.Logger
-	metrics          module.LibP2PMetrics
+	metricsConfig    *p2pconfig.MetricsConfig
 	basicResolver    madns.BasicResolver
 
 	resourceManager           network.ResourceManager
@@ -64,6 +68,7 @@ type LibP2PNodeBuilder struct {
 	rateLimiterDistributor    p2p.UnicastRateLimiterDistributor
 	gossipSubTracer           p2p.PubSubTracer
 	disallowListCacheCfg      *p2p.DisallowListCacheConfig
+	networkingType            flownet.NetworkingType // whether the node is running in private (staked) or public (unstaked) network
 }
 
 func NewNodeBuilder(
@@ -85,9 +90,10 @@ func NewNodeBuilder(
 		address:              address,
 		networkKey:           networkKey,
 		createNode:           DefaultCreateNodeFunc,
-		metrics:              metricsConfig.Metrics,
+		metricsConfig:        metricsConfig,
 		resourceManagerCfg:   rCfg,
 		disallowListCacheCfg: disallowListCacheCfg,
+		networkingType:       networkingType,
 		gossipSubBuilder: gossipsubbuilder.NewGossipSubBuilder(
 			logger,
 			metricsConfig,
@@ -246,7 +252,7 @@ func (builder *LibP2PNodeBuilder) Build() (p2p.LibP2PNode, error) {
 		}
 		limits.PeerBaseLimit.ConnsInbound = builder.resourceManagerCfg.PeerBaseLimitConnsInbound
 		l := limits.Scale(mem, fd)
-		mgr, err := rcmgr.NewResourceManager(rcmgr.NewFixedLimiter(l), rcmgr.WithMetrics(builder.metrics))
+		mgr, err := rcmgr.NewResourceManager(rcmgr.NewFixedLimiter(l), rcmgr.WithMetrics(builder.metricsConfig.Metrics))
 		if err != nil {
 			return nil, fmt.Errorf("could not create libp2p resource manager: %w", err)
 		}
@@ -309,15 +315,23 @@ func (builder *LibP2PNodeBuilder) Build() (p2p.LibP2PNode, error) {
 		builder.connGater.SetDisallowListOracle(node)
 	}
 
-	unicastManager, err := unicast.NewUnicastManager(&unicast.ManagerConfig{
+	unicastManager, err := unicastmgr.NewUnicastManager(&unicastmgr.ManagerConfig{
 		Logger:                    builder.logger,
 		StreamFactory:             stream.NewLibP2PStreamFactory(h),
 		SporkId:                   builder.sporkId,
 		ConnStatus:                node,
 		CreateStreamRetryDelay:    builder.createStreamRetryInterval,
-		Metrics:                   builder.metrics,
-		MaxConnectionBackoffTimes: p2pnode.MaxConnectAttempt,
-		MaxStreamBackoffTimes:     p2pnode.MaxStreamCreationAttempt,
+		Metrics:                   builder.metricsConfig.Metrics,
+		MaxConnectionBackoffTimes: unicastmodel.MaxConnectAttempt,
+		MaxStreamBackoffTimes:     unicastmodel.MaxStreamCreationAttempt,
+		PeerReliabilityThreshold:  unicastmodel.PeerReliabilityThreshold,
+		DialConfigCacheFactory: func() unicast.DialConfigCache {
+			return unicastcache.NewDialConfigCache(
+				unicast.DefaultDailConfigCacheSize,
+				builder.logger,
+				metrics.DialConfigCacheMetricFactory(builder.metricsConfig.HeroCacheFactory, builder.networkingType),
+				unicastmodel.DefaultDialConfigFactory)
+		},
 	})
 	if err != nil {
 		return nil, fmt.Errorf("could not create unicast manager: %w", err)

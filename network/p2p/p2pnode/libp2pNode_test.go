@@ -26,9 +26,9 @@ import (
 	"github.com/onflow/flow-go/network/internal/p2putils"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/p2plogging"
-	"github.com/onflow/flow-go/network/p2p/p2pnode"
 	p2ptest "github.com/onflow/flow-go/network/p2p/test"
 	"github.com/onflow/flow-go/network/p2p/unicast/protocols"
+	"github.com/onflow/flow-go/network/p2p/unicast/unicastmodel"
 	"github.com/onflow/flow-go/network/p2p/utils"
 	validator "github.com/onflow/flow-go/network/validator/pubsub"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -398,9 +398,9 @@ func TestCreateStream_SinglePeerDial(t *testing.T) {
 
 	// we expect a single routine to start attempting to dial thus the number of retries
 	// before failure should be at most p2pnode.MaxConnectAttempt
-	expectedNumOfDialRetries := int64(p2pnode.MaxConnectAttempt)
+	expectedNumOfDialRetries := int64(unicastmodel.MaxConnectAttempt)
 	// we expect the second routine to retry creating a stream p2pnode.MaxConnectAttempt when dialing is in progress
-	expectedCreateStreamRetries := int64(p2pnode.MaxConnectAttempt)
+	expectedCreateStreamRetries := int64(unicastmodel.MaxConnectAttempt)
 	require.Equal(t, expectedNumOfDialRetries, dialPeerRetries.Load(), fmt.Sprintf("expected %d dial peer retries got %d", expectedNumOfDialRetries, dialPeerRetries.Load()))
 	require.Equal(t, expectedCreateStreamRetries, createStreamRetries.Load(), fmt.Sprintf("expected %d dial peer retries got %d", expectedCreateStreamRetries, createStreamRetries.Load()))
 }

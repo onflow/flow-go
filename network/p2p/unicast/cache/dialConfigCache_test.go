@@ -1,4 +1,4 @@
-package internal_test
+package unicastcache_test
 
 import (
 	"testing"
@@ -7,10 +7,9 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/module/metrics"
-	"github.com/onflow/flow-go/network/p2p/p2pnode"
 	p2ptest "github.com/onflow/flow-go/network/p2p/test"
-	"github.com/onflow/flow-go/network/p2p/unicast/internal"
-	"github.com/onflow/flow-go/network/p2p/unicast/model"
+	unicastcache "github.com/onflow/flow-go/network/p2p/unicast/cache"
+	"github.com/onflow/flow-go/network/p2p/unicast/unicastmodel"
 )
 
 // TestNewDialConfigCache tests the creation of a new DialConfigCache.
@@ -19,17 +18,17 @@ func TestNewDialConfigCache(t *testing.T) {
 	sizeLimit := uint32(100)
 	logger := zerolog.Nop()
 	collector := metrics.NewNoopCollector()
-	cache := internal.NewDialConfigCache(sizeLimit, logger, collector, dialConfigFixture)
+	cache := unicastcache.NewDialConfigCache(sizeLimit, logger, collector, dialConfigFixture)
 	require.NotNil(t, cache)
 	require.Equalf(t, uint(0), cache.Size(), "cache size must be 0")
 }
 
 // dialConfigFixture returns a dial config fixture.
 // The dial config is initialized with the default values.
-func dialConfigFixture() model.DialConfig {
-	return model.DialConfig{
-		DialBackoff:        p2pnode.MaxConnectAttempt,
-		StreamBackoff:      p2pnode.MaxStreamCreationAttempt,
+func dialConfigFixture() unicastmodel.DialConfig {
+	return unicastmodel.DialConfig{
+		DialBackoff:        unicastmodel.MaxConnectAttempt,
+		StreamBackoff:      unicastmodel.MaxStreamCreationAttempt,
 		LastSuccessfulDial: 0,
 	}
 }
@@ -42,17 +41,17 @@ func TestDialConfigCache_Adjust_Init(t *testing.T) {
 	collector := metrics.NewNoopCollector()
 
 	dialFactoryCalled := 0
-	dialConfigFactory := func() model.DialConfig {
+	dialConfigFactory := func() unicastmodel.DialConfig {
 		require.Less(t, dialFactoryCalled, 2, "dial config factory must be called at most twice")
 		dialFactoryCalled++
 		return dialConfigFixture()
 	}
-	adjustFuncIncrement := func(cfg model.DialConfig) (model.DialConfig, error) {
+	adjustFuncIncrement := func(cfg unicastmodel.DialConfig) (unicastmodel.DialConfig, error) {
 		cfg.DialBackoff++
 		return cfg, nil
 	}
 
-	cache := internal.NewDialConfigCache(sizeLimit, logger, collector, dialConfigFactory)
+	cache := unicastcache.NewDialConfigCache(sizeLimit, logger, collector, dialConfigFactory)
 	require.NotNil(t, cache)
 	require.Zerof(t, cache.Size(), "cache size must be 0")
 
@@ -109,3 +108,6 @@ func TestDialConfigCache_Adjust_Init(t *testing.T) {
 	require.Equal(t, cfg.DialBackoff, dialConfigFixture().DialBackoff+2, "dial backoff must be adjusted")
 	require.Equal(t, cfg.StreamBackoff, dialConfigFixture().StreamBackoff, "stream backoff must be 1")
 }
+
+// TODO: concurrent adjust and get
+// TODO: LRU eviction

@@ -1,4 +1,4 @@
-package internal_test
+package unicastcache_test
 
 import (
 	"testing"
@@ -6,17 +6,17 @@ import (
 	"github.com/stretchr/testify/require"
 
 	p2ptest "github.com/onflow/flow-go/network/p2p/test"
-	"github.com/onflow/flow-go/network/p2p/unicast/internal"
-	"github.com/onflow/flow-go/network/p2p/unicast/model"
+	unicastcache "github.com/onflow/flow-go/network/p2p/unicast/cache"
+	"github.com/onflow/flow-go/network/p2p/unicast/unicastmodel"
 )
 
 // TestDialConfigEntity tests the DialConfigEntity struct and its methods.
 func TestDialConfigEntity(t *testing.T) {
 	peerID := p2ptest.PeerIdFixture(t)
 
-	d := &internal.DialConfigEntity{
+	d := &unicastcache.DialConfigEntity{
 		PeerId: peerID,
-		DialConfig: model.DialConfig{
+		DialConfig: unicastmodel.DialConfig{
 			DialBackoff:        10,
 			StreamBackoff:      20,
 			LastSuccessfulDial: 30,
@@ -25,7 +25,7 @@ func TestDialConfigEntity(t *testing.T) {
 
 	t.Run("Test ID and Checksum", func(t *testing.T) {
 		// id and checksum methods must return the same value as expected.
-		expectedID := internal.PeerIdToFlowId(peerID)
+		expectedID := unicastcache.PeerIdToFlowId(peerID)
 		require.Equal(t, expectedID, d.ID())
 		require.Equal(t, expectedID, d.Checksum())
 	})
