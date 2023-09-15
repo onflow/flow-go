@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/hashicorp/go-multierror"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	pubsub_pb "github.com/libp2p/go-libp2p-pubsub/pb"
 	"github.com/libp2p/go-libp2p/core/peer"
@@ -149,7 +150,6 @@ func (c *ControlMsgValidationInspector) processInspectRPCReq(req *InspectRPCRequ
 
 	activeClusterIDS := c.tracker.GetActiveClusterIds()
 	for _, ctrlMsgType := range p2pmsg.ControlMessageTypes() {
-		// iWant validation uses new sample size validation. This will be updated for all other control message types.
 		switch ctrlMsgType {
 		case p2pmsg.CtrlMsgGraft:
 			err := c.inspectGraftMessages(req.Peer, req.rpc.GetControl().GetGraft(), activeClusterIDS)
@@ -178,6 +178,13 @@ func (c *ControlMsgValidationInspector) processInspectRPCReq(req *InspectRPCRequ
 		}
 	}
 
+	// inspect rpc publish messages after all control message validation has passed
+	err := c.inspectRpcPublishMessages(req.Peer, req.rpc.GetPublish(), activeClusterIDS)
+	if err != nil {
+		c.logAndDistributeAsyncInspectErrs(req, p2pmsg.RpcPublishMessage, err)
+		return nil
+	}
+
 	return nil
 }
 
@@ -188,7 +195,6 @@ func (c *ControlMsgValidationInspector) processInspectRPCReq(req *InspectRPCRequ
 // - activeClusterIDS: the list of active cluster ids.
 // Returns:
 // - DuplicateFoundErr: if there are any duplicate topics in the list of grafts
-// - error: if any error occurs while sampling or validating topics, all returned errors are benign and should not cause the node to crash.
 func (c *ControlMsgValidationInspector) inspectGraftMessages(from peer.ID, grafts []*pubsub_pb.ControlGraft, activeClusterIDS flow.ChainIDList) error {
 	tracker := make(duplicateStrTracker)
 	for _, graft := range grafts {
@@ -284,7 +290,6 @@ func (c *ControlMsgValidationInspector) inspectIHaveMessages(from peer.ID, ihave
 // Returns:
 // - DuplicateFoundErr: if there are any duplicate message ids found in any of the iWants.
 // - IWantCacheMissThresholdErr: if the rate of cache misses exceeds the configured allowed threshold.
-// - error: if any error occurs while sampling or validating topics, all returned errors are benign and should not cause the node to crash.
 func (c *ControlMsgValidationInspector) inspectIWantMessages(from peer.ID, iWants []*pubsub_pb.ControlIWant) error {
 	lastHighest := c.rpcTracker.LastHighestIHaveRPCSize()
 	lg := c.logger.With().
@@ -333,6 +338,47 @@ func (c *ControlMsgValidationInspector) inspectIWantMessages(from peer.ID, iWant
 		Int("cache_misses", cacheMisses).
 		Int("duplicates", duplicates).
 		Msg("iwant control message validation complete")
+
+	return nil
+}
+
+// inspectRpcPublishMessages inspects a sample of the RPC gossip messages and performs topic validation that ensures the following:
+// - Topics are known flow topics.
+// - Topics are valid flow topics.
+// - Topics are in the nodes subscribe topics list.
+// If more than half the topics in the sample contain invalid topics an error will be returned.
+// Args:
+// - from: peer ID of the sender.
+// - messages: rpc publish messages.
+// - activeClusterIDS: the list of active cluster ids.
+// Returns:
+// - InvalidRpcPublishMessagesErr: if the amount of invalid messages exceeds the configured RPCMessageErrorThreshold.
+func (c *ControlMsgValidationInspector) inspectRpcPublishMessages(from peer.ID, messages []*pubsub_pb.Message, activeClusterIDS flow.ChainIDList) error {
+	totalMessages := len(messages)
+	if totalMessages == 0 {
+		return nil
+	}
+	sampleSize := c.config.RPCMessageMaxSampleSize
+	if sampleSize > totalMessages {
+		sampleSize = totalMessages
+	}
+	c.performSample(p2pmsg.RpcPublishMessage, uint(totalMessages), uint(sampleSize), func(i, j uint) {
+		messages[i], messages[j] = messages[j], messages[i]
+	})
+
+	var errs *multierror.Error
+	for _, message := range messages[:sampleSize] {
+		topic := channels.Topic(message.GetTopic())
+		err := c.validateTopic(from, topic, activeClusterIDS)
+		if err != nil {
+			errs = multierror.Append(errs, err)
+		}
+
+		// return an error when we exceed the error threshold
+		if errs.Len() > c.config.RPCMessageErrorThreshold {
+			return NewInvalidRpcPublishMessagesErr(errs.ErrorOrNil(), errs.Len())
+		}
+	}
 
 	return nil
 }
