@@ -59,51 +59,52 @@ func TestDialConfigCache_Adjust_Init(t *testing.T) {
 	peerID1 := p2ptest.PeerIdFixture(t)
 	peerID2 := p2ptest.PeerIdFixture(t)
 
-	// initially the dial config for peerID1 and peerID2 do not exist in the cache.
-	cfg, ok := cache.Get(peerID1)
-	require.False(t, ok, "dial config must not exist in the cache")
-	require.Nil(t, cfg, "dial config must be nil")
-	cfg, ok = cache.Get(peerID2)
-	require.False(t, ok, "dial config must not exist in the cache")
-	require.Nil(t, cfg, "dial config must be nil")
-
-	// adjust the dial config for peerID1; it does not exist in the cache, so it must be initialized.
-	err := cache.Adjust(peerID1, adjustFuncIncrement)
+	// Initializing the dial config for peerID1 through GetOrInit.
+	// dial config for peerID1 does not exist in the cache, so it must be initialized when using GetOrInit.
+	cfg, err := cache.GetOrInit(peerID1)
 	require.NoError(t, err)
+	require.NotNil(t, cfg, "dial config must not be nil")
+	require.Equal(t, dialConfigFixture(), *cfg, "dial config must be initialized with the default values")
 	require.Equal(t, uint(1), cache.Size(), "cache size must be 1")
 
-	// retrieve the dial config for peerID1 and assert that it is initialized with the default values; and the adjust function is applied.
-	cfg, ok = cache.Get(peerID1)
-	require.True(t, ok, "dial config must exist in the cache")
-	require.NotNil(t, cfg, "dial config must not be nil")
+	// Initializing and adjusting the dial config for peerID2 through Adjust.
+	// dial config for peerID2 does not exist in the cache, so it must be initialized when using Adjust.
+	cfg, err = cache.Adjust(peerID2, adjustFuncIncrement)
+	require.NoError(t, err)
+	// adjusting a non-existing dial config must not initialize the config.
+	require.Equal(t, uint(2), cache.Size(), "cache size must be 2")
 	require.Equal(t, cfg.LastSuccessfulDial, dialConfigFixture().LastSuccessfulDial, "last successful dial must be 0")
 	require.Equal(t, cfg.DialBackoff, dialConfigFixture().DialBackoff+1, "dial backoff must be adjusted")
 	require.Equal(t, cfg.StreamBackoff, dialConfigFixture().StreamBackoff, "stream backoff must be 1")
 
-	// adjusting the dial config for peerID2; it does not exist in the cache, so it must be initialized.
-	err = cache.Adjust(peerID2, adjustFuncIncrement)
-	require.NoError(t, err)
-	require.Equal(t, uint(2), cache.Size(), "cache size must be 2")
-	require.Equal(t, 2, dialFactoryCalled, "dial config factory must be called twice")
-
-	// retrieve the dial config for peerID2 and assert that it is initialized with the default values; and the adjust function is applied.
-	cfg, ok = cache.Get(peerID2)
-	require.True(t, ok, "dial config must exist in the cache")
+	// Retrieving the dial config of peerID2 through GetOrInit.
+	// retrieve the dial config for peerID2 and assert than it is initialized with the default values; and the adjust function is applied.
+	cfg, err = cache.GetOrInit(peerID2)
+	require.NoError(t, err, "dial config must exist in the cache")
 	require.NotNil(t, cfg, "dial config must not be nil")
+	// retrieving an existing dial config must not change the cache size.
+	require.Equal(t, uint(2), cache.Size(), "cache size must be 2")
+	// config should be the same as the one returned by Adjust.
 	require.Equal(t, cfg.LastSuccessfulDial, dialConfigFixture().LastSuccessfulDial, "last successful dial must be 0")
 	require.Equal(t, cfg.DialBackoff, dialConfigFixture().DialBackoff+1, "dial backoff must be adjusted")
 	require.Equal(t, cfg.StreamBackoff, dialConfigFixture().StreamBackoff, "stream backoff must be 1")
 
-	// adjust the dial config for peerID1 again; it exists in the cache, so the adjust function must be applied without initializing the config.
-	err = cache.Adjust(peerID1, adjustFuncIncrement)
+	// Adjusting the dial config of peerID1 through Adjust.
+	// dial config for peerID1 already exists in the cache, so it must be adjusted when using Adjust.
+	cfg, err = cache.Adjust(peerID1, adjustFuncIncrement)
 	require.NoError(t, err)
+	// adjusting an existing dial config must not change the cache size.
 	require.Equal(t, uint(2), cache.Size(), "cache size must be 2")
-	require.Equal(t, 2, dialFactoryCalled, "dial config factory must be called twice")
+	require.Equal(t, cfg.LastSuccessfulDial, dialConfigFixture().LastSuccessfulDial, "last successful dial must be 0")
+	require.Equal(t, cfg.DialBackoff, dialConfigFixture().DialBackoff+1, "dial backoff must be adjusted")
+	require.Equal(t, cfg.StreamBackoff, dialConfigFixture().StreamBackoff, "stream backoff must be 1")
 
-	// retrieve the dial config for peerID1 and assert that it is initialized with the default values; and the adjust function is applied.
-	cfg, ok = cache.Get(peerID1)
-	require.True(t, ok, "dial config must exist in the cache")
-	require.NotNil(t, cfg, "dial config must not be nil")
+	// Recurring adjustment of the dial config of peerID1 through Adjust.
+	// dial config for peerID1 already exists in the cache, so it must be adjusted when using Adjust.
+	cfg, err = cache.Adjust(peerID1, adjustFuncIncrement)
+	require.NoError(t, err)
+	// adjusting an existing dial config must not change the cache size.
+	require.Equal(t, uint(2), cache.Size(), "cache size must be 2")
 	require.Equal(t, cfg.LastSuccessfulDial, dialConfigFixture().LastSuccessfulDial, "last successful dial must be 0")
 	require.Equal(t, cfg.DialBackoff, dialConfigFixture().DialBackoff+2, "dial backoff must be adjusted")
 	require.Equal(t, cfg.StreamBackoff, dialConfigFixture().StreamBackoff, "stream backoff must be 1")

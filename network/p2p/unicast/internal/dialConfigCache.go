@@ -20,7 +20,7 @@ var ErrDialConfigNotFound = fmt.Errorf("dial config not found")
 
 type DialConfigCache struct {
 	peerCache  *stdmap.Backend
-	cfgFactory func() model.DialConfig
+	cfgFactory func() model.DialConfig // factory function that creates a new dial config.
 }
 
 var _ unicast.DialConfigCache = (*DialConfigCache)(nil)
@@ -60,32 +60,32 @@ func NewDialConfigCache(size uint32, logger zerolog.Logger, collector module.Her
 // - adjustFunc: the function that adjusts the dial config.
 // Returns:
 //   - error any returned error should be considered as an irrecoverable error and indicates a bug.
-func (d *DialConfigCache) Adjust(peerID peer.ID, adjustFunc model.DialConfigAdjustFunc) error {
+func (d *DialConfigCache) Adjust(peerID peer.ID, adjustFunc model.DialConfigAdjustFunc) (*model.DialConfig, error) {
 	// first we translate the peer id to a flow id (taking
 	flowPeerId := PeerIdToFlowId(peerID)
-	err := d.adjust(flowPeerId, adjustFunc)
-	switch {
-	case err == ErrDialConfigNotFound:
-		// if the config does not exist, we initialize the config and try to adjust it again.
-		// Note: there is an edge case where the config is initialized by another goroutine between the two calls.
-		// In this case, the init function is invoked twice, but it is not a problem because the underlying
-		// cache is thread-safe. Hence, we do not need to synchronize the two calls. In such cases, one of the
-		// two calls returns false, and the other call returns true. We do not care which call returns false, hence,
-		// we ignore the return value of the init function.
-		_ = d.peerCache.Add(DialConfigEntity{
-			PeerId:     peerID,
-			DialConfig: d.cfgFactory(),
-		})
-		// as the config is initialized, the adjust function should not return an error, and any returned error
-		// is an irrecoverable error and indicates a bug.
-		return d.adjust(flowPeerId, adjustFunc)
-	case err != nil:
+	adjustedDialCfg, err := d.adjust(flowPeerId, adjustFunc)
+	if err != nil {
+		if err == ErrDialConfigNotFound {
+			// if the config does not exist, we initialize the config and try to adjust it again.
+			// Note: there is an edge case where the config is initialized by another goroutine between the two calls.
+			// In this case, the init function is invoked twice, but it is not a problem because the underlying
+			// cache is thread-safe. Hence, we do not need to synchronize the two calls. In such cases, one of the
+			// two calls returns false, and the other call returns true. We do not care which call returns false, hence,
+			// we ignore the return value of the init function.
+			_ = d.peerCache.Add(DialConfigEntity{
+				PeerId:     peerID,
+				DialConfig: d.cfgFactory(),
+			})
+			// as the config is initialized, the adjust function should not return an error, and any returned error
+			// is an irrecoverable error and indicates a bug.
+			return d.adjust(flowPeerId, adjustFunc)
+		}
 		// if the adjust function returns an unexpected error on the first attempt, we return the error directly.
-		return fmt.Errorf("failed to adjust dial config: %w", err)
-	default:
-		// if the adjust function returns no error, we return nil
-		return nil
+		// any returned error should be considered as an irrecoverable error and indicates a bug.
+		return nil, fmt.Errorf("failed to adjust dial config: %w", err)
 	}
+	// if the adjust function returns no error on the first attempt, we return the adjusted config.
+	return adjustedDialCfg, nil
 }
 
 // adjust applies the given adjust function to the dial config of the given origin id.
@@ -96,9 +96,9 @@ func (d *DialConfigCache) Adjust(peerID peer.ID, adjustFunc model.DialConfigAdju
 // Returns:
 //   - error if the adjustFunc returns an error or if the config does not exist (ErrDialConfigNotFound). Except the ErrDialConfigNotFound,
 //     any other error should be treated as an irrecoverable error and indicates a bug.
-func (d *DialConfigCache) adjust(peerIdHash flow.Identifier, adjustFunc model.DialConfigAdjustFunc) error {
+func (d *DialConfigCache) adjust(peerIdHash flow.Identifier, adjustFunc model.DialConfigAdjustFunc) (*model.DialConfig, error) {
 	var rErr error
-	_, adjusted := d.peerCache.Adjust(peerIdHash, func(entity flow.Entity) flow.Entity {
+	adjustedEntity, adjusted := d.peerCache.Adjust(peerIdHash, func(entity flow.Entity) flow.Entity {
 		cfgEntity, ok := entity.(DialConfigEntity)
 		if !ok {
 			// sanity check
@@ -119,19 +119,47 @@ func (d *DialConfigCache) adjust(peerIdHash flow.Identifier, adjustFunc model.Di
 	})
 
 	if rErr != nil {
-		return fmt.Errorf("failed to adjust config: %w", rErr)
+		return nil, fmt.Errorf("failed to adjust config: %w", rErr)
 	}
 
 	if !adjusted {
-		return ErrDialConfigNotFound
+		return nil, ErrDialConfigNotFound
 	}
 
-	return nil
+	return &model.DialConfig{
+		DialBackoff:        adjustedEntity.(DialConfigEntity).DialBackoff,
+		StreamBackoff:      adjustedEntity.(DialConfigEntity).StreamBackoff,
+		LastSuccessfulDial: adjustedEntity.(DialConfigEntity).LastSuccessfulDial,
+	}, nil
+}
+
+// GetOrInit returns the dial config for the given peer id. If the config does not exist, it creates a new config
+// using the factory function and stores it in the cache.
+// Args:
+// - peerID: the peer id of the dial config.
+// Returns:
+//   - *DialConfig, the dial config for the given peer id.
+//   - error if the factory function returns an error. Any error should be treated as an irrecoverable error and indicates a bug.
+func (d *DialConfigCache) GetOrInit(peerID peer.ID) (*model.DialConfig, error) {
+	// first we translate the peer id to a flow id (taking
+	flowPeerId := PeerIdToFlowId(peerID)
+	cfg, ok := d.get(flowPeerId)
+	if !ok {
+		_ = d.peerCache.Add(DialConfigEntity{
+			PeerId:     peerID,
+			DialConfig: d.cfgFactory(),
+		})
+		cfg, ok = d.get(flowPeerId)
+		if !ok {
+			return nil, fmt.Errorf("failed to initialize dial config for peer %s", peerID)
+		}
+	}
+	return cfg, nil
 }
 
 // Get returns the dial config of the given peer ID.
-func (d *DialConfigCache) Get(peerID peer.ID) (*model.DialConfig, bool) {
-	entity, ok := d.peerCache.ByID(PeerIdToFlowId(peerID))
+func (d *DialConfigCache) get(peerIDHash flow.Identifier) (*model.DialConfig, bool) {
+	entity, ok := d.peerCache.ByID(peerIDHash)
 	if !ok {
 		return nil, false
 	}
