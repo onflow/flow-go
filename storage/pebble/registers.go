@@ -35,7 +35,6 @@ func NewRegisters(db *pebble.DB) (*Registers, error) {
 	// LatestHeight should also be the same
 	registers.firstHeight = firstHeight
 	registers.latestHeight = firstHeight
- 
 	return registers, nil
 }
 

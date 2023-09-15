@@ -198,7 +198,7 @@ func TestRegisters_LatestHeight(t *testing.T) {
 	require.NoError(t, err)
 	got, err := s.LatestHeight()
 	require.NoError(t, err)
-	//	require.Equal(t, got, expected)
+	require.Equal(t, got, expected)
 
 	// updating first height should not affect latest
 	firstHeight := uint64(0)
