@@ -12,7 +12,9 @@ import (
 
 // library that implements pebble storage for registers
 type Registers struct {
-	db *pebble.DB
+	db           *pebble.DB
+	firstHeight  uint64
+	latestHeight uint64
 }
 
 func NewRegisters(db *pebble.DB) (*Registers, error) {
@@ -32,11 +34,7 @@ func (s *Registers) Get(
 	height uint64,
 	reg flow.RegisterID,
 ) ([]byte, error) {
-	firstHeight, latestHeight, err := s.getHeightRange()
-	if err != nil {
-		return nil, fmt.Errorf("unable to perform height validation: %w", err)
-	}
-	if height > latestHeight || height < firstHeight {
+	if height > s.latestHeight || height < s.firstHeight {
 		return nil, storage.ErrHeightNotIndexed
 	}
 	iter, err := s.db.NewIter(&pebble.IterOptions{
@@ -70,12 +68,9 @@ func (s *Registers) Store(
 	entries flow.RegisterEntries,
 ) error {
 	// value check
-	firstHeight, latestHeight, err := s.getHeightRange()
-	if err != nil {
-		return fmt.Errorf("unable to perform height validation: %w", err)
-	}
-	if height > latestHeight+1 || height < firstHeight {
-		return storage.ErrHeightNotIndexed
+	upperBound := s.latestHeight + 1
+	if height > upperBound || height < s.latestHeight {
+		return fmt.Errorf("requested height out of bounds [%d, %d]", s.latestHeight, upperBound)
 	}
 	batch := s.db.NewBatch()
 	defer batch.Close()
@@ -89,11 +84,18 @@ func (s *Registers) Store(
 		}
 	}
 
-	err = batch.Commit(pebble.Sync)
+	err := batch.Commit(pebble.Sync)
 	if err != nil {
 		return fmt.Errorf("failed to commit batch: %w", err)
 	}
 
+	// increment height if necessary
+	if height > s.latestHeight {
+		err = s.updateLatestHeight(height)
+		if err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
@@ -116,28 +118,26 @@ func (s *Registers) heightLookup(key []byte) (uint64, error) {
 	return binary.BigEndian.Uint64(res), nil
 }
 
-func (s *Registers) SetFirstHeight(height uint64) error {
-	return s.indexHeightWithKey(firstHeightKey(), height)
-}
-
-func (s *Registers) SetLatestHeight(height uint64) error {
-	return s.indexHeightWithKey(latestHeightKey(), height)
-}
-
 func (s *Registers) indexHeightWithKey(key []byte, height uint64) error {
-	payload := make([]byte, 0, 0)
+	payload := make([]byte, 0)
 	encoded := binary.BigEndian.AppendUint64(payload, height)
 	return s.db.Set(key, encoded, nil)
 }
 
-func (s *Registers) getHeightRange() (uint64, uint64, error) {
-	latestHeight, err := s.LatestHeight()
+func (s *Registers) updateFirstHeight(height uint64) error {
+	err := s.indexHeightWithKey(firstHeightKey(), height)
 	if err != nil {
-		return 0, 0, fmt.Errorf("unable to get latest height: %w", err)
+		return fmt.Errorf("failed to update first height: %w", err)
 	}
-	firstHeight, err := s.FirstHeight()
+	s.firstHeight = height
+	return nil
+}
+
+func (s *Registers) updateLatestHeight(height uint64) error {
+	err := s.indexHeightWithKey(latestHeightKey(), height)
 	if err != nil {
-		return 0, 0, fmt.Errorf("unable to get first height: %w", err)
+		return fmt.Errorf("failed to update latest height: %w", err)
 	}
-	return firstHeight, latestHeight, nil
+	s.latestHeight = height
+	return nil
 }

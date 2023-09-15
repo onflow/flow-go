@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/cockroachdb/pebble"
+	"github.com/onflow/flow-go/storage"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/model/flow"
@@ -37,9 +38,9 @@ func TestRegisters_Storage_RoundTrip(t *testing.T) {
 	}
 
 	minHeight := uint64(2)
-	err = s.SetFirstHeight(minHeight)
+	err = s.updateFirstHeight(minHeight)
 	require.NoError(t, err)
-	err = s.SetLatestHeight(minHeight + 2)
+	err = s.updateLatestHeight(minHeight)
 	require.NoError(t, err)
 	err = s.Store(minHeight, entries)
 	require.NoError(t, err)
@@ -49,7 +50,9 @@ func TestRegisters_Storage_RoundTrip(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, expectedValue1, value1)
 
-	// lookup with a higher height returns the correct value
+	// lookup with a higher height returns the correct value after update
+	err = s.updateLatestHeight(minHeight + 1)
+	require.NoError(t, err)
 	value1, err = s.Get(minHeight+1, key1)
 	require.NoError(t, err)
 	require.Equal(t, expectedValue1, value1)
@@ -90,11 +93,16 @@ func TestRegisters_Store_Versioning(t *testing.T) {
 		{Key: key11, Value: expectedValue11},
 	}
 
+	// Happy path
 	height1 := uint64(1)
-	err = s.SetFirstHeight(height1)
+	err = s.updateFirstHeight(height1)
 	require.NoError(t, err)
-	err = s.SetLatestHeight(height1)
+	err = s.updateLatestHeight(height1)
 	require.NoError(t, err)
+	err = s.Store(height1, entries1)
+	require.NoError(t, err)
+
+	// check idempotence on same height
 	err = s.Store(height1, entries1)
 	require.NoError(t, err)
 
@@ -106,14 +114,26 @@ func TestRegisters_Store_Versioning(t *testing.T) {
 
 	// Add new version of key1.
 	height3 := uint64(3)
-	err = s.SetLatestHeight(height3 + 2)
 	require.NoError(t, err)
 	expectedValue1ge3 := []byte("value1ge3")
 	entries3 := flow.RegisterEntries{
 		{Key: key1, Value: expectedValue1ge3},
 	}
+	// check out of range (2 blocks after and 1 blocks before latestHeight = height1)
+	err = s.Store(height3, entries3)
+	require.Error(t, err)
+
+	err = s.Store(height1-1, entries3)
+	require.Error(t, err)
+
+	// check increment in height after Store()
+	err = s.updateLatestHeight(height3 - 1)
+	require.NoError(t, err)
 	err = s.Store(height3, entries3)
 	require.NoError(t, err)
+	updatedHeight, err := s.LatestHeight()
+	require.NoError(t, err)
+	require.Equal(t, updatedHeight, height3)
 
 	value1, err := s.Get(height1, key1)
 	require.NoError(t, err)
@@ -128,9 +148,9 @@ func TestRegisters_Store_Versioning(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, expectedValue1ge3, value1)
 
+	// out of range
 	value1, err = s.Get(height3+1, key1)
-	require.NoError(t, err)
-	require.Equal(t, expectedValue1ge3, value1)
+	require.ErrorIs(t, err, storage.ErrHeightNotIndexed)
 
 	err = db.Close()
 	require.NoError(t, err)
@@ -151,7 +171,7 @@ func TestRegisters_LatestHeight(t *testing.T) {
 
 	// happy path
 	expected := uint64(1)
-	err = s.SetLatestHeight(expected)
+	err = s.indexHeightWithKey(latestHeightKey(), expected)
 	require.NoError(t, err)
 	got, err := s.LatestHeight()
 	require.NoError(t, err)
@@ -159,14 +179,16 @@ func TestRegisters_LatestHeight(t *testing.T) {
 
 	// updating first height should not affect latest
 	firstHeight := uint64(0)
-	err = s.SetFirstHeight(firstHeight)
+	err = s.indexHeightWithKey(firstHeightKey(), firstHeight)
+	require.NoError(t, err)
 	got, err = s.LatestHeight()
 	require.NoError(t, err)
 	require.Equal(t, got, expected)
 
 	// check update
 	expected2 := uint64(3)
-	err = s.SetLatestHeight(expected2)
+	err = s.indexHeightWithKey(latestHeightKey(), expected2)
+	require.NoError(t, err)
 	got2, err := s.LatestHeight()
 	require.NoError(t, err)
 	require.Equal(t, got2, expected2)
@@ -187,7 +209,7 @@ func TestRegisters_FirstHeight(t *testing.T) {
 
 	// happy path
 	expected := uint64(1)
-	err = s.SetFirstHeight(expected)
+	err = s.indexHeightWithKey(firstHeightKey(), expected)
 	require.NoError(t, err)
 	got, err := s.FirstHeight()
 	require.NoError(t, err)
@@ -195,17 +217,11 @@ func TestRegisters_FirstHeight(t *testing.T) {
 
 	// updating the latest height should not affect first
 	latestHeight := uint64(0)
-	err = s.SetLatestHeight(latestHeight)
+	err = s.indexHeightWithKey(latestHeightKey(), latestHeight)
+	require.NoError(t, err)
 	got, err = s.FirstHeight()
 	require.NoError(t, err)
 	require.Equal(t, got, expected)
-
-	// check update
-	expected2 := uint64(3)
-	err = s.SetFirstHeight(expected2)
-	got2, err := s.FirstHeight()
-	require.NoError(t, err)
-	require.Equal(t, got2, expected2)
 }
 
 // Benchmark_PayloadStorage benchmarks the SetBatch method.
