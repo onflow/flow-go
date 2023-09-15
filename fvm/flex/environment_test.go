@@ -59,9 +59,9 @@ func TestNativeTokenBridging(t *testing.T) {
 
 func TestContractInteraction(t *testing.T) {
 	RunWithTempDB(t, func(db *storage.Database) {
-		coinbase := common.BytesToAddress([]byte("coinbase"))
-		config := flex.NewFlexConfig((flex.WithCoinbase(coinbase)),
-			flex.WithBlockNumber(big.NewInt(1)))
+		// coinbase := common.BytesToAddress([]byte("coinbase"))
+		// (flex.WithCoinbase(coinbase)),
+		config := flex.NewFlexConfig(flex.WithBlockNumber(flex.BlockNumberForEVMRules))
 
 		////  contract code:
 		// contract Storage {
@@ -166,7 +166,7 @@ func TestContractInteraction(t *testing.T) {
 				gasFee,
 				maxFeePerGas,
 				maxPriority,
-				big.NewInt(1),
+				big.NewInt(0),
 			)
 			require.NoError(t, err)
 			require.False(t, env.Result.Failed)
@@ -184,7 +184,7 @@ func TestContractInteraction(t *testing.T) {
 				gasFee,
 				maxFeePerGas,
 				maxPriority,
-				big.NewInt(1),
+				big.NewInt(0),
 			)
 			require.NoError(t, err)
 
