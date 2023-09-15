@@ -3,6 +3,7 @@ package flex_test
 import (
 	"encoding/hex"
 	"fmt"
+
 	"math/big"
 	"strings"
 	"testing"
