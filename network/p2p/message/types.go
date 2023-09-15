@@ -12,7 +12,7 @@ const (
 	CtrlMsgIWant      ControlMessageType = "IWANT"
 	CtrlMsgGraft      ControlMessageType = "GRAFT"
 	CtrlMsgPrune      ControlMessageType = "PRUNE"
-	RpcPublishMessage                    = "RpcPublishMessage"
+	RpcPublishMessage ControlMessageType = "RpcPublishMessage"
 )
 
 // ControlMessageTypes returns list of all libp2p control message types.

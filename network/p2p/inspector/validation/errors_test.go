@@ -79,10 +79,10 @@ func TestIWantDuplicateMsgIDThresholdErrRoundTrip(t *testing.T) {
 // TestInvalidRpcPublishMessagesErrRoundTrip ensures correct error formatting for InvalidRpcPublishMessagesErr.
 func TestInvalidRpcPublishMessagesErrRoundTrip(t *testing.T) {
 	wrappedErr := fmt.Errorf("invalid topic")
-	err := NewInvalidRpcPublishMessagesErr(wrappedErr)
+	err := NewInvalidRpcPublishMessagesErr(wrappedErr, 1)
 
 	// tests the error message formatting.
-	expectedErrMsg := "rpc publish messages validation failed: invalid topic"
+	expectedErrMsg := "rpc publish messages validation failed 1 error(s) encountered: invalid topic"
 	assert.Equal(t, expectedErrMsg, err.Error(), "the error message should be correctly formatted")
 
 	// tests the IsInvalidRpcPublishMessagesErr function.
