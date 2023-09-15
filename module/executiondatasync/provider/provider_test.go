@@ -177,7 +177,7 @@ func TestCalculateChunkExecutionDataID(t *testing.T) {
 	actual, err := cidProvider.CalculateChunkExecutionDataID(ced)
 	require.NoError(t, err)
 
-	// This can be used for updating the expected ID used by TestCalculateChunkExecutionDataID
+	// This can be used for updating the expected ID when the format is *intentionally* updated
 	t.Log(actual)
 
 	assert.Equal(t, expected, actual)
