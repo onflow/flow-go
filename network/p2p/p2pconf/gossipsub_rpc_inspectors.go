@@ -39,6 +39,8 @@ type IWantRPCInspectionConfig struct {
 	// CacheMissThreshold the threshold of missing corresponding iHave messages for iWant messages received before an invalid control message notification is disseminated.
 	// If the cache miss threshold is exceeded an invalid control message notification is disseminated and the sender will be penalized.
 	CacheMissThreshold float64 `validate:"gt=0" mapstructure:"gossipsub-rpc-iwant-cache-miss-threshold"`
+	// CacheMissCheckSize the iWants size at which message id cache misses will be checked.
+	CacheMissCheckSize int `validate:"gte=1000" mapstructure:"gossipsub-rpc-iwant-cache-miss-check-size"`
 	// DuplicateMsgIDThreshold maximum allowed duplicate message IDs in a single iWant control message.
 	// If the duplicate message threshold is exceeded an invalid control message notification is disseminated and the sender will be penalized.
 	DuplicateMsgIDThreshold float64 `validate:"gt=0" mapstructure:"gossipsub-rpc-iwant-duplicate-message-id-threshold"`

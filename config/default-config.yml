@@ -97,6 +97,8 @@ network-config:
   # The allowed threshold of iWant messages received without a corresponding tracked iHave message that was sent. If the cache miss threshold is exceeded an
   # invalid control message notification is disseminated and the sender will be penalized.
   gossipsub-rpc-iwant-cache-miss-threshold: .5
+  # The iWants size at which message id cache misses will be checked.
+  gossipsub-rpc-iwant-cache-miss-check-size: 1000
   # The max allowed duplicate message IDs in a single iWant control message. If the duplicate message threshold is exceeded an invalid control message
   # notification is disseminated and the sender will be penalized.
   gossipsub-rpc-iwant-duplicate-message-id-threshold: .15

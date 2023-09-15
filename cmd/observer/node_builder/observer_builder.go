@@ -34,6 +34,7 @@ import (
 	"github.com/onflow/flow-go/engine/access/rpc"
 	"github.com/onflow/flow-go/engine/access/rpc/backend"
 	rpcConnection "github.com/onflow/flow-go/engine/access/rpc/connection"
+	"github.com/onflow/flow-go/engine/access/state_stream"
 	"github.com/onflow/flow-go/engine/common/follower"
 	synceng "github.com/onflow/flow-go/engine/common/synchronization"
 	"github.com/onflow/flow-go/engine/protocol"
@@ -923,7 +924,7 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 			),
 		}
 
-		accessBackend := backend.New(backend.Params{
+		accessBackend, err := backend.New(backend.Params{
 			State:                     node.State,
 			Blocks:                    node.Storage.Blocks,
 			Headers:                   node.Storage.Headers,
@@ -944,6 +945,9 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 			Communicator:              backend.NewNodeCommunicator(backendConfig.CircuitBreakerConfig.Enabled),
 			ScriptExecValidation:      backendConfig.ScriptExecValidation,
 		})
+		if err != nil {
+			return nil, fmt.Errorf("could not initialize backend: %w", err)
+		}
 
 		observerCollector := metrics.NewObserverCollector()
 		restHandler, err := restapiproxy.NewRestProxyHandler(
@@ -970,6 +974,9 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 			restHandler,
 			builder.secureGrpcServer,
 			builder.unsecureGrpcServer,
+			nil, // state streaming is not supported
+			state_stream.DefaultEventFilterConfig,
+			0,
 		)
 		if err != nil {
 			return nil, err

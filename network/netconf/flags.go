@@ -56,6 +56,7 @@ const (
 	iwantMaxSampleSize           = "gossipsub-rpc-iwant-max-sample-size"
 	iwantMaxMessageIDSampleSize  = "gossipsub-rpc-iwant-max-message-id-sample-size"
 	iwantCacheMissThreshold      = "gossipsub-rpc-iwant-cache-miss-threshold"
+	iwantCacheMissCheckSize      = "gossipsub-rpc-iwant-cache-miss-check-size"
 	iwantDuplicateMsgIDThreshold = "gossipsub-rpc-iwant-duplicate-message-id-threshold"
 	rpcMessageMaxSampleSize      = "gossipsub-rpc-message-max-sample-size"
 	rpcMessageErrorThreshold     = "gossipsub-rpc-message-error-threshold"
@@ -77,7 +78,7 @@ func AllFlagNames() []string {
 		scoreTracerInterval, gossipSubRPCInspectorNotificationCacheSize, validationInspectorNumberOfWorkers, validationInspectorInspectMessageQueueCacheSize, validationInspectorClusterPrefixedTopicsReceivedCacheSize,
 		validationInspectorClusterPrefixedTopicsReceivedCacheDecay, validationInspectorClusterPrefixHardThreshold,
 		ihaveMaxSampleSize, metricsInspectorNumberOfWorkers, metricsInspectorCacheSize, alspDisabled, alspSpamRecordCacheSize, alspSpamRecordQueueSize, alspHearBeatInterval,
-		iwantMaxSampleSize, iwantMaxMessageIDSampleSize, ihaveMaxMessageIDSampleSize, iwantCacheMissThreshold, controlMessageMaxSampleSize, iwantDuplicateMsgIDThreshold, rpcMessageMaxSampleSize, rpcMessageErrorThreshold,
+		iwantMaxSampleSize, iwantMaxMessageIDSampleSize, ihaveMaxMessageIDSampleSize, iwantCacheMissThreshold, controlMessageMaxSampleSize, iwantDuplicateMsgIDThreshold, iwantCacheMissCheckSize, rpcMessageMaxSampleSize, rpcMessageErrorThreshold,
 	}
 }
 
@@ -140,6 +141,7 @@ func InitializeNetworkFlags(flags *pflag.FlagSet, config *Config) {
 	flags.Uint(iwantMaxSampleSize, config.GossipSubConfig.GossipSubRPCInspectorsConfig.GossipSubRPCValidationInspectorConfigs.IWantRPCInspectionConfig.MaxSampleSize, "max number of iwants to sample when performing validation")
 	flags.Int(iwantMaxMessageIDSampleSize, config.GossipSubConfig.GossipSubRPCInspectorsConfig.GossipSubRPCValidationInspectorConfigs.IWantRPCInspectionConfig.MaxMessageIDSampleSize, "max number of message ids to sample when performing validation per iwant")
 	flags.Float64(iwantCacheMissThreshold, config.GossipSubConfig.GossipSubRPCInspectorsConfig.GossipSubRPCValidationInspectorConfigs.IWantRPCInspectionConfig.CacheMissThreshold, "max number of iwants to sample when performing validation")
+	flags.Int(iwantCacheMissCheckSize, config.GossipSubConfig.GossipSubRPCInspectorsConfig.GossipSubRPCValidationInspectorConfigs.IWantRPCInspectionConfig.CacheMissCheckSize, "the iWants size at which message id cache misses will be checked")
 	flags.Float64(iwantDuplicateMsgIDThreshold, config.GossipSubConfig.GossipSubRPCInspectorsConfig.GossipSubRPCValidationInspectorConfigs.IWantRPCInspectionConfig.DuplicateMsgIDThreshold, "max allowed duplicate message IDs in a single iWant control message")
 
 	flags.Int(rpcMessageMaxSampleSize, config.GossipSubConfig.GossipSubRPCInspectorsConfig.GossipSubRPCValidationInspectorConfigs.RPCMessageMaxSampleSize, "the max sample size used for RPC message validation. If the total number of RPC messages exceeds this value a sample will be taken but messages will not be truncated")

@@ -12,12 +12,13 @@ require (
 	github.com/docker/go-connections v0.4.0
 	github.com/go-git/go-git/v5 v5.5.2
 	github.com/go-yaml/yaml v2.1.0+incompatible
+	github.com/gorilla/websocket v1.5.0
 	github.com/ipfs/go-blockservice v0.4.0
 	github.com/ipfs/go-cid v0.4.1
 	github.com/ipfs/go-datastore v0.6.0
 	github.com/ipfs/go-ds-badger2 v0.1.3
 	github.com/ipfs/go-ipfs-blockstore v1.3.0
-	github.com/onflow/cadence v0.40.0
+	github.com/onflow/cadence v0.41.0
 	github.com/onflow/flow-core-contracts/lib/go/contracts v1.2.4-0.20230703193002-53362441b57d
 	github.com/onflow/flow-core-contracts/lib/go/templates v1.2.3
 	github.com/onflow/flow-emulator v0.53.0
@@ -25,7 +26,7 @@ require (
 	github.com/onflow/flow-go-sdk v0.41.10
 	github.com/onflow/flow-go/crypto v0.24.9
 	github.com/onflow/flow-go/insecure v0.0.0-00010101000000-000000000000
-	github.com/onflow/flow/protobuf/go/flow v0.3.2-0.20230628215638-83439d22e0ce
+	github.com/onflow/flow/protobuf/go/flow v0.3.2-0.20230912213857-614a2a0c0128
 	github.com/plus3it/gorecurcopy v0.0.1
 	github.com/prometheus/client_golang v1.14.0
 	github.com/prometheus/client_model v0.4.0
@@ -138,7 +139,7 @@ require (
 	github.com/google/uuid v1.3.0 // indirect
 	github.com/googleapis/enterprise-certificate-proxy v0.2.3 // indirect
 	github.com/googleapis/gax-go/v2 v2.7.1 // indirect
-	github.com/gorilla/websocket v1.5.0 // indirect
+	github.com/gorilla/mux v1.8.0 // indirect
 	github.com/grpc-ecosystem/go-grpc-middleware/providers/zerolog/v2 v2.0.0-rc.2 // indirect
 	github.com/grpc-ecosystem/go-grpc-middleware/v2 v2.0.0-20200501113911-9a95f0fdbfea // indirect
 	github.com/grpc-ecosystem/go-grpc-prometheus v1.2.0 // indirect
