@@ -165,6 +165,7 @@ func (i *ExecutionState) IndexBlockData(ctx context.Context, data *execution_dat
 		return fmt.Errorf("failed to index block data at height %d: %w", block.Height, err)
 	}
 
+	// todo what if updating this value fails - should crash and restart or retry inside the queue
 	return i.indexRange.Increase(block.Height)
 }
 
