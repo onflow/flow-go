@@ -13,11 +13,12 @@ import (
 
 // TODO we might need to register our chain ID here https://github.com/DefiLlama/chainlist/blob/main/constants/chainIds.json
 var (
-	FlexTestnetChainID = big.NewInt(666)
-	FlexMainnetChainID = big.NewInt(777)
-	DefaultMaxGasLimit = uint64(30_000_000)
-	TransferGasUsage   = uint64(21_000)
-	DefaultGasPrice    = big.NewInt(1)
+	FlexTestnetChainID     = big.NewInt(666)
+	FlexMainnetChainID     = big.NewInt(777)
+	DefaultMaxGasLimit     = uint64(30_000_000)
+	TransferGasUsage       = uint64(21_000)
+	DefaultGasPrice        = big.NewInt(1)
+	BlockNumberForEVMRules = big.NewInt(18138954) // a recent block to be used as a refrence for the EVM setup
 
 	// ErrFlexEnvReuse is returned when a flex environment is used more than once
 	ErrFlexEnvReuse        = errors.New("flex env has been used")
@@ -62,7 +63,7 @@ func defaultConfig() *Config {
 			CanTransfer: core.CanTransfer,
 			Transfer:    core.Transfer,
 			GasLimit:    DefaultMaxGasLimit,
-			BaseFee:     big.NewInt(params.InitialBaseFee),
+			BaseFee:     big.NewInt(1), // small base fee for block
 			GetHash: func(n uint64) common.Hash {
 				return common.BytesToHash(crypto.Keccak256([]byte(new(big.Int).SetUint64(n).String())))
 			},
@@ -80,12 +81,8 @@ func NewFlexConfig(opts ...Option) *Config {
 }
 
 // returns the chain rules based on the block number
-// TODO(ramtin): we probably we need to hard code block number to something
-// to keep the behaviour consistent
 func (fc *Config) Rules() params.Rules {
-	// TODO fix me
-	return fc.ChainConfig.Rules(big.NewInt(18138954), false, fc.BlockContext.Time)
-	// return fc.ChainConfig.Rules(fc.BlockContext.BlockNumber, false, fc.BlockContext.Time)
+	return fc.ChainConfig.Rules(BlockNumberForEVMRules, false, fc.BlockContext.Time)
 }
 
 type Option func(*Config) *Config

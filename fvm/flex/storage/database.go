@@ -14,15 +14,10 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
+// TODO: add a vault to hold on to the passed Cadence token vaults under Flex account
+// this could make sure even if there is a bug in EVM there won't be more withdraws
+
 var (
-	// errMemorydbNotFound is returned if a key is requested that is not found in
-	// the provided memory database.
-	errMemorydbNotFound = errors.New("not found")
-
-	// errSnapshotReleased is returned if callers want to retrieve data from a
-	// released snapshot.
-	errSnapshotReleased = errors.New("snapshot released")
-
 	// err not implemented
 	errNotImplemented = errors.New("not implemented yet")
 )

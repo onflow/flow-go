@@ -9,6 +9,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/params"
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/flex"
 	"github.com/onflow/flow-go/fvm/flex/storage"
@@ -111,13 +112,13 @@ func TestContractInteraction(t *testing.T) {
 			]
 			`
 
-		byteCodes, err := hex.DecodeString("6080604052610150806100136000396000f3fe608060405234801561001057600080fd5b50600436106100365760003560e01c80632e64cec11461003b5780636057361d14610059575b600080fd5b610043610075565b60405161005091906100a1565b60405180910390f35b610073600480360381019061006e91906100ed565b61007e565b005b60008054905090565b8060008190555050565b6000819050919050565b61009b81610088565b82525050565b60006020820190506100b66000830184610092565b92915050565b600080fd5b6100ca81610088565b81146100d557600080fd5b50565b6000813590506100e7816100c1565b92915050565b600060208284031215610103576101026100bc565b5b6000610111848285016100d8565b9150509291505056fea264697066735822122088ca6d3fc8bb0f58bd615962552e556567945e58c4dbadeaac5a5cdc7626ffa264736f6c63430008120033")
+		byteCodes, err := hex.DecodeString("6080604052610150806100136000396000f3fe608060405234801561001057600080fd5b50600436106100365760003560e01c80632e64cec11461003b5780636057361d14610059575b600080fd5b610043610075565b60405161005091906100a1565b60405180910390f35b610073600480360381019061006e91906100ed565b61007e565b005b60008054905090565b8060008190555050565b6000819050919050565b61009b81610088565b82525050565b60006020820190506100b66000830184610092565b92915050565b600080fd5b6100ca81610088565b81146100d557600080fd5b50565b6000813590506100e7816100c1565b92915050565b600060208284031215610103576101026100bc565b5b6000610111848285016100d8565b9150509291505056fea2646970667358221220029e22143e146846aff5dd684a6d627d0bec77c78e5b7ce77674d91c25d7e22264736f6c63430008120033")
 		require.NoError(t, err)
 
 		// setup and fund the test account
 		testAccount := common.BytesToAddress([]byte("test"))
-		amount := big.NewInt(10000)
-		amountToBeTransfered := big.NewInt(4000)
+		amount := big.NewInt(0).Mul(big.NewInt(1337), big.NewInt(params.Ether))
+		amountToBeTransfered := big.NewInt(0).Mul(big.NewInt(100), big.NewInt(params.Ether))
 
 		// fund test account
 		env, err := flex.NewEnvironment(config, db)
@@ -138,7 +139,6 @@ func TestContractInteraction(t *testing.T) {
 			contractAddr = env.Result.DeployedContractAddress
 			require.NotNil(t, contractAddr)
 
-			env.State.GetBalance(testAccount)
 			require.True(t, len(env.State.GetCode(contractAddr)) > 0)
 			require.Equal(t, amountToBeTransfered, env.State.GetBalance(contractAddr))
 			require.Equal(t, amount.Sub(amount, amountToBeTransfered), env.State.GetBalance(testAccount))
@@ -151,12 +151,25 @@ func TestContractInteraction(t *testing.T) {
 			abi, err := abi.JSON(strings.NewReader(definition))
 			require.NoError(t, err)
 
-			num := big.NewInt(256)
+			num := big.NewInt(10)
 			store, err := abi.Pack("store", num)
 			require.NoError(t, err)
 
-			err = env.Call(testAccount, contractAddr, store, big.NewInt(0))
+			gasFee := big.NewInt(1)
+			maxPriority := big.NewInt(2)
+			maxFeePerGas := big.NewInt(3)
+
+			err = env.Call(&testAccount,
+				&contractAddr,
+				store,
+				1_000_000,
+				gasFee,
+				maxFeePerGas,
+				maxPriority,
+				big.NewInt(1),
+			)
 			require.NoError(t, err)
+			require.False(t, env.Result.Failed)
 
 			env2, err := flex.NewEnvironment(config, db)
 			require.NoError(t, err)
@@ -164,12 +177,21 @@ func TestContractInteraction(t *testing.T) {
 			retrieve, err := abi.Pack("retrieve")
 			require.NoError(t, err)
 
-			err = env2.Call(testAccount, contractAddr, retrieve, big.NewInt(0))
+			err = env2.Call(&testAccount,
+				&contractAddr,
+				retrieve,
+				1_000_000,
+				gasFee,
+				maxFeePerGas,
+				maxPriority,
+				big.NewInt(1),
+			)
 			require.NoError(t, err)
+
+			require.False(t, env2.Result.Failed)
 
 			ret := env2.Result.RetValue
 			retNum := new(big.Int).SetBytes(ret)
-
 			require.Equal(t, num, retNum)
 		})
 

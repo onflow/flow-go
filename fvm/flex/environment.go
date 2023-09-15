@@ -1,14 +1,20 @@
 package flex
 
 import (
+	"bytes"
 	"math/big"
 
 	"github.com/onflow/flow-go/fvm/flex/storage"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/math"
+	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/rawdb"
 	"github.com/ethereum/go-ethereum/core/state"
+	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/core/vm"
+	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/ethereum/go-ethereum/rlp"
 )
 
 // Environment is a one-time use flex environment and
@@ -182,6 +188,7 @@ func (fe *Environment) WithdrawFrom(balance *big.Int, source common.Address) err
 
 // Deploy deploys a contract at the given address
 // the value passed to this method would be deposited on the contract account
+// TODO change this to use the same message call (without to section)
 func (fe *Environment) Deploy(caller common.Address, code []byte, value *big.Int) error {
 	if err := fe.checkExecuteOnce(); err != nil {
 		return err
@@ -207,6 +214,7 @@ func (fe *Environment) Deploy(caller common.Address, code []byte, value *big.Int
 		return err
 	}
 
+	fe.Result.Logs = fe.State.Logs()
 	fe.Result.RetValue = ret
 	fe.Result.DeployedContractAddress = addr
 	fe.updateGasConsumed(leftOverGas)
@@ -215,9 +223,10 @@ func (fe *Environment) Deploy(caller common.Address, code []byte, value *big.Int
 
 }
 
-// Call calls a method on a contract
+// LegacyCall calls a method on a contract (mostly for testing)
+// Don't use for production
 // the value passed to this method would be deposited on the contract account
-func (fe *Environment) Call(caller common.Address, contract common.Address, input []byte, value *big.Int) error {
+func (fe *Environment) LegacyCall(caller common.Address, contract common.Address, input []byte, value *big.Int) error {
 	if err := fe.checkExecuteOnce(); err != nil {
 		return err
 	}
@@ -258,7 +267,91 @@ func (fe *Environment) Call(caller common.Address, contract common.Address, inpu
 	return fe.commit()
 }
 
-// TODO
-func (fe *Environment) RunFlexTransaction() error {
-	return nil
+// Run is used for FOA accounts only
+// for FOA calls use the custom Message constructor *core.Message
+func (fe *Environment) Call(
+	from *common.Address,
+	to *common.Address,
+	data []byte,
+	gasLimit uint64,
+	gasPrice, GasFeeCap, GasTipCap *big.Int, // TODO not sure if we need these
+	value *big.Int,
+) error {
+	if err := fe.checkExecuteOnce(); err != nil {
+		return err
+	}
+	// TODO: verify that the authorizer has the resource to interact with this contract (higher level check)
+
+	msg := &core.Message{
+		To:   to,
+		From: *from,
+		// Nonce:     fe.State.GetNonce(*origin), // always using the right nonce
+		Value:     value,
+		Data:      data,
+		GasLimit:  gasLimit,
+		GasPrice:  gasPrice,
+		GasFeeCap: GasFeeCap, // TODO revisit this
+		GasTipCap: GasTipCap,
+		// AccessList:        tx.AccessList(), // TODO unlock these
+		SkipAccountChecks: true, // TODO think about this
+		// BlobHashes:        tx.BlobHashes(), // TODO unlock these
+		// BlobGasFeeCap: tx.BlobGasFeeCap(), // TODO unlock these
+	}
+
+	// If baseFee provided, set gasPrice to effectiveGasPrice.
+	baseFee := fe.Config.BlockContext.BaseFee
+	if baseFee != nil {
+		msg.GasPrice = math.BigMin(msg.GasPrice.Add(msg.GasTipCap, baseFee), msg.GasFeeCap)
+	}
+
+	return fe.run(msg)
+}
+
+// RunTransaction runs a flex transaction
+func (fe *Environment) RunTransaction(rlpEncodedTx []byte) error {
+	if err := fe.checkExecuteOnce(); err != nil {
+		return err
+	}
+
+	// decode rlp
+	var tx *types.Transaction
+	// TODO: update the max limit on the encoded size to a meaningful value
+	err := tx.DecodeRLP(
+		rlp.NewStream(
+			bytes.NewReader(rlpEncodedTx),
+			uint64(len(rlpEncodedTx))))
+	if err != nil {
+		return err
+	}
+
+	signer := types.MakeSigner(fe.Config.ChainConfig, BlockNumberForEVMRules, fe.Config.BlockContext.Time)
+
+	msg, err := core.TransactionToMessage(tx, signer, fe.Config.BlockContext.BaseFee)
+	if err != nil {
+		return err
+	}
+
+	return fe.run(msg)
+}
+
+func (fe *Environment) run(msg *core.Message) error {
+
+	execResult, err := core.NewStateTransition(fe.EVM, msg, (*core.GasPool)(&fe.Config.BlockContext.GasLimit)).TransitionDb()
+	if err != nil {
+		return err
+	}
+
+	fe.Result.RetValue = execResult.ReturnData
+	fe.Result.GasConsumed = execResult.UsedGas
+	fe.Result.Failed = execResult.Failed()
+	fe.Result.Logs = fe.State.Logs()
+
+	// If the transaction created a contract, store the creation address in the receipt.
+	// TODO verify this later
+	if msg.To == nil {
+		fe.Result.DeployedContractAddress = crypto.CreateAddress(fe.Config.TxContext.Origin, msg.Nonce)
+	}
+
+	// TODO check if we have the logic to pay the coinbase
+	return fe.commit()
 }
