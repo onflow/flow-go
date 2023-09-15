@@ -16,6 +16,7 @@ import (
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/p2p"
+	"github.com/onflow/flow-go/network/p2p/p2plogging"
 	"github.com/onflow/flow-go/network/p2p/tracer/internal"
 	"github.com/onflow/flow-go/utils/logging"
 )
@@ -131,7 +132,7 @@ func (t *GossipSubMeshTracer) Graft(p peer.ID, topic string) {
 	t.topicMeshMu.Lock()
 	defer t.topicMeshMu.Unlock()
 
-	lg := t.logger.With().Str("topic", topic).Str("peer_id", p.String()).Logger()
+	lg := t.logger.With().Str("topic", topic).Str("peer_id", p2plogging.PeerId(p)).Logger()
 
 	if _, ok := t.topicMeshMap[topic]; !ok {
 		t.topicMeshMap[topic] = make(map[peer.ID]struct{})
@@ -158,7 +159,7 @@ func (t *GossipSubMeshTracer) Prune(p peer.ID, topic string) {
 	t.topicMeshMu.Lock()
 	defer t.topicMeshMu.Unlock()
 
-	lg := t.logger.With().Str("topic", topic).Str("peer_id", p.String()).Logger()
+	lg := t.logger.With().Str("topic", topic).Str("peer_id", p2plogging.PeerId(p)).Logger()
 
 	if _, ok := t.topicMeshMap[topic]; !ok {
 		return
@@ -188,6 +189,16 @@ func (t *GossipSubMeshTracer) SendRPC(rpc *pubsub.RPC, _ peer.ID) {
 	if err != nil {
 		t.logger.Err(err).Bool(logging.KeyNetworkingSecurity, true).Msg("failed to track sent pubsbub rpc")
 	}
+}
+
+// WasIHaveRPCSent returns true if an iHave control message for the messageID was sent, otherwise false.
+func (t *GossipSubMeshTracer) WasIHaveRPCSent(messageID string) bool {
+	return t.rpcSentTracker.WasIHaveRPCSent(messageID)
+}
+
+// LastHighestIHaveRPCSize returns the last highest RPC iHave message sent.
+func (t *GossipSubMeshTracer) LastHighestIHaveRPCSize() int64 {
+	return t.rpcSentTracker.LastHighestIHaveRPCSize()
 }
 
 // logLoop logs the mesh peers of the local node for each topic at a regular interval.
@@ -230,11 +241,11 @@ func (t *GossipSubMeshTracer) logPeers() {
 
 			if !exists {
 				shouldWarn = true
-				topicPeers = topicPeers.Str(strconv.Itoa(peerIndex), fmt.Sprintf("pid=%s, flow_id=unknown, role=unknown", p.String()))
+				topicPeers = topicPeers.Str(strconv.Itoa(peerIndex), fmt.Sprintf("pid=%s, flow_id=unknown, role=unknown", p2plogging.PeerId(p)))
 				continue
 			}
 
-			topicPeers = topicPeers.Str(strconv.Itoa(peerIndex), fmt.Sprintf("pid=%s, flow_id=%x, role=%s", p.String(), id.NodeID, id.Role.String()))
+			topicPeers = topicPeers.Str(strconv.Itoa(peerIndex), fmt.Sprintf("pid=%s, flow_id=%x, role=%s", p2plogging.PeerId(p), id.NodeID, id.Role.String()))
 		}
 
 		lg := t.logger.With().

@@ -83,13 +83,13 @@ func TestRPCSentTracker_DuplicateMessageID(t *testing.T) {
 
 	processedWorkLogs := atomic.NewInt64(0)
 	hook := zerolog.HookFunc(func(e *zerolog.Event, level zerolog.Level, message string) {
-		if level == zerolog.InfoLevel {
+		if level == zerolog.DebugLevel {
 			if message == iHaveRPCTrackedLog {
 				processedWorkLogs.Inc()
 			}
 		}
 	})
-	logger := zerolog.New(os.Stdout).Level(zerolog.InfoLevel).Hook(hook)
+	logger := zerolog.New(os.Stdout).Level(zerolog.DebugLevel).Hook(hook)
 
 	tracker := mockTracker(t, time.Minute)
 	require.NotNil(t, tracker)

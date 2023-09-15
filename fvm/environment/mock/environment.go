@@ -968,16 +968,14 @@ func (_m *Environment) LimitAccountStorage() bool {
 }
 
 // Logger provides a mock function with given fields:
-func (_m *Environment) Logger() *zerolog.Logger {
+func (_m *Environment) Logger() zerolog.Logger {
 	ret := _m.Called()
 
-	var r0 *zerolog.Logger
-	if rf, ok := ret.Get(0).(func() *zerolog.Logger); ok {
+	var r0 zerolog.Logger
+	if rf, ok := ret.Get(0).(func() zerolog.Logger); ok {
 		r0 = rf()
 	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*zerolog.Logger)
-		}
+		r0 = ret.Get(0).(zerolog.Logger)
 	}
 
 	return r0

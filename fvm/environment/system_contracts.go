@@ -75,8 +75,8 @@ func (sys *SystemContracts) Invoke(
 		spec.ArgumentTypes,
 	)
 	if err != nil {
-		sys.logger.Logger().
-			Info().
+		log := sys.logger.Logger()
+		log.Info().
 			Err(err).
 			Str("contract", contractLocation.String()).
 			Str("function", spec.FunctionName).

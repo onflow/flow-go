@@ -316,7 +316,7 @@ func (env *facadeEnvironment) GetInterpreterSharedState() *interpreter.SharedSta
 	return nil
 }
 
-func (env *facadeEnvironment) ReadRandom(bytes []byte) error {
+func (env *facadeEnvironment) ReadRandom([]byte) error {
 	// NO-OP for now, to unblock certain downstream dependencies.
 	// E.g. cadence-tools/test
 	return nil
