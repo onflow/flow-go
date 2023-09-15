@@ -24,19 +24,27 @@ type DynamicIdentityEntryList []*DynamicIdentityEntry
 // plus some modifiers. We intend to restructure this code soon.
 // TODO: https://github.com/onflow/flow-go/issues/4649
 type ProtocolStateEntry struct {
-	// setup and commit event IDs for current epoch.
-	CurrentEpochEventIDs EventIDs
-	// setup and commit event IDs for previous epoch.
+	// Setup and commit event IDs for previous epoch.
 	PreviousEpochEventIDs EventIDs
-	// Part of identity table that can be changed during the epoch.
-	// Always sorted in canonical order.
-	Identities DynamicIdentityEntryList
+	// Protocol state for current epoch
+	CurrentEpoch EpochStateContainer
+	// Protocol state for next epoch. Could be nil if next epoch not setup yet.
+	NextEpoch *EpochStateContainer
 	// InvalidStateTransitionAttempted encodes whether an invalid state transition
 	// has been detected in this fork. When this happens, epoch fallback is triggered
 	// AFTER the fork is finalized.
 	InvalidStateTransitionAttempted bool
-	// NextEpochProtocolState describes protocol state of the next epoch
-	NextEpochProtocolState *ProtocolStateEntry
+}
+
+// EpochStateContainer is a container for data that is relevant to a single epoch.
+type EpochStateContainer struct {
+	// ID of setup event for this epoch, never nil.
+	SetupID Identifier
+	// ID of commit event for this epoch. Could be ZeroID if epoch was not committed.
+	CommitID Identifier
+	// Part of identity table that can be changed during the epoch.
+	// Always sorted in canonical order.
+	Identities DynamicIdentityEntryList
 }
 
 // RichProtocolStateEntry is a ProtocolStateEntry which has additional fields that are cached
@@ -52,13 +60,14 @@ type ProtocolStateEntry struct {
 type RichProtocolStateEntry struct {
 	*ProtocolStateEntry
 
-	CurrentEpochSetup   *EpochSetup
-	CurrentEpochCommit  *EpochCommit
 	PreviousEpochSetup  *EpochSetup
 	PreviousEpochCommit *EpochCommit
+	CurrentEpochSetup   *EpochSetup
+	CurrentEpochCommit  *EpochCommit
+	NextEpochSetup      *EpochSetup
+	NextEpochCommit     *EpochCommit
 	Identities          IdentityList
-
-	NextEpochProtocolState *RichProtocolStateEntry
+	NextIdentities      IdentityList
 }
 
 // NewRichProtocolStateEntry constructs a rich protocol state entry from a protocol state entry and additional data.
