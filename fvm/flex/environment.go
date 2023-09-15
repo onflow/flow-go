@@ -177,6 +177,25 @@ func (fe *Environment) WithdrawFrom(amount *big.Int, source common.Address) erro
 	return fe.commit()
 }
 
+// Transfer transfers flow token from an FOA account to another flex account
+// this is a similar functionality as calling a call with empty data,
+// mostly provided for a easier interaction
+//
+// Warning, This method should only be used for bridging native token from Flex
+// back to the FVM environment. This method should only be used for FOA's
+// accounts where resource ownership has been verified
+func (fe *Environment) Transfer(
+	from *common.Address,
+	to *common.Address,
+	value *big.Int,
+) error {
+	if err := fe.checkExecuteOnce(); err != nil {
+		return err
+	}
+	msg := directCallMessage(from, to, value, nil, DefaultMaxGasLimit)
+	return fe.run(msg)
+}
+
 // Deploy deploys a contract at the given address
 // the value passed to this method would be deposited on the contract account
 //
