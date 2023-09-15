@@ -6,7 +6,7 @@
 
 - The `master` branch is intended to only contain features for the immediately upcoming release, whether it is a Height Coordinated Upgrade or a Spork
 - During development, all features should live on a feature branch.
-- For small features, this will be simple working branch, i.e. `kan/1-fix-known-issue`
+- For small features, this will be simple working branch. These branches have the naming scheme `<contributor>/<issue #>-<short description>, for example `kan/123-fix-known-issue`
 - For larger features, this may be a shared feature branch with other team members.
 
 ### Upgrade Path Eligibility
