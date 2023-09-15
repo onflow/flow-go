@@ -74,7 +74,8 @@ func (db *Database) Get(key []byte) ([]byte, error) {
 		return nil, err
 	}
 
-	return []byte(data.(StringValue).String()), nil
+	v, err := data.StoredValue(db.storage.Storage)
+	return []byte(v.(StringValue).String()), err
 }
 
 // Put inserts the given value into the key-value store.

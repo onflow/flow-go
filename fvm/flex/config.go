@@ -40,23 +40,20 @@ type Config struct {
 func defaultConfig() *Config {
 	return &Config{
 		ChainConfig: &params.ChainConfig{
-			ChainID: FlexTestnetChainID, // default is testnet
-			// Ramtin: chainID is the only one actively we use
-			// but the rest might be still needed if the functionality
-			// is dependent on it, we could test this later (TODO)
-			// HomesteadBlock:      new(big.Int),
-			// DAOForkBlock:        new(big.Int),
-			// DAOForkSupport:      false,
-			// EIP150Block:         new(big.Int),
-			// EIP155Block:         new(big.Int),
-			// EIP158Block:         new(big.Int),
-			// ByzantiumBlock:      new(big.Int),
-			// ConstantinopleBlock: new(big.Int),
-			// PetersburgBlock:     new(big.Int),
-			// IstanbulBlock:       new(big.Int),
-			// MuirGlacierBlock:    new(big.Int),
-			// BerlinBlock:         new(big.Int),
-			// LondonBlock:         new(big.Int),
+			ChainID:             FlexTestnetChainID, // default is testnet
+			HomesteadBlock:      new(big.Int),
+			DAOForkBlock:        new(big.Int),
+			DAOForkSupport:      false,
+			EIP150Block:         new(big.Int),
+			EIP155Block:         new(big.Int),
+			EIP158Block:         new(big.Int),
+			ByzantiumBlock:      new(big.Int),
+			ConstantinopleBlock: new(big.Int),
+			PetersburgBlock:     new(big.Int),
+			IstanbulBlock:       new(big.Int),
+			MuirGlacierBlock:    new(big.Int),
+			BerlinBlock:         new(big.Int),
+			LondonBlock:         new(big.Int),
 		},
 		TxContext: &vm.TxContext{
 			GasPrice: DefaultGasPrice,
@@ -86,7 +83,9 @@ func NewFlexConfig(opts ...Option) *Config {
 // TODO(ramtin): we probably we need to hard code block number to something
 // to keep the behaviour consistent
 func (fc *Config) Rules() params.Rules {
-	return fc.ChainConfig.Rules(fc.BlockContext.BlockNumber, false, fc.BlockContext.Time)
+	// TODO fix me
+	return fc.ChainConfig.Rules(big.NewInt(18138954), false, fc.BlockContext.Time)
+	// return fc.ChainConfig.Rules(fc.BlockContext.BlockNumber, false, fc.BlockContext.Time)
 }
 
 type Option func(*Config) *Config

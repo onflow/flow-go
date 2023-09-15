@@ -203,13 +203,20 @@ func (fe *Environment) Deploy(caller common.Address, code []byte, value *big.Int
 		fe.Config.BlockContext.GasLimit,
 		value)
 
+	if err != nil {
+		return err
+	}
+
 	fe.Result.RetValue = ret
 	fe.Result.DeployedContractAddress = addr
 	fe.updateGasConsumed(leftOverGas)
-	return err
+
+	return fe.commit()
+
 }
 
-// TODO update read me
+// Call calls a method on a contract
+// the value passed to this method would be deposited on the contract account
 func (fe *Environment) Call(caller common.Address, contract common.Address, input []byte, value *big.Int) error {
 	if err := fe.checkExecuteOnce(); err != nil {
 		return err
@@ -237,6 +244,7 @@ func (fe *Environment) Call(caller common.Address, contract common.Address, inpu
 
 	fe.Result.RetValue = ret
 	fe.updateGasConsumed(leftOverGas)
+
 	// TODO deal with the logs
 	// TODO process error (fatal vs non fatal)
 
