@@ -170,7 +170,11 @@ func NewScriptEnv(
 		params,
 		txnState,
 		NewCancellableMeter(ctx, txnState))
-	env.RandomGenerator = NewDummyRandomGenerator()
+	env.RandomGenerator = NewRandomGenerator(
+		tracer,
+		params.EntropyProvider,
+		params.ScriptInfoParams.ID[:],
+	)
 	env.addParseRestrictedChecks()
 	return env
 }
@@ -229,7 +233,7 @@ func NewTransactionEnvironment(
 	env.RandomGenerator = NewRandomGenerator(
 		tracer,
 		params.EntropyProvider,
-		params.TxId,
+		params.TxId[:],
 	)
 
 	env.addParseRestrictedChecks()

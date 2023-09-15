@@ -6,7 +6,6 @@ import (
 	"github.com/onflow/flow-go/crypto/random"
 	"github.com/onflow/flow-go/fvm/storage/state"
 	"github.com/onflow/flow-go/fvm/tracing"
-	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/state/protocol/prg"
 )
@@ -34,7 +33,7 @@ var _ RandomGenerator = (*randomGenerator)(nil)
 type randomGenerator struct {
 	tracer        tracing.TracerSpan
 	entropySource EntropyProvider
-	txId          flow.Identifier
+	salt          []byte
 	prg           random.Rand
 	isPRGCreated  bool
 }
@@ -65,12 +64,12 @@ func (gen ParseRestrictedRandomGenerator) ReadRandom(buf []byte) error {
 func NewRandomGenerator(
 	tracer tracing.TracerSpan,
 	entropySource EntropyProvider,
-	txId flow.Identifier,
+	salt []byte,
 ) RandomGenerator {
 	gen := &randomGenerator{
 		tracer:        tracer,
 		entropySource: entropySource,
-		txId:          txId,
+		salt:          salt,
 		isPRGCreated:  false, // PRG is not created
 	}
 
@@ -90,10 +89,10 @@ func (gen *randomGenerator) createPRG() (random.Rand, error) {
 	// Use the state/protocol PRG derivation from the source of randomness:
 	//  - for the transaction execution case, the PRG used must be a CSPRG
 	//  - use the state/protocol/prg customizer defined for the execution environment
-	//  - use the transaction ID as an extra diversifier of the CSPRG. Although this
+	//  - use the salt as an extra diversifier of the CSPRG. Although this
 	//    does not add any extra entropy to the output, it allows creating an independent
-	//    PRG for each transaction.
-	csprg, err := prg.New(source, prg.ExecutionEnvironment, gen.txId[:])
+	//    PRG for each transaction or script.
+	csprg, err := prg.New(source, prg.ExecutionEnvironment, gen.salt)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create a CSPRG from source: %w", err)
 	}
@@ -121,20 +120,5 @@ func (gen *randomGenerator) ReadRandom(buf []byte) error {
 	}
 
 	gen.prg.Read(buf)
-	return nil
-}
-
-var _ RandomGenerator = (*dummyRandomGenerator)(nil)
-
-// dummyRandomGenerator implements RandomGenerator and is used
-// for the scripts execution environment
-type dummyRandomGenerator struct{}
-
-func NewDummyRandomGenerator() RandomGenerator {
-	return &dummyRandomGenerator{}
-}
-
-// ReadRandom does nothing, because scripts do not support randomness APIs.
-func (gen *dummyRandomGenerator) ReadRandom(buf []byte) error {
 	return nil
 }
