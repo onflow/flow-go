@@ -7,7 +7,7 @@
 - The `master` branch is intended to only contain features for the immediately upcoming release, whether it is a Height Coordinated Upgrade or a Spork
 - During development, all features should live on a feature branch.
 - For small features, this will be simple working branch. These branches have the naming scheme `<contributor>/<issue #>-<short description>, for example `kan/123-fix-known-issue`
-- For larger features, this may be a shared feature branch with other team members.
+- For larger features, this may be a shared feature branch with other team members. Feature branches have the naming scheme `feature/<name>`.
 
 ### Upgrade Path Eligibility
 
@@ -22,9 +22,9 @@
         - Protocol level breaking change
         - State migrations required
 - All HCU upgrades can go directly into the `master` branch
-- All spork upgrades must live on a their own feature branch until the last HCU before the spork as been performed (usually approximately 1 month before the Spork.
+- All spork upgrades must live on their own feature branch until the last HCU before the spork as been performed (usually approximately 1 month before the Spork.
     - It is the responsibility of the DRI to keep this feature branch in a mergeable state
-    - Suggestion: once a sprint, merge `master` into the feature branch
+    - Suggestion: once a sprint, merge `master` into the feature branch. More frequent merges are easier, as they avoid complex conflict resolutions
 
 ### End of Release Cycle
 
