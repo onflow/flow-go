@@ -111,6 +111,8 @@ network-config:
   gossipsub-rpc-cluster-prefixed-hard-threshold: 100
   # The max sample size used for RPC message validation. If the total number of RPC messages exceeds this value a sample will be taken but messages will not be truncated
   gossipsub-rpc-message-max-sample-size: 1000
+  # The threshold at which an error will be returned if the number of invalid RPC messages exceeds this value
+  gossipsub-rpc-message-error-threshold: 500
   # RPC metrics observer inspector configs
   # The number of metrics inspector pool workers
   gossipsub-rpc-metrics-inspector-workers: 1
