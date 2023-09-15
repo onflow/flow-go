@@ -18,6 +18,8 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
+	accessflow "github.com/onflow/flow-go/access"
+	"github.com/onflow/flow-go/cmd/build"
 	access "github.com/onflow/flow-go/engine/access/mock"
 	backendmock "github.com/onflow/flow-go/engine/access/rpc/backend/mock"
 	"github.com/onflow/flow-go/engine/access/rpc/connection"
@@ -70,8 +72,12 @@ func (suite *Suite) SetupTest() {
 	header := unittest.BlockHeaderFixture()
 	params := new(protocol.Params)
 	params.On("FinalizedRoot").Return(header, nil)
+	params.On("SporkID").Return(unittest.IdentifierFixture(), nil)
+	params.On("ProtocolVersion").Return(uint(unittest.Uint64InRange(10, 30)), nil)
 	params.On("SporkRootBlockHeight").Return(header.Height, nil)
-	suite.state.On("Params").Return(params).Maybe()
+	params.On("SealedRoot").Return(header, nil)
+	suite.state.On("Params").Return(params)
+
 	suite.blocks = new(storagemock.Blocks)
 	suite.headers = new(storagemock.Headers)
 	suite.transactions = new(storagemock.Transactions)
@@ -1242,9 +1248,9 @@ func (suite *Suite) TestGetEventsForHeightRange() {
 	state.On("Sealed").Return(snapshot, nil)
 
 	rootHeader := unittest.BlockHeaderFixture()
-	params := new(protocol.Params)
-	params.On("FinalizedRoot").Return(rootHeader, nil)
-	state.On("Params").Return(params).Maybe()
+	stateParams := new(protocol.Params)
+	stateParams.On("FinalizedRoot").Return(rootHeader, nil)
+	state.On("Params").Return(stateParams).Maybe()
 
 	// mock snapshot to return head backend
 	snapshot.On("Head").Return(
@@ -1364,6 +1370,11 @@ func (suite *Suite) TestGetEventsForHeightRange() {
 		expectedResp := setupExecClient()
 		fixedENIdentifiersStr := flow.IdentifierList(nodeIdentities.NodeIDs()).Strings()
 
+		stateParams.On("SporkID").Return(unittest.IdentifierFixture(), nil)
+		stateParams.On("ProtocolVersion").Return(uint(unittest.Uint64InRange(10, 30)), nil)
+		stateParams.On("SporkRootBlockHeight").Return(headHeight, nil)
+		stateParams.On("SealedRoot").Return(head, nil)
+
 		params := suite.defaultBackendParams()
 		params.State = state
 		params.ConnFactory = connFactory
@@ -1387,6 +1398,11 @@ func (suite *Suite) TestGetEventsForHeightRange() {
 		blockHeaders, _, nodeIdentities = setupStorage(minHeight, headHeight)
 		expectedResp := setupExecClient()
 		fixedENIdentifiersStr := flow.IdentifierList(nodeIdentities.NodeIDs()).Strings()
+
+		stateParams.On("SporkID").Return(unittest.IdentifierFixture(), nil)
+		stateParams.On("ProtocolVersion").Return(uint(unittest.Uint64InRange(10, 30)), nil)
+		stateParams.On("SporkRootBlockHeight").Return(headHeight, nil)
+		stateParams.On("SealedRoot").Return(head, nil)
 
 		params := suite.defaultBackendParams()
 		params.State = state
@@ -1574,6 +1590,110 @@ func (suite *Suite) TestGetAccountAtBlockHeight() {
 		suite.Require().Equal(address, account.Address)
 
 		suite.assertAllExpectations()
+	})
+}
+
+func (suite *Suite) TestGetNodeVersionInfo() {
+	sporkRootBlock := unittest.BlockHeaderFixture()
+	nodeRootBlock := unittest.BlockHeaderFixture(unittest.WithHeaderHeight(sporkRootBlock.Height + 100))
+	sporkID := unittest.IdentifierFixture()
+	protocolVersion := uint(1234)
+
+	suite.Run("happy path", func() {
+		stateParams := protocol.NewParams(suite.T())
+		stateParams.On("SporkID").Return(sporkID, nil)
+		stateParams.On("ProtocolVersion").Return(protocolVersion, nil)
+		stateParams.On("SporkRootBlockHeight").Return(sporkRootBlock.Height, nil)
+		stateParams.On("SealedRoot").Return(nodeRootBlock, nil)
+
+		state := protocol.NewState(suite.T())
+		state.On("Params").Return(stateParams, nil).Maybe()
+
+		expected := &accessflow.NodeVersionInfo{
+			Semver:               build.Version(),
+			Commit:               build.Commit(),
+			SporkId:              sporkID,
+			ProtocolVersion:      uint64(protocolVersion),
+			SporkRootBlockHeight: sporkRootBlock.Height,
+			NodeRootBlockHeight:  nodeRootBlock.Height,
+		}
+
+		params := suite.defaultBackendParams()
+		params.State = state
+
+		backend, err := New(params)
+		suite.Require().NoError(err)
+
+		actual, err := backend.GetNodeVersionInfo(context.Background())
+		suite.Require().NoError(err)
+
+		suite.Require().Equal(expected, actual)
+	})
+
+	suite.Run("backend construct fails when SporkID lookup fails", func() {
+		stateParams := protocol.NewParams(suite.T())
+		stateParams.On("SporkID").Return(flow.ZeroID, fmt.Errorf("fail"))
+
+		state := protocol.NewState(suite.T())
+		state.On("Params").Return(stateParams, nil).Maybe()
+
+		params := suite.defaultBackendParams()
+		params.State = state
+
+		backend, err := New(params)
+		suite.Require().Error(err)
+		suite.Require().Nil(backend)
+	})
+
+	suite.Run("backend construct fails when ProtocolVersion lookup fails", func() {
+		stateParams := protocol.NewParams(suite.T())
+		stateParams.On("SporkID").Return(sporkID, nil)
+		stateParams.On("ProtocolVersion").Return(uint(0), fmt.Errorf("fail"))
+
+		state := protocol.NewState(suite.T())
+		state.On("Params").Return(stateParams, nil).Maybe()
+
+		params := suite.defaultBackendParams()
+		params.State = state
+
+		backend, err := New(params)
+		suite.Require().Error(err)
+		suite.Require().Nil(backend)
+	})
+
+	suite.Run("backend construct fails when SporkRootBlockHeight lookup fails", func() {
+		stateParams := protocol.NewParams(suite.T())
+		stateParams.On("SporkID").Return(sporkID, nil)
+		stateParams.On("ProtocolVersion").Return(protocolVersion, nil)
+		stateParams.On("SporkRootBlockHeight").Return(uint64(0), fmt.Errorf("fail"))
+
+		state := protocol.NewState(suite.T())
+		state.On("Params").Return(stateParams, nil).Maybe()
+
+		params := suite.defaultBackendParams()
+		params.State = state
+
+		backend, err := New(params)
+		suite.Require().Error(err)
+		suite.Require().Nil(backend)
+	})
+
+	suite.Run("backend construct fails when SealedRoot lookup fails", func() {
+		stateParams := protocol.NewParams(suite.T())
+		stateParams.On("SporkID").Return(sporkID, nil)
+		stateParams.On("ProtocolVersion").Return(protocolVersion, nil)
+		stateParams.On("SporkRootBlockHeight").Return(sporkRootBlock.Height, nil)
+		stateParams.On("SealedRoot").Return(nil, fmt.Errorf("fail"))
+
+		state := protocol.NewState(suite.T())
+		state.On("Params").Return(stateParams, nil).Maybe()
+
+		params := suite.defaultBackendParams()
+		params.State = state
+
+		backend, err := New(params)
+		suite.Require().Error(err)
+		suite.Require().Nil(backend)
 	})
 }
 

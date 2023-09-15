@@ -214,6 +214,13 @@ func (fcv *ChunkVerifier) verifyTransactionsInContext(
 	chunkState := fvmState.NewExecutionState(nil, fvmState.DefaultParameters())
 
 	var problematicTx flow.Identifier
+
+	// collect execution data formatted transaction results
+	var txResults []execution_data.TransactionResult
+	if len(transactions) > 0 {
+		txResults = make([]execution_data.TransactionResult, len(transactions))
+	}
+
 	// executes all transactions in this chunk
 	for i, tx := range transactions {
 		executionSnapshot, output, err := fcv.vm.Run(
@@ -237,6 +244,12 @@ func (fcv *ChunkVerifier) verifyTransactionsInContext(
 		err = chunkState.Merge(executionSnapshot)
 		if err != nil {
 			return nil, fmt.Errorf("failed to merge: %d (%w)", i, err)
+		}
+
+		txResults[i] = execution_data.TransactionResult{
+			TransactionID:   tx.ID,
+			ComputationUsed: output.ComputationUsed,
+			Failed:          output.Err != nil,
 		}
 	}
 
@@ -345,9 +358,10 @@ func (fcv *ChunkVerifier) verifyTransactionsInContext(
 	// 2. build our chunk's chunk execution data using the locally calculated values, and calculate
 	// its CID
 	chunkExecutionData := execution_data.ChunkExecutionData{
-		Collection: cedCollection,
-		Events:     events,
-		TrieUpdate: trieUpdate,
+		Collection:         cedCollection,
+		Events:             events,
+		TrieUpdate:         trieUpdate,
+		TransactionResults: txResults,
 	}
 
 	cidProvider := provider.NewExecutionDataCIDProvider(execution_data.DefaultSerializer)
