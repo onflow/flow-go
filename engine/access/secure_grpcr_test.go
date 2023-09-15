@@ -20,6 +20,7 @@ import (
 	accessmock "github.com/onflow/flow-go/engine/access/mock"
 	"github.com/onflow/flow-go/engine/access/rpc"
 	"github.com/onflow/flow-go/engine/access/rpc/backend"
+	"github.com/onflow/flow-go/engine/access/state_stream"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/grpcserver"
 	"github.com/onflow/flow-go/module/irrecoverable"
@@ -166,6 +167,9 @@ func (suite *SecureGRPCTestSuite) SetupTest() {
 		bnd,
 		suite.secureGrpcServer,
 		suite.unsecureGrpcServer,
+		nil,
+		state_stream.DefaultEventFilterConfig,
+		0,
 	)
 	assert.NoError(suite.T(), err)
 	suite.rpcEng, err = rpcEngBuilder.WithLegacy().Build()

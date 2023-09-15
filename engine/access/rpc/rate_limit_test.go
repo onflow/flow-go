@@ -22,6 +22,7 @@ import (
 
 	accessmock "github.com/onflow/flow-go/engine/access/mock"
 	"github.com/onflow/flow-go/engine/access/rpc/backend"
+	"github.com/onflow/flow-go/engine/access/state_stream"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/grpcserver"
 	"github.com/onflow/flow-go/module/irrecoverable"
@@ -182,8 +183,10 @@ func (suite *RateLimitTestSuite) SetupTest() {
 		bnd,
 		bnd,
 		suite.secureGrpcServer,
-		suite.unsecureGrpcServer)
-
+		suite.unsecureGrpcServer,
+		nil,
+		state_stream.DefaultEventFilterConfig,
+		0)
 	require.NoError(suite.T(), err)
 	suite.rpcEng, err = rpcEngBuilder.WithLegacy().Build()
 	require.NoError(suite.T(), err)

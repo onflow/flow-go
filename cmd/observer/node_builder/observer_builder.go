@@ -34,6 +34,7 @@ import (
 	"github.com/onflow/flow-go/engine/access/rpc"
 	"github.com/onflow/flow-go/engine/access/rpc/backend"
 	rpcConnection "github.com/onflow/flow-go/engine/access/rpc/connection"
+	"github.com/onflow/flow-go/engine/access/state_stream"
 	"github.com/onflow/flow-go/engine/common/follower"
 	synceng "github.com/onflow/flow-go/engine/common/synchronization"
 	"github.com/onflow/flow-go/engine/protocol"
@@ -973,6 +974,9 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 			restHandler,
 			builder.secureGrpcServer,
 			builder.unsecureGrpcServer,
+			nil, // state streaming is not supported
+			state_stream.DefaultEventFilterConfig,
+			0,
 		)
 		if err != nil {
 			return nil, err
