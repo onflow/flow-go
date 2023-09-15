@@ -2560,7 +2560,7 @@ func RootProtocolStateFixture() *flow.RichProtocolStateEntry {
 		NextEpochSetup:      nil,
 		NextEpochCommit:     nil,
 		Identities:          allIdentities,
-		NextIdentities:      nil,
+		NextIdentities:      flow.IdentityList{},
 	}
 }
 
@@ -2613,7 +2613,7 @@ func ProtocolStateFixture(options ...func(*flow.RichProtocolStateEntry)) *flow.R
 		NextEpochSetup:      nil,
 		NextEpochCommit:     nil,
 		Identities:          allIdentities,
-		NextIdentities:      nil,
+		NextIdentities:      flow.IdentityList{},
 	}
 
 	for _, option := range options {

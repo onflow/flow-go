@@ -119,8 +119,8 @@ func NewRichProtocolStateEntry(
 		CurrentEpochCommit:  currentEpochCommit,
 		NextEpochSetup:      nextEpochSetup,
 		NextEpochCommit:     nextEpochCommit,
-		Identities:          nil,
-		NextIdentities:      nil,
+		Identities:          IdentityList{},
+		NextIdentities:      IdentityList{},
 	}
 
 	// ensure data is consistent

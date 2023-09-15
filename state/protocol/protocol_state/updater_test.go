@@ -427,7 +427,7 @@ func (s *UpdaterSuite) TestEpochSetupAfterIdentityChange() {
 		NextEpochSetup:      nil,
 		NextEpochCommit:     nil,
 		Identities:          s.parentProtocolState.Identities.Copy(),
-		NextIdentities:      nil,
+		NextIdentities:      flow.IdentityList{},
 	}
 	// Update enriched data with the changes made to the low-level updated table
 	for _, identity := range allUpdates {
