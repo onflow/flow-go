@@ -220,7 +220,7 @@ func (fe *Environment) RunTransaction(rlpEncodedTx []byte) error {
 	}
 
 	// decode rlp
-	var tx *types.Transaction
+	tx := types.Transaction{}
 	// TODO: update the max limit on the encoded size to a meaningful value
 	err := tx.DecodeRLP(
 		rlp.NewStream(
@@ -232,7 +232,7 @@ func (fe *Environment) RunTransaction(rlpEncodedTx []byte) error {
 
 	signer := types.MakeSigner(fe.Config.ChainConfig, BlockNumberForEVMRules, fe.Config.BlockContext.Time)
 
-	msg, err := core.TransactionToMessage(tx, signer, fe.Config.BlockContext.BaseFee)
+	msg, err := core.TransactionToMessage(&tx, signer, fe.Config.BlockContext.BaseFee)
 	if err != nil {
 		return err
 	}
