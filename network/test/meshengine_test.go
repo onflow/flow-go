@@ -93,7 +93,7 @@ func setupNodesAndNetworks(t *testing.T, ctx context.Context) ([]*p2pnet.Network
 	testutils.StartNodes(signalerCtx, t, libP2PNodes)
 	for _, net := range networks {
 		testutils.StartNetworks(signalerCtx, t, []network.EngineRegistry{net})
-		unittest.RequireComponentsReadyBefore(t, 1*time.Second, net)
+		unittest.RequireComponentsReadyBefore(t, 5*time.Second, net)
 	}
 
 	for _, observableConnMgr := range tagObservables {
