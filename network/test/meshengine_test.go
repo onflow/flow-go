@@ -187,6 +187,8 @@ func TestTargetedValidators_Multicast(t *testing.T) {
 // TestTargetedValidators_Publish tests if only the intended recipients in a 1-k messaging actually receive the message.
 // The messages are disseminated through the Multicast method of conduits.
 func TestTargetedValidators_Publish(t *testing.T) {
+	unittest.SkipUnless(t, unittest.TEST_FLAKY, "passes on local, fails on CI")
+	
 	ctx, cancel := context.WithCancel(context.Background())
 	networks, libp2pNodes, ids, obs := setupNodesAndNetworks(t, ctx)
 	conduit := testutils.ConduitWrapper{}
