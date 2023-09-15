@@ -26,7 +26,7 @@ type workerTest struct {
 	progress      *mockProgress
 	indexTest     *indexTest
 	worker        *ExecutionStateWorker
-	executionData *mock.ExecutionDataStore
+	executionData *mempool.ExecutionData
 	t             *testing.T
 }
 
@@ -47,13 +47,13 @@ func newWorkerTest(t *testing.T, availableBlocks int, lastIndexedIndex int) *wor
 		useDefaultBlockByHeight().
 		initIndexer()
 
-	executionData := mock.NewExecutionDataStore(t)
+	executionData := mempool.NewExecutionData(t)
 	exeCache := cache.NewExecutionDataCache(
-		executionData,
+		mock.NewExecutionDataStore(t),
 		indexerTest.indexer.headers,
 		nil,
 		nil,
-		mempool.NewExecutionData(t),
+		executionData,
 	)
 
 	test := &workerTest{
