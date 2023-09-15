@@ -71,10 +71,6 @@ func (fe *Environment) checkExecuteOnce() error {
 	return nil
 }
 
-func (fe *Environment) updateGasConsumed(leftOverGas uint64) {
-	fe.Result.GasConsumed = fe.Config.BlockContext.GasLimit - leftOverGas
-}
-
 // commit commits the changes to the state.
 // if error is returned is a fatal one.
 func (fe *Environment) commit() error {
@@ -114,8 +110,9 @@ func (fe *Environment) commit() error {
 // MintTo mints tokens into the target address, if the address dees not
 // exist it would create it first.
 //
-// Warning, This method should only be used for bridging native token into Flex
-// from to the FVM environment.
+// Warning, This method should only be used for bridging native token from Flex
+// back to the FVM environment. This method should only be used for FOA's
+// accounts where resource ownership has been verified
 func (fe *Environment) MintTo(balance *big.Int, target common.Address) error {
 	if err := fe.checkExecuteOnce(); err != nil {
 		return err
@@ -144,6 +141,7 @@ func (fe *Environment) MintTo(balance *big.Int, target common.Address) error {
 //
 // Warning, This method should only be used for bridging native token from Flex
 // back to the FVM environment. This method should only be used for FOA's
+// accounts where resource ownership has been verified
 func (fe *Environment) WithdrawFrom(amount *big.Int, source common.Address) error {
 	if err := fe.checkExecuteOnce(); err != nil {
 		return err
@@ -181,6 +179,10 @@ func (fe *Environment) WithdrawFrom(amount *big.Int, source common.Address) erro
 
 // Deploy deploys a contract at the given address
 // the value passed to this method would be deposited on the contract account
+//
+// Warning, This method should only be used for bridging native token from Flex
+// back to the FVM environment. This method should only be used for FOA's
+// accounts where resource ownership has been verified
 func (fe *Environment) Deploy(
 	caller common.Address,
 	code []byte,
@@ -194,8 +196,11 @@ func (fe *Environment) Deploy(
 	return fe.run(msg)
 }
 
-// Run is used for FOA accounts only
-// for FOA calls use the custom Message constructor *core.Message
+// Call calls a smart contract with the input
+//
+// Warning, This method should only be used for bridging native token from Flex
+// back to the FVM environment. This method should only be used for FOA's
+// accounts where resource ownership has been verified
 func (fe *Environment) Call(
 	from *common.Address,
 	to *common.Address,
@@ -214,6 +219,7 @@ func (fe *Environment) Call(
 }
 
 // RunTransaction runs a flex transaction
+// this method could be called by anyone.
 func (fe *Environment) RunTransaction(rlpEncodedTx []byte) error {
 	if err := fe.checkExecuteOnce(); err != nil {
 		return err
@@ -241,7 +247,6 @@ func (fe *Environment) RunTransaction(rlpEncodedTx []byte) error {
 }
 
 func (fe *Environment) run(msg *core.Message) error {
-
 	execResult, err := core.NewStateTransition(fe.EVM, msg, (*core.GasPool)(&fe.Config.BlockContext.GasLimit)).TransitionDb()
 	if err != nil {
 		return err
