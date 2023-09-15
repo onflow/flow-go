@@ -31,10 +31,11 @@ func NewRegisters(db *pebble.DB) (*Registers, error) {
 		// and firstHeight
 		return nil, fmt.Errorf("unable to initialize register storage, first height unavailable in db: %w", err)
 	}
-	// since we assume the state of the DB has complete registers as of FirstHeight indexed
+	// since we assume the state of the DB has complete registers as of FirstHeight indexed,
+	// LatestHeight should also be the same
 	registers.firstHeight = firstHeight
 	registers.latestHeight = firstHeight
-
+ 
 	return registers, nil
 }
 
