@@ -31,7 +31,7 @@
 ### End of Release Cycle
 
 - At the end of every release cycle, we will tag a commit that includes all desired features to be released
-- This commit will be tagged according to semantic versioning guidelines
+- This commit will be tagged according to [semantic versioning guidelines](https://dapperlabs.notion.site/Changes-to-handling-git-tags-5e39af7c723a428a915bd88901fc1274)
 - Release notes must be written up, describing all features included in this tag
 
 ### Benchmark Testing
@@ -43,7 +43,7 @@
 ### Testnet
 
 - The current schedule is the Wednesday two weeks before the corresponding Mainnet spork
-- Features should aim to live on Testnet for at least a week before making it to Mainnet
+- Features should aim to live on Testnet for at least two weeks before making it to Mainnet
 
 ### Mainnet
 
@@ -66,15 +66,12 @@
     - i.e. something changing in how the historical state will be read and interacted with
 - Any change that would break the communication contract between nodes
     - e.g. Addition of a new REQUIRED field in a message structure
-    - Removal of a REQUIRED field in a message structure
     - Removal of a REQUIRED channel in libp2p
-    
-    Generally, *all* the fields in our node-to-node messages are required. For BFT reasons we avoid optional fields, as they add surface for spamming attacks, impose additional consistency requirements, and they often add security vulnerabilities w.r.t. the message hash/ID. I would strongly discourage working temporarily with optional fields, as this adds technical debt of needing to change those fields later to being required. 
-    
-- Most changes of the core protocol outside of execution, such as changes in the consensus algorithm, verification-and-sealing pipeline, or collector mechanics.
-    
-    For any protocol-related changes, you need to have a solid argument for why this change is non-breaking (absence of a counter-example is not sufficient).
-    
-- Changes in the [Service Events](https://www.notion.so/Service-Events-54e5edb7515445f293dff36ade910ad7?pvs=21) that are emitted by the Execution environment and ingested by the protocol
-- Change in the reading of Protocol state that is not backwards compatible
-    - e.g. If the way the node interprets identities loaded from storage is changed so that identities stored before an upgrade is no longer recognized after the upgrade, this is not acceptable for an HCU
+    - Removal of a REQUIRED field in a message structure
+        -  Generally, *all* the fields in our node-to-node messages are required.
+        -  For BFT reasons we avoid optional fields, as they add surface for spamming attacks, impose additional consistency requirements, and they often add security vulnerabilities w.r.t. the message hash/ID. 
+    - Most changes of the core protocol outside of execution, such as changes in the consensus algorithm, verification-and-sealing pipeline, or collector mechanics.
+        - For any protocol-related changes, you need to have a solid argument for why this change is non-breaking (absence of a counter-example is not sufficient).
+    - Changes in the [Service Events](https://www.notion.so/Service-Events-54e5edb7515445f293dff36ade910ad7?pvs=21) that are emitted by the Execution environment and ingested by the protocol
+    - Change in the reading of Protocol state that is not backwards compatible
+        - e.g. If the way the node interprets identities loaded from storage is changed so that identities stored before an upgrade is no longer recognized after the upgrade, this is not acceptable for an HCU
