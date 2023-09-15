@@ -62,6 +62,15 @@ func newIndexTest(
 	}
 }
 
+func (i *indexTest) blockIDByHeight(height uint64) (flow.Identifier, error) {
+	for _, b := range i.blocks {
+		if b.Header.Height == height {
+			return b.ID(), nil
+		}
+	}
+	return flow.ZeroID, fmt.Errorf("not found")
+}
+
 func (i *indexTest) setLastHeight(f func(t *testing.T) (uint64, error)) *indexTest {
 	i.registers.
 		On("LatestHeight").
