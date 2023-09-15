@@ -4,11 +4,12 @@ import (
 	"bytes"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data/internal"
 	"github.com/onflow/flow-go/utils/unittest"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
 func TestSerializeDeserializeChunkExecutionData(t *testing.T) {
