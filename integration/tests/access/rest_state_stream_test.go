@@ -164,6 +164,8 @@ func (s *RestStateStreamSuite) requireEvents(receivedEventsResponse []*state_str
 
 	grpcClient := accessproto.NewAccessAPIClient(grpcConn)
 
+	// Variable to keep track of non-empty event response count
+	nonEmptyResponseCount := 0
 	for _, receivedEventResponse := range receivedEventsResponse {
 		// Create a map where key is EventType and value is list of events with this EventType
 		receivedEventMap := make(map[flow.EventType][]flow.Event)
@@ -188,8 +190,15 @@ func (s *RestStateStreamSuite) requireEvents(receivedEventsResponse []*state_str
 				require.Equal(s.T(), expectedEventsResult.Events[i].EventIndex, event.EventIndex, "expect the same event index")
 				require.Equal(s.T(), convert.MessageToIdentifier(expectedEventsResult.Events[i].TransactionId), event.TransactionID, "expect the same transaction id")
 			}
+
+			// Check if the current response has non-empty events
+			if len(receivedEventResponse.Events) > 0 {
+				nonEmptyResponseCount++
+			}
 		}
 	}
+	// Ensure that at least one response had non-empty events
+	require.GreaterOrEqual(s.T(), nonEmptyResponseCount, 1, "expect at least one response with non-empty events")
 }
 
 // getWSClient is a helper function that creates a websocket client

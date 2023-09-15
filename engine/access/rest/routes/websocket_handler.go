@@ -113,12 +113,12 @@ func (wsController *WebsocketController) writeEvents(sub state_stream.Subscripti
 
 	for {
 		select {
-		case err, ok := <-wsController.readChannel:
+		case err := <-wsController.readChannel:
 			// we use `readChannel`
 			// 1) as indicator of client's status, when `readChannel` closes it means that client
 			// connection has been terminated and we need to stop this goroutine to avoid memory leak.
 			// 2) as error receiver for any errors that occur during the reading process
-			if ok {
+			if err != nil {
 				wsController.wsErrorHandler(err)
 			}
 			return
@@ -185,7 +185,7 @@ func (wsController *WebsocketController) read() {
 		// Check the message from the client, if is any just close the connection
 		if len(msg) > 0 {
 			err := fmt.Errorf("the client sent an unexpected message, connection closed")
-			wsController.logger.Debug().Err(err)
+			wsController.logger.Debug().Msg(err.Error())
 			wsController.readChannel <- err
 			return
 		}
@@ -215,8 +215,8 @@ var _ http.Handler = (*WSHandler)(nil)
 
 func NewWSHandler(
 	logger zerolog.Logger,
-	subscribeFunc SubscribeHandlerFunc,
 	api state_stream.API,
+	subscribeFunc SubscribeHandlerFunc,
 	chain flow.Chain,
 	eventFilterConfig state_stream.EventFilterConfig,
 	maxGlobalStreams uint32,

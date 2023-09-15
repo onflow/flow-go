@@ -66,7 +66,7 @@ func (b *RouterBuilder) AddWsRoutes(
 	maxGlobalStreams uint32) *RouterBuilder {
 
 	for _, r := range WSRoutes {
-		h := NewWSHandler(b.logger, r.Handler, stateStreamApi, chain, eventFilterConfig, maxGlobalStreams)
+		h := NewWSHandler(b.logger, stateStreamApi, r.Handler, chain, eventFilterConfig, maxGlobalStreams)
 		b.v1SubRouter.
 			Methods(r.Method).
 			Path(r.Pattern).
