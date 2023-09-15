@@ -7,7 +7,6 @@ import (
 	"github.com/onflow/flow-go/fvm/flex/storage"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/common/math"
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/rawdb"
 	"github.com/ethereum/go-ethereum/core/state"
@@ -118,28 +117,23 @@ func (fe *Environment) commit() error {
 // Warning, This method should only be used for bridging native token into Flex
 // from to the FVM environment.
 func (fe *Environment) MintTo(balance *big.Int, target common.Address) error {
-
 	if err := fe.checkExecuteOnce(); err != nil {
 		return err
 	}
 
-	if fe.Config.BlockContext.GasLimit < TransferGasUsage {
-		// still we deduct the amount that was possible to use
-		fe.Result.GasConsumed = fe.Config.BlockContext.GasLimit
-		return ErrGasLimit
+	// update the gas consumed // TODO: revisit
+	// do it as the very first thing to prevent attacks
+	fe.Result.GasConsumed = TransferGasUsage
+
+	// check account if not exist
+	if !fe.State.Exist(target) {
+		fe.State.CreateAccount(target)
 	}
 
-	// add address to the access list ?
-	fe.State.AddAddressToAccessList(target)
-	// create account (TODO: check if exists)
-	fe.State.CreateAccount(target)
 	// add balance
 	fe.State.AddBalance(target, balance)
 
 	// we don't need to increment any nonce, given the origin doesn't exist
-
-	// update the gas consumed
-	fe.Result.GasConsumed = TransferGasUsage
 
 	// TODO: emit an event
 
@@ -149,37 +143,36 @@ func (fe *Environment) MintTo(balance *big.Int, target common.Address) error {
 // WithdrawFrom deduct the balance from the given source account.
 //
 // Warning, This method should only be used for bridging native token from Flex
-// back to the FVM environment. This method should only be used for FOA's, for other
-// accounts they should send a message to transfer money to account zero?
-func (fe *Environment) WithdrawFrom(balance *big.Int, source common.Address) error {
-
+// back to the FVM environment. This method should only be used for FOA's
+func (fe *Environment) WithdrawFrom(amount *big.Int, source common.Address) error {
 	if err := fe.checkExecuteOnce(); err != nil {
 		return err
 	}
 
-	if fe.Config.BlockContext.GasLimit < TransferGasUsage {
-		// still we deduct the amount that was possible to use
-		fe.Result.GasConsumed = fe.Config.BlockContext.GasLimit
-		return ErrGasLimit
+	// update the gas consumed // TODO: revisit
+	// do it as the very first thing to prevent attacks
+	fe.Result.GasConsumed = TransferGasUsage
+
+	// check account exist
+	if !fe.State.Exist(source) {
+		fe.Result.Failed = true
+		return nil
 	}
 
-	// // TODO check account exist
-	// if !fe.State.Exist(source) {
-	// 	// return not exist
-	// }
+	// check balance
+	// if balance is lower than amount return
+	if fe.State.GetBalance(source).Cmp(amount) == -1 {
+		fe.Result.Failed = true
+		return nil
+	}
 
-	// add address to the access list ?
-	fe.State.AddAddressToAccessList(source)
 	// add balance
-	fe.State.SubBalance(source, balance)
+	fe.State.SubBalance(source, amount)
 
 	// we increment the nonce for source account cause
-	// withdraw counts as a
+	// withdraw counts as a transaction (similar to the way calls increment the nonce)
 	nonce := fe.State.GetNonce(source)
 	fe.State.SetNonce(source, nonce+1)
-
-	// update the gas consumed
-	fe.Result.GasConsumed = TransferGasUsage
 
 	// TODO: emit an event
 
@@ -188,83 +181,17 @@ func (fe *Environment) WithdrawFrom(balance *big.Int, source common.Address) err
 
 // Deploy deploys a contract at the given address
 // the value passed to this method would be deposited on the contract account
-// TODO change this to use the same message call (without to section)
-func (fe *Environment) Deploy(caller common.Address, code []byte, value *big.Int) error {
+func (fe *Environment) Deploy(
+	caller common.Address,
+	code []byte,
+	gasLimit uint64,
+	value *big.Int,
+) error {
 	if err := fe.checkExecuteOnce(); err != nil {
 		return err
 	}
-
-	// Execute the preparatory steps for state transition which includes:
-	rules := fe.Config.Rules()
-	fe.State.Prepare(rules,
-		fe.Config.TxContext.Origin,
-		fe.Config.BlockContext.Coinbase,
-		nil,
-		vm.ActivePrecompiles(rules),
-		nil)
-
-	// TODO maybe we should use Create2 and pass salt of type *uint256.Int
-	ret, addr, leftOverGas, err := fe.EVM.Create(
-		vm.AccountRef(caller),
-		code,
-		fe.Config.BlockContext.GasLimit,
-		value)
-
-	if err != nil {
-		return err
-	}
-
-	fe.Result.Logs = fe.State.Logs()
-	fe.Result.RetValue = ret
-	fe.Result.DeployedContractAddress = addr
-	fe.updateGasConsumed(leftOverGas)
-
-	return fe.commit()
-
-}
-
-// LegacyCall calls a method on a contract (mostly for testing)
-// Don't use for production
-// the value passed to this method would be deposited on the contract account
-func (fe *Environment) LegacyCall(caller common.Address, contract common.Address, input []byte, value *big.Int) error {
-	if err := fe.checkExecuteOnce(); err != nil {
-		return err
-	}
-
-	rules := fe.Config.Rules()
-	fe.State.Prepare(rules,
-		caller,
-		fe.Config.BlockContext.Coinbase,
-		&contract,
-		vm.ActivePrecompiles(rules),
-		nil)
-
-	// Call the code with the given configuration.
-	ret, leftOverGas, err := fe.EVM.Call(
-		fe.State.GetOrNewStateObject(caller),
-		contract,
-		input,
-		fe.Config.BlockContext.GasLimit,
-		value,
-	)
-	if err != nil {
-		return err
-	}
-
-	fe.Result.RetValue = ret
-	fe.updateGasConsumed(leftOverGas)
-
-	// TODO deal with the logs
-	// TODO process error (fatal vs non fatal)
-
-	// we increment the nonce for origin account cause
-	// withdraw counts as a
-	// TODO: check if the call is making the adjustment to the Nonce or not
-	// TODO: check if we need to move this logic before the call.
-	nonce := fe.State.GetNonce(caller)
-	fe.State.SetNonce(caller, nonce+1)
-
-	return fe.commit()
+	msg := directCallMessage(&caller, nil, value, code, gasLimit)
+	return fe.run(msg)
 }
 
 // Run is used for FOA accounts only
@@ -274,7 +201,6 @@ func (fe *Environment) Call(
 	to *common.Address,
 	data []byte,
 	gasLimit uint64,
-	gasPrice, GasFeeCap, GasTipCap *big.Int, // TODO not sure if we need these
 	value *big.Int,
 ) error {
 	if err := fe.checkExecuteOnce(); err != nil {
@@ -282,27 +208,7 @@ func (fe *Environment) Call(
 	}
 	// TODO: verify that the authorizer has the resource to interact with this contract (higher level check)
 
-	msg := &core.Message{
-		To:   to,
-		From: *from,
-		// Nonce:     fe.State.GetNonce(*origin), // always using the right nonce
-		Value:     value,
-		Data:      data,
-		GasLimit:  gasLimit,
-		GasPrice:  gasPrice,
-		GasFeeCap: GasFeeCap, // TODO revisit this
-		GasTipCap: GasTipCap,
-		// AccessList:        tx.AccessList(), // TODO unlock these
-		SkipAccountChecks: true, // TODO think about this
-		// BlobHashes:        tx.BlobHashes(), // TODO unlock these
-		// BlobGasFeeCap: tx.BlobGasFeeCap(), // TODO unlock these
-	}
-
-	// If baseFee provided, set gasPrice to effectiveGasPrice.
-	baseFee := fe.Config.BlockContext.BaseFee
-	if baseFee != nil {
-		msg.GasPrice = math.BigMin(msg.GasPrice.Add(msg.GasTipCap, baseFee), msg.GasFeeCap)
-	}
+	msg := directCallMessage(from, to, value, data, gasLimit)
 
 	return fe.run(msg)
 }
@@ -349,9 +255,29 @@ func (fe *Environment) run(msg *core.Message) error {
 	// If the transaction created a contract, store the creation address in the receipt.
 	// TODO verify this later
 	if msg.To == nil {
-		fe.Result.DeployedContractAddress = crypto.CreateAddress(fe.Config.TxContext.Origin, msg.Nonce)
+		fe.Result.DeployedContractAddress = crypto.CreateAddress(msg.From, msg.Nonce)
 	}
 
 	// TODO check if we have the logic to pay the coinbase
 	return fe.commit()
+}
+
+func directCallMessage(
+	from, to *common.Address,
+	value *big.Int,
+	data []byte,
+	gasLimit uint64,
+) *core.Message {
+	return &core.Message{
+		To:        to,
+		From:      *from,
+		Value:     value,
+		Data:      data,
+		GasLimit:  gasLimit,
+		GasPrice:  big.NewInt(0), // price has to be zero
+		GasTipCap: big.NewInt(1), // TODO revisit this value (also known as maxPriorityFeePerGas)
+		GasFeeCap: big.NewInt(2), // TODO revisit this value (also known as maxFeePerGas)
+		// AccessList:        tx.AccessList(), // TODO revisit this value, the cost matter but performance might
+		SkipAccountChecks: true, // this would let us not set the nonce
+	}
 }

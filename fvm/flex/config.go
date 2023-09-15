@@ -2,6 +2,7 @@ package flex
 
 import (
 	"errors"
+	"math"
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -15,7 +16,7 @@ import (
 var (
 	FlexTestnetChainID     = big.NewInt(666)
 	FlexMainnetChainID     = big.NewInt(777)
-	DefaultMaxGasLimit     = uint64(30_000_000)
+	DefaultMaxGasLimit     = uint64(math.MaxUint64) // TODO: revisit this limit
 	TransferGasUsage       = uint64(21_000)
 	DefaultGasPrice        = big.NewInt(1)
 	BlockNumberForEVMRules = big.NewInt(18138954) // a recent block to be used as a refrence for the EVM setup

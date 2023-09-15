@@ -2,6 +2,7 @@ package flex_test
 
 import (
 	"encoding/hex"
+	"math"
 
 	"math/big"
 	"strings"
@@ -133,7 +134,7 @@ func TestContractInteraction(t *testing.T) {
 			env, err := flex.NewEnvironment(config, db)
 			require.NoError(t, err)
 
-			err = env.Deploy(testAccount, byteCodes, amountToBeTransfered)
+			err = env.Deploy(testAccount, byteCodes, math.MaxUint64, amountToBeTransfered)
 			require.NoError(t, err)
 
 			contractAddr = env.Result.DeployedContractAddress
@@ -155,17 +156,11 @@ func TestContractInteraction(t *testing.T) {
 			store, err := abi.Pack("store", num)
 			require.NoError(t, err)
 
-			gasFee := big.NewInt(1)
-			maxPriority := big.NewInt(2)
-			maxFeePerGas := big.NewInt(3)
-
 			err = env.Call(&testAccount,
 				&contractAddr,
 				store,
 				1_000_000,
-				gasFee,
-				maxFeePerGas,
-				maxPriority,
+				// this should be zero because the contract doesn't have receiver
 				big.NewInt(0),
 			)
 			require.NoError(t, err)
@@ -181,9 +176,7 @@ func TestContractInteraction(t *testing.T) {
 				&contractAddr,
 				retrieve,
 				1_000_000,
-				gasFee,
-				maxFeePerGas,
-				maxPriority,
+				// this should be zero because the contract doesn't have receiver
 				big.NewInt(0),
 			)
 			require.NoError(t, err)
