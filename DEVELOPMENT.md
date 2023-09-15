@@ -15,7 +15,9 @@
     - Height Coordinated Upgrade (HCU)
         - No protocol level breaking changes
         - No state migrations
-        - Execution state/path changes allowed
+        - Changes to how Execution state/path are handled are allowed, if they are
+            - Backwards compatible, or
+            - Brand new additions
         - Resource optimizations are okay
         - Cadence upgrades which could cause execution state fork (likely any Cadence upgrade except for trivial changes)
     - Spork
