@@ -109,7 +109,8 @@ network-config:
   gossipsub-cluster-prefix-tracker-cache-decay: 0.99
   # The upper bound on the amount of cluster prefixed control messages that will be processed
   gossipsub-rpc-cluster-prefixed-hard-threshold: 100
-
+  # The max sample size used for RPC message validation. If the total number of RPC messages exceeds this value a sample will be taken but messages will not be truncated
+  gossipsub-rpc-message-max-sample-size: 1000
   # RPC metrics observer inspector configs
   # The number of metrics inspector pool workers
   gossipsub-rpc-metrics-inspector-workers: 1

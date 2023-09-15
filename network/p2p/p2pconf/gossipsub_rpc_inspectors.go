@@ -22,6 +22,8 @@ type GossipSubRPCValidationInspectorConfigs struct {
 	// GraftPruneMessageMaxSampleSize the max sample size used for control message validation of GRAFT and PRUNE. If the total number of control messages (GRAFT or PRUNE)
 	// exceeds this max sample size then the respective message will be truncated to this value before being processed.
 	GraftPruneMessageMaxSampleSize int `validate:"gte=1000" mapstructure:"gossipsub-rpc-graft-and-prune-message-max-sample-size"`
+	// RPCMessageMaxSampleSize the max sample size used for RPC message validation. If the total number of RPC messages exceeds this value a sample will be taken but messages will not be truncated.
+	RPCMessageMaxSampleSize int `validate:"gte=1000" mapstructure:"gossipsub-rpc-message-max-sample-size"`
 }
 
 // IWantRPCInspectionConfig validation configuration for iWANT RPC control messages.
