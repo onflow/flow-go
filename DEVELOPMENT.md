@@ -11,7 +11,7 @@
 
 ### Upgrade Path Eligibility
 
-- When a feature branch is ready to be merged, it must be determined if the desired upgrade path onto Mainnet. The options are:
+- When a feature branch is ready to be merged, the desired upgrade path onto Mainnet must be determined (if any). The options are:
     - Height Coordinated Upgrade (HCU)
         - No protocol level breaking changes
         - No state migrations
@@ -28,7 +28,7 @@
 
 ### End of Release Cycle
 
-- At the end of every release cycle, we will tag a commit that includes all desired features to be Released
+- At the end of every release cycle, we will tag a commit that includes all desired features to be released
 - This commit will be tagged according to semantic versioning guidelines
 - Release notes must be written up, describing all features included in this tag
 
@@ -40,13 +40,13 @@
 
 ### Testnet
 
-- The current schedule is the Wednesdays two weeks before the corresponding mainnet spork
+- The current schedule is the Wednesday two weeks before the corresponding Mainnet spork
 - Features should aim to live on Testnet for at least a week before making it to Mainnet
 
 ### Mainnet
 
 - Features must live on Testnet for two week before making it to Mainnet
-- The current schedule is the Wednesday two week after the Testnet Spork
+- The current schedule is the Wednesday two weeks after the Testnet Spork
 
 ## Breaking Change Classifications
 
