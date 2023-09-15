@@ -70,9 +70,17 @@ func (suite *SecureGRPCTestSuite) SetupTest() {
 	suite.state = new(protocol.State)
 	suite.snapshot = new(protocol.Snapshot)
 
+	rootHeader := unittest.BlockHeaderFixture()
+	params := new(protocol.Params)
+	params.On("SporkID").Return(unittest.IdentifierFixture(), nil)
+	params.On("ProtocolVersion").Return(uint(unittest.Uint64InRange(10, 30)), nil)
+	params.On("SporkRootBlockHeight").Return(rootHeader.Height, nil)
+	params.On("SealedRoot").Return(rootHeader, nil)
+
 	suite.epochQuery = new(protocol.EpochQuery)
 	suite.state.On("Sealed").Return(suite.snapshot, nil).Maybe()
 	suite.state.On("Final").Return(suite.snapshot, nil).Maybe()
+	suite.state.On("Params").Return(params, nil).Maybe()
 	suite.snapshot.On("Epochs").Return(suite.epochQuery).Maybe()
 	suite.blocks = new(storagemock.Blocks)
 	suite.headers = new(storagemock.Headers)
