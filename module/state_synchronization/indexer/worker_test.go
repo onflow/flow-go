@@ -55,9 +55,9 @@ func (w *mockProgress) InitProcessedIndex(index uint64) error {
 	return nil
 }
 
-func TestWorker(t *testing.T) {
+func TestWorker_Success(t *testing.T) {
 	blocks := blocksFixture(10)
-	// we use 5th index as the latest indexed height so we leave 5 more blocks to be indexed by the indexer in this test
+	// we use 5th index as the latest indexed height, so we leave 5 more blocks to be indexed by the indexer in this test
 	lastIndexedHeight := blocks[5].Header.Height
 	progress := &mockProgress{index: lastIndexedHeight}
 	test := workerTest{
@@ -70,14 +70,11 @@ func TestWorker(t *testing.T) {
 		setLastHeight(func(t *testing.T) (uint64, error) {
 			return lastIndexedHeight, nil
 		}).
+		useDefaultBlockByHeight().
 		initIndexer()
 
 	blockDataCache := mempool.NewExecutionData(t)
 	exeDatastore := mock.NewExecutionDataStore(t)
-
-	indexerTest.headers.
-		On("BlockIDByHeight", mocks.AnythingOfType("uint64")).
-		Return(indexerTest.blockIDByHeight)
 
 	blockDataCache.
 		On("ByID", mocks.AnythingOfType("flow.Identifier")).

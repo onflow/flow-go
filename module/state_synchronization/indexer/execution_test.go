@@ -9,6 +9,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	mocks "github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/cmd/util/ledger/migrations"
@@ -62,13 +63,19 @@ func newIndexTest(
 	}
 }
 
-func (i *indexTest) blockIDByHeight(height uint64) (flow.Identifier, error) {
-	for _, b := range i.blocks {
-		if b.Header.Height == height {
-			return b.ID(), nil
-		}
-	}
-	return flow.ZeroID, fmt.Errorf("not found")
+func (i *indexTest) useDefaultBlockByHeight() *indexTest {
+	i.headers.
+		On("BlockIDByHeight", mocks.AnythingOfType("uint64")).
+		Return(func(height uint64) (flow.Identifier, error) {
+			for _, b := range i.blocks {
+				if b.Header.Height == height {
+					return b.ID(), nil
+				}
+			}
+			return flow.ZeroID, fmt.Errorf("not found")
+		})
+
+	return i
 }
 
 func (i *indexTest) setLastHeight(f func(t *testing.T) (uint64, error)) *indexTest {
