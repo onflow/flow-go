@@ -198,25 +198,55 @@ func (table *DerivedDataTable[TKey, TVal]) unsafeValidate(
 
 	applicable := table.invalidators.ApplicableInvalidators(
 		txn.toValidateTime)
-	if applicable.ShouldInvalidateEntries() {
-		for key, entry := range txn.writeSet {
-			if applicable.ShouldInvalidateEntry(
+	shouldInvalidateEntries := applicable.ShouldInvalidateEntries()
+
+	for key, entry := range txn.writeSet {
+		current, ok := table.items[key]
+		if ok && current != entry {
+			// The derived data table must always return the same item for a given key,
+			// otherwise the cadence runtime will have issues comparing resolved cadence types.
+			//
+			// for example:
+			// two transactions are run concurrently, first loads (cadence contracts)
+			// A and B where B depends on A. The second transaction also loads A and C,
+			// where C depends on A. The first transaction commits first.
+			// The A from the second transaction is equivalent to the A from
+			// the first transaction but it is not the same object.
+			//
+			// Overwriting A with the A from the second transaction will cause program B
+			// to break because it will not know the types from A returned from
+			// the cache in the future.
+			// Not overwriting A will cause program C to break because it will not know
+			// the types from A returned from the cache in the future.
+			//
+			// The solution is to treat this as a conflict and retry the transaction.
+			// When the transaction is retried, the A from the first transaction will
+			// be used to load C in the second transaction.
+
+			return errors.NewRetryableConflictError(
+				"invalid TableTransaction: write conflict")
+		}
+
+		if !shouldInvalidateEntries ||
+			!applicable.ShouldInvalidateEntry(
 				key,
 				entry.Value,
-				entry.ExecutionSnapshot) {
-
-				if txn.snapshotTime == txn.executionTime {
-					// This should never happen since the transaction is
-					// sequentially executed.
-					return fmt.Errorf(
-						"invalid TableTransaction: unrecoverable outdated " +
-							"write set")
-				}
-
-				return errors.NewRetryableConflictError(
-					"invalid TableTransaction: outdated write set")
-			}
+				entry.ExecutionSnapshot,
+			) {
+			continue
 		}
+
+		if txn.snapshotTime == txn.executionTime {
+			// This should never happen since the transaction is
+			// sequentially executed.
+			return fmt.Errorf(
+				"invalid TableTransaction: unrecoverable outdated " +
+					"write set")
+		}
+
+		return errors.NewRetryableConflictError(
+			"invalid TableTransaction: outdated write set")
+
 	}
 
 	txn.toValidateTime = table.latestCommitExecutionTime + 1
