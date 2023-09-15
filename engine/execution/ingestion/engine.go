@@ -601,6 +601,7 @@ func (e *Engine) executeBlock(
 	lg := e.log.With().
 		Hex("block_id", logging.Entity(executableBlock)).
 		Uint64("height", executableBlock.Block.Header.Height).
+		Int("collections", len(executableBlock.CompleteCollections)).
 		Logger()
 
 	lg.Info().Msg("executing block")
@@ -888,7 +889,7 @@ func (e *Engine) handleCollection(
 
 	lg := e.log.With().Hex("collection_id", collID[:]).Logger()
 
-	lg.Info().Hex("sender", originID[:]).Msg("handle collection")
+	lg.Info().Hex("sender", originID[:]).Int("len", collection.Len()).Msg("handle collection")
 	defer func(startTime time.Time) {
 		lg.Info().TimeDiff("duration", time.Now(), startTime).Msg("collection handled")
 	}(time.Now())
