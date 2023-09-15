@@ -4,8 +4,10 @@ import (
 	"encoding/hex"
 	"fmt"
 	"math/big"
+	"strings"
 	"testing"
 
+	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/flex"
@@ -73,6 +75,42 @@ func TestContractInteraction(t *testing.T) {
 		//     }
 		// }
 
+		definition := `
+			[
+				{
+					"inputs": [],
+					"stateMutability": "payable",
+					"type": "constructor"
+				},
+				{
+					"inputs": [],
+					"name": "retrieve",
+					"outputs": [
+						{
+							"internalType": "uint256",
+							"name": "",
+							"type": "uint256"
+						}
+					],
+					"stateMutability": "view",
+					"type": "function"
+				},
+				{
+					"inputs": [
+						{
+							"internalType": "uint256",
+							"name": "num",
+							"type": "uint256"
+						}
+					],
+					"name": "store",
+					"outputs": [],
+					"stateMutability": "nonpayable",
+					"type": "function"
+				}
+			]
+			`
+
 		byteCodes, err := hex.DecodeString("6080604052610150806100136000396000f3fe608060405234801561001057600080fd5b50600436106100365760003560e01c80632e64cec11461003b5780636057361d14610059575b600080fd5b610043610075565b60405161005091906100a1565b60405180910390f35b610073600480360381019061006e91906100ed565b61007e565b005b60008054905090565b8060008190555050565b6000819050919050565b61009b81610088565b82525050565b60006020820190506100b66000830184610092565b92915050565b600080fd5b6100ca81610088565b81146100d557600080fd5b50565b6000813590506100e7816100c1565b92915050565b600060208284031215610103576101026100bc565b5b6000610111848285016100d8565b9150509291505056fea264697066735822122000554714e02795fc835a96df86a765b93852d8f1401a1bba8b9ea8049a31746764736f6c63430008120033")
 		require.NoError(t, err)
 
@@ -110,25 +148,27 @@ func TestContractInteraction(t *testing.T) {
 			env, err := flex.NewEnvironment(config, db)
 			require.NoError(t, err)
 
-			// method identifier for store 6057361d
-			input, err := hex.DecodeString("6057361d0000000000000000000000000000000000000000000000000000000000000003")
+			abi, err := abi.JSON(strings.NewReader(definition))
 			require.NoError(t, err)
 
-			err = env.Call(testAccount, contractAddr, input, big.NewInt(0))
+			store, err := abi.Pack("store", big.NewInt(256))
+			require.NoError(t, err)
+
+			err = env.Call(testAccount, contractAddr, store, big.NewInt(0))
 			require.NoError(t, err)
 
 			env2, err := flex.NewEnvironment(config, db)
 			require.NoError(t, err)
 
-			// method identifier 6057361d
-			input2, err := hex.DecodeString("2e64cec1")
+			retrieve, err := abi.Pack("retrieve")
 			require.NoError(t, err)
 
-			err = env2.Call(testAccount, contractAddr, input2, big.NewInt(0))
+			err = env2.Call(testAccount, contractAddr, retrieve, big.NewInt(0))
 			require.NoError(t, err)
 
-			ret := env.Result.RetValue
-			fmt.Println(ret)
+			ret := env2.Result.RetValue
+			num := new(big.Int).SetBytes(ret)
+			fmt.Println(num)
 
 			require.Equal(t, "XXXX", ret)
 		})
