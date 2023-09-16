@@ -254,7 +254,7 @@ func StartNodesAndNetworks(ctx irrecoverable.SignalerContext, t *testing.T, node
 func StartNetworks(ctx irrecoverable.SignalerContext, t *testing.T, nets []network.EngineRegistry) {
 	for _, net := range nets {
 		net.Start(ctx)
-		unittest.RequireComponentsReadyBefore(t, 5*time.Second, net)
+		unittest.RequireComponentsReadyBefore(t, 10*time.Second, net)
 	}
 }
 

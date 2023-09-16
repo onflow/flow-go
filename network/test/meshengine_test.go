@@ -91,9 +91,8 @@ func setupNodesAndNetworks(t *testing.T, ctx context.Context) ([]*p2pnet.Network
 	networks, _ := testutils.NetworksFixture(t, sporkId, identities, libP2PNodes)
 	// starts the nodes and networks
 	testutils.StartNodes(signalerCtx, t, libP2PNodes)
-	for _, net := range networks {
-		testutils.StartNetworks(signalerCtx, t, []network.EngineRegistry{net})
-		unittest.RequireComponentsReadyBefore(t, 5*time.Second, net)
+	for i := range networks {
+		testutils.StartNetworks(signalerCtx, t, []network.EngineRegistry{networks[i]})
 	}
 
 	for _, observableConnMgr := range tagObservables {
