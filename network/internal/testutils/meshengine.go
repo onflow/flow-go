@@ -43,7 +43,7 @@ func NewMeshEngine(t *testing.T, net network.EngineRegistry, cap int, channel ch
 
 // SubmitLocal is implemented for a valid type assertion to Engine
 // any call to it fails the test
-func (e *MeshEngine) SubmitLocal(event interface{}) {
+func (e *MeshEngine) SubmitLocal(_ interface{}) {
 	require.Fail(e.t, "not implemented")
 }
 
@@ -60,7 +60,7 @@ func (e *MeshEngine) Submit(channel channels.Channel, originID flow.Identifier, 
 
 // ProcessLocal is implemented for a valid type assertion to Engine
 // any call to it fails the test
-func (e *MeshEngine) ProcessLocal(event interface{}) error {
+func (e *MeshEngine) ProcessLocal(_ interface{}) error {
 	require.Fail(e.t, "not implemented")
 	return fmt.Errorf(" unexpected method called")
 }
@@ -73,8 +73,20 @@ func (e *MeshEngine) Process(channel channels.Channel, originID flow.Identifier,
 
 	// stores the message locally
 	e.originID = originID
-	e.Channel <- channel
-	e.Event <- event
-	e.Received <- struct{}{}
+	select {
+	case e.Channel <- channel:
+	default:
+		require.Fail(e.t, "could not put the received channel on the channel channel")
+	}
+	select {
+	case e.Event <- event:
+	default:
+		require.Fail(e.t, "could not put the received event on the event channel")
+	}
+	select {
+	case e.Received <- struct{}{}:
+	default:
+		require.Fail(e.t, "could not put the received event on the received channel")
+	}
 	return nil
 }
