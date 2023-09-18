@@ -3,6 +3,8 @@ package memory
 import (
 	"fmt"
 
+	"github.com/pkg/errors"
+
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/storage"
 )
@@ -15,29 +17,36 @@ type Registers struct {
 	firstHeight  uint64
 }
 
-func NewRegisters() *Registers {
+func NewRegisters(first uint64, last uint64) *Registers {
 	return &Registers{
 		registers: make(map[uint64]map[flow.RegisterID]flow.RegisterValue),
 	}
 }
 
 func (r *Registers) LatestHeight() (uint64, error) {
+	if r.latestHeight == 0 {
+		return 0, storage.ErrNotFound
+	}
 	return r.latestHeight, nil
 }
 
 func (r *Registers) FirstHeight() (uint64, error) {
+	if r.firstHeight == 0 {
+		return 0, storage.ErrNotFound
+	}
+
 	return r.firstHeight, nil
 }
 
-func (r Registers) Get(ID flow.RegisterID, height uint64) (flow.RegisterValue, error) {
+func (r *Registers) Get(ID flow.RegisterID, height uint64) (flow.RegisterValue, error) {
 	h, ok := r.registers[height]
 	if !ok {
-		return nil, fmt.Errorf("height %d for registers not indexed", height)
+		return nil, errors.Wrap(storage.ErrNotFound, fmt.Sprintf("height %d for registers not indexed", height))
 	}
 
 	entry, ok := h[ID]
 	if !ok {
-		return nil, fmt.Errorf("register by ID %s not found", ID.String())
+		return nil, errors.Wrap(storage.ErrNotFound, fmt.Sprintf("register by ID %s not found", ID.String()))
 	}
 
 	return entry, nil
