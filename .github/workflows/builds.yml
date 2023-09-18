@@ -101,13 +101,12 @@ jobs:
 
     # Provide Google Service Account credentials to Github Action, allowing interaction with the Google Container Registry
     # Logging in as github-actions@dl-flow.iam.gserviceaccount.com
-    - name: Configure gcloud
-      uses: google-github-actions/setup-gcloud@v0.2.1
+    - id: auth
+      uses: google-github-actions/auth@v1
       with:
-        version: "349.0.0"
-        service_account_key: ${{ env.GCR_SERVICE_KEY_SECRET }}
-        export_default_credentials: true
-
+        credentials_json: ${{ secrets.GCR_SERVICE_KEY_SECRET }}
+    - name: Set up Google Cloud SDK
+      uses: google-github-actions/setup-gcloud@v1
     - name: Authenticate docker with gcloud
       run: |
         gcloud auth configure-docker

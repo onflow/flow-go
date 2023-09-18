@@ -24,14 +24,14 @@ jobs:
       uses: google-github-actions/auth@v1
       with:
         credentials_json: ${{ secrets.GCR_SERVICE_KEY_SECRET }}
-    - name: Setup Go
-      uses: actions/setup-go@v2
-      with:
-        go-version: "1.20"
     - name: Set up Google Cloud SDK
       uses: google-github-actions/setup-gcloud@v1
       with:
         project_id: flow
+    - name: Setup Go
+      uses: actions/setup-go@v2
+      with:
+        go-version: "1.20"
     - name: Checkout repo
       uses: actions/checkout@v2
       with:
