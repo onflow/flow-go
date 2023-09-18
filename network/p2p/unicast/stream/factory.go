@@ -11,6 +11,8 @@ import (
 	"github.com/libp2p/go-libp2p/core/protocol"
 	"github.com/libp2p/go-libp2p/p2p/net/swarm"
 	"github.com/multiformats/go-multiaddr"
+
+	"github.com/onflow/flow-go/network/p2p"
 )
 
 const (
@@ -18,27 +20,13 @@ const (
 	protocolNotSupportedStr      = "protocol not supported"
 )
 
-// Factory is a wrapper around libp2p host.Host to provide abstraction and encapsulation for unicast stream manager so that
-// it can create libp2p streams with finer granularity.
-type Factory interface {
-	SetStreamHandler(protocol.ID, network.StreamHandler)
-	DialAddress(peer.ID) []multiaddr.Multiaddr
-	ClearBackoff(peer.ID)
-	// Connect connects host to peer with peerID.
-	// Expected errors during normal operations:
-	//   - NewSecurityProtocolNegotiationErr this indicates there was an issue upgrading the connection.
-	Connect(context.Context, peer.AddrInfo) error
-	// NewStream creates a new stream on the libp2p host.
-	// Expected errors during normal operations:
-	//   - ErrProtocolNotSupported this indicates remote node is running on a different spork.
-	NewStream(context.Context, peer.ID, ...protocol.ID) (network.Stream, error)
-}
-
 type LibP2PStreamFactory struct {
 	host host.Host
 }
 
-func NewLibP2PStreamFactory(h host.Host) Factory {
+var _ p2p.StreamFactory = (*LibP2PStreamFactory)(nil)
+
+func NewLibP2PStreamFactory(h host.Host) p2p.StreamFactory {
 	return &LibP2PStreamFactory{host: h}
 }
 

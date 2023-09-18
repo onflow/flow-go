@@ -41,7 +41,7 @@ type DialConfigCacheFactory func() unicast.DialConfigCache
 // Manager manages libp2p stream negotiation and creation, which is utilized for unicast dispatches.
 type Manager struct {
 	logger                 zerolog.Logger
-	streamFactory          stream.Factory
+	streamFactory          p2p.StreamFactory
 	protocols              []protocols.Protocol
 	defaultHandler         libp2pnet.StreamHandler
 	sporkId                flow.Identifier
@@ -75,7 +75,7 @@ type Manager struct {
 
 type ManagerConfig struct {
 	Logger                    zerolog.Logger
-	StreamFactory             stream.Factory
+	StreamFactory             p2p.StreamFactory
 	SporkId                   flow.Identifier
 	ConnStatus                p2p.PeerConnections
 	CreateStreamRetryDelay    time.Duration

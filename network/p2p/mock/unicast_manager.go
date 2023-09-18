@@ -20,34 +20,34 @@ type UnicastManager struct {
 	mock.Mock
 }
 
-// CreateStream provides a mock function with given fields: ctx, peerID, maxAttempts
-func (_m *UnicastManager) CreateStream(ctx context.Context, peerID peer.ID, maxAttempts int) (network.Stream, []multiaddr.Multiaddr, error) {
-	ret := _m.Called(ctx, peerID, maxAttempts)
+// CreateStream provides a mock function with given fields: ctx, peerID
+func (_m *UnicastManager) CreateStream(ctx context.Context, peerID peer.ID) (network.Stream, []multiaddr.Multiaddr, error) {
+	ret := _m.Called(ctx, peerID)
 
 	var r0 network.Stream
 	var r1 []multiaddr.Multiaddr
 	var r2 error
-	if rf, ok := ret.Get(0).(func(context.Context, peer.ID, int) (network.Stream, []multiaddr.Multiaddr, error)); ok {
-		return rf(ctx, peerID, maxAttempts)
+	if rf, ok := ret.Get(0).(func(context.Context, peer.ID) (network.Stream, []multiaddr.Multiaddr, error)); ok {
+		return rf(ctx, peerID)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, peer.ID, int) network.Stream); ok {
-		r0 = rf(ctx, peerID, maxAttempts)
+	if rf, ok := ret.Get(0).(func(context.Context, peer.ID) network.Stream); ok {
+		r0 = rf(ctx, peerID)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(network.Stream)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, peer.ID, int) []multiaddr.Multiaddr); ok {
-		r1 = rf(ctx, peerID, maxAttempts)
+	if rf, ok := ret.Get(1).(func(context.Context, peer.ID) []multiaddr.Multiaddr); ok {
+		r1 = rf(ctx, peerID)
 	} else {
 		if ret.Get(1) != nil {
 			r1 = ret.Get(1).([]multiaddr.Multiaddr)
 		}
 	}
 
-	if rf, ok := ret.Get(2).(func(context.Context, peer.ID, int) error); ok {
-		r2 = rf(ctx, peerID, maxAttempts)
+	if rf, ok := ret.Get(2).(func(context.Context, peer.ID) error); ok {
+		r2 = rf(ctx, peerID)
 	} else {
 		r2 = ret.Error(2)
 	}
