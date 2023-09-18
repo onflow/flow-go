@@ -608,12 +608,16 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionDataRequester() *FlowAccessN
 				execDataCacheBackend,
 			)
 
-			registers := memory.NewRegisters() // temporarily use the in-memory db
+			initHeight := builder.executionDataConfig.InitialBlockHeight
+
+			// temporarily use the in-memory db
+			registers := memory.NewRegisters(initHeight, initHeight)
+
 			exeIndexer, err := indexer.New(
 				registers,
 				builder.Storage.Headers,
 				builder.Storage.Events,
-				builder.executionDataConfig.InitialBlockHeight,
+				initHeight,
 				builder.Logger,
 			)
 			if err != nil {
@@ -624,7 +628,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionDataRequester() *FlowAccessN
 			worker := indexer.NewExecutionStateWorker(
 				builder.Logger,
 				// match the block height from the execution data requester as it depends on the data being downloaded
-				builder.executionDataConfig.InitialBlockHeight,
+				initHeight,
 				// not as relevant when using blob store backend
 				5*time.Second,
 				exeIndexer,
