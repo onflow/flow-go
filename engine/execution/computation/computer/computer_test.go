@@ -276,7 +276,10 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		assert.NotNil(t, chunkExecutionData2.TrieUpdate)
 		assert.Equal(t, byte(2), chunkExecutionData2.TrieUpdate.RootHash[0])
 
-		assert.Equal(t, 3, vm.CallCount())
+		assert.GreaterOrEqual(t, vm.CallCount(), 3)
+		// if every transaction is retried once, then the call count should be
+		// (1+totalTransactionCount) /2 * totalTransactionCount
+		assert.LessOrEqual(t, vm.CallCount(), (1+3)/2*3)
 	})
 
 	t.Run("empty block still computes system chunk", func(t *testing.T) {
@@ -533,7 +536,10 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 
 		assertEventHashesMatch(t, collectionCount+1, result)
 
-		assert.Equal(t, totalTransactionCount, vm.CallCount())
+		assert.GreaterOrEqual(t, vm.CallCount(), totalTransactionCount)
+		// if every transaction is retried once, then the call count should be
+		// (1+totalTransactionCount) /2 * totalTransactionCount
+		assert.LessOrEqual(t, vm.CallCount(), (1+totalTransactionCount)/2*totalTransactionCount)
 	})
 
 	t.Run(
