@@ -104,6 +104,7 @@ func (t *RPCSentTracker) Track(rpc *pubsub.RPC) error {
 	if err != nil {
 		return fmt.Errorf("failed to get track rpc work nonce: %w", err)
 	}
+
 	if ok := t.workerPool.Submit(trackableRPC{Nonce: n, rpc: rpc}); !ok {
 		return fmt.Errorf("failed to track RPC could not submit work to worker pool")
 	}
@@ -115,14 +116,23 @@ func (t *RPCSentTracker) rpcSentWorkerLogic(work trackableRPC) error {
 	switch {
 	case len(work.rpc.GetControl().GetIhave()) > 0:
 		iHave := work.rpc.GetControl().GetIhave()
-		t.iHaveRPCSent(iHave)
-		t.updateLastHighestIHaveRPCSize(int64(len(iHave)))
-		t.logger.Info().Int("size", len(iHave)).Msg(iHaveRPCTrackedLog)
+		numOfMessageIdsTracked := t.iHaveRPCSent(iHave)
+		lastHighestIHaveCount := t.updateLastHighestIHaveRPCSize(int64(numOfMessageIdsTracked))
+		t.logger.Debug().
+			Int("num_of_ihaves", len(iHave)).
+			Int("num_of_message_ids", numOfMessageIdsTracked).
+			Int64("last_highest_ihave_count", lastHighestIHaveCount).
+			Msg(iHaveRPCTrackedLog)
 	}
 	return nil
 }
 
-func (t *RPCSentTracker) updateLastHighestIHaveRPCSize(size int64) {
+// updateLastHighestIHaveRPCSize updates the last highest if the provided size is larger than the current last highest or the reset interval has passed.
+// Args:
+// - size: size that was cached.
+// Returns:
+// - int64: the last highest size.
+func (t *RPCSentTracker) updateLastHighestIHaveRPCSize(size int64) int64 {
 	t.Lock()
 	defer t.Unlock()
 	if t.lastSize < size || time.Since(t.lastUpdate) > t.lastHighestIHaveRPCSizeResetInterval {
@@ -130,18 +140,24 @@ func (t *RPCSentTracker) updateLastHighestIHaveRPCSize(size int64) {
 		t.lastSize = size
 		t.lastUpdate = time.Now()
 	}
+	return t.lastSize
 }
 
 // iHaveRPCSent caches a unique entity message ID for each message ID included in each rpc iHave control message.
 // Args:
 // - []*pb.ControlIHave: list of iHave control messages.
-func (t *RPCSentTracker) iHaveRPCSent(iHaves []*pb.ControlIHave) {
+// Returns:
+// - int: the number of message ids cached by the tracker.
+func (t *RPCSentTracker) iHaveRPCSent(iHaves []*pb.ControlIHave) int {
 	controlMsgType := p2pmsg.CtrlMsgIHave
+	messageIDCount := 0
 	for _, iHave := range iHaves {
+		messageIDCount += len(iHave.GetMessageIDs())
 		for _, messageID := range iHave.GetMessageIDs() {
 			t.cache.add(messageID, controlMsgType)
 		}
 	}
+	return messageIDCount
 }
 
 // WasIHaveRPCSent checks if an iHave control message with the provided message ID was sent.
@@ -153,7 +169,9 @@ func (t *RPCSentTracker) WasIHaveRPCSent(messageID string) bool {
 	return t.cache.has(messageID, p2pmsg.CtrlMsgIHave)
 }
 
-// LastHighestIHaveRPCSize returns the last highest size of iHaves sent in an rpc.
+// LastHighestIHaveRPCSize returns the last highest size of iHaves sent in a rpc.
+// Returns:
+// - int64: the last highest size.
 func (t *RPCSentTracker) LastHighestIHaveRPCSize() int64 {
 	t.RLock()
 	defer t.RUnlock()

@@ -41,8 +41,8 @@ func WithConduitFactory(factory network.ConduitFactory) func(*Network) {
 	}
 }
 
-var _ network.Network = (*Network)(nil)
-var _ network.Adapter = (*Network)(nil)
+var _ network.EngineRegistry = (*Network)(nil)
+var _ network.ConduitAdapter = (*Network)(nil)
 
 // NewNetwork create a mocked Network.
 // The committee has the identity of the node already, so only `committee` is needed

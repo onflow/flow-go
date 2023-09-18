@@ -45,13 +45,13 @@ access(all) contract MyFavContract {
 
     // heavy operations
     // computation heavy function
-    access(all) fun ComputationHeavy() {
+    access(all) fun ComputationHeavy(_ n: Int) {
     	var s: Int256 = 1024102410241024
         var i = 0
         var a = Int256(7)
         var b = Int256(5)
         var c = Int256(2)
-        while i < 15000 {
+        while i < n {
             s = s * a
             s = s / b
             s = s / c
@@ -63,18 +63,18 @@ access(all) contract MyFavContract {
     access(all) event LargeEvent(value: Int256, str: String, list: [UInt256], dic: {String: String})
 
     // event heavy function
-    access(all) fun EventHeavy() {
+    access(all) fun EventHeavy(_ n: Int) {
         var s: Int256 = 1024102410241024
         var i = 0
 
-        while i < 220 {
+        while i < n {
             emit LargeEvent(value: s, str: s.toString(), list:[], dic:{s.toString():s.toString()})
             i = i + 1
         }
         log(i)
     }
 
-    access(all) fun LedgerInteractionHeavy() {
-        MyFavContract.AddManyRandomItems(700)
+    access(all) fun LedgerInteractionHeavy(_ n: Int) {
+        MyFavContract.AddManyRandomItems(n)
     }
 }

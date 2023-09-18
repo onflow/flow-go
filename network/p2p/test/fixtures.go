@@ -36,7 +36,7 @@ import (
 	p2pdht "github.com/onflow/flow-go/network/p2p/dht"
 	"github.com/onflow/flow-go/network/p2p/p2pbuilder"
 	p2pconfig "github.com/onflow/flow-go/network/p2p/p2pbuilder/config"
-	"github.com/onflow/flow-go/network/p2p/p2pconf"
+	"github.com/onflow/flow-go/network/p2p/tracer"
 	"github.com/onflow/flow-go/network/p2p/unicast"
 	"github.com/onflow/flow-go/network/p2p/unicast/protocols"
 	"github.com/onflow/flow-go/network/p2p/utils"
@@ -86,6 +86,18 @@ func NodeFixture(
 		return nil
 	})
 	require.NotNil(t, connectionGater)
+
+	meshTracerCfg := &tracer.GossipSubMeshTracerConfig{
+		Logger:                             unittest.Logger(),
+		Metrics:                            metrics.NewNoopCollector(),
+		IDProvider:                         idProvider,
+		LoggerInterval:                     time.Second,
+		HeroCacheMetricsFactory:            metrics.NewNoopHeroCacheMetricsFactory(),
+		RpcSentTrackerCacheSize:            defaultFlowConfig.NetworkConfig.GossipSubConfig.RPCSentTrackerCacheSize,
+		RpcSentTrackerWorkerQueueCacheSize: defaultFlowConfig.NetworkConfig.GossipSubConfig.RPCSentTrackerQueueCacheSize,
+		RpcSentTrackerNumOfWorkers:         defaultFlowConfig.NetworkConfig.GossipSubConfig.RpcSentTrackerNumOfWorkers,
+	}
+
 	parameters := &NodeFixtureParameters{
 		NetworkingType:         flownet.PrivateNetwork,
 		HandlerFunc:            func(network.Stream) {},
@@ -104,7 +116,8 @@ func NodeFixture(
 		GossipSubPeerScoreTracerInterval: 0, // disabled by default
 		ConnGater:                        connectionGater,
 		PeerManagerConfig:                PeerManagerConfigFixture(), // disabled by default
-		GossipSubRPCInspectorCfg:         &defaultFlowConfig.NetworkConfig.GossipSubRPCInspectorsConfig,
+		FlowConfig:                       defaultFlowConfig,
+		PubSubTracer:                     tracer.NewGossipSubMeshTracer(meshTracerCfg),
 	}
 
 	for _, opt := range opts {
@@ -130,12 +143,13 @@ func NodeFixture(
 		sporkID,
 		parameters.IdProvider,
 		&defaultFlowConfig.NetworkConfig.ResourceManagerConfig,
-		parameters.GossipSubRPCInspectorCfg,
+		&parameters.FlowConfig.NetworkConfig.GossipSubRPCInspectorsConfig,
 		parameters.PeerManagerConfig,
 		&p2p.DisallowListCacheConfig{
 			MaxSize: uint32(1000),
 			Metrics: metrics.NewNoopCollector(),
-		}).
+		},
+		parameters.PubSubTracer).
 		SetConnectionManager(connManager).
 		SetRoutingSystem(func(c context.Context, h host.Host) (routing.Routing, error) {
 			return p2pdht.NewDHT(c, h,
@@ -230,7 +244,7 @@ type NodeFixtureParameters struct {
 	CreateStreamRetryDelay            time.Duration
 	UnicastRateLimitDistributor       p2p.UnicastRateLimiterDistributor
 	GossipSubRpcInspectorSuiteFactory p2p.GossipSubRpcInspectorSuiteFactoryFunc
-	GossipSubRPCInspectorCfg          *p2pconf.GossipSubRPCInspectorsConfig
+	FlowConfig                        *config.FlowConfig
 }
 
 func WithUnicastRateLimitDistributor(distributor p2p.UnicastRateLimiterDistributor) NodeFixtureParameterOption {
@@ -245,9 +259,9 @@ func OverrideGossipSubRpcInspectorSuiteFactory(factory p2p.GossipSubRpcInspector
 	}
 }
 
-func OverrideGossipSubRpcInspectorConfig(cfg *p2pconf.GossipSubRPCInspectorsConfig) NodeFixtureParameterOption {
+func OverrideFlowConfig(cfg *config.FlowConfig) NodeFixtureParameterOption {
 	return func(p *NodeFixtureParameters) {
-		p.GossipSubRPCInspectorCfg = cfg
+		p.FlowConfig = cfg
 	}
 }
 
@@ -509,7 +523,7 @@ func LetNodesDiscoverEachOther(t *testing.T, ctx context.Context, nodes []p2p.Li
 			}
 			otherPInfo, err := utils.PeerAddressInfo(*ids[i])
 			require.NoError(t, err)
-			require.NoError(t, node.AddPeer(ctx, otherPInfo))
+			require.NoError(t, node.ConnectToPeer(ctx, otherPInfo))
 		}
 	}
 }
@@ -522,11 +536,11 @@ func TryConnectionAndEnsureConnected(t *testing.T, ctx context.Context, nodes []
 			if node == other {
 				continue
 			}
-			require.NoError(t, node.Host().Connect(ctx, other.Host().Peerstore().PeerInfo(other.Host().ID())))
+			require.NoError(t, node.Host().Connect(ctx, other.Host().Peerstore().PeerInfo(other.ID())))
 			// the other node should be connected to this node
-			require.Equal(t, node.Host().Network().Connectedness(other.Host().ID()), network.Connected)
+			require.Equal(t, node.Host().Network().Connectedness(other.ID()), network.Connected)
 			// at least one connection should be established
-			require.True(t, len(node.Host().Network().ConnsToPeer(other.Host().ID())) > 0)
+			require.True(t, len(node.Host().Network().ConnsToPeer(other.ID())) > 0)
 		}
 	}
 }
@@ -544,10 +558,10 @@ func RequireConnectedEventually(t *testing.T, nodes []p2p.LibP2PNode, tick time.
 				if node == other {
 					continue
 				}
-				if node.Host().Network().Connectedness(other.Host().ID()) != network.Connected {
+				if node.Host().Network().Connectedness(other.ID()) != network.Connected {
 					return false
 				}
-				if len(node.Host().Network().ConnsToPeer(other.Host().ID())) == 0 {
+				if len(node.Host().Network().ConnsToPeer(other.ID())) == 0 {
 					return false
 				}
 			}
@@ -567,10 +581,10 @@ func RequireEventuallyNotConnected(t *testing.T, groupA []p2p.LibP2PNode, groupB
 	require.Eventually(t, func() bool {
 		for _, node := range groupA {
 			for _, other := range groupB {
-				if node.Host().Network().Connectedness(other.Host().ID()) == network.Connected {
+				if node.Host().Network().Connectedness(other.ID()) == network.Connected {
 					return false
 				}
-				if len(node.Host().Network().ConnsToPeer(other.Host().ID())) > 0 {
+				if len(node.Host().Network().ConnsToPeer(other.ID())) > 0 {
 					return false
 				}
 			}
@@ -587,9 +601,13 @@ func EnsureStreamCreationInBothDirections(t *testing.T, ctx context.Context, nod
 				continue
 			}
 			// stream creation should pass without error
-			s, err := this.CreateStream(ctx, other.Host().ID())
+			err := this.OpenProtectedStream(ctx, other.ID(), t.Name(), func(stream network.Stream) error {
+				// do nothing
+				require.NotNil(t, stream)
+				return nil
+			})
 			require.NoError(t, err)
-			require.NotNil(t, s)
+
 		}
 	}
 }
@@ -691,7 +709,7 @@ func EnsurePubsubMessageExchangeFromNode(
 
 // PeerIdFixture returns a random peer ID for testing.
 // peer ID is the identifier of a node on the libp2p network.
-func PeerIdFixture(t *testing.T) peer.ID {
+func PeerIdFixture(t testing.TB) peer.ID {
 	buf := make([]byte, 16)
 	n, err := rand.Read(buf)
 	require.NoError(t, err)

@@ -5,8 +5,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/rs/zerolog"
-	"github.com/stretchr/testify/mock"
+	"github.com/ipfs/go-cid"
 	testifymock "github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
@@ -32,18 +31,19 @@ import (
 
 type VerifierEngineTestSuite struct {
 	suite.Suite
-	net       *mocknetwork.Network
-	tracer    realModule.Tracer
-	state     *protocol.State
-	ss        *protocol.Snapshot
-	me        *mocklocal.MockLocal
-	sk        crypto.PrivateKey
-	hasher    hash.Hasher
-	chain     flow.Chain
-	pushCon   *mocknetwork.Conduit // mocks con for submitting result approvals
-	pullCon   *mocknetwork.Conduit
-	metrics   *mockmodule.VerificationMetrics // mocks performance monitoring metrics
-	approvals *mockstorage.ResultApprovals
+	net           *mocknetwork.Network
+	tracer        realModule.Tracer
+	state         *protocol.State
+	ss            *protocol.Snapshot
+	me            *mocklocal.MockLocal
+	sk            crypto.PrivateKey
+	hasher        hash.Hasher
+	chain         flow.Chain
+	pushCon       *mocknetwork.Conduit // mocks con for submitting result approvals
+	pullCon       *mocknetwork.Conduit
+	metrics       *mockmodule.VerificationMetrics // mocks performance monitoring metrics
+	approvals     *mockstorage.ResultApprovals
+	chunkVerifier *mockmodule.ChunkVerifier
 }
 
 func TestVerifierEngine(t *testing.T) {
@@ -51,19 +51,16 @@ func TestVerifierEngine(t *testing.T) {
 }
 
 func (suite *VerifierEngineTestSuite) SetupTest() {
-
-	suite.state = &protocol.State{}
-	suite.net = &mocknetwork.Network{}
+	suite.state = new(protocol.State)
+	suite.net = mocknetwork.NewNetwork(suite.T())
 	suite.tracer = trace.NewNoopTracer()
-	suite.ss = &protocol.Snapshot{}
-	suite.pushCon = &mocknetwork.Conduit{}
-	suite.pullCon = &mocknetwork.Conduit{}
-	suite.metrics = &mockmodule.VerificationMetrics{}
+	suite.ss = new(protocol.Snapshot)
+	suite.pushCon = mocknetwork.NewConduit(suite.T())
+	suite.pullCon = mocknetwork.NewConduit(suite.T())
+	suite.metrics = mockmodule.NewVerificationMetrics(suite.T())
 	suite.chain = flow.Testnet.Chain()
-	suite.approvals = &mockstorage.ResultApprovals{}
-
-	suite.approvals.On("Store", mock.Anything).Return(nil)
-	suite.approvals.On("Index", mock.Anything, mock.Anything, mock.Anything).Return(nil)
+	suite.approvals = mockstorage.NewResultApprovals(suite.T())
+	suite.chunkVerifier = mockmodule.NewChunkVerifier(suite.T())
 
 	suite.net.On("Register", channels.PushApprovals, testifymock.Anything).
 		Return(suite.pushCon, nil).
@@ -97,15 +94,15 @@ func (suite *VerifierEngineTestSuite) SetupTest() {
 	suite.me = mocklocal.NewMockLocal(sk, verIdentity.NodeID, suite.T())
 }
 
-func (suite *VerifierEngineTestSuite) TestNewEngine() *verifier.Engine {
+func (suite *VerifierEngineTestSuite) getTestNewEngine() *verifier.Engine {
 	e, err := verifier.New(
-		zerolog.Logger{},
+		unittest.Logger(),
 		suite.metrics,
 		suite.tracer,
 		suite.net,
 		suite.state,
 		suite.me,
-		ChunkVerifierMock{},
+		suite.chunkVerifier,
 		suite.approvals)
 	require.Nil(suite.T(), err)
 
@@ -114,137 +111,207 @@ func (suite *VerifierEngineTestSuite) TestNewEngine() *verifier.Engine {
 
 }
 
-func (suite *VerifierEngineTestSuite) TestIncorrectResult() {
-	// TODO when ERs are verified
-}
-
 // TestVerifyHappyPath tests the verification path for a single verifiable chunk, which is
 // assigned to the verifier node, and is passed by the ingest engine
 // The tests evaluates that a result approval is emitted to all consensus nodes
 // about the input execution receipt
 func (suite *VerifierEngineTestSuite) TestVerifyHappyPath() {
+	eng := suite.getTestNewEngine()
 
-	eng := suite.TestNewEngine()
-	myID := unittest.IdentifierFixture()
 	consensusNodes := unittest.IdentityListFixture(1, unittest.WithRole(flow.RoleConsensus))
-	// creates a verifiable chunk
-	vChunk := unittest.VerifiableChunkDataFixture(uint64(0))
-
-	// mocking node ID using the LocalMock
-	suite.me.MockNodeID(myID)
 	suite.ss.On("Identities", testifymock.Anything).Return(consensusNodes, nil)
 
-	// mocks metrics
-	// reception of verifiable chunk
-	suite.metrics.On("OnVerifiableChunkReceivedAtVerifierEngine").Return()
-	// emission of result approval
-	suite.metrics.On("OnResultApprovalDispatchedInNetworkByVerifier").Return()
+	vChunk := unittest.VerifiableChunkDataFixture(uint64(0))
 
-	suite.pushCon.
-		On("Publish", testifymock.Anything, testifymock.Anything).
-		Return(nil).
-		Run(func(args testifymock.Arguments) {
-			// check that the approval matches the input execution result
-			ra, ok := args[0].(*flow.ResultApproval)
-			suite.Assert().True(ok)
-			suite.Assert().Equal(vChunk.Result.ID(), ra.Body.ExecutionResultID)
+	tests := []struct {
+		name string
+		err  error
+	}{
+		// tests that a valid verifiable chunk is verified and a result approval is emitted
+		{
+			name: "chunk verified successfully",
+			err:  nil,
+		},
+		// tests that a verifiable chunk that triggers a CFMissingRegisterTouch fault still emits a result approval
+		{
+			name: "chunk failed with missing register touch fault",
+			err: chmodel.NewCFMissingRegisterTouch(
+				[]string{"test missing register touch"},
+				vChunk.Chunk.Index,
+				vChunk.Result.ID(),
+				unittest.TransactionFixture().ID()),
+		},
+	}
 
-			// verifies the signatures
-			atstID := ra.Body.Attestation.ID()
-			suite.Assert().True(suite.sk.PublicKey().Verify(ra.Body.AttestationSignature, atstID[:], suite.hasher))
-			bodyID := ra.Body.ID()
-			suite.Assert().True(suite.sk.PublicKey().Verify(ra.VerifierSignature, bodyID[:], suite.hasher))
+	for _, test := range tests {
+		suite.Run(test.name, func() {
+			var expectedApproval *flow.ResultApproval
 
-			// spock should be non-nil
-			suite.Assert().NotNil(ra.Body.Spock)
-		}).
-		Once()
+			suite.approvals.
+				On("Store", testifymock.Anything).
+				Return(nil).
+				Run(func(args testifymock.Arguments) {
+					ra, ok := args[0].(*flow.ResultApproval)
+					suite.Require().True(ok)
 
-	err := eng.ProcessLocal(vChunk)
-	suite.Assert().NoError(err)
-	suite.ss.AssertExpectations(suite.T())
-	suite.pushCon.AssertExpectations(suite.T())
+					suite.Assert().Equal(vChunk.Chunk.BlockID, ra.Body.BlockID)
+					suite.Assert().Equal(vChunk.Result.ID(), ra.Body.ExecutionResultID)
+					suite.Assert().Equal(vChunk.Chunk.Index, ra.Body.ChunkIndex)
+					suite.Assert().Equal(suite.me.NodeID(), ra.Body.ApproverID)
 
+					// verifies the signatures
+					atstID := ra.Body.Attestation.ID()
+					suite.Assert().True(suite.sk.PublicKey().Verify(ra.Body.AttestationSignature, atstID[:], suite.hasher))
+					bodyID := ra.Body.ID()
+					suite.Assert().True(suite.sk.PublicKey().Verify(ra.VerifierSignature, bodyID[:], suite.hasher))
+
+					// spock should be non-nil
+					suite.Assert().NotNil(ra.Body.Spock)
+
+					expectedApproval = ra
+				}).
+				Once()
+			suite.approvals.
+				On("Index", testifymock.Anything, testifymock.Anything, testifymock.Anything).
+				Return(nil).
+				Run(func(args testifymock.Arguments) {
+					erID, ok := args[0].(flow.Identifier)
+					suite.Require().True(ok)
+					suite.Assert().Equal(expectedApproval.Body.ExecutionResultID, erID)
+
+					chIndex, ok := args[1].(uint64)
+					suite.Require().True(ok)
+					suite.Assert().Equal(expectedApproval.Body.ChunkIndex, chIndex)
+
+					raID, ok := args[2].(flow.Identifier)
+					suite.Require().True(ok)
+					suite.Assert().Equal(expectedApproval.ID(), raID)
+				}).
+				Once()
+
+			suite.pushCon.
+				On("Publish", testifymock.Anything, testifymock.Anything).
+				Return(nil).
+				Run(func(args testifymock.Arguments) {
+					// check that the approval matches the input execution result
+					ra, ok := args[0].(*flow.ResultApproval)
+					suite.Require().True(ok)
+					suite.Assert().Equal(expectedApproval, ra)
+
+					// note: mock includes each variadic argument as a separate element in slice
+					node, ok := args[1].(flow.Identifier)
+					suite.Require().True(ok)
+					suite.Assert().Equal(consensusNodes.NodeIDs()[0], node)
+					suite.Assert().Len(args, 2) // only a single node should be in the list
+				}).
+				Once()
+
+			suite.metrics.On("OnVerifiableChunkReceivedAtVerifierEngine").Return().Once()
+			suite.metrics.On("OnResultApprovalDispatchedInNetworkByVerifier").Return().Once()
+
+			suite.chunkVerifier.On("Verify", vChunk).Return(nil, test.err).Once()
+
+			err := eng.ProcessLocal(vChunk)
+			suite.Assert().NoError(err)
+		})
+	}
 }
 
 func (suite *VerifierEngineTestSuite) TestVerifyUnhappyPaths() {
-	eng := suite.TestNewEngine()
-	myID := unittest.IdentifierFixture()
-	consensusNodes := unittest.IdentityListFixture(1, unittest.WithRole(flow.RoleConsensus))
-
-	// mocking node ID using the LocalMock
-	suite.me.MockNodeID(myID)
-	suite.ss.On("Identities", testifymock.Anything).Return(consensusNodes, nil)
-
-	// mocks metrics
-	// reception of verifiable chunk
-	suite.metrics.On("OnVerifiableChunkReceivedAtVerifierEngine").Return()
-
-	// we shouldn't receive any result approval
-	suite.pushCon.
-		On("Publish", testifymock.Anything, testifymock.Anything).
-		Return(nil).
-		Run(func(args testifymock.Arguments) {
-			// TODO change this to check challeneges
-			_, ok := args[0].(*flow.ResultApproval)
-			// TODO change this to false when missing register is rolled back
-			suite.Assert().True(ok)
-		})
-
-	// emission of result approval
-	suite.metrics.On("OnResultApprovalDispatchedInNetworkByVerifier").Return()
+	eng := suite.getTestNewEngine()
 
 	var tests = []struct {
-		vc          *verification.VerifiableChunkData
-		expectedErr error
+		errFn func(vc *verification.VerifiableChunkData) error
 	}{
-		{unittest.VerifiableChunkDataFixture(uint64(1)), nil},
-		{unittest.VerifiableChunkDataFixture(uint64(2)), nil},
-		{unittest.VerifiableChunkDataFixture(uint64(3)), nil},
+		// Note: skipping CFMissingRegisterTouch because it does emit a result approval
+		{
+			errFn: func(vc *verification.VerifiableChunkData) error {
+				return chmodel.NewCFInvalidVerifiableChunk(
+					"test",
+					errors.New("test invalid verifiable chunk"),
+					vc.Chunk.Index,
+					vc.Result.ID())
+			},
+		},
+		{
+			errFn: func(vc *verification.VerifiableChunkData) error {
+				return chmodel.NewCFNonMatchingFinalState(
+					unittest.StateCommitmentFixture(),
+					unittest.StateCommitmentFixture(),
+					vc.Chunk.Index,
+					vc.Result.ID())
+			},
+		},
+		{
+			errFn: func(vc *verification.VerifiableChunkData) error {
+				return chmodel.NewCFInvalidEventsCollection(
+					unittest.IdentifierFixture(),
+					unittest.IdentifierFixture(),
+					vc.Chunk.Index,
+					vc.Result.ID(),
+					flow.EventsList{})
+			},
+		},
+		{
+			errFn: func(vc *verification.VerifiableChunkData) error {
+				return chmodel.NewCFSystemChunkIncludedCollection(vc.Chunk.Index, vc.Result.ID())
+			},
+		},
+		{
+			errFn: func(vc *verification.VerifiableChunkData) error {
+				return chmodel.NewCFExecutionDataBlockIDMismatch(
+					unittest.IdentifierFixture(),
+					unittest.IdentifierFixture(),
+					vc.Chunk.Index,
+					vc.Result.ID())
+			},
+		},
+		{
+			errFn: func(vc *verification.VerifiableChunkData) error {
+				return chmodel.NewCFExecutionDataChunksLengthMismatch(
+					0,
+					0,
+					vc.Chunk.Index,
+					vc.Result.ID())
+			},
+		},
+		{
+			errFn: func(vc *verification.VerifiableChunkData) error {
+				return chmodel.NewCFExecutionDataInvalidChunkCID(
+					cid.Cid{},
+					cid.Cid{},
+					vc.Chunk.Index,
+					vc.Result.ID())
+			},
+		},
+		{
+			errFn: func(vc *verification.VerifiableChunkData) error {
+				return chmodel.NewCFInvalidExecutionDataID(
+					unittest.IdentifierFixture(),
+					unittest.IdentifierFixture(),
+					vc.Chunk.Index,
+					vc.Result.ID())
+			},
+		},
+		{
+			errFn: func(vc *verification.VerifiableChunkData) error {
+				return errors.New("test error")
+			},
+		},
 	}
-	for _, test := range tests {
-		err := eng.ProcessLocal(test.vc)
+
+	for i, test := range tests {
+		vc := unittest.VerifiableChunkDataFixture(uint64(i))
+		expectedErr := test.errFn(vc)
+
+		suite.chunkVerifier.On("Verify", vc).Return(nil, expectedErr).Once()
+
+		suite.metrics.On("OnVerifiableChunkReceivedAtVerifierEngine").Return().Once()
+		// note: we shouldn't publish any result approval or emit OnResultApprovalDispatchedInNetworkByVerifier
+
+		err := eng.ProcessLocal(vc)
+
+		// no error returned from the engine
 		suite.Assert().NoError(err)
 	}
-}
-
-type ChunkVerifierMock struct {
-}
-
-func (v ChunkVerifierMock) Verify(vc *verification.VerifiableChunkData) ([]byte, chmodel.ChunkFault, error) {
-	if vc.IsSystemChunk {
-		return nil, nil, nil
-	}
-
-	switch vc.Chunk.Index {
-	case 0:
-		return []byte{}, nil, nil
-	// return error
-	case 1:
-		return nil, chmodel.NewCFMissingRegisterTouch(
-			[]string{"test missing register touch"},
-			vc.Chunk.Index,
-			vc.Result.ID(),
-			unittest.TransactionFixture().ID()), nil
-
-	case 2:
-		return nil, chmodel.NewCFInvalidVerifiableChunk(
-			"test",
-			errors.New("test invalid verifiable chunk"),
-			vc.Chunk.Index,
-			vc.Result.ID()), nil
-
-	case 3:
-		return nil, chmodel.NewCFNonMatchingFinalState(
-			unittest.StateCommitmentFixture(),
-			unittest.StateCommitmentFixture(),
-			vc.Chunk.Index,
-			vc.Result.ID()), nil
-
-	// TODO add cases for challenges
-	// return successful by default
-	default:
-		return nil, nil, nil
-	}
-
 }
