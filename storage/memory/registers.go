@@ -21,11 +21,11 @@ func NewRegisters() *Registers {
 	}
 }
 
-func (r Registers) LatestHeight() (uint64, error) {
+func (r *Registers) LatestHeight() (uint64, error) {
 	return r.latestHeight, nil
 }
 
-func (r Registers) FirstHeight() (uint64, error) {
+func (r *Registers) FirstHeight() (uint64, error) {
 	return r.firstHeight, nil
 }
 
@@ -43,12 +43,14 @@ func (r Registers) Get(ID flow.RegisterID, height uint64) (flow.RegisterValue, e
 	return entry, nil
 }
 
-func (r Registers) Store(entries flow.RegisterEntries, height uint64) error {
+func (r *Registers) Store(entries flow.RegisterEntries, height uint64) error {
 	if _, ok := r.registers[height]; !ok {
 		r.registers[height] = make(map[flow.RegisterID]flow.RegisterValue)
 	}
-
 	for _, e := range entries {
+		if _, ok := r.registers[height]; !ok {
+			r.registers[height] = make(map[flow.RegisterID]flow.RegisterValue)
+		}
 		r.registers[height][e.Key] = e.Value
 	}
 

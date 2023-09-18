@@ -498,6 +498,10 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionDataRequester() *FlowAccessN
 			builder.ExecutionDataStore = execution_data.NewExecutionDataStore(blobstore, execution_data.DefaultSerializer)
 			return nil
 		}).
+		Module("events storage", func(node *cmd.NodeConfig) error {
+			builder.Storage.Events = bstorage.NewEvents(node.Metrics.Cache, node.DB)
+			return nil
+		}).
 		Component("execution data service", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 
 			opts := []network.BlobServiceOption{
@@ -605,7 +609,13 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionDataRequester() *FlowAccessN
 			)
 
 			registers := memory.NewRegisters() // temporarily use the in-memory db
-			exeIndexer, err := indexer.New(registers, builder.Storage.Headers, builder.executionDataConfig.InitialBlockHeight, builder.Logger)
+			exeIndexer, err := indexer.New(
+				registers,
+				builder.Storage.Headers,
+				builder.Storage.Events,
+				builder.executionDataConfig.InitialBlockHeight,
+				builder.Logger,
+			)
 			if err != nil {
 				return nil, err
 			}
