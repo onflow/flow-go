@@ -129,17 +129,16 @@ func (i *ExecutionState) IndexBlockData(ctx context.Context, data *execution_dat
 	collections := make([]*flow.Collection, 0)
 
 	for _, chunk := range data.ChunkExecutionDatas {
-		// we are iterating all the registers and overwrite any existing register at the same path
-		// this will make sure if we have multiple register changes only the last change will get persisted
-		// if block has two chucks:
-		// first chunk updates: { X: 1, Y: 2 }
-		// second chunk updates: { X: 2 }
-		// then we should persist only {X: 2: Y: 2}
-		for i, path := range chunk.TrieUpdate.Paths {
-			if chunk.TrieUpdate == nil {
-				continue
+		if chunk.TrieUpdate != nil {
+			// we are iterating all the registers and overwrite any existing register at the same path
+			// this will make sure if we have multiple register changes only the last change will get persisted
+			// if block has two chucks:
+			// first chunk updates: { X: 1, Y: 2 }
+			// second chunk updates: { X: 2 }
+			// then we should persist only {X: 2: Y: 2}
+			for i, path := range chunk.TrieUpdate.Paths {
+				payloads[path] = chunk.TrieUpdate.Payloads[i] // todo should we use TrieUpdate.Paths or TrieUpdate.Payload.Key?
 			}
-			payloads[path] = chunk.TrieUpdate.Payloads[i] // todo should we use TrieUpdate.Paths or TrieUpdate.Payload.Key?
 		}
 
 		events = append(events, chunk.Events...)
