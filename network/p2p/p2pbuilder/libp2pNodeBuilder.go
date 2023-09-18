@@ -71,19 +71,7 @@ type LibP2PNodeBuilder struct {
 	networkingType            flownet.NetworkingType // whether the node is running in private (staked) or public (unstaked) network
 }
 
-func NewNodeBuilder(
-	logger zerolog.Logger,
-	metricsConfig *p2pconfig.MetricsConfig,
-	networkingType flownet.NetworkingType,
-	address string,
-	networkKey fcrypto.PrivateKey,
-	sporkId flow.Identifier,
-	idProvider module.IdentityProvider,
-	rCfg *p2pconf.ResourceManagerConfig,
-	rpcInspectorCfg *p2pconf.GossipSubRPCInspectorsConfig,
-	peerManagerConfig *p2pconfig.PeerManagerConfig,
-	disallowListCacheCfg *p2p.DisallowListCacheConfig,
-	rpcTracker p2p.RpcControlTracking) *LibP2PNodeBuilder {
+func NewNodeBuilder(logger zerolog.Logger, metricsConfig *p2pconfig.MetricsConfig, networkingType flownet.NetworkingType, address string, networkKey fcrypto.PrivateKey, sporkId flow.Identifier, idProvider module.IdentityProvider, rCfg *p2pconf.ResourceManagerConfig, rpcInspectorCfg *p2pconf.GossipSubRPCInspectorsConfig, peerManagerConfig *p2pconfig.PeerManagerConfig, disallowListCacheCfg *p2p.DisallowListCacheConfig, rpcTracker p2p.RpcControlTracking) *LibP2PNodeBuilder {
 	return &LibP2PNodeBuilder{
 		logger:               logger,
 		sporkId:              sporkId,
@@ -94,15 +82,8 @@ func NewNodeBuilder(
 		resourceManagerCfg:   rCfg,
 		disallowListCacheCfg: disallowListCacheCfg,
 		networkingType:       networkingType,
-		gossipSubBuilder: gossipsubbuilder.NewGossipSubBuilder(
-			logger,
-			metricsConfig,
-			networkingType,
-			sporkId,
-			idProvider,
-			rpcInspectorCfg,
-			rpcTracker),
-		peerManagerConfig: peerManagerConfig,
+		gossipSubBuilder:     gossipsubbuilder.NewGossipSubBuilder(logger, metricsConfig, networkingType, sporkId, idProvider, rpcInspectorCfg, rpcTracker),
+		peerManagerConfig:    peerManagerConfig,
 	}
 }
 
@@ -316,19 +297,15 @@ func (builder *LibP2PNodeBuilder) Build() (p2p.LibP2PNode, error) {
 	}
 
 	unicastManager, err := unicastmgr.NewUnicastManager(&unicastmgr.ManagerConfig{
-		Logger:                   builder.logger,
-		StreamFactory:            stream.NewLibP2PStreamFactory(h),
-		SporkId:                  builder.sporkId,
-		ConnStatus:               node,
-		CreateStreamRetryDelay:   builder.createStreamRetryInterval,
-		Metrics:                  builder.metricsConfig.Metrics,
-		PeerReliabilityThreshold: unicastmodel.PeerReliabilityThreshold,
+		Logger:                     builder.logger,
+		StreamFactory:              stream.NewLibP2PStreamFactory(h),
+		SporkId:                    builder.sporkId,
+		ConnStatus:                 node,
+		CreateStreamRetryDelay:     builder.createStreamRetryInterval,
+		Metrics:                    builder.metricsConfig.Metrics,
+		StreamHistoryResetInterval: unicastmodel.StreamHistoryResetInterval,
 		DialConfigCacheFactory: func() unicast.DialConfigCache {
-			return unicastcache.NewDialConfigCache(
-				unicast.DefaultDailConfigCacheSize,
-				builder.logger,
-				metrics.DialConfigCacheMetricFactory(builder.metricsConfig.HeroCacheFactory, builder.networkingType),
-				unicastmodel.DefaultDialConfigFactory)
+			return unicastcache.NewDialConfigCache(unicast.DefaultDailConfigCacheSize, builder.logger, metrics.DialConfigCacheMetricFactory(builder.metricsConfig.HeroCacheFactory, builder.networkingType), unicastmodel.DefaultDialConfigFactory)
 		},
 	})
 	if err != nil {
@@ -434,33 +411,12 @@ func defaultLibP2POptions(address string, key fcrypto.PrivateKey) ([]config.Opti
 }
 
 // DefaultCreateNodeFunc returns new libP2P node.
-func DefaultCreateNodeFunc(logger zerolog.Logger,
-	host host.Host,
-	pCache p2p.ProtocolPeerCache,
-	peerManager p2p.PeerManager,
-	disallowListCacheCfg *p2p.DisallowListCacheConfig) p2p.LibP2PNode {
+func DefaultCreateNodeFunc(logger zerolog.Logger, host host.Host, pCache p2p.ProtocolPeerCache, peerManager p2p.PeerManager, disallowListCacheCfg *p2p.DisallowListCacheConfig) p2p.LibP2PNode {
 	return p2pnode.NewNode(logger, host, pCache, peerManager, disallowListCacheCfg)
 }
 
 // DefaultNodeBuilder returns a node builder.
-func DefaultNodeBuilder(
-	logger zerolog.Logger,
-	address string,
-	networkingType flownet.NetworkingType,
-	flowKey fcrypto.PrivateKey,
-	sporkId flow.Identifier,
-	idProvider module.IdentityProvider,
-	metricsCfg *p2pconfig.MetricsConfig,
-	resolver madns.BasicResolver,
-	role string,
-	connGaterCfg *p2pconfig.ConnectionGaterConfig,
-	peerManagerCfg *p2pconfig.PeerManagerConfig,
-	gossipCfg *p2pconf.GossipSubConfig,
-	rpcInspectorCfg *p2pconf.GossipSubRPCInspectorsConfig,
-	rCfg *p2pconf.ResourceManagerConfig,
-	uniCfg *p2pconfig.UnicastConfig,
-	connMgrConfig *netconf.ConnectionManagerConfig,
-	disallowListCacheCfg *p2p.DisallowListCacheConfig) (p2p.NodeBuilder, error) {
+func DefaultNodeBuilder(logger zerolog.Logger, address string, networkingType flownet.NetworkingType, flowKey fcrypto.PrivateKey, sporkId flow.Identifier, idProvider module.IdentityProvider, metricsCfg *p2pconfig.MetricsConfig, resolver madns.BasicResolver, role string, connGaterCfg *p2pconfig.ConnectionGaterConfig, peerManagerCfg *p2pconfig.PeerManagerConfig, gossipCfg *p2pconf.GossipSubConfig, rpcInspectorCfg *p2pconf.GossipSubRPCInspectorsConfig, rCfg *p2pconf.ResourceManagerConfig, uniCfg *p2pconfig.UnicastConfig, connMgrConfig *netconf.ConnectionManagerConfig, disallowListCacheCfg *p2p.DisallowListCacheConfig) (p2p.NodeBuilder, error) {
 
 	connManager, err := connection.NewConnManager(logger, metricsCfg.Metrics, connMgrConfig)
 	if err != nil {
@@ -471,10 +427,7 @@ func DefaultNodeBuilder(
 	peerFilter := notEjectedPeerFilter(idProvider)
 	peerFilters := []p2p.PeerFilter{peerFilter}
 
-	connGater := connection.NewConnGater(logger,
-		idProvider,
-		connection.WithOnInterceptPeerDialFilters(append(peerFilters, connGaterCfg.InterceptPeerDialFilters...)),
-		connection.WithOnInterceptSecuredFilters(append(peerFilters, connGaterCfg.InterceptSecuredFilters...)))
+	connGater := connection.NewConnGater(logger, idProvider, connection.WithOnInterceptPeerDialFilters(append(peerFilters, connGaterCfg.InterceptPeerDialFilters...)), connection.WithOnInterceptSecuredFilters(append(peerFilters, connGaterCfg.InterceptSecuredFilters...)))
 
 	meshTracerCfg := &tracer.GossipSubMeshTracerConfig{
 		Logger:                             logger,
@@ -489,19 +442,7 @@ func DefaultNodeBuilder(
 	}
 	meshTracer := tracer.NewGossipSubMeshTracer(meshTracerCfg)
 
-	builder := NewNodeBuilder(
-		logger,
-		metricsCfg,
-		networkingType,
-		address,
-		flowKey,
-		sporkId,
-		idProvider,
-		rCfg,
-		rpcInspectorCfg,
-		peerManagerCfg,
-		disallowListCacheCfg,
-		meshTracer).
+	builder := NewNodeBuilder(logger, metricsCfg, networkingType, address, flowKey, sporkId, idProvider, rCfg, rpcInspectorCfg, peerManagerCfg, disallowListCacheCfg, meshTracer).
 		SetBasicResolver(resolver).
 		SetConnectionManager(connManager).
 		SetConnectionGater(connGater).

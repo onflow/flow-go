@@ -2,6 +2,7 @@ package unicastcache_test
 
 import (
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 
@@ -17,15 +18,20 @@ func TestDialConfigEntity(t *testing.T) {
 	d := &unicastcache.DialConfigEntity{
 		PeerId: peerID,
 		DialConfig: unicastmodel.DialConfig{
-			DialBackoffBudget:  10,
-			StreamBackBudget:   20,
-			LastSuccessfulDial: 30,
+			DialBackoffBudget:    10,
+			StreamBackBudget:     20,
+			LastSuccessfulDial:   time.Now(),
+			LastSuccessfulStream: time.Now(),
 		},
 	}
 
 	t.Run("Test ID and Checksum", func(t *testing.T) {
 		// id and checksum methods must return the same value as expected.
 		expectedID := unicastcache.PeerIdToFlowId(peerID)
+		require.Equal(t, expectedID, d.ID())
+		require.Equal(t, expectedID, d.Checksum())
+
+		// id and checksum methods must always return the same value.
 		require.Equal(t, expectedID, d.ID())
 		require.Equal(t, expectedID, d.Checksum())
 	})

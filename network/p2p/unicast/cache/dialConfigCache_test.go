@@ -27,9 +27,8 @@ func TestNewDialConfigCache(t *testing.T) {
 // The dial config is initialized with the default values.
 func dialConfigFixture() unicastmodel.DialConfig {
 	return unicastmodel.DialConfig{
-		DialBackoffBudget:  unicastmodel.MaxConnectAttempt,
-		StreamBackBudget:   unicastmodel.MaxStreamCreationAttempt,
-		LastSuccessfulDial: 0,
+		DialBackoffBudget: unicastmodel.MaxConnectAttempt,
+		StreamBackBudget:  unicastmodel.MaxStreamCreationAttempt,
 	}
 }
 

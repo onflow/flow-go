@@ -70,14 +70,14 @@ type Manager struct {
 }
 
 type ManagerConfig struct {
-	Logger                   zerolog.Logger
-	StreamFactory            p2p.StreamFactory
-	SporkId                  flow.Identifier
-	ConnStatus               p2p.PeerConnections
-	CreateStreamRetryDelay   time.Duration
-	Metrics                  module.UnicastManagerMetrics
-	PeerReliabilityThreshold time.Duration
-	DialConfigCacheFactory   DialConfigCacheFactory
+	Logger                     zerolog.Logger
+	StreamFactory              p2p.StreamFactory
+	SporkId                    flow.Identifier
+	ConnStatus                 p2p.PeerConnections
+	CreateStreamRetryDelay     time.Duration
+	Metrics                    module.UnicastManagerMetrics
+	StreamHistoryResetInterval time.Duration
+	DialConfigCacheFactory     DialConfigCacheFactory
 }
 
 // NewUnicastManager creates a new unicast manager.
@@ -97,7 +97,7 @@ func NewUnicastManager(cfg *ManagerConfig) (*Manager, error) {
 		peerDialing:              sync.Map{},
 		createStreamRetryDelay:   cfg.CreateStreamRetryDelay,
 		metrics:                  cfg.Metrics,
-		peerReliabilityThreshold: cfg.PeerReliabilityThreshold,
+		peerReliabilityThreshold: cfg.StreamHistoryResetInterval,
 	}, nil
 }
 
@@ -258,6 +258,25 @@ func (m *Manager) tryCreateStream(ctx context.Context, peerID peer.ID, protocol 
 	}
 
 	m.metrics.OnStreamCreated(duration, attempts)
+	updatedConfig, err := m.dialConfigCache.Adjust(peerID, func(config unicastmodel.DialConfig) (unicastmodel.DialConfig, error) {
+		config.LastSuccessfulStream = time.Now() // update last successful stream creation time
+		return config, nil
+	})
+	if err != nil {
+		// This is not a connection retryable error, this is a fatal error.
+		// TODO: technically, we better to return an error here, but the error must be irrecoverable, and we cannot
+		//       guarantee a clear distinction between recoverable and irrecoverable errors at the moment with CreateStream.
+		//       We have to revisit this once we studied the error handling paths in the unicast manager.
+		m.logger.Fatal().
+			Err(err).
+			Bool(logging.KeyNetworkingSecurity, true).
+			Str("peer_id", p2plogging.PeerId(peerID)).
+			Msg("failed to adjust dial config for peer id")
+	}
+	m.logger.Debug().
+		Str("peer_id", p2plogging.PeerId(peerID)).
+		Str("updated_dial_config", fmt.Sprintf("%+v", updatedConfig)).
+		Msg("stream created successfully")
 	return s, addrs, nil
 }
 
@@ -362,6 +381,25 @@ func (m *Manager) dialPeer(ctx context.Context, peerID peer.ID, dialCfg *unicast
 				Msg("retrying peer dialing")
 			return retry.RetryableError(multierror.Append(errs, err))
 		}
+		updatedConfig, err := m.dialConfigCache.Adjust(peerID, func(config unicastmodel.DialConfig) (unicastmodel.DialConfig, error) {
+			config.LastSuccessfulDial = time.Now() // update last successful dial time
+			return config, nil
+		})
+		if err != nil {
+			// This is not a connection retryable error, this is a fatal error.
+			// TODO: technically, we better to return an error here, but the error must be irrecoverable, and we cannot
+			//       guarantee a clear distinction between recoverable and irrecoverable errors at the moment with CreateStream.
+			//       We have to revisit this once we studied the error handling paths in the unicast manager.
+			m.logger.Fatal().
+				Err(err).
+				Bool(logging.KeyNetworkingSecurity, true).
+				Str("peer_id", p2plogging.PeerId(peerID)).
+				Msg("failed to adjust dial config for peer id")
+		}
+		m.logger.Info().
+			Str("peer_id", p2plogging.PeerId(peerID)).
+			Str("updated_dial_config", fmt.Sprintf("%+v", updatedConfig)).
+			Msg("peer dialed successfully")
 		return nil
 	}
 

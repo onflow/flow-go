@@ -28,8 +28,8 @@ import (
 //
 //}
 
-// TODO test: 3. After each unsuccessful attempt (failing all x times), it reduces the backoff time by one.
-// TODO test: 4. When backoff time is 0, it does not back it off.
+// TODO test: When the connection is created, it is added to the stream history.
+// TODO test: When the stream is created, it is added to the stream history.
 // TODO test: 5. When connection is successful, it resets the backoff times only when it passes a grace period.
 // TODO test: 6. When stream time is 0, it does not back it off.
 // TODO test: 7. When stream is successful, it resets the backoff time only when it passes a grace period.
@@ -57,13 +57,13 @@ func TestUnicastManager_StreamFactory_ConnectionBackoff(t *testing.T) {
 	require.NoError(t, err)
 
 	mgr, err := unicastmgr.NewUnicastManager(&unicastmgr.ManagerConfig{
-		Logger:                   unittest.Logger(),
-		StreamFactory:            streamFactory,
-		SporkId:                  unittest.IdentifierFixture(),
-		ConnStatus:               connStatus,
-		CreateStreamRetryDelay:   cfg.NetworkConfig.UnicastCreateStreamRetryDelay,
-		Metrics:                  metrics.NewNoopCollector(),
-		PeerReliabilityThreshold: unicastmodel.PeerReliabilityThreshold,
+		Logger:                     unittest.Logger(),
+		StreamFactory:              streamFactory,
+		SporkId:                    unittest.IdentifierFixture(),
+		ConnStatus:                 connStatus,
+		CreateStreamRetryDelay:     cfg.NetworkConfig.UnicastCreateStreamRetryDelay,
+		Metrics:                    metrics.NewNoopCollector(),
+		StreamHistoryResetInterval: unicastmodel.StreamHistoryResetInterval,
 		DialConfigCacheFactory: func() unicast.DialConfigCache {
 			return unicastcache.NewDialConfigCache(unicast.DefaultDailConfigCacheSize, unittest.Logger(), metrics.NewNoopCollector(), unicastmodel.DefaultDialConfigFactory)
 		},
@@ -97,13 +97,13 @@ func TestUnicastManager_StreamFactory_StreamBackoff(t *testing.T) {
 	require.NoError(t, err)
 
 	mgr, err := unicastmgr.NewUnicastManager(&unicastmgr.ManagerConfig{
-		Logger:                   unittest.Logger(),
-		StreamFactory:            streamFactory,
-		SporkId:                  unittest.IdentifierFixture(),
-		ConnStatus:               connStatus,
-		CreateStreamRetryDelay:   cfg.NetworkConfig.UnicastCreateStreamRetryDelay,
-		Metrics:                  metrics.NewNoopCollector(),
-		PeerReliabilityThreshold: unicastmodel.PeerReliabilityThreshold,
+		Logger:                     unittest.Logger(),
+		StreamFactory:              streamFactory,
+		SporkId:                    unittest.IdentifierFixture(),
+		ConnStatus:                 connStatus,
+		CreateStreamRetryDelay:     cfg.NetworkConfig.UnicastCreateStreamRetryDelay,
+		Metrics:                    metrics.NewNoopCollector(),
+		StreamHistoryResetInterval: unicastmodel.StreamHistoryResetInterval,
 		DialConfigCacheFactory: func() unicast.DialConfigCache {
 			return unicastcache.NewDialConfigCache(unicast.DefaultDailConfigCacheSize, unittest.Logger(), metrics.NewNoopCollector(), unicastmodel.DefaultDialConfigFactory)
 		},
@@ -135,13 +135,13 @@ func TestUnicastManager_StreamFactory_ErrProtocolNotSupported(t *testing.T) {
 	require.NoError(t, err)
 
 	mgr, err := unicastmgr.NewUnicastManager(&unicastmgr.ManagerConfig{
-		Logger:                   unittest.Logger(),
-		StreamFactory:            streamFactory,
-		SporkId:                  unittest.IdentifierFixture(),
-		ConnStatus:               connStatus,
-		CreateStreamRetryDelay:   cfg.NetworkConfig.UnicastCreateStreamRetryDelay,
-		Metrics:                  metrics.NewNoopCollector(),
-		PeerReliabilityThreshold: unicastmodel.PeerReliabilityThreshold,
+		Logger:                     unittest.Logger(),
+		StreamFactory:              streamFactory,
+		SporkId:                    unittest.IdentifierFixture(),
+		ConnStatus:                 connStatus,
+		CreateStreamRetryDelay:     cfg.NetworkConfig.UnicastCreateStreamRetryDelay,
+		Metrics:                    metrics.NewNoopCollector(),
+		StreamHistoryResetInterval: unicastmodel.StreamHistoryResetInterval,
 		DialConfigCacheFactory: func() unicast.DialConfigCache {
 			return unicastcache.NewDialConfigCache(unicast.DefaultDailConfigCacheSize, unittest.Logger(), metrics.NewNoopCollector(), unicastmodel.DefaultDialConfigFactory)
 		},
@@ -188,13 +188,13 @@ func TestUnicastManager_Connection_BackoffBudgetDecremented(t *testing.T) {
 
 	dialCfgCache := unicastcache.NewDialConfigCache(unicast.DefaultDailConfigCacheSize, unittest.Logger(), metrics.NewNoopCollector(), unicastmodel.DefaultDialConfigFactory)
 	mgr, err := unicastmgr.NewUnicastManager(&unicastmgr.ManagerConfig{
-		Logger:                   unittest.Logger(),
-		StreamFactory:            streamFactory,
-		SporkId:                  unittest.IdentifierFixture(),
-		ConnStatus:               connStatus,
-		CreateStreamRetryDelay:   cfg.NetworkConfig.UnicastCreateStreamRetryDelay,
-		Metrics:                  metrics.NewNoopCollector(),
-		PeerReliabilityThreshold: unicastmodel.PeerReliabilityThreshold,
+		Logger:                     unittest.Logger(),
+		StreamFactory:              streamFactory,
+		SporkId:                    unittest.IdentifierFixture(),
+		ConnStatus:                 connStatus,
+		CreateStreamRetryDelay:     cfg.NetworkConfig.UnicastCreateStreamRetryDelay,
+		Metrics:                    metrics.NewNoopCollector(),
+		StreamHistoryResetInterval: unicastmodel.StreamHistoryResetInterval,
 		DialConfigCacheFactory: func() unicast.DialConfigCache {
 			return dialCfgCache
 		},
@@ -272,13 +272,13 @@ func TestUnicastManager_Stream_BackoffBudgetDecremented(t *testing.T) {
 
 	dialCfgCache := unicastcache.NewDialConfigCache(unicast.DefaultDailConfigCacheSize, unittest.Logger(), metrics.NewNoopCollector(), unicastmodel.DefaultDialConfigFactory)
 	mgr, err := unicastmgr.NewUnicastManager(&unicastmgr.ManagerConfig{
-		Logger:                   unittest.Logger(),
-		StreamFactory:            streamFactory,
-		SporkId:                  unittest.IdentifierFixture(),
-		ConnStatus:               connStatus,
-		CreateStreamRetryDelay:   cfg.NetworkConfig.UnicastCreateStreamRetryDelay,
-		Metrics:                  metrics.NewNoopCollector(),
-		PeerReliabilityThreshold: unicastmodel.PeerReliabilityThreshold,
+		Logger:                     unittest.Logger(),
+		StreamFactory:              streamFactory,
+		SporkId:                    unittest.IdentifierFixture(),
+		ConnStatus:                 connStatus,
+		CreateStreamRetryDelay:     cfg.NetworkConfig.UnicastCreateStreamRetryDelay,
+		Metrics:                    metrics.NewNoopCollector(),
+		StreamHistoryResetInterval: unicastmodel.StreamHistoryResetInterval,
 		DialConfigCacheFactory: func() unicast.DialConfigCache {
 			return dialCfgCache
 		},
