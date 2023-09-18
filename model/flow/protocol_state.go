@@ -42,7 +42,9 @@ type EpochStateContainer struct {
 	SetupID Identifier
 	// ID of commit event for this epoch. Could be ZeroID if epoch was not committed.
 	CommitID Identifier
-	// Part of identity table that can be changed during the epoch.
+	// Part of identity table that can be changed on a block-by-block basis. 
+	// Each non-deferred identity-mutating operation is applied independently to each
+	// relevant epoch's dynamic identity list separately. 
 	// Always sorted in canonical order.
 	Identities DynamicIdentityEntryList
 }
