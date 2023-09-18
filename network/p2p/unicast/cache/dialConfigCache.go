@@ -127,8 +127,8 @@ func (d *DialConfigCache) adjust(peerIdHash flow.Identifier, adjustFunc unicastm
 	}
 
 	return &unicastmodel.DialConfig{
-		DialBackoff:        adjustedEntity.(DialConfigEntity).DialBackoff,
-		StreamBackoff:      adjustedEntity.(DialConfigEntity).StreamBackoff,
+		DialBackoffBudget:  adjustedEntity.(DialConfigEntity).DialBackoffBudget,
+		StreamBackBudget:   adjustedEntity.(DialConfigEntity).StreamBackBudget,
 		LastSuccessfulDial: adjustedEntity.(DialConfigEntity).LastSuccessfulDial,
 	}, nil
 }
@@ -173,8 +173,8 @@ func (d *DialConfigCache) get(peerIDHash flow.Identifier) (*unicastmodel.DialCon
 
 	// return a copy of the config (we do not want the caller to modify the config).
 	return &unicastmodel.DialConfig{
-		DialBackoff:        cfg.DialBackoff,
-		StreamBackoff:      cfg.StreamBackoff,
+		DialBackoffBudget:  cfg.DialBackoffBudget,
+		StreamBackBudget:   cfg.StreamBackBudget,
 		LastSuccessfulDial: cfg.LastSuccessfulDial,
 	}, true
 }

@@ -28,8 +28,6 @@ import (
 //
 //}
 
-// TODO tests: 1. Manager tries streamFactory x times for connection and y times for stream.
-// TODO test: 2. when there is a no protocol issue, it does not retry it.
 // TODO test: 3. After each unsuccessful attempt (failing all x times), it reduces the backoff time by one.
 // TODO test: 4. When backoff time is 0, it does not back it off.
 // TODO test: 5. When connection is successful, it resets the backoff times only when it passes a grace period.
@@ -59,15 +57,13 @@ func TestUnicastManager_StreamFactory_ConnectionBackoff(t *testing.T) {
 	require.NoError(t, err)
 
 	mgr, err := unicastmgr.NewUnicastManager(&unicastmgr.ManagerConfig{
-		Logger:                    unittest.Logger(),
-		StreamFactory:             streamFactory,
-		SporkId:                   unittest.IdentifierFixture(),
-		ConnStatus:                connStatus,
-		CreateStreamRetryDelay:    cfg.NetworkConfig.UnicastCreateStreamRetryDelay,
-		Metrics:                   metrics.NewNoopCollector(),
-		MaxConnectionBackoffTimes: unicastmodel.MaxConnectAttempt,
-		MaxStreamBackoffTimes:     unicastmodel.MaxStreamCreationAttempt,
-		PeerReliabilityThreshold:  unicastmodel.PeerReliabilityThreshold,
+		Logger:                   unittest.Logger(),
+		StreamFactory:            streamFactory,
+		SporkId:                  unittest.IdentifierFixture(),
+		ConnStatus:               connStatus,
+		CreateStreamRetryDelay:   cfg.NetworkConfig.UnicastCreateStreamRetryDelay,
+		Metrics:                  metrics.NewNoopCollector(),
+		PeerReliabilityThreshold: unicastmodel.PeerReliabilityThreshold,
 		DialConfigCacheFactory: func() unicast.DialConfigCache {
 			return unicastcache.NewDialConfigCache(unicast.DefaultDailConfigCacheSize, unittest.Logger(), metrics.NewNoopCollector(), unicastmodel.DefaultDialConfigFactory)
 		},
@@ -101,15 +97,13 @@ func TestUnicastManager_StreamFactory_StreamBackoff(t *testing.T) {
 	require.NoError(t, err)
 
 	mgr, err := unicastmgr.NewUnicastManager(&unicastmgr.ManagerConfig{
-		Logger:                    unittest.Logger(),
-		StreamFactory:             streamFactory,
-		SporkId:                   unittest.IdentifierFixture(),
-		ConnStatus:                connStatus,
-		CreateStreamRetryDelay:    cfg.NetworkConfig.UnicastCreateStreamRetryDelay,
-		Metrics:                   metrics.NewNoopCollector(),
-		MaxConnectionBackoffTimes: unicastmodel.MaxConnectAttempt,
-		MaxStreamBackoffTimes:     unicastmodel.MaxStreamCreationAttempt,
-		PeerReliabilityThreshold:  unicastmodel.PeerReliabilityThreshold,
+		Logger:                   unittest.Logger(),
+		StreamFactory:            streamFactory,
+		SporkId:                  unittest.IdentifierFixture(),
+		ConnStatus:               connStatus,
+		CreateStreamRetryDelay:   cfg.NetworkConfig.UnicastCreateStreamRetryDelay,
+		Metrics:                  metrics.NewNoopCollector(),
+		PeerReliabilityThreshold: unicastmodel.PeerReliabilityThreshold,
 		DialConfigCacheFactory: func() unicast.DialConfigCache {
 			return unicastcache.NewDialConfigCache(unicast.DefaultDailConfigCacheSize, unittest.Logger(), metrics.NewNoopCollector(), unicastmodel.DefaultDialConfigFactory)
 		},
@@ -141,15 +135,13 @@ func TestUnicastManager_StreamFactory_ErrProtocolNotSupported(t *testing.T) {
 	require.NoError(t, err)
 
 	mgr, err := unicastmgr.NewUnicastManager(&unicastmgr.ManagerConfig{
-		Logger:                    unittest.Logger(),
-		StreamFactory:             streamFactory,
-		SporkId:                   unittest.IdentifierFixture(),
-		ConnStatus:                connStatus,
-		CreateStreamRetryDelay:    cfg.NetworkConfig.UnicastCreateStreamRetryDelay,
-		Metrics:                   metrics.NewNoopCollector(),
-		MaxConnectionBackoffTimes: unicastmodel.MaxConnectAttempt,
-		MaxStreamBackoffTimes:     unicastmodel.MaxStreamCreationAttempt,
-		PeerReliabilityThreshold:  unicastmodel.PeerReliabilityThreshold,
+		Logger:                   unittest.Logger(),
+		StreamFactory:            streamFactory,
+		SporkId:                  unittest.IdentifierFixture(),
+		ConnStatus:               connStatus,
+		CreateStreamRetryDelay:   cfg.NetworkConfig.UnicastCreateStreamRetryDelay,
+		Metrics:                  metrics.NewNoopCollector(),
+		PeerReliabilityThreshold: unicastmodel.PeerReliabilityThreshold,
 		DialConfigCacheFactory: func() unicast.DialConfigCache {
 			return unicastcache.NewDialConfigCache(unicast.DefaultDailConfigCacheSize, unittest.Logger(), metrics.NewNoopCollector(), unicastmodel.DefaultDialConfigFactory)
 		},
@@ -163,4 +155,88 @@ func TestUnicastManager_StreamFactory_ErrProtocolNotSupported(t *testing.T) {
 	require.Error(t, err)
 	require.Nil(t, s)
 	require.Nil(t, addrs)
+}
+
+// TestUnicastManager_Connection_BackoffBudgetDecremented tests that everytime the unicast manger gives up on creating a connection (after retrials),
+// it decrements the backoff budget for the remote peer.
+func TestUnicastManager_Connection_BackoffBudgetDecremented(t *testing.T) {
+	connStatus := mockp2p.NewPeerConnections(t)
+	streamFactory := mockp2p.NewStreamFactory(t)
+	peerID := p2ptest.PeerIdFixture(t)
+	peerAddr, err := multiaddr.NewMultiaddr("/ip4/127.0.0.1")
+	require.NoError(t, err)
+
+	// totalAttempts is the total number of times that unicast manager calls Connect on the stream factory to dial the peer.
+	// Let's consider x = unicastmodel.MaxConnectAttempt. Then the test tries x times CreateStream. With dynamic backoffs,
+	// the first CreateStream call will try to Connect x times, the second CreateStream call will try to Connect x-1 times,
+	// and so on. So the total number of Connect calls is x + (x-1) + (x-2) + ... + 1 = x(x+1)/2.
+	// However, we also attempt one more time at the end of the test to CreateStream, when the backoff budget is 0.
+	// When the backoff budget is 0, the unicast manager does not backoff, and tries to Connect once. So the total number
+	// of Connect calls is x(x+1)/2 + 1.
+	totalAttempts := unicastmodel.MaxConnectAttempt*(unicastmodel.MaxConnectAttempt+1)/2 + 1
+
+	connStatus.On("IsConnected", peerID).Return(false, nil) // not connected
+	streamFactory.On("ClearBackoff", peerID).Return().Times(totalAttempts)
+	streamFactory.On("DialAddress", peerID).Return([]multiaddr.Multiaddr{peerAddr}) // dial address
+	streamFactory.On("Connect", mock.Anything, peer.AddrInfo{ID: peerID}).
+		Return(fmt.Errorf("some error")).
+		Times(totalAttempts)
+	streamFactory.On("SetStreamHandler", mock.Anything, mock.Anything).Return().Once()
+
+	cfg, err := config.DefaultConfig()
+	require.NoError(t, err)
+
+	dialCfgCache := unicastcache.NewDialConfigCache(unicast.DefaultDailConfigCacheSize, unittest.Logger(), metrics.NewNoopCollector(), unicastmodel.DefaultDialConfigFactory)
+	mgr, err := unicastmgr.NewUnicastManager(&unicastmgr.ManagerConfig{
+		Logger:                   unittest.Logger(),
+		StreamFactory:            streamFactory,
+		SporkId:                  unittest.IdentifierFixture(),
+		ConnStatus:               connStatus,
+		CreateStreamRetryDelay:   cfg.NetworkConfig.UnicastCreateStreamRetryDelay,
+		Metrics:                  metrics.NewNoopCollector(),
+		PeerReliabilityThreshold: unicastmodel.PeerReliabilityThreshold,
+		DialConfigCacheFactory: func() unicast.DialConfigCache {
+			return dialCfgCache
+		},
+	})
+	require.NoError(t, err)
+	mgr.SetDefaultHandler(func(libp2pnet.Stream) {}) // no-op handler, we don't care about the handler for this test
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	for i := 0; i < unicastmodel.MaxConnectAttempt; i++ {
+		s, addrs, err := mgr.CreateStream(ctx, peerID)
+		require.Error(t, err)
+		require.Nil(t, s)
+		require.Nil(t, addrs)
+
+		dialCfg, err := dialCfgCache.GetOrInit(peerID)
+		require.NoError(t, err)
+		
+		if i == unicastmodel.MaxConnectAttempt-1 {
+			require.Equal(t, uint64(0), dialCfg.DialBackoffBudget)
+		} else {
+			require.Equal(t, uint64(unicastmodel.MaxConnectAttempt-i-1), dialCfg.DialBackoffBudget)
+		}
+
+		// The stream backoff budget must remain intact, as we have not tried to create a stream yet.
+		require.Equal(t, uint64(unicastmodel.MaxStreamCreationAttempt), dialCfg.StreamBackBudget)
+	}
+	// At this time the backoff budget for connection must be 0.
+	dialCfg, err := dialCfgCache.GetOrInit(peerID)
+	require.NoError(t, err)
+
+	require.Equal(t, uint64(0), dialCfg.DialBackoffBudget)
+	// The stream backoff budget must remain intact, as we have not tried to create a stream yet.
+	require.Equal(t, uint64(unicastmodel.MaxStreamCreationAttempt), dialCfg.StreamBackBudget)
+
+	// After all the backoff budget is used up, it should stay at 0.
+	s, addrs, err := mgr.CreateStream(ctx, peerID)
+	require.Error(t, err)
+	require.Nil(t, addrs)
+	require.Nil(t, s)
+
+	dialCfg, err = dialCfgCache.GetOrInit(peerID)
+	require.NoError(t, err)
+	require.Equal(t, uint64(0), dialCfg.DialBackoffBudget)
 }

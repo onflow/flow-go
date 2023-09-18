@@ -26,8 +26,8 @@ const (
 
 // DialConfig is a struct that represents the dial config for a peer.
 type DialConfig struct {
-	DialBackoff        uint64 // number of times we have to try to dial the peer before we give up.
-	StreamBackoff      uint64 // number of times we have to try to open a stream to the peer before we give up.
+	DialBackoffBudget  uint64 // number of times we have to try to dial the peer before we give up.
+	StreamBackBudget   uint64 // number of times we have to try to open a stream to the peer before we give up.
 	LastSuccessfulDial uint64 // timestamp of the last successful dial to the peer.
 }
 
@@ -39,8 +39,8 @@ type DialConfigAdjustFunc func(DialConfig) (DialConfig, error)
 
 func DefaultDialConfigFactory() DialConfig {
 	return DialConfig{
-		DialBackoff:   0,
-		StreamBackoff: 0,
+		DialBackoffBudget: MaxConnectAttempt,
+		StreamBackBudget:  MaxStreamCreationAttempt,
 
 		// TODO: test it!
 		LastSuccessfulDial: 0,

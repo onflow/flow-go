@@ -17,8 +17,8 @@ func TestDialConfigEntity(t *testing.T) {
 	d := &unicastcache.DialConfigEntity{
 		PeerId: peerID,
 		DialConfig: unicastmodel.DialConfig{
-			DialBackoff:        10,
-			StreamBackoff:      20,
+			DialBackoffBudget:  10,
+			StreamBackBudget:   20,
 			LastSuccessfulDial: 30,
 		},
 	}
