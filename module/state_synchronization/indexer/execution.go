@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/rs/zerolog"
 	"golang.org/x/exp/maps"
 	"golang.org/x/sync/errgroup"
 
@@ -21,12 +22,13 @@ type ExecutionState struct {
 	headers    storage.Headers
 	events     storage.Events
 	indexRange *SequentialIndexRange
+	log        zerolog.Logger
 }
 
 // New execution state indexer with provided storage access for registers and headers as well as initial height.
 // This method will initialize the index starting height and end height to that found in the register storage,
 // if no height was previously persisted it will use the provided initHeight.
-func New(registers storage.RegisterIndex, headers storage.Headers, initHeight uint64) (*ExecutionState, error) {
+func New(registers storage.RegisterIndex, headers storage.Headers, initHeight uint64, log zerolog.Logger) (*ExecutionState, error) {
 	// get the first indexed height from the register storage, if not found use the default start index height provided
 	first, err := registers.FirstHeight()
 	if err != nil {
@@ -55,6 +57,7 @@ func New(registers storage.RegisterIndex, headers storage.Headers, initHeight ui
 		registers:  registers,
 		headers:    headers,
 		indexRange: indexRange,
+		log:        log,
 	}, nil
 }
 
@@ -165,6 +168,8 @@ func (i *ExecutionState) IndexBlockData(ctx context.Context, data *execution_dat
 	if err != nil {
 		return fmt.Errorf("failed to index block data at height %d: %w", block.Height, err)
 	}
+
+	i.log.Debug().Uint64("height", block.Height).Int("register count", len(payloads)).Msgf("indexed block data")
 
 	return i.indexRange.Increase(block.Height)
 }

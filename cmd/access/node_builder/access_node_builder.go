@@ -612,7 +612,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionDataRequester() *FlowAccessN
 			)
 
 			registers := memory.NewRegisters() // temporarily use the in-memory db
-			exeIndexer, err := indexer.New(registers, builder.Storage.Headers, builder.executionDataConfig.InitialBlockHeight)
+			exeIndexer, err := indexer.New(registers, builder.Storage.Headers, builder.executionDataConfig.InitialBlockHeight, builder.Logger)
 			if err != nil {
 				return nil, err
 			}

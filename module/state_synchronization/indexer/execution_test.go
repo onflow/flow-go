@@ -7,6 +7,7 @@ import (
 	"math/rand"
 	"testing"
 
+	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	mocks "github.com/stretchr/testify/mock"
@@ -150,7 +151,7 @@ func (i *indexTest) initIndexer() *indexTest {
 	if len(i.registers.ExpectedCalls) == 0 {
 		i.useDefaultHeights() // only set when no other were set
 	}
-	indexer, err := New(i.registers, i.headers, i.blocks[0].Header.Height)
+	indexer, err := New(i.registers, i.headers, i.blocks[0].Header.Height, zerolog.Nop())
 	require.NoError(i.t, err)
 	i.indexer = indexer
 	return i
