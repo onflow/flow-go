@@ -448,7 +448,6 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionDataRequester() *FlowAccessN
 	var execDataDistributor *edrequester.ExecutionDataDistributor
 	var execDataCacheBackend *herocache.BlockExecutionData
 	var localExecutionDataCache *execdatacache.ExecutionDataCache
-	var highestAvailableHeight uint64
 
 	builder.
 		AdminCommand("read-execution-data", func(config *cmd.NodeConfig) commands.AdminCommand {
@@ -497,6 +496,10 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionDataRequester() *FlowAccessN
 		Module("execution datastore", func(node *cmd.NodeConfig) error {
 			blobstore := blobs.NewBlobstore(ds)
 			builder.ExecutionDataStore = execution_data.NewExecutionDataStore(blobstore, execution_data.DefaultSerializer)
+			return nil
+		}).
+		Module("events storage", func(node *cmd.NodeConfig) error {
+			builder.Storage.Events = bstorage.NewEvents(node.Metrics.Cache, node.DB)
 			return nil
 		}).
 		Component("execution data service", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
@@ -592,12 +595,6 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionDataRequester() *FlowAccessN
 			builder.FollowerDistributor.AddOnBlockFinalizedConsumer(builder.ExecutionDataRequester.OnBlockFinalized)
 			builder.ExecutionDataRequester.AddOnExecutionDataReceivedConsumer(execDataDistributor.OnExecutionDataReceived)
 
-			var err error
-			highestAvailableHeight, err = builder.ExecutionDataRequester.HighestConsecutiveHeight()
-			if err != nil {
-				return nil, fmt.Errorf("could not get highest consecutive height: %w", err)
-			}
-
 			return builder.ExecutionDataRequester, nil
 		}).
 		Component("execution data indexer", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
@@ -612,7 +609,12 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionDataRequester() *FlowAccessN
 			)
 
 			registers := memory.NewRegisters() // temporarily use the in-memory db
-			exeIndexer, err := indexer.New(registers, builder.Storage.Headers, builder.executionDataConfig.InitialBlockHeight)
+			exeIndexer, err := indexer.New(
+				registers,
+				builder.Storage.Headers,
+				builder.Storage.Events,
+				builder.executionDataConfig.InitialBlockHeight,
+			)
 			if err != nil {
 				return nil, err
 			}
@@ -650,6 +652,11 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionDataRequester() *FlowAccessN
 				}
 			}
 			builder.stateStreamConf.RpcMetricsEnabled = builder.rpcMetricsEnabled
+
+			highestAvailableHeight, err := builder.ExecutionDataRequester.HighestConsecutiveHeight()
+			if err != nil {
+				return nil, fmt.Errorf("could not get highest consecutive height: %w", err)
+			}
 
 			stateStreamEng, err := state_stream.NewEng(
 				node.Logger,

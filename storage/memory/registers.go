@@ -7,7 +7,7 @@ import (
 	"github.com/onflow/flow-go/storage"
 )
 
-var _ storage.Registers = (*Registers)(nil)
+var _ storage.RegisterIndex = (*Registers)(nil)
 
 type Registers struct {
 	registers    map[uint64]map[flow.RegisterID]flow.RegisterValue
@@ -21,15 +21,15 @@ func NewRegisters() *Registers {
 	}
 }
 
-func (r Registers) LatestHeight() (uint64, error) {
+func (r *Registers) LatestHeight() (uint64, error) {
 	return r.latestHeight, nil
 }
 
-func (r Registers) FirstHeight() (uint64, error) {
+func (r *Registers) FirstHeight() (uint64, error) {
 	return r.firstHeight, nil
 }
 
-func (r Registers) SetLatestHeight(height uint64) error {
+func (r *Registers) SetLatestHeight(height uint64) error {
 	if height-r.latestHeight > 1 || height-r.latestHeight < 0 {
 		panic("invalid height")
 	}
@@ -38,7 +38,7 @@ func (r Registers) SetLatestHeight(height uint64) error {
 	return nil
 }
 
-func (r Registers) Get(ID flow.RegisterID, height uint64) (flow.RegisterValue, error) {
+func (r *Registers) Get(ID flow.RegisterID, height uint64) (flow.RegisterValue, error) {
 	h, ok := r.registers[height]
 	if !ok {
 		return nil, fmt.Errorf("height %d for registers not indexed", height)
@@ -52,8 +52,11 @@ func (r Registers) Get(ID flow.RegisterID, height uint64) (flow.RegisterValue, e
 	return entry, nil
 }
 
-func (r Registers) Store(entries flow.RegisterEntries, height uint64) error {
+func (r *Registers) Store(entries flow.RegisterEntries, height uint64) error {
 	for _, e := range entries {
+		if _, ok := r.registers[height]; !ok {
+			r.registers[height] = make(map[flow.RegisterID]flow.RegisterValue)
+		}
 		r.registers[height][e.Key] = e.Value
 	}
 
