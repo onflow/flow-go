@@ -102,11 +102,11 @@ jobs:
     # Provide Google Service Account credentials to Github Action, allowing interaction with the Google Container Registry
     # Logging in as github-actions@dl-flow.iam.gserviceaccount.com
     - name: Docker login
-      uses: docker/login-action@v1
+      uses: docker/login-action@v3
       with:
         registry: gcr.io
         username: _json_key
-        password: ${{ secrets.GCR_SERVICE_KEY }}
+        password: ${{ secrets.GCR_SERVICE_KEY_SECRET }}
 
     - name: Build/Push ${{ matrix.role }} images
       env:

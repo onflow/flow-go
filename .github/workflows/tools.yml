@@ -23,7 +23,7 @@ jobs:
     - id: auth
       uses: google-github-actions/auth@v1
       with:
-        credentials_json: ${{ secrets.GCR_SERVICE_KEY }} # TODO: we need a new key to allow uploads
+        credentials_json: ${{ secrets.GCR_SERVICE_KEY_SECRET }}
     - name: Setup Go
       uses: actions/setup-go@v2
       with:
