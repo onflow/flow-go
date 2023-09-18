@@ -110,6 +110,7 @@ func (i *ExecutionState) IndexBlockData(ctx context.Context, data *execution_dat
 	// todo can we use the headers index from badger to get the height of a block provided from exec sync API?
 	block, err := i.headers.ByBlockID(data.BlockID)
 	if err != nil {
+		// todo should we wrap sentinel error or should we use irrecoverable.exception as per design guidelines https://github.com/onflow/flow-go/blob/master/CodingConventions.md
 		return fmt.Errorf("could not get the block by ID %s: %w", data.BlockID, err)
 	}
 
@@ -165,7 +166,6 @@ func (i *ExecutionState) IndexBlockData(ctx context.Context, data *execution_dat
 		return fmt.Errorf("failed to index block data at height %d: %w", block.Height, err)
 	}
 
-	// todo what if updating this value fails - should crash and restart or retry inside the queue
 	return i.indexRange.Increase(block.Height)
 }
 

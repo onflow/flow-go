@@ -7,7 +7,7 @@ import (
 	"github.com/onflow/flow-go/storage"
 )
 
-var _ storage.Registers = (*Registers)(nil)
+var _ storage.RegisterIndex = (*Registers)(nil)
 
 type Registers struct {
 	registers    map[uint64]map[flow.RegisterID]flow.RegisterValue
@@ -27,15 +27,6 @@ func (r Registers) LatestHeight() (uint64, error) {
 
 func (r Registers) FirstHeight() (uint64, error) {
 	return r.firstHeight, nil
-}
-
-func (r Registers) SetLatestHeight(height uint64) error {
-	if height-r.latestHeight > 1 || height-r.latestHeight < 0 {
-		panic("invalid height")
-	}
-
-	r.latestHeight = height
-	return nil
 }
 
 func (r Registers) Get(ID flow.RegisterID, height uint64) (flow.RegisterValue, error) {
