@@ -243,13 +243,7 @@ An example of the Flow CLI configuration with the service account added:
 	"accounts": {
 		"localnet-service-account": {
 			"address": "f8d6e0586b0a20c7",
-			"key":{
-				"type": "hex",
-        "index": 0,
-        "signatureAlgorithm": "ECDSA_P256",
-        "hashAlgorithm": "SHA2_256",
-        "privateKey": "8ae3d0461cfed6d6f49bfc25fa899351c39d1bd21fdba8c87595b6c49bb4cc43"
-			}
+			"key": "8ae3d0461cfed6d6f49bfc25fa899351c39d1bd21fdba8c87595b6c49bb4cc43"
 		}
 	}
 }
@@ -261,7 +255,7 @@ flow -n localnet accounts get f8d6e0586b0a20c7
 and check that the output contains `Contract: 'FlowServiceAccount'`.
 #### Configure contract addresses for localnet
 
-When you send transaction via CLI, the cadence contract you provide to the CLI will likely need to reference other contracts deployed on the network. You can configure the CLI to substitute the contract addresses on different networks. For example, to run  [this contract](https://github.com/onflow/flow-core-contracts/blob/master/transactions/flowToken/transfer_tokens.cdc), you will need to import FungibleToken and FlowToken.
+When you send transactions via CLI, the cadence contract you provide to the CLI will likely need to reference other contracts deployed on the network. You can configure the CLI to substitute the contract addresses on different networks. For example, to run  [this contract](https://github.com/onflow/flow-core-contracts/blob/master/transactions/flowToken/transfer_tokens.cdc), you will need to import FungibleToken and FlowToken.
 
 Add this block to your Flow CLI configuration file `"contracts"` section:
 ```
@@ -284,9 +278,9 @@ Add this block to your Flow CLI configuration file `"contracts"` section:
 ```
 >Note: The actual address values can also be found in Flow Documentation for [Fungible Token Contract](https://docs.onflow.org/core-contracts/fungible-token/) and [Flow Token Contract](https://docs.onflow.org/core-contracts/flow-token/).
 
-### Using Flow CLI to send transaction to localnet
+### Using Flow CLI to send transactions to localnet
 
-#### Creating new account on the localnet
+#### Creating a new account on the localnet
 
 Create keys for a new account:
 ```
@@ -307,11 +301,11 @@ flow -n localnet accounts get <ACCOUNT_ADDRESS>
 #### Running a cadence script
 
 This script below reads the balance field of an account's FlowToken Balance.
-Create a file (for example `my_script.cdc`) containing following cadence code:
+Create a file (for example `my_script.cdc`) containing the following cadence code:
 
 ```
-import FungibleToken from 0xee82856bf20e2aa6
-import FlowToken from 0x0ae53cb6e3f42a79
+import "FungibleToken"
+import "FlowToken"
 
 pub fun main(address: Address): UFix64 {
 	let acct = getAccount(address)
@@ -328,7 +322,7 @@ flow scripts execute -n localnet ~/my_script.cdc "<ACCOUNT_ADDRESS>"
 
 The script should output the account balance of the specified account.
 
-You can also execute simple script without creating files, by providing the script in the command, for example:
+You can also execute simple scripts without creating files, by providing the script in the command, for example:
 ```
 # flow scripts execute -n localnet <(echo """
 pub fun main(address: Address): UFix64 {
@@ -338,11 +332,11 @@ pub fun main(address: Address): UFix64 {
 ```
 #### Moving tokens from the service account to another account
 
-Create new cadence contract file from [this template.](https://github.com/onflow/flow-core-contracts/blob/master/transactions/flowToken/transfer_tokens.cdc)
-Make sure that contract imports have values that match your cli config, following the CLI configuration chapter above it should look like:
+Create a new cadence contract file from [this template.](https://github.com/onflow/flow-core-contracts/blob/master/transactions/flowToken/transfer_tokens.cdc)
+Make sure that contract imports have values that match your CLI config, following the CLI configuration chapter above it should look like this:
 ```
-import FungibleToken from "cadence/contracts/FungibleToken.cdc"
-import FlowToken from "cadence/contracts/FlowToken.cdc"
+import "FungibleToken"
+import "FlowToken"
 ```
 Send the transaction with this contract to localnet:
 ```
@@ -352,10 +346,10 @@ flow transactions send transfer_tokens.cdc 9999.9 <ACCOUNT_ADDRESS> -n localnet 
 
 After the transaction is sealed, the account with `<ACCOUNT_ADDRESS>` should have the balance increased by 9999.9 tokens.
 
-# admin tool
-The admin tool is enabled by default in localnet for all node type except access node.
+# Admin tool
+The admin tool is enabled by default in localnet for all node types except the access node.
 
-For instance, in order to use admin tool to change log level, first find the local port that maps to `9002` which is the admin tool address, if the local port is `6100`, then run:
+For instance, in order to use the admin tool to change the log level, first find the local port that maps to `9002` which is the admin tool address, if the local port is `6100`, then run:
 ```
 curl localhost:6100/admin/run_command -H 'Content-Type: application/json' -d '{"commandName": "set-log-level", "data": "debug"}'
 ```
