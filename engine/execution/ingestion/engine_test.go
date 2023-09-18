@@ -21,6 +21,7 @@ import (
 	enginePkg "github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/execution"
 	computation "github.com/onflow/flow-go/engine/execution/computation/mock"
+	"github.com/onflow/flow-go/engine/execution/ingestion/fetcher"
 	"github.com/onflow/flow-go/engine/execution/ingestion/stop"
 	"github.com/onflow/flow-go/engine/execution/ingestion/uploader"
 	uploadermock "github.com/onflow/flow-go/engine/execution/ingestion/uploader/mock"
@@ -133,7 +134,7 @@ func runWithEngine(t *testing.T, f func(testingContext)) {
 
 	ctrl := gomock.NewController(t)
 
-	net := mocknetwork.NewMockNetwork(ctrl)
+	net := mocknetwork.NewMockEngineRegistry(ctrl)
 	request := module.NewMockRequester(ctrl)
 
 	// initialize the mocks and engine
@@ -154,9 +155,6 @@ func runWithEngine(t *testing.T, f func(testingContext)) {
 	blocks := storage.NewMockBlocks(ctrl)
 	payloads := storage.NewMockPayloads(ctrl)
 	collections := storage.NewMockCollections(ctrl)
-	events := storage.NewMockEvents(ctrl)
-	serviceEvents := storage.NewMockServiceEvents(ctrl)
-	txResults := storage.NewMockTransactionResults(ctrl)
 
 	computationManager := new(computation.ComputationManager)
 	providerEngine := new(provider.ProviderEngine)
@@ -188,7 +186,6 @@ func runWithEngine(t *testing.T, f func(testingContext)) {
 		return identity
 	}, nil)
 
-	txResults.EXPECT().BatchStore(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
 	payloads.EXPECT().Store(gomock.Any(), gomock.Any()).AnyTimes()
 
 	log := unittest.Logger()
@@ -219,19 +216,18 @@ func runWithEngine(t *testing.T, f func(testingContext)) {
 
 	uploadMgr := uploader.NewManager(trace.NewNoopTracer())
 
+	fetcher := fetcher.NewCollectionFetcher(log, request, protocolState, false)
+
 	engine, err = New(
 		unit,
 		log,
 		net,
 		me,
-		request,
+		fetcher,
 		protocolState,
 		headers,
 		blocks,
 		collections,
-		events,
-		serviceEvents,
-		txResults,
 		computationManager,
 		providerEngine,
 		executionState,
@@ -242,7 +238,6 @@ func runWithEngine(t *testing.T, f func(testingContext)) {
 		nil,
 		uploadMgr,
 		stopControl,
-		false,
 	)
 	require.NoError(t, err)
 
@@ -283,6 +278,7 @@ func (ctx *testingContext) assertSuccessfulBlockComputation(
 ) *protocol.Snapshot {
 	if computationResult == nil {
 		computationResult = executionUnittest.ComputationResultForBlockFixture(
+			ctx.t,
 			previousExecutionResultID,
 			executableBlock)
 	}
@@ -1319,6 +1315,7 @@ func TestExecutionGenerationResultsAreChained(t *testing.T) {
 	previousExecutionResultID := unittest.IdentifierFixture()
 
 	cr := executionUnittest.ComputationResultFixture(
+		t,
 		previousExecutionResultID,
 		nil)
 	cr.ExecutableBlock = executableBlock
@@ -1490,7 +1487,7 @@ func newIngestionEngine(t *testing.T, ps *mocks.ProtocolState, es *mockExecution
 	tracer, err := trace.NewTracer(log, "test", "test", trace.SensitivityCaptureAll)
 	require.NoError(t, err)
 	ctrl := gomock.NewController(t)
-	net := mocknetwork.NewMockNetwork(ctrl)
+	net := mocknetwork.NewMockEngineRegistry(ctrl)
 	request := module.NewMockRequester(ctrl)
 	var engine *Engine
 
@@ -1507,9 +1504,6 @@ func newIngestionEngine(t *testing.T, ps *mocks.ProtocolState, es *mockExecution
 	headers := storage.NewMockHeaders(ctrl)
 	blocks := storage.NewMockBlocks(ctrl)
 	collections := storage.NewMockCollections(ctrl)
-	events := storage.NewMockEvents(ctrl)
-	serviceEvents := storage.NewMockServiceEvents(ctrl)
-	txResults := storage.NewMockTransactionResults(ctrl)
 
 	computationManager := new(computation.ComputationManager)
 	providerEngine := new(provider.ProviderEngine)
@@ -1518,20 +1512,19 @@ func newIngestionEngine(t *testing.T, ps *mocks.ProtocolState, es *mockExecution
 		return stateProtocol.IsNodeAuthorizedAt(ps.AtBlockID(blockID), myIdentity.NodeID)
 	}
 
+	fetcher := fetcher.NewCollectionFetcher(log, request, ps, false)
+
 	unit := enginePkg.NewUnit()
 	engine, err = New(
 		unit,
 		log,
 		net,
 		me,
-		request,
+		fetcher,
 		ps,
 		headers,
 		blocks,
 		collections,
-		events,
-		serviceEvents,
-		txResults,
 		computationManager,
 		providerEngine,
 		es,
@@ -1553,7 +1546,6 @@ func newIngestionEngine(t *testing.T, ps *mocks.ProtocolState, es *mockExecution
 			false,
 			false,
 		),
-		false,
 	)
 
 	require.NoError(t, err)
@@ -1826,6 +1818,7 @@ func TestExecutedBlockIsUploaded(t *testing.T) {
 
 		parentBlockExecutionResultID := unittest.IdentifierFixture()
 		computationResultB := executionUnittest.ComputationResultForBlockFixture(
+			t,
 			parentBlockExecutionResultID,
 			blockB)
 
@@ -1886,6 +1879,7 @@ func TestExecutedBlockUploadedFailureDoesntBlock(t *testing.T) {
 		previousExecutionResultID := unittest.IdentifierFixture()
 
 		computationResultB := executionUnittest.ComputationResultForBlockFixture(
+			t,
 			previousExecutionResultID,
 			blockB)
 

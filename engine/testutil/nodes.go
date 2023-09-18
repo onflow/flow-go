@@ -45,6 +45,7 @@ import (
 	"github.com/onflow/flow-go/engine/execution/computation/committer"
 	"github.com/onflow/flow-go/engine/execution/computation/query"
 	"github.com/onflow/flow-go/engine/execution/ingestion"
+	exeFetcher "github.com/onflow/flow-go/engine/execution/ingestion/fetcher"
 	"github.com/onflow/flow-go/engine/execution/ingestion/stop"
 	"github.com/onflow/flow-go/engine/execution/ingestion/uploader"
 	executionprovider "github.com/onflow/flow-go/engine/execution/provider"
@@ -709,20 +710,18 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 		true,
 	)
 
+	fetcher := exeFetcher.NewCollectionFetcher(node.Log, requestEngine, node.State, false)
 	rootHead, rootQC := getRoot(t, &node)
 	ingestionEngine, err := ingestion.New(
 		unit,
 		node.Log,
 		node.Net,
 		node.Me,
-		requestEngine,
+		fetcher,
 		node.State,
 		node.Headers,
 		node.Blocks,
 		collectionsStorage,
-		eventsStorage,
-		serviceEventsStorage,
-		txResultStorage,
 		computationEngine,
 		pusherEngine,
 		execState,
@@ -733,7 +732,6 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 		nil,
 		uploader,
 		stopControl,
-		false,
 	)
 	require.NoError(t, err)
 	requestEngine.WithHandle(ingestionEngine.OnCollection)
@@ -790,6 +788,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 			),
 			idCache,
 		),
+		synchronization.NewSpamDetectionConfig(),
 		synchronization.WithPollInterval(time.Duration(0)),
 	)
 	require.NoError(t, err)

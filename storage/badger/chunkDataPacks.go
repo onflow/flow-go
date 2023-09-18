@@ -115,9 +115,10 @@ func (ch *ChunkDataPacks) ByChunkID(chunkID flow.Identifier) (*flow.ChunkDataPac
 	}
 
 	chdp := &flow.ChunkDataPack{
-		ChunkID:    schdp.ChunkID,
-		StartState: schdp.StartState,
-		Proof:      schdp.Proof,
+		ChunkID:           schdp.ChunkID,
+		StartState:        schdp.StartState,
+		Proof:             schdp.Proof,
+		ExecutionDataRoot: schdp.ExecutionDataRoot,
 	}
 
 	if !schdp.SystemChunk {
@@ -156,10 +157,11 @@ func (ch *ChunkDataPacks) retrieveCHDP(chunkID flow.Identifier) func(*badger.Txn
 
 func toStoredChunkDataPack(c *flow.ChunkDataPack) *badgermodel.StoredChunkDataPack {
 	sc := &badgermodel.StoredChunkDataPack{
-		ChunkID:     c.ChunkID,
-		StartState:  c.StartState,
-		Proof:       c.Proof,
-		SystemChunk: false,
+		ChunkID:           c.ChunkID,
+		StartState:        c.StartState,
+		Proof:             c.Proof,
+		SystemChunk:       false,
+		ExecutionDataRoot: c.ExecutionDataRoot,
 	}
 
 	if c.Collection != nil {

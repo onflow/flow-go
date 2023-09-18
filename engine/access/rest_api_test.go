@@ -10,11 +10,6 @@ import (
 	"testing"
 	"time"
 
-	"google.golang.org/grpc/credentials"
-
-	"github.com/onflow/flow-go/module/grpcserver"
-	"github.com/onflow/flow-go/utils/grpcutils"
-
 	"github.com/antihax/optional"
 	restclient "github.com/onflow/flow/openapi/go-client-generated"
 	"github.com/rs/zerolog"
@@ -22,13 +17,17 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
+	"google.golang.org/grpc/credentials"
 
 	accessmock "github.com/onflow/flow-go/engine/access/mock"
+	"github.com/onflow/flow-go/engine/access/rest"
 	"github.com/onflow/flow-go/engine/access/rest/request"
 	"github.com/onflow/flow-go/engine/access/rest/routes"
 	"github.com/onflow/flow-go/engine/access/rpc"
 	"github.com/onflow/flow-go/engine/access/rpc/backend"
+	"github.com/onflow/flow-go/engine/access/state_stream"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/grpcserver"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
 	module "github.com/onflow/flow-go/module/mock"
@@ -36,6 +35,7 @@ import (
 	protocol "github.com/onflow/flow-go/state/protocol/mock"
 	"github.com/onflow/flow-go/storage"
 	storagemock "github.com/onflow/flow-go/storage/mock"
+	"github.com/onflow/flow-go/utils/grpcutils"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -48,7 +48,7 @@ type RestAPITestSuite struct {
 	sealedSnaphost    *protocol.Snapshot
 	finalizedSnapshot *protocol.Snapshot
 	log               zerolog.Logger
-	net               *network.Network
+	net               *network.EngineRegistry
 	request           *module.Requester
 	collClient        *accessmock.AccessAPIClient
 	execClient        *accessmock.ExecutionAPIClient
@@ -77,15 +77,23 @@ type RestAPITestSuite struct {
 
 func (suite *RestAPITestSuite) SetupTest() {
 	suite.log = zerolog.New(os.Stdout)
-	suite.net = new(network.Network)
+	suite.net = new(network.EngineRegistry)
 	suite.state = new(protocol.State)
 	suite.sealedSnaphost = new(protocol.Snapshot)
 	suite.finalizedSnapshot = new(protocol.Snapshot)
 	suite.sealedBlock = unittest.BlockHeaderFixture(unittest.WithHeaderHeight(0))
 	suite.finalizedBlock = unittest.BlockHeaderWithParentFixture(suite.sealedBlock)
 
+	rootHeader := unittest.BlockHeaderFixture()
+	params := new(protocol.Params)
+	params.On("SporkID").Return(unittest.IdentifierFixture(), nil)
+	params.On("ProtocolVersion").Return(uint(unittest.Uint64InRange(10, 30)), nil)
+	params.On("SporkRootBlockHeight").Return(rootHeader.Height, nil)
+	params.On("SealedRoot").Return(rootHeader, nil)
+
 	suite.state.On("Sealed").Return(suite.sealedSnaphost, nil)
 	suite.state.On("Final").Return(suite.finalizedSnapshot, nil)
+	suite.state.On("Params").Return(params)
 	suite.sealedSnaphost.On("Head").Return(
 		func() *flow.Header {
 			return suite.sealedBlock
@@ -125,7 +133,9 @@ func (suite *RestAPITestSuite) SetupTest() {
 		UnsecureGRPCListenAddr: unittest.DefaultAddress,
 		SecureGRPCListenAddr:   unittest.DefaultAddress,
 		HTTPListenAddr:         unittest.DefaultAddress,
-		RESTListenAddr:         unittest.DefaultAddress,
+		RestConfig: rest.Config{
+			ListenAddress: unittest.DefaultAddress,
+		},
 	}
 
 	// generate a server certificate that will be served by the GRPC server
@@ -151,28 +161,22 @@ func (suite *RestAPITestSuite) SetupTest() {
 		nil,
 		nil).Build()
 
-	backend := backend.New(suite.state,
-		suite.collClient,
-		nil,
-		suite.blocks,
-		suite.headers,
-		suite.collections,
-		suite.transactions,
-		nil,
-		suite.executionResults,
-		suite.chainID,
-		suite.metrics,
-		nil,
-		false,
-		0,
-		nil,
-		nil,
-		suite.log,
-		0,
-		nil,
-		false,
-		false,
-	)
+	bnd, err := backend.New(backend.Params{
+		State:                suite.state,
+		CollectionRPC:        suite.collClient,
+		Blocks:               suite.blocks,
+		Headers:              suite.headers,
+		Collections:          suite.collections,
+		Transactions:         suite.transactions,
+		ExecutionResults:     suite.executionResults,
+		ChainID:              suite.chainID,
+		AccessMetrics:        suite.metrics,
+		MaxHeightRange:       0,
+		Log:                  suite.log,
+		SnapshotHistoryLimit: 0,
+		Communicator:         backend.NewNodeCommunicator(false),
+	})
+	require.NoError(suite.T(), err)
 
 	rpcEngBuilder, err := rpc.NewBuilder(
 		suite.log,
@@ -182,10 +186,13 @@ func (suite *RestAPITestSuite) SetupTest() {
 		suite.metrics,
 		false,
 		suite.me,
-		backend,
-		backend,
+		bnd,
+		bnd,
 		suite.secureGrpcServer,
 		suite.unsecureGrpcServer,
+		nil,
+		state_stream.DefaultEventFilterConfig,
+		0,
 	)
 	assert.NoError(suite.T(), err)
 	suite.rpcEng, err = rpcEngBuilder.WithLegacy().Build()
@@ -207,10 +214,12 @@ func (suite *RestAPITestSuite) SetupTest() {
 }
 
 func (suite *RestAPITestSuite) TearDownTest() {
-	suite.cancel()
-	unittest.AssertClosesBefore(suite.T(), suite.secureGrpcServer.Done(), 2*time.Second)
-	unittest.AssertClosesBefore(suite.T(), suite.unsecureGrpcServer.Done(), 2*time.Second)
-	unittest.AssertClosesBefore(suite.T(), suite.rpcEng.Done(), 2*time.Second)
+	if suite.cancel != nil {
+		suite.cancel()
+		unittest.AssertClosesBefore(suite.T(), suite.secureGrpcServer.Done(), 2*time.Second)
+		unittest.AssertClosesBefore(suite.T(), suite.unsecureGrpcServer.Done(), 2*time.Second)
+		unittest.AssertClosesBefore(suite.T(), suite.rpcEng.Done(), 2*time.Second)
+	}
 }
 
 func TestRestAPI(t *testing.T) {

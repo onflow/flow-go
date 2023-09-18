@@ -2,209 +2,82 @@ package synchronization
 
 import (
 	"context"
-	"io"
 	"math"
-	"math/rand"
 	"testing"
 	"time"
 
-	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
-	"github.com/stretchr/testify/suite"
 
-	mockconsensus "github.com/onflow/flow-go/engine/consensus/mock"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/model/messages"
 	synccore "github.com/onflow/flow-go/module/chainsync"
-	"github.com/onflow/flow-go/module/id"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
-	module "github.com/onflow/flow-go/module/mock"
 	netint "github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/channels"
-	"github.com/onflow/flow-go/network/mocknetwork"
-	"github.com/onflow/flow-go/network/p2p/cache"
-	protocolint "github.com/onflow/flow-go/state/protocol"
-	protocolEvents "github.com/onflow/flow-go/state/protocol/events"
-	protocol "github.com/onflow/flow-go/state/protocol/mock"
-	storerr "github.com/onflow/flow-go/storage"
-	storage "github.com/onflow/flow-go/storage/mock"
+	"github.com/onflow/flow-go/utils/rand"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-func TestSyncEngine(t *testing.T) {
-	suite.Run(t, new(SyncSuite))
-}
-
-type SyncSuite struct {
-	suite.Suite
-	myID         flow.Identifier
-	participants flow.IdentityList
-	head         *flow.Header
-	heights      map[uint64]*flow.Block
-	blockIDs     map[flow.Identifier]*flow.Block
-	net          *mocknetwork.Network
-	con          *mocknetwork.Conduit
-	me           *module.Local
-	state        *protocol.State
-	snapshot     *protocol.Snapshot
-	blocks       *storage.Blocks
-	comp         *mockconsensus.Compliance
-	core         *module.SyncCore
-	e            *Engine
-}
-
-func (ss *SyncSuite) SetupTest() {
-	// generate own ID
-	ss.participants = unittest.IdentityListFixture(3, unittest.WithRole(flow.RoleConsensus))
-	keys := unittest.NetworkingKeys(len(ss.participants))
-
-	for i, p := range ss.participants {
-		p.NetworkPubKey = keys[i].PublicKey()
-	}
-	ss.myID = ss.participants[0].NodeID
-
-	// generate a header for the final state
-	header := unittest.BlockHeaderFixture()
-	ss.head = header
-
-	// create maps to enable block returns
-	ss.heights = make(map[uint64]*flow.Block)
-	ss.blockIDs = make(map[flow.Identifier]*flow.Block)
-
-	// set up the network module mock
-	ss.net = &mocknetwork.Network{}
-	ss.net.On("Register", mock.Anything, mock.Anything).Return(
-		func(channel channels.Channel, engine netint.MessageProcessor) netint.Conduit {
-			return ss.con
-		},
-		nil,
-	)
-
-	// set up the network conduit mock
-	ss.con = &mocknetwork.Conduit{}
-
-	// set up the local module mock
-	ss.me = &module.Local{}
-	ss.me.On("NodeID").Return(
-		func() flow.Identifier {
-			return ss.myID
-		},
-	)
-
-	// set up the protocol state mock
-	ss.state = &protocol.State{}
-	ss.state.On("Final").Return(
-		func() protocolint.Snapshot {
-			return ss.snapshot
-		},
-	)
-	ss.state.On("AtBlockID", mock.Anything).Return(
-		func(blockID flow.Identifier) protocolint.Snapshot {
-			if ss.head.ID() == blockID {
-				return ss.snapshot
-			} else {
-				return unittest.StateSnapshotForUnknownBlock()
-			}
-		},
-	).Maybe()
-
-	// set up the snapshot mock
-	ss.snapshot = &protocol.Snapshot{}
-	ss.snapshot.On("Head").Return(
-		func() *flow.Header {
-			return ss.head
-		},
-		nil,
-	)
-	ss.snapshot.On("Identities", mock.Anything).Return(
-		func(selector flow.IdentityFilter) flow.IdentityList {
-			return ss.participants.Filter(selector)
-		},
-		nil,
-	)
-
-	// set up blocks storage mock
-	ss.blocks = &storage.Blocks{}
-	ss.blocks.On("ByHeight", mock.Anything).Return(
-		func(height uint64) *flow.Block {
-			return ss.heights[height]
-		},
-		func(height uint64) error {
-			_, enabled := ss.heights[height]
-			if !enabled {
-				return storerr.ErrNotFound
-			}
-			return nil
-		},
-	)
-	ss.blocks.On("ByID", mock.Anything).Return(
-		func(blockID flow.Identifier) *flow.Block {
-			return ss.blockIDs[blockID]
-		},
-		func(blockID flow.Identifier) error {
-			_, enabled := ss.blockIDs[blockID]
-			if !enabled {
-				return storerr.ErrNotFound
-			}
-			return nil
-		},
-	)
-
-	// set up compliance engine mock
-	ss.comp = mockconsensus.NewCompliance(ss.T())
-	ss.comp.On("Process", mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
-
-	// set up sync core
-	ss.core = &module.SyncCore{}
-
-	// initialize the engine
-	log := zerolog.New(io.Discard)
-	metrics := metrics.NewNoopCollector()
-
-	idCache, err := cache.NewProtocolStateIDCache(log, ss.state, protocolEvents.NewDistributor())
-	require.NoError(ss.T(), err, "could not create protocol state identity cache")
-	e, err := New(log, metrics, ss.net, ss.me, ss.state, ss.blocks, ss.comp, ss.core,
-		id.NewIdentityFilterIdentifierProvider(
-			filter.And(
-				filter.HasRole(flow.RoleConsensus),
-				filter.Not(filter.HasNodeID(ss.me.NodeID())),
-			),
-			idCache,
-		))
-	require.NoError(ss.T(), err, "should pass engine initialization")
-
-	ss.e = e
-}
-
-func (ss *SyncSuite) TestOnSyncRequest() {
-
+// TestOnSyncRequest_LowerThanReceiver_WithinTolerance tests that a sync request that's within tolerance of the receiver doesn't trigger
+// a response, even if request height is lower than receiver.
+func (ss *SyncSuite) TestOnSyncRequest_LowerThanReceiver_WithinTolerance() {
+	nonce, err := rand.Uint64()
+	require.NoError(ss.T(), err, "should generate nonce")
 	// generate origin and request message
 	originID := unittest.IdentifierFixture()
 	req := &messages.SyncRequest{
-		Nonce:  rand.Uint64(),
+		Nonce:  nonce,
 		Height: 0,
 	}
 
 	// regardless of request height, if within tolerance, we should not respond
 	ss.core.On("HandleHeight", ss.head, req.Height)
 	ss.core.On("WithinTolerance", ss.head, req.Height).Return(true)
-	err := ss.e.requestHandler.onSyncRequest(originID, req)
-	ss.Assert().NoError(err, "same height sync request should pass")
+	ss.Assert().NoError(ss.e.requestHandler.onSyncRequest(originID, req))
 	ss.con.AssertNotCalled(ss.T(), "Unicast", mock.Anything, mock.Anything)
+	ss.core.AssertExpectations(ss.T())
+}
+
+// TestOnSyncRequest_HigherThanReceiver_OutsideTolerance tests that a sync request that's higher
+// than the receiver's height doesn't trigger a response, even if outside tolerance.
+func (ss *SyncSuite) TestOnSyncRequest_HigherThanReceiver_OutsideTolerance() {
+	nonce, err := rand.Uint64()
+	require.NoError(ss.T(), err, "should generate nonce")
+	// generate origin and request message
+	originID := unittest.IdentifierFixture()
+	req := &messages.SyncRequest{
+		Nonce:  nonce,
+		Height: 0,
+	}
 
 	// if request height is higher than local finalized, we should not respond
 	req.Height = ss.head.Height + 1
+
 	ss.core.On("HandleHeight", ss.head, req.Height)
 	ss.core.On("WithinTolerance", ss.head, req.Height).Return(false)
-	err = ss.e.requestHandler.onSyncRequest(originID, req)
-	ss.Assert().NoError(err, "same height sync request should pass")
+	ss.Assert().NoError(ss.e.requestHandler.onSyncRequest(originID, req))
 	ss.con.AssertNotCalled(ss.T(), "Unicast", mock.Anything, mock.Anything)
+	ss.core.AssertExpectations(ss.T())
+}
 
-	// if the request height is lower than head and outside tolerance, we should submit correct response
+// TestOnSyncRequest_LowerThanReceiver_OutsideTolerance tests that a sync request that's outside tolerance and
+// lower than the receiver's height triggers a response.
+func (ss *SyncSuite) TestOnSyncRequest_LowerThanReceiver_OutsideTolerance() {
+	nonce, err := rand.Uint64()
+	require.NoError(ss.T(), err, "should generate nonce")
+
+	// generate origin and request message
+	originID := unittest.IdentifierFixture()
+	req := &messages.SyncRequest{
+		Nonce:  nonce,
+		Height: 0,
+	}
+
+	// if the request height is lower than head and outside tolerance, we should expect correct response
 	req.Height = ss.head.Height - 1
 	ss.core.On("HandleHeight", ss.head, req.Height)
 	ss.core.On("WithinTolerance", ss.head, req.Height).Return(false)
@@ -224,12 +97,17 @@ func (ss *SyncSuite) TestOnSyncRequest() {
 }
 
 func (ss *SyncSuite) TestOnSyncResponse() {
+	nonce, err := rand.Uint64()
+	require.NoError(ss.T(), err, "should generate nonce")
+
+	height, err := rand.Uint64()
+	require.NoError(ss.T(), err, "should generate height")
 
 	// generate origin ID and response message
 	originID := unittest.IdentifierFixture()
 	res := &messages.SyncResponse{
-		Nonce:  rand.Uint64(),
-		Height: rand.Uint64(),
+		Nonce:  nonce,
+		Height: height,
 	}
 
 	// the height should be handled
@@ -239,11 +117,13 @@ func (ss *SyncSuite) TestOnSyncResponse() {
 }
 
 func (ss *SyncSuite) TestOnRangeRequest() {
+	nonce, err := rand.Uint64()
+	require.NoError(ss.T(), err, "should generate nonce")
 
 	// generate originID and range request
 	originID := unittest.IdentifierFixture()
 	req := &messages.RangeRequest{
-		Nonce:      rand.Uint64(),
+		Nonce:      nonce,
 		FromHeight: 0,
 		ToHeight:   0,
 	}
@@ -262,7 +142,7 @@ func (ss *SyncSuite) TestOnRangeRequest() {
 		req.ToHeight = ref - 1
 		err := ss.e.requestHandler.onRangeRequest(originID, req)
 		require.NoError(ss.T(), err, "empty range request should pass")
-		ss.con.AssertNumberOfCalls(ss.T(), "Unicast", 0)
+		ss.con.AssertNotCalled(ss.T(), "Unicast", mock.Anything, mock.Anything)
 	})
 
 	// range with only unknown block should be a no-op
@@ -271,7 +151,7 @@ func (ss *SyncSuite) TestOnRangeRequest() {
 		req.ToHeight = ref + 3
 		err := ss.e.requestHandler.onRangeRequest(originID, req)
 		require.NoError(ss.T(), err, "unknown range request should pass")
-		ss.con.AssertNumberOfCalls(ss.T(), "Unicast", 0)
+		ss.con.AssertNotCalled(ss.T(), "Unicast", mock.Anything, mock.Anything)
 	})
 
 	// a request for same from and to should send single block
@@ -291,6 +171,10 @@ func (ss *SyncSuite) TestOnRangeRequest() {
 		)
 		err := ss.e.requestHandler.onRangeRequest(originID, req)
 		require.NoError(ss.T(), err, "range request with higher to height should pass")
+		ss.con.AssertNumberOfCalls(ss.T(), "Unicast", 1)
+
+		// clear any expectations for next test - otherwise, next subtest will fail due to increment of expected calls to Unicast
+		ss.con.Mock = mock.Mock{}
 	})
 
 	// a request for a range that we partially have should send partial response
@@ -309,6 +193,10 @@ func (ss *SyncSuite) TestOnRangeRequest() {
 		)
 		err := ss.e.requestHandler.onRangeRequest(originID, req)
 		require.NoError(ss.T(), err, "valid range with missing blocks should fail")
+		ss.con.AssertNumberOfCalls(ss.T(), "Unicast", 1)
+
+		// clear any expectations for next test - otherwise, next subtest will fail due to increment of expected calls to Unicast
+		ss.con.Mock = mock.Mock{}
 	})
 
 	// a request for a range we entirely have should send all blocks
@@ -327,6 +215,10 @@ func (ss *SyncSuite) TestOnRangeRequest() {
 		)
 		err := ss.e.requestHandler.onRangeRequest(originID, req)
 		require.NoError(ss.T(), err, "valid range request should pass")
+		ss.con.AssertNumberOfCalls(ss.T(), "Unicast", 1)
+
+		// clear any expectations for next test - otherwise, next subtest will fail due to increment of expected calls to Unicast
+		ss.con.Mock = mock.Mock{}
 	})
 
 	// a request for a range larger than MaxSize should be clamped
@@ -353,15 +245,21 @@ func (ss *SyncSuite) TestOnRangeRequest() {
 
 		err = ss.e.requestHandler.onRangeRequest(originID, req)
 		require.NoError(ss.T(), err, "valid range request exceeding max size should still pass")
+		ss.con.AssertNumberOfCalls(ss.T(), "Unicast", 1)
+
+		// clear any expectations for next test - otherwise, next subtest will fail due to increment of expected calls to Unicast
+		ss.con.Mock = mock.Mock{}
 	})
 }
 
 func (ss *SyncSuite) TestOnBatchRequest() {
+	nonce, err := rand.Uint64()
+	require.NoError(ss.T(), err, "should generate nonce")
 
 	// generate origin ID and batch request
 	originID := unittest.IdentifierFixture()
 	req := &messages.BatchRequest{
-		Nonce:    rand.Uint64(),
+		Nonce:    nonce,
 		BlockIDs: nil,
 	}
 
@@ -434,11 +332,13 @@ func (ss *SyncSuite) TestOnBatchRequest() {
 }
 
 func (ss *SyncSuite) TestOnBlockResponse() {
+	nonce, err := rand.Uint64()
+	require.NoError(ss.T(), err, "should generate nonce")
 
 	// generate origin and block response
 	originID := unittest.IdentifierFixture()
 	res := &messages.BlockResponse{
-		Nonce:  rand.Uint64(),
+		Nonce:  nonce,
 		Blocks: []messages.UntrustedBlock{},
 	}
 
@@ -544,6 +444,9 @@ func (ss *SyncSuite) TestProcessingMultipleItems() {
 		ss.core.On("WithinTolerance", mock.Anything, mock.Anything).Return(false)
 		ss.core.On("HandleHeight", mock.Anything, msg.Height).Once()
 		ss.con.On("Unicast", mock.Anything, mock.Anything).Return(nil)
+
+		// misbehavior might or might not be reported
+		ss.con.On("ReportMisbehavior", mock.Anything).Return(mock.Anything).Maybe()
 
 		require.NoError(ss.T(), ss.e.Process(channels.SyncCommittee, originID, msg))
 	}
