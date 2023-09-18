@@ -42,9 +42,9 @@ type EpochStateContainer struct {
 	SetupID Identifier
 	// ID of commit event for this epoch. Could be ZeroID if epoch was not committed.
 	CommitID Identifier
-	// Part of identity table that can be changed on a block-by-block basis. 
+	// Part of identity table that can be changed on a block-by-block basis.
 	// Each non-deferred identity-mutating operation is applied independently to each
-	// relevant epoch's dynamic identity list separately. 
+	// relevant epoch's dynamic identity list separately.
 	// Always sorted in canonical order.
 	Identities DynamicIdentityEntryList
 }
@@ -187,7 +187,7 @@ func NewRichProtocolStateEntry(
 	} else {
 		// if next epoch is not yet created, it means that we are in staking phase,
 		// so we need to build the identity table using previous and current epoch setup events.
-		var otherIdentities IdentityList
+		var otherIdentities IdentitySkeletonList
 		if previousEpochSetup != nil {
 			otherIdentities = previousEpochSetup.Participants
 		}
@@ -354,8 +354,8 @@ func (ll DynamicIdentityEntryList) Sort(less IdentifierOrder) DynamicIdentityEnt
 // No errors are expected during normal operation.
 func buildIdentityTable(
 	targetEpochDynamicIdentities DynamicIdentityEntryList,
-	targetEpochIdentitySkeletons IdentityList, // TODO: change to `IdentitySkeletonList`
-	adjacentEpochIdentitySkeletons IdentityList, // TODO: change to `IdentitySkeletonList`
+	targetEpochIdentitySkeletons IdentitySkeletonList,
+	adjacentEpochIdentitySkeletons IdentitySkeletonList,
 ) (IdentityList, error) {
 	// produce a unique set for current and previous epoch participants
 	allEpochParticipants := targetEpochIdentitySkeletons.Union(adjacentEpochIdentitySkeletons)
@@ -372,7 +372,7 @@ func buildIdentityTable(
 			return nil, fmt.Errorf("identites in protocol state are not in canonical order: expected %s, got %s", allEpochParticipants[i].NodeID, identity.NodeID)
 		}
 		result = append(result, &Identity{
-			IdentitySkeleton: allEpochParticipants[i].IdentitySkeleton,
+			IdentitySkeleton: *allEpochParticipants[i],
 			DynamicIdentity:  identity.Dynamic,
 		})
 	}

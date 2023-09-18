@@ -279,7 +279,7 @@ func (iy *Identity) UnmarshalMsgpack(b []byte) error {
 	return nil
 }
 
-func (iy *Identity) EqualTo(other *Identity) bool {
+func (iy *IdentitySkeleton) EqualTo(other *IdentitySkeleton) bool {
 	if iy.NodeID != other.NodeID {
 		return false
 	}
@@ -290,12 +290,6 @@ func (iy *Identity) EqualTo(other *Identity) bool {
 		return false
 	}
 	if iy.InitialWeight != other.InitialWeight {
-		return false
-	}
-	if iy.Weight != other.Weight {
-		return false
-	}
-	if iy.Ejected != other.Ejected {
 		return false
 	}
 	if (iy.StakingPubKey != nil && other.StakingPubKey == nil) ||
@@ -314,6 +308,26 @@ func (iy *Identity) EqualTo(other *Identity) bool {
 		return false
 	}
 
+	return true
+}
+
+func (iy *DynamicIdentity) EqualTo(other *DynamicIdentity) bool {
+	if iy.Weight != other.Weight {
+		return false
+	}
+	if iy.Ejected != other.Ejected {
+		return false
+	}
+	return true
+}
+
+func (iy *Identity) EqualTo(other *Identity) bool {
+	if !iy.IdentitySkeleton.EqualTo(&other.IdentitySkeleton) {
+		return false
+	}
+	if !iy.DynamicIdentity.EqualTo(&other.DynamicIdentity) {
+		return false
+	}
 	return true
 }
 
@@ -598,10 +612,45 @@ func (il IdentityList) Union(other IdentityList) IdentityList {
 	return union
 }
 
+// Union returns a new identity list containing every identity that occurs in
+// either `il`, or `other`, or both. There are no duplicates in the output,
+// where duplicates are identities with the same node ID.
+// Receiver `il` and/or method input `other` can be nil or empty.
+// The returned IdentityList is sorted in canonical order.
+func (il IdentitySkeletonList) Union(other IdentitySkeletonList) IdentitySkeletonList {
+	maxLen := len(il) + len(other)
+
+	union := make(IdentitySkeletonList, 0, maxLen)
+	set := make(map[Identifier]struct{}, maxLen)
+
+	for _, list := range []IdentitySkeletonList{il, other} {
+		for _, id := range list {
+			if _, isDuplicate := set[id.NodeID]; !isDuplicate {
+				set[id.NodeID] = struct{}{}
+				union = append(union, id)
+			}
+		}
+	}
+
+	slices.SortFunc(union, func(a, b *IdentitySkeleton) bool {
+		return bytes.Compare(a.NodeID[:], b.NodeID[:]) < 0
+	})
+
+	return union
+}
+
 // EqualTo checks if the other list if the same, that it contains the same elements
 // in the same order
 func (il IdentityList) EqualTo(other IdentityList) bool {
 	return slices.EqualFunc(il, other, func(a, b *Identity) bool {
+		return a.EqualTo(b)
+	})
+}
+
+// EqualTo checks if the other list if the same, that it contains the same elements
+// in the same order
+func (il IdentitySkeletonList) EqualTo(other IdentitySkeletonList) bool {
+	return slices.EqualFunc(il, other, func(a, b *IdentitySkeleton) bool {
 		return a.EqualTo(b)
 	})
 }

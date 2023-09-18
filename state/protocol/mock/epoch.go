@@ -311,7 +311,7 @@ func (_m *Epoch) FirstView() (uint64, error) {
 }
 
 // InitialIdentities provides a mock function with given fields:
-func (_m *Epoch) InitialIdentities() (flow.IdentityList, error) {
+func (_m *Epoch) InitialIdentities() (flow.IdentitySkeletonList, error) {
 	ret := _m.Called()
 
 	var r0 flow.IdentityList

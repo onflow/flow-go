@@ -116,4 +116,4 @@ var IsVotingConsensusCommitteeMember = And(
 // IsValidDKGParticipant is an identity filter for all DKG participants. It is
 // equivalent to the filter for consensus committee members, as these are
 // the same group for now.
-var IsValidDKGParticipant = IsVotingConsensusCommitteeMember
+var IsValidDKGParticipant = func(identity *flow.IdentitySkeleton) {}

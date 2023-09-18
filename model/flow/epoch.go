@@ -63,15 +63,15 @@ const EpochSetupRandomSourceLength = 16
 // for the upcoming epoch. It contains the participants in the epoch, the
 // length, the cluster assignment, and the seed for leader selection.
 type EpochSetup struct {
-	Counter            uint64         // the number of the epoch
-	FirstView          uint64         // the first view of the epoch
-	DKGPhase1FinalView uint64         // the final view of DKG phase 1
-	DKGPhase2FinalView uint64         // the final view of DKG phase 2
-	DKGPhase3FinalView uint64         // the final view of DKG phase 3
-	FinalView          uint64         // the final view of the epoch
-	Participants       IdentityList   // all participants of the epoch in canonical order
-	Assignments        AssignmentList // cluster assignment for the epoch with node IDs for each cluster in canonical order
-	RandomSource       []byte         // source of randomness for epoch-specific setup tasks
+	Counter            uint64               // the number of the epoch
+	FirstView          uint64               // the first view of the epoch
+	DKGPhase1FinalView uint64               // the final view of DKG phase 1
+	DKGPhase2FinalView uint64               // the final view of DKG phase 2
+	DKGPhase3FinalView uint64               // the final view of DKG phase 3
+	FinalView          uint64               // the final view of the epoch
+	Participants       IdentitySkeletonList // all participants of the epoch in canonical order
+	Assignments        AssignmentList       // cluster assignment for the epoch with node IDs for each cluster in canonical order
+	RandomSource       []byte               // source of randomness for epoch-specific setup tasks
 }
 
 func (setup *EpochSetup) ServiceEvent() ServiceEvent {

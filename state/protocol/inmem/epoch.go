@@ -33,7 +33,7 @@ func (e Epoch) DKGPhase1FinalView() (uint64, error) { return e.enc.DKGPhase1Fina
 func (e Epoch) DKGPhase2FinalView() (uint64, error) { return e.enc.DKGPhase2FinalView, nil }
 func (e Epoch) DKGPhase3FinalView() (uint64, error) { return e.enc.DKGPhase3FinalView, nil }
 func (e Epoch) FinalView() (uint64, error)          { return e.enc.FinalView, nil }
-func (e Epoch) InitialIdentities() (flow.IdentityList, error) {
+func (e Epoch) InitialIdentities() (flow.IdentitySkeletonList, error) {
 	return e.enc.InitialIdentities, nil
 }
 func (e Epoch) RandomSource() ([]byte, error) {
@@ -150,7 +150,7 @@ func (es *setupEpoch) RandomSource() ([]byte, error) {
 	return es.setupEvent.RandomSource, nil
 }
 
-func (es *setupEpoch) InitialIdentities() (flow.IdentityList, error) {
+func (es *setupEpoch) InitialIdentities() (flow.IdentitySkeletonList, error) {
 	identities := es.setupEvent.Participants.Filter(filter.Any)
 	return identities, nil
 }
