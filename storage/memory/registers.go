@@ -54,5 +54,7 @@ func (r *Registers) Store(entries flow.RegisterEntries, height uint64) error {
 		r.registers[height][e.Key] = e.Value
 	}
 
+	r.latestHeight = height
+
 	return nil
 }
