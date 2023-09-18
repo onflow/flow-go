@@ -12,7 +12,6 @@ type RegisterWriter struct {
 	mock.Mock
 }
 
-
 // Store provides a mock function with given fields: entries, height
 func (_m *RegisterWriter) Store(entries flow.RegisterEntries, height uint64) error {
 	ret := _m.Called(entries, height)
