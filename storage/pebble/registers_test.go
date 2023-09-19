@@ -265,8 +265,8 @@ func RunWithRegistersStorageAtInitialHeights(tb testing.TB, first uint64, latest
 	opts := DefaultPebbleOptions(cache, registers.NewMVCCComparer())
 	unittest.RunWithConfiguredPebbleInstance(tb, opts, func(p *pebble.DB) {
 		// insert initial heights to pebble
-		require.NoError(tb, p.Set(FirstHeightKey(), EncodedUint64(first), nil))
-		require.NoError(tb, p.Set(LatestHeightKey(), EncodedUint64(latest), nil))
+		require.NoError(tb, p.Set(firstHeightKey(), EncodedUint64(first), nil))
+		require.NoError(tb, p.Set(latestHeightKey(), EncodedUint64(latest), nil))
 		r, err := NewRegisters(p)
 		require.NoError(tb, err)
 		f(r)

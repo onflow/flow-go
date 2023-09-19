@@ -27,14 +27,14 @@ func createHeightKey(identifier byte) []byte {
 // LatestHeightKey is a special case of a lookupKey
 // with keyLatestBlockHeight as key, no owner and a placeholder height of 0.
 // This is to ensure SeekPrefixGE in pebble does not break
-func LatestHeightKey() []byte {
+func latestHeightKey() []byte {
 	return createHeightKey(codeLatestBlockHeight)
 }
 
 // FirstHeightKey is a special case of a lookupKey
 // with keyFirstBlockHeight as key, no owner and a placeholder height of 0.
 // This is to ensure SeekPrefixGE in pebble does not break
-func FirstHeightKey() []byte {
+func firstHeightKey() []byte {
 	return createHeightKey(codeFirstBlockHeight)
 }
 

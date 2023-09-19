@@ -109,7 +109,7 @@ func (s *Registers) Store(
 		}
 	}
 	// increment height and commit
-	err := batch.Set(LatestHeightKey(), EncodedUint64(height), nil)
+	err := batch.Set(latestHeightKey(), EncodedUint64(height), nil)
 	if err != nil {
 		return fmt.Errorf("failed to update latest height %d", height)
 	}
@@ -124,12 +124,12 @@ func (s *Registers) Store(
 
 // LatestHeight Gets the latest height of complete registers available
 func (s *Registers) LatestHeight() (uint64, error) {
-	return s.heightLookup(LatestHeightKey())
+	return s.heightLookup(latestHeightKey())
 }
 
 // FirstHeight first indexed height found in the store, typically root block for the spork
 func (s *Registers) FirstHeight() (uint64, error) {
-	return s.heightLookup(FirstHeightKey())
+	return s.heightLookup(firstHeightKey())
 }
 
 func (s *Registers) heightLookup(key []byte) (uint64, error) {
