@@ -164,7 +164,7 @@ func TestCalculateChunkExecutionDataID(t *testing.T) {
 		TrieUpdate: &ledger.TrieUpdate{
 			RootHash: rootHash,
 		},
-		TransactionResults: []execution_data.TransactionResult{
+		TransactionResults: []flow.LightTransactionResult{
 			{
 				TransactionID:   flow.MustHexStringToIdentifier("0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"),
 				ComputationUsed: 100,
@@ -198,7 +198,7 @@ func generateChunkExecutionDataID(t *testing.T) {
 		TrieUpdate: &ledger.TrieUpdate{
 			RootHash: rootHash,
 		},
-		TransactionResults: []execution_data.TransactionResult{
+		TransactionResults: []flow.LightTransactionResult{
 			{
 				TransactionID:   flow.MustHexStringToIdentifier("0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"),
 				ComputationUsed: 100,
