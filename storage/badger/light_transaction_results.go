@@ -12,6 +12,8 @@ import (
 	"github.com/onflow/flow-go/storage/badger/operation"
 )
 
+var _ storage.LightTransactionResults = (*LightTransactionResults)(nil)
+
 type LightTransactionResults struct {
 	db         *badger.DB
 	cache      *Cache[string, flow.LightTransactionResult]
