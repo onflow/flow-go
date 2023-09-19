@@ -15,9 +15,11 @@ type StreamFactory interface {
 	SetStreamHandler(protocol.ID, network.StreamHandler)
 	DialAddress(peer.ID) []multiaddr.Multiaddr
 	ClearBackoff(peer.ID)
-	// Connect connects host to peer with peerID.
-	// Expected errors during normal operations:
-	//   - NewSecurityProtocolNegotiationErr this indicates there was an issue upgrading the connection.
+	// Connect connects host to peer with peerAddrInfo.
+	// All errors returned from this function can be considered benign. We expect the following errors during normal operations:
+	//   - ErrSecurityProtocolNegotiationFailed this indicates there was an issue upgrading the connection.
+	//   - ErrGaterDisallowedConnection this indicates the connection was disallowed by the gater.
+	//   - There may be other unexpected errors from libp2p but they should be considered benign.
 	Connect(context.Context, peer.AddrInfo) error
 	// NewStream creates a new stream on the libp2p host.
 	// Expected errors during normal operations:

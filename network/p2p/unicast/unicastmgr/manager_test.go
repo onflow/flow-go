@@ -404,6 +404,112 @@ func TestUnicastManager_StreamFactory_ErrProtocolNotSupported(t *testing.T) {
 	require.Nil(t, s)
 }
 
+// TestUnicastManager_Dial_ErrSecurityProtocolNegotiationFailed tests that when there is a security protocol negotiation error, it does not retry dialing.
+func TestUnicastManager_Dial_ErrSecurityProtocolNegotiationFailed(t *testing.T) {
+	connStatus := mockp2p.NewPeerConnections(t)
+	streamFactory := mockp2p.NewStreamFactory(t)
+	peerID := p2ptest.PeerIdFixture(t)
+	// mocks that the connection is not established.
+	connStatus.On("IsConnected", peerID).Return(false, nil)
+
+	// mocks that dialing the peer returns a security protocol negotiation error, and the mock is set to once, meaning that it won't retry dialing again.
+	streamFactory.On("Connect", mock.Anything, peer.AddrInfo{ID: peerID}).
+		Return(stream.NewSecurityProtocolNegotiationErr(peerID, fmt.Errorf("some error"))).
+		Once()
+	streamFactory.On("ClearBackoff", peerID).Return().Once()
+	streamFactory.On("SetStreamHandler", mock.Anything, mock.Anything).Return().Once()
+
+	cfg, err := config.DefaultConfig()
+	require.NoError(t, err)
+
+	dialConfigCache := unicastcache.NewDialConfigCache(unicast.DefaultDailConfigCacheSize, unittest.Logger(), metrics.NewNoopCollector(), unicastmodel.DefaultDialConfigFactory)
+	mgr, err := unicastmgr.NewUnicastManager(
+		&unicastmgr.ManagerConfig{
+			Logger:                          unittest.Logger(),
+			StreamFactory:                   streamFactory,
+			SporkId:                         unittest.IdentifierFixture(),
+			ConnStatus:                      connStatus,
+			CreateStreamRetryDelay:          cfg.NetworkConfig.UnicastCreateStreamRetryDelay,
+			Metrics:                         metrics.NewNoopCollector(),
+			StreamZeroBackoffResetThreshold: unicastmodel.StreamZeroBackoffResetThreshold,
+			DialConfigCacheFactory: func() unicast.DialConfigCache {
+				return dialConfigCache
+			},
+		},
+	)
+	require.NoError(t, err)
+	mgr.SetDefaultHandler(func(libp2pnet.Stream) {}) // no-op handler, we don't care about the handler for this test
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	s, err := mgr.CreateStream(ctx, peerID)
+	require.Error(t, err)
+	require.Nil(t, s)
+
+	dialCfg, err := dialConfigCache.GetOrInit(peerID)
+	require.NoError(t, err)
+	// dial backoff budget must be decremented by 1 (although we didn't have a backoff attempt, the connection was unsuccessful).
+	require.Equal(t, uint64(unicastmodel.MaxConnectAttempt-1), dialCfg.DialBackoffBudget)
+	// stream backoff budget must remain intact, as we have not tried to create a stream yet.
+	require.Equal(t, uint64(unicastmodel.MaxStreamCreationAttempt), dialCfg.StreamBackBudget)
+	// last successful dial must be set to zero.
+	require.True(t, dialCfg.LastSuccessfulDial.IsZero())
+	// consecutive successful stream must be set to zero.
+	require.Equal(t, uint64(0), dialCfg.ConsecutiveSuccessfulStream)
+}
+
+// TestUnicastManager_Dial_ErrGaterDisallowedConnection tests that when there is a connection gater disallow listing error, it does not retry dialing.
+func TestUnicastManager_Dial_ErrGaterDisallowedConnection(t *testing.T) {
+	connStatus := mockp2p.NewPeerConnections(t)
+	streamFactory := mockp2p.NewStreamFactory(t)
+	peerID := p2ptest.PeerIdFixture(t)
+	// mocks that the connection is not established.
+	connStatus.On("IsConnected", peerID).Return(false, nil)
+
+	// mocks that dialing the peer returns a security protocol negotiation error, and the mock is set to once, meaning that it won't retry dialing again.
+	streamFactory.On("Connect", mock.Anything, peer.AddrInfo{ID: peerID}).
+		Return(stream.NewGaterDisallowedConnectionErr(fmt.Errorf("some error"))).
+		Once()
+	streamFactory.On("ClearBackoff", peerID).Return().Once()
+	streamFactory.On("SetStreamHandler", mock.Anything, mock.Anything).Return().Once()
+
+	cfg, err := config.DefaultConfig()
+	require.NoError(t, err)
+
+	dialConfigCache := unicastcache.NewDialConfigCache(unicast.DefaultDailConfigCacheSize, unittest.Logger(), metrics.NewNoopCollector(), unicastmodel.DefaultDialConfigFactory)
+	mgr, err := unicastmgr.NewUnicastManager(
+		&unicastmgr.ManagerConfig{
+			Logger:                          unittest.Logger(),
+			StreamFactory:                   streamFactory,
+			SporkId:                         unittest.IdentifierFixture(),
+			ConnStatus:                      connStatus,
+			CreateStreamRetryDelay:          cfg.NetworkConfig.UnicastCreateStreamRetryDelay,
+			Metrics:                         metrics.NewNoopCollector(),
+			StreamZeroBackoffResetThreshold: unicastmodel.StreamZeroBackoffResetThreshold,
+			DialConfigCacheFactory: func() unicast.DialConfigCache {
+				return dialConfigCache
+			},
+		},
+	)
+	require.NoError(t, err)
+	mgr.SetDefaultHandler(func(libp2pnet.Stream) {}) // no-op handler, we don't care about the handler for this test
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	s, err := mgr.CreateStream(ctx, peerID)
+	require.Error(t, err)
+	require.Nil(t, s)
+
+	dialCfg, err := dialConfigCache.GetOrInit(peerID)
+	require.NoError(t, err)
+	// dial backoff budget must be decremented by 1 (although we didn't have a backoff attempt, the connection was unsuccessful).
+	require.Equal(t, uint64(unicastmodel.MaxConnectAttempt-1), dialCfg.DialBackoffBudget)
+	// stream backoff budget must remain intact, as we have not tried to create a stream yet.
+	require.Equal(t, uint64(unicastmodel.MaxStreamCreationAttempt), dialCfg.StreamBackBudget)
+	// last successful dial must be set to zero.
+	require.True(t, dialCfg.LastSuccessfulDial.IsZero())
+	// consecutive successful stream must be set to zero.
+	require.Equal(t, uint64(0), dialCfg.ConsecutiveSuccessfulStream)
+}
+
 // TestUnicastManager_Connection_BackoffBudgetDecremented tests that everytime the unicast manger gives up on creating a connection (after retrials),
 // it decrements the backoff budget for the remote peer.
 func TestUnicastManager_Connection_BackoffBudgetDecremented(t *testing.T) {

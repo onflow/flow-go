@@ -45,8 +45,10 @@ func (l *LibP2PStreamFactory) ClearBackoff(p peer.ID) {
 }
 
 // Connect connects host to peer with peerAddrInfo.
-// Expected errors during normal operations:
+// All errors returned from this function can be considered benign. We expect the following errors during normal operations:
 //   - ErrSecurityProtocolNegotiationFailed this indicates there was an issue upgrading the connection.
+//   - ErrGaterDisallowedConnection this indicates the connection was disallowed by the gater.
+//   - There may be other unexpected errors from libp2p but they should be considered benign.
 func (l *LibP2PStreamFactory) Connect(ctx context.Context, peerAddrInfo peer.AddrInfo) error {
 	err := l.host.Connect(ctx, peerAddrInfo)
 	switch {
