@@ -583,7 +583,7 @@ func TestExecutionEvictingCacheClients(t *testing.T) {
 
 	netReq := &access.GetNetworkParametersRequest{}
 	netResp := &access.GetNetworkParametersResponse{}
-	cn.handler.On("GetNetworkParameters", testifymock.Anything).Return(netResp, nil)
+	cn.handler.On("GetNetworkParameters", testifymock.Anything, netReq).Return(netResp, nil)
 
 	// Create the connection factory
 	connectionFactory := new(ConnectionFactoryImpl)
@@ -622,6 +622,12 @@ func TestExecutionEvictingCacheClients(t *testing.T) {
 	time.AfterFunc(250*time.Millisecond, func() {
 		// Invalidate the access API client
 		connectionFactory.InvalidateAccessAPIClient(clientAddress)
+
+		// InvalidateAccessAPIClient marks the connection for closure asynchronously, so give it
+		// some time to run
+		require.Eventually(t, func() bool {
+			return cachedClient.closeRequested.Load()
+		}, 100*time.Millisecond, 10*time.Millisecond, "client timed out closing connection")
 
 		// Assert that the cached client is marked for closure but still waiting for previous request
 		assert.True(t, cachedClient.closeRequested.Load())
