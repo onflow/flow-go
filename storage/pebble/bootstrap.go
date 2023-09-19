@@ -8,12 +8,13 @@ import (
 )
 
 type Bootstrap struct {
-	db         *pebble.DB
-	rootHeight uint64
-	done       chan struct{}
+	checkpointDir string
+	db            *pebble.DB
+	done          chan struct{}
+	rootHeight    uint64
 }
 
-func NewBootstrap(db *pebble.DB, rootHeight uint64) *Bootstrap {
+func NewBootstrap(db *pebble.DB, checkpointDir string, rootHeight uint64) *Bootstrap {
 	// check for pre-populated heights, fail if it is populated
 	// i.e. the IndexCheckpointFile function has already run for the db in this directory
 	_, _, err := db.Get(latestHeightKey())
@@ -22,9 +23,10 @@ func NewBootstrap(db *pebble.DB, rootHeight uint64) *Bootstrap {
 		panic("found latest key set on badger instance, cannot bootstrap populated DB")
 	}
 	return &Bootstrap{
-		db:         db,
-		done:       make(chan struct{}),
-		rootHeight: rootHeight,
+		checkpointDir: checkpointDir,
+		db:            db,
+		done:          make(chan struct{}),
+		rootHeight:    rootHeight,
 	}
 }
 
@@ -59,27 +61,49 @@ func (b *Bootstrap) batchIndexRegisters(height uint64, registers []*wal.LeafNode
 }
 
 // IndexCheckpointFile indexes the checkpoint file in the Dir provided and returns a channel that closes when done
-func (b *Bootstrap) IndexCheckpointFile(checkpointDir string) <-chan struct{} {
+func (b *Bootstrap) IndexCheckpointFile() <-chan error {
+	c := make(chan error, 1)
 	// index checkpoint
 
-	// update heights atomically in case one gets populated and the other doesn't,
-	// leaving it in a corrupted state
-	bat := b.db.NewBatch()
-	err := bat.Set(firstHeightKey(), EncodedUint64(b.rootHeight), nil)
-	if err != nil {
+	go func() {
+		bat := b.db.NewBatch()
 
-	}
-	err = bat.Set(latestHeightKey(), EncodedUint64(b.rootHeight), nil)
-	if err != nil {
+		defer func() {
+			close(c)
+			err := bat.Close()
+			if err != nil {
 
-	}
-	err = bat.Commit(pebble.Sync)
-	if err != nil {
-
-	}
+			}
+		}()
+		// index checkpoint file async
+		doneIndex := b.indexCheckpointFileWorker()
+		err := <-doneIndex
+		if err != nil {
+			c <- fmt.Errorf("failed to index checkpoint files: %w", err)
+			return
+		}
+		// update heights atomically to prevent one getting populated without the other
+		// leaving it in a corrupted state
+		err = bat.Set(firstHeightKey(), EncodedUint64(b.rootHeight), nil)
+		if err != nil {
+			c <- fmt.Errorf("failed to set first height %w", err)
+			return
+		}
+		err = bat.Set(latestHeightKey(), EncodedUint64(b.rootHeight), nil)
+		if err != nil {
+			c <- fmt.Errorf("failed to set latest height %w", err)
+			return
+		}
+		err = bat.Commit(pebble.Sync)
+		if err != nil {
+			c <- fmt.Errorf("failed to commit height updates %w", err)
+			return
+		}
+	}()
+	return c
 }
 
 // indexCheckpointFileWorker asynchronously indexes register entries from wal.OpenAndReadLeafNodesFromCheckpointV6
-func (b *Bootstrap) indexCheckpointFileWorker() <-chan bool {
+func (b *Bootstrap) indexCheckpointFileWorker() <-chan error {
 
 }
