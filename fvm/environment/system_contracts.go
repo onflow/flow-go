@@ -245,7 +245,6 @@ var accountBalanceInvocationSpec = ContractFunctionSpec{
 	LocationName:     systemcontracts.ContractNameServiceAccount,
 	FunctionName:     systemcontracts.ContractServiceAccountFunction_defaultTokenBalance,
 	ArgumentTypes: []sema.Type{
-		// TODO: pass proper authorization
 		sema.NewReferenceType(
 			nil,
 			sema.UnauthorizedAccess,

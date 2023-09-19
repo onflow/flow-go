@@ -39,15 +39,20 @@ transaction(
 
         // Reference must be taken after storing in the storage.
         // Otherwise the reference gets invalidated upon move.
-        let stakingCollectionRef = stakingAccount.storage.borrow<auth(FlowStakingCollection.CollectionOwner) &FlowStakingCollection.StakingCollection>(from: FlowStakingCollection.StakingCollectionStoragePath)
+        let stakingCollectionRef = stakingAccount.storage
+            .borrow<auth(FlowStakingCollection.CollectionOwner) &FlowStakingCollection.StakingCollection>(
+                from: FlowStakingCollection.StakingCollectionStoragePath,
+            )
             ?? panic("Could not borrow reference to the staking collection")
 
-        // TODO: Is this needed?
         // Create a public link to the staking collection
-        // stakingAccount.link<&FlowStakingCollection.StakingCollection> (
-        //    FlowStakingCollection.StakingCollectionPublicPath,
-        //    target: FlowStakingCollection.StakingCollectionStoragePath
-        // )
+        let stakingCollectionCap = stakingAccount.capabilities.storage
+            .issue<&FlowStakingCollection.StakingCollection>(FlowStakingCollection.StakingCollectionStoragePath)
+
+        stakingAccount.capabilities.publish(
+            stakingCollectionCap,
+            at: FlowStakingCollection.StakingCollectionPublicPath,
+        )
 
         // 4 - register the node
         //

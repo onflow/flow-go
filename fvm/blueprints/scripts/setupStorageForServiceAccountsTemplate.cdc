@@ -6,15 +6,19 @@ import FlowToken from 0xFLOWTOKENADDRESS
 // This transaction sets up storage on any auth accounts that were created before the storage fees.
 // This is used during bootstrapping a local environment
 transaction() {
-    prepare(service: auth(SaveValue, BorrowValue, Capabilities) &Account,
-            fungibleToken: auth(SaveValue, Capabilities) &Account,
-            flowToken: auth(SaveValue, Capabilities) &Account,
-            feeContract: auth(SaveValue, Capabilities) &Account,
+
+    prepare(
+        service: auth(SaveValue, BorrowValue, Capabilities) &Account,
+        fungibleToken: auth(SaveValue, Capabilities) &Account,
+        flowToken: auth(SaveValue, Capabilities) &Account,
+        feeContract: auth(SaveValue, Capabilities) &Account,
     ) {
+
         let authAccounts:[auth(SaveValue, Capabilities) &Account] = [service, fungibleToken, flowToken, feeContract]
 
-        // take all the funds from the service account
-        let tokenVault: auth(FungibleToken.Withdrawable) &FlowToken.Vault = service.storage.borrow<auth(FungibleToken.Withdrawable) &FlowToken.Vault>(from: /storage/flowTokenVault)
+        // Take all the funds from the service account.
+        let tokenVault: auth(FungibleToken.Withdrawable) &FlowToken.Vault = service.storage
+            .borrow<auth(FungibleToken.Withdrawable) &FlowToken.Vault>(from: /storage/flowTokenVault)
             ?? panic("Unable to borrow reference to the default token vault")
 
         for account in authAccounts {
