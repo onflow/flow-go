@@ -24,6 +24,7 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/connectivity"
+	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/status"
 
 	"github.com/onflow/flow-go/engine/access/mock"
@@ -643,6 +644,132 @@ func TestExecutionEvictingCacheClients(t *testing.T) {
 	assert.True(t, changed)
 	assert.Equal(t, connectivity.Shutdown, cachedClient.ClientConn.GetState())
 	assert.Equal(t, 0, cache.Len())
+}
+
+func TestCachedClientShutdown(t *testing.T) {
+	// Test that a completely uninitialized client can be closed without panics
+	t.Run("uninitialized client", func(t *testing.T) {
+		client := &CachedClient{
+			closeRequested: atomic.NewBool(false),
+		}
+		client.Close()
+	})
+
+	// Test closing a client with no outstanding requests
+	// Close() should return quickly
+	t.Run("with no outstanding requests", func(t *testing.T) {
+		client := &CachedClient{
+			closeRequested: atomic.NewBool(false),
+			ClientConn:     setupGRPCServer(t),
+		}
+
+		unittest.RequireReturnsBefore(t, func() {
+			client.Close()
+		}, 100*time.Millisecond, "client timed out closing connection")
+
+		assert.True(t, client.closeRequested.Load())
+	})
+
+	// Test closing a client with outstanding requests waits for requests to complete
+	// Close() should block until the request completes
+	t.Run("with some outstanding requests", func(t *testing.T) {
+		client := &CachedClient{
+			closeRequested: atomic.NewBool(false),
+			ClientConn:     setupGRPCServer(t),
+		}
+		client.wg.Add(1)
+
+		done := atomic.NewBool(false)
+		go func() {
+			defer client.wg.Done()
+			time.Sleep(50 * time.Millisecond)
+			done.Store(true)
+		}()
+
+		unittest.RequireReturnsBefore(t, func() {
+			client.Close()
+		}, 100*time.Millisecond, "client timed out closing connection")
+
+		assert.True(t, client.closeRequested.Load())
+		assert.True(t, done.Load())
+	})
+
+	// Test closing a client that is already closing does not block
+	// Close() should return immediately
+	t.Run("already closing", func(t *testing.T) {
+		client := &CachedClient{
+			closeRequested: atomic.NewBool(true), // close already requested
+			ClientConn:     setupGRPCServer(t),
+		}
+		client.wg.Add(1)
+
+		done := atomic.NewBool(false)
+		go func() {
+			defer client.wg.Done()
+
+			// use a long delay and require Close() to complete faster
+			time.Sleep(5 * time.Second)
+			done.Store(true)
+		}()
+
+		// should return immediately
+		unittest.RequireReturnsBefore(t, func() {
+			client.Close()
+		}, 10*time.Millisecond, "client timed out closing connection")
+
+		assert.True(t, client.closeRequested.Load())
+		assert.False(t, done.Load())
+	})
+
+	// Test closing a client that is locked during connection setup
+	// Close() should wait for the lock before shutting down
+	t.Run("connection setting up", func(t *testing.T) {
+		client := &CachedClient{
+			closeRequested: atomic.NewBool(false),
+		}
+
+		// simulate an in-progress connection setup
+		client.mu.Lock()
+
+		go func() {
+			// unlock after setting up the connection
+			defer client.mu.Unlock()
+
+			// pause before setting the connection to cause client.Close() to block
+			time.Sleep(100 * time.Millisecond)
+			client.ClientConn = setupGRPCServer(t)
+		}()
+
+		// should wait at least 100 milliseconds before returning
+		unittest.RequireReturnsBefore(t, func() {
+			client.Close()
+		}, 500*time.Millisecond, "client timed out closing connection")
+
+		assert.True(t, client.closeRequested.Load())
+		assert.NotNil(t, client.ClientConn)
+	})
+}
+
+// setupGRPCServer starts a dummy grpc server for connection tests
+func setupGRPCServer(t *testing.T) *grpc.ClientConn {
+	l, err := net.Listen("tcp", net.JoinHostPort("localhost", "0"))
+	require.NoError(t, err)
+
+	server := grpc.NewServer()
+
+	t.Cleanup(func() {
+		server.Stop()
+	})
+
+	go func() {
+		err = server.Serve(l)
+		require.NoError(t, err)
+	}()
+
+	conn, err := grpc.Dial(l.Addr().String(), grpc.WithTransportCredentials(insecure.NewCredentials()))
+	require.NoError(t, err)
+
+	return conn
 }
 
 // TestCircuitBreakerExecutionNode tests the circuit breaker state changes for execution nodes.

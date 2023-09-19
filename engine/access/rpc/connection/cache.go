@@ -21,19 +21,27 @@ type CachedClient struct {
 
 // Close closes the CachedClient connection. It marks the connection for closure and waits asynchronously for ongoing
 // requests to complete before closing the connection.
-func (s *CachedClient) Close() {
+func (cc *CachedClient) Close() {
 	// Mark the connection for closure
-	if swapped := s.closeRequested.CompareAndSwap(false, true); !swapped {
+	if !cc.closeRequested.CompareAndSwap(false, true) {
+		return
+	}
+
+	// Obtain the lock to ensure that any connection attempts have completed
+	cc.mu.Lock()
+	conn := cc.ClientConn
+	cc.mu.Unlock()
+
+	// If the initial connection attempt failed, ClientConn will be nil
+	if conn == nil {
 		return
 	}
 
 	// If there are ongoing requests, wait for them to complete asynchronously
-	go func() {
-		s.wg.Wait()
+	cc.wg.Wait()
 
-		// Close the connection
-		s.ClientConn.Close()
-	}()
+	// Close the connection
+	conn.Close()
 }
 
 // Cache represents a cache of CachedClient instances with a given maximum size.
