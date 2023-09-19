@@ -5,10 +5,8 @@ package mockp2p
 import (
 	context "context"
 
-	multiaddr "github.com/multiformats/go-multiaddr"
-	mock "github.com/stretchr/testify/mock"
-
 	network "github.com/libp2p/go-libp2p/core/network"
+	mock "github.com/stretchr/testify/mock"
 
 	peer "github.com/libp2p/go-libp2p/core/peer"
 
@@ -20,11 +18,6 @@ type StreamFactory struct {
 	mock.Mock
 }
 
-// ClearBackoff provides a mock function with given fields: _a0
-func (_m *StreamFactory) ClearBackoff(_a0 peer.ID) {
-	_m.Called(_a0)
-}
-
 // Connect provides a mock function with given fields: _a0, _a1
 func (_m *StreamFactory) Connect(_a0 context.Context, _a1 peer.AddrInfo) error {
 	ret := _m.Called(_a0, _a1)
@@ -34,22 +27,6 @@ func (_m *StreamFactory) Connect(_a0 context.Context, _a1 peer.AddrInfo) error {
 		r0 = rf(_a0, _a1)
 	} else {
 		r0 = ret.Error(0)
-	}
-
-	return r0
-}
-
-// DialAddress provides a mock function with given fields: _a0
-func (_m *StreamFactory) DialAddress(_a0 peer.ID) []multiaddr.Multiaddr {
-	ret := _m.Called(_a0)
-
-	var r0 []multiaddr.Multiaddr
-	if rf, ok := ret.Get(0).(func(peer.ID) []multiaddr.Multiaddr); ok {
-		r0 = rf(_a0)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]multiaddr.Multiaddr)
-		}
 	}
 
 	return r0

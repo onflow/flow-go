@@ -34,8 +34,7 @@ func TestUnicastManager_Connection_ConnectionBackoff(t *testing.T) {
 	streamFactory := mockp2p.NewStreamFactory(t)
 	peerID := p2ptest.PeerIdFixture(t)
 
-	connStatus.On("IsConnected", peerID).Return(false, nil) // not connected
-	streamFactory.On("ClearBackoff", peerID).Return().Times(unicastmodel.MaxConnectAttempt)
+	connStatus.On("IsConnected", peerID).Return(false, nil)                                                                                      // not connected
 	streamFactory.On("Connect", mock.Anything, peer.AddrInfo{ID: peerID}).Return(fmt.Errorf("some error")).Times(unicastmodel.MaxConnectAttempt) // connect
 	streamFactory.On("SetStreamHandler", mock.Anything, mock.Anything).Return().Once()
 
@@ -91,8 +90,7 @@ func TestUnicastManager_Connection_SuccessfulConnection_And_Stream(t *testing.T)
 	streamFactory := mockp2p.NewStreamFactory(t)
 	peerID := p2ptest.PeerIdFixture(t)
 
-	connStatus.On("IsConnected", peerID).Return(false, nil) // not connected
-	streamFactory.On("ClearBackoff", peerID).Return().Once()
+	connStatus.On("IsConnected", peerID).Return(false, nil)                                  // not connected
 	streamFactory.On("Connect", mock.Anything, peer.AddrInfo{ID: peerID}).Return(nil).Once() // connect on the first attempt.
 	streamFactory.On("SetStreamHandler", mock.Anything, mock.Anything).Return().Once()
 	// mocks that it attempts to create a stream once and succeeds.
@@ -157,7 +155,6 @@ func TestUnicastManager_Connection_SuccessfulConnection_StreamBackoff(t *testing
 			return true
 		}, nil,
 	)
-	streamFactory.On("ClearBackoff", peerID).Return().Once()
 	streamFactory.On("Connect", mock.Anything, peer.AddrInfo{ID: peerID}).Return(nil).Once() // connect on the first attempt.
 	streamFactory.On("SetStreamHandler", mock.Anything, mock.Anything).Return().Once()
 	streamFactory.On("NewStream", mock.Anything, peerID, mock.Anything).Return(nil, fmt.Errorf("some error")).
@@ -416,7 +413,6 @@ func TestUnicastManager_Dial_ErrSecurityProtocolNegotiationFailed(t *testing.T) 
 	streamFactory.On("Connect", mock.Anything, peer.AddrInfo{ID: peerID}).
 		Return(stream.NewSecurityProtocolNegotiationErr(peerID, fmt.Errorf("some error"))).
 		Once()
-	streamFactory.On("ClearBackoff", peerID).Return().Once()
 	streamFactory.On("SetStreamHandler", mock.Anything, mock.Anything).Return().Once()
 
 	cfg, err := config.DefaultConfig()
@@ -469,7 +465,6 @@ func TestUnicastManager_Dial_ErrGaterDisallowedConnection(t *testing.T) {
 	streamFactory.On("Connect", mock.Anything, peer.AddrInfo{ID: peerID}).
 		Return(stream.NewGaterDisallowedConnectionErr(fmt.Errorf("some error"))).
 		Once()
-	streamFactory.On("ClearBackoff", peerID).Return().Once()
 	streamFactory.On("SetStreamHandler", mock.Anything, mock.Anything).Return().Once()
 
 	cfg, err := config.DefaultConfig()
@@ -527,7 +522,6 @@ func TestUnicastManager_Connection_BackoffBudgetDecremented(t *testing.T) {
 	totalAttempts := unicastmodel.MaxConnectAttempt*(unicastmodel.MaxConnectAttempt+1)/2 + 1
 
 	connStatus.On("IsConnected", peerID).Return(false, nil) // not connected
-	streamFactory.On("ClearBackoff", peerID).Return().Times(totalAttempts)
 	streamFactory.On("Connect", mock.Anything, peer.AddrInfo{ID: peerID}).
 		Return(fmt.Errorf("some error")).
 		Times(totalAttempts)
@@ -753,7 +747,6 @@ func TestUnicastManager_Stream_BackoffConnectionBudgetResetToDefault(t *testing.
 
 	connStatus.On("IsConnected", peerID).Return(false, nil)                                  // there is no connection.
 	streamFactory.On("Connect", mock.Anything, peer.AddrInfo{ID: peerID}).Return(nil).Once() // connect on the first attempt.
-	streamFactory.On("ClearBackoff", peerID).Return().Once()
 	streamFactory.On("SetStreamHandler", mock.Anything, mock.Anything).Return().Once()
 	// mocks that it attempts to create a stream once and succeeds.
 	streamFactory.On("NewStream", mock.Anything, peerID, mock.Anything).Return(&p2ptest.MockStream{}, nil).Once()
@@ -817,7 +810,6 @@ func TestUnicastManager_Connection_NoBackoff_When_Budget_Is_Zero(t *testing.T) {
 
 	connStatus.On("IsConnected", peerID).Return(false, nil)                                                       // there is no connection.
 	streamFactory.On("Connect", mock.Anything, peer.AddrInfo{ID: peerID}).Return(fmt.Errorf("some error")).Once() // connection is tried only once and fails.
-	streamFactory.On("ClearBackoff", peerID).Return().Once()                                                      // connection is tried only once and fails.
 	streamFactory.On("SetStreamHandler", mock.Anything, mock.Anything).Return().Once()
 
 	cfg, err := config.DefaultConfig()

@@ -6,15 +6,12 @@ import (
 	"github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/protocol"
-	"github.com/multiformats/go-multiaddr"
 )
 
 // StreamFactory is a wrapper around libp2p host.Host to provide abstraction and encapsulation for unicast stream manager so that
 // it can create libp2p streams with finer granularity.
 type StreamFactory interface {
 	SetStreamHandler(protocol.ID, network.StreamHandler)
-	DialAddress(peer.ID) []multiaddr.Multiaddr
-	ClearBackoff(peer.ID)
 	// Connect connects host to peer with peerAddrInfo.
 	// All errors returned from this function can be considered benign. We expect the following errors during normal operations:
 	//   - ErrSecurityProtocolNegotiationFailed this indicates there was an issue upgrading the connection.

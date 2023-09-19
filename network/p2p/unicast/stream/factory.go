@@ -10,7 +10,6 @@ import (
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/protocol"
 	"github.com/libp2p/go-libp2p/p2p/net/swarm"
-	"github.com/multiformats/go-multiaddr"
 
 	"github.com/onflow/flow-go/network/p2p"
 )
@@ -34,22 +33,21 @@ func (l *LibP2PStreamFactory) SetStreamHandler(pid protocol.ID, handler network.
 	l.host.SetStreamHandler(pid, handler)
 }
 
-func (l *LibP2PStreamFactory) DialAddress(p peer.ID) []multiaddr.Multiaddr {
-	return l.host.Peerstore().Addrs(p)
-}
-
-func (l *LibP2PStreamFactory) ClearBackoff(p peer.ID) {
-	if swm, ok := l.host.Network().(*swarm.Swarm); ok {
-		swm.Backoff().Clear(p)
-	}
-}
-
 // Connect connects host to peer with peerAddrInfo.
 // All errors returned from this function can be considered benign. We expect the following errors during normal operations:
 //   - ErrSecurityProtocolNegotiationFailed this indicates there was an issue upgrading the connection.
 //   - ErrGaterDisallowedConnection this indicates the connection was disallowed by the gater.
 //   - There may be other unexpected errors from libp2p but they should be considered benign.
 func (l *LibP2PStreamFactory) Connect(ctx context.Context, peerAddrInfo peer.AddrInfo) error {
+	// libp2p internally uses swarm dial - https://github.com/libp2p/go-libp2p-swarm/blob/master/swarm_dial.go
+	// to connect to a peer. Swarm dial adds a back off each time it fails connecting to a peer. While this is
+	// the desired behaviour for pub-sub (1-k style of communication) for 1-1 style we want to retry the connection
+	// immediately without backing off and fail-fast.
+	// Hence, explicitly cancel the dial back off (if any) and try connecting again
+	if swm, ok := l.host.Network().(*swarm.Swarm); ok {
+		swm.Backoff().Clear(peerAddrInfo.ID)
+	}
+
 	err := l.host.Connect(ctx, peerAddrInfo)
 	switch {
 	case err == nil:

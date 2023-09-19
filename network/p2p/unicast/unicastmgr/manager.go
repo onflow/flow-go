@@ -426,14 +426,6 @@ func (m *Manager) dialPeer(ctx context.Context, peerID peer.ID, dialCfg *unicast
 			return fmt.Errorf("context done before stream could be created (retry attempt: %d, errors: %w)", dialAttempts, errs)
 		default:
 		}
-		// libp2p internally uses swarm dial - https://github.com/libp2p/go-libp2p-swarm/blob/master/swarm_dial.go
-		// to connect to a peer. Swarm dial adds a back off each time it fails connecting to a peer. While this is
-		// the desired behaviour for pub-sub (1-k style of communication) for 1-1 style we want to retry the connection
-		// immediately without backing off and fail-fast.
-		// Hence, explicitly cancel the dial back off (if any) and try connecting again
-
-		// cancel the dial back off (if any), since we want to connect immediately
-		m.streamFactory.ClearBackoff(peerID)
 		err := m.streamFactory.Connect(ctx, peer.AddrInfo{ID: peerID})
 		if err != nil {
 			// if the connection was rejected due to invalid node id or
