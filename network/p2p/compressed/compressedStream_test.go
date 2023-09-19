@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/network/compressor"
+	"github.com/onflow/flow-go/network/p2p/test"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -98,19 +99,19 @@ func TestUnhappyPath(t *testing.T) {
 
 // newStreamPair is a test helper that creates a pair of compressed streams a and b such that
 // a reads what b writes and b reads what a writes.
-func newStreamPair() (*mockStream, *mockStream) {
+func newStreamPair() (*p2ptest.MockStream, *p2ptest.MockStream) {
 	ra, wb := io.Pipe()
 	rb, wa := io.Pipe()
 
-	sa := newMockStream(wa, ra)
-	sb := newMockStream(wb, rb)
+	sa := p2ptest.NewMockStream(wa, ra)
+	sb := p2ptest.NewMockStream(wb, rb)
 
 	return sa, sb
 }
 
 // newCompressedStreamPair is a test helper that creates a pair of compressed streams a and b such that
 // a reads what b writes and b reads what a writes.
-func newCompressedStreamPair(t *testing.T) (*compressedStream, *mockStream, *compressedStream, *mockStream) {
+func newCompressedStreamPair(t *testing.T) (*compressedStream, *p2ptest.MockStream, *compressedStream, *p2ptest.MockStream) {
 	sa, sb := newStreamPair()
 
 	mca, err := NewCompressedStream(sa, compressor.GzipStreamCompressor{})
