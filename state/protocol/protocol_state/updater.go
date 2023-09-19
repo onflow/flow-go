@@ -22,8 +22,15 @@ type Updater struct {
 	state       *flow.ProtocolStateEntry
 	candidate   *flow.Header
 
+	// nextEpochIdentitiesLookup is a map from NodeID → DynamicIdentityEntry for the _current_ epoch, containing the
+	// same identities as in the EpochStateContainer `state.CurrentEpoch.Identities`. Note that map values are pointers,
+	// so writes to map values will modify the respective DynamicIdentityEntry in EpochStateContainer.
 	currentEpochIdentitiesLookup map[flow.Identifier]*flow.DynamicIdentityEntry
-	nextEpochIdentitiesLookup    map[flow.Identifier]*flow.DynamicIdentityEntry
+
+	// nextEpochIdentitiesLookup is a map from NodeID → DynamicIdentityEntry for the _next_ epoch, containing the
+	// same identities as in the EpochStateContainer `state.NextEpoch.Identities`. Note that map values are pointers,
+	// so writes to map values will modify the respective DynamicIdentityEntry in EpochStateContainer.
+	nextEpochIdentitiesLookup map[flow.Identifier]*flow.DynamicIdentityEntry
 }
 
 var _ protocol.StateUpdater = (*Updater)(nil)
@@ -145,9 +152,9 @@ func (u *Updater) ProcessEpochSetup(epochSetup *flow.EpochSetup) error {
 		Identities: nextEpochIdentities.Sort(order.IdentifierCanonical),
 	}
 
-	// since identities have changed, invalidate lookup, so we can safely process epoch setup
-	// and update identities afterward.
-	u.invalidateLookup()
+	// since identities have changed, rebuild identity lookups, so we can safely process
+	// subsequent epoch commit event and update identities afterward.
+	u.rebuildIdentityLookup()
 
 	return nil
 }
@@ -233,7 +240,7 @@ func (u *Updater) TransitionToNextEpoch() error {
 		CurrentEpoch:                    *u.state.NextEpoch,
 		InvalidStateTransitionAttempted: false,
 	}
-	u.invalidateLookup()
+	u.rebuildIdentityLookup()
 	return nil
 }
 
@@ -254,12 +261,12 @@ func (u *Updater) ensureLookupPopulated() {
 	if len(u.currentEpochIdentitiesLookup) > 0 {
 		return
 	}
-	u.invalidateLookup()
+	u.rebuildIdentityLookup()
 }
 
 // rebuildIdentityLookup re-generates `currentEpochIdentitiesLookup` and `nextEpochIdentitiesLookup` from the
 // underlying identity lists `state.Identities` and `state.NextEpochProtocolState.Identities`, respectively.
-func (u *Updater) invalidateLookup() {
+func (u *Updater) rebuildIdentityLookup() {
 	u.currentEpochIdentitiesLookup = u.state.CurrentEpoch.Identities.Lookup()
 	if u.state.NextEpoch != nil {
 		u.nextEpochIdentitiesLookup = u.state.NextEpoch.Identities.Lookup()
