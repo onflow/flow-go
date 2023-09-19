@@ -21,20 +21,19 @@ func TestBatchStoringLightTransactionResults(t *testing.T) {
 		store := bstorage.NewLightTransactionResults(metrics, db, 1000)
 
 		blockID := unittest.IdentifierFixture()
-		txResults := make([]flow.LightTransactionResult, 0, 10)
-		for i := 0; i < 10; i++ {
-			txID := unittest.IdentifierFixture()
-			expected := flow.LightTransactionResult{
-				TransactionID:   txID,
-				Failed:          true,
-				ComputationUsed: unittest.Uint64InRange(1, 1000),
-			}
-			txResults = append(txResults, expected)
-		}
+		txResults := getLightTransactionResultsFixture(10)
 
 		t.Run("batch store results", func(t *testing.T) {
 			writeBatch := bstorage.NewBatch(db)
 			err := store.BatchStore(blockID, txResults, writeBatch)
+			require.NoError(t, err)
+
+			err = writeBatch.Flush()
+			require.NoError(t, err)
+
+			// add a results to a new block to validate they are not included in lookups
+			writeBatch = bstorage.NewBatch(db)
+			err = store.BatchStore(unittest.IdentifierFixture(), getLightTransactionResultsFixture(2), writeBatch)
 			require.NoError(t, err)
 
 			err = writeBatch.Flush()
@@ -72,6 +71,16 @@ func TestBatchStoringLightTransactionResults(t *testing.T) {
 				assert.Equal(t, txResults[i], *actual)
 			}
 		})
+
+		t.Run("read all results for block", func(t *testing.T) {
+			actuals, err := store.ByBlockID(blockID)
+			require.NoError(t, err)
+
+			assert.Equal(t, len(txResults), len(actuals))
+			for i := range txResults {
+				assert.Equal(t, txResults[i], actuals[i])
+			}
+		})
 	})
 }
 
@@ -90,4 +99,17 @@ func TestReadingNotStoredLightTransactionResults(t *testing.T) {
 		_, err = store.ByBlockIDTransactionIndex(blockID, txIndex)
 		assert.ErrorIs(t, err, storage.ErrNotFound)
 	})
+}
+
+func getLightTransactionResultsFixture(n int) []flow.LightTransactionResult {
+	txResults := make([]flow.LightTransactionResult, 0, n)
+	for i := 0; i < n; i++ {
+		expected := flow.LightTransactionResult{
+			TransactionID:   unittest.IdentifierFixture(),
+			Failed:          i%2 == 0,
+			ComputationUsed: unittest.Uint64InRange(1, 1000),
+		}
+		txResults = append(txResults, expected)
+	}
+	return txResults
 }
