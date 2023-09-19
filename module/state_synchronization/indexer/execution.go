@@ -63,7 +63,7 @@ func New(registers storage.RegisterIndex, headers storage.Headers, events storag
 		headers:    headers,
 		events:     events,
 		indexRange: indexRange,
-		log:        log,
+		log:        log.With().Str("component", "execution_indexer").Logger(),
 	}, nil
 }
 
