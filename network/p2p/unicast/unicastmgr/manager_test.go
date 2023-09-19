@@ -542,6 +542,7 @@ func TestUnicastManager_Connection_BackoffBudgetDecremented(t *testing.T) {
 			CreateStreamRetryDelay:          cfg.NetworkConfig.UnicastCreateStreamRetryDelay,
 			Metrics:                         metrics.NewNoopCollector(),
 			StreamZeroBackoffResetThreshold: unicastmodel.StreamZeroBackoffResetThreshold,
+			DialZeroBackoffResetThreshold:   unicastmodel.DialZeroBackoffResetThreshold,
 			DialConfigCacheFactory: func() unicast.DialConfigCache {
 				return dialCfgCache
 			},

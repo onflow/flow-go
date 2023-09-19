@@ -193,7 +193,9 @@ func (m *Manager) CreateStream(ctx context.Context, peerID peer.ID) (libp2pnet.S
 			Str("updated_dial_config", fmt.Sprintf("%+v", dialCfg)).
 			Msg("stream creation backoff budget reset to default value")
 	}
-	if dialCfg.DialBackoffBudget == uint64(0) && time.Since(dialCfg.LastSuccessfulDial) >= m.dialZeroBackoffResetThreshold {
+	if dialCfg.DialBackoffBudget == uint64(0) &&
+		!dialCfg.LastSuccessfulDial.IsZero() && // if the last successful dial time is zero, it means that we have never successfully dialed to the peer, so we should not reset the dial backoff budget.
+		time.Since(dialCfg.LastSuccessfulDial) >= m.dialZeroBackoffResetThreshold {
 		// reset the dial backoff budget to the default value if the last successful dial was long enough ago,
 		// as the dialing is reliable enough to be trusted again.
 		dialCfg, err = m.dialConfigCache.Adjust(
