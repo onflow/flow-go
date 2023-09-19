@@ -63,6 +63,18 @@ type Manager struct {
 	// Note that the counter is reset to 0 when the stream creation fails, so the value of for example 100 means that the stream creation is reliable enough that the recent
 	// 100 stream creations are all successful.
 	streamZeroBackoffResetThreshold uint64
+
+	// dialZeroBackoffResetThreshold is the threshold that determines when to reset the dial backoff budget to the default value.
+	//
+	// For example the threshold of 1 hour means that if the dial backoff budget is decreased to 0, then it will be reset to default value
+	// when it has been 1 hour since the last successful dial.
+	//
+	// This is to prevent the backoff budget from being reset too frequently, as the backoff budget is used to gauge the reliability of the dialing a remote peer.
+	// When the dial backoff budget is reset to the default value, it means that the dialing is reliable enough to be trusted again.
+	// This parameter mandates when the dialing is reliable enough to be trusted again; i.e., when it has been 1 hour since the last successful dial.
+	// Note that the last dial attempt timestamp is reset to zero when the dial fails, so the value of for example 1 hour means that the dialing to the remote peer is reliable enough that the last
+	// successful dial attempt was 1 hour ago.
+	dialZeroBackoffResetThreshold time.Duration
 }
 
 type ManagerConfig struct {
@@ -73,6 +85,7 @@ type ManagerConfig struct {
 	CreateStreamRetryDelay          time.Duration
 	Metrics                         module.UnicastManagerMetrics
 	StreamZeroBackoffResetThreshold uint64
+	DialZeroBackoffResetThreshold   time.Duration
 	DialConfigCacheFactory          DialConfigCacheFactory
 }
 
@@ -94,6 +107,7 @@ func NewUnicastManager(cfg *ManagerConfig) (*Manager, error) {
 		createStreamRetryDelay:          cfg.CreateStreamRetryDelay,
 		metrics:                         cfg.Metrics,
 		streamZeroBackoffResetThreshold: cfg.StreamZeroBackoffResetThreshold,
+		dialZeroBackoffResetThreshold:   cfg.DialZeroBackoffResetThreshold,
 	}, nil
 }
 
@@ -172,12 +186,37 @@ func (m *Manager) CreateStream(ctx context.Context, peerID peer.ID) (libp2pnet.S
 				Err(err).
 				Bool(logging.KeyNetworkingSecurity, true).
 				Str("peer_id", p2plogging.PeerId(peerID)).
-				Msg("failed to adjust dial config for peer id")
+				Msg("failed to adjust dial config for peer id (resetting stream backoff budget)")
 		}
 		m.logger.Debug().
 			Str("peer_id", p2plogging.PeerId(peerID)).
 			Str("updated_dial_config", fmt.Sprintf("%+v", dialCfg)).
 			Msg("stream creation backoff budget reset to default value")
+	}
+	if dialCfg.DialBackoffBudget == uint64(0) && time.Since(dialCfg.LastSuccessfulDial) >= m.dialZeroBackoffResetThreshold {
+		// reset the dial backoff budget to the default value if the last successful dial was long enough ago,
+		// as the dialing is reliable enough to be trusted again.
+		dialCfg, err = m.dialConfigCache.Adjust(
+			peerID, func(config unicastmodel.DialConfig) (unicastmodel.DialConfig, error) {
+				config.DialBackoffBudget = unicastmodel.DefaultDialConfigFactory().DialBackoffBudget
+				return config, nil
+			},
+		)
+		if err != nil {
+			// This is not a connection retryable error, this is a fatal error.
+			// TODO: technically, we better to return an error here, but the error must be irrecoverable, and we cannot
+			//       guarantee a clear distinction between recoverable and irrecoverable errors at the moment with CreateStream.
+			//       We have to revisit this once we studied the error handling paths in the unicast manager.
+			m.logger.Fatal().
+				Err(err).
+				Bool(logging.KeyNetworkingSecurity, true).
+				Str("peer_id", p2plogging.PeerId(peerID)).
+				Msg("failed to adjust dial config for peer id (resetting dial backoff budget)")
+		}
+		m.logger.Debug().
+			Str("peer_id", p2plogging.PeerId(peerID)).
+			Str("updated_dial_config", fmt.Sprintf("%+v", dialCfg)).
+			Msg("dial backoff budget reset to default value")
 	}
 
 	for i := len(m.protocols) - 1; i >= 0; i-- {
