@@ -552,7 +552,7 @@ func TestExecutionNodeClientClosedGracefully(t *testing.T) {
 		}
 
 		// Close connection
-		connectionFactory.InvalidateExecutionAPIClient(clientAddress)
+		connectionFactory.Manager.Remove(clientAddress)
 
 		waitGroup.Wait()
 
@@ -620,7 +620,7 @@ func TestExecutionEvictingCacheClients(t *testing.T) {
 	// Schedule the invalidation of the access API client after a delay
 	time.AfterFunc(250*time.Millisecond, func() {
 		// Invalidate the access API client
-		connectionFactory.InvalidateAccessAPIClient(clientAddress)
+		connectionFactory.Manager.Remove(clientAddress)
 
 		// Assert that the cached client is marked for closure but still waiting for previous request
 		assert.True(t, cachedClient.closeRequested.Load())
