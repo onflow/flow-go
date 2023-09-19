@@ -57,9 +57,6 @@ func (r *Registers) Store(entries flow.RegisterEntries, height uint64) error {
 		r.registers[height] = make(map[flow.RegisterID]flow.RegisterValue)
 	}
 	for _, e := range entries {
-		if _, ok := r.registers[height]; !ok {
-			r.registers[height] = make(map[flow.RegisterID]flow.RegisterValue)
-		}
 		r.registers[height][e.Key] = e.Value
 	}
 
