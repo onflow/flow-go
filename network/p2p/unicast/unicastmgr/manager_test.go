@@ -765,8 +765,8 @@ func TestUnicastManager_Connection_NoBackoff_When_Budget_Is_Zero(t *testing.T) {
 	require.Equal(t, uint64(0), dialCfg.ConsecutiveSuccessfulStream)                          // consecutive successful stream must be set to zero.
 }
 
-// TestUnicastManager_Connection_NoBackoff_When_Budget_Is_Zero tests that when there is no connection, and the dial backoff budget is zero and last successful dial is not within the zero reset threshold
-// the unicast manager does not backoff if the dial attempt fails.
+// TestUnicastManager_Stream_NoBackoff_When_Budget_Is_Zero tests that when there is a connection, and the stream backoff budget is zero and the consecutive successful stream counter is not above the
+// zero rest threshold, the unicast manager does not backoff if the dial attempt fails.
 func TestUnicastManager_Stream_NoBackoff_When_Budget_Is_Zero(t *testing.T) {
 	connStatus := mockp2p.NewPeerConnections(t)
 	streamFactory := mockp2p.NewStreamFactory(t)
