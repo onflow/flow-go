@@ -16,7 +16,6 @@ type lookupKey struct {
 
 func createHeightKey(identifier byte) []byte {
 	key := make([]byte, 0, MinLookupKeyLen)
-	key = append(key, '/')
 	key = append(key, identifier)
 	key = append(key, '/')
 	key = binary.BigEndian.AppendUint64(key, placeHolderHeight)
@@ -27,14 +26,14 @@ func createHeightKey(identifier byte) []byte {
 // with keyLatestBlockHeight as key, no owner and a placeholder height of 0.
 // This is to ensure SeekPrefixGE in pebble does not break
 func LatestHeightKey() []byte {
-	return createHeightKey(keyLatestBlockHeight)
+	return createHeightKey(codeLatestBlockHeight)
 }
 
 // FirstHeightKey is a special case of a lookupKey
 // with keyFirstBlockHeight as key, no owner and a placeholder height of 0.
 // This is to ensure SeekPrefixGE in pebble does not break
 func FirstHeightKey() []byte {
-	return createHeightKey(keyFirstBlockHeight)
+	return createHeightKey(codeFirstBlockHeight)
 }
 
 // newLookupKey takes a height and registerID, returns the key for storing the register value in storage
@@ -43,6 +42,9 @@ func newLookupKey(height uint64, reg flow.RegisterID) *lookupKey {
 		// 1 byte gaps for db prefix and '/' separator
 		encoded: make([]byte, 0, 1+len(reg.Owner)+1+len(reg.Key)+1+registers.HeightSuffixLen),
 	}
+
+	// append DB prefix
+	key.encoded = append(key.encoded, codeRegister)
 
 	// The lookup key used to find most recent value for a register.
 	//
@@ -71,13 +73,18 @@ func newLookupKey(height uint64, reg flow.RegisterID) *lookupKey {
 
 // lookupKeyToRegisterID takes a lookup key and decode it into height and RegisterID
 func lookupKeyToRegisterID(lookupKey []byte) (uint64, flow.RegisterID, error) {
-	// 2 fixed bytes for:
-	// 1. '/' byte separator for owner
-	// 2. '/' byte for key (owner and key values are blank so both have 0 bytes before each '/')
-	if len(lookupKey) < MinLookupKeyLen {
+	// 3 fixed bytes for:
+	// 1. The identifier prefix byte
+	// 2. '/' byte separator for owner
+	// 3. '/' byte for key (owner and key values are blank so both have 0 bytes after the '/')
+	const minLookupKeyLen = 3 + registers.HeightSuffixLen
+	if len(lookupKey) < minLookupKeyLen {
 		return 0, flow.RegisterID{}, fmt.Errorf("invalid lookup key format: expected >= %d bytes, got %d bytes",
 			MinLookupKeyLen, len(lookupKey))
 	}
+
+	// exclude db prefix
+	lookupKey = lookupKey[1:]
 
 	// Find the first slash to split the lookup key and decode the owner.
 	firstSlash := bytes.IndexByte(lookupKey, '/')
