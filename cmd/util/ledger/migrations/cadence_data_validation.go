@@ -99,7 +99,11 @@ func (m *preMigration) MigrateAccount(
 
 	hash, err := hashAccountCadenceValues(address, payloads)
 	if err != nil {
-		return nil, err
+		m.log.Info().
+			Err(err).
+			Hex("address", address[:]).
+			Msg("failed to hash cadence values")
+		return payloads, nil
 	}
 
 	m.v.set(address, hash)
@@ -242,8 +246,15 @@ func hashDomainCadenceValues(
 			break
 		}
 
-		// TODO: check if this is enough. We might need to switch to jsoncdc
-		s := value.RecursiveString(interpreter.SeenReferences{})
+		var s string
+		err := capturePanic(
+			func() {
+				// TODO: check if this is enough. We might need to switch to jsoncdc
+				s = value.RecursiveString(interpreter.SeenReferences{})
+			})
+		if err != nil {
+			return nil, fmt.Errorf("failed to convert value to string: %w", err)
+		}
 
 		//cadenceValue, err := runtime.ExportValue(value, mr.Interpreter, interpreter.EmptyLocationRange)
 		//if err != nil {

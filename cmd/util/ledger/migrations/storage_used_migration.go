@@ -54,7 +54,7 @@ func (m *AccountUsageMigrator) MigrateAccount(
 
 	var status *environment.AccountStatus
 	var statusIndex int
-	totalSize := uint64(0)
+	actualSize := uint64(0)
 	for i, payload := range payloads {
 		key, err := payload.Key()
 		if err != nil {
@@ -73,22 +73,30 @@ func (m *AccountUsageMigrator) MigrateAccount(
 		if err != nil {
 			return nil, err
 		}
-		totalSize += size
-	}
-
-	err := compareUsage(payloads[statusIndex], status, totalSize)
-	if err != nil {
-		m.log.Info().
-			Err(err).
-			Msg("account storage used usage mismatch")
+		actualSize += size
 	}
 
 	if status == nil {
 		return nil, fmt.Errorf("could not find account status for account %v", address.Hex())
 	}
 
+	const oldAccountStatusSize = 25
+	isOldVersionOfStatusRegister := len(payloads[statusIndex].Value()) == oldAccountStatusSize
+
+	same := m.compareUsage(isOldVersionOfStatusRegister, status, actualSize)
+	if same {
+		// there is no problem with the usage, return
+		return payloads, nil
+	}
+
+	if isOldVersionOfStatusRegister {
+		// size will grow by 8 bytes because of the on-the-fly
+		// migration of account status in AccountStatusFromBytes
+		actualSize += 8
+	}
+
 	// update storage used
-	status.SetStorageUsed(totalSize)
+	status.SetStorageUsed(actualSize)
 
 	newValue := status.ToBytes()
 	newPayload, err := newPayloadWithValue(payloads[statusIndex], newValue)
@@ -101,23 +109,26 @@ func (m *AccountUsageMigrator) MigrateAccount(
 	return payloads, nil
 }
 
-func compareUsage(
-	payload *ledger.Payload,
+func (m *AccountUsageMigrator) compareUsage(
+	isOldVersionOfStatusRegister bool,
 	status *environment.AccountStatus,
-	totalSize uint64,
-) error {
-	const oldAccountStatusSize = 25
+	actualSize uint64,
+) bool {
 	oldSize := status.StorageUsed()
-	if len(payload.Value()) == oldAccountStatusSize {
+	if isOldVersionOfStatusRegister {
 		// size will be reported as 8 bytes larger than the actual size due to on-the-fly
 		// migration of account status in AccountStatusFromBytes
 		oldSize -= 8
 	}
 
-	if oldSize != totalSize {
-		return fmt.Errorf("old size: %v, new size: %v", oldSize, totalSize)
+	if oldSize != actualSize {
+		m.log.Info().
+			Uint64("old_size", oldSize).
+			Uint64("new_size", actualSize).
+			Msg("account storage used usage mismatch")
+		return false
 	}
-	return nil
+	return true
 }
 
 // newPayloadWithValue returns a new payload with the key from the given payload, and
