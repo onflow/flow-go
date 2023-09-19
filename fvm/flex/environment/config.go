@@ -1,4 +1,4 @@
-package flex
+package env
 
 import (
 	"errors"

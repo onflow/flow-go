@@ -1,4 +1,4 @@
-package flex_test
+package env_test
 
 import (
 	"bytes"
@@ -16,7 +16,8 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/onflow/flow-go/fvm/environment"
-	"github.com/onflow/flow-go/fvm/flex"
+	env "github.com/onflow/flow-go/fvm/flex/environment"
+	fenv "github.com/onflow/flow-go/fvm/flex/environment"
 	"github.com/onflow/flow-go/fvm/flex/storage"
 	"github.com/onflow/flow-go/fvm/storage/testutils"
 	"github.com/stretchr/testify/require"
@@ -29,11 +30,11 @@ func RunWithTempDB(t testing.TB, f func(*storage.Database)) {
 	f(db)
 }
 
-func RunWithNewEnv(t testing.TB, db *storage.Database, f func(*flex.Environment)) {
+func RunWithNewEnv(t testing.TB, db *storage.Database, f func(*fenv.Environment)) {
 	coinbase := common.BytesToAddress([]byte("coinbase"))
-	config := flex.NewFlexConfig((flex.WithCoinbase(coinbase)),
-		flex.WithBlockNumber(flex.BlockNumberForEVMRules))
-	env, err := flex.NewEnvironment(config, db)
+	config := fenv.NewFlexConfig((fenv.WithCoinbase(coinbase)),
+		fenv.WithBlockNumber(fenv.BlockNumberForEVMRules))
+	env, err := fenv.NewEnvironment(config, db)
 	require.NoError(t, err)
 	f(env)
 }
@@ -44,7 +45,7 @@ func TestNativeTokenBridging(t *testing.T) {
 		testAccount := common.BytesToAddress([]byte("test"))
 
 		t.Run("mint tokens to the first account", func(t *testing.T) {
-			RunWithNewEnv(t, db, func(env *flex.Environment) {
+			RunWithNewEnv(t, db, func(env *fenv.Environment) {
 				amount := big.NewInt(10000)
 				testAccount := common.BytesToAddress([]byte("test"))
 				err := env.MintTo(amount, testAccount)
@@ -53,14 +54,14 @@ func TestNativeTokenBridging(t *testing.T) {
 		})
 		t.Run("mint tokens withdraw", func(t *testing.T) {
 			amount := big.NewInt(1000)
-			RunWithNewEnv(t, db, func(env *flex.Environment) {
+			RunWithNewEnv(t, db, func(env *fenv.Environment) {
 				require.Equal(t, originalBalance, env.State.GetBalance(testAccount))
 			})
-			RunWithNewEnv(t, db, func(env *flex.Environment) {
+			RunWithNewEnv(t, db, func(env *fenv.Environment) {
 				err := env.WithdrawFrom(amount, testAccount)
 				require.NoError(t, err)
 			})
-			RunWithNewEnv(t, db, func(env *flex.Environment) {
+			RunWithNewEnv(t, db, func(env *fenv.Environment) {
 				require.Equal(t, amount.Sub(originalBalance, amount), env.State.GetBalance(testAccount))
 			})
 		})
@@ -127,7 +128,7 @@ func TestContractInteraction(t *testing.T) {
 		amountToBeTransfered := big.NewInt(0).Mul(big.NewInt(100), big.NewInt(params.Ether))
 
 		// fund test account
-		RunWithNewEnv(t, db, func(env *flex.Environment) {
+		RunWithNewEnv(t, db, func(env *fenv.Environment) {
 			err = env.MintTo(amount, testAccount)
 			require.NoError(t, err)
 		})
@@ -135,7 +136,7 @@ func TestContractInteraction(t *testing.T) {
 		var contractAddr common.Address
 
 		t.Run("deploy contract", func(t *testing.T) {
-			RunWithNewEnv(t, db, func(env *flex.Environment) {
+			RunWithNewEnv(t, db, func(env *fenv.Environment) {
 				err = env.Deploy(testAccount, byteCodes, math.MaxUint64, amountToBeTransfered)
 				require.NoError(t, err)
 
@@ -154,7 +155,7 @@ func TestContractInteraction(t *testing.T) {
 
 			num := big.NewInt(10)
 
-			RunWithNewEnv(t, db, func(env *flex.Environment) {
+			RunWithNewEnv(t, db, func(env *fenv.Environment) {
 				store, err := abi.Pack("store", num)
 				require.NoError(t, err)
 
@@ -169,7 +170,7 @@ func TestContractInteraction(t *testing.T) {
 				require.False(t, env.Result.Failed)
 			})
 
-			RunWithNewEnv(t, db, func(env *flex.Environment) {
+			RunWithNewEnv(t, db, func(env *fenv.Environment) {
 				retrieve, err := abi.Pack("retrieve")
 				require.NoError(t, err)
 
@@ -196,13 +197,13 @@ func TestContractInteraction(t *testing.T) {
 			key, _ := crypto.HexToECDSA(keyHex)
 			address := crypto.PubkeyToAddress(key.PublicKey) // 658bdf435d810c91414ec09147daa6db62406379
 
-			RunWithNewEnv(t, db, func(env *flex.Environment) {
+			RunWithNewEnv(t, db, func(env *env.Environment) {
 				err = env.MintTo(amount, address)
 				require.NoError(t, err)
 			})
 
-			RunWithNewEnv(t, db, func(env *flex.Environment) {
-				signer := types.MakeSigner(env.Config.ChainConfig, flex.BlockNumberForEVMRules, env.Config.BlockContext.Time)
+			RunWithNewEnv(t, db, func(env *env.Environment) {
+				signer := types.MakeSigner(env.Config.ChainConfig, fenv.BlockNumberForEVMRules, env.Config.BlockContext.Time)
 				tx, _ := types.SignTx(types.NewTransaction(0, testAccount, big.NewInt(1000), params.TxGas, new(big.Int).Add(big.NewInt(0), common.Big1), nil), signer, key)
 
 				var b bytes.Buffer

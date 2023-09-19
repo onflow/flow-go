@@ -1,4 +1,4 @@
-package flex
+package env
 
 import (
 	"bytes"
@@ -239,6 +239,7 @@ func (fe *Environment) Call(
 
 // RunTransaction runs a flex transaction
 // this method could be called by anyone.
+// TODO : check gas limit complience (one set on tx and the one allowed by flow tx)
 func (fe *Environment) RunTransaction(rlpEncodedTx []byte) error {
 	if err := fe.checkExecuteOnce(); err != nil {
 		return err
