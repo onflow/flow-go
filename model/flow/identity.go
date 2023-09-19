@@ -336,6 +336,10 @@ func (iy *Identity) EqualTo(other *Identity) bool {
 	return true
 }
 
+// GenericIdentity defines a constraint for generic identities.
+// Golang doesn't support constraint with fields(for time being) so we have to define this interface
+// with getter methods.
+// Details here: https://github.com/golang/go/issues/51259.
 type GenericIdentity interface {
 	Identity | IdentitySkeleton
 	GetNodeID() Identifier
@@ -380,10 +384,12 @@ type IdentityOrder[T GenericIdentity] func(*T, *T) bool
 // Identities are COPIED from the source slice.
 type IdentityMapFunc[T GenericIdentity] func(T) T
 
-// IdentitySkeletonList is a list of nodes skeletons.
+// IdentitySkeletonList is a list of nodes skeletons. We use a type alias instead of defining a new type
+// since go generics doesn't support implicit conversion between types.
 type IdentitySkeletonList = GenericIdentityList[IdentitySkeleton]
 
-// IdentityList is a list of nodes.
+// IdentityList is a list of nodes. We use a type alias instead of defining a new type
+// since go generics doesn't support implicit conversion between types.
 type IdentityList = GenericIdentityList[Identity]
 
 type GenericIdentityList[T GenericIdentity] []*T
@@ -440,31 +446,6 @@ func (il GenericIdentityList[T]) Copy() GenericIdentityList[T] {
 	}
 	return dup
 }
-
-//// Copy returns a copy of IdentitySkeletonList. The resulting slice uses a different
-//// backing array, meaning appends and insert operations on either slice are
-//// guaranteed to only affect that slice.
-////
-//// Copy should be used when modifying an existing identity list by either
-//// appending new elements, re-ordering, or inserting new elements in an
-//// existing index.
-////
-//// CAUTION:
-//// All IdentitySkeleton fields are deep-copied, _except_ for their keys, which
-//// are copied by reference.
-//func (il IdentitySkeletonList) Copy() IdentitySkeletonList {
-//	dup := make(IdentitySkeletonList, 0, len(il))
-//
-//	lenList := len(il)
-//
-//	// performance tests show this is faster than 'range'
-//	for i := 0; i < lenList; i++ {
-//		// copy the object
-//		next := *(il[i])
-//		dup = append(dup, &next)
-//	}
-//	return dup
-//}
 
 // Selector returns an identity filter function that selects only identities
 // within this identity list.
