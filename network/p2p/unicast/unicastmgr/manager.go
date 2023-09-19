@@ -172,16 +172,17 @@ func (m *Manager) CreateStream(ctx context.Context, peerID peer.ID) (libp2pnet.S
 	noConnection := err != nil || !connected
 	updatedCfg, err := m.dialConfigCache.Adjust(
 		peerID, func(config unicastmodel.DialConfig) (unicastmodel.DialConfig, error) {
-			// consecutive successful stream count is reset to 0 if we fail to create a stream to the peer.
+			// consecutive successful stream count is reset to 0 if we fail to create a stream or connection to the peer.
 			config.ConsecutiveSuccessfulStream = 0
-			// last successful dial time is reset to 0 if we fail to create a stream to the peer.
-			config.LastSuccessfulDial = time.Time{}
 
 			if noConnection {
 				// if no connections could be established to the peer, we will try to dial with a more strict dial config next time.
 				if config.DialBackoffBudget > 0 {
 					config.DialBackoffBudget--
 				}
+				// last successful dial time is reset to 0 if we fail to create a stream to the peer.
+				config.LastSuccessfulDial = time.Time{}
+
 			} else {
 				// there is a connection to the peer it means that the stream creation failed, hence we decrease the stream backoff budget
 				// to try to create a stream with a more strict dial config next time.

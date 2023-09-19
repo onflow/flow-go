@@ -44,9 +44,7 @@ func TestUnicastManager_Connection_ConnectionBackoff(t *testing.T) {
 
 	connStatus.On("IsConnected", peerID).Return(false, nil) // not connected
 	streamFactory.On("ClearBackoff", peerID).Return().Times(unicastmodel.MaxConnectAttempt)
-	streamFactory.On("Connect", mock.Anything, peer.AddrInfo{ID: peerID}).
-		Return(fmt.Errorf("some error")).
-		Times(unicastmodel.MaxConnectAttempt) // connect
+	streamFactory.On("Connect", mock.Anything, peer.AddrInfo{ID: peerID}).Return(fmt.Errorf("some error")).Times(unicastmodel.MaxConnectAttempt) // connect
 	streamFactory.On("SetStreamHandler", mock.Anything, mock.Anything).Return().Once()
 
 	cfg, err := config.DefaultConfig()
@@ -92,6 +90,123 @@ func TestUnicastManager_Connection_ConnectionBackoff(t *testing.T) {
 	// last successful dial is set back to zero, since although we have a successful dial in the past, the most recent dial failed.
 	require.True(t, dialCfg.LastSuccessfulDial.IsZero())
 	require.Equal(t, uint64(0), dialCfg.ConsecutiveSuccessfulStream) // consecutive successful stream must be intact.
+}
+
+// TestUnicastManager_StreamFactory_Connection_SuccessfulConnection_And_Stream tests that when there is no connection, and CreateStream is successful on the first attempt for connection and stream creation,
+// it updates the last successful dial time and the consecutive successful stream counter.
+func TestUnicastManager_Connection_SuccessfulConnection_And_Stream(t *testing.T) {
+	connStatus := mockp2p.NewPeerConnections(t)
+	streamFactory := mockp2p.NewStreamFactory(t)
+	peerID := p2ptest.PeerIdFixture(t)
+
+	connStatus.On("IsConnected", peerID).Return(false, nil) // not connected
+	streamFactory.On("ClearBackoff", peerID).Return().Once()
+	streamFactory.On("Connect", mock.Anything, peer.AddrInfo{ID: peerID}).Return(nil).Once() // connect on the first attempt.
+	streamFactory.On("SetStreamHandler", mock.Anything, mock.Anything).Return().Once()
+	// mocks that it attempts to create a stream once and succeeds.
+	streamFactory.On("NewStream", mock.Anything, peerID, mock.Anything).Return(&p2ptest.MockStream{}, nil).Once()
+
+	cfg, err := config.DefaultConfig()
+	require.NoError(t, err)
+	dialConfigCache := unicastcache.NewDialConfigCache(unicast.DefaultDailConfigCacheSize, unittest.Logger(), metrics.NewNoopCollector(), unicastmodel.DefaultDialConfigFactory)
+	mgr, err := unicastmgr.NewUnicastManager(
+		&unicastmgr.ManagerConfig{
+			Logger:                     unittest.Logger(),
+			StreamFactory:              streamFactory,
+			SporkId:                    unittest.IdentifierFixture(),
+			ConnStatus:                 connStatus,
+			CreateStreamRetryDelay:     cfg.NetworkConfig.UnicastCreateStreamRetryDelay,
+			Metrics:                    metrics.NewNoopCollector(),
+			StreamHistoryResetInterval: unicastmodel.StreamHistoryResetInterval,
+			DialConfigCacheFactory: func() unicast.DialConfigCache {
+				return dialConfigCache
+			},
+		},
+	)
+	require.NoError(t, err)
+	mgr.SetDefaultHandler(func(libp2pnet.Stream) {}) // no-op handler, we don't care about the handler for this test
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	dialTime := time.Now()
+	s, err := mgr.CreateStream(ctx, peerID)
+	require.NoError(t, err)
+	require.NotNil(t, s)
+
+	// The dial config must be updated with the backoff budget decremented.
+	dialCfg, err := dialConfigCache.GetOrInit(peerID)
+	require.NoError(t, err)
+	require.Equal(t, uint64(unicastmodel.MaxConnectAttempt), dialCfg.DialBackoffBudget)       // dial backoff budget must be intact.
+	require.Equal(t, uint64(unicastmodel.MaxStreamCreationAttempt), dialCfg.StreamBackBudget) // stream backoff budget must remain intact.
+	// last successful dial must be set AFTER the successful dial.
+	require.True(t, dialCfg.LastSuccessfulDial.After(dialTime))
+	require.Equal(t, uint64(1), dialCfg.ConsecutiveSuccessfulStream) // consecutive successful stream must incremented.
+}
+
+// TestUnicastManager_StreamFactory_Connection_SuccessfulConnection_StreamBackoff tests the backoff mechanism of the unicast manager for stream creation.
+// It tests the situation that there is no connection when CreateStream is called. The connection is created successfully, but the stream creation fails.
+// It tests that when there is a connection, but no stream, it tries to create a stream some number of times (unicastmodel.MaxStreamCreationAttempt), before
+// giving up.
+// It also checks the consecutive successful stream counter is reset when the stream creation fails, and the last successful dial time is updated.
+func TestUnicastManager_Connection_SuccessfulConnection_StreamBackoff(t *testing.T) {
+	connStatus := mockp2p.NewPeerConnections(t)
+	streamFactory := mockp2p.NewStreamFactory(t)
+	peerID := p2ptest.PeerIdFixture(t)
+
+	isConnectedCalled := 0
+	connStatus.On("IsConnected", peerID).Return(
+		func(id peer.ID) bool {
+			if isConnectedCalled == 0 {
+				// we mock that the connection is not established on the first call, and is established on the second call and onwards.
+				isConnectedCalled++
+				return false
+			}
+			return true
+		}, nil,
+	)
+	streamFactory.On("ClearBackoff", peerID).Return().Once()
+	streamFactory.On("Connect", mock.Anything, peer.AddrInfo{ID: peerID}).Return(nil).Once() // connect on the first attempt.
+	streamFactory.On("SetStreamHandler", mock.Anything, mock.Anything).Return().Once()
+	streamFactory.On("NewStream", mock.Anything, peerID, mock.Anything).Return(nil, fmt.Errorf("some error")).
+		Times(unicastmodel.MaxStreamCreationAttempt) // mocks that it attempts to create a stream some number of times, before giving up.
+
+	cfg, err := config.DefaultConfig()
+	require.NoError(t, err)
+	dialConfigCache := unicastcache.NewDialConfigCache(unicast.DefaultDailConfigCacheSize, unittest.Logger(), metrics.NewNoopCollector(), unicastmodel.DefaultDialConfigFactory)
+	mgr, err := unicastmgr.NewUnicastManager(
+		&unicastmgr.ManagerConfig{
+			Logger:                     unittest.Logger(),
+			StreamFactory:              streamFactory,
+			SporkId:                    unittest.IdentifierFixture(),
+			ConnStatus:                 connStatus,
+			CreateStreamRetryDelay:     cfg.NetworkConfig.UnicastCreateStreamRetryDelay,
+			Metrics:                    metrics.NewNoopCollector(),
+			StreamHistoryResetInterval: unicastmodel.StreamHistoryResetInterval,
+			DialConfigCacheFactory: func() unicast.DialConfigCache {
+				return dialConfigCache
+			},
+		},
+	)
+	require.NoError(t, err)
+	mgr.SetDefaultHandler(func(libp2pnet.Stream) {}) // no-op handler, we don't care about the handler for this test
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	dialTime := time.Now()
+	s, err := mgr.CreateStream(ctx, peerID)
+	require.Error(t, err)
+	require.Nil(t, s)
+
+	// The dial config must be updated with the backoff budget decremented.
+	dialCfg, err := dialConfigCache.GetOrInit(peerID)
+	require.NoError(t, err)
+	require.Equal(t, uint64(unicastmodel.MaxConnectAttempt), dialCfg.DialBackoffBudget)         // dial backoff budget must be intact, since the connection is successful.
+	require.Equal(t, uint64(unicastmodel.MaxStreamCreationAttempt-1), dialCfg.StreamBackBudget) // stream backoff budget must be decremented by 1 since all budget is used up.
+	// last successful dial must be set AFTER the successful dial.
+	require.True(t, dialCfg.LastSuccessfulDial.After(dialTime))
+	require.Equal(t, uint64(0), dialCfg.ConsecutiveSuccessfulStream) // consecutive successful stream must be reset to zero, since the stream creation failed.
 }
 
 // TestUnicastManager_StreamFactory_StreamBackoff tests the backoff mechanism of the unicast manager for stream creation.
