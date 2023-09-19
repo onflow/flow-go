@@ -2,9 +2,9 @@ package pebble
 
 import (
 	"bytes"
-	"encoding/binary"
 	"fmt"
 	"math/rand"
+	"os"
 	"path"
 	"strconv"
 	"testing"
@@ -15,208 +15,163 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/pebble/registers"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
-// TestRegisters_Storage_RoundTrip tests the round trip of a payload storage.
-func TestRegisters_Storage_RoundTrip(t *testing.T) {
+// TestRegisters_Initialize
+func TestRegisters_Initialize(t *testing.T) {
 	t.Parallel()
-
-	cache := pebble.NewCache(1 << 20)
-	defer cache.Unref()
-	opts := DefaultPebbleOptions(cache, registers.NewMVCCComparer())
-
-	dbpath := path.Join(t.TempDir(), "roundtrip.db")
-	db, err := pebble.Open(dbpath, opts)
-	require.NoError(t, err)
-	// populate first height!
-	payload := make([]byte, 8)
-	initialHeight := binary.BigEndian.AppendUint64(payload, uint64(1))
-	err = db.Set(firstHeightKey(), initialHeight, nil)
-	require.NoError(t, err)
-	s, err := NewRegisters(db)
-	require.NoError(t, err)
-	require.NotNil(t, s)
-
-	key1 := flow.RegisterID{Owner: "owner", Key: "key1"}
-	expectedValue1 := []byte("value1")
-	entries := flow.RegisterEntries{
-		{Key: key1, Value: expectedValue1},
-	}
-
-	minHeight := uint64(2)
-	err = s.db.Set(firstHeightKey(), s.getEncodedHeight(minHeight), nil)
-	s.firstHeight = minHeight
-	require.NoError(t, err)
-	err = s.db.Set(latestHeightKey(), s.getEncodedHeight(minHeight), nil)
-	s.latestHeight = minHeight
-	require.NoError(t, err)
-	err = s.Store(minHeight, entries)
-	require.NoError(t, err)
-
-	// lookup with exact height returns the correct value
-	value1, err := s.Get(minHeight, key1)
-	require.NoError(t, err)
-	require.Equal(t, expectedValue1, value1)
-
-	// lookup with a higher height returns the correct value after update
-	err = s.db.Set(latestHeightKey(), s.getEncodedHeight(minHeight+1), nil)
-	s.latestHeight = minHeight + 1
-	require.NoError(t, err)
-	value1, err = s.Get(minHeight+1, key1)
-	require.NoError(t, err)
-	require.Equal(t, expectedValue1, value1)
-
-	// lookup with a lower height returns no results
-	value1, err = s.Get(minHeight-1, key1)
+	p, dir := unittest.TempPebbleDBWithOpts(t, nil)
+	// fail on blank database without FirstHeight and LastHeight set
+	_, err := NewRegisters(p)
 	require.Error(t, err)
-	require.Empty(t, value1)
-
-	err = db.Close()
+	err = os.RemoveAll(dir)
 	require.NoError(t, err)
+}
+
+// TestRegisters_Get tests the expected Get function behavior on a single height
+func TestRegisters_Get(t *testing.T) {
+	t.Parallel()
+	height1 := uint64(1)
+	RunWithRegistersStorageAtHeight1(t, func(r *Registers) {
+		// invalid keys return correct error type
+		invalidKey := flow.RegisterID{Owner: "invalid", Key: "invalid"}
+		_, err := r.Get(height1, invalidKey)
+		require.ErrorIs(t, err, storage.ErrNotFound)
+
+		// insert new data
+		height2 := uint64(2)
+		key1 := flow.RegisterID{Owner: "owner", Key: "key1"}
+		expectedValue1 := []byte("value1")
+		entries := flow.RegisterEntries{
+			{Key: key1, Value: expectedValue1},
+		}
+
+		err = r.Store(height2, entries)
+		require.NoError(t, err)
+
+		// happy path
+		value1, err := r.Get(height2, key1)
+		require.NoError(t, err)
+		require.Equal(t, expectedValue1, value1)
+
+		// out of range
+		beforeFirstHeight := uint64(0)
+		_, err = r.Get(beforeFirstHeight, key1)
+		require.ErrorIs(t, err, storage.ErrHeightNotIndexed)
+		afterLatestHeight := uint64(3)
+		_, err = r.Get(afterLatestHeight, key1)
+		require.ErrorIs(t, err, storage.ErrHeightNotIndexed)
+	})
+}
+
+// TestRegisters_Store tests the expected store behaviour on a single height
+func TestRegisters_Store(t *testing.T) {
+	t.Parallel()
+	RunWithRegistersStorageAtHeight1(t, func(r *Registers) {
+		// insert new data
+		key1 := flow.RegisterID{Owner: "owner", Key: "key1"}
+		expectedValue1 := []byte("value1")
+		entries := flow.RegisterEntries{
+			{Key: key1, Value: expectedValue1},
+		}
+		height2 := uint64(2)
+		err := r.Store(height2, entries)
+		require.NoError(t, err)
+
+		// idempotent at same height
+		err = r.Store(height2, entries)
+		require.NoError(t, err)
+
+		// out of range
+		height5 := uint64(5)
+		err = r.Store(height5, entries)
+		require.Error(t, err)
+
+		height1 := uint64(1)
+		err = r.Store(height1, entries)
+		require.Error(t, err)
+
+	})
+}
+
+// TestRegisters_Store_RoundTrip tests the round trip of a payload storage.
+func TestRegisters_Store_RoundTrip(t *testing.T) {
+	t.Parallel()
+	minHeight := uint64(2)
+	RunWithRegistersStorageAtInitialHeights(t, minHeight, minHeight, func(r *Registers) {
+		key1 := flow.RegisterID{Owner: "owner", Key: "key1"}
+		expectedValue1 := []byte("value1")
+		entries := flow.RegisterEntries{
+			{Key: key1, Value: expectedValue1},
+		}
+		testHeight := minHeight + 1
+		// happy path
+		err := r.Store(testHeight, entries)
+		require.NoError(t, err)
+
+		// lookup with exact height returns the correct value
+		value1, err := r.Get(testHeight, key1)
+		require.NoError(t, err)
+		require.Equal(t, expectedValue1, value1)
+
+		value11, err := r.Get(testHeight, key1)
+		require.NoError(t, err)
+		require.Equal(t, expectedValue1, value11)
+	})
 }
 
 // TestRegisters_Store_Versioning tests the scan functionality for the most recent value
 func TestRegisters_Store_Versioning(t *testing.T) {
 	t.Parallel()
+	RunWithRegistersStorageAtHeight1(t, func(r *Registers) {
+		// Save key11 is a prefix of the key1, and we save it first.
+		// It should be invisible for our prefix scan.
+		key11 := flow.RegisterID{Owner: "owner", Key: "key11"}
+		expectedValue11 := []byte("value11")
 
-	cache := pebble.NewCache(1 << 20)
-	defer cache.Unref()
-	opts := DefaultPebbleOptions(cache, registers.NewMVCCComparer())
+		key1 := flow.RegisterID{Owner: "owner", Key: "key1"}
+		expectedValue1 := []byte("value1")
+		entries1 := flow.RegisterEntries{
+			{Key: key1, Value: expectedValue1},
+			{Key: key11, Value: expectedValue11},
+		}
 
-	dbpath := path.Join(t.TempDir(), "versioning.db")
-	db, err := pebble.Open(dbpath, opts)
-	require.NoError(t, err)
-	// populate first height!
-	payload := make([]byte, 8)
-	initialHeight := binary.BigEndian.AppendUint64(payload, uint64(1))
-	err = db.Set(firstHeightKey(), initialHeight, nil)
-	require.NoError(t, err)
-	s, err := NewRegisters(db)
-	require.NoError(t, err)
-	require.NotNil(t, s)
+		height2 := uint64(2)
 
-	// Save key11 is a prefix of the key1 and we save it first.
-	// It should be invisible for our prefix scan.
-	key11 := flow.RegisterID{Owner: "owner", Key: "key11"}
-	expectedValue11 := []byte("value11")
+		// check increment in height after Store()
+		err := r.Store(height2, entries1)
+		require.NoError(t, err)
 
-	key1 := flow.RegisterID{Owner: "owner", Key: "key1"}
-	expectedValue1 := []byte("value1")
-	entries1 := flow.RegisterEntries{
-		{Key: key1, Value: expectedValue1},
-		{Key: key11, Value: expectedValue11},
-	}
+		// Add new version of key1.
+		height3 := uint64(3)
+		expectedValue1ge3 := []byte("value1ge3")
+		entries3 := flow.RegisterEntries{
+			{Key: key1, Value: expectedValue1ge3},
+		}
 
-	// Happy path
-	height1 := uint64(1)
-	err = s.db.Set(firstHeightKey(), s.getEncodedHeight(height1), nil)
-	s.firstHeight = height1
-	require.NoError(t, err)
-	err = s.db.Set(latestHeightKey(), s.getEncodedHeight(height1), nil)
-	s.latestHeight = height1
-	require.NoError(t, err)
-	err = s.Store(height1, entries1)
-	require.NoError(t, err)
+		// check increment in height after Store()
+		err = r.Store(height3, entries3)
+		require.NoError(t, err)
+		updatedHeight, err := r.LatestHeight()
+		require.NoError(t, err)
+		require.Equal(t, updatedHeight, height3)
 
-	// check idempotence on same height
-	err = s.Store(height1, entries1)
-	require.NoError(t, err)
+		// test old version at previous height
+		value1, err := r.Get(height2, key1)
+		require.NoError(t, err)
+		require.Equal(t, expectedValue1, value1)
 
-	// Test non-existent prefix.
-	key := flow.RegisterID{Owner: "owner", Key: "key"}
-	value0, err := s.Get(height1, key)
-	require.Nil(t, err)
-	require.Empty(t, value0)
+		// test new version at new height
+		value1, err = r.Get(height3, key1)
+		require.NoError(t, err)
+		require.Equal(t, expectedValue1ge3, value1)
 
-	// Add new version of key1.
-	height3 := uint64(3)
-	require.NoError(t, err)
-	expectedValue1ge3 := []byte("value1ge3")
-	entries3 := flow.RegisterEntries{
-		{Key: key1, Value: expectedValue1ge3},
-	}
-	// check out of range (2 blocks after and 1 blocks before latestHeight = height1)
-	err = s.Store(height3, entries3)
-	require.Error(t, err)
-
-	err = s.Store(height1-1, entries3)
-	require.Error(t, err)
-
-	// check increment in height after Store()
-	err = s.db.Set(latestHeightKey(), s.getEncodedHeight(height3-1), nil)
-	s.latestHeight = height3 - 1
-	require.NoError(t, err)
-	err = s.Store(height3, entries3)
-	require.NoError(t, err)
-	updatedHeight, err := s.LatestHeight()
-	require.NoError(t, err)
-	require.Equal(t, updatedHeight, height3)
-
-	value1, err := s.Get(height1, key1)
-	require.NoError(t, err)
-	require.Equal(t, expectedValue1, value1)
-
-	value1, err = s.Get(height3-1, key1)
-	require.NoError(t, err)
-	require.Equal(t, expectedValue1, value1)
-
-	// test new version
-	value1, err = s.Get(height3, key1)
-	require.NoError(t, err)
-	require.Equal(t, expectedValue1ge3, value1)
-
-	// out of range
-	_, err = s.Get(height3+1, key1)
-	require.ErrorIs(t, err, storage.ErrHeightNotIndexed)
-
-	err = db.Close()
-	require.NoError(t, err)
-}
-
-func TestRegisters_LatestHeight(t *testing.T) {
-	t.Parallel()
-	cache := pebble.NewCache(1 << 20)
-	defer cache.Unref()
-	opts := DefaultPebbleOptions(cache, registers.NewMVCCComparer())
-
-	dbpath := path.Join(t.TempDir(), "versioning.db")
-	db, err := pebble.Open(dbpath, opts)
-	require.NoError(t, err)
-	// populate first height!
-	payload := make([]byte, 8)
-	initialHeight := binary.BigEndian.AppendUint64(payload, uint64(1))
-	err = db.Set(firstHeightKey(), initialHeight, nil)
-	require.NoError(t, err)
-	s, err := NewRegisters(db)
-	require.NoError(t, err)
-	require.NotNil(t, s)
-
-	// happy path
-	expected := uint64(1)
-	err = s.db.Set(latestHeightKey(), s.getEncodedHeight(expected), nil)
-	s.latestHeight = expected
-	require.NoError(t, err)
-	got, err := s.LatestHeight()
-	require.NoError(t, err)
-	require.Equal(t, got, expected)
-
-	// updating first height should not affect latest
-	firstHeight := uint64(0)
-	err = s.db.Set(firstHeightKey(), s.getEncodedHeight(firstHeight), nil)
-	s.firstHeight = firstHeight
-	require.NoError(t, err)
-	got, err = s.LatestHeight()
-	require.NoError(t, err)
-	require.Equal(t, got, expected)
-
-	// check update
-	expected2 := uint64(3)
-	err = s.db.Set(latestHeightKey(), s.getEncodedHeight(expected2), nil)
-	s.latestHeight = expected2
-	require.NoError(t, err)
-	got2, err := s.LatestHeight()
-	require.NoError(t, err)
-	require.Equal(t, got2, expected2)
+		// test unchanged key at incremented height
+		value11, err := r.Get(height3, key11)
+		require.NoError(t, err)
+		require.Equal(t, expectedValue11, value11)
+	})
 }
 
 // Benchmark_PayloadStorage benchmarks the SetBatch method.
@@ -303,4 +258,22 @@ func Benchmark_PayloadStorage(b *testing.B) {
 			}
 		}
 	}
+}
+
+func RunWithRegistersStorageAtInitialHeights(tb testing.TB, first uint64, latest uint64, f func(r *Registers)) {
+	cache := pebble.NewCache(1 << 20)
+	opts := DefaultPebbleOptions(cache, registers.NewMVCCComparer())
+	unittest.RunWithConfiguredPebbleInstance(tb, opts, func(p *pebble.DB) {
+		// insert initial heights to pebble
+		require.NoError(tb, p.Set(FirstHeightKey(), EncodedUint64(first), nil))
+		require.NoError(tb, p.Set(LatestHeightKey(), EncodedUint64(latest), nil))
+		r, err := NewRegisters(p)
+		require.NoError(tb, err)
+		f(r)
+	})
+}
+
+func RunWithRegistersStorageAtHeight1(tb testing.TB, f func(r *Registers)) {
+	defaultHeight := uint64(1)
+	RunWithRegistersStorageAtInitialHeights(tb, defaultHeight, defaultHeight, f)
 }
