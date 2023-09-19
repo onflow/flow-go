@@ -8,7 +8,6 @@ import (
 	libp2pnet "github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/protocol"
-	"github.com/multiformats/go-multiaddr"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
@@ -42,12 +41,9 @@ func TestUnicastManager_StreamFactory_ConnectionBackoff(t *testing.T) {
 	connStatus := mockp2p.NewPeerConnections(t)
 	streamFactory := mockp2p.NewStreamFactory(t)
 	peerID := p2ptest.PeerIdFixture(t)
-	peerAddr, err := multiaddr.NewMultiaddr("/ip4/127.0.0.1")
-	require.NoError(t, err)
 
 	connStatus.On("IsConnected", peerID).Return(false, nil) // not connected
 	streamFactory.On("ClearBackoff", peerID).Return().Times(unicastmodel.MaxConnectAttempt)
-	streamFactory.On("DialAddress", peerID).Return([]multiaddr.Multiaddr{peerAddr}) // dial address
 	streamFactory.On("Connect", mock.Anything, peer.AddrInfo{ID: peerID}).
 		Return(fmt.Errorf("some error")).
 		Times(unicastmodel.MaxConnectAttempt) // connect
@@ -77,10 +73,9 @@ func TestUnicastManager_StreamFactory_ConnectionBackoff(t *testing.T) {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	s, addrs, err := mgr.CreateStream(ctx, peerID)
+	s, err := mgr.CreateStream(ctx, peerID)
 	require.Error(t, err)
 	require.Nil(t, s)
-	require.Nil(t, addrs)
 
 	// The dial config must be updated with the backoff budget decremented.
 	dialCfg, err := dialConfigCache.GetOrInit(peerID)
@@ -128,19 +123,20 @@ func TestUnicastManager_StreamFactory_StreamBackoff(t *testing.T) {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	s, addrs, err := mgr.CreateStream(ctx, peerID)
+	s, err := mgr.CreateStream(ctx, peerID)
 	require.Error(t, err)
 	require.Nil(t, s)
-	require.Nil(t, addrs)
 
 	// The dial config must be updated with the stream backoff budget decremented.
 	dialCfg, err := dialConfigCache.GetOrInit(peerID)
 	require.NoError(t, err)
 	require.Equal(t, uint64(unicastmodel.MaxConnectAttempt), dialCfg.DialBackoffBudget)         // dial backoff budget must be intact.
 	require.Equal(t, uint64(unicastmodel.MaxStreamCreationAttempt-1), dialCfg.StreamBackBudget) // stream backoff budget must be decremented by 1.
-	require.Equal(t, uint64(1), dialCfg.ConsecutiveSuccessfulStream)                            // consecutive successful stream must be intact.
+	require.Equal(t, uint64(0), dialCfg.ConsecutiveSuccessfulStream)                            // consecutive successful stream must be zero as we have not created a successful stream yet.
 }
 
+// TestUnicastManager_Stream_ConsecutiveStreamCreation tests that when there is a connection, and the stream creation is successful,
+// it increments the consecutive successful stream counter in the dial config.
 func TestUnicastManager_Stream_ConsecutiveStreamCreation(t *testing.T) {
 	connStatus := mockp2p.NewPeerConnections(t)
 	streamFactory := mockp2p.NewStreamFactory(t)
@@ -179,10 +175,9 @@ func TestUnicastManager_Stream_ConsecutiveStreamCreation(t *testing.T) {
 	defer cancel()
 
 	for i := 0; i < totalSuccessAttempts; i++ {
-		s, addrs, err := mgr.CreateStream(ctx, peerID)
+		s, err := mgr.CreateStream(ctx, peerID)
 		require.NoError(t, err)
 		require.NotNil(t, s)
-		require.NotNil(t, addrs)
 
 		// The dial config must be updated with the stream backoff budget decremented.
 		dialCfg, err := dialConfigCache.GetOrInit(peerID)
@@ -229,10 +224,9 @@ func TestUnicastManager_StreamFactory_ErrProtocolNotSupported(t *testing.T) {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	s, addrs, err := mgr.CreateStream(ctx, peerID)
+	s, err := mgr.CreateStream(ctx, peerID)
 	require.Error(t, err)
 	require.Nil(t, s)
-	require.Nil(t, addrs)
 }
 
 // TestUnicastManager_Connection_BackoffBudgetDecremented tests that everytime the unicast manger gives up on creating a connection (after retrials),
@@ -241,8 +235,6 @@ func TestUnicastManager_Connection_BackoffBudgetDecremented(t *testing.T) {
 	connStatus := mockp2p.NewPeerConnections(t)
 	streamFactory := mockp2p.NewStreamFactory(t)
 	peerID := p2ptest.PeerIdFixture(t)
-	peerAddr, err := multiaddr.NewMultiaddr("/ip4/127.0.0.1")
-	require.NoError(t, err)
 
 	// totalAttempts is the total number of times that unicast manager calls Connect on the stream factory to dial the peer.
 	// Let's consider x = unicastmodel.MaxConnectAttempt. Then the test tries x times CreateStream. With dynamic backoffs,
@@ -255,7 +247,6 @@ func TestUnicastManager_Connection_BackoffBudgetDecremented(t *testing.T) {
 
 	connStatus.On("IsConnected", peerID).Return(false, nil) // not connected
 	streamFactory.On("ClearBackoff", peerID).Return().Times(totalAttempts)
-	streamFactory.On("DialAddress", peerID).Return([]multiaddr.Multiaddr{peerAddr}) // dial address
 	streamFactory.On("Connect", mock.Anything, peer.AddrInfo{ID: peerID}).
 		Return(fmt.Errorf("some error")).
 		Times(totalAttempts)
@@ -287,10 +278,9 @@ func TestUnicastManager_Connection_BackoffBudgetDecremented(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	for i := 0; i < unicastmodel.MaxConnectAttempt; i++ {
-		s, addrs, err := mgr.CreateStream(ctx, peerID)
+		s, err := mgr.CreateStream(ctx, peerID)
 		require.Error(t, err)
 		require.Nil(t, s)
-		require.Nil(t, addrs)
 
 		dialCfg, err := dialCfgCache.GetOrInit(peerID)
 		require.NoError(t, err)
@@ -313,9 +303,8 @@ func TestUnicastManager_Connection_BackoffBudgetDecremented(t *testing.T) {
 	require.Equal(t, uint64(unicastmodel.MaxStreamCreationAttempt), dialCfg.StreamBackBudget)
 
 	// After all the backoff budget is used up, it should stay at 0.
-	s, addrs, err := mgr.CreateStream(ctx, peerID)
+	s, err := mgr.CreateStream(ctx, peerID)
 	require.Error(t, err)
-	require.Nil(t, addrs)
 	require.Nil(t, s)
 
 	dialCfg, err = dialCfgCache.GetOrInit(peerID)
@@ -375,10 +364,9 @@ func TestUnicastManager_Stream_BackoffBudgetDecremented(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	for i := 0; i < unicastmodel.MaxStreamCreationAttempt; i++ {
-		s, addrs, err := mgr.CreateStream(ctx, peerID)
+		s, err := mgr.CreateStream(ctx, peerID)
 		require.Error(t, err)
 		require.Nil(t, s)
-		require.Nil(t, addrs)
 
 		dialCfg, err := dialCfgCache.GetOrInit(peerID)
 		require.NoError(t, err)
@@ -401,9 +389,8 @@ func TestUnicastManager_Stream_BackoffBudgetDecremented(t *testing.T) {
 	require.Equal(t, uint64(unicastmodel.MaxConnectAttempt), dialCfg.DialBackoffBudget)
 
 	// After all the backoff budget is used up, it should stay at 0.
-	s, addrs, err := mgr.CreateStream(ctx, peerID)
+	s, err := mgr.CreateStream(ctx, peerID)
 	require.Error(t, err)
-	require.Nil(t, addrs)
 	require.Nil(t, s)
 
 	dialCfg, err = dialCfgCache.GetOrInit(peerID)

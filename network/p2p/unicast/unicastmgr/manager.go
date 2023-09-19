@@ -413,7 +413,7 @@ func (m *Manager) dialPeer(ctx context.Context, peerID peer.ID, dialCfg *unicast
 	duration := time.Since(start)
 	if err != nil {
 		m.metrics.OnPeerDialFailure(duration, dialAttempts)
-		return retryFailedError(uint64(dialAttempts), dialCfg.DialBackoffBudget, fmt.Errorf("failed to dial peer %s on address %s: %w", p2plogging.PeerId(peerID), err))
+		return retryFailedError(uint64(dialAttempts), dialCfg.DialBackoffBudget, fmt.Errorf("failed to dial peer %s: %w", p2plogging.PeerId(peerID), err))
 	}
 	m.metrics.OnPeerDialed(duration, dialAttempts)
 	return nil
