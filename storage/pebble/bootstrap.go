@@ -14,20 +14,20 @@ type Bootstrap struct {
 	rootHeight    uint64
 }
 
-func NewBootstrap(db *pebble.DB, checkpointDir string, rootHeight uint64) *Bootstrap {
+func NewBootstrap(db *pebble.DB, checkpointDir string, rootHeight uint64) (*Bootstrap, error) {
 	// check for pre-populated heights, fail if it is populated
 	// i.e. the IndexCheckpointFile function has already run for the db in this directory
 	_, _, err := db.Get(latestHeightKey())
 	if err == nil {
 		// key detected, attempt to run bootstrap on corrupt or already bootstrapped data
-		panic("found latest key set on badger instance, cannot bootstrap populated DB")
+		return nil, fmt.Errorf("found latest key set on badger instance, cannot bootstrap populated DB")
 	}
 	return &Bootstrap{
 		checkpointDir: checkpointDir,
 		db:            db,
 		done:          make(chan struct{}),
 		rootHeight:    rootHeight,
-	}
+	}, nil
 }
 
 func (b *Bootstrap) batchIndexRegisters(height uint64, registers []*wal.LeafNode) error {
@@ -63,8 +63,6 @@ func (b *Bootstrap) batchIndexRegisters(height uint64, registers []*wal.LeafNode
 // IndexCheckpointFile indexes the checkpoint file in the Dir provided and returns a channel that closes when done
 func (b *Bootstrap) IndexCheckpointFile() <-chan error {
 	c := make(chan error, 1)
-	// index checkpoint
-
 	go func() {
 		bat := b.db.NewBatch()
 
@@ -103,7 +101,8 @@ func (b *Bootstrap) IndexCheckpointFile() <-chan error {
 	return c
 }
 
-// indexCheckpointFileWorker asynchronously indexes register entries from wal.OpenAndReadLeafNodesFromCheckpointV6
+// indexCheckpointFileWorker asynchronously indexes register entries in b.checkpointDir
+// with wal.OpenAndReadLeafNodesFromCheckpointV6
 func (b *Bootstrap) indexCheckpointFileWorker() <-chan error {
-
+	panic("not implemented")
 }
