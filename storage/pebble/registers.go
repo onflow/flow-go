@@ -68,6 +68,7 @@ func (s *Registers) Get(
 	encoded := newLookupKey(height, reg).Bytes()
 	ok := iter.SeekPrefixGE(encoded)
 	if !ok {
+		// no such register found
 		return nil, storage.ErrNotFound
 	}
 
