@@ -26,10 +26,10 @@ const (
 
 // DialConfig is a struct that represents the dial config for a peer.
 type DialConfig struct {
-	DialBackoffBudget    uint64    // number of times we have to try to dial the peer before we give up.
-	StreamBackBudget     uint64    // number of times we have to try to open a stream to the peer before we give up.
-	LastSuccessfulDial   time.Time // timestamp of the last successful dial to the peer.
-	LastSuccessfulStream time.Time // timestamp of the last successful stream to the peer.
+	DialBackoffBudget           uint64    // number of times we have to try to dial the peer before we give up.
+	StreamBackBudget            uint64    // number of times we have to try to open a stream to the peer before we give up.
+	LastSuccessfulDial          time.Time // timestamp of the last successful dial to the peer.
+	ConsecutiveSuccessfulStream uint64    // consecutive number of successful streams to the peer since the last time stream creation failed.
 }
 
 // DialConfigAdjustFunc is a function that is used to adjust the fields of a DialConfigEntity.
