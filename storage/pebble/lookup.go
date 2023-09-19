@@ -5,6 +5,8 @@ import (
 	"encoding/binary"
 	"fmt"
 
+	"github.com/onflow/flow-go/engine/execution/state"
+	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/storage/pebble/registers"
 )
@@ -112,6 +114,19 @@ func lookupKeyToRegisterID(lookupKey []byte) (uint64, flow.RegisterID, error) {
 	regID := flow.RegisterID{Owner: owner, Key: key}
 
 	return height, regID, nil
+}
+
+func registerIDFromPayloadKey(key ledger.Key) (flow.RegisterID, error) {
+	if len(key.KeyParts) != 2 ||
+		key.KeyParts[0].Type != state.KeyPartOwner ||
+		key.KeyParts[1].Type != state.KeyPartKey {
+		return flow.RegisterID{}, fmt.Errorf("key not in expected format: %s", key.String())
+	}
+
+	return flow.RegisterID{
+		Owner: string(key.KeyParts[0].Value),
+		Key:   string(key.KeyParts[1].Value),
+	}, nil
 }
 
 // Bytes returns the encoded lookup key.
