@@ -84,7 +84,8 @@ func NewNode(
 		disallowListedCache: internal.NewDisallowListCache(
 			disallowLstCacheCfg.MaxSize,
 			logger.With().Str("module", "disallow-list-cache").Logger(),
-			disallowLstCacheCfg.Metrics),
+			disallowLstCacheCfg.Metrics,
+		),
 	}
 }
 
@@ -266,15 +267,13 @@ func (n *Node) createStream(ctx context.Context, peerID peer.ID) (libp2pnet.Stre
 		}
 	}
 
-	stream, dialAddrs, err := n.uniMgr.CreateStream(ctx, peerID)
+	stream, err := n.uniMgr.CreateStream(ctx, peerID)
 	if err != nil {
-		return nil, flownet.NewPeerUnreachableError(fmt.Errorf("could not create stream (peer_id: %s, dialing address(s): %v): %w", peerID,
-			dialAddrs, err))
+		return nil, flownet.NewPeerUnreachableError(fmt.Errorf("could not create stream peer_id: %s: %w", peerID, err))
 	}
 
 	lg.Info().
 		Str("networking_protocol_id", string(stream.Protocol())).
-		Str("dial_address", fmt.Sprintf("%v", dialAddrs)).
 		Msg("stream successfully created to remote peer")
 	return stream, nil
 }
@@ -492,7 +491,8 @@ func (n *Node) WithPeersProvider(peersProvider p2p.PeersProvider) {
 				}
 
 				return allowListedPeerIds
-			})
+			},
+		)
 	}
 }
 
