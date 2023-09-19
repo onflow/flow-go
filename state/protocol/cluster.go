@@ -21,7 +21,7 @@ type Cluster interface {
 	EpochCounter() uint64
 
 	// Members returns the initial set of collector nodes in this cluster.
-	Members() flow.IdentityList
+	Members() flow.IdentitySkeletonList
 
 	// RootBlock returns the root block for this cluster.
 	RootBlock() *cluster.Block

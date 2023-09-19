@@ -13,8 +13,8 @@ func Any(*flow.Identity) bool {
 }
 
 // And combines two or more filters that all need to be true.
-func And(filters ...flow.IdentityFilter) flow.IdentityFilter {
-	return func(identity *flow.Identity) bool {
+func And[T flow.GenericIdentity](filters ...flow.IdentityFilter[T]) flow.IdentityFilter[T] {
+	return func(identity *T) bool {
 		for _, filter := range filters {
 			if !filter(identity) {
 				return false
@@ -25,8 +25,8 @@ func And(filters ...flow.IdentityFilter) flow.IdentityFilter {
 }
 
 // Or combines two or more filters and only needs one of them to be true.
-func Or(filters ...flow.IdentityFilter) flow.IdentityFilter {
-	return func(identity *flow.Identity) bool {
+func Or[T flow.GenericIdentity](filters ...flow.IdentityFilter[T]) flow.IdentityFilter[T] {
+	return func(identity *T) bool {
 		for _, filter := range filters {
 			if filter(identity) {
 				return true
@@ -37,34 +37,34 @@ func Or(filters ...flow.IdentityFilter) flow.IdentityFilter {
 }
 
 // Not returns a filter equivalent to the inverse of the input filter.
-func Not(filter flow.IdentityFilter) flow.IdentityFilter {
-	return func(identity *flow.Identity) bool {
+func Not[T flow.GenericIdentity](filter flow.IdentityFilter[T]) flow.IdentityFilter[T] {
+	return func(identity *T) bool {
 		return !filter(identity)
 	}
 }
 
 // In returns a filter for identities within the input list. This is equivalent
 // to HasNodeID, but for list-typed inputs.
-func In(list flow.IdentityList) flow.IdentityFilter {
-	return HasNodeID(list.NodeIDs()...)
+func In(list flow.IdentityList) flow.IdentityFilter[flow.Identity] {
+	return HasNodeID[flow.Identity](list.NodeIDs()...)
 }
 
 // HasNodeID returns a filter that returns true for any identity with an ID
 // matching any of the inputs.
-func HasNodeID(nodeIDs ...flow.Identifier) flow.IdentityFilter {
+func HasNodeID[T flow.GenericIdentity](nodeIDs ...flow.Identifier) flow.IdentityFilter[T] {
 	lookup := make(map[flow.Identifier]struct{})
 	for _, nodeID := range nodeIDs {
 		lookup[nodeID] = struct{}{}
 	}
-	return func(identity *flow.Identity) bool {
-		_, ok := lookup[identity.NodeID]
+	return func(identity *T) bool {
+		_, ok := lookup[(*identity).GetNodeID()]
 		return ok
 	}
 }
 
 // HasNetworkingKey returns a filter that returns true for any identity with a
 // networking public key matching any of the inputs.
-func HasNetworkingKey(keys ...crypto.PublicKey) flow.IdentityFilter {
+func HasNetworkingKey(keys ...crypto.PublicKey) flow.IdentityFilter[flow.Identity] {
 	return func(identity *flow.Identity) bool {
 		for _, key := range keys {
 			if key.Equals(identity.NetworkPubKey) {
@@ -76,7 +76,7 @@ func HasNetworkingKey(keys ...crypto.PublicKey) flow.IdentityFilter {
 }
 
 // HasWeight returns a filter for nodes with non-zero weight.
-func HasWeight(hasWeight bool) flow.IdentityFilter {
+func HasWeight(hasWeight bool) flow.IdentityFilter[flow.Identity] {
 	return func(identity *flow.Identity) bool {
 		return (identity.Weight > 0) == hasWeight
 	}
@@ -88,13 +88,13 @@ func Ejected(identity *flow.Identity) bool {
 }
 
 // HasRole returns a filter for nodes with one of the input roles.
-func HasRole(roles ...flow.Role) flow.IdentityFilter {
+func HasRole[T flow.GenericIdentity](roles ...flow.Role) flow.IdentityFilter[T] {
 	lookup := make(map[flow.Role]struct{})
 	for _, role := range roles {
 		lookup[role] = struct{}{}
 	}
-	return func(identity *flow.Identity) bool {
-		_, ok := lookup[identity.Role]
+	return func(identity *T) bool {
+		_, ok := lookup[(*identity).GetRole()]
 		return ok
 	}
 }
@@ -109,11 +109,19 @@ var IsValidCurrentEpochParticipant = And(
 // IsVotingConsensusCommitteeMember is a identity filter for all members of
 // the consensus committee allowed to vote.
 var IsVotingConsensusCommitteeMember = And(
-	HasRole(flow.RoleConsensus),
+	HasRole[flow.Identity](flow.RoleConsensus),
 	IsValidCurrentEpochParticipant,
 )
 
 // IsValidDKGParticipant is an identity filter for all DKG participants. It is
 // equivalent to the filter for consensus committee members, as these are
 // the same group for now.
-var IsValidDKGParticipant = func(identity *flow.IdentitySkeleton) {}
+var IsValidDKGParticipant = func(identity *flow.IdentitySkeleton) bool {
+	if identity.Role != flow.RoleConsensus {
+		return false
+	}
+	if identity.InitialWeight == 0 {
+		return false
+	}
+	return true
+}

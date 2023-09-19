@@ -109,15 +109,15 @@ func (_m *Snapshot) Head() (*flow.Header, error) {
 }
 
 // Identities provides a mock function with given fields: selector
-func (_m *Snapshot) Identities(selector flow.IdentityFilter) (flow.IdentityList, error) {
+func (_m *Snapshot) Identities(selector flow.IdentityFilter[flow.Identity]) (flow.IdentityList, error) {
 	ret := _m.Called(selector)
 
 	var r0 flow.IdentityList
 	var r1 error
-	if rf, ok := ret.Get(0).(func(flow.IdentityFilter) (flow.IdentityList, error)); ok {
+	if rf, ok := ret.Get(0).(func(flow.IdentityFilter[flow.Identity]) (flow.IdentityList, error)); ok {
 		return rf(selector)
 	}
-	if rf, ok := ret.Get(0).(func(flow.IdentityFilter) flow.IdentityList); ok {
+	if rf, ok := ret.Get(0).(func(flow.IdentityFilter[flow.Identity]) flow.IdentityList); ok {
 		r0 = rf(selector)
 	} else {
 		if ret.Get(0) != nil {
@@ -125,7 +125,7 @@ func (_m *Snapshot) Identities(selector flow.IdentityFilter) (flow.IdentityList,
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(flow.IdentityFilter) error); ok {
+	if rf, ok := ret.Get(1).(func(flow.IdentityFilter[flow.Identity]) error); ok {
 		r1 = rf(selector)
 	} else {
 		r1 = ret.Error(1)

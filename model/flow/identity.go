@@ -114,6 +114,11 @@ func (iy Identity) String() string {
 	return fmt.Sprintf("%s-%s@%s=%d", iy.Role, iy.NodeID.String(), iy.Address, iy.Weight)
 }
 
+// String returns a string representation of the identity.
+func (iy IdentitySkeleton) String() string {
+	return fmt.Sprintf("%s-%s@%s", iy.Role, iy.NodeID.String(), iy.Address)
+}
+
 // ID returns a unique, persistent identifier for the identity.
 // CAUTION: the ID may be chosen by a node operator, so long as it is unique.
 func (iy Identity) ID() Identifier {
@@ -331,25 +336,61 @@ func (iy *Identity) EqualTo(other *Identity) bool {
 	return true
 }
 
+type GenericIdentity interface {
+	Identity | IdentitySkeleton
+	GetNodeID() Identifier
+	GetRole() Role
+	GetStakingPubKey() crypto.PublicKey
+	GetNetworkPubKey() crypto.PublicKey
+	GetInitialWeight() uint64
+	GetSkeleton() IdentitySkeleton
+}
+
+func (iy IdentitySkeleton) GetNodeID() Identifier {
+	return iy.NodeID
+}
+
+func (iy IdentitySkeleton) GetRole() Role {
+	return iy.Role
+}
+
+func (iy IdentitySkeleton) GetStakingPubKey() crypto.PublicKey {
+	return iy.StakingPubKey
+}
+
+func (iy IdentitySkeleton) GetNetworkPubKey() crypto.PublicKey {
+	return iy.NetworkPubKey
+}
+
+func (iy IdentitySkeleton) GetInitialWeight() uint64 {
+	return iy.InitialWeight
+}
+
+func (iy IdentitySkeleton) GetSkeleton() IdentitySkeleton {
+	return iy
+}
+
 // IdentityFilter is a filter on identities.
-type IdentityFilter func(*Identity) bool
+type IdentityFilter[T GenericIdentity] func(*T) bool
 
 // IdentityOrder is a sort for identities.
-type IdentityOrder func(*Identity, *Identity) bool
+type IdentityOrder[T GenericIdentity] func(*T, *T) bool
 
 // IdentityMapFunc is a modifier function for map operations for identities.
 // Identities are COPIED from the source slice.
-type IdentityMapFunc func(Identity) Identity
+type IdentityMapFunc[T GenericIdentity] func(T) T
 
 // IdentitySkeletonList is a list of nodes skeletons.
-type IdentitySkeletonList []*IdentitySkeleton
+type IdentitySkeletonList = GenericIdentityList[IdentitySkeleton]
 
 // IdentityList is a list of nodes.
-type IdentityList []*Identity
+type IdentityList = GenericIdentityList[Identity]
+
+type GenericIdentityList[T GenericIdentity] []*T
 
 // Filter will apply a filter to the identity list.
-func (il IdentityList) Filter(filter IdentityFilter) IdentityList {
-	var dup IdentityList
+func (il GenericIdentityList[T]) Filter(filter IdentityFilter[T]) GenericIdentityList[T] {
+	var dup GenericIdentityList[T]
 IDLoop:
 	for _, identity := range il {
 		if !filter(identity) {
@@ -366,8 +407,8 @@ IDLoop:
 // CAUTION: this relies on structure copy semantics. Map functions that modify
 // an object referenced by the input Identity structure will modify identities
 // in the source slice as well.
-func (il IdentityList) Map(f IdentityMapFunc) IdentityList {
-	dup := make(IdentityList, 0, len(il))
+func (il GenericIdentityList[T]) Map(f IdentityMapFunc[T]) GenericIdentityList[T] {
+	dup := make(GenericIdentityList[T], 0, len(il))
 	for _, identity := range il {
 		next := f(*identity)
 		dup = append(dup, &next)
@@ -386,8 +427,8 @@ func (il IdentityList) Map(f IdentityMapFunc) IdentityList {
 // CAUTION:
 // All Identity fields are deep-copied, _except_ for their keys, which
 // are copied by reference.
-func (il IdentityList) Copy() IdentityList {
-	dup := make(IdentityList, 0, len(il))
+func (il GenericIdentityList[T]) Copy() GenericIdentityList[T] {
+	dup := make(GenericIdentityList[T], 0, len(il))
 
 	lenList := len(il)
 
@@ -400,29 +441,45 @@ func (il IdentityList) Copy() IdentityList {
 	return dup
 }
 
+//// Copy returns a copy of IdentitySkeletonList. The resulting slice uses a different
+//// backing array, meaning appends and insert operations on either slice are
+//// guaranteed to only affect that slice.
+////
+//// Copy should be used when modifying an existing identity list by either
+//// appending new elements, re-ordering, or inserting new elements in an
+//// existing index.
+////
+//// CAUTION:
+//// All IdentitySkeleton fields are deep-copied, _except_ for their keys, which
+//// are copied by reference.
+//func (il IdentitySkeletonList) Copy() IdentitySkeletonList {
+//	dup := make(IdentitySkeletonList, 0, len(il))
+//
+//	lenList := len(il)
+//
+//	// performance tests show this is faster than 'range'
+//	for i := 0; i < lenList; i++ {
+//		// copy the object
+//		next := *(il[i])
+//		dup = append(dup, &next)
+//	}
+//	return dup
+//}
+
 // Selector returns an identity filter function that selects only identities
 // within this identity list.
-func (il IdentityList) Selector() IdentityFilter {
-
+func (il GenericIdentityList[T]) Selector() IdentityFilter[T] {
 	lookup := il.Lookup()
-	return func(identity *Identity) bool {
-		_, exists := lookup[identity.NodeID]
+	return func(identity *T) bool {
+		_, exists := lookup[(*identity).GetNodeID()]
 		return exists
 	}
 }
 
-func (il IdentitySkeletonList) Lookup() map[Identifier]*IdentitySkeleton {
-	lookup := make(map[Identifier]*IdentitySkeleton, len(il))
+func (il GenericIdentityList[T]) Lookup() map[Identifier]*T {
+	lookup := make(map[Identifier]*T, len(il))
 	for _, identity := range il {
-		lookup[identity.NodeID] = identity
-	}
-	return lookup
-}
-
-func (il IdentityList) Lookup() map[Identifier]*Identity {
-	lookup := make(map[Identifier]*Identity, len(il))
-	for _, identity := range il {
-		lookup[identity.NodeID] = identity
+		lookup[(*identity).GetNodeID()] = identity
 	}
 	return lookup
 }
@@ -430,40 +487,31 @@ func (il IdentityList) Lookup() map[Identifier]*Identity {
 // Sort will sort the list using the given ordering.  This is
 // not recommended for performance.  Expand the 'less' function
 // in place for best performance, and don't use this function.
-func (il IdentityList) Sort(less IdentityOrder) IdentityList {
+func (il GenericIdentityList[T]) Sort(less IdentityOrder[T]) GenericIdentityList[T] {
 	dup := il.Copy()
 	slices.SortFunc(dup, less)
 	return dup
 }
 
 // Sorted returns whether the list is sorted by the input ordering.
-func (il IdentityList) Sorted(less IdentityOrder) bool {
+func (il GenericIdentityList[T]) Sorted(less IdentityOrder[T]) bool {
 	return slices.IsSortedFunc(il, less)
 }
 
 // NodeIDs returns the NodeIDs of the nodes in the list.
-func (il IdentityList) NodeIDs() IdentifierList {
+func (il GenericIdentityList[T]) NodeIDs() IdentifierList {
 	nodeIDs := make([]Identifier, 0, len(il))
 	for _, id := range il {
-		nodeIDs = append(nodeIDs, id.NodeID)
-	}
-	return nodeIDs
-}
-
-// NodeIDs returns the NodeIDs of the nodes in the list.
-func (il IdentitySkeletonList) NodeIDs() IdentifierList {
-	nodeIDs := make([]Identifier, 0, len(il))
-	for _, id := range il {
-		nodeIDs = append(nodeIDs, id.NodeID)
+		nodeIDs = append(nodeIDs, (*id).GetNodeID())
 	}
 	return nodeIDs
 }
 
 // PublicStakingKeys returns a list with the public staking keys (order preserving).
-func (il IdentitySkeletonList) PublicStakingKeys() []crypto.PublicKey {
+func (il GenericIdentityList[T]) PublicStakingKeys() []crypto.PublicKey {
 	pks := make([]crypto.PublicKey, 0, len(il))
 	for _, id := range il {
-		pks = append(pks, id.StakingPubKey)
+		pks = append(pks, (*id).GetStakingPubKey())
 	}
 	return pks
 }
@@ -479,32 +527,32 @@ func (il IdentitySkeletonList) PublicStakingKeys() []crypto.PublicKey {
 //   - The outputs of `IdentityList.ID()` and `IdentityList.Checksum()` are both order-sensitive.
 //     Therefore, the `IdentityList` must be in canonical order, unless explicitly specified
 //     otherwise by the protocol.
-func (il IdentityList) ID() Identifier {
+func (il GenericIdentityList[T]) ID() Identifier {
 	return il.NodeIDs().ID()
 }
 
 // Checksum generates a cryptographic commitment to the full IdentityList, including mutable fields.
 // The checksum for the same group of identities (by NodeID) may change from block to block.
-func (il IdentityList) Checksum() Identifier {
+func (il GenericIdentityList[T]) Checksum() Identifier {
 	return MakeID(il)
 }
 
 // TotalWeight returns the total weight of all given identities.
-func (il IdentitySkeletonList) TotalWeight() uint64 {
+func (il GenericIdentityList[T]) TotalWeight() uint64 {
 	var total uint64
 	for _, identity := range il {
-		total += identity.InitialWeight
+		total += (*identity).GetInitialWeight()
 	}
 	return total
 }
 
 // Count returns the count of identities.
-func (il IdentityList) Count() uint {
+func (il GenericIdentityList[T]) Count() uint {
 	return uint(len(il))
 }
 
 // ByIndex returns the node at the given index.
-func (il IdentityList) ByIndex(index uint) (*Identity, bool) {
+func (il GenericIdentityList[T]) ByIndex(index uint) (*T, bool) {
 	if index >= uint(len(il)) {
 		return nil, false
 	}
@@ -512,19 +560,9 @@ func (il IdentityList) ByIndex(index uint) (*Identity, bool) {
 }
 
 // ByNodeID gets a node from the list by node ID.
-func (il IdentitySkeletonList) ByNodeID(nodeID Identifier) (*IdentitySkeleton, bool) {
+func (il GenericIdentityList[T]) ByNodeID(nodeID Identifier) (*T, bool) {
 	for _, identity := range il {
-		if identity.NodeID == nodeID {
-			return identity, true
-		}
-	}
-	return nil, false
-}
-
-// ByNodeID gets a node from the list by node ID.
-func (il IdentityList) ByNodeID(nodeID Identifier) (*Identity, bool) {
-	for _, identity := range il {
-		if identity.NodeID == nodeID {
+		if (*identity).GetNodeID() == nodeID {
 			return identity, true
 		}
 	}
@@ -532,9 +570,9 @@ func (il IdentityList) ByNodeID(nodeID Identifier) (*Identity, bool) {
 }
 
 // ByNetworkingKey gets a node from the list by network public key.
-func (il IdentityList) ByNetworkingKey(key crypto.PublicKey) (*Identity, bool) {
+func (il GenericIdentityList[T]) ByNetworkingKey(key crypto.PublicKey) (*T, bool) {
 	for _, identity := range il {
-		if identity.NetworkPubKey.Equals(key) {
+		if (*identity).GetNetworkPubKey().Equals(key) {
 			return identity, true
 		}
 	}
@@ -542,9 +580,9 @@ func (il IdentityList) ByNetworkingKey(key crypto.PublicKey) (*Identity, bool) {
 }
 
 // Sample returns non-deterministic random sample from the `IdentityList`
-func (il IdentityList) Sample(size uint) (IdentityList, error) {
+func (il GenericIdentityList[T]) Sample(size uint) (GenericIdentityList[T], error) {
 	n := uint(len(il))
-	dup := make([]*Identity, 0, n)
+	dup := make(GenericIdentityList[T], 0, n)
 	dup = append(dup, il...)
 	if n < size {
 		size = n
@@ -561,7 +599,7 @@ func (il IdentityList) Sample(size uint) (IdentityList, error) {
 
 // Shuffle randomly shuffles the identity list (non-deterministic),
 // and returns the shuffled list without modifying the receiver.
-func (il IdentityList) Shuffle() (IdentityList, error) {
+func (il GenericIdentityList[T]) Shuffle() (GenericIdentityList[T], error) {
 	return il.Sample(uint(len(il)))
 }
 
@@ -570,9 +608,9 @@ func (il IdentityList) Shuffle() (IdentityList, error) {
 // if `pct>0`, so this will always select at least one identity.
 //
 // NOTE: The input must be between 0-1.
-func (il IdentityList) SamplePct(pct float64) (IdentityList, error) {
+func (il GenericIdentityList[T]) SamplePct(pct float64) (GenericIdentityList[T], error) {
 	if pct <= 0 {
-		return IdentityList{}, nil
+		return GenericIdentityList[T]{}, nil
 	}
 
 	count := float64(il.Count()) * pct
@@ -590,50 +628,24 @@ func (il IdentityList) SamplePct(pct float64) (IdentityList, error) {
 // where duplicates are identities with the same node ID.
 // Receiver `il` and/or method input `other` can be nil or empty.
 // The returned IdentityList is sorted in canonical order.
-func (il IdentityList) Union(other IdentityList) IdentityList {
+func (il GenericIdentityList[T]) Union(other GenericIdentityList[T]) GenericIdentityList[T] {
 	maxLen := len(il) + len(other)
 
-	union := make(IdentityList, 0, maxLen)
+	union := make(GenericIdentityList[T], 0, maxLen)
 	set := make(map[Identifier]struct{}, maxLen)
 
-	for _, list := range []IdentityList{il, other} {
+	for _, list := range []GenericIdentityList[T]{il, other} {
 		for _, id := range list {
-			if _, isDuplicate := set[id.NodeID]; !isDuplicate {
-				set[id.NodeID] = struct{}{}
+			if _, isDuplicate := set[(*id).GetNodeID()]; !isDuplicate {
+				set[(*id).GetNodeID()] = struct{}{}
 				union = append(union, id)
 			}
 		}
 	}
 
-	slices.SortFunc(union, func(a, b *Identity) bool {
-		return bytes.Compare(a.NodeID[:], b.NodeID[:]) < 0
-	})
-
-	return union
-}
-
-// Union returns a new identity list containing every identity that occurs in
-// either `il`, or `other`, or both. There are no duplicates in the output,
-// where duplicates are identities with the same node ID.
-// Receiver `il` and/or method input `other` can be nil or empty.
-// The returned IdentityList is sorted in canonical order.
-func (il IdentitySkeletonList) Union(other IdentitySkeletonList) IdentitySkeletonList {
-	maxLen := len(il) + len(other)
-
-	union := make(IdentitySkeletonList, 0, maxLen)
-	set := make(map[Identifier]struct{}, maxLen)
-
-	for _, list := range []IdentitySkeletonList{il, other} {
-		for _, id := range list {
-			if _, isDuplicate := set[id.NodeID]; !isDuplicate {
-				set[id.NodeID] = struct{}{}
-				union = append(union, id)
-			}
-		}
-	}
-
-	slices.SortFunc(union, func(a, b *IdentitySkeleton) bool {
-		return bytes.Compare(a.NodeID[:], b.NodeID[:]) < 0
+	slices.SortFunc(union, func(a, b *T) bool {
+		lhs, rhs := (*a).GetNodeID(), (*b).GetNodeID()
+		return bytes.Compare(lhs[:], rhs[:]) < 0
 	})
 
 	return union
@@ -641,43 +653,38 @@ func (il IdentitySkeletonList) Union(other IdentitySkeletonList) IdentitySkeleto
 
 // EqualTo checks if the other list if the same, that it contains the same elements
 // in the same order
-func (il IdentityList) EqualTo(other IdentityList) bool {
-	return slices.EqualFunc(il, other, func(a, b *Identity) bool {
-		return a.EqualTo(b)
-	})
-}
-
-// EqualTo checks if the other list if the same, that it contains the same elements
-// in the same order
-func (il IdentitySkeletonList) EqualTo(other IdentitySkeletonList) bool {
-	return slices.EqualFunc(il, other, func(a, b *IdentitySkeleton) bool {
-		return a.EqualTo(b)
-	})
+func (il GenericIdentityList[T]) EqualTo(other GenericIdentityList[T]) bool {
+	// TODO: temporary
+	//return slices.EqualFunc(il, other, func(a, b *T) bool {
+	//	return (*a)..EqualTo(b)
+	//})
+	return il.ID() == other.ID()
 }
 
 // Exists takes a previously sorted Identity list and searches it for the target value
 // This code is optimized, so the coding style will be different
 // target:  value to search for
 // CAUTION:  The identity list MUST be sorted prior to calling this method
-func (il IdentityList) Exists(target *Identity) bool {
-	return il.IdentifierExists(target.NodeID)
+func (il GenericIdentityList[T]) Exists(target *T) bool {
+	return il.IdentifierExists((*target).GetNodeID())
 }
 
 // IdentifierExists takes a previously sorted Identity list and searches it for the target value
 // target:  value to search for
 // CAUTION:  The identity list MUST be sorted prior to calling this method
-func (il IdentityList) IdentifierExists(target Identifier) bool {
-	_, ok := slices.BinarySearchFunc(il, &Identity{IdentitySkeleton: IdentitySkeleton{NodeID: target}}, func(a, b *Identity) int {
-		return bytes.Compare(a.NodeID[:], b.NodeID[:])
+func (il GenericIdentityList[T]) IdentifierExists(target Identifier) bool {
+	_, ok := slices.BinarySearchFunc(il, target, func(a *T, b Identifier) int {
+		lhs := (*a).GetNodeID()
+		return bytes.Compare(lhs[:], b[:])
 	})
 	return ok
 }
 
 // GetIndex returns the index of the identifier in the IdentityList and true
 // if the identifier is found.
-func (il IdentityList) GetIndex(target Identifier) (uint, bool) {
-	i := slices.IndexFunc(il, func(a *Identity) bool {
-		return a.NodeID == target
+func (il GenericIdentityList[T]) GetIndex(target Identifier) (uint, bool) {
+	i := slices.IndexFunc(il, func(a *T) bool {
+		return (*a).GetNodeID() == target
 	})
 	if i == -1 {
 		return 0, false
@@ -686,10 +693,11 @@ func (il IdentityList) GetIndex(target Identifier) (uint, bool) {
 }
 
 // ToSkeleton converts the identity list to a list of identity skeletons.
-func (il IdentityList) ToSkeleton() IdentitySkeletonList {
+func (il GenericIdentityList[T]) ToSkeleton() IdentitySkeletonList {
 	skeletons := make(IdentitySkeletonList, len(il))
 	for i, id := range il {
-		skeletons[i] = &id.IdentitySkeleton
+		v := (*id).GetSkeleton()
+		skeletons[i] = &v
 	}
 	return skeletons
 }

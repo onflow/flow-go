@@ -2,8 +2,6 @@ package unittest
 
 import (
 	"fmt"
-	"sort"
-
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/factory"
 	"github.com/onflow/flow-go/model/flow/filter"
@@ -46,14 +44,12 @@ func AlterTransactionForCluster(tx flow.TransactionBody, clusters flow.ClusterLi
 
 // ClusterAssignment creates an assignment list with n clusters and with nodes
 // evenly distributed among clusters.
-func ClusterAssignment(n uint, nodes flow.IdentityList) flow.AssignmentList {
+func ClusterAssignment(n uint, nodes flow.IdentitySkeletonList) flow.AssignmentList {
 
-	collectors := nodes.Filter(filter.HasRole(flow.RoleCollection))
+	collectors := nodes.Filter(filter.HasRole[flow.IdentitySkeleton](flow.RoleCollection))
 
 	// order, so the same list results in the same
-	sort.Slice(collectors, func(i, j int) bool {
-		return order.Canonical(collectors[i], collectors[j])
-	})
+	collectors = collectors.Sort(order.Canonical[flow.IdentitySkeleton])
 
 	assignments := make(flow.AssignmentList, n)
 	for i, collector := range collectors {
@@ -64,9 +60,9 @@ func ClusterAssignment(n uint, nodes flow.IdentityList) flow.AssignmentList {
 	return assignments
 }
 
-func ClusterList(n uint, nodes flow.IdentityList) flow.ClusterList {
+func ClusterList(n uint, nodes flow.IdentitySkeletonList) flow.ClusterList {
 	assignments := ClusterAssignment(n, nodes)
-	clusters, err := factory.NewClusterList(assignments, nodes.Filter(filter.HasRole(flow.RoleCollection)))
+	clusters, err := factory.NewClusterList(assignments, nodes.Filter(filter.HasRole[flow.IdentitySkeleton](flow.RoleCollection)))
 	if err != nil {
 		panic(err)
 	}

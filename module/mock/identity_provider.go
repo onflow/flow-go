@@ -67,11 +67,11 @@ func (_m *IdentityProvider) ByPeerID(_a0 peer.ID) (*flow.Identity, bool) {
 }
 
 // Identities provides a mock function with given fields: _a0
-func (_m *IdentityProvider) Identities(_a0 flow.IdentityFilter) flow.IdentityList {
+func (_m *IdentityProvider) Identities(_a0 flow.IdentityFilter[flow.Identity]) flow.IdentityList {
 	ret := _m.Called(_a0)
 
 	var r0 flow.IdentityList
-	if rf, ok := ret.Get(0).(func(flow.IdentityFilter) flow.IdentityList); ok {
+	if rf, ok := ret.Get(0).(func(flow.IdentityFilter[flow.Identity]) flow.IdentityList); ok {
 		r0 = rf(_a0)
 	} else {
 		if ret.Get(0) != nil {

@@ -314,16 +314,16 @@ func (_m *Epoch) FirstView() (uint64, error) {
 func (_m *Epoch) InitialIdentities() (flow.IdentitySkeletonList, error) {
 	ret := _m.Called()
 
-	var r0 flow.IdentityList
+	var r0 flow.IdentitySkeletonList
 	var r1 error
-	if rf, ok := ret.Get(0).(func() (flow.IdentityList, error)); ok {
+	if rf, ok := ret.Get(0).(func() (flow.IdentitySkeletonList, error)); ok {
 		return rf()
 	}
-	if rf, ok := ret.Get(0).(func() flow.IdentityList); ok {
+	if rf, ok := ret.Get(0).(func() flow.IdentitySkeletonList); ok {
 		r0 = rf()
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(flow.IdentityList)
+			r0 = ret.Get(0).(flow.IdentitySkeletonList)
 		}
 	}
 

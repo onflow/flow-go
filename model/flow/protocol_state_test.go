@@ -16,13 +16,23 @@ func TestNewRichProtocolStateEntry(t *testing.T) {
 	//  * no previous epoch exists from the perspective of the freshly-sporked protocol state
 	//  * network is currently in the staking phase for the next epoch, hence no service events for the next epoch exist
 	t.Run("staking-root-protocol-state", func(t *testing.T) {
-		currentEpochSetup := unittest.EpochSetupFixture()
+		setup := unittest.EpochSetupFixture()
 		currentEpochCommit := unittest.EpochCommitFixture()
+		identities := make(flow.DynamicIdentityEntryList, 0, len(setup.Participants))
+		for _, identity := range setup.Participants {
+			identities = append(identities, &flow.DynamicIdentityEntry{
+				NodeID: identity.NodeID,
+				Dynamic: flow.DynamicIdentity{
+					Weight:  identity.InitialWeight,
+					Ejected: false,
+				},
+			})
+		}
 		stateEntry := &flow.ProtocolStateEntry{
 			CurrentEpoch: flow.EpochStateContainer{
-				SetupID:    currentEpochSetup.ID(),
+				SetupID:    setup.ID(),
 				CommitID:   currentEpochCommit.ID(),
-				Identities: flow.DynamicIdentityEntryListFromIdentities(currentEpochSetup.Participants),
+				Identities: identities,
 			},
 			PreviousEpochEventIDs:           flow.EventIDs{},
 			InvalidStateTransitionAttempted: false,
@@ -31,13 +41,15 @@ func TestNewRichProtocolStateEntry(t *testing.T) {
 			stateEntry,
 			nil,
 			nil,
-			currentEpochSetup,
+			setup,
 			currentEpochCommit,
 			nil,
 			nil,
 		)
 		assert.NoError(t, err)
-		assert.Equal(t, currentEpochSetup.Participants, entry.Identities, "should be equal to current epoch setup participants")
+		expectedIdentities, err := flow.BuildIdentityTable(identities, setup.Participants, nil)
+		assert.NoError(t, err)
+		assert.Equal(t, expectedIdentities, entry.Identities, "should be equal to current epoch setup participants")
 	})
 
 	// Common situation during the staking phase for epoch N+1
@@ -56,7 +68,12 @@ func TestNewRichProtocolStateEntry(t *testing.T) {
 			nil,
 		)
 		assert.NoError(t, err)
-		expectedIdentities := stateEntry.CurrentEpochSetup.Participants.Union(stateEntry.PreviousEpochSetup.Participants)
+		expectedIdentities, err := flow.BuildIdentityTable(
+			stateEntry.CurrentEpoch.Identities,
+			stateEntry.CurrentEpochSetup.Participants,
+			stateEntry.PreviousEpochSetup.Participants,
+		)
+		assert.NoError(t, err)
 		assert.Equal(t, expectedIdentities, richEntry.Identities, "should be equal to current epoch setup participants + previous epoch setup participants")
 		assert.Nil(t, richEntry.NextEpoch)
 	})
@@ -81,10 +98,20 @@ func TestNewRichProtocolStateEntry(t *testing.T) {
 			nil,
 		)
 		assert.NoError(t, err)
-		expectedIdentities := stateEntry.CurrentEpochSetup.Participants.Union(stateEntry.NextEpochSetup.Participants)
+		expectedIdentities, err := flow.BuildIdentityTable(
+			stateEntry.CurrentEpoch.Identities,
+			stateEntry.CurrentEpochSetup.Participants,
+			stateEntry.NextEpochSetup.Participants,
+		)
+		assert.NoError(t, err)
 		assert.Equal(t, expectedIdentities, richEntry.Identities, "should be equal to current epoch setup participants + next epoch setup participants")
 		assert.Nil(t, richEntry.NextEpochCommit)
-		expectedIdentities = stateEntry.NextEpochSetup.Participants.Union(stateEntry.CurrentEpochSetup.Participants)
+		expectedIdentities, err = flow.BuildIdentityTable(
+			stateEntry.NextEpoch.Identities,
+			stateEntry.NextEpochSetup.Participants,
+			stateEntry.CurrentEpochSetup.Participants,
+		)
+		assert.NoError(t, err)
 		assert.Equal(t, expectedIdentities, richEntry.NextIdentities, "should be equal to next epoch setup participants + current epoch setup participants")
 	})
 
@@ -107,9 +134,19 @@ func TestNewRichProtocolStateEntry(t *testing.T) {
 			stateEntry.NextEpochCommit,
 		)
 		assert.NoError(t, err)
-		expectedIdentities := stateEntry.CurrentEpochSetup.Participants.Union(stateEntry.NextEpochSetup.Participants)
+		expectedIdentities, err := flow.BuildIdentityTable(
+			stateEntry.CurrentEpoch.Identities,
+			stateEntry.CurrentEpochSetup.Participants,
+			stateEntry.NextEpochSetup.Participants,
+		)
+		assert.NoError(t, err)
 		assert.Equal(t, expectedIdentities, richEntry.Identities, "should be equal to current epoch setup participants + next epoch setup participants")
-		expectedIdentities = stateEntry.NextEpochSetup.Participants.Union(stateEntry.CurrentEpochSetup.Participants)
+		expectedIdentities, err = flow.BuildIdentityTable(
+			stateEntry.NextEpoch.Identities,
+			stateEntry.NextEpochSetup.Participants,
+			stateEntry.CurrentEpochSetup.Participants,
+		)
+		assert.NoError(t, err)
 		assert.Equal(t, expectedIdentities, richEntry.NextIdentities, "should be equal to next epoch setup participants + current epoch setup participants")
 	})
 

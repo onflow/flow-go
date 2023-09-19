@@ -55,7 +55,7 @@ type Snapshot interface {
 	// It allows us to provide optional upfront filters which can be used by the
 	// implementation to speed up database lookups.
 	// TODO document error returns
-	Identities(selector flow.IdentityFilter) (flow.IdentityList, error)
+	Identities(selector flow.IdentityFilter[flow.Identity]) (flow.IdentityList, error)
 
 	// Identity attempts to retrieve the node with the given identifier at the
 	// selected point of the protocol state history. It will error if it doesn't exist.

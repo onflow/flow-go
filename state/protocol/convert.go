@@ -149,7 +149,7 @@ func GetDKGParticipantKeys(dkg DKG, participants flow.IdentitySkeletonList) ([]c
 // DKG instance. The participants must exactly match the DKG instance configuration.
 // All errors indicate inconsistent or invalid inputs.
 // No errors are expected during normal operation.
-func ToDKGParticipantLookup(dkg DKG, participants flow.IdentityList) (map[flow.Identifier]flow.DKGParticipant, error) {
+func ToDKGParticipantLookup(dkg DKG, participants flow.IdentitySkeletonList) (map[flow.Identifier]flow.DKGParticipant, error) {
 
 	lookup := make(map[flow.Identifier]flow.DKGParticipant)
 	for _, identity := range participants {

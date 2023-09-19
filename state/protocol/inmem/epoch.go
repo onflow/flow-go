@@ -151,8 +151,7 @@ func (es *setupEpoch) RandomSource() ([]byte, error) {
 }
 
 func (es *setupEpoch) InitialIdentities() (flow.IdentitySkeletonList, error) {
-	identities := es.setupEvent.Participants.Filter(filter.Any)
-	return identities, nil
+	return es.setupEvent.Participants, nil
 }
 
 func (es *setupEpoch) Clustering() (flow.ClusterList, error) {
@@ -160,7 +159,7 @@ func (es *setupEpoch) Clustering() (flow.ClusterList, error) {
 }
 
 func ClusteringFromSetupEvent(setupEvent *flow.EpochSetup) (flow.ClusterList, error) {
-	collectorFilter := filter.HasRole(flow.RoleCollection)
+	collectorFilter := filter.HasRole[flow.IdentitySkeleton](flow.RoleCollection)
 	clustering, err := factory.NewClusterList(setupEvent.Assignments, setupEvent.Participants.Filter(collectorFilter))
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate ClusterList from collector identities: %w", err)

@@ -312,7 +312,7 @@ func (commit *EpochCommit) EqualTo(other *EpochCommit) bool {
 // ToDKGParticipantLookup constructs a DKG participant lookup from an identity
 // list and a key list. The identity list must be EXACTLY the same (order and
 // contents) as that used when initializing the corresponding DKG instance.
-func ToDKGParticipantLookup(participants IdentityList, keys []crypto.PublicKey) (map[Identifier]DKGParticipant, error) {
+func ToDKGParticipantLookup(participants IdentitySkeletonList, keys []crypto.PublicKey) (map[Identifier]DKGParticipant, error) {
 	if len(participants) != len(keys) {
 		return nil, fmt.Errorf("participant list (len=%d) does not match key list (len=%d)", len(participants), len(keys))
 	}

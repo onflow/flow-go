@@ -3,6 +3,7 @@
 package order_test
 
 import (
+	"github.com/onflow/flow-go/model/flow"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -14,5 +15,5 @@ import (
 // Test the canonical ordering of identity and identifier match
 func TestCanonicalOrderingMatch(t *testing.T) {
 	identities := unittest.IdentityListFixture(100)
-	require.Equal(t, identities.Sort(order.Canonical).NodeIDs(), identities.NodeIDs().Sort(order.IdentifierCanonical))
+	require.Equal(t, identities.Sort(order.Canonical[flow.Identity]).NodeIDs(), identities.NodeIDs().Sort(order.IdentifierCanonical))
 }

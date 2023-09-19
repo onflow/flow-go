@@ -104,7 +104,7 @@ func TestIdentityList_Exists(t *testing.T) {
 		il2 := unittest.IdentityListFixture(1)
 
 		// sort the first list
-		il1 = il1.Sort(order.Canonical)
+		il1 = il1.Sort(order.Canonical[flow.Identity])
 
 		for i := 0; i < 10; i++ {
 			assert.True(t, il1.Exists(il1[i]))
@@ -119,7 +119,7 @@ func TestIdentityList_IdentifierExists(t *testing.T) {
 		il2 := unittest.IdentityListFixture(1)
 
 		// sort the first list
-		il1 = il1.Sort(order.Canonical)
+		il1 = il1.Sort(order.Canonical[flow.Identity])
 
 		for i := 0; i < 10; i++ {
 			assert.True(t, il1.IdentifierExists(il1[i].NodeID))
@@ -246,10 +246,10 @@ func TestIdentity_Sort(t *testing.T) {
 	il := unittest.IdentityListFixture(20)
 	random, err := il.Shuffle()
 	require.NoError(t, err)
-	assert.False(t, random.Sorted(order.Canonical))
+	assert.False(t, random.Sorted(order.Canonical[flow.Identity]))
 
-	canonical := il.Sort(order.Canonical)
-	assert.True(t, canonical.Sorted(order.Canonical))
+	canonical := il.Sort(order.Canonical[flow.Identity])
+	assert.True(t, canonical.Sorted(order.Canonical[flow.Identity]))
 }
 
 func TestIdentity_EqualTo(t *testing.T) {

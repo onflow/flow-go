@@ -167,7 +167,7 @@ func NewRichProtocolStateEntry(
 
 		// if next epoch is available, it means that we have observed epoch setup event and we are not anymore in staking phase,
 		// so we need to build the identity table using current and next epoch setup events.
-		result.Identities, err = buildIdentityTable(
+		result.Identities, err = BuildIdentityTable(
 			protocolState.CurrentEpoch.Identities,
 			currentEpochSetup.Participants,
 			nextEpochSetup.Participants,
@@ -176,7 +176,7 @@ func NewRichProtocolStateEntry(
 			return nil, fmt.Errorf("could not build identity table for setup/commit phase: %w", err)
 		}
 
-		result.NextIdentities, err = buildIdentityTable(
+		result.NextIdentities, err = BuildIdentityTable(
 			nextEpoch.Identities,
 			nextEpochSetup.Participants,
 			currentEpochSetup.Participants,
@@ -191,7 +191,7 @@ func NewRichProtocolStateEntry(
 		if previousEpochSetup != nil {
 			otherIdentities = previousEpochSetup.Participants
 		}
-		result.Identities, err = buildIdentityTable(
+		result.Identities, err = BuildIdentityTable(
 			protocolState.CurrentEpoch.Identities,
 			currentEpochSetup.Participants,
 			otherIdentities,
@@ -341,7 +341,7 @@ func (ll DynamicIdentityEntryList) Sort(less IdentifierOrder) DynamicIdentityEnt
 	return dup
 }
 
-// buildIdentityTable constructs the full identity table for the target epoch by combining data from:
+// BuildIdentityTable constructs the full identity table for the target epoch by combining data from:
 //  1. The target epoch's Dynamic Identities.
 //  2. The target epoch's IdentitySkeletons
 //     (recorded in EpochSetup event and immutable throughout the epoch).
@@ -352,7 +352,7 @@ func (ll DynamicIdentityEntryList) Sort(less IdentifierOrder) DynamicIdentityEnt
 //
 // It also performs sanity checks to make sure that the data is consistent.
 // No errors are expected during normal operation.
-func buildIdentityTable(
+func BuildIdentityTable(
 	targetEpochDynamicIdentities DynamicIdentityEntryList,
 	targetEpochIdentitySkeletons IdentitySkeletonList,
 	adjacentEpochIdentitySkeletons IdentitySkeletonList,
