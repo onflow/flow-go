@@ -42,6 +42,9 @@ type EventEmitter interface {
 	// OperationNotSupportedError.
 	EmitEvent(event cadence.Event) error
 
+	// TODO unlock me
+	// EmitEventByType(string flow.EventType) error
+
 	Events() flow.EventsList
 	ServiceEvents() flow.EventsList
 	ConvertedServiceEvents() flow.ServiceEventList

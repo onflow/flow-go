@@ -1,4 +1,4 @@
-package flex
+package env
 
 import "github.com/onflow/flow-go/model/flow"
 
