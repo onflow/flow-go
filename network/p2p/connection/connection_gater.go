@@ -96,7 +96,7 @@ func (c *ConnGater) InterceptPeerDial(p peer.ID) bool {
 		return false
 	}
 
-	lg.Info().Msg("outbound connection established")
+	lg.Debug().Msg("outbound connection established")
 	return true
 }
 
@@ -148,7 +148,7 @@ func (c *ConnGater) InterceptSecured(dir network.Direction, p peer.ID, addr netw
 			return false
 		}
 
-		lg.Info().Msg("inbound connection established")
+		lg.Debug().Msg("inbound connection established")
 		return true
 	default:
 		// outbound connection should have been already blocked before this call
