@@ -33,27 +33,23 @@ type AtreeRegisterMigrator struct {
 	rwf     reporters.ReportWriterFactory
 }
 
-var _ AccountMigrator = (*AtreeRegisterMigrator)(nil)
+var _ AccountBasedMigration = (*AtreeRegisterMigrator)(nil)
 var _ io.Closer = (*AtreeRegisterMigrator)(nil)
 
 func NewAtreeRegisterMigrator(
 	rwf reporters.ReportWriterFactory,
-) AccountMigratorFactory {
-	return func(log zerolog.Logger, payloads []*ledger.Payload, i int) (AccountMigrator, error) {
-		log = log.With().Str("migration", "atree-register-migration").Logger()
+) *AtreeRegisterMigrator {
 
-		sampler := util2.NewTimedSampler(30 * time.Second)
+	sampler := util2.NewTimedSampler(30 * time.Second)
 
-		migrator := &AtreeRegisterMigrator{
-			log:     log,
-			sampler: sampler,
+	migrator := &AtreeRegisterMigrator{
+		sampler: sampler,
 
-			rwf: rwf,
-			rw:  rwf.ReportWriter("atree-register-migrator"),
-		}
-
-		return migrator, nil
+		rwf: rwf,
+		rw:  rwf.ReportWriter("atree-register-migrator"),
 	}
+
+	return migrator
 }
 
 func (m *AtreeRegisterMigrator) Close() error {
@@ -61,9 +57,17 @@ func (m *AtreeRegisterMigrator) Close() error {
 	return nil
 }
 
-var skippableAccountError = errors.New("account can be skipped")
+func (m *AtreeRegisterMigrator) InitMigration(
+	log zerolog.Logger,
+	_ []*ledger.Payload,
+	_ int,
+) error {
+	m.log = log.With().Str("migration", "atree-register-migration").Logger()
 
-func (m *AtreeRegisterMigrator) MigratePayloads(
+	return nil
+}
+
+func (m *AtreeRegisterMigrator) MigrateAccount(
 	_ context.Context,
 	address common.Address,
 	oldPayloads []*ledger.Payload,
@@ -82,7 +86,7 @@ func (m *AtreeRegisterMigrator) MigratePayloads(
 	}
 
 	// create all the runtime components we need for the migration
-	mr, err := m.newMigratorRuntime(address, oldPayloads)
+	mr, err := newMigratorRuntime(address, oldPayloads)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create migrator runtime: %w", err)
 	}
@@ -231,7 +235,7 @@ func (m *AtreeRegisterMigrator) convertStorageDomain(
 	return nil
 }
 
-func (m *AtreeRegisterMigrator) newMigratorRuntime(
+func newMigratorRuntime(
 	address common.Address,
 	payloads []*ledger.Payload,
 ) (
@@ -371,7 +375,8 @@ func (m *AtreeRegisterMigrator) validateChangesAndCreateNewRegisters(
 			Msg:     fmt.Sprintf("%x", value),
 		})
 
-		return nil, skippableAccountError
+		// this is ok
+		// return nil, skippableAccountError
 	}
 
 	//if hasMissingKeys && m.sampler.Sample(zerolog.InfoLevel) {
@@ -511,3 +516,5 @@ func mustHexToAddress(hex string) common.Address {
 	}
 	return address
 }
+
+var skippableAccountError = errors.New("account can be skipped")

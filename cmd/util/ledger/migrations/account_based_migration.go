@@ -17,30 +17,32 @@ import (
 	moduleUtil "github.com/onflow/flow-go/module/util"
 )
 
-// AccountMigrator takes all the Payloads that belong to the given account
+// AccountBasedMigration takes all the Payloads that belong to the given account
 // and return the migrated Payloads
-type AccountMigrator interface {
-	MigratePayloads(ctx context.Context, address common.Address, payloads []*ledger.Payload) ([]*ledger.Payload, error)
+type AccountBasedMigration interface {
+	InitMigration(
+		log zerolog.Logger,
+		allPayloads []*ledger.Payload,
+		nWorker int,
+	) error
+	MigrateAccount(
+		ctx context.Context,
+		address common.Address,
+		payloads []*ledger.Payload,
+	) ([]*ledger.Payload, error)
 }
 
-// AccountMigratorFactory creates an AccountMigrator
-type AccountMigratorFactory func(
-	log zerolog.Logger,
-	allPayloads []*ledger.Payload,
-	nWorker int,
-) (AccountMigrator, error)
-
-func CreateAccountBasedMigrations(
+func CreateAccountBasedMigration(
 	log zerolog.Logger,
 	nWorker int,
-	migratorFactories []AccountMigratorFactory,
+	migrations []AccountBasedMigration,
 ) func(payloads []*ledger.Payload) ([]*ledger.Payload, error) {
 	return func(payloads []*ledger.Payload) ([]*ledger.Payload, error) {
 		return MigrateByAccount(
 			log,
 			nWorker,
 			payloads,
-			migratorFactories,
+			migrations,
 		)
 	}
 }
@@ -51,7 +53,7 @@ func MigrateByAccount(
 	log zerolog.Logger,
 	nWorker int,
 	allPayloads []*ledger.Payload,
-	migratorFactories []AccountMigratorFactory,
+	migrations []AccountBasedMigration,
 ) (
 	[]*ledger.Payload,
 	error,
@@ -60,27 +62,19 @@ func MigrateByAccount(
 		return allPayloads, nil
 	}
 
-	accountGroups := util.GroupPayloadsByAccount(log, allPayloads, nWorker)
-
-	migrators := make([]AccountMigrator, len(migratorFactories))
-	for i, migratorFactory := range migratorFactories {
-		migrator, err := migratorFactory(
-			log.With().Int("account_migration_sequence", i).Logger(),
-			allPayloads,
-			nWorker)
-		if err != nil {
-			return nil, fmt.Errorf("could not create account migrator: %w", err)
+	for _, migrator := range migrations {
+		if err := migrator.InitMigration(log, allPayloads, nWorker); err != nil {
+			return nil, fmt.Errorf("could not init migrator: %w", err)
 		}
-		migrators[i] = migrator
 	}
 
 	log.Info().
-		Int("inner_migrations", len(migrators)).
+		Int("inner_migrations", len(migrations)).
 		Int("nWorker", nWorker).
-		Msgf("created account migrator")
+		Msgf("created account migrations")
 
 	defer func() {
-		for _, migrator := range migrators {
+		for _, migrator := range migrations {
 			// close the migrator if it's a Closer
 			if migrator, ok := migrator.(io.Closer); ok {
 				if err := migrator.Close(); err != nil {
@@ -90,8 +84,10 @@ func MigrateByAccount(
 		}
 	}()
 
+	accountGroups := util.GroupPayloadsByAccount(log, allPayloads, nWorker)
+
 	// migrate the Payloads under accounts
-	migrated, err := MigrateGroupConcurrently(log, migrators, accountGroups, nWorker)
+	migrated, err := MigrateGroupConcurrently(log, migrations, accountGroups, nWorker)
 
 	if err != nil {
 		return nil, fmt.Errorf("could not migrate group: %w", err)
@@ -110,7 +106,7 @@ func MigrateByAccount(
 // It's similar to MigrateGroupSequentially, except it will migrate different groups concurrently
 func MigrateGroupConcurrently(
 	log zerolog.Logger,
-	migrators []AccountMigrator,
+	migrations []AccountBasedMigration,
 	accountGroups *util.PayloadAccountGrouping,
 	nWorker int,
 ) ([]*ledger.Payload, error) {
@@ -142,8 +138,8 @@ func MigrateGroupConcurrently(
 
 					var err error
 					accountMigrated := job.Payloads
-					for _, migrator := range migrators {
-						accountMigrated, err = migrator.MigratePayloads(ctx, job.Address, accountMigrated)
+					for _, migrator := range migrations {
+						accountMigrated, err = migrator.MigrateAccount(ctx, job.Address, accountMigrated)
 						if err != nil {
 							break
 						}

@@ -214,8 +214,6 @@ func sortPayloads(i, j int, source, buffer sortablePayloads, goroutineAllowance 
 	wg.Wait()
 
 	mergeInto(source, buffer, i, mid, j)
-
-	return
 }
 
 func mergeInto(source, buffer sortablePayloads, i int, mid int, j int) {

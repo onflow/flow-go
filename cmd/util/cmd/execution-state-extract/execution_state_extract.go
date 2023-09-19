@@ -83,17 +83,23 @@ func extractExecutionState(
 		<-compactor.Done()
 	}()
 
+	rwf := reporters.NewReportFileWriterFactory(dir, log)
+
+	cadenceDataValidation := migrators.NewCadenceDataValidationMigrations(rwf, nWorker)
+
 	var migrations = []ledger.Migration{
-		migrators.CreateAccountBasedMigrations(
+		migrators.CreateAccountBasedMigration(
 			log,
 			nWorker,
-			[]migrators.AccountMigratorFactory{
+			[]migrators.AccountBasedMigration{
 				// do account usage migration before and after as a sanity check.
-				migrators.NewAccountUsageMigrator,
+				&migrators.AccountUsageMigrator{},
+				cadenceDataValidation.PreMigration(),
 				migrators.NewAtreeRegisterMigrator(
-					reporters.NewReportFileWriterFactory(dir, log),
+					rwf,
 				),
-				migrators.NewAccountUsageMigrator,
+				cadenceDataValidation.PostMigration(),
+				&migrators.AccountUsageMigrator{},
 			}),
 	}
 	newState := ledger.State(targetHash)

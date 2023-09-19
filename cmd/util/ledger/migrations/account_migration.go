@@ -32,18 +32,19 @@ type AccountUsageMigrator struct {
 	log zerolog.Logger
 }
 
-func NewAccountUsageMigrator(
+var _ AccountBasedMigration = &AccountUsageMigrator{}
+
+func (m *AccountUsageMigrator) InitMigration(
 	log zerolog.Logger,
 	_ []*ledger.Payload,
 	_ int,
-) (AccountMigrator, error) {
-	return AccountUsageMigrator{
-		log: log,
-	}, nil
+) error {
+	m.log = log.With().Str("component", "AccountUsageMigrator").Logger()
+	return nil
 }
 
-func (m AccountUsageMigrator) MigratePayloads(
-	ctx context.Context,
+func (m *AccountUsageMigrator) MigrateAccount(
+	_ context.Context,
 	address common.Address,
 	payloads []*ledger.Payload,
 ) ([]*ledger.Payload, error) {
@@ -126,6 +127,6 @@ func newPayloadWithValue(payload *ledger.Payload, value ledger.Value) (ledger.Pa
 	if err != nil {
 		return ledger.Payload{}, err
 	}
-	newPayload := ledger.NewPayload(key, payload.Value())
+	newPayload := ledger.NewPayload(key, value)
 	return *newPayload, nil
 }
