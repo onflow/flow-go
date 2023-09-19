@@ -174,6 +174,8 @@ func (m *Manager) CreateStream(ctx context.Context, peerID peer.ID) (libp2pnet.S
 		peerID, func(config unicastmodel.DialConfig) (unicastmodel.DialConfig, error) {
 			// consecutive successful stream count is reset to 0 if we fail to create a stream to the peer.
 			config.ConsecutiveSuccessfulStream = 0
+			// last successful dial time is reset to 0 if we fail to create a stream to the peer.
+			config.LastSuccessfulDial = time.Time{}
 
 			if noConnection {
 				// if no connections could be established to the peer, we will try to dial with a more strict dial config next time.
