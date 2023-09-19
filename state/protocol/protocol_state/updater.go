@@ -207,8 +207,8 @@ func (u *Updater) SetInvalidStateTransitionAttempted() {
 	u.state.InvalidStateTransitionAttempted = true
 }
 
-// TransitionToNextEpoch discards current protocol state and transitions to the next epoch.
-// Epoch transition is only allowed when:
+// TransitionToNextEpoch updates the notion of 'current epoch', 'previous' and 'next epoch' in the protocol
+// state. An epoch transition is only allowed when:
 // - next epoch has been set up,
 // - next epoch has been committed,
 // - invalid state transition has not been attempted,
@@ -265,7 +265,7 @@ func (u *Updater) ensureLookupPopulated() {
 }
 
 // rebuildIdentityLookup re-generates `currentEpochIdentitiesLookup` and `nextEpochIdentitiesLookup` from the
-// underlying identity lists `state.Identities` and `state.NextEpochProtocolState.Identities`, respectively.
+// underlying identity lists `state.CurrentEpoch.Identities` and `state.NextEpoch.Identities`, respectively.
 func (u *Updater) rebuildIdentityLookup() {
 	u.currentEpochIdentitiesLookup = u.state.CurrentEpoch.Identities.Lookup()
 	if u.state.NextEpoch != nil {
