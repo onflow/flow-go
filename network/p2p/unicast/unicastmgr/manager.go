@@ -52,31 +52,28 @@ type Manager struct {
 	metrics                module.UnicastManagerMetrics
 	dialConfigCache        unicast.DialConfigCache
 
-	// peerReliabilityThreshold is the threshold for the dial history to a remote peer that is considered reliable. When
-	// the last time we dialed a peer is less than this threshold, we will assume the remote peer is not reliable. Otherwise,
-	// we will assume the remote peer is reliable.
+	// streamZeroBackoffResetThreshold is the threshold that determines when to reset the stream creation backoff budget to the default value.
 	//
-	// For example, with peerReliabilityThreshold set to 5 minutes, if the last time we dialed a peer was 5 minutes ago, we will
-	// assume the remote peer is reliable and will attempt to dial again with more flexible dial options. However, if the last time
-	// we dialed a peer was 3 minutes ago, we will assume the remote peer is not reliable and will attempt to dial again with
-	// more strict dial options.
+	// For example the default value of 100 means that if the stream creation backoff budget is decreased to 0, then it will be reset to default value
+	// when the number of consecutive successful streams reaches 100.
 	//
-	// Note in Flow, we only dial a peer when we need to send a message to it; and we assume two nodes that are supposed to
-	// exchange unicast messages will do it frequently. Therefore, the dial history is a good indicator
-	// of the reliability of the peer.
-	// TODO: rename to peer backoff rest period
-	peerReliabilityThreshold time.Duration
+	// This is to prevent the backoff budget from being reset too frequently, as the backoff budget is used to gauge the reliability of the stream creation.
+	// When the stream creation backoff budget is reset to the default value, it means that the stream creation is reliable enough to be trusted again.
+	// This parameter mandates when the stream creation is reliable enough to be trusted again; i.e., when the number of consecutive successful streams reaches this threshold.
+	// Note that the counter is reset to 0 when the stream creation fails, so the value of for example 100 means that the stream creation is reliable enough that the recent
+	// 100 stream creations are all successful.
+	streamZeroBackoffResetThreshold uint64
 }
 
 type ManagerConfig struct {
-	Logger                     zerolog.Logger
-	StreamFactory              p2p.StreamFactory
-	SporkId                    flow.Identifier
-	ConnStatus                 p2p.PeerConnections
-	CreateStreamRetryDelay     time.Duration
-	Metrics                    module.UnicastManagerMetrics
-	StreamHistoryResetInterval time.Duration
-	DialConfigCacheFactory     DialConfigCacheFactory
+	Logger                          zerolog.Logger
+	StreamFactory                   p2p.StreamFactory
+	SporkId                         flow.Identifier
+	ConnStatus                      p2p.PeerConnections
+	CreateStreamRetryDelay          time.Duration
+	Metrics                         module.UnicastManagerMetrics
+	StreamZeroBackoffResetThreshold uint64
+	DialConfigCacheFactory          DialConfigCacheFactory
 }
 
 // NewUnicastManager creates a new unicast manager.
@@ -88,15 +85,15 @@ type ManagerConfig struct {
 //   - an error if the configuration is invalid, any error is irrecoverable.
 func NewUnicastManager(cfg *ManagerConfig) (*Manager, error) {
 	return &Manager{
-		logger:                   cfg.Logger.With().Str("module", "unicast-manager").Logger(),
-		dialConfigCache:          cfg.DialConfigCacheFactory(),
-		streamFactory:            cfg.StreamFactory,
-		sporkId:                  cfg.SporkId,
-		connStatus:               cfg.ConnStatus,
-		peerDialing:              sync.Map{},
-		createStreamRetryDelay:   cfg.CreateStreamRetryDelay,
-		metrics:                  cfg.Metrics,
-		peerReliabilityThreshold: cfg.StreamHistoryResetInterval,
+		logger:                          cfg.Logger.With().Str("module", "unicast-manager").Logger(),
+		dialConfigCache:                 cfg.DialConfigCacheFactory(),
+		streamFactory:                   cfg.StreamFactory,
+		sporkId:                         cfg.SporkId,
+		connStatus:                      cfg.ConnStatus,
+		peerDialing:                     sync.Map{},
+		createStreamRetryDelay:          cfg.CreateStreamRetryDelay,
+		metrics:                         cfg.Metrics,
+		streamZeroBackoffResetThreshold: cfg.StreamZeroBackoffResetThreshold,
 	}, nil
 }
 
@@ -157,6 +154,32 @@ func (m *Manager) CreateStream(ctx context.Context, peerID peer.ID) (libp2pnet.S
 			Str("peer_id", p2plogging.PeerId(peerID)).
 			Msg("failed to get or init dial config for peer id")
 	}
+	if dialCfg.StreamBackBudget == uint64(0) && dialCfg.ConsecutiveSuccessfulStream >= m.streamZeroBackoffResetThreshold {
+		// reset the stream creation backoff budget to the default value if the number of consecutive successful streams reaches the threshold,
+		// as the stream creation is reliable enough to be trusted again.
+		dialCfg, err = m.dialConfigCache.Adjust(
+			peerID, func(config unicastmodel.DialConfig) (unicastmodel.DialConfig, error) {
+				config.StreamBackBudget = unicastmodel.DefaultDialConfigFactory().StreamBackBudget
+				return config, nil
+			},
+		)
+		if err != nil {
+			// This is not a connection retryable error, this is a fatal error.
+			// TODO: technically, we better to return an error here, but the error must be irrecoverable, and we cannot
+			//       guarantee a clear distinction between recoverable and irrecoverable errors at the moment with CreateStream.
+			//       We have to revisit this once we studied the error handling paths in the unicast manager.
+			m.logger.Fatal().
+				Err(err).
+				Bool(logging.KeyNetworkingSecurity, true).
+				Str("peer_id", p2plogging.PeerId(peerID)).
+				Msg("failed to adjust dial config for peer id")
+		}
+		m.logger.Debug().
+			Str("peer_id", p2plogging.PeerId(peerID)).
+			Str("updated_dial_config", fmt.Sprintf("%+v", dialCfg)).
+			Msg("stream creation backoff budget reset to default value")
+	}
+
 	for i := len(m.protocols) - 1; i >= 0; i-- {
 		s, err := m.tryCreateStream(ctx, peerID, m.protocols[i], dialCfg)
 		if err != nil {

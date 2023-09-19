@@ -9,19 +9,17 @@ const (
 	// MaxStreamCreationAttempt is the maximum number of attempts to be made to create a stream to a remote node over a direct unicast (1:1) connection.
 	MaxStreamCreationAttempt = 3
 
-	// StreamHistoryResetInterval is the threshold for the dial history to a remote peer that is considered reliable. When
-	// the last time we dialed a peer is less than this threshold, we will assume the remote peer is not reliable. Otherwise,
-	// we will assume the remote peer is reliable.
+	// StreamZeroBackoffResetThreshold is the threshold that determines when to reset the stream creation backoff budget to the default value.
 	//
-	// For example, with StreamHistoryResetInterval set to 5 minutes, if the last time we dialed a peer was 5 minutes ago, we will
-	// assume the remote peer is reliable and will attempt to dial again with more flexible dial options. However, if the last time
-	// we dialed a peer was 3 minutes ago, we will assume the remote peer is not reliable and will attempt to dial again with
-	// more strict dial options.
+	// For example the default value of 100 means that if the stream creation backoff budget is decreased to 0, then it will be reset to default value
+	// when the number of consecutive successful streams reaches 100.
 	//
-	// Note in Flow, we only dial a peer when we need to send a message to it; and we assume two nodes that are supposed to
-	// exchange unicast messages will do it frequently. Therefore, the dial history is a good indicator
-	// of the reliability of the peer.
-	StreamHistoryResetInterval = 5 * time.Minute
+	// This is to prevent the backoff budget from being reset too frequently, as the backoff budget is used to gauge the reliability of the stream creation.
+	// When the stream creation backoff budget is reset to the default value, it means that the stream creation is reliable enough to be trusted again.
+	// This parameter mandates when the stream creation is reliable enough to be trusted again; i.e., when the number of consecutive successful streams reaches this threshold.
+	// Note that the counter is reset to 0 when the stream creation fails, so the value of for example 100 means that the stream creation is reliable enough that the recent
+	// 100 stream creations are all successful.
+	StreamZeroBackoffResetThreshold = 100
 )
 
 // DialConfig is a struct that represents the dial config for a peer.
