@@ -376,7 +376,7 @@ func (m *AtreeRegisterMigrator) validateChangesAndCreateNewRegisters(
 		})
 
 		// this is ok
-		// return nil, skippableAccountError
+		return nil, skippableAccountError
 	}
 
 	//if hasMissingKeys && m.sampler.Sample(zerolog.InfoLevel) {

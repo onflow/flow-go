@@ -3,14 +3,15 @@ package util
 import (
 	"bytes"
 	"fmt"
-	"github.com/onflow/cadence/runtime/common"
-	"github.com/onflow/flow-go/model/flow"
-	"github.com/rs/zerolog"
 	"sort"
 	"sync"
 	"time"
 
+	"github.com/rs/zerolog"
+
+	"github.com/onflow/cadence/runtime/common"
 	"github.com/onflow/flow-go/ledger"
+	"github.com/onflow/flow-go/model/flow"
 )
 
 type PayloadAccountGroup struct {

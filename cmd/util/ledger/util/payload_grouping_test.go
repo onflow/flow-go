@@ -3,14 +3,16 @@ package util_test
 import (
 	"crypto/rand"
 	"encoding/hex"
-	"github.com/onflow/flow-go/cmd/util/ledger/util"
-	"github.com/onflow/flow-go/ledger"
-	"github.com/onflow/flow-go/model/flow"
-	"github.com/rs/zerolog"
-	"github.com/stretchr/testify/require"
 	rand2 "math/rand"
 	"runtime"
 	"testing"
+
+	"github.com/rs/zerolog"
+	"github.com/stretchr/testify/require"
+
+	"github.com/onflow/flow-go/cmd/util/ledger/util"
+	"github.com/onflow/flow-go/ledger"
+	"github.com/onflow/flow-go/model/flow"
 )
 
 func TestGroupPayloadsByAccount(t *testing.T) {

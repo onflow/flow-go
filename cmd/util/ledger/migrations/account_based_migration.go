@@ -62,8 +62,12 @@ func MigrateByAccount(
 		return allPayloads, nil
 	}
 
-	for _, migrator := range migrations {
-		if err := migrator.InitMigration(log, allPayloads, nWorker); err != nil {
+	for i, migrator := range migrations {
+		if err := migrator.InitMigration(
+			log.With().Int("migration_index", i).Logger(),
+			allPayloads,
+			nWorker,
+		); err != nil {
 			return nil, fmt.Errorf("could not init migrator: %w", err)
 		}
 	}

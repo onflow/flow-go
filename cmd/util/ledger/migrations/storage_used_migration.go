@@ -3,6 +3,7 @@ package migrations
 import (
 	"context"
 	"fmt"
+
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/cadence/runtime/common"
