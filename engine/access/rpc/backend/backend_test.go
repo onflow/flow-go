@@ -528,7 +528,7 @@ func (suite *Suite) TestGetTransactionResultByIndex() {
 
 	_, fixedENIDs := suite.setupReceipts(&block)
 	suite.state.On("Final").Return(suite.snapshot, nil).Maybe()
-	suite.snapshot.On("ActiveIdentities", mock.Anything).Return(fixedENIDs, nil)
+	suite.snapshot.On("Identities", mock.Anything).Return(fixedENIDs, nil)
 
 	// create a mock connection factory
 	connFactory := new(backendmock.ConnectionFactory)
@@ -590,7 +590,7 @@ func (suite *Suite) TestGetTransactionResultsByBlockID() {
 
 	_, fixedENIDs := suite.setupReceipts(&block)
 	suite.state.On("Final").Return(suite.snapshot, nil).Maybe()
-	suite.snapshot.On("ActiveIdentities", mock.Anything).Return(fixedENIDs, nil)
+	suite.snapshot.On("Identities", mock.Anything).Return(fixedENIDs, nil)
 
 	// create a mock connection factory
 	connFactory := new(backendmock.ConnectionFactory)
@@ -677,7 +677,7 @@ func (suite *Suite) TestTransactionStatusTransition() {
 	blockID := block.ID()
 	_, fixedENIDs := suite.setupReceipts(&block)
 	suite.state.On("Final").Return(suite.snapshot, nil).Maybe()
-	suite.snapshot.On("ActiveIdentities", mock.Anything).Return(fixedENIDs, nil)
+	suite.snapshot.On("Identities", mock.Anything).Return(fixedENIDs, nil)
 
 	// create a mock connection factory
 	connFactory := new(backendmock.ConnectionFactory)
@@ -912,7 +912,7 @@ func (suite *Suite) TestTransactionPendingToFinalizedStatusTransition() {
 	_, enIDs := suite.setupReceipts(&block)
 	suite.state.On("Final").Return(suite.snapshot, nil).Maybe()
 
-	suite.snapshot.On("ActiveIdentities", mock.Anything).Return(enIDs, nil)
+	suite.snapshot.On("Identities", mock.Anything).Return(enIDs, nil)
 
 	suite.state.
 		On("AtBlockID", refBlockID).
@@ -1126,7 +1126,7 @@ func (suite *Suite) TestGetEventsForBlockIDs() {
 	}
 	blockHeaders := setupStorage(5)
 
-	suite.snapshot.On("ActiveIdentities", mock.Anything).Return(validExecutorIdentities, nil)
+	suite.snapshot.On("Identities", mock.Anything).Return(validExecutorIdentities, nil)
 	validENIDs := flow.IdentifierList(validExecutorIdentities.NodeIDs())
 
 	// create a mock connection factory
@@ -1412,7 +1412,7 @@ func (suite *Suite) TestGetEventsForHeightRange() {
 		func() *flow.Header { return head },
 		func() error { return nil },
 	)
-	snapshot.On("ActiveIdentities", mock.Anything).Return(
+	snapshot.On("Identities", mock.Anything).Return(
 		func(_ flow.IdentityFilter) flow.IdentityList {
 			return nodeIdentities
 		},
@@ -1690,7 +1690,7 @@ func (suite *Suite) TestGetAccount() {
 
 	receipts, ids := suite.setupReceipts(&block)
 
-	suite.snapshot.On("ActiveIdentities", mock.Anything).Return(ids, nil)
+	suite.snapshot.On("Identities", mock.Anything).Return(ids, nil)
 	// create a mock connection factory
 	connFactory := new(backendmock.ConnectionFactory)
 	connFactory.On("GetExecutionAPIClient", mock.Anything).Return(suite.execClient, &mockCloser{}, nil)
@@ -1744,7 +1744,7 @@ func (suite *Suite) TestGetAccountAtBlockHeight() {
 		Once()
 
 	receipts, ids := suite.setupReceipts(&b)
-	suite.snapshot.On("ActiveIdentities", mock.Anything).Return(ids, nil)
+	suite.snapshot.On("Identities", mock.Anything).Return(ids, nil)
 
 	// create a mock connection factory
 	connFactory := new(backendmock.ConnectionFactory)
@@ -1858,7 +1858,7 @@ func (suite *Suite) TestExecutionNodesForBlockID() {
 		},
 		func(id flow.Identifier) error { return nil })
 
-	suite.snapshot.On("ActiveIdentities", mock.Anything).Return(
+	suite.snapshot.On("Identities", mock.Anything).Return(
 		func(filter flow.IdentityFilter) flow.IdentityList {
 			// apply the filter passed in to the list of all the execution nodes
 			return allExecutionNodes.Filter(filter)
@@ -2150,7 +2150,7 @@ func (suite *Suite) TestScriptExecutionValidationMode() {
 	blockID := block.ID()
 	_, ids := suite.setupReceipts(&block)
 	suite.state.On("Final").Return(suite.snapshot, nil).Maybe()
-	suite.snapshot.On("ActiveIdentities", mock.Anything).Return(ids, nil)
+	suite.snapshot.On("Identities", mock.Anything).Return(ids, nil)
 	suite.state.On("AtBlockID", mock.Anything).Return(suite.snapshot)
 
 	script := []byte("dummy script")

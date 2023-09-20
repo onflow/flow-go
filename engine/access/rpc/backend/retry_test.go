@@ -124,7 +124,7 @@ func (suite *Suite) TestSuccessfulTransactionsDontRetry() {
 	}
 
 	_, enIDs := suite.setupReceipts(&block)
-	suite.snapshot.On("ActiveIdentities", mock.Anything).Return(enIDs, nil)
+	suite.snapshot.On("Identities", mock.Anything).Return(enIDs, nil)
 	connFactory := suite.setupConnectionFactory()
 
 	backend := New(

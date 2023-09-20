@@ -70,7 +70,7 @@ func (cs *EngineSuite) SetupTest() {
 
 	protoSnapshot := &protocol.Snapshot{}
 	protoSnapshot.On("Epochs").Return(protoQuery)
-	protoSnapshot.On("ActiveIdentities", mock.Anything).Return(
+	protoSnapshot.On("Identities", mock.Anything).Return(
 		func(selector flow.IdentityFilter) flow.IdentityList {
 			return cs.cluster.Filter(selector)
 		},

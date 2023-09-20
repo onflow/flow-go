@@ -597,7 +597,7 @@ func (suite *Suite) TestGetSealedTransaction() {
 		colIdentities := unittest.IdentityListFixture(1, unittest.WithRole(flow.RoleCollection))
 		allIdentities := append(colIdentities, enIdentities...)
 
-		suite.finalSnapshot.On("ActiveIdentities", mock.Anything).Return(allIdentities, nil).Once()
+		suite.finalSnapshot.On("Identities", mock.Anything).Return(allIdentities, nil).Once()
 
 		exeEventResp := execproto.GetTransactionResultResponse{
 			Events: nil,
@@ -731,7 +731,7 @@ func (suite *Suite) TestGetTransactionResult() {
 
 		enNodeIDs := enIdentities.NodeIDs()
 		allIdentities := append(colIdentities, enIdentities...)
-		finalSnapshot.On("ActiveIdentities", mock.Anything).Return(allIdentities, nil)
+		finalSnapshot.On("Identities", mock.Anything).Return(allIdentities, nil)
 
 		// assume execution node returns an empty list of events
 		suite.execClient.On("GetTransactionResult", mock.Anything, mock.Anything).Return(&execproto.GetTransactionResultResponse{
@@ -941,8 +941,8 @@ func (suite *Suite) TestExecuteScript() {
 		receipts := bstorage.NewExecutionReceipts(suite.metrics, db, results, bstorage.DefaultCacheSize)
 
 		identities := unittest.IdentityListFixture(2, unittest.WithRole(flow.RoleExecution))
-		suite.sealedSnapshot.On("ActiveIdentities", mock.Anything).Return(identities, nil)
-		suite.finalSnapshot.On("ActiveIdentities", mock.Anything).Return(identities, nil)
+		suite.sealedSnapshot.On("Identities", mock.Anything).Return(identities, nil)
+		suite.finalSnapshot.On("Identities", mock.Anything).Return(identities, nil)
 
 		// create a mock connection factory
 		connFactory := new(factorymock.ConnectionFactory)

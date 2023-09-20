@@ -395,7 +395,7 @@ func StateSnapshotForUnknownBlock() *protocol.Snapshot {
 	snapshot.On("Identity", mock.Anything).Return(
 		nil, storerr.ErrNotFound,
 	)
-	snapshot.On("ActiveIdentities", mock.Anything).Return(
+	snapshot.On("Identities", mock.Anything).Return(
 		nil, storerr.ErrNotFound,
 	)
 	snapshot.On("Head", mock.Anything).Return(
@@ -418,7 +418,7 @@ func StateSnapshotForKnownBlock(block *flow.Header, identities map[flow.Identifi
 			return nil
 		},
 	)
-	snapshot.On("ActiveIdentities", mock.Anything).Return(
+	snapshot.On("Identities", mock.Anything).Return(
 		func(selector flow.IdentityFilter) flow.IdentityList {
 			var idts flow.IdentityList
 			for _, i := range identities {

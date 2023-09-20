@@ -518,7 +518,7 @@ func (suite *NetworkTestSuite) TestUnicastRateLimit_Bandwidth() {
 
 func (suite *NetworkTestSuite) createOverlay(provider *unittest.UpdatableIDProvider) *mocknetwork.Overlay {
 	overlay := &mocknetwork.Overlay{}
-	overlay.On("ActiveIdentities").Maybe().Return(func() flow.IdentityList {
+	overlay.On("Identities").Maybe().Return(func() flow.IdentityList {
 		return provider.Identities(filter.Any)
 	})
 	overlay.On("Topology").Maybe().Return(func() flow.IdentityList {

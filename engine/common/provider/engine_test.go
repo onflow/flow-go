@@ -58,7 +58,7 @@ func TestOnEntityRequestFull(t *testing.T) {
 	}
 
 	final := protocol.NewSnapshot(t)
-	final.On("ActiveIdentities", mock.Anything).Return(
+	final.On("Identities", mock.Anything).Return(
 		func(selector flow.IdentityFilter) flow.IdentityList {
 			return identities.Filter(selector)
 		},
@@ -152,7 +152,7 @@ func TestOnEntityRequestPartial(t *testing.T) {
 	}
 
 	final := protocol.NewSnapshot(t)
-	final.On("ActiveIdentities", mock.Anything).Return(
+	final.On("Identities", mock.Anything).Return(
 		func(selector flow.IdentityFilter) flow.IdentityList {
 			return identities.Filter(selector)
 		},
@@ -240,7 +240,7 @@ func TestOnEntityRequestDuplicates(t *testing.T) {
 	}
 
 	final := protocol.NewSnapshot(t)
-	final.On("ActiveIdentities", mock.Anything).Return(
+	final.On("Identities", mock.Anything).Return(
 		func(selector flow.IdentityFilter) flow.IdentityList {
 			return identities.Filter(selector)
 		},
@@ -325,7 +325,7 @@ func TestOnEntityRequestEmpty(t *testing.T) {
 	}
 
 	final := protocol.NewSnapshot(t)
-	final.On("ActiveIdentities", mock.Anything).Return(
+	final.On("Identities", mock.Anything).Return(
 		func(selector flow.IdentityFilter) flow.IdentityList {
 			return identities.Filter(selector)
 		},
@@ -409,7 +409,7 @@ func TestOnEntityRequestInvalidOrigin(t *testing.T) {
 	}
 
 	final := protocol.NewSnapshot(t)
-	final.On("ActiveIdentities", mock.Anything).Return(
+	final.On("Identities", mock.Anything).Return(
 		func(selector flow.IdentityFilter) flow.IdentityList {
 			defer cancel()
 			return identities.Filter(selector)

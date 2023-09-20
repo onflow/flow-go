@@ -71,7 +71,7 @@ func (s *NodeDisallowListWrapperTestSuite) TestHonestNode() {
 		identities := unittest.IdentityListFixture(11)
 		f := filter.In(identities[3:4])
 		expectedFilteredIdentities := identities.Filter(f)
-		s.provider.On("ActiveIdentities", mock.Anything).Return(
+		s.provider.On("Identities", mock.Anything).Return(
 			func(filter flow.IdentityFilter) flow.IdentityList {
 				return identities.Filter(filter)
 			},
@@ -147,7 +147,7 @@ func (s *NodeDisallowListWrapperTestSuite) TestDisallowListNode() {
 		require.NoError(s.T(), err)
 		numIdentities := len(combinedIdentities)
 
-		s.provider.On("ActiveIdentities", mock.Anything).Return(combinedIdentities)
+		s.provider.On("Identities", mock.Anything).Return(combinedIdentities)
 
 		noFilter := filter.Not(filter.In(nil))
 		identities := s.wrapper.Identities(noFilter)
@@ -175,7 +175,7 @@ func (s *NodeDisallowListWrapperTestSuite) TestDisallowListNode() {
 		require.NoError(s.T(), err)
 		numIdentities := len(combinedIdentities)
 
-		s.provider.On("ActiveIdentities", mock.Anything).Return(combinedIdentities)
+		s.provider.On("Identities", mock.Anything).Return(combinedIdentities)
 
 		identities := s.wrapper.Identities(p2pnet.NotEjectedFilter)
 
