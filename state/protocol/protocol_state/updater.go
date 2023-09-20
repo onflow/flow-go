@@ -271,6 +271,6 @@ func (u *Updater) rebuildIdentityLookup() {
 	if u.state.NextEpoch != nil {
 		u.nextEpochIdentitiesLookup = u.state.NextEpoch.Identities.Lookup()
 	} else {
-		u.state.NextEpoch = nil
+		u.nextEpochIdentitiesLookup = nil
 	}
 }

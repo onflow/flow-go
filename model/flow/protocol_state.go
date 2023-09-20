@@ -26,17 +26,21 @@ type DynamicIdentityEntryList []*DynamicIdentityEntry
 type ProtocolStateEntry struct {
 	// Setup and commit event IDs for previous epoch.
 	PreviousEpochEventIDs EventIDs
-	// Protocol state for current epoch
+	// Setup and commit event IDs for previous epoch. These EventIDs are ZeroID if 
+	// and only if the current Epoch is the first epoch after a spork or genesis. 
 	CurrentEpoch EpochStateContainer
-	// Protocol state for next epoch. Could be nil if next epoch not setup yet.
+	// Protocol state for next epoch. Could be nil if next epoch is not yet set up.
 	NextEpoch *EpochStateContainer
 	// InvalidStateTransitionAttempted encodes whether an invalid state transition
-	// has been detected in this fork. When this happens, epoch fallback is triggered
-	// AFTER the fork is finalized.
+	// has been detected in this fork. Under normal operations, this value is false.
+	// The only possible state transition is false → true. When this happens, 
+	// epoch fallback is triggered AFTER the fork is finalized.  
 	InvalidStateTransitionAttempted bool
 }
 
-// EpochStateContainer is a container for data that is relevant to a single epoch.
+// EpochStateContainer holds the data pertaining to a _single_ epoch but no information about
+// any adjacent epochs. To perform a transition from epoch N to N+1, EpochStateContainers for 
+// both epochs are necessary. 
 type EpochStateContainer struct {
 	// ID of setup event for this epoch, never nil.
 	SetupID Identifier
@@ -55,20 +59,12 @@ func (c *EpochStateContainer) ID() Identifier {
 	if c == nil {
 		return ZeroID
 	}
-	body := struct {
-		SetupID    Identifier
-		CommitID   Identifier
-		Identities DynamicIdentityEntryList
-	}{
-		SetupID:    c.SetupID,
-		CommitID:   c.CommitID,
-		Identities: c.Identities,
-	}
-	return MakeID(body)
+	return MakeID(c)
 }
 
 // Copy returns a full copy of the entry.
 // Embedded Identities are deep-copied, _except_ for their keys, which are copied by reference.
+// Per convention, the ID of a `nil` EpochStateContainer is `flow.ZeroID`.
 func (c *EpochStateContainer) Copy() *EpochStateContainer {
 	if c == nil {
 		return nil
