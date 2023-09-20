@@ -4,6 +4,7 @@ package synchronization
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -525,7 +526,7 @@ func (e *Engine) validateBatchRequestForALSP(originID flow.Identifier, batchRequ
 		return nil, false, fmt.Errorf("failed to generate random number from %x: %w", originID[:], err)
 	}
 
-	// check if range request is valid
+	// validity check #1: if no block IDs
 	if len(batchRequest.BlockIDs) == 0 {
 		e.log.Warn().
 			Hex("origin_id", logging.ID(originID)).
@@ -537,10 +538,34 @@ func (e *Engine) validateBatchRequestForALSP(originID flow.Identifier, batchRequ
 		if err != nil {
 			// failing to create the misbehavior report is unlikely. If an error is encountered while
 			// creating the misbehavior report it indicates a bug and processing can not proceed.
-			return nil, false, fmt.Errorf("failed to create misbehavior report (invalid range request) from %x: %w", originID[:], err)
+			return nil, false, fmt.Errorf("failed to create misbehavior report (invalid batch request, no block IDs) from %x: %w", originID[:], err)
 		}
 		// failed validation check and should be reported as misbehavior
 		return report, false, nil
+	}
+
+	// validity check #2: if any block ID is unknown
+	for _, blockID := range batchRequest.BlockIDs {
+		_, err := e.requestHandler.blocks.ByID(blockID)
+		if errors.Is(err, storage.ErrNotFound) {
+			//logger.Debug().Hex("block_id", blockID[:]).Msg("skipping unknown block")
+			//continue
+
+			e.log.Warn().
+				Hex("origin_id", logging.ID(originID)).
+				Str(logging.KeySuspicious, "true").
+				Str("reason", alsp.InvalidMessage.String()).
+				Msgf("received invalid batch request with block ID %x that does not exist, creating ALSP report", blockID[:])
+			report, err := alsp.NewMisbehaviorReport(originID, alsp.InvalidMessage)
+
+			if err != nil {
+				// failing to create the misbehavior report is unlikely. If an error is encountered while
+				// creating the misbehavior report it indicates a bug and processing can not proceed.
+				return nil, false, fmt.Errorf("failed to create misbehavior report (invalid batch request, unknown block ID) from %x: %w", originID[:], err)
+			}
+			return report, false, nil
+		}
+
 	}
 
 	return nil, true, nil

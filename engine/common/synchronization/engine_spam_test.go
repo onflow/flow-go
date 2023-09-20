@@ -298,6 +298,9 @@ func (ss *SyncSuite) TestLoad_Process_BatchRequest_SometimesReportSpam() {
 	// using an empty batch request always results in a misbehavior report, no matter how small the base probability factor is
 	loadGroups = append(loadGroups, loadGroup{0.001, 1000, 1000, []flow.Identifier{}})
 
+	// using a batch request with missing block ID should always result in a misbehavior report, no matter how small the base probability factor is
+	loadGroups = append(loadGroups, loadGroup{0.001, 1000, 1000, unittest.IdentifierListFixture(100)})
+
 	// reset misbehavior report counter for each subtest
 	misbehaviorsCounter := 0
 
@@ -312,7 +315,7 @@ func (ss *SyncSuite) TestLoad_Process_BatchRequest_SometimesReportSpam() {
 			originID := unittest.IdentifierFixture()
 			req := &messages.BatchRequest{
 				Nonce:    nonce,
-				BlockIDs: make([]flow.Identifier, 0),
+				BlockIDs: loadGroup.blockIDs,
 			}
 
 			// count misbehavior reports over the course of a load test
