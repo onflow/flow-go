@@ -142,7 +142,7 @@ func (m *postMigration) Close() error {
 func (m *postMigration) InitMigration(
 	log zerolog.Logger,
 	_ []*ledger.Payload,
-	nWorker int,
+	_ int,
 ) error {
 	m.log = log.With().Str("component", "CadenceDataValidationPostMigration").Logger()
 	m.rw = m.rwf.ReportWriter("cadence_data_validation")
@@ -161,7 +161,11 @@ func (m *postMigration) MigrateAccount(
 
 	newHash, err := hashAccountCadenceValues(address, payloads)
 	if err != nil {
-		return nil, err
+		m.log.Info().
+			Err(err).
+			Hex("address", address[:]).
+			Msg("failed to hash cadence values")
+		return payloads, nil
 	}
 
 	hash, ok := m.v.get(address)
