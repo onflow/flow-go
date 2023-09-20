@@ -252,6 +252,7 @@ type FlowAccessNodeBuilder struct {
 	ExecutionDataRequester     state_synchronization.ExecutionDataRequester
 	ExecutionDataStore         execution_data.ExecutionDataStore
 	ExecutionDataCache         *execdatacache.ExecutionDataCache
+	ExecutionIndexer           *indexer.ExecutionState
 
 	// The sync engine participants provider is the libp2p peer store for the access node
 	// which is not available until after the network has started.
@@ -465,6 +466,9 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 		AdminCommand("read-execution-data", func(config *cmd.NodeConfig) commands.AdminCommand {
 			return stateSyncCommands.NewReadExecutionDataCommand(builder.ExecutionDataStore)
 		}).
+		AdminCommand("read-register-data", func(config *cmd.NodeConfig) commands.AdminCommand {
+			return stateSyncCommands.NewRegisterDataCommand(builder.ExecutionIndexer)
+		}).
 		Module("execution data datastore and blobstore", func(node *cmd.NodeConfig) error {
 			datastoreDir := filepath.Join(builder.executionDataDir, "blobstore")
 			err := os.MkdirAll(datastoreDir, 0700)
@@ -635,6 +639,8 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 			if err != nil {
 				return nil, err
 			}
+
+			builder.ExecutionIndexer = exeIndexer // todo temporary to test
 
 			// execution state worker uses a jobqueue to process new execution data and indexes it by using the indexer.
 			worker := indexer.NewExecutionStateWorker(
