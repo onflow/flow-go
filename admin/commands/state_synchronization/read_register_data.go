@@ -2,6 +2,7 @@ package state_synchronization
 
 import (
 	"context"
+	"encoding/hex"
 	"fmt"
 	"strconv"
 
@@ -46,7 +47,7 @@ func (r *ReadRegisterDataCommand) Validator(req *admin.CommandRequest) error {
 		return admin.NewInvalidAdminReqErrorf("missing required field 'owner")
 	}
 
-	owner, ok := ownerRaw.(string)
+	ownerHex, ok := ownerRaw.(string)
 	if !ok {
 		return admin.NewInvalidAdminReqParameterError("owner", "must be a string", ownerRaw)
 	}
@@ -76,8 +77,13 @@ func (r *ReadRegisterDataCommand) Validator(req *admin.CommandRequest) error {
 		return admin.NewInvalidAdminReqParameterError("height", "must be a number", err)
 	}
 
+	owner, err := hex.DecodeString(ownerHex)
+	if err != nil {
+		return admin.NewInvalidAdminReqParameterError("owner", "must be a hex-encoded string", err)
+	}
+
 	req.ValidatorData = &registerRequest{
-		registerID: flow.NewRegisterID(owner, key),
+		registerID: flow.NewRegisterID(string(owner), key),
 		height:     height,
 	}
 
