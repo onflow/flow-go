@@ -44,6 +44,8 @@ func (m *AccountUsageMigrator) InitMigration(
 	return nil
 }
 
+const oldAccountStatusSize = 25
+
 func (m *AccountUsageMigrator) MigrateAccount(
 	_ context.Context,
 	address common.Address,
@@ -81,7 +83,6 @@ func (m *AccountUsageMigrator) MigrateAccount(
 		return nil, fmt.Errorf("could not find account status for account %v", address.Hex())
 	}
 
-	const oldAccountStatusSize = 25
 	isOldVersionOfStatusRegister := len(payloads[statusIndex].Value()) == oldAccountStatusSize
 
 	same := m.compareUsage(isOldVersionOfStatusRegister, status, actualSize)

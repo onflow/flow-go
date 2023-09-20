@@ -126,13 +126,13 @@ func (m *postMigration) Close() error {
 	for address := range m.v.hashes {
 		m.log.Error().
 			Hex("address", address[:]).
-			Msg("cadence values missing")
+			Msg("cadence values missing after migration")
 
 		m.rw.Write(
 			cadenceDataValidationReportEntry{
 
 				Address: address.Hex(),
-				Problem: "cadence values missing",
+				Problem: "cadence values missing after migration",
 			},
 		)
 	}
@@ -169,13 +169,13 @@ func (m *postMigration) MigrateAccount(
 	if !ok {
 		m.log.Error().
 			Hex("address", address[:]).
-			Msg("cadence values missing")
+			Msg("cadence values missing before migration")
 
 		m.rw.Write(
 			cadenceDataValidationReportEntry{
 
 				Address: address.Hex(),
-				Problem: "cadence values missing",
+				Problem: "cadence values missing before migration",
 			},
 		)
 	}
@@ -230,8 +230,13 @@ func hashDomainCadenceValues(
 	domain string,
 ) ([]byte, error) {
 	hasher := newHasher()
-
-	storageMap := mr.Storage.GetStorageMap(mr.Address, domain, false)
+	var storageMap *interpreter.StorageMap
+	err := capturePanic(func() {
+		storageMap = mr.Storage.GetStorageMap(mr.Address, domain, false)
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to get storage map: %w", err)
+	}
 	if storageMap == nil {
 		// no storage for this domain
 		return nil, nil

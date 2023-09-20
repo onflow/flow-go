@@ -309,6 +309,9 @@ func (m *AtreeRegisterMigrator) validateChangesAndCreateNewRegisters(
 	originalPayloads := originalPayloadsSnapshot.Payloads
 	newPayloads := make([]*ledger.Payload, 0, len(originalPayloads))
 
+	// store state payload so that it can be updated
+	var statePayload *ledger.Payload
+
 	for id, value := range changes {
 		// delete all values that were changed from the original payloads so that we can
 		// check what remains
@@ -335,10 +338,16 @@ func (m *AtreeRegisterMigrator) validateChangesAndCreateNewRegisters(
 			return nil, fmt.Errorf("register for a different account was produced during migration")
 		}
 
+		if isAccountKey(util.RegisterIDToKey(id)) {
+			statePayload = ledger.NewPayload(util.RegisterIDToKey(id), value)
+			// we will append this later
+			continue
+		}
+
 		newPayloads = append(newPayloads, ledger.NewPayload(util.RegisterIDToKey(id), value))
 	}
 
-	//hasMissingKeys := false
+	removedSize := uint64(0)
 
 	// add all values that were not changed
 	for id, value := range originalPayloads {
@@ -347,8 +356,20 @@ func (m *AtreeRegisterMigrator) validateChangesAndCreateNewRegisters(
 			m.log.Warn().Msgf("empty value for key %s", id)
 			continue
 		}
+
+		key, err := value.Key()
+		if err != nil {
+			return nil, fmt.Errorf("failed to get payload key: %w", err)
+		}
+
+		if isAccountKey(key) {
+			statePayload = value
+			// we will append this later
+			continue
+		}
+
 		if id.IsInternalState() {
-			// this is expected. Move it to the new payload
+			// this is expected. Move it to the new payloads
 			newPayloads = append(newPayloads, value)
 			continue
 		}
@@ -362,7 +383,7 @@ func (m *AtreeRegisterMigrator) validateChangesAndCreateNewRegisters(
 		}
 		if isADomainKey {
 			// TODO: check if this is really expected
-			// this is expected. Move it to the new payload
+			// this is expected. Move it to the new payloads
 			newPayloads = append(newPayloads, value)
 			continue
 		}
@@ -375,9 +396,39 @@ func (m *AtreeRegisterMigrator) validateChangesAndCreateNewRegisters(
 			Msg:     fmt.Sprintf("%x", value),
 		})
 
+		size, err := payloadSize(key, value)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get payload size: %w", err)
+		}
+
+		removedSize += size
+
 		// this is ok
-		return nil, skippableAccountError
+		// return nil, skippableAccountError
 	}
+
+	if statePayload == nil {
+		return nil, fmt.Errorf("state payload was not found")
+	}
+
+	if removedSize > 0 {
+		status, err := environment.AccountStatusFromBytes(statePayload.Value())
+		if err != nil {
+			return nil, fmt.Errorf("could not parse account status: %w", err)
+		}
+
+		status.SetStorageUsed(status.StorageUsed() - removedSize)
+
+		newPayload, err := newPayloadWithValue(statePayload, status.ToBytes())
+		if err != nil {
+			return nil, fmt.Errorf("cannot create new payload with value: %w", err)
+		}
+
+		statePayload = &newPayload
+
+	}
+
+	newPayloads = append(newPayloads, statePayload)
 
 	//if hasMissingKeys && m.sampler.Sample(zerolog.InfoLevel) {
 	//	m.dumpAccount(mr.Address, mr.Payloads, newPayloads)
