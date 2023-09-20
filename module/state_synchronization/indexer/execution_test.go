@@ -180,16 +180,6 @@ func TestExecutionState_HeightByBlockID(t *testing.T) {
 	}
 }
 
-// test cases:
-// - no chunk data
-// - no registers data
-// - multiple inserts, same height
-// - smaller invalid height
-// - bigger invalid height
-// - error on register updates
-// - error on events
-// - full register data, events, collections...
-
 func TestExecutionState_IndexBlockData(t *testing.T) {
 	blocks := blocksFixture(5)
 	block := blocks[len(blocks)-1]
