@@ -420,3 +420,29 @@ func TestIdentityList_GetIndex(t *testing.T) {
 		require.Equal(t, uint(0), index)
 	})
 }
+
+func addWeightGeneric[T flow.GenericIdentity](i1, i2 T) uint64 {
+	return i1.GetInitialWeight() + i2.GetInitialWeight()
+}
+
+func addWeightLiteral(i1, i2 flow.Identity) uint64 {
+	return i1.InitialWeight + i2.InitialWeight
+}
+
+func BenchmarkIdentityGenerics(b *testing.B) {
+	id1 := unittest.IdentityFixture()
+	id2 := unittest.IdentityFixture()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_ = addWeightGeneric(*id1, *id2)
+	}
+}
+
+func BenchmarkIdentityLiteral(b *testing.B) {
+	id1 := unittest.IdentityFixture()
+	id2 := unittest.IdentityFixture()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_ = addWeightLiteral(*id1, *id2)
+	}
+}
