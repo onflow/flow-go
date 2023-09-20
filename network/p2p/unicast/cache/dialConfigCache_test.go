@@ -1,8 +1,12 @@
 package unicastcache_test
 
 import (
+	"fmt"
+	"sync"
 	"testing"
+	"time"
 
+	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 
@@ -10,6 +14,7 @@ import (
 	p2ptest "github.com/onflow/flow-go/network/p2p/test"
 	unicastcache "github.com/onflow/flow-go/network/p2p/unicast/cache"
 	"github.com/onflow/flow-go/network/p2p/unicast/unicastmodel"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 // TestNewDialConfigCache tests the creation of a new DialConfigCache.
@@ -106,6 +111,60 @@ func TestDialConfigCache_Adjust_Init(t *testing.T) {
 	require.Equal(t, cfg.LastSuccessfulDial, dialConfigFixture().LastSuccessfulDial, "last successful dial must be 0")
 	require.Equal(t, cfg.DialAttemptBudget, dialConfigFixture().DialAttemptBudget+2, "dial backoff must be adjusted")
 	require.Equal(t, cfg.StreamCreationAttemptBudget, dialConfigFixture().StreamCreationAttemptBudget, "stream backoff must be 1")
+}
+
+func TestDialConfigCache_Concurrent_Adjust(t *testing.T) {
+	sizeLimit := uint32(50)
+	logger := zerolog.Nop()
+	collector := metrics.NewNoopCollector()
+
+	cache := unicastcache.NewDialConfigCache(sizeLimit, logger, collector, func() unicastmodel.DialConfig {
+		return unicastmodel.DialConfig{} // empty dial config
+	})
+	require.NotNil(t, cache)
+	require.Zerof(t, cache.Size(), "cache size must be 0")
+
+	peerIds := make([]peer.ID, sizeLimit)
+	for i := 0; i < int(sizeLimit); i++ {
+		peerId := p2ptest.PeerIdFixture(t)
+		require.NotContainsf(t, peerIds, peerId, "peer id must be unique")
+		peerIds[i] = peerId
+	}
+
+	wg := sync.WaitGroup{}
+	for i := 0; i < int(sizeLimit); i++ {
+		// adjusts the ith dial config for peerID i times, concurrently.
+		for j := 0; j < i+1; j++ {
+			wg.Add(1)
+			go func(peerId peer.ID) {
+				defer wg.Done()
+				_, err := cache.Adjust(peerId, func(cfg unicastmodel.DialConfig) (unicastmodel.DialConfig, error) {
+					cfg.DialAttemptBudget++
+					return cfg, nil
+				})
+				require.NoError(t, err)
+			}(peerIds[i])
+		}
+	}
+
+	unittest.RequireReturnsBefore(t, wg.Wait, time.Second*100000, "adjustments must be done on time")
+
+	// assert that the cache size is equal to the size limit.
+	require.Equal(t, uint(sizeLimit), cache.Size(), "cache size must be equal to the size limit")
+
+	// assert that the dial config for each peer is adjusted i times, concurrently.
+	for i := 0; i < int(sizeLimit); i++ {
+		wg.Add(1)
+		j := i
+		// go func(j int) {
+		peerID := peerIds[j]
+		cfg, err := cache.GetOrInit(peerID)
+		require.NoError(t, err)
+		require.Equal(t, uint64(j+1), cfg.DialAttemptBudget, fmt.Sprintf("peerId %s dial backoff must be adjusted %d times got: %d", peerID, j+1, cfg.DialAttemptBudget))
+		// }(i)
+	}
+
+	// unittest.RequireReturnsBefore(t, wg.Wait, time.Second*1, "retrievals must be done on time")
 }
 
 // TODO: concurrent adjust and get

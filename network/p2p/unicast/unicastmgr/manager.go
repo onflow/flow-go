@@ -88,6 +88,7 @@ type Manager struct {
 
 // TODO-3: test for dial config cache.
 // TODO-4: wire the paramters as flags.
+// TODO-5: metrics
 type ManagerConfig struct {
 	Logger                 zerolog.Logger
 	StreamFactory          p2p.StreamFactory

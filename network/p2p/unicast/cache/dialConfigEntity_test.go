@@ -37,4 +37,22 @@ func TestDialConfigEntity(t *testing.T) {
 			require.Equal(t, expectedID, d.Checksum())
 		},
 	)
+
+	t.Run("ID is only calculated from peer.ID", func(t *testing.T) {
+		d2 := &unicastcache.DialConfigEntity{
+			PeerId:     p2ptest.PeerIdFixture(t),
+			DialConfig: d.DialConfig,
+		}
+		require.NotEqual(t, d.ID(), d2.ID()) // different peer id, different id.
+
+		d3 := &unicastcache.DialConfigEntity{
+			PeerId: d.PeerId,
+			DialConfig: unicastmodel.DialConfig{
+				DialAttemptBudget:           100,
+				StreamCreationAttemptBudget: 200,
+				LastSuccessfulDial:          time.Now(),
+			},
+		}
+		require.Equal(t, d.ID(), d3.ID()) // same peer id, same id, even though the dial config is different.
+	})
 }
