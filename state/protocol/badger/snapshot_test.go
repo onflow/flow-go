@@ -1227,8 +1227,8 @@ func TestSnapshot_EpochHeightBoundaries(t *testing.T) {
 
 // Test querying identities in different epoch phases. During staking phase we
 // should see identities from last epoch and current epoch. After staking phase
-// we should see identities from current epoch and next epoch. Identities from
-// a non-current epoch should have weight 0. Identities that exist in consecutive
+// we should see identities from current epoch and next epoch. ActiveIdentities from
+// a non-current epoch should have weight 0. ActiveIdentities that exist in consecutive
 // epochs should be de-duplicated.
 func TestSnapshot_CrossEpochIdentities(t *testing.T) {
 

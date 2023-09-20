@@ -324,7 +324,7 @@ type IdentityFilter func(*Identity) bool
 type IdentityOrder func(*Identity, *Identity) bool
 
 // IdentityMapFunc is a modifier function for map operations for identities.
-// Identities are COPIED from the source slice.
+// ActiveIdentities are COPIED from the source slice.
 type IdentityMapFunc func(Identity) Identity
 
 // IdentitySkeletonList is a list of nodes skeletons.

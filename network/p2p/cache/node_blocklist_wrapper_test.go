@@ -67,11 +67,11 @@ func (s *NodeDisallowListWrapperTestSuite) TestHonestNode() {
 		require.True(s.T(), found)
 		require.Equal(s.T(), i, identity)
 	})
-	s.Run("Identities", func() {
+	s.Run("ActiveIdentities", func() {
 		identities := unittest.IdentityListFixture(11)
 		f := filter.In(identities[3:4])
 		expectedFilteredIdentities := identities.Filter(f)
-		s.provider.On("Identities", mock.Anything).Return(
+		s.provider.On("ActiveIdentities", mock.Anything).Return(
 			func(filter flow.IdentityFilter) flow.IdentityList {
 				return identities.Filter(filter)
 			},
@@ -139,7 +139,7 @@ func (s *NodeDisallowListWrapperTestSuite) TestDisallowListNode() {
 		})
 	}
 
-	s.Run("Identities", func() {
+	s.Run("ActiveIdentities", func() {
 		blocklistLookup := blocklist.Lookup()
 		honestIdentities := unittest.IdentityListFixture(8)
 		combinedIdentities := honestIdentities.Union(blocklist)
@@ -147,7 +147,7 @@ func (s *NodeDisallowListWrapperTestSuite) TestDisallowListNode() {
 		require.NoError(s.T(), err)
 		numIdentities := len(combinedIdentities)
 
-		s.provider.On("Identities", mock.Anything).Return(combinedIdentities)
+		s.provider.On("ActiveIdentities", mock.Anything).Return(combinedIdentities)
 
 		noFilter := filter.Not(filter.In(nil))
 		identities := s.wrapper.Identities(noFilter)
@@ -165,9 +165,9 @@ func (s *NodeDisallowListWrapperTestSuite) TestDisallowListNode() {
 		}
 	})
 
-	// this tests the edge case where the  Identities func is invoked with the p2p.NotEjectedFilter. Block listed
+	// this tests the edge case where the  ActiveIdentities func is invoked with the p2p.NotEjectedFilter. Block listed
 	// nodes are expected to be filtered from the identity list returned after setting the ejected field.
-	s.Run("Identities(p2p.NotEjectedFilter) should not return block listed nodes", func() {
+	s.Run("ActiveIdentities(p2p.NotEjectedFilter) should not return block listed nodes", func() {
 		blocklistLookup := blocklist.Lookup()
 		honestIdentities := unittest.IdentityListFixture(8)
 		combinedIdentities := honestIdentities.Union(blocklist)
@@ -175,7 +175,7 @@ func (s *NodeDisallowListWrapperTestSuite) TestDisallowListNode() {
 		require.NoError(s.T(), err)
 		numIdentities := len(combinedIdentities)
 
-		s.provider.On("Identities", mock.Anything).Return(combinedIdentities)
+		s.provider.On("ActiveIdentities", mock.Anything).Return(combinedIdentities)
 
 		identities := s.wrapper.Identities(p2pnet.NotEjectedFilter)
 

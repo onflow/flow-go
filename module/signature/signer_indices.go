@@ -138,7 +138,7 @@ func DecodeSigTypeToStakingAndBeaconSigners(
 		return nil, nil, fmt.Errorf("unexpected exception while checking padding of sigTypes: %w", err)
 	}
 
-	// decode bits to Identities
+	// decode bits to ActiveIdentities
 	stakingSigners := make(flow.IdentitySkeletonList, 0, numberSigners)
 	beaconSigners := make(flow.IdentitySkeletonList, 0, numberSigners)
 	for i, signer := range signers {
@@ -275,7 +275,7 @@ func decodeSignerIndices(
 	return indices, nil
 }
 
-// DecodeSignerIndicesToIdentities decodes the given compacted bit vector into node Identities.
+// DecodeSignerIndicesToIdentities decodes the given compacted bit vector into node ActiveIdentities.
 // Prerequisite:
 //   - The input `canonicalIdentifiers` must exhaustively list the set of authorized signers in their canonical order.
 //

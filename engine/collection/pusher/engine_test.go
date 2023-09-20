@@ -44,7 +44,7 @@ func (suite *Suite) SetupTest() {
 
 	suite.state = new(protocol.State)
 	suite.snapshot = new(protocol.Snapshot)
-	suite.snapshot.On("Identities", mock.Anything).Return(func(filter flow.IdentityFilter) flow.IdentityList {
+	suite.snapshot.On("ActiveIdentities", mock.Anything).Return(func(filter flow.IdentityFilter) flow.IdentityList {
 		return suite.identities.Filter(filter)
 	}, func(filter flow.IdentityFilter) error {
 		return nil

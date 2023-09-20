@@ -178,7 +178,7 @@ func runWithEngine(t *testing.T, f func(testingContext)) {
 	identityListUnsorted := flow.IdentityList{myIdentity, collection1Identity, collection2Identity, collection3Identity}
 	identityList := identityListUnsorted.Sort(order.Canonical)
 
-	snapshot.On("Identities", mock.Anything).Return(func(selector flow.IdentityFilter) flow.IdentityList {
+	snapshot.On("ActiveIdentities", mock.Anything).Return(func(selector flow.IdentityFilter) flow.IdentityList {
 		return identityList.Filter(selector)
 	}, nil)
 

@@ -2542,9 +2542,9 @@ func RootProtocolStateFixture() *flow.RichProtocolStateEntry {
 		ProtocolStateEntry: &flow.ProtocolStateEntry{
 
 			CurrentEpoch: flow.EpochStateContainer{
-				SetupID:    currentEpochSetup.ID(),
-				CommitID:   currentEpochCommit.ID(),
-				Identities: flow.DynamicIdentityEntryListFromIdentities(allIdentities),
+				SetupID:          currentEpochSetup.ID(),
+				CommitID:         currentEpochCommit.ID(),
+				ActiveIdentities: flow.DynamicIdentityEntryListFromIdentities(allIdentities),
 			},
 			PreviousEpochEventIDs: flow.EventIDs{
 				SetupID:  flow.ZeroID,
@@ -2553,14 +2553,14 @@ func RootProtocolStateFixture() *flow.RichProtocolStateEntry {
 			InvalidStateTransitionAttempted: false,
 			NextEpoch:                       nil,
 		},
-		PreviousEpochSetup:  nil,
-		PreviousEpochCommit: nil,
-		CurrentEpochSetup:   currentEpochSetup,
-		CurrentEpochCommit:  currentEpochCommit,
-		NextEpochSetup:      nil,
-		NextEpochCommit:     nil,
-		Identities:          allIdentities,
-		NextIdentities:      flow.IdentityList{},
+		PreviousEpochSetup:        nil,
+		PreviousEpochCommit:       nil,
+		CurrentEpochSetup:         currentEpochSetup,
+		CurrentEpochCommit:        currentEpochCommit,
+		NextEpochSetup:            nil,
+		NextEpochCommit:           nil,
+		CurrentEpochIdentityTable: allIdentities,
+		NextEpochIdentityTable:    flow.IdentityList{},
 	}
 }
 
@@ -2573,8 +2573,8 @@ func RootProtocolStateFixture() *flow.RichProtocolStateEntry {
 //
 // In particular, the following consistency requirements hold:
 //   - Epoch setup and commit counters are set to match.
-//   - Identities are constructed from setup events.
-//   - Identities are sorted in canonical order.
+//   - ActiveIdentities are constructed from setup events.
+//   - ActiveIdentities are sorted in canonical order.
 func ProtocolStateFixture(options ...func(*flow.RichProtocolStateEntry)) *flow.RichProtocolStateEntry {
 	prevEpochSetup := EpochSetupFixture()
 	prevEpochCommit := EpochCommitFixture(func(commit *flow.EpochCommit) {
@@ -2595,9 +2595,9 @@ func ProtocolStateFixture(options ...func(*flow.RichProtocolStateEntry)) *flow.R
 	entry := &flow.RichProtocolStateEntry{
 		ProtocolStateEntry: &flow.ProtocolStateEntry{
 			CurrentEpoch: flow.EpochStateContainer{
-				SetupID:    currentEpochSetup.ID(),
-				CommitID:   currentEpochCommit.ID(),
-				Identities: flow.DynamicIdentityEntryListFromIdentities(allIdentities),
+				SetupID:          currentEpochSetup.ID(),
+				CommitID:         currentEpochCommit.ID(),
+				ActiveIdentities: flow.DynamicIdentityEntryListFromIdentities(allIdentities),
 			},
 			PreviousEpochEventIDs: flow.EventIDs{
 				SetupID:  prevEpochSetup.ID(),
@@ -2606,14 +2606,14 @@ func ProtocolStateFixture(options ...func(*flow.RichProtocolStateEntry)) *flow.R
 			InvalidStateTransitionAttempted: false,
 			NextEpoch:                       nil,
 		},
-		PreviousEpochSetup:  prevEpochSetup,
-		PreviousEpochCommit: prevEpochCommit,
-		CurrentEpochSetup:   currentEpochSetup,
-		CurrentEpochCommit:  currentEpochCommit,
-		NextEpochSetup:      nil,
-		NextEpochCommit:     nil,
-		Identities:          allIdentities,
-		NextIdentities:      flow.IdentityList{},
+		PreviousEpochSetup:        prevEpochSetup,
+		PreviousEpochCommit:       prevEpochCommit,
+		CurrentEpochSetup:         currentEpochSetup,
+		CurrentEpochCommit:        currentEpochCommit,
+		NextEpochSetup:            nil,
+		NextEpochCommit:           nil,
+		CurrentEpochIdentityTable: allIdentities,
+		NextEpochIdentityTable:    flow.IdentityList{},
 	}
 
 	for _, option := range options {
@@ -2643,17 +2643,17 @@ func WithNextEpochProtocolState() func(entry *flow.RichProtocolStateEntry) {
 		})
 		allIdentities := nextEpochSetup.Participants.Union(entry.CurrentEpochSetup.Participants)
 
-		entry.Identities = entry.CurrentEpochSetup.Participants.Union(nextEpochSetup.Participants)
-		entry.ProtocolStateEntry.CurrentEpoch.Identities = flow.DynamicIdentityEntryListFromIdentities(entry.Identities)
+		entry.CurrentEpochIdentityTable = entry.CurrentEpochSetup.Participants.Union(nextEpochSetup.Participants)
+		entry.ProtocolStateEntry.CurrentEpoch.ActiveIdentities = flow.DynamicIdentityEntryListFromIdentities(entry.CurrentEpochIdentityTable)
 
 		entry.ProtocolStateEntry.NextEpoch = &flow.EpochStateContainer{
-			SetupID:    nextEpochSetup.ID(),
-			CommitID:   nextEpochCommit.ID(),
-			Identities: flow.DynamicIdentityEntryListFromIdentities(allIdentities),
+			SetupID:          nextEpochSetup.ID(),
+			CommitID:         nextEpochCommit.ID(),
+			ActiveIdentities: flow.DynamicIdentityEntryListFromIdentities(allIdentities),
 		}
 		entry.NextEpochSetup = nextEpochSetup
 		entry.NextEpochCommit = nextEpochCommit
-		entry.NextIdentities = allIdentities
+		entry.NextEpochIdentityTable = allIdentities
 	}
 }
 

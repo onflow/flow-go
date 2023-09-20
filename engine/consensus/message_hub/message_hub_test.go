@@ -120,7 +120,7 @@ func (s *MessageHubSuite) SetupTest() {
 
 	// set up protocol snapshot mock
 	s.snapshot = &protocol.Snapshot{}
-	s.snapshot.On("Identities", mock.Anything).Return(
+	s.snapshot.On("ActiveIdentities", mock.Anything).Return(
 		func(filter flow.IdentityFilter) flow.IdentityList {
 			return s.participants.Filter(filter)
 		},

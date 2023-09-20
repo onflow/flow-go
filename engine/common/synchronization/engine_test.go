@@ -122,7 +122,7 @@ func (ss *SyncSuite) SetupTest() {
 		},
 		nil,
 	)
-	ss.snapshot.On("Identities", mock.Anything).Return(
+	ss.snapshot.On("ActiveIdentities", mock.Anything).Return(
 		func(selector flow.IdentityFilter) flow.IdentityList {
 			return ss.participants.Filter(selector)
 		},

@@ -23,12 +23,12 @@ type Updater struct {
 	candidate   *flow.Header
 
 	// nextEpochIdentitiesLookup is a map from NodeID → DynamicIdentityEntry for the _current_ epoch, containing the
-	// same identities as in the EpochStateContainer `state.CurrentEpoch.Identities`. Note that map values are pointers,
+	// same identities as in the EpochStateContainer `state.CurrentEpoch.ActiveIdentities`. Note that map values are pointers,
 	// so writes to map values will modify the respective DynamicIdentityEntry in EpochStateContainer.
 	currentEpochIdentitiesLookup map[flow.Identifier]*flow.DynamicIdentityEntry
 
 	// nextEpochIdentitiesLookup is a map from NodeID → DynamicIdentityEntry for the _next_ epoch, containing the
-	// same identities as in the EpochStateContainer `state.NextEpoch.Identities`. Note that map values are pointers,
+	// same identities as in the EpochStateContainer `state.NextEpoch.ActiveIdentities`. Note that map values are pointers,
 	// so writes to map values will modify the respective DynamicIdentityEntry in EpochStateContainer.
 	nextEpochIdentitiesLookup map[flow.Identifier]*flow.DynamicIdentityEntry
 }
@@ -84,7 +84,7 @@ func (u *Updater) ProcessEpochSetup(epochSetup *flow.EpochSetup) error {
 
 	// lookup of dynamic data for current protocol state identities
 	// by definition, this will include identities from current epoch + identities from previous epoch with 0 weight.
-	identitiesStateLookup := u.parentState.CurrentEpoch.Identities.Lookup()
+	identitiesStateLookup := u.parentState.CurrentEpoch.ActiveIdentities.Lookup()
 
 	currentEpochSetupParticipants := u.parentState.CurrentEpochSetup.Participants
 	// construct identities for current epoch: current epoch participants + next epoch participants with 0 weight
@@ -143,13 +143,13 @@ func (u *Updater) ProcessEpochSetup(epochSetup *flow.EpochSetup) error {
 	}
 
 	// IMPORTANT: per convention, identities must be listed on canonical order!
-	u.state.CurrentEpoch.Identities = currentEpochIdentities.Sort(order.IdentifierCanonical)
+	u.state.CurrentEpoch.ActiveIdentities = currentEpochIdentities.Sort(order.IdentifierCanonical)
 
 	// construct protocol state entry for next epoch
 	u.state.NextEpoch = &flow.EpochStateContainer{
-		SetupID:    epochSetup.ID(),
-		CommitID:   flow.ZeroID,
-		Identities: nextEpochIdentities.Sort(order.IdentifierCanonical),
+		SetupID:          epochSetup.ID(),
+		CommitID:         flow.ZeroID,
+		ActiveIdentities: nextEpochIdentities.Sort(order.IdentifierCanonical),
 	}
 
 	// since identities have changed, rebuild identity lookups, so we can safely process
@@ -233,10 +233,7 @@ func (u *Updater) TransitionToNextEpoch() error {
 		return fmt.Errorf("protocol state transition is only allowed when enterring next epoch")
 	}
 	u.state = &flow.ProtocolStateEntry{
-		PreviousEpochEventIDs: flow.EventIDs{
-			SetupID:  u.state.CurrentEpoch.SetupID,
-			CommitID: u.state.CurrentEpoch.CommitID,
-		},
+		PreviousEpochEventIDs:           u.state.CurrentEpoch.EventIDs(),
 		CurrentEpoch:                    *u.state.NextEpoch,
 		InvalidStateTransitionAttempted: false,
 	}
@@ -265,11 +262,11 @@ func (u *Updater) ensureLookupPopulated() {
 }
 
 // rebuildIdentityLookup re-generates `currentEpochIdentitiesLookup` and `nextEpochIdentitiesLookup` from the
-// underlying identity lists `state.CurrentEpoch.Identities` and `state.NextEpoch.Identities`, respectively.
+// underlying identity lists `state.CurrentEpoch.ActiveIdentities` and `state.NextEpoch.ActiveIdentities`, respectively.
 func (u *Updater) rebuildIdentityLookup() {
-	u.currentEpochIdentitiesLookup = u.state.CurrentEpoch.Identities.Lookup()
+	u.currentEpochIdentitiesLookup = u.state.CurrentEpoch.ActiveIdentities.Lookup()
 	if u.state.NextEpoch != nil {
-		u.nextEpochIdentitiesLookup = u.state.NextEpoch.Identities.Lookup()
+		u.nextEpochIdentitiesLookup = u.state.NextEpoch.ActiveIdentities.Lookup()
 	} else {
 		u.state.NextEpoch = nil
 	}

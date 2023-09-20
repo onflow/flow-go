@@ -203,14 +203,14 @@ func (a *PublicAssignmentTestSuite) TestDeterministicy() {
 	require.Equal(a.T(), copy(nodes2, nodes1), n)
 
 	// chunk assignment of the first set
-	snapshot.On("Identities", mock.Anything).Return(nodes1, nil).Once()
+	snapshot.On("ActiveIdentities", mock.Anything).Return(nodes1, nil).Once()
 	a1, err := NewChunkAssigner(alpha, state)
 	require.NoError(a.T(), err)
 	p1, err := a1.Assign(result, head.ID())
 	require.NoError(a.T(), err)
 
 	// chunk assignment of the second set
-	snapshot.On("Identities", mock.Anything).Return(nodes2, nil).Once()
+	snapshot.On("ActiveIdentities", mock.Anything).Return(nodes2, nil).Once()
 	a2, err := NewChunkAssigner(alpha, state)
 	require.NoError(a.T(), err)
 	p2, err := a2.Assign(result, head.ID())
@@ -269,7 +269,7 @@ func (a *PublicAssignmentTestSuite) ChunkAssignmentScenario(chunkNum, verNum, al
 	original := make([]*flow.Identity, verNum)
 	require.Equal(a.T(), copy(original, nodes), verNum)
 
-	snapshot.On("Identities", mock.Anything).Return(nodes, nil).Once()
+	snapshot.On("ActiveIdentities", mock.Anything).Return(nodes, nil).Once()
 	a1, err := NewChunkAssigner(uint(alpha), state)
 	require.NoError(a.T(), err)
 	p1, err := a1.Assign(result, head.ID())
@@ -303,7 +303,7 @@ func (a *PublicAssignmentTestSuite) TestCacheAssignment() {
 	// random generators are stateful and we need to
 	// generate a new one if we want to have the same
 	// state
-	snapshot.On("Identities", mock.Anything).Return(nodes, nil).Once()
+	snapshot.On("ActiveIdentities", mock.Anything).Return(nodes, nil).Once()
 	_, err = assigner.Assign(result, head.ID())
 	require.NoError(a.T(), err)
 	require.Equal(a.T(), assigner.Size(), uint(1))

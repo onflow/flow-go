@@ -594,7 +594,7 @@ func mockReceiptsBlockID(t *testing.T,
 func mockStateAtBlockIDForIdentities(state *protocol.State, blockID flow.Identifier, participants flow.IdentityList) {
 	snapshot := &protocol.Snapshot{}
 	state.On("AtBlockID", blockID).Return(snapshot)
-	snapshot.On("Identities", mock.Anything).Return(participants, nil)
+	snapshot.On("ActiveIdentities", mock.Anything).Return(participants, nil)
 	for _, id := range participants {
 		snapshot.On("Identity", id.NodeID).Return(id, nil)
 	}

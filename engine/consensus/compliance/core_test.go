@@ -171,7 +171,7 @@ func (cs *CommonSuite) SetupTest() {
 
 	// set up protocol snapshot mock
 	cs.snapshot = &protocol.Snapshot{}
-	cs.snapshot.On("Identities", mock.Anything).Return(
+	cs.snapshot.On("ActiveIdentities", mock.Anything).Return(
 		func(filter flow.IdentityFilter) flow.IdentityList {
 			return cs.participants.Filter(filter)
 		},

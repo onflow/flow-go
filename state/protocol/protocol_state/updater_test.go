@@ -246,8 +246,8 @@ func (s *UpdaterSuite) TestUpdateIdentityHappyPath() {
 	}
 
 	// check if changes are reflected in current and next epochs
-	requireUpdatesApplied(updatedState.CurrentEpoch.Identities.Lookup())
-	requireUpdatesApplied(updatedState.NextEpoch.Identities.Lookup())
+	requireUpdatesApplied(updatedState.CurrentEpoch.ActiveIdentities.Lookup())
+	requireUpdatesApplied(updatedState.NextEpoch.ActiveIdentities.Lookup())
 }
 
 // TestProcessEpochSetupInvariants tests if processing epoch setup when invariants are violated doesn't update internal structures.
@@ -356,12 +356,12 @@ func (s *UpdaterSuite) TestProcessEpochSetupHappyPath() {
 
 	updatedState, _, hasChanges := s.updater.Build()
 	require.True(s.T(), hasChanges, "should have changes")
-	require.Equal(s.T(), expectedCurrentEpochIdentityTable, updatedState.CurrentEpoch.Identities)
+	require.Equal(s.T(), expectedCurrentEpochIdentityTable, updatedState.CurrentEpoch.ActiveIdentities)
 	nextEpoch := updatedState.NextEpoch
 	require.NotNil(s.T(), nextEpoch, "should have next epoch protocol state")
 	require.Equal(s.T(), nextEpoch.SetupID, setup.ID(),
 		"should have correct setup ID for next protocol state")
-	require.Equal(s.T(), expectedNextEpochIdentityTable, nextEpoch.Identities)
+	require.Equal(s.T(), expectedNextEpochIdentityTable, nextEpoch.ActiveIdentities)
 }
 
 // TestProcessEpochSetupWithSameParticipants tests that processing epoch setup with overlapping participants results in correctly
@@ -380,14 +380,14 @@ func (s *UpdaterSuite) TestProcessEpochSetupWithSameParticipants() {
 	expectedParticipants := flow.DynamicIdentityEntryListFromIdentities(
 		s.parentProtocolState.CurrentEpochSetup.Participants.Union(setup.Participants.Map(mapfunc.WithWeight(0))),
 	)
-	require.Equal(s.T(), updatedState.CurrentEpoch.Identities,
+	require.Equal(s.T(), updatedState.CurrentEpoch.ActiveIdentities,
 		expectedParticipants,
 		"should have all participants from current epoch and next epoch, but without duplicates")
 
 	nextEpochParticipants := flow.DynamicIdentityEntryListFromIdentities(
 		setup.Participants.Union(s.parentProtocolState.CurrentEpochSetup.Participants.Map(mapfunc.WithWeight(0))),
 	)
-	require.Equal(s.T(), updatedState.NextEpoch.Identities,
+	require.Equal(s.T(), updatedState.NextEpoch.ActiveIdentities,
 		nextEpochParticipants,
 		"should have all participants from previous epoch and current epoch, but without duplicates")
 }
@@ -419,19 +419,19 @@ func (s *UpdaterSuite) TestEpochSetupAfterIdentityChange() {
 	// Construct a valid flow.RichProtocolStateEntry for next block
 	// We do this by copying the parent protocol state and updating the identities manually
 	updatedRichProtocolState := &flow.RichProtocolStateEntry{
-		ProtocolStateEntry:  updatedState,
-		PreviousEpochSetup:  s.parentProtocolState.PreviousEpochSetup,
-		PreviousEpochCommit: s.parentProtocolState.PreviousEpochCommit,
-		CurrentEpochSetup:   s.parentProtocolState.CurrentEpochSetup,
-		CurrentEpochCommit:  s.parentProtocolState.CurrentEpochCommit,
-		NextEpochSetup:      nil,
-		NextEpochCommit:     nil,
-		Identities:          s.parentProtocolState.Identities.Copy(),
-		NextIdentities:      flow.IdentityList{},
+		ProtocolStateEntry:        updatedState,
+		PreviousEpochSetup:        s.parentProtocolState.PreviousEpochSetup,
+		PreviousEpochCommit:       s.parentProtocolState.PreviousEpochCommit,
+		CurrentEpochSetup:         s.parentProtocolState.CurrentEpochSetup,
+		CurrentEpochCommit:        s.parentProtocolState.CurrentEpochCommit,
+		NextEpochSetup:            nil,
+		NextEpochCommit:           nil,
+		CurrentEpochIdentityTable: s.parentProtocolState.CurrentEpochIdentityTable.Copy(),
+		NextEpochIdentityTable:    flow.IdentityList{},
 	}
 	// Update enriched data with the changes made to the low-level updated table
 	for _, identity := range allUpdates {
-		toBeUpdated, _ := updatedRichProtocolState.Identities.ByNodeID(identity.NodeID)
+		toBeUpdated, _ := updatedRichProtocolState.CurrentEpochIdentityTable.ByNodeID(identity.NodeID)
 		toBeUpdated.DynamicIdentity = identity.DynamicIdentity
 	}
 
@@ -450,8 +450,8 @@ func (s *UpdaterSuite) TestEpochSetupAfterIdentityChange() {
 	updatedState, _, _ = s.updater.Build()
 
 	// assert that all changes made in previous epoch are preserved
-	currentEpochLookup := updatedState.CurrentEpoch.Identities.Lookup()
-	nextEpochLookup := updatedState.NextEpoch.Identities.Lookup()
+	currentEpochLookup := updatedState.CurrentEpoch.ActiveIdentities.Lookup()
+	nextEpochLookup := updatedState.NextEpoch.ActiveIdentities.Lookup()
 
 	for _, updated := range ejectedChanges {
 		currentEpochIdentity := currentEpochLookup[updated.NodeID]

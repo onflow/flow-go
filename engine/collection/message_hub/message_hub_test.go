@@ -97,7 +97,7 @@ func (s *MessageHubSuite) SetupTest() {
 
 	protoSnapshot := &protocol.Snapshot{}
 	protoSnapshot.On("Epochs").Return(protoQuery)
-	protoSnapshot.On("Identities", mock.Anything).Return(
+	protoSnapshot.On("ActiveIdentities", mock.Anything).Return(
 		func(selector flow.IdentityFilter) flow.IdentityList {
 			return s.cluster.Filter(selector)
 		},

@@ -39,7 +39,7 @@ func PeerAddressInfo(identity flow.IdentitySkeleton) (peer.AddrInfo, error) {
 	return pInfo, err
 }
 
-// PeerInfosFromIDs converts the given flow.Identities to peer.AddrInfo.
+// PeerInfosFromIDs converts the given flow.ActiveIdentities to peer.AddrInfo.
 // For each identity, if the conversion succeeds, the peer.AddrInfo is included in the result else it is
 // included in the error map with the corresponding error
 func PeerInfosFromIDs(ids flow.IdentityList) ([]peer.AddrInfo, map[flow.Identifier]error) {

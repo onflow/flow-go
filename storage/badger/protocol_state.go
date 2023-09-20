@@ -64,10 +64,10 @@ func NewProtocolState(collector module.CacheMetrics,
 //   - storage.ErrAlreadyExists if an Identity Table with the given id is already stored
 func (s *ProtocolState) StoreTx(id flow.Identifier, protocolState *flow.ProtocolStateEntry) func(*transaction.Tx) error {
 	// front-load sanity checks:
-	if !protocolState.CurrentEpoch.Identities.Sorted(order.IdentifierCanonical) {
+	if !protocolState.CurrentEpoch.ActiveIdentities.Sorted(order.IdentifierCanonical) {
 		return transaction.Fail(fmt.Errorf("sanity check failed: identities are not sorted"))
 	}
-	if protocolState.NextEpoch != nil && !protocolState.NextEpoch.Identities.Sorted(order.IdentifierCanonical) {
+	if protocolState.NextEpoch != nil && !protocolState.NextEpoch.ActiveIdentities.Sorted(order.IdentifierCanonical) {
 		return transaction.Fail(fmt.Errorf("sanity check failed: next epoch identities are not sorted"))
 	}
 

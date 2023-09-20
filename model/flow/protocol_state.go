@@ -13,7 +13,7 @@ type DynamicIdentityEntry struct {
 
 type DynamicIdentityEntryList []*DynamicIdentityEntry
 
-// ProtocolStateEntry represents a snapshot of the identity table (i.e. the set of all notes authorized to
+// ProtocolStateEntry represents a snapshot of the identity table (incl. the set of all notes authorized to
 // be part of the network) at some point in time. It allows to reconstruct the state of identity table using
 // epoch setup events and dynamic identities. It tracks attempts of invalid state transitions.
 // It also holds information about the next epoch, if it has been already committed.
@@ -42,11 +42,19 @@ type EpochStateContainer struct {
 	SetupID Identifier
 	// ID of commit event for this epoch. Could be ZeroID if epoch was not committed.
 	CommitID Identifier
-	// Part of identity table that can be changed on a block-by-block basis.
-	// Each non-deferred identity-mutating operation is applied independently to each
-	// relevant epoch's dynamic identity list separately.
-	// Always sorted in canonical order.
-	Identities DynamicIdentityEntryList
+	// ActiveIdentities contains the dynamic identity properties for the nodes that
+	// are active in this epoch. Active means that these nodes are authorized to contribute to
+	// extending the chain. Nodes are listed in `ActiveIdentities` if and only if
+	// they are part of the EpochSetup even for the respective epoch.
+	// The dynamic identity properties can change from block to block. Each non-deferred
+	// identity-mutating operation is applied independently to the `ActiveIdentities`
+	// of the relevant epoch's EpochStateContainer separately.
+	// ActiveIdentities are always sorted in canonical order.
+	//
+	// Context: In comparison, nodes that are joining in the next epoch or left as of this
+	// epoch are only allowed to listen to the network but not actively contribute. Such
+	// nodes are _not_ part of `ActiveIdentities`.
+	ActiveIdentities DynamicIdentityEntryList
 }
 
 // ID returns an identifier for this EpochStateContainer by hashing internal fields.
@@ -62,21 +70,30 @@ func (c *EpochStateContainer) ID() Identifier {
 	}{
 		SetupID:    c.SetupID,
 		CommitID:   c.CommitID,
-		Identities: c.Identities,
+		Identities: c.ActiveIdentities,
 	}
 	return MakeID(body)
 }
 
+// EventIDs returns the `flow.EventIDs` with the hashes of the EpochSetup and EpochCommit events.
+// Per convention, for a `nil` EpochStateContainer, we return `flow.ZeroID` for both events.
+func (c *EpochStateContainer) EventIDs() EventIDs {
+	if c == nil {
+		return EventIDs{ZeroID, ZeroID}
+	}
+	return EventIDs{c.SetupID, c.CommitID}
+}
+
 // Copy returns a full copy of the entry.
-// Embedded Identities are deep-copied, _except_ for their keys, which are copied by reference.
+// Embedded ActiveIdentities are deep-copied, _except_ for their keys, which are copied by reference.
 func (c *EpochStateContainer) Copy() *EpochStateContainer {
 	if c == nil {
 		return nil
 	}
 	return &EpochStateContainer{
-		SetupID:    c.SetupID,
-		CommitID:   c.CommitID,
-		Identities: c.Identities.Copy(),
+		SetupID:          c.SetupID,
+		CommitID:         c.CommitID,
+		ActiveIdentities: c.ActiveIdentities.Copy(),
 	}
 }
 
@@ -87,20 +104,28 @@ func (c *EpochStateContainer) Copy() *EpochStateContainer {
 // It holds several invariants, such as:
 //   - CurrentEpochSetup and CurrentEpochCommit are for the same epoch. Never nil.
 //   - PreviousEpochSetup and PreviousEpochCommit are for the same epoch. Can be nil.
-//   - Identities is a full identity table for the current epoch.
+//   - CurrentEpochIdentityTable is the full (dynamic) identity table for the current epoch.
 //     Identities are sorted in canonical order. Without duplicates. Never nil.
-//   - NextEpochProtocolState is a protocol state for the next epoch. Can be nil.
+//   - NextEpochIdentityTable is the full (dynamic) identity table for the next epoch. Can be nil.
+//
+// NOTE regarding `CurrentEpochIdentityTable` and `NextEpochIdentityTable`:
+// The Identity Table is generally a super-set of the identities listed in the Epoch
+// Service Events for the respective epoch. This is because the service events only list
+// nodes that are authorized to _actively_ contribute to extending the chain. In contrast,
+// the Identity Table additionally contains nodes (with weight zero) from the previous or
+// upcoming epoch, which are transitioning into / out of the network and are only allowed
+// to listen but not to actively contribute.
 type RichProtocolStateEntry struct {
 	*ProtocolStateEntry
 
-	PreviousEpochSetup  *EpochSetup
-	PreviousEpochCommit *EpochCommit
-	CurrentEpochSetup   *EpochSetup
-	CurrentEpochCommit  *EpochCommit
-	NextEpochSetup      *EpochSetup
-	NextEpochCommit     *EpochCommit
-	Identities          IdentityList
-	NextIdentities      IdentityList
+	PreviousEpochSetup        *EpochSetup
+	PreviousEpochCommit       *EpochCommit
+	CurrentEpochSetup         *EpochSetup
+	CurrentEpochCommit        *EpochCommit
+	NextEpochSetup            *EpochSetup
+	NextEpochCommit           *EpochCommit
+	CurrentEpochIdentityTable IdentityList
+	NextEpochIdentityTable    IdentityList
 }
 
 // NewRichProtocolStateEntry constructs a rich protocol state entry from a protocol state entry and additional data.
@@ -115,15 +140,15 @@ func NewRichProtocolStateEntry(
 	nextEpochCommit *EpochCommit,
 ) (*RichProtocolStateEntry, error) {
 	result := &RichProtocolStateEntry{
-		ProtocolStateEntry:  protocolState,
-		PreviousEpochSetup:  previousEpochSetup,
-		PreviousEpochCommit: previousEpochCommit,
-		CurrentEpochSetup:   currentEpochSetup,
-		CurrentEpochCommit:  currentEpochCommit,
-		NextEpochSetup:      nextEpochSetup,
-		NextEpochCommit:     nextEpochCommit,
-		Identities:          IdentityList{},
-		NextIdentities:      IdentityList{},
+		ProtocolStateEntry:        protocolState,
+		PreviousEpochSetup:        previousEpochSetup,
+		PreviousEpochCommit:       previousEpochCommit,
+		CurrentEpochSetup:         currentEpochSetup,
+		CurrentEpochCommit:        currentEpochCommit,
+		NextEpochSetup:            nextEpochSetup,
+		NextEpochCommit:           nextEpochCommit,
+		CurrentEpochIdentityTable: IdentityList{},
+		NextEpochIdentityTable:    IdentityList{},
 	}
 
 	// ensure data is consistent
@@ -168,8 +193,8 @@ func NewRichProtocolStateEntry(
 
 		// if next epoch is available, it means that we have observed epoch setup event and we are not anymore in staking phase,
 		// so we need to build the identity table using current and next epoch setup events.
-		result.Identities, err = buildIdentityTable(
-			protocolState.CurrentEpoch.Identities,
+		result.CurrentEpochIdentityTable, err = buildIdentityTable(
+			protocolState.CurrentEpoch.ActiveIdentities,
 			currentEpochSetup.Participants,
 			nextEpochSetup.Participants,
 		)
@@ -177,8 +202,8 @@ func NewRichProtocolStateEntry(
 			return nil, fmt.Errorf("could not build identity table for setup/commit phase: %w", err)
 		}
 
-		result.NextIdentities, err = buildIdentityTable(
-			nextEpoch.Identities,
+		result.NextEpochIdentityTable, err = buildIdentityTable(
+			nextEpoch.ActiveIdentities,
 			nextEpochSetup.Participants,
 			currentEpochSetup.Participants,
 		)
@@ -192,8 +217,8 @@ func NewRichProtocolStateEntry(
 		if previousEpochSetup != nil {
 			otherIdentities = previousEpochSetup.Participants
 		}
-		result.Identities, err = buildIdentityTable(
-			protocolState.CurrentEpoch.Identities,
+		result.CurrentEpochIdentityTable, err = buildIdentityTable(
+			protocolState.CurrentEpoch.ActiveIdentities,
 			currentEpochSetup.Participants,
 			otherIdentities,
 		)
@@ -225,7 +250,7 @@ func (e *ProtocolStateEntry) ID() Identifier {
 }
 
 // Copy returns a full copy of the entry.
-// Embedded Identities are deep-copied, _except_ for their keys, which are copied by reference.
+// Embedded ActiveIdentities are deep-copied, _except_ for their keys, which are copied by reference.
 func (e *ProtocolStateEntry) Copy() *ProtocolStateEntry {
 	if e == nil {
 		return nil
@@ -240,40 +265,30 @@ func (e *ProtocolStateEntry) Copy() *ProtocolStateEntry {
 
 // Copy returns a full copy of rich protocol state entry.
 //   - Embedded service events are copied by reference (not deep-copied).
-//   - Identities and NextIdentities are deep-copied, _except_ for their keys, which are copied by reference.
+//   - CurrentEpochIdentityTable and NextEpochIdentityTable are deep-copied, _except_ for their keys, which are copied by reference.
 func (e *RichProtocolStateEntry) Copy() *RichProtocolStateEntry {
 	if e == nil {
 		return nil
 	}
 	return &RichProtocolStateEntry{
-		ProtocolStateEntry:  e.ProtocolStateEntry.Copy(),
-		PreviousEpochSetup:  e.PreviousEpochSetup,
-		PreviousEpochCommit: e.PreviousEpochCommit,
-		CurrentEpochSetup:   e.CurrentEpochSetup,
-		CurrentEpochCommit:  e.CurrentEpochCommit,
-		NextEpochSetup:      e.NextEpochSetup,
-		NextEpochCommit:     e.NextEpochCommit,
-		Identities:          e.Identities.Copy(),
-		NextIdentities:      e.NextIdentities.Copy(),
+		ProtocolStateEntry:        e.ProtocolStateEntry.Copy(),
+		PreviousEpochSetup:        e.PreviousEpochSetup,
+		PreviousEpochCommit:       e.PreviousEpochCommit,
+		CurrentEpochSetup:         e.CurrentEpochSetup,
+		CurrentEpochCommit:        e.CurrentEpochCommit,
+		NextEpochSetup:            e.NextEpochSetup,
+		NextEpochCommit:           e.NextEpochCommit,
+		CurrentEpochIdentityTable: e.CurrentEpochIdentityTable.Copy(),
+		NextEpochIdentityTable:    e.NextEpochIdentityTable.Copy(),
 	}
 }
 
 // EpochStatus returns epoch status for the current protocol state.
 func (e *ProtocolStateEntry) EpochStatus() *EpochStatus {
-	var nextEpoch EventIDs
-	if e.NextEpoch != nil {
-		nextEpoch = EventIDs{
-			SetupID:  e.NextEpoch.SetupID,
-			CommitID: e.NextEpoch.CommitID,
-		}
-	}
 	return &EpochStatus{
-		PreviousEpoch: e.PreviousEpochEventIDs,
-		CurrentEpoch: EventIDs{
-			SetupID:  e.CurrentEpoch.SetupID,
-			CommitID: e.CurrentEpoch.CommitID,
-		},
-		NextEpoch:                       nextEpoch,
+		PreviousEpoch:                   e.PreviousEpochEventIDs,
+		CurrentEpoch:                    e.CurrentEpoch.EventIDs(),
+		NextEpoch:                       e.NextEpoch.EventIDs(),
 		InvalidServiceEventIncorporated: e.InvalidStateTransitionAttempted,
 	}
 }
@@ -343,7 +358,7 @@ func (ll DynamicIdentityEntryList) Sort(less IdentifierOrder) DynamicIdentityEnt
 }
 
 // buildIdentityTable constructs the full identity table for the target epoch by combining data from:
-//  1. The target epoch's Dynamic Identities.
+//  1. The target epoch's Dynamic ActiveIdentities.
 //  2. The target epoch's IdentitySkeletons
 //     (recorded in EpochSetup event and immutable throughout the epoch).
 //  3. [optional] An adjacent epoch's IdentitySkeletons (can be empty or nil), as recorded in the

@@ -21,7 +21,7 @@ func FinalizedProtocolStateWithParticipants(participants flow.IdentityList) (
 
 	// set up protocol snapshot mock
 	snapshot := &mockprotocol.Snapshot{}
-	snapshot.On("Identities", mock.Anything).Return(
+	snapshot.On("ActiveIdentities", mock.Anything).Return(
 		func(filter flow.IdentityFilter) flow.IdentityList {
 			return participants.Filter(filter)
 		},

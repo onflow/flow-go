@@ -53,7 +53,7 @@ func TestDispatchRequestVarious(t *testing.T) {
 	targetID := identities[0].NodeID
 
 	final := &protocol.Snapshot{}
-	final.On("Identities", mock.Anything).Return(
+	final.On("ActiveIdentities", mock.Anything).Return(
 		func(selector flow.IdentityFilter) flow.IdentityList {
 			return identities.Filter(selector)
 		},
@@ -162,7 +162,7 @@ func TestDispatchRequestBatchSize(t *testing.T) {
 	identities := unittest.IdentityListFixture(16)
 
 	final := &protocol.Snapshot{}
-	final.On("Identities", mock.Anything).Return(
+	final.On("ActiveIdentities", mock.Anything).Return(
 		func(selector flow.IdentityFilter) flow.IdentityList {
 			return identities.Filter(selector)
 		},
@@ -225,7 +225,7 @@ func TestOnEntityResponseValid(t *testing.T) {
 	targetID := identities[0].NodeID
 
 	final := &protocol.Snapshot{}
-	final.On("Identities", mock.Anything).Return(
+	final.On("ActiveIdentities", mock.Anything).Return(
 		func(selector flow.IdentityFilter) flow.IdentityList {
 			return identities.Filter(selector)
 		},
@@ -323,7 +323,7 @@ func TestOnEntityIntegrityCheck(t *testing.T) {
 	targetID := identities[0].NodeID
 
 	final := &protocol.Snapshot{}
-	final.On("Identities", mock.Anything).Return(
+	final.On("ActiveIdentities", mock.Anything).Return(
 		func(selector flow.IdentityFilter) flow.IdentityList {
 			return identities.Filter(selector)
 		},
@@ -407,7 +407,7 @@ func TestOriginValidation(t *testing.T) {
 	meID := identities[3].NodeID
 
 	final := &protocol.Snapshot{}
-	final.On("Identities", mock.Anything).Return(
+	final.On("ActiveIdentities", mock.Anything).Return(
 		func(selector flow.IdentityFilter) flow.IdentityList {
 			return identities.Filter(selector)
 		},

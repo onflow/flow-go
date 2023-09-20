@@ -251,7 +251,7 @@ func withNextEpoch(
 
 	// set identities for root snapshot to include next epoch identities,
 	// since we are in committed phase
-	protocolState.CurrentEpoch.Identities = flow.DynamicIdentityEntryListFromIdentities(
+	protocolState.CurrentEpoch.ActiveIdentities = flow.DynamicIdentityEntryListFromIdentities(
 		append(
 			// all the current epoch identities
 			currentEpochIdentities,
@@ -277,9 +277,9 @@ func withNextEpoch(
 	convertedEpochSetup, _ = protocol.ToEpochSetup(inmem.NewEpoch(*encodableSnapshot.Epochs.Next))
 	convertedEpochCommit, _ := protocol.ToEpochCommit(inmem.NewEpoch(*encodableSnapshot.Epochs.Next))
 	protocolState.NextEpoch = &flow.EpochStateContainer{
-		SetupID:    convertedEpochSetup.ID(),
-		CommitID:   convertedEpochCommit.ID(),
-		Identities: flow.DynamicIdentityEntryListFromIdentities(nextEpochIdentities),
+		SetupID:          convertedEpochSetup.ID(),
+		CommitID:         convertedEpochCommit.ID(),
+		ActiveIdentities: flow.DynamicIdentityEntryListFromIdentities(nextEpochIdentities),
 	}
 
 	return inmem.SnapshotFromEncodable(encodableSnapshot)

@@ -132,7 +132,7 @@ func (suite *VerifierEngineTestSuite) TestVerifyHappyPath() {
 
 	// mocking node ID using the LocalMock
 	suite.me.MockNodeID(myID)
-	suite.ss.On("Identities", testifymock.Anything).Return(consensusNodes, nil)
+	suite.ss.On("ActiveIdentities", testifymock.Anything).Return(consensusNodes, nil)
 
 	// mocks metrics
 	// reception of verifiable chunk
@@ -174,7 +174,7 @@ func (suite *VerifierEngineTestSuite) TestVerifyUnhappyPaths() {
 
 	// mocking node ID using the LocalMock
 	suite.me.MockNodeID(myID)
-	suite.ss.On("Identities", testifymock.Anything).Return(consensusNodes, nil)
+	suite.ss.On("ActiveIdentities", testifymock.Anything).Return(consensusNodes, nil)
 
 	// mocks metrics
 	// reception of verifiable chunk

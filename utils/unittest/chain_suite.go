@@ -72,7 +72,7 @@ func (bc *BaseChainSuite) SetupChain() {
 
 	// ~~~~~~~~~~~~~~~~~~~~~~~~~~ SETUP IDENTITIES ~~~~~~~~~~~~~~~~~~~~~~~~~~ //
 
-	// asign node Identities
+	// asign node ActiveIdentities
 	con := IdentityFixture(WithRole(flow.RoleConsensus))
 	exe := IdentityFixture(WithRole(flow.RoleExecution))
 	ver := IdentityFixture(WithRole(flow.RoleVerification))
@@ -395,7 +395,7 @@ func StateSnapshotForUnknownBlock() *protocol.Snapshot {
 	snapshot.On("Identity", mock.Anything).Return(
 		nil, storerr.ErrNotFound,
 	)
-	snapshot.On("Identities", mock.Anything).Return(
+	snapshot.On("ActiveIdentities", mock.Anything).Return(
 		nil, storerr.ErrNotFound,
 	)
 	snapshot.On("Head", mock.Anything).Return(
@@ -418,7 +418,7 @@ func StateSnapshotForKnownBlock(block *flow.Header, identities map[flow.Identifi
 			return nil
 		},
 	)
-	snapshot.On("Identities", mock.Anything).Return(
+	snapshot.On("ActiveIdentities", mock.Anything).Return(
 		func(selector flow.IdentityFilter) flow.IdentityList {
 			var idts flow.IdentityList
 			for _, i := range identities {
