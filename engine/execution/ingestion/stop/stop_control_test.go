@@ -319,7 +319,7 @@ func TestStopControlWithVersionControl(t *testing.T) {
 		// setting this means all finalized blocks are considered already executed
 		execState.
 			On("IsBlockExecuted", headerC.Height-1, headerC.ParentID).
-			Return(false, nil)
+			Return(true, nil)
 
 		versionBeacons.
 			On("Highest", testifyMock.Anything).
@@ -743,7 +743,7 @@ func Test_StopControlWorkers(t *testing.T) {
 		execState := mock.NewExecutionState(t)
 		execState.
 			On("IsBlockExecuted", headerA.Height, headerA.ID()).
-			Return(false, nil).
+			Return(true, nil).
 			Once()
 
 		headers := &stopControlMockHeaders{
@@ -817,7 +817,7 @@ func Test_StopControlWorkers(t *testing.T) {
 		execState := mock.NewExecutionState(t)
 		execState.
 			On("IsBlockExecuted", headerB.Height, headerB.ID()).
-			Return(false, nil).
+			Return(true, nil).
 			Once()
 
 		headers := &stopControlMockHeaders{
