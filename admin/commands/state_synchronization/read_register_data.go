@@ -31,7 +31,7 @@ func (r *ReadRegisterDataCommand) Handler(ctx context.Context, req *admin.Comman
 		return nil, fmt.Errorf("failed to get register data: %w", err)
 	}
 
-	return commands.ConvertToMap(registers)
+	return fmt.Sprintf("%x", registers[0]), nil
 }
 
 // Validator validates the request.
