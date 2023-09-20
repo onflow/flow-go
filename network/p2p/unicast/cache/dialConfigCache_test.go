@@ -113,8 +113,10 @@ func TestDialConfigCache_Adjust_Init(t *testing.T) {
 	require.Equal(t, cfg.StreamCreationAttemptBudget, dialConfigFixture().StreamCreationAttemptBudget, "stream backoff must be 1")
 }
 
+// TestDialConfigCache_Adjust tests the Adjust method of the DialConfigCache. It asserts that the dial config is adjusted,
+// and stored in the cache as expected under concurrent adjustments.
 func TestDialConfigCache_Concurrent_Adjust(t *testing.T) {
-	sizeLimit := uint32(50)
+	sizeLimit := uint32(100)
 	logger := zerolog.Nop()
 	collector := metrics.NewNoopCollector()
 
@@ -147,7 +149,7 @@ func TestDialConfigCache_Concurrent_Adjust(t *testing.T) {
 		}
 	}
 
-	unittest.RequireReturnsBefore(t, wg.Wait, time.Second*100000, "adjustments must be done on time")
+	unittest.RequireReturnsBefore(t, wg.Wait, time.Second*1, "adjustments must be done on time")
 
 	// assert that the cache size is equal to the size limit.
 	require.Equal(t, uint(sizeLimit), cache.Size(), "cache size must be equal to the size limit")
@@ -155,17 +157,71 @@ func TestDialConfigCache_Concurrent_Adjust(t *testing.T) {
 	// assert that the dial config for each peer is adjusted i times, concurrently.
 	for i := 0; i < int(sizeLimit); i++ {
 		wg.Add(1)
-		j := i
-		// go func(j int) {
-		peerID := peerIds[j]
-		cfg, err := cache.GetOrInit(peerID)
-		require.NoError(t, err)
-		require.Equal(t, uint64(j+1), cfg.DialAttemptBudget, fmt.Sprintf("peerId %s dial backoff must be adjusted %d times got: %d", peerID, j+1, cfg.DialAttemptBudget))
-		// }(i)
+		go func(j int) {
+			peerID := peerIds[j]
+			cfg, err := cache.GetOrInit(peerID)
+			require.NoError(t, err)
+			require.Equal(t, uint64(j+1), cfg.DialAttemptBudget, fmt.Sprintf("peerId %s dial backoff must be adjusted %d times got: %d", peerID, j+1, cfg.DialAttemptBudget))
+		}(i)
 	}
 
-	// unittest.RequireReturnsBefore(t, wg.Wait, time.Second*1, "retrievals must be done on time")
+	unittest.RequireReturnsBefore(t, wg.Wait, time.Second*1, "retrievals must be done on time")
 }
 
-// TODO: concurrent adjust and get
-// TODO: LRU eviction
+// TestConcurrent_Adjust_And_Get_Is_Safe tests that concurrent adjustments and retrievals are safe, and do not cause error even if they cause eviction. The test stress tests the cache
+// with 2 * SizeLimit concurrent operations (SizeLimit times concurrent adjustments and SizeLimit times concurrent retrievals).
+// It asserts that the cache size is equal to the size limit, and the dial config for each peer is adjusted and retrieved correctly.
+func TestConcurrent_Adjust_And_Get_Is_Safe(t *testing.T) {
+	sizeLimit := uint32(100)
+	logger := zerolog.Nop()
+	collector := metrics.NewNoopCollector()
+
+	cache := unicastcache.NewDialConfigCache(sizeLimit, logger, collector, dialConfigFixture)
+	require.NotNil(t, cache)
+	require.Zerof(t, cache.Size(), "cache size must be 0")
+
+	wg := sync.WaitGroup{}
+	for i := 0; i < int(sizeLimit); i++ {
+		// concurrently adjusts the dial configs.
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			peerId := p2ptest.PeerIdFixture(t)
+			dialTime := time.Now()
+			updatedConfig, err := cache.Adjust(peerId, func(cfg unicastmodel.DialConfig) (unicastmodel.DialConfig, error) {
+				cfg.DialAttemptBudget = 1 // some random adjustment
+				cfg.LastSuccessfulDial = dialTime
+				cfg.StreamCreationAttemptBudget = 2 // some random adjustment
+				cfg.ConsecutiveSuccessfulStream = 3 // some random adjustment
+				return cfg, nil
+			})
+			require.NoError(t, err)                                      // concurrent adjustment must not fail.
+			require.Equal(t, uint64(1), updatedConfig.DialAttemptBudget) // adjustment must be successful
+			require.Equal(t, uint64(2), updatedConfig.StreamCreationAttemptBudget)
+			require.Equal(t, uint64(3), updatedConfig.ConsecutiveSuccessfulStream)
+			require.Equal(t, dialTime, updatedConfig.LastSuccessfulDial)
+		}()
+	}
+
+	// assert that the dial config for each peer is adjusted i times, concurrently.
+	for i := 0; i < int(sizeLimit); i++ {
+		wg.Add(1)
+		go func() {
+			wg.Done()
+			peerId := p2ptest.PeerIdFixture(t)
+			cfg, err := cache.GetOrInit(peerId)
+			require.NoError(t, err)                                                        // concurrent retrieval must not fail.
+			require.Equal(t, dialConfigFixture().DialAttemptBudget, cfg.DialAttemptBudget) // dial config must be initialized with the default values.
+			require.Equal(t, dialConfigFixture().StreamCreationAttemptBudget, cfg.StreamCreationAttemptBudget)
+			require.Equal(t, uint64(0), cfg.ConsecutiveSuccessfulStream)
+			require.True(t, cfg.LastSuccessfulDial.IsZero())
+		}()
+	}
+
+	unittest.RequireReturnsBefore(t, wg.Wait, time.Second*1, "all operations must be done on time")
+
+	// cache was stress-tested with 2 * SizeLimit concurrent operations. Nevertheless, the cache size must be equal to the size limit due to LRU eviction.
+	require.Equal(t, uint(sizeLimit), cache.Size(), "cache size must be equal to the size limit")
+}
+
+// TODO: test LRU eviction

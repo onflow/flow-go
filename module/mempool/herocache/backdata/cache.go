@@ -108,12 +108,14 @@ type Cache struct {
 // The default overSizeFactor factor is different in the package code because slotsPerBucket is > 3.
 const DefaultOversizeFactor = uint32(8)
 
-func NewCache(sizeLimit uint32,
+func NewCache(
+	sizeLimit uint32,
 	oversizeFactor uint32,
 	ejectionMode heropool.EjectionMode,
 	logger zerolog.Logger,
 	collector module.HeroCacheMetrics,
-	opts ...CacheOpt) *Cache {
+	opts ...CacheOpt,
+) *Cache {
 
 	// total buckets.
 	capacity := uint64(sizeLimit * oversizeFactor)
