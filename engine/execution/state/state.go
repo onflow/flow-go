@@ -35,10 +35,7 @@ type ReadOnlyExecutionState interface {
 // used for script execution and not mutate the execution state of the blockchain.
 type ScriptExecutionState interface {
 	// NewStorageSnapshot creates a new ready-only view at the given state commitment.
-	// deprecated
-	NewStorageSnapshot(flow.StateCommitment) snapshot.StorageSnapshot
-
-	NewBlockStorageSnapshot(commit flow.StateCommitment, blockID flow.Identifier, height uint64) snapshot.StorageSnapshot
+	NewStorageSnapshot(blockID flow.Identifier, height uint64) snapshot.StorageSnapshot
 
 	// StateCommitmentByBlockID returns the final state commitment for the provided block ID.
 	StateCommitmentByBlockID(context.Context, flow.Identifier) (flow.StateCommitment, error)
@@ -50,8 +47,6 @@ type ScriptExecutionState interface {
 	GetHighestFinalizedExecuted() uint64
 	// Any error returned is exception
 	IsBlockExecuted(height uint64, blockID flow.Identifier) (bool, error)
-
-	NewStorageSnapshot(blockID flow.Identifier, height uint64) snapshot.StorageSnapshot
 }
 
 func IsParentExecuted(state ReadOnlyExecutionState, header *flow.Header) (bool, error) {
