@@ -127,7 +127,8 @@ func newFlexTypeRunFunction(
 
 			convertedInput, err := interpreter.ByteArrayValueToByteSlice(invocation.Interpreter, input, locationRange)
 			if err != nil {
-				// TODO deal with this
+				// TODO deal wrap this with proper error
+				panic(err)
 				// panic(RLPDecodeStringError{
 				// 	Msg:           err.Error(),
 				// 	LocationRange: locationRange,
