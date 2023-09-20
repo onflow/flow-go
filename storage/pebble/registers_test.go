@@ -95,6 +95,35 @@ func TestRegisters_Store(t *testing.T) {
 	})
 }
 
+// TestRegisters_Heights tests the expected store behaviour on a single height
+func TestRegisters_Heights(t *testing.T) {
+	t.Parallel()
+	RunWithRegistersStorageAtHeight1(t, func(r *Registers) {
+		// first and latest heights are the same
+		firstHeight := r.FirstHeight()
+		latestHeight := r.LatestHeight()
+		require.Equal(t, firstHeight, latestHeight)
+		// insert new data
+		key1 := flow.RegisterID{Owner: "owner", Key: "key1"}
+		expectedValue1 := []byte("value1")
+		entries := flow.RegisterEntries{
+			{Key: key1, Value: expectedValue1},
+		}
+		height2 := uint64(2)
+		err := r.Store(height2, entries)
+		require.NoError(t, err)
+
+		firstHeight2 := r.FirstHeight()
+		latestHeight2 := r.LatestHeight()
+
+		// new latest height
+		require.Equal(t, latestHeight2, height2)
+
+		// same first height
+		require.Equal(t, firstHeight, firstHeight2)
+	})
+}
+
 // TestRegisters_Store_RoundTrip tests the round trip of a payload storage.
 func TestRegisters_Store_RoundTrip(t *testing.T) {
 	t.Parallel()
@@ -153,8 +182,7 @@ func TestRegisters_Store_Versioning(t *testing.T) {
 		// check increment in height after Store()
 		err = r.Store(height3, entries3)
 		require.NoError(t, err)
-		updatedHeight, err := r.LatestHeight()
-		require.NoError(t, err)
+		updatedHeight := r.LatestHeight()
 		require.Equal(t, updatedHeight, height3)
 
 		// test old version at previous height
@@ -265,8 +293,8 @@ func RunWithRegistersStorageAtInitialHeights(tb testing.TB, first uint64, latest
 	opts := DefaultPebbleOptions(cache, registers.NewMVCCComparer())
 	unittest.RunWithConfiguredPebbleInstance(tb, opts, func(p *pebble.DB) {
 		// insert initial heights to pebble
-		require.NoError(tb, p.Set(FirstHeightKey(), EncodedUint64(first), nil))
-		require.NoError(tb, p.Set(LatestHeightKey(), EncodedUint64(latest), nil))
+		require.NoError(tb, p.Set(firstHeightKey(), EncodedUint64(first), nil))
+		require.NoError(tb, p.Set(latestHeightKey(), EncodedUint64(latest), nil))
 		r, err := NewRegisters(p)
 		require.NoError(tb, err)
 		f(r)

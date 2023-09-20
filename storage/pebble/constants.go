@@ -13,12 +13,13 @@ const (
 	// 1. '/' byte separator for owner
 	// 2. '/' byte for key (owner and key values are blank so both have 0 bytes before each '/')
 	// 3. the 8 byte space for uint64 in big endian for the block height
-	MinLookupKeyLen = 2 + registers.HeightSuffixLen
+	// we will need to maintain this minimum length to ensure the
+	MinLookupKeyLen = 3 + registers.HeightSuffixLen
 
 	// prefixes
-	// codeRegister (r)
-	codeRegister byte = 0x72
-	// codeFirstBlockHeight and  codeLatestBlockHeight keys for register heights (f,l)
-	codeFirstBlockHeight  byte = 0x66
-	codeLatestBlockHeight byte = 0x6C
+	// codeRegister starting at 2, 1 and 0 reserved for DB specific constants
+	codeRegister byte = 2
+	// codeFirstBlockHeight and  codeLatestBlockHeight keys for register heights
+	codeFirstBlockHeight  byte = 3
+	codeLatestBlockHeight byte = 4
 )

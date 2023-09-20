@@ -3,6 +3,7 @@ package pebble
 import (
 	"encoding/binary"
 	"fmt"
+	"sync"
 
 	"github.com/cockroachdb/pebble"
 
@@ -16,6 +17,7 @@ type Registers struct {
 	db           *pebble.DB
 	firstHeight  uint64
 	latestHeight uint64
+	lock         sync.RWMutex
 }
 
 // NewRegisters takes a populated pebble instance with LatestHeight and FirstHeight set.
@@ -25,19 +27,19 @@ func NewRegisters(db *pebble.DB) (*Registers, error) {
 		db: db,
 	}
 	// check height keys and populate cache. These two variables will have been set
-	firstHeight, err := registers.FirstHeight()
+	firstHeight, err := registers.firsHeightFromDB()
 	if err != nil {
 		// this means that the DB is either in a corrupted state or has not been initialized with a set of registers
 		// and firstHeight
 		return nil, fmt.Errorf("unable to initialize register storage, first height unavailable in db: %w", err)
 	}
-	latestHeight, err := registers.LatestHeight()
+	latestHeight, err := registers.latestHeightFromDB()
 	if err != nil {
 		// and firstHeight
 		return nil, fmt.Errorf("unable to initialize register storage, latest height unavailable in db: %w", err)
 	}
-	// since we assume the state of the DB has complete registers as of FirstHeight indexed,
-	// LatestHeight should also be the same
+	// at this stage, the bootstrap function has been called and the firstHeight == lastHeight.
+	// All registers for the height have been indexed
 	registers.firstHeight = firstHeight
 	registers.latestHeight = latestHeight
 	return registers, nil
@@ -54,6 +56,8 @@ func (s *Registers) Get(
 	height uint64,
 	reg flow.RegisterID,
 ) ([]byte, error) {
+	s.lock.RLock()
+	defer s.lock.RUnlock()
 	if height > s.latestHeight || height < s.firstHeight {
 		return nil, storage.ErrHeightNotIndexed
 	}
@@ -88,6 +92,8 @@ func (s *Registers) Store(
 	height uint64,
 	entries flow.RegisterEntries,
 ) error {
+	s.lock.Lock()
+	defer s.lock.Unlock()
 	if height == s.latestHeight {
 		// already updated
 		return nil
@@ -109,7 +115,7 @@ func (s *Registers) Store(
 		}
 	}
 	// increment height and commit
-	err := batch.Set(LatestHeightKey(), EncodedUint64(height), nil)
+	err := batch.Set(latestHeightKey(), EncodedUint64(height), nil)
 	if err != nil {
 		return fmt.Errorf("failed to update latest height %d", height)
 	}
@@ -123,13 +129,23 @@ func (s *Registers) Store(
 }
 
 // LatestHeight Gets the latest height of complete registers available
-func (s *Registers) LatestHeight() (uint64, error) {
-	return s.heightLookup(LatestHeightKey())
+func (s *Registers) LatestHeight() uint64 {
+	s.lock.RLock()
+	defer s.lock.RUnlock()
+	return s.latestHeight
 }
 
 // FirstHeight first indexed height found in the store, typically root block for the spork
-func (s *Registers) FirstHeight() (uint64, error) {
-	return s.heightLookup(FirstHeightKey())
+func (s *Registers) FirstHeight() uint64 {
+	return s.firstHeight
+}
+
+func (s *Registers) firsHeightFromDB() (uint64, error) {
+	return s.heightLookup(firstHeightKey())
+}
+
+func (s *Registers) latestHeightFromDB() (uint64, error) {
+	return s.heightLookup(latestHeightKey())
 }
 
 func (s *Registers) heightLookup(key []byte) (uint64, error) {
