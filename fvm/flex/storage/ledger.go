@@ -12,6 +12,14 @@ type ledger struct {
 
 var _ atree.Ledger = &ledger{}
 
+func NewLedger(accounts environment.Accounts) *ledger {
+	l := &ledger{
+		accounts: accounts,
+	}
+	l.Setup()
+	return l
+}
+
 // TODO deal with this setup better
 func (l *ledger) Setup() {
 	exists, err := l.accounts.Exists(FlexAddress)

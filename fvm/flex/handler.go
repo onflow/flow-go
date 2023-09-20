@@ -2,6 +2,7 @@ package flex
 
 import (
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/onflow/atree"
 	env "github.com/onflow/flow-go/fvm/flex/environment"
 	"github.com/onflow/flow-go/fvm/flex/storage"
 )
@@ -22,9 +23,9 @@ type BaseFlexContractHandler struct {
 	db *storage.Database
 }
 
-func NewBaseFlexContractHandler(db *storage.Database) *BaseFlexContractHandler {
+func NewBaseFlexContractHandler(ledger atree.Ledger) *BaseFlexContractHandler {
 	return &BaseFlexContractHandler{
-		db: db,
+		db: storage.NewDatabase(ledger),
 	}
 }
 

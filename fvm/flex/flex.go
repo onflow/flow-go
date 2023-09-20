@@ -165,7 +165,7 @@ func NewFlexStandardLibraryValue(
 	handler FlexContractHandler,
 ) *stdlib.StandardLibraryValue {
 	return &stdlib.StandardLibraryValue{
-		Name:  "FLEX",
+		Name:  FlexTypeName,
 		Type:  FlexType,
 		Value: NewFlexContractValue(gauge, handler),
 		Kind:  common.DeclarationKindContract,

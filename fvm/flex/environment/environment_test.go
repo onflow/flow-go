@@ -26,7 +26,8 @@ import (
 func RunWithTempDB(t testing.TB, f func(*storage.Database)) {
 	txnState := testutils.NewSimpleTransaction(nil)
 	accounts := environment.NewAccounts(txnState)
-	db := storage.NewDatabase(accounts)
+	led := storage.NewLedger(accounts)
+	db := storage.NewDatabase(led)
 	f(db)
 }
 

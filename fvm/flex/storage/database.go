@@ -10,7 +10,6 @@ import (
 
 	"github.com/onflow/atree"
 
-	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -29,7 +28,7 @@ var RootHashKey = "RootHash"
 // functionality it also supports batch writes and iterating over the keyspace in
 // binary-alphabetical order.
 type Database struct {
-	led *ledger
+	led atree.Ledger
 
 	storage *atree.OrderedMap
 
@@ -38,11 +37,9 @@ type Database struct {
 
 // New returns a wrapped map with all the required database interface methods
 // implemented.
-func NewDatabase(accounts environment.Accounts) *Database {
+func NewDatabase(led atree.Ledger) *Database {
 	// TODO figure out these details
 	// var typeInfo
-	led := &ledger{accounts}
-	led.Setup()
 	baseStorage := atree.NewLedgerBaseStorage(led)
 
 	storage := NewPersistentSlabStorage(baseStorage)
