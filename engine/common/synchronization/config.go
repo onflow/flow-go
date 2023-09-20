@@ -46,8 +46,12 @@ const spamProbabilityMultiplier = 1001
 // message types.
 type SpamDetectionConfig struct {
 
-  batchRequestBaseProb   float32
-  
+	// batchRequestBaseProb is the base probability that's used in creating the final probability of creating a
+	// misbehavior report for a BatchRequest message. This is why the word "base" is used in the name of this field,
+	// since it's not the final probability and there are other factors that determine the final probability.
+	// The reason for this is that we want to increase the probability of creating a misbehavior report for a large batch.
+	batchRequestBaseProb float32
+
 	// syncRequestProb is the probability of creating a misbehavior report for a SyncRequest message.
 	syncRequestProb float32
 

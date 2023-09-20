@@ -280,6 +280,10 @@ func (ss *SyncSuite) TestLoad_Process_BatchRequest_SometimesReportSpam() {
 
 	load := 1000
 
+	// each load test is a load group that contains a set of factors with unique values to test how many misbehavior reports are generated.
+	// Due to the probabilistic nature of how misbehavior reports are generated, we use an expected lower and
+	// upper range of expected misbehaviors to determine if the load test passed or failed. As long as the number of misbehavior reports
+	// falls within the expected range, the load test passes.
 	type loadGroup struct {
 		batchRequestBaseProb      float32
 		expectedMisbehaviorsLower int
