@@ -5,8 +5,6 @@ on:
     tags: 
       - '*'
       - "!daily-*"
-    branches:
-      - 'petera/update-gcr-cred-format'
 
 jobs:
   docker-push:
@@ -38,5 +36,5 @@ jobs:
         make docker-build-flow-without-netgo
     - name: Docker push
       run: |
-        make -e VERSION=peter-test-deleteme docker-push-access
-        make -e VERSION=peter-test-deleteme docker-push-access-without-netgo
+        make docker-push-flow
+        make docker-push-flow-without-netgo
