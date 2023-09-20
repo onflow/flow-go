@@ -164,17 +164,17 @@ func newRichProtocolStateEntry(
 		return nil, fmt.Errorf("could not retrieve current epoch commit: %w", err)
 	}
 
-	// if next epoch has been setup, fill in data for it as well.
-	if protocolState.NextEpoch != nil {
-		nextEpoch := protocolState.NextEpoch
+	// if next epoch has been set up, fill in data for it as well
+	nextEpoch := protocolState.NextEpoch
+	if nextEpoch != nil {
 		nextEpochSetup, err = setups.ByID(nextEpoch.SetupID)
 		if err != nil {
-			return nil, fmt.Errorf("could not retrieve next epoch setup: %w", err)
+			return nil, fmt.Errorf("could not retrieve next epoch's setup event: %w", err)
 		}
 		if nextEpoch.CommitID != flow.ZeroID {
 			nextEpochCommit, err = commits.ByID(nextEpoch.CommitID)
 			if err != nil {
-				return nil, fmt.Errorf("could not retrieve next epoch commit: %w", err)
+				return nil, fmt.Errorf("could not retrieve next epoch's commit event: %w", err)
 			}
 		}
 	}
@@ -191,7 +191,7 @@ func newRichProtocolStateEntry(
 	if err != nil {
 		// observing an error here would be an indication of severe data corruption or bug in our code since
 		// all data should be available and correctly structured at this point.
-		return nil, irrecoverable.NewExceptionf("could not create rich protocol state entry from storage: %w", err)
+		return nil, irrecoverable.NewExceptionf("critical failure while instantiating RichProtocolStateEntry: %w", err)
 	}
 	return result, nil
 }

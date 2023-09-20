@@ -117,8 +117,8 @@ func (s *UpdaterSuite) TestBuild() {
 	require.Equal(s.T(), updatedState.ID(), stateID, "should return correct ID")
 }
 
-// TestSetInvalidStateTransitionAttempted tests if setting invalid state transition attempted flag is reflected in built
-// protocol state. It should be set for both current and next epoch protocol state.
+// TestSetInvalidStateTransitionAttempted tests if setting `InvalidStateTransitionAttempted` flag is
+// reflected in updating the protocol state.
 func (s *UpdaterSuite) TestSetInvalidStateTransitionAttempted() {
 	// update protocol state with next epoch information
 	unittest.WithNextEpochProtocolState()(s.parentProtocolState)

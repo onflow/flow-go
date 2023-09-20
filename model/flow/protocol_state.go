@@ -104,7 +104,7 @@ type RichProtocolStateEntry struct {
 }
 
 // NewRichProtocolStateEntry constructs a rich protocol state entry from a protocol state entry and additional data.
-// No errors are expected during normal operation.
+// No errors are expected during normal operation. All errors indicate inconsistent or invalid inputs.
 func NewRichProtocolStateEntry(
 	protocolState *ProtocolStateEntry,
 	previousEpochSetup *EpochSetup,
@@ -288,7 +288,7 @@ func (ll DynamicIdentityEntryList) Lookup() map[Identifier]*DynamicIdentityEntry
 
 // Sorted returns whether the list is sorted by the input ordering.
 func (ll DynamicIdentityEntryList) Sorted(less IdentifierOrder) bool {
-	for i := 0; i < len(ll)-1; i++ {
+	for i := 0; i+1 < len(ll); i++ {
 		a := ll[i]
 		b := ll[i+1]
 		if !less(a.NodeID, b.NodeID) {
@@ -352,7 +352,7 @@ func (ll DynamicIdentityEntryList) Sort(less IdentifierOrder) DynamicIdentityEnt
 //     a single epoch), in which case this input is nil or empty.
 //
 // It also performs sanity checks to make sure that the data is consistent.
-// No errors are expected during normal operation.
+// No errors are expected during normal operation. All errors indicate inconsistent or invalid inputs.
 func buildIdentityTable(
 	targetEpochDynamicIdentities DynamicIdentityEntryList,
 	targetEpochIdentitySkeletons IdentityList, // TODO: change to `IdentitySkeletonList`
