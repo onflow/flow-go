@@ -208,7 +208,7 @@ func (e *Engine) Process(channel channels.Channel, originID flow.Identifier, eve
 func (e *Engine) process(channel channels.Channel, originID flow.Identifier, event interface{}) error {
 	switch message := event.(type) {
 	case *messages.BatchRequest:
-		report, valid, err := e.validateBatchRequestForALSP(channel, originID, message)
+		report, valid, err := e.validateBatchRequestForALSP(originID, message)
 		if err != nil {
 			return fmt.Errorf("failed to validate batch request from %x: %w", originID[:], err)
 		}
@@ -509,8 +509,40 @@ func (e *Engine) sendRequests(participants flow.IdentifierList, ranges []chainsy
 	}
 }
 
-// TODO: implement spam reporting similar to validateSyncRequestForALSP
-func (e *Engine) validateBatchRequestForALSP(channel channels.Channel, id flow.Identifier, batchRequest *messages.BatchRequest) (*alsp.MisbehaviorReport, bool, error) {
+// validateBatchRequestForALSP checks if a batch request should be reported as a misbehavior due to malicious intent (e.g. spamming).
+// It returns a misbehavior report and a boolean indicating whether validation passed, as well as an error.
+// Returns an error that is assumed to be irrecoverable because of internal processes that didn't allow validation to complete.
+// Returns true if the batch request is valid and should not be reported as misbehavior.
+// Returns false if either
+// a) the batch request is invalid or
+// b) the batch request is valid but should be reported as misbehavior anyway (due to probabilities) or
+// c) an error is encountered.
+func (e *Engine) validateBatchRequestForALSP(originID flow.Identifier, batchRequest *messages.BatchRequest) (*alsp.MisbehaviorReport, bool, error) {
+	// Generate a random integer between 1 and spamProbabilityMultiplier (exclusive)
+	_, err := rand.Uint32n(spamProbabilityMultiplier)
+
+	if err != nil {
+		return nil, false, fmt.Errorf("failed to generate random number from %x: %w", originID[:], err)
+	}
+
+	// check if range request is valid
+	if len(batchRequest.BlockIDs) == 0 {
+		e.log.Warn().
+			Hex("origin_id", logging.ID(originID)).
+			Str(logging.KeySuspicious, "true").
+			Str("reason", alsp.InvalidMessage.String()).
+			Msg("received invalid batch request with 0 block IDs, creating ALSP report")
+		report, err := alsp.NewMisbehaviorReport(originID, alsp.InvalidMessage)
+
+		if err != nil {
+			// failing to create the misbehavior report is unlikely. If an error is encountered while
+			// creating the misbehavior report it indicates a bug and processing can not proceed.
+			return nil, false, fmt.Errorf("failed to create misbehavior report (invalid range request) from %x: %w", originID[:], err)
+		}
+		// failed validation check and should be reported as misbehavior
+		return report, false, nil
+	}
+
 	return nil, true, nil
 }
 
@@ -519,11 +551,14 @@ func (e *Engine) validateBlockResponseForALSP(channel channels.Channel, id flow.
 	return nil, true, nil
 }
 
-// validateRangeRequestForALSP checks if a range request should be reported as a misbehavior.
+// validateRangeRequestForALSP checks if a range request should be reported as a misbehavior due to malicious intent (e.g. spamming).
 // It returns a misbehavior report and a boolean indicating whether validation passed, as well as an error.
 // Returns an error that is assumed to be irrecoverable because of internal processes that didn't allow validation to complete.
 // Returns true if the range request is valid and should not be reported as misbehavior.
-// Returns false if either a) the range request is invalid or b) the range request is valid but should be reported as misbehavior anyway (due to probabilities) or c) an error is encountered.
+// Returns false if either
+// a) the range request is invalid or
+// b) the range request is valid but should be reported as misbehavior anyway (due to probabilities) or
+// c) an error is encountered.
 func (e *Engine) validateRangeRequestForALSP(originID flow.Identifier, rangeRequest *messages.RangeRequest) (*alsp.MisbehaviorReport, bool, error) {
 	// Generate a random integer between 1 and spamProbabilityMultiplier (exclusive)
 	n, err := rand.Uint32n(spamProbabilityMultiplier)
@@ -586,11 +621,13 @@ func (e *Engine) validateRangeRequestForALSP(originID flow.Identifier, rangeRequ
 	return nil, true, nil
 }
 
-// validateSyncRequestForALSP checks if a sync request should be reported as a misbehavior.
+// validateSyncRequestForALSP checks if a sync request should be reported as a misbehavior due to malicious intent (e.g. spamming).
 // It returns a misbehavior report and a boolean indicating whether validation passed, as well as an error.
 // Returns an error that is assumed to be irrecoverable because of internal processes that didn't allow validation to complete.
 // Returns true if passed validation.
-// Returns false if either a) failed validation (due to probabilities) or b) an error is encountered.
+// Returns false if either
+// a) failed validation (due to probabilities) or
+// b) an error is encountered.
 func (e *Engine) validateSyncRequestForALSP(originID flow.Identifier) (*alsp.MisbehaviorReport, bool, error) {
 	// Generate a random integer between 1 and spamProbabilityMultiplier (exclusive)
 	n, err := rand.Uint32n(spamProbabilityMultiplier)

@@ -288,11 +288,15 @@ func (ss *SyncSuite) TestLoad_Process_BatchRequest_SometimesReportSpam() {
 		batchRequestBaseProb      float32
 		expectedMisbehaviorsLower int
 		expectedMisbehaviorsUpper int
-		fromHeight                uint64
-		toHeight                  uint64
+		blockIDs                  []flow.Identifier
 	}
 
 	loadGroups := []loadGroup{}
+
+	// ALWAYS REPORT SPAM FOR INVALID BATCH REQUESTS OR BATCH REQUESTS THAT ARE FAR OUTSIDE OF THE TOLERANCE
+
+	// using an empty batch request always results in a misbehavior report, no matter how small the base probability factor is
+	loadGroups = append(loadGroups, loadGroup{0.001, 1000, 1000, []flow.Identifier{}})
 
 	// reset misbehavior report counter for each subtest
 	misbehaviorsCounter := 0
