@@ -61,8 +61,8 @@ func (ss *SyncSuite) TestLoad_Process_SyncRequest_HigherThanReceiver_OutsideTole
 			},
 		)
 
-		// force creating misbehavior report by setting syncRequestProbability to 1.0 (i.e. report misbehavior 100% of the time)
-		ss.e.spamDetectionConfig.syncRequestProbability = 1.0
+		// force creating misbehavior report by setting syncRequestProb to 1.0 (i.e. report misbehavior 100% of the time)
+		ss.e.spamDetectionConfig.syncRequestProb = 1.0
 
 		require.NoError(ss.T(), ss.e.Process(channels.SyncCommittee, originID, req))
 	}
@@ -84,10 +84,14 @@ func (ss *SyncSuite) TestLoad_Process_SyncRequest_HigherThanReceiver_OutsideTole
 
 	load := 1000
 
+	// each load test is a load group that contains a set of factors with unique values to test how many misbehavior reports are generated
+	// Due to the probabilistic nature of how misbehavior reports are generated, we use an expected lower and
+	// upper range of expected misbehaviors to determine if the load test passed or failed. As long as the number of misbehavior reports
+	// falls within the expected range, the load test passes.
 	type loadGroup struct {
-		syncRequestProbabilityFactor float32
-		expectedMisbehaviorsLower    int
-		expectedMisbehaviorsUpper    int
+		syncRequestProbabilityFactor float32 // probability factor that will be used to generate misbehavior reports
+		expectedMisbehaviorsLower    int     // lower range of expected misbehavior reports
+		expectedMisbehaviorsUpper    int     // upper range of expected misbehavior reports
 	}
 
 	loadGroups := []loadGroup{}
@@ -144,7 +148,7 @@ func (ss *SyncSuite) TestLoad_Process_SyncRequest_HigherThanReceiver_OutsideTole
 						misbehaviorsCounter++
 					},
 				)
-				ss.e.spamDetectionConfig.syncRequestProbability = loadGroup.syncRequestProbabilityFactor
+				ss.e.spamDetectionConfig.syncRequestProb = loadGroup.syncRequestProbabilityFactor
 				require.NoError(ss.T(), ss.e.Process(channels.SyncCommittee, originID, req))
 			}
 
@@ -174,12 +178,16 @@ func (ss *SyncSuite) TestLoad_Process_RangeRequest_SometimesReportSpam() {
 
 	load := 1000
 
+	// each load test is a load group that contains a set of factors with unique values to test how many misbehavior reports are generated.
+	// Due to the probabilistic nature of how misbehavior reports are generated, we use an expected lower and
+	// upper range of expected misbehaviors to determine if the load test passed or failed. As long as the number of misbehavior reports
+	// falls within the expected range, the load test passes.
 	type loadGroup struct {
-		rangeRequestBaseProb      float32
-		expectedMisbehaviorsLower int
-		expectedMisbehaviorsUpper int
-		fromHeight                uint64
-		toHeight                  uint64
+		rangeRequestBaseProb      float32 // base probability factor that will be used to calculate the final probability factor
+		expectedMisbehaviorsLower int     // lower range of expected misbehavior reports
+		expectedMisbehaviorsUpper int     // upper range of expected misbehavior reports
+		fromHeight                uint64  // from height of the range request
+		toHeight                  uint64  // to height of the range request
 	}
 
 	loadGroups := []loadGroup{}
@@ -198,6 +206,9 @@ func (ss *SyncSuite) TestLoad_Process_RangeRequest_SometimesReportSpam() {
 
 	// using a flat range (0) (from height == to height) with a 1% base probability factor, expect to almost never get a misbehavior report, about 0.16% of the time (2 in 1000 requests)
 	// expected probability factor: 0.01 * ((1-1) + 1)/64 = 0.0015625
+	// Note: the expected upper misbehavior count is 5 even though the expected probability is close to 0 to cover outlier cases during the load test to avoid flakiness in CI.
+	// Due of the probabilistic nature of the load tests, you sometimes get edge cases (that cover outliers where out of a 1000 messages, up to 5 could be reported as spam.
+	// 5/1000 = 0.005 and the calculated probability is 0.00171875 which 2.9x as small.
 	loadGroups = append(loadGroups, loadGroup{0.01, 0, 5, 1, 1})
 
 	// using a small range (10) with a 1% base probability factor, expect to almost never get misbehavior report, about 0.17% of the time (2 in 1000 requests)

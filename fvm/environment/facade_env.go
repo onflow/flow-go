@@ -170,7 +170,11 @@ func NewScriptEnv(
 		params,
 		txnState,
 		NewCancellableMeter(ctx, txnState))
-	env.RandomGenerator = NewDummyRandomGenerator()
+	env.RandomGenerator = NewRandomGenerator(
+		tracer,
+		params.EntropyProvider,
+		params.ScriptInfoParams.ID[:],
+	)
 	env.addParseRestrictedChecks()
 	return env
 }
@@ -229,7 +233,7 @@ func NewTransactionEnvironment(
 	env.RandomGenerator = NewRandomGenerator(
 		tracer,
 		params.EntropyProvider,
-		params.TxId,
+		params.TxId[:],
 	)
 
 	env.addParseRestrictedChecks()
@@ -313,11 +317,5 @@ func (env *facadeEnvironment) SetInterpreterSharedState(state *interpreter.Share
 }
 
 func (env *facadeEnvironment) GetInterpreterSharedState() *interpreter.SharedState {
-	return nil
-}
-
-func (env *facadeEnvironment) ReadRandom(buffer []byte) error {
-	// NO-OP for now, to unblock certain downstream dependencies.
-	// E.g. cadence-tools/test
 	return nil
 }

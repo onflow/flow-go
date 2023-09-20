@@ -11,8 +11,6 @@ import (
 	lru2 "github.com/hashicorp/golang-lru/v2"
 	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
 	"github.com/rs/zerolog"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 
 	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/cmd/build"
@@ -76,6 +74,9 @@ type Backend struct {
 	collections       storage.Collections
 	executionReceipts storage.ExecutionReceipts
 	connFactory       connection.ConnectionFactory
+
+	// cache the response to GetNodeVersionInfo since it doesn't change
+	nodeInfo *access.NodeVersionInfo
 }
 
 // Config defines the configurable options for creating Backend
@@ -117,7 +118,7 @@ type Params struct {
 }
 
 // New creates backend instance
-func New(params Params) *Backend {
+func New(params Params) (*Backend, error) {
 	retry := newRetry()
 	if params.RetryEnabled {
 		retry.Activate()
@@ -125,14 +126,14 @@ func New(params Params) *Backend {
 
 	loggedScripts, err := lru.New(DefaultLoggedScriptsCacheSize)
 	if err != nil {
-		params.Log.Fatal().Err(err).Msg("failed to initialize script logging cache")
+		return nil, fmt.Errorf("failed to initialize script logging cache: %w", err)
 	}
 
 	archivePorts := make([]uint, len(params.ArchiveAddressList))
 	for idx, addr := range params.ArchiveAddressList {
 		port, err := findPortFromAddress(addr)
 		if err != nil {
-			params.Log.Fatal().Err(err).Msg("failed to find archive node port")
+			return nil, fmt.Errorf("failed to find archive node port: %w", err)
 		}
 		archivePorts[idx] = port
 	}
@@ -141,8 +142,14 @@ func New(params Params) *Backend {
 	if params.TxResultCacheSize > 0 {
 		txResCache, err = lru2.New[flow.Identifier, *access.TransactionResult](int(params.TxResultCacheSize))
 		if err != nil {
-			params.Log.Fatal().Err(err).Msg("failed to init cache for transaction results")
+			return nil, fmt.Errorf("failed to init cache for transaction results: %w", err)
 		}
+	}
+
+	// initialize node version info
+	nodeInfo, err := getNodeVersionInfo(params.State.Params())
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize node version info: %w", err)
 	}
 
 	b := &Backend{
@@ -215,21 +222,22 @@ func New(params Params) *Backend {
 		executionReceipts: params.ExecutionReceipts,
 		connFactory:       params.ConnFactory,
 		chainID:           params.ChainID,
+		nodeInfo:          nodeInfo,
 	}
 
 	retry.SetBackend(b)
 
 	preferredENIdentifiers, err = identifierList(params.PreferredExecutionNodeIDs)
 	if err != nil {
-		params.Log.Fatal().Err(err).Msg("failed to convert node id string to Flow Identifier for preferred EN map")
+		return nil, fmt.Errorf("failed to convert node id string to Flow Identifier for preferred EN map: %w", err)
 	}
 
 	fixedENIdentifiers, err = identifierList(params.FixedExecutionNodeIDs)
 	if err != nil {
-		params.Log.Fatal().Err(err).Msg("failed to convert node id string to Flow Identifier for fixed EN map")
+		return nil, fmt.Errorf("failed to convert node id string to Flow Identifier for fixed EN map: %w", err)
 	}
 
-	return b
+	return b, nil
 }
 
 // NewCache constructs cache for storing connections to other nodes.
@@ -303,24 +311,43 @@ func (b *Backend) Ping(ctx context.Context) error {
 }
 
 // GetNodeVersionInfo returns node version information such as semver, commit, sporkID, protocolVersion, etc
-func (b *Backend) GetNodeVersionInfo(ctx context.Context) (*access.NodeVersionInfo, error) {
-	stateParams := b.state.Params()
-	sporkId, err := stateParams.SporkID()
+func (b *Backend) GetNodeVersionInfo(_ context.Context) (*access.NodeVersionInfo, error) {
+	return b.nodeInfo, nil
+}
+
+// getNodeVersionInfo returns the NodeVersionInfo for the node.
+// Since these values are static while the node is running, it is safe to cache.
+func getNodeVersionInfo(stateParams protocol.Params) (*access.NodeVersionInfo, error) {
+	sporkID, err := stateParams.SporkID()
 	if err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to read spork ID: %v", err)
+		return nil, fmt.Errorf("failed to read spork ID: %v", err)
 	}
 
 	protocolVersion, err := stateParams.ProtocolVersion()
 	if err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to read protocol version: %v", err)
+		return nil, fmt.Errorf("failed to read protocol version: %v", err)
 	}
 
-	return &access.NodeVersionInfo{
-		Semver:          build.Version(),
-		Commit:          build.Commit(),
-		SporkId:         sporkId,
-		ProtocolVersion: uint64(protocolVersion),
-	}, nil
+	sporkRootBlockHeight, err := stateParams.SporkRootBlockHeight()
+	if err != nil {
+		return nil, fmt.Errorf("failed to read spork root block height: %w", err)
+	}
+
+	nodeRootBlockHeader, err := stateParams.SealedRoot()
+	if err != nil {
+		return nil, fmt.Errorf("failed to read node root block: %w", err)
+	}
+
+	nodeInfo := &access.NodeVersionInfo{
+		Semver:               build.Version(),
+		Commit:               build.Commit(),
+		SporkId:              sporkID,
+		ProtocolVersion:      uint64(protocolVersion),
+		SporkRootBlockHeight: sporkRootBlockHeight,
+		NodeRootBlockHeight:  nodeRootBlockHeader.Height,
+	}
+
+	return nodeInfo, nil
 }
 
 func (b *Backend) GetCollectionByID(_ context.Context, colID flow.Identifier) (*flow.LightCollection, error) {
