@@ -20,6 +20,7 @@ type ReusableCadenceRuntime struct {
 	fvmEnv Environment
 }
 
+// TODO(ramtin): probably we have to update here to inject env
 func NewReusableCadenceRuntime(rt runtime.Runtime, config runtime.Config) *ReusableCadenceRuntime {
 	reusable := &ReusableCadenceRuntime{
 		Runtime:     rt,

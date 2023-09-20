@@ -146,14 +146,15 @@ func WithCoinbase(coinbase common.Address) Option {
 	}
 }
 
-// WithBlobHashes sets the blob hash part of the transaction context
-// not used at the moment but would be useful in near future
-func WithBlobHashes(hashes []common.Hash) Option {
-	return func(c *Config) *Config {
-		c.TxContext.BlobHashes = hashes
-		return c
-	}
-}
+// Ramtin: This is only available if we update the EVM to 1.13 etc
+// // WithBlobHashes sets the blob hash part of the transaction context
+// // not used at the moment but would be useful in near future
+// func WithBlobHashes(hashes []common.Hash) Option {
+// 	return func(c *Config) *Config {
+// 		c.TxContext.BlobHashes = hashes
+// 		return c
+// 	}
+// }
 
 // WithBlockNumber sets the block height in the block context
 func WithBlockNumber(blockNumber *big.Int) Option {

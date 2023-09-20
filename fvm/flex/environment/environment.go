@@ -75,13 +75,14 @@ func (fe *Environment) checkExecuteOnce() error {
 // if error is returned is a fatal one.
 func (fe *Environment) commit() error {
 	// commit the changes
-	var height uint64
-	if fe.Config.BlockContext.BlockNumber != nil {
-		height = fe.Config.BlockContext.BlockNumber.Uint64()
-	}
+	// ramtin: height is needed when we want to update to version v13
+	// var height uint64
+	// if fe.Config.BlockContext.BlockNumber != nil {
+	// 	height = fe.Config.BlockContext.BlockNumber.Uint64()
+	// }
 
 	// commits the changes from the journal into the in memory trie.
-	newRoot, err := fe.State.Commit(height, true)
+	newRoot, err := fe.State.Commit(true)
 	if err != nil {
 		return err
 	}
