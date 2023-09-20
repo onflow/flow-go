@@ -5,6 +5,7 @@ import (
 	"math"
 
 	"github.com/pkg/errors"
+	"github.com/rs/zerolog"
 	"golang.org/x/exp/maps"
 	"golang.org/x/exp/slices"
 
@@ -18,13 +19,17 @@ type Registers struct {
 	registers    map[flow.RegisterID]map[uint64]flow.RegisterValue
 	latestHeight uint64
 	firstHeight  uint64
+	logger       zerolog.Logger
 }
 
-func NewRegisters(first uint64, last uint64) *Registers {
+func NewRegisters(first uint64, last uint64, log zerolog.Logger) *Registers {
+	logger := log.With().Str("component", "execution_indexer_storage").Logger()
+
 	return &Registers{
 		firstHeight:  first,
 		latestHeight: last,
 		registers:    make(map[flow.RegisterID]map[uint64]flow.RegisterValue),
+		logger:       logger,
 	}
 }
 
@@ -73,6 +78,10 @@ func (r *Registers) Store(entries flow.RegisterEntries, height uint64) error {
 		if _, ok := r.registers[e.Key]; !ok {
 			r.registers[e.Key] = make(map[uint64]flow.RegisterValue)
 		}
+
+		r.logger.Debug().Uint64("height", height).
+			Str("value", fmt.Sprintf("%x", e.Value)).
+			Msgf("stored register with ID: %s", e.Key.String())
 
 		r.registers[e.Key][height] = e.Value
 	}

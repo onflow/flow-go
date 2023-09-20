@@ -627,7 +627,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 			initHeight := builder.executionDataConfig.InitialBlockHeight
 
 			// temporarily use the in-memory db
-			registers := memory.NewRegisters(initHeight, initHeight)
+			registers := memory.NewRegisters(initHeight, initHeight, builder.Logger)
 
 			exeIndexer, err := indexer.New(
 				registers,

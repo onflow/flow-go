@@ -30,10 +30,7 @@ type ExecutionState struct {
 // if no height was previously persisted it will use the provided initHeight.
 func New(registers storage.RegisterIndex, headers storage.Headers, events storage.Events, initHeight uint64, log zerolog.Logger) (*ExecutionState, error) {
 	// get the first indexed height from the register storage, if not found use the default start index height provided
-	log.Info().Msgf("creating new indexer with init height %d", initHeight)
-
 	first, err := registers.FirstHeight()
-	log.Info().Msgf("got first height from db val: %d err: %s", first, err)
 	if err != nil {
 		if errors.Is(err, storage.ErrNotFound) {
 			first = initHeight
@@ -43,7 +40,6 @@ func New(registers storage.RegisterIndex, headers storage.Headers, events storag
 	}
 
 	last, err := registers.LatestHeight()
-	log.Info().Msgf("got last height from db val: %d err: %s", first, err)
 	if err != nil {
 		if errors.Is(err, storage.ErrNotFound) {
 			last = first // if last was not found we are just starting to index
@@ -52,7 +48,8 @@ func New(registers storage.RegisterIndex, headers storage.Headers, events storag
 		}
 	}
 
-	log.Info().Msgf("created indexer range first %d last %d", first, last)
+	log.Debug().Msgf("initialized indexer with range first %d last %d", first, last)
+
 	indexRange, err := NewSequentialIndexRange(first, last)
 	if err != nil {
 		return nil, err
@@ -116,7 +113,6 @@ func (i *ExecutionState) IndexBlockData(ctx context.Context, data *execution_dat
 	default:
 	}
 
-	i.log.Info().Msgf("indexing new block data at ID %d", data.BlockID)
 	// todo can we use the headers index from badger to get the height of a block provided from exec sync API?
 	block, err := i.headers.ByBlockID(data.BlockID)
 	if err != nil {
@@ -124,7 +120,7 @@ func (i *ExecutionState) IndexBlockData(ctx context.Context, data *execution_dat
 		return fmt.Errorf("could not get the block by ID %s: %w", data.BlockID, err)
 	}
 
-	i.log.Info().Msgf("indexing new block data at height %d", block.Height)
+	i.log.Debug().Msgf("indexing new block ID %s at height %d", data.BlockID.String(), block.Height)
 
 	if _, err := i.indexRange.CanIncrease(block.Height); err != nil {
 		return err
