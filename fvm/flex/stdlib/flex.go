@@ -1,4 +1,4 @@
-package flex
+package stdlib
 
 import (
 	"github.com/onflow/cadence/runtime/ast"
@@ -7,6 +7,7 @@ import (
 	"github.com/onflow/cadence/runtime/interpreter"
 	"github.com/onflow/cadence/runtime/sema"
 	"github.com/onflow/cadence/runtime/stdlib"
+	"github.com/onflow/flow-go/fvm/flex/models"
 )
 
 const Flex_AddressTypeBytesFieldName = "bytes"
@@ -108,7 +109,7 @@ var flexContractStaticType interpreter.StaticType = interpreter.NewCompositeStat
 
 func newFlexTypeRunFunction(
 	gauge common.MemoryGauge,
-	handler FlexContractHandler,
+	handler models.FlexContractHandler,
 ) *interpreter.HostFunctionValue {
 	return interpreter.NewHostFunctionValue(
 		gauge,
@@ -136,7 +137,7 @@ func newFlexTypeRunFunction(
 			}
 
 			// TODO deal with the coinbase address
-			res := handler.Run(convertedInput, FlexAddress(common.ZeroAddress[:]))
+			res := handler.Run(convertedInput, models.FlexAddress(common.ZeroAddress[:]))
 
 			return interpreter.AsBoolValue(res)
 		},
@@ -145,7 +146,7 @@ func newFlexTypeRunFunction(
 
 func NewFlexContractValue(
 	gauge common.MemoryGauge,
-	handler FlexContractHandler,
+	handler models.FlexContractHandler,
 ) *interpreter.SimpleCompositeValue {
 	return interpreter.NewSimpleCompositeValue(
 		gauge,
@@ -163,7 +164,7 @@ func NewFlexContractValue(
 
 func NewFlexStandardLibraryValue(
 	gauge common.MemoryGauge,
-	handler FlexContractHandler,
+	handler models.FlexContractHandler,
 ) *stdlib.StandardLibraryValue {
 	return &stdlib.StandardLibraryValue{
 		Name:  FlexTypeName,

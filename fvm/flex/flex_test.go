@@ -17,6 +17,7 @@ import (
 	"github.com/onflow/cadence/runtime/sema"
 	"github.com/onflow/cadence/runtime/stdlib"
 	"github.com/onflow/flow-go/fvm/environment"
+	fstdlib "github.com/onflow/flow-go/fvm/flex/stdlib"
 	"github.com/onflow/flow-go/fvm/flex/storage"
 	"github.com/onflow/flow-go/fvm/storage/testutils"
 	"github.com/stretchr/testify/require"
@@ -47,7 +48,7 @@ func Test(t *testing.T) {
 	RunWithTempLedger(t, func(led atree.Ledger) {
 		handler := NewBaseFlexContractHandler(led)
 		env := runtime.NewBaseInterpreterEnvironment(runtime.Config{})
-		flex := NewFlexStandardLibraryValue(nil, handler)
+		flex := fstdlib.NewFlexStandardLibraryValue(nil, handler)
 		env.Declare(*flex)
 		inter := runtime.NewInterpreterRuntime(runtime.Config{})
 
