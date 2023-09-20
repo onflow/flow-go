@@ -83,8 +83,9 @@ func Test(t *testing.T) {
 				}),
 			},
 			runtime.Context{
-				Interface: runtimeInterface,
-				Location:  common.ScriptLocation{},
+				Interface:   runtimeInterface,
+				Environment: env,
+				Location:    common.ScriptLocation{},
 			},
 		)
 		require.NoError(t, err)
