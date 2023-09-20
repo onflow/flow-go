@@ -133,7 +133,7 @@ func TestWorker_Success(t *testing.T) {
 	test := newWorkerTest(t, blocks, lastIndexedIndex)
 
 	test.setBlockDataByID(func(ID flow.Identifier) (*execution_data.BlockExecutionDataEntity, bool) {
-		trie := trieUpdateFixture()
+		trie := trieUpdateFixture(t)
 		ed := &execution_data.BlockExecutionData{
 			BlockID: ID,
 			ChunkExecutionDatas: []*execution_data.ChunkExecutionData{
@@ -174,7 +174,7 @@ func TestWorker_Failure(t *testing.T) {
 	test := newWorkerTest(t, blocks, lastIndexedIndex)
 
 	test.setBlockDataByID(func(ID flow.Identifier) (*execution_data.BlockExecutionDataEntity, bool) {
-		trie := trieUpdateFixture()
+		trie := trieUpdateFixture(t)
 		ed := &execution_data.BlockExecutionData{
 			BlockID: ID,
 			ChunkExecutionDatas: []*execution_data.ChunkExecutionData{

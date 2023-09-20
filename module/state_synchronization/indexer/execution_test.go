@@ -2,10 +2,10 @@ package indexer
 
 import (
 	"context"
+	"crypto/rand"
 	"errors"
 	"fmt"
 	"math"
-	"math/rand"
 	"testing"
 
 	"github.com/rs/zerolog"
@@ -33,7 +33,7 @@ import (
 type indexTest struct {
 	t                *testing.T
 	indexer          *ExecutionState
-	registers        *storagemock.Registers
+	registers        *storagemock.RegisterIndex
 	events           *storagemock.Events
 	headers          *storagemock.Headers
 	ctx              context.Context
@@ -51,7 +51,7 @@ func newIndexTest(
 	blocks []*flow.Block,
 	exeData *execution_data.BlockExecutionDataEntity,
 ) *indexTest {
-	registers := storagemock.NewRegisters(t)
+	registers := storagemock.NewRegisterIndex(t)
 	events := storagemock.NewEvents(t)
 	headers := newBlockHeadersStorage(blocks)
 
@@ -153,7 +153,7 @@ func (i *indexTest) initIndexer() *indexTest {
 	if len(i.registers.ExpectedCalls) == 0 {
 		i.useDefaultHeights() // only set when no other were set
 	}
-	indexer, err := New(i.registers, i.headers, nil, i.blocks[0].Header.Height, zerolog.Nop())
+	indexer, err := New(unittest.Logger(), i.registers, i.headers, i.events, i.blocks[0].Header.Height)
 	require.NoError(i.t, err)
 	i.indexer = indexer
 	return i
@@ -187,7 +187,7 @@ func TestExecutionState_IndexBlockData(t *testing.T) {
 	// this test makes sure the index block data is correctly calling store register with the
 	// same entries we create as a block execution data test, and correctly converts the registers
 	t.Run("Index Single Chunk and Single Register", func(t *testing.T) {
-		trie := trieUpdateFixture()
+		trie := trieUpdateFixture(t)
 		ed := &execution_data.BlockExecutionData{
 			BlockID: block.ID(),
 			ChunkExecutionDatas: []*execution_data.ChunkExecutionData{
@@ -217,7 +217,7 @@ func TestExecutionState_IndexBlockData(t *testing.T) {
 	// we only update that register once with the latest value, so this makes sure merging of
 	// registers is done correctly.
 	t.Run("Index Multiple Chunks and Merge Same Register Updates", func(t *testing.T) {
-		tries := []*ledger.TrieUpdate{trieUpdateFixture(), trieUpdateFixture()}
+		tries := []*ledger.TrieUpdate{trieUpdateFixture(t), trieUpdateFixture(t)}
 		// make sure we have two register updates that are updating the same value, so we can check
 		// if the value from the second update is being persisted instead of first
 		tries[1].Paths[0] = tries[0].Paths[0]
@@ -343,7 +343,7 @@ func TestIntegration_StoreAndGet(t *testing.T) {
 
 	// this test makes sure index values for a single register are correctly updated and always last value is returned
 	t.Run("Single Index Value Changes", func(t *testing.T) {
-		indexer, err := New(initRegisterStorage(), nil, nil, 0, zerolog.Nop())
+		indexer, err := New(unittest.Logger(), initRegisterStorage(), nil, nil, 0)
 		require.NoError(t, err)
 
 		values := [][]byte{
@@ -368,7 +368,7 @@ func TestIntegration_StoreAndGet(t *testing.T) {
 	// the correct highest height indexed value is returned.
 	// e.g. we index A{h(1) -> X}, A{h(2) -> Y}, when we request h(5) we get value Y
 	t.Run("Single Index Value At Later Heights", func(t *testing.T) {
-		indexer, err := New(initRegisterStorage(), nil, nil, 0, zerolog.Nop())
+		indexer, err := New(unittest.Logger(), initRegisterStorage(), nil, nil, 0)
 		require.NoError(t, err)
 
 		value := []byte("1")
@@ -397,7 +397,7 @@ func TestIntegration_StoreAndGet(t *testing.T) {
 
 	// this test makes sure we correctly handle weird payloads
 	t.Run("Empty and Nil Payloads", func(t *testing.T) {
-		indexer, err := New(initRegisterStorage(), nil, nil, 0, zerolog.Nop())
+		indexer, err := New(unittest.Logger(), initRegisterStorage(), nil, nil, 0)
 		require.NoError(t, err)
 
 		require.NoError(t, indexer.indexRegisterPayloads([]*ledger.Payload{}, 1))
@@ -412,7 +412,7 @@ func TestIntegration_StoreAndGet(t *testing.T) {
 		first := uint64(5)
 		last := uint64(10)
 		registers := memory.NewRegisters(first, last, logger)
-		indexer, err := New(registers, nil, nil, 8, zerolog.Nop())
+		indexer, err := New(unittest.Logger(), registers, nil, nil, 8)
 		require.NoError(t, err)
 
 		assert.Equal(t, first, indexer.indexRange.First())
@@ -420,7 +420,7 @@ func TestIntegration_StoreAndGet(t *testing.T) {
 
 		zero := uint64(0)
 		registers = memory.NewRegisters(zero, zero, logger)
-		indexer, err = New(registers, nil, nil, 5, zerolog.Nop())
+		indexer, err = New(unittest.Logger(), registers, nil, nil, 5)
 		require.NoError(t, err)
 
 		assert.Equal(t, zero, indexer.indexRange.First())
@@ -429,7 +429,7 @@ func TestIntegration_StoreAndGet(t *testing.T) {
 		empty := uint64(math.MaxUint64) // we use this value to trigger memory db to return empty
 		init := uint64(8)
 		registers = memory.NewRegisters(empty, empty, logger)
-		indexer, err = New(registers, nil, nil, init, zerolog.Nop())
+		indexer, err = New(unittest.Logger(), registers, nil, nil, init)
 		require.NoError(t, err)
 
 		assert.Equal(t, init, indexer.indexRange.First())
@@ -511,22 +511,26 @@ func trieUpdateWithPayloadsFixture(payloads []*ledger.Payload) *ledger.TrieUpdat
 	return trie
 }
 
-func trieUpdateFixture() *ledger.TrieUpdate {
+func trieUpdateFixture(t *testing.T) *ledger.TrieUpdate {
 	return trieUpdateWithPayloadsFixture(
 		[]*ledger.Payload{
-			ledgerPayloadFixture(),
-			ledgerPayloadFixture(),
-			ledgerPayloadFixture(),
-			ledgerPayloadFixture(),
+			ledgerPayloadFixture(t),
+			ledgerPayloadFixture(t),
+			ledgerPayloadFixture(t),
+			ledgerPayloadFixture(t),
 		})
 }
 
-func ledgerPayloadFixture() *ledger.Payload {
+func ledgerPayloadFixture(t *testing.T) *ledger.Payload {
 	owner := unittest.RandomAddressFixture()
 	key := make([]byte, 8)
-	rand.Read(key)
+	_, err := rand.Read(key)
+	require.NoError(t, err)
+
 	val := make([]byte, 8)
-	rand.Read(val)
+	_, err = rand.Read(val)
+	require.NoError(t, err)
+
 	return ledgerPayloadWithValuesFixture(owner.String(), fmt.Sprintf("%x", key), val)
 }
 

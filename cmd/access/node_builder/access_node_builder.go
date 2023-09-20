@@ -625,16 +625,21 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 			)
 
 			initHeight := builder.executionDataConfig.InitialBlockHeight
+			lastHeight, err := indexedBlockHeight.ProcessedIndex()
+			if err != nil {
+				return nil, err
+			}
+			builder.Logger.Debug().Uint64("last_indexed_height", lastHeight).Msg("execution data indexer")
 
 			// temporarily use the in-memory db
-			registers := memory.NewRegisters(initHeight, initHeight, builder.Logger)
+			registers := memory.NewRegisters(initHeight, lastHeight, builder.Logger)
 
 			exeIndexer, err := indexer.New(
+				builder.Logger,
 				registers,
 				builder.Storage.Headers,
 				builder.Storage.Events,
 				initHeight,
-				builder.Logger,
 			)
 			if err != nil {
 				return nil, err

@@ -14,6 +14,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	"github.com/onflow/flow-go/storage"
+	"github.com/onflow/flow-go/utils/logging"
 )
 
 // ExecutionState indexes the execution state.
@@ -28,7 +29,13 @@ type ExecutionState struct {
 // New execution state indexer with provided storage access for registers and headers as well as initial height.
 // This method will initialize the index starting height and end height to that found in the register storage,
 // if no height was previously persisted it will use the provided initHeight.
-func New(registers storage.RegisterIndex, headers storage.Headers, events storage.Events, initHeight uint64, log zerolog.Logger) (*ExecutionState, error) {
+func New(
+	log zerolog.Logger,
+	registers storage.RegisterIndex,
+	headers storage.Headers,
+	events storage.Events,
+	initHeight uint64,
+) (*ExecutionState, error) {
 	// get the first indexed height from the register storage, if not found use the default start index height provided
 	first, err := registers.FirstHeight()
 	if err != nil {
@@ -48,7 +55,10 @@ func New(registers storage.RegisterIndex, headers storage.Headers, events storag
 		}
 	}
 
-	log.Debug().Msgf("initialized indexer with range first %d last %d", first, last)
+	log.Debug().
+		Uint64("first_height", first).
+		Uint64("latest_height", last).
+		Msgf("initialized indexer range")
 
 	indexRange, err := NewSequentialIndexRange(first, last)
 	if err != nil {
@@ -120,30 +130,27 @@ func (i *ExecutionState) IndexBlockData(ctx context.Context, data *execution_dat
 		return fmt.Errorf("could not get the block by ID %s: %w", data.BlockID, err)
 	}
 
-	i.log.Debug().Msgf("indexing new block ID %s at height %d", data.BlockID.String(), block.Height)
+	lg := i.log.With().
+		Hex("block_id", logging.ID(data.BlockID)).
+		Uint64("height", block.Height).
+		Logger()
+
+	lg.Debug().Msgf("indexing new block")
 
 	if _, err := i.indexRange.CanIncrease(block.Height); err != nil {
 		return err
 	}
 
 	// concurrently process indexing of block data
-	g, ctx := errgroup.WithContext(ctx)
+	g, _ := errgroup.WithContext(ctx)
 
-	payloads := make(map[ledger.Path]*ledger.Payload)
+	updates := make([]*ledger.TrieUpdate, 0)
 	events := make([]flow.Event, 0)
 	collections := make([]*flow.Collection, 0)
 
 	for _, chunk := range data.ChunkExecutionDatas {
 		if chunk.TrieUpdate != nil {
-			// we are iterating all the registers and overwrite any existing register at the same path
-			// this will make sure if we have multiple register changes only the last change will get persisted
-			// if block has two chucks:
-			// first chunk updates: { X: 1, Y: 2 }
-			// second chunk updates: { X: 2 }
-			// then we should persist only {X: 2: Y: 2}
-			for i, path := range chunk.TrieUpdate.Paths {
-				payloads[path] = chunk.TrieUpdate.Payloads[i] // todo should we use TrieUpdate.Paths or TrieUpdate.Payload.Key?
-			}
+			updates = append(updates, chunk.TrieUpdate)
 		}
 
 		events = append(events, chunk.Events...)
@@ -160,7 +167,24 @@ func (i *ExecutionState) IndexBlockData(ctx context.Context, data *execution_dat
 		})
 	}
 
+	registersUpdated := 0
 	g.Go(func() error {
+		// we are iterating all the registers and overwrite any existing register at the same path
+		// this will make sure if we have multiple register changes only the last change will get persisted
+		// if block has two chucks:
+		// first chunk updates: { X: 1, Y: 2 }
+		// second chunk updates: { X: 2 }
+		// then we should persist only {X: 2: Y: 2}
+
+		payloads := make(map[ledger.Path]*ledger.Payload)
+		for _, update := range updates {
+			for i, path := range update.Paths {
+				payloads[path] = update.Payloads[i] // todo should we use TrieUpdate.Paths or TrieUpdate.Payload.Key?
+			}
+		}
+
+		registersUpdated = len(payloads)
+
 		err = i.indexRegisterPayloads(maps.Values(payloads), block.Height)
 		if err != nil {
 			return fmt.Errorf("could not index register payloads at height %d: %w", block.Height, err)
@@ -173,7 +197,9 @@ func (i *ExecutionState) IndexBlockData(ctx context.Context, data *execution_dat
 		return fmt.Errorf("failed to index block data at height %d: %w", block.Height, err)
 	}
 
-	i.log.Debug().Uint64("height", block.Height).Int("register count", len(payloads)).Msgf("indexed block data")
+	lg.Debug().
+		Int("register_count", registersUpdated).
+		Msg("indexed block data")
 
 	return i.indexRange.Increase(block.Height)
 }

@@ -6,6 +6,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
+	"go.uber.org/atomic"
 	"golang.org/x/exp/maps"
 	"golang.org/x/exp/slices"
 
@@ -17,7 +18,7 @@ var _ storage.RegisterIndex = (*Registers)(nil)
 
 type Registers struct {
 	registers    map[flow.RegisterID]map[uint64]flow.RegisterValue
-	latestHeight uint64
+	latestHeight *atomic.Uint64
 	firstHeight  uint64
 	logger       zerolog.Logger
 }
@@ -27,17 +28,17 @@ func NewRegisters(first uint64, last uint64, log zerolog.Logger) *Registers {
 
 	return &Registers{
 		firstHeight:  first,
-		latestHeight: last,
+		latestHeight: atomic.NewUint64(last),
 		registers:    make(map[flow.RegisterID]map[uint64]flow.RegisterValue),
 		logger:       logger,
 	}
 }
 
 func (r *Registers) LatestHeight() (uint64, error) {
-	if r.latestHeight == math.MaxUint64 {
+	if r.latestHeight.Load() == math.MaxUint64 {
 		return 0, storage.ErrNotFound
 	}
-	return r.latestHeight, nil
+	return r.latestHeight.Load(), nil
 }
 
 func (r *Registers) FirstHeight() (uint64, error) {
@@ -86,7 +87,7 @@ func (r *Registers) Store(entries flow.RegisterEntries, height uint64) error {
 		r.registers[e.Key][height] = e.Value
 	}
 
-	r.latestHeight = height
+	r.latestHeight.Store(height)
 
 	return nil
 }
