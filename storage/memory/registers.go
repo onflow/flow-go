@@ -22,19 +22,21 @@ type Registers struct {
 
 func NewRegisters(first uint64, last uint64) *Registers {
 	return &Registers{
-		registers: make(map[flow.RegisterID]map[uint64]flow.RegisterValue),
+		firstHeight:  first,
+		latestHeight: last,
+		registers:    make(map[flow.RegisterID]map[uint64]flow.RegisterValue),
 	}
 }
 
 func (r *Registers) LatestHeight() (uint64, error) {
-	if r.latestHeight == 0 {
+	if r.latestHeight == math.MaxUint64 {
 		return 0, storage.ErrNotFound
 	}
 	return r.latestHeight, nil
 }
 
 func (r *Registers) FirstHeight() (uint64, error) {
-	if r.firstHeight == 0 {
+	if r.firstHeight == math.MaxUint64 {
 		return 0, storage.ErrNotFound
 	}
 
