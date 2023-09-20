@@ -201,10 +201,8 @@ func (m *AtreeRegisterMigrator) convertStorageDomain(
 				return fmt.Errorf("failed to read value for key %s: %w", key, err)
 			}
 
-			err = capturePanic(func() {
-				// force the value to be read entirely
-				value = value.Clone(mr.Interpreter)
-			})
+			value, err = m.cloneValue(mr, value)
+
 			if err != nil {
 				return fmt.Errorf("failed to clone value for key %s: %w", key, err)
 			}
@@ -450,6 +448,21 @@ func (m *AtreeRegisterMigrator) dumpAccount(address common.Address, before, afte
 	afterWriter.Close()
 }
 
+func (m *AtreeRegisterMigrator) cloneValue(
+	mr *migratorRuntime,
+	value interpreter.Value,
+) (interpreter.Value, error) {
+
+	err := capturePanic(func() {
+		// force the value to be read entirely
+		value = value.Clone(mr.Interpreter)
+	})
+	if err != nil {
+		return nil, err
+	}
+	return value, nil
+}
+
 //
 //func (m *AtreeRegisterMigrator) checkStorageHealth(
 //	mr *migratorRuntime,
@@ -558,6 +571,10 @@ var knownProblematicAccounts = map[common.Address]string{
 var accountsToLog = map[common.Address]string{
 	// Testnet accounts
 	mustHexToAddress("ff8bbaa2905b7bd6"): "Small account that increased in size",
+	mustHexToAddress("04d3fdfd153c8a2a"): "Removed slabs break account",
+	mustHexToAddress("05ad65e6ff041440"): "Removed slabs break account",
+	mustHexToAddress("496f36b415c0417d"): "Removed slabs break account",
+	mustHexToAddress("c7abe7300faa6f3a"): "Removed slabs break account",
 }
 
 func mustHexToAddress(hex string) common.Address {
