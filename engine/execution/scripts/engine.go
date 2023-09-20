@@ -127,6 +127,6 @@ func (e *Engine) getSnapshotAtBlockID(blockID flow.Identifier) (snapshot.Storage
 	}
 
 	// create a snapshot powered by register store
-	blockSnapshot := e.execState.NewBlockStorageSnapshot(blockID, header.Height)
+	blockSnapshot := e.execState.NewStorageSnapshot(blockID, header.Height)
 	return blockSnapshot, header, nil
 }
