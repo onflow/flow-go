@@ -3,9 +3,10 @@ package synchronization
 import (
 	"context"
 	"fmt"
-	"github.com/onflow/flow-go/model/flow"
 	"testing"
 	"time"
+
+	"github.com/onflow/flow-go/model/flow"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
