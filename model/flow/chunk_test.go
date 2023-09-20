@@ -1,8 +1,10 @@
 package flow_test
 
 import (
+	mathRand "math/rand"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/model/flow"
@@ -103,4 +105,53 @@ func TestChunkList_Indices(t *testing.T) {
 		require.Len(t, indices, 3)
 		require.Contains(t, indices, uint64(0), uint64(2), uint64(4))
 	})
+}
+
+func TestChunkIndexIsSet(t *testing.T) {
+
+	i := mathRand.Int()
+	chunk := flow.NewChunk(
+		unittest.IdentifierFixture(),
+		i,
+		unittest.StateCommitmentFixture(),
+		21,
+		unittest.IdentifierFixture(),
+		unittest.StateCommitmentFixture(),
+		17995,
+	)
+
+	assert.Equal(t, i, int(chunk.Index))
+	assert.Equal(t, i, int(chunk.CollectionIndex))
+}
+
+func TestChunkNumberOfTxsIsSet(t *testing.T) {
+
+	i := int(mathRand.Uint32())
+	chunk := flow.NewChunk(
+		unittest.IdentifierFixture(),
+		3,
+		unittest.StateCommitmentFixture(),
+		i,
+		unittest.IdentifierFixture(),
+		unittest.StateCommitmentFixture(),
+		17995,
+	)
+
+	assert.Equal(t, i, int(chunk.NumberOfTransactions))
+}
+
+func TestChunkTotalComputationUsedIsSet(t *testing.T) {
+
+	i := mathRand.Uint64()
+	chunk := flow.NewChunk(
+		unittest.IdentifierFixture(),
+		3,
+		unittest.StateCommitmentFixture(),
+		21,
+		unittest.IdentifierFixture(),
+		unittest.StateCommitmentFixture(),
+		i,
+	)
+
+	assert.Equal(t, i, chunk.TotalComputationUsed)
 }

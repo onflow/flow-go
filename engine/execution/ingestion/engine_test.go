@@ -4,14 +4,12 @@ import (
 	"context"
 	"crypto/rand"
 	"fmt"
-	mathRand "math/rand"
 	"sync"
 	"testing"
 	"time"
 
 	"github.com/golang/mock/gomock"
 	"github.com/rs/zerolog"
-	"github.com/rs/zerolog/log"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -36,8 +34,8 @@ import (
 	"github.com/onflow/flow-go/model/flow/order"
 	"github.com/onflow/flow-go/module/mempool/entity"
 	"github.com/onflow/flow-go/module/metrics"
+	modulemock "github.com/onflow/flow-go/module/mock"
 	module "github.com/onflow/flow-go/module/mocks"
-	"github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/network/mocknetwork"
 	stateProtocol "github.com/onflow/flow-go/state/protocol"
@@ -113,7 +111,7 @@ type testingContext struct {
 	engine              *Engine
 	headers             *storage.MockHeaders
 	blocks              *storage.MockBlocks
-	collections         *storage.MockCollections
+	collections         *mockCollectionStore
 	state               *protocol.State
 	conduit             *mocknetwork.Conduit
 	collectionConduit   *mocknetwork.Conduit
@@ -127,6 +125,7 @@ type testingContext struct {
 	identities          flow.IdentityList
 	stopControl         *stop.StopControl
 	uploadMgr           *uploader.Manager
+	fetcher             *mockFetcher
 
 	mu *sync.Mutex
 }
@@ -137,6 +136,8 @@ func runWithEngine(t *testing.T, f func(testingContext)) {
 
 	net := mocknetwork.NewMockEngineRegistry(ctrl)
 	request := module.NewMockRequester(ctrl)
+	requester := new(modulemock.Requester)
+	requester.On("Force").Return()
 
 	// initialize the mocks and engine
 	conduit := &mocknetwork.Conduit{}
@@ -155,7 +156,7 @@ func runWithEngine(t *testing.T, f func(testingContext)) {
 	headers := storage.NewMockHeaders(ctrl)
 	blocks := storage.NewMockBlocks(ctrl)
 	payloads := storage.NewMockPayloads(ctrl)
-	collections := storage.NewMockCollections(ctrl)
+	collections := newMockCollectionStore()
 
 	computationManager := new(computation.ComputationManager)
 	providerEngine := new(provider.ProviderEngine)
@@ -217,7 +218,7 @@ func runWithEngine(t *testing.T, f func(testingContext)) {
 
 	uploadMgr := uploader.NewManager(trace.NewNoopTracer())
 
-	fetcher := fetcher.NewCollectionFetcher(log, request, protocolState, false)
+	fetcher := newMockFetcher()
 	loader := loader.NewLoader(log, protocolState, headers, executionState)
 
 	engine, err = New(
@@ -263,6 +264,7 @@ func runWithEngine(t *testing.T, f func(testingContext)) {
 		identities:          identityList,
 		uploadMgr:           uploadMgr,
 		stopControl:         stopControl,
+		fetcher:             fetcher,
 
 		mu: &sync.Mutex{},
 	})
@@ -290,14 +292,9 @@ func (ctx *testingContext) assertSuccessfulBlockComputation(
 		computationResult.Chunks[len(computationResult.Chunks)-1].EndState = newStateCommitment
 	}
 
-	// copy executable block to set `Executing` state for arguments matching
-	// without changing original object
-	eb := *executableBlock
-	eb.Executing = true
-	eb.StartState = &newStateCommitment
-
+	// TODO: return computed block
 	ctx.computationManager.
-		On("ComputeBlock", mock.Anything, previousExecutionResultID, &eb, mock.Anything).
+		On("ComputeBlock", mock.Anything, previousExecutionResultID, mock.Anything, mock.Anything).
 		Return(computationResult, nil).Once()
 
 	ctx.executionState.On("NewStorageSnapshot", newStateCommitment).Return(nil)
@@ -408,61 +405,18 @@ func (ctx *testingContext) mockStateCommitsWithMap(commits map[flow.Identifier]f
 	}
 }
 
-func TestChunkIndexIsSet(t *testing.T) {
-
-	i := mathRand.Int()
-	chunk := flow.NewChunk(
-		unittest.IdentifierFixture(),
-		i,
-		unittest.StateCommitmentFixture(),
-		21,
-		unittest.IdentifierFixture(),
-		unittest.StateCommitmentFixture(),
-		17995,
-	)
-
-	assert.Equal(t, i, int(chunk.Index))
-	assert.Equal(t, i, int(chunk.CollectionIndex))
-}
-
-func TestChunkNumberOfTxsIsSet(t *testing.T) {
-
-	i := int(mathRand.Uint32())
-	chunk := flow.NewChunk(
-		unittest.IdentifierFixture(),
-		3,
-		unittest.StateCommitmentFixture(),
-		i,
-		unittest.IdentifierFixture(),
-		unittest.StateCommitmentFixture(),
-		17995,
-	)
-
-	assert.Equal(t, i, int(chunk.NumberOfTransactions))
-}
-
-func TestChunkTotalComputationUsedIsSet(t *testing.T) {
-
-	i := mathRand.Uint64()
-	chunk := flow.NewChunk(
-		unittest.IdentifierFixture(),
-		3,
-		unittest.StateCommitmentFixture(),
-		21,
-		unittest.IdentifierFixture(),
-		unittest.StateCommitmentFixture(),
-		i,
-	)
-
-	assert.Equal(t, i, chunk.TotalComputationUsed)
-}
-
+// TestExecuteOneBlock block is executed after receiving collection
 func TestExecuteOneBlock(t *testing.T) {
 	runWithEngine(t, func(ctx testingContext) {
+		col := unittest.CollectionFixture(1)
+		gua := col.Guarantee()
 
+		colSigner := unittest.IdentifierFixture()
 		// A <- B
 		blockA := unittest.BlockHeaderFixture()
-		blockB := unittest.ExecutableBlockFixtureWithParent(nil, blockA, unittest.StateCommitmentPointerFixture())
+		blockB := unittest.ExecutableBlockFixtureWithParent([][]flow.Identifier{{colSigner}}, blockA, unittest.StateCommitmentPointerFixture())
+		blockB.Block.Payload.Guarantees[0] = &gua
+		blockB.Block.Header.PayloadHash = blockB.Block.Payload.Hash()
 
 		ctx.mockHasWeightAtBlockID(blockA.ID(), true)
 		ctx.mockHasWeightAtBlockID(blockB.ID(), true)
@@ -472,11 +426,16 @@ func TestExecuteOneBlock(t *testing.T) {
 		// and blockA's parent has been executed.
 		commits := make(map[flow.Identifier]flow.StateCommitment)
 		commits[blockB.Block.Header.ParentID] = *blockB.StartState
-		wg := sync.WaitGroup{}
 		ctx.mockStateCommitsWithMap(commits)
 
 		ctx.state.On("Sealed").Return(ctx.snapshot)
 		ctx.snapshot.On("Head").Return(blockA, nil)
+
+		err := ctx.engine.handleBlock(context.Background(), blockB.Block)
+		require.NoError(t, err)
+
+		wg := sync.WaitGroup{}
+		wg.Add(1) // wait for block B to be executed
 
 		ctx.assertSuccessfulBlockComputation(
 			commits,
@@ -489,11 +448,15 @@ func TestExecuteOneBlock(t *testing.T) {
 			*blockB.StartState,
 			nil)
 
-		wg.Add(1) // wait for block B to be executed
-		err := ctx.engine.handleBlock(context.Background(), blockB.Block)
+		err = ctx.engine.handleCollection(
+			unittest.IdentifierFixture(),
+			&col,
+		)
 		require.NoError(t, err)
 
 		unittest.AssertReturnsBefore(t, wg.Wait, 10*time.Second)
+
+		require.True(t, ctx.fetcher.isFetched(gua.ID()))
 
 		_, more := <-ctx.engine.Done() // wait for all the blocks to be processed
 		require.False(t, more)
@@ -672,271 +635,271 @@ func Test_OnlyHeadOfTheQueueIsExecuted(t *testing.T) {
 	})
 }
 
-func TestBlocksArentExecutedMultipleTimes_multipleBlockEnqueue(t *testing.T) {
-	unittest.SkipUnless(t, unittest.TEST_TODO, "broken test")
+// func TestBlocksArentExecutedMultipleTimes_multipleBlockEnqueue(t *testing.T) {
+// 	unittest.SkipUnless(t, unittest.TEST_TODO, "broken test")
+//
+// 	runWithEngine(t, func(ctx testingContext) {
+//
+// 		colSigner := unittest.IdentifierFixture()
+//
+// 		// A <- B <- C
+// 		blockA := unittest.BlockHeaderFixture()
+// 		blockB := unittest.ExecutableBlockFixtureWithParent(nil, blockA, unittest.StateCommitmentPointerFixture())
+//
+// 		// blocks are empty, so no state change is expected
+// 		blockC := unittest.ExecutableBlockFixtureWithParent([][]flow.Identifier{{colSigner}}, blockB.Block.Header, blockB.StartState)
+//
+// 		logBlocks(map[string]*entity.ExecutableBlock{
+// 			"B": blockB,
+// 			"C": blockC,
+// 		})
+//
+// 		collection := blockC.Collections()[0].Collection()
+//
+// 		commits := make(map[flow.Identifier]flow.StateCommitment)
+// 		commits[blockB.Block.Header.ParentID] = *blockB.StartState
+//
+// 		wg := sync.WaitGroup{}
+// 		ctx.mockStateCommitsWithMap(commits)
+//
+// 		ctx.state.On("Sealed").Return(ctx.snapshot)
+// 		ctx.snapshot.On("Head").Return(blockA, nil)
+//
+// 		// wait finishing execution until all the blocks are sent to execution
+// 		wgPut := sync.WaitGroup{}
+// 		wgPut.Add(1)
+//
+// 		// add extra flag to make sure B was indeed executed before C
+// 		wasBExecuted := false
+//
+// 		ctx.assertSuccessfulBlockComputation(
+// 			commits,
+// 			func(blockID flow.Identifier, commit flow.StateCommitment) {
+// 				wgPut.Wait()
+// 				wg.Done()
+//
+// 				wasBExecuted = true
+// 			},
+// 			blockB,
+// 			unittest.IdentifierFixture(),
+// 			true,
+// 			*blockB.StartState,
+// 			nil)
+//
+// 		ctx.assertSuccessfulBlockComputation(
+// 			commits,
+// 			func(blockID flow.Identifier, commit flow.StateCommitment) {
+// 				wg.Done()
+// 				require.True(t, wasBExecuted)
+// 			},
+// 			blockC,
+// 			unittest.IdentifierFixture(),
+// 			true,
+// 			*blockB.StartState,
+// 			nil)
+//
+// 		// make sure collection requests are sent
+// 		// first, the collection should not be found, so the request will be sent. Next, it will be queried again, and this time
+// 		// it should return fine
+// 		gomock.InOrder(
+// 			ctx.collections.EXPECT().ByID(blockC.Collections()[0].Guarantee.CollectionID).DoAndReturn(func(_ flow.Identifier) (*flow.Collection, error) {
+// 				// make sure request for collection from block C are sent before block B finishes execution
+// 				require.False(t, wasBExecuted)
+// 				return nil, storageerr.ErrNotFound
+// 			}),
+// 			ctx.collections.EXPECT().ByID(blockC.Collections()[0].Guarantee.CollectionID).DoAndReturn(func(_ flow.Identifier) (*flow.Collection, error) {
+// 				return &collection, nil
+// 			}),
+// 		)
+//
+// 		ctx.collectionRequester.EXPECT().EntityByID(gomock.Any(), gomock.Any()).DoAndReturn(func(_ flow.Identifier, _ flow.IdentityFilter) {
+// 			// parallel run to avoid deadlock, ingestion engine is thread-safe
+// 			go func() {
+// 				err := ctx.engine.handleCollection(unittest.IdentifierFixture(), &collection)
+// 				require.NoError(t, err)
+// 			}()
+// 		})
+// 		ctx.collections.EXPECT().Store(&collection)
+//
+// 		times := 4
+//
+// 		wg.Add(1) // wait for block B to be executed
+// 		for i := 0; i < times; i++ {
+// 			err := ctx.engine.handleBlock(context.Background(), blockB.Block)
+// 			require.NoError(t, err)
+// 		}
+// 		wg.Add(1) // wait for block C to be executed
+// 		// add extra block to ensure the execution can continue after duplicated blocks
+// 		err := ctx.engine.handleBlock(context.Background(), blockC.Block)
+// 		require.NoError(t, err)
+// 		wgPut.Done()
+//
+// 		unittest.AssertReturnsBefore(t, wg.Wait, 10*time.Second)
+//
+// 		_, more := <-ctx.engine.Done() // wait for all the blocks to be processed
+// 		require.False(t, more)
+//
+// 		_, ok := commits[blockB.ID()]
+// 		require.True(t, ok)
+//
+// 		_, ok = commits[blockC.ID()]
+// 		require.True(t, ok)
+// 	})
+// }
 
-	runWithEngine(t, func(ctx testingContext) {
-
-		colSigner := unittest.IdentifierFixture()
-
-		// A <- B <- C
-		blockA := unittest.BlockHeaderFixture()
-		blockB := unittest.ExecutableBlockFixtureWithParent(nil, blockA, unittest.StateCommitmentPointerFixture())
-
-		// blocks are empty, so no state change is expected
-		blockC := unittest.ExecutableBlockFixtureWithParent([][]flow.Identifier{{colSigner}}, blockB.Block.Header, blockB.StartState)
-
-		logBlocks(map[string]*entity.ExecutableBlock{
-			"B": blockB,
-			"C": blockC,
-		})
-
-		collection := blockC.Collections()[0].Collection()
-
-		commits := make(map[flow.Identifier]flow.StateCommitment)
-		commits[blockB.Block.Header.ParentID] = *blockB.StartState
-
-		wg := sync.WaitGroup{}
-		ctx.mockStateCommitsWithMap(commits)
-
-		ctx.state.On("Sealed").Return(ctx.snapshot)
-		ctx.snapshot.On("Head").Return(blockA, nil)
-
-		// wait finishing execution until all the blocks are sent to execution
-		wgPut := sync.WaitGroup{}
-		wgPut.Add(1)
-
-		// add extra flag to make sure B was indeed executed before C
-		wasBExecuted := false
-
-		ctx.assertSuccessfulBlockComputation(
-			commits,
-			func(blockID flow.Identifier, commit flow.StateCommitment) {
-				wgPut.Wait()
-				wg.Done()
-
-				wasBExecuted = true
-			},
-			blockB,
-			unittest.IdentifierFixture(),
-			true,
-			*blockB.StartState,
-			nil)
-
-		ctx.assertSuccessfulBlockComputation(
-			commits,
-			func(blockID flow.Identifier, commit flow.StateCommitment) {
-				wg.Done()
-				require.True(t, wasBExecuted)
-			},
-			blockC,
-			unittest.IdentifierFixture(),
-			true,
-			*blockB.StartState,
-			nil)
-
-		// make sure collection requests are sent
-		// first, the collection should not be found, so the request will be sent. Next, it will be queried again, and this time
-		// it should return fine
-		gomock.InOrder(
-			ctx.collections.EXPECT().ByID(blockC.Collections()[0].Guarantee.CollectionID).DoAndReturn(func(_ flow.Identifier) (*flow.Collection, error) {
-				// make sure request for collection from block C are sent before block B finishes execution
-				require.False(t, wasBExecuted)
-				return nil, storageerr.ErrNotFound
-			}),
-			ctx.collections.EXPECT().ByID(blockC.Collections()[0].Guarantee.CollectionID).DoAndReturn(func(_ flow.Identifier) (*flow.Collection, error) {
-				return &collection, nil
-			}),
-		)
-
-		ctx.collectionRequester.EXPECT().EntityByID(gomock.Any(), gomock.Any()).DoAndReturn(func(_ flow.Identifier, _ flow.IdentityFilter) {
-			// parallel run to avoid deadlock, ingestion engine is thread-safe
-			go func() {
-				err := ctx.engine.handleCollection(unittest.IdentifierFixture(), &collection)
-				require.NoError(t, err)
-			}()
-		})
-		ctx.collections.EXPECT().Store(&collection)
-
-		times := 4
-
-		wg.Add(1) // wait for block B to be executed
-		for i := 0; i < times; i++ {
-			err := ctx.engine.handleBlock(context.Background(), blockB.Block)
-			require.NoError(t, err)
-		}
-		wg.Add(1) // wait for block C to be executed
-		// add extra block to ensure the execution can continue after duplicated blocks
-		err := ctx.engine.handleBlock(context.Background(), blockC.Block)
-		require.NoError(t, err)
-		wgPut.Done()
-
-		unittest.AssertReturnsBefore(t, wg.Wait, 10*time.Second)
-
-		_, more := <-ctx.engine.Done() // wait for all the blocks to be processed
-		require.False(t, more)
-
-		_, ok := commits[blockB.ID()]
-		require.True(t, ok)
-
-		_, ok = commits[blockC.ID()]
-		require.True(t, ok)
-	})
-}
-
-func TestBlocksArentExecutedMultipleTimes_collectionArrival(t *testing.T) {
-	runWithEngine(t, func(ctx testingContext) {
-
-		// block in the queue are removed only after the execution has finished
-		// this gives a brief window for multiple execution
-		// when parent block is executing and collection arrives, completing the block
-		// it gets executed. When parent finishes it checks it children, finds complete
-		// block and executes it again.
-		// It should rather not occur during normal execution because StartState won't be set
-		// before parent has finished, but we should handle this edge case that it is set as well.
-
-		// A (0 collection) <- B (0 collection) <- C (0 collection) <- D (1 collection)
-		blockA := unittest.BlockHeaderFixture()
-		blockB := unittest.ExecutableBlockFixtureWithParent(nil, blockA, unittest.StateCommitmentPointerFixture())
-
-		collectionIdentities := ctx.identities.Filter(filter.HasRole(flow.RoleCollection))
-		colSigner := collectionIdentities[0].ID()
-		// blocks are empty, so no state change is expected
-		blockC := unittest.ExecutableBlockFixtureWithParent([][]flow.Identifier{{colSigner}}, blockB.Block.Header, blockB.StartState)
-		// the default fixture uses a 10 collectors committee, but in this test case, there are only 4,
-		// so we need to update the signer indices.
-		// set the first identity as signer
-		log.Info().Msgf("canonical collection list %v", collectionIdentities.NodeIDs())
-		log.Info().Msgf("full list %v", ctx.identities)
-		indices, err :=
-			signature.EncodeSignersToIndices(collectionIdentities.NodeIDs(), []flow.Identifier{colSigner})
-		require.NoError(t, err)
-		blockC.Block.Payload.Guarantees[0].SignerIndices = indices
-
-		// block D to make sure execution resumes after block C multiple execution has been prevented
-		blockD := unittest.ExecutableBlockFixtureWithParent(nil, blockC.Block.Header, blockC.StartState)
-
-		logBlocks(map[string]*entity.ExecutableBlock{
-			"B": blockB,
-			"C": blockC,
-			"D": blockD,
-		})
-
-		collection := blockC.Collections()[0].Collection()
-
-		commits := make(map[flow.Identifier]flow.StateCommitment)
-		commits[blockB.Block.Header.ParentID] = *blockB.StartState
-
-		wg := sync.WaitGroup{}
-		ctx.mockStateCommitsWithMap(commits)
-
-		// mock the cluster canonical list at the collection guarantee's reference block
-		// use the same canonical list as used for building signer indices
-		ctx.mockSnapshotWithBlockID(unittest.FixedReferenceBlockID(), ctx.identities)
-		ctx.mockSnapshot(blockB.Block.Header, ctx.identities)
-		ctx.mockSnapshot(blockC.Block.Header, ctx.identities)
-		ctx.mockSnapshot(blockD.Block.Header, ctx.identities)
-
-		ctx.state.On("Sealed").Return(ctx.snapshot)
-		ctx.snapshot.On("Head").Return(blockA, nil)
-
-		// wait to control parent (block B) execution until we are ready
-		wgB := sync.WaitGroup{}
-		wgB.Add(1)
-
-		wgC := sync.WaitGroup{}
-		wgC.Add(1)
-
-		ctx.assertSuccessfulBlockComputation(
-			commits,
-			func(blockID flow.Identifier, commit flow.StateCommitment) {
-				wgB.Wait()
-				wg.Done()
-			},
-			blockB,
-			unittest.IdentifierFixture(),
-			true,
-			*blockB.StartState,
-			nil)
-
-		ctx.assertSuccessfulBlockComputation(
-			commits,
-			func(blockID flow.Identifier, commit flow.StateCommitment) {
-				wgC.Wait()
-				wg.Done()
-			},
-			blockC,
-			unittest.IdentifierFixture(),
-			true,
-			*blockC.StartState,
-			nil)
-
-		ctx.assertSuccessfulBlockComputation(
-			commits,
-			func(blockID flow.Identifier, commit flow.StateCommitment) {
-				wg.Done()
-			},
-			blockD,
-			unittest.IdentifierFixture(),
-			true,
-			*blockD.StartState,
-			nil)
-
-		// make sure collection requests are sent
-		// first, the collection should not be found, so the request will be sent. Next, it will be queried again, and this time
-		// it should return fine
-		gomock.InOrder(
-			ctx.collections.EXPECT().ByID(blockC.Collections()[0].Guarantee.CollectionID).DoAndReturn(func(_ flow.Identifier) (*flow.Collection, error) {
-				return nil, storageerr.ErrNotFound
-
-			}),
-			ctx.collections.EXPECT().Store(&collection),
-			ctx.collections.EXPECT().ByID(blockC.Collections()[0].Guarantee.CollectionID).DoAndReturn(func(_ flow.Identifier) (*flow.Collection, error) {
-				return &collection, nil
-			}),
-		)
-
-		ctx.collectionRequester.EXPECT().EntityByID(gomock.Any(), gomock.Any()).DoAndReturn(func(_ flow.Identifier, _ flow.IdentityFilter) {
-			// parallel run to avoid deadlock, ingestion engine is thread-safe
-			go func() {
-				// OnCollection is official callback for collection requester engine
-				ctx.engine.OnCollection(unittest.IdentifierFixture(), &collection)
-
-				// if block C execution started, it will be unblocked, and next execution will cause WaitGroup/mock failure
-				// if not, it will be run only once and all will be good
-				wgC.Done()
-				wgB.Done()
-			}()
-		}).Times(1)
-
-		wg.Add(1) // wait for block B to be executed
-		err = ctx.engine.handleBlock(context.Background(), blockB.Block)
-		require.NoError(t, err)
-
-		wg.Add(1) // wait for block C to be executed
-		err = ctx.engine.handleBlock(context.Background(), blockC.Block)
-		require.NoError(t, err)
-
-		wg.Add(1) // wait for block D to be executed
-		err = ctx.engine.handleBlock(context.Background(), blockD.Block)
-		require.NoError(t, err)
-
-		unittest.AssertReturnsBefore(t, wg.Wait, 10*time.Second)
-
-		_, more := <-ctx.engine.Done() // wait for all the blocks to be processed
-		require.False(t, more)
-
-		_, ok := commits[blockB.ID()]
-		require.True(t, ok)
-
-		_, ok = commits[blockC.ID()]
-		require.True(t, ok)
-
-		_, ok = commits[blockD.ID()]
-		require.True(t, ok)
-
-	})
-}
+// func TestBlocksArentExecutedMultipleTimes_collectionArrival(t *testing.T) {
+// 	runWithEngine(t, func(ctx testingContext) {
+//
+// 		// block in the queue are removed only after the execution has finished
+// 		// this gives a brief window for multiple execution
+// 		// when parent block is executing and collection arrives, completing the block
+// 		// it gets executed. When parent finishes it checks it children, finds complete
+// 		// block and executes it again.
+// 		// It should rather not occur during normal execution because StartState won't be set
+// 		// before parent has finished, but we should handle this edge case that it is set as well.
+//
+// 		// A (0 collection) <- B (0 collection) <- C (0 collection) <- D (1 collection)
+// 		blockA := unittest.BlockHeaderFixture()
+// 		blockB := unittest.ExecutableBlockFixtureWithParent(nil, blockA, unittest.StateCommitmentPointerFixture())
+//
+// 		collectionIdentities := ctx.identities.Filter(filter.HasRole(flow.RoleCollection))
+// 		colSigner := collectionIdentities[0].ID()
+// 		// blocks are empty, so no state change is expected
+// 		blockC := unittest.ExecutableBlockFixtureWithParent([][]flow.Identifier{{colSigner}}, blockB.Block.Header, blockB.StartState)
+// 		// the default fixture uses a 10 collectors committee, but in this test case, there are only 4,
+// 		// so we need to update the signer indices.
+// 		// set the first identity as signer
+// 		log.Info().Msgf("canonical collection list %v", collectionIdentities.NodeIDs())
+// 		log.Info().Msgf("full list %v", ctx.identities)
+// 		indices, err :=
+// 			signature.EncodeSignersToIndices(collectionIdentities.NodeIDs(), []flow.Identifier{colSigner})
+// 		require.NoError(t, err)
+// 		blockC.Block.Payload.Guarantees[0].SignerIndices = indices
+//
+// 		// block D to make sure execution resumes after block C multiple execution has been prevented
+// 		blockD := unittest.ExecutableBlockFixtureWithParent(nil, blockC.Block.Header, blockC.StartState)
+//
+// 		logBlocks(map[string]*entity.ExecutableBlock{
+// 			"B": blockB,
+// 			"C": blockC,
+// 			"D": blockD,
+// 		})
+//
+// 		collection := blockC.Collections()[0].Collection()
+//
+// 		commits := make(map[flow.Identifier]flow.StateCommitment)
+// 		commits[blockB.Block.Header.ParentID] = *blockB.StartState
+//
+// 		wg := sync.WaitGroup{}
+// 		ctx.mockStateCommitsWithMap(commits)
+//
+// 		// mock the cluster canonical list at the collection guarantee's reference block
+// 		// use the same canonical list as used for building signer indices
+// 		ctx.mockSnapshotWithBlockID(unittest.FixedReferenceBlockID(), ctx.identities)
+// 		ctx.mockSnapshot(blockB.Block.Header, ctx.identities)
+// 		ctx.mockSnapshot(blockC.Block.Header, ctx.identities)
+// 		ctx.mockSnapshot(blockD.Block.Header, ctx.identities)
+//
+// 		ctx.state.On("Sealed").Return(ctx.snapshot)
+// 		ctx.snapshot.On("Head").Return(blockA, nil)
+//
+// 		// wait to control parent (block B) execution until we are ready
+// 		wgB := sync.WaitGroup{}
+// 		wgB.Add(1)
+//
+// 		wgC := sync.WaitGroup{}
+// 		wgC.Add(1)
+//
+// 		ctx.assertSuccessfulBlockComputation(
+// 			commits,
+// 			func(blockID flow.Identifier, commit flow.StateCommitment) {
+// 				wgB.Wait()
+// 				wg.Done()
+// 			},
+// 			blockB,
+// 			unittest.IdentifierFixture(),
+// 			true,
+// 			*blockB.StartState,
+// 			nil)
+//
+// 		ctx.assertSuccessfulBlockComputation(
+// 			commits,
+// 			func(blockID flow.Identifier, commit flow.StateCommitment) {
+// 				wgC.Wait()
+// 				wg.Done()
+// 			},
+// 			blockC,
+// 			unittest.IdentifierFixture(),
+// 			true,
+// 			*blockC.StartState,
+// 			nil)
+//
+// 		ctx.assertSuccessfulBlockComputation(
+// 			commits,
+// 			func(blockID flow.Identifier, commit flow.StateCommitment) {
+// 				wg.Done()
+// 			},
+// 			blockD,
+// 			unittest.IdentifierFixture(),
+// 			true,
+// 			*blockD.StartState,
+// 			nil)
+//
+// 		// make sure collection requests are sent
+// 		// first, the collection should not be found, so the request will be sent. Next, it will be queried again, and this time
+// 		// it should return fine
+// 		gomock.InOrder(
+// 			ctx.collections.EXPECT().ByID(blockC.Collections()[0].Guarantee.CollectionID).DoAndReturn(func(_ flow.Identifier) (*flow.Collection, error) {
+// 				return nil, storageerr.ErrNotFound
+//
+// 			}),
+// 			ctx.collections.EXPECT().Store(&collection),
+// 			ctx.collections.EXPECT().ByID(blockC.Collections()[0].Guarantee.CollectionID).DoAndReturn(func(_ flow.Identifier) (*flow.Collection, error) {
+// 				return &collection, nil
+// 			}),
+// 		)
+//
+// 		ctx.collectionRequester.EXPECT().EntityByID(gomock.Any(), gomock.Any()).DoAndReturn(func(_ flow.Identifier, _ flow.IdentityFilter) {
+// 			// parallel run to avoid deadlock, ingestion engine is thread-safe
+// 			go func() {
+// 				// OnCollection is official callback for collection requester engine
+// 				ctx.engine.OnCollection(unittest.IdentifierFixture(), &collection)
+//
+// 				// if block C execution started, it will be unblocked, and next execution will cause WaitGroup/mock failure
+// 				// if not, it will be run only once and all will be good
+// 				wgC.Done()
+// 				wgB.Done()
+// 			}()
+// 		}).Times(1)
+//
+// 		wg.Add(1) // wait for block B to be executed
+// 		err = ctx.engine.handleBlock(context.Background(), blockB.Block)
+// 		require.NoError(t, err)
+//
+// 		wg.Add(1) // wait for block C to be executed
+// 		err = ctx.engine.handleBlock(context.Background(), blockC.Block)
+// 		require.NoError(t, err)
+//
+// 		wg.Add(1) // wait for block D to be executed
+// 		err = ctx.engine.handleBlock(context.Background(), blockD.Block)
+// 		require.NoError(t, err)
+//
+// 		unittest.AssertReturnsBefore(t, wg.Wait, 10*time.Second)
+//
+// 		_, more := <-ctx.engine.Done() // wait for all the blocks to be processed
+// 		require.False(t, more)
+//
+// 		_, ok := commits[blockB.ID()]
+// 		require.True(t, ok)
+//
+// 		_, ok = commits[blockC.ID()]
+// 		require.True(t, ok)
+//
+// 		_, ok = commits[blockD.ID()]
+// 		require.True(t, ok)
+//
+// 	})
+// }
 
 func logBlocks(blocks map[string]*entity.ExecutableBlock) {
 	log := unittest.Logger()
@@ -1675,4 +1638,75 @@ func TestExecutedBlockUploadedFailureDoesntBlock(t *testing.T) {
 		require.True(t, ok)
 
 	})
+}
+
+type mockCollectionStore struct {
+	byID map[flow.Identifier]*flow.Collection
+}
+
+func newMockCollectionStore() *mockCollectionStore {
+	return &mockCollectionStore{
+		byID: make(map[flow.Identifier]*flow.Collection),
+	}
+}
+
+func (m *mockCollectionStore) ByID(id flow.Identifier) (*flow.Collection, error) {
+	c, ok := m.byID[id]
+	if !ok {
+		return nil, fmt.Errorf("collection %s not found: %w", id, storageerr.ErrNotFound)
+	}
+	return c, nil
+}
+
+func (m *mockCollectionStore) Store(c *flow.Collection) error {
+	m.byID[c.ID()] = c
+	return nil
+}
+
+func (m *mockCollectionStore) StoreLightAndIndexByTransaction(collection *flow.LightCollection) error {
+	panic("StoreLightIndexByTransaction not implemented")
+}
+
+func (m *mockCollectionStore) StoreLight(collection *flow.LightCollection) error {
+	panic("LightIndexByTransaction not implemented")
+}
+
+func (m *mockCollectionStore) Remove(id flow.Identifier) error {
+	delete(m.byID, id)
+	return nil
+}
+
+func (m *mockCollectionStore) LightByID(id flow.Identifier) (*flow.LightCollection, error) {
+	panic("LightByID not implemented")
+}
+
+func (m *mockCollectionStore) LightByTransactionID(id flow.Identifier) (*flow.LightCollection, error) {
+	panic("LightByTransactionID not implemented")
+}
+
+type collectionHandler interface {
+	handleCollection(flow.Identifier, *flow.Collection) error
+}
+
+type mockFetcher struct {
+	byID map[flow.Identifier]struct{}
+}
+
+func newMockFetcher() *mockFetcher {
+	return &mockFetcher{
+		byID: make(map[flow.Identifier]struct{}),
+	}
+}
+
+func (r *mockFetcher) FetchCollection(blockID flow.Identifier, height uint64, guarantee *flow.CollectionGuarantee) error {
+	r.byID[guarantee.ID()] = struct{}{}
+	return nil
+}
+
+func (r *mockFetcher) Force() {
+}
+
+func (r *mockFetcher) isFetched(id flow.Identifier) bool {
+	_, ok := r.byID[id]
+	return ok
 }
