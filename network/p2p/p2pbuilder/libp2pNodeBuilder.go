@@ -312,6 +312,8 @@ func (builder *LibP2PNodeBuilder) Build() (p2p.LibP2PNode, error) {
 			Metrics:                         builder.metricsConfig.Metrics,
 			StreamZeroBackoffResetThreshold: unicastmodel.StreamZeroBackoffResetThreshold,
 			DialZeroBackoffResetThreshold:   unicastmodel.DialZeroBackoffResetThreshold,
+			MaxStreamCreationAttemptTimes:   unicastmodel.MaxStreamCreationAttemptTimes,
+			MaxDialAttemptTimes:             unicastmodel.MaxDialAttemptTimes,
 			DialConfigCacheFactory: func() unicast.DialConfigCache {
 				return unicastcache.NewDialConfigCache(
 					unicast.DefaultDailConfigCacheSize,

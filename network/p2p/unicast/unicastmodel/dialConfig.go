@@ -3,11 +3,11 @@ package unicastmodel
 import "time"
 
 const (
-	// MaxConnectAttempt is the maximum number of attempts to be made to connect to a remote node to establish a unicast (1:1) connection.
-	MaxConnectAttempt = 3
+	// MaxDialAttemptTimes is the maximum number of attempts to be made to connect to a remote node to establish a unicast (1:1) connection.
+	MaxDialAttemptTimes = 3
 
-	// MaxStreamCreationAttempt is the maximum number of attempts to be made to create a stream to a remote node over a direct unicast (1:1) connection.
-	MaxStreamCreationAttempt = 3
+	// MaxStreamCreationAttemptTimes is the maximum number of attempts to be made to create a stream to a remote node over a direct unicast (1:1) connection.
+	MaxStreamCreationAttemptTimes = 3
 
 	// StreamZeroBackoffResetThreshold is the threshold that determines when to reset the stream creation backoff budget to the default value.
 	//
@@ -36,8 +36,8 @@ const (
 
 // DialConfig is a struct that represents the dial config for a peer.
 type DialConfig struct {
-	DialBackoffBudget           uint64    // number of times we have to try to dial the peer before we give up.
-	StreamBackBudget            uint64    // number of times we have to try to open a stream to the peer before we give up.
+	DialAttemptBudget           uint64    // number of times we have to try to dial the peer before we give up.
+	StreamCreationAttemptBudget uint64    // number of times we have to try to open a stream to the peer before we give up.
 	LastSuccessfulDial          time.Time // timestamp of the last successful dial to the peer.
 	ConsecutiveSuccessfulStream uint64    // consecutive number of successful streams to the peer since the last time stream creation failed.
 }
@@ -50,7 +50,7 @@ type DialConfigAdjustFunc func(DialConfig) (DialConfig, error)
 
 func DefaultDialConfigFactory() DialConfig {
 	return DialConfig{
-		DialBackoffBudget: MaxConnectAttempt,
-		StreamBackBudget:  MaxStreamCreationAttempt,
+		DialAttemptBudget:           MaxDialAttemptTimes,
+		StreamCreationAttemptBudget: MaxStreamCreationAttemptTimes,
 	}
 }
