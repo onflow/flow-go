@@ -33,7 +33,7 @@ func New(registers storage.RegisterIndex, headers storage.Headers, events storag
 	log.Info().Msgf("creating new indexer with init height %d", initHeight)
 
 	first, err := registers.FirstHeight()
-	log.Info().Msgf("got first height from db val: %d err: %s", first, err.Error())
+	log.Info().Msgf("got first height from db val: %d err: %s", first, err)
 	if err != nil {
 		if errors.Is(err, storage.ErrNotFound) {
 			first = initHeight
@@ -43,7 +43,7 @@ func New(registers storage.RegisterIndex, headers storage.Headers, events storag
 	}
 
 	last, err := registers.LatestHeight()
-	log.Info().Msgf("got last height from db val: %d err: %s", first, err.Error())
+	log.Info().Msgf("got last height from db val: %d err: %s", first, err)
 	if err != nil {
 		if errors.Is(err, storage.ErrNotFound) {
 			last = first // if last was not found we are just starting to index
