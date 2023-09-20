@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math"
 	"math/rand"
 	"testing"
 
@@ -24,6 +25,7 @@ import (
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	synctest "github.com/onflow/flow-go/module/state_synchronization/requester/unittest"
 	"github.com/onflow/flow-go/storage"
+	"github.com/onflow/flow-go/storage/memory"
 	storagemock "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -151,7 +153,7 @@ func (i *indexTest) initIndexer() *indexTest {
 	if len(i.registers.ExpectedCalls) == 0 {
 		i.useDefaultHeights() // only set when no other were set
 	}
-	indexer, err := New(i.registers, i.headers, i.blocks[0].Header.Height, zerolog.Nop())
+	indexer, err := New(i.registers, i.headers, nil, i.blocks[0].Header.Height, zerolog.Nop())
 	require.NoError(i.t, err)
 	i.indexer = indexer
 	return i
@@ -192,6 +194,8 @@ func TestExecutionState_IndexBlockData(t *testing.T) {
 	blocks := blocksFixture(5)
 	block := blocks[len(blocks)-1]
 
+	// this test makes sure the index block data is correctly calling store register with the
+	// same entries we create as a block execution data test, and correctly converts the registers
 	t.Run("Index Single Chunk and Single Register", func(t *testing.T) {
 		trie := trieUpdateFixture()
 		ed := &execution_data.BlockExecutionData{
@@ -218,6 +222,10 @@ func TestExecutionState_IndexBlockData(t *testing.T) {
 		assert.NoError(t, err)
 	})
 
+	// this test makes sure that if we have multiple trie updates in a single block data
+	// and some of those trie updates are for same register but have different values,
+	// we only update that register once with the latest value, so this makes sure merging of
+	// registers is done correctly.
 	t.Run("Index Multiple Chunks and Merge Same Register Updates", func(t *testing.T) {
 		tries := []*ledger.TrieUpdate{trieUpdateFixture(), trieUpdateFixture()}
 		// make sure we have two register updates that are updating the same value, so we can check
@@ -260,6 +268,8 @@ func TestExecutionState_IndexBlockData(t *testing.T) {
 		assert.True(t, testRegisterFound)
 	})
 
+	// this test makes sure we get correct error when we try to index block that is not
+	// within the range of indexed heights.
 	t.Run("Invalid Heights", func(t *testing.T) {
 		last := blocks[len(blocks)-1]
 		ed := &execution_data.BlockExecutionData{
@@ -278,6 +288,8 @@ func TestExecutionState_IndexBlockData(t *testing.T) {
 		assert.True(t, errors.Is(err, ErrIndexValue))
 	})
 
+	// this test makes sure that if a block we try to index is not found in block storage
+	// we get correct error.
 	t.Run("Unknown block ID", func(t *testing.T) {
 		unknownBlock := blocksFixture(1)[0]
 		ed := &execution_data.BlockExecutionData{
@@ -311,6 +323,125 @@ func TestExecutionState_RegisterValues(t *testing.T) {
 
 		assert.NoError(t, err)
 		assert.Equal(t, values, []flow.RegisterValue{val})
+	})
+}
+
+// helper to store register at height and increment index range
+func storeRegisterWithValue(indexer *ExecutionState, height uint64, owner string, key string, value []byte) error {
+	payload := ledgerPayloadWithValuesFixture(owner, key, value)
+	err := indexer.indexRegisterPayloads([]*ledger.Payload{payload}, height)
+	if err != nil {
+		return err
+	}
+
+	err = indexer.indexRange.Increase(height)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func TestIntegration_StoreAndGet(t *testing.T) {
+	regOwner := "f8d6e0586b0a20c7"
+	regKey := "code"
+	registerID := flow.NewRegisterID(regOwner, regKey)
+
+	// this test makes sure index values for a single register are correctly updated and always last value is returned
+	t.Run("Single Index Value Changes", func(t *testing.T) {
+		registers := memory.NewRegisters(0, 0)
+		indexer, err := New(registers, nil, nil, 0, zerolog.Nop())
+		require.NoError(t, err)
+
+		values := [][]byte{
+			[]byte("1"), []byte("1"), []byte("2"), []byte("3"), nil, []byte("4"),
+		}
+
+		value, err := indexer.RegisterValues(flow.RegisterIDs{registerID}, 0)
+		require.Nil(t, value)
+		assert.ErrorIs(t, err, storage.ErrNotFound)
+
+		for i, value := range values {
+			err := storeRegisterWithValue(indexer, uint64(i), regOwner, regKey, value)
+			assert.NoError(t, err)
+
+			val, err := indexer.RegisterValues(flow.RegisterIDs{registerID}, uint64(i))
+			require.Nil(t, err)
+			assert.Equal(t, value, val[0])
+		}
+	})
+
+	// this test makes sure that even if indexed values for a specific register are requested with higher height
+	// the correct highest height indexed value is returned.
+	// e.g. we index A{h(1) -> X}, A{h(2) -> Y}, when we request h(5) we get value Y
+	t.Run("Single Index Value At Later Heights", func(t *testing.T) {
+		registers := memory.NewRegisters(0, 0)
+		indexer, err := New(registers, nil, nil, 0, zerolog.Nop())
+		require.NoError(t, err)
+
+		value := []byte("1")
+
+		err = storeRegisterWithValue(indexer, 1, regOwner, regKey, value)
+		require.NoError(t, err)
+
+		assert.NoError(t, indexer.indexRange.Increase(2))
+		assert.NoError(t, indexer.indexRange.Increase(3))
+
+		val, err := indexer.RegisterValues(flow.RegisterIDs{registerID}, uint64(3))
+		require.Nil(t, err)
+		assert.Equal(t, value, val[0])
+
+		value = []byte("2")
+		err = storeRegisterWithValue(indexer, 4, regOwner, regKey, value)
+		require.NoError(t, err)
+
+		assert.NoError(t, indexer.indexRange.Increase(5))
+		assert.NoError(t, indexer.indexRange.Increase(6))
+
+		val, err = indexer.RegisterValues(flow.RegisterIDs{registerID}, uint64(6))
+		require.Nil(t, err)
+		assert.Equal(t, value, val[0])
+	})
+
+	// this test makes sure we correctly handle weird payloads
+	t.Run("Empty and Nil Payloads", func(t *testing.T) {
+		registers := memory.NewRegisters(0, 0)
+		indexer, err := New(registers, nil, nil, 0, zerolog.Nop())
+		require.NoError(t, err)
+
+		require.NoError(t, indexer.indexRegisterPayloads([]*ledger.Payload{}, 1))
+		require.NoError(t, indexer.indexRegisterPayloads([]*ledger.Payload{}, 1))
+		require.NoError(t, indexer.indexRange.Increase(1))
+		require.NoError(t, indexer.indexRegisterPayloads(nil, 2))
+	})
+
+	// this test makes sure correct values are used to initialize range no matter the init value provided
+	t.Run("Initialize Indexer", func(t *testing.T) {
+		first := uint64(5)
+		last := uint64(10)
+		registers := memory.NewRegisters(first, last)
+		indexer, err := New(registers, nil, nil, 8, zerolog.Nop())
+		require.NoError(t, err)
+
+		assert.Equal(t, first, indexer.indexRange.First())
+		assert.Equal(t, last, indexer.indexRange.Last())
+
+		zero := uint64(0)
+		registers = memory.NewRegisters(zero, zero)
+		indexer, err = New(registers, nil, nil, 5, zerolog.Nop())
+		require.NoError(t, err)
+
+		assert.Equal(t, zero, indexer.indexRange.First())
+		assert.Equal(t, zero, indexer.indexRange.Last())
+
+		empty := uint64(math.MaxUint64) // we use this value to trigger memory db to return empty
+		init := uint64(8)
+		registers = memory.NewRegisters(empty, empty)
+		indexer, err = New(registers, nil, nil, init, zerolog.Nop())
+		require.NoError(t, err)
+
+		assert.Equal(t, init, indexer.indexRange.First())
+		assert.Equal(t, init, indexer.indexRange.Last())
 	})
 }
 
