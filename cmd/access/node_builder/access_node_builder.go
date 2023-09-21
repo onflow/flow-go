@@ -633,7 +633,6 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 				registers,
 				builder.Storage.Headers,
 				builder.Storage.Events,
-				initHeight,
 				builder.Logger,
 			)
 			if err != nil {
