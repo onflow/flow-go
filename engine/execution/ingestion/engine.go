@@ -35,26 +35,25 @@ import (
 type Engine struct {
 	psEvents.Noop // satisfy protocol events consumer interface
 
-	unit                   *engine.Unit
-	log                    zerolog.Logger
-	me                     module.Local
-	collectionFetcher      CollectionFetcher
-	headers                storage.Headers // see comments on getHeaderByHeight for why we need it
-	blocks                 storage.Blocks
-	collections            storage.Collections
-	computationManager     computation.ComputationManager
-	providerEngine         provider.ProviderEngine
-	mempool                *Mempool
-	execState              state.ExecutionState
-	metrics                module.ExecutionMetrics
-	maxCollectionHeight    uint64
-	tracer                 module.Tracer
-	extensiveLogging       bool
-	checkAuthorizedAtBlock func(blockID flow.Identifier) (bool, error)
-	executionDataPruner    *pruner.Pruner
-	uploader               *uploader.Manager
-	stopControl            *stop.StopControl
-	loader                 BlockLoader
+	unit                *engine.Unit
+	log                 zerolog.Logger
+	me                  module.Local
+	collectionFetcher   CollectionFetcher
+	headers             storage.Headers // see comments on getHeaderByHeight for why we need it
+	blocks              storage.Blocks
+	collections         storage.Collections
+	computationManager  computation.ComputationManager
+	providerEngine      provider.ProviderEngine
+	mempool             *Mempool
+	execState           state.ExecutionState
+	metrics             module.ExecutionMetrics
+	maxCollectionHeight uint64
+	tracer              module.Tracer
+	extensiveLogging    bool
+	executionDataPruner *pruner.Pruner
+	uploader            *uploader.Manager
+	stopControl         *stop.StopControl
+	loader              BlockLoader
 }
 
 func New(
@@ -72,7 +71,6 @@ func New(
 	metrics module.ExecutionMetrics,
 	tracer module.Tracer,
 	extLog bool,
-	checkAuthorizedAtBlock func(blockID flow.Identifier) (bool, error),
 	pruner *pruner.Pruner,
 	uploader *uploader.Manager,
 	stopControl *stop.StopControl,
@@ -83,26 +81,25 @@ func New(
 	mempool := newMempool()
 
 	eng := Engine{
-		unit:                   unit,
-		log:                    log,
-		me:                     me,
-		collectionFetcher:      collectionFetcher,
-		headers:                headers,
-		blocks:                 blocks,
-		collections:            collections,
-		computationManager:     executionEngine,
-		providerEngine:         providerEngine,
-		mempool:                mempool,
-		execState:              execState,
-		metrics:                metrics,
-		maxCollectionHeight:    0,
-		tracer:                 tracer,
-		extensiveLogging:       extLog,
-		checkAuthorizedAtBlock: checkAuthorizedAtBlock,
-		executionDataPruner:    pruner,
-		uploader:               uploader,
-		stopControl:            stopControl,
-		loader:                 loader,
+		unit:                unit,
+		log:                 log,
+		me:                  me,
+		collectionFetcher:   collectionFetcher,
+		headers:             headers,
+		blocks:              blocks,
+		collections:         collections,
+		computationManager:  executionEngine,
+		providerEngine:      providerEngine,
+		mempool:             mempool,
+		execState:           execState,
+		metrics:             metrics,
+		maxCollectionHeight: 0,
+		tracer:              tracer,
+		extensiveLogging:    extLog,
+		executionDataPruner: pruner,
+		uploader:            uploader,
+		stopControl:         stopControl,
+		loader:              loader,
 	}
 
 	return &eng, nil

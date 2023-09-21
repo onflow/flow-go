@@ -40,7 +40,6 @@ import (
 	"github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/network/mocknetwork"
-	stateProtocol "github.com/onflow/flow-go/state/protocol"
 	protocol "github.com/onflow/flow-go/state/protocol/mock"
 	storageerr "github.com/onflow/flow-go/storage"
 	storage "github.com/onflow/flow-go/storage/mocks"
@@ -197,10 +196,6 @@ func runWithEngine(t *testing.T, f func(testingContext)) {
 
 	request.EXPECT().Force().Return().AnyTimes()
 
-	checkAuthorizedAtBlock := func(blockID flow.Identifier) (bool, error) {
-		return stateProtocol.IsNodeAuthorizedAt(protocolState.AtBlockID(blockID), myIdentity.NodeID)
-	}
-
 	unit := enginePkg.NewUnit()
 	stopControl := stop.NewStopControl(
 		unit,
@@ -226,7 +221,6 @@ func runWithEngine(t *testing.T, f func(testingContext)) {
 		net,
 		me,
 		fetcher,
-		protocolState,
 		headers,
 		blocks,
 		collections,
@@ -236,7 +230,6 @@ func runWithEngine(t *testing.T, f func(testingContext)) {
 		metrics,
 		tracer,
 		false,
-		checkAuthorizedAtBlock,
 		nil,
 		uploadMgr,
 		stopControl,
@@ -1511,10 +1504,6 @@ func newIngestionEngine(t *testing.T, ps *mocks.ProtocolState, es *mockExecution
 	computationManager := new(computation.ComputationManager)
 	providerEngine := new(provider.ProviderEngine)
 
-	checkAuthorizedAtBlock := func(blockID flow.Identifier) (bool, error) {
-		return stateProtocol.IsNodeAuthorizedAt(ps.AtBlockID(blockID), myIdentity.NodeID)
-	}
-
 	fetcher := fetcher.NewCollectionFetcher(log, request, ps, false)
 	loader := loader.NewLoader(log, ps, headers, es)
 
@@ -1535,7 +1524,6 @@ func newIngestionEngine(t *testing.T, ps *mocks.ProtocolState, es *mockExecution
 		metrics,
 		tracer,
 		false,
-		checkAuthorizedAtBlock,
 		nil,
 		nil,
 		stop.NewStopControl(
