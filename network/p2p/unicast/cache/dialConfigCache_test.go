@@ -158,6 +158,8 @@ func TestDialConfigCache_Concurrent_Adjust(t *testing.T) {
 	for i := 0; i < int(sizeLimit); i++ {
 		wg.Add(1)
 		go func(j int) {
+			wg.Done()
+
 			peerID := peerIds[j]
 			cfg, err := cache.GetOrInit(peerID)
 			require.NoError(t, err)
