@@ -13,8 +13,8 @@ void Fr_polynomial_image_write(byte *out, E2 *y, const Fr *a, const int degree,
 
 // computes P(x) = a_0 + a_1 * x + .. + a_n * x^n  where P is in Fr[X].
 // a_i are all in Fr, `degree` is P's degree, x is a small integer less than
-// 255. The function writes P(x) in `image` and P(x).g2 in `y` if `y` is non
-// NULL
+// `MAX_IND` (currently 255). 
+// The function writes P(x) in `image` and P(x).g2 in `y` if `y` is non NULL.
 void Fr_polynomial_image(Fr *image, E2 *y, const Fr *a, const int degree,
                          const byte x) {
   Fr_set_zero(image);
@@ -34,7 +34,9 @@ void Fr_polynomial_image(Fr *image, E2 *y, const Fr *a, const int degree,
 }
 
 // computes Q(x) = A_0 + A_1*x + ... +  A_n*x^n  in G2
-// and stores the point in y
+// and stores the point in y.
+//  - A_i being G2 points
+//  - x being a small scalar (less than `MAX_IND`)
 static void E2_polynomial_image(E2 *y, const E2 *A, const int degree,
                                 const byte x) {
   E2_set_infty(y);
@@ -45,7 +47,9 @@ static void E2_polynomial_image(E2 *y, const E2 *A, const int degree,
 }
 
 // computes y[i] = Q(i+1) for all participants i ( 0 <= i < len_y)
-// where Q(x) = A_0 + A_1*x + ... +  A_n*x^n  in G2[X]
+// where Q(x) = A_0 + A_1*x + ... +  A_n*x^n 
+//  - A_i being G2 points
+//  - x being a small scalar (less than `MAX_IND`)
 void E2_polynomial_images(E2 *y, const int len_y, const E2 *A,
                           const int degree) {
   for (byte i = 0; i < len_y; i++) {
@@ -56,17 +60,17 @@ void E2_polynomial_images(E2 *y, const int len_y, const E2 *A,
 
 // export an array of G2 into an array of bytes by concatenating
 // all serializations of G2 points in order.
-// the array must be of length (len * G2_SER_BYTES).
-void G2_vector_write_bytes(byte *out, const E2 *A, const int len) {
+// the array must be of length (A_len * G2_SER_BYTES).
+void G2_vector_write_bytes(byte *out, const E2 *A, const int A_len) {
   byte *p = out;
-  for (int i = 0; i < len; i++) {
+  for (int i = 0; i < A_len; i++) {
     E2_write_bytes(p, &A[i]);
     p += G2_SER_BYTES;
   }
 }
 
-// The function imports an array of `n` E2 points from a concatenated array of
-// bytes. The bytes array is supposed to be of size (n * G2_SER_BYTES).
+// The function imports an array of `A_len` E2 points from a concatenated array of
+// bytes. The bytes array is supposed to be of size (A_len * G2_SER_BYTES).
 //
 // If return is `VALID`, output vector is guaranteed to be in G2.
 // It returns other errors if at least one input isn't a serialization of a E2
@@ -80,9 +84,9 @@ void G2_vector_write_bytes(byte *out, const E2 *A, const int len) {
 //    E2.
 //    - POINT_NOT_IN_GROUP if at least one E2 point isn't in G2.
 //    - VALID if deserialization of all points to G2 is valid.
-ERROR G2_vector_read_bytes(E2 *A, const byte *src, const int n) {
+ERROR G2_vector_read_bytes(E2 *A, const byte *src, const int A_len) {
   byte *p = (byte *)src;
-  for (int i = 0; i < n; i++) {
+  for (int i = 0; i < A_len; i++) {
     int read_ret = E2_read_bytes(&A[i], p, G2_SER_BYTES);
     if (read_ret != VALID) {
       return read_ret;

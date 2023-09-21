@@ -457,7 +457,6 @@ bool E1_affine_on_curve(const E1 *p) {
 // It assumes input `p` is on E1.
 bool E1_in_G1(const E1 *p) {
   // currently uses Scott method
-  // TODO: compare to clearing the cofactor using u-1
   return POINTonE1_in_G1((const POINTonE1 *)p);
 }
 

@@ -6,9 +6,10 @@
 
 // Computes the Lagrange coefficient L_i(0) in Fr with regards to the range
 // [indices(0)..indices(t)] and stores it in `res`, where t is the degree of the
-// polynomial P. `len` is equal to `t+1` where `t` is the polynomial degree.
+// polynomial P. 
+// `degree` is equal to the polynomial degree `t`.
 static void Fr_lagrange_coeff_at_zero(Fr *res, const int i,
-                                      const byte indices[], const int len) {
+                                      const byte indices[], const int degree) {
 
   // coefficient is computed as N * D^(-1)
   Fr numerator;   // eventually would represent N*R^k
@@ -24,15 +25,14 @@ static void Fr_lagrange_coeff_at_zero(Fr *res, const int i,
 // the highest k such that fact(MAX_IND)/fact(MAX_IND-k) < 2^64 (approximately
 // 64/MAX_IND_BITS) this means we can multiply up to (k) indices in a limb (64
 // bits) without overflowing.
-#define MAX_IND_LOOPS (64 / MAX_IND_BITS)
-  const int loops = MAX_IND_LOOPS;
+  const int loops = 64 / MAX_IND_BITS;
   int k, j = 0;
   Fr tmp;
-  while (j < len) {
+  while (j < degree+1) {
     limb_t limb_numerator = 1;
     limb_t limb_denominator = 1;
-    for (k = j; j < MIN(len, k + loops);
-         j++) { // batch up to `loops` elements in one limb
+    // batch up to `loops` elements in one limb
+    for (k = j; j < MIN(degree+1, k + loops); j++) { 
       if (j == i)
         continue;
       if (indices[j] < indices[i]) {
@@ -65,11 +65,11 @@ static void Fr_lagrange_coeff_at_zero(Fr *res, const int i,
 
 // Computes the Langrange interpolation at zero P(0) = LI(0) with regards to the
 // indices [indices(0)..indices(t)] and their G1 images [shares(0)..shares(t)],
-// and stores the resulting G1 point in `dest`. `len` is equal to `t+1` where
-// `t` is the polynomial degree.
+// and stores the resulting G1 point in `dest`. 
+// `degree` is equal to the polynomial degree `t`.
 static void E1_lagrange_interpolate_at_zero(E1 *out, const E1 shares[],
                                             const byte indices[],
-                                            const int len) {
+                                            const int degree) {
   // Purpose is to compute Q(0) where Q(x) = A_0 + A_1*x + ... +  A_t*x^t in G1
   // where A_i = g1 ^ a_i
 
@@ -79,22 +79,22 @@ static void E1_lagrange_interpolate_at_zero(E1 *out, const E1 shares[],
   E1_set_infty(out);
   Fr fr_lagr_coef;
   E1 mult;
-  for (int i = 0; i < len; i++) {
-    Fr_lagrange_coeff_at_zero(&fr_lagr_coef, i, indices, len);
+  for (int i = 0; i < degree+1; i++) {
+    Fr_lagrange_coeff_at_zero(&fr_lagr_coef, i, indices, degree);
     E1_mult(&mult, &shares[i], &fr_lagr_coef);
     E1_add(out, out, &mult);
   }
 }
 
-// Computes the Langrange interpolation at zero LI(0) with regards to the
+// Computes the Lagrange interpolation at zero LI(0) with regards to the
 // indices [indices(0)..indices(t)] and writes their E1 concatenated
-// serializations [shares(1)..shares(t+1)] in `dest`. `len` is equal to `t+1`
-// where `t` is the polynomial degree.
+// serializations [shares(1)..shares(t+1)] in `dest`. 
+// `degree` is equal to the polynomial degree `t`.
 int E1_lagrange_interpolate_at_zero_write(byte *dest, const byte *shares,
-                                          const byte indices[], const int len) {
+                                          const byte indices[], const int degree) {
   int read_ret;
-  E1 *E1_shares = malloc(sizeof(E1) * len);
-  for (int i = 0; i < len; i++) {
+  E1 *E1_shares = malloc(sizeof(E1) * (degree+1));
+  for (int i = 0; i < degree+1; i++) {
     read_ret =
         E1_read_bytes(&E1_shares[i], &shares[G1_SER_BYTES * i], G1_SER_BYTES);
     if (read_ret != VALID) {
@@ -106,7 +106,7 @@ int E1_lagrange_interpolate_at_zero_write(byte *dest, const byte *shares,
   // computes Q(x) = A_0 + A_1*x + ... +  A_t*x^t  in G1,
   // where A_i = g1 ^ a_i
   E1 res;
-  E1_lagrange_interpolate_at_zero(&res, E1_shares, indices, len);
+  E1_lagrange_interpolate_at_zero(&res, E1_shares, indices, degree);
   // export the result
   E1_write_bytes(dest, &res);
   read_ret = VALID;
