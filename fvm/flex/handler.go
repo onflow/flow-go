@@ -3,6 +3,7 @@ package flex
 import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/onflow/atree"
+
 	env "github.com/onflow/flow-go/fvm/flex/environment"
 	"github.com/onflow/flow-go/fvm/flex/models"
 	"github.com/onflow/flow-go/fvm/flex/storage"
@@ -21,20 +22,20 @@ func (h *FOAHandler) Address() *models.FlexAddress {
 
 // Deposit deposits the token from the given vault into the Flex main vault
 // and update the FOA balance with the new amount
-func (h *FOAHandler) Deposit(models.FlowTokenVault) {
+func (h *FOAHandler) Deposit(models.FLOWTokenVault) {
 	panic("not implemented")
 }
 
 // Withdraw deducts the balance from the FOA account and
 // withdraw and return flow token from the Flex main vault.
-func (h *FOAHandler) Withdraw(models.Balance) models.FlowTokenVault {
+func (h *FOAHandler) Withdraw(models.Balance) models.FLOWTokenVault {
 	panic("not implemented")
 }
 
 // Deploy deploys a contract to the Flex environment
 // the new deployed contract would be at the returned address and
 // the contract data is not controlled by the FOA accounts
-func (h *FOAHandler) Deploy(code models.Code, gaslimit models.Gaslimit, balance models.Balance) models.FlexAddress {
+func (h *FOAHandler) Deploy(code models.Code, gaslimit models.GasLimit, balance models.Balance) models.FlexAddress {
 	config := env.NewFlexConfig(
 		env.WithBlockNumber(env.BlockNumberForEVMRules))
 	env, err := env.NewEnvironment(config, h.fch.db)
@@ -56,7 +57,7 @@ func (h *FOAHandler) Deploy(code models.Code, gaslimit models.Gaslimit, balance 
 // given it doesn't goes beyond what Flow transaction allows.
 // the balance would be deducted from the OFA account and would be transferred to the target address
 // contract data is not controlled by the FOA accounts
-func (h *FOAHandler) Call(to models.FlexAddress, data models.Data, gaslimit models.Gaslimit, balance models.Balance) models.Data {
+func (h *FOAHandler) Call(to models.FlexAddress, data models.Data, gaslimit models.GasLimit, balance models.Balance) models.Data {
 	config := env.NewFlexConfig(
 		env.WithBlockNumber(env.BlockNumberForEVMRules))
 	env, err := env.NewEnvironment(config, h.fch.db)
