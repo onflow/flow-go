@@ -6,16 +6,16 @@
 #include "fields.h"
 #include "point.h"
 
-// types used by the Flow crypto library that are imported from BLST
-// these type definitions are used as an abstraction from BLST internal types
+// types used by the Flow crypto library that are imported from BLST.
+// these type definitions are used as an abstraction from BLST internal types.
 
 // field elements F_r
 // where `r` is the order of G1/G2.
 // F_r elements are represented as big numbers reduced modulo `r`. Big numbers
 // are represented as a little endian vector of limbs.
 // `Fr` is equivalent to type `vec256` (used internally by BLST for F_r
-// elements). `Fr` is defined as a struct to be exportable through cgo to the Go
-// layer.
+// elements). `Fr` is defined as a struct so that it can be exportable through 
+// cgo to the Go layer.
 #define R_BITS 255 // equal to Fr_bits in bls12381_utils.h
 typedef struct {
   limb_t limbs[(R_BITS + 63) / 64];
@@ -30,7 +30,7 @@ typedef vec384 Fp;
 
 // curve E_1 (over F_p)
 // E_1 points are represented in Jacobian coordinates (x,y,z),
-// where x, y, x are elements of F_p (type `Fp`).
+// where x, y, z are elements of F_p (type `Fp`).
 // `E1` is equivalent to type `POINTonE1` (used internally by BLST for Jacobian
 // E1 elements) `E1` is defined as a struct to be exportable through cgo to the
 // Go layer. `E1` is also used to represent all subgroup G_1 elements.
@@ -49,7 +49,7 @@ typedef vec384x Fp2;
 
 // curve E_2 (over F_p^2)
 // E_2 points are represented in Jacobian coordinates (x,y,z),
-// where x, y, x are elements of F_p (type `Fp`).
+// where x, y, z are elements of F_p (type `Fp`).
 // `E2` is equivelent to type `POINTonE2` (used internally by BLST for Jacobian
 // E2 elements) `E2` is defined as a struct to be exportable through cgo to the
 // Go layer. `E2` is also used to represent all subgroup G_2 elements.
