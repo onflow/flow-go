@@ -94,7 +94,7 @@ func (s *Registers) Get(
 // Store sets the given entries in a batch.
 // This function is expected to be called at one batch per height, sequentially. Under normal conditions,
 // it should be called wth the value of height set to LatestHeight + 1
-// ** DO NOT CALL THIS FUNCTION CONCURRENTLY WITH OTHER CALLS TO Store **
+// CAUTION: This function is not safe for concurrent use.
 func (s *Registers) Store(
 	entries flow.RegisterEntries,
 	height uint64,
