@@ -37,11 +37,12 @@ import (
 )
 
 const (
-	// SignatureLenBLSBLS12381 is the size of a `G_1` element.
+	// SignatureLenBLSBLS12381 is the serialization size of a `G_1` element.
 	SignatureLenBLSBLS12381 = g1BytesLen
-	// PubKeyLenBLSBLS12381 is the size of a `G_2` element.
+	// PubKeyLenBLSBLS12381 is the serialization size of a `G_2` element.
 	PubKeyLenBLSBLS12381 = g2BytesLen
-	// PrKeyLenBLSBLS12381 is the size of a `F_r` element, where `r` is the order of `G_1` and `G_2`.
+	// PrKeyLenBLSBLS12381 is the serialization size of a `F_r` element,
+	// where `r` is the order of `G_1` and `G_2`.
 	PrKeyLenBLSBLS12381 = frBytesLen
 
 	// Hash to curve params

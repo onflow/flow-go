@@ -450,7 +450,7 @@ func frPolynomialImage(dest []byte, a []scalar, x index, y *pointE2) {
 // writeVerifVector exports a vector A into an array of bytes
 // assuming the array length matches the vector length
 func writeVerifVector(dest []byte, A []pointE2) {
-	C.G2_vector_write_bytes((*C.uchar)(&dest[0]),
+	C.E2_vector_write_bytes((*C.uchar)(&dest[0]),
 		(*C.E2)(&A[0]),
 		(C.int)(len(A)),
 	)

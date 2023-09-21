@@ -61,8 +61,8 @@ const (
 )
 
 // header of the point at infinity serializations
-var g1SerHeader byte // g1
-var g2SerHeader byte // g2
+var g1SerHeader byte // g1 (G1 identity)
+var g2SerHeader byte // g2 (G2 identity)
 
 // `g1“ serialization
 var g1Serialization []byte
@@ -214,7 +214,7 @@ func readScalarFrStar(a *scalar, src []byte) error {
 		return invalidInputsErrorf("input length must be %d, got %d",
 			frBytesLen, len(src))
 	case badValue:
-		return invalidInputsErrorf("scalar is not in the correct range w.r.t the BLS12-381 curve")
+		return invalidInputsErrorf("scalar is not in the correct range")
 	default:
 		return invalidInputsErrorf("reading the scalar failed")
 	}
@@ -233,7 +233,7 @@ func readPointE2(a *pointE2, src []byte) error {
 	case valid:
 		return nil
 	case badEncoding, badValue:
-		return invalidInputsErrorf("input could not deserialize to a E2 point")
+		return invalidInputsErrorf("input could not deserialize to an E2 point")
 	case pointNotOnCurve:
 		return invalidInputsErrorf("input is not a point on curve E2")
 	default:
