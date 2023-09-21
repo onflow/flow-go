@@ -26,7 +26,6 @@ import (
 	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/channels"
-	"github.com/onflow/flow-go/state/protocol"
 	psEvents "github.com/onflow/flow-go/state/protocol/events"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/utils/logging"
@@ -40,7 +39,6 @@ type Engine struct {
 	log                    zerolog.Logger
 	me                     module.Local
 	collectionFetcher      CollectionFetcher
-	state                  protocol.State
 	headers                storage.Headers // see comments on getHeaderByHeight for why we need it
 	blocks                 storage.Blocks
 	collections            storage.Collections
@@ -65,7 +63,6 @@ func New(
 	net network.EngineRegistry,
 	me module.Local,
 	collectionFetcher CollectionFetcher,
-	state protocol.State,
 	headers storage.Headers,
 	blocks storage.Blocks,
 	collections storage.Collections,
@@ -90,7 +87,6 @@ func New(
 		log:                    log,
 		me:                     me,
 		collectionFetcher:      collectionFetcher,
-		state:                  state,
 		headers:                headers,
 		blocks:                 blocks,
 		collections:            collections,
@@ -471,29 +467,11 @@ func (e *Engine) executeBlock(
 		return
 	}
 
-	// if the receipt is for a sealed block, then no need to broadcast it.
-	lastSealed, err := e.state.Sealed().Head()
-	if err != nil {
-		lg.Fatal().Err(err).Msg("could not get sealed block before broadcasting")
-	}
-
 	receipt := computationResult.ExecutionReceipt
-	isExecutedBlockSealed := executableBlock.Block.Header.Height <= lastSealed.Height
-	broadcasted := false
-
-	if !isExecutedBlockSealed {
-		authorizedAtBlock, err := e.checkAuthorizedAtBlock(executableBlock.ID())
-		if err != nil {
-			lg.Fatal().Err(err).Msg("could not check staking status")
-		}
-		if authorizedAtBlock {
-			err = e.providerEngine.BroadcastExecutionReceipt(ctx, receipt)
-			if err != nil {
-				lg.Err(err).Msg("critical: failed to broadcast the receipt")
-			} else {
-				broadcasted = true
-			}
-		}
+	broadcasted, err := e.providerEngine.BroadcastExecutionReceipt(
+		ctx, executableBlock.Block.Header.Height, receipt)
+	if err != nil {
+		lg.Err(err).Msg("critical: failed to broadcast the receipt")
 	}
 
 	finalEndState := computationResult.CurrentEndState()
@@ -505,7 +483,6 @@ func (e *Engine) executeBlock(
 		Hex("receipt_id", logging.Entity(receipt)).
 		Hex("result_id", logging.Entity(receipt.ExecutionResult)).
 		Hex("execution_data_id", receipt.ExecutionResult.ExecutionDataID[:]).
-		Bool("sealed", isExecutedBlockSealed).
 		Bool("state_changed", finalEndState != *executableBlock.StartState).
 		Uint64("num_txs", nonSystemTransactionCount(receipt.ExecutionResult)).
 		Bool("broadcasted", broadcasted).
