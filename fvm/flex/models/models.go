@@ -1,6 +1,8 @@
 package models
 
 import (
+	"math/big"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/onflow/cadence"
 )
@@ -18,6 +20,10 @@ import (
 
 // Flex addresses are evm-compatible addresses
 type FlexAddress common.Address
+
+func (fa FlexAddress) ToCommon() common.Address {
+	return common.Address(fa)
+}
 
 func NewFlexAddressFromString(str string) FlexAddress {
 	return FlexAddress(common.BytesToAddress([]byte(str)))
@@ -37,7 +43,7 @@ type FlexBlock interface {
 // a separate type has been considered here to prevent
 // accidental dev mistakes when dealing with the conversion
 type Balance interface {
-	InAttoFlow() uint64
+	InAttoFlow() *big.Int
 	InFlow() cadence.UFix64
 }
 
@@ -45,7 +51,7 @@ type Gaslimit uint64
 
 type Code []byte
 
-type Data []byte
+type Data []byte // TODO add functionality to convert this into values
 
 type FlexAccount interface {
 	Address() FlexAddress

@@ -101,7 +101,7 @@ func init() {
 }
 
 var flexContractStaticType interpreter.StaticType = interpreter.NewCompositeStaticType(
-	nil, // TODO deal with memory gage
+	nil, // TODO deal with memory gauge
 	FlexType.Location,
 	FlexType.QualifiedIdentifier(),
 	FlexType.ID(),

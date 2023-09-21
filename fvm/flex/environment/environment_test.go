@@ -160,8 +160,8 @@ func TestContractInteraction(t *testing.T) {
 				store, err := abi.Pack("store", num)
 				require.NoError(t, err)
 
-				err = env.Call(&testAccount,
-					&contractAddr,
+				err = env.Call(testAccount,
+					contractAddr,
 					store,
 					1_000_000,
 					// this should be zero because the contract doesn't have receiver
@@ -175,8 +175,8 @@ func TestContractInteraction(t *testing.T) {
 				retrieve, err := abi.Pack("retrieve")
 				require.NoError(t, err)
 
-				err = env.Call(&testAccount,
-					&contractAddr,
+				err = env.Call(testAccount,
+					contractAddr,
 					retrieve,
 					1_000_000,
 					// this should be zero because the contract doesn't have receiver

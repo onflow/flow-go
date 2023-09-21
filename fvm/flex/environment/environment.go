@@ -222,8 +222,8 @@ func (fe *Environment) Deploy(
 // back to the FVM environment. This method should only be used for FOA's
 // accounts where resource ownership has been verified
 func (fe *Environment) Call(
-	from *common.Address,
-	to *common.Address,
+	from common.Address,
+	to common.Address,
 	data []byte,
 	gasLimit uint64,
 	value *big.Int,
@@ -233,7 +233,7 @@ func (fe *Environment) Call(
 	}
 	// TODO: verify that the authorizer has the resource to interact with this contract (higher level check)
 
-	msg := directCallMessage(from, to, value, data, gasLimit)
+	msg := directCallMessage(&from, &to, value, data, gasLimit)
 
 	return fe.run(msg)
 }

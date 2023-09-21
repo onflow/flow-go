@@ -46,7 +46,7 @@ func encodeArgs(argValues []cadence.Value) [][]byte {
 func Test(t *testing.T) {
 
 	RunWithTempLedger(t, func(led atree.Ledger) {
-		handler := NewBaseFlexContractHandler(led)
+		handler := NewFlexContractHandler(led)
 		env := runtime.NewBaseInterpreterEnvironment(runtime.Config{})
 		flex := fstdlib.NewFlexStandardLibraryValue(nil, handler)
 		env.Declare(*flex)
