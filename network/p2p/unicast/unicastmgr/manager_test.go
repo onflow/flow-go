@@ -84,8 +84,8 @@ func TestUnicastManager_Connection_ConnectionBackoff(t *testing.T) {
 	// The dial config must be updated with the backoff budget decremented.
 	dialCfg, err := dialConfigCache.GetOrInit(peerID)
 	require.NoError(t, err)
-	require.Equal(t, uint64(unicastmodel.MaxDialAttemptTimes-1), dialCfg.DialAttemptBudget)                   // dial backoff budget must be decremented by 1.
-	require.Equal(t, uint64(unicastmodel.MaxStreamCreationAttemptTimes), dialCfg.StreamCreationAttemptBudget) // stream backoff budget must remain intact (no stream creation attempt yet).
+	require.Equal(t, uint64(unicastmodel.MaxDialAttemptTimes-1), dialCfg.DialRetryAttemptBudget)                   // dial backoff budget must be decremented by 1.
+	require.Equal(t, uint64(unicastmodel.MaxStreamCreationAttemptTimes), dialCfg.StreamCreationRetryAttemptBudget) // stream backoff budget must remain intact (no stream creation attempt yet).
 	// last successful dial is set back to zero, since although we have a successful dial in the past, the most recent dial failed.
 	require.True(t, dialCfg.LastSuccessfulDial.IsZero())
 	require.Equal(t, uint64(0), dialCfg.ConsecutiveSuccessfulStream) // consecutive successful stream must be intact.
@@ -113,8 +113,8 @@ func TestUnicastManager_Connection_SuccessfulConnection_And_Stream(t *testing.T)
 	// The dial config must be updated with the backoff budget decremented.
 	dialCfg, err := dialConfigCache.GetOrInit(peerID)
 	require.NoError(t, err)
-	require.Equal(t, uint64(unicastmodel.MaxDialAttemptTimes), dialCfg.DialAttemptBudget)                     // dial backoff budget must be intact.
-	require.Equal(t, uint64(unicastmodel.MaxStreamCreationAttemptTimes), dialCfg.StreamCreationAttemptBudget) // stream backoff budget must remain intact.
+	require.Equal(t, uint64(unicastmodel.MaxDialAttemptTimes), dialCfg.DialRetryAttemptBudget)                     // dial backoff budget must be intact.
+	require.Equal(t, uint64(unicastmodel.MaxStreamCreationAttemptTimes), dialCfg.StreamCreationRetryAttemptBudget) // stream backoff budget must remain intact.
 	// last successful dial must be set AFTER the successful dial.
 	require.True(t, dialCfg.LastSuccessfulDial.After(dialTime))
 	require.Equal(t, uint64(1), dialCfg.ConsecutiveSuccessfulStream) // consecutive successful stream must incremented.
@@ -155,8 +155,8 @@ func TestUnicastManager_Connection_SuccessfulConnection_StreamBackoff(t *testing
 	// The dial config must be updated with the backoff budget decremented.
 	dialCfg, err := dialConfigCache.GetOrInit(peerID)
 	require.NoError(t, err)
-	require.Equal(t, uint64(unicastmodel.MaxDialAttemptTimes), dialCfg.DialAttemptBudget)                       // dial backoff budget must be intact, since the connection is successful.
-	require.Equal(t, uint64(unicastmodel.MaxStreamCreationAttemptTimes-1), dialCfg.StreamCreationAttemptBudget) // stream backoff budget must be decremented by 1 since all budget is used up.
+	require.Equal(t, uint64(unicastmodel.MaxDialAttemptTimes), dialCfg.DialRetryAttemptBudget)                       // dial backoff budget must be intact, since the connection is successful.
+	require.Equal(t, uint64(unicastmodel.MaxStreamCreationAttemptTimes-1), dialCfg.StreamCreationRetryAttemptBudget) // stream backoff budget must be decremented by 1 since all budget is used up.
 	// last successful dial must be set AFTER the successful dial.
 	require.True(t, dialCfg.LastSuccessfulDial.After(dialTime))
 	require.Equal(t, uint64(0), dialCfg.ConsecutiveSuccessfulStream) // consecutive successful stream must be reset to zero, since the stream creation failed.
@@ -183,8 +183,8 @@ func TestUnicastManager_StreamFactory_StreamBackoff(t *testing.T) {
 	// The dial config must be updated with the stream backoff budget decremented.
 	dialCfg, err := dialConfigCache.GetOrInit(peerID)
 	require.NoError(t, err)
-	require.Equal(t, uint64(unicastmodel.MaxDialAttemptTimes), dialCfg.DialAttemptBudget)                       // dial backoff budget must be intact.
-	require.Equal(t, uint64(unicastmodel.MaxStreamCreationAttemptTimes-1), dialCfg.StreamCreationAttemptBudget) // stream backoff budget must be decremented by 1.
+	require.Equal(t, uint64(unicastmodel.MaxDialAttemptTimes), dialCfg.DialRetryAttemptBudget)                       // dial backoff budget must be intact.
+	require.Equal(t, uint64(unicastmodel.MaxStreamCreationAttemptTimes-1), dialCfg.StreamCreationRetryAttemptBudget) // stream backoff budget must be decremented by 1.
 	require.Equal(
 		t, uint64(0), dialCfg.ConsecutiveSuccessfulStream,
 	) // consecutive successful stream must be zero as we have not created a successful stream yet.
@@ -214,9 +214,9 @@ func TestUnicastManager_Stream_ConsecutiveStreamCreation_Increment(t *testing.T)
 		// The dial config must be updated with the stream backoff budget decremented.
 		dialCfg, err := dialConfigCache.GetOrInit(peerID)
 		require.NoError(t, err)
-		require.Equal(t, uint64(unicastmodel.MaxDialAttemptTimes), dialCfg.DialAttemptBudget)                     // dial backoff budget must be intact.
-		require.Equal(t, uint64(unicastmodel.MaxStreamCreationAttemptTimes), dialCfg.StreamCreationAttemptBudget) // stream backoff budget must be intact (all stream creation attempts are successful).
-		require.Equal(t, uint64(i+1), dialCfg.ConsecutiveSuccessfulStream)                                        // consecutive successful stream must be incremented.
+		require.Equal(t, uint64(unicastmodel.MaxDialAttemptTimes), dialCfg.DialRetryAttemptBudget)                     // dial backoff budget must be intact.
+		require.Equal(t, uint64(unicastmodel.MaxStreamCreationAttemptTimes), dialCfg.StreamCreationRetryAttemptBudget) // stream backoff budget must be intact (all stream creation attempts are successful).
+		require.Equal(t, uint64(i+1), dialCfg.ConsecutiveSuccessfulStream)                                             // consecutive successful stream must be incremented.
 	}
 }
 
@@ -233,8 +233,8 @@ func TestUnicastManager_Stream_ConsecutiveStreamCreation_Reset(t *testing.T) {
 
 	adjustedDialConfig, err := dialConfigCache.Adjust(
 		peerID, func(dialConfig unicastmodel.DialConfig) (unicastmodel.DialConfig, error) {
-			dialConfig.ConsecutiveSuccessfulStream = 5 // sets the consecutive successful stream to 10 meaning that the last 10 stream creation attempts were successful.
-			dialConfig.StreamCreationAttemptBudget = 0 // sets the stream back budget to 0 meaning that the stream backoff budget is exhausted.
+			dialConfig.ConsecutiveSuccessfulStream = 5      // sets the consecutive successful stream to 10 meaning that the last 10 stream creation attempts were successful.
+			dialConfig.StreamCreationRetryAttemptBudget = 0 // sets the stream back budget to 0 meaning that the stream backoff budget is exhausted.
 
 			return dialConfig, nil
 		},
@@ -252,9 +252,9 @@ func TestUnicastManager_Stream_ConsecutiveStreamCreation_Reset(t *testing.T) {
 	// The dial config must be updated with the stream backoff budget decremented.
 	dialCfg, err := dialConfigCache.GetOrInit(peerID)
 	require.NoError(t, err)
-	require.Equal(t, uint64(unicastmodel.MaxDialAttemptTimes), dialCfg.DialAttemptBudget) // dial backoff budget must be intact.
-	require.Equal(t, uint64(0), dialCfg.StreamCreationAttemptBudget)                      // stream backoff budget must be intact (we can't decrement it below 0).
-	require.Equal(t, uint64(0), dialCfg.ConsecutiveSuccessfulStream)                      // consecutive successful stream must be reset to 0.
+	require.Equal(t, uint64(unicastmodel.MaxDialAttemptTimes), dialCfg.DialRetryAttemptBudget) // dial backoff budget must be intact.
+	require.Equal(t, uint64(0), dialCfg.StreamCreationRetryAttemptBudget)                      // stream backoff budget must be intact (we can't decrement it below 0).
+	require.Equal(t, uint64(0), dialCfg.ConsecutiveSuccessfulStream)                           // consecutive successful stream must be reset to 0.
 }
 
 // TestUnicastManager_StreamFactory_ErrProtocolNotSupported tests that when there is a protocol not supported error, it does not retry creating a stream.
@@ -296,9 +296,9 @@ func TestUnicastManager_Dial_ErrSecurityProtocolNegotiationFailed(t *testing.T) 
 	dialCfg, err := dialConfigCache.GetOrInit(peerID)
 	require.NoError(t, err)
 	// dial backoff budget must be decremented by 1 (although we didn't have a backoff attempt, the connection was unsuccessful).
-	require.Equal(t, uint64(unicastmodel.MaxDialAttemptTimes-1), dialCfg.DialAttemptBudget)
+	require.Equal(t, uint64(unicastmodel.MaxDialAttemptTimes-1), dialCfg.DialRetryAttemptBudget)
 	// stream backoff budget must remain intact, as we have not tried to create a stream yet.
-	require.Equal(t, uint64(unicastmodel.MaxStreamCreationAttemptTimes), dialCfg.StreamCreationAttemptBudget)
+	require.Equal(t, uint64(unicastmodel.MaxStreamCreationAttemptTimes), dialCfg.StreamCreationRetryAttemptBudget)
 	// last successful dial must be set to zero.
 	require.True(t, dialCfg.LastSuccessfulDial.IsZero())
 	// consecutive successful stream must be set to zero.
@@ -326,9 +326,9 @@ func TestUnicastManager_Dial_ErrGaterDisallowedConnection(t *testing.T) {
 	dialCfg, err := dialConfigCache.GetOrInit(peerID)
 	require.NoError(t, err)
 	// dial backoff budget must be decremented by 1 (although we didn't have a backoff attempt, the connection was unsuccessful).
-	require.Equal(t, uint64(unicastmodel.MaxDialAttemptTimes-1), dialCfg.DialAttemptBudget)
+	require.Equal(t, uint64(unicastmodel.MaxDialAttemptTimes-1), dialCfg.DialRetryAttemptBudget)
 	// stream backoff budget must remain intact, as we have not tried to create a stream yet.
-	require.Equal(t, uint64(unicastmodel.MaxStreamCreationAttemptTimes), dialCfg.StreamCreationAttemptBudget)
+	require.Equal(t, uint64(unicastmodel.MaxStreamCreationAttemptTimes), dialCfg.StreamCreationRetryAttemptBudget)
 	// last successful dial must be set to zero.
 	require.True(t, dialCfg.LastSuccessfulDial.IsZero())
 	// consecutive successful stream must be set to zero.
@@ -366,21 +366,21 @@ func TestUnicastManager_Connection_BackoffBudgetDecremented(t *testing.T) {
 		require.NoError(t, err)
 
 		if i == unicastmodel.MaxDialAttemptTimes-1 {
-			require.Equal(t, uint64(0), dialCfg.DialAttemptBudget)
+			require.Equal(t, uint64(0), dialCfg.DialRetryAttemptBudget)
 		} else {
-			require.Equal(t, uint64(unicastmodel.MaxDialAttemptTimes-i-1), dialCfg.DialAttemptBudget)
+			require.Equal(t, uint64(unicastmodel.MaxDialAttemptTimes-i-1), dialCfg.DialRetryAttemptBudget)
 		}
 
 		// The stream backoff budget must remain intact, as we have not tried to create a stream yet.
-		require.Equal(t, uint64(unicastmodel.MaxStreamCreationAttemptTimes), dialCfg.StreamCreationAttemptBudget)
+		require.Equal(t, uint64(unicastmodel.MaxStreamCreationAttemptTimes), dialCfg.StreamCreationRetryAttemptBudget)
 	}
 	// At this time the backoff budget for connection must be 0.
 	dialCfg, err := dialConfigCache.GetOrInit(peerID)
 	require.NoError(t, err)
 
-	require.Equal(t, uint64(0), dialCfg.DialAttemptBudget)
+	require.Equal(t, uint64(0), dialCfg.DialRetryAttemptBudget)
 	// The stream backoff budget must remain intact, as we have not tried to create a stream yet.
-	require.Equal(t, uint64(unicastmodel.MaxStreamCreationAttemptTimes), dialCfg.StreamCreationAttemptBudget)
+	require.Equal(t, uint64(unicastmodel.MaxStreamCreationAttemptTimes), dialCfg.StreamCreationRetryAttemptBudget)
 
 	// After all the backoff budget is used up, it should stay at 0.
 	s, err := mgr.CreateStream(ctx, peerID)
@@ -389,10 +389,10 @@ func TestUnicastManager_Connection_BackoffBudgetDecremented(t *testing.T) {
 
 	dialCfg, err = dialConfigCache.GetOrInit(peerID)
 	require.NoError(t, err)
-	require.Equal(t, uint64(0), dialCfg.DialAttemptBudget)
+	require.Equal(t, uint64(0), dialCfg.DialRetryAttemptBudget)
 
 	// The stream backoff budget must remain intact, as we have not tried to create a stream yet.
-	require.Equal(t, uint64(unicastmodel.MaxStreamCreationAttemptTimes), dialCfg.StreamCreationAttemptBudget)
+	require.Equal(t, uint64(unicastmodel.MaxStreamCreationAttemptTimes), dialCfg.StreamCreationRetryAttemptBudget)
 }
 
 // TestUnicastManager_Connection_BackoffBudgetDecremented tests that everytime the unicast manger gives up on creating a connection (after retrials),
@@ -427,21 +427,21 @@ func TestUnicastManager_Stream_BackoffBudgetDecremented(t *testing.T) {
 		require.NoError(t, err)
 
 		if i == unicastmodel.MaxStreamCreationAttemptTimes-1 {
-			require.Equal(t, uint64(0), dialCfg.StreamCreationAttemptBudget)
+			require.Equal(t, uint64(0), dialCfg.StreamCreationRetryAttemptBudget)
 		} else {
-			require.Equal(t, uint64(unicastmodel.MaxStreamCreationAttemptTimes-i-1), dialCfg.StreamCreationAttemptBudget)
+			require.Equal(t, uint64(unicastmodel.MaxStreamCreationAttemptTimes-i-1), dialCfg.StreamCreationRetryAttemptBudget)
 		}
 
 		// The dial backoff budget must remain intact, as we have not tried to create a stream yet.
-		require.Equal(t, uint64(unicastmodel.MaxDialAttemptTimes), dialCfg.DialAttemptBudget)
+		require.Equal(t, uint64(unicastmodel.MaxDialAttemptTimes), dialCfg.DialRetryAttemptBudget)
 	}
 	// At this time the backoff budget for connection must be 0.
 	dialCfg, err := dialConfigCache.GetOrInit(peerID)
 	require.NoError(t, err)
 
-	require.Equal(t, uint64(0), dialCfg.StreamCreationAttemptBudget)
+	require.Equal(t, uint64(0), dialCfg.StreamCreationRetryAttemptBudget)
 	// The dial backoff budget must remain intact, as we have not tried to create a stream yet.
-	require.Equal(t, uint64(unicastmodel.MaxDialAttemptTimes), dialCfg.DialAttemptBudget)
+	require.Equal(t, uint64(unicastmodel.MaxDialAttemptTimes), dialCfg.DialRetryAttemptBudget)
 
 	// After all the backoff budget is used up, it should stay at 0.
 	s, err := mgr.CreateStream(ctx, peerID)
@@ -450,10 +450,10 @@ func TestUnicastManager_Stream_BackoffBudgetDecremented(t *testing.T) {
 
 	dialCfg, err = dialConfigCache.GetOrInit(peerID)
 	require.NoError(t, err)
-	require.Equal(t, uint64(0), dialCfg.StreamCreationAttemptBudget)
+	require.Equal(t, uint64(0), dialCfg.StreamCreationRetryAttemptBudget)
 
 	// The dial backoff budget must remain intact, as we have not tried to create a stream yet.
-	require.Equal(t, uint64(unicastmodel.MaxDialAttemptTimes), dialCfg.DialAttemptBudget)
+	require.Equal(t, uint64(unicastmodel.MaxDialAttemptTimes), dialCfg.DialRetryAttemptBudget)
 }
 
 // TestUnicastManager_StreamFactory_Connection_SuccessfulConnection_And_Stream tests that when there is no connection, and CreateStream is successful on the first attempt for connection and stream creation,
@@ -469,13 +469,13 @@ func TestUnicastManager_Stream_BackoffBudgetResetToDefault(t *testing.T) {
 	// update the dial config of the peer to have a zero stream backoff budget but a consecutive successful stream counter above the reset threshold.
 	adjustedCfg, err := dialConfigCache.Adjust(
 		peerID, func(dialConfig unicastmodel.DialConfig) (unicastmodel.DialConfig, error) {
-			dialConfig.StreamCreationAttemptBudget = 0
+			dialConfig.StreamCreationRetryAttemptBudget = 0
 			dialConfig.ConsecutiveSuccessfulStream = unicastmodel.StreamZeroBackoffResetThreshold + 1
 			return dialConfig, nil
 		},
 	)
 	require.NoError(t, err)
-	require.Equal(t, uint64(0), adjustedCfg.StreamCreationAttemptBudget)
+	require.Equal(t, uint64(0), adjustedCfg.StreamCreationRetryAttemptBudget)
 	require.Equal(t, uint64(unicastmodel.StreamZeroBackoffResetThreshold+1), adjustedCfg.ConsecutiveSuccessfulStream)
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -488,9 +488,9 @@ func TestUnicastManager_Stream_BackoffBudgetResetToDefault(t *testing.T) {
 	// The dial config must be updated with the backoff budget decremented.
 	dialCfg, err := dialConfigCache.GetOrInit(peerID)
 	require.NoError(t, err)
-	require.Equal(t, uint64(unicastmodel.MaxDialAttemptTimes), dialCfg.DialAttemptBudget)                     // dial backoff budget must be intact.
-	require.Equal(t, uint64(unicastmodel.MaxStreamCreationAttemptTimes), dialCfg.StreamCreationAttemptBudget) // stream backoff budget must reset to default.
-	require.True(t, dialCfg.LastSuccessfulDial.IsZero())                                                      // last successful dial must be intact.
+	require.Equal(t, uint64(unicastmodel.MaxDialAttemptTimes), dialCfg.DialRetryAttemptBudget)                     // dial backoff budget must be intact.
+	require.Equal(t, uint64(unicastmodel.MaxStreamCreationAttemptTimes), dialCfg.StreamCreationRetryAttemptBudget) // stream backoff budget must reset to default.
+	require.True(t, dialCfg.LastSuccessfulDial.IsZero())                                                           // last successful dial must be intact.
 	// consecutive successful stream must increment by 1 (it was threshold + 1 before).
 	require.Equal(t, uint64(unicastmodel.StreamZeroBackoffResetThreshold+1+1), dialCfg.ConsecutiveSuccessfulStream)
 }
@@ -509,13 +509,13 @@ func TestUnicastManager_Stream_BackoffConnectionBudgetResetToDefault(t *testing.
 	// update the dial config of the peer to have a zero dial backoff budget but it has not been long enough since the last successful dial.
 	adjustedCfg, err := dialConfigCache.Adjust(
 		peerID, func(dialConfig unicastmodel.DialConfig) (unicastmodel.DialConfig, error) {
-			dialConfig.DialAttemptBudget = 0
+			dialConfig.DialRetryAttemptBudget = 0
 			dialConfig.LastSuccessfulDial = time.Now().Add(-unicastmodel.DialZeroBackoffResetThreshold)
 			return dialConfig, nil
 		},
 	)
 	require.NoError(t, err)
-	require.Equal(t, uint64(0), adjustedCfg.DialAttemptBudget)
+	require.Equal(t, uint64(0), adjustedCfg.DialRetryAttemptBudget)
 	require.True(t, adjustedCfg.LastSuccessfulDial.Before(time.Now().Add(-unicastmodel.DialZeroBackoffResetThreshold))) // last successful dial must be within the threshold.
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -529,10 +529,10 @@ func TestUnicastManager_Stream_BackoffConnectionBudgetResetToDefault(t *testing.
 	// The dial config must be updated with the backoff budget decremented.
 	dialCfg, err := dialConfigCache.GetOrInit(peerID)
 	require.NoError(t, err)
-	require.Equal(t, uint64(unicastmodel.MaxDialAttemptTimes), dialCfg.DialAttemptBudget)                     // dial backoff budget must be reset to default.
-	require.Equal(t, uint64(unicastmodel.MaxStreamCreationAttemptTimes), dialCfg.StreamCreationAttemptBudget) // stream backoff budget must be intact.
-	require.True(t, dialCfg.LastSuccessfulDial.After(dialTime))                                               // last successful dial must be updated when the dial was successful.
-	require.Equal(t, uint64(1), dialCfg.ConsecutiveSuccessfulStream)                                          // consecutive successful stream must be incremented by 1 (0 -> 1).
+	require.Equal(t, uint64(unicastmodel.MaxDialAttemptTimes), dialCfg.DialRetryAttemptBudget)                     // dial backoff budget must be reset to default.
+	require.Equal(t, uint64(unicastmodel.MaxStreamCreationAttemptTimes), dialCfg.StreamCreationRetryAttemptBudget) // stream backoff budget must be intact.
+	require.True(t, dialCfg.LastSuccessfulDial.After(dialTime))                                                    // last successful dial must be updated when the dial was successful.
+	require.Equal(t, uint64(1), dialCfg.ConsecutiveSuccessfulStream)                                               // consecutive successful stream must be incremented by 1 (0 -> 1).
 }
 
 // TestUnicastManager_Connection_NoBackoff_When_Budget_Is_Zero tests that when there is no connection, and the dial backoff budget is zero and last successful dial is not within the zero reset threshold
@@ -547,14 +547,14 @@ func TestUnicastManager_Connection_NoBackoff_When_Budget_Is_Zero(t *testing.T) {
 	// update the dial config of the peer to have a zero dial backoff, and the last successful dial is not within the threshold.
 	adjustedCfg, err := dialConfigCache.Adjust(
 		peerID, func(dialConfig unicastmodel.DialConfig) (unicastmodel.DialConfig, error) {
-			dialConfig.DialAttemptBudget = 0                                  // set the dial backoff budget to 0, meaning that the dial backoff budget is exhausted.
+			dialConfig.DialRetryAttemptBudget = 0                             // set the dial backoff budget to 0, meaning that the dial backoff budget is exhausted.
 			dialConfig.LastSuccessfulDial = time.Now().Add(-10 * time.Minute) // last successful dial is not within the threshold.
 			dialConfig.ConsecutiveSuccessfulStream = 2                        // set the consecutive successful stream to 2, meaning that the last 2 stream creation attempts were successful.
 			return dialConfig, nil
 		},
 	)
 	require.NoError(t, err)
-	require.Equal(t, uint64(0), adjustedCfg.DialAttemptBudget)
+	require.Equal(t, uint64(0), adjustedCfg.DialRetryAttemptBudget)
 	require.False(t, adjustedCfg.LastSuccessfulDial.Before(time.Now().Add(-unicastmodel.DialZeroBackoffResetThreshold))) // last successful dial must not be within the threshold.
 	require.Equal(t, uint64(2), adjustedCfg.ConsecutiveSuccessfulStream)
 
@@ -567,10 +567,10 @@ func TestUnicastManager_Connection_NoBackoff_When_Budget_Is_Zero(t *testing.T) {
 
 	dialCfg, err := dialConfigCache.GetOrInit(peerID)
 	require.NoError(t, err)
-	require.Equal(t, uint64(0), dialCfg.DialAttemptBudget)                                                    // dial backoff budget must remain at 0.
-	require.Equal(t, uint64(unicastmodel.MaxStreamCreationAttemptTimes), dialCfg.StreamCreationAttemptBudget) // stream backoff budget must be intact.
-	require.True(t, dialCfg.LastSuccessfulDial.IsZero())                                                      // last successful dial must be set to zero.
-	require.Equal(t, uint64(0), dialCfg.ConsecutiveSuccessfulStream)                                          // consecutive successful stream must be set to zero.
+	require.Equal(t, uint64(0), dialCfg.DialRetryAttemptBudget)                                                    // dial backoff budget must remain at 0.
+	require.Equal(t, uint64(unicastmodel.MaxStreamCreationAttemptTimes), dialCfg.StreamCreationRetryAttemptBudget) // stream backoff budget must be intact.
+	require.True(t, dialCfg.LastSuccessfulDial.IsZero())                                                           // last successful dial must be set to zero.
+	require.Equal(t, uint64(0), dialCfg.ConsecutiveSuccessfulStream)                                               // consecutive successful stream must be set to zero.
 }
 
 // TestUnicastManager_Stream_NoBackoff_When_Budget_Is_Zero tests that when there is a connection, and the stream backoff budget is zero and the consecutive successful stream counter is not above the
@@ -589,12 +589,12 @@ func TestUnicastManager_Stream_NoBackoff_When_Budget_Is_Zero(t *testing.T) {
 		peerID, func(dialConfig unicastmodel.DialConfig) (unicastmodel.DialConfig, error) {
 			dialConfig.LastSuccessfulDial = lastSuccessfulDial // last successful dial is not within the threshold.
 			dialConfig.ConsecutiveSuccessfulStream = 2         // set the consecutive successful stream to 2, which is below the reset threshold.
-			dialConfig.StreamCreationAttemptBudget = 0         // set the stream backoff budget to 0, meaning that the stream backoff budget is exhausted.
+			dialConfig.StreamCreationRetryAttemptBudget = 0    // set the stream backoff budget to 0, meaning that the stream backoff budget is exhausted.
 			return dialConfig, nil
 		},
 	)
 	require.NoError(t, err)
-	require.Equal(t, uint64(0), adjustedCfg.StreamCreationAttemptBudget)
+	require.Equal(t, uint64(0), adjustedCfg.StreamCreationRetryAttemptBudget)
 	require.False(t, adjustedCfg.LastSuccessfulDial.Before(time.Now().Add(-unicastmodel.DialZeroBackoffResetThreshold))) // last successful dial must not be within the threshold.
 	require.Equal(t, uint64(2), adjustedCfg.ConsecutiveSuccessfulStream)
 
@@ -607,8 +607,8 @@ func TestUnicastManager_Stream_NoBackoff_When_Budget_Is_Zero(t *testing.T) {
 
 	dialCfg, err := dialConfigCache.GetOrInit(peerID)
 	require.NoError(t, err)
-	require.Equal(t, uint64(unicastmodel.MaxDialAttemptTimes), dialCfg.DialAttemptBudget) // dial backoff budget must remain intact.
-	require.Equal(t, uint64(0), dialCfg.StreamCreationAttemptBudget)                      // stream backoff budget must remain zero.
-	require.Equal(t, lastSuccessfulDial, dialCfg.LastSuccessfulDial)                      // last successful dial must be intact.
-	require.Equal(t, uint64(0), dialCfg.ConsecutiveSuccessfulStream)                      // consecutive successful stream must be set to zero.
+	require.Equal(t, uint64(unicastmodel.MaxDialAttemptTimes), dialCfg.DialRetryAttemptBudget) // dial backoff budget must remain intact.
+	require.Equal(t, uint64(0), dialCfg.StreamCreationRetryAttemptBudget)                      // stream backoff budget must remain zero.
+	require.Equal(t, lastSuccessfulDial, dialCfg.LastSuccessfulDial)                           // last successful dial must be intact.
+	require.Equal(t, uint64(0), dialCfg.ConsecutiveSuccessfulStream)                           // consecutive successful stream must be set to zero.
 }

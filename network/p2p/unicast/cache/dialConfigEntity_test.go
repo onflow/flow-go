@@ -18,10 +18,10 @@ func TestDialConfigEntity(t *testing.T) {
 	d := &unicastcache.DialConfigEntity{
 		PeerId: peerID,
 		DialConfig: unicastmodel.DialConfig{
-			DialAttemptBudget:           10,
-			StreamCreationAttemptBudget: 20,
-			LastSuccessfulDial:          time.Now(),
-			ConsecutiveSuccessfulStream: 30,
+			DialRetryAttemptBudget:           10,
+			StreamCreationRetryAttemptBudget: 20,
+			LastSuccessfulDial:               time.Now(),
+			ConsecutiveSuccessfulStream:      30,
 		},
 	}
 
@@ -48,9 +48,9 @@ func TestDialConfigEntity(t *testing.T) {
 		d3 := &unicastcache.DialConfigEntity{
 			PeerId: d.PeerId,
 			DialConfig: unicastmodel.DialConfig{
-				DialAttemptBudget:           100,
-				StreamCreationAttemptBudget: 200,
-				LastSuccessfulDial:          time.Now(),
+				DialRetryAttemptBudget:           100,
+				StreamCreationRetryAttemptBudget: 200,
+				LastSuccessfulDial:               time.Now(),
 			},
 		}
 		require.Equal(t, d.ID(), d3.ID()) // same peer id, same id, even though the dial config is different.

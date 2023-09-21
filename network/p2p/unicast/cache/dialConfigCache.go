@@ -130,10 +130,10 @@ func (d *DialConfigCache) adjust(peerIdHash flow.Identifier, adjustFunc unicastm
 	}
 
 	return &unicastmodel.DialConfig{
-		DialAttemptBudget:           adjustedEntity.(DialConfigEntity).DialAttemptBudget,
-		StreamCreationAttemptBudget: adjustedEntity.(DialConfigEntity).StreamCreationAttemptBudget,
-		LastSuccessfulDial:          adjustedEntity.(DialConfigEntity).LastSuccessfulDial,
-		ConsecutiveSuccessfulStream: adjustedEntity.(DialConfigEntity).ConsecutiveSuccessfulStream,
+		DialRetryAttemptBudget:           adjustedEntity.(DialConfigEntity).DialRetryAttemptBudget,
+		StreamCreationRetryAttemptBudget: adjustedEntity.(DialConfigEntity).StreamCreationRetryAttemptBudget,
+		LastSuccessfulDial:               adjustedEntity.(DialConfigEntity).LastSuccessfulDial,
+		ConsecutiveSuccessfulStream:      adjustedEntity.(DialConfigEntity).ConsecutiveSuccessfulStream,
 	}, nil
 }
 
@@ -177,10 +177,10 @@ func (d *DialConfigCache) get(peerIDHash flow.Identifier) (*unicastmodel.DialCon
 
 	// return a copy of the config (we do not want the caller to modify the config).
 	return &unicastmodel.DialConfig{
-		DialAttemptBudget:           cfg.DialAttemptBudget,
-		StreamCreationAttemptBudget: cfg.StreamCreationAttemptBudget,
-		LastSuccessfulDial:          cfg.LastSuccessfulDial,
-		ConsecutiveSuccessfulStream: cfg.ConsecutiveSuccessfulStream,
+		DialRetryAttemptBudget:           cfg.DialRetryAttemptBudget,
+		StreamCreationRetryAttemptBudget: cfg.StreamCreationRetryAttemptBudget,
+		LastSuccessfulDial:               cfg.LastSuccessfulDial,
+		ConsecutiveSuccessfulStream:      cfg.ConsecutiveSuccessfulStream,
 	}, true
 }
 

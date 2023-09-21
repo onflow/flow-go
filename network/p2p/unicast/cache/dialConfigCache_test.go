@@ -32,8 +32,8 @@ func TestNewDialConfigCache(t *testing.T) {
 // The dial config is initialized with the default values.
 func dialConfigFixture() unicastmodel.DialConfig {
 	return unicastmodel.DialConfig{
-		DialAttemptBudget:           unicastmodel.MaxDialAttemptTimes,
-		StreamCreationAttemptBudget: unicastmodel.MaxStreamCreationAttemptTimes,
+		DialRetryAttemptBudget:           unicastmodel.MaxDialAttemptTimes,
+		StreamCreationRetryAttemptBudget: unicastmodel.MaxStreamCreationAttemptTimes,
 	}
 }
 
@@ -51,7 +51,7 @@ func TestDialConfigCache_Adjust_Init(t *testing.T) {
 		return dialConfigFixture()
 	}
 	adjustFuncIncrement := func(cfg unicastmodel.DialConfig) (unicastmodel.DialConfig, error) {
-		cfg.DialAttemptBudget++
+		cfg.DialRetryAttemptBudget++
 		return cfg, nil
 	}
 
@@ -77,8 +77,8 @@ func TestDialConfigCache_Adjust_Init(t *testing.T) {
 	// adjusting a non-existing dial config must not initialize the config.
 	require.Equal(t, uint(2), cache.Size(), "cache size must be 2")
 	require.Equal(t, cfg.LastSuccessfulDial, dialConfigFixture().LastSuccessfulDial, "last successful dial must be 0")
-	require.Equal(t, cfg.DialAttemptBudget, dialConfigFixture().DialAttemptBudget+1, "dial backoff must be adjusted")
-	require.Equal(t, cfg.StreamCreationAttemptBudget, dialConfigFixture().StreamCreationAttemptBudget, "stream backoff must be 1")
+	require.Equal(t, cfg.DialRetryAttemptBudget, dialConfigFixture().DialRetryAttemptBudget+1, "dial backoff must be adjusted")
+	require.Equal(t, cfg.StreamCreationRetryAttemptBudget, dialConfigFixture().StreamCreationRetryAttemptBudget, "stream backoff must be 1")
 
 	// Retrieving the dial config of peerID2 through GetOrInit.
 	// retrieve the dial config for peerID2 and assert than it is initialized with the default values; and the adjust function is applied.
@@ -89,8 +89,8 @@ func TestDialConfigCache_Adjust_Init(t *testing.T) {
 	require.Equal(t, uint(2), cache.Size(), "cache size must be 2")
 	// config should be the same as the one returned by Adjust.
 	require.Equal(t, cfg.LastSuccessfulDial, dialConfigFixture().LastSuccessfulDial, "last successful dial must be 0")
-	require.Equal(t, cfg.DialAttemptBudget, dialConfigFixture().DialAttemptBudget+1, "dial backoff must be adjusted")
-	require.Equal(t, cfg.StreamCreationAttemptBudget, dialConfigFixture().StreamCreationAttemptBudget, "stream backoff must be 1")
+	require.Equal(t, cfg.DialRetryAttemptBudget, dialConfigFixture().DialRetryAttemptBudget+1, "dial backoff must be adjusted")
+	require.Equal(t, cfg.StreamCreationRetryAttemptBudget, dialConfigFixture().StreamCreationRetryAttemptBudget, "stream backoff must be 1")
 
 	// Adjusting the dial config of peerID1 through Adjust.
 	// dial config for peerID1 already exists in the cache, so it must be adjusted when using Adjust.
@@ -99,8 +99,8 @@ func TestDialConfigCache_Adjust_Init(t *testing.T) {
 	// adjusting an existing dial config must not change the cache size.
 	require.Equal(t, uint(2), cache.Size(), "cache size must be 2")
 	require.Equal(t, cfg.LastSuccessfulDial, dialConfigFixture().LastSuccessfulDial, "last successful dial must be 0")
-	require.Equal(t, cfg.DialAttemptBudget, dialConfigFixture().DialAttemptBudget+1, "dial backoff must be adjusted")
-	require.Equal(t, cfg.StreamCreationAttemptBudget, dialConfigFixture().StreamCreationAttemptBudget, "stream backoff must be 1")
+	require.Equal(t, cfg.DialRetryAttemptBudget, dialConfigFixture().DialRetryAttemptBudget+1, "dial backoff must be adjusted")
+	require.Equal(t, cfg.StreamCreationRetryAttemptBudget, dialConfigFixture().StreamCreationRetryAttemptBudget, "stream backoff must be 1")
 
 	// Recurring adjustment of the dial config of peerID1 through Adjust.
 	// dial config for peerID1 already exists in the cache, so it must be adjusted when using Adjust.
@@ -109,8 +109,8 @@ func TestDialConfigCache_Adjust_Init(t *testing.T) {
 	// adjusting an existing dial config must not change the cache size.
 	require.Equal(t, uint(2), cache.Size(), "cache size must be 2")
 	require.Equal(t, cfg.LastSuccessfulDial, dialConfigFixture().LastSuccessfulDial, "last successful dial must be 0")
-	require.Equal(t, cfg.DialAttemptBudget, dialConfigFixture().DialAttemptBudget+2, "dial backoff must be adjusted")
-	require.Equal(t, cfg.StreamCreationAttemptBudget, dialConfigFixture().StreamCreationAttemptBudget, "stream backoff must be 1")
+	require.Equal(t, cfg.DialRetryAttemptBudget, dialConfigFixture().DialRetryAttemptBudget+2, "dial backoff must be adjusted")
+	require.Equal(t, cfg.StreamCreationRetryAttemptBudget, dialConfigFixture().StreamCreationRetryAttemptBudget, "stream backoff must be 1")
 }
 
 // TestDialConfigCache_Adjust tests the Adjust method of the DialConfigCache. It asserts that the dial config is adjusted,
@@ -141,7 +141,7 @@ func TestDialConfigCache_Concurrent_Adjust(t *testing.T) {
 			go func(peerId peer.ID) {
 				defer wg.Done()
 				_, err := cache.Adjust(peerId, func(cfg unicastmodel.DialConfig) (unicastmodel.DialConfig, error) {
-					cfg.DialAttemptBudget++
+					cfg.DialRetryAttemptBudget++
 					return cfg, nil
 				})
 				require.NoError(t, err)
@@ -163,7 +163,7 @@ func TestDialConfigCache_Concurrent_Adjust(t *testing.T) {
 			peerID := peerIds[j]
 			cfg, err := cache.GetOrInit(peerID)
 			require.NoError(t, err)
-			require.Equal(t, uint64(j+1), cfg.DialAttemptBudget, fmt.Sprintf("peerId %s dial backoff must be adjusted %d times got: %d", peerID, j+1, cfg.DialAttemptBudget))
+			require.Equal(t, uint64(j+1), cfg.DialRetryAttemptBudget, fmt.Sprintf("peerId %s dial backoff must be adjusted %d times got: %d", peerID, j+1, cfg.DialRetryAttemptBudget))
 		}(i)
 	}
 
@@ -191,15 +191,15 @@ func TestConcurrent_Adjust_And_Get_Is_Safe(t *testing.T) {
 			peerId := p2ptest.PeerIdFixture(t)
 			dialTime := time.Now()
 			updatedConfig, err := cache.Adjust(peerId, func(cfg unicastmodel.DialConfig) (unicastmodel.DialConfig, error) {
-				cfg.DialAttemptBudget = 1 // some random adjustment
+				cfg.DialRetryAttemptBudget = 1 // some random adjustment
 				cfg.LastSuccessfulDial = dialTime
-				cfg.StreamCreationAttemptBudget = 2 // some random adjustment
-				cfg.ConsecutiveSuccessfulStream = 3 // some random adjustment
+				cfg.StreamCreationRetryAttemptBudget = 2 // some random adjustment
+				cfg.ConsecutiveSuccessfulStream = 3      // some random adjustment
 				return cfg, nil
 			})
-			require.NoError(t, err)                                      // concurrent adjustment must not fail.
-			require.Equal(t, uint64(1), updatedConfig.DialAttemptBudget) // adjustment must be successful
-			require.Equal(t, uint64(2), updatedConfig.StreamCreationAttemptBudget)
+			require.NoError(t, err)                                           // concurrent adjustment must not fail.
+			require.Equal(t, uint64(1), updatedConfig.DialRetryAttemptBudget) // adjustment must be successful
+			require.Equal(t, uint64(2), updatedConfig.StreamCreationRetryAttemptBudget)
 			require.Equal(t, uint64(3), updatedConfig.ConsecutiveSuccessfulStream)
 			require.Equal(t, dialTime, updatedConfig.LastSuccessfulDial)
 		}()
@@ -212,9 +212,9 @@ func TestConcurrent_Adjust_And_Get_Is_Safe(t *testing.T) {
 			wg.Done()
 			peerId := p2ptest.PeerIdFixture(t)
 			cfg, err := cache.GetOrInit(peerId)
-			require.NoError(t, err)                                                        // concurrent retrieval must not fail.
-			require.Equal(t, dialConfigFixture().DialAttemptBudget, cfg.DialAttemptBudget) // dial config must be initialized with the default values.
-			require.Equal(t, dialConfigFixture().StreamCreationAttemptBudget, cfg.StreamCreationAttemptBudget)
+			require.NoError(t, err)                                                                  // concurrent retrieval must not fail.
+			require.Equal(t, dialConfigFixture().DialRetryAttemptBudget, cfg.DialRetryAttemptBudget) // dial config must be initialized with the default values.
+			require.Equal(t, dialConfigFixture().StreamCreationRetryAttemptBudget, cfg.StreamCreationRetryAttemptBudget)
 			require.Equal(t, uint64(0), cfg.ConsecutiveSuccessfulStream)
 			require.True(t, cfg.LastSuccessfulDial.IsZero())
 		}()
@@ -226,4 +226,43 @@ func TestConcurrent_Adjust_And_Get_Is_Safe(t *testing.T) {
 	require.Equal(t, uint(sizeLimit), cache.Size(), "cache size must be equal to the size limit")
 }
 
-// TODO: test LRU eviction
+func TestDialConfigCache_LRU_Eviction(t *testing.T) {
+	sizeLimit := uint32(100)
+	logger := zerolog.Nop()
+	collector := metrics.NewNoopCollector()
+
+	cache := unicastcache.NewDialConfigCache(sizeLimit, logger, collector, dialConfigFixture)
+	require.NotNil(t, cache)
+	require.Zerof(t, cache.Size(), "cache size must be 0")
+
+	peerIds := make([]peer.ID, sizeLimit+1)
+	for i := 0; i < int(sizeLimit+1); i++ {
+		peerId := p2ptest.PeerIdFixture(t)
+		require.NotContainsf(t, peerIds, peerId, "peer id must be unique")
+		peerIds[i] = peerId
+	}
+	for i := 0; i < int(sizeLimit+1); i++ {
+		dialTime := time.Now()
+		updatedConfig, err := cache.Adjust(peerIds[i], func(cfg unicastmodel.DialConfig) (unicastmodel.DialConfig, error) {
+			cfg.DialRetryAttemptBudget = 1           // some random adjustment
+			cfg.StreamCreationRetryAttemptBudget = 2 // some random adjustment
+			cfg.ConsecutiveSuccessfulStream = 3      // some random adjustment
+			cfg.LastSuccessfulDial = dialTime
+			return cfg, nil
+		})
+		require.NoError(t, err)                                           // concurrent adjustment must not fail.
+		require.Equal(t, uint64(1), updatedConfig.DialRetryAttemptBudget) // adjustment must be successful
+		require.Equal(t, uint64(2), updatedConfig.StreamCreationRetryAttemptBudget)
+		require.Equal(t, uint64(3), updatedConfig.ConsecutiveSuccessfulStream)
+		require.Equal(t, dialTime, updatedConfig.LastSuccessfulDial)
+	}
+
+	for i := 1; i < int(sizeLimit+1); i++ {
+		cfg, err := cache.GetOrInit(peerIds[i])
+		require.NoError(t, err)
+		require.Equal(t, uint64(1), cfg.DialRetryAttemptBudget)
+		require.Equal(t, uint64(2), cfg.StreamCreationRetryAttemptBudget)
+		require.Equal(t, uint64(3), cfg.ConsecutiveSuccessfulStream)
+		require.False(t, cfg.LastSuccessfulDial.IsZero())
+	}
+}
