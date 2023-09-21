@@ -55,6 +55,13 @@ func (m *AccountUsageMigrator) MigrateAccount(
 		return payloads, nil
 	}
 
+	if _, ok := knownProblematicAccounts[address]; ok {
+		m.log.Error().
+			Hex("address", address[:]).
+			Msg("skipping problematic account")
+		return payloads, nil
+	}
+
 	var status *environment.AccountStatus
 	var statusIndex int
 	actualSize := uint64(0)

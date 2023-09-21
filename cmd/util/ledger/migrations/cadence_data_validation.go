@@ -97,6 +97,13 @@ func (m *preMigration) MigrateAccount(
 		return payloads, nil
 	}
 
+	if _, ok := knownProblematicAccounts[address]; ok {
+		m.log.Error().
+			Hex("address", address[:]).
+			Msg("skipping problematic account")
+		return payloads, nil
+	}
+
 	hash, err := hashAccountCadenceValues(address, payloads)
 	if err != nil {
 		m.log.Info().
@@ -156,6 +163,13 @@ func (m *postMigration) MigrateAccount(
 	payloads []*ledger.Payload,
 ) ([]*ledger.Payload, error) {
 	if address == common.ZeroAddress {
+		return payloads, nil
+	}
+
+	if _, ok := knownProblematicAccounts[address]; ok {
+		m.log.Error().
+			Hex("address", address[:]).
+			Msg("skipping problematic account")
 		return payloads, nil
 	}
 
