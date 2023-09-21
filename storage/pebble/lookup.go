@@ -9,12 +9,10 @@ import (
 	"github.com/onflow/flow-go/storage/pebble/registers"
 )
 
-const placeholderHeight = uint64(0)
-
 var latestHeightKeyLiteral = binary.BigEndian.AppendUint64(
-	[]byte{codeLatestBlockHeight, byte('/'), byte('/')}, placeholderHeight)
+	[]byte{codeLatestBlockHeight, byte('/'), byte('/')}, placeHolderHeight)
 var firstHeightKeyLiteral = binary.BigEndian.AppendUint64(
-	[]byte{codeFirstBlockHeight, byte('/'), byte('/')}, placeholderHeight)
+	[]byte{codeFirstBlockHeight, byte('/'), byte('/')}, placeHolderHeight)
 
 // lookupKey is the encoded format of the storage key for looking up register value
 type lookupKey struct {
