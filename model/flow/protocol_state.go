@@ -232,12 +232,12 @@ func (e *ProtocolStateEntry) ID() Identifier {
 		return ZeroID
 	}
 	body := struct {
-		PreviousEpochEventIDs           Identifier
+		PreviousEpochEventIDs           EventIDs
 		CurrentEpochID                  Identifier
 		NextEpochID                     Identifier
 		InvalidStateTransitionAttempted bool
 	}{
-		PreviousEpochEventIDs:           e.PreviousEpochEventIDs.ID(),
+		PreviousEpochEventIDs:           e.PreviousEpochEventIDs,
 		CurrentEpochID:                  e.CurrentEpoch.ID(),
 		NextEpochID:                     e.NextEpoch.ID(),
 		InvalidStateTransitionAttempted: e.InvalidStateTransitionAttempted,
