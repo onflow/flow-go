@@ -9,37 +9,36 @@ import (
 	"github.com/onflow/flow-go/storage/pebble/registers"
 )
 
+const placeholderHeight = uint64(0)
+
+var latestHeightKeyLiteral = binary.BigEndian.AppendUint64(
+	[]byte{codeLatestBlockHeight, byte('/'), byte('/')}, placeholderHeight)
+var firstHeightKeyLiteral = binary.BigEndian.AppendUint64(
+	[]byte{codeFirstBlockHeight, byte('/'), byte('/')}, placeholderHeight)
+
 // lookupKey is the encoded format of the storage key for looking up register value
 type lookupKey struct {
 	encoded []byte
 }
 
-func newHeightKey(identifier byte) []byte {
-	key := make([]byte, 0, MinLookupKeyLen)
-	key = append(key, identifier)
-	key = append(key, '/')
-	key = binary.BigEndian.AppendUint64(key, placeHolderHeight)
-	return key
-}
-
-// LatestHeightKey is a special case of a lookupKey
+// latestHeightKey is a special case of a lookupKey
 // with keyLatestBlockHeight as key, no owner and a placeholder height of 0.
 // This is to ensure SeekPrefixGE in pebble does not break
 func latestHeightKey() []byte {
-	return newHeightKey(codeLatestBlockHeight)
+	return latestHeightKeyLiteral
 }
 
-// FirstHeightKey is a special case of a lookupKey
+// firstHeightKey is a special case of a lookupKey
 // with keyFirstBlockHeight as key, no owner and a placeholder height of 0.
 // This is to ensure SeekPrefixGE in pebble does not break
 func firstHeightKey() []byte {
-	return newHeightKey(codeFirstBlockHeight)
+	return firstHeightKeyLiteral
 }
 
 // newLookupKey takes a height and registerID, returns the key for storing the register value in storage
 func newLookupKey(height uint64, reg flow.RegisterID) *lookupKey {
 	key := lookupKey{
-		// 1 byte gaps for db prefix and '/' separator
+		// 1 byte gaps for db prefix and '/' separators
 		encoded: make([]byte, 0, MinLookupKeyLen+len(reg.Owner)+len(reg.Key)),
 	}
 
@@ -78,7 +77,12 @@ func lookupKeyToRegisterID(lookupKey []byte) (uint64, flow.RegisterID, error) {
 			MinLookupKeyLen, len(lookupKey))
 	}
 
-	// exclude db prefix
+	// check and exclude db prefix
+	prefix := lookupKey[0]
+	if prefix != codeRegister {
+		return 0, flow.RegisterID{}, fmt.Errorf("incorrect prefix %d for register lookup key, expected %d",
+			prefix, codeRegister)
+	}
 	lookupKey = lookupKey[1:]
 
 	// Find the first slash to split the lookup key and decode the owner.
@@ -122,7 +126,7 @@ func (h lookupKey) Bytes() []byte {
 }
 
 // EncodedUint64 encodes uint64 for storing as a pebble payload
-func EncodedUint64(height uint64) []byte {
+func encodedUint64(height uint64) []byte {
 	payload := make([]byte, 0, 8)
 	return binary.BigEndian.AppendUint64(payload, height)
 }

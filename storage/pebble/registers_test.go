@@ -84,8 +84,8 @@ func TestRegisters_Store(t *testing.T) {
 		require.NoError(t, err)
 
 		// out of range
-		height5 := uint64(5)
-		err = r.Store(height5, entries)
+		height4 := uint64(4)
+		err = r.Store(height4, entries)
 		require.Error(t, err)
 
 		height1 := uint64(1)
@@ -199,6 +199,10 @@ func TestRegisters_Store_Versioning(t *testing.T) {
 		value11, err := r.Get(height3, key11)
 		require.NoError(t, err)
 		require.Equal(t, expectedValue11, value11)
+
+		// make sure the key is unavailable at height 1
+		_, err = r.Get(uint64(1), key1)
+		require.ErrorIs(t, err, storage.ErrNotFound)
 	})
 }
 
@@ -293,8 +297,8 @@ func RunWithRegistersStorageAtInitialHeights(tb testing.TB, first uint64, latest
 	opts := DefaultPebbleOptions(cache, registers.NewMVCCComparer())
 	unittest.RunWithConfiguredPebbleInstance(tb, opts, func(p *pebble.DB) {
 		// insert initial heights to pebble
-		require.NoError(tb, p.Set(firstHeightKey(), EncodedUint64(first), nil))
-		require.NoError(tb, p.Set(latestHeightKey(), EncodedUint64(latest), nil))
+		require.NoError(tb, p.Set(firstHeightKey(), encodedUint64(first), nil))
+		require.NoError(tb, p.Set(latestHeightKey(), encodedUint64(latest), nil))
 		r, err := NewRegisters(p)
 		require.NoError(tb, err)
 		f(r)

@@ -96,3 +96,13 @@ func Test_decodeKey_fail(t *testing.T) {
 	_, _, err = lookupKeyToRegisterID([]byte{codeRegister, 1, 2, 3, '/', 5, '/', 7, 8, 9, 10, 11, 12, 13, 14})
 	require.NoError(t, err)
 }
+
+func Test_prefix_error(t *testing.T) {
+	correctKey := newLookupKey(uint64(0), flow.RegisterID{Owner: "owner", Key: "key"})
+	incorrectKey := firstHeightKey()
+	_, _, err := lookupKeyToRegisterID(correctKey.Bytes())
+	require.NoError(t, err)
+
+	_, _, err = lookupKeyToRegisterID(incorrectKey)
+	require.ErrorContains(t, err, "incorrect prefix")
+}
