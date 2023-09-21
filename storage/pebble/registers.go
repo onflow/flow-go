@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/cockroachdb/pebble"
+	"github.com/pkg/errors"
 	"go.uber.org/atomic"
 
 	"github.com/onflow/flow-go/model/flow"
@@ -55,8 +56,12 @@ func (s *Registers) Get(
 	height uint64,
 	reg flow.RegisterID,
 ) ([]byte, error) {
-	if height > s.latestHeight.Load() || height < s.firstHeight {
-		return nil, storage.ErrHeightNotIndexed
+	latestHeight := s.latestHeight.Load()
+	if height > latestHeight || height < s.firstHeight {
+		return nil, errors.Wrap(
+			storage.ErrHeightNotIndexed,
+			fmt.Sprintf("height %d not indexed, indexed range is [%d-%d]", height, s.firstHeight, latestHeight),
+		)
 	}
 	iter, err := s.db.NewIter(&pebble.IterOptions{
 		UseL6Filters: true,
