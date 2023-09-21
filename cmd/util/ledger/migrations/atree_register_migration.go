@@ -9,6 +9,7 @@ import (
 
 	"github.com/rs/zerolog"
 
+	"github.com/onflow/atree"
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/onflow/cadence/runtime/interpreter"
@@ -97,8 +98,12 @@ func (m *AtreeRegisterMigrator) MigrateAccount(
 	//	return nil, fmt.Errorf("storage health issues for address %s: %w", address.Hex(), err)
 	//}
 
+	// keep track of all storage maps that were accessed
+	// if they are empty the wont be changed, but we sill need to copy them over
+	storageMapIds := make(map[string]struct{})
+
 	// Do the storage conversion
-	changes, err := m.migrateAccountStorage(mr)
+	changes, err := m.migrateAccountStorage(mr, storageMapIds)
 	if err != nil {
 		if errors.Is(err, skippableAccountError) {
 			return oldPayloads, nil
@@ -108,7 +113,7 @@ func (m *AtreeRegisterMigrator) MigrateAccount(
 
 	originalLen := len(oldPayloads)
 
-	newPayloads, err := m.validateChangesAndCreateNewRegisters(mr, changes)
+	newPayloads, err := m.validateChangesAndCreateNewRegisters(mr, changes, storageMapIds)
 	if err != nil {
 		if errors.Is(err, skippableAccountError) {
 			return oldPayloads, nil
@@ -137,11 +142,12 @@ func (m *AtreeRegisterMigrator) MigrateAccount(
 
 func (m *AtreeRegisterMigrator) migrateAccountStorage(
 	mr *migratorRuntime,
+	storageMapIds map[string]struct{},
 ) (map[flow.RegisterID]flow.RegisterValue, error) {
 
 	// iterate through all domains and migrate them
 	for _, domain := range domains {
-		err := m.convertStorageDomain(mr, domain)
+		err := m.convertStorageDomain(mr, storageMapIds, domain)
 		if err != nil {
 			return nil, fmt.Errorf("failed to convert storage domain %s : %w", domain, err)
 		}
@@ -164,6 +170,7 @@ func (m *AtreeRegisterMigrator) migrateAccountStorage(
 
 func (m *AtreeRegisterMigrator) convertStorageDomain(
 	mr *migratorRuntime,
+	storageMapIds map[string]struct{},
 	domain string,
 ) error {
 
@@ -172,6 +179,7 @@ func (m *AtreeRegisterMigrator) convertStorageDomain(
 		// no storage for this domain
 		return nil
 	}
+	storageMapIds[string(atree.SlabIndexToLedgerKey(storageMap.StorageID().Index))] = struct{}{}
 
 	iterator := storageMap.Iterator(util.NopMemoryGauge{})
 	keys := make([]interpreter.StringStorageMapKey, 0)
@@ -299,10 +307,8 @@ type migratorRuntime struct {
 func (m *AtreeRegisterMigrator) validateChangesAndCreateNewRegisters(
 	mr *migratorRuntime,
 	changes map[flow.RegisterID]flow.RegisterValue,
-) (
-	[]*ledger.Payload,
-	error,
-) {
+	storageMapIds map[string]struct{},
+) ([]*ledger.Payload, error) {
 	originalPayloadsSnapshot := mr.Snapshot
 	originalPayloads := originalPayloadsSnapshot.Payloads
 	newPayloads := make([]*ledger.Payload, 0, len(originalPayloads))
@@ -355,11 +361,7 @@ func (m *AtreeRegisterMigrator) validateChangesAndCreateNewRegisters(
 			continue
 		}
 
-		key, err := value.Key()
-		if err != nil {
-			return nil, fmt.Errorf("failed to get payload key: %w", err)
-		}
-
+		key := util.RegisterIDToKey(id)
 		if isAccountKey(key) {
 			statePayload = value
 			// we will append this later
@@ -382,6 +384,11 @@ func (m *AtreeRegisterMigrator) validateChangesAndCreateNewRegisters(
 		if isADomainKey {
 			// TODO: check if this is really expected
 			// this is expected. Move it to the new payloads
+			newPayloads = append(newPayloads, value)
+			continue
+		}
+
+		if _, ok := storageMapIds[id.Key]; ok {
 			newPayloads = append(newPayloads, value)
 			continue
 		}
@@ -462,6 +469,73 @@ func (m *AtreeRegisterMigrator) cloneValue(
 	}
 	return value, nil
 }
+
+//
+//func (m *AtreeRegisterMigrator) cloneLargeArray(
+//	mr *migratorRuntime,
+//	value *interpreter.ArrayValue,
+//) (interpreter.Value, error) {
+//
+//	count := value.Count()
+//
+//	workers := 2 // TODO
+//
+//	type valueWithIndex struct {
+//		value interpreter.Value
+//		index int
+//	}
+//
+//	inChan := make(chan valueWithIndex, workers)
+//	outChan := make(chan valueWithIndex)
+//	defer close(inChan)
+//	defer close(outChan)
+//
+//	for i := 0; i < workers; i++ {
+//		go func() {
+//			for v := range inChan {
+//				v.value = v.value.Clone(mr.Interpreter)
+//				outChan <- v
+//			}
+//		}()
+//	}
+//
+//	go func() {
+//		iterator := value.Iterator(mr.Interpreter)
+//		for i := 0; i < count; i++ {
+//			inChan <- valueWithIndex{
+//				value: iterator.Next(mr.Interpreter),
+//				index: i,
+//			}
+//		}
+//	}()
+//
+//	copied := make([]interpreter.Value, count)
+//
+//	for i := 0; i < count; i++ {
+//		v := <-outChan
+//		copied[v.index] = v.value
+//	}
+//
+//	current := 0
+//	values := func() interpreter.Value {
+//		if current == count {
+//			return nil
+//		}
+//
+//		v := copied[current]
+//		current++
+//		return v
+//	}
+//
+//	value = interpreter.NewArrayValueWithIterator(
+//		mr.Interpreter,
+//		value.StaticType(mr.Interpreter).(interpreter.ArrayStaticType),
+//		mr.Address,
+//		0,
+//		values)
+//
+//	return value, nil
+//}
 
 //
 //func (m *AtreeRegisterMigrator) checkStorageHealth(
@@ -568,14 +642,7 @@ var knownProblematicAccounts = map[common.Address]string{
 	mustHexToAddress("48d3be92e6e4a973"): "Broken contract FanTopPermission",
 }
 
-var accountsToLog = map[common.Address]string{
-	// Testnet accounts
-	mustHexToAddress("ff8bbaa2905b7bd6"): "Small account that increased in size",
-	mustHexToAddress("04d3fdfd153c8a2a"): "Removed slabs break account",
-	mustHexToAddress("05ad65e6ff041440"): "Removed slabs break account",
-	mustHexToAddress("496f36b415c0417d"): "Removed slabs break account",
-	mustHexToAddress("c7abe7300faa6f3a"): "Removed slabs break account",
-}
+var accountsToLog = map[common.Address]string{}
 
 func mustHexToAddress(hex string) common.Address {
 	address, err := common.HexToAddress(hex)
