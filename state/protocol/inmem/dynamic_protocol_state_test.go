@@ -21,7 +21,7 @@ func TestDynamicProtocolStateAdapter(t *testing.T) {
 	adapter := inmem.NewDynamicProtocolStateAdapter(entry, globalParams)
 
 	t.Run("identities", func(t *testing.T) {
-		assert.Equal(t, entry.Identities, adapter.Identities())
+		assert.Equal(t, entry.CurrentEpochIdentityTable, adapter.Identities())
 	})
 	t.Run("global-params", func(t *testing.T) {
 		expectedChainID := flow.Testnet

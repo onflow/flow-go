@@ -23,7 +23,7 @@ func NewDynamicProtocolStateAdapter(entry *flow.RichProtocolStateEntry, params p
 }
 
 func (s *DynamicProtocolStateAdapter) Identities() flow.IdentityList {
-	return s.RichProtocolStateEntry.Identities
+	return s.RichProtocolStateEntry.CurrentEpochIdentityTable
 }
 
 func (s *DynamicProtocolStateAdapter) GlobalParams() protocol.GlobalParams {

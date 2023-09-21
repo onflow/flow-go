@@ -336,9 +336,9 @@ func SnapshotFromBootstrapStateWithParams(
 	protocolState := &flow.ProtocolStateEntry{
 		PreviousEpochEventIDs: flow.EventIDs{},
 		CurrentEpoch: flow.EpochStateContainer{
-			SetupID:    setup.ID(),
-			CommitID:   commit.ID(),
-			Identities: identities,
+			SetupID:          setup.ID(),
+			CommitID:         commit.ID(),
+			ActiveIdentities: identities,
 		},
 		NextEpoch:                       nil,
 		InvalidStateTransitionAttempted: false,

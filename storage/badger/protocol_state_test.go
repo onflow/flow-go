@@ -74,14 +74,14 @@ func TestProtocolStateStoreInvalidProtocolState(t *testing.T) {
 		store := NewProtocolState(metrics, setups, commits, db, DefaultCacheSize)
 		invalid := unittest.ProtocolStateFixture().ProtocolStateEntry
 		// swap first and second elements to break canonical order
-		invalid.CurrentEpoch.Identities[0], invalid.CurrentEpoch.Identities[1] = invalid.CurrentEpoch.Identities[1], invalid.CurrentEpoch.Identities[0]
+		invalid.CurrentEpoch.ActiveIdentities[0], invalid.CurrentEpoch.ActiveIdentities[1] = invalid.CurrentEpoch.ActiveIdentities[1], invalid.CurrentEpoch.ActiveIdentities[0]
 
 		err := transaction.Update(db, store.StoreTx(invalid.ID(), invalid))
 		require.Error(t, err)
 
 		invalid = unittest.ProtocolStateFixture(unittest.WithNextEpochProtocolState()).ProtocolStateEntry
 		// swap first and second elements to break canonical order
-		invalid.NextEpoch.Identities[0], invalid.NextEpoch.Identities[1] = invalid.NextEpoch.Identities[1], invalid.NextEpoch.Identities[0]
+		invalid.NextEpoch.ActiveIdentities[0], invalid.NextEpoch.ActiveIdentities[1] = invalid.NextEpoch.ActiveIdentities[1], invalid.NextEpoch.ActiveIdentities[0]
 
 		err = transaction.Update(db, store.StoreTx(invalid.ID(), invalid))
 		require.Error(t, err)
@@ -131,7 +131,7 @@ func TestProtocolStateMergeParticipants(t *testing.T) {
 		require.Equal(t, stateEntry, actual)
 
 		assertRichProtocolStateValidity(t, actual)
-		identity, ok := actual.Identities.ByNodeID(nodeID)
+		identity, ok := actual.CurrentEpochIdentityTable.ByNodeID(nodeID)
 		require.True(t, ok)
 		require.Equal(t, newAddress, identity.Address)
 	})
@@ -212,9 +212,9 @@ func assertRichProtocolStateValidity(t *testing.T, state *flow.RichProtocolState
 		allIdentities = state.CurrentEpochSetup.Participants.Union(previousEpochParticipants)
 	}
 
-	assert.Equal(t, allIdentities, state.Identities, "identities should be a full identity table for the current epoch, without duplicates")
+	assert.Equal(t, allIdentities, state.CurrentEpochIdentityTable, "identities should be a full identity table for the current epoch, without duplicates")
 
-	for i, identity := range state.CurrentEpoch.Identities {
+	for i, identity := range state.CurrentEpoch.ActiveIdentities {
 		assert.Equal(t, identity.NodeID, allIdentities[i].NodeID, "identity node ID should match")
 	}
 
@@ -232,5 +232,5 @@ func assertRichProtocolStateValidity(t *testing.T, state *flow.RichProtocolState
 	// invariant: Identities is a full identity table for the current epoch. Identities are sorted in canonical order. Without duplicates. Never nil.
 	allIdentities = state.NextEpochSetup.Participants.Union(state.CurrentEpochSetup.Participants)
 
-	assert.Equal(t, allIdentities, state.NextIdentities, "identities should be a full identity table for the next epoch, without duplicates")
+	assert.Equal(t, allIdentities, state.NextEpochIdentityTable, "identities should be a full identity table for the next epoch, without duplicates")
 }

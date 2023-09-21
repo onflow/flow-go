@@ -2550,9 +2550,9 @@ func RootProtocolStateFixture() *flow.RichProtocolStateEntry {
 		ProtocolStateEntry: &flow.ProtocolStateEntry{
 
 			CurrentEpoch: flow.EpochStateContainer{
-				SetupID:    currentEpochSetup.ID(),
-				CommitID:   currentEpochCommit.ID(),
-				Identities: flow.DynamicIdentityEntryListFromIdentities(allIdentities),
+				SetupID:          currentEpochSetup.ID(),
+				CommitID:         currentEpochCommit.ID(),
+				ActiveIdentities: flow.DynamicIdentityEntryListFromIdentities(allIdentities),
 			},
 			PreviousEpochEventIDs: flow.EventIDs{
 				SetupID:  flow.ZeroID,
@@ -2561,14 +2561,14 @@ func RootProtocolStateFixture() *flow.RichProtocolStateEntry {
 			InvalidStateTransitionAttempted: false,
 			NextEpoch:                       nil,
 		},
-		PreviousEpochSetup:  nil,
-		PreviousEpochCommit: nil,
-		CurrentEpochSetup:   currentEpochSetup,
-		CurrentEpochCommit:  currentEpochCommit,
-		NextEpochSetup:      nil,
-		NextEpochCommit:     nil,
-		Identities:          allIdentities,
-		NextIdentities:      flow.IdentityList{},
+		PreviousEpochSetup:        nil,
+		PreviousEpochCommit:       nil,
+		CurrentEpochSetup:         currentEpochSetup,
+		CurrentEpochCommit:        currentEpochCommit,
+		NextEpochSetup:            nil,
+		NextEpochCommit:           nil,
+		CurrentEpochIdentityTable: allIdentities,
+		NextEpochIdentityTable:    flow.IdentityList{},
 	}
 }
 
@@ -2611,9 +2611,9 @@ func ProtocolStateFixture(options ...func(*flow.RichProtocolStateEntry)) *flow.R
 	entry := &flow.RichProtocolStateEntry{
 		ProtocolStateEntry: &flow.ProtocolStateEntry{
 			CurrentEpoch: flow.EpochStateContainer{
-				SetupID:    currentEpochSetup.ID(),
-				CommitID:   currentEpochCommit.ID(),
-				Identities: flow.DynamicIdentityEntryListFromIdentities(allIdentities),
+				SetupID:          currentEpochSetup.ID(),
+				CommitID:         currentEpochCommit.ID(),
+				ActiveIdentities: flow.DynamicIdentityEntryListFromIdentities(allIdentities),
 			},
 			PreviousEpochEventIDs: flow.EventIDs{
 				SetupID:  prevEpochSetup.ID(),
@@ -2622,14 +2622,14 @@ func ProtocolStateFixture(options ...func(*flow.RichProtocolStateEntry)) *flow.R
 			InvalidStateTransitionAttempted: false,
 			NextEpoch:                       nil,
 		},
-		PreviousEpochSetup:  prevEpochSetup,
-		PreviousEpochCommit: prevEpochCommit,
-		CurrentEpochSetup:   currentEpochSetup,
-		CurrentEpochCommit:  currentEpochCommit,
-		NextEpochSetup:      nil,
-		NextEpochCommit:     nil,
-		Identities:          allIdentities,
-		NextIdentities:      flow.IdentityList{},
+		PreviousEpochSetup:        prevEpochSetup,
+		PreviousEpochCommit:       prevEpochCommit,
+		CurrentEpochSetup:         currentEpochSetup,
+		CurrentEpochCommit:        currentEpochCommit,
+		NextEpochSetup:            nil,
+		NextEpochCommit:           nil,
+		CurrentEpochIdentityTable: allIdentities,
+		NextEpochIdentityTable:    flow.IdentityList{},
 	}
 
 	for _, option := range options {
@@ -2658,18 +2658,18 @@ func WithNextEpochProtocolState() func(entry *flow.RichProtocolStateEntry) {
 			commit.Counter = nextEpochSetup.Counter
 		})
 
-		entry.Identities = nil
-		identitiesStateLookup := entry.CurrentEpoch.Identities.Lookup()
+		entry.CurrentEpochIdentityTable = nil
+		identitiesStateLookup := entry.CurrentEpoch.ActiveIdentities.Lookup()
 		for _, identity := range entry.CurrentEpochSetup.Participants {
-			entry.Identities = append(entry.Identities, &flow.Identity{
+			entry.CurrentEpochIdentityTable = append(entry.CurrentEpochIdentityTable, &flow.Identity{
 				IdentitySkeleton: *identity,
 				DynamicIdentity:  identitiesStateLookup[identity.NodeID].Dynamic,
 			})
 		}
 
 		for _, identity := range nextEpochSetup.Participants {
-			if _, found := entry.Identities.ByNodeID(identity.NodeID); !found {
-				entry.Identities = append(entry.Identities, &flow.Identity{
+			if _, found := entry.CurrentEpochIdentityTable.ByNodeID(identity.NodeID); !found {
+				entry.CurrentEpochIdentityTable = append(entry.CurrentEpochIdentityTable, &flow.Identity{
 					IdentitySkeleton: *identity,
 					DynamicIdentity: flow.DynamicIdentity{
 						Weight:  0,
@@ -2678,7 +2678,7 @@ func WithNextEpochProtocolState() func(entry *flow.RichProtocolStateEntry) {
 				})
 			}
 
-			entry.NextIdentities = append(entry.NextIdentities, &flow.Identity{
+			entry.NextEpochIdentityTable = append(entry.NextEpochIdentityTable, &flow.Identity{
 				IdentitySkeleton: *identity,
 				DynamicIdentity: flow.DynamicIdentity{
 					Weight:  identity.InitialWeight,
@@ -2688,8 +2688,8 @@ func WithNextEpochProtocolState() func(entry *flow.RichProtocolStateEntry) {
 		}
 
 		for _, identity := range entry.CurrentEpochSetup.Participants {
-			if _, found := entry.NextIdentities.ByNodeID(identity.NodeID); !found {
-				entry.NextIdentities = append(entry.NextIdentities, &flow.Identity{
+			if _, found := entry.NextEpochIdentityTable.ByNodeID(identity.NodeID); !found {
+				entry.NextEpochIdentityTable = append(entry.NextEpochIdentityTable, &flow.Identity{
 					IdentitySkeleton: *identity,
 					DynamicIdentity: flow.DynamicIdentity{
 						Weight:  0,
@@ -2699,14 +2699,14 @@ func WithNextEpochProtocolState() func(entry *flow.RichProtocolStateEntry) {
 			}
 		}
 
-		entry.Identities = entry.Identities.Sort(order.Canonical[flow.Identity])
-		entry.NextIdentities = entry.NextIdentities.Sort(order.Canonical[flow.Identity])
+		entry.CurrentEpochIdentityTable = entry.CurrentEpochIdentityTable.Sort(order.Canonical[flow.Identity])
+		entry.NextEpochIdentityTable = entry.NextEpochIdentityTable.Sort(order.Canonical[flow.Identity])
 
-		entry.CurrentEpoch.Identities = flow.DynamicIdentityEntryListFromIdentities(entry.Identities)
+		entry.CurrentEpoch.ActiveIdentities = flow.DynamicIdentityEntryListFromIdentities(entry.CurrentEpochIdentityTable)
 		entry.NextEpoch = &flow.EpochStateContainer{
-			SetupID:    nextEpochSetup.ID(),
-			CommitID:   nextEpochCommit.ID(),
-			Identities: flow.DynamicIdentityEntryListFromIdentities(entry.NextIdentities),
+			SetupID:          nextEpochSetup.ID(),
+			CommitID:         nextEpochCommit.ID(),
+			ActiveIdentities: flow.DynamicIdentityEntryListFromIdentities(entry.NextEpochIdentityTable),
 		}
 		entry.NextEpochSetup = nextEpochSetup
 		entry.NextEpochCommit = nextEpochCommit

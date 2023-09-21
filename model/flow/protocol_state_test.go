@@ -30,9 +30,9 @@ func TestNewRichProtocolStateEntry(t *testing.T) {
 		}
 		stateEntry := &flow.ProtocolStateEntry{
 			CurrentEpoch: flow.EpochStateContainer{
-				SetupID:    setup.ID(),
-				CommitID:   currentEpochCommit.ID(),
-				Identities: identities,
+				SetupID:          setup.ID(),
+				CommitID:         currentEpochCommit.ID(),
+				ActiveIdentities: identities,
 			},
 			PreviousEpochEventIDs:           flow.EventIDs{},
 			InvalidStateTransitionAttempted: false,
@@ -49,7 +49,7 @@ func TestNewRichProtocolStateEntry(t *testing.T) {
 		assert.NoError(t, err)
 		expectedIdentities, err := flow.BuildIdentityTable(identities, setup.Participants, nil)
 		assert.NoError(t, err)
-		assert.Equal(t, expectedIdentities, entry.Identities, "should be equal to current epoch setup participants")
+		assert.Equal(t, expectedIdentities, entry.CurrentEpochIdentityTable, "should be equal to current epoch setup participants")
 	})
 
 	// Common situation during the staking phase for epoch N+1
@@ -69,12 +69,12 @@ func TestNewRichProtocolStateEntry(t *testing.T) {
 		)
 		assert.NoError(t, err)
 		expectedIdentities, err := flow.BuildIdentityTable(
-			stateEntry.CurrentEpoch.Identities,
+			stateEntry.CurrentEpoch.ActiveIdentities,
 			stateEntry.CurrentEpochSetup.Participants,
 			stateEntry.PreviousEpochSetup.Participants,
 		)
 		assert.NoError(t, err)
-		assert.Equal(t, expectedIdentities, richEntry.Identities, "should be equal to current epoch setup participants + previous epoch setup participants")
+		assert.Equal(t, expectedIdentities, richEntry.CurrentEpochIdentityTable, "should be equal to current epoch setup participants + previous epoch setup participants")
 		assert.Nil(t, richEntry.NextEpoch)
 	})
 
@@ -99,20 +99,20 @@ func TestNewRichProtocolStateEntry(t *testing.T) {
 		)
 		assert.NoError(t, err)
 		expectedIdentities, err := flow.BuildIdentityTable(
-			stateEntry.CurrentEpoch.Identities,
+			stateEntry.CurrentEpoch.ActiveIdentities,
 			stateEntry.CurrentEpochSetup.Participants,
 			stateEntry.NextEpochSetup.Participants,
 		)
 		assert.NoError(t, err)
-		assert.Equal(t, expectedIdentities, richEntry.Identities, "should be equal to current epoch setup participants + next epoch setup participants")
+		assert.Equal(t, expectedIdentities, richEntry.CurrentEpochIdentityTable, "should be equal to current epoch setup participants + next epoch setup participants")
 		assert.Nil(t, richEntry.NextEpochCommit)
 		expectedIdentities, err = flow.BuildIdentityTable(
-			stateEntry.NextEpoch.Identities,
+			stateEntry.NextEpoch.ActiveIdentities,
 			stateEntry.NextEpochSetup.Participants,
 			stateEntry.CurrentEpochSetup.Participants,
 		)
 		assert.NoError(t, err)
-		assert.Equal(t, expectedIdentities, richEntry.NextIdentities, "should be equal to next epoch setup participants + current epoch setup participants")
+		assert.Equal(t, expectedIdentities, richEntry.NextEpochIdentityTable, "should be equal to next epoch setup participants + current epoch setup participants")
 	})
 
 	// TODO: include test for epoch setup phase where no prior epoch exist (i.e. first epoch setup phase after spork)
@@ -135,19 +135,19 @@ func TestNewRichProtocolStateEntry(t *testing.T) {
 		)
 		assert.NoError(t, err)
 		expectedIdentities, err := flow.BuildIdentityTable(
-			stateEntry.CurrentEpoch.Identities,
+			stateEntry.CurrentEpoch.ActiveIdentities,
 			stateEntry.CurrentEpochSetup.Participants,
 			stateEntry.NextEpochSetup.Participants,
 		)
 		assert.NoError(t, err)
-		assert.Equal(t, expectedIdentities, richEntry.Identities, "should be equal to current epoch setup participants + next epoch setup participants")
+		assert.Equal(t, expectedIdentities, richEntry.CurrentEpochIdentityTable, "should be equal to current epoch setup participants + next epoch setup participants")
 		expectedIdentities, err = flow.BuildIdentityTable(
-			stateEntry.NextEpoch.Identities,
+			stateEntry.NextEpoch.ActiveIdentities,
 			stateEntry.NextEpochSetup.Participants,
 			stateEntry.CurrentEpochSetup.Participants,
 		)
 		assert.NoError(t, err)
-		assert.Equal(t, expectedIdentities, richEntry.NextIdentities, "should be equal to next epoch setup participants + current epoch setup participants")
+		assert.Equal(t, expectedIdentities, richEntry.NextEpochIdentityTable, "should be equal to next epoch setup participants + current epoch setup participants")
 	})
 
 	// TODO: include test for epoch commit phase where no prior epoch exist (i.e. first epoch commit phase after spork)
@@ -167,16 +167,16 @@ func TestProtocolStateEntry_Copy(t *testing.T) {
 	cpy.InvalidStateTransitionAttempted = !entry.InvalidStateTransitionAttempted
 	assert.NotEqual(t, entry, cpy)
 
-	assert.Equal(t, entry.CurrentEpoch.Identities[0], cpy.CurrentEpoch.Identities[0])
-	cpy.CurrentEpoch.Identities[0].Dynamic.Weight = 123
-	assert.NotEqual(t, entry.CurrentEpoch.Identities[0], cpy.CurrentEpoch.Identities[0])
+	assert.Equal(t, entry.CurrentEpoch.ActiveIdentities[0], cpy.CurrentEpoch.ActiveIdentities[0])
+	cpy.CurrentEpoch.ActiveIdentities[0].Dynamic.Weight = 123
+	assert.NotEqual(t, entry.CurrentEpoch.ActiveIdentities[0], cpy.CurrentEpoch.ActiveIdentities[0])
 
-	cpy.CurrentEpoch.Identities = append(cpy.CurrentEpoch.Identities, &flow.DynamicIdentityEntry{
+	cpy.CurrentEpoch.ActiveIdentities = append(cpy.CurrentEpoch.ActiveIdentities, &flow.DynamicIdentityEntry{
 		NodeID: unittest.IdentifierFixture(),
 		Dynamic: flow.DynamicIdentity{
 			Weight:  100,
 			Ejected: false,
 		},
 	})
-	assert.NotEqual(t, entry.CurrentEpoch.Identities, cpy.CurrentEpoch.Identities)
+	assert.NotEqual(t, entry.CurrentEpoch.ActiveIdentities, cpy.CurrentEpoch.ActiveIdentities)
 }

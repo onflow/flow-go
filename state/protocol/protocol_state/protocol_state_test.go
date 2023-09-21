@@ -31,7 +31,7 @@ func TestProtocolState_AtBlockID(t *testing.T) {
 		dynamicProtocolState, err := protocolState.AtBlockID(blockID)
 		require.NoError(t, err)
 
-		assert.Equal(t, entry.Identities, dynamicProtocolState.Identities())
+		assert.Equal(t, entry.CurrentEpochIdentityTable, dynamicProtocolState.Identities())
 
 		other, err := protocolState.AtBlockID(otherBlockID)
 		require.NoError(t, err)
