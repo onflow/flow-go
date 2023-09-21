@@ -23,6 +23,7 @@ type ReadRegisterDataCommand struct {
 	indexer *indexer.ExecutionState
 }
 
+// Handler returns hex encoded data.
 func (r *ReadRegisterDataCommand) Handler(ctx context.Context, req *admin.CommandRequest) (interface{}, error) {
 	data := req.ValidatorData.(*registerRequest)
 
