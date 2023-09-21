@@ -577,8 +577,6 @@ func TestExecutionEvictingCacheClients(t *testing.T) {
 	connectionFactory.CollectionNodeGRPCTimeout = 5 * time.Second
 	// Set the connection pool cache size
 	cacheSize := 1
-	cache, err := lru.New[string, *CachedClient](cacheSize)
-	require.NoError(t, err)
 
 	connectionCache := NewCache(getCache(t, cacheSize), cacheSize)
 	// set metrics reporting
@@ -599,7 +597,7 @@ func TestExecutionEvictingCacheClients(t *testing.T) {
 	ctx := context.Background()
 
 	// Retrieve the cached client from the cache
-	cachedClient, ok := cache.Get(clientAddress)
+	cachedClient, ok := connectionCache.Get(clientAddress)
 	require.True(t, ok)
 	// Schedule the invalidation of the access API client after a delay
 	time.AfterFunc(250*time.Millisecond, func() {
@@ -626,7 +624,7 @@ func TestExecutionEvictingCacheClients(t *testing.T) {
 	changed := cachedClient.ClientConn.WaitForStateChange(ctx, connectivity.Ready)
 	assert.True(t, changed)
 	assert.Equal(t, connectivity.Shutdown, cachedClient.ClientConn.GetState())
-	assert.Equal(t, 0, cache.Len())
+	assert.Equal(t, 0, connectionCache.Len())
 }
 
 // TestCircuitBreakerExecutionNode tests the circuit breaker state changes for execution nodes.
