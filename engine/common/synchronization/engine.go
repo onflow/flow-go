@@ -4,7 +4,6 @@ package synchronization
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"time"
 
@@ -520,13 +519,13 @@ func (e *Engine) sendRequests(participants flow.IdentifierList, ranges []chainsy
 // c) an error is encountered.
 func (e *Engine) validateBatchRequestForALSP(originID flow.Identifier, batchRequest *messages.BatchRequest) (*alsp.MisbehaviorReport, bool, error) {
 	// Generate a random integer between 1 and spamProbabilityMultiplier (exclusive)
-	_, err := rand.Uint32n(spamProbabilityMultiplier)
+	n, err := rand.Uint32n(spamProbabilityMultiplier)
 
 	if err != nil {
 		return nil, false, fmt.Errorf("failed to generate random number from %x: %w", originID[:], err)
 	}
 
-	// validity check #1: if no block IDs
+	// validity check: if no block IDs, always report as misbehavior
 	if len(batchRequest.BlockIDs) == 0 {
 		e.log.Warn().
 			Hex("origin_id", logging.ID(originID)).
@@ -544,28 +543,36 @@ func (e *Engine) validateBatchRequestForALSP(originID flow.Identifier, batchRequ
 		return report, false, nil
 	}
 
-	// validity check #2: if any block ID is unknown
-	for _, blockID := range batchRequest.BlockIDs {
-		_, err := e.requestHandler.blocks.ByID(blockID)
-		if errors.Is(err, storage.ErrNotFound) {
-			//logger.Debug().Hex("block_id", blockID[:]).Msg("skipping unknown block")
-			//continue
+	// to avoid creating a misbehavior report for every batch request received, use a probabilistic approach.
+	// The larger the batch request and base probability, the higher the probability of creating a misbehavior report.
 
-			e.log.Warn().
-				Hex("origin_id", logging.ID(originID)).
-				Str(logging.KeySuspicious, "true").
-				Str("reason", alsp.InvalidMessage.String()).
-				Msgf("received invalid batch request with block ID %x that does not exist, creating ALSP report", blockID[:])
-			report, err := alsp.NewMisbehaviorReport(originID, alsp.InvalidMessage)
+	// batchRequestProb is calculated as follows:
+	// batchRequestBaseProb * (len(batchRequest.BlockIDs) + 1) / synccore.DefaultConfig().MaxSize
+	// Example 1 (small batch of block IDs) if the batch request is for 10 blocks IDs and batchRequestBaseProb is 0.01, then the probability of
+	// creating a misbehavior report is:
+	// batchRequestBaseProb * (10+1) / synccore.DefaultConfig().MaxSize
+	// = 0.01 * 11 / 64 = 0.00171875 = 0.171875%
+	// Example 2 (large batch of block IDs) if the batch request is for 1000 block IDs and batchRequestBaseProb is 0.01, then the probability of
+	// creating a misbehavior report is:
+	// batchRequestBaseProb * (1000+1) / synccore.DefaultConfig().MaxSize
+	// = 0.01 * 1001 / 64 = 0.15640625 = 15.640625%
+	batchRequestProb := e.spamDetectionConfig.batchRequestBaseProb * (float32(len(batchRequest.BlockIDs)) + 1) / float32(synccore.DefaultConfig().MaxSize)
+	if float32(n) < batchRequestProb*spamProbabilityMultiplier {
+		// create a misbehavior report
+		e.log.Warn().
+			Hex("origin_id", logging.ID(originID)).
+			Str(logging.KeySuspicious, "true").
+			Str("reason", alsp.ResourceIntensiveRequest.String()).
+			Msgf("for %d block IDs, creating probabilistic ALSP report", len(batchRequest.BlockIDs))
+		report, err := alsp.NewMisbehaviorReport(originID, alsp.ResourceIntensiveRequest)
 
-			if err != nil {
-				// failing to create the misbehavior report is unlikely. If an error is encountered while
-				// creating the misbehavior report it indicates a bug and processing can not proceed.
-				return nil, false, fmt.Errorf("failed to create misbehavior report (invalid batch request, unknown block ID) from %x: %w", originID[:], err)
-			}
-			return report, false, nil
+		if err != nil {
+			// failing to create the misbehavior report is unlikely. If an error is encountered while
+			// creating the misbehavior report it indicates a bug and processing can not proceed.
+			return nil, false, fmt.Errorf("failed to create misbehavior report from %x: %w", originID[:], err)
 		}
-
+		// failed validation check and should be reported as misbehavior
+		return report, false, nil
 	}
 
 	return nil, true, nil
