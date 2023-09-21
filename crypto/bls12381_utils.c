@@ -1,6 +1,6 @@
 // this file contains utility functions for the curve BLS 12-381
 // these tools are shared by the BLS signature scheme, the BLS based threshold
-// signature and the BLS distributed key generation protocols
+// signature, BLS-SPoCK and the BLS distributed key generation protocols
 
 #include "bls12381_utils.h"
 #include "assert.h"
@@ -18,7 +18,7 @@ void types_sanity(void) {
   assert(sizeof(E2) == sizeof(POINTonE2));
   assert(sizeof(vec384fp12) == sizeof(Fp12));
 }
-  
+
 // ------------------- Fr utilities
 
 // Montgomery constant R related to the curve order r
@@ -78,8 +78,8 @@ void Fr_squ_montg(Fr *res, const Fr *a) {
 
 // res = a*R
 void Fr_to_montg(Fr *res, const Fr *a) {
-  mul_mont_sparse_256((limb_t *)res, (limb_t *)a, 
-  BLS12_381_rRR, BLS12_381_r, r0);
+  mul_mont_sparse_256((limb_t *)res, (limb_t *)a, BLS12_381_rRR, BLS12_381_r,
+                      r0);
 }
 
 // res = a*R^(-1)
@@ -273,8 +273,8 @@ static bool Fp_check(const Fp *a) {
   Fp temp;
   Fp_add(&temp, a, &ZERO_384);
   return vec_is_equal(&temp, a, Fp_BYTES);
-  // no need to clear `tmp` as no current use-case involves sensitive data being passed
-  // as `a`
+  // no need to clear `tmp` as no current use-case involves sensitive data being
+  // passed as `a`
 }
 
 // res = a*b*R^(-1)
@@ -606,7 +606,7 @@ void E1_sum_vector(E1 *sum, const E1 *y, const int len) {
 
 // Computes the sum of input E1 elements flattened in a single byte
 // array `in_bytes` of `in_len` bytes. and writes the sum (E1 element) as
-// bytes in `out`. 
+// bytes in `out`.
 // The function does not check membership of E1 inputs in G1
 // subgroup. The header is using byte pointers to minimize Cgo calls from the Go
 // layer.
@@ -948,7 +948,7 @@ void G2_mult_gen(E2 *res, const Fr *expo) {
 
 // Exponentiation of generator g2 of G2, res = expo.g2.
 //
-// Result is converted to affine. This is useful for results being used multiple 
+// Result is converted to affine. This is useful for results being used multiple
 // times in pairings. Conversion to affine saves later pre-pairing conversions.
 void G2_mult_gen_to_affine(E2 *res, const Fr *expo) {
   G2_mult_gen(res, expo);
@@ -973,7 +973,7 @@ void E2_sum_vector(E2 *sum, const E2 *y, const int y_len) {
 // computes the sum of the E2 array elements `y[i]`, converts it
 // to affine coordinates, and writes it in `sum`.
 //
-// Result is converted to affine. This is useful for results being used multiple 
+// Result is converted to affine. This is useful for results being used multiple
 // times in pairings. Conversion to affine saves later pre-pairing conversions.
 void E2_sum_vector_to_affine(E2 *sum, const E2 *y, const int y_len) {
   E2_sum_vector(sum, y, y_len);

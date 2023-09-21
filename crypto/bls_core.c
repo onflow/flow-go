@@ -13,7 +13,7 @@ static void bls_sign_E1(byte *out, const Fr *sk, const E1 *h) {
 
 // Computes a BLS signature from a hash and writes it in `out`.
 // `hash` represents the hashed message with length `hash_len` equal to
-// `MAP_TO_G1_INPUT_LEN`. 
+// `MAP_TO_G1_INPUT_LEN`.
 // `out` must be allocated properly with `G1_SER_BYTES` bytes.
 int bls_sign(byte *out, const Fr *sk, const byte *hash, const int hash_len) {
   // hash to G1
@@ -31,7 +31,7 @@ extern const E2 *BLS12_381_minus_g2;
 // Verifies a BLS signature (G1 point) against a public key (G2 point)
 // and a message hash `h` (G1 point).
 // Hash, signature and public key are assumed to be in G1, G1 and G2
-// respectively. 
+// respectively.
 // This function only checks the pairing equality.
 static int bls_verify_E1(const E2 *pk, const E1 *s, const E1 *h) {
   E1 elemsG1[2];
@@ -69,9 +69,8 @@ static int bls_verify_E1(const E2 *pk, const E1 *s, const E1 *h) {
 // membership check of pks in G2 is not verified in this function
 // the membership check is separated to allow optimizing multiple verifications
 // using the same pks
-int bls_verifyPerDistinctMessage(const byte *sig, 
-                                 const int nb_hashes, const byte *hashes, 
-                                 const uint32_t *len_hashes,
+int bls_verifyPerDistinctMessage(const byte *sig, const int nb_hashes,
+                                 const byte *hashes, const uint32_t *len_hashes,
                                  const uint32_t *pks_per_hash, const E2 *pks) {
 
   int ret = UNDEFINED; // return value
@@ -148,8 +147,8 @@ outG1:
 // the membership check is separated to allow optimizing multiple verifications
 // using the same pks
 int bls_verifyPerDistinctKey(const byte *sig, const int nb_pks, const E2 *pks,
-                             const uint32_t *hashes_per_pk, 
-                             const byte *hashes, const uint32_t *len_hashes) {
+                             const uint32_t *hashes_per_pk, const byte *hashes,
+                             const uint32_t *len_hashes) {
 
   int ret = UNDEFINED; // return value
 
@@ -464,8 +463,8 @@ out_sigs:
 // Membership check in G2 of both keys is not verified in this function.
 // the membership check in G2 is separated to allow optimizing multiple
 // verifications using the same public keys.
-int bls_spock_verify(const E2 *pk1, const byte *sig1, 
-                      const E2 *pk2, const byte *sig2) {
+int bls_spock_verify(const E2 *pk1, const byte *sig1, const E2 *pk2,
+                     const byte *sig2) {
   E1 elemsG1[2];
   E2 elemsG2[2];
 

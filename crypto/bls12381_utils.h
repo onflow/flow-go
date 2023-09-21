@@ -1,6 +1,6 @@
 // this file contains utility functions for the curve BLS 12-381
 // these tools are shared by the BLS signature scheme, the BLS based threshold
-// signature and the BLS distributed key generation protocols
+// signature, BLS-SPoCK and the BLS distributed key generation protocols
 
 #ifndef _BLS12_381_UTILS_H
 #define _BLS12_381_UTILS_H
@@ -101,8 +101,7 @@ void unsafe_map_bytes_to_G1(E1 *, const byte *, int);
 void unsafe_map_bytes_to_G1complement(E1 *, const byte *, int);
 
 #define MAP_TO_G1_INPUT_LEN (2 * (Fp_BYTES + SEC_BITS / 8))
-int map_to_G1(E1 *, const byte *,
-              const int); // functions in bls12381_hashtocurve.c
+int map_to_G1(E1 *, const byte *, const int);
 
 // E2 and G2 utilities
 void E2_set_infty(E2 *p);

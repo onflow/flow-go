@@ -13,7 +13,7 @@ void Fr_polynomial_image_write(byte *out, E2 *y, const Fr *a, const int degree,
 
 // computes P(x) = a_0 + a_1 * x + .. + a_n * x^n  where P is in Fr[X].
 // a_i are all in Fr, `degree` is P's degree, x is a small integer less than
-// `MAX_IND` (currently 255). 
+// `MAX_IND` (currently 255).
 // The function writes P(x) in `image` and P(x).g2 in `y` if `y` is non NULL.
 void Fr_polynomial_image(Fr *image, E2 *y, const Fr *a, const int degree,
                          const byte x) {
@@ -47,7 +47,7 @@ static void E2_polynomial_image(E2 *y, const E2 *A, const int degree,
 }
 
 // computes y[i] = Q(i+1) for all participants i ( 0 <= i < len_y)
-// where Q(x) = A_0 + A_1*x + ... +  A_n*x^n 
+// where Q(x) = A_0 + A_1*x + ... +  A_n*x^n
 //  - A_i being G2 points
 //  - x being a small scalar (less than `MAX_IND`)
 void E2_polynomial_images(E2 *y, const int len_y, const E2 *A,
@@ -58,10 +58,10 @@ void E2_polynomial_images(E2 *y, const int len_y, const E2 *A,
   }
 }
 
-// export an array of G2 into an array of bytes by concatenating
-// all serializations of G2 points in order.
+// export an array of E2 into an array of bytes by concatenating
+// all serializations of E2 points in order.
 // the array must be of length (A_len * G2_SER_BYTES).
-void G2_vector_write_bytes(byte *out, const E2 *A, const int A_len) {
+void E2_vector_write_bytes(byte *out, const E2 *A, const int A_len) {
   byte *p = out;
   for (int i = 0; i < A_len; i++) {
     E2_write_bytes(p, &A[i]);
@@ -69,8 +69,8 @@ void G2_vector_write_bytes(byte *out, const E2 *A, const int A_len) {
   }
 }
 
-// The function imports an array of `A_len` E2 points from a concatenated array of
-// bytes. The bytes array is supposed to be of size (A_len * G2_SER_BYTES).
+// The function imports an array of `A_len` E2 points from a concatenated array
+// of bytes. The bytes array is supposed to be of size (A_len * G2_SER_BYTES).
 //
 // If return is `VALID`, output vector is guaranteed to be in G2.
 // It returns other errors if at least one input isn't a serialization of a E2

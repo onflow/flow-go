@@ -14,7 +14,7 @@
 // F_r elements are represented as big numbers reduced modulo `r`. Big numbers
 // are represented as a little endian vector of limbs.
 // `Fr` is equivalent to type `vec256` (used internally by BLST for F_r
-// elements). `Fr` is defined as a struct so that it can be exportable through 
+// elements). `Fr` is defined as a struct so that it can be exportable through
 // cgo to the Go layer.
 #define R_BITS 255 // equal to Fr_bits in bls12381_utils.h
 typedef struct {
