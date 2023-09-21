@@ -1514,7 +1514,6 @@ func newIngestionEngine(t *testing.T, ps *mocks.ProtocolState, es *mockExecution
 		net,
 		me,
 		fetcher,
-		ps,
 		headers,
 		blocks,
 		collections,
