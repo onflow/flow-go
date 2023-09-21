@@ -226,6 +226,7 @@ func TestConcurrent_Adjust_And_Get_Is_Safe(t *testing.T) {
 	require.Equal(t, uint(sizeLimit), cache.Size(), "cache size must be equal to the size limit")
 }
 
+// TestDialConfigCache_LRU_Eviction tests that the cache evicts the least recently used dial config when the cache size reaches the size limit.
 func TestDialConfigCache_LRU_Eviction(t *testing.T) {
 	sizeLimit := uint32(100)
 	logger := zerolog.Nop()
@@ -257,6 +258,7 @@ func TestDialConfigCache_LRU_Eviction(t *testing.T) {
 		require.Equal(t, dialTime, updatedConfig.LastSuccessfulDial)
 	}
 
+	// except the first peer id, all other peer ids should stay intact in the cache.
 	for i := 1; i < int(sizeLimit+1); i++ {
 		cfg, err := cache.GetOrInit(peerIds[i])
 		require.NoError(t, err)
@@ -265,4 +267,16 @@ func TestDialConfigCache_LRU_Eviction(t *testing.T) {
 		require.Equal(t, uint64(3), cfg.ConsecutiveSuccessfulStream)
 		require.False(t, cfg.LastSuccessfulDial.IsZero())
 	}
+
+	require.Equal(t, uint(sizeLimit), cache.Size(), "cache size must be equal to the size limit")
+
+	// querying the first peer id should return a fresh dial config, since it should be evicted due to LRU eviction, and the initiated with the default values.
+	cfg, err := cache.GetOrInit(peerIds[0])
+	require.NoError(t, err)
+	require.Equal(t, dialConfigFixture().DialRetryAttemptBudget, cfg.DialRetryAttemptBudget)
+	require.Equal(t, dialConfigFixture().StreamCreationRetryAttemptBudget, cfg.StreamCreationRetryAttemptBudget)
+	require.Equal(t, uint64(0), cfg.ConsecutiveSuccessfulStream)
+	require.True(t, cfg.LastSuccessfulDial.IsZero())
+
+	require.Equal(t, uint(sizeLimit), cache.Size(), "cache size must be equal to the size limit")
 }
