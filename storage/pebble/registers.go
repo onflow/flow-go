@@ -20,6 +20,8 @@ type Registers struct {
 	latestHeight atomic.Uint64
 }
 
+var _ storage.RegisterIndex = (*Registers)(nil)
+
 // NewRegisters takes a populated pebble instance with LatestHeight and FirstHeight set.
 // Will fail if they those two keys are unavailable as it implies a corrupted or uninitialized state
 func NewRegisters(db *pebble.DB) (*Registers, error) {
@@ -53,9 +55,9 @@ func NewRegisters(db *pebble.DB) (*Registers, error) {
 // - storage.ErrNotFound if no register values are found
 // - storage.ErrHeightNotIndexed if the requested height is out of the range of stored heights
 func (s *Registers) Get(
-	height uint64,
 	reg flow.RegisterID,
-) ([]byte, error) {
+	height uint64,
+) (flow.RegisterValue, error) {
 	latestHeight := s.latestHeight.Load()
 	if height > latestHeight || height < s.firstHeight {
 		return nil, errors.Wrap(
@@ -94,8 +96,8 @@ func (s *Registers) Get(
 // it should be called wth the value of height set to LatestHeight + 1
 // ** DO NOT CALL THIS FUNCTION CONCURRENTLY WITH OTHER CALLS TO Store **
 func (s *Registers) Store(
-	height uint64,
 	entries flow.RegisterEntries,
+	height uint64,
 ) error {
 	latestHeight := s.latestHeight.Load()
 	// This check is for a special case for the execution node.
