@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"regexp"
 	"sync"
 	"time"
 
@@ -19,7 +18,6 @@ import (
 	"github.com/onflow/flow-go/engine/execution/provider"
 	"github.com/onflow/flow-go/engine/execution/state"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/executiondatasync/pruner"
 	"github.com/onflow/flow-go/module/mempool/entity"
@@ -41,7 +39,7 @@ type Engine struct {
 	unit                   *engine.Unit
 	log                    zerolog.Logger
 	me                     module.Local
-	request                module.Requester // used to request collections
+	collectionFetcher      CollectionFetcher
 	state                  protocol.State
 	headers                storage.Headers // see comments on getHeaderByHeight for why we need it
 	blocks                 storage.Blocks
@@ -58,22 +56,15 @@ type Engine struct {
 	executionDataPruner    *pruner.Pruner
 	uploader               *uploader.Manager
 	stopControl            *stop.StopControl
-
-	// This is included to temporarily work around an issue observed on a small number of ENs.
-	// It works around an issue where some collection nodes are not configured with enough
-	// this works around an issue where some collection nodes are not configured with enough
-	// file descriptors causing connection failures.
-	onflowOnlyLNs bool
+	loader                 BlockLoader
 }
-
-var onlyOnflowRegex = regexp.MustCompile(`.*\.onflow\.org:3569$`)
 
 func New(
 	unit *engine.Unit,
 	logger zerolog.Logger,
 	net network.EngineRegistry,
 	me module.Local,
-	request module.Requester,
+	collectionFetcher CollectionFetcher,
 	state protocol.State,
 	headers storage.Headers,
 	blocks storage.Blocks,
@@ -88,7 +79,7 @@ func New(
 	pruner *pruner.Pruner,
 	uploader *uploader.Manager,
 	stopControl *stop.StopControl,
-	onflowOnlyLNs bool,
+	loader BlockLoader,
 ) (*Engine, error) {
 	log := logger.With().Str("engine", "ingestion").Logger()
 
@@ -98,7 +89,7 @@ func New(
 		unit:                   unit,
 		log:                    log,
 		me:                     me,
-		request:                request,
+		collectionFetcher:      collectionFetcher,
 		state:                  state,
 		headers:                headers,
 		blocks:                 blocks,
@@ -115,7 +106,7 @@ func New(
 		executionDataPruner:    pruner,
 		uploader:               uploader,
 		stopControl:            stopControl,
-		onflowOnlyLNs:          onflowOnlyLNs,
+		loader:                 loader,
 	}
 
 	return &eng, nil
@@ -191,126 +182,13 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 	return nil
 }
 
-func (e *Engine) finalizedUnexecutedBlocks(finalized protocol.Snapshot) (
-	[]flow.Identifier,
-	error,
-) {
-	// get finalized height
-	final, err := finalized.Head()
-	if err != nil {
-		return nil, fmt.Errorf("could not get finalized block: %w", err)
-	}
-
-	// find the first unexecuted and finalized block
-	// We iterate from the last finalized, check if it has been executed,
-	// if not, keep going to the lower height, until we find an executed
-	// block, and then the next height is the first unexecuted.
-	// If there is only one finalized, and it's executed (i.e. root block),
-	// then the firstUnexecuted is a unfinalized block, which is ok,
-	// because the next loop will ensure it only iterates through finalized
-	// blocks.
-	lastExecuted := final.Height
-
-	// dynamically bootstrapped execution node will reload blocks from
-	// [sealedRoot.Height + 1, finalizedRoot.Height] and execute them on startup.
-	rootBlock, err := e.state.Params().SealedRoot()
-	if err != nil {
-		return nil, fmt.Errorf("failed to retrieve root block: %w", err)
-	}
-
-	for ; lastExecuted > rootBlock.Height; lastExecuted-- {
-		header, err := e.getHeaderByHeight(lastExecuted)
-		if err != nil {
-			return nil, fmt.Errorf("could not get header at height: %v, %w", lastExecuted, err)
-		}
-
-		executed, err := state.IsBlockExecuted(e.unit.Ctx(), e.execState, header.ID())
-		if err != nil {
-			return nil, fmt.Errorf("could not check whether block is executed: %w", err)
-		}
-
-		if executed {
-			break
-		}
-	}
-
-	firstUnexecuted := lastExecuted + 1
-
-	unexecuted := make([]flow.Identifier, 0)
-
-	// starting from the first unexecuted block, go through each unexecuted and finalized block
-	// reload its block to execution queues
-	for height := firstUnexecuted; height <= final.Height; height++ {
-		header, err := e.getHeaderByHeight(height)
-		if err != nil {
-			return nil, fmt.Errorf("could not get header at height: %v, %w", height, err)
-		}
-
-		unexecuted = append(unexecuted, header.ID())
-	}
-
-	e.log.Info().
-		Uint64("last_finalized", final.Height).
-		Uint64("last_finalized_executed", lastExecuted).
-		Uint64("sealed_root_height", rootBlock.Height).
-		Hex("sealed_root_id", logging.Entity(rootBlock)).
-		Uint64("first_unexecuted", firstUnexecuted).
-		Int("total_finalized_unexecuted", len(unexecuted)).
-		Msgf("finalized unexecuted blocks")
-
-	return unexecuted, nil
-}
-
-func (e *Engine) pendingUnexecutedBlocks(finalized protocol.Snapshot) (
-	[]flow.Identifier,
-	error,
-) {
-	pendings, err := finalized.Descendants()
-	if err != nil {
-		return nil, fmt.Errorf("could not get pending blocks: %w", err)
-	}
-
-	unexecuted := make([]flow.Identifier, 0)
-
-	for _, pending := range pendings {
-		executed, err := state.IsBlockExecuted(e.unit.Ctx(), e.execState, pending)
-		if err != nil {
-			return nil, fmt.Errorf("could not check block executed or not: %w", err)
-		}
-
-		if !executed {
-			unexecuted = append(unexecuted, pending)
-		}
-	}
-
-	return unexecuted, nil
-}
-
-func (e *Engine) unexecutedBlocks() (
-	finalized []flow.Identifier,
-	pending []flow.Identifier,
-	err error,
-) {
-	// pin the snapshot so that finalizedUnexecutedBlocks and pendingUnexecutedBlocks are based
-	// on the same snapshot.
-	snapshot := e.state.Final()
-
-	finalized, err = e.finalizedUnexecutedBlocks(snapshot)
-	if err != nil {
-		return nil, nil, fmt.Errorf("could not read finalized unexecuted blocks")
-	}
-
-	pending, err = e.pendingUnexecutedBlocks(snapshot)
-	if err != nil {
-		return nil, nil, fmt.Errorf("could not read pending unexecuted blocks")
-	}
-
-	return finalized, pending, nil
-}
-
 // on nodes startup, we need to load all the unexecuted blocks to the execution queues.
 // blocks have to be loaded in the way that the parent has been loaded before loading its children
 func (e *Engine) reloadUnexecutedBlocks() error {
+	unexecuted, err := e.loader.LoadUnexecuted(e.unit.Ctx())
+	if err != nil {
+		return fmt.Errorf("could not load unexecuted blocks: %w", err)
+	}
 	// it's possible the BlockProcessable is called during the reloading, as the follower engine
 	// will receive blocks before ingestion engine is ready.
 	// The problem with that is, since the reloading hasn't finished yet, enqueuing the new block from
@@ -322,68 +200,6 @@ func (e *Engine) reloadUnexecutedBlocks() error {
 		blockByCollection *stdmap.BlockByCollectionBackdata,
 		executionQueues *stdmap.QueuesBackdata,
 	) error {
-
-		// saving an executed block is currently not transactional, so it's possible
-		// the block is marked as executed but the receipt might not be saved during a crash.
-		// in order to mitigate this problem, we always re-execute the last executed and finalized
-		// block.
-		// there is an exception, if the last executed block is a root block, then don't execute it,
-		// because the root has already been executed during bootstrapping phase. And re-executing
-		// a root block will fail, because the root block doesn't have a parent block, and could not
-		// get the result of it.
-		// TODO: remove this, when saving a executed block is transactional
-		lastExecutedHeight, lastExecutedID, err := e.execState.GetHighestExecutedBlockID(e.unit.Ctx())
-		if err != nil {
-			return fmt.Errorf("could not get last executed: %w", err)
-		}
-
-		last, err := e.headers.ByBlockID(lastExecutedID)
-		if err != nil {
-			return fmt.Errorf("could not get last executed final by ID: %w", err)
-		}
-
-		// don't reload root block
-		rootBlock, err := e.state.Params().SealedRoot()
-		if err != nil {
-			return fmt.Errorf("failed to retrieve root block: %w", err)
-		}
-
-		isRoot := rootBlock.ID() == last.ID()
-		if !isRoot {
-			executed, err := state.IsBlockExecuted(e.unit.Ctx(), e.execState, lastExecutedID)
-			if err != nil {
-				return fmt.Errorf("cannot check is last exeucted final block has been executed %v: %w", lastExecutedID, err)
-			}
-			if !executed {
-				// this should not happen, but if it does, execution should still work
-				e.log.Warn().
-					Hex("block_id", lastExecutedID[:]).
-					Msg("block marked as highest executed one, but not executable - internal inconsistency")
-
-				err = e.reloadBlock(blockByCollection, executionQueues, lastExecutedID)
-				if err != nil {
-					return fmt.Errorf("could not reload the last executed final block: %v, %w", lastExecutedID, err)
-				}
-			}
-		}
-
-		finalized, pending, err := e.unexecutedBlocks()
-		if err != nil {
-			return fmt.Errorf("could not reload unexecuted blocks: %w", err)
-		}
-
-		unexecuted := append(finalized, pending...)
-
-		log := e.log.With().
-			Int("total", len(unexecuted)).
-			Int("finalized", len(finalized)).
-			Int("pending", len(pending)).
-			Uint64("last_executed", lastExecutedHeight).
-			Hex("last_executed_id", lastExecutedID[:]).
-			Logger()
-
-		log.Info().Msg("reloading unexecuted blocks")
-
 		for _, blockID := range unexecuted {
 			err := e.reloadBlock(blockByCollection, executionQueues, blockID)
 			if err != nil {
@@ -601,6 +417,7 @@ func (e *Engine) executeBlock(
 	lg := e.log.With().
 		Hex("block_id", logging.Entity(executableBlock)).
 		Uint64("height", executableBlock.Block.Header.Height).
+		Int("collections", len(executableBlock.CompleteCollections)).
 		Logger()
 
 	lg.Info().Msg("executing block")
@@ -888,7 +705,7 @@ func (e *Engine) handleCollection(
 
 	lg := e.log.With().Hex("collection_id", collID[:]).Logger()
 
-	lg.Info().Hex("sender", originID[:]).Msg("handle collection")
+	lg.Info().Hex("sender", originID[:]).Int("len", collection.Len()).Msg("handle collection")
 	defer func(startTime time.Time) {
 		lg.Info().TimeDiff("duration", time.Now(), startTime).Msg("collection handled")
 	}(time.Now())
@@ -1177,7 +994,7 @@ func (e *Engine) fetchAndHandleCollection(
 			return fmt.Errorf("error while querying for collection: %w", err)
 		}
 
-		err = e.fetchCollection(blockID, height, guarantee)
+		err = e.collectionFetcher.FetchCollection(blockID, height, guarantee)
 		if err != nil {
 			return fmt.Errorf("could not fetch collection: %w", err)
 		}
@@ -1186,70 +1003,11 @@ func (e *Engine) fetchAndHandleCollection(
 
 	// make sure that the requests are dispatched immediately by the requester
 	if fetched {
-		e.request.Force()
+		e.collectionFetcher.Force()
 		e.metrics.ExecutionCollectionRequestSent()
 	}
 
 	return nil
-}
-
-// fetchCollection takes a guarantee and forwards to requester engine for fetching the collection
-// any error returned are fatal error
-func (e *Engine) fetchCollection(
-	blockID flow.Identifier,
-	height uint64,
-	guarantee *flow.CollectionGuarantee,
-) error {
-	e.log.Debug().
-		Hex("block", blockID[:]).
-		Hex("collection_id", logging.ID(guarantee.ID())).
-		Msg("requesting collection")
-
-	guarantors, err := protocol.FindGuarantors(e.state, guarantee)
-	if err != nil {
-		// execution node executes certified blocks, which means there is a quorum of consensus nodes who
-		// have validated the block payload. And that validation includes checking the guarantors are correct.
-		// Based on that assumption, failing to find guarantors for guarantees contained in an incorporated block
-		// should be treated as fatal error
-		e.log.Fatal().Err(err).Msgf("failed to find guarantors for guarantee %v at block %v, height %v",
-			guarantee.ID(),
-			blockID,
-			height,
-		)
-		return fmt.Errorf("could not find guarantors: %w", err)
-	}
-
-	filters := []flow.IdentityFilter{
-		filter.HasNodeID(guarantors...),
-	}
-
-	// This is included to temporarily work around an issue observed on a small number of ENs.
-	// It works around an issue where some collection nodes are not configured with enough
-	// file descriptors causing connection failures. This will be removed once a
-	// proper fix is in place.
-	if e.onflowOnlyLNs {
-		// func(Identity("verification-049.mainnet20.nodes.onflow.org:3569")) => true
-		// func(Identity("verification-049.hello.org:3569")) => false
-		filters = append(filters, func(identity *flow.Identity) bool {
-			return onlyOnflowRegex.MatchString(identity.Address)
-		})
-	}
-
-	// queue the collection to be requested from one of the guarantors
-	e.request.EntityByID(guarantee.ID(), filter.And(
-		filters...,
-	))
-
-	return nil
-}
-
-// if the EN is dynamically bootstrapped, the finalized blocks at height range:
-// [ sealedRoot.Height, finalizedRoot.Height - 1] can not be retrieved from
-// protocol state, but only from headers
-func (e *Engine) getHeaderByHeight(height uint64) (*flow.Header, error) {
-	// we don't use protocol state because for dynamic boostrapped execution node
-	// the last executed and sealed block is below the finalized root block
-	return e.headers.ByHeight(height)
 }
 
 func logQueueState(log zerolog.Logger, queues *stdmap.QueuesBackdata, blockID flow.Identifier) {
