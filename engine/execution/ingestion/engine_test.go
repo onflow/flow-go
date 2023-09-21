@@ -268,7 +268,7 @@ func (ctx *testingContext) assertSuccessfulBlockComputation(
 	expectBroadcast bool,
 	newStateCommitment flow.StateCommitment,
 	computationResult *execution.ComputationResult,
-) *protocol.Snapshot {
+) *execution.ComputationResult {
 	if computationResult == nil {
 		computationResult = executionUnittest.ComputationResultForBlockFixture(
 			ctx.t,
@@ -336,7 +336,7 @@ func (ctx *testingContext) assertSuccessfulBlockComputation(
 		}).
 		Return(expectBroadcast, nil)
 
-	return nil
+	return computationResult
 }
 
 func (ctx testingContext) mockSnapshotWithBlockID(blockID flow.Identifier, identities flow.IdentityList) {
@@ -378,7 +378,8 @@ func (ctx *testingContext) mockStateCommitsWithMap(commits map[flow.Identifier]f
 	}
 }
 
-// TestExecuteOneBlock block is executed after receiving collection
+// TestExecuteOneBlock verifies after collection is received,
+// block is executed, uploaded, and broadcasted
 func TestExecuteOneBlock(t *testing.T) {
 	runWithEngine(t, func(ctx testingContext) {
 		col := unittest.CollectionFixture(1)
@@ -403,7 +404,7 @@ func TestExecuteOneBlock(t *testing.T) {
 		wg := sync.WaitGroup{}
 		wg.Add(1) // wait for block B to be executed
 
-		_ = ctx.assertSuccessfulBlockComputation(
+		result := ctx.assertSuccessfulBlockComputation(
 			commits,
 			func(blockID flow.Identifier, commit flow.StateCommitment) {
 				wg.Done()
@@ -413,6 +414,11 @@ func TestExecuteOneBlock(t *testing.T) {
 			true,
 			*blockB.StartState,
 			nil)
+
+		// configure upload manager with a single uploader
+		uploader1 := uploadermock.NewUploader(ctx.t)
+		uploader1.On("Upload", result).Return(nil).Once()
+		ctx.uploadMgr.AddUploader(uploader1)
 
 		err = ctx.engine.handleCollection(
 			unittest.IdentifierFixture(),
@@ -809,21 +815,6 @@ func TestExecutionGenerationResultsAreChained(t *testing.T) {
 	execState.AssertExpectations(t)
 }
 
-// func TestShouldTriggerStateSync(t *testing.T) {
-// 	require.True(t, shouldTriggerStateSync(1, 2, 2))
-// 	require.False(t, shouldTriggerStateSync(1, 1, 2))
-// 	require.True(t, shouldTriggerStateSync(1, 3, 2))
-// 	require.True(t, shouldTriggerStateSync(1, 4, 2))
-//
-// 	// there are only 9 sealed and unexecuted blocks between height 20 and 28,
-// 	// haven't reach the threshold 10 yet, so should not trigger
-// 	require.False(t, shouldTriggerStateSync(20, 28, 10))
-//
-// 	// there are 10 sealed and unexecuted blocks between height 20 and 29,
-// 	// reached the threshold 10, so should trigger
-// 	require.True(t, shouldTriggerStateSync(20, 29, 10))
-// }
-
 // func newIngestionEngine(t *testing.T, ps *mocks.ProtocolState, es *mockExecutionState) (*Engine, *storage.MockHeaders) {
 // 	log := unittest.Logger()
 // 	metrics := metrics.NewNoopCollector()
@@ -888,58 +879,6 @@ func TestExecutionGenerationResultsAreChained(t *testing.T) {
 // 	require.NoError(t, err)
 // 	return engine, headers
 // }
-
-// TestExecutedBlockIsUploaded tests that the engine uploads the execution result
-func TestExecutedBlockIsUploaded(t *testing.T) {
-	runWithEngine(t, func(ctx testingContext) {
-
-		// A <- B
-		blockA := unittest.BlockHeaderFixture()
-		blockB := unittest.ExecutableBlockFixtureWithParent(nil, blockA, unittest.StateCommitmentPointerFixture())
-
-		parentBlockExecutionResultID := unittest.IdentifierFixture()
-		computationResultB := executionUnittest.ComputationResultForBlockFixture(
-			t,
-			parentBlockExecutionResultID,
-			blockB)
-
-		// configure upload manager with a single uploader
-		uploader1 := uploadermock.NewUploader(ctx.t)
-		uploader1.On("Upload", computationResultB).Return(nil).Once()
-		ctx.uploadMgr.AddUploader(uploader1)
-
-		// blockA's start state is its parent's state commitment,
-		// and blockA's parent has been executed.
-		commits := make(map[flow.Identifier]flow.StateCommitment)
-		commits[blockB.Block.Header.ParentID] = *blockB.StartState
-		wg := sync.WaitGroup{}
-		ctx.mockStateCommitsWithMap(commits)
-
-		ctx.assertSuccessfulBlockComputation(
-			commits,
-			func(blockID flow.Identifier, commit flow.StateCommitment) {
-				wg.Done()
-			},
-			blockB,
-			parentBlockExecutionResultID,
-			true,
-			*blockB.StartState,
-			computationResultB)
-
-		wg.Add(1) // wait for block B to be executed
-		err := ctx.engine.handleBlock(context.Background(), blockB.Block)
-		require.NoError(t, err)
-
-		unittest.AssertReturnsBefore(t, wg.Wait, 10*time.Second)
-
-		_, more := <-ctx.engine.Done() // wait for all the blocks to be processed
-		require.False(t, more)
-
-		_, ok := commits[blockB.ID()]
-		require.True(t, ok)
-
-	})
-}
 
 // TestExecutedBlockUploadedFailureDoesntBlock tests that block processing continues even the
 // uploader fails with an error
