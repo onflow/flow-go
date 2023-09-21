@@ -416,7 +416,7 @@ func (s *blsThresholdSignatureInspector) reconstructThresholdSignature() (Signat
 	result := C.E1_lagrange_interpolate_at_zero_write(
 		(*C.uchar)(&thresholdSignature[0]),
 		(*C.uchar)(&shares[0]),
-		(*C.uint8_t)(&signers[0]), (C.int)(s.threshold+1))
+		(*C.uint8_t)(&signers[0]), (C.int)(s.threshold))
 
 	if result != valid {
 		return nil, invalidSignatureError
@@ -508,7 +508,7 @@ func BLSReconstructThresholdSignature(size int, threshold int,
 	if C.E1_lagrange_interpolate_at_zero_write(
 		(*C.uchar)(&thresholdSignature[0]),
 		(*C.uchar)(&flatShares[0]),
-		(*C.uint8_t)(&indexSigners[0]), (C.int)(threshold+1),
+		(*C.uint8_t)(&indexSigners[0]), (C.int)(threshold),
 	) != valid {
 		return nil, invalidSignatureError
 	}

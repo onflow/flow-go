@@ -2,12 +2,10 @@
 
 // this file is about the core functions required by the BLS signature scheme
 
-// The functions are tested for ALLOC=AUTO (not for ALLOC=DYNAMIC)
-
-// Computes a BLS signature from a G1 point and writes it in `out`.
+// Compute a BLS signature from a G1 point (not checked) and writes it in `out`.
 // `out` must be allocated properly with `G1_SER_BYTES` bytes.
 static void bls_sign_E1(byte *out, const Fr *sk, const E1 *h) {
-  // s = h^s
+  // s = h^sk
   E1 s;
   E1_mult(&s, h, sk);
   E1_write_bytes(out, &s);
@@ -15,8 +13,8 @@ static void bls_sign_E1(byte *out, const Fr *sk, const E1 *h) {
 
 // Computes a BLS signature from a hash and writes it in `out`.
 // `hash` represents the hashed message with length `hash_len` equal to
-// `MAP_TO_G1_INPUT_LEN`. `out` must be allocated properly with `G1_SER_BYTES`
-// bytes.
+// `MAP_TO_G1_INPUT_LEN`.
+// `out` must be allocated properly with `G1_SER_BYTES` bytes.
 int bls_sign(byte *out, const Fr *sk, const byte *hash, const int hash_len) {
   // hash to G1
   E1 h;
@@ -33,7 +31,8 @@ extern const E2 *BLS12_381_minus_g2;
 // Verifies a BLS signature (G1 point) against a public key (G2 point)
 // and a message hash `h` (G1 point).
 // Hash, signature and public key are assumed to be in G1, G1 and G2
-// respectively. This function only checks the pairing equality.
+// respectively.
+// This function only checks the pairing equality.
 static int bls_verify_E1(const E2 *pk, const E1 *s, const E1 *h) {
   E1 elemsG1[2];
   E2 elemsG2[2];
