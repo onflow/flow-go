@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"sync"
 	"time"
 
 	"github.com/rs/zerolog"
@@ -32,6 +33,8 @@ type AtreeRegisterMigrator struct {
 	sampler zerolog.Sampler
 	rw      reporters.ReportWriter
 	rwf     reporters.ReportWriterFactory
+
+	metrics *metrics
 }
 
 var _ AccountBasedMigration = (*AtreeRegisterMigrator)(nil)
@@ -48,6 +51,8 @@ func NewAtreeRegisterMigrator(
 
 		rwf: rwf,
 		rw:  rwf.ReportWriter("atree-register-migrator"),
+
+		metrics: &metrics{},
 	}
 
 	return migrator
@@ -55,6 +60,13 @@ func NewAtreeRegisterMigrator(
 
 func (m *AtreeRegisterMigrator) Close() error {
 	m.rw.Close()
+	m.log.Info().
+		Str("average_non_zero_clone_time", m.metrics.AverageNonZeroCloneTime().String()).
+		Str("average_non_zero_save_time", m.metrics.AverageNonZeroSaveTime().String()).
+		Int("non_zero_time_clones", m.metrics.cloned).
+		Int("non_zero_time_saves", m.metrics.saved).
+		Msg("metrics")
+
 	return nil
 }
 
@@ -209,16 +221,23 @@ func (m *AtreeRegisterMigrator) convertStorageDomain(
 				return fmt.Errorf("failed to read value for key %s: %w", key, err)
 			}
 
-			value, err = m.cloneValue(mr, value)
-
+			m.metrics.trackCloneTime(
+				func() {
+					value, err = m.cloneValue(mr, value)
+				},
+			)
 			if err != nil {
 				return fmt.Errorf("failed to clone value for key %s: %w", key, err)
 			}
 
-			err = capturePanic(func() {
-				// set value will first purge the old value
-				storageMap.SetValue(mr.Interpreter, key, value)
-			})
+			m.metrics.trackSaveTime(
+				func() {
+					err = capturePanic(func() {
+						// set value will first purge the old value
+						storageMap.SetValue(mr.Interpreter, key, value)
+					})
+				},
+			)
 			if err != nil {
 				return fmt.Errorf("failed to set value for key %s: %w", key, err)
 			}
@@ -640,6 +659,8 @@ var knownProblematicAccounts = map[common.Address]string{
 	mustHexToAddress("ba53f16ede01972d"): "Broken contract FanTopPermission",
 	mustHexToAddress("c843c1f5a4805c3a"): "Broken contract FanTopPermission",
 	mustHexToAddress("48d3be92e6e4a973"): "Broken contract FanTopPermission",
+	// Mainnet account
+	mustHexToAddress("4eded0de73020ca5"): "Account to big to migrate",
 }
 
 var accountsToLog = map[common.Address]string{}
@@ -653,3 +674,56 @@ func mustHexToAddress(hex string) common.Address {
 }
 
 var skippableAccountError = errors.New("account can be skipped")
+
+type metrics struct {
+	timeToClone      time.Duration
+	clonedWithZeroMS int
+	cloned           int
+	timeToSave       time.Duration
+	savedWithZeroMS  int
+	saved            int
+
+	mu sync.Mutex
+}
+
+func (m *metrics) trackCloneTime(clone func()) {
+	start := time.Now()
+	clone()
+
+	time := time.Since(start)
+	if time == 0 {
+		// only count non-zero times
+		m.clonedWithZeroMS += 1
+		return
+	}
+	m.mu.Lock()
+	m.timeToClone += time
+	m.cloned += 1
+	m.mu.Unlock()
+}
+
+func (m *metrics) trackSaveTime(save func()) {
+	start := time.Now()
+	save()
+
+	time := time.Since(start)
+	if time == 0 {
+		// only count non-zero times
+		m.savedWithZeroMS += 1
+		return
+	}
+	m.mu.Lock()
+	m.timeToSave += time
+	m.saved += 1
+	m.mu.Unlock()
+}
+
+func (m *metrics) AverageNonZeroCloneTime() time.Duration {
+	avg := m.timeToClone / time.Duration(m.cloned)
+	return avg
+}
+
+func (m *metrics) AverageNonZeroSaveTime() time.Duration {
+	avg := m.timeToSave / time.Duration(m.saved)
+	return avg
+}
