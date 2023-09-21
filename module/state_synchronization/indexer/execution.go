@@ -57,18 +57,6 @@ func New(registers storage.RegisterIndex, headers storage.Headers, events storag
 	}, nil
 }
 
-// HeightByBlockID retrieves the height for block ID.
-// Expected errors:
-// - storage.ErrNotFound if a block is not found in the storage.
-func (i *ExecutionState) HeightByBlockID(ID flow.Identifier) (uint64, error) {
-	header, err := i.headers.ByBlockID(ID)
-	if err != nil {
-		return 0, fmt.Errorf("could not find block by ID %: %w", ID, err)
-	}
-
-	return header.Height, nil
-}
-
 // RegisterValues retrieves register values by the register IDs at the provided block height.
 // Even if the register wasn't indexed at the provided height, returns the highest height the register was indexed at.
 // Expected errors:
