@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto/rand"
 	"fmt"
-	mathRand "math/rand"
 	"sync"
 	"testing"
 	"time"
@@ -378,55 +377,6 @@ func (ctx *testingContext) mockStateCommitsWithMap(commits map[flow.Identifier]f
 
 		mocked.ReturnArguments = mock.Arguments{flow.StateCommitment{}, storageerr.ErrNotFound}
 	}
-}
-
-func TestChunkIndexIsSet(t *testing.T) {
-
-	i := mathRand.Int()
-	chunk := flow.NewChunk(
-		unittest.IdentifierFixture(),
-		i,
-		unittest.StateCommitmentFixture(),
-		21,
-		unittest.IdentifierFixture(),
-		unittest.StateCommitmentFixture(),
-		17995,
-	)
-
-	assert.Equal(t, i, int(chunk.Index))
-	assert.Equal(t, i, int(chunk.CollectionIndex))
-}
-
-func TestChunkNumberOfTxsIsSet(t *testing.T) {
-
-	i := int(mathRand.Uint32())
-	chunk := flow.NewChunk(
-		unittest.IdentifierFixture(),
-		3,
-		unittest.StateCommitmentFixture(),
-		i,
-		unittest.IdentifierFixture(),
-		unittest.StateCommitmentFixture(),
-		17995,
-	)
-
-	assert.Equal(t, i, int(chunk.NumberOfTransactions))
-}
-
-func TestChunkTotalComputationUsedIsSet(t *testing.T) {
-
-	i := mathRand.Uint64()
-	chunk := flow.NewChunk(
-		unittest.IdentifierFixture(),
-		3,
-		unittest.StateCommitmentFixture(),
-		21,
-		unittest.IdentifierFixture(),
-		unittest.StateCommitmentFixture(),
-		i,
-	)
-
-	assert.Equal(t, i, chunk.TotalComputationUsed)
 }
 
 func TestExecuteOneBlock(t *testing.T) {
