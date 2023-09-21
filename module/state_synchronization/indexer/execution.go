@@ -2,9 +2,9 @@ package indexer
 
 import (
 	"context"
-	"errors"
 	"fmt"
 
+	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 	"golang.org/x/exp/maps"
 	"golang.org/x/sync/errgroup"
@@ -25,35 +25,27 @@ type ExecutionState struct {
 	log        zerolog.Logger
 }
 
-// New execution state indexer with provided storage access for registers and headers as well as initial height.
-// This method will initialize the index starting height and end height to that found in the register storage,
-// if no height was previously persisted it will use the provided initHeight.
-func New(registers storage.RegisterIndex, headers storage.Headers, events storage.Events, initHeight uint64, log zerolog.Logger) (*ExecutionState, error) {
+// New execution state indexer used to ingest block execution data and index it by height.
+// The passed RegisterIndex storage must be populated to include the first and last height otherwise the indexer
+// won't be initialized to ensure we have bootstrapped the storage first.
+func New(registers storage.RegisterIndex, headers storage.Headers, events storage.Events, log zerolog.Logger) (*ExecutionState, error) {
 	// get the first indexed height from the register storage, if not found use the default start index height provided
 	first, err := registers.FirstHeight()
 	if err != nil {
-		if errors.Is(err, storage.ErrNotFound) {
-			first = initHeight
-		} else {
-			return nil, err
-		}
+		return nil, errors.Wrap(err, "failed to initialize the indexer with missing first height")
 	}
 
 	last, err := registers.LatestHeight()
 	if err != nil {
-		if errors.Is(err, storage.ErrNotFound) {
-			last = first // if last was not found we are just starting to index
-		} else {
-			return nil, err
-		}
+		return nil, errors.Wrap(err, "failed to initialize the indexer with missing latest height")
 	}
-
-	log.Debug().Msgf("initialized indexer with range first %d last %d", first, last)
 
 	indexRange, err := NewSequentialIndexRange(first, last)
 	if err != nil {
 		return nil, err
 	}
+
+	log.Debug().Msgf("initialized indexer with range first %d last %d", first, last)
 
 	return &ExecutionState{
 		registers:  registers,
@@ -131,7 +123,6 @@ func (i *ExecutionState) IndexBlockData(ctx context.Context, data *execution_dat
 
 	payloads := make(map[ledger.Path]*ledger.Payload)
 	events := make([]flow.Event, 0)
-	collections := make([]*flow.Collection, 0)
 
 	for _, chunk := range data.ChunkExecutionDatas {
 		if chunk.TrieUpdate != nil {
@@ -147,7 +138,6 @@ func (i *ExecutionState) IndexBlockData(ctx context.Context, data *execution_dat
 		}
 
 		events = append(events, chunk.Events...)
-		collections = append(collections, chunk.Collection)
 	}
 
 	if len(events) > 0 {
