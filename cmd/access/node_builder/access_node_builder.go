@@ -466,9 +466,6 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 		AdminCommand("read-execution-data", func(config *cmd.NodeConfig) commands.AdminCommand {
 			return stateSyncCommands.NewReadExecutionDataCommand(builder.ExecutionDataStore)
 		}).
-		AdminCommand("read-register-data", func(config *cmd.NodeConfig) commands.AdminCommand {
-			return stateSyncCommands.NewRegisterDataCommand(builder.ExecutionIndexer)
-		}).
 		Module("execution data datastore and blobstore", func(node *cmd.NodeConfig) error {
 			datastoreDir := filepath.Join(builder.executionDataDir, "blobstore")
 			err := os.MkdirAll(datastoreDir, 0700)
