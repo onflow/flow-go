@@ -341,10 +341,6 @@ func (ctx *testingContext) assertSuccessfulBlockComputation(
 	return nil
 }
 
-func (ctx testingContext) mockSnapshot(header *flow.Header, identities flow.IdentityList) {
-	ctx.mockSnapshotWithBlockID(header.ID(), identities)
-}
-
 func (ctx testingContext) mockSnapshotWithBlockID(blockID flow.Identifier, identities flow.IdentityList) {
 	cluster := new(protocol.Cluster)
 	// filter only collections as cluster members
@@ -748,7 +744,7 @@ func TestBlocksArentExecutedMultipleTimes_multipleBlockEnqueue(t *testing.T) {
 }
 
 func TestBlocksArentExecutedMultipleTimes_collectionArrival(t *testing.T) {
-	t.Skip("")
+	unittest.SkipUnless(t, unittest.TEST_FLAKY, "To be fixed later")
 	runWithEngine(t, func(ctx testingContext) {
 
 		// block in the queue are removed only after the execution has finished
@@ -793,12 +789,6 @@ func TestBlocksArentExecutedMultipleTimes_collectionArrival(t *testing.T) {
 
 		wg := sync.WaitGroup{}
 		ctx.mockStateCommitsWithMap(commits)
-
-		// mock the cluster canonical list at the collection guarantee's reference block
-		// use the same canonical list as used for building signer indices
-		ctx.mockSnapshot(blockB.Block.Header, ctx.identities)
-		ctx.mockSnapshot(blockC.Block.Header, ctx.identities)
-		ctx.mockSnapshot(blockD.Block.Header, ctx.identities)
 
 		// wait to control parent (block B) execution until we are ready
 		wgB := sync.WaitGroup{}
