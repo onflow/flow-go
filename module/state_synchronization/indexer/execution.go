@@ -127,7 +127,7 @@ func (i *ExecutionState) IndexBlockData(ctx context.Context, data *execution_dat
 	}
 
 	// concurrently process indexing of block data
-	g, ctx := errgroup.WithContext(ctx)
+	g, _ := errgroup.WithContext(ctx)
 
 	payloads := make(map[ledger.Path]*ledger.Payload)
 	events := make([]flow.Event, 0)
