@@ -659,6 +659,7 @@ func TestCachedClientShutdown(t *testing.T) {
 			closeRequested: atomic.NewBool(false),
 		}
 		client.Close()
+		assert.True(t, client.closeRequested.Load())
 	})
 
 	// Test closing a client with no outstanding requests
