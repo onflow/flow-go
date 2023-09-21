@@ -48,16 +48,16 @@ type EpochStateContainer struct {
 	CommitID Identifier
 	// ActiveIdentities contains the dynamic identity properties for the nodes that
 	// are active in this epoch. Active means that these nodes are authorized to contribute to
-	// extending the chain. Nodes are listed in `ActiveIdentities` if and only if
+	// extending the chain. Nodes are listed in `Identities` if and only if
 	// they are part of the EpochSetup even for the respective epoch.
 	// The dynamic identity properties can change from block to block. Each non-deferred
 	// identity-mutating operation is applied independently to the `ActiveIdentities`
 	// of the relevant epoch's EpochStateContainer separately.
-	// ActiveIdentities are always sorted in canonical order.
+	// Identities are always sorted in canonical order.
 	//
 	// Context: In comparison, nodes that are joining in the next epoch or left as of this
 	// epoch are only allowed to listen to the network but not actively contribute. Such
-	// nodes are _not_ part of `ActiveIdentities`.
+	// nodes are _not_ part of `Identities`.
 	ActiveIdentities DynamicIdentityEntryList
 }
 
@@ -80,7 +80,7 @@ func (c *EpochStateContainer) EventIDs() EventIDs {
 }
 
 // Copy returns a full copy of the entry.
-// Embedded ActiveIdentities are deep-copied, _except_ for their keys, which are copied by reference.
+// Embedded Identities are deep-copied, _except_ for their keys, which are copied by reference.
 // Per convention, the ID of a `nil` EpochStateContainer is `flow.ZeroID`.
 func (c *EpochStateContainer) Copy() *EpochStateContainer {
 	if c == nil {
@@ -246,7 +246,7 @@ func (e *ProtocolStateEntry) ID() Identifier {
 }
 
 // Copy returns a full copy of the entry.
-// Embedded ActiveIdentities are deep-copied, _except_ for their keys, which are copied by reference.
+// Embedded Identities are deep-copied, _except_ for their keys, which are copied by reference.
 func (e *ProtocolStateEntry) Copy() *ProtocolStateEntry {
 	if e == nil {
 		return nil
@@ -354,7 +354,7 @@ func (ll DynamicIdentityEntryList) Sort(less IdentifierOrder) DynamicIdentityEnt
 }
 
 // buildIdentityTable constructs the full identity table for the target epoch by combining data from:
-//  1. The target epoch's Dynamic ActiveIdentities.
+//  1. The target epoch's Dynamic Identities.
 //  2. The target epoch's IdentitySkeletons
 //     (recorded in EpochSetup event and immutable throughout the epoch).
 //  3. [optional] An adjacent epoch's IdentitySkeletons (can be empty or nil), as recorded in the

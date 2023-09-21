@@ -23,12 +23,12 @@ type Updater struct {
 	candidate   *flow.Header
 
 	// nextEpochIdentitiesLookup is a map from NodeID → DynamicIdentityEntry for the _current_ epoch, containing the
-	// same identities as in the EpochStateContainer `state.CurrentEpoch.ActiveIdentities`. Note that map values are pointers,
+	// same identities as in the EpochStateContainer `state.CurrentEpoch.Identities`. Note that map values are pointers,
 	// so writes to map values will modify the respective DynamicIdentityEntry in EpochStateContainer.
 	currentEpochIdentitiesLookup map[flow.Identifier]*flow.DynamicIdentityEntry
 
 	// nextEpochIdentitiesLookup is a map from NodeID → DynamicIdentityEntry for the _next_ epoch, containing the
-	// same identities as in the EpochStateContainer `state.NextEpoch.ActiveIdentities`. Note that map values are pointers,
+	// same identities as in the EpochStateContainer `state.NextEpoch.Identities`. Note that map values are pointers,
 	// so writes to map values will modify the respective DynamicIdentityEntry in EpochStateContainer.
 	nextEpochIdentitiesLookup map[flow.Identifier]*flow.DynamicIdentityEntry
 }
@@ -262,7 +262,7 @@ func (u *Updater) ensureLookupPopulated() {
 }
 
 // rebuildIdentityLookup re-generates `currentEpochIdentitiesLookup` and `nextEpochIdentitiesLookup` from the
-// underlying identity lists `state.CurrentEpoch.ActiveIdentities` and `state.NextEpoch.ActiveIdentities`, respectively.
+// underlying identity lists `state.CurrentEpoch.Identities` and `state.NextEpoch.Identities`, respectively.
 func (u *Updater) rebuildIdentityLookup() {
 	u.currentEpochIdentitiesLookup = u.state.CurrentEpoch.ActiveIdentities.Lookup()
 	if u.state.NextEpoch != nil {

@@ -21,7 +21,7 @@ import (
 // TestEncodeDecodeIdentities verifies the two path of encoding -> decoding:
 //  1. Identifiers --encode--> Indices --decode--> Identifiers
 //  2. for the decoding step, we offer an optimized convenience function to directly
-//     decode to full identities: Indices --decode--> ActiveIdentities
+//     decode to full identities: Indices --decode--> Identities
 func TestEncodeDecodeIdentities(t *testing.T) {
 	canonicalIdentities := unittest.IdentityListFixture(20).ToSkeleton()
 	canonicalIdentifiers := canonicalIdentities.NodeIDs()
@@ -38,7 +38,7 @@ func TestEncodeDecodeIdentities(t *testing.T) {
 			require.NoError(t, err)
 			require.Equal(t, signers.NodeIDs(), decodedIDs)
 
-			// decoding option 2: decode to ActiveIdentities
+			// decoding option 2: decode to Identities
 			decodedIdentities, err := signature.DecodeSignerIndicesToIdentities(canonicalIdentities, indices)
 			require.NoError(t, err)
 			require.Equal(t, signers, decodedIdentities)

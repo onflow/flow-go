@@ -204,7 +204,7 @@ func assertRichProtocolStateValidity(t *testing.T, state *flow.RichProtocolState
 		previousEpochParticipants = state.PreviousEpochSetup.Participants
 	}
 
-	// invariant: ActiveIdentities is a full identity table for the current epoch. ActiveIdentities are sorted in canonical order. Without duplicates. Never nil.
+	// invariant: Identities is a full identity table for the current epoch. Identities are sorted in canonical order. Without duplicates. Never nil.
 	var allIdentities flow.IdentityList
 	if state.NextEpoch != nil {
 		allIdentities = state.CurrentEpochSetup.Participants.Union(state.NextEpochSetup.Participants)
@@ -229,7 +229,7 @@ func assertRichProtocolStateValidity(t *testing.T, state *flow.RichProtocolState
 	assert.Equal(t, state.NextEpochSetup.ID(), nextEpoch.SetupID, "epoch setup should be for correct event ID")
 	assert.Equal(t, state.NextEpochCommit.ID(), nextEpoch.CommitID, "epoch commit should be for correct event ID")
 
-	// invariant: ActiveIdentities is a full identity table for the current epoch. ActiveIdentities are sorted in canonical order. Without duplicates. Never nil.
+	// invariant: Identities is a full identity table for the current epoch. Identities are sorted in canonical order. Without duplicates. Never nil.
 	allIdentities = state.NextEpochSetup.Participants.Union(state.CurrentEpochSetup.Participants)
 
 	assert.Equal(t, allIdentities, state.NextEpochIdentityTable, "identities should be a full identity table for the next epoch, without duplicates")

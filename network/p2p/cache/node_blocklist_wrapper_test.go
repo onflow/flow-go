@@ -67,7 +67,7 @@ func (s *NodeDisallowListWrapperTestSuite) TestHonestNode() {
 		require.True(s.T(), found)
 		require.Equal(s.T(), i, identity)
 	})
-	s.Run("ActiveIdentities", func() {
+	s.Run("Identities", func() {
 		identities := unittest.IdentityListFixture(11)
 		f := filter.In(identities[3:4])
 		expectedFilteredIdentities := identities.Filter(f)
@@ -139,7 +139,7 @@ func (s *NodeDisallowListWrapperTestSuite) TestDisallowListNode() {
 		})
 	}
 
-	s.Run("ActiveIdentities", func() {
+	s.Run("Identities", func() {
 		blocklistLookup := blocklist.Lookup()
 		honestIdentities := unittest.IdentityListFixture(8)
 		combinedIdentities := honestIdentities.Union(blocklist)
@@ -165,9 +165,9 @@ func (s *NodeDisallowListWrapperTestSuite) TestDisallowListNode() {
 		}
 	})
 
-	// this tests the edge case where the  ActiveIdentities func is invoked with the p2p.NotEjectedFilter. Block listed
+	// this tests the edge case where the  Identities func is invoked with the p2p.NotEjectedFilter. Block listed
 	// nodes are expected to be filtered from the identity list returned after setting the ejected field.
-	s.Run("ActiveIdentities(p2p.NotEjectedFilter) should not return block listed nodes", func() {
+	s.Run("Identities(p2p.NotEjectedFilter) should not return block listed nodes", func() {
 		blocklistLookup := blocklist.Lookup()
 		honestIdentities := unittest.IdentityListFixture(8)
 		combinedIdentities := honestIdentities.Union(blocklist)

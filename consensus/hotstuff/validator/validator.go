@@ -180,7 +180,7 @@ func (v *Validator) ValidateQC(qc *flow.QuorumCertificate) error {
 		case errors.Is(err, model.ErrInvalidSignature):
 			return newInvalidQCError(qc, fmt.Errorf("QC contains invalid signature(s): %w", err))
 		case errors.Is(err, model.ErrViewForUnknownEpoch):
-			// We have earlier queried the ActiveIdentities for the QC's view, which must have returned proper values,
+			// We have earlier queried the Identities for the QC's view, which must have returned proper values,
 			// otherwise, we wouldn't reach this code. Therefore, it should be impossible for `verifier.VerifyQC`
 			// to return ErrViewForUnknownEpoch. To avoid confusion with expected sentinel errors, we only preserve
 			// the error messages here, but not the error types.

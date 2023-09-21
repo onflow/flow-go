@@ -178,7 +178,7 @@ func (suite *MutableIdentityTableSuite) setupStateMock() {
 	suite.snapshot = new(mockprotocol.Snapshot)
 	suite.snapshot.On("Head").Return(&final, nil)
 	suite.snapshot.On("Phase").Return(flow.EpochPhaseCommitted, nil)
-	// return all the current list of ids for the state.Final.ActiveIdentities call made by the network
+	// return all the current list of ids for the state.Final.Identities call made by the network
 	suite.snapshot.On("Identities", mock.Anything).Return(
 		func(flow.IdentityFilter) flow.IdentityList {
 			return suite.testNodes.ids()

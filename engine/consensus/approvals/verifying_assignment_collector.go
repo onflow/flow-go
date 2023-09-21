@@ -401,7 +401,7 @@ func authorizedVerifiersAtBlock(state protocol.State, blockID flow.Identifier) (
 			filter.Not(filter.Ejected),
 		))
 	if err != nil {
-		return nil, fmt.Errorf("failed to retrieve ActiveIdentities for block %v: %w", blockID, err)
+		return nil, fmt.Errorf("failed to retrieve Identities for block %v: %w", blockID, err)
 	}
 	if len(authorizedVerifierList) == 0 {
 		return nil, fmt.Errorf("no authorized verifiers found for block %v", blockID)

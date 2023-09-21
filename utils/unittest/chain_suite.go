@@ -72,7 +72,7 @@ func (bc *BaseChainSuite) SetupChain() {
 
 	// ~~~~~~~~~~~~~~~~~~~~~~~~~~ SETUP IDENTITIES ~~~~~~~~~~~~~~~~~~~~~~~~~~ //
 
-	// asign node ActiveIdentities
+	// asign node Identities
 	con := IdentityFixture(WithRole(flow.RoleConsensus))
 	exe := IdentityFixture(WithRole(flow.RoleExecution))
 	ver := IdentityFixture(WithRole(flow.RoleVerification))

@@ -43,8 +43,8 @@ func (b *Bootstrap) GenTemplateData(outputToFile bool, dockerTag string, dockerR
 		log.Fatal(err)
 	}
 
-	// examine "ActiveIdentities" section for list of node data to extract and build out node data list
-	identities := dataMap["ActiveIdentities"].([]interface{})
+	// examine "Identities" section for list of node data to extract and build out node data list
+	identities := dataMap["Identities"].([]interface{})
 	var nodeDataList []NodeData
 
 	for _, identity := range identities {

@@ -2573,8 +2573,8 @@ func RootProtocolStateFixture() *flow.RichProtocolStateEntry {
 //
 // In particular, the following consistency requirements hold:
 //   - Epoch setup and commit counters are set to match.
-//   - ActiveIdentities are constructed from setup events.
-//   - ActiveIdentities are sorted in canonical order.
+//   - Identities are constructed from setup events.
+//   - Identities are sorted in canonical order.
 func ProtocolStateFixture(options ...func(*flow.RichProtocolStateEntry)) *flow.RichProtocolStateEntry {
 	prevEpochSetup := EpochSetupFixture()
 	prevEpochCommit := EpochCommitFixture(func(commit *flow.EpochCommit) {

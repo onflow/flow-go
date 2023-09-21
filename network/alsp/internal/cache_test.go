@@ -166,10 +166,10 @@ func TestSpamRecordCache_Adjust_Error(t *testing.T) {
 	require.Equal(t, -10.0, record1.Penalty)
 }
 
-// TestSpamRecordCache_Identities tests the ActiveIdentities method of the SpamRecordCache.
+// TestSpamRecordCache_Identities tests the Identities method of the SpamRecordCache.
 // The test covers the following scenarios:
 // 1. Initializing the cache with multiple spam records.
-// 2. Checking if the ActiveIdentities method returns the correct set of origin IDs.
+// 2. Checking if the Identities method returns the correct set of origin IDs.
 func TestSpamRecordCache_Identities(t *testing.T) {
 	sizeLimit := uint32(100)
 	logger := zerolog.Nop()
@@ -196,7 +196,7 @@ func TestSpamRecordCache_Identities(t *testing.T) {
 	_, err = cache.Adjust(originID3, adjustFnNoOp)
 	require.NoError(t, err)
 
-	// check if the ActiveIdentities method returns the correct set of origin IDs
+	// check if the Identities method returns the correct set of origin IDs
 	identities := cache.Identities()
 	require.Equal(t, 3, len(identities))
 
@@ -739,11 +739,11 @@ func TestSpamRecordCache_ConcurrentInitRemoveAndAdjust(t *testing.T) {
 	}
 }
 
-// TestSpamRecordCache_ConcurrentIdentitiesAndOperations tests the concurrent calls to ActiveIdentities method while
+// TestSpamRecordCache_ConcurrentIdentitiesAndOperations tests the concurrent calls to Identities method while
 // other goroutines are initializing or removing spam records. The test covers the following scenarios:
 // 1. Multiple goroutines initializing spam records for different origin IDs concurrently.
 // 2. Multiple goroutines removing spam records for different origin IDs concurrently.
-// 3. Multiple goroutines calling ActiveIdentities method concurrently.
+// 3. Multiple goroutines calling Identities method concurrently.
 func TestSpamRecordCache_ConcurrentIdentitiesAndOperations(t *testing.T) {
 	sizeLimit := uint32(100)
 	logger := zerolog.Nop()
@@ -797,7 +797,7 @@ func TestSpamRecordCache_ConcurrentIdentitiesAndOperations(t *testing.T) {
 		}()
 	}
 
-	// call ActiveIdentities method concurrently
+	// call Identities method concurrently
 	for i := 0; i < 10; i++ {
 		go func() {
 			defer wg.Done()

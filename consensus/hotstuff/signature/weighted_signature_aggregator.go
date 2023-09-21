@@ -32,7 +32,7 @@ type WeightedSignatureAggregator struct {
 	totalWeight uint64                                    // weight collected (gets updated)
 	lock        sync.RWMutex                              // lock for atomic updates to totalWeight and collectedIDs
 
-	// collectedIDs tracks the ActiveIdentities of all nodes whose signatures have been collected so far.
+	// collectedIDs tracks the Identities of all nodes whose signatures have been collected so far.
 	// The reason for tracking the duplicate signers at this module level is that having no duplicates
 	// is a Hotstuff constraint, rather than a cryptographic aggregation constraint. We are planning to
 	// extend the cryptographic primitives to support multiplicity higher than 1 in the future.
