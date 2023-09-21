@@ -272,7 +272,7 @@ func (ss *SyncSuite) TestLoad_Process_RangeRequest_SometimesReportSpam() {
 }
 
 // TestLoad_Process_BatchRequest_SometimesReportSpam is a load test that ensures that a misbehavior report is generated
-// an appropriate range of times when the base probability factor and range are set to different values.
+// an appropriate range of times when the base probability factor and number of block IDs are set to different values.
 func (ss *SyncSuite) TestLoad_Process_BatchRequest_SometimesReportSpam() {
 	ctx, cancel := irrecoverable.NewMockSignalerContextWithCancel(ss.T(), context.Background())
 	ss.e.Start(ctx)
@@ -294,14 +294,34 @@ func (ss *SyncSuite) TestLoad_Process_BatchRequest_SometimesReportSpam() {
 
 	loadGroups := []loadGroup{}
 
+	// using a very small batch request (1 block ID) with a 10% base probability factor, expect to almost never get misbehavior report, about 0.003% of the time (3 in 1000 requests)
+	// expected probability factor: 0.1 * ((10-9) + 1)/64 = 0.003125
+	loadGroups = append(loadGroups, loadGroup{0.1, 0, 15, repeatedBlockIDs(1)})
+
+	// using a small batch request (10 block IDs) with a 10% base probability factor, expect to get misbehavior report about 1.7% of the time (17 in 1000 requests)
+	// expected probability factor: 0.1 * ((11-1) + 1)/64 = 0.0171875
+	loadGroups = append(loadGroups, loadGroup{0.1, 5, 31, repeatedBlockIDs(10)})
+
+	// using a large batch request (99 block IDs) with a 10% base probability factor, expect to get misbehavior report about 15% of the time (150 in 1000 requests)
+	// expected probability factor: 0.1 * ((100-1) + 1)/64 = 0.15625
+	loadGroups = append(loadGroups, loadGroup{0.1, 110, 200, repeatedBlockIDs(99)})
+
+	// using a small batch request (10 block IDs) with a 1% base probability factor, expect to almost never get misbehavior report, about 0.17% of the time (2 in 1000 requests)
+	// expected probability factor: 0.01 * ((11-1) + 1)/64 = 0.00171875
+	loadGroups = append(loadGroups, loadGroup{0.01, 0, 7, repeatedBlockIDs(10)})
+
+	// using a very large batch request (999 block IDs) with a 1% base probability factor, expect to get misbehavior report about 15% of the time (150 in 1000 requests)
+	// expected probability factor: 0.01 * ((1000-1) + 1)/64 = 0.15625
+	loadGroups = append(loadGroups, loadGroup{0.01, 110, 200, repeatedBlockIDs(999)})
+
 	// ALWAYS REPORT SPAM FOR INVALID BATCH REQUESTS OR BATCH REQUESTS THAT ARE FAR OUTSIDE OF THE TOLERANCE
 
-	// using an empty batch request always results in a misbehavior report, no matter how small the base probability factor is
+	// using an empty batch request (0 block IDs) always results in a misbehavior report, no matter how small the base probability factor is
 	loadGroups = append(loadGroups, loadGroup{0.001, 1000, 1000, []flow.Identifier{}})
 
 	// using a very large batch request (999 block IDs) with a 10% base probability factor, expect to get misbehavior report 100% of the time (1000 in 1000 requests)
 	// expected probability factor: 0.1 * ((999 + 1)/64 = 1.5625
-	loadGroups = append(loadGroups, loadGroup{0.1, 1000, 1000, repeatedBlockIDs(unittest.BlockFixture().ID(), 999)})
+	loadGroups = append(loadGroups, loadGroup{0.1, 1000, 1000, repeatedBlockIDs(999)})
 
 	// reset misbehavior report counter for each subtest
 	misbehaviorsCounter := 0
@@ -344,10 +364,12 @@ func (ss *SyncSuite) TestLoad_Process_BatchRequest_SometimesReportSpam() {
 	}
 }
 
-func repeatedBlockIDs(value flow.Identifier, n int) []flow.Identifier {
+func repeatedBlockIDs(n int) []flow.Identifier {
+	blockID := unittest.BlockFixture().ID()
+
 	arr := make([]flow.Identifier, n)
 	for i := 0; i < n; i++ {
-		arr[i] = value
+		arr[i] = blockID
 	}
 	return arr
 }
