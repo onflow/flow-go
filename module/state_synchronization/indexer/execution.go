@@ -29,12 +29,13 @@ type ExecutionState struct {
 // The passed RegisterIndex storage must be populated to include the first and last height otherwise the indexer
 // won't be initialized to ensure we have bootstrapped the storage first.
 func New(registers storage.RegisterIndex, headers storage.Headers, events storage.Events, log zerolog.Logger) (*ExecutionState, error) {
-	// get the first indexed height from the register storage, if not found use the default start index height provided
+	// we must have the first height set in the storage otherwise error out
 	first, err := registers.FirstHeight()
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to initialize the indexer with missing first height")
 	}
 
+	// we must have the latest height set in the storage otherwise error out
 	last, err := registers.LatestHeight()
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to initialize the indexer with missing latest height")
@@ -45,7 +46,7 @@ func New(registers storage.RegisterIndex, headers storage.Headers, events storag
 		return nil, err
 	}
 
-	log.Debug().Msgf("initialized indexer with range first %d last %d", first, last)
+	log.Debug().Msgf("initialized indexer with range first: %d, last: %d", first, last)
 
 	return &ExecutionState{
 		registers:  registers,
