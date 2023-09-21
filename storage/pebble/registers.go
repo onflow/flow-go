@@ -6,6 +6,8 @@ import (
 	"sync"
 
 	"github.com/cockroachdb/pebble"
+	"github.com/pkg/errors"
+	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/storage"
@@ -18,16 +20,53 @@ type Registers struct {
 	firstHeight  uint64
 	latestHeight uint64
 	lock         sync.RWMutex
+	logger       zerolog.Logger
 }
 
 // NewRegisters takes a populated pebble instance with LatestHeight and FirstHeight set.
 // Will fail if they those two keys are unavailable as it implies a corrupted or uninitialized state
-func NewRegisters(db *pebble.DB) (*Registers, error) {
+func NewRegisters(db *pebble.DB, logger zerolog.Logger) (*Registers, error) {
 	registers := &Registers{
-		db: db,
+		db:     db,
+		logger: logger,
 	}
 	// check height keys and populate cache. These two variables will have been set
-	firstHeight, err := registers.firsHeightFromDB()
+	firstHeight, err := registers.firstStoredHeight()
+	if err != nil {
+		// this means that the DB is either in a corrupted state or has not been initialized with a set of registers
+		// and firstHeight
+		return nil, fmt.Errorf("unable to initialize register storage, first height unavailable in db: %w", err)
+	}
+	latestHeight, err := registers.latestHeightFromDB()
+	if err != nil {
+		// and firstHeight
+		return nil, fmt.Errorf("unable to initialize register storage, latest height unavailable in db: %w", err)
+	}
+	// at this stage, the bootstrap function has been called and the firstHeight == lastHeight.
+	// All registers for the height have been indexed
+	registers.firstHeight = firstHeight
+	registers.latestHeight = latestHeight
+	return registers, nil
+}
+
+func TempNewRegisterWithHeight(db *pebble.DB, logger zerolog.Logger) (*Registers, error) {
+	registers := &Registers{
+		db:     db,
+		logger: logger,
+	}
+
+	err := db.Set(newHeightKey(codeFirstBlockHeight), EncodedUint64(0), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	err = db.Set(newHeightKey(codeLatestBlockHeight), EncodedUint64(0), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	// check height keys and populate cache. These two variables will have been set
+	firstHeight, err := registers.firstStoredHeight()
 	if err != nil {
 		// this means that the DB is either in a corrupted state or has not been initialized with a set of registers
 		// and firstHeight
@@ -52,14 +91,14 @@ func NewRegisters(db *pebble.DB) (*Registers, error) {
 // GetPayload(13, A) would return the value at height 11.
 //
 // If no payload is found, storage.ErrNotFound is returned
-func (s *Registers) Get(
-	height uint64,
-	reg flow.RegisterID,
-) ([]byte, error) {
+func (s *Registers) Get(reg flow.RegisterID, height uint64) ([]byte, error) {
 	s.lock.RLock()
 	defer s.lock.RUnlock()
 	if height > s.latestHeight || height < s.firstHeight {
-		return nil, storage.ErrHeightNotIndexed
+		return nil, errors.Wrap(
+			storage.ErrHeightNotIndexed,
+			fmt.Sprintf("height %d not indexed, indexed range is [%d-%d]", height, s.firstHeight, s.latestHeight),
+		)
 	}
 	iter, err := s.db.NewIter(&pebble.IterOptions{
 		UseL6Filters: true,
@@ -73,7 +112,7 @@ func (s *Registers) Get(
 	ok := iter.SeekPrefixGE(encoded)
 	if !ok {
 		// no such register found
-		return nil, storage.ErrNotFound
+		return nil, errors.Wrap(storage.ErrNotFound, fmt.Sprintf("register by ID %s not found", reg.String()))
 	}
 
 	binaryValue, err := iter.ValueAndErr()
@@ -88,19 +127,16 @@ func (s *Registers) Get(
 }
 
 // Store sets the given entries in a batch.
-func (s *Registers) Store(
-	height uint64,
-	entries flow.RegisterEntries,
-) error {
+func (s *Registers) Store(entries flow.RegisterEntries, height uint64) error {
 	s.lock.Lock()
 	defer s.lock.Unlock()
-	if height == s.latestHeight {
+	if height == s.latestHeight && s.latestHeight != 0 {
 		// already updated
 		return nil
 	}
 
 	nextHeight := s.latestHeight + 1
-	if height != nextHeight {
+	if height != nextHeight && height != 0 {
 		return fmt.Errorf("must store registers with the next height %v, but got %v", nextHeight, height)
 	}
 	batch := s.db.NewBatch()
@@ -125,22 +161,27 @@ func (s *Registers) Store(
 	}
 	s.latestHeight = height
 
+	s.logger.Debug().
+		Str("keys", fmt.Sprintf("%s", entries.IDs())).
+		Str("values", fmt.Sprintf("%s", entries.Values())).
+		Msgf("register entries stored")
+
 	return nil
 }
 
 // LatestHeight Gets the latest height of complete registers available
-func (s *Registers) LatestHeight() uint64 {
+func (s *Registers) LatestHeight() (uint64, error) {
 	s.lock.RLock()
 	defer s.lock.RUnlock()
-	return s.latestHeight
+	return s.latestHeight, nil
 }
 
 // FirstHeight first indexed height found in the store, typically root block for the spork
-func (s *Registers) FirstHeight() uint64 {
-	return s.firstHeight
+func (s *Registers) FirstHeight() (uint64, error) {
+	return s.firstHeight, nil
 }
 
-func (s *Registers) firsHeightFromDB() (uint64, error) {
+func (s *Registers) firstStoredHeight() (uint64, error) {
 	return s.heightLookup(firstHeightKey())
 }
 

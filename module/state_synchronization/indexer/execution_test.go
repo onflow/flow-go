@@ -2,12 +2,15 @@ package indexer
 
 import (
 	"context"
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"math"
 	"math/rand"
+	"os"
 	"testing"
 
+	"github.com/cockroachdb/pebble"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -27,6 +30,8 @@ import (
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/memory"
 	storagemock "github.com/onflow/flow-go/storage/mock"
+	pebbleStorage "github.com/onflow/flow-go/storage/pebble"
+	"github.com/onflow/flow-go/storage/pebble/registers"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -340,100 +345,109 @@ func TestIntegration_StoreAndGet(t *testing.T) {
 	regOwner := "f8d6e0586b0a20c7"
 	regKey := "code"
 	registerID := flow.NewRegisterID(regOwner, regKey)
+	logger := zerolog.New(os.Stdout)
 
 	// this test makes sure index values for a single register are correctly updated and always last value is returned
 	t.Run("Single Index Value Changes", func(t *testing.T) {
-		indexer, err := New(initRegisterStorage(), nil, nil, 0, zerolog.Nop())
-		require.NoError(t, err)
+		RunWithRegistersStorageAtInitialHeights(t, 0, 0, logger, func(registers storage.RegisterIndex) {
+			indexer, err := New(registers, nil, nil, 0, logger)
+			require.NoError(t, err)
 
-		values := [][]byte{
-			[]byte("1"), []byte("1"), []byte("2"), []byte("3"), nil, []byte("4"),
-		}
+			values := [][]byte{[]byte("1"), []byte("1"), []byte("2"), []byte("3") /*nil,*/, []byte("4")}
 
-		value, err := indexer.RegisterValues(flow.RegisterIDs{registerID}, 0)
-		require.Nil(t, value)
-		assert.ErrorIs(t, err, storage.ErrNotFound)
+			value, err := indexer.RegisterValues(flow.RegisterIDs{registerID}, 0)
+			require.Nil(t, value)
+			assert.ErrorIs(t, err, storage.ErrNotFound)
 
-		for i, value := range values {
-			err := storeRegisterWithValue(indexer, uint64(i), regOwner, regKey, value)
-			assert.NoError(t, err)
+			for i, val := range values {
+				testDesc := fmt.Sprintf("test itteration number %d failed with test value %s", i, val)
+				err := storeRegisterWithValue(indexer, uint64(i), regOwner, regKey, val)
+				assert.NoError(t, err)
 
-			val, err := indexer.RegisterValues(flow.RegisterIDs{registerID}, uint64(i))
-			require.Nil(t, err)
-			assert.Equal(t, value, val[0])
-		}
+				results, err := indexer.RegisterValues(flow.RegisterIDs{registerID}, uint64(i))
+				require.Nil(t, err, testDesc)
+				assert.Equal(t, val, results[0])
+			}
+		})
 	})
 
 	// this test makes sure that even if indexed values for a specific register are requested with higher height
 	// the correct highest height indexed value is returned.
 	// e.g. we index A{h(1) -> X}, A{h(2) -> Y}, when we request h(5) we get value Y
 	t.Run("Single Index Value At Later Heights", func(t *testing.T) {
-		indexer, err := New(initRegisterStorage(), nil, nil, 0, zerolog.Nop())
-		require.NoError(t, err)
+		RunWithRegistersStorageAtInitialHeights(t, 0, 0, logger, func(registers storage.RegisterIndex) {
+			indexer, err := New(registers, nil, nil, 0, zerolog.Nop())
+			require.NoError(t, err)
 
-		value := []byte("1")
+			value := []byte("1")
 
-		err = storeRegisterWithValue(indexer, 1, regOwner, regKey, value)
-		require.NoError(t, err)
+			require.NoError(t, storeRegisterWithValue(indexer, 1, regOwner, regKey, value))
 
-		assert.NoError(t, indexer.indexRange.Increase(2))
-		assert.NoError(t, indexer.indexRange.Increase(3))
+			require.NoError(t, indexer.indexRegisterPayloads(nil, 2))
+			assert.NoError(t, indexer.indexRange.Increase(2))
 
-		val, err := indexer.RegisterValues(flow.RegisterIDs{registerID}, uint64(3))
-		require.Nil(t, err)
-		assert.Equal(t, value, val[0])
+			require.NoError(t, indexer.indexRegisterPayloads(nil, 3))
+			assert.NoError(t, indexer.indexRange.Increase(3))
 
-		value = []byte("2")
-		err = storeRegisterWithValue(indexer, 4, regOwner, regKey, value)
-		require.NoError(t, err)
+			val, err := indexer.RegisterValues(flow.RegisterIDs{registerID}, uint64(3))
+			require.Nil(t, err)
+			assert.Equal(t, value, val[0])
 
-		assert.NoError(t, indexer.indexRange.Increase(5))
-		assert.NoError(t, indexer.indexRange.Increase(6))
+			value = []byte("2")
+			err = storeRegisterWithValue(indexer, 4, regOwner, regKey, value)
+			require.NoError(t, err)
 
-		val, err = indexer.RegisterValues(flow.RegisterIDs{registerID}, uint64(6))
-		require.Nil(t, err)
-		assert.Equal(t, value, val[0])
+			require.NoError(t, indexer.indexRegisterPayloads(nil, 5))
+			assert.NoError(t, indexer.indexRange.Increase(5))
+
+			val, err = indexer.RegisterValues(flow.RegisterIDs{registerID}, uint64(6))
+			require.Nil(t, err)
+			assert.Equal(t, value, val[0])
+		})
 	})
 
 	// this test makes sure we correctly handle weird payloads
 	t.Run("Empty and Nil Payloads", func(t *testing.T) {
-		indexer, err := New(initRegisterStorage(), nil, nil, 0, zerolog.Nop())
-		require.NoError(t, err)
+		RunWithRegistersStorageAtInitialHeights(t, 0, 0, logger, func(registers storage.RegisterIndex) {
+			indexer, err := New(registers, nil, nil, 0, zerolog.Nop())
+			require.NoError(t, err)
 
-		require.NoError(t, indexer.indexRegisterPayloads([]*ledger.Payload{}, 1))
-		require.NoError(t, indexer.indexRegisterPayloads([]*ledger.Payload{}, 1))
-		require.NoError(t, indexer.indexRange.Increase(1))
-		require.NoError(t, indexer.indexRegisterPayloads(nil, 2))
+			require.NoError(t, indexer.indexRegisterPayloads([]*ledger.Payload{}, 1))
+			require.NoError(t, indexer.indexRegisterPayloads([]*ledger.Payload{}, 1))
+			require.NoError(t, indexer.indexRange.Increase(1))
+			require.NoError(t, indexer.indexRegisterPayloads(nil, 2))
+		})
 	})
 
 	// this test makes sure correct values are used to initialize range no matter the init value provided
 	t.Run("Initialize Indexer", func(t *testing.T) {
-		logger := zerolog.Nop()
 		first := uint64(5)
 		last := uint64(10)
-		registers := memory.NewRegisters(first, last, logger)
-		indexer, err := New(registers, nil, nil, 8, zerolog.Nop())
-		require.NoError(t, err)
 
-		assert.Equal(t, first, indexer.indexRange.First())
-		assert.Equal(t, last, indexer.indexRange.Last())
+		RunWithRegistersStorageAtInitialHeights(t, first, last, logger, func(registers storage.RegisterIndex) {
+			indexer, err := New(registers, nil, nil, 0, zerolog.Nop())
+			require.NoError(t, err)
 
-		zero := uint64(0)
-		registers = memory.NewRegisters(zero, zero, logger)
-		indexer, err = New(registers, nil, nil, 5, zerolog.Nop())
-		require.NoError(t, err)
+			assert.Equal(t, first, indexer.indexRange.First())
+			assert.Equal(t, last, indexer.indexRange.Last())
 
-		assert.Equal(t, zero, indexer.indexRange.First())
-		assert.Equal(t, zero, indexer.indexRange.Last())
+			zero := uint64(0)
+			registers = memory.NewRegisters(zero, zero, logger)
+			indexer, err = New(registers, nil, nil, 5, zerolog.Nop())
+			require.NoError(t, err)
 
-		empty := uint64(math.MaxUint64) // we use this value to trigger memory db to return empty
-		init := uint64(8)
-		registers = memory.NewRegisters(empty, empty, logger)
-		indexer, err = New(registers, nil, nil, init, zerolog.Nop())
-		require.NoError(t, err)
+			assert.Equal(t, zero, indexer.indexRange.First())
+			assert.Equal(t, zero, indexer.indexRange.Last())
 
-		assert.Equal(t, init, indexer.indexRange.First())
-		assert.Equal(t, init, indexer.indexRange.Last())
+			empty := uint64(math.MaxUint64) // we use this value to trigger memory db to return empty
+			init := uint64(8)
+			registers = memory.NewRegisters(empty, empty, logger)
+			indexer, err = New(registers, nil, nil, init, zerolog.Nop())
+			require.NoError(t, err)
+
+			assert.Equal(t, init, indexer.indexRange.First())
+			assert.Equal(t, init, indexer.indexRange.Last())
+		})
 	})
 }
 
@@ -565,4 +579,39 @@ func trieRegistersPayloadComparer(t *testing.T, triePayloads []*ledger.Payload, 
 		val := triePayloads[index].Value()
 		assert.True(t, val.Equals(entry.Value), fmt.Sprintf("payload values not same %s - %s", val, entry.Value))
 	}
+}
+
+// duplicated from register tests https://github.com/onflow/flow-go/blob/aa41e76c824260f8f08aacbe46471619ecf3fe6e/storage/pebble/registers_test.go#L291
+const (
+	placeHolderHeight          = uint64(0)
+	MinLookupKeyLen            = 3 + registers.HeightSuffixLen
+	codeFirstBlockHeight  byte = 3
+	codeLatestBlockHeight byte = 4
+)
+
+func newHeightKey(identifier byte) []byte {
+	key := make([]byte, 0, MinLookupKeyLen)
+	key = append(key, identifier)
+	key = append(key, '/')
+	key = binary.BigEndian.AppendUint64(key, placeHolderHeight)
+	return key
+}
+
+func RunWithRegistersStorageAtInitialHeights(
+	tb testing.TB,
+	first uint64,
+	latest uint64,
+	logger zerolog.Logger,
+	f func(r storage.RegisterIndex),
+) {
+	cache := pebble.NewCache(1 << 20)
+	opts := pebbleStorage.DefaultPebbleOptions(cache, registers.NewMVCCComparer())
+	unittest.RunWithConfiguredPebbleInstance(tb, opts, func(p *pebble.DB) {
+		// insert initial heights to pebble
+		require.NoError(tb, p.Set(newHeightKey(codeFirstBlockHeight), pebbleStorage.EncodedUint64(first), nil))
+		require.NoError(tb, p.Set(newHeightKey(codeLatestBlockHeight), pebbleStorage.EncodedUint64(latest), nil))
+		r, err := pebbleStorage.NewRegisters(p, logger)
+		require.NoError(tb, err)
+		f(r)
+	})
 }
