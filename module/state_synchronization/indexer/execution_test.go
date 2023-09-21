@@ -169,17 +169,6 @@ func (i *indexTest) runGetRegisters(IDs flow.RegisterIDs, height uint64) ([]flow
 	return i.indexer.RegisterValues(IDs, height)
 }
 
-func TestExecutionState_HeightByBlockID(t *testing.T) {
-	blocks := blocksFixture(5)
-	indexer := ExecutionState{headers: newBlockHeadersStorage(blocks)}
-
-	for _, b := range blocks {
-		ret, err := indexer.HeightByBlockID(b.ID())
-		require.NoError(t, err)
-		require.Equal(t, b.Header.Height, ret)
-	}
-}
-
 func TestExecutionState_IndexBlockData(t *testing.T) {
 	blocks := blocksFixture(5)
 	block := blocks[len(blocks)-1]
