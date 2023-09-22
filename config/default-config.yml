@@ -25,6 +25,21 @@ network-config:
   unicast-bandwidth-rate-limit: 0
   # Bandwidth size in bytes a peer is allowed to send via unicast streams at once
   unicast-bandwidth-burst-limit: 1e9
+  # The minimum number of consecutive successful streams to reset the unicast stream creation retry budget from zero to the maximum default. If it is set to 100 for example, it
+  # means that if a peer has 100 consecutive successful streams to the remote peer, and the remote peer has a zero stream creation budget,
+  # the unicast stream creation retry budget for that remote peer will be reset to the maximum default.
+  unicast-stream-zero-retry-reset-threshold: 100
+  # The maximum number of retry attempts for creating a unicast stream to a remote peer before giving up. If it is set to 3 for example, it means that if a peer fails to create
+  # retry a unicast stream to a remote peer 3 times, the peer will give up and will not retry creating a unicast stream to that remote peer.
+  # When it is set to zero it means that the peer will not retry creating a unicast stream to a remote peer if it fails.
+  unicast-max-stream-creation-retry-attempt-times: 3
+  # The number of seconds that the local peer waits since the last successful dial to a remote peer before resetting the unicast dial retry budget from zero to the maximum default.
+  # If it is set to 3600s (1h) for example, it means that if it has passed at least one hour since the last successful dial, and the remote peer has a zero dial retry budget,
+  # the unicast dial retry budget for that remote peer will be reset to the maximum default.
+  unicast-dial-zero-retry-reset-threshold: 3600s
+  # The maximum number of retry attempts for dialing a remote peer before giving up. If it is set to 3 for example, it means that if a peer fails to dial a remote peer 3 times,
+  # the peer will give up and will not retry dialing that remote peer.
+  unicast-max-dial-retry-attempt-times: 3
   # Resource manager config
   # Maximum allowed fraction of file descriptors to be allocated by the libp2p resources in (0,1]
   libp2p-memory-limit-ratio: 0.5 # flow default
@@ -122,3 +137,5 @@ network-config:
   alsp-spam-report-queue-size: 10e4
   alsp-disable-penalty: false
   alsp-heart-beat-interval: 1s
+
+
