@@ -43,7 +43,7 @@ func TestGossipSubMeshTracer(t *testing.T) {
 
 	// logger hook to count the number of times the meshTracer logs at the interval specified.
 	hook := zerolog.HookFunc(func(e *zerolog.Event, level zerolog.Level, message string) {
-		if level == zerolog.InfoLevel {
+		if level == zerolog.DebugLevel {
 			if message == tracer.MeshLogIntervalMsg {
 				loggerCycle.Inc()
 			}
