@@ -343,8 +343,7 @@ func (builder *FlowAccessNodeBuilder) buildFollowerCore() *FlowAccessNodeBuilder
 			builder.FollowerDistributor,
 			node.FinalizedRootBlock.Header,
 			node.RootQC,
-			builder.Finalized,
-			builder.Pending)
+			builder.Finalized, builder.Pending)
 		if err != nil {
 			return nil, fmt.Errorf("could not initialize follower core: %w", err)
 		}
@@ -370,8 +369,7 @@ func (builder *FlowAccessNodeBuilder) buildFollowerEngine() *FlowAccessNodeBuild
 			builder.FollowerState,
 			builder.FollowerCore,
 			builder.Validator,
-			builder.SyncCore,
-			node.Tracer)
+			builder.SyncCore, node.Tracer)
 		if err != nil {
 			return nil, fmt.Errorf("could not create follower core: %w", err)
 		}
@@ -382,8 +380,7 @@ func (builder *FlowAccessNodeBuilder) buildFollowerEngine() *FlowAccessNodeBuild
 			node.Metrics.Engine,
 			node.Storage.Headers,
 			builder.Finalized,
-			core,
-			node.ComplianceConfig)
+			core, node.ComplianceConfig)
 		if err != nil {
 			return nil, fmt.Errorf("could not create follower engine: %w", err)
 		}
@@ -405,8 +402,7 @@ func (builder *FlowAccessNodeBuilder) buildSyncEngine() *FlowAccessNodeBuilder {
 			node.Storage.Blocks,
 			builder.FollowerEng,
 			builder.SyncCore,
-			builder.SyncEngineParticipantsProviderFactory(),
-			synceng.NewSpamDetectionConfig())
+			builder.SyncEngineParticipantsProviderFactory(), synceng.NewSpamDetectionConfig())
 		if err != nil {
 			return nil, fmt.Errorf("could not create synchronization engine: %w", err)
 		}
@@ -491,8 +487,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 			opts := []network.BlobServiceOption{
 				blob.WithBitswapOptions(
 					// Only allow block requests from staked ENs and ANs
-					bitswap.WithPeerBlockRequestFilter(blob.AuthorizedRequester(nil, builder.IdentityProvider, builder.Logger)),
-					bitswap.WithTracer(blob.NewTracer(node.Logger.With().Str("blob_service", channels.ExecutionDataService.String()).Logger()))),
+					bitswap.WithPeerBlockRequestFilter(blob.AuthorizedRequester(nil, builder.IdentityProvider, builder.Logger)), bitswap.WithTracer(blob.NewTracer(node.Logger.With().Str("blob_service", channels.ExecutionDataService.String()).Logger()))),
 			}
 
 			var err error
@@ -514,9 +509,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 			// Validation of the start block height needs to be done after loading state
 			if builder.executionDataStartHeight > 0 {
 				if builder.executionDataStartHeight <= builder.FinalizedRootBlock.Header.Height {
-					return nil, fmt.Errorf("execution data start block height (%d) must be greater than the root block height (%d)",
-						builder.executionDataStartHeight,
-						builder.FinalizedRootBlock.Header.Height)
+					return nil, fmt.Errorf("execution data start block height (%d) must be greater than the root block height (%d)", builder.executionDataStartHeight, builder.FinalizedRootBlock.Header.Height)
 				}
 
 				latestSeal, err := builder.State.Sealed().Head()
@@ -529,9 +522,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 				// very beginning of a spork, this check will always fail. Operators should not specify
 				// an InitialBlockHeight when starting from the beginning of a spork.
 				if builder.executionDataStartHeight > latestSeal.Height {
-					return nil, fmt.Errorf("execution data start block height (%d) must be less than or equal to the latest sealed block height (%d)",
-						builder.executionDataStartHeight,
-						latestSeal.Height)
+					return nil, fmt.Errorf("execution data start block height (%d) must be less than or equal to the latest sealed block height (%d)", builder.executionDataStartHeight, latestSeal.Height)
 				}
 
 				// executionDataStartHeight is provided as the first block to sync, but the
@@ -560,8 +551,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 				processedBlockHeight,
 				processedNotifications,
 				builder.State,
-				builder.Storage.Headers,
-				builder.executionDataConfig)
+				builder.Storage.Headers, builder.executionDataConfig)
 
 			builder.FollowerDistributor.AddOnBlockFinalizedConsumer(builder.ExecutionDataRequester.OnBlockFinalized)
 			builder.ExecutionDataRequester.AddOnExecutionDataReceivedConsumer(execDataDistributor.OnExecutionDataReceived)
@@ -616,8 +606,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 				node.Storage.Headers,
 				node.RootChainID,
 				builder.stateStreamGrpcServer,
-				builder.stateStreamBackend,
-				broadcaster)
+				builder.stateStreamBackend, broadcaster)
 			if err != nil {
 				return nil, fmt.Errorf("could not create state stream engine: %w", err)
 			}
@@ -659,133 +648,57 @@ func (builder *FlowAccessNodeBuilder) extraFlags() {
 		flags.UintVar(&builder.executionGRPCPort, "execution-ingress-port", defaultConfig.executionGRPCPort, "the grpc ingress port for all execution nodes")
 		flags.StringVarP(&builder.rpcConf.UnsecureGRPCListenAddr, "rpc-addr", "r", defaultConfig.rpcConf.UnsecureGRPCListenAddr, "the address the unsecured gRPC server listens on")
 		flags.StringVar(&builder.rpcConf.SecureGRPCListenAddr, "secure-rpc-addr", defaultConfig.rpcConf.SecureGRPCListenAddr, "the address the secure gRPC server listens on")
-		flags.StringVar(&builder.stateStreamConf.ListenAddr,
-			"state-stream-addr",
-			defaultConfig.stateStreamConf.ListenAddr,
-			"the address the state stream server listens on (if empty the server will not be started)")
+		flags.StringVar(&builder.stateStreamConf.ListenAddr, "state-stream-addr", defaultConfig.stateStreamConf.ListenAddr, "the address the state stream server listens on (if empty the server will not be started)")
 		flags.StringVarP(&builder.rpcConf.HTTPListenAddr, "http-addr", "h", defaultConfig.rpcConf.HTTPListenAddr, "the address the http proxy server listens on")
-		flags.StringVar(&builder.rpcConf.RestConfig.ListenAddress,
-			"rest-addr",
-			defaultConfig.rpcConf.RestConfig.ListenAddress,
-			"the address the REST server listens on (if empty the REST server will not be started)")
+		flags.StringVar(&builder.rpcConf.RestConfig.ListenAddress, "rest-addr", defaultConfig.rpcConf.RestConfig.ListenAddress, "the address the REST server listens on (if empty the REST server will not be started)")
 		flags.DurationVar(&builder.rpcConf.RestConfig.WriteTimeout, "rest-write-timeout", defaultConfig.rpcConf.RestConfig.WriteTimeout, "timeout to use when writing REST response")
 		flags.DurationVar(&builder.rpcConf.RestConfig.ReadTimeout, "rest-read-timeout", defaultConfig.rpcConf.RestConfig.ReadTimeout, "timeout to use when reading REST request headers")
 		flags.DurationVar(&builder.rpcConf.RestConfig.IdleTimeout, "rest-idle-timeout", defaultConfig.rpcConf.RestConfig.IdleTimeout, "idle timeout for REST connections")
 		flags.StringVarP(&builder.rpcConf.CollectionAddr, "static-collection-ingress-addr", "", defaultConfig.rpcConf.CollectionAddr, "the address (of the collection node) to send transactions to")
 		flags.StringVarP(&builder.ExecutionNodeAddress, "script-addr", "s", defaultConfig.ExecutionNodeAddress, "the address (of the execution node) forward the script to")
-		flags.StringSliceVar(&builder.rpcConf.BackendConfig.ArchiveAddressList,
-			"archive-address-list",
-			defaultConfig.rpcConf.BackendConfig.ArchiveAddressList,
-			"the list of address of the archive node to forward the script queries to")
-		flags.BoolVar(&builder.rpcConf.BackendConfig.ScriptExecValidation,
-			"validate-rn-script-exec",
-			defaultConfig.rpcConf.BackendConfig.ScriptExecValidation,
-			"whether to validate script execution results from the archive node with results from the execution node")
+		flags.StringSliceVar(&builder.rpcConf.BackendConfig.ArchiveAddressList, "archive-address-list", defaultConfig.rpcConf.BackendConfig.ArchiveAddressList, "the list of address of the archive node to forward the script queries to")
+		flags.BoolVar(&builder.rpcConf.BackendConfig.ScriptExecValidation, "validate-rn-script-exec", defaultConfig.rpcConf.BackendConfig.ScriptExecValidation, "whether to validate script execution results from the archive node with results from the execution node")
 		flags.StringVarP(&builder.rpcConf.HistoricalAccessAddrs, "historical-access-addr", "", defaultConfig.rpcConf.HistoricalAccessAddrs, "comma separated rpc addresses for historical access nodes")
-		flags.DurationVar(&builder.rpcConf.BackendConfig.CollectionClientTimeout,
-			"collection-client-timeout",
-			defaultConfig.rpcConf.BackendConfig.CollectionClientTimeout,
-			"grpc client timeout for a collection node")
-		flags.DurationVar(&builder.rpcConf.BackendConfig.ExecutionClientTimeout,
-			"execution-client-timeout",
-			defaultConfig.rpcConf.BackendConfig.ExecutionClientTimeout,
-			"grpc client timeout for an execution node")
-		flags.UintVar(&builder.rpcConf.BackendConfig.ConnectionPoolSize,
-			"connection-pool-size",
-			defaultConfig.rpcConf.BackendConfig.ConnectionPoolSize,
-			"maximum number of connections allowed in the connection pool, size of 0 disables the connection pooling, and anything less than the default size will be overridden to use the default size")
+		flags.DurationVar(&builder.rpcConf.BackendConfig.CollectionClientTimeout, "collection-client-timeout", defaultConfig.rpcConf.BackendConfig.CollectionClientTimeout, "grpc client timeout for a collection node")
+		flags.DurationVar(&builder.rpcConf.BackendConfig.ExecutionClientTimeout, "execution-client-timeout", defaultConfig.rpcConf.BackendConfig.ExecutionClientTimeout, "grpc client timeout for an execution node")
+		flags.UintVar(&builder.rpcConf.BackendConfig.ConnectionPoolSize, "connection-pool-size", defaultConfig.rpcConf.BackendConfig.ConnectionPoolSize, "maximum number of connections allowed in the connection pool, size of 0 disables the connection pooling, and anything less than the default size will be overridden to use the default size")
 		flags.UintVar(&builder.rpcConf.MaxMsgSize, "rpc-max-message-size", grpcutils.DefaultMaxMsgSize, "the maximum message size in bytes for messages sent or received over grpc")
 		flags.UintVar(&builder.rpcConf.BackendConfig.MaxHeightRange, "rpc-max-height-range", defaultConfig.rpcConf.BackendConfig.MaxHeightRange, "maximum size for height range requests")
-		flags.StringSliceVar(&builder.rpcConf.BackendConfig.PreferredExecutionNodeIDs,
-			"preferred-execution-node-ids",
-			defaultConfig.rpcConf.BackendConfig.PreferredExecutionNodeIDs,
-			"comma separated list of execution nodes ids to choose from when making an upstream call e.g. b4a4dbdcd443d...,fb386a6a... etc.")
-		flags.StringSliceVar(&builder.rpcConf.BackendConfig.FixedExecutionNodeIDs,
-			"fixed-execution-node-ids",
-			defaultConfig.rpcConf.BackendConfig.FixedExecutionNodeIDs,
-			"comma separated list of execution nodes ids to choose from when making an upstream call if no matching preferred execution id is found e.g. b4a4dbdcd443d...,fb386a6a... etc.")
+		flags.StringSliceVar(&builder.rpcConf.BackendConfig.PreferredExecutionNodeIDs, "preferred-execution-node-ids", defaultConfig.rpcConf.BackendConfig.PreferredExecutionNodeIDs, "comma separated list of execution nodes ids to choose from when making an upstream call e.g. b4a4dbdcd443d...,fb386a6a... etc.")
+		flags.StringSliceVar(&builder.rpcConf.BackendConfig.FixedExecutionNodeIDs, "fixed-execution-node-ids", defaultConfig.rpcConf.BackendConfig.FixedExecutionNodeIDs, "comma separated list of execution nodes ids to choose from when making an upstream call if no matching preferred execution id is found e.g. b4a4dbdcd443d...,fb386a6a... etc.")
 		flags.BoolVar(&builder.logTxTimeToFinalized, "log-tx-time-to-finalized", defaultConfig.logTxTimeToFinalized, "log transaction time to finalized")
 		flags.BoolVar(&builder.logTxTimeToExecuted, "log-tx-time-to-executed", defaultConfig.logTxTimeToExecuted, "log transaction time to executed")
 		flags.BoolVar(&builder.logTxTimeToFinalizedExecuted, "log-tx-time-to-finalized-executed", defaultConfig.logTxTimeToFinalizedExecuted, "log transaction time to finalized and executed")
 		flags.BoolVar(&builder.pingEnabled, "ping-enabled", defaultConfig.pingEnabled, "whether to enable the ping process that pings all other peers and report the connectivity to metrics")
 		flags.BoolVar(&builder.retryEnabled, "retry-enabled", defaultConfig.retryEnabled, "whether to enable the retry mechanism at the access node level")
 		flags.BoolVar(&builder.rpcMetricsEnabled, "rpc-metrics-enabled", defaultConfig.rpcMetricsEnabled, "whether to enable the rpc metrics")
-		flags.StringVarP(&builder.nodeInfoFile,
-			"node-info-file",
-			"",
-			defaultConfig.nodeInfoFile,
-			"full path to a json file which provides more details about nodes when reporting its reachability metrics")
+		flags.StringVarP(&builder.nodeInfoFile, "node-info-file", "", defaultConfig.nodeInfoFile, "full path to a json file which provides more details about nodes when reporting its reachability metrics")
 		flags.StringToIntVar(&builder.apiRatelimits, "api-rate-limits", defaultConfig.apiRatelimits, "per second rate limits for Access API methods e.g. Ping=300,GetTransaction=500 etc.")
 		flags.StringToIntVar(&builder.apiBurstlimits, "api-burst-limits", defaultConfig.apiBurstlimits, "burst limits for Access API methods e.g. Ping=100,GetTransaction=100 etc.")
 		flags.BoolVar(&builder.supportsObserver, "supports-observer", defaultConfig.supportsObserver, "true if this staked access node supports observer or follower connections")
 		flags.StringVar(&builder.PublicNetworkConfig.BindAddress, "public-network-address", defaultConfig.PublicNetworkConfig.BindAddress, "staked access node's public network bind address")
-		flags.BoolVar(&builder.rpcConf.BackendConfig.CircuitBreakerConfig.Enabled,
-			"circuit-breaker-enabled",
-			defaultConfig.rpcConf.BackendConfig.CircuitBreakerConfig.Enabled,
-			"specifies whether the circuit breaker is enabled for collection and execution API clients.")
-		flags.DurationVar(&builder.rpcConf.BackendConfig.CircuitBreakerConfig.RestoreTimeout,
-			"circuit-breaker-restore-timeout",
-			defaultConfig.rpcConf.BackendConfig.CircuitBreakerConfig.RestoreTimeout,
-			"duration after which the circuit breaker will restore the connection to the client after closing it due to failures. Default value is 60s")
-		flags.Uint32Var(&builder.rpcConf.BackendConfig.CircuitBreakerConfig.MaxFailures,
-			"circuit-breaker-max-failures",
-			defaultConfig.rpcConf.BackendConfig.CircuitBreakerConfig.MaxFailures,
-			"maximum number of failed calls to the client that will cause the circuit breaker to close the connection. Default value is 5")
-		flags.Uint32Var(&builder.rpcConf.BackendConfig.CircuitBreakerConfig.MaxRequests,
-			"circuit-breaker-max-requests",
-			defaultConfig.rpcConf.BackendConfig.CircuitBreakerConfig.MaxRequests,
-			"maximum number of requests to check if connection restored after timeout. Default value is 1")
+		flags.BoolVar(&builder.rpcConf.BackendConfig.CircuitBreakerConfig.Enabled, "circuit-breaker-enabled", defaultConfig.rpcConf.BackendConfig.CircuitBreakerConfig.Enabled, "specifies whether the circuit breaker is enabled for collection and execution API clients.")
+		flags.DurationVar(&builder.rpcConf.BackendConfig.CircuitBreakerConfig.RestoreTimeout, "circuit-breaker-restore-timeout", defaultConfig.rpcConf.BackendConfig.CircuitBreakerConfig.RestoreTimeout, "duration after which the circuit breaker will restore the connection to the client after closing it due to failures. Default value is 60s")
+		flags.Uint32Var(&builder.rpcConf.BackendConfig.CircuitBreakerConfig.MaxFailures, "circuit-breaker-max-failures", defaultConfig.rpcConf.BackendConfig.CircuitBreakerConfig.MaxFailures, "maximum number of failed calls to the client that will cause the circuit breaker to close the connection. Default value is 5")
+		flags.Uint32Var(&builder.rpcConf.BackendConfig.CircuitBreakerConfig.MaxRequests, "circuit-breaker-max-requests", defaultConfig.rpcConf.BackendConfig.CircuitBreakerConfig.MaxRequests, "maximum number of requests to check if connection restored after timeout. Default value is 1")
 		// ExecutionDataRequester config
 		flags.BoolVar(&builder.executionDataSyncEnabled, "execution-data-sync-enabled", defaultConfig.executionDataSyncEnabled, "whether to enable the execution data sync protocol")
 		flags.StringVar(&builder.executionDataDir, "execution-data-dir", defaultConfig.executionDataDir, "directory to use for Execution Data database")
-		flags.Uint64Var(&builder.executionDataStartHeight,
-			"execution-data-start-height",
-			defaultConfig.executionDataStartHeight,
-			"height of first block to sync execution data from when starting with an empty Execution Data database")
-		flags.Uint64Var(&builder.executionDataConfig.MaxSearchAhead,
-			"execution-data-max-search-ahead",
-			defaultConfig.executionDataConfig.MaxSearchAhead,
-			"max number of heights to search ahead of the lowest outstanding execution data height")
-		flags.DurationVar(&builder.executionDataConfig.FetchTimeout,
-			"execution-data-fetch-timeout",
-			defaultConfig.executionDataConfig.FetchTimeout,
-			"initial timeout to use when fetching execution data from the network. timeout increases using an incremental backoff until execution-data-max-fetch-timeout. e.g. 30s")
-		flags.DurationVar(&builder.executionDataConfig.MaxFetchTimeout,
-			"execution-data-max-fetch-timeout",
-			defaultConfig.executionDataConfig.MaxFetchTimeout,
-			"maximum timeout to use when fetching execution data from the network e.g. 300s")
-		flags.DurationVar(&builder.executionDataConfig.RetryDelay,
-			"execution-data-retry-delay",
-			defaultConfig.executionDataConfig.RetryDelay,
-			"initial delay for exponential backoff when fetching execution data fails e.g. 10s")
-		flags.DurationVar(&builder.executionDataConfig.MaxRetryDelay,
-			"execution-data-max-retry-delay",
-			defaultConfig.executionDataConfig.MaxRetryDelay,
-			"maximum delay for exponential backoff when fetching execution data fails e.g. 5m")
+		flags.Uint64Var(&builder.executionDataStartHeight, "execution-data-start-height", defaultConfig.executionDataStartHeight, "height of first block to sync execution data from when starting with an empty Execution Data database")
+		flags.Uint64Var(&builder.executionDataConfig.MaxSearchAhead, "execution-data-max-search-ahead", defaultConfig.executionDataConfig.MaxSearchAhead, "max number of heights to search ahead of the lowest outstanding execution data height")
+		flags.DurationVar(&builder.executionDataConfig.FetchTimeout, "execution-data-fetch-timeout", defaultConfig.executionDataConfig.FetchTimeout, "initial timeout to use when fetching execution data from the network. timeout increases using an incremental backoff until execution-data-max-fetch-timeout. e.g. 30s")
+		flags.DurationVar(&builder.executionDataConfig.MaxFetchTimeout, "execution-data-max-fetch-timeout", defaultConfig.executionDataConfig.MaxFetchTimeout, "maximum timeout to use when fetching execution data from the network e.g. 300s")
+		flags.DurationVar(&builder.executionDataConfig.RetryDelay, "execution-data-retry-delay", defaultConfig.executionDataConfig.RetryDelay, "initial delay for exponential backoff when fetching execution data fails e.g. 10s")
+		flags.DurationVar(&builder.executionDataConfig.MaxRetryDelay, "execution-data-max-retry-delay", defaultConfig.executionDataConfig.MaxRetryDelay, "maximum delay for exponential backoff when fetching execution data fails e.g. 5m")
 
 		// Execution State Streaming API
 		flags.Uint32Var(&builder.stateStreamConf.ExecutionDataCacheSize, "execution-data-cache-size", defaultConfig.stateStreamConf.ExecutionDataCacheSize, "block execution data cache size")
 		flags.Uint32Var(&builder.stateStreamConf.MaxGlobalStreams, "state-stream-global-max-streams", defaultConfig.stateStreamConf.MaxGlobalStreams, "global maximum number of concurrent streams")
-		flags.UintVar(&builder.stateStreamConf.MaxExecutionDataMsgSize,
-			"state-stream-max-message-size",
-			defaultConfig.stateStreamConf.MaxExecutionDataMsgSize,
-			"maximum size for a gRPC message containing block execution data")
-		flags.StringToIntVar(&builder.stateStreamFilterConf,
-			"state-stream-event-filter-limits",
-			defaultConfig.stateStreamFilterConf,
-			"event filter limits for ExecutionData SubscribeEvents API e.g. EventTypes=100,Addresses=100,Contracts=100 etc.")
-		flags.DurationVar(&builder.stateStreamConf.ClientSendTimeout,
-			"state-stream-send-timeout",
-			defaultConfig.stateStreamConf.ClientSendTimeout,
-			"maximum wait before timing out while sending a response to a streaming client e.g. 30s")
-		flags.UintVar(&builder.stateStreamConf.ClientSendBufferSize,
-			"state-stream-send-buffer-size",
-			defaultConfig.stateStreamConf.ClientSendBufferSize,
-			"maximum number of responses to buffer within a stream")
-		flags.Float64Var(&builder.stateStreamConf.ResponseLimit,
-			"state-stream-response-limit",
-			defaultConfig.stateStreamConf.ResponseLimit,
-			"max number of responses per second to send over streaming endpoints. this helps manage resources consumed by each client querying data not in the cache e.g. 3 or 0.5. 0 means no limit")
+		flags.UintVar(&builder.stateStreamConf.MaxExecutionDataMsgSize, "state-stream-max-message-size", defaultConfig.stateStreamConf.MaxExecutionDataMsgSize, "maximum size for a gRPC message containing block execution data")
+		flags.StringToIntVar(&builder.stateStreamFilterConf, "state-stream-event-filter-limits", defaultConfig.stateStreamFilterConf, "event filter limits for ExecutionData SubscribeEvents API e.g. EventTypes=100,Addresses=100,Contracts=100 etc.")
+		flags.DurationVar(&builder.stateStreamConf.ClientSendTimeout, "state-stream-send-timeout", defaultConfig.stateStreamConf.ClientSendTimeout, "maximum wait before timing out while sending a response to a streaming client e.g. 30s")
+		flags.UintVar(&builder.stateStreamConf.ClientSendBufferSize, "state-stream-send-buffer-size", defaultConfig.stateStreamConf.ClientSendBufferSize, "maximum number of responses to buffer within a stream")
+		flags.Float64Var(&builder.stateStreamConf.ResponseLimit, "state-stream-response-limit", defaultConfig.stateStreamConf.ResponseLimit, "max number of responses per second to send over streaming endpoints. this helps manage resources consumed by each client querying data not in the cache e.g. 3 or 0.5. 0 means no limit")
 
 		flags.UintVar(&builder.TxResultCacheSize, "transaction-result-cache-size", defaultConfig.TxResultCacheSize, "transaction result cache size.(Disabled by default i.e 0)")
 	}).ValidateFlags(func() error {
@@ -885,8 +798,7 @@ func (builder *FlowAccessNodeBuilder) InitIDProviders() {
 		}
 
 		builder.SyncEngineParticipantsProviderFactory = func() module.IdentifierProvider {
-			return id.NewIdentityFilterIdentifierProvider(filter.And(filter.HasRole(flow.RoleConsensus), filter.Not(filter.HasNodeID(node.Me.NodeID())), p2pnet.NotEjectedFilter),
-				builder.IdentityProvider)
+			return id.NewIdentityFilterIdentifierProvider(filter.And(filter.HasRole(flow.RoleConsensus), filter.Not(filter.HasNodeID(node.Me.NodeID())), p2pnet.NotEjectedFilter), builder.IdentityProvider)
 		}
 		return nil
 	})
@@ -1005,8 +917,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 			builder.TransactionMetrics = metrics.NewTransactionCollector(node.Logger,
 				builder.TransactionTimings,
 				builder.logTxTimeToFinalized,
-				builder.logTxTimeToExecuted,
-				builder.logTxTimeToFinalizedExecuted)
+				builder.logTxTimeToExecuted, builder.logTxTimeToFinalizedExecuted)
 			return nil
 		}).
 		Module("rest metrics", func(node *cmd.NodeConfig) error {
@@ -1019,8 +930,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 		}).
 		Module("access metrics", func(node *cmd.NodeConfig) error {
 			builder.AccessMetrics = metrics.NewAccessCollector(metrics.WithTransactionMetrics(builder.TransactionMetrics),
-				metrics.WithBackendScriptsMetrics(builder.TransactionMetrics),
-				metrics.WithRestMetrics(builder.RestMetrics))
+				metrics.WithBackendScriptsMetrics(builder.TransactionMetrics), metrics.WithRestMetrics(builder.RestMetrics))
 			return nil
 		}).
 		Module("ping metrics", func(node *cmd.NodeConfig) error {
@@ -1132,8 +1042,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				builder.secureGrpcServer,
 				builder.unsecureGrpcServer,
 				builder.stateStreamBackend,
-				builder.stateStreamConf.EventFilterConfig,
-				builder.stateStreamConf.MaxGlobalStreams)
+				builder.stateStreamConf.EventFilterConfig, builder.stateStreamConf.MaxGlobalStreams)
 			if err != nil {
 				return nil, err
 			}
@@ -1158,8 +1067,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				node.Me,
 				node.State,
 				channels.RequestCollections,
-				filter.HasRole(flow.RoleCollection),
-				func() flow.Entity { return &flow.Collection{} })
+				filter.HasRole(flow.RoleCollection), func() flow.Entity { return &flow.Collection{} })
 			if err != nil {
 				return nil, fmt.Errorf("could not create requester engine: %w", err)
 			}
@@ -1177,8 +1085,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				node.Storage.Receipts,
 				builder.AccessMetrics,
 				builder.CollectionsToMarkFinalized,
-				builder.CollectionsToMarkExecuted,
-				builder.BlocksToMarkExecuted)
+				builder.CollectionsToMarkExecuted, builder.BlocksToMarkExecuted)
 			if err != nil {
 				return nil, err
 			}
@@ -1201,8 +1108,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				builder.AccessNodeConfig.PublicNetworkConfig.Network,
 				node.Me,
 				node.State,
-				node.Storage.Blocks,
-				builder.SyncCore)
+				node.Storage.Blocks, builder.SyncCore)
 			if err != nil {
 				return nil, fmt.Errorf("could not create public sync request handler: %w", err)
 			}
@@ -1345,47 +1251,40 @@ func (builder *FlowAccessNodeBuilder) initPublicLibp2pNode(networkKey crypto.Pri
 	}
 	meshTracer := tracer.NewGossipSubMeshTracer(meshTracerCfg)
 
-	libp2pNode, err := p2pbuilder.NewNodeBuilder(builder.Logger,
-		&p2pconfig.MetricsConfig{
-			HeroCacheFactory: builder.HeroCacheMetricsFactory(),
-			Metrics:          networkMetrics,
-		},
-		network.PublicNetwork,
-		bindAddress,
-		networkKey,
-		builder.SporkID,
-		builder.IdentityProvider,
-		&builder.FlowConfig.NetworkConfig.ResourceManagerConfig,
-		&builder.FlowConfig.NetworkConfig.GossipSubConfig.GossipSubRPCInspectorsConfig,
-		&p2pconfig.PeerManagerConfig{
-			// TODO: eventually, we need pruning enabled even on public network. However, it needs a modified version of
-			// the peer manager that also operate on the public identities.
-			ConnectionPruning: connection.PruningDisabled,
-			UpdateInterval:    builder.FlowConfig.NetworkConfig.PeerUpdateInterval,
-			ConnectorFactory:  connection.DefaultLibp2pBackoffConnectorFactory(),
-		},
-		&p2p.DisallowListCacheConfig{
-			MaxSize: builder.FlowConfig.NetworkConfig.DisallowListNotificationCacheSize,
-			Metrics: metrics.DisallowListCacheMetricsFactory(builder.HeroCacheMetricsFactory(), network.PublicNetwork),
-		},
-		meshTracer,
-		&p2pconfig.UnicastConfig{
-			StreamRetryInterval:                builder.FlowConfig.NetworkConfig.UnicastConfig.UnicastCreateStreamRetryDelay,
-			StreamZeroRetryResetThreshold:      builder.FlowConfig.NetworkConfig.UnicastStreamZeroRetryResetThreshold,
-			DialZeroRetryResetThreshold:        builder.FlowConfig.NetworkConfig.UnicastDialZeroRetryResetThreshold,
-			DialConfigCacheSize:                builder.FlowConfig.NetworkConfig.UnicastDialConfigCacheSize,
-			MaxDialRetryAttemptTimes:           builder.FlowConfig.NetworkConfig.UnicastMaxDialRetryAttemptTimes,
-			MaxStreamCreationRetryAttemptTimes: builder.FlowConfig.NetworkConfig.UnicastMaxStreamCreationRetryAttemptTimes,
-		}).
+	libp2pNode, err := p2pbuilder.NewNodeBuilder(builder.Logger, &p2pconfig.MetricsConfig{
+		HeroCacheFactory: builder.HeroCacheMetricsFactory(),
+		Metrics:          networkMetrics,
+	}, network.PublicNetwork, bindAddress, networkKey, builder.SporkID, builder.IdentityProvider, &builder.FlowConfig.NetworkConfig.ResourceManagerConfig, &builder.FlowConfig.NetworkConfig.GossipSubConfig.GossipSubRPCInspectorsConfig, &p2pconfig.PeerManagerConfig{
+		// TODO: eventually, we need pruning enabled even on public network. However, it needs a modified version of
+		// the peer manager that also operate on the public identities.
+		ConnectionPruning: connection.PruningDisabled,
+		UpdateInterval:    builder.FlowConfig.NetworkConfig.PeerUpdateInterval,
+		ConnectorFactory:  connection.DefaultLibp2pBackoffConnectorFactory(),
+	}, &p2p.DisallowListCacheConfig{
+		MaxSize: builder.FlowConfig.NetworkConfig.DisallowListNotificationCacheSize,
+		Metrics: metrics.DisallowListCacheMetricsFactory(builder.HeroCacheMetricsFactory(), network.PublicNetwork),
+	}, meshTracer, &p2pconfig.UnicastConfig{
+		StreamRetryInterval:                builder.FlowConfig.NetworkConfig.UnicastConfig.UnicastCreateStreamRetryDelay,
+		StreamZeroRetryResetThreshold:      builder.FlowConfig.NetworkConfig.UnicastStreamZeroRetryResetThreshold,
+		DialZeroRetryResetThreshold:        builder.FlowConfig.NetworkConfig.UnicastDialZeroRetryResetThreshold,
+		DialConfigCacheSize:                builder.FlowConfig.NetworkConfig.UnicastDialConfigCacheSize,
+		MaxDialRetryAttemptTimes:           builder.FlowConfig.NetworkConfig.UnicastMaxDialRetryAttemptTimes,
+		MaxStreamCreationRetryAttemptTimes: builder.FlowConfig.NetworkConfig.UnicastMaxStreamCreationRetryAttemptTimes,
+	}).
 		SetBasicResolver(builder.Resolver).
 		SetSubscriptionFilter(subscription.NewRoleBasedFilter(flow.RoleAccess, builder.IdentityProvider)).
 		SetConnectionManager(connManager).
 		SetRoutingSystem(func(ctx context.Context, h host.Host) (routing.Routing, error) {
 			return dht.NewDHT(ctx, h, protocols.FlowPublicDHTProtocolID(builder.SporkID), builder.Logger, networkMetrics, dht.AsServer())
 		}).
+		// disable connection pruning for the access node which supports the observer
 		SetGossipSubTracer(meshTracer).
 		SetGossipSubScoreTracerInterval(builder.FlowConfig.NetworkConfig.GossipSubConfig.ScoreTracerInterval).
 		Build()
+
+	if err != nil {
+		return nil, fmt.Errorf("could not build libp2p node for staked access node: %w", err)
+	}
 
 	if err != nil {
 		return nil, fmt.Errorf("could not build libp2p node for staked access node: %w", err)
