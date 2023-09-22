@@ -388,17 +388,17 @@ func TestNoBackoffWhenCreatingStream(t *testing.T) {
 	someGraceTime := 100 * time.Millisecond
 	totalWaitTime := maxTimeToWait + someGraceTime
 
-	//each CreateStream() call may try to connect up to MaxDialAttemptTimes (3) times.
+	//each CreateStream() call may try to connect up to MaxDialRetryAttemptTimes (3) times.
 
 	//there are 2 scenarios that we need to account for:
 	//
 	//1. machines where a timeout occurs on the first connection attempt - this can be due to local firewall rules or other processes running on the machine.
 	//   In this case, we need to create a scenario where a backoff would have normally occured. This is why we initiate a second connection attempt.
 	//   Libp2p remembers the peer we are trying to connect to between CreateStream() calls and would have initiated a backoff if backoff wasn't turned off.
-	//   The second CreateStream() call will make a second connection attempt MaxDialAttemptTimes times and that should never result in a backoff error.
+	//   The second CreateStream() call will make a second connection attempt MaxDialRetryAttemptTimes times and that should never result in a backoff error.
 	//
 	//2. machines where a timeout does NOT occur on the first connection attempt - this is on CI machines and some local dev machines without a firewall / too many other processes.
-	//   In this case, there will be MaxDialAttemptTimes (3) connection attempts on the first CreateStream() call and MaxDialAttemptTimes (3) attempts on the second CreateStream() call.
+	//   In this case, there will be MaxDialRetryAttemptTimes (3) connection attempts on the first CreateStream() call and MaxDialRetryAttemptTimes (3) attempts on the second CreateStream() call.
 
 	// make two separate stream creation attempt and assert that no connection back off happened
 	for i := 0; i < 2; i++ {

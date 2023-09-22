@@ -439,9 +439,9 @@ func TestCreateStream_SinglePeerDial(t *testing.T) {
 	unittest.RequireReturnsBefore(t, wg.Wait, 3*time.Second, "cannot create streams on time")
 
 	// we expect a single routine to start attempting to dial thus the number of retries
-	// before failure should be at most p2pnode.MaxDialAttemptTimes
+	// before failure should be at most p2pnode.MaxDialRetryAttemptTimes
 	expectedNumOfDialRetries := int64(unicastmodel.MaxDialAttemptTimes)
-	// we expect the second routine to retry creating a stream p2pnode.MaxDialAttemptTimes when dialing is in progress
+	// we expect the second routine to retry creating a stream p2pnode.MaxDialRetryAttemptTimes when dialing is in progress
 	expectedCreateStreamRetries := int64(unicastmodel.MaxDialAttemptTimes)
 	require.Equal(t, expectedNumOfDialRetries, dialPeerRetries.Load(), fmt.Sprintf("expected %d dial peer retries got %d", expectedNumOfDialRetries, dialPeerRetries.Load()))
 	require.Equal(t, expectedCreateStreamRetries, createStreamRetries.Load(), fmt.Sprintf("expected %d dial peer retries got %d", expectedCreateStreamRetries, createStreamRetries.Load()))

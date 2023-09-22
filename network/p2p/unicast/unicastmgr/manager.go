@@ -26,7 +26,7 @@ import (
 
 const (
 	// MaxRetryJitter is the maximum number of milliseconds to wait between attempts for a 1-1 direct connection
-	MaxRetryJitter = 5
+	MaxRetryJitter = 5 * time.Millisecond
 
 	// DefaultRetryDelay Initial delay between failing to establish a connection with another node and retrying. This delay
 	// increases exponentially (exponential backoff) with the number of subsequent failures to establish a connection.
@@ -86,50 +86,6 @@ type Manager struct {
 	maxStreamCreationAttemptTimes uint64
 }
 
-// TODO-3: test for dial config cache.
-// TODO-4: wire the paramters as flags.
-// TODO-5: metrics
-type ManagerConfig struct {
-	Logger                 zerolog.Logger
-	StreamFactory          p2p.StreamFactory
-	SporkId                flow.Identifier
-	ConnStatus             p2p.PeerConnections
-	CreateStreamRetryDelay time.Duration
-	Metrics                module.UnicastManagerMetrics
-
-	// StreamZeroBackoffResetThreshold is the threshold that determines when to reset the stream creation backoff budget to the default value.
-	//
-	// For example the default value of 100 means that if the stream creation backoff budget is decreased to 0, then it will be reset to default value
-	// when the number of consecutive successful streams reaches 100.
-	//
-	// This is to prevent the backoff budget from being reset too frequently, as the backoff budget is used to gauge the reliability of the stream creation.
-	// When the stream creation backoff budget is reset to the default value, it means that the stream creation is reliable enough to be trusted again.
-	// This parameter mandates when the stream creation is reliable enough to be trusted again; i.e., when the number of consecutive successful streams reaches this threshold.
-	// Note that the counter is reset to 0 when the stream creation fails, so the value of for example 100 means that the stream creation is reliable enough that the recent
-	// 100 stream creations are all successful.
-	StreamZeroBackoffResetThreshold uint64
-
-	// DialZeroBackoffResetThreshold is the threshold that determines when to reset the dial backoff budget to the default value.
-	// For example the threshold of 1 hour means that if the dial backoff budget is decreased to 0, then it will be reset to default value
-	// when it has been 1 hour since the last successful dial.
-	//
-	// This is to prevent the backoff budget from being reset too frequently, as the backoff budget is used to gauge the reliability of the dialing a remote peer.
-	// When the dial backoff budget is reset to the default value, it means that the dialing is reliable enough to be trusted again.
-	// This parameter mandates when the dialing is reliable enough to be trusted again; i.e., when it has been 1 hour since the last successful dial.
-	// Note that the last dial attempt timestamp is reset to zero when the dial fails, so the value of for example 1 hour means that the dialing to the remote peer is reliable enough that the last
-	// successful dial attempt was 1 hour ago.
-	DialZeroBackoffResetThreshold time.Duration
-
-	// MaxDialAttemptTimes is the maximum number of attempts to be made to connect to a remote node to establish a unicast (1:1) connection before we give up.
-	MaxDialAttemptTimes uint64
-
-	// MaxStreamCreationAttemptTimes is the maximum number of attempts to be made to create a stream to a remote node over a direct unicast (1:1) connection before we give up.
-	MaxStreamCreationAttemptTimes uint64
-
-	// DialConfigCacheFactory is a factory function to create a new dial config cache.
-	DialConfigCacheFactory DialConfigCacheFactory
-}
-
 // NewUnicastManager creates a new unicast manager.
 // Args:
 //   - cfg: configuration for the unicast manager.
@@ -138,16 +94,16 @@ type ManagerConfig struct {
 //   - a new unicast manager.
 //   - an error if the configuration is invalid, any error is irrecoverable.
 func NewUnicastManager(cfg *ManagerConfig) (*Manager, error) {
-	if cfg.MaxStreamCreationAttemptTimes == uint64(0) {
+	if cfg.MaxStreamCreationRetryAttemptTimes == uint64(0) {
 		return nil, fmt.Errorf("max stream creation attempt times must be greater than 0")
 	}
-	if cfg.MaxDialAttemptTimes == uint64(0) {
+	if cfg.MaxDialRetryAttemptTimes == uint64(0) {
 		return nil, fmt.Errorf("max dial attempt times must be greater than 0")
 	}
-	if cfg.DialZeroBackoffResetThreshold == time.Duration(0) {
+	if cfg.DialRetryZeroRetryResetThreshold == time.Duration(0) {
 		return nil, fmt.Errorf("dial zero backoff reset threshold must be greater than 0")
 	}
-	if cfg.StreamZeroBackoffResetThreshold == uint64(0) {
+	if cfg.StreamZeroRetryResetThreshold == uint64(0) {
 		return nil, fmt.Errorf("stream zero backoff reset threshold must be greater than 0")
 	}
 
@@ -158,12 +114,12 @@ func NewUnicastManager(cfg *ManagerConfig) (*Manager, error) {
 		sporkId:                         cfg.SporkId,
 		connStatus:                      cfg.ConnStatus,
 		peerDialing:                     sync.Map{},
-		createStreamRetryDelay:          cfg.CreateStreamRetryDelay,
 		metrics:                         cfg.Metrics,
-		streamZeroBackoffResetThreshold: cfg.StreamZeroBackoffResetThreshold,
-		dialZeroBackoffResetThreshold:   cfg.DialZeroBackoffResetThreshold,
-		maxStreamCreationAttemptTimes:   cfg.MaxStreamCreationAttemptTimes,
-		maxDialAttemptTimes:             cfg.MaxDialAttemptTimes,
+		createStreamRetryDelay:          cfg.CreateStreamRetryDelay,
+		streamZeroBackoffResetThreshold: cfg.StreamZeroRetryResetThreshold,
+		dialZeroBackoffResetThreshold:   cfg.DialRetryZeroRetryResetThreshold,
+		maxStreamCreationAttemptTimes:   cfg.MaxStreamCreationRetryAttemptTimes,
+		maxDialAttemptTimes:             cfg.MaxDialRetryAttemptTimes,
 	}, nil
 }
 
@@ -512,7 +468,7 @@ func retryBackoff(maxAttempts uint64) retry.Backoff {
 	// create backoff
 	backoff := retry.NewConstant(time.Second)
 	// add a MaxRetryJitter*time.Millisecond jitter to our backoff to ensure that this node and the target node don't attempt to reconnect at the same time
-	backoff = retry.WithJitter(MaxRetryJitter*time.Millisecond, backoff)
+	backoff = retry.WithJitter(MaxRetryJitter, backoff)
 	maxRetries := maxAttempts
 	if maxAttempts != 0 {
 		// https://github.com/sethvargo/go-retry#maxretries retries counter starts at zero and library will make last attempt

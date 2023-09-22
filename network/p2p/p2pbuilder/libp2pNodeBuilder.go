@@ -304,16 +304,16 @@ func (builder *LibP2PNodeBuilder) Build() (p2p.LibP2PNode, error) {
 
 	unicastManager, err := unicastmgr.NewUnicastManager(
 		&unicastmgr.ManagerConfig{
-			Logger:                          builder.logger,
-			StreamFactory:                   stream.NewLibP2PStreamFactory(h),
-			SporkId:                         builder.sporkId,
-			ConnStatus:                      node,
-			CreateStreamRetryDelay:          builder.createStreamRetryInterval,
-			Metrics:                         builder.metricsConfig.Metrics,
-			StreamZeroBackoffResetThreshold: unicastmodel.StreamZeroBackoffResetThreshold,
-			DialZeroBackoffResetThreshold:   unicastmodel.DialZeroBackoffResetThreshold,
-			MaxStreamCreationAttemptTimes:   unicastmodel.MaxStreamCreationAttemptTimes,
-			MaxDialAttemptTimes:             unicastmodel.MaxDialAttemptTimes,
+			Logger:                             builder.logger,
+			StreamFactory:                      stream.NewLibP2PStreamFactory(h),
+			SporkId:                            builder.sporkId,
+			ConnStatus:                         node,
+			CreateStreamRetryDelay:             builder.createStreamRetryInterval,
+			Metrics:                            builder.metricsConfig.Metrics,
+			StreamZeroRetryResetThreshold:      unicastmodel.StreamZeroBackoffResetThreshold,
+			DialRetryZeroRetryResetThreshold:   unicastmodel.DialZeroBackoffResetThreshold,
+			MaxStreamCreationRetryAttemptTimes: unicastmodel.MaxStreamCreationAttemptTimes,
+			MaxDialRetryAttemptTimes:           unicastmodel.MaxDialAttemptTimes,
 			DialConfigCacheFactory: func() unicast.DialConfigCache {
 				return unicastcache.NewDialConfigCache(
 					unicast.DefaultDailConfigCacheSize,

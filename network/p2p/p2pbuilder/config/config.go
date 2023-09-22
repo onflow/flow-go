@@ -11,8 +11,21 @@ type UnicastConfig struct {
 	// StreamRetryInterval is the initial delay between failing to establish a connection with another node and retrying. This
 	// delay increases exponentially (exponential backoff) with the number of subsequent failures to establish a connection.
 	StreamRetryInterval time.Duration
+
 	// RateLimiterDistributor distributor that distributes notifications whenever a peer is rate limited to all consumers.
 	RateLimiterDistributor p2p.UnicastRateLimiterDistributor
+
+	// StreamZeroRetryResetThreshold is the threshold that determines when to reset the stream creation retry budget to the default value.
+	//
+	// For example the default value of 100 means that if the stream creation retry budget is decreased to 0, then it will be reset to default value
+	// when the number of consecutive successful streams reaches 100.
+	//
+	// This is to prevent the retry budget from being reset too frequently, as the retry budget is used to gauge the reliability of the stream creation.
+	// When the stream creation retry budget is reset to the default value, it means that the stream creation is reliable enough to be trusted again.
+	// This parameter mandates when the stream creation is reliable enough to be trusted again; i.e., when the number of consecutive successful streams reaches this threshold.
+	// Note that the counter is reset to 0 when the stream creation fails, so the value of for example 100 means that the stream creation is reliable enough that the recent
+	// 100 stream creations are all successful.
+	StreamZeroRetryResetThreshold uint64
 }
 
 // ConnectionGaterConfig configuration parameters for the connection gater.
