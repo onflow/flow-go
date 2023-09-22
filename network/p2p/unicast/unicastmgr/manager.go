@@ -581,45 +581,5 @@ func (m *Manager) adjustUnsuccessfulStreamAttempt(peerID peer.ID, connected bool
 }
 
 /*
-	libp2pNode, err := p2pbuilder.NewNodeBuilder(builder.Logger, &p2pconfig.MetricsConfig{
-		HeroCacheFactory: builder.HeroCacheMetricsFactory(),
-		Metrics:          networkMetrics,
-	},
-		network.PublicNetwork,
-		bindAddress,
-		networkKey,
-		builder.SporkID,
-		builder.IdentityProvider,
-		&builder.FlowConfig.NetworkConfig.ResourceManagerConfig,
-		&builder.FlowConfig.NetworkConfig.GossipSubConfig.GossipSubRPCInspectorsConfig,
-		&p2pconfig.PeerManagerConfig{
-			// TODO: eventually, we need pruning enabled even on public network. However, it needs a modified version of
-			// the peer manager that also operate on the public identities.
-			ConnectionPruning: connection.PruningDisabled,
-			UpdateInterval:    builder.FlowConfig.NetworkConfig.PeerUpdateInterval,
-			ConnectorFactory:  connection.DefaultLibp2pBackoffConnectorFactory(),
-		},
-		&p2p.DisallowListCacheConfig{
-			MaxSize: builder.FlowConfig.NetworkConfig.DisallowListNotificationCacheSize,
-			Metrics: metrics.DisallowListCacheMetricsFactory(builder.HeroCacheMetricsFactory(), network.PublicNetwork),
-		},
-		meshTracer,
-		&p2pconfig.UnicastConfig{
-			StreamRetryInterval:                builder.FlowConfig.NetworkConfig.UnicastConfig.UnicastCreateStreamRetryDelay,
-			StreamZeroRetryResetThreshold:      builder.FlowConfig.NetworkConfig.UnicastStreamZeroRetryResetThreshold,
-			DialZeroRetryResetThreshold:        builder.FlowConfig.NetworkConfig.UnicastDialZeroRetryResetThreshold,
-			DialConfigCacheSize:                builder.FlowConfig.NetworkConfig.UnicastDialConfigCacheSize,
-			MaxDialRetryAttemptTimes:           builder.FlowConfig.NetworkConfig.UnicastMaxDialRetryAttemptTimes,
-			MaxStreamCreationRetryAttemptTimes: builder.FlowConfig.NetworkConfig.UnicastMaxStreamCreationRetryAttemptTimes,
-		}).
-		SetBasicResolver(builder.Resolver).
-		SetSubscriptionFilter(subscription.NewRoleBasedFilter(flow.RoleAccess, builder.IdentityProvider)).
-		SetConnectionManager(connManager).
-		SetRoutingSystem(func(ctx context.Context, h host.Host) (routing.Routing, error) {
-			return dht.NewDHT(ctx, h, protocols.FlowPublicDHTProtocolID(builder.SporkID), builder.Logger, networkMetrics, dht.AsServer())
-		}).
-		// disable connection pruning for the access node which supports the observer
-		SetGossipSubTracer(meshTracer).
-		SetGossipSubScoreTracerInterval(builder.FlowConfig.NetworkConfig.GossipSubConfig.ScoreTracerInterval).
-		Build()
-*/
+
+ */
