@@ -57,18 +57,17 @@ type LibP2PNodeBuilder struct {
 	metricsConfig    *p2pconfig.MetricsConfig
 	basicResolver    madns.BasicResolver
 
-	resourceManager           network.ResourceManager
-	resourceManagerCfg        *p2pconf.ResourceManagerConfig
-	connManager               connmgr.ConnManager
-	connGater                 p2p.ConnectionGater
-	routingFactory            func(context.Context, host.Host) (routing.Routing, error)
-	peerManagerConfig         *p2pconfig.PeerManagerConfig
-	createNode                p2p.CreateNodeFunc
-	createStreamRetryInterval time.Duration
-	gossipSubTracer           p2p.PubSubTracer
-	disallowListCacheCfg      *p2p.DisallowListCacheConfig
-	unicastConfig             *p2pconfig.UnicastConfig
-	networkingType            flownet.NetworkingType // whether the node is running in private (staked) or public (unstaked) network
+	resourceManager      network.ResourceManager
+	resourceManagerCfg   *p2pconf.ResourceManagerConfig
+	connManager          connmgr.ConnManager
+	connGater            p2p.ConnectionGater
+	routingFactory       func(context.Context, host.Host) (routing.Routing, error)
+	peerManagerConfig    *p2pconfig.PeerManagerConfig
+	createNode           p2p.CreateNodeFunc
+	gossipSubTracer      p2p.PubSubTracer
+	disallowListCacheCfg *p2p.DisallowListCacheConfig
+	unicastConfig        *p2pconfig.UnicastConfig
+	networkingType       flownet.NetworkingType // whether the node is running in private (staked) or public (unstaked) network
 }
 
 func NewNodeBuilder(
@@ -174,11 +173,6 @@ func (builder *LibP2PNodeBuilder) SetGossipSubTracer(tracer p2p.PubSubTracer) p2
 
 func (builder *LibP2PNodeBuilder) SetCreateNode(f p2p.CreateNodeFunc) p2p.NodeBuilder {
 	builder.createNode = f
-	return builder
-}
-
-func (builder *LibP2PNodeBuilder) SetStreamCreationRetryInterval(createStreamRetryInterval time.Duration) p2p.NodeBuilder {
-	builder.createStreamRetryInterval = createStreamRetryInterval
 	return builder
 }
 
@@ -317,7 +311,7 @@ func (builder *LibP2PNodeBuilder) Build() (p2p.LibP2PNode, error) {
 		StreamFactory:                      stream.NewLibP2PStreamFactory(h),
 		SporkId:                            builder.sporkId,
 		ConnStatus:                         node,
-		CreateStreamRetryDelay:             builder.createStreamRetryInterval,
+		CreateStreamRetryDelay:             builder.unicastConfig.StreamRetryInterval,
 		Metrics:                            builder.metricsConfig.Metrics,
 		StreamZeroRetryResetThreshold:      builder.unicastConfig.StreamZeroRetryResetThreshold,
 		DialZeroRetryResetThreshold:        builder.unicastConfig.DialZeroRetryResetThreshold,

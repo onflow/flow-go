@@ -18,6 +18,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/onflow/flow-go/config"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	mockmodule "github.com/onflow/flow-go/module/mock"
@@ -27,7 +28,6 @@ import (
 	p2ptest "github.com/onflow/flow-go/network/p2p/test"
 	"github.com/onflow/flow-go/network/p2p/unicast/protocols"
 	"github.com/onflow/flow-go/network/p2p/unicast/unicastmgr"
-	"github.com/onflow/flow-go/network/p2p/unicast/unicastmodel"
 	"github.com/onflow/flow-go/network/p2p/utils"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -381,7 +381,11 @@ func TestNoBackoffWhenCreatingStream(t *testing.T) {
 	pInfo, err := utils.PeerAddressInfo(*id2)
 	require.NoError(t, err)
 	nodes[0].Host().Peerstore().AddAddrs(pInfo.ID, pInfo.Addrs, peerstore.AddressTTL)
-	maxTimeToWait := unicastmodel.MaxDialAttemptTimes * unicastmgr.MaxRetryJitter * time.Millisecond
+
+	cfg, err := config.DefaultConfig()
+	require.NoError(t, err)
+
+	maxTimeToWait := time.Duration(cfg.NetworkConfig.UnicastMaxStreamCreationRetryAttemptTimes) * unicastmgr.MaxRetryJitter * time.Millisecond
 
 	// need to add some buffer time so that RequireReturnsBefore waits slightly longer than maxTimeToWait to avoid
 	// a race condition

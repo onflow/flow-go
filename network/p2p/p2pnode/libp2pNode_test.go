@@ -18,6 +18,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/atomic"
 
+	"github.com/onflow/flow-go/config"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	mockmodule "github.com/onflow/flow-go/module/mock"
@@ -28,7 +29,6 @@ import (
 	"github.com/onflow/flow-go/network/p2p/p2plogging"
 	p2ptest "github.com/onflow/flow-go/network/p2p/test"
 	"github.com/onflow/flow-go/network/p2p/unicast/protocols"
-	"github.com/onflow/flow-go/network/p2p/unicast/unicastmodel"
 	"github.com/onflow/flow-go/network/p2p/utils"
 	validator "github.com/onflow/flow-go/network/validator/pubsub"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -441,11 +441,14 @@ func TestCreateStream_SinglePeerDial(t *testing.T) {
 
 	unittest.RequireReturnsBefore(t, wg.Wait, 3*time.Second, "cannot create streams on time")
 
+	cfg, err := config.DefaultConfig()
+	require.NoError(t, err)
+
 	// we expect a single routine to start attempting to dial thus the number of retries
 	// before failure should be at most p2pnode.UnicastMaxDialRetryAttemptTimes
-	expectedNumOfDialRetries := int64(unicastmodel.MaxDialAttemptTimes)
+	expectedNumOfDialRetries := int64(cfg.NetworkConfig.UnicastMaxDialRetryAttemptTimes)
 	// we expect the second routine to retry creating a stream p2pnode.UnicastMaxDialRetryAttemptTimes when dialing is in progress
-	expectedCreateStreamRetries := int64(unicastmodel.MaxDialAttemptTimes)
+	expectedCreateStreamRetries := int64(cfg.NetworkConfig.UnicastMaxStreamCreationRetryAttemptTimes)
 	require.Equal(t, expectedNumOfDialRetries, dialPeerRetries.Load(), fmt.Sprintf("expected %d dial peer retries got %d", expectedNumOfDialRetries, dialPeerRetries.Load()))
 	require.Equal(t, expectedCreateStreamRetries, createStreamRetries.Load(), fmt.Sprintf("expected %d dial peer retries got %d", expectedCreateStreamRetries, createStreamRetries.Load()))
 }

@@ -466,7 +466,10 @@ func (builder *ObserverServiceBuilder) extraFlags() {
 		flags.StringVarP(&builder.rpcConf.UnsecureGRPCListenAddr, "rpc-addr", "r", defaultConfig.rpcConf.UnsecureGRPCListenAddr, "the address the unsecured gRPC server listens on")
 		flags.StringVar(&builder.rpcConf.SecureGRPCListenAddr, "secure-rpc-addr", defaultConfig.rpcConf.SecureGRPCListenAddr, "the address the secure gRPC server listens on")
 		flags.StringVarP(&builder.rpcConf.HTTPListenAddr, "http-addr", "h", defaultConfig.rpcConf.HTTPListenAddr, "the address the http proxy server listens on")
-		flags.StringVar(&builder.rpcConf.RestConfig.ListenAddress, "rest-addr", defaultConfig.rpcConf.RestConfig.ListenAddress, "the address the REST server listens on (if empty the REST server will not be started)")
+		flags.StringVar(&builder.rpcConf.RestConfig.ListenAddress,
+			"rest-addr",
+			defaultConfig.rpcConf.RestConfig.ListenAddress,
+			"the address the REST server listens on (if empty the REST server will not be started)")
 		flags.DurationVar(&builder.rpcConf.RestConfig.WriteTimeout, "rest-write-timeout", defaultConfig.rpcConf.RestConfig.WriteTimeout, "timeout to use when writing REST response")
 		flags.DurationVar(&builder.rpcConf.RestConfig.ReadTimeout, "rest-read-timeout", defaultConfig.rpcConf.RestConfig.ReadTimeout, "timeout to use when reading REST request headers")
 		flags.DurationVar(&builder.rpcConf.RestConfig.IdleTimeout, "rest-idle-timeout", defaultConfig.rpcConf.RestConfig.IdleTimeout, "idle timeout for REST connections")
@@ -736,7 +739,15 @@ func (builder *ObserverServiceBuilder) initPublicLibp2pNode(networkKey crypto.Pr
 			MaxSize: builder.FlowConfig.NetworkConfig.DisallowListNotificationCacheSize,
 			Metrics: metrics.DisallowListCacheMetricsFactory(builder.HeroCacheMetricsFactory(), network.PublicNetwork),
 		},
-		meshTracer).
+		meshTracer,
+		&p2pconfig.UnicastConfig{
+			StreamRetryInterval:                builder.FlowConfig.NetworkConfig.UnicastConfig.UnicastCreateStreamRetryDelay,
+			StreamZeroRetryResetThreshold:      builder.FlowConfig.NetworkConfig.UnicastStreamZeroRetryResetThreshold,
+			DialZeroRetryResetThreshold:        builder.FlowConfig.NetworkConfig.UnicastDialZeroRetryResetThreshold,
+			DialConfigCacheSize:                builder.FlowConfig.NetworkConfig.UnicastDialConfigCacheSize,
+			MaxDialRetryAttemptTimes:           builder.FlowConfig.NetworkConfig.UnicastMaxDialRetryAttemptTimes,
+			MaxStreamCreationRetryAttemptTimes: builder.FlowConfig.NetworkConfig.UnicastMaxStreamCreationRetryAttemptTimes,
+		}).
 		SetSubscriptionFilter(
 			subscription.NewRoleBasedFilter(
 				subscription.UnstakedRole, builder.IdentityProvider,

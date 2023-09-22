@@ -106,6 +106,9 @@ func NewUnicastManager(cfg *ManagerConfig) (*Manager, error) {
 	if cfg.StreamZeroRetryResetThreshold == uint64(0) {
 		return nil, fmt.Errorf("stream zero backoff reset threshold must be greater than 0")
 	}
+	if cfg.CreateStreamRetryDelay == time.Duration(0) {
+		return nil, fmt.Errorf("create stream retry delay must be greater than 0")
+	}
 
 	return &Manager{
 		logger: cfg.Logger.With().Str("module", "unicast-manager").Logger(),
