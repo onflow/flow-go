@@ -29,6 +29,9 @@ import (
 
 type ProviderEngine interface {
 	network.MessageProcessor
+	// BroadcastExecutionReceipt broadcasts an execution receipt to all nodes in the network.
+	// It skips broadcasting the receipt if the block is sealed, or the node is not authorized at the block.
+	// It returns true if the receipt is broadcasted, false otherwise.
 	BroadcastExecutionReceipt(context.Context, uint64, *flow.ExecutionReceipt) (bool, error)
 }
 
@@ -354,6 +357,9 @@ func (e *Engine) deliverChunkDataResponse(chunkDataPack *flow.ChunkDataPack, req
 	lg.Info().Msg("chunk data pack request successfully replied")
 }
 
+// BroadcastExecutionReceipt broadcasts an execution receipt to all nodes in the network.
+// It skips broadcasting the receipt if the block is sealed, or the node is not authorized at the block.
+// It returns true if the receipt is broadcasted, false otherwise.
 func (e *Engine) BroadcastExecutionReceipt(ctx context.Context, height uint64, receipt *flow.ExecutionReceipt) (bool, error) {
 	// if the receipt is for a sealed block, then no need to broadcast it.
 	lastSealed, err := e.state.Sealed().Head()
