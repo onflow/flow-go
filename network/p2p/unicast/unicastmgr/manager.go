@@ -100,7 +100,7 @@ func NewUnicastManager(cfg *ManagerConfig) (*Manager, error) {
 	if cfg.MaxDialRetryAttemptTimes == uint64(0) {
 		return nil, fmt.Errorf("max dial attempt times must be greater than 0")
 	}
-	if cfg.DialRetryZeroRetryResetThreshold == time.Duration(0) {
+	if cfg.DialZeroRetryResetThreshold == time.Duration(0) {
 		return nil, fmt.Errorf("dial zero backoff reset threshold must be greater than 0")
 	}
 	if cfg.StreamZeroRetryResetThreshold == uint64(0) {
@@ -117,7 +117,7 @@ func NewUnicastManager(cfg *ManagerConfig) (*Manager, error) {
 		metrics:                         cfg.Metrics,
 		createStreamRetryDelay:          cfg.CreateStreamRetryDelay,
 		streamZeroBackoffResetThreshold: cfg.StreamZeroRetryResetThreshold,
-		dialZeroBackoffResetThreshold:   cfg.DialRetryZeroRetryResetThreshold,
+		dialZeroBackoffResetThreshold:   cfg.DialZeroRetryResetThreshold,
 		maxStreamCreationAttemptTimes:   cfg.MaxStreamCreationRetryAttemptTimes,
 		maxDialAttemptTimes:             cfg.MaxDialRetryAttemptTimes,
 	}, nil

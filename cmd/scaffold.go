@@ -322,8 +322,12 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 	unicastRateLimiters := ratelimit.NewRateLimiters(unicastRateLimiterOpts...)
 
 	uniCfg := &p2pconfig.UnicastConfig{
-		StreamRetryInterval:    fnb.FlowConfig.NetworkConfig.UnicastCreateStreamRetryDelay,
-		RateLimiterDistributor: fnb.UnicastRateLimiterDistributor,
+		StreamRetryInterval:                fnb.FlowConfig.NetworkConfig.CreateStreamRetryDelay,
+		StreamZeroRetryResetThreshold:      fnb.FlowConfig.NetworkConfig.StreamZeroRetryResetThreshold,
+		DialZeroRetryResetThreshold:        fnb.FlowConfig.NetworkConfig.DialZeroRetryResetThreshold,
+		MaxDialRetryAttemptTimes:           fnb.FlowConfig.NetworkConfig.MaxDialRetryAttemptTimes,
+		MaxStreamCreationRetryAttemptTimes: fnb.FlowConfig.NetworkConfig.MaxStreamCreationRetryAttemptTimes,
+		RateLimiterDistributor:             fnb.UnicastRateLimiterDistributor,
 	}
 
 	connGaterCfg := &p2pconfig.ConnectionGaterConfig{

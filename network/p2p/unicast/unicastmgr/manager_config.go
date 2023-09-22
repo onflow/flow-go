@@ -33,16 +33,16 @@ type ManagerConfig struct {
 	// 100 stream creations are all successful.
 	StreamZeroRetryResetThreshold uint64
 
-	// DialRetryZeroRetryResetThreshold is the threshold that determines when to reset the dial backoff budget to the default value.
-	// For example the threshold of 1 hour means that if the dial backoff budget is decreased to 0, then it will be reset to default value
+	// DialZeroRetryResetThreshold is the threshold that determines when to reset the dial retry budget to the default value.
+	// For example the threshold of 1 hour means that if the dial retry budget is decreased to 0, then it will be reset to default value
 	// when it has been 1 hour since the last successful dial.
 	//
-	// This is to prevent the backoff budget from being reset too frequently, as the backoff budget is used to gauge the reliability of the dialing a remote peer.
-	// When the dial backoff budget is reset to the default value, it means that the dialing is reliable enough to be trusted again.
+	// This is to prevent the retry budget from being reset too frequently, as the retry budget is used to gauge the reliability of the dialing a remote peer.
+	// When the dial retry budget is reset to the default value, it means that the dialing is reliable enough to be trusted again.
 	// This parameter mandates when the dialing is reliable enough to be trusted again; i.e., when it has been 1 hour since the last successful dial.
 	// Note that the last dial attempt timestamp is reset to zero when the dial fails, so the value of for example 1 hour means that the dialing to the remote peer is reliable enough that the last
 	// successful dial attempt was 1 hour ago.
-	DialRetryZeroRetryResetThreshold time.Duration
+	DialZeroRetryResetThreshold time.Duration
 
 	// MaxDialRetryAttemptTimes is the maximum number of attempts to be made to connect to a remote node to establish a unicast (1:1) connection before we give up.
 	MaxDialRetryAttemptTimes uint64

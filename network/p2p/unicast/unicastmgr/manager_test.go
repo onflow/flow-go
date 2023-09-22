@@ -39,10 +39,10 @@ func unicastManagerFixture(t *testing.T) (*unicastmgr.Manager, *mockp2p.StreamFa
 			StreamFactory:                      streamFactory,
 			SporkId:                            unittest.IdentifierFixture(),
 			ConnStatus:                         connStatus,
-			CreateStreamRetryDelay:             cfg.NetworkConfig.UnicastCreateStreamRetryDelay,
+			CreateStreamRetryDelay:             cfg.NetworkConfig.CreateStreamRetryDelay,
 			Metrics:                            metrics.NewNoopCollector(),
 			StreamZeroRetryResetThreshold:      unicastmodel.StreamZeroBackoffResetThreshold,
-			DialRetryZeroRetryResetThreshold:   unicastmodel.DialZeroBackoffResetThreshold,
+			DialZeroRetryResetThreshold:        unicastmodel.DialZeroBackoffResetThreshold,
 			MaxStreamCreationRetryAttemptTimes: unicastmodel.MaxStreamCreationAttemptTimes,
 			MaxDialRetryAttemptTimes:           unicastmodel.MaxDialAttemptTimes,
 			DialConfigCacheFactory: func() unicast.DialConfigCache {

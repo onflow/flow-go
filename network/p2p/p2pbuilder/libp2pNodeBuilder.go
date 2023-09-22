@@ -86,8 +86,14 @@ func NewNodeBuilder(
 		resourceManagerCfg:   rCfg,
 		disallowListCacheCfg: disallowListCacheCfg,
 		networkingType:       networkingType,
-		gossipSubBuilder:     gossipsubbuilder.NewGossipSubBuilder(logger, metricsConfig, networkingType, sporkId, idProvider, rpcInspectorCfg, rpcTracker),
-		peerManagerConfig:    peerManagerConfig,
+		gossipSubBuilder: gossipsubbuilder.NewGossipSubBuilder(logger,
+			metricsConfig,
+			networkingType,
+			sporkId,
+			idProvider,
+			rpcInspectorCfg,
+			rpcTracker),
+		peerManagerConfig: peerManagerConfig,
 	}
 }
 
@@ -311,14 +317,15 @@ func (builder *LibP2PNodeBuilder) Build() (p2p.LibP2PNode, error) {
 			CreateStreamRetryDelay:             builder.createStreamRetryInterval,
 			Metrics:                            builder.metricsConfig.Metrics,
 			StreamZeroRetryResetThreshold:      unicastmodel.StreamZeroBackoffResetThreshold,
-			DialRetryZeroRetryResetThreshold:   unicastmodel.DialZeroBackoffResetThreshold,
+			DialZeroRetryResetThreshold:        unicastmodel.DialZeroBackoffResetThreshold,
 			MaxStreamCreationRetryAttemptTimes: unicastmodel.MaxStreamCreationAttemptTimes,
 			MaxDialRetryAttemptTimes:           unicastmodel.MaxDialAttemptTimes,
 			DialConfigCacheFactory: func() unicast.DialConfigCache {
 				return unicastcache.NewDialConfigCache(
 					unicast.DefaultDailConfigCacheSize,
 					builder.logger,
-					metrics.DialConfigCacheMetricFactory(builder.metricsConfig.HeroCacheFactory, builder.networkingType),
+					metrics.DialConfigCacheMetricFactory(builder.metricsConfig.HeroCacheFactory,
+						builder.networkingType),
 					unicastmodel.DefaultDialConfigFactory,
 				)
 			},
@@ -439,10 +446,23 @@ func DefaultCreateNodeFunc(logger zerolog.Logger, host host.Host, pCache p2p.Pro
 
 // DefaultNodeBuilder returns a node builder.
 func DefaultNodeBuilder(
-	logger zerolog.Logger, address string, networkingType flownet.NetworkingType, flowKey fcrypto.PrivateKey, sporkId flow.Identifier, idProvider module.IdentityProvider,
-	metricsCfg *p2pconfig.MetricsConfig, resolver madns.BasicResolver, role string, connGaterCfg *p2pconfig.ConnectionGaterConfig, peerManagerCfg *p2pconfig.PeerManagerConfig,
-	gossipCfg *p2pconf.GossipSubConfig, rpcInspectorCfg *p2pconf.GossipSubRPCInspectorsConfig, rCfg *p2pconf.ResourceManagerConfig, uniCfg *p2pconfig.UnicastConfig,
-	connMgrConfig *netconf.ConnectionManagerConfig, disallowListCacheCfg *p2p.DisallowListCacheConfig,
+	logger zerolog.Logger,
+	address string,
+	networkingType flownet.NetworkingType,
+	flowKey fcrypto.PrivateKey,
+	sporkId flow.Identifier,
+	idProvider module.IdentityProvider,
+	metricsCfg *p2pconfig.MetricsConfig,
+	resolver madns.BasicResolver,
+	role string,
+	connGaterCfg *p2pconfig.ConnectionGaterConfig,
+	peerManagerCfg *p2pconfig.PeerManagerConfig,
+	gossipCfg *p2pconf.GossipSubConfig,
+	rpcInspectorCfg *p2pconf.GossipSubRPCInspectorsConfig,
+	rCfg *p2pconf.ResourceManagerConfig,
+	uniCfg *p2pconfig.UnicastConfig,
+	connMgrConfig *netconf.ConnectionManagerConfig,
+	disallowListCacheCfg *p2p.DisallowListCacheConfig,
 ) (p2p.NodeBuilder, error) {
 
 	connManager, err := connection.NewConnManager(logger, metricsCfg.Metrics, connMgrConfig)
@@ -474,13 +494,29 @@ func DefaultNodeBuilder(
 	}
 	meshTracer := tracer.NewGossipSubMeshTracer(meshTracerCfg)
 
-	builder := NewNodeBuilder(logger, metricsCfg, networkingType, address, flowKey, sporkId, idProvider, rCfg, rpcInspectorCfg, peerManagerCfg, disallowListCacheCfg, meshTracer).
+	builder := NewNodeBuilder(logger,
+		metricsCfg,
+		networkingType,
+		address,
+		flowKey,
+		sporkId,
+		idProvider,
+		rCfg,
+		rpcInspectorCfg,
+		peerManagerCfg,
+		disallowListCacheCfg,
+		meshTracer).
 		SetBasicResolver(resolver).
 		SetConnectionManager(connManager).
 		SetConnectionGater(connGater).
 		SetRoutingSystem(
 			func(ctx context.Context, host host.Host) (routing.Routing, error) {
-				return dht.NewDHT(ctx, host, protocols.FlowDHTProtocolID(sporkId), logger, metricsCfg.Metrics, dht.AsServer())
+				return dht.NewDHT(ctx,
+					host,
+					protocols.FlowDHTProtocolID(sporkId),
+					logger,
+					metricsCfg.Metrics,
+					dht.AsServer())
 			},
 		).
 		SetStreamCreationRetryInterval(uniCfg.StreamRetryInterval).
