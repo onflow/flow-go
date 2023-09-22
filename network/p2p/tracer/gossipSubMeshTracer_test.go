@@ -55,7 +55,7 @@ func TestGossipSubMeshTracer(t *testing.T) {
 			}
 		}
 	})
-	logger := zerolog.New(os.Stdout).Level(zerolog.InfoLevel).Hook(hook)
+	logger := zerolog.New(os.Stdout).Level(zerolog.DebugLevel).Hook(hook)
 
 	// creates one node with a gossipsub mesh meshTracer, and the other nodes without a gossipsub mesh meshTracer.
 	// we only need one node with a meshTracer to test the meshTracer.
