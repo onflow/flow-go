@@ -157,7 +157,7 @@ func (i *ExecutionState) IndexBlockData(ctx context.Context, data *execution_dat
 }
 
 func (i *ExecutionState) indexEvents(blockID flow.Identifier, events flow.EventsList) error {
-	// Note: service events are currently not included in execution data: https://github.com/onflow/flow-go/issues/4624
+	// Note: the last chunk in an execution data is the system chunk. All events in that ChunkExecutionData are service events.
 	return i.events.Store(blockID, []flow.EventsList{events})
 }
 
