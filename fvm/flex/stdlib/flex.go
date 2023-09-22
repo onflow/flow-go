@@ -1,107 +1,20 @@
 package stdlib
 
 import (
-	"github.com/onflow/cadence/runtime/ast"
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/onflow/cadence/runtime/errors"
 	"github.com/onflow/cadence/runtime/interpreter"
 	"github.com/onflow/cadence/runtime/sema"
 	"github.com/onflow/cadence/runtime/stdlib"
+
 	"github.com/onflow/flow-go/fvm/flex/models"
 )
 
-const Flex_AddressTypeBytesFieldName = "bytes"
-
-var Flex_AddressTypeBytesFieldType = &sema.ConstantSizedType{
-	Type: sema.UInt8Type,
-	Size: 20,
-}
-
-const Flex_AddressTypeBytesFieldDocString = `
-Bytes of the address
-`
-
-const Flex_AddressTypeName = "Address"
-
-var Flex_AddressType = func() *sema.CompositeType {
-	var t = &sema.CompositeType{
-		Identifier: Flex_AddressTypeName,
-		Kind:       common.CompositeKindStructure,
-	}
-
-	return t
-}()
-
-func init() {
-	var members = []*sema.Member{
-		sema.NewUnmeteredFieldMember(
-			Flex_AddressType,
-			ast.AccessPublic,
-			ast.VariableKindConstant,
-			Flex_AddressTypeBytesFieldName,
-			Flex_AddressTypeBytesFieldType,
-			Flex_AddressTypeBytesFieldDocString,
-		),
-	}
-
-	Flex_AddressType.Members = sema.MembersAsMap(members)
-	Flex_AddressType.Fields = sema.MembersFieldNames(members)
-}
-
-const FlexTypeRunFunctionName = "run"
-
-var FlexTypeRunFunctionType = &sema.FunctionType{
-	Parameters: []sema.Parameter{
-		{
-			Identifier: "tx",
-			TypeAnnotation: sema.NewTypeAnnotation(&sema.VariableSizedType{
-				Type: sema.UInt8Type,
-			}),
-		},
-		{
-			Identifier:     "coinbase",
-			TypeAnnotation: sema.NewTypeAnnotation(Flex_AddressType),
-		},
-	},
-	ReturnTypeAnnotation: sema.NewTypeAnnotation(
-		sema.VoidType,
-	),
-}
-
-const FlexTypeRunFunctionDocString = `
-Run runs a flex transaction, deducts the gas fees and deposits them into the
-provided coinbase address
-`
-
-const FlexTypeName = "Flex"
-
-var FlexType = func() *sema.CompositeType {
-	var t = &sema.CompositeType{
-		Identifier: FlexTypeName,
-		Kind:       common.CompositeKindContract,
-	}
-
-	t.SetNestedType(Flex_AddressTypeName, Flex_AddressType)
-	return t
-}()
-
-func init() {
-	var members = []*sema.Member{
-		sema.NewUnmeteredFunctionMember(
-			FlexType,
-			ast.AccessPublic,
-			FlexTypeRunFunctionName,
-			FlexTypeRunFunctionType,
-			FlexTypeRunFunctionDocString,
-		),
-	}
-
-	FlexType.Members = sema.MembersAsMap(members)
-	FlexType.Fields = sema.MembersFieldNames(members)
-}
+// TODO: switch to released version once available
+//go:generate env GOPROXY=direct go run github.com/onflow/cadence/runtime/sema/gen@1e04b7af1c098a3deff37931ef33191644606a89 -p stdlib flex.cdc flex.gen.go
 
 var flexContractStaticType interpreter.StaticType = interpreter.NewCompositeStaticType(
-	nil, // TODO deal with memory gauge
+	nil,
 	FlexType.Location,
 	FlexType.QualifiedIdentifier(),
 	FlexType.ID(),
@@ -115,34 +28,89 @@ func newFlexTypeRunFunction(
 		gauge,
 		FlexTypeRunFunctionType,
 		func(invocation interpreter.Invocation) interpreter.Value {
-			// inter := invocation.Interpreter
+			inter := invocation.Interpreter
 			locationRange := invocation.LocationRange
 
-			input, ok := invocation.Arguments[0].(*interpreter.ArrayValue)
+			// Get transaction argument
+
+			transactionValue, ok := invocation.Arguments[0].(*interpreter.ArrayValue)
 			if !ok {
 				panic(errors.NewUnreachableError())
 			}
 
-			// TODO capture computation
-			// invocation.Interpreter.ReportComputation(common.ComputationKindSTDLIBRLPDecodeString, uint(input.Count()))
-
-			convertedInput, err := interpreter.ByteArrayValueToByteSlice(invocation.Interpreter, input, locationRange)
+			transaction, err := interpreter.ByteArrayValueToByteSlice(inter, transactionValue, locationRange)
 			if err != nil {
-				// TODO deal wrap this with proper error
 				panic(err)
-				// panic(RLPDecodeStringError{
-				// 	Msg:           err.Error(),
-				// 	LocationRange: locationRange,
-				// })
 			}
 
-			// TODO deal with the coinbase address
-			res := handler.Run(convertedInput, models.FlexAddress(common.ZeroAddress[:]))
+			// Get coinbase argument
+
+			coinbaseValue, ok := invocation.Arguments[1].(interpreter.MemberAccessibleValue)
+			if !ok {
+				panic(errors.NewUnreachableError())
+			}
+
+			coinbaseBytesValue := coinbaseValue.GetMember(inter, locationRange, Flex_FlexAddressTypeBytesFieldName)
+			if coinbaseBytesValue == nil {
+				panic(errors.NewUnreachableError())
+			}
+
+			coinbase, err := interpreter.ByteArrayValueToByteSlice(inter, coinbaseBytesValue, locationRange)
+			if err != nil {
+				panic(err)
+			}
+
+			// Run
+
+			res := handler.Run(transaction, models.FlexAddress(coinbase))
 
 			return interpreter.AsBoolValue(res)
 		},
 	)
 }
+
+func constructorType(compositeType *sema.CompositeType) *sema.FunctionType {
+	// TODO: Use t.ConstructorType() at call-sites, once available.
+	//   Depends on Stable Cadence / https://github.com/onflow/cadence/pull/2805
+	return &sema.FunctionType{
+		IsConstructor:        true,
+		Parameters:           compositeType.ConstructorParameters,
+		ReturnTypeAnnotation: sema.NewTypeAnnotation(compositeType),
+	}
+}
+
+var Flex_FlexAddressConstructorType = constructorType(Flex_FlexAddressType)
+
+var flexAddressConstructor = interpreter.NewHostFunctionValue(
+	nil,
+	Flex_FlexAddressConstructorType,
+	func(invocation interpreter.Invocation) interpreter.Value {
+		inter := invocation.Interpreter
+		locationRange := invocation.LocationRange
+
+		// Get address
+
+		bytesValue, ok := invocation.Arguments[0].(*interpreter.ArrayValue)
+		if !ok {
+			panic(errors.NewUnreachableError())
+		}
+
+		return interpreter.NewCompositeValue(
+			inter,
+			locationRange,
+			FlexType.Location,
+			Flex_FlexAddressType.QualifiedIdentifier(),
+			Flex_FlexAddressType.Kind,
+			[]interpreter.CompositeField{
+				{
+					Name:  Flex_FlexAddressTypeBytesFieldName,
+					Value: bytesValue,
+				},
+			},
+			common.ZeroAddress,
+		)
+	},
+)
 
 func NewFlexContractValue(
 	gauge common.MemoryGauge,
@@ -154,7 +122,8 @@ func NewFlexContractValue(
 		flexContractStaticType,
 		FlexType.Fields,
 		map[string]interpreter.Value{
-			FlexTypeRunFunctionName: newFlexTypeRunFunction(gauge, handler),
+			Flex_FlexAddressTypeName: flexAddressConstructor,
+			FlexTypeRunFunctionName:  newFlexTypeRunFunction(gauge, handler),
 		},
 		nil,
 		nil,
@@ -165,11 +134,17 @@ func NewFlexContractValue(
 func NewFlexStandardLibraryValue(
 	gauge common.MemoryGauge,
 	handler models.FlexContractHandler,
-) *stdlib.StandardLibraryValue {
-	return &stdlib.StandardLibraryValue{
+) stdlib.StandardLibraryValue {
+	return stdlib.StandardLibraryValue{
 		Name:  FlexTypeName,
 		Type:  FlexType,
 		Value: NewFlexContractValue(gauge, handler),
 		Kind:  common.DeclarationKindContract,
 	}
+}
+
+var FlexStandardLibraryType = stdlib.StandardLibraryType{
+	Name: FlexTypeName,
+	Type: FlexType,
+	Kind: common.DeclarationKindContract,
 }

@@ -15,13 +15,15 @@ import (
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/onflow/cadence/runtime/interpreter"
 	"github.com/onflow/cadence/runtime/sema"
-	"github.com/onflow/cadence/runtime/stdlib"
-	"github.com/onflow/flow-go/fvm/environment"
-	fstdlib "github.com/onflow/flow-go/fvm/flex/stdlib"
-	"github.com/onflow/flow-go/fvm/flex/storage"
-	"github.com/onflow/flow-go/fvm/storage/testutils"
+	cadenceStdlib "github.com/onflow/cadence/runtime/stdlib"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.opentelemetry.io/otel/attribute"
+
+	"github.com/onflow/flow-go/fvm/environment"
+	flexStdlib "github.com/onflow/flow-go/fvm/flex/stdlib"
+	"github.com/onflow/flow-go/fvm/flex/storage"
+	"github.com/onflow/flow-go/fvm/storage/testutils"
 )
 
 func RunWithTempLedger(t testing.TB, f func(atree.Ledger)) {
@@ -43,20 +45,24 @@ func encodeArgs(argValues []cadence.Value) [][]byte {
 	return args
 }
 
-func Test(t *testing.T) {
+func TestFlexAddressConstructionAndReturn(t *testing.T) {
 
 	RunWithTempLedger(t, func(led atree.Ledger) {
 		handler := NewFlexContractHandler(led)
+
 		env := runtime.NewBaseInterpreterEnvironment(runtime.Config{})
-		flex := fstdlib.NewFlexStandardLibraryValue(nil, handler)
-		env.Declare(*flex)
+
+		env.DeclareValue(flexStdlib.NewFlexStandardLibraryValue(nil, handler))
+		env.DeclareType(flexStdlib.FlexStandardLibraryType)
+
 		inter := runtime.NewInterpreterRuntime(runtime.Config{})
 
 		script := []byte(`
-			pub fun main(_ data: [UInt8]): [[UInt8]] {
-				return Flex.Address(data)
+			pub fun main(_ bytes: [UInt8; 20]): Flex.FlexAddress {
+				return Flex.FlexAddress(bytes: bytes)
 			}
 		`)
+
 		input := []cadence.Value{
 			cadence.UInt8(1), cadence.UInt8(1),
 			cadence.UInt8(2), cadence.UInt8(2),
@@ -70,17 +76,20 @@ func Test(t *testing.T) {
 			cadence.UInt8(10), cadence.UInt8(10),
 		}
 
-		runtimeInterface := &testRuntimeInterface{storage: led}
+		bytesType := cadence.NewConstantSizedArrayType(20, cadence.TheUInt8Type)
+
+		runtimeInterface := &testRuntimeInterface{
+			storage: led,
+			decodeArgument: func(b []byte, t cadence.Type) (cadence.Value, error) {
+				return json.Decode(nil, b)
+			},
+		}
+
 		result, err := inter.ExecuteScript(
 			runtime.Script{
 				Source: script,
 				Arguments: encodeArgs([]cadence.Value{
-					cadence.Array{
-						ArrayType: &cadence.VariableSizedArrayType{
-							ElementType: cadence.UInt8Type{},
-						},
-						Values: input,
-					},
+					cadence.NewArray(input).WithType(bytesType),
 				}),
 			},
 			runtime.Context{
@@ -90,12 +99,30 @@ func Test(t *testing.T) {
 			},
 		)
 		require.NoError(t, err)
-		// data :=
-		fmt.Println(result)
-		t.Fatal("XXX")
 
+		assert.Equal(t,
+			cadence.Struct{
+				StructType: cadence.NewStructType(
+					nil,
+					flexStdlib.Flex_FlexAddressType.QualifiedIdentifier(),
+					[]cadence.Field{
+						{
+							Identifier: flexStdlib.Flex_FlexAddressTypeBytesFieldName,
+							Type:       bytesType,
+						},
+					},
+					nil,
+				),
+				Fields: []cadence.Value{
+					cadence.NewArray(input).WithType(bytesType),
+				},
+			},
+			result,
+		)
 	})
 }
+
+// TODO: replace with Cadence runtime testing utils once available https://github.com/onflow/cadence/pull/2800
 
 type testRuntimeInterface struct {
 	resolveLocation  func(identifiers []runtime.Identifier, location runtime.Location) ([]runtime.ResolvedLocation, error)
@@ -112,12 +139,12 @@ type testRuntimeInterface struct {
 	removeEncodedAccountKey   func(address runtime.Address, index int) (publicKey []byte, err error)
 	addAccountKey             func(
 		address runtime.Address,
-		publicKey *stdlib.PublicKey,
+		publicKey *cadenceStdlib.PublicKey,
 		hashAlgo runtime.HashAlgorithm,
 		weight int,
-	) (*stdlib.AccountKey, error)
-	getAccountKey             func(address runtime.Address, index int) (*stdlib.AccountKey, error)
-	removeAccountKey          func(address runtime.Address, index int) (*stdlib.AccountKey, error)
+	) (*cadenceStdlib.AccountKey, error)
+	getAccountKey             func(address runtime.Address, index int) (*cadenceStdlib.AccountKey, error)
+	removeAccountKey          func(address runtime.Address, index int) (*cadenceStdlib.AccountKey, error)
 	accountKeysCount          func(address runtime.Address) (uint64, error)
 	updateAccountContractCode func(location common.AddressLocation, code []byte) error
 	getAccountContractCode    func(location common.AddressLocation) (code []byte, err error)
@@ -154,10 +181,10 @@ type testRuntimeInterface struct {
 	getStorageCapacity         func(_ runtime.Address) (uint64, error)
 	programs                   map[runtime.Location]*interpreter.Program
 	implementationDebugLog     func(message string) error
-	validatePublicKey          func(publicKey *stdlib.PublicKey) error
-	bLSVerifyPOP               func(pk *stdlib.PublicKey, s []byte) (bool, error)
+	validatePublicKey          func(publicKey *cadenceStdlib.PublicKey) error
+	bLSVerifyPOP               func(pk *cadenceStdlib.PublicKey, s []byte) (bool, error)
 	blsAggregateSignatures     func(sigs [][]byte) ([]byte, error)
-	blsAggregatePublicKeys     func(keys []*stdlib.PublicKey) (*stdlib.PublicKey, error)
+	blsAggregatePublicKeys     func(keys []*cadenceStdlib.PublicKey) (*cadenceStdlib.PublicKey, error)
 	getAccountContractNames    func(address runtime.Address) ([]string, error)
 	recordTrace                func(operation string, location runtime.Location, duration time.Duration, attrs []attribute.KeyValue)
 	meterMemory                func(usage common.MemoryUsage) error
@@ -297,17 +324,17 @@ func (i *testRuntimeInterface) RevokeEncodedAccountKey(address runtime.Address, 
 
 func (i *testRuntimeInterface) AddAccountKey(
 	address runtime.Address,
-	publicKey *stdlib.PublicKey,
+	publicKey *cadenceStdlib.PublicKey,
 	hashAlgo runtime.HashAlgorithm,
 	weight int,
-) (*stdlib.AccountKey, error) {
+) (*cadenceStdlib.AccountKey, error) {
 	if i.addAccountKey == nil {
 		panic("must specify testRuntimeInterface.addAccountKey")
 	}
 	return i.addAccountKey(address, publicKey, hashAlgo, weight)
 }
 
-func (i *testRuntimeInterface) GetAccountKey(address runtime.Address, index int) (*stdlib.AccountKey, error) {
+func (i *testRuntimeInterface) GetAccountKey(address runtime.Address, index int) (*cadenceStdlib.AccountKey, error) {
 	if i.getAccountKey == nil {
 		panic("must specify testRuntimeInterface.getAccountKey")
 	}
@@ -321,7 +348,7 @@ func (i *testRuntimeInterface) AccountKeysCount(address runtime.Address) (uint64
 	return i.accountKeysCount(address)
 }
 
-func (i *testRuntimeInterface) RevokeAccountKey(address runtime.Address, index int) (*stdlib.AccountKey, error) {
+func (i *testRuntimeInterface) RevokeAccountKey(address runtime.Address, index int) (*cadenceStdlib.AccountKey, error) {
 	if i.removeAccountKey == nil {
 		panic("must specify testRuntimeInterface.removeAccountKey")
 	}
@@ -432,7 +459,7 @@ func (i *testRuntimeInterface) GetCurrentBlockHeight() (uint64, error) {
 	return 1, nil
 }
 
-func (i *testRuntimeInterface) GetBlockAtHeight(height uint64) (block stdlib.Block, exists bool, err error) {
+func (i *testRuntimeInterface) GetBlockAtHeight(height uint64) (block cadenceStdlib.Block, exists bool, err error) {
 
 	buf := new(bytes.Buffer)
 	err = binary.Write(buf, binary.BigEndian, height)
@@ -441,10 +468,10 @@ func (i *testRuntimeInterface) GetBlockAtHeight(height uint64) (block stdlib.Blo
 	}
 
 	encoded := buf.Bytes()
-	var hash stdlib.BlockHash
+	var hash cadenceStdlib.BlockHash
 	copy(hash[sema.BlockTypeIdFieldType.Size-int64(len(encoded)):], encoded)
 
-	block = stdlib.Block{
+	block = cadenceStdlib.Block{
 		Height:    height,
 		View:      height,
 		Hash:      hash,
@@ -530,7 +557,7 @@ func (i *testRuntimeInterface) ImplementationDebugLog(message string) error {
 	return i.implementationDebugLog(message)
 }
 
-func (i *testRuntimeInterface) ValidatePublicKey(key *stdlib.PublicKey) error {
+func (i *testRuntimeInterface) ValidatePublicKey(key *cadenceStdlib.PublicKey) error {
 	if i.validatePublicKey == nil {
 		return errors.New("mock defaults to public key validation failure")
 	}
@@ -538,7 +565,7 @@ func (i *testRuntimeInterface) ValidatePublicKey(key *stdlib.PublicKey) error {
 	return i.validatePublicKey(key)
 }
 
-func (i *testRuntimeInterface) BLSVerifyPOP(key *stdlib.PublicKey, s []byte) (bool, error) {
+func (i *testRuntimeInterface) BLSVerifyPOP(key *cadenceStdlib.PublicKey, s []byte) (bool, error) {
 	if i.bLSVerifyPOP == nil {
 		return false, nil
 	}
@@ -554,7 +581,7 @@ func (i *testRuntimeInterface) BLSAggregateSignatures(sigs [][]byte) ([]byte, er
 	return i.blsAggregateSignatures(sigs)
 }
 
-func (i *testRuntimeInterface) BLSAggregatePublicKeys(keys []*stdlib.PublicKey) (*stdlib.PublicKey, error) {
+func (i *testRuntimeInterface) BLSAggregatePublicKeys(keys []*cadenceStdlib.PublicKey) (*cadenceStdlib.PublicKey, error) {
 	if i.blsAggregatePublicKeys == nil {
 		return nil, nil
 	}

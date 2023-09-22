@@ -51,7 +51,7 @@ require (
 	github.com/multiformats/go-multiaddr-dns v0.3.1
 	github.com/multiformats/go-multihash v0.2.3
 	github.com/onflow/atree v0.6.0
-	github.com/onflow/cadence v0.40.0
+	github.com/onflow/cadence v0.41.2-0.20230922203525-957de13ed7bf
 	github.com/onflow/flow v0.3.4
 	github.com/onflow/flow-core-contracts/lib/go/contracts v1.2.4-0.20230703193002-53362441b57d
 	github.com/onflow/flow-core-contracts/lib/go/templates v1.2.3
@@ -112,11 +112,8 @@ require (
 	cloud.google.com/go/compute v1.18.0 // indirect
 	cloud.google.com/go/iam v0.12.0 // indirect
 	github.com/DataDog/zstd v1.5.2 // indirect
-	github.com/Microsoft/go-winio v0.6.1 // indirect
-	github.com/SaveTheRbtz/mph v0.1.2 // indirect
 	github.com/StackExchange/wmi v1.2.1 // indirect
 	github.com/VictoriaMetrics/fastcache v1.6.0 // indirect
-	github.com/aristanetworks/goarista v0.0.0-20170210015632-ea17b1a17847 // indirect
 	github.com/aws/aws-sdk-go-v2 v1.17.7 // indirect
 	github.com/aws/aws-sdk-go-v2/credentials v1.13.18 // indirect
 	github.com/aws/aws-sdk-go-v2/feature/ec2/imds v1.13.1 // indirect
@@ -141,15 +138,10 @@ require (
 	github.com/cockroachdb/logtags v0.0.0-20230118201751-21c54148d20b // indirect
 	github.com/cockroachdb/pebble v0.0.0-20230906160148-46873a6a7a06 // indirect
 	github.com/cockroachdb/redact v1.1.3 // indirect
-	github.com/consensys/bavard v0.1.13 // indirect
-	github.com/consensys/gnark-crypto v0.10.0 // indirect
 	github.com/containerd/cgroups v1.1.0 // indirect
 	github.com/coreos/go-systemd/v22 v22.5.0 // indirect
-	github.com/crate-crypto/go-kzg-4844 v0.3.0 // indirect
 	github.com/cskr/pubsub v1.0.2 // indirect
-	github.com/dave/dst v0.27.2 // indirect
 	github.com/davidlazar/go-crypto v0.0.0-20200604182044-b73af7476f6c // indirect
-	github.com/deckarep/golang-set v0.0.0-20180603214616-504e848d77ea // indirect
 	github.com/deckarep/golang-set/v2 v2.1.0 // indirect
 	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.2.0 // indirect
 	github.com/desertbit/timer v0.0.0-20180107155436-c41aec40b27f // indirect
@@ -158,7 +150,6 @@ require (
 	github.com/docker/go-units v0.5.0 // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/elastic/gosigar v0.14.2 // indirect
-	github.com/ethereum/c-kzg-4844 v0.3.1 // indirect
 	github.com/felixge/fgprof v0.9.3 // indirect
 	github.com/flynn/noise v1.0.0 // indirect
 	github.com/francoispqt/gojay v1.2.13 // indirect
@@ -166,7 +157,6 @@ require (
 	github.com/fxamacker/circlehash v0.3.0 // indirect
 	github.com/gabriel-vasile/mimetype v1.4.2 // indirect
 	github.com/gammazero/deque v0.1.0 // indirect
-	github.com/gballet/go-libpcsclite v0.0.0-20190607065134-2772fd86a8ff // indirect
 	github.com/getsentry/sentry-go v0.18.0 // indirect
 	github.com/ghodss/yaml v1.0.0 // indirect
 	github.com/go-kit/kit v0.12.0 // indirect
@@ -213,7 +203,6 @@ require (
 	github.com/jbenet/go-temp-err-catcher v0.1.0 // indirect
 	github.com/jbenet/goprocess v0.1.4 // indirect
 	github.com/jmespath/go-jmespath v0.4.0 // indirect
-	github.com/k0kubun/pp v3.0.1+incompatible // indirect
 	github.com/kevinburke/go-bindata v3.23.0+incompatible // indirect
 	github.com/klauspost/compress v1.16.5 // indirect
 	github.com/klauspost/cpuid/v2 v2.2.5 // indirect
@@ -245,7 +234,6 @@ require (
 	github.com/mikioh/tcpopt v0.0.0-20190314235656-172688c1accc // indirect
 	github.com/minio/sha256-simd v1.0.1 // indirect
 	github.com/mitchellh/colorstring v0.0.0-20190213212951-d06e56a500db // indirect
-	github.com/mmcloughlin/addchain v0.4.0 // indirect
 	github.com/mr-tron/base58 v1.2.0 // indirect
 	github.com/multiformats/go-base32 v0.1.0 // indirect
 	github.com/multiformats/go-base36 v0.2.0 // indirect
@@ -290,13 +278,12 @@ require (
 	github.com/tklauser/go-sysconf v0.3.12 // indirect
 	github.com/tklauser/numcpus v0.6.1 // indirect
 	github.com/turbolent/prettier v0.0.0-20220320183459-661cc755135d // indirect
-	github.com/tyler-smith/go-bip39 v1.1.0 // indirect
 	github.com/vmihailenco/tagparser v0.1.1 // indirect
 	github.com/whyrusleeping/go-keyspace v0.0.0-20160322163242-5b898ac5add1 // indirect
 	github.com/x448/float16 v0.8.4 // indirect
 	github.com/yusufpapurcu/wmi v1.2.2 // indirect
+	github.com/zeebo/assert v1.3.0 // indirect
 	github.com/zeebo/blake3 v0.2.3 // indirect
-	github.com/zeebo/xxh3 v1.0.2 // indirect
 	go.opencensus.io v0.24.0 // indirect
 	go.opentelemetry.io/otel/exporters/otlp/internal/retry v1.16.0 // indirect
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace v1.16.0 // indirect
@@ -318,5 +305,4 @@ require (
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	lukechampine.com/blake3 v1.2.1 // indirect
 	nhooyr.io/websocket v1.8.7 // indirect
-	rsc.io/tmplfunc v0.0.3 // indirect
 )
