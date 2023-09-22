@@ -93,6 +93,10 @@ func (m *AtreeRegisterMigrator) MigrateAccount(
 		return oldPayloads, nil
 	}
 
+	if address != mustHexToAddress("4eded0de73020ca5") {
+		return oldPayloads, nil
+	}
+
 	if reason, ok := knownProblematicAccounts[address]; ok {
 		m.log.Info().
 			Str("account", address.Hex()).
@@ -880,11 +884,17 @@ func (m *metrics) trackSaveTime(save func()) {
 }
 
 func (m *metrics) AverageNonZeroCloneTime() time.Duration {
+	if m.cloned == 0 {
+		return 0
+	}
 	avg := m.timeToClone / time.Duration(m.cloned)
 	return avg
 }
 
 func (m *metrics) AverageNonZeroSaveTime() time.Duration {
+	if m.saved == 0 {
+		return 0
+	}
 	avg := m.timeToSave / time.Duration(m.saved)
 	return avg
 }

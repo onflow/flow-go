@@ -23,6 +23,8 @@ type CadenceDataValidationMigrations struct {
 
 	mu     sync.RWMutex
 	hashes map[common.Address][]byte
+
+	nWorkers int
 }
 
 func NewCadenceDataValidationMigrations(
@@ -30,8 +32,9 @@ func NewCadenceDataValidationMigrations(
 	nWorkers int,
 ) *CadenceDataValidationMigrations {
 	return &CadenceDataValidationMigrations{
-		rwf:    rwf,
-		hashes: make(map[common.Address][]byte, 40_000_000),
+		rwf:      rwf,
+		hashes:   make(map[common.Address][]byte, 40_000_000),
+		nWorkers: nWorkers,
 	}
 }
 
@@ -96,7 +99,9 @@ func (m *preMigration) MigrateAccount(
 	if address == common.ZeroAddress {
 		return payloads, nil
 	}
-
+	if address != mustHexToAddress("4eded0de73020ca5") {
+		return payloads, nil
+	}
 	if _, ok := knownProblematicAccounts[address]; ok {
 		m.log.Error().
 			Hex("address", address[:]).
@@ -104,7 +109,7 @@ func (m *preMigration) MigrateAccount(
 		return payloads, nil
 	}
 
-	hash, err := hashAccountCadenceValues(address, payloads)
+	hash, err := m.v.hashAccountCadenceValues(address, payloads)
 	if err != nil {
 		m.log.Info().
 			Err(err).
@@ -165,6 +170,9 @@ func (m *postMigration) MigrateAccount(
 	if address == common.ZeroAddress {
 		return payloads, nil
 	}
+	if address != mustHexToAddress("4eded0de73020ca5") {
+		return payloads, nil
+	}
 
 	if _, ok := knownProblematicAccounts[address]; ok {
 		m.log.Error().
@@ -173,7 +181,7 @@ func (m *postMigration) MigrateAccount(
 		return payloads, nil
 	}
 
-	newHash, err := hashAccountCadenceValues(address, payloads)
+	newHash, err := m.v.hashAccountCadenceValues(address, payloads)
 	if err != nil {
 		m.log.Info().
 			Err(err).
@@ -218,7 +226,7 @@ func (m *postMigration) MigrateAccount(
 	return payloads, nil
 }
 
-func hashAccountCadenceValues(
+func (m *CadenceDataValidationMigrations) hashAccountCadenceValues(
 	address common.Address,
 	payloads []*ledger.Payload,
 ) ([]byte, error) {
@@ -230,7 +238,7 @@ func hashAccountCadenceValues(
 
 	// iterate through all domains and migrate them
 	for _, domain := range domains {
-		domainHash, err := hashDomainCadenceValues(mr, domain)
+		domainHash, err := m.hashDomainCadenceValues(mr, domain)
 		if err != nil {
 			return nil, fmt.Errorf("failed to convert storage domain %s : %w", domain, err)
 		}
@@ -243,7 +251,7 @@ func hashAccountCadenceValues(
 	return hasher.SumHash(), nil
 }
 
-func hashDomainCadenceValues(
+func (m *CadenceDataValidationMigrations) hashDomainCadenceValues(
 	mr *migratorRuntime,
 	domain string,
 ) ([]byte, error) {
@@ -269,12 +277,7 @@ func hashDomainCadenceValues(
 			break
 		}
 
-		var s string
-		err := capturePanic(
-			func() {
-				// TODO: check if this is enough. We might need to switch to jsoncdc
-				s = value.RecursiveString(interpreter.SeenReferences{})
-			})
+		h, err := m.recursiveString(mr, value, hasher)
 		if err != nil {
 			return nil, fmt.Errorf("failed to convert value to string: %w", err)
 		}
@@ -289,7 +292,6 @@ func hashDomainCadenceValues(
 		//	return nil, fmt.Errorf("failed to encode value: %w", err)
 		//}
 
-		h := hasher.ComputeHash([]byte(s))
 		hasher.Reset()
 
 		hashes = append(hashes, h)
@@ -307,6 +309,290 @@ func hashDomainCadenceValues(
 
 	return hasher.SumHash(), nil
 
+}
+
+func (m *CadenceDataValidationMigrations) recursiveString(
+	mr *migratorRuntime,
+	value interpreter.Value,
+	hasher hash.Hasher,
+) ([]byte, error) {
+	if mr.Address == mustHexToAddress("4eded0de73020ca5") {
+		compositeValue, ok := value.(*interpreter.CompositeValue)
+		if ok && string(compositeValue.TypeID()) == "A.4eded0de73020ca5.CricketMomentsShardedCollection.ShardedCollection" {
+			return m.recursiveStringShardedCollection(mr, value)
+		}
+	}
+
+	var s string
+	err := capturePanic(
+		func() {
+			s = value.RecursiveString(interpreter.SeenReferences{})
+		})
+	if err != nil {
+		return nil, fmt.Errorf("failed to convert value to string: %w", err)
+	}
+
+	h := hasher.ComputeHash([]byte(s))
+	return h, nil
+}
+
+func (m *CadenceDataValidationMigrations) recursiveStringShardedCollection(
+	mr *migratorRuntime,
+	value interpreter.Value,
+) ([]byte, error) {
+
+	shardedCollectionResource, ok := value.(*interpreter.CompositeValue)
+	if !ok {
+		return nil, fmt.Errorf("expected *interpreter.CompositeValue, got %T", value)
+	}
+	shardedCollectionMapField := shardedCollectionResource.GetField(
+		mr.Interpreter,
+		interpreter.EmptyLocationRange,
+		"collections",
+	)
+	if shardedCollectionMapField == nil {
+		return nil, fmt.Errorf("expected collections field")
+	}
+	shardedCollectionMap, ok := shardedCollectionMapField.(*interpreter.DictionaryValue)
+	if !ok {
+		return nil, fmt.Errorf("expected collections to be *interpreter.DictionaryValue, got %T", shardedCollectionMapField)
+	}
+
+	type valueWithKeys struct {
+		outerKey interpreter.Value
+		innerKey interpreter.Value
+		value    interpreter.Value
+	}
+
+	type hashWithKeys struct {
+		outerKey interpreter.Value
+		innerKey interpreter.Value
+		hash     []byte
+	}
+
+	ctx, cancel := context.WithCancelCause(context.Background())
+	defer cancel(nil)
+	hashifyChan := make(chan valueWithKeys, m.nWorkers)
+	hashChan := make(chan hashWithKeys, m.nWorkers)
+	wg := sync.WaitGroup{}
+	wg.Add(m.nWorkers)
+
+	for i := 0; i < m.nWorkers; i++ {
+		hasher := newHasher()
+		go func() {
+			defer wg.Done()
+			for {
+				select {
+				case <-ctx.Done():
+					return
+				case hashify, ok := <-hashifyChan:
+					if !ok {
+						return
+					}
+					s := ""
+					err := capturePanic(func() {
+						s = hashify.value.RecursiveString(interpreter.SeenReferences{})
+					})
+					if err != nil {
+						cancel(err)
+						return
+					}
+					hash := hasher.ComputeHash([]byte(s))
+					hasher.Reset()
+
+					hashChan <- hashWithKeys{
+						outerKey: hashify.outerKey,
+						innerKey: hashify.innerKey,
+						hash:     hash,
+					}
+				}
+			}
+		}()
+	}
+
+	go func() {
+		shardedCollectionMapIterator := shardedCollectionMap.Iterator()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			default:
+			}
+
+			outerKey := shardedCollectionMapIterator.NextKey(nil)
+			if outerKey == nil {
+				break
+			}
+			value := shardedCollectionMap.GetKey(
+				mr.Interpreter,
+				interpreter.EmptyLocationRange,
+				outerKey,
+			)
+
+			collection, ok := value.(*interpreter.CompositeValue)
+			if !ok {
+				cancel(fmt.Errorf("expected collection to be *interpreter.CompositeValue, got %T", value))
+				return
+			}
+
+			ownedNFTsRaw := collection.GetField(
+				mr.Interpreter,
+				interpreter.EmptyLocationRange,
+				"ownedNFTs",
+			)
+			if ownedNFTsRaw == nil {
+				cancel(fmt.Errorf("expected ownedNFTs field"))
+				return
+			}
+			ownedNFTs, ok := ownedNFTsRaw.(*interpreter.DictionaryValue)
+			if !ok {
+				cancel(fmt.Errorf("expected ownedNFTs to be *interpreter.DictionaryValue, got %T", ownedNFTsRaw))
+				return
+			}
+
+			ownedNFTsIterator := ownedNFTs.Iterator()
+			keys := make([]interpreter.Value, 0, ownedNFTs.Count())
+			for {
+				select {
+				case <-ctx.Done():
+					return
+				default:
+				}
+
+				innerKey := ownedNFTsIterator.NextKey(nil)
+				if innerKey == nil {
+					break
+				}
+				value := ownedNFTs.GetKey(
+					mr.Interpreter,
+					interpreter.EmptyLocationRange,
+					innerKey,
+				)
+
+				hashifyChan <- valueWithKeys{
+					innerKey: innerKey,
+					outerKey: outerKey,
+					value:    value,
+				}
+
+				keys = append(keys, innerKey)
+			}
+
+			for _, key := range keys {
+				ownedNFTs.Remove(
+					mr.Interpreter,
+					interpreter.EmptyLocationRange,
+					key,
+				)
+			}
+		}
+		close(hashifyChan)
+	}()
+
+	done := make(chan struct{})
+	hashes := make(map[interpreter.Value]sortableHashes)
+
+	go func() {
+		defer close(done)
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case clone, ok := <-hashChan:
+				if !ok {
+					return
+				}
+				l, ok := hashes[clone.outerKey]
+				if !ok {
+					l = make(sortableHashes, 0, 1_0000_000)
+				}
+				l = append(l, clone.hash)
+			}
+		}
+	}()
+
+	wg.Wait()
+	close(hashChan)
+	<-done
+
+	if ctx.Err() != nil {
+		return nil, ctx.Err()
+	}
+
+	inputChan := make(chan interpreter.Value, m.nWorkers)
+	outputChan := make(chan []byte)
+	wg.Add(m.nWorkers)
+	done = make(chan struct{})
+
+	for i := 0; i < m.nWorkers; i++ {
+		go func() {
+			defer wg.Done()
+			hasher := newHasher()
+
+			for {
+				select {
+				case <-ctx.Done():
+					return
+				case i, ok := <-inputChan:
+					if !ok {
+						return
+					}
+					l := hashes[i]
+					sort.Sort(l)
+					for _, h := range l {
+						_, err := hasher.Write(h)
+						if err != nil {
+							cancel(fmt.Errorf("failed to write hash: %w", err))
+
+							return
+						}
+					}
+					outputChan <- hasher.SumHash()
+					hasher.Reset()
+				}
+			}
+		}()
+	}
+
+	outHashes := make(sortableHashes, 0, 10_000_000)
+
+	go func() {
+		defer close(done)
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case h, ok := <-outputChan:
+				if !ok {
+					return
+				}
+				outHashes = append(outHashes, h)
+			}
+		}
+	}()
+
+	for k := range hashes {
+		inputChan <- k
+	}
+	close(inputChan)
+	wg.Wait()
+	<-done
+
+	if ctx.Err() != nil {
+		return nil, ctx.Err()
+	}
+
+	sort.Sort(outHashes)
+	hasher := newHasher()
+
+	for _, h := range outHashes {
+		_, err := hasher.Write(h)
+		if err != nil {
+			return nil, fmt.Errorf("failed to write hash: %w", err)
+		}
+
+	}
+	return hasher.SumHash(), nil
 }
 
 func newHasher() hash.Hasher {

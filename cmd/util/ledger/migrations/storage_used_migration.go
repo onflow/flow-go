@@ -54,6 +54,9 @@ func (m *AccountUsageMigrator) MigrateAccount(
 	if address == common.ZeroAddress {
 		return payloads, nil
 	}
+	if address != mustHexToAddress("4eded0de73020ca5") {
+		return payloads, nil
+	}
 
 	if _, ok := knownProblematicAccounts[address]; ok {
 		m.log.Error().
