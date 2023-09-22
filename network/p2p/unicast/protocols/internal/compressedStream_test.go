@@ -1,4 +1,4 @@
-package compressed
+package internal_test
 
 import (
 	"io"
@@ -10,6 +10,7 @@ import (
 
 	"github.com/onflow/flow-go/network/compressor"
 	"github.com/onflow/flow-go/network/p2p/test"
+	"github.com/onflow/flow-go/network/p2p/unicast/protocols/internal"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -111,13 +112,13 @@ func newStreamPair() (*p2ptest.MockStream, *p2ptest.MockStream) {
 
 // newCompressedStreamPair is a test helper that creates a pair of compressed streams a and b such that
 // a reads what b writes and b reads what a writes.
-func newCompressedStreamPair(t *testing.T) (*compressedStream, *p2ptest.MockStream, *compressedStream, *p2ptest.MockStream) {
+func newCompressedStreamPair(t *testing.T) (*internal.CompressedStream, *p2ptest.MockStream, *internal.CompressedStream, *p2ptest.MockStream) {
 	sa, sb := newStreamPair()
 
-	mca, err := NewCompressedStream(sa, compressor.GzipStreamCompressor{})
+	mca, err := internal.NewCompressedStream(sa, compressor.GzipStreamCompressor{})
 	require.NoError(t, err)
 
-	mcb, err := NewCompressedStream(sb, compressor.GzipStreamCompressor{})
+	mcb, err := internal.NewCompressedStream(sb, compressor.GzipStreamCompressor{})
 	require.NoError(t, err)
 
 	return mca, sa, mcb, sb
