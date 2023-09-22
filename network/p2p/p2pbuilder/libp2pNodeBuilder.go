@@ -41,6 +41,7 @@ import (
 	"github.com/onflow/flow-go/network/p2p/tracer"
 	"github.com/onflow/flow-go/network/p2p/unicast"
 	unicastcache "github.com/onflow/flow-go/network/p2p/unicast/cache"
+	"github.com/onflow/flow-go/network/p2p/unicast/manager"
 	"github.com/onflow/flow-go/network/p2p/unicast/protocols"
 	"github.com/onflow/flow-go/network/p2p/unicast/stream"
 	"github.com/onflow/flow-go/network/p2p/utils"
@@ -315,7 +316,7 @@ func (builder *LibP2PNodeBuilder) Build() (p2p.LibP2PNode, error) {
 		DialZeroRetryResetThreshold:        builder.unicastConfig.DialZeroRetryResetThreshold,
 		MaxStreamCreationRetryAttemptTimes: builder.unicastConfig.MaxStreamCreationRetryAttemptTimes,
 		MaxDialRetryAttemptTimes:           builder.unicastConfig.MaxDialRetryAttemptTimes,
-		DialConfigCacheFactory: func(configFactory func() manager.DialConfig) unicast.DialConfigCache {
+		DialConfigCacheFactory: func(configFactory func() unicast.DialConfig) unicast.DialConfigCache {
 			return unicastcache.NewDialConfigCache(builder.unicastConfig.DialConfigCacheSize,
 				builder.logger,
 				metrics.DialConfigCacheMetricFactory(builder.metricsConfig.HeroCacheFactory, builder.networkingType),
