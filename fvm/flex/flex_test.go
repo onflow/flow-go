@@ -61,6 +61,8 @@ var flexAddressCadenceType = cadence.NewStructType(
 
 func TestFlexAddressConstructionAndReturn(t *testing.T) {
 
+	t.Parallel()
+
 	RunWithTempLedger(t, func(led atree.Ledger) {
 		handler := NewFlexContractHandler(led)
 
@@ -125,6 +127,8 @@ func TestFlexAddressConstructionAndReturn(t *testing.T) {
 }
 
 func TestFlexRun(t *testing.T) {
+
+	t.Parallel()
 
 	RunWithTempLedger(t, func(led atree.Ledger) {
 		handler := NewFlexContractHandler(led)
