@@ -65,16 +65,26 @@ type LibP2PNodeBuilder struct {
 	peerManagerConfig         *p2pconfig.PeerManagerConfig
 	createNode                p2p.CreateNodeFunc
 	createStreamRetryInterval time.Duration
-	rateLimiterDistributor    p2p.UnicastRateLimiterDistributor
 	gossipSubTracer           p2p.PubSubTracer
 	disallowListCacheCfg      *p2p.DisallowListCacheConfig
+	unicastConfig             *p2pconfig.UnicastConfig
 	networkingType            flownet.NetworkingType // whether the node is running in private (staked) or public (unstaked) network
 }
 
 func NewNodeBuilder(
-	logger zerolog.Logger, metricsConfig *p2pconfig.MetricsConfig, networkingType flownet.NetworkingType, address string, networkKey fcrypto.PrivateKey, sporkId flow.Identifier,
-	idProvider module.IdentityProvider, rCfg *p2pconf.ResourceManagerConfig, rpcInspectorCfg *p2pconf.GossipSubRPCInspectorsConfig, peerManagerConfig *p2pconfig.PeerManagerConfig,
-	disallowListCacheCfg *p2p.DisallowListCacheConfig, rpcTracker p2p.RpcControlTracking,
+	logger zerolog.Logger,
+	metricsConfig *p2pconfig.MetricsConfig,
+	networkingType flownet.NetworkingType,
+	address string,
+	networkKey fcrypto.PrivateKey,
+	sporkId flow.Identifier,
+	idProvider module.IdentityProvider,
+	rCfg *p2pconf.ResourceManagerConfig,
+	rpcInspectorCfg *p2pconf.GossipSubRPCInspectorsConfig,
+	peerManagerConfig *p2pconfig.PeerManagerConfig,
+	disallowListCacheCfg *p2p.DisallowListCacheConfig,
+	rpcTracker p2p.RpcControlTracking,
+	unicastConfig *p2pconfig.UnicastConfig,
 ) *LibP2PNodeBuilder {
 	return &LibP2PNodeBuilder{
 		logger:               logger,
@@ -94,6 +104,7 @@ func NewNodeBuilder(
 			rpcInspectorCfg,
 			rpcTracker),
 		peerManagerConfig: peerManagerConfig,
+		unicastConfig:     unicastConfig,
 	}
 }
 
@@ -163,11 +174,6 @@ func (builder *LibP2PNodeBuilder) SetGossipSubTracer(tracer p2p.PubSubTracer) p2
 
 func (builder *LibP2PNodeBuilder) SetCreateNode(f p2p.CreateNodeFunc) p2p.NodeBuilder {
 	builder.createNode = f
-	return builder
-}
-
-func (builder *LibP2PNodeBuilder) SetRateLimiterDistributor(distributor p2p.UnicastRateLimiterDistributor) p2p.NodeBuilder {
-	builder.rateLimiterDistributor = distributor
 	return builder
 }
 
@@ -297,8 +303,8 @@ func (builder *LibP2PNodeBuilder) Build() (p2p.LibP2PNode, error) {
 
 		peerManager = connection.NewPeerManager(builder.logger, builder.peerManagerConfig.UpdateInterval, peerUpdater)
 
-		if builder.rateLimiterDistributor != nil {
-			builder.rateLimiterDistributor.AddConsumer(peerManager)
+		if builder.unicastConfig.RateLimiterDistributor != nil {
+			builder.unicastConfig.RateLimiterDistributor.AddConsumer(peerManager)
 		}
 	}
 
@@ -316,10 +322,10 @@ func (builder *LibP2PNodeBuilder) Build() (p2p.LibP2PNode, error) {
 			ConnStatus:                         node,
 			CreateStreamRetryDelay:             builder.createStreamRetryInterval,
 			Metrics:                            builder.metricsConfig.Metrics,
-			StreamZeroRetryResetThreshold:      unicastmodel.StreamZeroBackoffResetThreshold,
-			DialZeroRetryResetThreshold:        unicastmodel.DialZeroBackoffResetThreshold,
-			MaxStreamCreationRetryAttemptTimes: unicastmodel.MaxStreamCreationAttemptTimes,
-			MaxDialRetryAttemptTimes:           unicastmodel.MaxDialAttemptTimes,
+			StreamZeroRetryResetThreshold:      builder.unicastConfig.StreamZeroRetryResetThreshold,
+			DialZeroRetryResetThreshold:        builder.unicastConfig.DialZeroRetryResetThreshold,
+			MaxStreamCreationRetryAttemptTimes: builder.unicastConfig.MaxStreamCreationRetryAttemptTimes,
+			MaxDialRetryAttemptTimes:           builder.unicastConfig.MaxDialRetryAttemptTimes,
 			DialConfigCacheFactory: func() unicast.DialConfigCache {
 				return unicastcache.NewDialConfigCache(
 					unicast.DefaultDailConfigCacheSize,
@@ -505,7 +511,8 @@ func DefaultNodeBuilder(
 		rpcInspectorCfg,
 		peerManagerCfg,
 		disallowListCacheCfg,
-		meshTracer).
+		meshTracer,
+		uniCfg).
 		SetBasicResolver(resolver).
 		SetConnectionManager(connManager).
 		SetConnectionGater(connGater).
@@ -519,9 +526,7 @@ func DefaultNodeBuilder(
 					dht.AsServer())
 			},
 		).
-		SetStreamCreationRetryInterval(uniCfg.StreamRetryInterval).
-		SetCreateNode(DefaultCreateNodeFunc).
-		SetRateLimiterDistributor(uniCfg.RateLimiterDistributor)
+		SetCreateNode(DefaultCreateNodeFunc)
 
 	if gossipCfg.PeerScoring {
 		// In production, we never override the default scoring config.

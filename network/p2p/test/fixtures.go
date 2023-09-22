@@ -118,6 +118,13 @@ func NodeFixture(
 		PeerManagerConfig:                PeerManagerConfigFixture(), // disabled by default
 		FlowConfig:                       defaultFlowConfig,
 		PubSubTracer:                     tracer.NewGossipSubMeshTracer(meshTracerCfg),
+		UnicastConfig: &p2pconfig.UnicastConfig{
+			StreamRetryInterval:                defaultFlowConfig.NetworkConfig.UnicastCreateStreamRetryDelay,
+			StreamZeroRetryResetThreshold:      defaultFlowConfig.NetworkConfig.UnicastStreamZeroRetryResetThreshold,
+			DialZeroRetryResetThreshold:        defaultFlowConfig.NetworkConfig.UnicastDialZeroRetryResetThreshold,
+			MaxDialRetryAttemptTimes:           defaultFlowConfig.NetworkConfig.UnicastMaxDialRetryAttemptTimes,
+			MaxStreamCreationRetryAttemptTimes: defaultFlowConfig.NetworkConfig.UnicastMaxStreamCreationRetryAttemptTimes,
+		},
 	}
 
 	for _, opt := range opts {
@@ -149,7 +156,8 @@ func NodeFixture(
 			MaxSize: uint32(1000),
 			Metrics: metrics.NewNoopCollector(),
 		},
-		parameters.PubSubTracer).
+		parameters.PubSubTracer,
+		parameters.UnicastConfig).
 		SetConnectionManager(connManager).
 		SetRoutingSystem(func(c context.Context, h host.Host) (routing.Routing, error) {
 			return p2pdht.NewDHT(c, h,
@@ -160,7 +168,6 @@ func NodeFixture(
 			)
 		}).
 		SetCreateNode(p2pbuilder.DefaultCreateNodeFunc).
-		SetStreamCreationRetryInterval(parameters.CreateStreamRetryDelay).
 		SetResourceManager(parameters.ResourceManager)
 
 	if parameters.GossipSubRpcInspectorSuiteFactory != nil {
@@ -191,10 +198,6 @@ func NodeFixture(
 		builder.SetGossipSubTracer(parameters.PubSubTracer)
 	}
 
-	if parameters.UnicastRateLimitDistributor != nil {
-		builder.SetRateLimiterDistributor(parameters.UnicastRateLimitDistributor)
-	}
-
 	builder.SetGossipSubScoreTracerInterval(parameters.GossipSubPeerScoreTracerInterval)
 
 	n, err := builder.Build()
@@ -223,6 +226,7 @@ type NodeFixtureParameters struct {
 	HandlerFunc                       network.StreamHandler
 	NetworkingType                    flownet.NetworkingType
 	Unicasts                          []protocols.ProtocolName
+	UnicastConfig                     *p2pconfig.UnicastConfig
 	Key                               crypto.PrivateKey
 	Address                           string
 	DhtOptions                        []dht.Option
@@ -242,14 +246,13 @@ type NodeFixtureParameters struct {
 	PubSubTracer                      p2p.PubSubTracer
 	GossipSubPeerScoreTracerInterval  time.Duration // intervals at which the peer score is updated and logged.
 	CreateStreamRetryDelay            time.Duration
-	UnicastRateLimitDistributor       p2p.UnicastRateLimiterDistributor
 	GossipSubRpcInspectorSuiteFactory p2p.GossipSubRpcInspectorSuiteFactoryFunc
 	FlowConfig                        *config.FlowConfig
 }
 
 func WithUnicastRateLimitDistributor(distributor p2p.UnicastRateLimiterDistributor) NodeFixtureParameterOption {
 	return func(p *NodeFixtureParameters) {
-		p.UnicastRateLimitDistributor = distributor
+		p.UnicastConfig.RateLimiterDistributor = distributor
 	}
 }
 
@@ -676,7 +679,8 @@ func EnsurePubsubMessageExchangeFromNode(
 	receiverIdentifier flow.Identifier,
 	topic channels.Topic,
 	count int,
-	messageFactory func() interface{}) {
+	messageFactory func() interface{},
+) {
 	_, err := sender.Subscribe(topic, validator.TopicValidator(unittest.Logger(), unittest.AllowAllPeerFilter()))
 	require.NoError(t, err)
 
@@ -744,7 +748,8 @@ func EnsureNoPubsubMessageExchange(
 	toIdentifiers flow.IdentifierList,
 	topic channels.Topic,
 	count int,
-	messageFactory func() interface{}) {
+	messageFactory func() interface{},
+) {
 	subs := make([]p2p.Subscription, len(to))
 	tv := validator.TopicValidator(
 		unittest.Logger(),
@@ -815,7 +820,8 @@ func EnsureNoPubsubExchangeBetweenGroups(
 	groupBIdentifiers flow.IdentifierList,
 	topic channels.Topic,
 	count int,
-	messageFactory func() interface{}) {
+	messageFactory func() interface{},
+) {
 	// ensure no message exchange from group A to group B
 	EnsureNoPubsubMessageExchange(t, ctx, groupANodes, groupBNodes, groupBIdentifiers, topic, count, messageFactory)
 	// ensure no message exchange from group B to group A

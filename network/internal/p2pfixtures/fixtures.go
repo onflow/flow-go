@@ -37,7 +37,6 @@ import (
 	p2pconfig "github.com/onflow/flow-go/network/p2p/p2pbuilder/config"
 	"github.com/onflow/flow-go/network/p2p/tracer"
 	"github.com/onflow/flow-go/network/p2p/unicast/protocols"
-	"github.com/onflow/flow-go/network/p2p/unicast/unicastmgr"
 	"github.com/onflow/flow-go/network/p2p/utils"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -134,12 +133,18 @@ func CreateNode(t *testing.T, networkKey crypto.PrivateKey, sporkID flow.Identif
 			MaxSize: uint32(1000),
 			Metrics: metrics.NewNoopCollector(),
 		},
-		meshTracer).
+		meshTracer,
+		&p2pconfig.UnicastConfig{
+			StreamRetryInterval:                defaultFlowConfig.NetworkConfig.UnicastCreateStreamRetryDelay,
+			StreamZeroRetryResetThreshold:      defaultFlowConfig.NetworkConfig.UnicastStreamZeroRetryResetThreshold,
+			DialZeroRetryResetThreshold:        defaultFlowConfig.NetworkConfig.UnicastDialZeroRetryResetThreshold,
+			MaxDialRetryAttemptTimes:           defaultFlowConfig.NetworkConfig.UnicastMaxDialRetryAttemptTimes,
+			MaxStreamCreationRetryAttemptTimes: defaultFlowConfig.NetworkConfig.UnicastMaxStreamCreationRetryAttemptTimes,
+		}).
 		SetRoutingSystem(func(c context.Context, h host.Host) (routing.Routing, error) {
 			return p2pdht.NewDHT(c, h, protocols.FlowDHTProtocolID(sporkID), zerolog.Nop(), metrics.NewNoopCollector())
 		}).
 		SetResourceManager(&network.NullResourceManager{}).
-		SetStreamCreationRetryInterval(unicastmgr.DefaultRetryDelay).
 		SetGossipSubTracer(meshTracer).
 		SetGossipSubScoreTracerInterval(defaultFlowConfig.NetworkConfig.GossipSubConfig.ScoreTracerInterval)
 
