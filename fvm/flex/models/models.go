@@ -3,43 +3,49 @@ package models
 import (
 	"math/big"
 
-	"github.com/ethereum/go-ethereum/common"
+	gethCommon "github.com/ethereum/go-ethereum/common"
 	"github.com/onflow/cadence"
 )
 
-// Flex is an account inside FVM with special access to the underlying infrasturcture which
-// allows to run a virtual evm-based blockchain on top of FVM. There are two ways to interact with this
-// blockchain (flex env), first by passing signed transactions (EOA accounts) through Flex.Run method and each transaction
-// would be considered as a block, updating the internal merkle tree of the Flex env and emitting a new root hash.
-// The second way is through a new form of accounts called (FOA) which acts as a resource that any account on Flow environment
-// could own and it has a collision-proof allocated flex address and any one who owns the resource, would be able to
-// interact with the Flex environment on behalf of the flex address.
+// Flex is an account inside FVM with special access to the underlying infrastructure
+// which allows to run a virtual EVM-based blockchain inside FVM.
+//
+// There are two ways to interact with this environment:
+//
+// First, passing a signed transaction (EOA account) to the `Flex.run` Cadence function
+// creates a new block, updates the internal merkle tree, and emits a new root hash.
+//
+// The Second way is through a new form of account called Flow-owned account (FOA),
+// which is represented and controlled through a resource, owned by a Flow account.
+// The FOA has a collision-proof allocated address.
+/// The owner of the FOA resource can interact with the Flex environment on behalf of the Flex address.
+//
+// The Flex environment shares the same native token as Flow, there are no new tokens minted.
+// Other ERC-20 fungible tokens can be bridged between FOA resources and Flow accounts.
 
-// The Flex enviornment shares the same native token as Flow, there is no new tokens minted and tokens could be bridged between
-// FOA resources and Flow accounts. Then it could be circulated to any address space in the Flex (EOA, smart contracts), etc.
+// FlexAddress is an EVM-compatible address
+type FlexAddress gethCommon.Address
 
-// Flex addresses are evm-compatible addresses
-type FlexAddress common.Address
-
-func (fa FlexAddress) ToCommon() common.Address {
-	return common.Address(fa)
+func (fa FlexAddress) ToCommon() gethCommon.Address {
+	return gethCommon.Address(fa)
 }
 
 func NewFlexAddressFromString(str string) FlexAddress {
-	return FlexAddress(common.BytesToAddress([]byte(str)))
+	return FlexAddress(gethCommon.BytesToAddress([]byte(str)))
 }
 
-// FlexBlock captures block info such as height and state
+// FlexBlock represents an EVM block.
+// It captures block info such as height and state
 type FlexBlock interface {
-	// returns the height of this block (autoincrement number)
+	// Height returns the height of this EVM block (auto-incremented number)
 	Height() uint64
-	// returns the root hash of the state after executing this block
-	StateRoot() common.Hash
-	// returns the root hash of the events emited during execution of this block
-	EventRoot() common.Hash
+	// StateRoot returns the EVM root hash of the state after executing this EVM block
+	StateRoot() gethCommon.Hash
+	// EventRoot returns the EVM root hash of the events emitted during execution of this EVM block
+	EventRoot() gethCommon.Hash
 }
 
-// Balance of a flex account
+// Balance represents the balance of a Flex account
 // a separate type has been considered here to prevent
 // accidental dev mistakes when dealing with the conversion
 type Balance interface {
@@ -47,7 +53,7 @@ type Balance interface {
 	InFlow() cadence.UFix64
 }
 
-type Gaslimit uint64
+type GasLimit uint64
 
 type Code []byte
 
@@ -59,51 +65,59 @@ type FlexAccount interface {
 	Balance() Balance
 }
 
-type FlowTokenVault interface {
+// FLOWTokenVault represents a FLOW Vault
+type FLOWTokenVault interface {
 	Balance() Balance
-	Withdraw(Balance) FlowTokenVault
-	Deposit(FlowTokenVault)
+	Withdraw(Balance) FLOWTokenVault
+	Deposit(FLOWTokenVault)
 }
 
-// FlowOwnedAccount is a new type of accounts on the Flex environment
-// that instead of being managed by public key inside the Flex, it would be managed
-// as a resource inside the FVM accounts. in other words, the FVM account who holds
-// a owns the FOA resource, could bridge native token from and to flex account associated with the FOA
-// and deploys contracts or calls method on contracts without the need to sign a transaction.
+// FlowOwnedAccount is a new type of account in the Flex environment,
+// that instead of being managed by public key inside the Flex,
+// is managed by  a resource owned by a Flow account.
+//
+// In other words, the FVM account who owns the FOA resource
+// can bridge native tokens to and from the Flex account associated with the FOA,
+// deploy contracts to the Flex environment,
+// or call methods on contracts without the need to sign a transaction.
 type FlowOwnedAccount interface {
 	// Address returns the flex address associated with the FOA account
 	Address() *FlexAddress
 
 	// Deposit deposits the token from the given vault into the Flex main vault
 	// and update the FOA balance with the new amount
-	Deposit(FlowTokenVault)
+	// TODO: move to FlexAccount
+	Deposit(FLOWTokenVault)
 
 	// Withdraw deducts the balance from the FOA account and
 	// withdraw and return flow token from the Flex main vault.
-	Withdraw(Balance) FlowTokenVault
+	Withdraw(Balance) FLOWTokenVault
 
 	// Deploy deploys a contract to the Flex environment
 	// the new deployed contract would be at the returned address and
 	// the contract data is not controlled by the FOA accounts
-	Deploy(Code, Gaslimit, Balance) FlexAddress
+	Deploy(Code, GasLimit, Balance) FlexAddress
 
-	// Call calls a smart contract function with the given data
-	// it would limit the gas used according to the limit provided
-	// given it doesn't goes beyond what Flow transaction allows.
-	// the balance would be deducted from the OFA account and would be transferred to the target address
-	// contract data is not controlled by the FOA accounts
-	Call(FlexAddress, Data, Gaslimit, Balance) Data
+	// Call calls a smart contract function with the given data.
+	// The gas usage is limited by the given gas limit,
+	// and the Flow transaction's computation limit.
+	// The fees are deducted from the FOA
+	// and are transferred to the target address.
+	// TODO: clarify
+	// Contract data is not controlled by the FOA account
+	Call(FlexAddress, Data, GasLimit, Balance) Data
 }
 
-// Flex contract handles operations on the flex environment
+// FlexContractHandler handles operations on the Flex environment
 type FlexContractHandler interface {
-	// constructs a new flow owned account
+	// NewFlowOwnedAccount constructs a new FOA
 	NewFlowOwnedAccount() FlowOwnedAccount
 
-	// returns the last executed block info
+	// LastExecutedBlock returns information about the last executed block
 	LastExecutedBlock() FlexBlock
 
-	// runs a transaction in the Flex environment and collect
-	// the flex gas fees under coinbase account, if tx is success full it returns true
-	Run(bytes []byte, coinbase FlexAddress) bool
+	// Run runs a transaction in the Flex environment,
+	// collects the gas fees, and transfers the gas fees to the given coinbase account.
+	// Returns true if the transaction was successfully executed
+	Run(tx []byte, coinbase FlexAddress) bool
 }
