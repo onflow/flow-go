@@ -229,6 +229,7 @@ func (e *Manager) QueryExecutor() query.Executor {
 
 func DefaultFVMOptions(chainID flow.ChainID, cadenceTracing bool, extensiveTracing bool) []fvm.Option {
 	options := []fvm.Option{
+		fvm.WithChain(chainID.Chain()),
 		fvm.WithReusableCadenceRuntimePool(
 			reusableRuntime.NewReusableCadenceRuntimePool(
 				ReusableCadenceRuntimePoolSize,
