@@ -189,9 +189,9 @@ func sortPayloads(i, j int, source, buffer sortablePayloads, goroutineAllowance 
 	}
 
 	// below this size, no need to split the sorting into goroutines
-	const minSizeForSplit = 1000000
+	const minSizeForSplit = 100_000
 
-	// if we are out of goroutine allowance, sort with built-in sort
+	// if we are out of goroutine allowance, sort with built-in sortß
 	// if the length is less than minSizeForSplit, sort with built-in sort
 	if goroutineAllowance < 2 || j-i < minSizeForSplit {
 		sort.Sort(source[i:j])

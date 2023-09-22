@@ -93,13 +93,13 @@ func (m *AtreeRegisterMigrator) MigrateAccount(
 		return oldPayloads, nil
 	}
 
-	//if reason, ok := knownProblematicAccounts[address]; ok {
-	//	m.log.Info().
-	//		Str("account", address.Hex()).
-	//		Str("reason", reason).
-	//		Msg("Account is known to have issues. Skipping it.")
-	//	return oldPayloads, nil
-	//}
+	if reason, ok := knownProblematicAccounts[address]; ok {
+		m.log.Info().
+			Str("account", address.Hex()).
+			Str("reason", reason).
+			Msg("Account is known to have issues. Skipping it.")
+		return oldPayloads, nil
+	}
 
 	if address != mustHexToAddress("4eded0de73020ca5") {
 		// for testing purposes migrate only one account
@@ -701,6 +701,10 @@ func (m *AtreeRegisterMigrator) cloneCricketMomentsShardedCollection(
 		return nil, ctx.Err()
 	}
 
+	m.log.Info().
+		Int("cloned", len(cloned)).
+		Msg("CricketMomentsShardedCollection: all values cloned")
+
 	// clone a now empty sharded collection
 	shardedCollectionResource = shardedCollectionResource.Clone(mr.Interpreter).(*interpreter.CompositeValue)
 	shardedCollectionMapField = shardedCollectionResource.GetField(
@@ -765,136 +769,13 @@ func (m *AtreeRegisterMigrator) cloneCricketMomentsShardedCollection(
 		)
 	}
 
+	m.log.Info().
+		Int("cloned", len(cloned)).
+		Msg("CricketMomentsShardedCollection: cloned")
+
 	// everything is cloned which means we forced the entire value to be read from storage
-	return value, nil
+	return shardedCollectionResource, nil
 }
-
-//
-//func (m *AtreeRegisterMigrator) cloneLargeArray(
-//	mr *migratorRuntime,
-//	value *interpreter.ArrayValue,
-//) (interpreter.Value, error) {
-//
-//	count := value.Count()
-//
-//	workers := 2 // TODO
-//
-//	type valueWithIndex struct {
-//		value interpreter.Value
-//		index int
-//	}
-//
-//	inChan := make(chan valueWithIndex, workers)
-//	outChan := make(chan valueWithIndex)
-//	defer close(inChan)
-//	defer close(outChan)
-//
-//	for i := 0; i < workers; i++ {
-//		go func() {
-//			for v := range inChan {
-//				v.value = v.value.Clone(mr.Interpreter)
-//				outChan <- v
-//			}
-//		}()
-//	}
-//
-//	go func() {
-//		iterator := value.Iterator(mr.Interpreter)
-//		for i := 0; i < count; i++ {
-//			inChan <- valueWithIndex{
-//				value: iterator.Next(mr.Interpreter),
-//				index: i,
-//			}
-//		}
-//	}()
-//
-//	copied := make([]interpreter.Value, count)
-//
-//	for i := 0; i < count; i++ {
-//		v := <-outChan
-//		copied[v.index] = v.value
-//	}
-//
-//	current := 0
-//	values := func() interpreter.Value {
-//		if current == count {
-//			return nil
-//		}
-//
-//		v := copied[current]
-//		current++
-//		return v
-//	}
-//
-//	value = interpreter.NewArrayValueWithIterator(
-//		mr.Interpreter,
-//		value.StaticType(mr.Interpreter).(interpreter.ArrayStaticType),
-//		mr.Address,
-//		0,
-//		values)
-//
-//	return value, nil
-//}
-
-//
-//func (m *AtreeRegisterMigrator) checkStorageHealth(
-//	mr *migratorRuntime,
-//) (
-//	err error,
-//) {
-//
-//	storageIDs := make([]atree.StorageID, 0, len(mr.Payloads))
-//
-//	for _, payload := range mr.Payloads {
-//		key, err := payload.Key()
-//		if err != nil {
-//			return fmt.Errorf("failed to get payload key: %w", err)
-//		}
-//
-//		id, err := util.KeyToRegisterID(key)
-//		if err != nil {
-//			return fmt.Errorf("failed to convert key to register ID: %w", err)
-//		}
-//
-//		if id.IsInternalState() {
-//			continue
-//		}
-//
-//		if !strings.HasPrefix(id.Key, atree.LedgerBaseStorageSlabPrefix) {
-//			continue
-//		}
-//
-//		storageIDs = append(storageIDs, atree.StorageID{
-//			Address: atree.Address([]byte(id.Owner)),
-//			Index:   atree.StorageIndex([]byte(id.Key)[1:]),
-//		})
-//	}
-//
-//	// load (but don't create) storage map in Cadence storage
-//	for _, domain := range domains {
-//		_ = mr.Storage.GetStorageMap(mr.Address, domain, false)
-//
-//	}
-//
-//	// load slabs in atree storage
-//	for _, id := range storageIDs {
-//		_, _, _ = mr.Storage.Retrieve(id)
-//	}
-//
-//	err = mr.Storage.CheckHealth()
-//	if err != nil {
-//		m.rw.Write(migrationProblem{
-//			Address: mr.Address.Hex(),
-//			Key:     "",
-//			Kind:    "storage_health_problem",
-//			Msg:     err.Error(),
-//		})
-//
-//		return skippableAccountError
-//	}
-//	return nil
-//
-//}
 
 // capturePanic captures panics and converts them to errors
 // this is needed for some cadence functions that panic on error
@@ -940,7 +821,7 @@ var knownProblematicAccounts = map[common.Address]string{
 	mustHexToAddress("c843c1f5a4805c3a"): "Broken contract FanTopPermission",
 	mustHexToAddress("48d3be92e6e4a973"): "Broken contract FanTopPermission",
 	// Mainnet account
-	mustHexToAddress("4eded0de73020ca5"): "Account to big to migrate",
+	// mustHexToAddress("4eded0de73020ca5"): "Account to big to migrate",
 }
 
 var accountsToLog = map[common.Address]string{}
