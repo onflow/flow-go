@@ -46,11 +46,16 @@ import (
 	followereng "github.com/onflow/flow-go/engine/common/follower"
 	"github.com/onflow/flow-go/engine/common/requester"
 	synceng "github.com/onflow/flow-go/engine/common/synchronization"
+	"github.com/onflow/flow-go/engine/execution/computation"
+	"github.com/onflow/flow-go/engine/execution/computation/query"
+	"github.com/onflow/flow-go/fvm"
+	"github.com/onflow/flow-go/fvm/storage/derived"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/blobs"
 	"github.com/onflow/flow-go/module/chainsync"
+	"github.com/onflow/flow-go/module/execution"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	execdatacache "github.com/onflow/flow-go/module/executiondatasync/execution_data/cache"
 	finalizer "github.com/onflow/flow-go/module/finalizer/consensus"
@@ -134,6 +139,7 @@ type AccessNodeConfig struct {
 	executionDataDir             string
 	executionDataStartHeight     uint64
 	executionDataConfig          edrequester.ExecutionDataConfig
+	queryExecutorConfig          query.QueryConfig
 	PublicNetworkConfig          PublicNetworkConfig
 	executionIndexLastHeight     uint64
 	TxResultCacheSize            uint
@@ -655,6 +661,29 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 			// jobqueue to inform of new tasks.
 			builder.ExecutionDataRequester.AddOnExecutionDataReceivedConsumer(worker.OnExecutionData)
 
+			// todo move this to separate component
+			vm := fvm.NewVirtualMachine()
+
+			options := computation.DefaultFVMOptions(node.RootChainID, false, false)
+			vmCtx := fvm.NewContext(options...)
+
+			derivedChainData, err := derived.NewDerivedChainData(derived.DefaultDerivedDataCacheSize)
+			if err != nil {
+				return nil, err
+			}
+
+			queryExecutor := query.NewQueryExecutor(
+				builder.queryExecutorConfig,
+				builder.Logger,
+				metrics.NewExecutionCollector(node.Tracer),
+				vm,
+				vmCtx,
+				derivedChainData,
+				query.NewProtocolStateWrapper(builder.State),
+			)
+
+			scripts := execution.NewScripts(*queryExecutor, builder.Storage.Headers, exeIndexer.RegisterValues)
+
 			return worker, nil
 		})
 
@@ -812,6 +841,11 @@ func (builder *FlowAccessNodeBuilder) extraFlags() {
 
 		// Execution Index
 		flags.Uint64Var(&builder.executionIndexLastHeight, "execution-index-last-height", 0, "block height to start indexing execution data from")
+
+		// Script Execution
+		flags.DurationVar(&builder.queryExecutorConfig.LogTimeThreshold, "script-log-threshold", query.DefaultLogTimeThreshold, "threshold for logging script execution")
+		flags.DurationVar(&builder.queryExecutorConfig.ExecutionTimeLimit, "script-execution-time-limit", query.DefaultExecutionTimeLimit, "script execution time limit")
+
 	}).ValidateFlags(func() error {
 		if builder.supportsObserver && (builder.PublicNetworkConfig.BindAddress == cmd.NotSet || builder.PublicNetworkConfig.BindAddress == "") {
 			return errors.New("public-network-address must be set if supports-observer is true")
