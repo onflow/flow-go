@@ -3,6 +3,7 @@ package env
 import (
 	"bytes"
 	"encoding/binary"
+	"fmt"
 	"math/big"
 
 	"github.com/onflow/flow-go/fvm/flex/models"
@@ -194,6 +195,10 @@ func (fe *Environment) mintTo(balance *big.Int, target common.Address) {
 func (fe *Environment) WithdrawFrom(amount *big.Int, source common.Address) error {
 	if err := fe.checkExecuteOnce(); err != nil {
 		return err
+	}
+
+	if amount.Uint64() > fe.Result.TotalSupplyOfNativeToken {
+		return fmt.Errorf("total supply does not match %d > %d", amount.Uint64(), fe.Result.TotalSupplyOfNativeToken)
 	}
 
 	// update the gas consumed // TODO: revisit
