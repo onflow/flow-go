@@ -14,6 +14,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	"github.com/onflow/flow-go/storage"
+	"github.com/onflow/flow-go/utils/logging"
 )
 
 // ExecutionState indexes the execution state.
@@ -51,7 +52,10 @@ func New(
 		return nil, err
 	}
 
-	log.Debug().Msgf("initialized indexer with range first: %d, last: %d", first, last)
+	log.Debug().
+		Uint64("first_height", first).
+		Uint64("latest_height", last).
+		Msgf("initialized indexer range")
 
 	return &ExecutionState{
 		registers:  registers,
@@ -101,11 +105,15 @@ func (i *ExecutionState) IndexBlockData(ctx context.Context, data *execution_dat
 
 	block, err := i.headers.ByBlockID(data.BlockID)
 	if err != nil {
-		// todo should we wrap sentinel error or should we use irrecoverable.exception as per design guidelines https://github.com/onflow/flow-go/blob/master/CodingConventions.md
 		return fmt.Errorf("could not get the block by ID %s: %w", data.BlockID, err)
 	}
 
-	i.log.Debug().Msgf("indexing new block ID %s at height %d", data.BlockID.String(), block.Height)
+	lg := i.log.With().
+		Hex("block_id", logging.ID(data.BlockID)).
+		Uint64("height", block.Height).
+		Logger()
+
+	lg.Debug().Msgf("indexing new block")
 
 	if _, err := i.indexRange.CanIncrease(block.Height); err != nil {
 		return err
@@ -114,20 +122,12 @@ func (i *ExecutionState) IndexBlockData(ctx context.Context, data *execution_dat
 	// concurrently process indexing of block data
 	g, _ := errgroup.WithContext(ctx)
 
-	payloads := make(map[ledger.Path]*ledger.Payload)
+	updates := make([]*ledger.TrieUpdate, 0)
 	events := make([]flow.Event, 0)
 
 	for _, chunk := range data.ChunkExecutionDatas {
 		if chunk.TrieUpdate != nil {
-			// we are iterating all the registers and overwrite any existing register at the same path
-			// this will make sure if we have multiple register changes only the last change will get persisted
-			// if block has two chucks:
-			// first chunk updates: { X: 1, Y: 2 }
-			// second chunk updates: { X: 2 }
-			// then we should persist only {X: 2: Y: 2}
-			for i, path := range chunk.TrieUpdate.Paths {
-				payloads[path] = chunk.TrieUpdate.Payloads[i]
-			}
+			updates = append(updates, chunk.TrieUpdate)
 		}
 
 		events = append(events, chunk.Events...)
@@ -144,10 +144,29 @@ func (i *ExecutionState) IndexBlockData(ctx context.Context, data *execution_dat
 	}
 
 	g.Go(func() error {
+		// we are iterating all the registers and overwrite any existing register at the same path
+		// this will make sure if we have multiple register changes only the last change will get persisted
+		// if block has two chucks:
+		// first chunk updates: { X: 1, Y: 2 }
+		// second chunk updates: { X: 2 }
+		// then we should persist only {X: 2: Y: 2}
+
+		payloads := make(map[ledger.Path]*ledger.Payload)
+		for _, update := range updates {
+			for i, path := range update.Paths {
+				payloads[path] = update.Payloads[i] // todo should we use TrieUpdate.Paths or TrieUpdate.Payload.Key?
+			}
+		}
+
 		err = i.indexRegisterPayloads(maps.Values(payloads), block.Height)
 		if err != nil {
 			return fmt.Errorf("could not index register payloads at height %d: %w", block.Height, err)
 		}
+
+		lg.Debug().
+			Int("register_count", len(payloads)).
+			Msg("indexed registers")
+
 		return nil
 	})
 
@@ -155,8 +174,6 @@ func (i *ExecutionState) IndexBlockData(ctx context.Context, data *execution_dat
 	if err != nil {
 		return fmt.Errorf("failed to index block data at height %d: %w", block.Height, err)
 	}
-
-	i.log.Debug().Uint64("height", block.Height).Int("register count", len(payloads)).Msgf("indexed block data")
 
 	return i.indexRange.Increase(block.Height)
 }
