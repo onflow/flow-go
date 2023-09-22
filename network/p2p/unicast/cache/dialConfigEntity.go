@@ -4,13 +4,13 @@ import (
 	"github.com/libp2p/go-libp2p/core/peer"
 
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/network/p2p/unicast/manager"
+	"github.com/onflow/flow-go/network/p2p/unicast"
 )
 
 // DialConfigEntity is a struct that represents a dial config entry for storing in the dial config cache.
 // It implements the flow.Entity interface.
 type DialConfigEntity struct {
-	manager.DialConfig
+	unicast.DialConfig
 	PeerId peer.ID         // remote peer id; used as the "key" in the dial config cache.
 	id     flow.Identifier // cache the id for fast lookup (HeroCache).
 }

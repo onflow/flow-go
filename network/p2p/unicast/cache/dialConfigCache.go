@@ -13,7 +13,6 @@ import (
 	"github.com/onflow/flow-go/module/mempool/herocache/backdata/heropool"
 	"github.com/onflow/flow-go/module/mempool/stdmap"
 	"github.com/onflow/flow-go/network/p2p/unicast"
-	"github.com/onflow/flow-go/network/p2p/unicast/manager"
 )
 
 // ErrDialConfigNotFound is a benign error that indicates that the dial config does not exist in the cache. It is not a fatal error.
@@ -24,7 +23,7 @@ type DialConfigCache struct {
 	// TODO: remove this mutex after the HeroCache is fixed.
 	mutex      sync.RWMutex
 	peerCache  *stdmap.Backend
-	cfgFactory func() manager.DialConfig // factory function that creates a new dial config.
+	cfgFactory func() unicast.DialConfig // factory function that creates a new dial config.
 }
 
 var _ unicast.DialConfigCache = (*DialConfigCache)(nil)
@@ -45,7 +44,7 @@ func NewDialConfigCache(
 	size uint32,
 	logger zerolog.Logger,
 	collector module.HeroCacheMetrics,
-	cfgFactory func() manager.DialConfig,
+	cfgFactory func() unicast.DialConfig,
 ) *DialConfigCache {
 	return &DialConfigCache{
 		peerCache: stdmap.NewBackend(stdmap.WithBackData(herocache.NewCache(size,
@@ -66,7 +65,7 @@ func NewDialConfigCache(
 // - adjustFunc: the function that adjusts the dial config.
 // Returns:
 //   - error any returned error should be considered as an irrecoverable error and indicates a bug.
-func (d *DialConfigCache) Adjust(peerID peer.ID, adjustFunc manager.DialConfigAdjustFunc) (*manager.DialConfig, error) {
+func (d *DialConfigCache) Adjust(peerID peer.ID, adjustFunc unicast.DialConfigAdjustFunc) (*unicast.DialConfig, error) {
 	d.mutex.Lock() // making optimistic adjustment atomic.
 	defer d.mutex.Unlock()
 
@@ -108,7 +107,7 @@ func (d *DialConfigCache) Adjust(peerID peer.ID, adjustFunc manager.DialConfigAd
 // Returns:
 //   - error if the adjustFunc returns an error or if the config does not exist (ErrDialConfigNotFound). Except the ErrDialConfigNotFound,
 //     any other error should be treated as an irrecoverable error and indicates a bug.
-func (d *DialConfigCache) adjust(peerIdHash flow.Identifier, adjustFunc manager.DialConfigAdjustFunc) (*manager.DialConfig, error) {
+func (d *DialConfigCache) adjust(peerIdHash flow.Identifier, adjustFunc unicast.DialConfigAdjustFunc) (*unicast.DialConfig, error) {
 	var rErr error
 	adjustedEntity, adjusted := d.peerCache.Adjust(peerIdHash, func(entity flow.Entity) flow.Entity {
 		cfgEntity, ok := entity.(DialConfigEntity)
@@ -138,7 +137,7 @@ func (d *DialConfigCache) adjust(peerIdHash flow.Identifier, adjustFunc manager.
 		return nil, ErrDialConfigNotFound
 	}
 
-	return &manager.DialConfig{
+	return &unicast.DialConfig{
 		DialRetryAttemptBudget:           adjustedEntity.(DialConfigEntity).DialRetryAttemptBudget,
 		StreamCreationRetryAttemptBudget: adjustedEntity.(DialConfigEntity).StreamCreationRetryAttemptBudget,
 		LastSuccessfulDial:               adjustedEntity.(DialConfigEntity).LastSuccessfulDial,
@@ -153,7 +152,7 @@ func (d *DialConfigCache) adjust(peerIdHash flow.Identifier, adjustFunc manager.
 // Returns:
 //   - *DialConfig, the dial config for the given peer id.
 //   - error if the factory function returns an error. Any error should be treated as an irrecoverable error and indicates a bug.
-func (d *DialConfigCache) GetOrInit(peerID peer.ID) (*manager.DialConfig, error) {
+func (d *DialConfigCache) GetOrInit(peerID peer.ID) (*unicast.DialConfig, error) {
 	// first we translate the peer id to a flow id (taking
 	flowPeerId := PeerIdToFlowId(peerID)
 	cfg, ok := d.get(flowPeerId)
@@ -171,7 +170,7 @@ func (d *DialConfigCache) GetOrInit(peerID peer.ID) (*manager.DialConfig, error)
 }
 
 // Get returns the dial config of the given peer ID.
-func (d *DialConfigCache) get(peerIDHash flow.Identifier) (*manager.DialConfig, bool) {
+func (d *DialConfigCache) get(peerIDHash flow.Identifier) (*unicast.DialConfig, bool) {
 	entity, ok := d.peerCache.ByID(peerIDHash)
 	if !ok {
 		return nil, false
@@ -185,7 +184,7 @@ func (d *DialConfigCache) get(peerIDHash flow.Identifier) (*manager.DialConfig, 
 	}
 
 	// return a copy of the config (we do not want the caller to modify the config).
-	return &manager.DialConfig{
+	return &unicast.DialConfig{
 		DialRetryAttemptBudget:           cfg.DialRetryAttemptBudget,
 		StreamCreationRetryAttemptBudget: cfg.StreamCreationRetryAttemptBudget,
 		LastSuccessfulDial:               cfg.LastSuccessfulDial,
