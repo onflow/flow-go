@@ -5,11 +5,11 @@ import (
 	"sync"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/ethdb"
 
 	"github.com/onflow/atree"
 
+	"github.com/onflow/flow-go/fvm/flex/models"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -22,7 +22,7 @@ var (
 )
 
 var FlexAddress = flow.BytesToAddress([]byte("Flex"))
-var RootHashKey = "RootHash"
+var FlexLatextBlockKey = "LatestBlock"
 
 // Database is an ephemeral key-value store. Apart from basic data storage
 // functionality it also supports batch writes and iterating over the keyspace in
@@ -88,20 +88,20 @@ func (db *Database) Delete(key []byte) error {
 	return err
 }
 
-// SetRootHash sets the root hash
+// SetLatestBlock sets the latest executed block
 // we have this functionality given we only allow on state to exist
-func (db *Database) SetRootHash(root common.Hash) error {
-	return db.led.SetValue(FlexAddress[:], []byte(RootHashKey), root[:])
+func (db *Database) SetLatestBlock(block *models.FlexBlock) error {
+	return db.led.SetValue(FlexAddress[:], []byte(FlexLatextBlockKey), block.ToBytes())
 }
 
-// GetRootHash returns the latest root hash
-// we have this functionality given we only allow on state to exist
-func (db *Database) GetRootHash() (common.Hash, error) {
-	data, err := db.led.GetValue(FlexAddress[:], []byte(RootHashKey))
+// GetLatestBlock returns the latest executed block
+// we have this functionality given we only allow on state to exist (no forks, etc.)
+func (db *Database) GetLatestBlock() (*models.FlexBlock, error) {
+	data, err := db.led.GetValue(FlexAddress[:], []byte(FlexLatextBlockKey))
 	if len(data) == 0 {
-		return types.EmptyRootHash, err
+		return models.GenesisFlexBlock, err
 	}
-	return common.Hash(data), err
+	return models.NewFlexBlockFromEncoded(data), err
 }
 
 // Close deallocates the internal map and ensures any consecutive data access op

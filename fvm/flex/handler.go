@@ -97,7 +97,7 @@ func (h FlexContractHandler) NewFlowOwnedAccount() models.FlowOwnedAccount {
 	panic("not implemented yet")
 }
 
-func (h FlexContractHandler) LastExecutedBlock() models.FlexBlock {
+func (h FlexContractHandler) LastExecutedBlock() *models.FlexBlock {
 	panic("not implemented yet")
 }
 

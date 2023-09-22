@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"math/big"
 
+	"github.com/onflow/flow-go/fvm/flex/models"
 	"github.com/onflow/flow-go/fvm/flex/storage"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -19,12 +20,13 @@ import (
 // Environment is a one-time use flex environment and
 // should not be used more than once
 type Environment struct {
-	Config   *Config
-	EVM      *vm.EVM
-	Database *storage.Database
-	State    *state.StateDB
-	Result   *Result
-	Used     bool
+	Config            *Config
+	EVM               *vm.EVM
+	Database          *storage.Database
+	State             *state.StateDB
+	LastExecutedBlock *models.FlexBlock
+	Result            *Result
+	Used              bool
 }
 
 // NewEnvironment constructs a new Flex Enviornment
@@ -33,12 +35,12 @@ func NewEnvironment(
 	db *storage.Database,
 ) (*Environment, error) {
 
-	rootHash, err := db.GetRootHash()
+	lastExcutedBlock, err := db.GetLatestBlock()
 	if err != nil {
 		return nil, err
 	}
 
-	execState, err := state.New(rootHash,
+	execState, err := state.New(lastExcutedBlock.StateRoot,
 		state.NewDatabase(
 			rawdb.NewDatabase(db),
 		),
@@ -56,10 +58,11 @@ func NewEnvironment(
 			cfg.ChainConfig,
 			cfg.EVMConfig,
 		),
-		Database: db,
-		State:    execState,
-		Result:   &Result{},
-		Used:     false,
+		Database:          db,
+		State:             execState,
+		Result:            &Result{},
+		LastExecutedBlock: lastExcutedBlock,
+		Used:              false,
 	}, nil
 }
 
@@ -98,7 +101,12 @@ func (fe *Environment) commit() error {
 		return err
 	}
 
-	err = fe.Database.SetRootHash(newRoot)
+	newBlock := models.NewFlexBlock(fe.LastExecutedBlock.Height,
+		newRoot,
+		types.EmptyRootHash,
+	)
+
+	err = fe.Database.SetLatestBlock(newBlock)
 	if err != nil {
 		return err
 	}
