@@ -1412,7 +1412,15 @@ func (builder *FlowAccessNodeBuilder) initPublicLibp2pNode(networkKey crypto.Pri
 			MaxSize: builder.FlowConfig.NetworkConfig.DisallowListNotificationCacheSize,
 			Metrics: metrics.DisallowListCacheMetricsFactory(builder.HeroCacheMetricsFactory(), network.PublicNetwork),
 		},
-		meshTracer).
+		meshTracer,
+		&p2pconfig.UnicastConfig{
+			StreamRetryInterval:                builder.FlowConfig.NetworkConfig.UnicastConfig.UnicastCreateStreamRetryDelay,
+			StreamZeroRetryResetThreshold:      builder.FlowConfig.NetworkConfig.UnicastStreamZeroRetryResetThreshold,
+			DialZeroRetryResetThreshold:        builder.FlowConfig.NetworkConfig.UnicastDialZeroRetryResetThreshold,
+			DialConfigCacheSize:                builder.FlowConfig.NetworkConfig.UnicastDialConfigCacheSize,
+			MaxDialRetryAttemptTimes:           builder.FlowConfig.NetworkConfig.UnicastMaxDialRetryAttemptTimes,
+			MaxStreamCreationRetryAttemptTimes: builder.FlowConfig.NetworkConfig.UnicastMaxStreamCreationRetryAttemptTimes,
+		}).
 		SetBasicResolver(builder.Resolver).
 		SetSubscriptionFilter(
 			subscription.NewRoleBasedFilter(
