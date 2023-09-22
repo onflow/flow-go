@@ -26,7 +26,6 @@ type Environment struct {
 	Database          *storage.Database
 	State             *state.StateDB
 	LastExecutedBlock *models.FlexBlock
-	UUIDIndex         uint64
 	Result            *Result
 	Used              bool
 }
@@ -62,10 +61,12 @@ func NewEnvironment(
 		),
 		Database:          db,
 		State:             execState,
-		Result:            &Result{},
 		LastExecutedBlock: lastExcutedBlock,
-		UUIDIndex:         lastExcutedBlock.UUIDIndex,
-		Used:              false,
+		Result: &Result{
+			UUIDIndex:                lastExcutedBlock.UUIDIndex,
+			TotalSupplyOfNativeToken: lastExcutedBlock.TotalSupplyOfNativeToken,
+		},
+		Used: false,
 	}, nil
 }
 
@@ -105,7 +106,8 @@ func (fe *Environment) commit() error {
 	}
 
 	newBlock := models.NewFlexBlock(fe.LastExecutedBlock.Height,
-		fe.UUIDIndex,
+		fe.Result.UUIDIndex,
+		fe.Result.TotalSupplyOfNativeToken,
 		newRoot,
 		types.EmptyRootHash,
 	)
@@ -140,7 +142,7 @@ func (fe *Environment) allocateAddress() *models.FlexAddress {
 	// first 12 bytes would be zero
 	// the next 8 bytes would be incremented of uuid
 	binary.BigEndian.PutUint64(target[12:], fe.LastExecutedBlock.UUIDIndex)
-	fe.UUIDIndex++
+	fe.Result.UUIDIndex++
 
 	// TODO: if account exist try some new number
 	// if fe.State.Exist(target.ToCommon()) {
@@ -177,6 +179,7 @@ func (fe *Environment) mintTo(balance *big.Int, target common.Address) {
 
 	// add balance
 	fe.State.AddBalance(target, balance)
+	fe.Result.TotalSupplyOfNativeToken += balance.Uint64()
 
 	// we don't need to increment any nonce, given the origin doesn't exist
 
@@ -212,6 +215,7 @@ func (fe *Environment) WithdrawFrom(amount *big.Int, source common.Address) erro
 
 	// add balance
 	fe.State.SubBalance(source, amount)
+	fe.Result.TotalSupplyOfNativeToken -= amount.Uint64()
 
 	// we increment the nonce for source account cause
 	// withdraw counts as a transaction (similar to the way calls increment the nonce)

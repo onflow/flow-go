@@ -16,6 +16,9 @@ type FlexBlock struct {
 	// UUID Index
 	UUIDIndex uint64
 
+	// holds the total amount of the native token deposited in Flex
+	TotalSupplyOfNativeToken uint64
+
 	// StateRoot returns the EVM root hash of the state after executing this block
 	StateRoot gethCommon.Hash
 
@@ -28,7 +31,7 @@ const (
 	encodedHashSize   = 32
 
 	// ( height + uuid + state root + event root)
-	encodedBlockSize = 8 + 8 + 32 + 32
+	encodedBlockSize = 8 + 8 + 8 + 32 + 32
 )
 
 func (b *FlexBlock) ToBytes() []byte {
@@ -40,6 +43,9 @@ func (b *FlexBlock) ToBytes() []byte {
 	// encode the uuid index
 	binary.BigEndian.PutUint64(encoded[index:index+encodedUInt64Size], b.UUIDIndex)
 	index += encodedUInt64Size
+	// encode the total supply
+	binary.BigEndian.PutUint64(encoded[index:index+encodedUInt64Size], b.TotalSupplyOfNativeToken)
+	index += encodedUInt64Size
 	// encode state root
 	copy(encoded[index:index+encodedHashSize], b.StateRoot[:])
 	index += encodedHashSize
@@ -48,12 +54,13 @@ func (b *FlexBlock) ToBytes() []byte {
 	return encoded[:]
 }
 
-func NewFlexBlock(height, uuidIndex uint64, stateRoot, eventRoot gethCommon.Hash) *FlexBlock {
+func NewFlexBlock(height, uuidIndex, totalSupply uint64, stateRoot, eventRoot gethCommon.Hash) *FlexBlock {
 	return &FlexBlock{
-		Height:    height,
-		UUIDIndex: uuidIndex,
-		StateRoot: stateRoot,
-		EventRoot: eventRoot,
+		Height:                   height,
+		UUIDIndex:                uuidIndex,
+		TotalSupplyOfNativeToken: totalSupply,
+		StateRoot:                stateRoot,
+		EventRoot:                eventRoot,
 	}
 }
 
@@ -63,14 +70,17 @@ func NewFlexBlockFromEncoded(encoded []byte) *FlexBlock {
 	index += encodedUInt64Size
 	uuidIndex := binary.BigEndian.Uint64(encoded[index : index+encodedUInt64Size])
 	index += encodedUInt64Size
+	totalSupply := binary.BigEndian.Uint64(encoded[index : index+encodedUInt64Size])
+	index += encodedUInt64Size
 	stateRoot := gethCommon.BytesToHash(encoded[index : index+encodedHashSize])
 	index += encodedUInt64Size
 	eventRoot := gethCommon.BytesToHash(encoded[index : index+encodedHashSize])
 	return &FlexBlock{
-		Height:    height,
-		UUIDIndex: uuidIndex,
-		StateRoot: stateRoot,
-		EventRoot: eventRoot,
+		Height:                   height,
+		UUIDIndex:                uuidIndex,
+		TotalSupplyOfNativeToken: totalSupply,
+		StateRoot:                stateRoot,
+		EventRoot:                eventRoot,
 	}
 }
 
