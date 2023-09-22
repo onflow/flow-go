@@ -36,7 +36,7 @@ func TestConvertTransactionResults(t *testing.T) {
 				ErrorMessage:    "some error",
 			},
 		}
-		expected := []execution_data.TransactionResult{
+		expected := []flow.LightTransactionResult{
 			{
 				TransactionID:   flow.Identifier{1, 2, 3},
 				ComputationUsed: 100,
