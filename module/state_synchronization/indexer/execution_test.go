@@ -176,7 +176,7 @@ func TestExecutionState_IndexBlockData(t *testing.T) {
 	// this test makes sure the index block data is correctly calling store register with the
 	// same entries we create as a block execution data test, and correctly converts the registers
 	t.Run("Index Single Chunk and Single Register", func(t *testing.T) {
-		trie := trieUpdateFixture()
+		trie := trieUpdateFixture(t)
 		ed := &execution_data.BlockExecutionData{
 			BlockID: block.ID(),
 			ChunkExecutionDatas: []*execution_data.ChunkExecutionData{
@@ -206,7 +206,7 @@ func TestExecutionState_IndexBlockData(t *testing.T) {
 	// we only update that register once with the latest value, so this makes sure merging of
 	// registers is done correctly.
 	t.Run("Index Multiple Chunks and Merge Same Register Updates", func(t *testing.T) {
-		tries := []*ledger.TrieUpdate{trieUpdateFixture(), trieUpdateFixture()}
+		tries := []*ledger.TrieUpdate{trieUpdateFixture(t), trieUpdateFixture(t)}
 		// make sure we have two register updates that are updating the same value, so we can check
 		// if the value from the second update is being persisted instead of first
 		tries[1].Paths[0] = tries[0].Paths[0]
@@ -489,22 +489,24 @@ func trieUpdateWithPayloadsFixture(payloads []*ledger.Payload) *ledger.TrieUpdat
 	return trie
 }
 
-func trieUpdateFixture() *ledger.TrieUpdate {
+func trieUpdateFixture(t *testing.T) *ledger.TrieUpdate {
 	return trieUpdateWithPayloadsFixture(
 		[]*ledger.Payload{
-			ledgerPayloadFixture(),
-			ledgerPayloadFixture(),
-			ledgerPayloadFixture(),
-			ledgerPayloadFixture(),
+			ledgerPayloadFixture(t),
+			ledgerPayloadFixture(t),
+			ledgerPayloadFixture(t),
+			ledgerPayloadFixture(t),
 		})
 }
 
-func ledgerPayloadFixture() *ledger.Payload {
+func ledgerPayloadFixture(t *testing.T) *ledger.Payload {
 	owner := unittest.RandomAddressFixture()
 	key := make([]byte, 8)
-	rand.Read(key)
+	_, err := rand.Read(key)
+	require.NoError(t, err)
 	val := make([]byte, 8)
-	rand.Read(val)
+	_, err = rand.Read(key)
+	require.NoError(t, err)
 	return ledgerPayloadWithValuesFixture(owner.String(), fmt.Sprintf("%x", key), val)
 }
 
