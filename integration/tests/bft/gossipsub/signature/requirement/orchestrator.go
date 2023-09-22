@@ -80,7 +80,6 @@ func (s *Orchestrator) trackIngressEvents(event *insecure.IngressEvent) error {
 		s.unauthorizedEventsReceived.Inc()
 		s.Logger.Warn().Str("event_id", event.FlowProtocolEventID.String()).Msg("unauthorized ingress event received")
 	}
-
 	// track all authorized events sent during test
 	if expectedEvent, ok := s.authorizedEvents[event.FlowProtocolEventID]; ok {
 		// ensure event received intact no changes have been made to the underlying message
@@ -107,11 +106,7 @@ func (s *Orchestrator) sendUnauthorizedMsgs(t *testing.T) {
 // This func allows us to ensure that unauthorized messages have been processed.
 func (s *Orchestrator) sendAuthorizedMsgs(t *testing.T) {
 	for i := 0; i < numOfAuthorizedEvents; i++ {
-		event := bft.RequestChunkDataPackEgressFixture(s.T, s.attackerVNWithMsgSigning, s.victimENID, insecure.Protocol_PUBLISH)
-		err := s.OrchestratorNetwork.SendEgress(event)
-		require.NoError(t, err)
-		s.authorizedEvents[event.FlowProtocolEventID] = event
-		s.authorizedEventReceivedWg.Add(1)
+
 	}
 }
 

@@ -2661,6 +2661,12 @@ func WithIWants(iWants ...*pubsub_pb.ControlIWant) RPCFixtureOpt {
 	}
 }
 
+func WithPubsubMessages(msgs ...*pubsub_pb.Message) RPCFixtureOpt {
+	return func(rpc *pubsub.RPC) {
+		rpc.Publish = msgs
+	}
+}
+
 // P2PRPCFixture returns a pubsub RPC fixture. Currently, this fixture only sets the ControlMessage field.
 func P2PRPCFixture(opts ...RPCFixtureOpt) *pubsub.RPC {
 	rpc := &pubsub.RPC{
@@ -2674,4 +2680,20 @@ func P2PRPCFixture(opts ...RPCFixtureOpt) *pubsub.RPC {
 	}
 
 	return rpc
+}
+
+// GossipSubMessageFixture a gossipsub message fixture for the provided topic.
+func GossipSubMessageFixture(topic string) *pubsub_pb.Message {
+	return &pubsub_pb.Message{
+		Topic: &topic,
+	}
+}
+
+// GossipSubMessageFixtures returns a list of gossipsub message fixtures.
+func GossipSubMessageFixtures(n int, topic string) []*pubsub_pb.Message {
+	msgs := make([]*pubsub_pb.Message, n)
+	for i := 0; i < n; i++ {
+		msgs[i] = GossipSubMessageFixture(topic)
+	}
+	return msgs
 }
