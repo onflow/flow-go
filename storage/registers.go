@@ -8,7 +8,7 @@ import (
 type RegisterIndex interface {
 	// Get the register by the ID at a given block height or lower.
 	//
-	// If the register at the given height was not indexed, return the highest height the register was indexed at if one exists.
+	// If the register at the given height was not indexed, return the value from the highest height the register was indexed at if one exists.
 	// Expected errors:
 	// - storage.ErrHeightNotIndexed if the given height was not indexed yet or lower than the first indexed height.
 	// - storage.ErrNotFound if the given height is indexed, but the register does not exist.
