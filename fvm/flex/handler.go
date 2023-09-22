@@ -93,11 +93,11 @@ func (h FlexContractHandler) NewFlowOwnedAccount() models.FlowOwnedAccount {
 	// allocate a new address
 	// TODO check for collission
 	// from 20 bytes, the first 12 could be zero, the next 8 could be the output of a uuid generator (resourceID?)
-	// does this leads to trie depth issue?
+
 	panic("not implemented yet")
 }
 
-func (h FlexContractHandler) LastExecutedBlock() models.FlexBlock {
+func (h FlexContractHandler) LastExecutedBlock() *models.FlexBlock {
 	panic("not implemented yet")
 }
 

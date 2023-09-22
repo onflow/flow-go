@@ -2,8 +2,11 @@ package env
 
 import (
 	"bytes"
+	"encoding/binary"
+	"fmt"
 	"math/big"
 
+	"github.com/onflow/flow-go/fvm/flex/models"
 	"github.com/onflow/flow-go/fvm/flex/storage"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -19,12 +22,13 @@ import (
 // Environment is a one-time use flex environment and
 // should not be used more than once
 type Environment struct {
-	Config   *Config
-	EVM      *vm.EVM
-	Database *storage.Database
-	State    *state.StateDB
-	Result   *Result
-	Used     bool
+	Config            *Config
+	EVM               *vm.EVM
+	Database          *storage.Database
+	State             *state.StateDB
+	LastExecutedBlock *models.FlexBlock
+	Result            *Result
+	Used              bool
 }
 
 // NewEnvironment constructs a new Flex Enviornment
@@ -33,12 +37,12 @@ func NewEnvironment(
 	db *storage.Database,
 ) (*Environment, error) {
 
-	rootHash, err := db.GetRootHash()
+	lastExcutedBlock, err := db.GetLatestBlock()
 	if err != nil {
 		return nil, err
 	}
 
-	execState, err := state.New(rootHash,
+	execState, err := state.New(lastExcutedBlock.StateRoot,
 		state.NewDatabase(
 			rawdb.NewDatabase(db),
 		),
@@ -56,10 +60,14 @@ func NewEnvironment(
 			cfg.ChainConfig,
 			cfg.EVMConfig,
 		),
-		Database: db,
-		State:    execState,
-		Result:   &Result{},
-		Used:     false,
+		Database:          db,
+		State:             execState,
+		LastExecutedBlock: lastExcutedBlock,
+		Result: &Result{
+			UUIDIndex:                lastExcutedBlock.UUIDIndex,
+			TotalSupplyOfNativeToken: lastExcutedBlock.TotalSupply,
+		},
+		Used: false,
 	}, nil
 }
 
@@ -98,7 +106,14 @@ func (fe *Environment) commit() error {
 		return err
 	}
 
-	err = fe.Database.SetRootHash(newRoot)
+	newBlock := models.NewFlexBlock(fe.LastExecutedBlock.Height,
+		fe.Result.UUIDIndex,
+		fe.Result.TotalSupplyOfNativeToken,
+		newRoot,
+		types.EmptyRootHash,
+	)
+
+	err = fe.Database.SetLatestBlock(newBlock)
 	if err != nil {
 		return err
 	}
@@ -106,6 +121,35 @@ func (fe *Environment) commit() error {
 	// TODO: emit event on root changes
 	fe.Result.RootHash = newRoot
 	return nil
+}
+
+// TODO: properly use an address generator (zeros + random section) and verify collision
+// TODO: does this leads to trie depth issue?
+func (fe *Environment) AllocateAddressAndMintTo(balance *big.Int) (*models.FlexAddress, error) {
+	if err := fe.checkExecuteOnce(); err != nil {
+		return nil, err
+	}
+
+	target := fe.allocateAddress()
+	fe.mintTo(balance, target.ToCommon())
+
+	// TODO: emit an event
+
+	return target, fe.commit()
+}
+
+func (fe *Environment) allocateAddress() *models.FlexAddress {
+	target := models.FlexAddress{}
+	// first 12 bytes would be zero
+	// the next 8 bytes would be incremented of uuid
+	binary.BigEndian.PutUint64(target[12:], fe.LastExecutedBlock.UUIDIndex)
+	fe.Result.UUIDIndex++
+
+	// TODO: if account exist try some new number
+	// if fe.State.Exist(target.ToCommon()) {
+	// }
+
+	return &target
 }
 
 // MintTo mints tokens into the target address, if the address dees not
@@ -119,6 +163,12 @@ func (fe *Environment) MintTo(balance *big.Int, target common.Address) error {
 		return err
 	}
 
+	fe.mintTo(balance, target)
+
+	return fe.commit()
+}
+
+func (fe *Environment) mintTo(balance *big.Int, target common.Address) {
 	// update the gas consumed // TODO: revisit
 	// do it as the very first thing to prevent attacks
 	fe.Result.GasConsumed = TransferGasUsage
@@ -130,12 +180,11 @@ func (fe *Environment) MintTo(balance *big.Int, target common.Address) error {
 
 	// add balance
 	fe.State.AddBalance(target, balance)
+	fe.Result.TotalSupplyOfNativeToken += balance.Uint64()
 
 	// we don't need to increment any nonce, given the origin doesn't exist
 
 	// TODO: emit an event
-
-	return fe.commit()
 }
 
 // WithdrawFrom deduct the balance from the given source account.
@@ -146,6 +195,10 @@ func (fe *Environment) MintTo(balance *big.Int, target common.Address) error {
 func (fe *Environment) WithdrawFrom(amount *big.Int, source common.Address) error {
 	if err := fe.checkExecuteOnce(); err != nil {
 		return err
+	}
+
+	if amount.Uint64() > fe.Result.TotalSupplyOfNativeToken {
+		return fmt.Errorf("total supply does not match %d > %d", amount.Uint64(), fe.Result.TotalSupplyOfNativeToken)
 	}
 
 	// update the gas consumed // TODO: revisit
@@ -167,6 +220,7 @@ func (fe *Environment) WithdrawFrom(amount *big.Int, source common.Address) erro
 
 	// add balance
 	fe.State.SubBalance(source, amount)
+	fe.Result.TotalSupplyOfNativeToken -= amount.Uint64()
 
 	// we increment the nonce for source account cause
 	// withdraw counts as a transaction (similar to the way calls increment the nonce)

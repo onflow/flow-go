@@ -34,17 +34,6 @@ func NewFlexAddressFromString(str string) FlexAddress {
 	return FlexAddress(gethCommon.BytesToAddress([]byte(str)))
 }
 
-// FlexBlock represents an EVM block.
-// It captures block info such as height and state
-type FlexBlock interface {
-	// Height returns the height of this EVM block (auto-incremented number)
-	Height() uint64
-	// StateRoot returns the EVM root hash of the state after executing this EVM block
-	StateRoot() gethCommon.Hash
-	// EventRoot returns the EVM root hash of the events emitted during execution of this EVM block
-	EventRoot() gethCommon.Hash
-}
-
 // Balance represents the balance of a Flex account
 // a separate type has been considered here to prevent
 // accidental dev mistakes when dealing with the conversion
@@ -114,7 +103,7 @@ type FlexContractHandler interface {
 	NewFlowOwnedAccount() FlowOwnedAccount
 
 	// LastExecutedBlock returns information about the last executed block
-	LastExecutedBlock() FlexBlock
+	LastExecutedBlock() *FlexBlock
 
 	// Run runs a transaction in the Flex environment,
 	// collects the gas fees, and transfers the gas fees to the given coinbase account.
