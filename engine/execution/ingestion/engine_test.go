@@ -29,7 +29,6 @@ import (
 	executionUnittest "github.com/onflow/flow-go/engine/execution/state/unittest"
 	"github.com/onflow/flow-go/engine/testutil/mocklocal"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/model/flow/order"
 	"github.com/onflow/flow-go/module/mempool/entity"
 	"github.com/onflow/flow-go/module/metrics"
@@ -298,16 +297,16 @@ func (ctx *testingContext) assertSuccessfulBlockComputation(
 		computationResult.Chunks[len(computationResult.Chunks)-1].EndState = newStateCommitment
 	}
 
+	ctx.executionState.
+		On("GetExecutionResultID", mock.Anything, executableBlock.Block.Header.ParentID).
+		Return(previousExecutionResultID, nil)
+
+	ctx.executionState.On("NewStorageSnapshot", mock.Anything).Return(nil)
+
 	// TODO: return computed block
 	ctx.computationManager.
 		On("ComputeBlock", mock.Anything, previousExecutionResultID, mock.Anything, mock.Anything).
 		Return(computationResult, nil).Once()
-
-	ctx.executionState.On("NewStorageSnapshot", mock.Anything).Return(nil)
-
-	ctx.executionState.
-		On("GetExecutionResultID", mock.Anything, executableBlock.Block.Header.ParentID).
-		Return(previousExecutionResultID, nil)
 
 	mocked := ctx.executionState.
 		On("SaveExecutionResults", mock.Anything, computationResult).
@@ -349,23 +348,6 @@ func (ctx *testingContext) assertSuccessfulBlockComputation(
 		Return(expectBroadcast, nil)
 
 	return computationResult
-}
-
-func (ctx testingContext) mockSnapshotWithBlockID(blockID flow.Identifier, identities flow.IdentityList) {
-	cluster := new(protocol.Cluster)
-	// filter only collections as cluster members
-	cluster.On("Members").Return(identities.Filter(filter.HasRole(flow.RoleCollection)))
-
-	epoch := new(protocol.Epoch)
-	epoch.On("ClusterByChainID", mock.Anything).Return(cluster, nil)
-
-	epochQuery := new(protocol.EpochQuery)
-	epochQuery.On("Current").Return(epoch)
-
-	snap := new(protocol.Snapshot)
-	snap.On("Epochs").Return(epochQuery)
-	snap.On("Identity", mock.Anything).Return(identities[0], nil)
-	ctx.state.On("AtBlockID", blockID).Return(snap)
 }
 
 func (ctx *testingContext) stateCommitmentExist(blockID flow.Identifier, commit flow.StateCommitment) {
