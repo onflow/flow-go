@@ -252,7 +252,7 @@ func (g *GossipSubScoreTracer) logPeerScore(peerID peer.ID) bool {
 	}
 
 	if snapshot.IsWarning() {
-		lg.Debug().Msg(PeerScoreLogMessage)
+		lg.Warn().Msg(PeerScoreLogMessage)
 		return true
 	}
 
