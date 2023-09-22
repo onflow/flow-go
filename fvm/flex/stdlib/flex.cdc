@@ -16,5 +16,5 @@ contract Flex {
     /// Run runs a flex transaction, deducts the gas fees and deposits them into the
     /// provided coinbase address
     access(all)
-    fun run(tx: [UInt8], coinbase: Flex.FlexAddress)
+    fun run(tx: [UInt8], coinbase: Flex.FlexAddress): Bool
 }

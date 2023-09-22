@@ -45,6 +45,20 @@ func encodeArgs(argValues []cadence.Value) [][]byte {
 	return args
 }
 
+var flexAddressBytesCadenceType = cadence.NewConstantSizedArrayType(20, cadence.TheUInt8Type)
+
+var flexAddressCadenceType = cadence.NewStructType(
+	nil,
+	flexStdlib.Flex_FlexAddressType.QualifiedIdentifier(),
+	[]cadence.Field{
+		{
+			Identifier: flexStdlib.Flex_FlexAddressTypeBytesFieldName,
+			Type:       flexAddressBytesCadenceType,
+		},
+	},
+	nil,
+)
+
 func TestFlexAddressConstructionAndReturn(t *testing.T) {
 
 	RunWithTempLedger(t, func(led atree.Ledger) {
@@ -63,7 +77,14 @@ func TestFlexAddressConstructionAndReturn(t *testing.T) {
 			}
 		`)
 
-		input := []cadence.Value{
+		runtimeInterface := &testRuntimeInterface{
+			storage: led,
+			decodeArgument: func(b []byte, t cadence.Type) (cadence.Value, error) {
+				return json.Decode(nil, b)
+			},
+		}
+
+		addressBytesArray := cadence.NewArray([]cadence.Value{
 			cadence.UInt8(1), cadence.UInt8(1),
 			cadence.UInt8(2), cadence.UInt8(2),
 			cadence.UInt8(3), cadence.UInt8(3),
@@ -74,22 +95,13 @@ func TestFlexAddressConstructionAndReturn(t *testing.T) {
 			cadence.UInt8(8), cadence.UInt8(8),
 			cadence.UInt8(9), cadence.UInt8(9),
 			cadence.UInt8(10), cadence.UInt8(10),
-		}
-
-		bytesType := cadence.NewConstantSizedArrayType(20, cadence.TheUInt8Type)
-
-		runtimeInterface := &testRuntimeInterface{
-			storage: led,
-			decodeArgument: func(b []byte, t cadence.Type) (cadence.Value, error) {
-				return json.Decode(nil, b)
-			},
-		}
+		}).WithType(flexAddressBytesCadenceType)
 
 		result, err := inter.ExecuteScript(
 			runtime.Script{
 				Source: script,
 				Arguments: encodeArgs([]cadence.Value{
-					cadence.NewArray(input).WithType(bytesType),
+					addressBytesArray,
 				}),
 			},
 			runtime.Context{
@@ -102,23 +114,78 @@ func TestFlexAddressConstructionAndReturn(t *testing.T) {
 
 		assert.Equal(t,
 			cadence.Struct{
-				StructType: cadence.NewStructType(
-					nil,
-					flexStdlib.Flex_FlexAddressType.QualifiedIdentifier(),
-					[]cadence.Field{
-						{
-							Identifier: flexStdlib.Flex_FlexAddressTypeBytesFieldName,
-							Type:       bytesType,
-						},
-					},
-					nil,
-				),
+				StructType: flexAddressCadenceType,
 				Fields: []cadence.Value{
-					cadence.NewArray(input).WithType(bytesType),
+					addressBytesArray,
 				},
 			},
 			result,
 		)
+	})
+}
+
+func TestFlexRun(t *testing.T) {
+
+	RunWithTempLedger(t, func(led atree.Ledger) {
+		handler := NewFlexContractHandler(led)
+
+		env := runtime.NewBaseInterpreterEnvironment(runtime.Config{})
+
+		env.DeclareValue(flexStdlib.NewFlexStandardLibraryValue(nil, handler))
+		env.DeclareType(flexStdlib.FlexStandardLibraryType)
+
+		inter := runtime.NewInterpreterRuntime(runtime.Config{})
+
+		script := []byte(`
+			pub fun main(tx: [UInt8], coinbaseBytes: [UInt8; 20]): Bool {
+                let coinbase = Flex.FlexAddress(bytes: coinbaseBytes)
+				return Flex.run(tx: tx, coinbase: coinbase)
+			}
+		`)
+
+		// TODO: provide proper RLP-encoded EVM transaction
+		tx := cadence.NewArray([]cadence.Value{
+			cadence.UInt8(1),
+			cadence.UInt8(2),
+			cadence.UInt8(3),
+		}).WithType(flexAddressBytesCadenceType)
+
+		// TODO: provide proper EVM address
+		coinbase := cadence.NewArray([]cadence.Value{
+			cadence.UInt8(1), cadence.UInt8(1),
+			cadence.UInt8(2), cadence.UInt8(2),
+			cadence.UInt8(3), cadence.UInt8(3),
+			cadence.UInt8(4), cadence.UInt8(4),
+			cadence.UInt8(5), cadence.UInt8(5),
+			cadence.UInt8(6), cadence.UInt8(6),
+			cadence.UInt8(7), cadence.UInt8(7),
+			cadence.UInt8(8), cadence.UInt8(8),
+			cadence.UInt8(9), cadence.UInt8(9),
+			cadence.UInt8(10), cadence.UInt8(10),
+		}).WithType(flexAddressBytesCadenceType)
+
+		runtimeInterface := &testRuntimeInterface{
+			storage: led,
+			decodeArgument: func(b []byte, t cadence.Type) (cadence.Value, error) {
+				return json.Decode(nil, b)
+			},
+		}
+
+		result, err := inter.ExecuteScript(
+			runtime.Script{
+				Source:    script,
+				Arguments: encodeArgs([]cadence.Value{tx, coinbase}),
+			},
+			runtime.Context{
+				Interface:   runtimeInterface,
+				Environment: env,
+				Location:    common.ScriptLocation{},
+			},
+		)
+		require.NoError(t, err)
+
+		// TODO: should succeed
+		assert.Equal(t, cadence.Bool(false), result)
 	})
 }
 

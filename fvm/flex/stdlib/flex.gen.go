@@ -100,7 +100,7 @@ var FlexTypeRunFunctionType = &sema.FunctionType{
 		},
 	},
 	ReturnTypeAnnotation: sema.NewTypeAnnotation(
-		sema.VoidType,
+		sema.BoolType,
 	),
 }
 
