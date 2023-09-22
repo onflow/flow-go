@@ -43,8 +43,6 @@ import (
 	unicastcache "github.com/onflow/flow-go/network/p2p/unicast/cache"
 	"github.com/onflow/flow-go/network/p2p/unicast/protocols"
 	"github.com/onflow/flow-go/network/p2p/unicast/stream"
-	"github.com/onflow/flow-go/network/p2p/unicast/unicastmgr"
-	"github.com/onflow/flow-go/network/p2p/unicast/unicastmodel"
 	"github.com/onflow/flow-go/network/p2p/utils"
 )
 
@@ -306,7 +304,7 @@ func (builder *LibP2PNodeBuilder) Build() (p2p.LibP2PNode, error) {
 		builder.connGater.SetDisallowListOracle(node)
 	}
 
-	unicastManager, err := unicastmgr.NewUnicastManager(&unicastmgr.ManagerConfig{
+	unicastManager, err := manager.NewUnicastManager(&manager.ManagerConfig{
 		Logger:                             builder.logger,
 		StreamFactory:                      stream.NewLibP2PStreamFactory(h),
 		SporkId:                            builder.sporkId,
@@ -317,7 +315,7 @@ func (builder *LibP2PNodeBuilder) Build() (p2p.LibP2PNode, error) {
 		DialZeroRetryResetThreshold:        builder.unicastConfig.DialZeroRetryResetThreshold,
 		MaxStreamCreationRetryAttemptTimes: builder.unicastConfig.MaxStreamCreationRetryAttemptTimes,
 		MaxDialRetryAttemptTimes:           builder.unicastConfig.MaxDialRetryAttemptTimes,
-		DialConfigCacheFactory: func(configFactory func() unicastmodel.DialConfig) unicast.DialConfigCache {
+		DialConfigCacheFactory: func(configFactory func() manager.DialConfig) unicast.DialConfigCache {
 			return unicastcache.NewDialConfigCache(builder.unicastConfig.DialConfigCacheSize,
 				builder.logger,
 				metrics.DialConfigCacheMetricFactory(builder.metricsConfig.HeroCacheFactory, builder.networkingType),

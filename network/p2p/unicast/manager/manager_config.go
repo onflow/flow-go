@@ -1,4 +1,4 @@
-package unicastmgr
+package manager
 
 import (
 	"time"

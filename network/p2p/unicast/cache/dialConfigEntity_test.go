@@ -8,7 +8,6 @@ import (
 
 	p2ptest "github.com/onflow/flow-go/network/p2p/test"
 	unicastcache "github.com/onflow/flow-go/network/p2p/unicast/cache"
-	"github.com/onflow/flow-go/network/p2p/unicast/unicastmodel"
 )
 
 // TestDialConfigEntity tests the DialConfigEntity struct and its methods.
@@ -17,7 +16,7 @@ func TestDialConfigEntity(t *testing.T) {
 
 	d := &unicastcache.DialConfigEntity{
 		PeerId: peerID,
-		DialConfig: unicastmodel.DialConfig{
+		DialConfig: manager.DialConfig{
 			DialRetryAttemptBudget:           10,
 			StreamCreationRetryAttemptBudget: 20,
 			LastSuccessfulDial:               time.Now(),
@@ -47,7 +46,7 @@ func TestDialConfigEntity(t *testing.T) {
 
 		d3 := &unicastcache.DialConfigEntity{
 			PeerId: d.PeerId,
-			DialConfig: unicastmodel.DialConfig{
+			DialConfig: manager.DialConfig{
 				DialRetryAttemptBudget:           100,
 				StreamCreationRetryAttemptBudget: 200,
 				LastSuccessfulDial:               time.Now(),
