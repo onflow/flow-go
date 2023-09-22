@@ -35,6 +35,8 @@ type AtreeRegisterMigrator struct {
 	rwf     reporters.ReportWriterFactory
 
 	metrics *metrics
+
+	nWorkers int
 }
 
 var _ AccountBasedMigration = (*AtreeRegisterMigrator)(nil)
@@ -73,9 +75,10 @@ func (m *AtreeRegisterMigrator) Close() error {
 func (m *AtreeRegisterMigrator) InitMigration(
 	log zerolog.Logger,
 	_ []*ledger.Payload,
-	_ int,
+	nWorkers int,
 ) error {
 	m.log = log.With().Str("migration", "atree-register-migration").Logger()
+	m.nWorkers = nWorkers
 
 	return nil
 }
@@ -90,11 +93,16 @@ func (m *AtreeRegisterMigrator) MigrateAccount(
 		return oldPayloads, nil
 	}
 
-	if reason, ok := knownProblematicAccounts[address]; ok {
-		m.log.Info().
-			Str("account", address.Hex()).
-			Str("reason", reason).
-			Msg("Account is known to have issues. Skipping it.")
+	//if reason, ok := knownProblematicAccounts[address]; ok {
+	//	m.log.Info().
+	//		Str("account", address.Hex()).
+	//		Str("reason", reason).
+	//		Msg("Account is known to have issues. Skipping it.")
+	//	return oldPayloads, nil
+	//}
+
+	if address != mustHexToAddress("4eded0de73020ca5") {
+		// for testing purposes migrate only one account
 		return oldPayloads, nil
 	}
 
@@ -479,10 +487,20 @@ func (m *AtreeRegisterMigrator) cloneValue(
 	value interpreter.Value,
 ) (interpreter.Value, error) {
 
+	yes, err := m.isCricketMomentsShardedCollection(mr, value)
+	if err != nil {
+		return nil, err
+	}
+
+	if yes {
+		m.log.Info().Msg("migrating CricketMomentsShardedCollection")
+		return m.cloneCricketMomentsShardedCollection(mr, value)
+	}
+
 	// if this very special register on this very special account then handle
 	// it differently
 
-	err := capturePanic(func() {
+	err = capturePanic(func() {
 		// force the value to be read entirely
 		value = value.Clone(mr.Interpreter)
 	})
@@ -492,73 +510,264 @@ func (m *AtreeRegisterMigrator) cloneValue(
 	return value, nil
 }
 
-//
-//func cloneCricketMomentsShardedCollection(
-//	mr *migratorRuntime,
-//	value interpreter.Value,
-//) (interpreter.Value, error) {
-//	// the CricketMomentsShardedCollection is a resource wit two fields
-//	//
-//	// pub var collections: @{UInt64: CricketMoments.Collection}
-//	// pub let numBuckets: UInt64
-//	//
-//	// each collection has one field
-//	//
-//	// pub var ownedNFTs: @{UInt64: NonFungibleToken.NFT}
-//	//
-//	// the goal is to copy the ownedNFTs field of each collection with multiple go-rutines
-//	// and then reassemble the CricketMomentsShardedCollection
-//
-//	shardedCollectionResource, ok := value.(*interpreter.CompositeValue)
-//	if !ok {
-//		return nil, fmt.Errorf("expected *interpreter.CompositeValue, got %T", value)
-//	}
-//	shardedCollectionMapRaw, ok := shardedCollectionResource.InjectedFields["collections"]
-//	if !ok {
-//		return nil, fmt.Errorf("expected collections field")
-//	}
-//	shardedCollectionMap, ok := shardedCollectionMapRaw.(*interpreter.DictionaryValue)
-//	if !ok {
-//		return nil, fmt.Errorf("expected collections to be *interpreter.DictionaryValue, got %T", shardedCollectionMapRaw)
-//	}
-//
-//	shardedCollectionMapIterator := shardedCollectionMap.Iterator()
-//	for {
-//		key := shardedCollectionMapIterator.NextKey(nil)
-//		if key == nil {
-//			break
-//		}
-//		value := shardedCollectionMap.GetKey(key)
-//
-//		collection, ok := value.(*interpreter.CompositeValue)
-//		if !ok {
-//			return nil, fmt.Errorf("expected collection to be *interpreter.CompositeValue, got %T", value)
-//		}
-//		ownedNFTsRaw, ok := collection.InjectedFields["ownedNFTs"]
-//		if !ok {
-//			return nil, fmt.Errorf("expected ownedNFTs field")
-//		}
-//		ownedNFTs, ok := ownedNFTsRaw.(*interpreter.DictionaryValue)
-//		if !ok {
-//			return nil, fmt.Errorf("expected ownedNFTs to be *interpreter.DictionaryValue, got %T", ownedNFTsRaw)
-//		}
-//
-//		ownedNFTs = cloneCricketMomentsShardedCollectionOwnedNFTs(mr, ownedNFTs)
-//
-//		collection.InjectedFields["ownedNFTs"] = ownedNFTs
-//
-//		// ok, now clone it
-//
-//	}
-//
-//}
-//
-//func cloneCricketMomentsShardedCollectionOwnedNFTs(
-//	mr *migratorRuntime,
-//	ownedNFTs *interpreter.DictionaryValue,
-//) *interpreter.DictionaryValue {
-//
-//}
+func (m *AtreeRegisterMigrator) isCricketMomentsShardedCollection(
+	mr *migratorRuntime,
+	value interpreter.Value,
+) (bool, error) {
+	if mr.Address != mustHexToAddress("0x4eded0de73020ca5") {
+		return false, nil
+	}
+
+	compositeValue, ok := value.(*interpreter.CompositeValue)
+	if !ok {
+		return false, nil
+	}
+
+	return string(compositeValue.TypeID()) == "A.4eded0de73020ca5.CricketMomentsShardedCollection.ShardedCollection", nil
+}
+
+func (m *AtreeRegisterMigrator) cloneCricketMomentsShardedCollection(
+	mr *migratorRuntime,
+	value interpreter.Value,
+) (interpreter.Value, error) {
+	// the CricketMomentsShardedCollection is a resource wit two fields
+	//
+	// pub var collections: @{UInt64: CricketMoments.Collection}
+	// pub let numBuckets: UInt64
+	//
+	// each collection has one field
+	//
+	// pub var ownedNFTs: @{UInt64: NonFungibleToken.NFT}
+	//
+	// the goal is to copy the ownedNFTs field of each collection with multiple go-rutines
+	// and then reassemble the CricketMomentsShardedCollection
+
+	shardedCollectionResource, ok := value.(*interpreter.CompositeValue)
+	if !ok {
+		return nil, fmt.Errorf("expected *interpreter.CompositeValue, got %T", value)
+	}
+	shardedCollectionMapField := shardedCollectionResource.GetField(
+		mr.Interpreter,
+		interpreter.EmptyLocationRange,
+		"collections",
+	)
+	if shardedCollectionMapField == nil {
+		return nil, fmt.Errorf("expected collections field")
+	}
+	shardedCollectionMap, ok := shardedCollectionMapField.(*interpreter.DictionaryValue)
+	if !ok {
+		return nil, fmt.Errorf("expected collections to be *interpreter.DictionaryValue, got %T", shardedCollectionMapField)
+	}
+
+	type valueWithKeys struct {
+		outerKey interpreter.Value
+		innerKey interpreter.Value
+		value    interpreter.Value
+	}
+
+	ctx, cancel := context.WithCancelCause(context.Background())
+	defer cancel(nil)
+	cloneChan := make(chan valueWithKeys, m.nWorkers)
+	clonedChan := make(chan valueWithKeys, m.nWorkers)
+	wg := sync.WaitGroup{}
+	wg.Add(m.nWorkers)
+
+	for i := 0; i < m.nWorkers; i++ {
+		go func() {
+			defer wg.Done()
+			for {
+				select {
+				case <-ctx.Done():
+					return
+				case clone, ok := <-cloneChan:
+					if !ok {
+						return
+					}
+					err := capturePanic(func() {
+						clone.value = clone.value.Clone(mr.Interpreter)
+					})
+					if err != nil {
+						cancel(err)
+						return
+					}
+					clonedChan <- clone
+				}
+			}
+		}()
+	}
+
+	go func() {
+		shardedCollectionMapIterator := shardedCollectionMap.Iterator()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			default:
+			}
+
+			outerKey := shardedCollectionMapIterator.NextKey(nil)
+			if outerKey == nil {
+				break
+			}
+			value := shardedCollectionMap.GetKey(
+				mr.Interpreter,
+				interpreter.EmptyLocationRange,
+				outerKey,
+			)
+
+			collection, ok := value.(*interpreter.CompositeValue)
+			if !ok {
+				cancel(fmt.Errorf("expected collection to be *interpreter.CompositeValue, got %T", value))
+				return
+			}
+
+			ownedNFTsRaw := collection.GetField(
+				mr.Interpreter,
+				interpreter.EmptyLocationRange,
+				"ownedNFTs",
+			)
+			if ownedNFTsRaw == nil {
+				cancel(fmt.Errorf("expected ownedNFTs field"))
+				return
+			}
+			ownedNFTs, ok := ownedNFTsRaw.(*interpreter.DictionaryValue)
+			if !ok {
+				cancel(fmt.Errorf("expected ownedNFTs to be *interpreter.DictionaryValue, got %T", ownedNFTsRaw))
+				return
+			}
+
+			ownedNFTsIterator := ownedNFTs.Iterator()
+			keys := make([]interpreter.Value, 0, ownedNFTs.Count())
+			for {
+				select {
+				case <-ctx.Done():
+					return
+				default:
+				}
+
+				innerKey := ownedNFTsIterator.NextKey(nil)
+				if innerKey == nil {
+					break
+				}
+				value := ownedNFTs.GetKey(
+					mr.Interpreter,
+					interpreter.EmptyLocationRange,
+					innerKey,
+				)
+
+				cloneChan <- valueWithKeys{
+					innerKey: innerKey,
+					outerKey: outerKey,
+					value:    value,
+				}
+
+				keys = append(keys, innerKey)
+			}
+
+			for _, key := range keys {
+				ownedNFTs.Remove(
+					mr.Interpreter,
+					interpreter.EmptyLocationRange,
+					key,
+				)
+			}
+		}
+		close(cloneChan)
+	}()
+
+	done := make(chan struct{})
+	cloned := make([]valueWithKeys, 0, 10_0000_000)
+
+	go func() {
+		defer close(done)
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case clone, ok := <-clonedChan:
+				if !ok {
+					return
+				}
+				cloned = append(cloned, clone)
+			}
+		}
+	}()
+
+	wg.Wait()
+	close(clonedChan)
+	<-done
+
+	if ctx.Err() != nil {
+		return nil, ctx.Err()
+	}
+
+	// clone a now empty sharded collection
+	shardedCollectionResource = shardedCollectionResource.Clone(mr.Interpreter).(*interpreter.CompositeValue)
+	shardedCollectionMapField = shardedCollectionResource.GetField(
+		mr.Interpreter,
+		interpreter.EmptyLocationRange,
+		"collections",
+	)
+	if shardedCollectionMapField == nil {
+		return nil, fmt.Errorf("expected collections field")
+	}
+	shardedCollectionMap, ok = shardedCollectionMapField.(*interpreter.DictionaryValue)
+	if !ok {
+		return nil, fmt.Errorf("expected collections to be *interpreter.DictionaryValue, got %T", shardedCollectionMapField)
+	}
+
+	shards := make(map[interpreter.Value]*interpreter.DictionaryValue)
+
+	shardedCollectionMapIterator := shardedCollectionMap.Iterator()
+	for {
+		outerKey := shardedCollectionMapIterator.NextKey(nil)
+		if outerKey == nil {
+			break
+		}
+		value := shardedCollectionMap.GetKey(
+			mr.Interpreter,
+			interpreter.EmptyLocationRange,
+			outerKey,
+		)
+
+		collection, ok := value.(*interpreter.CompositeValue)
+		if !ok {
+			return nil, fmt.Errorf("expected collection to be *interpreter.CompositeValue, got %T", value)
+		}
+
+		ownedNFTsRaw := collection.GetField(
+			mr.Interpreter,
+			interpreter.EmptyLocationRange,
+			"ownedNFTs",
+		)
+		if ownedNFTsRaw == nil {
+			return nil, fmt.Errorf("expected ownedNFTs field")
+		}
+		ownedNFTs, ok := ownedNFTsRaw.(*interpreter.DictionaryValue)
+		if !ok {
+			return nil, fmt.Errorf("expected ownedNFTs to be *interpreter.DictionaryValue, got %T", ownedNFTsRaw)
+		}
+
+		shards[outerKey] = ownedNFTs
+	}
+
+	for _, clone := range cloned {
+		ownedNFTs, ok := shards[clone.outerKey]
+		if !ok {
+			return nil, fmt.Errorf("expected shard for key %s", clone.outerKey)
+		}
+
+		ownedNFTs.Insert(
+			mr.Interpreter,
+			interpreter.EmptyLocationRange,
+			clone.innerKey,
+			clone.value,
+		)
+	}
+
+	// everything is cloned which means we forced the entire value to be read from storage
+	return value, nil
+}
 
 //
 //func (m *AtreeRegisterMigrator) cloneLargeArray(
