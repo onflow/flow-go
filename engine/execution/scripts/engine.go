@@ -20,7 +20,7 @@ type Engine struct {
 	log           zerolog.Logger
 	state         protocol.State
 	queryExecutor query.Executor
-	execState     state.ExecutionState
+	execState     state.ScriptExecutionState
 }
 
 var _ execution.ScriptExecutor = (*Engine)(nil)
@@ -29,7 +29,7 @@ func New(
 	logger zerolog.Logger,
 	state protocol.State,
 	queryExecutor query.Executor,
-	execState ScriptExecutionState,
+	execState state.ScriptExecutionState,
 ) *Engine {
 	return &Engine{
 		unit:          engine.NewUnit(),
