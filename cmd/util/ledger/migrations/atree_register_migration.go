@@ -479,6 +479,9 @@ func (m *AtreeRegisterMigrator) cloneValue(
 	value interpreter.Value,
 ) (interpreter.Value, error) {
 
+	// if this very special register on this very special account then handle
+	// it differently
+
 	err := capturePanic(func() {
 		// force the value to be read entirely
 		value = value.Clone(mr.Interpreter)
@@ -488,6 +491,74 @@ func (m *AtreeRegisterMigrator) cloneValue(
 	}
 	return value, nil
 }
+
+//
+//func cloneCricketMomentsShardedCollection(
+//	mr *migratorRuntime,
+//	value interpreter.Value,
+//) (interpreter.Value, error) {
+//	// the CricketMomentsShardedCollection is a resource wit two fields
+//	//
+//	// pub var collections: @{UInt64: CricketMoments.Collection}
+//	// pub let numBuckets: UInt64
+//	//
+//	// each collection has one field
+//	//
+//	// pub var ownedNFTs: @{UInt64: NonFungibleToken.NFT}
+//	//
+//	// the goal is to copy the ownedNFTs field of each collection with multiple go-rutines
+//	// and then reassemble the CricketMomentsShardedCollection
+//
+//	shardedCollectionResource, ok := value.(*interpreter.CompositeValue)
+//	if !ok {
+//		return nil, fmt.Errorf("expected *interpreter.CompositeValue, got %T", value)
+//	}
+//	shardedCollectionMapRaw, ok := shardedCollectionResource.InjectedFields["collections"]
+//	if !ok {
+//		return nil, fmt.Errorf("expected collections field")
+//	}
+//	shardedCollectionMap, ok := shardedCollectionMapRaw.(*interpreter.DictionaryValue)
+//	if !ok {
+//		return nil, fmt.Errorf("expected collections to be *interpreter.DictionaryValue, got %T", shardedCollectionMapRaw)
+//	}
+//
+//	shardedCollectionMapIterator := shardedCollectionMap.Iterator()
+//	for {
+//		key := shardedCollectionMapIterator.NextKey(nil)
+//		if key == nil {
+//			break
+//		}
+//		value := shardedCollectionMap.GetKey(key)
+//
+//		collection, ok := value.(*interpreter.CompositeValue)
+//		if !ok {
+//			return nil, fmt.Errorf("expected collection to be *interpreter.CompositeValue, got %T", value)
+//		}
+//		ownedNFTsRaw, ok := collection.InjectedFields["ownedNFTs"]
+//		if !ok {
+//			return nil, fmt.Errorf("expected ownedNFTs field")
+//		}
+//		ownedNFTs, ok := ownedNFTsRaw.(*interpreter.DictionaryValue)
+//		if !ok {
+//			return nil, fmt.Errorf("expected ownedNFTs to be *interpreter.DictionaryValue, got %T", ownedNFTsRaw)
+//		}
+//
+//		ownedNFTs = cloneCricketMomentsShardedCollectionOwnedNFTs(mr, ownedNFTs)
+//
+//		collection.InjectedFields["ownedNFTs"] = ownedNFTs
+//
+//		// ok, now clone it
+//
+//	}
+//
+//}
+//
+//func cloneCricketMomentsShardedCollectionOwnedNFTs(
+//	mr *migratorRuntime,
+//	ownedNFTs *interpreter.DictionaryValue,
+//) *interpreter.DictionaryValue {
+//
+//}
 
 //
 //func (m *AtreeRegisterMigrator) cloneLargeArray(
