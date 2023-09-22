@@ -61,7 +61,6 @@ import (
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/metrics/unstaked"
 	"github.com/onflow/flow-go/module/state_synchronization"
-	"github.com/onflow/flow-go/module/state_synchronization/indexer"
 	edrequester "github.com/onflow/flow-go/module/state_synchronization/requester"
 	"github.com/onflow/flow-go/network"
 	alspmgr "github.com/onflow/flow-go/network/alsp/manager"
@@ -134,7 +133,6 @@ type AccessNodeConfig struct {
 	executionDataStartHeight     uint64
 	executionDataConfig          edrequester.ExecutionDataConfig
 	PublicNetworkConfig          PublicNetworkConfig
-	executionIndexLastHeight     uint64
 	TxResultCacheSize            uint
 }
 
@@ -251,7 +249,6 @@ type FlowAccessNodeBuilder struct {
 	ExecutionDataRequester     state_synchronization.ExecutionDataRequester
 	ExecutionDataStore         execution_data.ExecutionDataStore
 	ExecutionDataCache         *execdatacache.ExecutionDataCache
-	ExecutionIndexer           *indexer.ExecutionState
 
 	// The sync engine participants provider is the libp2p peer store for the access node
 	// which is not available until after the network has started.
@@ -505,10 +502,6 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 			builder.ExecutionDataStore = execution_data.NewExecutionDataStore(blobstore, execution_data.DefaultSerializer)
 			return nil
 		}).
-		Module("events storage", func(node *cmd.NodeConfig) error {
-			builder.Storage.Events = bstorage.NewEvents(node.Metrics.Cache, node.DB)
-			return nil
-		}).
 		Component("execution data service", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 
 			opts := []network.BlobServiceOption{
@@ -756,9 +749,6 @@ func (builder *FlowAccessNodeBuilder) extraFlags() {
 		flags.Float64Var(&builder.stateStreamConf.ResponseLimit, "state-stream-response-limit", defaultConfig.stateStreamConf.ResponseLimit, "max number of responses per second to send over streaming endpoints. this helps manage resources consumed by each client querying data not in the cache e.g. 3 or 0.5. 0 means no limit")
 
 		flags.UintVar(&builder.TxResultCacheSize, "transaction-result-cache-size", defaultConfig.TxResultCacheSize, "transaction result cache size.(Disabled by default i.e 0)")
-
-		// Execution Index
-		flags.Uint64Var(&builder.executionIndexLastHeight, "execution-index-last-height", 0, "block height to start indexing execution data from")
 	}).ValidateFlags(func() error {
 		if builder.supportsObserver && (builder.PublicNetworkConfig.BindAddress == cmd.NotSet || builder.PublicNetworkConfig.BindAddress == "") {
 			return errors.New("public-network-address must be set if supports-observer is true")
