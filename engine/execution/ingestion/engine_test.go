@@ -304,10 +304,12 @@ func (ctx *testingContext) assertSuccessfulBlockComputation(
 
 	ctx.executionState.On("NewStorageSnapshot", mock.Anything).Return(nil)
 
-	// TODO: return computed block
+	matcher := mock.MatchedBy(func(block *entity.ExecutableBlock) bool {
+		return block.ID() == executableBlock.ID()
+	})
 	ctx.computationManager.
-		On("ComputeBlock", mock.Anything, previousExecutionResultID, mock.Anything, mock.Anything).
-		Return(computationResult, nil).Once()
+		On("ComputeBlock", mock.Anything, mock.Anything, matcher, mock.Anything).
+		Return(computationResult, nil)
 
 	mocked := ctx.executionState.
 		On("SaveExecutionResults", mock.Anything, computationResult).
@@ -433,6 +435,7 @@ func TestExecuteOneBlock(t *testing.T) {
 	})
 }
 
+// verify block will be executed if collection is received first
 func TestExecuteBlocks(t *testing.T) {
 
 	runWithEngine(t, func(ctx testingContext) {
@@ -497,6 +500,71 @@ func TestExecuteBlocks(t *testing.T) {
 	})
 }
 
+// verify block will be executed if collection is already in storage
+func TestExecuteNextBlockIfCollectionIsReady(t *testing.T) {
+	runWithEngine(t, func(ctx testingContext) {
+		col := unittest.CollectionFixture(1)
+		gua := col.Guarantee()
+
+		colSigner := unittest.IdentifierFixture()
+		// Root <- A
+		blockRoot := unittest.BlockHeaderFixture()
+		blockA := unittest.ExecutableBlockFixtureWithParent([][]flow.Identifier{{colSigner}}, blockRoot, unittest.StateCommitmentPointerFixture())
+		blockA.Block.Payload.Guarantees[0] = &gua
+		blockA.Block.Header.PayloadHash = blockA.Block.Payload.Hash()
+
+		// A <- B
+		col2 := unittest.CollectionFixture(1)
+		gua2 := col2.Guarantee()
+		blockB := unittest.ExecutableBlockFixtureWithParent([][]flow.Identifier{{colSigner}}, blockA.Block.Header, unittest.StateCommitmentPointerFixture())
+		blockB.Block.Payload.Guarantees[0] = &gua2
+		blockB.Block.Header.PayloadHash = blockB.Block.Payload.Hash()
+
+		// blockA's start state is its parent's state commitment,
+		// and blockA and blockA's parent have been executed.
+		commits := make(map[flow.Identifier]flow.StateCommitment)
+		commits[blockA.Block.Header.ParentID] = *blockA.StartState
+		ctx.mockStateCommitsWithMap(commits)
+
+		// blockB's collection is available in storage
+		require.NoError(t, ctx.collections.Store(&col2))
+
+		// receive block
+		err := ctx.engine.handleBlock(context.Background(), blockA.Block)
+		require.NoError(t, err)
+
+		err = ctx.engine.handleBlock(context.Background(), blockB.Block)
+		require.NoError(t, err)
+
+		wg := sync.WaitGroup{}
+		wg.Add(2) // wait for block B to be executed
+
+		ctx.assertExecution(commits, blockA, unittest.IdentifierFixture(), &wg)
+		ctx.assertExecution(commits, blockB, unittest.IdentifierFixture(), &wg)
+
+		// verify upload will be called
+		uploader := uploadermock.NewUploader(ctx.t)
+		uploader.On("Upload", mock.Anything).Return(nil)
+		ctx.uploadMgr.AddUploader(uploader)
+
+		err = ctx.engine.handleCollection(unittest.IdentifierFixture(), &col)
+		require.NoError(t, err)
+
+		unittest.AssertReturnsBefore(t, wg.Wait, 10*time.Second)
+
+		// verify collection is fetched
+		require.True(t, ctx.fetcher.isFetched(gua.ID()))
+		require.False(t, ctx.fetcher.isFetched(gua2.ID()))
+
+		// verify block is executed
+		_, ok := commits[blockA.ID()]
+		require.True(t, ok)
+		_, ok = commits[blockB.ID()]
+		require.True(t, ok)
+	})
+}
+
+// verify block will only be executed once even if block or collection are received multiple times
 func TestExecuteBlockOnlyOnce(t *testing.T) {
 	runWithEngine(t, func(ctx testingContext) {
 		col := unittest.CollectionFixture(1)
@@ -595,8 +663,9 @@ func TestExecuteForkConcurrently(t *testing.T) {
 		wg := sync.WaitGroup{}
 		wg.Add(2) // wait for block B to be executed
 
-		ctx.assertExecution(commits, blockA, unittest.IdentifierFixture(), &wg)
-		ctx.assertExecution(commits, blockB, unittest.IdentifierFixture(), &wg)
+		rootResultID := unittest.IdentifierFixture()
+		blockAResult := ctx.assertExecution(commits, blockA, rootResultID, &wg)
+		ctx.assertExecution(commits, blockB, blockAResult.ExecutionReceipt.ExecutionResult.ID(), &wg)
 
 		// verify upload will be called
 		uploader := uploadermock.NewUploader(ctx.t)
