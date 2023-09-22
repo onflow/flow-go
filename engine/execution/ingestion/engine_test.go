@@ -1,6 +1,7 @@
 package ingestion
 
 import (
+	"bytes"
 	"context"
 	"crypto/rand"
 	"fmt"
@@ -493,6 +494,133 @@ func TestExecuteBlocks(t *testing.T) {
 		require.True(t, ok)
 		_, ok = commits[blockB.ID()]
 		require.True(t, ok)
+	})
+}
+
+func TestExecuteBlockOnlyOnce(t *testing.T) {
+	runWithEngine(t, func(ctx testingContext) {
+		col := unittest.CollectionFixture(1)
+		gua := col.Guarantee()
+
+		colSigner := unittest.IdentifierFixture()
+		// Root <- A
+		blockRoot := unittest.BlockHeaderFixture()
+		blockA := unittest.ExecutableBlockFixtureWithParent([][]flow.Identifier{{colSigner}}, blockRoot, unittest.StateCommitmentPointerFixture())
+		blockA.Block.Payload.Guarantees[0] = &gua
+		blockA.Block.Header.PayloadHash = blockA.Block.Payload.Hash()
+
+		// blockA's start state is its parent's state commitment,
+		// and blockA's parent has been executed.
+		commits := make(map[flow.Identifier]flow.StateCommitment)
+		commits[blockA.Block.Header.ParentID] = *blockA.StartState
+		ctx.mockStateCommitsWithMap(commits)
+
+		// receive block
+		err := ctx.engine.handleBlock(context.Background(), blockA.Block)
+		require.NoError(t, err)
+
+		wg := sync.WaitGroup{}
+		wg.Add(1) // wait for block B to be executed
+
+		result := ctx.assertExecution(commits, blockA, unittest.IdentifierFixture(), &wg)
+
+		// receiving block again
+		err = ctx.engine.handleBlock(context.Background(), blockA.Block)
+		require.NoError(t, err)
+
+		// verify upload will be called
+		uploader := uploadermock.NewUploader(ctx.t)
+		uploader.On("Upload", result).Return(nil).Once()
+		ctx.uploadMgr.AddUploader(uploader)
+
+		err = ctx.engine.handleCollection(unittest.IdentifierFixture(), &col)
+		require.NoError(t, err)
+
+		// receiving collection again before block is executed
+		err = ctx.engine.handleCollection(unittest.IdentifierFixture(), &col)
+		require.NoError(t, err)
+
+		unittest.AssertReturnsBefore(t, wg.Wait, 10*time.Second)
+
+		// receiving collection again after block is executed
+		err = ctx.engine.handleCollection(unittest.IdentifierFixture(), &col)
+		require.NoError(t, err)
+
+		// verify collection is fetched
+		require.True(t, ctx.fetcher.isFetched(gua.ID()))
+
+		// verify block is executed
+		_, ok := commits[blockA.ID()]
+		require.True(t, ok)
+	})
+}
+
+// given two blocks depend on the same root block and contain same collections,
+// receiving all collections will trigger the execution of both blocks concurrently
+func TestExecuteForkConcurrently(t *testing.T) {
+	runWithEngine(t, func(ctx testingContext) {
+		col1 := unittest.CollectionFixture(1)
+		gua1 := col1.Guarantee()
+		col2 := unittest.CollectionFixture(1)
+		gua2 := col2.Guarantee()
+
+		colSigner1 := unittest.IdentifierFixture()
+		colSigner2 := unittest.IdentifierFixture()
+		// Root <- A[C1,C2]
+		blockRoot := unittest.BlockHeaderFixture()
+		blockA := unittest.ExecutableBlockFixtureWithParent([][]flow.Identifier{{colSigner1}, {colSigner2}}, blockRoot, unittest.StateCommitmentPointerFixture())
+		blockA.Block.Payload.Guarantees[0] = &gua1
+		blockA.Block.Payload.Guarantees[1] = &gua2
+		blockA.Block.Header.PayloadHash = blockA.Block.Payload.Hash()
+
+		// Root <- B[C1,C2]
+		blockB := unittest.ExecutableBlockFixtureWithParent([][]flow.Identifier{{colSigner1}, {colSigner2}}, blockRoot, unittest.StateCommitmentPointerFixture())
+		blockB.Block.Payload.Guarantees[0] = &gua1
+		blockB.Block.Payload.Guarantees[1] = &gua2
+		blockB.Block.Header.PayloadHash = blockB.Block.Payload.Hash()
+
+		// blockA's start state is its parent's state commitment,
+		// and blockA's parent has been executed.
+		commits := make(map[flow.Identifier]flow.StateCommitment)
+		commits[blockA.Block.Header.ParentID] = *blockA.StartState
+		ctx.mockStateCommitsWithMap(commits)
+
+		// receive blocks
+		err := ctx.engine.handleBlock(context.Background(), blockA.Block)
+		require.NoError(t, err)
+
+		err = ctx.engine.handleBlock(context.Background(), blockB.Block)
+		require.NoError(t, err)
+
+		wg := sync.WaitGroup{}
+		wg.Add(2) // wait for block B to be executed
+
+		ctx.assertExecution(commits, blockA, unittest.IdentifierFixture(), &wg)
+		ctx.assertExecution(commits, blockB, unittest.IdentifierFixture(), &wg)
+
+		// verify upload will be called
+		uploader := uploadermock.NewUploader(ctx.t)
+		uploader.On("Upload", mock.Anything).Return(nil)
+		ctx.uploadMgr.AddUploader(uploader)
+
+		err = ctx.engine.handleCollection(unittest.IdentifierFixture(), &col1)
+		require.NoError(t, err)
+
+		err = ctx.engine.handleCollection(unittest.IdentifierFixture(), &col2)
+		require.NoError(t, err)
+
+		unittest.AssertReturnsBefore(t, wg.Wait, 10*time.Second)
+
+		// verify collection is fetched
+		require.True(t, ctx.fetcher.isFetched(gua1.ID()))
+		require.True(t, ctx.fetcher.isFetched(gua2.ID()))
+
+		// verify block is executed
+		commit1, ok := commits[blockA.ID()]
+		require.True(t, ok)
+		commit2, ok := commits[blockB.ID()]
+		require.True(t, ok)
+		require.False(t, bytes.Equal(commit1[:], commit2[:]))
 	})
 }
 
