@@ -37,7 +37,7 @@ var (
 	_ p2p.UnicastManager = (*Manager)(nil)
 )
 
-type DialConfigCacheFactory func(func() unicastmodel.DialConfig) unicast.DialConfigCache
+type DialConfigCacheFactory func(configFactory func() unicastmodel.DialConfig) unicast.DialConfigCache
 
 // Manager manages libp2p stream negotiation and creation, which is utilized for unicast dispatches.
 type Manager struct {

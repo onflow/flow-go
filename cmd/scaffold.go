@@ -149,21 +149,22 @@ func (fnb *FlowNodeBuilder) BaseFlags() {
 	fnb.flags.Uint32Var(&fnb.BaseConfig.debugLogLimit, "debug-log-limit", defaultConfig.debugLogLimit, "max number of debug/trace log events per second")
 	fnb.flags.UintVarP(&fnb.BaseConfig.metricsPort, "metricport", "m", defaultConfig.metricsPort, "port for /metrics endpoint")
 	fnb.flags.BoolVar(&fnb.BaseConfig.profilerConfig.Enabled, "profiler-enabled", defaultConfig.profilerConfig.Enabled, "whether to enable the auto-profiler")
-	fnb.flags.BoolVar(&fnb.BaseConfig.profilerConfig.UploaderEnabled, "profile-uploader-enabled", defaultConfig.profilerConfig.UploaderEnabled,
+	fnb.flags.BoolVar(&fnb.BaseConfig.profilerConfig.UploaderEnabled,
+		"profile-uploader-enabled",
+		defaultConfig.profilerConfig.UploaderEnabled,
 		"whether to enable automatic profile upload to Google Cloud Profiler. "+
 			"For autoupload to work forllowing should be true: "+
 			"1) both -profiler-enabled=true and -profile-uploader-enabled=true need to be set. "+
 			"2) node is running in GCE. "+
 			"3) server or user has https://www.googleapis.com/auth/monitoring.write scope. ")
 	fnb.flags.StringVar(&fnb.BaseConfig.profilerConfig.Dir, "profiler-dir", defaultConfig.profilerConfig.Dir, "directory to create auto-profiler profiles")
-	fnb.flags.DurationVar(&fnb.BaseConfig.profilerConfig.Interval, "profiler-interval", defaultConfig.profilerConfig.Interval,
-		"the interval between auto-profiler runs")
-	fnb.flags.DurationVar(&fnb.BaseConfig.profilerConfig.Duration, "profiler-duration", defaultConfig.profilerConfig.Duration,
-		"the duration to run the auto-profile for")
+	fnb.flags.DurationVar(&fnb.BaseConfig.profilerConfig.Interval, "profiler-interval", defaultConfig.profilerConfig.Interval, "the interval between auto-profiler runs")
+	fnb.flags.DurationVar(&fnb.BaseConfig.profilerConfig.Duration, "profiler-duration", defaultConfig.profilerConfig.Duration, "the duration to run the auto-profile for")
 
-	fnb.flags.BoolVar(&fnb.BaseConfig.tracerEnabled, "tracer-enabled", defaultConfig.tracerEnabled,
-		"whether to enable tracer")
-	fnb.flags.UintVar(&fnb.BaseConfig.tracerSensitivity, "tracer-sensitivity", defaultConfig.tracerSensitivity,
+	fnb.flags.BoolVar(&fnb.BaseConfig.tracerEnabled, "tracer-enabled", defaultConfig.tracerEnabled, "whether to enable tracer")
+	fnb.flags.UintVar(&fnb.BaseConfig.tracerSensitivity,
+		"tracer-sensitivity",
+		defaultConfig.tracerSensitivity,
 		"adjusts the level of sampling when tracing is enabled. 0 means capture everything, higher value results in less samples")
 
 	fnb.flags.StringVar(&fnb.BaseConfig.AdminAddr, "admin-addr", defaultConfig.AdminAddr, "address to bind on for admin HTTP server")
@@ -176,9 +177,18 @@ func (fnb *FlowNodeBuilder) BaseFlags() {
 	fnb.flags.UintVar(&fnb.BaseConfig.receiptsCacheSize, "receipts-cache-size", bstorage.DefaultCacheSize, "receipts cache size")
 
 	// dynamic node startup flags
-	fnb.flags.StringVar(&fnb.BaseConfig.DynamicStartupANPubkey, "dynamic-startup-access-publickey", "", "the public key of the trusted secure access node to connect to when using dynamic-startup, this access node must be staked")
-	fnb.flags.StringVar(&fnb.BaseConfig.DynamicStartupANAddress, "dynamic-startup-access-address", "", "the access address of the trusted secure access node to connect to when using dynamic-startup, this access node must be staked")
-	fnb.flags.StringVar(&fnb.BaseConfig.DynamicStartupEpochPhase, "dynamic-startup-epoch-phase", "EpochPhaseSetup", "the target epoch phase for dynamic startup <EpochPhaseStaking|EpochPhaseSetup|EpochPhaseCommitted")
+	fnb.flags.StringVar(&fnb.BaseConfig.DynamicStartupANPubkey,
+		"dynamic-startup-access-publickey",
+		"",
+		"the public key of the trusted secure access node to connect to when using dynamic-startup, this access node must be staked")
+	fnb.flags.StringVar(&fnb.BaseConfig.DynamicStartupANAddress,
+		"dynamic-startup-access-address",
+		"",
+		"the access address of the trusted secure access node to connect to when using dynamic-startup, this access node must be staked")
+	fnb.flags.StringVar(&fnb.BaseConfig.DynamicStartupEpochPhase,
+		"dynamic-startup-epoch-phase",
+		"EpochPhaseSetup",
+		"the target epoch phase for dynamic startup <EpochPhaseStaking|EpochPhaseSetup|EpochPhaseCommitted")
 	fnb.flags.StringVar(&fnb.BaseConfig.DynamicStartupEpoch, "dynamic-startup-epoch", "current", "the target epoch for dynamic-startup, use \"current\" to start node in the current epoch")
 	fnb.flags.DurationVar(&fnb.BaseConfig.DynamicStartupSleepInterval, "dynamic-startup-sleep-interval", time.Minute, "the interval in which the node will check if it can start")
 
@@ -186,9 +196,18 @@ func (fnb *FlowNodeBuilder) BaseFlags() {
 	fnb.flags.BoolVar(&fnb.BaseConfig.HeroCacheMetricsEnable, "herocache-metrics-collector", false, "enables herocache metrics collection")
 
 	// sync core flags
-	fnb.flags.DurationVar(&fnb.BaseConfig.SyncCoreConfig.RetryInterval, "sync-retry-interval", defaultConfig.SyncCoreConfig.RetryInterval, "the initial interval before we retry a sync request, uses exponential backoff")
-	fnb.flags.UintVar(&fnb.BaseConfig.SyncCoreConfig.Tolerance, "sync-tolerance", defaultConfig.SyncCoreConfig.Tolerance, "determines how big of a difference in block heights we tolerate before actively syncing with range requests")
-	fnb.flags.UintVar(&fnb.BaseConfig.SyncCoreConfig.MaxAttempts, "sync-max-attempts", defaultConfig.SyncCoreConfig.MaxAttempts, "the maximum number of attempts we make for each requested block/height before discarding")
+	fnb.flags.DurationVar(&fnb.BaseConfig.SyncCoreConfig.RetryInterval,
+		"sync-retry-interval",
+		defaultConfig.SyncCoreConfig.RetryInterval,
+		"the initial interval before we retry a sync request, uses exponential backoff")
+	fnb.flags.UintVar(&fnb.BaseConfig.SyncCoreConfig.Tolerance,
+		"sync-tolerance",
+		defaultConfig.SyncCoreConfig.Tolerance,
+		"determines how big of a difference in block heights we tolerate before actively syncing with range requests")
+	fnb.flags.UintVar(&fnb.BaseConfig.SyncCoreConfig.MaxAttempts,
+		"sync-max-attempts",
+		defaultConfig.SyncCoreConfig.MaxAttempts,
+		"the maximum number of attempts we make for each requested block/height before discarding")
 	fnb.flags.UintVar(&fnb.BaseConfig.SyncCoreConfig.MaxSize, "sync-max-size", defaultConfig.SyncCoreConfig.MaxSize, "the maximum number of blocks we request in the same block request message")
 	fnb.flags.UintVar(&fnb.BaseConfig.SyncCoreConfig.MaxRequests, "sync-max-requests", defaultConfig.SyncCoreConfig.MaxRequests, "the maximum number of requests we send during each scanning period")
 
@@ -251,18 +270,9 @@ func (fnb *FlowNodeBuilder) EnqueueResolver() {
 			dnsTxtCacheMetricsCollector = metrics.NetworkDnsTxtCacheMetricsFactory(fnb.MetricsRegisterer)
 		}
 
-		cache := herocache.NewDNSCache(
-			dns.DefaultCacheSize,
-			node.Logger,
-			dnsIpCacheMetricsCollector,
-			dnsTxtCacheMetricsCollector,
-		)
+		cache := herocache.NewDNSCache(dns.DefaultCacheSize, node.Logger, dnsIpCacheMetricsCollector, dnsTxtCacheMetricsCollector)
 
-		resolver := dns.NewResolver(
-			node.Logger,
-			fnb.Metrics.Network,
-			cache,
-			dns.WithTTL(fnb.BaseConfig.FlowConfig.NetworkConfig.DNSCacheTTL))
+		resolver := dns.NewResolver(node.Logger, fnb.Metrics.Network, cache, dns.WithTTL(fnb.BaseConfig.FlowConfig.NetworkConfig.DNSCacheTTL))
 
 		fnb.Resolver = resolver
 		return resolver, nil
@@ -285,11 +295,9 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 
 	// override noop unicast message rate limiter
 	if fnb.BaseConfig.FlowConfig.NetworkConfig.UnicastRateLimitersConfig.MessageRateLimit > 0 {
-		unicastMessageRateLimiter := ratelimiter.NewRateLimiter(
-			rate.Limit(fnb.BaseConfig.FlowConfig.NetworkConfig.UnicastRateLimitersConfig.MessageRateLimit),
+		unicastMessageRateLimiter := ratelimiter.NewRateLimiter(rate.Limit(fnb.BaseConfig.FlowConfig.NetworkConfig.UnicastRateLimitersConfig.MessageRateLimit),
 			fnb.BaseConfig.FlowConfig.NetworkConfig.UnicastRateLimitersConfig.MessageRateLimit,
-			fnb.BaseConfig.FlowConfig.NetworkConfig.UnicastRateLimitersConfig.LockoutDuration,
-		)
+			fnb.BaseConfig.FlowConfig.NetworkConfig.UnicastRateLimitersConfig.LockoutDuration)
 		unicastRateLimiterOpts = append(unicastRateLimiterOpts, ratelimit.WithMessageRateLimiter(unicastMessageRateLimiter))
 
 		// avoid connection gating and pruning during dry run
@@ -305,11 +313,9 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 
 	// override noop unicast bandwidth rate limiter
 	if fnb.BaseConfig.FlowConfig.NetworkConfig.UnicastRateLimitersConfig.BandwidthRateLimit > 0 && fnb.BaseConfig.FlowConfig.NetworkConfig.UnicastRateLimitersConfig.BandwidthBurstLimit > 0 {
-		unicastBandwidthRateLimiter := ratelimit.NewBandWidthRateLimiter(
-			rate.Limit(fnb.BaseConfig.FlowConfig.NetworkConfig.UnicastRateLimitersConfig.BandwidthRateLimit),
+		unicastBandwidthRateLimiter := ratelimit.NewBandWidthRateLimiter(rate.Limit(fnb.BaseConfig.FlowConfig.NetworkConfig.UnicastRateLimitersConfig.BandwidthRateLimit),
 			fnb.BaseConfig.FlowConfig.NetworkConfig.UnicastRateLimitersConfig.BandwidthBurstLimit,
-			fnb.BaseConfig.FlowConfig.NetworkConfig.UnicastRateLimitersConfig.LockoutDuration,
-		)
+			fnb.BaseConfig.FlowConfig.NetworkConfig.UnicastRateLimitersConfig.LockoutDuration)
 		unicastRateLimiterOpts = append(unicastRateLimiterOpts, ratelimit.WithBandwidthRateLimiter(unicastBandwidthRateLimiter))
 
 		// avoid connection gating and pruning during dry run
@@ -330,6 +336,7 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 		DialZeroRetryResetThreshold:        fnb.FlowConfig.NetworkConfig.UnicastDialZeroRetryResetThreshold,
 		MaxDialRetryAttemptTimes:           fnb.FlowConfig.NetworkConfig.UnicastMaxDialRetryAttemptTimes,
 		MaxStreamCreationRetryAttemptTimes: fnb.FlowConfig.NetworkConfig.UnicastMaxStreamCreationRetryAttemptTimes,
+		DialConfigCacheSize:                fnb.FlowConfig.NetworkConfig.UnicastDialConfigCacheSize,
 		RateLimiterDistributor:             fnb.UnicastRateLimiterDistributor,
 	}
 
@@ -350,8 +357,7 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 			myAddr = fnb.BaseConfig.BindAddr
 		}
 
-		builder, err := p2pbuilder.DefaultNodeBuilder(
-			fnb.Logger,
+		builder, err := p2pbuilder.DefaultNodeBuilder(fnb.Logger,
 			myAddr,
 			network.PrivateNetwork,
 			fnb.NetworkKey,
@@ -389,11 +395,7 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 	})
 	fnb.Component(NetworkComponent, func(node *NodeConfig) (module.ReadyDoneAware, error) {
 		fnb.Logger.Info().Hex("node_id", logging.ID(fnb.NodeID)).Msg("default conduit factory initiated")
-		return fnb.InitFlowNetworkWithConduitFactory(
-			node,
-			conduit.NewDefaultConduitFactory(),
-			unicastRateLimiters,
-			peerManagerFilters)
+		return fnb.InitFlowNetworkWithConduitFactory(node, conduit.NewDefaultConduitFactory(), unicastRateLimiters, peerManagerFilters)
 	})
 
 	fnb.Module("network underlay dependency", func(node *NodeConfig) error {
@@ -419,10 +421,8 @@ func (fnb *FlowNodeBuilder) HeroCacheMetricsFactory() metrics.HeroCacheMetricsFa
 }
 
 func (fnb *FlowNodeBuilder) InitFlowNetworkWithConduitFactory(
-	node *NodeConfig,
-	cf network.ConduitFactory,
-	unicastRateLimiters *ratelimit.RateLimiters,
-	peerManagerFilters []p2p.PeerFilter) (network.EngineRegistry, error) {
+	node *NodeConfig, cf network.ConduitFactory, unicastRateLimiters *ratelimit.RateLimiters, peerManagerFilters []p2p.PeerFilter,
+) (network.EngineRegistry, error) {
 
 	var networkOptions []p2pnet.NetworkOption
 	if len(fnb.MsgValidators) > 0 {
@@ -433,9 +433,7 @@ func (fnb *FlowNodeBuilder) InitFlowNetworkWithConduitFactory(
 	// noop rate limiter will be used.
 	networkOptions = append(networkOptions, p2pnet.WithUnicastRateLimiters(unicastRateLimiters))
 
-	networkOptions = append(networkOptions,
-		p2pnet.WithPreferredUnicastProtocols(protocols.ToProtocolNames(fnb.FlowConfig.NetworkConfig.PreferredUnicastProtocols)...),
-	)
+	networkOptions = append(networkOptions, p2pnet.WithPreferredUnicastProtocols(protocols.ToProtocolNames(fnb.FlowConfig.NetworkConfig.PreferredUnicastProtocols)...))
 
 	// peerManagerFilters are used by the peerManager via the network to filter peers from the topology.
 	if len(peerManagerFilters) > 0 {
@@ -679,12 +677,7 @@ func (fnb *FlowNodeBuilder) initMetrics() error {
 		}
 
 		serviceName := fnb.BaseConfig.NodeRole + "-" + nodeIdHex
-		tracer, err := trace.NewTracer(
-			fnb.Logger,
-			serviceName,
-			fnb.RootChainID.String(),
-			fnb.tracerSensitivity,
-		)
+		tracer, err := trace.NewTracer(fnb.Logger, serviceName, fnb.RootChainID.String(), fnb.tracerSensitivity)
 		if err != nil {
 			return fmt.Errorf("could not initialize tracer: %w", err)
 		}
@@ -710,8 +703,7 @@ func (fnb *FlowNodeBuilder) initMetrics() error {
 		fnb.Metrics = Metrics{
 			Network:    metrics.NewNetworkCollector(fnb.Logger),
 			Engine:     metrics.NewEngineCollector(),
-			Compliance: metrics.NewComplianceCollector(),
-			// CacheControl metrics has been causing memory abuse, disable for now
+			Compliance: metrics.NewComplianceCollector(), // CacheControl metrics has been causing memory abuse, disable for now
 			// Cache:          metrics.NewCacheCollector(fnb.RootChainID),
 			Cache:          metrics.NewNoopCollector(),
 			CleanCollector: metrics.NewCleanerCollector(),
@@ -796,40 +788,32 @@ func (fnb *FlowNodeBuilder) initProfiler() error {
 		return fmt.Errorf("could not register profiler-enabled config: %w", err)
 	}
 
-	err = fnb.ConfigManager.RegisterDurationConfig(
-		"profiler-trigger",
+	err = fnb.ConfigManager.RegisterDurationConfig("profiler-trigger",
 		func() time.Duration { return fnb.BaseConfig.profilerConfig.Duration },
-		func(d time.Duration) error { return profiler.TriggerRun(d) },
-	)
+		func(d time.Duration) error { return profiler.TriggerRun(d) })
 	if err != nil {
 		return fmt.Errorf("could not register profiler-trigger config: %w", err)
 	}
 
-	err = fnb.ConfigManager.RegisterUintConfig(
-		"profiler-set-mem-profile-rate",
+	err = fnb.ConfigManager.RegisterUintConfig("profiler-set-mem-profile-rate",
 		func() uint { return uint(runtime.MemProfileRate) },
-		func(r uint) error { runtime.MemProfileRate = int(r); return nil },
-	)
+		func(r uint) error { runtime.MemProfileRate = int(r); return nil })
 	if err != nil {
 		return fmt.Errorf("could not register profiler-set-mem-profile-rate setting: %w", err)
 	}
 
 	// There is no way to get the current block profile rate so we keep track of it ourselves.
 	currentRate := new(uint)
-	err = fnb.ConfigManager.RegisterUintConfig(
-		"profiler-set-block-profile-rate",
+	err = fnb.ConfigManager.RegisterUintConfig("profiler-set-block-profile-rate",
 		func() uint { return *currentRate },
-		func(r uint) error { currentRate = &r; runtime.SetBlockProfileRate(int(r)); return nil },
-	)
+		func(r uint) error { currentRate = &r; runtime.SetBlockProfileRate(int(r)); return nil })
 	if err != nil {
 		return fmt.Errorf("could not register profiler-set-block-profile-rate setting: %w", err)
 	}
 
-	err = fnb.ConfigManager.RegisterUintConfig(
-		"profiler-set-mutex-profile-fraction",
+	err = fnb.ConfigManager.RegisterUintConfig("profiler-set-mutex-profile-fraction",
 		func() uint { return uint(runtime.SetMutexProfileFraction(-1)) },
-		func(r uint) error { _ = runtime.SetMutexProfileFraction(int(r)); return nil },
-	)
+		func(r uint) error { _ = runtime.SetMutexProfileFraction(int(r)); return nil })
 	if err != nil {
 		return fmt.Errorf("could not register profiler-set-mutex-profile-fraction setting: %w", err)
 	}
@@ -1023,20 +1007,14 @@ func (fnb *FlowNodeBuilder) InitIDProviders() {
 		node.IdentityProvider = disallowListWrapper
 
 		// register the disallow list wrapper for dynamic configuration via admin command
-		err = node.ConfigManager.RegisterIdentifierListConfig("network-id-provider-blocklist",
-			disallowListWrapper.GetDisallowList, disallowListWrapper.Update)
+		err = node.ConfigManager.RegisterIdentifierListConfig("network-id-provider-blocklist", disallowListWrapper.GetDisallowList, disallowListWrapper.Update)
 		if err != nil {
 			return fmt.Errorf("failed to register disallow-list wrapper with config manager: %w", err)
 		}
 
-		node.SyncEngineIdentifierProvider = id.NewIdentityFilterIdentifierProvider(
-			filter.And(
-				filter.HasRole(flow.RoleConsensus),
-				filter.Not(filter.HasNodeID(node.Me.NodeID())),
-				p2pnet.NotEjectedFilter,
-			),
-			node.IdentityProvider,
-		)
+		node.SyncEngineIdentifierProvider = id.NewIdentityFilterIdentifierProvider(filter.And(filter.HasRole(flow.RoleConsensus),
+			filter.Not(filter.HasNodeID(node.Me.NodeID())),
+			p2pnet.NotEjectedFilter), node.IdentityProvider)
 		return nil
 	})
 }
@@ -1051,8 +1029,7 @@ func (fnb *FlowNodeBuilder) initState() error {
 
 	if isBootStrapped {
 		fnb.Logger.Info().Msg("opening already bootstrapped protocol state")
-		state, err := badgerState.OpenState(
-			fnb.Metrics.Compliance,
+		state, err := badgerState.OpenState(fnb.Metrics.Compliance,
 			fnb.DB,
 			fnb.Storage.Headers,
 			fnb.Storage.Seals,
@@ -1062,8 +1039,7 @@ func (fnb *FlowNodeBuilder) initState() error {
 			fnb.Storage.Setups,
 			fnb.Storage.EpochCommits,
 			fnb.Storage.Statuses,
-			fnb.Storage.VersionBeacons,
-		)
+			fnb.Storage.VersionBeacons)
 		if err != nil {
 			return fmt.Errorf("could not open protocol state: %w", err)
 		}
@@ -1103,8 +1079,7 @@ func (fnb *FlowNodeBuilder) initState() error {
 			options = append(options, badgerState.SkipNetworkAddressValidation)
 		}
 
-		fnb.State, err = badgerState.Bootstrap(
-			fnb.Metrics.Compliance,
+		fnb.State, err = badgerState.Bootstrap(fnb.Metrics.Compliance,
 			fnb.DB,
 			fnb.Storage.Headers,
 			fnb.Storage.Seals,
@@ -1116,8 +1091,7 @@ func (fnb *FlowNodeBuilder) initState() error {
 			fnb.Storage.Statuses,
 			fnb.Storage.VersionBeacons,
 			fnb.RootSnapshot,
-			options...,
-		)
+			options...)
 		if err != nil {
 			return fmt.Errorf("could not bootstrap protocol state: %w", err)
 		}
@@ -1235,15 +1209,10 @@ func (fnb *FlowNodeBuilder) initLocal() error {
 		}
 
 		if rootBlockHeader.ChainID == flow.Mainnet {
-			return fmt.Errorf("running as incorrect role, expected: %v, actual: %v, exiting",
-				self.Role.String(),
-				fnb.BaseConfig.NodeRole,
-			)
+			return fmt.Errorf("running as incorrect role, expected: %v, actual: %v, exiting", self.Role.String(), fnb.BaseConfig.NodeRole)
 		}
 
-		fnb.Logger.Warn().Msgf("running as incorrect role, expected: %v, actual: %v, continuing",
-			self.Role.String(),
-			fnb.BaseConfig.NodeRole)
+		fnb.Logger.Warn().Msgf("running as incorrect role, expected: %v, actual: %v, continuing", self.Role.String(), fnb.BaseConfig.NodeRole)
 	}
 
 	// ensure that the configured staking/network keys are consistent with the protocol state
@@ -1270,14 +1239,10 @@ func (fnb *FlowNodeBuilder) initFvmOptions() {
 		fvm.WithAccountStorageLimit(true),
 	}
 	if fnb.RootChainID == flow.Testnet || fnb.RootChainID == flow.Sandboxnet || fnb.RootChainID == flow.Mainnet {
-		vmOpts = append(vmOpts,
-			fvm.WithTransactionFeesEnabled(true),
-		)
+		vmOpts = append(vmOpts, fvm.WithTransactionFeesEnabled(true))
 	}
 	if fnb.RootChainID == flow.Testnet || fnb.RootChainID == flow.Sandboxnet || fnb.RootChainID == flow.Localnet || fnb.RootChainID == flow.Benchnet {
-		vmOpts = append(vmOpts,
-			fvm.WithContractDeploymentRestricted(false),
-		)
+		vmOpts = append(vmOpts, fvm.WithContractDeploymentRestricted(false))
 	}
 	fnb.FvmOptions = vmOpts
 }
@@ -1760,13 +1725,7 @@ func (fnb *FlowNodeBuilder) Build() (Node, error) {
 		return nil, err
 	}
 
-	return NewNode(
-		fnb.componentBuilder.Build(),
-		fnb.NodeConfig,
-		fnb.Logger,
-		fnb.postShutdown,
-		fnb.handleFatal,
-	), nil
+	return NewNode(fnb.componentBuilder.Build(), fnb.NodeConfig, fnb.Logger, fnb.postShutdown, fnb.handleFatal), nil
 }
 
 func (fnb *FlowNodeBuilder) onStart() error {

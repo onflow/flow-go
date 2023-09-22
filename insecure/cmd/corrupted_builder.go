@@ -80,6 +80,7 @@ func (cnb *CorruptedNodeBuilder) enqueueNetworkingLayer() {
 			DialZeroRetryResetThreshold:        cnb.FlowConfig.NetworkConfig.UnicastDialZeroRetryResetThreshold,
 			MaxDialRetryAttemptTimes:           cnb.FlowConfig.NetworkConfig.UnicastMaxDialRetryAttemptTimes,
 			MaxStreamCreationRetryAttemptTimes: cnb.FlowConfig.NetworkConfig.UnicastMaxStreamCreationRetryAttemptTimes,
+			DialConfigCacheSize:                cnb.FlowConfig.NetworkConfig.UnicastDialConfigCacheSize,
 		}
 
 		connGaterCfg := &p2pconfig.ConnectionGaterConfig{
@@ -94,8 +95,7 @@ func (cnb *CorruptedNodeBuilder) enqueueNetworkingLayer() {
 		}
 
 		// create default libp2p factory if corrupt node should enable the topic validator
-		corruptLibp2pNode, err := corruptlibp2p.InitCorruptLibp2pNode(
-			cnb.Logger,
+		corruptLibp2pNode, err := corruptlibp2p.InitCorruptLibp2pNode(cnb.Logger,
 			cnb.RootChainID,
 			myAddr,
 			cnb.NetworkKey,
@@ -104,8 +104,7 @@ func (cnb *CorruptedNodeBuilder) enqueueNetworkingLayer() {
 			cnb.Metrics.Network,
 			cnb.Resolver,
 			cnb.BaseConfig.NodeRole,
-			connGaterCfg,
-			// run peer manager with the specified interval and let it also prune connections
+			connGaterCfg, // run peer manager with the specified interval and let it also prune connections
 			peerManagerCfg,
 			uniCfg,
 			cnb.FlowConfig.NetworkConfig,
@@ -115,8 +114,7 @@ func (cnb *CorruptedNodeBuilder) enqueueNetworkingLayer() {
 			},
 			cnb.TopicValidatorDisabled,
 			cnb.WithPubSubMessageSigning,
-			cnb.WithPubSubStrictSignatureVerification,
-		)
+			cnb.WithPubSubStrictSignatureVerification)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create libp2p node: %w", err)
 		}
@@ -152,14 +150,7 @@ func (cnb *CorruptedNodeBuilder) enqueueNetworkingLayer() {
 
 		// initializes corruptible network that acts as a wrapper around the original flow network of the node, hence
 		// allowing a remote attacker to control the ingress and egress traffic of the node.
-		corruptibleNetwork, err := corruptnet.NewCorruptNetwork(
-			cnb.Logger,
-			cnb.RootChainID,
-			address,
-			cnb.Me,
-			cnb.CodecFactory(),
-			flowNetwork,
-			ccf)
+		corruptibleNetwork, err := corruptnet.NewCorruptNetwork(cnb.Logger, cnb.RootChainID, address, cnb.Me, cnb.CodecFactory(), flowNetwork, ccf)
 		if err != nil {
 			return nil, fmt.Errorf("could not create corruptible network: %w", err)
 		}

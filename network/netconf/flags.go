@@ -21,6 +21,7 @@ const (
 	unicastDialZeroRetryResetThreshold        = "unicast-dial-zero-retry-reset-threshold"
 	unicastMaxDialRetryAttemptTimes           = "unicast-max-dial-retry-attempt-times"
 	unicastMaxStreamCreationRetryAttemptTimes = "unicast-max-stream-creation-retry-attempt-times"
+	unicastDialConfigCacheSize                = "unicast-dial-config-cache-size"
 	dnsCacheTTL                               = "dns-cache-ttl"
 	disallowListNotificationCacheSize         = "disallow-list-notification-cache-size"
 	// unicast rate limiters config
@@ -85,6 +86,7 @@ func AllFlagNames() []string {
 		unicastDialZeroRetryResetThreshold,
 		unicastMaxDialRetryAttemptTimes,
 		unicastMaxStreamCreationRetryAttemptTimes,
+		unicastDialConfigCacheSize,
 		dnsCacheTTL,
 		disallowListNotificationCacheSize,
 		dryRun,
@@ -145,16 +147,23 @@ func InitializeNetworkFlags(flags *pflag.FlagSet, config *Config) {
 	flags.Duration(unicastCreateStreamRetryDelay,
 		config.UnicastConfig.UnicastCreateStreamRetryDelay,
 		"Initial delay between failing to establish a connection with another node and retrying. This delay increases exponentially (exponential backoff) with the number of subsequent failures to establish a connection.")
-	flags.Uint64(unicastStreamZeroRetryResetThreshold, config.UnicastConfig.UnicastStreamZeroRetryResetThreshold, "reset stream creation retry budget from zero to the maximum after consecutive successful streams reach this threshold.")
+	flags.Uint64(unicastStreamZeroRetryResetThreshold,
+		config.UnicastConfig.UnicastStreamZeroRetryResetThreshold,
+		"reset stream creation retry budget from zero to the maximum after consecutive successful streams reach this threshold.")
 	flags.Duration(unicastDialZeroRetryResetThreshold, config.UnicastConfig.UnicastDialZeroRetryResetThreshold, "reset dial retry budget if the last successful dial is longer than this threshold.")
 	flags.Uint64(unicastMaxDialRetryAttemptTimes, config.UnicastConfig.UnicastMaxDialRetryAttemptTimes, "maximum attempts to establish a unicast connection.")
 	flags.Uint64(unicastMaxStreamCreationRetryAttemptTimes, config.UnicastConfig.UnicastMaxStreamCreationRetryAttemptTimes, "max attempts to create a unicast stream.")
+	flags.Uint32(unicastDialConfigCacheSize,
+		config.UnicastConfig.UnicastDialConfigCacheSize,
+		"cache size of the dial config cache, recommended to be big enough to accommodate the entire nodes in the network.")
 
 	// unicast stream handler rate limits
 	flags.Int(messageRateLimit, config.UnicastRateLimitersConfig.MessageRateLimit, "maximum number of unicast messages that a peer can send per second")
 	flags.Int(bandwidthRateLimit, config.UnicastRateLimitersConfig.BandwidthRateLimit, "bandwidth size in bytes a peer is allowed to send via unicast streams per second")
 	flags.Int(bandwidthBurstLimit, config.UnicastRateLimitersConfig.BandwidthBurstLimit, "bandwidth size in bytes a peer is allowed to send at one time")
-	flags.Duration(lockoutDuration, config.UnicastRateLimitersConfig.LockoutDuration, "the number of seconds a peer will be forced to wait before being allowed to successful reconnect to the node after being rate limited")
+	flags.Duration(lockoutDuration,
+		config.UnicastRateLimitersConfig.LockoutDuration,
+		"the number of seconds a peer will be forced to wait before being allowed to successful reconnect to the node after being rate limited")
 	flags.Bool(dryRun, config.UnicastRateLimitersConfig.DryRun, "disable peer disconnects and connections gating when rate limiting peers")
 	// resource manager cli flags
 	flags.Float64(fileDescriptorsRatio, config.ResourceManagerConfig.FileDescriptorsRatio, "ratio of available file descriptors to be used by libp2p (in (0,1])")
@@ -172,8 +181,12 @@ func InitializeNetworkFlags(flags *pflag.FlagSet, config *Config) {
 	flags.Uint32(rpcSentTrackerQueueCacheSize, config.GossipSubConfig.RPCSentTrackerQueueCacheSize, "cache size of the rpc sent tracker worker queue.")
 	flags.Int(rpcSentTrackerNumOfWorkers, config.GossipSubConfig.RpcSentTrackerNumOfWorkers, "number of workers for the rpc sent tracker worker pool.")
 	// gossipsub RPC control message validation limits used for validation configuration and rate limiting
-	flags.Int(validationInspectorNumberOfWorkers, config.GossipSubConfig.GossipSubRPCInspectorsConfig.GossipSubRPCValidationInspectorConfigs.NumberOfWorkers, "number of gossupsub RPC control message validation inspector component workers")
-	flags.Uint32(validationInspectorInspectMessageQueueCacheSize, config.GossipSubConfig.GossipSubRPCInspectorsConfig.GossipSubRPCValidationInspectorConfigs.CacheSize, "cache size for gossipsub RPC validation inspector events worker pool queue.")
+	flags.Int(validationInspectorNumberOfWorkers,
+		config.GossipSubConfig.GossipSubRPCInspectorsConfig.GossipSubRPCValidationInspectorConfigs.NumberOfWorkers,
+		"number of gossupsub RPC control message validation inspector component workers")
+	flags.Uint32(validationInspectorInspectMessageQueueCacheSize,
+		config.GossipSubConfig.GossipSubRPCInspectorsConfig.GossipSubRPCValidationInspectorConfigs.CacheSize,
+		"cache size for gossipsub RPC validation inspector events worker pool queue.")
 	flags.Uint32(validationInspectorClusterPrefixedTopicsReceivedCacheSize,
 		config.GossipSubConfig.GossipSubRPCInspectorsConfig.GossipSubRPCValidationInspectorConfigs.ClusterPrefixedControlMsgsReceivedCacheSize,
 		"cache size for gossipsub RPC validation inspector cluster prefix received tracker.")
@@ -184,29 +197,45 @@ func InitializeNetworkFlags(flags *pflag.FlagSet, config *Config) {
 		config.GossipSubConfig.GossipSubRPCInspectorsConfig.GossipSubRPCValidationInspectorConfigs.ClusterPrefixHardThreshold,
 		"the maximum number of cluster-prefixed control messages allowed to be processed when the active cluster id is unset or a mismatch is detected, exceeding this threshold will result in node penalization by gossipsub.")
 	// gossipsub RPC control message metrics observer inspector configuration
-	flags.Int(metricsInspectorNumberOfWorkers, config.GossipSubConfig.GossipSubRPCInspectorsConfig.GossipSubRPCMetricsInspectorConfigs.NumberOfWorkers, "cache size for gossipsub RPC metrics inspector events worker pool queue.")
-	flags.Uint32(metricsInspectorCacheSize, config.GossipSubConfig.GossipSubRPCInspectorsConfig.GossipSubRPCMetricsInspectorConfigs.CacheSize, "cache size for gossipsub RPC metrics inspector events worker pool.")
+	flags.Int(metricsInspectorNumberOfWorkers,
+		config.GossipSubConfig.GossipSubRPCInspectorsConfig.GossipSubRPCMetricsInspectorConfigs.NumberOfWorkers,
+		"cache size for gossipsub RPC metrics inspector events worker pool queue.")
+	flags.Uint32(metricsInspectorCacheSize,
+		config.GossipSubConfig.GossipSubRPCInspectorsConfig.GossipSubRPCMetricsInspectorConfigs.CacheSize,
+		"cache size for gossipsub RPC metrics inspector events worker pool.")
 	// networking event notifications
-	flags.Uint32(gossipSubRPCInspectorNotificationCacheSize, config.GossipSubConfig.GossipSubRPCInspectorsConfig.GossipSubRPCInspectorNotificationCacheSize, "cache size for notification events from gossipsub rpc inspector")
+	flags.Uint32(gossipSubRPCInspectorNotificationCacheSize,
+		config.GossipSubConfig.GossipSubRPCInspectorsConfig.GossipSubRPCInspectorNotificationCacheSize,
+		"cache size for notification events from gossipsub rpc inspector")
 	// application layer spam prevention (alsp) protocol
 	flags.Bool(alspDisabled, config.AlspConfig.DisablePenalty, "disable the penalty mechanism of the alsp protocol. default value (recommended) is false")
 	flags.Uint32(alspSpamRecordCacheSize, config.AlspConfig.SpamRecordCacheSize, "size of spam record cache, recommended to be 10x the number of authorized nodes")
 	flags.Uint32(alspSpamRecordQueueSize, config.AlspConfig.SpamReportQueueSize, "size of spam report queue, recommended to be 100x the number of authorized nodes")
-	flags.Duration(alspHearBeatInterval, config.AlspConfig.HearBeatInterval, "interval between two consecutive heartbeat events at alsp, recommended to leave it as default unless you know what you are doing.")
+	flags.Duration(alspHearBeatInterval,
+		config.AlspConfig.HearBeatInterval,
+		"interval between two consecutive heartbeat events at alsp, recommended to leave it as default unless you know what you are doing.")
 
-	flags.Int(ihaveMaxSampleSize, config.GossipSubConfig.GossipSubRPCInspectorsConfig.GossipSubRPCValidationInspectorConfigs.IHaveRPCInspectionConfig.MaxSampleSize, "max number of ihaves to sample when performing validation")
+	flags.Int(ihaveMaxSampleSize,
+		config.GossipSubConfig.GossipSubRPCInspectorsConfig.GossipSubRPCValidationInspectorConfigs.IHaveRPCInspectionConfig.MaxSampleSize,
+		"max number of ihaves to sample when performing validation")
 	flags.Int(ihaveMaxMessageIDSampleSize,
 		config.GossipSubConfig.GossipSubRPCInspectorsConfig.GossipSubRPCValidationInspectorConfigs.IHaveRPCInspectionConfig.MaxMessageIDSampleSize,
 		"max number of message ids to sample when performing validation per ihave")
 	flags.Int(controlMessageMaxSampleSize,
 		config.GossipSubConfig.GossipSubRPCInspectorsConfig.GossipSubRPCValidationInspectorConfigs.GraftPruneMessageMaxSampleSize,
 		"max number of control messages to sample when performing validation on GRAFT and PRUNE message types")
-	flags.Uint(iwantMaxSampleSize, config.GossipSubConfig.GossipSubRPCInspectorsConfig.GossipSubRPCValidationInspectorConfigs.IWantRPCInspectionConfig.MaxSampleSize, "max number of iwants to sample when performing validation")
+	flags.Uint(iwantMaxSampleSize,
+		config.GossipSubConfig.GossipSubRPCInspectorsConfig.GossipSubRPCValidationInspectorConfigs.IWantRPCInspectionConfig.MaxSampleSize,
+		"max number of iwants to sample when performing validation")
 	flags.Int(iwantMaxMessageIDSampleSize,
 		config.GossipSubConfig.GossipSubRPCInspectorsConfig.GossipSubRPCValidationInspectorConfigs.IWantRPCInspectionConfig.MaxMessageIDSampleSize,
 		"max number of message ids to sample when performing validation per iwant")
-	flags.Float64(iwantCacheMissThreshold, config.GossipSubConfig.GossipSubRPCInspectorsConfig.GossipSubRPCValidationInspectorConfigs.IWantRPCInspectionConfig.CacheMissThreshold, "max number of iwants to sample when performing validation")
-	flags.Int(iwantCacheMissCheckSize, config.GossipSubConfig.GossipSubRPCInspectorsConfig.GossipSubRPCValidationInspectorConfigs.IWantRPCInspectionConfig.CacheMissCheckSize, "the iWants size at which message id cache misses will be checked")
+	flags.Float64(iwantCacheMissThreshold,
+		config.GossipSubConfig.GossipSubRPCInspectorsConfig.GossipSubRPCValidationInspectorConfigs.IWantRPCInspectionConfig.CacheMissThreshold,
+		"max number of iwants to sample when performing validation")
+	flags.Int(iwantCacheMissCheckSize,
+		config.GossipSubConfig.GossipSubRPCInspectorsConfig.GossipSubRPCValidationInspectorConfigs.IWantRPCInspectionConfig.CacheMissCheckSize,
+		"the iWants size at which message id cache misses will be checked")
 	flags.Float64(iwantDuplicateMsgIDThreshold,
 		config.GossipSubConfig.GossipSubRPCInspectorsConfig.GossipSubRPCValidationInspectorConfigs.IWantRPCInspectionConfig.DuplicateMsgIDThreshold,
 		"max allowed duplicate message IDs in a single iWant control message")

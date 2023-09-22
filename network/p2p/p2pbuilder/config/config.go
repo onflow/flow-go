@@ -39,6 +39,9 @@ type UnicastConfig struct {
 	// successful dial attempt was 1 hour ago.
 	DialZeroRetryResetThreshold time.Duration
 
+	// DialConfigCacheSize is the cache size of the dial config cache that keeps the individual dial config for each peer.
+	DialConfigCacheSize uint32
+
 	// MaxDialRetryAttemptTimes is the maximum number of attempts to be made to connect to a remote node to establish a unicast (1:1) connection before we give up.
 	MaxDialRetryAttemptTimes uint64
 

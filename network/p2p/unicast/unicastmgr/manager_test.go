@@ -32,7 +32,7 @@ func unicastManagerFixture(t *testing.T) (*unicastmgr.Manager, *mockp2p.StreamFa
 	cfg, err := config.DefaultConfig()
 	require.NoError(t, err)
 
-	dialConfigCache := unicastcache.NewDialConfigCache(unicast.DefaultDailConfigCacheSize, unittest.Logger(), metrics.NewNoopCollector(), func() unicastmodel.DialConfig {
+	dialConfigCache := unicastcache.NewDialConfigCache(cfg.NetworkConfig.UnicastDialConfigCacheSize, unittest.Logger(), metrics.NewNoopCollector(), func() unicastmodel.DialConfig {
 		return unicastmodel.DialConfig{
 			DialRetryAttemptBudget:           cfg.NetworkConfig.UnicastMaxDialRetryAttemptTimes,
 			StreamCreationRetryAttemptBudget: cfg.NetworkConfig.UnicastMaxStreamCreationRetryAttemptTimes,

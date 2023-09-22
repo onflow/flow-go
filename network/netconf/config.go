@@ -64,6 +64,9 @@ type UnicastConfig struct {
 
 	// UnicastMaxStreamCreationRetryAttemptTimes is the maximum number of attempts to be made to create a stream to a remote node over a direct unicast (1:1) connection before we give up.
 	UnicastMaxStreamCreationRetryAttemptTimes uint64 `validate:"gt=1" mapstructure:"unicast-max-stream-creation-retry-attempt-times"`
+
+	// UnicastDialConfigCacheSize is the cache size of the dial config cache that keeps the individual dial config for each peer.
+	UnicastDialConfigCacheSize uint32 `validate:"gt=0" mapstructure:"unicast-dial-config-cache-size"`
 }
 
 // UnicastRateLimitersConfig unicast rate limiter configuration for the message and bandwidth rate limiters.

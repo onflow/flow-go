@@ -6,14 +6,6 @@ import (
 	"github.com/onflow/flow-go/network/p2p/unicast/unicastmodel"
 )
 
-const (
-	// DefaultDailConfigCacheSize is the default size of the dial config cache.
-	// It is used if the size is not specified when creating a new dial config cache.
-	// We choose the default size to be big enough so that the eviction is rare.
-	// Typically, there should be a single entry in the cache for each authorized node.
-	DefaultDailConfigCacheSize = 10_000
-)
-
 // DialConfigCache is a thread-safe cache for dial configs. It is used by the unicast service to store
 // the dial configs for peers.
 type DialConfigCache interface {
