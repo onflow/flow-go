@@ -41,9 +41,18 @@ var _ unicast.DialConfigCache = (*DialConfigCache)(nil)
 // expected to be small, size must be large enough to hold all the dial configs of the authorized nodes.
 // To avoid any crash-failure, the cache is configured to eject the least recently used configs when the cache is full.
 // Hence, we recommend setting the size to a large value to minimize the ejections.
-func NewDialConfigCache(size uint32, logger zerolog.Logger, collector module.HeroCacheMetrics, cfgFactory func() unicastmodel.DialConfig) *DialConfigCache {
+func NewDialConfigCache(
+	size uint32,
+	logger zerolog.Logger,
+	collector module.HeroCacheMetrics,
+	cfgFactory func() unicastmodel.DialConfig,
+) *DialConfigCache {
 	return &DialConfigCache{
-		peerCache:  stdmap.NewBackend(stdmap.WithBackData(herocache.NewCache(size, herocache.DefaultOversizeFactor, heropool.LRUEjection, logger.With().Str("module", "dial-config-cache").Logger(), collector))),
+		peerCache: stdmap.NewBackend(stdmap.WithBackData(herocache.NewCache(size,
+			herocache.DefaultOversizeFactor,
+			heropool.LRUEjection,
+			logger.With().Str("module", "dial-config-cache").Logger(),
+			collector))),
 		cfgFactory: cfgFactory,
 	}
 }

@@ -289,14 +289,12 @@ func (builder *LibP2PNodeBuilder) Build() (p2p.LibP2PNode, error) {
 		if err != nil {
 			return nil, fmt.Errorf("failed to create libp2p connector: %w", err)
 		}
-		peerUpdater, err := connection.NewPeerUpdater(
-			&connection.PeerUpdaterConfig{
-				PruneConnections: builder.peerManagerConfig.ConnectionPruning,
-				Logger:           builder.logger,
-				Host:             connection.NewConnectorHost(h),
-				Connector:        connector,
-			},
-		)
+		peerUpdater, err := connection.NewPeerUpdater(&connection.PeerUpdaterConfig{
+			PruneConnections: builder.peerManagerConfig.ConnectionPruning,
+			Logger:           builder.logger,
+			Host:             connection.NewConnectorHost(h),
+			Connector:        connector,
+		})
 		if err != nil {
 			return nil, fmt.Errorf("failed to create libp2p connector: %w", err)
 		}
@@ -314,73 +312,64 @@ func (builder *LibP2PNodeBuilder) Build() (p2p.LibP2PNode, error) {
 		builder.connGater.SetDisallowListOracle(node)
 	}
 
-	unicastManager, err := unicastmgr.NewUnicastManager(
-		&unicastmgr.ManagerConfig{
-			Logger:                             builder.logger,
-			StreamFactory:                      stream.NewLibP2PStreamFactory(h),
-			SporkId:                            builder.sporkId,
-			ConnStatus:                         node,
-			CreateStreamRetryDelay:             builder.createStreamRetryInterval,
-			Metrics:                            builder.metricsConfig.Metrics,
-			StreamZeroRetryResetThreshold:      builder.unicastConfig.StreamZeroRetryResetThreshold,
-			DialZeroRetryResetThreshold:        builder.unicastConfig.DialZeroRetryResetThreshold,
-			MaxStreamCreationRetryAttemptTimes: builder.unicastConfig.MaxStreamCreationRetryAttemptTimes,
-			MaxDialRetryAttemptTimes:           builder.unicastConfig.MaxDialRetryAttemptTimes,
-			DialConfigCacheFactory: func() unicast.DialConfigCache {
-				return unicastcache.NewDialConfigCache(
-					unicast.DefaultDailConfigCacheSize,
-					builder.logger,
-					metrics.DialConfigCacheMetricFactory(builder.metricsConfig.HeroCacheFactory,
-						builder.networkingType),
-					unicastmodel.DefaultDialConfigFactory,
-				)
-			},
+	unicastManager, err := unicastmgr.NewUnicastManager(&unicastmgr.ManagerConfig{
+		Logger:                             builder.logger,
+		StreamFactory:                      stream.NewLibP2PStreamFactory(h),
+		SporkId:                            builder.sporkId,
+		ConnStatus:                         node,
+		CreateStreamRetryDelay:             builder.createStreamRetryInterval,
+		Metrics:                            builder.metricsConfig.Metrics,
+		StreamZeroRetryResetThreshold:      builder.unicastConfig.StreamZeroRetryResetThreshold,
+		DialZeroRetryResetThreshold:        builder.unicastConfig.DialZeroRetryResetThreshold,
+		MaxStreamCreationRetryAttemptTimes: builder.unicastConfig.MaxStreamCreationRetryAttemptTimes,
+		MaxDialRetryAttemptTimes:           builder.unicastConfig.MaxDialRetryAttemptTimes,
+		DialConfigCacheFactory: func(configFactory func() unicastmodel.DialConfig) unicast.DialConfigCache {
+			return unicastcache.NewDialConfigCache(unicast.DefaultDailConfigCacheSize,
+				builder.logger,
+				metrics.DialConfigCacheMetricFactory(builder.metricsConfig.HeroCacheFactory, builder.networkingType),
+				configFactory)
 		},
-	)
+	})
 	if err != nil {
 		return nil, fmt.Errorf("could not create unicast manager: %w", err)
 	}
 	node.SetUnicastManager(unicastManager)
 
 	cm := component.NewComponentManagerBuilder().
-		AddWorker(
-			func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
-				// routing system is created here, because it needs to be created during the node startup.
-				routingSystem, err := builder.buildRouting(ctx, h)
-				if err != nil {
-					ctx.Throw(fmt.Errorf("could not create routing system: %w", err))
-				}
-				node.SetRouting(routingSystem)
-				builder.gossipSubBuilder.SetRoutingSystem(routingSystem)
+		AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+			// routing system is created here, because it needs to be created during the node startup.
+			routingSystem, err := builder.buildRouting(ctx, h)
+			if err != nil {
+				ctx.Throw(fmt.Errorf("could not create routing system: %w", err))
+			}
+			node.SetRouting(routingSystem)
+			builder.gossipSubBuilder.SetRoutingSystem(routingSystem)
 
-				// gossipsub is created here, because it needs to be created during the node startup.
-				gossipSub, err := builder.gossipSubBuilder.Build(ctx)
-				if err != nil {
-					ctx.Throw(fmt.Errorf("could not create gossipsub: %w", err))
-				}
-				node.SetPubSub(gossipSub)
-				gossipSub.Start(ctx)
-				ready()
+			// gossipsub is created here, because it needs to be created during the node startup.
+			gossipSub, err := builder.gossipSubBuilder.Build(ctx)
+			if err != nil {
+				ctx.Throw(fmt.Errorf("could not create gossipsub: %w", err))
+			}
+			node.SetPubSub(gossipSub)
+			gossipSub.Start(ctx)
+			ready()
 
-				<-gossipSub.Done()
-			},
-		).
-		AddWorker(
-			func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
-				// encapsulates shutdown logic for the libp2p node.
-				ready()
-				<-ctx.Done()
-				// we wait till the context is done, and then we stop the libp2p node.
+			<-gossipSub.Done()
+		}).
+		AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+			// encapsulates shutdown logic for the libp2p node.
+			ready()
+			<-ctx.Done()
+			// we wait till the context is done, and then we stop the libp2p node.
 
-				err = node.Stop()
-				if err != nil {
-					// ignore context cancellation errors
-					if !errors.Is(err, context.Canceled) && !errors.Is(err, context.DeadlineExceeded) {
-						ctx.Throw(fmt.Errorf("could not stop libp2p node: %w", err))
-					}
+			err = node.Stop()
+			if err != nil {
+				// ignore context cancellation errors
+				if !errors.Is(err, context.Canceled) && !errors.Is(err, context.DeadlineExceeded) {
+					ctx.Throw(fmt.Errorf("could not stop libp2p node: %w", err))
 				}
-			},
-		)
+			}
+		})
 
 	node.SetComponentManager(cm.Build())
 
@@ -429,11 +418,9 @@ func defaultLibP2POptions(address string, key fcrypto.PrivateKey) ([]config.Opti
 	// While this sounds great, it intermittently causes a 'broken pipe' error
 	// as the 1-k discovery process and the 1-1 messaging both sometimes attempt to open connection to the same target
 	// As of now there is no requirement of client sockets to be a well-known port, so disabling port reuse all together.
-	t := libp2p.Transport(
-		func(u transport.Upgrader) (*tcp.TcpTransport, error) {
-			return tcp.NewTCPTransport(u, nil, tcp.DisableReuseport())
-		},
-	)
+	t := libp2p.Transport(func(u transport.Upgrader) (*tcp.TcpTransport, error) {
+		return tcp.NewTCPTransport(u, nil, tcp.DisableReuseport())
+	})
 
 	// gather all the options for the libp2p node
 	options := []config.Option{
@@ -446,7 +433,13 @@ func defaultLibP2POptions(address string, key fcrypto.PrivateKey) ([]config.Opti
 }
 
 // DefaultCreateNodeFunc returns new libP2P node.
-func DefaultCreateNodeFunc(logger zerolog.Logger, host host.Host, pCache p2p.ProtocolPeerCache, peerManager p2p.PeerManager, disallowListCacheCfg *p2p.DisallowListCacheConfig) p2p.LibP2PNode {
+func DefaultCreateNodeFunc(
+	logger zerolog.Logger,
+	host host.Host,
+	pCache p2p.ProtocolPeerCache,
+	peerManager p2p.PeerManager,
+	disallowListCacheCfg *p2p.DisallowListCacheConfig,
+) p2p.LibP2PNode {
 	return p2pnode.NewNode(logger, host, pCache, peerManager, disallowListCacheCfg)
 }
 
@@ -480,12 +473,10 @@ func DefaultNodeBuilder(
 	peerFilter := notEjectedPeerFilter(idProvider)
 	peerFilters := []p2p.PeerFilter{peerFilter}
 
-	connGater := connection.NewConnGater(
-		logger,
+	connGater := connection.NewConnGater(logger,
 		idProvider,
 		connection.WithOnInterceptPeerDialFilters(append(peerFilters, connGaterCfg.InterceptPeerDialFilters...)),
-		connection.WithOnInterceptSecuredFilters(append(peerFilters, connGaterCfg.InterceptSecuredFilters...)),
-	)
+		connection.WithOnInterceptSecuredFilters(append(peerFilters, connGaterCfg.InterceptSecuredFilters...)))
 
 	meshTracerCfg := &tracer.GossipSubMeshTracerConfig{
 		Logger:                             logger,
@@ -516,16 +507,9 @@ func DefaultNodeBuilder(
 		SetBasicResolver(resolver).
 		SetConnectionManager(connManager).
 		SetConnectionGater(connGater).
-		SetRoutingSystem(
-			func(ctx context.Context, host host.Host) (routing.Routing, error) {
-				return dht.NewDHT(ctx,
-					host,
-					protocols.FlowDHTProtocolID(sporkId),
-					logger,
-					metricsCfg.Metrics,
-					dht.AsServer())
-			},
-		).
+		SetRoutingSystem(func(ctx context.Context, host host.Host) (routing.Routing, error) {
+			return dht.NewDHT(ctx, host, protocols.FlowDHTProtocolID(sporkId), logger, metricsCfg.Metrics, dht.AsServer())
+		}).
 		SetCreateNode(DefaultCreateNodeFunc)
 
 	if gossipCfg.PeerScoring {

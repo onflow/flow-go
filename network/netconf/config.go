@@ -63,7 +63,7 @@ type UnicastConfig struct {
 	UnicastMaxDialRetryAttemptTimes uint64 `validate:"gt=0" mapstructure:"unicast-max-dial-retry-attempt-times"`
 
 	// UnicastMaxStreamCreationRetryAttemptTimes is the maximum number of attempts to be made to create a stream to a remote node over a direct unicast (1:1) connection before we give up.
-	UnicastMaxStreamCreationRetryAttemptTimes uint64 `validate:"gt=0" mapstructure:"unicast-max-stream-creation-retry-attempt-times"`
+	UnicastMaxStreamCreationRetryAttemptTimes uint64 `validate:"gt=1" mapstructure:"unicast-max-stream-creation-retry-attempt-times"`
 }
 
 // UnicastRateLimitersConfig unicast rate limiter configuration for the message and bandwidth rate limiters.

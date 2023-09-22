@@ -37,7 +37,7 @@ var (
 	_ p2p.UnicastManager = (*Manager)(nil)
 )
 
-type DialConfigCacheFactory func() unicast.DialConfigCache
+type DialConfigCacheFactory func(func() unicastmodel.DialConfig) unicast.DialConfigCache
 
 // Manager manages libp2p stream negotiation and creation, which is utilized for unicast dispatches.
 type Manager struct {
@@ -108,8 +108,13 @@ func NewUnicastManager(cfg *ManagerConfig) (*Manager, error) {
 	}
 
 	return &Manager{
-		logger:                          cfg.Logger.With().Str("module", "unicast-manager").Logger(),
-		dialConfigCache:                 cfg.DialConfigCacheFactory(),
+		logger: cfg.Logger.With().Str("module", "unicast-manager").Logger(),
+		dialConfigCache: cfg.DialConfigCacheFactory(func() unicastmodel.DialConfig {
+			return unicastmodel.DialConfig{
+				StreamCreationRetryAttemptBudget: cfg.MaxStreamCreationRetryAttemptTimes,
+				DialRetryAttemptBudget:           cfg.MaxDialRetryAttemptTimes,
+			}
+		}),
 		streamFactory:                   cfg.StreamFactory,
 		sporkId:                         cfg.SporkId,
 		connStatus:                      cfg.ConnStatus,
@@ -226,7 +231,12 @@ func (m *Manager) CreateStream(ctx context.Context, peerID peer.ID) (libp2pnet.S
 // stream can be successfully the multierror will be returned. During stream creation when IsErrDialInProgress
 // is encountered during retries this would indicate that no connection to the peer exists yet.
 // In this case we will retry creating the stream with a backoff until a connection is established.
-func (m *Manager) tryCreateStream(ctx context.Context, peerID peer.ID, protocol protocols.Protocol, dialCfg *unicastmodel.DialConfig) (libp2pnet.Stream, error) {
+func (m *Manager) tryCreateStream(
+	ctx context.Context,
+	peerID peer.ID,
+	protocol protocols.Protocol,
+	dialCfg *unicastmodel.DialConfig,
+) (libp2pnet.Stream, error) {
 	var err error
 	var s libp2pnet.Stream
 
@@ -269,12 +279,10 @@ func (m *Manager) tryCreateStream(ctx context.Context, peerID peer.ID, protocol 
 	}
 
 	m.metrics.OnStreamCreated(duration, attempts)
-	updatedConfig, err := m.dialConfigCache.Adjust(
-		peerID, func(config unicastmodel.DialConfig) (unicastmodel.DialConfig, error) {
-			config.ConsecutiveSuccessfulStream++ // increase consecutive successful stream count.
-			return config, nil
-		},
-	)
+	updatedConfig, err := m.dialConfigCache.Adjust(peerID, func(config unicastmodel.DialConfig) (unicastmodel.DialConfig, error) {
+		config.ConsecutiveSuccessfulStream++ // increase consecutive successful stream count.
+		return config, nil
+	})
 	if err != nil {
 		// This is not a connection retryable error, this is a fatal error.
 		// TODO: technically, we better to return an error here, but the error must be irrecoverable, and we cannot
@@ -294,7 +302,10 @@ func (m *Manager) tryCreateStream(ctx context.Context, peerID peer.ID, protocol 
 }
 
 // createStream creates a stream to the peerID with the provided protocol.
-func (m *Manager) createStream(ctx context.Context, peerID peer.ID, protocol protocols.Protocol, dialCfg *unicastmodel.DialConfig) (libp2pnet.Stream, error) {
+func (m *Manager) createStream(ctx context.Context, peerID peer.ID, protocol protocols.Protocol, dialCfg *unicastmodel.DialConfig) (
+	libp2pnet.Stream,
+	error,
+) {
 	s, err := m.rawStreamWithProtocol(ctx, protocol.ProtocolId(), peerID, dialCfg)
 	if err != nil {
 		return nil, err
@@ -325,7 +336,12 @@ func (m *Manager) createStream(ctx context.Context, peerID peer.ID, protocol pro
 //
 // Unexpected errors during normal operations:
 //   - network.ErrIllegalConnectionState indicates bug in libpp2p when checking IsConnected status of peer.
-func (m *Manager) rawStreamWithProtocol(ctx context.Context, protocolID protocol.ID, peerID peer.ID, dialCfg *unicastmodel.DialConfig) (libp2pnet.Stream, error) {
+func (m *Manager) rawStreamWithProtocol(
+	ctx context.Context,
+	protocolID protocol.ID,
+	peerID peer.ID,
+	dialCfg *unicastmodel.DialConfig,
+) (libp2pnet.Stream, error) {
 	isConnected, err := m.connStatus.IsConnected(peerID)
 	if err != nil {
 		return nil, err
@@ -384,12 +400,10 @@ func (m *Manager) dialPeer(ctx context.Context, peerID peer.ID, dialCfg *unicast
 				Msg("retrying peer dialing")
 			return retry.RetryableError(multierror.Append(errs, err))
 		}
-		updatedConfig, err := m.dialConfigCache.Adjust(
-			peerID, func(config unicastmodel.DialConfig) (unicastmodel.DialConfig, error) {
-				config.LastSuccessfulDial = time.Now() // update last successful dial time
-				return config, nil
-			},
-		)
+		updatedConfig, err := m.dialConfigCache.Adjust(peerID, func(config unicastmodel.DialConfig) (unicastmodel.DialConfig, error) {
+			config.LastSuccessfulDial = time.Now() // update last successful dial time
+			return config, nil
+		})
 		if err != nil {
 			// This is not a connection retryable error, this is a fatal error.
 			// TODO: technically, we better to return an error here, but the error must be irrecoverable, and we cannot
@@ -413,7 +427,9 @@ func (m *Manager) dialPeer(ctx context.Context, peerID peer.ID, dialCfg *unicast
 	duration := time.Since(start)
 	if err != nil {
 		m.metrics.OnPeerDialFailure(duration, dialAttempts)
-		return retryFailedError(uint64(dialAttempts), dialCfg.DialRetryAttemptBudget, fmt.Errorf("failed to dial peer %s: %w", p2plogging.PeerId(peerID), err))
+		return retryFailedError(uint64(dialAttempts),
+			dialCfg.DialRetryAttemptBudget,
+			fmt.Errorf("failed to dial peer %s: %w", p2plogging.PeerId(peerID), err))
 	}
 	m.metrics.OnPeerDialed(duration, dialAttempts)
 	return nil
@@ -457,7 +473,9 @@ func (m *Manager) rawStream(ctx context.Context, peerID peer.ID, protocolID prot
 	duration := time.Since(start)
 	if err != nil {
 		m.metrics.OnEstablishStreamFailure(duration, attempts)
-		return nil, retryFailedError(uint64(attempts), dialCfg.StreamCreationRetryAttemptBudget, fmt.Errorf("failed to create a stream to peer: %w", err))
+		return nil, retryFailedError(uint64(attempts),
+			dialCfg.StreamCreationRetryAttemptBudget,
+			fmt.Errorf("failed to create a stream to peer: %w", err))
 	}
 	m.metrics.OnStreamEstablished(duration, attempts)
 	return s, nil
@@ -516,12 +534,10 @@ func (m *Manager) getDialConfig(peerID peer.ID) (*unicastmodel.DialConfig, error
 	if dialCfg.StreamCreationRetryAttemptBudget == uint64(0) && dialCfg.ConsecutiveSuccessfulStream >= m.streamZeroBackoffResetThreshold {
 		// reset the stream creation backoff budget to the default value if the number of consecutive successful streams reaches the threshold,
 		// as the stream creation is reliable enough to be trusted again.
-		dialCfg, err = m.dialConfigCache.Adjust(
-			peerID, func(config unicastmodel.DialConfig) (unicastmodel.DialConfig, error) {
-				config.StreamCreationRetryAttemptBudget = m.maxStreamCreationAttemptTimes
-				return config, nil
-			},
-		)
+		dialCfg, err = m.dialConfigCache.Adjust(peerID, func(config unicastmodel.DialConfig) (unicastmodel.DialConfig, error) {
+			config.StreamCreationRetryAttemptBudget = m.maxStreamCreationAttemptTimes
+			return config, nil
+		})
 		if err != nil {
 			return nil, fmt.Errorf("failed to adjust dial config for peer id (resetting stream creation attempt budget): %w", err)
 		}
@@ -531,12 +547,10 @@ func (m *Manager) getDialConfig(peerID peer.ID) (*unicastmodel.DialConfig, error
 		time.Since(dialCfg.LastSuccessfulDial) >= m.dialZeroBackoffResetThreshold {
 		// reset the dial backoff budget to the default value if the last successful dial was long enough ago,
 		// as the dialing is reliable enough to be trusted again.
-		dialCfg, err = m.dialConfigCache.Adjust(
-			peerID, func(config unicastmodel.DialConfig) (unicastmodel.DialConfig, error) {
-				config.DialRetryAttemptBudget = m.maxDialAttemptTimes
-				return config, nil
-			},
-		)
+		dialCfg, err = m.dialConfigCache.Adjust(peerID, func(config unicastmodel.DialConfig) (unicastmodel.DialConfig, error) {
+			config.DialRetryAttemptBudget = m.maxDialAttemptTimes
+			return config, nil
+		})
 		if err != nil {
 			return nil, fmt.Errorf("failed to adjust dial config for peer id (resetting dial attempt budget): %w", err)
 		}
@@ -555,29 +569,27 @@ func (m *Manager) getDialConfig(peerID peer.ID) (*unicastmodel.DialConfig, error
 // - connected indicates whether there is a connection to the peer.
 // - error if the dial config cannot be adjusted; any error is irrecoverable and indicates a fatal error.
 func (m *Manager) adjustUnsuccessfulStreamAttempt(peerID peer.ID, connected bool) (*unicastmodel.DialConfig, error) {
-	updatedCfg, err := m.dialConfigCache.Adjust(
-		peerID, func(config unicastmodel.DialConfig) (unicastmodel.DialConfig, error) {
-			// consecutive successful stream count is reset to 0 if we fail to create a stream or connection to the peer.
-			config.ConsecutiveSuccessfulStream = 0
+	updatedCfg, err := m.dialConfigCache.Adjust(peerID, func(config unicastmodel.DialConfig) (unicastmodel.DialConfig, error) {
+		// consecutive successful stream count is reset to 0 if we fail to create a stream or connection to the peer.
+		config.ConsecutiveSuccessfulStream = 0
 
-			if !connected {
-				// if no connections could be established to the peer, we will try to dial with a more strict dial config next time.
-				if config.DialRetryAttemptBudget > 0 {
-					config.DialRetryAttemptBudget--
-				}
-				// last successful dial time is reset to 0 if we fail to create a stream to the peer.
-				config.LastSuccessfulDial = time.Time{}
-
-			} else {
-				// there is a connection to the peer it means that the stream creation failed, hence we decrease the stream backoff budget
-				// to try to create a stream with a more strict dial config next time.
-				if config.StreamCreationRetryAttemptBudget > 0 {
-					config.StreamCreationRetryAttemptBudget--
-				}
+		if !connected {
+			// if no connections could be established to the peer, we will try to dial with a more strict dial config next time.
+			if config.DialRetryAttemptBudget > 0 {
+				config.DialRetryAttemptBudget--
 			}
-			return config, nil
-		},
-	)
+			// last successful dial time is reset to 0 if we fail to create a stream to the peer.
+			config.LastSuccessfulDial = time.Time{}
+
+		} else {
+			// there is a connection to the peer it means that the stream creation failed, hence we decrease the stream backoff budget
+			// to try to create a stream with a more strict dial config next time.
+			if config.StreamCreationRetryAttemptBudget > 0 {
+				config.StreamCreationRetryAttemptBudget--
+			}
+		}
+		return config, nil
+	})
 
 	if err != nil {
 		return nil, fmt.Errorf("failed to adjust dial config for peer id: %w", err)
