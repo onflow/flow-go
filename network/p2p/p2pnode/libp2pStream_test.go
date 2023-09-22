@@ -58,22 +58,20 @@ func TestStreamClosing(t *testing.T) {
 		go func(i int) {
 			// Create stream from node 1 to node 2 (reuse if one already exists)
 			nodes[0].Host().Peerstore().AddAddrs(nodeInfo1.ID, nodeInfo1.Addrs, peerstore.AddressTTL)
-			err := nodes[0].OpenProtectedStream(
-				ctx, nodeInfo1.ID, t.Name(), func(s network.Stream) error {
-					w := bufio.NewWriter(s)
+			err := nodes[0].OpenProtectedStream(ctx, nodeInfo1.ID, t.Name(), func(s network.Stream) error {
+				w := bufio.NewWriter(s)
 
-					// Send message from node 1 to 2
-					msg := fmt.Sprintf("hello%d\n", i)
-					_, err = w.WriteString(msg)
-					assert.NoError(t, err)
+				// Send message from node 1 to 2
+				msg := fmt.Sprintf("hello%d\n", i)
+				_, err = w.WriteString(msg)
+				assert.NoError(t, err)
 
-					// Flush the stream
-					require.NoError(t, w.Flush())
+				// Flush the stream
+				require.NoError(t, w.Flush())
 
-					// returning will close the stream
-					return nil
-				},
-			)
+				// returning will close the stream
+				return nil
+			})
 			require.NoError(t, err)
 
 			senderWG.Done()
@@ -125,10 +123,8 @@ func mockStreamHandlerForMessages(t *testing.T, ctx context.Context, msgCount in
 // TestCreateStream_WithDefaultUnicast evaluates correctness of creating default (tcp) unicast streams between two libp2p nodes.
 func TestCreateStream_WithDefaultUnicast(t *testing.T) {
 	sporkId := unittest.IdentifierFixture()
-	testCreateStream(
-		t, sporkId, nil, // sends nil as preferred unicast so that nodes run on default plain tcp streams.
-		protocols.FlowProtocolID(sporkId),
-	)
+	testCreateStream(t, sporkId, nil, // sends nil as preferred unicast so that nodes run on default plain tcp streams.
+		protocols.FlowProtocolID(sporkId))
 }
 
 // TestCreateStream_WithPreferredGzipUnicast evaluates correctness of creating gzip-compressed tcp unicast streams between two libp2p nodes.
@@ -164,17 +160,15 @@ func testCreateStream(t *testing.T, sporkId flow.Identifier, unicasts []protocol
 		require.NoError(t, err)
 		nodes[0].Host().Peerstore().AddAddrs(pInfo.ID, pInfo.Addrs, peerstore.AddressTTL)
 		go func() {
-			err := nodes[0].OpenProtectedStream(
-				ctx, pInfo.ID, t.Name(), func(stream network.Stream) error {
-					require.NotNil(t, stream)
-					streams = append(streams, stream)
-					// if we return this function, the stream will be closed, but we need to keep it open for the test
-					// hence we wait for the context to be done
-					<-ctx.Done()
-					allStreamsClosedWg.Done()
-					return nil
-				},
-			)
+			err := nodes[0].OpenProtectedStream(ctx, pInfo.ID, t.Name(), func(stream network.Stream) error {
+				require.NotNil(t, stream)
+				streams = append(streams, stream)
+				// if we return this function, the stream will be closed, but we need to keep it open for the test
+				// hence we wait for the context to be done
+				<-ctx.Done()
+				allStreamsClosedWg.Done()
+				return nil
+			})
 			if err != nil {
 				// we omit errors due to closing the stream. This is because we close the stream in the test.
 				require.Contains(t, err.Error(), "failed to close the stream")
@@ -182,11 +176,9 @@ func testCreateStream(t *testing.T, sporkId flow.Identifier, unicasts []protocol
 		}()
 	}
 
-	require.Eventually(
-		t, func() bool {
-			return streamCount == p2putils.CountStream(nodes[0].Host(), nodes[1].ID(), protocolID, network.DirOutbound)
-		}, 5*time.Second, 100*time.Millisecond, "could not create streams on time",
-	)
+	require.Eventually(t, func() bool {
+		return streamCount == p2putils.CountStream(nodes[0].Host(), nodes[1].ID(), protocolID, network.DirOutbound)
+	}, 5*time.Second, 100*time.Millisecond, "could not create streams on time")
 
 	// checks that the number of connections is 1 despite the number of streams; i.e., all streams are created on the same connection
 	require.Len(t, nodes[0].Host().Network().Conns(), 1)
@@ -238,27 +230,23 @@ func TestCreateStream_FallBack(t *testing.T) {
 
 		// a new stream must be created
 		go func() {
-			err = thisNode.OpenProtectedStream(
-				ctx, pInfo.ID, t.Name(), func(stream network.Stream) error {
-					require.NotNil(t, stream)
-					streams = append(streams, stream)
+			err = thisNode.OpenProtectedStream(ctx, pInfo.ID, t.Name(), func(stream network.Stream) error {
+				require.NotNil(t, stream)
+				streams = append(streams, stream)
 
-					// if we return this function, the stream will be closed, but we need to keep it open for the test
-					// hence we wait for the context to be done
-					<-ctx.Done()
-					allStreamsClosedWg.Done()
-					return nil
-				},
-			)
+				// if we return this function, the stream will be closed, but we need to keep it open for the test
+				// hence we wait for the context to be done
+				<-ctx.Done()
+				allStreamsClosedWg.Done()
+				return nil
+			})
 		}()
 	}
 
 	// wait for the stream to be created on the default protocol id.
-	require.Eventually(
-		t, func() bool {
-			return streamCount == p2putils.CountStream(nodes[0].Host(), nodes[1].ID(), defaultProtocolId, network.DirOutbound)
-		}, 5*time.Second, 100*time.Millisecond, "could not create streams on time",
-	)
+	require.Eventually(t, func() bool {
+		return streamCount == p2putils.CountStream(nodes[0].Host(), nodes[1].ID(), defaultProtocolId, network.DirOutbound)
+	}, 5*time.Second, 100*time.Millisecond, "could not create streams on time")
 
 	// no stream must be created on the preferred protocol id
 	require.Equal(t, 0, p2putils.CountStream(thisNode.Host(), otherNode.ID(), preferredProtocolId, network.DirOutbound))
@@ -296,12 +284,10 @@ func TestCreateStreamIsConcurrencySafe(t *testing.T) {
 	createStream := func() {
 		<-gate
 		nodes[0].Host().Peerstore().AddAddrs(nodeInfo1.ID, nodeInfo1.Addrs, peerstore.AddressTTL)
-		err := nodes[0].OpenProtectedStream(
-			ctx, nodeInfo1.ID, t.Name(), func(stream network.Stream) error {
-				// no-op stream writer, we just check that the stream was created
-				return nil
-			},
-		)
+		err := nodes[0].OpenProtectedStream(ctx, nodeInfo1.ID, t.Name(), func(stream network.Stream) error {
+			// no-op stream writer, we just check that the stream was created
+			return nil
+		})
 		require.NoError(t, err) // assert that stream was successfully created
 		wg.Done()
 	}
@@ -377,17 +363,13 @@ func TestNoBackoffWhenCreatingStream(t *testing.T) {
 		// limit the maximum amount of time to wait for a connection to be established by using a context that times out
 		ctx, cancel := context.WithTimeout(ctx, maxTimeToWait)
 
-		unittest.RequireReturnsBefore(
-			t, func() {
-				err = node1.OpenProtectedStream(
-					ctx, pInfo.ID, t.Name(), func(stream network.Stream) error {
-						// do nothing, this is a no-op stream writer, we just check that the stream was created
-						return nil
-					},
-				)
-				require.Error(t, err)
-			}, totalWaitTime, fmt.Sprintf("create stream did not error within %s", totalWaitTime.String()),
-		)
+		unittest.RequireReturnsBefore(t, func() {
+			err = node1.OpenProtectedStream(ctx, pInfo.ID, t.Name(), func(stream network.Stream) error {
+				// do nothing, this is a no-op stream writer, we just check that the stream was created
+				return nil
+			})
+			require.Error(t, err)
+		}, totalWaitTime, fmt.Sprintf("create stream did not error within %s", totalWaitTime.String()))
 		require.NotContainsf(t, err.Error(), swarm.ErrDialBackoff.Error(), "swarm dialer unexpectedly did a back off for a one-to-one connection")
 		cancel()
 	}
@@ -446,9 +428,7 @@ func TestUnicastOverStream_Fallback(t *testing.T) {
 	node1, id1 := p2ptest.NodeFixture(t, sporkId, t.Name(), idProvider, p2ptest.WithDefaultStreamHandler(streamHandler1))
 
 	streamHandler2, inbound2 := p2ptest.StreamHandlerFixture(t)
-	node2, id2 := p2ptest.NodeFixture(
-		t, sporkId, t.Name(), idProvider, p2ptest.WithDefaultStreamHandler(streamHandler2), p2ptest.WithPreferredUnicasts([]protocols.ProtocolName{protocols.GzipCompressionUnicast}),
-	)
+	node2, id2 := p2ptest.NodeFixture(t, sporkId, t.Name(), idProvider, p2ptest.WithDefaultStreamHandler(streamHandler2), p2ptest.WithPreferredUnicasts([]protocols.ProtocolName{protocols.GzipCompressionUnicast}))
 
 	ids := flow.IdentityList{&id1, &id2}
 	nodes := []p2p.LibP2PNode{node1, node2}
@@ -491,18 +471,14 @@ func TestCreateStreamTimeoutWithUnresponsiveNode(t *testing.T) {
 
 	// attempt to create a stream from node 1 to node 2 and assert that it fails after timeout
 	grace := 100 * time.Millisecond
-	unittest.AssertReturnsBefore(
-		t, func() {
-			nodes[0].Host().Peerstore().AddAddrs(silentNodeInfo.ID, silentNodeInfo.Addrs, peerstore.AddressTTL)
-			err = nodes[0].OpenProtectedStream(
-				tctx, silentNodeInfo.ID, t.Name(), func(stream network.Stream) error {
-					// do nothing, this is a no-op stream writer, we just check that the stream was created
-					return nil
-				},
-			)
-			require.Error(t, err)
-		}, timeout+grace,
-	)
+	unittest.AssertReturnsBefore(t, func() {
+		nodes[0].Host().Peerstore().AddAddrs(silentNodeInfo.ID, silentNodeInfo.Addrs, peerstore.AddressTTL)
+		err = nodes[0].OpenProtectedStream(tctx, silentNodeInfo.ID, t.Name(), func(stream network.Stream) error {
+			// do nothing, this is a no-op stream writer, we just check that the stream was created
+			return nil
+		})
+		require.Error(t, err)
+	}, timeout+grace)
 }
 
 // TestCreateStreamIsConcurrent tests that CreateStream calls can be made concurrently such that one blocked call
@@ -530,33 +506,25 @@ func TestCreateStreamIsConcurrent(t *testing.T) {
 	require.NoError(t, err)
 
 	// creates a stream to unresponsive node and makes sure that the stream creation is blocked
-	blockedCallCh := unittest.RequireNeverReturnBefore(
-		t, func() {
-			goodNodes[0].Host().Peerstore().AddAddrs(silentNodeInfo.ID, silentNodeInfo.Addrs, peerstore.AddressTTL)
-			// the subsequent call will be blocked
-			_ = goodNodes[0].OpenProtectedStream(
-				ctx, silentNodeInfo.ID, t.Name(), func(stream network.Stream) error {
-					// do nothing, the stream creation will be blocked so this should never be called
-					require.Fail(t, "this should never be called")
-					return nil
-				},
-			)
-		}, 1*time.Second, "CreateStream attempt to the unresponsive peer did not block",
-	)
+	blockedCallCh := unittest.RequireNeverReturnBefore(t, func() {
+		goodNodes[0].Host().Peerstore().AddAddrs(silentNodeInfo.ID, silentNodeInfo.Addrs, peerstore.AddressTTL)
+		// the subsequent call will be blocked
+		_ = goodNodes[0].OpenProtectedStream(ctx, silentNodeInfo.ID, t.Name(), func(stream network.Stream) error {
+			// do nothing, the stream creation will be blocked so this should never be called
+			require.Fail(t, "this should never be called")
+			return nil
+		})
+	}, 1*time.Second, "CreateStream attempt to the unresponsive peer did not block")
 
 	// requires same peer can still connect to the other regular peer without being blocked
-	unittest.RequireReturnsBefore(
-		t, func() {
-			goodNodes[0].Host().Peerstore().AddAddrs(goodNodeInfo1.ID, goodNodeInfo1.Addrs, peerstore.AddressTTL)
-			err := goodNodes[0].OpenProtectedStream(
-				ctx, goodNodeInfo1.ID, t.Name(), func(stream network.Stream) error {
-					// do nothing, this is a no-op stream writer, we just check that the stream was created
-					return nil
-				},
-			)
-			require.NoError(t, err)
-		}, 1*time.Second, "creating stream to a responsive node failed while concurrently blocked on unresponsive node",
-	)
+	unittest.RequireReturnsBefore(t, func() {
+		goodNodes[0].Host().Peerstore().AddAddrs(goodNodeInfo1.ID, goodNodeInfo1.Addrs, peerstore.AddressTTL)
+		err := goodNodes[0].OpenProtectedStream(ctx, goodNodeInfo1.ID, t.Name(), func(stream network.Stream) error {
+			// do nothing, this is a no-op stream writer, we just check that the stream was created
+			return nil
+		})
+		require.NoError(t, err)
+	}, 1*time.Second, "creating stream to a responsive node failed while concurrently blocked on unresponsive node")
 
 	// requires the CreateStream call to the unresponsive node was blocked while we attempted the CreateStream to the
 	// good address
