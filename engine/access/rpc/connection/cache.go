@@ -4,7 +4,7 @@ import (
 	"sync"
 	"time"
 
-	lru "github.com/hashicorp/golang-lru"
+	lru "github.com/hashicorp/golang-lru/v2"
 	"go.uber.org/atomic"
 	"google.golang.org/grpc"
 )
@@ -46,12 +46,12 @@ func (cc *CachedClient) Close() {
 
 // Cache represents a cache of CachedClient instances with a given maximum size.
 type Cache struct {
-	cache *lru.Cache
+	cache *lru.Cache[string, *CachedClient]
 	size  int
 }
 
 // NewCache creates a new Cache with the specified maximum size and the underlying LRU cache.
-func NewCache(cache *lru.Cache, size int) *Cache {
+func NewCache(cache *lru.Cache[string, *CachedClient], size int) *Cache {
 	return &Cache{
 		cache: cache,
 		size:  size,
@@ -65,7 +65,7 @@ func (c *Cache) Get(address string) (*CachedClient, bool) {
 	if !ok {
 		return nil, false
 	}
-	return val.(*CachedClient), true
+	return val, true
 }
 
 // GetOrAdd atomically gets the CachedClient for the given address from the cache, or adds a new one
@@ -79,7 +79,7 @@ func (c *Cache) GetOrAdd(address string, timeout time.Duration) (*CachedClient, 
 
 	val, existed, _ := c.cache.PeekOrAdd(address, client)
 	if existed {
-		return val.(*CachedClient), true
+		return val, true
 	}
 
 	client.Address = address
