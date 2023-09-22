@@ -259,6 +259,7 @@ type FlowAccessNodeBuilder struct {
 	ExecutionDataStore         execution_data.ExecutionDataStore
 	ExecutionDataCache         *execdatacache.ExecutionDataCache
 	ExecutionIndexer           *indexer.ExecutionState
+	Scripts                    *execution.Scripts
 
 	// The sync engine participants provider is the libp2p peer store for the access node
 	// which is not available until after the network has started.
@@ -472,6 +473,9 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 		AdminCommand("read-execution-data", func(config *cmd.NodeConfig) commands.AdminCommand {
 			return stateSyncCommands.NewReadExecutionDataCommand(builder.ExecutionDataStore)
 		}).
+		AdminCommand("execute-script", func(config *cmd.NodeConfig) commands.AdminCommand {
+			return stateSyncCommands.NewExecuteScriptCommand(builder.Scripts)
+		}).
 		Module("execution data datastore and blobstore", func(node *cmd.NodeConfig) error {
 			datastoreDir := filepath.Join(builder.executionDataDir, "blobstore")
 			err := os.MkdirAll(datastoreDir, 0700)
@@ -682,7 +686,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 				query.NewProtocolStateWrapper(builder.State),
 			)
 
-			scripts := execution.NewScripts(*queryExecutor, builder.Storage.Headers, exeIndexer.RegisterValues)
+			builder.Scripts = execution.NewScripts(*queryExecutor, builder.Storage.Headers, exeIndexer.RegisterValues)
 
 			return worker, nil
 		})

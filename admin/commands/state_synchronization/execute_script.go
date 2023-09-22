@@ -2,6 +2,7 @@ package state_synchronization
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strconv"
 
@@ -51,9 +52,9 @@ func (e *ExecuteScriptCommand) Validator(req *admin.CommandRequest) error {
 		return admin.NewInvalidAdminReqErrorf("missing required field 'script")
 	}
 
-	argumentsRaw, ok := input["arguments"]
+	argsRaw, ok := input["args"]
 	if !ok {
-		return admin.NewInvalidAdminReqErrorf("missing required field 'arguments")
+		return admin.NewInvalidAdminReqErrorf("missing required field 'args")
 	}
 
 	heightStr, ok := heightRaw.(string)
@@ -66,8 +67,26 @@ func (e *ExecuteScriptCommand) Validator(req *admin.CommandRequest) error {
 		return admin.NewInvalidAdminReqErrorf("'height' must be valid uint64 value", err)
 	}
 
-	data := &scriptData{
-		height: height,
+	scriptStr, ok := scriptRaw.(string)
+	if !ok {
+		return admin.NewInvalidAdminReqErrorf("'script' must be string")
+	}
+
+	argsStr, ok := argsRaw.(string)
+	if !ok {
+		return admin.NewInvalidAdminReqErrorf("'args' must be string")
+	}
+
+	args := make([][]byte, 0)
+	err = json.Unmarshal([]byte(argsStr), &args)
+	if err != nil {
+		return admin.NewInvalidAdminReqErrorf("'args' not valid JSON", err)
+	}
+
+	req.ValidatorData = &scriptData{
+		height:    height,
+		script:    []byte(scriptStr),
+		arguments: args,
 	}
 
 	return nil
