@@ -178,7 +178,7 @@ func (n *Node) CreateStream(ctx context.Context, peerID peer.ID) (libp2pnet.Stre
 	// certainly fail. If this Node was configured with a routing system, we can try to use it to
 	// look up the address of the peer.
 	if len(n.host.Peerstore().Addrs(peerID)) == 0 && n.routing != nil {
-		lg.Info().Msg("address not found in peer store, searching for peer in routing system")
+		lg.Debug().Msg("address not found in peer store, searching for peer in routing system")
 
 		var err error
 		func() {

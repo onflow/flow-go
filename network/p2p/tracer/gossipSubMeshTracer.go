@@ -109,7 +109,7 @@ func (t *GossipSubMeshTracer) Graft(p peer.ID, topic string) {
 		return
 	}
 
-	lg.Info().Hex("flow_id", logging.ID(id.NodeID)).Str("role", id.Role.String()).Msg("grafted peer")
+	lg.Debug().Hex("flow_id", logging.ID(id.NodeID)).Str("role", id.Role.String()).Msg("grafted peer")
 }
 
 // Prune is called when a peer is removed from a topic mesh. The tracer uses this to track the mesh peers.
@@ -137,7 +137,7 @@ func (t *GossipSubMeshTracer) Prune(p peer.ID, topic string) {
 		return
 	}
 
-	lg.Info().Hex("flow_id", logging.ID(id.NodeID)).Str("role", id.Role.String()).Msg("pruned peer")
+	lg.Debug().Hex("flow_id", logging.ID(id.NodeID)).Str("role", id.Role.String()).Msg("pruned peer")
 }
 
 // logLoop logs the mesh peers of the local node for each topic at a regular interval.
@@ -199,6 +199,6 @@ func (t *GossipSubMeshTracer) logPeers() {
 				Msg(MeshLogIntervalWarnMsg)
 			continue
 		}
-		lg.Info().Msg(MeshLogIntervalMsg)
+		lg.Debug().Msg(MeshLogIntervalMsg)
 	}
 }
