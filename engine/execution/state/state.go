@@ -424,6 +424,12 @@ func (s *state) GetHighestFinalizedExecuted() uint64 {
 	return s.registerStore.FinalizedAndExecutedHeight()
 }
 
+// IsBlockExecuted returns true if the block is executed, which means registers, events,
+// results, etc are all stored.
+// otherwise returns false
 func (s *state) IsBlockExecuted(height uint64, blockID flow.Identifier) (bool, error) {
+	// since registers are the last data stored by SaveExecutionResults, if registers
+	// are available, it means all the data have been stored, in other words, the block
+	// is executed.
 	return s.registerStore.IsBlockExecuted(height, blockID)
 }
