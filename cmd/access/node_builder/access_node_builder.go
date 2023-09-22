@@ -90,7 +90,6 @@ import (
 	"github.com/onflow/flow-go/state/protocol/blocktimer"
 	"github.com/onflow/flow-go/storage"
 	bstorage "github.com/onflow/flow-go/storage/badger"
-	"github.com/onflow/flow-go/storage/memory"
 	"github.com/onflow/flow-go/utils/grpcutils"
 )
 
@@ -456,7 +455,6 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 	var ds *badger.Datastore
 	var bs network.BlobService
 	var processedBlockHeight storage.ConsumerProgress
-	var indexedBlockHeight storage.ConsumerProgress
 	var processedNotifications storage.ConsumerProgress
 	var bsDependable *module.ProxiedReadyDoneAware
 	var execDataDistributor *edrequester.ExecutionDataDistributor
@@ -490,10 +488,6 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 		Module("processed block height consumer progress", func(node *cmd.NodeConfig) error {
 			// uses the datastore's DB
 			processedBlockHeight = bstorage.NewConsumerProgress(ds.DB, module.ConsumeProgressExecutionDataRequesterBlockHeight)
-			return nil
-		}).
-		Module("indexed block height consumer progress", func(node *cmd.NodeConfig) error {
-			indexedBlockHeight = bstorage.NewConsumerProgress(ds.DB, module.ConsumeProgressExecutionDataIndexerBlockHeight)
 			return nil
 		}).
 		Module("processed notifications consumer progress", func(node *cmd.NodeConfig) error {
@@ -609,53 +603,6 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 			builder.ExecutionDataRequester.AddOnExecutionDataReceivedConsumer(execDataDistributor.OnExecutionDataReceived)
 
 			return builder.ExecutionDataRequester, nil
-		}).
-		Component("execution data indexer", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-			// Execution data cache uses blob store as the backend. It's used by the execution
-			// state indexer to get the execution data from the store.
-			executionDataCache := execdatacache.NewExecutionDataCache(
-				builder.ExecutionDataStore,
-				builder.Storage.Headers,
-				builder.Storage.Seals,
-				builder.Storage.Results,
-				execDataCacheBackend,
-			)
-
-			initHeight := builder.executionDataConfig.InitialBlockHeight
-
-			// temporarily use the in-memory db
-			registers := memory.NewRegisters(initHeight, initHeight, builder.Logger)
-
-			exeIndexer, err := indexer.New(
-				registers,
-				builder.Storage.Headers,
-				builder.Storage.Events,
-				builder.Logger,
-			)
-			if err != nil {
-				return nil, err
-			}
-
-			builder.ExecutionIndexer = exeIndexer // todo temporary to test
-
-			// execution state worker uses a jobqueue to process new execution data and indexes it by using the indexer.
-			worker := indexer.NewExecutionStateWorker(
-				builder.Logger,
-				// match the block height from the execution data requester as it depends on the data being downloaded
-				initHeight,
-				// not as relevant when using blob store backend
-				5*time.Second,
-				exeIndexer,
-				executionDataCache,
-				builder.ExecutionDataRequester.HighestConsecutiveHeight,
-				indexedBlockHeight,
-			)
-
-			// add worker on execution data handler to the execution data requester to use as a signal for the
-			// jobqueue to inform of new tasks.
-			builder.ExecutionDataRequester.AddOnExecutionDataReceivedConsumer(worker.OnExecutionData)
-
-			return worker, nil
 		})
 
 	if builder.stateStreamConf.ListenAddr != "" {
