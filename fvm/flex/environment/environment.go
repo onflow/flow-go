@@ -65,7 +65,7 @@ func NewEnvironment(
 		LastExecutedBlock: lastExcutedBlock,
 		Result: &Result{
 			UUIDIndex:                lastExcutedBlock.UUIDIndex,
-			TotalSupplyOfNativeToken: lastExcutedBlock.TotalSupplyOfNativeToken,
+			TotalSupplyOfNativeToken: lastExcutedBlock.TotalSupply,
 		},
 		Used: false,
 	}, nil
