@@ -250,11 +250,11 @@ func TestUnicastManager_Stream_ConsecutiveStreamCreation_Reset(t *testing.T) {
 
 	streamFactory.On("NewStream", mock.Anything, peerID, mock.Anything).
 		Return(nil, fmt.Errorf("some error")).
-		Once() // mocks that it attempts to create a stream only once.
+		Once() // mocks that it attempts to create a stream once and fails.
 	connStatus.On("IsConnected", peerID).Return(true, nil) // connected.
 
 	adjustedDialConfig, err := dialConfigCache.Adjust(peerID, func(dialConfig unicastmodel.DialConfig) (unicastmodel.DialConfig, error) {
-		dialConfig.ConsecutiveSuccessfulStream = 5      // sets the consecutive successful stream to 10 meaning that the last 10 stream creation attempts were successful.
+		dialConfig.ConsecutiveSuccessfulStream = 5      // sets the consecutive successful stream to 5 meaning that the last 5 stream creation attempts were successful.
 		dialConfig.StreamCreationRetryAttemptBudget = 0 // sets the stream back budget to 0 meaning that the stream backoff budget is exhausted.
 
 		return dialConfig, nil

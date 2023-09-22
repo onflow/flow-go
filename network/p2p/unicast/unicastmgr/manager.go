@@ -470,7 +470,7 @@ func retryBackoff(maxAttempts uint64) retry.Backoff {
 	// add a MaxRetryJitter*time.Millisecond jitter to our backoff to ensure that this node and the target node don't attempt to reconnect at the same time
 	backoff = retry.WithJitter(MaxRetryJitter*time.Millisecond, backoff)
 	maxRetries := maxAttempts
-	if maxAttempts >= 0 {
+	if maxAttempts > 0 {
 		// https://github.com/sethvargo/go-retry#maxretries retries counter starts at zero and library will make last attempt
 		// when retries == maxAttempts causing 1 more func invocation than expected.
 		maxRetries = maxAttempts - 1
