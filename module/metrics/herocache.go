@@ -121,7 +121,7 @@ func ApplicationLayerSpamRecordCacheMetricFactory(f HeroCacheMetricsFactory, net
 }
 
 func DialConfigCacheMetricFactory(f HeroCacheMetricsFactory, networkType network.NetworkingType) module.HeroCacheMetrics {
-	r := ResourceNetworkingDialConfigCache
+	r := ResourceNetworkingUnicastDialConfigCache
 	if networkType == network.PublicNetwork {
 		r = PrependPublicPrefix(r)
 	}
