@@ -30,10 +30,10 @@ type ExecutionState struct {
 // The passed RegisterIndex storage must be populated to include the first and last height otherwise the indexer
 // won't be initialized to ensure we have bootstrapped the storage first.
 func New(
+	log zerolog.Logger,
 	registers storage.RegisterIndex,
 	headers storage.Headers,
 	events storage.Events,
-	log zerolog.Logger,
 ) (*ExecutionState, error) {
 	// we must have the first height set in the storage otherwise error out
 	first, err := registers.FirstHeight()
