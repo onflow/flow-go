@@ -192,7 +192,10 @@ func (fnb *FlowNodeBuilder) BaseFlags() {
 	fnb.flags.UintVar(&fnb.BaseConfig.SyncCoreConfig.MaxSize, "sync-max-size", defaultConfig.SyncCoreConfig.MaxSize, "the maximum number of blocks we request in the same block request message")
 	fnb.flags.UintVar(&fnb.BaseConfig.SyncCoreConfig.MaxRequests, "sync-max-requests", defaultConfig.SyncCoreConfig.MaxRequests, "the maximum number of requests we send during each scanning period")
 
-	fnb.flags.Uint64Var(&fnb.BaseConfig.ComplianceConfig.SkipNewProposalsThreshold, "compliance-skip-proposals-threshold", defaultConfig.ComplianceConfig.SkipNewProposalsThreshold, "threshold at which new proposals are discarded rather than cached, if their height is this much above local finalized height")
+	fnb.flags.Uint64Var(&fnb.BaseConfig.ComplianceConfig.SkipNewProposalsThreshold,
+		"compliance-skip-proposals-threshold",
+		defaultConfig.ComplianceConfig.SkipNewProposalsThreshold,
+		"threshold at which new proposals are discarded rather than cached, if their height is this much above local finalized height")
 }
 
 func (fnb *FlowNodeBuilder) EnqueuePingService() {
@@ -322,11 +325,11 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 	unicastRateLimiters := ratelimit.NewRateLimiters(unicastRateLimiterOpts...)
 
 	uniCfg := &p2pconfig.UnicastConfig{
-		StreamRetryInterval:                fnb.FlowConfig.NetworkConfig.CreateStreamRetryDelay,
-		StreamZeroRetryResetThreshold:      fnb.FlowConfig.NetworkConfig.StreamZeroRetryResetThreshold,
-		DialZeroRetryResetThreshold:        fnb.FlowConfig.NetworkConfig.DialZeroRetryResetThreshold,
-		MaxDialRetryAttemptTimes:           fnb.FlowConfig.NetworkConfig.MaxDialRetryAttemptTimes,
-		MaxStreamCreationRetryAttemptTimes: fnb.FlowConfig.NetworkConfig.MaxStreamCreationRetryAttemptTimes,
+		StreamRetryInterval:                fnb.FlowConfig.NetworkConfig.UnicastCreateStreamRetryDelay,
+		StreamZeroRetryResetThreshold:      fnb.FlowConfig.NetworkConfig.UnicastStreamZeroRetryResetThreshold,
+		DialZeroRetryResetThreshold:        fnb.FlowConfig.NetworkConfig.UnicastDialZeroRetryResetThreshold,
+		MaxDialRetryAttemptTimes:           fnb.FlowConfig.NetworkConfig.UnicastMaxDialRetryAttemptTimes,
+		MaxStreamCreationRetryAttemptTimes: fnb.FlowConfig.NetworkConfig.UnicastMaxStreamCreationRetryAttemptTimes,
 		RateLimiterDistributor:             fnb.UnicastRateLimiterDistributor,
 	}
 

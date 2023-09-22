@@ -39,7 +39,7 @@ func unicastManagerFixture(t *testing.T) (*unicastmgr.Manager, *mockp2p.StreamFa
 			StreamFactory:                      streamFactory,
 			SporkId:                            unittest.IdentifierFixture(),
 			ConnStatus:                         connStatus,
-			CreateStreamRetryDelay:             cfg.NetworkConfig.CreateStreamRetryDelay,
+			CreateStreamRetryDelay:             cfg.NetworkConfig.UnicastCreateStreamRetryDelay,
 			Metrics:                            metrics.NewNoopCollector(),
 			StreamZeroRetryResetThreshold:      unicastmodel.StreamZeroBackoffResetThreshold,
 			DialZeroRetryResetThreshold:        unicastmodel.DialZeroBackoffResetThreshold,
@@ -342,7 +342,7 @@ func TestUnicastManager_Connection_BackoffBudgetDecremented(t *testing.T) {
 	peerID := p2ptest.PeerIdFixture(t)
 
 	// totalAttempts is the total number of times that unicast manager calls Connect on the stream factory to dial the peer.
-	// Let's consider x = unicastmodel.MaxDialRetryAttemptTimes. Then the test tries x times CreateStream. With dynamic backoffs,
+	// Let's consider x = unicastmodel.UnicastMaxDialRetryAttemptTimes. Then the test tries x times CreateStream. With dynamic backoffs,
 	// the first CreateStream call will try to Connect x times, the second CreateStream call will try to Connect x-1 times,
 	// and so on. So the total number of Connect calls is x + (x-1) + (x-2) + ... + 1 = x(x+1)/2.
 	// However, we also attempt one more time at the end of the test to CreateStream, when the backoff budget is 0.
@@ -403,7 +403,7 @@ func TestUnicastManager_Stream_BackoffBudgetDecremented(t *testing.T) {
 
 	// totalAttempts is the total number of times that unicast manager calls NewStream on the stream factory to create stream to the peer.
 	// Note that it already assumes that the connection is established, so it does not try to connect to the peer.
-	// Let's consider x = unicastmodel.MaxStreamCreationRetryAttemptTimes. Then the test tries x times CreateStream. With dynamic backoffs,
+	// Let's consider x = unicastmodel.UnicastMaxStreamCreationRetryAttemptTimes. Then the test tries x times CreateStream. With dynamic backoffs,
 	// the first CreateStream call will try to NewStream x times, the second CreateStream call will try to NewStream x-1 times,
 	// and so on. So the total number of Connect calls is x + (x-1) + (x-2) + ... + 1 = x(x+1)/2.
 	// However, we also attempt one more time at the end of the test to CreateStream, when the backoff budget is 0.

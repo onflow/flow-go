@@ -43,15 +43,18 @@ func TestMultiAddress(t *testing.T) {
 		identity     *flow.Identity
 		multiaddress string
 	}{
-		{ // ip4 test case
+		{
+			// ip4 test case
 			identity:     unittest.IdentityFixture(unittest.WithNetworkingKey(key.PublicKey()), unittest.WithAddress("172.16.254.1:72")),
 			multiaddress: "/ip4/172.16.254.1/tcp/72",
 		},
-		{ // dns test case
+		{
+			// dns test case
 			identity:     unittest.IdentityFixture(unittest.WithNetworkingKey(key.PublicKey()), unittest.WithAddress("consensus:2222")),
 			multiaddress: "/dns4/consensus/tcp/2222",
 		},
-		{ // dns test case
+		{
+			// dns test case
 			identity:     unittest.IdentityFixture(unittest.WithNetworkingKey(key.PublicKey()), unittest.WithAddress("flow.com:3333")),
 			multiaddress: "/dns4/flow.com/tcp/3333",
 		},
@@ -439,9 +442,9 @@ func TestCreateStream_SinglePeerDial(t *testing.T) {
 	unittest.RequireReturnsBefore(t, wg.Wait, 3*time.Second, "cannot create streams on time")
 
 	// we expect a single routine to start attempting to dial thus the number of retries
-	// before failure should be at most p2pnode.MaxDialRetryAttemptTimes
+	// before failure should be at most p2pnode.UnicastMaxDialRetryAttemptTimes
 	expectedNumOfDialRetries := int64(unicastmodel.MaxDialAttemptTimes)
-	// we expect the second routine to retry creating a stream p2pnode.MaxDialRetryAttemptTimes when dialing is in progress
+	// we expect the second routine to retry creating a stream p2pnode.UnicastMaxDialRetryAttemptTimes when dialing is in progress
 	expectedCreateStreamRetries := int64(unicastmodel.MaxDialAttemptTimes)
 	require.Equal(t, expectedNumOfDialRetries, dialPeerRetries.Load(), fmt.Sprintf("expected %d dial peer retries got %d", expectedNumOfDialRetries, dialPeerRetries.Load()))
 	require.Equal(t, expectedCreateStreamRetries, createStreamRetries.Load(), fmt.Sprintf("expected %d dial peer retries got %d", expectedCreateStreamRetries, createStreamRetries.Load()))
