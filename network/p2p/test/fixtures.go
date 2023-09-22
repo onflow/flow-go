@@ -38,7 +38,6 @@ import (
 	p2pconfig "github.com/onflow/flow-go/network/p2p/p2pbuilder/config"
 	"github.com/onflow/flow-go/network/p2p/tracer"
 	"github.com/onflow/flow-go/network/p2p/unicast/protocols"
-	"github.com/onflow/flow-go/network/p2p/unicast/unicastmgr"
 	"github.com/onflow/flow-go/network/p2p/utils"
 	validator "github.com/onflow/flow-go/network/validator/pubsub"
 	"github.com/onflow/flow-go/utils/logging"
@@ -95,15 +94,14 @@ func NodeFixture(
 	}
 
 	parameters := &NodeFixtureParameters{
-		NetworkingType:         flownet.PrivateNetwork,
-		HandlerFunc:            func(network.Stream) {},
-		Unicasts:               nil,
-		Key:                    NetworkingKeyFixtures(t),
-		Address:                unittest.DefaultAddress,
-		Logger:                 logger,
-		Role:                   flow.RoleCollection,
-		CreateStreamRetryDelay: unicastmgr.DefaultRetryDelay,
-		IdProvider:             idProvider,
+		NetworkingType: flownet.PrivateNetwork,
+		HandlerFunc:    func(network.Stream) {},
+		Unicasts:       nil,
+		Key:            NetworkingKeyFixtures(t),
+		Address:        unittest.DefaultAddress,
+		Logger:         logger,
+		Role:           flow.RoleCollection,
+		IdProvider:     idProvider,
 		MetricsCfg: &p2pconfig.MetricsConfig{
 			HeroCacheFactory: metrics.NewNoopHeroCacheMetricsFactory(),
 			Metrics:          metrics.NewNoopCollector(),
@@ -233,7 +231,6 @@ type NodeFixtureParameters struct {
 	ResourceManager                   network.ResourceManager
 	PubSubTracer                      p2p.PubSubTracer
 	GossipSubPeerScoreTracerInterval  time.Duration // intervals at which the peer score is updated and logged.
-	CreateStreamRetryDelay            time.Duration
 	GossipSubRpcInspectorSuiteFactory p2p.GossipSubRpcInspectorSuiteFactoryFunc
 	FlowConfig                        *config.FlowConfig
 }
@@ -258,7 +255,7 @@ func OverrideFlowConfig(cfg *config.FlowConfig) NodeFixtureParameterOption {
 
 func WithCreateStreamRetryDelay(delay time.Duration) NodeFixtureParameterOption {
 	return func(p *NodeFixtureParameters) {
-		p.CreateStreamRetryDelay = delay
+		p.UnicastConfig.StreamRetryInterval = delay
 	}
 }
 

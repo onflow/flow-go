@@ -315,8 +315,16 @@ func TestCreateStream_SinglePeerDial(t *testing.T) {
 	// mock metrics we expected only a single call to CreateStream to initiate the dialing to the peer, which will result in 3 failed attempts
 	// the next call to CreateStream will encounter a DialInProgress error which will result in 3 failed attempts
 	m := mockmodule.NewNetworkMetrics(t)
-	m.On("OnPeerDialFailure", mock.Anything, mock.Anything).Twice()
-	m.On("OnStreamCreationFailure", mock.Anything, mock.Anything).Twice().Run(func(args mock.Arguments) {})
+	m.On("OnPeerDialFailure", mock.Anything, 3).Once()
+	m.On("OnStreamCreationFailure", mock.Anything, mock.Anything).Twice().Run(func(args mock.Arguments) {
+		attempts := args.Get(1).(int)
+		// We expect OnCreateStream to be called twice: once in each separate call to CreateStream. The first call that initializes
+		// the peer dialing should not attempt to retry CreateStream because all peer dialing attempts will be made which will not
+		// return the DialInProgress err that kicks off the CreateStream retries so we expect attempts to be 1 in this case. In the
+		// second call to CreateStream we expect all 3 attempts to be made as we wait for the DialInProgress to complete, in this case
+		// we expect attempts to be 3. Thus we only expect this method to be called twice with either 1 or 3 attempts.
+		require.False(t, attempts != 1 && attempts != 3, fmt.Sprintf("expected either 1 or 3 attempts got %d", attempts))
+	})
 
 	sender, id1 := p2ptest.NodeFixture(t, sporkID, t.Name(), idProvider, p2ptest.WithConnectionGater(p2ptest.NewConnectionGater(idProvider, func(pid peer.ID) error {
 		// avoid connection gating outbound messages on sender
@@ -355,16 +363,16 @@ func TestCreateStream_SinglePeerDial(t *testing.T) {
 		require.Error(t, err)
 	}()
 
-	unittest.RequireReturnsBefore(t, wg.Wait, 10*time.Second, "cannot create streams on time")
+	unittest.RequireReturnsBefore(t, wg.Wait, 3*time.Second, "cannot create streams on time")
 
 	cfg, err := config.DefaultConfig()
 	require.NoError(t, err)
 
 	// we expect a single routine to start attempting to dial thus the number of retries
 	// before failure should be at most p2pnode.UnicastMaxDialRetryAttemptTimes
-	expectedNumOfDialRetries := int64(2 * cfg.NetworkConfig.UnicastMaxDialRetryAttemptTimes)
+	expectedNumOfDialRetries := int64(cfg.NetworkConfig.UnicastMaxDialRetryAttemptTimes)
 	// we expect the second routine to retry creating a stream p2pnode.UnicastMaxDialRetryAttemptTimes when dialing is in progress
-	expectedCreateStreamRetries := int64(2)
+	expectedCreateStreamRetries := int64(cfg.NetworkConfig.UnicastMaxStreamCreationRetryAttemptTimes)
 	require.Equal(t, expectedNumOfDialRetries, dialPeerRetries.Load(), fmt.Sprintf("expected %d dial peer retries got %d", expectedNumOfDialRetries, dialPeerRetries.Load()))
 	require.Equal(t, expectedCreateStreamRetries, createStreamRetries.Load(), fmt.Sprintf("expected %d dial peer retries got %d", expectedCreateStreamRetries, createStreamRetries.Load()))
 }

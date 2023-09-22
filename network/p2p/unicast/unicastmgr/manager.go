@@ -26,11 +26,7 @@ import (
 
 const (
 	// MaxRetryJitter is the maximum number of milliseconds to wait between attempts for a 1-1 direct connection
-	MaxRetryJitter = 5 * time.Millisecond
-
-	// DefaultRetryDelay Initial delay between failing to establish a connection with another node and retrying. This delay
-	// increases exponentially (exponential backoff) with the number of subsequent failures to establish a connection.
-	DefaultRetryDelay = 1 * time.Second
+	MaxRetryJitter = 5
 )
 
 var (
@@ -472,7 +468,7 @@ func retryBackoff(maxAttempts uint64) retry.Backoff {
 	// create backoff
 	backoff := retry.NewConstant(time.Second)
 	// add a MaxRetryJitter*time.Millisecond jitter to our backoff to ensure that this node and the target node don't attempt to reconnect at the same time
-	backoff = retry.WithJitter(MaxRetryJitter, backoff)
+	backoff = retry.WithJitter(MaxRetryJitter*time.Millisecond, backoff)
 	maxRetries := maxAttempts
 	if maxAttempts >= 0 {
 		// https://github.com/sethvargo/go-retry#maxretries retries counter starts at zero and library will make last attempt
