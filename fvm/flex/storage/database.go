@@ -16,6 +16,9 @@ import (
 // TODO: add a vault to hold on to the passed Cadence token vaults under Flex account
 // this could make sure even if there is a bug in EVM there won't be more withdraws
 
+// TODO: I put a lot of functionality into this database, but it could later on be by different
+// components holding access to the ledger or runtime.Environment
+
 var (
 	// err not implemented
 	errNotImplemented = errors.New("not implemented yet")

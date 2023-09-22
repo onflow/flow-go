@@ -2,6 +2,7 @@ package env
 
 import (
 	"bytes"
+	"encoding/binary"
 	"math/big"
 
 	"github.com/onflow/flow-go/fvm/flex/models"
@@ -25,6 +26,7 @@ type Environment struct {
 	Database          *storage.Database
 	State             *state.StateDB
 	LastExecutedBlock *models.FlexBlock
+	UUIDIndex         uint64
 	Result            *Result
 	Used              bool
 }
@@ -62,6 +64,7 @@ func NewEnvironment(
 		State:             execState,
 		Result:            &Result{},
 		LastExecutedBlock: lastExcutedBlock,
+		UUIDIndex:         lastExcutedBlock.UUIDIndex,
 		Used:              false,
 	}, nil
 }
@@ -102,6 +105,7 @@ func (fe *Environment) commit() error {
 	}
 
 	newBlock := models.NewFlexBlock(fe.LastExecutedBlock.Height,
+		fe.UUIDIndex,
 		newRoot,
 		types.EmptyRootHash,
 	)
@@ -116,6 +120,35 @@ func (fe *Environment) commit() error {
 	return nil
 }
 
+// TODO: properly use an address generator (zeros + random section) and verify collision
+// TODO: does this leads to trie depth issue?
+func (fe *Environment) AllocateAddressAndMintTo(balance *big.Int) (*models.FlexAddress, error) {
+	if err := fe.checkExecuteOnce(); err != nil {
+		return nil, err
+	}
+
+	target := fe.allocateAddress()
+	fe.mintTo(balance, target.ToCommon())
+
+	// TODO: emit an event
+
+	return target, fe.commit()
+}
+
+func (fe *Environment) allocateAddress() *models.FlexAddress {
+	target := models.FlexAddress{}
+	// first 12 bytes would be zero
+	// the next 8 bytes would be incremented of uuid
+	binary.BigEndian.PutUint64(target[12:], fe.LastExecutedBlock.UUIDIndex)
+	fe.UUIDIndex++
+
+	// TODO: if account exist try some new number
+	// if fe.State.Exist(target.ToCommon()) {
+	// }
+
+	return &target
+}
+
 // MintTo mints tokens into the target address, if the address dees not
 // exist it would create it first.
 //
@@ -127,6 +160,12 @@ func (fe *Environment) MintTo(balance *big.Int, target common.Address) error {
 		return err
 	}
 
+	fe.mintTo(balance, target)
+
+	return fe.commit()
+}
+
+func (fe *Environment) mintTo(balance *big.Int, target common.Address) {
 	// update the gas consumed // TODO: revisit
 	// do it as the very first thing to prevent attacks
 	fe.Result.GasConsumed = TransferGasUsage
@@ -142,8 +181,6 @@ func (fe *Environment) MintTo(balance *big.Int, target common.Address) error {
 	// we don't need to increment any nonce, given the origin doesn't exist
 
 	// TODO: emit an event
-
-	return fe.commit()
 }
 
 // WithdrawFrom deduct the balance from the given source account.
