@@ -6,7 +6,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	mocks "github.com/stretchr/testify/mock"
 
@@ -65,7 +64,7 @@ func newWorkerTest(t *testing.T, availableBlocks int, lastIndexedIndex int) *wor
 	}
 
 	test.worker = NewExecutionStateWorker(
-		zerolog.Nop(),
+		unittest.Logger(),
 		test.first().Header.Height,
 		testTimeout,
 		indexerTest.indexer,
@@ -133,7 +132,7 @@ func TestWorker_Success(t *testing.T) {
 	test := newWorkerTest(t, blocks, lastIndexedIndex)
 
 	test.setBlockDataByID(func(ID flow.Identifier) (*execution_data.BlockExecutionDataEntity, bool) {
-		trie := trieUpdateFixture()
+		trie := trieUpdateFixture(t)
 		ed := &execution_data.BlockExecutionData{
 			BlockID: ID,
 			ChunkExecutionDatas: []*execution_data.ChunkExecutionData{
@@ -174,7 +173,7 @@ func TestWorker_Failure(t *testing.T) {
 	test := newWorkerTest(t, blocks, lastIndexedIndex)
 
 	test.setBlockDataByID(func(ID flow.Identifier) (*execution_data.BlockExecutionDataEntity, bool) {
-		trie := trieUpdateFixture()
+		trie := trieUpdateFixture(t)
 		ed := &execution_data.BlockExecutionData{
 			BlockID: ID,
 			ChunkExecutionDatas: []*execution_data.ChunkExecutionData{

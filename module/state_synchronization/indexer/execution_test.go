@@ -322,7 +322,7 @@ func storeRegisterWithValue(indexer *ExecutionState, height uint64, owner string
 }
 
 func initRegisterStorage() storage.RegisterIndex {
-	return memory.NewRegisters(0, 0, zerolog.Nop())
+	return memory.NewRegisters(0, 0, unittest.Logger())
 }
 
 func TestIntegration_StoreAndGet(t *testing.T) {
@@ -332,7 +332,7 @@ func TestIntegration_StoreAndGet(t *testing.T) {
 
 	// this test makes sure index values for a single register are correctly updated and always last value is returned
 	t.Run("Single Index Value Changes", func(t *testing.T) {
-		indexer, err := New(zerolog.Nop(), initRegisterStorage(), nil, nil)
+		indexer, err := New(unittest.Logger(), initRegisterStorage(), nil, nil)
 		require.NoError(t, err)
 
 		values := [][]byte{
@@ -357,7 +357,7 @@ func TestIntegration_StoreAndGet(t *testing.T) {
 	// the correct highest height indexed value is returned.
 	// e.g. we index A{h(1) -> X}, A{h(2) -> Y}, when we request h(5) we get value Y
 	t.Run("Single Index Value At Later Heights", func(t *testing.T) {
-		indexer, err := New(zerolog.Nop(), initRegisterStorage(), nil, nil)
+		indexer, err := New(unittest.Logger(), initRegisterStorage(), nil, nil)
 		require.NoError(t, err)
 
 		value := []byte("1")
@@ -386,7 +386,7 @@ func TestIntegration_StoreAndGet(t *testing.T) {
 
 	// this test makes sure we correctly handle weird payloads
 	t.Run("Empty and Nil Payloads", func(t *testing.T) {
-		indexer, err := New(zerolog.Nop(), initRegisterStorage(), nil, nil)
+		indexer, err := New(unittest.Logger(), initRegisterStorage(), nil, nil)
 		require.NoError(t, err)
 
 		require.NoError(t, indexer.indexRegisterPayloads([]*ledger.Payload{}, 1))
@@ -397,11 +397,11 @@ func TestIntegration_StoreAndGet(t *testing.T) {
 
 	// this test makes sure correct values are used to initialize range no matter the init value provided
 	t.Run("Initialize Indexer", func(t *testing.T) {
-		logger := zerolog.Nop()
+		logger := unittest.Logger()
 		first := uint64(5)
 		last := uint64(10)
 		registers := memory.NewRegisters(first, last, logger)
-		indexer, err := New(zerolog.Nop(), registers, nil, nil)
+		indexer, err := New(unittest.Logger(), registers, nil, nil)
 		require.NoError(t, err)
 
 		assert.Equal(t, first, indexer.indexRange.First())
@@ -409,7 +409,7 @@ func TestIntegration_StoreAndGet(t *testing.T) {
 
 		empty := uint64(math.MaxUint64) // we use this value to trigger memory db to return empty
 		registers = memory.NewRegisters(empty, empty, logger)
-		indexer, err = New(zerolog.Nop(), registers, nil, nil)
+		indexer, err = New(unittest.Logger(), registers, nil, nil)
 		require.ErrorIs(t, err, storage.ErrNotFound)
 		require.EqualError(t, err, "failed to initialize the indexer with missing first height: key not found")
 	})
