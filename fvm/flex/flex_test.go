@@ -76,6 +76,8 @@ func TestFlexAddressConstructionAndReturn(t *testing.T) {
 			cadence.UInt8(10), cadence.UInt8(10),
 		}
 
+		bytesType := cadence.NewConstantSizedArrayType(20, cadence.TheUInt8Type)
+
 		runtimeInterface := &testRuntimeInterface{
 			storage: led,
 			decodeArgument: func(b []byte, t cadence.Type) (cadence.Value, error) {
@@ -87,12 +89,7 @@ func TestFlexAddressConstructionAndReturn(t *testing.T) {
 			runtime.Script{
 				Source: script,
 				Arguments: encodeArgs([]cadence.Value{
-					cadence.Array{
-						ArrayType: &cadence.VariableSizedArrayType{
-							ElementType: cadence.UInt8Type{},
-						},
-						Values: input,
-					},
+					cadence.NewArray(input).WithType(bytesType),
 				}),
 			},
 			runtime.Context{
@@ -102,8 +99,6 @@ func TestFlexAddressConstructionAndReturn(t *testing.T) {
 			},
 		)
 		require.NoError(t, err)
-
-		bytesType := cadence.NewConstantSizedArrayType(20, cadence.TheUInt8Type)
 
 		assert.Equal(t,
 			cadence.Struct{
