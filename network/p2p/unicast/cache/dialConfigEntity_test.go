@@ -7,6 +7,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	p2ptest "github.com/onflow/flow-go/network/p2p/test"
+	"github.com/onflow/flow-go/network/p2p/unicast"
 	unicastcache "github.com/onflow/flow-go/network/p2p/unicast/cache"
 )
 
@@ -16,7 +17,7 @@ func TestDialConfigEntity(t *testing.T) {
 
 	d := &unicastcache.DialConfigEntity{
 		PeerId: peerID,
-		DialConfig: manager.DialConfig{
+		DialConfig: unicast.DialConfig{
 			DialRetryAttemptBudget:           10,
 			StreamCreationRetryAttemptBudget: 20,
 			LastSuccessfulDial:               time.Now(),
@@ -46,7 +47,7 @@ func TestDialConfigEntity(t *testing.T) {
 
 		d3 := &unicastcache.DialConfigEntity{
 			PeerId: d.PeerId,
-			DialConfig: manager.DialConfig{
+			DialConfig: unicast.DialConfig{
 				DialRetryAttemptBudget:           100,
 				StreamCreationRetryAttemptBudget: 200,
 				LastSuccessfulDial:               time.Now(),

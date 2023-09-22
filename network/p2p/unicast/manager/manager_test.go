@@ -18,6 +18,7 @@ import (
 	p2ptest "github.com/onflow/flow-go/network/p2p/test"
 	"github.com/onflow/flow-go/network/p2p/unicast"
 	unicastcache "github.com/onflow/flow-go/network/p2p/unicast/cache"
+	"github.com/onflow/flow-go/network/p2p/unicast/manager"
 	"github.com/onflow/flow-go/network/p2p/unicast/stream"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -30,8 +31,8 @@ func unicastManagerFixture(t *testing.T) (*manager.Manager, *mockp2p.StreamFacto
 	cfg, err := config.DefaultConfig()
 	require.NoError(t, err)
 
-	dialConfigCache := unicastcache.NewDialConfigCache(cfg.NetworkConfig.UnicastDialConfigCacheSize, unittest.Logger(), metrics.NewNoopCollector(), func() manager.DialConfig {
-		return manager.DialConfig{
+	dialConfigCache := unicastcache.NewDialConfigCache(cfg.NetworkConfig.UnicastDialConfigCacheSize, unittest.Logger(), metrics.NewNoopCollector(), func() unicast.DialConfig {
+		return unicast.DialConfig{
 			DialRetryAttemptBudget:           cfg.NetworkConfig.UnicastMaxDialRetryAttemptTimes,
 			StreamCreationRetryAttemptBudget: cfg.NetworkConfig.UnicastMaxStreamCreationRetryAttemptTimes,
 		}
@@ -47,7 +48,7 @@ func unicastManagerFixture(t *testing.T) (*manager.Manager, *mockp2p.StreamFacto
 		DialZeroRetryResetThreshold:        cfg.NetworkConfig.UnicastDialZeroRetryResetThreshold,
 		MaxStreamCreationRetryAttemptTimes: cfg.NetworkConfig.UnicastMaxStreamCreationRetryAttemptTimes,
 		MaxDialRetryAttemptTimes:           cfg.NetworkConfig.UnicastMaxDialRetryAttemptTimes,
-		DialConfigCacheFactory: func(func() manager.DialConfig) unicast.DialConfigCache {
+		DialConfigCacheFactory: func(func() unicast.DialConfig) unicast.DialConfigCache {
 			return dialConfigCache
 		},
 	})
@@ -70,7 +71,7 @@ func TestUnicastManager_Connection_ConnectionBackoff(t *testing.T) {
 	connStatus.On("IsConnected", peerID).Return(false, nil)                                                                                                              // not connected
 	streamFactory.On("Connect", mock.Anything, peer.AddrInfo{ID: peerID}).Return(fmt.Errorf("some error")).Times(int(cfg.NetworkConfig.UnicastMaxDialRetryAttemptTimes)) // connect
 
-	_, err = dialConfigCache.Adjust(peerID, func(dialConfig manager.DialConfig) (manager.DialConfig, error) {
+	_, err = dialConfigCache.Adjust(peerID, func(dialConfig unicast.DialConfig) (unicast.DialConfig, error) {
 		// assumes that there was a successful connection to the peer before (2 minutes ago), and now the connection is lost.
 		dialConfig.LastSuccessfulDial = time.Now().Add(2 * time.Minute)
 		return dialConfig, nil
@@ -251,7 +252,7 @@ func TestUnicastManager_Stream_ConsecutiveStreamCreation_Reset(t *testing.T) {
 		Once() // mocks that it attempts to create a stream once and fails.
 	connStatus.On("IsConnected", peerID).Return(true, nil) // connected.
 
-	adjustedDialConfig, err := dialConfigCache.Adjust(peerID, func(dialConfig manager.DialConfig) (manager.DialConfig, error) {
+	adjustedDialConfig, err := dialConfigCache.Adjust(peerID, func(dialConfig unicast.DialConfig) (unicast.DialConfig, error) {
 		dialConfig.ConsecutiveSuccessfulStream = 5      // sets the consecutive successful stream to 5 meaning that the last 5 stream creation attempts were successful.
 		dialConfig.StreamCreationRetryAttemptBudget = 0 // sets the stream back budget to 0 meaning that the stream backoff budget is exhausted.
 
@@ -502,7 +503,7 @@ func TestUnicastManager_Stream_BackoffBudgetResetToDefault(t *testing.T) {
 	streamFactory.On("NewStream", mock.Anything, peerID, mock.Anything).Return(&p2ptest.MockStream{}, nil).Once()
 
 	// update the dial config of the peer to have a zero stream backoff budget but a consecutive successful stream counter above the reset threshold.
-	adjustedCfg, err := dialConfigCache.Adjust(peerID, func(dialConfig manager.DialConfig) (manager.DialConfig, error) {
+	adjustedCfg, err := dialConfigCache.Adjust(peerID, func(dialConfig unicast.DialConfig) (unicast.DialConfig, error) {
 		dialConfig.StreamCreationRetryAttemptBudget = 0
 		dialConfig.ConsecutiveSuccessfulStream = cfg.NetworkConfig.UnicastStreamZeroRetryResetThreshold + 1
 		return dialConfig, nil
@@ -543,7 +544,7 @@ func TestUnicastManager_Stream_BackoffConnectionBudgetResetToDefault(t *testing.
 	streamFactory.On("NewStream", mock.Anything, peerID, mock.Anything).Return(&p2ptest.MockStream{}, nil).Once()
 
 	// update the dial config of the peer to have a zero dial backoff budget but it has not been long enough since the last successful dial.
-	adjustedCfg, err := dialConfigCache.Adjust(peerID, func(dialConfig manager.DialConfig) (manager.DialConfig, error) {
+	adjustedCfg, err := dialConfigCache.Adjust(peerID, func(dialConfig unicast.DialConfig) (unicast.DialConfig, error) {
 		dialConfig.DialRetryAttemptBudget = 0
 		dialConfig.LastSuccessfulDial = time.Now().Add(-cfg.NetworkConfig.UnicastDialZeroRetryResetThreshold)
 		return dialConfig, nil
@@ -582,7 +583,7 @@ func TestUnicastManager_Connection_NoBackoff_When_Budget_Is_Zero(t *testing.T) {
 	streamFactory.On("Connect", mock.Anything, peer.AddrInfo{ID: peerID}).Return(fmt.Errorf("some error")).Once() // connection is tried only once and fails.
 
 	// update the dial config of the peer to have a zero dial backoff, and the last successful dial is not within the threshold.
-	adjustedCfg, err := dialConfigCache.Adjust(peerID, func(dialConfig manager.DialConfig) (manager.DialConfig, error) {
+	adjustedCfg, err := dialConfigCache.Adjust(peerID, func(dialConfig unicast.DialConfig) (unicast.DialConfig, error) {
 		dialConfig.DialRetryAttemptBudget = 0                             // set the dial backoff budget to 0, meaning that the dial backoff budget is exhausted.
 		dialConfig.LastSuccessfulDial = time.Now().Add(-10 * time.Minute) // last successful dial is not within the threshold.
 		dialConfig.ConsecutiveSuccessfulStream = 2                        // set the consecutive successful stream to 2, meaning that the last 2 stream creation attempts were successful.
@@ -623,7 +624,7 @@ func TestUnicastManager_Stream_NoBackoff_When_Budget_Is_Zero(t *testing.T) {
 
 	// update the dial config of the peer to have a zero dial backoff, and the last successful dial is not within the threshold.
 	lastSuccessfulDial := time.Now().Add(-10 * time.Minute)
-	adjustedCfg, err := dialConfigCache.Adjust(peerID, func(dialConfig manager.DialConfig) (manager.DialConfig, error) {
+	adjustedCfg, err := dialConfigCache.Adjust(peerID, func(dialConfig unicast.DialConfig) (unicast.DialConfig, error) {
 		dialConfig.LastSuccessfulDial = lastSuccessfulDial // last successful dial is not within the threshold.
 		dialConfig.ConsecutiveSuccessfulStream = 2         // set the consecutive successful stream to 2, which is below the reset threshold.
 		dialConfig.StreamCreationRetryAttemptBudget = 0    // set the stream backoff budget to 0, meaning that the stream backoff budget is exhausted.
