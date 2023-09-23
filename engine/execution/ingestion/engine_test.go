@@ -201,7 +201,7 @@ func TestExecuteOneBlock(t *testing.T) {
 		require.True(t, ctx.fetcher.IsFetched(col.ID()))
 
 		// verify block is executed
-		store.AssertExecuted(t, blockA.ID())
+		store.AssertExecuted(t, "A", blockA.ID())
 	})
 }
 
@@ -246,8 +246,8 @@ func TestExecuteBlocks(t *testing.T) {
 		require.True(t, ctx.fetcher.IsFetched(col2.ID()))
 
 		// verify block is executed
-		store.AssertExecuted(t, blockA.ID())
-		store.AssertExecuted(t, blockB.ID())
+		store.AssertExecuted(t, "A", blockA.ID())
+		store.AssertExecuted(t, "B", blockB.ID())
 	})
 }
 
@@ -297,8 +297,8 @@ func TestExecuteNextBlockIfCollectionIsReady(t *testing.T) {
 		require.False(t, ctx.fetcher.IsFetched(col2.ID()))
 
 		// verify block is executed
-		store.AssertExecuted(t, blockA.ID())
-		store.AssertExecuted(t, blockB.ID())
+		store.AssertExecuted(t, "A", blockA.ID())
+		store.AssertExecuted(t, "B", blockB.ID())
 	})
 }
 
@@ -347,7 +347,7 @@ func TestExecuteBlockOnlyOnce(t *testing.T) {
 		require.True(t, ctx.fetcher.IsFetched(col.ID()))
 
 		// verify block is executed
-		store.AssertExecuted(t, blockA.ID())
+		store.AssertExecuted(t, "A", blockA.ID())
 	})
 }
 
@@ -394,8 +394,8 @@ func TestExecuteForkConcurrently(t *testing.T) {
 		unittest.AssertReturnsBefore(t, wg.Wait, 10*time.Second)
 
 		// verify block is executed
-		store.AssertExecuted(t, blockA.ID())
-		store.AssertExecuted(t, blockB.ID())
+		store.AssertExecuted(t, "A", blockA.ID())
+		store.AssertExecuted(t, "B", blockB.ID())
 	})
 }
 
@@ -450,9 +450,9 @@ func TestExecuteBlockInOrder(t *testing.T) {
 		unittest.AssertReturnsBefore(t, wg.Wait, 10*time.Second)
 
 		// verify block is executed
-		store.AssertExecuted(t, blockA.ID())
-		store.AssertExecuted(t, blockB.ID())
-		store.AssertExecuted(t, blockC.ID())
+		store.AssertExecuted(t, "A", blockA.ID())
+		store.AssertExecuted(t, "B", blockB.ID())
+		store.AssertExecuted(t, "C", blockC.ID())
 	})
 }
 
@@ -524,11 +524,11 @@ func TestStopAtHeightWhenFinalizedBeforeExecuted(t *testing.T) {
 		unittest.AssertReturnsBefore(t, wg.Wait, 10*time.Second)
 
 		// since stop height is C, verify that only A and B are executed, C and D are not executed
-		store.AssertExecuted(t, blockA.ID())
-		store.AssertExecuted(t, blockB.ID())
+		store.AssertExecuted(t, "A", blockA.ID())
+		store.AssertExecuted(t, "B", blockB.ID())
 
-		store.AssertNotExecuted(t, blockC.ID())
-		store.AssertNotExecuted(t, blockD.ID())
+		store.AssertNotExecuted(t, "C", blockC.ID())
+		store.AssertNotExecuted(t, "D", blockD.ID())
 	})
 }
 
@@ -587,10 +587,11 @@ func TestStopAtHeightWhenExecutedBeforeFinalized(t *testing.T) {
 		unittest.AssertReturnsBefore(t, wg.Wait, 10*time.Second)
 
 		// since stop height is C, verify that only A and B are executed, C and D are not executed
-		store.AssertExecuted(t, blockA.ID())
-		store.AssertExecuted(t, blockB.ID())
-		store.AssertNotExecuted(t, blockC.ID())
-		store.AssertNotExecuted(t, blockD.ID())
+		store.AssertExecuted(t, "A", blockA.ID())
+		store.AssertExecuted(t, "B", blockB.ID())
+
+		store.AssertNotExecuted(t, "C", blockC.ID())
+		store.AssertNotExecuted(t, "D", blockD.ID())
 	})
 }
 
@@ -649,9 +650,9 @@ func TestStopAtHeightWhenExecutionFinalization(t *testing.T) {
 		unittest.AssertReturnsBefore(t, wg.Wait, 10*time.Second)
 
 		// since stop height is C, verify that only A and B are executed, C and D are not executed
-		store.AssertExecuted(t, blockA.ID())
-		store.AssertNotExecuted(t, blockB.ID())
-		store.AssertNotExecuted(t, blockC.ID())
+		store.AssertExecuted(t, "A", blockA.ID())
+		store.AssertNotExecuted(t, "B", blockB.ID())
+		store.AssertNotExecuted(t, "C", blockC.ID())
 	})
 }
 
@@ -696,7 +697,7 @@ func TestExecutedBlockUploadedFailureDoesntBlock(t *testing.T) {
 		require.True(t, ctx.fetcher.IsFetched(col.ID()))
 
 		// verify block is executed
-		store.AssertExecuted(t, blockA.ID())
+		store.AssertExecuted(t, "A", blockA.ID())
 	})
 }
 
@@ -777,17 +778,15 @@ func (ctx *testingContext) mockSaveExecutionResults(store *mocks.MockBlockStore,
 		On("SaveExecutionResults", mock.Anything, mock.Anything)
 
 	mocked.RunFn = func(args mock.Arguments) {
-		defer func() {
-			wg.Done()
-		}()
-
 		result := args[1].(*execution.ComputationResult)
 
 		err := store.MarkExecuted(result)
 		if err != nil {
 			mocked.ReturnArguments = mock.Arguments{err}
+			wg.Done()
 			return
 		}
 		mocked.ReturnArguments = mock.Arguments{nil}
+		wg.Done()
 	}
 }

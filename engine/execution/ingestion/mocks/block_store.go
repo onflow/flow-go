@@ -120,16 +120,16 @@ func (bs *MockBlockStore) GetExecuted(blockID flow.Identifier) (*BlockResult, er
 	return result, nil
 }
 
-func (bs *MockBlockStore) AssertExecuted(t *testing.T, blocks ...flow.Identifier) {
-	for _, blockID := range blocks {
-		_, exist := bs.Executed[blockID]
-		require.True(t, exist, "block %s not executed", blockID)
-	}
+func (bs *MockBlockStore) AssertExecuted(t *testing.T, alias string, block flow.Identifier) {
+	bs.Lock()
+	defer bs.Unlock()
+	_, exist := bs.Executed[block]
+	require.True(t, exist, "block %s not executed", alias)
 }
 
-func (bs *MockBlockStore) AssertNotExecuted(t *testing.T, blocks ...flow.Identifier) {
-	for _, blockID := range blocks {
-		_, exist := bs.Executed[blockID]
-		require.False(t, exist, "block %s executed", blockID)
-	}
+func (bs *MockBlockStore) AssertNotExecuted(t *testing.T, alias string, block flow.Identifier) {
+	bs.Lock()
+	defer bs.Unlock()
+	_, exist := bs.Executed[block]
+	require.False(t, exist, "block %s executed", alias)
 }
