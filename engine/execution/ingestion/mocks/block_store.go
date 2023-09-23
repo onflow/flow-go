@@ -75,13 +75,14 @@ func (bs *MockBlockStore) MarkExecuted(computationResult *execution.ComputationR
 	return nil
 }
 
-func (bs *MockBlockStore) CreateBlockAndMockResult(t *testing.T, parent flow.Identifier, block *entity.ExecutableBlock) *execution.ComputationResult {
+func (bs *MockBlockStore) CreateBlockAndMockResult(t *testing.T, block *entity.ExecutableBlock) *execution.ComputationResult {
 	bs.Lock()
 	defer bs.Unlock()
 	blockID := block.ID()
 	_, exist := bs.ResultByBlock[blockID]
 	require.False(t, exist, "block %s already exists", blockID)
 
+	parent := block.Block.Header.ParentID
 	parentResult, ok := bs.ResultByBlock[parent]
 	require.True(t, ok, "parent block %s not found", parent)
 

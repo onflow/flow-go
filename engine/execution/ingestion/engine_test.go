@@ -464,19 +464,20 @@ func TestExecuteOneBlock(t *testing.T) {
 		col := unittest.CollectionFixture(1)
 		// Root <- A
 		blockA := makeBlockWithCollection(store.RootBlock, &col)
-		result := store.CreateBlockAndMockResult(t, store.RootBlock.ID(), blockA)
+		result := store.CreateBlockAndMockResult(t, blockA)
 
-		wg := sync.WaitGroup{}
-		wg.Add(1) // wait for block B to be executed
 		ctx.mockStateCommitmentByBlockID(store)
 		ctx.mockGetExecutionResultID(store)
 		ctx.executionState.On("NewStorageSnapshot", mock.Anything).Return(nil)
-		ctx.mockComputeBlock(store)
 
 		// receive block
 		err := ctx.engine.handleBlock(context.Background(), blockA.Block)
 		require.NoError(t, err)
 
+		wg := sync.WaitGroup{}
+		wg.Add(1) // wait for block B to be executed
+
+		ctx.mockComputeBlock(store)
 		ctx.mockSaveExecutionResults(store, &wg)
 
 		// verify upload will be called
@@ -503,53 +504,53 @@ func TestExecuteOneBlock(t *testing.T) {
 	})
 }
 
-// // verify block will be executed if collection is received first
-// func TestExecuteBlocks(t *testing.T) {
-//
-// 	runWithEngine(t, func(ctx testingContext) {
-// 		col1 := unittest.CollectionFixture(1)
-// 		col2 := unittest.CollectionFixture(1)
-// 		// Root <- A
-// 		blockRoot := unittest.BlockHeaderFixture()
-// 		blockA := makeBlockWithCollection(blockRoot, &col1)
-// 		blockB := makeBlockWithCollection(blockA.Header, &col2)
-//
-// 		// blockA's start state is its parent's state commitment,
-// 		// and blockA's parent has been executed.
-// 		commits := make(map[flow.Identifier]flow.StateCommitment)
-// 		commits[blockA.Header.ParentID] = unittest.StateCommitmentFixture()
-// 		ctx.mockStateCommitsWithMap(commits)
-//
-// 		// receive block
-// 		err := ctx.engine.handleBlock(context.Background(), blockA)
-// 		require.NoError(t, err)
-//
-// 		err = ctx.engine.handleBlock(context.Background(), blockB)
-// 		require.NoError(t, err)
-//
-// 		wg := sync.WaitGroup{}
-// 		wg.Add(2) // wait for block B to be executed
-//
-// 		// mock execution state
-// 		ctx.assertExecution(commits, blockA, unittest.IdentifierFixture(), &wg)
-// 		ctx.assertExecution(commits, blockB, unittest.IdentifierFixture(), &wg)
-//
-// 		require.NoError(t, ctx.engine.handleCollection(unittest.IdentifierFixture(), &col2))
-// 		require.NoError(t, ctx.engine.handleCollection(unittest.IdentifierFixture(), &col1))
-//
-// 		unittest.AssertReturnsBefore(t, wg.Wait, 10*time.Second)
-//
-// 		// verify collection is fetched
-// 		require.True(t, ctx.fetcher.IsFetched(col1.ID()))
-// 		require.True(t, ctx.fetcher.IsFetched(col2.ID()))
-//
-// 		// verify block is executed
-// 		_, ok := commits[blockA.ID()]
-// 		require.True(t, ok)
-// 		_, ok = commits[blockB.ID()]
-// 		require.True(t, ok)
-// 	})
-// }
+// verify block will be executed if collection is received first
+func TestExecuteBlocks(t *testing.T) {
+
+	runWithEngine(t, func(ctx testingContext) {
+		store := mocks.NewMockBlockStore(t)
+
+		col1 := unittest.CollectionFixture(1)
+		col2 := unittest.CollectionFixture(1)
+		// Root <- A[C1] <- B[C2]
+		blockA := makeBlockWithCollection(store.RootBlock, &col1)
+		blockB := makeBlockWithCollection(blockA.Block.Header, &col2)
+		store.CreateBlockAndMockResult(t, blockA)
+		store.CreateBlockAndMockResult(t, blockB)
+
+		ctx.mockStateCommitmentByBlockID(store)
+		ctx.mockGetExecutionResultID(store)
+		ctx.executionState.On("NewStorageSnapshot", mock.Anything).Return(nil)
+		ctx.mockComputeBlock(store)
+		ctx.providerEngine.On("BroadcastExecutionReceipt", mock.Anything, mock.Anything, mock.Anything).Return(false, nil)
+
+		// receive block
+		err := ctx.engine.handleBlock(context.Background(), blockA.Block)
+		require.NoError(t, err)
+
+		err = ctx.engine.handleBlock(context.Background(), blockB.Block)
+		require.NoError(t, err)
+
+		wg := sync.WaitGroup{}
+		wg.Add(2) // wait for 2 blocks to be executed
+
+		ctx.mockComputeBlock(store)
+		ctx.mockSaveExecutionResults(store, &wg)
+
+		require.NoError(t, ctx.engine.handleCollection(unittest.IdentifierFixture(), &col2))
+		require.NoError(t, ctx.engine.handleCollection(unittest.IdentifierFixture(), &col1))
+
+		unittest.AssertReturnsBefore(t, wg.Wait, 3*time.Second)
+
+		// verify collection is fetched
+		require.True(t, ctx.fetcher.IsFetched(col1.ID()))
+		require.True(t, ctx.fetcher.IsFetched(col2.ID()))
+
+		// verify block is executed
+		store.AssertExecuted(t, blockA.ID())
+		store.AssertExecuted(t, blockB.ID())
+	})
+}
 
 // verify block will be executed if collection is already in storage
 func TestExecuteNextBlockIfCollectionIsReady(t *testing.T) {
