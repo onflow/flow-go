@@ -213,24 +213,6 @@ func runWithEngine(t *testing.T, f func(testingContext)) {
 	<-engine.Done()
 }
 
-func (ctx *testingContext) assertExecution(
-	commits map[flow.Identifier]flow.StateCommitment,
-	block *entity.ExecutableBlock,
-	previousExecutionResultID flow.Identifier,
-	wg *sync.WaitGroup,
-) *execution.ComputationResult {
-	return ctx.assertSuccessfulBlockComputation(
-		commits,
-		func(blockID flow.Identifier, commit flow.StateCommitment) {
-			wg.Done()
-		},
-		block,
-		previousExecutionResultID,
-		false,
-		unittest.StateCommitmentFixture(),
-		nil)
-}
-
 func (ctx *testingContext) assertSuccessfulBlockComputation(
 	commits map[flow.Identifier]flow.StateCommitment,
 	onPersisted func(blockID flow.Identifier, commit flow.StateCommitment),
@@ -376,82 +358,6 @@ func (ctx *testingContext) mockStateCommitsWithMap(commits map[flow.Identifier]f
 
 		mocked.ReturnArguments = mock.Arguments{flow.StateCommitment{}, storageerr.ErrNotFound}
 	}
-}
-
-func (ctx *testingContext) mockStateCommitmentByBlockID(store *mocks.MockBlockStore) {
-	mocked := ctx.executionState.On("StateCommitmentByBlockID", mock.Anything, mock.Anything)
-	// https://github.com/stretchr/testify/issues/350#issuecomment-570478958
-	mocked.RunFn = func(args mock.Arguments) {
-		blockID := args[1].(flow.Identifier)
-		fmt.Println("mockStateCommitmentByBlockID", blockID)
-		result, err := store.GetExecuted(blockID)
-		if err != nil {
-			mocked.ReturnArguments = mock.Arguments{flow.StateCommitment{}, storageerr.ErrNotFound}
-			return
-		}
-		mocked.ReturnArguments = mock.Arguments{result.Result.CurrentEndState(), nil}
-	}
-}
-
-func (ctx *testingContext) mockGetExecutionResultID(store *mocks.MockBlockStore) {
-
-	mocked := ctx.executionState.On("GetExecutionResultID", mock.Anything, mock.Anything)
-	mocked.RunFn = func(args mock.Arguments) {
-		blockID := args[1].(flow.Identifier)
-		blockResult, err := store.GetExecuted(blockID)
-		if err != nil {
-			mocked.ReturnArguments = mock.Arguments{nil, storageerr.ErrNotFound}
-			return
-		}
-
-		mocked.ReturnArguments = mock.Arguments{
-			blockResult.Result.ExecutionReceipt.ExecutionResult.ID(), nil}
-	}
-}
-
-func (ctx *testingContext) mockComputeBlock(store *mocks.MockBlockStore) {
-	mocked := ctx.computationManager.On("ComputeBlock", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
-	mocked.RunFn = func(args mock.Arguments) {
-		block := args[2].(*entity.ExecutableBlock)
-		blockResult, ok := store.ResultByBlock[block.ID()]
-		if !ok {
-			mocked.ReturnArguments = mock.Arguments{nil, fmt.Errorf("block %s not found", block.ID())}
-			return
-		}
-		mocked.ReturnArguments = mock.Arguments{blockResult.Result, nil}
-	}
-}
-
-func (ctx *testingContext) mockSaveExecutionResults(store *mocks.MockBlockStore, wg *sync.WaitGroup) {
-	mocked := ctx.executionState.
-		On("SaveExecutionResults", mock.Anything, mock.Anything)
-
-	mocked.RunFn = func(args mock.Arguments) {
-		defer func() {
-			wg.Done()
-		}()
-
-		result := args[1].(*execution.ComputationResult)
-
-		err := store.MarkExecuted(result)
-		if err != nil {
-			mocked.ReturnArguments = mock.Arguments{err}
-			return
-		}
-		fmt.Println("mockSaveExecutionResults", result.ExecutableBlock.ID())
-		mocked.ReturnArguments = mock.Arguments{nil}
-	}
-}
-
-func newBlockWithCollection(parent *flow.Header, parentState flow.StateCommitment) *entity.ExecutableBlock {
-	col := unittest.CollectionFixture(1)
-	gua := col.Guarantee()
-
-	colSigner := unittest.IdentifierFixture()
-	block := unittest.ExecutableBlockFixtureWithParent([][]flow.Identifier{{colSigner}}, parent, unittest.StateCommitmentPointerFixture())
-	block.Block.Payload.Guarantees[0] = &gua
-	block.Block.Header.PayloadHash = block.Block.Payload.Hash()
-	return block
 }
 
 // TestExecuteOneBlock verifies after collection is received,
@@ -1042,10 +948,6 @@ func TestExecutedBlockUploadedFailureDoesntBlock(t *testing.T) {
 
 }
 
-type collectionHandler interface {
-	handleCollection(flow.Identifier, *flow.Collection) error
-}
-
 func makeCollection() (*flow.Collection, *flow.CollectionGuarantee) {
 	col := unittest.CollectionFixture(1)
 	gua := col.Guarantee()
@@ -1073,4 +975,69 @@ func makeBlockWithCollection(parent *flow.Header, cols ...*flow.Collection) *ent
 		StartState:          unittest.StateCommitmentPointerFixture(),
 	}
 	return executableBlock
+}
+
+func (ctx *testingContext) mockStateCommitmentByBlockID(store *mocks.MockBlockStore) {
+	mocked := ctx.executionState.On("StateCommitmentByBlockID", mock.Anything, mock.Anything)
+	// https://github.com/stretchr/testify/issues/350#issuecomment-570478958
+	mocked.RunFn = func(args mock.Arguments) {
+		blockID := args[1].(flow.Identifier)
+		fmt.Println("mockStateCommitmentByBlockID", blockID)
+		result, err := store.GetExecuted(blockID)
+		if err != nil {
+			mocked.ReturnArguments = mock.Arguments{flow.StateCommitment{}, storageerr.ErrNotFound}
+			return
+		}
+		mocked.ReturnArguments = mock.Arguments{result.Result.CurrentEndState(), nil}
+	}
+}
+
+func (ctx *testingContext) mockGetExecutionResultID(store *mocks.MockBlockStore) {
+
+	mocked := ctx.executionState.On("GetExecutionResultID", mock.Anything, mock.Anything)
+	mocked.RunFn = func(args mock.Arguments) {
+		blockID := args[1].(flow.Identifier)
+		blockResult, err := store.GetExecuted(blockID)
+		if err != nil {
+			mocked.ReturnArguments = mock.Arguments{nil, storageerr.ErrNotFound}
+			return
+		}
+
+		mocked.ReturnArguments = mock.Arguments{
+			blockResult.Result.ExecutionReceipt.ExecutionResult.ID(), nil}
+	}
+}
+
+func (ctx *testingContext) mockComputeBlock(store *mocks.MockBlockStore) {
+	mocked := ctx.computationManager.On("ComputeBlock", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+	mocked.RunFn = func(args mock.Arguments) {
+		block := args[2].(*entity.ExecutableBlock)
+		blockResult, ok := store.ResultByBlock[block.ID()]
+		if !ok {
+			mocked.ReturnArguments = mock.Arguments{nil, fmt.Errorf("block %s not found", block.ID())}
+			return
+		}
+		mocked.ReturnArguments = mock.Arguments{blockResult.Result, nil}
+	}
+}
+
+func (ctx *testingContext) mockSaveExecutionResults(store *mocks.MockBlockStore, wg *sync.WaitGroup) {
+	mocked := ctx.executionState.
+		On("SaveExecutionResults", mock.Anything, mock.Anything)
+
+	mocked.RunFn = func(args mock.Arguments) {
+		defer func() {
+			wg.Done()
+		}()
+
+		result := args[1].(*execution.ComputationResult)
+
+		err := store.MarkExecuted(result)
+		if err != nil {
+			mocked.ReturnArguments = mock.Arguments{err}
+			return
+		}
+		fmt.Println("mockSaveExecutionResults", result.ExecutableBlock.ID())
+		mocked.ReturnArguments = mock.Arguments{nil}
+	}
 }
