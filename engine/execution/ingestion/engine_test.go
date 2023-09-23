@@ -622,11 +622,11 @@ func TestStopAtHeightWhenExecutionFinalization(t *testing.T) {
 		ctx.providerEngine.On("BroadcastExecutionReceipt", mock.Anything, mock.Anything, mock.Anything).Return(false, nil)
 		ctx.mockComputeBlock(store)
 		wg := sync.WaitGroup{}
-		wg.Add(2) // wait A to be executed and B to be finalized
+		wg.Add(3) // wait A to be executed and B to be finalized
 		ctx.mockSaveExecutionResults(store, &wg)
 
 		// receive blocks
-		go func() {
+		go func(wg *sync.WaitGroup) {
 			err = ctx.engine.handleBlock(context.Background(), blockA.Block)
 			require.NoError(t, err)
 
@@ -635,7 +635,8 @@ func TestStopAtHeightWhenExecutionFinalization(t *testing.T) {
 
 			err = ctx.engine.handleBlock(context.Background(), blockC.Block)
 			require.NoError(t, err)
-		}()
+			wg.Done()
+		}(&wg)
 
 		go func(wg *sync.WaitGroup) {
 			// all blocks finalized
