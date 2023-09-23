@@ -389,8 +389,9 @@ func (s *state) GetHighestExecutedBlockID(ctx context.Context) (uint64, flow.Ide
 	return height, blockID, nil
 }
 
-// IsBlockExecuted returns whether the block has been executed.
-// it checks whether the state commitment exists in execution state.
+// IsBlockExecuted returns true if the block is executed, which means registers, events,
+// results, statecommitment etc are all stored.
+// otherwise returns false
 func IsBlockExecuted(ctx context.Context, state ReadOnlyExecutionState, block flow.Identifier) (bool, error) {
 	_, err := state.StateCommitmentByBlockID(ctx, block)
 
