@@ -681,14 +681,14 @@ func TestExecuteForkConcurrently(t *testing.T) {
 		err = ctx.engine.handleBlock(context.Background(), blockB.Block)
 		require.NoError(t, err)
 
+		err = ctx.engine.handleCollection(unittest.IdentifierFixture(), &col1)
+		require.NoError(t, err)
+
 		wg := sync.WaitGroup{}
 		wg.Add(2) // wait for block B to be executed
 		ctx.providerEngine.On("BroadcastExecutionReceipt", mock.Anything, mock.Anything, mock.Anything).Return(false, nil)
 		ctx.mockComputeBlock(store)
 		ctx.mockSaveExecutionResults(store, &wg)
-
-		err = ctx.engine.handleCollection(unittest.IdentifierFixture(), &col1)
-		require.NoError(t, err)
 
 		err = ctx.engine.handleCollection(unittest.IdentifierFixture(), &col2)
 		require.NoError(t, err)
@@ -698,6 +698,64 @@ func TestExecuteForkConcurrently(t *testing.T) {
 		// verify block is executed
 		store.AssertExecuted(t, blockA.ID())
 		store.AssertExecuted(t, blockB.ID())
+	})
+}
+
+// verify block will be executed in order
+func TestExecuteBlockInOrder(t *testing.T) {
+	runWithEngine(t, func(ctx testingContext) {
+		store := mocks.NewMockBlockStore(t)
+		// create A and B that have the same collections and same parent
+		// Root <- A[C1, C2]
+		//      <- B[C2] <- C[C3]
+		// verify receiving C3, C1, then C2 will trigger all blocks to be executed
+		col1 := unittest.CollectionFixture(1)
+		col2 := unittest.CollectionFixture(1)
+		col3 := unittest.CollectionFixture(1)
+
+		blockA := makeBlockWithCollection(store.RootBlock, &col1, &col2)
+		blockB := makeBlockWithCollection(store.RootBlock, &col2)
+		blockC := makeBlockWithCollection(store.RootBlock, &col3)
+		store.CreateBlockAndMockResult(t, blockA)
+		store.CreateBlockAndMockResult(t, blockB)
+		store.CreateBlockAndMockResult(t, blockC)
+
+		ctx.mockStateCommitmentByBlockID(store)
+		ctx.mockGetExecutionResultID(store)
+		ctx.executionState.On("NewStorageSnapshot", mock.Anything).Return(nil)
+		ctx.mockComputeBlock(store)
+
+		// receive blocks
+		err := ctx.engine.handleBlock(context.Background(), blockA.Block)
+		require.NoError(t, err)
+
+		err = ctx.engine.handleBlock(context.Background(), blockB.Block)
+		require.NoError(t, err)
+
+		err = ctx.engine.handleBlock(context.Background(), blockC.Block)
+		require.NoError(t, err)
+
+		err = ctx.engine.handleCollection(unittest.IdentifierFixture(), &col3)
+		require.NoError(t, err)
+
+		err = ctx.engine.handleCollection(unittest.IdentifierFixture(), &col1)
+		require.NoError(t, err)
+
+		wg := sync.WaitGroup{}
+		wg.Add(3)
+		ctx.providerEngine.On("BroadcastExecutionReceipt", mock.Anything, mock.Anything, mock.Anything).Return(false, nil)
+		ctx.mockComputeBlock(store)
+		ctx.mockSaveExecutionResults(store, &wg)
+
+		err = ctx.engine.handleCollection(unittest.IdentifierFixture(), &col2)
+		require.NoError(t, err)
+
+		unittest.AssertReturnsBefore(t, wg.Wait, 3*time.Second)
+
+		// verify block is executed
+		store.AssertExecuted(t, blockA.ID())
+		store.AssertExecuted(t, blockB.ID())
+		store.AssertExecuted(t, blockC.ID())
 	})
 }
 
