@@ -126,3 +126,10 @@ func (bs *MockBlockStore) AssertExecuted(t *testing.T, blocks ...flow.Identifier
 		require.True(t, exist, "block %s not executed", blockID)
 	}
 }
+
+func (bs *MockBlockStore) AssertNotExecuted(t *testing.T, blocks ...flow.Identifier) {
+	for _, blockID := range blocks {
+		_, exist := bs.Executed[blockID]
+		require.False(t, exist, "block %s executed", blockID)
+	}
+}
