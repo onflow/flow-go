@@ -23,6 +23,7 @@ import (
 	access "github.com/onflow/flow-go/engine/access/mock"
 	backendmock "github.com/onflow/flow-go/engine/access/rpc/backend/mock"
 	"github.com/onflow/flow-go/engine/access/rpc/connection"
+	connectionmock "github.com/onflow/flow-go/engine/access/rpc/connection/mock"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
@@ -55,7 +56,7 @@ type Suite struct {
 	historicalAccessClient *access.AccessAPIClient
 	archiveClient          *access.AccessAPIClient
 
-	connectionFactory *backendmock.ConnectionFactory
+	connectionFactory *connectionmock.ConnectionFactory
 	communicator      *backendmock.Communicator
 
 	chainID flow.ChainID
@@ -89,7 +90,7 @@ func (suite *Suite) SetupTest() {
 	suite.execClient = new(access.ExecutionAPIClient)
 	suite.chainID = flow.Testnet
 	suite.historicalAccessClient = new(access.AccessAPIClient)
-	suite.connectionFactory = new(backendmock.ConnectionFactory)
+	suite.connectionFactory = connectionmock.NewConnectionFactory(suite.T())
 
 	suite.communicator = new(backendmock.Communicator)
 }
@@ -484,7 +485,7 @@ func (suite *Suite) TestGetTransactionResultByIndex() {
 	suite.snapshot.On("Identities", mock.Anything).Return(fixedENIDs, nil)
 
 	// create a mock connection factory
-	connFactory := new(backendmock.ConnectionFactory)
+	connFactory := connectionmock.NewConnectionFactory(suite.T())
 	connFactory.On("GetExecutionAPIClient", mock.Anything).Return(suite.execClient, &mockCloser{}, nil)
 
 	exeEventReq := &execproto.GetTransactionByIndexRequest{
@@ -535,7 +536,7 @@ func (suite *Suite) TestGetTransactionResultsByBlockID() {
 	suite.snapshot.On("Identities", mock.Anything).Return(fixedENIDs, nil)
 
 	// create a mock connection factory
-	connFactory := new(backendmock.ConnectionFactory)
+	connFactory := connectionmock.NewConnectionFactory(suite.T())
 	connFactory.On("GetExecutionAPIClient", mock.Anything).Return(suite.execClient, &mockCloser{}, nil)
 
 	exeEventReq := &execproto.GetTransactionsByBlockIDRequest{
@@ -611,9 +612,8 @@ func (suite *Suite) TestTransactionStatusTransition() {
 	suite.snapshot.On("Identities", mock.Anything).Return(fixedENIDs, nil)
 
 	// create a mock connection factory
-	connFactory := new(backendmock.ConnectionFactory)
+	connFactory := connectionmock.NewConnectionFactory(suite.T())
 	connFactory.On("GetExecutionAPIClient", mock.Anything).Return(suite.execClient, &mockCloser{}, nil)
-	connFactory.On("InvalidateExecutionAPIClient", mock.Anything)
 
 	exeEventReq := &execproto.GetTransactionResultRequest{
 		BlockId:       blockID[:],
@@ -1018,7 +1018,7 @@ func (suite *Suite) TestGetEventsForBlockIDs() {
 	validENIDs := flow.IdentifierList(validExecutorIdentities.NodeIDs())
 
 	// create a mock connection factory
-	connFactory := new(backendmock.ConnectionFactory)
+	connFactory := connectionmock.NewConnectionFactory(suite.T())
 	connFactory.On("GetExecutionAPIClient", mock.Anything).Return(suite.execClient, &mockCloser{}, nil)
 
 	// create the expected results from execution node and access node
@@ -1115,7 +1115,7 @@ func (suite *Suite) TestGetExecutionResultByID() {
 	validENIDs := flow.IdentifierList(validExecutorIdentities.NodeIDs())
 
 	// create a mock connection factory
-	connFactory := new(backendmock.ConnectionFactory)
+	connFactory := connectionmock.NewConnectionFactory(suite.T())
 
 	nonexistingID := unittest.IdentifierFixture()
 	blockID := unittest.IdentifierFixture()
@@ -1175,7 +1175,7 @@ func (suite *Suite) TestGetExecutionResultByBlockID() {
 	validENIDs := flow.IdentifierList(validExecutorIdentities.NodeIDs())
 
 	// create a mock connection factory
-	connFactory := new(backendmock.ConnectionFactory)
+	connFactory := connectionmock.NewConnectionFactory(suite.T())
 
 	blockID := unittest.IdentifierFixture()
 	executionResult := unittest.ExecutionResultFixture(
@@ -1507,7 +1507,7 @@ func (suite *Suite) TestGetAccount() {
 
 	suite.snapshot.On("Identities", mock.Anything).Return(ids, nil)
 	// create a mock connection factory
-	connFactory := new(backendmock.ConnectionFactory)
+	connFactory := connectionmock.NewConnectionFactory(suite.T())
 	connFactory.On("GetExecutionAPIClient", mock.Anything).Return(suite.execClient, &mockCloser{}, nil)
 
 	params := suite.defaultBackendParams()
@@ -1553,7 +1553,7 @@ func (suite *Suite) TestGetAccountAtBlockHeight() {
 	suite.snapshot.On("Identities", mock.Anything).Return(ids, nil)
 
 	// create a mock connection factory
-	connFactory := new(backendmock.ConnectionFactory)
+	connFactory := connectionmock.NewConnectionFactory(suite.T())
 	connFactory.On("GetExecutionAPIClient", mock.Anything).Return(suite.execClient, &mockCloser{}, nil)
 
 	// create the expected execution API request
@@ -1883,9 +1883,8 @@ func (suite *Suite) TestExecutionNodesForBlockID() {
 func (suite *Suite) TestExecuteScriptOnExecutionNode() {
 
 	// create a mock connection factory
-	connFactory := new(backendmock.ConnectionFactory)
+	connFactory := connectionmock.NewConnectionFactory(suite.T())
 	connFactory.On("GetExecutionAPIClient", mock.Anything).Return(suite.execClient, &mockCloser{}, nil)
-	connFactory.On("InvalidateExecutionAPIClient", mock.Anything)
 
 	params := suite.defaultBackendParams()
 	params.ChainID = flow.Mainnet
@@ -1941,9 +1940,8 @@ func (suite *Suite) TestExecuteScriptOnArchiveNode() {
 
 	// create a mock connection factory
 	var mockPort uint = 9000
-	connFactory := new(backendmock.ConnectionFactory)
+	connFactory := connectionmock.NewConnectionFactory(suite.T())
 	connFactory.On("GetAccessAPIClientWithPort", mock.Anything, mockPort).Return(suite.archiveClient, &mockCloser{}, nil)
-	connFactory.On("InvalidateAccessAPIClient", mock.Anything)
 	archiveNode := unittest.IdentityFixture(unittest.WithRole(flow.RoleAccess))
 	fullArchiveAddress := archiveNode.Address + ":" + strconv.FormatUint(uint64(mockPort), 10)
 
@@ -2007,10 +2005,9 @@ func (suite *Suite) TestScriptExecutionValidationMode() {
 
 	// create a mock connection factory
 	var mockPort uint = 9000
-	connFactory := new(backendmock.ConnectionFactory)
+	connFactory := connectionmock.NewConnectionFactory(suite.T())
 	connFactory.On("GetAccessAPIClientWithPort", mock.Anything, mockPort).Return(suite.archiveClient, &mockCloser{}, nil)
 	connFactory.On("GetExecutionAPIClient", mock.Anything).Return(suite.execClient, &mockCloser{}, nil)
-	connFactory.On("InvalidateAccessAPIClient", mock.Anything)
 	archiveNode := unittest.IdentityFixture(unittest.WithRole(flow.RoleAccess))
 	fullArchiveAddress := archiveNode.Address + ":" + strconv.FormatUint(uint64(mockPort), 10)
 
@@ -2138,9 +2135,8 @@ func (suite *Suite) setupReceipts(block *flow.Block) ([]*flow.ExecutionReceipt, 
 
 func (suite *Suite) setupConnectionFactory() connection.ConnectionFactory {
 	// create a mock connection factory
-	connFactory := new(backendmock.ConnectionFactory)
+	connFactory := connectionmock.NewConnectionFactory(suite.T())
 	connFactory.On("GetExecutionAPIClient", mock.Anything).Return(suite.execClient, &mockCloser{}, nil)
-	connFactory.On("InvalidateExecutionAPIClient", mock.Anything)
 	return connFactory
 }
 
