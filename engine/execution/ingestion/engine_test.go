@@ -1,7 +1,6 @@
 package ingestion
 
 import (
-	"bytes"
 	"context"
 	"crypto/rand"
 	"fmt"
@@ -573,7 +572,6 @@ func TestExecuteNextBlockIfCollectionIsReady(t *testing.T) {
 		ctx.mockGetExecutionResultID(store)
 		ctx.executionState.On("NewStorageSnapshot", mock.Anything).Return(nil)
 		ctx.mockComputeBlock(store)
-		ctx.providerEngine.On("BroadcastExecutionReceipt", mock.Anything, mock.Anything, mock.Anything).Return(false, nil)
 
 		// receiving block A and B will not trigger any execution
 		// because A is missing collection C1, B is waiting for A to be executed
@@ -585,6 +583,7 @@ func TestExecuteNextBlockIfCollectionIsReady(t *testing.T) {
 
 		wg := sync.WaitGroup{}
 		wg.Add(2)
+		ctx.providerEngine.On("BroadcastExecutionReceipt", mock.Anything, mock.Anything, mock.Anything).Return(false, nil)
 		ctx.mockComputeBlock(store)
 		ctx.mockSaveExecutionResults(store, &wg)
 
@@ -657,31 +656,23 @@ func TestExecuteBlockOnlyOnce(t *testing.T) {
 // receiving all collections will trigger the execution of both blocks concurrently
 func TestExecuteForkConcurrently(t *testing.T) {
 	runWithEngine(t, func(ctx testingContext) {
+		store := mocks.NewMockBlockStore(t)
+
+		// create A and B that have the same collections and same parent
+		// Root <- A[C1, C2]
+		//      <- B[C1, C2]
 		col1 := unittest.CollectionFixture(1)
-		gua1 := col1.Guarantee()
 		col2 := unittest.CollectionFixture(1)
-		gua2 := col2.Guarantee()
 
-		colSigner1 := unittest.IdentifierFixture()
-		colSigner2 := unittest.IdentifierFixture()
-		// Root <- A[C1,C2]
-		blockRoot := unittest.BlockHeaderFixture()
-		blockA := unittest.ExecutableBlockFixtureWithParent([][]flow.Identifier{{colSigner1}, {colSigner2}}, blockRoot, unittest.StateCommitmentPointerFixture())
-		blockA.Block.Payload.Guarantees[0] = &gua1
-		blockA.Block.Payload.Guarantees[1] = &gua2
-		blockA.Block.Header.PayloadHash = blockA.Block.Payload.Hash()
+		blockA := makeBlockWithCollection(store.RootBlock, &col1, &col2)
+		blockB := makeBlockWithCollection(store.RootBlock, &col1, &col2)
+		store.CreateBlockAndMockResult(t, blockA)
+		store.CreateBlockAndMockResult(t, blockB)
 
-		// Root <- B[C1,C2]
-		blockB := unittest.ExecutableBlockFixtureWithParent([][]flow.Identifier{{colSigner1}, {colSigner2}}, blockRoot, unittest.StateCommitmentPointerFixture())
-		blockB.Block.Payload.Guarantees[0] = &gua1
-		blockB.Block.Payload.Guarantees[1] = &gua2
-		blockB.Block.Header.PayloadHash = blockB.Block.Payload.Hash()
-
-		// blockA's start state is its parent's state commitment,
-		// and blockA's parent has been executed.
-		commits := make(map[flow.Identifier]flow.StateCommitment)
-		commits[blockA.Block.Header.ParentID] = *blockA.StartState
-		ctx.mockStateCommitsWithMap(commits)
+		ctx.mockStateCommitmentByBlockID(store)
+		ctx.mockGetExecutionResultID(store)
+		ctx.executionState.On("NewStorageSnapshot", mock.Anything).Return(nil)
+		ctx.mockComputeBlock(store)
 
 		// receive blocks
 		err := ctx.engine.handleBlock(context.Background(), blockA.Block)
@@ -692,15 +683,9 @@ func TestExecuteForkConcurrently(t *testing.T) {
 
 		wg := sync.WaitGroup{}
 		wg.Add(2) // wait for block B to be executed
-
-		rootResultID := unittest.IdentifierFixture()
-		blockAResult := ctx.assertExecution(commits, blockA, rootResultID, &wg)
-		ctx.assertExecution(commits, blockB, blockAResult.ExecutionReceipt.ExecutionResult.ID(), &wg)
-
-		// verify upload will be called
-		uploader := uploadermock.NewUploader(ctx.t)
-		uploader.On("Upload", mock.Anything).Return(nil)
-		ctx.uploadMgr.AddUploader(uploader)
+		ctx.providerEngine.On("BroadcastExecutionReceipt", mock.Anything, mock.Anything, mock.Anything).Return(false, nil)
+		ctx.mockComputeBlock(store)
+		ctx.mockSaveExecutionResults(store, &wg)
 
 		err = ctx.engine.handleCollection(unittest.IdentifierFixture(), &col1)
 		require.NoError(t, err)
@@ -708,18 +693,11 @@ func TestExecuteForkConcurrently(t *testing.T) {
 		err = ctx.engine.handleCollection(unittest.IdentifierFixture(), &col2)
 		require.NoError(t, err)
 
-		unittest.AssertReturnsBefore(t, wg.Wait, 10*time.Second)
-
-		// verify collection is fetched
-		require.True(t, ctx.fetcher.IsFetched(gua1.ID()))
-		require.True(t, ctx.fetcher.IsFetched(gua2.ID()))
+		unittest.AssertReturnsBefore(t, wg.Wait, 3*time.Second)
 
 		// verify block is executed
-		commit1, ok := commits[blockA.ID()]
-		require.True(t, ok)
-		commit2, ok := commits[blockB.ID()]
-		require.True(t, ok)
-		require.False(t, bytes.Equal(commit1[:], commit2[:]))
+		store.AssertExecuted(t, blockA.ID())
+		store.AssertExecuted(t, blockB.ID())
 	})
 }
 
