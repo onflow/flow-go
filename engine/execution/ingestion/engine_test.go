@@ -995,96 +995,51 @@ func TestStopAtHeightRaceFinalization(t *testing.T) {
 	})
 }
 
-func TestExecutionGenerationResultsAreChained(t *testing.T) {
-
-	execState := new(stateMock.ExecutionState)
-
-	ctrl := gomock.NewController(t)
-	me := module.NewMockLocal(ctrl)
-
-	startState := unittest.StateCommitmentFixture()
-	executableBlock := unittest.ExecutableBlockFixture(
-		[][]flow.Identifier{{collection1Identity.NodeID},
-			{collection1Identity.NodeID}},
-		&startState,
-	)
-	previousExecutionResultID := unittest.IdentifierFixture()
-
-	cr := executionUnittest.ComputationResultFixture(
-		t,
-		previousExecutionResultID,
-		nil)
-	cr.ExecutableBlock = executableBlock
-
-	execState.
-		On("SaveExecutionResults", mock.Anything, cr).
-		Return(nil)
-
-	e := Engine{
-		execState: execState,
-		tracer:    trace.NewNoopTracer(),
-		metrics:   metrics.NewNoopCollector(),
-		me:        me,
-	}
-
-	err := e.saveExecutionResults(context.Background(), cr)
-	assert.NoError(t, err)
-
-	execState.AssertExpectations(t)
-}
-
 // TestExecutedBlockUploadedFailureDoesntBlock tests that block processing continues even the
 // uploader fails with an error
 func TestExecutedBlockUploadedFailureDoesntBlock(t *testing.T) {
 	runWithEngine(t, func(ctx testingContext) {
+		store := mocks.NewMockBlockStore(t)
 
-		// A <- B
-		blockA := unittest.BlockHeaderFixture()
-		blockB := unittest.ExecutableBlockFixtureWithParent(nil, blockA, unittest.StateCommitmentPointerFixture())
+		col := unittest.CollectionFixture(1)
+		// Root <- A
+		blockA := makeBlockWithCollection(store.RootBlock, &col)
+		result := store.CreateBlockAndMockResult(t, blockA)
 
-		previousExecutionResultID := unittest.IdentifierFixture()
+		ctx.mockStateCommitmentByBlockID(store)
+		ctx.mockGetExecutionResultID(store)
+		ctx.executionState.On("NewStorageSnapshot", mock.Anything).Return(nil)
 
-		computationResultB := executionUnittest.ComputationResultForBlockFixture(
-			t,
-			previousExecutionResultID,
-			blockB)
-
-		// configure upload manager with a single uploader that returns an error
-		uploader1 := uploadermock.NewUploader(ctx.t)
-		uploader1.On("Upload", computationResultB).Return(fmt.Errorf("error uploading")).Once()
-		ctx.uploadMgr.AddUploader(uploader1)
-
-		// blockA's start state is its parent's state commitment,
-		// and blockA's parent has been executed.
-		commits := make(map[flow.Identifier]flow.StateCommitment)
-		commits[blockB.Block.Header.ParentID] = *blockB.StartState
-		wg := sync.WaitGroup{}
-		ctx.mockStateCommitsWithMap(commits)
-
-		ctx.assertSuccessfulBlockComputation(
-			commits,
-			func(blockID flow.Identifier, commit flow.StateCommitment) {
-				wg.Done()
-			},
-			blockB,
-			previousExecutionResultID,
-			true,
-			*blockB.StartState,
-			computationResultB)
-
-		wg.Add(1) // wait for block B to be executed
-		err := ctx.engine.handleBlock(context.Background(), blockB.Block)
+		// receive block
+		err := ctx.engine.handleBlock(context.Background(), blockA.Block)
 		require.NoError(t, err)
 
-		unittest.AssertReturnsBefore(t, wg.Wait, 10*time.Second)
+		wg := sync.WaitGroup{}
+		wg.Add(1) // wait for block B to be executed
 
-		_, more := <-ctx.engine.Done() // wait for all the blocks to be processed
-		require.False(t, more)
+		ctx.mockComputeBlock(store)
+		ctx.mockSaveExecutionResults(store, &wg)
 
-		_, ok := commits[blockB.ID()]
-		require.True(t, ok)
+		// verify upload will fail
+		uploader1 := uploadermock.NewUploader(ctx.t)
+		uploader1.On("Upload", result).Return(fmt.Errorf("error uploading")).Once()
+		ctx.uploadMgr.AddUploader(uploader1)
 
+		// verify broadcast will be called
+		ctx.providerEngine.On("BroadcastExecutionReceipt", mock.Anything, mock.Anything, mock.Anything).Return(false, nil)
+
+		err = ctx.engine.handleCollection(unittest.IdentifierFixture(), &col)
+		require.NoError(t, err)
+
+		unittest.AssertReturnsBefore(t, wg.Wait, 3*time.Second)
+
+		// verify collection is fetched
+		require.True(t, ctx.fetcher.IsFetched(col.ID()))
+
+		// verify block is executed
+		store.AssertExecuted(t, blockA.ID())
 	})
+
 }
 
 type collectionHandler interface {
