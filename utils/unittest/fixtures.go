@@ -2487,9 +2487,9 @@ func WithTrieUpdate(trieUpdate *ledger.TrieUpdate) func(*execution_data.ChunkExe
 
 func ChunkExecutionDataFixture(t *testing.T, minSize int, opts ...func(*execution_data.ChunkExecutionData)) *execution_data.ChunkExecutionData {
 	collection := CollectionFixture(5)
-	results := make([]execution_data.TransactionResult, len(collection.Transactions))
+	results := make([]flow.LightTransactionResult, len(collection.Transactions))
 	for i, tx := range collection.Transactions {
-		results[i] = execution_data.TransactionResult{
+		results[i] = flow.LightTransactionResult{
 			TransactionID:   tx.ID(),
 			Failed:          false,
 			ComputationUsed: uint64(i * 100),
