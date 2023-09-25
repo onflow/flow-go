@@ -11,6 +11,7 @@ import (
 	"github.com/onflow/flow-go/ledger/common/testutils"
 	"github.com/onflow/flow-go/ledger/complete/mtrie/trie"
 	"github.com/onflow/flow-go/ledger/complete/wal"
+	"github.com/onflow/flow-go/module/component"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 
@@ -52,7 +53,8 @@ func TestBootstrap_IndexCheckpointFile_Random(t *testing.T) {
 		unittest.RunWithConfiguredPebbleInstance(t, getTestingPebbleOpts(), func(p *pebble.DB) {
 			bootstrap, err := NewBootstrap(p, checkpointFile, rootHeight, log)
 			require.NoError(t, err)
-
+			cm := component.NewComponentManagerBuilder().AddWorker(bootstrap.IndexCheckpointFile).Build()
+			<-cm.Done()
 		})
 	})
 
@@ -61,8 +63,12 @@ func TestBootstrap_IndexCheckpointFile_Random(t *testing.T) {
 		tries := createSimpleTrie(t)
 		fileName := "simple-checkpoint"
 		require.NoErrorf(t, wal.StoreCheckpointV6Concurrently(tries, dir, fileName, log), "fail to store checkpoint")
+		checkpointFile := path.Join(dir, fileName)
 		unittest.RunWithConfiguredPebbleInstance(t, getTestingPebbleOpts(), func(p *pebble.DB) {
-
+			bootstrap, err := NewBootstrap(p, checkpointFile, rootHeight, log)
+			require.NoError(t, err)
+			cm := component.NewComponentManagerBuilder().AddWorker(bootstrap.IndexCheckpointFile).Build()
+			<-cm.Done()
 		})
 	})
 
@@ -70,9 +76,13 @@ func TestBootstrap_IndexCheckpointFile_Random(t *testing.T) {
 		t.Parallel()
 		tries := createMultipleRandomTriesMini(t)
 		fileName := "random-checkpoint"
+		checkpointFile := path.Join(dir, fileName)
 		require.NoErrorf(t, wal.StoreCheckpointV6Concurrently(tries, dir, fileName, log), "fail to store checkpoint")
 		unittest.RunWithConfiguredPebbleInstance(t, getTestingPebbleOpts(), func(p *pebble.DB) {
-
+			bootstrap, err := NewBootstrap(p, checkpointFile, rootHeight, log)
+			require.NoError(t, err)
+			cm := component.NewComponentManagerBuilder().AddWorker(bootstrap.IndexCheckpointFile).Build()
+			<-cm.Done()
 		})
 	})
 }
