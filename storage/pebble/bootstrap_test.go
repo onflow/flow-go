@@ -21,8 +21,8 @@ func TestBootstrap_NewBootstrap(t *testing.T) {
 		_, err := NewBootstrap(p, sampleDir, rootHeight)
 		require.NoError(t, err)
 		// set heights
-		require.NoError(t, p.Set(firstHeightKey(), EncodedUint64(rootHeight), nil))
-		require.NoError(t, p.Set(latestHeightKey(), EncodedUint64(rootHeight), nil))
+		require.NoError(t, p.Set(firstHeightKey(), encodedUint64(rootHeight), nil))
+		require.NoError(t, p.Set(latestHeightKey(), encodedUint64(rootHeight), nil))
 		// errors if FirstHeight or LastHeight are populated
 		_, err = NewBootstrap(p, sampleDir, rootHeight)
 		require.ErrorContains(t, err, "cannot bootstrap populated DB")

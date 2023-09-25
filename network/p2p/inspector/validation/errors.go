@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/onflow/flow-go/network/channels"
+	p2pmsg "github.com/onflow/flow-go/network/p2p/message"
 )
 
 // IWantDuplicateMsgIDThresholdErr indicates that the amount of duplicate message ids exceeds the allowed threshold.
@@ -51,23 +52,45 @@ func IsIWantCacheMissThresholdErr(err error) bool {
 	return errors.As(err, &e)
 }
 
-// DuplicateFoundErr error that indicates a duplicate has been detected. This can be duplicate topic or message ID tracking.
-type DuplicateFoundErr struct {
-	err error
+// DuplicateTopicErr error that indicates a duplicate has been detected. This can be duplicate topic or message ID tracking.
+type DuplicateTopicErr struct {
+	topic   string
+	msgType p2pmsg.ControlMessageType
 }
 
-func (e DuplicateFoundErr) Error() string {
-	return e.err.Error()
+func (e DuplicateTopicErr) Error() string {
+	return fmt.Sprintf("duplicate topic foud in %s control message type: %s", e.msgType, e.topic)
 }
 
-// NewDuplicateFoundErr returns a new DuplicateFoundErr.
-func NewDuplicateFoundErr(err error) DuplicateFoundErr {
-	return DuplicateFoundErr{err}
+// NewDuplicateTopicErr returns a new DuplicateTopicErr.
+func NewDuplicateTopicErr(topic string, msgType p2pmsg.ControlMessageType) DuplicateTopicErr {
+	return DuplicateTopicErr{topic, msgType}
 }
 
-// IsDuplicateFoundErr returns true if an error is DuplicateFoundErr.
-func IsDuplicateFoundErr(err error) bool {
-	var e DuplicateFoundErr
+// IsDuplicateTopicErr returns true if an error is DuplicateTopicErr.
+func IsDuplicateTopicErr(err error) bool {
+	var e DuplicateTopicErr
+	return errors.As(err, &e)
+}
+
+// DuplicateMessageIDErr error that indicates a duplicate message ID has been detected in a IHAVE or IWANT control message.
+type DuplicateMessageIDErr struct {
+	id      string
+	msgType p2pmsg.ControlMessageType
+}
+
+func (e DuplicateMessageIDErr) Error() string {
+	return fmt.Sprintf("duplicate message ID foud in %s control message type: %s", e.msgType, e.id)
+}
+
+// NewDuplicateMessageIDErr returns a new DuplicateMessageIDErr.
+func NewDuplicateMessageIDErr(id string, msgType p2pmsg.ControlMessageType) DuplicateMessageIDErr {
+	return DuplicateMessageIDErr{id, msgType}
+}
+
+// IsDuplicateMessageIDErr returns true if an error is DuplicateMessageIDErr.
+func IsDuplicateMessageIDErr(err error) bool {
+	var e DuplicateMessageIDErr
 	return errors.As(err, &e)
 }
 

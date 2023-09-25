@@ -227,7 +227,7 @@ func (s *ObserverSuite) TestObserverRest() {
 	require.NoError(t, err)
 
 	t.Run("HandledByUpstream", func(t *testing.T) {
-		// verify that we receive StatusInternalServerError, StatusServiceUnavailable errors from all rests handled upstream
+		// verify that we receive StatusServiceUnavailable errors from all rests handled upstream
 		for _, endpoint := range s.getRestEndpoints() {
 			if _, local := s.localRest[endpoint.name]; local {
 				continue

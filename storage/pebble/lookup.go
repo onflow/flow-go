@@ -11,38 +11,35 @@ import (
 	"github.com/onflow/flow-go/storage/pebble/registers"
 )
 
+var latestHeightKeyLiteral = binary.BigEndian.AppendUint64(
+	[]byte{codeLatestBlockHeight, byte('/'), byte('/')}, placeHolderHeight)
+var firstHeightKeyLiteral = binary.BigEndian.AppendUint64(
+	[]byte{codeFirstBlockHeight, byte('/'), byte('/')}, placeHolderHeight)
+
 // lookupKey is the encoded format of the storage key for looking up register value
 type lookupKey struct {
 	encoded []byte
 }
 
-func createHeightKey(identifier byte) []byte {
-	key := make([]byte, 0, MinLookupKeyLen)
-	key = append(key, identifier)
-	key = append(key, '/')
-	key = binary.BigEndian.AppendUint64(key, placeHolderHeight)
-	return key
-}
-
-// LatestHeightKey is a special case of a lookupKey
+// latestHeightKey is a special case of a lookupKey
 // with keyLatestBlockHeight as key, no owner and a placeholder height of 0.
 // This is to ensure SeekPrefixGE in pebble does not break
 func latestHeightKey() []byte {
-	return createHeightKey(codeLatestBlockHeight)
+	return latestHeightKeyLiteral
 }
 
-// FirstHeightKey is a special case of a lookupKey
+// firstHeightKey is a special case of a lookupKey
 // with keyFirstBlockHeight as key, no owner and a placeholder height of 0.
 // This is to ensure SeekPrefixGE in pebble does not break
 func firstHeightKey() []byte {
-	return createHeightKey(codeFirstBlockHeight)
+	return firstHeightKeyLiteral
 }
 
 // newLookupKey takes a height and registerID, returns the key for storing the register value in storage
 func newLookupKey(height uint64, reg flow.RegisterID) *lookupKey {
 	key := lookupKey{
-		// 1 byte gaps for db prefix and '/' separator
-		encoded: make([]byte, 0, 1+len(reg.Owner)+1+len(reg.Key)+1+registers.HeightSuffixLen),
+		// 1 byte gaps for db prefix and '/' separators
+		encoded: make([]byte, 0, MinLookupKeyLen+len(reg.Owner)+len(reg.Key)),
 	}
 
 	// append DB prefix
@@ -75,17 +72,17 @@ func newLookupKey(height uint64, reg flow.RegisterID) *lookupKey {
 
 // lookupKeyToRegisterID takes a lookup key and decode it into height and RegisterID
 func lookupKeyToRegisterID(lookupKey []byte) (uint64, flow.RegisterID, error) {
-	// 3 fixed bytes for:
-	// 1. The identifier prefix byte
-	// 2. '/' byte separator for owner
-	// 3. '/' byte for key (owner and key values are blank so both have 0 bytes after the '/')
-	const minLookupKeyLen = 3 + registers.HeightSuffixLen
-	if len(lookupKey) < minLookupKeyLen {
+	if len(lookupKey) < MinLookupKeyLen {
 		return 0, flow.RegisterID{}, fmt.Errorf("invalid lookup key format: expected >= %d bytes, got %d bytes",
 			MinLookupKeyLen, len(lookupKey))
 	}
 
-	// exclude db prefix
+	// check and exclude db prefix
+	prefix := lookupKey[0]
+	if prefix != codeRegister {
+		return 0, flow.RegisterID{}, fmt.Errorf("incorrect prefix %d for register lookup key, expected %d",
+			prefix, codeRegister)
+	}
 	lookupKey = lookupKey[1:]
 
 	// Find the first slash to split the lookup key and decode the owner.
@@ -123,7 +120,19 @@ func lookupKeyToRegisterID(lookupKey []byte) (uint64, flow.RegisterID, error) {
 	return height, regID, nil
 }
 
-func registerIDFromPayloadKey(key ledger.Key) (flow.RegisterID, error) {
+// Bytes returns the encoded lookup key.
+func (h lookupKey) Bytes() []byte {
+	return h.encoded
+}
+
+// EncodedUint64 encodes uint64 for storing as a pebble payload
+func encodedUint64(height uint64) []byte {
+	payload := make([]byte, 0, 8)
+	return binary.BigEndian.AppendUint64(payload, height)
+}
+
+// KeyToRegisterID converts a ledger key into a register ID.
+func keyToRegisterID(key ledger.Key) (flow.RegisterID, error) {
 	if len(key.KeyParts) != 2 ||
 		key.KeyParts[0].Type != state.KeyPartOwner ||
 		key.KeyParts[1].Type != state.KeyPartKey {
@@ -134,15 +143,4 @@ func registerIDFromPayloadKey(key ledger.Key) (flow.RegisterID, error) {
 		Owner: string(key.KeyParts[0].Value),
 		Key:   string(key.KeyParts[1].Value),
 	}, nil
-}
-
-// Bytes returns the encoded lookup key.
-func (h lookupKey) Bytes() []byte {
-	return h.encoded
-}
-
-// EncodedUint64 encodes uint64 for storing as a pebble payload
-func EncodedUint64(height uint64) []byte {
-	payload := make([]byte, 0, 8)
-	return binary.BigEndian.AppendUint64(payload, height)
 }

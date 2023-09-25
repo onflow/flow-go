@@ -247,7 +247,6 @@ func TestGetTransactionResult(t *testing.T) {
 
 	t.Run("get by transaction ID", func(t *testing.T) {
 		backend := &mock.API{}
-
 		req := getTransactionResultReq(id.String(), "", "")
 
 		backend.Mock.
@@ -271,7 +270,6 @@ func TestGetTransactionResult(t *testing.T) {
 
 	t.Run("get by collection ID", func(t *testing.T) {
 		backend := &mock.API{}
-
 		req := getTransactionResultReq(id.String(), "", cid.String())
 
 		backend.Mock.

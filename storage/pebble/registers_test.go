@@ -36,7 +36,7 @@ func TestRegisters_Get(t *testing.T) {
 	RunWithRegistersStorageAtHeight1(t, func(r *Registers) {
 		// invalid keys return correct error type
 		invalidKey := flow.RegisterID{Owner: "invalid", Key: "invalid"}
-		_, err := r.Get(height1, invalidKey)
+		_, err := r.Get(invalidKey, height1)
 		require.ErrorIs(t, err, storage.ErrNotFound)
 
 		// insert new data
@@ -47,20 +47,20 @@ func TestRegisters_Get(t *testing.T) {
 			{Key: key1, Value: expectedValue1},
 		}
 
-		err = r.Store(height2, entries)
+		err = r.Store(entries, height2)
 		require.NoError(t, err)
 
 		// happy path
-		value1, err := r.Get(height2, key1)
+		value1, err := r.Get(key1, height2)
 		require.NoError(t, err)
 		require.Equal(t, expectedValue1, value1)
 
 		// out of range
 		beforeFirstHeight := uint64(0)
-		_, err = r.Get(beforeFirstHeight, key1)
+		_, err = r.Get(key1, beforeFirstHeight)
 		require.ErrorIs(t, err, storage.ErrHeightNotIndexed)
 		afterLatestHeight := uint64(3)
-		_, err = r.Get(afterLatestHeight, key1)
+		_, err = r.Get(key1, afterLatestHeight)
 		require.ErrorIs(t, err, storage.ErrHeightNotIndexed)
 	})
 }
@@ -76,22 +76,51 @@ func TestRegisters_Store(t *testing.T) {
 			{Key: key1, Value: expectedValue1},
 		}
 		height2 := uint64(2)
-		err := r.Store(height2, entries)
+		err := r.Store(entries, height2)
 		require.NoError(t, err)
 
 		// idempotent at same height
-		err = r.Store(height2, entries)
+		err = r.Store(entries, height2)
 		require.NoError(t, err)
 
 		// out of range
-		height5 := uint64(5)
-		err = r.Store(height5, entries)
+		height4 := uint64(4)
+		err = r.Store(entries, height4)
 		require.Error(t, err)
 
 		height1 := uint64(1)
-		err = r.Store(height1, entries)
+		err = r.Store(entries, height1)
 		require.Error(t, err)
 
+	})
+}
+
+// TestRegisters_Heights tests the expected store behaviour on a single height
+func TestRegisters_Heights(t *testing.T) {
+	t.Parallel()
+	RunWithRegistersStorageAtHeight1(t, func(r *Registers) {
+		// first and latest heights are the same
+		firstHeight := r.FirstHeight()
+		latestHeight := r.LatestHeight()
+		require.Equal(t, firstHeight, latestHeight)
+		// insert new data
+		key1 := flow.RegisterID{Owner: "owner", Key: "key1"}
+		expectedValue1 := []byte("value1")
+		entries := flow.RegisterEntries{
+			{Key: key1, Value: expectedValue1},
+		}
+		height2 := uint64(2)
+		err := r.Store(entries, height2)
+		require.NoError(t, err)
+
+		firstHeight2 := r.FirstHeight()
+		latestHeight2 := r.LatestHeight()
+
+		// new latest height
+		require.Equal(t, latestHeight2, height2)
+
+		// same first height
+		require.Equal(t, firstHeight, firstHeight2)
 	})
 }
 
@@ -107,15 +136,15 @@ func TestRegisters_Store_RoundTrip(t *testing.T) {
 		}
 		testHeight := minHeight + 1
 		// happy path
-		err := r.Store(testHeight, entries)
+		err := r.Store(entries, testHeight)
 		require.NoError(t, err)
 
 		// lookup with exact height returns the correct value
-		value1, err := r.Get(testHeight, key1)
+		value1, err := r.Get(key1, testHeight)
 		require.NoError(t, err)
 		require.Equal(t, expectedValue1, value1)
 
-		value11, err := r.Get(testHeight, key1)
+		value11, err := r.Get(key1, testHeight)
 		require.NoError(t, err)
 		require.Equal(t, expectedValue1, value11)
 	})
@@ -140,7 +169,7 @@ func TestRegisters_Store_Versioning(t *testing.T) {
 		height2 := uint64(2)
 
 		// check increment in height after Store()
-		err := r.Store(height2, entries1)
+		err := r.Store(entries1, height2)
 		require.NoError(t, err)
 
 		// Add new version of key1.
@@ -151,26 +180,29 @@ func TestRegisters_Store_Versioning(t *testing.T) {
 		}
 
 		// check increment in height after Store()
-		err = r.Store(height3, entries3)
+		err = r.Store(entries3, height3)
 		require.NoError(t, err)
-		updatedHeight, err := r.LatestHeight()
-		require.NoError(t, err)
+		updatedHeight := r.LatestHeight()
 		require.Equal(t, updatedHeight, height3)
 
 		// test old version at previous height
-		value1, err := r.Get(height2, key1)
+		value1, err := r.Get(key1, height2)
 		require.NoError(t, err)
 		require.Equal(t, expectedValue1, value1)
 
 		// test new version at new height
-		value1, err = r.Get(height3, key1)
+		value1, err = r.Get(key1, height3)
 		require.NoError(t, err)
 		require.Equal(t, expectedValue1ge3, value1)
 
 		// test unchanged key at incremented height
-		value11, err := r.Get(height3, key11)
+		value11, err := r.Get(key11, height3)
 		require.NoError(t, err)
 		require.Equal(t, expectedValue11, value11)
+
+		// make sure the key is unavailable at height 1
+		_, err = r.Get(key1, uint64(1))
+		require.ErrorIs(t, err, storage.ErrNotFound)
 	})
 }
 
@@ -217,7 +249,7 @@ func Benchmark_PayloadStorage(b *testing.B) {
 		}
 		b.StartTimer()
 
-		err = s.Store(uint64(i), entries)
+		err = s.Store(entries, uint64(i))
 		require.NoError(b, err)
 	}
 
@@ -226,21 +258,21 @@ func Benchmark_PayloadStorage(b *testing.B) {
 	// verify written batches
 	for i := 0; i < b.N; i++ {
 		// get number of batches written for height
-		batchSizeBytes, err := s.Get(uint64(i), batchSizeKey)
+		batchSizeBytes, err := s.Get(batchSizeKey, uint64(i))
 		require.NoError(b, err)
 		batchSize, err := strconv.Atoi(string(batchSizeBytes))
 		require.NoError(b, err)
 
 		// verify that all entries can be read with correct values
 		for j := 1; j < batchSize; j++ {
-			value, err := s.Get(uint64(i), keyForBatchSize(j))
+			value, err := s.Get(keyForBatchSize(j), uint64(i))
 			require.NoError(b, err)
 			require.Equal(b, valueForHeightAndKey(i, j), value)
 		}
 
 		// verify that the rest of the batches either do not exist or have a previous height
 		for j := batchSize; j < maxBatchSize+1; j++ {
-			value, err := s.Get(uint64(i), keyForBatchSize(j))
+			value, err := s.Get(keyForBatchSize(j), uint64(i))
 			require.Nil(b, err)
 
 			if len(value) > 0 {
@@ -265,8 +297,8 @@ func RunWithRegistersStorageAtInitialHeights(tb testing.TB, first uint64, latest
 	opts := DefaultPebbleOptions(cache, registers.NewMVCCComparer())
 	unittest.RunWithConfiguredPebbleInstance(tb, opts, func(p *pebble.DB) {
 		// insert initial heights to pebble
-		require.NoError(tb, p.Set(firstHeightKey(), EncodedUint64(first), nil))
-		require.NoError(tb, p.Set(latestHeightKey(), EncodedUint64(latest), nil))
+		require.NoError(tb, p.Set(firstHeightKey(), encodedUint64(first), nil))
+		require.NoError(tb, p.Set(latestHeightKey(), encodedUint64(latest), nil))
 		r, err := NewRegisters(p)
 		require.NoError(tb, err)
 		f(r)

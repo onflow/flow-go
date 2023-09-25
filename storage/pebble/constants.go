@@ -3,22 +3,35 @@ package pebble
 import "github.com/onflow/flow-go/storage/pebble/registers"
 
 const (
-	// lookup keys for register heights (f,l)
+	checkpointLeafNodeBufSize = 1000
+
+	pebbleBootstrapRegisterBatchLen = 1000
+
+	pebbleBootstrapWorkerCount = 10
 
 	// placeHolderHeight is an element of the height lookup keys of length HeightSuffixLen
 	// 10 bits per key yields a filter with <1% false positive rate.
 	placeHolderHeight = uint64(0)
 
-	// MinLookupKeyLen is a structure with at least 2 fixed bytes for:
-	// 1. '/' byte separator for owner
-	// 2. '/' byte for key (owner and key values are blank so both have 0 bytes before each '/')
-	// 3. the 8 byte space for uint64 in big endian for the block height
-	MinLookupKeyLen = 2 + registers.HeightSuffixLen
+	// MinLookupKeyLen defines the minimum length for a valid lookup key
+	//
+	// Lookup keys use the following format:
+	//     [code] [owner] / [key] / [height]
+	// Where:
+	// - code: 1 byte indicating the type of data stored
+	// - owner: optional variable length field
+	// - key: optional variable length field
+	// - height: 8 bytes representing the block height (uint64)
+	// - separator: '/' is used to separate variable length fields (required 2)
+	//
+	// Therefore the minimum key would be 3 bytes + # of bytes for height
+	//     [code] / / [height]
+	MinLookupKeyLen = 3 + registers.HeightSuffixLen
 
 	// prefixes
-	// codeRegister (r)
-	codeRegister byte = 0x72
-	// codeFirstBlockHeight and  codeLatestBlockHeight keys for register heights (f,l)
-	codeFirstBlockHeight  byte = 0x66
-	codeLatestBlockHeight byte = 0x6C
+	// codeRegister starting at 2, 1 and 0 reserved for DB specific constants
+	codeRegister byte = 2
+	// codeFirstBlockHeight and codeLatestBlockHeight are keys for the range of block heights in the register store
+	codeFirstBlockHeight  byte = 3
+	codeLatestBlockHeight byte = 4
 )

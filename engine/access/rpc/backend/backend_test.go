@@ -18,9 +18,12 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
+	accessflow "github.com/onflow/flow-go/access"
+	"github.com/onflow/flow-go/cmd/build"
 	access "github.com/onflow/flow-go/engine/access/mock"
 	backendmock "github.com/onflow/flow-go/engine/access/rpc/backend/mock"
 	"github.com/onflow/flow-go/engine/access/rpc/connection"
+	connectionmock "github.com/onflow/flow-go/engine/access/rpc/connection/mock"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
@@ -53,7 +56,7 @@ type Suite struct {
 	historicalAccessClient *access.AccessAPIClient
 	archiveClient          *access.AccessAPIClient
 
-	connectionFactory *backendmock.ConnectionFactory
+	connectionFactory *connectionmock.ConnectionFactory
 	communicator      *backendmock.Communicator
 
 	chainID flow.ChainID
@@ -70,8 +73,12 @@ func (suite *Suite) SetupTest() {
 	header := unittest.BlockHeaderFixture()
 	params := new(protocol.Params)
 	params.On("FinalizedRoot").Return(header, nil)
+	params.On("SporkID").Return(unittest.IdentifierFixture(), nil)
+	params.On("ProtocolVersion").Return(uint(unittest.Uint64InRange(10, 30)), nil)
 	params.On("SporkRootBlockHeight").Return(header.Height, nil)
-	suite.state.On("Params").Return(params).Maybe()
+	params.On("SealedRoot").Return(header, nil)
+	suite.state.On("Params").Return(params)
+
 	suite.blocks = new(storagemock.Blocks)
 	suite.headers = new(storagemock.Headers)
 	suite.transactions = new(storagemock.Transactions)
@@ -83,7 +90,7 @@ func (suite *Suite) SetupTest() {
 	suite.execClient = new(access.ExecutionAPIClient)
 	suite.chainID = flow.Testnet
 	suite.historicalAccessClient = new(access.AccessAPIClient)
-	suite.connectionFactory = new(backendmock.ConnectionFactory)
+	suite.connectionFactory = connectionmock.NewConnectionFactory(suite.T())
 
 	suite.communicator = new(backendmock.Communicator)
 }
@@ -97,18 +104,12 @@ func (suite *Suite) TestPing() {
 		On("Ping", mock.Anything, &execproto.PingRequest{}).
 		Return(&execproto.PingResponse{}, nil)
 
-	backend := New(Params{
-		State:                suite.state,
-		CollectionRPC:        suite.colClient,
-		ChainID:              suite.chainID,
-		AccessMetrics:        metrics.NewNoopCollector(),
-		MaxHeightRange:       DefaultMaxHeightRange,
-		Log:                  suite.log,
-		SnapshotHistoryLimit: DefaultSnapshotHistoryLimit,
-		Communicator:         NewNodeCommunicator(false),
-	})
+	params := suite.defaultBackendParams()
 
-	err := backend.Ping(context.Background())
+	backend, err := New(params)
+	suite.Require().NoError(err)
+
+	err = backend.Ping(context.Background())
 
 	suite.Require().NoError(err)
 }
@@ -121,16 +122,10 @@ func (suite *Suite) TestGetLatestFinalizedBlockHeader() {
 	suite.state.On("Sealed").Return(suite.snapshot, nil)
 	suite.snapshot.On("Head").Return(block, nil).Once()
 
-	backend := New(
-		Params{
-			State:                suite.state,
-			ChainID:              suite.chainID,
-			AccessMetrics:        metrics.NewNoopCollector(),
-			MaxHeightRange:       DefaultMaxHeightRange,
-			Log:                  suite.log,
-			SnapshotHistoryLimit: DefaultSnapshotHistoryLimit,
-			Communicator:         NewNodeCommunicator(false),
-		})
+	params := suite.defaultBackendParams()
+
+	backend, err := New(params)
+	suite.Require().NoError(err)
 
 	// query the handler for the latest finalized block
 	header, stat, err := backend.GetLatestBlockHeader(context.Background(), false)
@@ -143,7 +138,6 @@ func (suite *Suite) TestGetLatestFinalizedBlockHeader() {
 	suite.Require().Equal(stat, flow.BlockStatusSealed)
 
 	suite.assertAllExpectations()
-
 }
 
 // TestGetLatestProtocolStateSnapshot_NoTransitionSpan tests our GetLatestProtocolStateSnapshot RPC endpoint
@@ -175,15 +169,11 @@ func (suite *Suite) TestGetLatestProtocolStateSnapshot_NoTransitionSpan() {
 		snap := state.AtHeight(epoch1.Range()[2])
 		suite.state.On("Final").Return(snap).Once()
 
-		backend := New(Params{
-			State:                suite.state,
-			ChainID:              suite.chainID,
-			AccessMetrics:        metrics.NewNoopCollector(),
-			MaxHeightRange:       TEST_MAX_HEIGHT,
-			Log:                  suite.log,
-			SnapshotHistoryLimit: DefaultSnapshotHistoryLimit,
-			Communicator:         NewNodeCommunicator(false),
-		})
+		params := suite.defaultBackendParams()
+		params.MaxHeightRange = TEST_MAX_HEIGHT
+
+		backend, err := New(params)
+		suite.Require().NoError(err)
 
 		// query the handler for the latest finalized snapshot
 		bytes, err := backend.GetLatestProtocolStateSnapshot(context.Background())
@@ -235,16 +225,11 @@ func (suite *Suite) TestGetLatestProtocolStateSnapshot_TransitionSpans() {
 		snap := state.AtHeight(epoch2.Range()[0])
 		suite.state.On("Final").Return(snap).Once()
 
-		backend := New(
-			Params{
-				State:                suite.state,
-				ChainID:              suite.chainID,
-				AccessMetrics:        metrics.NewNoopCollector(),
-				MaxHeightRange:       TEST_MAX_HEIGHT,
-				Log:                  suite.log,
-				SnapshotHistoryLimit: DefaultSnapshotHistoryLimit,
-				Communicator:         NewNodeCommunicator(false),
-			})
+		params := suite.defaultBackendParams()
+		params.MaxHeightRange = TEST_MAX_HEIGHT
+
+		backend, err := New(params)
+		suite.Require().NoError(err)
 
 		// query the handler for the latest finalized snapshot
 		bytes, err := backend.GetLatestProtocolStateSnapshot(context.Background())
@@ -289,15 +274,11 @@ func (suite *Suite) TestGetLatestProtocolStateSnapshot_PhaseTransitionSpan() {
 		snap := state.AtHeight(epoch1.Range()[3])
 		suite.state.On("Final").Return(snap).Once()
 
-		backend := New(Params{
-			State:                suite.state,
-			ChainID:              suite.chainID,
-			AccessMetrics:        metrics.NewNoopCollector(),
-			MaxHeightRange:       TEST_MAX_HEIGHT,
-			Log:                  suite.log,
-			SnapshotHistoryLimit: DefaultSnapshotHistoryLimit,
-			Communicator:         NewNodeCommunicator(false),
-		})
+		params := suite.defaultBackendParams()
+		params.MaxHeightRange = TEST_MAX_HEIGHT
+
+		backend, err := New(params)
+		suite.Require().NoError(err)
 
 		// query the handler for the latest finalized snapshot
 		bytes, err := backend.GetLatestProtocolStateSnapshot(context.Background())
@@ -353,15 +334,11 @@ func (suite *Suite) TestGetLatestProtocolStateSnapshot_EpochTransitionSpan() {
 		snap := state.AtHeight(epoch2.Range()[0])
 		suite.state.On("Final").Return(snap).Once()
 
-		backend := New(Params{
-			State:                suite.state,
-			ChainID:              suite.chainID,
-			AccessMetrics:        metrics.NewNoopCollector(),
-			MaxHeightRange:       TEST_MAX_HEIGHT,
-			Log:                  suite.log,
-			SnapshotHistoryLimit: DefaultSnapshotHistoryLimit,
-			Communicator:         NewNodeCommunicator(false),
-		})
+		params := suite.defaultBackendParams()
+		params.MaxHeightRange = TEST_MAX_HEIGHT
+
+		backend, err := New(params)
+		suite.Require().NoError(err)
 
 		// query the handler for the latest finalized snapshot
 		bytes, err := backend.GetLatestProtocolStateSnapshot(context.Background())
@@ -399,20 +376,15 @@ func (suite *Suite) TestGetLatestProtocolStateSnapshot_HistoryLimit() {
 		snap := state.AtHeight(epoch1.Range()[4])
 		suite.state.On("Final").Return(snap).Once()
 
+		params := suite.defaultBackendParams()
 		// very short history limit, any segment with any Blocks spanning any transition should force the endpoint to return a history limit error
-		snapshotHistoryLimit := 1
-		backend := New(Params{
-			State:                suite.state,
-			ChainID:              suite.chainID,
-			AccessMetrics:        metrics.NewNoopCollector(),
-			MaxHeightRange:       DefaultMaxHeightRange,
-			Log:                  suite.log,
-			SnapshotHistoryLimit: snapshotHistoryLimit,
-			Communicator:         NewNodeCommunicator(false),
-		})
+		params.SnapshotHistoryLimit = 1
+
+		backend, err := New(params)
+		suite.Require().NoError(err)
 
 		// the handler should return a snapshot history limit error
-		_, err := backend.GetLatestProtocolStateSnapshot(context.Background())
+		_, err = backend.GetLatestProtocolStateSnapshot(context.Background())
 		suite.Require().ErrorIs(err, SnapshotHistoryLimitErr)
 	})
 }
@@ -427,15 +399,10 @@ func (suite *Suite) TestGetLatestSealedBlockHeader() {
 	suite.state.On("Sealed").Return(suite.snapshot, nil)
 	suite.snapshot.On("Head").Return(block, nil).Once()
 
-	backend := New(Params{
-		State:                suite.state,
-		ChainID:              suite.chainID,
-		AccessMetrics:        metrics.NewNoopCollector(),
-		MaxHeightRange:       DefaultMaxHeightRange,
-		Log:                  suite.log,
-		SnapshotHistoryLimit: DefaultSnapshotHistoryLimit,
-		Communicator:         NewNodeCommunicator(false),
-	})
+	params := suite.defaultBackendParams()
+
+	backend, err := New(params)
+	suite.Require().NoError(err)
 
 	// query the handler for the latest sealed block
 	header, stat, err := backend.GetLatestBlockHeader(context.Background(), true)
@@ -461,16 +428,10 @@ func (suite *Suite) TestGetTransaction() {
 		Return(&expected, nil).
 		Once()
 
-	backend := New(Params{
-		State:                suite.state,
-		Transactions:         suite.transactions,
-		ChainID:              suite.chainID,
-		AccessMetrics:        metrics.NewNoopCollector(),
-		MaxHeightRange:       DefaultMaxHeightRange,
-		Log:                  suite.log,
-		SnapshotHistoryLimit: DefaultSnapshotHistoryLimit,
-		Communicator:         NewNodeCommunicator(false),
-	})
+	params := suite.defaultBackendParams()
+
+	backend, err := New(params)
+	suite.Require().NoError(err)
 
 	actual, err := backend.GetTransaction(context.Background(), transaction.ID())
 	suite.checkResponse(actual, err)
@@ -490,17 +451,10 @@ func (suite *Suite) TestGetCollection() {
 		Return(&expected, nil).
 		Once()
 
-	backend := New(Params{
-		State:                suite.state,
-		Collections:          suite.collections,
-		Transactions:         suite.transactions,
-		ChainID:              suite.chainID,
-		AccessMetrics:        metrics.NewNoopCollector(),
-		MaxHeightRange:       DefaultMaxHeightRange,
-		Log:                  suite.log,
-		SnapshotHistoryLimit: DefaultSnapshotHistoryLimit,
-		Communicator:         NewNodeCommunicator(false),
-	})
+	params := suite.defaultBackendParams()
+
+	backend, err := New(params)
+	suite.Require().NoError(err)
 
 	actual, err := backend.GetCollectionByID(context.Background(), expected.ID())
 	suite.transactions.AssertExpectations(suite.T())
@@ -531,7 +485,7 @@ func (suite *Suite) TestGetTransactionResultByIndex() {
 	suite.snapshot.On("Identities", mock.Anything).Return(fixedENIDs, nil)
 
 	// create a mock connection factory
-	connFactory := new(backendmock.ConnectionFactory)
+	connFactory := connectionmock.NewConnectionFactory(suite.T())
 	connFactory.On("GetExecutionAPIClient", mock.Anything).Return(suite.execClient, &mockCloser{}, nil)
 
 	exeEventReq := &execproto.GetTransactionByIndexRequest{
@@ -543,24 +497,13 @@ func (suite *Suite) TestGetTransactionResultByIndex() {
 		Events: nil,
 	}
 
-	backend := New(Params{
-		State:             suite.state,
-		Blocks:            suite.blocks,
-		Headers:           suite.headers,
-		Collections:       suite.collections,
-		Transactions:      suite.transactions,
-		ExecutionReceipts: suite.receipts,
-		ExecutionResults:  suite.results,
-		ChainID:           suite.chainID,
-		AccessMetrics:     metrics.NewNoopCollector(),
-		// the connection factory should be used to get the execution node client
-		ConnFactory:           connFactory,
-		MaxHeightRange:        DefaultMaxHeightRange,
-		FixedExecutionNodeIDs: (fixedENIDs.NodeIDs()).Strings(),
-		Log:                   suite.log,
-		SnapshotHistoryLimit:  DefaultSnapshotHistoryLimit,
-		Communicator:          NewNodeCommunicator(false),
-	})
+	params := suite.defaultBackendParams()
+	// the connection factory should be used to get the execution node client
+	params.ConnFactory = connFactory
+	params.FixedExecutionNodeIDs = (fixedENIDs.NodeIDs()).Strings()
+
+	backend, err := New(params)
+	suite.Require().NoError(err)
 
 	suite.execClient.
 		On("GetTransactionResultByIndex", ctx, exeEventReq).
@@ -593,7 +536,7 @@ func (suite *Suite) TestGetTransactionResultsByBlockID() {
 	suite.snapshot.On("Identities", mock.Anything).Return(fixedENIDs, nil)
 
 	// create a mock connection factory
-	connFactory := new(backendmock.ConnectionFactory)
+	connFactory := connectionmock.NewConnectionFactory(suite.T())
 	connFactory.On("GetExecutionAPIClient", mock.Anything).Return(suite.execClient, &mockCloser{}, nil)
 
 	exeEventReq := &execproto.GetTransactionsByBlockIDRequest{
@@ -604,24 +547,13 @@ func (suite *Suite) TestGetTransactionResultsByBlockID() {
 		TransactionResults: []*execproto.GetTransactionResultResponse{{}},
 	}
 
-	backend := New(Params{
-		State:             suite.state,
-		Blocks:            suite.blocks,
-		Headers:           suite.headers,
-		Collections:       suite.collections,
-		Transactions:      suite.transactions,
-		ExecutionReceipts: suite.receipts,
-		ExecutionResults:  suite.results,
-		ChainID:           suite.chainID,
-		AccessMetrics:     metrics.NewNoopCollector(),
-		// the connection factory should be used to get the execution node client
-		ConnFactory:           connFactory,
-		MaxHeightRange:        DefaultMaxHeightRange,
-		FixedExecutionNodeIDs: (fixedENIDs.NodeIDs()).Strings(),
-		Log:                   suite.log,
-		SnapshotHistoryLimit:  DefaultSnapshotHistoryLimit,
-		Communicator:          NewNodeCommunicator(false),
-	})
+	params := suite.defaultBackendParams()
+	// the connection factory should be used to get the execution node client
+	params.ConnFactory = connFactory
+	params.FixedExecutionNodeIDs = (fixedENIDs.NodeIDs()).Strings()
+
+	backend, err := New(params)
+	suite.Require().NoError(err)
 
 	suite.execClient.
 		On("GetTransactionResultsByBlockID", ctx, exeEventReq).
@@ -680,9 +612,8 @@ func (suite *Suite) TestTransactionStatusTransition() {
 	suite.snapshot.On("Identities", mock.Anything).Return(fixedENIDs, nil)
 
 	// create a mock connection factory
-	connFactory := new(backendmock.ConnectionFactory)
+	connFactory := connectionmock.NewConnectionFactory(suite.T())
 	connFactory.On("GetExecutionAPIClient", mock.Anything).Return(suite.execClient, &mockCloser{}, nil)
-	connFactory.On("InvalidateExecutionAPIClient", mock.Anything)
 
 	exeEventReq := &execproto.GetTransactionResultRequest{
 		BlockId:       blockID[:],
@@ -693,24 +624,13 @@ func (suite *Suite) TestTransactionStatusTransition() {
 		Events: nil,
 	}
 
-	backend := New(Params{
-		State:             suite.state,
-		Blocks:            suite.blocks,
-		Headers:           suite.headers,
-		Collections:       suite.collections,
-		Transactions:      suite.transactions,
-		ExecutionReceipts: suite.receipts,
-		ExecutionResults:  suite.results,
-		ChainID:           suite.chainID,
-		AccessMetrics:     metrics.NewNoopCollector(),
-		// the connection factory should be used to get the execution node client
-		ConnFactory:           connFactory,
-		MaxHeightRange:        DefaultMaxHeightRange,
-		FixedExecutionNodeIDs: (fixedENIDs.NodeIDs()).Strings(),
-		Log:                   suite.log,
-		SnapshotHistoryLimit:  DefaultSnapshotHistoryLimit,
-		Communicator:          NewNodeCommunicator(false),
-	})
+	params := suite.defaultBackendParams()
+	// the connection factory should be used to get the execution node client
+	params.ConnFactory = connFactory
+	params.FixedExecutionNodeIDs = (fixedENIDs.NodeIDs()).Strings()
+
+	backend, err := New(params)
+	suite.Require().NoError(err)
 
 	// Successfully return empty event list
 	suite.execClient.
@@ -810,21 +730,10 @@ func (suite *Suite) TestTransactionExpiredStatusTransition() {
 
 	txID := transactionBody.ID()
 
-	backend := New(Params{
-		State:                suite.state,
-		Blocks:               suite.blocks,
-		Headers:              suite.headers,
-		Collections:          suite.collections,
-		Transactions:         suite.transactions,
-		ExecutionReceipts:    suite.receipts,
-		ExecutionResults:     suite.results,
-		ChainID:              suite.chainID,
-		AccessMetrics:        metrics.NewNoopCollector(),
-		MaxHeightRange:       DefaultMaxHeightRange,
-		Log:                  suite.log,
-		SnapshotHistoryLimit: DefaultSnapshotHistoryLimit,
-		Communicator:         NewNodeCommunicator(false),
-	})
+	params := suite.defaultBackendParams()
+
+	backend, err := New(params)
+	suite.Require().NoError(err)
 
 	// should return pending status when we have not observed an expiry block
 	suite.Run("pending", func() {
@@ -970,22 +879,13 @@ func (suite *Suite) TestTransactionPendingToFinalizedStatusTransition() {
 
 	// create a mock connection factory
 	connFactory := suite.setupConnectionFactory()
-	backend := New(Params{
-		State:                suite.state,
-		Blocks:               suite.blocks,
-		Headers:              suite.headers,
-		Collections:          suite.collections,
-		Transactions:         suite.transactions,
-		ExecutionReceipts:    suite.receipts,
-		ExecutionResults:     suite.results,
-		ChainID:              suite.chainID,
-		AccessMetrics:        metrics.NewNoopCollector(),
-		ConnFactory:          connFactory,
-		MaxHeightRange:       TEST_MAX_HEIGHT,
-		Log:                  suite.log,
-		SnapshotHistoryLimit: DefaultSnapshotHistoryLimit,
-		Communicator:         NewNodeCommunicator(false),
-	})
+
+	params := suite.defaultBackendParams()
+	params.ConnFactory = connFactory
+	params.MaxHeightRange = TEST_MAX_HEIGHT
+
+	backend, err := New(params)
+	suite.Require().NoError(err)
 
 	preferredENIdentifiers = flow.IdentifierList{receipts[0].ExecutorID}
 
@@ -1023,16 +923,10 @@ func (suite *Suite) TestTransactionResultUnknown() {
 		On("ByID", txID).
 		Return(nil, storage.ErrNotFound)
 
-	backend := New(Params{
-		State:                suite.state,
-		Transactions:         suite.transactions,
-		ChainID:              suite.chainID,
-		AccessMetrics:        metrics.NewNoopCollector(),
-		MaxHeightRange:       DefaultMaxHeightRange,
-		Log:                  suite.log,
-		SnapshotHistoryLimit: DefaultSnapshotHistoryLimit,
-		Communicator:         NewNodeCommunicator(false),
-	})
+	params := suite.defaultBackendParams()
+
+	backend, err := New(params)
+	suite.Require().NoError(err)
 
 	// first call - when block under test is greater height than the sealed head, but execution node does not know about Tx
 	result, err := backend.GetTransactionResult(ctx, txID, flow.ZeroID, flow.ZeroID)
@@ -1066,16 +960,10 @@ func (suite *Suite) TestGetLatestFinalizedBlock() {
 		On("ByHeight", header.Height).
 		Return(&expected, nil)
 
-	backend := New(Params{
-		State:                suite.state,
-		Blocks:               suite.blocks,
-		ChainID:              suite.chainID,
-		AccessMetrics:        metrics.NewNoopCollector(),
-		MaxHeightRange:       DefaultMaxHeightRange,
-		SnapshotHistoryLimit: DefaultSnapshotHistoryLimit,
-		Log:                  suite.log,
-		Communicator:         NewNodeCommunicator(false),
-	})
+	params := suite.defaultBackendParams()
+
+	backend, err := New(params)
+	suite.Require().NoError(err)
 
 	// query the handler for the latest finalized header
 	actual, stat, err := backend.GetLatestBlock(context.Background(), false)
@@ -1130,7 +1018,7 @@ func (suite *Suite) TestGetEventsForBlockIDs() {
 	validENIDs := flow.IdentifierList(validExecutorIdentities.NodeIDs())
 
 	// create a mock connection factory
-	connFactory := new(backendmock.ConnectionFactory)
+	connFactory := connectionmock.NewConnectionFactory(suite.T())
 	connFactory.On("GetExecutionAPIClient", mock.Anything).Return(suite.execClient, &mockCloser{}, nil)
 
 	// create the expected results from execution node and access node
@@ -1184,23 +1072,14 @@ func (suite *Suite) TestGetEventsForBlockIDs() {
 
 	suite.Run("with an execution node chosen using block ID form the list of Fixed ENs", func() {
 
-		// create the handler
-		backend := New(Params{
-			State:             suite.state,
-			Headers:           suite.headers,
-			ExecutionReceipts: suite.receipts,
-			ExecutionResults:  suite.results,
-			ChainID:           suite.chainID,
-			AccessMetrics:     metrics.NewNoopCollector(),
-			ConnFactory:       connFactory,
-			// set the fixed EN Identifiers to the generated execution IDs
-			FixedExecutionNodeIDs: validENIDs.Strings(),
+		params := suite.defaultBackendParams()
+		params.ConnFactory = connFactory
+		// set the fixed EN Identifiers to the generated execution IDs
+		params.FixedExecutionNodeIDs = validENIDs.Strings()
 
-			MaxHeightRange:       DefaultMaxHeightRange,
-			SnapshotHistoryLimit: DefaultSnapshotHistoryLimit,
-			Log:                  suite.log,
-			Communicator:         NewNodeCommunicator(false),
-		})
+		// create the handler
+		backend, err := New(params)
+		suite.Require().NoError(err)
 
 		// execute request
 		actual, err := backend.GetEventsForBlockIDs(ctx, string(flow.EventAccountCreated), blockIDs)
@@ -1211,20 +1090,14 @@ func (suite *Suite) TestGetEventsForBlockIDs() {
 
 	suite.Run("with an empty block ID list", func() {
 
+		params := suite.defaultBackendParams()
+		params.ExecutionReceipts = receipts
+		params.ConnFactory = connFactory
+		params.FixedExecutionNodeIDs = validENIDs.Strings()
+
 		// create the handler
-		backend := New(Params{
-			State:                 suite.state,
-			Headers:               suite.headers,
-			ExecutionReceipts:     receipts,
-			ChainID:               suite.chainID,
-			AccessMetrics:         metrics.NewNoopCollector(),
-			ConnFactory:           connFactory,
-			MaxHeightRange:        DefaultMaxHeightRange,
-			SnapshotHistoryLimit:  DefaultSnapshotHistoryLimit,
-			FixedExecutionNodeIDs: validENIDs.Strings(),
-			Log:                   suite.log,
-			Communicator:          NewNodeCommunicator(false),
-		})
+		backend, err := New(params)
+		suite.Require().NoError(err)
 
 		// execute request with an empty block id list and expect an empty list of events and no error
 		resp, err := backend.GetEventsForBlockIDs(ctx, string(flow.EventAccountCreated), []flow.Identifier{})
@@ -1242,7 +1115,7 @@ func (suite *Suite) TestGetExecutionResultByID() {
 	validENIDs := flow.IdentifierList(validExecutorIdentities.NodeIDs())
 
 	// create a mock connection factory
-	connFactory := new(backendmock.ConnectionFactory)
+	connFactory := connectionmock.NewConnectionFactory(suite.T())
 
 	nonexistingID := unittest.IdentifierFixture()
 	blockID := unittest.IdentifierFixture()
@@ -1261,41 +1134,28 @@ func (suite *Suite) TestGetExecutionResultByID() {
 		Return(executionResult, nil)
 
 	suite.Run("nonexisting execution result for id", func() {
-		backend := New(Params{
-			State:                 suite.state,
-			Headers:               suite.headers,
-			ExecutionReceipts:     suite.receipts,
-			ExecutionResults:      results,
-			ChainID:               suite.chainID,
-			AccessMetrics:         metrics.NewNoopCollector(),
-			ConnFactory:           connFactory,
-			MaxHeightRange:        DefaultMaxHeightRange,
-			SnapshotHistoryLimit:  DefaultSnapshotHistoryLimit,
-			FixedExecutionNodeIDs: validENIDs.Strings(),
-			Log:                   suite.log,
-			Communicator:          NewNodeCommunicator(false),
-		})
+		params := suite.defaultBackendParams()
+		params.ExecutionResults = results
+		params.ConnFactory = connFactory
+		params.FixedExecutionNodeIDs = validENIDs.Strings()
+
+		backend, err := New(params)
+		suite.Require().NoError(err)
 
 		// execute request
-		_, err := backend.GetExecutionResultByID(ctx, nonexistingID)
+		_, err = backend.GetExecutionResultByID(ctx, nonexistingID)
 
 		assert.Error(suite.T(), err)
 	})
 
 	suite.Run("existing execution result id", func() {
-		backend := New(Params{
-			State:                 suite.state,
-			Headers:               suite.headers,
-			ExecutionResults:      results,
-			ChainID:               suite.chainID,
-			AccessMetrics:         metrics.NewNoopCollector(),
-			ConnFactory:           connFactory,
-			MaxHeightRange:        DefaultMaxHeightRange,
-			SnapshotHistoryLimit:  DefaultSnapshotHistoryLimit,
-			FixedExecutionNodeIDs: validENIDs.Strings(),
-			Log:                   suite.log,
-			Communicator:          NewNodeCommunicator(false),
-		})
+		params := suite.defaultBackendParams()
+		params.ExecutionResults = results
+		params.ConnFactory = connFactory
+		params.FixedExecutionNodeIDs = validENIDs.Strings()
+
+		backend, err := New(params)
+		suite.Require().NoError(err)
 
 		// execute request
 		er, err := backend.GetExecutionResultByID(ctx, executionResult.ID())
@@ -1315,7 +1175,7 @@ func (suite *Suite) TestGetExecutionResultByBlockID() {
 	validENIDs := flow.IdentifierList(validExecutorIdentities.NodeIDs())
 
 	// create a mock connection factory
-	connFactory := new(backendmock.ConnectionFactory)
+	connFactory := connectionmock.NewConnectionFactory(suite.T())
 
 	blockID := unittest.IdentifierFixture()
 	executionResult := unittest.ExecutionResultFixture(
@@ -1336,43 +1196,28 @@ func (suite *Suite) TestGetExecutionResultByBlockID() {
 		Return(executionResult, nil)
 
 	suite.Run("nonexisting execution results", func() {
+		params := suite.defaultBackendParams()
+		params.ExecutionResults = results
+		params.ConnFactory = connFactory
+		params.FixedExecutionNodeIDs = validENIDs.Strings()
 
-		backend := New(Params{
-			State:                 suite.state,
-			Headers:               suite.headers,
-			ExecutionReceipts:     suite.receipts,
-			ExecutionResults:      results,
-			ChainID:               suite.chainID,
-			AccessMetrics:         metrics.NewNoopCollector(),
-			ConnFactory:           connFactory,
-			MaxHeightRange:        DefaultMaxHeightRange,
-			SnapshotHistoryLimit:  DefaultSnapshotHistoryLimit,
-			FixedExecutionNodeIDs: validENIDs.Strings(),
-			Log:                   suite.log,
-			Communicator:          NewNodeCommunicator(false),
-		})
+		backend, err := New(params)
+		suite.Require().NoError(err)
 
 		// execute request
-		_, err := backend.GetExecutionResultForBlockID(ctx, nonexistingBlockID)
+		_, err = backend.GetExecutionResultForBlockID(ctx, nonexistingBlockID)
 
 		assert.Error(suite.T(), err)
 	})
 
 	suite.Run("existing execution results", func() {
+		params := suite.defaultBackendParams()
+		params.ExecutionResults = results
+		params.ConnFactory = connFactory
+		params.FixedExecutionNodeIDs = validENIDs.Strings()
 
-		backend := New(Params{
-			State:                 suite.state,
-			Headers:               suite.headers,
-			ExecutionResults:      results,
-			ChainID:               suite.chainID,
-			AccessMetrics:         metrics.NewNoopCollector(),
-			ConnFactory:           connFactory,
-			MaxHeightRange:        DefaultMaxHeightRange,
-			SnapshotHistoryLimit:  DefaultSnapshotHistoryLimit,
-			FixedExecutionNodeIDs: validENIDs.Strings(),
-			Log:                   suite.log,
-			Communicator:          NewNodeCommunicator(false),
-		})
+		backend, err := New(params)
+		suite.Require().NoError(err)
 
 		// execute request
 		er, err := backend.GetExecutionResultForBlockID(ctx, blockID)
@@ -1403,9 +1248,9 @@ func (suite *Suite) TestGetEventsForHeightRange() {
 	state.On("Sealed").Return(snapshot, nil)
 
 	rootHeader := unittest.BlockHeaderFixture()
-	params := new(protocol.Params)
-	params.On("FinalizedRoot").Return(rootHeader, nil)
-	state.On("Params").Return(params).Maybe()
+	stateParams := new(protocol.Params)
+	stateParams.On("FinalizedRoot").Return(rootHeader, nil)
+	state.On("Params").Return(stateParams).Maybe()
 
 	// mock snapshot to return head backend
 	snapshot.On("Head").Return(
@@ -1503,21 +1348,13 @@ func (suite *Suite) TestGetEventsForHeightRange() {
 
 	//suite.state = state
 	suite.Run("invalid request max height < min height", func() {
-		backend := New(Params{
-			State:                suite.state,
-			Headers:              suite.headers,
-			ExecutionReceipts:    suite.receipts,
-			ExecutionResults:     suite.results,
-			ChainID:              suite.chainID,
-			AccessMetrics:        metrics.NewNoopCollector(),
-			ConnFactory:          connFactory,
-			MaxHeightRange:       DefaultMaxHeightRange,
-			Log:                  suite.log,
-			SnapshotHistoryLimit: DefaultSnapshotHistoryLimit,
-			Communicator:         NewNodeCommunicator(false),
-		})
+		params := suite.defaultBackendParams()
+		params.ConnFactory = connFactory
 
-		_, err := backend.GetEventsForHeightRange(ctx, string(flow.EventAccountCreated), maxHeight, minHeight)
+		backend, err := New(params)
+		suite.Require().NoError(err)
+
+		_, err = backend.GetEventsForHeightRange(ctx, string(flow.EventAccountCreated), maxHeight, minHeight)
 		suite.Require().Error(err)
 
 		suite.assertAllExpectations() // assert that request was not sent to execution node
@@ -1533,21 +1370,18 @@ func (suite *Suite) TestGetEventsForHeightRange() {
 		expectedResp := setupExecClient()
 		fixedENIdentifiersStr := flow.IdentifierList(nodeIdentities.NodeIDs()).Strings()
 
-		backend := New(Params{
-			State:                 state,
-			Blocks:                suite.blocks,
-			Headers:               suite.headers,
-			ExecutionReceipts:     suite.receipts,
-			ExecutionResults:      suite.results,
-			ChainID:               suite.chainID,
-			AccessMetrics:         metrics.NewNoopCollector(),
-			ConnFactory:           connFactory,
-			MaxHeightRange:        DefaultMaxHeightRange,
-			SnapshotHistoryLimit:  DefaultSnapshotHistoryLimit,
-			Log:                   suite.log,
-			Communicator:          NewNodeCommunicator(false),
-			FixedExecutionNodeIDs: fixedENIdentifiersStr,
-		})
+		stateParams.On("SporkID").Return(unittest.IdentifierFixture(), nil)
+		stateParams.On("ProtocolVersion").Return(uint(unittest.Uint64InRange(10, 30)), nil)
+		stateParams.On("SporkRootBlockHeight").Return(headHeight, nil)
+		stateParams.On("SealedRoot").Return(head, nil)
+
+		params := suite.defaultBackendParams()
+		params.State = state
+		params.ConnFactory = connFactory
+		params.FixedExecutionNodeIDs = fixedENIdentifiersStr
+
+		backend, err := New(params)
+		suite.Require().NoError(err)
 
 		// execute request
 		actualResp, err := backend.GetEventsForHeightRange(ctx, string(flow.EventAccountCreated), minHeight, maxHeight)
@@ -1565,21 +1399,18 @@ func (suite *Suite) TestGetEventsForHeightRange() {
 		expectedResp := setupExecClient()
 		fixedENIdentifiersStr := flow.IdentifierList(nodeIdentities.NodeIDs()).Strings()
 
-		backend := New(Params{
-			State:                 state,
-			Blocks:                suite.blocks,
-			Headers:               suite.headers,
-			ExecutionReceipts:     suite.receipts,
-			ExecutionResults:      suite.results,
-			ChainID:               suite.chainID,
-			AccessMetrics:         metrics.NewNoopCollector(),
-			ConnFactory:           connFactory,
-			MaxHeightRange:        DefaultMaxHeightRange,
-			SnapshotHistoryLimit:  DefaultSnapshotHistoryLimit,
-			Log:                   suite.log,
-			Communicator:          NewNodeCommunicator(false),
-			FixedExecutionNodeIDs: fixedENIdentifiersStr,
-		})
+		stateParams.On("SporkID").Return(unittest.IdentifierFixture(), nil)
+		stateParams.On("ProtocolVersion").Return(uint(unittest.Uint64InRange(10, 30)), nil)
+		stateParams.On("SporkRootBlockHeight").Return(headHeight, nil)
+		stateParams.On("SealedRoot").Return(head, nil)
+
+		params := suite.defaultBackendParams()
+		params.State = state
+		params.ConnFactory = connFactory
+		params.FixedExecutionNodeIDs = fixedENIdentifiersStr
+
+		backend, err := New(params)
+		suite.Require().NoError(err)
 
 		actualResp, err := backend.GetEventsForHeightRange(ctx, string(flow.EventAccountCreated), minHeight, maxHeight)
 		suite.checkResponse(actualResp, err)
@@ -1595,23 +1426,15 @@ func (suite *Suite) TestGetEventsForHeightRange() {
 		blockHeaders, _, nodeIdentities = setupStorage(minHeight, headHeight)
 		fixedENIdentifiersStr := flow.IdentifierList(nodeIdentities.NodeIDs()).Strings()
 
-		backend := New(Params{
-			State:                 suite.state,
-			Blocks:                suite.blocks,
-			Headers:               suite.headers,
-			ExecutionReceipts:     suite.receipts,
-			ExecutionResults:      suite.results,
-			ChainID:               suite.chainID,
-			AccessMetrics:         metrics.NewNoopCollector(),
-			ConnFactory:           connFactory,
-			MaxHeightRange:        1,
-			SnapshotHistoryLimit:  DefaultSnapshotHistoryLimit,
-			Log:                   suite.log,
-			Communicator:          NewNodeCommunicator(false),
-			FixedExecutionNodeIDs: fixedENIdentifiersStr,
-		})
+		params := suite.defaultBackendParams()
+		params.ConnFactory = connFactory
+		params.MaxHeightRange = 1
+		params.FixedExecutionNodeIDs = fixedENIdentifiersStr
 
-		_, err := backend.GetEventsForHeightRange(ctx, string(flow.EventAccountCreated), minHeight, minHeight+1)
+		backend, err := New(params)
+		suite.Require().NoError(err)
+
+		_, err = backend.GetEventsForHeightRange(ctx, string(flow.EventAccountCreated), minHeight, minHeight+1)
 		suite.Require().Error(err)
 	})
 
@@ -1625,23 +1448,15 @@ func (suite *Suite) TestGetEventsForHeightRange() {
 		blockHeaders, _, nodeIdentities = setupStorage(minHeight, maxHeight)
 		fixedENIdentifiersStr := flow.IdentifierList(nodeIdentities.NodeIDs()).Strings()
 
-		backend := New(Params{
-			State:                 state,
-			Blocks:                suite.blocks,
-			Headers:               suite.headers,
-			ExecutionReceipts:     suite.receipts,
-			ExecutionResults:      suite.results,
-			ChainID:               suite.chainID,
-			AccessMetrics:         metrics.NewNoopCollector(),
-			ConnFactory:           connFactory,
-			MaxHeightRange:        DefaultMaxHeightRange,
-			SnapshotHistoryLimit:  DefaultSnapshotHistoryLimit,
-			Log:                   suite.log,
-			Communicator:          NewNodeCommunicator(false),
-			FixedExecutionNodeIDs: fixedENIdentifiersStr,
-		})
+		params := suite.defaultBackendParams()
+		params.State = state
+		params.ConnFactory = connFactory
+		params.FixedExecutionNodeIDs = fixedENIdentifiersStr
 
-		_, err := backend.GetEventsForHeightRange(ctx, string(flow.EventAccountCreated), minHeight, maxHeight)
+		backend, err := New(params)
+		suite.Require().NoError(err)
+
+		_, err = backend.GetEventsForHeightRange(ctx, string(flow.EventAccountCreated), minHeight, maxHeight)
 		suite.Require().Error(err)
 	})
 
@@ -1692,23 +1507,14 @@ func (suite *Suite) TestGetAccount() {
 
 	suite.snapshot.On("Identities", mock.Anything).Return(ids, nil)
 	// create a mock connection factory
-	connFactory := new(backendmock.ConnectionFactory)
+	connFactory := connectionmock.NewConnectionFactory(suite.T())
 	connFactory.On("GetExecutionAPIClient", mock.Anything).Return(suite.execClient, &mockCloser{}, nil)
 
-	backend := New(Params{
-		State:                suite.state,
-		Blocks:               suite.blocks,
-		Headers:              suite.headers,
-		ExecutionReceipts:    suite.receipts,
-		ExecutionResults:     suite.results,
-		ChainID:              suite.chainID,
-		AccessMetrics:        metrics.NewNoopCollector(),
-		ConnFactory:          connFactory,
-		MaxHeightRange:       DefaultMaxHeightRange,
-		SnapshotHistoryLimit: DefaultSnapshotHistoryLimit,
-		Log:                  suite.log,
-		Communicator:         NewNodeCommunicator(false),
-	})
+	params := suite.defaultBackendParams()
+	params.ConnFactory = connFactory
+
+	backend, err := New(params)
+	suite.Require().NoError(err)
 
 	preferredENIdentifiers = flow.IdentifierList{receipts[0].ExecutorID}
 
@@ -1747,7 +1553,7 @@ func (suite *Suite) TestGetAccountAtBlockHeight() {
 	suite.snapshot.On("Identities", mock.Anything).Return(ids, nil)
 
 	// create a mock connection factory
-	connFactory := new(backendmock.ConnectionFactory)
+	connFactory := connectionmock.NewConnectionFactory(suite.T())
 	connFactory.On("GetExecutionAPIClient", mock.Anything).Return(suite.execClient, &mockCloser{}, nil)
 
 	// create the expected execution API request
@@ -1768,19 +1574,12 @@ func (suite *Suite) TestGetAccountAtBlockHeight() {
 		Return(exeResp, nil).
 		Once()
 
-	backend := New(Params{
-		State:                suite.state,
-		Headers:              suite.headers,
-		ExecutionReceipts:    suite.receipts,
-		ExecutionResults:     suite.results,
-		ChainID:              flow.Testnet,
-		AccessMetrics:        metrics.NewNoopCollector(),
-		ConnFactory:          connFactory,
-		MaxHeightRange:       DefaultMaxHeightRange,
-		SnapshotHistoryLimit: DefaultSnapshotHistoryLimit,
-		Log:                  suite.log,
-		Communicator:         NewNodeCommunicator(false),
-	})
+	params := suite.defaultBackendParams()
+	params.ChainID = flow.Testnet
+	params.ConnFactory = connFactory
+
+	backend, err := New(params)
+	suite.Require().NoError(err)
 
 	preferredENIdentifiers = flow.IdentifierList{receipts[0].ExecutorID}
 
@@ -1794,23 +1593,124 @@ func (suite *Suite) TestGetAccountAtBlockHeight() {
 	})
 }
 
+func (suite *Suite) TestGetNodeVersionInfo() {
+	sporkRootBlock := unittest.BlockHeaderFixture()
+	nodeRootBlock := unittest.BlockHeaderFixture(unittest.WithHeaderHeight(sporkRootBlock.Height + 100))
+	sporkID := unittest.IdentifierFixture()
+	protocolVersion := uint(1234)
+
+	suite.Run("happy path", func() {
+		stateParams := protocol.NewParams(suite.T())
+		stateParams.On("SporkID").Return(sporkID, nil)
+		stateParams.On("ProtocolVersion").Return(protocolVersion, nil)
+		stateParams.On("SporkRootBlockHeight").Return(sporkRootBlock.Height, nil)
+		stateParams.On("SealedRoot").Return(nodeRootBlock, nil)
+
+		state := protocol.NewState(suite.T())
+		state.On("Params").Return(stateParams, nil).Maybe()
+
+		expected := &accessflow.NodeVersionInfo{
+			Semver:               build.Version(),
+			Commit:               build.Commit(),
+			SporkId:              sporkID,
+			ProtocolVersion:      uint64(protocolVersion),
+			SporkRootBlockHeight: sporkRootBlock.Height,
+			NodeRootBlockHeight:  nodeRootBlock.Height,
+		}
+
+		params := suite.defaultBackendParams()
+		params.State = state
+
+		backend, err := New(params)
+		suite.Require().NoError(err)
+
+		actual, err := backend.GetNodeVersionInfo(context.Background())
+		suite.Require().NoError(err)
+
+		suite.Require().Equal(expected, actual)
+	})
+
+	suite.Run("backend construct fails when SporkID lookup fails", func() {
+		stateParams := protocol.NewParams(suite.T())
+		stateParams.On("SporkID").Return(flow.ZeroID, fmt.Errorf("fail"))
+
+		state := protocol.NewState(suite.T())
+		state.On("Params").Return(stateParams, nil).Maybe()
+
+		params := suite.defaultBackendParams()
+		params.State = state
+
+		backend, err := New(params)
+		suite.Require().Error(err)
+		suite.Require().Nil(backend)
+	})
+
+	suite.Run("backend construct fails when ProtocolVersion lookup fails", func() {
+		stateParams := protocol.NewParams(suite.T())
+		stateParams.On("SporkID").Return(sporkID, nil)
+		stateParams.On("ProtocolVersion").Return(uint(0), fmt.Errorf("fail"))
+
+		state := protocol.NewState(suite.T())
+		state.On("Params").Return(stateParams, nil).Maybe()
+
+		params := suite.defaultBackendParams()
+		params.State = state
+
+		backend, err := New(params)
+		suite.Require().Error(err)
+		suite.Require().Nil(backend)
+	})
+
+	suite.Run("backend construct fails when SporkRootBlockHeight lookup fails", func() {
+		stateParams := protocol.NewParams(suite.T())
+		stateParams.On("SporkID").Return(sporkID, nil)
+		stateParams.On("ProtocolVersion").Return(protocolVersion, nil)
+		stateParams.On("SporkRootBlockHeight").Return(uint64(0), fmt.Errorf("fail"))
+
+		state := protocol.NewState(suite.T())
+		state.On("Params").Return(stateParams, nil).Maybe()
+
+		params := suite.defaultBackendParams()
+		params.State = state
+
+		backend, err := New(params)
+		suite.Require().Error(err)
+		suite.Require().Nil(backend)
+	})
+
+	suite.Run("backend construct fails when SealedRoot lookup fails", func() {
+		stateParams := protocol.NewParams(suite.T())
+		stateParams.On("SporkID").Return(sporkID, nil)
+		stateParams.On("ProtocolVersion").Return(protocolVersion, nil)
+		stateParams.On("SporkRootBlockHeight").Return(sporkRootBlock.Height, nil)
+		stateParams.On("SealedRoot").Return(nil, fmt.Errorf("fail"))
+
+		state := protocol.NewState(suite.T())
+		state.On("Params").Return(stateParams, nil).Maybe()
+
+		params := suite.defaultBackendParams()
+		params.State = state
+
+		backend, err := New(params)
+		suite.Require().Error(err)
+		suite.Require().Nil(backend)
+	})
+}
+
 func (suite *Suite) TestGetNetworkParameters() {
 	suite.state.On("Sealed").Return(suite.snapshot, nil).Maybe()
 
 	expectedChainID := flow.Mainnet
 
-	backend := New(Params{
-		ChainID:              flow.Mainnet,
-		AccessMetrics:        metrics.NewNoopCollector(),
-		MaxHeightRange:       DefaultMaxHeightRange,
-		SnapshotHistoryLimit: DefaultSnapshotHistoryLimit,
-		Log:                  suite.log,
-		Communicator:         NewNodeCommunicator(false),
-	})
+	params := suite.defaultBackendParams()
+	params.ChainID = expectedChainID
 
-	params := backend.GetNetworkParameters(context.Background())
+	backend, err := New(params)
+	suite.Require().NoError(err)
 
-	suite.Require().Equal(expectedChainID, params.ChainID)
+	actual := backend.GetNetworkParameters(context.Background())
+
+	suite.Require().Equal(expectedChainID, actual.ChainID)
 }
 
 // TestExecutionNodesForBlockID tests the common method backend.executionNodesForBlockID used for serving all API calls
@@ -1983,23 +1883,15 @@ func (suite *Suite) TestExecutionNodesForBlockID() {
 func (suite *Suite) TestExecuteScriptOnExecutionNode() {
 
 	// create a mock connection factory
-	connFactory := new(backendmock.ConnectionFactory)
+	connFactory := connectionmock.NewConnectionFactory(suite.T())
 	connFactory.On("GetExecutionAPIClient", mock.Anything).Return(suite.execClient, &mockCloser{}, nil)
-	connFactory.On("InvalidateExecutionAPIClient", mock.Anything)
 
-	backend := New(Params{
-		State:                suite.state,
-		Headers:              suite.headers,
-		ExecutionReceipts:    suite.receipts,
-		ExecutionResults:     suite.results,
-		ChainID:              flow.Mainnet,
-		ConnFactory:          connFactory,
-		AccessMetrics:        metrics.NewNoopCollector(),
-		MaxHeightRange:       DefaultMaxHeightRange,
-		SnapshotHistoryLimit: DefaultSnapshotHistoryLimit,
-		Log:                  suite.log,
-		Communicator:         NewNodeCommunicator(false),
-	})
+	params := suite.defaultBackendParams()
+	params.ChainID = flow.Mainnet
+	params.ConnFactory = connFactory
+
+	backend, err := New(params)
+	suite.Require().NoError(err)
 
 	// mock parameters
 	ctx := context.Background()
@@ -2048,26 +1940,18 @@ func (suite *Suite) TestExecuteScriptOnArchiveNode() {
 
 	// create a mock connection factory
 	var mockPort uint = 9000
-	connFactory := new(backendmock.ConnectionFactory)
+	connFactory := connectionmock.NewConnectionFactory(suite.T())
 	connFactory.On("GetAccessAPIClientWithPort", mock.Anything, mockPort).Return(suite.archiveClient, &mockCloser{}, nil)
-	connFactory.On("InvalidateAccessAPIClient", mock.Anything)
 	archiveNode := unittest.IdentityFixture(unittest.WithRole(flow.RoleAccess))
 	fullArchiveAddress := archiveNode.Address + ":" + strconv.FormatUint(uint64(mockPort), 10)
 
-	backend := New(Params{
-		State:                suite.state,
-		Headers:              suite.headers,
-		ExecutionReceipts:    suite.receipts,
-		ExecutionResults:     suite.results,
-		ChainID:              flow.Mainnet,
-		ConnFactory:          connFactory,
-		AccessMetrics:        metrics.NewNoopCollector(),
-		MaxHeightRange:       DefaultMaxHeightRange,
-		SnapshotHistoryLimit: DefaultSnapshotHistoryLimit,
-		Log:                  suite.log,
-		Communicator:         NewNodeCommunicator(false),
-		ArchiveAddressList:   []string{fullArchiveAddress},
-	})
+	params := suite.defaultBackendParams()
+	params.ChainID = flow.Mainnet
+	params.ConnFactory = connFactory
+	params.ArchiveAddressList = []string{fullArchiveAddress}
+
+	backend, err := New(params)
+	suite.Require().NoError(err)
 
 	// mock parameters
 	ctx := context.Background()
@@ -2121,28 +2005,20 @@ func (suite *Suite) TestScriptExecutionValidationMode() {
 
 	// create a mock connection factory
 	var mockPort uint = 9000
-	connFactory := new(backendmock.ConnectionFactory)
+	connFactory := connectionmock.NewConnectionFactory(suite.T())
 	connFactory.On("GetAccessAPIClientWithPort", mock.Anything, mockPort).Return(suite.archiveClient, &mockCloser{}, nil)
 	connFactory.On("GetExecutionAPIClient", mock.Anything).Return(suite.execClient, &mockCloser{}, nil)
-	connFactory.On("InvalidateAccessAPIClient", mock.Anything)
 	archiveNode := unittest.IdentityFixture(unittest.WithRole(flow.RoleAccess))
 	fullArchiveAddress := archiveNode.Address + ":" + strconv.FormatUint(uint64(mockPort), 10)
 
-	backend := New(Params{
-		State:                suite.state,
-		Headers:              suite.headers,
-		ExecutionReceipts:    suite.receipts,
-		ExecutionResults:     suite.results,
-		ChainID:              flow.Mainnet,
-		ConnFactory:          connFactory,
-		AccessMetrics:        metrics.NewNoopCollector(),
-		MaxHeightRange:       DefaultMaxHeightRange,
-		SnapshotHistoryLimit: DefaultSnapshotHistoryLimit,
-		Log:                  suite.log,
-		Communicator:         NewNodeCommunicator(false),
-		ArchiveAddressList:   []string{fullArchiveAddress},
-		ScriptExecValidation: true,
-	})
+	params := suite.defaultBackendParams()
+	params.ChainID = flow.Mainnet
+	params.ConnFactory = connFactory
+	params.ArchiveAddressList = []string{fullArchiveAddress}
+	params.ScriptExecValidation = true
+
+	backend, err := New(params)
+	suite.Require().NoError(err)
 
 	// mock parameters
 	ctx := context.Background()
@@ -2259,9 +2135,8 @@ func (suite *Suite) setupReceipts(block *flow.Block) ([]*flow.ExecutionReceipt, 
 
 func (suite *Suite) setupConnectionFactory() connection.ConnectionFactory {
 	// create a mock connection factory
-	connFactory := new(backendmock.ConnectionFactory)
+	connFactory := connectionmock.NewConnectionFactory(suite.T())
 	connFactory.On("GetExecutionAPIClient", mock.Anything).Return(suite.execClient, &mockCloser{}, nil)
-	connFactory.On("InvalidateExecutionAPIClient", mock.Anything)
 	return connFactory
 }
 
@@ -2271,4 +2146,23 @@ func getEvents(n int) []flow.Event {
 		events[i] = flow.Event{Type: flow.EventAccountCreated}
 	}
 	return events
+}
+
+func (suite *Suite) defaultBackendParams() Params {
+	return Params{
+		State:                suite.state,
+		Blocks:               suite.blocks,
+		Headers:              suite.headers,
+		Collections:          suite.collections,
+		Transactions:         suite.transactions,
+		ExecutionReceipts:    suite.receipts,
+		ExecutionResults:     suite.results,
+		ChainID:              suite.chainID,
+		CollectionRPC:        suite.colClient,
+		MaxHeightRange:       DefaultMaxHeightRange,
+		SnapshotHistoryLimit: DefaultSnapshotHistoryLimit,
+		Communicator:         NewNodeCommunicator(false),
+		AccessMetrics:        metrics.NewNoopCollector(),
+		Log:                  suite.log,
+	}
 }
