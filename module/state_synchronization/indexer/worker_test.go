@@ -97,14 +97,14 @@ func (w *workerTest) first() *flow.Block {
 func (w *workerTest) run(ctx irrecoverable.SignalerContext, cancel context.CancelFunc) {
 	w.worker.Start(ctx)
 
-	unittest.RequireComponentsReadyBefore(w.t, testTimeout, w.worker.ComponentConsumer)
+	unittest.RequireComponentsReadyBefore(w.t, testTimeout, w.worker.component)
 
 	w.worker.OnExecutionData(nil)
 
 	// give it a bit of time to process all the blocks
 	time.Sleep(testTimeout - 50)
 	cancel()
-	unittest.RequireCloseBefore(w.t, w.worker.Done(), testTimeout, "timeout waiting for the consumer to be done")
+	unittest.RequireCloseBefore(w.t, w.worker.component.Done(), testTimeout, "timeout waiting for the consumer to be done")
 }
 
 type mockProgress struct {

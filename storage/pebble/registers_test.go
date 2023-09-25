@@ -100,8 +100,8 @@ func TestRegisters_Heights(t *testing.T) {
 	t.Parallel()
 	RunWithRegistersStorageAtHeight1(t, func(r *Registers) {
 		// first and latest heights are the same
-		firstHeight := r.FirstHeight()
-		latestHeight := r.LatestHeight()
+		firstHeight, _ := r.FirstHeight()
+		latestHeight, _ := r.LatestHeight()
 		require.Equal(t, firstHeight, latestHeight)
 		// insert new data
 		key1 := flow.RegisterID{Owner: "owner", Key: "key1"}
@@ -113,8 +113,8 @@ func TestRegisters_Heights(t *testing.T) {
 		err := r.Store(entries, height2)
 		require.NoError(t, err)
 
-		firstHeight2 := r.FirstHeight()
-		latestHeight2 := r.LatestHeight()
+		firstHeight2, _ := r.FirstHeight()
+		latestHeight2, _ := r.LatestHeight()
 
 		// new latest height
 		require.Equal(t, latestHeight2, height2)
@@ -182,7 +182,7 @@ func TestRegisters_Store_Versioning(t *testing.T) {
 		// check increment in height after Store()
 		err = r.Store(entries3, height3)
 		require.NoError(t, err)
-		updatedHeight := r.LatestHeight()
+		updatedHeight, _ := r.LatestHeight()
 		require.Equal(t, updatedHeight, height3)
 
 		// test old version at previous height
