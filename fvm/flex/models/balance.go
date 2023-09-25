@@ -4,7 +4,6 @@ import (
 	"math/big"
 
 	"github.com/onflow/cadence"
-	"github.com/onflow/cadence/fixedpoint"
 )
 
 // Balance represents the balance of a Flex address
@@ -15,12 +14,8 @@ import (
 type Balance cadence.UFix64
 
 func (b Balance) ToAttoFlow() *big.Int {
-	res := new(big.Int)
-	conv := new(big.Int).SetInt64(1e18)
-	integer := new(big.Int).SetUint64(uint64(b) / fixedpoint.Fix64Scale)
-	fraction := new(big.Int).SetUint64(uint64(b) % fixedpoint.Fix64Scale)
-	scaledInteger := integer.Mul(integer, conv)
-	return res.Add(scaledInteger, fraction)
+	conv := new(big.Int).SetInt64(1e10)
+	return new(big.Int).Mul(new(big.Int).SetUint64(uint64(b)), conv)
 }
 
 func (b Balance) Sub(other Balance) Balance {
@@ -34,15 +29,14 @@ func (b Balance) Add(other Balance) Balance {
 }
 
 func NewBalanceFromAttoFlow(inp *big.Int) (Balance, error) {
-	conv := new(big.Int).SetInt64(1e18)
-	integer := inp.Div(inp, conv)
-	fraction := inp.Rem(inp, conv)
+	conv := new(big.Int).SetInt64(1e10)
+	// TODO: check for underflow
+	// rem := new(big.Int).Rem(inp, conv)
+	// if rem != 0 {
+	// 	return error
+	// }
 
-	// TODO check the underlying cadence method errors on underflow and over flow
-	v, err := cadence.NewUFix64FromParts(int(integer.Int64()), uint(fraction.Uint64()))
-	if err != nil {
-		return 0, err
-	}
-
-	return Balance(v), nil
+	// we only need to divide by 10 given we already have 8 as factor
+	converted := new(big.Int).Div(inp, conv)
+	return Balance(cadence.UFix64(converted.Uint64())), nil
 }
