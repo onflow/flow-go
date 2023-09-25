@@ -40,7 +40,6 @@ func NewBootstrap(db *pebble.DB, checkpointFile string, rootHeight uint64, log z
 }
 
 func (b *Bootstrap) batchIndexRegisters(leafNodes []*wal.LeafNode) error {
-	// collect entries
 	batch := b.db.NewBatch()
 	defer batch.Close()
 	for _, register := range leafNodes {
@@ -61,7 +60,6 @@ func (b *Bootstrap) batchIndexRegisters(leafNodes []*wal.LeafNode) error {
 			return fmt.Errorf("failed to set key: %w", err)
 		}
 	}
-	// batch insert to db
 	err := batch.Commit(pebble.Sync)
 	if err != nil {
 		return fmt.Errorf("failed to commit batch: %w", err)
@@ -69,10 +67,31 @@ func (b *Bootstrap) batchIndexRegisters(leafNodes []*wal.LeafNode) error {
 	return nil
 }
 
-// IndexCheckpointFile indexes the checkpoint file in the Dir provided and returns a channel that closes when done
+// indexCheckpointFileWorker asynchronously indexes register entries in b.checkpointDir
+// with wal.OpenAndReadLeafNodesFromCheckpointV6
+func (b *Bootstrap) indexCheckpointFileWorker(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+	ready()
+	select {
+	case <-ctx.Done():
+		return
+	default:
+	}
+	// collect leaf nodes to batch index until the channel is closed
+	batch := make([]*wal.LeafNode, 0, pebbleBootstrapRegisterBatchLen)
+	for leafNode := range b.leafNodeChan {
+		batch = append(batch, leafNode)
+		if len(batch) >= pebbleBootstrapRegisterBatchLen {
+			err := b.batchIndexRegisters(batch)
+			if err != nil {
+				ctx.Throw(fmt.Errorf("unable to index registers to pebble: %w", err))
+			}
+		}
+	}
+}
+
+// IndexCheckpointFile indexes the checkpoint file in the Dir provided as a component
 func (b *Bootstrap) IndexCheckpointFile(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 	ready()
-	bat := b.db.NewBatch()
 	// index checkpoint file async
 	cmb := component.NewComponentManagerBuilder()
 	for i := 0; i < pebbleBootstrapWorkerCount; i++ {
@@ -86,8 +105,11 @@ func (b *Bootstrap) IndexCheckpointFile(ctx irrecoverable.SignalerContext, ready
 		// error in reading a leaf node
 		ctx.Throw(fmt.Errorf("error reading leaf node: %w", err))
 	}
+
 	// wait for the indexing to finish before populating heights
 	<-c.Done()
+	bat := b.db.NewBatch()
+	defer bat.Close()
 	// update heights atomically to prevent one getting populated without the other
 	// leaving it in a corrupted state
 	err = bat.Set(firstHeightKey(), encodedUint64(b.rootHeight), nil)
@@ -101,29 +123,5 @@ func (b *Bootstrap) IndexCheckpointFile(ctx irrecoverable.SignalerContext, ready
 	err = bat.Commit(pebble.Sync)
 	if err != nil {
 		ctx.Throw(fmt.Errorf("unable to index first and latest heights: %w", err))
-	}
-}
-
-// indexCheckpointFileWorker asynchronously indexes register entries in b.checkpointDir
-// with wal.OpenAndReadLeafNodesFromCheckpointV6
-func (b *Bootstrap) indexCheckpointFileWorker(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
-	ready()
-	select {
-	case <-ctx.Done():
-		return
-	default:
-	}
-	// collect leaf nodes to batch
-	batch := make([]*wal.LeafNode, 0, pebbleBootstrapRegisterBatchLen)
-	for leafNode := range b.leafNodeChan {
-		batch = append(batch, leafNode)
-		if len(batch) >= pebbleBootstrapRegisterBatchLen {
-			// index to pebble
-			err := b.batchIndexRegisters(batch)
-			if err != nil {
-				ctx.Throw(fmt.Errorf("unable to index registers to pebble: %w", err))
-			}
-			return
-		}
 	}
 }
