@@ -520,14 +520,15 @@ func TestCreateStreamTimeoutWithUnresponsiveNode(t *testing.T) {
 
 	// attempt to create a stream from node 1 to node 2 and assert that it fails after timeout
 	grace := 100 * time.Millisecond
-	unittest.AssertReturnsBefore(t, func() {
-		nodes[0].Host().Peerstore().AddAddrs(silentNodeInfo.ID, silentNodeInfo.Addrs, peerstore.AddressTTL)
-		err = nodes[0].OpenProtectedStream(tctx, silentNodeInfo.ID, t.Name(), func(stream network.Stream) error {
-			// do nothing, this is a no-op stream writer, we just check that the stream was created
-			return nil
-		})
-		require.Error(t, err)
-	}, timeout+grace)
+	unittest.AssertReturnsBefore(t,
+		func() {
+			nodes[0].Host().Peerstore().AddAddrs(silentNodeInfo.ID, silentNodeInfo.Addrs, peerstore.AddressTTL)
+			err = nodes[0].OpenProtectedStream(tctx, silentNodeInfo.ID, t.Name(), func(stream network.Stream) error {
+				// do nothing, this is a no-op stream writer, we just check that the stream was created
+				return nil
+			})
+			require.Error(t, err)
+		}, timeout+grace)
 }
 
 // TestCreateStreamIsConcurrent tests that CreateStream calls can be made concurrently such that one blocked call
@@ -577,6 +578,8 @@ func TestCreateStreamIsConcurrent(t *testing.T) {
 
 	// requires the CreateStream call to the unresponsive node was blocked while we attempted the CreateStream to the
 	// good address
-	unittest.RequireNeverClosedWithin(t, blockedCallCh, 1*time.Millisecond, "CreateStream attempt to the unresponsive peer did not block after connecting to good node")
-
+	unittest.RequireNeverClosedWithin(t,
+		blockedCallCh,
+		1*time.Millisecond,
+		"CreateStream attempt to the unresponsive peer did not block after connecting to good node")
 }
