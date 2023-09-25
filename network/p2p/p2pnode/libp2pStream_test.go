@@ -538,7 +538,11 @@ func TestCreateStreamIsConcurrent(t *testing.T) {
 	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
 	idProvider := unittest.NewUpdatableIDProvider(flow.IdentityList{})
 	// create two regular node
-	goodNodes, goodNodeIds := p2ptest.NodesFixture(t, unittest.IdentifierFixture(), "test_create_stream_is_concurrent", 2, idProvider)
+	goodNodes, goodNodeIds := p2ptest.NodesFixture(t,
+		unittest.IdentifierFixture(),
+		t.Name(),
+		2,
+		idProvider)
 	require.Len(t, goodNodeIds, 2)
 	idProvider.SetIdentities(goodNodeIds)
 	p2ptest.StartNodes(t, signalerCtx, goodNodes)
@@ -556,25 +560,27 @@ func TestCreateStreamIsConcurrent(t *testing.T) {
 	require.NoError(t, err)
 
 	// creates a stream to unresponsive node and makes sure that the stream creation is blocked
-	blockedCallCh := unittest.RequireNeverReturnBefore(t, func() {
-		goodNodes[0].Host().Peerstore().AddAddrs(silentNodeInfo.ID, silentNodeInfo.Addrs, peerstore.AddressTTL)
-		// the subsequent call will be blocked
-		_ = goodNodes[0].OpenProtectedStream(ctx, silentNodeInfo.ID, t.Name(), func(stream network.Stream) error {
-			// do nothing, the stream creation will be blocked so this should never be called
-			require.Fail(t, "this should never be called")
-			return nil
-		})
-	}, 1*time.Second, "CreateStream attempt to the unresponsive peer did not block")
+	blockedCallCh := unittest.RequireNeverReturnBefore(t,
+		func() {
+			goodNodes[0].Host().Peerstore().AddAddrs(silentNodeInfo.ID, silentNodeInfo.Addrs, peerstore.AddressTTL)
+			// the subsequent call will be blocked
+			_ = goodNodes[0].OpenProtectedStream(ctx, silentNodeInfo.ID, t.Name(), func(stream network.Stream) error {
+				// do nothing, the stream creation will be blocked so this should never be called
+				require.Fail(t, "this should never be called")
+				return nil
+			})
+		}, 1*time.Second, "CreateStream attempt to the unresponsive peer did not block")
 
 	// requires same peer can still connect to the other regular peer without being blocked
-	unittest.RequireReturnsBefore(t, func() {
-		goodNodes[0].Host().Peerstore().AddAddrs(goodNodeInfo1.ID, goodNodeInfo1.Addrs, peerstore.AddressTTL)
-		err := goodNodes[0].OpenProtectedStream(ctx, goodNodeInfo1.ID, t.Name(), func(stream network.Stream) error {
-			// do nothing, this is a no-op stream writer, we just check that the stream was created
-			return nil
-		})
-		require.NoError(t, err)
-	}, 1*time.Second, "creating stream to a responsive node failed while concurrently blocked on unresponsive node")
+	unittest.RequireReturnsBefore(t,
+		func() {
+			goodNodes[0].Host().Peerstore().AddAddrs(goodNodeInfo1.ID, goodNodeInfo1.Addrs, peerstore.AddressTTL)
+			err := goodNodes[0].OpenProtectedStream(ctx, goodNodeInfo1.ID, t.Name(), func(stream network.Stream) error {
+				// do nothing, this is a no-op stream writer, we just check that the stream was created
+				return nil
+			})
+			require.NoError(t, err)
+		}, 1*time.Second, "creating stream to a responsive node failed while concurrently blocked on unresponsive node")
 
 	// requires the CreateStream call to the unresponsive node was blocked while we attempted the CreateStream to the
 	// good address
