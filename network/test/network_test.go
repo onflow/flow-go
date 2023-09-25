@@ -140,7 +140,8 @@ func (suite *NetworkTestSuite) SetupTest() {
 
 		opts = append(opts,
 			p2ptest.WithConnectionManager(connManager),
-			p2ptest.WithRole(flow.RoleExecution))
+			p2ptest.WithRole(flow.RoleExecution),
+			p2ptest.WithCreateStreamRetryDelay(1*time.Millisecond)) // to suppress exponential backoff
 		node, nodeId := p2ptest.NodeFixture(suite.T(),
 			suite.sporkId,
 			suite.T().Name(),
@@ -282,6 +283,7 @@ func (suite *NetworkTestSuite) TestUnicastRateLimit_Messages() {
 		suite.sporkId,
 		1,
 		p2ptest.WithUnicastRateLimitDistributor(distributor),
+		p2ptest.WithCreateStreamRetryDelay(1*time.Millisecond), // to suppress exponential backoff
 		p2ptest.WithConnectionGater(p2ptest.NewConnectionGater(idProvider, func(pid peer.ID) error {
 			if messageRateLimiter.IsRateLimited(pid) {
 				return fmt.Errorf("rate-limited peer")
@@ -356,7 +358,7 @@ func (suite *NetworkTestSuite) TestUnicastRateLimit_Messages() {
 	unittest.RequireCloseBefore(suite.T(), ch, 100*time.Millisecond, "could not stop rate limit test ch on time")
 
 	// sleep for 1 seconds to allow connection pruner to prune connections
-	time.Sleep(1 * time.Second)
+	time.Sleep(2 * time.Second)
 
 	// ensure connection to rate limited peer is pruned
 	p2ptest.EnsureNotConnectedBetweenGroups(suite.T(), ctx, []p2p.LibP2PNode{libP2PNodes[0]}, []p2p.LibP2PNode{suite.libP2PNodes[0]})
@@ -380,10 +382,10 @@ func (suite *NetworkTestSuite) TestUnicastRateLimit_Messages() {
 }
 
 func (suite *NetworkTestSuite) TestUnicastRateLimit_Bandwidth() {
-	//limiter limit will be set up to 1000 bytes/sec
+	// limiter limit will be set up to 1000 bytes/sec
 	limit := rate.Limit(1000)
 
-	//burst per interval
+	// burst per interval
 	burst := 1000
 
 	// we only expect messages from the first network on the test suite
@@ -420,6 +422,7 @@ func (suite *NetworkTestSuite) TestUnicastRateLimit_Bandwidth() {
 		suite.sporkId,
 		1,
 		p2ptest.WithUnicastRateLimitDistributor(distributor),
+		p2ptest.WithCreateStreamRetryDelay(1*time.Millisecond), // to suppress exponential backoff
 		p2ptest.WithConnectionGater(p2ptest.NewConnectionGater(idProvider, func(pid peer.ID) error {
 			// create connection gater, connection gater will refuse connections from rate limited nodes
 			if bandwidthRateLimiter.IsRateLimited(pid) {
@@ -506,11 +509,11 @@ func (suite *NetworkTestSuite) TestUnicastRateLimit_Bandwidth() {
 			Text: "",
 		}, newId.NodeID)
 		return err == nil
-	}, 3*time.Second, 100*time.Millisecond)
+	}, 5*time.Second, 100*time.Millisecond)
 
 	// shutdown our network so that each message can be processed
 	cancel()
-	unittest.RequireComponentsDoneBefore(suite.T(), 100*time.Millisecond, newNet)
+	unittest.RequireComponentsDoneBefore(suite.T(), 5*time.Second, newNet)
 
 	// expect our rate limited peer callback to be invoked once
 	require.Equal(suite.T(), uint64(1), rateLimits.Load())

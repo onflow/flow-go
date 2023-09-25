@@ -346,7 +346,7 @@ func EnsureNoStreamCreation(t *testing.T, ctx context.Context, from []p2p.LibP2P
 				return nil
 			})
 			// ensures that other node has never received a connection from this node.
-			require.Equal(t, other.Host().Network().Connectedness(thisId), network.NotConnected)
+			require.Equal(t, network.NotConnected, other.Host().Network().Connectedness(thisId))
 			// a stream is established on top of a connection, so if there is no connection, there should be no stream.
 			require.Empty(t, other.Host().Network().ConnsToPeer(thisId))
 			// runs the error checkers if any.

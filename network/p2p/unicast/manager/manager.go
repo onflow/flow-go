@@ -362,7 +362,7 @@ func (m *Manager) dialPeer(ctx context.Context, peerID peer.ID, dialCfg *unicast
 	// if retry context times out or maxAttempts have been made before a successful retry occurs
 	var errs error
 	dialAttempts := 0
-	backoff := retryBackoff(dialCfg.DialRetryAttemptBudget)
+	backoff := retryBackoff(dialCfg.DialRetryAttemptBudget, 1*time.Millisecond)
 	f := func(context.Context) error {
 		dialAttempts++
 		select {
@@ -452,7 +452,7 @@ func (m *Manager) rawStream(ctx context.Context, peerID peer.ID, protocolID prot
 	}
 
 	start := time.Now()
-	err := retry.Do(ctx, retryBackoff(dialCfg.StreamCreationRetryAttemptBudget), f)
+	err := retry.Do(ctx, retryBackoff(dialCfg.StreamCreationRetryAttemptBudget, m.createStreamRetryDelay), f)
 	duration := time.Since(start)
 	if err != nil {
 		m.metrics.OnEstablishStreamFailure(duration, attempts)
@@ -466,17 +466,17 @@ func (m *Manager) rawStream(ctx context.Context, peerID peer.ID, protocolID prot
 // Note that the retryBackoff by default makes one attempt. Hence, that total number of attempts are 1 + maxRetries.
 // Args:
 // - maxRetries: maximum number of retries (in addition to the first backoff).
+// - retryInterval: initial retry interval for exponential backoff.
 // Returns:
 // - a retry backoff object that makes maximum of maxRetries + 1 attempts.
-func retryBackoff(maxRetries uint64) retry.Backoff {
+func retryBackoff(maxRetries uint64, retryInterval time.Duration) retry.Backoff {
 	// create backoff
-	backoff := retry.NewConstant(time.Second)
+	backoff := retry.NewConstant(retryInterval)
 	// add a MaxRetryJitter*time.Millisecond jitter to our backoff to ensure that this node and the target node don't attempt to reconnect at the same time
 	backoff = retry.WithJitter(MaxRetryJitter*time.Millisecond, backoff)
 
 	// https://github.com/sethvargo/go-retry#maxretries retries counter starts at zero and library will make last attempt
 	// when retries == maxRetries. Hence, the total number of invocations is maxRetires + 1
-
 	backoff = retry.WithMaxRetries(maxRetries, backoff)
 	return backoff
 }
