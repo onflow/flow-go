@@ -569,7 +569,13 @@ func (m *AtreeRegisterMigrator) cloneCricketMomentsShardedCollection(
 		value    interpreter.Value
 	}
 
-	ctx, cancel := context.WithCancelCause(context.Background())
+	ctx, c := context.WithCancelCause(context.Background())
+	cancel := func(err error) {
+		if err != nil {
+			m.log.Info().Err(err).Msg("canceling context")
+		}
+		c(err)
+	}
 	defer cancel(nil)
 	cloneChan := make(chan valueWithKeys, m.nWorkers)
 	clonedChan := make(chan valueWithKeys, m.nWorkers)
@@ -619,9 +625,17 @@ func (m *AtreeRegisterMigrator) cloneCricketMomentsShardedCollection(
 				outerKey,
 			)
 
-			collection, ok := value.(*interpreter.CompositeValue)
+			someCollection, ok := value.(*interpreter.SomeValue)
 			if !ok {
-				cancel(fmt.Errorf("expected collection to be *interpreter.CompositeValue, got %T", value))
+				cancel(fmt.Errorf("expected collection to be *interpreter.SomeValue, got %T", value))
+				return
+			}
+
+			collection, ok := someCollection.InnerValue(
+				mr.Interpreter,
+				interpreter.EmptyLocationRange).(*interpreter.CompositeValue)
+			if !ok {
+				cancel(fmt.Errorf("expected inner collection to be *interpreter.CompositeValue, got %T", value))
 				return
 			}
 
@@ -738,9 +752,17 @@ func (m *AtreeRegisterMigrator) cloneCricketMomentsShardedCollection(
 			outerKey,
 		)
 
-		collection, ok := value.(*interpreter.CompositeValue)
+		someCollection, ok := value.(*interpreter.SomeValue)
 		if !ok {
-			return nil, fmt.Errorf("expected collection to be *interpreter.CompositeValue, got %T", value)
+			return nil, fmt.Errorf("expected collection to be *interpreter.SomeValue, got %T", value)
+
+		}
+
+		collection, ok := someCollection.InnerValue(
+			mr.Interpreter,
+			interpreter.EmptyLocationRange).(*interpreter.CompositeValue)
+		if !ok {
+			return nil, fmt.Errorf("expected inner collection to be *interpreter.CompositeValue, got %T", value)
 		}
 
 		ownedNFTsRaw := collection.GetField(

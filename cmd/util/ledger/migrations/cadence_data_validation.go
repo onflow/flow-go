@@ -377,7 +377,9 @@ func (m *CadenceDataValidationMigrations) recursiveStringShardedCollection(
 	ctx, c := context.WithCancelCause(context.Background())
 
 	cancel := func(err error) {
-		log.Info().Err(err).Msg("canceling context")
+		if err != nil {
+			log.Info().Err(err).Msg("canceling context")
+		}
 		c(err)
 	}
 	defer cancel(nil)
@@ -439,9 +441,17 @@ func (m *CadenceDataValidationMigrations) recursiveStringShardedCollection(
 				outerKey,
 			)
 
-			collection, ok := value.(*interpreter.CompositeValue)
+			someCollection, ok := value.(*interpreter.SomeValue)
 			if !ok {
-				cancel(fmt.Errorf("expected collection to be *interpreter.CompositeValue, got %T", value))
+				cancel(fmt.Errorf("expected collection to be *interpreter.SomeValue, got %T", value))
+				return
+			}
+
+			collection, ok := someCollection.InnerValue(
+				mr.Interpreter,
+				interpreter.EmptyLocationRange).(*interpreter.CompositeValue)
+			if !ok {
+				cancel(fmt.Errorf("expected inner collection to be *interpreter.CompositeValue, got %T", value))
 				return
 			}
 
