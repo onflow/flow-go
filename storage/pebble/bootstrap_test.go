@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"io"
+	"os"
 	"path"
 	"testing"
 
@@ -27,6 +28,7 @@ func TestBootstrap_NewBootstrap(t *testing.T) {
 	rootHeight := uint64(1)
 	log := zerolog.New(io.Discard)
 	cache := pebble.NewCache(1 << 20)
+	defer cache.Unref()
 	opts := DefaultPebbleOptions(cache, registers.NewMVCCComparer())
 	unittest.RunWithConfiguredPebbleInstance(t, opts, func(p *pebble.DB) {
 		// no issues when pebble instance is blank
@@ -42,23 +44,27 @@ func TestBootstrap_NewBootstrap(t *testing.T) {
 }
 
 func TestBootstrap_IndexCheckpointFile_Random(t *testing.T) {
-	t.Parallel()
 	log := zerolog.New(io.Discard)
 	rootHeight := uint64(10000)
-	// write empty trie
 	unittest.RunWithTempDir(t, func(dir string) {
 		fileName := "empty-checkpoint"
 		emptyTrie := []*trie.MTrie{trie.NewEmptyMTrie()}
 		require.NoErrorf(t, wal.StoreCheckpointV6Concurrently(emptyTrie, dir, fileName, log), "fail to store checkpoint")
 		checkpointFile := path.Join(dir, fileName)
-		unittest.RunWithConfiguredPebbleInstance(t, getTestingPebbleOpts(), func(p *pebble.DB) {
-			bootstrap, err := NewBootstrap(p, checkpointFile, rootHeight, log)
-			require.NoError(t, err)
-			ctx, cancel := context.WithCancel(context.Background())
-			irrecoverableCtx, _ := irrecoverable.WithSignaler(ctx)
-			component.NewComponentManagerBuilder().AddWorker(bootstrap.IndexCheckpointFile).Build().Start(irrecoverableCtx)
-			cancel()
-		})
+		cache := pebble.NewCache(1 << 20)
+		opts := DefaultPebbleOptions(cache, registers.NewMVCCComparer())
+		defer cache.Unref()
+		pb, dbDir := unittest.TempPebbleDBWithOpts(t, opts)
+		bootstrap, err := NewBootstrap(pb, checkpointFile, rootHeight, log)
+		require.NoError(t, err)
+		ctx, cancel := context.WithCancel(context.Background())
+		irrecoverableCtx, _ := irrecoverable.WithSignaler(ctx)
+		cm := component.NewComponentManagerBuilder().AddWorker(bootstrap.IndexCheckpointFile).Build()
+		cm.Start(irrecoverableCtx)
+		<-cm.Done()
+		defer cancel()
+		require.NoError(t, pb.Close())
+		require.NoError(t, os.RemoveAll(dbDir))
 	})
 
 	unittest.RunWithTempDir(t, func(dir string) {
@@ -66,14 +72,20 @@ func TestBootstrap_IndexCheckpointFile_Random(t *testing.T) {
 		fileName := "simple-checkpoint"
 		require.NoErrorf(t, wal.StoreCheckpointV6Concurrently(tries, dir, fileName, log), "fail to store checkpoint")
 		checkpointFile := path.Join(dir, fileName)
-		unittest.RunWithConfiguredPebbleInstance(t, getTestingPebbleOpts(), func(p *pebble.DB) {
-			bootstrap, err := NewBootstrap(p, checkpointFile, rootHeight, log)
-			require.NoError(t, err)
-			ctx, cancel := context.WithCancel(context.Background())
-			irrecoverableCtx, _ := irrecoverable.WithSignaler(ctx)
-			component.NewComponentManagerBuilder().AddWorker(bootstrap.IndexCheckpointFile).Build().Start(irrecoverableCtx)
-			cancel()
-		})
+		cache := pebble.NewCache(1 << 20)
+		opts := DefaultPebbleOptions(cache, registers.NewMVCCComparer())
+		defer cache.Unref()
+		pb, dbDir := unittest.TempPebbleDBWithOpts(t, opts)
+		bootstrap, err := NewBootstrap(pb, checkpointFile, rootHeight, log)
+		require.NoError(t, err)
+		ctx, cancel := context.WithCancel(context.Background())
+		irrecoverableCtx, _ := irrecoverable.WithSignaler(ctx)
+		cm := component.NewComponentManagerBuilder().AddWorker(bootstrap.IndexCheckpointFile).Build()
+		cm.Start(irrecoverableCtx)
+		<-cm.Done()
+		defer cancel()
+		require.NoError(t, pb.Close())
+		require.NoError(t, os.RemoveAll(dbDir))
 	})
 
 	unittest.RunWithTempDir(t, func(dir string) {
@@ -81,14 +93,20 @@ func TestBootstrap_IndexCheckpointFile_Random(t *testing.T) {
 		fileName := "random-checkpoint"
 		checkpointFile := path.Join(dir, fileName)
 		require.NoErrorf(t, wal.StoreCheckpointV6Concurrently(tries, dir, fileName, log), "fail to store checkpoint")
-		unittest.RunWithConfiguredPebbleInstance(t, getTestingPebbleOpts(), func(p *pebble.DB) {
-			bootstrap, err := NewBootstrap(p, checkpointFile, rootHeight, log)
-			require.NoError(t, err)
-			ctx, cancel := context.WithCancel(context.Background())
-			irrecoverableCtx, _ := irrecoverable.WithSignaler(ctx)
-			component.NewComponentManagerBuilder().AddWorker(bootstrap.IndexCheckpointFile).Build().Start(irrecoverableCtx)
-			cancel()
-		})
+		cache := pebble.NewCache(1 << 20)
+		opts := DefaultPebbleOptions(cache, registers.NewMVCCComparer())
+		defer cache.Unref()
+		pb, dbDir := unittest.TempPebbleDBWithOpts(t, opts)
+		bootstrap, err := NewBootstrap(pb, checkpointFile, rootHeight, log)
+		require.NoError(t, err)
+		ctx, cancel := context.WithCancel(context.Background())
+		irrecoverableCtx, _ := irrecoverable.WithSignaler(ctx)
+		cm := component.NewComponentManagerBuilder().AddWorker(bootstrap.IndexCheckpointFile).Build()
+		cm.Start(irrecoverableCtx)
+		<-cm.Done()
+		defer cancel()
+		require.NoError(t, pb.Close())
+		require.NoError(t, os.RemoveAll(dbDir))
 	})
 }
 
