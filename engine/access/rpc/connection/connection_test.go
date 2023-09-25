@@ -546,25 +546,36 @@ func TestExecutionNodeClientClosedGracefully(t *testing.T) {
 	})
 }
 
-// TestExecutionEvictingCacheClients tests the eviction of cached clients in the execution flow.
+// TestEvictingCacheClients tests the eviction of cached clients.
 // It verifies that when a client is evicted from the cache, subsequent requests are handled correctly.
 //
 // Test Steps:
-//   - Call the gRPC method Ping with a delayed response.
-//   - Invalidate the access API client during the Ping call and verify the expected behavior.
+//   - Call the gRPC method Ping
+//   - While the request is still in progress, remove the connection
 //   - Call the gRPC method GetNetworkParameters on the client immediately after eviction and assert the expected
 //     error response.
 //   - Wait for the client state to change from "Ready" to "Shutdown", indicating that the client connection was closed.
-func TestExecutionEvictingCacheClients(t *testing.T) {
+func TestEvictingCacheClients(t *testing.T) {
 	// Create a new collection node for testing
 	cn := new(collectionNode)
 	cn.start(t)
 	defer cn.stop(t)
 
+	// Channels used to synchronize test with grpc calls
+	startPing := make(chan struct{})      // notify Ping in progress
+	returnFromPing := make(chan struct{}) // notify OK to return from Ping
+
 	// Set up mock handlers for Ping and GetNetworkParameters
 	pingReq := &access.PingRequest{}
 	pingResp := &access.PingResponse{}
-	cn.handler.On("Ping", testifymock.Anything, pingReq).After(time.Second).Return(pingResp, nil)
+	cn.handler.On("Ping", testifymock.Anything, pingReq).Return(
+		func(context.Context, *access.PingRequest) *access.PingResponse {
+			close(startPing)
+			<-returnFromPing // keeps request open until returnFromPing is closed
+			return pingResp
+		},
+		func(context.Context, *access.PingRequest) error { return nil },
+	)
 
 	netReq := &access.GetNetworkParametersRequest{}
 	netResp := &access.GetNetworkParametersResponse{}
@@ -579,7 +590,13 @@ func TestExecutionEvictingCacheClients(t *testing.T) {
 	// Set the connection pool cache size
 	cacheSize := 1
 
-	connectionCache := NewCache(getCache(t, cacheSize), cacheSize)
+	// create a non-blocking cache
+	cache, err := lru.NewWithEvict[string, *CachedClient](cacheSize, func(_ string, client *CachedClient) {
+		go client.Close()
+	})
+	require.NoError(t, err)
+
+	connectionCache := NewCache(cache, cacheSize)
 	// set metrics reporting
 	connectionFactory.AccessMetrics = metrics.NewNoopCollector()
 	connectionFactory.Manager = NewManager(
@@ -600,26 +617,35 @@ func TestExecutionEvictingCacheClients(t *testing.T) {
 	// Retrieve the cached client from the cache
 	cachedClient, ok := connectionCache.Get(clientAddress)
 	require.True(t, ok)
-	// Schedule the invalidation of the access API client after a delay
-	time.AfterFunc(250*time.Millisecond, func() {
+
+	// wait until the client connection is ready
+	require.Eventually(t, func() bool {
+		return cachedClient.ClientConn.GetState() == connectivity.Ready
+	}, 100*time.Millisecond, 10*time.Millisecond, "client timed out before ready")
+
+	// Schedule the invalidation of the access API client while the Ping call is in progress
+	wg := sync.WaitGroup{}
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+
+		<-startPing // wait until Ping is called
+
 		// Invalidate the access API client
 		connectionFactory.Manager.Remove(clientAddress)
 
-		// InvalidateAccessAPIClient marks the connection for closure asynchronously, so give it
-		// some time to run
+		// Remove marks the connection for closure asynchronously, so give it some time to run
 		require.Eventually(t, func() bool {
 			return cachedClient.closeRequested.Load()
 		}, 100*time.Millisecond, 10*time.Millisecond, "client timed out closing connection")
 
-		// Assert that the cached client is marked for closure but still waiting for previous request
-		assert.True(t, cachedClient.closeRequested.Load())
-		assert.Equal(t, cachedClient.ClientConn.GetState(), connectivity.Ready)
-
-		// Call a gRPC method on the client, that was already evicted
+		// Call a gRPC method on the client, requests should be blocked since the connection is invalidated
 		resp, err := client.GetNetworkParameters(ctx, netReq)
 		assert.Equal(t, status.Errorf(codes.Unavailable, "the connection to %s was closed", clientAddress), err)
 		assert.Nil(t, resp)
-	})
+
+		close(returnFromPing) // signal it's ok to return from Ping
+	}()
 
 	// Call a gRPC method on the client
 	_, err = client.Ping(ctx, pingReq)
@@ -628,10 +654,14 @@ func TestExecutionEvictingCacheClients(t *testing.T) {
 	assert.NoError(t, err)
 
 	// Wait for the client connection to change state from "Ready" to "Shutdown" as connection was closed.
-	changed := cachedClient.ClientConn.WaitForStateChange(ctx, connectivity.Ready)
-	assert.True(t, changed)
+	require.Eventually(t, func() bool {
+		return cachedClient.ClientConn.WaitForStateChange(ctx, connectivity.Ready)
+	}, 100*time.Millisecond, 10*time.Millisecond, "client timed out transitioning state")
+
 	assert.Equal(t, connectivity.Shutdown, cachedClient.ClientConn.GetState())
 	assert.Equal(t, 0, connectionCache.Len())
+
+	wg.Wait() // wait until the move test routine is done
 }
 
 func TestCachedClientShutdown(t *testing.T) {
