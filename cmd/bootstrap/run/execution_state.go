@@ -6,8 +6,6 @@ import (
 	"github.com/rs/zerolog"
 	"go.uber.org/atomic"
 
-	"github.com/onflow/flow-go/crypto"
-	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/engine/execution/state/bootstrap"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/ledger/common/pathfinder"
@@ -17,20 +15,6 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
 )
-
-// NOTE: this is now unused and should become part of another tool.
-func GenerateServiceAccountPrivateKey(seed []byte) (flow.AccountPrivateKey, error) {
-	priv, err := crypto.GeneratePrivateKey(crypto.ECDSASecp256k1, seed)
-	if err != nil {
-		return flow.AccountPrivateKey{}, err
-	}
-
-	return flow.AccountPrivateKey{
-		PrivateKey: priv,
-		SignAlgo:   crypto.ECDSASecp256k1,
-		HashAlgo:   hash.SHA2_256,
-	}, nil
-}
 
 func GenerateExecutionState(
 	dbDir string,
