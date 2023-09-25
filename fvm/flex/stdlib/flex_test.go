@@ -1,37 +1,220 @@
-package flex
+package stdlib
 
 import (
 	"bytes"
-	"encoding/binary"
-	"errors"
 	"fmt"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/onflow/atree"
 	"github.com/onflow/cadence"
-	"github.com/onflow/cadence/encoding/json"
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/onflow/cadence/runtime/interpreter"
 	"github.com/onflow/cadence/runtime/sema"
 	cadenceStdlib "github.com/onflow/cadence/runtime/stdlib"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.opentelemetry.io/otel/attribute"
 
-	"github.com/onflow/flow-go/fvm/environment"
-	flexStdlib "github.com/onflow/flow-go/fvm/flex/stdlib"
-	"github.com/onflow/flow-go/fvm/flex/storage"
-	"github.com/onflow/flow-go/fvm/storage/testutils"
+	"encoding/binary"
+	"errors"
+
+	"github.com/onflow/cadence/encoding/json"
+	"github.com/stretchr/testify/assert"
+
+	"github.com/onflow/flow-go/fvm/flex/models"
 )
 
-func RunWithTempLedger(t testing.TB, f func(atree.Ledger)) {
-	txnState := testutils.NewSimpleTransaction(nil)
-	accounts := environment.NewAccounts(txnState)
-	led := storage.NewLedger(accounts)
-	f(led)
+type testFlexContractHandler struct {
+	newFlowOwnedAccount func() models.FlowOwnedAccount
+	lastExecutedBlock   func() models.FlexBlock
+	run                 func(tx []byte, coinbase models.FlexAddress) bool
 }
+
+var _ models.FlexContractHandler = testFlexContractHandler{}
+
+func (t testFlexContractHandler) NewFlowOwnedAccount() models.FlowOwnedAccount {
+	if t.newFlowOwnedAccount == nil {
+		panic("unexpected NewFlowOwnedAccount")
+	}
+	return t.newFlowOwnedAccount()
+}
+
+func (t testFlexContractHandler) LastExecutedBlock() models.FlexBlock {
+	if t.lastExecutedBlock == nil {
+		panic("unexpected LastExecutedBlock")
+	}
+	return t.lastExecutedBlock()
+}
+
+func (t testFlexContractHandler) Run(tx []byte, coinbase models.FlexAddress) bool {
+	if t.run == nil {
+		panic("unexpected Run")
+	}
+	return t.run(tx, coinbase)
+}
+
+var flexAddressBytesCadenceType = cadence.NewConstantSizedArrayType(20, cadence.TheUInt8Type)
+
+var flexAddressCadenceType = cadence.NewStructType(
+	nil,
+	Flex_FlexAddressType.QualifiedIdentifier(),
+	[]cadence.Field{
+		{
+			Identifier: Flex_FlexAddressTypeBytesFieldName,
+			Type:       flexAddressBytesCadenceType,
+		},
+	},
+	nil,
+)
+
+func TestFlexAddressConstructionAndReturn(t *testing.T) {
+
+	t.Parallel()
+
+	handler := testFlexContractHandler{}
+
+	env := runtime.NewBaseInterpreterEnvironment(runtime.Config{})
+
+	env.DeclareValue(NewFlexStandardLibraryValue(nil, handler))
+	env.DeclareType(FlexStandardLibraryType)
+
+	inter := runtime.NewInterpreterRuntime(runtime.Config{})
+
+	script := []byte(`
+			pub fun main(_ bytes: [UInt8; 20]): Flex.FlexAddress {
+				return Flex.FlexAddress(bytes: bytes)
+			}
+		`)
+
+	runtimeInterface := &testRuntimeInterface{
+		storage: newTestLedger(),
+		decodeArgument: func(b []byte, t cadence.Type) (cadence.Value, error) {
+			return json.Decode(nil, b)
+		},
+	}
+
+	addressBytesArray := cadence.NewArray([]cadence.Value{
+		cadence.UInt8(1), cadence.UInt8(1),
+		cadence.UInt8(2), cadence.UInt8(2),
+		cadence.UInt8(3), cadence.UInt8(3),
+		cadence.UInt8(4), cadence.UInt8(4),
+		cadence.UInt8(5), cadence.UInt8(5),
+		cadence.UInt8(6), cadence.UInt8(6),
+		cadence.UInt8(7), cadence.UInt8(7),
+		cadence.UInt8(8), cadence.UInt8(8),
+		cadence.UInt8(9), cadence.UInt8(9),
+		cadence.UInt8(10), cadence.UInt8(10),
+	}).WithType(flexAddressBytesCadenceType)
+
+	result, err := inter.ExecuteScript(
+		runtime.Script{
+			Source: script,
+			Arguments: encodeArgs([]cadence.Value{
+				addressBytesArray,
+			}),
+		},
+		runtime.Context{
+			Interface:   runtimeInterface,
+			Environment: env,
+			Location:    common.ScriptLocation{},
+		},
+	)
+	require.NoError(t, err)
+
+	assert.Equal(t,
+		cadence.Struct{
+			StructType: flexAddressCadenceType,
+			Fields: []cadence.Value{
+				addressBytesArray,
+			},
+		},
+		result,
+	)
+
+}
+
+func TestFlexRun(t *testing.T) {
+
+	t.Parallel()
+
+	tx := cadence.NewArray([]cadence.Value{
+		cadence.UInt8(1),
+		cadence.UInt8(2),
+		cadence.UInt8(3),
+	}).WithType(flexAddressBytesCadenceType)
+
+	coinbase := cadence.NewArray([]cadence.Value{
+		cadence.UInt8(1), cadence.UInt8(1),
+		cadence.UInt8(2), cadence.UInt8(2),
+		cadence.UInt8(3), cadence.UInt8(3),
+		cadence.UInt8(4), cadence.UInt8(4),
+		cadence.UInt8(5), cadence.UInt8(5),
+		cadence.UInt8(6), cadence.UInt8(6),
+		cadence.UInt8(7), cadence.UInt8(7),
+		cadence.UInt8(8), cadence.UInt8(8),
+		cadence.UInt8(9), cadence.UInt8(9),
+		cadence.UInt8(10), cadence.UInt8(10),
+	}).WithType(flexAddressBytesCadenceType)
+
+	runCalled := false
+
+	handler := testFlexContractHandler{
+		run: func(tx []byte, coinbase models.FlexAddress) bool {
+			runCalled = true
+
+			assert.Equal(t, []byte{1, 2, 3}, tx)
+			assert.Equal(t,
+				models.FlexAddress{
+					1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 6, 7, 7, 8, 8, 9, 9, 10, 10,
+				},
+				coinbase,
+			)
+
+			return true
+		},
+	}
+
+	env := runtime.NewBaseInterpreterEnvironment(runtime.Config{})
+
+	env.DeclareValue(NewFlexStandardLibraryValue(nil, handler))
+	env.DeclareType(FlexStandardLibraryType)
+
+	inter := runtime.NewInterpreterRuntime(runtime.Config{})
+
+	script := []byte(`
+      pub fun main(tx: [UInt8], coinbaseBytes: [UInt8; 20]): Bool {
+          let coinbase = Flex.FlexAddress(bytes: coinbaseBytes)
+          return Flex.run(tx: tx, coinbase: coinbase)
+      }
+	`)
+
+	runtimeInterface := &testRuntimeInterface{
+		storage: newTestLedger(),
+		decodeArgument: func(b []byte, t cadence.Type) (cadence.Value, error) {
+			return json.Decode(nil, b)
+		},
+	}
+
+	result, err := inter.ExecuteScript(
+		runtime.Script{
+			Source:    script,
+			Arguments: encodeArgs([]cadence.Value{tx, coinbase}),
+		},
+		runtime.Context{
+			Interface:   runtimeInterface,
+			Environment: env,
+			Location:    common.ScriptLocation{},
+		},
+	)
+	require.NoError(t, err)
+
+	assert.True(t, runCalled)
+	assert.Equal(t, cadence.Bool(true), result)
+}
+
+// TODO: replace with Cadence runtime testing utils once available https://github.com/onflow/cadence/pull/2800
 
 func encodeArgs(argValues []cadence.Value) [][]byte {
 	args := make([][]byte, len(argValues))
@@ -45,155 +228,45 @@ func encodeArgs(argValues []cadence.Value) [][]byte {
 	return args
 }
 
-var flexAddressBytesCadenceType = cadence.NewConstantSizedArrayType(20, cadence.TheUInt8Type)
-
-var flexAddressCadenceType = cadence.NewStructType(
-	nil,
-	flexStdlib.Flex_FlexAddressType.QualifiedIdentifier(),
-	[]cadence.Field{
-		{
-			Identifier: flexStdlib.Flex_FlexAddressTypeBytesFieldName,
-			Type:       flexAddressBytesCadenceType,
-		},
-	},
-	nil,
-)
-
-func TestFlexAddressConstructionAndReturn(t *testing.T) {
-
-	t.Parallel()
-
-	RunWithTempLedger(t, func(led atree.Ledger) {
-		handler := NewFlexContractHandler(led)
-
-		env := runtime.NewBaseInterpreterEnvironment(runtime.Config{})
-
-		env.DeclareValue(flexStdlib.NewFlexStandardLibraryValue(nil, handler))
-		env.DeclareType(flexStdlib.FlexStandardLibraryType)
-
-		inter := runtime.NewInterpreterRuntime(runtime.Config{})
-
-		script := []byte(`
-			pub fun main(_ bytes: [UInt8; 20]): Flex.FlexAddress {
-				return Flex.FlexAddress(bytes: bytes)
-			}
-		`)
-
-		runtimeInterface := &testRuntimeInterface{
-			storage: led,
-			decodeArgument: func(b []byte, t cadence.Type) (cadence.Value, error) {
-				return json.Decode(nil, b)
-			},
-		}
-
-		addressBytesArray := cadence.NewArray([]cadence.Value{
-			cadence.UInt8(1), cadence.UInt8(1),
-			cadence.UInt8(2), cadence.UInt8(2),
-			cadence.UInt8(3), cadence.UInt8(3),
-			cadence.UInt8(4), cadence.UInt8(4),
-			cadence.UInt8(5), cadence.UInt8(5),
-			cadence.UInt8(6), cadence.UInt8(6),
-			cadence.UInt8(7), cadence.UInt8(7),
-			cadence.UInt8(8), cadence.UInt8(8),
-			cadence.UInt8(9), cadence.UInt8(9),
-			cadence.UInt8(10), cadence.UInt8(10),
-		}).WithType(flexAddressBytesCadenceType)
-
-		result, err := inter.ExecuteScript(
-			runtime.Script{
-				Source: script,
-				Arguments: encodeArgs([]cadence.Value{
-					addressBytesArray,
-				}),
-			},
-			runtime.Context{
-				Interface:   runtimeInterface,
-				Environment: env,
-				Location:    common.ScriptLocation{},
-			},
-		)
-		require.NoError(t, err)
-
-		assert.Equal(t,
-			cadence.Struct{
-				StructType: flexAddressCadenceType,
-				Fields: []cadence.Value{
-					addressBytesArray,
-				},
-			},
-			result,
-		)
-	})
+type testLedger struct {
+	storageIndices map[string]uint64
+	storedValues   map[string][]byte
 }
 
-func TestFlexRun(t *testing.T) {
-
-	t.Parallel()
-
-	RunWithTempLedger(t, func(led atree.Ledger) {
-		handler := NewFlexContractHandler(led)
-
-		env := runtime.NewBaseInterpreterEnvironment(runtime.Config{})
-
-		env.DeclareValue(flexStdlib.NewFlexStandardLibraryValue(nil, handler))
-		env.DeclareType(flexStdlib.FlexStandardLibraryType)
-
-		inter := runtime.NewInterpreterRuntime(runtime.Config{})
-
-		script := []byte(`
-			pub fun main(tx: [UInt8], coinbaseBytes: [UInt8; 20]): Bool {
-                let coinbase = Flex.FlexAddress(bytes: coinbaseBytes)
-				return Flex.run(tx: tx, coinbase: coinbase)
-			}
-		`)
-
-		// TODO: provide proper RLP-encoded EVM transaction
-		tx := cadence.NewArray([]cadence.Value{
-			cadence.UInt8(1),
-			cadence.UInt8(2),
-			cadence.UInt8(3),
-		}).WithType(flexAddressBytesCadenceType)
-
-		// TODO: provide proper EVM address
-		coinbase := cadence.NewArray([]cadence.Value{
-			cadence.UInt8(1), cadence.UInt8(1),
-			cadence.UInt8(2), cadence.UInt8(2),
-			cadence.UInt8(3), cadence.UInt8(3),
-			cadence.UInt8(4), cadence.UInt8(4),
-			cadence.UInt8(5), cadence.UInt8(5),
-			cadence.UInt8(6), cadence.UInt8(6),
-			cadence.UInt8(7), cadence.UInt8(7),
-			cadence.UInt8(8), cadence.UInt8(8),
-			cadence.UInt8(9), cadence.UInt8(9),
-			cadence.UInt8(10), cadence.UInt8(10),
-		}).WithType(flexAddressBytesCadenceType)
-
-		runtimeInterface := &testRuntimeInterface{
-			storage: led,
-			decodeArgument: func(b []byte, t cadence.Type) (cadence.Value, error) {
-				return json.Decode(nil, b)
-			},
-		}
-
-		result, err := inter.ExecuteScript(
-			runtime.Script{
-				Source:    script,
-				Arguments: encodeArgs([]cadence.Value{tx, coinbase}),
-			},
-			runtime.Context{
-				Interface:   runtimeInterface,
-				Environment: env,
-				Location:    common.ScriptLocation{},
-			},
-		)
-		require.NoError(t, err)
-
-		// TODO: should succeed
-		assert.Equal(t, cadence.Bool(false), result)
-	})
+func newTestLedger() *testLedger {
+	return &testLedger{
+		storageIndices: map[string]uint64{},
+		storedValues:   map[string][]byte{},
+	}
 }
 
-// TODO: replace with Cadence runtime testing utils once available https://github.com/onflow/cadence/pull/2800
+var _ atree.Ledger = &testLedger{}
+
+func (l *testLedger) storageKey(owner, key string) string {
+	return strings.Join([]string{owner, key}, "|")
+}
+
+func (l *testLedger) GetValue(owner, key []byte) (value []byte, err error) {
+	value = l.storedValues[l.storageKey(string(owner), string(key))]
+	return
+}
+
+func (l *testLedger) SetValue(owner, key, value []byte) (err error) {
+	l.storedValues[l.storageKey(string(owner), string(key))] = value
+	return
+}
+
+func (l *testLedger) ValueExists(owner, key []byte) (exists bool, err error) {
+	value := l.storedValues[l.storageKey(string(owner), string(key))]
+	return len(value) > 0, nil
+}
+
+func (l *testLedger) AllocateStorageIndex(owner []byte) (result atree.StorageIndex, err error) {
+	index := l.storageIndices[string(owner)] + 1
+	l.storageIndices[string(owner)] = index
+	binary.BigEndian.PutUint64(result[:], index)
+	return
+}
 
 type testRuntimeInterface struct {
 	resolveLocation  func(identifiers []runtime.Identifier, location runtime.Location) ([]runtime.ResolvedLocation, error)
