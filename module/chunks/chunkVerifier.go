@@ -216,9 +216,9 @@ func (fcv *ChunkVerifier) verifyTransactionsInContext(
 	var problematicTx flow.Identifier
 
 	// collect execution data formatted transaction results
-	var txResults []execution_data.TransactionResult
+	var txResults []flow.LightTransactionResult
 	if len(transactions) > 0 {
-		txResults = make([]execution_data.TransactionResult, len(transactions))
+		txResults = make([]flow.LightTransactionResult, len(transactions))
 	}
 
 	// executes all transactions in this chunk
@@ -246,7 +246,7 @@ func (fcv *ChunkVerifier) verifyTransactionsInContext(
 			return nil, fmt.Errorf("failed to merge: %d (%w)", i, err)
 		}
 
-		txResults[i] = execution_data.TransactionResult{
+		txResults[i] = flow.LightTransactionResult{
 			TransactionID:   tx.ID,
 			ComputationUsed: output.ComputationUsed,
 			Failed:          output.Err != nil,

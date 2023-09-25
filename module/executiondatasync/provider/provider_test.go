@@ -151,7 +151,7 @@ func TestCalculateChunkExecutionDataID(t *testing.T) {
 	rootHash, err := ledger.ToRootHash([]byte("0123456789acbdef0123456789acbdef"))
 	require.NoError(t, err)
 
-	expected := cid.MustParse("QmXrbSY6XkrrVGvQzprLKSW6ixp64YHXDhUGKMGHkA862p")
+	expected := cid.MustParse("QmdtRuw9jFgkynBWofz4qFQHDqUwLhi2nReF4fUyXvdERC")
 	ced := execution_data.ChunkExecutionData{
 		Collection: &flow.Collection{
 			Transactions: []*flow.TransactionBody{
@@ -164,7 +164,7 @@ func TestCalculateChunkExecutionDataID(t *testing.T) {
 		TrieUpdate: &ledger.TrieUpdate{
 			RootHash: rootHash,
 		},
-		TransactionResults: []execution_data.TransactionResult{
+		TransactionResults: []flow.LightTransactionResult{
 			{
 				TransactionID:   flow.MustHexStringToIdentifier("0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"),
 				ComputationUsed: 100,
@@ -176,40 +176,9 @@ func TestCalculateChunkExecutionDataID(t *testing.T) {
 	cidProvider := provider.NewExecutionDataCIDProvider(execution_data.DefaultSerializer)
 	actual, err := cidProvider.CalculateChunkExecutionDataID(ced)
 	require.NoError(t, err)
+
+	// This can be used for updating the expected ID when the format is *intentionally* updated
+	t.Log(actual)
 
 	assert.Equal(t, expected, actual)
-}
-
-// generateChunkExecutionDataID generates a ChunkExecutionDataID for a static blob. This can be used
-// for updating the expected ID used by TestCalculateChunkExecutionDataID
-func generateChunkExecutionDataID(t *testing.T) {
-	rootHash, err := ledger.ToRootHash([]byte("0123456789acbdef0123456789acbdef"))
-	require.NoError(t, err)
-
-	ced := execution_data.ChunkExecutionData{
-		Collection: &flow.Collection{
-			Transactions: []*flow.TransactionBody{
-				{Script: []byte("pub fun main() {}")},
-			},
-		},
-		Events: []flow.Event{
-			unittest.EventFixture(flow.EventType("A.0123456789abcdef.SomeContract.SomeEvent"), 1, 2, flow.MustHexStringToIdentifier("95e0929839063afbe334a3d175bea0775cdf5d93f64299e369d16ce21aa423d3"), 0),
-		},
-		TrieUpdate: &ledger.TrieUpdate{
-			RootHash: rootHash,
-		},
-		TransactionResults: []execution_data.TransactionResult{
-			{
-				TransactionID:   flow.MustHexStringToIdentifier("0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"),
-				ComputationUsed: 100,
-				Failed:          true,
-			},
-		},
-	}
-
-	cidProvider := provider.NewExecutionDataCIDProvider(execution_data.DefaultSerializer)
-	actual, err := cidProvider.CalculateChunkExecutionDataID(ced)
-	require.NoError(t, err)
-
-	t.Log(actual)
 }
