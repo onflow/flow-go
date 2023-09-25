@@ -28,7 +28,7 @@ import (
 
 type testFlexContractHandler struct {
 	newFlowOwnedAccount func() models.FlowOwnedAccount
-	lastExecutedBlock   func() models.FlexBlock
+	lastExecutedBlock   func() *models.FlexBlock
 	run                 func(tx []byte, coinbase models.FlexAddress) bool
 }
 
@@ -41,7 +41,7 @@ func (t testFlexContractHandler) NewFlowOwnedAccount() models.FlowOwnedAccount {
 	return t.newFlowOwnedAccount()
 }
 
-func (t testFlexContractHandler) LastExecutedBlock() models.FlexBlock {
+func (t testFlexContractHandler) LastExecutedBlock() *models.FlexBlock {
 	if t.lastExecutedBlock == nil {
 		panic("unexpected LastExecutedBlock")
 	}
