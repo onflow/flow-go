@@ -100,7 +100,8 @@ func TestInvalidCtrlMsgScoringIntegration(t *testing.T) {
 			module.GossipSubMetrics,
 			metrics.HeroCacheMetricsFactory,
 			flownet.NetworkingType,
-			module.IdentityProvider) (p2p.GossipSubInspectorSuite, error) {
+			module.IdentityProvider,
+			p2p.Subscriptions) (p2p.GossipSubInspectorSuite, error) {
 			// override the gossipsub rpc inspector suite factory to return the mock inspector suite
 			return inspectorSuite1, nil
 		}))
