@@ -17,6 +17,8 @@ import (
 	"github.com/onflow/flow-go/module/metrics"
 )
 
+const bootstrapCheckpointFile = "bootstrap-checkpoint"
+
 func GenerateExecutionState(
 	dbDir string,
 	accountKey flow.AccountPublicKey,
@@ -80,7 +82,7 @@ func GenerateExecutionState(
 		return flow.DummyStateCommitment, err
 	}
 
-	err = wal.StoreCheckpointV6(trie, dbDir, "bootstrap-checkpoint", zerolog.Nop(), 1)
+	err = wal.StoreCheckpointV6(trie, dbDir, bootstrapCheckpointFile, zerolog.Nop(), 1)
 	if err != nil {
 		return flow.DummyStateCommitment, fmt.Errorf("failed to store bootstrap checkpoint: %w", err)
 	}
