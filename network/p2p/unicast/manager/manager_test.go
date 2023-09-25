@@ -68,8 +68,9 @@ func TestUnicastManager_Connection_ConnectionBackoff(t *testing.T) {
 	cfg, err := config.DefaultConfig()
 	require.NoError(t, err)
 
-	connStatus.On("IsConnected", peerID).Return(false, nil)                                                                                                              // not connected
-	streamFactory.On("Connect", mock.Anything, peer.AddrInfo{ID: peerID}).Return(fmt.Errorf("some error")).Times(int(cfg.NetworkConfig.UnicastMaxDialRetryAttemptTimes)) // connect
+	connStatus.On("IsConnected", peerID).Return(false, nil) // not connected
+	streamFactory.On("Connect", mock.Anything, peer.AddrInfo{ID: peerID}).
+		Return(fmt.Errorf("some error")).Times(int(cfg.NetworkConfig.UnicastMaxDialRetryAttemptTimes + 1)) // connect
 
 	_, err = dialConfigCache.Adjust(peerID, func(dialConfig unicast.DialConfig) (unicast.DialConfig, error) {
 		// assumes that there was a successful connection to the peer before (2 minutes ago), and now the connection is lost.
@@ -151,7 +152,7 @@ func TestUnicastManager_Connection_SuccessfulConnection_StreamBackoff(t *testing
 	}, nil)
 	streamFactory.On("Connect", mock.Anything, peer.AddrInfo{ID: peerID}).Return(nil).Once() // connect on the first attempt.
 	streamFactory.On("NewStream", mock.Anything, peerID, mock.Anything).Return(nil, fmt.Errorf("some error")).
-		Times(int(cfg.NetworkConfig.UnicastMaxStreamCreationRetryAttemptTimes)) // mocks that it attempts to create a stream some number of times, before giving up.
+		Times(int(cfg.NetworkConfig.UnicastMaxStreamCreationRetryAttemptTimes + 1)) // mocks that it attempts to create a stream some number of times, before giving up.
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -186,7 +187,7 @@ func TestUnicastManager_StreamFactory_StreamBackoff(t *testing.T) {
 	connStatus.On("IsConnected", peerID).Return(true, nil) // connected.
 	streamFactory.On("NewStream", mock.Anything, peerID, mock.Anything).
 		Return(nil, fmt.Errorf("some error")).
-		Times(int(cfg.NetworkConfig.UnicastMaxStreamCreationRetryAttemptTimes)) // mocks that it attempts to create a stream some number of times, before giving up.
+		Times(int(cfg.NetworkConfig.UnicastMaxStreamCreationRetryAttemptTimes + 1)) // mocks that it attempts to create a stream some number of times, before giving up.
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -370,14 +371,13 @@ func TestUnicastManager_Connection_BackoffBudgetDecremented(t *testing.T) {
 	require.NoError(t, err)
 
 	// totalAttempts is the total number of times that unicast manager calls Connect on the stream factory to dial the peer.
-	// Let's consider x = unicastmodel.UnicastMaxDialRetryAttemptTimes. Then the test tries x times CreateStream. With dynamic backoffs,
+	// Let's consider x = unicastmodel.UnicastMaxDialRetryAttemptTimes + 1. Then the test tries x times CreateStream. With dynamic backoffs,
 	// the first CreateStream call will try to Connect x times, the second CreateStream call will try to Connect x-1 times,
 	// and so on. So the total number of Connect calls is x + (x-1) + (x-2) + ... + 1 = x(x+1)/2.
 	// However, we also attempt one more time at the end of the test to CreateStream, when the backoff budget is 0.
-	// When the backoff budget is 0, the unicast manager does not backoff, and tries to Connect once. So the total number
-	// of Connect calls is x(x+1)/2 + 1.
-	maxDialAttemptBudget := int(cfg.NetworkConfig.UnicastMaxDialRetryAttemptTimes)
-	totalAttempts := cfg.NetworkConfig.UnicastMaxDialRetryAttemptTimes*(cfg.NetworkConfig.UnicastMaxDialRetryAttemptTimes+1)/2 + 1
+	maxDialRetryAttemptBudget := int(cfg.NetworkConfig.UnicastMaxDialRetryAttemptTimes)
+	attemptTimes := maxDialRetryAttemptBudget + 1 // 1 attempt + retry times
+	totalAttempts := attemptTimes * (attemptTimes + 1) / 2
 
 	connStatus.On("IsConnected", peerID).Return(false, nil) // not connected
 	streamFactory.On("Connect", mock.Anything, peer.AddrInfo{ID: peerID}).
@@ -386,7 +386,7 @@ func TestUnicastManager_Connection_BackoffBudgetDecremented(t *testing.T) {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	for i := 0; i < maxDialAttemptBudget; i++ {
+	for i := 0; i < maxDialRetryAttemptBudget; i++ {
 		s, err := mgr.CreateStream(ctx, peerID)
 		require.Error(t, err)
 		require.Nil(t, s)
@@ -394,10 +394,10 @@ func TestUnicastManager_Connection_BackoffBudgetDecremented(t *testing.T) {
 		dialCfg, err := dialConfigCache.GetOrInit(peerID)
 		require.NoError(t, err)
 
-		if i == maxDialAttemptBudget-1 {
+		if i == maxDialRetryAttemptBudget-1 {
 			require.Equal(t, uint64(0), dialCfg.DialRetryAttemptBudget)
 		} else {
-			require.Equal(t, uint64(maxDialAttemptBudget-i-1), dialCfg.DialRetryAttemptBudget)
+			require.Equal(t, uint64(maxDialRetryAttemptBudget-i-1), dialCfg.DialRetryAttemptBudget)
 		}
 
 		// The stream backoff budget must remain intact, as we have not tried to create a stream yet.
@@ -435,14 +435,12 @@ func TestUnicastManager_Stream_BackoffBudgetDecremented(t *testing.T) {
 
 	// totalAttempts is the total number of times that unicast manager calls NewStream on the stream factory to create stream to the peer.
 	// Note that it already assumes that the connection is established, so it does not try to connect to the peer.
-	// Let's consider x = unicastmodel.UnicastMaxStreamCreationRetryAttemptTimes. Then the test tries x times CreateStream. With dynamic backoffs,
+	// Let's consider x = unicastmodel.UnicastMaxStreamCreationRetryAttemptTimes + 1. Then the test tries x times CreateStream. With dynamic backoffs,
 	// the first CreateStream call will try to NewStream x times, the second CreateStream call will try to NewStream x-1 times,
 	// and so on. So the total number of Connect calls is x + (x-1) + (x-2) + ... + 1 = x(x+1)/2.
-	// However, we also attempt one more time at the end of the test to CreateStream, when the backoff budget is 0.
-	// When the backoff budget is 0, the unicast manager does not backoff, and tries to CreateStream once. So the total number
-	// of Connect calls is x(x+1)/2 + 1.
 	maxStreamRetryBudget := cfg.NetworkConfig.UnicastMaxStreamCreationRetryAttemptTimes
-	totalAttempts := maxStreamRetryBudget*(maxStreamRetryBudget+1)/2 + 1
+	maxStreamAttempt := maxStreamRetryBudget + 1 // 1 attempt + retry times
+	totalAttempts := maxStreamAttempt * (maxStreamAttempt + 1) / 2
 
 	connStatus.On("IsConnected", peerID).Return(true, nil) // not connected
 	streamFactory.On("NewStream", mock.Anything, peerID, mock.Anything).

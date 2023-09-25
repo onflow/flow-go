@@ -462,18 +462,21 @@ func (m *Manager) rawStream(ctx context.Context, peerID peer.ID, protocolID prot
 	return s, nil
 }
 
-// retryBackoff returns an exponential retry with jitter and max attempts.
-func retryBackoff(maxAttempts uint64) retry.Backoff {
+// retryBackoff creates and returns a retry exponential backoff with the given maximum number of retries.
+// Note that the retryBackoff by default makes one attempt. Hence, that total number of attempts are 1 + maxRetries.
+// Args:
+// - maxRetries: maximum number of retries (in addition to the first backoff).
+// Returns:
+// - a retry backoff object that makes maximum of maxRetries + 1 attempts.
+func retryBackoff(maxRetries uint64) retry.Backoff {
 	// create backoff
 	backoff := retry.NewConstant(time.Second)
 	// add a MaxRetryJitter*time.Millisecond jitter to our backoff to ensure that this node and the target node don't attempt to reconnect at the same time
 	backoff = retry.WithJitter(MaxRetryJitter*time.Millisecond, backoff)
-	maxRetries := maxAttempts
-	if maxAttempts > 0 {
-		// https://github.com/sethvargo/go-retry#maxretries retries counter starts at zero and library will make last attempt
-		// when retries == maxAttempts causing 1 more func invocation than expected.
-		maxRetries = maxAttempts - 1
-	}
+
+	// https://github.com/sethvargo/go-retry#maxretries retries counter starts at zero and library will make last attempt
+	// when retries == maxRetries. Hence, the total number of invocations is maxRetires + 1
+
 	backoff = retry.WithMaxRetries(maxRetries, backoff)
 	return backoff
 }
