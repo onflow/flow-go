@@ -1,10 +1,7 @@
 package models
 
 import (
-	"math/big"
-
 	gethCommon "github.com/ethereum/go-ethereum/common"
-	"github.com/onflow/cadence"
 )
 
 // Flex is an account inside FVM with special access to the underlying infrastructure
@@ -26,20 +23,17 @@ import (
 // FlexAddress is an EVM-compatible address
 type FlexAddress gethCommon.Address
 
+func NewFlexAddress(addr gethCommon.Address) *FlexAddress {
+	fa := FlexAddress(addr)
+	return &fa
+}
+
 func (fa FlexAddress) ToCommon() gethCommon.Address {
 	return gethCommon.Address(fa)
 }
 
 func NewFlexAddressFromString(str string) FlexAddress {
 	return FlexAddress(gethCommon.BytesToAddress([]byte(str)))
-}
-
-// Balance represents the balance of a Flex account
-// a separate type has been considered here to prevent
-// accidental dev mistakes when dealing with the conversion
-type Balance interface {
-	InAttoFlow() *big.Int
-	InFlow() cadence.UFix64
 }
 
 type GasLimit uint64
@@ -85,7 +79,7 @@ type FlowOwnedAccount interface {
 	// Deploy deploys a contract to the Flex environment
 	// the new deployed contract would be at the returned address and
 	// the contract data is not controlled by the FOA accounts
-	Deploy(Code, GasLimit, Balance) FlexAddress
+	Deploy(Code, GasLimit, Balance) *FlexAddress
 
 	// Call calls a smart contract function with the given data.
 	// The gas usage is limited by the given gas limit,
