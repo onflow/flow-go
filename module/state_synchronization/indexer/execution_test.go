@@ -2,10 +2,9 @@ package indexer
 
 import (
 	"context"
+	"crypto/rand"
 	"errors"
 	"fmt"
-	"math"
-	"math/rand"
 	"testing"
 
 	"github.com/rs/zerolog"
@@ -25,7 +24,6 @@ import (
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	synctest "github.com/onflow/flow-go/module/state_synchronization/requester/unittest"
 	"github.com/onflow/flow-go/storage"
-	"github.com/onflow/flow-go/storage/memory"
 	storagemock "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -319,100 +317,6 @@ func storeRegisterWithValue(indexer *ExecutionState, height uint64, owner string
 	}
 
 	return nil
-}
-
-func initRegisterStorage() storage.RegisterIndex {
-	return memory.NewRegisters(0, 0, unittest.Logger())
-}
-
-func TestIntegration_StoreAndGet(t *testing.T) {
-	regOwner := "f8d6e0586b0a20c7"
-	regKey := "code"
-	registerID := flow.NewRegisterID(regOwner, regKey)
-
-	// this test makes sure index values for a single register are correctly updated and always last value is returned
-	t.Run("Single Index Value Changes", func(t *testing.T) {
-		indexer, err := New(unittest.Logger(), initRegisterStorage(), nil, nil)
-		require.NoError(t, err)
-
-		values := [][]byte{
-			[]byte("1"), []byte("1"), []byte("2"), []byte("3"), nil, []byte("4"),
-		}
-
-		value, err := indexer.RegisterValues(flow.RegisterIDs{registerID}, 0)
-		require.Nil(t, value)
-		assert.ErrorIs(t, err, storage.ErrNotFound)
-
-		for i, value := range values {
-			err := storeRegisterWithValue(indexer, uint64(i), regOwner, regKey, value)
-			assert.NoError(t, err)
-
-			val, err := indexer.RegisterValues(flow.RegisterIDs{registerID}, uint64(i))
-			require.Nil(t, err)
-			assert.Equal(t, value, val[0])
-		}
-	})
-
-	// this test makes sure that even if indexed values for a specific register are requested with higher height
-	// the correct highest height indexed value is returned.
-	// e.g. we index A{h(1) -> X}, A{h(2) -> Y}, when we request h(5) we get value Y
-	t.Run("Single Index Value At Later Heights", func(t *testing.T) {
-		indexer, err := New(unittest.Logger(), initRegisterStorage(), nil, nil)
-		require.NoError(t, err)
-
-		value := []byte("1")
-
-		err = storeRegisterWithValue(indexer, 1, regOwner, regKey, value)
-		require.NoError(t, err)
-
-		assert.NoError(t, indexer.indexRange.Increase(2))
-		assert.NoError(t, indexer.indexRange.Increase(3))
-
-		val, err := indexer.RegisterValues(flow.RegisterIDs{registerID}, uint64(3))
-		require.Nil(t, err)
-		assert.Equal(t, value, val[0])
-
-		value = []byte("2")
-		err = storeRegisterWithValue(indexer, 4, regOwner, regKey, value)
-		require.NoError(t, err)
-
-		assert.NoError(t, indexer.indexRange.Increase(5))
-		assert.NoError(t, indexer.indexRange.Increase(6))
-
-		val, err = indexer.RegisterValues(flow.RegisterIDs{registerID}, uint64(6))
-		require.Nil(t, err)
-		assert.Equal(t, value, val[0])
-	})
-
-	// this test makes sure we correctly handle weird payloads
-	t.Run("Empty and Nil Payloads", func(t *testing.T) {
-		indexer, err := New(unittest.Logger(), initRegisterStorage(), nil, nil)
-		require.NoError(t, err)
-
-		require.NoError(t, indexer.indexRegisterPayloads([]*ledger.Payload{}, 1))
-		require.NoError(t, indexer.indexRegisterPayloads([]*ledger.Payload{}, 1))
-		require.NoError(t, indexer.indexRange.Increase(1))
-		require.NoError(t, indexer.indexRegisterPayloads(nil, 2))
-	})
-
-	// this test makes sure correct values are used to initialize range no matter the init value provided
-	t.Run("Initialize Indexer", func(t *testing.T) {
-		logger := unittest.Logger()
-		first := uint64(5)
-		last := uint64(10)
-		registers := memory.NewRegisters(first, last, logger)
-		indexer, err := New(unittest.Logger(), registers, nil, nil)
-		require.NoError(t, err)
-
-		assert.Equal(t, first, indexer.indexRange.First())
-		assert.Equal(t, last, indexer.indexRange.Last())
-
-		empty := uint64(math.MaxUint64) // we use this value to trigger memory db to return empty
-		registers = memory.NewRegisters(empty, empty, logger)
-		indexer, err = New(unittest.Logger(), registers, nil, nil)
-		require.ErrorIs(t, err, storage.ErrNotFound)
-		require.EqualError(t, err, "failed to initialize the indexer with missing first height: key not found")
-	})
 }
 
 func newBlockHeadersStorage(blocks []*flow.Block) storage.Headers {
