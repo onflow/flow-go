@@ -109,7 +109,7 @@ func (m *preMigration) MigrateAccount(
 		return payloads, nil
 	}
 
-	hash, err := m.v.hashAccountCadenceValues(address, payloads)
+	hash, err := m.v.hashAccountCadenceValues(m.log, address, payloads)
 	if err != nil {
 		m.log.Info().
 			Err(err).
@@ -181,7 +181,7 @@ func (m *postMigration) MigrateAccount(
 		return payloads, nil
 	}
 
-	newHash, err := m.v.hashAccountCadenceValues(address, payloads)
+	newHash, err := m.v.hashAccountCadenceValues(m.log, address, payloads)
 	if err != nil {
 		m.log.Info().
 			Err(err).
@@ -227,6 +227,7 @@ func (m *postMigration) MigrateAccount(
 }
 
 func (m *CadenceDataValidationMigrations) hashAccountCadenceValues(
+	log zerolog.Logger,
 	address common.Address,
 	payloads []*ledger.Payload,
 ) ([]byte, error) {
@@ -238,9 +239,9 @@ func (m *CadenceDataValidationMigrations) hashAccountCadenceValues(
 
 	// iterate through all domains and migrate them
 	for _, domain := range domains {
-		domainHash, err := m.hashDomainCadenceValues(mr, domain)
+		domainHash, err := m.hashDomainCadenceValues(log, mr, domain)
 		if err != nil {
-			return nil, fmt.Errorf("failed to convert storage domain %s : %w", domain, err)
+			return nil, fmt.Errorf("failed to hash storage domain %s : %w", domain, err)
 		}
 		_, err = hasher.Write(domainHash)
 		if err != nil {
@@ -252,6 +253,7 @@ func (m *CadenceDataValidationMigrations) hashAccountCadenceValues(
 }
 
 func (m *CadenceDataValidationMigrations) hashDomainCadenceValues(
+	log zerolog.Logger,
 	mr *migratorRuntime,
 	domain string,
 ) ([]byte, error) {
@@ -277,7 +279,7 @@ func (m *CadenceDataValidationMigrations) hashDomainCadenceValues(
 			break
 		}
 
-		h, err := m.recursiveString(mr, value, hasher)
+		h, err := m.recursiveString(log, mr, value, hasher)
 		if err != nil {
 			return nil, fmt.Errorf("failed to convert value to string: %w", err)
 		}
@@ -312,6 +314,7 @@ func (m *CadenceDataValidationMigrations) hashDomainCadenceValues(
 }
 
 func (m *CadenceDataValidationMigrations) recursiveString(
+	log zerolog.Logger,
 	mr *migratorRuntime,
 	value interpreter.Value,
 	hasher hash.Hasher,
@@ -319,7 +322,7 @@ func (m *CadenceDataValidationMigrations) recursiveString(
 	if mr.Address == mustHexToAddress("4eded0de73020ca5") {
 		compositeValue, ok := value.(*interpreter.CompositeValue)
 		if ok && string(compositeValue.TypeID()) == "A.4eded0de73020ca5.CricketMomentsShardedCollection.ShardedCollection" {
-			return m.recursiveStringShardedCollection(mr, value)
+			return m.recursiveStringShardedCollection(log, mr, value)
 		}
 	}
 
@@ -337,6 +340,7 @@ func (m *CadenceDataValidationMigrations) recursiveString(
 }
 
 func (m *CadenceDataValidationMigrations) recursiveStringShardedCollection(
+	log zerolog.Logger,
 	mr *migratorRuntime,
 	value interpreter.Value,
 ) ([]byte, error) {
@@ -370,8 +374,14 @@ func (m *CadenceDataValidationMigrations) recursiveStringShardedCollection(
 		hash     []byte
 	}
 
-	ctx, cancel := context.WithCancelCause(context.Background())
+	ctx, c := context.WithCancelCause(context.Background())
+
+	cancel := func(err error) {
+		log.Info().Err(err).Msg("canceling context")
+		c(err)
+	}
 	defer cancel(nil)
+
 	hashifyChan := make(chan valueWithKeys, m.nWorkers)
 	hashChan := make(chan hashWithKeys, m.nWorkers)
 	wg := sync.WaitGroup{}
@@ -507,6 +517,7 @@ func (m *CadenceDataValidationMigrations) recursiveStringShardedCollection(
 					l = make(sortableHashes, 0, 1_0000_000)
 				}
 				l = append(l, clone.hash)
+				hashes[clone.outerKey] = l
 			}
 		}
 	}()
@@ -516,6 +527,7 @@ func (m *CadenceDataValidationMigrations) recursiveStringShardedCollection(
 	<-done
 
 	if ctx.Err() != nil {
+		log.Info().Err(ctx.Err()).Msg("context error when hashing individual values")
 		return nil, ctx.Err()
 	}
 
@@ -579,6 +591,7 @@ func (m *CadenceDataValidationMigrations) recursiveStringShardedCollection(
 	<-done
 
 	if ctx.Err() != nil {
+		log.Info().Err(ctx.Err()).Msg("context error when hashing values together")
 		return nil, ctx.Err()
 	}
 
