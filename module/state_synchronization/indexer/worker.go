@@ -28,7 +28,7 @@ const (
 // The execution state worker has a callback that is used by the upstream queues which download new execution data to
 // notify new data is available and kick off indexing.
 type ExecutionStateWorker struct {
-	*jobqueue.ComponentConsumer
+	component       *jobqueue.ComponentConsumer
 	log             zerolog.Logger
 	exeDataReader   *jobs.ExecutionDataReader
 	exeDataNotifier engine.Notifier
@@ -54,7 +54,7 @@ func NewExecutionStateWorker(
 
 	// create a jobqueue that will process new available block execution data. The `exeDataNotifier` is used to
 	// signal new work, which is being triggered on the `OnExecutionData` handler.
-	r.ComponentConsumer = jobqueue.NewComponentConsumer(
+	r.component = jobqueue.NewComponentConsumer(
 		log.With().Str("module", "execution_indexer").Logger(),
 		r.exeDataNotifier.Channel(),
 		processedHeight,
@@ -72,7 +72,7 @@ func NewExecutionStateWorker(
 func (r *ExecutionStateWorker) Start(ctx irrecoverable.SignalerContext) {
 	// todo should we protect this to only be called once - albeit start on the consumer being called that has the protection
 	r.exeDataReader.AddContext(ctx)
-	r.ComponentConsumer.Start(ctx)
+	r.component.Start(ctx)
 }
 
 // OnExecutionData is used to notify when new execution data is downloaded by the execution data requester jobqueue.
