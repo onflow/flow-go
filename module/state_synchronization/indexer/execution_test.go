@@ -305,6 +305,24 @@ func TestExecutionState_RegisterValues(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Equal(t, values, []flow.RegisterValue{val})
 	})
+
+	t.Run("Get values out of range", func(t *testing.T) {
+		blocks := blocksFixture(5)
+		values, err := newIndexTest(t, blocks, nil).
+			initIndexer().
+			runGetRegisters(nil, 6)
+
+		assert.EqualError(
+			t,
+			err,
+			fmt.Sprintf(
+				"value 6 is out of boundary [%d - %d]: the value is not within the indexed interval",
+				blocks[0].Header.Height,
+				blocks[len(blocks)-1].Header.Height,
+			),
+		)
+		assert.Nil(t, values)
+	})
 }
 
 func newBlockHeadersStorage(blocks []*flow.Block) storage.Headers {
