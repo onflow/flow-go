@@ -41,7 +41,6 @@ import (
 	"github.com/onflow/flow-go/network/p2p/tracer"
 	"github.com/onflow/flow-go/network/p2p/unicast"
 	unicastcache "github.com/onflow/flow-go/network/p2p/unicast/cache"
-	"github.com/onflow/flow-go/network/p2p/unicast/manager"
 	"github.com/onflow/flow-go/network/p2p/unicast/protocols"
 	"github.com/onflow/flow-go/network/p2p/unicast/stream"
 	"github.com/onflow/flow-go/network/p2p/utils"
@@ -305,7 +304,7 @@ func (builder *LibP2PNodeBuilder) Build() (p2p.LibP2PNode, error) {
 		builder.connGater.SetDisallowListOracle(node)
 	}
 
-	unicastManager, err := manager.NewUnicastManager(&manager.ManagerConfig{
+	unicastManager, err := unicast.NewUnicastManager(&unicast.ManagerConfig{
 		Logger:                             builder.logger,
 		StreamFactory:                      stream.NewLibP2PStreamFactory(h),
 		SporkId:                            builder.sporkId,

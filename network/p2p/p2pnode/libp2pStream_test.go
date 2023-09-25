@@ -26,7 +26,7 @@ import (
 	"github.com/onflow/flow-go/network/internal/p2putils"
 	"github.com/onflow/flow-go/network/p2p"
 	p2ptest "github.com/onflow/flow-go/network/p2p/test"
-	"github.com/onflow/flow-go/network/p2p/unicast/manager"
+	"github.com/onflow/flow-go/network/p2p/unicast"
 	"github.com/onflow/flow-go/network/p2p/unicast/protocols"
 	"github.com/onflow/flow-go/network/p2p/utils"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -358,7 +358,7 @@ func TestNoBackoffWhenCreatingStream(t *testing.T) {
 	cfg, err := config.DefaultConfig()
 	require.NoError(t, err)
 
-	maxTimeToWait := time.Duration(cfg.NetworkConfig.UnicastMaxStreamCreationRetryAttemptTimes) * manager.MaxRetryJitter * time.Millisecond
+	maxTimeToWait := time.Duration(cfg.NetworkConfig.UnicastMaxStreamCreationRetryAttemptTimes) * unicast.MaxRetryJitter * time.Millisecond
 
 	// need to add some buffer time so that RequireReturnsBefore waits slightly longer than maxTimeToWait to avoid
 	// a race condition

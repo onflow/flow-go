@@ -1,4 +1,4 @@
-package manager_test
+package unicast_test
 
 import (
 	"context"
@@ -18,12 +18,11 @@ import (
 	p2ptest "github.com/onflow/flow-go/network/p2p/test"
 	"github.com/onflow/flow-go/network/p2p/unicast"
 	unicastcache "github.com/onflow/flow-go/network/p2p/unicast/cache"
-	"github.com/onflow/flow-go/network/p2p/unicast/manager"
 	"github.com/onflow/flow-go/network/p2p/unicast/stream"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-func unicastManagerFixture(t *testing.T) (*manager.Manager, *mockp2p.StreamFactory, *mockp2p.PeerConnections, unicast.DialConfigCache) {
+func unicastManagerFixture(t *testing.T) (*unicast.Manager, *mockp2p.StreamFactory, *mockp2p.PeerConnections, unicast.DialConfigCache) {
 	streamFactory := mockp2p.NewStreamFactory(t)
 	streamFactory.On("SetStreamHandler", mock.Anything, mock.Anything).Return().Once()
 	connStatus := mockp2p.NewPeerConnections(t)
@@ -37,7 +36,7 @@ func unicastManagerFixture(t *testing.T) (*manager.Manager, *mockp2p.StreamFacto
 			StreamCreationRetryAttemptBudget: cfg.NetworkConfig.UnicastMaxStreamCreationRetryAttemptTimes,
 		}
 	})
-	mgr, err := manager.NewUnicastManager(&manager.ManagerConfig{
+	mgr, err := unicast.NewUnicastManager(&unicast.ManagerConfig{
 		Logger:                             unittest.Logger(),
 		StreamFactory:                      streamFactory,
 		SporkId:                            unittest.IdentifierFixture(),
