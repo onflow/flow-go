@@ -31,56 +31,46 @@ func (f *foa) Address() *models.FlexAddress {
 	return f.address
 }
 
+// Balance returns the balance of this foa
+func (f *foa) Balance() models.Balance {
+	env := f.fch.getNewDefaultEnv()
+	bl, err := env.Balance(f.address)
+	if err != nil {
+		panic(err)
+	}
+	balance, err := models.NewBalanceFromAttoFlow(bl)
+	if err != nil {
+		panic(err)
+	}
+	return balance
+}
+
 // Deposit deposits the token from the given vault into the Flex main vault
 // and update the FOA balance with the new amount
-func (f *foa) Deposit(v models.FLOWTokenVault) {
-	config := env.NewFlexConfig(
-		env.WithBlockNumber(env.BlockNumberForEVMRules))
-	env, err := env.NewEnvironment(config, f.fch.db)
-	// TODO improve this
-	if err != nil {
-		panic(err)
-	}
-
-	err = env.MintTo(v.Balance().ToAttoFlow(), f.address.ToCommon())
-	if err != nil {
-		panic(err)
-	}
+func (f *foa) Deposit(v *models.FLOWTokenVault) {
+	env := f.fch.getNewDefaultEnv()
+	err := env.MintTo(v.Balance().ToAttoFlow(), f.address.ToCommon())
+	f.fch.handleError(err)
 }
 
 // Withdraw deducts the balance from the FOA account and
 // withdraw and return flow token from the Flex main vault.
-func (f *foa) Withdraw(b models.Balance) models.FLOWTokenVault {
-	config := env.NewFlexConfig(
-		env.WithBlockNumber(env.BlockNumberForEVMRules))
-	env, err := env.NewEnvironment(config, f.fch.db)
-	// TODO improve this
-	if err != nil {
-		panic(err)
-	}
-	err = env.WithdrawFrom(b.ToAttoFlow(), f.address.ToCommon())
-	if err != nil {
-		panic(err)
-	}
-	// TODO: construct a new FlowTokenVault
-	return nil
+func (f *foa) Withdraw(b models.Balance) *models.FLOWTokenVault {
+	env := f.fch.getNewDefaultEnv()
+	err := env.WithdrawFrom(b.ToAttoFlow(), f.address.ToCommon())
+	f.fch.handleError(err)
+	return models.NewFlowTokenVault(b)
 }
 
 // Deploy deploys a contract to the Flex environment
 // the new deployed contract would be at the returned address and
 // the contract data is not controlled by the FOA accounts
 func (f *foa) Deploy(code models.Code, gaslimit models.GasLimit, balance models.Balance) *models.FlexAddress {
-	config := env.NewFlexConfig(
-		env.WithBlockNumber(env.BlockNumberForEVMRules))
-	env, err := env.NewEnvironment(config, f.fch.db)
-	// TODO improve this
-	if err != nil {
-		panic(err)
-	}
+	env := f.fch.getNewDefaultEnv()
 	// TODO check gas limit against what has been left on the transaction side
-	env.Deploy(f.address.ToCommon(), code, uint64(gaslimit), balance.ToAttoFlow())
+	err := env.Deploy(f.address.ToCommon(), code, uint64(gaslimit), balance.ToAttoFlow())
+	f.fch.handleError(err)
 	if env.Result.Failed {
-		// TODO panic with a handlable error
 		panic("deploy failed")
 	}
 	return models.NewFlexAddress(env.Result.DeployedContractAddress)
@@ -92,15 +82,10 @@ func (f *foa) Deploy(code models.Code, gaslimit models.GasLimit, balance models.
 // the balance would be deducted from the OFA account and would be transferred to the target address
 // contract data is not controlled by the FOA accounts
 func (f *foa) Call(to models.FlexAddress, data models.Data, gaslimit models.GasLimit, balance models.Balance) models.Data {
-	config := env.NewFlexConfig(
-		env.WithBlockNumber(env.BlockNumberForEVMRules))
-	env, err := env.NewEnvironment(config, f.fch.db)
-	// TODO improve this
-	if err != nil {
-		panic(err)
-	}
+	env := f.fch.getNewDefaultEnv()
 	// TODO check gas limit against what has been left on the transaction side
-	env.Call(f.address.ToCommon(), to.ToCommon(), data, uint64(gaslimit), balance.ToAttoFlow())
+	err := env.Call(f.address.ToCommon(), to.ToCommon(), data, uint64(gaslimit), balance.ToAttoFlow())
+	f.fch.handleError(err)
 	if env.Result.Failed {
 		// TODO panic with a handlable error
 		panic("call failed")
@@ -156,4 +141,22 @@ func (h FlexContractHandler) Run(tx []byte, coinbase models.FlexAddress) bool {
 	}
 	env.RunTransaction(tx)
 	return env.Result.Failed
+}
+
+// TODO: properly implement this
+func (h FlexContractHandler) handleError(err error) {
+	if err != nil {
+		panic(err)
+	}
+}
+
+func (h FlexContractHandler) getNewDefaultConfig() *env.Config {
+	return env.NewFlexConfig(
+		env.WithBlockNumber(env.BlockNumberForEVMRules))
+}
+
+func (h FlexContractHandler) getNewDefaultEnv() *env.Environment {
+	env, err := env.NewEnvironment(h.getNewDefaultConfig(), h.db)
+	h.handleError(err)
+	return env
 }

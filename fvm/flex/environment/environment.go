@@ -138,6 +138,15 @@ func (fe *Environment) AllocateAddressAndMintTo(balance *big.Int) (*models.FlexA
 	return target, fe.commit()
 }
 
+// Balance returns the balance of an address
+// TODO: do it as a ReadOnly env view.
+func (fe *Environment) Balance(target *models.FlexAddress) (*big.Int, error) {
+	if err := fe.checkExecuteOnce(); err != nil {
+		return nil, err
+	}
+	return fe.State.GetBalance(target.ToCommon()), nil
+}
+
 func (fe *Environment) allocateAddress() *models.FlexAddress {
 	target := models.FlexAddress{}
 	// first 12 bytes would be zero

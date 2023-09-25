@@ -1,23 +1,23 @@
 package models
 
-// TokenVault holds a balance of native token
-type TokenVault struct {
+// FLOWTokenVault holds a balance of flow token
+type FLOWTokenVault struct {
 	balance Balance
 }
 
-func NewTokenVault(balance Balance) *TokenVault {
-	return &TokenVault{balance: balance}
+func NewFlowTokenVault(balance Balance) *FLOWTokenVault {
+	return &FLOWTokenVault{balance: balance}
 }
 
-func (t *TokenVault) Balance() Balance {
+func (t *FLOWTokenVault) Balance() Balance {
 	return t.balance
 }
 
-func (t *TokenVault) Withdraw(b Balance) *TokenVault {
+func (t *FLOWTokenVault) Withdraw(b Balance) *FLOWTokenVault {
 	t.balance = t.balance.Sub(b)
-	return NewTokenVault(b)
+	return NewFlowTokenVault(b)
 }
 
-func (t *TokenVault) Deposit(inp TokenVault) {
+func (t *FLOWTokenVault) Deposit(inp FLOWTokenVault) {
 	t.balance = t.balance.Add(inp.Balance())
 }

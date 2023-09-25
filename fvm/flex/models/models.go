@@ -48,13 +48,6 @@ type FlexAccount interface {
 	Balance() Balance
 }
 
-// FLOWTokenVault represents a FLOW Vault
-type FLOWTokenVault interface {
-	Balance() Balance
-	Withdraw(Balance) FLOWTokenVault
-	Deposit(FLOWTokenVault)
-}
-
 // FlowOwnedAccount is a new type of account in the Flex environment,
 // that instead of being managed by public key inside the Flex,
 // is managed by  a resource owned by a Flow account.
@@ -67,14 +60,17 @@ type FlowOwnedAccount interface {
 	// Address returns the flex address associated with the FOA account
 	Address() *FlexAddress
 
+	// returns balance of this account
+	Balance() Balance
+
 	// Deposit deposits the token from the given vault into the Flex main vault
 	// and update the FOA balance with the new amount
 	// TODO: move to FlexAccount
-	Deposit(FLOWTokenVault)
+	Deposit(*FLOWTokenVault)
 
 	// Withdraw deducts the balance from the FOA account and
 	// withdraw and return flow token from the Flex main vault.
-	Withdraw(Balance) FLOWTokenVault
+	Withdraw(Balance) *FLOWTokenVault
 
 	// Deploy deploys a contract to the Flex environment
 	// the new deployed contract would be at the returned address and
