@@ -120,7 +120,7 @@ func (i *ExecutionState) IndexBlockData(ctx context.Context, data *execution_dat
 	}
 
 	// concurrently process indexing of block data
-	g, _ := errgroup.WithContext(ctx)
+	g := errgroup.Group{}
 
 	updates := make([]*ledger.TrieUpdate, 0)
 	events := make([]flow.Event, 0)
