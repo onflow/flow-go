@@ -12,18 +12,28 @@ type Registers struct {
 	mock.Mock
 }
 
-// Close provides a mock function with given fields:
-func (_m *Registers) Close() error {
+// FirstHeight provides a mock function with given fields:
+func (_m *Registers) FirstHeight() (uint64, error) {
 	ret := _m.Called()
 
-	var r0 error
-	if rf, ok := ret.Get(0).(func() error); ok {
+	var r0 uint64
+	var r1 error
+	if rf, ok := ret.Get(0).(func() (uint64, error)); ok {
+		return rf()
+	}
+	if rf, ok := ret.Get(0).(func() uint64); ok {
 		r0 = rf()
 	} else {
-		r0 = ret.Error(0)
+		r0 = ret.Get(0).(uint64)
 	}
 
-	return r0
+	if rf, ok := ret.Get(1).(func() error); ok {
+		r1 = rf()
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
 }
 
 // Get provides a mock function with given fields: ID, height
@@ -45,6 +55,30 @@ func (_m *Registers) Get(ID flow.RegisterID, height uint64) ([]byte, error) {
 
 	if rf, ok := ret.Get(1).(func(flow.RegisterID, uint64) error); ok {
 		r1 = rf(ID, height)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// LatestHeight provides a mock function with given fields:
+func (_m *Registers) LatestHeight() (uint64, error) {
+	ret := _m.Called()
+
+	var r0 uint64
+	var r1 error
+	if rf, ok := ret.Get(0).(func() (uint64, error)); ok {
+		return rf()
+	}
+	if rf, ok := ret.Get(0).(func() uint64); ok {
+		r0 = rf()
+	} else {
+		r0 = ret.Get(0).(uint64)
+	}
+
+	if rf, ok := ret.Get(1).(func() error); ok {
+		r1 = rf()
 	} else {
 		r1 = ret.Error(1)
 	}

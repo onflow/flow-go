@@ -46,11 +46,16 @@ import (
 	followereng "github.com/onflow/flow-go/engine/common/follower"
 	"github.com/onflow/flow-go/engine/common/requester"
 	synceng "github.com/onflow/flow-go/engine/common/synchronization"
+	"github.com/onflow/flow-go/engine/execution/computation"
+	"github.com/onflow/flow-go/engine/execution/computation/query"
+	"github.com/onflow/flow-go/fvm"
+	"github.com/onflow/flow-go/fvm/storage/derived"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/blobs"
 	"github.com/onflow/flow-go/module/chainsync"
+	"github.com/onflow/flow-go/module/execution"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	execdatacache "github.com/onflow/flow-go/module/executiondatasync/execution_data/cache"
 	finalizer "github.com/onflow/flow-go/module/finalizer/consensus"
@@ -61,6 +66,7 @@ import (
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/metrics/unstaked"
 	"github.com/onflow/flow-go/module/state_synchronization"
+	"github.com/onflow/flow-go/module/state_synchronization/indexer"
 	edrequester "github.com/onflow/flow-go/module/state_synchronization/requester"
 	"github.com/onflow/flow-go/network"
 	alspmgr "github.com/onflow/flow-go/network/alsp/manager"
@@ -89,6 +95,7 @@ import (
 	"github.com/onflow/flow-go/state/protocol/blocktimer"
 	"github.com/onflow/flow-go/storage"
 	bstorage "github.com/onflow/flow-go/storage/badger"
+	"github.com/onflow/flow-go/storage/memory"
 	"github.com/onflow/flow-go/utils/grpcutils"
 )
 
@@ -132,7 +139,9 @@ type AccessNodeConfig struct {
 	executionDataDir             string
 	executionDataStartHeight     uint64
 	executionDataConfig          edrequester.ExecutionDataConfig
+	queryExecutorConfig          query.QueryConfig
 	PublicNetworkConfig          PublicNetworkConfig
+	executionIndexLastHeight     uint64
 	TxResultCacheSize            uint
 }
 
@@ -249,6 +258,8 @@ type FlowAccessNodeBuilder struct {
 	ExecutionDataRequester     state_synchronization.ExecutionDataRequester
 	ExecutionDataStore         execution_data.ExecutionDataStore
 	ExecutionDataCache         *execdatacache.ExecutionDataCache
+	ExecutionIndexer           *indexer.ExecutionState
+	Scripts                    *execution.Scripts
 
 	// The sync engine participants provider is the libp2p peer store for the access node
 	// which is not available until after the network has started.
@@ -452,6 +463,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 	var ds *badger.Datastore
 	var bs network.BlobService
 	var processedBlockHeight storage.ConsumerProgress
+	var indexedBlockHeight storage.ConsumerProgress
 	var processedNotifications storage.ConsumerProgress
 	var bsDependable *module.ProxiedReadyDoneAware
 	var execDataDistributor *edrequester.ExecutionDataDistributor
@@ -460,6 +472,9 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 	builder.
 		AdminCommand("read-execution-data", func(config *cmd.NodeConfig) commands.AdminCommand {
 			return stateSyncCommands.NewReadExecutionDataCommand(builder.ExecutionDataStore)
+		}).
+		AdminCommand("execute-script", func(config *cmd.NodeConfig) commands.AdminCommand {
+			return stateSyncCommands.NewExecuteScriptCommand(builder.Scripts)
 		}).
 		Module("execution data datastore and blobstore", func(node *cmd.NodeConfig) error {
 			datastoreDir := filepath.Join(builder.executionDataDir, "blobstore")
@@ -487,6 +502,10 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 			processedBlockHeight = bstorage.NewConsumerProgress(ds.DB, module.ConsumeProgressExecutionDataRequesterBlockHeight)
 			return nil
 		}).
+		Module("indexed block height consumer progress", func(node *cmd.NodeConfig) error {
+			indexedBlockHeight = bstorage.NewConsumerProgress(ds.DB, module.ConsumeProgressExecutionDataIndexerBlockHeight)
+			return nil
+		}).
 		Module("processed notifications consumer progress", func(node *cmd.NodeConfig) error {
 			// uses the datastore's DB
 			processedNotifications = bstorage.NewConsumerProgress(ds.DB, module.ConsumeProgressExecutionDataRequesterNotification)
@@ -500,6 +519,10 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 		Module("execution datastore", func(node *cmd.NodeConfig) error {
 			blobstore := blobs.NewBlobstore(ds)
 			builder.ExecutionDataStore = execution_data.NewExecutionDataStore(blobstore, execution_data.DefaultSerializer)
+			return nil
+		}).
+		Module("events storage", func(node *cmd.NodeConfig) error {
+			builder.Storage.Events = bstorage.NewEvents(node.Metrics.Cache, node.DB)
 			return nil
 		}).
 		Component("execution data service", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
@@ -596,6 +619,76 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 			builder.ExecutionDataRequester.AddOnExecutionDataReceivedConsumer(execDataDistributor.OnExecutionDataReceived)
 
 			return builder.ExecutionDataRequester, nil
+		}).
+		Component("execution data indexer", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+			// Execution data cache uses blob store as the backend. It's used by the execution
+			// state indexer to get the execution data from the store.
+			executionDataCache := execdatacache.NewExecutionDataCache(
+				builder.ExecutionDataStore,
+				builder.Storage.Headers,
+				builder.Storage.Seals,
+				builder.Storage.Results,
+				execDataCacheBackend,
+			)
+
+			initHeight := builder.executionDataConfig.InitialBlockHeight
+
+			// temporarily use the in-memory db
+			registers := memory.NewRegisters(initHeight, initHeight, builder.Logger)
+
+			exeIndexer, err := indexer.New(
+				registers,
+				builder.Storage.Headers,
+				builder.Storage.Events,
+				builder.Logger,
+			)
+			if err != nil {
+				return nil, err
+			}
+
+			builder.ExecutionIndexer = exeIndexer // todo temporary to test
+
+			// execution state worker uses a jobqueue to process new execution data and indexes it by using the indexer.
+			worker := indexer.NewExecutionStateWorker(
+				builder.Logger,
+				// match the block height from the execution data requester as it depends on the data being downloaded
+				initHeight,
+				// not as relevant when using blob store backend
+				5*time.Second,
+				exeIndexer,
+				executionDataCache,
+				builder.ExecutionDataRequester.HighestConsecutiveHeight,
+				indexedBlockHeight,
+			)
+
+			// add worker on execution data handler to the execution data requester to use as a signal for the
+			// jobqueue to inform of new tasks.
+			builder.ExecutionDataRequester.AddOnExecutionDataReceivedConsumer(worker.OnExecutionData)
+
+			// todo move this to separate component
+			vm := fvm.NewVirtualMachine()
+
+			options := computation.DefaultFVMOptions(node.RootChainID, false, false)
+			vmCtx := fvm.NewContext(options...)
+
+			derivedChainData, err := derived.NewDerivedChainData(derived.DefaultDerivedDataCacheSize)
+			if err != nil {
+				return nil, err
+			}
+
+			queryExecutor := query.NewQueryExecutor(
+				builder.queryExecutorConfig,
+				builder.Logger,
+				metrics.NewExecutionCollector(node.Tracer),
+				vm,
+				vmCtx,
+				derivedChainData,
+				query.NewProtocolStateWrapper(builder.State),
+			)
+
+			builder.Scripts = execution.NewScripts(*queryExecutor, builder.Storage.Headers, exeIndexer.RegisterValues)
+
+			return worker, nil
 		})
 
 	if builder.stateStreamConf.ListenAddr != "" {
@@ -749,6 +842,14 @@ func (builder *FlowAccessNodeBuilder) extraFlags() {
 		flags.Float64Var(&builder.stateStreamConf.ResponseLimit, "state-stream-response-limit", defaultConfig.stateStreamConf.ResponseLimit, "max number of responses per second to send over streaming endpoints. this helps manage resources consumed by each client querying data not in the cache e.g. 3 or 0.5. 0 means no limit")
 
 		flags.UintVar(&builder.TxResultCacheSize, "transaction-result-cache-size", defaultConfig.TxResultCacheSize, "transaction result cache size.(Disabled by default i.e 0)")
+
+		// Execution Index
+		flags.Uint64Var(&builder.executionIndexLastHeight, "execution-index-last-height", 0, "block height to start indexing execution data from")
+
+		// Script Execution
+		flags.DurationVar(&builder.queryExecutorConfig.LogTimeThreshold, "script-log-threshold", query.DefaultLogTimeThreshold, "threshold for logging script execution")
+		flags.DurationVar(&builder.queryExecutorConfig.ExecutionTimeLimit, "script-execution-time-limit", query.DefaultExecutionTimeLimit, "script execution time limit")
+
 	}).ValidateFlags(func() error {
 		if builder.supportsObserver && (builder.PublicNetworkConfig.BindAddress == cmd.NotSet || builder.PublicNetworkConfig.BindAddress == "") {
 			return errors.New("public-network-address must be set if supports-observer is true")
