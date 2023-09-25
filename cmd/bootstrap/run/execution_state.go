@@ -1,6 +1,7 @@
 package run
 
 import (
+	"fmt"
 	"math"
 
 	"github.com/rs/zerolog"
@@ -24,7 +25,7 @@ func GenerateExecutionState(
 ) (flow.StateCommitment, error) {
 	const (
 		capacity           = 100
-		checkpointDistance = math.MaxInt // A large number to prevent checkpoint creation.
+		checkpointDistance = math.MaxInt // A large number to prevent last creation.
 		checkpointsToKeep  = 1
 	)
 
@@ -51,11 +52,38 @@ func GenerateExecutionState(
 		<-compactor.Done()
 	}()
 
-	return bootstrap.NewBootstrapper(
-		zerolog.Nop()).BootstrapLedger(
-		ledgerStorage,
-		accountKey,
-		chain,
-		bootstrapOptions...,
-	)
+	stateCommitment, err := bootstrap.
+		NewBootstrapper(zerolog.Nop()).
+		BootstrapLedger(
+			ledgerStorage,
+			accountKey,
+			chain,
+			bootstrapOptions...,
+		)
+	if err != nil {
+		return flow.DummyStateCommitment, err
+	}
+
+	checkpointer, err := ledgerStorage.Checkpointer()
+	if err != nil {
+		return flow.DummyStateCommitment, err
+	}
+
+	root := 0
+	err = checkpointer.Checkpoint(root)
+	if err != nil {
+		return flow.DummyStateCommitment, err
+	}
+
+	trie, err := checkpointer.LoadCheckpoint(root)
+	if err != nil {
+		return flow.DummyStateCommitment, err
+	}
+
+	err = wal.StoreCheckpointV6(trie, dbDir, "bootstrap-checkpoint", zerolog.Nop(), 1)
+	if err != nil {
+		return flow.DummyStateCommitment, fmt.Errorf("failed to store bootstrap checkpoint: %w", err)
+	}
+
+	return stateCommitment, nil
 }
