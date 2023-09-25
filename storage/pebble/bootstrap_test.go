@@ -92,6 +92,10 @@ func TestBootstrap_IndexCheckpointFile_Error(t *testing.T) {
 	unittest.RunWithTempDir(t, func(dir string) {
 		log := zerolog.New(io.Discard)
 		// write trie and remove part of the file
+		fileName := "simple-checkpoint"
+		tries := createSimpleTrie(t)
+		require.NoErrorf(t, wal.StoreCheckpointV6Concurrently(tries, dir, fileName, log), "fail to store checkpoint")
+		checkpointFile := path.Join(dir, fileName)
 
 		unittest.RunWithConfiguredPebbleInstance(t, getTestingPebbleOpts(), func(p *pebble.DB) {
 
