@@ -3,6 +3,12 @@ package pebble
 import "github.com/onflow/flow-go/storage/pebble/registers"
 
 const (
+	checkpointLeafNodeBufSize = 1000
+
+	pebbleBootstrapRegisterBatchLen = 1000
+
+	pebbleBootstrapWorkerCount = 10
+
 	// placeHolderHeight is an element of the height lookup keys of length HeightSuffixLen
 	// 10 bits per key yields a filter with <1% false positive rate.
 	placeHolderHeight = uint64(0)
