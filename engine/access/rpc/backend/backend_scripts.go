@@ -377,9 +377,6 @@ func (b *backendScripts) tryExecuteScriptOnArchiveNode(
 	}(closer)
 	resp, err := archiveClient.ExecuteScriptAtBlockID(ctx, req)
 	if err != nil {
-		if status.Code(err) == codes.Unavailable {
-			b.connFactory.InvalidateAccessAPIClient(executorAddress)
-		}
 		return nil, status.Errorf(status.Code(err), "failed to execute the script on archive node %s: %v",
 			executorAddress, err)
 	}

@@ -485,7 +485,7 @@ func (c *Cache) logTelemetry() {
 			Logger()
 	}
 
-	lg.Info().Msg("logging telemetry")
+	lg.Debug().Msg("logging telemetry")
 	c.lastTelemetryDump.Store(runtimeNano())
 }
 
