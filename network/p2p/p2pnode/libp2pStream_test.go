@@ -123,14 +123,19 @@ func mockStreamHandlerForMessages(t *testing.T, ctx context.Context, msgCount in
 // TestCreateStream_WithDefaultUnicast evaluates correctness of creating default (tcp) unicast streams between two libp2p nodes.
 func TestCreateStream_WithDefaultUnicast(t *testing.T) {
 	sporkId := unittest.IdentifierFixture()
-	testCreateStream(t, sporkId, nil, // sends nil as preferred unicast so that nodes run on default plain tcp streams.
+	testCreateStream(t,
+		sporkId,
+		nil, // sends nil as preferred unicast so that nodes run on default plain tcp streams.
 		protocols.FlowProtocolID(sporkId))
 }
 
 // TestCreateStream_WithPreferredGzipUnicast evaluates correctness of creating gzip-compressed tcp unicast streams between two libp2p nodes.
 func TestCreateStream_WithPreferredGzipUnicast(t *testing.T) {
 	sporkId := unittest.IdentifierFixture()
-	testCreateStream(t, sporkId, []protocols.ProtocolName{protocols.GzipCompressionUnicast}, protocols.FlowGzipProtocolId(sporkId))
+	testCreateStream(t,
+		sporkId,
+		[]protocols.ProtocolName{protocols.GzipCompressionUnicast},
+		protocols.FlowGzipProtocolId(sporkId))
 }
 
 // testCreateStreams checks if a new streams of "preferred" type is created each time when CreateStream is called and an existing stream is not
@@ -202,8 +207,15 @@ func TestCreateStream_FallBack(t *testing.T) {
 	// Creates two nodes: one with preferred gzip, and other one with default protocol
 	sporkId := unittest.IdentifierFixture()
 	idProvider := mockmodule.NewIdentityProvider(t)
-	thisNode, thisID := p2ptest.NodeFixture(t, sporkId, "test_create_stream_fallback", idProvider, p2ptest.WithPreferredUnicasts([]protocols.ProtocolName{protocols.GzipCompressionUnicast}))
-	otherNode, otherId := p2ptest.NodeFixture(t, sporkId, "test_create_stream_fallback", idProvider)
+	thisNode, thisID := p2ptest.NodeFixture(t,
+		sporkId,
+		t.Name(),
+		idProvider,
+		p2ptest.WithPreferredUnicasts([]protocols.ProtocolName{protocols.GzipCompressionUnicast}))
+	otherNode, otherId := p2ptest.NodeFixture(t,
+		sporkId,
+		t.Name(),
+		idProvider)
 	identities := []flow.Identity{thisID, otherId}
 	nodes := []p2p.LibP2PNode{thisNode, otherNode}
 	for i, node := range nodes {
@@ -267,7 +279,11 @@ func TestCreateStreamIsConcurrencySafe(t *testing.T) {
 	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
 	idProvider := unittest.NewUpdatableIDProvider(flow.IdentityList{})
 	// create two nodes
-	nodes, identities := p2ptest.NodesFixture(t, unittest.IdentifierFixture(), "test_create_stream_is_concurrency_safe", 2, idProvider)
+	nodes, identities := p2ptest.NodesFixture(t,
+		unittest.IdentifierFixture(),
+		t.Name(),
+		2,
+		idProvider)
 	require.Len(t, identities, 2)
 	idProvider.SetIdentities(flow.IdentityList{identities[0], identities[1]})
 	p2ptest.StartNodes(t, signalerCtx, nodes)
@@ -319,7 +335,11 @@ func TestNoBackoffWhenCreatingStream(t *testing.T) {
 	idProvider := unittest.NewUpdatableIDProvider(flow.IdentityList{})
 	count := 2
 	// Creates nodes
-	nodes, identities := p2ptest.NodesFixture(t, unittest.IdentifierFixture(), "test_no_backoff_when_create_stream", count, idProvider)
+	nodes, identities := p2ptest.NodesFixture(t,
+		unittest.IdentifierFixture(),
+		t.Name(),
+		count,
+		idProvider)
 	node1 := nodes[0]
 	node2 := nodes[1]
 	idProvider.SetIdentities(flow.IdentityList{identities[0], identities[1]})
@@ -395,10 +415,18 @@ func testUnicastOverStream(t *testing.T, opts ...p2ptest.NodeFixtureParameterOpt
 	sporkId := unittest.IdentifierFixture()
 	idProvider := mockmodule.NewIdentityProvider(t)
 	streamHandler1, inbound1 := p2ptest.StreamHandlerFixture(t)
-	node1, id1 := p2ptest.NodeFixture(t, sporkId, t.Name(), idProvider, append(opts, p2ptest.WithDefaultStreamHandler(streamHandler1))...)
+	node1, id1 := p2ptest.NodeFixture(t,
+		sporkId,
+		t.Name(),
+		idProvider,
+		append(opts, p2ptest.WithDefaultStreamHandler(streamHandler1))...)
 
 	streamHandler2, inbound2 := p2ptest.StreamHandlerFixture(t)
-	node2, id2 := p2ptest.NodeFixture(t, sporkId, t.Name(), idProvider, append(opts, p2ptest.WithDefaultStreamHandler(streamHandler2))...)
+	node2, id2 := p2ptest.NodeFixture(t,
+		sporkId,
+		t.Name(),
+		idProvider,
+		append(opts, p2ptest.WithDefaultStreamHandler(streamHandler2))...)
 	ids := flow.IdentityList{&id1, &id2}
 	nodes := []p2p.LibP2PNode{node1, node2}
 	for i, node := range nodes {
@@ -410,7 +438,11 @@ func testUnicastOverStream(t *testing.T, opts ...p2ptest.NodeFixtureParameterOpt
 
 	p2ptest.LetNodesDiscoverEachOther(t, ctx, nodes, ids)
 
-	p2pfixtures.EnsureMessageExchangeOverUnicast(t, ctx, nodes, []chan string{inbound1, inbound2}, p2pfixtures.LongStringMessageFactoryFixture(t))
+	p2pfixtures.EnsureMessageExchangeOverUnicast(t,
+		ctx,
+		nodes,
+		[]chan string{inbound1, inbound2},
+		p2pfixtures.LongStringMessageFactoryFixture(t))
 }
 
 // TestUnicastOverStream_Fallback checks two nodes with asymmetric sets of preferred unicast protocols can create streams and
@@ -425,10 +457,19 @@ func TestUnicastOverStream_Fallback(t *testing.T) {
 	sporkId := unittest.IdentifierFixture()
 	idProvider := mockmodule.NewIdentityProvider(t)
 	streamHandler1, inbound1 := p2ptest.StreamHandlerFixture(t)
-	node1, id1 := p2ptest.NodeFixture(t, sporkId, t.Name(), idProvider, p2ptest.WithDefaultStreamHandler(streamHandler1))
+	node1, id1 := p2ptest.NodeFixture(t,
+		sporkId,
+		t.Name(),
+		idProvider,
+		p2ptest.WithDefaultStreamHandler(streamHandler1))
 
 	streamHandler2, inbound2 := p2ptest.StreamHandlerFixture(t)
-	node2, id2 := p2ptest.NodeFixture(t, sporkId, t.Name(), idProvider, p2ptest.WithDefaultStreamHandler(streamHandler2), p2ptest.WithPreferredUnicasts([]protocols.ProtocolName{protocols.GzipCompressionUnicast}))
+	node2, id2 := p2ptest.NodeFixture(t,
+		sporkId,
+		t.Name(),
+		idProvider,
+		p2ptest.WithDefaultStreamHandler(streamHandler2),
+		p2ptest.WithPreferredUnicasts([]protocols.ProtocolName{protocols.GzipCompressionUnicast}))
 
 	ids := flow.IdentityList{&id1, &id2}
 	nodes := []p2p.LibP2PNode{node1, node2}
@@ -440,7 +481,11 @@ func TestUnicastOverStream_Fallback(t *testing.T) {
 	defer p2ptest.StopNodes(t, nodes, cancel)
 
 	p2ptest.LetNodesDiscoverEachOther(t, ctx, nodes, ids)
-	p2pfixtures.EnsureMessageExchangeOverUnicast(t, ctx, nodes, []chan string{inbound1, inbound2}, p2pfixtures.LongStringMessageFactoryFixture(t))
+	p2pfixtures.EnsureMessageExchangeOverUnicast(
+		t,
+		ctx,
+		nodes,
+		[]chan string{inbound1, inbound2}, p2pfixtures.LongStringMessageFactoryFixture(t))
 }
 
 // TestCreateStreamTimeoutWithUnresponsiveNode tests that the CreateStream call does not block longer than the
@@ -450,7 +495,11 @@ func TestCreateStreamTimeoutWithUnresponsiveNode(t *testing.T) {
 	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
 	idProvider := unittest.NewUpdatableIDProvider(flow.IdentityList{})
 	// creates a regular node
-	nodes, identities := p2ptest.NodesFixture(t, unittest.IdentifierFixture(), "test_create_stream_timeout_with_unresponsive_node", 1, idProvider)
+	nodes, identities := p2ptest.NodesFixture(t,
+		unittest.IdentifierFixture(),
+		t.Name(),
+		1,
+		idProvider)
 	require.Len(t, identities, 1)
 	idProvider.SetIdentities(identities)
 	p2ptest.StartNodes(t, signalerCtx, nodes)
