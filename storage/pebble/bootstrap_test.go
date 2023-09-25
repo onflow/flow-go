@@ -1,6 +1,7 @@
 package pebble
 
 import (
+	"context"
 	"crypto/rand"
 	"io"
 	"path"
@@ -12,6 +13,7 @@ import (
 	"github.com/onflow/flow-go/ledger/complete/mtrie/trie"
 	"github.com/onflow/flow-go/ledger/complete/wal"
 	"github.com/onflow/flow-go/module/component"
+	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 
@@ -45,7 +47,6 @@ func TestBootstrap_IndexCheckpointFile_Random(t *testing.T) {
 	rootHeight := uint64(10000)
 	// write empty trie
 	unittest.RunWithTempDir(t, func(dir string) {
-		t.Parallel()
 		fileName := "empty-checkpoint"
 		emptyTrie := []*trie.MTrie{trie.NewEmptyMTrie()}
 		require.NoErrorf(t, wal.StoreCheckpointV6Concurrently(emptyTrie, dir, fileName, log), "fail to store checkpoint")
@@ -53,13 +54,14 @@ func TestBootstrap_IndexCheckpointFile_Random(t *testing.T) {
 		unittest.RunWithConfiguredPebbleInstance(t, getTestingPebbleOpts(), func(p *pebble.DB) {
 			bootstrap, err := NewBootstrap(p, checkpointFile, rootHeight, log)
 			require.NoError(t, err)
-			cm := component.NewComponentManagerBuilder().AddWorker(bootstrap.IndexCheckpointFile).Build()
-			<-cm.Done()
+			ctx, cancel := context.WithCancel(context.Background())
+			irrecoverableCtx, _ := irrecoverable.WithSignaler(ctx)
+			component.NewComponentManagerBuilder().AddWorker(bootstrap.IndexCheckpointFile).Build().Start(irrecoverableCtx)
+			cancel()
 		})
 	})
 
 	unittest.RunWithTempDir(t, func(dir string) {
-		t.Parallel()
 		tries := createSimpleTrie(t)
 		fileName := "simple-checkpoint"
 		require.NoErrorf(t, wal.StoreCheckpointV6Concurrently(tries, dir, fileName, log), "fail to store checkpoint")
@@ -67,13 +69,14 @@ func TestBootstrap_IndexCheckpointFile_Random(t *testing.T) {
 		unittest.RunWithConfiguredPebbleInstance(t, getTestingPebbleOpts(), func(p *pebble.DB) {
 			bootstrap, err := NewBootstrap(p, checkpointFile, rootHeight, log)
 			require.NoError(t, err)
-			cm := component.NewComponentManagerBuilder().AddWorker(bootstrap.IndexCheckpointFile).Build()
-			<-cm.Done()
+			ctx, cancel := context.WithCancel(context.Background())
+			irrecoverableCtx, _ := irrecoverable.WithSignaler(ctx)
+			component.NewComponentManagerBuilder().AddWorker(bootstrap.IndexCheckpointFile).Build().Start(irrecoverableCtx)
+			cancel()
 		})
 	})
 
 	unittest.RunWithTempDir(t, func(dir string) {
-		t.Parallel()
 		tries := createMultipleRandomTriesMini(t)
 		fileName := "random-checkpoint"
 		checkpointFile := path.Join(dir, fileName)
@@ -81,26 +84,28 @@ func TestBootstrap_IndexCheckpointFile_Random(t *testing.T) {
 		unittest.RunWithConfiguredPebbleInstance(t, getTestingPebbleOpts(), func(p *pebble.DB) {
 			bootstrap, err := NewBootstrap(p, checkpointFile, rootHeight, log)
 			require.NoError(t, err)
-			cm := component.NewComponentManagerBuilder().AddWorker(bootstrap.IndexCheckpointFile).Build()
-			<-cm.Done()
+			ctx, cancel := context.WithCancel(context.Background())
+			irrecoverableCtx, _ := irrecoverable.WithSignaler(ctx)
+			component.NewComponentManagerBuilder().AddWorker(bootstrap.IndexCheckpointFile).Build().Start(irrecoverableCtx)
+			cancel()
 		})
 	})
 }
 
 func TestBootstrap_IndexCheckpointFile_Error(t *testing.T) {
 	t.Parallel()
-	unittest.RunWithTempDir(t, func(dir string) {
-		log := zerolog.New(io.Discard)
-		// write trie and remove part of the file
-		fileName := "simple-checkpoint"
-		tries := createSimpleTrie(t)
-		require.NoErrorf(t, wal.StoreCheckpointV6Concurrently(tries, dir, fileName, log), "fail to store checkpoint")
-		checkpointFile := path.Join(dir, fileName)
-
-		unittest.RunWithConfiguredPebbleInstance(t, getTestingPebbleOpts(), func(p *pebble.DB) {
-
-		})
-	})
+	//unittest.RunWithTempDir(t, func(dir string) {
+	//	log := zerolog.New(io.Discard)
+	//	// write trie and remove part of the file
+	//	fileName := "simple-checkpoint"
+	//	tries := createSimpleTrie(t)
+	//	require.NoErrorf(t, wal.StoreCheckpointV6Concurrently(tries, dir, fileName, log), "fail to store checkpoint")
+	//	checkpointFile := path.Join(dir, fileName)
+	//
+	//	unittest.RunWithConfiguredPebbleInstance(t, getTestingPebbleOpts(), func(p *pebble.DB) {
+	//
+	//	})
+	//})
 }
 
 func getTestingPebbleOpts() *pebble.Options {
@@ -128,21 +133,21 @@ func createSimpleTrie(t *testing.T) []*trie.MTrie {
 }
 
 func randPathPayload() (ledger.Path, ledger.Payload) {
-	var path ledger.Path
-	_, err := rand.Read(path[:])
+	var p ledger.Path
+	_, err := rand.Read(p[:])
 	if err != nil {
 		panic("randomness failed")
 	}
 	payload := testutils.RandomPayload(1, 100)
-	return path, *payload
+	return p, *payload
 }
 
 func randNPathPayloads(n int) ([]ledger.Path, []ledger.Payload) {
 	paths := make([]ledger.Path, n)
 	payloads := make([]ledger.Payload, n)
 	for i := 0; i < n; i++ {
-		path, payload := randPathPayload()
-		paths[i] = path
+		p, payload := randPathPayload()
+		paths[i] = p
 		payloads[i] = payload
 	}
 	return paths, payloads

@@ -105,7 +105,6 @@ func (b *Bootstrap) IndexCheckpointFile(ctx irrecoverable.SignalerContext, ready
 		// error in reading a leaf node
 		ctx.Throw(fmt.Errorf("error reading leaf node: %w", err))
 	}
-
 	// wait for the indexing to finish before populating heights
 	<-c.Done()
 	bat := b.db.NewBatch()
