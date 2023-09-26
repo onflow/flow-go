@@ -341,18 +341,7 @@ func (m *CadenceDataValidationMigrations) recursiveString(
 	return h, nil
 }
 
-func (m *CadenceDataValidationMigrations) recursiveStringShardedCollection(
-	log zerolog.Logger,
-	mr *migratorRuntime,
-	domain string,
-	key interpreter.StorageMapKey,
-	_ interpreter.Value,
-) ([]byte, error) {
-
-	// the readonly storage is going to allow concurrent access to the storage
-	storageMap := mr.GetReadOnlyStorage().GetStorageMap(mr.Address, domain, false)
-	value := storageMap.ReadValue(&util.NopMemoryGauge{}, key)
-
+func getShardedCollectionMap(mr *migratorRuntime, value interpreter.Value) (*interpreter.DictionaryValue, error) {
 	shardedCollectionResource, ok := value.(*interpreter.CompositeValue)
 	if !ok {
 		return nil, fmt.Errorf("expected *interpreter.CompositeValue, got %T", value)
@@ -369,11 +358,54 @@ func (m *CadenceDataValidationMigrations) recursiveStringShardedCollection(
 	if !ok {
 		return nil, fmt.Errorf("expected collections to be *interpreter.DictionaryValue, got %T", shardedCollectionMapField)
 	}
+	return shardedCollectionMap, nil
+}
 
-	type valueWithKeys struct {
+func getNftsCollection(mr *migratorRuntime, outerKey interpreter.Value, shardedCollectionMap *interpreter.DictionaryValue) (*interpreter.DictionaryValue, error) {
+	value := shardedCollectionMap.GetKey(
+		mr.Interpreter,
+		interpreter.EmptyLocationRange,
+		outerKey,
+	)
+
+	someCollection, ok := value.(*interpreter.SomeValue)
+	if !ok {
+		return nil, fmt.Errorf("expected collection to be *interpreter.SomeValue, got %T", value)
+	}
+
+	collection, ok := someCollection.InnerValue(
+		mr.Interpreter,
+		interpreter.EmptyLocationRange).(*interpreter.CompositeValue)
+	if !ok {
+		return nil, fmt.Errorf("expected inner collection to be *interpreter.CompositeValue, got %T", value)
+	}
+
+	ownedNFTsRaw := collection.GetField(
+		mr.Interpreter,
+		interpreter.EmptyLocationRange,
+		"ownedNFTs",
+	)
+	if ownedNFTsRaw == nil {
+		return nil, fmt.Errorf("expected ownedNFTs field")
+	}
+	ownedNFTs, ok := ownedNFTsRaw.(*interpreter.DictionaryValue)
+	if !ok {
+		return nil, fmt.Errorf("expected ownedNFTs to be *interpreter.DictionaryValue, got %T", ownedNFTsRaw)
+	}
+	return ownedNFTs, nil
+}
+
+func (m *CadenceDataValidationMigrations) recursiveStringShardedCollection(
+	log zerolog.Logger,
+	mr *migratorRuntime,
+	domain string,
+	key interpreter.StorageMapKey,
+	value interpreter.Value,
+) ([]byte, error) {
+
+	type keys struct {
 		outerKey interpreter.Value
 		innerKey interpreter.Value
-		value    interpreter.Value
 	}
 
 	type hashWithKeys struct {
@@ -391,7 +423,7 @@ func (m *CadenceDataValidationMigrations) recursiveStringShardedCollection(
 	}
 	defer cancel(nil)
 
-	hashifyChan := make(chan valueWithKeys, m.nWorkers)
+	hashifyChan := make(chan keys, m.nWorkers)
 	hashChan := make(chan hashWithKeys, m.nWorkers)
 	wg := sync.WaitGroup{}
 	wg.Add(m.nWorkers)
@@ -399,6 +431,17 @@ func (m *CadenceDataValidationMigrations) recursiveStringShardedCollection(
 	for i := 0; i < m.nWorkers; i++ {
 		hasher := newHasher()
 		go func() {
+
+			// the readonly storage is going to allow concurrent access to the storage
+			storageMap := mr.GetReadOnlyStorage().GetStorageMap(mr.Address, domain, false)
+			value := storageMap.ReadValue(&util.NopMemoryGauge{}, key)
+
+			shardedCollectionMap, err := getShardedCollectionMap(mr, value)
+			if err != nil {
+				cancel(err)
+				return
+			}
+
 			defer wg.Done()
 			for {
 				select {
@@ -409,8 +452,21 @@ func (m *CadenceDataValidationMigrations) recursiveStringShardedCollection(
 						return
 					}
 					s := ""
-					err := capturePanic(func() {
-						s = hashify.value.RecursiveString(interpreter.SeenReferences{})
+
+					ownedNFTs, err := getNftsCollection(mr, hashify.outerKey, shardedCollectionMap)
+					if err != nil {
+						cancel(err)
+						return
+					}
+
+					value := ownedNFTs.GetKey(
+						mr.Interpreter,
+						interpreter.EmptyLocationRange,
+						hashify.innerKey,
+					)
+
+					err = capturePanic(func() {
+						s = value.RecursiveString(interpreter.SeenReferences{})
 					})
 					if err != nil {
 						cancel(err)
@@ -451,6 +507,12 @@ func (m *CadenceDataValidationMigrations) recursiveStringShardedCollection(
 	}()
 
 	go func() {
+		shardedCollectionMap, err := getShardedCollectionMap(mr, value)
+		if err != nil {
+			cancel(err)
+			return
+		}
+
 		shardedCollectionMapIterator := shardedCollectionMap.Iterator()
 		for {
 			select {
@@ -463,38 +525,10 @@ func (m *CadenceDataValidationMigrations) recursiveStringShardedCollection(
 			if outerKey == nil {
 				break
 			}
-			value := shardedCollectionMap.GetKey(
-				mr.Interpreter,
-				interpreter.EmptyLocationRange,
-				outerKey,
-			)
 
-			someCollection, ok := value.(*interpreter.SomeValue)
-			if !ok {
-				cancel(fmt.Errorf("expected collection to be *interpreter.SomeValue, got %T", value))
-				return
-			}
-
-			collection, ok := someCollection.InnerValue(
-				mr.Interpreter,
-				interpreter.EmptyLocationRange).(*interpreter.CompositeValue)
-			if !ok {
-				cancel(fmt.Errorf("expected inner collection to be *interpreter.CompositeValue, got %T", value))
-				return
-			}
-
-			ownedNFTsRaw := collection.GetField(
-				mr.Interpreter,
-				interpreter.EmptyLocationRange,
-				"ownedNFTs",
-			)
-			if ownedNFTsRaw == nil {
-				cancel(fmt.Errorf("expected ownedNFTs field"))
-				return
-			}
-			ownedNFTs, ok := ownedNFTsRaw.(*interpreter.DictionaryValue)
-			if !ok {
-				cancel(fmt.Errorf("expected ownedNFTs to be *interpreter.DictionaryValue, got %T", ownedNFTsRaw))
+			ownedNFTs, err := getNftsCollection(mr, outerKey, shardedCollectionMap)
+			if err != nil {
+				cancel(err)
 				return
 			}
 
@@ -510,16 +544,10 @@ func (m *CadenceDataValidationMigrations) recursiveStringShardedCollection(
 				if innerKey == nil {
 					break
 				}
-				value := ownedNFTs.GetKey(
-					mr.Interpreter,
-					interpreter.EmptyLocationRange,
-					innerKey,
-				)
 
-				hashifyChan <- valueWithKeys{
+				hashifyChan <- keys{
 					innerKey: innerKey,
 					outerKey: outerKey,
-					value:    value,
 				}
 			}
 		}
