@@ -2,15 +2,12 @@ package env_test
 
 import (
 	"bytes"
-	"encoding/hex"
 	"io"
 	"math"
 
 	"math/big"
-	"strings"
 	"testing"
 
-	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -19,6 +16,7 @@ import (
 	env "github.com/onflow/flow-go/fvm/flex/environment"
 	fenv "github.com/onflow/flow-go/fvm/flex/environment"
 	"github.com/onflow/flow-go/fvm/flex/storage"
+	"github.com/onflow/flow-go/fvm/flex/utils"
 	"github.com/onflow/flow-go/fvm/storage/testutils"
 	"github.com/stretchr/testify/require"
 )
@@ -72,57 +70,8 @@ func TestNativeTokenBridging(t *testing.T) {
 
 func TestContractInteraction(t *testing.T) {
 	RunWithTempDB(t, func(db *storage.Database) {
-		////  contract code:
-		// contract Storage {
-		//     uint256 number;
-		//     constructor() payable {
-		//     }
-		//     function store(uint256 num) public {
-		//         number = num;
-		//     }
-		//     function retrieve() public view returns (uint256){
-		//         return number;
-		//     }
-		// }
 
-		definition := `
-			[
-				{
-					"inputs": [],
-					"stateMutability": "payable",
-					"type": "constructor"
-				},
-				{
-					"inputs": [],
-					"name": "retrieve",
-					"outputs": [
-						{
-							"internalType": "uint256",
-							"name": "",
-							"type": "uint256"
-						}
-					],
-					"stateMutability": "view",
-					"type": "function"
-				},
-				{
-					"inputs": [
-						{
-							"internalType": "uint256",
-							"name": "num",
-							"type": "uint256"
-						}
-					],
-					"name": "store",
-					"outputs": [],
-					"stateMutability": "nonpayable",
-					"type": "function"
-				}
-			]
-			`
-
-		byteCodes, err := hex.DecodeString("6080604052610150806100136000396000f3fe608060405234801561001057600080fd5b50600436106100365760003560e01c80632e64cec11461003b5780636057361d14610059575b600080fd5b610043610075565b60405161005091906100a1565b60405180910390f35b610073600480360381019061006e91906100ed565b61007e565b005b60008054905090565b8060008190555050565b6000819050919050565b61009b81610088565b82525050565b60006020820190506100b66000830184610092565b92915050565b600080fd5b6100ca81610088565b81146100d557600080fd5b50565b6000813590506100e7816100c1565b92915050565b600060208284031215610103576101026100bc565b5b6000610111848285016100d8565b9150509291505056fea2646970667358221220029e22143e146846aff5dd684a6d627d0bec77c78e5b7ce77674d91c25d7e22264736f6c63430008120033")
-		require.NoError(t, err)
+		testContract := utils.GetTestContract(t)
 
 		testAccount := common.BytesToAddress([]byte("test"))
 		amount := big.NewInt(0).Mul(big.NewInt(1337), big.NewInt(params.Ether))
@@ -130,7 +79,7 @@ func TestContractInteraction(t *testing.T) {
 
 		// fund test account
 		RunWithNewEnv(t, db, func(env *fenv.Environment) {
-			err = env.MintTo(amount, testAccount)
+			err := env.MintTo(amount, testAccount)
 			require.NoError(t, err)
 		})
 
@@ -138,7 +87,7 @@ func TestContractInteraction(t *testing.T) {
 
 		t.Run("deploy contract", func(t *testing.T) {
 			RunWithNewEnv(t, db, func(env *fenv.Environment) {
-				err = env.Deploy(testAccount, byteCodes, math.MaxUint64, amountToBeTransfered)
+				err := env.Deploy(testAccount, testContract.ByteCode, math.MaxUint64, amountToBeTransfered)
 				require.NoError(t, err)
 
 				contractAddr = env.Result.DeployedContractAddress
@@ -151,18 +100,12 @@ func TestContractInteraction(t *testing.T) {
 		})
 
 		t.Run("call contract", func(t *testing.T) {
-			abi, err := abi.JSON(strings.NewReader(definition))
-			require.NoError(t, err)
-
 			num := big.NewInt(10)
 
 			RunWithNewEnv(t, db, func(env *fenv.Environment) {
-				store, err := abi.Pack("store", num)
-				require.NoError(t, err)
-
-				err = env.Call(testAccount,
+				err := env.Call(testAccount,
 					contractAddr,
-					store,
+					testContract.MakeStoreCallData(t, num),
 					1_000_000,
 					// this should be zero because the contract doesn't have receiver
 					big.NewInt(0),
@@ -172,12 +115,9 @@ func TestContractInteraction(t *testing.T) {
 			})
 
 			RunWithNewEnv(t, db, func(env *fenv.Environment) {
-				retrieve, err := abi.Pack("retrieve")
-				require.NoError(t, err)
-
-				err = env.Call(testAccount,
+				err := env.Call(testAccount,
 					contractAddr,
-					retrieve,
+					testContract.MakeRetrieveCallData(t),
 					1_000_000,
 					// this should be zero because the contract doesn't have receiver
 					big.NewInt(0),
@@ -199,7 +139,7 @@ func TestContractInteraction(t *testing.T) {
 			address := crypto.PubkeyToAddress(key.PublicKey) // 658bdf435d810c91414ec09147daa6db62406379
 
 			RunWithNewEnv(t, db, func(env *env.Environment) {
-				err = env.MintTo(amount, address)
+				err := env.MintTo(amount, address)
 				require.NoError(t, err)
 			})
 
@@ -211,7 +151,7 @@ func TestContractInteraction(t *testing.T) {
 				writer := io.Writer(&b)
 				tx.EncodeRLP(writer)
 
-				err = env.RunTransaction(b.Bytes())
+				err := env.RunTransaction(b.Bytes())
 				require.NoError(t, err)
 				require.False(t, env.Result.Failed)
 			})

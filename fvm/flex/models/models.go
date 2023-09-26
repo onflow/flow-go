@@ -84,7 +84,7 @@ type FlowOwnedAccount interface {
 	// and are transferred to the target address.
 	// TODO: clarify
 	// Contract data is not controlled by the FOA account
-	Call(FlexAddress, Data, GasLimit, Balance) Data
+	Call(*FlexAddress, Data, GasLimit, Balance) Data
 }
 
 // FlexContractHandler handles operations on the Flex environment

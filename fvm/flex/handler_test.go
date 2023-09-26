@@ -3,6 +3,7 @@ package flex_test
 import (
 	"bytes"
 	"io"
+	"math"
 	"math/big"
 	"testing"
 
@@ -14,6 +15,7 @@ import (
 	"github.com/onflow/flow-go/fvm/flex"
 	env "github.com/onflow/flow-go/fvm/flex/environment"
 	"github.com/onflow/flow-go/fvm/flex/models"
+	"github.com/onflow/flow-go/fvm/flex/utils"
 	"github.com/stretchr/testify/require"
 )
 
@@ -66,7 +68,7 @@ func TestFlexContractHandler(t *testing.T) {
 			// transfer 0.1 flow to the non-foa address
 			deduction, err := models.NewBalanceFromAttoFlow(big.NewInt(1e17))
 			require.NoError(t, err)
-			foa.Call(*models.NewFlexAddress(address), nil, 400000, deduction)
+			foa.Call(models.NewFlexAddress(address), nil, 400000, deduction)
 			require.Equal(t, orgBalance.Sub(deduction), foa.Balance())
 
 			// transfer 0.01 flow back to the foa through
@@ -131,13 +133,38 @@ func TestFOA(t *testing.T) {
 			require.Equal(t, zeroBalance, foa.Balance())
 		})
 	})
+
 	t.Run("test deploy/call", func(t *testing.T) {
 		flex.RunWithTempLedger(t, func(led atree.Ledger) {
 			handler := flex.NewFlexContractHandler(led)
 			foa := handler.NewFlowOwnedAccount()
 			require.NotNil(t, foa)
 
-			// TODO: from here, make contract stuff utils
+			// deposit 100 flow
+			orgBalance, err := models.NewBalanceFromAttoFlow(new(big.Int).Mul(big.NewInt(1e18), big.NewInt(100)))
+			require.NoError(t, err)
+			vault := models.NewFlowTokenVault(orgBalance)
+			foa.Deposit(vault)
+
+			testContract := utils.GetTestContract(t)
+			addr := foa.Deploy(testContract.ByteCode, math.MaxUint64, models.Balance(0))
+			require.NotNil(t, addr)
+
+			num := big.NewInt(22)
+
+			_ = foa.Call(
+				addr,
+				testContract.MakeStoreCallData(t, num),
+				math.MaxUint64,
+				models.Balance(0))
+
+			ret := foa.Call(
+				addr,
+				testContract.MakeRetrieveCallData(t),
+				math.MaxUint64,
+				models.Balance(0))
+
+			require.Equal(t, num, new(big.Int).SetBytes(ret))
 		})
 	})
 }
