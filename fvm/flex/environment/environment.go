@@ -134,8 +134,6 @@ func (fe *Environment) AllocateAddressAndMintTo(balance *big.Int) (*models.FlexA
 	target := fe.allocateAddress()
 	fe.mintTo(balance, target.ToCommon())
 
-	// TODO: emit an event
-
 	return target, fe.commit()
 }
 
@@ -339,6 +337,7 @@ func (fe *Environment) run(msg *core.Message) error {
 
 	fe.Result.RetValue = execResult.ReturnData
 	fe.Result.GasConsumed = execResult.UsedGas
+	fe.Result.Error = execResult.Err
 	fe.Result.Failed = execResult.Failed()
 	fe.Result.Logs = fe.State.Logs()
 

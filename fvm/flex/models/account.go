@@ -1,6 +1,10 @@
 package models
 
-import gethCommon "github.com/ethereum/go-ethereum/common"
+import (
+	"math/big"
+
+	gethCommon "github.com/ethereum/go-ethereum/common"
+)
 
 // FlexAddress is an EVM-compatible address
 type FlexAddress gethCommon.Address
@@ -22,7 +26,11 @@ type GasLimit uint64
 
 type Code []byte
 
-type Data []byte // TODO add functionality to convert this into values
+type Data []byte
+
+func (d Data) AsBigInt() *big.Int {
+	return new(big.Int).SetBytes(d)
+}
 
 // Flex accounts are EVM accounts on Flex, currently
 // three types of accounts are supported on Flex,

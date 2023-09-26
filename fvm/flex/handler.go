@@ -11,7 +11,6 @@ import (
 type FlexContractHandler struct {
 	db      *storage.Database
 	backend models.Backend
-	// TODO inject what captures how much gas has been used
 }
 
 var _ models.FlexContractHandler = &FlexContractHandler{}
@@ -84,7 +83,6 @@ func (h FlexContractHandler) handleError(err error) {
 type foa struct {
 	fch     FlexContractHandler
 	address *models.FlexAddress
-	// TODO inject gas meter
 }
 
 var _ models.FlowOwnedAccount = &foa{}
@@ -122,7 +120,8 @@ func (f *foa) Deposit(v *models.FLOWTokenVault) {
 	err := env.MintTo(v.Balance().ToAttoFlow(), f.address.ToCommon())
 	f.fch.handleError(err)
 	// emit event
-	f.fch.backend.EmitEvent(models.NewEventFlexTokenDeposit())
+	// TODO pass encoded payload data
+	f.fch.backend.EmitFlowEvent(models.EventFlexTokenDeposit, nil)
 }
 
 // Withdraw deducts the balance from the FOA account and

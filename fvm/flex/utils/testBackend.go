@@ -167,6 +167,7 @@ func (m *testMeter) TotalEmittedEventBytes() uint64 {
 
 type testEventEmitter struct {
 	emitEvent              func(event cadence.Event) error
+	emitFlowEvent          func(etype flow.EventType, payload []byte) error
 	events                 func() flow.EventsList
 	serviceEvents          func() flow.EventsList
 	convertedServiceEvents func() flow.ServiceEventList
@@ -180,6 +181,13 @@ func (vs *testEventEmitter) EmitEvent(event cadence.Event) error {
 		panic("method not set")
 	}
 	return vs.emitEvent(event)
+}
+
+func (vs *testEventEmitter) EmitFlowEvent(etype flow.EventType, payload []byte) error {
+	if vs.emitFlowEvent == nil {
+		panic("method not set")
+	}
+	return vs.emitFlowEvent(etype, payload)
 }
 
 func (vs *testEventEmitter) Events() flow.EventsList {
