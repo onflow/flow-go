@@ -2,6 +2,7 @@ package unicast
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sync"
 	"time"
@@ -10,6 +11,7 @@ import (
 	libp2pnet "github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/protocol"
+	"github.com/libp2p/go-libp2p/p2p/net/swarm"
 	"github.com/rs/zerolog"
 	"github.com/sethvargo/go-retry"
 
@@ -358,10 +360,10 @@ func (m *Manager) rawStreamWithProtocol(ctx context.Context, protocolID protocol
 	// check connection status and attempt to dial the peer if dialing is not in progress
 	if !isConnected {
 		// return error if we can't start dialing
-		if m.dialingInProgress(peerID) {
+		if _, inProgress := m.peerDialing.LoadOrStore(peerID, struct{}{}); inProgress {
 			return nil, NewDialInProgressErr(peerID)
 		}
-		defer m.dialingComplete(peerID)
+		defer m.peerDialing.Delete(peerID)
 		err := m.dialPeer(ctx, peerID, dialCfg)
 		if err != nil {
 			return nil, err
@@ -397,7 +399,8 @@ func (m *Manager) dialPeer(ctx context.Context, peerID peer.ID, dialCfg *DialCon
 		if err != nil {
 			// if the connection was rejected due to invalid node id or
 			// if the connection was rejected due to connection gating skip the re-attempt
-			if stream.IsErrSecurityProtocolNegotiationFailed(err) || stream.IsErrGaterDisallowedConnection(err) {
+			// if there is no address for the peer skip the re-attempt
+			if stream.IsErrSecurityProtocolNegotiationFailed(err) || stream.IsErrGaterDisallowedConnection(err) || errors.Is(err, swarm.ErrNoAddresses) {
 				return multierror.Append(errs, err)
 			}
 			m.logger.Warn().
@@ -510,17 +513,6 @@ func retryFailedError(dialAttempts, maxAttempts uint64, err error) error {
 		return NewMaxRetriesErr(dialAttempts, err)
 	}
 	return err
-}
-
-// dialingInProgress sets the value for peerID key in our map if it does not already exist.
-func (m *Manager) dialingInProgress(peerID peer.ID) bool {
-	_, loaded := m.peerDialing.LoadOrStore(peerID, struct{}{})
-	return loaded
-}
-
-// dialingComplete removes peerDialing value for peerID indicating dialing to peerID no longer in progress.
-func (m *Manager) dialingComplete(peerID peer.ID) {
-	m.peerDialing.Delete(peerID)
 }
 
 // getDialConfig gets the dial config for the given peer id.

@@ -9,6 +9,7 @@ import (
 	libp2pnet "github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/protocol"
+	"github.com/libp2p/go-libp2p/p2p/net/swarm"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
@@ -293,6 +294,40 @@ func TestUnicastManager_StreamFactory_ErrProtocolNotSupported(t *testing.T) {
 	s, err := mgr.CreateStream(ctx, peerID)
 	require.Error(t, err)
 	require.Nil(t, s)
+}
+
+// TestUnicastManager_StreamFactory_ErrNoAddresses tests that when dialing returns a no addresses error, it does not retry dialing again and returns an error immediately.
+func TestUnicastManager_StreamFactory_ErrNoAddresses(t *testing.T) {
+	mgr, streamFactory, connStatus, dialConfigCache := unicastManagerFixture(t)
+
+	cfg, err := config.DefaultConfig()
+	require.NoError(t, err)
+
+	peerID := p2ptest.PeerIdFixture(t)
+	// mocks that the connection is not established.
+	connStatus.On("IsConnected", peerID).Return(false, nil)
+
+	// mocks that dialing the peer returns a no addresses error, and the mock is set to once, meaning that it won't retry dialing again.
+	streamFactory.On("Connect", mock.Anything, peer.AddrInfo{ID: peerID}).
+		Return(fmt.Errorf("some error to ensure wrapping works fine: %w", swarm.ErrNoAddresses)).
+		Once()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	s, err := mgr.CreateStream(ctx, peerID)
+	require.Error(t, err)
+	require.Nil(t, s)
+
+	dialCfg, err := dialConfigCache.GetOrInit(peerID)
+	require.NoError(t, err)
+	// dial backoff budget must be decremented by 1 (although we didn't have a backoff attempt, the connection was unsuccessful).
+	require.Equal(t, cfg.NetworkConfig.UnicastConfig.MaxDialRetryAttemptTimes-1, dialCfg.DialRetryAttemptBudget)
+	// stream backoff budget must remain intact, as we have not tried to create a stream yet.
+	require.Equal(t, cfg.NetworkConfig.UnicastConfig.MaxStreamCreationRetryAttemptTimes, dialCfg.StreamCreationRetryAttemptBudget)
+	// last successful dial must be set to zero.
+	require.True(t, dialCfg.LastSuccessfulDial.IsZero())
+	// consecutive successful stream must be set to zero.
+	require.Equal(t, uint64(0), dialCfg.ConsecutiveSuccessfulStream)
 }
 
 // TestUnicastManager_Dial_ErrSecurityProtocolNegotiationFailed tests that when there is a security protocol negotiation error, it does not retry dialing.
