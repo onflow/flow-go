@@ -78,8 +78,8 @@ func TestFlexContractHandler(t *testing.T) {
 				0,
 				foa.Address().ToCommon(),
 				addition.ToAttoFlow(),
-				params.TxGas,
-				common.Big1,
+				params.TxGas*10,
+				big.NewInt(1e8), // high gas fee to test coinbase collection
 				nil),
 				signer, key)
 
@@ -96,7 +96,7 @@ func TestFlexContractHandler(t *testing.T) {
 
 			require.Equal(t, orgBalance.Sub(deduction).Add(addition), foa.Balance())
 
-			// fees has been collected
+			// fees has been collected to the coinbase
 			require.NotEqual(t, models.Balance(0), foa2.Balance())
 
 		})
