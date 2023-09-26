@@ -13,6 +13,7 @@ import (
 
 var latestHeightKeyLiteral = binary.BigEndian.AppendUint64(
 	[]byte{codeLatestBlockHeight, byte('/'), byte('/')}, placeHolderHeight)
+
 var firstHeightKeyLiteral = binary.BigEndian.AppendUint64(
 	[]byte{codeFirstBlockHeight, byte('/'), byte('/')}, placeHolderHeight)
 
@@ -126,7 +127,7 @@ func (h lookupKey) Bytes() []byte {
 }
 
 // EncodedUint64 encodes uint64 for storing as a pebble payload
-func encodedUint64(height uint64) []byte {
+func EncodedUint64(height uint64) []byte {
 	payload := make([]byte, 0, 8)
 	return binary.BigEndian.AppendUint64(payload, height)
 }

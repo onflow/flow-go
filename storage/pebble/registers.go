@@ -6,8 +6,8 @@ import (
 
 	"github.com/cockroachdb/pebble"
 	"github.com/pkg/errors"
-	"go.uber.org/atomic"
 	"github.com/rs/zerolog"
+	"go.uber.org/atomic"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/storage"
@@ -38,7 +38,7 @@ func NewRegisters(db *pebble.DB, logger zerolog.Logger) (*Registers, error) {
 		// and firstHeight
 		return nil, fmt.Errorf("unable to initialize register storage, first height unavailable in db: %w", err)
 	}
-	latestHeight, err := registers.latestHeightFromDB()
+	latestHeight, err := registers.latestStoredHeight()
 	if err != nil {
 		// and firstHeight
 		return nil, fmt.Errorf("unable to initialize register storage, latest height unavailable in db: %w", err)
@@ -46,7 +46,7 @@ func NewRegisters(db *pebble.DB, logger zerolog.Logger) (*Registers, error) {
 	// at this stage, the bootstrap function has been called and the firstHeight == lastHeight.
 	// All registers for the height have been indexed
 	registers.firstHeight = firstHeight
-	registers.latestHeight = latestHeight
+	registers.latestHeight.Store(latestHeight)
 	return registers, nil
 }
 
@@ -128,7 +128,7 @@ func (s *Registers) Store(
 		}
 	}
 	// increment height and commit
-	err := batch.Set(latestHeightKey(), encodedUint64(height), nil)
+	err := batch.Set(latestHeightKey(), EncodedUint64(height), nil)
 	if err != nil {
 		return fmt.Errorf("failed to update latest height %d", height)
 	}

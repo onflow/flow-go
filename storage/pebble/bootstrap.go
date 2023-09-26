@@ -121,11 +121,11 @@ func (b *Bootstrap) IndexCheckpointFile(ctx irrecoverable.SignalerContext, ready
 	defer bat.Close()
 	// update heights atomically to prevent one getting populated without the other
 	// leaving it in a corrupted state
-	err = bat.Set(firstHeightKey(), encodedUint64(b.rootHeight), nil)
+	err = bat.Set(firstHeightKey(), EncodedUint64(b.rootHeight), nil)
 	if err != nil {
 		ctx.Throw(fmt.Errorf("unable to add first height to batch: %w", err))
 	}
-	err = bat.Set(latestHeightKey(), encodedUint64(b.rootHeight), nil)
+	err = bat.Set(latestHeightKey(), EncodedUint64(b.rootHeight), nil)
 	if err != nil {
 		ctx.Throw(fmt.Errorf("unable to add latest height to batch: %w", err))
 	}
