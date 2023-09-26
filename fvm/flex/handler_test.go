@@ -11,7 +11,6 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/params"
-	"github.com/onflow/atree"
 	"github.com/onflow/flow-go/fvm/flex"
 	env "github.com/onflow/flow-go/fvm/flex/environment"
 	"github.com/onflow/flow-go/fvm/flex/models"
@@ -22,8 +21,8 @@ import (
 func TestFlexContractHandler(t *testing.T) {
 	t.Parallel()
 	t.Run("test last executed block call", func(t *testing.T) {
-		flex.RunWithTempLedger(t, func(led atree.Ledger) {
-			handler := flex.NewFlexContractHandler(led)
+		utils.RunWithTestBackend(t, func(backend models.Backend) {
+			handler := flex.NewFlexContractHandler(backend)
 			// test call last executed block without initialization
 			b := handler.LastExecutedBlock()
 			require.NotNil(t, b)
@@ -41,8 +40,8 @@ func TestFlexContractHandler(t *testing.T) {
 	})
 
 	t.Run("test foa creation", func(t *testing.T) {
-		flex.RunWithTempLedger(t, func(led atree.Ledger) {
-			handler := flex.NewFlexContractHandler(led)
+		utils.RunWithTestBackend(t, func(backend models.Backend) {
+			handler := flex.NewFlexContractHandler(backend)
 			foa := handler.NewFlowOwnedAccount()
 			require.NotNil(t, foa)
 
@@ -52,8 +51,8 @@ func TestFlexContractHandler(t *testing.T) {
 	})
 
 	t.Run("test running transaction", func(t *testing.T) {
-		flex.RunWithTempLedger(t, func(led atree.Ledger) {
-			handler := flex.NewFlexContractHandler(led)
+		utils.RunWithTestBackend(t, func(backend models.Backend) {
+			handler := flex.NewFlexContractHandler(backend)
 			keyHex := "9c647b8b7c4e7c3490668fb6c11473619db80c93704c70893d3813af4090c39c"
 			key, _ := crypto.HexToECDSA(keyHex)
 			address := crypto.PubkeyToAddress(key.PublicKey) // 658bdf435d810c91414ec09147daa6db62406379
@@ -107,8 +106,8 @@ func TestFlexContractHandler(t *testing.T) {
 
 func TestFOA(t *testing.T) {
 	t.Run("test deposit/withdraw", func(t *testing.T) {
-		flex.RunWithTempLedger(t, func(led atree.Ledger) {
-			handler := flex.NewFlexContractHandler(led)
+		utils.RunWithTestBackend(t, func(backend models.Backend) {
+			handler := flex.NewFlexContractHandler(backend)
 			foa := handler.NewFlowOwnedAccount()
 			require.NotNil(t, foa)
 
@@ -135,8 +134,8 @@ func TestFOA(t *testing.T) {
 	})
 
 	t.Run("test deploy/call", func(t *testing.T) {
-		flex.RunWithTempLedger(t, func(led atree.Ledger) {
-			handler := flex.NewFlexContractHandler(led)
+		utils.RunWithTestBackend(t, func(backend models.Backend) {
+			handler := flex.NewFlexContractHandler(backend)
 			foa := handler.NewFlowOwnedAccount()
 			require.NotNil(t, foa)
 
