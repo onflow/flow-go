@@ -113,12 +113,14 @@ func NodeFixture(
 		FlowConfig:                       defaultFlowConfig,
 		PubSubTracer:                     tracer.NewGossipSubMeshTracer(meshTracerCfg),
 		UnicastConfig: &p2pconfig.UnicastConfig{
-			StreamRetryInterval:                defaultFlowConfig.NetworkConfig.UnicastCreateStreamRetryDelay,
+			CreateStreamBackoffDelay:           defaultFlowConfig.NetworkConfig.UnicastCreateStreamRetryDelay,
 			StreamZeroRetryResetThreshold:      defaultFlowConfig.NetworkConfig.UnicastStreamZeroRetryResetThreshold,
 			DialZeroRetryResetThreshold:        defaultFlowConfig.NetworkConfig.UnicastDialZeroRetryResetThreshold,
 			MaxDialRetryAttemptTimes:           defaultFlowConfig.NetworkConfig.UnicastMaxDialRetryAttemptTimes,
 			MaxStreamCreationRetryAttemptTimes: defaultFlowConfig.NetworkConfig.UnicastMaxStreamCreationRetryAttemptTimes,
 			DialConfigCacheSize:                defaultFlowConfig.NetworkConfig.UnicastDialConfigCacheSize,
+			DialInProgressBackoffDelay:         defaultFlowConfig.NetworkConfig.UnicastDialInProgressBackoffDelay,
+			DialBackoffDelay:                   defaultFlowConfig.NetworkConfig.UnicastDialBackoffDelay,
 		},
 	}
 
@@ -255,7 +257,7 @@ func OverrideFlowConfig(cfg *config.FlowConfig) NodeFixtureParameterOption {
 
 func WithCreateStreamRetryDelay(delay time.Duration) NodeFixtureParameterOption {
 	return func(p *NodeFixtureParameters) {
-		p.UnicastConfig.StreamRetryInterval = delay
+		p.UnicastConfig.CreateStreamBackoffDelay = delay
 	}
 }
 

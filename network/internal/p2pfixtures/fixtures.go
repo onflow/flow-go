@@ -134,12 +134,14 @@ func CreateNode(t *testing.T, networkKey crypto.PrivateKey, sporkID flow.Identif
 		},
 		meshTracer,
 		&p2pconfig.UnicastConfig{
-			StreamRetryInterval:                defaultFlowConfig.NetworkConfig.UnicastCreateStreamRetryDelay,
+			CreateStreamBackoffDelay:           defaultFlowConfig.NetworkConfig.UnicastCreateStreamRetryDelay,
 			StreamZeroRetryResetThreshold:      defaultFlowConfig.NetworkConfig.UnicastStreamZeroRetryResetThreshold,
 			DialZeroRetryResetThreshold:        defaultFlowConfig.NetworkConfig.UnicastDialZeroRetryResetThreshold,
 			MaxDialRetryAttemptTimes:           defaultFlowConfig.NetworkConfig.UnicastMaxDialRetryAttemptTimes,
 			MaxStreamCreationRetryAttemptTimes: defaultFlowConfig.NetworkConfig.UnicastMaxStreamCreationRetryAttemptTimes,
 			DialConfigCacheSize:                defaultFlowConfig.NetworkConfig.UnicastDialConfigCacheSize,
+			DialInProgressBackoffDelay:         defaultFlowConfig.NetworkConfig.UnicastDialInProgressBackoffDelay,
+			DialBackoffDelay:                   defaultFlowConfig.NetworkConfig.UnicastDialBackoffDelay,
 		}).
 		SetRoutingSystem(func(c context.Context, h host.Host) (routing.Routing, error) {
 			return p2pdht.NewDHT(c, h, protocols.FlowDHTProtocolID(sporkID), zerolog.Nop(), metrics.NewNoopCollector())

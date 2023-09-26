@@ -40,6 +40,11 @@ network-config:
   # The maximum number of retry attempts for dialing a remote peer before giving up. If it is set to 3 for example, it means that if a peer fails to dial a remote peer 3 times,
   # the peer will give up and will not retry dialing that remote peer.
   unicast-max-dial-retry-attempt-times: 3
+  # The backoff delay used in the exponential backoff for consecutive failed unicast dial attempts to a remote peer.
+  unicast-dial-backoff-delay: 1s
+  # The backoff delay used in the exponential backoff for backing off concurrent create stream attempts to the same remote peer
+  # when there is no available connections to that remote peer and a dial is in progress.
+  unicast-dial-in-progress-backoff-delay: 1s
   # The size of the dial config cache used to keep track of the dial config for each remote peer. The dial config is used to keep track of the dial retry budget for each remote peer.
   # Recommended to set it to the maximum number of remote peers in the network.
   unicast-dial-config-cache-size: 10000

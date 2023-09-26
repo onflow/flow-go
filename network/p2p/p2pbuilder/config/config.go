@@ -6,15 +6,25 @@ import (
 	"github.com/onflow/flow-go/network/p2p"
 )
 
-// UnicastConfig configuration parameters for the unicast manager.
+// UnicastConfig configuration parameters for the unicast protocol.
 type UnicastConfig struct {
-	// StreamRetryInterval is the initial delay between failing to establish a connection with another node and retrying. This
+	// CreateStreamBackoffDelay is the initial delay between failing to establish a connection with another node and retrying. This
 	// delay increases exponentially (exponential backoff) with the number of subsequent failures to establish a connection.
-	StreamRetryInterval time.Duration
+	CreateStreamBackoffDelay time.Duration
 
 	// TODO: removing this field allows to directly use the netconf/config UnicastConfig struct for the rest.
 	// RateLimiterDistributor distributor that distributes notifications whenever a peer is rate limited to all consumers.
 	RateLimiterDistributor p2p.UnicastRateLimiterDistributor
+
+	// DialInProgressBackoffDelay is the backoff delay for parallel attempts on dialing to the same peer.
+	// When the unicast manager is invoked to create stream to the same peer concurrently while there is
+	// already an ongoing dialing attempt to the same peer, the unicast manager will wait for this backoff delay
+	// and retry creating the stream after the backoff delay has elapsed. This is to prevent the unicast manager
+	// from creating too many parallel dialing attempts to the same peer.
+	DialInProgressBackoffDelay time.Duration
+
+	// DialBackoffDelay is the backoff delay between retrying connection to the same peer.
+	DialBackoffDelay time.Duration
 
 	// StreamZeroRetryResetThreshold is the threshold that determines when to reset the stream creation retry budget to the default value.
 	//

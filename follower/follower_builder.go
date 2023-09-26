@@ -601,12 +601,14 @@ func (builder *FollowerServiceBuilder) initPublicLibp2pNode(networkKey crypto.Pr
 		},
 		meshTracer,
 		&p2pconfig.UnicastConfig{
-			StreamRetryInterval:                builder.FlowConfig.NetworkConfig.UnicastConfig.UnicastCreateStreamRetryDelay,
+			CreateStreamBackoffDelay:           builder.FlowConfig.NetworkConfig.UnicastConfig.UnicastCreateStreamRetryDelay,
 			StreamZeroRetryResetThreshold:      builder.FlowConfig.NetworkConfig.UnicastStreamZeroRetryResetThreshold,
 			DialZeroRetryResetThreshold:        builder.FlowConfig.NetworkConfig.UnicastDialZeroRetryResetThreshold,
 			DialConfigCacheSize:                builder.FlowConfig.NetworkConfig.UnicastDialConfigCacheSize,
 			MaxDialRetryAttemptTimes:           builder.FlowConfig.NetworkConfig.UnicastMaxDialRetryAttemptTimes,
 			MaxStreamCreationRetryAttemptTimes: builder.FlowConfig.NetworkConfig.UnicastMaxStreamCreationRetryAttemptTimes,
+			DialInProgressBackoffDelay:         builder.FlowConfig.NetworkConfig.UnicastDialInProgressBackoffDelay,
+			DialBackoffDelay:                   builder.FlowConfig.NetworkConfig.UnicastDialBackoffDelay,
 		}).
 		SetSubscriptionFilter(
 			subscription.NewRoleBasedFilter(

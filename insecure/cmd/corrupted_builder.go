@@ -74,13 +74,15 @@ func (cnb *CorruptedNodeBuilder) enqueueNetworkingLayer() {
 		}
 
 		uniCfg := &p2pconfig.UnicastConfig{
-			StreamRetryInterval:                cnb.FlowConfig.NetworkConfig.UnicastCreateStreamRetryDelay,
+			CreateStreamBackoffDelay:           cnb.FlowConfig.NetworkConfig.UnicastCreateStreamRetryDelay,
 			RateLimiterDistributor:             cnb.UnicastRateLimiterDistributor,
 			StreamZeroRetryResetThreshold:      cnb.FlowConfig.NetworkConfig.UnicastStreamZeroRetryResetThreshold,
 			DialZeroRetryResetThreshold:        cnb.FlowConfig.NetworkConfig.UnicastDialZeroRetryResetThreshold,
 			MaxDialRetryAttemptTimes:           cnb.FlowConfig.NetworkConfig.UnicastMaxDialRetryAttemptTimes,
 			MaxStreamCreationRetryAttemptTimes: cnb.FlowConfig.NetworkConfig.UnicastMaxStreamCreationRetryAttemptTimes,
 			DialConfigCacheSize:                cnb.FlowConfig.NetworkConfig.UnicastDialConfigCacheSize,
+			DialInProgressBackoffDelay:         cnb.FlowConfig.NetworkConfig.UnicastDialInProgressBackoffDelay,
+			DialBackoffDelay:                   cnb.FlowConfig.NetworkConfig.UnicastDialBackoffDelay,
 		}
 
 		connGaterCfg := &p2pconfig.ConnectionGaterConfig{
