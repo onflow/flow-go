@@ -344,10 +344,11 @@ func TestIntegration_StoreAndGet(t *testing.T) {
 
 			for i, val := range values {
 				testDesc := fmt.Sprintf("test itteration number %d failed with test value %s", i, val)
-				err := storeRegisterWithValue(indexer, uint64(i), regOwner, regKey, val)
+				height := uint64(i + 1)
+				err := storeRegisterWithValue(indexer, height, regOwner, regKey, val)
 				assert.NoError(t, err)
 
-				results, err := indexer.RegisterValues(flow.RegisterIDs{registerID}, uint64(i))
+				results, err := indexer.RegisterValues(flow.RegisterIDs{registerID}, height)
 				require.Nil(t, err, testDesc)
 				assert.Equal(t, val, results[0])
 			}
