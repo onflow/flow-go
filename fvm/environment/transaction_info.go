@@ -17,6 +17,7 @@ type TransactionInfoParams struct {
 
 	TransactionFeesEnabled bool
 	LimitAccountStorage    bool
+	FlexEnabled            bool
 }
 
 func DefaultTransactionInfoParams() TransactionInfoParams {
@@ -25,6 +26,7 @@ func DefaultTransactionInfoParams() TransactionInfoParams {
 	return TransactionInfoParams{
 		TransactionFeesEnabled: false,
 		LimitAccountStorage:    false,
+		FlexEnabled:            false,
 	}
 }
 
