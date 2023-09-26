@@ -38,10 +38,10 @@ func CreateEmitEventTransaction(contractAccount, signer flow.Address) *flow.Tran
 			import EventContract from 0x%s
 
 			transaction {
-				prepare(acc: AuthAccount) {}
+				prepare(acc: &Account) {}
 				execute {
-						EventContract.EmitEvent()
-					}
+					EventContract.EmitEvent()
+				}
 			}`, contractAccount)),
 		).
 		AddAuthorizer(signer)

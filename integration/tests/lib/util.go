@@ -54,16 +54,17 @@ func CreateCounterTx(counterAddress sdk.Address) dsl.Transaction {
 		Import: dsl.Import{Address: counterAddress},
 		Content: dsl.Prepare{
 			Content: dsl.Code(`
-				var maybeCounter <- signer.load<@Testing.Counter>(from: /storage/counter)
+				var maybeCounter <- signer.storage.load<@Testing.Counter>(from: /storage/counter)
 
 				if maybeCounter == nil {
 					maybeCounter <-! Testing.createCounter()
 				}
 
 				maybeCounter?.add(2)
-				signer.save(<-maybeCounter!, to: /storage/counter)
+				signer.storage.save(<-maybeCounter!, to: /storage/counter)
 
-				signer.link<&Testing.Counter>(/public/counter, target: /storage/counter)
+				let counterCap = signer.capabilities.storage.issue<&Testing.Counter>(/storage/counter)
+				signer.capabilities.publish(counterCap, at: /public/counter)
 				`),
 		},
 	}
@@ -80,8 +81,8 @@ func ReadCounterScript(contractAddress sdk.Address, accountAddress sdk.Address) 
 		Code: fmt.Sprintf(
 			`
 			  let account = getAccount(0x%s)
-			  let cap = account.getCapability(/public/counter)
-              return cap.borrow<&Testing.Counter>()?.count ?? -3
+              let counter = account.capabilities.borrow<&Testing.Counter>(/public/counter)
+              return counter?.count ?? -3
             `,
 			accountAddress.Hex(),
 		),
@@ -96,16 +97,17 @@ func CreateCounterPanicTx(chain flow.Chain) dsl.Transaction {
 		Import: dsl.Import{Address: sdk.Address(chain.ServiceAddress())},
 		Content: dsl.Prepare{
 			Content: dsl.Code(`
-				var maybeCounter <- signer.load<@Testing.Counter>(from: /storage/counter)
+				var maybeCounter <- signer.storage.load<@Testing.Counter>(from: /storage/counter)
 
 				if maybeCounter == nil {
 					maybeCounter <-! Testing.createCounter()
 				}
 
 				maybeCounter?.add(2)
-				signer.save(<-maybeCounter!, to: /storage/counter)
+				signer.storage.save(<-maybeCounter!, to: /storage/counter)
 
-				signer.link<&Testing.Counter>(/public/counter, target: /storage/counter)
+				let counterCap = signer.capabilities.storage.issue<&Testing.Counter>(/storage/counter)
+				signer.capabilities.publish(counterCap, at: /public/counter)
 
 				panic("fail for testing purposes")
 				`),

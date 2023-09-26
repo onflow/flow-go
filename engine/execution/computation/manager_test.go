@@ -939,8 +939,8 @@ func TestScriptStorageMutationsDiscarded(t *testing.T) {
 
 	script := []byte(`
 	access(all) fun main(account: Address) {
-		let acc = getAuthAccount(account)
-		acc.save(3, to: /storage/x)
+		let acc = getAuthAccount<auth(SaveValue) &Account>(account)
+		acc.storage.save(3, to: /storage/x)
 	}
 	`)
 

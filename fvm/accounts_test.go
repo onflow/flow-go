@@ -181,25 +181,25 @@ func removeAccountCreator(
 
 const createAccountTransaction = `
 transaction {
-  prepare(signer: AuthAccount) {
-    let account = AuthAccount(payer: signer)
+  prepare(signer: auth(BorrowValue) &Account) {
+    let account = Account(payer: signer)
   }
 }
 `
 
 const createMultipleAccountsTransaction = `
 transaction {
-  prepare(signer: AuthAccount) {
-    let accountA = AuthAccount(payer: signer)
-    let accountB = AuthAccount(payer: signer)
-    let accountC = AuthAccount(payer: signer)
+  prepare(signer: auth(BorrowValue) &Account) {
+    let accountA = Account(payer: signer)
+    let accountB = Account(payer: signer)
+    let accountC = Account(payer: signer)
   }
 }
 `
 
 const addAccountKeyTransaction = `
 transaction(key: [UInt8]) {
-  prepare(signer: AuthAccount) {
+  prepare(signer: auth(AddKey) &Account) {
 	let publicKey = PublicKey(
 		publicKey: key,
 		signatureAlgorithm: SignatureAlgorithm.ECDSA_P256
@@ -215,7 +215,7 @@ transaction(key: [UInt8]) {
 
 const addMultipleAccountKeysTransaction = `
 transaction(key1: [UInt8], key2: [UInt8]) {
-  prepare(signer: AuthAccount) {
+  prepare(signer: auth(AddKey) &Account) {
     signer.keys.add(
 		publicKey: PublicKey(
 			publicKey: key1,
@@ -238,7 +238,7 @@ transaction(key1: [UInt8], key2: [UInt8]) {
 
 const revokeAccountKeyTransaction = `
 transaction(keyIndex: Int) {
-  prepare(signer: AuthAccount) {
+  prepare(signer: auth(RevokeKey) &Account) {
     signer.keys.revoke(keyIndex: keyIndex)
   }
 }
@@ -246,7 +246,7 @@ transaction(keyIndex: Int) {
 
 const revokeMultipleAccountKeysTransaction = `
 transaction(keyIndex1: Int, keyIndex2: Int) {
-  prepare(signer: AuthAccount) {
+  prepare(signer: auth(RevokeKey) &Account) {
     for keyIndex in [keyIndex1, keyIndex2] {
       signer.keys.revoke(keyIndex: keyIndex)
     }
@@ -258,10 +258,10 @@ const removeAccountCreatorTransactionTemplate = `
 import FlowServiceAccount from 0x%s
 transaction {
 	let serviceAccountAdmin: &FlowServiceAccount.Administrator
-	prepare(signer: AuthAccount) {
+	prepare(signer: auth(BorrowValue) &Account) {
 		// Borrow reference to FlowServiceAccount Administrator resource.
 		//
-		self.serviceAccountAdmin = signer.borrow<&FlowServiceAccount.Administrator>(from: /storage/flowServiceAdmin)
+		self.serviceAccountAdmin = signer.storage.borrow<&FlowServiceAccount.Administrator>(from: /storage/flowServiceAdmin)
 			?? panic("Unable to borrow reference to administrator resource")
 	}
 	execute {
@@ -278,10 +278,10 @@ const addAccountCreatorTransactionTemplate = `
 import FlowServiceAccount from 0x%s
 transaction {
 	let serviceAccountAdmin: &FlowServiceAccount.Administrator
-	prepare(signer: AuthAccount) {
+	prepare(signer: auth(BorrowValue) &Account) {
 		// Borrow reference to FlowServiceAccount Administrator resource.
 		//
-		self.serviceAccountAdmin = signer.borrow<&FlowServiceAccount.Administrator>(from: /storage/flowServiceAdmin)
+		self.serviceAccountAdmin = signer.storage.borrow<&FlowServiceAccount.Administrator>(from: /storage/flowServiceAdmin)
 			?? panic("Unable to borrow reference to administrator resource")
 	}
 	execute {
@@ -296,7 +296,7 @@ transaction {
 
 const getAccountKeyTransaction = `
 transaction(keyIndex: Int) {
-  prepare(signer: AuthAccount) {
+  prepare(signer: &Account) {
     var key :AccountKey? = signer.keys.get(keyIndex: keyIndex)
     log(key)
   }
@@ -305,7 +305,7 @@ transaction(keyIndex: Int) {
 
 const getMultipleAccountKeysTransaction = `
 transaction(keyIndex1: Int, keyIndex2: Int) {
-  prepare(signer: AuthAccount) {
+  prepare(signer: &Account) {
     for keyIndex in [keyIndex1, keyIndex2] {
       var key :AccountKey? = signer.keys.get(keyIndex: keyIndex)
       log(key)
@@ -825,7 +825,7 @@ func TestAddAccountKey(t *testing.T) {
 							SetScript([]byte(fmt.Sprintf(
 								`
 								transaction(key: [UInt8]) {
-								  prepare(signer: AuthAccount) {
+								  prepare(signer: auth(AddKey) &Account) {
 								    let publicKey = PublicKey(
 									  publicKey: key,
 									  signatureAlgorithm: SignatureAlgorithm.ECDSA_P256
@@ -1546,7 +1546,7 @@ func TestAccountBalanceFields(t *testing.T) {
 				_, output, err = vm.Run(ctx, script, snapshotTree)
 				assert.NoError(t, err)
 				assert.NoError(t, output.Err)
-				assert.Equal(t, cadence.UFix64(99_994_110), output.Value)
+				assert.Equal(t, cadence.UFix64(99_989_590), output.Value)
 			}),
 	)
 
@@ -1663,7 +1663,7 @@ func TestGetStorageCapacity(t *testing.T) {
 				script := fvm.Script([]byte(fmt.Sprintf(`
 					access(all) fun main(): UInt64 {
 						let acc = getAccount(0x%s)
-						return acc.storageCapacity
+						return acc.storage.capacity
 					}
 				`, account)))
 
@@ -1692,7 +1692,7 @@ func TestGetStorageCapacity(t *testing.T) {
 				script := fvm.Script([]byte(fmt.Sprintf(`
 					access(all) fun main(): UInt64 {
 						let acc = getAccount(0x%s)
-						return acc.storageCapacity
+						return acc.storage.capacity
 					}
 				`, nonExistentAddress)))
 
@@ -1720,7 +1720,7 @@ func TestGetStorageCapacity(t *testing.T) {
 				script := fvm.Script([]byte(fmt.Sprintf(`
 					access(all) fun main(): UInt64 {
 						let acc = getAccount(0x%s)
-						return acc.storageCapacity
+						return acc.storage.capacity
 					}
 				`, address)))
 

@@ -111,12 +111,9 @@ func New(
 			reusableRuntime.NewReusableCadenceRuntimePool(
 				ReusableCadenceRuntimePoolSize,
 				runtime.Config{
-					TracingEnabled:        params.CadenceTracing,
-					AccountLinkingEnabled: true,
+					TracingEnabled: params.CadenceTracing,
 					// Attachments are enabled everywhere except for Mainnet
 					AttachmentsEnabled: chainID != flow.Mainnet,
-					// Capability Controllers are enabled everywhere except for Mainnet
-					CapabilityControllersEnabled: chainID != flow.Mainnet,
 				},
 			)),
 	}

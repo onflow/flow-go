@@ -1118,14 +1118,6 @@ func (e *testRuntime) ReadStored(
 	return e.readStored(a, p, c)
 }
 
-func (*testRuntime) ReadLinked(
-	_ common.Address,
-	_ cadence.Path,
-	_ runtime.Context,
-) (cadence.Value, error) {
-	panic("ReadLinked not expected")
-}
-
 func (*testRuntime) SetDebugger(_ *interpreter.Debugger) {
 	panic("SetDebugger not expected")
 }
@@ -1197,7 +1189,7 @@ func Test_ExecutingSystemCollection(t *testing.T) {
 	noopCollector := metrics.NewNoopCollector()
 
 	expectedNumberOfEvents := 3
-	expectedEventSize := 1417
+	expectedEventSize := 1421
 	// bootstrapping does not cache programs
 	expectedCachedPrograms := 0
 
