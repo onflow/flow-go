@@ -5,10 +5,12 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path"
 	"path/filepath"
 	"strings"
 	"time"
 
+	"github.com/cockroachdb/pebble"
 	badger "github.com/ipfs/go-ds-badger2"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/routing"
@@ -24,6 +26,7 @@ import (
 	stateSyncCommands "github.com/onflow/flow-go/admin/commands/state_synchronization"
 	storageCommands "github.com/onflow/flow-go/admin/commands/storage"
 	"github.com/onflow/flow-go/cmd"
+	"github.com/onflow/flow-go/cmd/bootstrap/run"
 	"github.com/onflow/flow-go/consensus"
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/committees"
@@ -55,12 +58,14 @@ import (
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/blobs"
 	"github.com/onflow/flow-go/module/chainsync"
+	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/execution"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	execdatacache "github.com/onflow/flow-go/module/executiondatasync/execution_data/cache"
 	finalizer "github.com/onflow/flow-go/module/finalizer/consensus"
 	"github.com/onflow/flow-go/module/grpcserver"
 	"github.com/onflow/flow-go/module/id"
+	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/mempool/herocache"
 	"github.com/onflow/flow-go/module/mempool/stdmap"
 	"github.com/onflow/flow-go/module/metrics"
@@ -95,7 +100,8 @@ import (
 	"github.com/onflow/flow-go/state/protocol/blocktimer"
 	"github.com/onflow/flow-go/storage"
 	bstorage "github.com/onflow/flow-go/storage/badger"
-	"github.com/onflow/flow-go/storage/memory"
+	pebbleStorage "github.com/onflow/flow-go/storage/pebble"
+	"github.com/onflow/flow-go/storage/pebble/registers"
 	"github.com/onflow/flow-go/utils/grpcutils"
 )
 
@@ -462,6 +468,7 @@ func (builder *FlowAccessNodeBuilder) BuildConsensusFollower() *FlowAccessNodeBu
 func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccessNodeBuilder {
 	var ds *badger.Datastore
 	var bs network.BlobService
+	var ps *pebble.DB
 	var processedBlockHeight storage.ConsumerProgress
 	var indexedBlockHeight storage.ConsumerProgress
 	var processedNotifications storage.ConsumerProgress
@@ -472,6 +479,9 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 	builder.
 		AdminCommand("read-execution-data", func(config *cmd.NodeConfig) commands.AdminCommand {
 			return stateSyncCommands.NewReadExecutionDataCommand(builder.ExecutionDataStore)
+		}).
+		AdminCommand("read-register-data", func(config *cmd.NodeConfig) commands.AdminCommand {
+			return stateSyncCommands.NewRegisterDataCommand(builder.ExecutionIndexer)
 		}).
 		AdminCommand("execute-script", func(config *cmd.NodeConfig) commands.AdminCommand {
 			return stateSyncCommands.NewExecuteScriptCommand(builder.Scripts)
@@ -496,6 +506,14 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 			})
 
 			return nil
+		}).
+		Module("pebble database", func(node *cmd.NodeConfig) error {
+			opts := pebbleStorage.DefaultPebbleOptions(pebble.NewCache(1<<20), registers.NewMVCCComparer())
+			dbpath := path.Join("pebble.db")
+			var err error
+			ps, err = pebble.Open(dbpath, opts)
+
+			return err
 		}).
 		Module("processed block height consumer progress", func(node *cmd.NodeConfig) error {
 			// uses the datastore's DB
@@ -631,13 +649,30 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 				execDataCacheBackend,
 			)
 
+			// todo should we use this as root height
 			initHeight := builder.executionDataConfig.InitialBlockHeight
 
-			// temporarily use the in-memory db
-			registers := memory.NewRegisters(initHeight, initHeight, builder.Logger)
+			// todo move this
+			checkpointFile := path.Join(builder.BootstrapDir, "execution-state", run.BootstrapCheckpointFile)
+			bootstrap, err := pebbleStorage.NewBootstrap(ps, checkpointFile, initHeight, builder.Logger)
+			if err != nil {
+				return nil, err
+			}
+
+			irrecoverableCtx, _ := irrecoverable.WithSignaler(context.Background())
+			cm := component.NewComponentManagerBuilder().
+				AddWorker(bootstrap.IndexCheckpointFile).
+				Build()
+			cm.Start(irrecoverableCtx)
+			<-cm.Done()
+
+			registersStorage, err := pebbleStorage.NewRegisters(ps)
+			if err != nil {
+				return nil, err
+			}
 
 			exeIndexer, err := indexer.New(
-				registers,
+				registersStorage,
 				builder.Storage.Headers,
 				builder.Storage.Events,
 				builder.Logger,
