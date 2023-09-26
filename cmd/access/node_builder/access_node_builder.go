@@ -1056,17 +1056,15 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 			config := builder.rpcConf
 			backendConfig := config.BackendConfig
 			accessMetrics := builder.AccessMetrics
-
-			backendCache, cacheSize, err := backend.NewCache(node.Logger,
-				accessMetrics,
-				backendConfig.ConnectionPoolSize)
-			if err != nil {
-				return nil, fmt.Errorf("could not initialize backend cache: %w", err)
-			}
+			cacheSize := int(backendConfig.ConnectionPoolSize)
 
 			var connBackendCache *rpcConnection.Cache
-			if backendCache != nil {
-				connBackendCache = rpcConnection.NewCache(backendCache, int(cacheSize))
+			if cacheSize > 0 {
+				backendCache, err := backend.NewCache(node.Logger, accessMetrics, cacheSize)
+				if err != nil {
+					return nil, fmt.Errorf("could not initialize backend cache: %w", err)
+				}
+				connBackendCache = rpcConnection.NewCache(backendCache, cacheSize)
 			}
 
 			connFactory := &rpcConnection.ConnectionFactoryImpl{
