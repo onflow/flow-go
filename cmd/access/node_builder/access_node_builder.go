@@ -172,14 +172,13 @@ func DefaultAccessNodeConfig() *AccessNodeConfig {
 				MaxHeightRange:            backend.DefaultMaxHeightRange,
 				PreferredExecutionNodeIDs: nil,
 				FixedExecutionNodeIDs:     nil,
-				ArchiveAddressList:        nil,
-				ScriptExecValidation:      false,
 				CircuitBreakerConfig: rpcConnection.CircuitBreakerConfig{
 					Enabled:        false,
 					RestoreTimeout: 60 * time.Second,
 					MaxFailures:    5,
 					MaxRequests:    1,
 				},
+				ScriptExecutionMode: backend.ScriptExecutionModeExecutionNodesOnly.String(), // default to ENs only for now
 			},
 			RestConfig: rest.Config{
 				ListenAddress: "",
@@ -259,7 +258,8 @@ type FlowAccessNodeBuilder struct {
 	ExecutionDataStore         execution_data.ExecutionDataStore
 	ExecutionDataCache         *execdatacache.ExecutionDataCache
 	ExecutionIndexer           *indexer.ExecutionState
-	Scripts                    *execution.Scripts
+	ExecutionIndexReporter     indexer.IndexReporter
+	ScriptExecutor             *execution.Scripts
 
 	// The sync engine participants provider is the libp2p peer store for the access node
 	// which is not available until after the network has started.
@@ -474,7 +474,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 			return stateSyncCommands.NewReadExecutionDataCommand(builder.ExecutionDataStore)
 		}).
 		AdminCommand("execute-script", func(config *cmd.NodeConfig) commands.AdminCommand {
-			return stateSyncCommands.NewExecuteScriptCommand(builder.Scripts)
+			return stateSyncCommands.NewExecuteScriptCommand(builder.ScriptExecutor)
 		}).
 		Module("execution data datastore and blobstore", func(node *cmd.NodeConfig) error {
 			datastoreDir := filepath.Join(builder.executionDataDir, "blobstore")
@@ -632,9 +632,14 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 			)
 
 			initHeight := builder.executionDataConfig.InitialBlockHeight
+			lastHeight, err := indexedBlockHeight.ProcessedIndex()
+			if err != nil {
+				lastHeight = initHeight
+			}
+			builder.Logger.Debug().Uint64("last_indexed_height", lastHeight).Msg("execution data indexer")
 
 			// temporarily use the in-memory db
-			registers := memory.NewRegisters(initHeight, initHeight, builder.Logger)
+			registers := memory.NewRegisters(initHeight, lastHeight, builder.Logger)
 
 			exeIndexer, err := indexer.New(
 				registers,
@@ -661,6 +666,8 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 				indexedBlockHeight,
 			)
 
+			builder.ExecutionIndexReporter = worker
+
 			// add worker on execution data handler to the execution data requester to use as a signal for the
 			// jobqueue to inform of new tasks.
 			builder.ExecutionDataRequester.AddOnExecutionDataReceivedConsumer(worker.OnExecutionData)
@@ -686,7 +693,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 				query.NewProtocolStateWrapper(builder.State),
 			)
 
-			builder.Scripts = execution.NewScripts(*queryExecutor, builder.Storage.Headers, exeIndexer.RegisterValues)
+			builder.ScriptExecutor = execution.NewScripts(*queryExecutor, builder.Storage.Headers, exeIndexer.RegisterValues)
 
 			return worker, nil
 		})
@@ -797,8 +804,6 @@ func (builder *FlowAccessNodeBuilder) extraFlags() {
 		flags.DurationVar(&builder.rpcConf.RestConfig.IdleTimeout, "rest-idle-timeout", defaultConfig.rpcConf.RestConfig.IdleTimeout, "idle timeout for REST connections")
 		flags.StringVarP(&builder.rpcConf.CollectionAddr, "static-collection-ingress-addr", "", defaultConfig.rpcConf.CollectionAddr, "the address (of the collection node) to send transactions to")
 		flags.StringVarP(&builder.ExecutionNodeAddress, "script-addr", "s", defaultConfig.ExecutionNodeAddress, "the address (of the execution node) forward the script to")
-		flags.StringSliceVar(&builder.rpcConf.BackendConfig.ArchiveAddressList, "archive-address-list", defaultConfig.rpcConf.BackendConfig.ArchiveAddressList, "the list of address of the archive node to forward the script queries to")
-		flags.BoolVar(&builder.rpcConf.BackendConfig.ScriptExecValidation, "validate-rn-script-exec", defaultConfig.rpcConf.BackendConfig.ScriptExecValidation, "whether to validate script execution results from the archive node with results from the execution node")
 		flags.StringVarP(&builder.rpcConf.HistoricalAccessAddrs, "historical-access-addr", "", defaultConfig.rpcConf.HistoricalAccessAddrs, "comma separated rpc addresses for historical access nodes")
 		flags.DurationVar(&builder.rpcConf.BackendConfig.CollectionClientTimeout, "collection-client-timeout", defaultConfig.rpcConf.BackendConfig.CollectionClientTimeout, "grpc client timeout for a collection node")
 		flags.DurationVar(&builder.rpcConf.BackendConfig.ExecutionClientTimeout, "execution-client-timeout", defaultConfig.rpcConf.BackendConfig.ExecutionClientTimeout, "grpc client timeout for an execution node")
@@ -849,6 +854,7 @@ func (builder *FlowAccessNodeBuilder) extraFlags() {
 		// Script Execution
 		flags.DurationVar(&builder.queryExecutorConfig.LogTimeThreshold, "script-log-threshold", query.DefaultLogTimeThreshold, "threshold for logging script execution")
 		flags.DurationVar(&builder.queryExecutorConfig.ExecutionTimeLimit, "script-execution-time-limit", query.DefaultExecutionTimeLimit, "script execution time limit")
+		flags.StringVar(&builder.rpcConf.BackendConfig.ScriptExecutionMode, "script-execution-mode", defaultConfig.rpcConf.BackendConfig.ScriptExecutionMode, "mode to use when executing scripts. one of (local-only, execution-nodes-only, failover, compare)")
 
 	}).ValidateFlags(func() error {
 		if builder.supportsObserver && (builder.PublicNetworkConfig.BindAddress == cmd.NotSet || builder.PublicNetworkConfig.BindAddress == "") {
@@ -1186,6 +1192,11 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				),
 			}
 
+			scriptExecMode, err := backend.ParseScriptExecutionMode(config.BackendConfig.ScriptExecutionMode)
+			if err != nil {
+				return nil, fmt.Errorf("could not parse script execution mode: %w", err)
+			}
+
 			nodeBackend, err := backend.New(backend.Params{
 				State:                     node.State,
 				CollectionRPC:             builder.CollectionRPC,
@@ -1205,10 +1216,11 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				FixedExecutionNodeIDs:     backendConfig.FixedExecutionNodeIDs,
 				Log:                       node.Logger,
 				SnapshotHistoryLimit:      backend.DefaultSnapshotHistoryLimit,
-				ArchiveAddressList:        backendConfig.ArchiveAddressList,
 				Communicator:              backend.NewNodeCommunicator(backendConfig.CircuitBreakerConfig.Enabled),
-				ScriptExecValidation:      backendConfig.ScriptExecValidation,
 				TxResultCacheSize:         builder.TxResultCacheSize,
+				ScriptExecutor:            builder.ScriptExecutor,
+				ScriptExecutionMode:       scriptExecMode,
+				Indexer:                   builder.ExecutionIndexReporter,
 			})
 			if err != nil {
 				return nil, fmt.Errorf("could not initialize backend: %w", err)

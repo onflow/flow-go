@@ -3,6 +3,7 @@ package memory
 import (
 	"fmt"
 	"math"
+	"sync"
 
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
@@ -20,6 +21,7 @@ type Registers struct {
 	latestHeight uint64
 	firstHeight  uint64
 	logger       zerolog.Logger
+	mu           sync.RWMutex
 }
 
 func NewRegisters(first uint64, last uint64, log zerolog.Logger) *Registers {
@@ -49,6 +51,9 @@ func (r *Registers) FirstHeight() (uint64, error) {
 }
 
 func (r *Registers) Get(ID flow.RegisterID, height uint64) (flow.RegisterValue, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
 	reg, ok := r.registers[ID]
 	if !ok {
 		return nil, errors.Wrap(storage.ErrNotFound, fmt.Sprintf("register by ID %s not found", ID.String()))
@@ -74,6 +79,9 @@ func (r *Registers) Get(ID flow.RegisterID, height uint64) (flow.RegisterValue, 
 }
 
 func (r *Registers) Store(entries flow.RegisterEntries, height uint64) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
 	for _, e := range entries {
 		if _, ok := r.registers[e.Key]; !ok {
 			r.registers[e.Key] = make(map[uint64]flow.RegisterValue)
