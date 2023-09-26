@@ -192,7 +192,10 @@ func (fnb *FlowNodeBuilder) BaseFlags() {
 	fnb.flags.UintVar(&fnb.BaseConfig.SyncCoreConfig.MaxSize, "sync-max-size", defaultConfig.SyncCoreConfig.MaxSize, "the maximum number of blocks we request in the same block request message")
 	fnb.flags.UintVar(&fnb.BaseConfig.SyncCoreConfig.MaxRequests, "sync-max-requests", defaultConfig.SyncCoreConfig.MaxRequests, "the maximum number of requests we send during each scanning period")
 
-	fnb.flags.Uint64Var(&fnb.BaseConfig.ComplianceConfig.SkipNewProposalsThreshold, "compliance-skip-proposals-threshold", defaultConfig.ComplianceConfig.SkipNewProposalsThreshold, "threshold at which new proposals are discarded rather than cached, if their height is this much above local finalized height")
+	fnb.flags.Uint64Var(&fnb.BaseConfig.ComplianceConfig.SkipNewProposalsThreshold,
+		"compliance-skip-proposals-threshold",
+		defaultConfig.ComplianceConfig.SkipNewProposalsThreshold,
+		"threshold at which new proposals are discarded rather than cached, if their height is this much above local finalized height")
 }
 
 func (fnb *FlowNodeBuilder) EnqueuePingService() {
@@ -276,7 +279,7 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 
 	// setup default rate limiter options
 	unicastRateLimiterOpts := []ratelimit.RateLimitersOption{
-		ratelimit.WithDisabledRateLimiting(fnb.BaseConfig.FlowConfig.NetworkConfig.UnicastRateLimitersConfig.DryRun),
+		ratelimit.WithDisabledRateLimiting(fnb.BaseConfig.FlowConfig.NetworkConfig.UnicastConfig.UnicastRateLimitersConfig.DryRun),
 		ratelimit.WithNotifier(fnb.UnicastRateLimiterDistributor),
 	}
 
@@ -301,7 +304,7 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 	}
 
 	// override noop unicast bandwidth rate limiter
-	if fnb.BaseConfig.FlowConfig.NetworkConfig.UnicastConfig.UnicastRateLimitersConfig.BandwidthRateLimit > 0 && fnb.BaseConfig.FlowConfig.NetworkConfig.UnicastRateLimitersConfig.BandwidthBurstLimit > 0 {
+	if fnb.BaseConfig.FlowConfig.NetworkConfig.UnicastConfig.UnicastRateLimitersConfig.BandwidthRateLimit > 0 && fnb.BaseConfig.FlowConfig.NetworkConfig.UnicastConfig.UnicastRateLimitersConfig.BandwidthBurstLimit > 0 {
 		unicastBandwidthRateLimiter := ratelimit.NewBandWidthRateLimiter(
 			rate.Limit(fnb.BaseConfig.FlowConfig.NetworkConfig.UnicastConfig.UnicastRateLimitersConfig.BandwidthRateLimit),
 			fnb.BaseConfig.FlowConfig.NetworkConfig.UnicastConfig.UnicastRateLimitersConfig.BandwidthBurstLimit,
