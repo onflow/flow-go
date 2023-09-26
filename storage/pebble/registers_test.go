@@ -9,9 +9,8 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/rs/zerolog"
-
 	"github.com/cockroachdb/pebble"
+	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/model/flow"
@@ -57,11 +56,30 @@ func TestRegisters_Get(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, expectedValue1, value1)
 
+		height3 := uint64(3)
+		key2 := flow.RegisterID{Owner: "owner2", Key: "key2"}
+		expectedValue2 := []byte("value1")
+		entries2 := flow.RegisterEntries{
+			{Key: key2, Value: expectedValue2},
+		}
+		err = r.Store(entries2, height3)
+		require.NoError(t, err)
+
+		// data matches the second height and owner
+		value2, err := r.Get(key2, height3)
+		require.NoError(t, err)
+		require.Equal(t, expectedValue2, value2)
+
+		// we can still get the first data at later height
+		value1, err = r.Get(key1, height3)
+		require.NoError(t, err)
+		require.Equal(t, expectedValue1, value1)
+
 		// out of range
 		beforeFirstHeight := uint64(0)
 		_, err = r.Get(key1, beforeFirstHeight)
 		require.ErrorIs(t, err, storage.ErrHeightNotIndexed)
-		afterLatestHeight := uint64(3)
+		afterLatestHeight := uint64(4)
 		_, err = r.Get(key1, afterLatestHeight)
 		require.ErrorIs(t, err, storage.ErrHeightNotIndexed)
 	})
@@ -213,7 +231,7 @@ func Benchmark_PayloadStorage(b *testing.B) {
 	dbpath := path.Join(b.TempDir(), "benchmark1.db")
 	db, err := pebble.Open(dbpath, opts)
 	require.NoError(b, err)
-	s, err := NewRegisters(db)
+	s, err := NewRegisters(db, zerolog.Nop())
 	require.NoError(b, err)
 	require.NotNil(b, s)
 
@@ -297,7 +315,7 @@ func RunWithRegistersStorageAtInitialHeights(tb testing.TB, first uint64, latest
 		// insert initial heights to pebble
 		require.NoError(tb, p.Set(firstHeightKey(), EncodedUint64(first), nil))
 		require.NoError(tb, p.Set(latestHeightKey(), EncodedUint64(latest), nil))
-		r, err := NewRegisters(p)
+		r, err := NewRegisters(p, zerolog.Nop())
 		require.NoError(tb, err)
 		f(r)
 	})
