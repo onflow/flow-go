@@ -129,3 +129,36 @@ func (n NopMemoryGauge) MeterMemory(common.MemoryUsage) error {
 }
 
 var _ common.MemoryGauge = (*NopMemoryGauge)(nil)
+
+type PayloadsReadonlyLedger struct {
+	Snapshot *PayloadSnapshot
+}
+
+func (p *PayloadsReadonlyLedger) GetValue(owner, key []byte) (value []byte, err error) {
+	v, err := p.Snapshot.Get(flow.NewRegisterID(string(owner), string(key)))
+	if err != nil {
+		return nil, fmt.Errorf("getting value failed: %w", err)
+	}
+	return v, nil
+}
+
+func (p *PayloadsReadonlyLedger) SetValue(owner, key, value []byte) (err error) {
+
+	panic("not expected to be called")
+}
+
+func (p *PayloadsReadonlyLedger) ValueExists(owner, key []byte) (exists bool, err error) {
+	_, ok := p.Snapshot.Payloads[flow.NewRegisterID(string(owner), string(key))]
+	return ok, nil
+}
+
+func (p *PayloadsReadonlyLedger) AllocateStorageIndex(owner []byte) (atree.StorageIndex, error) {
+	//TODO implement me
+	panic("not expected to be called")
+}
+
+func NewPayloadsReadonlyLedger(snapshot *PayloadSnapshot) *PayloadsReadonlyLedger {
+	return &PayloadsReadonlyLedger{Snapshot: snapshot}
+}
+
+var _ atree.Ledger = &PayloadsReadonlyLedger{}

@@ -335,6 +335,10 @@ type migratorRuntime struct {
 	Address          common.Address
 }
 
+func (mr *migratorRuntime) GetReadOnlyStorage() *runtime.Storage {
+	return runtime.NewStorage(util.NewPayloadsReadonlyLedger(mr.Snapshot), util.NopMemoryGauge{})
+}
+
 func (m *AtreeRegisterMigrator) validateChangesAndCreateNewRegisters(
 	mr *migratorRuntime,
 	changes map[flow.RegisterID]flow.RegisterValue,

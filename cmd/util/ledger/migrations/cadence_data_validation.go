@@ -279,7 +279,7 @@ func (m *CadenceDataValidationMigrations) hashDomainCadenceValues(
 			break
 		}
 
-		h, err := m.recursiveString(log, mr, value, hasher)
+		h, err := m.recursiveString(log, mr, domain, interpreter.StringStorageMapKey(key.(interpreter.StringAtreeValue)), value, hasher)
 		if err != nil {
 			return nil, fmt.Errorf("failed to convert value to string: %w", err)
 		}
@@ -316,13 +316,15 @@ func (m *CadenceDataValidationMigrations) hashDomainCadenceValues(
 func (m *CadenceDataValidationMigrations) recursiveString(
 	log zerolog.Logger,
 	mr *migratorRuntime,
+	domain string,
+	key interpreter.StorageMapKey,
 	value interpreter.Value,
 	hasher hash.Hasher,
 ) ([]byte, error) {
 	if mr.Address == mustHexToAddress("4eded0de73020ca5") {
 		compositeValue, ok := value.(*interpreter.CompositeValue)
 		if ok && string(compositeValue.TypeID()) == "A.4eded0de73020ca5.CricketMomentsShardedCollection.ShardedCollection" {
-			return m.recursiveStringShardedCollection(log, mr, value)
+			return m.recursiveStringShardedCollection(log, mr, domain, key, value)
 		}
 	}
 
@@ -342,8 +344,14 @@ func (m *CadenceDataValidationMigrations) recursiveString(
 func (m *CadenceDataValidationMigrations) recursiveStringShardedCollection(
 	log zerolog.Logger,
 	mr *migratorRuntime,
-	value interpreter.Value,
+	domain string,
+	key interpreter.StorageMapKey,
+	_ interpreter.Value,
 ) ([]byte, error) {
+
+	// the readonly storage is going to allow concurrent access to the storage
+	storageMap := mr.GetReadOnlyStorage().GetStorageMap(mr.Address, domain, false)
+	value := storageMap.ReadValue(&util.NopMemoryGauge{}, key)
 
 	shardedCollectionResource, ok := value.(*interpreter.CompositeValue)
 	if !ok {
@@ -375,7 +383,6 @@ func (m *CadenceDataValidationMigrations) recursiveStringShardedCollection(
 	}
 
 	ctx, c := context.WithCancelCause(context.Background())
-
 	cancel := func(err error) {
 		if err != nil {
 			log.Info().Err(err).Msg("canceling context")
@@ -421,6 +428,27 @@ func (m *CadenceDataValidationMigrations) recursiveStringShardedCollection(
 			}
 		}()
 	}
+
+	done := make(chan struct{})
+	hashes := make(map[interpreter.Value]sortableHashes)
+	go func() {
+		defer close(done)
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case clone, ok := <-hashChan:
+				if !ok {
+					return
+				}
+				_, ok = hashes[clone.outerKey]
+				if !ok {
+					hashes[clone.outerKey] = make(sortableHashes, 0, 1_0000_000)
+				}
+				hashes[clone.outerKey] = append(hashes[clone.outerKey], clone.hash)
+			}
+		}
+	}()
 
 	go func() {
 		shardedCollectionMapIterator := shardedCollectionMap.Iterator()
@@ -471,7 +499,6 @@ func (m *CadenceDataValidationMigrations) recursiveStringShardedCollection(
 			}
 
 			ownedNFTsIterator := ownedNFTs.Iterator()
-			keys := make([]interpreter.Value, 0, ownedNFTs.Count())
 			for {
 				select {
 				case <-ctx.Done():
@@ -494,42 +521,9 @@ func (m *CadenceDataValidationMigrations) recursiveStringShardedCollection(
 					outerKey: outerKey,
 					value:    value,
 				}
-
-				keys = append(keys, innerKey)
-			}
-
-			for _, key := range keys {
-				ownedNFTs.Remove(
-					mr.Interpreter,
-					interpreter.EmptyLocationRange,
-					key,
-				)
 			}
 		}
 		close(hashifyChan)
-	}()
-
-	done := make(chan struct{})
-	hashes := make(map[interpreter.Value]sortableHashes)
-
-	go func() {
-		defer close(done)
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			case clone, ok := <-hashChan:
-				if !ok {
-					return
-				}
-				l, ok := hashes[clone.outerKey]
-				if !ok {
-					l = make(sortableHashes, 0, 1_0000_000)
-				}
-				l = append(l, clone.hash)
-				hashes[clone.outerKey] = l
-			}
-		}
 	}()
 
 	wg.Wait()
