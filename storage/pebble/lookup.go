@@ -5,8 +5,6 @@ import (
 	"encoding/binary"
 	"fmt"
 
-	"github.com/onflow/flow-go/engine/execution/state"
-	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/storage/pebble/registers"
 )
@@ -130,18 +128,4 @@ func (h lookupKey) Bytes() []byte {
 func EncodedUint64(height uint64) []byte {
 	payload := make([]byte, 0, 8)
 	return binary.BigEndian.AppendUint64(payload, height)
-}
-
-// KeyToRegisterID converts a ledger key into a register ID.
-func keyToRegisterID(key ledger.Key) (flow.RegisterID, error) {
-	if len(key.KeyParts) != 2 ||
-		key.KeyParts[0].Type != state.KeyPartOwner ||
-		key.KeyParts[1].Type != state.KeyPartKey {
-		return flow.RegisterID{}, fmt.Errorf("key not in expected format: %s", key.String())
-	}
-
-	return flow.RegisterID{
-		Owner: string(key.KeyParts[0].Value),
-		Key:   string(key.KeyParts[1].Value),
-	}, nil
 }
