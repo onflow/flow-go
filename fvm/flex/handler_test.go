@@ -56,22 +56,28 @@ func TestFlexContractHandler(t *testing.T) {
 			key, _ := crypto.HexToECDSA(keyHex)
 			address := crypto.PubkeyToAddress(key.PublicKey) // 658bdf435d810c91414ec09147daa6db62406379
 
-			// deposit 200_000_000_000 to the foa account
+			// deposit 1 Flow to the foa account
 			foa := handler.NewFlowOwnedAccount()
-			vault := models.NewFlowTokenVault(models.Balance(200_000_000_000))
+			orgBalance, err := models.NewBalanceFromAttoFlow(big.NewInt(1e18))
+			require.NoError(t, err)
+			vault := models.NewFlowTokenVault(orgBalance)
 			foa.Deposit(vault)
 
-			// transfer 80_000_000_000 of the money to the non-foa address
-			foa.Call(*models.NewFlexAddress(address), nil, 400000, models.Balance(80_000_000_000))
-			require.Equal(t, models.Balance(120_000_000_000), foa.Balance())
+			// transfer 0.1 flow to the non-foa address
+			deduction, err := models.NewBalanceFromAttoFlow(big.NewInt(1e17))
+			require.NoError(t, err)
+			foa.Call(*models.NewFlexAddress(address), nil, 400000, deduction)
+			require.Equal(t, orgBalance.Sub(deduction), foa.Balance())
 
-			// transfer 20_000_000 back to the foa through
+			// transfer 0.01 flow back to the foa through
+			addition, err := models.NewBalanceFromAttoFlow(big.NewInt(1e16))
+			require.NoError(t, err)
 			flexConf := env.NewFlexConfig()
 			signer := types.MakeSigner(flexConf.ChainConfig, env.BlockNumberForEVMRules, flexConf.BlockContext.Time)
 			tx, _ := types.SignTx(types.NewTransaction(
 				0,
 				foa.Address().ToCommon(),
-				models.Balance(20_000_000).ToAttoFlow(),
+				addition.ToAttoFlow(),
 				params.TxGas,
 				common.Big1,
 				nil),
@@ -88,7 +94,7 @@ func TestFlexContractHandler(t *testing.T) {
 			success := handler.Run(b.Bytes(), foa2.Address())
 			require.True(t, success)
 
-			require.Equal(t, models.Balance(140_000_000_000), foa.Balance())
+			require.Equal(t, orgBalance.Sub(deduction).Add(addition), foa.Balance())
 
 			// fees has been collected
 			require.NotEqual(t, models.Balance(0), foa2.Balance())
