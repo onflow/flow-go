@@ -79,11 +79,13 @@ func (i *ExecutionState) IndexBlockData(ctx context.Context, data *execution_dat
 
 	lg.Debug().Msgf("indexing new block")
 
+	// the height we are indexing must be exactly one bigger or same as the latest height indexed from the storage
 	latest, err := i.registers.LatestHeight()
 	if err != nil {
 		return err
 	}
 
+	// return to make the action idempotent
 	if block.Height == latest {
 		lg.Warn().Uint64("height", block.Height).Msg("indexing already indexed block")
 		return nil
