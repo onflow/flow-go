@@ -1,4 +1,4 @@
-// Code generated from flex.cdc. DO NOT EDIT.
+// Code generated from ../flex.cdc. DO NOT EDIT.
 /*
  * Cadence - The resource-oriented smart contract programming language
  *
@@ -17,7 +17,7 @@
  * limitations under the License.
  */
 
-package stdlib
+package emulator
 
 import (
 	"github.com/onflow/cadence/runtime/ast"
