@@ -3,21 +3,23 @@ package pebble
 import (
 	"context"
 	"crypto/rand"
+	"encoding/binary"
 	"io"
 	"os"
 	"path"
 	"testing"
 
 	"github.com/cockroachdb/pebble"
+	"github.com/rs/zerolog"
+	"github.com/stretchr/testify/require"
+	"gotest.tools/assert"
+
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/testutils"
 	"github.com/onflow/flow-go/ledger/complete/mtrie/trie"
 	"github.com/onflow/flow-go/ledger/complete/wal"
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/irrecoverable"
-	"github.com/rs/zerolog"
-	"github.com/stretchr/testify/require"
-
 	"github.com/onflow/flow-go/storage/pebble/registers"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -46,6 +48,7 @@ func TestBootstrap_NewBootstrap(t *testing.T) {
 func TestBootstrap_IndexCheckpointFile_Random(t *testing.T) {
 	log := zerolog.New(io.Discard)
 	rootHeight := uint64(10000)
+
 	unittest.RunWithTempDir(t, func(dir string) {
 		fileName := "empty-checkpoint"
 		emptyTrie := []*trie.MTrie{trie.NewEmptyMTrie()}
@@ -67,25 +70,35 @@ func TestBootstrap_IndexCheckpointFile_Random(t *testing.T) {
 		require.NoError(t, os.RemoveAll(dbDir))
 	})
 
-	unittest.RunWithTempDir(t, func(dir string) {
-		tries := createSimpleTrie(t)
-		fileName := "simple-checkpoint"
-		require.NoErrorf(t, wal.StoreCheckpointV6Concurrently(tries, dir, fileName, log), "fail to store checkpoint")
-		checkpointFile := path.Join(dir, fileName)
-		cache := pebble.NewCache(1 << 20)
-		opts := DefaultPebbleOptions(cache, registers.NewMVCCComparer())
-		defer cache.Unref()
-		pb, dbDir := unittest.TempPebbleDBWithOpts(t, opts)
-		bootstrap, err := NewBootstrap(pb, checkpointFile, rootHeight, log)
-		require.NoError(t, err)
-		ctx, cancel := context.WithCancel(context.Background())
-		irrecoverableCtx, _ := irrecoverable.WithSignaler(ctx)
-		cm := component.NewComponentManagerBuilder().AddWorker(bootstrap.IndexCheckpointFile).Build()
-		cm.Start(irrecoverableCtx)
-		<-cm.Done()
-		defer cancel()
-		require.NoError(t, pb.Close())
-		require.NoError(t, os.RemoveAll(dbDir))
+	t.Run("Ingest Simple Checkpoint", func(t *testing.T) {
+		unittest.RunWithTempDir(t, func(dir string) {
+			tries := createSimpleTrie(t)
+			fileName := "simple-checkpoint"
+			require.NoErrorf(t, wal.StoreCheckpointV6Concurrently(tries, dir, fileName, log), "fail to store checkpoint")
+			checkpointFile := path.Join(dir, fileName)
+			cache := pebble.NewCache(1 << 20)
+			opts := DefaultPebbleOptions(cache, registers.NewMVCCComparer())
+			defer cache.Unref()
+			pb, dbDir := unittest.TempPebbleDBWithOpts(t, opts)
+			bootstrap, err := NewBootstrap(pb, checkpointFile, rootHeight, log)
+			require.NoError(t, err)
+			ctx, cancel := context.WithCancel(context.Background())
+			irrecoverableCtx, _ := irrecoverable.WithSignaler(ctx)
+			cm := component.NewComponentManagerBuilder().AddWorker(bootstrap.IndexCheckpointFile).Build()
+			cm.Start(irrecoverableCtx)
+			<-cm.Done()
+			defer cancel()
+
+			firstRaw, closer, err := pb.Get(firstHeightKey())
+			require.NoError(t, err)
+			err = closer.Close()
+			require.NoError(t, err)
+			first := binary.BigEndian.Uint64(firstRaw)
+			assert.Equal(t, rootHeight, first)
+
+			require.NoError(t, pb.Close())
+			require.NoError(t, os.RemoveAll(dbDir))
+		})
 	})
 
 	unittest.RunWithTempDir(t, func(dir string) {
