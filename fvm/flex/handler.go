@@ -3,7 +3,6 @@ package flex
 import (
 	"math/big"
 
-	"github.com/ethereum/go-ethereum/common"
 	"github.com/onflow/atree"
 
 	env "github.com/onflow/flow-go/fvm/flex/environment"
@@ -130,17 +129,20 @@ func (h FlexContractHandler) LastExecutedBlock() *models.FlexBlock {
 	return block
 }
 
-func (h FlexContractHandler) Run(tx []byte, coinbase models.FlexAddress) bool {
+func (h FlexContractHandler) Run(tx []byte, coinbase *models.FlexAddress) bool {
 	config := env.NewFlexConfig(
-		env.WithCoinbase(common.Address(coinbase)),
+		env.WithCoinbase(coinbase.ToCommon()),
 		env.WithBlockNumber(env.BlockNumberForEVMRules))
 	env, err := env.NewEnvironment(config, h.db)
 	// TODO improve this
 	if err != nil {
 		panic(err)
 	}
-	env.RunTransaction(tx)
-	return env.Result.Failed
+	err = env.RunTransaction(tx)
+	if err != nil {
+		panic(err)
+	}
+	return !env.Result.Failed
 }
 
 // TODO: properly implement this
