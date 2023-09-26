@@ -24,7 +24,7 @@ type ChunkExecutionData struct {
 	// TransactionResults are the results of executing the transactions in the collection
 	// This includes all of the data from flow.TransactionResult, except that it uses a boolean
 	// value to indicate if an error occurred instead of a full error message.
-	TransactionResults []TransactionResult
+	TransactionResults []flow.LightTransactionResult
 }
 
 // BlockExecutionData represents the execution data of a block.
@@ -33,33 +33,16 @@ type BlockExecutionData struct {
 	ChunkExecutionDatas []*ChunkExecutionData
 }
 
-// TransactionResult represents a flow.TransactionResult that's encoded within a ChunkExecutionData.
-//
-// The only difference is this version includes a boolean value indicated if the transaction's
-// execution resulted in an error, instead of the full error message. Error messages are prone to
-// non-determinism due to (undiscovered) bugs in the execution and verification code. Rather than
-// including the error and risking execution forks if an undetected bug is introduced, we simplify
-// it to just a boolean value. This will likely change in the future to include some additional
-// information about the error.
-type TransactionResult struct {
-	// TransactionID is the ID of the transaction this result was emitted from.
-	TransactionID flow.Identifier
-	// Failed is true if the transaction's execution failed resulting in an error, false otherwise.
-	Failed bool
-	// ComputationUsed is amount of computation used while executing the transaction.
-	ComputationUsed uint64
-}
-
 // ConvertTransactionResults converts a list of flow.TransactionResults into a list of
-// execution_data.TransactionResults to be included in a ChunkExecutionData.
-func ConvertTransactionResults(results flow.TransactionResults) []TransactionResult {
+// flow.LightTransactionResults to be included in a ChunkExecutionData.
+func ConvertTransactionResults(results flow.TransactionResults) []flow.LightTransactionResult {
 	if len(results) == 0 {
 		return nil
 	}
 
-	converted := make([]TransactionResult, len(results))
+	converted := make([]flow.LightTransactionResult, len(results))
 	for i, txResult := range results {
-		converted[i] = TransactionResult{
+		converted[i] = flow.LightTransactionResult{
 			TransactionID:   txResult.TransactionID,
 			ComputationUsed: txResult.ComputationUsed,
 			Failed:          txResult.ErrorMessage != "",
