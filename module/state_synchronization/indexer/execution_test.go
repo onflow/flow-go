@@ -400,7 +400,7 @@ func TestIntegration_StoreAndGet(t *testing.T) {
 			require.NoError(t, indexer.indexRegisterPayloads(nil, 5))
 			assert.NoError(t, indexer.indexRange.Increase(5))
 
-			val, err = indexer.RegisterValues(flow.RegisterIDs{registerID}, uint64(6))
+			val, err = indexer.RegisterValues(flow.RegisterIDs{registerID}, uint64(5))
 			require.Nil(t, err)
 			assert.Equal(t, value, val[0])
 		})
