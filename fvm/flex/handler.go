@@ -3,7 +3,6 @@ package flex
 import (
 	"math/big"
 
-	"github.com/ethereum/go-ethereum/common"
 	"github.com/onflow/atree"
 
 	env "github.com/onflow/flow-go/fvm/flex/environment"
@@ -81,7 +80,7 @@ func (f *foa) Deploy(code models.Code, gaslimit models.GasLimit, balance models.
 // given it doesn't goes beyond what Flow transaction allows.
 // the balance would be deducted from the OFA account and would be transferred to the target address
 // contract data is not controlled by the FOA accounts
-func (f *foa) Call(to models.FlexAddress, data models.Data, gaslimit models.GasLimit, balance models.Balance) models.Data {
+func (f *foa) Call(to *models.FlexAddress, data models.Data, gaslimit models.GasLimit, balance models.Balance) models.Data {
 	env := f.fch.getNewDefaultEnv()
 	// TODO check gas limit against what has been left on the transaction side
 	err := env.Call(f.address.ToCommon(), to.ToCommon(), data, uint64(gaslimit), balance.ToAttoFlow())
@@ -130,17 +129,20 @@ func (h FlexContractHandler) LastExecutedBlock() *models.FlexBlock {
 	return block
 }
 
-func (h FlexContractHandler) Run(tx []byte, coinbase models.FlexAddress) bool {
+func (h FlexContractHandler) Run(tx []byte, coinbase *models.FlexAddress) bool {
 	config := env.NewFlexConfig(
-		env.WithCoinbase(common.Address(coinbase)),
+		env.WithCoinbase(coinbase.ToCommon()),
 		env.WithBlockNumber(env.BlockNumberForEVMRules))
 	env, err := env.NewEnvironment(config, h.db)
 	// TODO improve this
 	if err != nil {
 		panic(err)
 	}
-	env.RunTransaction(tx)
-	return env.Result.Failed
+	err = env.RunTransaction(tx)
+	if err != nil {
+		panic(err)
+	}
+	return !env.Result.Failed
 }
 
 // TODO: properly implement this

@@ -84,7 +84,7 @@ type FlowOwnedAccount interface {
 	// and are transferred to the target address.
 	// TODO: clarify
 	// Contract data is not controlled by the FOA account
-	Call(FlexAddress, Data, GasLimit, Balance) Data
+	Call(*FlexAddress, Data, GasLimit, Balance) Data
 }
 
 // FlexContractHandler handles operations on the Flex environment
@@ -98,5 +98,5 @@ type FlexContractHandler interface {
 	// Run runs a transaction in the Flex environment,
 	// collects the gas fees, and transfers the gas fees to the given coinbase account.
 	// Returns true if the transaction was successfully executed
-	Run(tx []byte, coinbase FlexAddress) bool
+	Run(tx []byte, coinbase *FlexAddress) bool
 }

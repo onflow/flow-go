@@ -106,7 +106,8 @@ func (fe *Environment) commit() error {
 		return err
 	}
 
-	newBlock := models.NewFlexBlock(fe.LastExecutedBlock.Height,
+	newBlock := models.NewFlexBlock(
+		fe.LastExecutedBlock.Height+1,
 		fe.Result.UUIDIndex,
 		fe.Result.TotalSupplyOfNativeToken,
 		newRoot,
