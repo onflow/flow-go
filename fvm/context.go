@@ -357,3 +357,11 @@ func WithEventEncoder(encoder environment.EventEncoder) Option {
 		return ctx
 	}
 }
+
+// WithFlexEnabled enables access to the flex environment
+func WithFlexEnabled(enabled bool) Option {
+	return func(ctx Context) Context {
+		ctx.FlexEnabled = enabled
+		return ctx
+	}
+}
