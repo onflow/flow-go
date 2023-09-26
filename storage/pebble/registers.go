@@ -29,7 +29,7 @@ var _ storage.RegisterIndex = (*Registers)(nil)
 func NewRegisters(db *pebble.DB, logger zerolog.Logger) (*Registers, error) {
 	registers := &Registers{
 		db:     db,
-		logger: logger,
+		logger: logger.With().Str("component", "execution_indexer pebble").Logger(),
 	}
 	// check height keys and populate cache. These two variables will have been set
 	firstHeight, err := registers.firstStoredHeight()
@@ -45,6 +45,12 @@ func NewRegisters(db *pebble.DB, logger zerolog.Logger) (*Registers, error) {
 	}
 	// at this stage, the bootstrap function has been called and the firstHeight == lastHeight.
 	// All registers for the height have been indexed
+
+	registers.logger.Debug().
+		Uint64("first height", firstHeight).
+		Uint64("last height", latestHeight).
+		Msg("initialized register storage")
+
 	registers.firstHeight = firstHeight
 	registers.latestHeight.Store(latestHeight)
 	return registers, nil
@@ -109,6 +115,7 @@ func (s *Registers) Store(
 	// but the remaining execution data in badger is not, so we skip the indexing step without throwing an error
 	if height == latestHeight {
 		// already updated
+		s.logger.Warn().Uint64("height", height).Msg("trying to store already indexed height")
 		return nil
 	}
 
@@ -139,6 +146,7 @@ func (s *Registers) Store(
 	s.latestHeight.Store(height)
 
 	s.logger.Debug().
+		Uint64("height", height).
 		Str("keys", fmt.Sprintf("%s", entries.IDs())).
 		Str("values", fmt.Sprintf("%s", entries.Values())).
 		Msgf("register entries stored")

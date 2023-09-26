@@ -666,7 +666,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 			cm.Start(irrecoverableCtx)
 			<-cm.Done()
 
-			registersStorage, err := pebbleStorage.NewRegisters(ps)
+			registersStorage, err := pebbleStorage.NewRegisters(ps, builder.Logger)
 			if err != nil {
 				return nil, err
 			}
