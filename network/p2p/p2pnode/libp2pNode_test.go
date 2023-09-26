@@ -318,7 +318,7 @@ func TestCreateStream_SinglePeerDial(t *testing.T) {
 	// mock metrics we expected only a single call to CreateStream to initiate the dialing to the peer, which will result in 3 failed attempts
 	// the next call to CreateStream will encounter a DialInProgress error which will result in 3 failed attempts
 	m := mockmodule.NewNetworkMetrics(t)
-	m.On("OnPeerDialFailure", mock.Anything, int(cfg.NetworkConfig.UnicastMaxDialRetryAttemptTimes)+1).Once()
+	m.On("OnPeerDialFailure", mock.Anything, int(cfg.NetworkConfig.UnicastConfig.MaxDialRetryAttemptTimes)+1).Once()
 	m.On("OnStreamCreationFailure", mock.Anything, mock.Anything).Twice().Run(func(args mock.Arguments) {
 		attempts := args.Get(1).(int)
 		// We expect OnCreateStream to be called twice: once in each separate call to CreateStream. The first call that initializes
@@ -370,10 +370,10 @@ func TestCreateStream_SinglePeerDial(t *testing.T) {
 	unittest.RequireReturnsBefore(t, wg.Wait, 5*time.Second, "stream creation attempts are not returned on time")
 
 	// we expect a single routine to start attempting to dial thus the number of retries
-	// before failure should be at most p2pnode.UnicastMaxDialRetryAttemptTimes
-	expectedNumOfDialRetries := int64(cfg.NetworkConfig.UnicastMaxDialRetryAttemptTimes) + 1 // 1 initial attempt + retries
-	// we expect the second routine to retry creating a stream p2pnode.UnicastMaxDialRetryAttemptTimes when dialing is in progress
-	expectedCreateStreamRetries := int64(cfg.NetworkConfig.UnicastMaxStreamCreationRetryAttemptTimes)
+	// before failure should be at most p2pnode.MaxDialRetryAttemptTimes
+	expectedNumOfDialRetries := int64(cfg.NetworkConfig.UnicastConfig.MaxDialRetryAttemptTimes) + 1 // 1 initial attempt + retries
+	// we expect the second routine to retry creating a stream p2pnode.MaxDialRetryAttemptTimes when dialing is in progress
+	expectedCreateStreamRetries := int64(cfg.NetworkConfig.UnicastConfig.MaxStreamCreationRetryAttemptTimes)
 	require.Equal(t, expectedNumOfDialRetries, dialPeerRetries.Load(), fmt.Sprintf("expected %d dial peer retries got %d", expectedNumOfDialRetries, dialPeerRetries.Load()))
 	require.Equal(t, expectedCreateStreamRetries, createStreamRetries.Load(), fmt.Sprintf("expected %d dial peer retries got %d", expectedCreateStreamRetries, createStreamRetries.Load()))
 }

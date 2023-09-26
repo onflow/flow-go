@@ -52,8 +52,8 @@ func TestDefaultConfig(t *testing.T) {
 func TestFlowConfig_Validate(t *testing.T) {
 	c := defaultConfig(t)
 	// set invalid config values
-	c.NetworkConfig.UnicastRateLimitersConfig.MessageRateLimit = -100
-	c.NetworkConfig.UnicastRateLimitersConfig.BandwidthRateLimit = -100
+	c.NetworkConfig.UnicastConfig.UnicastRateLimitersConfig.MessageRateLimit = -100
+	c.NetworkConfig.UnicastConfig.UnicastRateLimitersConfig.BandwidthRateLimit = -100
 	err := c.Validate()
 	require.Error(t, err)
 	errs, ok := errors.Unwrap(err).(validator.ValidationErrors)

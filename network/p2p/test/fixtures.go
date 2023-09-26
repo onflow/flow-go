@@ -113,14 +113,7 @@ func NodeFixture(
 		FlowConfig:                       defaultFlowConfig,
 		PubSubTracer:                     tracer.NewGossipSubMeshTracer(meshTracerCfg),
 		UnicastConfig: &p2pconfig.UnicastConfig{
-			CreateStreamBackoffDelay:           defaultFlowConfig.NetworkConfig.UnicastCreateStreamRetryDelay,
-			StreamZeroRetryResetThreshold:      defaultFlowConfig.NetworkConfig.UnicastStreamZeroRetryResetThreshold,
-			DialZeroRetryResetThreshold:        defaultFlowConfig.NetworkConfig.UnicastDialZeroRetryResetThreshold,
-			MaxDialRetryAttemptTimes:           defaultFlowConfig.NetworkConfig.UnicastMaxDialRetryAttemptTimes,
-			MaxStreamCreationRetryAttemptTimes: defaultFlowConfig.NetworkConfig.UnicastMaxStreamCreationRetryAttemptTimes,
-			DialConfigCacheSize:                defaultFlowConfig.NetworkConfig.UnicastDialConfigCacheSize,
-			DialInProgressBackoffDelay:         defaultFlowConfig.NetworkConfig.UnicastDialInProgressBackoffDelay,
-			DialBackoffDelay:                   defaultFlowConfig.NetworkConfig.UnicastDialBackoffDelay,
+			UnicastConfig: defaultFlowConfig.NetworkConfig.UnicastConfig,
 		},
 	}
 
