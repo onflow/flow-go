@@ -265,6 +265,10 @@ func (nc *NoopCollector) OnPeerDialed(duration time.Duration, attempts int)     
 func (nc *NoopCollector) OnPeerDialFailure(duration time.Duration, attempts int)        {}
 func (nc *NoopCollector) OnStreamEstablished(duration time.Duration, attempts int)      {}
 func (nc *NoopCollector) OnEstablishStreamFailure(duration time.Duration, attempts int) {}
+func (nc *NoopCollector) OnDialRetryBudgetUpdated(budget uint64)                        {}
+func (nc *NoopCollector) OnStreamCreationRetryBudgetUpdated(budget uint64)              {}
+func (nc *NoopCollector) OnDialRetryBudgetResetToDefault()                              {}
+func (nc *NoopCollector) OnStreamCreationRetryBudgetResetToDefault()                    {}
 
 var _ module.HeroCacheMetrics = (*NoopCollector)(nil)
 var _ module.NetworkMetrics = (*NoopCollector)(nil)

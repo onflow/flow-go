@@ -535,6 +535,8 @@ func (m *Manager) getDialConfig(peerID peer.ID) (*DialConfig, error) {
 		// as the stream creation is reliable enough to be trusted again.
 		dialCfg, err = m.dialConfigCache.Adjust(peerID, func(config DialConfig) (DialConfig, error) {
 			config.StreamCreationRetryAttemptBudget = m.maxStreamCreationAttemptTimes
+			m.metrics.OnStreamCreationRetryBudgetUpdated(config.StreamCreationRetryAttemptBudget)
+			m.metrics.OnStreamCreationRetryBudgetResetToDefault()
 			return config, nil
 		})
 		if err != nil {
@@ -548,6 +550,8 @@ func (m *Manager) getDialConfig(peerID peer.ID) (*DialConfig, error) {
 		// as the dialing is reliable enough to be trusted again.
 		dialCfg, err = m.dialConfigCache.Adjust(peerID, func(config DialConfig) (DialConfig, error) {
 			config.DialRetryAttemptBudget = m.maxDialAttemptTimes
+			m.metrics.OnDialRetryBudgetUpdated(config.DialRetryAttemptBudget)
+			m.metrics.OnDialRetryBudgetResetToDefault()
 			return config, nil
 		})
 		if err != nil {
@@ -576,6 +580,7 @@ func (m *Manager) adjustUnsuccessfulStreamAttempt(peerID peer.ID, connected bool
 			// if no connections could be established to the peer, we will try to dial with a more strict dial config next time.
 			if config.DialRetryAttemptBudget > 0 {
 				config.DialRetryAttemptBudget--
+				m.metrics.OnDialRetryBudgetUpdated(config.DialRetryAttemptBudget)
 			}
 			// last successful dial time is reset to 0 if we fail to create a stream to the peer.
 			config.LastSuccessfulDial = time.Time{}
@@ -585,6 +590,7 @@ func (m *Manager) adjustUnsuccessfulStreamAttempt(peerID peer.ID, connected bool
 			// to try to create a stream with a more strict dial config next time.
 			if config.StreamCreationRetryAttemptBudget > 0 {
 				config.StreamCreationRetryAttemptBudget--
+				m.metrics.OnStreamCreationRetryBudgetUpdated(config.StreamCreationRetryAttemptBudget)
 			}
 		}
 		return config, nil

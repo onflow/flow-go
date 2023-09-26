@@ -112,6 +112,18 @@ type UnicastManagerMetrics interface {
 	// OnEstablishStreamFailure tracks the amount of time taken and number of retry attempts used when the unicast manager cannot establish
 	// a stream on the open connection between two peers.
 	OnEstablishStreamFailure(duration time.Duration, attempts int)
+
+	// OnDialRetryBudgetUpdated tracks the history of the dial retry budget updates.
+	OnDialRetryBudgetUpdated(budget uint64)
+
+	// OnStreamCreationRetryBudgetUpdated tracks the history of the stream creation retry budget updates.
+	OnStreamCreationRetryBudgetUpdated(budget uint64)
+
+	// OnDialRetryBudgetResetToDefault tracks the number of times the dial retry budget is reset to default.
+	OnDialRetryBudgetResetToDefault()
+
+	// OnStreamCreationRetryBudgetResetToDefault tracks the number of times the stream creation retry budget is reset to default.
+	OnStreamCreationRetryBudgetResetToDefault()
 }
 
 type GossipSubMetrics interface {
