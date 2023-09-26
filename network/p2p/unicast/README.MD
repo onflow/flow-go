@@ -53,6 +53,8 @@ However, there can be cases that the connection does not exist, the remote peer 
 maliciously and does not respond to connection and stream creation requests. In order to distinguish between the cases that the remote peer
 is not reliable and the cases that the remote peer is malicious, the `UnicastManager` uses a backoff and retry mechanism.
 
+![retry.png](retry.png)
+
 ### Addressing Unreliable Remote Peer
 To address the unreliability of remote peer, upon an unsuccessful attempt to establish a connection or stream, the `UnicastManager` will wait for a certain amount of time before it tries to establish (i.e., the backoff mechanism),
 and will retry a certain number of times before it gives up (i.e., the retry mechanism). The backoff and retry parameters are configurable through runtime flags.
@@ -66,16 +68,24 @@ These parameters are configured using the `config/default-config.yml` file:
 ```yaml
   # Unicast create stream retry delay is initial delay used in the exponential backoff for create stream retries
   unicast-create-stream-retry-delay: 1s
-  # The maximum number of retry attempts for creating a unicast stream to a remote peer before giving up. If it is set to 3 for example, it means that if a peer fails to create
-  # retry a unicast stream to a remote peer 3 times, the peer will give up and will not retry creating a unicast stream to that remote peer.
-  # When it is set to zero it means that the peer will not retry creating a unicast stream to a remote peer if it fails.
-  unicast-max-stream-creation-retry-attempt-times: 3
-  # The maximum number of retry attempts for dialing a remote peer before giving up. If it is set to 3 for example, it means that if a peer fails to dial a remote peer 3 times,
-  # the peer will give up and will not retry dialing that remote peer.
-  unicast-max-dial-retry-attempt-times: 3
+  # The backoff delay used in the exponential backoff for consecutive failed unicast dial attempts to a remote peer.
+  unicast-dial-backoff-delay: 1s
 ```
 
-![retry.png](retry.png)
+#### Addressing Concurrent Stream Creation Attempts
+There might be the case that multiple threads attempt to create a stream to the same remote peer concurrently, while there is no 
+existing connection to the remote peer. In such cases, the `UnicastManager` will let the first attempt to create a stream to the remote peer to proceed with dialing
+while it will backoff the concurrent attempts for a certain amount of time. The backoff delay is configurable through the `config/default-config.yml` file:
+```yaml
+  # The backoff delay used in the exponential backoff for backing off concurrent create stream attempts to the same remote peer
+  # when there is no available connections to that remote peer and a dial is in progress.
+  unicast-dial-in-progress-backoff-delay: 1s
+```
+This is done for several reasons including:
+- The resource manager of the remote peer may block the concurrent dial attempts if they exceed a certain threshold.
+- As a convention in networking layer, we don't desire more than one connection to a remote peer, and there are hard reactive constraints in place. 
+  However, as a soft proactive measure, we backoff concurrent dial attempts to the same remote peer to prevent multiple connections to the same peer.
+- Dialing is a resource-intensive operation, and we don't want to waste resources on concurrent dial attempts to the same remote peer.
 
 ### Addressing Malicious Remote Peer
 The backoff and retry mechanism is used to address the cases that the remote peer is not reliable. 
@@ -106,7 +116,7 @@ Each time the `UnicastManager` fails to dial or create a stream to a remote peer
 - If the retry budget reaches zero, the `UnicastManager` will only attempt once to dial or create a stream to the remote peer, and will not retry the attempt, and rather return an error to the caller.
 - When any of the budgets reaches zero, the `UnicastManager` will not decrement the budget anymore.
 
-**Note** `UnicastManager` is part of the networking layer of the Flow node, which is a lower-order component than
+**Note:** `UnicastManager` is part of the networking layer of the Flow node, which is a lower-order component than
 the Flow protocol engines who call the `UnicastManager` to send messages to remote peers. Hence, the `UnicastManager` _must not_ outsmart
 the Flow protocol engines on deciding whether to _dial or create stream_ in the first place. This means that `UnicastManager` will attempt 
 to dial and create stream even to peers with zero retry budgets. However, `UnicastManager` does not retry attempts for the peers with zero budgets, and rather
@@ -114,3 +124,32 @@ returns an error immediately upon a failure. This is the responsibility of the F
 to send a message to a remote peer or not after a certain number of failures. 
 
 #### Restoring Retry Budgets
+
+The `UnicastManager` may reset the dial and stream creation budgets for a remote peers _from zero to the default values_ in the following cases:
+
+- **Restoring Stream Creation Retry Budget**: To restore the stream creation budget from zero to the default value, the `UnicastManager` keeps track of the _consecutive_
+  successful streams created to the remote peer. Everytime a stream is created successfully, the `UnicastManager` increments a counter for the remote peer. The counter is
+  reset to zero upon the _first failure_ to create a stream to the remote peer. If the counter reaches a certain threshold, the `UnicastManager` will reset the stream creation
+  budget for the remote peer to the default value. The threshold is configurable through the `config/default-config.yml` file:
+    ```yaml
+  # The minimum number of consecutive successful streams to reset the unicast stream creation retry budget from zero to the maximum default. If it is set to 100 for example, it
+  # means that if a peer has 100 consecutive successful streams to the remote peer, and the remote peer has a zero stream creation budget,
+  # the unicast stream creation retry budget for that remote peer will be reset to the maximum default.
+  unicast-stream-zero-retry-reset-threshold: 100
+    ```
+  Reaching the threshold means that the remote peer is reliable enough to regain the default retry budget for stream creation.
+- **Restoring Dial Retry Budget**: To restore the dial retry budget from zero to the default value, the `UnicastManager` keeps track of the last successful
+  dial time to the remote peer. Every failed dialing attempt will reset the last successful dial time to zero. If the time since the last successful dialing attempt
+  reaches a certain threshold, the `UnicastManager` will reset the dial budget for the remote peer to the default value.
+  The threshold is configurable through the `config/default-config.yml` file:
+    ```yaml
+      # The number of seconds that the local peer waits since the last successful dial to a remote peer before resetting the unicast dial retry budget from zero to the maximum default.
+  # If it is set to 3600s (1h) for example, it means that if it has passed at least one hour since the last successful dial, and the remote peer has a zero dial retry budget,
+  # the unicast dial retry budget for that remote peer will be reset to the maximum default.
+  unicast-dial-zero-retry-reset-threshold: 3600s
+    ```
+  Reaching the threshold means that either the `UnicastManager` has not dialed the remote peer for a long time, and the peer 
+  deserves a chance to regain its dial retry budget, or the remote peer maintains a persistent connection to the local peer, for a long time, and 
+  deserves a chance to regain its dial retry budget. Note that the networking layer enforces a maximum number of _one_ connection to a remote peer, hence
+  the remote peer cannot have multiple connections to the local peer. Also, connection establishment is assumed a more resource-intensive operation than the stream creation,  
+  hence, in contrast to the stream reliability that is measured by the number of consecutive successful streams, the dial reliability is measured by the time since the last successful dial.
