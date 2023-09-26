@@ -45,8 +45,53 @@ func TestBootstrap_NewBootstrap(t *testing.T) {
 	})
 }
 
+func Test_BootstrapSingle(t *testing.T) {
+	log := zerolog.New(os.Stdout)
+	rootHeight := uint64(10000)
+
+	t.Run("Ingest Simple Checkpoint", func(t *testing.T) {
+		unittest.RunWithTempDir(t, func(dir string) {
+			tries := createSimpleTrie(t)
+			fileName := "simple-checkpoint"
+
+			err := wal.StoreCheckpointV6Concurrently(tries, dir, fileName, log)
+			require.NoErrorf(t, err, "fail to store checkpoint")
+			checkpointFile := path.Join(dir, fileName)
+
+			cache := pebble.NewCache(1 << 20)
+			opts := DefaultPebbleOptions(cache, registers.NewMVCCComparer())
+			defer cache.Unref()
+			pb, dbDir := unittest.TempPebbleDBWithOpts(t, opts)
+
+			bootstrap, err := NewBootstrap(pb, checkpointFile, rootHeight, log)
+			require.NoError(t, err)
+
+			ctx, cancel := context.WithCancel(context.Background())
+			irrecoverableCtx, _ := irrecoverable.WithSignaler(ctx)
+			bootstrap.IndexCheckpointFile(irrecoverableCtx, func() {})
+
+			<-irrecoverableCtx.Done()
+			require.NoError(t, irrecoverableCtx.Err())
+			defer cancel()
+
+			firstRaw, closer, err := pb.Get(firstHeightKey())
+			require.NoError(t, err)
+
+			err = closer.Close()
+			require.NoError(t, err)
+
+			first := binary.BigEndian.Uint64(firstRaw)
+			assert.Equal(t, rootHeight, first)
+
+			require.NoError(t, pb.Close())
+			require.NoError(t, os.RemoveAll(dbDir))
+		})
+	})
+
+}
+
 func TestBootstrap_IndexCheckpointFile_Random(t *testing.T) {
-	log := zerolog.New(io.Discard)
+	log := zerolog.New(os.Stdout)
 	rootHeight := uint64(10000)
 
 	unittest.RunWithTempDir(t, func(dir string) {
@@ -74,16 +119,22 @@ func TestBootstrap_IndexCheckpointFile_Random(t *testing.T) {
 		unittest.RunWithTempDir(t, func(dir string) {
 			tries := createSimpleTrie(t)
 			fileName := "simple-checkpoint"
-			require.NoErrorf(t, wal.StoreCheckpointV6Concurrently(tries, dir, fileName, log), "fail to store checkpoint")
+
+			err := wal.StoreCheckpointV6Concurrently(tries, dir, fileName, log)
+			require.NoErrorf(t, err, "fail to store checkpoint")
 			checkpointFile := path.Join(dir, fileName)
+
 			cache := pebble.NewCache(1 << 20)
 			opts := DefaultPebbleOptions(cache, registers.NewMVCCComparer())
 			defer cache.Unref()
 			pb, dbDir := unittest.TempPebbleDBWithOpts(t, opts)
+
 			bootstrap, err := NewBootstrap(pb, checkpointFile, rootHeight, log)
 			require.NoError(t, err)
+
 			ctx, cancel := context.WithCancel(context.Background())
 			irrecoverableCtx, _ := irrecoverable.WithSignaler(ctx)
+
 			cm := component.NewComponentManagerBuilder().AddWorker(bootstrap.IndexCheckpointFile).Build()
 			cm.Start(irrecoverableCtx)
 			<-cm.Done()
@@ -91,8 +142,10 @@ func TestBootstrap_IndexCheckpointFile_Random(t *testing.T) {
 
 			firstRaw, closer, err := pb.Get(firstHeightKey())
 			require.NoError(t, err)
+
 			err = closer.Close()
 			require.NoError(t, err)
+
 			first := binary.BigEndian.Uint64(firstRaw)
 			assert.Equal(t, rootHeight, first)
 
