@@ -7,6 +7,7 @@ import (
 	"github.com/cockroachdb/pebble"
 	"github.com/pkg/errors"
 	"go.uber.org/atomic"
+	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/storage"
@@ -18,15 +19,17 @@ type Registers struct {
 	db           *pebble.DB
 	firstHeight  uint64
 	latestHeight atomic.Uint64
+	logger       zerolog.Logger
 }
 
 var _ storage.RegisterIndex = (*Registers)(nil)
 
 // NewRegisters takes a populated pebble instance with LatestHeight and FirstHeight set.
 // Will fail if they those two keys are unavailable as it implies a corrupted or uninitialized state
-func NewRegisters(db *pebble.DB) (*Registers, error) {
+func NewRegisters(db *pebble.DB, logger zerolog.Logger) (*Registers, error) {
 	registers := &Registers{
-		db: db,
+		db:     db,
+		logger: logger,
 	}
 	// check height keys and populate cache. These two variables will have been set
 	firstHeight, err := registers.firstStoredHeight()
@@ -35,14 +38,15 @@ func NewRegisters(db *pebble.DB) (*Registers, error) {
 		// and firstHeight
 		return nil, fmt.Errorf("unable to initialize register storage, first height unavailable in db: %w", err)
 	}
-	latestHeight, err := registers.latestStoredHeight()
+	latestHeight, err := registers.latestHeightFromDB()
 	if err != nil {
 		// and firstHeight
 		return nil, fmt.Errorf("unable to initialize register storage, latest height unavailable in db: %w", err)
 	}
-	/// All registers between firstHeight and lastHeight have been indexed
+	// at this stage, the bootstrap function has been called and the firstHeight == lastHeight.
+	// All registers for the height have been indexed
 	registers.firstHeight = firstHeight
-	registers.latestHeight.Store(latestHeight)
+	registers.latestHeight = latestHeight
 	return registers, nil
 }
 
@@ -77,7 +81,7 @@ func (s *Registers) Get(
 	ok := iter.SeekPrefixGE(encoded)
 	if !ok {
 		// no such register found
-		return nil, storage.ErrNotFound
+		return nil, errors.Wrap(storage.ErrNotFound, fmt.Sprintf("register by ID %s not found", reg.String()))
 	}
 
 	binaryValue, err := iter.ValueAndErr()
@@ -109,7 +113,7 @@ func (s *Registers) Store(
 	}
 
 	nextHeight := latestHeight + 1
-	if height != nextHeight {
+	if height != nextHeight && height != 0 {
 		return fmt.Errorf("must store registers with the next height %v, but got %v", nextHeight, height)
 	}
 	batch := s.db.NewBatch()
@@ -133,6 +137,11 @@ func (s *Registers) Store(
 		return fmt.Errorf("failed to commit batch: %w", err)
 	}
 	s.latestHeight.Store(height)
+
+	s.logger.Debug().
+		Str("keys", fmt.Sprintf("%s", entries.IDs())).
+		Str("values", fmt.Sprintf("%s", entries.Values())).
+		Msgf("register entries stored")
 
 	return nil
 }
