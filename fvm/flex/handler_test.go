@@ -104,29 +104,40 @@ func TestFlexContractHandler(t *testing.T) {
 }
 
 func TestFOA(t *testing.T) {
-	flex.RunWithTempLedger(t, func(led atree.Ledger) {
-		handler := flex.NewFlexContractHandler(led)
-		foa := handler.NewFlowOwnedAccount()
-		require.NotNil(t, foa)
+	t.Run("test deposit/withdraw", func(t *testing.T) {
+		flex.RunWithTempLedger(t, func(led atree.Ledger) {
+			handler := flex.NewFlexContractHandler(led)
+			foa := handler.NewFlowOwnedAccount()
+			require.NotNil(t, foa)
 
-		zeroBalance, err := models.NewBalanceFromAttoFlow(big.NewInt(0))
-		require.NoError(t, err)
-		require.Equal(t, zeroBalance, foa.Balance())
+			zeroBalance, err := models.NewBalanceFromAttoFlow(big.NewInt(0))
+			require.NoError(t, err)
+			require.Equal(t, zeroBalance, foa.Balance())
 
-		balance, err := models.NewBalanceFromAttoFlow(big.NewInt(100))
-		require.NoError(t, err)
-		vault := models.NewFlowTokenVault(balance)
+			balance, err := models.NewBalanceFromAttoFlow(big.NewInt(100))
+			require.NoError(t, err)
+			vault := models.NewFlowTokenVault(balance)
 
-		foa.Deposit(vault)
+			foa.Deposit(vault)
 
-		require.NoError(t, err)
-		require.Equal(t, balance, foa.Balance())
+			require.NoError(t, err)
+			require.Equal(t, balance, foa.Balance())
 
-		v := foa.Withdraw(balance)
-		require.NoError(t, err)
-		require.Equal(t, balance, v.Balance())
+			v := foa.Withdraw(balance)
+			require.NoError(t, err)
+			require.Equal(t, balance, v.Balance())
 
-		require.NoError(t, err)
-		require.Equal(t, zeroBalance, foa.Balance())
+			require.NoError(t, err)
+			require.Equal(t, zeroBalance, foa.Balance())
+		})
+	})
+	t.Run("test deploy/call", func(t *testing.T) {
+		flex.RunWithTempLedger(t, func(led atree.Ledger) {
+			handler := flex.NewFlexContractHandler(led)
+			foa := handler.NewFlowOwnedAccount()
+			require.NotNil(t, foa)
+
+			// TODO: from here, make contract stuff utils
+		})
 	})
 }
