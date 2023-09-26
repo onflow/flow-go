@@ -5,7 +5,6 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
-	"math"
 	"math/rand"
 	"os"
 	"testing"
@@ -28,7 +27,6 @@ import (
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	synctest "github.com/onflow/flow-go/module/state_synchronization/requester/unittest"
 	"github.com/onflow/flow-go/storage"
-	"github.com/onflow/flow-go/storage/memory"
 	storagemock "github.com/onflow/flow-go/storage/mock"
 	pebbleStorage "github.com/onflow/flow-go/storage/pebble"
 	"github.com/onflow/flow-go/storage/pebble/registers"
@@ -326,10 +324,6 @@ func storeRegisterWithValue(indexer *ExecutionState, height uint64, owner string
 	return nil
 }
 
-func initRegisterStorage() storage.RegisterIndex {
-	return memory.NewRegisters(0, 0, zerolog.Nop())
-}
-
 func TestIntegration_StoreAndGet(t *testing.T) {
 	regOwner := "f8d6e0586b0a20c7"
 	regKey := "code"
@@ -338,7 +332,7 @@ func TestIntegration_StoreAndGet(t *testing.T) {
 
 	// this test makes sure index values for a single register are correctly updated and always last value is returned
 	t.Run("Single Index Value Changes", func(t *testing.T) {
-		RunWithRegistersStorageAtInitialHeights(t, 0, 0, logger, func(registers storage.RegisterIndex) {
+		RunWithRegistersStorageAtInitialHeights(t, 0, 0, func(registers *pebbleStorage.Registers) {
 			indexer, err := New(registers, nil, nil, logger)
 			require.NoError(t, err)
 
@@ -364,7 +358,7 @@ func TestIntegration_StoreAndGet(t *testing.T) {
 	// the correct highest height indexed value is returned.
 	// e.g. we index A{h(1) -> X}, A{h(2) -> Y}, when we request h(5) we get value Y
 	t.Run("Single Index Value At Later Heights", func(t *testing.T) {
-		RunWithRegistersStorageAtInitialHeights(t, 0, 0, logger, func(registers storage.RegisterIndex) {
+		RunWithRegistersStorageAtInitialHeights(t, 0, 0, func(registers *pebbleStorage.Registers) {
 			indexer, err := New(registers, nil, nil, zerolog.Nop())
 			require.NoError(t, err)
 
@@ -397,7 +391,7 @@ func TestIntegration_StoreAndGet(t *testing.T) {
 
 	// this test makes sure we correctly handle weird payloads
 	t.Run("Empty and Nil Payloads", func(t *testing.T) {
-		RunWithRegistersStorageAtInitialHeights(t, 0, 0, logger, func(registers storage.RegisterIndex) {
+		RunWithRegistersStorageAtInitialHeights(t, 0, 0, func(registers *pebbleStorage.Registers) {
 			indexer, err := New(registers, nil, nil, zerolog.Nop())
 			require.NoError(t, err)
 
@@ -405,26 +399,6 @@ func TestIntegration_StoreAndGet(t *testing.T) {
 			require.NoError(t, indexer.indexRegisterPayloads([]*ledger.Payload{}, 1))
 			require.NoError(t, indexer.indexRange.Increase(1))
 			require.NoError(t, indexer.indexRegisterPayloads(nil, 2))
-		})
-	})
-
-	// this test makes sure correct values are used to initialize range no matter the init value provided
-	t.Run("Initialize Indexer", func(t *testing.T) {
-		first := uint64(5)
-		last := uint64(10)
-
-		RunWithRegistersStorageAtInitialHeights(t, first, last, logger, func(registers storage.RegisterIndex) {
-			indexer, err := New(registers, nil, nil, zerolog.Nop())
-			require.NoError(t, err)
-
-			assert.Equal(t, first, indexer.indexRange.First())
-			assert.Equal(t, last, indexer.indexRange.Last())
-
-			empty := uint64(math.MaxUint64) // we use this value to trigger memory db to return empty
-			registers = memory.NewRegisters(empty, empty, logger)
-			indexer, err = New(registers, nil, nil, zerolog.Nop())
-		require.ErrorIs(t, err, storage.ErrNotFound)
-		require.EqualError(t, err, "failed to initialize the indexer with missing first height: key not found")
 		})
 	})
 }
@@ -567,28 +541,20 @@ const (
 	codeLatestBlockHeight byte = 4
 )
 
-func newHeightKey(identifier byte) []byte {
-	key := make([]byte, 0, MinLookupKeyLen)
-	key = append(key, identifier)
-	key = append(key, '/')
-	key = binary.BigEndian.AppendUint64(key, placeHolderHeight)
-	return key
-}
+var latestHeightKeyLiteral = binary.BigEndian.AppendUint64(
+	[]byte{codeLatestBlockHeight, byte('/'), byte('/')}, placeHolderHeight)
 
-func RunWithRegistersStorageAtInitialHeights(
-	tb testing.TB,
-	first uint64,
-	latest uint64,
-	logger zerolog.Logger,
-	f func(r storage.RegisterIndex),
-) {
+var firstHeightKeyLiteral = binary.BigEndian.AppendUint64(
+	[]byte{codeFirstBlockHeight, byte('/'), byte('/')}, placeHolderHeight)
+
+func RunWithRegistersStorageAtInitialHeights(tb testing.TB, first uint64, latest uint64, f func(r *pebbleStorage.Registers)) {
 	cache := pebble.NewCache(1 << 20)
 	opts := pebbleStorage.DefaultPebbleOptions(cache, registers.NewMVCCComparer())
 	unittest.RunWithConfiguredPebbleInstance(tb, opts, func(p *pebble.DB) {
 		// insert initial heights to pebble
-		require.NoError(tb, p.Set(newHeightKey(codeFirstBlockHeight), pebbleStorage.EncodedUint64(first), nil))
-		require.NoError(tb, p.Set(newHeightKey(codeLatestBlockHeight), pebbleStorage.EncodedUint64(latest), nil))
-		r, err := pebbleStorage.NewRegisters(p, logger)
+		require.NoError(tb, p.Set(firstHeightKeyLiteral, pebbleStorage.EncodedUint64(first), nil))
+		require.NoError(tb, p.Set(latestHeightKeyLiteral, pebbleStorage.EncodedUint64(latest), nil))
+		r, err := pebbleStorage.NewRegisters(p, zerolog.Nop())
 		require.NoError(tb, err)
 		f(r)
 	})
