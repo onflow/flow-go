@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 	"golang.org/x/exp/maps"
 	"golang.org/x/sync/errgroup"
@@ -19,11 +18,10 @@ import (
 
 // ExecutionState indexes the execution state.
 type ExecutionState struct {
-	registers  storage.RegisterIndex
-	headers    storage.Headers
-	events     storage.Events
-	indexRange *SequentialIndexRange
-	log        zerolog.Logger
+	registers storage.RegisterIndex
+	headers   storage.Headers
+	events    storage.Events
+	log       zerolog.Logger
 }
 
 // New execution state indexer used to ingest block execution data and index it by height.
@@ -35,34 +33,11 @@ func New(
 	headers storage.Headers,
 	events storage.Events,
 ) (*ExecutionState, error) {
-	// we must have the first height set in the storage otherwise error out
-	first, err := registers.FirstHeight()
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to initialize the indexer with missing first height")
-	}
-
-	// we must have the latest height set in the storage otherwise error out
-	last, err := registers.LatestHeight()
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to initialize the indexer with missing latest height")
-	}
-
-	indexRange, err := NewSequentialIndexRange(first, last)
-	if err != nil {
-		return nil, err
-	}
-
-	log.Debug().
-		Uint64("first_height", first).
-		Uint64("latest_height", last).
-		Msgf("initialized indexer range")
-
 	return &ExecutionState{
-		registers:  registers,
-		headers:    headers,
-		events:     events,
-		indexRange: indexRange,
-		log:        log.With().Str("component", "execution_indexer").Logger(),
+		registers: registers,
+		headers:   headers,
+		events:    events,
+		log:       log.With().Str("component", "execution_indexer").Logger(),
 	}, nil
 }
 
@@ -72,11 +47,6 @@ func New(
 // - storage.ErrNotFound if the register by the ID was never indexed
 // - ErrIndexBoundary if the height is out of indexed height boundary
 func (i *ExecutionState) RegisterValues(IDs flow.RegisterIDs, height uint64) ([]flow.RegisterValue, error) {
-	_, err := i.indexRange.Contained(height)
-	if err != nil {
-		return nil, err
-	}
-
 	values := make([]flow.RegisterValue, len(IDs))
 
 	for j, id := range IDs {
@@ -109,8 +79,18 @@ func (i *ExecutionState) IndexBlockData(ctx context.Context, data *execution_dat
 
 	lg.Debug().Msgf("indexing new block")
 
-	if _, err := i.indexRange.CanIncrease(block.Height); err != nil {
+	latest, err := i.registers.LatestHeight()
+	if err != nil {
 		return err
+	}
+
+	if block.Height == latest {
+		lg.Warn().Uint64("height", block.Height).Msg("indexing already indexed block")
+		return nil
+	}
+
+	if block.Height != latest+1 {
+		return fmt.Errorf("must store registers with the next height %d, but got %d", latest+1, block.Height)
 	}
 
 	// concurrently process indexing of block data
@@ -168,8 +148,7 @@ func (i *ExecutionState) IndexBlockData(ctx context.Context, data *execution_dat
 	if err != nil {
 		return fmt.Errorf("failed to index block data at height %d: %w", block.Height, err)
 	}
-
-	return i.indexRange.Increase(block.Height)
+	return nil
 }
 
 func (i *ExecutionState) indexEvents(blockID flow.Identifier, events flow.EventsList) error {
