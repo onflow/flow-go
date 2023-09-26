@@ -85,26 +85,26 @@ func (b *Bootstrap) indexCheckpointFileWorker(ctx irrecoverable.SignalerContext,
 			if err != nil {
 				ctx.Throw(fmt.Errorf("unable to index registers to pebble: %w", err))
 			}
+			batch = make([]*wal.LeafNode, 0, pebbleBootstrapRegisterBatchLen)
 		}
 	}
 }
 
 // IndexCheckpointFile indexes the checkpoint file in the Dir provided as a component
-func (b *Bootstrap) IndexCheckpointFile(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
-	ready()
+func (b *Bootstrap) IndexCheckpointFile(parentCtx irrecoverable.SignalerContext) error {
 	// index checkpoint file async
 	cmb := component.NewComponentManagerBuilder()
 	for i := 0; i < pebbleBootstrapWorkerCount; i++ {
 		// create workers to read and index registers
 		cmb.AddWorker(b.indexCheckpointFileWorker)
 	}
-	c := cmb.Build()
-	c.Start(ctx)
 	err := wal.OpenAndReadLeafNodesFromCheckpointV6(b.leafNodeChan, b.checkpointDir, b.checkpointFileName, b.log)
 	if err != nil {
 		// error in reading a leaf node
-		ctx.Throw(fmt.Errorf("error reading leaf node: %w", err))
+		return fmt.Errorf("error reading leaf node: %w", err)
 	}
+	c := cmb.Build()
+	c.Start(parentCtx)
 	// wait for the indexing to finish before populating heights
 	<-c.Done()
 	bat := b.db.NewBatch()
@@ -113,14 +113,15 @@ func (b *Bootstrap) IndexCheckpointFile(ctx irrecoverable.SignalerContext, ready
 	// leaving it in a corrupted state
 	err = bat.Set(firstHeightKey(), encodedUint64(b.rootHeight), nil)
 	if err != nil {
-		ctx.Throw(fmt.Errorf("unable to add first height to batch: %w", err))
+		return fmt.Errorf("unable to add first height to batch: %w", err)
 	}
 	err = bat.Set(latestHeightKey(), encodedUint64(b.rootHeight), nil)
 	if err != nil {
-		ctx.Throw(fmt.Errorf("unable to add latest height to batch: %w", err))
+		return fmt.Errorf("unable to add latest height to batch: %w", err)
 	}
 	err = bat.Commit(pebble.Sync)
 	if err != nil {
-		ctx.Throw(fmt.Errorf("unable to index first and latest heights: %w", err))
+		return fmt.Errorf("unable to index first and latest heights: %w", err)
 	}
+	return nil
 }
