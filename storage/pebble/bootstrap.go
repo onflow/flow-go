@@ -5,10 +5,11 @@ import (
 	"path/filepath"
 
 	"github.com/cockroachdb/pebble"
+	"github.com/rs/zerolog"
+
 	"github.com/onflow/flow-go/ledger/complete/wal"
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/irrecoverable"
-	"github.com/rs/zerolog"
 )
 
 type Bootstrap struct {
@@ -29,10 +30,17 @@ func NewBootstrap(db *pebble.DB, checkpointFile string, rootHeight uint64, log z
 		// key detected, attempt to run bootstrap on corrupt or already bootstrapped data
 		return nil, fmt.Errorf("found latest key set on badger instance, cannot bootstrap populated DB")
 	}
+
+	logger := log.With().
+		Str("component", "register ingestion").
+		Str("checkpoint file", checkpointFile).
+		Uint64("root height", rootHeight).
+		Logger()
+
 	return &Bootstrap{
 		checkpointDir:      checkpointDir,
 		checkpointFileName: checkpointFileName,
-		log:                log,
+		log:                logger,
 		db:                 db,
 		leafNodeChan:       make(chan *wal.LeafNode, checkpointLeafNodeBufSize),
 		rootHeight:         rootHeight,
@@ -91,6 +99,8 @@ func (b *Bootstrap) indexCheckpointFileWorker(ctx irrecoverable.SignalerContext,
 
 // IndexCheckpointFile indexes the checkpoint file in the Dir provided as a component
 func (b *Bootstrap) IndexCheckpointFile(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+	b.log.Debug().Msg("starting to index checkpoint file")
+
 	ready()
 	// index checkpoint file async
 	cmb := component.NewComponentManagerBuilder()
