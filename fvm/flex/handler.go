@@ -159,8 +159,7 @@ func (f *foa) Call(to *models.FlexAddress, data models.Data, gaslimit models.Gas
 	err := env.Call(f.address.ToCommon(), to.ToCommon(), data, uint64(gaslimit), balance.ToAttoFlow())
 	f.fch.handleError(err)
 	if env.Result.Failed {
-		// TODO panic with a handlable error
-		panic("call failed")
+		panic(models.NewEVMExecutionError(env.Result.Error))
 	}
 	return env.Result.RetValue
 }

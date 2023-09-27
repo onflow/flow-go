@@ -73,7 +73,7 @@ func NewEnvironment(
 
 func (fe *Environment) checkExecuteOnce() error {
 	if fe.Used {
-		return ErrFlexEnvReuse
+		return models.ErrFlexEnvReuse
 	}
 	fe.Used = true
 	return nil
@@ -92,7 +92,7 @@ func (fe *Environment) commit() error {
 	// commits the changes from the journal into the in memory trie.
 	newRoot, err := fe.State.Commit(true)
 	if err != nil {
-		return err
+		return models.NewFatalError(err)
 	}
 
 	// flush the trie to the lower level db
@@ -103,7 +103,7 @@ func (fe *Environment) commit() error {
 	// have to explicitly ask the trie to commit to the underlying storage
 	err = fe.State.Database().TrieDB().Commit(newRoot, false)
 	if err != nil {
-		return err
+		return models.NewFatalError(err)
 	}
 
 	newBlock := models.NewFlexBlock(
@@ -116,7 +116,7 @@ func (fe *Environment) commit() error {
 
 	err = fe.Database.SetLatestBlock(newBlock)
 	if err != nil {
-		return err
+		return models.NewFatalError(err)
 	}
 
 	// TODO: emit event on root changes
