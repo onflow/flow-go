@@ -7,8 +7,44 @@ import (
 	"github.com/onflow/cadence/runtime/sema"
 	"github.com/onflow/cadence/runtime/stdlib"
 
+	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/flex/models"
+	"github.com/onflow/flow-go/model/flow"
 )
+
+func NewFlowTokenVaultType(chain flow.Chain) *sema.CompositeType {
+	const flowTokenContractName = "FlowToken"
+	const vaultTypeName = "Vault"
+
+	var flowTokenAddress, err = chain.AddressAtIndex(environment.FlowTokenAccountIndex)
+	if err != nil {
+		panic(err)
+	}
+
+	location := common.NewAddressLocation(
+		nil,
+		common.Address(flowTokenAddress),
+		flowTokenContractName,
+	)
+
+	// TODO: replace with proper type, e.g. extracted from checker
+
+	flowTokenType := &sema.CompositeType{
+		Location:   location,
+		Identifier: flowTokenContractName,
+		Kind:       common.CompositeKindContract,
+	}
+
+	vaultType := &sema.CompositeType{
+		Location:   location,
+		Identifier: vaultTypeName,
+		Kind:       common.CompositeKindResource,
+	}
+
+	flowTokenType.SetNestedType(vaultTypeName, vaultType)
+
+	return vaultType
+}
 
 type FlexTypeDefinition struct {
 	FlexType *sema.CompositeType

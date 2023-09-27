@@ -84,6 +84,248 @@ func init() {
 	Flex_FlexAddressType.ConstructorParameters = Flex_FlexAddressTypeConstructorType.Parameters
 }
 
+var Flex_BalanceTypeConstructorType = &sema.FunctionType{
+	IsConstructor: true,
+	Parameters: []sema.Parameter{
+		{
+			Identifier:     "flowAmount",
+			TypeAnnotation: sema.NewTypeAnnotation(sema.UFix64Type),
+		},
+	},
+	ReturnTypeAnnotation: sema.NewTypeAnnotation(
+		Flex_BalanceType,
+	),
+}
+
+const Flex_BalanceTypeConstructorDocString = `
+Constructs a new
+`
+
+const Flex_BalanceTypeToFLOWFunctionName = "toFLOW"
+
+var Flex_BalanceTypeToFLOWFunctionType = &sema.FunctionType{
+	ReturnTypeAnnotation: sema.NewTypeAnnotation(
+		sema.UFix64Type,
+	),
+}
+
+const Flex_BalanceTypeToFLOWFunctionDocString = `
+Returns the balance in FLOW
+`
+
+const Flex_BalanceTypeToAttoFlowFunctionName = "toAttoFlow"
+
+var Flex_BalanceTypeToAttoFlowFunctionType = &sema.FunctionType{
+	ReturnTypeAnnotation: sema.NewTypeAnnotation(
+		sema.UInt64Type,
+	),
+}
+
+const Flex_BalanceTypeToAttoFlowFunctionDocString = `
+Returns the balance in terms of atto-FLOW.
+Atto-FLOW is the smallest denomination of FLOW inside Flex.
+`
+
+const Flex_BalanceTypeName = "Balance"
+
+var Flex_BalanceType = func() *sema.CompositeType {
+	var t = &sema.CompositeType{
+		Identifier:         Flex_BalanceTypeName,
+		Kind:               common.CompositeKindStructure,
+	}
+
+	return t
+}()
+
+func init() {
+	var members = []*sema.Member{
+		sema.NewUnmeteredFunctionMember(
+			Flex_BalanceType,
+			ast.AccessPublic,
+			Flex_BalanceTypeToFLOWFunctionName,
+			Flex_BalanceTypeToFLOWFunctionType,
+			Flex_BalanceTypeToFLOWFunctionDocString,
+		),
+		sema.NewUnmeteredFunctionMember(
+			Flex_BalanceType,
+						ast.AccessPublic,
+			Flex_BalanceTypeToAttoFlowFunctionName,
+			Flex_BalanceTypeToAttoFlowFunctionType,
+			Flex_BalanceTypeToAttoFlowFunctionDocString,
+		),
+	}
+
+	Flex_BalanceType.Members = sema.MembersAsMap(members)
+	Flex_BalanceType.Fields = sema.MembersFieldNames(members)
+	Flex_BalanceType.ConstructorParameters = Flex_BalanceTypeConstructorType.Parameters
+}
+
+const Flex_FlowOwnedAccountTypeAddressFunctionName = "address"
+
+var Flex_FlowOwnedAccountTypeAddressFunctionType = &sema.FunctionType{
+	ReturnTypeAnnotation: sema.NewTypeAnnotation(
+		Flex_FlexAddressType,
+	),
+}
+
+const Flex_FlowOwnedAccountTypeAddressFunctionDocString = `
+The address of the owned Flex account
+`
+
+const Flex_FlowOwnedAccountTypeDepositFunctionName = "deposit"
+
+var Flex_FlowOwnedAccountTypeDepositFunctionType = &sema.FunctionType{
+	Parameters: []sema.Parameter{
+		{
+			Identifier:     "from",
+			TypeAnnotation: sema.NewTypeAnnotation(FlowToken_VaultType),
+		},
+	},
+	ReturnTypeAnnotation: sema.NewTypeAnnotation(
+		sema.VoidType,
+	),
+}
+
+const Flex_FlowOwnedAccountTypeDepositFunctionDocString = `
+Deposits the given vault into the Flex account's balance
+`
+
+const Flex_FlowOwnedAccountTypeWithdrawFunctionName = "withdraw"
+
+var Flex_FlowOwnedAccountTypeWithdrawFunctionType = &sema.FunctionType{
+	Parameters: []sema.Parameter{
+		{
+			Identifier:     "balance",
+			TypeAnnotation: sema.NewTypeAnnotation(Flex_BalanceType),
+		},
+	},
+	ReturnTypeAnnotation: sema.NewTypeAnnotation(
+		FlowToken_VaultType,
+	),
+}
+
+const Flex_FlowOwnedAccountTypeWithdrawFunctionDocString = `
+Withdraws the balance from the Flex account's balance
+`
+
+const Flex_FlowOwnedAccountTypeDeployFunctionName = "deploy"
+
+var Flex_FlowOwnedAccountTypeDeployFunctionType = &sema.FunctionType{
+	Parameters: []sema.Parameter{
+		{
+			Identifier: "code",
+			TypeAnnotation: sema.NewTypeAnnotation(&sema.VariableSizedType{
+				Type: sema.UInt8Type,
+			}),
+		},
+		{
+			Identifier:     "gaslimit",
+			TypeAnnotation: sema.NewTypeAnnotation(sema.UInt64Type),
+		},
+		{
+			Identifier:     "value",
+			TypeAnnotation: sema.NewTypeAnnotation(Flex_BalanceType),
+		},
+	},
+	ReturnTypeAnnotation: sema.NewTypeAnnotation(
+		Flex_FlexAddressType,
+	),
+}
+
+const Flex_FlowOwnedAccountTypeDeployFunctionDocString = `
+Deploys a contract to the Flex environment.
+Returns the address of the newly deployed.
+`
+
+const Flex_FlowOwnedAccountTypeCallFunctionName = "call"
+
+var Flex_FlowOwnedAccountTypeCallFunctionType = &sema.FunctionType{
+	Parameters: []sema.Parameter{
+		{
+			Identifier:     "to",
+			TypeAnnotation: sema.NewTypeAnnotation(Flex_FlexAddressType),
+		},
+		{
+			Identifier: "data",
+			TypeAnnotation: sema.NewTypeAnnotation(&sema.VariableSizedType{
+				Type: sema.UInt8Type,
+			}),
+		},
+		{
+			Identifier:     "gaslimit",
+			TypeAnnotation: sema.NewTypeAnnotation(sema.UInt64Type),
+		},
+		{
+			Identifier:     "value",
+			TypeAnnotation: sema.NewTypeAnnotation(Flex_BalanceType),
+		},
+	},
+	ReturnTypeAnnotation: sema.NewTypeAnnotation(
+		&sema.VariableSizedType{
+			Type: sema.UInt8Type,
+		},
+	),
+}
+
+const Flex_FlowOwnedAccountTypeCallFunctionDocString = `
+Calls a function with the given data.
+The execution is limited by the given amount of gas.
+`
+
+const Flex_FlowOwnedAccountTypeName = "FlowOwnedAccount"
+
+var Flex_FlowOwnedAccountType = func() *sema.CompositeType {
+	var t = &sema.CompositeType{
+		Identifier:         Flex_FlowOwnedAccountTypeName,
+		Kind:               common.CompositeKindResource,
+	}
+
+	return t
+}()
+
+func init() {
+	var members = []*sema.Member{
+		sema.NewUnmeteredFunctionMember(
+			Flex_FlowOwnedAccountType,
+						ast.AccessPublic,
+			Flex_FlowOwnedAccountTypeAddressFunctionName,
+			Flex_FlowOwnedAccountTypeAddressFunctionType,
+			Flex_FlowOwnedAccountTypeAddressFunctionDocString,
+		),
+		sema.NewUnmeteredFunctionMember(
+			Flex_FlowOwnedAccountType,
+						ast.AccessPublic,
+			Flex_FlowOwnedAccountTypeDepositFunctionName,
+			Flex_FlowOwnedAccountTypeDepositFunctionType,
+			Flex_FlowOwnedAccountTypeDepositFunctionDocString,
+		),
+		sema.NewUnmeteredFunctionMember(
+			Flex_FlowOwnedAccountType,
+						ast.AccessPublic,
+			Flex_FlowOwnedAccountTypeWithdrawFunctionName,
+			Flex_FlowOwnedAccountTypeWithdrawFunctionType,
+			Flex_FlowOwnedAccountTypeWithdrawFunctionDocString,
+		),
+		sema.NewUnmeteredFunctionMember(
+			Flex_FlowOwnedAccountType,
+						ast.AccessPublic,
+			Flex_FlowOwnedAccountTypeDeployFunctionName,
+			Flex_FlowOwnedAccountTypeDeployFunctionType,
+			Flex_FlowOwnedAccountTypeDeployFunctionDocString,
+		),
+		sema.NewUnmeteredFunctionMember(
+			Flex_FlowOwnedAccountType,
+						ast.AccessPublic,
+			Flex_FlowOwnedAccountTypeCallFunctionName,
+			Flex_FlowOwnedAccountTypeCallFunctionType,
+			Flex_FlowOwnedAccountTypeCallFunctionDocString,
+		),
+	}
+
+	Flex_FlowOwnedAccountType.Members = sema.MembersAsMap(members)
+	Flex_FlowOwnedAccountType.Fields = sema.MembersFieldNames(members)
+}
+
 const FlexTypeRunFunctionName = "run"
 
 var FlexTypeRunFunctionType = &sema.FunctionType{
@@ -105,8 +347,12 @@ var FlexTypeRunFunctionType = &sema.FunctionType{
 }
 
 const FlexTypeRunFunctionDocString = `
-Run runs a flex transaction, deducts the gas fees and deposits them into the
-provided coinbase address
+Runs an a RLP-encoded Flex transaction,
+deducts the gas fees and deposits them into the
+provided coinbase address.
+
+Returns true if the transaction was successful,
+and returns false otherwise.
 `
 
 const FlexTypeName = "Flex"
@@ -118,6 +364,8 @@ var FlexType = func() *sema.CompositeType {
 	}
 
 	t.SetNestedType(Flex_FlexAddressTypeName, Flex_FlexAddressType)
+	t.SetNestedType(Flex_BalanceTypeName, Flex_BalanceType)
+	t.SetNestedType(Flex_FlowOwnedAccountTypeName, Flex_FlowOwnedAccountType)
 	return t
 }()
 
@@ -130,6 +378,14 @@ func init() {
 			Flex_FlexAddressTypeName,
 			Flex_FlexAddressTypeConstructorType,
 			Flex_FlexAddressTypeConstructorDocString,
+		),
+		// TODO: use NewUnmeteredConstructorMember
+		sema.NewUnmeteredFunctionMember(
+			FlexType,
+			ast.AccessPublic,
+			Flex_BalanceTypeName,
+			Flex_BalanceTypeConstructorType,
+			Flex_BalanceTypeConstructorDocString,
 		),
 		sema.NewUnmeteredFunctionMember(
 			FlexType,

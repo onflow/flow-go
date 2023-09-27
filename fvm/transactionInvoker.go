@@ -14,6 +14,7 @@ import (
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/flex"
 	flexStdlib "github.com/onflow/flow-go/fvm/flex/stdlib"
+	"github.com/onflow/flow-go/fvm/flex/stdlib/emulator"
 	reusableRuntime "github.com/onflow/flow-go/fvm/runtime"
 	"github.com/onflow/flow-go/fvm/storage"
 	"github.com/onflow/flow-go/fvm/storage/derived"
@@ -94,8 +95,10 @@ func newTransactionExecutor(
 	// TODO: how to clean up?
 	if ctx.FlexEnabled {
 		handler := flex.NewFlexContractHandler(env)
-		cadenceRuntime.DeclareValue(flexStdlib.NewFlexStandardLibraryValue(nil, handler))
-		cadenceRuntime.DeclareType(flexStdlib.FlexStandardLibraryType)
+		// TODO: pass proper Flex type definition based on environment
+		flexTypeDefinition := emulator.FlexTypeDefinition
+		cadenceRuntime.DeclareValue(flexStdlib.NewFlexStandardLibraryValue(nil, flexTypeDefinition, handler))
+		cadenceRuntime.DeclareType(flexStdlib.NewFlexStandardLibraryType(flexTypeDefinition))
 	}
 
 	return &transactionExecutor{
