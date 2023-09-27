@@ -37,7 +37,7 @@ func (d Data) AsBigInt() *big.Int {
 // externally owned accounts (EOAs), smart contract accounts and flow owned accounts (FOAs)
 type FlexAccount interface {
 	// Returns the address of this account
-	Address() *FlexAddress
+	Address() FlexAddress
 
 	// Returns balance of this account
 	Balance() Balance
@@ -64,7 +64,7 @@ type FlowOwnedAccount interface {
 	// Deploy deploys a contract to the Flex environment
 	// the new deployed contract would be at the returned address and
 	// the contract data is not controlled by the FOA accounts
-	Deploy(Code, GasLimit, Balance) *FlexAddress
+	Deploy(Code, GasLimit, Balance) FlexAddress
 
 	// Call calls a smart contract function with the given data.
 	// The gas usage is limited by the given gas limit,
@@ -73,5 +73,5 @@ type FlowOwnedAccount interface {
 	// and are transferred to the target address.
 	// if no data is provided it would behave as transfering tokens to the
 	// target address
-	Call(*FlexAddress, Data, GasLimit, Balance) Data
+	Call(FlexAddress, Data, GasLimit, Balance) Data
 }

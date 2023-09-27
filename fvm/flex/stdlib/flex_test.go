@@ -31,7 +31,7 @@ import (
 type testFlexContractHandler struct {
 	newFlowOwnedAccount func() models.FlowOwnedAccount
 	lastExecutedBlock   func() *models.FlexBlock
-	run                 func(tx []byte, coinbase *models.FlexAddress) bool
+	run                 func(tx []byte, coinbase models.FlexAddress) bool
 }
 
 var _ models.FlexContractHandler = testFlexContractHandler{}
@@ -50,7 +50,7 @@ func (t testFlexContractHandler) LastExecutedBlock() *models.FlexBlock {
 	return t.lastExecutedBlock()
 }
 
-func (t testFlexContractHandler) Run(tx []byte, coinbase *models.FlexAddress) bool {
+func (t testFlexContractHandler) Run(tx []byte, coinbase models.FlexAddress) bool {
 	if t.run == nil {
 		panic("unexpected Run")
 	}
@@ -164,7 +164,7 @@ func TestFlexRun(t *testing.T) {
 	runCalled := false
 
 	handler := testFlexContractHandler{
-		run: func(tx []byte, coinbase *models.FlexAddress) bool {
+		run: func(tx []byte, coinbase models.FlexAddress) bool {
 			runCalled = true
 
 			assert.Equal(t, []byte{1, 2, 3}, tx)
@@ -172,7 +172,7 @@ func TestFlexRun(t *testing.T) {
 				models.FlexAddress{
 					1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 6, 7, 7, 8, 8, 9, 9, 10, 10,
 				},
-				*coinbase,
+				coinbase,
 			)
 
 			return true

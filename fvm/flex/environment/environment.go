@@ -126,9 +126,9 @@ func (fe *Environment) commit() error {
 
 // TODO: properly use an address generator (zeros + random section) and verify collision
 // TODO: does this leads to trie depth issue?
-func (fe *Environment) AllocateAddressAndMintTo(balance *big.Int) (*models.FlexAddress, error) {
+func (fe *Environment) AllocateAddressAndMintTo(balance *big.Int) (models.FlexAddress, error) {
 	if err := fe.checkExecuteOnce(); err != nil {
-		return nil, err
+		return models.FlexAddress{}, err
 	}
 
 	target := fe.allocateAddress()
@@ -139,14 +139,14 @@ func (fe *Environment) AllocateAddressAndMintTo(balance *big.Int) (*models.FlexA
 
 // Balance returns the balance of an address
 // TODO: do it as a ReadOnly env view.
-func (fe *Environment) Balance(target *models.FlexAddress) (*big.Int, error) {
+func (fe *Environment) Balance(target models.FlexAddress) (*big.Int, error) {
 	if err := fe.checkExecuteOnce(); err != nil {
 		return nil, err
 	}
 	return fe.State.GetBalance(target.ToCommon()), nil
 }
 
-func (fe *Environment) allocateAddress() *models.FlexAddress {
+func (fe *Environment) allocateAddress() models.FlexAddress {
 	target := models.FlexAddress{}
 	// first 12 bytes would be zero
 	// the next 8 bytes would be incremented of uuid
@@ -157,7 +157,7 @@ func (fe *Environment) allocateAddress() *models.FlexAddress {
 	// if fe.State.Exist(target.ToCommon()) {
 	// }
 
-	return &target
+	return target
 }
 
 // MintTo mints tokens into the target address, if the address dees not

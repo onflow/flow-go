@@ -46,7 +46,7 @@ func (h FlexContractHandler) LastExecutedBlock() *models.FlexBlock {
 	return block
 }
 
-func (h FlexContractHandler) Run(tx []byte, coinbase *models.FlexAddress) bool {
+func (h FlexContractHandler) Run(tx []byte, coinbase models.FlexAddress) bool {
 	config := env.NewFlexConfig(
 		env.WithCoinbase(coinbase.ToCommon()),
 		env.WithBlockNumber(env.BlockNumberForEVMRules))
@@ -82,12 +82,12 @@ func (h FlexContractHandler) handleError(err error) {
 
 type foa struct {
 	fch     FlexContractHandler
-	address *models.FlexAddress
+	address models.FlexAddress
 }
 
 var _ models.FlowOwnedAccount = &foa{}
 
-func newFOA(fch FlexContractHandler, addr *models.FlexAddress) *foa {
+func newFOA(fch FlexContractHandler, addr models.FlexAddress) *foa {
 	return &foa{
 		fch:     fch,
 		address: addr,
@@ -95,7 +95,7 @@ func newFOA(fch FlexContractHandler, addr *models.FlexAddress) *foa {
 }
 
 // Address returns the flex address associated with the FOA account
-func (f *foa) Address() *models.FlexAddress {
+func (f *foa) Address() models.FlexAddress {
 	return f.address
 }
 
@@ -136,7 +136,7 @@ func (f *foa) Withdraw(b models.Balance) *models.FLOWTokenVault {
 // Deploy deploys a contract to the Flex environment
 // the new deployed contract would be at the returned address and
 // the contract data is not controlled by the FOA accounts
-func (f *foa) Deploy(code models.Code, gaslimit models.GasLimit, balance models.Balance) *models.FlexAddress {
+func (f *foa) Deploy(code models.Code, gaslimit models.GasLimit, balance models.Balance) models.FlexAddress {
 	env := f.fch.getNewDefaultEnv()
 	// TODO check gas limit against what has been left on the transaction side
 	err := env.Deploy(f.address.ToCommon(), code, uint64(gaslimit), balance.ToAttoFlow())
@@ -144,7 +144,7 @@ func (f *foa) Deploy(code models.Code, gaslimit models.GasLimit, balance models.
 	if env.Result.Failed {
 		panic("deploy failed")
 	}
-	return models.NewFlexAddress(env.Result.DeployedContractAddress)
+	return models.FlexAddress(env.Result.DeployedContractAddress)
 }
 
 // Call calls a smart contract function with the given data
@@ -152,7 +152,7 @@ func (f *foa) Deploy(code models.Code, gaslimit models.GasLimit, balance models.
 // given it doesn't goes beyond what Flow transaction allows.
 // the balance would be deducted from the OFA account and would be transferred to the target address
 // contract data is not controlled by the FOA accounts
-func (f *foa) Call(to *models.FlexAddress, data models.Data, gaslimit models.GasLimit, balance models.Balance) models.Data {
+func (f *foa) Call(to models.FlexAddress, data models.Data, gaslimit models.GasLimit, balance models.Balance) models.Data {
 	env := f.fch.getNewDefaultEnv()
 	// TODO check the gas on the backend
 	// TODO check gas limit against what has been left on the transaction side

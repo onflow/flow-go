@@ -121,7 +121,7 @@ func NewFlexTypeRunFunction(
 			// Run
 
 			cb := models.FlexAddress(coinbase)
-			res := handler.Run(transaction, &cb)
+			res := handler.Run(transaction, cb)
 
 			return interpreter.AsBoolValue(res)
 		},

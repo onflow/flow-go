@@ -66,7 +66,7 @@ func TestFlexContractHandler(t *testing.T) {
 			// transfer 0.1 flow to the non-foa address
 			deduction, err := models.NewBalanceFromAttoFlow(big.NewInt(1e17))
 			require.NoError(t, err)
-			foa.Call(models.NewFlexAddress(address), nil, 400000, deduction)
+			foa.Call(models.FlexAddress(address), nil, 400000, deduction)
 			require.Equal(t, orgBalance.Sub(deduction), foa.Balance())
 
 			// transfer 0.01 flow back to the foa through
