@@ -70,7 +70,6 @@ func NewExecutionStateWorker(
 
 // Start the worker jobqueue to consume the available data.
 func (i *Indexer) Start(ctx irrecoverable.SignalerContext) {
-	// todo should we protect this to only be called once - albeit start on the consumer being called that has the protection
 	i.exeDataReader.AddContext(ctx)
 	i.component.Start(ctx)
 }
