@@ -22,6 +22,30 @@ func RunWithTestBackend(t testing.TB, f func(models.Backend)) {
 	f(tb)
 }
 
+func RunWithDeployedContract(t *testing.T, f func(models.Backend, *TestContract)) {
+	RunWithTestBackend(t, func(backend models.Backend) {
+		tc := GetTestContract(t)
+		// deploy contract
+
+		// config := env.NewFlexConfig(
+		// 	env.WithCoinbase(coinbase.ToCommon()),
+		// 	env.WithBlockNumber(env.BlockNumberForEVMRules))
+		// env, err := env.NewEnvironment(config, h.db)
+		// storage.NewDatabase(backend)
+		// // TODO improve this
+		// if err != nil {
+		// 	panic(err)
+		// }
+		// err = env.RunTransaction(tx)
+		// if err != nil {
+		// 	panic(err)
+		// }
+		// return !env.Result.Failed
+
+		f(backend, tc)
+	})
+}
+
 func fullKey(owner, key []byte) string {
 	return string(owner) + "~" + string(key)
 }

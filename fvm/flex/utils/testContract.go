@@ -7,13 +7,15 @@ import (
 	"testing"
 
 	"github.com/ethereum/go-ethereum/accounts/abi"
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/stretchr/testify/require"
 )
 
 type TestContract struct {
-	Code     string
-	ABI      string
-	ByteCode []byte
+	Code       string
+	ABI        string
+	ByteCode   []byte
+	DeployedAt common.Address
 }
 
 func (tc *TestContract) MakeStoreCallData(t *testing.T, num *big.Int) []byte {
@@ -30,6 +32,10 @@ func (tc *TestContract) MakeRetrieveCallData(t *testing.T) []byte {
 	retrieve, err := abi.Pack("retrieve")
 	require.NoError(t, err)
 	return retrieve
+}
+
+func (tc *TestContract) SetDeployedAt(deployedAt common.Address) {
+	tc.DeployedAt = deployedAt
 }
 
 func GetTestContract(t *testing.T) *TestContract {

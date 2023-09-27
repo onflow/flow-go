@@ -20,22 +20,12 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.opentelemetry.io/otel/attribute"
 
-	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/flex"
 	"github.com/onflow/flow-go/fvm/flex/models"
 	flexStdlib "github.com/onflow/flow-go/fvm/flex/stdlib"
 	"github.com/onflow/flow-go/fvm/flex/stdlib/emulator"
-	"github.com/onflow/flow-go/fvm/flex/storage"
 	"github.com/onflow/flow-go/fvm/flex/utils"
-	"github.com/onflow/flow-go/fvm/storage/testutils"
 )
-
-func RunWithTempLedger(t testing.TB, f func(atree.Ledger)) {
-	txnState := testutils.NewSimpleTransaction(nil)
-	accounts := environment.NewAccounts(txnState)
-	led := storage.NewLedger(accounts)
-	f(led)
-}
 
 func encodeArgs(argValues []cadence.Value) [][]byte {
 	args := make([][]byte, len(argValues))
@@ -66,7 +56,6 @@ var flexAddressCadenceType = cadence.NewStructType(
 func TestFlexAddressConstructionAndReturn(t *testing.T) {
 
 	t.Parallel()
-
 	utils.RunWithTestBackend(t, func(backend models.Backend) {
 		handler := flex.NewFlexContractHandler(backend)
 
