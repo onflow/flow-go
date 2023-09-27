@@ -58,58 +58,77 @@ type ControlMsgValidationInspector struct {
 	subscriptions p2p.Subscriptions
 }
 
+type InspectorParams struct {
+	Ctx irrecoverable.SignalerContext
+	// Logger the logger used by the inspector.
+	Logger zerolog.Logger
+	// SporkID the current spork ID.
+	SporkID flow.Identifier
+	// Config inspector configuration.
+	Config *p2pconf.GossipSubRPCValidationInspectorConfigs
+	// Distributor gossipsub inspector notification distributor.
+	Distributor p2p.GossipSubInspectorNotifDistributor
+	// InspectMsgQueueCacheCollector metrics collector for the underlying inspect message queue cache.
+	InspectMsgQueueCacheCollector module.HeroCacheMetrics
+	// ClusterPrefixedCacheCollector metrics collector for the underlying cluster prefix received tracker cache.
+	ClusterPrefixedCacheCollector module.HeroCacheMetrics
+	// IdProvider identity provider is used to get the flow identifier for a peer.
+	IdProvider module.IdentityProvider
+	// InspectorMetrics metrics for the validation inspector.
+	InspectorMetrics module.GossipSubRpcValidationInspectorMetrics
+	// RpcTracker tracker used to track iHave RPC's sent and last size.
+	RpcTracker p2p.RpcControlTracking
+	// Subscriptions p2p subscriptions used to check if node has a subscription to a topic.
+	Subscriptions p2p.Subscriptions
+}
+
 var _ component.Component = (*ControlMsgValidationInspector)(nil)
 var _ p2p.GossipSubRPCInspector = (*ControlMsgValidationInspector)(nil)
 var _ protocol.Consumer = (*ControlMsgValidationInspector)(nil)
 
 // NewControlMsgValidationInspector returns new ControlMsgValidationInspector
 // Args:
-//   - logger: the logger used by the inspector.
-//   - sporkID: the current spork ID.
-//   - config: inspector configuration.
-//   - distributor: gossipsub inspector notification distributor.
-//   - clusterPrefixedCacheCollector: metrics collector for the underlying cluster prefix received tracker cache.
-//   - idProvider: identity provider is used to get the flow identifier for a peer.
+//   - *InspectorParams: params used to create the inspector.
 //
 // Returns:
 //   - *ControlMsgValidationInspector: a new control message validation inspector.
 //   - error: an error if there is any error while creating the inspector. All errors are irrecoverable and unexpected.
-func NewControlMsgValidationInspector(ctx irrecoverable.SignalerContext, logger zerolog.Logger, sporkID flow.Identifier, config *p2pconf.GossipSubRPCValidationInspectorConfigs, distributor p2p.GossipSubInspectorNotifDistributor, inspectMsgQueueCacheCollector module.HeroCacheMetrics, clusterPrefixedCacheCollector module.HeroCacheMetrics, idProvider module.IdentityProvider, inspectorMetrics module.GossipSubRpcValidationInspectorMetrics, rpcTracker p2p.RpcControlTracking, subscriptions p2p.Subscriptions) (*ControlMsgValidationInspector, error) {
-	lg := logger.With().Str("component", "gossip_sub_rpc_validation_inspector").Logger()
+func NewControlMsgValidationInspector(params *InspectorParams) (*ControlMsgValidationInspector, error) {
+	lg := params.Logger.With().Str("component", "gossip_sub_rpc_validation_inspector").Logger()
 
-	clusterPrefixedTracker, err := cache.NewClusterPrefixedMessagesReceivedTracker(logger, config.ClusterPrefixedControlMsgsReceivedCacheSize, clusterPrefixedCacheCollector, config.ClusterPrefixedControlMsgsReceivedCacheDecay)
+	clusterPrefixedTracker, err := cache.NewClusterPrefixedMessagesReceivedTracker(params.Logger, params.Config.ClusterPrefixedControlMsgsReceivedCacheSize, params.ClusterPrefixedCacheCollector, params.Config.ClusterPrefixedControlMsgsReceivedCacheDecay)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create cluster prefix topics received tracker")
 	}
 
 	c := &ControlMsgValidationInspector{
-		ctx:           ctx,
+		ctx:           params.Ctx,
 		logger:        lg,
-		sporkID:       sporkID,
-		config:        config,
-		distributor:   distributor,
+		sporkID:       params.SporkID,
+		config:        params.Config,
+		distributor:   params.Distributor,
 		tracker:       clusterPrefixedTracker,
-		rpcTracker:    rpcTracker,
-		idProvider:    idProvider,
-		metrics:       inspectorMetrics,
+		rpcTracker:    params.RpcTracker,
+		idProvider:    params.IdProvider,
+		metrics:       params.InspectorMetrics,
 		rateLimiters:  make(map[p2pmsg.ControlMessageType]p2p.BasicRateLimiter),
-		subscriptions: subscriptions,
+		subscriptions: params.Subscriptions,
 	}
 
-	store := queue.NewHeroStore(config.CacheSize, logger, inspectMsgQueueCacheCollector)
+	store := queue.NewHeroStore(params.Config.CacheSize, params.Logger, params.InspectMsgQueueCacheCollector)
 	pool := worker.NewWorkerPoolBuilder[*InspectRPCRequest](lg, store, c.processInspectRPCReq).Build()
 
 	c.workerPool = pool
 
 	builder := component.NewComponentManagerBuilder()
 	builder.AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
-		distributor.Start(ctx)
+		c.distributor.Start(ctx)
 		select {
 		case <-ctx.Done():
-		case <-distributor.Ready():
+		case <-c.distributor.Ready():
 			ready()
 		}
-		<-distributor.Done()
+		<-c.distributor.Done()
 	})
 	for i := 0; i < c.config.NumberOfWorkers; i++ {
 		builder.AddWorker(pool.WorkerLogic())

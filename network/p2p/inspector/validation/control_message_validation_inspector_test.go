@@ -472,19 +472,19 @@ func TestControlMessageValidationInspector_ActiveClustersChanged(t *testing.T) {
 	require.NoError(t, err, "failed to get default flow config")
 	distributor := mockp2p.NewGossipSubInspectorNotifDistributor(t)
 	signalerCtx := irrecoverable.NewMockSignalerContext(t, context.Background())
-	inspector, err := NewControlMsgValidationInspector(
-		signalerCtx,
-		unittest.Logger(),
-		sporkID,
-		&flowConfig.NetworkConfig.GossipSubRPCValidationInspectorConfigs,
-		distributor,
-		metrics.NewNoopCollector(),
-		metrics.NewNoopCollector(),
-		mockmodule.NewIdentityProvider(t),
-		metrics.NewNoopCollector(),
-		mockp2p.NewRpcControlTracking(t),
-		mockp2p.NewSubscriptions(t),
-	)
+	inspector, err := NewControlMsgValidationInspector(&InspectorParams{
+		Ctx:                           signalerCtx,
+		Logger:                        unittest.Logger(),
+		SporkID:                       sporkID,
+		Config:                        &flowConfig.NetworkConfig.GossipSubRPCValidationInspectorConfigs,
+		Distributor:                   distributor,
+		InspectMsgQueueCacheCollector: metrics.NewNoopCollector(),
+		ClusterPrefixedCacheCollector: metrics.NewNoopCollector(),
+		IdProvider:                    mockmodule.NewIdentityProvider(t),
+		InspectorMetrics:              metrics.NewNoopCollector(),
+		RpcTracker:                    mockp2p.NewRpcControlTracking(t),
+		Subscriptions:                 mockp2p.NewSubscriptions(t),
+	})
 	require.NoError(t, err)
 	activeClusterIds := make(flow.ChainIDList, 0)
 	for _, id := range unittest.IdentifierListFixture(5) {
@@ -504,19 +504,19 @@ func inspectorFixture(t *testing.T) (*ControlMsgValidationInspector, *mockp2p.Go
 	idProvider := mockmodule.NewIdentityProvider(t)
 	signalerCtx := irrecoverable.NewMockSignalerContext(t, context.Background())
 	subscriptions := mockp2p.NewSubscriptions(t)
-	inspector, err := NewControlMsgValidationInspector(
-		signalerCtx,
-		unittest.Logger(),
-		sporkID,
-		&flowConfig.NetworkConfig.GossipSubRPCValidationInspectorConfigs,
-		distributor,
-		metrics.NewNoopCollector(),
-		metrics.NewNoopCollector(),
-		idProvider,
-		metrics.NewNoopCollector(),
-		mockp2p.NewRpcControlTracking(t),
-		subscriptions,
-	)
+	inspector, err := NewControlMsgValidationInspector(&InspectorParams{
+		Ctx:                           signalerCtx,
+		Logger:                        unittest.Logger(),
+		SporkID:                       sporkID,
+		Config:                        &flowConfig.NetworkConfig.GossipSubRPCValidationInspectorConfigs,
+		Distributor:                   distributor,
+		InspectMsgQueueCacheCollector: metrics.NewNoopCollector(),
+		ClusterPrefixedCacheCollector: metrics.NewNoopCollector(),
+		IdProvider:                    idProvider,
+		InspectorMetrics:              metrics.NewNoopCollector(),
+		RpcTracker:                    mockp2p.NewRpcControlTracking(t),
+		Subscriptions:                 subscriptions,
+	})
 	require.NoError(t, err, "failed to create control message validation inspector fixture")
 	rpcTracker := mockp2p.NewRpcControlTracking(t)
 	inspector.rpcTracker = rpcTracker
