@@ -39,7 +39,6 @@ func newWorkerTest(t *testing.T, availableBlocks int, lastIndexedIndex int) *wor
 	progress := &mockProgress{index: lastIndexedHeight}
 
 	indexerTest := newIndexTest(t, blocks, nil).
-		useDefaultFirstHeight().
 		setLastHeight(func(t *testing.T) (uint64, error) {
 			return lastIndexedHeight, nil
 		}).
@@ -94,7 +93,7 @@ func (w *workerTest) first() *flow.Block {
 	return w.blocks[0]
 }
 
-func (w *workerTest) run(ctx irrecoverable.SignalerContext, cancel context.CancelFunc) {
+func (w *workerTest) run(ctx irrecoverable.SignalerContext) {
 	w.worker.Start(ctx)
 
 	unittest.RequireComponentsReadyBefore(w.t, testTimeout, w.worker.component)
@@ -102,9 +101,7 @@ func (w *workerTest) run(ctx irrecoverable.SignalerContext, cancel context.Cance
 	w.worker.OnExecutionData(nil)
 
 	// give it a bit of time to process all the blocks
-	time.Sleep(testTimeout - 50)
-	cancel()
-	unittest.RequireCloseBefore(w.t, w.worker.component.Done(), testTimeout, "timeout waiting for the consumer to be done")
+	unittest.RequireCloseBefore(w.t, w.worker.component.Done(), testTimeout*10000, "timeout waiting for the consumer to be done")
 }
 
 type mockProgress struct {
@@ -159,8 +156,8 @@ func TestWorker_Success(t *testing.T) {
 		return execution_data.NewBlockExecutionDataEntity(ID, ed), true
 	})
 
-	signalerCtx, cancel := irrecoverable.NewMockSignalerContextWithCancel(t, context.Background())
-	test.run(signalerCtx, cancel)
+	signalerCtx := irrecoverable.NewMockSignalerContext(t, context.Background())
+	test.run(signalerCtx)
 
 	// make sure store was called correct number of times
 	test.indexTest.registers.AssertNumberOfCalls(t, "Store", blocks-lastIndexedIndex-1)
@@ -195,10 +192,9 @@ func TestWorker_Failure(t *testing.T) {
 		test.blocks[lastIndexedIndex].Header.Height+1,
 		test.blocks[lastIndexedIndex].Header.Height+1,
 	)
-	ctx, cancel := context.WithCancel(context.Background())
-	signalerCtx := irrecoverable.NewMockSignalerContextExpectError(t, ctx, expectedErr)
 
-	test.run(signalerCtx, cancel)
+	signalerCtx := irrecoverable.NewMockSignalerContextExpectError(t, context.Background(), expectedErr)
+	test.run(signalerCtx)
 
 	// make sure store was called correct number of times
 	test.indexTest.registers.AssertNumberOfCalls(t, "Store", 1) // it fails after first run

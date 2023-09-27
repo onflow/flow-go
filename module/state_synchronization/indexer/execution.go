@@ -66,7 +66,7 @@ func (i *ExecutionState) RegisterValues(IDs flow.RegisterIDs, height uint64) ([]
 // Expected errors:
 // - ErrIndexValue if height was not incremented in sequence
 // - storage.ErrNotFound if the block for execution data was not found
-func (i *ExecutionState) IndexBlockData(ctx context.Context, data *execution_data.BlockExecutionDataEntity) error {
+func (i *ExecutionState) IndexBlockData(_ context.Context, data *execution_data.BlockExecutionDataEntity) error {
 	block, err := i.headers.ByBlockID(data.BlockID)
 	if err != nil {
 		return fmt.Errorf("could not get the block by ID %s: %w", data.BlockID, err)
