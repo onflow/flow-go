@@ -33,7 +33,7 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-type indexTest struct {
+type indexCoreTest struct {
 	t                *testing.T
 	indexer          *IndexerCore
 	registers        *storagemock.RegisterIndex
@@ -49,12 +49,12 @@ type indexTest struct {
 	registersGet     func(t *testing.T, IDs flow.RegisterID, height uint64) (flow.RegisterValue, error)
 }
 
-func newIndexTest(
+func newIndexCoreTest(
 	t *testing.T,
 	blocks []*flow.Block,
 	exeData *execution_data.BlockExecutionDataEntity,
-) *indexTest {
-	return &indexTest{
+) *indexCoreTest {
+	return &indexCoreTest{
 		t:         t,
 		registers: storagemock.NewRegisterIndex(t),
 		events:    storagemock.NewEvents(t),
@@ -65,7 +65,7 @@ func newIndexTest(
 	}
 }
 
-func (i *indexTest) useDefaultBlockByHeight() *indexTest {
+func (i *indexCoreTest) useDefaultBlockByHeight() *indexCoreTest {
 	i.headers.
 		On("BlockIDByHeight", mocks.AnythingOfType("uint64")).
 		Return(func(height uint64) (flow.Identifier, error) {
@@ -80,7 +80,7 @@ func (i *indexTest) useDefaultBlockByHeight() *indexTest {
 	return i
 }
 
-func (i *indexTest) setLastHeight(f func(t *testing.T) uint64) *indexTest {
+func (i *indexCoreTest) setLastHeight(f func(t *testing.T) uint64) *indexCoreTest {
 	i.registers.
 		On("LatestHeight").
 		Return(func() uint64 {
@@ -89,7 +89,7 @@ func (i *indexTest) setLastHeight(f func(t *testing.T) uint64) *indexTest {
 	return i
 }
 
-func (i *indexTest) useDefaultLastHeight() *indexTest {
+func (i *indexCoreTest) useDefaultLastHeight() *indexCoreTest {
 	i.registers.
 		On("LatestHeight").
 		Return(func() uint64 {
@@ -98,7 +98,7 @@ func (i *indexTest) useDefaultLastHeight() *indexTest {
 	return i
 }
 
-func (i *indexTest) setStoreRegisters(f func(t *testing.T, entries flow.RegisterEntries, height uint64) error) *indexTest {
+func (i *indexCoreTest) setStoreRegisters(f func(t *testing.T, entries flow.RegisterEntries, height uint64) error) *indexCoreTest {
 	i.registers.
 		On("Store", mock.AnythingOfType("flow.RegisterEntries"), mock.AnythingOfType("uint64")).
 		Return(func(entries flow.RegisterEntries, height uint64) error {
@@ -107,7 +107,7 @@ func (i *indexTest) setStoreRegisters(f func(t *testing.T, entries flow.Register
 	return i
 }
 
-func (i *indexTest) setStoreEvents(f func(t *testing.T, ID flow.Identifier, events []flow.EventsList) error) *indexTest {
+func (i *indexCoreTest) setStoreEvents(f func(t *testing.T, ID flow.Identifier, events []flow.EventsList) error) *indexCoreTest {
 	i.events.
 		On("Store", mock.AnythingOfType("flow.Identifier"), mock.AnythingOfType("[]flow.EventsList")).
 		Return(func(ID flow.Identifier, events []flow.EventsList) error {
@@ -116,7 +116,7 @@ func (i *indexTest) setStoreEvents(f func(t *testing.T, ID flow.Identifier, even
 	return i
 }
 
-func (i *indexTest) setGetRegisters(f func(t *testing.T, ID flow.RegisterID, height uint64) (flow.RegisterValue, error)) *indexTest {
+func (i *indexCoreTest) setGetRegisters(f func(t *testing.T, ID flow.RegisterID, height uint64) (flow.RegisterValue, error)) *indexCoreTest {
 	i.registers.
 		On("Get", mock.AnythingOfType("flow.RegisterID"), mock.AnythingOfType("uint64")).
 		Return(func(IDs flow.RegisterID, height uint64) (flow.RegisterValue, error) {
@@ -125,19 +125,19 @@ func (i *indexTest) setGetRegisters(f func(t *testing.T, ID flow.RegisterID, hei
 	return i
 }
 
-func (i *indexTest) initIndexer() *indexTest {
+func (i *indexCoreTest) initIndexer() *indexCoreTest {
 	indexer, err := New(zerolog.New(os.Stdout), i.registers, i.headers, nil)
 	require.NoError(i.t, err)
 	i.indexer = indexer
 	return i
 }
 
-func (i *indexTest) runIndexBlockData() error {
+func (i *indexCoreTest) runIndexBlockData() error {
 	i.initIndexer()
 	return i.indexer.IndexBlockData(i.ctx, i.data)
 }
 
-func (i *indexTest) runGetRegisters(IDs flow.RegisterIDs, height uint64) ([]flow.RegisterValue, error) {
+func (i *indexCoreTest) runGetRegisters(IDs flow.RegisterIDs, height uint64) ([]flow.RegisterValue, error) {
 	i.initIndexer()
 	return i.indexer.RegisterValues(IDs, height)
 }
@@ -158,7 +158,7 @@ func TestExecutionState_IndexBlockData(t *testing.T) {
 		}
 		execData := execution_data.NewBlockExecutionDataEntity(block.ID(), ed)
 
-		err := newIndexTest(t, blocks, execData).
+		err := newIndexCoreTest(t, blocks, execData).
 			initIndexer().
 			useDefaultLastHeight().
 			// make sure update registers match in length and are same as block data ledger payloads
@@ -200,7 +200,7 @@ func TestExecutionState_IndexBlockData(t *testing.T) {
 		execData := execution_data.NewBlockExecutionDataEntity(block.ID(), ed)
 
 		testRegisterFound := false
-		err = newIndexTest(t, blocks, execData).
+		err = newIndexCoreTest(t, blocks, execData).
 			initIndexer().
 			useDefaultLastHeight().
 			// make sure update registers match in length and are same as block data ledger payloads
@@ -232,7 +232,7 @@ func TestExecutionState_IndexBlockData(t *testing.T) {
 		execData := execution_data.NewBlockExecutionDataEntity(last.ID(), ed)
 		latestHeight := blocks[len(blocks)-3].Header.Height
 
-		err := newIndexTest(t, blocks, execData).
+		err := newIndexCoreTest(t, blocks, execData).
 			// return a height one smaller than the latest block in storage
 			setLastHeight(func(t *testing.T) uint64 {
 				return latestHeight
@@ -251,7 +251,7 @@ func TestExecutionState_IndexBlockData(t *testing.T) {
 		}
 		execData := execution_data.NewBlockExecutionDataEntity(unknownBlock.Header.ID(), ed)
 
-		err := newIndexTest(t, blocks, execData).runIndexBlockData()
+		err := newIndexCoreTest(t, blocks, execData).runIndexBlockData()
 
 		assert.True(t, errors.Is(err, storage.ErrNotFound))
 	})
@@ -268,7 +268,7 @@ func TestExecutionState_RegisterValues(t *testing.T) {
 		}}
 		val := flow.RegisterValue("0x1")
 
-		values, err := newIndexTest(t, blocks, nil).
+		values, err := newIndexCoreTest(t, blocks, nil).
 			initIndexer().
 			setGetRegisters(func(t *testing.T, ID flow.RegisterID, height uint64) (flow.RegisterValue, error) {
 				return val, nil

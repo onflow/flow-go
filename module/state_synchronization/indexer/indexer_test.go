@@ -20,25 +20,25 @@ import (
 
 const testTimeout = 300 * time.Millisecond
 
-type workerTest struct {
+type indexerTest struct {
 	blocks        []*flow.Block
 	progress      *mockProgress
-	indexTest     *indexTest
+	indexTest     *indexCoreTest
 	worker        *Indexer
 	executionData *mempool.ExecutionData
 	t             *testing.T
 }
 
-// newWorkerTest set up a jobqueue integration test with the worker.
+// newIndexerTest set up a jobqueue integration test with the worker.
 // It will create blocks fixtures with the length provided as availableBlocks, and it will set heights already
 // indexed to lastIndexedIndex value. Using run it should index all the remaining blocks up to all available blocks.
-func newWorkerTest(t *testing.T, availableBlocks int, lastIndexedIndex int) *workerTest {
+func newIndexerTest(t *testing.T, availableBlocks int, lastIndexedIndex int) *indexerTest {
 	blocks := blocksFixture(availableBlocks)
 	// we use 5th index as the latest indexed height, so we leave 5 more blocks to be indexed by the indexer in this test
 	lastIndexedHeight := blocks[lastIndexedIndex].Header.Height
 	progress := &mockProgress{index: lastIndexedHeight}
 
-	indexerTest := newIndexTest(t, blocks, nil).
+	indexerCoreTest := newIndexCoreTest(t, blocks, nil).
 		setLastHeight(func(t *testing.T) uint64 {
 			return progress.index
 		}).
@@ -48,17 +48,17 @@ func newWorkerTest(t *testing.T, availableBlocks int, lastIndexedIndex int) *wor
 	executionData := mempool.NewExecutionData(t)
 	exeCache := cache.NewExecutionDataCache(
 		mock.NewExecutionDataStore(t),
-		indexerTest.indexer.headers,
+		indexerCoreTest.indexer.headers,
 		nil,
 		nil,
 		executionData,
 	)
 
-	test := &workerTest{
+	test := &indexerTest{
 		t:             t,
 		blocks:        blocks,
 		progress:      progress,
-		indexTest:     indexerTest,
+		indexTest:     indexerCoreTest,
 		executionData: executionData,
 	}
 
@@ -66,7 +66,7 @@ func newWorkerTest(t *testing.T, availableBlocks int, lastIndexedIndex int) *wor
 		unittest.Logger(),
 		test.first().Header.Height,
 		testTimeout,
-		indexerTest.indexer,
+		indexerCoreTest.indexer,
 		exeCache,
 		test.latestHeight,
 		progress,
@@ -75,25 +75,25 @@ func newWorkerTest(t *testing.T, availableBlocks int, lastIndexedIndex int) *wor
 	return test
 }
 
-func (w *workerTest) setBlockDataByID(f func(ID flow.Identifier) (*execution_data.BlockExecutionDataEntity, bool)) {
+func (w *indexerTest) setBlockDataByID(f func(ID flow.Identifier) (*execution_data.BlockExecutionDataEntity, bool)) {
 	w.executionData.
 		On("ByID", mocks.AnythingOfType("flow.Identifier")).
 		Return(f)
 }
 
-func (w *workerTest) latestHeight() (uint64, error) {
+func (w *indexerTest) latestHeight() (uint64, error) {
 	return w.last().Header.Height, nil
 }
 
-func (w *workerTest) last() *flow.Block {
+func (w *indexerTest) last() *flow.Block {
 	return w.blocks[len(w.blocks)-1]
 }
 
-func (w *workerTest) first() *flow.Block {
+func (w *indexerTest) first() *flow.Block {
 	return w.blocks[0]
 }
 
-func (w *workerTest) run(ctx irrecoverable.SignalerContext, cancel context.CancelFunc) {
+func (w *indexerTest) run(ctx irrecoverable.SignalerContext, cancel context.CancelFunc) {
 	w.worker.Start(ctx)
 
 	unittest.RequireComponentsReadyBefore(w.t, testTimeout, w.worker.component)
@@ -125,11 +125,11 @@ func (w *mockProgress) InitProcessedIndex(index uint64) error {
 	return nil
 }
 
-func TestWorker_Success(t *testing.T) {
+func TestIndexer_Success(t *testing.T) {
 	// we use 5th index as the latest indexed height, so we leave 5 more blocks to be indexed by the indexer in this test
 	blocks := 10
 	lastIndexedIndex := 5
-	test := newWorkerTest(t, blocks, lastIndexedIndex)
+	test := newIndexerTest(t, blocks, lastIndexedIndex)
 
 	test.setBlockDataByID(func(ID flow.Identifier) (*execution_data.BlockExecutionDataEntity, bool) {
 		trie := trieUpdateFixture(t)
@@ -166,11 +166,11 @@ func TestWorker_Success(t *testing.T) {
 	test.indexTest.registers.AssertNumberOfCalls(t, "Store", blocks-lastIndexedIndex-1)
 }
 
-func TestWorker_Failure(t *testing.T) {
+func TestIndexer_Failure(t *testing.T) {
 	// we use 5th index as the latest indexed height, so we leave 5 more blocks to be indexed by the indexer in this test
 	blocks := 10
 	lastIndexedIndex := 5
-	test := newWorkerTest(t, blocks, lastIndexedIndex)
+	test := newIndexerTest(t, blocks, lastIndexedIndex)
 
 	test.setBlockDataByID(func(ID flow.Identifier) (*execution_data.BlockExecutionDataEntity, bool) {
 		trie := trieUpdateFixture(t)
