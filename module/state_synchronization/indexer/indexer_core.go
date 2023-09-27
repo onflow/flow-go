@@ -8,8 +8,8 @@ import (
 	"golang.org/x/exp/maps"
 	"golang.org/x/sync/errgroup"
 
-	"github.com/onflow/flow-go/cmd/util/ledger/migrations"
 	"github.com/onflow/flow-go/ledger"
+	"github.com/onflow/flow-go/ledger/common/convert"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	"github.com/onflow/flow-go/storage"
@@ -163,7 +163,7 @@ func (i *IndexerCore) indexRegisterPayloads(payloads []*ledger.Payload, height u
 			return err
 		}
 
-		id, err := migrations.KeyToRegisterID(k)
+		id, err := convert.LedgerKeyToRegisterID(k)
 		if err != nil {
 			return err
 		}
