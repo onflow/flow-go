@@ -273,9 +273,6 @@ func (m *Manager) tryCreateStream(ctx context.Context, peerID peer.ID, protocol 
 	// https://github.com/sethvargo/go-retry#maxretries retries counter starts at zero and library will make last attempt
 	// when retries == maxAttempts causing 1 more func invocation than expected.
 	maxRetries := dialCfg.StreamCreationRetryAttemptBudget
-	if maxRetries > 0 {
-		maxRetries = maxRetries - 1
-	}
 	backoff = retry.WithMaxRetries(maxRetries, backoff)
 
 	attempts := 0

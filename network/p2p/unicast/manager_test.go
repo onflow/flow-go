@@ -15,6 +15,7 @@ import (
 
 	"github.com/onflow/flow-go/config"
 	"github.com/onflow/flow-go/module/metrics"
+	mockmetrics "github.com/onflow/flow-go/module/mock"
 	mockp2p "github.com/onflow/flow-go/network/p2p/mock"
 	p2ptest "github.com/onflow/flow-go/network/p2p/test"
 	"github.com/onflow/flow-go/network/p2p/unicast"
@@ -37,6 +38,7 @@ func unicastManagerFixture(t *testing.T) (*unicast.Manager, *mockp2p.StreamFacto
 			StreamCreationRetryAttemptBudget: cfg.NetworkConfig.UnicastConfig.MaxStreamCreationRetryAttemptTimes,
 		}
 	})
+
 	mgr, err := unicast.NewUnicastManager(&unicast.ManagerConfig{
 		Logger:                             unittest.Logger(),
 		StreamFactory:                      streamFactory,
@@ -682,4 +684,103 @@ func TestUnicastManager_Stream_NoBackoff_When_Budget_Is_Zero(t *testing.T) {
 	require.Equal(t, uint64(0), dialCfg.StreamCreationRetryAttemptBudget)                                      // stream backoff budget must remain zero.
 	require.Equal(t, lastSuccessfulDial, dialCfg.LastSuccessfulDial)                                           // last successful dial must be intact.
 	require.Equal(t, uint64(0), dialCfg.ConsecutiveSuccessfulStream)                                           // consecutive successful stream must be set to zero.
+}
+
+// TestUnicastManager_Dial_In_Progress_Backoff tests that when there is a dial in progress, the unicast manager back-offs concurrent CreateStream calls.
+func TestUnicastManager_Dial_In_Progress_Backoff(t *testing.T) {
+	streamFactory := mockp2p.NewStreamFactory(t)
+	streamFactory.On("SetStreamHandler", mock.Anything, mock.Anything).Return().Once()
+	connStatus := mockp2p.NewPeerConnections(t)
+
+	cfg, err := config.DefaultConfig()
+	require.NoError(t, err)
+
+	dialConfigCache := unicastcache.NewDialConfigCache(cfg.NetworkConfig.UnicastConfig.DialConfigCacheSize, unittest.Logger(), metrics.NewNoopCollector(), func() unicast.DialConfig {
+		return unicast.DialConfig{
+			DialRetryAttemptBudget:           cfg.NetworkConfig.UnicastConfig.MaxDialRetryAttemptTimes,
+			StreamCreationRetryAttemptBudget: cfg.NetworkConfig.UnicastConfig.MaxStreamCreationRetryAttemptTimes,
+		}
+	})
+	collector := mockmetrics.NewNetworkMetrics(t)
+	mgr, err := unicast.NewUnicastManager(&unicast.ManagerConfig{
+		Logger:                             unittest.Logger(),
+		StreamFactory:                      streamFactory,
+		SporkId:                            unittest.IdentifierFixture(),
+		ConnStatus:                         connStatus,
+		CreateStreamBackoffDelay:           1 * time.Millisecond, // overrides the default backoff delay to 1 millisecond to speed up the test.
+		Metrics:                            collector,
+		StreamZeroRetryResetThreshold:      cfg.NetworkConfig.UnicastConfig.StreamZeroRetryResetThreshold,
+		DialZeroRetryResetThreshold:        cfg.NetworkConfig.UnicastConfig.DialZeroRetryResetThreshold,
+		MaxStreamCreationRetryAttemptTimes: cfg.NetworkConfig.UnicastConfig.MaxStreamCreationRetryAttemptTimes,
+		MaxDialRetryAttemptTimes:           cfg.NetworkConfig.UnicastConfig.MaxDialRetryAttemptTimes,
+		DialInProgressBackoffDelay:         1 * time.Millisecond, // overrides the default backoff delay to 1 millisecond to speed up the test.
+		DialBackoffDelay:                   cfg.NetworkConfig.UnicastConfig.DialBackoffDelay,
+		DialConfigCacheFactory: func(func() unicast.DialConfig) unicast.DialConfigCache {
+			return dialConfigCache
+		},
+	})
+	require.NoError(t, err)
+	mgr.SetDefaultHandler(func(libp2pnet.Stream) {}) // no-op handler, we don't care about the handler for this test
+
+	testSucceeds := make(chan struct{})
+
+	// indicates whether OnStreamCreationFailure called with 1 attempt (this happens when dial fails), as the dial budget is 0,
+	// hence dial attempt is not retried after the first attempt.
+	streamCreationCalledFor1 := false
+	// indicates whether OnStreamCreationFailure called with 4 attempts (this happens when stream creation fails due to all backoff budget
+	// exhausted when there is another dial in progress). The stream creation retry budget is 3, so it will be called 4 times (1 attempt + 3 retries).
+	streamCreationCalledFor4 := false
+
+	blockingDial := make(chan struct{})
+	collector.On("OnStreamCreationFailure", mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
+		attempts := args.Get(1).(int)
+		if attempts == 1 && !streamCreationCalledFor1 { // dial attempt is not retried after the first attempt.
+			streamCreationCalledFor1 = true
+		} else if attempts == 4 && !streamCreationCalledFor4 { // stream creation attempt is retried 3 times, and exhausts the budget.
+			close(blockingDial) // close the blocking dial to allow the dial to fail with an error.
+			streamCreationCalledFor4 = true
+		} else {
+			require.Fail(t, "unexpected attempt", "expected 1 or 4 (each once), got %d (maybe twice)", attempts)
+		}
+		if streamCreationCalledFor1 && streamCreationCalledFor4 {
+			close(testSucceeds)
+		}
+	}).Twice()
+	collector.On("OnPeerDialFailure", mock.Anything, mock.Anything).Once()
+
+	peerID := p2ptest.PeerIdFixture(t)
+	adjustedCfg, err := dialConfigCache.Adjust(peerID, func(dialConfig unicast.DialConfig) (unicast.DialConfig, error) {
+		dialConfig.DialRetryAttemptBudget = 0           // set the dial backoff budget to 0, meaning that the dial backoff budget is exhausted.
+		dialConfig.StreamCreationRetryAttemptBudget = 3 // set the stream backoff budget to 3, meaning that the stream backoff budget is exhausted after 1 attempt + 3 retries.
+		return dialConfig, nil
+	})
+	require.NoError(t, err)
+	require.Equal(t, uint64(0), adjustedCfg.DialRetryAttemptBudget)
+	require.Equal(t, uint64(3), adjustedCfg.StreamCreationRetryAttemptBudget)
+
+	connStatus.On("IsConnected", peerID).Return(false, nil)
+	streamFactory.On("Connect", mock.Anything, peer.AddrInfo{ID: peerID}).
+		Return(func(ctx context.Context, info peer.AddrInfo) error {
+			<-blockingDial                  // blocks the call to Connect until the test unblocks it, this is to simulate a dial in progress.
+			return fmt.Errorf("some error") // dial fails with an error when it is unblocked.
+		}).
+		Once()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	// create 2 streams concurrently, the first one will block the dial and the second one will fail after 1 + 3 backoff attempts (4 attempts).
+	go func() {
+		s, err := mgr.CreateStream(ctx, peerID)
+		require.Error(t, err)
+		require.Nil(t, s)
+	}()
+
+	go func() {
+		s, err := mgr.CreateStream(ctx, peerID)
+		require.Error(t, err)
+		require.Nil(t, s)
+	}()
+
+	unittest.RequireCloseBefore(t, testSucceeds, 1*time.Second, "test timed out")
 }

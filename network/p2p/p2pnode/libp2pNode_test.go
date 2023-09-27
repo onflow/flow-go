@@ -3,8 +3,6 @@ package p2pnode_test
 import (
 	"context"
 	"fmt"
-	"os"
-	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -12,13 +10,9 @@ import (
 	"github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/peerstore"
-	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
-	"go.uber.org/atomic"
 
-	"github.com/onflow/flow-go/config"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	mockmodule "github.com/onflow/flow-go/module/mock"
@@ -287,95 +281,6 @@ func TestCreateStream_SinglePairwiseConnection(t *testing.T) {
 	// ensure only a single connection exists between all nodes
 	ensureSinglePairwiseConnection(t, nodes)
 	close(streamChan)
-}
-
-// TestCreateStream_SinglePeerDial ensures that the unicast manager only attempts to dial a peer once, retries dialing a peer the expected max amount of times when an
-// error is encountered and retries creating the stream the expected max amount of times when unicast.ErrDialInProgress is encountered.
-func TestCreateStream_SinglePeerDial(t *testing.T) {
-	cfg, err := config.DefaultConfig()
-	require.NoError(t, err)
-
-	createStreamRetries := atomic.NewInt64(0)
-	dialPeerRetries := atomic.NewInt64(0)
-	hook := zerolog.HookFunc(func(e *zerolog.Event, level zerolog.Level, message string) {
-		if level == zerolog.WarnLevel {
-			switch {
-			case strings.Contains(message, "retrying create stream, dial to peer in progress"):
-				createStreamRetries.Inc()
-			case strings.Contains(message, "retrying peer dialing"):
-				dialPeerRetries.Inc()
-			}
-		}
-	})
-	logger := zerolog.New(os.Stdout).Level(zerolog.InfoLevel).Hook(hook)
-	idProvider := mockmodule.NewIdentityProvider(t)
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
-
-	sporkID := unittest.IdentifierFixture()
-
-	// mock metrics we expected only a single call to CreateStream to initiate the dialing to the peer, which will result in 3 failed attempts
-	// the next call to CreateStream will encounter a DialInProgress error which will result in 3 failed attempts
-	m := mockmodule.NewNetworkMetrics(t)
-	m.On("OnPeerDialFailure", mock.Anything, int(cfg.NetworkConfig.UnicastConfig.MaxDialRetryAttemptTimes)+1).Once()
-	m.On("OnStreamCreationFailure", mock.Anything, mock.Anything).Twice().Run(func(args mock.Arguments) {
-		attempts := args.Get(1).(int)
-		// We expect OnCreateStream to be called twice: once in each separate call to CreateStream. The first call that initializes
-		// the peer dialing should not attempt to retry CreateStream because all peer dialing attempts will be made which will not
-		// return the DialInProgress err that kicks off the CreateStream retries so we expect attempts to be 1 in this case. In the
-		// second call to CreateStream we expect all 3 attempts to be made as we wait for the DialInProgress to complete, in this case
-		// we expect attempts to be 3. Thus we only expect this method to be called twice with either 1 or 3 attempts.
-		require.False(t, attempts != 1 && attempts != 3, fmt.Sprintf("expected either 1 or 3 attempts got %d", attempts))
-	})
-
-	sender, id1 := p2ptest.NodeFixture(t, sporkID, t.Name(), idProvider, p2ptest.WithConnectionGater(p2ptest.NewConnectionGater(idProvider, func(pid peer.ID) error {
-		// avoid connection gating outbound messages on sender
-		return nil
-	})), // add very small delay so that when the sender attempts to create multiple streams
-		// the func fails fast before the first routine can finish the peer dialing retries
-		// this prevents us from making another call to dial peer
-		p2ptest.WithCreateStreamRetryDelay(1*time.Millisecond), p2ptest.WithLogger(logger), p2ptest.WithMetricsCollector(m))
-
-	receiver, id2 := p2ptest.NodeFixture(t, sporkID, t.Name(), idProvider, p2ptest.WithConnectionGater(p2ptest.NewConnectionGater(idProvider, func(pid peer.ID) error {
-		// connection gate all incoming connections forcing the senders unicast manager to perform retries
-		return fmt.Errorf("gate keep")
-	})), p2ptest.WithCreateStreamRetryDelay(1*time.Millisecond), p2ptest.WithLogger(logger))
-
-	idProvider.On("ByPeerID", sender.ID()).Return(&id1, true).Maybe()
-	idProvider.On("ByPeerID", receiver.ID()).Return(&id2, true).Maybe()
-
-	p2ptest.StartNodes(t, signalerCtx, []p2p.LibP2PNode{sender, receiver})
-	defer p2ptest.StopNodes(t, []p2p.LibP2PNode{sender, receiver}, cancel)
-
-	var wg sync.WaitGroup
-	wg.Add(2)
-	// attempt to create two concurrent streams
-	go func() {
-		defer wg.Done()
-		err := sender.OpenProtectedStream(ctx, receiver.ID(), t.Name(), func(stream network.Stream) error {
-			return nil
-		})
-		require.Error(t, err)
-	}()
-	go func() {
-		defer wg.Done()
-		err := sender.OpenProtectedStream(ctx, receiver.ID(), t.Name(), func(stream network.Stream) error {
-			return nil
-		})
-		require.Error(t, err)
-	}()
-
-	// the wait time should be enough to account for backoff and retries.
-	unittest.RequireReturnsBefore(t, wg.Wait, 5*time.Second, "stream creation attempts are not returned on time")
-
-	// we expect a single routine to start attempting to dial thus the number of retries
-	// before failure should be at most p2pnode.MaxDialRetryAttemptTimes
-	expectedNumOfDialRetries := int64(cfg.NetworkConfig.UnicastConfig.MaxDialRetryAttemptTimes) + 1 // 1 initial attempt + retries
-	// we expect the second routine to retry creating a stream p2pnode.MaxDialRetryAttemptTimes when dialing is in progress
-	expectedCreateStreamRetries := int64(cfg.NetworkConfig.UnicastConfig.MaxStreamCreationRetryAttemptTimes)
-	require.Equal(t, expectedNumOfDialRetries, dialPeerRetries.Load(), fmt.Sprintf("expected %d dial peer retries got %d", expectedNumOfDialRetries, dialPeerRetries.Load()))
-	require.Equal(t, expectedCreateStreamRetries, createStreamRetries.Load(), fmt.Sprintf("expected %d dial peer retries got %d", expectedCreateStreamRetries, createStreamRetries.Load()))
 }
 
 // TestCreateStream_InboundConnResourceLimit ensures that the setting the resource limit config for
