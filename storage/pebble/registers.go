@@ -17,7 +17,7 @@ import (
 type Registers struct {
 	db           *pebble.DB
 	firstHeight  uint64
-	latestHeight atomic.Uint64
+	latestHeight *atomic.Uint64
 }
 
 var _ storage.RegisterIndex = (*Registers)(nil)
@@ -45,7 +45,7 @@ func NewRegisters(db *pebble.DB) (*Registers, error) {
 
 	// all registers between firstHeight and lastHeight have been indexed
 	registers.firstHeight = firstHeight
-	registers.latestHeight.Store(latestHeight)
+	registers.latestHeight = atomic.NewUint64(latestHeight)
 
 	return registers, nil
 }
