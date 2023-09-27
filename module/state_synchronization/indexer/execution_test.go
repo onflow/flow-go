@@ -257,16 +257,16 @@ func TestExecutionState_IndexBlockData(t *testing.T) {
 			BlockID: last.Header.ID(),
 		}
 		execData := execution_data.NewBlockExecutionDataEntity(last.ID(), ed)
+		latestHeight := blocks[len(blocks)-3].Header.Height
 
 		err := newIndexTest(t, blocks, execData).
 			// return a height one smaller than the latest block in storage
 			setLastHeight(func(t *testing.T) (uint64, error) {
-				return blocks[len(blocks)-3].Header.Height, nil
+				return latestHeight, nil
 			}).
-			useDefaultFirstHeight().
 			runIndexBlockData()
 
-		assert.True(t, errors.Is(err, ErrIndexValue))
+		assert.EqualError(t, err, fmt.Sprintf("must store registers with the next height %d, but got %d", latestHeight+1, last.Header.Height))
 	})
 
 	// this test makes sure that if a block we try to index is not found in block storage
@@ -499,14 +499,12 @@ func TestIndexerIntegration_StoreAndGet(t *testing.T) {
 			require.NoError(t, storeRegisterWithValue(index, 1, regOwner, regKey, storeValues[0]))
 
 			require.NoError(t, index.indexRegisterPayloads(nil, 2))
-			assert.NoError(t, index.indexRange.Increase(2))
 
 			value, err := index.RegisterValues(flow.RegisterIDs{registerID}, uint64(2))
 			require.Nil(t, err)
 			assert.Equal(t, storeValues[0], value[0])
 
 			require.NoError(t, index.indexRegisterPayloads(nil, 3))
-			assert.NoError(t, index.indexRange.Increase(3))
 
 			err = storeRegisterWithValue(index, 4, regOwner, regKey, storeValues[1])
 			require.NoError(t, err)
@@ -529,7 +527,6 @@ func TestIndexerIntegration_StoreAndGet(t *testing.T) {
 
 			require.NoError(t, index.indexRegisterPayloads([]*ledger.Payload{}, 1))
 			require.NoError(t, index.indexRegisterPayloads([]*ledger.Payload{}, 1))
-			require.NoError(t, index.indexRange.Increase(1))
 			require.NoError(t, index.indexRegisterPayloads(nil, 2))
 		})
 	})
@@ -538,17 +535,7 @@ func TestIndexerIntegration_StoreAndGet(t *testing.T) {
 // helper to store register at height and increment index range
 func storeRegisterWithValue(indexer *ExecutionState, height uint64, owner string, key string, value []byte) error {
 	payload := ledgerPayloadWithValuesFixture(owner, key, value)
-	err := indexer.indexRegisterPayloads([]*ledger.Payload{payload}, height)
-	if err != nil {
-		return err
-	}
-
-	err = indexer.indexRange.Increase(height)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return indexer.indexRegisterPayloads([]*ledger.Payload{payload}, height)
 }
 
 // duplicated from register tests https://github.com/onflow/flow-go/blob/aa41e76c824260f8f08aacbe46471619ecf3fe6e/storage/pebble/registers_test.go#L291
