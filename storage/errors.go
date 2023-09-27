@@ -25,4 +25,8 @@ var (
 	// ErrHeightNotIndexed is returned when data that is indexed sequentially is queried by a given block height
 	// and that data is unavailable.
 	ErrHeightNotIndexed = errors.New("data for block height not available")
+
+	// ErrNotBootstrapped is returned when data in the storage was not previously bootstrapped and
+	// populated as part of the bootstrapping procedure.
+	ErrNotBootstrapped = errors.New("data was not bootstrapped")
 )

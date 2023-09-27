@@ -28,21 +28,22 @@ func NewRegisters(db *pebble.DB) (*Registers, error) {
 	registers := &Registers{
 		db: db,
 	}
-	// check height keys and populate cache. These two variables will have been set
+
+	// load first and last heights and cache the values, if the first or last height is not successfully loaded
+	// we return bootstrapped error indicating the bootstrap did not run successfully
 	firstHeight, err := registers.firstStoredHeight()
 	if err != nil {
-		// this means that the DB is either in a corrupted state or has not been initialized with a set of registers
-		// and firstHeight
-		return nil, fmt.Errorf("unable to initialize register storage, first height unavailable in db: %w", err)
+		return nil, errors.Wrap(storage.ErrNotBootstrapped, "first height not loaded")
 	}
 	latestHeight, err := registers.latestStoredHeight()
 	if err != nil {
-		// and firstHeight
-		return nil, fmt.Errorf("unable to initialize register storage, latest height unavailable in db: %w", err)
+		return nil, errors.Wrap(storage.ErrNotBootstrapped, "latest height not loaded")
 	}
-	/// All registers between firstHeight and lastHeight have been indexed
+
+	// all registers between firstHeight and lastHeight have been indexed
 	registers.firstHeight = firstHeight
 	registers.latestHeight.Store(latestHeight)
+
 	return registers, nil
 }
 
@@ -138,13 +139,13 @@ func (s *Registers) Store(
 }
 
 // LatestHeight Gets the latest height of complete registers available
-func (s *Registers) LatestHeight() (uint64, error) {
-	return s.latestHeight.Load(), nil
+func (s *Registers) LatestHeight() uint64 {
+	return s.latestHeight.Load()
 }
 
 // FirstHeight first indexed height found in the store, typically root block for the spork
-func (s *Registers) FirstHeight() (uint64, error) {
-	return s.firstHeight, nil
+func (s *Registers) FirstHeight() uint64 {
+	return s.firstHeight
 }
 
 func (s *Registers) firstStoredHeight() (uint64, error) {
