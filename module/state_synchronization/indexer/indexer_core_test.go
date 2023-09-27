@@ -16,11 +16,10 @@ import (
 	mocks "github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	"github.com/onflow/flow-go/cmd/util/ledger/migrations"
-	"github.com/onflow/flow-go/engine/execution/state"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/ledger"
+	"github.com/onflow/flow-go/ledger/common/convert"
 	"github.com/onflow/flow-go/ledger/common/pathfinder"
 	"github.com/onflow/flow-go/ledger/complete"
 	"github.com/onflow/flow-go/model/flow"
@@ -187,7 +186,7 @@ func TestExecutionState_IndexBlockData(t *testing.T) {
 		testValue := tries[1].Payloads[0]
 		key, err := testValue.Key()
 		require.NoError(t, err)
-		testRegisterID, err := migrations.KeyToRegisterID(key)
+		testRegisterID, err := convert.LedgerKeyToRegisterID(key)
 		require.NoError(t, err)
 
 		ed := &execution_data.BlockExecutionData{
@@ -324,11 +323,11 @@ func bootstrapTrieUpdates() *ledger.TrieUpdate {
 		key := ledger.Key{
 			KeyParts: []ledger.KeyPart{
 				{
-					Type:  state.KeyPartOwner,
+					Type:  convert.KeyPartOwner,
 					Value: []byte(regID.Owner),
 				},
 				{
-					Type:  state.KeyPartKey,
+					Type:  convert.KeyPartKey,
 					Value: []byte(regID.Key),
 				},
 			},
@@ -379,11 +378,11 @@ func ledgerPayloadWithValuesFixture(owner string, key string, value []byte) *led
 	k := ledger.Key{
 		KeyParts: []ledger.KeyPart{
 			{
-				Type:  state.KeyPartOwner,
+				Type:  convert.KeyPartOwner,
 				Value: []byte(owner),
 			},
 			{
-				Type:  state.KeyPartKey,
+				Type:  convert.KeyPartKey,
 				Value: []byte(key),
 			},
 		},
@@ -400,7 +399,7 @@ func trieRegistersPayloadComparer(t *testing.T, triePayloads []*ledger.Payload, 
 	payloadRegID := make(map[flow.RegisterID]int)
 	for i, p := range triePayloads {
 		k, _ := p.Key()
-		regKey, _ := migrations.KeyToRegisterID(k)
+		regKey, _ := convert.LedgerKeyToRegisterID(k)
 		payloadRegID[regKey] = i
 	}
 
