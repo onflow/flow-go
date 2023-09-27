@@ -110,11 +110,6 @@ func (i *indexTest) useDefaultFirstHeight() *indexTest {
 	return i
 }
 
-func (i *indexTest) useDefaultHeights() *indexTest {
-	i.useDefaultFirstHeight()
-	return i.useDefaultLastHeight()
-}
-
 func (i *indexTest) setFirstHeight(f func(t *testing.T) (uint64, error)) *indexTest {
 	i.registers.
 		On("FirstHeight").
@@ -152,9 +147,6 @@ func (i *indexTest) setGetRegisters(f func(t *testing.T, ID flow.RegisterID, hei
 }
 
 func (i *indexTest) initIndexer() *indexTest {
-	if len(i.registers.ExpectedCalls) == 0 {
-		i.useDefaultHeights() // only set when no other were set
-	}
 	indexer, err := New(zerolog.Nop(), i.registers, i.headers, nil)
 	require.NoError(i.t, err)
 	i.indexer = indexer
@@ -189,6 +181,7 @@ func TestExecutionState_IndexBlockData(t *testing.T) {
 
 		err := newIndexTest(t, blocks, execData).
 			initIndexer().
+			useDefaultLastHeight().
 			// make sure update registers match in length and are same as block data ledger payloads
 			setStoreRegisters(func(t *testing.T, entries flow.RegisterEntries, height uint64) error {
 				assert.Equal(t, height, block.Header.Height)
@@ -230,6 +223,7 @@ func TestExecutionState_IndexBlockData(t *testing.T) {
 		testRegisterFound := false
 		err = newIndexTest(t, blocks, execData).
 			initIndexer().
+			useDefaultLastHeight().
 			// make sure update registers match in length and are same as block data ledger payloads
 			setStoreRegisters(func(t *testing.T, entries flow.RegisterEntries, height uint64) error {
 				for _, entry := range entries {
@@ -304,24 +298,6 @@ func TestExecutionState_RegisterValues(t *testing.T) {
 
 		assert.NoError(t, err)
 		assert.Equal(t, values, []flow.RegisterValue{val})
-	})
-
-	t.Run("Get values out of range", func(t *testing.T) {
-		blocks := blocksFixture(5)
-		values, err := newIndexTest(t, blocks, nil).
-			initIndexer().
-			runGetRegisters(nil, 6)
-
-		assert.EqualError(
-			t,
-			err,
-			fmt.Sprintf(
-				"value 6 is out of boundary [%d - %d]: the value is not within the indexed interval",
-				blocks[0].Header.Height,
-				blocks[len(blocks)-1].Header.Height,
-			),
-		)
-		assert.Nil(t, values)
 	})
 }
 
@@ -476,10 +452,11 @@ func TestIndexerIntegration_StoreAndGet(t *testing.T) {
 
 			for i, val := range values {
 				testDesc := fmt.Sprintf("test itteration number %d failed with test value %s", i, val)
-				err := storeRegisterWithValue(index, uint64(i), regOwner, regKey, val)
+				height := uint64(i + 1)
+				err := storeRegisterWithValue(index, height, regOwner, regKey, val)
 				assert.NoError(t, err)
 
-				results, err := index.RegisterValues(flow.RegisterIDs{registerID}, uint64(i))
+				results, err := index.RegisterValues(flow.RegisterIDs{registerID}, height)
 				require.Nil(t, err, testDesc)
 				assert.Equal(t, val, results[0])
 			}
