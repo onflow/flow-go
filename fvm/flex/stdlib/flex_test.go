@@ -29,9 +29,10 @@ import (
 )
 
 type testFlexContractHandler struct {
-	newFlowOwnedAccount func() models.FlowOwnedAccount
-	lastExecutedBlock   func() *models.FlexBlock
-	run                 func(tx []byte, coinbase models.FlexAddress) bool
+	newFlowOwnedAccount       func() models.FlowOwnedAccount
+	flowOwnedAccountByAddress func(models.FlexAddress) models.FlowOwnedAccount
+	lastExecutedBlock         func() *models.FlexBlock
+	run                       func(tx []byte, coinbase models.FlexAddress) bool
 }
 
 var _ models.FlexContractHandler = testFlexContractHandler{}
@@ -41,6 +42,13 @@ func (t testFlexContractHandler) NewFlowOwnedAccount() models.FlowOwnedAccount {
 		panic("unexpected NewFlowOwnedAccount")
 	}
 	return t.newFlowOwnedAccount()
+}
+
+func (t testFlexContractHandler) FlowOwnedAccountByAddress(addr models.FlexAddress) models.FlowOwnedAccount {
+	if t.flowOwnedAccountByAddress == nil {
+		panic("unexpected FlowOwnedAccountByAddress")
+	}
+	return t.flowOwnedAccountByAddress(addr)
 }
 
 func (t testFlexContractHandler) LastExecutedBlock() *models.FlexBlock {

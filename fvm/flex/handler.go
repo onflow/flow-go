@@ -38,6 +38,10 @@ func (h FlexContractHandler) NewFlowOwnedAccount() models.FlowOwnedAccount {
 	return newFOA(h, addr)
 }
 
+func (h FlexContractHandler) FlowOwnedAccountByAddress(addr models.FlexAddress) models.FlowOwnedAccount {
+	return newFOA(h, addr)
+}
+
 func (h FlexContractHandler) LastExecutedBlock() *models.FlexBlock {
 	block, err := h.db.GetLatestBlock()
 	if err != nil {

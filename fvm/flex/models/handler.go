@@ -25,6 +25,9 @@ type FlexContractHandler interface {
 	// NewFlowOwnedAccount constructs a new FOA
 	NewFlowOwnedAccount() FlowOwnedAccount
 
+	// FlowOwnedAccountByAddress returns the FlowOwnedAccount by address
+	FlowOwnedAccountByAddress(FlexAddress) FlowOwnedAccount
+
 	// LastExecutedBlock returns information about the last executed block
 	LastExecutedBlock() *FlexBlock
 
