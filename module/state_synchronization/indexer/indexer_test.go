@@ -24,7 +24,7 @@ type workerTest struct {
 	blocks        []*flow.Block
 	progress      *mockProgress
 	indexTest     *indexTest
-	worker        *ExecutionStateWorker
+	worker        *Indexer
 	executionData *mempool.ExecutionData
 	t             *testing.T
 }

@@ -35,7 +35,7 @@ import (
 
 type indexTest struct {
 	t                *testing.T
-	indexer          *ExecutionState
+	indexer          *IndexerCore
 	registers        *storagemock.RegisterIndex
 	events           *storagemock.Events
 	headers          *storagemock.Headers
@@ -489,7 +489,7 @@ func TestIndexerIntegration_StoreAndGet(t *testing.T) {
 }
 
 // helper to store register at height and increment index range
-func storeRegisterWithValue(indexer *ExecutionState, height uint64, owner string, key string, value []byte) error {
+func storeRegisterWithValue(indexer *IndexerCore, height uint64, owner string, key string, value []byte) error {
 	payload := ledgerPayloadWithValuesFixture(owner, key, value)
 	return indexer.indexRegisterPayloads([]*ledger.Payload{payload}, height)
 }

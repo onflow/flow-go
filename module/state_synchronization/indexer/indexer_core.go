@@ -16,8 +16,8 @@ import (
 	"github.com/onflow/flow-go/utils/logging"
 )
 
-// ExecutionState indexes the execution state.
-type ExecutionState struct {
+// IndexerCore indexes the execution state.
+type IndexerCore struct {
 	registers storage.RegisterIndex
 	headers   storage.Headers
 	events    storage.Events
@@ -32,8 +32,8 @@ func New(
 	registers storage.RegisterIndex,
 	headers storage.Headers,
 	events storage.Events,
-) (*ExecutionState, error) {
-	return &ExecutionState{
+) (*IndexerCore, error) {
+	return &IndexerCore{
 		registers: registers,
 		headers:   headers,
 		events:    events,
@@ -46,7 +46,7 @@ func New(
 // Expected errors:
 // - storage.ErrNotFound if the register by the ID was never indexed
 // - ErrIndexBoundary if the height is out of indexed height boundary
-func (i *ExecutionState) RegisterValues(IDs flow.RegisterIDs, height uint64) ([]flow.RegisterValue, error) {
+func (i *IndexerCore) RegisterValues(IDs flow.RegisterIDs, height uint64) ([]flow.RegisterValue, error) {
 	values := make([]flow.RegisterValue, len(IDs))
 
 	for j, id := range IDs {
@@ -66,7 +66,7 @@ func (i *ExecutionState) RegisterValues(IDs flow.RegisterIDs, height uint64) ([]
 // Expected errors:
 // - ErrIndexValue if height was not incremented in sequence
 // - storage.ErrNotFound if the block for execution data was not found
-func (i *ExecutionState) IndexBlockData(_ context.Context, data *execution_data.BlockExecutionDataEntity) error {
+func (i *IndexerCore) IndexBlockData(_ context.Context, data *execution_data.BlockExecutionDataEntity) error {
 	fmt.Println("index block data", data.BlockID)
 	block, err := i.headers.ByBlockID(data.BlockID)
 	if err != nil {
@@ -149,12 +149,12 @@ func (i *ExecutionState) IndexBlockData(_ context.Context, data *execution_data.
 	return nil
 }
 
-func (i *ExecutionState) indexEvents(blockID flow.Identifier, events flow.EventsList) error {
+func (i *IndexerCore) indexEvents(blockID flow.Identifier, events flow.EventsList) error {
 	// Note: the last chunk in an execution data is the system chunk. All events in that ChunkExecutionData are service events.
 	return i.events.Store(blockID, []flow.EventsList{events})
 }
 
-func (i *ExecutionState) indexRegisterPayloads(payloads []*ledger.Payload, height uint64) error {
+func (i *IndexerCore) indexRegisterPayloads(payloads []*ledger.Payload, height uint64) error {
 	regEntries := make(flow.RegisterEntries, len(payloads))
 
 	for j, payload := range payloads {
