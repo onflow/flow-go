@@ -62,7 +62,7 @@ func newWorkerTest(t *testing.T, availableBlocks int, lastIndexedIndex int) *wor
 		executionData: executionData,
 	}
 
-	test.worker = NewExecutionStateWorker(
+	test.worker = NewIndexer(
 		unittest.Logger(),
 		test.first().Header.Height,
 		testTimeout,

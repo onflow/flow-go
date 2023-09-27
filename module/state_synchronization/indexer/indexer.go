@@ -35,8 +35,8 @@ type Indexer struct {
 	indexer         *IndexerCore
 }
 
-// NewExecutionStateWorker creates a new execution worker.
-func NewExecutionStateWorker(
+// NewIndexer creates a new execution worker.
+func NewIndexer(
 	log zerolog.Logger,
 	initHeight uint64,
 	fetchTimeout time.Duration,
