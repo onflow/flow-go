@@ -125,13 +125,13 @@ func (h lookupKey) Bytes() []byte {
 	return h.encoded
 }
 
-// EncodedUint64 encodes uint64 for storing as a pebble payload
+// encodedUint64 encodes uint64 for storing as a pebble payload
 func encodedUint64(height uint64) []byte {
 	payload := make([]byte, 0, 8)
 	return binary.BigEndian.AppendUint64(payload, height)
 }
 
-// KeyToRegisterID converts a ledger key into a register ID.
+// keyToRegisterID converts a ledger key into a register ID.
 func keyToRegisterID(key ledger.Key) (flow.RegisterID, error) {
 	if len(key.KeyParts) != 2 ||
 		key.KeyParts[0].Type != state.KeyPartOwner ||

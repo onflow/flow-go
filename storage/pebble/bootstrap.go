@@ -1,6 +1,7 @@
 package pebble
 
 import (
+	"context"
 	"fmt"
 	"path/filepath"
 
@@ -83,15 +84,21 @@ func (b *Bootstrap) indexCheckpointFileWorker(ctx irrecoverable.SignalerContext,
 		if len(batch) >= pebbleBootstrapRegisterBatchLen {
 			err := b.batchIndexRegisters(batch)
 			if err != nil {
-				ctx.Throw(fmt.Errorf("unable to index registers to pebble: %w", err))
+				ctx.Throw(fmt.Errorf("unable to index registers to pebble in batch: %w", err))
 			}
 			batch = make([]*wal.LeafNode, 0, pebbleBootstrapRegisterBatchLen)
 		}
 	}
+	err := b.batchIndexRegisters(batch)
+	if err != nil {
+		ctx.Throw(fmt.Errorf("unable to index remaining registers to pebble: %w", err))
+	}
 }
 
 // IndexCheckpointFile indexes the checkpoint file in the Dir provided as a component
-func (b *Bootstrap) IndexCheckpointFile(parentCtx irrecoverable.SignalerContext) error {
+func (b *Bootstrap) IndexCheckpointFile() error {
+	ctx := context.Background()
+	sigCtx, errChan := irrecoverable.WithSignaler(ctx)
 	// index checkpoint file async
 	cmb := component.NewComponentManagerBuilder()
 	for i := 0; i < pebbleBootstrapWorkerCount; i++ {
@@ -104,9 +111,16 @@ func (b *Bootstrap) IndexCheckpointFile(parentCtx irrecoverable.SignalerContext)
 		return fmt.Errorf("error reading leaf node: %w", err)
 	}
 	c := cmb.Build()
-	c.Start(parentCtx)
+	c.Start(sigCtx)
 	// wait for the indexing to finish before populating heights
 	<-c.Done()
+
+	select {
+	case procErr := <-errChan:
+		return fmt.Errorf("failed to index checkpoint file: %w", procErr)
+	default:
+	}
+
 	bat := b.db.NewBatch()
 	defer bat.Close()
 	// update heights atomically to prevent one getting populated without the other

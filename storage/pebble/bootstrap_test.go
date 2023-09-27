@@ -1,19 +1,18 @@
 package pebble
 
 import (
-	"context"
-	"crypto/rand"
 	"io"
 	"os"
 	"path"
 	"testing"
 
 	"github.com/cockroachdb/pebble"
+	"github.com/onflow/flow-go/engine/execution/state"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/testutils"
 	"github.com/onflow/flow-go/ledger/complete/mtrie/trie"
 	"github.com/onflow/flow-go/ledger/complete/wal"
-	"github.com/onflow/flow-go/module/irrecoverable"
+	"github.com/onflow/flow-go/model/flow"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 
@@ -33,50 +32,23 @@ func TestBootstrap_NewBootstrap(t *testing.T) {
 		// no issues when pebble instance is blank
 		_, err := NewBootstrap(p, sampleDir, rootHeight, log)
 		require.NoError(t, err)
+	})
+	unittest.RunWithConfiguredPebbleInstance(t, opts, func(p *pebble.DB) {
 		// set heights
 		require.NoError(t, p.Set(firstHeightKey(), encodedUint64(rootHeight), nil))
 		require.NoError(t, p.Set(latestHeightKey(), encodedUint64(rootHeight), nil))
 		// errors if FirstHeight or LastHeight are populated
-		_, err = NewBootstrap(p, sampleDir, rootHeight, log)
+		_, err := NewBootstrap(p, sampleDir, rootHeight, log)
 		require.ErrorContains(t, err, "cannot bootstrap populated DB")
 	})
 }
 
-func TestBootstrap_IndexCheckpointFile_Random(t *testing.T) {
+func TestBootstrap_IndexCheckpointFile_Happy(t *testing.T) {
 	t.Parallel()
 	log := zerolog.New(io.Discard)
 	rootHeight := uint64(10000)
 	unittest.RunWithTempDir(t, func(dir string) {
-		fileName := "empty-checkpoint"
-		emptyTrie := []*trie.MTrie{trie.NewEmptyMTrie()}
-		require.NoErrorf(t, wal.StoreCheckpointV6Concurrently(emptyTrie, dir, fileName, log), "fail to store checkpoint")
-		checkpointFile := path.Join(dir, fileName)
-
-		cache := pebble.NewCache(1 << 20)
-		opts := DefaultPebbleOptions(cache, registers.NewMVCCComparer())
-		defer cache.Unref()
-		pb, dbDir := unittest.TempPebbleDBWithOpts(t, opts)
-
-		bootstrap, err := NewBootstrap(pb, checkpointFile, rootHeight, log)
-		require.NoError(t, err)
-		ctx, cancel := context.WithCancel(context.Background())
-		irrecoverableCtx, _ := irrecoverable.WithSignaler(ctx)
-		err = bootstrap.IndexCheckpointFile(irrecoverableCtx)
-		require.NoError(t, err)
-		defer cancel()
-		// create registers instance and check values
-		reg, err := NewRegisters(pb)
-
-		require.Equal(t, reg.LatestHeight(), rootHeight)
-		require.Equal(t, reg.FirstHeight(), rootHeight)
-
-		require.NoError(t, err)
-		require.NoError(t, pb.Close())
-		require.NoError(t, os.RemoveAll(dbDir))
-	})
-
-	unittest.RunWithTempDir(t, func(dir string) {
-		tries := createSimpleTrie(t)
+		tries, registerIDs := simpleTrieWithValidRegisterIDs(t)
 		fileName := "simple-checkpoint"
 		require.NoErrorf(t, wal.StoreCheckpointV6Concurrently(tries, dir, fileName, log), "fail to store checkpoint")
 		checkpointFile := path.Join(dir, fileName)
@@ -86,137 +58,106 @@ func TestBootstrap_IndexCheckpointFile_Random(t *testing.T) {
 		pb, dbDir := unittest.TempPebbleDBWithOpts(t, opts)
 		bootstrap, err := NewBootstrap(pb, checkpointFile, rootHeight, log)
 		require.NoError(t, err)
-		ctx, cancel := context.WithCancel(context.Background())
-		irrecoverableCtx, _ := irrecoverable.WithSignaler(ctx)
-		err = bootstrap.IndexCheckpointFile(irrecoverableCtx)
+		err = bootstrap.IndexCheckpointFile()
 		require.NoError(t, err)
-		defer cancel()
 
 		// create registers instance and check values
 		reg, err := NewRegisters(pb)
+		require.NoError(t, err)
 
 		require.Equal(t, reg.LatestHeight(), rootHeight)
 		require.Equal(t, reg.FirstHeight(), rootHeight)
 
-		require.NoError(t, err)
+		for _, register := range registerIDs {
+			err, value := reg.Get(*register, rootHeight)
+		}
+
 		require.NoError(t, pb.Close())
 		require.NoError(t, os.RemoveAll(dbDir))
 	})
+}
 
+func TestBootstrap_IndexCheckpointFile_Empty(t *testing.T) {
+	t.Parallel()
+	log := zerolog.New(io.Discard)
+	rootHeight := uint64(10000)
 	unittest.RunWithTempDir(t, func(dir string) {
-		tries := createMultipleRandomTriesMini(t)
-		fileName := "random-checkpoint"
-		checkpointFile := path.Join(dir, fileName)
+		tries := []*trie.MTrie{trie.NewEmptyMTrie()}
+		fileName := "empty-checkpoint"
 		require.NoErrorf(t, wal.StoreCheckpointV6Concurrently(tries, dir, fileName, log), "fail to store checkpoint")
-
+		checkpointFile := path.Join(dir, fileName)
 		cache := pebble.NewCache(1 << 20)
 		opts := DefaultPebbleOptions(cache, registers.NewMVCCComparer())
 		defer cache.Unref()
 		pb, dbDir := unittest.TempPebbleDBWithOpts(t, opts)
 		bootstrap, err := NewBootstrap(pb, checkpointFile, rootHeight, log)
 		require.NoError(t, err)
-
-		ctx, cancel := context.WithCancel(context.Background())
-		irrecoverableCtx, _ := irrecoverable.WithSignaler(ctx)
-		err = bootstrap.IndexCheckpointFile(irrecoverableCtx)
+		err = bootstrap.IndexCheckpointFile()
 		require.NoError(t, err)
-		defer cancel()
+
 		// create registers instance and check values
 		reg, err := NewRegisters(pb)
+		require.NoError(t, err)
 
 		require.Equal(t, reg.LatestHeight(), rootHeight)
 		require.Equal(t, reg.FirstHeight(), rootHeight)
 
-		require.NoError(t, err)
 		require.NoError(t, pb.Close())
 		require.NoError(t, os.RemoveAll(dbDir))
 	})
 }
 
+func TestBootstrap_IndexCheckpointFile_FormatIssue(t *testing.T) {
+	t.Parallel()
+
+}
+
 func TestBootstrap_IndexCheckpointFile_Error(t *testing.T) {
 	t.Parallel()
-	//unittest.RunWithTempDir(t, func(dir string) {
-	//	log := zerolog.New(io.Discard)
-	//	// write trie and remove part of the file
-	//	fileName := "simple-checkpoint"
-	//	tries := createSimpleTrie(t)
-	//	require.NoErrorf(t, wal.StoreCheckpointV6Concurrently(tries, dir, fileName, log), "fail to store checkpoint")
-	//	checkpointFile := path.Join(dir, fileName)
-	//
-	//	unittest.RunWithConfiguredPebbleInstance(t, getTestingPebbleOpts(), func(p *pebble.DB) {
-	//
-	//	})
-	//})
+
 }
 
-func getTestingPebbleOpts() *pebble.Options {
-	cache := pebble.NewCache(1 << 20)
-	return DefaultPebbleOptions(cache, registers.NewMVCCComparer())
-}
-
-// Todo: Move these functions to somewhere common, this is from checkpoint_v6_test.go
-func createSimpleTrie(t *testing.T) []*trie.MTrie {
-	emptyTrie := trie.NewEmptyMTrie()
-
+func simpleTrieWithValidRegisterIDs(t *testing.T) ([]*trie.MTrie, []*flow.RegisterID) {
 	p1 := testutils.PathByUint8(0)
-	v1 := testutils.LightPayload8('A', 'a')
-
 	p2 := testutils.PathByUint8(1)
-	v2 := testutils.LightPayload8('B', 'b')
-
 	paths := []ledger.Path{p1, p2}
-	payloads := []ledger.Payload{*v1, *v2}
-
+	payloads := RandomRegisterPayloads(2)
+	// collect register IDs to return
+	rID := make([]*flow.RegisterID, 0, 2)
+	for _, payload := range payloads {
+		key, err := payload.Key()
+		require.NoError(t, err)
+		regID, err := keyToRegisterID(key)
+		require.NoError(t, err)
+		rID = append(rID, regID)
+	}
+	emptyTrie := trie.NewEmptyMTrie()
 	updatedTrie, _, err := trie.NewTrieWithUpdatedRegisters(emptyTrie, paths, payloads, true)
 	require.NoError(t, err)
 	tries := []*trie.MTrie{emptyTrie, updatedTrie}
-	return tries
+	return tries, rID
 }
 
-func randPathPayload() (ledger.Path, ledger.Payload) {
-	var p ledger.Path
-	_, err := rand.Read(p[:])
-	if err != nil {
-		panic("randomness failed")
+// RegisterPayloadFixture a single payload with a key structure of an execution state register value
+func RegisterPayloadFixture() *ledger.Payload {
+	k := ledger.Key{KeyParts: []ledger.KeyPart{
+		{Type: state.KeyPartOwner, Value: []byte{byte('o')}},
+		{Type: state.KeyPartKey, Value: []byte{byte('k')}}},
 	}
-	payload := testutils.RandomPayload(1, 100)
-	return p, *payload
+	v := ledger.Value{uint8(0)}
+	return ledger.NewPayload(k, v)
 }
 
-func randNPathPayloads(n int) ([]ledger.Path, []ledger.Payload) {
-	paths := make([]ledger.Path, n)
-	payloads := make([]ledger.Payload, n)
+func RandomRegisterPayloads(n int) []*ledger.Payload {
+	p := make([]*ledger.Payload, 0, n)
 	for i := 0; i < n; i++ {
-		p, payload := randPathPayload()
-		paths[i] = p
-		payloads[i] = payload
+		k := ledger.Key{KeyParts: []ledger.KeyPart{
+			{Type: state.KeyPartOwner, Value: []byte{byte('o')}},
+			{Type: state.KeyPartKey, Value: []byte{byte('k')}}},
+		}
+		v := ledger.Value{uint8(0)}
+		pl := ledger.NewPayload(k, v)
+		p = append(p, pl)
 	}
-	return paths, payloads
-}
-
-func createMultipleRandomTriesMini(t *testing.T) []*trie.MTrie {
-	tries := make([]*trie.MTrie, 0)
-	activeTrie := trie.NewEmptyMTrie()
-
-	var err error
-	// add tries with no shared paths
-	for i := 0; i < 5; i++ {
-		paths, payloads := randNPathPayloads(20)
-		activeTrie, _, err = trie.NewTrieWithUpdatedRegisters(activeTrie, paths, payloads, false)
-		require.NoError(t, err, "update registers")
-		tries = append(tries, activeTrie)
-	}
-
-	// add trie with some shared path
-	sharedPaths, payloads1 := randNPathPayloads(10)
-	activeTrie, _, err = trie.NewTrieWithUpdatedRegisters(activeTrie, sharedPaths, payloads1, false)
-	require.NoError(t, err, "update registers")
-	tries = append(tries, activeTrie)
-
-	_, payloads2 := randNPathPayloads(10)
-	activeTrie, _, err = trie.NewTrieWithUpdatedRegisters(activeTrie, sharedPaths, payloads2, false)
-	require.NoError(t, err, "update registers")
-	tries = append(tries, activeTrie)
-
-	return tries
+	return p
 }
