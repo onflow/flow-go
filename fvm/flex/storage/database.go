@@ -93,13 +93,35 @@ func (db *Database) Get(key []byte) ([]byte, error) {
 	defer db.lock.RUnlock()
 
 	data, err := db.atreemap.Get(compare, hashInputProvider, NewStringValue(string(key)))
-
 	if err != nil {
 		return nil, err
 	}
 
 	v, err := data.StoredValue(db.atreemap.Storage)
-	return []byte(v.(StringValue).String()), err
+	if err != nil {
+		return nil, err
+	}
+
+	array := v.(*atree.Array)
+	result := make([]byte, 0)
+	itr, err := array.Iterator()
+	if err != nil {
+		return nil, err
+	}
+
+	item, err := itr.Next()
+	if err != nil {
+		return nil, err
+	}
+	for item != nil {
+		result = append(result, uint8(item.(Uint8Value)))
+		item, err = itr.Next()
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return result, err
 }
 
 // Put inserts the given value into the key-value store.
@@ -107,7 +129,14 @@ func (db *Database) Put(key []byte, value []byte) error {
 	db.lock.Lock()
 	defer db.lock.Unlock()
 
-	_, err := db.atreemap.Set(compare, hashInputProvider, NewStringValue(string(key)), NewStringValue(string(value)))
+	array, err := atree.NewArray(db.storage, atree.Address(FlexAddress), typeInfo{})
+	if err != nil {
+		panic(err)
+	}
+	for i, v := range value {
+		array.Set(uint64(i), Uint8Value(v))
+	}
+	_, err = db.atreemap.Set(compare, hashInputProvider, NewStringValue(string(key)), array)
 	return err
 }
 
