@@ -160,6 +160,10 @@ func runWithEngine(t *testing.T, f func(testingContext)) {
 // block is executed, uploaded, and broadcasted
 func TestExecuteOneBlock(t *testing.T) {
 	runWithEngine(t, func(ctx testingContext) {
+		// create a mocked storage that has similar behavior as the real execution state.
+		// the mocked storage allows us to prepare results for the prepared blocks, so that
+		// the mocked methods know what to return, and it also allows us to verify that the
+		// mocked API is called with correct data.
 		store := mocks.NewMockBlockStore(t)
 
 		col := unittest.CollectionFixture(1)
@@ -176,7 +180,7 @@ func TestExecuteOneBlock(t *testing.T) {
 		require.NoError(t, err)
 
 		wg := sync.WaitGroup{}
-		wg.Add(1) // wait for block B to be executed
+		wg.Add(1) // wait for block A to be executed
 
 		ctx.mockComputeBlock(store)
 		ctx.mockSaveExecutionResults(store, &wg)
@@ -214,6 +218,9 @@ func TestExecuteBlocks(t *testing.T) {
 		col1 := unittest.CollectionFixture(1)
 		col2 := unittest.CollectionFixture(1)
 		// Root <- A[C1] <- B[C2]
+		// prepare two blocks, so that receiving C2 before C1 won't trigger any block to be executed,
+		// which creates the case where C2 collection is received first, and block B will become
+		// executable as soon as its parent block A is executed.
 		blockA := makeBlockWithCollection(store.RootBlock, &col1)
 		blockB := makeBlockWithCollection(blockA.Block.Header, &col2)
 		store.CreateBlockAndMockResult(t, blockA)
@@ -283,7 +290,7 @@ func TestExecuteNextBlockIfCollectionIsReady(t *testing.T) {
 		ctx.providerEngine.On("BroadcastExecutionReceipt", mock.Anything, mock.Anything, mock.Anything).Return(false, nil)
 		ctx.mockComputeBlock(store)
 		wg := sync.WaitGroup{}
-		wg.Add(2)
+		wg.Add(2) // waiting for A and B to be executed
 		ctx.mockSaveExecutionResults(store, &wg)
 
 		// receiving collection C1 will execute both A and B
@@ -326,7 +333,7 @@ func TestExecuteBlockOnlyOnce(t *testing.T) {
 
 		ctx.mockComputeBlock(store)
 		wg := sync.WaitGroup{}
-		wg.Add(1) // wait for block B to be executed
+		wg.Add(1) // wait for block A to be executed
 		ctx.mockSaveExecutionResults(store, &wg)
 		ctx.providerEngine.On("BroadcastExecutionReceipt", mock.Anything, mock.Anything, mock.Anything).Return(false, nil)
 
@@ -385,7 +392,7 @@ func TestExecuteForkConcurrently(t *testing.T) {
 		ctx.providerEngine.On("BroadcastExecutionReceipt", mock.Anything, mock.Anything, mock.Anything).Return(false, nil)
 		ctx.mockComputeBlock(store)
 		wg := sync.WaitGroup{}
-		wg.Add(2) // wait for block B to be executed
+		wg.Add(2) // wait for A and B to be executed
 		ctx.mockSaveExecutionResults(store, &wg)
 
 		err = ctx.engine.handleCollection(unittest.IdentifierFixture(), &col2)
@@ -441,7 +448,7 @@ func TestExecuteBlockInOrder(t *testing.T) {
 		ctx.providerEngine.On("BroadcastExecutionReceipt", mock.Anything, mock.Anything, mock.Anything).Return(false, nil)
 		ctx.mockComputeBlock(store)
 		wg := sync.WaitGroup{}
-		wg.Add(3)
+		wg.Add(3) // waiting for A, B, C to be executed
 		ctx.mockSaveExecutionResults(store, &wg)
 
 		err = ctx.engine.handleCollection(unittest.IdentifierFixture(), &col2)
@@ -562,7 +569,7 @@ func TestStopAtHeightWhenExecutedBeforeFinalized(t *testing.T) {
 		ctx.providerEngine.On("BroadcastExecutionReceipt", mock.Anything, mock.Anything, mock.Anything).Return(false, nil)
 		ctx.mockComputeBlock(store)
 		wg := sync.WaitGroup{}
-		wg.Add(2) // only 2 blocks (A, B) will be executed
+		wg.Add(2) // waiting for only A, B to be executed
 		ctx.mockSaveExecutionResults(store, &wg)
 
 		// receive blocks
@@ -623,7 +630,11 @@ func TestStopAtHeightWhenExecutionFinalization(t *testing.T) {
 		ctx.providerEngine.On("BroadcastExecutionReceipt", mock.Anything, mock.Anything, mock.Anything).Return(false, nil)
 		ctx.mockComputeBlock(store)
 		wg := sync.WaitGroup{}
-		wg.Add(3) // wait A to be executed and B to be finalized
+		// waiting for:
+		// 1. A, B, C to be handled
+		// 2. A, B, C to be finalized
+		// 3. only A to be executed
+		wg.Add(3)
 		ctx.mockSaveExecutionResults(store, &wg)
 
 		// receive blocks
@@ -677,7 +688,7 @@ func TestExecutedBlockUploadedFailureDoesntBlock(t *testing.T) {
 
 		ctx.mockComputeBlock(store)
 		wg := sync.WaitGroup{}
-		wg.Add(1) // wait for block B to be executed
+		wg.Add(1) // wait for block A to be executed
 		ctx.mockSaveExecutionResults(store, &wg)
 
 		// verify upload will fail
