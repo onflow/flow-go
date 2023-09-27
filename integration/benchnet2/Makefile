@@ -56,7 +56,7 @@ deploy-all: validate gen-helm-values k8s-secrets-create helm-deploy
 clean-all: validate k8s-delete k8s-delete-secrets clean-bootstrap clean-gen-helm clean-flow
 
 # target to be used in workflow as local clean up will not be needed
-remote-clean-all: validate k8s-delete-secrets k8s-delete
+remote-clean-all: validate delete-configuration k8s-delete
 
 clean-bootstrap:
 	rm -rf ./bootstrap
@@ -66,7 +66,8 @@ clean-gen-helm:
 	rm -f template-data.json
 
 upload-bootstrap:
-	tar -cvf -C ./bootstrap | gsutil cp - gs://${CONFIGURATION_BUCKET}/${NETWORK_ID}.tar
+	tar -cvf ${NETWORK_ID}.tar -C ./bootstrap .
+	gsutil cp ${NETWORK_ID}.tar gs://${CONFIGURATION_BUCKET}/${NETWORK_ID}.tar
 
 helm-deploy:
 	helm upgrade --install -f ./values.yml ${NETWORK_ID} ./flow --set ingress.enabled=true --set networkId="${NETWORK_ID}" --set owner="${OWNER}" --set configurationBucket="${CONFIGURATION_BUCKET}" --debug --namespace ${NAMESPACE} --wait
@@ -75,8 +76,8 @@ k8s-delete:
 	helm delete ${NETWORK_ID} --namespace ${NAMESPACE}
 	kubectl delete pvc -l networkId=${NETWORK_ID} --namespace ${NAMESPACE}
 
-k8s-delete-secrets:
-	kubectl delete secrets -l networkId=${NETWORK_ID} --namespace ${NAMESPACE}
+delete-configuration:
+	gsutil rm gs://${CONFIGURATION_BUCKET}/${NETWORK_ID}.tar
 
 k8s-pod-health: validate
 	kubectl get pods --namespace ${NAMESPACE}
