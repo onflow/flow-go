@@ -10,6 +10,7 @@ import (
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/storage"
+	"github.com/onflow/flow-go/storage/pebble/registers"
 )
 
 // Registers library that implements pebble storage for registers
@@ -21,6 +22,26 @@ type Registers struct {
 }
 
 var _ storage.RegisterIndex = (*Registers)(nil)
+
+func NewRegistersWithPath(dir string) (*Registers, error) {
+	db, err := initPebbleDB(dir)
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize pebble db: %w", err)
+	}
+	return NewRegisters(db)
+}
+
+func initPebbleDB(dir string) (*pebble.DB, error) {
+	cache := pebble.NewCache(1 << 20)
+	// currently pebble is only used for registers
+	opts := DefaultPebbleOptions(cache, registers.NewMVCCComparer())
+	db, err := pebble.Open(dir, opts)
+	if err != nil {
+		return nil, fmt.Errorf("failed to open db: %w", err)
+	}
+
+	return db, nil
+}
 
 // NewRegisters takes a populated pebble instance with LatestHeight and FirstHeight set.
 // Will fail if they those two keys are unavailable as it implies a corrupted or uninitialized state
