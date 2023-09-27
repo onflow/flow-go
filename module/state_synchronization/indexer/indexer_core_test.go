@@ -125,7 +125,11 @@ func (i *indexCoreTest) setGetRegisters(f func(t *testing.T, ID flow.RegisterID,
 }
 
 func (i *indexCoreTest) initIndexer() *indexCoreTest {
-	indexer, err := New(zerolog.New(os.Stdout), i.registers, i.headers, nil)
+	i.events.
+		On("Store", mock.AnythingOfType("flow.Identifier"), mock.AnythingOfType("[]flow.EventsList")).
+		Return(nil)
+
+	indexer, err := New(zerolog.New(os.Stdout), i.registers, i.headers, i.events)
 	require.NoError(i.t, err)
 	i.indexer = indexer
 	return i
