@@ -2,6 +2,7 @@ package execution
 
 import (
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/storage"
 )
 
 // RegisterStore is the interface for register store
@@ -54,6 +55,8 @@ type InMemoryRegisterStore interface {
 
 	IsBlockExecuted(height uint64, blockID flow.Identifier) (bool, error)
 }
+
+type OnDiskRegisterStore = storage.RegisterIndex
 
 // type OnDiskRegisterStore interface {
 // 	GetRegister(height uint64, register flow.RegisterID) (flow.RegisterValue, error)
