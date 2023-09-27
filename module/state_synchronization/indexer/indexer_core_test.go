@@ -453,13 +453,13 @@ func TestIndexerIntegration_StoreAndGet(t *testing.T) {
 
 			require.NoError(t, storeRegisterWithValue(index, 1, regOwner, regKey, storeValues[0]))
 
-			require.NoError(t, index.indexRegisterPayloads(nil, 2))
+			require.NoError(t, index.indexRegisters(nil, 2))
 
 			value, err := index.RegisterValues(flow.RegisterIDs{registerID}, uint64(2))
 			require.Nil(t, err)
 			assert.Equal(t, storeValues[0], value[0])
 
-			require.NoError(t, index.indexRegisterPayloads(nil, 3))
+			require.NoError(t, index.indexRegisters(nil, 3))
 
 			err = storeRegisterWithValue(index, 4, regOwner, regKey, storeValues[1])
 			require.NoError(t, err)
@@ -480,9 +480,9 @@ func TestIndexerIntegration_StoreAndGet(t *testing.T) {
 			index, err := New(zerolog.Nop(), registers, nil, nil)
 			require.NoError(t, err)
 
-			require.NoError(t, index.indexRegisterPayloads([]*ledger.Payload{}, 1))
-			require.NoError(t, index.indexRegisterPayloads([]*ledger.Payload{}, 1))
-			require.NoError(t, index.indexRegisterPayloads(nil, 2))
+			require.NoError(t, index.indexRegisters([]*ledger.Payload{}, 1))
+			require.NoError(t, index.indexRegisters([]*ledger.Payload{}, 1))
+			require.NoError(t, index.indexRegisters(nil, 2))
 		})
 	})
 }
@@ -490,7 +490,7 @@ func TestIndexerIntegration_StoreAndGet(t *testing.T) {
 // helper to store register at height and increment index range
 func storeRegisterWithValue(indexer *IndexerCore, height uint64, owner string, key string, value []byte) error {
 	payload := ledgerPayloadWithValuesFixture(owner, key, value)
-	return indexer.indexRegisterPayloads([]*ledger.Payload{payload}, height)
+	return indexer.indexRegisters([]*ledger.Payload{payload}, height)
 }
 
 // duplicated from register tests https://github.com/onflow/flow-go/blob/aa41e76c824260f8f08aacbe46471619ecf3fe6e/storage/pebble/registers_test.go#L291

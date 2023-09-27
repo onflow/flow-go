@@ -128,7 +128,7 @@ func (i *IndexerCore) IndexBlockData(_ context.Context, data *execution_data.Blo
 			}
 		}
 
-		err = i.indexRegisterPayloads(maps.Values(payloads), block.Height)
+		err = i.indexRegisters(maps.Values(payloads), block.Height)
 		if err != nil {
 			return fmt.Errorf("could not index register payloads at height %d: %w", block.Height, err)
 		}
@@ -152,7 +152,7 @@ func (i *IndexerCore) indexEvents(blockID flow.Identifier, events flow.EventsLis
 	return i.events.Store(blockID, []flow.EventsList{events})
 }
 
-func (i *IndexerCore) indexRegisterPayloads(payloads []*ledger.Payload, height uint64) error {
+func (i *IndexerCore) indexRegisters(payloads []*ledger.Payload, height uint64) error {
 	regEntries := make(flow.RegisterEntries, len(payloads))
 
 	for j, payload := range payloads {
