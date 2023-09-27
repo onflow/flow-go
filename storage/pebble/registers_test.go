@@ -293,15 +293,17 @@ func Benchmark_PayloadStorage(b *testing.B) {
 }
 
 func RunWithRegistersStorageAtInitialHeights(tb testing.TB, first uint64, latest uint64, f func(r *Registers)) {
-	cache := pebble.NewCache(1 << 20)
-	opts := DefaultPebbleOptions(cache, registers.NewMVCCComparer())
-	unittest.RunWithConfiguredPebbleInstance(tb, opts, func(p *pebble.DB) {
+	unittest.RunWithTempDir(tb, func(dir string) {
+		r, p, err := NewRegistersWithPath(dir)
+		require.NoError(tb, err)
+
 		// insert initial heights to pebble
 		require.NoError(tb, p.Set(firstHeightKey(), encodedUint64(first), nil))
 		require.NoError(tb, p.Set(latestHeightKey(), encodedUint64(latest), nil))
-		r, err := NewRegisters(p)
-		require.NoError(tb, err)
 		f(r)
+		require.NoError(tb, p.Close())
+		require.NoError(tb, os.RemoveAll(dir))
+
 	})
 }
 

@@ -23,12 +23,16 @@ type Registers struct {
 
 var _ storage.RegisterIndex = (*Registers)(nil)
 
-func NewRegistersWithPath(dir string) (*Registers, error) {
+func NewRegistersWithPath(dir string) (*Registers, *pebble.DB, error) {
 	db, err := initPebbleDB(dir)
 	if err != nil {
-		return nil, fmt.Errorf("failed to initialize pebble db: %w", err)
+		return nil, nil, fmt.Errorf("failed to initialize pebble db: %w", err)
 	}
-	return NewRegisters(db)
+	registers, err := NewRegisters(db)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to initialize registers: %w", err)
+	}
+	return registers, db, nil
 }
 
 func initPebbleDB(dir string) (*pebble.DB, error) {
