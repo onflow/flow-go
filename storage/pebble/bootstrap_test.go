@@ -1,6 +1,7 @@
 package pebble
 
 import (
+	"encoding/binary"
 	"io"
 	"os"
 	"path"
@@ -13,34 +14,27 @@ import (
 	"github.com/onflow/flow-go/ledger/complete/mtrie/trie"
 	"github.com/onflow/flow-go/ledger/complete/wal"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/rs/zerolog"
-	"github.com/stretchr/testify/require"
-
 	"github.com/onflow/flow-go/storage/pebble/registers"
 	"github.com/onflow/flow-go/utils/unittest"
+	"github.com/rs/zerolog"
+	"github.com/stretchr/testify/require"
 )
 
 func TestBootstrap_NewBootstrap(t *testing.T) {
-	t.Parallel()
 	sampleDir := path.Join(unittest.TempDir(t), "checkpoint.checkpoint")
 	rootHeight := uint64(1)
 	log := zerolog.New(io.Discard)
 	cache := pebble.NewCache(1 << 20)
 	defer cache.Unref()
 	opts := DefaultPebbleOptions(cache, registers.NewMVCCComparer())
-	unittest.RunWithConfiguredPebbleInstance(t, opts, func(p *pebble.DB) {
-		// no issues when pebble instance is blank
-		_, err := NewBootstrap(p, sampleDir, rootHeight, log)
-		require.NoError(t, err)
-	})
-	unittest.RunWithConfiguredPebbleInstance(t, opts, func(p *pebble.DB) {
-		// set heights
-		require.NoError(t, p.Set(firstHeightKey(), encodedUint64(rootHeight), nil))
-		require.NoError(t, p.Set(latestHeightKey(), encodedUint64(rootHeight), nil))
-		// errors if FirstHeight or LastHeight are populated
-		_, err := NewBootstrap(p, sampleDir, rootHeight, log)
-		require.ErrorContains(t, err, "cannot bootstrap populated DB")
-	})
+	p, dir := unittest.TempPebbleDBWithOpts(t, opts)
+	// set heights
+	require.NoError(t, p.Set(firstHeightKey(), encodedUint64(rootHeight), nil))
+	require.NoError(t, p.Set(latestHeightKey(), encodedUint64(rootHeight), nil))
+	// errors if FirstHeight or LastHeight are populated
+	_, err := NewBootstrap(p, sampleDir, rootHeight, log)
+	require.ErrorContains(t, err, "cannot bootstrap populated DB")
+	require.NoError(t, os.RemoveAll(dir))
 }
 
 func TestBootstrap_IndexCheckpointFile_Happy(t *testing.T) {
@@ -69,7 +63,9 @@ func TestBootstrap_IndexCheckpointFile_Happy(t *testing.T) {
 		require.Equal(t, reg.FirstHeight(), rootHeight)
 
 		for _, register := range registerIDs {
-			err, value := reg.Get(*register, rootHeight)
+			val, err := reg.Get(*register, rootHeight)
+			require.NoError(t, err)
+			require.Equal(t, val, []byte{uint8(0)})
 		}
 
 		require.NoError(t, pb.Close())
@@ -129,7 +125,7 @@ func simpleTrieWithValidRegisterIDs(t *testing.T) ([]*trie.MTrie, []*flow.Regist
 		require.NoError(t, err)
 		regID, err := keyToRegisterID(key)
 		require.NoError(t, err)
-		rID = append(rID, regID)
+		rID = append(rID, &regID)
 	}
 	emptyTrie := trie.NewEmptyMTrie()
 	updatedTrie, _, err := trie.NewTrieWithUpdatedRegisters(emptyTrie, paths, payloads, true)
@@ -138,26 +134,18 @@ func simpleTrieWithValidRegisterIDs(t *testing.T) ([]*trie.MTrie, []*flow.Regist
 	return tries, rID
 }
 
-// RegisterPayloadFixture a single payload with a key structure of an execution state register value
-func RegisterPayloadFixture() *ledger.Payload {
-	k := ledger.Key{KeyParts: []ledger.KeyPart{
-		{Type: state.KeyPartOwner, Value: []byte{byte('o')}},
-		{Type: state.KeyPartKey, Value: []byte{byte('k')}}},
-	}
-	v := ledger.Value{uint8(0)}
-	return ledger.NewPayload(k, v)
-}
-
-func RandomRegisterPayloads(n int) []*ledger.Payload {
-	p := make([]*ledger.Payload, 0, n)
-	for i := 0; i < n; i++ {
+func RandomRegisterPayloads(n uint64) []ledger.Payload {
+	p := make([]ledger.Payload, 0, n)
+	for i := uint64(0); i < n; i++ {
+		o := make([]byte, 0, 8)
+		o = binary.BigEndian.AppendUint64(o, n)
 		k := ledger.Key{KeyParts: []ledger.KeyPart{
-			{Type: state.KeyPartOwner, Value: []byte{byte('o')}},
-			{Type: state.KeyPartKey, Value: []byte{byte('k')}}},
-		}
+			{Type: state.KeyPartOwner, Value: o},
+			{Type: state.KeyPartKey, Value: o},
+		}}
 		v := ledger.Value{uint8(0)}
 		pl := ledger.NewPayload(k, v)
-		p = append(p, pl)
+		p = append(p, *pl)
 	}
 	return p
 }
