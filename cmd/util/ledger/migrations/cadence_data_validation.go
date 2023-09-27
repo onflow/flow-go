@@ -363,7 +363,7 @@ func getShardedCollectionMap(mr *migratorRuntime, value interpreter.Value) (*int
 
 func getNftCollection(inter *interpreter.Interpreter, outerKey interpreter.Value, shardedCollectionMap *interpreter.DictionaryValue) (*interpreter.DictionaryValue, error) {
 	value := shardedCollectionMap.GetKey(
-		nil,
+		inter,
 		interpreter.EmptyLocationRange,
 		outerKey,
 	)
