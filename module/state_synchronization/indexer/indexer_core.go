@@ -93,39 +93,42 @@ func (i *IndexerCore) IndexBlockData(_ context.Context, data *execution_data.Blo
 	// concurrently process indexing of block data
 	g := errgroup.Group{}
 
-	updates := make([]*ledger.TrieUpdate, 0)
-	events := make([]flow.Event, 0)
-
-	for _, chunk := range data.ChunkExecutionDatas {
-		if chunk.TrieUpdate != nil {
-			updates = append(updates, chunk.TrieUpdate)
+	g.Go(func() error {
+		events := make([]flow.Event, 0)
+		for _, chunk := range data.ChunkExecutionDatas {
+			events = append(events, chunk.Events...)
 		}
 
-		events = append(events, chunk.Events...)
-	}
-
-	if len(events) > 0 {
-		g.Go(func() error {
-			err := i.indexEvents(data.BlockID, events)
-			if err != nil {
-				return fmt.Errorf("could not index events at height %d: %w", block.Height, err)
-			}
+		if len(events) == 0 {
 			return nil
-		})
-	}
+		}
+
+		err := i.indexEvents(data.BlockID, events)
+		if err != nil {
+			return fmt.Errorf("could not index events at height %d: %w", block.Height, err)
+		}
+		return nil
+	})
 
 	g.Go(func() error {
+		updates := make([]*ledger.TrieUpdate, 0)
+
+		for _, chunk := range data.ChunkExecutionDatas {
+			if chunk.TrieUpdate != nil {
+				updates = append(updates, chunk.TrieUpdate)
+			}
+		}
+
 		// we are iterating all the registers and overwrite any existing register at the same path
 		// this will make sure if we have multiple register changes only the last change will get persisted
 		// if block has two chucks:
 		// first chunk updates: { X: 1, Y: 2 }
 		// second chunk updates: { X: 2 }
 		// then we should persist only {X: 2: Y: 2}
-
 		payloads := make(map[ledger.Path]*ledger.Payload)
 		for _, update := range updates {
 			for i, path := range update.Paths {
-				payloads[path] = update.Payloads[i] // todo should we use TrieUpdate.Paths or TrieUpdate.Payload.Key?
+				payloads[path] = update.Payloads[i]
 			}
 		}
 
