@@ -549,14 +549,14 @@ func (m *CadenceDataValidationMigrations) hashAllNftsInAllCollections(
 
 	// workers for hashing
 	for i := 0; i < m.nWorkers; i++ {
-		go func() {
+		go func(i int) {
 			defer wg.Done()
 
 			storageMap := mr.GetReadOnlyStorage().GetStorageMap(mr.Address, domain, false)
 			storageMapValue := storageMap.ReadValue(&util.NopMemoryGauge{}, key)
 
-			hashNFTWorker(sampler, ctx, cancel, mr, storageMapValue, keyPairChan, hashChan)
-		}()
+			hashNFTWorker(sampler.With().Int("worker", i).Logger(), ctx, cancel, mr, storageMapValue, keyPairChan, hashChan)
+		}(i)
 	}
 
 	// worker for collecting hashes

@@ -93,13 +93,13 @@ func extractExecutionState(
 			nWorker,
 			[]migrators.AccountBasedMigration{
 				// do account usage migration before and after as a sanity check.
-				&migrators.AccountUsageMigrator{},
+				//&migrators.AccountUsageMigrator{},
 				cadenceDataValidation.PreMigration(),
-				migrators.NewAtreeRegisterMigrator(
-					rwf,
-				),
+				//migrators.NewAtreeRegisterMigrator(
+				//	rwf,
+				//),
 				cadenceDataValidation.PostMigration(),
-				&migrators.AccountUsageMigrator{},
+				//&migrators.AccountUsageMigrator{},
 			}),
 	}
 	newState := ledger.State(targetHash)
