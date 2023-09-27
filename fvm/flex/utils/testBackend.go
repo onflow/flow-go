@@ -22,20 +22,24 @@ func RunWithTestBackend(t testing.TB, f func(models.Backend)) {
 	f(tb)
 }
 
+func fullKey(owner, key []byte) string {
+	return string(owner) + "~" + string(key)
+}
+
 func getSimpleValueStore() *testValueStore {
 	data := make(map[string][]byte)
 	allocator := make(map[string]uint64)
 
 	return &testValueStore{
 		getValue: func(owner, key []byte) ([]byte, error) {
-			return data[string(owner)+"~"+string(key)], nil
+			return data[fullKey(owner, key)], nil
 		},
 		setValue: func(owner, key, value []byte) error {
-			data[string(owner)+"~"+string(key)] = value
+			data[fullKey(owner, key)] = value
 			return nil
 		},
 		valueExists: func(owner, key []byte) (bool, error) {
-			return len(data[string(owner)+"~"+string(key)]) > 0, nil
+			return len(data[fullKey(owner, key)]) > 0, nil
 
 		},
 		allocateStorageIndex: func(owner []byte) (atree.StorageIndex, error) {
