@@ -766,14 +766,20 @@ func (exeNode *ExecutionNode) LoadExecutionStateLedger(
 func (exeNode *ExecutionNode) LoadRegisterStore(
 	node *NodeConfig,
 ) error {
-	db, err := storagepebble.InitPebbleDB(exeNode.exeConf.registerDir)
-	if err != nil {
-		return fmt.Errorf("could not create pebble db: %w", err)
-	}
-	diskStore, err := storagepebble.NewRegisters(db)
+	diskStore, pebbledb, err := storagepebble.NewRegistersWithPath(exeNode.exeConf.registerDir)
 	if err != nil {
 		return fmt.Errorf("could not create disk register store: %w", err)
 	}
+
+	// close pebble db on shut down
+	exeNode.builder.ShutdownFunc(func() error {
+		err := pebbledb.Close()
+		if err != nil {
+			return fmt.Errorf("could not close register store: %w", err)
+		}
+		return nil
+	})
+
 	reader := finalizedreader.NewFinalizedReader(node.Storage.Headers)
 	registerStore, err := storehouse.NewRegisterStore(
 		diskStore,
