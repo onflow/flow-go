@@ -31,11 +31,10 @@ var FlexLatextBlockKey = "LatestBlock"
 // functionality it also supports batch writes and iterating over the keyspace in
 // binary-alphabetical order.
 type Database struct {
-	led atree.Ledger
-
-	storage *atree.OrderedMap
-
-	lock sync.RWMutex // Ramtin: do we need this?
+	led      atree.Ledger
+	storage  *atree.PersistentSlabStorage
+	atreemap *atree.OrderedMap
+	lock     sync.RWMutex // Ramtin: do we need this?
 }
 
 // New returns a wrapped map with all the required database interface methods
@@ -46,15 +45,17 @@ func NewDatabase(led atree.Ledger) *Database {
 	baseStorage := atree.NewLedgerBaseStorage(led)
 
 	storage := NewPersistentSlabStorage(baseStorage)
-	m, err := atree.NewMap(storage, atree.Address(FlexAddress), atree.NewDefaultDigesterBuilder(), nil)
+
+	m, err := atree.NewMap(storage, atree.Address(FlexAddress), atree.NewDefaultDigesterBuilder(), typeInfo{})
 	// TODO do not panic
 	if err != nil {
 		panic(err)
 	}
 
 	return &Database{
-		led:     led,
-		storage: m,
+		led:      led,
+		storage:  storage,
+		atreemap: m,
 	}
 }
 
@@ -63,13 +64,13 @@ func (db *Database) Get(key []byte) ([]byte, error) {
 	db.lock.RLock()
 	defer db.lock.RUnlock()
 
-	data, err := db.storage.Get(compare, hashInputProvider, NewStringValue(string(key)))
+	data, err := db.atreemap.Get(compare, hashInputProvider, NewStringValue(string(key)))
 
 	if err != nil {
 		return nil, err
 	}
 
-	v, err := data.StoredValue(db.storage.Storage)
+	v, err := data.StoredValue(db.atreemap.Storage)
 	return []byte(v.(StringValue).String()), err
 }
 
@@ -78,7 +79,7 @@ func (db *Database) Put(key []byte, value []byte) error {
 	db.lock.Lock()
 	defer db.lock.Unlock()
 
-	_, err := db.storage.Set(compare, hashInputProvider, NewStringValue(string(key)), NewStringValue(string(value)))
+	_, err := db.atreemap.Set(compare, hashInputProvider, NewStringValue(string(key)), NewStringValue(string(value)))
 	return err
 }
 
@@ -87,7 +88,7 @@ func (db *Database) Delete(key []byte) error {
 	db.lock.Lock()
 	defer db.lock.Unlock()
 
-	_, _, err := db.storage.Remove(compare, hashInputProvider, NewStringValue(string(key)))
+	_, _, err := db.atreemap.Remove(compare, hashInputProvider, NewStringValue(string(key)))
 	return err
 }
 
@@ -107,10 +108,15 @@ func (db *Database) GetLatestBlock() (*models.FlexBlock, error) {
 	return models.NewFlexBlockFromEncoded(data), err
 }
 
+// Commits the changes from atree
+func (db *Database) Commit() error {
+	return db.storage.Commit()
+}
+
 // Close deallocates the internal map and ensures any consecutive data access op
 // fails with an error.
 func (db *Database) Close() error {
-	return nil
+	return db.Commit()
 }
 
 // Has retrieves if a key is present in the key-value store.
@@ -219,6 +225,7 @@ func (b *batch) Write() error {
 		}
 		b.db.Put(keyvalue.key, keyvalue.value)
 	}
+
 	return nil
 }
 
