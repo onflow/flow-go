@@ -44,7 +44,6 @@ import (
 	"github.com/onflow/flow-go/engine/common/provider"
 	"github.com/onflow/flow-go/engine/common/requester"
 	"github.com/onflow/flow-go/engine/common/synchronization"
-	"github.com/onflow/flow-go/engine/execution"
 	"github.com/onflow/flow-go/engine/execution/checker"
 	"github.com/onflow/flow-go/engine/execution/computation"
 	"github.com/onflow/flow-go/engine/execution/computation/committer"
@@ -89,6 +88,7 @@ import (
 	storageerr "github.com/onflow/flow-go/storage"
 	storage "github.com/onflow/flow-go/storage/badger"
 	"github.com/onflow/flow-go/storage/badger/procedure"
+	storagepebble "github.com/onflow/flow-go/storage/pebble"
 	sutil "github.com/onflow/flow-go/storage/util"
 )
 
@@ -766,8 +766,14 @@ func (exeNode *ExecutionNode) LoadExecutionStateLedger(
 func (exeNode *ExecutionNode) LoadRegisterStore(
 	node *NodeConfig,
 ) error {
-	// TODO: replace with OnDiskRegisterStore implementation
-	var diskStore execution.OnDiskRegisterStore
+	db, err := storagepebble.InitPebbleDB(exeNode.exeConf.registerDir)
+	if err != nil {
+		return fmt.Errorf("could not create pebble db: %w", err)
+	}
+	diskStore, err := storagepebble.NewRegisters(db)
+	if err != nil {
+		return fmt.Errorf("could not create disk register store: %w", err)
+	}
 	reader := finalizedreader.NewFinalizedReader(node.Storage.Headers)
 	registerStore, err := storehouse.NewRegisterStore(
 		diskStore,
