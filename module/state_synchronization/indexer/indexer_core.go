@@ -99,10 +99,6 @@ func (i *IndexerCore) IndexBlockData(_ context.Context, data *execution_data.Blo
 			events = append(events, chunk.Events...)
 		}
 
-		if len(events) == 0 {
-			return nil
-		}
-
 		err := i.indexEvents(data.BlockID, events)
 		if err != nil {
 			return fmt.Errorf("could not index events at height %d: %w", block.Height, err)
