@@ -2,10 +2,10 @@ package indexer
 
 import (
 	"context"
+	"crypto/rand"
 	"encoding/binary"
 	"errors"
 	"fmt"
-	"math/rand"
 	"os"
 	"testing"
 
