@@ -39,8 +39,8 @@ func newWorkerTest(t *testing.T, availableBlocks int, lastIndexedIndex int) *wor
 	progress := &mockProgress{index: lastIndexedHeight}
 
 	indexerTest := newIndexTest(t, blocks, nil).
-		setLastHeight(func(t *testing.T) (uint64, error) {
-			return lastIndexedHeight, nil
+		setLastHeight(func(t *testing.T) uint64 {
+			return lastIndexedHeight
 		}).
 		useDefaultBlockByHeight().
 		initIndexer()

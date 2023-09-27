@@ -35,14 +35,14 @@ import (
 type indexTest struct {
 	t                *testing.T
 	indexer          *ExecutionState
-	registers        *storagemock.Registers
+	registers        *storagemock.RegisterIndex
 	events           *storagemock.Events
 	headers          *storagemock.Headers
 	ctx              context.Context
 	blocks           []*flow.Block
 	data             *execution_data.BlockExecutionDataEntity
-	lastHeightStore  func(t *testing.T) (uint64, error)
-	firstHeightStore func(t *testing.T) (uint64, error)
+	lastHeightStore  func(t *testing.T) uint64
+	firstHeightStore func(t *testing.T) uint64
 	registersStore   func(t *testing.T, entries flow.RegisterEntries, height uint64) error
 	eventsStore      func(t *testing.T, ID flow.Identifier, events []flow.EventsList) error
 	registersGet     func(t *testing.T, IDs flow.RegisterID, height uint64) (flow.RegisterValue, error)
@@ -53,18 +53,14 @@ func newIndexTest(
 	blocks []*flow.Block,
 	exeData *execution_data.BlockExecutionDataEntity,
 ) *indexTest {
-	registers := storagemock.NewRegisters(t)
-	events := storagemock.NewEvents(t)
-	headers := newBlockHeadersStorage(blocks)
-
 	return &indexTest{
 		t:         t,
-		registers: registers,
-		events:    events,
+		registers: storagemock.NewRegisterIndex(t),
+		events:    storagemock.NewEvents(t),
 		blocks:    blocks,
 		ctx:       context.Background(),
 		data:      exeData,
-		headers:   headers.(*storagemock.Headers), // convert it back to mock type for tests
+		headers:   newBlockHeadersStorage(blocks).(*storagemock.Headers), // convert it back to mock type for tests
 	}
 }
 
@@ -95,8 +91,8 @@ func (i *indexTest) setLastHeight(f func(t *testing.T) uint64) *indexTest {
 func (i *indexTest) useDefaultLastHeight() *indexTest {
 	i.registers.
 		On("LatestHeight").
-		Return(func() (uint64, error) {
-			return i.blocks[len(i.blocks)-1].Header.Height, nil
+		Return(func() uint64 {
+			return i.blocks[len(i.blocks)-1].Header.Height
 		})
 	return i
 }
@@ -237,8 +233,8 @@ func TestExecutionState_IndexBlockData(t *testing.T) {
 
 		err := newIndexTest(t, blocks, execData).
 			// return a height one smaller than the latest block in storage
-			setLastHeight(func(t *testing.T) (uint64, error) {
-				return latestHeight, nil
+			setLastHeight(func(t *testing.T) uint64 {
+				return latestHeight
 			}).
 			runIndexBlockData()
 
