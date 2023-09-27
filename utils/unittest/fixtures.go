@@ -2683,17 +2683,18 @@ func P2PRPCFixture(opts ...RPCFixtureOpt) *pubsub.RPC {
 }
 
 // GossipSubMessageFixture a gossipsub message fixture for the provided topic.
-func GossipSubMessageFixture(topic string) *pubsub_pb.Message {
+func GossipSubMessageFixture(topic string, from []byte) *pubsub_pb.Message {
 	return &pubsub_pb.Message{
 		Topic: &topic,
+		From:  from,
 	}
 }
 
 // GossipSubMessageFixtures returns a list of gossipsub message fixtures.
-func GossipSubMessageFixtures(n int, topic string) []*pubsub_pb.Message {
+func GossipSubMessageFixtures(n int, topic string, from peer.ID) []*pubsub_pb.Message {
 	msgs := make([]*pubsub_pb.Message, n)
 	for i := 0; i < n; i++ {
-		msgs[i] = GossipSubMessageFixture(topic)
+		msgs[i] = GossipSubMessageFixture(topic, []byte(from))
 	}
 	return msgs
 }

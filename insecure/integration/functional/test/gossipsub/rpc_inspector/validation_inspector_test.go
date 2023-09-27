@@ -22,6 +22,7 @@ import (
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/mock"
+	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/inspector/validation"
@@ -103,6 +104,7 @@ func TestValidationInspector_InvalidTopicId_Detection(t *testing.T) {
 		InspectorMetrics:              metrics.NewNoopCollector(),
 		RpcTracker:                    meshTracer,
 		Subscriptions:                 subscriptions,
+		NetworkingType:                network.PrivateNetwork,
 	})
 	require.NoError(t, err)
 	corruptInspectorFunc := corruptlibp2p.CorruptInspectorFunc(validationInspector)
@@ -238,6 +240,7 @@ func TestValidationInspector_DuplicateTopicId_Detection(t *testing.T) {
 		InspectorMetrics:              metrics.NewNoopCollector(),
 		RpcTracker:                    meshTracer,
 		Subscriptions:                 subscriptions,
+		NetworkingType:                network.PrivateNetwork,
 	})
 	require.NoError(t, err)
 	corruptInspectorFunc := corruptlibp2p.CorruptInspectorFunc(validationInspector)
@@ -336,6 +339,7 @@ func TestValidationInspector_IHaveDuplicateMessageId_Detection(t *testing.T) {
 		InspectorMetrics:              metrics.NewNoopCollector(),
 		RpcTracker:                    meshTracer,
 		Subscriptions:                 subscriptions,
+		NetworkingType:                network.PrivateNetwork,
 	})
 	require.NoError(t, err)
 	corruptInspectorFunc := corruptlibp2p.CorruptInspectorFunc(validationInspector)
@@ -448,6 +452,7 @@ func TestValidationInspector_UnknownClusterId_Detection(t *testing.T) {
 		InspectorMetrics:              metrics.NewNoopCollector(),
 		RpcTracker:                    meshTracer,
 		Subscriptions:                 subscriptions,
+		NetworkingType:                network.PrivateNetwork,
 	})
 	require.NoError(t, err)
 	corruptInspectorFunc := corruptlibp2p.CorruptInspectorFunc(validationInspector)
@@ -541,6 +546,7 @@ func TestValidationInspector_ActiveClusterIdsNotSet_Graft_Detection(t *testing.T
 		InspectorMetrics:              metrics.NewNoopCollector(),
 		RpcTracker:                    meshTracer,
 		Subscriptions:                 subscriptions,
+		NetworkingType:                network.PrivateNetwork,
 	})
 	require.NoError(t, err)
 	corruptInspectorFunc := corruptlibp2p.CorruptInspectorFunc(validationInspector)
@@ -626,6 +632,7 @@ func TestValidationInspector_ActiveClusterIdsNotSet_Prune_Detection(t *testing.T
 		InspectorMetrics:              metrics.NewNoopCollector(),
 		RpcTracker:                    meshTracer,
 		Subscriptions:                 subscriptions,
+		NetworkingType:                network.PrivateNetwork,
 	})
 	require.NoError(t, err)
 	corruptInspectorFunc := corruptlibp2p.CorruptInspectorFunc(validationInspector)
@@ -716,6 +723,7 @@ func TestValidationInspector_UnstakedNode_Detection(t *testing.T) {
 		InspectorMetrics:              metrics.NewNoopCollector(),
 		RpcTracker:                    meshTracer,
 		Subscriptions:                 subscriptions,
+		NetworkingType:                network.PrivateNetwork,
 	})
 	require.NoError(t, err)
 	corruptInspectorFunc := corruptlibp2p.CorruptInspectorFunc(validationInspector)
@@ -813,6 +821,7 @@ func TestValidationInspector_InspectIWants_CacheMissThreshold(t *testing.T) {
 		InspectorMetrics:              metrics.NewNoopCollector(),
 		RpcTracker:                    meshTracer,
 		Subscriptions:                 subscriptions,
+		NetworkingType:                network.PrivateNetwork,
 	})
 	require.NoError(t, err)
 	corruptInspectorFunc := corruptlibp2p.CorruptInspectorFunc(validationInspector)
@@ -870,12 +879,39 @@ func TestValidationInspector_InspectRpcPublishMessages(t *testing.T) {
 	require.NoError(t, err)
 	inspectorConfig := flowConfig.NetworkConfig.GossipSubConfig.GossipSubRPCInspectorsConfig.GossipSubRPCValidationInspectorConfigs
 	inspectorConfig.NumberOfWorkers = 1
-	// after 5 errors encountered disseminate a notification
-	inspectorConfig.RPCMessageErrorThreshold = 4
+
+	idProvider := mock.NewIdentityProvider(t)
+	spammer := corruptlibp2p.NewGossipSubRouterSpammer(t, sporkID, role, idProvider)
 
 	controlMessageCount := int64(1)
 	notificationCount := atomic.NewUint64(0)
 	done := make(chan struct{})
+	validTopic := channels.Topic(fmt.Sprintf("%s/%s", channels.TestNetworkChannel.String(), sporkID)).String()
+	// create unknown topic
+	unknownTopic := channels.Topic(fmt.Sprintf("%s/%s", corruptlibp2p.GossipSubTopicIdFixture(), sporkID)).String()
+	// create malformed topic
+	malformedTopic := channels.Topic("!@#$%^&**((").String()
+	// a topics spork ID is considered invalid if it does not match the current spork ID
+	invalidSporkIDTopic := channels.Topic(fmt.Sprintf("%s/%s", channels.PushBlocks, unittest.IdentifierFixture())).String()
+
+	// unknown peer ID
+	unknownPeerID := unittest.PeerIdFixture(t)
+
+	// ejected identity
+	ejectedIdentityPeerID := unittest.PeerIdFixture(t)
+	ejectedIdentity := unittest.IdentityFixture()
+	ejectedIdentity.Ejected = true
+
+	// invalid messages this should force a notification to disseminate
+	invalidPublishMsgs := []*pb.Message{
+		{Topic: &unknownTopic, From: []byte(spammer.SpammerNode.ID())},
+		{Topic: &malformedTopic, From: []byte(spammer.SpammerNode.ID())},
+		{Topic: &malformedTopic, From: []byte(spammer.SpammerNode.ID())},
+		{Topic: &malformedTopic, From: []byte(spammer.SpammerNode.ID())},
+		{Topic: &invalidSporkIDTopic, From: []byte(spammer.SpammerNode.ID())},
+		{Topic: &validTopic, From: []byte(unknownPeerID)},
+		{Topic: &validTopic, From: []byte(ejectedIdentityPeerID)},
+	}
 	// ensure expected notifications are disseminated with expected error
 	inspectDisseminatedNotifyFunc := func(spammer *corruptlibp2p.GossipSubRouterSpammer) func(args mockery.Arguments) {
 		return func(args mockery.Arguments) {
@@ -884,15 +920,15 @@ func TestValidationInspector_InspectRpcPublishMessages(t *testing.T) {
 			require.Equal(t, spammer.SpammerNode.ID(), notification.PeerID)
 			require.True(t, notification.MsgType == p2pmsg.RpcPublishMessage, fmt.Sprintf("unexpected control message type %s error: %s", notification.MsgType, notification.Error))
 			require.True(t, validation.IsInvalidRpcPublishMessagesErr(notification.Error))
+			require.Contains(t, notification.Error.Error(), fmt.Sprintf("%d error(s) encountered", len(invalidPublishMsgs)), fmt.Sprintf("expected %d errors, an error for each invalid pubsub message", len(invalidPublishMsgs)))
+			require.Contains(t, notification.Error.Error(), fmt.Sprintf("received rpc publish message from unstaked peer: %s", unknownPeerID))
+			require.Contains(t, notification.Error.Error(), fmt.Sprintf("received rpc publish message from ejected peer: %s", ejectedIdentityPeerID))
 			notificationCount.Inc()
 			if notificationCount.Load() == 1 {
 				close(done)
 			}
 		}
 	}
-
-	idProvider := mock.NewIdentityProvider(t)
-	spammer := corruptlibp2p.NewGossipSubRouterSpammer(t, sporkID, role, idProvider)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
@@ -915,7 +951,11 @@ func TestValidationInspector_InspectRpcPublishMessages(t *testing.T) {
 		InspectorMetrics:              metrics.NewNoopCollector(),
 		RpcTracker:                    meshTracer,
 		Subscriptions:                 subscriptions,
+		NetworkingType:                network.PrivateNetwork,
 	})
+	// after 7 errors encountered disseminate a notification
+	inspectorConfig.RPCMessageErrorThreshold = 6
+
 	require.NoError(t, err)
 	corruptInspectorFunc := corruptlibp2p.CorruptInspectorFunc(validationInspector)
 	victimNode, victimIdentity := p2ptest.NodeFixture(
@@ -931,6 +971,11 @@ func TestValidationInspector_InspectRpcPublishMessages(t *testing.T) {
 	idProvider.On("ByPeerID", victimNode.ID()).Return(&victimIdentity, true).Maybe()
 	idProvider.On("ByPeerID", spammer.SpammerNode.ID()).Return(&spammer.SpammerId, true).Maybe()
 
+	// return nil for unknown peer ID indicating unstaked peer
+	idProvider.On("ByPeerID", unknownPeerID).Return(nil, false).Once()
+	// return ejected identity for peer ID will force message validation failure
+	idProvider.On("ByPeerID", ejectedIdentityPeerID).Return(ejectedIdentity, true).Once()
+
 	validationInspector.Start(signalerCtx)
 	nodes := []p2p.LibP2PNode{victimNode, spammer.SpammerNode}
 	startNodesAndEnsureConnected(t, signalerCtx, nodes, sporkID)
@@ -941,22 +986,9 @@ func TestValidationInspector_InspectRpcPublishMessages(t *testing.T) {
 	// prepare to spam - generate control messages
 	ctlMsg := spammer.GenerateCtlMessages(int(controlMessageCount))
 	topic := channels.Topic(fmt.Sprintf("%s/%s", channels.PushBlocks, sporkID))
-	// first create 5 valid messages
-	publishMsgs := unittest.GossipSubMessageFixtures(4, topic.String())
-	// create unknown topic
-	unknownTopic := channels.Topic(fmt.Sprintf("%s/%s", corruptlibp2p.GossipSubTopicIdFixture(), sporkID)).String()
-	// create malformed topic
-	malformedTopic := channels.Topic("!@#$%^&**((").String()
-	// a topics spork ID is considered invalid if it does not match the current spork ID
-	invalidSporkIDTopic := channels.Topic(fmt.Sprintf("%s/%s", channels.PushBlocks, unittest.IdentifierFixture())).String()
-	// append messages with invalid topics this should force a notification to disseminate
-	publishMsgs = append(publishMsgs, []*pb.Message{
-		{Topic: &unknownTopic},
-		{Topic: &malformedTopic},
-		{Topic: &malformedTopic},
-		{Topic: &malformedTopic},
-		{Topic: &invalidSporkIDTopic},
-	}...)
+	// first create 4 valid messages
+	publishMsgs := unittest.GossipSubMessageFixtures(4, topic.String(), spammer.SpammerNode.ID())
+	publishMsgs = append(publishMsgs, invalidPublishMsgs...)
 	// start spamming the victim peer
 	spammer.SpamControlMessage(t, victimNode, ctlMsg, publishMsgs...)
 
