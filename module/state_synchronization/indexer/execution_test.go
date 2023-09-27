@@ -83,10 +83,10 @@ func (i *indexTest) useDefaultBlockByHeight() *indexTest {
 	return i
 }
 
-func (i *indexTest) setLastHeight(f func(t *testing.T) (uint64, error)) *indexTest {
+func (i *indexTest) setLastHeight(f func(t *testing.T) uint64) *indexTest {
 	i.registers.
 		On("LatestHeight").
-		Return(func() (uint64, error) {
+		Return(func() uint64 {
 			return f(i.t)
 		})
 	return i
@@ -97,15 +97,6 @@ func (i *indexTest) useDefaultLastHeight() *indexTest {
 		On("LatestHeight").
 		Return(func() (uint64, error) {
 			return i.blocks[len(i.blocks)-1].Header.Height, nil
-		})
-	return i
-}
-
-func (i *indexTest) setFirstHeight(f func(t *testing.T) (uint64, error)) *indexTest {
-	i.registers.
-		On("FirstHeight").
-		Return(func() (uint64, error) {
-			return f(i.t)
 		})
 	return i
 }
