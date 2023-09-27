@@ -55,12 +55,12 @@ type InMemoryRegisterStore interface {
 	IsBlockExecuted(height uint64, blockID flow.Identifier) (bool, error)
 }
 
-type OnDiskRegisterStore interface {
-	GetRegister(height uint64, register flow.RegisterID) (flow.RegisterValue, error)
-	SaveRegisters(height uint64, registers []flow.RegisterEntry) error
-	// latest finalized and executed height
-	Latest() (height uint64)
-}
+// type OnDiskRegisterStore interface {
+// 	GetRegister(height uint64, register flow.RegisterID) (flow.RegisterValue, error)
+// 	SaveRegisters(height uint64, registers []flow.RegisterEntry) error
+// 	// latest finalized and executed height
+// 	Latest() (height uint64)
+// }
 
 type ExecutedFinalizedWAL interface {
 	Append(height uint64, registers []flow.RegisterEntry) error

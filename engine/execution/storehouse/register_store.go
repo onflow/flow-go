@@ -13,14 +13,14 @@ import (
 
 type RegisterStore struct {
 	memStore  *InMemoryRegisterStore
-	diskStore execution.OnDiskRegisterStore
+	diskStore storage.RegisterIndex
 	wal       execution.ExecutedFinalizedWAL
 	finalized execution.FinalizedReader
 	log       zerolog.Logger
 }
 
 func NewRegisterStore(
-	diskStore execution.OnDiskRegisterStore,
+	diskStore storage.RegisterIndex,
 	wal execution.ExecutedFinalizedWAL,
 	finalized execution.FinalizedReader,
 	log zerolog.Logger,
@@ -58,7 +58,7 @@ func (r *RegisterStore) GetRegister(height uint64, blockID flow.Identifier, regi
 	// in both cases, we need to get the register from diskStore
 	// there is no other error type
 	if err != nil {
-		return r.diskStore.GetRegister(height, register)
+		return r.diskStore.Get(register, height)
 	}
 	return reg, nil
 }
@@ -88,7 +88,7 @@ func (r *RegisterStore) SaveRegisters(header *flow.Header, registers []flow.Regi
 // 2. save the registers of the block to OnDiskRegisterStore
 // 3. prune the height in InMemoryRegisterStore
 func (r *RegisterStore) OnBlockFinalized() error {
-	latest := r.diskStore.Latest()
+	latest := r.diskStore.LatestHeight()
 	next := latest + 1
 	blockID, err := r.finalized.GetFinalizedBlockIDAtHeight(next)
 	if errors.Is(err, storage.ErrNotFound) {
@@ -109,7 +109,7 @@ func (r *RegisterStore) OnBlockFinalized() error {
 	// 	return fmt.Errorf("cannot write %v registers to write ahead logs for height %v: %w", len(regs), next, err)
 	// }
 
-	err = r.diskStore.SaveRegisters(next, regs)
+	err = r.diskStore.Store(regs, next)
 	if err != nil {
 		return fmt.Errorf("cannot save %v registers to disk store for height %v: %w", len(regs), next, err)
 	}
@@ -126,7 +126,7 @@ func (r *RegisterStore) OnBlockFinalized() error {
 // which has been saved in OnDiskRegisterStore
 func (r *RegisterStore) FinalizedAndExecutedHeight() uint64 {
 	// diskStore caches the latest height in memory
-	return r.diskStore.Latest()
+	return r.diskStore.LatestHeight()
 }
 
 // IsBlockExecuted returns true if the block is executed, false if not executed
@@ -154,18 +154,18 @@ func (r *RegisterStore) isBlockFinalized(height uint64, blockID flow.Identifier)
 // syncDiskStore replay WAL to disk store
 func syncDiskStore(
 	wal execution.ExecutedFinalizedWAL,
-	diskStore execution.OnDiskRegisterStore,
+	diskStore storage.RegisterIndex,
 	log zerolog.Logger,
 ) (uint64, error) {
 	// TODO: replace diskStore.Latest with wal.Latest
 	// latest, err := r.wal.Latest()
 	var err error
-	latest := diskStore.Latest()
+	latest := diskStore.LatestHeight() // tmp
 	if err != nil {
 		return 0, fmt.Errorf("cannot get latest height from write ahead logs: %w", err)
 	}
 
-	stored := diskStore.Latest()
+	stored := diskStore.LatestHeight()
 
 	if stored > latest {
 		return 0, fmt.Errorf("latest height in storehouse %v is larger than latest height %v in write ahead logs", stored, latest)
@@ -184,7 +184,7 @@ func syncDiskStore(
 				return 0, fmt.Errorf("cannot read registers from write ahead logs: %w", err)
 			}
 
-			err = diskStore.SaveRegisters(height, registers)
+			err = diskStore.Store(registers, height)
 			if err != nil {
 				return 0, fmt.Errorf("cannot save registers to disk store at height %v : %w", height, err)
 			}
