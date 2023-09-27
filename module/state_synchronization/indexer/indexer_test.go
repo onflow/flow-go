@@ -44,6 +44,7 @@ func newIndexerTest(t *testing.T, availableBlocks int, lastIndexedIndex int) *in
 		}).
 		useDefaultBlockByHeight().
 		useDefaultEvents().
+		useDefaultTransactionResults().
 		initIndexer()
 
 	executionData := mempool.NewExecutionData(t)
