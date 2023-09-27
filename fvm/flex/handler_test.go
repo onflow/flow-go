@@ -25,6 +25,9 @@ func TestFlexContractHandler(t *testing.T) {
 			handler := flex.NewFlexContractHandler(backend)
 			// test call last executed block without initialization
 			b := handler.LastExecutedBlock()
+			require.Equal(t, models.GenesisFlexBlock, b)
+
+			// do some changes
 			foa := handler.NewFlowOwnedAccount()
 			require.NotNil(t, foa)
 

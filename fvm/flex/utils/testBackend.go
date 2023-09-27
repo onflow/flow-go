@@ -16,15 +16,10 @@ import (
 
 func RunWithTestBackend(t testing.TB, f func(models.Backend)) {
 	tb := testBackend{
-		testValueStore: getSimpleValueStore(),
+		testValueStore:   getSimpleValueStore(),
+		testEventEmitter: getSimpleEventEmitter(),
 	}
 	f(tb)
-}
-
-type testBackend struct {
-	*testValueStore
-	*testMeter
-	*testEventEmitter
 }
 
 func getSimpleValueStore() *testValueStore {
@@ -51,6 +46,25 @@ func getSimpleValueStore() *testValueStore {
 			return atree.StorageIndex(data), nil
 		},
 	}
+}
+
+func getSimpleEventEmitter() *testEventEmitter {
+	events := make(flow.EventsList, 0)
+	return &testEventEmitter{
+		emitFlowEvent: func(etype flow.EventType, payload []byte) error {
+			events = append(events, flow.Event{Type: etype, Payload: payload})
+			return nil
+		},
+		events: func() flow.EventsList {
+			return events
+		},
+	}
+}
+
+type testBackend struct {
+	*testValueStore
+	*testMeter
+	*testEventEmitter
 }
 
 type testValueStore struct {
