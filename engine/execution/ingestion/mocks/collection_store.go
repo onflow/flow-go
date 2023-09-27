@@ -35,7 +35,7 @@ func (m *MockCollectionStore) StoreLightAndIndexByTransaction(collection *flow.L
 }
 
 func (m *MockCollectionStore) StoreLight(collection *flow.LightCollection) error {
-	panic("LightIndexByTransaction not implemented")
+	panic("StoreLight not implemented")
 }
 
 func (m *MockCollectionStore) Remove(id flow.Identifier) error {
