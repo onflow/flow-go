@@ -112,16 +112,17 @@ func NewControlMsgValidationInspector(params *InspectorParams) (*ControlMsgValid
 	}
 
 	c := &ControlMsgValidationInspector{
-		ctx:           params.Ctx,
-		logger:        lg,
-		sporkID:       params.SporkID,
-		config:        params.Config,
-		distributor:   params.Distributor,
-		tracker:       clusterPrefixedTracker,
-		rpcTracker:    params.RpcTracker,
-		idProvider:    params.IdProvider,
-		metrics:       params.InspectorMetrics,
-		subscriptions: params.Subscriptions,
+		ctx:            params.Ctx,
+		logger:         lg,
+		sporkID:        params.SporkID,
+		config:         params.Config,
+		distributor:    params.Distributor,
+		tracker:        clusterPrefixedTracker,
+		rpcTracker:     params.RpcTracker,
+		idProvider:     params.IdProvider,
+		metrics:        params.InspectorMetrics,
+		subscriptions:  params.Subscriptions,
+		networkingType: params.NetworkingType,
 	}
 
 	store := queue.NewHeroStore(params.Config.CacheSize, params.Logger, params.InspectMsgQueueCacheCollector)
@@ -149,7 +150,6 @@ func NewControlMsgValidationInspector(params *InspectorParams) (*ControlMsgValid
 // Inspect is called by gossipsub upon reception of a rpc from a remote  node.
 // It creates a new InspectRPCRequest for the RPC to be inspected async by the worker pool.
 func (c *ControlMsgValidationInspector) Inspect(from peer.ID, rpc *pubsub.RPC) error {
-	// first truncate rpc
 	err := c.truncateRPC(from, rpc)
 	if err != nil {
 		// irrecoverable error encountered
@@ -184,35 +184,52 @@ func (c *ControlMsgValidationInspector) processInspectRPCReq(req *InspectRPCRequ
 		case p2pmsg.CtrlMsgGraft:
 			err := c.inspectGraftMessages(req.Peer, req.rpc.GetControl().GetGraft(), activeClusterIDS)
 			if err != nil {
-				c.logAndDistributeAsyncInspectErrs(req, p2pmsg.CtrlMsgGraft, err)
+				c.logAndDistributeAsyncInspectErrs(req, p2pmsg.CtrlMsgGraft, err, 1)
 				return nil
 			}
 		case p2pmsg.CtrlMsgPrune:
 			err := c.inspectPruneMessages(req.Peer, req.rpc.GetControl().GetPrune(), activeClusterIDS)
 			if err != nil {
-				c.logAndDistributeAsyncInspectErrs(req, p2pmsg.CtrlMsgPrune, err)
+				c.logAndDistributeAsyncInspectErrs(req, p2pmsg.CtrlMsgPrune, err, 1)
 				return nil
 			}
 		case p2pmsg.CtrlMsgIWant:
 			err := c.inspectIWantMessages(req.Peer, req.rpc.GetControl().GetIwant())
 			if err != nil {
-				c.logAndDistributeAsyncInspectErrs(req, p2pmsg.CtrlMsgIWant, err)
+				c.logAndDistributeAsyncInspectErrs(req, p2pmsg.CtrlMsgIWant, err, 1)
 				return nil
 			}
 		case p2pmsg.CtrlMsgIHave:
 			err := c.inspectIHaveMessages(req.Peer, req.rpc.GetControl().GetIhave(), activeClusterIDS)
 			if err != nil {
-				c.logAndDistributeAsyncInspectErrs(req, p2pmsg.CtrlMsgIHave, err)
+				c.logAndDistributeAsyncInspectErrs(req, p2pmsg.CtrlMsgIHave, err, 1)
 				return nil
 			}
 		}
 	}
 
 	// inspect rpc publish messages after all control message validation has passed
-	err := c.inspectRpcPublishMessages(req.Peer, req.rpc.GetPublish(), activeClusterIDS)
+	err, errCount := c.inspectRpcPublishMessages(req.Peer, req.rpc.GetPublish(), activeClusterIDS)
 	if err != nil {
-		c.logAndDistributeAsyncInspectErrs(req, p2pmsg.RpcPublishMessage, err)
+		c.logAndDistributeAsyncInspectErrs(req, p2pmsg.RpcPublishMessage, err, errCount)
 		return nil
+	}
+
+	return nil
+}
+
+// preProcessRPCPublishMessages checks the sender of the sender of pubsub message to ensure they are not unstaked, or ejected.
+// This check is only required on private networks.
+func (c *ControlMsgValidationInspector) checkPubsubMessageSender(message *pubsub_pb.Message) error {
+	pid, err := peer.IDFromBytes(message.GetFrom())
+	if err != nil {
+		return fmt.Errorf("failed to get peer ID from bytes: %w", err)
+	}
+
+	if id, ok := c.idProvider.ByPeerID(pid); !ok {
+		return fmt.Errorf("received rpc publish message from unstaked peer: %s", pid)
+	} else if id.Ejected {
+		return fmt.Errorf("received rpc publish message from ejected peer: %s", pid)
 	}
 
 	return nil
@@ -393,10 +410,11 @@ func (c *ControlMsgValidationInspector) inspectIWantMessages(from peer.ID, iWant
 // - activeClusterIDS: the list of active cluster ids.
 // Returns:
 // - InvalidRpcPublishMessagesErr: if the amount of invalid messages exceeds the configured RPCMessageErrorThreshold.
-func (c *ControlMsgValidationInspector) inspectRpcPublishMessages(from peer.ID, messages []*pubsub_pb.Message, activeClusterIDS flow.ChainIDList) error {
+// - int: the number of invalid pubsub messages
+func (c *ControlMsgValidationInspector) inspectRpcPublishMessages(from peer.ID, messages []*pubsub_pb.Message, activeClusterIDS flow.ChainIDList) (error, int) {
 	totalMessages := len(messages)
 	if totalMessages == 0 {
-		return nil
+		return nil, 0
 	}
 	sampleSize := c.config.RPCMessageMaxSampleSize
 	if sampleSize > totalMessages {
@@ -408,6 +426,12 @@ func (c *ControlMsgValidationInspector) inspectRpcPublishMessages(from peer.ID, 
 
 	var errs *multierror.Error
 	for _, message := range messages[:sampleSize] {
+		if c.networkingType == network.PrivateNetwork {
+			err := c.checkPubsubMessageSender(message)
+			if err != nil {
+				errs = multierror.Append(errs, err)
+			}
+		}
 		topic := channels.Topic(message.GetTopic())
 		err := c.validateTopic(from, topic, activeClusterIDS)
 		if err != nil {
@@ -420,11 +444,10 @@ func (c *ControlMsgValidationInspector) inspectRpcPublishMessages(from peer.ID, 
 
 		// return an error when we exceed the error threshold
 		if errs != nil && errs.Len() > c.config.RPCMessageErrorThreshold {
-			return NewInvalidRpcPublishMessagesErr(errs.ErrorOrNil(), errs.Len())
+			return NewInvalidRpcPublishMessagesErr(errs.ErrorOrNil(), errs.Len()), errs.Len()
 		}
 	}
-
-	return nil
+	return nil, 0
 }
 
 // truncateRPC truncates the RPC by truncating each control message type using the configured max sample size values.
@@ -740,7 +763,7 @@ func (c *ControlMsgValidationInspector) checkClusterPrefixHardThreshold(nodeID f
 }
 
 // logAndDistributeErr logs the provided error and attempts to disseminate an invalid control message validation notification for the error.
-func (c *ControlMsgValidationInspector) logAndDistributeAsyncInspectErrs(req *InspectRPCRequest, ctlMsgType p2pmsg.ControlMessageType, err error) {
+func (c *ControlMsgValidationInspector) logAndDistributeAsyncInspectErrs(req *InspectRPCRequest, ctlMsgType p2pmsg.ControlMessageType, err error, count int) {
 	lg := c.logger.With().
 		Bool(logging.KeySuspicious, true).
 		Bool(logging.KeyNetworkingSecurity, true).
@@ -753,13 +776,19 @@ func (c *ControlMsgValidationInspector) logAndDistributeAsyncInspectErrs(req *In
 	case IsErrUnstakedPeer(err):
 		lg.Warn().Err(err).Msg("control message received from unstaked peer")
 	default:
-		err = c.distributor.Distribute(p2p.NewInvalidControlMessageNotification(req.Peer, ctlMsgType, err))
+		notification := p2p.NewInvalidControlMessageNotification(req.Peer, ctlMsgType, err, count)
+		lg.Error().Err(notification.Error).
+			Str("control_msg_type", notification.MsgType.String()).
+			Int("err_count", count).
+			Msg("rpc control message async inspection failed")
+		err = c.distributor.Distribute(notification)
 		if err != nil {
 			lg.Error().
 				Err(err).
+				Str("notification_error", notification.Error.Error()).
+				Str("control_msg_type", notification.MsgType.String()).
 				Msg("failed to distribute invalid control message notification")
 		}
-		lg.Error().Err(err).Msg("rpc control message async inspection failed")
 	}
 }
 
