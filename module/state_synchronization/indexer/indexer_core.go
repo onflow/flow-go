@@ -44,11 +44,11 @@ func New(
 // Even if the register wasn't indexed at the provided height, returns the highest height the register was indexed at.
 // Expected errors:
 // - storage.ErrNotFound if the register by the ID was never indexed
-func (i *IndexerCore) RegisterValues(IDs flow.RegisterIDs, height uint64) ([]flow.RegisterValue, error) {
+func (c *IndexerCore) RegisterValues(IDs flow.RegisterIDs, height uint64) ([]flow.RegisterValue, error) {
 	values := make([]flow.RegisterValue, len(IDs))
 
 	for j, id := range IDs {
-		value, err := i.registers.Get(id, height)
+		value, err := c.registers.Get(id, height)
 		if err != nil {
 			return nil, err
 		}
@@ -64,13 +64,13 @@ func (i *IndexerCore) RegisterValues(IDs flow.RegisterIDs, height uint64) ([]flo
 // Expected errors:
 // - ErrIndexValue if height was not incremented in sequence
 // - storage.ErrNotFound if the block for execution data was not found
-func (i *IndexerCore) IndexBlockData(data *execution_data.BlockExecutionDataEntity) error {
-	block, err := i.headers.ByBlockID(data.BlockID)
+func (c *IndexerCore) IndexBlockData(data *execution_data.BlockExecutionDataEntity) error {
+	block, err := c.headers.ByBlockID(data.BlockID)
 	if err != nil {
 		return fmt.Errorf("could not get the block by ID %s: %w", data.BlockID, err)
 	}
 
-	lg := i.log.With().
+	lg := c.log.With().
 		Hex("block_id", logging.ID(data.BlockID)).
 		Uint64("height", block.Height).
 		Logger()
@@ -78,7 +78,7 @@ func (i *IndexerCore) IndexBlockData(data *execution_data.BlockExecutionDataEnti
 	lg.Debug().Msgf("indexing new block")
 
 	// the height we are indexing must be exactly one bigger or same as the latest height indexed from the storage
-	latest := i.registers.LatestHeight()
+	latest := c.registers.LatestHeight()
 	if block.Height != latest+1 && block.Height != latest {
 		return fmt.Errorf("must store registers with the next height %d, but got %d", latest+1, block.Height)
 	}
@@ -97,7 +97,7 @@ func (i *IndexerCore) IndexBlockData(data *execution_data.BlockExecutionDataEnti
 			events = append(events, chunk.Events...)
 		}
 
-		err := i.indexEvents(data.BlockID, events)
+		err := c.indexEvents(data.BlockID, events)
 		if err != nil {
 			return fmt.Errorf("could not index events at height %d: %w", block.Height, err)
 		}
@@ -126,7 +126,7 @@ func (i *IndexerCore) IndexBlockData(data *execution_data.BlockExecutionDataEnti
 			}
 		}
 
-		err = i.indexRegisters(maps.Values(payloads), block.Height)
+		err = c.indexRegisters(maps.Values(payloads), block.Height)
 		if err != nil {
 			return fmt.Errorf("could not index register payloads at height %d: %w", block.Height, err)
 		}
@@ -145,12 +145,12 @@ func (i *IndexerCore) IndexBlockData(data *execution_data.BlockExecutionDataEnti
 	return nil
 }
 
-func (i *IndexerCore) indexEvents(blockID flow.Identifier, events flow.EventsList) error {
+func (c *IndexerCore) indexEvents(blockID flow.Identifier, events flow.EventsList) error {
 	// Note: the last chunk in an execution data is the system chunk. All events in that ChunkExecutionData are service events.
-	return i.events.Store(blockID, []flow.EventsList{events})
+	return c.events.Store(blockID, []flow.EventsList{events})
 }
 
-func (i *IndexerCore) indexRegisters(payloads []*ledger.Payload, height uint64) error {
+func (c *IndexerCore) indexRegisters(payloads []*ledger.Payload, height uint64) error {
 	regEntries := make(flow.RegisterEntries, len(payloads))
 
 	for j, payload := range payloads {
@@ -170,5 +170,5 @@ func (i *IndexerCore) indexRegisters(payloads []*ledger.Payload, height uint64) 
 		}
 	}
 
-	return i.registers.Store(regEntries, height)
+	return c.registers.Store(regEntries, height)
 }
