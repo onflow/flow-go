@@ -49,46 +49,6 @@ func TestLedgerKeyToRegisterID_Error(t *testing.T) {
 	require.ErrorIs(t, err, convert.UnexpectedLedgerKeyFormat)
 }
 
-func TestMustLedgerKeyToRegisterID(t *testing.T) {
-	key := ledger.Key{
-		KeyParts: []ledger.KeyPart{
-			{
-				Type:  convert.KeyPartOwner,
-				Value: []byte("owner"),
-			},
-			{
-				Type:  convert.KeyPartKey,
-				Value: []byte("key"),
-			},
-		},
-	}
-
-	expectedRegisterID := flow.NewRegisterID("owner", "key")
-	require.NotPanics(t, func() {
-		registerID := convert.MustLedgerKeyToRegisterID(key)
-		require.Equal(t, expectedRegisterID, registerID)
-	})
-}
-
-func TestMustLedgerKeyToRegisterID_Panic(t *testing.T) {
-	key := ledger.Key{
-		KeyParts: []ledger.KeyPart{
-			{
-				Type:  999, // Invalid type
-				Value: []byte("owner"),
-			},
-			{
-				Type:  convert.KeyPartKey,
-				Value: []byte("key"),
-			},
-		},
-	}
-
-	require.Panics(t, func() {
-		convert.MustLedgerKeyToRegisterID(key)
-	})
-}
-
 func TestRegisterIDToLedgerKey(t *testing.T) {
 	registerID := flow.NewRegisterID("owner", "key")
 	expectedKey := ledger.Key{

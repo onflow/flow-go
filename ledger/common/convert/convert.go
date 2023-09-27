@@ -33,16 +33,6 @@ func LedgerKeyToRegisterID(key ledger.Key) (flow.RegisterID, error) {
 	), nil
 }
 
-// MustLedgerKeyToRegisterID converts a ledger key to a register id
-// panics if the key is not in the expected format
-func MustLedgerKeyToRegisterID(key ledger.Key) flow.RegisterID {
-	registerID, err := LedgerKeyToRegisterID(key)
-	if err != nil {
-		panic(err)
-	}
-	return registerID
-}
-
 // RegisterIDToLedgerKey converts a register id to a ledger key
 func RegisterIDToLedgerKey(registerID flow.RegisterID) ledger.Key {
 	newKey := ledger.Key{}
