@@ -7,26 +7,84 @@ import (
 	"github.com/onflow/cadence/runtime/sema"
 	"github.com/onflow/cadence/runtime/stdlib"
 
+	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/flex/models"
+	"github.com/onflow/flow-go/model/flow"
 )
 
-// TODO: switch to released version once available
-//go:generate env GOPROXY=direct go run github.com/onflow/cadence/runtime/sema/gen@1e04b7af1c098a3deff37931ef33191644606a89 -p stdlib flex.cdc flex.gen.go
+func NewFlowTokenVaultType(chain flow.Chain) *sema.CompositeType {
+	const flowTokenContractName = "FlowToken"
+	const vaultTypeName = "Vault"
 
-var flexContractStaticType interpreter.StaticType = interpreter.NewCompositeStaticType(
-	nil,
-	FlexType.Location,
-	FlexType.QualifiedIdentifier(),
-	FlexType.ID(),
-)
+	var flowTokenAddress, err = chain.AddressAtIndex(environment.FlowTokenAccountIndex)
+	if err != nil {
+		panic(err)
+	}
 
-func newFlexTypeRunFunction(
+	location := common.NewAddressLocation(
+		nil,
+		common.Address(flowTokenAddress),
+		flowTokenContractName,
+	)
+
+	// TODO: replace with proper type, e.g. extracted from checker
+
+	flowTokenType := &sema.CompositeType{
+		Location:   location,
+		Identifier: flowTokenContractName,
+		Kind:       common.CompositeKindContract,
+	}
+
+	vaultType := &sema.CompositeType{
+		Location:   location,
+		Identifier: vaultTypeName,
+		Kind:       common.CompositeKindResource,
+	}
+
+	flowTokenType.SetNestedType(vaultTypeName, vaultType)
+
+	return vaultType
+}
+
+type FlexTypeDefinition struct {
+	FlexType *sema.CompositeType
+	// Use FlexStaticType()
+	_flexStaticType                    interpreter.StaticType
+	FlexTypeRunFunctionType            *sema.FunctionType
+	FlexTypeRunFunctionName            string
+	Flex_FlexAddressType               *sema.CompositeType
+	Flex_FlexAddressTypeBytesFieldName string
+	_flex_FlexAddressConstructorType   *sema.FunctionType
+}
+
+func (t *FlexTypeDefinition) FlexStaticType() interpreter.StaticType {
+	if t._flexStaticType == nil {
+		flexType := t.FlexType
+		t._flexStaticType = interpreter.NewCompositeStaticType(
+			nil,
+			flexType.Location,
+			flexType.QualifiedIdentifier(),
+			flexType.ID(),
+		)
+	}
+	return t._flexStaticType
+}
+
+func (t *FlexTypeDefinition) Flex_FlexAddressConstructorType() *sema.FunctionType {
+	if t._flex_FlexAddressConstructorType == nil {
+		t._flex_FlexAddressConstructorType = constructorType(t.Flex_FlexAddressType)
+	}
+	return t._flex_FlexAddressConstructorType
+}
+
+func NewFlexTypeRunFunction(
 	gauge common.MemoryGauge,
+	def FlexTypeDefinition,
 	handler models.FlexContractHandler,
 ) *interpreter.HostFunctionValue {
 	return interpreter.NewHostFunctionValue(
 		gauge,
-		FlexTypeRunFunctionType,
+		def.FlexTypeRunFunctionType,
 		func(invocation interpreter.Invocation) interpreter.Value {
 			inter := invocation.Interpreter
 			locationRange := invocation.LocationRange
@@ -50,7 +108,7 @@ func newFlexTypeRunFunction(
 				panic(errors.NewUnreachableError())
 			}
 
-			coinbaseBytesValue := coinbaseValue.GetMember(inter, locationRange, Flex_FlexAddressTypeBytesFieldName)
+			coinbaseBytesValue := coinbaseValue.GetMember(inter, locationRange, def.Flex_FlexAddressTypeBytesFieldName)
 			if coinbaseBytesValue == nil {
 				panic(errors.NewUnreachableError())
 			}
@@ -80,51 +138,52 @@ func constructorType(compositeType *sema.CompositeType) *sema.FunctionType {
 	}
 }
 
-var Flex_FlexAddressConstructorType = constructorType(Flex_FlexAddressType)
+func NewFlexAddressConstructor(def FlexTypeDefinition) *interpreter.HostFunctionValue {
+	return interpreter.NewHostFunctionValue(
+		nil,
+		def.Flex_FlexAddressConstructorType(),
+		func(invocation interpreter.Invocation) interpreter.Value {
+			inter := invocation.Interpreter
+			locationRange := invocation.LocationRange
 
-var flexAddressConstructor = interpreter.NewHostFunctionValue(
-	nil,
-	Flex_FlexAddressConstructorType,
-	func(invocation interpreter.Invocation) interpreter.Value {
-		inter := invocation.Interpreter
-		locationRange := invocation.LocationRange
+			// Get address
 
-		// Get address
+			bytesValue, ok := invocation.Arguments[0].(*interpreter.ArrayValue)
+			if !ok {
+				panic(errors.NewUnreachableError())
+			}
 
-		bytesValue, ok := invocation.Arguments[0].(*interpreter.ArrayValue)
-		if !ok {
-			panic(errors.NewUnreachableError())
-		}
-
-		return interpreter.NewCompositeValue(
-			inter,
-			locationRange,
-			FlexType.Location,
-			Flex_FlexAddressType.QualifiedIdentifier(),
-			Flex_FlexAddressType.Kind,
-			[]interpreter.CompositeField{
-				{
-					Name:  Flex_FlexAddressTypeBytesFieldName,
-					Value: bytesValue,
+			return interpreter.NewCompositeValue(
+				inter,
+				locationRange,
+				def.FlexType.Location,
+				def.Flex_FlexAddressType.QualifiedIdentifier(),
+				def.Flex_FlexAddressType.Kind,
+				[]interpreter.CompositeField{
+					{
+						Name:  def.Flex_FlexAddressTypeBytesFieldName,
+						Value: bytesValue,
+					},
 				},
-			},
-			common.ZeroAddress,
-		)
-	},
-)
+				common.ZeroAddress,
+			)
+		},
+	)
+}
 
 func NewFlexContractValue(
 	gauge common.MemoryGauge,
+	def FlexTypeDefinition,
 	handler models.FlexContractHandler,
 ) *interpreter.SimpleCompositeValue {
 	return interpreter.NewSimpleCompositeValue(
 		gauge,
-		FlexType.ID(),
-		flexContractStaticType,
-		FlexType.Fields,
+		def.FlexType.ID(),
+		def.FlexStaticType(),
+		def.FlexType.Fields,
 		map[string]interpreter.Value{
-			Flex_FlexAddressTypeName: flexAddressConstructor,
-			FlexTypeRunFunctionName:  newFlexTypeRunFunction(gauge, handler),
+			def.Flex_FlexAddressType.Identifier: NewFlexAddressConstructor(def),
+			def.FlexTypeRunFunctionName:         NewFlexTypeRunFunction(gauge, def, handler),
 		},
 		nil,
 		nil,
@@ -134,18 +193,21 @@ func NewFlexContractValue(
 
 func NewFlexStandardLibraryValue(
 	gauge common.MemoryGauge,
+	def FlexTypeDefinition,
 	handler models.FlexContractHandler,
 ) stdlib.StandardLibraryValue {
 	return stdlib.StandardLibraryValue{
-		Name:  FlexTypeName,
-		Type:  FlexType,
-		Value: NewFlexContractValue(gauge, handler),
+		Name:  def.FlexType.Identifier,
+		Type:  def.FlexType,
+		Value: NewFlexContractValue(gauge, def, handler),
 		Kind:  common.DeclarationKindContract,
 	}
 }
 
-var FlexStandardLibraryType = stdlib.StandardLibraryType{
-	Name: FlexTypeName,
-	Type: FlexType,
-	Kind: common.DeclarationKindContract,
+func NewFlexStandardLibraryType(def FlexTypeDefinition) stdlib.StandardLibraryType {
+	return stdlib.StandardLibraryType{
+		Name: def.FlexType.Identifier,
+		Type: def.FlexType,
+		Kind: common.DeclarationKindContract,
+	}
 }

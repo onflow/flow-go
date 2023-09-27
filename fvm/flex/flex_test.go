@@ -1,4 +1,4 @@
-package flex
+package flex_test
 
 import (
 	"bytes"
@@ -21,8 +21,10 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 
 	"github.com/onflow/flow-go/fvm/environment"
+	"github.com/onflow/flow-go/fvm/flex"
 	"github.com/onflow/flow-go/fvm/flex/models"
 	flexStdlib "github.com/onflow/flow-go/fvm/flex/stdlib"
+	"github.com/onflow/flow-go/fvm/flex/stdlib/emulator"
 	"github.com/onflow/flow-go/fvm/flex/storage"
 	"github.com/onflow/flow-go/fvm/flex/utils"
 	"github.com/onflow/flow-go/fvm/storage/testutils"
@@ -51,10 +53,10 @@ var flexAddressBytesCadenceType = cadence.NewConstantSizedArrayType(20, cadence.
 
 var flexAddressCadenceType = cadence.NewStructType(
 	nil,
-	flexStdlib.Flex_FlexAddressType.QualifiedIdentifier(),
+	emulator.Flex_FlexAddressType.QualifiedIdentifier(),
 	[]cadence.Field{
 		{
-			Identifier: flexStdlib.Flex_FlexAddressTypeBytesFieldName,
+			Identifier: emulator.Flex_FlexAddressTypeBytesFieldName,
 			Type:       flexAddressBytesCadenceType,
 		},
 	},
@@ -66,12 +68,13 @@ func TestFlexAddressConstructionAndReturn(t *testing.T) {
 	t.Parallel()
 
 	utils.RunWithTestBackend(t, func(backend models.Backend) {
-		handler := NewFlexContractHandler(backend)
+		handler := flex.NewFlexContractHandler(backend)
 
 		env := runtime.NewBaseInterpreterEnvironment(runtime.Config{})
 
-		env.DeclareValue(flexStdlib.NewFlexStandardLibraryValue(nil, handler))
-		env.DeclareType(flexStdlib.FlexStandardLibraryType)
+		flexTypeDefinition := emulator.FlexTypeDefinition
+		env.DeclareValue(flexStdlib.NewFlexStandardLibraryValue(nil, flexTypeDefinition, handler))
+		env.DeclareType(flexStdlib.NewFlexStandardLibraryType(flexTypeDefinition))
 
 		inter := runtime.NewInterpreterRuntime(runtime.Config{})
 
@@ -133,12 +136,13 @@ func TestFlexRun(t *testing.T) {
 	t.Parallel()
 
 	utils.RunWithTestBackend(t, func(backend models.Backend) {
-		handler := NewFlexContractHandler(backend)
+		handler := flex.NewFlexContractHandler(backend)
 
 		env := runtime.NewBaseInterpreterEnvironment(runtime.Config{})
 
-		env.DeclareValue(flexStdlib.NewFlexStandardLibraryValue(nil, handler))
-		env.DeclareType(flexStdlib.FlexStandardLibraryType)
+		flexTypeDefinition := emulator.FlexTypeDefinition
+		env.DeclareValue(flexStdlib.NewFlexStandardLibraryValue(nil, flexTypeDefinition, handler))
+		env.DeclareType(flexStdlib.NewFlexStandardLibraryType(flexTypeDefinition))
 
 		inter := runtime.NewInterpreterRuntime(runtime.Config{})
 

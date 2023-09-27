@@ -1,4 +1,4 @@
-package stdlib
+package stdlib_test
 
 import (
 	"bytes"
@@ -24,6 +24,8 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/onflow/flow-go/fvm/flex/models"
+	"github.com/onflow/flow-go/fvm/flex/stdlib"
+	"github.com/onflow/flow-go/fvm/flex/stdlib/emulator"
 )
 
 type testFlexContractHandler struct {
@@ -59,10 +61,10 @@ var flexAddressBytesCadenceType = cadence.NewConstantSizedArrayType(20, cadence.
 
 var flexAddressCadenceType = cadence.NewStructType(
 	nil,
-	Flex_FlexAddressType.QualifiedIdentifier(),
+	emulator.Flex_FlexAddressType.QualifiedIdentifier(),
 	[]cadence.Field{
 		{
-			Identifier: Flex_FlexAddressTypeBytesFieldName,
+			Identifier: emulator.Flex_FlexAddressTypeBytesFieldName,
 			Type:       flexAddressBytesCadenceType,
 		},
 	},
@@ -77,8 +79,9 @@ func TestFlexAddressConstructionAndReturn(t *testing.T) {
 
 	env := runtime.NewBaseInterpreterEnvironment(runtime.Config{})
 
-	env.DeclareValue(NewFlexStandardLibraryValue(nil, handler))
-	env.DeclareType(FlexStandardLibraryType)
+	flexTypeDefinition := emulator.FlexTypeDefinition
+	env.DeclareValue(stdlib.NewFlexStandardLibraryValue(nil, flexTypeDefinition, handler))
+	env.DeclareType(stdlib.NewFlexStandardLibraryType(flexTypeDefinition))
 
 	inter := runtime.NewInterpreterRuntime(runtime.Config{})
 
@@ -178,8 +181,9 @@ func TestFlexRun(t *testing.T) {
 
 	env := runtime.NewBaseInterpreterEnvironment(runtime.Config{})
 
-	env.DeclareValue(NewFlexStandardLibraryValue(nil, handler))
-	env.DeclareType(FlexStandardLibraryType)
+	flexTypeDefinition := emulator.FlexTypeDefinition
+	env.DeclareValue(stdlib.NewFlexStandardLibraryValue(nil, flexTypeDefinition, handler))
+	env.DeclareType(stdlib.NewFlexStandardLibraryType(flexTypeDefinition))
 
 	inter := runtime.NewInterpreterRuntime(runtime.Config{})
 
