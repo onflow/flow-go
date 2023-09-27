@@ -16,14 +16,10 @@ type RegisterIndex interface {
 	Get(ID flow.RegisterID, height uint64) (flow.RegisterValue, error)
 
 	// LatestHeight returns the latest indexed height.
-	// Expected errors:
-	// - storage.ErrNotFound if the latest height wasn't set.
-	LatestHeight() (uint64, error)
+	LatestHeight() uint64
 
 	// FirstHeight at which we started to index. Returns the first indexed height found in the store.
-	// Expected errors:
-	// - storage.ErrNotFound if the first height wasn't set.
-	FirstHeight() (uint64, error)
+	FirstHeight() uint64
 
 	// Store batch of register entries at the provided block height.
 	//

@@ -486,10 +486,10 @@ func generateEvents(t *testing.T, isSystemChunk bool, collection *flow.Collectio
 	return chunkEvents, serviceEvents
 }
 
-func generateTransactionResults(t *testing.T, collection *flow.Collection) []execution_data.TransactionResult {
-	txResults := make([]execution_data.TransactionResult, len(collection.Transactions))
+func generateTransactionResults(t *testing.T, collection *flow.Collection) []flow.LightTransactionResult {
+	txResults := make([]flow.LightTransactionResult, len(collection.Transactions))
 	for i, tx := range collection.Transactions {
-		txResults[i] = execution_data.TransactionResult{
+		txResults[i] = flow.LightTransactionResult{
 			TransactionID:   tx.ID(),
 			ComputationUsed: computationUsed,
 			Failed:          false,
@@ -596,7 +596,7 @@ type testMetadata struct {
 	IsSystemChunk bool
 	Header        *flow.Header
 	Collection    *flow.Collection
-	TxResults     []execution_data.TransactionResult
+	TxResults     []flow.LightTransactionResult
 	ChunkEvents   flow.EventsList
 	ServiceEvents []flow.ServiceEvent
 	StartState    ledger.State

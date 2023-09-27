@@ -120,11 +120,11 @@ func MessageToChunkExecutionData(
 		events = nil
 	}
 
-	var results []execution_data.TransactionResult
+	var results []flow.LightTransactionResult
 	if len(m.GetTransactionResults()) > 0 {
-		results = make([]execution_data.TransactionResult, len(m.GetTransactionResults()))
+		results = make([]flow.LightTransactionResult, len(m.GetTransactionResults()))
 		for i, result := range m.GetTransactionResults() {
-			results[i] = execution_data.TransactionResult{
+			results[i] = flow.LightTransactionResult{
 				TransactionID:   MessageToIdentifier(result.GetTransactionId()),
 				Failed:          result.GetFailed(),
 				ComputationUsed: result.GetComputationUsed(),
