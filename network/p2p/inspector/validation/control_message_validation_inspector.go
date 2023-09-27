@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/go-playground/validator/v10"
 	"github.com/hashicorp/go-multierror"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	pubsub_pb "github.com/libp2p/go-libp2p-pubsub/pb"
@@ -16,6 +17,7 @@ import (
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/mempool/queue"
+	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/inspector/internal/cache"
@@ -53,33 +55,36 @@ type ControlMsgValidationInspector struct {
 	// In such cases, the inspector will allow a configured number of these messages from the corresponding peer.
 	tracker       *cache.ClusterPrefixedMessagesReceivedTracker
 	idProvider    module.IdentityProvider
-	rateLimiters  map[p2pmsg.ControlMessageType]p2p.BasicRateLimiter
 	rpcTracker    p2p.RpcControlTracking
 	subscriptions p2p.Subscriptions
+	// networkingType indicates public or private network, rpc publish messages are inspected for unstaked senders when running the private network.
+	networkingType network.NetworkingType
 }
 
 type InspectorParams struct {
-	Ctx irrecoverable.SignalerContext
+	Ctx irrecoverable.SignalerContext `validate:"required"`
 	// Logger the logger used by the inspector.
-	Logger zerolog.Logger
+	Logger zerolog.Logger `validate:"required"`
 	// SporkID the current spork ID.
-	SporkID flow.Identifier
+	SporkID flow.Identifier `validate:"required"`
 	// Config inspector configuration.
-	Config *p2pconf.GossipSubRPCValidationInspectorConfigs
+	Config *p2pconf.GossipSubRPCValidationInspectorConfigs `validate:"required"`
 	// Distributor gossipsub inspector notification distributor.
-	Distributor p2p.GossipSubInspectorNotifDistributor
+	Distributor p2p.GossipSubInspectorNotifDistributor `validate:"required"`
 	// InspectMsgQueueCacheCollector metrics collector for the underlying inspect message queue cache.
-	InspectMsgQueueCacheCollector module.HeroCacheMetrics
+	InspectMsgQueueCacheCollector module.HeroCacheMetrics `validate:"required"`
 	// ClusterPrefixedCacheCollector metrics collector for the underlying cluster prefix received tracker cache.
-	ClusterPrefixedCacheCollector module.HeroCacheMetrics
+	ClusterPrefixedCacheCollector module.HeroCacheMetrics `validate:"required"`
 	// IdProvider identity provider is used to get the flow identifier for a peer.
-	IdProvider module.IdentityProvider
+	IdProvider module.IdentityProvider `validate:"required"`
 	// InspectorMetrics metrics for the validation inspector.
-	InspectorMetrics module.GossipSubRpcValidationInspectorMetrics
+	InspectorMetrics module.GossipSubRpcValidationInspectorMetrics `validate:"required"`
 	// RpcTracker tracker used to track iHave RPC's sent and last size.
-	RpcTracker p2p.RpcControlTracking
+	RpcTracker p2p.RpcControlTracking `validate:"required"`
 	// Subscriptions p2p subscriptions used to check if node has a subscription to a topic.
-	Subscriptions p2p.Subscriptions
+	Subscriptions p2p.Subscriptions `validate:"required"`
+	// NetworkingType the networking type of the node.
+	NetworkingType network.NetworkingType `validate:"required"`
 }
 
 var _ component.Component = (*ControlMsgValidationInspector)(nil)
@@ -94,6 +99,11 @@ var _ protocol.Consumer = (*ControlMsgValidationInspector)(nil)
 //   - *ControlMsgValidationInspector: a new control message validation inspector.
 //   - error: an error if there is any error while creating the inspector. All errors are irrecoverable and unexpected.
 func NewControlMsgValidationInspector(params *InspectorParams) (*ControlMsgValidationInspector, error) {
+	err := validator.New().Struct(params)
+	if err != nil {
+		return nil, fmt.Errorf("inspector params validation failed: %w", err)
+	}
+
 	lg := params.Logger.With().Str("component", "gossip_sub_rpc_validation_inspector").Logger()
 
 	clusterPrefixedTracker, err := cache.NewClusterPrefixedMessagesReceivedTracker(params.Logger, params.Config.ClusterPrefixedControlMsgsReceivedCacheSize, params.ClusterPrefixedCacheCollector, params.Config.ClusterPrefixedControlMsgsReceivedCacheDecay)
@@ -111,7 +121,6 @@ func NewControlMsgValidationInspector(params *InspectorParams) (*ControlMsgValid
 		rpcTracker:    params.RpcTracker,
 		idProvider:    params.IdProvider,
 		metrics:       params.InspectorMetrics,
-		rateLimiters:  make(map[p2pmsg.ControlMessageType]p2p.BasicRateLimiter),
 		subscriptions: params.Subscriptions,
 	}
 

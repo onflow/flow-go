@@ -91,7 +91,19 @@ func TestValidationInspector_InvalidTopicId_Detection(t *testing.T) {
 	meshTracer := meshTracerFixture(flowConfig, idProvider)
 	subscriptions := mockp2p.NewSubscriptions(t)
 	subscriptions.On("HasSubscription", mockery.AnythingOfType("channels.Topic")).Return(true).Maybe()
-	validationInspector, err := validation.NewControlMsgValidationInspector(signalerCtx, unittest.Logger(), sporkID, &inspectorConfig, distributor, metrics.NewNoopCollector(), metrics.NewNoopCollector(), idProvider, metrics.NewNoopCollector(), meshTracer, subscriptions)
+	validationInspector, err := validation.NewControlMsgValidationInspector(&validation.InspectorParams{
+		Ctx:                           signalerCtx,
+		Logger:                        unittest.Logger(),
+		SporkID:                       sporkID,
+		Config:                        &inspectorConfig,
+		Distributor:                   distributor,
+		InspectMsgQueueCacheCollector: metrics.NewNoopCollector(),
+		ClusterPrefixedCacheCollector: metrics.NewNoopCollector(),
+		IdProvider:                    idProvider,
+		InspectorMetrics:              metrics.NewNoopCollector(),
+		RpcTracker:                    meshTracer,
+		Subscriptions:                 subscriptions,
+	})
 	require.NoError(t, err)
 	corruptInspectorFunc := corruptlibp2p.CorruptInspectorFunc(validationInspector)
 	victimNode, victimIdentity := p2ptest.NodeFixture(
@@ -214,7 +226,19 @@ func TestValidationInspector_DuplicateTopicId_Detection(t *testing.T) {
 	meshTracer := meshTracerFixture(flowConfig, idProvider)
 	subscriptions := mockp2p.NewSubscriptions(t)
 	subscriptions.On("HasSubscription", mockery.AnythingOfType("channels.Topic")).Return(true).Maybe()
-	validationInspector, err := validation.NewControlMsgValidationInspector(signalerCtx, unittest.Logger(), sporkID, &inspectorConfig, distributor, metrics.NewNoopCollector(), metrics.NewNoopCollector(), idProvider, metrics.NewNoopCollector(), meshTracer, subscriptions)
+	validationInspector, err := validation.NewControlMsgValidationInspector(&validation.InspectorParams{
+		Ctx:                           signalerCtx,
+		Logger:                        unittest.Logger(),
+		SporkID:                       sporkID,
+		Config:                        &inspectorConfig,
+		Distributor:                   distributor,
+		InspectMsgQueueCacheCollector: metrics.NewNoopCollector(),
+		ClusterPrefixedCacheCollector: metrics.NewNoopCollector(),
+		IdProvider:                    idProvider,
+		InspectorMetrics:              metrics.NewNoopCollector(),
+		RpcTracker:                    meshTracer,
+		Subscriptions:                 subscriptions,
+	})
 	require.NoError(t, err)
 	corruptInspectorFunc := corruptlibp2p.CorruptInspectorFunc(validationInspector)
 	victimNode, victimIdentity := p2ptest.NodeFixture(
@@ -300,7 +324,19 @@ func TestValidationInspector_IHaveDuplicateMessageId_Detection(t *testing.T) {
 	meshTracer := meshTracerFixture(flowConfig, idProvider)
 	subscriptions := mockp2p.NewSubscriptions(t)
 	subscriptions.On("HasSubscription", mockery.AnythingOfType("channels.Topic")).Return(true).Maybe()
-	validationInspector, err := validation.NewControlMsgValidationInspector(signalerCtx, unittest.Logger(), sporkID, &inspectorConfig, distributor, metrics.NewNoopCollector(), metrics.NewNoopCollector(), idProvider, metrics.NewNoopCollector(), meshTracer, subscriptions)
+	validationInspector, err := validation.NewControlMsgValidationInspector(&validation.InspectorParams{
+		Ctx:                           signalerCtx,
+		Logger:                        unittest.Logger(),
+		SporkID:                       sporkID,
+		Config:                        &inspectorConfig,
+		Distributor:                   distributor,
+		InspectMsgQueueCacheCollector: metrics.NewNoopCollector(),
+		ClusterPrefixedCacheCollector: metrics.NewNoopCollector(),
+		IdProvider:                    idProvider,
+		InspectorMetrics:              metrics.NewNoopCollector(),
+		RpcTracker:                    meshTracer,
+		Subscriptions:                 subscriptions,
+	})
 	require.NoError(t, err)
 	corruptInspectorFunc := corruptlibp2p.CorruptInspectorFunc(validationInspector)
 	victimNode, victimIdentity := p2ptest.NodeFixture(
@@ -400,7 +436,19 @@ func TestValidationInspector_UnknownClusterId_Detection(t *testing.T) {
 	meshTracer := meshTracerFixture(flowConfig, idProvider)
 	subscriptions := mockp2p.NewSubscriptions(t)
 	subscriptions.On("HasSubscription", mockery.AnythingOfType("channels.Topic")).Return(true).Maybe()
-	validationInspector, err := validation.NewControlMsgValidationInspector(signalerCtx, unittest.Logger(), sporkID, &inspectorConfig, distributor, metrics.NewNoopCollector(), metrics.NewNoopCollector(), idProvider, metrics.NewNoopCollector(), meshTracer, subscriptions)
+	validationInspector, err := validation.NewControlMsgValidationInspector(&validation.InspectorParams{
+		Ctx:                           signalerCtx,
+		Logger:                        unittest.Logger(),
+		SporkID:                       sporkID,
+		Config:                        &inspectorConfig,
+		Distributor:                   distributor,
+		InspectMsgQueueCacheCollector: metrics.NewNoopCollector(),
+		ClusterPrefixedCacheCollector: metrics.NewNoopCollector(),
+		IdProvider:                    idProvider,
+		InspectorMetrics:              metrics.NewNoopCollector(),
+		RpcTracker:                    meshTracer,
+		Subscriptions:                 subscriptions,
+	})
 	require.NoError(t, err)
 	corruptInspectorFunc := corruptlibp2p.CorruptInspectorFunc(validationInspector)
 	victimNode, victimIdentity := p2ptest.NodeFixture(
@@ -481,7 +529,19 @@ func TestValidationInspector_ActiveClusterIdsNotSet_Graft_Detection(t *testing.T
 	meshTracer := meshTracerFixture(flowConfig, idProvider)
 	subscriptions := mockp2p.NewSubscriptions(t)
 	subscriptions.On("HasSubscription", mockery.AnythingOfType("channels.Topic")).Return(true).Maybe()
-	validationInspector, err := validation.NewControlMsgValidationInspector(signalerCtx, logger, sporkID, &inspectorConfig, distributor, metrics.NewNoopCollector(), metrics.NewNoopCollector(), idProvider, metrics.NewNoopCollector(), meshTracer, subscriptions)
+	validationInspector, err := validation.NewControlMsgValidationInspector(&validation.InspectorParams{
+		Ctx:                           signalerCtx,
+		Logger:                        logger,
+		SporkID:                       sporkID,
+		Config:                        &inspectorConfig,
+		Distributor:                   distributor,
+		InspectMsgQueueCacheCollector: metrics.NewNoopCollector(),
+		ClusterPrefixedCacheCollector: metrics.NewNoopCollector(),
+		IdProvider:                    idProvider,
+		InspectorMetrics:              metrics.NewNoopCollector(),
+		RpcTracker:                    meshTracer,
+		Subscriptions:                 subscriptions,
+	})
 	require.NoError(t, err)
 	corruptInspectorFunc := corruptlibp2p.CorruptInspectorFunc(validationInspector)
 	victimNode, victimIdentity := p2ptest.NodeFixture(
@@ -554,7 +614,19 @@ func TestValidationInspector_ActiveClusterIdsNotSet_Prune_Detection(t *testing.T
 	meshTracer := meshTracerFixture(flowConfig, idProvider)
 	subscriptions := mockp2p.NewSubscriptions(t)
 	subscriptions.On("HasSubscription", mockery.AnythingOfType("channels.Topic")).Return(true).Maybe()
-	validationInspector, err := validation.NewControlMsgValidationInspector(signalerCtx, logger, sporkID, &inspectorConfig, distributor, metrics.NewNoopCollector(), metrics.NewNoopCollector(), idProvider, metrics.NewNoopCollector(), meshTracer, subscriptions)
+	validationInspector, err := validation.NewControlMsgValidationInspector(&validation.InspectorParams{
+		Ctx:                           signalerCtx,
+		Logger:                        logger,
+		SporkID:                       sporkID,
+		Config:                        &inspectorConfig,
+		Distributor:                   distributor,
+		InspectMsgQueueCacheCollector: metrics.NewNoopCollector(),
+		ClusterPrefixedCacheCollector: metrics.NewNoopCollector(),
+		IdProvider:                    idProvider,
+		InspectorMetrics:              metrics.NewNoopCollector(),
+		RpcTracker:                    meshTracer,
+		Subscriptions:                 subscriptions,
+	})
 	require.NoError(t, err)
 	corruptInspectorFunc := corruptlibp2p.CorruptInspectorFunc(validationInspector)
 	victimNode, victimIdentity := p2ptest.NodeFixture(
@@ -632,7 +704,19 @@ func TestValidationInspector_UnstakedNode_Detection(t *testing.T) {
 	meshTracer := meshTracerFixture(flowConfig, idProvider)
 	subscriptions := mockp2p.NewSubscriptions(t)
 	subscriptions.On("HasSubscription", mockery.AnythingOfType("channels.Topic")).Return(true).Maybe()
-	validationInspector, err := validation.NewControlMsgValidationInspector(signalerCtx, logger, sporkID, &inspectorConfig, distributor, metrics.NewNoopCollector(), metrics.NewNoopCollector(), idProvider, metrics.NewNoopCollector(), meshTracer, subscriptions)
+	validationInspector, err := validation.NewControlMsgValidationInspector(&validation.InspectorParams{
+		Ctx:                           signalerCtx,
+		Logger:                        logger,
+		SporkID:                       sporkID,
+		Config:                        &inspectorConfig,
+		Distributor:                   distributor,
+		InspectMsgQueueCacheCollector: metrics.NewNoopCollector(),
+		ClusterPrefixedCacheCollector: metrics.NewNoopCollector(),
+		IdProvider:                    idProvider,
+		InspectorMetrics:              metrics.NewNoopCollector(),
+		RpcTracker:                    meshTracer,
+		Subscriptions:                 subscriptions,
+	})
 	require.NoError(t, err)
 	corruptInspectorFunc := corruptlibp2p.CorruptInspectorFunc(validationInspector)
 	victimNode, victimIdentity := p2ptest.NodeFixture(
@@ -717,7 +801,19 @@ func TestValidationInspector_InspectIWants_CacheMissThreshold(t *testing.T) {
 	meshTracer := meshTracerFixture(flowConfig, idProvider)
 	subscriptions := mockp2p.NewSubscriptions(t)
 	subscriptions.On("HasSubscription", mockery.AnythingOfType("channels.Topic")).Return(true).Maybe()
-	validationInspector, err := validation.NewControlMsgValidationInspector(signalerCtx, unittest.Logger(), sporkID, &inspectorConfig, distributor, metrics.NewNoopCollector(), metrics.NewNoopCollector(), idProvider, metrics.NewNoopCollector(), meshTracer, subscriptions)
+	validationInspector, err := validation.NewControlMsgValidationInspector(&validation.InspectorParams{
+		Ctx:                           signalerCtx,
+		Logger:                        unittest.Logger(),
+		SporkID:                       sporkID,
+		Config:                        &inspectorConfig,
+		Distributor:                   distributor,
+		InspectMsgQueueCacheCollector: metrics.NewNoopCollector(),
+		ClusterPrefixedCacheCollector: metrics.NewNoopCollector(),
+		IdProvider:                    idProvider,
+		InspectorMetrics:              metrics.NewNoopCollector(),
+		RpcTracker:                    meshTracer,
+		Subscriptions:                 subscriptions,
+	})
 	require.NoError(t, err)
 	corruptInspectorFunc := corruptlibp2p.CorruptInspectorFunc(validationInspector)
 	victimNode, victimIdentity := p2ptest.NodeFixture(
@@ -807,7 +903,19 @@ func TestValidationInspector_InspectRpcPublishMessages(t *testing.T) {
 	meshTracer := meshTracerFixture(flowConfig, idProvider)
 	subscriptions := mockp2p.NewSubscriptions(t)
 	subscriptions.On("HasSubscription", mockery.AnythingOfType("channels.Topic")).Return(true).Maybe()
-	validationInspector, err := validation.NewControlMsgValidationInspector(signalerCtx, unittest.Logger(), sporkID, &inspectorConfig, distributor, metrics.NewNoopCollector(), metrics.NewNoopCollector(), idProvider, metrics.NewNoopCollector(), meshTracer, subscriptions)
+	validationInspector, err := validation.NewControlMsgValidationInspector(&validation.InspectorParams{
+		Ctx:                           signalerCtx,
+		Logger:                        unittest.Logger(),
+		SporkID:                       sporkID,
+		Config:                        &inspectorConfig,
+		Distributor:                   distributor,
+		InspectMsgQueueCacheCollector: metrics.NewNoopCollector(),
+		ClusterPrefixedCacheCollector: metrics.NewNoopCollector(),
+		IdProvider:                    idProvider,
+		InspectorMetrics:              metrics.NewNoopCollector(),
+		RpcTracker:                    meshTracer,
+		Subscriptions:                 subscriptions,
+	})
 	require.NoError(t, err)
 	corruptInspectorFunc := corruptlibp2p.CorruptInspectorFunc(validationInspector)
 	victimNode, victimIdentity := p2ptest.NodeFixture(

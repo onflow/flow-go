@@ -22,6 +22,61 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
+func TestNewControlMsgValidationInspector(t *testing.T) {
+	t.Run("should create validation inspector without error", func(t *testing.T) {
+		sporkID := unittest.IdentifierFixture()
+		flowConfig, err := config.DefaultConfig()
+		require.NoError(t, err, "failed to get default flow config")
+		distributor := mockp2p.NewGossipSubInspectorNotifDistributor(t)
+		idProvider := mockmodule.NewIdentityProvider(t)
+		signalerCtx := irrecoverable.NewMockSignalerContext(t, context.Background())
+		subscriptions := mockp2p.NewSubscriptions(t)
+		inspector, err := NewControlMsgValidationInspector(&InspectorParams{
+			Ctx:                           signalerCtx,
+			Logger:                        unittest.Logger(),
+			SporkID:                       sporkID,
+			Config:                        &flowConfig.NetworkConfig.GossipSubRPCValidationInspectorConfigs,
+			Distributor:                   distributor,
+			InspectMsgQueueCacheCollector: metrics.NewNoopCollector(),
+			ClusterPrefixedCacheCollector: metrics.NewNoopCollector(),
+			IdProvider:                    idProvider,
+			InspectorMetrics:              metrics.NewNoopCollector(),
+			RpcTracker:                    mockp2p.NewRpcControlTracking(t),
+			Subscriptions:                 subscriptions,
+		})
+		require.NoError(t, err)
+		require.NotNil(t, inspector)
+	})
+	t.Run("should return error if any of the params are nil", func(t *testing.T) {
+		inspector, err := NewControlMsgValidationInspector(&InspectorParams{
+			Ctx:                           nil,
+			Logger:                        unittest.Logger(),
+			SporkID:                       unittest.IdentifierFixture(),
+			Config:                        nil,
+			Distributor:                   nil,
+			InspectMsgQueueCacheCollector: nil,
+			ClusterPrefixedCacheCollector: nil,
+			IdProvider:                    nil,
+			InspectorMetrics:              nil,
+			RpcTracker:                    nil,
+			Subscriptions:                 nil,
+		})
+		require.Nil(t, inspector)
+		require.Error(t, err)
+		s := err.Error()
+		require.Contains(t, s, "validation for 'Ctx' failed on the 'required'")
+		require.Contains(t, s, "validation for 'Config' failed on the 'required'")
+		require.Contains(t, s, "validation for 'Distributor' failed on the 'required'")
+		require.Contains(t, s, "validation for 'InspectMsgQueueCacheCollector' failed on the 'required'")
+		require.Contains(t, s, "validation for 'ClusterPrefixedCacheCollector' failed on the 'required'")
+		require.Contains(t, s, "validation for 'IdProvider' failed on the 'required'")
+		require.Contains(t, s, "validation for 'InspectorMetrics' failed on the 'required'")
+		require.Contains(t, s, "validation for 'RpcTracker' failed on the 'required'")
+		require.Contains(t, s, "validation for 'Subscriptions' failed on the 'required'")
+		require.Contains(t, s, "validation for 'NetworkingType' failed on the 'required'")
+	})
+}
+
 // TestControlMessageValidationInspector_TruncateRPC verifies the expected truncation behavior of RPC control messages.
 // Message truncation for each control message type occurs when the count of control
 // messages exceeds the configured maximum sample size for that control message type.

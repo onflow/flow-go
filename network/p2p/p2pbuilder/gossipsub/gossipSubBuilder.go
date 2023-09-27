@@ -268,19 +268,20 @@ func defaultInspectorSuite(rpcTracker p2p.RpcControlTracking) p2p.GossipSubRpcIn
 
 		inspectMsgQueueCacheCollector := metrics.GossipSubRPCInspectorQueueMetricFactory(heroCacheMetricsFactory, networkType)
 		clusterPrefixedCacheCollector := metrics.GossipSubRPCInspectorClusterPrefixedCacheMetricFactory(heroCacheMetricsFactory, networkType)
-		rpcValidationInspector, err := validation.NewControlMsgValidationInspector(
-			ctx,
-			logger,
-			sporkId,
-			&inspectorCfg.GossipSubRPCValidationInspectorConfigs,
-			notificationDistributor,
-			inspectMsgQueueCacheCollector,
-			clusterPrefixedCacheCollector,
-			idProvider,
-			gossipSubMetrics,
-			rpcTracker,
-			subscriptions,
-		)
+		rpcValidationInspector, err := validation.NewControlMsgValidationInspector(&validation.InspectorParams{
+			Ctx:                           ctx,
+			Logger:                        logger,
+			SporkID:                       sporkId,
+			Config:                        &inspectorCfg.GossipSubRPCValidationInspectorConfigs,
+			Distributor:                   notificationDistributor,
+			InspectMsgQueueCacheCollector: inspectMsgQueueCacheCollector,
+			ClusterPrefixedCacheCollector: clusterPrefixedCacheCollector,
+			IdProvider:                    idProvider,
+			InspectorMetrics:              gossipSubMetrics,
+			RpcTracker:                    rpcTracker,
+			Subscriptions:                 subscriptions,
+			NetworkingType:                networkType,
+		})
 		if err != nil {
 			return nil, fmt.Errorf("failed to create new control message valiadation inspector: %w", err)
 		}
