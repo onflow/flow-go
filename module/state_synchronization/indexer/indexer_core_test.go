@@ -124,11 +124,14 @@ func (i *indexCoreTest) setGetRegisters(f func(t *testing.T, ID flow.RegisterID,
 	return i
 }
 
-func (i *indexCoreTest) initIndexer() *indexCoreTest {
+func (i *indexCoreTest) useDefaultEvents() *indexCoreTest {
 	i.events.
 		On("Store", mock.AnythingOfType("flow.Identifier"), mock.AnythingOfType("[]flow.EventsList")).
 		Return(nil)
+	return i
+}
 
+func (i *indexCoreTest) initIndexer() *indexCoreTest {
 	indexer, err := New(zerolog.New(os.Stdout), i.registers, i.headers, i.events)
 	require.NoError(i.t, err)
 	i.indexer = indexer
@@ -164,6 +167,7 @@ func TestExecutionState_IndexBlockData(t *testing.T) {
 		err := newIndexCoreTest(t, blocks, execData).
 			initIndexer().
 			useDefaultLastHeight().
+			useDefaultEvents().
 			// make sure update registers match in length and are same as block data ledger payloads
 			setStoreRegisters(func(t *testing.T, entries flow.RegisterEntries, height uint64) error {
 				assert.Equal(t, height, block.Header.Height)
@@ -205,6 +209,7 @@ func TestExecutionState_IndexBlockData(t *testing.T) {
 		testRegisterFound := false
 		err = newIndexCoreTest(t, blocks, execData).
 			initIndexer().
+			useDefaultEvents().
 			useDefaultLastHeight().
 			// make sure update registers match in length and are same as block data ledger payloads
 			setStoreRegisters(func(t *testing.T, entries flow.RegisterEntries, height uint64) error {
