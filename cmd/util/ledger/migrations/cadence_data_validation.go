@@ -4,8 +4,10 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	util2 "github.com/onflow/flow-go/module/util"
 	"sort"
 	"sync"
+	"time"
 
 	"github.com/rs/zerolog"
 
@@ -284,33 +286,12 @@ func (m *CadenceDataValidationMigrations) hashDomainCadenceValues(
 			return nil, fmt.Errorf("failed to convert value to string: %w", err)
 		}
 
-		//cadenceValue, err := runtime.ExportValue(value, mr.Interpreter, interpreter.EmptyLocationRange)
-		//if err != nil {
-		//	return nil, fmt.Errorf("failed to export value: %w", err)
-		//}
-		//
-		//encoded, err := jsoncdc.Encode(cadenceValue)
-		//if err != nil {
-		//	return nil, fmt.Errorf("failed to encode value: %w", err)
-		//}
-
 		hasher.Reset()
 
 		hashes = append(hashes, h)
 	}
 
-	// order the hashes since iteration order is not deterministic
-	sort.Sort(hashes)
-
-	for _, h := range hashes {
-		_, err := hasher.Write(h)
-		if err != nil {
-			return nil, fmt.Errorf("failed to write hash: %w", err)
-		}
-	}
-
-	return hasher.SumHash(), nil
-
+	return hashes.SortAndHash(hasher)
 }
 
 func (m *CadenceDataValidationMigrations) recursiveString(
@@ -413,6 +394,144 @@ func (m *CadenceDataValidationMigrations) recursiveStringShardedCollection(
 	value interpreter.Value,
 ) ([]byte, error) {
 
+	sampler := log.Sample(util2.NewTimedSampler(30 * time.Second))
+	log.Info().Msg("starting recursiveStringShardedCollection")
+	defer log.Info().Msg("done with recursiveStringShardedCollection")
+
+	// hash all values
+	hashes, err := m.hashAllNftsInAllCollections(
+		log,
+		sampler,
+		mr,
+		domain,
+		key,
+		value,
+	)
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to hash all values: %w", err)
+	}
+
+	return m.consolidateAllHashes(
+		log,
+		sampler,
+		hashes,
+	)
+
+}
+
+func (m *CadenceDataValidationMigrations) consolidateAllHashes(
+	log zerolog.Logger,
+	sampler zerolog.Logger,
+	hashes map[uint64]sortableHashes,
+) ([]byte, error) {
+
+	log.Info().Msg("starting consolidateAllHashes")
+	defer log.Info().Msg("done with consolidateAllHashes")
+
+	ctx, c := context.WithCancelCause(context.Background())
+	cancel := func(err error) {
+		if err != nil {
+			log.Info().Err(err).Msg("canceling context")
+		}
+		c(err)
+	}
+	defer cancel(nil)
+
+	hashCollectionChan := make(chan uint64, m.nWorkers)
+	hashedCollectionChan := make(chan []byte)
+	finalHashes := make(sortableHashes, 0, 10_000_000)
+	wg := sync.WaitGroup{}
+	wg.Add(m.nWorkers)
+	done := make(chan struct{})
+
+	for i := 0; i < m.nWorkers; i++ {
+		go func() {
+			defer wg.Done()
+			hasher := newHasher()
+
+			for {
+				select {
+				case <-ctx.Done():
+					return
+				case i, ok := <-hashCollectionChan:
+					if !ok {
+						return
+					}
+					l := hashes[i]
+
+					h, err := l.SortAndHash(hasher)
+					if err != nil {
+						cancel(fmt.Errorf("failed to write hash: %w", err))
+
+						return
+					}
+					hashedCollectionChan <- h
+				}
+			}
+		}()
+	}
+
+	go func() {
+		defer close(done)
+		defer log.Info().Msg("finished collecting final hashes")
+
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case h, ok := <-hashedCollectionChan:
+				if !ok {
+					return
+				}
+				finalHashes = append(finalHashes, h)
+			}
+		}
+	}()
+
+	go func() {
+		defer close(hashCollectionChan)
+		defer log.Info().Msg("finished dispatching final hashes")
+
+		for k := range hashes {
+			select {
+			case <-ctx.Done():
+				return
+			case hashCollectionChan <- k:
+			}
+		}
+	}()
+
+	wg.Wait()
+	close(hashedCollectionChan)
+	<-done
+
+	if ctx.Err() != nil {
+		log.Info().Err(ctx.Err()).Msg("context error when hashing values together")
+		return nil, ctx.Err()
+	}
+
+	hasher := newHasher()
+	h, err := finalHashes.SortAndHash(hasher)
+	if err != nil {
+		return nil, fmt.Errorf("failed to write hash: %w", err)
+	}
+
+	return h, nil
+}
+
+func (m *CadenceDataValidationMigrations) hashAllNftsInAllCollections(
+	log zerolog.Logger,
+	sampler zerolog.Logger,
+	mr *migratorRuntime,
+	domain string,
+	key interpreter.StorageMapKey,
+	value interpreter.Value,
+) (map[uint64]sortableHashes, error) {
+
+	log.Info().Msg("starting consolidateAllHashes")
+	defer log.Info().Msg("done with consolidateAllHashes")
+
 	ctx, c := context.WithCancelCause(context.Background())
 	cancel := func(err error) {
 		if err != nil {
@@ -436,7 +555,7 @@ func (m *CadenceDataValidationMigrations) recursiveStringShardedCollection(
 			storageMap := mr.GetReadOnlyStorage().GetStorageMap(mr.Address, domain, false)
 			storageMapValue := storageMap.ReadValue(&util.NopMemoryGauge{}, key)
 
-			hashNFTWorker(ctx, cancel, mr, storageMapValue, keyPairChan, hashChan)
+			hashNFTWorker(sampler, ctx, cancel, mr, storageMapValue, keyPairChan, hashChan)
 		}()
 	}
 
@@ -444,6 +563,7 @@ func (m *CadenceDataValidationMigrations) recursiveStringShardedCollection(
 	done := make(chan struct{})
 	go func() {
 		defer close(done)
+		defer log.Info().Msg("finished collecting hashes")
 		for {
 			select {
 			case <-ctx.Done():
@@ -464,12 +584,17 @@ func (m *CadenceDataValidationMigrations) recursiveStringShardedCollection(
 	// worker for dispatching values to hash
 	go func() {
 		defer close(keyPairChan)
+		defer log.Info().Msg("finished dispatching values to hash")
 
 		shardedCollectionMap, err := getShardedCollectionMap(mr, value)
 		if err != nil {
 			cancel(err)
 			return
 		}
+
+		log.Info().
+			Int("shardedCollectionMapLen", shardedCollectionMap.Count()).
+			Msg("shardedCollectionMapLen")
 
 		shardedCollectionMapIterator := shardedCollectionMap.Iterator()
 		for {
@@ -512,6 +637,7 @@ func (m *CadenceDataValidationMigrations) recursiveStringShardedCollection(
 	}()
 
 	wg.Wait()
+	log.Info().Msg("finished hashing values")
 	close(hashChan)
 	<-done
 
@@ -519,86 +645,11 @@ func (m *CadenceDataValidationMigrations) recursiveStringShardedCollection(
 		log.Info().Err(ctx.Err()).Msg("context error when hashing individual values")
 		return nil, ctx.Err()
 	}
-
-	hashCollectionChan := make(chan uint64, m.nWorkers)
-	hashedCollectionChan := make(chan []byte)
-	finalHashes := make(sortableHashes, 0, 10_000_000)
-	wg = sync.WaitGroup{}
-	wg.Add(m.nWorkers)
-	done = make(chan struct{})
-
-	for i := 0; i < m.nWorkers; i++ {
-		go func() {
-			defer wg.Done()
-			hasher := newHasher()
-
-			for {
-				select {
-				case <-ctx.Done():
-					return
-				case i, ok := <-hashCollectionChan:
-					if !ok {
-						return
-					}
-					l := hashes[i]
-
-					h, err := l.SortAndHash(hasher)
-					if err != nil {
-						cancel(fmt.Errorf("failed to write hash: %w", err))
-
-						return
-					}
-					hashedCollectionChan <- h
-				}
-			}
-		}()
-	}
-
-	go func() {
-		defer close(done)
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			case h, ok := <-hashedCollectionChan:
-				if !ok {
-					return
-				}
-				finalHashes = append(finalHashes, h)
-			}
-		}
-	}()
-
-	go func() {
-		defer close(hashCollectionChan)
-		for k := range hashes {
-			select {
-			case <-ctx.Done():
-				return
-			case hashCollectionChan <- k:
-			}
-		}
-	}()
-
-	wg.Wait()
-	close(hashedCollectionChan)
-	<-done
-
-	if ctx.Err() != nil {
-		log.Info().Err(ctx.Err()).Msg("context error when hashing values together")
-		return nil, ctx.Err()
-	}
-
-	hasher := newHasher()
-	h, err := finalHashes.SortAndHash(hasher)
-	if err != nil {
-		return nil, fmt.Errorf("failed to write hash: %w", err)
-	}
-
-	return h, nil
+	return hashes, nil
 }
 
 func hashNFTWorker(
+	sample zerolog.Logger,
 	ctx context.Context,
 	cancel context.CancelCauseFunc,
 	mr *migratorRuntime,
@@ -613,6 +664,7 @@ func hashNFTWorker(
 		cancel(err)
 		return
 	}
+	hashed := 0
 
 	for {
 		select {
@@ -656,6 +708,8 @@ func hashNFTWorker(
 				key:  uintKey,
 				hash: hash,
 			}
+			hashed++
+			sample.Info().Int("hashed", hashed).Msg("Hashing worker running")
 		}
 	}
 }
