@@ -361,9 +361,9 @@ func getShardedCollectionMap(mr *migratorRuntime, value interpreter.Value) (*int
 	return shardedCollectionMap, nil
 }
 
-func getNftsCollection(mr *migratorRuntime, outerKey interpreter.Value, shardedCollectionMap *interpreter.DictionaryValue) (*interpreter.DictionaryValue, error) {
+func getNftCollection(inter *interpreter.Interpreter, outerKey interpreter.Value, shardedCollectionMap *interpreter.DictionaryValue) (*interpreter.DictionaryValue, error) {
 	value := shardedCollectionMap.GetKey(
-		mr.Interpreter,
+		nil,
 		interpreter.EmptyLocationRange,
 		outerKey,
 	)
@@ -374,14 +374,14 @@ func getNftsCollection(mr *migratorRuntime, outerKey interpreter.Value, shardedC
 	}
 
 	collection, ok := someCollection.InnerValue(
-		mr.Interpreter,
+		inter,
 		interpreter.EmptyLocationRange).(*interpreter.CompositeValue)
 	if !ok {
 		return nil, fmt.Errorf("expected inner collection to be *interpreter.CompositeValue, got %T", value)
 	}
 
 	ownedNFTsRaw := collection.GetField(
-		mr.Interpreter,
+		inter,
 		interpreter.EmptyLocationRange,
 		"ownedNFTs",
 	)
@@ -395,6 +395,16 @@ func getNftsCollection(mr *migratorRuntime, outerKey interpreter.Value, shardedC
 	return ownedNFTs, nil
 }
 
+type keyPair struct {
+	shardedCollectionKey interpreter.Value
+	nftCollectionKey     interpreter.Value
+}
+
+type hashWithKeys struct {
+	key  uint64
+	hash []byte
+}
+
 func (m *CadenceDataValidationMigrations) recursiveStringShardedCollection(
 	log zerolog.Logger,
 	mr *migratorRuntime,
@@ -402,17 +412,6 @@ func (m *CadenceDataValidationMigrations) recursiveStringShardedCollection(
 	key interpreter.StorageMapKey,
 	value interpreter.Value,
 ) ([]byte, error) {
-
-	type keys struct {
-		outerKey interpreter.Value
-		innerKey interpreter.Value
-	}
-
-	type hashWithKeys struct {
-		outerKey interpreter.Value
-		innerKey interpreter.Value
-		hash     []byte
-	}
 
 	ctx, c := context.WithCancelCause(context.Background())
 	cancel := func(err error) {
@@ -423,90 +422,49 @@ func (m *CadenceDataValidationMigrations) recursiveStringShardedCollection(
 	}
 	defer cancel(nil)
 
-	hashifyChan := make(chan keys, m.nWorkers)
+	keyPairChan := make(chan keyPair, m.nWorkers)
 	hashChan := make(chan hashWithKeys, m.nWorkers)
+	hashes := make(map[uint64]sortableHashes)
 	wg := sync.WaitGroup{}
 	wg.Add(m.nWorkers)
 
+	// workers for hashing
 	for i := 0; i < m.nWorkers; i++ {
-		hasher := newHasher()
 		go func() {
-
-			// the readonly storage is going to allow concurrent access to the storage
-			storageMap := mr.GetReadOnlyStorage().GetStorageMap(mr.Address, domain, false)
-			value := storageMap.ReadValue(&util.NopMemoryGauge{}, key)
-
-			shardedCollectionMap, err := getShardedCollectionMap(mr, value)
-			if err != nil {
-				cancel(err)
-				return
-			}
-
 			defer wg.Done()
-			for {
-				select {
-				case <-ctx.Done():
-					return
-				case hashify, ok := <-hashifyChan:
-					if !ok {
-						return
-					}
-					s := ""
 
-					ownedNFTs, err := getNftsCollection(mr, hashify.outerKey, shardedCollectionMap)
-					if err != nil {
-						cancel(err)
-						return
-					}
+			storageMap := mr.GetReadOnlyStorage().GetStorageMap(mr.Address, domain, false)
+			storageMapValue := storageMap.ReadValue(&util.NopMemoryGauge{}, key)
 
-					value := ownedNFTs.GetKey(
-						mr.Interpreter,
-						interpreter.EmptyLocationRange,
-						hashify.innerKey,
-					)
-
-					err = capturePanic(func() {
-						s = value.RecursiveString(interpreter.SeenReferences{})
-					})
-					if err != nil {
-						cancel(err)
-						return
-					}
-					hash := hasher.ComputeHash([]byte(s))
-					hasher.Reset()
-
-					hashChan <- hashWithKeys{
-						outerKey: hashify.outerKey,
-						innerKey: hashify.innerKey,
-						hash:     hash,
-					}
-				}
-			}
+			hashNFTWorker(ctx, cancel, mr, storageMapValue, keyPairChan, hashChan)
 		}()
 	}
 
+	// worker for collecting hashes
 	done := make(chan struct{})
-	hashes := make(map[interpreter.Value]sortableHashes)
 	go func() {
 		defer close(done)
 		for {
 			select {
 			case <-ctx.Done():
 				return
-			case clone, ok := <-hashChan:
+			case hashed, ok := <-hashChan:
 				if !ok {
 					return
 				}
-				_, ok = hashes[clone.outerKey]
+				_, ok = hashes[hashed.key]
 				if !ok {
-					hashes[clone.outerKey] = make(sortableHashes, 0, 1_0000_000)
+					hashes[hashed.key] = make(sortableHashes, 0, 1_000_000)
 				}
-				hashes[clone.outerKey] = append(hashes[clone.outerKey], clone.hash)
+				hashes[hashed.key] = append(hashes[hashed.key], hashed.hash)
 			}
 		}
 	}()
 
+	// worker for dispatching values to hash
 	go func() {
+		defer close(keyPairChan)
+
 		shardedCollectionMap, err := getShardedCollectionMap(mr, value)
 		if err != nil {
 			cancel(err)
@@ -526,7 +484,7 @@ func (m *CadenceDataValidationMigrations) recursiveStringShardedCollection(
 				break
 			}
 
-			ownedNFTs, err := getNftsCollection(mr, outerKey, shardedCollectionMap)
+			ownedNFTs, err := getNftCollection(mr.Interpreter, outerKey, shardedCollectionMap)
 			if err != nil {
 				cancel(err)
 				return
@@ -545,13 +503,12 @@ func (m *CadenceDataValidationMigrations) recursiveStringShardedCollection(
 					break
 				}
 
-				hashifyChan <- keys{
-					innerKey: innerKey,
-					outerKey: outerKey,
+				keyPairChan <- keyPair{
+					nftCollectionKey:     innerKey,
+					shardedCollectionKey: outerKey,
 				}
 			}
 		}
-		close(hashifyChan)
 	}()
 
 	wg.Wait()
@@ -563,8 +520,10 @@ func (m *CadenceDataValidationMigrations) recursiveStringShardedCollection(
 		return nil, ctx.Err()
 	}
 
-	inputChan := make(chan interpreter.Value, m.nWorkers)
-	outputChan := make(chan []byte)
+	hashCollectionChan := make(chan uint64, m.nWorkers)
+	hashedCollectionChan := make(chan []byte)
+	finalHashes := make(sortableHashes, 0, 10_000_000)
+	wg = sync.WaitGroup{}
 	wg.Add(m.nWorkers)
 	done = make(chan struct{})
 
@@ -577,28 +536,23 @@ func (m *CadenceDataValidationMigrations) recursiveStringShardedCollection(
 				select {
 				case <-ctx.Done():
 					return
-				case i, ok := <-inputChan:
+				case i, ok := <-hashCollectionChan:
 					if !ok {
 						return
 					}
 					l := hashes[i]
-					sort.Sort(l)
-					for _, h := range l {
-						_, err := hasher.Write(h)
-						if err != nil {
-							cancel(fmt.Errorf("failed to write hash: %w", err))
 
-							return
-						}
+					h, err := l.SortAndHash(hasher)
+					if err != nil {
+						cancel(fmt.Errorf("failed to write hash: %w", err))
+
+						return
 					}
-					outputChan <- hasher.SumHash()
-					hasher.Reset()
+					hashedCollectionChan <- h
 				}
 			}
 		}()
 	}
-
-	outHashes := make(sortableHashes, 0, 10_000_000)
 
 	go func() {
 		defer close(done)
@@ -606,20 +560,28 @@ func (m *CadenceDataValidationMigrations) recursiveStringShardedCollection(
 			select {
 			case <-ctx.Done():
 				return
-			case h, ok := <-outputChan:
+			case h, ok := <-hashedCollectionChan:
 				if !ok {
 					return
 				}
-				outHashes = append(outHashes, h)
+				finalHashes = append(finalHashes, h)
 			}
 		}
 	}()
 
-	for k := range hashes {
-		inputChan <- k
-	}
-	close(inputChan)
+	go func() {
+		defer close(hashCollectionChan)
+		for k := range hashes {
+			select {
+			case <-ctx.Done():
+				return
+			case hashCollectionChan <- k:
+			}
+		}
+	}()
+
 	wg.Wait()
+	close(hashedCollectionChan)
 	<-done
 
 	if ctx.Err() != nil {
@@ -627,17 +589,75 @@ func (m *CadenceDataValidationMigrations) recursiveStringShardedCollection(
 		return nil, ctx.Err()
 	}
 
-	sort.Sort(outHashes)
+	hasher := newHasher()
+	h, err := finalHashes.SortAndHash(hasher)
+	if err != nil {
+		return nil, fmt.Errorf("failed to write hash: %w", err)
+	}
+
+	return h, nil
+}
+
+func hashNFTWorker(
+	ctx context.Context,
+	cancel context.CancelCauseFunc,
+	mr *migratorRuntime,
+	storageMapValue interpreter.Value,
+	keyPairChan <-chan keyPair,
+	hashChan chan<- hashWithKeys,
+) {
 	hasher := newHasher()
 
-	for _, h := range outHashes {
-		_, err := hasher.Write(h)
-		if err != nil {
-			return nil, fmt.Errorf("failed to write hash: %w", err)
-		}
-
+	shardedCollectionMap, err := getShardedCollectionMap(mr, storageMapValue)
+	if err != nil {
+		cancel(err)
+		return
 	}
-	return hasher.SumHash(), nil
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case keyPair, ok := <-keyPairChan:
+			if !ok {
+				return
+			}
+			s := ""
+
+			ownedNFTs, err := getNftCollection(
+				mr.Interpreter,
+				keyPair.shardedCollectionKey,
+				shardedCollectionMap,
+			)
+			if err != nil {
+				cancel(err)
+				return
+			}
+
+			value := ownedNFTs.GetKey(
+				mr.Interpreter,
+				interpreter.EmptyLocationRange,
+				keyPair.nftCollectionKey,
+			)
+
+			err = capturePanic(func() {
+				s = value.RecursiveString(interpreter.SeenReferences{})
+			})
+			if err != nil {
+				cancel(err)
+				return
+			}
+			hash := hasher.ComputeHash([]byte(s))
+			hasher.Reset()
+
+			uintKey := uint64(keyPair.shardedCollectionKey.(interpreter.UInt64Value))
+
+			hashChan <- hashWithKeys{
+				key:  uintKey,
+				hash: hash,
+			}
+		}
+	}
 }
 
 func newHasher() hash.Hasher {
@@ -656,6 +676,19 @@ func (s sortableHashes) Less(i, j int) bool {
 
 func (s sortableHashes) Swap(i, j int) {
 	s[i], s[j] = s[j], s[i]
+}
+
+func (s sortableHashes) SortAndHash(hasher hash.Hasher) ([]byte, error) {
+	defer hasher.Reset()
+	sort.Sort(s)
+	for _, h := range s {
+		_, err := hasher.Write(h)
+		if err != nil {
+			return nil, fmt.Errorf("failed to write hash: %w", err)
+		}
+
+	}
+	return hasher.SumHash(), nil
 }
 
 type cadenceDataValidationReportEntry struct {

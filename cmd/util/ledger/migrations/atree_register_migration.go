@@ -522,16 +522,17 @@ func (m *AtreeRegisterMigrator) isCricketMomentsShardedCollection(
 	mr *migratorRuntime,
 	value interpreter.Value,
 ) (bool, error) {
-	if mr.Address != mustHexToAddress("0x4eded0de73020ca5") {
-		return false, nil
-	}
-
-	compositeValue, ok := value.(*interpreter.CompositeValue)
-	if !ok {
-		return false, nil
-	}
-
-	return string(compositeValue.TypeID()) == "A.4eded0de73020ca5.CricketMomentsShardedCollection.ShardedCollection", nil
+	//if mr.Address != mustHexToAddress("0x4eded0de73020ca5") {
+	//	return false, nil
+	//}
+	//
+	//compositeValue, ok := value.(*interpreter.CompositeValue)
+	//if !ok {
+	//	return false, nil
+	//}
+	//
+	//return string(compositeValue.TypeID()) == "A.4eded0de73020ca5.CricketMomentsShardedCollection.ShardedCollection", nil
+	return false, nil
 }
 
 func (m *AtreeRegisterMigrator) cloneCricketMomentsShardedCollection(
