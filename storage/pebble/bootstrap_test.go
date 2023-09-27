@@ -21,6 +21,7 @@ import (
 )
 
 func TestBootstrap_NewBootstrap(t *testing.T) {
+	t.Parallel()
 	sampleDir := path.Join(unittest.TempDir(t), "checkpoint.checkpoint")
 	rootHeight := uint64(1)
 	log := zerolog.New(io.Discard)
@@ -109,6 +110,11 @@ func TestBootstrap_IndexCheckpointFile_FormatIssue(t *testing.T) {
 }
 
 func TestBootstrap_IndexCheckpointFile_Error(t *testing.T) {
+	t.Parallel()
+
+}
+
+func TestBootstrap_IndexCheckpointFile_MultipleBatch(t *testing.T) {
 	t.Parallel()
 
 }
