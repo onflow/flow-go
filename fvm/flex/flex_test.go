@@ -5,6 +5,8 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"math"
+	"math/big"
 	"testing"
 	"time"
 
@@ -125,66 +127,66 @@ func TestFlexRun(t *testing.T) {
 	t.Parallel()
 
 	utils.RunWithTestBackend(t, func(backend models.Backend) {
-		handler := flex.NewFlexContractHandler(backend)
+		utils.RunWithDeployedContract(t, backend, func(testContract *utils.TestContract) {
+			handler := flex.NewFlexContractHandler(backend)
 
-		env := runtime.NewBaseInterpreterEnvironment(runtime.Config{})
+			env := runtime.NewBaseInterpreterEnvironment(runtime.Config{})
 
-		flexTypeDefinition := emulator.FlexTypeDefinition
-		env.DeclareValue(flexStdlib.NewFlexStandardLibraryValue(nil, flexTypeDefinition, handler))
-		env.DeclareType(flexStdlib.NewFlexStandardLibraryType(flexTypeDefinition))
+			flexTypeDefinition := emulator.FlexTypeDefinition
+			env.DeclareValue(flexStdlib.NewFlexStandardLibraryValue(nil, flexTypeDefinition, handler))
+			env.DeclareType(flexStdlib.NewFlexStandardLibraryType(flexTypeDefinition))
 
-		inter := runtime.NewInterpreterRuntime(runtime.Config{})
+			inter := runtime.NewInterpreterRuntime(runtime.Config{})
 
-		script := []byte(`
-			pub fun main(tx: [UInt8], coinbaseBytes: [UInt8; 20]): Bool {
-                let coinbase = Flex.FlexAddress(bytes: coinbaseBytes)
-				return Flex.run(tx: tx, coinbase: coinbase)
-			}
-		`)
+			script := []byte(`
+				pub fun main(tx: [UInt8], coinbaseBytes: [UInt8; 20]): Bool {
+					let coinbase = Flex.FlexAddress(bytes: coinbaseBytes)
+					return Flex.run(tx: tx, coinbase: coinbase)
+				}
+			`)
 
-		// TODO: provide proper RLP-encoded EVM transaction
-		tx := cadence.NewArray([]cadence.Value{
-			cadence.UInt8(1),
-			cadence.UInt8(2),
-			cadence.UInt8(3),
-		}).WithType(flexAddressBytesCadenceType)
+			utils.RunWithEOATestAccount(t, backend, func(testAccount *utils.EOATestAccount) {
+				num := int64(12)
 
-		// TODO: provide proper EVM address
-		coinbase := cadence.NewArray([]cadence.Value{
-			cadence.UInt8(1), cadence.UInt8(1),
-			cadence.UInt8(2), cadence.UInt8(2),
-			cadence.UInt8(3), cadence.UInt8(3),
-			cadence.UInt8(4), cadence.UInt8(4),
-			cadence.UInt8(5), cadence.UInt8(5),
-			cadence.UInt8(6), cadence.UInt8(6),
-			cadence.UInt8(7), cadence.UInt8(7),
-			cadence.UInt8(8), cadence.UInt8(8),
-			cadence.UInt8(9), cadence.UInt8(9),
-			cadence.UInt8(10), cadence.UInt8(10),
-		}).WithType(flexAddressBytesCadenceType)
+				txBytes := testAccount.PrepareSignAndEncodeTx(t,
+					testContract.DeployedAt,
+					testContract.MakeStoreCallData(t, big.NewInt(num)),
+					big.NewInt(0),
+					math.MaxUint64,
+					big.NewInt(0),
+				)
+				tx := cadence.NewArray(
+					utils.ConvertToCadence(txBytes),
+				).WithType(flexAddressBytesCadenceType)
 
-		runtimeInterface := &testRuntimeInterface{
-			storage: backend,
-			decodeArgument: func(b []byte, t cadence.Type) (cadence.Value, error) {
-				return json.Decode(nil, b)
-			},
-		}
+				coinbase := cadence.NewArray(
+					utils.ConvertToCadence(testAccount.FlexAddress().Bytes()),
+				).WithType(flexAddressBytesCadenceType)
 
-		result, err := inter.ExecuteScript(
-			runtime.Script{
-				Source:    script,
-				Arguments: encodeArgs([]cadence.Value{tx, coinbase}),
-			},
-			runtime.Context{
-				Interface:   runtimeInterface,
-				Environment: env,
-				Location:    common.ScriptLocation{},
-			},
-		)
-		require.NoError(t, err)
+				runtimeInterface := &testRuntimeInterface{
+					storage: backend,
+					decodeArgument: func(b []byte, t cadence.Type) (cadence.Value, error) {
+						return json.Decode(nil, b)
+					},
+				}
 
-		// TODO: should succeed
-		assert.Equal(t, cadence.Bool(false), result)
+				result, err := inter.ExecuteScript(
+					runtime.Script{
+						Source:    script,
+						Arguments: encodeArgs([]cadence.Value{tx, coinbase}),
+					},
+					runtime.Context{
+						Interface:   runtimeInterface,
+						Environment: env,
+						Location:    common.ScriptLocation{},
+					},
+				)
+				require.NoError(t, err)
+
+				// TODO: should succeed
+				assert.Equal(t, cadence.Bool(false), result)
+			})
+		})
 	})
 }
 

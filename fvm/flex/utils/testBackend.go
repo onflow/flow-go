@@ -2,14 +2,20 @@ package utils
 
 import (
 	"encoding/binary"
+	"math"
+	"math/big"
 	"testing"
 
 	"github.com/onflow/atree"
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/runtime/common"
+	"github.com/stretchr/testify/require"
 
+	gethCommon "github.com/ethereum/go-ethereum/common"
 	fvmenv "github.com/onflow/flow-go/fvm/environment"
+	env "github.com/onflow/flow-go/fvm/flex/environment"
 	"github.com/onflow/flow-go/fvm/flex/models"
+	"github.com/onflow/flow-go/fvm/flex/storage"
 	"github.com/onflow/flow-go/fvm/meter"
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -22,28 +28,53 @@ func RunWithTestBackend(t testing.TB, f func(models.Backend)) {
 	f(tb)
 }
 
-func RunWithDeployedContract(t *testing.T, f func(models.Backend, *TestContract)) {
-	RunWithTestBackend(t, func(backend models.Backend) {
-		tc := GetTestContract(t)
-		// deploy contract
+func RunWithEOATestAccount(t *testing.T, backend models.Backend, f func(*EOATestAccount)) {
+	account := GetTestEOAAccount(t, EOATestAccount1KeyHex)
 
-		// config := env.NewFlexConfig(
-		// 	env.WithCoinbase(coinbase.ToCommon()),
-		// 	env.WithBlockNumber(env.BlockNumberForEVMRules))
-		// env, err := env.NewEnvironment(config, h.db)
-		// storage.NewDatabase(backend)
-		// // TODO improve this
-		// if err != nil {
-		// 	panic(err)
-		// }
-		// err = env.RunTransaction(tx)
-		// if err != nil {
-		// 	panic(err)
-		// }
-		// return !env.Result.Failed
+	// fund account
+	db := storage.NewDatabase(backend)
+	config := env.NewFlexConfig(env.WithBlockNumber(env.BlockNumberForEVMRules))
 
-		f(backend, tc)
-	})
+	env, err := env.NewEnvironment(config, db)
+	require.NoError(t, err)
+
+	err = env.MintTo(new(big.Int).Mul(big.NewInt(1e18), big.NewInt(1000)), account.FlexAddress().ToCommon())
+	require.NoError(t, err)
+	require.False(t, env.Result.Failed)
+	f(account)
+}
+
+func RunWithDeployedContract(t *testing.T, backend models.Backend, f func(*TestContract)) {
+	tc := GetTestContract(t)
+	// deploy contract
+	db := storage.NewDatabase(backend)
+	config := env.NewFlexConfig(env.WithBlockNumber(env.BlockNumberForEVMRules))
+
+	e, err := env.NewEnvironment(config, db)
+	require.NoError(t, err)
+
+	caller := gethCommon.Address{}
+	err = e.MintTo(new(big.Int).Mul(big.NewInt(1e18), big.NewInt(1000)), caller)
+	require.NoError(t, err)
+	require.False(t, e.Result.Failed)
+
+	e, err = env.NewEnvironment(config, db)
+	require.NoError(t, err)
+
+	err = e.Deploy(gethCommon.Address{}, tc.ByteCode, math.MaxUint64, big.NewInt(0))
+	require.NoError(t, err)
+	require.False(t, e.Result.Failed)
+
+	tc.SetDeployedAt(e.Result.DeployedContractAddress)
+	f(tc)
+}
+
+func ConvertToCadence(data []byte) []cadence.Value {
+	ret := make([]cadence.Value, 20)
+	for i, v := range data {
+		ret[i] = cadence.UInt8(v)
+	}
+	return ret
 }
 
 func fullKey(owner, key []byte) string {
