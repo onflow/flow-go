@@ -106,6 +106,35 @@ func TestBootstrap_IndexCheckpointFile_Empty(t *testing.T) {
 
 func TestBootstrap_IndexCheckpointFile_FormatIssue(t *testing.T) {
 	t.Parallel()
+	pa1 := testutils.PathByUint8(0)
+	pa2 := testutils.PathByUint8(1)
+	rootHeight := uint64(666)
+	pl1 := testutils.LightPayload8('A', 'A')
+	pl2 := testutils.LightPayload('B', 'B')
+	paths := []ledger.Path{pa1, pa2}
+	payloads := []ledger.Payload{*pl1, *pl2}
+	emptyTrie := trie.NewEmptyMTrie()
+	trieWithInvalidEntry, _, err := trie.NewTrieWithUpdatedRegisters(emptyTrie, paths, payloads, true)
+	require.NoError(t, err)
+	log := zerolog.New(io.Discard)
+
+	unittest.RunWithTempDir(t, func(dir string) {
+		fileName := "invalid-checkpoint"
+		require.NoErrorf(t, wal.StoreCheckpointV6Concurrently([]*trie.MTrie{trieWithInvalidEntry}, dir, fileName, log),
+			"fail to store checkpoint")
+		checkpointFile := path.Join(dir, fileName)
+		cache := pebble.NewCache(1 << 20)
+		opts := DefaultPebbleOptions(cache, registers.NewMVCCComparer())
+		defer cache.Unref()
+
+		pb, dbDir := unittest.TempPebbleDBWithOpts(t, opts)
+		bootstrap, err := NewBootstrap(pb, checkpointFile, rootHeight, log)
+		require.NoError(t, err)
+		err = bootstrap.IndexCheckpointFile()
+		require.ErrorContains(t, err, "key not in expected format")
+		require.NoError(t, pb.Close())
+		require.NoError(t, os.RemoveAll(dbDir))
+	})
 
 }
 
@@ -116,6 +145,38 @@ func TestBootstrap_IndexCheckpointFile_Error(t *testing.T) {
 
 func TestBootstrap_IndexCheckpointFile_MultipleBatch(t *testing.T) {
 	t.Parallel()
+	log := zerolog.New(io.Discard)
+	rootHeight := uint64(10000)
+	unittest.RunWithTempDir(t, func(dir string) {
+		tries, registerIDs := simpleTrieWithValidRegisterIDs(t)
+		fileName := "simple-checkpoint"
+		require.NoErrorf(t, wal.StoreCheckpointV6Concurrently(tries, dir, fileName, log), "fail to store checkpoint")
+		checkpointFile := path.Join(dir, fileName)
+		cache := pebble.NewCache(1 << 20)
+		opts := DefaultPebbleOptions(cache, registers.NewMVCCComparer())
+		defer cache.Unref()
+		pb, dbDir := unittest.TempPebbleDBWithOpts(t, opts)
+		bootstrap, err := NewBootstrap(pb, checkpointFile, rootHeight, log)
+		require.NoError(t, err)
+		err = bootstrap.IndexCheckpointFile()
+		require.NoError(t, err)
+
+		// create registers instance and check values
+		reg, err := NewRegisters(pb)
+		require.NoError(t, err)
+
+		require.Equal(t, reg.LatestHeight(), rootHeight)
+		require.Equal(t, reg.FirstHeight(), rootHeight)
+
+		for _, register := range registerIDs {
+			val, err := reg.Get(*register, rootHeight)
+			require.NoError(t, err)
+			require.Equal(t, val, []byte{uint8(0)})
+		}
+
+		require.NoError(t, pb.Close())
+		require.NoError(t, os.RemoveAll(dbDir))
+	})
 
 }
 
@@ -123,7 +184,7 @@ func simpleTrieWithValidRegisterIDs(t *testing.T) ([]*trie.MTrie, []*flow.Regist
 	p1 := testutils.PathByUint8(0)
 	p2 := testutils.PathByUint8(1)
 	paths := []ledger.Path{p1, p2}
-	payloads := RandomRegisterPayloads(2)
+	payloads := randomRegisterPayloads(2)
 	// collect register IDs to return
 	rID := make([]*flow.RegisterID, 0, 2)
 	for _, payload := range payloads {
@@ -140,7 +201,11 @@ func simpleTrieWithValidRegisterIDs(t *testing.T) ([]*trie.MTrie, []*flow.Regist
 	return tries, rID
 }
 
-func RandomRegisterPayloads(n uint64) []ledger.Payload {
+func largeTrieWithValidRegisterIDs(t *testing.T) {
+
+}
+
+func randomRegisterPayloads(n uint64) []ledger.Payload {
 	p := make([]ledger.Payload, 0, n)
 	for i := uint64(0); i < n; i++ {
 		o := make([]byte, 0, 8)
@@ -154,4 +219,8 @@ func RandomRegisterPayloads(n uint64) []ledger.Payload {
 		p = append(p, *pl)
 	}
 	return p
+}
+
+func randomRegisterPaths(n uint64) []ledger.Path {
+	return nil
 }
