@@ -1,13 +1,13 @@
 package flow_test
 
 import (
-	"math/rand"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/utils/rand"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -109,10 +109,11 @@ func TestChunkList_Indices(t *testing.T) {
 
 func TestChunkIndexIsSet(t *testing.T) {
 
-	i := rand.Int()
+	i, err := rand.Uint()
+	require.NoError(t, err)
 	chunk := flow.NewChunk(
 		unittest.IdentifierFixture(),
-		i,
+		int(i),
 		unittest.StateCommitmentFixture(),
 		21,
 		unittest.IdentifierFixture(),
@@ -126,12 +127,13 @@ func TestChunkIndexIsSet(t *testing.T) {
 
 func TestChunkNumberOfTxsIsSet(t *testing.T) {
 
-	i := int(rand.Uint32())
+	i, err := rand.Uint32()
+	require.NoError(t, err)
 	chunk := flow.NewChunk(
 		unittest.IdentifierFixture(),
 		3,
 		unittest.StateCommitmentFixture(),
-		i,
+		int(i),
 		unittest.IdentifierFixture(),
 		unittest.StateCommitmentFixture(),
 		17995,
@@ -142,7 +144,8 @@ func TestChunkNumberOfTxsIsSet(t *testing.T) {
 
 func TestChunkTotalComputationUsedIsSet(t *testing.T) {
 
-	i := rand.Uint64()
+	i, err := rand.Uint64()
+	require.NoError(t, err)
 	chunk := flow.NewChunk(
 		unittest.IdentifierFixture(),
 		3,
