@@ -79,14 +79,15 @@ func (i *ExecutionState) IndexBlockData(_ context.Context, data *execution_data.
 
 	lg.Debug().Msgf("indexing new block")
 
-	latest, err := i.registers.LatestHeight()
-	if err != nil {
-		return err
-	}
-
 	// the height we are indexing must be exactly one bigger or same as the latest height indexed from the storage
+	latest := i.registers.LatestHeight()
 	if block.Height != latest+1 && block.Height != latest {
 		return fmt.Errorf("must store registers with the next height %d, but got %d", latest+1, block.Height)
+	}
+	// allow rerunning the indexer for same height since we are fetching height from register storage, but there are other storages
+	// for indexing resources which might fail to update the values, so this enables rerunning and reindexing those resources
+	if block.Height == latest {
+		lg.Warn().Msg("reindexing block data")
 	}
 
 	// concurrently process indexing of block data
