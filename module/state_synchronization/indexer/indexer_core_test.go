@@ -133,7 +133,7 @@ func (i *indexCoreTest) initIndexer() *indexCoreTest {
 
 func (i *indexCoreTest) runIndexBlockData() error {
 	i.initIndexer()
-	return i.indexer.IndexBlockData(i.ctx, i.data)
+	return i.indexer.IndexBlockData(i.data)
 }
 
 func (i *indexCoreTest) runGetRegisters(IDs flow.RegisterIDs, height uint64) ([]flow.RegisterValue, error) {

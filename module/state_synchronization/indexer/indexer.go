@@ -89,7 +89,7 @@ func (i *Indexer) processExecutionData(ctx irrecoverable.SignalerContext, job mo
 		ctx.Throw(err)
 	}
 
-	err = i.indexer.IndexBlockData(ctx, entry.ExecutionData)
+	err = i.indexer.IndexBlockData(entry.ExecutionData)
 	if err != nil {
 		i.log.Error().Err(err).Str("job_id", string(job.ID())).Msg("error during execution data index processing job")
 		ctx.Throw(err)
