@@ -22,9 +22,11 @@ import (
 
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/flex"
+	"github.com/onflow/flow-go/fvm/flex/models"
 	flexStdlib "github.com/onflow/flow-go/fvm/flex/stdlib"
 	"github.com/onflow/flow-go/fvm/flex/stdlib/emulator"
 	"github.com/onflow/flow-go/fvm/flex/storage"
+	"github.com/onflow/flow-go/fvm/flex/utils"
 	"github.com/onflow/flow-go/fvm/storage/testutils"
 )
 
@@ -65,8 +67,8 @@ func TestFlexAddressConstructionAndReturn(t *testing.T) {
 
 	t.Parallel()
 
-	RunWithTempLedger(t, func(led atree.Ledger) {
-		handler := flex.NewFlexContractHandler(led)
+	utils.RunWithTestBackend(t, func(backend models.Backend) {
+		handler := flex.NewFlexContractHandler(backend)
 
 		env := runtime.NewBaseInterpreterEnvironment(runtime.Config{})
 
@@ -83,7 +85,7 @@ func TestFlexAddressConstructionAndReturn(t *testing.T) {
 		`)
 
 		runtimeInterface := &testRuntimeInterface{
-			storage: led,
+			storage: backend,
 			decodeArgument: func(b []byte, t cadence.Type) (cadence.Value, error) {
 				return json.Decode(nil, b)
 			},
@@ -133,8 +135,8 @@ func TestFlexRun(t *testing.T) {
 
 	t.Parallel()
 
-	RunWithTempLedger(t, func(led atree.Ledger) {
-		handler := flex.NewFlexContractHandler(led)
+	utils.RunWithTestBackend(t, func(backend models.Backend) {
+		handler := flex.NewFlexContractHandler(backend)
 
 		env := runtime.NewBaseInterpreterEnvironment(runtime.Config{})
 
@@ -173,7 +175,7 @@ func TestFlexRun(t *testing.T) {
 		}).WithType(flexAddressBytesCadenceType)
 
 		runtimeInterface := &testRuntimeInterface{
-			storage: led,
+			storage: backend,
 			decodeArgument: func(b []byte, t cadence.Type) (cadence.Value, error) {
 				return json.Decode(nil, b)
 			},

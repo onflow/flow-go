@@ -29,18 +29,26 @@ import (
 )
 
 type testFlexContractHandler struct {
-	newFlowOwnedAccount func() models.FlowOwnedAccount
-	lastExecutedBlock   func() *models.FlexBlock
-	run                 func(tx []byte, coinbase *models.FlexAddress) bool
+	allocateAddress   func() models.FlexAddress
+	accountByAddress  func(models.FlexAddress, bool) models.FlexAccount
+	lastExecutedBlock func() *models.FlexBlock
+	run               func(tx []byte, coinbase models.FlexAddress) bool
 }
 
 var _ models.FlexContractHandler = testFlexContractHandler{}
 
-func (t testFlexContractHandler) NewFlowOwnedAccount() models.FlowOwnedAccount {
-	if t.newFlowOwnedAccount == nil {
-		panic("unexpected NewFlowOwnedAccount")
+func (t testFlexContractHandler) AllocateAddress() models.FlexAddress {
+	if t.allocateAddress == nil {
+		panic("unexpected AllocateAddress")
 	}
-	return t.newFlowOwnedAccount()
+	return t.allocateAddress()
+}
+
+func (t testFlexContractHandler) AccountByAddress(addr models.FlexAddress, isFOA bool) models.FlexAccount {
+	if t.accountByAddress == nil {
+		panic("unexpected AccountByAddress")
+	}
+	return t.accountByAddress(addr, isFOA)
 }
 
 func (t testFlexContractHandler) LastExecutedBlock() *models.FlexBlock {
@@ -50,7 +58,7 @@ func (t testFlexContractHandler) LastExecutedBlock() *models.FlexBlock {
 	return t.lastExecutedBlock()
 }
 
-func (t testFlexContractHandler) Run(tx []byte, coinbase *models.FlexAddress) bool {
+func (t testFlexContractHandler) Run(tx []byte, coinbase models.FlexAddress) bool {
 	if t.run == nil {
 		panic("unexpected Run")
 	}
@@ -164,7 +172,7 @@ func TestFlexRun(t *testing.T) {
 	runCalled := false
 
 	handler := testFlexContractHandler{
-		run: func(tx []byte, coinbase *models.FlexAddress) bool {
+		run: func(tx []byte, coinbase models.FlexAddress) bool {
 			runCalled = true
 
 			assert.Equal(t, []byte{1, 2, 3}, tx)
@@ -172,7 +180,7 @@ func TestFlexRun(t *testing.T) {
 				models.FlexAddress{
 					1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 6, 7, 7, 8, 8, 9, 9, 10, 10,
 				},
-				*coinbase,
+				coinbase,
 			)
 
 			return true

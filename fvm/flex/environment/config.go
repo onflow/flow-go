@@ -1,7 +1,6 @@
 package env
 
 import (
-	"errors"
 	"math"
 	"math/big"
 
@@ -20,11 +19,6 @@ var (
 	TransferGasUsage       = uint64(21_000)
 	DefaultGasPrice        = big.NewInt(1)
 	BlockNumberForEVMRules = big.NewInt(18138954) // a recent block to be used as a refrence for the EVM setup
-
-	// ErrFlexEnvReuse is returned when a flex environment is used more than once
-	ErrFlexEnvReuse        = errors.New("flex env has been used")
-	ErrInsufficientBalance = errors.New("insufficient balance")
-	ErrGasLimit            = errors.New("gas limit hit")
 )
 
 // Config sets the required parameters

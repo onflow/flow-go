@@ -11,28 +11,25 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/params"
-	"github.com/onflow/atree"
-	"github.com/stretchr/testify/require"
-
 	"github.com/onflow/flow-go/fvm/flex"
 	env "github.com/onflow/flow-go/fvm/flex/environment"
 	"github.com/onflow/flow-go/fvm/flex/models"
 	"github.com/onflow/flow-go/fvm/flex/utils"
+	"github.com/stretchr/testify/require"
 )
 
 func TestFlexContractHandler(t *testing.T) {
 	t.Parallel()
 	t.Run("test last executed block call", func(t *testing.T) {
-		RunWithTempLedger(t, func(led atree.Ledger) {
-			handler := flex.NewFlexContractHandler(led)
+		utils.RunWithTestBackend(t, func(backend models.Backend) {
+			handler := flex.NewFlexContractHandler(backend)
 			// test call last executed block without initialization
 			b := handler.LastExecutedBlock()
-			require.NotNil(t, b)
 			require.Equal(t, models.GenesisFlexBlock, b)
 
-			// some opeartion
-			foa := handler.NewFlowOwnedAccount()
-			require.NotNil(t, foa)
+			// do some changes
+			addr := handler.AllocateAddress()
+			require.NotNil(t, addr)
 
 			// check if uuid index and block height has been incremented
 			b = handler.LastExecutedBlock()
@@ -42,34 +39,35 @@ func TestFlexContractHandler(t *testing.T) {
 	})
 
 	t.Run("test foa creation", func(t *testing.T) {
-		RunWithTempLedger(t, func(led atree.Ledger) {
-			handler := flex.NewFlexContractHandler(led)
-			foa := handler.NewFlowOwnedAccount()
+		utils.RunWithTestBackend(t, func(backend models.Backend) {
+			handler := flex.NewFlexContractHandler(backend)
+			foa := handler.AllocateAddress()
 			require.NotNil(t, foa)
 
 			expectedAddress := models.NewFlexAddress(common.HexToAddress("0x00000000000000000001"))
-			require.Equal(t, expectedAddress, foa.Address())
+			require.Equal(t, expectedAddress, foa)
 		})
 	})
 
 	t.Run("test running transaction", func(t *testing.T) {
-		RunWithTempLedger(t, func(led atree.Ledger) {
-			handler := flex.NewFlexContractHandler(led)
+		utils.RunWithTestBackend(t, func(backend models.Backend) {
+			handler := flex.NewFlexContractHandler(backend)
 			keyHex := "9c647b8b7c4e7c3490668fb6c11473619db80c93704c70893d3813af4090c39c"
 			key, _ := crypto.HexToECDSA(keyHex)
 			address := crypto.PubkeyToAddress(key.PublicKey) // 658bdf435d810c91414ec09147daa6db62406379
 
 			// deposit 1 Flow to the foa account
-			foa := handler.NewFlowOwnedAccount()
+			addr := handler.AllocateAddress()
 			orgBalance, err := models.NewBalanceFromAttoFlow(big.NewInt(1e18))
 			require.NoError(t, err)
 			vault := models.NewFlowTokenVault(orgBalance)
+			foa := handler.AccountByAddress(addr, true)
 			foa.Deposit(vault)
 
 			// transfer 0.1 flow to the non-foa address
 			deduction, err := models.NewBalanceFromAttoFlow(big.NewInt(1e17))
 			require.NoError(t, err)
-			foa.Call(models.NewFlexAddress(address), nil, 400000, deduction)
+			foa.Call(models.FlexAddress(address), nil, 400000, deduction)
 			require.Equal(t, orgBalance.Sub(deduction), foa.Balance())
 
 			// transfer 0.01 flow back to the foa through
@@ -91,16 +89,17 @@ func TestFlexContractHandler(t *testing.T) {
 			tx.EncodeRLP(writer)
 
 			// setup coinbase
-			foa2 := handler.NewFlowOwnedAccount()
-			require.Equal(t, models.Balance(0), foa2.Balance())
+			foa2 := handler.AllocateAddress()
+			account2 := handler.AccountByAddress(foa2, true)
+			require.Equal(t, models.Balance(0), account2.Balance())
 
-			success := handler.Run(b.Bytes(), foa2.Address())
+			success := handler.Run(b.Bytes(), account2.Address())
 			require.True(t, success)
 
 			require.Equal(t, orgBalance.Sub(deduction).Add(addition), foa.Balance())
 
 			// fees has been collected to the coinbase
-			require.NotEqual(t, models.Balance(0), foa2.Balance())
+			require.NotEqual(t, models.Balance(0), account2.Balance())
 
 		})
 	})
@@ -108,9 +107,9 @@ func TestFlexContractHandler(t *testing.T) {
 
 func TestFOA(t *testing.T) {
 	t.Run("test deposit/withdraw", func(t *testing.T) {
-		RunWithTempLedger(t, func(led atree.Ledger) {
-			handler := flex.NewFlexContractHandler(led)
-			foa := handler.NewFlowOwnedAccount()
+		utils.RunWithTestBackend(t, func(backend models.Backend) {
+			handler := flex.NewFlexContractHandler(backend)
+			foa := handler.AccountByAddress(handler.AllocateAddress(), true)
 			require.NotNil(t, foa)
 
 			zeroBalance, err := models.NewBalanceFromAttoFlow(big.NewInt(0))
@@ -136,9 +135,9 @@ func TestFOA(t *testing.T) {
 	})
 
 	t.Run("test deploy/call", func(t *testing.T) {
-		RunWithTempLedger(t, func(led atree.Ledger) {
-			handler := flex.NewFlexContractHandler(led)
-			foa := handler.NewFlowOwnedAccount()
+		utils.RunWithTestBackend(t, func(backend models.Backend) {
+			handler := flex.NewFlexContractHandler(backend)
+			foa := handler.AccountByAddress(handler.AllocateAddress(), true)
 			require.NotNil(t, foa)
 
 			// deposit 100 flow

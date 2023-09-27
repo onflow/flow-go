@@ -73,7 +73,7 @@ func NewEnvironment(
 
 func (fe *Environment) checkExecuteOnce() error {
 	if fe.Used {
-		return ErrFlexEnvReuse
+		return models.ErrFlexEnvReuse
 	}
 	fe.Used = true
 	return nil
@@ -92,7 +92,7 @@ func (fe *Environment) commit() error {
 	// commits the changes from the journal into the in memory trie.
 	newRoot, err := fe.State.Commit(true)
 	if err != nil {
-		return err
+		return models.NewFatalError(err)
 	}
 
 	// flush the trie to the lower level db
@@ -103,7 +103,7 @@ func (fe *Environment) commit() error {
 	// have to explicitly ask the trie to commit to the underlying storage
 	err = fe.State.Database().TrieDB().Commit(newRoot, false)
 	if err != nil {
-		return err
+		return models.NewFatalError(err)
 	}
 
 	newBlock := models.NewFlexBlock(
@@ -116,7 +116,7 @@ func (fe *Environment) commit() error {
 
 	err = fe.Database.SetLatestBlock(newBlock)
 	if err != nil {
-		return err
+		return models.NewFatalError(err)
 	}
 
 	// TODO: emit event on root changes
@@ -126,29 +126,23 @@ func (fe *Environment) commit() error {
 
 // TODO: properly use an address generator (zeros + random section) and verify collision
 // TODO: does this leads to trie depth issue?
-func (fe *Environment) AllocateAddressAndMintTo(balance *big.Int) (*models.FlexAddress, error) {
+func (fe *Environment) AllocateAddress() (models.FlexAddress, error) {
 	if err := fe.checkExecuteOnce(); err != nil {
-		return nil, err
+		return models.FlexAddress{}, err
 	}
-
-	target := fe.allocateAddress()
-	fe.mintTo(balance, target.ToCommon())
-
-	// TODO: emit an event
-
-	return target, fe.commit()
+	return fe.allocateAddress(), fe.commit()
 }
 
 // Balance returns the balance of an address
 // TODO: do it as a ReadOnly env view.
-func (fe *Environment) Balance(target *models.FlexAddress) (*big.Int, error) {
+func (fe *Environment) Balance(target models.FlexAddress) (*big.Int, error) {
 	if err := fe.checkExecuteOnce(); err != nil {
 		return nil, err
 	}
 	return fe.State.GetBalance(target.ToCommon()), nil
 }
 
-func (fe *Environment) allocateAddress() *models.FlexAddress {
+func (fe *Environment) allocateAddress() models.FlexAddress {
 	target := models.FlexAddress{}
 	// first 12 bytes would be zero
 	// the next 8 bytes would be incremented of uuid
@@ -159,7 +153,7 @@ func (fe *Environment) allocateAddress() *models.FlexAddress {
 	// if fe.State.Exist(target.ToCommon()) {
 	// }
 
-	return &target
+	return target
 }
 
 // MintTo mints tokens into the target address, if the address dees not
@@ -339,6 +333,7 @@ func (fe *Environment) run(msg *core.Message) error {
 
 	fe.Result.RetValue = execResult.ReturnData
 	fe.Result.GasConsumed = execResult.UsedGas
+	fe.Result.Error = execResult.Err
 	fe.Result.Failed = execResult.Failed()
 	fe.Result.Logs = fe.State.Logs()
 
