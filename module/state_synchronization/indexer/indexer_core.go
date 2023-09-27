@@ -45,7 +45,6 @@ func New(
 // Even if the register wasn't indexed at the provided height, returns the highest height the register was indexed at.
 // Expected errors:
 // - storage.ErrNotFound if the register by the ID was never indexed
-// - ErrIndexBoundary if the height is out of indexed height boundary
 func (i *IndexerCore) RegisterValues(IDs flow.RegisterIDs, height uint64) ([]flow.RegisterValue, error) {
 	values := make([]flow.RegisterValue, len(IDs))
 
