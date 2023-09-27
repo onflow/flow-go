@@ -7,6 +7,7 @@ import (
 
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data/cache"
 	"github.com/onflow/flow-go/module/irrecoverable"
@@ -28,7 +29,7 @@ const (
 // The execution state worker has a callback that is used by the upstream queues which download new execution data to
 // notify new data is available and kick off indexing.
 type Indexer struct {
-	component       *jobqueue.ComponentConsumer
+	component.Component
 	log             zerolog.Logger
 	exeDataReader   *jobs.ExecutionDataReader
 	exeDataNotifier engine.Notifier
@@ -54,7 +55,7 @@ func NewIndexer(
 
 	// create a jobqueue that will process new available block execution data. The `exeDataNotifier` is used to
 	// signal new work, which is being triggered on the `OnExecutionData` handler.
-	r.component = jobqueue.NewComponentConsumer(
+	r.Component = jobqueue.NewComponentConsumer(
 		log.With().Str("module", "execution_indexer").Logger(),
 		r.exeDataNotifier.Channel(),
 		processedHeight,
@@ -71,7 +72,7 @@ func NewIndexer(
 // Start the worker jobqueue to consume the available data.
 func (i *Indexer) Start(ctx irrecoverable.SignalerContext) {
 	i.exeDataReader.AddContext(ctx)
-	i.component.Start(ctx)
+	i.Component.Start(ctx)
 }
 
 // OnExecutionData is used to notify when new execution data is downloaded by the execution data requester jobqueue.
