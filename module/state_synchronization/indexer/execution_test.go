@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"math/rand"
+	"os"
 	"testing"
 
 	"github.com/cockroachdb/pebble"
@@ -125,7 +126,7 @@ func (i *indexTest) setGetRegisters(f func(t *testing.T, ID flow.RegisterID, hei
 }
 
 func (i *indexTest) initIndexer() *indexTest {
-	indexer, err := New(zerolog.Nop(), i.registers, i.headers, nil)
+	indexer, err := New(zerolog.New(os.Stdout), i.registers, i.headers, nil)
 	require.NoError(i.t, err)
 	i.indexer = indexer
 	return i
