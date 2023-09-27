@@ -48,7 +48,8 @@ func (err EVMExecutionError) Error() string {
 
 var (
 	// ErrFlexEnvReuse is returned when a flex environment is used more than once
-	ErrFlexEnvReuse        = errors.New("flex env has been used")
-	ErrInsufficientBalance = errors.New("insufficient balance")
-	ErrGasLimit            = errors.New("gas limit hit")
+	ErrFlexEnvReuse           = errors.New("flex env has been used")
+	ErrInsufficientBalance    = errors.New("insufficient balance")
+	ErrGasLimit               = errors.New("gas limit hit")
+	ErrUnAuthroizedMethodCall = errors.New("unauthroized method call")
 )

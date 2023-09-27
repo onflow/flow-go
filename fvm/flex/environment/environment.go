@@ -126,15 +126,11 @@ func (fe *Environment) commit() error {
 
 // TODO: properly use an address generator (zeros + random section) and verify collision
 // TODO: does this leads to trie depth issue?
-func (fe *Environment) AllocateAddressAndMintTo(balance *big.Int) (models.FlexAddress, error) {
+func (fe *Environment) AllocateAddress() (models.FlexAddress, error) {
 	if err := fe.checkExecuteOnce(); err != nil {
 		return models.FlexAddress{}, err
 	}
-
-	target := fe.allocateAddress()
-	fe.mintTo(balance, target.ToCommon())
-
-	return target, fe.commit()
+	return fe.allocateAddress(), fe.commit()
 }
 
 // Balance returns the balance of an address

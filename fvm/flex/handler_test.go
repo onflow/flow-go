@@ -28,8 +28,8 @@ func TestFlexContractHandler(t *testing.T) {
 			require.Equal(t, models.GenesisFlexBlock, b)
 
 			// do some changes
-			foa := handler.NewFlowOwnedAccount()
-			require.NotNil(t, foa)
+			addr := handler.AllocateAddress()
+			require.NotNil(t, addr)
 
 			// check if uuid index and block height has been incremented
 			b = handler.LastExecutedBlock()
@@ -41,11 +41,11 @@ func TestFlexContractHandler(t *testing.T) {
 	t.Run("test foa creation", func(t *testing.T) {
 		utils.RunWithTestBackend(t, func(backend models.Backend) {
 			handler := flex.NewFlexContractHandler(backend)
-			foa := handler.NewFlowOwnedAccount()
+			foa := handler.AllocateAddress()
 			require.NotNil(t, foa)
 
 			expectedAddress := models.NewFlexAddress(common.HexToAddress("0x00000000000000000001"))
-			require.Equal(t, expectedAddress, foa.Address())
+			require.Equal(t, expectedAddress, foa)
 		})
 	})
 
@@ -57,10 +57,11 @@ func TestFlexContractHandler(t *testing.T) {
 			address := crypto.PubkeyToAddress(key.PublicKey) // 658bdf435d810c91414ec09147daa6db62406379
 
 			// deposit 1 Flow to the foa account
-			foa := handler.NewFlowOwnedAccount()
+			addr := handler.AllocateAddress()
 			orgBalance, err := models.NewBalanceFromAttoFlow(big.NewInt(1e18))
 			require.NoError(t, err)
 			vault := models.NewFlowTokenVault(orgBalance)
+			foa := handler.AccountByAddress(addr, true)
 			foa.Deposit(vault)
 
 			// transfer 0.1 flow to the non-foa address
@@ -88,16 +89,17 @@ func TestFlexContractHandler(t *testing.T) {
 			tx.EncodeRLP(writer)
 
 			// setup coinbase
-			foa2 := handler.NewFlowOwnedAccount()
-			require.Equal(t, models.Balance(0), foa2.Balance())
+			foa2 := handler.AllocateAddress()
+			account2 := handler.AccountByAddress(foa2, true)
+			require.Equal(t, models.Balance(0), account2.Balance())
 
-			success := handler.Run(b.Bytes(), foa2.Address())
+			success := handler.Run(b.Bytes(), account2.Address())
 			require.True(t, success)
 
 			require.Equal(t, orgBalance.Sub(deduction).Add(addition), foa.Balance())
 
 			// fees has been collected to the coinbase
-			require.NotEqual(t, models.Balance(0), foa2.Balance())
+			require.NotEqual(t, models.Balance(0), account2.Balance())
 
 		})
 	})
@@ -107,7 +109,7 @@ func TestFOA(t *testing.T) {
 	t.Run("test deposit/withdraw", func(t *testing.T) {
 		utils.RunWithTestBackend(t, func(backend models.Backend) {
 			handler := flex.NewFlexContractHandler(backend)
-			foa := handler.NewFlowOwnedAccount()
+			foa := handler.AccountByAddress(handler.AllocateAddress(), true)
 			require.NotNil(t, foa)
 
 			zeroBalance, err := models.NewBalanceFromAttoFlow(big.NewInt(0))
@@ -135,7 +137,7 @@ func TestFOA(t *testing.T) {
 	t.Run("test deploy/call", func(t *testing.T) {
 		utils.RunWithTestBackend(t, func(backend models.Backend) {
 			handler := flex.NewFlexContractHandler(backend)
-			foa := handler.NewFlowOwnedAccount()
+			foa := handler.AccountByAddress(handler.AllocateAddress(), true)
 			require.NotNil(t, foa)
 
 			// deposit 100 flow

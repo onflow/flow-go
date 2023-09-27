@@ -1,8 +1,6 @@
 package flex
 
 import (
-	"math/big"
-
 	env "github.com/onflow/flow-go/fvm/flex/environment"
 	"github.com/onflow/flow-go/fvm/flex/models"
 	"github.com/onflow/flow-go/fvm/flex/storage"
@@ -22,24 +20,23 @@ func NewFlexContractHandler(backend models.Backend) *FlexContractHandler {
 	}
 }
 
-func (h FlexContractHandler) NewFlowOwnedAccount() models.FlowOwnedAccount {
+func (h FlexContractHandler) AllocateAddress() models.FlexAddress {
 	config := env.NewFlexConfig(
 		env.WithBlockNumber(env.BlockNumberForEVMRules))
 	env, err := env.NewEnvironment(config, h.db)
 	if err != nil {
 		panic(err)
 	}
-	// TODO support passing values to be minted
-	addr, err := env.AllocateAddressAndMintTo(big.NewInt(0))
+	addr, err := env.AllocateAddress()
 	if err != nil {
 		panic(err)
 	}
 
-	return newFOA(h, addr)
+	return addr
 }
 
-func (h FlexContractHandler) FlowOwnedAccountByAddress(addr models.FlexAddress) models.FlowOwnedAccount {
-	return newFOA(h, addr)
+func (h FlexContractHandler) AccountByAddress(addr models.FlexAddress, isFOA bool) models.FlexAccount {
+	return newFlexAccount(h, addr, isFOA)
 }
 
 func (h FlexContractHandler) LastExecutedBlock() *models.FlexBlock {
@@ -84,27 +81,28 @@ func (h FlexContractHandler) handleError(err error) {
 	}
 }
 
-type foa struct {
-	fch     FlexContractHandler
+type flexAccount struct {
+	isFOA   bool
 	address models.FlexAddress
+	fch     FlexContractHandler
 }
 
-var _ models.FlowOwnedAccount = &foa{}
-
-func newFOA(fch FlexContractHandler, addr models.FlexAddress) *foa {
-	return &foa{
+// newFlexAccount creates a new flex account
+func newFlexAccount(fch FlexContractHandler, addr models.FlexAddress, isFOA bool) *flexAccount {
+	return &flexAccount{
+		isFOA:   isFOA,
 		fch:     fch,
 		address: addr,
 	}
 }
 
 // Address returns the flex address associated with the FOA account
-func (f *foa) Address() models.FlexAddress {
+func (f *flexAccount) Address() models.FlexAddress {
 	return f.address
 }
 
 // Balance returns the balance of this foa
-func (f *foa) Balance() models.Balance {
+func (f *flexAccount) Balance() models.Balance {
 	env := f.fch.getNewDefaultEnv()
 	bl, err := env.Balance(f.address)
 	if err != nil {
@@ -119,7 +117,7 @@ func (f *foa) Balance() models.Balance {
 
 // Deposit deposits the token from the given vault into the Flex main vault
 // and update the FOA balance with the new amount
-func (f *foa) Deposit(v *models.FLOWTokenVault) {
+func (f *flexAccount) Deposit(v *models.FLOWTokenVault) {
 	env := f.fch.getNewDefaultEnv()
 	err := env.MintTo(v.Balance().ToAttoFlow(), f.address.ToCommon())
 	f.fch.handleError(err)
@@ -130,7 +128,10 @@ func (f *foa) Deposit(v *models.FLOWTokenVault) {
 
 // Withdraw deducts the balance from the FOA account and
 // withdraw and return flow token from the Flex main vault.
-func (f *foa) Withdraw(b models.Balance) *models.FLOWTokenVault {
+func (f *flexAccount) Withdraw(b models.Balance) *models.FLOWTokenVault {
+	if !f.isFOA {
+		panic(models.ErrUnAuthroizedMethodCall)
+	}
 	env := f.fch.getNewDefaultEnv()
 	err := env.WithdrawFrom(b.ToAttoFlow(), f.address.ToCommon())
 	f.fch.handleError(err)
@@ -140,7 +141,10 @@ func (f *foa) Withdraw(b models.Balance) *models.FLOWTokenVault {
 // Deploy deploys a contract to the Flex environment
 // the new deployed contract would be at the returned address and
 // the contract data is not controlled by the FOA accounts
-func (f *foa) Deploy(code models.Code, gaslimit models.GasLimit, balance models.Balance) models.FlexAddress {
+func (f *flexAccount) Deploy(code models.Code, gaslimit models.GasLimit, balance models.Balance) models.FlexAddress {
+	if !f.isFOA {
+		panic(models.ErrUnAuthroizedMethodCall)
+	}
 	env := f.fch.getNewDefaultEnv()
 	// TODO check gas limit against what has been left on the transaction side
 	err := env.Deploy(f.address.ToCommon(), code, uint64(gaslimit), balance.ToAttoFlow())
@@ -156,7 +160,10 @@ func (f *foa) Deploy(code models.Code, gaslimit models.GasLimit, balance models.
 // given it doesn't goes beyond what Flow transaction allows.
 // the balance would be deducted from the OFA account and would be transferred to the target address
 // contract data is not controlled by the FOA accounts
-func (f *foa) Call(to models.FlexAddress, data models.Data, gaslimit models.GasLimit, balance models.Balance) models.Data {
+func (f *flexAccount) Call(to models.FlexAddress, data models.Data, gaslimit models.GasLimit, balance models.Balance) models.Data {
+	if !f.isFOA {
+		panic(models.ErrUnAuthroizedMethodCall)
+	}
 	env := f.fch.getNewDefaultEnv()
 	// TODO check the gas on the backend
 	// TODO check gas limit against what has been left on the transaction side

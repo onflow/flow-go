@@ -29,26 +29,26 @@ import (
 )
 
 type testFlexContractHandler struct {
-	newFlowOwnedAccount       func() models.FlowOwnedAccount
-	flowOwnedAccountByAddress func(models.FlexAddress) models.FlowOwnedAccount
-	lastExecutedBlock         func() *models.FlexBlock
-	run                       func(tx []byte, coinbase models.FlexAddress) bool
+	allocateAddress   func() models.FlexAddress
+	accountByAddress  func(models.FlexAddress, bool) models.FlexAccount
+	lastExecutedBlock func() *models.FlexBlock
+	run               func(tx []byte, coinbase models.FlexAddress) bool
 }
 
 var _ models.FlexContractHandler = testFlexContractHandler{}
 
-func (t testFlexContractHandler) NewFlowOwnedAccount() models.FlowOwnedAccount {
-	if t.newFlowOwnedAccount == nil {
-		panic("unexpected NewFlowOwnedAccount")
+func (t testFlexContractHandler) AllocateAddress() models.FlexAddress {
+	if t.allocateAddress == nil {
+		panic("unexpected AllocateAddress")
 	}
-	return t.newFlowOwnedAccount()
+	return t.allocateAddress()
 }
 
-func (t testFlexContractHandler) FlowOwnedAccountByAddress(addr models.FlexAddress) models.FlowOwnedAccount {
-	if t.flowOwnedAccountByAddress == nil {
-		panic("unexpected FlowOwnedAccountByAddress")
+func (t testFlexContractHandler) AccountByAddress(addr models.FlexAddress, isFOA bool) models.FlexAccount {
+	if t.accountByAddress == nil {
+		panic("unexpected AccountByAddress")
 	}
-	return t.flowOwnedAccountByAddress(addr)
+	return t.accountByAddress(addr, isFOA)
 }
 
 func (t testFlexContractHandler) LastExecutedBlock() *models.FlexBlock {

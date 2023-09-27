@@ -22,11 +22,12 @@ import (
 
 // FlexContractHandler handles operations on the Flex environment
 type FlexContractHandler interface {
-	// NewFlowOwnedAccount constructs a new FOA
-	NewFlowOwnedAccount() FlowOwnedAccount
+	// AllocateAddress allocates an address to be used by a foa resource
+	AllocateAddress() FlexAddress
 
-	// FlowOwnedAccountByAddress returns the FlowOwnedAccount by address
-	FlowOwnedAccountByAddress(FlexAddress) FlowOwnedAccount
+	// AccountByAddress returns the FlexAccount by address
+	// if isFOA is set, it allows for functionality like `call`, `deploy`
+	AccountByAddress(addr FlexAddress, isFOA bool) FlexAccount
 
 	// LastExecutedBlock returns information about the last executed block
 	LastExecutedBlock() *FlexBlock
