@@ -85,7 +85,7 @@ func (m *Manager) GetConnection(grpcAddress string, timeout time.Duration, clien
 		if err != nil {
 			return nil, nil, err
 		}
-		return conn, &noopCloser{}, err
+		return conn, &noopCloser{}, nil
 	}
 
 	conn, err := m.createConnection(grpcAddress, timeout, nil, clientType)
@@ -103,21 +103,20 @@ func (m *Manager) Remove(grpcAddress string) bool {
 		return false
 	}
 
-	res, ok := m.cache.Get(grpcAddress)
+	client, ok := m.cache.Get(grpcAddress)
 	if !ok {
 		return false
 	}
 
+	// First, remove the client from the cache to ensure other callers create a new entry
+	// Remove is done atomically, so only the first caller will succeed
 	if !m.cache.Remove(grpcAddress) {
 		return false
 	}
 
-	// Obtain the lock here to ensure that ClientConn was initialized, avoiding a situation with a nil ClientConn.
-	res.mu.Lock()
-	defer res.mu.Unlock()
+	// Close the connection asynchronously to avoid blocking requests
+	go client.Close()
 
-	// Close the connection only if it is successfully removed from the cache
-	res.Close()
 	return true
 }
 
