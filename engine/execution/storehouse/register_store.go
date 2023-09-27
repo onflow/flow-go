@@ -13,14 +13,14 @@ import (
 
 type RegisterStore struct {
 	memStore  *InMemoryRegisterStore
-	diskStore storage.RegisterIndex
+	diskStore execution.OnDiskRegisterStore
 	wal       execution.ExecutedFinalizedWAL
 	finalized execution.FinalizedReader
 	log       zerolog.Logger
 }
 
 func NewRegisterStore(
-	diskStore storage.RegisterIndex,
+	diskStore execution.OnDiskRegisterStore,
 	wal execution.ExecutedFinalizedWAL,
 	finalized execution.FinalizedReader,
 	log zerolog.Logger,
@@ -155,7 +155,7 @@ func (r *RegisterStore) isBlockFinalized(height uint64, blockID flow.Identifier)
 // syncDiskStore replay WAL to disk store
 func syncDiskStore(
 	wal execution.ExecutedFinalizedWAL,
-	diskStore storage.RegisterIndex,
+	diskStore execution.OnDiskRegisterStore,
 	log zerolog.Logger,
 ) (uint64, error) {
 	// TODO: replace diskStore.Latest with wal.Latest
