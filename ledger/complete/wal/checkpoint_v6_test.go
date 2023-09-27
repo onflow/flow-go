@@ -262,7 +262,7 @@ func TestWriteAndReadCheckpointV6EmptyTrie(t *testing.T) {
 		tries := []*trie.MTrie{trie.NewEmptyMTrie()}
 		fileName := "checkpoint-empty-trie"
 		logger := unittest.Logger()
-		require.NoErrorf(t, StoreCheckpointV6Concurrently(tries, dir, fileName, &logger), "fail to store checkpoint")
+		require.NoErrorf(t, StoreCheckpointV6Concurrently(tries, dir, fileName, logger), "fail to store checkpoint")
 		decoded, err := OpenAndReadCheckpointV6(dir, fileName, logger)
 		require.NoErrorf(t, err, "fail to read checkpoint %v/%v", dir, fileName)
 		requireTriesEqual(t, tries, decoded)
@@ -274,7 +274,7 @@ func TestWriteAndReadCheckpointV6SimpleTrie(t *testing.T) {
 		tries := createSimpleTrie(t)
 		fileName := "checkpoint"
 		logger := unittest.Logger()
-		require.NoErrorf(t, StoreCheckpointV6Concurrently(tries, dir, fileName, &logger), "fail to store checkpoint")
+		require.NoErrorf(t, StoreCheckpointV6Concurrently(tries, dir, fileName, logger), "fail to store checkpoint")
 		decoded, err := OpenAndReadCheckpointV6(dir, fileName, logger)
 		require.NoErrorf(t, err, "fail to read checkpoint %v/%v", dir, fileName)
 		requireTriesEqual(t, tries, decoded)
@@ -286,7 +286,7 @@ func TestWriteAndReadCheckpointV6MultipleTries(t *testing.T) {
 		tries := createMultipleRandomTries(t)
 		fileName := "checkpoint-multi-file"
 		logger := unittest.Logger()
-		require.NoErrorf(t, StoreCheckpointV6Concurrently(tries, dir, fileName, &logger), "fail to store checkpoint")
+		require.NoErrorf(t, StoreCheckpointV6Concurrently(tries, dir, fileName, logger), "fail to store checkpoint")
 		decoded, err := OpenAndReadCheckpointV6(dir, fileName, logger)
 		require.NoErrorf(t, err, "fail to read checkpoint %v/%v", dir, fileName)
 		requireTriesEqual(t, tries, decoded)
@@ -447,7 +447,7 @@ func TestWriteAndReadCheckpointV6ThenBackToV5(t *testing.T) {
 		logger := unittest.Logger()
 
 		// store tries into v6 then read back, then store into v5
-		require.NoErrorf(t, StoreCheckpointV6Concurrently(tries, dir, "checkpoint-v6", &logger), "fail to store checkpoint")
+		require.NoErrorf(t, StoreCheckpointV6Concurrently(tries, dir, "checkpoint-v6", logger), "fail to store checkpoint")
 		decoded, err := OpenAndReadCheckpointV6(dir, "checkpoint-v6", logger)
 		require.NoErrorf(t, err, "fail to read checkpoint %v/checkpoint-v6", dir)
 		require.NoErrorf(t, storeCheckpointV5(decoded, dir, "checkpoint-v6-v5", logger), "fail to store checkpoint")
