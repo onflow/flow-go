@@ -26,6 +26,7 @@ var (
 
 var FlexAddress = flow.BytesToAddress([]byte("Flex"))
 var FlexLatextBlockKey = "LatestBlock"
+var FlexRootSlabKey = "RootSlabKey"
 
 // Database is an ephemeral key-value store. Apart from basic data storage
 // functionality it also supports batch writes and iterating over the keyspace in
@@ -46,10 +47,37 @@ func NewDatabase(led atree.Ledger) *Database {
 
 	storage := NewPersistentSlabStorage(baseStorage)
 
-	m, err := atree.NewMap(storage, atree.Address(FlexAddress), atree.NewDefaultDigesterBuilder(), typeInfo{})
-	// TODO do not panic
+	// TODO if map already exists load it
+	rootIDBytes, err := led.GetValue(FlexAddress.Bytes(), []byte(FlexRootSlabKey))
 	if err != nil {
 		panic(err)
+	}
+
+	var m *atree.OrderedMap
+	if len(rootIDBytes) == 0 {
+		m, err = atree.NewMap(storage, atree.Address(FlexAddress), atree.NewDefaultDigesterBuilder(), typeInfo{})
+		if err != nil {
+			panic(err)
+		}
+
+		// TODO: read size from atree package
+		rootIDBytes := make([]byte, 16)
+		_, err = m.StorageID().ToRawBytes(rootIDBytes)
+		if err != nil {
+			panic(err)
+		}
+
+		led.SetValue(FlexAddress.Bytes(), []byte(FlexRootSlabKey), rootIDBytes)
+	} else {
+		storageID, err := atree.NewStorageIDFromRawBytes(rootIDBytes)
+		if err != nil {
+			panic(err)
+		}
+
+		m, err = atree.NewMapWithRootID(storage, storageID, atree.NewDefaultDigesterBuilder())
+		if err != nil {
+			panic(err)
+		}
 	}
 
 	return &Database{
