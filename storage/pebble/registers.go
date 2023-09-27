@@ -24,6 +24,9 @@ var _ storage.RegisterIndex = (*Registers)(nil)
 
 // NewRegisters takes a populated pebble instance with LatestHeight and FirstHeight set.
 // Will fail if they those two keys are unavailable as it implies a corrupted or uninitialized state
+// expected errors:
+// - storage.ErrNotBootstrapped error is returned if the database wasn't bootstrapped which involves populating
+// the database with first and last height as well as registers
 func NewRegisters(db *pebble.DB) (*Registers, error) {
 	registers := &Registers{
 		db: db,
