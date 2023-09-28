@@ -125,8 +125,6 @@ func (fe *Environment) commit() error {
 		return models.NewFatalError(err)
 	}
 
-	fmt.Println("new root", newRoot)
-
 	// TODO: emit event on root changes
 	fe.Result.RootHash = newRoot
 	return nil

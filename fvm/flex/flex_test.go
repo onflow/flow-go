@@ -128,32 +128,30 @@ func TestFlexRun(t *testing.T) {
 
 	utils.RunWithTestBackend(t, func(backend models.Backend) {
 		utils.RunWithDeployedContract(t, backend, func(testContract *utils.TestContract) {
-			handler := flex.NewFlexContractHandler(backend)
-
-			env := runtime.NewBaseInterpreterEnvironment(runtime.Config{})
-
-			flexTypeDefinition := emulator.FlexTypeDefinition
-			env.DeclareValue(flexStdlib.NewFlexStandardLibraryValue(nil, flexTypeDefinition, handler))
-			env.DeclareType(flexStdlib.NewFlexStandardLibraryType(flexTypeDefinition))
-
-			inter := runtime.NewInterpreterRuntime(runtime.Config{})
-
-			script := []byte(`
-				pub fun main(tx: [UInt8], coinbaseBytes: [UInt8; 20]): Bool {
-					let coinbase = Flex.FlexAddress(bytes: coinbaseBytes)
-					return Flex.run(tx: tx, coinbase: coinbase)
-				}
-			`)
-
 			utils.RunWithEOATestAccount(t, backend, func(testAccount *utils.EOATestAccount) {
 				num := int64(12)
+				handler := flex.NewFlexContractHandler(backend)
+				interEnv := runtime.NewBaseInterpreterEnvironment(runtime.Config{})
+
+				flexTypeDefinition := emulator.FlexTypeDefinition
+				interEnv.DeclareValue(flexStdlib.NewFlexStandardLibraryValue(nil, flexTypeDefinition, handler))
+				interEnv.DeclareType(flexStdlib.NewFlexStandardLibraryType(flexTypeDefinition))
+
+				inter := runtime.NewInterpreterRuntime(runtime.Config{})
+
+				script := []byte(`
+					pub fun main(tx: [UInt8], coinbaseBytes: [UInt8; 20]): Bool {
+						let coinbase = Flex.FlexAddress(bytes: coinbaseBytes)
+						return Flex.run(tx: tx, coinbase: coinbase)
+					}
+				`)
 
 				txBytes := testAccount.PrepareSignAndEncodeTx(t,
 					testContract.DeployedAt,
 					testContract.MakeStoreCallData(t, big.NewInt(num)),
 					big.NewInt(0),
 					math.MaxUint64,
-					big.NewInt(0),
+					big.NewInt(1),
 				)
 				tx := cadence.NewArray(
 					utils.ConvertToCadence(txBytes),
@@ -177,14 +175,12 @@ func TestFlexRun(t *testing.T) {
 					},
 					runtime.Context{
 						Interface:   runtimeInterface,
-						Environment: env,
+						Environment: interEnv,
 						Location:    common.ScriptLocation{},
 					},
 				)
 				require.NoError(t, err)
-
-				// TODO: should succeed
-				assert.Equal(t, cadence.Bool(false), result)
+				assert.Equal(t, cadence.Bool(true), result)
 			})
 		})
 	})

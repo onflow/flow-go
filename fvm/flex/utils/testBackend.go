@@ -15,7 +15,7 @@ import (
 )
 
 func RunWithTestBackend(t testing.TB, f func(models.Backend)) {
-	tb := testBackend{
+	tb := &testBackend{
 		testValueStore:   getSimpleValueStore(),
 		testEventEmitter: getSimpleEventEmitter(),
 	}

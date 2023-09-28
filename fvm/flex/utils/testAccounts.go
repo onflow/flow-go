@@ -59,13 +59,14 @@ func (a *EOATestAccount) PrepareAndSignTx(
 	a.lock.Lock()
 	defer a.lock.Unlock()
 
-	tx, err := types.SignTx(types.NewTransaction(
-		a.nonce,
-		to,
-		amount,
-		gasLimit,
-		gasFee,
-		nil),
+	tx, err := types.SignTx(
+		types.NewTransaction(
+			a.nonce,
+			to,
+			amount,
+			gasLimit,
+			gasFee,
+			data),
 		a.signer, a.key)
 	require.NoError(t, err)
 	a.nonce++
@@ -94,11 +95,12 @@ func RunWithEOATestAccount(t *testing.T, backend models.Backend, f func(*EOATest
 	db := storage.NewDatabase(backend)
 	config := env.NewFlexConfig(env.WithBlockNumber(env.BlockNumberForEVMRules))
 
-	env, err := env.NewEnvironment(config, db)
+	e, err := env.NewEnvironment(config, db)
 	require.NoError(t, err)
 
-	err = env.MintTo(new(big.Int).Mul(big.NewInt(1e18), big.NewInt(1000)), account.FlexAddress().ToCommon())
+	err = e.MintTo(new(big.Int).Mul(big.NewInt(1e18), big.NewInt(1000)), account.FlexAddress().ToCommon())
 	require.NoError(t, err)
-	require.False(t, env.Result.Failed)
+	require.False(t, e.Result.Failed)
+
 	f(account)
 }
