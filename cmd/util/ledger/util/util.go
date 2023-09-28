@@ -142,9 +142,8 @@ func (p *PayloadsReadonlyLedger) GetValue(owner, key []byte) (value []byte, err 
 	return v, nil
 }
 
-func (p *PayloadsReadonlyLedger) SetValue(owner, key, value []byte) (err error) {
-
-	panic("not expected to be called")
+func (p *PayloadsReadonlyLedger) SetValue(_, _, _ []byte) (err error) {
+	panic("SetValue not expected to be called")
 }
 
 func (p *PayloadsReadonlyLedger) ValueExists(owner, key []byte) (exists bool, err error) {
@@ -152,9 +151,8 @@ func (p *PayloadsReadonlyLedger) ValueExists(owner, key []byte) (exists bool, er
 	return ok, nil
 }
 
-func (p *PayloadsReadonlyLedger) AllocateStorageIndex(owner []byte) (atree.StorageIndex, error) {
-	//TODO implement me
-	panic("not expected to be called")
+func (p *PayloadsReadonlyLedger) AllocateStorageIndex(_ []byte) (atree.StorageIndex, error) {
+	panic("AllocateStorageIndex not expected to be called")
 }
 
 func NewPayloadsReadonlyLedger(snapshot *PayloadSnapshot) *PayloadsReadonlyLedger {

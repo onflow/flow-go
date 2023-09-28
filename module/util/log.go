@@ -8,6 +8,7 @@ import (
 	"github.com/rs/zerolog"
 )
 
+// LogProgressFunc is a function that can be called to add to the progress
 type LogProgressFunc func(add int)
 
 // LogProgress takes a total and return function such that when called adds the given

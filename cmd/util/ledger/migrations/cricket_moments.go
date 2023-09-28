@@ -46,7 +46,7 @@ func getCricketMomentsShardedCollectionNFTCount(
 
 		count += ownedNFTs.Count()
 	}
-	return 0, nil
+	return count, nil
 }
 
 func getShardedCollectionMap(mr *migratorRuntime, value interpreter.Value) (*interpreter.DictionaryValue, error) {

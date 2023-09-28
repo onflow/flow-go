@@ -15,6 +15,18 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
+// encodedKeyAddressPrefixLength is the length of the address prefix in the encoded key
+// 2 for uint16 of number of key parts
+// 4 for uint32 of the length of the first key part
+// 2 for uint32 of the key part type
+// 8 for the address which is the actual length of the first key part
+const encodedKeyAddressPrefixLength = 2 + 4 + 2 + flow.AddressLength
+
+// minSizeForSplitSortingIntoGoroutines below this size, no need to split
+// the sorting into goroutines
+const minSizeForSplitSortingIntoGoroutines = 100_000
+
+// PayloadAccountGroup is a grouping of payloads by account
 type PayloadAccountGroup struct {
 	Address  common.Address
 	Payloads []*ledger.Payload
@@ -27,23 +39,25 @@ type PayloadAccountGrouping struct {
 	current int
 }
 
+// Next returns the next account group. If there is no more account group, it returns nil.
+// The zero address is used for global Payloads and is not an actual account.
 func (g *PayloadAccountGrouping) Next() (*PayloadAccountGroup, error) {
 	if g.current == len(g.indexes) {
 		// reached the end
 		return nil, nil
 	}
+
 	accountStartIndex := g.indexes[g.current]
 	accountEndIndex := len(g.payloads)
 	if g.current != len(g.indexes)-1 {
 		accountEndIndex = g.indexes[g.current+1]
 	}
+	g.current++
 
 	address, err := payloadToAddress(g.payloads[accountStartIndex])
 	if err != nil {
 		return nil, fmt.Errorf("failed to get address from payload: %w", err)
 	}
-
-	g.current++
 
 	return &PayloadAccountGroup{
 		Address:  address,
@@ -51,11 +65,19 @@ func (g *PayloadAccountGrouping) Next() (*PayloadAccountGroup, error) {
 	}, nil
 }
 
+// Len returns the number of accounts
 func (g *PayloadAccountGrouping) Len() int {
 	return len(g.indexes)
 }
 
-func GroupPayloadsByAccount(log zerolog.Logger, payloads []*ledger.Payload, nWorkers int) *PayloadAccountGrouping {
+// GroupPayloadsByAccount takes a list of payloads and groups them by account.
+// it uses nWorkers to sort the payloads by address and find the start and end indexes of
+// each account.
+func GroupPayloadsByAccount(
+	log zerolog.Logger,
+	payloads []*ledger.Payload,
+	nWorkers int,
+) *PayloadAccountGrouping {
 	if len(payloads) == 0 {
 		return &PayloadAccountGrouping{}
 	}
@@ -100,7 +122,7 @@ func GroupPayloadsByAccount(log zerolog.Logger, payloads []*ledger.Payload, nWor
 // - (address, true, nil) if the payload is for an account, the account address is returned
 // - ("", false, nil) if the payload is not for an account
 // - ("", false, err) if running into any exception
-// The zero address is used for global Payloads and is not an account
+// The zero address is used for global Payloads and is not an actual account
 func payloadToAddress(p *ledger.Payload) (common.Address, error) {
 	k, err := p.Key()
 	if err != nil {
@@ -124,13 +146,6 @@ func payloadToAddress(p *ledger.Payload) (common.Address, error) {
 	return address, nil
 }
 
-// EncodedKeyAddressPrefixLength is the length of the address prefix in the encoded key
-// 2 for uint16 of number of key parts
-// 4 for uint32 of the length of the first key part
-// 2 for uint32 of the key part type
-// 8 for the address which is the actual length of the first key part
-const EncodedKeyAddressPrefixLength = 2 + 4 + 2 + flow.AddressLength
-
 type sortablePayloads []*ledger.Payload
 
 func (s sortablePayloads) Len() int {
@@ -143,8 +158,8 @@ func (s sortablePayloads) Less(i, j int) bool {
 
 func (s sortablePayloads) Compare(i, j int) int {
 	return bytes.Compare(
-		s[i].EncodedKey()[:EncodedKeyAddressPrefixLength],
-		s[j].EncodedKey()[:EncodedKeyAddressPrefixLength],
+		s[i].EncodedKey()[:encodedKeyAddressPrefixLength],
+		s[j].EncodedKey()[:encodedKeyAddressPrefixLength],
 	)
 }
 
@@ -188,12 +203,9 @@ func sortPayloads(i, j int, source, buffer sortablePayloads, goroutineAllowance 
 		return
 	}
 
-	// below this size, no need to split the sorting into goroutines
-	const minSizeForSplit = 100_000
-
 	// if we are out of goroutine allowance, sort with built-in sortß
 	// if the length is less than minSizeForSplit, sort with built-in sort
-	if goroutineAllowance < 2 || j-i < minSizeForSplit {
+	if goroutineAllowance < 2 || j-i < minSizeForSplitSortingIntoGoroutines {
 		sort.Sort(source[i:j])
 		return
 	}
