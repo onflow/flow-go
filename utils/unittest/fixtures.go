@@ -1953,9 +1953,9 @@ func VoteWithBeaconSig() func(*hotstuff.Vote) {
 	}
 }
 
-func WithParticipants(participants flow.IdentityList) func(*flow.EpochSetup) {
+func WithParticipants(participants flow.IdentitySkeletonList) func(*flow.EpochSetup) {
 	return func(setup *flow.EpochSetup) {
-		setup.Participants = participants.Sort(order.Canonical[flow.Identity]).ToSkeleton()
+		setup.Participants = participants.Sort(order.Canonical[flow.IdentitySkeleton])
 		setup.Assignments = ClusterAssignment(1, participants.ToSkeleton())
 	}
 }
