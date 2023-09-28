@@ -6,10 +6,10 @@ import (
 	"path/filepath"
 
 	"github.com/cockroachdb/pebble"
-	"github.com/onflow/flow-go/ledger/common/convert"
 	"github.com/rs/zerolog"
 	"golang.org/x/sync/errgroup"
 
+	"github.com/onflow/flow-go/ledger/common/convert"
 	"github.com/onflow/flow-go/ledger/complete/wal"
 )
 
@@ -39,7 +39,6 @@ func NewRegisterBootstrap(
 		// key detected, attempt to run bootstrap on corrupt or already bootstrapped data
 		return nil, fmt.Errorf("found latest key set on badger instance, cannot bootstrap populated DB")
 	}
-	// populate first height
 	err = db.Set(firstHeightKey(), encodedUint64(rootHeight), nil)
 	if err != nil {
 		return nil, fmt.Errorf("could not index first height key to initialize: %w", err)

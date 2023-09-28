@@ -33,12 +33,13 @@ func TestRegisterBootstrap_NewBootstrap(t *testing.T) {
 		cache := pebble.NewCache(1 << 20)
 		defer cache.Unref()
 		opts := DefaultPebbleOptions(cache, registers.NewMVCCComparer())
-		p, dir := unittest.TempPebbleDBWithOpts(t, opts)
+		p, err := pebble.Open(dir, opts)
+		require.NoError(t, err)
 		// set heights
 		require.NoError(t, p.Set(firstHeightKey(), encodedUint64(rootHeight), nil))
 		require.NoError(t, p.Set(latestHeightKey(), encodedUint64(rootHeight), nil))
 		// errors if FirstHeight or LastHeight are populated
-		_, err := NewRegisterBootstrap(p, dir, rootHeight, log)
+		_, err = NewRegisterBootstrap(p, dir, rootHeight, log)
 		require.ErrorContains(t, err, "cannot bootstrap populated DB")
 	})
 }
