@@ -110,6 +110,9 @@ func (w *indexerTest) run(ctx irrecoverable.SignalerContext, cancel context.Canc
 
 type mockProgress struct {
 	index uint64
+	// signal to mark the progress reached an index set with WaitForIndex
+	doneChan  chan struct{}
+	doneIndex uint64
 }
 
 func (w *mockProgress) ProcessedIndex() (uint64, error) {
@@ -118,12 +121,24 @@ func (w *mockProgress) ProcessedIndex() (uint64, error) {
 
 func (w *mockProgress) SetProcessedIndex(index uint64) error {
 	w.index = index
+
+	if w.index == w.doneIndex && w.doneChan != nil {
+		close(w.doneChan)
+	}
+
 	return nil
 }
 
 func (w *mockProgress) InitProcessedIndex(index uint64) error {
 	w.index = index
 	return nil
+}
+
+// WaitForIndex will trigger a signal to the consumer, so they know the test reached a certain point
+func (w *mockProgress) WaitForIndex(n uint64) <-chan struct{} {
+	w.doneIndex = n
+	w.doneChan = make(chan struct{})
+	return w.doneChan
 }
 
 func TestIndexer_Success(t *testing.T) {
