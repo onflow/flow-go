@@ -53,7 +53,6 @@ func NewRegisterBootstrap(
 	}, nil
 }
 
-// batchIndexRegisters
 func (b *RegisterBootstrap) batchIndexRegisters(leafNodes []*wal.LeafNode) error {
 	b.log.Debug().Int("batch_size", len(leafNodes)).Msg("indexing batch of leaf nodes")
 	batch := b.db.NewBatch()
