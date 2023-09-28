@@ -72,7 +72,7 @@ func GenerateExecutionState(
 		return flow.DummyStateCommitment, err
 	}
 	if matchTrie == nil {
-		return flow.DummyStateCommitment, fmt.Errorf("bootstraping failed to produce a checkpoint")
+		return flow.DummyStateCommitment, fmt.Errorf("bootstraping failed to produce a checkpoint for trie %v", stateCommitment)
 	}
 
 	err = wal.StoreCheckpointV6([]*trie.MTrie{matchTrie}, dbDir, bootstrapCheckpointFile, zerolog.Nop(), 1)
