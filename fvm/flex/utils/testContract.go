@@ -2,12 +2,17 @@ package utils
 
 import (
 	"encoding/hex"
+	"math"
 	"math/big"
 	"strings"
 	"testing"
 
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
+	gethCommon "github.com/ethereum/go-ethereum/common"
+	env "github.com/onflow/flow-go/fvm/flex/environment"
+	"github.com/onflow/flow-go/fvm/flex/models"
+	"github.com/onflow/flow-go/fvm/flex/storage"
 	"github.com/stretchr/testify/require"
 )
 
@@ -93,4 +98,29 @@ func GetTestContract(t *testing.T) *TestContract {
 		`,
 		ByteCode: byteCodes,
 	}
+}
+
+func RunWithDeployedContract(t *testing.T, backend models.Backend, f func(*TestContract)) {
+	tc := GetTestContract(t)
+	// deploy contract
+	db := storage.NewDatabase(backend)
+	config := env.NewFlexConfig(env.WithBlockNumber(env.BlockNumberForEVMRules))
+
+	e, err := env.NewEnvironment(config, db)
+	require.NoError(t, err)
+
+	caller := gethCommon.Address{}
+	err = e.MintTo(new(big.Int).Mul(big.NewInt(1e18), big.NewInt(1000)), caller)
+	require.NoError(t, err)
+	require.False(t, e.Result.Failed)
+
+	e, err = env.NewEnvironment(config, db)
+	require.NoError(t, err)
+
+	err = e.Deploy(gethCommon.Address{}, tc.ByteCode, math.MaxUint64, big.NewInt(0))
+	require.NoError(t, err)
+	require.False(t, e.Result.Failed)
+
+	tc.SetDeployedAt(e.Result.DeployedContractAddress)
+	f(tc)
 }

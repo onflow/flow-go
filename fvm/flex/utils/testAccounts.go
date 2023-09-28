@@ -13,6 +13,7 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	env "github.com/onflow/flow-go/fvm/flex/environment"
 	"github.com/onflow/flow-go/fvm/flex/models"
+	"github.com/onflow/flow-go/fvm/flex/storage"
 	"github.com/stretchr/testify/require"
 )
 
@@ -84,4 +85,20 @@ func GetTestEOAAccount(t testing.TB, keyHex string) *EOATestAccount {
 		signer:  signer,
 		lock:    sync.Mutex{},
 	}
+}
+
+func RunWithEOATestAccount(t *testing.T, backend models.Backend, f func(*EOATestAccount)) {
+	account := GetTestEOAAccount(t, EOATestAccount1KeyHex)
+
+	// fund account
+	db := storage.NewDatabase(backend)
+	config := env.NewFlexConfig(env.WithBlockNumber(env.BlockNumberForEVMRules))
+
+	env, err := env.NewEnvironment(config, db)
+	require.NoError(t, err)
+
+	err = env.MintTo(new(big.Int).Mul(big.NewInt(1e18), big.NewInt(1000)), account.FlexAddress().ToCommon())
+	require.NoError(t, err)
+	require.False(t, env.Result.Failed)
+	f(account)
 }
