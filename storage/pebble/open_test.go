@@ -11,7 +11,7 @@ import (
 func TestIsDBNotBootstrapped(t *testing.T) {
 	t.Parallel()
 	dir := unittest.TempPebblePath(t)
-	db, err := openRegisterPebbleDB(dir)
+	db, err := OpenRegisterPebbleDB(dir)
 	require.NoError(t, err)
 	notBootstrapped, err := IsDBNotBootstrapped(db)
 	require.NoError(t, err)
@@ -23,7 +23,7 @@ func TestIsDBNotBootstrapped(t *testing.T) {
 func TestReadHeightsFromBootstrappedDB(t *testing.T) {
 	t.Parallel()
 	dir := unittest.TempPebblePath(t)
-	db, err := openRegisterPebbleDB(dir)
+	db, err := OpenRegisterPebbleDB(dir)
 	require.NoError(t, err)
 
 	// init with first height

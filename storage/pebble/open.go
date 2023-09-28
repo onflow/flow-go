@@ -12,7 +12,7 @@ import (
 // NewBootstrappedRegistersWithPath initializes a new Registers instance with a pebble db
 // if the database is not initialized, it close the database and return pebble.ErrNotBootstrapped
 func NewBootstrappedRegistersWithPath(dir string) (*Registers, *pebble.DB, error) {
-	db, err := openRegisterPebbleDB(dir)
+	db, err := OpenRegisterPebbleDB(dir)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to initialize pebble db: %w", err)
 	}
@@ -24,7 +24,7 @@ func NewBootstrappedRegistersWithPath(dir string) (*Registers, *pebble.DB, error
 }
 
 // openRegisterPebbleDB opens the database
-func openRegisterPebbleDB(dir string) (*pebble.DB, error) {
+func OpenRegisterPebbleDB(dir string) (*pebble.DB, error) {
 	cache := pebble.NewCache(1 << 20)
 	defer cache.Unref()
 	// currently pebble is only used for registers

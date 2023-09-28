@@ -314,7 +314,7 @@ func RunWithRegistersStorageAtHeight1(tb testing.TB, f func(r *Registers)) {
 }
 
 func newBootstrappedRegistersWithPathForTest(tb testing.TB, dir string, first, latest uint64) *pebble.DB {
-	p, err := openRegisterPebbleDB(dir)
+	p, err := OpenRegisterPebbleDB(dir)
 	require.NoError(tb, err)
 
 	// insert initial heights to pebble
