@@ -23,22 +23,24 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
+const defaultRegisterValue = byte('v')
+
 func TestRegisterBootstrap_NewBootstrap(t *testing.T) {
 	t.Parallel()
-	sampleDir := path.Join(unittest.TempDir(t), "checkpoint.checkpoint")
-	rootHeight := uint64(1)
-	log := zerolog.New(io.Discard)
-	cache := pebble.NewCache(1 << 20)
-	defer cache.Unref()
-	opts := DefaultPebbleOptions(cache, registers.NewMVCCComparer())
-	p, dir := unittest.TempPebbleDBWithOpts(t, opts)
-	// set heights
-	require.NoError(t, p.Set(firstHeightKey(), encodedUint64(rootHeight), nil))
-	require.NoError(t, p.Set(latestHeightKey(), encodedUint64(rootHeight), nil))
-	// errors if FirstHeight or LastHeight are populated
-	_, err := NewRegisterBootstrap(p, sampleDir, rootHeight, log)
-	require.ErrorContains(t, err, "cannot bootstrap populated DB")
-	require.NoError(t, os.RemoveAll(dir))
+	unittest.RunWithTempDir(t, func(dir string) {
+		rootHeight := uint64(1)
+		log := zerolog.New(io.Discard)
+		cache := pebble.NewCache(1 << 20)
+		defer cache.Unref()
+		opts := DefaultPebbleOptions(cache, registers.NewMVCCComparer())
+		p, dir := unittest.TempPebbleDBWithOpts(t, opts)
+		// set heights
+		require.NoError(t, p.Set(firstHeightKey(), encodedUint64(rootHeight), nil))
+		require.NoError(t, p.Set(latestHeightKey(), encodedUint64(rootHeight), nil))
+		// errors if FirstHeight or LastHeight are populated
+		_, err := NewRegisterBootstrap(p, dir, rootHeight, log)
+		require.ErrorContains(t, err, "cannot bootstrap populated DB")
+	})
 }
 
 func TestRegisterBootstrap_IndexCheckpointFile_Happy(t *testing.T) {
@@ -71,7 +73,7 @@ func TestRegisterBootstrap_IndexCheckpointFile_Happy(t *testing.T) {
 		for _, register := range registerIDs {
 			val, err := reg.Get(*register, rootHeight)
 			require.NoError(t, err)
-			require.Equal(t, val, []byte{uint8(0)})
+			require.Equal(t, val, []byte{defaultRegisterValue})
 		}
 
 		require.NoError(t, pb.Close())
@@ -194,7 +196,7 @@ func TestRegisterBootstrap_IndexCheckpointFile_MultipleBatch(t *testing.T) {
 		for _, register := range registerIDs {
 			val, err := reg.Get(*register, rootHeight)
 			require.NoError(t, err)
-			require.Equal(t, val, []byte{uint8(0)})
+			require.Equal(t, val, []byte{defaultRegisterValue})
 		}
 
 		require.NoError(t, pb.Close())
@@ -242,8 +244,8 @@ func randomRegisterPayloads(n uint16) []ledger.Payload {
 			{Type: state.KeyPartOwner, Value: o},
 			{Type: state.KeyPartKey, Value: o},
 		}}
-		// values are always 0 for ease of testing/checking
-		v := ledger.Value{uint8(0)}
+		// values are always 'v' for ease of testing/checking
+		v := ledger.Value{defaultRegisterValue}
 		pl := ledger.NewPayload(k, v)
 		p = append(p, *pl)
 	}

@@ -3,10 +3,16 @@ package pebble
 import "github.com/onflow/flow-go/storage/pebble/registers"
 
 const (
+	// checkpointLeafNodeBufSize is the batch size of leaf nodes being read from the checkpoint file,
+	// for use by wal.OpenAndReadLeafNodesFromCheckpointV6
 	checkpointLeafNodeBufSize = 1000
 
+	// pebbleBootstrapRegisterBatchLen is the batch size of converted register values to be written to pebble by the
+	// register bootstrap process
 	pebbleBootstrapRegisterBatchLen = 1000
 
+	// pebbleBootstrapWorkerCount is the maximum number of concurrent goroutines that read and index
+	// checkpoint leaf nodes
 	pebbleBootstrapWorkerCount = 10
 
 	// placeHolderHeight is an element of the height lookup keys of length HeightSuffixLen

@@ -38,10 +38,15 @@ func NewRegisterBootstrap(
 		// key detected, attempt to run bootstrap on corrupt or already bootstrapped data
 		return nil, fmt.Errorf("found latest key set on badger instance, cannot bootstrap populated DB")
 	}
+	// populate first height
+	err = db.Set(firstHeightKey(), encodedUint64(rootHeight), nil)
+	if err != nil {
+		return nil, fmt.Errorf("could not index first height key to initialize: %w", err)
+	}
 	return &RegisterBootstrap{
 		checkpointDir:      checkpointDir,
 		checkpointFileName: checkpointFileName,
-		log:                log,
+		log:                log.With().Str("module", "register_bootstrap").Logger(),
 		db:                 db,
 		leafNodeChan:       make(chan *wal.LeafNode, checkpointLeafNodeBufSize),
 		rootHeight:         rootHeight,
@@ -80,18 +85,23 @@ func (b *RegisterBootstrap) batchIndexRegisters(leafNodes []*wal.LeafNode) error
 
 // indexCheckpointFileWorker asynchronously indexes register entries in b.checkpointDir
 // with wal.OpenAndReadLeafNodesFromCheckpointV6
-func (b *RegisterBootstrap) indexCheckpointFileWorker() error {
-	b.log.Debug().Msg("started checkpoint index worker")
+func (b *RegisterBootstrap) indexCheckpointFileWorker(ctx context.Context) error {
+	b.log.Info().Msg("started checkpoint index worker")
 	// collect leaf nodes to batch index until the channel is closed
 	batch := make([]*wal.LeafNode, 0, pebbleBootstrapRegisterBatchLen)
 	for leafNode := range b.leafNodeChan {
-		batch = append(batch, leafNode)
-		if len(batch) >= pebbleBootstrapRegisterBatchLen {
-			err := b.batchIndexRegisters(batch)
-			if err != nil {
-				return fmt.Errorf("unable to index registers to pebble in batch: %w", err)
+		select {
+		case <-ctx.Done():
+			return nil
+		default:
+			batch = append(batch, leafNode)
+			if len(batch) >= pebbleBootstrapRegisterBatchLen {
+				err := b.batchIndexRegisters(batch)
+				if err != nil {
+					return fmt.Errorf("unable to index registers to pebble in batch: %w", err)
+				}
+				batch = make([]*wal.LeafNode, 0, pebbleBootstrapRegisterBatchLen)
 			}
-			batch = make([]*wal.LeafNode, 0, pebbleBootstrapRegisterBatchLen)
 		}
 	}
 	// index the remaining registers if didn't reach a batch length.
@@ -104,11 +114,11 @@ func (b *RegisterBootstrap) indexCheckpointFileWorker() error {
 
 // IndexCheckpointFile indexes the checkpoint file in the Dir provided
 func (b *RegisterBootstrap) IndexCheckpointFile(ctx context.Context) error {
-	g, _ := errgroup.WithContext(ctx)
-	b.log.Debug().Msg("indexing checkpoint file for pebble register store")
+	g, gCtx := errgroup.WithContext(ctx)
+	b.log.Info().Msg("indexing checkpoint file for pebble register store")
 	for i := 0; i < pebbleBootstrapWorkerCount; i++ {
 		g.Go(func() error {
-			return b.indexCheckpointFileWorker()
+			return b.indexCheckpointFileWorker(gCtx)
 		})
 	}
 	err := wal.OpenAndReadLeafNodesFromCheckpointV6(b.leafNodeChan, b.checkpointDir, b.checkpointFileName, b.log)
@@ -118,21 +128,10 @@ func (b *RegisterBootstrap) IndexCheckpointFile(ctx context.Context) error {
 	if err = g.Wait(); err != nil {
 		return fmt.Errorf("failed to index checkpoint file: %w", err)
 	}
-	b.log.Debug().Msg("checkpoint indexing complete")
-	batch := b.db.NewBatch()
-	defer batch.Close()
-	// update heights atomically to prevent one getting populated without the other
-	err = batch.Set(firstHeightKey(), encodedUint64(b.rootHeight), nil)
+	b.log.Info().Msg("checkpoint indexing complete")
+	err = b.db.Set(latestHeightKey(), encodedUint64(b.rootHeight), nil)
 	if err != nil {
-		return fmt.Errorf("unable to add first height to batch: %w", err)
-	}
-	err = batch.Set(latestHeightKey(), encodedUint64(b.rootHeight), nil)
-	if err != nil {
-		return fmt.Errorf("unable to add latest height to batch: %w", err)
-	}
-	err = batch.Commit(pebble.Sync)
-	if err != nil {
-		return fmt.Errorf("unable to index first and latest heights: %w", err)
+		return fmt.Errorf("could not index latest height: %w", err)
 	}
 	return nil
 }
