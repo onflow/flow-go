@@ -10,7 +10,6 @@ import (
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/storage"
-	"github.com/onflow/flow-go/storage/pebble/registers"
 )
 
 // Registers library that implements pebble storage for registers
@@ -18,39 +17,14 @@ import (
 type Registers struct {
 	db           *pebble.DB
 	firstHeight  uint64
-	latestHeight atomic.Uint64
+	latestHeight *atomic.Uint64
 }
 
 var _ storage.RegisterIndex = (*Registers)(nil)
 
-func NewBootstrappedRegistersWithPath(dir string) (*Registers, *pebble.DB, error) {
-	db, err := initRegisterPebbleDB(dir)
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to initialize pebble db: %w", err)
-	}
-	registers, err := NewRegisters(db)
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to initialize registers: %w", err)
-	}
-	return registers, db, nil
-}
-
-func initRegisterPebbleDB(dir string) (*pebble.DB, error) {
-	cache := pebble.NewCache(1 << 20)
-	defer cache.Unref()
-	// currently pebble is only used for registers
-	opts := DefaultPebbleOptions(cache, registers.NewMVCCComparer())
-	db, err := pebble.Open(dir, opts)
-	if err != nil {
-		return nil, fmt.Errorf("failed to open db: %w", err)
-	}
-
-	return db, nil
-}
-
 // TODO: rename to NewBootstrappedRegisters
 // NewRegisters takes a populated pebble instance with LatestHeight and FirstHeight set.
-// Will fail if they those two keys are unavailable as it implies a corrupted or uninitialized state
+// return error if they those two keys are unavailable as it implies a uninitialized state or corrupted state
 func NewRegisters(db *pebble.DB) (*Registers, error) {
 	registers := &Registers{
 		db: db,
@@ -58,19 +32,19 @@ func NewRegisters(db *pebble.DB) (*Registers, error) {
 	// check height keys and populate cache. These two variables will have been set
 	firstHeight, err := registers.firstStoredHeight()
 	if err != nil {
-		// this means that the DB is either in a corrupted state or has not been initialized with a set of registers
-		// and firstHeight
+		// this means that the DB is either in a corrupted state or has not been initialized
 		return nil, fmt.Errorf("unable to initialize register storage, first height unavailable in db: %w", err)
 	}
 	latestHeight, err := registers.latestStoredHeight()
 	if err != nil {
-		// and firstHeight
 		return nil, fmt.Errorf("unable to initialize register storage, latest height unavailable in db: %w", err)
 	}
 	/// All registers between firstHeight and lastHeight have been indexed
-	registers.firstHeight = firstHeight
-	registers.latestHeight.Store(latestHeight)
-	return registers, nil
+	return &Registers{
+		db:           db,
+		firstHeight:  firstHeight,
+		latestHeight: atomic.NewUint64(latestHeight),
+	}, nil
 }
 
 // Get returns the most recent updated payload for the given RegisterID.
