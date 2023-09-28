@@ -426,26 +426,30 @@ func (c *ControlMsgValidationInspector) inspectRpcPublishMessages(from peer.ID, 
 
 	var errs *multierror.Error
 	for _, message := range messages[:sampleSize] {
+		// return an error when we exceed the error threshold
+		if errs != nil && errs.Len() > c.config.RPCMessageErrorThreshold {
+			return NewInvalidRpcPublishMessagesErr(errs.ErrorOrNil(), errs.Len()), errs.Len()
+		}
+
 		if c.networkingType == network.PrivateNetwork {
 			err := c.checkPubsubMessageSender(message)
 			if err != nil {
 				errs = multierror.Append(errs, err)
+				continue
 			}
 		}
 		topic := channels.Topic(message.GetTopic())
 		err := c.validateTopic(from, topic, activeClusterIDS)
 		if err != nil {
 			errs = multierror.Append(errs, err)
+			continue
 		}
 
 		if !c.subscriptions.HasSubscription(topic) {
 			errs = multierror.Append(errs, fmt.Errorf("subscription for topic %s not found", topic))
+			continue
 		}
 
-		// return an error when we exceed the error threshold
-		if errs != nil && errs.Len() > c.config.RPCMessageErrorThreshold {
-			return NewInvalidRpcPublishMessagesErr(errs.ErrorOrNil(), errs.Len()), errs.Len()
-		}
 	}
 	return nil, 0
 }

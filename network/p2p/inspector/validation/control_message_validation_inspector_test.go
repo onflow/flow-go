@@ -15,6 +15,7 @@ import (
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
 	mockmodule "github.com/onflow/flow-go/module/mock"
+	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/p2p"
 	p2pmsg "github.com/onflow/flow-go/network/p2p/message"
@@ -43,6 +44,7 @@ func TestNewControlMsgValidationInspector(t *testing.T) {
 			InspectorMetrics:              metrics.NewNoopCollector(),
 			RpcTracker:                    mockp2p.NewRpcControlTracking(t),
 			Subscriptions:                 subscriptions,
+			NetworkingType:                network.PublicNetwork,
 		})
 		require.NoError(t, err)
 		require.NotNil(t, inspector)
@@ -463,6 +465,52 @@ func TestControlMessageValidationInspector_processInspectRPCReq(t *testing.T) {
 		distributor.On("Distribute", mock.AnythingOfType("*p2p.InvCtrlMsgNotif")).Return(nil).Once().Run(checkNotification)
 		require.NoError(t, inspector.processInspectRPCReq(req))
 	})
+	t.Run("inspectRpcPublishMessages should not inspect pubsub message sender on public networks", func(t *testing.T) {
+		inspector, _, _, subscriptions, idProvider, sporkID := inspectorFixture(t)
+		inspector.networkingType = network.PublicNetwork
+		pid := unittest.PeerIdFixture(t)
+		defer idProvider.AssertNotCalled(t, "ByPeerID", pid)
+		topic := fmt.Sprintf("%s/%s", channels.TestNetworkChannel, sporkID)
+		pubsubMsgs := unittest.GossipSubMessageFixtures(10, topic, pid)
+		req, err := NewInspectRPCRequest(pid, unittest.P2PRPCFixture(unittest.WithPubsubMessages(pubsubMsgs...)))
+		require.NoError(t, err, "failed to get inspect message request")
+		subscriptions.On("HasSubscription", channels.Topic(topic)).Return(true).Times(len(pubsubMsgs))
+		require.NoError(t, inspector.processInspectRPCReq(req))
+	})
+	t.Run("inspectRpcPublishMessages should disseminate invalid control message notification when message is from unstaked peer", func(t *testing.T) {
+		inspector, distributor, _, subscriptions, idProvider, sporkID := inspectorFixture(t)
+		inspector.networkingType = network.PrivateNetwork
+		// 5 invalid pubsub messages will force notification dissemination
+		inspector.config.RPCMessageErrorThreshold = 4
+		pid := unittest.PeerIdFixture(t)
+		topic := fmt.Sprintf("%s/%s", channels.TestNetworkChannel, sporkID)
+		pubsubMsgs := unittest.GossipSubMessageFixtures(10, topic, pid)
+		idProvider.On("ByPeerID", pid).Return(nil, false).Times(5)
+		req, err := NewInspectRPCRequest(pid, unittest.P2PRPCFixture(unittest.WithPubsubMessages(pubsubMsgs...)))
+		require.NoError(t, err, "failed to get inspect message request")
+		defer subscriptions.AssertNotCalled(t, "HasSubscription", topic)
+		checkNotification := checkNotificationFunc(t, pid, p2pmsg.RpcPublishMessage, IsInvalidRpcPublishMessagesErr)
+		distributor.On("Distribute", mock.AnythingOfType("*p2p.InvCtrlMsgNotif")).Return(nil).Once().Run(checkNotification)
+		require.NoError(t, inspector.processInspectRPCReq(req))
+	})
+	t.Run("inspectRpcPublishMessages should disseminate invalid control message notification when message is from ejected peer", func(t *testing.T) {
+		inspector, distributor, _, subscriptions, idProvider, sporkID := inspectorFixture(t)
+		inspector.networkingType = network.PrivateNetwork
+		// 5 invalid pubsub messages will force notification dissemination
+		inspector.config.RPCMessageErrorThreshold = 4
+		pid := unittest.PeerIdFixture(t)
+		id := unittest.IdentityFixture()
+		id.Ejected = true
+		topic := fmt.Sprintf("%s/%s", channels.TestNetworkChannel, sporkID)
+		pubsubMsgs := unittest.GossipSubMessageFixtures(10, topic, pid)
+		idProvider.On("ByPeerID", pid).Return(id, true).Times(5)
+		req, err := NewInspectRPCRequest(pid, unittest.P2PRPCFixture(unittest.WithPubsubMessages(pubsubMsgs...)))
+		require.NoError(t, err, "failed to get inspect message request")
+		defer subscriptions.AssertNotCalled(t, "HasSubscription", topic)
+		checkNotification := checkNotificationFunc(t, pid, p2pmsg.RpcPublishMessage, IsInvalidRpcPublishMessagesErr)
+		distributor.On("Distribute", mock.AnythingOfType("*p2p.InvCtrlMsgNotif")).Return(nil).Once().Run(checkNotification)
+		require.NoError(t, inspector.processInspectRPCReq(req))
+	})
 }
 
 // TestNewControlMsgValidationInspector_validateClusterPrefixedTopic ensures cluster prefixed topics are validated as expected.
@@ -539,6 +587,7 @@ func TestControlMessageValidationInspector_ActiveClustersChanged(t *testing.T) {
 		InspectorMetrics:              metrics.NewNoopCollector(),
 		RpcTracker:                    mockp2p.NewRpcControlTracking(t),
 		Subscriptions:                 mockp2p.NewSubscriptions(t),
+		NetworkingType:                network.PrivateNetwork,
 	})
 	require.NoError(t, err)
 	activeClusterIds := make(flow.ChainIDList, 0)
@@ -571,6 +620,7 @@ func inspectorFixture(t *testing.T) (*ControlMsgValidationInspector, *mockp2p.Go
 		InspectorMetrics:              metrics.NewNoopCollector(),
 		RpcTracker:                    mockp2p.NewRpcControlTracking(t),
 		Subscriptions:                 subscriptions,
+		NetworkingType:                network.PublicNetwork,
 	})
 	require.NoError(t, err, "failed to create control message validation inspector fixture")
 	rpcTracker := mockp2p.NewRpcControlTracking(t)
