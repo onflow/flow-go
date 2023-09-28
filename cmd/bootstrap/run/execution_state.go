@@ -12,6 +12,7 @@ import (
 	"github.com/onflow/flow-go/ledger/common/pathfinder"
 	"github.com/onflow/flow-go/ledger/complete"
 	ledger "github.com/onflow/flow-go/ledger/complete"
+	"github.com/onflow/flow-go/ledger/complete/mtrie/trie"
 	"github.com/onflow/flow-go/ledger/complete/wal"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
@@ -66,23 +67,15 @@ func GenerateExecutionState(
 		return flow.DummyStateCommitment, err
 	}
 
-	checkpointer, err := ledgerStorage.Checkpointer()
+	matchTrie, err := ledgerStorage.FindTrieByStateCommit(stateCommitment)
 	if err != nil {
 		return flow.DummyStateCommitment, err
 	}
-
-	root := 0
-	err = checkpointer.Checkpoint(root)
-	if err != nil {
-		return flow.DummyStateCommitment, err
+	if matchTrie == nil {
+		return flow.DummyStateCommitment, fmt.Errorf("bootstraping failed to produce a checkpoint")
 	}
 
-	trie, err := checkpointer.LoadCheckpoint(root)
-	if err != nil {
-		return flow.DummyStateCommitment, err
-	}
-
-	err = wal.StoreCheckpointV6(trie, dbDir, bootstrapCheckpointFile, zerolog.Nop(), 1)
+	err = wal.StoreCheckpointV6([]*trie.MTrie{matchTrie}, dbDir, bootstrapCheckpointFile, zerolog.Nop(), 1)
 	if err != nil {
 		return flow.DummyStateCommitment, fmt.Errorf("failed to store bootstrap checkpoint: %w", err)
 	}
