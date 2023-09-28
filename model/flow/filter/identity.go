@@ -7,6 +7,15 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
+// Adapt adapts a filter for a specific identity type.
+//
+//	Converts flow.IdentityFilter[flow.IdentitySkeleton] to flow.IdentityFilter[flow.Identity].
+func Adapt(f flow.IdentityFilter[flow.IdentitySkeleton]) flow.IdentityFilter[flow.Identity] {
+	return func(i *flow.Identity) bool {
+		return f(&i.IdentitySkeleton)
+	}
+}
+
 // Any will always be true.
 func Any(*flow.Identity) bool {
 	return true

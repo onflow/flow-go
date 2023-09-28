@@ -70,7 +70,7 @@ func NewClusterCommittee(
 		selection: selection,
 		clusterMemberFilter: filter.And[flow.Identity](
 			// adapt the identity filter to the identity skeleton filter
-			flow.AdaptIdentityFilter(initialClusterMembersSelector),
+			filter.Adapt(initialClusterMembersSelector),
 			filter.Not(filter.Ejected),
 			filter.HasWeight(true),
 		),
