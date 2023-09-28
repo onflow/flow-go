@@ -1,5 +1,5 @@
 package pebble
 
-import "github.com/pkg/errors"
+import "errors"
 
 var ErrNotBootstrapped = errors.New("pebble database not bootstrapped")
