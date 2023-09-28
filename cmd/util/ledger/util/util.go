@@ -132,6 +132,8 @@ var _ common.MemoryGauge = (*NopMemoryGauge)(nil)
 
 type PayloadsReadonlyLedger struct {
 	Snapshot *PayloadSnapshot
+
+	AllocateStorageIndexFunc func(owner []byte) (atree.StorageIndex, error)
 }
 
 func (p *PayloadsReadonlyLedger) GetValue(owner, key []byte) (value []byte, err error) {
@@ -151,7 +153,11 @@ func (p *PayloadsReadonlyLedger) ValueExists(owner, key []byte) (exists bool, er
 	return ok, nil
 }
 
-func (p *PayloadsReadonlyLedger) AllocateStorageIndex(_ []byte) (atree.StorageIndex, error) {
+func (p *PayloadsReadonlyLedger) AllocateStorageIndex(owner []byte) (atree.StorageIndex, error) {
+	if p.AllocateStorageIndexFunc != nil {
+		return p.AllocateStorageIndexFunc(owner)
+	}
+
 	panic("AllocateStorageIndex not expected to be called")
 }
 

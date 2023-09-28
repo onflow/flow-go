@@ -313,6 +313,7 @@ func newMigratorRuntime(
 		TransactionState: transactionState,
 		Interpreter:      inter,
 		Storage:          storage,
+		Accounts:         accountsAtreeLedger,
 	}, nil
 }
 
@@ -323,10 +324,52 @@ type migratorRuntime struct {
 	Storage          *runtime.Storage
 	Payloads         []*ledger.Payload
 	Address          common.Address
+	Accounts         *util.AccountsAtreeLedger
 }
 
 func (mr *migratorRuntime) GetReadOnlyStorage() *runtime.Storage {
 	return runtime.NewStorage(util.NewPayloadsReadonlyLedger(mr.Snapshot), util.NopMemoryGauge{})
+}
+
+func (mr *migratorRuntime) ChildInterpreter() (*interpreter.Interpreter, error) {
+
+	ledger := util.NewPayloadsReadonlyLedger(mr.Snapshot)
+	mu := sync.Mutex{}
+	ledger.AllocateStorageIndexFunc = func(owner []byte) (atree.StorageIndex, error) {
+		mu.Lock()
+		defer mu.Unlock()
+
+		return mr.Accounts.AllocateStorageIndex(owner)
+	}
+
+	storage := runtime.NewStorage(ledger, util.NopMemoryGauge{})
+
+	ri := &util.MigrationRuntimeInterface{}
+
+	env := runtime.NewBaseInterpreterEnvironment(runtime.Config{
+		AccountLinkingEnabled: true,
+		// Attachments are enabled everywhere except for Mainnet
+		AttachmentsEnabled: true,
+		// Capability Controllers are enabled everywhere except for Mainnet
+		CapabilityControllersEnabled: true,
+	})
+
+	env.Configure(
+		ri,
+		runtime.NewCodesAndPrograms(),
+		storage,
+		runtime.NewCoverageReport(),
+	)
+
+	inter, err := interpreter.NewInterpreter(
+		nil,
+		nil,
+		env.InterpreterConfig)
+	if err != nil {
+		return nil, err
+	}
+
+	return inter, nil
 }
 
 func (m *AtreeRegisterMigrator) validateChangesAndCreateNewRegisters(
@@ -593,9 +636,15 @@ func (m *AtreeRegisterMigrator) cloneCricketMomentsShardedCollection(
 		go func(i int) {
 			defer wg.Done()
 
+			inter, err := mr.ChildInterpreter()
+			if err != nil {
+				cancel(err)
+				return
+			}
+
 			storageMap := mr.GetReadOnlyStorage().GetStorageMap(mr.Address, domain, false)
 			storageMapValue := storageMap.ReadValue(&util.NopMemoryGauge{}, key)
-			shardedCollectionMap, err := getShardedCollectionMap(mr, storageMapValue)
+			scm, err := getShardedCollectionMap(mr, storageMapValue)
 			if err != nil {
 				cancel(err)
 				return
@@ -611,9 +660,9 @@ func (m *AtreeRegisterMigrator) cloneCricketMomentsShardedCollection(
 					}
 
 					ownedNFTs, err := getNftCollection(
-						mr.Interpreter,
+						inter,
 						keyPair.shardedCollectionKey,
-						shardedCollectionMap,
+						scm,
 					)
 					if err != nil {
 						cancel(err)
@@ -621,7 +670,7 @@ func (m *AtreeRegisterMigrator) cloneCricketMomentsShardedCollection(
 					}
 
 					value := ownedNFTs.GetKey(
-						mr.Interpreter,
+						inter,
 						interpreter.EmptyLocationRange,
 						keyPair.nftCollectionKey,
 					)
