@@ -151,7 +151,7 @@ func TestContractInteraction(t *testing.T) {
 				writer := io.Writer(&b)
 				tx.EncodeRLP(writer)
 
-				err := env.RunTransaction(b.Bytes())
+				err := env.RunTransaction(b.Bytes(), math.MaxUint64)
 				require.NoError(t, err)
 				require.False(t, env.Result.Failed)
 			})
