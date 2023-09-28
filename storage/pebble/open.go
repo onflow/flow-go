@@ -13,7 +13,7 @@ import (
 )
 
 // NewBootstrappedRegistersWithPath initializes a new Registers instance with a pebble db
-// if the database is not initialized, it close the database and return pebble.ErrNotBootstrapped
+// if the database is not initialized, it close the database and return storage.ErrNotBootstrapped
 func NewBootstrappedRegistersWithPath(dir string) (*Registers, *pebble.DB, error) {
 	db, err := OpenRegisterPebbleDB(dir)
 	if err != nil {
@@ -21,7 +21,7 @@ func NewBootstrappedRegistersWithPath(dir string) (*Registers, *pebble.DB, error
 	}
 	registers, err := NewRegisters(db)
 	if err != nil {
-		if errors.Is(err, ErrNotBootstrapped) {
+		if errors.Is(err, storage.ErrNotBootstrapped) {
 			// closing the db if not bootstrapped
 			dbErr := db.Close()
 			if dbErr != nil {
@@ -48,14 +48,14 @@ func OpenRegisterPebbleDB(dir string) (*pebble.DB, error) {
 }
 
 // ReadHeightsFromBootstrappedDB reads the first and latest height from a bootstrapped register db
-// If the register db is not bootstrapped, it returns ErrNotBootstrapped
+// If the register db is not bootstrapped, it returns storage.ErrNotBootstrapped
 // If the register db is corrupted, it returns an error
 func ReadHeightsFromBootstrappedDB(db *pebble.DB) (firstHeight uint64, latestHeight uint64, err error) {
 	// check height keys and populate cache. These two variables will have been set
 	firstHeight, err = firstStoredHeight(db)
 	if err != nil {
 		if errors.Is(err, storage.ErrNotFound) {
-			return 0, 0, fmt.Errorf("unable to initialize register storage, first height not found in db: %w", ErrNotBootstrapped)
+			return 0, 0, fmt.Errorf("unable to initialize register storage, first height not found in db: %w", storage.ErrNotBootstrapped)
 		}
 		// this means that the DB is either in a corrupted state or has not been initialized
 		return 0, 0, fmt.Errorf("unable to initialize register storage, first height unavailable in db: %w", err)

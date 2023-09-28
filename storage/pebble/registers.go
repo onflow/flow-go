@@ -23,7 +23,7 @@ type Registers struct {
 var _ storage.RegisterIndex = (*Registers)(nil)
 
 // NewRegisters takes a populated pebble instance with LatestHeight and FirstHeight set.
-// return ErrNotBootstrapped if they those two keys are unavailable as it implies a uninitialized state
+// return storage.ErrNotBootstrapped if they those two keys are unavailable as it implies a uninitialized state
 // return other error if database is in a corrupted state
 func NewRegisters(db *pebble.DB) (*Registers, error) {
 	// check height keys and populate cache. These two variables will have been set

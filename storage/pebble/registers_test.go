@@ -27,7 +27,7 @@ func TestRegisters_Initialize(t *testing.T) {
 	_, err := NewRegisters(p)
 	require.Error(t, err)
 	// verify the error type
-	require.True(t, errors.Is(err, ErrNotBootstrapped))
+	require.True(t, errors.Is(err, storage.ErrNotBootstrapped))
 	err = os.RemoveAll(dir)
 	require.NoError(t, err)
 }

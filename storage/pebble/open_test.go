@@ -6,6 +6,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -53,7 +54,7 @@ func TestNewBootstrappedRegistersWithPath(t *testing.T) {
 	unittest.RunWithTempDir(t, func(dir string) {
 		_, db, err := NewBootstrappedRegistersWithPath(dir)
 		require.Error(t, err)
-		require.True(t, errors.Is(err, ErrNotBootstrapped))
+		require.True(t, errors.Is(err, storage.ErrNotBootstrapped))
 
 		// verify the db is closed
 		require.True(t, db == nil)
