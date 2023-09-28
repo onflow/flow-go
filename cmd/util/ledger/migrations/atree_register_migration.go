@@ -112,12 +112,6 @@ func (m *AtreeRegisterMigrator) MigrateAccount(
 		return nil, fmt.Errorf("failed to create migrator runtime: %w", err)
 	}
 
-	//// check the storage health
-	//healthOk, err := m.checkStorageHealth(mr)
-	//if err != nil {
-	//	return nil, fmt.Errorf("storage health issues for address %s: %w", address.Hex(), err)
-	//}
-
 	// keep track of all storage maps that were accessed
 	// if they are empty the wont be changed, but we sill need to copy them over
 	storageMapIds := make(map[string]struct{})
@@ -466,9 +460,6 @@ func (m *AtreeRegisterMigrator) validateChangesAndCreateNewRegisters(
 
 	newPayloads = append(newPayloads, statePayload)
 
-	//if hasMissingKeys && m.sampler.Sample(zerolog.InfoLevel) {
-	//	m.dumpAccount(mr.Address, mr.Payloads, newPayloads)
-	//}
 	return newPayloads, nil
 }
 

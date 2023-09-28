@@ -14,21 +14,8 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-func payloadSize(key ledger.Key, payload *ledger.Payload) (uint64, error) {
-	id, err := util.KeyToRegisterID(key)
-	if err != nil {
-		return 0, err
-	}
-
-	return uint64(registerSize(id, payload)), nil
-}
-
-func isAccountKey(key ledger.Key) bool {
-	return string(key.KeyParts[1].Value) == flow.AccountStatusKey
-}
-
 // AccountUsageMigrator iterates through each payload, and calculate the storage usage
-// and update the accoutns status with the updated storage usage
+// and update the accounts status with the updated storage usage
 type AccountUsageMigrator struct {
 	log zerolog.Logger
 }
@@ -154,4 +141,17 @@ func newPayloadWithValue(payload *ledger.Payload, value ledger.Value) (ledger.Pa
 	}
 	newPayload := ledger.NewPayload(key, value)
 	return *newPayload, nil
+}
+
+func payloadSize(key ledger.Key, payload *ledger.Payload) (uint64, error) {
+	id, err := util.KeyToRegisterID(key)
+	if err != nil {
+		return 0, err
+	}
+
+	return uint64(registerSize(id, payload)), nil
+}
+
+func isAccountKey(key ledger.Key) bool {
+	return string(key.KeyParts[1].Value) == flow.AccountStatusKey
 }

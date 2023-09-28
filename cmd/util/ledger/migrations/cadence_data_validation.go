@@ -372,7 +372,7 @@ func (m *CadenceDataValidationMigrations) hashAllNftsInAllCollections(
 	if err != nil {
 		return nil, err
 	}
-	progressLog := util2.LogProgress("setting cloned cricket moments", count, log)
+	progressLog := util2.LogProgress("hashing cricket moments", count, log)
 
 	ctx, c := context.WithCancelCause(context.Background())
 	cancel := func(err error) {
@@ -383,26 +383,26 @@ func (m *CadenceDataValidationMigrations) hashAllNftsInAllCollections(
 	}
 	defer cancel(nil)
 
-	keyPairChan := make(chan cricketKeyPair, m.nWorkers)
-	hashChan := make(chan hashWithKeys, m.nWorkers)
+	keyPairChan := make(chan cricketKeyPair, count)
+	hashChan := make(chan hashWithKeys, count)
 	hashes := make(map[uint64]sortableHashes)
 	wg := sync.WaitGroup{}
 	wg.Add(m.nWorkers)
+	done := make(chan struct{})
 
 	// workers for hashing
 	for i := 0; i < m.nWorkers; i++ {
-		go func(i int) {
+		go func() {
 			defer wg.Done()
 
 			storageMap := mr.GetReadOnlyStorage().GetStorageMap(mr.Address, domain, false)
 			storageMapValue := storageMap.ReadValue(&util.NopMemoryGauge{}, key)
 
 			hashNFTWorker(progressLog, ctx, cancel, mr, storageMapValue, keyPairChan, hashChan)
-		}(i)
+		}()
 	}
 
 	// worker for collecting hashes
-	done := make(chan struct{})
 	go func() {
 		defer close(done)
 		defer log.Info().Msg("finished collecting hashes")
@@ -425,6 +425,8 @@ func (m *CadenceDataValidationMigrations) hashAllNftsInAllCollections(
 
 	// worker for dispatching values to hash
 	go func() {
+		defer close(keyPairChan)
+
 		shardedCollectionMapIterator := shardedCollectionMap.Iterator()
 		for {
 			select {
