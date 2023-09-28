@@ -68,26 +68,22 @@ func ReadHeightsFromBootstrappedDB(db *pebble.DB) (firstHeight uint64, latestHei
 	return firstHeight, latestHeight, nil
 }
 
-// IsDBNotBootstrapped returns true if the db is not bootstrapped
+// IsBootstrapped returns true if the db is bootstrapped
 // otherwise return false
-func IsDBNotBootstrapped(db *pebble.DB) (bool, error) {
-	//
-	_, err := firstStoredHeight(db)
-	if err == nil {
-		return false, nil
-	}
-	if !errors.Is(err, storage.ErrNotFound) {
-		return false, fmt.Errorf("unable to check first stored height: %w", err)
+// it returns error if the db is corrupted or other exceptions
+func IsBootstrapped(db *pebble.DB) (bool, error) {
+	_, err1 := firstStoredHeight(db)
+	_, err2 := latestStoredHeight(db)
+
+	if err1 == nil && err2 == nil {
+		return true, nil
 	}
 
-	_, err = latestStoredHeight(db)
-	if err == nil {
+	if errors.Is(err1, storage.ErrNotFound) && errors.Is(err2, storage.ErrNotFound) {
 		return false, nil
 	}
-	if !errors.Is(err, storage.ErrNotFound) {
-		return false, fmt.Errorf("unable to check latest stored height: %w", err)
-	}
-	return true, nil
+
+	return false, fmt.Errorf("unable to check if db is bootstrapped %v: %w", err1, err2)
 }
 
 func initHeights(db *pebble.DB, firstHeight uint64) error {

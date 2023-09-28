@@ -9,14 +9,14 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-func TestIsDBNotBootstrapped(t *testing.T) {
+func TestIsBootstrapped(t *testing.T) {
 	t.Parallel()
 	unittest.RunWithTempDir(t, func(dir string) {
 		db, err := OpenRegisterPebbleDB(dir)
 		require.NoError(t, err)
-		notBootstrapped, err := IsDBNotBootstrapped(db)
+		bootstrapped, err := IsBootstrapped(db)
 		require.NoError(t, err)
-		require.True(t, notBootstrapped)
+		require.False(t, bootstrapped)
 		require.NoError(t, db.Close())
 	})
 }
@@ -31,10 +31,10 @@ func TestReadHeightsFromBootstrappedDB(t *testing.T) {
 		firstHeight := uint64(10)
 		require.NoError(t, initHeights(db, firstHeight))
 
-		notBootstrapped, err := IsDBNotBootstrapped(db)
+		bootstrapped, err := IsBootstrapped(db)
 		require.NoError(t, err)
 
-		require.False(t, notBootstrapped)
+		require.True(t, bootstrapped)
 		require.NoError(t, db.Close())
 
 		// reopen the db
