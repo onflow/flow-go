@@ -33,7 +33,6 @@ var FlexRootSlabKey = "RootSlabKey"
 // functionality it also supports batch writes and iterating over the keyspace in
 // binary-alphabetical order.
 
-// TODO: maybe instead of array for values we also use hex.Encode
 type Database struct {
 	led      atree.Ledger
 	storage  *atree.PersistentSlabStorage
