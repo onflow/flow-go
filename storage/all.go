@@ -1,6 +1,6 @@
 package storage
 
-// All includes all the storage modules
+// All includes all the storage modules.
 type All struct {
 	Headers                 Headers
 	Guarantees              Guarantees
