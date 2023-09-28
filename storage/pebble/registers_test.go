@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/cockroachdb/pebble"
+	"github.com/pkg/errors"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/model/flow"
@@ -25,6 +26,8 @@ func TestRegisters_Initialize(t *testing.T) {
 	// fail on blank database without FirstHeight and LastHeight set
 	_, err := NewRegisters(p)
 	require.Error(t, err)
+	// verify the error type
+	require.True(t, errors.Is(err, storage.ErrNotBootstrapped))
 	err = os.RemoveAll(dir)
 	require.NoError(t, err)
 }
@@ -293,19 +296,29 @@ func Benchmark_PayloadStorage(b *testing.B) {
 }
 
 func RunWithRegistersStorageAtInitialHeights(tb testing.TB, first uint64, latest uint64, f func(r *Registers)) {
-	cache := pebble.NewCache(1 << 20)
-	opts := DefaultPebbleOptions(cache, registers.NewMVCCComparer())
-	unittest.RunWithConfiguredPebbleInstance(tb, opts, func(p *pebble.DB) {
-		// insert initial heights to pebble
-		require.NoError(tb, p.Set(firstHeightKey(), encodedUint64(first), nil))
-		require.NoError(tb, p.Set(latestHeightKey(), encodedUint64(latest), nil))
+	unittest.RunWithTempDir(tb, func(dir string) {
+		p := newBootstrappedRegistersWithPathForTest(tb, dir, first, latest)
 		r, err := NewRegisters(p)
 		require.NoError(tb, err)
+
 		f(r)
+		require.NoError(tb, p.Close())
+		require.NoError(tb, os.RemoveAll(dir))
+
 	})
 }
 
 func RunWithRegistersStorageAtHeight1(tb testing.TB, f func(r *Registers)) {
 	defaultHeight := uint64(1)
 	RunWithRegistersStorageAtInitialHeights(tb, defaultHeight, defaultHeight, f)
+}
+
+func newBootstrappedRegistersWithPathForTest(tb testing.TB, dir string, first, latest uint64) *pebble.DB {
+	p, err := OpenRegisterPebbleDB(dir)
+	require.NoError(tb, err)
+
+	// insert initial heights to pebble
+	require.NoError(tb, p.Set(firstHeightKey, encodedUint64(first), nil))
+	require.NoError(tb, p.Set(latestHeightKey, encodedUint64(latest), nil))
+	return p
 }
