@@ -26,19 +26,8 @@ var _ storage.RegisterIndex = (*Registers)(nil)
 // return ErrNotBootstrapped if they those two keys are unavailable as it implies a uninitialized state
 // return other error if database is in a corrupted state
 func NewRegisters(db *pebble.DB) (*Registers, error) {
-	registers := &Registers{
-		db: db,
-	}
 	// check height keys and populate cache. These two variables will have been set
-	firstHeight, err := registers.firstStoredHeight()
-	if err != nil {
-		if errors.Is(err, storage.ErrNotFound) {
-			return nil, fmt.Errorf("unable to initialize register storage, first height not found in db: %w", ErrNotBootstrapped)
-		}
-		// this means that the DB is either in a corrupted state or has not been initialized
-		return nil, fmt.Errorf("unable to initialize register storage, first height unavailable in db: %w", err)
-	}
-	latestHeight, err := registers.latestStoredHeight()
+	firstHeight, latestHeight, err := ReadHeightsFromBootstrappedDB(db)
 	if err != nil {
 		// first height is found, but latest height is not found, this means that the DB is in a corrupted state
 		return nil, fmt.Errorf("unable to initialize register storage, latest height unavailable in db: %w", err)
@@ -152,16 +141,16 @@ func (s *Registers) FirstHeight() uint64 {
 	return s.firstHeight
 }
 
-func (s *Registers) firstStoredHeight() (uint64, error) {
-	return s.heightLookup(firstHeightKey)
+func firstStoredHeight(db *pebble.DB) (uint64, error) {
+	return heightLookup(db, firstHeightKey)
 }
 
-func (s *Registers) latestStoredHeight() (uint64, error) {
-	return s.heightLookup(latestHeightKey)
+func latestStoredHeight(db *pebble.DB) (uint64, error) {
+	return heightLookup(db, latestHeightKey)
 }
 
-func (s *Registers) heightLookup(key []byte) (uint64, error) {
-	res, closer, err := s.db.Get(key)
+func heightLookup(db *pebble.DB, key []byte) (uint64, error) {
+	res, closer, err := db.Get(key)
 	if err != nil {
 		return 0, convertNotFoundError(err)
 	}
