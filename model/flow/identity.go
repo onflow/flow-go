@@ -394,6 +394,12 @@ type IdentityList = GenericIdentityList[Identity]
 
 type GenericIdentityList[T GenericIdentity] []*T
 
+func AdaptIdentityFilter(f IdentityFilter[IdentitySkeleton]) IdentityFilter[Identity] {
+	return func(i *Identity) bool {
+		return f(&i.IdentitySkeleton)
+	}
+}
+
 // Filter will apply a filter to the identity list.
 func (il GenericIdentityList[T]) Filter(filter IdentityFilter[T]) GenericIdentityList[T] {
 	var dup GenericIdentityList[T]
