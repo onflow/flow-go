@@ -37,7 +37,7 @@ spec:
         iam.gke.io/gke-metadata-server-enabled: "true"
       serviceAccountName: "benchnet-configuration-reader"
       initContainers:
-        - name: execution-download
+        - name: bootstrap-download
           image: gcr.io/google.com/cloudsdktool/google-cloud-cli:372.0.0
           command: 
             - 'sh'
