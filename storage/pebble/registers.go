@@ -23,8 +23,8 @@ type Registers struct {
 
 var _ storage.RegisterIndex = (*Registers)(nil)
 
-func NewRegistersWithPath(dir string) (*Registers, *pebble.DB, error) {
-	db, err := initPebbleDB(dir)
+func NewBootstrappedRegistersWithPath(dir string) (*Registers, *pebble.DB, error) {
+	db, err := initRegisterPebbleDB(dir)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to initialize pebble db: %w", err)
 	}
@@ -35,7 +35,7 @@ func NewRegistersWithPath(dir string) (*Registers, *pebble.DB, error) {
 	return registers, db, nil
 }
 
-func initPebbleDB(dir string) (*pebble.DB, error) {
+func initRegisterPebbleDB(dir string) (*pebble.DB, error) {
 	cache := pebble.NewCache(1 << 20)
 	defer cache.Unref()
 	// currently pebble is only used for registers
@@ -48,6 +48,7 @@ func initPebbleDB(dir string) (*pebble.DB, error) {
 	return db, nil
 }
 
+// TODO: rename to NewBootstrappedRegisters
 // NewRegisters takes a populated pebble instance with LatestHeight and FirstHeight set.
 // Will fail if they those two keys are unavailable as it implies a corrupted or uninitialized state
 func NewRegisters(db *pebble.DB) (*Registers, error) {
@@ -150,7 +151,7 @@ func (s *Registers) Store(
 		}
 	}
 	// increment height and commit
-	err := batch.Set(latestHeightKey(), encodedUint64(height), nil)
+	err := batch.Set(latestHeightKey, encodedUint64(height), nil)
 	if err != nil {
 		return fmt.Errorf("failed to update latest height %d", height)
 	}
@@ -174,11 +175,11 @@ func (s *Registers) FirstHeight() uint64 {
 }
 
 func (s *Registers) firstStoredHeight() (uint64, error) {
-	return s.heightLookup(firstHeightKey())
+	return s.heightLookup(firstHeightKey)
 }
 
 func (s *Registers) latestStoredHeight() (uint64, error) {
-	return s.heightLookup(latestHeightKey())
+	return s.heightLookup(latestHeightKey)
 }
 
 func (s *Registers) heightLookup(key []byte) (uint64, error) {
