@@ -17,11 +17,11 @@ import (
 	"github.com/onflow/flow-go/module"
 )
 
-const DefaultCacheSize = 1000
-
-const DefaultPathFinderVersion = 1
-
-const defaultTrieUpdateChanSize = 500
+const (
+	DefaultCacheSize          = 1000
+	DefaultPathFinderVersion  = 1
+	defaultTrieUpdateChanSize = 500
+)
 
 // Ledger (complete) is a fast memory-efficient fork-aware thread-safe trie-based key/value storage.
 // Ledger holds an array of registers (key-value pairs) and keeps tracks of changes over a limited time.
