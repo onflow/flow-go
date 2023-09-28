@@ -75,6 +75,13 @@ func HasNetworkingKey(keys ...crypto.PublicKey) flow.IdentityFilter[flow.Identit
 	}
 }
 
+// HasInitialWeight returns a filter for nodes with non-zero initial weight.
+func HasInitialWeight[T flow.GenericIdentity](hasWeight bool) flow.IdentityFilter[T] {
+	return func(identity *T) bool {
+		return ((*identity).GetInitialWeight() > 0) == hasWeight
+	}
+}
+
 // HasWeight returns a filter for nodes with non-zero weight.
 func HasWeight(hasWeight bool) flow.IdentityFilter[flow.Identity] {
 	return func(identity *flow.Identity) bool {
@@ -106,9 +113,16 @@ var IsValidCurrentEpochParticipant = And(
 	Not(Ejected), // ejection will change signer index
 )
 
+// IsAllowedConsensusCommitteeMember is a identity filter for all members of
+// the consensus committee allowed to participate.
+var IsAllowedConsensusCommitteeMember = And(
+	HasRole[flow.IdentitySkeleton](flow.RoleConsensus),
+	HasInitialWeight[flow.IdentitySkeleton](true),
+)
+
 // IsVotingConsensusCommitteeMember is a identity filter for all members of
 // the consensus committee allowed to vote.
-var IsVotingConsensusCommitteeMember = And(
+var IsVotingConsensusCommitteeMember = And[flow.Identity](
 	HasRole[flow.Identity](flow.RoleConsensus),
 	IsValidCurrentEpochParticipant,
 )
@@ -116,12 +130,4 @@ var IsVotingConsensusCommitteeMember = And(
 // IsValidDKGParticipant is an identity filter for all DKG participants. It is
 // equivalent to the filter for consensus committee members, as these are
 // the same group for now.
-var IsValidDKGParticipant = func(identity *flow.IdentitySkeleton) bool {
-	if identity.Role != flow.RoleConsensus {
-		return false
-	}
-	if identity.InitialWeight == 0 {
-		return false
-	}
-	return true
-}
+var IsValidDKGParticipant = IsAllowedConsensusCommitteeMember
