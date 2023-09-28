@@ -94,15 +94,15 @@ func (w *indexerTest) first() *flow.Block {
 	return w.blocks[0]
 }
 
-func (w *indexerTest) run(ctx irrecoverable.SignalerContext, cancel context.CancelFunc) {
+func (w *indexerTest) run(ctx irrecoverable.SignalerContext, reachHeight uint64, cancel context.CancelFunc) {
 	w.worker.Start(ctx)
 
 	unittest.RequireComponentsReadyBefore(w.t, testTimeout, w.worker)
 
 	w.worker.OnExecutionData(nil)
 
-	// give it a bit of time to process all the blocks
-	time.Sleep(testTimeout - 50)
+	// wait for end to be reached
+	<-w.progress.WaitForIndex(reachHeight)
 	cancel()
 
 	unittest.RequireCloseBefore(w.t, w.worker.Done(), testTimeout, "timeout waiting for the consumer to be done")
@@ -176,7 +176,8 @@ func TestIndexer_Success(t *testing.T) {
 	})
 
 	signalerCtx, cancel := irrecoverable.NewMockSignalerContextWithCancel(t, context.Background())
-	test.run(signalerCtx, cancel)
+	lastHeight := test.blocks[len(test.blocks)-1].Header.Height
+	test.run(signalerCtx, lastHeight, cancel)
 
 	// make sure store was called correct number of times
 	test.indexTest.registers.AssertNumberOfCalls(t, "Store", blocks-lastIndexedIndex-1)
@@ -214,7 +215,8 @@ func TestIndexer_Failure(t *testing.T) {
 
 	_, cancel := context.WithCancel(context.Background())
 	signalerCtx := irrecoverable.NewMockSignalerContextExpectError(t, context.Background(), expectedErr)
-	test.run(signalerCtx, cancel)
+	lastHeight := test.blocks[lastIndexedIndex].Header.Height
+	test.run(signalerCtx, lastHeight, cancel)
 
 	// make sure store was called correct number of times
 	test.indexTest.registers.AssertNumberOfCalls(t, "Store", 1) // it fails after first run
