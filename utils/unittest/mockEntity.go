@@ -1,28 +1,34 @@
 package unittest
 
 import (
+	"crypto/rand"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/stretchr/testify/require"
+	"testing"
 )
 
 // MockEntity implements a bare minimum entity for sake of test.
 type MockEntity struct {
-	Identifier flow.Identifier
+	b  []byte
+	id flow.Identifier
 }
 
 func (m MockEntity) ID() flow.Identifier {
-	return m.Identifier
+	return m.id
 }
 
 func (m MockEntity) Checksum() flow.Identifier {
-	return m.Identifier
+	return m.id
 }
 
 func EntityListFixture(n uint) []*MockEntity {
 	list := make([]*MockEntity, 0, n)
 
 	for i := uint(0); i < n; i++ {
+		id := IdentifierFixture()
 		list = append(list, &MockEntity{
-			Identifier: IdentifierFixture(),
+			id: id,
+			b:  id[:],
 		})
 	}
 
@@ -30,7 +36,33 @@ func EntityListFixture(n uint) []*MockEntity {
 }
 
 func MockEntityFixture() *MockEntity {
-	return &MockEntity{Identifier: IdentifierFixture()}
+	id := IdentifierFixture()
+	b := id[:]
+	return &MockEntity{
+		b:  b,
+		id: id,
+	}
+}
+
+func MockEntityFixtureWithSize(t *testing.T, size int) *MockEntity {
+	b := make([]byte, size)
+	n, err := rand.Read(b)
+	require.NoError(t, err)
+	require.Equal(t, size, n)
+	return &MockEntity{
+		b:  b,
+		id: flow.MakeID(b),
+	}
+}
+
+func MockEntityFixtureListWithSize(t *testing.T, count int, size int) []*MockEntity {
+	entities := make([]*MockEntity, 0, count)
+	for i := 0; i < count; i++ {
+		e := MockEntityFixtureWithSize(t, size)
+		require.NotContainsf(t, entities, e, "entity %d already exists", i)
+		entities = append(entities, e)
+	}
+	return entities
 }
 
 func MockEntityListFixture(count int) []*MockEntity {
