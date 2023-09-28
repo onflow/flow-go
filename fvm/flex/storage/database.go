@@ -110,25 +110,6 @@ func (db *Database) Get(key []byte) ([]byte, error) {
 		return nil, err
 	}
 
-	// array := v.(*atree.Array)
-	// result := make([]byte, 0)
-	// itr, err := array.Iterator()
-	// if err != nil {
-	// 	return nil, err
-	// }
-
-	// item, err := itr.Next()
-	// if err != nil {
-	// 	return nil, err
-	// }
-	// for item != nil {
-	// 	result = append(result, uint8(item.(Uint8Value)))
-	// 	item, err = itr.Next()
-	// 	if err != nil {
-	// 		return nil, err
-	// 	}
-	// }
-
 	return val, err
 }
 
@@ -137,16 +118,6 @@ func (db *Database) Put(key []byte, value []byte) error {
 	db.lock.Lock()
 	defer db.lock.Unlock()
 
-	// array, err := atree.NewArray(db.storage, atree.Address(FlexAddress), typeInfo{})
-	// if err != nil {
-	// 	panic(err)
-	// }
-	// for _, v := range value {
-	// 	err = array.Append(Uint8Value(v))
-	// 	if err != nil {
-	// 		panic(err)
-	// 	}
-	// }
 	_, err := db.atreemap.Set(compare, hashInputProvider, NewStringValue(hex.EncodeToString(key)), NewStringValue(hex.EncodeToString(value)))
 	return err
 }
