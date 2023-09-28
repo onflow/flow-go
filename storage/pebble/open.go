@@ -3,11 +3,13 @@ package pebble
 import (
 	"fmt"
 
+	"errors"
+
 	"github.com/cockroachdb/pebble"
 	"github.com/hashicorp/go-multierror"
+
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/pebble/registers"
-	"github.com/pkg/errors"
 )
 
 // NewBootstrappedRegistersWithPath initializes a new Registers instance with a pebble db

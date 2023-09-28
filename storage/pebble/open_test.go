@@ -19,6 +19,7 @@ func TestIsDBNotBootstrapped(t *testing.T) {
 	require.True(t, notBootstrapped)
 	require.NoError(t, db.Close())
 	err = os.RemoveAll(dir)
+	require.NoError(t, err)
 }
 
 func TestReadHeightsFromBootstrappedDB(t *testing.T) {
@@ -46,6 +47,7 @@ func TestReadHeightsFromBootstrappedDB(t *testing.T) {
 
 	require.NoError(t, db.Close())
 	err = os.RemoveAll(dir)
+	require.NoError(t, err)
 }
 
 func TestNewBootstrappedRegistersWithPath(t *testing.T) {
@@ -71,4 +73,5 @@ func TestNewBootstrappedRegistersWithPath(t *testing.T) {
 
 	require.NoError(t, db.Close())
 	err = os.RemoveAll(dir)
+	require.NoError(t, err)
 }
