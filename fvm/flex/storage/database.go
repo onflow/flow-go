@@ -1,6 +1,7 @@
 package storage
 
 import (
+	"encoding/hex"
 	"errors"
 	"sync"
 
@@ -31,6 +32,8 @@ var FlexRootSlabKey = "RootSlabKey"
 // Database is an ephemeral key-value store. Apart from basic data storage
 // functionality it also supports batch writes and iterating over the keyspace in
 // binary-alphabetical order.
+
+// TODO: maybe instead of array for values we also use hex.Encode
 type Database struct {
 	led      atree.Ledger
 	storage  *atree.PersistentSlabStorage
@@ -92,7 +95,7 @@ func (db *Database) Get(key []byte) ([]byte, error) {
 	db.lock.RLock()
 	defer db.lock.RUnlock()
 
-	data, err := db.atreemap.Get(compare, hashInputProvider, NewStringValue(string(key)))
+	data, err := db.atreemap.Get(compare, hashInputProvider, NewStringValue(hex.EncodeToString(key)))
 	if err != nil {
 		return nil, err
 	}
@@ -102,26 +105,31 @@ func (db *Database) Get(key []byte) ([]byte, error) {
 		return nil, err
 	}
 
-	array := v.(*atree.Array)
-	result := make([]byte, 0)
-	itr, err := array.Iterator()
+	val, err := hex.DecodeString(v.(StringValue).String())
 	if err != nil {
 		return nil, err
 	}
 
-	item, err := itr.Next()
-	if err != nil {
-		return nil, err
-	}
-	for item != nil {
-		result = append(result, uint8(item.(Uint8Value)))
-		item, err = itr.Next()
-		if err != nil {
-			return nil, err
-		}
-	}
+	// array := v.(*atree.Array)
+	// result := make([]byte, 0)
+	// itr, err := array.Iterator()
+	// if err != nil {
+	// 	return nil, err
+	// }
 
-	return result, err
+	// item, err := itr.Next()
+	// if err != nil {
+	// 	return nil, err
+	// }
+	// for item != nil {
+	// 	result = append(result, uint8(item.(Uint8Value)))
+	// 	item, err = itr.Next()
+	// 	if err != nil {
+	// 		return nil, err
+	// 	}
+	// }
+
+	return val, err
 }
 
 // Put inserts the given value into the key-value store.
@@ -129,14 +137,17 @@ func (db *Database) Put(key []byte, value []byte) error {
 	db.lock.Lock()
 	defer db.lock.Unlock()
 
-	array, err := atree.NewArray(db.storage, atree.Address(FlexAddress), typeInfo{})
-	if err != nil {
-		panic(err)
-	}
-	for i, v := range value {
-		array.Set(uint64(i), Uint8Value(v))
-	}
-	_, err = db.atreemap.Set(compare, hashInputProvider, NewStringValue(string(key)), array)
+	// array, err := atree.NewArray(db.storage, atree.Address(FlexAddress), typeInfo{})
+	// if err != nil {
+	// 	panic(err)
+	// }
+	// for _, v := range value {
+	// 	err = array.Append(Uint8Value(v))
+	// 	if err != nil {
+	// 		panic(err)
+	// 	}
+	// }
+	_, err := db.atreemap.Set(compare, hashInputProvider, NewStringValue(hex.EncodeToString(key)), NewStringValue(hex.EncodeToString(value)))
 	return err
 }
 
@@ -145,7 +156,7 @@ func (db *Database) Delete(key []byte) error {
 	db.lock.Lock()
 	defer db.lock.Unlock()
 
-	_, _, err := db.atreemap.Remove(compare, hashInputProvider, NewStringValue(string(key)))
+	_, _, err := db.atreemap.Remove(compare, hashInputProvider, NewStringValue(hex.EncodeToString(key)))
 	return err
 }
 

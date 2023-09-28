@@ -70,7 +70,7 @@ func RunWithDeployedContract(t *testing.T, backend models.Backend, f func(*TestC
 }
 
 func ConvertToCadence(data []byte) []cadence.Value {
-	ret := make([]cadence.Value, 20)
+	ret := make([]cadence.Value, len(data))
 	for i, v := range data {
 		ret[i] = cadence.UInt8(v)
 	}
