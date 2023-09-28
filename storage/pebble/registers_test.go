@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/cockroachdb/pebble"
+	"github.com/pkg/errors"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/model/flow"
@@ -25,6 +26,8 @@ func TestRegisters_Initialize(t *testing.T) {
 	// fail on blank database without FirstHeight and LastHeight set
 	_, err := NewRegisters(p)
 	require.Error(t, err)
+	// verify the error type
+	require.True(t, errors.Is(err, ErrNotBootstrapped))
 	err = os.RemoveAll(dir)
 	require.NoError(t, err)
 }
@@ -311,7 +314,7 @@ func RunWithRegistersStorageAtHeight1(tb testing.TB, f func(r *Registers)) {
 }
 
 func newBootstrappedRegistersWithPathForTest(tb testing.TB, dir string, first, latest uint64) *pebble.DB {
-	p, err := initRegisterPebbleDB(dir)
+	p, err := openRegisterPebbleDB(dir)
 	require.NoError(tb, err)
 
 	// insert initial heights to pebble

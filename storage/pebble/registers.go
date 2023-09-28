@@ -22,9 +22,9 @@ type Registers struct {
 
 var _ storage.RegisterIndex = (*Registers)(nil)
 
-// TODO: rename to NewBootstrappedRegisters
 // NewRegisters takes a populated pebble instance with LatestHeight and FirstHeight set.
-// return error if they those two keys are unavailable as it implies a uninitialized state or corrupted state
+// return ErrNotBootstrapped if they those two keys are unavailable as it implies a uninitialized state
+// return other error if database is in a corrupted state
 func NewRegisters(db *pebble.DB) (*Registers, error) {
 	registers := &Registers{
 		db: db,
@@ -32,11 +32,15 @@ func NewRegisters(db *pebble.DB) (*Registers, error) {
 	// check height keys and populate cache. These two variables will have been set
 	firstHeight, err := registers.firstStoredHeight()
 	if err != nil {
+		if errors.Is(err, storage.ErrNotFound) {
+			return nil, fmt.Errorf("unable to initialize register storage, first height not found in db: %w", ErrNotBootstrapped)
+		}
 		// this means that the DB is either in a corrupted state or has not been initialized
 		return nil, fmt.Errorf("unable to initialize register storage, first height unavailable in db: %w", err)
 	}
 	latestHeight, err := registers.latestStoredHeight()
 	if err != nil {
+		// first height is found, but latest height is not found, this means that the DB is in a corrupted state
 		return nil, fmt.Errorf("unable to initialize register storage, latest height unavailable in db: %w", err)
 	}
 	/// All registers between firstHeight and lastHeight have been indexed
@@ -159,8 +163,16 @@ func (s *Registers) latestStoredHeight() (uint64, error) {
 func (s *Registers) heightLookup(key []byte) (uint64, error) {
 	res, closer, err := s.db.Get(key)
 	if err != nil {
-		return 0, err
+		return 0, convertNotFoundError(err)
 	}
 	defer closer.Close()
 	return binary.BigEndian.Uint64(res), nil
+}
+
+// convert pebble NotFound error to storage NotFound error
+func convertNotFoundError(err error) error {
+	if errors.Is(err, pebble.ErrNotFound) {
+		return storage.ErrNotFound
+	}
+	return err
 }
