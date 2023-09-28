@@ -119,6 +119,7 @@ func (fe *Environment) commit() error {
 		return models.NewFatalError(err)
 	}
 
+	// commit atree changes back to the backend
 	err = fe.Database.Commit()
 	if err != nil {
 		return models.NewFatalError(err)
