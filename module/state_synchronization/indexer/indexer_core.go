@@ -150,9 +150,8 @@ func (c *IndexerCore) indexEvents(blockID flow.Identifier, events flow.EventsLis
 }
 
 func (c *IndexerCore) indexRegisters(registers map[ledger.Path]*ledger.Payload, height uint64) error {
-	regEntries := make(flow.RegisterEntries, len(registers))
+	regEntries := make(flow.RegisterEntries, 0, len(registers))
 
-	j := 0
 	for _, payload := range registers {
 		k, err := payload.Key()
 		if err != nil {
@@ -164,11 +163,10 @@ func (c *IndexerCore) indexRegisters(registers map[ledger.Path]*ledger.Payload, 
 			return err
 		}
 
-		regEntries[j] = flow.RegisterEntry{
+		regEntries = append(regEntries, flow.RegisterEntry{
 			Key:   id,
 			Value: payload.Value(),
-		}
-		j++
+		})
 	}
 
 	return c.registers.Store(regEntries, height)
