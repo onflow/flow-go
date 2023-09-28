@@ -50,6 +50,7 @@ func NewRegisterBootstrap(
 
 // batchIndexRegisters
 func (b *RegisterBootstrap) batchIndexRegisters(leafNodes []*wal.LeafNode) error {
+	b.log.Debug().Int("batch_size", len(leafNodes)).Msg("indexing batch of leaf nodes ")
 	batch := b.db.NewBatch()
 	defer batch.Close()
 	for _, register := range leafNodes {
@@ -80,6 +81,7 @@ func (b *RegisterBootstrap) batchIndexRegisters(leafNodes []*wal.LeafNode) error
 // indexCheckpointFileWorker asynchronously indexes register entries in b.checkpointDir
 // with wal.OpenAndReadLeafNodesFromCheckpointV6
 func (b *RegisterBootstrap) indexCheckpointFileWorker() error {
+	b.log.Debug().Msg("started checkpoint index worker")
 	// collect leaf nodes to batch index until the channel is closed
 	batch := make([]*wal.LeafNode, 0, pebbleBootstrapRegisterBatchLen)
 	for leafNode := range b.leafNodeChan {
@@ -103,6 +105,7 @@ func (b *RegisterBootstrap) indexCheckpointFileWorker() error {
 // IndexCheckpointFile indexes the checkpoint file in the Dir provided
 func (b *RegisterBootstrap) IndexCheckpointFile(ctx context.Context) error {
 	g, _ := errgroup.WithContext(ctx)
+	b.log.Debug().Msg("indexing checkpoint file for pebble register store")
 	for i := 0; i < pebbleBootstrapWorkerCount; i++ {
 		g.Go(func() error {
 			return b.indexCheckpointFileWorker()
@@ -110,12 +113,12 @@ func (b *RegisterBootstrap) IndexCheckpointFile(ctx context.Context) error {
 	}
 	err := wal.OpenAndReadLeafNodesFromCheckpointV6(b.leafNodeChan, b.checkpointDir, b.checkpointFileName, b.log)
 	if err != nil {
-		// error in reading a leaf node
 		return fmt.Errorf("error reading leaf node: %w", err)
 	}
 	if err = g.Wait(); err != nil {
 		return fmt.Errorf("failed to index checkpoint file: %w", err)
 	}
+	b.log.Debug().Msg("checkpoint indexing complete")
 	batch := b.db.NewBatch()
 	defer batch.Close()
 	// update heights atomically to prevent one getting populated without the other

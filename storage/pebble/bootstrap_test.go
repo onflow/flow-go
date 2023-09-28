@@ -3,6 +3,7 @@ package pebble
 import (
 	"context"
 	"encoding/binary"
+	"fmt"
 	"io"
 	"os"
 	"path"
@@ -144,7 +145,25 @@ func TestRegisterBootstrap_IndexCheckpointFile_FormatIssue(t *testing.T) {
 
 func TestRegisterBootstrap_IndexCheckpointFile_CorruptedCheckpointFile(t *testing.T) {
 	t.Parallel()
-
+	rootHeight := uint64(666)
+	log := zerolog.New(io.Discard)
+	unittest.RunWithTempDir(t, func(dir string) {
+		tries, _ := largeTrieWithValidRegisterIDs(t)
+		checkpointFileName := "large-checkpoint-incomplete"
+		require.NoErrorf(t, wal.StoreCheckpointV6Concurrently(tries, dir, checkpointFileName, log), "fail to store checkpoint")
+		// delete 2nd part of the file (2nd subtrie)
+		fileToDelete := path.Join(dir, fmt.Sprintf("%v.%03d", checkpointFileName, 2))
+		err := os.RemoveAll(fileToDelete)
+		require.NoError(t, err)
+		cache := pebble.NewCache(1 << 20)
+		opts := DefaultPebbleOptions(cache, registers.NewMVCCComparer())
+		defer cache.Unref()
+		pb, _ := unittest.TempPebbleDBWithOpts(t, opts)
+		bootstrap, err := NewRegisterBootstrap(pb, checkpointFileName, rootHeight, log)
+		require.NoError(t, err)
+		err = bootstrap.IndexCheckpointFile(context.Background())
+		require.ErrorIs(t, err, os.ErrNotExist)
+	})
 }
 
 func TestRegisterBootstrap_IndexCheckpointFile_MultipleBatch(t *testing.T) {
