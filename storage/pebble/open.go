@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/cockroachdb/pebble"
+	"github.com/hashicorp/go-multierror"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/pebble/registers"
 	"github.com/pkg/errors"
@@ -18,6 +19,13 @@ func NewBootstrappedRegistersWithPath(dir string) (*Registers, *pebble.DB, error
 	}
 	registers, err := NewRegisters(db)
 	if err != nil {
+		if errors.Is(err, ErrNotBootstrapped) {
+			// closing the db if not bootstrapped
+			dbErr := db.Close()
+			if dbErr != nil {
+				err = multierror.Append(err, fmt.Errorf("failed to close db: %w", dbErr))
+			}
+		}
 		return nil, nil, fmt.Errorf("failed to initialize registers: %w", err)
 	}
 	return registers, db, nil

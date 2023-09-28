@@ -1,6 +1,7 @@
 package pebble
 
 import (
+	"errors"
 	"os"
 	"testing"
 
@@ -43,5 +44,31 @@ func TestReadHeightsFromBootstrappedDB(t *testing.T) {
 	require.Equal(t, firstHeight, registers.FirstHeight())
 	require.Equal(t, firstHeight, registers.LatestHeight())
 
+	require.NoError(t, db.Close())
+	err = os.RemoveAll(dir)
+}
+
+func TestNewBootstrappedRegistersWithPath(t *testing.T) {
+	t.Parallel()
+	dir := unittest.TempPebblePath(t)
+	_, db, err := NewBootstrappedRegistersWithPath(dir)
+	require.Error(t, err)
+	require.True(t, errors.Is(err, ErrNotBootstrapped))
+
+	// verify the db is closed
+	require.True(t, db == nil)
+
+	// bootstrap the db
+	// init with first height
+	db, err = OpenRegisterPebbleDB(dir)
+	firstHeight := uint64(10)
+	require.NoError(t, initHeights(db, firstHeight))
+
+	registers, err := NewRegisters(db)
+	require.NoError(t, err)
+	require.Equal(t, firstHeight, registers.FirstHeight())
+	require.Equal(t, firstHeight, registers.LatestHeight())
+
+	require.NoError(t, db.Close())
 	err = os.RemoveAll(dir)
 }
