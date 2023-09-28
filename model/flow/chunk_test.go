@@ -121,8 +121,8 @@ func TestChunkIndexIsSet(t *testing.T) {
 		17995,
 	)
 
-	assert.Equal(t, i, int(chunk.Index))
-	assert.Equal(t, i, int(chunk.CollectionIndex))
+	assert.Equal(t, i, uint(chunk.Index))
+	assert.Equal(t, i, uint(chunk.CollectionIndex))
 }
 
 func TestChunkNumberOfTxsIsSet(t *testing.T) {
@@ -139,7 +139,7 @@ func TestChunkNumberOfTxsIsSet(t *testing.T) {
 		17995,
 	)
 
-	assert.Equal(t, i, int(chunk.NumberOfTransactions))
+	assert.Equal(t, i, uint32(chunk.NumberOfTransactions))
 }
 
 func TestChunkTotalComputationUsedIsSet(t *testing.T) {
