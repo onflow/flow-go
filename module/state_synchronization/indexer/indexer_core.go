@@ -4,7 +4,6 @@ import (
 	"fmt"
 
 	"github.com/rs/zerolog"
-	"golang.org/x/exp/maps"
 	"golang.org/x/sync/errgroup"
 
 	"github.com/onflow/flow-go/ledger"
@@ -104,14 +103,6 @@ func (c *IndexerCore) IndexBlockData(data *execution_data.BlockExecutionDataEnti
 	})
 
 	g.Go(func() error {
-		updates := make([]*ledger.TrieUpdate, 0)
-
-		for _, chunk := range data.ChunkExecutionDatas {
-			if chunk.TrieUpdate != nil {
-				updates = append(updates, chunk.TrieUpdate)
-			}
-		}
-
 		// we are iterating all the registers and overwrite any existing register at the same path
 		// this will make sure if we have multiple register changes only the last change will get persisted
 		// if block has two chucks:
@@ -119,13 +110,16 @@ func (c *IndexerCore) IndexBlockData(data *execution_data.BlockExecutionDataEnti
 		// second chunk updates: { X: 2 }
 		// then we should persist only {X: 2: Y: 2}
 		payloads := make(map[ledger.Path]*ledger.Payload)
-		for _, update := range updates {
-			for i, path := range update.Paths {
-				payloads[path] = update.Payloads[i]
+		for _, chunk := range data.ChunkExecutionDatas {
+			update := chunk.TrieUpdate
+			if update != nil && len(update.Paths) == len(update.Payloads) {
+				for i, path := range update.Paths {
+					payloads[path] = update.Payloads[i]
+				}
 			}
 		}
 
-		err = c.indexRegisters(maps.Values(payloads), block.Height)
+		err = c.indexRegisters(payloads, block.Height)
 		if err != nil {
 			return fmt.Errorf("could not index register payloads at height %d: %w", block.Height, err)
 		}
@@ -150,10 +144,11 @@ func (c *IndexerCore) indexEvents(blockID flow.Identifier, events flow.EventsLis
 	return err
 }
 
-func (c *IndexerCore) indexRegisters(payloads []*ledger.Payload, height uint64) error {
-	regEntries := make(flow.RegisterEntries, len(payloads))
+func (c *IndexerCore) indexRegisters(registers map[ledger.Path]*ledger.Payload, height uint64) error {
+	regEntries := make(flow.RegisterEntries, len(registers))
 
-	for j, payload := range payloads {
+	j := 0
+	for _, payload := range registers {
 		k, err := payload.Key()
 		if err != nil {
 			return err
@@ -168,6 +163,7 @@ func (c *IndexerCore) indexRegisters(payloads []*ledger.Payload, height uint64) 
 			Key:   id,
 			Value: payload.Value(),
 		}
+		j++
 	}
 
 	return c.registers.Store(regEntries, height)

@@ -489,8 +489,8 @@ func TestIndexerIntegration_StoreAndGet(t *testing.T) {
 			index, err := New(zerolog.Nop(), registers, nil, nil)
 			require.NoError(t, err)
 
-			require.NoError(t, index.indexRegisters([]*ledger.Payload{}, 1))
-			require.NoError(t, index.indexRegisters([]*ledger.Payload{}, 1))
+			require.NoError(t, index.indexRegisters(map[ledger.Path]*ledger.Payload{}, 1))
+			require.NoError(t, index.indexRegisters(map[ledger.Path]*ledger.Payload{}, 1))
 			require.NoError(t, index.indexRegisters(nil, 2))
 		})
 	})
@@ -499,7 +499,7 @@ func TestIndexerIntegration_StoreAndGet(t *testing.T) {
 // helper to store register at height and increment index range
 func storeRegisterWithValue(indexer *IndexerCore, height uint64, owner string, key string, value []byte) error {
 	payload := ledgerPayloadWithValuesFixture(owner, key, value)
-	return indexer.indexRegisters([]*ledger.Payload{payload}, height)
+	return indexer.indexRegisters(map[ledger.Path]*ledger.Payload{ledger.DummyPath: payload}, height)
 }
 
 // duplicated from register tests https://github.com/onflow/flow-go/blob/aa41e76c824260f8f08aacbe46471619ecf3fe6e/storage/pebble/registers_test.go#L291
