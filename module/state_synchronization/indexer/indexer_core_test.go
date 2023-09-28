@@ -151,6 +151,7 @@ func (i *indexCoreTest) useDefaultTransactionResults() *indexCoreTest {
 func (i *indexCoreTest) initIndexer() *indexCoreTest {
 	db, dbDir := unittest.TempBadgerDB(i.t)
 	i.t.Cleanup(func() {
+		require.NoError(i.t, db.Close())
 		require.NoError(i.t, os.RemoveAll(dbDir))
 	})
 
