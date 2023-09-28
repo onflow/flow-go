@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 
 	"github.com/cockroachdb/pebble"
+	"github.com/onflow/flow-go/ledger/common/convert"
 	"github.com/rs/zerolog"
 	"golang.org/x/sync/errgroup"
 
@@ -55,7 +56,7 @@ func NewRegisterBootstrap(
 
 // batchIndexRegisters
 func (b *RegisterBootstrap) batchIndexRegisters(leafNodes []*wal.LeafNode) error {
-	b.log.Debug().Int("batch_size", len(leafNodes)).Msg("indexing batch of leaf nodes ")
+	b.log.Debug().Int("batch_size", len(leafNodes)).Msg("indexing batch of leaf nodes")
 	batch := b.db.NewBatch()
 	defer batch.Close()
 	for _, register := range leafNodes {
@@ -65,7 +66,7 @@ func (b *RegisterBootstrap) batchIndexRegisters(leafNodes []*wal.LeafNode) error
 			return fmt.Errorf("could not get key from register payload: %w", err)
 		}
 
-		registerID, err := keyToRegisterID(key)
+		registerID, err := convert.LedgerKeyToRegisterID(key)
 		if err != nil {
 			return fmt.Errorf("could not get register ID from key: %w", err)
 		}

@@ -13,8 +13,8 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 
-	"github.com/onflow/flow-go/engine/execution/state"
 	"github.com/onflow/flow-go/ledger"
+	"github.com/onflow/flow-go/ledger/common/convert"
 	"github.com/onflow/flow-go/ledger/common/testutils"
 	"github.com/onflow/flow-go/ledger/complete/mtrie/trie"
 	"github.com/onflow/flow-go/ledger/complete/wal"
@@ -138,7 +138,7 @@ func TestRegisterBootstrap_IndexCheckpointFile_FormatIssue(t *testing.T) {
 		bootstrap, err := NewRegisterBootstrap(pb, checkpointFile, rootHeight, log)
 		require.NoError(t, err)
 		err = bootstrap.IndexCheckpointFile(context.Background())
-		require.ErrorContains(t, err, "key not in expected format")
+		require.ErrorContains(t, err, "unexpected ledger key format")
 		require.NoError(t, pb.Close())
 		require.NoError(t, os.RemoveAll(dbDir))
 	})
@@ -223,7 +223,7 @@ func trieWithValidRegisterIDs(t *testing.T, n uint16) ([]*trie.MTrie, []*flow.Re
 	for _, payload := range payloads {
 		key, err := payload.Key()
 		require.NoError(t, err)
-		regID, err := keyToRegisterID(key)
+		regID, err := convert.LedgerKeyToRegisterID(key)
 		require.NoError(t, err)
 		resultRegisterIDs = append(resultRegisterIDs, &regID)
 	}
@@ -241,8 +241,8 @@ func randomRegisterPayloads(n uint16) []ledger.Payload {
 		o := make([]byte, 0, 8)
 		o = binary.BigEndian.AppendUint16(o, n)
 		k := ledger.Key{KeyParts: []ledger.KeyPart{
-			{Type: state.KeyPartOwner, Value: o},
-			{Type: state.KeyPartKey, Value: o},
+			{Type: convert.KeyPartOwner, Value: o},
+			{Type: convert.KeyPartKey, Value: o},
 		}}
 		// values are always 'v' for ease of testing/checking
 		v := ledger.Value{defaultRegisterValue}
