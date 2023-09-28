@@ -5,8 +5,9 @@ import (
 	"os"
 	"testing"
 
-	"github.com/onflow/flow-go/utils/unittest"
 	"github.com/stretchr/testify/require"
+
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 func TestIsDBNotBootstrapped(t *testing.T) {
@@ -62,16 +63,17 @@ func TestNewBootstrappedRegistersWithPath(t *testing.T) {
 
 	// bootstrap the db
 	// init with first height
-	db, err = OpenRegisterPebbleDB(dir)
+	db2, err := OpenRegisterPebbleDB(dir)
+	require.NoError(t, err)
 	firstHeight := uint64(10)
-	require.NoError(t, initHeights(db, firstHeight))
+	require.NoError(t, initHeights(db2, firstHeight))
 
-	registers, err := NewRegisters(db)
+	registers, err := NewRegisters(db2)
 	require.NoError(t, err)
 	require.Equal(t, firstHeight, registers.FirstHeight())
 	require.Equal(t, firstHeight, registers.LatestHeight())
 
-	require.NoError(t, db.Close())
+	require.NoError(t, db2.Close())
 	err = os.RemoveAll(dir)
 	require.NoError(t, err)
 }
