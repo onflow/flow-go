@@ -181,7 +181,7 @@ func (e *ReactorEngine) startDKGForEpoch(currentEpochCounter uint64, first *flow
 		log.Fatal().Err(err).Msg("could not retrieve epoch info")
 	}
 
-	committee := curDKGInfo.identities.Filter(filter.IsVotingConsensusCommitteeMember)
+	committee := curDKGInfo.identities.Filter(filter.IsAllowedConsensusCommitteeMember)
 
 	log.Info().
 		Uint64("phase1", curDKGInfo.phase1FinalView).

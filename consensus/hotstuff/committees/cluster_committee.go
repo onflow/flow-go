@@ -26,7 +26,7 @@ type Cluster struct {
 	// pre-computed leader selection for the full lifecycle of the cluster
 	selection *leader.LeaderSelection
 	// a filter that returns all members of the cluster committee allowed to vote
-	clusterMemberFilter flow.IdentityFilter
+	clusterMemberFilter flow.IdentityFilter[flow.Identity]
 	// initial set of cluster members, WITHOUT dynamic weight changes
 	initialClusterMembers    flow.IdentitySkeletonList
 	initialClusterIdentities flow.IdentityList
@@ -50,19 +50,34 @@ func NewClusterCommittee(
 		return nil, fmt.Errorf("could not compute leader selection for cluster: %w", err)
 	}
 
-	totalWeight := cluster.Members().ToSkeleton().TotalWeight()
+	initialClusterMembers := cluster.Members()
+	totalWeight := initialClusterMembers.TotalWeight()
+	initialClusterMembersSelector := initialClusterMembers.Selector()
+	initialClusterIdentities := make(flow.IdentityList, 0, len(cluster.Members()))
+	for _, skeleton := range initialClusterMembers {
+		initialClusterIdentities = append(initialClusterIdentities, &flow.Identity{
+			IdentitySkeleton: *skeleton,
+			DynamicIdentity: flow.DynamicIdentity{
+				Weight:  skeleton.InitialWeight,
+				Ejected: false,
+			},
+		})
+	}
 	com := &Cluster{
 		state:     state,
 		payloads:  payloads,
 		me:        me,
 		selection: selection,
-		clusterMemberFilter: filter.And(
-			cluster.Members().Selector(),
+		clusterMemberFilter: filter.And[flow.Identity](
+			// adapt the identity filter to the identity skeleton filter
+			func(f *flow.Identity) bool {
+				return initialClusterMembersSelector(&f.IdentitySkeleton)
+			},
 			filter.Not(filter.Ejected),
 			filter.HasWeight(true),
 		),
-		initialClusterMembers:    cluster.Members().ToSkeleton(),
-		initialClusterIdentities: cluster.Members(),
+		initialClusterMembers:    initialClusterMembers,
+		initialClusterIdentities: initialClusterIdentities,
 		weightThresholdForQC:     WeightThresholdToBuildQC(totalWeight),
 		weightThresholdForTO:     WeightThresholdToTimeout(totalWeight),
 	}
