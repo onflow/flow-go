@@ -1134,7 +1134,7 @@ func (m *FollowerState) handleEpochServiceEvents(candidate *flow.Block, updater 
 					updater.SetInvalidStateTransitionAttempted()
 					return dbUpdates, nil
 				}
-				extendingSetup := parentProtocolState.NextEpochProtocolState.CurrentEpochSetup
+				extendingSetup := parentProtocolState.NextEpochSetup
 
 				// validate the service event
 				err = isValidExtendingEpochCommit(ev, extendingSetup, activeSetup, epochStatus)

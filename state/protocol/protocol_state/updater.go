@@ -22,8 +22,15 @@ type Updater struct {
 	state       *flow.ProtocolStateEntry
 	candidate   *flow.Header
 
+	// nextEpochIdentitiesLookup is a map from NodeID → DynamicIdentityEntry for the _current_ epoch, containing the
+	// same identities as in the EpochStateContainer `state.CurrentEpoch.Identities`. Note that map values are pointers,
+	// so writes to map values will modify the respective DynamicIdentityEntry in EpochStateContainer.
 	currentEpochIdentitiesLookup map[flow.Identifier]*flow.DynamicIdentityEntry
-	nextEpochIdentitiesLookup    map[flow.Identifier]*flow.DynamicIdentityEntry
+
+	// nextEpochIdentitiesLookup is a map from NodeID → DynamicIdentityEntry for the _next_ epoch, containing the
+	// same identities as in the EpochStateContainer `state.NextEpoch.Identities`. Note that map values are pointers,
+	// so writes to map values will modify the respective DynamicIdentityEntry in EpochStateContainer.
+	nextEpochIdentitiesLookup map[flow.Identifier]*flow.DynamicIdentityEntry
 }
 
 var _ protocol.StateUpdater = (*Updater)(nil)
@@ -57,7 +64,7 @@ func (u *Updater) ProcessEpochSetup(epochSetup *flow.EpochSetup) error {
 	if epochSetup.Counter != u.parentState.CurrentEpochSetup.Counter+1 {
 		return fmt.Errorf("invalid epoch setup counter, expecting %v got %v", u.parentState.CurrentEpochSetup.Counter+1, epochSetup.Counter)
 	}
-	if u.state.NextEpochProtocolState != nil {
+	if u.state.NextEpoch != nil {
 		return fmt.Errorf("protocol state has already a setup event")
 	}
 	if u.state.InvalidStateTransitionAttempted {
@@ -77,7 +84,7 @@ func (u *Updater) ProcessEpochSetup(epochSetup *flow.EpochSetup) error {
 
 	// lookup of dynamic data for current protocol state identities
 	// by definition, this will include identities from current epoch + identities from previous epoch with 0 weight.
-	identitiesStateLookup := u.parentState.ProtocolStateEntry.Identities.Lookup()
+	identitiesStateLookup := u.parentState.CurrentEpoch.ActiveIdentities.Lookup()
 
 	currentEpochSetupParticipants := u.parentState.CurrentEpochSetup.Participants
 	// construct identities for current epoch: current epoch participants + next epoch participants with 0 weight
@@ -136,23 +143,18 @@ func (u *Updater) ProcessEpochSetup(epochSetup *flow.EpochSetup) error {
 	}
 
 	// IMPORTANT: per convention, identities must be listed on canonical order!
-	u.state.Identities = currentEpochIdentities.Sort(order.IdentifierCanonical)
+	u.state.CurrentEpoch.ActiveIdentities = currentEpochIdentities.Sort(order.IdentifierCanonical)
 
 	// construct protocol state entry for next epoch
-	u.state.NextEpochProtocolState = &flow.ProtocolStateEntry{
-		CurrentEpochEventIDs: flow.EventIDs{
-			SetupID:  epochSetup.ID(),
-			CommitID: flow.ZeroID,
-		},
-		PreviousEpochEventIDs:           u.state.CurrentEpochEventIDs,
-		Identities:                      nextEpochIdentities.Sort(order.IdentifierCanonical),
-		InvalidStateTransitionAttempted: false,
-		NextEpochProtocolState:          nil,
+	u.state.NextEpoch = &flow.EpochStateContainer{
+		SetupID:          epochSetup.ID(),
+		CommitID:         flow.ZeroID,
+		ActiveIdentities: nextEpochIdentities.Sort(order.IdentifierCanonical),
 	}
 
-	// since identities have changed, invalidate lookup, so we can safely process epoch setup
-	// and update identities afterward.
-	u.invalidateLookup()
+	// since identities have changed, rebuild identity lookups, so we can safely process
+	// subsequent epoch commit event and update identities afterward.
+	u.rebuildIdentityLookup()
 
 	return nil
 }
@@ -166,17 +168,17 @@ func (u *Updater) ProcessEpochCommit(epochCommit *flow.EpochCommit) error {
 	if epochCommit.Counter != u.parentState.CurrentEpochSetup.Counter+1 {
 		return fmt.Errorf("invalid epoch commit counter, expecting %v got %v", u.parentState.CurrentEpochSetup.Counter+1, epochCommit.Counter)
 	}
-	if u.state.NextEpochProtocolState == nil {
+	if u.state.NextEpoch == nil {
 		return fmt.Errorf("protocol state has been setup yet")
 	}
-	if u.state.NextEpochProtocolState.CurrentEpochEventIDs.CommitID != flow.ZeroID {
+	if u.state.NextEpoch.CommitID != flow.ZeroID {
 		return fmt.Errorf("protocol state has already a commit event")
 	}
 	if u.state.InvalidStateTransitionAttempted {
 		return nil // won't process new events if we are going to enter EECC
 	}
 
-	u.state.NextEpochProtocolState.CurrentEpochEventIDs.CommitID = epochCommit.ID()
+	u.state.NextEpoch.CommitID = epochCommit.ID()
 	return nil
 }
 
@@ -191,7 +193,7 @@ func (u *Updater) UpdateIdentity(updated *flow.DynamicIdentityEntry) error {
 	}
 
 	currentEpochIdentity.Dynamic = updated.Dynamic
-	if u.state.NextEpochProtocolState != nil {
+	if u.state.NextEpoch != nil {
 		nextEpochIdentity, found := u.nextEpochIdentitiesLookup[updated.NodeID]
 		if found {
 			nextEpochIdentity.Dynamic = updated.Dynamic
@@ -203,37 +205,39 @@ func (u *Updater) UpdateIdentity(updated *flow.DynamicIdentityEntry) error {
 // SetInvalidStateTransitionAttempted sets a flag indicating that invalid state transition was attempted.
 func (u *Updater) SetInvalidStateTransitionAttempted() {
 	u.state.InvalidStateTransitionAttempted = true
-	if u.state.NextEpochProtocolState != nil {
-		u.state.NextEpochProtocolState.InvalidStateTransitionAttempted = true
-	}
 }
 
-// TransitionToNextEpoch discards current protocol state and transitions to the next epoch.
-// Epoch transition is only allowed when:
+// TransitionToNextEpoch updates the notion of 'current epoch', 'previous' and 'next epoch' in the protocol
+// state. An epoch transition is only allowed when:
 // - next epoch has been set up,
 // - next epoch has been committed,
 // - invalid state transition has not been attempted,
 // - candidate block is in the next epoch.
 // No errors are expected during normal operations.
 func (u *Updater) TransitionToNextEpoch() error {
+	nextEpoch := u.state.NextEpoch
 	// Check if there is next epoch protocol state
-	if u.state.NextEpochProtocolState == nil {
+	if nextEpoch == nil {
 		return fmt.Errorf("protocol state has not been setup yet")
 	}
-	nextEpochState := u.state.NextEpochProtocolState
+
 	// Check if there is a commit event for next epoch
-	if nextEpochState.CurrentEpochEventIDs.CommitID == flow.ZeroID {
+	if nextEpoch.CommitID == flow.ZeroID {
 		return fmt.Errorf("protocol state has not been committed yet")
 	}
-	if nextEpochState.InvalidStateTransitionAttempted {
+	if u.state.InvalidStateTransitionAttempted {
 		return fmt.Errorf("invalid state transition has been attempted, no transition is allowed")
 	}
 	// Check if we are at the next epoch, only then a transition is allowed
-	if u.candidate.View < u.parentState.NextEpochProtocolState.CurrentEpochSetup.FirstView {
+	if u.candidate.View < u.parentState.NextEpochSetup.FirstView {
 		return fmt.Errorf("protocol state transition is only allowed when enterring next epoch")
 	}
-	u.state = nextEpochState
-	u.invalidateLookup()
+	u.state = &flow.ProtocolStateEntry{
+		PreviousEpochEventIDs:           u.state.CurrentEpoch.EventIDs(),
+		CurrentEpoch:                    *u.state.NextEpoch,
+		InvalidStateTransitionAttempted: false,
+	}
+	u.rebuildIdentityLookup()
 	return nil
 }
 
@@ -254,16 +258,16 @@ func (u *Updater) ensureLookupPopulated() {
 	if len(u.currentEpochIdentitiesLookup) > 0 {
 		return
 	}
-	u.invalidateLookup()
+	u.rebuildIdentityLookup()
 }
 
 // rebuildIdentityLookup re-generates `currentEpochIdentitiesLookup` and `nextEpochIdentitiesLookup` from the
-// underlying identity lists `state.Identities` and `state.NextEpochProtocolState.Identities`, respectively.
-func (u *Updater) invalidateLookup() {
-	u.currentEpochIdentitiesLookup = u.state.Identities.Lookup()
-	if u.state.NextEpochProtocolState != nil {
-		u.nextEpochIdentitiesLookup = u.state.NextEpochProtocolState.Identities.Lookup()
+// underlying identity lists `state.CurrentEpoch.Identities` and `state.NextEpoch.Identities`, respectively.
+func (u *Updater) rebuildIdentityLookup() {
+	u.currentEpochIdentitiesLookup = u.state.CurrentEpoch.ActiveIdentities.Lookup()
+	if u.state.NextEpoch != nil {
+		u.nextEpochIdentitiesLookup = u.state.NextEpoch.ActiveIdentities.Lookup()
 	} else {
-		u.state.NextEpochProtocolState = nil
+		u.nextEpochIdentitiesLookup = nil
 	}
 }

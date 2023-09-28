@@ -138,7 +138,7 @@ func DecodeSigTypeToStakingAndBeaconSigners(
 		return nil, nil, fmt.Errorf("unexpected exception while checking padding of sigTypes: %w", err)
 	}
 
-	// decode bits to Identities
+	// decode bits to IdentitySkeletonList
 	stakingSigners := make(flow.IdentitySkeletonList, 0, numberSigners)
 	beaconSigners := make(flow.IdentitySkeletonList, 0, numberSigners)
 	for i, signer := range signers {

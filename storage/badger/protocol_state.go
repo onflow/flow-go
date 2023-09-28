@@ -8,6 +8,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/order"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/badger/operation"
@@ -63,10 +64,10 @@ func NewProtocolState(collector module.CacheMetrics,
 //   - storage.ErrAlreadyExists if an Identity Table with the given id is already stored
 func (s *ProtocolState) StoreTx(id flow.Identifier, protocolState *flow.ProtocolStateEntry) func(*transaction.Tx) error {
 	// front-load sanity checks:
-	if !protocolState.Identities.Sorted(order.IdentifierCanonical) {
+	if !protocolState.CurrentEpoch.ActiveIdentities.Sorted(order.IdentifierCanonical) {
 		return transaction.Fail(fmt.Errorf("sanity check failed: identities are not sorted"))
 	}
-	if protocolState.NextEpochProtocolState != nil && !protocolState.NextEpochProtocolState.Identities.Sorted(order.IdentifierCanonical) {
+	if protocolState.NextEpoch != nil && !protocolState.NextEpoch.ActiveIdentities.Sorted(order.IdentifierCanonical) {
 		return transaction.Fail(fmt.Errorf("sanity check failed: next epoch identities are not sorted"))
 	}
 
@@ -154,31 +155,31 @@ func newRichProtocolStateEntry(
 		}
 	}
 
-	currentEpochSetup, err := setups.ByID(protocolState.CurrentEpochEventIDs.SetupID)
+	currentEpochSetup, err := setups.ByID(protocolState.CurrentEpoch.SetupID)
 	if err != nil {
 		return nil, fmt.Errorf("could not retrieve current epoch setup: %w", err)
 	}
-	currentEpochCommit, err := commits.ByID(protocolState.CurrentEpochEventIDs.CommitID)
+	currentEpochCommit, err := commits.ByID(protocolState.CurrentEpoch.CommitID)
 	if err != nil {
 		return nil, fmt.Errorf("could not retrieve current epoch commit: %w", err)
 	}
 
-	// if next epoch has been already committed, fill in data for it as well.
-	if protocolState.NextEpochProtocolState != nil {
-		nextEpochProtocolState := *protocolState.NextEpochProtocolState
-		nextEpochSetup, err = setups.ByID(nextEpochProtocolState.CurrentEpochEventIDs.SetupID)
+	// if next epoch has been set up, fill in data for it as well
+	nextEpoch := protocolState.NextEpoch
+	if nextEpoch != nil {
+		nextEpochSetup, err = setups.ByID(nextEpoch.SetupID)
 		if err != nil {
-			return nil, fmt.Errorf("could not retrieve next epoch setup: %w", err)
+			return nil, fmt.Errorf("could not retrieve next epoch's setup event: %w", err)
 		}
-		if nextEpochProtocolState.CurrentEpochEventIDs.CommitID != flow.ZeroID {
-			nextEpochCommit, err = commits.ByID(nextEpochProtocolState.CurrentEpochEventIDs.CommitID)
+		if nextEpoch.CommitID != flow.ZeroID {
+			nextEpochCommit, err = commits.ByID(nextEpoch.CommitID)
 			if err != nil {
-				return nil, fmt.Errorf("could not retrieve next epoch commit: %w", err)
+				return nil, fmt.Errorf("could not retrieve next epoch's commit event: %w", err)
 			}
 		}
 	}
 
-	return flow.NewRichProtocolStateEntry(
+	result, err := flow.NewRichProtocolStateEntry(
 		protocolState,
 		previousEpochSetup,
 		previousEpochCommit,
@@ -187,4 +188,10 @@ func newRichProtocolStateEntry(
 		nextEpochSetup,
 		nextEpochCommit,
 	)
+	if err != nil {
+		// observing an error here would be an indication of severe data corruption or bug in our code since
+		// all data should be available and correctly structured at this point.
+		return nil, irrecoverable.NewExceptionf("critical failure while instantiating RichProtocolStateEntry: %w", err)
+	}
+	return result, nil
 }

@@ -324,14 +324,14 @@ func SnapshotFromBootstrapStateWithParams(
 	}
 
 	protocolState := &flow.ProtocolStateEntry{
-		CurrentEpochEventIDs: flow.EventIDs{
-			SetupID:  setup.ID(),
-			CommitID: commit.ID(),
+		PreviousEpochEventIDs: flow.EventIDs{},
+		CurrentEpoch: flow.EpochStateContainer{
+			SetupID:          setup.ID(),
+			CommitID:         commit.ID(),
+			ActiveIdentities: flow.DynamicIdentityEntryListFromIdentities(setup.Participants),
 		},
-		PreviousEpochEventIDs:           flow.EventIDs{},
-		Identities:                      flow.DynamicIdentityEntryListFromIdentities(setup.Participants),
+		NextEpoch:                       nil,
 		InvalidStateTransitionAttempted: false,
-		NextEpochProtocolState:          nil,
 	}
 
 	snap := SnapshotFromEncodable(EncodableSnapshot{
