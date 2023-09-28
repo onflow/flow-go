@@ -29,19 +29,9 @@ func ByReferenceOrder(nodeIDs []flow.Identifier) func(*flow.Identity, *flow.Iden
 
 // IdentityListCanonical takes a list of identities and
 // check if it's ordered in canonical order.
-func IdentityListCanonical(identities flow.IdentityList) bool {
+func IdentityListCanonical[T flow.GenericIdentity](identities flow.GenericIdentityList[T]) bool {
 	if len(identities) == 0 {
 		return true
 	}
-
-	prev := identities[0].ID()
-	for i := 1; i < len(identities); i++ {
-		id := identities[i].ID()
-		if !IdentifierCanonical(prev, id) {
-			return false
-		}
-		prev = id
-	}
-
-	return true
+	return identities.Sorted(Canonical[T])
 }

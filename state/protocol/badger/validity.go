@@ -87,14 +87,14 @@ func verifyEpochSetup(setup *flow.EpochSetup, verifyNetworkAddress bool) error {
 	}
 
 	// the participants must be listed in canonical order
-	if !setup.Participants.Sorted(order.Canonical) {
+	if !setup.Participants.Sorted(order.Canonical[flow.IdentitySkeleton]) {
 		return fmt.Errorf("participants are not canonically ordered")
 	}
 
 	// STEP 3: sanity checks for individual roles
 	// IMPORTANT: here we remove all nodes with zero weight, as they are allowed to partake
 	// in communication but not in respective node functions
-	activeParticipants := setup.Participants.Filter(filter.HasWeight(true))
+	activeParticipants := setup.Participants.Filter(filter.HasInitialWeight[flow.IdentitySkeleton](true))
 
 	// we need at least one node of each role
 	roles := make(map[flow.Role]uint)
@@ -125,7 +125,8 @@ func verifyEpochSetup(setup *flow.EpochSetup, verifyNetworkAddress bool) error {
 	}
 
 	// the collection cluster assignments need to be valid
-	_, err := factory.NewClusterList(setup.Assignments, activeParticipants.Filter(filter.HasRole(flow.RoleCollection)))
+	_, err := factory.NewClusterList(setup.Assignments,
+		activeParticipants.Filter(filter.HasRole[flow.IdentitySkeleton](flow.RoleCollection)))
 	if err != nil {
 		return fmt.Errorf("invalid cluster assignments: %w", err)
 	}
@@ -235,7 +236,7 @@ func IsValidRootSnapshot(snap protocol.Snapshot, verifyResultID bool) error {
 	if err != nil {
 		return fmt.Errorf("could not get identities for root snapshot: %w", err)
 	}
-	if !identities.Sorted(order.Canonical) {
+	if !identities.Sorted(order.Canonical[flow.Identity]) {
 		return fmt.Errorf("identities are not canonically ordered")
 	}
 
@@ -304,7 +305,9 @@ func IsValidRootSnapshotQCs(snap protocol.Snapshot) error {
 // validateRootQC performs validation of root QC
 // Returns nil on success
 func validateRootQC(snap protocol.Snapshot) error {
-	identities, err := snap.Identities(filter.IsAllowedConsensusCommitteeMember)
+	identities, err := snap.Identities(func(identity *flow.Identity) bool {
+		return filter.IsAllowedConsensusCommitteeMember(&identity.IdentitySkeleton)
+	})
 	if err != nil {
 		return fmt.Errorf("could not get root snapshot identities: %w", err)
 	}
@@ -335,7 +338,7 @@ func validateRootQC(snap protocol.Snapshot) error {
 // validateClusterQC performs QC validation of single collection cluster
 // Returns nil on success
 func validateClusterQC(cluster protocol.Cluster) error {
-	committee, err := committees.NewStaticCommittee(cluster.Members(), flow.Identifier{}, nil, nil)
+	committee, err := committees.NewStaticReplicas(cluster.Members(), flow.Identifier{}, nil, nil)
 	if err != nil {
 		return fmt.Errorf("could not create static committee: %w", err)
 	}
