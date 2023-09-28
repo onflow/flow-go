@@ -54,7 +54,9 @@ func (m *AccountUsageMigrator) MigrateAccount(
 	if address == common.ZeroAddress {
 		return payloads, nil
 	}
-	if address != mustHexToAddress("4eded0de73020ca5") {
+
+	if address != cricketMomentsAddress {
+		// skip non-cricket-moments accounts for quicker testing
 		return payloads, nil
 	}
 

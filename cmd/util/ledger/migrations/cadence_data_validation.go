@@ -4,10 +4,8 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	util2 "github.com/onflow/flow-go/module/util"
 	"sort"
 	"sync"
-	"time"
 
 	"github.com/rs/zerolog"
 
@@ -18,6 +16,7 @@ import (
 	"github.com/onflow/flow-go/cmd/util/ledger/util"
 	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/ledger"
+	util2 "github.com/onflow/flow-go/module/util"
 )
 
 type CadenceDataValidationMigrations struct {
@@ -101,9 +100,12 @@ func (m *preMigration) MigrateAccount(
 	if address == common.ZeroAddress {
 		return payloads, nil
 	}
-	if address != mustHexToAddress("4eded0de73020ca5") {
+
+	if address != cricketMomentsAddress {
+		// skip non-cricket-moments accounts for quicker testing
 		return payloads, nil
 	}
+
 	if _, ok := knownProblematicAccounts[address]; ok {
 		m.log.Error().
 			Hex("address", address[:]).
@@ -172,7 +174,9 @@ func (m *postMigration) MigrateAccount(
 	if address == common.ZeroAddress {
 		return payloads, nil
 	}
-	if address != mustHexToAddress("4eded0de73020ca5") {
+
+	if address != cricketMomentsAddress {
+		// skip non-cricket-moments accounts for quicker testing
 		return payloads, nil
 	}
 
@@ -302,11 +306,8 @@ func (m *CadenceDataValidationMigrations) recursiveString(
 	value interpreter.Value,
 	hasher hash.Hasher,
 ) ([]byte, error) {
-	if mr.Address == mustHexToAddress("4eded0de73020ca5") {
-		compositeValue, ok := value.(*interpreter.CompositeValue)
-		if ok && string(compositeValue.TypeID()) == "A.4eded0de73020ca5.CricketMomentsShardedCollection.ShardedCollection" {
-			return m.recursiveStringShardedCollection(log, mr, domain, key, value)
-		}
+	if isCricketMomentsShardedCollection(mr, value) {
+		return m.recursiveStringShardedCollection(log, mr, domain, key, value)
 	}
 
 	var s string
@@ -322,65 +323,6 @@ func (m *CadenceDataValidationMigrations) recursiveString(
 	return h, nil
 }
 
-func getShardedCollectionMap(mr *migratorRuntime, value interpreter.Value) (*interpreter.DictionaryValue, error) {
-	shardedCollectionResource, ok := value.(*interpreter.CompositeValue)
-	if !ok {
-		return nil, fmt.Errorf("expected *interpreter.CompositeValue, got %T", value)
-	}
-	shardedCollectionMapField := shardedCollectionResource.GetField(
-		mr.Interpreter,
-		interpreter.EmptyLocationRange,
-		"collections",
-	)
-	if shardedCollectionMapField == nil {
-		return nil, fmt.Errorf("expected collections field")
-	}
-	shardedCollectionMap, ok := shardedCollectionMapField.(*interpreter.DictionaryValue)
-	if !ok {
-		return nil, fmt.Errorf("expected collections to be *interpreter.DictionaryValue, got %T", shardedCollectionMapField)
-	}
-	return shardedCollectionMap, nil
-}
-
-func getNftCollection(inter *interpreter.Interpreter, outerKey interpreter.Value, shardedCollectionMap *interpreter.DictionaryValue) (*interpreter.DictionaryValue, error) {
-	value := shardedCollectionMap.GetKey(
-		inter,
-		interpreter.EmptyLocationRange,
-		outerKey,
-	)
-
-	someCollection, ok := value.(*interpreter.SomeValue)
-	if !ok {
-		return nil, fmt.Errorf("expected collection to be *interpreter.SomeValue, got %T", value)
-	}
-
-	collection, ok := someCollection.InnerValue(
-		inter,
-		interpreter.EmptyLocationRange).(*interpreter.CompositeValue)
-	if !ok {
-		return nil, fmt.Errorf("expected inner collection to be *interpreter.CompositeValue, got %T", value)
-	}
-
-	ownedNFTsRaw := collection.GetField(
-		inter,
-		interpreter.EmptyLocationRange,
-		"ownedNFTs",
-	)
-	if ownedNFTsRaw == nil {
-		return nil, fmt.Errorf("expected ownedNFTs field")
-	}
-	ownedNFTs, ok := ownedNFTsRaw.(*interpreter.DictionaryValue)
-	if !ok {
-		return nil, fmt.Errorf("expected ownedNFTs to be *interpreter.DictionaryValue, got %T", ownedNFTsRaw)
-	}
-	return ownedNFTs, nil
-}
-
-type keyPair struct {
-	shardedCollectionKey interpreter.Value
-	nftCollectionKey     interpreter.Value
-}
-
 type hashWithKeys struct {
 	key  uint64
 	hash []byte
@@ -393,15 +335,9 @@ func (m *CadenceDataValidationMigrations) recursiveStringShardedCollection(
 	key interpreter.StorageMapKey,
 	value interpreter.Value,
 ) ([]byte, error) {
-
-	sampler := log.Sample(util2.NewTimedSampler(30 * time.Second))
-	log.Info().Msg("starting recursiveStringShardedCollection")
-	defer log.Info().Msg("done with recursiveStringShardedCollection")
-
 	// hash all values
 	hashes, err := m.hashAllNftsInAllCollections(
 		log,
-		sampler,
 		mr,
 		domain,
 		key,
@@ -414,15 +350,135 @@ func (m *CadenceDataValidationMigrations) recursiveStringShardedCollection(
 
 	return m.consolidateAllHashes(
 		log,
-		sampler,
 		hashes,
 	)
+}
 
+func (m *CadenceDataValidationMigrations) hashAllNftsInAllCollections(
+	log zerolog.Logger,
+	mr *migratorRuntime,
+	domain string,
+	key interpreter.StorageMapKey,
+	value interpreter.Value,
+) (map[uint64]sortableHashes, error) {
+
+	shardedCollectionMap, err := getShardedCollectionMap(mr, value)
+	if err != nil {
+		return nil, err
+	}
+	count, err := getCricketMomentsShardedCollectionNFTCount(
+		mr,
+		shardedCollectionMap)
+	if err != nil {
+		return nil, err
+	}
+	progressLog := util2.LogProgress("setting cloned cricket moments", count, log)
+
+	ctx, c := context.WithCancelCause(context.Background())
+	cancel := func(err error) {
+		if err != nil {
+			log.Info().Err(err).Msg("canceling context")
+		}
+		c(err)
+	}
+	defer cancel(nil)
+
+	keyPairChan := make(chan cricketKeyPair, m.nWorkers)
+	hashChan := make(chan hashWithKeys, m.nWorkers)
+	hashes := make(map[uint64]sortableHashes)
+	wg := sync.WaitGroup{}
+	wg.Add(m.nWorkers)
+
+	// workers for hashing
+	for i := 0; i < m.nWorkers; i++ {
+		go func(i int) {
+			defer wg.Done()
+
+			storageMap := mr.GetReadOnlyStorage().GetStorageMap(mr.Address, domain, false)
+			storageMapValue := storageMap.ReadValue(&util.NopMemoryGauge{}, key)
+
+			hashNFTWorker(progressLog, ctx, cancel, mr, storageMapValue, keyPairChan, hashChan)
+		}(i)
+	}
+
+	// worker for collecting hashes
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		defer log.Info().Msg("finished collecting hashes")
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case hashed, ok := <-hashChan:
+				if !ok {
+					return
+				}
+				_, ok = hashes[hashed.key]
+				if !ok {
+					hashes[hashed.key] = make(sortableHashes, 0, 1_000_000)
+				}
+				hashes[hashed.key] = append(hashes[hashed.key], hashed.hash)
+			}
+		}
+	}()
+
+	// worker for dispatching values to hash
+	go func() {
+		shardedCollectionMapIterator := shardedCollectionMap.Iterator()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			default:
+			}
+
+			outerKey := shardedCollectionMapIterator.NextKey(nil)
+			if outerKey == nil {
+				break
+			}
+
+			ownedNFTs, err := getNftCollection(mr.Interpreter, outerKey, shardedCollectionMap)
+			if err != nil {
+				cancel(err)
+				return
+			}
+
+			ownedNFTsIterator := ownedNFTs.Iterator()
+			for {
+				select {
+				case <-ctx.Done():
+					return
+				default:
+				}
+
+				innerKey := ownedNFTsIterator.NextKey(nil)
+				if innerKey == nil {
+					break
+				}
+
+				keyPairChan <- cricketKeyPair{
+					nftCollectionKey:     innerKey,
+					shardedCollectionKey: outerKey,
+				}
+			}
+		}
+	}()
+
+	wg.Wait()
+	log.Info().Msg("finished hashing values")
+	close(hashChan)
+	<-done
+
+	if ctx.Err() != nil {
+		log.Info().Err(ctx.Err()).Msg("context error when hashing individual values")
+		return nil, ctx.Err()
+	}
+	return hashes, nil
 }
 
 func (m *CadenceDataValidationMigrations) consolidateAllHashes(
 	log zerolog.Logger,
-	sampler zerolog.Logger,
 	hashes map[uint64]sortableHashes,
 ) ([]byte, error) {
 
@@ -520,141 +576,13 @@ func (m *CadenceDataValidationMigrations) consolidateAllHashes(
 	return h, nil
 }
 
-func (m *CadenceDataValidationMigrations) hashAllNftsInAllCollections(
-	log zerolog.Logger,
-	sampler zerolog.Logger,
-	mr *migratorRuntime,
-	domain string,
-	key interpreter.StorageMapKey,
-	value interpreter.Value,
-) (map[uint64]sortableHashes, error) {
-
-	log.Info().Msg("starting consolidateAllHashes")
-	defer log.Info().Msg("done with consolidateAllHashes")
-
-	ctx, c := context.WithCancelCause(context.Background())
-	cancel := func(err error) {
-		if err != nil {
-			log.Info().Err(err).Msg("canceling context")
-		}
-		c(err)
-	}
-	defer cancel(nil)
-
-	keyPairChan := make(chan keyPair, m.nWorkers)
-	hashChan := make(chan hashWithKeys, m.nWorkers)
-	hashes := make(map[uint64]sortableHashes)
-	wg := sync.WaitGroup{}
-	wg.Add(m.nWorkers)
-
-	// workers for hashing
-	for i := 0; i < m.nWorkers; i++ {
-		go func(i int) {
-			defer wg.Done()
-
-			storageMap := mr.GetReadOnlyStorage().GetStorageMap(mr.Address, domain, false)
-			storageMapValue := storageMap.ReadValue(&util.NopMemoryGauge{}, key)
-
-			hashNFTWorker(sampler.With().Int("worker", i).Logger(), ctx, cancel, mr, storageMapValue, keyPairChan, hashChan)
-		}(i)
-	}
-
-	// worker for collecting hashes
-	done := make(chan struct{})
-	go func() {
-		defer close(done)
-		defer log.Info().Msg("finished collecting hashes")
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			case hashed, ok := <-hashChan:
-				if !ok {
-					return
-				}
-				_, ok = hashes[hashed.key]
-				if !ok {
-					hashes[hashed.key] = make(sortableHashes, 0, 1_000_000)
-				}
-				hashes[hashed.key] = append(hashes[hashed.key], hashed.hash)
-			}
-		}
-	}()
-
-	// worker for dispatching values to hash
-	go func() {
-		defer close(keyPairChan)
-		defer log.Info().Msg("finished dispatching values to hash")
-
-		shardedCollectionMap, err := getShardedCollectionMap(mr, value)
-		if err != nil {
-			cancel(err)
-			return
-		}
-
-		log.Info().
-			Int("shardedCollectionMapLen", shardedCollectionMap.Count()).
-			Msg("shardedCollectionMapLen")
-
-		shardedCollectionMapIterator := shardedCollectionMap.Iterator()
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			default:
-			}
-
-			outerKey := shardedCollectionMapIterator.NextKey(nil)
-			if outerKey == nil {
-				break
-			}
-
-			ownedNFTs, err := getNftCollection(mr.Interpreter, outerKey, shardedCollectionMap)
-			if err != nil {
-				cancel(err)
-				return
-			}
-
-			ownedNFTsIterator := ownedNFTs.Iterator()
-			for {
-				select {
-				case <-ctx.Done():
-					return
-				default:
-				}
-
-				innerKey := ownedNFTsIterator.NextKey(nil)
-				if innerKey == nil {
-					break
-				}
-
-				keyPairChan <- keyPair{
-					nftCollectionKey:     innerKey,
-					shardedCollectionKey: outerKey,
-				}
-			}
-		}
-	}()
-
-	wg.Wait()
-	log.Info().Msg("finished hashing values")
-	close(hashChan)
-	<-done
-
-	if ctx.Err() != nil {
-		log.Info().Err(ctx.Err()).Msg("context error when hashing individual values")
-		return nil, ctx.Err()
-	}
-	return hashes, nil
-}
-
 func hashNFTWorker(
-	sample zerolog.Logger,
+	progress util2.LogProgressFunc,
 	ctx context.Context,
 	cancel context.CancelCauseFunc,
 	mr *migratorRuntime,
 	storageMapValue interpreter.Value,
-	keyPairChan <-chan keyPair,
+	keyPairChan <-chan cricketKeyPair,
 	hashChan chan<- hashWithKeys,
 ) {
 	hasher := newHasher()
@@ -664,7 +592,6 @@ func hashNFTWorker(
 		cancel(err)
 		return
 	}
-	hashed := 0
 
 	for {
 		select {
@@ -708,8 +635,7 @@ func hashNFTWorker(
 				key:  uintKey,
 				hash: hash,
 			}
-			hashed++
-			sample.Info().Int("hashed", hashed).Msg("Hashing worker running")
+			progress(1)
 		}
 	}
 }

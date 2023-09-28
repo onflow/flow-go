@@ -8,12 +8,14 @@ import (
 	"github.com/rs/zerolog"
 )
 
+type LogProgressFunc func(add int)
+
 // LogProgress takes a total and return function such that when called adds the given
 // number to the progress and logs the progress every 10% or every 60 seconds whichever
 // comes first.
 // The returned function can be called concurrently.
 // An eta is also logged, but it assumes that the progress is linear.
-func LogProgress(msg string, total int, log zerolog.Logger) func(add int) {
+func LogProgress(msg string, total int, log zerolog.Logger) LogProgressFunc {
 	nth := uint32(total / 10) // sample every 10% by default
 	if nth == 0 {
 		nth = 1
