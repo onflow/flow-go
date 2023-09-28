@@ -112,7 +112,12 @@ func (c *IndexerCore) IndexBlockData(data *execution_data.BlockExecutionDataEnti
 		payloads := make(map[ledger.Path]*ledger.Payload)
 		for _, chunk := range data.ChunkExecutionDatas {
 			update := chunk.TrieUpdate
-			if update != nil && len(update.Paths) == len(update.Payloads) {
+			if update != nil {
+				// this should never happen but we check anyway
+				if len(update.Paths) != len(update.Payloads) {
+					return fmt.Errorf("update paths length is %d and payloads length is %d and they don't match", len(update.Paths), len(update.Payloads))
+				}
+
 				for i, path := range update.Paths {
 					payloads[path] = update.Payloads[i]
 				}
