@@ -28,7 +28,7 @@ func GenerateExecutionState(
 ) (flow.StateCommitment, error) {
 	const (
 		capacity           = 100
-		checkpointDistance = math.MaxInt // A large number to prevent last creation.
+		checkpointDistance = math.MaxInt // A large number to prevent checkpoint creation.
 		checkpointsToKeep  = 1
 	)
 
