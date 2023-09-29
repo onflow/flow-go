@@ -10,17 +10,15 @@ import (
 	"testing"
 
 	"github.com/cockroachdb/pebble"
-	"github.com/rs/zerolog"
-	"github.com/stretchr/testify/require"
-
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/convert"
 	"github.com/onflow/flow-go/ledger/common/testutils"
 	"github.com/onflow/flow-go/ledger/complete/mtrie/trie"
 	"github.com/onflow/flow-go/ledger/complete/wal"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/storage/pebble/registers"
 	"github.com/onflow/flow-go/utils/unittest"
+	"github.com/rs/zerolog"
+	"github.com/stretchr/testify/require"
 )
 
 const defaultRegisterValue = byte('v')
@@ -30,17 +28,13 @@ func TestRegisterBootstrap_NewBootstrap(t *testing.T) {
 	unittest.RunWithTempDir(t, func(dir string) {
 		rootHeight := uint64(1)
 		log := zerolog.New(io.Discard)
-		cache := pebble.NewCache(1 << 20)
-		defer cache.Unref()
-		opts := DefaultPebbleOptions(cache, registers.NewMVCCComparer())
-		p, err := pebble.Open(dir, opts)
+		p, err := OpenRegisterPebbleDB(dir)
 		require.NoError(t, err)
 		// set heights
-		require.NoError(t, p.Set(firstHeightKey(), encodedUint64(rootHeight), nil))
-		require.NoError(t, p.Set(latestHeightKey(), encodedUint64(rootHeight), nil))
+		require.NoError(t, initHeights(p, rootHeight))
 		// errors if FirstHeight or LastHeight are populated
 		_, err = NewRegisterBootstrap(p, dir, rootHeight, log)
-		require.ErrorContains(t, err, "cannot bootstrap populated DB")
+		require.ErrorContains(t, err, "DB is already bootstrapped")
 	})
 }
 
@@ -53,11 +47,7 @@ func TestRegisterBootstrap_IndexCheckpointFile_Happy(t *testing.T) {
 		fileName := "simple-checkpoint"
 		require.NoErrorf(t, wal.StoreCheckpointV6Concurrently(tries, dir, fileName, log), "fail to store checkpoint")
 		checkpointFile := path.Join(dir, fileName)
-
-		cache := pebble.NewCache(1 << 20)
-		opts := DefaultPebbleOptions(cache, registers.NewMVCCComparer())
-		defer cache.Unref()
-		pb, dbDir := unittest.TempPebbleDBWithOpts(t, opts)
+		pb, dbDir := createPebbleForTest(t)
 
 		bootstrap, err := NewRegisterBootstrap(pb, checkpointFile, rootHeight, log)
 		require.NoError(t, err)
@@ -91,10 +81,8 @@ func TestRegisterBootstrap_IndexCheckpointFile_Empty(t *testing.T) {
 		fileName := "empty-checkpoint"
 		require.NoErrorf(t, wal.StoreCheckpointV6Concurrently(tries, dir, fileName, log), "fail to store checkpoint")
 		checkpointFile := path.Join(dir, fileName)
-		cache := pebble.NewCache(1 << 20)
-		opts := DefaultPebbleOptions(cache, registers.NewMVCCComparer())
-		defer cache.Unref()
-		pb, dbDir := unittest.TempPebbleDBWithOpts(t, opts)
+		pb, dbDir := createPebbleForTest(t)
+
 		bootstrap, err := NewRegisterBootstrap(pb, checkpointFile, rootHeight, log)
 		require.NoError(t, err)
 		err = bootstrap.IndexCheckpointFile(context.Background())
@@ -131,11 +119,8 @@ func TestRegisterBootstrap_IndexCheckpointFile_FormatIssue(t *testing.T) {
 		require.NoErrorf(t, wal.StoreCheckpointV6Concurrently([]*trie.MTrie{trieWithInvalidEntry}, dir, fileName, log),
 			"fail to store checkpoint")
 		checkpointFile := path.Join(dir, fileName)
-		cache := pebble.NewCache(1 << 20)
-		opts := DefaultPebbleOptions(cache, registers.NewMVCCComparer())
-		defer cache.Unref()
+		pb, dbDir := createPebbleForTest(t)
 
-		pb, dbDir := unittest.TempPebbleDBWithOpts(t, opts)
 		bootstrap, err := NewRegisterBootstrap(pb, checkpointFile, rootHeight, log)
 		require.NoError(t, err)
 		err = bootstrap.IndexCheckpointFile(context.Background())
@@ -158,10 +143,7 @@ func TestRegisterBootstrap_IndexCheckpointFile_CorruptedCheckpointFile(t *testin
 		fileToDelete := path.Join(dir, fmt.Sprintf("%v.%03d", checkpointFileName, 2))
 		err := os.RemoveAll(fileToDelete)
 		require.NoError(t, err)
-		cache := pebble.NewCache(1 << 20)
-		opts := DefaultPebbleOptions(cache, registers.NewMVCCComparer())
-		defer cache.Unref()
-		pb, _ := unittest.TempPebbleDBWithOpts(t, opts)
+		pb, _ := createPebbleForTest(t)
 		bootstrap, err := NewRegisterBootstrap(pb, checkpointFileName, rootHeight, log)
 		require.NoError(t, err)
 		err = bootstrap.IndexCheckpointFile(context.Background())
@@ -178,10 +160,7 @@ func TestRegisterBootstrap_IndexCheckpointFile_MultipleBatch(t *testing.T) {
 		fileName := "large-checkpoint"
 		require.NoErrorf(t, wal.StoreCheckpointV6Concurrently(tries, dir, fileName, log), "fail to store checkpoint")
 		checkpointFile := path.Join(dir, fileName)
-		cache := pebble.NewCache(1 << 20)
-		opts := DefaultPebbleOptions(cache, registers.NewMVCCComparer())
-		defer cache.Unref()
-		pb, dbDir := unittest.TempPebbleDBWithOpts(t, opts)
+		pb, dbDir := createPebbleForTest(t)
 		bootstrap, err := NewRegisterBootstrap(pb, checkpointFile, rootHeight, log)
 		require.NoError(t, err)
 		err = bootstrap.IndexCheckpointFile(context.Background())
@@ -259,4 +238,11 @@ func randomRegisterPaths(n uint16) []ledger.Path {
 		p = append(p, testutils.PathByUint16(i))
 	}
 	return p
+}
+
+func createPebbleForTest(t *testing.T) (*pebble.DB, string) {
+	dbDir := unittest.TempPebblePath(t)
+	pb, err := OpenRegisterPebbleDB(dbDir)
+	require.NoError(t, err)
+	return pb, dbDir
 }

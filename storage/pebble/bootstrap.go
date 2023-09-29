@@ -33,16 +33,15 @@ func NewRegisterBootstrap(
 ) (*RegisterBootstrap, error) {
 	// check for pre-populated heights, fail if it is populated
 	// i.e. the IndexCheckpointFile function has already run for the db in this directory
-	checkpointDir, checkpointFileName := filepath.Split(checkpointFile)
-	_, _, err := db.Get(latestHeightKey())
-	if err == nil {
-		// key detected, attempt to run bootstrap on corrupt or already bootstrapped data
-		return nil, fmt.Errorf("found latest key set on badger instance, cannot bootstrap populated DB")
-	}
-	err = db.Set(firstHeightKey(), encodedUint64(rootHeight), nil)
+	isBootstrapped, err := IsBootstrapped(db)
 	if err != nil {
-		return nil, fmt.Errorf("could not index first height key to initialize: %w", err)
+		return nil, err
 	}
+	if isBootstrapped {
+		// key detected, attempt to run bootstrap on corrupt or already bootstrapped data
+		return nil, fmt.Errorf("found latest key set on badger instance, DB is already bootstrapped")
+	}
+	checkpointDir, checkpointFileName := filepath.Split(checkpointFile)
 	return &RegisterBootstrap{
 		checkpointDir:      checkpointDir,
 		checkpointFileName: checkpointFileName,
@@ -113,7 +112,8 @@ func (b *RegisterBootstrap) indexCheckpointFileWorker(ctx context.Context) error
 
 // IndexCheckpointFile indexes the checkpoint file in the Dir provided
 func (b *RegisterBootstrap) IndexCheckpointFile(ctx context.Context) error {
-	g, gCtx := errgroup.WithContext(ctx)
+	cct, cancel := context.WithCancel(ctx)
+	g, gCtx := errgroup.WithContext(cct)
 	b.log.Info().Msg("indexing checkpoint file for pebble register store")
 	for i := 0; i < pebbleBootstrapWorkerCount; i++ {
 		g.Go(func() error {
@@ -122,13 +122,16 @@ func (b *RegisterBootstrap) IndexCheckpointFile(ctx context.Context) error {
 	}
 	err := wal.OpenAndReadLeafNodesFromCheckpointV6(b.leafNodeChan, b.checkpointDir, b.checkpointFileName, b.log)
 	if err != nil {
+		cancel()
 		return fmt.Errorf("error reading leaf node: %w", err)
 	}
 	if err = g.Wait(); err != nil {
+		cancel()
 		return fmt.Errorf("failed to index checkpoint file: %w", err)
 	}
+	cancel()
 	b.log.Info().Msg("checkpoint indexing complete")
-	err = b.db.Set(latestHeightKey(), encodedUint64(b.rootHeight), nil)
+	err = initHeights(b.db, b.rootHeight)
 	if err != nil {
 		return fmt.Errorf("could not index latest height: %w", err)
 	}
