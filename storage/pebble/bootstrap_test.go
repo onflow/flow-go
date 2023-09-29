@@ -144,11 +144,12 @@ func TestRegisterBootstrap_IndexCheckpointFile_CorruptedCheckpointFile(t *testin
 		fileToDelete := path.Join(dir, fmt.Sprintf("%v.%03d", checkpointFileName, 2))
 		err := os.RemoveAll(fileToDelete)
 		require.NoError(t, err)
-		pb, _ := createPebbleForTest(t)
+		pb, dbDir := createPebbleForTest(t)
 		bootstrap, err := NewRegisterBootstrap(pb, checkpointFileName, rootHeight, log)
 		require.NoError(t, err)
 		err = bootstrap.IndexCheckpointFile(context.Background())
 		require.ErrorIs(t, err, os.ErrNotExist)
+		require.NoError(t, os.RemoveAll(dbDir))
 	})
 }
 
