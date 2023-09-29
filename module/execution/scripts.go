@@ -77,9 +77,27 @@ func (s *Scripts) ExecuteAtBlockHeight(
 	arguments [][]byte,
 	height uint64) ([]byte, error) {
 
-	header, err := s.headers.ByHeight(height)
+	snap, header, err := s.snapshotWithBlock(height)
 	if err != nil {
 		return nil, err
+	}
+
+	return s.executor.ExecuteScript(ctx, script, arguments, header, snap)
+}
+
+func (s *Scripts) GetAccount(ctx context.Context, address flow.Address, height uint64) (*flow.Account, error) {
+	snap, header, err := s.snapshotWithBlock(height)
+	if err != nil {
+		return nil, err
+	}
+
+	return s.executor.GetAccount(ctx, address, header, snap)
+}
+
+func (s *Scripts) snapshotWithBlock(height uint64) (snapshot.StorageSnapshot, *flow.Header, error) {
+	header, err := s.headers.ByHeight(height)
+	if err != nil {
+		return nil, nil, err
 	}
 
 	storageSnapshot := snapshot.NewReadFuncStorageSnapshot(func(ID flow.RegisterID) (flow.RegisterValue, error) {
@@ -93,5 +111,5 @@ func (s *Scripts) ExecuteAtBlockHeight(
 		return values[0], nil
 	})
 
-	return s.executor.ExecuteScript(ctx, script, arguments, header, storageSnapshot)
+	return storageSnapshot, header, nil
 }
