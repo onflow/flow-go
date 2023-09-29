@@ -4,9 +4,17 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/rs/zerolog"
+
+	"github.com/onflow/flow-go/engine/execution/computation"
 	"github.com/onflow/flow-go/engine/execution/computation/query"
+	"github.com/onflow/flow-go/fvm"
+	"github.com/onflow/flow-go/fvm/storage/derived"
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/metrics"
+	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
 )
 
@@ -18,17 +26,44 @@ import (
 type RegistersAtHeight func(IDs flow.RegisterIDs, height uint64) ([]flow.RegisterValue, error)
 
 type Scripts struct {
-	executor          query.QueryExecutor
+	executor          *query.QueryExecutor
 	headers           storage.Headers
 	registersAtHeight RegistersAtHeight
 }
 
-func NewScripts(executor query.QueryExecutor, header storage.Headers, registersAtHeight RegistersAtHeight) *Scripts {
+func NewScripts(
+	log zerolog.Logger,
+	tracer module.Tracer,
+	chainID flow.ChainID,
+	state protocol.State,
+	header storage.Headers,
+	registersAtHeight RegistersAtHeight,
+) (*Scripts, error) {
+	vm := fvm.NewVirtualMachine()
+
+	options := computation.DefaultFVMOptions(chainID, false, false)
+	vmCtx := fvm.NewContext(options...)
+
+	derivedChainData, err := derived.NewDerivedChainData(derived.DefaultDerivedDataCacheSize)
+	if err != nil {
+		return nil, err
+	}
+
+	queryExecutor := query.NewQueryExecutor(
+		query.NewDefaultConfig(),
+		log,
+		metrics.NewExecutionCollector(tracer),
+		vm,
+		vmCtx,
+		derivedChainData,
+		query.NewProtocolStateWrapper(state),
+	)
+
 	return &Scripts{
-		executor:          executor,
+		executor:          queryExecutor,
 		headers:           header,
 		registersAtHeight: registersAtHeight,
-	}
+	}, nil
 }
 
 // ExecuteAtBlockHeight executes provided script against the block height.
