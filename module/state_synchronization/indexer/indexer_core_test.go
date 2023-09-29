@@ -146,7 +146,7 @@ func (i *indexCoreTest) runGetRegisters(IDs flow.RegisterIDs, height uint64) ([]
 }
 
 func TestExecutionState_IndexBlockData(t *testing.T) {
-	blocks := blocksFixture(5)
+	blocks := unittest.BlockchainFixture(5)
 	block := blocks[len(blocks)-1]
 
 	// this test makes sure the index block data is correctly calling store register with the
@@ -250,7 +250,7 @@ func TestExecutionState_IndexBlockData(t *testing.T) {
 	// this test makes sure that if a block we try to index is not found in block storage
 	// we get correct error.
 	t.Run("Unknown block ID", func(t *testing.T) {
-		unknownBlock := blocksFixture(1)[0]
+		unknownBlock := unittest.BlockchainFixture(1)[0]
 		ed := &execution_data.BlockExecutionData{
 			BlockID: unknownBlock.Header.ID(),
 		}
@@ -265,7 +265,7 @@ func TestExecutionState_IndexBlockData(t *testing.T) {
 
 func TestExecutionState_RegisterValues(t *testing.T) {
 	t.Run("Get value for single register", func(t *testing.T) {
-		blocks := blocksFixture(5)
+		blocks := unittest.BlockchainFixture(5)
 		height := blocks[1].Header.Height
 		ids := []flow.RegisterID{{
 			Owner: "1",
@@ -292,18 +292,6 @@ func newBlockHeadersStorage(blocks []*flow.Block) storage.Headers {
 	}
 
 	return synctest.MockBlockHeaderStorage(synctest.WithByID(blocksByID))
-}
-
-func blocksFixture(n int) []*flow.Block {
-	blocks := make([]*flow.Block, n)
-
-	genesis := unittest.BlockFixture()
-	blocks[0] = &genesis
-	for i := 1; i < n; i++ {
-		blocks[i] = unittest.BlockWithParentFixture(blocks[i-1].Header)
-	}
-
-	return blocks
 }
 
 func bootstrapTrieUpdates() *ledger.TrieUpdate {
