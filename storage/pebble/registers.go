@@ -17,33 +17,27 @@ import (
 type Registers struct {
 	db           *pebble.DB
 	firstHeight  uint64
-	latestHeight atomic.Uint64
+	latestHeight *atomic.Uint64
 }
 
 var _ storage.RegisterIndex = (*Registers)(nil)
 
 // NewRegisters takes a populated pebble instance with LatestHeight and FirstHeight set.
-// Will fail if they those two keys are unavailable as it implies a corrupted or uninitialized state
+// return storage.ErrNotBootstrapped if they those two keys are unavailable as it implies a uninitialized state
+// return other error if database is in a corrupted state
 func NewRegisters(db *pebble.DB) (*Registers, error) {
-	registers := &Registers{
-		db: db,
-	}
 	// check height keys and populate cache. These two variables will have been set
-	firstHeight, err := registers.firstStoredHeight()
+	firstHeight, latestHeight, err := ReadHeightsFromBootstrappedDB(db)
 	if err != nil {
-		// this means that the DB is either in a corrupted state or has not been initialized with a set of registers
-		// and firstHeight
-		return nil, fmt.Errorf("unable to initialize register storage, first height unavailable in db: %w", err)
-	}
-	latestHeight, err := registers.latestStoredHeight()
-	if err != nil {
-		// and firstHeight
+		// first height is found, but latest height is not found, this means that the DB is in a corrupted state
 		return nil, fmt.Errorf("unable to initialize register storage, latest height unavailable in db: %w", err)
 	}
 	/// All registers between firstHeight and lastHeight have been indexed
-	registers.firstHeight = firstHeight
-	registers.latestHeight.Store(latestHeight)
-	return registers, nil
+	return &Registers{
+		db:           db,
+		firstHeight:  firstHeight,
+		latestHeight: atomic.NewUint64(latestHeight),
+	}, nil
 }
 
 // Get returns the most recent updated payload for the given RegisterID.
@@ -124,7 +118,7 @@ func (s *Registers) Store(
 		}
 	}
 	// increment height and commit
-	err := batch.Set(latestHeightKey(), encodedUint64(height), nil)
+	err := batch.Set(latestHeightKey, encodedUint64(height), nil)
 	if err != nil {
 		return fmt.Errorf("failed to update latest height %d", height)
 	}
@@ -147,19 +141,27 @@ func (s *Registers) FirstHeight() uint64 {
 	return s.firstHeight
 }
 
-func (s *Registers) firstStoredHeight() (uint64, error) {
-	return s.heightLookup(firstHeightKey())
+func firstStoredHeight(db *pebble.DB) (uint64, error) {
+	return heightLookup(db, firstHeightKey)
 }
 
-func (s *Registers) latestStoredHeight() (uint64, error) {
-	return s.heightLookup(latestHeightKey())
+func latestStoredHeight(db *pebble.DB) (uint64, error) {
+	return heightLookup(db, latestHeightKey)
 }
 
-func (s *Registers) heightLookup(key []byte) (uint64, error) {
-	res, closer, err := s.db.Get(key)
+func heightLookup(db *pebble.DB, key []byte) (uint64, error) {
+	res, closer, err := db.Get(key)
 	if err != nil {
-		return 0, err
+		return 0, convertNotFoundError(err)
 	}
 	defer closer.Close()
 	return binary.BigEndian.Uint64(res), nil
+}
+
+// convert pebble NotFound error to storage NotFound error
+func convertNotFoundError(err error) error {
+	if errors.Is(err, pebble.ErrNotFound) {
+		return storage.ErrNotFound
+	}
+	return err
 }
