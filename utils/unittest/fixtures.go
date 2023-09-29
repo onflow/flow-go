@@ -2128,7 +2128,7 @@ func BootstrapFixtureWithChainID(
 
 	counter := uint64(1)
 	setup := EpochSetupFixture(
-		WithParticipants(participants),
+		WithParticipants(participants.ToSkeleton()),
 		SetupWithCounter(counter),
 		WithFirstView(root.Header.View),
 		WithFinalView(root.Header.View+1000),

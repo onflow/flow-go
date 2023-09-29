@@ -1761,7 +1761,7 @@ func TestEmergencyEpochFallback(t *testing.T) {
 
 			// add a participant for the next epoch
 			epoch2NewParticipant := unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification))
-			epoch2Participants := append(participants, epoch2NewParticipant).Sort(order.Canonical)
+			epoch2Participants := append(participants, epoch2NewParticipant).Sort(order.Canonical[flow.Identity]).ToSkeleton()
 
 			// create the epoch setup event for the second epoch
 			epoch2Setup := unittest.EpochSetupFixture(
@@ -1851,7 +1851,7 @@ func TestEmergencyEpochFallback(t *testing.T) {
 
 			// add a participant for the next epoch
 			epoch2NewParticipant := unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification))
-			epoch2Participants := append(participants, epoch2NewParticipant).Sort(order.Canonical)
+			epoch2Participants := append(participants, epoch2NewParticipant).Sort(order.Canonical[flow.Identity]).ToSkeleton()
 
 			// create the epoch setup event for the second epoch
 			// this event is invalid because it used a non-contiguous first view

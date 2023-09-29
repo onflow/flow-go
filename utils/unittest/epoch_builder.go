@@ -201,7 +201,7 @@ func (builder *EpochBuilder) BuildEpoch() *EpochBuilder {
 
 	// defaults for the EpochSetup event
 	setupDefaults := []func(*flow.EpochSetup){
-		WithParticipants(identities),
+		WithParticipants(identities.ToSkeleton()),
 		SetupWithCounter(counter + 1),
 		WithFirstView(finalView + 1),
 		WithFinalView(finalView + 1_000_000),
