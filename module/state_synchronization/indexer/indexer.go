@@ -19,7 +19,11 @@ import (
 const (
 	workersCount = 1 // how many workers will concurrently process the tasks in the jobqueue
 	searchAhead  = 1 // how many block heights ahead of the current will be requested and tasked for jobqueue
+
+	fetchTimeout = 30 * time.Second
 )
+
+var _ IndexReporter = (*Indexer)(nil)
 
 // Indexer handles ingestion of new execution data available and uses the execution data indexer module
 // to index the data.
@@ -34,13 +38,15 @@ type Indexer struct {
 	exeDataReader   *jobs.ExecutionDataReader
 	exeDataNotifier engine.Notifier
 	indexer         *IndexerCore
+	jobConsumer     *jobqueue.ComponentConsumer
+	registers       storage.RegisterIndex
 }
 
 // NewIndexer creates a new execution worker.
 func NewIndexer(
 	log zerolog.Logger,
 	initHeight uint64,
-	fetchTimeout time.Duration,
+	registers storage.RegisterIndex,
 	indexer *IndexerCore,
 	executionCache *cache.ExecutionDataCache,
 	executionDataLatestHeight func() (uint64, error),
@@ -49,22 +55,25 @@ func NewIndexer(
 	r := &Indexer{
 		exeDataNotifier: engine.NewNotifier(),
 		indexer:         indexer,
+		registers:       registers,
 	}
 
 	r.exeDataReader = jobs.NewExecutionDataReader(executionCache, fetchTimeout, executionDataLatestHeight)
 
 	// create a jobqueue that will process new available block execution data. The `exeDataNotifier` is used to
 	// signal new work, which is being triggered on the `OnExecutionData` handler.
-	r.Component = jobqueue.NewComponentConsumer(
+	r.jobConsumer = jobqueue.NewComponentConsumer(
 		log.With().Str("module", "execution_indexer").Logger(),
 		r.exeDataNotifier.Channel(),
 		processedHeight,
 		r.exeDataReader,
-		initHeight,
+		registers.FirstHeight(),
 		r.processExecutionData,
 		workersCount,
 		searchAhead,
 	)
+
+	r.Component = r.jobConsumer
 
 	return r
 }
@@ -73,6 +82,14 @@ func NewIndexer(
 func (i *Indexer) Start(ctx irrecoverable.SignalerContext) {
 	i.exeDataReader.AddContext(ctx)
 	i.Component.Start(ctx)
+}
+
+func (i *Indexer) LowestIndexedHeight() uint64 {
+	return i.registers.FirstHeight()
+}
+
+func (i *Indexer) HighestIndexedHeight() uint64 {
+	return i.jobConsumer.LastProcessedIndex()
 }
 
 // OnExecutionData is used to notify when new execution data is downloaded by the execution data requester jobqueue.

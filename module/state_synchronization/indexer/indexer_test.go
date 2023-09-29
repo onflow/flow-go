@@ -15,6 +15,7 @@ import (
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data/mock"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	mempool "github.com/onflow/flow-go/module/mempool/mock"
+	storagemock "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -23,6 +24,7 @@ const testTimeout = 300 * time.Millisecond
 type indexerTest struct {
 	blocks        []*flow.Block
 	progress      *mockProgress
+	registers     *storagemock.RegisterIndex
 	indexTest     *indexCoreTest
 	worker        *Indexer
 	executionData *mempool.ExecutionData
@@ -37,6 +39,7 @@ func newIndexerTest(t *testing.T, availableBlocks int, lastIndexedIndex int) *in
 	// we use 5th index as the latest indexed height, so we leave 5 more blocks to be indexed by the indexer in this test
 	lastIndexedHeight := blocks[lastIndexedIndex].Header.Height
 	progress := &mockProgress{index: lastIndexedHeight}
+	registers := storagemock.NewRegisterIndex(t)
 
 	indexerCoreTest := newIndexCoreTest(t, blocks, nil).
 		setLastHeight(func(t *testing.T) uint64 {
@@ -67,7 +70,7 @@ func newIndexerTest(t *testing.T, availableBlocks int, lastIndexedIndex int) *in
 	test.worker = NewIndexer(
 		unittest.Logger(),
 		test.first().Header.Height,
-		testTimeout,
+		registers,
 		indexerCoreTest.indexer,
 		exeCache,
 		test.latestHeight,
@@ -221,4 +224,12 @@ func TestIndexer_Failure(t *testing.T) {
 
 	// make sure store was called correct number of times
 	test.indexTest.registers.AssertNumberOfCalls(t, "Store", 1) // it fails after first run
+}
+
+func TestIndexer_LowestIndexedHeight(t *testing.T) {
+
+}
+
+func TestIndexer_HighestIndexedHeight(t *testing.T) {
+
 }
