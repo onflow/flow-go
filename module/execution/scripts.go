@@ -14,7 +14,6 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/metrics"
-	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
 )
 
@@ -35,7 +34,7 @@ func NewScripts(
 	log zerolog.Logger,
 	tracer module.Tracer,
 	chainID flow.ChainID,
-	state protocol.State,
+	entropy query.EntropyProviderPerBlock,
 	header storage.Headers,
 	registersAtHeight RegistersAtHeight,
 ) (*Scripts, error) {
@@ -56,7 +55,7 @@ func NewScripts(
 		vm,
 		vmCtx,
 		derivedChainData,
-		query.NewProtocolStateWrapper(state),
+		entropy,
 	)
 
 	return &Scripts{

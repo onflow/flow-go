@@ -610,7 +610,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 				builder.Logger,
 				builder.Tracer,
 				builder.RootChainID,
-				builder.State,
+				query.NewProtocolStateWrapper(builder.State),
 				builder.Storage.Headers,
 				builder.ExecutionIndexer.RegisterValues,
 			)
