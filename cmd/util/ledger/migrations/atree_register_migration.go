@@ -591,7 +591,21 @@ func (m *AtreeRegisterMigrator) cloneCricketMomentsShardedCollection(
 	go func() {
 		defer close(keyPairChan)
 
-		shardedCollectionMapIterator := shardedCollectionMap.Iterator()
+		inter, err := mr.ChildInterpreter()
+		if err != nil {
+			cancel(err)
+			return
+		}
+
+		storageMap := mr.GetReadOnlyStorage().GetStorageMap(mr.Address, domain, false)
+		storageMapValue := storageMap.ReadValue(&util.NopMemoryGauge{}, key)
+		scm, err := getShardedCollectionMap(mr, storageMapValue)
+		if err != nil {
+			cancel(err)
+			return
+		}
+
+		shardedCollectionMapIterator := scm.Iterator()
 		for {
 			select {
 			case <-ctx.Done():
@@ -604,7 +618,7 @@ func (m *AtreeRegisterMigrator) cloneCricketMomentsShardedCollection(
 				break
 			}
 
-			ownedNFTs, err := getNftCollection(mr.Interpreter, outerKey, shardedCollectionMap)
+			ownedNFTs, err := getNftCollection(inter, outerKey, scm)
 			if err != nil {
 				cancel(err)
 				return
