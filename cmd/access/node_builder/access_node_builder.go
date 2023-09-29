@@ -590,10 +590,10 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 				builder.State,
 				builder.Storage.Headers,
 				builder.executionDataConfig,
+				execDataDistributor,
 			)
 
 			builder.FollowerDistributor.AddOnBlockFinalizedConsumer(builder.ExecutionDataRequester.OnBlockFinalized)
-			builder.ExecutionDataRequester.AddOnExecutionDataReceivedConsumer(execDataDistributor.OnExecutionDataReceived)
 
 			return builder.ExecutionDataRequester, nil
 		})
