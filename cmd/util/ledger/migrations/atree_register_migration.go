@@ -529,12 +529,18 @@ func (m *AtreeRegisterMigrator) cloneValue(
 
 	if isCricketMomentsShardedCollection(mr, value) {
 		m.log.Info().Msg("migrating CricketMomentsShardedCollection")
-		return m.cloneCricketMomentsShardedCollection(
+		value, err := m.cloneCricketMomentsShardedCollection(
 			mr,
 			domain,
 			key,
 			value,
 		)
+
+		if err != nil {
+			m.log.Info().Err(err).Msg("failed to clone value")
+			return nil, err
+		}
+		return value, nil
 	}
 
 	err := capturePanic(func() {
@@ -715,7 +721,7 @@ func (m *AtreeRegisterMigrator) cloneCricketMomentsShardedCollection(
 		return nil, ctx.Err()
 	}
 
-	progressLog = util2.LogProgress("setting cloned cricket moments", count, m.log)
+	progressLog = util2.LogProgress("setting cloned cricket moments", len(clonedValues), m.log)
 	for _, clonedValue := range clonedValues {
 		ownedNFTs, err := getNftCollection(
 			mr.Interpreter,
