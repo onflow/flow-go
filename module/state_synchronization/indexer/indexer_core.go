@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/dgraph-io/badger/v2"
 	"github.com/rs/zerolog"
 	"golang.org/x/sync/errgroup"
 
@@ -24,7 +23,7 @@ type IndexerCore struct {
 	events    storage.Events
 	results   storage.LightTransactionResults
 	log       zerolog.Logger
-	db        *badger.DB
+	batcher   bstorage.BatchBuilder
 }
 
 // New execution state indexer used to ingest block execution data and index it by height.
@@ -32,7 +31,7 @@ type IndexerCore struct {
 // won't be initialized to ensure we have bootstrapped the storage first.
 func New(
 	log zerolog.Logger,
-	db *badger.DB,
+	batcher bstorage.BatchBuilder,
 	registers storage.RegisterIndex,
 	headers storage.Headers,
 	events storage.Events,
@@ -40,7 +39,7 @@ func New(
 ) (*IndexerCore, error) {
 	return &IndexerCore{
 		log:       log.With().Str("component", "execution_indexer").Logger(),
-		db:        db,
+		batcher:   batcher,
 		registers: registers,
 		headers:   headers,
 		events:    events,
@@ -114,7 +113,7 @@ func (c *IndexerCore) IndexBlockData(data *execution_data.BlockExecutionDataEnti
 			results = append(results, chunk.TransactionResults...)
 		}
 
-		batch := bstorage.NewBatch(c.db)
+		batch := bstorage.NewBatch(c.batcher)
 
 		err := c.events.BatchStore(data.BlockID, []flow.EventsList{events}, batch)
 		if err != nil {
