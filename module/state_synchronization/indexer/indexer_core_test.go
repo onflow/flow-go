@@ -14,8 +14,6 @@ import (
 	mocks "github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	"github.com/onflow/flow-go/fvm"
-	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/convert"
 	"github.com/onflow/flow-go/ledger/common/pathfinder"
@@ -292,45 +290,6 @@ func newBlockHeadersStorage(blocks []*flow.Block) storage.Headers {
 	}
 
 	return synctest.MockBlockHeaderStorage(synctest.WithByID(blocksByID))
-}
-
-func bootstrapTrieUpdates() *ledger.TrieUpdate {
-	opts := []fvm.Option{
-		fvm.WithChain(flow.Testnet.Chain()),
-	}
-	ctx := fvm.NewContext(opts...)
-	vm := fvm.NewVirtualMachine()
-
-	snapshotTree := snapshot.NewSnapshotTree(nil)
-
-	bootstrapOpts := []fvm.BootstrapProcedureOption{
-		fvm.WithInitialTokenSupply(unittest.GenesisTokenSupply),
-	}
-
-	executionSnapshot, _, _ := vm.Run(
-		ctx,
-		fvm.Bootstrap(unittest.ServiceAccountPublicKey, bootstrapOpts...),
-		snapshotTree)
-
-	payloads := make([]*ledger.Payload, 0)
-	for regID, regVal := range executionSnapshot.WriteSet {
-		key := ledger.Key{
-			KeyParts: []ledger.KeyPart{
-				{
-					Type:  convert.KeyPartOwner,
-					Value: []byte(regID.Owner),
-				},
-				{
-					Type:  convert.KeyPartKey,
-					Value: []byte(regID.Key),
-				},
-			},
-		}
-
-		payloads = append(payloads, ledger.NewPayload(key, regVal))
-	}
-
-	return trieUpdateWithPayloadsFixture(payloads)
 }
 
 func trieUpdateWithPayloadsFixture(payloads []*ledger.Payload) *ledger.TrieUpdate {
