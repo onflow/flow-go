@@ -10,6 +10,8 @@ import (
 	"testing"
 
 	"github.com/cockroachdb/pebble"
+	"github.com/rs/zerolog"
+
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/convert"
 	"github.com/onflow/flow-go/ledger/common/testutils"
@@ -17,7 +19,6 @@ import (
 	"github.com/onflow/flow-go/ledger/complete/wal"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
-	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 )
 
