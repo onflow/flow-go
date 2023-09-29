@@ -3,13 +3,11 @@ package indexer
 import (
 	"context"
 	"crypto/rand"
-	"encoding/binary"
 	"errors"
 	"fmt"
 	"os"
 	"testing"
 
-	"github.com/cockroachdb/pebble"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -28,7 +26,6 @@ import (
 	"github.com/onflow/flow-go/storage"
 	storagemock "github.com/onflow/flow-go/storage/mock"
 	pebbleStorage "github.com/onflow/flow-go/storage/pebble"
-	"github.com/onflow/flow-go/storage/pebble/registers"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -427,7 +424,7 @@ func TestIndexerIntegration_StoreAndGet(t *testing.T) {
 
 	// this test makes sure index values for a single register are correctly updated and always last value is returned
 	t.Run("Single Index Value Changes", func(t *testing.T) {
-		RunWithRegistersStorageAtInitialHeights(t, 0, 0, func(registers storage.RegisterIndex) {
+		pebbleStorage.RunWithRegistersStorageAtInitialHeights(t, 0, 0, func(registers *pebbleStorage.Registers) {
 			index, err := New(zerolog.Nop(), registers, nil, nil)
 			require.NoError(t, err)
 
@@ -454,7 +451,7 @@ func TestIndexerIntegration_StoreAndGet(t *testing.T) {
 	// the correct highest height indexed value is returned.
 	// e.g. we index A{h(1) -> X}, A{h(2) -> Y}, when we request h(4) we get value Y
 	t.Run("Single Index Value At Later Heights", func(t *testing.T) {
-		RunWithRegistersStorageAtInitialHeights(t, 0, 0, func(registers storage.RegisterIndex) {
+		pebbleStorage.RunWithRegistersStorageAtInitialHeights(t, 0, 0, func(registers *pebbleStorage.Registers) {
 			index, err := New(zerolog.Nop(), registers, nil, nil)
 			require.NoError(t, err)
 
@@ -485,7 +482,7 @@ func TestIndexerIntegration_StoreAndGet(t *testing.T) {
 
 	// this test makes sure we correctly handle weird payloads
 	t.Run("Empty and Nil Payloads", func(t *testing.T) {
-		RunWithRegistersStorageAtInitialHeights(t, 0, 0, func(registers storage.RegisterIndex) {
+		pebbleStorage.RunWithRegistersStorageAtInitialHeights(t, 0, 0, func(registers *pebbleStorage.Registers) {
 			index, err := New(zerolog.Nop(), registers, nil, nil)
 			require.NoError(t, err)
 
@@ -500,40 +497,4 @@ func TestIndexerIntegration_StoreAndGet(t *testing.T) {
 func storeRegisterWithValue(indexer *IndexerCore, height uint64, owner string, key string, value []byte) error {
 	payload := ledgerPayloadWithValuesFixture(owner, key, value)
 	return indexer.indexRegisters(map[ledger.Path]*ledger.Payload{ledger.DummyPath: payload}, height)
-}
-
-// duplicated from register tests https://github.com/onflow/flow-go/blob/aa41e76c824260f8f08aacbe46471619ecf3fe6e/storage/pebble/registers_test.go#L291
-const (
-	placeHolderHeight          = uint64(0)
-	codeFirstBlockHeight  byte = 3
-	codeLatestBlockHeight byte = 4
-)
-
-var latestHeightKeyLiteral = binary.BigEndian.AppendUint64(
-	[]byte{codeLatestBlockHeight, byte('/'), byte('/')}, placeHolderHeight)
-
-var firstHeightKeyLiteral = binary.BigEndian.AppendUint64(
-	[]byte{codeFirstBlockHeight, byte('/'), byte('/')}, placeHolderHeight)
-
-func RunWithRegistersStorageAtInitialHeights(
-	tb testing.TB,
-	first uint64,
-	latest uint64,
-	f func(r storage.RegisterIndex),
-) {
-	cache := pebble.NewCache(1 << 20)
-	opts := pebbleStorage.DefaultPebbleOptions(cache, registers.NewMVCCComparer())
-	unittest.RunWithConfiguredPebbleInstance(tb, opts, func(p *pebble.DB) {
-		// insert initial heights to pebble
-		require.NoError(tb, p.Set(firstHeightKeyLiteral, encodedUint64(first), nil))
-		require.NoError(tb, p.Set(latestHeightKeyLiteral, encodedUint64(latest), nil))
-		r, err := pebbleStorage.NewRegisters(p)
-		require.NoError(tb, err)
-		f(r)
-	})
-}
-
-func encodedUint64(height uint64) []byte {
-	payload := make([]byte, 0, 8)
-	return binary.BigEndian.AppendUint64(payload, height)
 }
