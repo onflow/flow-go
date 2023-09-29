@@ -189,12 +189,6 @@ func (c *IndexerCore) IndexBlockData(data *execution_data.BlockExecutionDataEnti
 	return nil
 }
 
-func (c *IndexerCore) indexEvents(blockID flow.Identifier, events flow.EventsList) error {
-	// Note: the last chunk in an execution data is the system chunk. All events in that ChunkExecutionData are service events.
-	err := c.events.Store(blockID, []flow.EventsList{events})
-	return err
-}
-
 func (c *IndexerCore) indexRegisters(registers map[ledger.Path]*ledger.Payload, height uint64) error {
 	regEntries := make(flow.RegisterEntries, 0, len(registers))
 
