@@ -677,7 +677,7 @@ func (m *AtreeRegisterMigrator) cloneCricketMomentsShardedCollection(
 
 					var newValue interpreter.Value
 					err = capturePanic(func() {
-						newValue = value.Clone(mr.Interpreter)
+						newValue = value.Clone(inter)
 					})
 					if err != nil {
 						cancel(err)

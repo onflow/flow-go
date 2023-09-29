@@ -201,7 +201,6 @@ func MigrateGroupConcurrently(
 	logAccount := moduleUtil.LogProgress("processing account group", accountGroups.Len(), log)
 
 	migrated := make([]*ledger.Payload, 0)
-
 	durations := newMigrationDurations(logTopNDurations)
 	for i := 0; i < accountGroups.Len(); i++ {
 		select {
