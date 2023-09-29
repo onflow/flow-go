@@ -64,7 +64,7 @@ func (r *ExecutionDataReader) AtIndex(height uint64) (module.Job, error) {
 	// data for the requested height or a lower height, has not been downloaded yet.
 	highestHeight, err := r.highestConsecutiveHeight()
 	if err != nil {
-		return nil, fmt.Errorf("failed to get highest hight: %w", err)
+		return nil, fmt.Errorf("failed to get highest height: %w", err)
 	}
 
 	if height > highestHeight {
