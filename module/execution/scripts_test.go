@@ -87,6 +87,8 @@ func bootstrapTrieUpdates() *ledger.TrieUpdate {
 		fvm.Bootstrap(unittest.ServiceAccountPublicKey, bootstrapOpts...),
 		snapshotTree)
 
+	// todo deploy a contract for script to import it an check values
+
 	payloads := make([]*ledger.Payload, 0)
 	for regID, regVal := range executionSnapshot.WriteSet {
 		key := ledger.Key{
