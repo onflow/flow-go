@@ -318,6 +318,7 @@ func newMigratorRuntime(
 }
 
 type migratorRuntime struct {
+	mu               sync.Mutex
 	Snapshot         *util.PayloadSnapshot
 	TransactionState state.NestedTransactionPreparer
 	Interpreter      *interpreter.Interpreter
@@ -334,10 +335,9 @@ func (mr *migratorRuntime) GetReadOnlyStorage() *runtime.Storage {
 func (mr *migratorRuntime) ChildInterpreter() (*interpreter.Interpreter, error) {
 
 	ledger := util.NewPayloadsReadonlyLedger(mr.Snapshot)
-	mu := sync.Mutex{}
 	ledger.AllocateStorageIndexFunc = func(owner []byte) (atree.StorageIndex, error) {
-		mu.Lock()
-		defer mu.Unlock()
+		mr.mu.Lock()
+		defer mr.mu.Unlock()
 
 		return mr.Accounts.AllocateStorageIndex(owner)
 	}
