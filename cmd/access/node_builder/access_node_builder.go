@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path"
 	"path/filepath"
 	"strings"
 	"time"
@@ -46,6 +47,7 @@ import (
 	followereng "github.com/onflow/flow-go/engine/common/follower"
 	"github.com/onflow/flow-go/engine/common/requester"
 	synceng "github.com/onflow/flow-go/engine/common/synchronization"
+	"github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module"
@@ -61,6 +63,7 @@ import (
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/metrics/unstaked"
 	"github.com/onflow/flow-go/module/state_synchronization"
+	"github.com/onflow/flow-go/module/state_synchronization/indexer"
 	edrequester "github.com/onflow/flow-go/module/state_synchronization/requester"
 	"github.com/onflow/flow-go/network"
 	alspmgr "github.com/onflow/flow-go/network/alsp/manager"
@@ -89,6 +92,7 @@ import (
 	"github.com/onflow/flow-go/state/protocol/blocktimer"
 	"github.com/onflow/flow-go/storage"
 	bstorage "github.com/onflow/flow-go/storage/badger"
+	pStorage "github.com/onflow/flow-go/storage/pebble"
 	"github.com/onflow/flow-go/utils/grpcutils"
 )
 
@@ -134,6 +138,9 @@ type AccessNodeConfig struct {
 	executionDataConfig          edrequester.ExecutionDataConfig
 	PublicNetworkConfig          PublicNetworkConfig
 	TxResultCacheSize            uint
+	executionDataIndexingEnabled bool
+	registersDBPath              string
+	checkpointFile               string
 }
 
 type PublicNetworkConfig struct {
@@ -200,6 +207,7 @@ func DefaultAccessNodeConfig() *AccessNodeConfig {
 		nodeInfoFile:                 "",
 		apiRatelimits:                nil,
 		apiBurstlimits:               nil,
+		TxResultCacheSize:            0,
 		PublicNetworkConfig: PublicNetworkConfig{
 			BindAddress: cmd.NotSet,
 			Metrics:     metrics.NewNoopCollector(),
@@ -215,7 +223,9 @@ func DefaultAccessNodeConfig() *AccessNodeConfig {
 			RetryDelay:         edrequester.DefaultRetryDelay,
 			MaxRetryDelay:      edrequester.DefaultMaxRetryDelay,
 		},
-		TxResultCacheSize: 0,
+		executionDataIndexingEnabled: false,
+		registersDBPath:              filepath.Join(homedir, ".flow", "execution_state"),
+		checkpointFile:               cmd.NotSet,
 	}
 }
 
@@ -249,6 +259,7 @@ type FlowAccessNodeBuilder struct {
 	ExecutionDataRequester     state_synchronization.ExecutionDataRequester
 	ExecutionDataStore         execution_data.ExecutionDataStore
 	ExecutionDataCache         *execdatacache.ExecutionDataCache
+	ExecutionIndexer           *indexer.Indexer
 
 	// The sync engine participants provider is the libp2p peer store for the access node
 	// which is not available until after the network has started.
@@ -456,6 +467,12 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 	var bsDependable *module.ProxiedReadyDoneAware
 	var execDataDistributor *edrequester.ExecutionDataDistributor
 	var execDataCacheBackend *herocache.BlockExecutionData
+	var executionDataStoreCache *execdatacache.ExecutionDataCache
+
+	// setup dependency chain to ensure indexer starts after the requester
+	requesterDependable := module.NewProxiedReadyDoneAware()
+	indexerDependencies := cmd.NewDependencyList()
+	indexerDependencies.Add(requesterDependable)
 
 	builder.
 		AdminCommand("read-execution-data", func(config *cmd.NodeConfig) commands.AdminCommand {
@@ -483,12 +500,14 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 			return nil
 		}).
 		Module("processed block height consumer progress", func(node *cmd.NodeConfig) error {
-			// uses the datastore's DB
+			// Note: progress is stored in the datastore's DB since that is where the jobqueue
+			// writes execution data to.
 			processedBlockHeight = bstorage.NewConsumerProgress(ds.DB, module.ConsumeProgressExecutionDataRequesterBlockHeight)
 			return nil
 		}).
 		Module("processed notifications consumer progress", func(node *cmd.NodeConfig) error {
-			// uses the datastore's DB
+			// Note: progress is stored in the datastore's DB since that is where the jobqueue
+			// writes execution data to.
 			processedNotifications = bstorage.NewConsumerProgress(ds.DB, module.ConsumeProgressExecutionDataRequesterNotification)
 			return nil
 		}).
@@ -502,8 +521,28 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 			builder.ExecutionDataStore = execution_data.NewExecutionDataStore(blobstore, execution_data.DefaultSerializer)
 			return nil
 		}).
-		Component("execution data service", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+		Module("execution data cache", func(node *cmd.NodeConfig) error {
+			var heroCacheCollector module.HeroCacheMetrics = metrics.NewNoopCollector()
+			if builder.HeroCacheMetricsEnable {
+				heroCacheCollector = metrics.AccessNodeExecutionDataCacheMetrics(builder.MetricsRegisterer)
+			}
 
+			execDataCacheBackend = herocache.NewBlockExecutionData(builder.stateStreamConf.ExecutionDataCacheSize, builder.Logger, heroCacheCollector)
+
+			// Execution Data cache that uses a blobstore as the backend (instead of a downloader)
+			// This ensures that it simply returns a not found error if the blob doesn't exist
+			// instead of attempting to download it from the network.
+			executionDataStoreCache = execdatacache.NewExecutionDataCache(
+				builder.ExecutionDataStore,
+				builder.Storage.Headers,
+				builder.Storage.Seals,
+				builder.Storage.Results,
+				execDataCacheBackend,
+			)
+
+			return nil
+		}).
+		Component("execution data service", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			opts := []network.BlobServiceOption{
 				blob.WithBitswapOptions(
 					// Only allow block requests from staked ENs and ANs
@@ -564,14 +603,9 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 
 			execDataDistributor = edrequester.NewExecutionDataDistributor()
 
-			var heroCacheCollector module.HeroCacheMetrics = metrics.NewNoopCollector()
-			if builder.HeroCacheMetricsEnable {
-				heroCacheCollector = metrics.AccessNodeExecutionDataCacheMetrics(builder.MetricsRegisterer)
-			}
-
-			execDataCacheBackend = herocache.NewBlockExecutionData(builder.stateStreamConf.ExecutionDataCacheSize, builder.Logger, heroCacheCollector)
 			// Execution Data cache with a downloader as the backend. This is used by the requester
-			// to download and cache execution data for each block.
+			// to download and cache execution data for each block. It shares a cache backend instance
+			// with the datastore implementation.
 			executionDataCache := execdatacache.NewExecutionDataCache(
 				builder.ExecutionDataDownloader,
 				builder.Storage.Headers,
@@ -595,8 +629,106 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 
 			builder.FollowerDistributor.AddOnBlockFinalizedConsumer(builder.ExecutionDataRequester.OnBlockFinalized)
 
+			// add requester into ReadyDoneAware dependency passed to indexer. This allows the indexer
+			// to wait for the requester to be ready before starting.
+			requesterDependable.Init(builder.ExecutionDataRequester)
+
 			return builder.ExecutionDataRequester, nil
 		})
+
+	if builder.executionDataIndexingEnabled {
+		var indexedBlockHeight storage.ConsumerProgress
+
+		builder.
+			Module("indexed block height consumer progress", func(node *cmd.NodeConfig) error {
+				// Note: progress is stored in the MAIN db since that is where indexed execution data is stored.
+				indexedBlockHeight = bstorage.NewConsumerProgress(builder.DB, module.ConsumeProgressExecutionDataIndexerBlockHeight)
+				return nil
+			}).
+			Module("events storage", func(node *cmd.NodeConfig) error {
+				builder.Storage.Events = bstorage.NewEvents(node.Metrics.Cache, node.DB)
+				return nil
+			}).
+			Module("transaction results storage", func(node *cmd.NodeConfig) error {
+				builder.Storage.LightTransactionResults = bstorage.NewLightTransactionResults(node.Metrics.Cache, node.DB, bstorage.DefaultCacheSize)
+				return nil
+			}).
+			DependableComponent("execution data indexer", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+				// Note: using a DependableComponent here to ensure that the indexer does not block
+				// other components from starting while bootstrapping the register db since it may
+				// take hours to complete.
+
+				pdb, err := pStorage.OpenRegisterPebbleDB(builder.registersDBPath)
+				if err != nil {
+					return nil, fmt.Errorf("could not open registers db: %w", err)
+				}
+				builder.ShutdownFunc(func() error {
+					return pdb.Close()
+				})
+
+				bootstrapped, err := pStorage.IsBootstrapped(pdb)
+				if err != nil {
+					return nil, fmt.Errorf("could not check if registers db is bootstrapped: %w", err)
+				}
+
+				if !bootstrapped {
+					// TODO: this is OK as an initial default, once automatic pruning is added,
+					// this height will be dynamic
+					initHeight := builder.executionDataConfig.InitialBlockHeight
+
+					checkpointFile := builder.checkpointFile
+					if checkpointFile == cmd.NotSet {
+						checkpointFile = path.Join(builder.BootstrapDir, bootstrap.PathRootCheckpoint)
+					}
+
+					bootstrap, err := pStorage.NewRegisterBootstrap(pdb, checkpointFile, initHeight, builder.Logger)
+					if err != nil {
+						return nil, fmt.Errorf("could not create registers bootstrapper: %w", err)
+					}
+
+					// TODO: find a way to hook a context up to this to allow a graceful shutdown
+					err = bootstrap.IndexCheckpointFile(context.Background())
+					if err != nil {
+						return nil, fmt.Errorf("could not load checkpoint file: %w", err)
+					}
+				}
+
+				registers, err := pStorage.NewRegisters(pdb)
+				if err != nil {
+					return nil, fmt.Errorf("could not create registers storage: %w", err)
+				}
+
+				builder.Storage.RegisterIndex = registers
+
+				indexerCore, err := indexer.New(
+					builder.Logger,
+					builder.DB,
+					builder.Storage.RegisterIndex,
+					builder.Storage.Headers,
+					builder.Storage.Events,
+					builder.Storage.LightTransactionResults,
+				)
+				if err != nil {
+					return nil, err
+				}
+
+				// execution state worker uses a jobqueue to process new execution data and indexes it by using the indexer.
+				builder.ExecutionIndexer = indexer.NewIndexer(
+					builder.Logger,
+					registers.FirstHeight(),
+					registers,
+					indexerCore,
+					executionDataStoreCache,
+					builder.ExecutionDataRequester.HighestConsecutiveHeight,
+					indexedBlockHeight,
+				)
+
+				// setup requester to notify indexer when new execution data is received
+				execDataDistributor.AddOnExecutionDataReceivedConsumer(builder.ExecutionIndexer.OnExecutionData)
+
+				return builder.ExecutionIndexer, nil
+			}, indexerDependencies)
+	}
 
 	if builder.stateStreamConf.ListenAddr != "" {
 		builder.Component("exec state stream engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
@@ -612,32 +744,21 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 			}
 			builder.stateStreamConf.RpcMetricsEnabled = builder.rpcMetricsEnabled
 
-			// Execution Data cache that uses a blobstore as the backend (instead of a downloader)
-			// This ensures that it simply returns a not found error if the blob doesn't exist
-			// instead of attempting to download it from the network. It shares a cache backend instance
-			// with the requester's implementation.
-			executionDataCache := execdatacache.NewExecutionDataCache(
-				builder.ExecutionDataStore,
-				builder.Storage.Headers,
-				builder.Storage.Seals,
-				builder.Storage.Results,
-				execDataCacheBackend,
-			)
-
 			highestAvailableHeight, err := builder.ExecutionDataRequester.HighestConsecutiveHeight()
 			if err != nil {
 				return nil, fmt.Errorf("could not get highest consecutive height: %w", err)
 			}
 			broadcaster := engine.NewBroadcaster()
 
-			builder.stateStreamBackend, err = state_stream.New(node.Logger,
+			builder.stateStreamBackend, err = state_stream.New(
+				node.Logger,
 				builder.stateStreamConf,
 				node.State,
 				node.Storage.Headers,
 				node.Storage.Seals,
 				node.Storage.Results,
 				builder.ExecutionDataStore,
-				executionDataCache,
+				executionDataStoreCache,
 				broadcaster,
 				builder.executionDataConfig.InitialBlockHeight,
 				highestAvailableHeight)
@@ -648,7 +769,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 			stateStreamEng, err := state_stream.NewEng(
 				node.Logger,
 				builder.stateStreamConf,
-				executionDataCache,
+				executionDataStoreCache,
 				node.Storage.Headers,
 				node.RootChainID,
 				builder.stateStreamGrpcServer,
@@ -720,6 +841,7 @@ func (builder *FlowAccessNodeBuilder) extraFlags() {
 		flags.BoolVar(&builder.pingEnabled, "ping-enabled", defaultConfig.pingEnabled, "whether to enable the ping process that pings all other peers and report the connectivity to metrics")
 		flags.BoolVar(&builder.retryEnabled, "retry-enabled", defaultConfig.retryEnabled, "whether to enable the retry mechanism at the access node level")
 		flags.BoolVar(&builder.rpcMetricsEnabled, "rpc-metrics-enabled", defaultConfig.rpcMetricsEnabled, "whether to enable the rpc metrics")
+		flags.UintVar(&builder.TxResultCacheSize, "transaction-result-cache-size", defaultConfig.TxResultCacheSize, "transaction result cache size.(Disabled by default i.e 0)")
 		flags.StringVarP(&builder.nodeInfoFile, "node-info-file", "", defaultConfig.nodeInfoFile, "full path to a json file which provides more details about nodes when reporting its reachability metrics")
 		flags.StringToIntVar(&builder.apiRatelimits, "api-rate-limits", defaultConfig.apiRatelimits, "per second rate limits for Access API methods e.g. Ping=300,GetTransaction=500 etc.")
 		flags.StringToIntVar(&builder.apiBurstlimits, "api-burst-limits", defaultConfig.apiBurstlimits, "burst limits for Access API methods e.g. Ping=100,GetTransaction=100 etc.")
@@ -748,7 +870,10 @@ func (builder *FlowAccessNodeBuilder) extraFlags() {
 		flags.UintVar(&builder.stateStreamConf.ClientSendBufferSize, "state-stream-send-buffer-size", defaultConfig.stateStreamConf.ClientSendBufferSize, "maximum number of responses to buffer within a stream")
 		flags.Float64Var(&builder.stateStreamConf.ResponseLimit, "state-stream-response-limit", defaultConfig.stateStreamConf.ResponseLimit, "max number of responses per second to send over streaming endpoints. this helps manage resources consumed by each client querying data not in the cache e.g. 3 or 0.5. 0 means no limit")
 
-		flags.UintVar(&builder.TxResultCacheSize, "transaction-result-cache-size", defaultConfig.TxResultCacheSize, "transaction result cache size.(Disabled by default i.e 0)")
+		// Execution Data Indexer
+		flags.BoolVar(&builder.executionDataIndexingEnabled, "execution-data-indexing-enabled", defaultConfig.executionDataIndexingEnabled, "whether to enable the execution data indexing")
+		flags.StringVar(&builder.registersDBPath, "execution-state-dir", defaultConfig.registersDBPath, "directory to use for execution-state database")
+		flags.StringVar(&builder.checkpointFile, "execution-state-checkpoint", defaultConfig.checkpointFile, "directory to use for execution-state database")
 	}).ValidateFlags(func() error {
 		if builder.supportsObserver && (builder.PublicNetworkConfig.BindAddress == cmd.NotSet || builder.PublicNetworkConfig.BindAddress == "") {
 			return errors.New("public-network-address must be set if supports-observer is true")
