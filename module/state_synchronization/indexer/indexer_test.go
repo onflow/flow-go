@@ -225,11 +225,3 @@ func TestIndexer_Failure(t *testing.T) {
 	// make sure store was called correct number of times
 	test.indexTest.registers.AssertNumberOfCalls(t, "Store", 1) // it fails after first run
 }
-
-func TestIndexer_LowestIndexedHeight(t *testing.T) {
-
-}
-
-func TestIndexer_HighestIndexedHeight(t *testing.T) {
-
-}

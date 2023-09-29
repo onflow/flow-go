@@ -20,6 +20,9 @@ const (
 	workersCount = 1 // how many workers will concurrently process the tasks in the jobqueue
 	searchAhead  = 1 // how many block heights ahead of the current will be requested and tasked for jobqueue
 
+	// fetchTimeout is the timeout for retrieving execution data from the datastore
+	// This is required by the execution data reader, but in practice, this isn't needed
+	// here since the data is in a local db.
 	fetchTimeout = 30 * time.Second
 )
 
@@ -53,6 +56,7 @@ func NewIndexer(
 	processedHeight storage.ConsumerProgress,
 ) *Indexer {
 	r := &Indexer{
+		log:             log.With().Str("module", "execution_indexer").Logger(),
 		exeDataNotifier: engine.NewNotifier(),
 		indexer:         indexer,
 		registers:       registers,
@@ -63,11 +67,11 @@ func NewIndexer(
 	// create a jobqueue that will process new available block execution data. The `exeDataNotifier` is used to
 	// signal new work, which is being triggered on the `OnExecutionData` handler.
 	r.jobConsumer = jobqueue.NewComponentConsumer(
-		log.With().Str("module", "execution_indexer").Logger(),
+		r.log,
 		r.exeDataNotifier.Channel(),
 		processedHeight,
 		r.exeDataReader,
-		registers.FirstHeight(),
+		initHeight,
 		r.processExecutionData,
 		workersCount,
 		searchAhead,
@@ -84,11 +88,19 @@ func (i *Indexer) Start(ctx irrecoverable.SignalerContext) {
 	i.Component.Start(ctx)
 }
 
+// LowestIndexedHeight returns the lowest height indexed by the execution indexer.
 func (i *Indexer) LowestIndexedHeight() uint64 {
+	// TODO: use a separate value to track the lowest indexed height. We're using the registers db's
+	// value here to start because it's convenient. When pruning support is added, this will need to
+	// be updated.
 	return i.registers.FirstHeight()
 }
 
+// HighestIndexedHeight returns the highest height indexed by the execution indexer.
 func (i *Indexer) HighestIndexedHeight() uint64 {
+	// The jobqueue maintains its own highest indexed height value, separate from the register db.
+	// Since jobs are only marked complete when ALL data is indexed, the lastProcessedIndex must
+	// be strictly less than or equal to the register db's LatestHeight.
 	return i.jobConsumer.LastProcessedIndex()
 }
 

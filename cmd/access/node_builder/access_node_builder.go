@@ -141,6 +141,7 @@ type AccessNodeConfig struct {
 	executionDataIndexingEnabled bool
 	registersDBPath              string
 	checkpointFile               string
+	checkpointHeight             uint64
 }
 
 type PublicNetworkConfig struct {
@@ -226,6 +227,7 @@ func DefaultAccessNodeConfig() *AccessNodeConfig {
 		executionDataIndexingEnabled: false,
 		registersDBPath:              filepath.Join(homedir, ".flow", "execution_state"),
 		checkpointFile:               cmd.NotSet,
+		checkpointHeight:             0,
 	}
 }
 
@@ -672,16 +674,24 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 				}
 
 				if !bootstrapped {
-					// TODO: this is OK as an initial default, once automatic pruning is added,
-					// this height will be dynamic
-					initHeight := builder.executionDataConfig.InitialBlockHeight
+					// since indexing is done using execution data, make sure that execution data
+					// will be available starting at the checkpoint height. otherwise, the indexer
+					// will fail to progress.
+					if builder.checkpointHeight < builder.executionDataConfig.InitialBlockHeight {
+						return nil, fmt.Errorf(
+							"checkpoint is from height %d, but execution data is only available from height %d. "+
+								"either provide a more recent checkpoint, or configure execution sync to start from a lower height",
+							builder.checkpointHeight,
+							builder.executionDataConfig.InitialBlockHeight,
+						)
+					}
 
 					checkpointFile := builder.checkpointFile
 					if checkpointFile == cmd.NotSet {
 						checkpointFile = path.Join(builder.BootstrapDir, bootstrap.PathRootCheckpoint)
 					}
 
-					bootstrap, err := pStorage.NewRegisterBootstrap(pdb, checkpointFile, initHeight, builder.Logger)
+					bootstrap, err := pStorage.NewRegisterBootstrap(pdb, checkpointFile, builder.checkpointHeight, builder.Logger)
 					if err != nil {
 						return nil, fmt.Errorf("could not create registers bootstrapper: %w", err)
 					}
@@ -873,7 +883,8 @@ func (builder *FlowAccessNodeBuilder) extraFlags() {
 		// Execution Data Indexer
 		flags.BoolVar(&builder.executionDataIndexingEnabled, "execution-data-indexing-enabled", defaultConfig.executionDataIndexingEnabled, "whether to enable the execution data indexing")
 		flags.StringVar(&builder.registersDBPath, "execution-state-dir", defaultConfig.registersDBPath, "directory to use for execution-state database")
-		flags.StringVar(&builder.checkpointFile, "execution-state-checkpoint", defaultConfig.checkpointFile, "directory to use for execution-state database")
+		flags.StringVar(&builder.checkpointFile, "execution-state-checkpoint", defaultConfig.checkpointFile, "execution-state checkpoint file")
+		flags.Uint64Var(&builder.checkpointHeight, "execution-state-checkpoint-height", defaultConfig.checkpointHeight, "block height at which the execution-state checkpoint was generated")
 	}).ValidateFlags(func() error {
 		if builder.supportsObserver && (builder.PublicNetworkConfig.BindAddress == cmd.NotSet || builder.PublicNetworkConfig.BindAddress == "") {
 			return errors.New("public-network-address must be set if supports-observer is true")
