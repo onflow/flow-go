@@ -13,6 +13,9 @@ import (
 	"github.com/onflow/flow-go/ledger/complete/wal"
 )
 
+// ErrAlreadyBootstrapped is the sentinel error for an already bootstrapped pebble instance
+var ErrAlreadyBootstrapped = fmt.Errorf("found latest key set on badger instance, DB is already bootstrapped")
+
 type RegisterBootstrap struct {
 	checkpointDir      string
 	checkpointFileName string
@@ -39,7 +42,7 @@ func NewRegisterBootstrap(
 	}
 	if isBootstrapped {
 		// key detected, attempt to run bootstrap on corrupt or already bootstrapped data
-		return nil, fmt.Errorf("found latest key set on badger instance, DB is already bootstrapped")
+		return nil, ErrAlreadyBootstrapped
 	}
 	checkpointDir, checkpointFileName := filepath.Split(checkpointFile)
 	return &RegisterBootstrap{

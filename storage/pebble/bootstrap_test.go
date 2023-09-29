@@ -35,7 +35,7 @@ func TestRegisterBootstrap_NewBootstrap(t *testing.T) {
 		require.NoError(t, initHeights(p, rootHeight))
 		// errors if FirstHeight or LastHeight are populated
 		_, err = NewRegisterBootstrap(p, dir, rootHeight, log)
-		require.ErrorContains(t, err, "DB is already bootstrapped")
+		require.ErrorIs(t, err, ErrAlreadyBootstrapped)
 	})
 }
 
