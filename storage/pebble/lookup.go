@@ -116,7 +116,7 @@ func (h lookupKey) Bytes() []byte {
 	return h.encoded
 }
 
-// EncodedUint64 encodes uint64 for storing as a pebble payload
+// encodedUint64 encodes uint64 for storing as a pebble payload
 func encodedUint64(height uint64) []byte {
 	payload := make([]byte, 0, 8)
 	return binary.BigEndian.AppendUint64(payload, height)
