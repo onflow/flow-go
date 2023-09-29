@@ -113,6 +113,7 @@ func (b *RegisterBootstrap) indexCheckpointFileWorker(ctx context.Context) error
 // IndexCheckpointFile indexes the checkpoint file in the Dir provided
 func (b *RegisterBootstrap) IndexCheckpointFile(ctx context.Context) error {
 	cct, cancel := context.WithCancel(ctx)
+	defer cancel()
 	g, gCtx := errgroup.WithContext(cct)
 	b.log.Info().Msg("indexing checkpoint file for pebble register store")
 	for i := 0; i < pebbleBootstrapWorkerCount; i++ {
@@ -122,14 +123,11 @@ func (b *RegisterBootstrap) IndexCheckpointFile(ctx context.Context) error {
 	}
 	err := wal.OpenAndReadLeafNodesFromCheckpointV6(b.leafNodeChan, b.checkpointDir, b.checkpointFileName, b.log)
 	if err != nil {
-		cancel()
 		return fmt.Errorf("error reading leaf node: %w", err)
 	}
 	if err = g.Wait(); err != nil {
-		cancel()
 		return fmt.Errorf("failed to index checkpoint file: %w", err)
 	}
-	cancel()
 	b.log.Info().Msg("checkpoint indexing complete")
 	err = initHeights(b.db, b.rootHeight)
 	if err != nil {
