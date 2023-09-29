@@ -2,6 +2,7 @@ package pebble
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"path/filepath"
 
@@ -14,7 +15,7 @@ import (
 )
 
 // ErrAlreadyBootstrapped is the sentinel error for an already bootstrapped pebble instance
-var ErrAlreadyBootstrapped = fmt.Errorf("found latest key set on badger instance, DB is already bootstrapped")
+var ErrAlreadyBootstrapped = errors.New("found latest key set on badger instance, DB is already bootstrapped")
 
 type RegisterBootstrap struct {
 	checkpointDir      string

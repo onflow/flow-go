@@ -48,7 +48,7 @@ func TestRegisterBootstrap_IndexCheckpointFile_Happy(t *testing.T) {
 		fileName := "simple-checkpoint"
 		require.NoErrorf(t, wal.StoreCheckpointV6Concurrently(tries, dir, fileName, log), "fail to store checkpoint")
 		checkpointFile := path.Join(dir, fileName)
-		pb, dbDir := createPebbleForTest(t)
+		pb := createPebbleForTest(t)
 
 		bootstrap, err := NewRegisterBootstrap(pb, checkpointFile, rootHeight, log)
 		require.NoError(t, err)
@@ -67,9 +67,6 @@ func TestRegisterBootstrap_IndexCheckpointFile_Happy(t *testing.T) {
 			require.NoError(t, err)
 			require.Equal(t, val, []byte{defaultRegisterValue})
 		}
-
-		require.NoError(t, pb.Close())
-		require.NoError(t, os.RemoveAll(dbDir))
 	})
 }
 
@@ -82,7 +79,7 @@ func TestRegisterBootstrap_IndexCheckpointFile_Empty(t *testing.T) {
 		fileName := "empty-checkpoint"
 		require.NoErrorf(t, wal.StoreCheckpointV6Concurrently(tries, dir, fileName, log), "fail to store checkpoint")
 		checkpointFile := path.Join(dir, fileName)
-		pb, dbDir := createPebbleForTest(t)
+		pb := createPebbleForTest(t)
 
 		bootstrap, err := NewRegisterBootstrap(pb, checkpointFile, rootHeight, log)
 		require.NoError(t, err)
@@ -95,9 +92,6 @@ func TestRegisterBootstrap_IndexCheckpointFile_Empty(t *testing.T) {
 
 		require.Equal(t, reg.LatestHeight(), rootHeight)
 		require.Equal(t, reg.FirstHeight(), rootHeight)
-
-		require.NoError(t, pb.Close())
-		require.NoError(t, os.RemoveAll(dbDir))
 	})
 }
 
@@ -120,14 +114,12 @@ func TestRegisterBootstrap_IndexCheckpointFile_FormatIssue(t *testing.T) {
 		require.NoErrorf(t, wal.StoreCheckpointV6Concurrently([]*trie.MTrie{trieWithInvalidEntry}, dir, fileName, log),
 			"fail to store checkpoint")
 		checkpointFile := path.Join(dir, fileName)
-		pb, dbDir := createPebbleForTest(t)
+		pb := createPebbleForTest(t)
 
 		bootstrap, err := NewRegisterBootstrap(pb, checkpointFile, rootHeight, log)
 		require.NoError(t, err)
 		err = bootstrap.IndexCheckpointFile(context.Background())
 		require.ErrorContains(t, err, "unexpected ledger key format")
-		require.NoError(t, pb.Close())
-		require.NoError(t, os.RemoveAll(dbDir))
 	})
 
 }
@@ -144,7 +136,7 @@ func TestRegisterBootstrap_IndexCheckpointFile_CorruptedCheckpointFile(t *testin
 		fileToDelete := path.Join(dir, fmt.Sprintf("%v.%03d", checkpointFileName, 2))
 		err := os.RemoveAll(fileToDelete)
 		require.NoError(t, err)
-		pb, _ := createPebbleForTest(t)
+		pb := createPebbleForTest(t)
 		bootstrap, err := NewRegisterBootstrap(pb, checkpointFileName, rootHeight, log)
 		require.NoError(t, err)
 		err = bootstrap.IndexCheckpointFile(context.Background())
@@ -161,7 +153,7 @@ func TestRegisterBootstrap_IndexCheckpointFile_MultipleBatch(t *testing.T) {
 		fileName := "large-checkpoint"
 		require.NoErrorf(t, wal.StoreCheckpointV6Concurrently(tries, dir, fileName, log), "fail to store checkpoint")
 		checkpointFile := path.Join(dir, fileName)
-		pb, dbDir := createPebbleForTest(t)
+		pb := createPebbleForTest(t)
 		bootstrap, err := NewRegisterBootstrap(pb, checkpointFile, rootHeight, log)
 		require.NoError(t, err)
 		err = bootstrap.IndexCheckpointFile(context.Background())
@@ -179,9 +171,6 @@ func TestRegisterBootstrap_IndexCheckpointFile_MultipleBatch(t *testing.T) {
 			require.NoError(t, err)
 			require.Equal(t, val, []byte{defaultRegisterValue})
 		}
-
-		require.NoError(t, pb.Close())
-		require.NoError(t, os.RemoveAll(dbDir))
 	})
 
 }
@@ -241,9 +230,13 @@ func randomRegisterPaths(n uint16) []ledger.Path {
 	return p
 }
 
-func createPebbleForTest(t *testing.T) (*pebble.DB, string) {
+func createPebbleForTest(t *testing.T) *pebble.DB {
 	dbDir := unittest.TempPebblePath(t)
 	pb, err := OpenRegisterPebbleDB(dbDir)
 	require.NoError(t, err)
-	return pb, dbDir
+	t.Cleanup(func() {
+		require.NoError(t, pb.Close())
+		require.NoError(t, os.RemoveAll(dbDir))
+	})
+	return pb
 }
