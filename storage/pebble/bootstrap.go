@@ -31,18 +31,18 @@ func NewRegisterBootstrap(
 	rootHeight uint64,
 	log zerolog.Logger,
 ) (*RegisterBootstrap, error) {
+	bootstrapped, err := IsBootstrapped(db)
+	if err != nil {
+		return nil, fmt.Errorf("failed to check if db is bootstrapped: %w", err)
+	}
+	if bootstrapped {
+		return nil, fmt.Errorf("cannot bootstrap populated DB")
+	}
+
 	// check for pre-populated heights, fail if it is populated
 	// i.e. the IndexCheckpointFile function has already run for the db in this directory
 	checkpointDir, checkpointFileName := filepath.Split(checkpointFile)
-	_, _, err := db.Get(latestHeightKey())
-	if err == nil {
-		// key detected, attempt to run bootstrap on corrupt or already bootstrapped data
-		return nil, fmt.Errorf("found latest key set on badger instance, cannot bootstrap populated DB")
-	}
-	err = db.Set(firstHeightKey(), encodedUint64(rootHeight), nil)
-	if err != nil {
-		return nil, fmt.Errorf("could not index first height key to initialize: %w", err)
-	}
+
 	return &RegisterBootstrap{
 		checkpointDir:      checkpointDir,
 		checkpointFileName: checkpointFileName,
@@ -128,9 +128,10 @@ func (b *RegisterBootstrap) IndexCheckpointFile(ctx context.Context) error {
 		return fmt.Errorf("failed to index checkpoint file: %w", err)
 	}
 	b.log.Info().Msg("checkpoint indexing complete")
-	err = b.db.Set(latestHeightKey(), encodedUint64(b.rootHeight), nil)
+
+	err = initHeights(b.db, b.rootHeight)
 	if err != nil {
-		return fmt.Errorf("could not index latest height: %w", err)
+		return fmt.Errorf("could not initialize first and latest height: %w", err)
 	}
 	return nil
 }

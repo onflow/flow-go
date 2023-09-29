@@ -27,20 +27,16 @@ const defaultRegisterValue = byte('v')
 
 func TestRegisterBootstrap_NewBootstrap(t *testing.T) {
 	t.Parallel()
+
 	unittest.RunWithTempDir(t, func(dir string) {
 		rootHeight := uint64(1)
-		log := zerolog.New(io.Discard)
-		cache := pebble.NewCache(1 << 20)
-		defer cache.Unref()
-		opts := DefaultPebbleOptions(cache, registers.NewMVCCComparer())
-		p, err := pebble.Open(dir, opts)
-		require.NoError(t, err)
-		// set heights
-		require.NoError(t, p.Set(firstHeightKey(), encodedUint64(rootHeight), nil))
-		require.NoError(t, p.Set(latestHeightKey(), encodedUint64(rootHeight), nil))
+		db := newBootstrappedRegistersWithPathForTest(t, dir, rootHeight, rootHeight)
+
 		// errors if FirstHeight or LastHeight are populated
-		_, err = NewRegisterBootstrap(p, dir, rootHeight, log)
+		_, err := NewRegisterBootstrap(db, dir, rootHeight, unittest.Logger())
 		require.ErrorContains(t, err, "cannot bootstrap populated DB")
+
+		require.NoError(t, db.Close())
 	})
 }
 
