@@ -12,6 +12,7 @@ import (
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data/cache"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/jobqueue"
+	"github.com/onflow/flow-go/module/state_synchronization"
 	"github.com/onflow/flow-go/module/state_synchronization/requester/jobs"
 	"github.com/onflow/flow-go/storage"
 )
@@ -26,7 +27,7 @@ const (
 	fetchTimeout = 30 * time.Second
 )
 
-var _ IndexReporter = (*Indexer)(nil)
+var _ state_synchronization.IndexReporter = (*Indexer)(nil)
 
 // Indexer handles ingestion of new execution data available and uses the execution data indexer module
 // to index the data.
