@@ -46,10 +46,7 @@ import (
 	followereng "github.com/onflow/flow-go/engine/common/follower"
 	"github.com/onflow/flow-go/engine/common/requester"
 	synceng "github.com/onflow/flow-go/engine/common/synchronization"
-	"github.com/onflow/flow-go/engine/execution/computation"
 	"github.com/onflow/flow-go/engine/execution/computation/query"
-	"github.com/onflow/flow-go/fvm"
-	"github.com/onflow/flow-go/fvm/storage/derived"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module"
@@ -609,28 +606,19 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 		Component("script execution", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 
 			// todo this code will be included in the builder PR but it shows how it can be used to build it there
-
-			vm := fvm.NewVirtualMachine()
-
-			options := computation.DefaultFVMOptions(node.RootChainID, false, false)
-			vmCtx := fvm.NewContext(options...)
-
-			derivedChainData, err := derived.NewDerivedChainData(derived.DefaultDerivedDataCacheSize)
+			scripts, err := execution.NewScripts(
+				builder.Logger,
+				builder.Tracer,
+				builder.RootChainID,
+				builder.State,
+				builder.Storage.Headers,
+				builder.ExecutionIndexer.RegisterValues,
+			)
 			if err != nil {
 				return nil, err
 			}
 
-			queryExecutor := query.NewQueryExecutor(
-				builder.queryExecutorConfig,
-				builder.Logger,
-				metrics.NewExecutionCollector(node.Tracer),
-				vm,
-				vmCtx,
-				derivedChainData,
-				query.NewProtocolStateWrapper(builder.State),
-			)
-
-			builder.Scripts = execution.NewScripts(*queryExecutor, builder.Storage.Headers, builder.ExecutionIndexer.RegisterValues)
+			builder.Scripts = scripts
 
 			return &module.NoopReadyDoneAware{}, nil
 		})
