@@ -66,6 +66,7 @@ import (
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/metrics/unstaked"
 	"github.com/onflow/flow-go/module/state_synchronization"
+	"github.com/onflow/flow-go/module/state_synchronization/indexer"
 	edrequester "github.com/onflow/flow-go/module/state_synchronization/requester"
 	"github.com/onflow/flow-go/network"
 	alspmgr "github.com/onflow/flow-go/network/alsp/manager"
@@ -255,6 +256,8 @@ type FlowAccessNodeBuilder struct {
 	ExecutionDataRequester     state_synchronization.ExecutionDataRequester
 	ExecutionDataStore         execution_data.ExecutionDataStore
 	ExecutionDataCache         *execdatacache.ExecutionDataCache
+	ExecutionIndexer           *indexer.IndexerCore
+	Scripts                    *execution.Scripts
 
 	// The sync engine participants provider is the libp2p peer store for the access node
 	// which is not available until after the network has started.
@@ -602,6 +605,34 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 			builder.ExecutionDataRequester.AddOnExecutionDataReceivedConsumer(execDataDistributor.OnExecutionDataReceived)
 
 			return builder.ExecutionDataRequester, nil
+		}).
+		Component("script execution", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+
+			// todo this code will be included in the builder PR but it shows how it can be used to build it there
+
+			vm := fvm.NewVirtualMachine()
+
+			options := computation.DefaultFVMOptions(node.RootChainID, false, false)
+			vmCtx := fvm.NewContext(options...)
+
+			derivedChainData, err := derived.NewDerivedChainData(derived.DefaultDerivedDataCacheSize)
+			if err != nil {
+				return nil, err
+			}
+
+			queryExecutor := query.NewQueryExecutor(
+				builder.queryExecutorConfig,
+				builder.Logger,
+				metrics.NewExecutionCollector(node.Tracer),
+				vm,
+				vmCtx,
+				derivedChainData,
+				query.NewProtocolStateWrapper(builder.State),
+			)
+
+			builder.Scripts = execution.NewScripts(*queryExecutor, builder.Storage.Headers, builder.ExecutionIndexer.RegisterValues)
+
+			return &module.NoopReadyDoneAware{}, nil
 		})
 
 	if builder.stateStreamConf.ListenAddr != "" {
