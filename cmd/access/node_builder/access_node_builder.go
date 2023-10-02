@@ -608,7 +608,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 			// todo this code will be included in the builder PR but it shows how it can be used to build it there
 			scripts, err := execution.NewScripts(
 				builder.Logger,
-				builder.Tracer,
+				metrics.NewExecutionCollector(builder.Tracer),
 				builder.RootChainID,
 				query.NewProtocolStateWrapper(builder.State),
 				builder.Storage.Headers,
