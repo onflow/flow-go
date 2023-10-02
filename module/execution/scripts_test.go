@@ -13,13 +13,9 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/engine/execution/computation/query/mock"
+	"github.com/onflow/flow-go/engine/execution/testutil"
 	"github.com/onflow/flow-go/fvm"
-	envMock "github.com/onflow/flow-go/fvm/environment/mock"
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
-	"github.com/onflow/flow-go/ledger"
-	"github.com/onflow/flow-go/ledger/common/convert"
-	"github.com/onflow/flow-go/ledger/common/pathfinder"
-	"github.com/onflow/flow-go/ledger/complete"
 	"github.com/onflow/flow-go/model/flow"
 	synctest "github.com/onflow/flow-go/module/state_synchronization/requester/unittest"
 	"github.com/onflow/flow-go/module/trace"
@@ -27,24 +23,18 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-func Test_ExecuteSimpleScript(t *testing.T) {
+var chain = flow.Emulator.Chain()
+
+func Test_ExecuteScript(t *testing.T) {
 	blockchain := unittest.BlockchainFixture(10)
-	headers := newBlockHeadersStorage(blockchain)
 	first := blockchain[0]
-
-	entropyProvider := envMock.NewEntropyProvider(t)
-	entropyBlock := mock.NewEntropyProviderPerBlock(t)
-
-	entropyBlock.
-		On("AtBlockID", mocks.AnythingOfType("flow.Identifier")).
-		Return(entropyProvider)
-
-	registers := func(IDs flow.RegisterIDs, height uint64) ([]flow.RegisterValue, error) {
-		return nil, nil
-	}
-
-	scripts, err := NewScripts(zerolog.Nop(), &trace.NoopTracer{}, flow.Emulator, entropyBlock, headers, registers)
-	require.NoError(t, err)
+	scripts := newScripts(
+		t,
+		newBlockHeadersStorage(blockchain),
+		func(IDs flow.RegisterIDs, height uint64) ([]flow.RegisterValue, error) {
+			return nil, nil
+		},
+	)
 
 	number := int64(42)
 	code := []byte(fmt.Sprintf("pub fun main(): Int { return %d; }", number))
@@ -56,8 +46,54 @@ func Test_ExecuteSimpleScript(t *testing.T) {
 	assert.Equal(t, number, value.(cadence.Int).Value.Int64())
 }
 
-func Test_ComplexScriptWithRegisters(t *testing.T) {
+func Test_GetAccount(t *testing.T) {
+	blockchain := unittest.BlockchainFixture(10)
+	first := blockchain[0]
+	tree := bootstrapFVM()
 
+	scripts := newScripts(
+		t,
+		newBlockHeadersStorage(blockchain),
+		func(IDs flow.RegisterIDs, height uint64) ([]flow.RegisterValue, error) {
+			values := make([]flow.RegisterValue, len(IDs))
+
+			for i, ID := range IDs {
+				val, err := tree.Get(ID)
+				if err != nil {
+					return nil, err
+				}
+				values[i] = val
+			}
+
+			return values, nil
+		},
+	)
+
+	address := chain.ServiceAddress()
+	account, err := scripts.GetAccount(context.Background(), address, first.Header.Height)
+	require.NoError(t, err)
+	assert.Equal(t, address, account.Address)
+	assert.NotZero(t, account.Balance)
+	assert.NotZero(t, len(account.Contracts))
+}
+
+func newScripts(
+	t *testing.T,
+	headers storage.Headers,
+	registers func(IDs flow.RegisterIDs, height uint64) ([]flow.RegisterValue, error),
+) *Scripts {
+	entropyProvider := testutil.EntropyProviderFixture(nil)
+	entropyBlock := mock.NewEntropyProviderPerBlock(t)
+
+	entropyBlock.
+		On("AtBlockID", mocks.AnythingOfType("flow.Identifier")).
+		Return(entropyProvider).
+		Maybe()
+
+	scripts, err := NewScripts(zerolog.Nop(), &trace.NoopTracer{}, flow.Emulator, entropyBlock, headers, registers)
+	require.NoError(t, err)
+
+	return scripts
 }
 
 func newBlockHeadersStorage(blocks []*flow.Block) storage.Headers {
@@ -69,9 +105,9 @@ func newBlockHeadersStorage(blocks []*flow.Block) storage.Headers {
 	return synctest.MockBlockHeaderStorage(synctest.WithByHeight(blocksByHeight))
 }
 
-func bootstrapTrieUpdates() *ledger.TrieUpdate {
+func bootstrapFVM() snapshot.SnapshotTree {
 	opts := []fvm.Option{
-		fvm.WithChain(flow.Testnet.Chain()),
+		fvm.WithChain(chain),
 	}
 	ctx := fvm.NewContext(opts...)
 	vm := fvm.NewVirtualMachine()
@@ -87,39 +123,5 @@ func bootstrapTrieUpdates() *ledger.TrieUpdate {
 		fvm.Bootstrap(unittest.ServiceAccountPublicKey, bootstrapOpts...),
 		snapshotTree)
 
-	// todo deploy a contract for script to import it an check values
-
-	payloads := make([]*ledger.Payload, 0)
-	for regID, regVal := range executionSnapshot.WriteSet {
-		key := ledger.Key{
-			KeyParts: []ledger.KeyPart{
-				{
-					Type:  convert.KeyPartOwner,
-					Value: []byte(regID.Owner),
-				},
-				{
-					Type:  convert.KeyPartKey,
-					Value: []byte(regID.Key),
-				},
-			},
-		}
-
-		payloads = append(payloads, ledger.NewPayload(key, regVal))
-	}
-
-	return trieUpdateWithPayloadsFixture(payloads)
-}
-
-func trieUpdateWithPayloadsFixture(payloads []*ledger.Payload) *ledger.TrieUpdate {
-	keys := make([]ledger.Key, 0)
-	values := make([]ledger.Value, 0)
-	for _, payload := range payloads {
-		key, _ := payload.Key()
-		keys = append(keys, key)
-		values = append(values, payload.Value())
-	}
-
-	update, _ := ledger.NewUpdate(ledger.DummyState, keys, values)
-	trie, _ := pathfinder.UpdateToTrieUpdate(update, complete.DefaultPathFinderVersion)
-	return trie
+	return snapshotTree.Append(executionSnapshot)
 }
