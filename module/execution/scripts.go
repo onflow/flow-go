@@ -103,8 +103,8 @@ func (s *Scripts) snapshotWithBlock(height uint64) (snapshot.StorageSnapshot, *f
 		if err != nil {
 			return nil, err
 		}
-		if len(values) > 1 {
-			return nil, fmt.Errorf("multiple values returned for a single register")
+		if len(values) > 1 || len(values) == 0 {
+			return nil, fmt.Errorf("invalid number of returned values for a single register: %d", len(values))
 		}
 		return values[0], nil
 	})

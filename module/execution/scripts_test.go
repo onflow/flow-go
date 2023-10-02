@@ -3,6 +3,7 @@ package execution
 import (
 	"context"
 	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/onflow/cadence"
@@ -30,24 +31,45 @@ var (
 )
 
 func Test_ExecuteScript(t *testing.T) {
-	blockchain := unittest.BlockchainFixture(10)
-	first := blockchain[0]
-	scripts := newScripts(
-		t,
-		newBlockHeadersStorage(blockchain),
-		func(IDs flow.RegisterIDs, height uint64) ([]flow.RegisterValue, error) {
-			return nil, nil
-		},
-	)
+	t.Run("Simple Script Execution", func(t *testing.T) {
+		blockchain := unittest.BlockchainFixture(10)
+		first := blockchain[0]
+		tree := bootstrapFVM()
 
-	number := int64(42)
-	code := []byte(fmt.Sprintf("pub fun main(): Int { return %d; }", number))
+		scripts := newScripts(
+			t,
+			newBlockHeadersStorage(blockchain),
+			treeToRegisterAdapter(tree),
+		)
 
-	result, err := scripts.ExecuteAtBlockHeight(context.Background(), code, nil, first.Header.Height)
-	require.NoError(t, err)
-	value, err := jsoncdc.Decode(nil, result)
-	require.NoError(t, err)
-	assert.Equal(t, number, value.(cadence.Int).Value.Int64())
+		number := int64(42)
+		code := []byte(fmt.Sprintf("pub fun main(): Int { return %d; }", number))
+
+		result, err := scripts.ExecuteAtBlockHeight(context.Background(), code, nil, first.Header.Height)
+		require.NoError(t, err)
+		value, err := jsoncdc.Decode(nil, result)
+		require.NoError(t, err)
+		assert.Equal(t, number, value.(cadence.Int).Value.Int64())
+	})
+
+	t.Run("Handle not found Register", func(t *testing.T) {
+		blockchain := unittest.BlockchainFixture(10)
+		first := blockchain[0]
+		scripts := newScripts(
+			t,
+			newBlockHeadersStorage(blockchain),
+			func(IDs flow.RegisterIDs, height uint64) ([]flow.RegisterValue, error) {
+				return nil, nil // intentionally return nil to check edge case
+			},
+		)
+
+		// use a non-existing address to trigger register get function
+		code := []byte("import Foo from 0x01; pub fun main() { }")
+
+		result, err := scripts.ExecuteAtBlockHeight(context.Background(), code, nil, first.Header.Height)
+		require.True(t, strings.Contains(err.Error(), "invalid number of returned values for a single register"))
+		require.Nil(t, result)
+	})
 }
 
 func Test_GetAccount(t *testing.T) {
@@ -58,19 +80,7 @@ func Test_GetAccount(t *testing.T) {
 	scripts := newScripts(
 		t,
 		newBlockHeadersStorage(blockchain),
-		func(IDs flow.RegisterIDs, height uint64) ([]flow.RegisterValue, error) {
-			values := make([]flow.RegisterValue, len(IDs))
-
-			for i, ID := range IDs {
-				val, err := tree.Get(ID)
-				if err != nil {
-					return nil, err
-				}
-				values[i] = val
-			}
-
-			return values, nil
-		},
+		treeToRegisterAdapter(tree),
 	)
 
 	address := chain.ServiceAddress()
@@ -109,6 +119,7 @@ func newBlockHeadersStorage(blocks []*flow.Block) storage.Headers {
 	return synctest.MockBlockHeaderStorage(synctest.WithByHeight(blocksByHeight))
 }
 
+// bootstrapFVM starts up an FVM and run bootstrap procedures and returns the snapshot tree of the state.
 func bootstrapFVM() snapshot.SnapshotTree {
 	opts := []fvm.Option{
 		fvm.WithChain(chain),
@@ -128,4 +139,21 @@ func bootstrapFVM() snapshot.SnapshotTree {
 		snapshotTree)
 
 	return snapshotTree.Append(executionSnapshot)
+}
+
+// converts tree get register function to the required script get register function
+func treeToRegisterAdapter(tree snapshot.SnapshotTree) func(IDs flow.RegisterIDs, height uint64) ([]flow.RegisterValue, error) {
+	return func(IDs flow.RegisterIDs, height uint64) ([]flow.RegisterValue, error) {
+		values := make([]flow.RegisterValue, len(IDs))
+
+		for i, ID := range IDs {
+			val, err := tree.Get(ID)
+			if err != nil {
+				return nil, err
+			}
+			values[i] = val
+		}
+
+		return values, nil
+	}
 }
