@@ -10,6 +10,9 @@ import (
 
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/errors"
+	"github.com/onflow/flow-go/fvm/flex"
+	flexStdlib "github.com/onflow/flow-go/fvm/flex/stdlib"
+	"github.com/onflow/flow-go/fvm/flex/stdlib/emulator"
 	"github.com/onflow/flow-go/fvm/storage"
 	"github.com/onflow/flow-go/fvm/storage/logical"
 	"github.com/onflow/flow-go/model/flow"
@@ -197,6 +200,17 @@ func (executor *scriptExecutor) execute() error {
 func (executor *scriptExecutor) executeScript() error {
 	rt := executor.env.BorrowCadenceRuntime()
 	defer executor.env.ReturnCadenceRuntime(rt)
+
+	// TODO: how to clean up?
+	if executor.ctx.FlexEnabled {
+		// TODO: pass proper flex root address based on enviornment
+		flexRootAddress := emulator.FlexRootAccountAddress
+		handler := flex.NewFlexContractHandler(executor.env, flexRootAddress)
+		// TODO: pass proper Flex type definition based on environment
+		flexTypeDefinition := emulator.FlexTypeDefinition
+		rt.DeclareValue(flexStdlib.NewFlexStandardLibraryValue(nil, flexTypeDefinition, handler))
+		rt.DeclareType(flexStdlib.NewFlexStandardLibraryType(flexTypeDefinition))
+	}
 
 	value, err := rt.ExecuteScript(
 		runtime.Script{
