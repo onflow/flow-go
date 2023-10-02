@@ -125,34 +125,27 @@ func (iy Identity) Checksum() Identifier {
 	return MakeID(iy)
 }
 
-type encodableIdentity struct {
+type encodableIdentitySkeleton struct {
 	NodeID        Identifier
 	Address       string `json:",omitempty"`
 	Role          Role
 	InitialWeight uint64
-	Weight        uint64
-	Ejected       bool
 	StakingPubKey []byte
 	NetworkPubKey []byte
 }
 
-// decodableIdentity provides backward-compatible decoding of old models
-// which use the Stake field in place of Weight.
-type decodableIdentity struct {
-	encodableIdentity
-	// Stake previously was used in place of the Weight field.
-	// Deprecated: supported in decoding for backward-compatibility
-	Stake uint64
+type encodableIdentity struct {
+	encodableIdentitySkeleton
+	Weight  uint64
+	Ejected bool
 }
 
-func encodableFromIdentity(iy Identity) (encodableIdentity, error) {
-	ie := encodableIdentity{
+func encodableSkeletonFromIdentity(iy IdentitySkeleton) encodableIdentitySkeleton {
+	ie := encodableIdentitySkeleton{
 		NodeID:        iy.NodeID,
 		Address:       iy.Address,
 		Role:          iy.Role,
 		InitialWeight: iy.InitialWeight,
-		Weight:        iy.Weight,
-		Ejected:       iy.Ejected,
 	}
 	if iy.StakingPubKey != nil {
 		ie.StakingPubKey = iy.StakingPubKey.Encode()
@@ -160,15 +153,55 @@ func encodableFromIdentity(iy Identity) (encodableIdentity, error) {
 	if iy.NetworkPubKey != nil {
 		ie.NetworkPubKey = iy.NetworkPubKey.Encode()
 	}
-	return ie, nil
+	return ie
+}
+
+func encodableFromIdentity(iy Identity) encodableIdentity {
+	return encodableIdentity{
+		encodableIdentitySkeleton: encodableSkeletonFromIdentity(iy.IdentitySkeleton),
+		Weight:                    iy.Weight,
+		Ejected:                   iy.Ejected,
+	}
+}
+
+func (iy IdentitySkeleton) MarshalJSON() ([]byte, error) {
+	encodable := encodableSkeletonFromIdentity(iy)
+	data, err := json.Marshal(encodable)
+	if err != nil {
+		return nil, fmt.Errorf("could not encode json: %w", err)
+	}
+	return data, nil
+}
+
+func (iy IdentitySkeleton) MarshalCBOR() ([]byte, error) {
+	encodable := encodableSkeletonFromIdentity(iy)
+	data, err := cbor.Marshal(encodable)
+	if err != nil {
+		return nil, fmt.Errorf("could not encode cbor: %w", err)
+	}
+	return data, nil
+}
+
+func (iy IdentitySkeleton) MarshalMsgpack() ([]byte, error) {
+	encodable := encodableSkeletonFromIdentity(iy)
+	data, err := msgpack.Marshal(encodable)
+	if err != nil {
+		return nil, fmt.Errorf("could not encode msgpack: %w", err)
+	}
+	return data, nil
+}
+
+func (iy IdentitySkeleton) EncodeRLP(w io.Writer) error {
+	encodable := encodableSkeletonFromIdentity(iy)
+	err := rlp.Encode(w, encodable)
+	if err != nil {
+		return fmt.Errorf("could not encode rlp: %w", err)
+	}
+	return nil
 }
 
 func (iy Identity) MarshalJSON() ([]byte, error) {
-	encodable, err := encodableFromIdentity(iy)
-	if err != nil {
-		return nil, fmt.Errorf("could not convert identity to encodable: %w", err)
-	}
-
+	encodable := encodableFromIdentity(iy)
 	data, err := json.Marshal(encodable)
 	if err != nil {
 		return nil, fmt.Errorf("could not encode json: %w", err)
@@ -177,10 +210,7 @@ func (iy Identity) MarshalJSON() ([]byte, error) {
 }
 
 func (iy Identity) MarshalCBOR() ([]byte, error) {
-	encodable, err := encodableFromIdentity(iy)
-	if err != nil {
-		return nil, fmt.Errorf("could not convert identity to encodable: %w", err)
-	}
+	encodable := encodableFromIdentity(iy)
 	data, err := cbor.Marshal(encodable)
 	if err != nil {
 		return nil, fmt.Errorf("could not encode cbor: %w", err)
@@ -189,10 +219,7 @@ func (iy Identity) MarshalCBOR() ([]byte, error) {
 }
 
 func (iy Identity) MarshalMsgpack() ([]byte, error) {
-	encodable, err := encodableFromIdentity(iy)
-	if err != nil {
-		return nil, fmt.Errorf("could not convert to encodable: %w", err)
-	}
+	encodable := encodableFromIdentity(iy)
 	data, err := msgpack.Marshal(encodable)
 	if err != nil {
 		return nil, fmt.Errorf("could not encode msgpack: %w", err)
@@ -201,24 +228,19 @@ func (iy Identity) MarshalMsgpack() ([]byte, error) {
 }
 
 func (iy Identity) EncodeRLP(w io.Writer) error {
-	encodable, err := encodableFromIdentity(iy)
-	if err != nil {
-		return fmt.Errorf("could not convert to encodable: %w", err)
-	}
-	err = rlp.Encode(w, encodable)
+	encodable := encodableFromIdentity(iy)
+	err := rlp.Encode(w, encodable)
 	if err != nil {
 		return fmt.Errorf("could not encode rlp: %w", err)
 	}
 	return nil
 }
 
-func identityFromEncodable(ie encodableIdentity, identity *Identity) error {
+func identitySkeletonFromEncodable(ie encodableIdentitySkeleton, identity *IdentitySkeleton) error {
 	identity.NodeID = ie.NodeID
 	identity.Address = ie.Address
 	identity.Role = ie.Role
 	identity.InitialWeight = ie.InitialWeight
-	identity.Weight = ie.Weight
-	identity.Ejected = ie.Ejected
 	var err error
 	if ie.StakingPubKey != nil {
 		if identity.StakingPubKey, err = crypto.DecodePublicKey(crypto.BLSBLS12381, ie.StakingPubKey); err != nil {
@@ -233,20 +255,62 @@ func identityFromEncodable(ie encodableIdentity, identity *Identity) error {
 	return nil
 }
 
-func (iy *Identity) UnmarshalJSON(b []byte) error {
-	var decodable decodableIdentity
+func identityFromEncodable(ie encodableIdentity, identity *Identity) error {
+	err := identitySkeletonFromEncodable(ie.encodableIdentitySkeleton, &identity.IdentitySkeleton)
+	if err != nil {
+		return fmt.Errorf("could not decode identity skeleton: %w", err)
+	}
+	identity.Weight = ie.Weight
+	identity.Ejected = ie.Ejected
+	return nil
+}
+
+func (iy *IdentitySkeleton) UnmarshalJSON(b []byte) error {
+	var decodable encodableIdentitySkeleton
 	err := json.Unmarshal(b, &decodable)
 	if err != nil {
 		return fmt.Errorf("could not decode json: %w", err)
 	}
-	// compat: translate Stake fields to Weight
-	if decodable.Stake != 0 {
-		if decodable.Weight != 0 {
-			return fmt.Errorf("invalid identity with both Stake and Weight fields")
-		}
-		decodable.Weight = decodable.Stake
+	err = identitySkeletonFromEncodable(decodable, iy)
+	if err != nil {
+		return fmt.Errorf("could not convert from encodable json: %w", err)
 	}
-	err = identityFromEncodable(decodable.encodableIdentity, iy)
+	return nil
+}
+
+func (iy *IdentitySkeleton) UnmarshalCBOR(b []byte) error {
+	var encodable encodableIdentitySkeleton
+	err := cbor.Unmarshal(b, &encodable)
+	if err != nil {
+		return fmt.Errorf("could not decode json: %w", err)
+	}
+	err = identitySkeletonFromEncodable(encodable, iy)
+	if err != nil {
+		return fmt.Errorf("could not convert from encodable cbor: %w", err)
+	}
+	return nil
+}
+
+func (iy *IdentitySkeleton) UnmarshalMsgpack(b []byte) error {
+	var encodable encodableIdentitySkeleton
+	err := msgpack.Unmarshal(b, &encodable)
+	if err != nil {
+		return fmt.Errorf("could not decode json: %w", err)
+	}
+	err = identitySkeletonFromEncodable(encodable, iy)
+	if err != nil {
+		return fmt.Errorf("could not convert from encodable msgpack: %w", err)
+	}
+	return nil
+}
+
+func (iy *Identity) UnmarshalJSON(b []byte) error {
+	var decodable encodableIdentity
+	err := json.Unmarshal(b, &decodable)
+	if err != nil {
+		return fmt.Errorf("could not decode json: %w", err)
+	}
+	err = identityFromEncodable(decodable, iy)
 	if err != nil {
 		return fmt.Errorf("could not convert from encodable json: %w", err)
 	}
