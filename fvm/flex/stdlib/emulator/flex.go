@@ -1,6 +1,7 @@
 package emulator
 
 import (
+	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/flex/stdlib"
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -17,3 +18,13 @@ var FlexTypeDefinition = stdlib.FlexTypeDefinition{
 }
 
 var FlowToken_VaultType = stdlib.NewFlowTokenVaultType(flow.Emulator.Chain())
+
+var FlexRootAccountAddress = setupFlexRootAccountAddress()
+
+func setupFlexRootAccountAddress() flow.Address {
+	flexRootAddress, err := flow.Emulator.Chain().AddressAtIndex(environment.FlexAccountIndex)
+	if err != nil {
+		panic(err)
+	}
+	return flexRootAddress
+}

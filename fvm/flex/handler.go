@@ -6,6 +6,7 @@ import (
 	env "github.com/onflow/flow-go/fvm/flex/environment"
 	"github.com/onflow/flow-go/fvm/flex/models"
 	"github.com/onflow/flow-go/fvm/flex/storage"
+	"github.com/onflow/flow-go/model/flow"
 )
 
 type FlexContractHandler struct {
@@ -15,9 +16,9 @@ type FlexContractHandler struct {
 
 var _ models.FlexContractHandler = &FlexContractHandler{}
 
-func NewFlexContractHandler(backend models.Backend) *FlexContractHandler {
+func NewFlexContractHandler(backend models.Backend, flexAddress flow.Address) *FlexContractHandler {
 	return &FlexContractHandler{
-		db:      storage.NewDatabase(backend),
+		db:      storage.NewDatabase(backend, flexAddress),
 		backend: backend,
 	}
 }

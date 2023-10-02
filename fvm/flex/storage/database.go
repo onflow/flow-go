@@ -25,7 +25,6 @@ var (
 	errNotImplemented = errors.New("not implemented yet")
 )
 
-var FlexAddress = flow.BytesToAddress([]byte("Flex"))
 var FlexLatextBlockKey = "LatestBlock"
 var FlexRootSlabKey = "RootSlabKey"
 
@@ -34,15 +33,16 @@ var FlexRootSlabKey = "RootSlabKey"
 // binary-alphabetical order.
 
 type Database struct {
-	led      atree.Ledger
-	storage  *atree.PersistentSlabStorage
-	atreemap *atree.OrderedMap
-	lock     sync.RWMutex // Ramtin: do we need this?
+	led         atree.Ledger
+	flexAddress flow.Address
+	storage     *atree.PersistentSlabStorage
+	atreemap    *atree.OrderedMap
+	lock        sync.RWMutex // Ramtin: do we need this?
 }
 
 // New returns a wrapped map with all the required database interface methods
 // implemented.
-func NewDatabase(led atree.Ledger) *Database {
+func NewDatabase(led atree.Ledger, flexAddress flow.Address) *Database {
 	// TODO figure out these details
 	// var typeInfo
 	baseStorage := atree.NewLedgerBaseStorage(led)
@@ -50,14 +50,14 @@ func NewDatabase(led atree.Ledger) *Database {
 	storage := NewPersistentSlabStorage(baseStorage)
 
 	// TODO if map already exists load it
-	rootIDBytes, err := led.GetValue(FlexAddress.Bytes(), []byte(FlexRootSlabKey))
+	rootIDBytes, err := led.GetValue(flexAddress.Bytes(), []byte(FlexRootSlabKey))
 	if err != nil {
 		panic(err)
 	}
 
 	var m *atree.OrderedMap
 	if len(rootIDBytes) == 0 {
-		m, err = atree.NewMap(storage, atree.Address(FlexAddress), atree.NewDefaultDigesterBuilder(), typeInfo{})
+		m, err = atree.NewMap(storage, atree.Address(flexAddress), atree.NewDefaultDigesterBuilder(), typeInfo{})
 		if err != nil {
 			panic(err)
 		}
@@ -69,7 +69,7 @@ func NewDatabase(led atree.Ledger) *Database {
 			panic(err)
 		}
 
-		led.SetValue(FlexAddress.Bytes(), []byte(FlexRootSlabKey), rootIDBytes)
+		led.SetValue(flexAddress.Bytes(), []byte(FlexRootSlabKey), rootIDBytes)
 	} else {
 		storageID, err := atree.NewStorageIDFromRawBytes(rootIDBytes)
 		if err != nil {
@@ -133,13 +133,13 @@ func (db *Database) Delete(key []byte) error {
 // SetLatestBlock sets the latest executed block
 // we have this functionality given we only allow on state to exist
 func (db *Database) SetLatestBlock(block *models.FlexBlock) error {
-	return db.led.SetValue(FlexAddress[:], []byte(FlexLatextBlockKey), block.ToBytes())
+	return db.led.SetValue(db.flexAddress[:], []byte(FlexLatextBlockKey), block.ToBytes())
 }
 
 // GetLatestBlock returns the latest executed block
 // we have this functionality given we only allow on state to exist (no forks, etc.)
 func (db *Database) GetLatestBlock() (*models.FlexBlock, error) {
-	data, err := db.led.GetValue(FlexAddress[:], []byte(FlexLatextBlockKey))
+	data, err := db.led.GetValue(db.flexAddress[:], []byte(FlexLatextBlockKey))
 	if len(data) == 0 {
 		return models.GenesisFlexBlock, err
 	}

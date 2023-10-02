@@ -5,14 +5,17 @@ import (
 
 	"github.com/onflow/flow-go/fvm/flex/models"
 	"github.com/onflow/flow-go/fvm/flex/storage"
-	"github.com/onflow/flow-go/fvm/flex/utils"
+	"github.com/onflow/flow-go/fvm/flex/testutils"
+	"github.com/onflow/flow-go/model/flow"
 	"github.com/stretchr/testify/require"
 )
 
 func TestDatabase(t *testing.T) {
 	t.Run("test storage", func(t *testing.T) {
-		utils.RunWithTestBackend(t, func(backend models.Backend) {
-			db := storage.NewDatabase(backend)
+		testutils.RunWithTestBackend(t, func(backend models.Backend) {
+
+			flexAddress := flow.BytesToAddress([]byte("Flex"))
+			db := storage.NewDatabase(backend, flexAddress)
 
 			key := []byte("ABC")
 			value := []byte{1, 2, 3, 4, 5, 6, 7, 8}
@@ -22,7 +25,7 @@ func TestDatabase(t *testing.T) {
 			err = db.Commit()
 			require.NoError(t, err)
 
-			newdb := storage.NewDatabase(backend)
+			newdb := storage.NewDatabase(backend, flexAddress)
 			retValue, err := newdb.Get(key)
 			require.NoError(t, err)
 

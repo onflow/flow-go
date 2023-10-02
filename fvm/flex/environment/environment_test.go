@@ -12,21 +12,22 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/params"
-	"github.com/onflow/flow-go/fvm/environment"
-	env "github.com/onflow/flow-go/fvm/flex/environment"
 	fenv "github.com/onflow/flow-go/fvm/flex/environment"
+	"github.com/onflow/flow-go/fvm/flex/models"
 	"github.com/onflow/flow-go/fvm/flex/storage"
-	"github.com/onflow/flow-go/fvm/flex/utils"
-	"github.com/onflow/flow-go/fvm/storage/testutils"
+	"github.com/onflow/flow-go/fvm/flex/testutils"
+	"github.com/onflow/flow-go/model/flow"
+
 	"github.com/stretchr/testify/require"
 )
 
-func RunWithTempDB(t testing.TB, f func(*storage.Database)) {
-	txnState := testutils.NewSimpleTransaction(nil)
-	accounts := environment.NewAccounts(txnState)
-	led := storage.NewLedger(accounts)
-	db := storage.NewDatabase(led)
-	f(db)
+func RunWithTestDB(t testing.TB, f func(*storage.Database)) {
+	testutils.RunWithTestBackend(t, func(backend models.Backend) {
+		testutils.RunWithTestFlexRoot(t, backend, func(flexRoot flow.Address) {
+			db := storage.NewDatabase(backend, testutils.TestFlexRootAddress)
+			f(db)
+		})
+	})
 }
 
 func RunWithNewEnv(t testing.TB, db *storage.Database, f func(*fenv.Environment)) {
@@ -39,7 +40,7 @@ func RunWithNewEnv(t testing.TB, db *storage.Database, f func(*fenv.Environment)
 }
 
 func TestNativeTokenBridging(t *testing.T) {
-	RunWithTempDB(t, func(db *storage.Database) {
+	RunWithTestDB(t, func(db *storage.Database) {
 		originalBalance := big.NewInt(10000)
 		testAccount := common.BytesToAddress([]byte("test"))
 
@@ -69,9 +70,9 @@ func TestNativeTokenBridging(t *testing.T) {
 }
 
 func TestContractInteraction(t *testing.T) {
-	RunWithTempDB(t, func(db *storage.Database) {
+	RunWithTestDB(t, func(db *storage.Database) {
 
-		testContract := utils.GetTestContract(t)
+		testContract := testutils.GetTestContract(t)
 
 		testAccount := common.BytesToAddress([]byte("test"))
 		amount := big.NewInt(0).Mul(big.NewInt(1337), big.NewInt(params.Ether))
@@ -138,12 +139,12 @@ func TestContractInteraction(t *testing.T) {
 			key, _ := crypto.HexToECDSA(keyHex)
 			address := crypto.PubkeyToAddress(key.PublicKey) // 658bdf435d810c91414ec09147daa6db62406379
 
-			RunWithNewEnv(t, db, func(env *env.Environment) {
+			RunWithNewEnv(t, db, func(env *fenv.Environment) {
 				err := env.MintTo(amount, address)
 				require.NoError(t, err)
 			})
 
-			RunWithNewEnv(t, db, func(env *env.Environment) {
+			RunWithNewEnv(t, db, func(env *fenv.Environment) {
 				signer := types.MakeSigner(env.Config.ChainConfig, fenv.BlockNumberForEVMRules, env.Config.BlockContext.Time)
 				tx, _ := types.SignTx(types.NewTransaction(0, testAccount, big.NewInt(1000), params.TxGas, new(big.Int).Add(big.NewInt(0), common.Big1), nil), signer, key)
 
