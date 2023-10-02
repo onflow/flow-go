@@ -209,7 +209,9 @@ func New(
 		// here by the notification job consumer to discover new jobs.
 		// Note: we don't want to notify notificationConsumer for a block if it has not downloaded
 		// execution data yet.
-		e.blockConsumer.LastProcessedIndex,
+		func() (uint64, error) {
+			return e.blockConsumer.LastProcessedIndex(), nil
+		},
 	)
 
 	// notificationConsumer consumes `OnExecutionDataFetched` events, and ensures its consumer
