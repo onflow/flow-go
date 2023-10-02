@@ -560,8 +560,9 @@ func (m *AtreeRegisterMigrator) cloneValue(
 func capturePanic(f func()) (err error) {
 	defer func() {
 		if r := recover(); r != nil {
-
 			switch x := r.(type) {
+			case runtime.Error:
+				err = fmt.Errorf("runtime error @%s: %w", x.Location, x)
 			case error:
 				err = x
 			default:

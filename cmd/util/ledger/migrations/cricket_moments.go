@@ -113,6 +113,7 @@ func getNftCollection(
 	if !ok {
 		return nil, fmt.Errorf("expected ownedNFTs to be *interpreter.DictionaryValue, got %T", ownedNFTsRaw)
 	}
+
 	return ownedNFTs, nil
 }
 
@@ -278,10 +279,12 @@ func cloneCricketMomentsShardedCollection(
 						return
 					}
 
-					clonedValues = append(clonedValues, valueWithKeys{
-						cricketKeyPair: keyPair,
-						value:          newValue,
-					})
+					clonedValues = append(clonedValues,
+						valueWithKeys{
+							cricketKeyPair: keyPair,
+							value:          newValue,
+						},
+					)
 
 					progressLog(1)
 				}
@@ -292,7 +295,7 @@ func cloneCricketMomentsShardedCollection(
 	wg.Wait()
 
 	if ctx.Err() != nil {
-		return nil, ctx.Err()
+		return nil, fmt.Errorf("context error when cloning values: %w", ctx.Err())
 	}
 
 	progressLog = util2.LogProgress("setting cloned cricket moments", len(clonedValues), log)
@@ -304,7 +307,7 @@ func cloneCricketMomentsShardedCollection(
 		)
 
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("failed to get nft collection: %w", err)
 		}
 
 		err = capturePanic(func() {
@@ -316,7 +319,7 @@ func cloneCricketMomentsShardedCollection(
 			)
 		})
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("failed to set key: %w", err)
 		}
 		progressLog(1)
 	}
