@@ -68,7 +68,7 @@ func NewScripts(
 // A result value is returned encoded as byte array. An error will be returned if script
 // doesn't successfully execute.
 // Expected errors:
-// - Storage.NotFound if block at height was not found.
+// - Storage.NotFound if block or register value at height was not found.
 func (s *Scripts) ExecuteAtBlockHeight(
 	ctx context.Context,
 	script []byte,
@@ -83,6 +83,9 @@ func (s *Scripts) ExecuteAtBlockHeight(
 	return s.executor.ExecuteScript(ctx, script, arguments, header, snap)
 }
 
+// GetAccount returns a Flow account by the provided address and block height.
+// Expected errors:
+// - Storage.NotFound if block or register value at height was not found.
 func (s *Scripts) GetAccount(ctx context.Context, address flow.Address, height uint64) (*flow.Account, error) {
 	snap, header, err := s.snapshotWithBlock(height)
 	if err != nil {
@@ -92,6 +95,8 @@ func (s *Scripts) GetAccount(ctx context.Context, address flow.Address, height u
 	return s.executor.GetAccount(ctx, address, header, snap)
 }
 
+// snapshotWithBlock is a common function for executing scripts and get account functionality.
+// It creates a storage snapshot that is needed by the FVM to execute scripts.
 func (s *Scripts) snapshotWithBlock(height uint64) (snapshot.StorageSnapshot, *flow.Header, error) {
 	header, err := s.headers.ByHeight(height)
 	if err != nil {
@@ -103,6 +108,7 @@ func (s *Scripts) snapshotWithBlock(height uint64) (snapshot.StorageSnapshot, *f
 		if err != nil {
 			return nil, err
 		}
+		// even though this shouldn't occur in correct implementation we check that function returned either a single register or error
 		if len(values) > 1 || len(values) == 0 {
 			return nil, fmt.Errorf("invalid number of returned values for a single register: %d", len(values))
 		}
