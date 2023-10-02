@@ -14,8 +14,6 @@ import (
 
 func TestWithFlexEnabled(t *testing.T) {
 
-	t.Parallel()
-
 	chain, vm := createChainAndVm(flow.Emulator)
 
 	ctx := fvm.NewContext(
@@ -36,6 +34,8 @@ func TestWithFlexEnabled(t *testing.T) {
 		snapshotTree)
 	require.NoError(t, err)
 
+	snapshotTree = snapshotTree.Append(executionSnapshot)
+
 	// now setup ctx with flex enabled
 	ctx = fvm.NewContext(
 		fvm.WithChain(chain),
@@ -43,8 +43,6 @@ func TestWithFlexEnabled(t *testing.T) {
 		fvm.WithAuthorizationChecksEnabled(false),
 		fvm.WithSequenceNumberCheckAndIncrementEnabled(false),
 	)
-
-	snapshotTree = snapshotTree.Append(executionSnapshot)
 
 	script := []byte(`
 			transaction(addr bytes: [UInt8; 20]) {
@@ -91,6 +89,7 @@ func TestWithFlexEnabled(t *testing.T) {
 	})
 
 	t.Run("second operation (reuse of vm)", func(t *testing.T) {
+		// Currently reusing cadence run time doens't work in this environment
 		executionSnapshot, output, err := vm.Run(
 			ctx,
 			fvm.Transaction(txBody, 0),

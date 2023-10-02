@@ -49,7 +49,6 @@ func NewDatabase(led atree.Ledger, flexAddress flow.Address) *Database {
 
 	storage := NewPersistentSlabStorage(baseStorage)
 
-	// TODO if map already exists load it
 	rootIDBytes, err := led.GetValue(flexAddress.Bytes(), []byte(FlexRootSlabKey))
 	if err != nil {
 		panic(err)
@@ -61,15 +60,6 @@ func NewDatabase(led atree.Ledger, flexAddress flow.Address) *Database {
 		if err != nil {
 			panic(err)
 		}
-
-		// TODO: read size from atree package
-		rootIDBytes := make([]byte, 16)
-		_, err = m.StorageID().ToRawBytes(rootIDBytes)
-		if err != nil {
-			panic(err)
-		}
-
-		led.SetValue(flexAddress.Bytes(), []byte(FlexRootSlabKey), rootIDBytes)
 	} else {
 		storageID, err := atree.NewStorageIDFromRawBytes(rootIDBytes)
 		if err != nil {
@@ -83,9 +73,10 @@ func NewDatabase(led atree.Ledger, flexAddress flow.Address) *Database {
 	}
 
 	return &Database{
-		led:      led,
-		storage:  storage,
-		atreemap: m,
+		led:         led,
+		flexAddress: flexAddress,
+		storage:     storage,
+		atreemap:    m,
 	}
 }
 
@@ -146,8 +137,24 @@ func (db *Database) GetLatestBlock() (*models.FlexBlock, error) {
 	return models.NewFlexBlockFromEncoded(data), err
 }
 
+func (db *Database) storeMapRoot() error {
+	// TODO: read size from atree package
+	rootIDBytes := make([]byte, 16)
+	_, err := db.atreemap.StorageID().ToRawBytes(rootIDBytes)
+	if err != nil {
+		return err
+	}
+
+	db.led.SetValue(db.flexAddress.Bytes(), []byte(FlexRootSlabKey), rootIDBytes[:])
+	return nil
+}
+
 // Commits the changes from atree
 func (db *Database) Commit() error {
+	err := db.storeMapRoot()
+	if err != nil {
+		return err
+	}
 	return db.storage.Commit()
 }
 
