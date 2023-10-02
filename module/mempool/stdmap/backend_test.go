@@ -96,7 +96,7 @@ func TestAdjust(t *testing.T) {
 // Test that size mempool de-duplicates based on ID
 func Test_DeduplicationByID(t *testing.T) {
 	item1 := unittest.MockEntityFixture()
-	item2 := unittest.MockEntity{Identifier: item1.Identifier} // duplicate
+	item2 := unittest.NewMockEntity(item1.ID()) // duplicate
 	assert.True(t, item1.ID() == item2.ID())
 
 	pool := stdmap.NewBackend()

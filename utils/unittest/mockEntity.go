@@ -13,6 +13,13 @@ type MockEntity struct {
 	id flow.Identifier
 }
 
+func NewMockEntity(id flow.Identifier) *MockEntity {
+	return &MockEntity{
+		b:  id[:],
+		id: id,
+	}
+}
+
 func (m MockEntity) ID() flow.Identifier {
 	return m.id
 }
@@ -44,7 +51,7 @@ func MockEntityFixture() *MockEntity {
 	}
 }
 
-func MockEntityFixtureWithSize(t *testing.T, size int) *MockEntity {
+func MockEntityFixtureWithSize(t testing.TB, size int) *MockEntity {
 	b := make([]byte, size)
 	n, err := rand.Read(b)
 	require.NoError(t, err)
@@ -55,7 +62,7 @@ func MockEntityFixtureWithSize(t *testing.T, size int) *MockEntity {
 	}
 }
 
-func MockEntityFixtureListWithSize(t *testing.T, count int, size int) []*MockEntity {
+func MockEntityFixtureListWithSize(t testing.TB, count int, size int) []*MockEntity {
 	entities := make([]*MockEntity, 0, count)
 	for i := 0; i < count; i++ {
 		e := MockEntityFixtureWithSize(t, size)

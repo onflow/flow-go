@@ -22,16 +22,17 @@ import (
 // hashicorp LRU cache with 50K capacity against writing 100M entities,
 // with Garbage Collection (GC) disabled.
 func BenchmarkBaselineLRU(b *testing.B) {
-	unittest.SkipBenchmarkUnless(b, unittest.BENCHMARK_EXPERIMENT, "skips benchmarking baseline LRU, set environment variable to enable")
+	// unittest.SkipBenchmarkUnless(b, unittest.BENCHMARK_EXPERIMENT, "skips benchmarking baseline LRU, set environment variable to enable")
 
 	defer debug.SetGCPercent(debug.SetGCPercent(-1)) // disable GC
 
-	limit := uint(50)
+	limit := uint(50_000)
 	backData := stdmap.NewBackend(
 		stdmap.WithBackData(newBaselineLRU(int(limit))),
 		stdmap.WithLimit(limit))
 
-	entities := unittest.EntityListFixture(uint(100_000))
+	entities := unittest.MockEntityFixtureListWithSize(b, 1000_000, 10)
+
 	testAddEntities(b, limit, backData, entities)
 
 	unittest.PrintHeapInfo(unittest.Logger()) // heap info after writing 100M entities
@@ -68,9 +69,9 @@ func gcAndWriteHeapProfile() {
 	// see <https://pkg.go.dev/runtime/pprof>
 	t1 := time.Now()
 	runtime.GC() // get up-to-date statistics
-	elapsed := time.Since(t1).Seconds()
+	elapsed := time.Since(t1).String()
 	zlog.Info().
-		Float64("gc-elapsed-time", elapsed).
+		Str("gc-elapsed-time", elapsed).
 		Msg("garbage collection done")
 }
 
@@ -99,8 +100,8 @@ func testAddEntities(t testing.TB, limit uint, b *stdmap.Backend, entities []*un
 		require.True(t, ok)
 		require.Equal(t, *e, actual)
 	}
-	elapsed := time.Since(t1)
-	zlog.Info().Dur("interaction_time", elapsed).Msg("adding elements done")
+	elapsed := time.Since(t1).String()
+	zlog.Info().Str("interaction_time", elapsed).Msg("adding elements done")
 }
 
 // baseLineLRU implements a BackData wrapper around hashicorp lru, which makes
