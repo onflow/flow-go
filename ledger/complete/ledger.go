@@ -13,12 +13,15 @@ import (
 	"github.com/onflow/flow-go/ledger/complete/mtrie"
 	"github.com/onflow/flow-go/ledger/complete/mtrie/trie"
 	realWAL "github.com/onflow/flow-go/ledger/complete/wal"
+	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 )
 
-const DefaultCacheSize = 1000
-const DefaultPathFinderVersion = 1
-const defaultTrieUpdateChanSize = 500
+const (
+	DefaultCacheSize          = 1000
+	DefaultPathFinderVersion  = 1
+	defaultTrieUpdateChanSize = 500
+)
 
 // Ledger (complete) is a fast memory-efficient fork-aware thread-safe trie-based key/value storage.
 // Ledger holds an array of registers (key-value pairs) and keeps tracks of changes over a limited time.
@@ -447,4 +450,21 @@ func (l *Ledger) keepOnlyOneTrie(state ledger.State) error {
 	l.wal.PauseRecord()
 	defer l.wal.UnpauseRecord()
 	return l.forest.PurgeCacheExcept(ledger.RootHash(state))
+}
+
+// FindTrieByStateCommit iterates over the ledger tries and compares the root hash to the state commitment
+// if a match is found it is returned, otherwise a nil value is returned indicating no match was found
+func (l *Ledger) FindTrieByStateCommit(commitment flow.StateCommitment) (*trie.MTrie, error) {
+	tries, err := l.Tries()
+	if err != nil {
+		return nil, err
+	}
+
+	for _, t := range tries {
+		if t.RootHash().Equals(ledger.RootHash(commitment)) {
+			return t, nil
+		}
+	}
+
+	return nil, nil
 }
