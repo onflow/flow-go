@@ -13,16 +13,16 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-//go:embed scripts/deploySourceOfRandomnessHistoryTransactionTemplate.cdc
-var deploySourceOfRandomnessHistoryTransactionTemplate string
+//go:embed scripts/deployRandomBeaconHistoryTransactionTemplate.cdc
+var deployRandomBeaconHistoryTransactionTemplate string
 
-// DeploySourceOfRandomnessHistoryTransaction returns the transaction body for the deployment
-// of the SourceOfRandomness contract transaction
-func DeploySourceOfRandomnessHistoryTransaction(
+// DeployRandomBeaconHistoryTransaction returns the transaction body for the deployment
+// of the RandomBeaconHistory contract transaction
+func DeployRandomBeaconHistoryTransaction(
 	service flow.Address,
 ) *flow.TransactionBody {
 	return flow.NewTransactionBody().
-		SetScript([]byte(deploySourceOfRandomnessHistoryTransactionTemplate)).
+		SetScript([]byte(deployRandomBeaconHistoryTransactionTemplate)).
 		AddArgument(jsoncdc.MustEncode(cadence.String(hex.EncodeToString(contracts.SourceOfRandomnessHistory())))).
 		AddAuthorizer(service)
 }

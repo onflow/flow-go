@@ -42,7 +42,7 @@ func TestRandomGenerator(t *testing.T) {
 			txId := unittest.TransactionFixture().ID()
 			urg := environment.NewRandomGenerator(
 				tracing.NewTracerSpan(),
-				entropyProvider,
+				randomSourceHistoryProvider,
 				txId[:])
 
 			// make sure n is a power of 2 so that there is no bias in the last class
