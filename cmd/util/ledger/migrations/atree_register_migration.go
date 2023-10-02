@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	runtime2 "runtime"
 	"sync"
 	"time"
 
@@ -560,6 +561,10 @@ func (m *AtreeRegisterMigrator) cloneValue(
 func capturePanic(f func()) (err error) {
 	defer func() {
 		if r := recover(); r != nil {
+			var stack [4096]byte
+			n := runtime2.Stack(stack[:], false)
+			fmt.Printf("%s", stack[:n])
+
 			switch x := r.(type) {
 			case runtime.Error:
 				err = fmt.Errorf("runtime error @%s: %w", x.Location, x)
