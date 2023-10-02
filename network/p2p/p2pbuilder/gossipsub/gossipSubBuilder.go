@@ -184,7 +184,7 @@ func NewGossipSubBuilder(
 	sporkId flow.Identifier,
 	idProvider module.IdentityProvider,
 	rpcInspectorConfig *p2pconf.GossipSubRPCInspectorsConfig,
-	rpcTracker p2p.RPCControlTracking,
+	rpcTracker p2p.RpcControlTracking,
 ) *Builder {
 	lg := logger.With().
 		Str("component", "gossipsub").
@@ -231,8 +231,9 @@ func defaultGossipSubAdapterConfig() p2p.GossipSubAdapterConfigFunc {
 // defaultInspectorSuite returns the default inspector suite factory function. It is used to create the default inspector suite.
 // Inspector suite is utilized to inspect the incoming gossipsub rpc messages from different perspectives.
 // Note: always use the default inspector suite factory function to create the inspector suite (unless you know what you are doing).
-func defaultInspectorSuite(rpcTracker p2p.RPCControlTracking) p2p.GossipSubRpcInspectorSuiteFactoryFunc {
+func defaultInspectorSuite(rpcTracker p2p.RpcControlTracking) p2p.GossipSubRpcInspectorSuiteFactoryFunc {
 	return func(
+		ctx irrecoverable.SignalerContext,
 		logger zerolog.Logger,
 		sporkId flow.Identifier,
 		inspectorCfg *p2pconf.GossipSubRPCInspectorsConfig,
@@ -257,6 +258,7 @@ func defaultInspectorSuite(rpcTracker p2p.RPCControlTracking) p2p.GossipSubRpcIn
 		inspectMsgQueueCacheCollector := metrics.GossipSubRPCInspectorQueueMetricFactory(heroCacheMetricsFactory, networkType)
 		clusterPrefixedCacheCollector := metrics.GossipSubRPCInspectorClusterPrefixedCacheMetricFactory(heroCacheMetricsFactory, networkType)
 		rpcValidationInspector, err := validation.NewControlMsgValidationInspector(
+			ctx,
 			logger,
 			sporkId,
 			&inspectorCfg.GossipSubRPCValidationInspectorConfigs,
@@ -301,6 +303,7 @@ func (g *Builder) Build(ctx irrecoverable.SignalerContext) (p2p.PubSubAdapter, e
 	}
 
 	inspectorSuite, err := g.rpcInspectorSuiteFactory(
+		ctx,
 		g.logger,
 		g.sporkId,
 		g.rpcInspectorConfig,
