@@ -529,7 +529,9 @@ func (m *AtreeRegisterMigrator) cloneValue(
 
 	if isCricketMomentsShardedCollection(mr, value) {
 		m.log.Info().Msg("migrating CricketMomentsShardedCollection")
-		value, err := m.cloneCricketMomentsShardedCollection(
+		value, err := cloneCricketMomentsShardedCollection(
+			m.log,
+			m.nWorkers,
 			mr,
 			domain,
 			key,
@@ -553,212 +555,20 @@ func (m *AtreeRegisterMigrator) cloneValue(
 	return value, nil
 }
 
-func (m *AtreeRegisterMigrator) cloneCricketMomentsShardedCollection(
-	mr *migratorRuntime,
-	domain string,
-	key interpreter.StorageMapKey,
-	value interpreter.Value,
-) (interpreter.Value, error) {
-
-	shardedCollectionMap, err := getShardedCollectionMap(mr, value)
-	if err != nil {
-		return nil, err
-	}
-	count, err := getCricketMomentsShardedCollectionNFTCount(
-		mr,
-		shardedCollectionMap,
-	)
-	if err != nil {
-		return nil, err
-	}
-
-	progressLog := util2.LogProgress("cloning cricket moments", count, m.log)
-
-	ctx, c := context.WithCancelCause(context.Background())
-	cancel := func(err error) {
-		if err != nil {
-			m.log.Info().Err(err).Msg("canceling context")
-		}
-		c(err)
-	}
-	defer cancel(nil)
-
-	type valueWithKeys struct {
-		cricketKeyPair
-		value interpreter.Value
-	}
-
-	keyPairChan := make(chan cricketKeyPair, count)
-	clonedValues := make([]valueWithKeys, 0, count)
-	wg := sync.WaitGroup{}
-	wg.Add(m.nWorkers)
-
-	// worker for dispatching values to clone
-	go func() {
-		defer close(keyPairChan)
-
-		inter, err := mr.ChildInterpreter()
-		if err != nil {
-			cancel(err)
-			return
-		}
-
-		storageMap := mr.GetReadOnlyStorage().GetStorageMap(mr.Address, domain, false)
-		storageMapValue := storageMap.ReadValue(&util.NopMemoryGauge{}, key)
-		scm, err := getShardedCollectionMap(mr, storageMapValue)
-		if err != nil {
-			cancel(err)
-			return
-		}
-
-		shardedCollectionMapIterator := scm.Iterator()
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			default:
-			}
-
-			outerKey := shardedCollectionMapIterator.NextKey(nil)
-			if outerKey == nil {
-				break
-			}
-
-			ownedNFTs, err := getNftCollection(inter, outerKey, scm)
-			if err != nil {
-				cancel(err)
-				return
-			}
-
-			ownedNFTsIterator := ownedNFTs.Iterator()
-			for {
-				select {
-				case <-ctx.Done():
-					return
-				default:
-				}
-
-				innerKey := ownedNFTsIterator.NextKey(nil)
-				if innerKey == nil {
-					break
-				}
-
-				keyPairChan <- cricketKeyPair{
-					nftCollectionKey:     innerKey,
-					shardedCollectionKey: outerKey,
-				}
-			}
-		}
-	}()
-
-	// workers for cloning values
-	for i := 0; i < m.nWorkers; i++ {
-		go func(i int) {
-			defer wg.Done()
-
-			inter, err := mr.ChildInterpreter()
-			if err != nil {
-				cancel(err)
-				return
-			}
-
-			storageMap := mr.GetReadOnlyStorage().GetStorageMap(mr.Address, domain, false)
-			storageMapValue := storageMap.ReadValue(&util.NopMemoryGauge{}, key)
-			scm, err := getShardedCollectionMap(mr, storageMapValue)
-			if err != nil {
-				cancel(err)
-				return
-			}
-
-			for {
-				select {
-				case <-ctx.Done():
-					return
-				case keyPair, ok := <-keyPairChan:
-					if !ok {
-						return
-					}
-
-					ownedNFTs, err := getNftCollection(
-						inter,
-						keyPair.shardedCollectionKey,
-						scm,
-					)
-					if err != nil {
-						cancel(err)
-						return
-					}
-
-					value := ownedNFTs.GetKey(
-						inter,
-						interpreter.EmptyLocationRange,
-						keyPair.nftCollectionKey,
-					)
-
-					var newValue interpreter.Value
-					err = capturePanic(func() {
-						newValue = value.Clone(inter)
-					})
-					if err != nil {
-						cancel(err)
-						return
-					}
-
-					clonedValues = append(clonedValues, valueWithKeys{
-						cricketKeyPair: keyPair,
-						value:          newValue,
-					})
-
-					progressLog(1)
-				}
-			}
-		}(i)
-	}
-	// only after all values have been cloned, can they be set back
-	wg.Wait()
-
-	if ctx.Err() != nil {
-		return nil, ctx.Err()
-	}
-
-	progressLog = util2.LogProgress("setting cloned cricket moments", len(clonedValues), m.log)
-	for _, clonedValue := range clonedValues {
-		ownedNFTs, err := getNftCollection(
-			mr.Interpreter,
-			clonedValue.shardedCollectionKey,
-			shardedCollectionMap,
-		)
-
-		if err != nil {
-			return nil, err
-		}
-
-		err = capturePanic(func() {
-			ownedNFTs.SetKey(
-				mr.Interpreter,
-				interpreter.EmptyLocationRange,
-				clonedValue.nftCollectionKey,
-				clonedValue.value,
-			)
-		})
-		if err != nil {
-			return nil, err
-		}
-		progressLog(1)
-	}
-
-	return value, nil
-}
-
 // capturePanic captures panics and converts them to errors
 // this is needed for some cadence functions that panic on error
 func capturePanic(f func()) (err error) {
 	defer func() {
 		if r := recover(); r != nil {
-			err = fmt.Errorf("panic: %v", r)
+
+			switch x := r.(type) {
+			case error:
+				err = x
+			default:
+				err = fmt.Errorf("panic: %v", r)
+			}
 		}
 	}()
-
 	f()
 
 	return
