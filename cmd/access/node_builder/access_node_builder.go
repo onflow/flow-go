@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path"
 	"path/filepath"
 	"strings"
 	"time"
@@ -46,12 +47,14 @@ import (
 	followereng "github.com/onflow/flow-go/engine/common/follower"
 	"github.com/onflow/flow-go/engine/common/requester"
 	synceng "github.com/onflow/flow-go/engine/common/synchronization"
+	"github.com/onflow/flow-go/engine/execution/computation/query"
 	"github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/blobs"
 	"github.com/onflow/flow-go/module/chainsync"
+	"github.com/onflow/flow-go/module/execution"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	execdatacache "github.com/onflow/flow-go/module/executiondatasync/execution_data/cache"
 	finalizer "github.com/onflow/flow-go/module/finalizer/consensus"
@@ -261,6 +264,8 @@ type FlowAccessNodeBuilder struct {
 	ExecutionDataStore         execution_data.ExecutionDataStore
 	ExecutionDataCache         *execdatacache.ExecutionDataCache
 	ExecutionIndexer           *indexer.Indexer
+	ExecutionIndexerCore       *indexer.IndexerCore
+	ScriptExecutor             *execution.Scripts
 
 	// The sync engine participants provider is the libp2p peer store for the access node
 	// which is not available until after the network has started.
@@ -720,6 +725,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 				if err != nil {
 					return nil, err
 				}
+				builder.ExecutionIndexerCore = indexerCore
 
 				// execution state worker uses a jobqueue to process new execution data and indexes it by using the indexer.
 				builder.ExecutionIndexer = indexer.NewIndexer(
@@ -736,7 +742,25 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 				execDataDistributor.AddOnExecutionDataReceivedConsumer(builder.ExecutionIndexer.OnExecutionData)
 
 				return builder.ExecutionIndexer, nil
-			}, indexerDependencies)
+			}, indexerDependencies).
+			Component("script execution", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+
+				scripts, err := execution.NewScripts(
+					builder.Logger,
+					metrics.NewExecutionCollector(builder.Tracer),
+					builder.RootChainID,
+					query.NewProtocolStateWrapper(builder.State),
+					builder.Storage.Headers,
+					builder.ExecutionIndexerCore.RegisterValues,
+				)
+				if err != nil {
+					return nil, err
+				}
+
+				builder.ScriptExecutor = scripts
+
+				return &module.NoopReadyDoneAware{}, nil
+			})
 	}
 
 	if builder.stateStreamConf.ListenAddr != "" {
