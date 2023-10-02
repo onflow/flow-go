@@ -411,7 +411,7 @@ func (c *ControlMsgValidationInspector) inspectIWantMessages(from peer.ID, iWant
 // Returns:
 // - InvalidRpcPublishMessagesErr: if the amount of invalid messages exceeds the configured RPCMessageErrorThreshold.
 // - int: the number of invalid pubsub messages
-func (c *ControlMsgValidationInspector) inspectRpcPublishMessages(from peer.ID, messages []*pubsub_pb.Message, activeClusterIDS flow.ChainIDList) (error, int) {
+func (c *ControlMsgValidationInspector) inspectRpcPublishMessages(from peer.ID, messages []*pubsub_pb.Message, activeClusterIDS flow.ChainIDList) (error, uint64) {
 	totalMessages := len(messages)
 	if totalMessages == 0 {
 		return nil, 0
@@ -428,7 +428,7 @@ func (c *ControlMsgValidationInspector) inspectRpcPublishMessages(from peer.ID, 
 	for _, message := range messages[:sampleSize] {
 		// return an error when we exceed the error threshold
 		if errs != nil && errs.Len() > c.config.RPCMessageErrorThreshold {
-			return NewInvalidRpcPublishMessagesErr(errs.ErrorOrNil(), errs.Len()), errs.Len()
+			return NewInvalidRpcPublishMessagesErr(errs.ErrorOrNil(), errs.Len()), uint64(errs.Len())
 		}
 
 		if c.networkingType == network.PrivateNetwork {
@@ -767,7 +767,7 @@ func (c *ControlMsgValidationInspector) checkClusterPrefixHardThreshold(nodeID f
 }
 
 // logAndDistributeErr logs the provided error and attempts to disseminate an invalid control message validation notification for the error.
-func (c *ControlMsgValidationInspector) logAndDistributeAsyncInspectErrs(req *InspectRPCRequest, ctlMsgType p2pmsg.ControlMessageType, err error, count int) {
+func (c *ControlMsgValidationInspector) logAndDistributeAsyncInspectErrs(req *InspectRPCRequest, ctlMsgType p2pmsg.ControlMessageType, err error, count uint64) {
 	lg := c.logger.With().
 		Bool(logging.KeySuspicious, true).
 		Bool(logging.KeyNetworkingSecurity, true).
@@ -783,7 +783,7 @@ func (c *ControlMsgValidationInspector) logAndDistributeAsyncInspectErrs(req *In
 		notification := p2p.NewInvalidControlMessageNotification(req.Peer, ctlMsgType, err, count)
 		lg.Error().Err(notification.Error).
 			Str("control_msg_type", notification.MsgType.String()).
-			Int("err_count", count).
+			Uint64("err_count", count).
 			Msg("rpc control message async inspection failed")
 		err = c.distributor.Distribute(notification)
 		if err != nil {

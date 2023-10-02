@@ -34,11 +34,11 @@ type InvCtrlMsgNotif struct {
 	// MsgType the control message type.
 	MsgType p2pmsg.ControlMessageType
 	// Count the number of errors.
-	Count int
+	Count uint64
 }
 
 // NewInvalidControlMessageNotification returns a new *InvCtrlMsgNotif
-func NewInvalidControlMessageNotification(peerID peer.ID, ctlMsgType p2pmsg.ControlMessageType, err error, count int) *InvCtrlMsgNotif {
+func NewInvalidControlMessageNotification(peerID peer.ID, ctlMsgType p2pmsg.ControlMessageType, err error, count uint64) *InvCtrlMsgNotif {
 	return &InvCtrlMsgNotif{
 		PeerID:  peerID,
 		Error:   err,
