@@ -28,30 +28,13 @@ import (
 func TestProviderEngine_onChunkDataRequest(t *testing.T) {
 
 	t.Run("non-existent chunk", func(t *testing.T) {
-		ps := mockprotocol.NewState(t)
 		net := mocknetwork.NewNetwork(t)
 		chunkConduit := mocknetwork.NewConduit(t)
-		execState := state.NewExecutionState(t)
-
 		net.On("Register", channels.PushReceipts, mock.Anything).Return(&mocknetwork.Conduit{}, nil)
 		net.On("Register", channels.ProvideChunks, mock.Anything).Return(chunkConduit, nil)
+		e, _, es, requestQueue := newTestEngine(t, net, true)
 
-		execState.On("ChunkDataPackByChunkID", mock.Anything).Return(nil, errors.New("not found!"))
-		requestQueue := queue.NewHeroStore(10, unittest.Logger(), metrics.NewNoopCollector())
-
-		e, err := New(
-			unittest.Logger(),
-			trace.NewNoopTracer(),
-			net,
-			ps,
-			execState,
-			metrics.NewNoopCollector(),
-			func(_ flow.Identifier) (bool, error) { return true, nil },
-			requestQueue,
-			DefaultChunkDataPackRequestWorker,
-			DefaultChunkDataPackQueryTimeout,
-			DefaultChunkDataPackDeliveryTimeout)
-		require.NoError(t, err)
+		es.On("ChunkDataPackByChunkID", mock.Anything).Return(nil, errors.New("not found!"))
 
 		originIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification))
 
@@ -83,38 +66,17 @@ func TestProviderEngine_onChunkDataRequest(t *testing.T) {
 	})
 
 	t.Run("success", func(t *testing.T) {
-		ps := new(mockprotocol.State)
-		ss := new(mockprotocol.Snapshot)
-		net := new(mocknetwork.Network)
+		net := mocknetwork.NewNetwork(t)
 		chunkConduit := &mocknetwork.Conduit{}
-		execState := new(state.ExecutionState)
-
 		net.On("Register", channels.PushReceipts, mock.Anything).Return(&mocknetwork.Conduit{}, nil)
 		net.On("Register", channels.ProvideChunks, mock.Anything).Return(chunkConduit, nil)
-		requestQueue := queue.NewHeroStore(10, unittest.Logger(), metrics.NewNoopCollector())
-
-		e, err := New(
-			unittest.Logger(),
-			trace.NewNoopTracer(),
-			net,
-			ps,
-			execState,
-			metrics.NewNoopCollector(),
-			func(_ flow.Identifier) (bool, error) { return true, nil },
-			requestQueue,
-			DefaultChunkDataPackRequestWorker,
-			DefaultChunkDataPackQueryTimeout,
-			DefaultChunkDataPackDeliveryTimeout)
-		require.NoError(t, err)
+		e, _, es, requestQueue := newTestEngine(t, net, true)
 
 		originIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification))
 
 		chunkID := unittest.IdentifierFixture()
 		chunkDataPack := unittest.ChunkDataPackFixture(chunkID)
-		blockID := unittest.IdentifierFixture()
 
-		ps.On("AtBlockID", blockID).Return(ss).Once()
-		ss.On("Identity", originIdentity.NodeID).Return(originIdentity, nil)
 		chunkConduit.On("Unicast", mock.Anything, originIdentity.NodeID).
 			Run(func(args mock.Arguments) {
 				res, ok := args[0].(*messages.ChunkDataResponse)
@@ -125,7 +87,7 @@ func TestProviderEngine_onChunkDataRequest(t *testing.T) {
 			}).
 			Return(nil)
 
-		execState.On("ChunkDataPackByChunkID", chunkID).Return(chunkDataPack, nil)
+		es.On("ChunkDataPackByChunkID", chunkID).Return(chunkDataPack, nil)
 
 		req := &messages.ChunkDataRequest{
 			ChunkID: chunkID,
@@ -149,4 +111,93 @@ func TestProviderEngine_onChunkDataRequest(t *testing.T) {
 		unittest.RequireCloseBefore(t, e.Done(), 100*time.Millisecond, "could not stop engine")
 	})
 
+}
+
+func TestProviderEngine_BroadcastExecutionReceipt(t *testing.T) {
+	// prepare
+	net := mocknetwork.NewNetwork(t)
+	chunkConduit := mocknetwork.NewConduit(t)
+	receiptConduit := mocknetwork.NewConduit(t)
+	net.On("Register", channels.PushReceipts, mock.Anything).Return(receiptConduit, nil)
+	net.On("Register", channels.ProvideChunks, mock.Anything).Return(chunkConduit, nil)
+	e, ps, _, _ := newTestEngine(t, net, true)
+
+	sealedBlock := unittest.BlockHeaderFixture()
+	sealed := new(mockprotocol.Snapshot)
+	sealed.On("Head").Return(sealedBlock, nil)
+	ps.On("Sealed").Return(sealed)
+	sealedHeight := sealedBlock.Height
+
+	receivers := unittest.IdentityListFixture(1)
+	snap := new(mockprotocol.Snapshot)
+	snap.On("Identities", mock.Anything).Return(receivers, nil)
+	ps.On("Final").Return(snap)
+
+	// verify that above the sealed height will be broadcasted
+	receipt1 := unittest.ExecutionReceiptFixture()
+	receiptConduit.On("Publish", receipt1, receivers.NodeIDs()[0]).Return(nil)
+
+	broadcasted, err := e.BroadcastExecutionReceipt(context.Background(), sealedHeight+1, receipt1)
+	require.NoError(t, err)
+	require.True(t, broadcasted)
+
+	// verify that equal the sealed height will NOT be broadcasted
+	receipt2 := unittest.ExecutionReceiptFixture()
+	broadcasted, err = e.BroadcastExecutionReceipt(context.Background(), sealedHeight, receipt2)
+	require.NoError(t, err)
+	require.False(t, broadcasted)
+
+	// verify that below the sealed height will NOT be broadcasted
+	broadcasted, err = e.BroadcastExecutionReceipt(context.Background(), sealedHeight-1, receipt2)
+	require.NoError(t, err)
+	require.False(t, broadcasted)
+}
+
+func TestProviderEngine_BroadcastExecutionUnauthorized(t *testing.T) {
+	net := mocknetwork.NewNetwork(t)
+	chunkConduit := mocknetwork.NewConduit(t)
+	receiptConduit := mocknetwork.NewConduit(t)
+	net.On("Register", channels.PushReceipts, mock.Anything).Return(receiptConduit, nil)
+	net.On("Register", channels.ProvideChunks, mock.Anything).Return(chunkConduit, nil)
+	// make sure the node is not authorized for broadcasting
+	authorized := false
+	e, ps, _, _ := newTestEngine(t, net, authorized)
+
+	sealedBlock := unittest.BlockHeaderFixture()
+	sealed := mockprotocol.NewSnapshot(t)
+	sealed.On("Head").Return(sealedBlock, nil)
+	ps.On("Sealed").Return(sealed)
+	sealedHeight := sealedBlock.Height
+
+	// verify that unstaked node will NOT broadcast
+	receipt2 := unittest.ExecutionReceiptFixture()
+	broadcasted, err := e.BroadcastExecutionReceipt(context.Background(), sealedHeight+1, receipt2)
+	require.NoError(t, err)
+	require.False(t, broadcasted)
+}
+
+func newTestEngine(t *testing.T, net *mocknetwork.Network, authorized bool) (
+	*Engine,
+	*mockprotocol.State,
+	*state.ExecutionState,
+	*queue.HeroStore,
+) {
+	ps := mockprotocol.NewState(t)
+	execState := state.NewExecutionState(t)
+	requestQueue := queue.NewHeroStore(10, unittest.Logger(), metrics.NewNoopCollector())
+
+	e, err := New(
+		unittest.Logger(),
+		trace.NewNoopTracer(),
+		net,
+		ps,
+		execState,
+		metrics.NewNoopCollector(),
+		func(_ flow.Identifier) (bool, error) { return authorized, nil },
+		requestQueue,
+		DefaultChunkDataPackRequestWorker,
+		DefaultChunkDataPackQueryTimeout,
+		DefaultChunkDataPackDeliveryTimeout)
+	require.NoError(t, err)
+	return e, ps, execState, requestQueue
 }

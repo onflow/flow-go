@@ -16,6 +16,7 @@ import (
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/p2p"
+	"github.com/onflow/flow-go/network/p2p/p2plogging"
 	"github.com/onflow/flow-go/network/p2p/tracer/internal"
 	"github.com/onflow/flow-go/utils/logging"
 )
@@ -102,12 +103,12 @@ func NewGossipSubMeshTracer(config *GossipSubMeshTracerConfig) *GossipSubMeshTra
 		}).
 		AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 			ready()
-			lg.Info().Msg("starting rpc sent tracker")
+			lg.Debug().Msg("starting rpc sent tracker")
 			g.rpcSentTracker.Start(ctx)
-			lg.Info().Msg("rpc sent tracker started")
+			lg.Debug().Msg("rpc sent tracker started")
 
 			<-g.rpcSentTracker.Done()
-			lg.Info().Msg("rpc sent tracker stopped")
+			lg.Debug().Msg("rpc sent tracker stopped")
 		}).
 		Build()
 
@@ -131,7 +132,7 @@ func (t *GossipSubMeshTracer) Graft(p peer.ID, topic string) {
 	t.topicMeshMu.Lock()
 	defer t.topicMeshMu.Unlock()
 
-	lg := t.logger.With().Str("topic", topic).Str("peer_id", p.String()).Logger()
+	lg := t.logger.With().Str("topic", topic).Str("peer_id", p2plogging.PeerId(p)).Logger()
 
 	if _, ok := t.topicMeshMap[topic]; !ok {
 		t.topicMeshMap[topic] = make(map[peer.ID]struct{})
@@ -150,7 +151,7 @@ func (t *GossipSubMeshTracer) Graft(p peer.ID, topic string) {
 		return
 	}
 
-	lg.Info().Hex("flow_id", logging.ID(id.NodeID)).Str("role", id.Role.String()).Msg("grafted peer")
+	lg.Debug().Hex("flow_id", logging.ID(id.NodeID)).Str("role", id.Role.String()).Msg("grafted peer")
 }
 
 // Prune is called when a peer is removed from a topic mesh. The tracer uses this to track the mesh peers.
@@ -158,7 +159,7 @@ func (t *GossipSubMeshTracer) Prune(p peer.ID, topic string) {
 	t.topicMeshMu.Lock()
 	defer t.topicMeshMu.Unlock()
 
-	lg := t.logger.With().Str("topic", topic).Str("peer_id", p.String()).Logger()
+	lg := t.logger.With().Str("topic", topic).Str("peer_id", p2plogging.PeerId(p)).Logger()
 
 	if _, ok := t.topicMeshMap[topic]; !ok {
 		return
@@ -178,7 +179,7 @@ func (t *GossipSubMeshTracer) Prune(p peer.ID, topic string) {
 		return
 	}
 
-	lg.Info().Hex("flow_id", logging.ID(id.NodeID)).Str("role", id.Role.String()).Msg("pruned peer")
+	lg.Debug().Hex("flow_id", logging.ID(id.NodeID)).Str("role", id.Role.String()).Msg("pruned peer")
 }
 
 // SendRPC is called when a RPC is sent. Currently, the GossipSubMeshTracer tracks iHave RPC messages that have been sent.
@@ -240,11 +241,11 @@ func (t *GossipSubMeshTracer) logPeers() {
 
 			if !exists {
 				shouldWarn = true
-				topicPeers = topicPeers.Str(strconv.Itoa(peerIndex), fmt.Sprintf("pid=%s, flow_id=unknown, role=unknown", p.String()))
+				topicPeers = topicPeers.Str(strconv.Itoa(peerIndex), fmt.Sprintf("pid=%s, flow_id=unknown, role=unknown", p2plogging.PeerId(p)))
 				continue
 			}
 
-			topicPeers = topicPeers.Str(strconv.Itoa(peerIndex), fmt.Sprintf("pid=%s, flow_id=%x, role=%s", p.String(), id.NodeID, id.Role.String()))
+			topicPeers = topicPeers.Str(strconv.Itoa(peerIndex), fmt.Sprintf("pid=%s, flow_id=%x, role=%s", p2plogging.PeerId(p), id.NodeID, id.Role.String()))
 		}
 
 		lg := t.logger.With().
@@ -259,6 +260,6 @@ func (t *GossipSubMeshTracer) logPeers() {
 				Msg(MeshLogIntervalWarnMsg)
 			continue
 		}
-		lg.Info().Msg(MeshLogIntervalMsg)
+		lg.Debug().Msg(MeshLogIntervalMsg)
 	}
 }

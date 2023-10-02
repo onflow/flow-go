@@ -34,6 +34,7 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/verification"
 	recovery "github.com/onflow/flow-go/consensus/recovery/protocol"
 	"github.com/onflow/flow-go/crypto"
+	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/access/ingestion"
 	pingeng "github.com/onflow/flow-go/engine/access/ping"
 	"github.com/onflow/flow-go/engine/access/rest"
@@ -265,6 +266,8 @@ type FlowAccessNodeBuilder struct {
 	secureGrpcServer      *grpcserver.GrpcServer
 	unsecureGrpcServer    *grpcserver.GrpcServer
 	stateStreamGrpcServer *grpcserver.GrpcServer
+
+	stateStreamBackend *state_stream.StateStreamBackend
 }
 
 func (builder *FlowAccessNodeBuilder) buildFollowerState() *FlowAccessNodeBuilder {
@@ -445,7 +448,7 @@ func (builder *FlowAccessNodeBuilder) BuildConsensusFollower() *FlowAccessNodeBu
 	return builder
 }
 
-func (builder *FlowAccessNodeBuilder) BuildExecutionDataRequester() *FlowAccessNodeBuilder {
+func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccessNodeBuilder {
 	var ds *badger.Datastore
 	var bs network.BlobService
 	var processedBlockHeight storage.ConsumerProgress
@@ -625,20 +628,32 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionDataRequester() *FlowAccessN
 			if err != nil {
 				return nil, fmt.Errorf("could not get highest consecutive height: %w", err)
 			}
+			broadcaster := engine.NewBroadcaster()
 
-			stateStreamEng, err := state_stream.NewEng(
-				node.Logger,
+			builder.stateStreamBackend, err = state_stream.New(node.Logger,
 				builder.stateStreamConf,
-				builder.ExecutionDataStore,
-				executionDataCache,
 				node.State,
 				node.Storage.Headers,
 				node.Storage.Seals,
 				node.Storage.Results,
-				node.RootChainID,
+				builder.ExecutionDataStore,
+				executionDataCache,
+				broadcaster,
 				builder.executionDataConfig.InitialBlockHeight,
-				highestAvailableHeight,
+				highestAvailableHeight)
+			if err != nil {
+				return nil, fmt.Errorf("could not create state stream backend: %w", err)
+			}
+
+			stateStreamEng, err := state_stream.NewEng(
+				node.Logger,
+				builder.stateStreamConf,
+				executionDataCache,
+				node.Storage.Headers,
+				node.RootChainID,
 				builder.stateStreamGrpcServer,
+				builder.stateStreamBackend,
+				broadcaster,
 			)
 			if err != nil {
 				return nil, fmt.Errorf("could not create state stream engine: %w", err)
@@ -898,6 +913,10 @@ func (builder *FlowAccessNodeBuilder) enqueueRelayNetwork() {
 }
 
 func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
+	if builder.executionDataSyncEnabled {
+		builder.BuildExecutionSyncComponents()
+	}
+
 	builder.
 		BuildConsensusFollower().
 		Module("collection node client", func(node *cmd.NodeConfig) error {
@@ -1037,17 +1056,15 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 			config := builder.rpcConf
 			backendConfig := config.BackendConfig
 			accessMetrics := builder.AccessMetrics
-
-			backendCache, cacheSize, err := backend.NewCache(node.Logger,
-				accessMetrics,
-				backendConfig.ConnectionPoolSize)
-			if err != nil {
-				return nil, fmt.Errorf("could not initialize backend cache: %w", err)
-			}
+			cacheSize := int(backendConfig.ConnectionPoolSize)
 
 			var connBackendCache *rpcConnection.Cache
-			if backendCache != nil {
-				connBackendCache = rpcConnection.NewCache(backendCache, int(cacheSize))
+			if cacheSize > 0 {
+				backendCache, err := backend.NewCache(node.Logger, accessMetrics, cacheSize)
+				if err != nil {
+					return nil, fmt.Errorf("could not initialize backend cache: %w", err)
+				}
+				connBackendCache = rpcConnection.NewCache(backendCache, cacheSize)
 			}
 
 			connFactory := &rpcConnection.ConnectionFactoryImpl{
@@ -1066,7 +1083,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				),
 			}
 
-			nodeBackend := backend.New(backend.Params{
+			nodeBackend, err := backend.New(backend.Params{
 				State:                     node.State,
 				CollectionRPC:             builder.CollectionRPC,
 				HistoricalAccessNodes:     builder.HistoricalAccessRPCs,
@@ -1090,6 +1107,9 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				ScriptExecValidation:      backendConfig.ScriptExecValidation,
 				TxResultCacheSize:         builder.TxResultCacheSize,
 			})
+			if err != nil {
+				return nil, fmt.Errorf("could not initialize backend: %w", err)
+			}
 
 			engineBuilder, err := rpc.NewBuilder(
 				node.Logger,
@@ -1103,6 +1123,9 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				nodeBackend,
 				builder.secureGrpcServer,
 				builder.unsecureGrpcServer,
+				builder.stateStreamBackend,
+				builder.stateStreamConf.EventFilterConfig,
+				builder.stateStreamConf.MaxGlobalStreams,
 			)
 			if err != nil {
 				return nil, err
@@ -1186,10 +1209,6 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 
 			return syncRequestHandler, nil
 		})
-	}
-
-	if builder.executionDataSyncEnabled {
-		builder.BuildExecutionDataRequester()
 	}
 
 	builder.Component("secure grpc server", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {

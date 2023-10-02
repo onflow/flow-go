@@ -12,6 +12,7 @@ import (
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/p2p"
+	"github.com/onflow/flow-go/network/p2p/p2plogging"
 	"github.com/onflow/flow-go/utils/logging"
 )
 
@@ -225,7 +226,7 @@ func (g *GossipSubScoreTracer) logPeerScore(peerID peer.ID) bool {
 	}
 
 	lg = lg.With().
-		Str("peer_id", peerID.String()).
+		Str("peer_id", p2plogging.PeerId(peerID)).
 		Float64("overall_score", snapshot.Score).
 		Float64("app_specific_score", snapshot.AppSpecificScore).
 		Float64("ip_colocation_factor", snapshot.IPColocationFactor).
@@ -255,6 +256,6 @@ func (g *GossipSubScoreTracer) logPeerScore(peerID peer.ID) bool {
 		return true
 	}
 
-	lg.Info().Msg(PeerScoreLogMessage)
+	lg.Debug().Msg(PeerScoreLogMessage)
 	return false
 }

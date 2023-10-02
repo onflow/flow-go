@@ -45,6 +45,8 @@ import (
 	"github.com/onflow/flow-go/engine/execution/computation/committer"
 	"github.com/onflow/flow-go/engine/execution/computation/query"
 	"github.com/onflow/flow-go/engine/execution/ingestion"
+	exeFetcher "github.com/onflow/flow-go/engine/execution/ingestion/fetcher"
+	"github.com/onflow/flow-go/engine/execution/ingestion/loader"
 	"github.com/onflow/flow-go/engine/execution/ingestion/stop"
 	"github.com/onflow/flow-go/engine/execution/ingestion/uploader"
 	executionprovider "github.com/onflow/flow-go/engine/execution/provider"
@@ -709,14 +711,15 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 		true,
 	)
 
+	fetcher := exeFetcher.NewCollectionFetcher(node.Log, requestEngine, node.State, false)
+	loader := loader.NewLoader(node.Log, node.State, node.Headers, execState)
 	rootHead, rootQC := getRoot(t, &node)
 	ingestionEngine, err := ingestion.New(
 		unit,
 		node.Log,
 		node.Net,
 		node.Me,
-		requestEngine,
-		node.State,
+		fetcher,
 		node.Headers,
 		node.Blocks,
 		collectionsStorage,
@@ -726,11 +729,10 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 		node.Metrics,
 		node.Tracer,
 		false,
-		checkAuthorizedAtBlock,
 		nil,
 		uploader,
 		stopControl,
-		false,
+		loader,
 	)
 	require.NoError(t, err)
 	requestEngine.WithHandle(ingestionEngine.OnCollection)
