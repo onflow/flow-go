@@ -175,7 +175,6 @@ func NewScriptEnv(
 		params.EntropyProvider,
 		params.ScriptInfoParams.ID[:],
 	)
-
 	env.addParseRestrictedChecks()
 	return env
 }
