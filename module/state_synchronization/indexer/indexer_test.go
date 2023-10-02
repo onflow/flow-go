@@ -8,6 +8,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	mocks "github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
+	"go.uber.org/atomic"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
@@ -15,6 +17,7 @@ import (
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data/mock"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	mempool "github.com/onflow/flow-go/module/mempool/mock"
+	storagemock "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -23,6 +26,7 @@ const testTimeout = 300 * time.Millisecond
 type indexerTest struct {
 	blocks        []*flow.Block
 	progress      *mockProgress
+	registers     *storagemock.RegisterIndex
 	indexTest     *indexCoreTest
 	worker        *Indexer
 	executionData *mempool.ExecutionData
@@ -36,11 +40,16 @@ func newIndexerTest(t *testing.T, availableBlocks int, lastIndexedIndex int) *in
 	blocks := blocksFixture(availableBlocks)
 	// we use 5th index as the latest indexed height, so we leave 5 more blocks to be indexed by the indexer in this test
 	lastIndexedHeight := blocks[lastIndexedIndex].Header.Height
-	progress := &mockProgress{index: lastIndexedHeight}
+	progress := newMockProgress()
+	progress.SetProcessedIndex(lastIndexedHeight)
+	registers := storagemock.NewRegisterIndex(t)
 
 	indexerCoreTest := newIndexCoreTest(t, blocks, nil).
 		setLastHeight(func(t *testing.T) uint64 {
-			return progress.index
+			i, err := progress.ProcessedIndex()
+			require.NoError(t, err)
+
+			return i
 		}).
 		useDefaultBlockByHeight().
 		useDefaultEvents().
@@ -67,7 +76,7 @@ func newIndexerTest(t *testing.T, availableBlocks int, lastIndexedIndex int) *in
 	test.worker = NewIndexer(
 		unittest.Logger(),
 		test.first().Header.Height,
-		testTimeout,
+		registers,
 		indexerCoreTest.indexer,
 		exeCache,
 		test.latestHeight,
@@ -110,20 +119,28 @@ func (w *indexerTest) run(ctx irrecoverable.SignalerContext, reachHeight uint64,
 }
 
 type mockProgress struct {
-	index uint64
+	index     *atomic.Uint64
+	doneIndex *atomic.Uint64
 	// signal to mark the progress reached an index set with WaitForIndex
-	doneChan  chan struct{}
-	doneIndex uint64
+	doneChan chan struct{}
+}
+
+func newMockProgress() *mockProgress {
+	return &mockProgress{
+		index:     atomic.NewUint64(0),
+		doneIndex: atomic.NewUint64(0),
+		doneChan:  make(chan struct{}),
+	}
 }
 
 func (w *mockProgress) ProcessedIndex() (uint64, error) {
-	return w.index, nil
+	return w.index.Load(), nil
 }
 
 func (w *mockProgress) SetProcessedIndex(index uint64) error {
-	w.index = index
+	w.index.Store(index)
 
-	if w.index == w.doneIndex && w.doneChan != nil {
+	if index > 0 && index == w.doneIndex.Load() {
 		close(w.doneChan)
 	}
 
@@ -131,14 +148,13 @@ func (w *mockProgress) SetProcessedIndex(index uint64) error {
 }
 
 func (w *mockProgress) InitProcessedIndex(index uint64) error {
-	w.index = index
+	w.index.Store(index)
 	return nil
 }
 
 // WaitForIndex will trigger a signal to the consumer, so they know the test reached a certain point
 func (w *mockProgress) WaitForIndex(n uint64) <-chan struct{} {
-	w.doneIndex = n
-	w.doneChan = make(chan struct{})
+	w.doneIndex.Store(n)
 	return w.doneChan
 }
 
