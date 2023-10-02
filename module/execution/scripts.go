@@ -12,7 +12,6 @@ import (
 	"github.com/onflow/flow-go/fvm/storage/derived"
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/storage"
 )
@@ -32,7 +31,7 @@ type Scripts struct {
 
 func NewScripts(
 	log zerolog.Logger,
-	tracer module.Tracer,
+	metrics *metrics.ExecutionCollector,
 	chainID flow.ChainID,
 	entropy query.EntropyProviderPerBlock,
 	header storage.Headers,
@@ -51,7 +50,7 @@ func NewScripts(
 	queryExecutor := query.NewQueryExecutor(
 		query.NewDefaultConfig(),
 		log,
-		metrics.NewExecutionCollector(tracer),
+		metrics,
 		vm,
 		vmCtx,
 		derivedChainData,
