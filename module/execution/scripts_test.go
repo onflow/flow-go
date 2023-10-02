@@ -17,13 +17,17 @@ import (
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/metrics"
 	synctest "github.com/onflow/flow-go/module/state_synchronization/requester/unittest"
 	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-var chain = flow.Emulator.Chain()
+var (
+	chain     = flow.Emulator.Chain()
+	collector = metrics.NewExecutionCollector(&trace.NoopTracer{})
+)
 
 func Test_ExecuteScript(t *testing.T) {
 	blockchain := unittest.BlockchainFixture(10)
@@ -90,7 +94,7 @@ func newScripts(
 		Return(entropyProvider).
 		Maybe()
 
-	scripts, err := NewScripts(zerolog.Nop(), &trace.NoopTracer{}, flow.Emulator, entropyBlock, headers, registers)
+	scripts, err := NewScripts(zerolog.Nop(), collector, flow.Emulator, entropyBlock, headers, registers)
 	require.NoError(t, err)
 
 	return scripts
