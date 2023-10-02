@@ -646,6 +646,9 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 		var indexedBlockHeight storage.ConsumerProgress
 
 		builder.
+			AdminCommand("execute-script", func(config *cmd.NodeConfig) commands.AdminCommand {
+				return stateSyncCommands.NewExecuteScriptCommand(builder.ScriptExecutor)
+			}).
 			Module("indexed block height consumer progress", func(node *cmd.NodeConfig) error {
 				// Note: progress is stored in the MAIN db since that is where indexed execution data is stored.
 				indexedBlockHeight = bstorage.NewConsumerProgress(builder.DB, module.ConsumeProgressExecutionDataIndexerBlockHeight)
