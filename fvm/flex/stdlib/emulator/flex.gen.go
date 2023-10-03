@@ -148,7 +148,7 @@ func init() {
 		),
 		sema.NewUnmeteredFunctionMember(
 			Flex_BalanceType,
-						ast.AccessPublic,
+			ast.AccessPublic,
 			Flex_BalanceTypeToAttoFlowFunctionName,
 			Flex_BalanceTypeToAttoFlowFunctionType,
 			Flex_BalanceTypeToAttoFlowFunctionDocString,
@@ -287,35 +287,35 @@ func init() {
 	var members = []*sema.Member{
 		sema.NewUnmeteredFunctionMember(
 			Flex_FlowOwnedAccountType,
-						ast.AccessPublic,
+			ast.AccessPublic,
 			Flex_FlowOwnedAccountTypeAddressFunctionName,
 			Flex_FlowOwnedAccountTypeAddressFunctionType,
 			Flex_FlowOwnedAccountTypeAddressFunctionDocString,
 		),
 		sema.NewUnmeteredFunctionMember(
 			Flex_FlowOwnedAccountType,
-						ast.AccessPublic,
+			ast.AccessPublic,
 			Flex_FlowOwnedAccountTypeDepositFunctionName,
 			Flex_FlowOwnedAccountTypeDepositFunctionType,
 			Flex_FlowOwnedAccountTypeDepositFunctionDocString,
 		),
 		sema.NewUnmeteredFunctionMember(
 			Flex_FlowOwnedAccountType,
-						ast.AccessPublic,
+			ast.AccessPublic,
 			Flex_FlowOwnedAccountTypeWithdrawFunctionName,
 			Flex_FlowOwnedAccountTypeWithdrawFunctionType,
 			Flex_FlowOwnedAccountTypeWithdrawFunctionDocString,
 		),
 		sema.NewUnmeteredFunctionMember(
 			Flex_FlowOwnedAccountType,
-						ast.AccessPublic,
+			ast.AccessPublic,
 			Flex_FlowOwnedAccountTypeDeployFunctionName,
 			Flex_FlowOwnedAccountTypeDeployFunctionType,
 			Flex_FlowOwnedAccountTypeDeployFunctionDocString,
 		),
 		sema.NewUnmeteredFunctionMember(
 			Flex_FlowOwnedAccountType,
-						ast.AccessPublic,
+			ast.AccessPublic,
 			Flex_FlowOwnedAccountTypeCallFunctionName,
 			Flex_FlowOwnedAccountTypeCallFunctionType,
 			Flex_FlowOwnedAccountTypeCallFunctionDocString,
@@ -325,6 +325,18 @@ func init() {
 	Flex_FlowOwnedAccountType.Members = sema.MembersAsMap(members)
 	Flex_FlowOwnedAccountType.Fields = sema.MembersFieldNames(members)
 }
+
+const FlexTypeCreateFlowOwnedAccountFunctionName = "createFlowOwnedAccount"
+
+var FlexTypeCreateFlowOwnedAccountFunctionType = &sema.FunctionType{
+	ReturnTypeAnnotation: sema.NewTypeAnnotation(
+		Flex_FlowOwnedAccountType,
+	),
+}
+
+const FlexTypeCreateFlowOwnedAccountFunctionDocString = `
+Creates a new Flex account
+`
 
 const FlexTypeRunFunctionName = "run"
 
@@ -386,6 +398,13 @@ func init() {
 			Flex_BalanceTypeName,
 			Flex_BalanceTypeConstructorType,
 			Flex_BalanceTypeConstructorDocString,
+		),
+		sema.NewUnmeteredFunctionMember(
+			FlexType,
+			ast.AccessPublic,
+			FlexTypeCreateFlowOwnedAccountFunctionName,
+			FlexTypeCreateFlowOwnedAccountFunctionType,
+			FlexTypeCreateFlowOwnedAccountFunctionDocString,
 		),
 		sema.NewUnmeteredFunctionMember(
 			FlexType,

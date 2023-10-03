@@ -1,6 +1,7 @@
 package stdlib
 
 import (
+	"github.com/onflow/atree"
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/onflow/cadence/runtime/errors"
 	"github.com/onflow/cadence/runtime/interpreter"
@@ -11,6 +12,8 @@ import (
 	"github.com/onflow/flow-go/fvm/flex/models"
 	"github.com/onflow/flow-go/model/flow"
 )
+
+const Flex_FlowOwnedAccountTypeAddressBytesFieldName = "addressBytes"
 
 func NewFlowTokenVaultType(chain flow.Chain) *sema.CompositeType {
 	const flowTokenContractName = "FlowToken"
@@ -48,13 +51,19 @@ func NewFlowTokenVaultType(chain flow.Chain) *sema.CompositeType {
 
 type FlexTypeDefinition struct {
 	FlexType *sema.CompositeType
-	// Use FlexStaticType()
-	_flexStaticType                    interpreter.StaticType
-	FlexTypeRunFunctionType            *sema.FunctionType
-	FlexTypeRunFunctionName            string
-	Flex_FlexAddressType               *sema.CompositeType
-	Flex_FlexAddressTypeBytesFieldName string
-	_flex_FlexAddressConstructorType   *sema.FunctionType
+	// Deprecated: Use FlexStaticType()
+	_flexStaticType                            interpreter.StaticType
+	FlexTypeRunFunctionName                    string
+	FlexTypeRunFunctionType                    *sema.FunctionType
+	FlexTypeCreateFlowOwnedAccountFunctionName string
+	FlexTypeCreateFlowOwnedAccountFunctionType *sema.FunctionType
+	Flex_FlexAddressType                       *sema.CompositeType
+	Flex_FlexAddressTypeBytesFieldName         string
+	// Deprecated: Use Flex_FlexAddressConstructorType
+	_flex_FlexAddressConstructorType             *sema.FunctionType
+	Flex_FlowOwnedAccountType                    *sema.CompositeType
+	Flex_FlowOwnedAccountTypeAddressFunctionName string
+	Flex_FlowOwnedAccountTypeAddressFunctionType *sema.FunctionType
 }
 
 func (t *FlexTypeDefinition) FlexStaticType() interpreter.StaticType {
@@ -128,6 +137,117 @@ func NewFlexTypeRunFunction(
 	)
 }
 
+var flexAddressArrayStaticType = interpreter.NewConstantSizedStaticType(
+	nil,
+	interpreter.PrimitiveStaticTypeUInt8,
+	models.FlexAddressLength,
+)
+
+func FlexAddressToAddressBytesArrayValue(
+	inter *interpreter.Interpreter,
+	address models.FlexAddress,
+) *interpreter.ArrayValue {
+	var index int
+	return interpreter.NewArrayValueWithIterator(
+		inter,
+		flexAddressArrayStaticType,
+		common.ZeroAddress,
+		models.FlexAddressLength,
+		func() interpreter.Value {
+			if index >= models.FlexAddressLength {
+				return nil
+			}
+			result := interpreter.NewUInt8Value(inter, func() uint8 {
+				return address[index]
+			})
+			index++
+			return result
+		},
+	)
+}
+
+func NewFlexOwnedAccountTypeAddressFunction(
+	gauge common.MemoryGauge,
+	def FlexTypeDefinition,
+	addressBytesValue *interpreter.ArrayValue,
+) *interpreter.HostFunctionValue {
+	return interpreter.NewHostFunctionValue(
+		gauge,
+		def.Flex_FlowOwnedAccountTypeAddressFunctionType,
+		func(invocation interpreter.Invocation) interpreter.Value {
+			inter := invocation.Interpreter
+			locationRange := invocation.LocationRange
+
+			// NOTE: important: provide a *copy*, so modifications are not reflected in storage
+			addressBytesValue := addressBytesValue.Transfer(
+				inter,
+				locationRange,
+				atree.Address{},
+				false,
+				nil,
+				nil,
+			)
+
+			return interpreter.NewCompositeValue(
+				inter,
+				locationRange,
+				nil,
+				def.Flex_FlexAddressType.QualifiedIdentifier(),
+				common.CompositeKindStructure,
+				[]interpreter.CompositeField{
+					{
+						Name:  def.Flex_FlexAddressTypeBytesFieldName,
+						Value: addressBytesValue,
+					},
+				},
+				common.ZeroAddress,
+			)
+		},
+	)
+}
+
+func NewFlexTypeCreateOwnedAccountFunction(
+	gauge common.MemoryGauge,
+	def FlexTypeDefinition,
+	handler models.FlexContractHandler,
+) *interpreter.HostFunctionValue {
+	return interpreter.NewHostFunctionValue(
+		gauge,
+		def.FlexTypeCreateFlowOwnedAccountFunctionType,
+		func(invocation interpreter.Invocation) interpreter.Value {
+			inter := invocation.Interpreter
+			locationRange := invocation.LocationRange
+
+			address := handler.AllocateAddress()
+
+			addressBytesValue := FlexAddressToAddressBytesArrayValue(inter, address)
+
+			// Construct and return Flex.FlowOwnedAccount
+
+			return interpreter.NewCompositeValue(
+				inter,
+				locationRange,
+				nil,
+				def.Flex_FlowOwnedAccountType.QualifiedIdentifier(),
+				common.CompositeKindResource,
+				[]interpreter.CompositeField{
+					{
+						Value: addressBytesValue,
+						Name:  Flex_FlowOwnedAccountTypeAddressBytesFieldName,
+					},
+					// TODO: inject properly as function
+					{
+						Name:  def.Flex_FlowOwnedAccountTypeAddressFunctionName,
+						Value: NewFlexOwnedAccountTypeAddressFunction(gauge, def, addressBytesValue),
+					},
+					// TODO: inject other functions
+				},
+				common.ZeroAddress,
+			)
+		},
+	)
+}
+
 func constructorType(compositeType *sema.CompositeType) *sema.FunctionType {
 	// TODO: Use t.ConstructorType() at call-sites, once available.
 	//   Depends on Stable Cadence / https://github.com/onflow/cadence/pull/2805
@@ -182,8 +302,9 @@ func NewFlexContractValue(
 		def.FlexStaticType(),
 		def.FlexType.Fields,
 		map[string]interpreter.Value{
-			def.Flex_FlexAddressType.Identifier: NewFlexAddressConstructor(def),
-			def.FlexTypeRunFunctionName:         NewFlexTypeRunFunction(gauge, def, handler),
+			def.Flex_FlexAddressType.Identifier:            NewFlexAddressConstructor(def),
+			def.FlexTypeRunFunctionName:                    NewFlexTypeRunFunction(gauge, def, handler),
+			def.FlexTypeCreateFlowOwnedAccountFunctionName: NewFlexTypeCreateOwnedAccountFunction(gauge, def, handler),
 		},
 		nil,
 		nil,
