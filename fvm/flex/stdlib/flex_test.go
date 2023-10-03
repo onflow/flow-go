@@ -42,7 +42,7 @@ func (t *testFlexContractHandler) AllocateAddress() models.FlexAddress {
 	if t.allocateAddress == nil {
 		t.addressIndex++
 		var address models.FlexAddress
-		binary.BigEndian.PutUint64(address[:], t.addressIndex)
+		binary.LittleEndian.PutUint64(address[:], t.addressIndex)
 		return address
 	}
 	return t.allocateAddress()
@@ -260,7 +260,7 @@ func TestFlexCreateFlowOwnedAccount(t *testing.T) {
 		},
 	}
 
-	_, err := inter.ExecuteScript(
+	actual, err := inter.ExecuteScript(
 		runtime.Script{
 			Source: script,
 		},
@@ -272,7 +272,23 @@ func TestFlexCreateFlowOwnedAccount(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	// TODO: assert result
+	expected := cadence.NewArray([]cadence.Value{
+		cadence.UInt8(1), cadence.UInt8(0),
+		cadence.UInt8(0), cadence.UInt8(0),
+		cadence.UInt8(0), cadence.UInt8(0),
+		cadence.UInt8(0), cadence.UInt8(0),
+		cadence.UInt8(0), cadence.UInt8(0),
+		cadence.UInt8(0), cadence.UInt8(0),
+		cadence.UInt8(0), cadence.UInt8(0),
+		cadence.UInt8(0), cadence.UInt8(0),
+		cadence.UInt8(0), cadence.UInt8(0),
+		cadence.UInt8(0), cadence.UInt8(0),
+	}).WithType(cadence.NewConstantSizedArrayType(
+		models.FlexAddressLength,
+		cadence.UInt8Type{},
+	))
+
+	require.Equal(t, expected, actual)
 }
 
 // TODO: replace with Cadence runtime testing utils once available https://github.com/onflow/cadence/pull/2800

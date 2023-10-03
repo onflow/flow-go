@@ -169,7 +169,7 @@ func FlexAddressToAddressBytesArrayValue(
 func NewFlexOwnedAccountTypeAddressFunction(
 	gauge common.MemoryGauge,
 	def FlexTypeDefinition,
-	addressBytesValue *interpreter.ArrayValue,
+	addressBytesValue interpreter.Value,
 ) *interpreter.HostFunctionValue {
 	return interpreter.NewHostFunctionValue(
 		gauge,
@@ -177,16 +177,6 @@ func NewFlexOwnedAccountTypeAddressFunction(
 		func(invocation interpreter.Invocation) interpreter.Value {
 			inter := invocation.Interpreter
 			locationRange := invocation.LocationRange
-
-			// NOTE: important: provide a *copy*, so modifications are not reflected in storage
-			addressBytesValue := addressBytesValue.Transfer(
-				inter,
-				locationRange,
-				atree.Address{},
-				false,
-				nil,
-				nil,
-			)
 
 			return interpreter.NewCompositeValue(
 				inter,
@@ -220,9 +210,19 @@ func NewFlexTypeCreateOwnedAccountFunction(
 
 			address := handler.AllocateAddress()
 
-			addressBytesValue := FlexAddressToAddressBytesArrayValue(inter, address)
+			storedAddressBytesValue := FlexAddressToAddressBytesArrayValue(inter, address)
 
 			// Construct and return Flex.FlowOwnedAccount
+
+			// NOTE: important: provide a *copy*, so modifications are not reflected in storage
+			flexAddressBytesValue := storedAddressBytesValue.Transfer(
+				inter,
+				locationRange,
+				atree.Address{},
+				false,
+				nil,
+				nil,
+			)
 
 			return interpreter.NewCompositeValue(
 				inter,
@@ -232,13 +232,13 @@ func NewFlexTypeCreateOwnedAccountFunction(
 				common.CompositeKindResource,
 				[]interpreter.CompositeField{
 					{
-						Value: addressBytesValue,
+						Value: storedAddressBytesValue,
 						Name:  Flex_FlowOwnedAccountTypeAddressBytesFieldName,
 					},
 					// TODO: inject properly as function
 					{
 						Name:  def.Flex_FlowOwnedAccountTypeAddressFunctionName,
-						Value: NewFlexOwnedAccountTypeAddressFunction(gauge, def, addressBytesValue),
+						Value: NewFlexOwnedAccountTypeAddressFunction(gauge, def, flexAddressBytesValue),
 					},
 					// TODO: inject other functions
 				},
