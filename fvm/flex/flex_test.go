@@ -5,6 +5,8 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"math"
+	"math/big"
 	"testing"
 	"time"
 
@@ -20,22 +22,12 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.opentelemetry.io/otel/attribute"
 
-	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/flex"
 	"github.com/onflow/flow-go/fvm/flex/models"
 	flexStdlib "github.com/onflow/flow-go/fvm/flex/stdlib"
 	"github.com/onflow/flow-go/fvm/flex/stdlib/emulator"
-	"github.com/onflow/flow-go/fvm/flex/storage"
 	"github.com/onflow/flow-go/fvm/flex/utils"
-	"github.com/onflow/flow-go/fvm/storage/testutils"
 )
-
-func RunWithTempLedger(t testing.TB, f func(atree.Ledger)) {
-	txnState := testutils.NewSimpleTransaction(nil)
-	accounts := environment.NewAccounts(txnState)
-	led := storage.NewLedger(accounts)
-	f(led)
-}
 
 func encodeArgs(argValues []cadence.Value) [][]byte {
 	args := make([][]byte, len(argValues))
@@ -66,7 +58,6 @@ var flexAddressCadenceType = cadence.NewStructType(
 func TestFlexAddressConstructionAndReturn(t *testing.T) {
 
 	t.Parallel()
-
 	utils.RunWithTestBackend(t, func(backend models.Backend) {
 		handler := flex.NewFlexContractHandler(backend)
 
@@ -136,66 +127,62 @@ func TestFlexRun(t *testing.T) {
 	t.Parallel()
 
 	utils.RunWithTestBackend(t, func(backend models.Backend) {
-		handler := flex.NewFlexContractHandler(backend)
+		utils.RunWithDeployedContract(t, backend, func(testContract *utils.TestContract) {
+			utils.RunWithEOATestAccount(t, backend, func(testAccount *utils.EOATestAccount) {
+				num := int64(12)
+				handler := flex.NewFlexContractHandler(backend)
+				interEnv := runtime.NewBaseInterpreterEnvironment(runtime.Config{})
 
-		env := runtime.NewBaseInterpreterEnvironment(runtime.Config{})
+				flexTypeDefinition := emulator.FlexTypeDefinition
+				interEnv.DeclareValue(flexStdlib.NewFlexStandardLibraryValue(nil, flexTypeDefinition, handler))
+				interEnv.DeclareType(flexStdlib.NewFlexStandardLibraryType(flexTypeDefinition))
 
-		flexTypeDefinition := emulator.FlexTypeDefinition
-		env.DeclareValue(flexStdlib.NewFlexStandardLibraryValue(nil, flexTypeDefinition, handler))
-		env.DeclareType(flexStdlib.NewFlexStandardLibraryType(flexTypeDefinition))
+				inter := runtime.NewInterpreterRuntime(runtime.Config{})
 
-		inter := runtime.NewInterpreterRuntime(runtime.Config{})
+				script := []byte(`
+					pub fun main(tx: [UInt8], coinbaseBytes: [UInt8; 20]): Bool {
+						let coinbase = Flex.FlexAddress(bytes: coinbaseBytes)
+						return Flex.run(tx: tx, coinbase: coinbase)
+					}
+				`)
 
-		script := []byte(`
-			pub fun main(tx: [UInt8], coinbaseBytes: [UInt8; 20]): Bool {
-                let coinbase = Flex.FlexAddress(bytes: coinbaseBytes)
-				return Flex.run(tx: tx, coinbase: coinbase)
-			}
-		`)
+				txBytes := testAccount.PrepareSignAndEncodeTx(t,
+					testContract.DeployedAt,
+					testContract.MakeStoreCallData(t, big.NewInt(num)),
+					big.NewInt(0),
+					math.MaxUint64,
+					big.NewInt(1),
+				)
+				tx := cadence.NewArray(
+					utils.ConvertToCadence(txBytes),
+				).WithType(flexAddressBytesCadenceType)
 
-		// TODO: provide proper RLP-encoded EVM transaction
-		tx := cadence.NewArray([]cadence.Value{
-			cadence.UInt8(1),
-			cadence.UInt8(2),
-			cadence.UInt8(3),
-		}).WithType(flexAddressBytesCadenceType)
+				coinbase := cadence.NewArray(
+					utils.ConvertToCadence(testAccount.FlexAddress().Bytes()),
+				).WithType(flexAddressBytesCadenceType)
 
-		// TODO: provide proper EVM address
-		coinbase := cadence.NewArray([]cadence.Value{
-			cadence.UInt8(1), cadence.UInt8(1),
-			cadence.UInt8(2), cadence.UInt8(2),
-			cadence.UInt8(3), cadence.UInt8(3),
-			cadence.UInt8(4), cadence.UInt8(4),
-			cadence.UInt8(5), cadence.UInt8(5),
-			cadence.UInt8(6), cadence.UInt8(6),
-			cadence.UInt8(7), cadence.UInt8(7),
-			cadence.UInt8(8), cadence.UInt8(8),
-			cadence.UInt8(9), cadence.UInt8(9),
-			cadence.UInt8(10), cadence.UInt8(10),
-		}).WithType(flexAddressBytesCadenceType)
+				runtimeInterface := &testRuntimeInterface{
+					storage: backend,
+					decodeArgument: func(b []byte, t cadence.Type) (cadence.Value, error) {
+						return json.Decode(nil, b)
+					},
+				}
 
-		runtimeInterface := &testRuntimeInterface{
-			storage: backend,
-			decodeArgument: func(b []byte, t cadence.Type) (cadence.Value, error) {
-				return json.Decode(nil, b)
-			},
-		}
-
-		result, err := inter.ExecuteScript(
-			runtime.Script{
-				Source:    script,
-				Arguments: encodeArgs([]cadence.Value{tx, coinbase}),
-			},
-			runtime.Context{
-				Interface:   runtimeInterface,
-				Environment: env,
-				Location:    common.ScriptLocation{},
-			},
-		)
-		require.NoError(t, err)
-
-		// TODO: should succeed
-		assert.Equal(t, cadence.Bool(false), result)
+				result, err := inter.ExecuteScript(
+					runtime.Script{
+						Source:    script,
+						Arguments: encodeArgs([]cadence.Value{tx, coinbase}),
+					},
+					runtime.Context{
+						Interface:   runtimeInterface,
+						Environment: interEnv,
+						Location:    common.ScriptLocation{},
+					},
+				)
+				require.NoError(t, err)
+				assert.Equal(t, cadence.Bool(true), result)
+			})
+		})
 	})
 }
 

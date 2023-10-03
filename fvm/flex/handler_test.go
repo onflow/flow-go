@@ -1,18 +1,13 @@
 package flex_test
 
 import (
-	"bytes"
-	"io"
 	"math"
 	"math/big"
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/core/types"
-	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/onflow/flow-go/fvm/flex"
-	env "github.com/onflow/flow-go/fvm/flex/environment"
 	"github.com/onflow/flow-go/fvm/flex/models"
 	"github.com/onflow/flow-go/fvm/flex/utils"
 	"github.com/stretchr/testify/require"
@@ -52,9 +47,8 @@ func TestFlexContractHandler(t *testing.T) {
 	t.Run("test running transaction", func(t *testing.T) {
 		utils.RunWithTestBackend(t, func(backend models.Backend) {
 			handler := flex.NewFlexContractHandler(backend)
-			keyHex := "9c647b8b7c4e7c3490668fb6c11473619db80c93704c70893d3813af4090c39c"
-			key, _ := crypto.HexToECDSA(keyHex)
-			address := crypto.PubkeyToAddress(key.PublicKey) // 658bdf435d810c91414ec09147daa6db62406379
+
+			eoa := utils.GetTestEOAAccount(t, utils.EOATestAccount1KeyHex)
 
 			// deposit 1 Flow to the foa account
 			addr := handler.AllocateAddress()
@@ -67,35 +61,29 @@ func TestFlexContractHandler(t *testing.T) {
 			// transfer 0.1 flow to the non-foa address
 			deduction, err := models.NewBalanceFromAttoFlow(big.NewInt(1e17))
 			require.NoError(t, err)
-			foa.Call(models.FlexAddress(address), nil, 400000, deduction)
+			foa.Call(eoa.FlexAddress(), nil, 400000, deduction)
 			require.Equal(t, orgBalance.Sub(deduction), foa.Balance())
 
 			// transfer 0.01 flow back to the foa through
 			addition, err := models.NewBalanceFromAttoFlow(big.NewInt(1e16))
 			require.NoError(t, err)
-			flexConf := env.NewFlexConfig()
-			signer := types.MakeSigner(flexConf.ChainConfig, env.BlockNumberForEVMRules, flexConf.BlockContext.Time)
-			tx, _ := types.SignTx(types.NewTransaction(
-				0,
+
+			tx := eoa.PrepareSignAndEncodeTx(
+				t,
 				foa.Address().ToCommon(),
+				nil,
 				addition.ToAttoFlow(),
 				params.TxGas*10,
-				big.NewInt(1e8), // high gas fee to test coinbase collection
-				nil),
-				signer, key)
-
-			var b bytes.Buffer
-			writer := io.Writer(&b)
-			tx.EncodeRLP(writer)
+				big.NewInt(1e8), // high gas fee to test coinbase collection,
+			)
 
 			// setup coinbase
 			foa2 := handler.AllocateAddress()
 			account2 := handler.AccountByAddress(foa2, true)
 			require.Equal(t, models.Balance(0), account2.Balance())
 
-			success := handler.Run(b.Bytes(), account2.Address())
+			success := handler.Run(tx, account2.Address())
 			require.True(t, success)
-
 			require.Equal(t, orgBalance.Sub(deduction).Add(addition), foa.Balance())
 
 			// fees has been collected to the coinbase

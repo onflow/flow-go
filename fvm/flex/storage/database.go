@@ -1,6 +1,7 @@
 package storage
 
 import (
+	"encoding/hex"
 	"errors"
 	"sync"
 
@@ -26,16 +27,17 @@ var (
 
 var FlexAddress = flow.BytesToAddress([]byte("Flex"))
 var FlexLatextBlockKey = "LatestBlock"
+var FlexRootSlabKey = "RootSlabKey"
 
 // Database is an ephemeral key-value store. Apart from basic data storage
 // functionality it also supports batch writes and iterating over the keyspace in
 // binary-alphabetical order.
+
 type Database struct {
-	led atree.Ledger
-
-	storage *atree.OrderedMap
-
-	lock sync.RWMutex // Ramtin: do we need this?
+	led      atree.Ledger
+	storage  *atree.PersistentSlabStorage
+	atreemap *atree.OrderedMap
+	lock     sync.RWMutex // Ramtin: do we need this?
 }
 
 // New returns a wrapped map with all the required database interface methods
@@ -46,15 +48,44 @@ func NewDatabase(led atree.Ledger) *Database {
 	baseStorage := atree.NewLedgerBaseStorage(led)
 
 	storage := NewPersistentSlabStorage(baseStorage)
-	m, err := atree.NewMap(storage, atree.Address(FlexAddress), atree.NewDefaultDigesterBuilder(), nil)
-	// TODO do not panic
+
+	// TODO if map already exists load it
+	rootIDBytes, err := led.GetValue(FlexAddress.Bytes(), []byte(FlexRootSlabKey))
 	if err != nil {
 		panic(err)
 	}
 
+	var m *atree.OrderedMap
+	if len(rootIDBytes) == 0 {
+		m, err = atree.NewMap(storage, atree.Address(FlexAddress), atree.NewDefaultDigesterBuilder(), typeInfo{})
+		if err != nil {
+			panic(err)
+		}
+
+		// TODO: read size from atree package
+		rootIDBytes := make([]byte, 16)
+		_, err = m.StorageID().ToRawBytes(rootIDBytes)
+		if err != nil {
+			panic(err)
+		}
+
+		led.SetValue(FlexAddress.Bytes(), []byte(FlexRootSlabKey), rootIDBytes)
+	} else {
+		storageID, err := atree.NewStorageIDFromRawBytes(rootIDBytes)
+		if err != nil {
+			panic(err)
+		}
+
+		m, err = atree.NewMapWithRootID(storage, storageID, atree.NewDefaultDigesterBuilder())
+		if err != nil {
+			panic(err)
+		}
+	}
+
 	return &Database{
-		led:     led,
-		storage: m,
+		led:      led,
+		storage:  storage,
+		atreemap: m,
 	}
 }
 
@@ -63,14 +94,22 @@ func (db *Database) Get(key []byte) ([]byte, error) {
 	db.lock.RLock()
 	defer db.lock.RUnlock()
 
-	data, err := db.storage.Get(compare, hashInputProvider, NewStringValue(string(key)))
-
+	data, err := db.atreemap.Get(compare, hashInputProvider, NewStringValue(hex.EncodeToString(key)))
 	if err != nil {
 		return nil, err
 	}
 
-	v, err := data.StoredValue(db.storage.Storage)
-	return []byte(v.(StringValue).String()), err
+	v, err := data.StoredValue(db.atreemap.Storage)
+	if err != nil {
+		return nil, err
+	}
+
+	val, err := hex.DecodeString(v.(StringValue).String())
+	if err != nil {
+		return nil, err
+	}
+
+	return val, err
 }
 
 // Put inserts the given value into the key-value store.
@@ -78,7 +117,7 @@ func (db *Database) Put(key []byte, value []byte) error {
 	db.lock.Lock()
 	defer db.lock.Unlock()
 
-	_, err := db.storage.Set(compare, hashInputProvider, NewStringValue(string(key)), NewStringValue(string(value)))
+	_, err := db.atreemap.Set(compare, hashInputProvider, NewStringValue(hex.EncodeToString(key)), NewStringValue(hex.EncodeToString(value)))
 	return err
 }
 
@@ -87,7 +126,7 @@ func (db *Database) Delete(key []byte) error {
 	db.lock.Lock()
 	defer db.lock.Unlock()
 
-	_, _, err := db.storage.Remove(compare, hashInputProvider, NewStringValue(string(key)))
+	_, _, err := db.atreemap.Remove(compare, hashInputProvider, NewStringValue(hex.EncodeToString(key)))
 	return err
 }
 
@@ -107,10 +146,15 @@ func (db *Database) GetLatestBlock() (*models.FlexBlock, error) {
 	return models.NewFlexBlockFromEncoded(data), err
 }
 
+// Commits the changes from atree
+func (db *Database) Commit() error {
+	return db.storage.Commit()
+}
+
 // Close deallocates the internal map and ensures any consecutive data access op
 // fails with an error.
 func (db *Database) Close() error {
-	return nil
+	return db.Commit()
 }
 
 // Has retrieves if a key is present in the key-value store.
@@ -219,6 +263,7 @@ func (b *batch) Write() error {
 		}
 		b.db.Put(keyvalue.key, keyvalue.value)
 	}
+
 	return nil
 }
 

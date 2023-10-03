@@ -14,6 +14,10 @@ func NewFlexAddress(addr gethCommon.Address) FlexAddress {
 	return fa
 }
 
+func (fa FlexAddress) Bytes() []byte {
+	return fa[:]
+}
+
 func (fa FlexAddress) ToCommon() gethCommon.Address {
 	return gethCommon.Address(fa)
 }
