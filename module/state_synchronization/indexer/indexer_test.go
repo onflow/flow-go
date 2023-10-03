@@ -41,7 +41,9 @@ func newIndexerTest(t *testing.T, availableBlocks int, lastIndexedIndex int) *in
 	// we use 5th index as the latest indexed height, so we leave 5 more blocks to be indexed by the indexer in this test
 	lastIndexedHeight := blocks[lastIndexedIndex].Header.Height
 	progress := newMockProgress()
-	progress.SetProcessedIndex(lastIndexedHeight)
+	err := progress.SetProcessedIndex(lastIndexedHeight)
+	require.NoError(t, err)
+
 	registers := storagemock.NewRegisterIndex(t)
 
 	indexerCoreTest := newIndexCoreTest(t, blocks, nil).

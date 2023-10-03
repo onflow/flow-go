@@ -59,7 +59,6 @@ func TestExecutionDataRequesterSuite(t *testing.T) {
 func (suite *ExecutionDataRequesterSuite) SetupTest() {
 	suite.datastore = dssync.MutexWrap(datastore.NewMapDatastore())
 	suite.blobstore = blobs.NewBlobstore(suite.datastore)
-	suite.distributor = requester.NewExecutionDataDistributor()
 
 	suite.run = edTestRun{
 		"",
@@ -407,6 +406,7 @@ func (suite *ExecutionDataRequesterSuite) prepareRequesterTest(cfg *fetchTestRun
 	state := suite.mockProtocolState(cfg.blocksByHeight)
 
 	suite.downloader = mockDownloader(cfg.executionDataEntries)
+	suite.distributor = requester.NewExecutionDataDistributor()
 
 	heroCache := herocache.NewBlockExecutionData(state_stream.DefaultCacheSize, logger, metrics)
 	cache := cache.NewExecutionDataCache(suite.downloader, headers, seals, results, heroCache)
@@ -541,6 +541,11 @@ func (suite *ExecutionDataRequesterSuite) consumeExecutionDataNotifications(cfg 
 		}
 
 		fetchedExecutionData[ed.BlockID] = ed.BlockExecutionData
+		if _, ok := cfg.blocksByID[ed.BlockID]; !ok {
+			suite.T().Errorf("unknown execution data for block %s", ed.BlockID)
+			return
+		}
+
 		suite.T().Logf("notified of execution data for block %v height %d (%d/%d)", ed.BlockID, cfg.blocksByID[ed.BlockID].Header.Height, len(fetchedExecutionData), cfg.sealedCount)
 
 		if cfg.IsLastSeal(ed.BlockID) {
