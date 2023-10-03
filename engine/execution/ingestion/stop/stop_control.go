@@ -599,6 +599,8 @@ func (s *StopControl) processNewVersionBeacons(
 	}
 
 	lg := s.log.With().
+		Str("node_version", s.nodeVersion.String()).
+		Str("beacon", vb.String()).
 		Uint64("vb_seal_height", vb.SealHeight).
 		Uint64("vb_sequence", vb.Sequence).Logger()
 
