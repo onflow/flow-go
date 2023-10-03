@@ -66,6 +66,7 @@ import (
 	ledger "github.com/onflow/flow-go/ledger/complete"
 	"github.com/onflow/flow-go/ledger/complete/wal"
 	bootstrapFilenames "github.com/onflow/flow-go/model/bootstrap"
+	modelbootstrap "github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module"
@@ -766,7 +767,10 @@ func (exeNode *ExecutionNode) LoadExecutionStateLedger(
 func (exeNode *ExecutionNode) LoadRegisterStore(
 	node *NodeConfig,
 ) error {
-	diskStore, pebbledb, err := storagepebble.NewBootstrappedRegistersWithPath(exeNode.exeConf.registerDir)
+
+	pebbledb, err := storagepebble.OpenRegisterPebbleDB(exeNode.exeConf.registerDir)
+
+	// diskStore, pebbledb, err := storagepebble.NewBootstrappedRegistersWithPath(exeNode.exeConf.registerDir)
 	if err != nil {
 		return fmt.Errorf("could not create disk register store: %w", err)
 	}
@@ -779,6 +783,30 @@ func (exeNode *ExecutionNode) LoadRegisterStore(
 		}
 		return nil
 	})
+
+	bootstrapped, err := storagepebble.IsBootstrapped(pebbledb)
+	if err != nil {
+		return fmt.Errorf("could not check if registers db is bootstrapped: %w", err)
+	}
+
+	if !bootstrapped {
+		checkpointFile := path.Join(exeNode.exeConf.triedir, modelbootstrap.PathRootCheckpoint)
+		root, err := exeNode.builder.RootSnapshot.Head()
+		if err != nil {
+			return fmt.Errorf("could not get root snapshot head: %w", err)
+		}
+
+		checkpointHeight := root.Height
+
+		err = bootstrap.ImportRegistersFromCheckpoint(node.Logger, checkpointFile, checkpointHeight, pebbledb)
+		if err != nil {
+			return fmt.Errorf("could not import registers from checkpoint: %w", err)
+		}
+	}
+	diskStore, err := storagepebble.NewRegisters(pebbledb)
+	if err != nil {
+		return fmt.Errorf("could not create registers storage: %w", err)
+	}
 
 	reader := finalizedreader.NewFinalizedReader(node.Storage.Headers)
 	registerStore, err := storehouse.NewRegisterStore(
