@@ -87,7 +87,7 @@ func TestWithFlexEnabled_ContractInteraction(t *testing.T) {
 							assert(Flex.run(tx: tx, coinbase: coinbase), message: "tx execution failed")
 						}
 					}
-			`)
+				`)
 
 				storeTxBytes := testAccount.PrepareSignAndEncodeTx(t,
 					testContract.DeployedAt,
@@ -129,6 +129,7 @@ func TestWithFlexEnabled_ContractInteraction(t *testing.T) {
 				snapshotTree = snapshotTree.Append(executionSnapshot)
 
 				// test retriveing a value
+
 				retrieveTxBytes := testAccount.PrepareSignAndEncodeTx(t,
 					testContract.DeployedAt,
 					testContract.MakeRetrieveCallData(t),
@@ -156,7 +157,7 @@ func TestWithFlexEnabled_ContractInteraction(t *testing.T) {
 						let coinbase = Flex.FlexAddress(bytes: coinbaseBytes)
 						return Flex.run(tx: tx, coinbase: coinbase)
 					}
-			`)
+				`)
 
 				retriveScriptBody := fvm.Script(script).
 					WithArguments(encodedInnerTx, encodedCoinbase)
@@ -175,6 +176,45 @@ func TestWithFlexEnabled_ContractInteraction(t *testing.T) {
 				// require.Equal(t, output.Value, num)
 			})
 		})
+	})
+}
+
+func TestWithFlexEnabled_FOAInteraction(t *testing.T) {
+
+	chainID := flow.Emulator
+	// flexRoot := emulator.FlexRootAccountAddress
+	var snapshotTree snapshot.SnapshotTree
+	WithBootstrappedTestVM(t, chainID, func(chain flow.Chain, vm fvm.VM, tree *snapshot.SnapshotTree) {
+		// create ctx with flex enabled
+		ctx := fvm.NewContext(
+			fvm.WithChain(chain),
+			fvm.WithFlexEnabled(true),
+			fvm.WithAuthorizationChecksEnabled(false),
+			fvm.WithSequenceNumberCheckAndIncrementEnabled(false),
+		)
+
+		txScript := []byte(`
+					transaction(tx: [UInt8], coinbaseBytes: [UInt8; 20]) {
+						prepare(signer: AuthAccount) {
+						}
+						execute {
+							// TODO: create a flex account
+						}
+					}
+				`)
+
+		storeTxBody := flow.NewTransactionBody().
+			SetScript(txScript).
+			AddAuthorizer(chain.ServiceAddress())
+
+		_, output, err := vm.Run(
+			ctx,
+			fvm.Transaction(storeTxBody, 0),
+			snapshotTree)
+		require.NoError(t, err)
+
+		// transaction should pass
+		require.NoError(t, output.Err)
 	})
 }
 
