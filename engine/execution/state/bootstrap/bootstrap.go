@@ -1,13 +1,16 @@
 package bootstrap
 
 import (
+	"context"
 	"errors"
 	"fmt"
 
+	"github.com/cockroachdb/pebble"
 	"github.com/dgraph-io/badger/v2"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/engine/execution/state"
+
 	"github.com/onflow/flow-go/engine/execution/storehouse"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
@@ -15,6 +18,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/badger/operation"
+	pStorage "github.com/onflow/flow-go/storage/pebble"
 )
 
 // an increased limit for bootstrapping
@@ -139,5 +143,23 @@ func (b *Bootstrapper) BootstrapExecutionDatabase(
 		return err
 	}
 
+	return nil
+}
+
+func ImportRegistersFromCheckpoint(logger zerolog.Logger, checkpointFile string, checkpointHeight uint64, pdb *pebble.DB) error {
+	logger.Info().Msgf("importing registers from checkpoint file %s at height %d", checkpointFile, checkpointHeight)
+
+	bootstrap, err := pStorage.NewRegisterBootstrap(pdb, checkpointFile, checkpointHeight, logger)
+	if err != nil {
+		return fmt.Errorf("could not create registers bootstrapper: %w", err)
+	}
+
+	// TODO: find a way to hook a context up to this to allow a graceful shutdown
+	err = bootstrap.IndexCheckpointFile(context.Background())
+	if err != nil {
+		return fmt.Errorf("could not load checkpoint file: %w", err)
+	}
+
+	logger.Info().Msgf("finish importing registers from checkpoint file %s at height %d", checkpointFile, checkpointHeight)
 	return nil
 }
