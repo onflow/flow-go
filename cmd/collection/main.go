@@ -424,7 +424,7 @@ func main() {
 				channels.ProvideCollections,
 				filter.And(
 					filter.HasWeight(true),
-					filter.HasRole(flow.RoleAccess, flow.RoleExecution),
+					filter.HasRole[flow.Identity](flow.RoleAccess, flow.RoleExecution),
 				),
 				retrieve,
 			)

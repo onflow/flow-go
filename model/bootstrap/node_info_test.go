@@ -2,6 +2,7 @@ package bootstrap_test
 
 import (
 	"encoding/json"
+	"github.com/onflow/flow-go/model/flow"
 	"strings"
 	"testing"
 
@@ -15,8 +16,8 @@ import (
 
 func TestSort(t *testing.T) {
 	nodes := unittest.NodeInfosFixture(20)
-	nodes = bootstrap.Sort(nodes, order.Canonical)
-	require.True(t, bootstrap.ToIdentityList(nodes).Sorted(order.Canonical))
+	nodes = bootstrap.Sort(nodes, order.Canonical[flow.Identity])
+	require.True(t, bootstrap.ToIdentityList(nodes).Sorted(order.Canonical[flow.Identity]))
 }
 
 func TestNodeConfigEncodingJSON(t *testing.T) {

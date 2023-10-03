@@ -108,11 +108,11 @@ func (b *backendAccounts) getAccountAtBlockID(
 // We attempt querying each EN in sequence. If any EN returns a valid response, then errors from
 // other ENs are logged and swallowed. If all ENs fail to return a valid response, then an
 // error aggregating all failures is returned.
-func (b *backendAccounts) getAccountFromAnyExeNode(ctx context.Context, execNodes flow.IdentityList, req *execproto.GetAccountAtBlockIDRequest) (*execproto.GetAccountAtBlockIDResponse, error) {
+func (b *backendAccounts) getAccountFromAnyExeNode(ctx context.Context, execNodes flow.IdentitySkeletonList, req *execproto.GetAccountAtBlockIDRequest) (*execproto.GetAccountAtBlockIDResponse, error) {
 	var resp *execproto.GetAccountAtBlockIDResponse
 	errToReturn := b.nodeCommunicator.CallAvailableNode(
 		execNodes,
-		func(node *flow.Identity) error {
+		func(node *flow.IdentitySkeleton) error {
 			var err error
 			start := time.Now()
 
@@ -146,7 +146,7 @@ func (b *backendAccounts) getAccountFromAnyExeNode(ctx context.Context, execNode
 	return resp, errToReturn
 }
 
-func (b *backendAccounts) tryGetAccount(ctx context.Context, execNode *flow.Identity, req *execproto.GetAccountAtBlockIDRequest) (*execproto.GetAccountAtBlockIDResponse, error) {
+func (b *backendAccounts) tryGetAccount(ctx context.Context, execNode *flow.IdentitySkeleton, req *execproto.GetAccountAtBlockIDRequest) (*execproto.GetAccountAtBlockIDResponse, error) {
 	execRPCClient, closer, err := b.connFactory.GetExecutionAPIClient(execNode.Address)
 	if err != nil {
 		return nil, err

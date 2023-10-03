@@ -237,8 +237,8 @@ func (h *MessageHub) sendOwnTimeout(timeout *model.TimeoutObject) error {
 	//          TCs might not be constructed at epoch switchover.
 	recipients, err := h.state.Final().Identities(filter.And(
 		filter.Not(filter.Ejected),
-		filter.HasRole(flow.RoleConsensus),
-		filter.Not(filter.HasNodeID(h.me.NodeID())),
+		filter.HasRole[flow.Identity](flow.RoleConsensus),
+		filter.Not(filter.HasNodeID[flow.Identity](h.me.NodeID())),
 	))
 	if err != nil {
 		return fmt.Errorf("could not get consensus recipients for broadcasting timeout: %w", err)
@@ -329,13 +329,13 @@ func (h *MessageHub) sendOwnProposal(header *flow.Header) error {
 	//       `OnOwnTimeout` is directly called by the consensus core logic.
 	allIdentities, err := h.state.AtBlockID(header.ParentID).Identities(filter.And(
 		filter.Not(filter.Ejected),
-		filter.Not(filter.HasNodeID(h.me.NodeID())),
+		filter.Not(filter.HasNodeID[flow.Identity](h.me.NodeID())),
 	))
 	if err != nil {
 		return fmt.Errorf("could not get identities for broadcasting proposal: %w", err)
 	}
 
-	consRecipients := allIdentities.Filter(filter.HasRole(flow.RoleConsensus))
+	consRecipients := allIdentities.Filter(filter.HasRole[flow.Identity](flow.RoleConsensus))
 
 	// NOTE: some fields are not needed for the message
 	// - proposer ID is conveyed over the network message
@@ -356,7 +356,7 @@ func (h *MessageHub) sendOwnProposal(header *flow.Header) error {
 	log.Info().Msg("block proposal was broadcast")
 
 	// submit proposal to non-consensus nodes
-	h.provideProposal(proposal, allIdentities.Filter(filter.Not(filter.HasRole(flow.RoleConsensus))))
+	h.provideProposal(proposal, allIdentities.Filter(filter.Not(filter.HasRole[flow.Identity](flow.RoleConsensus))))
 	h.engineMetrics.MessageSent(metrics.EngineConsensusMessageHub, metrics.MessageBlockProposal)
 
 	return nil

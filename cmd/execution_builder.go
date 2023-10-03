@@ -1056,7 +1056,7 @@ func (exeNode *ExecutionNode) LoadReceiptProviderEngine(
 		channels.ProvideReceiptsByBlockID,
 		filter.And(
 			filter.HasWeight(true),
-			filter.HasRole(flow.RoleConsensus),
+			filter.HasRole[flow.Identity](flow.RoleConsensus),
 		),
 		retrieve,
 	)

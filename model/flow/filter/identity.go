@@ -54,8 +54,8 @@ func Not[T flow.GenericIdentity](filter flow.IdentityFilter[T]) flow.IdentityFil
 
 // In returns a filter for identities within the input list. This is equivalent
 // to HasNodeID, but for list-typed inputs.
-func In(list flow.IdentityList) flow.IdentityFilter[flow.Identity] {
-	return HasNodeID[flow.Identity](list.NodeIDs()...)
+func In[T flow.GenericIdentity](list flow.GenericIdentityList[T]) flow.IdentityFilter[T] {
+	return HasNodeID[T](list.NodeIDs()...)
 }
 
 // HasNodeID returns a filter that returns true for any identity with an ID

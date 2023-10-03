@@ -484,7 +484,7 @@ func main() {
 				node.Me,
 				node.State,
 				channels.RequestReceiptsByBlockID,
-				filter.HasRole(flow.RoleExecution),
+				filter.HasRole[flow.Identity](flow.RoleExecution),
 				func() flow.Entity { return &flow.ExecutionReceipt{} },
 				requester.WithRetryInitial(2*time.Second),
 				requester.WithRetryMaximum(30*time.Second),

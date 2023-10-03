@@ -59,7 +59,7 @@ type Broker struct {
 	log                       zerolog.Logger
 	unit                      *engine.Unit
 	dkgInstanceID             string                            // unique identifier of the current dkg run (prevent replay attacks)
-	committee                 flow.IdentityList                 // identities of DKG members
+	committee                 flow.IdentitySkeletonList         // identities of DKG members
 	me                        module.Local                      // used for signing broadcast messages
 	myIndex                   int                               // index of this instance in the committee
 	dkgContractClients        []module.DKGContractClient        // array of clients to communicate with the DKG smart contract in priority order for fallbacks during retries
@@ -84,7 +84,7 @@ var _ module.DKGBroker = (*Broker)(nil)
 func NewBroker(
 	log zerolog.Logger,
 	dkgInstanceID string,
-	committee flow.IdentityList,
+	committee flow.IdentitySkeletonList,
 	me module.Local,
 	myIndex int,
 	dkgContractClients []module.DKGContractClient,

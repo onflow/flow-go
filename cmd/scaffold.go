@@ -1021,8 +1021,8 @@ func (fnb *FlowNodeBuilder) InitIDProviders() {
 
 		node.SyncEngineIdentifierProvider = id.NewIdentityFilterIdentifierProvider(
 			filter.And(
-				filter.HasRole(flow.RoleConsensus),
-				filter.Not(filter.HasNodeID(node.Me.NodeID())),
+				filter.HasRole[flow.Identity](flow.RoleConsensus),
+				filter.Not(filter.HasNodeID[flow.Identity](node.Me.NodeID())),
 				p2pnet.NotEjectedFilter,
 			),
 			node.IdentityProvider,

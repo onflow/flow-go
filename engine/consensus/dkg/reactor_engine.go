@@ -24,7 +24,7 @@ const DefaultPollStep = 10
 
 // dkgInfo consolidates information about the current DKG protocol instance.
 type dkgInfo struct {
-	identities      flow.IdentityList
+	identities      flow.IdentitySkeletonList
 	phase1FinalView uint64
 	phase2FinalView uint64
 	phase3FinalView uint64

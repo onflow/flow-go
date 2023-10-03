@@ -103,7 +103,7 @@ func (b *backendTransactions) trySendTransaction(ctx context.Context, tx *flow.T
 	// try sending the transaction to one of the chosen collection nodes
 	sendError = b.nodeCommunicator.CallAvailableNode(
 		collNodes,
-		func(node *flow.Identity) error {
+		func(node *flow.IdentitySkeleton) error {
 			err = b.sendTransactionToCollector(ctx, tx, node.Address)
 			if err != nil {
 				return err
@@ -118,7 +118,7 @@ func (b *backendTransactions) trySendTransaction(ctx context.Context, tx *flow.T
 
 // chooseCollectionNodes finds a random subset of size sampleSize of collection node addresses from the
 // collection node cluster responsible for the given tx
-func (b *backendTransactions) chooseCollectionNodes(tx *flow.TransactionBody) (flow.IdentityList, error) {
+func (b *backendTransactions) chooseCollectionNodes(tx *flow.TransactionBody) (flow.IdentitySkeletonList, error) {
 
 	// retrieve the set of collector clusters
 	clusters, err := b.state.Final().Epochs().Current().Clustering()
@@ -781,7 +781,7 @@ func (b *backendTransactions) NotifyFinalizedBlockHeight(height uint64) {
 
 func (b *backendTransactions) getTransactionResultFromAnyExeNode(
 	ctx context.Context,
-	execNodes flow.IdentityList,
+	execNodes flow.IdentitySkeletonList,
 	req *execproto.GetTransactionResultRequest,
 ) (*execproto.GetTransactionResultResponse, error) {
 	var errToReturn error
@@ -795,7 +795,7 @@ func (b *backendTransactions) getTransactionResultFromAnyExeNode(
 	var resp *execproto.GetTransactionResultResponse
 	errToReturn = b.nodeCommunicator.CallAvailableNode(
 		execNodes,
-		func(node *flow.Identity) error {
+		func(node *flow.IdentitySkeleton) error {
 			var err error
 			resp, err = b.tryGetTransactionResult(ctx, node, req)
 			if err == nil {
@@ -816,7 +816,7 @@ func (b *backendTransactions) getTransactionResultFromAnyExeNode(
 
 func (b *backendTransactions) tryGetTransactionResult(
 	ctx context.Context,
-	execNode *flow.Identity,
+	execNode *flow.IdentitySkeleton,
 	req *execproto.GetTransactionResultRequest,
 ) (*execproto.GetTransactionResultResponse, error) {
 	execRPCClient, closer, err := b.connFactory.GetExecutionAPIClient(execNode.Address)
@@ -835,7 +835,7 @@ func (b *backendTransactions) tryGetTransactionResult(
 
 func (b *backendTransactions) getTransactionResultsByBlockIDFromAnyExeNode(
 	ctx context.Context,
-	execNodes flow.IdentityList,
+	execNodes flow.IdentitySkeletonList,
 	req *execproto.GetTransactionsByBlockIDRequest,
 ) (*execproto.GetTransactionResultsResponse, error) {
 	var errToReturn error
@@ -855,7 +855,7 @@ func (b *backendTransactions) getTransactionResultsByBlockIDFromAnyExeNode(
 	var resp *execproto.GetTransactionResultsResponse
 	errToReturn = b.nodeCommunicator.CallAvailableNode(
 		execNodes,
-		func(node *flow.Identity) error {
+		func(node *flow.IdentitySkeleton) error {
 			var err error
 			resp, err = b.tryGetTransactionResultsByBlockID(ctx, node, req)
 			if err == nil {
@@ -875,7 +875,7 @@ func (b *backendTransactions) getTransactionResultsByBlockIDFromAnyExeNode(
 
 func (b *backendTransactions) tryGetTransactionResultsByBlockID(
 	ctx context.Context,
-	execNode *flow.Identity,
+	execNode *flow.IdentitySkeleton,
 	req *execproto.GetTransactionsByBlockIDRequest,
 ) (*execproto.GetTransactionResultsResponse, error) {
 	execRPCClient, closer, err := b.connFactory.GetExecutionAPIClient(execNode.Address)
@@ -894,7 +894,7 @@ func (b *backendTransactions) tryGetTransactionResultsByBlockID(
 
 func (b *backendTransactions) getTransactionResultByIndexFromAnyExeNode(
 	ctx context.Context,
-	execNodes flow.IdentityList,
+	execNodes flow.IdentitySkeletonList,
 	req *execproto.GetTransactionByIndexRequest,
 ) (*execproto.GetTransactionResultResponse, error) {
 	var errToReturn error
@@ -911,7 +911,7 @@ func (b *backendTransactions) getTransactionResultByIndexFromAnyExeNode(
 	var resp *execproto.GetTransactionResultResponse
 	errToReturn = b.nodeCommunicator.CallAvailableNode(
 		execNodes,
-		func(node *flow.Identity) error {
+		func(node *flow.IdentitySkeleton) error {
 			var err error
 			resp, err = b.tryGetTransactionResultByIndex(ctx, node, req)
 			if err == nil {
@@ -932,7 +932,7 @@ func (b *backendTransactions) getTransactionResultByIndexFromAnyExeNode(
 
 func (b *backendTransactions) tryGetTransactionResultByIndex(
 	ctx context.Context,
-	execNode *flow.Identity,
+	execNode *flow.IdentitySkeleton,
 	req *execproto.GetTransactionByIndexRequest,
 ) (*execproto.GetTransactionResultResponse, error) {
 	execRPCClient, closer, err := b.connFactory.GetExecutionAPIClient(execNode.Address)
