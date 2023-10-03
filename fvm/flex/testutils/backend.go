@@ -2,6 +2,7 @@ package testutils
 
 import (
 	"encoding/binary"
+	"fmt"
 	"testing"
 
 	"github.com/onflow/atree"
@@ -26,6 +27,7 @@ func RunWithTestBackend(t testing.TB, f func(models.Backend)) {
 	tb := &testBackend{
 		testValueStore:   getSimpleValueStore(),
 		testEventEmitter: getSimpleEventEmitter(),
+		testMeter:        getSimpleMeter(),
 	}
 	f(tb)
 }
@@ -77,6 +79,26 @@ func getSimpleEventEmitter() *testEventEmitter {
 		},
 		events: func() flow.EventsList {
 			return events
+		},
+	}
+}
+
+func getSimpleMeter() *testMeter {
+	computationLimit := uint(10000)
+	computationUsed := uint(0)
+	return &testMeter{
+		meterComputation: func(kind common.ComputationKind, intensity uint) error {
+			computationUsed += intensity
+			if computationUsed > computationLimit {
+				return fmt.Errorf("computation limit has hit %d", computationLimit)
+			}
+			return nil
+		},
+		hasComputationCapacity: func(kind common.ComputationKind, intensity uint) bool {
+			if computationUsed+intensity > computationLimit {
+				return false
+			}
+			return true
 		},
 	}
 }
