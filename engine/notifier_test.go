@@ -83,28 +83,33 @@ func TestNotifier_ManyNotifications(t *testing.T) {
 // sends just as many notifications with small delays. We require that
 // all workers eventually get a notification.
 func TestNotifier_ManyConsumers(t *testing.T) {
+	t.Parallel()
 	singleTestRun := func(t *testing.T) {
 		t.Parallel()
 		notifier := NewNotifier()
 		c := notifier.Channel()
 
+		workerCount := 100
+		notificationReceived := make(chan struct{}, workerCount)
+
 		// spawn 100 worker routines to each wait for a notification
 		var startingWorkers sync.WaitGroup
-		pendingWorkers := atomic.NewInt32(100)
-		for i := 0; i < 100; i++ {
+		pendingWorkers := atomic.NewInt32(int32(workerCount))
+		for i := 0; i < workerCount; i++ {
 			startingWorkers.Add(1)
 			go func() {
 				startingWorkers.Done()
 				<-c
+				notificationReceived <- struct{}{} // notify that a notification was received
 				pendingWorkers.Dec()
 			}()
 		}
 		startingWorkers.Wait()
 
 		// send 100 notifications, with small delays
-		for i := 0; i < 100; i++ {
+		for i := 0; i < workerCount; i++ {
 			notifier.Notify()
-			time.Sleep(100 * time.Millisecond)
+			<-notificationReceived // wait until a worker has received a notification
 		}
 
 		// require that all workers got a notification
@@ -121,6 +126,7 @@ func TestNotifier_ManyConsumers(t *testing.T) {
 // TestNotifier_AllWorkProcessed spans many routines pushing work and fewer
 // routines consuming work. We require that all worker is eventually processed.
 func TestNotifier_AllWorkProcessed(t *testing.T) {
+	t.Parallel()
 	singleTestRun := func(t *testing.T) {
 		t.Parallel()
 		notifier := NewNotifier()
