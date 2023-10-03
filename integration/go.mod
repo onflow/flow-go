@@ -18,7 +18,7 @@ require (
 	github.com/ipfs/go-datastore v0.6.0
 	github.com/ipfs/go-ds-badger2 v0.1.3
 	github.com/ipfs/go-ipfs-blockstore v1.3.0
-	github.com/onflow/cadence v0.41.0
+	github.com/onflow/cadence v0.41.1
 	github.com/onflow/flow-core-contracts/lib/go/contracts v1.2.4-0.20230703193002-53362441b57d
 	github.com/onflow/flow-core-contracts/lib/go/templates v1.2.3
 	github.com/onflow/flow-emulator v0.53.0
@@ -48,6 +48,7 @@ require (
 	cloud.google.com/go/iam v0.13.0 // indirect
 	cloud.google.com/go/storage v1.29.0 // indirect
 	github.com/Azure/go-ansiterm v0.0.0-20170929234023-d6e3b3328b78 // indirect
+	github.com/DataDog/zstd v1.4.5 // indirect
 	github.com/Microsoft/go-winio v0.5.2 // indirect
 	github.com/Microsoft/hcsshim v0.8.7 // indirect
 	github.com/ProtonMail/go-crypto v0.0.0-20221026131551-cf6655e29de4 // indirect
@@ -80,6 +81,12 @@ require (
 	github.com/cespare/xxhash v1.1.0 // indirect
 	github.com/cespare/xxhash/v2 v2.2.0 // indirect
 	github.com/cloudflare/circl v1.1.0 // indirect
+	github.com/cockroachdb/errors v1.8.1 // indirect
+	github.com/cockroachdb/logtags v0.0.0-20190617123548-eb05cc24525f // indirect
+	github.com/cockroachdb/pebble v0.0.0-20230829171545-74d4bb649d92 // indirect
+	github.com/cockroachdb/redact v1.0.8 // indirect
+	github.com/cockroachdb/sentry-go v0.6.1-cockroachdb.2 // indirect
+	github.com/cockroachdb/tokenbucket v0.0.0-20230807174530-cc333fc44b06 // indirect
 	github.com/containerd/cgroups v1.1.0 // indirect
 	github.com/containerd/continuity v0.0.0-20200107194136-26c1120b8d41 // indirect
 	github.com/containerd/fifo v0.0.0-20191213151349-ff969a566b00 // indirect
@@ -181,6 +188,8 @@ require (
 	github.com/klauspost/compress v1.16.5 // indirect
 	github.com/klauspost/cpuid/v2 v2.2.5 // indirect
 	github.com/koron/go-ssdp v0.0.4 // indirect
+	github.com/kr/pretty v0.3.1 // indirect
+	github.com/kr/text v0.2.0 // indirect
 	github.com/leodido/go-urn v1.2.4 // indirect
 	github.com/libp2p/go-addr-util v0.1.0 // indirect
 	github.com/libp2p/go-buffer-pool v0.1.0 // indirect
@@ -260,6 +269,7 @@ require (
 	github.com/raulk/go-watchdog v1.3.0 // indirect
 	github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec // indirect
 	github.com/rivo/uniseg v0.4.4 // indirect
+	github.com/rogpeppe/go-internal v1.9.0 // indirect
 	github.com/schollz/progressbar/v3 v3.13.1 // indirect
 	github.com/sergi/go-diff v1.1.0 // indirect
 	github.com/sethvargo/go-retry v0.2.3 // indirect

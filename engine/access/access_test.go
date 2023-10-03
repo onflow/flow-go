@@ -26,7 +26,7 @@ import (
 	"github.com/onflow/flow-go/engine/access/ingestion"
 	accessmock "github.com/onflow/flow-go/engine/access/mock"
 	"github.com/onflow/flow-go/engine/access/rpc/backend"
-	factorymock "github.com/onflow/flow-go/engine/access/rpc/backend/mock"
+	connectionmock "github.com/onflow/flow-go/engine/access/rpc/connection/mock"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/factory"
@@ -312,7 +312,7 @@ func (suite *Suite) TestSendTransactionToRandomCollectionNode() {
 		col2ApiClient.On("SendTransaction", mock.Anything, sendReq2).Return(&sendResp, nil).Once()
 
 		// create a mock connection factory
-		connFactory := new(factorymock.ConnectionFactory)
+		connFactory := connectionmock.NewConnectionFactory(suite.T())
 		connFactory.On("GetAccessAPIClient", collNode1.Address).Return(col1ApiClient, &mockCloser{}, nil)
 		connFactory.On("GetAccessAPIClient", collNode2.Address).Return(col2ApiClient, &mockCloser{}, nil)
 
@@ -620,7 +620,7 @@ func (suite *Suite) TestGetSealedTransaction() {
 		suite.execClient.On("GetTransactionResult", mock.Anything, mock.Anything).Return(&exeEventResp, nil)
 
 		// create a mock connection factory
-		connFactory := new(factorymock.ConnectionFactory)
+		connFactory := connectionmock.NewConnectionFactory(suite.T())
 		connFactory.On("GetExecutionAPIClient", mock.Anything).Return(suite.execClient, &mockCloser{}, nil)
 
 		// initialize storage
@@ -755,7 +755,7 @@ func (suite *Suite) TestGetTransactionResult() {
 		suite.request.On("Request", mock.Anything, mock.Anything).Return()
 
 		// create a mock connection factory
-		connFactory := new(factorymock.ConnectionFactory)
+		connFactory := connectionmock.NewConnectionFactory(suite.T())
 		connFactory.On("GetExecutionAPIClient", mock.Anything).Return(suite.execClient, &mockCloser{}, nil)
 
 		// initialize storage
@@ -957,7 +957,7 @@ func (suite *Suite) TestExecuteScript() {
 		suite.finalSnapshot.On("Identities", mock.Anything).Return(identities, nil)
 
 		// create a mock connection factory
-		connFactory := new(factorymock.ConnectionFactory)
+		connFactory := connectionmock.NewConnectionFactory(suite.T())
 		connFactory.On("GetExecutionAPIClient", mock.Anything).Return(suite.execClient, &mockCloser{}, nil)
 
 		var err error

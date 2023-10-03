@@ -2368,6 +2368,18 @@ func TransactionResultsFixture(n int) []flow.TransactionResult {
 	return results
 }
 
+func LightTransactionResultsFixture(n int) []flow.LightTransactionResult {
+	results := make([]flow.LightTransactionResult, 0, n)
+	for i := 0; i < n; i++ {
+		results = append(results, flow.LightTransactionResult{
+			TransactionID:   IdentifierFixture(),
+			Failed:          i%2 == 0,
+			ComputationUsed: Uint64InRange(1, 10_000),
+		})
+	}
+	return results
+}
+
 func AllowAllPeerFilter() func(peer.ID) error {
 	return func(_ peer.ID) error {
 		return nil
@@ -2487,9 +2499,9 @@ func WithTrieUpdate(trieUpdate *ledger.TrieUpdate) func(*execution_data.ChunkExe
 
 func ChunkExecutionDataFixture(t *testing.T, minSize int, opts ...func(*execution_data.ChunkExecutionData)) *execution_data.ChunkExecutionData {
 	collection := CollectionFixture(5)
-	results := make([]execution_data.TransactionResult, len(collection.Transactions))
+	results := make([]flow.LightTransactionResult, len(collection.Transactions))
 	for i, tx := range collection.Transactions {
-		results[i] = execution_data.TransactionResult{
+		results[i] = flow.LightTransactionResult{
 			TransactionID:   tx.ID(),
 			Failed:          false,
 			ComputationUsed: uint64(i * 100),

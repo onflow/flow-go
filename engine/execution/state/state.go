@@ -11,6 +11,7 @@ import (
 	"github.com/onflow/flow-go/engine/execution"
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/ledger"
+	"github.com/onflow/flow-go/ledger/common/convert"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/trace"
@@ -61,14 +62,6 @@ type ExecutionState interface {
 	) error
 }
 
-const (
-	KeyPartOwner = uint16(0)
-	// @deprecated - controller was used only by the very first
-	// version of cadence for access controll which was retired later on
-	// KeyPartController = uint16(1)
-	KeyPartKey = uint16(2)
-)
-
 type state struct {
 	tracer             module.Tracer
 	ls                 ledger.Ledger
@@ -83,13 +76,6 @@ type state struct {
 	serviceEvents      storage.ServiceEvents
 	transactionResults storage.TransactionResults
 	db                 *badger.DB
-}
-
-func RegisterIDToKey(reg flow.RegisterID) ledger.Key {
-	return ledger.NewKey([]ledger.KeyPart{
-		ledger.NewKeyPart(KeyPartOwner, []byte(reg.Owner)),
-		ledger.NewKeyPart(KeyPartKey, []byte(reg.Key)),
-	})
 }
 
 // NewExecutionState returns a new execution state access layer for the given ledger storage.
@@ -128,7 +114,7 @@ func NewExecutionState(
 
 func makeSingleValueQuery(commitment flow.StateCommitment, id flow.RegisterID) (*ledger.QuerySingleValue, error) {
 	return ledger.NewQuerySingleValue(ledger.State(commitment),
-		RegisterIDToKey(id),
+		convert.RegisterIDToLedgerKey(id),
 	)
 }
 
@@ -141,7 +127,7 @@ func RegisterEntriesToKeysValues(
 	keys := make([]ledger.Key, len(entries))
 	values := make([]ledger.Value, len(entries))
 	for i, entry := range entries {
-		keys[i] = RegisterIDToKey(entry.Key)
+		keys[i] = convert.RegisterIDToLedgerKey(entry.Key)
 		values[i] = entry.Value
 	}
 	return keys, values
@@ -403,8 +389,9 @@ func (s *state) GetHighestExecutedBlockID(ctx context.Context) (uint64, flow.Ide
 	return height, blockID, nil
 }
 
-// IsBlockExecuted returns whether the block has been executed.
-// it checks whether the state commitment exists in execution state.
+// IsBlockExecuted returns true if the block is executed, which means registers, events,
+// results, statecommitment etc are all stored.
+// otherwise returns false
 func IsBlockExecuted(ctx context.Context, state ReadOnlyExecutionState, block flow.Identifier) (bool, error) {
 	_, err := state.StateCommitmentByBlockID(ctx, block)
 

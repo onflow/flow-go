@@ -2,13 +2,13 @@ package backend
 
 import (
 	"context"
+	"crypto/md5" //nolint:gosec
 	"fmt"
 	"net"
 	"strconv"
 	"time"
 
-	lru "github.com/hashicorp/golang-lru"
-	lru2 "github.com/hashicorp/golang-lru/v2"
+	lru "github.com/hashicorp/golang-lru/v2"
 	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
 	"github.com/rs/zerolog"
 
@@ -124,7 +124,7 @@ func New(params Params) (*Backend, error) {
 		retry.Activate()
 	}
 
-	loggedScripts, err := lru.New(DefaultLoggedScriptsCacheSize)
+	loggedScripts, err := lru.New[[md5.Size]byte, time.Time](DefaultLoggedScriptsCacheSize)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize script logging cache: %w", err)
 	}
@@ -138,9 +138,9 @@ func New(params Params) (*Backend, error) {
 		archivePorts[idx] = port
 	}
 
-	var txResCache *lru2.Cache[flow.Identifier, *access.TransactionResult]
+	var txResCache *lru.Cache[flow.Identifier, *access.TransactionResult]
 	if params.TxResultCacheSize > 0 {
-		txResCache, err = lru2.New[flow.Identifier, *access.TransactionResult](int(params.TxResultCacheSize))
+		txResCache, err = lru.New[flow.Identifier, *access.TransactionResult](int(params.TxResultCacheSize))
 		if err != nil {
 			return nil, fmt.Errorf("failed to init cache for transaction results: %w", err)
 		}
@@ -244,27 +244,21 @@ func New(params Params) (*Backend, error) {
 // No errors are expected during normal operations.
 func NewCache(
 	log zerolog.Logger,
-	accessMetrics module.AccessMetrics,
-	connectionPoolSize uint,
-) (*lru.Cache, uint, error) {
+	metrics module.AccessMetrics,
+	connectionPoolSize int,
+) (*lru.Cache[string, *connection.CachedClient], error) {
+	cache, err := lru.NewWithEvict(connectionPoolSize, func(_ string, client *connection.CachedClient) {
+		go client.Close() // close is blocking, so run in a goroutine
 
-	var cache *lru.Cache
-	cacheSize := connectionPoolSize
-	if cacheSize > 0 {
-		var err error
-		cache, err = lru.NewWithEvict(int(cacheSize), func(_, evictedValue interface{}) {
-			store := evictedValue.(*connection.CachedClient)
-			store.Close()
-			log.Debug().Str("grpc_conn_evicted", store.Address).Msg("closing grpc connection evicted from pool")
-			if accessMetrics != nil {
-				accessMetrics.ConnectionFromPoolEvicted()
-			}
-		})
-		if err != nil {
-			return nil, 0, fmt.Errorf("could not initialize connection pool cache: %w", err)
-		}
+		log.Debug().Str("grpc_conn_evicted", client.Address).Msg("closing grpc connection evicted from pool")
+		metrics.ConnectionFromPoolEvicted()
+	})
+
+	if err != nil {
+		return nil, fmt.Errorf("could not initialize connection pool cache: %w", err)
 	}
-	return cache, cacheSize, nil
+
+	return cache, nil
 }
 
 func identifierList(ids []string) (flow.IdentifierList, error) {
