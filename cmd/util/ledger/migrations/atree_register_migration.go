@@ -561,7 +561,7 @@ func (m *AtreeRegisterMigrator) cloneValue(
 func capturePanic(f func()) (err error) {
 	defer func() {
 		if r := recover(); r != nil {
-			var stack [4096]byte
+			var stack [100000]byte
 			n := runtime2.Stack(stack[:], false)
 			fmt.Printf("%s", stack[:n])
 

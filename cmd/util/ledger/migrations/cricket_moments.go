@@ -298,6 +298,8 @@ func cloneCricketMomentsShardedCollection(
 		return nil, fmt.Errorf("context error when cloning values: %w", ctx.Err())
 	}
 
+	mr.Interpreter.SharedState.Config.InvalidatedResourceValidationEnabled = false
+
 	progressLog = util2.LogProgress("setting cloned cricket moments", len(clonedValues), log)
 	for _, clonedValue := range clonedValues {
 		ownedNFTs, err := getNftCollection(
