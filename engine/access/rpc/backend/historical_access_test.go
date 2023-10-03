@@ -5,7 +5,6 @@ import (
 
 	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
 	"github.com/onflow/flow/protobuf/go/flow/entities"
-	execproto "github.com/onflow/flow/protobuf/go/flow/execution"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
@@ -49,7 +48,7 @@ func (suite *Suite) TestHistoricalTransactionResult() {
 		Once()
 
 	// Make the call for the transaction result
-	result, err := backend.GetTransactionResult(ctx, txID, flow.ZeroID, flow.ZeroID, execproto.EventEncodingVersion_JSON_CDC_V0)
+	result, err := backend.GetTransactionResult(ctx, txID, flow.ZeroID, flow.ZeroID, nil)
 	suite.checkResponse(result, err)
 
 	// status should be sealed

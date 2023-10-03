@@ -3,8 +3,6 @@ package routes
 import (
 	"fmt"
 
-	execproto "github.com/onflow/flow/protobuf/go/flow/execution"
-
 	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/engine/access/rest/models"
 	"github.com/onflow/flow-go/engine/access/rest/request"
@@ -23,7 +21,7 @@ func GetEvents(r *request.Request, backend access.API, _ models.LinkGenerator) (
 	// if the request has block IDs provided then return events for block IDs
 	var blocksEvents models.BlocksEvents
 	if len(req.BlockIDs) > 0 {
-		events, err := backend.GetEventsForBlockIDs(r.Context(), req.Type, req.BlockIDs, execproto.EventEncodingVersion_JSON_CDC_V0)
+		events, err := backend.GetEventsForBlockIDs(r.Context(), req.Type, req.BlockIDs, nil)
 		if err != nil {
 			return nil, err
 		}
@@ -47,7 +45,7 @@ func GetEvents(r *request.Request, backend access.API, _ models.LinkGenerator) (
 	}
 
 	// if request provided block height range then return events for that range
-	events, err := backend.GetEventsForHeightRange(r.Context(), req.Type, req.StartHeight, req.EndHeight, execproto.EventEncodingVersion_JSON_CDC_V0)
+	events, err := backend.GetEventsForHeightRange(r.Context(), req.Type, req.StartHeight, req.EndHeight, nil)
 	if err != nil {
 		return nil, err
 	}

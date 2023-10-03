@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/onflow/flow/protobuf/go/flow/entities"
+
 	execproto "github.com/onflow/flow/protobuf/go/flow/execution"
 	"github.com/rs/zerolog"
 	"google.golang.org/grpc/codes"
@@ -36,7 +38,7 @@ func (b *backendEvents) GetEventsForHeightRange(
 	ctx context.Context,
 	eventType string,
 	startHeight, endHeight uint64,
-	eventEncodingVersion execproto.EventEncodingVersion,
+	eventEncodingVersionValue *entities.EventEncodingVersionValue,
 ) ([]flow.BlockEvents, error) {
 
 	if endHeight < startHeight {
@@ -78,7 +80,7 @@ func (b *backendEvents) GetEventsForHeightRange(
 		blockHeaders = append(blockHeaders, header)
 	}
 
-	return b.getBlockEventsFromExecutionNode(ctx, blockHeaders, eventType, eventEncodingVersion)
+	return b.getBlockEventsFromExecutionNode(ctx, blockHeaders, eventType, eventEncodingVersionValue)
 }
 
 // GetEventsForBlockIDs retrieves events for all the specified block IDs that have the given type
@@ -86,7 +88,7 @@ func (b *backendEvents) GetEventsForBlockIDs(
 	ctx context.Context,
 	eventType string,
 	blockIDs []flow.Identifier,
-	eventEncodingVersion execproto.EventEncodingVersion,
+	eventEncodingVersionValue *entities.EventEncodingVersionValue,
 ) ([]flow.BlockEvents, error) {
 
 	if uint(len(blockIDs)) > b.maxHeightRange {
@@ -105,14 +107,14 @@ func (b *backendEvents) GetEventsForBlockIDs(
 	}
 
 	// forward the request to the execution node
-	return b.getBlockEventsFromExecutionNode(ctx, blockHeaders, eventType, eventEncodingVersion)
+	return b.getBlockEventsFromExecutionNode(ctx, blockHeaders, eventType, eventEncodingVersionValue)
 }
 
 func (b *backendEvents) getBlockEventsFromExecutionNode(
 	ctx context.Context,
 	blockHeaders []*flow.Header,
 	eventType string,
-	eventEncodingVersion execproto.EventEncodingVersion,
+	eventEncodingVersionValue *entities.EventEncodingVersionValue,
 ) ([]flow.BlockEvents, error) {
 
 	// create an execution API request for events at block ID
@@ -150,6 +152,11 @@ func (b *backendEvents) getBlockEventsFromExecutionNode(
 		Str("execution_id", successfulNode.String()).
 		Str("last_block_id", lastBlockID.String()).
 		Msg("successfully got events")
+
+	eventEncodingVersion := execproto.EventEncodingVersion_JSON_CDC_V0
+	if requestEEV := eventEncodingVersionValue; requestEEV != nil {
+		eventEncodingVersion = execproto.EventEncodingVersion(requestEEV.GetValue())
+	}
 
 	// convert execution node api result to access node api result
 	results, err := verifyAndConvertToAccessEvents(resp.GetResults(), blockHeaders, eventEncodingVersion)

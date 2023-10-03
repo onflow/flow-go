@@ -3,7 +3,6 @@ package handler
 import (
 	"context"
 
-	execproto "github.com/onflow/flow/protobuf/go/flow/execution"
 	accessproto "github.com/onflow/flow/protobuf/go/flow/legacy/access"
 	entitiesproto "github.com/onflow/flow/protobuf/go/flow/legacy/entities"
 	"google.golang.org/grpc/codes"
@@ -190,7 +189,7 @@ func (h *Handler) GetTransactionResult(
 ) (*accessproto.TransactionResultResponse, error) {
 	id := convert.MessageToIdentifier(req.GetId())
 
-	result, err := h.api.GetTransactionResult(ctx, id, flow.ZeroID, flow.ZeroID, execproto.EventEncodingVersion_JSON_CDC_V0)
+	result, err := h.api.GetTransactionResult(ctx, id, flow.ZeroID, flow.ZeroID, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -314,7 +313,7 @@ func (h *Handler) GetEventsForHeightRange(
 	startHeight := req.GetStartHeight()
 	endHeight := req.GetEndHeight()
 
-	results, err := h.api.GetEventsForHeightRange(ctx, eventType, startHeight, endHeight, execproto.EventEncodingVersion_JSON_CDC_V0)
+	results, err := h.api.GetEventsForHeightRange(ctx, eventType, startHeight, endHeight, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -332,7 +331,7 @@ func (h *Handler) GetEventsForBlockIDs(
 	eventType := req.GetType()
 	blockIDs := convert.MessagesToIdentifiers(req.GetBlockIds())
 
-	results, err := h.api.GetEventsForBlockIDs(ctx, eventType, blockIDs, execproto.EventEncodingVersion_JSON_CDC_V0)
+	results, err := h.api.GetEventsForBlockIDs(ctx, eventType, blockIDs, nil)
 	if err != nil {
 		return nil, err
 	}

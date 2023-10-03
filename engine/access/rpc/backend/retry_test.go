@@ -130,7 +130,7 @@ func (suite *Suite) TestSuccessfulTransactionsDontRetry() {
 		Times(len(enIDs)) // should call each EN once
 
 	// first call - when block under test is greater height than the sealed head, but execution node does not know about Tx
-	result, err := backend.GetTransactionResult(ctx, txID, flow.ZeroID, flow.ZeroID, execution.EventEncodingVersion_JSON_CDC_V0)
+	result, err := backend.GetTransactionResult(ctx, txID, flow.ZeroID, flow.ZeroID, nil)
 	suite.checkResponse(result, err)
 
 	// status should be finalized since the sealed Blocks is smaller in height

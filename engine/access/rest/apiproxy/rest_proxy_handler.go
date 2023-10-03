@@ -17,7 +17,6 @@ import (
 
 	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
 	"github.com/onflow/flow/protobuf/go/flow/entities"
-	execproto "github.com/onflow/flow/protobuf/go/flow/execution"
 )
 
 // RestProxyHandler is a structure that represents the proxy algorithm for observer node.
@@ -154,7 +153,7 @@ func (r *RestProxyHandler) GetTransactionResult(
 	id flow.Identifier,
 	blockID flow.Identifier,
 	collectionID flow.Identifier,
-	eventEncodingVersion execproto.EventEncodingVersion,
+	eventEncodingVersionValue *entities.EventEncodingVersionValue,
 ) (*access.TransactionResult, error) {
 	upstream, err := r.FaultTolerantClient()
 	if err != nil {
@@ -166,7 +165,7 @@ func (r *RestProxyHandler) GetTransactionResult(
 		Id:                   id[:],
 		BlockId:              blockID[:],
 		CollectionId:         collectionID[:],
-		EventEncodingVersion: &entities.EventEncodingVersionValue{Value: entities.EventEncodingVersion(eventEncodingVersion)},
+		EventEncodingVersion: eventEncodingVersionValue,
 	}
 
 	transactionResultResponse, err := upstream.GetTransactionResult(ctx, getTransactionResultRequest)
@@ -271,7 +270,7 @@ func (r *RestProxyHandler) GetEventsForHeightRange(
 	ctx context.Context,
 	eventType string,
 	startHeight, endHeight uint64,
-	eventEncodingVersion execproto.EventEncodingVersion,
+	eventEncodingVersionValue *entities.EventEncodingVersionValue,
 ) ([]flow.BlockEvents, error) {
 	upstream, err := r.FaultTolerantClient()
 	if err != nil {
@@ -282,7 +281,7 @@ func (r *RestProxyHandler) GetEventsForHeightRange(
 		Type:                 eventType,
 		StartHeight:          startHeight,
 		EndHeight:            endHeight,
-		EventEncodingVersion: &entities.EventEncodingVersionValue{Value: entities.EventEncodingVersion(eventEncodingVersion)},
+		EventEncodingVersion: eventEncodingVersionValue,
 	}
 	eventsResponse, err := upstream.GetEventsForHeightRange(ctx, getEventsForHeightRangeRequest)
 	r.log("upstream", "GetEventsForHeightRange", err)
@@ -295,7 +294,12 @@ func (r *RestProxyHandler) GetEventsForHeightRange(
 }
 
 // GetEventsForBlockIDs returns events by their name in the specified block IDs.
-func (r *RestProxyHandler) GetEventsForBlockIDs(ctx context.Context, eventType string, blockIDs []flow.Identifier, eventEncodingVersion execproto.EventEncodingVersion) ([]flow.BlockEvents, error) {
+func (r *RestProxyHandler) GetEventsForBlockIDs(
+	ctx context.Context,
+	eventType string,
+	blockIDs []flow.Identifier,
+	eventEncodingVersionValue *entities.EventEncodingVersionValue,
+) ([]flow.BlockEvents, error) {
 	upstream, err := r.FaultTolerantClient()
 	if err != nil {
 		return nil, err
@@ -306,7 +310,7 @@ func (r *RestProxyHandler) GetEventsForBlockIDs(ctx context.Context, eventType s
 	getEventsForBlockIDsRequest := &accessproto.GetEventsForBlockIDsRequest{
 		Type:                 eventType,
 		BlockIds:             blockIds,
-		EventEncodingVersion: &entities.EventEncodingVersionValue{Value: entities.EventEncodingVersion(eventEncodingVersion)},
+		EventEncodingVersion: eventEncodingVersionValue,
 	}
 	eventsResponse, err := upstream.GetEventsForBlockIDs(ctx, getEventsForBlockIDsRequest)
 	r.log("upstream", "GetEventsForBlockIDs", err)
