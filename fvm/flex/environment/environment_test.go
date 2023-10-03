@@ -1,8 +1,6 @@
 package env_test
 
 import (
-	"bytes"
-	"io"
 	"math"
 
 	"math/big"
@@ -148,11 +146,7 @@ func TestContractInteraction(t *testing.T) {
 				signer := types.MakeSigner(env.Config.ChainConfig, fenv.BlockNumberForEVMRules, env.Config.BlockContext.Time)
 				tx, _ := types.SignTx(types.NewTransaction(0, testAccount, big.NewInt(1000), params.TxGas, new(big.Int).Add(big.NewInt(0), common.Big1), nil), signer, key)
 
-				var b bytes.Buffer
-				writer := io.Writer(&b)
-				tx.EncodeRLP(writer)
-
-				err := env.RunTransaction(b.Bytes(), math.MaxUint64)
+				err := env.RunTransaction(tx, math.MaxUint64)
 				require.NoError(t, err)
 				require.False(t, env.Result.Failed)
 			})

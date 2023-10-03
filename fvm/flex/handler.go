@@ -1,8 +1,12 @@
 package flex
 
 import (
-	"math"
+	"bytes"
+	"fmt"
 
+	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/rlp"
+	"github.com/onflow/flow-go/fvm/environment"
 	env "github.com/onflow/flow-go/fvm/flex/environment"
 	"github.com/onflow/flow-go/fvm/flex/models"
 	"github.com/onflow/flow-go/fvm/flex/storage"
@@ -50,7 +54,7 @@ func (h FlexContractHandler) LastExecutedBlock() *models.FlexBlock {
 	return block
 }
 
-func (h FlexContractHandler) Run(tx []byte, coinbase models.FlexAddress) bool {
+func (h FlexContractHandler) Run(rlpEncodedTx []byte, coinbase models.FlexAddress) bool {
 	config := env.NewFlexConfig(
 		env.WithCoinbase(coinbase.ToCommon()),
 		env.WithBlockNumber(env.BlockNumberForEVMRules))
@@ -59,13 +63,41 @@ func (h FlexContractHandler) Run(tx []byte, coinbase models.FlexAddress) bool {
 	if err != nil {
 		panic(err)
 	}
-	// TODO compute the max gas using backend
-	gasLimit := uint64(math.MaxUint64)
-	err = env.RunTransaction(tx, gasLimit)
+
+	// decode rlp
+	tx := types.Transaction{}
+	// TODO: update the max limit on the encoded size to a meaningful value
+	err = tx.DecodeRLP(
+		rlp.NewStream(
+			bytes.NewReader(rlpEncodedTx),
+			uint64(len(rlpEncodedTx))))
+	if err != nil {
+		panic(err)
+	}
+
+	// check tx gas limit
+	// TODO: let caller set a limit as well
+	gasLimit := tx.Gas()
+	h.checkGasLimit(models.GasLimit(gasLimit))
+	err = env.RunTransaction(&tx, gasLimit)
 	if err != nil {
 		panic(err)
 	}
 	return !env.Result.Failed
+}
+
+func (h FlexContractHandler) checkGasLimit(limit models.GasLimit) {
+	// check gas limit against what has been left on the transaction side
+	if !h.backend.HasComputationCapacity(environment.ComputationKindEVMGasUsage, uint(limit)) {
+		panic(models.NewEVMExecutionError(fmt.Errorf("not enough computation capacity is left for an evm call with gas limit of %d", limit)))
+	}
+}
+
+func (h FlexContractHandler) meterGasUsage(usage uint64) {
+	err := h.backend.MeterComputation(environment.ComputationKindEVMGasUsage, uint(usage))
+	if err != nil {
+		panic(err)
+	}
 }
 
 func (h FlexContractHandler) getNewDefaultConfig() *env.Config {
@@ -124,7 +156,9 @@ func (f *flexAccount) Balance() models.Balance {
 // and update the FOA balance with the new amount
 func (f *flexAccount) Deposit(v *models.FLOWTokenVault) {
 	env := f.fch.getNewDefaultEnv()
+	// TODO check gas limit and meter
 	err := env.MintTo(v.Balance().ToAttoFlow(), f.address.ToCommon())
+	f.fch.meterGasUsage(env.Result.GasConsumed)
 	f.fch.handleError(err)
 	// emit event
 	// TODO pass encoded payload data
@@ -137,8 +171,10 @@ func (f *flexAccount) Withdraw(b models.Balance) *models.FLOWTokenVault {
 	if !f.isFOA {
 		panic(models.ErrUnAuthroizedMethodCall)
 	}
+	// TODO check gas limit and meter
 	env := f.fch.getNewDefaultEnv()
 	err := env.WithdrawFrom(b.ToAttoFlow(), f.address.ToCommon())
+	f.fch.meterGasUsage(env.Result.GasConsumed)
 	f.fch.handleError(err)
 	return models.NewFlowTokenVault(b)
 }
@@ -150,9 +186,11 @@ func (f *flexAccount) Deploy(code models.Code, gaslimit models.GasLimit, balance
 	if !f.isFOA {
 		panic(models.ErrUnAuthroizedMethodCall)
 	}
+	f.fch.checkGasLimit(gaslimit)
 	env := f.fch.getNewDefaultEnv()
 	// TODO check gas limit against what has been left on the transaction side
 	err := env.Deploy(f.address.ToCommon(), code, uint64(gaslimit), balance.ToAttoFlow())
+	f.fch.meterGasUsage(env.Result.GasConsumed)
 	f.fch.handleError(err)
 	if env.Result.Failed {
 		panic("deploy failed")
@@ -169,10 +207,11 @@ func (f *flexAccount) Call(to models.FlexAddress, data models.Data, gaslimit mod
 	if !f.isFOA {
 		panic(models.ErrUnAuthroizedMethodCall)
 	}
+
+	f.fch.checkGasLimit(gaslimit)
 	env := f.fch.getNewDefaultEnv()
-	// TODO check the gas on the backend
-	// TODO check gas limit against what has been left on the transaction side
 	err := env.Call(f.address.ToCommon(), to.ToCommon(), data, uint64(gaslimit), balance.ToAttoFlow())
+	f.fch.meterGasUsage(env.Result.GasConsumed)
 	f.fch.handleError(err)
 	if env.Result.Failed {
 		panic(models.NewEVMExecutionError(env.Result.Error))

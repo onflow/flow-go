@@ -47,12 +47,14 @@ const (
 	ComputationKindBLSAggregatePublicKeys     = 2033
 	ComputationKindGetOrLoadProgram           = 2034
 	ComputationKindGenerateAccountLocalID     = 2035
+	ComputationKindEVMGasUsage                = 2036
 )
 
 type Meter interface {
 	MeterComputation(common.ComputationKind, uint) error
 	ComputationUsed() (uint64, error)
 	ComputationIntensities() meter.MeteredComputationIntensities
+	HasComputationCapacity(common.ComputationKind, uint) bool
 
 	MeterMemory(usage common.MemoryUsage) error
 	MemoryUsed() (uint64, error)
@@ -78,6 +80,13 @@ func (meter *meterImpl) MeterComputation(
 	intensity uint,
 ) error {
 	return meter.txnState.MeterComputation(kind, intensity)
+}
+
+func (meter *meterImpl) HasComputationCapacity(
+	kind common.ComputationKind,
+	intensity uint,
+) bool {
+	return meter.txnState.HasComputationCapacity(kind, intensity)
 }
 
 func (meter *meterImpl) ComputationIntensities() meter.MeteredComputationIntensities {

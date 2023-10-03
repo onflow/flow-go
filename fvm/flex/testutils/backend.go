@@ -126,6 +126,7 @@ func (vs *testValueStore) AllocateStorageIndex(owner []byte) (atree.StorageIndex
 
 type testMeter struct {
 	meterComputation       func(common.ComputationKind, uint) error
+	hasComputationCapacity func(common.ComputationKind, uint) bool
 	computationUsed        func() (uint64, error)
 	computationIntensities func() meter.MeteredComputationIntensities
 
@@ -148,6 +149,16 @@ func (m *testMeter) MeterComputation(
 		panic("method not set")
 	}
 	return m.meterComputation(kind, intensity)
+}
+
+func (m *testMeter) HasComputationCapacity(
+	kind common.ComputationKind,
+	intensity uint,
+) bool {
+	if m.hasComputationCapacity == nil {
+		panic("method not set")
+	}
+	return m.hasComputationCapacity(kind, intensity)
 }
 
 func (m *testMeter) ComputationIntensities() meter.MeteredComputationIntensities {

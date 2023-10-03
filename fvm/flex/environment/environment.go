@@ -1,7 +1,6 @@
 package env
 
 import (
-	"bytes"
 	"encoding/binary"
 	"fmt"
 	"math/big"
@@ -16,7 +15,6 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/core/vm"
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/ethereum/go-ethereum/rlp"
 )
 
 // Environment is a one-time use flex environment and
@@ -297,19 +295,8 @@ func (fe *Environment) Call(
 // RunTransaction runs a flex transaction
 // this method could be called by anyone.
 // TODO : check gas limit complience (one set on tx and the one allowed by flow tx)
-func (fe *Environment) RunTransaction(rlpEncodedTx []byte, gasLimit uint64) error {
+func (fe *Environment) RunTransaction(tx *types.Transaction, gasLimit uint64) error {
 	if err := fe.checkExecuteOnce(); err != nil {
-		return err
-	}
-
-	// decode rlp
-	tx := types.Transaction{}
-	// TODO: update the max limit on the encoded size to a meaningful value
-	err := tx.DecodeRLP(
-		rlp.NewStream(
-			bytes.NewReader(rlpEncodedTx),
-			uint64(len(rlpEncodedTx))))
-	if err != nil {
 		return err
 	}
 
@@ -323,7 +310,7 @@ func (fe *Environment) RunTransaction(rlpEncodedTx []byte, gasLimit uint64) erro
 
 	signer := types.MakeSigner(fe.Config.ChainConfig, BlockNumberForEVMRules, fe.Config.BlockContext.Time)
 
-	msg, err := core.TransactionToMessage(&tx, signer, fe.Config.BlockContext.BaseFee)
+	msg, err := core.TransactionToMessage(tx, signer, fe.Config.BlockContext.BaseFee)
 	if err != nil {
 		return err
 	}
