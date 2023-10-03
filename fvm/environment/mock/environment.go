@@ -903,6 +903,20 @@ func (_m *Environment) GetValue(owner []byte, key []byte) ([]byte, error) {
 	return r0, r1
 }
 
+// HasComputationCapacity provides a mock function with given fields: _a0, _a1
+func (_m *Environment) HasComputationCapacity(_a0 common.ComputationKind, _a1 uint) bool {
+	ret := _m.Called(_a0, _a1)
+
+	var r0 bool
+	if rf, ok := ret.Get(0).(func(common.ComputationKind, uint) bool); ok {
+		r0 = rf(_a0, _a1)
+	} else {
+		r0 = ret.Get(0).(bool)
+	}
+
+	return r0
+}
+
 // Hash provides a mock function with given fields: data, tag, hashAlgorithm
 func (_m *Environment) Hash(data []byte, tag string, hashAlgorithm sema.HashAlgorithm) ([]byte, error) {
 	ret := _m.Called(data, tag, hashAlgorithm)
