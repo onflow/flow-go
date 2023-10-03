@@ -106,7 +106,7 @@ func TestNotifier_ManyConsumers(t *testing.T) {
 		}
 		startingWorkers.Wait()
 
-		// send 100 notifications, with small delays
+		// send 100 notifications, pausing between each to ensure that the notification was received
 		for i := 0; i < workerCount; i++ {
 			notifier.Notify()
 			<-notificationReceived // wait until a worker has received a notification
