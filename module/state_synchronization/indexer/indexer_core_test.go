@@ -416,7 +416,7 @@ func TestExecutionState_IndexBlockData(t *testing.T) {
 			}).
 			runIndexBlockData()
 
-		assert.EqualError(t, err, fmt.Sprintf("must store registers with the next height %d, but got %d", latestHeight+1, last.Header.Height))
+		assert.EqualError(t, err, fmt.Sprintf("must index block data with the next height %d, but got %d", latestHeight+1, last.Header.Height))
 	})
 
 	// this test makes sure that if a block we try to index is not found in block storage

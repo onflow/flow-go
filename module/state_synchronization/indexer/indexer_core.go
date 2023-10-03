@@ -86,7 +86,7 @@ func (c *IndexerCore) IndexBlockData(data *execution_data.BlockExecutionDataEnti
 	// the height we are indexing must be exactly one bigger or same as the latest height indexed from the storage
 	latest := c.registers.LatestHeight()
 	if block.Height != latest+1 && block.Height != latest {
-		return fmt.Errorf("must store registers with the next height %d, but got %d", latest+1, block.Height)
+		return fmt.Errorf("must index block data with the next height %d, but got %d", latest+1, block.Height)
 	}
 	// allow rerunning the indexer for same height since we are fetching height from register storage, but there are other storages
 	// for indexing resources which might fail to update the values, so this enables rerunning and reindexing those resources
