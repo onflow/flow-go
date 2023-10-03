@@ -36,6 +36,7 @@ func (b *backendEvents) GetEventsForHeightRange(
 	ctx context.Context,
 	eventType string,
 	startHeight, endHeight uint64,
+	eventEncodingVersion execproto.EventEncodingVersion,
 ) ([]flow.BlockEvents, error) {
 
 	if endHeight < startHeight {
@@ -77,7 +78,7 @@ func (b *backendEvents) GetEventsForHeightRange(
 		blockHeaders = append(blockHeaders, header)
 	}
 
-	return b.getBlockEventsFromExecutionNode(ctx, blockHeaders, eventType)
+	return b.getBlockEventsFromExecutionNode(ctx, blockHeaders, eventType, eventEncodingVersion)
 }
 
 // GetEventsForBlockIDs retrieves events for all the specified block IDs that have the given type
@@ -85,6 +86,7 @@ func (b *backendEvents) GetEventsForBlockIDs(
 	ctx context.Context,
 	eventType string,
 	blockIDs []flow.Identifier,
+	eventEncodingVersion execproto.EventEncodingVersion,
 ) ([]flow.BlockEvents, error) {
 
 	if uint(len(blockIDs)) > b.maxHeightRange {
@@ -103,13 +105,14 @@ func (b *backendEvents) GetEventsForBlockIDs(
 	}
 
 	// forward the request to the execution node
-	return b.getBlockEventsFromExecutionNode(ctx, blockHeaders, eventType)
+	return b.getBlockEventsFromExecutionNode(ctx, blockHeaders, eventType, eventEncodingVersion)
 }
 
 func (b *backendEvents) getBlockEventsFromExecutionNode(
 	ctx context.Context,
 	blockHeaders []*flow.Header,
 	eventType string,
+	eventEncodingVersion execproto.EventEncodingVersion,
 ) ([]flow.BlockEvents, error) {
 
 	// create an execution API request for events at block ID
@@ -149,7 +152,7 @@ func (b *backendEvents) getBlockEventsFromExecutionNode(
 		Msg("successfully got events")
 
 	// convert execution node api result to access node api result
-	results, err := verifyAndConvertToAccessEvents(resp.GetResults(), blockHeaders, resp.GetEventEncodingVersion())
+	results, err := verifyAndConvertToAccessEvents(resp.GetResults(), blockHeaders, eventEncodingVersion)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to verify retrieved events from execution node: %v", err)
 	}

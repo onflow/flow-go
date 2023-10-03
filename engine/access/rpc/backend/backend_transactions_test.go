@@ -7,6 +7,7 @@ import (
 	"github.com/dgraph-io/badger/v2"
 	"github.com/onflow/flow/protobuf/go/flow/access"
 	"github.com/onflow/flow/protobuf/go/flow/entities"
+	execproto "github.com/onflow/flow/protobuf/go/flow/execution"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc/codes"
@@ -74,7 +75,7 @@ func (suite *Suite) TestGetTransactionResultReturnsUnknown() {
 		backend, err := New(params)
 		suite.Require().NoError(err)
 
-		res, err := backend.GetTransactionResult(context.Background(), tx.ID(), block.ID(), coll.ID())
+		res, err := backend.GetTransactionResult(context.Background(), tx.ID(), block.ID(), coll.ID(), execproto.EventEncodingVersion_JSON_CDC_V0)
 		suite.Require().NoError(err)
 		suite.Require().Equal(res.Status, flow.TransactionStatusUnknown)
 	})
@@ -107,7 +108,7 @@ func (suite *Suite) TestGetTransactionResultReturnsTransactionError() {
 		backend, err := New(params)
 		suite.Require().NoError(err)
 
-		_, err = backend.GetTransactionResult(context.Background(), tx.ID(), block.ID(), coll.ID())
+		_, err = backend.GetTransactionResult(context.Background(), tx.ID(), block.ID(), coll.ID(), execproto.EventEncodingVersion_JSON_CDC_V0)
 		suite.Require().Equal(err, status.Errorf(codes.Internal, "failed to find: %v", fmt.Errorf("some other error")))
 
 	})
@@ -145,7 +146,7 @@ func (suite *Suite) TestGetTransactionResultReturnsValidTransactionResultFromHis
 		backend, err := New(params)
 		suite.Require().NoError(err)
 
-		resp, err := backend.GetTransactionResult(context.Background(), tx.ID(), block.ID(), coll.ID())
+		resp, err := backend.GetTransactionResult(context.Background(), tx.ID(), block.ID(), coll.ID(), execproto.EventEncodingVersion_JSON_CDC_V0)
 		suite.Require().NoError(err)
 		suite.Require().Equal(flow.TransactionStatusExecuted, resp.Status)
 		suite.Require().Equal(uint(flow.TransactionStatusExecuted), resp.StatusCode)
@@ -191,12 +192,12 @@ func (suite *Suite) TestGetTransactionResultFromCache() {
 
 		coll := flow.CollectionFromTransactions([]*flow.Transaction{tx})
 
-		resp, err := backend.GetTransactionResult(context.Background(), tx.ID(), block.ID(), coll.ID())
+		resp, err := backend.GetTransactionResult(context.Background(), tx.ID(), block.ID(), coll.ID(), execproto.EventEncodingVersion_JSON_CDC_V0)
 		suite.Require().NoError(err)
 		suite.Require().Equal(flow.TransactionStatusExecuted, resp.Status)
 		suite.Require().Equal(uint(flow.TransactionStatusExecuted), resp.StatusCode)
 
-		resp2, err := backend.GetTransactionResult(context.Background(), tx.ID(), block.ID(), coll.ID())
+		resp2, err := backend.GetTransactionResult(context.Background(), tx.ID(), block.ID(), coll.ID(), execproto.EventEncodingVersion_JSON_CDC_V0)
 		suite.Require().NoError(err)
 		suite.Require().Equal(flow.TransactionStatusExecuted, resp2.Status)
 		suite.Require().Equal(uint(flow.TransactionStatusExecuted), resp2.StatusCode)
@@ -223,7 +224,7 @@ func (suite *Suite) TestGetTransactionResultCacheNonExistent() {
 
 		coll := flow.CollectionFromTransactions([]*flow.Transaction{tx})
 
-		resp, err := backend.GetTransactionResult(context.Background(), tx.ID(), block.ID(), coll.ID())
+		resp, err := backend.GetTransactionResult(context.Background(), tx.ID(), block.ID(), coll.ID(), execproto.EventEncodingVersion_JSON_CDC_V0)
 		suite.Require().NoError(err)
 		suite.Require().Equal(flow.TransactionStatusUnknown, resp.Status)
 		suite.Require().Equal(uint(flow.TransactionStatusUnknown), resp.StatusCode)
@@ -258,7 +259,7 @@ func (suite *Suite) TestGetTransactionResultUnknownFromCache() {
 
 		coll := flow.CollectionFromTransactions([]*flow.Transaction{tx})
 
-		resp, err := backend.GetTransactionResult(context.Background(), tx.ID(), block.ID(), coll.ID())
+		resp, err := backend.GetTransactionResult(context.Background(), tx.ID(), block.ID(), coll.ID(), execproto.EventEncodingVersion_JSON_CDC_V0)
 		suite.Require().NoError(err)
 		suite.Require().Equal(flow.TransactionStatusUnknown, resp.Status)
 		suite.Require().Equal(uint(flow.TransactionStatusUnknown), resp.StatusCode)
@@ -272,7 +273,7 @@ func (suite *Suite) TestGetTransactionResultUnknownFromCache() {
 			StatusCode: uint(txStatus),
 		})
 
-		resp2, err := backend.GetTransactionResult(context.Background(), tx.ID(), block.ID(), coll.ID())
+		resp2, err := backend.GetTransactionResult(context.Background(), tx.ID(), block.ID(), coll.ID(), execproto.EventEncodingVersion_JSON_CDC_V0)
 		suite.Require().NoError(err)
 		suite.Require().Equal(flow.TransactionStatusUnknown, resp2.Status)
 		suite.Require().Equal(uint(flow.TransactionStatusUnknown), resp2.StatusCode)

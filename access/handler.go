@@ -14,6 +14,7 @@ import (
 
 	"github.com/onflow/flow/protobuf/go/flow/access"
 	"github.com/onflow/flow/protobuf/go/flow/entities"
+	execproto "github.com/onflow/flow/protobuf/go/flow/execution"
 )
 
 type Handler struct {
@@ -274,7 +275,12 @@ func (h *Handler) GetTransactionResult(
 		}
 	}
 
-	result, err := h.api.GetTransactionResult(ctx, transactionID, blockId, collectionId)
+	eventEncodingVersion := execproto.EventEncodingVersion_JSON_CDC_V0
+	if requestEEV := req.GetEventEncodingVersion(); requestEEV != nil {
+		eventEncodingVersion = execproto.EventEncodingVersion(requestEEV.GetValue())
+	}
+
+	result, err := h.api.GetTransactionResult(ctx, transactionID, blockId, collectionId, eventEncodingVersion)
 	if err != nil {
 		return nil, err
 	}
@@ -296,7 +302,12 @@ func (h *Handler) GetTransactionResultsByBlockID(
 		return nil, err
 	}
 
-	results, err := h.api.GetTransactionResultsByBlockID(ctx, id)
+	eventEncodingVersion := execproto.EventEncodingVersion_JSON_CDC_V0
+	if requestEEV := req.GetEventEncodingVersion(); requestEEV != nil {
+		eventEncodingVersion = execproto.EventEncodingVersion(requestEEV.GetValue())
+	}
+
+	results, err := h.api.GetTransactionResultsByBlockID(ctx, id, eventEncodingVersion)
 	if err != nil {
 		return nil, err
 	}
@@ -342,7 +353,12 @@ func (h *Handler) GetTransactionResultByIndex(
 		return nil, err
 	}
 
-	result, err := h.api.GetTransactionResultByIndex(ctx, blockID, req.GetIndex())
+	eventEncodingVersion := execproto.EventEncodingVersion_JSON_CDC_V0
+	if requestEEV := req.GetEventEncodingVersion(); requestEEV != nil {
+		eventEncodingVersion = execproto.EventEncodingVersion(requestEEV.GetValue())
+	}
+
+	result, err := h.api.GetTransactionResultByIndex(ctx, blockID, req.GetIndex(), eventEncodingVersion)
 	if err != nil {
 		return nil, err
 	}
@@ -513,7 +529,12 @@ func (h *Handler) GetEventsForHeightRange(
 	startHeight := req.GetStartHeight()
 	endHeight := req.GetEndHeight()
 
-	results, err := h.api.GetEventsForHeightRange(ctx, eventType, startHeight, endHeight)
+	eventEncodingVersion := execproto.EventEncodingVersion_JSON_CDC_V0
+	if requestEEV := req.GetEventEncodingVersion(); requestEEV != nil {
+		eventEncodingVersion = execproto.EventEncodingVersion(requestEEV.GetValue())
+	}
+
+	results, err := h.api.GetEventsForHeightRange(ctx, eventType, startHeight, endHeight, eventEncodingVersion)
 	if err != nil {
 		return nil, err
 	}
@@ -545,7 +566,12 @@ func (h *Handler) GetEventsForBlockIDs(
 		return nil, err
 	}
 
-	results, err := h.api.GetEventsForBlockIDs(ctx, eventType, blockIDs)
+	eventEncodingVersion := execproto.EventEncodingVersion_JSON_CDC_V0
+	if requestEEV := req.GetEventEncodingVersion(); requestEEV != nil {
+		eventEncodingVersion = execproto.EventEncodingVersion(requestEEV.GetValue())
+	}
+
+	results, err := h.api.GetEventsForBlockIDs(ctx, eventType, blockIDs, eventEncodingVersion)
 	if err != nil {
 		return nil, err
 	}
