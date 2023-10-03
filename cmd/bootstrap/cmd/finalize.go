@@ -156,7 +156,7 @@ func finalize(cmd *cobra.Command, args []string) {
 	log.Info().Msg("")
 
 	// create flow.IdentityList representation of participant set
-	participants := model.ToIdentityList(stakingNodes).Sort(order.Canonical)
+	participants := model.ToIdentityList(stakingNodes).Sort(order.Canonical[flow.Identity])
 
 	log.Info().Msg("reading root block data")
 	block := readRootBlock()

@@ -26,8 +26,8 @@ import (
 // of succeeding the assignment by re-running the function without increasing the internal nodes ratio.
 func constructClusterAssignment(partnerNodes, internalNodes []model.NodeInfo) (flow.AssignmentList, flow.ClusterList, error) {
 
-	partners := model.ToIdentityList(partnerNodes).Filter(filter.HasRole(flow.RoleCollection))
-	internals := model.ToIdentityList(internalNodes).Filter(filter.HasRole(flow.RoleCollection))
+	partners := model.ToIdentityList(partnerNodes).Filter(filter.HasRole[flow.Identity](flow.RoleCollection))
+	internals := model.ToIdentityList(internalNodes).Filter(filter.HasRole[flow.Identity](flow.RoleCollection))
 	nClusters := int(flagCollectionClusters)
 	nCollectors := len(partners) + len(internals)
 

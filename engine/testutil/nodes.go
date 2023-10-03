@@ -299,7 +299,7 @@ func CollectionNode(t *testing.T, hub *stub.Hub, identity bootstrap.NodeInfo, ro
 	ingestionEngine, err := collectioningest.New(node.Log, node.Net, node.State, node.Metrics, node.Metrics, node.Metrics, node.Me, node.ChainID.Chain(), pools, collectioningest.DefaultConfig())
 	require.NoError(t, err)
 
-	selector := filter.HasRole(flow.RoleAccess, flow.RoleVerification)
+	selector := filter.HasRole[flow.Identity](flow.RoleAccess, flow.RoleVerification)
 	retrieve := func(collID flow.Identifier) (flow.Entity, error) {
 		coll, err := collections.ByID(collID)
 		return coll, err
@@ -622,7 +622,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	requestEngine, err := requester.New(
 		node.Log, node.Metrics, node.Net, node.Me, node.State,
 		channels.RequestCollections,
-		filter.HasRole(flow.RoleCollection),
+		filter.HasRole[flow.Identity](flow.RoleCollection),
 		func() flow.Entity { return &flow.Collection{} },
 	)
 	require.NoError(t, err)
@@ -785,8 +785,8 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 		syncCore,
 		id.NewIdentityFilterIdentifierProvider(
 			filter.And(
-				filter.HasRole(flow.RoleConsensus),
-				filter.Not(filter.HasNodeID(node.Me.NodeID())),
+				filter.HasRole[flow.Identity](flow.RoleConsensus),
+				filter.Not(filter.HasNodeID[flow.Identity](node.Me.NodeID())),
 			),
 			idCache,
 		),
@@ -822,7 +822,7 @@ func getRoot(t *testing.T, node *testmock.GenericNode) (*flow.Header, *flow.Quor
 	rootHead, err := node.State.Params().FinalizedRoot()
 	require.NoError(t, err)
 
-	signers, err := node.State.AtHeight(0).Identities(filter.HasRole(flow.RoleConsensus))
+	signers, err := node.State.AtHeight(0).Identities(filter.HasRole[flow.Identity](flow.RoleConsensus))
 	require.NoError(t, err)
 
 	signerIDs := signers.NodeIDs()

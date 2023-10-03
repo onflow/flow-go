@@ -679,7 +679,7 @@ func newMockEpoch(counter uint64, identities flow.IdentityList, firstView uint64
 
 	epoch := new(protocolmock.Epoch)
 	epoch.On("Counter").Return(counter, nil)
-	epoch.On("InitialIdentities").Return(identities, nil)
+	epoch.On("InitialIdentities").Return(identities.ToSkeleton(), nil)
 	epoch.On("FirstView").Return(firstView, nil)
 	epoch.On("FinalView").Return(finalView, nil)
 	if committed {

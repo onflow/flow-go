@@ -75,7 +75,7 @@ func SetupChunkDataPackProvider(t *testing.T,
 			originID, ok := args[1].(flow.Identifier)
 			require.True(t, ok)
 			// request should be dispatched by a verification node.
-			require.Contains(t, participants.Filter(filter.HasRole(flow.RoleVerification)).NodeIDs(), originID)
+			require.Contains(t, participants.Filter(filter.HasRole[flow.Identity](flow.RoleVerification)).NodeIDs(), originID)
 
 			req, ok := args[2].(*messages.ChunkDataRequest)
 			require.True(t, ok)
@@ -479,8 +479,8 @@ func withConsumers(t *testing.T,
 
 	// bootstraps system with one node of each role.
 	s, verID, participants := bootstrapSystem(t, log, tracer, authorized)
-	exeID := participants.Filter(filter.HasRole(flow.RoleExecution))[0]
-	conID := participants.Filter(filter.HasRole(flow.RoleConsensus))[0]
+	exeID := participants.Filter(filter.HasRole[flow.Identity](flow.RoleExecution))[0]
+	conID := participants.Filter(filter.HasRole[flow.Identity](flow.RoleConsensus))[0]
 	// generates a chain of blocks in the form of root <- R1 <- C1 <- R2 <- C2 <- ... where Rs are distinct reference
 	// blocks (i.e., containing guarantees), and Cs are container blocks for their preceding reference block,
 	// Container blocks only contain receipts of their preceding reference blocks. But they do not
@@ -489,9 +489,9 @@ func withConsumers(t *testing.T,
 	require.NoError(t, err)
 	chainID := root.ChainID
 	ops = append(ops, WithExecutorIDs(
-		participants.Filter(filter.HasRole(flow.RoleExecution)).NodeIDs()), func(builder *CompleteExecutionReceiptBuilder) {
+		participants.Filter(filter.HasRole[flow.Identity](flow.RoleExecution)).NodeIDs()), func(builder *CompleteExecutionReceiptBuilder) {
 		// needed for the guarantees to have the correct chainID and signer indices
-		builder.clusterCommittee = participants.Filter(filter.HasRole(flow.RoleCollection))
+		builder.clusterCommittee = participants.Filter(filter.HasRole[flow.Identity](flow.RoleCollection))
 	})
 
 	// random sources for all blocks:
@@ -633,7 +633,7 @@ func bootstrapSystem(
 
 		epochBuilder := unittest.NewEpochBuilder(t, stateFixture.State)
 		epochBuilder.
-			UsingSetupOpts(unittest.WithParticipants(identities)).
+			UsingSetupOpts(unittest.WithParticipants(identities.ToSkeleton())).
 			BuildEpoch()
 	}
 

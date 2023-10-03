@@ -39,7 +39,7 @@ func constructRootResultAndSeal(
 		DKGPhase1FinalView: firstView + flagNumViewsInStakingAuction + flagNumViewsInDKGPhase - 1,
 		DKGPhase2FinalView: firstView + flagNumViewsInStakingAuction + flagNumViewsInDKGPhase*2 - 1,
 		DKGPhase3FinalView: firstView + flagNumViewsInStakingAuction + flagNumViewsInDKGPhase*3 - 1,
-		Participants:       participants.Sort(order.Canonical),
+		Participants:       participants.Sort(order.Canonical[flow.Identity]),
 		Assignments:        assignments,
 		RandomSource:       GenerateRandomSeed(flow.EpochSetupRandomSourceLength),
 	}

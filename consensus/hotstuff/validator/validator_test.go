@@ -69,7 +69,7 @@ func (ps *ProposalSuite) SetupTest() {
 	voterIDs, err := signature.DecodeSignerIndicesToIdentifiers(ps.participants.NodeIDs(), ps.block.QC.SignerIndices)
 	require.NoError(ps.T(), err)
 
-	ps.voters = ps.participants.Filter(filter.HasNodeID(voterIDs...)).ToSkeleton()
+	ps.voters = ps.participants.Filter(filter.HasNodeID[flow.Identity](voterIDs...)).ToSkeleton()
 	ps.proposal = &model.Proposal{Block: ps.block}
 	ps.vote = ps.proposal.ProposerVote()
 	ps.voter = ps.leader

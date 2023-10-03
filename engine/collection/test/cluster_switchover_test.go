@@ -60,8 +60,8 @@ func NewClusterSwitchoverTestCase(t *testing.T, conf ClusterSwitchoverTestConf) 
 	nodeInfos := unittest.PrivateNodeInfosFixture(int(conf.collectors), unittest.WithRole(flow.RoleCollection))
 	collectors := model.ToIdentityList(nodeInfos)
 	tc.identities = unittest.CompleteIdentitySet(collectors...)
-	assignment := unittest.ClusterAssignment(tc.conf.clusters, collectors)
-	clusters, err := factory.NewClusterList(assignment, collectors)
+	assignment := unittest.ClusterAssignment(tc.conf.clusters, collectors.ToSkeleton())
+	clusters, err := factory.NewClusterList(assignment, collectors.ToSkeleton())
 	require.NoError(t, err)
 	rootClusterBlocks := run.GenerateRootClusterBlocks(1, clusters)
 	rootClusterQCs := make([]flow.ClusterQCVoteData, len(rootClusterBlocks))
@@ -72,7 +72,7 @@ func NewClusterSwitchoverTestCase(t *testing.T, conf ClusterSwitchoverTestConf) 
 				signers = append(signers, identity)
 			}
 		}
-		signerIdentities := model.ToIdentityList(signers).Sort(order.Canonical)
+		signerIdentities := model.ToIdentityList(signers).Sort(order.Canonical[flow.Identity])
 		qc, err := run.GenerateClusterRootQC(signers, signerIdentities, rootClusterBlocks[i])
 		require.NoError(t, err)
 		rootClusterQCs[i] = flow.ClusterQCVoteDataFromQC(&flow.QuorumCertificateWithSignerIDs{
@@ -92,7 +92,7 @@ func NewClusterSwitchoverTestCase(t *testing.T, conf ClusterSwitchoverTestConf) 
 	setup := result.ServiceEvents[0].Event.(*flow.EpochSetup)
 	commit := result.ServiceEvents[1].Event.(*flow.EpochCommit)
 
-	setup.Assignments = unittest.ClusterAssignment(tc.conf.clusters, tc.identities)
+	setup.Assignments = unittest.ClusterAssignment(tc.conf.clusters, tc.identities.ToSkeleton())
 	commit.ClusterQCs = rootClusterQCs
 
 	seal.ResultID = result.ID()
@@ -109,7 +109,7 @@ func NewClusterSwitchoverTestCase(t *testing.T, conf ClusterSwitchoverTestConf) 
 	consensus := testutil.GenericNode(
 		tc.T(),
 		tc.hub,
-		tc.identities.Filter(filter.HasRole(flow.RoleConsensus))[0],
+		tc.identities.Filter(filter.HasRole[flow.Identity](flow.RoleConsensus))[0],
 		tc.root,
 	)
 	tc.sn = new(mocknetwork.Engine)
@@ -140,7 +140,7 @@ func NewClusterSwitchoverTestCase(t *testing.T, conf ClusterSwitchoverTestConf) 
 			}
 
 			// generate root cluster block
-			rootClusterBlock := cluster.CanonicalRootBlock(commit.Counter, model.ToIdentityList(signers))
+			rootClusterBlock := cluster.CanonicalRootBlock(commit.Counter, model.ToIdentityList(signers).ToSkeleton())
 			// generate cluster root qc
 			qc, err := run.GenerateClusterRootQC(signers, model.ToIdentityList(signers), rootClusterBlock)
 			require.NoError(t, err)
@@ -360,7 +360,7 @@ func (tc *ClusterSwitchoverTestCase) SubmitTransactionToCluster(
 // cluster) and asserts that only transaction specified by ExpectTransaction are
 // included.
 func (tc *ClusterSwitchoverTestCase) CheckClusterState(
-	identity *flow.Identity,
+	identity *flow.IdentitySkeleton,
 	clusterInfo protocol.Cluster,
 ) {
 	node := tc.Collector(identity.NodeID)

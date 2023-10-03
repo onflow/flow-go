@@ -49,11 +49,11 @@ func (suite *ClusterSuite) SetupTest() {
 	suite.members = unittest.IdentityListFixture(5, unittest.WithRole(flow.RoleCollection))
 	suite.me = suite.members[0]
 	counter := uint64(1)
-	suite.root = clusterstate.CanonicalRootBlock(counter, suite.members)
+	suite.root = clusterstate.CanonicalRootBlock(counter, suite.members.ToSkeleton())
 
 	suite.cluster.On("EpochCounter").Return(counter)
 	suite.cluster.On("Index").Return(uint(1))
-	suite.cluster.On("Members").Return(suite.members)
+	suite.cluster.On("Members").Return(suite.members.ToSkeleton())
 	suite.cluster.On("RootBlock").Return(suite.root)
 	suite.epoch.On("Counter").Return(counter, nil)
 	suite.epoch.On("RandomSource").Return(unittest.SeedFixture(prg.RandomSourceLength), nil)

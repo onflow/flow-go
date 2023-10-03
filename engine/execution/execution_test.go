@@ -60,7 +60,7 @@ func TestExecutionFlow(t *testing.T) {
 		unittest.WithKeys,
 	)
 
-	identities := unittest.CompleteIdentitySet(colID, conID, exeID, verID).Sort(order.Canonical)
+	identities := unittest.CompleteIdentitySet(colID, conID, exeID, verID).Sort(order.Canonical[flow.Identity])
 
 	// create execution node
 	exeNode := testutil.ExecutionNode(t, hub, exeID, identities, 21, chainID)

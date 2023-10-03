@@ -108,7 +108,7 @@ func (suite *IngestionCoreSuite) SetupTest() {
 		},
 	)
 	final.On("Identities", mock.Anything).Return(
-		func(selector flow.IdentityFilter) flow.IdentityList {
+		func(selector flow.IdentityFilter[flow.Identity]) flow.IdentityList {
 			return suite.finalIdentities.Filter(selector)
 		},
 		nil,

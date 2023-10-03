@@ -123,7 +123,7 @@ func (ss *SyncSuite) SetupTest() {
 		nil,
 	)
 	ss.snapshot.On("Identities", mock.Anything).Return(
-		func(selector flow.IdentityFilter) flow.IdentityList {
+		func(selector flow.IdentityFilter[flow.Identity]) flow.IdentityList {
 			return ss.participants.Filter(selector)
 		},
 		nil,
@@ -172,8 +172,8 @@ func (ss *SyncSuite) SetupTest() {
 	e, err := New(log, metrics, ss.net, ss.me, ss.state, ss.blocks, ss.comp, ss.core,
 		id.NewIdentityFilterIdentifierProvider(
 			filter.And(
-				filter.HasRole(flow.RoleConsensus),
-				filter.Not(filter.HasNodeID(ss.me.NodeID())),
+				filter.HasRole[flow.Identity](flow.RoleConsensus),
+				filter.Not(filter.HasNodeID[flow.Identity](ss.me.NodeID())),
 			),
 			idCache,
 		),
@@ -698,7 +698,7 @@ func (ss *SyncSuite) TestOnBlockResponse() {
 func (ss *SyncSuite) TestPollHeight() {
 
 	// check that we send to three nodes from our total list
-	others := ss.participants.Filter(filter.HasNodeID(ss.participants[1:].NodeIDs()...))
+	others := ss.participants.Filter(filter.HasNodeID[flow.Identity](ss.participants[1:].NodeIDs()...))
 	ss.con.On("Multicast", mock.Anything, synccore.DefaultPollNodes, others[0].NodeID, others[1].NodeID).Return(nil).Run(
 		func(args mock.Arguments) {
 			req := args.Get(0).(*messages.SyncRequest)

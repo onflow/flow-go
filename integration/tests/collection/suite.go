@@ -142,7 +142,7 @@ func (suite *CollectorSuite) Clusters() flow.ClusterList {
 	setup, ok := result.ServiceEvents[0].Event.(*flow.EpochSetup)
 	suite.Require().True(ok)
 
-	collectors := suite.net.Identities().Filter(filter.HasRole(flow.RoleCollection))
+	collectors := suite.net.Identities().Filter(filter.HasRole[flow.Identity](flow.RoleCollection))
 	clusters, err := factory.NewClusterList(setup.Assignments, collectors)
 	suite.Require().Nil(err)
 	return clusters

@@ -176,9 +176,9 @@ func runWithEngine(t *testing.T, f func(testingContext)) {
 	}()
 
 	identityListUnsorted := flow.IdentityList{myIdentity, collection1Identity, collection2Identity, collection3Identity}
-	identityList := identityListUnsorted.Sort(order.Canonical)
+	identityList := identityListUnsorted.Sort(order.Canonical[flow.Identity])
 
-	snapshot.On("Identities", mock.Anything).Return(func(selector flow.IdentityFilter) flow.IdentityList {
+	snapshot.On("Identities", mock.Anything).Return(func(selector flow.IdentityFilter[flow.Identity]) flow.IdentityList {
 		return identityList.Filter(selector)
 	}, nil)
 
@@ -373,7 +373,7 @@ func (ctx testingContext) mockSnapshot(header *flow.Header, identities flow.Iden
 func (ctx testingContext) mockSnapshotWithBlockID(blockID flow.Identifier, identities flow.IdentityList) {
 	cluster := new(protocol.Cluster)
 	// filter only collections as cluster members
-	cluster.On("Members").Return(identities.Filter(filter.HasRole(flow.RoleCollection)))
+	cluster.On("Members").Return(identities.Filter(filter.HasRole[flow.Identity](flow.RoleCollection)))
 
 	epoch := new(protocol.Epoch)
 	epoch.On("ClusterByChainID", mock.Anything).Return(cluster, nil)
@@ -750,7 +750,7 @@ func TestBlocksArentExecutedMultipleTimes_multipleBlockEnqueue(t *testing.T) {
 			}),
 		)
 
-		ctx.collectionRequester.EXPECT().EntityByID(gomock.Any(), gomock.Any()).DoAndReturn(func(_ flow.Identifier, _ flow.IdentityFilter) {
+		ctx.collectionRequester.EXPECT().EntityByID(gomock.Any(), gomock.Any()).DoAndReturn(func(_ flow.Identifier, _ flow.IdentityFilter[flow.Identity]) {
 			// parallel run to avoid deadlock, ingestion engine is thread-safe
 			go func() {
 				err := ctx.engine.handleCollection(unittest.IdentifierFixture(), &collection)
@@ -800,7 +800,7 @@ func TestBlocksArentExecutedMultipleTimes_collectionArrival(t *testing.T) {
 		blockA := unittest.BlockHeaderFixture()
 		blockB := unittest.ExecutableBlockFixtureWithParent(nil, blockA, unittest.StateCommitmentPointerFixture())
 
-		collectionIdentities := ctx.identities.Filter(filter.HasRole(flow.RoleCollection))
+		collectionIdentities := ctx.identities.Filter(filter.HasRole[flow.Identity](flow.RoleCollection))
 		colSigner := collectionIdentities[0].ID()
 		// blocks are empty, so no state change is expected
 		blockC := unittest.ExecutableBlockFixtureWithParent([][]flow.Identifier{{colSigner}}, blockB.Block.Header, blockB.StartState)
@@ -897,7 +897,7 @@ func TestBlocksArentExecutedMultipleTimes_collectionArrival(t *testing.T) {
 			}),
 		)
 
-		ctx.collectionRequester.EXPECT().EntityByID(gomock.Any(), gomock.Any()).DoAndReturn(func(_ flow.Identifier, _ flow.IdentityFilter) {
+		ctx.collectionRequester.EXPECT().EntityByID(gomock.Any(), gomock.Any()).DoAndReturn(func(_ flow.Identifier, _ flow.IdentityFilter[flow.Identity]) {
 			// parallel run to avoid deadlock, ingestion engine is thread-safe
 			go func() {
 				// OnCollection is official callback for collection requester engine

@@ -266,7 +266,7 @@ func (net *FlowNetwork) RemoveContainers() {
 
 // DropDBs resets the protocol state database for all containers in the network
 // matching the given filter.
-func (net *FlowNetwork) DropDBs(filter flow.IdentityFilter) {
+func (net *FlowNetwork) DropDBs(filter flow.IdentityFilter[flow.Identity]) {
 	if net == nil || net.suite == nil {
 		return
 	}
@@ -1305,8 +1305,8 @@ func runBeaconKG(confs []ContainerConfig) (dkgmod.DKGData, error) {
 func setupClusterGenesisBlockQCs(nClusters uint, epochCounter uint64, confs []ContainerConfig) ([]*cluster.Block, flow.AssignmentList, []*flow.QuorumCertificate, error) {
 
 	participantsUnsorted := toParticipants(confs)
-	participants := participantsUnsorted.Sort(order.Canonical)
-	collectors := participants.Filter(filter.HasRole(flow.RoleCollection))
+	participants := participantsUnsorted.Sort(order.Canonical[flow.Identity])
+	collectors := participants.Filter(filter.HasRole[flow.Identity](flow.RoleCollection))
 	assignments := unittest.ClusterAssignment(nClusters, collectors)
 	clusters, err := factory.NewClusterList(assignments, collectors)
 	if err != nil {
@@ -1338,7 +1338,7 @@ func setupClusterGenesisBlockQCs(nClusters uint, epochCounter uint64, confs []Co
 		}
 
 		// must order in canonical ordering otherwise decoding signer indices from cluster QC would fail
-		clusterCommittee := bootstrap.ToIdentityList(clusterNodeInfos).Sort(order.Canonical)
+		clusterCommittee := bootstrap.ToIdentityList(clusterNodeInfos).Sort(order.Canonical[flow.Identity])
 		qc, err := run.GenerateClusterRootQC(clusterNodeInfos, clusterCommittee, block)
 		if err != nil {
 			return nil, nil, nil, fmt.Errorf("fail to generate cluster root QC with clusterNodeInfos %v, %w",

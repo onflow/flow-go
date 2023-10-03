@@ -161,15 +161,15 @@ func (_m *DynamicProtocolState) GlobalParams() protocol.GlobalParams {
 }
 
 // Identities provides a mock function with given fields:
-func (_m *DynamicProtocolState) Identities() flow.IdentityList {
+func (_m *DynamicProtocolState) Identities() flow.GenericIdentityList[flow.Identity] {
 	ret := _m.Called()
 
-	var r0 flow.IdentityList
-	if rf, ok := ret.Get(0).(func() flow.IdentityList); ok {
+	var r0 flow.GenericIdentityList[flow.Identity]
+	if rf, ok := ret.Get(0).(func() flow.GenericIdentityList[flow.Identity]); ok {
 		r0 = rf()
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(flow.IdentityList)
+			r0 = ret.Get(0).(flow.GenericIdentityList[flow.Identity])
 		}
 	}
 

@@ -72,7 +72,7 @@ func (s *NodeDisallowListWrapperTestSuite) TestHonestNode() {
 		f := filter.In(identities[3:4])
 		expectedFilteredIdentities := identities.Filter(f)
 		s.provider.On("Identities", mock.Anything).Return(
-			func(filter flow.IdentityFilter) flow.IdentityList {
+			func(filter flow.IdentityFilter[flow.Identity]) flow.IdentityList {
 				return identities.Filter(filter)
 			},
 			nil,
@@ -149,7 +149,7 @@ func (s *NodeDisallowListWrapperTestSuite) TestDisallowListNode() {
 
 		s.provider.On("Identities", mock.Anything).Return(combinedIdentities)
 
-		noFilter := filter.Not(filter.In(nil))
+		noFilter := filter.Not(filter.In[flow.Identity](nil))
 		identities := s.wrapper.Identities(noFilter)
 
 		require.Equal(s.T(), numIdentities, len(identities)) // expected number resulting identities have the

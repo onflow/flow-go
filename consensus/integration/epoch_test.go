@@ -33,7 +33,7 @@ func TestUnweightedNode(t *testing.T) {
 	// * same collection node from epoch 1, so cluster QCs are consistent
 	// * 1 new consensus node, joining at epoch 2
 	// * random nodes with other roles
-	currentEpochCollectionNodes, err := rootSnapshot.Identities(filter.HasRole(flow.RoleCollection))
+	currentEpochCollectionNodes, err := rootSnapshot.Identities(filter.HasRole[flow.Identity](flow.RoleCollection))
 	require.NoError(t, err)
 	nextEpochIdentities := unittest.CompleteIdentitySet(
 		append(
@@ -121,7 +121,7 @@ func TestEpochTransition_IdentitiesOverlap(t *testing.T) {
 	removedIdentity := privateNodeInfos[0].Identity()
 	newIdentity := privateNodeInfos[3].Identity()
 	nextEpochIdentities := append(
-		firstEpochIdentities.Filter(filter.Not(filter.HasNodeID(removedIdentity.NodeID))),
+		firstEpochIdentities.Filter(filter.Not(filter.HasNodeID[flow.Identity](removedIdentity.NodeID))),
 		newIdentity,
 	)
 
@@ -172,8 +172,8 @@ func TestEpochTransition_IdentitiesDisjoint(t *testing.T) {
 
 	nextEpochParticipantData := createConsensusIdentities(t, 3)
 	nextEpochIdentities := append(
-		firstEpochIdentities.Filter(filter.Not(filter.HasRole(flow.RoleConsensus))), // remove all consensus nodes
-		nextEpochParticipantData.Identities()...,                                    // add new consensus nodes
+		firstEpochIdentities.Filter(filter.Not(filter.HasRole[flow.Identity](flow.RoleConsensus))), // remove all consensus nodes
+		nextEpochParticipantData.Identities()...,                                                   // add new consensus nodes
 	)
 
 	rootSnapshot = withNextEpoch(
@@ -221,7 +221,7 @@ func withNextEpoch(
 
 	currEpoch := &encodableSnapshot.Epochs.Current // take pointer so assignments apply
 	currentEpochIdentities := currEpoch.InitialIdentities
-	nextEpochIdentities = nextEpochIdentities.Sort(order.Canonical)
+	nextEpochIdentities = nextEpochIdentities.Sort(order.Canonical[flow.Identity])
 
 	currEpoch.FinalView = currEpoch.FirstView + curEpochViews - 1 // first epoch lasts curEpochViews
 	encodableSnapshot.Epochs.Next = &inmem.EncodableEpoch{
@@ -229,10 +229,10 @@ func withNextEpoch(
 		FirstView:         currEpoch.FinalView + 1,
 		FinalView:         currEpoch.FinalView + 1 + 10000,
 		RandomSource:      unittest.SeedFixture(flow.EpochSetupRandomSourceLength),
-		InitialIdentities: nextEpochIdentities,
+		InitialIdentities: nextEpochIdentities.ToSkeleton(),
 		// must include info corresponding to EpochCommit event, since we are
 		// starting in committed phase
-		Clustering: unittest.ClusterList(1, nextEpochIdentities),
+		Clustering: unittest.ClusterList(1, nextEpochIdentities.ToSkeleton()),
 		Clusters:   currEpoch.Clusters,
 		DKG: &inmem.EncodableDKG{
 			GroupKey: encodable.RandomBeaconPubKey{
@@ -257,9 +257,9 @@ func withNextEpoch(
 			currentEpochIdentities,
 			// and all the NEW identities in next epoch, with 0 weight
 			nextEpochIdentities.
-				Filter(filter.Not(filter.In(currentEpochIdentities))).
+				Filter(filter.Not(filter.In[flow.Identity](currentEpochIdentities))).
 				Map(mapfunc.WithWeight(0))...,
-		).Sort(order.Canonical))
+		).Sort(order.Canonical[flow.Identity]))
 
 	nextEpochIdentities = append(
 		// all the next epoch identities
@@ -268,7 +268,7 @@ func withNextEpoch(
 		currentEpochIdentities.
 			Filter(filter.Not(filter.In(nextEpochIdentities))).
 			Map(mapfunc.WithWeight(0))...,
-	).Sort(order.Canonical)
+	).Sort(order.Canonical[flow.Identity])
 
 	// setup ID has changed, need to update it
 	convertedEpochSetup, _ := protocol.ToEpochSetup(inmem.NewEpoch(*currEpoch))
