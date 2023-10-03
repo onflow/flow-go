@@ -173,12 +173,6 @@ func (fe *Environment) MintTo(balance *big.Int, target common.Address) error {
 		return err
 	}
 
-	fe.mintTo(balance, target)
-
-	return fe.commit()
-}
-
-func (fe *Environment) mintTo(balance *big.Int, target common.Address) {
 	// update the gas consumed // TODO: revisit
 	// do it as the very first thing to prevent attacks
 	fe.Result.GasConsumed = TransferGasUsage
@@ -195,6 +189,7 @@ func (fe *Environment) mintTo(balance *big.Int, target common.Address) {
 	// we don't need to increment any nonce, given the origin doesn't exist
 
 	// TODO: emit an event
+	return fe.commit()
 }
 
 // WithdrawFrom deduct the balance from the given source account.
@@ -295,17 +290,14 @@ func (fe *Environment) Call(
 	if err := fe.checkExecuteOnce(); err != nil {
 		return err
 	}
-	// TODO: verify that the authorizer has the resource to interact with this contract (higher level check)
-
 	msg := directCallMessage(&from, &to, value, data, gasLimit)
-
 	return fe.run(msg)
 }
 
 // RunTransaction runs a flex transaction
 // this method could be called by anyone.
 // TODO : check gas limit complience (one set on tx and the one allowed by flow tx)
-func (fe *Environment) RunTransaction(rlpEncodedTx []byte) error {
+func (fe *Environment) RunTransaction(rlpEncodedTx []byte, gasLimit uint64) error {
 	if err := fe.checkExecuteOnce(); err != nil {
 		return err
 	}
@@ -319,6 +311,14 @@ func (fe *Environment) RunTransaction(rlpEncodedTx []byte) error {
 			uint64(len(rlpEncodedTx))))
 	if err != nil {
 		return err
+	}
+
+	// gas limit larger than what is allowed for this operation
+	txGasLimit := tx.Gas()
+	if txGasLimit > gasLimit {
+		fe.Result.GasConsumed += TransferGasUsage
+		// TODO: do proper error
+		return fmt.Errorf("transaction gas limit is larger than the remaining gas for running transaction %d > %d", txGasLimit, gasLimit)
 	}
 
 	signer := types.MakeSigner(fe.Config.ChainConfig, BlockNumberForEVMRules, fe.Config.BlockContext.Time)
@@ -372,3 +372,17 @@ func directCallMessage(
 		SkipAccountChecks: true, // this would let us not set the nonce
 	}
 }
+
+// TODO hid config from upper level and construct EVM per operation
+// Question: is it safe to reuse injected db, probably yes, as we construct the
+// the execution state again from it.
+//
+// func getNewEVM(cfg *Config) *vm.EVM {
+// 	return vm.NewEVM(
+// 		*cfg.BlockContext,
+// 		*cfg.TxContext,
+// 		execState,
+// 		cfg.ChainConfig,
+// 		cfg.EVMConfig,
+// 	)
+// }

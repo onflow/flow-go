@@ -94,7 +94,9 @@ func newTransactionExecutor(
 
 	// TODO: how to clean up?
 	if ctx.FlexEnabled {
-		handler := flex.NewFlexContractHandler(env)
+		// TODO: pass proper flex root address based on enviornment
+		flexRootAddress := emulator.FlexRootAccountAddress
+		handler := flex.NewFlexContractHandler(env, flexRootAddress)
 		// TODO: pass proper Flex type definition based on environment
 		flexTypeDefinition := emulator.FlexTypeDefinition
 		cadenceRuntime.DeclareValue(flexStdlib.NewFlexStandardLibraryValue(nil, flexTypeDefinition, handler))

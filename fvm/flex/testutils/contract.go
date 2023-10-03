@@ -1,4 +1,4 @@
-package utils
+package testutils
 
 import (
 	"encoding/hex"
@@ -10,9 +10,10 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
 	gethCommon "github.com/ethereum/go-ethereum/common"
+	"github.com/onflow/atree"
 	env "github.com/onflow/flow-go/fvm/flex/environment"
-	"github.com/onflow/flow-go/fvm/flex/models"
 	"github.com/onflow/flow-go/fvm/flex/storage"
+	"github.com/onflow/flow-go/model/flow"
 	"github.com/stretchr/testify/require"
 )
 
@@ -100,10 +101,10 @@ func GetTestContract(t *testing.T) *TestContract {
 	}
 }
 
-func RunWithDeployedContract(t *testing.T, backend models.Backend, f func(*TestContract)) {
+func RunWithDeployedContract(t *testing.T, led atree.Ledger, flexRoot flow.Address, f func(*TestContract)) {
 	tc := GetTestContract(t)
 	// deploy contract
-	db := storage.NewDatabase(backend)
+	db := storage.NewDatabase(led, flexRoot)
 	config := env.NewFlexConfig(env.WithBlockNumber(env.BlockNumberForEVMRules))
 
 	e, err := env.NewEnvironment(config, db)

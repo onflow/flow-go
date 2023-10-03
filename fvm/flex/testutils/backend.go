@@ -1,4 +1,4 @@
-package utils
+package testutils
 
 import (
 	"encoding/binary"
@@ -13,6 +13,14 @@ import (
 	"github.com/onflow/flow-go/fvm/meter"
 	"github.com/onflow/flow-go/model/flow"
 )
+
+var TestFlexRootAddress = flow.BytesToAddress([]byte("Flex"))
+
+func RunWithTestFlexRoot(t testing.TB, backend models.Backend, f func(flow.Address)) {
+	as := fvmenv.NewAccountStatus()
+	backend.SetValue(TestFlexRootAddress[:], []byte(flow.AccountStatusKey), as.ToBytes())
+	f(TestFlexRootAddress)
+}
 
 func RunWithTestBackend(t testing.TB, f func(models.Backend)) {
 	tb := &testBackend{

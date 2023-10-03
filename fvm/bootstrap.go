@@ -378,7 +378,16 @@ func (b *bootstrapExecutor) Execute() error {
 	// set the list of nodes which are allowed to stake in this network
 	b.setStakingAllowlist(service, b.identities.NodeIDs())
 
+	// setup the flex account
+	b.setupFlex()
+
 	return nil
+}
+
+func (b *bootstrapExecutor) setupFlex() flow.Address {
+	// no key is attached to Flex
+	// TODO: maybe it should be the same as service account
+	return b.createAccount(nil)
 }
 
 func (b *bootstrapExecutor) createAccount(publicKeys []flow.AccountPublicKey) flow.Address {

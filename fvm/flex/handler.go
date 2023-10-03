@@ -1,9 +1,12 @@
 package flex
 
 import (
+	"math"
+
 	env "github.com/onflow/flow-go/fvm/flex/environment"
 	"github.com/onflow/flow-go/fvm/flex/models"
 	"github.com/onflow/flow-go/fvm/flex/storage"
+	"github.com/onflow/flow-go/model/flow"
 )
 
 type FlexContractHandler struct {
@@ -13,9 +16,9 @@ type FlexContractHandler struct {
 
 var _ models.FlexContractHandler = &FlexContractHandler{}
 
-func NewFlexContractHandler(backend models.Backend) *FlexContractHandler {
+func NewFlexContractHandler(backend models.Backend, flexAddress flow.Address) *FlexContractHandler {
 	return &FlexContractHandler{
-		db:      storage.NewDatabase(backend),
+		db:      storage.NewDatabase(backend, flexAddress),
 		backend: backend,
 	}
 }
@@ -56,7 +59,9 @@ func (h FlexContractHandler) Run(tx []byte, coinbase models.FlexAddress) bool {
 	if err != nil {
 		panic(err)
 	}
-	err = env.RunTransaction(tx)
+	// TODO compute the max gas using backend
+	gasLimit := uint64(math.MaxUint64)
+	err = env.RunTransaction(tx, gasLimit)
 	if err != nil {
 		panic(err)
 	}

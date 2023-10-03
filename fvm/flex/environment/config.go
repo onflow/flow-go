@@ -51,6 +51,9 @@ func defaultConfig() *Config {
 			BerlinBlock:         new(big.Int),
 			LondonBlock:         new(big.Int),
 		},
+		EVMConfig: vm.Config{
+			NoBaseFee: true,
+		},
 		TxContext: &vm.TxContext{
 			GasPrice: DefaultGasPrice,
 		},
