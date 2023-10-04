@@ -3,7 +3,6 @@ package state_synchronization
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"strconv"
 
 	"github.com/onflow/flow-go/admin"
@@ -31,7 +30,7 @@ func (e *ExecuteScriptCommand) Handler(ctx context.Context, req *admin.CommandRe
 		return nil, err
 	}
 
-	return fmt.Sprintf("%s", string(result)), nil
+	return string(result), nil
 }
 
 // Validator validates the request.
