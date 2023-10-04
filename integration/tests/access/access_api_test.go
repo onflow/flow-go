@@ -15,6 +15,7 @@ import (
 
 	"github.com/onflow/flow-go/integration/testnet"
 	"github.com/onflow/flow-go/integration/tests/lib"
+	"github.com/onflow/flow-go/integration/tests/mvp"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -132,6 +133,10 @@ func (s *AccessAPISuite) TestLocalExecutionState() {
 	s.testGetAccount()
 	s.testExecuteScriptWithSimpleScript()
 	s.testExecuteScriptWithSimpleContract()
+
+	// this is a specialized test that creates accounts, deposits funds, deploys contracts, etc, and
+	// uses the provided access node to handle the Access API calls
+	mvp.RunMVPTest(s.T(), s.ctx, s.net, s.accessNode)
 }
 
 func (s *AccessAPISuite) testGetAccount() {
