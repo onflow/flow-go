@@ -134,7 +134,7 @@ func (db *Database) GetLatestBlock() (*models.FlexBlock, error) {
 	if len(data) == 0 {
 		return models.GenesisFlexBlock, err
 	}
-	return models.NewFlexBlockFromEncoded(data), err
+	return models.NewFlexBlockFromBytes(data), err
 }
 
 func (db *Database) storeMapRoot() error {

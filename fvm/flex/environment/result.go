@@ -19,15 +19,3 @@ type Result struct {
 	UUIDIndex                uint64
 	TotalSupplyOfNativeToken uint64
 }
-
-func (r *Result) Events() {
-	// TODO convert EVM logs into FVM events
-	// for _, log := range r.Logs {
-	//   log.EncodeRLP()
-	// }
-}
-
-func (r *Result) WrappedError() error {
-	// TODO
-	return nil
-}

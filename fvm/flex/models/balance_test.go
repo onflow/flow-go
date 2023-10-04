@@ -31,3 +31,5 @@ func TestHandler(t *testing.T) {
 	bb := models.Balance(u).ToAttoFlow()
 	require.Equal(t, "100000200000000000000", bb.String())
 }
+
+// TODO add test for encoding decoding

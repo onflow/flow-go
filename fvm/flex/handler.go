@@ -27,62 +27,57 @@ func NewFlexContractHandler(backend models.Backend, flexAddress flow.Address) *F
 	}
 }
 
+// AllocateAddress allocates an address to be used by FOA resources
 func (h FlexContractHandler) AllocateAddress() models.FlexAddress {
-	config := env.NewFlexConfig(
-		env.WithBlockNumber(env.BlockNumberForEVMRules))
-	env, err := env.NewEnvironment(config, h.db)
-	if err != nil {
-		panic(err)
-	}
+	env := h.getNewDefaultEnv()
 	addr, err := env.AllocateAddress()
-	if err != nil {
-		panic(err)
-	}
-
+	h.handleError(err)
 	return addr
 }
 
+// AccountByAddress returns the account for the given flex address,
+// if isFOA is set, account is controlled by the FVM and FOA resources
 func (h FlexContractHandler) AccountByAddress(addr models.FlexAddress, isFOA bool) models.FlexAccount {
 	return newFlexAccount(h, addr, isFOA)
 }
 
+// LastExecutedBlock returns the last executed block
 func (h FlexContractHandler) LastExecutedBlock() *models.FlexBlock {
 	block, err := h.db.GetLatestBlock()
-	if err != nil {
-		panic(err)
-	}
+	h.handleError(err)
 	return block
 }
 
+// Run runs an rlpencoded evm transaction, collect the evm fees under the provided coinbase
 func (h FlexContractHandler) Run(rlpEncodedTx []byte, coinbase models.FlexAddress) bool {
 	config := env.NewFlexConfig(
 		env.WithCoinbase(coinbase.ToCommon()),
 		env.WithBlockNumber(env.BlockNumberForEVMRules))
 	env, err := env.NewEnvironment(config, h.db)
-	// TODO improve this
-	if err != nil {
-		panic(err)
-	}
+	h.handleError(err)
 
-	// decode rlp
+	// Decode transaction encoding
 	tx := types.Transaction{}
 	// TODO: update the max limit on the encoded size to a meaningful value
 	err = tx.DecodeRLP(
 		rlp.NewStream(
 			bytes.NewReader(rlpEncodedTx),
 			uint64(len(rlpEncodedTx))))
-	if err != nil {
-		panic(err)
-	}
+	h.handleError(err)
 
 	// check tx gas limit
 	// TODO: let caller set a limit as well
 	gasLimit := tx.Gas()
 	h.checkGasLimit(models.GasLimit(gasLimit))
 	err = env.RunTransaction(&tx, gasLimit)
-	if err != nil {
-		panic(err)
+	h.meterGasUsage(env.Result.GasConsumed)
+	h.handleError(err)
+
+	// emit logs as events
+	for _, log := range env.Result.Logs {
+		h.EmitEvent(models.NewEVMLogEvent(log))
 	}
+	h.EmitLastExecutedBlockEvent()
 	return !env.Result.Failed
 }
 
@@ -95,9 +90,7 @@ func (h FlexContractHandler) checkGasLimit(limit models.GasLimit) {
 
 func (h FlexContractHandler) meterGasUsage(usage uint64) {
 	err := h.backend.MeterComputation(environment.ComputationKindEVMGasUsage, uint(usage))
-	if err != nil {
-		panic(err)
-	}
+	h.handleError(err)
 }
 
 func (h FlexContractHandler) getNewDefaultConfig() *env.Config {
@@ -116,6 +109,20 @@ func (h FlexContractHandler) handleError(err error) {
 	if err != nil {
 		panic(err)
 	}
+}
+
+func (h *FlexContractHandler) EmitEvent(event *models.Event) {
+	// TODO add extra metering for encoding
+	encoded, err := event.Payload.RLPEncode()
+	h.handleError(err)
+	h.backend.EmitFlowEvent(event.Etype, encoded)
+}
+
+func (h *FlexContractHandler) EmitLastExecutedBlockEvent() {
+	// TODO: we should handle loading of blocks here and not inside db
+	block, err := h.db.GetLatestBlock()
+	h.handleError(err)
+	h.EmitEvent(models.NewBlockExecutedEvent(block))
 }
 
 type flexAccount struct {
@@ -142,13 +149,9 @@ func (f *flexAccount) Address() models.FlexAddress {
 func (f *flexAccount) Balance() models.Balance {
 	env := f.fch.getNewDefaultEnv()
 	bl, err := env.Balance(f.address)
-	if err != nil {
-		panic(err)
-	}
+	f.fch.handleError(err)
 	balance, err := models.NewBalanceFromAttoFlow(bl)
-	if err != nil {
-		panic(err)
-	}
+	f.fch.handleError(err)
 	return balance
 }
 
@@ -161,8 +164,8 @@ func (f *flexAccount) Deposit(v *models.FLOWTokenVault) {
 	f.fch.meterGasUsage(env.Result.GasConsumed)
 	f.fch.handleError(err)
 	// emit event
-	// TODO pass encoded payload data
-	f.fch.backend.EmitFlowEvent(models.EventFlexTokenDeposit, nil)
+	f.fch.EmitEvent(models.NewFlowTokenDepositEvent(f.address, v.Balance()))
+	f.fch.EmitLastExecutedBlockEvent()
 }
 
 // Withdraw deducts the balance from the FOA account and
@@ -176,6 +179,9 @@ func (f *flexAccount) Withdraw(b models.Balance) *models.FLOWTokenVault {
 	err := env.WithdrawFrom(b.ToAttoFlow(), f.address.ToCommon())
 	f.fch.meterGasUsage(env.Result.GasConsumed)
 	f.fch.handleError(err)
+	// emit event
+	f.fch.EmitEvent(models.NewFlowTokenWithdrawalEvent(f.address, b))
+	f.fch.EmitLastExecutedBlockEvent()
 	return models.NewFlowTokenVault(b)
 }
 
@@ -195,6 +201,7 @@ func (f *flexAccount) Deploy(code models.Code, gaslimit models.GasLimit, balance
 	if env.Result.Failed {
 		panic("deploy failed")
 	}
+	f.fch.EmitLastExecutedBlockEvent()
 	return models.FlexAddress(env.Result.DeployedContractAddress)
 }
 
@@ -213,6 +220,7 @@ func (f *flexAccount) Call(to models.FlexAddress, data models.Data, gaslimit mod
 	err := env.Call(f.address.ToCommon(), to.ToCommon(), data, uint64(gaslimit), balance.ToAttoFlow())
 	f.fch.meterGasUsage(env.Result.GasConsumed)
 	f.fch.handleError(err)
+	f.fch.EmitLastExecutedBlockEvent()
 	if env.Result.Failed {
 		panic(models.NewEVMExecutionError(env.Result.Error))
 	}

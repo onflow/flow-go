@@ -1,6 +1,7 @@
 package models
 
 import (
+	"encoding/binary"
 	"math/big"
 
 	"github.com/onflow/cadence"
@@ -26,6 +27,17 @@ func (b Balance) Sub(other Balance) Balance {
 func (b Balance) Add(other Balance) Balance {
 	// TODO check for overflow
 	return Balance(uint64(b) + uint64(other))
+}
+
+func (b Balance) Encode() []byte {
+	var encoded []byte
+	binary.BigEndian.PutUint64(encoded, b.ToAttoFlow().Uint64())
+	return encoded
+}
+
+func DecodeBalance(encoded []byte) (Balance, error) {
+	balance := new(big.Int)
+	return NewBalanceFromAttoFlow(balance.SetUint64(binary.BigEndian.Uint64(encoded)))
 }
 
 func NewBalanceFromAttoFlow(inp *big.Int) (Balance, error) {
