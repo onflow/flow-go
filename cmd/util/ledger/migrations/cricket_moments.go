@@ -316,6 +316,12 @@ func cloneCricketMomentsShardedCollection(
 			return nil, fmt.Errorf("failed to get nft collection: %w", err)
 		}
 
+		fmt.Printf("ownedNFTs value type %s\n"+
+			"cloned value type %s\n",
+			ownedNFTs.Type.ValueType.String(),
+			clonedValue.value.StaticType(mr.Interpreter).String(),
+		)
+
 		err = capturePanic(func() {
 			ownedNFTs.Insert(
 				mr.Interpreter,
