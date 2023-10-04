@@ -51,19 +51,20 @@ func NewSubscriptionProvider(cfg *SubscriptionProviderConfig) (*SubscriptionProv
 		logger:                  cfg.Logger.With().Str("module", "subscription_provider").Logger(),
 		tp:                      cfg.TopicProvider,
 		allTopics:               make([]string, 0),
-		allTopicsUpdateInterval: cfg.Params.TopicListUpdateInterval,
+		allTopicsUpdateInterval: cfg.Params.SubscriptionUpdateInterval,
 		peerUpdateInterval:      cfg.Params.PeerSubscriptionUpdateTTL,
 	}
 
 	builder := component.NewComponentManagerBuilder()
-	builder.AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
-		ready()
-		p.logger.Debug().Msg("subscription provider started; starting update topics loop")
-		p.updateTopicsLoop(ctx)
+	builder.AddWorker(
+		func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+			ready()
+			p.logger.Debug().Msg("subscription provider started; starting update topics loop")
+			p.updateTopicsLoop(ctx)
 
-		<-ctx.Done()
-		p.logger.Debug().Msg("subscription provider stopped; stopping update topics loop")
-	})
+			<-ctx.Done()
+			p.logger.Debug().Msg("subscription provider stopped; stopping update topics loop")
+		})
 
 	return p, nil
 }

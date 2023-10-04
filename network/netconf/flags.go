@@ -43,6 +43,7 @@ const (
 	scoreTracerInterval          = "gossipsub-score-tracer-interval"
 
 	gossipSubSubscriptionProviderUpdateInterval = "gossipsub-subscription-provider-update-interval"
+	gossipSubSubscriptionProviderCacheSize      = "gossipsub-subscription-provider-cache-size"
 
 	// gossipsub validation inspector
 	gossipSubRPCInspectorNotificationCacheSize                 = "gossipsub-rpc-inspector-notification-cache-size"
@@ -101,6 +102,7 @@ func AllFlagNames() []string {
 		scoreTracerInterval,
 		gossipSubRPCInspectorNotificationCacheSize,
 		gossipSubSubscriptionProviderUpdateInterval,
+		gossipSubRPCInspectorNotificationCacheSize,
 		validationInspectorNumberOfWorkers,
 		validationInspectorInspectMessageQueueCacheSize,
 		validationInspectorClusterPrefixedTopicsReceivedCacheSize,
@@ -283,9 +285,12 @@ func InitializeNetworkFlags(flags *pflag.FlagSet, config *Config) {
 		config.GossipSubConfig.GossipSubRPCInspectorsConfig.GossipSubRPCValidationInspectorConfigs.IWantRPCInspectionConfig.DuplicateMsgIDThreshold,
 		"max allowed duplicate message IDs in a single iWant control message")
 	flags.Duration(
-		gossipSubSubscriptionProviderUpdateInterval,
-		config.GossipSubConfig.SubscriptionProviderConfig.TopicListUpdateInterval,
+		gossipSubSubscriptionProviderUpdateInterval, config.GossipSubConfig.SubscriptionProviderConfig.SubscriptionUpdateInterval,
 		"interval for updating the list of subscribed topics for all peers in the gossipsub, recommended value is a few minutes")
+	flags.Uint32(
+		gossipSubSubscriptionProviderCacheSize,
+		config.GossipSubConfig.SubscriptionProviderConfig.CacheSize,
+		"size of the cache that keeps the list of topics each peer has subscribed to, recommended size is 10x the number of authorized nodes")
 }
 
 // SetAliases this func sets an aliases for each CLI flag defined for network config overrides to it's corresponding

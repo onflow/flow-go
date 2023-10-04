@@ -28,16 +28,15 @@ type GossipSubConfig struct {
 }
 
 type SubscriptionProviderParameters struct {
-	// TopicListUpdateInterval is the interval for updating the list of topics in the pubsub network that this node has subscribed to.
-	// Note that we recommend setting this value larger than the PeerSubscriptionUpdateTTL; otherwise, the list of topics
-	// will be updated as (or even more) frequently than the list of peers subscribed to a topic, which is not necessary.
-	// Also, small values for this parameter can lead to a high contention with the reading threads.
-	TopicListUpdateInterval time.Duration `validate:"gt=0s" mapstructure:"gossipsub-topic-list-update-interval"`
+	// SubscriptionUpdateInterval is the interval for updating the list of topics the node have subscribed to; as well as the list of all
+	// peers subscribed to each of those topics. This is used to penalize peers that have an invalid subscription based on their role.
+	SubscriptionUpdateInterval time.Duration `validate:"gt=0s" mapstructure:"gossipsub-subscription-provider-update-interval"`
 
-	// PeerSubscriptionUpdateTTL is the time-to-live for updating the list of topics a peer is subscribed to.
-	// Note that we recommend setting this value smaller than the TopicListUpdateTTL; otherwise, the list of topics
-	// will be updated as (or even more) frequently than the list of peers subscribed to a topic, which is not necessary.
-	PeerSubscriptionUpdateTTL time.Duration `validate:"gt=0s" mapstructure:"gossipsub-peer-subscription-update-ttl"`
+	// CacheSize is the size of the cache that keeps the list of peers subscribed to each topic as the local node.
+	// This is the local view of the current node towards the subscription status of other nodes in the system.
+	// The cache must be large enough to accommodate the maximum number of nodes in the system, otherwise the view of the local node will be incomplete
+	// due to cache eviction.
+	CacheSize uint32 `validate:"gt=0" mapstructure:"gossipsub-subscription-provider-cache-size"`
 }
 
 // GossipSubTracerConfig is the config for the gossipsub tracer. GossipSub tracer is used to trace the local mesh events and peer scores.
