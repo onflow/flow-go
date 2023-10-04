@@ -30,7 +30,7 @@ contract Flex {
     }
 
     access(all)
-    resource FlowOwnedAccount{
+    resource FlowOwnedAccount {
 
         /// The address of the owned Flex account
         access(all)
@@ -59,6 +59,10 @@ contract Flex {
             value: Flex.Balance
         ): [UInt8]
     }
+
+    /// Creates a new Flex account
+    access(all)
+    fun createFlowOwnedAccount(): @Flex.FlowOwnedAccount
 
     /// Runs an a RLP-encoded Flex transaction,
     /// deducts the gas fees and deposits them into the
