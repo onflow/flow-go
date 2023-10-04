@@ -522,7 +522,7 @@ func (e *Engine) sendRequests(participants flow.IdentifierList, ranges []chainsy
 //
 // - error: If an error is encountered while validating the batch request. Error is assumed to be irrecoverable because of internal processes that didn't allow validation to complete.
 func (e *Engine) validateBatchRequestForALSP(originID flow.Identifier, batchRequest *messages.BatchRequest) (*alsp.MisbehaviorReport, bool, error) {
-	// Generate a random integer between 1 and spamProbabilityMultiplier (exclusive)
+	// Generate a random integer between 0 and spamProbabilityMultiplier (exclusive)
 	n, err := rand.Uint32n(spamProbabilityMultiplier)
 
 	if err != nil {
@@ -600,7 +600,7 @@ func (e *Engine) validateBlockResponseForALSP(channel channels.Channel, id flow.
 //
 // - error: If an error is encountered while validating the range request. Error is assumed to be irrecoverable because of internal processes that didn't allow validation to complete.
 func (e *Engine) validateRangeRequestForALSP(originID flow.Identifier, rangeRequest *messages.RangeRequest) (*alsp.MisbehaviorReport, bool, error) {
-	// Generate a random integer between 1 and spamProbabilityMultiplier (exclusive)
+	// Generate a random integer between 0 and spamProbabilityMultiplier (exclusive)
 	n, err := rand.Uint32n(spamProbabilityMultiplier)
 
 	if err != nil {
@@ -672,7 +672,7 @@ func (e *Engine) validateRangeRequestForALSP(originID flow.Identifier, rangeRequ
 //
 // - error: If an error is encountered while validating the sync request. Error is assumed to be irrecoverable because of internal processes that didn't allow validation to complete.
 func (e *Engine) validateSyncRequestForALSP(originID flow.Identifier) (*alsp.MisbehaviorReport, bool, error) {
-	// Generate a random integer between 1 and spamProbabilityMultiplier (exclusive)
+	// Generate a random integer between 0 and spamProbabilityMultiplier (exclusive)
 	n, err := rand.Uint32n(spamProbabilityMultiplier)
 
 	if err != nil {
