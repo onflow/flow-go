@@ -53,6 +53,8 @@ func NewClusterCommittee(
 	initialClusterMembers := cluster.Members()
 	totalWeight := initialClusterMembers.TotalWeight()
 	initialClusterMembersSelector := initialClusterMembers.Selector()
+	// the next section is not very nice, but there are no dynamic identities for root block,
+	// and we need them to specificially handle querying of identities for root block
 	initialClusterIdentities := make(flow.IdentityList, 0, len(cluster.Members()))
 	for _, skeleton := range initialClusterMembers {
 		initialClusterIdentities = append(initialClusterIdentities, &flow.Identity{
