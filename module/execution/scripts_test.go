@@ -58,9 +58,10 @@ func Test_ExecuteScript(t *testing.T) {
 		scripts := newScripts(
 			t,
 			newBlockHeadersStorage(blockchain),
-			func(ID flow.RegisterID, height uint64) (flow.RegisterValue, error) {
-				return nil, nil // intentionally return nil to check edge case
-			},
+			IndexRegisterAdapter(
+				func(IDs flow.RegisterIDs, height uint64) ([]flow.RegisterValue, error) {
+					return nil, nil // intentionally return nil to check edge case
+				}),
 		)
 
 		// use a non-existing address to trigger register get function
