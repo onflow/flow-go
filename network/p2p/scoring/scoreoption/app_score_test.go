@@ -1,4 +1,4 @@
-package scoring_test
+package scoreoption_test
 
 import (
 	"context"
@@ -19,7 +19,7 @@ import (
 	"github.com/onflow/flow-go/network/internal/p2pfixtures"
 	"github.com/onflow/flow-go/network/message"
 	"github.com/onflow/flow-go/network/p2p"
-	"github.com/onflow/flow-go/network/p2p/scoring"
+	"github.com/onflow/flow-go/network/p2p/scoring/scoreoption"
 	p2ptest "github.com/onflow/flow-go/network/p2p/test"
 	"github.com/onflow/flow-go/network/p2p/tracer"
 	flowpubsub "github.com/onflow/flow-go/network/validator/pubsub"
@@ -247,9 +247,9 @@ func maliciousAppSpecificScore(honestIds flow.IdentityList) func(peer.ID) float6
 	return func(p peer.ID) float64 {
 		_, isHonest := honestIdProvider.ByPeerID(p)
 		if isHonest {
-			return scoring.MaxAppSpecificPenalty
+			return scoreoption.MaxAppSpecificPenalty
 		}
 
-		return scoring.MaxAppSpecificReward
+		return scoreoption.MaxAppSpecificReward
 	}
 }

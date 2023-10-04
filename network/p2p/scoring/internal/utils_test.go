@@ -1,4 +1,4 @@
-package scoring_test
+package internal_test
 
 import (
 	"testing"
@@ -7,7 +7,7 @@ import (
 
 	"github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/network/internal/p2pfixtures"
-	"github.com/onflow/flow-go/network/p2p/scoring"
+	"github.com/onflow/flow-go/network/p2p/scoring/internal"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -17,11 +17,11 @@ func TestHasValidIdentity_Unknown(t *testing.T) {
 	idProvider := mock.NewIdentityProvider(t)
 	idProvider.On("ByPeerID", peerId).Return(nil, false)
 
-	identity, err := scoring.HasValidFlowIdentity(idProvider, peerId)
+	identity, err := internal.HasValidFlowIdentity(idProvider, peerId)
 	require.Nil(t, identity)
 	require.Error(t, err)
-	require.True(t, scoring.IsInvalidPeerIDError(err))
-	require.Contains(t, err.Error(), scoring.PeerIdStatusUnknown)
+	require.True(t, internal.IsInvalidPeerIDError(err))
+	require.Contains(t, err.Error(), internal.PeerIdStatusUnknown)
 }
 
 // TestHasValidIdentity_Ejected tests that when a peer has been ejected, the HasValidIdentity returns an InvalidPeerIDError.
@@ -33,10 +33,10 @@ func TestHasValidIdentity_Ejected(t *testing.T) {
 	peerId := p2pfixtures.PeerIdFixture(t)
 	idProvider.On("ByPeerID", peerId).Return(ejectedIdentity, true)
 
-	identity, err := scoring.HasValidFlowIdentity(idProvider, peerId)
+	identity, err := internal.HasValidFlowIdentity(idProvider, peerId)
 	require.Error(t, err)
-	require.True(t, scoring.IsInvalidPeerIDError(err))
-	require.Contains(t, err.Error(), scoring.PeerIdStatusEjected)
+	require.True(t, internal.IsInvalidPeerIDError(err))
+	require.Contains(t, err.Error(), internal.PeerIdStatusEjected)
 	require.Nil(t, identity)
 }
 
@@ -48,7 +48,7 @@ func TestHasValidIdentity_Valid(t *testing.T) {
 	peerId := p2pfixtures.PeerIdFixture(t)
 	idProvider.On("ByPeerID", peerId).Return(trueID, true)
 
-	identity, err := scoring.HasValidFlowIdentity(idProvider, peerId)
+	identity, err := internal.HasValidFlowIdentity(idProvider, peerId)
 	require.NoError(t, err)
 	require.Equal(t, trueID, identity)
 }

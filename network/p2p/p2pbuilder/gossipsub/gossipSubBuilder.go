@@ -24,7 +24,8 @@ import (
 	inspectorbuilder "github.com/onflow/flow-go/network/p2p/p2pbuilder/inspector"
 	"github.com/onflow/flow-go/network/p2p/p2pconf"
 	"github.com/onflow/flow-go/network/p2p/p2pnode"
-	"github.com/onflow/flow-go/network/p2p/scoring"
+	"github.com/onflow/flow-go/network/p2p/scoring/scoreoption"
+	"github.com/onflow/flow-go/network/p2p/subscription"
 	"github.com/onflow/flow-go/network/p2p/tracer"
 	"github.com/onflow/flow-go/network/p2p/utils"
 	"github.com/onflow/flow-go/utils/logging"
@@ -45,7 +46,7 @@ type Builder struct {
 	// gossipSubTracer is a callback interface that is called by the gossipsub implementation upon
 	// certain events. Currently, we use it to log and observe the local mesh of the node.
 	gossipSubTracer          p2p.PubSubTracer
-	scoreOptionConfig        *scoring.ScoreOptionConfig
+	scoreOptionConfig        *scoreoption.ScoreOptionConfig
 	idProvider               module.IdentityProvider
 	routingSystem            routing.Routing
 	rpcInspectorConfig       *p2pconf.GossipSubRPCInspectorsConfig
@@ -199,7 +200,7 @@ func NewGossipSubBuilder(
 		idProvider:               idProvider,
 		gossipSubFactory:         defaultGossipSubFactory(),
 		gossipSubConfigFunc:      defaultGossipSubAdapterConfig(),
-		scoreOptionConfig:        scoring.NewScoreOptionConfig(lg, idProvider),
+		scoreOptionConfig:        scoreoption.NewScoreOptionConfig(lg, idProvider),
 		rpcInspectorConfig:       rpcInspectorConfig,
 		rpcInspectorSuiteFactory: defaultInspectorSuite(rpcTracker),
 	}
@@ -316,11 +317,11 @@ func (g *Builder) Build(ctx irrecoverable.SignalerContext) (p2p.PubSubAdapter, e
 	}
 	gossipSubConfigs.WithInspectorSuite(inspectorSuite)
 
-	var scoreOpt *scoring.ScoreOption
+	var scoreOpt *scoreoption.ScoreOption
 	var scoreTracer p2p.PeerScoreTracer
 	if g.gossipSubPeerScoring {
 		g.scoreOptionConfig.SetRegisterNotificationConsumerFunc(inspectorSuite.AddInvalidControlMessageConsumer)
-		scoreOpt = scoring.NewScoreOption(g.scoreOptionConfig)
+		scoreOpt = scoreoption.NewScoreOption(g.scoreOptionConfig)
 		gossipSubConfigs.WithScoreOption(scoreOpt)
 
 		if g.gossipSubScoreTracerInterval > 0 {
@@ -352,7 +353,7 @@ func (g *Builder) Build(ctx irrecoverable.SignalerContext) (p2p.PubSubAdapter, e
 	}
 
 	if scoreOpt != nil {
-		err := scoreOpt.SetSubscriptionProvider(scoring.NewSubscriptionProvider(g.logger, gossipSub))
+		err := scoreOpt.SetSubscriptionProvider(subscription.NewSubscriptionProvider(g.logger, gossipSub))
 		if err != nil {
 			return nil, fmt.Errorf("could not set subscription provider: %w", err)
 		}

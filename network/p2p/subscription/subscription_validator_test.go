@@ -1,4 +1,4 @@
-package scoring_test
+package subscription_test
 
 import (
 	"context"
@@ -9,6 +9,7 @@ import (
 
 	"github.com/onflow/flow-go/network/message"
 	"github.com/onflow/flow-go/network/p2p"
+	"github.com/onflow/flow-go/network/p2p/subscription"
 	p2ptest "github.com/onflow/flow-go/network/p2p/test"
 	flowpubsub "github.com/onflow/flow-go/network/validator/pubsub"
 
@@ -24,7 +25,6 @@ import (
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/internal/p2pfixtures"
 	mockp2p "github.com/onflow/flow-go/network/p2p/mock"
-	"github.com/onflow/flow-go/network/p2p/scoring"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -33,7 +33,7 @@ import (
 func TestSubscriptionValidator_NoSubscribedTopic(t *testing.T) {
 	sp := mockp2p.NewSubscriptionProvider(t)
 
-	sv := scoring.NewSubscriptionValidator()
+	sv := subscription.NewSubscriptionValidator()
 	require.NoError(t, sv.RegisterSubscriptionProvider(sp))
 
 	// mocks peer 1 not subscribed to any topic.
@@ -51,7 +51,7 @@ func TestSubscriptionValidator_NoSubscribedTopic(t *testing.T) {
 // topic, the subscription validator returns an error.
 func TestSubscriptionValidator_UnknownChannel(t *testing.T) {
 	sp := mockp2p.NewSubscriptionProvider(t)
-	sv := scoring.NewSubscriptionValidator()
+	sv := subscription.NewSubscriptionValidator()
 	require.NoError(t, sv.RegisterSubscriptionProvider(sp))
 
 	// mocks peer 1 not subscribed to an unknown topic.
@@ -71,7 +71,7 @@ func TestSubscriptionValidator_UnknownChannel(t *testing.T) {
 // topics based on its Flow protocol role, the subscription validator returns no error.
 func TestSubscriptionValidator_ValidSubscriptions(t *testing.T) {
 	sp := mockp2p.NewSubscriptionProvider(t)
-	sv := scoring.NewSubscriptionValidator()
+	sv := subscription.NewSubscriptionValidator()
 	require.NoError(t, sv.RegisterSubscriptionProvider(sp))
 
 	for _, role := range flow.Roles() {
@@ -102,7 +102,7 @@ func TestSubscriptionValidator_ValidSubscriptions(t *testing.T) {
 // is no longer true.
 func TestSubscriptionValidator_SubscribeToAllTopics(t *testing.T) {
 	sp := mockp2p.NewSubscriptionProvider(t)
-	sv := scoring.NewSubscriptionValidator()
+	sv := subscription.NewSubscriptionValidator()
 	require.NoError(t, sv.RegisterSubscriptionProvider(sp))
 
 	allChannels := channels.Channels().ExcludePattern(regexp.MustCompile("^(test).*"))
@@ -125,7 +125,7 @@ func TestSubscriptionValidator_SubscribeToAllTopics(t *testing.T) {
 // topics based on its Flow protocol role, the subscription validator returns an error.
 func TestSubscriptionValidator_InvalidSubscriptions(t *testing.T) {
 	sp := mockp2p.NewSubscriptionProvider(t)
-	sv := scoring.NewSubscriptionValidator()
+	sv := subscription.NewSubscriptionValidator()
 	require.NoError(t, sv.RegisterSubscriptionProvider(sp))
 
 	for _, role := range flow.Roles() {

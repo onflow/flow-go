@@ -1,4 +1,4 @@
-package scoring
+package internal
 
 import (
 	"errors"

@@ -1,4 +1,4 @@
-package scoring_test
+package subscription_test
 
 import (
 	"testing"
@@ -9,7 +9,7 @@ import (
 
 	"github.com/onflow/flow-go/network/internal/p2pfixtures"
 	mockp2p "github.com/onflow/flow-go/network/p2p/mock"
-	"github.com/onflow/flow-go/network/p2p/scoring"
+	"github.com/onflow/flow-go/network/p2p/subscription"
 	"github.com/onflow/flow-go/utils/slices"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -18,7 +18,7 @@ import (
 // list of topics a peer is subscribed to.
 func TestSubscriptionProvider_GetSubscribedTopics(t *testing.T) {
 	tp := mockp2p.NewTopicProvider(t)
-	sp := scoring.NewSubscriptionProvider(unittest.Logger(), tp)
+	sp := subscription.NewSubscriptionProvider(unittest.Logger(), tp)
 
 	tp.On("GetTopics").Return([]string{"topic1", "topic2", "topic3"}).Maybe()
 
