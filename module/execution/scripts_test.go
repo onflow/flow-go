@@ -58,7 +58,7 @@ func Test_ExecuteScript(t *testing.T) {
 		scripts := newScripts(
 			t,
 			newBlockHeadersStorage(blockchain),
-			func(IDs flow.RegisterIDs, height uint64) ([]flow.RegisterValue, error) {
+			func(ID flow.RegisterID, height uint64) ([]flow.RegisterValue, error) {
 				return nil, nil // intentionally return nil to check edge case
 			},
 		)
@@ -94,7 +94,7 @@ func Test_GetAccount(t *testing.T) {
 func newScripts(
 	t *testing.T,
 	headers storage.Headers,
-	registers func(IDs flow.RegisterIDs, height uint64) ([]flow.RegisterValue, error),
+	registers func(ID flow.RegisterID, height uint64) ([]flow.RegisterValue, error),
 ) *Scripts {
 	entropyProvider := testutil.EntropyProviderFixture(nil)
 	entropyBlock := mock.NewEntropyProviderPerBlock(t)
