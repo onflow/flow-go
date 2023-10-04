@@ -2,7 +2,6 @@ package bootstrap_test
 
 import (
 	"encoding/json"
-	"github.com/onflow/flow-go/model/flow"
 	"strings"
 	"testing"
 
@@ -10,6 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/model/bootstrap"
+	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/order"
 	"github.com/onflow/flow-go/utils/unittest"
 )
