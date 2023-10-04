@@ -317,7 +317,7 @@ func cloneCricketMomentsShardedCollection(
 		}
 
 		err = capturePanic(func() {
-			ownedNFTs.SetKey(
+			ownedNFTs.Insert(
 				mr.Interpreter,
 				interpreter.EmptyLocationRange,
 				clonedValue.nftCollectionKey,
