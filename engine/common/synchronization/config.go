@@ -44,18 +44,23 @@ const spamProbabilityMultiplier = 1001
 // SpamDetectionConfig contains configuration parameters for spam detection for different message types.
 // The probability of creating a misbehavior report for a message of a given type is calculated differently for different
 // message types.
+// MisbehaviourReports are generated for two reasons:
+//  1. A malformed message will always produce a MisbehaviourReport, to notify ALSP of *unambiguous* spam.
+//  2. A correctly formed message may produce a MisbehaviourReport probabilistically, to notify ALSP of *ambiguous* spam.
+//     This effectively tracks the load associated with a particular sender, for this engine, and, on average,
+//     reports message load proportionally as misbehaviour to ALSP.
 type SpamDetectionConfig struct {
 
-	// batchRequestBaseProb is the base probability that's used in creating the final probability of creating a
+	// batchRequestBaseProb is the base probability in [0,1] that's used in creating the final probability of creating a
 	// misbehavior report for a BatchRequest message. This is why the word "base" is used in the name of this field,
 	// since it's not the final probability and there are other factors that determine the final probability.
 	// The reason for this is that we want to increase the probability of creating a misbehavior report for a large batch.
 	batchRequestBaseProb float32
 
-	// syncRequestProb is the probability of creating a misbehavior report for a SyncRequest message.
+	// syncRequestProb is the probability in [0,1] of creating a misbehavior report for a SyncRequest message.
 	syncRequestProb float32
 
-	// rangeRequestBaseProb is the base probability that's used in creating the final probability of creating a
+	// rangeRequestBaseProb is the base probability in [0,1] that's used in creating the final probability of creating a
 	// misbehavior report for a RangeRequest message. This is why the word "base" is used in the name of this field,
 	// since it's not the final probability and there are other factors that determine the final probability.
 	// The reason for this is that we want to increase the probability of creating a misbehavior report for a large range.
