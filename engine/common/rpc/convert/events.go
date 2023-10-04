@@ -13,7 +13,6 @@ import (
 
 	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
 	"github.com/onflow/flow/protobuf/go/flow/entities"
-	execproto "github.com/onflow/flow/protobuf/go/flow/execution"
 )
 
 // EventToMessage converts a flow.Event to a protobuf message
@@ -63,17 +62,17 @@ func MessagesToEvents(l []*entities.Event) []flow.Event {
 
 // MessageToEventFromVersion converts a protobuf message to a flow.Event, and converts the payload
 // encoding from CCF to JSON if the input version is CCF
-func MessageToEventFromVersion(m *entities.Event, inputVersion execproto.EventEncodingVersion) (*flow.Event, error) {
+func MessageToEventFromVersion(m *entities.Event, inputVersion entities.EventEncodingVersion) (*flow.Event, error) {
 	event := MessageToEvent(m)
 	switch inputVersion {
-	case execproto.EventEncodingVersion_CCF_V0:
+	case entities.EventEncodingVersion_CCF_V0:
 		convertedPayload, err := CcfPayloadToJsonPayload(event.Payload)
 		if err != nil {
 			return nil, fmt.Errorf("could not convert event payload from CCF to Json: %w", err)
 		}
 		event.Payload = convertedPayload
 		return &event, nil
-	case execproto.EventEncodingVersion_JSON_CDC_V0:
+	case entities.EventEncodingVersion_JSON_CDC_V0:
 		return &event, nil
 	default:
 		return nil, fmt.Errorf("invalid encoding format %d", inputVersion)
@@ -82,7 +81,7 @@ func MessageToEventFromVersion(m *entities.Event, inputVersion execproto.EventEn
 
 // MessagesToEventsFromVersion converts a slice of protobuf messages to a slice of flow.Events, converting
 // the payload encoding from CCF to JSON if the input version is CCF
-func MessagesToEventsFromVersion(l []*entities.Event, version execproto.EventEncodingVersion) ([]flow.Event, error) {
+func MessagesToEventsFromVersion(l []*entities.Event, version entities.EventEncodingVersion) ([]flow.Event, error) {
 	events := make([]flow.Event, len(l))
 	for i, m := range l {
 		event, err := MessageToEventFromVersion(m, version)

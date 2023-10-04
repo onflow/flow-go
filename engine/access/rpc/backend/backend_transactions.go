@@ -418,9 +418,9 @@ func (b *backendTransactions) GetTransactionResultsByBlockID(
 		"number of transaction results returned by execution node is less than the number of transactions  in the block",
 	)
 
-	eventEncodingVersion := execproto.EventEncodingVersion_JSON_CDC_V0
+	eventEncodingVersion := entities.EventEncodingVersion_JSON_CDC_V0
 	if requestEEV := eventEncodingVersionValue; requestEEV != nil {
-		eventEncodingVersion = execproto.EventEncodingVersion(requestEEV.GetValue())
+		eventEncodingVersion = requestEEV.GetValue()
 	}
 
 	for _, guarantee := range block.Payload.Guarantees {
@@ -441,7 +441,6 @@ func (b *backendTransactions) GetTransactionResultsByBlockID(
 			if err != nil {
 				return nil, rpc.ConvertStorageError(err)
 			}
-
 			events, err := convert.MessagesToEventsFromVersion(txResult.GetEvents(), eventEncodingVersion)
 			if err != nil {
 				return nil, status.Errorf(codes.Internal,
@@ -555,9 +554,9 @@ func (b *backendTransactions) GetTransactionResultByIndex(
 		return nil, rpc.ConvertStorageError(err)
 	}
 
-	eventEncodingVersion := execproto.EventEncodingVersion_JSON_CDC_V0
+	eventEncodingVersion := entities.EventEncodingVersion_JSON_CDC_V0
 	if requestEEV := eventEncodingVersionValue; requestEEV != nil {
-		eventEncodingVersion = execproto.EventEncodingVersion(requestEEV.GetValue())
+		eventEncodingVersion = requestEEV.GetValue()
 	}
 
 	events, err := convert.MessagesToEventsFromVersion(resp.GetEvents(), eventEncodingVersion)
@@ -785,9 +784,9 @@ func (b *backendTransactions) getTransactionResultFromExecutionNode(
 		return nil, 0, "", err
 	}
 
-	eventEncodingVersion := execproto.EventEncodingVersion_JSON_CDC_V0
+	eventEncodingVersion := entities.EventEncodingVersion_JSON_CDC_V0
 	if requestEEV := eventEncodingVersionValue; requestEEV != nil {
-		eventEncodingVersion = execproto.EventEncodingVersion(requestEEV.GetValue())
+		eventEncodingVersion = requestEEV.GetValue()
 	}
 
 	events, err := convert.MessagesToEventsFromVersion(resp.GetEvents(), eventEncodingVersion)

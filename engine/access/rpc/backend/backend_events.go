@@ -153,9 +153,9 @@ func (b *backendEvents) getBlockEventsFromExecutionNode(
 		Str("last_block_id", lastBlockID.String()).
 		Msg("successfully got events")
 
-	eventEncodingVersion := execproto.EventEncodingVersion_JSON_CDC_V0
+	eventEncodingVersion := entities.EventEncodingVersion_JSON_CDC_V0
 	if requestEEV := eventEncodingVersionValue; requestEEV != nil {
-		eventEncodingVersion = execproto.EventEncodingVersion(requestEEV.GetValue())
+		eventEncodingVersion = requestEEV.GetValue()
 	}
 
 	// convert execution node api result to access node api result
@@ -172,7 +172,7 @@ func (b *backendEvents) getBlockEventsFromExecutionNode(
 func verifyAndConvertToAccessEvents(
 	execEvents []*execproto.GetEventsForBlockIDsResponse_Result,
 	requestedBlockHeaders []*flow.Header,
-	version execproto.EventEncodingVersion,
+	version entities.EventEncodingVersion,
 ) ([]flow.BlockEvents, error) {
 	if len(execEvents) != len(requestedBlockHeaders) {
 		return nil, errors.New("number of results does not match number of blocks requested")
