@@ -11,6 +11,7 @@ import (
 	"github.com/onflow/flow-go/fvm/flex/models"
 	"github.com/onflow/flow-go/fvm/flex/testutils"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -95,6 +96,32 @@ func TestFlexContractHandler(t *testing.T) {
 				// fees has been collected to the coinbase
 				require.NotEqual(t, models.Balance(0), account2.Balance())
 
+			})
+		})
+	})
+
+	t.Run("test gas compliance", func(t *testing.T) {
+		testutils.RunWithTestBackend(t, func(backend models.Backend) {
+			testutils.RunWithTestFlexRoot(t, backend, func(flexRoot flow.Address) {
+				testutils.RunWithEOATestAccount(t, backend, flexRoot, func(eoa *testutils.EOATestAccount) {
+
+					handler := flex.NewFlexContractHandler(backend, flexRoot)
+					// set tx limit above the tx limit
+
+					gasLimit := uint64(testutils.TestComputationLimit + 1)
+					tx := eoa.PrepareSignAndEncodeTx(
+						t,
+						common.Address{},
+						nil,
+						nil,
+						gasLimit,
+						big.NewInt(1e8), // high gas fee to test coinbase collection,
+					)
+
+					assert.PanicsWithError(t, models.ErrInsufficientComputation.Error(), func() {
+						handler.Run(tx, eoa.FlexAddress())
+					})
+				})
 			})
 		})
 	})

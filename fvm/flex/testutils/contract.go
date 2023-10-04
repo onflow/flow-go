@@ -104,7 +104,9 @@ func GetTestContract(t *testing.T) *TestContract {
 func RunWithDeployedContract(t *testing.T, led atree.Ledger, flexRoot flow.Address, f func(*TestContract)) {
 	tc := GetTestContract(t)
 	// deploy contract
-	db := storage.NewDatabase(led, flexRoot)
+	db, err := storage.NewDatabase(led, flexRoot)
+	require.NoError(t, err)
+
 	config := env.NewFlexConfig(env.WithBlockNumber(env.BlockNumberForEVMRules))
 
 	e, err := env.NewEnvironment(config, db)
@@ -113,14 +115,12 @@ func RunWithDeployedContract(t *testing.T, led atree.Ledger, flexRoot flow.Addre
 	caller := gethCommon.Address{}
 	err = e.MintTo(new(big.Int).Mul(big.NewInt(1e18), big.NewInt(1000)), caller)
 	require.NoError(t, err)
-	require.False(t, e.Result.Failed)
 
 	e, err = env.NewEnvironment(config, db)
 	require.NoError(t, err)
 
 	err = e.Deploy(gethCommon.Address{}, tc.ByteCode, math.MaxUint64, big.NewInt(0))
 	require.NoError(t, err)
-	require.False(t, e.Result.Failed)
 
 	tc.SetDeployedAt(e.Result.DeployedContractAddress)
 	f(tc)

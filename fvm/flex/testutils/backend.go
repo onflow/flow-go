@@ -3,6 +3,7 @@ package testutils
 import (
 	"encoding/binary"
 	"fmt"
+	"math"
 	"testing"
 
 	"github.com/onflow/atree"
@@ -16,6 +17,7 @@ import (
 )
 
 var TestFlexRootAddress = flow.BytesToAddress([]byte("Flex"))
+var TestComputationLimit = uint(math.MaxUint64 - 1)
 
 func RunWithTestFlexRoot(t testing.TB, backend models.Backend, f func(flow.Address)) {
 	as := fvmenv.NewAccountStatus()
@@ -84,7 +86,7 @@ func getSimpleEventEmitter() *testEventEmitter {
 }
 
 func getSimpleMeter() *testMeter {
-	computationLimit := uint(1000_000_000_000)
+	computationLimit := TestComputationLimit
 	computationUsed := uint(0)
 	return &testMeter{
 		meterComputation: func(kind common.ComputationKind, intensity uint) error {

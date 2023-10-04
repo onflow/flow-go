@@ -9,8 +9,6 @@ import (
 // TODO we might not need this and reuse the ExecutionResult provided by VM
 // extra methods like convert can be provided by the interface layer
 type Result struct {
-	Failed                   bool // this tracks user level failures, other errors indicates fatal issues
-	Error                    error
 	RootHash                 common.Hash
 	DeployedContractAddress  common.Address
 	RetValue                 []byte

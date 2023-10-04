@@ -1,7 +1,6 @@
 package fvm_test
 
 import (
-	"math"
 	"math/big"
 	"testing"
 
@@ -70,6 +69,8 @@ func TestWithFlexEnabled_ContractInteraction(t *testing.T) {
 				// test storing a value
 				num := int64(12)
 
+				gasLimit := uint64(100_000)
+
 				// create ctx with flex enabled
 				ctx := fvm.NewContext(
 					fvm.WithChain(chain),
@@ -93,7 +94,7 @@ func TestWithFlexEnabled_ContractInteraction(t *testing.T) {
 					testContract.DeployedAt,
 					testContract.MakeStoreCallData(t, big.NewInt(num)),
 					big.NewInt(0),
-					math.MaxUint64,
+					gasLimit,
 					big.NewInt(1),
 				)
 
@@ -134,7 +135,7 @@ func TestWithFlexEnabled_ContractInteraction(t *testing.T) {
 					testContract.DeployedAt,
 					testContract.MakeRetrieveCallData(t),
 					big.NewInt(0),
-					math.MaxUint64,
+					gasLimit,
 					big.NewInt(1),
 				)
 

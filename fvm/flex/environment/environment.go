@@ -2,7 +2,6 @@ package env
 
 import (
 	"encoding/binary"
-	"fmt"
 	"math/big"
 
 	"github.com/onflow/flow-go/fvm/flex/models"
@@ -71,65 +70,6 @@ func NewEnvironment(
 	}, nil
 }
 
-func (fe *Environment) checkExecuteOnce() error {
-	if fe.Used {
-		return models.ErrFlexEnvReuse
-	}
-	fe.Used = true
-	return nil
-}
-
-// commit commits the changes to the state.
-// if error is returned is a fatal one.
-func (fe *Environment) commit() error {
-	// commit the changes
-	// ramtin: height is needed when we want to update to version v13
-	// var height uint64
-	// if fe.Config.BlockContext.BlockNumber != nil {
-	// 	height = fe.Config.BlockContext.BlockNumber.Uint64()
-	// }
-
-	// commits the changes from the journal into the in memory trie.
-	newRoot, err := fe.State.Commit(true)
-	if err != nil {
-		return models.NewFatalError(err)
-	}
-
-	// flush the trie to the lower level db
-	// the reason we have to do this, is the original database
-	// is designed to keep changes in memory until the state.Commit
-	// is called then the changes moves into the trie, but the trie
-	// would stay in memory for faster trasnaction execution. you
-	// have to explicitly ask the trie to commit to the underlying storage
-	err = fe.State.Database().TrieDB().Commit(newRoot, false)
-	if err != nil {
-		return models.NewFatalError(err)
-	}
-
-	newBlock := models.NewFlexBlock(
-		fe.LastExecutedBlock.Height+1,
-		fe.Result.UUIDIndex,
-		fe.Result.TotalSupplyOfNativeToken,
-		newRoot,
-		types.EmptyRootHash,
-	)
-
-	err = fe.Database.SetLatestBlock(newBlock)
-	if err != nil {
-		return models.NewFatalError(err)
-	}
-
-	// commit atree changes back to the backend
-	err = fe.Database.Commit()
-	if err != nil {
-		return models.NewFatalError(err)
-	}
-
-	// TODO: emit event on root changes
-	fe.Result.RootHash = newRoot
-	return nil
-}
-
 // TODO: properly use an address generator (zeros + random section) and verify collision
 // TODO: does this leads to trie depth issue?
 func (fe *Environment) AllocateAddress() (models.FlexAddress, error) {
@@ -137,15 +77,6 @@ func (fe *Environment) AllocateAddress() (models.FlexAddress, error) {
 		return models.FlexAddress{}, err
 	}
 	return fe.allocateAddress(), fe.commit()
-}
-
-// Balance returns the balance of an address
-// TODO: do it as a ReadOnly env view.
-func (fe *Environment) Balance(target models.FlexAddress) (*big.Int, error) {
-	if err := fe.checkExecuteOnce(); err != nil {
-		return nil, err
-	}
-	return fe.State.GetBalance(target.ToCommon()), nil
 }
 
 // TODO: move this to handler, its not related to here, then results like UUIndex, Total balance
@@ -160,8 +91,16 @@ func (fe *Environment) allocateAddress() models.FlexAddress {
 	// TODO: if account exist try some new number
 	// if fe.State.Exist(target.ToCommon()) {
 	// }
-
 	return target
+}
+
+// Balance returns the balance of an address
+// TODO: do it as a ReadOnly env view.
+func (fe *Environment) Balance(target models.FlexAddress) (*big.Int, error) {
+	if err := fe.checkExecuteOnce(); err != nil {
+		return nil, err
+	}
+	return fe.State.GetBalance(target.ToCommon()), nil
 }
 
 // MintTo mints tokens into the target address, if the address dees not
@@ -190,7 +129,6 @@ func (fe *Environment) MintTo(balance *big.Int, target common.Address) error {
 
 	// we don't need to increment any nonce, given the origin doesn't exist
 
-	// TODO: emit an event
 	return fe.commit()
 }
 
@@ -204,25 +142,19 @@ func (fe *Environment) WithdrawFrom(amount *big.Int, source common.Address) erro
 		return err
 	}
 
-	if amount.Uint64() > fe.Result.TotalSupplyOfNativeToken {
-		return fmt.Errorf("total supply does not match %d > %d", amount.Uint64(), fe.Result.TotalSupplyOfNativeToken)
-	}
-
-	// update the gas consumed // TODO: revisit
+	// update the gas consumed // TODO: revisit, we might do this at the higher level
 	// do it as the very first thing to prevent attacks
 	fe.Result.GasConsumed = TransferGasUsage
 
-	// check account exist
-	if !fe.State.Exist(source) {
-		fe.Result.Failed = true
-		return nil
-	}
-
-	// check balance
+	// check source balance
 	// if balance is lower than amount return
 	if fe.State.GetBalance(source).Cmp(amount) == -1 {
-		fe.Result.Failed = true
-		return nil
+		return models.ErrInsufficientBalance
+	}
+
+	// check balance of flex vault
+	if amount.Uint64() > fe.Result.TotalSupplyOfNativeToken {
+		return models.ErrInsufficientTotalSupply
 	}
 
 	// add balance
@@ -233,8 +165,6 @@ func (fe *Environment) WithdrawFrom(amount *big.Int, source common.Address) erro
 	// withdraw counts as a transaction (similar to the way calls increment the nonce)
 	nonce := fe.State.GetNonce(source)
 	fe.State.SetNonce(source, nonce+1)
-
-	// TODO: emit an event
 
 	return fe.commit()
 }
@@ -299,24 +229,16 @@ func (fe *Environment) Call(
 // RunTransaction runs a flex transaction
 // this method could be called by anyone.
 // TODO : check gas limit complience (one set on tx and the one allowed by flow tx)
-func (fe *Environment) RunTransaction(tx *types.Transaction, gasLimit uint64) error {
+func (fe *Environment) RunTransaction(tx *types.Transaction) error {
 	if err := fe.checkExecuteOnce(); err != nil {
 		return err
 	}
-
-	// gas limit larger than what is allowed for this operation
-	txGasLimit := tx.Gas()
-	if txGasLimit > gasLimit {
-		fe.Result.GasConsumed += TransferGasUsage
-		// TODO: do proper error
-		return fmt.Errorf("transaction gas limit is larger than the remaining gas for running transaction %d > %d", txGasLimit, gasLimit)
-	}
-
 	signer := types.MakeSigner(fe.Config.ChainConfig, BlockNumberForEVMRules, fe.Config.BlockContext.Time)
 
 	msg, err := core.TransactionToMessage(tx, signer, fe.Config.BlockContext.BaseFee)
 	if err != nil {
-		return err
+		// note that this is not a fatal errro
+		return models.NewEVMExecutionError(err)
 	}
 
 	return fe.run(msg)
@@ -325,21 +247,23 @@ func (fe *Environment) RunTransaction(tx *types.Transaction, gasLimit uint64) er
 func (fe *Environment) run(msg *core.Message) error {
 	execResult, err := core.NewStateTransition(fe.EVM, msg, (*core.GasPool)(&fe.Config.BlockContext.GasLimit)).TransitionDb()
 	if err != nil {
-		return err
+		// this is not a fatal error
+		// TODO: we might revist this later
+		return models.NewEVMExecutionError(err)
 	}
 
 	fe.Result.RetValue = execResult.ReturnData
 	fe.Result.GasConsumed = execResult.UsedGas
-	fe.Result.Error = execResult.Err
-	fe.Result.Failed = execResult.Failed()
 	fe.Result.Logs = fe.State.Logs()
 
 	// If the transaction created a contract, store the creation address in the receipt.
-	// TODO verify this later
 	if msg.To == nil {
 		fe.Result.DeployedContractAddress = crypto.CreateAddress(msg.From, msg.Nonce)
 	}
 
+	if execResult.Failed() {
+		return models.NewEVMExecutionError(execResult.Err)
+	}
 	// TODO check if we have the logic to pay the coinbase
 	return fe.commit()
 }
@@ -362,6 +286,65 @@ func directCallMessage(
 		// AccessList:        tx.AccessList(), // TODO revisit this value, the cost matter but performance might
 		SkipAccountChecks: true, // this would let us not set the nonce
 	}
+}
+
+func (fe *Environment) checkExecuteOnce() error {
+	if fe.Used {
+		return models.ErrFlexEnvReuse
+	}
+	fe.Used = true
+	return nil
+}
+
+// commit commits the changes to the state.
+// if error is returned is a fatal one.
+func (fe *Environment) commit() error {
+	// commit the changes
+	// ramtin: height is needed when we want to update to version v13
+	// var height uint64
+	// if fe.Config.BlockContext.BlockNumber != nil {
+	// 	height = fe.Config.BlockContext.BlockNumber.Uint64()
+	// }
+
+	// commits the changes from the journal into the in memory trie.
+	newRoot, err := fe.State.Commit(true)
+	if err != nil {
+		return models.NewFatalError(err)
+	}
+
+	// flush the trie to the lower level db
+	// the reason we have to do this, is the original database
+	// is designed to keep changes in memory until the state.Commit
+	// is called then the changes moves into the trie, but the trie
+	// would stay in memory for faster trasnaction execution. you
+	// have to explicitly ask the trie to commit to the underlying storage
+	err = fe.State.Database().TrieDB().Commit(newRoot, false)
+	if err != nil {
+		return models.NewFatalError(err)
+	}
+
+	newBlock := models.NewFlexBlock(
+		fe.LastExecutedBlock.Height+1,
+		fe.Result.UUIDIndex,
+		fe.Result.TotalSupplyOfNativeToken,
+		newRoot,
+		types.EmptyRootHash,
+	)
+
+	err = fe.Database.SetLatestBlock(newBlock)
+	if err != nil {
+		return models.NewFatalError(err)
+	}
+
+	// commit atree changes back to the backend
+	err = fe.Database.Commit()
+	if err != nil {
+		return models.NewFatalError(err)
+	}
+
+	// TODO: emit event on root changes
+	fe.Result.RootHash = newRoot
+	return nil
 }
 
 // TODO hid config from upper level and construct EVM per operation

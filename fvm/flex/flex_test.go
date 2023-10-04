@@ -5,7 +5,6 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
-	"math"
 	"math/big"
 	"testing"
 	"time"
@@ -142,17 +141,19 @@ func TestFlexRun(t *testing.T) {
 					inter := runtime.NewInterpreterRuntime(runtime.Config{})
 
 					script := []byte(`
-					pub fun main(tx: [UInt8], coinbaseBytes: [UInt8; 20]): Bool {
-						let coinbase = Flex.FlexAddress(bytes: coinbaseBytes)
-						return Flex.run(tx: tx, coinbase: coinbase)
-					}
-				`)
+						pub fun main(tx: [UInt8], coinbaseBytes: [UInt8; 20]): Bool {
+							let coinbase = Flex.FlexAddress(bytes: coinbaseBytes)
+							return Flex.run(tx: tx, coinbase: coinbase)
+						}
+					`)
+
+					gasLimit := uint64(100_000)
 
 					txBytes := testAccount.PrepareSignAndEncodeTx(t,
 						testContract.DeployedAt,
 						testContract.MakeStoreCallData(t, big.NewInt(num)),
 						big.NewInt(0),
-						math.MaxUint64,
+						gasLimit,
 						big.NewInt(1),
 					)
 					tx := cadence.NewArray(

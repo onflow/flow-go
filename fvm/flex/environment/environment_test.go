@@ -22,7 +22,8 @@ import (
 func RunWithTestDB(t testing.TB, f func(*storage.Database)) {
 	testutils.RunWithTestBackend(t, func(backend models.Backend) {
 		testutils.RunWithTestFlexRoot(t, backend, func(flexRoot flow.Address) {
-			db := storage.NewDatabase(backend, testutils.TestFlexRootAddress)
+			db, err := storage.NewDatabase(backend, testutils.TestFlexRootAddress)
+			require.NoError(t, err)
 			f(db)
 		})
 	})
@@ -110,7 +111,6 @@ func TestContractInteraction(t *testing.T) {
 					big.NewInt(0),
 				)
 				require.NoError(t, err)
-				require.False(t, env.Result.Failed)
 			})
 
 			RunWithNewEnv(t, db, func(env *fenv.Environment) {
@@ -122,7 +122,6 @@ func TestContractInteraction(t *testing.T) {
 					big.NewInt(0),
 				)
 				require.NoError(t, err)
-				require.False(t, env.Result.Failed)
 
 				ret := env.Result.RetValue
 				retNum := new(big.Int).SetBytes(ret)
@@ -146,9 +145,8 @@ func TestContractInteraction(t *testing.T) {
 				signer := types.MakeSigner(env.Config.ChainConfig, fenv.BlockNumberForEVMRules, env.Config.BlockContext.Time)
 				tx, _ := types.SignTx(types.NewTransaction(0, testAccount, big.NewInt(1000), params.TxGas, new(big.Int).Add(big.NewInt(0), common.Big1), nil), signer, key)
 
-				err := env.RunTransaction(tx, math.MaxUint64)
+				err := env.RunTransaction(tx)
 				require.NoError(t, err)
-				require.False(t, env.Result.Failed)
 			})
 		})
 	})

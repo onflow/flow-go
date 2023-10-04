@@ -94,7 +94,9 @@ func RunWithEOATestAccount(t *testing.T, led atree.Ledger, flexRoot flow.Address
 	account := GetTestEOAAccount(t, EOATestAccount1KeyHex)
 
 	// fund account
-	db := storage.NewDatabase(led, flexRoot)
+	db, err := storage.NewDatabase(led, flexRoot)
+	require.NoError(t, err)
+
 	config := env.NewFlexConfig(env.WithBlockNumber(env.BlockNumberForEVMRules))
 
 	e, err := env.NewEnvironment(config, db)
@@ -102,7 +104,6 @@ func RunWithEOATestAccount(t *testing.T, led atree.Ledger, flexRoot flow.Address
 
 	err = e.MintTo(new(big.Int).Mul(big.NewInt(1e18), big.NewInt(1000)), account.FlexAddress().ToCommon())
 	require.NoError(t, err)
-	require.False(t, e.Result.Failed)
 
 	f(account)
 }

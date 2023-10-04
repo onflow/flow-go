@@ -30,7 +30,7 @@ func (b Balance) Add(other Balance) Balance {
 }
 
 func (b Balance) Encode() []byte {
-	var encoded []byte
+	encoded := make([]byte, 8)
 	binary.BigEndian.PutUint64(encoded, b.ToAttoFlow().Uint64())
 	return encoded
 }

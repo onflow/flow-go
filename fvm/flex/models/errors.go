@@ -5,6 +5,51 @@ import (
 	"fmt"
 )
 
+var (
+	// ErrInsufficientBalance is returned when evm account doesn't have enough balance
+	ErrInsufficientBalance = errors.New("insufficient balance")
+
+	// ErrInsufficientComputation is returned when not enough computation is
+	// left in the context of flow transaction to execute the evm operation.
+	ErrInsufficientComputation = errors.New("insufficient computation")
+
+	// unauthorized method call, usually emited when calls are called on EOA accounts
+	ErrUnAuthroizedMethodCall = errors.New("unauthroized method call")
+	// ErrInsufficientTotalSupply is returned when flow token
+	// is withdraw request is there but not enough balance is on Flex vault
+	// this should never happen but its a saftey measure to protect Flow against Flex issues.
+	// TODO we might consider this fatal
+	ErrInsufficientTotalSupply = errors.New("insufficient total supply")
+
+	// ErrFlexEnvReuse is returned when a flex environment is used more than once
+	// TODO: this might be considered fatal
+	ErrFlexEnvReuse = errors.New("flex env has been used")
+)
+
+// EVMExecutionError is a user-related error,
+// emitted when a evm transaction execution or a contract call has been failed
+type EVMExecutionError struct {
+	err error
+}
+
+func NewEVMExecutionError(rootCause error) EVMExecutionError {
+	return EVMExecutionError{
+		err: rootCause,
+	}
+}
+
+func (err EVMExecutionError) Unwrap() error {
+	return err.err
+}
+
+func (err EVMExecutionError) Error() string {
+	return fmt.Sprintf("EVM execution failed: %v", err.err)
+}
+
+func IsEVMExecutionError(err error) bool {
+	return errors.As(err, &EVMExecutionError{})
+}
+
 // FatalError is user for any error that is not user related and something
 // unusual has happend. Usually we stop the node when this happens
 // given it might have a non-deterministic root.
@@ -25,31 +70,3 @@ func (err FatalError) Unwrap() error {
 func (err FatalError) Error() string {
 	return fmt.Sprintf("fatal error: %v", err.err)
 }
-
-// EVMExecutionError is a user-related error,
-// emitted when a evm transaction execution or a contract call has been failed
-type EVMExecutionError struct {
-	err error
-}
-
-func NewEVMExecutionError(rootCause error) EVMExecutionError {
-	return EVMExecutionError{
-		err: rootCause,
-	}
-}
-
-func (err EVMExecutionError) Unwrap() error {
-	return err.err
-}
-
-func (err EVMExecutionError) Error() string {
-	return fmt.Sprintf("EVM execution has failed: %v", err.err)
-}
-
-var (
-	// ErrFlexEnvReuse is returned when a flex environment is used more than once
-	ErrFlexEnvReuse           = errors.New("flex env has been used")
-	ErrInsufficientBalance    = errors.New("insufficient balance")
-	ErrGasLimit               = errors.New("gas limit hit")
-	ErrUnAuthroizedMethodCall = errors.New("unauthroized method call")
-)
