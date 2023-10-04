@@ -3,8 +3,7 @@
 package mockp2p
 
 import (
-	"github.com/onflow/flow-go/network/p2p/scoring"
-
+	p2p "github.com/onflow/flow-go/network/p2p"
 	mock "github.com/stretchr/testify/mock"
 )
 
@@ -14,14 +13,14 @@ type UpdateFunction struct {
 }
 
 // Execute provides a mock function with given fields: record
-func (_m *UpdateFunction) Execute(record scoring.GossipSubSpamRecord) scoring.GossipSubSpamRecord {
+func (_m *UpdateFunction) Execute(record p2p.GossipSubSpamRecord) p2p.GossipSubSpamRecord {
 	ret := _m.Called(record)
 
-	var r0 scoring.GossipSubSpamRecord
-	if rf, ok := ret.Get(0).(func(scoring.GossipSubSpamRecord) scoring.GossipSubSpamRecord); ok {
+	var r0 p2p.GossipSubSpamRecord
+	if rf, ok := ret.Get(0).(func(p2p.GossipSubSpamRecord) p2p.GossipSubSpamRecord); ok {
 		r0 = rf(record)
 	} else {
-		r0 = ret.Get(0).(scoring.GossipSubSpamRecord)
+		r0 = ret.Get(0).(p2p.GossipSubSpamRecord)
 	}
 
 	return r0

@@ -3,8 +3,7 @@
 package mockp2p
 
 import (
-	"github.com/onflow/flow-go/network/p2p/scoring"
-
+	p2p "github.com/onflow/flow-go/network/p2p"
 	mock "github.com/stretchr/testify/mock"
 
 	peer "github.com/libp2p/go-libp2p/core/peer"
@@ -16,11 +15,11 @@ type GossipSubSpamRecordCache struct {
 }
 
 // Add provides a mock function with given fields: peerId, record
-func (_m *GossipSubSpamRecordCache) Add(peerId peer.ID, record scoring.GossipSubSpamRecord) bool {
+func (_m *GossipSubSpamRecordCache) Add(peerId peer.ID, record p2p.GossipSubSpamRecord) bool {
 	ret := _m.Called(peerId, record)
 
 	var r0 bool
-	if rf, ok := ret.Get(0).(func(peer.ID, scoring.GossipSubSpamRecord) bool); ok {
+	if rf, ok := ret.Get(0).(func(peer.ID, p2p.GossipSubSpamRecord) bool); ok {
 		r0 = rf(peerId, record)
 	} else {
 		r0 = ret.Get(0).(bool)
@@ -30,20 +29,20 @@ func (_m *GossipSubSpamRecordCache) Add(peerId peer.ID, record scoring.GossipSub
 }
 
 // Get provides a mock function with given fields: peerID
-func (_m *GossipSubSpamRecordCache) Get(peerID peer.ID) (*scoring.GossipSubSpamRecord, error, bool) {
+func (_m *GossipSubSpamRecordCache) Get(peerID peer.ID) (*p2p.GossipSubSpamRecord, error, bool) {
 	ret := _m.Called(peerID)
 
-	var r0 *scoring.GossipSubSpamRecord
+	var r0 *p2p.GossipSubSpamRecord
 	var r1 error
 	var r2 bool
-	if rf, ok := ret.Get(0).(func(peer.ID) (*scoring.GossipSubSpamRecord, error, bool)); ok {
+	if rf, ok := ret.Get(0).(func(peer.ID) (*p2p.GossipSubSpamRecord, error, bool)); ok {
 		return rf(peerID)
 	}
-	if rf, ok := ret.Get(0).(func(peer.ID) *scoring.GossipSubSpamRecord); ok {
+	if rf, ok := ret.Get(0).(func(peer.ID) *p2p.GossipSubSpamRecord); ok {
 		r0 = rf(peerID)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*scoring.GossipSubSpamRecord)
+			r0 = ret.Get(0).(*p2p.GossipSubSpamRecord)
 		}
 	}
 
@@ -77,23 +76,23 @@ func (_m *GossipSubSpamRecordCache) Has(peerID peer.ID) bool {
 }
 
 // Update provides a mock function with given fields: peerID, updateFunc
-func (_m *GossipSubSpamRecordCache) Update(peerID peer.ID, updateFunc scoring.UpdateFunction) (*scoring.GossipSubSpamRecord, error) {
+func (_m *GossipSubSpamRecordCache) Update(peerID peer.ID, updateFunc p2p.UpdateFunction) (*p2p.GossipSubSpamRecord, error) {
 	ret := _m.Called(peerID, updateFunc)
 
-	var r0 *scoring.GossipSubSpamRecord
+	var r0 *p2p.GossipSubSpamRecord
 	var r1 error
-	if rf, ok := ret.Get(0).(func(peer.ID, scoring.UpdateFunction) (*scoring.GossipSubSpamRecord, error)); ok {
+	if rf, ok := ret.Get(0).(func(peer.ID, p2p.UpdateFunction) (*p2p.GossipSubSpamRecord, error)); ok {
 		return rf(peerID, updateFunc)
 	}
-	if rf, ok := ret.Get(0).(func(peer.ID, scoring.UpdateFunction) *scoring.GossipSubSpamRecord); ok {
+	if rf, ok := ret.Get(0).(func(peer.ID, p2p.UpdateFunction) *p2p.GossipSubSpamRecord); ok {
 		r0 = rf(peerID, updateFunc)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*scoring.GossipSubSpamRecord)
+			r0 = ret.Get(0).(*p2p.GossipSubSpamRecord)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(peer.ID, scoring.UpdateFunction) error); ok {
+	if rf, ok := ret.Get(1).(func(peer.ID, p2p.UpdateFunction) error); ok {
 		r1 = rf(peerID, updateFunc)
 	} else {
 		r1 = ret.Error(1)

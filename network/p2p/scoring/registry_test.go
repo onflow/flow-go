@@ -14,10 +14,10 @@ import (
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/network/p2p"
+	netcache "github.com/onflow/flow-go/network/p2p/cache"
 	p2pmsg "github.com/onflow/flow-go/network/p2p/message"
 	mockp2p "github.com/onflow/flow-go/network/p2p/mock"
 	"github.com/onflow/flow-go/network/p2p/scoring"
-	netcache "github.com/onflow/flow-go/network/p2p/scoring/internal"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -258,8 +258,8 @@ func TestSpamPenaltyDecayToZero(t *testing.T) {
 		t,
 		withStakedIdentity(peerID),
 		withValidSubscriptions(peerID),
-		withInitFunction(func() scoring.GossipSubSpamRecord {
-			return scoring.GossipSubSpamRecord{
+		withInitFunction(func() p2p.GossipSubSpamRecord {
+			return p2p.GossipSubSpamRecord{
 				Decay:   0.02, // we choose a small decay value to speed up the test.
 				Penalty: 0,
 			}
@@ -304,8 +304,8 @@ func TestPersistingUnknownIdentityPenalty(t *testing.T) {
 		t,
 		withUnknownIdentity(peerID), // the peer id has an unknown identity.
 		withValidSubscriptions(peerID),
-		withInitFunction(func() scoring.GossipSubSpamRecord {
-			return scoring.GossipSubSpamRecord{
+		withInitFunction(func() p2p.GossipSubSpamRecord {
+			return p2p.GossipSubSpamRecord{
 				Decay:   0.02, // we choose a small decay value to speed up the test.
 				Penalty: 0,
 			}
@@ -361,8 +361,8 @@ func TestPersistingInvalidSubscriptionPenalty(t *testing.T) {
 		t,
 		withStakedIdentity(peerID),
 		withInvalidSubscriptions(peerID), // the peer id has an invalid subscription.
-		withInitFunction(func() scoring.GossipSubSpamRecord {
-			return scoring.GossipSubSpamRecord{
+		withInitFunction(func() p2p.GossipSubSpamRecord {
+			return p2p.GossipSubSpamRecord{
 				Decay:   0.02, // we choose a small decay value to speed up the test.
 				Penalty: 0,
 			}
@@ -437,7 +437,7 @@ func withInvalidSubscriptions(peer peer.ID) func(cfg *scoring.GossipSubAppSpecif
 	}
 }
 
-func withInitFunction(initFunction func() scoring.GossipSubSpamRecord) func(cfg *scoring.GossipSubAppSpecificScoreRegistryConfig) {
+func withInitFunction(initFunction func() p2p.GossipSubSpamRecord) func(cfg *scoring.GossipSubAppSpecificScoreRegistryConfig) {
 	return func(cfg *scoring.GossipSubAppSpecificScoreRegistryConfig) {
 		cfg.Init = initFunction
 	}
@@ -453,7 +453,7 @@ func newGossipSubAppSpecificScoreRegistry(t *testing.T, opts ...func(*scoring.Go
 		Penalty:    penaltyValueFixtures(),
 		IdProvider: mock.NewIdentityProvider(t),
 		Validator:  mockp2p.NewSubscriptionValidator(t),
-		CacheFactory: func() scoring.GossipSubSpamRecordCache {
+		CacheFactory: func() p2p.GossipSubSpamRecordCache {
 			return cache
 		},
 	}

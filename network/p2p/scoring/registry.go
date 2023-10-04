@@ -10,9 +10,9 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/network/p2p"
+	netcache "github.com/onflow/flow-go/network/p2p/cache"
 	p2pmsg "github.com/onflow/flow-go/network/p2p/message"
 	"github.com/onflow/flow-go/network/p2p/p2plogging"
-	netcache "github.com/onflow/flow-go/network/p2p/scoring/internal"
 	"github.com/onflow/flow-go/utils/logging"
 )
 
@@ -79,10 +79,10 @@ type GossipSubAppSpecificScoreRegistry struct {
 	logger     zerolog.Logger
 	idProvider module.IdentityProvider
 	// spamScoreCache currently only holds the control message misbehaviour penalty (spam related penalty).
-	spamScoreCache GossipSubSpamRecordCache
+	spamScoreCache p2p.GossipSubSpamRecordCache
 	penalty        GossipSubCtrlMsgPenaltyValue
 	// initial application specific penalty record, used to initialize the penalty cache entry.
-	init      func() GossipSubSpamRecord
+	init      func() p2p.GossipSubSpamRecord
 	validator p2p.SubscriptionValidator
 }
 
@@ -104,11 +104,11 @@ type GossipSubAppSpecificScoreRegistryConfig struct {
 
 	// Init is a factory function that returns a new GossipSubSpamRecord. It is used to initialize the spam record of
 	// a peer when the peer is first observed by the local peer.
-	Init func() GossipSubSpamRecord
+	Init func() p2p.GossipSubSpamRecord
 
 	// CacheFactory is a factory function that returns a new GossipSubSpamRecordCache. It is used to initialize the spamScoreCache.
 	// The cache is used to store the application specific penalty of peers.
-	CacheFactory func() GossipSubSpamRecordCache
+	CacheFactory func() p2p.GossipSubSpamRecordCache
 }
 
 // NewGossipSubAppSpecificScoreRegistry returns a new GossipSubAppSpecificScoreRegistry.
@@ -254,7 +254,7 @@ func (r *GossipSubAppSpecificScoreRegistry) OnInvalidControlMessageNotification(
 		lg.Trace().Str("peer_id", p2plogging.PeerId(notification.PeerID)).Msg("application specific penalty initialized for peer")
 	}
 
-	record, err := r.spamScoreCache.Update(notification.PeerID, func(record GossipSubSpamRecord) GossipSubSpamRecord {
+	record, err := r.spamScoreCache.Update(notification.PeerID, func(record p2p.GossipSubSpamRecord) p2p.GossipSubSpamRecord {
 		switch notification.MsgType {
 		case p2pmsg.CtrlMsgGraft:
 			record.Penalty += r.penalty.Graft
@@ -284,7 +284,7 @@ func (r *GossipSubAppSpecificScoreRegistry) OnInvalidControlMessageNotification(
 // It is used if no decay function is provided in the configuration.
 // It decays the application specific penalty of a peer if it is negative.
 func DefaultDecayFunction() netcache.PreprocessorFunc {
-	return func(record GossipSubSpamRecord, lastUpdated time.Time) (GossipSubSpamRecord, error) {
+	return func(record p2p.GossipSubSpamRecord, lastUpdated time.Time) (p2p.GossipSubSpamRecord, error) {
 		if record.Penalty >= 0 {
 			// no need to decay the penalty if it is positive, the reason is currently the app specific penalty
 			// is only used to penalize peers. Hence, when there is no reward, there is no need to decay the positive penalty, as
@@ -311,8 +311,8 @@ func DefaultDecayFunction() netcache.PreprocessorFunc {
 // InitAppScoreRecordState initializes the gossipsub spam record state for a peer.
 // Returns:
 //   - a gossipsub spam record with the default decay value and 0 penalty.
-func InitAppScoreRecordState() GossipSubSpamRecord {
-	return GossipSubSpamRecord{
+func InitAppScoreRecordState() p2p.GossipSubSpamRecord {
+	return p2p.GossipSubSpamRecord{
 		Decay:   defaultDecay,
 		Penalty: 0,
 	}

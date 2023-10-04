@@ -12,7 +12,7 @@ import (
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/p2p"
-	netcache "github.com/onflow/flow-go/network/p2p/scoring/internal"
+	netcache "github.com/onflow/flow-go/network/p2p/cache"
 	"github.com/onflow/flow-go/network/p2p/utils"
 	"github.com/onflow/flow-go/utils/logging"
 )
@@ -394,7 +394,7 @@ func NewScoreOption(cfg *ScoreOptionConfig) *ScoreOption {
 		Validator:  validator,
 		Init:       InitAppScoreRecordState,
 		IdProvider: cfg.provider,
-		CacheFactory: func() GossipSubSpamRecordCache {
+		CacheFactory: func() p2p.GossipSubSpamRecordCache {
 			return netcache.NewGossipSubSpamRecordCache(cfg.cacheSize, cfg.logger, cfg.cacheMetrics, DefaultDecayFunction())
 		},
 	})
