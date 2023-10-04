@@ -19,7 +19,7 @@ import (
 	"github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/p2p"
-	"github.com/onflow/flow-go/network/p2p/scoring/scoreoption"
+	"github.com/onflow/flow-go/network/p2p/scoring"
 	p2ptest "github.com/onflow/flow-go/network/p2p/test"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -58,7 +58,7 @@ func TestGossipSubIHaveBrokenPromises_Below_Threshold(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
 	// we override some of the default scoring parameters in order to speed up the test in a time-efficient manner.
-	blockTopicOverrideParams := scoreoption.DefaultTopicScoreParams()
+	blockTopicOverrideParams := scoring.DefaultTopicScoreParams()
 	blockTopicOverrideParams.MeshMessageDeliveriesActivation = 1 * time.Second // we start observing the mesh message deliveries after 1 second of the node startup.
 	// we disable invalid message delivery parameters, as the way we implement spammer, when it spams ihave messages, it does not sign them. Hence, without decaying the invalid message deliveries,
 	// the node would be penalized for invalid message delivery way sooner than it can mount an ihave broken-promises spam attack.
@@ -120,9 +120,9 @@ func TestGossipSubIHaveBrokenPromises_Below_Threshold(t *testing.T) {
 	spammerScore, ok := victimNode.PeerScoreExposer().GetScore(spammer.SpammerNode.ID())
 	require.True(t, ok, "sanity check failed, we should have a score for the spammer node")
 	// since spammer is not yet considered to be penalized, its score must be greater than the gossipsub health thresholds.
-	require.Greaterf(t, spammerScore, scoreoption.DefaultGossipThreshold, "sanity check failed, the score of the spammer node must be greater than gossip threshold: %f, actual: %f", scoreoption.DefaultGossipThreshold, spammerScore)
-	require.Greaterf(t, spammerScore, scoreoption.DefaultPublishThreshold, "sanity check failed, the score of the spammer node must be greater than publish threshold: %f, actual: %f", scoreoption.DefaultPublishThreshold, spammerScore)
-	require.Greaterf(t, spammerScore, scoreoption.DefaultGraylistThreshold, "sanity check failed, the score of the spammer node must be greater than graylist threshold: %f, actual: %f", scoreoption.DefaultGraylistThreshold, spammerScore)
+	require.Greaterf(t, spammerScore, scoring.DefaultGossipThreshold, "sanity check failed, the score of the spammer node must be greater than gossip threshold: %f, actual: %f", scoring.DefaultGossipThreshold, spammerScore)
+	require.Greaterf(t, spammerScore, scoring.DefaultPublishThreshold, "sanity check failed, the score of the spammer node must be greater than publish threshold: %f, actual: %f", scoring.DefaultPublishThreshold, spammerScore)
+	require.Greaterf(t, spammerScore, scoring.DefaultGraylistThreshold, "sanity check failed, the score of the spammer node must be greater than graylist threshold: %f, actual: %f", scoring.DefaultGraylistThreshold, spammerScore)
 
 	// eventually, after a heartbeat the spammer behavioral counter must be decayed
 	require.Eventually(t, func() bool {
@@ -184,7 +184,7 @@ func TestGossipSubIHaveBrokenPromises_Above_Threshold(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
 	// we override some of the default scoring parameters in order to speed up the test in a time-efficient manner.
-	blockTopicOverrideParams := scoreoption.DefaultTopicScoreParams()
+	blockTopicOverrideParams := scoring.DefaultTopicScoreParams()
 	blockTopicOverrideParams.MeshMessageDeliveriesActivation = 1 * time.Second // we start observing the mesh message deliveries after 1 second of the node startup.
 	// we disable invalid message delivery parameters, as the way we implement spammer, when it spams ihave messages, it does not sign them. Hence, without decaying the invalid message deliveries,
 	// the node would be penalized for invalid message delivery way sooner than it can mount an ihave broken-promises spam attack.
@@ -277,15 +277,10 @@ func TestGossipSubIHaveBrokenPromises_Above_Threshold(t *testing.T) {
 	require.True(t, ok, "sanity check failed, we should have a score for the spammer node")
 	// with the second round of the attack, the spammer is about 10 broken promises above the threshold (total ~20 broken promises, but the first 10 are not counted).
 	// we expect the score to be dropped to initScore - 10 * 10 * 0.01 * scoring.MaxAppSpecificReward, however, instead of 10, we consider 8 about the threshold, to account for decays.
-	require.LessOrEqual(t,
-		spammerScore,
-		initScore-8*8*0.01*scoreoption.MaxAppSpecificReward,
-		"sanity check failed, the score of the spammer node must be less than the initial score minus 8 * 8 * 0.01 * scoring.MaxAppSpecificReward: %f, actual: %f",
-		initScore-10*10*10-2*scoreoption.MaxAppSpecificReward,
-		spammerScore)
-	require.Greaterf(t, spammerScore, scoreoption.DefaultGossipThreshold, "sanity check failed, the score of the spammer node must be greater than gossip threshold: %f, actual: %f", scoreoption.DefaultGossipThreshold, spammerScore)
-	require.Greaterf(t, spammerScore, scoreoption.DefaultPublishThreshold, "sanity check failed, the score of the spammer node must be greater than publish threshold: %f, actual: %f", scoreoption.DefaultPublishThreshold, spammerScore)
-	require.Greaterf(t, spammerScore, scoreoption.DefaultGraylistThreshold, "sanity check failed, the score of the spammer node must be greater than graylist threshold: %f, actual: %f", scoreoption.DefaultGraylistThreshold, spammerScore)
+	require.LessOrEqual(t, spammerScore, initScore-8*8*0.01*scoring.MaxAppSpecificReward, "sanity check failed, the score of the spammer node must be less than the initial score minus 8 * 8 * 0.01 * scoring.MaxAppSpecificReward: %f, actual: %f", initScore-10*10*10-2*scoring.MaxAppSpecificReward, spammerScore)
+	require.Greaterf(t, spammerScore, scoring.DefaultGossipThreshold, "sanity check failed, the score of the spammer node must be greater than gossip threshold: %f, actual: %f", scoring.DefaultGossipThreshold, spammerScore)
+	require.Greaterf(t, spammerScore, scoring.DefaultPublishThreshold, "sanity check failed, the score of the spammer node must be greater than publish threshold: %f, actual: %f", scoring.DefaultPublishThreshold, spammerScore)
+	require.Greaterf(t, spammerScore, scoring.DefaultGraylistThreshold, "sanity check failed, the score of the spammer node must be greater than graylist threshold: %f, actual: %f", scoring.DefaultGraylistThreshold, spammerScore)
 
 	// since the spammer score is above the gossip, graylist and publish thresholds, it should be still able to exchange messages with victim.
 	p2ptest.EnsurePubsubMessageExchange(t, ctx, nodes, blockTopic, 1, func() interface{} {
@@ -316,9 +311,9 @@ func TestGossipSubIHaveBrokenPromises_Above_Threshold(t *testing.T) {
 	require.True(t, ok, "sanity check failed, we should have a score for the spammer node")
 	// with the third round of the attack, the spammer is about 20 broken promises above the threshold (total ~30 broken promises), hence its overall score must be below the gossip, publish, and graylist thresholds, meaning that
 	// victim will not exchange messages with it anymore, and also that it will be graylisted meaning all incoming and outgoing RPCs to and from the spammer will be dropped by the victim.
-	require.Lessf(t, spammerScore, scoreoption.DefaultGossipThreshold, "sanity check failed, the score of the spammer node must be less than gossip threshold: %f, actual: %f", scoreoption.DefaultGossipThreshold, spammerScore)
-	require.Lessf(t, spammerScore, scoreoption.DefaultPublishThreshold, "sanity check failed, the score of the spammer node must be less than publish threshold: %f, actual: %f", scoreoption.DefaultPublishThreshold, spammerScore)
-	require.Lessf(t, spammerScore, scoreoption.DefaultGraylistThreshold, "sanity check failed, the score of the spammer node must be less than graylist threshold: %f, actual: %f", scoreoption.DefaultGraylistThreshold, spammerScore)
+	require.Lessf(t, spammerScore, scoring.DefaultGossipThreshold, "sanity check failed, the score of the spammer node must be less than gossip threshold: %f, actual: %f", scoring.DefaultGossipThreshold, spammerScore)
+	require.Lessf(t, spammerScore, scoring.DefaultPublishThreshold, "sanity check failed, the score of the spammer node must be less than publish threshold: %f, actual: %f", scoring.DefaultPublishThreshold, spammerScore)
+	require.Lessf(t, spammerScore, scoring.DefaultGraylistThreshold, "sanity check failed, the score of the spammer node must be less than graylist threshold: %f, actual: %f", scoring.DefaultGraylistThreshold, spammerScore)
 
 	// since the spammer score is below the gossip, graylist and publish thresholds, it should not be able to exchange messages with victim anymore.
 	p2ptest.EnsureNoPubsubExchangeBetweenGroups(

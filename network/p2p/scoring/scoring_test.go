@@ -1,4 +1,4 @@
-package scoreoption_test
+package scoring_test
 
 import (
 	"context"

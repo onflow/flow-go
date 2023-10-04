@@ -1,4 +1,4 @@
-package scoreoption
+package scoring
 
 import (
 	"fmt"
@@ -12,9 +12,7 @@ import (
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/p2p"
-	"github.com/onflow/flow-go/network/p2p/scoring"
 	netcache "github.com/onflow/flow-go/network/p2p/scoring/internal"
-	"github.com/onflow/flow-go/network/p2p/subscription"
 	"github.com/onflow/flow-go/network/p2p/utils"
 	"github.com/onflow/flow-go/utils/logging"
 )
@@ -389,15 +387,15 @@ func NewScoreOption(cfg *ScoreOptionConfig) *ScoreOption {
 			TraceSampler: throttledSampler,
 			DebugSampler: throttledSampler,
 		})
-	validator := subscription.NewSubscriptionValidator()
-	scoreRegistry := netcache.NewGossipSubAppSpecificScoreRegistry(&netcache.GossipSubAppSpecificScoreRegistryConfig{
+	validator := NewSubscriptionValidator()
+	scoreRegistry := NewGossipSubAppSpecificScoreRegistry(&GossipSubAppSpecificScoreRegistryConfig{
 		Logger:     logger,
-		Penalty:    netcache.DefaultGossipSubCtrlMsgPenaltyValue(),
+		Penalty:    DefaultGossipSubCtrlMsgPenaltyValue(),
 		Validator:  validator,
-		Init:       netcache.InitAppScoreRecordState,
+		Init:       InitAppScoreRecordState,
 		IdProvider: cfg.provider,
-		CacheFactory: func() scoring.GossipSubSpamRecordCache {
-			return netcache.NewGossipSubSpamRecordCache(cfg.cacheSize, cfg.logger, cfg.cacheMetrics, netcache.DefaultDecayFunction())
+		CacheFactory: func() GossipSubSpamRecordCache {
+			return netcache.NewGossipSubSpamRecordCache(cfg.cacheSize, cfg.logger, cfg.cacheMetrics, DefaultDecayFunction())
 		},
 	})
 	s := &ScoreOption{
@@ -441,7 +439,7 @@ func NewScoreOption(cfg *ScoreOptionConfig) *ScoreOption {
 	return s
 }
 
-func (s *ScoreOption) SetSubscriptionProvider(provider *subscription.SubscriptionProvider) error {
+func (s *ScoreOption) SetSubscriptionProvider(provider *SubscriptionProvider) error {
 	return s.validator.RegisterSubscriptionProvider(provider)
 }
 

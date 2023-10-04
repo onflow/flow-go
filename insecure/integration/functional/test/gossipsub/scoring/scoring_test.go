@@ -17,7 +17,7 @@ import (
 	"github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/p2p"
-	"github.com/onflow/flow-go/network/p2p/scoring/scoreoption"
+	"github.com/onflow/flow-go/network/p2p/scoring"
 	p2ptest "github.com/onflow/flow-go/network/p2p/test"
 	validator "github.com/onflow/flow-go/network/validator/pubsub"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -147,15 +147,15 @@ func testGossipSubInvalidMessageDeliveryScoring(t *testing.T, spamMsgFactory fun
 		if !ok {
 			return false
 		}
-		if spammerScore >= scoreoption.DefaultGossipThreshold {
+		if spammerScore >= scoring.DefaultGossipThreshold {
 			// ensure the score is low enough so that no gossip is routed by victim node to spammer node.
 			return false
 		}
-		if spammerScore >= scoreoption.DefaultPublishThreshold {
+		if spammerScore >= scoring.DefaultPublishThreshold {
 			// ensure the score is low enough so that non of the published messages of the victim node are routed to the spammer node.
 			return false
 		}
-		if spammerScore >= scoreoption.DefaultGraylistThreshold {
+		if spammerScore >= scoring.DefaultGraylistThreshold {
 			// ensure the score is low enough so that the victim node does not accept RPC messages from the spammer node.
 			return false
 		}
@@ -201,7 +201,7 @@ func TestGossipSubMeshDeliveryScoring_UnderDelivery_SingleTopic(t *testing.T) {
 	blockTopic := channels.TopicFromChannel(channels.PushBlocks, sporkId)
 
 	// we override some of the default scoring parameters in order to speed up the test in a time-efficient manner.
-	blockTopicOverrideParams := scoreoption.DefaultTopicScoreParams()
+	blockTopicOverrideParams := scoring.DefaultTopicScoreParams()
 	blockTopicOverrideParams.MeshMessageDeliveriesActivation = 1 * time.Second // we start observing the mesh message deliveries after 1 second of the node startup.
 	thisNode, thisId := p2ptest.NodeFixture(                                   // this node is the one that will be penalizing the under-performer node.
 		t,
@@ -251,7 +251,7 @@ func TestGossipSubMeshDeliveryScoring_UnderDelivery_SingleTopic(t *testing.T) {
 		if !ok {
 			return false
 		}
-		if underPerformingNodeScore < scoreoption.MaxAppSpecificReward {
+		if underPerformingNodeScore < scoring.MaxAppSpecificReward {
 			// ensure the score is high enough so that gossip is routed by victim node to spammer node.
 			return false
 		}
@@ -266,17 +266,17 @@ func TestGossipSubMeshDeliveryScoring_UnderDelivery_SingleTopic(t *testing.T) {
 		if !ok {
 			return false
 		}
-		if underPerformingNodeScore > 0.96*scoreoption.MaxAppSpecificReward { // score must be penalized by -0.05 * MaxAppSpecificReward.
+		if underPerformingNodeScore > 0.96*scoring.MaxAppSpecificReward { // score must be penalized by -0.05 * MaxAppSpecificReward.
 			// 0.96 is to account for floating point errors.
 			return false
 		}
-		if underPerformingNodeScore < scoreoption.DefaultGossipThreshold { // even the node is slightly penalized, it should still be able to gossip with this node.
+		if underPerformingNodeScore < scoring.DefaultGossipThreshold { // even the node is slightly penalized, it should still be able to gossip with this node.
 			return false
 		}
-		if underPerformingNodeScore < scoreoption.DefaultPublishThreshold { // even the node is slightly penalized, it should still be able to publish to this node.
+		if underPerformingNodeScore < scoring.DefaultPublishThreshold { // even the node is slightly penalized, it should still be able to publish to this node.
 			return false
 		}
-		if underPerformingNodeScore < scoreoption.DefaultGraylistThreshold { // even the node is slightly penalized, it should still be able to establish rpc connection with this node.
+		if underPerformingNodeScore < scoring.DefaultGraylistThreshold { // even the node is slightly penalized, it should still be able to establish rpc connection with this node.
 			return false
 		}
 
@@ -304,9 +304,9 @@ func TestGossipSubMeshDeliveryScoring_UnderDelivery_TwoTopics(t *testing.T) {
 	dkgTopic := channels.TopicFromChannel(channels.DKGCommittee, sporkId)
 
 	// we override some of the default scoring parameters in order to speed up the test in a time-efficient manner.
-	blockTopicOverrideParams := scoreoption.DefaultTopicScoreParams()
+	blockTopicOverrideParams := scoring.DefaultTopicScoreParams()
 	blockTopicOverrideParams.MeshMessageDeliveriesActivation = 1 * time.Second // we start observing the mesh message deliveries after 1 second of the node startup.
-	dkgTopicOverrideParams := scoreoption.DefaultTopicScoreParams()
+	dkgTopicOverrideParams := scoring.DefaultTopicScoreParams()
 	dkgTopicOverrideParams.MeshMessageDeliveriesActivation = 1 * time.Second // we start observing the mesh message deliveries after 1 second of the node startup.
 	thisNode, thisId := p2ptest.NodeFixture(                                 // this node is the one that will be penalizing the under-performer node.
 		t,
@@ -360,7 +360,7 @@ func TestGossipSubMeshDeliveryScoring_UnderDelivery_TwoTopics(t *testing.T) {
 		if !ok {
 			return false
 		}
-		if underPerformingNodeScore < scoreoption.MaxAppSpecificReward {
+		if underPerformingNodeScore < scoring.MaxAppSpecificReward {
 			// ensure the score is high enough so that gossip is routed by victim node to spammer node.
 			return false
 		}
@@ -376,17 +376,17 @@ func TestGossipSubMeshDeliveryScoring_UnderDelivery_TwoTopics(t *testing.T) {
 		if !ok {
 			return false
 		}
-		if underPerformingNodeScore > 0.91*scoreoption.MaxAppSpecificReward { // score must be penalized by ~ 2 * -0.05 * MaxAppSpecificReward.
+		if underPerformingNodeScore > 0.91*scoring.MaxAppSpecificReward { // score must be penalized by ~ 2 * -0.05 * MaxAppSpecificReward.
 			// 0.91 is to account for the floating point errors.
 			return false
 		}
-		if underPerformingNodeScore < scoreoption.DefaultGossipThreshold { // even the node is slightly penalized, it should still be able to gossip with this node.
+		if underPerformingNodeScore < scoring.DefaultGossipThreshold { // even the node is slightly penalized, it should still be able to gossip with this node.
 			return false
 		}
-		if underPerformingNodeScore < scoreoption.DefaultPublishThreshold { // even the node is slightly penalized, it should still be able to publish to this node.
+		if underPerformingNodeScore < scoring.DefaultPublishThreshold { // even the node is slightly penalized, it should still be able to publish to this node.
 			return false
 		}
-		if underPerformingNodeScore < scoreoption.DefaultGraylistThreshold { // even the node is slightly penalized, it should still be able to establish rpc connection with this node.
+		if underPerformingNodeScore < scoring.DefaultGraylistThreshold { // even the node is slightly penalized, it should still be able to establish rpc connection with this node.
 			return false
 		}
 
@@ -416,7 +416,7 @@ func TestGossipSubMeshDeliveryScoring_Replay_Will_Not_Counted(t *testing.T) {
 	blockTopic := channels.TopicFromChannel(channels.PushBlocks, sporkId)
 
 	// we override some of the default scoring parameters in order to speed up the test in a time-efficient manner.
-	blockTopicOverrideParams := scoreoption.DefaultTopicScoreParams()
+	blockTopicOverrideParams := scoring.DefaultTopicScoreParams()
 	blockTopicOverrideParams.MeshMessageDeliveriesActivation = 1 * time.Second // we start observing the mesh message deliveries after 1 second of the node startup.
 	thisNode, thisId := p2ptest.NodeFixture(                                   // this node is the one that will be penalizing the under-performer node.
 		t,
@@ -467,7 +467,7 @@ func TestGossipSubMeshDeliveryScoring_Replay_Will_Not_Counted(t *testing.T) {
 		if !ok {
 			return false
 		}
-		if replayingNodeScore < scoreoption.MaxAppSpecificReward {
+		if replayingNodeScore < scoring.MaxAppSpecificReward {
 			// ensure the score is high enough so that gossip is routed by victim node to spammer node.
 			return false
 		}
@@ -494,7 +494,7 @@ func TestGossipSubMeshDeliveryScoring_Replay_Will_Not_Counted(t *testing.T) {
 		if !ok {
 			return false
 		}
-		if replayingNodeScore < scoreoption.MaxAppSpecificReward {
+		if replayingNodeScore < scoring.MaxAppSpecificReward {
 			// ensure the score is high enough so that gossip is routed by victim node to spammer node.
 			return false
 		}
@@ -534,22 +534,22 @@ func TestGossipSubMeshDeliveryScoring_Replay_Will_Not_Counted(t *testing.T) {
 			return false
 		}
 
-		if replayingNodeScore >= scoreoption.MaxAppSpecificReward {
+		if replayingNodeScore >= scoring.MaxAppSpecificReward {
 			// node must be penalized for just replaying the same messages.
 			return false
 		}
 
 		// following if-statements check that even though the node is penalized, it is not penalized too much, and
 		// can still participate in the network. We don't desire to disallow list a node for just under-performing.
-		if replayingNodeScore < scoreoption.DefaultGossipThreshold {
+		if replayingNodeScore < scoring.DefaultGossipThreshold {
 			return false
 		}
 
-		if replayingNodeScore < scoreoption.DefaultPublishThreshold {
+		if replayingNodeScore < scoring.DefaultPublishThreshold {
 			return false
 		}
 
-		if replayingNodeScore < scoreoption.DefaultGraylistThreshold {
+		if replayingNodeScore < scoring.DefaultGraylistThreshold {
 			return false
 		}
 

@@ -11,7 +11,7 @@ import (
 	herocache "github.com/onflow/flow-go/module/mempool/herocache/backdata"
 	"github.com/onflow/flow-go/module/mempool/herocache/backdata/heropool"
 	"github.com/onflow/flow-go/module/mempool/stdmap"
-	"github.com/onflow/flow-go/network/p2p/utils"
+	"github.com/onflow/flow-go/network/p2p/scoring"
 )
 
 type recordEntityFactory func(identifier flow.Identifier) ClusterPrefixedMessagesReceivedRecord
@@ -217,7 +217,7 @@ func defaultDecayFunction(decay float64) decayFunc {
 			return recordEntity, nil
 		}
 
-		decayedVal, err := utils.GeometricDecay(received, decay, recordEntity.lastUpdated)
+		decayedVal, err := scoring.GeometricDecay(received, decay, recordEntity.lastUpdated)
 		if err != nil {
 			return recordEntity, fmt.Errorf("could not decay cluster prefixed control messages received gauge: %w", err)
 		}

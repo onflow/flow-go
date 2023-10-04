@@ -1,4 +1,4 @@
-package utils_test
+package scoring_test
 
 import (
 	"fmt"
@@ -9,7 +9,6 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/onflow/flow-go/network/p2p/scoring"
-	"github.com/onflow/flow-go/network/p2p/scoring/internal"
 )
 
 // TestGeometricDecay tests the GeometricDecay function.
@@ -119,7 +118,7 @@ func TestGeometricDecay(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := GeometricDecay(tt.args.penalty, tt.args.decay, tt.args.lastUpdated)
+			got, err := scoring.GeometricDecay(tt.args.penalty, tt.args.decay, tt.args.lastUpdated)
 			if tt.wantErr != nil {
 				assert.Errorf(t, err, tt.wantErr.Error())
 			}
@@ -241,7 +240,7 @@ func TestDefaultDecayFunction(t *testing.T) {
 		},
 	}
 
-	decayFunc := internal.DefaultDecayFunction()
+	decayFunc := scoring.DefaultDecayFunction()
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got, err := decayFunc(tt.args.record, tt.args.lastUpdated)
