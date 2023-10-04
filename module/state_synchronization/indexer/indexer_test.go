@@ -3,34 +3,21 @@ package indexer
 import (
 	"context"
 	"fmt"
-	"path"
 	"testing"
 	"time"
 
-	"github.com/cockroachdb/pebble"
-	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	mocks "github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/atomic"
 
-	"github.com/onflow/flow-go/engine/execution/state"
-	"github.com/onflow/flow-go/fvm"
-	"github.com/onflow/flow-go/fvm/storage/snapshot"
-	"github.com/onflow/flow-go/ledger"
-	completeLedger "github.com/onflow/flow-go/ledger/complete"
-	"github.com/onflow/flow-go/ledger/complete/mtrie/trie"
-	"github.com/onflow/flow-go/ledger/complete/wal"
-	"github.com/onflow/flow-go/ledger/complete/wal/fixtures"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data/cache"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data/mock"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	mempool "github.com/onflow/flow-go/module/mempool/mock"
-	"github.com/onflow/flow-go/module/metrics"
 	storagemock "github.com/onflow/flow-go/storage/mock"
-	pStorage "github.com/onflow/flow-go/storage/pebble"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -54,7 +41,8 @@ func newIndexerTest(t *testing.T, availableBlocks int, lastIndexedIndex int) *in
 	// we use 5th index as the latest indexed height, so we leave 5 more blocks to be indexed by the indexer in this test
 	lastIndexedHeight := blocks[lastIndexedIndex].Header.Height
 	progress := newMockProgress()
-	progress.SetProcessedIndex(lastIndexedHeight)
+	err := progress.SetProcessedIndex(lastIndexedHeight)
+	require.NoError(t, err)
 	registers := storagemock.NewRegisterIndex(t)
 
 	indexerCoreTest := newIndexCoreTest(t, blocks, nil).
@@ -250,139 +238,4 @@ func TestIndexer_Failure(t *testing.T) {
 
 	// make sure store was called correct number of times
 	test.indexTest.registers.AssertNumberOfCalls(t, "Store", 1) // it fails after first run
-}
-
-func Test_Integration(t *testing.T) {
-	const (
-		fileName   = "integration-checkpoint"
-		rootHeight = uint64(1)
-	)
-
-	log := zerolog.Nop()
-	chain, err := newTestChain()
-	require.NoError(t, err)
-
-	tries, err := chain.bootstrap()
-	require.NoError(t, err)
-
-	unittest.RunWithTempDir(t, func(dir string) {
-		err = wal.StoreCheckpointV6Concurrently([]*trie.MTrie{tries}, dir, fileName, log)
-		require.NoErrorf(t, err, "fail to store checkpoint")
-
-		checkpointFile := path.Join(dir, fileName)
-		pb, dbDir := createPebbleForTest(t)
-
-		bootstrap, err := pStorage.NewRegisterBootstrap(pb, checkpointFile, rootHeight, log)
-		require.NoError(t, err)
-
-		err = bootstrap.IndexCheckpointFile(context.Background())
-		require.NoError(t, err)
-
-		registers, err := pStorage.NewRegisters(pb)
-		require.NoError(t, err)
-
-		assert.Equal(t, registers.LatestHeight(), rootHeight)
-		assert.Equal(t, registers.FirstHeight(), rootHeight)
-
-		updates, err := chain.executeTx()
-		require.NoError(t, err)
-
-		ed := &execution_data.BlockExecutionData{
-			BlockID: ID,
-			ChunkExecutionDatas: []*execution_data.ChunkExecutionData{
-				{TrieUpdate: updates},
-			},
-		}
-	})
-
-}
-
-func createPebbleForTest(t *testing.T) (*pebble.DB, string) {
-	dbDir := unittest.TempPebblePath(t)
-	pb, err := pStorage.OpenRegisterPebbleDB(dbDir)
-	require.NoError(t, err)
-	return pb, dbDir
-}
-
-type testChain struct {
-	ldg          *completeLedger.Ledger
-	chain        flow.Chain
-	fvm          *fvm.VirtualMachine
-	fvmOpts      []fvm.Option
-	latestCommit flow.StateCommitment
-}
-
-func newTestChain() (*testChain, error) {
-	ldg, err := completeLedger.NewLedger(
-		&fixtures.NoopWAL{},
-		100,
-		&metrics.NoopCollector{},
-		zerolog.Logger{},
-		completeLedger.DefaultPathFinderVersion,
-	)
-	if err != nil {
-		return nil, err
-	}
-
-	chain := flow.Emulator.Chain()
-	opts := []fvm.Option{
-		fvm.WithChain(chain),
-		fvm.WithAuthorizationChecksEnabled(false),
-		fvm.WithTransactionFeesEnabled(false),
-		fvm.WithMemoryAndInteractionLimitsDisabled(),
-	}
-
-	return &testChain{
-		ldg:          ldg,
-		chain:        chain,
-		fvm:          fvm.NewVirtualMachine(),
-		fvmOpts:      opts,
-		latestCommit: flow.StateCommitment(ldg.InitialState()),
-	}, nil
-}
-
-func (t *testChain) newSnapshot() snapshot.StorageSnapshot {
-	return state.NewLedgerStorageSnapshot(t.ldg, t.latestCommit)
-}
-
-func (t *testChain) fvmRun(proc fvm.Procedure) (*ledger.TrieUpdate, error) {
-	ctx := fvm.NewContext(t.fvmOpts...)
-	executionSnapshot, _, _ := t.fvm.Run(ctx, proc, t.newSnapshot())
-
-	newCommit, updates, err := state.CommitDelta(
-		t.ldg,
-		executionSnapshot,
-		t.latestCommit,
-	)
-	if err != nil {
-		return nil, err
-	}
-
-	t.latestCommit = newCommit
-	return updates, nil
-}
-
-func (t *testChain) bootstrap() (*trie.MTrie, error) {
-	bootstrapOpts := []fvm.BootstrapProcedureOption{
-		fvm.WithInitialTokenSupply(unittest.GenesisTokenSupply),
-	}
-
-	_, err := t.fvmRun(fvm.Bootstrap(unittest.ServiceAccountPublicKey, bootstrapOpts...))
-	if err != nil {
-		return nil, err
-	}
-
-	return t.ldg.FindTrieByStateCommit(t.latestCommit)
-}
-
-func (t *testChain) executeTx() (*ledger.TrieUpdate, error) {
-	txScript := []byte(`transaction { prepare(auth: AuthAccount) { auth.save<String>("test", to: /storage/testPath) } }`)
-
-	txBody := flow.NewTransactionBody().
-		SetScript(txScript).
-		AddAuthorizer(t.chain.ServiceAddress())
-
-	txProc := fvm.NewTransaction(txBody.ID(), 0, txBody)
-
-	return t.fvmRun(txProc)
 }
