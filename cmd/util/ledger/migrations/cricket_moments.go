@@ -260,11 +260,15 @@ func cloneCricketMomentsShardedCollection(
 						return
 					}
 
-					value := ownedNFTs.GetKey(
+					value, ok := ownedNFTs.Get(
 						inter,
 						interpreter.EmptyLocationRange,
 						keyPair.nftCollectionKey,
 					)
+					if !ok {
+						cancel(fmt.Errorf("expected value for key %s", keyPair.nftCollectionKey))
+						return
+					}
 
 					var newValue interpreter.Value
 					err = capturePanic(func() {
@@ -313,7 +317,7 @@ func cloneCricketMomentsShardedCollection(
 		}
 
 		err = capturePanic(func() {
-			ownedNFTs.Insert(
+			ownedNFTs.SetKey(
 				mr.Interpreter,
 				interpreter.EmptyLocationRange,
 				clonedValue.nftCollectionKey,
