@@ -36,10 +36,10 @@ type ScriptExecutor interface {
 		height uint64,
 	) ([]byte, error)
 
-	// GetAccount returns a Flow account by the provided address and block height.
+	// GetAccountAtBlockHeight returns a Flow account by the provided address and block height.
 	// Expected errors:
 	// - storage.ErrNotFound if block or register value at height was not found.
-	GetAccount(ctx context.Context, address flow.Address, height uint64) (*flow.Account, error)
+	GetAccountAtBlockHeight(ctx context.Context, address flow.Address, height uint64) (*flow.Account, error)
 }
 
 var _ ScriptExecutor = (*Scripts)(nil)
@@ -89,7 +89,7 @@ func NewScripts(
 // A result value is returned encoded as byte array. An error will be returned if script
 // doesn't successfully execute.
 // Expected errors:
-// - Storage.NotFound if block or register value at height was not found.
+// - storage.ErrNotFound if block or register value at height was not found.
 func (s *Scripts) ExecuteAtBlockHeight(
 	ctx context.Context,
 	script []byte,
@@ -107,7 +107,7 @@ func (s *Scripts) ExecuteAtBlockHeight(
 
 // GetAccountAtBlockHeight returns a Flow account by the provided address and block height.
 // Expected errors:
-// - Storage.NotFound if block or register value at height was not found.
+// - storage.ErrNotFound if block or register value at height was not found.
 func (s *Scripts) GetAccountAtBlockHeight(ctx context.Context, address flow.Address, height uint64) (*flow.Account, error) {
 	snap, header, err := s.snapshotWithBlock(height)
 	if err != nil {

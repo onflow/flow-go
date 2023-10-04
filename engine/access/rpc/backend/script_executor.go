@@ -56,18 +56,18 @@ func (s *ScriptExecutor) ExecuteAtBlockHeight(ctx context.Context, script []byte
 	return s.scriptExecutor.ExecuteAtBlockHeight(ctx, script, arguments, height)
 }
 
-// GetAccount returns the account at the provided block height from a local execution state.
+// GetAccountAtBlockHeight returns the account at the provided block height from a local execution state.
 //
 // Expected errors:
 //   - ErrDataNotAvailable if the data for the block height is not available. this could be because
 //     the height is not within the index block range, or the index is not ready.
 //   - storage.ErrNotFound if the account or block height is not found
-func (s *ScriptExecutor) GetAccount(ctx context.Context, address flow.Address, height uint64) (*flow.Account, error) {
+func (s *ScriptExecutor) GetAccountAtBlockHeight(ctx context.Context, address flow.Address, height uint64) (*flow.Account, error) {
 	if !s.isDataAvailable(height) {
 		return nil, ErrDataNotAvailable
 	}
 
-	return s.scriptExecutor.GetAccount(ctx, address, height)
+	return s.scriptExecutor.GetAccountAtBlockHeight(ctx, address, height)
 }
 
 func (s *ScriptExecutor) isDataAvailable(height uint64) bool {

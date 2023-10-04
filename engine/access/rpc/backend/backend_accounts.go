@@ -111,7 +111,7 @@ func (b *backendAccounts) getAccountFromLocalStorage(
 	height uint64,
 ) (*flow.Account, error) {
 	// make sure data is available for the requested block
-	account, err := b.scriptExecutor.GetAccount(ctx, address, height)
+	account, err := b.scriptExecutor.GetAccountAtBlockHeight(ctx, address, height)
 	if err != nil {
 		if errors.Is(err, ErrDataNotAvailable) {
 			return nil, status.Errorf(codes.OutOfRange, "data for block height %d is not available", height)
