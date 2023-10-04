@@ -49,7 +49,7 @@ func genNetworkAndStakingKeys() []model.NodeInfo {
 		internalNodes = append(internalNodes, nodeInfo)
 	}
 
-	return model.Sort(internalNodes, order.Canonical)
+	return model.Sort(internalNodes, order.Canonical[flow.Identity])
 }
 
 func assembleNodeInfo(nodeConfig model.NodeConfig, networkKey, stakingKey crypto.PrivateKey) model.NodeInfo {

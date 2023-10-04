@@ -72,7 +72,7 @@ func NewClusterSwitchoverTestCase(t *testing.T, conf ClusterSwitchoverTestConf) 
 				signers = append(signers, identity)
 			}
 		}
-		signerIdentities := model.ToIdentityList(signers).Sort(order.Canonical[flow.Identity])
+		signerIdentities := model.ToIdentityList(signers).Sort(order.Canonical[flow.Identity]).ToSkeleton()
 		qc, err := run.GenerateClusterRootQC(signers, signerIdentities, rootClusterBlocks[i])
 		require.NoError(t, err)
 		rootClusterQCs[i] = flow.ClusterQCVoteDataFromQC(&flow.QuorumCertificateWithSignerIDs{
@@ -142,7 +142,7 @@ func NewClusterSwitchoverTestCase(t *testing.T, conf ClusterSwitchoverTestConf) 
 			// generate root cluster block
 			rootClusterBlock := cluster.CanonicalRootBlock(commit.Counter, model.ToIdentityList(signers).ToSkeleton())
 			// generate cluster root qc
-			qc, err := run.GenerateClusterRootQC(signers, model.ToIdentityList(signers), rootClusterBlock)
+			qc, err := run.GenerateClusterRootQC(signers, model.ToIdentityList(signers).ToSkeleton(), rootClusterBlock)
 			require.NoError(t, err)
 			signerIDs := toSignerIDs(signers)
 			qcWithSignerIDs := &flow.QuorumCertificateWithSignerIDs{

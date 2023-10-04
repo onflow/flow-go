@@ -491,7 +491,7 @@ func mergeNodeInfos(internalNodes, partnerNodes []model.NodeInfo) []model.NodeIn
 	}
 
 	// sort nodes using the canonical ordering
-	nodes = model.Sort(nodes, order.Canonical)
+	nodes = model.Sort(nodes, order.Canonical[flow.Identity])
 
 	return nodes
 }

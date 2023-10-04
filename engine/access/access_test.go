@@ -1183,7 +1183,7 @@ func (suite *Suite) createChain() (*flow.Block, *flow.Collection) {
 	block.SetPayload(unittest.PayloadFixture(unittest.WithGuarantees(guarantee)))
 
 	cluster := new(protocol.Cluster)
-	cluster.On("Members").Return(clusterCommittee, nil)
+	cluster.On("Members").Return(clusterCommittee.ToSkeleton(), nil)
 	epoch := new(protocol.Epoch)
 	epoch.On("ClusterByChainID", mock.Anything).Return(cluster, nil)
 	epochs := new(protocol.EpochQuery)

@@ -33,7 +33,7 @@ func TestGenerateClusterRootQC(t *testing.T) {
 	payload := cluster.EmptyPayload(flow.ZeroID)
 	clusterBlock.SetPayload(payload)
 
-	orderedParticipants := model.ToIdentityList(participants).Sort(order.Canonical[flow.Identity])
+	orderedParticipants := model.ToIdentityList(participants).Sort(order.Canonical[flow.Identity]).ToSkeleton()
 	_, err := GenerateClusterRootQC(participants, orderedParticipants, &clusterBlock)
 	require.NoError(t, err)
 }

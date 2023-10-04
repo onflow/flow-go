@@ -73,7 +73,7 @@ func constructClusterAssignment(partnerNodes, internalNodes []model.NodeInfo) (f
 	assignments := assignment.FromIdentifierLists(identifierLists)
 
 	collectors := append(partners, internals...)
-	clusters, err := factory.NewClusterList(assignments, collectors)
+	clusters, err := factory.NewClusterList(assignments, collectors.ToSkeleton())
 	if err != nil {
 		log.Fatal().Err(err).Msg("could not create cluster list")
 	}
@@ -109,7 +109,7 @@ func constructRootQCsForClusters(
 // Filters a list of nodes to include only nodes that will sign the QC for the
 // given cluster. The resulting list of nodes is only nodes that are in the
 // given cluster AND are not partner nodes (ie. we have the private keys).
-func filterClusterSigners(cluster flow.IdentityList, nodeInfos []model.NodeInfo) []model.NodeInfo {
+func filterClusterSigners(cluster flow.IdentitySkeletonList, nodeInfos []model.NodeInfo) []model.NodeInfo {
 
 	var filtered []model.NodeInfo
 	for _, node := range nodeInfos {
