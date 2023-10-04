@@ -50,7 +50,7 @@ func (s *EmulatorSuite) runTest(goodNodes int, emulatorProblems bool) {
 		DKGPhase2FinalView: 200,
 		DKGPhase3FinalView: 250,
 		FinalView:          300,
-		Participants:       s.netIDs,
+		Participants:       s.netIDs.ToSkeleton(),
 		RandomSource:       []byte("random bytes for seed"),
 	}
 
@@ -58,7 +58,7 @@ func (s *EmulatorSuite) runTest(goodNodes int, emulatorProblems bool) {
 	// desired parameters
 	nextEpochSetup := flow.EpochSetup{
 		Counter:      currentCounter + 1,
-		Participants: s.netIDs,
+		Participants: s.netIDs.ToSkeleton(),
 		RandomSource: []byte("random bytes for seed"),
 		FirstView:    301,
 		FinalView:    600,
