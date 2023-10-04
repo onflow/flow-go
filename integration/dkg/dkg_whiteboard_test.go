@@ -227,7 +227,7 @@ func TestWithWhiteboard(t *testing.T) {
 		DKGPhase2FinalView: 200,
 		DKGPhase3FinalView: 250,
 		FinalView:          300,
-		Participants:       conIdentities,
+		Participants:       conIdentities.ToSkeleton(),
 		RandomSource:       []byte("random bytes for seed"),
 	}
 
@@ -235,7 +235,7 @@ func TestWithWhiteboard(t *testing.T) {
 	// desired parameters
 	nextEpochSetup := flow.EpochSetup{
 		Counter:      currentCounter + 1,
-		Participants: conIdentities,
+		Participants: conIdentities.ToSkeleton(),
 		RandomSource: []byte("random bytes for seed"),
 	}
 

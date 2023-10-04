@@ -1038,7 +1038,7 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string, chainID fl
 
 	// IMPORTANT: we must use this ordering when writing the DKG keys as
 	//            this ordering defines the DKG participant's indices
-	stakedNodeInfos := bootstrap.Sort(toNodeInfos(stakedConfs), order.Canonical)
+	stakedNodeInfos := bootstrap.Sort(toNodeInfos(stakedConfs), order.Canonical[flow.Identity])
 
 	dkg, err := runBeaconKG(stakedConfs)
 	if err != nil {
@@ -1145,7 +1145,7 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string, chainID fl
 		DKGPhase2FinalView: dkgOffsetView + networkConf.ViewsInDKGPhase*2,
 		DKGPhase3FinalView: dkgOffsetView + networkConf.ViewsInDKGPhase*3,
 		FinalView:          root.Header.View + networkConf.ViewsInEpoch - 1,
-		Participants:       participants,
+		Participants:       participants.ToSkeleton(),
 		Assignments:        clusterAssignments,
 		RandomSource:       randomSource,
 	}
@@ -1306,7 +1306,7 @@ func setupClusterGenesisBlockQCs(nClusters uint, epochCounter uint64, confs []Co
 
 	participantsUnsorted := toParticipants(confs)
 	participants := participantsUnsorted.Sort(order.Canonical[flow.Identity])
-	collectors := participants.Filter(filter.HasRole[flow.Identity](flow.RoleCollection))
+	collectors := participants.Filter(filter.HasRole[flow.Identity](flow.RoleCollection)).ToSkeleton()
 	assignments := unittest.ClusterAssignment(nClusters, collectors)
 	clusters, err := factory.NewClusterList(assignments, collectors)
 	if err != nil {
@@ -1338,7 +1338,7 @@ func setupClusterGenesisBlockQCs(nClusters uint, epochCounter uint64, confs []Co
 		}
 
 		// must order in canonical ordering otherwise decoding signer indices from cluster QC would fail
-		clusterCommittee := bootstrap.ToIdentityList(clusterNodeInfos).Sort(order.Canonical[flow.Identity])
+		clusterCommittee := bootstrap.ToIdentityList(clusterNodeInfos).Sort(order.Canonical[flow.Identity]).ToSkeleton()
 		qc, err := run.GenerateClusterRootQC(clusterNodeInfos, clusterCommittee, block)
 		if err != nil {
 			return nil, nil, nil, fmt.Errorf("fail to generate cluster root QC with clusterNodeInfos %v, %w",
