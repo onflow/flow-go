@@ -3,6 +3,7 @@ package testnet
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/onflow/flow-go-sdk/templates"
@@ -112,7 +113,7 @@ func (c *Client) Events(ctx context.Context, typ string) ([]sdk.BlockEvents, err
 
 // DeployContract submits a transaction to deploy a contract with the given
 // code to the root account.
-func (c *Client) DeployContract(ctx context.Context, refID sdk.Identifier, contract dsl.Contract) error {
+func (c *Client) DeployContract(ctx context.Context, refID sdk.Identifier, contract dsl.Contract) (*sdk.Transaction, error) {
 
 	code := dsl.Transaction{
 		Import: dsl.Import{},
@@ -128,7 +129,7 @@ func (c *Client) DeployContract(ctx context.Context, refID sdk.Identifier, contr
 		SetPayer(c.SDKServiceAddress()).
 		AddAuthorizer(c.SDKServiceAddress())
 
-	return c.SignAndSendTransaction(ctx, tx)
+	return tx, c.SignAndSendTransaction(ctx, tx)
 }
 
 // SignTransaction signs the transaction using the proposer's key
@@ -220,6 +221,37 @@ func (c *Client) WaitForSealed(ctx context.Context, id sdk.Identifier) (*sdk.Tra
 
 	fmt.Println()
 	fmt.Printf("(Wait for Seal) Transaction %s sealed\n", id)
+
+	return result, err
+}
+
+// WaitForStatus waits for the transaction to reach the requested status, then returns the result.
+func (c *Client) WaitForStatus(ctx context.Context, id sdk.Identifier, targetStatus sdk.TransactionStatus) (*sdk.TransactionResult, error) {
+	statusName := strings.ToLower(targetStatus.String())
+	fmt.Printf("Waiting for transaction %s to be %s...\n", id, statusName)
+	errCount := 0
+	var result *sdk.TransactionResult
+	var err error
+	for result == nil || (result.Status != targetStatus) {
+		childCtx, cancel := context.WithTimeout(ctx, time.Second*5)
+		result, err = c.client.GetTransactionResult(childCtx, id)
+		cancel()
+		if err != nil {
+			fmt.Print("x")
+			errCount++
+			if errCount >= 10 {
+				return &sdk.TransactionResult{
+					Error: err,
+				}, err
+			}
+		} else {
+			fmt.Print(".")
+		}
+		time.Sleep(250 * time.Millisecond)
+	}
+
+	fmt.Println()
+	fmt.Printf("(Wait for Seal) Transaction %s %s\n", id, statusName)
 
 	return result, err
 }
