@@ -88,7 +88,7 @@ var Flex_BalanceTypeConstructorType = &sema.FunctionType{
 	IsConstructor: true,
 	Parameters: []sema.Parameter{
 		{
-			Identifier:     "flowAmount",
+			Identifier:     "flow",
 			TypeAnnotation: sema.NewTypeAnnotation(sema.UFix64Type),
 		},
 	},
@@ -98,19 +98,15 @@ var Flex_BalanceTypeConstructorType = &sema.FunctionType{
 }
 
 const Flex_BalanceTypeConstructorDocString = `
-Constructs a new
+Constructs a new balance, given the balance in FLOW.
 `
 
-const Flex_BalanceTypeToFLOWFunctionName = "toFLOW"
+const Flex_BalanceTypeFlowFieldName = "flow"
 
-var Flex_BalanceTypeToFLOWFunctionType = &sema.FunctionType{
-	ReturnTypeAnnotation: sema.NewTypeAnnotation(
-		sema.UFix64Type,
-	),
-}
+var Flex_BalanceTypeFlowFieldType = sema.UFix64Type
 
-const Flex_BalanceTypeToFLOWFunctionDocString = `
-Returns the balance in FLOW
+const Flex_BalanceTypeFlowFieldDocString = `
+The balance in FLOW.
 `
 
 const Flex_BalanceTypeToAttoFlowFunctionName = "toAttoFlow"
@@ -139,12 +135,13 @@ var Flex_BalanceType = func() *sema.CompositeType {
 
 func init() {
 	var members = []*sema.Member{
-		sema.NewUnmeteredFunctionMember(
+		sema.NewUnmeteredFieldMember(
 			Flex_BalanceType,
 			ast.AccessPublic,
-			Flex_BalanceTypeToFLOWFunctionName,
-			Flex_BalanceTypeToFLOWFunctionType,
-			Flex_BalanceTypeToFLOWFunctionDocString,
+			ast.VariableKindConstant,
+			Flex_BalanceTypeFlowFieldName,
+			Flex_BalanceTypeFlowFieldType,
+			Flex_BalanceTypeFlowFieldDocString,
 		),
 		sema.NewUnmeteredFunctionMember(
 			Flex_BalanceType,
@@ -219,7 +216,7 @@ var Flex_FlowOwnedAccountTypeDeployFunctionType = &sema.FunctionType{
 			}),
 		},
 		{
-			Identifier:     "gaslimit",
+			Identifier:     "gasLimit",
 			TypeAnnotation: sema.NewTypeAnnotation(sema.UInt64Type),
 		},
 		{
@@ -234,7 +231,7 @@ var Flex_FlowOwnedAccountTypeDeployFunctionType = &sema.FunctionType{
 
 const Flex_FlowOwnedAccountTypeDeployFunctionDocString = `
 Deploys a contract to the Flex environment.
-Returns the address of the newly deployed.
+Returns the address of the newly deployed contract.
 `
 
 const Flex_FlowOwnedAccountTypeCallFunctionName = "call"
@@ -252,7 +249,7 @@ var Flex_FlowOwnedAccountTypeCallFunctionType = &sema.FunctionType{
 			}),
 		},
 		{
-			Identifier:     "gaslimit",
+			Identifier:     "gasLimit",
 			TypeAnnotation: sema.NewTypeAnnotation(sema.UInt64Type),
 		},
 		{

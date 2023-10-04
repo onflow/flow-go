@@ -1,7 +1,6 @@
 package stdlib
 
 import (
-	"github.com/onflow/atree"
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/onflow/cadence/runtime/errors"
 	"github.com/onflow/cadence/runtime/interpreter"
@@ -60,10 +59,16 @@ type FlexTypeDefinition struct {
 	Flex_FlexAddressType                       *sema.CompositeType
 	Flex_FlexAddressTypeBytesFieldName         string
 	// Deprecated: Use Flex_FlexAddressConstructorType
-	_flex_FlexAddressConstructorType             *sema.FunctionType
+	_flex_FlexAddressConstructorType *sema.FunctionType
+	Flex_BalanceType                 *sema.CompositeType
+	Flex_BalanceTypeFlowFieldName    string
+	// Deprecated: Use Flex_BalanceConstructorType
+	_flex_BalanceConstructorType                 *sema.FunctionType
 	Flex_FlowOwnedAccountType                    *sema.CompositeType
 	Flex_FlowOwnedAccountTypeAddressFunctionName string
 	Flex_FlowOwnedAccountTypeAddressFunctionType *sema.FunctionType
+	Flex_FlowOwnedAccountTypeCallFunctionName    string
+	Flex_FlowOwnedAccountTypeCallFunctionType    *sema.FunctionType
 }
 
 func (t *FlexTypeDefinition) FlexStaticType() interpreter.StaticType {
@@ -84,6 +89,13 @@ func (t *FlexTypeDefinition) Flex_FlexAddressConstructorType() *sema.FunctionTyp
 		t._flex_FlexAddressConstructorType = constructorType(t.Flex_FlexAddressType)
 	}
 	return t._flex_FlexAddressConstructorType
+}
+
+func (t *FlexTypeDefinition) Flex_BalanceConstructorType() *sema.FunctionType {
+	if t._flex_BalanceConstructorType == nil {
+		t._flex_BalanceConstructorType = constructorType(t.Flex_BalanceType)
+	}
+	return t._flex_BalanceConstructorType
 }
 
 func NewFlexTypeRunFunction(
@@ -166,10 +178,47 @@ func FlexAddressToAddressBytesArrayValue(
 	)
 }
 
+func AddressBytesArrayValueToFlexAddress(
+	inter *interpreter.Interpreter,
+	locationRange interpreter.LocationRange,
+	addressBytesValue *interpreter.ArrayValue,
+) (
+	result models.FlexAddress,
+	err error,
+) {
+	// Convert
+
+	var bytes []byte
+	bytes, err = interpreter.ByteArrayValueToByteSlice(
+		inter,
+		addressBytesValue,
+		locationRange,
+	)
+	if err != nil {
+		return result, err
+	}
+
+	// Check length
+
+	length := len(bytes)
+	const expectedLength = models.FlexAddressLength
+	if length != expectedLength {
+		return result, errors.NewDefaultUserError(
+			"invalid address length: got %d, expected %d",
+			length,
+			expectedLength,
+		)
+	}
+
+	copy(result[:], bytes)
+
+	return result, nil
+}
+
 func NewFlexOwnedAccountTypeAddressFunction(
 	gauge common.MemoryGauge,
 	def FlexTypeDefinition,
-	addressBytesValue interpreter.Value,
+	address models.FlexAddress,
 ) *interpreter.HostFunctionValue {
 	return interpreter.NewHostFunctionValue(
 		gauge,
@@ -178,20 +227,107 @@ func NewFlexOwnedAccountTypeAddressFunction(
 			inter := invocation.Interpreter
 			locationRange := invocation.LocationRange
 
+			// NOTE: important: create a new value
+			bytesValue := FlexAddressToAddressBytesArrayValue(inter, address)
+
 			return interpreter.NewCompositeValue(
 				inter,
 				locationRange,
-				nil,
+				def.Flex_FlexAddressType.Location,
 				def.Flex_FlexAddressType.QualifiedIdentifier(),
-				common.CompositeKindStructure,
+				def.Flex_FlexAddressType.Kind,
 				[]interpreter.CompositeField{
 					{
 						Name:  def.Flex_FlexAddressTypeBytesFieldName,
-						Value: addressBytesValue,
+						Value: bytesValue,
 					},
 				},
 				common.ZeroAddress,
 			)
+		},
+	)
+}
+
+func NewFlexOwnedAccountTypeCallFunction(
+	gauge common.MemoryGauge,
+	def FlexTypeDefinition,
+	handler models.FlexContractHandler,
+	flowOwnedAccountAddress models.FlexAddress,
+) *interpreter.HostFunctionValue {
+	return interpreter.NewHostFunctionValue(
+		gauge,
+		def.Flex_FlowOwnedAccountTypeCallFunctionType,
+		func(invocation interpreter.Invocation) interpreter.Value {
+			inter := invocation.Interpreter
+			locationRange := invocation.LocationRange
+
+			// Get address
+
+			addressValue, ok := invocation.Arguments[0].(*interpreter.CompositeValue)
+			if !ok {
+				panic(errors.NewUnreachableError())
+			}
+
+			addressBytesValue, ok := addressValue.GetField(
+				inter,
+				locationRange,
+				def.Flex_FlexAddressTypeBytesFieldName,
+			).(*interpreter.ArrayValue)
+			if !ok {
+				panic(errors.NewUnreachableError())
+			}
+
+			address, err := AddressBytesArrayValueToFlexAddress(inter, locationRange, addressBytesValue)
+			if err != nil {
+				panic(err)
+			}
+
+			// Get data
+
+			dataValue, ok := invocation.Arguments[1].(*interpreter.ArrayValue)
+			if !ok {
+				panic(errors.NewUnreachableError())
+			}
+
+			data, err := interpreter.ByteArrayValueToByteSlice(inter, dataValue, locationRange)
+			if err != nil {
+				panic(err)
+			}
+
+			// Get gas limit
+
+			gasLimitValue, ok := invocation.Arguments[2].(interpreter.UInt64Value)
+			if !ok {
+				panic(errors.NewUnreachableError())
+			}
+
+			gasLimit := models.GasLimit(gasLimitValue)
+
+			// Get balance
+
+			balanceValue, ok := invocation.Arguments[3].(*interpreter.CompositeValue)
+			if !ok {
+				panic(errors.NewUnreachableError())
+			}
+
+			balanceFlowValue, ok := balanceValue.GetField(
+				inter,
+				locationRange,
+				def.Flex_BalanceTypeFlowFieldName,
+			).(interpreter.UFix64Value)
+			if !ok {
+				panic(errors.NewUnreachableError())
+			}
+
+			balance := models.Balance(balanceFlowValue)
+
+			// Call
+
+			const isFOA = true
+			account := handler.AccountByAddress(flowOwnedAccountAddress, isFOA)
+			result := account.Call(address, data, gasLimit, balance)
+
+			return interpreter.ByteSliceToByteArrayValue(inter, result)
 		},
 	)
 }
@@ -210,35 +346,27 @@ func NewFlexTypeCreateOwnedAccountFunction(
 
 			address := handler.AllocateAddress()
 
-			storedAddressBytesValue := FlexAddressToAddressBytesArrayValue(inter, address)
-
 			// Construct and return Flex.FlowOwnedAccount
-
-			// NOTE: important: provide a *copy*, so modifications are not reflected in storage
-			flexAddressBytesValue := storedAddressBytesValue.Transfer(
-				inter,
-				locationRange,
-				atree.Address{},
-				false,
-				nil,
-				nil,
-			)
 
 			return interpreter.NewCompositeValue(
 				inter,
 				locationRange,
-				nil,
+				def.Flex_FlowOwnedAccountType.Location,
 				def.Flex_FlowOwnedAccountType.QualifiedIdentifier(),
-				common.CompositeKindResource,
+				def.Flex_FlowOwnedAccountType.Kind,
 				[]interpreter.CompositeField{
 					{
-						Value: storedAddressBytesValue,
+						Value: FlexAddressToAddressBytesArrayValue(inter, address),
 						Name:  Flex_FlowOwnedAccountTypeAddressBytesFieldName,
 					},
 					// TODO: inject properly as function
 					{
 						Name:  def.Flex_FlowOwnedAccountTypeAddressFunctionName,
-						Value: NewFlexOwnedAccountTypeAddressFunction(gauge, def, flexAddressBytesValue),
+						Value: NewFlexOwnedAccountTypeAddressFunction(gauge, def, address),
+					},
+					{
+						Name:  def.Flex_FlowOwnedAccountTypeCallFunctionName,
+						Value: NewFlexOwnedAccountTypeCallFunction(gauge, def, handler, address),
 					},
 					// TODO: inject other functions
 				},
@@ -276,13 +404,46 @@ func NewFlexAddressConstructor(def FlexTypeDefinition) *interpreter.HostFunction
 			return interpreter.NewCompositeValue(
 				inter,
 				locationRange,
-				def.FlexType.Location,
+				def.Flex_FlexAddressType.Location,
 				def.Flex_FlexAddressType.QualifiedIdentifier(),
 				def.Flex_FlexAddressType.Kind,
 				[]interpreter.CompositeField{
 					{
 						Name:  def.Flex_FlexAddressTypeBytesFieldName,
 						Value: bytesValue,
+					},
+				},
+				common.ZeroAddress,
+			)
+		},
+	)
+}
+
+func NewBalanceConstructor(def FlexTypeDefinition) *interpreter.HostFunctionValue {
+	return interpreter.NewHostFunctionValue(
+		nil,
+		def.Flex_BalanceConstructorType(),
+		func(invocation interpreter.Invocation) interpreter.Value {
+			inter := invocation.Interpreter
+			locationRange := invocation.LocationRange
+
+			// Get amount
+
+			flowValue, ok := invocation.Arguments[0].(interpreter.UFix64Value)
+			if !ok {
+				panic(errors.NewUnreachableError())
+			}
+
+			return interpreter.NewCompositeValue(
+				inter,
+				locationRange,
+				def.Flex_BalanceType.Location,
+				def.Flex_BalanceType.QualifiedIdentifier(),
+				def.Flex_BalanceType.Kind,
+				[]interpreter.CompositeField{
+					{
+						Name:  def.Flex_BalanceTypeFlowFieldName,
+						Value: flowValue,
 					},
 				},
 				common.ZeroAddress,
@@ -303,6 +464,7 @@ func NewFlexContractValue(
 		def.FlexType.Fields,
 		map[string]interpreter.Value{
 			def.Flex_FlexAddressType.Identifier:            NewFlexAddressConstructor(def),
+			def.Flex_BalanceType.Identifier:                NewBalanceConstructor(def),
 			def.FlexTypeRunFunctionName:                    NewFlexTypeRunFunction(gauge, def, handler),
 			def.FlexTypeCreateFlowOwnedAccountFunctionName: NewFlexTypeCreateOwnedAccountFunction(gauge, def, handler),
 		},

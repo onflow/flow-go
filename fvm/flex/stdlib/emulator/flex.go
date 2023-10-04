@@ -17,9 +17,13 @@ var FlexTypeDefinition = stdlib.FlexTypeDefinition{
 	FlexTypeCreateFlowOwnedAccountFunctionType:   FlexTypeCreateFlowOwnedAccountFunctionType,
 	Flex_FlexAddressType:                         Flex_FlexAddressType,
 	Flex_FlexAddressTypeBytesFieldName:           Flex_FlexAddressTypeBytesFieldName,
+	Flex_BalanceType:                             Flex_BalanceType,
+	Flex_BalanceTypeFlowFieldName:                Flex_BalanceTypeFlowFieldName,
 	Flex_FlowOwnedAccountType:                    Flex_FlowOwnedAccountType,
 	Flex_FlowOwnedAccountTypeAddressFunctionName: Flex_FlowOwnedAccountTypeAddressFunctionName,
 	Flex_FlowOwnedAccountTypeAddressFunctionType: Flex_FlowOwnedAccountTypeAddressFunctionType,
+	Flex_FlowOwnedAccountTypeCallFunctionName:    Flex_FlowOwnedAccountTypeCallFunctionName,
+	Flex_FlowOwnedAccountTypeCallFunctionType:    Flex_FlowOwnedAccountTypeCallFunctionType,
 }
 
 var FlowToken_VaultType = stdlib.NewFlowTokenVaultType(flow.Emulator.Chain())
