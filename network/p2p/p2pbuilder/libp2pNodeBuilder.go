@@ -36,6 +36,7 @@ import (
 	gossipsubbuilder "github.com/onflow/flow-go/network/p2p/p2pbuilder/gossipsub"
 	"github.com/onflow/flow-go/network/p2p/p2pconf"
 	"github.com/onflow/flow-go/network/p2p/p2pnode"
+	"github.com/onflow/flow-go/network/p2p/scoring"
 	"github.com/onflow/flow-go/network/p2p/subscription"
 	"github.com/onflow/flow-go/network/p2p/tracer"
 	"github.com/onflow/flow-go/network/p2p/unicast"
@@ -77,6 +78,7 @@ func NewNodeBuilder(
 	rCfg *p2pconf.ResourceManagerConfig,
 	rpcInspectorCfg *p2pconf.GossipSubRPCInspectorsConfig,
 	peerManagerConfig *p2pconfig.PeerManagerConfig,
+	subscriptionProviderParam *scoring.SubscriptionProviderParam,
 	disallowListCacheCfg *p2p.DisallowListCacheConfig,
 	rpcTracker p2p.RpcControlTracking) *LibP2PNodeBuilder {
 	return &LibP2PNodeBuilder{
@@ -94,7 +96,7 @@ func NewNodeBuilder(
 			networkingType,
 			sporkId,
 			idProvider,
-			rpcInspectorCfg,
+			rpcInspectorCfg, subscriptionProviderParam,
 			rpcTracker),
 		peerManagerConfig: peerManagerConfig,
 	}
