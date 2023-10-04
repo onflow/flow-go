@@ -1891,12 +1891,15 @@ func (suite *Suite) TestExecutionNodesForBlockID() {
 			actualList = append(actualList, actual)
 		}
 
-		if len(expectedENs) > maxNodesCnt {
-			for _, actual := range actualList {
-				require.Contains(suite.T(), expectedENs, actual)
+		{
+			expectedENs := expectedENs.ToSkeleton()
+			if len(expectedENs) > maxNodesCnt {
+				for _, actual := range actualList {
+					require.Contains(suite.T(), expectedENs, actual)
+				}
+			} else {
+				require.ElementsMatch(suite.T(), actualList, expectedENs)
 			}
-		} else {
-			require.ElementsMatch(suite.T(), actualList, expectedENs)
 		}
 	}
 	// if we don't find sufficient receipts, executionNodesForBlockID should return a list of random ENs

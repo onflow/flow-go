@@ -266,7 +266,7 @@ func createRootBlockData(participantData *run.ParticipantData) (*flow.Block, *fl
 
 	counter := uint64(1)
 	setup := unittest.EpochSetupFixture(
-		unittest.WithParticipants(participants),
+		unittest.WithParticipants(participants.ToSkeleton()),
 		unittest.SetupWithCounter(counter),
 		unittest.WithFirstView(root.Header.View),
 		unittest.WithFinalView(root.Header.View+1000),

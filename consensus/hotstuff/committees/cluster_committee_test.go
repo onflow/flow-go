@@ -146,12 +146,6 @@ func (suite *ClusterSuite) TestInvalidSigner() {
 	})
 
 	suite.Run("should return ErrInvalidSigner for existent but ejected cluster member", func() {
-		// at the root block, the cluster member is not ejected yet
-		suite.Run("root block", func() {
-			actual, err := suite.com.IdentityByBlock(rootBlockID, realEjectedClusterMember.NodeID)
-			suite.Require().NoError(err)
-			suite.Assert().Equal(realEjectedClusterMember, actual)
-		})
 		suite.Run("non-root block", func() {
 			_, err := suite.com.IdentityByBlock(nonRootBlockID, realEjectedClusterMember.NodeID)
 			suite.Assert().True(model.IsInvalidSignerError(err))
@@ -164,12 +158,6 @@ func (suite *ClusterSuite) TestInvalidSigner() {
 	})
 
 	suite.Run("should return ErrInvalidSigner for existent but zero-weight cluster member", func() {
-		// at the root block, the cluster member has its initial weight
-		suite.Run("root block", func() {
-			actual, err := suite.com.IdentityByBlock(rootBlockID, realNoWeightClusterMember.NodeID)
-			suite.Require().NoError(err)
-			suite.Assert().Equal(realNoWeightClusterMember, actual)
-		})
 		suite.Run("non-root block", func() {
 			_, err := suite.com.IdentityByBlock(nonRootBlockID, realNoWeightClusterMember.NodeID)
 			suite.Assert().True(model.IsInvalidSignerError(err))

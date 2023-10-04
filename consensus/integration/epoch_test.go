@@ -220,7 +220,7 @@ func withNextEpoch(
 	encodableSnapshot := snapshot.Encodable()
 
 	currEpoch := &encodableSnapshot.Epochs.Current // take pointer so assignments apply
-	currentEpochIdentities := currEpoch.InitialIdentities
+	currentEpochIdentities, _ := snapshot.Identities(filter.Any)
 	nextEpochIdentities = nextEpochIdentities.Sort(order.Canonical[flow.Identity])
 
 	currEpoch.FinalView = currEpoch.FirstView + curEpochViews - 1 // first epoch lasts curEpochViews
