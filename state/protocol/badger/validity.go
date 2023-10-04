@@ -305,7 +305,7 @@ func IsValidRootSnapshotQCs(snap protocol.Snapshot) error {
 // validateRootQC performs validation of root QC
 // Returns nil on success
 func validateRootQC(snap protocol.Snapshot) error {
-	identities, err := snap.Identities(filter.Adapt(filter.IsAllowedConsensusCommitteeMember))
+	identities, err := snap.Identities(filter.IsVotingConsensusCommitteeMember)
 	if err != nil {
 		return fmt.Errorf("could not get root snapshot identities: %w", err)
 	}

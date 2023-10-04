@@ -23,7 +23,7 @@ import (
 //  2. for the decoding step, we offer an optimized convenience function to directly
 //     decode to full identities: Indices --decode--> Identities
 func TestEncodeDecodeIdentities(t *testing.T) {
-	canonicalIdentities := unittest.IdentityListFixture(20).ToSkeleton()
+	canonicalIdentities := unittest.IdentityListFixture(20).Sort(order.Canonical[flow.Identity]).ToSkeleton()
 	canonicalIdentifiers := canonicalIdentities.NodeIDs()
 	for s := 0; s < 20; s++ {
 		for e := s; e < 20; e++ {

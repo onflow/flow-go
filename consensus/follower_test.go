@@ -16,6 +16,7 @@ import (
 	mockhotstuff "github.com/onflow/flow-go/consensus/hotstuff/mocks"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow/order"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
 	mockmodule "github.com/onflow/flow-go/module/mock"
@@ -75,7 +76,7 @@ type HotStuffFollowerSuite struct {
 // SetupTest initializes all the components needed for the Follower.
 // The follower itself is instantiated in method BeforeTest
 func (s *HotStuffFollowerSuite) SetupTest() {
-	identities := unittest.IdentityListFixture(4, unittest.WithRole(flow.RoleConsensus))
+	identities := unittest.IdentityListFixture(4, unittest.WithRole(flow.RoleConsensus)).Sort(order.Canonical[flow.Identity])
 	s.mockConsensus = &MockConsensus{identities: identities}
 
 	// mock storage headers
