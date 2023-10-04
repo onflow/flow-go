@@ -2,6 +2,7 @@ package indexer
 
 import (
 	"context"
+	"os"
 	"path"
 	"testing"
 
@@ -57,10 +58,21 @@ func Test_Integration(t *testing.T) {
 		assert.Equal(t, registers.LatestHeight(), rootHeight)
 		assert.Equal(t, registers.FirstHeight(), rootHeight)
 
-		txScript := []byte(`transaction { prepare(auth: AuthAccount) { auth.save<String>("test", to: /storage/testPath) } }`)
-		exeData, err := chain.execute(txScript)
-		require.NoError(err)
+		badgerDB, dbDir := unittest.TempBadgerDB(t)
+		t.Cleanup(func() {
+			require.NoError(t, badgerDB.Close())
+			require.NoError(t, os.RemoveAll(dbDir))
+		})
 
+		txScript := []byte(`transaction { prepare(auth: AuthAccount) { auth.save<String>("test", to: /storage/testPath) } }`)
+		err = chain.execute(txScript)
+		require.NoError(t, err)
+
+		indexer := newIndexerTestWithBlocks(t, chain.blocks, 0)
+		indexer.setBlockDataByID(chain.getExecutionDataByID)
+
+		// todo we need to create indexer here instead use the method above because it needs to have a real indexer core
+		// instance with real dbs instead of mocks, otherwise we don't cover that area
 	})
 
 }
@@ -79,6 +91,7 @@ type testChain struct {
 	fvmOpts      []fvm.Option
 	latestCommit flow.StateCommitment
 	blocks       []*flow.Block
+	exeData      map[flow.Identifier]*execution_data.BlockExecutionData
 }
 
 func newTestChain() (*testChain, error) {
@@ -102,6 +115,8 @@ func newTestChain() (*testChain, error) {
 	}
 
 	genesis := unittest.BlockFixture()
+	data := make(map[flow.Identifier]*execution_data.BlockExecutionData)
+	data[genesis.ID()] = nil
 
 	return &testChain{
 		ldg:          ldg,
@@ -110,6 +125,7 @@ func newTestChain() (*testChain, error) {
 		fvmOpts:      opts,
 		latestCommit: flow.StateCommitment(ldg.InitialState()),
 		blocks:       []*flow.Block{&genesis},
+		exeData:      data,
 	}, nil
 }
 
@@ -147,7 +163,7 @@ func (t *testChain) bootstrap() (*trie.MTrie, error) {
 	return t.ldg.FindTrieByStateCommit(t.latestCommit)
 }
 
-func (t *testChain) execute(script []byte) (*execution_data.BlockExecutionData, error) {
+func (t *testChain) execute(script []byte) error {
 	previousBlock := t.blocks[len(t.blocks)-1]
 	newBlock := unittest.BlockWithParentFixture(previousBlock.Header)
 	t.blocks = append(t.blocks, newBlock)
@@ -160,18 +176,27 @@ func (t *testChain) execute(script []byte) (*execution_data.BlockExecutionData, 
 
 	trieUpdate, err := t.fvmRun(txProc)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	exeData := []*execution_data.ChunkExecutionData{{
-		Collection:         nil,
-		Events:             nil,
+	chunk := []*execution_data.ChunkExecutionData{{
+		Events:             nil, // todo extract
 		TrieUpdate:         trieUpdate,
-		TransactionResults: nil,
+		TransactionResults: nil, // todo extract
 	}}
 
-	return &execution_data.BlockExecutionData{
+	t.exeData[newBlock.ID()] = &execution_data.BlockExecutionData{
 		BlockID:             newBlock.Header.ID(),
-		ChunkExecutionDatas: exeData,
-	}, nil
+		ChunkExecutionDatas: chunk,
+	}
+
+	return nil
+}
+
+func (t *testChain) getExecutionDataByID(ID flow.Identifier) (*execution_data.BlockExecutionDataEntity, bool) {
+	data, ok := t.exeData[ID]
+	if !ok {
+		return nil, false
+	}
+	return execution_data.NewBlockExecutionDataEntity(ID, data), true
 }

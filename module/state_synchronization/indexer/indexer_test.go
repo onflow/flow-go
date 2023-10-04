@@ -38,7 +38,10 @@ type indexerTest struct {
 // indexed to lastIndexedIndex value. Using run it should index all the remaining blocks up to all available blocks.
 func newIndexerTest(t *testing.T, availableBlocks int, lastIndexedIndex int) *indexerTest {
 	blocks := unittest.BlockchainFixture(availableBlocks)
-	// we use 5th index as the latest indexed height, so we leave 5 more blocks to be indexed by the indexer in this test
+	return newIndexerTestWithBlocks(t, blocks, lastIndexedIndex)
+}
+
+func newIndexerTestWithBlocks(t *testing.T, blocks []*flow.Block, lastIndexedIndex int) *indexerTest {
 	lastIndexedHeight := blocks[lastIndexedIndex].Header.Height
 	progress := newMockProgress()
 	err := progress.SetProcessedIndex(lastIndexedHeight)
@@ -160,8 +163,8 @@ func (w *mockProgress) WaitForIndex(n uint64) <-chan struct{} {
 }
 
 func TestIndexer_Success(t *testing.T) {
-	// we use 5th index as the latest indexed height, so we leave 5 more blocks to be indexed by the indexer in this test
 	blocks := 10
+	// we use 5th index as the latest indexed height, so we leave 5 more blocks to be indexed by the indexer in this test
 	lastIndexedIndex := 5
 	test := newIndexerTest(t, blocks, lastIndexedIndex)
 
