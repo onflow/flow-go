@@ -167,7 +167,7 @@ func runWithEngine(t *testing.T, f func(testingContext)) {
 	var engine *Engine
 
 	defer func() {
-		<-engine.Done()
+		unittest.AssertClosesBefore(t, engine.Done(), 5*time.Second, "expect to stop before timeout")
 		ctrl.Finish()
 		computationManager.AssertExpectations(t)
 		protocolState.AssertExpectations(t)
@@ -373,7 +373,7 @@ func (ctx testingContext) mockSnapshot(header *flow.Header, identities flow.Iden
 func (ctx testingContext) mockSnapshotWithBlockID(blockID flow.Identifier, identities flow.IdentityList) {
 	cluster := new(protocol.Cluster)
 	// filter only collections as cluster members
-	cluster.On("Members").Return(identities.Filter(filter.HasRole[flow.Identity](flow.RoleCollection)))
+	cluster.On("Members").Return(identities.Filter(filter.HasRole[flow.Identity](flow.RoleCollection)).ToSkeleton())
 
 	epoch := new(protocol.Epoch)
 	epoch.On("ClusterByChainID", mock.Anything).Return(cluster, nil)
