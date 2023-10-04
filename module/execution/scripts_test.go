@@ -58,7 +58,7 @@ func Test_ExecuteScript(t *testing.T) {
 		scripts := newScripts(
 			t,
 			newBlockHeadersStorage(blockchain),
-			func(ID flow.RegisterID, height uint64) ([]flow.RegisterValue, error) {
+			func(ID flow.RegisterID, height uint64) (flow.RegisterValue, error) {
 				return nil, nil // intentionally return nil to check edge case
 			},
 		)
@@ -94,7 +94,7 @@ func Test_GetAccount(t *testing.T) {
 func newScripts(
 	t *testing.T,
 	headers storage.Headers,
-	registers func(ID flow.RegisterID, height uint64) ([]flow.RegisterValue, error),
+	registers func(ID flow.RegisterID, height uint64) (flow.RegisterValue, error),
 ) *Scripts {
 	entropyProvider := testutil.EntropyProviderFixture(nil)
 	entropyBlock := mock.NewEntropyProviderPerBlock(t)
@@ -142,18 +142,8 @@ func bootstrapFVM() snapshot.SnapshotTree {
 }
 
 // converts tree get register function to the required script get register function
-func treeToRegisterAdapter(tree snapshot.SnapshotTree) func(IDs flow.RegisterIDs, height uint64) ([]flow.RegisterValue, error) {
-	return func(IDs flow.RegisterIDs, height uint64) ([]flow.RegisterValue, error) {
-		values := make([]flow.RegisterValue, len(IDs))
-
-		for i, ID := range IDs {
-			val, err := tree.Get(ID)
-			if err != nil {
-				return nil, err
-			}
-			values[i] = val
-		}
-
-		return values, nil
+func treeToRegisterAdapter(tree snapshot.SnapshotTree) func(ID flow.RegisterID, height uint64) (flow.RegisterValue, error) {
+	return func(ID flow.RegisterID, height uint64) (flow.RegisterValue, error) {
+		return tree.Get(ID)
 	}
 }

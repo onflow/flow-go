@@ -752,11 +752,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 					builder.RootChainID,
 					query.NewProtocolStateWrapper(builder.State),
 					builder.Storage.Headers,
-					// this is an adapter for using indexer register values that takes a slice of IDs in the
-					// script executor that only uses a single register ID at a time.
-					func(ID flow.RegisterID, height uint64) ([]flow.RegisterValue, error) {
-						return builder.ExecutionIndexerCore.RegisterValues([]flow.RegisterID{ID}, height)
-					},
+					execution.IndexRegisterAdapter(builder.ExecutionIndexerCore.RegisterValues),
 				)
 				if err != nil {
 					return nil, err
