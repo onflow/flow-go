@@ -30,6 +30,8 @@ type Environment struct {
 }
 
 // NewEnvironment constructs a new Flex Enviornment
+// TODO: last executed block should be maybe injected here, it should not be a
+// concern for the EVM environment to load, should be injected as part of config
 func NewEnvironment(
 	cfg *Config,
 	db *storage.Database,
@@ -146,6 +148,8 @@ func (fe *Environment) Balance(target models.FlexAddress) (*big.Int, error) {
 	return fe.State.GetBalance(target.ToCommon()), nil
 }
 
+// TODO: move this to handler, its not related to here, then results like UUIndex, Total balance
+// could also be move to handler level.
 func (fe *Environment) allocateAddress() models.FlexAddress {
 	target := models.FlexAddress{}
 	// first 12 bytes would be zero
