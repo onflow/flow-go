@@ -84,7 +84,7 @@ func Test_GetAccount(t *testing.T) {
 	)
 
 	address := chain.ServiceAddress()
-	account, err := scripts.GetAccount(context.Background(), address, first.Header.Height)
+	account, err := scripts.GetAccountAtBlockHeight(context.Background(), address, first.Header.Height)
 	require.NoError(t, err)
 	assert.Equal(t, address, account.Address)
 	assert.NotZero(t, account.Balance)

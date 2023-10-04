@@ -83,10 +83,10 @@ func (s *Scripts) ExecuteAtBlockHeight(
 	return s.executor.ExecuteScript(ctx, script, arguments, header, snap)
 }
 
-// GetAccount returns a Flow account by the provided address and block height.
+// GetAccountAtBlockHeight returns a Flow account by the provided address and block height.
 // Expected errors:
 // - Storage.NotFound if block or register value at height was not found.
-func (s *Scripts) GetAccount(ctx context.Context, address flow.Address, height uint64) (*flow.Account, error) {
+func (s *Scripts) GetAccountAtBlockHeight(ctx context.Context, address flow.Address, height uint64) (*flow.Account, error) {
 	snap, header, err := s.snapshotWithBlock(height)
 	if err != nil {
 		return nil, err
