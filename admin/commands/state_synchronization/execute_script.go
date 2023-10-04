@@ -31,7 +31,7 @@ func (e *ExecuteScriptCommand) Handler(ctx context.Context, req *admin.CommandRe
 		return nil, err
 	}
 
-	return fmt.Sprintf("%s", result), nil
+	return fmt.Sprintf("%s", string(result)), nil
 }
 
 // Validator validates the request.
@@ -44,43 +44,43 @@ func (e *ExecuteScriptCommand) Validator(req *admin.CommandRequest) error {
 
 	heightRaw, ok := input["height"]
 	if !ok {
-		return admin.NewInvalidAdminReqErrorf("missing required field 'height")
+		return admin.NewInvalidAdminReqFormatError("missing required field 'height")
 	}
 
 	scriptRaw, ok := input["script"]
 	if !ok {
-		return admin.NewInvalidAdminReqErrorf("missing required field 'script")
+		return admin.NewInvalidAdminReqFormatError("missing required field 'script")
 	}
 
 	argsRaw, ok := input["args"]
 	if !ok {
-		return admin.NewInvalidAdminReqErrorf("missing required field 'args")
+		return admin.NewInvalidAdminReqFormatError("missing required field 'args")
 	}
 
 	heightStr, ok := heightRaw.(string)
 	if !ok {
-		return admin.NewInvalidAdminReqErrorf("'height' must be string")
+		return admin.NewInvalidAdminReqFormatError("'height' must be string")
 	}
 
 	height, err := strconv.ParseUint(heightStr, 10, 64)
 	if err != nil {
-		return admin.NewInvalidAdminReqErrorf("'height' must be valid uint64 value", err)
+		return admin.NewInvalidAdminReqFormatError("'height' must be valid uint64 value", err)
 	}
 
 	scriptStr, ok := scriptRaw.(string)
 	if !ok {
-		return admin.NewInvalidAdminReqErrorf("'script' must be string")
+		return admin.NewInvalidAdminReqFormatError("'script' must be string")
 	}
 
 	argsStr, ok := argsRaw.(string)
 	if !ok {
-		return admin.NewInvalidAdminReqErrorf("'args' must be string")
+		return admin.NewInvalidAdminReqFormatError("'args' must be string")
 	}
 
 	args := make([][]byte, 0)
 	err = json.Unmarshal([]byte(argsStr), &args)
 	if err != nil {
-		return admin.NewInvalidAdminReqErrorf("'args' not valid JSON", err)
+		return admin.NewInvalidAdminReqFormatError("'args' not valid JSON", err)
 	}
 
 	req.ValidatorData = &scriptData{
