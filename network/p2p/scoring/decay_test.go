@@ -8,7 +8,6 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/scoring"
 )
 
@@ -138,12 +137,12 @@ func TestGeometricDecay(t *testing.T) {
 // 5. penalty is negative and below the skipDecayThreshold and lastUpdated is too old. In this case, the penalty should be decayed.
 func TestDefaultDecayFunction(t *testing.T) {
 	type args struct {
-		record      p2p.GossipSubSpamRecord
+		record      scoring.GossipSubSpamRecord
 		lastUpdated time.Time
 	}
 
 	type want struct {
-		record p2p.GossipSubSpamRecord
+		record scoring.GossipSubSpamRecord
 	}
 
 	tests := []struct {
@@ -155,14 +154,14 @@ func TestDefaultDecayFunction(t *testing.T) {
 			// 1. penalty is non-negative and should not be decayed.
 			name: "penalty is non-negative",
 			args: args{
-				record: p2p.GossipSubSpamRecord{
+				record: scoring.GossipSubSpamRecord{
 					Penalty: 5,
 					Decay:   0.8,
 				},
 				lastUpdated: time.Now(),
 			},
 			want: want{
-				record: p2p.GossipSubSpamRecord{
+				record: scoring.GossipSubSpamRecord{
 					Penalty: 5,
 					Decay:   0.8,
 				},
@@ -173,14 +172,14 @@ func TestDefaultDecayFunction(t *testing.T) {
 			// since less than a second has passed since last update.
 			name: "penalty is negative and but above skipDecayThreshold and lastUpdated is too recent",
 			args: args{
-				record: p2p.GossipSubSpamRecord{
+				record: scoring.GossipSubSpamRecord{
 					Penalty: -0.09, // -0.09 is above skipDecayThreshold of -0.1
 					Decay:   0.8,
 				},
 				lastUpdated: time.Now(),
 			},
 			want: want{
-				record: p2p.GossipSubSpamRecord{
+				record: scoring.GossipSubSpamRecord{
 					Penalty: 0, // penalty is set to 0
 					Decay:   0.8,
 				},
@@ -191,14 +190,14 @@ func TestDefaultDecayFunction(t *testing.T) {
 			// since penalty is between [skipDecayThreshold, 0] and more than a second has passed since last update.
 			name: "penalty is negative and but above skipDecayThreshold and lastUpdated is too old",
 			args: args{
-				record: p2p.GossipSubSpamRecord{
+				record: scoring.GossipSubSpamRecord{
 					Penalty: -0.09, // -0.09 is above skipDecayThreshold of -0.1
 					Decay:   0.8,
 				},
 				lastUpdated: time.Now().Add(-10 * time.Second),
 			},
 			want: want{
-				record: p2p.GossipSubSpamRecord{
+				record: scoring.GossipSubSpamRecord{
 					Penalty: 0, // penalty is set to 0
 					Decay:   0.8,
 				},
@@ -209,14 +208,14 @@ func TestDefaultDecayFunction(t *testing.T) {
 			// since less than a second has passed since last update.
 			name: "penalty is negative and below skipDecayThreshold but lastUpdated is too recent",
 			args: args{
-				record: p2p.GossipSubSpamRecord{
+				record: scoring.GossipSubSpamRecord{
 					Penalty: -5,
 					Decay:   0.8,
 				},
 				lastUpdated: time.Now(),
 			},
 			want: want{
-				record: p2p.GossipSubSpamRecord{
+				record: scoring.GossipSubSpamRecord{
 					Penalty: -5,
 					Decay:   0.8,
 				},
@@ -226,14 +225,14 @@ func TestDefaultDecayFunction(t *testing.T) {
 			// 5. penalty is negative and below the skipDecayThreshold and lastUpdated is too old. In this case, the penalty should be decayed.
 			name: "penalty is negative and below skipDecayThreshold but lastUpdated is too old",
 			args: args{
-				record: p2p.GossipSubSpamRecord{
+				record: scoring.GossipSubSpamRecord{
 					Penalty: -15,
 					Decay:   0.8,
 				},
 				lastUpdated: time.Now().Add(-10 * time.Second),
 			},
 			want: want{
-				record: p2p.GossipSubSpamRecord{
+				record: scoring.GossipSubSpamRecord{
 					Penalty: -15 * math.Pow(0.8, 10),
 					Decay:   0.8,
 				},
