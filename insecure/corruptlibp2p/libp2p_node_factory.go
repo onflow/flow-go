@@ -90,7 +90,8 @@ func InitCorruptLibp2pNode(
 		&netConfig.ResourceManagerConfig,
 		uniCfg,
 		&netConfig.ConnectionManagerConfig,
-		disallowListCacheCfg)
+		disallowListCacheCfg,
+		&netConfig.SubscriptionProviderConfig)
 
 	if err != nil {
 		return nil, fmt.Errorf("could not create corrupt libp2p node builder: %w", err)

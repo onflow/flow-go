@@ -23,6 +23,21 @@ type GossipSubConfig struct {
 
 	// PeerScoring is whether to enable GossipSub peer scoring.
 	PeerScoring bool `mapstructure:"gossipsub-peer-scoring-enabled"`
+
+	SubscriptionProviderConfig SubscriptionProviderParameters
+}
+
+type SubscriptionProviderParameters struct {
+	// TopicListUpdateInterval is the interval for updating the list of topics in the pubsub network that this node has subscribed to.
+	// Note that we recommend setting this value larger than the PeerSubscriptionUpdateTTL; otherwise, the list of topics
+	// will be updated as (or even more) frequently than the list of peers subscribed to a topic, which is not necessary.
+	// Also, small values for this parameter can lead to a high contention with the reading threads.
+	TopicListUpdateInterval time.Duration `validate:"gt=0s" mapstructure:"gossipsub-topic-list-update-interval"`
+
+	// PeerSubscriptionUpdateTTL is the time-to-live for updating the list of topics a peer is subscribed to.
+	// Note that we recommend setting this value smaller than the TopicListUpdateTTL; otherwise, the list of topics
+	// will be updated as (or even more) frequently than the list of peers subscribed to a topic, which is not necessary.
+	PeerSubscriptionUpdateTTL time.Duration `validate:"gt=0s" mapstructure:"gossipsub-peer-subscription-update-ttl"`
 }
 
 // GossipSubTracerConfig is the config for the gossipsub tracer. GossipSub tracer is used to trace the local mesh events and peer scores.

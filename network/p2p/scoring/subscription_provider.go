@@ -13,6 +13,7 @@ import (
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/network/p2p"
+	"github.com/onflow/flow-go/network/p2p/p2pconf"
 )
 
 // SubscriptionProvider provides a list of topics a peer is subscribed to.
@@ -35,23 +36,10 @@ type SubscriptionProvider struct {
 	allTopicsUpdateInterval time.Duration // the interval for updating the list of topics in the pubsub network that this node has subscribed to.
 }
 
-type SubscriptionProviderParam struct {
-	// TopicListUpdateInterval is the interval for updating the list of topics in the pubsub network that this node has subscribed to.
-	// Note that we recommend setting this value larger than the PeerSubscriptionUpdateTTL; otherwise, the list of topics
-	// will be updated as (or even more) frequently than the list of peers subscribed to a topic, which is not necessary.
-	// Also, small values for this parameter can lead to a high contention with the reading threads.
-	TopicListUpdateInterval time.Duration `validate:"required"`
-
-	// PeerSubscriptionUpdateTTL is the time-to-live for updating the list of topics a peer is subscribed to.
-	// Note that we recommend setting this value smaller than the TopicListUpdateTTL; otherwise, the list of topics
-	// will be updated as (or even more) frequently than the list of peers subscribed to a topic, which is not necessary.
-	PeerSubscriptionUpdateTTL time.Duration `validate:"required"`
-}
-
 type SubscriptionProviderConfig struct {
 	Logger        zerolog.Logger    `validate:"required"`
 	TopicProvider p2p.TopicProvider `validate:"required"`
-	Params        *SubscriptionProviderParam
+	Params        *p2pconf.SubscriptionProviderParameters
 }
 
 func NewSubscriptionProvider(cfg *SubscriptionProviderConfig) (*SubscriptionProvider, error) {
