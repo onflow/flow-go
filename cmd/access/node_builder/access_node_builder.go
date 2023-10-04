@@ -744,17 +744,19 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 				// setup requester to notify indexer when new execution data is received
 				execDataDistributor.AddOnExecutionDataReceivedConsumer(builder.ExecutionIndexer.OnExecutionData)
 
-				return builder.ExecutionIndexer, nil
-			}, indexerDependencies).
-			Component("script execution", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-
+				// create script execution module, this depends on the indexer being initialized and the
+				// having the register storage bootstrapped
 				scripts, err := execution.NewScripts(
 					builder.Logger,
 					metrics.NewExecutionCollector(builder.Tracer),
 					builder.RootChainID,
 					query.NewProtocolStateWrapper(builder.State),
 					builder.Storage.Headers,
-					builder.ExecutionIndexerCore.RegisterValues,
+					// this is an adapter for using indexer register values that takes a slice of IDs in the
+					// script executor that only uses a single register ID at a time.
+					func(ID flow.RegisterID, height uint64) ([]flow.RegisterValue, error) {
+						return builder.ExecutionIndexerCore.RegisterValues([]flow.RegisterID{ID}, height)
+					},
 				)
 				if err != nil {
 					return nil, err
@@ -762,8 +764,8 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 
 				builder.ScriptExecutor = scripts
 
-				return &module.NoopReadyDoneAware{}, nil
-			})
+				return builder.ExecutionIndexer, nil
+			}, indexerDependencies)
 	}
 
 	if builder.stateStreamConf.ListenAddr != "" {

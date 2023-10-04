@@ -21,7 +21,7 @@ import (
 // Expected errors:
 // - storage.ErrNotFound if the register by the ID was never indexed
 // - ErrIndexBoundary if the height is out of indexed height boundary
-type RegistersAtHeight func(IDs flow.RegisterIDs, height uint64) ([]flow.RegisterValue, error)
+type RegistersAtHeight func(ID flow.RegisterID, height uint64) ([]flow.RegisterValue, error)
 
 type Scripts struct {
 	executor          *query.QueryExecutor
@@ -104,7 +104,7 @@ func (s *Scripts) snapshotWithBlock(height uint64) (snapshot.StorageSnapshot, *f
 	}
 
 	storageSnapshot := snapshot.NewReadFuncStorageSnapshot(func(ID flow.RegisterID) (flow.RegisterValue, error) {
-		values, err := s.registersAtHeight(flow.RegisterIDs{ID}, height)
+		values, err := s.registersAtHeight(ID, height)
 		if err != nil {
 			return nil, err
 		}
