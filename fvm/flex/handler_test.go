@@ -15,6 +15,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// TODO add test for fatal errors
+
 func TestFlexContractHandler(t *testing.T) {
 	t.Parallel()
 	t.Run("test last executed block call", func(t *testing.T) {

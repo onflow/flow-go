@@ -110,10 +110,12 @@ func (h FlexContractHandler) getNewDefaultEnv() *env.Environment {
 	return env
 }
 
-// TODO: properly implement this
 func handleError(err error) {
-	// TODO: check if is fatal
 	if err != nil {
+		if models.IsAFatalError(err) {
+			// don't wrap it
+			panic(err)
+		}
 		panic(errors.NewEVMError(err))
 	}
 }

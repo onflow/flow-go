@@ -70,3 +70,7 @@ func (err FatalError) Unwrap() error {
 func (err FatalError) Error() string {
 	return fmt.Sprintf("fatal error: %v", err.err)
 }
+
+func IsAFatalError(err error) bool {
+	return errors.As(err, &FatalError{})
+}

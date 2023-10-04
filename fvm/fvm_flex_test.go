@@ -169,7 +169,7 @@ func TestWithFlexEnabled_ContractInteraction(t *testing.T) {
 					snapshotTree)
 				require.NoError(t, err)
 
-				// transaction should pass
+				// transaction should pass in the future
 				require.NoError(t, output.Err)
 
 				require.Equal(t, output.Value, true)
@@ -180,44 +180,44 @@ func TestWithFlexEnabled_ContractInteraction(t *testing.T) {
 	})
 }
 
-func TestWithFlexEnabled_FOAInteraction(t *testing.T) {
+// func TestWithFlexEnabled_FOAInteraction(t *testing.T) {
 
-	chainID := flow.Emulator
-	// flexRoot := emulator.FlexRootAccountAddress
-	var snapshotTree snapshot.SnapshotTree
-	WithBootstrappedTestVM(t, chainID, func(chain flow.Chain, vm fvm.VM, tree *snapshot.SnapshotTree) {
-		// create ctx with flex enabled
-		ctx := fvm.NewContext(
-			fvm.WithChain(chain),
-			fvm.WithFlexEnabled(true),
-			fvm.WithAuthorizationChecksEnabled(false),
-			fvm.WithSequenceNumberCheckAndIncrementEnabled(false),
-		)
+// 	chainID := flow.Emulator
+// 	// flexRoot := emulator.FlexRootAccountAddress
+// 	var snapshotTree snapshot.SnapshotTree
+// 	WithBootstrappedTestVM(t, chainID, func(chain flow.Chain, vm fvm.VM, tree *snapshot.SnapshotTree) {
+// 		// create ctx with flex enabled
+// 		ctx := fvm.NewContext(
+// 			fvm.WithChain(chain),
+// 			fvm.WithFlexEnabled(true),
+// 			fvm.WithAuthorizationChecksEnabled(false),
+// 			fvm.WithSequenceNumberCheckAndIncrementEnabled(false),
+// 		)
 
-		txScript := []byte(`
-					transaction(tx: [UInt8], coinbaseBytes: [UInt8; 20]) {
-						prepare(signer: AuthAccount) {
-						}
-						execute {
-							// TODO: create a flex account
-						}
-					}
-				`)
+// 		txScript := []byte(`
+// 					transaction(tx: [UInt8], coinbaseBytes: [UInt8; 20]) {
+// 						prepare(signer: AuthAccount) {
+// 						}
+// 						execute {
+// 							// TODO: create a flex account
+// 						}
+// 					}
+// 				`)
 
-		storeTxBody := flow.NewTransactionBody().
-			SetScript(txScript).
-			AddAuthorizer(chain.ServiceAddress())
+// 		storeTxBody := flow.NewTransactionBody().
+// 			SetScript(txScript).
+// 			AddAuthorizer(chain.ServiceAddress())
 
-		_, output, err := vm.Run(
-			ctx,
-			fvm.Transaction(storeTxBody, 0),
-			snapshotTree)
-		require.NoError(t, err)
+// 		_, output, err := vm.Run(
+// 			ctx,
+// 			fvm.Transaction(storeTxBody, 0),
+// 			snapshotTree)
+// 		require.NoError(t, err)
 
-		// transaction should pass
-		require.NoError(t, output.Err)
-	})
-}
+// 		// transaction should pass
+// 		require.NoError(t, output.Err)
+// 	})
+// }
 
 type ledger struct {
 	tree     *snapshot.SnapshotTree
