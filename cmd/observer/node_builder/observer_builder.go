@@ -128,7 +128,6 @@ func DefaultObserverServiceConfig() *ObserverServiceConfig {
 				MaxHeightRange:            backend.DefaultMaxHeightRange,
 				PreferredExecutionNodeIDs: nil,
 				FixedExecutionNodeIDs:     nil,
-				ArchiveAddressList:        nil,
 			},
 			RestConfig: rest.Config{
 				ListenAddress: "",
@@ -939,9 +938,7 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 			FixedExecutionNodeIDs:     backendConfig.FixedExecutionNodeIDs,
 			Log:                       node.Logger,
 			SnapshotHistoryLimit:      backend.DefaultSnapshotHistoryLimit,
-			ArchiveAddressList:        backendConfig.ArchiveAddressList,
 			Communicator:              backend.NewNodeCommunicator(backendConfig.CircuitBreakerConfig.Enabled),
-			ScriptExecValidation:      backendConfig.ScriptExecValidation,
 		})
 		if err != nil {
 			return nil, fmt.Errorf("could not initialize backend: %w", err)

@@ -2,6 +2,7 @@ package backend
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"github.com/rs/zerolog"
@@ -14,6 +15,7 @@ import (
 	"github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/execution"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
 )
@@ -25,14 +27,18 @@ type backendAccounts struct {
 	connFactory       connection.ConnectionFactory
 	log               zerolog.Logger
 	nodeCommunicator  Communicator
+	scriptExecutor    execution.ScriptExecutor
+	scriptExecMode    ScriptExecutionMode
 }
 
+// GetAccount returns the account details at the latest sealed block.
+// Alias for GetAccountAtLatestBlock
 func (b *backendAccounts) GetAccount(ctx context.Context, address flow.Address) (*flow.Account, error) {
 	return b.GetAccountAtLatestBlock(ctx, address)
 }
 
+// GetAccountAtLatestBlock returns the account details at the latest sealed block.
 func (b *backendAccounts) GetAccountAtLatestBlock(ctx context.Context, address flow.Address) (*flow.Account, error) {
-
 	// get the latest sealed header
 	latestHeader, err := b.state.Sealed().Head()
 	if err != nil {
@@ -42,15 +48,16 @@ func (b *backendAccounts) GetAccountAtLatestBlock(ctx context.Context, address f
 	// get the block id of the latest sealed header
 	latestBlockID := latestHeader.ID()
 
-	account, err := b.getAccountAtBlockID(ctx, address, latestBlockID)
+	account, err := b.getAccountAtBlock(ctx, address, latestBlockID, latestHeader.Height)
 	if err != nil {
-		b.log.Error().Err(err).Msgf("failed to get account at blockID: %v", latestBlockID)
+		b.log.Debug().Err(err).Msgf("failed to get account at blockID: %v", latestBlockID)
 		return nil, err
 	}
 
 	return account, nil
 }
 
+// GetAccountAtBlockHeight returns the account details at the given block height
 func (b *backendAccounts) GetAccountAtBlockHeight(
 	ctx context.Context,
 	address flow.Address,
@@ -62,43 +69,57 @@ func (b *backendAccounts) GetAccountAtBlockHeight(
 		return nil, rpc.ConvertStorageError(err)
 	}
 
-	// get block ID of the header at the given height
+	// get the block id of the latest sealed header
 	blockID := header.ID()
 
-	account, err := b.getAccountAtBlockID(ctx, address, blockID)
+	account, err := b.getAccountAtBlock(ctx, address, blockID, header.Height)
 	if err != nil {
+		b.log.Debug().Err(err).Msgf("failed to get account at blockID: %v", blockID)
 		return nil, err
 	}
 
 	return account, nil
 }
 
-func (b *backendAccounts) getAccountAtBlockID(
+// getAccountAtBlock returns the account details at the given block
+//
+// The data may be sourced from the local storage or from an execution node depending on the nodes's
+// configuration and the availability of the data.
+func (b *backendAccounts) getAccountAtBlock(
 	ctx context.Context,
 	address flow.Address,
 	blockID flow.Identifier,
+	height uint64,
 ) (*flow.Account, error) {
-
-	exeReq := &execproto.GetAccountAtBlockIDRequest{
-		Address: address.Bytes(),
-		BlockId: blockID[:],
+	if b.scriptExecMode == ScriptExecutionModeExecutionNodesOnly {
+		return b.getAccountFromAnyExeNode(ctx, address, blockID)
 	}
 
-	execNodes, err := executionNodesForBlockID(ctx, blockID, b.executionReceipts, b.state, b.log)
-	if err != nil {
-		return nil, rpc.ConvertError(err, "failed to get account from the execution node", codes.Internal)
+	account, err := b.getAccountFromLocalStorage(ctx, address, height)
+
+	if err != nil && b.scriptExecMode == ScriptExecutionModeFailover {
+		return b.getAccountFromAnyExeNode(ctx, address, blockID)
 	}
 
-	var exeRes *execproto.GetAccountAtBlockIDResponse
-	exeRes, err = b.getAccountFromAnyExeNode(ctx, execNodes, exeReq)
-	if err != nil {
-		b.log.Error().Err(err).Msg("failed to get account from execution nodes")
-		return nil, rpc.ConvertError(err, "failed to get account from the execution node", codes.Internal)
-	}
+	return account, err
+}
 
-	account, err := convert.MessageToAccount(exeRes.GetAccount())
+// getAccountFromLocalStorage retrieves the given account from the local storage.
+func (b *backendAccounts) getAccountFromLocalStorage(
+	ctx context.Context,
+	address flow.Address,
+	height uint64,
+) (*flow.Account, error) {
+	// make sure data is available for the requested block
+	account, err := b.scriptExecutor.GetAccount(ctx, address, height)
 	if err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to convert account message: %v", err)
+		if errors.Is(err, ErrDataNotAvailable) {
+			return nil, status.Errorf(codes.OutOfRange, "data for block height %d is not available", height)
+		}
+		if errors.Is(err, storage.ErrNotFound) {
+			return nil, status.Errorf(codes.NotFound, "data not found: %v", err)
+		}
+		return nil, rpc.ConvertError(err, "failed to get account from local storage", codes.Internal)
 	}
 
 	return account, nil
@@ -108,7 +129,21 @@ func (b *backendAccounts) getAccountAtBlockID(
 // We attempt querying each EN in sequence. If any EN returns a valid response, then errors from
 // other ENs are logged and swallowed. If all ENs fail to return a valid response, then an
 // error aggregating all failures is returned.
-func (b *backendAccounts) getAccountFromAnyExeNode(ctx context.Context, execNodes flow.IdentityList, req *execproto.GetAccountAtBlockIDRequest) (*execproto.GetAccountAtBlockIDResponse, error) {
+func (b *backendAccounts) getAccountFromAnyExeNode(
+	ctx context.Context,
+	address flow.Address,
+	blockID flow.Identifier,
+) (*flow.Account, error) {
+	req := &execproto.GetAccountAtBlockIDRequest{
+		Address: address.Bytes(),
+		BlockId: blockID[:],
+	}
+
+	execNodes, err := executionNodesForBlockID(ctx, blockID, b.executionReceipts, b.state, b.log)
+	if err != nil {
+		return nil, rpc.ConvertError(err, "failed to get account from the execution node", codes.Internal)
+	}
+
 	var resp *execproto.GetAccountAtBlockIDResponse
 	errToReturn := b.nodeCommunicator.CallAvailableNode(
 		execNodes,
@@ -119,43 +154,48 @@ func (b *backendAccounts) getAccountFromAnyExeNode(ctx context.Context, execNode
 			resp, err = b.tryGetAccount(ctx, node, req)
 			duration := time.Since(start)
 
-			if err == nil {
-				// return if any execution node replied successfully
-				b.log.Debug().
-					Str("execution_node", node.String()).
-					Hex("block_id", req.GetBlockId()).
-					Hex("address", req.GetAddress()).
-					Int64("rtt_ms", duration.Milliseconds()).
-					Msg("Successfully got account info")
-				return nil
-			}
-
-			b.log.Error().
+			lg := b.log.With().
 				Str("execution_node", node.String()).
 				Hex("block_id", req.GetBlockId()).
 				Hex("address", req.GetAddress()).
 				Int64("rtt_ms", duration.Milliseconds()).
-				Err(err).
-				Msg("failed to execute GetAccount")
+				Logger()
 
-			return err
+			if err != nil {
+				lg.Err(err).Msg("failed to execute GetAccount")
+				return err
+			}
+
+			// return if any execution node replied successfully
+			lg.Debug().Msg("Successfully got account info")
+			return nil
 		},
 		nil,
 	)
 
-	return resp, errToReturn
+	if errToReturn != nil {
+		return nil, errToReturn
+	}
+
+	account, err := convert.MessageToAccount(resp.GetAccount())
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to convert account message: %v", err)
+	}
+
+	return account, nil
 }
 
-func (b *backendAccounts) tryGetAccount(ctx context.Context, execNode *flow.Identity, req *execproto.GetAccountAtBlockIDRequest) (*execproto.GetAccountAtBlockIDResponse, error) {
+// tryGetAccount attempts to get the account from the given execution node.
+func (b *backendAccounts) tryGetAccount(
+	ctx context.Context,
+	execNode *flow.Identity,
+	req *execproto.GetAccountAtBlockIDRequest,
+) (*execproto.GetAccountAtBlockIDResponse, error) {
 	execRPCClient, closer, err := b.connFactory.GetExecutionAPIClient(execNode.Address)
 	if err != nil {
 		return nil, err
 	}
 	defer closer.Close()
 
-	resp, err := execRPCClient.GetAccountAtBlockID(ctx, req)
-	if err != nil {
-		return nil, err
-	}
-	return resp, nil
+	return execRPCClient.GetAccountAtBlockID(ctx, req)
 }

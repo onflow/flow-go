@@ -20,6 +20,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/execution"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
 )
@@ -79,19 +80,6 @@ type Backend struct {
 	nodeInfo *access.NodeVersionInfo
 }
 
-// Config defines the configurable options for creating Backend
-type Config struct {
-	ExecutionClientTimeout    time.Duration // execution API GRPC client timeout
-	CollectionClientTimeout   time.Duration // collection API GRPC client timeout
-	ConnectionPoolSize        uint          // size of the cache for storing collection and execution connections
-	MaxHeightRange            uint          // max size of height range requests
-	PreferredExecutionNodeIDs []string      // preferred list of upstream execution node IDs
-	FixedExecutionNodeIDs     []string      // fixed list of execution node IDs to choose from if no node ID can be chosen from the PreferredExecutionNodeIDs
-	ArchiveAddressList        []string      // the archive node address list to send script executions. when configured, script executions will be all sent to the archive node
-	ScriptExecValidation      bool
-	CircuitBreakerConfig      connection.CircuitBreakerConfig // the configuration for circuit breaker
-}
-
 type Params struct {
 	State                     protocol.State
 	CollectionRPC             accessproto.AccessAPIClient
@@ -111,10 +99,10 @@ type Params struct {
 	FixedExecutionNodeIDs     []string
 	Log                       zerolog.Logger
 	SnapshotHistoryLimit      int
-	ArchiveAddressList        []string
 	Communicator              Communicator
-	ScriptExecValidation      bool
 	TxResultCacheSize         uint
+	ScriptExecutor            execution.ScriptExecutor
+	ScriptExecutionMode       ScriptExecutionMode
 }
 
 // New creates backend instance
@@ -127,15 +115,6 @@ func New(params Params) (*Backend, error) {
 	loggedScripts, err := lru.New[[md5.Size]byte, time.Time](DefaultLoggedScriptsCacheSize)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize script logging cache: %w", err)
-	}
-
-	archivePorts := make([]uint, len(params.ArchiveAddressList))
-	for idx, addr := range params.ArchiveAddressList {
-		port, err := findPortFromAddress(addr)
-		if err != nil {
-			return nil, fmt.Errorf("failed to find archive node port: %w", err)
-		}
-		archivePorts[idx] = port
 	}
 
 	var txResCache *lru.Cache[flow.Identifier, *access.TransactionResult]
@@ -156,17 +135,16 @@ func New(params Params) (*Backend, error) {
 		state: params.State,
 		// create the sub-backends
 		backendScripts: backendScripts{
-			headers:              params.Headers,
-			executionReceipts:    params.ExecutionReceipts,
-			connFactory:          params.ConnFactory,
-			state:                params.State,
-			log:                  params.Log,
-			metrics:              params.AccessMetrics,
-			loggedScripts:        loggedScripts,
-			archiveAddressList:   params.ArchiveAddressList,
-			archivePorts:         archivePorts,
-			nodeCommunicator:     params.Communicator,
-			scriptExecValidation: params.ScriptExecValidation,
+			headers:           params.Headers,
+			executionReceipts: params.ExecutionReceipts,
+			connFactory:       params.ConnFactory,
+			state:             params.State,
+			log:               params.Log,
+			metrics:           params.AccessMetrics,
+			loggedScripts:     loggedScripts,
+			nodeCommunicator:  params.Communicator,
+			scriptExecutor:    params.ScriptExecutor,
+			scriptExecMode:    params.ScriptExecutionMode,
 		},
 		backendTransactions: backendTransactions{
 			staticCollectionRPC:  params.CollectionRPC,
@@ -209,6 +187,8 @@ func New(params Params) (*Backend, error) {
 			connFactory:       params.ConnFactory,
 			log:               params.Log,
 			nodeCommunicator:  params.Communicator,
+			scriptExecutor:    params.ScriptExecutor,
+			scriptExecMode:    params.ScriptExecutionMode,
 		},
 		backendExecutionResults: backendExecutionResults{
 			executionResults: params.ExecutionResults,

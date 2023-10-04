@@ -23,6 +23,27 @@ import (
 // - ErrIndexBoundary if the height is out of indexed height boundary
 type RegistersAtHeight func(ID flow.RegisterID, height uint64) (flow.RegisterValue, error)
 
+type ScriptExecutor interface {
+	// ExecuteAtBlockHeight executes provided script against the block height.
+	// A result value is returned encoded as byte array. An error will be returned if script
+	// doesn't successfully execute.
+	// Expected errors:
+	// - storage.ErrNotFound if block or register value at height was not found.
+	ExecuteAtBlockHeight(
+		ctx context.Context,
+		script []byte,
+		arguments [][]byte,
+		height uint64,
+	) ([]byte, error)
+
+	// GetAccount returns a Flow account by the provided address and block height.
+	// Expected errors:
+	// - storage.ErrNotFound if block or register value at height was not found.
+	GetAccount(ctx context.Context, address flow.Address, height uint64) (*flow.Account, error)
+}
+
+var _ ScriptExecutor = (*Scripts)(nil)
+
 type Scripts struct {
 	executor          *query.QueryExecutor
 	headers           storage.Headers
@@ -73,7 +94,8 @@ func (s *Scripts) ExecuteAtBlockHeight(
 	ctx context.Context,
 	script []byte,
 	arguments [][]byte,
-	height uint64) ([]byte, error) {
+	height uint64,
+) ([]byte, error) {
 
 	snap, header, err := s.snapshotWithBlock(height)
 	if err != nil {
