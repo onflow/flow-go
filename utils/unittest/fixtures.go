@@ -2608,6 +2608,12 @@ func ProtocolStateFixture(options ...func(*flow.RichProtocolStateEntry)) *flow.R
 			},
 		})
 	}
+	allIdentities = allIdentities.Map(func(identity flow.Identity) flow.Identity {
+		if _, found := prevEpochSetup.Participants.ByNodeID(identity.NodeID); found {
+			identity.Weight = 0
+		}
+		return identity
+	})
 	entry := &flow.RichProtocolStateEntry{
 		ProtocolStateEntry: &flow.ProtocolStateEntry{
 			CurrentEpoch: flow.EpochStateContainer{

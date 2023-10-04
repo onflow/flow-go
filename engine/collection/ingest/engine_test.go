@@ -88,8 +88,8 @@ func (suite *Suite) SetupTest() {
 		return herocache.NewTransactions(1000, log, metrics)
 	})
 
-	assignments := unittest.ClusterAssignment(suite.N_CLUSTERS, collectors)
-	suite.clusters, err = factory.NewClusterList(assignments, collectors)
+	assignments := unittest.ClusterAssignment(suite.N_CLUSTERS, collectors.ToSkeleton())
+	suite.clusters, err = factory.NewClusterList(assignments, collectors.ToSkeleton())
 	suite.Require().NoError(err)
 
 	suite.root = unittest.GenesisFixture()
@@ -352,7 +352,7 @@ func (suite *Suite) TestRoutingToRemoteClusterWithNoNodes() {
 	suite.Require().True(ok)
 
 	// set the next cluster to be empty
-	emptyIdentityList := flow.IdentityList{}
+	emptyIdentityList := flow.IdentitySkeletonList{}
 	nextClusterIndex := (index + 1) % suite.N_CLUSTERS
 	suite.clusters[nextClusterIndex] = emptyIdentityList
 
@@ -384,7 +384,7 @@ func (suite *Suite) TestRoutingLocalClusterFromOtherNode() {
 	suite.Require().True(ok)
 
 	// another node will send us the transaction
-	sender := local.Filter(filter.Not(filter.HasNodeID[flow.Identity](suite.me.NodeID())))[0]
+	sender := local.Filter(filter.Not(filter.HasNodeID[flow.IdentitySkeleton](suite.me.NodeID())))[0]
 
 	// get a transaction that will be routed to local cluster
 	tx := unittest.TransactionBodyFixture()
@@ -476,7 +476,7 @@ func (suite *Suite) TestRouting_ClusterAssignmentRemoved() {
 	// remove ourselves from the cluster assignment for epoch 2
 	withoutMe := suite.identities.
 		Filter(filter.Not(filter.HasNodeID[flow.Identity](suite.me.NodeID()))).
-		Filter(filter.HasRole[flow.Identity](flow.RoleCollection))
+		Filter(filter.HasRole[flow.Identity](flow.RoleCollection)).ToSkeleton()
 	epoch2Assignment := unittest.ClusterAssignment(suite.N_CLUSTERS, withoutMe)
 	epoch2Clusters, err := factory.NewClusterList(epoch2Assignment, withoutMe)
 	suite.Require().NoError(err)
@@ -515,7 +515,7 @@ func (suite *Suite) TestRouting_ClusterAssignmentAdded() {
 	// remove ourselves from the cluster assignment for epoch 2
 	withoutMe := suite.identities.
 		Filter(filter.Not(filter.HasNodeID[flow.Identity](suite.me.NodeID()))).
-		Filter(filter.HasRole[flow.Identity](flow.RoleCollection))
+		Filter(filter.HasRole[flow.Identity](flow.RoleCollection)).ToSkeleton()
 	epoch2Assignment := unittest.ClusterAssignment(suite.N_CLUSTERS, withoutMe)
 	epoch2Clusters, err := factory.NewClusterList(epoch2Assignment, withoutMe)
 	suite.Require().NoError(err)
@@ -544,7 +544,7 @@ func (suite *Suite) TestRouting_ClusterAssignmentAdded() {
 	// EPOCH 3:
 
 	// include ourselves in cluster assignment
-	withMe := suite.identities.Filter(filter.HasRole[flow.Identity](flow.RoleCollection))
+	withMe := suite.identities.Filter(filter.HasRole[flow.Identity](flow.RoleCollection)).ToSkeleton()
 	epoch3Assignment := unittest.ClusterAssignment(suite.N_CLUSTERS, withMe)
 	epoch3Clusters, err := factory.NewClusterList(epoch3Assignment, withMe)
 	suite.Require().NoError(err)

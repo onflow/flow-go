@@ -115,7 +115,7 @@ func (suite *IngestionCoreSuite) SetupTest() {
 	)
 	ref.On("Epochs").Return(suite.query)
 	suite.query.On("Current").Return(suite.epoch)
-	cluster.On("Members").Return(suite.clusterMembers)
+	cluster.On("Members").Return(suite.clusterMembers.ToSkeleton())
 	suite.epoch.On("ClusterByChainID", mock.Anything).Return(
 		func(chainID flow.ChainID) protocol.Cluster {
 			if chainID == suite.clusterID {
