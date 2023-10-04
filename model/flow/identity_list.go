@@ -318,14 +318,22 @@ func (il GenericIdentityList[T]) Union(other GenericIdentityList[T]) GenericIden
 	return union
 }
 
-// EqualTo checks if the other list if the same, that it contains the same elements
-// in the same order
-func (il GenericIdentityList[T]) EqualTo(other GenericIdentityList[T]) bool {
-	// TODO: temporary
-	//return slices.EqualFunc(il, other, func(a, b *T) bool {
-	//	return (*a)..EqualTo(b)
-	//})
-	return il.ID() == other.ID()
+// IdentityListEqualTo checks if the other list if the same, that it contains the same elements
+// in the same order.
+// NOTE: currently a generic comparison is not possible, so we have to use a specific function.
+func IdentityListEqualTo(lhs, rhs IdentityList) bool {
+	return slices.EqualFunc(lhs, rhs, func(a, b *Identity) bool {
+		return a.EqualTo(b)
+	})
+}
+
+// IdentitySkeletonListEqualTo checks if the other list if the same, that it contains the same elements
+// in the same order.
+// NOTE: currently a generic comparison is not possible, so we have to use a specific function.
+func IdentitySkeletonListEqualTo(lhs, rhs IdentitySkeletonList) bool {
+	return slices.EqualFunc(lhs, rhs, func(a, b *IdentitySkeleton) bool {
+		return a.EqualTo(b)
+	})
 }
 
 // Exists takes a previously sorted Identity list and searches it for the target value

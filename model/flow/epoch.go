@@ -105,7 +105,7 @@ func (setup *EpochSetup) EqualTo(other *EpochSetup) bool {
 	if setup.FinalView != other.FinalView {
 		return false
 	}
-	if !setup.Participants.EqualTo(other.Participants) {
+	if !IdentitySkeletonListEqualTo(setup.Participants, other.Participants) {
 		return false
 	}
 	if !setup.Assignments.EqualTo(other.Assignments) {

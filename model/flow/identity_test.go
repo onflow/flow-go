@@ -356,8 +356,8 @@ func TestIdentityList_EqualTo(t *testing.T) {
 		a := flow.IdentityList{}
 		b := flow.IdentityList{}
 
-		require.True(t, a.EqualTo(b))
-		require.True(t, b.EqualTo(a))
+		require.True(t, flow.IdentityListEqualTo(a, b))
+		require.True(t, flow.IdentityListEqualTo(b, a))
 	})
 
 	t.Run("different len arent equal", func(t *testing.T) {
@@ -366,8 +366,8 @@ func TestIdentityList_EqualTo(t *testing.T) {
 		a := flow.IdentityList{identityA}
 		b := flow.IdentityList{}
 
-		require.False(t, a.EqualTo(b))
-		require.False(t, b.EqualTo(a))
+		require.False(t, flow.IdentityListEqualTo(a, b))
+		require.False(t, flow.IdentityListEqualTo(b, a))
 	})
 
 	t.Run("different data means not equal", func(t *testing.T) {
@@ -377,8 +377,8 @@ func TestIdentityList_EqualTo(t *testing.T) {
 		a := flow.IdentityList{identityA}
 		b := flow.IdentityList{identityB}
 
-		require.False(t, a.EqualTo(b))
-		require.False(t, b.EqualTo(a))
+		require.False(t, flow.IdentityListEqualTo(a, b))
+		require.False(t, flow.IdentityListEqualTo(b, a))
 	})
 
 	t.Run("same data means equal", func(t *testing.T) {
@@ -387,8 +387,8 @@ func TestIdentityList_EqualTo(t *testing.T) {
 		a := flow.IdentityList{identityA, identityA}
 		b := flow.IdentityList{identityA, identityA}
 
-		require.True(t, a.EqualTo(b))
-		require.True(t, b.EqualTo(a))
+		require.True(t, flow.IdentityListEqualTo(a, b))
+		require.True(t, flow.IdentityListEqualTo(b, a))
 	})
 }
 

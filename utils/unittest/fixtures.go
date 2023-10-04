@@ -2599,7 +2599,7 @@ func ProtocolStateFixture(options ...func(*flow.RichProtocolStateEntry)) *flow.R
 	})
 
 	allIdentities := make(flow.IdentityList, 0, len(currentEpochSetup.Participants))
-	for _, identity := range currentEpochSetup.Participants.Union(prevEpochSetup.Participants) {
+	for _, identity := range currentEpochSetup.Participants {
 		allIdentities = append(allIdentities, &flow.Identity{
 			IdentitySkeleton: *identity,
 			DynamicIdentity: flow.DynamicIdentity{
@@ -2608,12 +2608,20 @@ func ProtocolStateFixture(options ...func(*flow.RichProtocolStateEntry)) *flow.R
 			},
 		})
 	}
-	allIdentities = allIdentities.Map(func(identity flow.Identity) flow.Identity {
-		if _, found := prevEpochSetup.Participants.ByNodeID(identity.NodeID); found {
-			identity.Weight = 0
+	for _, identity := range prevEpochSetup.Participants {
+		if _, found := allIdentities.ByNodeID(identity.NodeID); !found {
+			allIdentities = append(allIdentities, &flow.Identity{
+				IdentitySkeleton: *identity,
+				DynamicIdentity: flow.DynamicIdentity{
+					Weight:  0,
+					Ejected: false,
+				},
+			})
 		}
-		return identity
-	})
+	}
+
+	allIdentities = allIdentities.Sort(order.Canonical[flow.Identity])
+
 	entry := &flow.RichProtocolStateEntry{
 		ProtocolStateEntry: &flow.ProtocolStateEntry{
 			CurrentEpoch: flow.EpochStateContainer{
