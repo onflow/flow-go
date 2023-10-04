@@ -422,7 +422,7 @@ func TestExecutionState_IndexBlockData(t *testing.T) {
 	// this test makes sure that if a block we try to index is not found in block storage
 	// we get correct error.
 	t.Run("Unknown block ID", func(t *testing.T) {
-		unknownBlock := unittest.BlockchainFixture(1)[0]
+		unknownBlock := unittest.BlockFixture()
 		ed := &execution_data.BlockExecutionData{
 			BlockID: unknownBlock.Header.ID(),
 		}
