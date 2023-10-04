@@ -72,6 +72,10 @@ network-config:
   gossipsub-rpc-sent-tracker-workers: 5
   # Peer scoring is the default value for enabling peer scoring
   gossipsub-peer-scoring-enabled: true
+  # The interval for updating the list of subscribed peers to all topics in gossipsub. This is used to keep track of subscriptions
+  # violations and penalize peers accordingly. Recommended value is in the order of a few minutes to avoid contentions; as the operation
+  # reads all topics and all peers subscribed to each topic.
+  gossipsub-subscription-provider-update-interval: 10m
 
   # Gossipsub rpc inspectors configs
   # The size of the queue for notifications about invalid RPC messages
