@@ -214,17 +214,9 @@ func (e *Engine) process(channel channels.Channel, originID flow.Identifier, eve
 		}
 		return e.requestHandler.Process(channel, originID, event)
 	case *messages.RangeRequest:
-		report, valid, err := e.validateRangeRequestForALSP(originID, message)
+		err := e.validateRangeRequestForALSP(originID, message)
 		if err != nil {
 			return fmt.Errorf("failed to validate range request from %x: %w", originID[:], err)
-		}
-		if !valid {
-			e.con.ReportMisbehavior(report) // report misbehavior to ALSP
-			e.log.
-				Warn().
-				Hex("origin_id", logging.ID(originID)).
-				Str(logging.KeySuspicious, "true").
-				Msgf("received invalid range request from %x: %v", originID[:], valid)
 		}
 		return e.requestHandler.Process(channel, originID, event)
 
@@ -518,8 +510,8 @@ func (e *Engine) validateBatchRequestForALSP(originID flow.Identifier, batchRequ
 			// creating the misbehavior report it indicates a bug and processing can not proceed.
 			return fmt.Errorf("failed to create misbehavior report (invalid batch request, no block IDs) from %x: %w", originID[:], err)
 		}
-		e.con.ReportMisbehavior(report) // report misbehavior to ALSP
-		// failed validation check and should be reported as misbehavior
+		// failed unambiguous validation check and should be reported as misbehavior
+		e.con.ReportMisbehavior(report)
 		return nil
 	}
 
@@ -550,8 +542,8 @@ func (e *Engine) validateBatchRequestForALSP(originID flow.Identifier, batchRequ
 			// creating the misbehavior report it indicates a bug and processing can not proceed.
 			return fmt.Errorf("failed to create misbehavior report from %x: %w", originID[:], err)
 		}
-		// failed validation check and should be reported as misbehavior
-		e.con.ReportMisbehavior(report) // report misbehavior to ALSP
+		// failed probabilistic (load) validation check and should be reported as misbehavior
+		e.con.ReportMisbehavior(report)
 		return nil
 	}
 	return nil
@@ -574,12 +566,12 @@ func (e *Engine) validateBlockResponseForALSP(channel channels.Channel, id flow.
 // - bool: true if the range request is valid and should not be reported as misbehavior; otherwise, false if a misbehavior is detected
 //
 // - error: If an error is encountered while validating the range request. Error is assumed to be irrecoverable because of internal processes that didn't allow validation to complete.
-func (e *Engine) validateRangeRequestForALSP(originID flow.Identifier, rangeRequest *messages.RangeRequest) (*alsp.MisbehaviorReport, bool, error) {
+func (e *Engine) validateRangeRequestForALSP(originID flow.Identifier, rangeRequest *messages.RangeRequest) error {
 	// Generate a random integer between 0 and spamProbabilityMultiplier (exclusive)
 	n, err := rand.Uint32n(spamProbabilityMultiplier)
 
 	if err != nil {
-		return nil, false, fmt.Errorf("failed to generate random number from %x: %w", originID[:], err)
+		return fmt.Errorf("failed to generate random number from %x: %w", originID[:], err)
 	}
 
 	// check if range request is valid
@@ -594,10 +586,11 @@ func (e *Engine) validateRangeRequestForALSP(originID flow.Identifier, rangeRequ
 		if err != nil {
 			// failing to create the misbehavior report is unlikely. If an error is encountered while
 			// creating the misbehavior report it indicates a bug and processing can not proceed.
-			return nil, false, fmt.Errorf("failed to create misbehavior report (invalid range request) from %x: %w", originID[:], err)
+			return fmt.Errorf("failed to create misbehavior report (invalid range request) from %x: %w", originID[:], err)
 		}
-		// failed validation check and should be reported as misbehavior
-		return report, false, nil
+		// failed unambiguous validation check and should be reported as misbehavior
+		e.con.ReportMisbehavior(report)
+		return nil
 	}
 
 	// to avoid creating a misbehavior report for every range request received, use a probabilistic approach.
@@ -626,14 +619,17 @@ func (e *Engine) validateRangeRequestForALSP(originID flow.Identifier, rangeRequ
 		if err != nil {
 			// failing to create the misbehavior report is unlikely. If an error is encountered while
 			// creating the misbehavior report it indicates a bug and processing can not proceed.
-			return nil, false, fmt.Errorf("failed to create misbehavior report from %x: %w", originID[:], err)
+			return fmt.Errorf("failed to create misbehavior report from %x: %w", originID[:], err)
 		}
 		// failed validation check and should be reported as misbehavior
-		return report, false, nil
+
+		// failed probabilistic (load) validation check and should be reported as misbehavior
+		e.con.ReportMisbehavior(report)
+		return nil
 	}
 
 	// passed all validation checks with no misbehavior detected
-	return nil, true, nil
+	return nil
 }
 
 // validateSyncRequestForALSP checks if a sync request should be reported as a misbehavior due to malicious intent (e.g. spamming).
