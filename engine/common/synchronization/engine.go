@@ -221,17 +221,9 @@ func (e *Engine) process(channel channels.Channel, originID flow.Identifier, eve
 		return e.requestHandler.Process(channel, originID, event)
 
 	case *messages.SyncRequest:
-		report, valid, err := e.validateSyncRequestForALSP(originID)
+		err := e.validateSyncRequestForALSP(originID)
 		if err != nil {
 			return fmt.Errorf("failed to validate sync request from %x: %w", originID[:], err)
-		}
-		if !valid {
-			e.con.ReportMisbehavior(report) // report misbehavior to ALSP
-			e.log.
-				Warn().
-				Hex("origin_id", logging.ID(originID)).
-				Str(logging.KeySuspicious, "true").
-				Msgf("received invalid sync request from %x: %v", originID[:], valid)
 		}
 		return e.requestHandler.Process(channel, originID, event)
 
@@ -645,12 +637,12 @@ func (e *Engine) validateRangeRequestForALSP(originID flow.Identifier, rangeRequ
 // - bool: true if the sync request is valid and should not be reported as misbehavior; otherwise, false if a misbehavior is detected
 //
 // - error: If an error is encountered while validating the sync request. Error is assumed to be irrecoverable because of internal processes that didn't allow validation to complete.
-func (e *Engine) validateSyncRequestForALSP(originID flow.Identifier) (*alsp.MisbehaviorReport, bool, error) {
+func (e *Engine) validateSyncRequestForALSP(originID flow.Identifier) error {
 	// Generate a random integer between 0 and spamProbabilityMultiplier (exclusive)
 	n, err := rand.Uint32n(spamProbabilityMultiplier)
 
 	if err != nil {
-		return nil, false, fmt.Errorf("failed to generate random number from %x: %w", originID[:], err)
+		return fmt.Errorf("failed to generate random number from %x: %w", originID[:], err)
 	}
 
 	// to avoid creating a misbehavior report for every sync request received, use a probabilistic approach.
@@ -669,13 +661,14 @@ func (e *Engine) validateSyncRequestForALSP(originID flow.Identifier) (*alsp.Mis
 		if err != nil {
 			// failing to create the misbehavior report is unlikely. If an error is encountered while
 			// creating the misbehavior report it indicates a bug and processing can not proceed.
-			return nil, false, fmt.Errorf("failed to create misbehavior report from %x: %w", originID[:], err)
+			return fmt.Errorf("failed to create misbehavior report from %x: %w", originID[:], err)
 		}
-		return report, false, nil
+		e.con.ReportMisbehavior(report)
+		return nil
 	}
 
 	// passed all validation checks with no misbehavior detected
-	return nil, true, nil
+	return nil
 }
 
 // TODO: implement spam reporting similar to validateSyncRequestForALSP
