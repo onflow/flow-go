@@ -13,6 +13,16 @@ import (
 	"github.com/onflow/flow-go/fvm/flex/storage"
 )
 
+// FlexContractHandler is responsible for triggering calls to emulator, metering,
+// event emission and updating the block
+//
+// TODO and Warning: currently database keeps a copy of roothash, and if after
+// commiting the changes by the evm we want to revert in this code we need to reset that
+// or we should always do all the checks and return before calling the emulator,
+// after that should be only event emissions and computation usage updates.
+// thats another reason we first check the computation limit before using.
+// in the future we might benefit from a view style of access to db passed as
+// a param to the emulator.
 type FlexContractHandler struct {
 	db                *storage.Database
 	backend           models.Backend
@@ -133,16 +143,6 @@ func (h FlexContractHandler) meterGasUsage(usage uint64) {
 	handleError(err)
 }
 
-func handleError(err error) {
-	if err != nil {
-		if models.IsAFatalError(err) {
-			// don't wrap it
-			panic(err)
-		}
-		panic(errors.NewEVMError(err))
-	}
-}
-
 func (h *FlexContractHandler) EmitEvent(event *models.Event) {
 	// TODO add extra metering for encoding
 	encoded, err := event.Payload.RLPEncode()
@@ -257,5 +257,15 @@ func (f *flexAccount) checkAuthorized() {
 	// check if account is authorized to to FOA related opeartions
 	if !f.isFOA {
 		handleError(models.ErrUnAuthroizedMethodCall)
+	}
+}
+
+func handleError(err error) {
+	if err != nil {
+		if models.IsAFatalError(err) {
+			// don't wrap it
+			panic(err)
+		}
+		panic(errors.NewEVMError(err))
 	}
 }
