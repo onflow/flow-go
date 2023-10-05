@@ -358,10 +358,10 @@ func TestControlMessageValidationInspector_processInspectRPCReq(t *testing.T) {
 		require.NoError(t, inspector.processInspectRPCReq(inspectMsgReq))
 	})
 
-	t.Run("inspectRpcPublishMessages should disseminate invalid control message notification when invalid pubsub messages count greater than configured RPCMessageErrorThreshold", func(t *testing.T) {
+	t.Run("inspectRpcPublishMessages should disseminate invalid control message notification when invalid pubsub messages count greater than configured RpcMessageErrorThreshold", func(t *testing.T) {
 		inspector, distributor, _, _, sporkID := inspectorFixture(t)
 		// 5 invalid pubsub messages will force notification dissemination
-		inspector.config.RPCMessageErrorThreshold = 4
+		inspector.config.RpcMessageErrorThreshold = 4
 		// create unknown topic
 		unknownTopic := channels.Topic(fmt.Sprintf("%s/%s", unittest.IdentifierFixture(), sporkID)).String()
 		// create malformed topic
@@ -396,7 +396,7 @@ func TestControlMessageValidationInspector_processInspectRPCReq(t *testing.T) {
 	t.Run("inspectRpcPublishMessages should disseminate invalid control message notification when subscription missing for topic", func(t *testing.T) {
 		inspector, distributor, _, _, sporkID := inspectorFixture(t)
 		// 5 invalid pubsub messages will force notification dissemination
-		inspector.config.RPCMessageErrorThreshold = 4
+		inspector.config.RpcMessageErrorThreshold = 4
 		pubsubMsgs := unittest.GossipSubMessageFixtures(10, fmt.Sprintf("%s/%s", channels.TestNetworkChannel, sporkID))
 		expectedPeerID := peer.ID("peerID987654321")
 		req, err := NewInspectRPCRequest(expectedPeerID, unittest.P2PRPCFixture(unittest.WithPubsubMessages(pubsubMsgs...)))

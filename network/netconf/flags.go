@@ -144,8 +144,8 @@ func InitializeNetworkFlags(flags *pflag.FlagSet, config *Config) {
 	flags.Int(iwantCacheMissCheckSize, config.GossipSubConfig.GossipSubRPCInspectorsConfig.GossipSubRPCValidationInspectorConfigs.IWantRPCInspectionConfig.CacheMissCheckSize, "the iWants size at which message id cache misses will be checked")
 	flags.Float64(iwantDuplicateMsgIDThreshold, config.GossipSubConfig.GossipSubRPCInspectorsConfig.GossipSubRPCValidationInspectorConfigs.IWantRPCInspectionConfig.DuplicateMsgIDThreshold, "max allowed duplicate message IDs in a single iWant control message")
 
-	flags.Int(rpcMessageMaxSampleSize, config.GossipSubConfig.GossipSubRPCInspectorsConfig.GossipSubRPCValidationInspectorConfigs.RPCMessageMaxSampleSize, "the max sample size used for RPC message validation. If the total number of RPC messages exceeds this value a sample will be taken but messages will not be truncated")
-	flags.Int(rpcMessageErrorThreshold, config.GossipSubConfig.GossipSubRPCInspectorsConfig.GossipSubRPCValidationInspectorConfigs.RPCMessageErrorThreshold, "the threshold at which an error will be returned if the number of invalid RPC messages exceeds this value")
+	flags.Int(rpcMessageMaxSampleSize, config.GossipSubConfig.GossipSubRPCInspectorsConfig.GossipSubRPCValidationInspectorConfigs.RpcMessageMaxSampleSize, "the max sample size used for RPC message validation. If the total number of RPC messages exceeds this value a sample will be taken but messages will not be truncated")
+	flags.Int(rpcMessageErrorThreshold, config.GossipSubConfig.GossipSubRPCInspectorsConfig.GossipSubRPCValidationInspectorConfigs.RpcMessageErrorThreshold, "the threshold at which an error will be returned if the number of invalid RPC messages exceeds this value")
 }
 
 // SetAliases this func sets an aliases for each CLI flag defined for network config overrides to it's corresponding

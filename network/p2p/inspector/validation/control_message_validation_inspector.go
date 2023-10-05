@@ -371,13 +371,13 @@ func (c *ControlMsgValidationInspector) inspectIWantMessages(from peer.ID, iWant
 // - messages: rpc publish messages.
 // - activeClusterIDS: the list of active cluster ids.
 // Returns:
-// - InvalidRpcPublishMessagesErr: if the amount of invalid messages exceeds the configured RPCMessageErrorThreshold.
+// - InvalidRpcPublishMessagesErr: if the amount of invalid messages exceeds the configured RpcMessageErrorThreshold.
 func (c *ControlMsgValidationInspector) inspectRpcPublishMessages(from peer.ID, messages []*pubsub_pb.Message, activeClusterIDS flow.ChainIDList) error {
 	totalMessages := len(messages)
 	if totalMessages == 0 {
 		return nil
 	}
-	sampleSize := c.config.RPCMessageMaxSampleSize
+	sampleSize := c.config.RpcMessageMaxSampleSize
 	if sampleSize > totalMessages {
 		sampleSize = totalMessages
 	}
@@ -408,7 +408,7 @@ func (c *ControlMsgValidationInspector) inspectRpcPublishMessages(from peer.ID, 
 		}
 
 		// return an error when we exceed the error threshold
-		if errs != nil && errs.Len() > c.config.RPCMessageErrorThreshold {
+		if errs != nil && errs.Len() > c.config.RpcMessageErrorThreshold {
 			return NewInvalidRpcPublishMessagesErr(errs.ErrorOrNil(), errs.Len())
 		}
 	}

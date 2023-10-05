@@ -806,7 +806,7 @@ func TestValidationInspector_InspectRpcPublishMessages(t *testing.T) {
 	inspectorConfig := flowConfig.NetworkConfig.GossipSubConfig.GossipSubRPCInspectorsConfig.GossipSubRPCValidationInspectorConfigs
 	inspectorConfig.NumberOfWorkers = 1
 	// after 5 errors encountered disseminate a notification
-	inspectorConfig.RPCMessageErrorThreshold = 4
+	inspectorConfig.RpcMessageErrorThreshold = 4
 
 	controlMessageCount := int64(1)
 	notificationCount := atomic.NewUint64(0)
