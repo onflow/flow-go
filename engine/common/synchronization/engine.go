@@ -210,27 +210,27 @@ func (e *Engine) process(channel channels.Channel, originID flow.Identifier, eve
 	case *messages.BatchRequest:
 		err := e.validateBatchRequestForALSP(originID, message)
 		if err != nil {
-			return fmt.Errorf("failed to validate batch request from %x: %w", originID[:], err)
+			irrecoverable.Throw(context.TODO(), fmt.Errorf("failed to validate batch request from %x: %w", originID[:], err))
 		}
 		return e.requestHandler.Process(channel, originID, event)
 	case *messages.RangeRequest:
 		err := e.validateRangeRequestForALSP(originID, message)
 		if err != nil {
-			return fmt.Errorf("failed to validate range request from %x: %w", originID[:], err)
+			irrecoverable.Throw(context.TODO(), fmt.Errorf("failed to validate range request from %x: %w", originID[:], err))
 		}
 		return e.requestHandler.Process(channel, originID, event)
 
 	case *messages.SyncRequest:
 		err := e.validateSyncRequestForALSP(originID)
 		if err != nil {
-			return fmt.Errorf("failed to validate sync request from %x: %w", originID[:], err)
+			irrecoverable.Throw(context.TODO(), fmt.Errorf("failed to validate sync request from %x: %w", originID[:], err))
 		}
 		return e.requestHandler.Process(channel, originID, event)
 
 	case *messages.BlockResponse:
 		report, valid, err := e.validateBlockResponseForALSP(channel, originID, message)
 		if err != nil {
-			return fmt.Errorf("failed to validate block response from %x: %w", originID[:], err)
+			irrecoverable.Throw(context.TODO(), fmt.Errorf("failed to validate block response from %x: %w", originID[:], err))
 		}
 		if !valid {
 			e.con.ReportMisbehavior(report) // report misbehavior to ALSP
@@ -245,7 +245,7 @@ func (e *Engine) process(channel channels.Channel, originID flow.Identifier, eve
 	case *messages.SyncResponse:
 		report, valid, err := e.validateSyncResponseForALSP(channel, originID, message)
 		if err != nil {
-			return fmt.Errorf("failed to validate sync response from %x: %w", originID[:], err)
+			irrecoverable.Throw(context.TODO(), fmt.Errorf("failed to validate sync response from %x: %w", originID[:], err))
 		}
 		if !valid {
 			e.con.ReportMisbehavior(report) // report misbehavior to ALSP
