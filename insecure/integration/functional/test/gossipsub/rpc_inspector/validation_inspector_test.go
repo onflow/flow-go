@@ -833,7 +833,7 @@ func TestValidationInspector_InspectRpcPublishMessages(t *testing.T) {
 	// prepare to spam - generate control messages
 	ctlMsg := spammer.GenerateCtlMessages(int(controlMessageCount))
 	topic := channels.Topic(fmt.Sprintf("%s/%s", channels.PushBlocks, sporkID))
-	// first create 5 valid messages
+	// first create 4 valid messages
 	publishMsgs := unittest.GossipSubMessageFixtures(4, topic.String())
 	// create unknown topic
 	unknownTopic := channels.Topic(fmt.Sprintf("%s/%s", corruptlibp2p.GossipSubTopicIdFixture(), sporkID)).String()
