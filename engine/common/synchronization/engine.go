@@ -491,17 +491,12 @@ func (e *Engine) sendRequests(participants flow.IdentifierList, ranges []chainsy
 	}
 }
 
-// validateBatchRequestForALSP checks if a batch request should be reported as a misbehavior due to malicious intent (e.g. spamming).
+// validateBatchRequestForALSP checks if a batch request should be reported as a misbehavior due to malicious intent (e.g. spamming)
+// and sends misbehavior report to ALSP.
 // Args:
 // - originID: the sender of the batch request
 // - batchRequest: the batch request to validate
 // Returns:
-// - *alsp.MisbehaviorReport: If any misbehavior is detected such as:
-//   - the batch request is invalid
-//   - the batch request is valid but should be reported as misbehavior anyway (due to probabilities)
-//
-// - bool: true if the batch request is valid and should not be reported as misbehavior; otherwise, false if a misbehavior is detected
-//
 // - error: If an error is encountered while validating the batch request. Error is assumed to be irrecoverable because of internal processes that didn't allow validation to complete.
 func (e *Engine) validateBatchRequestForALSP(originID flow.Identifier, batchRequest *messages.BatchRequest) error {
 	// Generate a random integer between 0 and spamProbabilityMultiplier (exclusive)
@@ -559,7 +554,6 @@ func (e *Engine) validateBatchRequestForALSP(originID flow.Identifier, batchRequ
 		e.con.ReportMisbehavior(report) // report misbehavior to ALSP
 		return nil
 	}
-
 	return nil
 }
 
