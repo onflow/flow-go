@@ -1,6 +1,9 @@
 package storehouse
 
 import (
+	"fmt"
+	"math/rand"
+	"sync"
 	"testing"
 
 	"github.com/onflow/flow-go/model/flow"
@@ -448,6 +451,68 @@ func TestPruneConflictingForks(t *testing.T) {
 	_, err = store.GetUpdatedRegisters(pruned+2, blockD)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "not found")
+}
+
+func TestConcurrentSaveAndGet(t *testing.T) {
+	// var blocks nil
+	pruned := uint64(10)
+	lastID := unittest.IdentifierFixture()
+	store := NewInMemoryRegisterStore(pruned, lastID)
+
+	// prepare a chain of 101 blocks with the first as lastID
+	count := 100
+	blocks := make([]flow.Identifier, 0, count+1)
+	blocks = append(blocks, lastID)
+	for i := 0; i < count; i++ {
+		block := unittest.IdentifierFixture()
+		blocks = append(blocks, block)
+	}
+
+	reg := makeReg("X", "0")
+
+	var wg sync.WaitGroup
+	for i := 1; i < count; i++ {
+		require.NoError(t, store.SaveRegisters(
+			pruned+uint64(i),
+			blocks[i],
+			blocks[i-1],
+			[]flow.RegisterEntry{makeReg("X", fmt.Sprintf("%v", i))},
+		))
+
+		// concurrent query get registers for past registers
+		go func(i int) {
+			wg.Add(1)
+			defer wg.Done()
+
+			rd := randBetween(1, i+1)
+			randHeight := pruned + uint64(rd)
+			val, err := store.GetRegister(randHeight, blocks[rd], reg.Key)
+			require.NoError(t, err)
+			r := makeReg("X", fmt.Sprintf("%v", rd))
+			require.Equal(t, r.Value, val)
+		}(i)
+
+		go func(i int) {
+			wg.Add(1)
+			defer wg.Done()
+
+			rd := randBetween(1, i+1)
+			randHeight := pruned + uint64(rd)
+			vals, err := store.GetUpdatedRegisters(randHeight, blocks[rd])
+			require.NoError(t, err)
+			r := makeReg("X", fmt.Sprintf("%v", rd))
+			require.Equal(t, []flow.RegisterEntry{r}, vals)
+		}(i)
+	}
+
+	wg.Wait()
+}
+
+func TestConcurrentPruneAndGet(t *testing.T) {
+}
+
+func randBetween(min, max int) int {
+	return rand.Intn(max-min) + min
 }
 
 func makeReg(key string, value string) flow.RegisterEntry {
