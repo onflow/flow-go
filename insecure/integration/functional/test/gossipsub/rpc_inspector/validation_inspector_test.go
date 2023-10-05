@@ -855,7 +855,7 @@ func TestValidationInspector_InspectRpcPublishMessages(t *testing.T) {
 
 	topic := channels.Topic(fmt.Sprintf("%s/%s", channels.PushBlocks, sporkID))
 	// first create 4 valid messages
-	publishMsgs := unittest.GossipSubMessageFixtures(4, topic.String())
+	publishMsgs := unittest.GossipSubMessageFixtures(t, 4, topic.String())
 	// create unknown topic
 	unknownTopic := channels.Topic(fmt.Sprintf("%s/%s", corruptlibp2p.GossipSubTopicIdFixture(), sporkID)).String()
 	// create malformed topic

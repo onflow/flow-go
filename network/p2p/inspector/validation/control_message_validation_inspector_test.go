@@ -150,7 +150,7 @@ func TestControlMessageValidationInspector_processInspectRPCReq(t *testing.T) {
 		prunes := unittest.P2PRPCPruneFixtures(topics...)
 		ihaves := unittest.P2PRPCIHaveFixtures(50, topics...)
 		iwants := unittest.P2PRPCIWantFixtures(2, 5)
-		pubsubMsgs := unittest.GossipSubMessageFixtures(10, topics[0])
+		pubsubMsgs := unittest.GossipSubMessageFixtures(t, 10, topics[0])
 
 		// avoid cache misses for iwant messages.
 		iwants[0].MessageIDs = ihaves[0].MessageIDs[:10]
@@ -370,7 +370,7 @@ func TestControlMessageValidationInspector_processInspectRPCReq(t *testing.T) {
 		invalidSporkIDTopic := channels.Topic(fmt.Sprintf("%s/%s", channels.PushBlocks, unittest.IdentifierFixture())).String()
 
 		// create 10 normal messages
-		pubsubMsgs := unittest.GossipSubMessageFixtures(10, fmt.Sprintf("%s/%s", channels.TestNetworkChannel, sporkID))
+		pubsubMsgs := unittest.GossipSubMessageFixtures(t, 10, fmt.Sprintf("%s/%s", channels.TestNetworkChannel, sporkID))
 		// add 5 invalid messages to force notification dissemination
 		pubsubMsgs = append(pubsubMsgs, []*pubsub_pb.Message{
 			{Topic: &unknownTopic},
@@ -399,7 +399,7 @@ func TestControlMessageValidationInspector_processInspectRPCReq(t *testing.T) {
 		inspector, distributor, _, _, sporkID := inspectorFixture(t)
 		// 5 invalid pubsub messages will force notification dissemination
 		inspector.config.RpcMessageErrorThreshold = 4
-		pubsubMsgs := unittest.GossipSubMessageFixtures(5, fmt.Sprintf("%s/%s", channels.TestNetworkChannel, sporkID))
+		pubsubMsgs := unittest.GossipSubMessageFixtures(t, 5, fmt.Sprintf("%s/%s", channels.TestNetworkChannel, sporkID))
 		expectedPeerID := unittest.PeerIdFixture(t)
 		req, err := NewInspectRPCRequest(expectedPeerID, unittest.P2PRPCFixture(unittest.WithPubsubMessages(pubsubMsgs...)))
 		require.NoError(t, err, "failed to get inspect message request")
@@ -420,7 +420,7 @@ func TestControlMessageValidationInspector_processInspectRPCReq(t *testing.T) {
 		inspector, distributor, _, _, _ := inspectorFixture(t)
 		// 5 invalid pubsub messages will force notification dissemination
 		inspector.config.RpcMessageErrorThreshold = 4
-		pubsubMsgs := unittest.GossipSubMessageFixtures(10, "")
+		pubsubMsgs := unittest.GossipSubMessageFixtures(t, 10, "")
 		expectedPeerID := unittest.PeerIdFixture(t)
 		req, err := NewInspectRPCRequest(expectedPeerID, unittest.P2PRPCFixture(unittest.WithPubsubMessages(pubsubMsgs...)))
 		require.NoError(t, err, "failed to get inspect message request")

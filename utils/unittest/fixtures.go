@@ -2688,9 +2688,8 @@ func WithTopic(topic string) func(*pubsub_pb.Message) {
 	}
 }
 
-func GossipSubMessageFixture(t *testing.T, opts ...func(*pubsub_pb.Message)) *pubsub_pb.Message {
-	s := RandomStringFixture(t, 100)
-
+// GossipSubMessageFixture returns a gossip sub message fixture for the specified topic.
+func GossipSubMessageFixture(t *testing.T, s string, opts ...func(*pubsub_pb.Message)) *pubsub_pb.Message {
 	pb := &pubsub_pb.Message{
 		From:      RandomBytes(32),
 		Data:      RandomBytes(32),
@@ -2708,10 +2707,10 @@ func GossipSubMessageFixture(t *testing.T, opts ...func(*pubsub_pb.Message)) *pu
 }
 
 // GossipSubMessageFixtures returns a list of gossipsub message fixtures.
-func GossipSubMessageFixtures(n int, topic string) []*pubsub_pb.Message {
+func GossipSubMessageFixtures(t *testing.T, n int, topic string, opts ...func(*pubsub_pb.Message)) []*pubsub_pb.Message {
 	msgs := make([]*pubsub_pb.Message, n)
 	for i := 0; i < n; i++ {
-		msgs[i] = GossipSubMessageFixture(topic)
+		msgs[i] = GossipSubMessageFixture(t, topic, opts...)
 	}
 	return msgs
 }
