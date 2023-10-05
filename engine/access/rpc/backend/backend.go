@@ -244,26 +244,21 @@ func New(params Params) (*Backend, error) {
 // No errors are expected during normal operations.
 func NewCache(
 	log zerolog.Logger,
-	accessMetrics module.AccessMetrics,
-	connectionPoolSize uint,
-) (*lru.Cache[string, *connection.CachedClient], uint, error) {
+	metrics module.AccessMetrics,
+	connectionPoolSize int,
+) (*lru.Cache[string, *connection.CachedClient], error) {
+	cache, err := lru.NewWithEvict(connectionPoolSize, func(_ string, client *connection.CachedClient) {
+		go client.Close() // close is blocking, so run in a goroutine
 
-	var cache *lru.Cache[string, *connection.CachedClient]
-	cacheSize := connectionPoolSize
-	if cacheSize > 0 {
-		var err error
-		cache, err = lru.NewWithEvict(int(cacheSize), func(_ string, store *connection.CachedClient) {
-			store.Close()
-			log.Debug().Str("grpc_conn_evicted", store.Address).Msg("closing grpc connection evicted from pool")
-			if accessMetrics != nil {
-				accessMetrics.ConnectionFromPoolEvicted()
-			}
-		})
-		if err != nil {
-			return nil, 0, fmt.Errorf("could not initialize connection pool cache: %w", err)
-		}
+		log.Debug().Str("grpc_conn_evicted", client.Address).Msg("closing grpc connection evicted from pool")
+		metrics.ConnectionFromPoolEvicted()
+	})
+
+	if err != nil {
+		return nil, fmt.Errorf("could not initialize connection pool cache: %w", err)
 	}
-	return cache, cacheSize, nil
+
+	return cache, nil
 }
 
 func identifierList(ids []string) (flow.IdentifierList, error) {

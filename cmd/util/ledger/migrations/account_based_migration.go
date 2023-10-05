@@ -6,6 +6,7 @@ import (
 	"github.com/rs/zerolog/log"
 
 	"github.com/onflow/flow-go/ledger"
+	"github.com/onflow/flow-go/ledger/common/convert"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/util"
 )
@@ -19,7 +20,7 @@ func PayloadToAccount(p ledger.Payload) (string, bool, error) {
 	if err != nil {
 		return "", false, fmt.Errorf("could not find key for payload: %w", err)
 	}
-	id, err := KeyToRegisterID(k)
+	id, err := convert.LedgerKeyToRegisterID(k)
 	if err != nil {
 		return "", false, fmt.Errorf("error converting key to register ID")
 	}
