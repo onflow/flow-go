@@ -10,15 +10,15 @@ import (
 
 // 1. SaveRegisters should fail if height is below or equal to pruned height
 //
-// 2. SaveRegisters should fail if the block is already saved
-//
+// 2. SaveRegisters should fail if its parent block doesn't exist and it is not the pruned block
+
 //  3. SaveRegisters should succeed if height is above pruned height and block is not saved,
 //     the updates can be retrieved by GetUpdatedRegisters
 //
-//  4. SaveRegisters should succeed if a different block at the same height was saved before,
-//     updates for different blocks can be retrieved by their blockID
+// 4. SaveRegisters should fail if the block is already saved
 //
-// 5. SaveRegisters should fail if its parent block doesn't exist and it is not the pruned block
+//  5. SaveRegisters should succeed if a different block at the same height was saved before,
+//     updates for different blocks can be retrieved by their blockID
 //
 // 6. Given A(X: 1, Y: 2), GetRegister(A, X) should return 1, GetRegister(A, X) should return 2
 //
@@ -54,11 +54,11 @@ import (
 // 15. Concurrency: Prune can happen concurrently with GetUpdatedRegisters, and GetRegister
 func TestInMemoryRegisterStoreFailBelowOrEqualPrunedHeight(t *testing.T) {
 	// 1.
-	height := uint64(10)
+	pruned := uint64(10)
 	lastID := unittest.IdentifierFixture()
-	store := NewInMemoryRegisterStore(height, lastID)
+	store := NewInMemoryRegisterStore(pruned, lastID)
 	err := store.SaveRegisters(
-		height-1, // below pruned height, will fail
+		pruned-1, // below pruned pruned, will fail
 		unittest.IdentifierFixture(),
 		unittest.IdentifierFixture(),
 		[]flow.RegisterEntry{},
@@ -67,11 +67,194 @@ func TestInMemoryRegisterStoreFailBelowOrEqualPrunedHeight(t *testing.T) {
 	require.Contains(t, err.Error(), "<= pruned height")
 
 	err = store.SaveRegisters(
-		height, // equal to pruned height, will fail
+		pruned, // equal to pruned height, will fail
 		lastID,
 		unittest.IdentifierFixture(),
 		[]flow.RegisterEntry{},
 	)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "<= pruned height")
+}
+
+func TestInMemoryRegisterStoreFailParentNotExist(t *testing.T) {
+	// 2.
+	pruned := uint64(10)
+	lastID := unittest.IdentifierFixture()
+	store := NewInMemoryRegisterStore(pruned, lastID)
+
+	height := pruned + 1 // above the pruned pruned
+	blockID := unittest.IdentifierFixture()
+	notExistParent := unittest.IdentifierFixture()
+	reg := unittest.RegisterEntryFixture()
+	err := store.SaveRegisters(
+		height,
+		blockID,
+		notExistParent, // should fail because parent doesn't exist
+		[]flow.RegisterEntry{reg},
+	)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "but its parent")
+}
+
+func TestInMemoryRegisterStoreOK(t *testing.T) {
+	// 3.
+	pruned := uint64(10)
+	lastID := unittest.IdentifierFixture()
+	store := NewInMemoryRegisterStore(pruned, lastID)
+
+	height := pruned + 1 // above the pruned pruned
+	blockID := unittest.IdentifierFixture()
+	reg := unittest.RegisterEntryFixture()
+	err := store.SaveRegisters(
+		height,
+		blockID,
+		lastID,
+		[]flow.RegisterEntry{reg},
+	)
+	require.NoError(t, err)
+
+	val, err := store.GetRegister(height, blockID, reg.Key)
+	require.NoError(t, err)
+	require.Equal(t, reg.Value, val)
+}
+
+func TestInMemoryRegisterStoreFailAlreadyExist(t *testing.T) {
+	// 4.
+	pruned := uint64(10)
+	lastID := unittest.IdentifierFixture()
+	store := NewInMemoryRegisterStore(pruned, lastID)
+
+	height := pruned + 1 // above the pruned pruned
+	blockID := unittest.IdentifierFixture()
+	reg := unittest.RegisterEntryFixture()
+	err := store.SaveRegisters(
+		height,
+		blockID,
+		lastID,
+		[]flow.RegisterEntry{reg},
+	)
+	require.NoError(t, err)
+
+	// saving again should fail
+	err = store.SaveRegisters(
+		height,
+		blockID,
+		lastID,
+		[]flow.RegisterEntry{reg},
+	)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "already exists")
+}
+
+func TestInMemoryRegisterStoreOKDifferentBlockSameParent(t *testing.T) {
+	// 5.
+	pruned := uint64(10)
+	lastID := unittest.IdentifierFixture()
+	store := NewInMemoryRegisterStore(pruned, lastID)
+
+	// 10 <- A
+	//    ^- B
+	height := pruned + 1 // above the pruned pruned
+	blockA := unittest.IdentifierFixture()
+	regA := unittest.RegisterEntryFixture()
+	err := store.SaveRegisters(
+		height,
+		blockA,
+		lastID,
+		[]flow.RegisterEntry{regA},
+	)
+	require.NoError(t, err)
+
+	blockB := unittest.IdentifierFixture()
+	regB := unittest.RegisterEntryFixture()
+	err = store.SaveRegisters(
+		height,
+		blockB, // different block
+		lastID, // same parent
+		[]flow.RegisterEntry{regB},
+	)
+	require.NoError(t, err)
+
+	valA, err := store.GetRegister(height, blockA, regA.Key)
+	require.NoError(t, err)
+	require.Equal(t, regA.Value, valA)
+
+	valB, err := store.GetRegister(height, blockB, regB.Key)
+	require.NoError(t, err)
+	require.Equal(t, regB.Value, valB)
+}
+
+func makeReg(key string, value string) flow.RegisterEntry {
+	return flow.RegisterEntry{
+		Key: flow.RegisterID{
+			Owner: "owner",
+			Key:   key,
+		},
+		Value: []byte(value),
+	}
+}
+
+func TestInMemoryRegisterGetRegistersOK(t *testing.T) {
+	// 6.
+	pruned := uint64(10)
+	lastID := unittest.IdentifierFixture()
+	store := NewInMemoryRegisterStore(pruned, lastID)
+
+	// 10 <- A (X: 1, Y: 2)
+	height := pruned + 1 // above the pruned pruned
+	blockA := unittest.IdentifierFixture()
+	regX := makeReg("X", "1")
+	regY := makeReg("Y", "2")
+	err := store.SaveRegisters(
+		height,
+		blockA,
+		lastID,
+		[]flow.RegisterEntry{regX, regY},
+	)
+	require.NoError(t, err)
+
+	valX, err := store.GetRegister(height, blockA, regX.Key)
+	require.NoError(t, err)
+	require.Equal(t, regX.Value, valX)
+
+	valY, err := store.GetRegister(height, blockA, regY.Key)
+	require.NoError(t, err)
+	require.Equal(t, regY.Value, valY)
+}
+
+func TestInMemoryRegisterStoreGetLatestValueOK(t *testing.T) {
+	// 7
+	pruned := uint64(10)
+	lastID := unittest.IdentifierFixture()
+	store := NewInMemoryRegisterStore(pruned, lastID)
+
+	// 10 <- A (X: 1, Y: 2) <- B (Y: 3)
+	blockA := unittest.IdentifierFixture()
+	regX := makeReg("X", "1")
+	regY := makeReg("Y", "2")
+	err := store.SaveRegisters(
+		pruned+1,
+		blockA,
+		lastID,
+		[]flow.RegisterEntry{regX, regY},
+	)
+	require.NoError(t, err)
+
+	blockB := unittest.IdentifierFixture()
+	regY3 := makeReg("Y", "3")
+	err = store.SaveRegisters(
+		pruned+2,
+		blockB,
+		blockA,
+		[]flow.RegisterEntry{regY3},
+	)
+	require.NoError(t, err)
+
+	valY, err := store.GetRegister(pruned+1, blockA, regY.Key)
+	require.NoError(t, err)
+	require.Equal(t, regY.Value, valY)
+
+	valY3, err := store.GetRegister(pruned+2, blockB, regY.Key)
+	require.NoError(t, err)
+	require.Equal(t, regY3.Value, valY3)
 }
