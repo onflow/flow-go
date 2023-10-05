@@ -304,7 +304,7 @@ func (g *Builder) Build(ctx irrecoverable.SignalerContext) (p2p.PubSubAdapter, e
 	if g.routingSystem != nil {
 		gossipSubConfigs.WithRoutingDiscovery(g.routingSystem)
 	}
-	
+
 	if g.subscriptionFilter != nil {
 		gossipSubConfigs.WithSubscriptionFilter(g.subscriptionFilter)
 	}
