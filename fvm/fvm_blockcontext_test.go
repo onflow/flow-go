@@ -1804,7 +1804,7 @@ func TestBlockContext_ExecuteTransaction_CreateAccount_WithMonotonicAddresses(t 
 	address := flow.ConvertAddress(
 		data.(cadence.Event).Fields[0].(cadence.Address))
 
-	require.Equal(t, flow.HexToAddress("05"), address)
+	require.Equal(t, flow.HexToAddress("06"), address)
 }
 
 func TestBlockContext_ExecuteTransaction_FailingTransactions(t *testing.T) {
