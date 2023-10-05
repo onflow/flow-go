@@ -9,6 +9,8 @@ import (
 // FlexAddress is an EVM-compatible address
 type FlexAddress gethCommon.Address
 
+const FlexAddressLength = gethCommon.AddressLength
+
 func NewFlexAddress(addr gethCommon.Address) FlexAddress {
 	fa := FlexAddress(addr)
 	return fa

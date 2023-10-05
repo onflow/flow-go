@@ -30,39 +30,91 @@ import (
 
 type testFlexContractHandler struct {
 	allocateAddress   func() models.FlexAddress
+	addressIndex      uint64
 	accountByAddress  func(models.FlexAddress, bool) models.FlexAccount
 	lastExecutedBlock func() *models.FlexBlock
 	run               func(tx []byte, coinbase models.FlexAddress) bool
 }
 
-var _ models.FlexContractHandler = testFlexContractHandler{}
+var _ models.FlexContractHandler = &testFlexContractHandler{}
 
-func (t testFlexContractHandler) AllocateAddress() models.FlexAddress {
+func (t *testFlexContractHandler) AllocateAddress() models.FlexAddress {
 	if t.allocateAddress == nil {
-		panic("unexpected AllocateAddress")
+		t.addressIndex++
+		var address models.FlexAddress
+		binary.LittleEndian.PutUint64(address[:], t.addressIndex)
+		return address
 	}
 	return t.allocateAddress()
 }
 
-func (t testFlexContractHandler) AccountByAddress(addr models.FlexAddress, isFOA bool) models.FlexAccount {
+func (t *testFlexContractHandler) AccountByAddress(addr models.FlexAddress, isFOA bool) models.FlexAccount {
 	if t.accountByAddress == nil {
 		panic("unexpected AccountByAddress")
 	}
 	return t.accountByAddress(addr, isFOA)
 }
 
-func (t testFlexContractHandler) LastExecutedBlock() *models.FlexBlock {
+func (t *testFlexContractHandler) LastExecutedBlock() *models.FlexBlock {
 	if t.lastExecutedBlock == nil {
 		panic("unexpected LastExecutedBlock")
 	}
 	return t.lastExecutedBlock()
 }
 
-func (t testFlexContractHandler) Run(tx []byte, coinbase models.FlexAddress) bool {
+func (t *testFlexContractHandler) Run(tx []byte, coinbase models.FlexAddress) bool {
 	if t.run == nil {
 		panic("unexpected Run")
 	}
 	return t.run(tx, coinbase)
+}
+
+type testFlowAccount struct {
+	address models.FlexAddress
+	vault   *models.FLOWTokenVault
+	deploy  func(code models.Code, limit models.GasLimit, balance models.Balance) models.FlexAddress
+	call    func(address models.FlexAddress, data models.Data, limit models.GasLimit, balance models.Balance) models.Data
+}
+
+var _ models.FlexAccount = &testFlowAccount{}
+
+func (t *testFlowAccount) Address() models.FlexAddress {
+	return t.address
+}
+
+func (t *testFlowAccount) Balance() models.Balance {
+	if t.vault == nil {
+		return models.Balance(0)
+	}
+	return t.vault.Balance()
+}
+
+func (t *testFlowAccount) Deposit(vault *models.FLOWTokenVault) {
+	if t.vault == nil {
+		t.vault = models.NewFlowTokenVault(0)
+	}
+	t.vault.Deposit(vault)
+}
+
+func (t *testFlowAccount) Withdraw(balance models.Balance) *models.FLOWTokenVault {
+	if t.vault == nil {
+		return models.NewFlowTokenVault(0)
+	}
+	return t.vault.Withdraw(balance)
+}
+
+func (t *testFlowAccount) Deploy(code models.Code, limit models.GasLimit, balance models.Balance) models.FlexAddress {
+	if t.deploy == nil {
+		panic("unexpected Deploy")
+	}
+	return t.deploy(code, limit, balance)
+}
+
+func (t *testFlowAccount) Call(address models.FlexAddress, data models.Data, limit models.GasLimit, balance models.Balance) models.Data {
+	if t.call == nil {
+		panic("unexpected Call")
+	}
+	return t.call(address, data, limit, balance)
 }
 
 var flexAddressBytesCadenceType = cadence.NewConstantSizedArrayType(20, cadence.TheUInt8Type)
@@ -83,7 +135,7 @@ func TestFlexAddressConstructionAndReturn(t *testing.T) {
 
 	t.Parallel()
 
-	handler := testFlexContractHandler{}
+	handler := &testFlexContractHandler{}
 
 	env := runtime.NewBaseInterpreterEnvironment(runtime.Config{})
 
@@ -171,7 +223,7 @@ func TestFlexRun(t *testing.T) {
 
 	runCalled := false
 
-	handler := testFlexContractHandler{
+	handler := &testFlexContractHandler{
 		run: func(tx []byte, coinbase models.FlexAddress) bool {
 			runCalled = true
 
@@ -224,6 +276,150 @@ func TestFlexRun(t *testing.T) {
 
 	assert.True(t, runCalled)
 	assert.Equal(t, cadence.Bool(true), result)
+}
+
+func TestFlexCreateFlowOwnedAccount(t *testing.T) {
+
+	t.Parallel()
+
+	handler := &testFlexContractHandler{}
+
+	env := runtime.NewBaseInterpreterEnvironment(runtime.Config{})
+
+	flexTypeDefinition := emulator.FlexTypeDefinition
+	env.DeclareValue(stdlib.NewFlexStandardLibraryValue(nil, flexTypeDefinition, handler))
+	env.DeclareType(stdlib.NewFlexStandardLibraryType(flexTypeDefinition))
+
+	inter := runtime.NewInterpreterRuntime(runtime.Config{})
+
+	script := []byte(`
+      pub fun main(): [UInt8; 20] {
+          let foa <- Flex.createFlowOwnedAccount()
+          let bytes = foa.address().bytes
+          destroy foa
+          return bytes
+      }
+	`)
+
+	runtimeInterface := &testRuntimeInterface{
+		storage: newTestLedger(),
+		decodeArgument: func(b []byte, t cadence.Type) (cadence.Value, error) {
+			return json.Decode(nil, b)
+		},
+	}
+
+	actual, err := inter.ExecuteScript(
+		runtime.Script{
+			Source: script,
+		},
+		runtime.Context{
+			Interface:   runtimeInterface,
+			Environment: env,
+			Location:    common.ScriptLocation{},
+		},
+	)
+	require.NoError(t, err)
+
+	expected := cadence.NewArray([]cadence.Value{
+		cadence.UInt8(1), cadence.UInt8(0),
+		cadence.UInt8(0), cadence.UInt8(0),
+		cadence.UInt8(0), cadence.UInt8(0),
+		cadence.UInt8(0), cadence.UInt8(0),
+		cadence.UInt8(0), cadence.UInt8(0),
+		cadence.UInt8(0), cadence.UInt8(0),
+		cadence.UInt8(0), cadence.UInt8(0),
+		cadence.UInt8(0), cadence.UInt8(0),
+		cadence.UInt8(0), cadence.UInt8(0),
+		cadence.UInt8(0), cadence.UInt8(0),
+	}).WithType(cadence.NewConstantSizedArrayType(
+		models.FlexAddressLength,
+		cadence.UInt8Type{},
+	))
+
+	require.Equal(t, expected, actual)
+}
+
+func TestFlowOwnedAccountCall(t *testing.T) {
+
+	t.Parallel()
+
+	expectedBalance, err := cadence.NewUFix64FromParts(1, 23000000)
+	require.NoError(t, err)
+
+	expectedAddress := models.FlexAddress{1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}
+
+	handler := &testFlexContractHandler{
+		accountByAddress: func(address models.FlexAddress, isFOA bool) models.FlexAccount {
+			assert.Equal(t, expectedAddress, address)
+			assert.True(t, isFOA)
+
+			return &testFlowAccount{
+				address: address,
+				call: func(
+					address models.FlexAddress,
+					data models.Data,
+					limit models.GasLimit,
+					balance models.Balance,
+				) models.Data {
+					assert.Equal(t, expectedAddress, address)
+					assert.Equal(t, models.Data{4, 5, 6}, data)
+					assert.Equal(t, models.GasLimit(9999), limit)
+					assert.Equal(t, models.Balance(expectedBalance), balance)
+
+					return models.Data{3, 1, 4}
+				},
+			}
+		},
+	}
+
+	env := runtime.NewBaseInterpreterEnvironment(runtime.Config{})
+
+	flexTypeDefinition := emulator.FlexTypeDefinition
+	env.DeclareValue(stdlib.NewFlexStandardLibraryValue(nil, flexTypeDefinition, handler))
+	env.DeclareType(stdlib.NewFlexStandardLibraryType(flexTypeDefinition))
+
+	inter := runtime.NewInterpreterRuntime(runtime.Config{})
+
+	script := []byte(`
+      pub fun main(): [UInt8] {
+          let foa <- Flex.createFlowOwnedAccount()
+          let response = foa.call(
+              to: Flex.FlexAddress(bytes: [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
+              data: [4, 5, 6],
+              gasLimit: 9999,
+              value: Flex.Balance(flow: 1.23)
+          )
+          destroy foa
+          return response
+      }
+	`)
+
+	runtimeInterface := &testRuntimeInterface{
+		storage: newTestLedger(),
+		decodeArgument: func(b []byte, t cadence.Type) (cadence.Value, error) {
+			return json.Decode(nil, b)
+		},
+	}
+
+	actual, err := inter.ExecuteScript(
+		runtime.Script{
+			Source: script,
+		},
+		runtime.Context{
+			Interface:   runtimeInterface,
+			Environment: env,
+			Location:    common.ScriptLocation{},
+		},
+	)
+	require.NoError(t, err)
+
+	expected := cadence.NewArray([]cadence.Value{
+		cadence.UInt8(3),
+		cadence.UInt8(1),
+		cadence.UInt8(4),
+	}).WithType(cadence.NewVariableSizedArrayType(cadence.UInt8Type{}))
+
+	require.Equal(t, expected, actual)
 }
 
 // TODO: replace with Cadence runtime testing utils once available https://github.com/onflow/cadence/pull/2800

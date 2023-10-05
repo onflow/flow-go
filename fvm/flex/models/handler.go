@@ -15,7 +15,7 @@ import (
 // The Second way is through a new form of account called Flow-owned account (FOA),
 // which is represented and controlled through a resource, owned by a Flow account.
 // The FOA has a collision-proof allocated address.
-/// The owner of the FOA resource can interact with the Flex environment on behalf of the Flex address.
+// The owner of the FOA resource can interact with the Flex environment on behalf of the Flex address.
 //
 // The Flex environment shares the same native token as Flow, there are no new tokens minted.
 // Other ERC-20 fungible tokens can be bridged between FOA resources and Flow accounts.
