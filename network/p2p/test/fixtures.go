@@ -159,6 +159,10 @@ func NodeFixture(
 		SetStreamCreationRetryInterval(parameters.CreateStreamRetryDelay).
 		SetResourceManager(parameters.ResourceManager)
 
+	if parameters.DhtOptions != nil && (parameters.Role != flow.RoleAccess && parameters.Role != flow.RoleExecution) {
+		require.Fail(t, "DHT should not be enabled for non-access and non-execution nodes")
+	}
+
 	if parameters.Role == flow.RoleAccess || parameters.Role == flow.RoleExecution {
 		// Only access and execution nodes need to run DHT;
 		// Access nodes and execution nodes need DHT to run a blob service.
