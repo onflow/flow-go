@@ -32,27 +32,25 @@ import (
 //     GetRegister(B, Z) should return ErrPruned, because register is unknown
 //     GetRegister(C, X) should return BlockNotExecuted, because block is not executed (unexecuted)
 //
-//  9. Given the following tree:
+//  8. Given the following tree:
 //     Pruned <- A(X:1) <- B(Y:2)
 //     .......^- C(X:3) <- D(Y:4)
 //     GetRegister(D, X) should return 3
 //
-// 10. Prune should fail if the block is unknown
-//
-// 11. Prune should succeed if the block is known, and GetUpdatedRegisters should return out of range error
-//
-//  12. Prune should prune up to the pruned height.
+//  9. Prune should fail if the block is unknown
+//     Prune should succeed if the block is known, and GetUpdatedRegisters should return out of range error
+//     Prune should prune up to the pruned height.
 //     Given Pruned <- A(X:1) <- B(X:2) <- C(X:3),
 //     after Prune(B), GetRegister(C, X) should return 3, GetRegister(B, X) should return out of range error
 //
-//  13. Prune should prune conflicting forks
+//  11. Prune should prune conflicting forks
 //     Given Pruned <- A(X:1) <- B(X:2)
 //     ............ ^- C(X:3) <- D(X:4)
 //     Prune(A) should prune C and D, and GetUpdatedRegisters(C) should return out of range error,
 //     GetUpdatedRegisters(D) should return NotFound
 //
-// 14. Concurrency: SaveRegisters can happen concurrently with GetUpdatedRegisters, and GetRegister
-// 15. Concurrency: Prune can happen concurrently with GetUpdatedRegisters, and GetRegister
+// 12. Concurrency: SaveRegisters can happen concurrently with GetUpdatedRegisters, and GetRegister
+// 13. Concurrency: Prune can happen concurrently with GetUpdatedRegisters, and GetRegister
 func TestInMemoryRegisterStoreFailBelowOrEqualPrunedHeight(t *testing.T) {
 	// 1.
 	pruned := uint64(10)
@@ -124,7 +122,6 @@ func TestInMemoryRegisterStoreOK(t *testing.T) {
 	require.ErrorIs(t, err, ErrPruned)
 
 	// unknown block with unknown height
-	unknownBlock := unittest.IdentifierFixture()
 	_, err = store.GetRegister(height+1, unknownBlock, reg.Key)
 	require.Error(t, err)
 	require.ErrorIs(t, err, ErrNotExecuted)
@@ -284,7 +281,7 @@ func TestInMemoryRegisterStoreGetLatestValueOK(t *testing.T) {
 }
 
 func TestInMemoryRegisterStoreMultiForkOK(t *testing.T) {
-	// 7
+	// 9
 	pruned := uint64(10)
 	lastID := unittest.IdentifierFixture()
 	store := NewInMemoryRegisterStore(pruned, lastID)
@@ -330,6 +327,82 @@ func TestInMemoryRegisterStoreMultiForkOK(t *testing.T) {
 	require.Equal(t, reg.Value, val)
 }
 
+func TestInMemoryRegisterStorePrune(t *testing.T) {
+	// 9
+	pruned := uint64(10)
+	lastID := unittest.IdentifierFixture()
+	store := NewInMemoryRegisterStore(pruned, lastID)
+
+	blockA := unittest.IdentifierFixture()
+	blockB := unittest.IdentifierFixture()
+	blockC := unittest.IdentifierFixture()
+	blockD := unittest.IdentifierFixture()
+
+	require.NoError(t, store.SaveRegisters(
+		pruned+1,
+		blockA,
+		lastID,
+		[]flow.RegisterEntry{makeReg("X", "1")},
+	))
+
+	require.NoError(t, store.SaveRegisters(
+		pruned+2,
+		blockB,
+		blockA,
+		[]flow.RegisterEntry{makeReg("X", "2")},
+	))
+
+	require.NoError(t, store.SaveRegisters(
+		pruned+3,
+		blockC,
+		blockB,
+		[]flow.RegisterEntry{makeReg("X", "3")},
+	))
+
+	require.NoError(t, store.SaveRegisters(
+		pruned+4,
+		blockD,
+		blockC,
+		[]flow.RegisterEntry{makeReg("X", "4")},
+	))
+
+	err := store.Prune(pruned+1, unknownBlock) // block is unknown
+	require.Error(t, err)
+
+	err = store.Prune(pruned+1, blockB) // block is known, but height is wrong
+	require.Error(t, err)
+
+	err = store.Prune(pruned+2, blockA) // height is known, but block is wrong
+	require.Error(t, err)
+
+	err = store.Prune(pruned+4, unknownBlock) // height is unknown
+	require.Error(t, err)
+
+	err = store.Prune(pruned+1, blockA) // prune next block
+	require.NoError(t, err)
+
+	require.Equal(t, pruned+1, store.PrunedHeight())
+
+	reg := makeReg("X", "3")
+	val, err := store.GetRegister(pruned+3, blockC, reg.Key)
+	require.NoError(t, err)
+	require.Equal(t, reg.Value, val)
+
+	val, err = store.GetRegister(pruned+1, blockA, reg.Key) // A is pruned
+	require.Error(t, err)
+	require.ErrorIs(t, err, ErrPruned)
+
+	err = store.Prune(pruned+3, blockC) // prune both B and C
+	require.NoError(t, err)
+
+	require.Equal(t, pruned+3, store.PrunedHeight())
+
+	reg = makeReg("X", "4")
+	val, err = store.GetRegister(pruned+4, blockD, reg.Key) // can still get X at block D
+	require.NoError(t, err)
+	require.Equal(t, reg.Value, val)
+}
+
 func makeReg(key string, value string) flow.RegisterEntry {
 	return flow.RegisterEntry{
 		Key: flow.RegisterID{
@@ -340,6 +413,7 @@ func makeReg(key string, value string) flow.RegisterEntry {
 	}
 }
 
+var unknownBlock = unittest.IdentifierFixture()
 var unknownKey = flow.RegisterID{
 	Owner: "unknown",
 	Key:   "unknown",

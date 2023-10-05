@@ -96,7 +96,7 @@ func (s *InMemoryRegisterStore) GetRegister(height uint64, blockID flow.Identifi
 	defer s.RUnlock()
 
 	if height <= s.prunedHeight {
-		return flow.RegisterValue{}, fmt.Errorf("cannot get register at height %d, it is pruned %v: %w", height, s.prunedHeight, ErrPruned)
+		return flow.RegisterValue{}, fmt.Errorf("cannot get register at height %d, it is pruned (prunedHeight: %v): %w", height, s.prunedHeight, ErrPruned)
 	}
 
 	_, ok := s.registersByBlockID[blockID]
@@ -179,18 +179,17 @@ func (s *InMemoryRegisterStore) Prune(height uint64, blockID flow.Identifier) er
 		return fmt.Errorf("cannot find finalized fork: %w", err)
 	}
 
-	offset := 1
+	s.Lock()
+	defer s.Unlock()
+
 	for i := len(finalizedFork) - 1; i >= 0; i-- {
 		// traverse from lower height to higher height
 		blockID := finalizedFork[i]
 
-		pruneHeight := s.prunedHeight + uint64(offset)
-		err := s.pruneByHeight(pruneHeight, blockID)
+		err := s.pruneByHeight(s.prunedHeight+1, blockID)
 		if err != nil {
-			return fmt.Errorf("could not prune by height %v: %w", pruneHeight, err)
+			return fmt.Errorf("could not prune by height %v: %w", s.prunedHeight+1, err)
 		}
-
-		offset++
 	}
 
 	return nil
@@ -215,16 +214,19 @@ func (s *InMemoryRegisterStore) IsBlockExecuted(height uint64, blockID flow.Iden
 	return ok, nil
 }
 
+// findFinalizedFork returns the finalized fork from higher height to lower height
+// the last block's height is s.prunedHeight + 1
 func (s *InMemoryRegisterStore) findFinalizedFork(height uint64, blockID flow.Identifier) ([]flow.Identifier, error) {
 	s.RLock()
 	defer s.RUnlock()
 
 	if height <= s.prunedHeight {
-		return nil, fmt.Errorf("cannot find finalized fork at height %d, it is pruned %v", height, s.prunedHeight)
+		return nil, fmt.Errorf("cannot find finalized fork at height %d, it is pruned (prunedHeight: %v)", height, s.prunedHeight)
 	}
 	prunedHeight := height
 	block := blockID
 
+	// finalized fork from pruned height to the last finalized height
 	fork := make([]flow.Identifier, 0, height-s.prunedHeight)
 	for {
 		fork = append(fork, block)
