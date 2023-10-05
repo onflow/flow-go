@@ -43,14 +43,14 @@ import (
 //     Given Pruned <- A(X:1) <- B(X:2) <- C(X:3),
 //     after Prune(B), GetRegister(C, X) should return 3, GetRegister(B, X) should return out of range error
 //
-//  11. Prune should prune conflicting forks
+//  10. Prune should prune conflicting forks
 //     Given Pruned <- A(X:1) <- B(X:2)
 //     ............ ^- C(X:3) <- D(X:4)
 //     Prune(A) should prune C and D, and GetUpdatedRegisters(C) should return out of range error,
 //     GetUpdatedRegisters(D) should return NotFound
 //
-// 12. Concurrency: SaveRegisters can happen concurrently with GetUpdatedRegisters, and GetRegister
-// 13. Concurrency: Prune can happen concurrently with GetUpdatedRegisters, and GetRegister
+// 11. Concurrency: SaveRegisters can happen concurrently with GetUpdatedRegisters, and GetRegister
+// 12. Concurrency: Prune can happen concurrently with GetUpdatedRegisters, and GetRegister
 func TestInMemoryRegisterStoreFailBelowOrEqualPrunedHeight(t *testing.T) {
 	// 1.
 	pruned := uint64(10)
@@ -401,6 +401,53 @@ func TestInMemoryRegisterStorePrune(t *testing.T) {
 	val, err = store.GetRegister(pruned+4, blockD, reg.Key) // can still get X at block D
 	require.NoError(t, err)
 	require.Equal(t, reg.Value, val)
+}
+
+func TestPruneConflictingForks(t *testing.T) {
+	// 9
+	pruned := uint64(10)
+	lastID := unittest.IdentifierFixture()
+	store := NewInMemoryRegisterStore(pruned, lastID)
+
+	blockA := unittest.IdentifierFixture()
+	blockB := unittest.IdentifierFixture()
+	blockC := unittest.IdentifierFixture()
+	blockD := unittest.IdentifierFixture()
+
+	require.NoError(t, store.SaveRegisters(
+		pruned+1,
+		blockA,
+		lastID,
+		[]flow.RegisterEntry{makeReg("X", "1")},
+	))
+
+	require.NoError(t, store.SaveRegisters(
+		pruned+2,
+		blockB,
+		blockA,
+		[]flow.RegisterEntry{makeReg("X", "2")},
+	))
+
+	require.NoError(t, store.SaveRegisters(
+		pruned+1,
+		blockC,
+		lastID,
+		[]flow.RegisterEntry{makeReg("X", "3")},
+	))
+
+	require.NoError(t, store.SaveRegisters(
+		pruned+2,
+		blockD,
+		blockC,
+		[]flow.RegisterEntry{makeReg("X", "4")},
+	))
+
+	err := store.Prune(pruned+1, blockA) // prune A should prune C and D
+	require.NoError(t, err)
+
+	_, err = store.GetUpdatedRegisters(pruned+2, blockD)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "not found")
 }
 
 func makeReg(key string, value string) flow.RegisterEntry {
