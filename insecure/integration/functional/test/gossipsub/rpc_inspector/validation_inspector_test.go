@@ -109,7 +109,7 @@ func TestValidationInspector_InvalidTopicId_Detection(t *testing.T) {
 	// create unknown topic
 	unknownTopic := channels.Topic(fmt.Sprintf("%s/%s", corruptlibp2p.GossipSubTopicIdFixture(), sporkID))
 	// create malformed topic
-	malformedTopic := channels.Topic("!@#$%^&**((")
+	malformedTopic := channels.Topic(unittest.RandomStringFixture(t, 100))
 	// a topics spork ID is considered invalid if it does not match the current spork ID
 	invalidSporkIDTopic := channels.Topic(fmt.Sprintf("%s/%s", channels.PushBlocks, unittest.IdentifierFixture()))
 
@@ -859,7 +859,7 @@ func TestValidationInspector_InspectRpcPublishMessages(t *testing.T) {
 	// create unknown topic
 	unknownTopic := channels.Topic(fmt.Sprintf("%s/%s", corruptlibp2p.GossipSubTopicIdFixture(), sporkID)).String()
 	// create malformed topic
-	malformedTopic := channels.Topic("!@#$%^&**((").String()
+	malformedTopic := channels.Topic(unittest.RandomStringFixture(t, 100)).String()
 	// a topics spork ID is considered invalid if it does not match the current spork ID
 	invalidSporkIDTopic := channels.Topic(fmt.Sprintf("%s/%s", channels.PushBlocks, unittest.IdentifierFixture())).String()
 	// append messages with invalid topics this should force a notification to disseminate
@@ -947,7 +947,7 @@ func TestGossipSubSpamMitigationIntegration(t *testing.T) {
 	unknownTopic := channels.Topic(fmt.Sprintf("%s/%s", corruptlibp2p.GossipSubTopicIdFixture(), sporkID))
 
 	// malformedTopic is a topic that is not shaped like a valid topic (i.e., it does not have the correct prefix and spork ID).
-	malformedTopic := channels.Topic("!@#$%^&**((")
+	malformedTopic := channels.Topic(unittest.RandomStringFixture(t, 100))
 
 	// invalidSporkIDTopic is a topic that has a valid prefix but an invalid spork ID (i.e., not the current spork ID).
 	invalidSporkIDTopic := channels.Topic(fmt.Sprintf("%s/%s", channels.PushBlocks, unittest.IdentifierFixture()))

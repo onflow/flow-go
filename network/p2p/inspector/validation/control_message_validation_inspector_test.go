@@ -207,7 +207,7 @@ func TestControlMessageValidationInspector_processInspectRPCReq(t *testing.T) {
 	t.Run("inspectGraftMessages should disseminate invalid control message notification for invalid graft messages as expected", func(t *testing.T) {
 		inspector, distributor, _, _, sporkID := inspectorFixture(t)
 		// create unknown topic
-		unknownTopic, malformedTopic, invalidSporkIDTopic := invalidTopics(sporkID)
+		unknownTopic, malformedTopic, invalidSporkIDTopic := invalidTopics(t, sporkID)
 		unknownTopicGraft := unittest.P2PRPCGraftFixture(&unknownTopic)
 		malformedTopicGraft := unittest.P2PRPCGraftFixture(&malformedTopic)
 		invalidSporkIDTopicGraft := unittest.P2PRPCGraftFixture(&invalidSporkIDTopic)
@@ -231,7 +231,7 @@ func TestControlMessageValidationInspector_processInspectRPCReq(t *testing.T) {
 	t.Run("inspectPruneMessages should disseminate invalid control message notification for invalid prune messages as expected", func(t *testing.T) {
 		inspector, distributor, _, _, sporkID := inspectorFixture(t)
 		// create unknown topic
-		unknownTopic, malformedTopic, invalidSporkIDTopic := invalidTopics(sporkID)
+		unknownTopic, malformedTopic, invalidSporkIDTopic := invalidTopics(t, sporkID)
 		unknownTopicPrune := unittest.P2PRPCPruneFixture(&unknownTopic)
 		malformedTopicPrune := unittest.P2PRPCPruneFixture(&malformedTopic)
 		invalidSporkIDTopicPrune := unittest.P2PRPCPruneFixture(&invalidSporkIDTopic)
@@ -255,7 +255,7 @@ func TestControlMessageValidationInspector_processInspectRPCReq(t *testing.T) {
 	t.Run("inspectIHaveMessages should disseminate invalid control message notification for iHave messages with invalid topics as expected", func(t *testing.T) {
 		inspector, distributor, _, _, sporkID := inspectorFixture(t)
 		// create unknown topic
-		unknownTopic, malformedTopic, invalidSporkIDTopic := invalidTopics(sporkID)
+		unknownTopic, malformedTopic, invalidSporkIDTopic := invalidTopics(t, sporkID)
 		unknownTopicIhave := unittest.P2PRPCIHaveFixture(&unknownTopic, unittest.IdentifierListFixture(5).Strings()...)
 		malformedTopicIhave := unittest.P2PRPCIHaveFixture(&malformedTopic, unittest.IdentifierListFixture(5).Strings()...)
 		invalidSporkIDTopicIhave := unittest.P2PRPCIHaveFixture(&invalidSporkIDTopic, unittest.IdentifierListFixture(5).Strings()...)
@@ -507,11 +507,11 @@ func inspectorFixture(t *testing.T) (*ControlMsgValidationInspector, *mockp2p.Go
 // - unknown topic
 // - malformed topic
 // - topic with invalid spork ID
-func invalidTopics(sporkID flow.Identifier) (string, string, string) {
+func invalidTopics(t *testing.T, sporkID flow.Identifier) (string, string, string) {
 	// create unknown topic
 	unknownTopic := channels.Topic(fmt.Sprintf("%s/%s", unittest.IdentifierFixture(), sporkID)).String()
 	// create malformed topic
-	malformedTopic := channels.Topic("!@#$%^&**((").String()
+	malformedTopic := channels.Topic(unittest.RandomStringFixture(t, 100)).String()
 	// a topics spork ID is considered invalid if it does not match the current spork ID
 	invalidSporkIDTopic := channels.Topic(fmt.Sprintf("%s/%s", channels.PushBlocks, unittest.IdentifierFixture())).String()
 	return unknownTopic, malformedTopic, invalidSporkIDTopic
