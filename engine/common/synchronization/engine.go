@@ -208,17 +208,9 @@ func (e *Engine) Process(channel channels.Channel, originID flow.Identifier, eve
 func (e *Engine) process(channel channels.Channel, originID flow.Identifier, event interface{}) error {
 	switch message := event.(type) {
 	case *messages.BatchRequest:
-		report, valid, err := e.validateBatchRequestForALSP(originID, message)
+		err := e.validateBatchRequestForALSP(originID, message)
 		if err != nil {
 			return fmt.Errorf("failed to validate batch request from %x: %w", originID[:], err)
-		}
-		if !valid {
-			e.con.ReportMisbehavior(report) // report misbehavior to ALSP
-			e.log.
-				Warn().
-				Hex("origin_id", logging.ID(originID)).
-				Str(logging.KeySuspicious, "true").
-				Msgf("received invalid batch request from %x: %v", originID[:], valid)
 		}
 		return e.requestHandler.Process(channel, originID, event)
 	case *messages.RangeRequest:
@@ -511,11 +503,11 @@ func (e *Engine) sendRequests(participants flow.IdentifierList, ranges []chainsy
 // - bool: true if the batch request is valid and should not be reported as misbehavior; otherwise, false if a misbehavior is detected
 //
 // - error: If an error is encountered while validating the batch request. Error is assumed to be irrecoverable because of internal processes that didn't allow validation to complete.
-func (e *Engine) validateBatchRequestForALSP(originID flow.Identifier, batchRequest *messages.BatchRequest) (*alsp.MisbehaviorReport, bool, error) {
+func (e *Engine) validateBatchRequestForALSP(originID flow.Identifier, batchRequest *messages.BatchRequest) error {
 	// Generate a random integer between 0 and spamProbabilityMultiplier (exclusive)
 	n, err := rand.Uint32n(spamProbabilityMultiplier)
 	if err != nil {
-		return nil, false, fmt.Errorf("failed to generate random number from %x: %w", originID[:], err)
+		return fmt.Errorf("failed to generate random number from %x: %w", originID[:], err)
 	}
 
 	// validity check: if no block IDs, always report as misbehavior
@@ -529,10 +521,11 @@ func (e *Engine) validateBatchRequestForALSP(originID flow.Identifier, batchRequ
 		if err != nil {
 			// failing to create the misbehavior report is unlikely. If an error is encountered while
 			// creating the misbehavior report it indicates a bug and processing can not proceed.
-			return nil, false, fmt.Errorf("failed to create misbehavior report (invalid batch request, no block IDs) from %x: %w", originID[:], err)
+			return fmt.Errorf("failed to create misbehavior report (invalid batch request, no block IDs) from %x: %w", originID[:], err)
 		}
+		e.con.ReportMisbehavior(report) // report misbehavior to ALSP
 		// failed validation check and should be reported as misbehavior
-		return report, false, nil
+		return nil
 	}
 
 	// to avoid creating a misbehavior report for every batch request received, use a probabilistic approach.
@@ -553,20 +546,21 @@ func (e *Engine) validateBatchRequestForALSP(originID flow.Identifier, batchRequ
 		// create a misbehavior report
 		e.log.Warn().
 			Hex("origin_id", logging.ID(originID)).
-			Str(logging.KeySuspicious, "true").
+			Str(logging.KeyLoad, "true").
 			Str("reason", alsp.ResourceIntensiveRequest.String()).
 			Msgf("for %d block IDs, creating probabilistic ALSP report", len(batchRequest.BlockIDs))
 		report, err := alsp.NewMisbehaviorReport(originID, alsp.ResourceIntensiveRequest)
 		if err != nil {
 			// failing to create the misbehavior report is unlikely. If an error is encountered while
 			// creating the misbehavior report it indicates a bug and processing can not proceed.
-			return nil, false, fmt.Errorf("failed to create misbehavior report from %x: %w", originID[:], err)
+			return fmt.Errorf("failed to create misbehavior report from %x: %w", originID[:], err)
 		}
 		// failed validation check and should be reported as misbehavior
-		return report, false, nil
+		e.con.ReportMisbehavior(report) // report misbehavior to ALSP
+		return nil
 	}
 
-	return nil, true, nil
+	return nil
 }
 
 // TODO: implement spam reporting similar to validateSyncRequestForALSP
@@ -630,7 +624,7 @@ func (e *Engine) validateRangeRequestForALSP(originID flow.Identifier, rangeRequ
 		// create a misbehavior report
 		e.log.Warn().
 			Hex("origin_id", logging.ID(originID)).
-			Str(logging.KeySuspicious, "true").
+			Str(logging.KeyLoad, "true").
 			Str("reason", alsp.ResourceIntensiveRequest.String()).
 			Msgf("from height %d to height %d, creating probabilistic ALSP report", rangeRequest.FromHeight, rangeRequest.ToHeight)
 		report, err := alsp.NewMisbehaviorReport(originID, alsp.ResourceIntensiveRequest)
@@ -673,7 +667,7 @@ func (e *Engine) validateSyncRequestForALSP(originID flow.Identifier) (*alsp.Mis
 		// create misbehavior report
 		e.log.Warn().
 			Hex("origin_id", logging.ID(originID)).
-			Str(logging.KeySuspicious, "true").
+			Str(logging.KeyLoad, "true").
 			Str("reason", alsp.ResourceIntensiveRequest.String()).
 			Msg("creating probabilistic ALSP report")
 
