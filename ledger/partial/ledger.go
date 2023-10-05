@@ -121,10 +121,10 @@ func (l *Ledger) Get(query *ledger.Query) (values []ledger.Value, err error) {
 // it returns the state after update and errors (if any)
 func (l *Ledger) Set(update *ledger.Update) (newState ledger.State, trieUpdate *ledger.TrieUpdate, err error) {
 	// TODO: add test case
-	if update.Size() == 0 {
-		// return current state root unchanged
-		return update.State(), nil, nil
-	}
+	// if update.Size() == 0 {
+	// 	// return current state root unchanged
+	// 	return update.State(), nil, nil
+	// }
 
 	trieUpdate, err = pathfinder.UpdateToTrieUpdate(update, l.pathFinderVersion)
 	if err != nil {
