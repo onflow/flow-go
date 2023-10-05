@@ -51,15 +51,16 @@ type ControlMsgValidationInspector struct {
 	// 1. The cluster prefix topic is received while the inspector waits for the cluster IDs provider to be set (this can happen during the startup or epoch transitions).
 	// 2. The node sends a cluster prefix topic where the cluster prefix does not match any of the active cluster IDs.
 	// In such cases, the inspector will allow a configured number of these messages from the corresponding peer.
-	tracker       *cache.ClusterPrefixedMessagesReceivedTracker
-	idProvider    module.IdentityProvider
-	rateLimiters  map[p2pmsg.ControlMessageType]p2p.BasicRateLimiter
-	rpcTracker    p2p.RpcControlTracking
-	subscriptions p2p.Subscriptions
+	tracker      *cache.ClusterPrefixedMessagesReceivedTracker
+	idProvider   module.IdentityProvider
+	rateLimiters map[p2pmsg.ControlMessageType]p2p.BasicRateLimiter
+	rpcTracker   p2p.RpcControlTracking
+	// topicOracle callback used to retrieve the current subscribed topics of the libp2p node.
+	topicOracle func() []string
 }
 
 var _ component.Component = (*ControlMsgValidationInspector)(nil)
-var _ p2p.GossipSubRPCInspector = (*ControlMsgValidationInspector)(nil)
+var _ p2p.GossipSubMsgValidationRpcInspector = (*ControlMsgValidationInspector)(nil)
 var _ protocol.Consumer = (*ControlMsgValidationInspector)(nil)
 
 // NewControlMsgValidationInspector returns new ControlMsgValidationInspector
@@ -74,7 +75,7 @@ var _ protocol.Consumer = (*ControlMsgValidationInspector)(nil)
 // Returns:
 //   - *ControlMsgValidationInspector: a new control message validation inspector.
 //   - error: an error if there is any error while creating the inspector. All errors are irrecoverable and unexpected.
-func NewControlMsgValidationInspector(ctx irrecoverable.SignalerContext, logger zerolog.Logger, sporkID flow.Identifier, config *p2pconf.GossipSubRPCValidationInspectorConfigs, distributor p2p.GossipSubInspectorNotifDistributor, inspectMsgQueueCacheCollector module.HeroCacheMetrics, clusterPrefixedCacheCollector module.HeroCacheMetrics, idProvider module.IdentityProvider, inspectorMetrics module.GossipSubRpcValidationInspectorMetrics, rpcTracker p2p.RpcControlTracking, subscriptions p2p.Subscriptions) (*ControlMsgValidationInspector, error) {
+func NewControlMsgValidationInspector(ctx irrecoverable.SignalerContext, logger zerolog.Logger, sporkID flow.Identifier, config *p2pconf.GossipSubRPCValidationInspectorConfigs, distributor p2p.GossipSubInspectorNotifDistributor, inspectMsgQueueCacheCollector module.HeroCacheMetrics, clusterPrefixedCacheCollector module.HeroCacheMetrics, idProvider module.IdentityProvider, inspectorMetrics module.GossipSubRpcValidationInspectorMetrics, rpcTracker p2p.RpcControlTracking) (*ControlMsgValidationInspector, error) {
 	lg := logger.With().Str("component", "gossip_sub_rpc_validation_inspector").Logger()
 
 	clusterPrefixedTracker, err := cache.NewClusterPrefixedMessagesReceivedTracker(logger, config.ClusterPrefixedControlMsgsReceivedCacheSize, clusterPrefixedCacheCollector, config.ClusterPrefixedControlMsgsReceivedCacheDecay)
@@ -83,17 +84,16 @@ func NewControlMsgValidationInspector(ctx irrecoverable.SignalerContext, logger 
 	}
 
 	c := &ControlMsgValidationInspector{
-		ctx:           ctx,
-		logger:        lg,
-		sporkID:       sporkID,
-		config:        config,
-		distributor:   distributor,
-		tracker:       clusterPrefixedTracker,
-		rpcTracker:    rpcTracker,
-		idProvider:    idProvider,
-		metrics:       inspectorMetrics,
-		rateLimiters:  make(map[p2pmsg.ControlMessageType]p2p.BasicRateLimiter),
-		subscriptions: subscriptions,
+		ctx:          ctx,
+		logger:       lg,
+		sporkID:      sporkID,
+		config:       config,
+		distributor:  distributor,
+		tracker:      clusterPrefixedTracker,
+		rpcTracker:   rpcTracker,
+		idProvider:   idProvider,
+		metrics:      inspectorMetrics,
+		rateLimiters: make(map[p2pmsg.ControlMessageType]p2p.BasicRateLimiter),
 	}
 
 	store := queue.NewHeroStore(config.CacheSize, logger, inspectMsgQueueCacheCollector)
@@ -116,6 +116,13 @@ func NewControlMsgValidationInspector(ctx irrecoverable.SignalerContext, logger 
 	}
 	c.Component = builder.Build()
 	return c, nil
+}
+
+func (c *ControlMsgValidationInspector) Start(parent irrecoverable.SignalerContext) {
+	if c.topicOracle == nil {
+		parent.Throw(fmt.Errorf("6"))
+	}
+	c.Component.Start(parent)
 }
 
 // Inspect is called by gossipsub upon reception of a rpc from a remote  node.
@@ -378,6 +385,16 @@ func (c *ControlMsgValidationInspector) inspectRpcPublishMessages(from peer.ID, 
 		messages[i], messages[j] = messages[j], messages[i]
 	})
 
+	subscribedTopics := c.topicOracle()
+	hasSubscription := func(topic string) bool {
+		for _, subscribedTopic := range subscribedTopics {
+			if topic == subscribedTopic {
+				return true
+			}
+		}
+		return false
+	}
+
 	var errs *multierror.Error
 	for _, message := range messages[:sampleSize] {
 		topic := channels.Topic(message.GetTopic())
@@ -386,7 +403,7 @@ func (c *ControlMsgValidationInspector) inspectRpcPublishMessages(from peer.ID, 
 			errs = multierror.Append(errs, err)
 		}
 
-		if !c.subscriptions.HasSubscription(topic) {
+		if !hasSubscription(topic.String()) {
 			errs = multierror.Append(errs, fmt.Errorf("subscription for topic %s not found", topic))
 		}
 
@@ -581,6 +598,18 @@ func (c *ControlMsgValidationInspector) Name() string {
 // ActiveClustersChanged consumes cluster ID update protocol events.
 func (c *ControlMsgValidationInspector) ActiveClustersChanged(clusterIDList flow.ChainIDList) {
 	c.tracker.StoreActiveClusterIds(clusterIDList)
+}
+
+// SetTopicOracle Sets the topic oracle. The topic oracle is used to determine the list of topics that the node is subscribed to.
+// If an oracle is not set, the node will not be able to determine the list of topics that the node is subscribed to.
+// This func is expected to be called once and will return an error on all subsequent calls.
+// All errors returned from this func are considered irrecoverable.
+func (c *ControlMsgValidationInspector) SetTopicOracle(topicOracle func() []string) error {
+	if c.topicOracle != nil {
+		return fmt.Errorf("topic oracle already set")
+	}
+	c.topicOracle = topicOracle
+	return nil
 }
 
 // performSample performs sampling on the specified control message that will randomize

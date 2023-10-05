@@ -36,10 +36,6 @@ type GossipSubBuilder interface {
 	// If the subscription filter has already been set, a fatal error is logged.
 	SetSubscriptionFilter(pubsub.SubscriptionFilter)
 
-	// SetSubscriptions sets the subscriptions interface of the builder.
-	// If the subscriptions interface has already been set, a fatal error is logged.
-	SetSubscriptions(subscriptions Subscriptions)
-
 	// SetGossipSubFactory sets the gossipsub factory of the builder.
 	// We expect the node to initialize with a default gossipsub factory. Hence, this function overrides the default config.
 	SetGossipSubFactory(GossipSubFactoryFunc)
@@ -113,8 +109,7 @@ type GossipSubRpcInspectorSuiteFactoryFunc func(
 	module.GossipSubMetrics,
 	metrics.HeroCacheMetricsFactory,
 	flownet.NetworkingType,
-	module.IdentityProvider,
-	Subscriptions) (GossipSubInspectorSuite, error)
+	module.IdentityProvider) (GossipSubInspectorSuite, error)
 
 // NodeBuilder is a builder pattern for creating a libp2p Node instance.
 type NodeBuilder interface {

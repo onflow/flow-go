@@ -83,3 +83,20 @@ func (s *GossipSubInspectorSuite) ActiveClustersChanged(list flow.ChainIDList) {
 		}
 	}
 }
+
+// SetTopicOracle sets the topic oracle of the gossipsub inspector suite.
+// The topic oracle is used to determine the list of topics that the node is subscribed to.
+// If an oracle is not set, the node will not be able to determine the list of topics that the node is subscribed to.
+// This func is expected to be called once and will return an error on all subsequent calls.
+// All errors returned from this func are considered irrecoverable.
+func (s *GossipSubInspectorSuite) SetTopicOracle(topicOracle func() []string) error {
+	for _, rpcInspector := range s.aggregatedInspector.Inspectors() {
+		if r, ok := rpcInspector.(p2p.GossipSubMsgValidationRpcInspector); ok {
+			err := r.SetTopicOracle(topicOracle)
+			if err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
