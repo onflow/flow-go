@@ -483,8 +483,12 @@ func (e *Engine) sendRequests(participants flow.IdentifierList, ranges []chainsy
 	}
 }
 
-// validateBatchRequestForALSP checks if a batch request should be reported as a misbehavior due to malicious intent (e.g. spamming)
-// and sends misbehavior report to ALSP.
+// validateBatchRequestForALSP checks if a batch request should be reported as a misbehavior and sends misbehavior report to ALSP.
+// The misbehavior is due to either:
+//  1. unambiguous malicious or incorrect behavior (0 block IDs) OR
+//  2. large number of block IDs in batch request. This is more ambiguous to detect as malicious behavior because there is no way to know for sure
+//     if the sender is sending a large batch request maliciously or not, so we use a probabilistic approach to report the misbehavior.
+//
 // Args:
 // - originID: the sender of the batch request
 // - batchRequest: the batch request to validate
@@ -554,17 +558,16 @@ func (e *Engine) validateBlockResponseForALSP(channel channels.Channel, id flow.
 	return nil, true, nil
 }
 
-// validateRangeRequestForALSP checks if a range request should be reported as a misbehavior due to malicious intent (e.g. spamming).
+// validateRangeRequestForALSP checks if a range request should be reported as a misbehavior and sends misbehavior report to ALSP.
+// The misbehavior is due to either:
+//  1. unambiguous malicious or incorrect behavior (toHeight < fromHeight) OR
+//  2. large height in range request. This is more ambiguous to detect as malicious behavior because there is no way to know for sure
+//     if the sender is sending a large range request height maliciously or not, so we use a probabilistic approach to report the misbehavior.
+//
 // Args:
 // - originID: the sender of the range request
 // - rangeRequest: the range request to validate
 // Returns:
-// - *alsp.MisbehaviorReport: If any misbehavior is detected such as:
-//   - the range request is invalid
-//   - the range request is valid but should be reported as misbehavior anyway (due to probabilities)
-//
-// - bool: true if the range request is valid and should not be reported as misbehavior; otherwise, false if a misbehavior is detected
-//
 // - error: If an error is encountered while validating the range request. Error is assumed to be irrecoverable because of internal processes that didn't allow validation to complete.
 func (e *Engine) validateRangeRequestForALSP(originID flow.Identifier, rangeRequest *messages.RangeRequest) error {
 	// Generate a random integer between 0 and spamProbabilityMultiplier (exclusive)
