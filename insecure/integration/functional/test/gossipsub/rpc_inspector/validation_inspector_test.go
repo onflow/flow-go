@@ -841,7 +841,7 @@ func TestValidationInspector_InspectRpcPublishMessages(t *testing.T) {
 	malformedTopic := channels.Topic("!@#$%^&**((").String()
 	// a topics spork ID is considered invalid if it does not match the current spork ID
 	invalidSporkIDTopic := channels.Topic(fmt.Sprintf("%s/%s", channels.PushBlocks, unittest.IdentifierFixture())).String()
-	// append messages with invalid topics this should force a notification to disseminate
+	// append 5 messages with invalid topics, this should force a notification to disseminate
 	publishMsgs = append(publishMsgs, []*pb.Message{
 		{Topic: &unknownTopic},
 		{Topic: &malformedTopic},
