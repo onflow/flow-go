@@ -6,6 +6,13 @@ import (
 	"strconv"
 	"testing"
 
+	"github.com/onflow/cadence"
+	"github.com/onflow/cadence/encoding/ccf"
+	jsoncdc "github.com/onflow/cadence/encoding/json"
+	"github.com/onflow/cadence/runtime/common"
+
+	"github.com/onflow/flow-go/utils/unittest/generator"
+
 	"github.com/dgraph-io/badger/v2"
 	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
 	entitiesproto "github.com/onflow/flow/protobuf/go/flow/entities"
@@ -1015,7 +1022,7 @@ func (suite *Suite) TestGetEventsForBlockIDs() {
 	blockHeaders := setupStorage(5)
 
 	suite.snapshot.On("Identities", mock.Anything).Return(validExecutorIdentities, nil)
-	validENIDs := flow.IdentifierList(validExecutorIdentities.NodeIDs())
+	validENIDs := validExecutorIdentities.NodeIDs()
 
 	// create a mock connection factory
 	connFactory := connectionmock.NewConnectionFactory(suite.T())
@@ -2102,6 +2109,108 @@ func (suite *Suite) TestScriptExecutionValidationMode() {
 	})
 }
 
+// TestGetTransactionResultByIndexEventEncodingVersion
+func (suite *Suite) TestGetTransactionResultByIndexEventEncodingVersion() {
+	suite.state.On("Sealed").Return(suite.snapshot, nil).Maybe()
+
+	ctx := context.Background()
+	block := unittest.BlockFixture()
+	blockId := block.ID()
+	index := uint32(0)
+
+	suite.snapshot.On("Head").Return(block.Header, nil)
+
+	// block storage returns the corresponding block
+	suite.blocks.
+		On("ByID", blockId).
+		Return(&block, nil)
+
+	_, fixedENIDs := suite.setupReceipts(&block)
+	suite.state.On("Final").Return(suite.snapshot, nil).Maybe()
+	suite.snapshot.On("Identities", mock.Anything).Return(fixedENIDs, nil)
+
+	// create a mock connection factory
+	connFactory := connectionmock.NewConnectionFactory(suite.T())
+	connFactory.On("GetExecutionAPIClient", mock.Anything).Return(suite.execClient, &mockCloser{}, nil)
+
+	params := suite.defaultBackendParams()
+	// the connection factory should be used to get the execution node client
+	params.ConnFactory = connFactory
+	params.FixedExecutionNodeIDs = (fixedENIDs.NodeIDs()).Strings()
+
+	backend, err := New(params)
+	suite.Require().NoError(err)
+
+	exeEventReq := &execproto.GetTransactionByIndexRequest{
+		BlockId: blockId[:],
+		Index:   index,
+	}
+
+	prepareGetTransactionResultByIndex := func(version entitiesproto.EventEncodingVersion) *execproto.GetTransactionResultResponse {
+		events := getEventsWithEncoding(1, version)
+
+		exeEventResp := &execproto.GetTransactionResultResponse{
+			Events: convert.EventsToMessages(events),
+		}
+
+		suite.execClient.
+			On("GetTransactionResultByIndex", ctx, exeEventReq).
+			Return(exeEventResp, nil).
+			Once()
+
+		return exeEventResp
+	}
+
+	assertResultExpectations := func(
+		exeEventResp *execproto.GetTransactionResultResponse,
+		encodingVersionValue *entitiesproto.EventEncodingVersionValue,
+	) {
+		encodingVersion := entitiesproto.EventEncodingVersion_JSON_CDC_V0
+		if encodingVersionValue != nil {
+			encodingVersion = encodingVersionValue.GetValue()
+		}
+
+		result, err := backend.GetTransactionResultByIndex(ctx, blockId, index, encodingVersionValue)
+		suite.checkResponse(result, err)
+
+		expectedResultEvents, err := convert.MessagesToEventsFromVersion(exeEventResp.GetEvents(), encodingVersion)
+		suite.Require().NoError(err)
+		suite.Assert().Equal(result.Events, expectedResultEvents)
+	}
+
+	suite.Run("test default(JSON) event encoding (happy case)", func() {
+		encodingVersion := entitiesproto.EventEncodingVersion_JSON_CDC_V0
+		exeEventResp := prepareGetTransactionResultByIndex(encodingVersion)
+		assertResultExpectations(exeEventResp, nil)
+	})
+
+	suite.Run("test JSON event encoding (happy case)", func() {
+		encodingVersion := entitiesproto.EventEncodingVersion_JSON_CDC_V0
+		exeEventResp := prepareGetTransactionResultByIndex(encodingVersion)
+		assertResultExpectations(exeEventResp, &entitiesproto.EventEncodingVersionValue{Value: encodingVersion})
+	})
+
+	suite.Run("test CFF event encoding (happy case)", func() {
+		encodingVersion := entitiesproto.EventEncodingVersion_CCF_V0
+		exeEventResp := prepareGetTransactionResultByIndex(encodingVersion)
+		assertResultExpectations(exeEventResp, &entitiesproto.EventEncodingVersionValue{Value: encodingVersion})
+	})
+
+	suite.Run("test wrong event conversion JSON to CFF", func() {
+		encodingVersion := entitiesproto.EventEncodingVersion_JSON_CDC_V0
+		_ = prepareGetTransactionResultByIndex(encodingVersion)
+
+		result, err := backend.GetTransactionResultByIndex(
+			ctx,
+			blockId,
+			index,
+			&entitiesproto.EventEncodingVersionValue{Value: entitiesproto.EventEncodingVersion_CCF_V0},
+		)
+		suite.Require().Error(err)
+		suite.Require().Nil(result)
+	})
+}
+
 func (suite *Suite) assertAllExpectations() {
 	suite.snapshot.AssertExpectations(suite.T())
 	suite.state.AssertExpectations(suite.T())
@@ -2145,6 +2254,66 @@ func getEvents(n int) []flow.Event {
 	for i := range events {
 		events[i] = flow.Event{Type: flow.EventAccountCreated}
 	}
+	return events
+}
+
+func getEventsWithEncoding(n int, version entitiesproto.EventEncodingVersion) []flow.Event {
+	events := make([]flow.Event, 0, n)
+	ids := generator.IdentifierGenerator()
+	for i := 0; i < n; i++ {
+		location := common.StringLocation("test")
+		identifier := fmt.Sprintf("FooEvent%d", i)
+		typeID := location.TypeID(nil, identifier)
+
+		testEventType := &cadence.EventType{
+			Location:            location,
+			QualifiedIdentifier: identifier,
+			Fields: []cadence.Field{
+				{
+					Identifier: "a",
+					Type:       cadence.IntType{},
+				},
+				{
+					Identifier: "b",
+					Type:       cadence.StringType{},
+				},
+			},
+		}
+
+		fooString, err := cadence.NewString("foo")
+		if err != nil {
+			panic(fmt.Sprintf("unexpected error while creating cadence string: %s", err))
+		}
+
+		testEvent := cadence.NewEvent(
+			[]cadence.Value{
+				cadence.NewInt(i),
+				fooString,
+			}).WithType(testEventType)
+
+		var payload []byte
+		switch version {
+		case entitiesproto.EventEncodingVersion_CCF_V0:
+			payload, err = ccf.Encode(testEvent)
+			if err != nil {
+				panic(fmt.Sprintf("unexpected error while ccf encoding events: %s", err))
+			}
+		case entitiesproto.EventEncodingVersion_JSON_CDC_V0:
+			payload, err = jsoncdc.Encode(testEvent)
+			if err != nil {
+				panic(fmt.Sprintf("unexpected error while json encoding events: %s", err))
+			}
+		}
+
+		events = append(events, flow.Event{
+			Type:             flow.EventType(typeID),
+			TransactionID:    ids.New(),
+			TransactionIndex: uint32(i),
+			EventIndex:       uint32(i),
+			Payload:          payload,
+		})
+	}
+
 	return events
 }
 
