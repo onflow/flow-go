@@ -413,6 +413,27 @@ func TestControlMessageValidationInspector_processInspectRPCReq(t *testing.T) {
 		distributor.On("Distribute", mock.AnythingOfType("*p2p.InvCtrlMsgNotif")).Return(nil).Once().Run(checkNotification)
 		require.NoError(t, inspector.processInspectRPCReq(req))
 	})
+
+	t.Run("inspectRpcPublishMessages should disseminate invalid control message notification when publish messages contain no topic", func(t *testing.T) {
+		inspector, distributor, _, _, _ := inspectorFixture(t)
+		// 5 invalid pubsub messages will force notification dissemination
+		inspector.config.RpcMessageErrorThreshold = 4
+		pubsubMsgs := unittest.GossipSubMessageFixtures(10, "")
+		expectedPeerID := unittest.PeerIdFixture(t)
+		req, err := NewInspectRPCRequest(expectedPeerID, unittest.P2PRPCFixture(unittest.WithPubsubMessages(pubsubMsgs...)))
+		require.NoError(t, err, "failed to get inspect message request")
+		topics := make([]string, len(pubsubMsgs))
+		for i, msg := range pubsubMsgs {
+			topics[i] = *msg.Topic
+		}
+		// set topic oracle to return list of topics excluding first topic sent
+		require.NoError(t, inspector.SetTopicOracle(func() []string {
+			return []string{}
+		}))
+		checkNotification := checkNotificationFunc(t, expectedPeerID, p2pmsg.RpcPublishMessage, IsInvalidRpcPublishMessagesErr)
+		distributor.On("Distribute", mock.AnythingOfType("*p2p.InvCtrlMsgNotif")).Return(nil).Once().Run(checkNotification)
+		require.NoError(t, inspector.processInspectRPCReq(req))
+	})
 }
 
 // TestNewControlMsgValidationInspector_validateClusterPrefixedTopic ensures cluster prefixed topics are validated as expected.
