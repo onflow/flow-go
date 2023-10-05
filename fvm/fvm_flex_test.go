@@ -130,7 +130,6 @@ func TestWithFlexEnabled_ContractInteraction(t *testing.T) {
 				snapshotTree = snapshotTree.Append(executionSnapshot)
 
 				// test retriveing a value
-
 				retrieveTxBytes := testAccount.PrepareSignAndEncodeTx(t,
 					testContract.DeployedAt,
 					testContract.MakeRetrieveCallData(t),

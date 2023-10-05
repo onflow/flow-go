@@ -16,12 +16,12 @@ contract Flex {
     access(all)
     struct Balance {
 
-        /// Constructs a new
-        init(flowAmount: UFix64)
+        /// Constructs a new balance, given the balance in FLOW.
+        init(flow: UFix64)
 
-        /// Returns the balance in FLOW
+        /// The balance in FLOW.
         access(all)
-        fun toFLOW(): UFix64
+        let flow: UFix64
 
         /// Returns the balance in terms of atto-FLOW.
         /// Atto-FLOW is the smallest denomination of FLOW inside Flex.
@@ -30,7 +30,7 @@ contract Flex {
     }
 
     access(all)
-    resource FlowOwnedAccount{
+    resource FlowOwnedAccount {
 
         /// The address of the owned Flex account
         access(all)
@@ -45,9 +45,13 @@ contract Flex {
         fun withdraw(balance: Flex.Balance): @FlowToken.Vault
 
         /// Deploys a contract to the Flex environment.
-        /// Returns the address of the newly deployed.
+        /// Returns the address of the newly deployed contract.
         access(all)
-        fun deploy(code: [UInt8], gaslimit: UInt64, value: Flex.Balance): Flex.FlexAddress
+        fun deploy(
+            code: [UInt8],
+            gasLimit: UInt64,
+            value: Flex.Balance
+        ): Flex.FlexAddress
 
         /// Calls a function with the given data.
         /// The execution is limited by the given amount of gas.
@@ -55,10 +59,14 @@ contract Flex {
         fun call(
             to: Flex.FlexAddress,
             data: [UInt8],
-            gaslimit: UInt64,
+            gasLimit: UInt64,
             value: Flex.Balance
         ): [UInt8]
     }
+
+    /// Creates a new Flex account
+    access(all)
+    fun createFlowOwnedAccount(): @Flex.FlowOwnedAccount
 
     /// Runs an a RLP-encoded Flex transaction,
     /// deducts the gas fees and deposits them into the
