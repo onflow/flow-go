@@ -18,6 +18,6 @@ func (t *FLOWTokenVault) Withdraw(b Balance) *FLOWTokenVault {
 	return NewFlowTokenVault(b)
 }
 
-func (t *FLOWTokenVault) Deposit(inp FLOWTokenVault) {
+func (t *FLOWTokenVault) Deposit(inp *FLOWTokenVault) {
 	t.balance = t.balance.Add(inp.Balance())
 }
