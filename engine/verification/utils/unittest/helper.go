@@ -3,6 +3,8 @@ package verificationtest
 import (
 	"context"
 	"fmt"
+	"github.com/onflow/flow-go/model/bootstrap"
+	"golang.org/x/exp/slices"
 	"sync"
 	"testing"
 	"time"
@@ -46,7 +48,7 @@ type MockChunkDataProviderFunc func(*testing.T, CompleteExecutionReceiptList, fl
 // requests should come from a verification node, and should has one of the assigned chunk IDs. Otherwise, it fails the test.
 func SetupChunkDataPackProvider(t *testing.T,
 	hub *stub.Hub,
-	exeIdentity *flow.Identity,
+	exeIdentity bootstrap.NodeInfo,
 	participants flow.IdentityList,
 	chainID flow.ChainID,
 	completeERs CompleteExecutionReceiptList,
@@ -150,7 +152,7 @@ func RespondChunkDataPackRequestAfterNTrials(n int) MockChunkDataProviderFunc {
 func SetupMockConsensusNode(t *testing.T,
 	log zerolog.Logger,
 	hub *stub.Hub,
-	conIdentity *flow.Identity,
+	conIdentity bootstrap.NodeInfo,
 	verIdentities flow.IdentityList,
 	othersIdentity flow.IdentityList,
 	completeERs CompleteExecutionReceiptList,
@@ -478,9 +480,15 @@ func withConsumers(t *testing.T,
 	log := zerolog.Nop()
 
 	// bootstraps system with one node of each role.
-	s, verID, participants := bootstrapSystem(t, log, tracer, authorized)
-	exeID := participants.Filter(filter.HasRole[flow.Identity](flow.RoleExecution))[0]
-	conID := participants.Filter(filter.HasRole[flow.Identity](flow.RoleConsensus))[0]
+	s, verID, bootstrapNodesInfo := bootstrapSystem(t, log, tracer, authorized)
+
+	participants := bootstrap.ToIdentityList(bootstrapNodesInfo)
+	exeIndex := slices.IndexFunc(bootstrapNodesInfo, func(info bootstrap.NodeInfo) bool {
+		return info.Role == flow.RoleExecution
+	})
+	conIndex := slices.IndexFunc(bootstrapNodesInfo, func(info bootstrap.NodeInfo) bool {
+		return info.Role == flow.RoleConsensus
+	})
 	// generates a chain of blocks in the form of root <- R1 <- C1 <- R2 <- C2 <- ... where Rs are distinct reference
 	// blocks (i.e., containing guarantees), and Cs are container blocks for their preceding reference block,
 	// Container blocks only contain receipts of their preceding reference blocks. But they do not
@@ -507,7 +515,7 @@ func withConsumers(t *testing.T,
 	if authorized {
 		// only authorized verification node has some chunks assigned to it.
 		_, assignedChunkIDs = MockChunkAssignmentFixture(chunkAssigner,
-			flow.IdentityList{verID},
+			flow.IdentityList{verID.Identity()},
 			completeERs,
 			EvenChunkIndexAssigner)
 	}
@@ -527,7 +535,7 @@ func withConsumers(t *testing.T,
 	// execution node
 	exeNode, exeEngine, exeWG := SetupChunkDataPackProvider(t,
 		hub,
-		exeID,
+		bootstrapNodesInfo[exeIndex],
 		participants,
 		chainID,
 		completeERs,
@@ -538,8 +546,8 @@ func withConsumers(t *testing.T,
 	conNode, conEngine, conWG := SetupMockConsensusNode(t,
 		unittest.Logger(),
 		hub,
-		conID,
-		flow.IdentityList{verID},
+		bootstrapNodesInfo[conIndex],
+		flow.IdentityList{verID.Identity()},
 		participants,
 		completeERs,
 		chainID,
@@ -613,13 +621,22 @@ func bootstrapSystem(
 	authorized bool,
 ) (
 	*enginemock.StateFixture,
-	*flow.Identity,
-	flow.IdentityList,
+	bootstrap.NodeInfo,
+	[]bootstrap.NodeInfo,
 ) {
-	// creates identities to bootstrap system with
-	verID := unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification))
-	identities := unittest.CompleteIdentitySet(verID)
-	identities = append(identities, unittest.IdentityFixture(unittest.WithRole(flow.RoleExecution))) // adds extra execution node
+	// creates bootstrapNodesInfo to bootstrap system with
+	bootstrapNodesInfo := make([]bootstrap.NodeInfo, 0)
+	var verID bootstrap.NodeInfo
+	for _, missingRole := range unittest.CompleteIdentitySet() {
+		nodeInfo := unittest.PrivateNodeInfosFixture(1, unittest.WithRole(missingRole.Role))[0]
+		if nodeInfo.Role == flow.RoleVerification {
+			verID = nodeInfo
+		}
+		bootstrapNodesInfo = append(bootstrapNodesInfo, nodeInfo)
+	}
+	bootstrapNodesInfo = append(bootstrapNodesInfo, unittest.PrivateNodeInfosFixture(1, unittest.WithRole(flow.RoleExecution))...) // adds extra execution node
+
+	identities := bootstrap.ToIdentityList(bootstrapNodesInfo)
 
 	collector := &metrics.NoopCollector{}
 	rootSnapshot := unittest.RootSnapshotFixture(identities)
@@ -628,8 +645,9 @@ func bootstrapSystem(
 
 	if !authorized {
 		// creates a new verification node identity that is unauthorized for this epoch
-		verID = unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification))
-		identities = identities.Union(flow.IdentityList{verID})
+		verID = unittest.PrivateNodeInfosFixture(1, unittest.WithRole(flow.RoleVerification))[0]
+		bootstrapNodesInfo = append(bootstrapNodesInfo, verID)
+		identities = append(identities, verID.Identity())
 
 		epochBuilder := unittest.NewEpochBuilder(t, stateFixture.State)
 		epochBuilder.
@@ -637,5 +655,5 @@ func bootstrapSystem(
 			BuildEpoch()
 	}
 
-	return stateFixture, verID, identities
+	return stateFixture, verID, bootstrapNodesInfo
 }

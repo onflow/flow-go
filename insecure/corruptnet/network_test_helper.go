@@ -5,6 +5,7 @@ package corruptnet
 import (
 	"context"
 	"fmt"
+	"github.com/onflow/flow-go/module/local"
 	"net"
 	"testing"
 	"time"
@@ -21,7 +22,6 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/onflow/flow-go/engine/testutil"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/network/mocknetwork"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -35,10 +35,10 @@ func corruptNetworkFixture(t *testing.T, logger zerolog.Logger, corruptedID ...*
 	// create corruptible network with no attacker registered
 	codec := unittest.NetworkCodec()
 
-	corruptedIdentity := unittest.IdentityFixture(unittest.WithAddress(insecure.DefaultAddress))
+	corruptedIdentity := unittest.PrivateNodeInfosFixture(1, unittest.WithAddress(insecure.DefaultAddress))[0]
 	// some tests will want to create corruptible network with a specific ID
 	if len(corruptedID) > 0 {
-		corruptedIdentity = corruptedID[0]
+		corruptedIdentity.NodeID = corruptedID[0].NodeID
 	}
 
 	flowNetwork := mocknetwork.NewNetwork(t)
@@ -65,11 +65,15 @@ func corruptNetworkFixture(t *testing.T, logger zerolog.Logger, corruptedID ...*
 	err := ccf.RegisterAdapter(adapter)
 	require.NoError(t, err)
 
+	private, err := corruptedIdentity.PrivateKeys()
+	require.NoError(t, err)
+	me, err := local.New(corruptedIdentity.Identity().IdentitySkeleton, private.StakingKey)
+	require.NoError(t, err)
 	corruptibleNetwork, err := NewCorruptNetwork(
 		logger,
 		flow.BftTestnet,
 		insecure.DefaultAddress,
-		testutil.LocalFixture(t, corruptedIdentity),
+		me,
 		codec,
 		flowNetwork,
 		ccf)

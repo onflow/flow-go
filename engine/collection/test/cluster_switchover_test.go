@@ -37,12 +37,12 @@ type ClusterSwitchoverTestCase struct {
 	t    *testing.T
 	conf ClusterSwitchoverTestConf
 
-	identities flow.IdentityList         // identity table
-	hub        *stub.Hub                 // mock network hub
-	root       protocol.Snapshot         // shared root snapshot
-	nodes      []testmock.CollectionNode // collection nodes
-	sn         *mocknetwork.Engine       // fake consensus node engine for receiving guarantees
-	builder    *unittest.EpochBuilder    // utility for building epochs
+	nodeInfos []model.NodeInfo          // identity table
+	hub       *stub.Hub                 // mock network hub
+	root      protocol.Snapshot         // shared root snapshot
+	nodes     []testmock.CollectionNode // collection nodes
+	sn        *mocknetwork.Engine       // fake consensus node engine for receiving guarantees
+	builder   *unittest.EpochBuilder    // utility for building epochs
 
 	// epoch counter -> cluster index -> transaction IDs
 	sentTransactions map[uint64]map[uint]flow.IdentifierList // track submitted transactions
@@ -57,17 +57,22 @@ func NewClusterSwitchoverTestCase(t *testing.T, conf ClusterSwitchoverTestConf) 
 		conf: conf,
 	}
 
-	nodeInfos := unittest.PrivateNodeInfosFixture(int(conf.collectors), unittest.WithRole(flow.RoleCollection))
-	collectors := model.ToIdentityList(nodeInfos)
-	tc.identities = unittest.CompleteIdentitySet(collectors...)
-	assignment := unittest.ClusterAssignment(tc.conf.clusters, collectors.ToSkeleton())
-	clusters, err := factory.NewClusterList(assignment, collectors.ToSkeleton())
+	identityRoles := unittest.CompleteIdentitySet(unittest.IdentityListFixture(int(conf.collectors), unittest.WithRole(flow.RoleCollection))...)
+	identities := flow.IdentityList{}
+	for _, missingRole := range identityRoles {
+		nodeInfo := unittest.PrivateNodeInfosFixture(1, unittest.WithRole(missingRole.Role))[0]
+		tc.nodeInfos = append(tc.nodeInfos, nodeInfo)
+		identities = append(identities, nodeInfo.Identity())
+	}
+	collectors := identities.Filter(filter.HasRole[flow.Identity](flow.RoleCollection)).ToSkeleton()
+	assignment := unittest.ClusterAssignment(tc.conf.clusters, collectors)
+	clusters, err := factory.NewClusterList(assignment, collectors)
 	require.NoError(t, err)
 	rootClusterBlocks := run.GenerateRootClusterBlocks(1, clusters)
 	rootClusterQCs := make([]flow.ClusterQCVoteData, len(rootClusterBlocks))
 	for i, cluster := range clusters {
 		signers := make([]model.NodeInfo, 0)
-		for _, identity := range nodeInfos {
+		for _, identity := range tc.nodeInfos {
 			if _, inCluster := cluster.ByNodeID(identity.NodeID); inCluster {
 				signers = append(signers, identity)
 			}
@@ -87,21 +92,28 @@ func NewClusterSwitchoverTestCase(t *testing.T, conf ClusterSwitchoverTestConf) 
 	tc.hub = stub.NewNetworkHub()
 
 	// create a root snapshot with the given number of initial clusters
-	root, result, seal := unittest.BootstrapFixture(tc.identities)
+	root, result, seal := unittest.BootstrapFixture(identities)
 	qc := unittest.QuorumCertificateFixture(unittest.QCWithRootBlockID(root.ID()))
 	setup := result.ServiceEvents[0].Event.(*flow.EpochSetup)
 	commit := result.ServiceEvents[1].Event.(*flow.EpochCommit)
 
-	setup.Assignments = unittest.ClusterAssignment(tc.conf.clusters, tc.identities.ToSkeleton())
+	setup.Assignments = unittest.ClusterAssignment(tc.conf.clusters, identities.ToSkeleton())
 	commit.ClusterQCs = rootClusterQCs
 
 	seal.ResultID = result.ID()
 	tc.root, err = inmem.SnapshotFromBootstrapState(root, result, seal, qc)
 	require.NoError(t, err)
 
+	// build a lookup table for node infos
+	nodeInfoLookup := make(map[flow.Identifier]model.NodeInfo)
+	for _, nodeInfo := range tc.nodeInfos {
+		nodeInfoLookup[nodeInfo.NodeID] = nodeInfo
+	}
+
 	// create a mock node for each collector identity
-	for _, collector := range nodeInfos {
-		node := testutil.CollectionNode(tc.T(), tc.hub, collector, tc.root)
+	for _, collector := range collectors {
+		nodeInfo := nodeInfoLookup[collector.NodeID]
+		node := testutil.CollectionNode(tc.T(), tc.hub, nodeInfo, tc.root)
 		tc.nodes = append(tc.nodes, node)
 	}
 
@@ -109,7 +121,7 @@ func NewClusterSwitchoverTestCase(t *testing.T, conf ClusterSwitchoverTestConf) 
 	consensus := testutil.GenericNode(
 		tc.T(),
 		tc.hub,
-		tc.identities.Filter(filter.HasRole[flow.Identity](flow.RoleConsensus))[0],
+		nodeInfoLookup[identities.Filter(filter.HasRole[flow.Identity](flow.RoleConsensus))[0].NodeID],
 		tc.root,
 	)
 	tc.sn = new(mocknetwork.Engine)
@@ -117,18 +129,13 @@ func NewClusterSwitchoverTestCase(t *testing.T, conf ClusterSwitchoverTestConf) 
 	require.NoError(tc.T(), err)
 
 	// create an epoch builder hooked to each collector's protocol state
-	states := make([]protocol.FollowerState, 0, len(collectors))
+	states := make([]protocol.FollowerState, 0)
 	for _, node := range tc.nodes {
 		states = append(states, node.State)
 	}
 	// when building new epoch we would like to replace fixture cluster QCs with real ones, for that we need
 	// to generate them using node infos
 	tc.builder = unittest.NewEpochBuilder(tc.T(), states...).UsingCommitOpts(func(commit *flow.EpochCommit) {
-		// build a lookup table for node infos
-		nodeInfoLookup := make(map[flow.Identifier]model.NodeInfo)
-		for _, nodeInfo := range nodeInfos {
-			nodeInfoLookup[nodeInfo.NodeID] = nodeInfo
-		}
 
 		// replace cluster QCs, with real data
 		for i, clusterQC := range commit.ClusterQCs {

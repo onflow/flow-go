@@ -19,7 +19,7 @@ import (
 )
 
 type nodeAccount struct {
-	netID          *flow.Identity
+	netID          bootstrap.NodeInfo
 	privKey        crypto.PrivateKey
 	accountKey     *sdk.AccountKey
 	accountID      string

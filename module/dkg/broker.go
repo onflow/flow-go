@@ -345,7 +345,7 @@ func (b *Broker) Poll(referenceBlock flow.Identifier) error {
 			continue
 		}
 		if !ok {
-			b.log.Error().Msg("invalid signature on broadcast dkg message")
+			b.log.Error().Err(err).Msg("invalid signature on broadcast dkg message")
 			continue
 		}
 		b.log.Debug().Msgf("forwarding broadcast message to controller")
@@ -470,7 +470,7 @@ func (b *Broker) prepareBroadcastMessage(data []byte) (messages.BroadcastDKGMess
 func (b *Broker) verifyBroadcastMessage(bcastMsg messages.BroadcastDKGMessage) (bool, error) {
 	err := b.hasValidDKGInstanceID(bcastMsg.DKGMessage)
 	if err != nil {
-		return false, err
+		return false, fmt.Errorf("invalid dkg instance: %w", err)
 	}
 	origin := b.committee[bcastMsg.CommitteeMemberIndex]
 	signData := fingerprint.Fingerprint(bcastMsg.DKGMessage)
