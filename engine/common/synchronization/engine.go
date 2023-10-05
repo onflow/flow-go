@@ -524,7 +524,6 @@ func (e *Engine) sendRequests(participants flow.IdentifierList, ranges []chainsy
 func (e *Engine) validateBatchRequestForALSP(originID flow.Identifier, batchRequest *messages.BatchRequest) (*alsp.MisbehaviorReport, bool, error) {
 	// Generate a random integer between 0 and spamProbabilityMultiplier (exclusive)
 	n, err := rand.Uint32n(spamProbabilityMultiplier)
-
 	if err != nil {
 		return nil, false, fmt.Errorf("failed to generate random number from %x: %w", originID[:], err)
 	}
@@ -537,7 +536,6 @@ func (e *Engine) validateBatchRequestForALSP(originID flow.Identifier, batchRequ
 			Str("reason", alsp.InvalidMessage.String()).
 			Msg("received invalid batch request with 0 block IDs, creating ALSP report")
 		report, err := alsp.NewMisbehaviorReport(originID, alsp.InvalidMessage)
-
 		if err != nil {
 			// failing to create the misbehavior report is unlikely. If an error is encountered while
 			// creating the misbehavior report it indicates a bug and processing can not proceed.
@@ -569,7 +567,6 @@ func (e *Engine) validateBatchRequestForALSP(originID flow.Identifier, batchRequ
 			Str("reason", alsp.ResourceIntensiveRequest.String()).
 			Msgf("for %d block IDs, creating probabilistic ALSP report", len(batchRequest.BlockIDs))
 		report, err := alsp.NewMisbehaviorReport(originID, alsp.ResourceIntensiveRequest)
-
 		if err != nil {
 			// failing to create the misbehavior report is unlikely. If an error is encountered while
 			// creating the misbehavior report it indicates a bug and processing can not proceed.
