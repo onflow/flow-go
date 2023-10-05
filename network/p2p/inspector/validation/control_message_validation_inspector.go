@@ -83,6 +83,10 @@ func NewControlMsgValidationInspector(ctx irrecoverable.SignalerContext, logger 
 		return nil, fmt.Errorf("failed to create cluster prefix topics received tracker")
 	}
 
+	if config.RpcMessageMaxSampleSize < config.RpcMessageErrorThreshold {
+		return nil, fmt.Errorf("rpc message max sample size must be greater than or equal to rpc message error threshold, got %d and %d respectively", config.RpcMessageMaxSampleSize, config.RpcMessageErrorThreshold)
+	}
+
 	c := &ControlMsgValidationInspector{
 		ctx:          ctx,
 		logger:       lg,
