@@ -366,6 +366,7 @@ func TestControlMessageValidationInspector_processInspectRPCReq(t *testing.T) {
 		// a topics spork ID is considered invalid if it does not match the current spork ID
 		invalidSporkIDTopic := channels.Topic(fmt.Sprintf("%s/%s", channels.PushBlocks, unittest.IdentifierFixture())).String()
 
+                // create 10 normal messages
 		pubsubMsgs := unittest.GossipSubMessageFixtures(10, fmt.Sprintf("%s/%s", channels.TestNetworkChannel, sporkID))
                 // add 5 invalid messages to force notification dissemination
 		pubsubMsgs = append(pubsubMsgs, []*pubsub_pb.Message{
