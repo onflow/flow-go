@@ -25,7 +25,7 @@ type GossipSubRPCValidationInspectorConfigs struct {
 	// RPCMessageMaxSampleSize the max sample size used for RPC message validation. If the total number of RPC messages exceeds this value a sample will be taken but messages will not be truncated.
 	RpcMessageMaxSampleSize int `validate:"gte=1000" mapstructure:"gossipsub-rpc-message-max-sample-size"`
 	// RPCMessageErrorThreshold the threshold at which an error will be returned if the number of invalid RPC messages exceeds this value.
-	RPCMessageErrorThreshold int `validate:"gte=500" mapstructure:"gossipsub-rpc-message-error-threshold"`
+	RpcMessageErrorThreshold int `validate:"gte=500" mapstructure:"gossipsub-rpc-message-error-threshold"`
 }
 
 // IWantRPCInspectionConfig validation configuration for iWANT RPC control messages.
