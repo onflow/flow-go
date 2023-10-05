@@ -770,7 +770,6 @@ func (exeNode *ExecutionNode) LoadRegisterStore(
 
 	pebbledb, err := storagepebble.OpenRegisterPebbleDB(exeNode.exeConf.registerDir)
 
-	// diskStore, pebbledb, err := storagepebble.NewBootstrappedRegistersWithPath(exeNode.exeConf.registerDir)
 	if err != nil {
 		return fmt.Errorf("could not create disk register store: %w", err)
 	}
