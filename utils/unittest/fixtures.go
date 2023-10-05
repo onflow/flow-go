@@ -2682,11 +2682,29 @@ func P2PRPCFixture(opts ...RPCFixtureOpt) *pubsub.RPC {
 	return rpc
 }
 
-// GossipSubMessageFixture a gossipsub message fixture for the provided topic.
-func GossipSubMessageFixture(topic string) *pubsub_pb.Message {
-	return &pubsub_pb.Message{
-		Topic: &topic,
+func WithTopic(topic string) func(*pubsub_pb.Message) {
+	return func(msg *pubsub_pb.Message) {
+		msg.Topic = &topic
 	}
+}
+
+func GossipSubMessageFixture(t *testing.T, opts ...func(*pubsub_pb.Message)) *pubsub_pb.Message {
+	s := RandomStringFixture(t, 100)
+
+	pb := &pubsub_pb.Message{
+		From:      RandomBytes(32),
+		Data:      RandomBytes(32),
+		Seqno:     RandomBytes(10),
+		Topic:     &s,
+		Signature: RandomBytes(100),
+		Key:       RandomBytes(32),
+	}
+
+	for _, opt := range opts {
+		opt(pb)
+	}
+
+	return pb
 }
 
 // GossipSubMessageFixtures returns a list of gossipsub message fixtures.

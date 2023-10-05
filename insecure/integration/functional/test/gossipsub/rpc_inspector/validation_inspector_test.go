@@ -854,7 +854,7 @@ func TestValidationInspector_InspectRpcPublishMessages(t *testing.T) {
 	idProvider.On("ByPeerID", spammer.SpammerNode.ID()).Return(&spammer.SpammerId, true).Maybe()
 
 	topic := channels.Topic(fmt.Sprintf("%s/%s", channels.PushBlocks, sporkID))
-	// first create 5 valid messages
+	// first create 4 valid messages
 	publishMsgs := unittest.GossipSubMessageFixtures(4, topic.String())
 	// create unknown topic
 	unknownTopic := channels.Topic(fmt.Sprintf("%s/%s", corruptlibp2p.GossipSubTopicIdFixture(), sporkID)).String()
@@ -862,7 +862,7 @@ func TestValidationInspector_InspectRpcPublishMessages(t *testing.T) {
 	malformedTopic := channels.Topic(unittest.RandomStringFixture(t, 100)).String()
 	// a topics spork ID is considered invalid if it does not match the current spork ID
 	invalidSporkIDTopic := channels.Topic(fmt.Sprintf("%s/%s", channels.PushBlocks, unittest.IdentifierFixture())).String()
-	// append messages with invalid topics this should force a notification to disseminate
+	// append 5 messages with invalid topics, this should force a notification to disseminate
 	publishMsgs = append(publishMsgs, []*pb.Message{
 		{Topic: &unknownTopic},
 		{Topic: &malformedTopic},
