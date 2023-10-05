@@ -31,19 +31,26 @@ func BenchmarkBaselineLRU(b *testing.B) {
 		stdmap.WithBackData(newBaselineLRU(int(limit))),
 		stdmap.WithLimit(limit))
 
-	entities := unittest.MockEntityFixtureListWithSize(b, 1000_000, 10)
+	entities := unittest.MockEntityFixtureListWithSize(b, 100_000, 10)
 
+	b.Log("starting benchmark")
+
+	b.ResetTimer()
 	testAddEntities(b, limit, backData, entities)
+	b.StopTimer()
 
+	b.Log("benchmark done")
+
+	b.Log("writing heap profile")
 	unittest.PrintHeapInfo(unittest.Logger()) // heap info after writing 100M entities
 	gcAndWriteHeapProfile()                   // runs garbage collection
 	unittest.PrintHeapInfo(unittest.Logger()) // heap info after running garbage collection
 }
 
-// BenchmarkArrayBackDataLRU benchmarks heap allocation performance of
+// BenchmarkHeroCacheLRU benchmarks heap allocation performance of
 // ArrayBackData-based cache (aka heroCache) with 50K capacity against writing 100M entities,
 // with Garbage Collection (GC) disabled.
-func BenchmarkArrayBackDataLRU(b *testing.B) {
+func BenchmarkHeroCacheLRU(b *testing.B) {
 	defer debug.SetGCPercent(debug.SetGCPercent(-1)) // disable GC
 	limit := uint(50_000)
 
@@ -57,8 +64,11 @@ func BenchmarkArrayBackDataLRU(b *testing.B) {
 				metrics.NewNoopCollector())),
 		stdmap.WithLimit(limit))
 
-	entities := unittest.EntityListFixture(uint(100_000_000))
+	entities := unittest.MockEntityFixtureListWithSize(b, 1000_000, 10)
+
+	b.ResetTimer()
 	testAddEntities(b, limit, backData, entities)
+	b.StopTimer()
 
 	unittest.PrintHeapInfo(unittest.Logger()) // heap info after writing 100M entities
 	gcAndWriteHeapProfile()                   // runs garbage collection
