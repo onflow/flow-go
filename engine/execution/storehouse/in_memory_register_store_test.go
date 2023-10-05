@@ -283,6 +283,53 @@ func TestInMemoryRegisterStoreGetLatestValueOK(t *testing.T) {
 	require.ErrorIs(t, err, ErrNotExecuted) // unknown block
 }
 
+func TestInMemoryRegisterStoreMultiForkOK(t *testing.T) {
+	// 7
+	pruned := uint64(10)
+	lastID := unittest.IdentifierFixture()
+	store := NewInMemoryRegisterStore(pruned, lastID)
+
+	// 10 <- A (X: 1) <- B (Y: 2)
+	//		^- C (X: 3) <- D (Y: 4)
+	blockA := unittest.IdentifierFixture()
+	blockB := unittest.IdentifierFixture()
+	blockC := unittest.IdentifierFixture()
+	blockD := unittest.IdentifierFixture()
+
+	require.NoError(t, store.SaveRegisters(
+		pruned+1,
+		blockA,
+		lastID,
+		[]flow.RegisterEntry{makeReg("X", "1")},
+	))
+
+	require.NoError(t, store.SaveRegisters(
+		pruned+2,
+		blockB,
+		blockA,
+		[]flow.RegisterEntry{makeReg("Y", "2")},
+	))
+
+	require.NoError(t, store.SaveRegisters(
+		pruned+1,
+		blockC,
+		lastID,
+		[]flow.RegisterEntry{makeReg("X", "3")},
+	))
+
+	require.NoError(t, store.SaveRegisters(
+		pruned+2,
+		blockD,
+		blockC,
+		[]flow.RegisterEntry{makeReg("Y", "4")},
+	))
+
+	reg := makeReg("X", "3")
+	val, err := store.GetRegister(pruned+2, blockD, reg.Key)
+	require.NoError(t, err)
+	require.Equal(t, reg.Value, val)
+}
+
 func makeReg(key string, value string) flow.RegisterEntry {
 	return flow.RegisterEntry{
 		Key: flow.RegisterID{
