@@ -1,4 +1,4 @@
-package env_test
+package evm_test
 
 import (
 	"math"
@@ -10,7 +10,7 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/params"
-	fenv "github.com/onflow/flow-go/fvm/flex/environment"
+	"github.com/onflow/flow-go/fvm/flex/evm"
 	"github.com/onflow/flow-go/fvm/flex/models"
 	"github.com/onflow/flow-go/fvm/flex/storage"
 	"github.com/onflow/flow-go/fvm/flex/testutils"
@@ -29,11 +29,11 @@ func RunWithTestDB(t testing.TB, f func(*storage.Database)) {
 	})
 }
 
-func RunWithNewEnv(t testing.TB, db *storage.Database, f func(*fenv.Environment)) {
+func RunWithNewEnv(t testing.TB, db *storage.Database, f func(*evm.Environment)) {
 	coinbase := common.BytesToAddress([]byte("coinbase"))
-	config := fenv.NewFlexConfig((fenv.WithCoinbase(coinbase)),
-		fenv.WithBlockNumber(fenv.BlockNumberForEVMRules))
-	env, err := fenv.NewEnvironment(config, db)
+	config := evm.NewFlexConfig((evm.WithCoinbase(coinbase)),
+		evm.WithBlockNumber(evm.BlockNumberForEVMRules))
+	env, err := evm.NewEnvironment(config, db)
 	require.NoError(t, err)
 	f(env)
 }
@@ -41,27 +41,28 @@ func RunWithNewEnv(t testing.TB, db *storage.Database, f func(*fenv.Environment)
 func TestNativeTokenBridging(t *testing.T) {
 	RunWithTestDB(t, func(db *storage.Database) {
 		originalBalance := big.NewInt(10000)
-		testAccount := common.BytesToAddress([]byte("test"))
+		testAccount := models.NewFlexAddressFromString("test")
 
 		t.Run("mint tokens to the first account", func(t *testing.T) {
-			RunWithNewEnv(t, db, func(env *fenv.Environment) {
+			RunWithNewEnv(t, db, func(env *evm.Environment) {
 				amount := big.NewInt(10000)
-				testAccount := common.BytesToAddress([]byte("test"))
-				err := env.MintTo(amount, testAccount)
+				res, err := env.MintTo(testAccount, amount)
 				require.NoError(t, err)
+				require.Equal(t, evm.TransferGasUsage, res.GasConsumed)
 			})
 		})
 		t.Run("mint tokens withdraw", func(t *testing.T) {
 			amount := big.NewInt(1000)
-			RunWithNewEnv(t, db, func(env *fenv.Environment) {
-				require.Equal(t, originalBalance, env.State.GetBalance(testAccount))
+			RunWithNewEnv(t, db, func(env *evm.Environment) {
+				require.Equal(t, originalBalance, env.State.GetBalance(testAccount.ToCommon()))
 			})
-			RunWithNewEnv(t, db, func(env *fenv.Environment) {
-				err := env.WithdrawFrom(amount, testAccount)
+			RunWithNewEnv(t, db, func(env *evm.Environment) {
+				res, err := env.WithdrawFrom(testAccount, amount)
 				require.NoError(t, err)
+				require.Equal(t, evm.TransferGasUsage, res.GasConsumed)
 			})
-			RunWithNewEnv(t, db, func(env *fenv.Environment) {
-				require.Equal(t, amount.Sub(originalBalance, amount), env.State.GetBalance(testAccount))
+			RunWithNewEnv(t, db, func(env *evm.Environment) {
+				require.Equal(t, amount.Sub(originalBalance, amount), env.State.GetBalance(testAccount.ToCommon()))
 			})
 		})
 	})
@@ -73,37 +74,36 @@ func TestContractInteraction(t *testing.T) {
 
 		testContract := testutils.GetTestContract(t)
 
-		testAccount := common.BytesToAddress([]byte("test"))
+		testAccount := models.NewFlexAddressFromString("test")
 		amount := big.NewInt(0).Mul(big.NewInt(1337), big.NewInt(params.Ether))
 		amountToBeTransfered := big.NewInt(0).Mul(big.NewInt(100), big.NewInt(params.Ether))
 
 		// fund test account
-		RunWithNewEnv(t, db, func(env *fenv.Environment) {
-			err := env.MintTo(amount, testAccount)
+		RunWithNewEnv(t, db, func(env *evm.Environment) {
+			_, err := env.MintTo(testAccount, amount)
 			require.NoError(t, err)
 		})
 
-		var contractAddr common.Address
+		var contractAddr models.FlexAddress
 
 		t.Run("deploy contract", func(t *testing.T) {
-			RunWithNewEnv(t, db, func(env *fenv.Environment) {
-				err := env.Deploy(testAccount, testContract.ByteCode, math.MaxUint64, amountToBeTransfered)
+			RunWithNewEnv(t, db, func(env *evm.Environment) {
+				res, err := env.Deploy(testAccount, testContract.ByteCode, math.MaxUint64, amountToBeTransfered)
 				require.NoError(t, err)
 
-				contractAddr = env.Result.DeployedContractAddress
+				contractAddr = res.DeployedContractAddress
 				require.NotNil(t, contractAddr)
-
-				require.True(t, len(env.State.GetCode(contractAddr)) > 0)
-				require.Equal(t, amountToBeTransfered, env.State.GetBalance(contractAddr))
-				require.Equal(t, amount.Sub(amount, amountToBeTransfered), env.State.GetBalance(testAccount))
+				require.True(t, len(env.State.GetCode(contractAddr.ToCommon())) > 0)
+				require.Equal(t, amountToBeTransfered, env.State.GetBalance(contractAddr.ToCommon()))
+				require.Equal(t, amount.Sub(amount, amountToBeTransfered), env.State.GetBalance(testAccount.ToCommon()))
 			})
 		})
 
 		t.Run("call contract", func(t *testing.T) {
 			num := big.NewInt(10)
 
-			RunWithNewEnv(t, db, func(env *fenv.Environment) {
-				err := env.Call(testAccount,
+			RunWithNewEnv(t, db, func(env *evm.Environment) {
+				res, err := env.Call(testAccount,
 					contractAddr,
 					testContract.MakeStoreCallData(t, num),
 					1_000_000,
@@ -111,10 +111,11 @@ func TestContractInteraction(t *testing.T) {
 					big.NewInt(0),
 				)
 				require.NoError(t, err)
+				require.Equal(t, uint64(1000), res.GasConsumed)
 			})
 
-			RunWithNewEnv(t, db, func(env *fenv.Environment) {
-				err := env.Call(testAccount,
+			RunWithNewEnv(t, db, func(env *evm.Environment) {
+				res, err := env.Call(testAccount,
 					contractAddr,
 					testContract.MakeRetrieveCallData(t),
 					1_000_000,
@@ -123,9 +124,9 @@ func TestContractInteraction(t *testing.T) {
 				)
 				require.NoError(t, err)
 
-				ret := env.Result.RetValue
-				retNum := new(big.Int).SetBytes(ret)
-				require.Equal(t, num, retNum)
+				ret := new(big.Int).SetBytes(res.ReturnedValue)
+				require.Equal(t, num, ret)
+				require.Equal(t, uint64(1000), res.GasConsumed)
 			})
 
 		})
@@ -135,17 +136,18 @@ func TestContractInteraction(t *testing.T) {
 			keyHex := "9c647b8b7c4e7c3490668fb6c11473619db80c93704c70893d3813af4090c39c"
 			key, _ := crypto.HexToECDSA(keyHex)
 			address := crypto.PubkeyToAddress(key.PublicKey) // 658bdf435d810c91414ec09147daa6db62406379
+			fAddr := models.NewFlexAddress(address)
 
-			RunWithNewEnv(t, db, func(env *fenv.Environment) {
-				err := env.MintTo(amount, address)
+			RunWithNewEnv(t, db, func(env *evm.Environment) {
+				_, err := env.MintTo(fAddr, amount)
 				require.NoError(t, err)
 			})
 
-			RunWithNewEnv(t, db, func(env *fenv.Environment) {
-				signer := types.MakeSigner(env.Config.ChainConfig, fenv.BlockNumberForEVMRules, env.Config.BlockContext.Time)
-				tx, _ := types.SignTx(types.NewTransaction(0, testAccount, big.NewInt(1000), params.TxGas, new(big.Int).Add(big.NewInt(0), common.Big1), nil), signer, key)
+			RunWithNewEnv(t, db, func(env *evm.Environment) {
+				signer := types.MakeSigner(env.Config.ChainConfig, evm.BlockNumberForEVMRules, env.Config.BlockContext.Time)
+				tx, _ := types.SignTx(types.NewTransaction(0, testAccount.ToCommon(), big.NewInt(1000), params.TxGas, new(big.Int).Add(big.NewInt(0), common.Big1), nil), signer, key)
 
-				err := env.RunTransaction(tx)
+				_, err := env.RunTransaction(tx)
 				require.NoError(t, err)
 			})
 		})

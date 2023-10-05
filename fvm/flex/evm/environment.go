@@ -1,7 +1,6 @@
-package env
+package evm
 
 import (
-	"encoding/binary"
 	"math/big"
 
 	"github.com/onflow/flow-go/fvm/flex/models"
@@ -18,15 +17,17 @@ import (
 
 // Environment is a one-time use flex environment and
 // should not be used more than once
+// TODO rename to Emulator
 type Environment struct {
 	Config            *Config
 	EVM               *vm.EVM
 	Database          *storage.Database
 	State             *state.StateDB
 	LastExecutedBlock *models.FlexBlock
-	Result            *Result
 	Used              bool
 }
+
+var _ models.Emulator = &Environment{}
 
 // NewEnvironment constructs a new Flex Enviornment
 // TODO: last executed block should be maybe injected here, it should not be a
@@ -62,45 +63,17 @@ func NewEnvironment(
 		Database:          db,
 		State:             execState,
 		LastExecutedBlock: lastExcutedBlock,
-		Result: &Result{
-			UUIDIndex:                lastExcutedBlock.UUIDIndex,
-			TotalSupplyOfNativeToken: lastExcutedBlock.TotalSupply,
-		},
-		Used: false,
+		Used:              false,
 	}, nil
 }
 
-// TODO: properly use an address generator (zeros + random section) and verify collision
-// TODO: does this leads to trie depth issue?
-func (fe *Environment) AllocateAddress() (models.FlexAddress, error) {
-	if err := fe.checkExecuteOnce(); err != nil {
-		return models.FlexAddress{}, err
-	}
-	return fe.allocateAddress(), fe.commit()
-}
-
-// TODO: move this to handler, its not related to here, then results like UUIndex, Total balance
-// could also be move to handler level.
-func (fe *Environment) allocateAddress() models.FlexAddress {
-	target := models.FlexAddress{}
-	// first 12 bytes would be zero
-	// the next 8 bytes would be incremented of uuid
-	binary.BigEndian.PutUint64(target[12:], fe.LastExecutedBlock.UUIDIndex)
-	fe.Result.UUIDIndex++
-
-	// TODO: if account exist try some new number
-	// if fe.State.Exist(target.ToCommon()) {
-	// }
-	return target
-}
-
-// Balance returns the balance of an address
+// BalanceOf returns the balance of an address
 // TODO: do it as a ReadOnly env view.
-func (fe *Environment) Balance(target models.FlexAddress) (*big.Int, error) {
+func (fe *Environment) BalanceOf(address models.FlexAddress) (*big.Int, error) {
 	if err := fe.checkExecuteOnce(); err != nil {
 		return nil, err
 	}
-	return fe.State.GetBalance(target.ToCommon()), nil
+	return fe.State.GetBalance(address.ToCommon()), nil
 }
 
 // MintTo mints tokens into the target address, if the address dees not
@@ -109,27 +82,31 @@ func (fe *Environment) Balance(target models.FlexAddress) (*big.Int, error) {
 // Warning, This method should only be used for bridging native token from Flex
 // back to the FVM environment. This method should only be used for FOA's
 // accounts where resource ownership has been verified
-func (fe *Environment) MintTo(balance *big.Int, target common.Address) error {
-	if err := fe.checkExecuteOnce(); err != nil {
-		return err
+func (fe *Environment) MintTo(address models.FlexAddress, amount *big.Int) (*models.Result, error) {
+	var err error
+	if err = fe.checkExecuteOnce(); err != nil {
+		return nil, err
 	}
 
+	faddr := address.ToCommon()
 	// update the gas consumed // TODO: revisit
 	// do it as the very first thing to prevent attacks
-	fe.Result.GasConsumed = TransferGasUsage
+	res := &models.Result{
+		GasConsumed: TransferGasUsage,
+	}
 
 	// check account if not exist
-	if !fe.State.Exist(target) {
-		fe.State.CreateAccount(target)
+	if !fe.State.Exist(faddr) {
+		fe.State.CreateAccount(faddr)
 	}
 
 	// add balance
-	fe.State.AddBalance(target, balance)
-	fe.Result.TotalSupplyOfNativeToken += balance.Uint64()
+	fe.State.AddBalance(faddr, amount)
 
 	// we don't need to increment any nonce, given the origin doesn't exist
+	res.RootHash, err = fe.commit()
 
-	return fe.commit()
+	return res, err
 }
 
 // WithdrawFrom deduct the balance from the given source account.
@@ -137,36 +114,35 @@ func (fe *Environment) MintTo(balance *big.Int, target common.Address) error {
 // Warning, This method should only be used for bridging native token from Flex
 // back to the FVM environment. This method should only be used for FOA's
 // accounts where resource ownership has been verified
-func (fe *Environment) WithdrawFrom(amount *big.Int, source common.Address) error {
-	if err := fe.checkExecuteOnce(); err != nil {
-		return err
+func (fe *Environment) WithdrawFrom(address models.FlexAddress, amount *big.Int) (*models.Result, error) {
+	var err error
+	if err = fe.checkExecuteOnce(); err != nil {
+		return nil, err
 	}
 
+	faddr := address.ToCommon()
 	// update the gas consumed // TODO: revisit, we might do this at the higher level
 	// do it as the very first thing to prevent attacks
-	fe.Result.GasConsumed = TransferGasUsage
+	res := &models.Result{
+		GasConsumed: TransferGasUsage,
+	}
 
 	// check source balance
 	// if balance is lower than amount return
-	if fe.State.GetBalance(source).Cmp(amount) == -1 {
-		return models.ErrInsufficientBalance
-	}
-
-	// check balance of flex vault
-	if amount.Uint64() > fe.Result.TotalSupplyOfNativeToken {
-		return models.ErrInsufficientTotalSupply
+	if fe.State.GetBalance(faddr).Cmp(amount) == -1 {
+		return nil, models.ErrInsufficientBalance
 	}
 
 	// add balance
-	fe.State.SubBalance(source, amount)
-	fe.Result.TotalSupplyOfNativeToken -= amount.Uint64()
+	fe.State.SubBalance(faddr, amount)
 
 	// we increment the nonce for source account cause
 	// withdraw counts as a transaction (similar to the way calls increment the nonce)
-	nonce := fe.State.GetNonce(source)
-	fe.State.SetNonce(source, nonce+1)
+	nonce := fe.State.GetNonce(faddr)
+	fe.State.SetNonce(faddr, nonce+1)
 
-	return fe.commit()
+	res.RootHash, err = fe.commit()
+	return res, err
 }
 
 // Transfer transfers flow token from an FOA account to another flex account
@@ -177,14 +153,13 @@ func (fe *Environment) WithdrawFrom(amount *big.Int, source common.Address) erro
 // back to the FVM environment. This method should only be used for FOA's
 // accounts where resource ownership has been verified
 func (fe *Environment) Transfer(
-	from *common.Address,
-	to *common.Address,
+	from, to models.FlexAddress,
 	value *big.Int,
-) error {
+) (*models.Result, error) {
 	if err := fe.checkExecuteOnce(); err != nil {
-		return err
+		return nil, err
 	}
-	msg := directCallMessage(from, to, value, nil, DefaultMaxGasLimit)
+	msg := directCallMessage(from, &to, value, nil, DefaultMaxGasLimit)
 	return fe.run(msg)
 }
 
@@ -195,15 +170,15 @@ func (fe *Environment) Transfer(
 // back to the FVM environment. This method should only be used for FOA's
 // accounts where resource ownership has been verified
 func (fe *Environment) Deploy(
-	caller common.Address,
-	code []byte,
+	caller models.FlexAddress,
+	code models.Code,
 	gasLimit uint64,
 	value *big.Int,
-) error {
+) (*models.Result, error) {
 	if err := fe.checkExecuteOnce(); err != nil {
-		return err
+		return nil, err
 	}
-	msg := directCallMessage(&caller, nil, value, code, gasLimit)
+	msg := directCallMessage(caller, nil, value, code, gasLimit)
 	return fe.run(msg)
 }
 
@@ -213,70 +188,80 @@ func (fe *Environment) Deploy(
 // back to the FVM environment. This method should only be used for FOA's
 // accounts where resource ownership has been verified
 func (fe *Environment) Call(
-	from common.Address,
-	to common.Address,
-	data []byte,
+	from, to models.FlexAddress,
+	data models.Data,
 	gasLimit uint64,
 	value *big.Int,
-) error {
+) (*models.Result, error) {
 	if err := fe.checkExecuteOnce(); err != nil {
-		return err
+		return nil, err
 	}
-	msg := directCallMessage(&from, &to, value, data, gasLimit)
+	msg := directCallMessage(from, &to, value, data, gasLimit)
 	return fe.run(msg)
 }
 
 // RunTransaction runs a flex transaction
 // this method could be called by anyone.
 // TODO : check gas limit complience (one set on tx and the one allowed by flow tx)
-func (fe *Environment) RunTransaction(tx *types.Transaction) error {
+func (fe *Environment) RunTransaction(tx *types.Transaction) (*models.Result, error) {
 	if err := fe.checkExecuteOnce(); err != nil {
-		return err
+		return nil, err
 	}
 	signer := types.MakeSigner(fe.Config.ChainConfig, BlockNumberForEVMRules, fe.Config.BlockContext.Time)
 
 	msg, err := core.TransactionToMessage(tx, signer, fe.Config.BlockContext.BaseFee)
 	if err != nil {
 		// note that this is not a fatal errro
-		return models.NewEVMExecutionError(err)
+		return nil, models.NewEVMExecutionError(err)
 	}
 
 	return fe.run(msg)
 }
 
-func (fe *Environment) run(msg *core.Message) error {
+func (fe *Environment) run(msg *core.Message) (*models.Result, error) {
 	execResult, err := core.NewStateTransition(fe.EVM, msg, (*core.GasPool)(&fe.Config.BlockContext.GasLimit)).TransitionDb()
 	if err != nil {
 		// this is not a fatal error
 		// TODO: we might revist this later
-		return models.NewEVMExecutionError(err)
+		return nil, models.NewEVMExecutionError(err)
 	}
 
-	fe.Result.RetValue = execResult.ReturnData
-	fe.Result.GasConsumed = execResult.UsedGas
-	fe.Result.Logs = fe.State.Logs()
+	res := &models.Result{
+		ReturnedValue: execResult.ReturnData,
+		GasConsumed:   execResult.UsedGas,
+		Logs:          fe.State.Logs(),
+	}
 
 	// If the transaction created a contract, store the creation address in the receipt.
 	if msg.To == nil {
-		fe.Result.DeployedContractAddress = crypto.CreateAddress(msg.From, msg.Nonce)
+		res.DeployedContractAddress = models.NewFlexAddress(crypto.CreateAddress(msg.From, msg.Nonce))
 	}
 
 	if execResult.Failed() {
-		return models.NewEVMExecutionError(execResult.Err)
+		return nil, models.NewEVMExecutionError(execResult.Err)
 	}
+
 	// TODO check if we have the logic to pay the coinbase
-	return fe.commit()
+	res.RootHash, err = fe.commit()
+
+	return res, err
 }
 
 func directCallMessage(
-	from, to *common.Address,
+	from models.FlexAddress,
+	to *models.FlexAddress,
 	value *big.Int,
 	data []byte,
 	gasLimit uint64,
 ) *core.Message {
+	var t *common.Address
+	if to != nil {
+		tc := to.ToCommon()
+		t = &tc
+	}
 	return &core.Message{
-		To:        to,
-		From:      *from,
+		From:      from.ToCommon(),
+		To:        t,
 		Value:     value,
 		Data:      data,
 		GasLimit:  gasLimit,
@@ -298,7 +283,7 @@ func (fe *Environment) checkExecuteOnce() error {
 
 // commit commits the changes to the state.
 // if error is returned is a fatal one.
-func (fe *Environment) commit() error {
+func (fe *Environment) commit() (common.Hash, error) {
 	// commit the changes
 	// ramtin: height is needed when we want to update to version v13
 	// var height uint64
@@ -309,7 +294,7 @@ func (fe *Environment) commit() error {
 	// commits the changes from the journal into the in memory trie.
 	newRoot, err := fe.State.Commit(true)
 	if err != nil {
-		return models.NewFatalError(err)
+		return types.EmptyRootHash, models.NewFatalError(err)
 	}
 
 	// flush the trie to the lower level db
@@ -320,31 +305,16 @@ func (fe *Environment) commit() error {
 	// have to explicitly ask the trie to commit to the underlying storage
 	err = fe.State.Database().TrieDB().Commit(newRoot, false)
 	if err != nil {
-		return models.NewFatalError(err)
-	}
-
-	newBlock := models.NewFlexBlock(
-		fe.LastExecutedBlock.Height+1,
-		fe.Result.UUIDIndex,
-		fe.Result.TotalSupplyOfNativeToken,
-		newRoot,
-		types.EmptyRootHash,
-	)
-
-	err = fe.Database.SetLatestBlock(newBlock)
-	if err != nil {
-		return models.NewFatalError(err)
+		return types.EmptyRootHash, models.NewFatalError(err)
 	}
 
 	// commit atree changes back to the backend
 	err = fe.Database.Commit()
 	if err != nil {
-		return models.NewFatalError(err)
+		return types.EmptyRootHash, models.NewFatalError(err)
 	}
 
-	// TODO: emit event on root changes
-	fe.Result.RootHash = newRoot
-	return nil
+	return newRoot, nil
 }
 
 // TODO hid config from upper level and construct EVM per operation

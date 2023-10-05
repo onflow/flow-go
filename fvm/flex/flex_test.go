@@ -150,7 +150,7 @@ func TestFlexRun(t *testing.T) {
 					gasLimit := uint64(100_000)
 
 					txBytes := testAccount.PrepareSignAndEncodeTx(t,
-						testContract.DeployedAt,
+						testContract.DeployedAt.ToCommon(),
 						testContract.MakeStoreCallData(t, big.NewInt(num)),
 						big.NewInt(0),
 						gasLimit,
