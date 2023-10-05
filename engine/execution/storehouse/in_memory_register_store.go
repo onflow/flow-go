@@ -10,6 +10,8 @@ import (
 
 var _ execution.InMemoryRegisterStore = (*InMemoryRegisterStore)(nil)
 
+var ErrPruned = fmt.Errorf("block is pruned")
+
 type InMemoryRegisterStore struct {
 	sync.RWMutex
 	registersByBlockID map[flow.Identifier]map[flow.RegisterID]flow.RegisterValue // for storing the registers
@@ -84,6 +86,9 @@ func (s *InMemoryRegisterStore) SaveRegisters(
 	return nil
 }
 
+// GetRegister will return the latest updated value of the given register
+// since the pruned height.
+// It returns ErrPruned if the register is unknown or not updated since the pruned height
 func (s *InMemoryRegisterStore) GetRegister(height uint64, blockID flow.Identifier, register flow.RegisterID) (flow.RegisterValue, error) {
 	s.RLock()
 	defer s.RUnlock()
@@ -112,7 +117,7 @@ func (s *InMemoryRegisterStore) GetRegister(height uint64, blockID flow.Identifi
 			// otherwise, it means the parent block index is not consistent, which is a bug
 			// we've reached the pruned block, so the register is not found
 			if block == s.prunedID {
-				return flow.RegisterValue{}, fmt.Errorf("cannot get register at height %d, block %v is pruned", height, blockID)
+				return flow.RegisterValue{}, fmt.Errorf("cannot get register at height %d, block %v is pruned: %w", height, blockID, ErrPruned)
 			}
 
 			return flow.RegisterValue{},

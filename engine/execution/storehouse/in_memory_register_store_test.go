@@ -116,6 +116,10 @@ func TestInMemoryRegisterStoreOK(t *testing.T) {
 	val, err := store.GetRegister(height, blockID, reg.Key)
 	require.NoError(t, err)
 	require.Equal(t, reg.Value, val)
+
+	_, err = store.GetRegister(height, blockID, unknownKey())
+	require.Error(t, err)
+	require.ErrorIs(t, err, ErrPruned)
 }
 
 func TestInMemoryRegisterStoreFailAlreadyExist(t *testing.T) {
@@ -184,16 +188,6 @@ func TestInMemoryRegisterStoreOKDifferentBlockSameParent(t *testing.T) {
 	require.Equal(t, regB.Value, valB)
 }
 
-func makeReg(key string, value string) flow.RegisterEntry {
-	return flow.RegisterEntry{
-		Key: flow.RegisterID{
-			Owner: "owner",
-			Key:   key,
-		},
-		Value: []byte(value),
-	}
-}
-
 func TestInMemoryRegisterGetRegistersOK(t *testing.T) {
 	// 6.
 	pruned := uint64(10)
@@ -257,4 +251,23 @@ func TestInMemoryRegisterStoreGetLatestValueOK(t *testing.T) {
 	valY3, err := store.GetRegister(pruned+2, blockB, regY.Key)
 	require.NoError(t, err)
 	require.Equal(t, regY3.Value, valY3)
+}
+
+// func TestInMemoryRegisterStore
+
+func makeReg(key string, value string) flow.RegisterEntry {
+	return flow.RegisterEntry{
+		Key: flow.RegisterID{
+			Owner: "owner",
+			Key:   key,
+		},
+		Value: []byte(value),
+	}
+}
+
+func unknownKey() flow.RegisterID {
+	return flow.RegisterID{
+		Owner: "unknown",
+		Key:   "unknown",
+	}
 }
