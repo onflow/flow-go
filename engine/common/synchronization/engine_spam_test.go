@@ -49,11 +49,13 @@ func (ss *SyncSuite) TestLoad_Process_SyncRequest_HigherThanReceiver_OutsideTole
 		// if request height is higher than local finalized, we should not respond
 		req.Height = ss.head.Height + 1
 
-		// assert that HandleHeight, WithinTolerance are not called because misbehavior is reported
-		// also, check that response is never sent
-		ss.core.AssertNotCalled(ss.T(), "HandleHeight")
-		ss.core.AssertNotCalled(ss.T(), "WithinTolerance")
+		ss.core.On("HandleHeight", ss.head, req.Height)
+		ss.core.On("WithinTolerance", ss.head, req.Height).Return(false)
 		ss.con.AssertNotCalled(ss.T(), "Unicast", mock.Anything, mock.Anything)
+
+		// maybe function calls that might or might not occur over the course of the load test
+		ss.core.On("ScanPending", ss.head).Return([]chainsync.Range{}, []chainsync.Batch{}).Maybe()
+		ss.con.On("Multicast", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
 
 		// count misbehavior reports over the course of a load test
 		ss.con.On("ReportMisbehavior", mock.Anything).Return(mock.Anything).Run(
