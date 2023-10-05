@@ -106,7 +106,11 @@ func (s *Orchestrator) sendUnauthorizedMsgs(t *testing.T) {
 // This func allows us to ensure that unauthorized messages have been processed.
 func (s *Orchestrator) sendAuthorizedMsgs(t *testing.T) {
 	for i := 0; i < numOfAuthorizedEvents; i++ {
-
+		event := bft.RequestChunkDataPackEgressFixture(s.T, s.attackerVNWithMsgSigning, s.victimENID, insecure.Protocol_PUBLISH)
+		err := s.OrchestratorNetwork.SendEgress(event)
+		require.NoError(t, err)
+		s.authorizedEvents[event.FlowProtocolEventID] = event
+		s.authorizedEventReceivedWg.Add(1)
 	}
 }
 
