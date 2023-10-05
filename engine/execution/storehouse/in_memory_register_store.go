@@ -11,6 +11,7 @@ import (
 var _ execution.InMemoryRegisterStore = (*InMemoryRegisterStore)(nil)
 
 var ErrPruned = fmt.Errorf("block is pruned")
+var ErrNotExecuted = fmt.Errorf("block is not executed")
 
 type InMemoryRegisterStore struct {
 	sync.RWMutex
@@ -89,14 +90,19 @@ func (s *InMemoryRegisterStore) SaveRegisters(
 // GetRegister will return the latest updated value of the given register
 // since the pruned height.
 // It returns ErrPruned if the register is unknown or not updated since the pruned height
+// Can't return ErrNotFound, since we can't distinguish between not found or not updated since the pruned height
 func (s *InMemoryRegisterStore) GetRegister(height uint64, blockID flow.Identifier, register flow.RegisterID) (flow.RegisterValue, error) {
 	s.RLock()
 	defer s.RUnlock()
 
-	if height < s.prunedHeight {
-		return flow.RegisterValue{}, fmt.Errorf("cannot get register at height %d, it is pruned %v", height, s.prunedHeight)
+	if height <= s.prunedHeight {
+		return flow.RegisterValue{}, fmt.Errorf("cannot get register at height %d, it is pruned %v: %w", height, s.prunedHeight, ErrPruned)
 	}
-	// TODO(leo): check if block is executed
+
+	_, ok := s.registersByBlockID[blockID]
+	if !ok {
+		return flow.RegisterValue{}, fmt.Errorf("cannot get register at height %d, block %v is not saved: %w", height, blockID, ErrNotExecuted)
+	}
 
 	// traverse the fork to find the latest updated value of the given register
 	// if not found, it means the register is not updated from the pruned block to the given block

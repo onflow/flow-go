@@ -14,6 +14,9 @@ import (
 
 //  3. SaveRegisters should succeed if height is above pruned height and block is not saved,
 //     the updates can be retrieved by GetUpdatedRegisters
+//     GetRegister should return ErrPruned if the queried key is not updated since pruned height
+//     GetRegister should return ErrPruned if the queried height is below pruned height
+//     GetRegister should return ErrNotExecuted if the block is unknown
 //
 // 4. SaveRegisters should fail if the block is already saved
 //
@@ -26,10 +29,8 @@ import (
 //     GetRegister(B, X) should return 1, because X is not updated in B
 //     GetRegister(B, Y) should return 3, because Y is updated in B
 //     GetRegister(A, Y) should return 2, because the query queries the value at A, not B
-//     GetRegister(B, Z) should return NotFound, because register is unknown
+//     GetRegister(B, Z) should return ErrPruned, because register is unknown
 //     GetRegister(C, X) should return BlockNotExecuted, because block is not executed (unexecuted)
-//
-// 8. GetRegister should return out of range error if the queried height is below pruned height
 //
 //  9. Given the following tree:
 //     Pruned <- A(X:1) <- B(Y:2)
@@ -117,7 +118,24 @@ func TestInMemoryRegisterStoreOK(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, reg.Value, val)
 
-	_, err = store.GetRegister(height, blockID, unknownKey())
+	// unknown key
+	_, err = store.GetRegister(height, blockID, unknownKey)
+	require.Error(t, err)
+	require.ErrorIs(t, err, ErrPruned)
+
+	// unknown block with unknown height
+	unknownBlock := unittest.IdentifierFixture()
+	_, err = store.GetRegister(height+1, unknownBlock, reg.Key)
+	require.Error(t, err)
+	require.ErrorIs(t, err, ErrNotExecuted)
+
+	// unknown block with known height
+	_, err = store.GetRegister(height, unknownBlock, reg.Key)
+	require.Error(t, err)
+	require.ErrorIs(t, err, ErrNotExecuted)
+
+	// too low height
+	_, err = store.GetRegister(height-1, unknownBlock, reg.Key)
 	require.Error(t, err)
 	require.ErrorIs(t, err, ErrPruned)
 }
@@ -244,16 +262,26 @@ func TestInMemoryRegisterStoreGetLatestValueOK(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	valY, err := store.GetRegister(pruned+1, blockA, regY.Key)
+	val, err := store.GetRegister(pruned+2, blockB, regX.Key)
 	require.NoError(t, err)
-	require.Equal(t, regY.Value, valY)
+	require.Equal(t, regX.Value, val) // X is not updated in B
 
-	valY3, err := store.GetRegister(pruned+2, blockB, regY.Key)
+	val, err = store.GetRegister(pruned+2, blockB, regY.Key)
 	require.NoError(t, err)
-	require.Equal(t, regY3.Value, valY3)
+	require.Equal(t, regY3.Value, val) // Y is updated in B
+
+	val, err = store.GetRegister(pruned+1, blockA, regY.Key)
+	require.NoError(t, err)
+	require.Equal(t, regY.Value, val) // Y's old value at A
+
+	val, err = store.GetRegister(pruned+2, blockB, unknownKey)
+	require.Error(t, err)
+	require.ErrorIs(t, err, ErrPruned) // unknown key
+
+	val, err = store.GetRegister(pruned+3, unittest.IdentifierFixture(), regX.Key)
+	require.Error(t, err)
+	require.ErrorIs(t, err, ErrNotExecuted) // unknown block
 }
-
-// func TestInMemoryRegisterStore
 
 func makeReg(key string, value string) flow.RegisterEntry {
 	return flow.RegisterEntry{
@@ -265,9 +293,7 @@ func makeReg(key string, value string) flow.RegisterEntry {
 	}
 }
 
-func unknownKey() flow.RegisterID {
-	return flow.RegisterID{
-		Owner: "unknown",
-		Key:   "unknown",
-	}
+var unknownKey = flow.RegisterID{
+	Owner: "unknown",
+	Key:   "unknown",
 }
