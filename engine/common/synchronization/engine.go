@@ -219,8 +219,6 @@ func (e *Engine) process(channel channels.Channel, originID flow.Identifier, eve
 				Hex("origin_id", logging.ID(originID)).
 				Str(logging.KeySuspicious, "true").
 				Msgf("received invalid batch request from %x: %v", originID[:], valid)
-			e.metrics.InboundMessageDropped(metrics.EngineSynchronization, metrics.MessageBatchRequest)
-			return nil
 		}
 		return e.requestHandler.Process(channel, originID, event)
 	case *messages.RangeRequest:
@@ -235,8 +233,6 @@ func (e *Engine) process(channel channels.Channel, originID flow.Identifier, eve
 				Hex("origin_id", logging.ID(originID)).
 				Str(logging.KeySuspicious, "true").
 				Msgf("received invalid range request from %x: %v", originID[:], valid)
-			e.metrics.InboundMessageDropped(metrics.EngineSynchronization, metrics.MessageRangeRequest)
-			return nil
 		}
 		return e.requestHandler.Process(channel, originID, event)
 
@@ -252,8 +248,6 @@ func (e *Engine) process(channel channels.Channel, originID flow.Identifier, eve
 				Hex("origin_id", logging.ID(originID)).
 				Str(logging.KeySuspicious, "true").
 				Msgf("received invalid sync request from %x: %v", originID[:], valid)
-			e.metrics.InboundMessageDropped(metrics.EngineSynchronization, metrics.MessageSyncRequest)
-			return nil
 		}
 		return e.requestHandler.Process(channel, originID, event)
 
@@ -269,8 +263,6 @@ func (e *Engine) process(channel channels.Channel, originID flow.Identifier, eve
 				Hex("origin_id", logging.ID(originID)).
 				Str(logging.KeySuspicious, "true").
 				Msgf("received invalid block response from %x: %v", originID[:], valid)
-			e.metrics.InboundMessageDropped(metrics.EngineSynchronization, metrics.MessageBlockResponse)
-			return nil
 		}
 		return e.responseMessageHandler.Process(originID, event)
 
@@ -286,8 +278,6 @@ func (e *Engine) process(channel channels.Channel, originID flow.Identifier, eve
 				Hex("origin_id", logging.ID(originID)).
 				Str(logging.KeySuspicious, "true").
 				Msgf("received invalid sync response from %x: %v", originID[:], valid)
-			e.metrics.InboundMessageDropped(metrics.EngineSynchronization, metrics.MessageSyncResponse)
-			return nil
 		}
 		return e.responseMessageHandler.Process(originID, event)
 	default:
