@@ -52,6 +52,8 @@ func (em *Emulator) CodeOf(address models.FlexAddress) (models.Code, error) {
 	return execState.GetCode(address.ToCommon()), nil
 }
 
+// MintTo mints tokens into the target address, if the address dees not
+// exist it would create it first.
 func (em *Emulator) MintTo(address models.FlexAddress, amount *big.Int) (*models.Result, error) {
 	proc, err := em.newProcedure(NewConfig())
 	if err != nil {
@@ -64,6 +66,7 @@ func (em *Emulator) MintTo(address models.FlexAddress, amount *big.Int) (*models
 	return res, em.commit(res.StateRootHash)
 }
 
+// WithdrawFrom deduct the balance from the given address.
 func (em *Emulator) WithdrawFrom(address models.FlexAddress, amount *big.Int) (*models.Result, error) {
 	proc, err := em.newProcedure(NewConfig())
 	if err != nil {
@@ -80,8 +83,7 @@ func (em *Emulator) WithdrawFrom(address models.FlexAddress, amount *big.Int) (*
 // this is a similar functionality as calling a call with empty data,
 // mostly provided for a easier interaction
 //
-// Warning, This method should only be used for bridging native token from Flex
-// back to the FVM environment. This method should only be used for FOA's
+// Warning, This method should only be used for FOA's
 // accounts where resource ownership has been verified
 func (em *Emulator) Transfer(
 	from, to models.FlexAddress,
@@ -104,8 +106,7 @@ func (em *Emulator) Transfer(
 // Deploy deploys a contract at the given address
 // the value passed to this method would be deposited on the contract account
 //
-// Warning, This method should only be used for bridging native token from Flex
-// back to the FVM environment. This method should only be used for FOA's
+// Warning, This method should only be used for FOA's
 // accounts where resource ownership has been verified
 func (em *Emulator) Deploy(
 	caller models.FlexAddress,
@@ -129,8 +130,7 @@ func (em *Emulator) Deploy(
 
 // Call calls a smart contract with the input
 //
-// Warning, This method should only be used for bridging native token from Flex
-// back to the FVM environment. This method should only be used for FOA's
+// Warning, This method should only be used for FOA's
 // accounts where resource ownership has been verified
 func (em *Emulator) Call(
 	from, to models.FlexAddress,
