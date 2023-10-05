@@ -11,8 +11,10 @@ import (
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/flex"
+	"github.com/onflow/flow-go/fvm/flex/evm"
 	flexStdlib "github.com/onflow/flow-go/fvm/flex/stdlib"
 	"github.com/onflow/flow-go/fvm/flex/stdlib/emulator"
+	flexStorage "github.com/onflow/flow-go/fvm/flex/storage"
 	"github.com/onflow/flow-go/fvm/storage"
 	"github.com/onflow/flow-go/fvm/storage/logical"
 	"github.com/onflow/flow-go/model/flow"
@@ -205,7 +207,15 @@ func (executor *scriptExecutor) executeScript() error {
 	if executor.ctx.FlexEnabled {
 		// TODO: pass proper flex root address based on enviornment
 		flexRootAddress := emulator.FlexRootAccountAddress
-		handler := flex.NewFlexContractHandler(executor.env, flexRootAddress)
+
+		db, err := flexStorage.NewDatabase(executor.env, flexRootAddress)
+		if err != nil {
+			// TODO don't panic just log and don't setup
+			panic(err)
+		}
+		em := evm.NewEmulator(db)
+
+		handler := flex.NewFlexContractHandler(db, executor.env, em)
 		// TODO: pass proper Flex type definition based on environment
 		flexTypeDefinition := emulator.FlexTypeDefinition
 		rt.DeclareValue(flexStdlib.NewFlexStandardLibraryValue(nil, flexTypeDefinition, handler))

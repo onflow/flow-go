@@ -91,7 +91,7 @@ func TestWithFlexEnabled_ContractInteraction(t *testing.T) {
 				`)
 
 				storeTxBytes := testAccount.PrepareSignAndEncodeTx(t,
-					testContract.DeployedAt,
+					testContract.DeployedAt.ToCommon(),
 					testContract.MakeStoreCallData(t, big.NewInt(num)),
 					big.NewInt(0),
 					gasLimit,
@@ -132,7 +132,7 @@ func TestWithFlexEnabled_ContractInteraction(t *testing.T) {
 				// test retriveing a value
 
 				retrieveTxBytes := testAccount.PrepareSignAndEncodeTx(t,
-					testContract.DeployedAt,
+					testContract.DeployedAt.ToCommon(),
 					testContract.MakeRetrieveCallData(t),
 					big.NewInt(0),
 					gasLimit,

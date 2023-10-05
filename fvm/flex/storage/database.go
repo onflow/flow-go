@@ -6,6 +6,7 @@ import (
 	"sync"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/ethdb"
 
 	"github.com/onflow/atree"
@@ -25,6 +26,7 @@ var (
 
 var FlexLatextBlockKey = "LatestBlock"
 var FlexRootSlabKey = "RootSlabKey"
+var FlexRootHashKey = "RootHash"
 
 // Database is an ephemeral key-value store. Apart from basic data storage
 // functionality it also supports batch writes and iterating over the keyspace in
@@ -41,8 +43,6 @@ type Database struct {
 // New returns a wrapped map with all the required database interface methods
 // implemented.
 func NewDatabase(led atree.Ledger, flexAddress flow.Address) (*Database, error) {
-	// TODO figure out these details
-	// var typeInfo
 	baseStorage := atree.NewLedgerBaseStorage(led)
 
 	storage := NewPersistentSlabStorage(baseStorage)
@@ -131,6 +131,22 @@ func (db *Database) Delete(key []byte) error {
 		return models.NewFatalError(err)
 	}
 	return nil
+}
+
+func (db *Database) SetRootHash(root common.Hash) error {
+	err := db.led.SetValue(db.flexAddress[:], []byte(FlexRootHashKey), root[:])
+	if err != nil {
+		return models.NewFatalError(err)
+	}
+	return nil
+}
+
+func (db *Database) GetRootHash() (common.Hash, error) {
+	data, err := db.led.GetValue(db.flexAddress[:], []byte(FlexRootHashKey))
+	if len(data) == 0 {
+		return types.EmptyRootHash, err
+	}
+	return common.Hash(data), err
 }
 
 // SetLatestBlock sets the latest executed block

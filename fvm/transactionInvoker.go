@@ -13,8 +13,10 @@ import (
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/flex"
+	"github.com/onflow/flow-go/fvm/flex/evm"
 	flexStdlib "github.com/onflow/flow-go/fvm/flex/stdlib"
 	"github.com/onflow/flow-go/fvm/flex/stdlib/emulator"
+	flexStorage "github.com/onflow/flow-go/fvm/flex/storage"
 	reusableRuntime "github.com/onflow/flow-go/fvm/runtime"
 	"github.com/onflow/flow-go/fvm/storage"
 	"github.com/onflow/flow-go/fvm/storage/derived"
@@ -96,7 +98,15 @@ func newTransactionExecutor(
 	if ctx.FlexEnabled {
 		// TODO: pass proper flex root address based on enviornment
 		flexRootAddress := emulator.FlexRootAccountAddress
-		handler := flex.NewFlexContractHandler(env, flexRootAddress)
+
+		db, err := flexStorage.NewDatabase(env, flexRootAddress)
+		if err != nil {
+			// TODO don't panic just log and don't setup
+			panic(err)
+		}
+		em := evm.NewEmulator(db)
+
+		handler := flex.NewFlexContractHandler(db, env, em)
 		// TODO: pass proper Flex type definition based on environment
 		flexTypeDefinition := emulator.FlexTypeDefinition
 		cadenceRuntime.DeclareValue(flexStdlib.NewFlexStandardLibraryValue(nil, flexTypeDefinition, handler))
