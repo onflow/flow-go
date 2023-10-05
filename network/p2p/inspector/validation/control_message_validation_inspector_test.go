@@ -367,6 +367,7 @@ func TestControlMessageValidationInspector_processInspectRPCReq(t *testing.T) {
 		invalidSporkIDTopic := channels.Topic(fmt.Sprintf("%s/%s", channels.PushBlocks, unittest.IdentifierFixture())).String()
 
 		pubsubMsgs := unittest.GossipSubMessageFixtures(10, fmt.Sprintf("%s/%s", channels.TestNetworkChannel, sporkID))
+                // add 5 invalid messages to force notification dissemination
 		pubsubMsgs = append(pubsubMsgs, []*pubsub_pb.Message{
 			{Topic: &unknownTopic},
 			{Topic: &malformedTopic},
