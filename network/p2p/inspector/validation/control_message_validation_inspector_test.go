@@ -158,7 +158,7 @@ func TestControlMessageValidationInspector_processInspectRPCReq(t *testing.T) {
 		expectedMsgIds := make([]string, 0)
 		expectedMsgIds = append(expectedMsgIds, ihaves[0].MessageIDs[:10]...)
 		expectedMsgIds = append(expectedMsgIds, ihaves[1].MessageIDs[11:20]...)
-		expectedPeerID := peer.ID("peerID987654321")
+		expectedPeerID := unittest.PeerIdFixture(t)
 		req, err := NewInspectRPCRequest(expectedPeerID, unittest.P2PRPCFixture(
 			unittest.WithGrafts(grafts...),
 			unittest.WithPrunes(prunes...),
@@ -184,7 +184,7 @@ func TestControlMessageValidationInspector_processInspectRPCReq(t *testing.T) {
 		grafts := []*pubsub_pb.ControlGraft{unittest.P2PRPCGraftFixture(&duplicateTopic), unittest.P2PRPCGraftFixture(&duplicateTopic)}
 		prunes := []*pubsub_pb.ControlPrune{unittest.P2PRPCPruneFixture(&duplicateTopic), unittest.P2PRPCPruneFixture(&duplicateTopic)}
 		ihaves := []*pubsub_pb.ControlIHave{unittest.P2PRPCIHaveFixture(&duplicateTopic, unittest.IdentifierListFixture(20).Strings()...), unittest.P2PRPCIHaveFixture(&duplicateTopic, unittest.IdentifierListFixture(20).Strings()...)}
-		expectedPeerID := peer.ID("peerID987654321")
+		expectedPeerID := unittest.PeerIdFixture(t)
 		duplicateTopicGraftsReq, err := NewInspectRPCRequest(expectedPeerID, unittest.P2PRPCFixture(unittest.WithGrafts(grafts...)))
 		require.NoError(t, err, "failed to get inspect message request")
 		duplicateTopicPrunesReq, err := NewInspectRPCRequest(expectedPeerID, unittest.P2PRPCFixture(unittest.WithPrunes(prunes...)))
@@ -212,7 +212,7 @@ func TestControlMessageValidationInspector_processInspectRPCReq(t *testing.T) {
 		malformedTopicGraft := unittest.P2PRPCGraftFixture(&malformedTopic)
 		invalidSporkIDTopicGraft := unittest.P2PRPCGraftFixture(&invalidSporkIDTopic)
 
-		expectedPeerID := peer.ID("peerID987654321")
+		expectedPeerID := unittest.PeerIdFixture(t)
 		unknownTopicReq, err := NewInspectRPCRequest(expectedPeerID, unittest.P2PRPCFixture(unittest.WithGrafts(unknownTopicGraft)))
 		require.NoError(t, err, "failed to get inspect message request")
 		malformedTopicReq, err := NewInspectRPCRequest(expectedPeerID, unittest.P2PRPCFixture(unittest.WithGrafts(malformedTopicGraft)))
@@ -236,7 +236,7 @@ func TestControlMessageValidationInspector_processInspectRPCReq(t *testing.T) {
 		malformedTopicPrune := unittest.P2PRPCPruneFixture(&malformedTopic)
 		invalidSporkIDTopicPrune := unittest.P2PRPCPruneFixture(&invalidSporkIDTopic)
 
-		expectedPeerID := peer.ID("peerID987654321")
+		expectedPeerID := unittest.PeerIdFixture(t)
 		unknownTopicReq, err := NewInspectRPCRequest(expectedPeerID, unittest.P2PRPCFixture(unittest.WithPrunes(unknownTopicPrune)))
 		require.NoError(t, err, "failed to get inspect message request")
 		malformedTopicReq, err := NewInspectRPCRequest(expectedPeerID, unittest.P2PRPCFixture(unittest.WithPrunes(malformedTopicPrune)))
@@ -260,7 +260,7 @@ func TestControlMessageValidationInspector_processInspectRPCReq(t *testing.T) {
 		malformedTopicIhave := unittest.P2PRPCIHaveFixture(&malformedTopic, unittest.IdentifierListFixture(5).Strings()...)
 		invalidSporkIDTopicIhave := unittest.P2PRPCIHaveFixture(&invalidSporkIDTopic, unittest.IdentifierListFixture(5).Strings()...)
 
-		expectedPeerID := peer.ID("peerID987654321")
+		expectedPeerID := unittest.PeerIdFixture(t)
 		unknownTopicReq, err := NewInspectRPCRequest(expectedPeerID, unittest.P2PRPCFixture(unittest.WithIHaves(unknownTopicIhave)))
 		require.NoError(t, err, "failed to get inspect message request")
 		malformedTopicReq, err := NewInspectRPCRequest(expectedPeerID, unittest.P2PRPCFixture(unittest.WithIHaves(malformedTopicIhave)))
@@ -283,7 +283,7 @@ func TestControlMessageValidationInspector_processInspectRPCReq(t *testing.T) {
 		msgIds := flow.IdentifierList{duplicateMsgID, duplicateMsgID, duplicateMsgID}
 		duplicateMsgIDIHave := unittest.P2PRPCIHaveFixture(&validTopic, append(msgIds, unittest.IdentifierListFixture(5)...).Strings()...)
 
-		expectedPeerID := peer.ID("peerID987654321")
+		expectedPeerID := unittest.PeerIdFixture(t)
 		duplicateMsgIDReq, err := NewInspectRPCRequest(expectedPeerID, unittest.P2PRPCFixture(unittest.WithIHaves(duplicateMsgIDIHave)))
 		require.NoError(t, err, "failed to get inspect message request")
 
@@ -299,7 +299,7 @@ func TestControlMessageValidationInspector_processInspectRPCReq(t *testing.T) {
 		msgIds := append(duplicates, unittest.IdentifierListFixture(5)...).Strings()
 		duplicateMsgIDIWant := unittest.P2PRPCIWantFixture(msgIds...)
 
-		expectedPeerID := peer.ID("peerID987654321")
+		expectedPeerID := unittest.PeerIdFixture(t)
 		duplicateMsgIDReq, err := NewInspectRPCRequest(expectedPeerID, unittest.P2PRPCFixture(unittest.WithIWants(duplicateMsgIDIWant)))
 		require.NoError(t, err, "failed to get inspect message request")
 
@@ -321,7 +321,7 @@ func TestControlMessageValidationInspector_processInspectRPCReq(t *testing.T) {
 		// set high cache miss threshold to ensure we only disseminate notification when it is exceeded
 		inspector.config.IWantRPCInspectionConfig.CacheMissThreshold = .9
 		msgIds := unittest.IdentifierListFixture(100).Strings()
-		expectedPeerID := peer.ID("peerID987654321")
+		expectedPeerID := unittest.PeerIdFixture(t)
 		inspectMsgReq, err := NewInspectRPCRequest(expectedPeerID, unittest.P2PRPCFixture(unittest.WithIWants(unittest.P2PRPCIWantFixture(msgIds...))))
 		require.NoError(t, err, "failed to get inspect message request")
 
@@ -345,7 +345,7 @@ func TestControlMessageValidationInspector_processInspectRPCReq(t *testing.T) {
 		// set high cache miss threshold to ensure we only disseminate notification when it is exceeded
 		inspector.config.IWantRPCInspectionConfig.CacheMissThreshold = .9
 		msgIds := unittest.IdentifierListFixture(100).Strings()
-		expectedPeerID := peer.ID("peerID987654321")
+		expectedPeerID := unittest.PeerIdFixture(t)
 		inspectMsgReq, err := NewInspectRPCRequest(expectedPeerID, unittest.P2PRPCFixture(unittest.WithIWants(unittest.P2PRPCIWantFixture(msgIds...))))
 		require.NoError(t, err, "failed to get inspect message request")
 		rpcTracker.On("LastHighestIHaveRPCSize").Return(int64(100)).Maybe()
@@ -377,7 +377,7 @@ func TestControlMessageValidationInspector_processInspectRPCReq(t *testing.T) {
 			{Topic: &invalidSporkIDTopic},
 			{Topic: &invalidSporkIDTopic},
 		}...)
-		expectedPeerID := peer.ID("peerID987654321")
+		expectedPeerID := unittest.PeerIdFixture(t)
 		req, err := NewInspectRPCRequest(expectedPeerID, unittest.P2PRPCFixture(unittest.WithPubsubMessages(pubsubMsgs...)))
 		require.NoError(t, err, "failed to get inspect message request")
 		topics := make([]string, len(pubsubMsgs))
@@ -398,7 +398,7 @@ func TestControlMessageValidationInspector_processInspectRPCReq(t *testing.T) {
 		// 5 invalid pubsub messages will force notification dissemination
 		inspector.config.RpcMessageErrorThreshold = 4
 		pubsubMsgs := unittest.GossipSubMessageFixtures(10, fmt.Sprintf("%s/%s", channels.TestNetworkChannel, sporkID))
-		expectedPeerID := peer.ID("peerID987654321")
+		expectedPeerID := unittest.PeerIdFixture(t)
 		req, err := NewInspectRPCRequest(expectedPeerID, unittest.P2PRPCFixture(unittest.WithPubsubMessages(pubsubMsgs...)))
 		require.NoError(t, err, "failed to get inspect message request")
 		topics := make([]string, len(pubsubMsgs))

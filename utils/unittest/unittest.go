@@ -1,6 +1,7 @@
 package unittest
 
 import (
+	crand "crypto/rand"
 	"encoding/json"
 	"math"
 	"math/rand"
@@ -16,6 +17,8 @@ import (
 
 	"github.com/cockroachdb/pebble"
 	"github.com/dgraph-io/badger/v2"
+	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/multiformats/go-multihash"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -444,4 +447,17 @@ func GenerateRandomStringWithLen(commentLen uint) string {
 		bytes[i] = letterBytes[rand.Intn(len(letterBytes))]
 	}
 	return string(bytes)
+}
+
+// PeerIdFixture returns a random peer ID for testing.
+// peer ID is the identifier of a node on the libp2p network.
+func PeerIdFixture(t testing.TB) peer.ID {
+	buf := make([]byte, 16)
+	n, err := crand.Read(buf)
+	require.NoError(t, err)
+	require.Equal(t, 16, n)
+	h, err := multihash.Sum(buf, multihash.SHA2_256, -1)
+	require.NoError(t, err)
+
+	return peer.ID(h)
 }
