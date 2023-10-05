@@ -627,15 +627,13 @@ func (e *Engine) validateRangeRequestForALSP(originID flow.Identifier, rangeRequ
 	return nil
 }
 
-// validateSyncRequestForALSP checks if a sync request should be reported as a misbehavior due to malicious intent (e.g. spamming).
+// validateSyncRequestForALSP checks if a sync request should be reported as a misbehavior and sends misbehavior report to ALSP.
+// The misbehavior is ambiguous to detect as malicious behavior because there is no way to know for sure if the sender is sending
+// a sync request maliciously or not, so we use a probabilistic approach to report the misbehavior.
+//
 // Args:
 // - originID: the sender of the sync request
 // Returns:
-// - *alsp.MisbehaviorReport: If any misbehavior is detected such as:
-//   - the sync request is valid but should be reported as misbehavior anyway (due to probabilities)
-//
-// - bool: true if the sync request is valid and should not be reported as misbehavior; otherwise, false if a misbehavior is detected
-//
 // - error: If an error is encountered while validating the sync request. Error is assumed to be irrecoverable because of internal processes that didn't allow validation to complete.
 func (e *Engine) validateSyncRequestForALSP(originID flow.Identifier) error {
 	// Generate a random integer between 0 and spamProbabilityMultiplier (exclusive)
