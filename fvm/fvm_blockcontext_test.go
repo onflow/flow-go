@@ -1624,8 +1624,8 @@ func TestBlockContext_GetAccount(t *testing.T) {
 	}
 
 	addressGen := chain.NewAddressGenerator()
-	// skip the addresses of 4 reserved accounts
-	for i := 0; i < 4; i++ {
+	// skip the addresses of 5 reserved accounts
+	for i := 0; i < 5; i++ {
 		_, err := addressGen.NextAddress()
 		require.NoError(t, err)
 	}
