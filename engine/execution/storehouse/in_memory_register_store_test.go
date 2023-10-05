@@ -2,6 +2,10 @@ package storehouse
 
 import (
 	"testing"
+
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/utils/unittest"
+	"github.com/stretchr/testify/require"
 )
 
 // 1. SaveRegisters should fail if height is below or equal to pruned height
@@ -48,6 +52,26 @@ import (
 //
 // 14. Concurrency: SaveRegisters can happen concurrently with GetUpdatedRegisters, and GetRegister
 // 15. Concurrency: Prune can happen concurrently with GetUpdatedRegisters, and GetRegister
-func TestInMemoryRegisterStore(t *testing.T) {
+func TestInMemoryRegisterStoreFailBelowOrEqualPrunedHeight(t *testing.T) {
+	// 1.
+	height := uint64(10)
+	lastID := unittest.IdentifierFixture()
+	store := NewInMemoryRegisterStore(height, lastID)
+	err := store.SaveRegisters(
+		height-1, // below pruned height, will fail
+		unittest.IdentifierFixture(),
+		unittest.IdentifierFixture(),
+		[]flow.RegisterEntry{},
+	)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "<= pruned height")
 
+	err = store.SaveRegisters(
+		height, // equal to pruned height, will fail
+		lastID,
+		unittest.IdentifierFixture(),
+		[]flow.RegisterEntry{},
+	)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "<= pruned height")
 }
