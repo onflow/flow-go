@@ -178,7 +178,8 @@ func DefaultAccessNodeConfig() *AccessNodeConfig {
 				ReadTimeout:   rest.DefaultReadTimeout,
 				IdleTimeout:   rest.DefaultIdleTimeout,
 			},
-			MaxMsgSize: grpcutils.DefaultMaxMsgSize,
+			MaxMsgSize:     grpcutils.DefaultMaxMsgSize,
+			CompressorName: grpcutils.DefaultCompressorName,
 		},
 		stateStreamConf: state_stream.Config{
 			MaxExecutionDataMsgSize: grpcutils.DefaultMaxMsgSize,
@@ -749,6 +750,8 @@ func (builder *FlowAccessNodeBuilder) extraFlags() {
 		flags.Float64Var(&builder.stateStreamConf.ResponseLimit, "state-stream-response-limit", defaultConfig.stateStreamConf.ResponseLimit, "max number of responses per second to send over streaming endpoints. this helps manage resources consumed by each client querying data not in the cache e.g. 3 or 0.5. 0 means no limit")
 
 		flags.UintVar(&builder.TxResultCacheSize, "transaction-result-cache-size", defaultConfig.TxResultCacheSize, "transaction result cache size.(Disabled by default i.e 0)")
+		flags.StringVar(&builder.rpcConf.CompressorName, "grpc-compressor", defaultConfig.rpcConf.CompressorName, "the grpc compressor name")
+
 	}).ValidateFlags(func() error {
 		if builder.supportsObserver && (builder.PublicNetworkConfig.BindAddress == cmd.NotSet || builder.PublicNetworkConfig.BindAddress == "") {
 			return errors.New("public-network-address must be set if supports-observer is true")
@@ -1082,6 +1085,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 					accessMetrics,
 					config.MaxMsgSize,
 					backendConfig.CircuitBreakerConfig,
+					config.CompressorName,
 				),
 			}
 

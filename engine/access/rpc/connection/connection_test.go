@@ -23,6 +23,7 @@ import (
 	"pgregory.net/rapid"
 
 	"github.com/onflow/flow-go/module/metrics"
+	"github.com/onflow/flow-go/utils/grpcutils"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -48,6 +49,7 @@ func TestProxyAccessAPI(t *testing.T) {
 		connectionFactory.AccessMetrics,
 		0,
 		CircuitBreakerConfig{},
+		grpcutils.DefaultCompressorName,
 	)
 
 	proxyConnectionFactory := ProxyConnectionFactory{
@@ -98,6 +100,7 @@ func TestProxyExecutionAPI(t *testing.T) {
 		connectionFactory.AccessMetrics,
 		0,
 		CircuitBreakerConfig{},
+		grpcutils.DefaultCompressorName,
 	)
 
 	proxyConnectionFactory := ProxyConnectionFactory{
@@ -142,6 +145,7 @@ func TestProxyAccessAPIConnectionReuse(t *testing.T) {
 		connectionFactory.AccessMetrics,
 		0,
 		CircuitBreakerConfig{},
+		grpcutils.DefaultCompressorName,
 	)
 
 	proxyConnectionFactory := ProxyConnectionFactory{
@@ -193,6 +197,7 @@ func TestProxyExecutionAPIConnectionReuse(t *testing.T) {
 		connectionFactory.AccessMetrics,
 		0,
 		CircuitBreakerConfig{},
+		grpcutils.DefaultCompressorName,
 	)
 
 	proxyConnectionFactory := ProxyConnectionFactory{
@@ -251,6 +256,7 @@ func TestExecutionNodeClientTimeout(t *testing.T) {
 		connectionFactory.AccessMetrics,
 		0,
 		CircuitBreakerConfig{},
+		grpcutils.DefaultCompressorName,
 	)
 
 	// create the execution API client
@@ -297,6 +303,7 @@ func TestCollectionNodeClientTimeout(t *testing.T) {
 		connectionFactory.AccessMetrics,
 		0,
 		CircuitBreakerConfig{},
+		grpcutils.DefaultCompressorName,
 	)
 
 	// create the collection API client
@@ -344,6 +351,7 @@ func TestConnectionPoolFull(t *testing.T) {
 		connectionFactory.AccessMetrics,
 		0,
 		CircuitBreakerConfig{},
+		grpcutils.DefaultCompressorName,
 	)
 
 	cn1Address := "foo1:123"
@@ -418,6 +426,7 @@ func TestConnectionPoolStale(t *testing.T) {
 		connectionFactory.AccessMetrics,
 		0,
 		CircuitBreakerConfig{},
+		grpcutils.DefaultCompressorName,
 	)
 
 	proxyConnectionFactory := ProxyConnectionFactory{
@@ -505,6 +514,7 @@ func TestExecutionNodeClientClosedGracefully(t *testing.T) {
 			connectionFactory.AccessMetrics,
 			0,
 			CircuitBreakerConfig{},
+			grpcutils.DefaultCompressorName,
 		)
 
 		clientAddress := en.listener.Addr().String()
@@ -587,6 +597,7 @@ func TestExecutionEvictingCacheClients(t *testing.T) {
 		connectionFactory.AccessMetrics,
 		0,
 		CircuitBreakerConfig{},
+		grpcutils.DefaultCompressorName,
 	)
 
 	clientAddress := cn.listener.Addr().String()
@@ -667,6 +678,7 @@ func TestCircuitBreakerExecutionNode(t *testing.T) {
 			MaxRequests:    1,
 			RestoreTimeout: circuitBreakerRestoreTimeout,
 		},
+		grpcutils.DefaultCompressorName,
 	)
 
 	// Set metrics reporting.
@@ -752,6 +764,7 @@ func TestCircuitBreakerCollectionNode(t *testing.T) {
 			MaxRequests:    1,
 			RestoreTimeout: circuitBreakerRestoreTimeout,
 		},
+		grpcutils.DefaultCompressorName,
 	)
 
 	// Set metrics reporting.
