@@ -2697,3 +2697,15 @@ func P2PRPCFixture(opts ...RPCFixtureOpt) *pubsub.RPC {
 
 	return rpc
 }
+
+func RegisterEntryFixture() flow.RegisterEntry {
+	val := make([]byte, 4)
+	_, _ = rand.Read(val)
+	return flow.RegisterEntry{
+		Key: flow.RegisterID{
+			Owner: "owner",
+			Key:   "key1",
+		},
+		Value: val,
+	}
+}
