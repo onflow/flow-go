@@ -454,53 +454,52 @@ func TestPruneConflictingForks(t *testing.T) {
 }
 
 func TestConcurrentSaveAndGet(t *testing.T) {
-	// var blocks nil
 	pruned := uint64(10)
 	lastID := unittest.IdentifierFixture()
 	store := NewInMemoryRegisterStore(pruned, lastID)
 
 	// prepare a chain of 101 blocks with the first as lastID
 	count := 100
-	blocks := make([]flow.Identifier, 0, count+1)
-	blocks = append(blocks, lastID)
-	for i := 0; i < count; i++ {
+	blocks := make(map[uint64]flow.Identifier, count)
+	blocks[pruned] = lastID
+	for i := 1; i < count; i++ {
 		block := unittest.IdentifierFixture()
-		blocks = append(blocks, block)
+		blocks[pruned+uint64(i)] = block
 	}
 
 	reg := makeReg("X", "0")
 
 	var wg sync.WaitGroup
 	for i := 1; i < count; i++ {
+		height := pruned + uint64(i)
 		require.NoError(t, store.SaveRegisters(
-			pruned+uint64(i),
-			blocks[i],
-			blocks[i-1],
-			[]flow.RegisterEntry{makeReg("X", fmt.Sprintf("%v", i))},
+			height,
+			blocks[height],
+			blocks[height-1],
+			[]flow.RegisterEntry{makeReg("X", fmt.Sprintf("%v", height))},
 		))
 
-		// concurrent query get registers for past registers
+		// concurrently query get registers for past registers
 		go func(i int) {
 			wg.Add(1)
 			defer wg.Done()
 
-			rd := randBetween(1, i+1)
-			randHeight := pruned + uint64(rd)
-			val, err := store.GetRegister(randHeight, blocks[rd], reg.Key)
+			rdHeight := randBetween(pruned+1, pruned+uint64(i)+1)
+			val, err := store.GetRegister(rdHeight, blocks[rdHeight], reg.Key)
 			require.NoError(t, err)
-			r := makeReg("X", fmt.Sprintf("%v", rd))
+			r := makeReg("X", fmt.Sprintf("%v", rdHeight))
 			require.Equal(t, r.Value, val)
 		}(i)
 
+		// concurrently query updated registers
 		go func(i int) {
 			wg.Add(1)
 			defer wg.Done()
 
-			rd := randBetween(1, i+1)
-			randHeight := pruned + uint64(rd)
-			vals, err := store.GetUpdatedRegisters(randHeight, blocks[rd])
+			rdHeight := randBetween(pruned+1, pruned+uint64(i)+1)
+			vals, err := store.GetUpdatedRegisters(rdHeight, blocks[rdHeight])
 			require.NoError(t, err)
-			r := makeReg("X", fmt.Sprintf("%v", rd))
+			r := makeReg("X", fmt.Sprintf("%v", rdHeight))
 			require.Equal(t, []flow.RegisterEntry{r}, vals)
 		}(i)
 	}
@@ -508,11 +507,59 @@ func TestConcurrentSaveAndGet(t *testing.T) {
 	wg.Wait()
 }
 
-func TestConcurrentPruneAndGet(t *testing.T) {
+func TestConcurrentSaveAndPrune(t *testing.T) {
+	pruned := uint64(10)
+	lastID := unittest.IdentifierFixture()
+	store := NewInMemoryRegisterStore(pruned, lastID)
+
+	// prepare a chain of 101 blocks with the first as lastID
+	count := 100
+	blocks := make(map[uint64]flow.Identifier, count)
+	blocks[pruned] = lastID
+	for i := 1; i < count; i++ {
+		block := unittest.IdentifierFixture()
+		blocks[pruned+uint64(i)] = block
+	}
+
+	var wg sync.WaitGroup
+	savedHeights := make(chan uint64, 100)
+
+	go func() {
+		wg.Add(1)
+		defer wg.Done()
+
+		lastPrunedHeight := pruned
+		for savedHeight := range savedHeights {
+			if savedHeight%10 != 0 {
+				continue
+			}
+			rdHeight := randBetween(lastPrunedHeight+1, savedHeight+1)
+			err := store.Prune(rdHeight, blocks[rdHeight])
+			require.NoError(t, err)
+			lastPrunedHeight = rdHeight
+		}
+	}()
+
+	// save 100 blocks
+	for i := 1; i < count; i++ {
+		height := pruned + uint64(i)
+		require.NoError(t, store.SaveRegisters(
+			height,
+			blocks[height],
+			blocks[height-1],
+			[]flow.RegisterEntry{makeReg("X", fmt.Sprintf("%v", i))},
+		))
+		savedHeights <- height
+	}
+
+	close(savedHeights)
+
+	wg.Wait()
+
 }
 
-func randBetween(min, max int) int {
-	return rand.Intn(max-min) + min
+func randBetween(min, max uint64) uint64 {
+	return uint64(rand.Intn(int(max)-int(min))) + min
 }
 
 func makeReg(key string, value string) flow.RegisterEntry {
