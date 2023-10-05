@@ -31,12 +31,14 @@ func BenchmarkBaselineLRU(b *testing.B) {
 		stdmap.WithBackData(newBaselineLRU(int(limit))),
 		stdmap.WithLimit(limit))
 
-	entities := unittest.MockEntityFixtureListWithSize(b, 100_000, 10)
+	entityFactory := func() flow.Entity {
+		return unittest.MockEntityFixtureWithSize(b, 10)
+	}
 
 	b.Log("starting benchmark")
 
 	b.ResetTimer()
-	testAddEntities(b, limit, backData, entities)
+	testAddEntities(b, limit, 10_000_000, backData, entityFactory)
 	b.StopTimer()
 
 	b.Log("benchmark done")
@@ -64,10 +66,12 @@ func BenchmarkHeroCacheLRU(b *testing.B) {
 				metrics.NewNoopCollector())),
 		stdmap.WithLimit(limit))
 
-	entities := unittest.MockEntityFixtureListWithSize(b, 1000_000, 10)
+	entityFactory := func() flow.Entity {
+		return unittest.MockEntityFixtureWithSize(b, 10)
+	}
 
 	b.ResetTimer()
-	testAddEntities(b, limit, backData, entities)
+	testAddEntities(b, limit, 100_000, backData, entityFactory)
 	b.StopTimer()
 
 	unittest.PrintHeapInfo(unittest.Logger()) // heap info after writing 100M entities
@@ -87,13 +91,14 @@ func gcAndWriteHeapProfile() {
 
 // testAddEntities is a test helper that checks entities are added successfully to the backdata.
 // and each entity is retrievable right after it is written to backdata.
-func testAddEntities(t testing.TB, limit uint, b *stdmap.Backend, entities []*unittest.MockEntity) {
+func testAddEntities(t testing.TB, limit uint, count uint, b *stdmap.Backend, entityFactory func() flow.Entity) {
 	// adding elements
 	t1 := time.Now()
-	for i, e := range entities {
+	for i := 0; i < int(count); i++ {
+		e := entityFactory()
 		require.False(t, b.Has(e.ID()))
 		// adding each element must be successful.
-		require.True(t, b.Add(*e))
+		require.True(t, b.Add(e))
 
 		if uint(i) < limit {
 			// when we are below limit the total of
@@ -108,7 +113,7 @@ func testAddEntities(t testing.TB, limit uint, b *stdmap.Backend, entities []*un
 		// entity should be immediately retrievable
 		actual, ok := b.ByID(e.ID())
 		require.True(t, ok)
-		require.Equal(t, *e, actual)
+		require.Equal(t, e, actual)
 	}
 	elapsed := time.Since(t1).String()
 	zlog.Info().Str("interaction_time", elapsed).Msg("adding elements done")
