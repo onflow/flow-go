@@ -403,6 +403,7 @@ func TestControlMessageValidationInspector_processInspectRPCReq(t *testing.T) {
 		for i, msg := range pubsubMsgs {
 			topics[i] = *msg.Topic
 		}
+                 // mark all messages as invalid by returning false for all subscriptions - this will force notification dissemination
 		subscriptions.On("HasSubscription", mock.AnythingOfType("channels.Topic")).Return(false).Run(func(args mock.Arguments) {
 			require.Contains(t, topics, args[0].(channels.Topic).String())
 		})
