@@ -249,7 +249,7 @@ func (s *AccessAPISuite) deployContract() *sdk.TransactionResult {
 	err = s.serviceClient.SignAndSendTransaction(s.ctx, createCounterTx)
 	s.Require().NoError(err)
 
-	result, err = s.serviceClient.WaitForSealed(s.ctx, createCounterTx.ID())
+	result, err := s.serviceClient.WaitForSealed(s.ctx, createCounterTx.ID())
 	s.Require().NoError(err)
 	s.Require().Empty(result.Error, "create counter tx should be accepted but got: %s", result.Error)
 
