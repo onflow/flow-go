@@ -532,7 +532,8 @@ func (n *Node) IsConnected(peerID peer.ID) (bool, error) {
 // SetRouting may be called at most once.
 func (n *Node) SetRouting(r routing.Routing) {
 	if n.routing != nil {
-		irrecoverable.Throw(context.TODO(), fmt.Errorf("routing already set"))
+		// we should not allow overriding the routing implementation if one is already set; crashing the node.
+		n.logger.Fatal().Msg("routing already set")
 	}
 
 	n.routing = r
