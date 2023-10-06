@@ -111,7 +111,7 @@ func (h FlexContractHandler) Run(rlpEncodedTx []byte, coinbase models.FlexAddres
 	handleError(err)
 
 	// check tx gas limit
-	// TODO: let caller set a limit as well
+	// TODO: let caller set an optional limit as well and take the min
 	gasLimit := tx.Gas()
 	h.checkGasLimit(models.GasLimit(gasLimit))
 	res, err := h.emulator.RunTransaction(&tx, coinbase)
@@ -146,14 +146,13 @@ func (h FlexContractHandler) meterGasUsage(res *models.Result) {
 }
 
 func (h *FlexContractHandler) EmitEvent(event *models.Event) {
-	// TODO add extra metering for encoding
+	// TODO add extra metering for rlp encoding
 	encoded, err := event.Payload.RLPEncode()
 	handleError(err)
 	h.backend.EmitFlowEvent(event.Etype, encoded)
 }
 
 func (h *FlexContractHandler) EmitLastExecutedBlockEvent() {
-	// TODO: we should handle loading of blocks here and not inside db
 	block, err := h.db.GetLatestBlock()
 	handleError(err)
 	h.EmitEvent(models.NewBlockExecutedEvent(block))
