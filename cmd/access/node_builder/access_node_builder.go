@@ -47,12 +47,14 @@ import (
 	followereng "github.com/onflow/flow-go/engine/common/follower"
 	"github.com/onflow/flow-go/engine/common/requester"
 	synceng "github.com/onflow/flow-go/engine/common/synchronization"
+	"github.com/onflow/flow-go/engine/execution/computation/query"
 	"github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/blobs"
 	"github.com/onflow/flow-go/module/chainsync"
+	"github.com/onflow/flow-go/module/execution"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	execdatacache "github.com/onflow/flow-go/module/executiondatasync/execution_data/cache"
 	finalizer "github.com/onflow/flow-go/module/finalizer/consensus"
@@ -262,6 +264,8 @@ type FlowAccessNodeBuilder struct {
 	ExecutionDataStore         execution_data.ExecutionDataStore
 	ExecutionDataCache         *execdatacache.ExecutionDataCache
 	ExecutionIndexer           *indexer.Indexer
+	ExecutionIndexerCore       *indexer.IndexerCore
+	ScriptExecutor             *execution.Scripts
 
 	// The sync engine participants provider is the libp2p peer store for the access node
 	// which is not available until after the network has started.
@@ -642,6 +646,9 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 		var indexedBlockHeight storage.ConsumerProgress
 
 		builder.
+			AdminCommand("execute-script", func(config *cmd.NodeConfig) commands.AdminCommand {
+				return stateSyncCommands.NewExecuteScriptCommand(builder.ScriptExecutor)
+			}).
 			Module("indexed block height consumer progress", func(node *cmd.NodeConfig) error {
 				// Note: progress is stored in the MAIN db since that is where indexed execution data is stored.
 				indexedBlockHeight = bstorage.NewConsumerProgress(builder.DB, module.ConsumeProgressExecutionDataIndexerBlockHeight)
@@ -721,6 +728,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 				if err != nil {
 					return nil, err
 				}
+				builder.ExecutionIndexerCore = indexerCore
 
 				// execution state worker uses a jobqueue to process new execution data and indexes it by using the indexer.
 				builder.ExecutionIndexer = indexer.NewIndexer(
@@ -735,6 +743,22 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 
 				// setup requester to notify indexer when new execution data is received
 				execDataDistributor.AddOnExecutionDataReceivedConsumer(builder.ExecutionIndexer.OnExecutionData)
+
+				// create script execution module, this depends on the indexer being initialized and the
+				// having the register storage bootstrapped
+				scripts, err := execution.NewScripts(
+					builder.Logger,
+					metrics.NewExecutionCollector(builder.Tracer),
+					builder.RootChainID,
+					query.NewProtocolStateWrapper(builder.State),
+					builder.Storage.Headers,
+					execution.IndexRegisterAdapter(builder.ExecutionIndexerCore.RegisterValues),
+				)
+				if err != nil {
+					return nil, err
+				}
+
+				builder.ScriptExecutor = scripts
 
 				return builder.ExecutionIndexer, nil
 			}, indexerDependencies)
