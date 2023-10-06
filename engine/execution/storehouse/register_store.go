@@ -57,6 +57,7 @@ func (r *RegisterStore) GetRegister(height uint64, blockID flow.Identifier, regi
 	// or the register might not be found in memStore.
 	if err != nil {
 		if errors.Is(err, ErrPruned) {
+			// TODO(leo): handle the case when height is too low
 			return r.diskStore.Get(register, height)
 		}
 		return flow.RegisterValue{}, fmt.Errorf("cannot get register from memStore: %w", err)
