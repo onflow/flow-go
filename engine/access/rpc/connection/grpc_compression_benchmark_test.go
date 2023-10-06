@@ -9,6 +9,7 @@ import (
 
 	"google.golang.org/grpc/encoding/gzip"
 
+	"github.com/onflow/flow-go/engine/common/grpc/compressor/deflate"
 	"github.com/onflow/flow-go/engine/common/grpc/compressor/lz4"
 	"github.com/onflow/flow-go/engine/common/grpc/compressor/snappy"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
@@ -30,6 +31,10 @@ func BenchmarkWithLZ4Compression(b *testing.B) {
 
 func BenchmarkWithSnappyCompression(b *testing.B) {
 	runBenchmark(b, snappy.Name)
+}
+
+func BenchmarkWithDeflateCompression(b *testing.B) {
+	runBenchmark(b, deflate.Name)
 }
 
 func runBenchmark(b *testing.B, compressorName string) {
