@@ -115,12 +115,14 @@ func (h FlexContractHandler) Run(rlpEncodedTx []byte, coinbase models.FlexAddres
 	gasLimit := tx.Gas()
 	h.checkGasLimit(models.GasLimit(gasLimit))
 	res, err := h.emulator.RunTransaction(&tx, coinbase)
-	h.meterGasUsage(res.GasConsumed)
+	if res != nil {
+		h.meterGasUsage(res.GasConsumed)
+	}
 
+	// TODO: we might need to revisit returning bool
 	if models.IsEVMExecutionError(err) {
 		return false
 	}
-
 	handleError(err)
 	// emit logs as events
 	for _, log := range res.Logs {
@@ -134,7 +136,7 @@ func (h FlexContractHandler) Run(rlpEncodedTx []byte, coinbase models.FlexAddres
 func (h FlexContractHandler) checkGasLimit(limit models.GasLimit) {
 	// check gas limit against what has been left on the transaction side
 	if !h.backend.HasComputationCapacity(environment.ComputationKindEVMGasUsage, uint(limit)) {
-		panic(models.ErrInsufficientComputation)
+		handleError(models.ErrInsufficientComputation)
 	}
 }
 

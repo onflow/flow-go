@@ -1,15 +1,20 @@
 package flex_test
 
 import (
+	"bytes"
+	"fmt"
 	"math"
 	"math/big"
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/params"
+	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/flex"
 	"github.com/onflow/flow-go/fvm/flex/evm"
 	"github.com/onflow/flow-go/fvm/flex/models"
@@ -230,4 +235,146 @@ func TestFOA(t *testing.T) {
 			})
 		})
 	})
+}
+
+func TestHandler_TransactionRun(t *testing.T) {
+
+	t.Run("test - transaction run (happy case)", func(t *testing.T) {
+		testutils.RunWithTestBackend(t, func(backend models.Backend) {
+			testutils.RunWithTestFlexRoot(t, backend, func(flexRoot flow.Address) {
+				testutils.RunWithEOATestAccount(t, backend, flexRoot, func(eoa *testutils.EOATestAccount) {
+
+					db, err := storage.NewDatabase(backend, flexRoot)
+					require.NoError(t, err)
+
+					result := &models.Result{
+						StateRootHash:           testutils.RandomCommonHash(),
+						LogsRootHash:            testutils.RandomCommonHash(),
+						DeployedContractAddress: models.FlexAddress(testutils.RandomAddress()),
+						ReturnedValue:           testutils.RandomData(),
+						GasConsumed:             testutils.RandomGas(1000),
+						Logs: []*types.Log{
+							testutils.GetRandomLogFixture(),
+							testutils.GetRandomLogFixture(),
+						},
+					}
+
+					em := &testutils.TestEmulator{
+						RunTransactionFunc: func(tx *types.Transaction, coinbase models.FlexAddress) (*models.Result, error) {
+							return result, nil
+						},
+					}
+					handler := flex.NewFlexContractHandler(db, backend, em)
+
+					coinbase := models.NewFlexAddress(common.Address{})
+
+					tx := eoa.PrepareSignAndEncodeTx(
+						t,
+						common.Address{},
+						nil,
+						nil,
+						100_000,
+						big.NewInt(1),
+					)
+					success := handler.Run(tx, coinbase)
+					require.True(t, success)
+
+					// check gas usage
+					computationUsed, err := backend.ComputationUsed()
+					require.NoError(t, err)
+					require.Equal(t, result.GasConsumed, computationUsed)
+
+					// check events (1 extra for block event)
+					events := backend.Events()
+					require.Len(t, events, len(result.Logs)+1)
+					for i, l := range result.Logs {
+						assert.Equal(t, events[i].Type, models.EventTypeFlexEVMLog)
+						retLog := types.Log{}
+						err := rlp.Decode(bytes.NewReader(events[i].Payload), &retLog)
+						require.NoError(t, err)
+						assert.Equal(t, *l, retLog)
+					}
+
+					// check block event
+					lastEvent := events[len(events)-1]
+					assert.Equal(t, lastEvent.Type, models.EventTypeFlexBlockExecuted)
+					payload := models.BlockExecutedEventPayload{}
+					err = rlp.Decode(bytes.NewReader(lastEvent.Payload), &payload)
+					require.NoError(t, err)
+				})
+			})
+		})
+	})
+
+	t.Run("test - transaction run (unhappy cases)", func(t *testing.T) {
+		testutils.RunWithTestBackend(t, func(backend models.Backend) {
+			testutils.RunWithTestFlexRoot(t, backend, func(flexRoot flow.Address) {
+				testutils.RunWithEOATestAccount(t, backend, flexRoot, func(eoa *testutils.EOATestAccount) {
+
+					db, err := storage.NewDatabase(backend, flexRoot)
+					require.NoError(t, err)
+
+					em := &testutils.TestEmulator{
+						RunTransactionFunc: func(tx *types.Transaction, coinbase models.FlexAddress) (*models.Result, error) {
+							return nil, models.NewEVMExecutionError(fmt.Errorf("some sort of error"))
+						},
+					}
+					handler := flex.NewFlexContractHandler(db, backend, em)
+
+					coinbase := models.NewFlexAddress(common.Address{})
+
+					// test RLP decoding (non fatal)
+					assertPanic(t, false, func() {
+						// invalid RLP encoding
+						invalidTx := "badencoding"
+						handler.Run([]byte(invalidTx), coinbase)
+					})
+
+					// test gas limit (non fatal)
+					assertPanic(t, false, func() {
+						gasLimit := uint64(testutils.TestComputationLimit + 1)
+						tx := eoa.PrepareSignAndEncodeTx(
+							t,
+							common.Address{},
+							nil,
+							nil,
+							gasLimit,
+							big.NewInt(1),
+						)
+
+						handler.Run([]byte(tx), coinbase)
+					})
+
+					// tx execution failure
+					// TODO: if not using bool, we should expect panic
+					tx := eoa.PrepareSignAndEncodeTx(
+						t,
+						common.Address{},
+						nil,
+						nil,
+						100_000,
+						big.NewInt(1),
+					)
+
+					success := handler.Run([]byte(tx), coinbase)
+					require.False(t, success)
+				})
+			})
+		})
+	})
+}
+
+func assertPanic(t *testing.T, isFatal bool, f func()) {
+	defer func() {
+		r := recover()
+		if r == nil {
+			t.Fatal("The code did not panic")
+		}
+		err, ok := r.(error)
+		if !ok {
+			t.Fatal("panic is not with an error type")
+		}
+		require.False(t, errors.IsFailure(err))
+	}()
+	f()
 }

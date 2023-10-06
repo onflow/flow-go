@@ -87,17 +87,20 @@ func getSimpleEventEmitter() *testEventEmitter {
 
 func getSimpleMeter() *testMeter {
 	computationLimit := TestComputationLimit
-	computationUsed := uint(0)
+	compUsed := uint(0)
 	return &testMeter{
 		meterComputation: func(kind common.ComputationKind, intensity uint) error {
-			computationUsed += intensity
-			if computationUsed > computationLimit {
+			compUsed += intensity
+			if compUsed > computationLimit {
 				return fmt.Errorf("computation limit has hit %d", computationLimit)
 			}
 			return nil
 		},
 		hasComputationCapacity: func(kind common.ComputationKind, intensity uint) bool {
-			return computationUsed+intensity < computationLimit
+			return compUsed+intensity < computationLimit
+		},
+		computationUsed: func() (uint64, error) {
+			return uint64(compUsed), nil
 		},
 	}
 }

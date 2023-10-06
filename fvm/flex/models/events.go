@@ -26,26 +26,14 @@ type Event struct {
 }
 
 type FlowTokenEventPayload struct {
-	address FlexAddress
-	amount  Balance
+	Address FlexAddress
+	Amount  Balance
 }
 
 func (p *FlowTokenEventPayload) RLPEncode() ([]byte, error) {
-	var data bytes.Buffer
-	dataWriter := io.Writer(&data)
-	_, err := dataWriter.Write(p.address[:])
-	if err != nil {
-		return nil, err
-	}
-
-	_, err = dataWriter.Write(p.amount.Encode())
-	if err != nil {
-		return nil, err
-	}
-
 	var encoded bytes.Buffer
 	encWriter := io.Writer(&encoded)
-	err = rlp.Encode(encWriter, data)
+	err := rlp.Encode(encWriter, p)
 	return encoded.Bytes(), err
 }
 
@@ -53,8 +41,8 @@ func NewFlowTokenDepositEvent(address FlexAddress, amount Balance) *Event {
 	return &Event{
 		Etype: EventTypeFlowTokenDeposit,
 		Payload: &FlowTokenEventPayload{
-			address: address,
-			amount:  amount,
+			Address: address,
+			Amount:  amount,
 		},
 	}
 }
@@ -63,8 +51,8 @@ func NewFlowTokenWithdrawalEvent(address FlexAddress, amount Balance) *Event {
 	return &Event{
 		Etype: EventTypeFlowTokenWithdrawal,
 		Payload: &FlowTokenEventPayload{
-			address: address,
-			amount:  amount,
+			Address: address,
+			Amount:  amount,
 		},
 	}
 }
@@ -90,13 +78,13 @@ func NewEVMLogEvent(log *types.Log) *Event {
 }
 
 type BlockExecutedEventPayload struct {
-	block *FlexBlock
+	Block *FlexBlock
 }
 
 func (p *BlockExecutedEventPayload) RLPEncode() ([]byte, error) {
 	var encoded bytes.Buffer
 	encWriter := io.Writer(&encoded)
-	err := rlp.Encode(encWriter, p.block.ToBytes())
+	err := rlp.Encode(encWriter, p)
 	return encoded.Bytes(), err
 }
 
@@ -104,7 +92,7 @@ func NewBlockExecutedEvent(block *FlexBlock) *Event {
 	return &Event{
 		Etype: EventTypeFlexBlockExecuted,
 		Payload: &BlockExecutedEventPayload{
-			block: block,
+			Block: block,
 		},
 	}
 }

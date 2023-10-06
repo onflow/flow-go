@@ -15,9 +15,6 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-// TODO: I put a lot of functionality into this database, but it could later on be by different
-// components holding access to the ledger or runtime.Environment
-
 // TODO: all database opeartion errors at the moments are labeled as fatal, we might revisit this
 var (
 	// err not implemented
