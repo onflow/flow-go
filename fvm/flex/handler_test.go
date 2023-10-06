@@ -345,6 +345,9 @@ func TestHandler_FOA(t *testing.T) {
 							WithdrawFromFunc: func(address models.FlexAddress, amount *big.Int) (*models.Result, error) {
 								return nil, models.NewEVMExecutionError(fmt.Errorf("some sort of error"))
 							},
+							TransferGasUsageFunc: func() uint64 {
+								return 1
+							},
 						}
 						handler := flex.NewFlexContractHandler(db, backend, em)
 						account := handler.AccountByAddress(testutils.RandomFlexAddress(), true)
@@ -357,6 +360,9 @@ func TestHandler_FOA(t *testing.T) {
 							WithdrawFromFunc: func(address models.FlexAddress, amount *big.Int) (*models.Result, error) {
 								return nil, models.NewEVMExecutionError(fmt.Errorf("some sort of error"))
 							},
+							TransferGasUsageFunc: func() uint64 {
+								return 1
+							},
 						}
 						handler := flex.NewFlexContractHandler(db, backend, em)
 						account := handler.AccountByAddress(testutils.RandomFlexAddress(), true)
@@ -368,6 +374,9 @@ func TestHandler_FOA(t *testing.T) {
 						em := &testutils.TestEmulator{
 							WithdrawFromFunc: func(address models.FlexAddress, amount *big.Int) (*models.Result, error) {
 								return nil, models.NewFatalError(fmt.Errorf("some sort of fatal error"))
+							},
+							TransferGasUsageFunc: func() uint64 {
+								return 1
 							},
 						}
 						handler := flex.NewFlexContractHandler(db, backend, em)
@@ -393,6 +402,9 @@ func TestHandler_FOA(t *testing.T) {
 							MintToFunc: func(address models.FlexAddress, amount *big.Int) (*models.Result, error) {
 								return nil, models.NewEVMExecutionError(fmt.Errorf("some sort of error"))
 							},
+							TransferGasUsageFunc: func() uint64 {
+								return 1
+							},
 						}
 						handler := flex.NewFlexContractHandler(db, backend, em)
 						account := handler.AccountByAddress(testutils.RandomFlexAddress(), true)
@@ -404,6 +416,9 @@ func TestHandler_FOA(t *testing.T) {
 						em := &testutils.TestEmulator{
 							MintToFunc: func(address models.FlexAddress, amount *big.Int) (*models.Result, error) {
 								return nil, models.NewFatalError(fmt.Errorf("some sort of fatal error"))
+							},
+							TransferGasUsageFunc: func() uint64 {
+								return 1
 							},
 						}
 						handler := flex.NewFlexContractHandler(db, backend, em)
