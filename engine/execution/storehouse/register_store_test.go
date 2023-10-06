@@ -2,6 +2,7 @@ package storehouse_test
 
 import (
 	"fmt"
+	"sync"
 	"testing"
 
 	"go.uber.org/atomic"
@@ -27,9 +28,10 @@ func TestRegisterStoreGetRegisterFail(t *testing.T) {
 		rs *storehouse.RegisterStore,
 		diskStore execution.OnDiskRegisterStore,
 		finalized *mockFinalizedReader,
+		rootHeight uint64,
+		endHeight uint64,
 		headerByHeight map[uint64]*flow.Header,
 	) {
-		rootHeight := uint64(10)
 		// unknown block
 		_, err := rs.GetRegister(rootHeight+1, unknownBlock, unknownReg.Key)
 		require.Error(t, err)
@@ -75,7 +77,7 @@ type mockFinalizedReader struct {
 	finalizedHeight *atomic.Uint64
 }
 
-func newMockFinalizedReader(initHeight uint64, count int) (*mockFinalizedReader, map[uint64]*flow.Header) {
+func newMockFinalizedReader(initHeight uint64, count int) (*mockFinalizedReader, map[uint64]*flow.Header, uint64) {
 	root := unittest.BlockHeaderFixture(unittest.WithHeaderHeight(initHeight))
 	blocks := unittest.ChainFixtureFrom(count, root)
 	headerByHeight := make(map[uint64]*flow.Header, len(blocks)+1)
@@ -85,12 +87,13 @@ func newMockFinalizedReader(initHeight uint64, count int) (*mockFinalizedReader,
 		headerByHeight[b.Header.Height] = b.Header
 	}
 
+	highest := blocks[len(blocks)-1].Header.Height
 	return &mockFinalizedReader{
 		headerByHeight:  headerByHeight,
 		lowest:          initHeight,
-		highest:         blocks[len(blocks)-1].Header.Height,
+		highest:         highest,
 		finalizedHeight: atomic.NewUint64(initHeight),
-	}, headerByHeight
+	}, headerByHeight, highest
 }
 
 func (r *mockFinalizedReader) GetFinalizedBlockIDAtHeight(height uint64) (flow.Identifier, error) {
@@ -116,15 +119,17 @@ func withRegisterStore(t *testing.T, fn func(
 	rs *storehouse.RegisterStore,
 	diskStore execution.OnDiskRegisterStore,
 	finalized *mockFinalizedReader,
+	rootHeight uint64,
+	endHeight uint64,
 	headers map[uint64]*flow.Header,
 )) {
 	pebble.RunWithRegistersStorageAtInitialHeights(t, 10, 10, func(diskStore *pebble.Registers) {
 		log := unittest.Logger()
 		var wal execution.ExecutedFinalizedWAL
-		finalized, headerByHeight := newMockFinalizedReader(10, 100)
+		finalized, headerByHeight, highest := newMockFinalizedReader(10, 100)
 		rs, err := storehouse.NewRegisterStore(diskStore, wal, finalized, log)
 		require.NoError(t, err)
-		fn(t, rs, diskStore, finalized, headerByHeight)
+		fn(t, rs, diskStore, finalized, 10, highest, headerByHeight)
 	})
 }
 
@@ -138,10 +143,10 @@ func TestRegisterStoreSaveRegistersShouldFail(t *testing.T) {
 		rs *storehouse.RegisterStore,
 		diskStore execution.OnDiskRegisterStore,
 		finalized *mockFinalizedReader,
+		rootHeight uint64,
+		endHeight uint64,
 		headerByHeight map[uint64]*flow.Header,
 	) {
-		rootHeight := uint64(10)
-
 		wrongParent := unittest.BlockHeaderFixture(unittest.WithHeaderHeight(rootHeight + 1))
 		err := rs.SaveRegisters(wrongParent, []flow.RegisterEntry{})
 		require.Error(t, err)
@@ -167,10 +172,10 @@ func TestRegisterStoreSaveRegistersShouldOK(t *testing.T) {
 		rs *storehouse.RegisterStore,
 		diskStore execution.OnDiskRegisterStore,
 		finalized *mockFinalizedReader,
+		rootHeight uint64,
+		endHeight uint64,
 		headerByHeight map[uint64]*flow.Header,
 	) {
-		rootHeight := uint64(10)
-
 		// not executed
 		executed, err := rs.IsBlockExecuted(rootHeight+1, headerByHeight[rootHeight+1].ID())
 		require.NoError(t, err)
@@ -219,9 +224,10 @@ func TestRegisterStoreIsBlockExecuted(t *testing.T) {
 		rs *storehouse.RegisterStore,
 		diskStore execution.OnDiskRegisterStore,
 		finalized *mockFinalizedReader,
+		rootHeight uint64,
+		endHeight uint64,
 		headerByHeight map[uint64]*flow.Header,
 	) {
-		rootHeight := uint64(10)
 		// save block 11
 		reg := makeReg("X", "1")
 		err := rs.SaveRegisters(headerByHeight[rootHeight+1], []flow.RegisterEntry{reg})
@@ -269,9 +275,10 @@ func TestRegisterStoreExecuteFirstFinalizeLater(t *testing.T) {
 		rs *storehouse.RegisterStore,
 		diskStore execution.OnDiskRegisterStore,
 		finalized *mockFinalizedReader,
+		rootHeight uint64,
+		endHeight uint64,
 		headerByHeight map[uint64]*flow.Header,
 	) {
-		rootHeight := uint64(10)
 		// save block 11
 		err := rs.SaveRegisters(headerByHeight[rootHeight+1], []flow.RegisterEntry{makeReg("X", "1")})
 		require.NoError(t, err)
@@ -314,10 +321,10 @@ func TestRegisterStoreFinalizeFirstExecuteLater(t *testing.T) {
 		rs *storehouse.RegisterStore,
 		diskStore execution.OnDiskRegisterStore,
 		finalized *mockFinalizedReader,
+		rootHeight uint64,
+		endHeight uint64,
 		headerByHeight map[uint64]*flow.Header,
 	) {
-		rootHeight := uint64(10)
-
 		require.NoError(t, finalized.MockFinal(rootHeight+1))
 		rs.OnBlockFinalized() // notify 11 is finalized
 		require.Equal(t, rootHeight, rs.FinalizedAndExecutedHeight(), fmt.Sprintf("FinalizedAndExecutedHeight: %d", rs.FinalizedAndExecutedHeight()))
@@ -350,5 +357,45 @@ func TestRegisterStoreFinalizeFirstExecuteLater(t *testing.T) {
 // Finalize and Execute concurrently
 // SaveRegisters(1), SaveRegisters(2), ... SaveRegisters(100), happen concurrently with
 // OnBlockFinalized(1), OnBlockFinalized(2), ... OnBlockFinalized(100), should update FinalizedAndExecutedHeight
+func TestRegisterStoreConcurrentFinalizeAndExecute(t *testing.T) {
+	t.Parallel()
+	withRegisterStore(t, func(
+		t *testing.T,
+		rs *storehouse.RegisterStore,
+		diskStore execution.OnDiskRegisterStore,
+		finalized *mockFinalizedReader,
+		rootHeight uint64,
+		endHeight uint64,
+		headerByHeight map[uint64]*flow.Header,
+	) {
 
-//
+		var wg sync.WaitGroup
+		savedHeights := make(chan uint64, len(headerByHeight)) // enough buffer so that producer won't be blocked
+
+		go func() {
+			wg.Add(1)
+			defer wg.Done()
+
+			for savedHeight := range savedHeights {
+				err := finalized.MockFinal(savedHeight)
+				require.NoError(t, err)
+				require.NoError(t, rs.OnBlockFinalized(), fmt.Sprintf("saved height %v", savedHeight))
+			}
+		}()
+
+		for height := rootHeight + 1; height <= endHeight; height++ {
+			if height >= 10 {
+				savedHeights <- height
+			}
+
+			err := rs.SaveRegisters(headerByHeight[height], []flow.RegisterEntry{makeReg("X", fmt.Sprintf("%d", height))})
+			require.NoError(t, err)
+		}
+		close(savedHeights)
+
+		wg.Wait() // wait until all heights are finalized
+
+		// after all heights are executed and finalized, the FinalizedAndExecutedHeight should be the last height
+		require.Equal(t, endHeight, rs.FinalizedAndExecutedHeight())
+	})
+}

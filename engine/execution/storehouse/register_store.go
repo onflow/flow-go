@@ -4,6 +4,8 @@ import (
 	"errors"
 	"fmt"
 
+	"go.uber.org/atomic"
+
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/engine/execution"
@@ -12,11 +14,12 @@ import (
 )
 
 type RegisterStore struct {
-	memStore  *InMemoryRegisterStore
-	diskStore execution.OnDiskRegisterStore
-	wal       execution.ExecutedFinalizedWAL
-	finalized execution.FinalizedReader
-	log       zerolog.Logger
+	memStore   *InMemoryRegisterStore
+	diskStore  execution.OnDiskRegisterStore
+	wal        execution.ExecutedFinalizedWAL
+	finalized  execution.FinalizedReader
+	log        zerolog.Logger
+	finalizing *atomic.Bool
 }
 
 func NewRegisterStore(
@@ -42,11 +45,12 @@ func NewRegisterStore(
 	memStore := NewInMemoryRegisterStore(height, finalizedID)
 
 	return &RegisterStore{
-		memStore:  memStore,
-		diskStore: diskStore,
-		wal:       wal,
-		finalized: finalized,
-		log:       log.With().Str("module", "register-store").Logger(),
+		memStore:   memStore,
+		diskStore:  diskStore,
+		wal:        wal,
+		finalized:  finalized,
+		finalizing: atomic.NewBool(false),
+		log:        log.With().Str("module", "register-store").Logger(),
 	}, nil
 }
 
@@ -90,6 +94,13 @@ func (r *RegisterStore) SaveRegisters(header *flow.Header, registers []flow.Regi
 // 2. save the registers of the block to OnDiskRegisterStore
 // 3. prune the height in InMemoryRegisterStore
 func (r *RegisterStore) OnBlockFinalized() error {
+	// only one goroutine can execute OnBlockFinalized at a time
+	if !r.finalizing.CAS(false, true) {
+		return nil
+	}
+
+	defer r.finalizing.Store(false)
+
 	latest := r.diskStore.LatestHeight()
 	next := latest + 1
 	blockID, err := r.finalized.GetFinalizedBlockIDAtHeight(next)
