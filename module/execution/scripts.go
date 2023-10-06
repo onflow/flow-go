@@ -143,7 +143,7 @@ func IndexRegisterAdapter(registerFun func(IDs flow.RegisterIDs, height uint64) 
 		}
 
 		// even though this shouldn't occur in correct implementation we check that function returned either a single register or error
-		if len(values) > 1 || len(values) == 0 {
+		if len(values) != 1 {
 			return nil, fmt.Errorf("invalid number of returned values for a single register: %d", len(values))
 		}
 		return values[0], nil
