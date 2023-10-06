@@ -1,7 +1,6 @@
 package dkg
 
 import (
-	"github.com/onflow/flow-go/model/bootstrap"
 	"math/rand"
 	"os"
 	"testing"
@@ -17,6 +16,7 @@ import (
 	"github.com/onflow/flow-go/crypto"
 	dkgeng "github.com/onflow/flow-go/engine/consensus/dkg"
 	"github.com/onflow/flow-go/engine/testutil"
+	"github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/dkg"
 	msig "github.com/onflow/flow-go/module/signature"
