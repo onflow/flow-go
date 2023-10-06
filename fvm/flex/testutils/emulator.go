@@ -11,17 +11,26 @@ import (
 )
 
 type TestEmulator struct {
-	BalanceOfFunc      func(address models.FlexAddress) (*big.Int, error)
-	CodeOfFunc         func(address models.FlexAddress) (models.Code, error)
-	MintToFunc         func(address models.FlexAddress, amount *big.Int) (*models.Result, error)
-	WithdrawFromFunc   func(address models.FlexAddress, amount *big.Int) (*models.Result, error)
-	TransferFunc       func(from models.FlexAddress, to models.FlexAddress, value *big.Int) (*models.Result, error)
-	DeployFunc         func(caller models.FlexAddress, code models.Code, gasLimit uint64, value *big.Int) (*models.Result, error)
-	CallFunc           func(caller models.FlexAddress, to models.FlexAddress, data models.Data, gasLimit uint64, value *big.Int) (*models.Result, error)
-	RunTransactionFunc func(tx *types.Transaction, coinbase models.FlexAddress) (*models.Result, error)
+	TransferGasUsageFunc func() uint64
+	BalanceOfFunc        func(address models.FlexAddress) (*big.Int, error)
+	CodeOfFunc           func(address models.FlexAddress) (models.Code, error)
+	MintToFunc           func(address models.FlexAddress, amount *big.Int) (*models.Result, error)
+	WithdrawFromFunc     func(address models.FlexAddress, amount *big.Int) (*models.Result, error)
+	TransferFunc         func(from models.FlexAddress, to models.FlexAddress, value *big.Int) (*models.Result, error)
+	DeployFunc           func(caller models.FlexAddress, code models.Code, gasLimit uint64, value *big.Int) (*models.Result, error)
+	CallFunc             func(caller models.FlexAddress, to models.FlexAddress, data models.Data, gasLimit uint64, value *big.Int) (*models.Result, error)
+	RunTransactionFunc   func(tx *types.Transaction, coinbase models.FlexAddress) (*models.Result, error)
 }
 
 var _ models.Emulator = &TestEmulator{}
+
+// TransferGasUsage returns the gas usage for token transfer
+func (em *TestEmulator) TransferGasUsage() uint64 {
+	if em.TransferGasUsageFunc == nil {
+		panic("method not set")
+	}
+	return em.TransferGasUsageFunc()
+}
 
 // BalanceOf returns the balance of this address
 func (em *TestEmulator) BalanceOf(address models.FlexAddress) (*big.Int, error) {

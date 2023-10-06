@@ -191,7 +191,7 @@ func (f *flexAccount) Balance() models.Balance {
 // Deposit deposits the token from the given vault into the Flex main vault
 // and update the FOA balance with the new amount
 func (f *flexAccount) Deposit(v *models.FLOWTokenVault) {
-	// TODO check gas limit and meter
+	f.fch.checkGasLimit(models.GasLimit(f.fch.emulator.TransferGasUsage()))
 	res, err := f.fch.emulator.MintTo(f.address, v.Balance().ToAttoFlow())
 	f.fch.meterGasUsage(res)
 	handleError(err)
@@ -206,13 +206,13 @@ func (f *flexAccount) Deposit(v *models.FLOWTokenVault) {
 // withdraw and return flow token from the Flex main vault.
 func (f *flexAccount) Withdraw(b models.Balance) *models.FLOWTokenVault {
 	f.checkAuthorized()
-	// TODO check gas limit and meter
 
 	// check balance of flex vault
 	if b.ToAttoFlow().Uint64() > f.fch.totalSupply {
 		handleError(models.ErrInsufficientTotalSupply)
 	}
 
+	f.fch.checkGasLimit(models.GasLimit(f.fch.emulator.TransferGasUsage()))
 	res, err := f.fch.emulator.WithdrawFrom(f.address, b.ToAttoFlow())
 	f.fch.meterGasUsage(res)
 	handleError(err)
@@ -223,6 +223,17 @@ func (f *flexAccount) Withdraw(b models.Balance) *models.FLOWTokenVault {
 	f.fch.totalSupply -= b.ToAttoFlow().Uint64()
 	f.fch.updateLastExecutedBlock(res.StateRootHash, res.LogsRootHash)
 	return models.NewFlowTokenVault(b)
+}
+
+// Transfer transfers tokens between accounts
+func (f *flexAccount) Transfer(to models.FlexAddress, balance models.Balance) {
+	f.checkAuthorized()
+	f.fch.checkGasLimit(models.GasLimit(f.fch.emulator.TransferGasUsage()))
+	res, err := f.fch.emulator.Transfer(f.address, to, balance.ToAttoFlow())
+	f.fch.meterGasUsage(res)
+	handleError(err)
+	f.fch.EmitLastExecutedBlockEvent()
+	f.fch.updateLastExecutedBlock(res.StateRootHash, res.LogsRootHash)
 }
 
 // Deploy deploys a contract to the Flex environment

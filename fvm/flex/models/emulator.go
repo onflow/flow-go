@@ -7,6 +7,8 @@ import (
 )
 
 type Emulator interface {
+	// returns the amount of gas needed for a token transfer
+	TransferGasUsage() uint64
 	// BalanceOf returns the balance of this address
 	BalanceOf(address FlexAddress) (*big.Int, error)
 	// CodeOf returns the code for this address (if smart contract is deployed at this address)

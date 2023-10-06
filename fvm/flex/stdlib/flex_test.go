@@ -70,10 +70,11 @@ func (t *testFlexContractHandler) Run(tx []byte, coinbase models.FlexAddress) bo
 }
 
 type testFlowAccount struct {
-	address models.FlexAddress
-	vault   *models.FLOWTokenVault
-	deploy  func(code models.Code, limit models.GasLimit, balance models.Balance) models.FlexAddress
-	call    func(address models.FlexAddress, data models.Data, limit models.GasLimit, balance models.Balance) models.Data
+	address  models.FlexAddress
+	vault    *models.FLOWTokenVault
+	deploy   func(code models.Code, limit models.GasLimit, balance models.Balance) models.FlexAddress
+	call     func(address models.FlexAddress, data models.Data, limit models.GasLimit, balance models.Balance) models.Data
+	transfer func(address models.FlexAddress, balance models.Balance)
 }
 
 var _ models.FlexAccount = &testFlowAccount{}
@@ -87,6 +88,13 @@ func (t *testFlowAccount) Balance() models.Balance {
 		return models.Balance(0)
 	}
 	return t.vault.Balance()
+}
+
+func (t *testFlowAccount) Transfer(address models.FlexAddress, balance models.Balance) {
+	if t.transfer == nil {
+		panic("unexpected Call")
+	}
+	t.transfer(address, balance)
 }
 
 func (t *testFlowAccount) Deposit(vault *models.FLOWTokenVault) {

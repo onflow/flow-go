@@ -64,6 +64,9 @@ type FlexAccount interface {
 	// works only for FOA accounts
 	Withdraw(Balance) *FLOWTokenVault
 
+	// Transfer is a utility method on top of call for transfering tokens to another account
+	Transfer(to FlexAddress, balance Balance)
+
 	// Deploy deploys a contract to the Flex environment
 	// the new deployed contract would be at the returned address and
 	// the contract data is not controlled by the FOA accounts

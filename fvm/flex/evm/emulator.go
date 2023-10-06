@@ -35,6 +35,10 @@ func NewEmulator(
 	}
 }
 
+func (em *Emulator) TransferGasUsage() uint64 {
+	return TransferGasUsage
+}
+
 func (em *Emulator) BalanceOf(address models.FlexAddress) (*big.Int, error) {
 	execState, err := em.newState()
 	if err != nil {
