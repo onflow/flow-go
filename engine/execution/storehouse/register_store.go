@@ -99,8 +99,7 @@ func (r *RegisterStore) OnBlockFinalized() error {
 	}
 
 	regs, err := r.memStore.GetUpdatedRegisters(next, blockID)
-	// TODO: use other error type
-	if errors.Is(err, storage.ErrNotFound) {
+	if errors.Is(err, ErrNotExecuted) {
 		// next block is not executed yet
 		return nil
 	}

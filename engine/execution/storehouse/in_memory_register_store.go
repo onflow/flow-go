@@ -155,7 +155,7 @@ func (s *InMemoryRegisterStore) GetUpdatedRegisters(height uint64, blockID flow.
 
 	registerUpdates, ok := s.registersByBlockID[blockID]
 	if !ok {
-		return nil, fmt.Errorf("cannot get register at height %d, block %s is not found", height, blockID)
+		return nil, fmt.Errorf("cannot get register at height %d, block %s is not found: %w", height, blockID, ErrNotExecuted)
 	}
 
 	// convert from map to into slice
