@@ -72,7 +72,7 @@ func NewFlexBlock(height, uuidIndex, totalSupply uint64, stateRoot, eventRoot ge
 	}
 }
 
-func NewFlexBlockFromEncoded(encoded []byte) *FlexBlock {
+func NewFlexBlockFromBytes(encoded []byte) *FlexBlock {
 	var index int
 	height := binary.BigEndian.Uint64(encoded[index : index+encodedHeightSize])
 	index += encodedHeightSize

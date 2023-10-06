@@ -1624,8 +1624,8 @@ func TestBlockContext_GetAccount(t *testing.T) {
 	}
 
 	addressGen := chain.NewAddressGenerator()
-	// skip the addresses of 4 reserved accounts
-	for i := 0; i < 4; i++ {
+	// skip the addresses of 5 reserved accounts
+	for i := 0; i < 5; i++ {
 		_, err := addressGen.NextAddress()
 		require.NoError(t, err)
 	}
@@ -1804,7 +1804,7 @@ func TestBlockContext_ExecuteTransaction_CreateAccount_WithMonotonicAddresses(t 
 	address := flow.ConvertAddress(
 		data.(cadence.Event).Fields[0].(cadence.Address))
 
-	require.Equal(t, flow.HexToAddress("05"), address)
+	require.Equal(t, flow.HexToAddress("06"), address)
 }
 
 func TestBlockContext_ExecuteTransaction_FailingTransactions(t *testing.T) {

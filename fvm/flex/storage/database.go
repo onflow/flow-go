@@ -14,15 +14,13 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-// TODO: add a vault to hold on to the passed Cadence token vaults under Flex account
-// this could make sure even if there is a bug in EVM there won't be more withdraws
-
 // TODO: I put a lot of functionality into this database, but it could later on be by different
 // components holding access to the ledger or runtime.Environment
 
+// TODO: all database opeartion errors at the moments are labeled as fatal, we might revisit this
 var (
 	// err not implemented
-	errNotImplemented = errors.New("not implemented yet")
+	errNotImplemented = models.NewFatalError(errors.New("not implemented yet"))
 )
 
 var FlexLatextBlockKey = "LatestBlock"
@@ -42,7 +40,7 @@ type Database struct {
 
 // New returns a wrapped map with all the required database interface methods
 // implemented.
-func NewDatabase(led atree.Ledger, flexAddress flow.Address) *Database {
+func NewDatabase(led atree.Ledger, flexAddress flow.Address) (*Database, error) {
 	// TODO figure out these details
 	// var typeInfo
 	baseStorage := atree.NewLedgerBaseStorage(led)
@@ -51,24 +49,23 @@ func NewDatabase(led atree.Ledger, flexAddress flow.Address) *Database {
 
 	rootIDBytes, err := led.GetValue(flexAddress.Bytes(), []byte(FlexRootSlabKey))
 	if err != nil {
-		panic(err)
+		return nil, models.NewFatalError(err)
 	}
 
 	var m *atree.OrderedMap
 	if len(rootIDBytes) == 0 {
 		m, err = atree.NewMap(storage, atree.Address(flexAddress), atree.NewDefaultDigesterBuilder(), typeInfo{})
 		if err != nil {
-			panic(err)
+			return nil, models.NewFatalError(err)
 		}
 	} else {
 		storageID, err := atree.NewStorageIDFromRawBytes(rootIDBytes)
 		if err != nil {
-			panic(err)
+			return nil, models.NewFatalError(err)
 		}
-
 		m, err = atree.NewMapWithRootID(storage, storageID, atree.NewDefaultDigesterBuilder())
 		if err != nil {
-			panic(err)
+			return nil, models.NewFatalError(err)
 		}
 	}
 
@@ -77,7 +74,7 @@ func NewDatabase(led atree.Ledger, flexAddress flow.Address) *Database {
 		flexAddress: flexAddress,
 		storage:     storage,
 		atreemap:    m,
-	}
+	}, nil
 }
 
 // Get retrieves the given key if it's present in the key-value store.
@@ -87,17 +84,17 @@ func (db *Database) Get(key []byte) ([]byte, error) {
 
 	data, err := db.atreemap.Get(compare, hashInputProvider, NewStringValue(hex.EncodeToString(key)))
 	if err != nil {
-		return nil, err
+		return nil, models.NewFatalError(err)
 	}
 
 	v, err := data.StoredValue(db.atreemap.Storage)
 	if err != nil {
-		return nil, err
+		return nil, models.NewFatalError(err)
 	}
 
 	val, err := hex.DecodeString(v.(StringValue).String())
 	if err != nil {
-		return nil, err
+		return nil, models.NewFatalError(err)
 	}
 
 	return val, err
@@ -112,19 +109,38 @@ func (db *Database) Put(key []byte, value []byte) error {
 	return err
 }
 
+// Has retrieves if a key is present in the key-value store.
+func (db *Database) Has(key []byte) (bool, error) {
+	db.lock.RLock()
+	defer db.lock.RUnlock()
+
+	data, err := db.Get(key)
+	if err != nil {
+		return false, models.NewFatalError(err)
+	}
+	return len(data) > 0, nil
+}
+
 // Delete removes the key from the key-value store.
 func (db *Database) Delete(key []byte) error {
 	db.lock.Lock()
 	defer db.lock.Unlock()
 
 	_, _, err := db.atreemap.Remove(compare, hashInputProvider, NewStringValue(hex.EncodeToString(key)))
-	return err
+	if err != nil {
+		return models.NewFatalError(err)
+	}
+	return nil
 }
 
 // SetLatestBlock sets the latest executed block
 // we have this functionality given we only allow on state to exist
 func (db *Database) SetLatestBlock(block *models.FlexBlock) error {
-	return db.led.SetValue(db.flexAddress[:], []byte(FlexLatextBlockKey), block.ToBytes())
+	err := db.led.SetValue(db.flexAddress[:], []byte(FlexLatextBlockKey), block.ToBytes())
+	if err != nil {
+		return models.NewFatalError(err)
+	}
+	return nil
 }
 
 // GetLatestBlock returns the latest executed block
@@ -134,43 +150,40 @@ func (db *Database) GetLatestBlock() (*models.FlexBlock, error) {
 	if len(data) == 0 {
 		return models.GenesisFlexBlock, err
 	}
-	return models.NewFlexBlockFromEncoded(data), err
+	if err != nil {
+		return nil, models.NewFatalError(err)
+	}
+	return models.NewFlexBlockFromBytes(data), nil
 }
 
 func (db *Database) storeMapRoot() error {
-	// TODO: read size from atree package
-	rootIDBytes := make([]byte, 16)
+	// TODO: read the size from atree package
+	storageIDSize := 16
+	rootIDBytes := make([]byte, storageIDSize)
 	_, err := db.atreemap.StorageID().ToRawBytes(rootIDBytes)
 	if err != nil {
 		return err
 	}
-
-	db.led.SetValue(db.flexAddress.Bytes(), []byte(FlexRootSlabKey), rootIDBytes[:])
-	return nil
+	return db.led.SetValue(db.flexAddress.Bytes(), []byte(FlexRootSlabKey), rootIDBytes[:])
 }
 
 // Commits the changes from atree
 func (db *Database) Commit() error {
 	err := db.storeMapRoot()
 	if err != nil {
-		return err
+		return models.NewFatalError(err)
 	}
-	return db.storage.Commit()
+	err = db.storage.Commit()
+	if err != nil {
+		return models.NewFatalError(err)
+	}
+	return nil
 }
 
 // Close deallocates the internal map and ensures any consecutive data access op
 // fails with an error.
 func (db *Database) Close() error {
 	return db.Commit()
-}
-
-// Has retrieves if a key is present in the key-value store.
-func (db *Database) Has(key []byte) (bool, error) {
-	db.lock.RLock()
-	defer db.lock.RUnlock()
-
-	data, err := db.Get(key)
-	return len(data) > 0, err
 }
 
 // NewBatch creates a write-only key-value store that buffers changes to its host
@@ -200,12 +213,12 @@ func (db *Database) NewIterator(prefix []byte, start []byte) ethdb.Iterator {
 // The created snapshot will not be affected by all following mutations
 // happened on the database.
 func (db *Database) NewSnapshot() (ethdb.Snapshot, error) {
-	panic(errNotImplemented)
+	return nil, errNotImplemented
 }
 
 // Stat returns a particular internal stat of the database.
 func (db *Database) Stat(property string) (string, error) {
-	return "", errors.New("unknown property")
+	return "", errNotImplemented
 }
 
 // Compact is not supported on a memory database, but there's no need either as

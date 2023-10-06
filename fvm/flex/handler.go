@@ -1,8 +1,12 @@
 package flex
 
 import (
-	"math"
+	"bytes"
 
+	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/rlp"
+	"github.com/onflow/flow-go/fvm/environment"
+	"github.com/onflow/flow-go/fvm/errors"
 	env "github.com/onflow/flow-go/fvm/flex/environment"
 	"github.com/onflow/flow-go/fvm/flex/models"
 	"github.com/onflow/flow-go/fvm/flex/storage"
@@ -17,55 +21,82 @@ type FlexContractHandler struct {
 var _ models.FlexContractHandler = &FlexContractHandler{}
 
 func NewFlexContractHandler(backend models.Backend, flexAddress flow.Address) *FlexContractHandler {
+	db, err := storage.NewDatabase(backend, flexAddress)
+	handleError(err)
 	return &FlexContractHandler{
-		db:      storage.NewDatabase(backend, flexAddress),
+		db:      db,
 		backend: backend,
 	}
 }
 
+// AllocateAddress allocates an address to be used by FOA resources
 func (h FlexContractHandler) AllocateAddress() models.FlexAddress {
-	config := env.NewFlexConfig(
-		env.WithBlockNumber(env.BlockNumberForEVMRules))
-	env, err := env.NewEnvironment(config, h.db)
-	if err != nil {
-		panic(err)
-	}
+	env := h.getNewDefaultEnv()
 	addr, err := env.AllocateAddress()
-	if err != nil {
-		panic(err)
-	}
-
+	handleError(err)
 	return addr
 }
 
+// AccountByAddress returns the account for the given flex address,
+// if isFOA is set, account is controlled by the FVM and FOA resources
 func (h FlexContractHandler) AccountByAddress(addr models.FlexAddress, isFOA bool) models.FlexAccount {
 	return newFlexAccount(h, addr, isFOA)
 }
 
+// LastExecutedBlock returns the last executed block
 func (h FlexContractHandler) LastExecutedBlock() *models.FlexBlock {
 	block, err := h.db.GetLatestBlock()
-	if err != nil {
-		panic(err)
-	}
+	handleError(err)
 	return block
 }
 
-func (h FlexContractHandler) Run(tx []byte, coinbase models.FlexAddress) bool {
+// Run runs an rlpencoded evm transaction, collect the evm fees under the provided coinbase
+func (h FlexContractHandler) Run(rlpEncodedTx []byte, coinbase models.FlexAddress) bool {
 	config := env.NewFlexConfig(
 		env.WithCoinbase(coinbase.ToCommon()),
 		env.WithBlockNumber(env.BlockNumberForEVMRules))
 	env, err := env.NewEnvironment(config, h.db)
-	// TODO improve this
-	if err != nil {
-		panic(err)
+	handleError(err)
+
+	// Decode transaction encoding
+	tx := types.Transaction{}
+	// TODO: update the max limit on the encoded size to a meaningful value
+	err = tx.DecodeRLP(
+		rlp.NewStream(
+			bytes.NewReader(rlpEncodedTx),
+			uint64(len(rlpEncodedTx))))
+	handleError(err)
+
+	// check tx gas limit
+	// TODO: let caller set a limit as well
+	gasLimit := tx.Gas()
+	h.checkGasLimit(models.GasLimit(gasLimit))
+	err = env.RunTransaction(&tx)
+	h.meterGasUsage(env.Result.GasConsumed)
+
+	if models.IsEVMExecutionError(err) {
+		return false
 	}
-	// TODO compute the max gas using backend
-	gasLimit := uint64(math.MaxUint64)
-	err = env.RunTransaction(tx, gasLimit)
-	if err != nil {
-		panic(err)
+
+	handleError(err)
+	// emit logs as events
+	for _, log := range env.Result.Logs {
+		h.EmitEvent(models.NewEVMLogEvent(log))
 	}
-	return !env.Result.Failed
+	h.EmitLastExecutedBlockEvent()
+	return true
+}
+
+func (h FlexContractHandler) checkGasLimit(limit models.GasLimit) {
+	// check gas limit against what has been left on the transaction side
+	if !h.backend.HasComputationCapacity(environment.ComputationKindEVMGasUsage, uint(limit)) {
+		panic(models.ErrInsufficientComputation)
+	}
+}
+
+func (h FlexContractHandler) meterGasUsage(usage uint64) {
+	err := h.backend.MeterComputation(environment.ComputationKindEVMGasUsage, uint(usage))
+	handleError(err)
 }
 
 func (h FlexContractHandler) getNewDefaultConfig() *env.Config {
@@ -75,15 +106,32 @@ func (h FlexContractHandler) getNewDefaultConfig() *env.Config {
 
 func (h FlexContractHandler) getNewDefaultEnv() *env.Environment {
 	env, err := env.NewEnvironment(h.getNewDefaultConfig(), h.db)
-	h.handleError(err)
+	handleError(err)
 	return env
 }
 
-// TODO: properly implement this
-func (h FlexContractHandler) handleError(err error) {
+func handleError(err error) {
 	if err != nil {
-		panic(err)
+		if models.IsAFatalError(err) {
+			// don't wrap it
+			panic(err)
+		}
+		panic(errors.NewEVMError(err))
 	}
+}
+
+func (h *FlexContractHandler) EmitEvent(event *models.Event) {
+	// TODO add extra metering for encoding
+	encoded, err := event.Payload.RLPEncode()
+	handleError(err)
+	h.backend.EmitFlowEvent(event.Etype, encoded)
+}
+
+func (h *FlexContractHandler) EmitLastExecutedBlockEvent() {
+	// TODO: we should handle loading of blocks here and not inside db
+	block, err := h.db.GetLatestBlock()
+	handleError(err)
+	h.EmitEvent(models.NewBlockExecutedEvent(block))
 }
 
 type flexAccount struct {
@@ -110,36 +158,37 @@ func (f *flexAccount) Address() models.FlexAddress {
 func (f *flexAccount) Balance() models.Balance {
 	env := f.fch.getNewDefaultEnv()
 	bl, err := env.Balance(f.address)
-	if err != nil {
-		panic(err)
-	}
+	handleError(err)
 	balance, err := models.NewBalanceFromAttoFlow(bl)
-	if err != nil {
-		panic(err)
-	}
+	handleError(err)
 	return balance
 }
 
 // Deposit deposits the token from the given vault into the Flex main vault
 // and update the FOA balance with the new amount
 func (f *flexAccount) Deposit(v *models.FLOWTokenVault) {
-	env := f.fch.getNewDefaultEnv()
+	env := f.getNewDefaultEnv()
+	// TODO check gas limit and meter
 	err := env.MintTo(v.Balance().ToAttoFlow(), f.address.ToCommon())
-	f.fch.handleError(err)
+	f.fch.meterGasUsage(env.Result.GasConsumed)
+	handleError(err)
 	// emit event
-	// TODO pass encoded payload data
-	f.fch.backend.EmitFlowEvent(models.EventFlexTokenDeposit, nil)
+	f.fch.EmitEvent(models.NewFlowTokenDepositEvent(f.address, v.Balance()))
+	f.fch.EmitLastExecutedBlockEvent()
 }
 
 // Withdraw deducts the balance from the FOA account and
 // withdraw and return flow token from the Flex main vault.
 func (f *flexAccount) Withdraw(b models.Balance) *models.FLOWTokenVault {
-	if !f.isFOA {
-		panic(models.ErrUnAuthroizedMethodCall)
-	}
-	env := f.fch.getNewDefaultEnv()
+	f.checkAuthorized()
+	// TODO check gas limit and meter
+	env := f.getNewDefaultEnv()
 	err := env.WithdrawFrom(b.ToAttoFlow(), f.address.ToCommon())
-	f.fch.handleError(err)
+	f.fch.meterGasUsage(env.Result.GasConsumed)
+	handleError(err)
+	// emit event
+	f.fch.EmitEvent(models.NewFlowTokenWithdrawalEvent(f.address, b))
+	f.fch.EmitLastExecutedBlockEvent()
 	return models.NewFlowTokenVault(b)
 }
 
@@ -147,16 +196,14 @@ func (f *flexAccount) Withdraw(b models.Balance) *models.FLOWTokenVault {
 // the new deployed contract would be at the returned address and
 // the contract data is not controlled by the FOA accounts
 func (f *flexAccount) Deploy(code models.Code, gaslimit models.GasLimit, balance models.Balance) models.FlexAddress {
-	if !f.isFOA {
-		panic(models.ErrUnAuthroizedMethodCall)
-	}
-	env := f.fch.getNewDefaultEnv()
+	f.checkAuthorized()
+	f.fch.checkGasLimit(gaslimit)
+	env := f.getNewDefaultEnv()
 	// TODO check gas limit against what has been left on the transaction side
 	err := env.Deploy(f.address.ToCommon(), code, uint64(gaslimit), balance.ToAttoFlow())
-	f.fch.handleError(err)
-	if env.Result.Failed {
-		panic("deploy failed")
-	}
+	f.fch.meterGasUsage(env.Result.GasConsumed)
+	handleError(err)
+	f.fch.EmitLastExecutedBlockEvent()
 	return models.FlexAddress(env.Result.DeployedContractAddress)
 }
 
@@ -166,16 +213,23 @@ func (f *flexAccount) Deploy(code models.Code, gaslimit models.GasLimit, balance
 // the balance would be deducted from the OFA account and would be transferred to the target address
 // contract data is not controlled by the FOA accounts
 func (f *flexAccount) Call(to models.FlexAddress, data models.Data, gaslimit models.GasLimit, balance models.Balance) models.Data {
-	if !f.isFOA {
-		panic(models.ErrUnAuthroizedMethodCall)
-	}
-	env := f.fch.getNewDefaultEnv()
-	// TODO check the gas on the backend
-	// TODO check gas limit against what has been left on the transaction side
+	f.checkAuthorized()
+	f.fch.checkGasLimit(gaslimit)
+	env := f.getNewDefaultEnv()
 	err := env.Call(f.address.ToCommon(), to.ToCommon(), data, uint64(gaslimit), balance.ToAttoFlow())
-	f.fch.handleError(err)
-	if env.Result.Failed {
-		panic(models.NewEVMExecutionError(env.Result.Error))
-	}
+	f.fch.meterGasUsage(env.Result.GasConsumed)
+	handleError(err)
+	f.fch.EmitLastExecutedBlockEvent()
 	return env.Result.RetValue
+}
+
+func (f *flexAccount) getNewDefaultEnv() *env.Environment {
+	return f.fch.getNewDefaultEnv()
+}
+
+func (f *flexAccount) checkAuthorized() {
+	// check if account is authorized to to FOA related opeartions
+	if !f.isFOA {
+		handleError(models.ErrUnAuthroizedMethodCall)
+	}
 }

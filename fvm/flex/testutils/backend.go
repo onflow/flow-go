@@ -2,6 +2,8 @@ package testutils
 
 import (
 	"encoding/binary"
+	"fmt"
+	"math"
 	"testing"
 
 	"github.com/onflow/atree"
@@ -15,6 +17,7 @@ import (
 )
 
 var TestFlexRootAddress = flow.BytesToAddress([]byte("Flex"))
+var TestComputationLimit = uint(math.MaxUint64 - 1)
 
 func RunWithTestFlexRoot(t testing.TB, backend models.Backend, f func(flow.Address)) {
 	as := fvmenv.NewAccountStatus()
@@ -26,6 +29,7 @@ func RunWithTestBackend(t testing.TB, f func(models.Backend)) {
 	tb := &testBackend{
 		testValueStore:   getSimpleValueStore(),
 		testEventEmitter: getSimpleEventEmitter(),
+		testMeter:        getSimpleMeter(),
 	}
 	f(tb)
 }
@@ -81,6 +85,23 @@ func getSimpleEventEmitter() *testEventEmitter {
 	}
 }
 
+func getSimpleMeter() *testMeter {
+	computationLimit := TestComputationLimit
+	computationUsed := uint(0)
+	return &testMeter{
+		meterComputation: func(kind common.ComputationKind, intensity uint) error {
+			computationUsed += intensity
+			if computationUsed > computationLimit {
+				return fmt.Errorf("computation limit has hit %d", computationLimit)
+			}
+			return nil
+		},
+		hasComputationCapacity: func(kind common.ComputationKind, intensity uint) bool {
+			return computationUsed+intensity < computationLimit
+		},
+	}
+}
+
 type testBackend struct {
 	*testValueStore
 	*testMeter
@@ -126,6 +147,7 @@ func (vs *testValueStore) AllocateStorageIndex(owner []byte) (atree.StorageIndex
 
 type testMeter struct {
 	meterComputation       func(common.ComputationKind, uint) error
+	hasComputationCapacity func(common.ComputationKind, uint) bool
 	computationUsed        func() (uint64, error)
 	computationIntensities func() meter.MeteredComputationIntensities
 
@@ -148,6 +170,16 @@ func (m *testMeter) MeterComputation(
 		panic("method not set")
 	}
 	return m.meterComputation(kind, intensity)
+}
+
+func (m *testMeter) HasComputationCapacity(
+	kind common.ComputationKind,
+	intensity uint,
+) bool {
+	if m.hasComputationCapacity == nil {
+		panic("method not set")
+	}
+	return m.hasComputationCapacity(kind, intensity)
 }
 
 func (m *testMeter) ComputationIntensities() meter.MeteredComputationIntensities {

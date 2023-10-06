@@ -1,7 +1,6 @@
 package fvm_test
 
 import (
-	"math"
 	"math/big"
 	"testing"
 
@@ -70,6 +69,8 @@ func TestWithFlexEnabled_ContractInteraction(t *testing.T) {
 				// test storing a value
 				num := int64(12)
 
+				gasLimit := uint64(100_000)
+
 				// create ctx with flex enabled
 				ctx := fvm.NewContext(
 					fvm.WithChain(chain),
@@ -87,13 +88,13 @@ func TestWithFlexEnabled_ContractInteraction(t *testing.T) {
 							assert(Flex.run(tx: tx, coinbase: coinbase), message: "tx execution failed")
 						}
 					}
-			`)
+				`)
 
 				storeTxBytes := testAccount.PrepareSignAndEncodeTx(t,
 					testContract.DeployedAt,
 					testContract.MakeStoreCallData(t, big.NewInt(num)),
 					big.NewInt(0),
-					math.MaxUint64,
+					gasLimit,
 					big.NewInt(1),
 				)
 
@@ -133,7 +134,7 @@ func TestWithFlexEnabled_ContractInteraction(t *testing.T) {
 					testContract.DeployedAt,
 					testContract.MakeRetrieveCallData(t),
 					big.NewInt(0),
-					math.MaxUint64,
+					gasLimit,
 					big.NewInt(1),
 				)
 
@@ -156,7 +157,7 @@ func TestWithFlexEnabled_ContractInteraction(t *testing.T) {
 						let coinbase = Flex.FlexAddress(bytes: coinbaseBytes)
 						return Flex.run(tx: tx, coinbase: coinbase)
 					}
-			`)
+				`)
 
 				retriveScriptBody := fvm.Script(script).
 					WithArguments(encodedInnerTx, encodedCoinbase)
@@ -167,7 +168,7 @@ func TestWithFlexEnabled_ContractInteraction(t *testing.T) {
 					snapshotTree)
 				require.NoError(t, err)
 
-				// transaction should pass
+				// transaction should pass in the future
 				require.NoError(t, output.Err)
 
 				require.Equal(t, output.Value, true)
@@ -177,6 +178,45 @@ func TestWithFlexEnabled_ContractInteraction(t *testing.T) {
 		})
 	})
 }
+
+// func TestWithFlexEnabled_FOAInteraction(t *testing.T) {
+
+// 	chainID := flow.Emulator
+// 	// flexRoot := emulator.FlexRootAccountAddress
+// 	var snapshotTree snapshot.SnapshotTree
+// 	WithBootstrappedTestVM(t, chainID, func(chain flow.Chain, vm fvm.VM, tree *snapshot.SnapshotTree) {
+// 		// create ctx with flex enabled
+// 		ctx := fvm.NewContext(
+// 			fvm.WithChain(chain),
+// 			fvm.WithFlexEnabled(true),
+// 			fvm.WithAuthorizationChecksEnabled(false),
+// 			fvm.WithSequenceNumberCheckAndIncrementEnabled(false),
+// 		)
+
+// 		txScript := []byte(`
+// 					transaction(tx: [UInt8], coinbaseBytes: [UInt8; 20]) {
+// 						prepare(signer: AuthAccount) {
+// 						}
+// 						execute {
+// 							// TODO: create a flex account
+// 						}
+// 					}
+// 				`)
+
+// 		storeTxBody := flow.NewTransactionBody().
+// 			SetScript(txScript).
+// 			AddAuthorizer(chain.ServiceAddress())
+
+// 		_, output, err := vm.Run(
+// 			ctx,
+// 			fvm.Transaction(storeTxBody, 0),
+// 			snapshotTree)
+// 		require.NoError(t, err)
+
+// 		// transaction should pass
+// 		require.NoError(t, output.Err)
+// 	})
+// }
 
 type ledger struct {
 	tree     *snapshot.SnapshotTree
