@@ -343,8 +343,18 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 			myAddr = fnb.BaseConfig.BindAddr
 		}
 
-		builder, err := p2pbuilder.DefaultNodeBuilder(
-			fnb.Logger,
+		routingSystemActivation := p2pbuilder.RoutingSystemActivationDisabled
+		role, err := flow.ParseRole(fnb.BaseConfig.NodeRole)
+		if err != nil {
+			return nil, fmt.Errorf("could not parse node role: %w", err)
+		}
+		if role == flow.RoleAccess || role == flow.RoleExecution {
+			// Only access and execution nodes need to run DHT;
+			// Access nodes and execution nodes need DHT to run a blob service.
+			// Moreover, access nodes run a DHT to let un-staked (public) access nodes find each other on the public network.
+			routingSystemActivation = p2pbuilder.RoutingSystemActivationEnabled
+		}
+		builder, err := p2pbuilder.DefaultNodeBuilder(fnb.Logger,
 			myAddr,
 			network.PrivateNetwork,
 			fnb.NetworkKey,
@@ -366,7 +376,8 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 			&p2p.DisallowListCacheConfig{
 				MaxSize: fnb.FlowConfig.NetworkConfig.DisallowListNotificationCacheSize,
 				Metrics: metrics.DisallowListCacheMetricsFactory(fnb.HeroCacheMetricsFactory(), network.PrivateNetwork),
-			})
+			},
+			routingSystemActivation)
 
 		if err != nil {
 			return nil, fmt.Errorf("could not create libp2p node builder: %w", err)

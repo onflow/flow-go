@@ -73,6 +73,18 @@ func InitCorruptLibp2pNode(
 		Metrics:          metricsCfg,
 	}
 
+	routingSystemActivation := p2pbuilder.RoutingSystemActivationDisabled
+	r, err := flow.ParseRole(role)
+	if err != nil {
+		return nil, fmt.Errorf("could not parse node role: %w", err)
+	}
+	if r == flow.RoleAccess || r == flow.RoleExecution {
+		// Only access and execution nodes need to run DHT;
+		// Access nodes and execution nodes need DHT to run a blob service.
+		// Moreover, access nodes run a DHT to let un-staked (public) access nodes find each other on the public network.
+		routingSystemActivation = p2pbuilder.RoutingSystemActivationEnabled
+	}
+
 	builder, err := p2pbuilder.DefaultNodeBuilder(
 		log,
 		address,
@@ -90,7 +102,8 @@ func InitCorruptLibp2pNode(
 		&netConfig.ResourceManagerConfig,
 		uniCfg,
 		&netConfig.ConnectionManagerConfig,
-		disallowListCacheCfg)
+		disallowListCacheCfg,
+		routingSystemActivation)
 
 	if err != nil {
 		return nil, fmt.Errorf("could not create corrupt libp2p node builder: %w", err)
@@ -99,14 +112,22 @@ func InitCorruptLibp2pNode(
 		builder.SetCreateNode(NewCorruptLibP2PNode)
 	}
 
-	overrideWithCorruptGossipSub(builder, WithMessageSigning(withMessageSigning), WithStrictSignatureVerification(withStrictSignatureVerification))
+	overrideWithCorruptGossipSub(
+		builder,
+		WithMessageSigning(withMessageSigning),
+		WithStrictSignatureVerification(withStrictSignatureVerification))
 	return builder.Build()
 }
 
 // CorruptGossipSubFactory returns a factory function that creates a new instance of the forked gossipsub module from
 // github.com/yhassanzadeh13/go-libp2p-pubsub for the purpose of BFT testing and attack vector implementation.
 func CorruptGossipSubFactory(routerOpts ...func(*corrupt.GossipSubRouter)) p2p.GossipSubFactoryFunc {
-	factory := func(ctx context.Context, logger zerolog.Logger, host host.Host, cfg p2p.PubSubAdapterConfig, clusterChangeConsumer p2p.CollectionClusterChangesConsumer) (p2p.PubSubAdapter, error) {
+	factory := func(
+		ctx context.Context,
+		logger zerolog.Logger,
+		host host.Host,
+		cfg p2p.PubSubAdapterConfig,
+		clusterChangeConsumer p2p.CollectionClusterChangesConsumer) (p2p.PubSubAdapter, error) {
 		adapter, router, err := NewCorruptGossipSubAdapter(ctx, logger, host, cfg, clusterChangeConsumer)
 		for _, opt := range routerOpts {
 			opt(router)

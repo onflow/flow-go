@@ -44,6 +44,13 @@ import (
 	"github.com/onflow/flow-go/network/p2p/utils"
 )
 
+type RoutingSystemActivation bool
+
+const (
+	RoutingSystemActivationEnabled  RoutingSystemActivation = true
+	RoutingSystemActivationDisabled RoutingSystemActivation = false
+)
+
 type LibP2PNodeBuilder struct {
 	gossipSubBuilder p2p.GossipSubBuilder
 	sporkId          flow.Identifier
@@ -424,7 +431,8 @@ func DefaultNodeBuilder(
 	rCfg *p2pconf.ResourceManagerConfig,
 	uniCfg *p2pconfig.UnicastConfig,
 	connMgrConfig *netconf.ConnectionManagerConfig,
-	disallowListCacheCfg *p2p.DisallowListCacheConfig) (p2p.NodeBuilder, error) {
+	disallowListCacheCfg *p2p.DisallowListCacheConfig,
+	routingSystemActivation RoutingSystemActivation) (p2p.NodeBuilder, error) {
 
 	connManager, err := connection.NewConnManager(logger, metricsCfg.Metrics, connMgrConfig)
 	if err != nil {
@@ -489,10 +497,7 @@ func DefaultNodeBuilder(
 		}
 		builder.SetSubscriptionFilter(subscription.NewRoleBasedFilter(r, idProvider))
 
-		if r == flow.RoleAccess || r == flow.RoleExecution {
-			// Only access and execution nodes need to run DHT;
-			// Access nodes and execution nodes need DHT to run a blob service.
-			// Moreover, access nodes run a DHT to let un-staked (public) access nodes find each other on the public network.
+		if routingSystemActivation == RoutingSystemActivationEnabled {
 			builder.SetRoutingSystem(
 				func(ctx context.Context, host host.Host) (routing.Routing, error) {
 					return dht.NewDHT(ctx, host, protocols.FlowDHTProtocolID(sporkId), logger, metricsCfg.Metrics, dht.AsServer())
