@@ -305,8 +305,7 @@ func (builder *LibP2PNodeBuilder) Build() (p2p.LibP2PNode, error) {
 					}
 					node.SetRouting(routingSystem)
 					builder.gossipSubBuilder.SetRoutingSystem(routingSystem)
-				} else {
-					builder.logger.Warn().Msg("no routing system is set for the node; ignore the log for non-access and non-execution nodes")
+					builder.logger.Debug().Msg("routing system created")
 				}
 				// gossipsub is created here, because it needs to be created during the node startup.
 				gossipSub, err := builder.gossipSubBuilder.Build(ctx)
