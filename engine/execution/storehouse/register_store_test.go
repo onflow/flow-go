@@ -25,7 +25,7 @@ func TestRegisterStoreGetRegisterFail(t *testing.T) {
 		t *testing.T,
 		rs *storehouse.RegisterStore,
 		diskStore execution.OnDiskRegisterStore,
-		finalized execution.FinalizedReader,
+		finalized *mockFinalizedReader,
 		headerByHeight map[uint64]*flow.Header,
 	) {
 		rootHeight := uint64(10)
@@ -114,7 +114,7 @@ func withRegisterStore(t *testing.T, fn func(
 	t *testing.T,
 	rs *storehouse.RegisterStore,
 	diskStore execution.OnDiskRegisterStore,
-	finalized execution.FinalizedReader,
+	finalized *mockFinalizedReader,
 	headers map[uint64]*flow.Header,
 )) {
 	pebble.RunWithRegistersStorageAtInitialHeights(t, 10, 10, func(diskStore *pebble.Registers) {
@@ -130,21 +130,127 @@ func withRegisterStore(t *testing.T, fn func(
 // SaveRegisters should fail for
 // 1. mismatching parent
 // 2. saved block
+func TestRegisterStoreSaveRegistersShouldFail(t *testing.T) {
+	withRegisterStore(t, func(
+		t *testing.T,
+		rs *storehouse.RegisterStore,
+		diskStore execution.OnDiskRegisterStore,
+		finalized *mockFinalizedReader,
+		headerByHeight map[uint64]*flow.Header,
+	) {
+		rootHeight := uint64(10)
+
+		wrongParent := unittest.BlockHeaderFixture(unittest.WithHeaderHeight(rootHeight + 1))
+		err := rs.SaveRegisters(wrongParent, []flow.RegisterEntry{})
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "parent")
+
+		err = rs.SaveRegisters(headerByHeight[rootHeight], []flow.RegisterEntry{})
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "pruned")
+	})
+}
 
 // SaveRegisters should ok, and
 // 1. GetRegister can get saved registers,
-// 2. FinalizedAndExecutedHeight should be updated
-// 3. IsBlockExecuted should return true
-
+// 2. IsBlockExecuted should return true
+//
 // if SaveRegisters with empty register, then
 // 1. FinalizedAndExecutedHeight should be updated
 // 2. IsBlockExecuted should return true
+func TestRegisterStoreSaveRegistersShouldOK(t *testing.T) {
+	withRegisterStore(t, func(
+		t *testing.T,
+		rs *storehouse.RegisterStore,
+		diskStore execution.OnDiskRegisterStore,
+		finalized *mockFinalizedReader,
+		headerByHeight map[uint64]*flow.Header,
+	) {
+		rootHeight := uint64(10)
 
-// if 10 is latest finalized, then
-// 1. IsBlockExecuted should return true for finalized block 9
-// 2. IsBlockExecuted should return false for conflicting block 9
-// 4. IsBlockExecuted should return true for executed and unfinalized block 11
-// 3. IsBlockExecuted should return false for unexecuted block 12
+		// not executed
+		executed, err := rs.IsBlockExecuted(rootHeight+1, headerByHeight[rootHeight+1].ID())
+		require.NoError(t, err)
+		require.False(t, executed)
+
+		// save block 11
+		reg := makeReg("X", "1")
+		err = rs.SaveRegisters(headerByHeight[rootHeight+1], []flow.RegisterEntry{reg})
+		require.NoError(t, err)
+
+		// should get value
+		val, err := rs.GetRegister(rootHeight+1, headerByHeight[rootHeight+1].ID(), reg.Key)
+		require.NoError(t, err)
+		require.Equal(t, reg.Value, val)
+
+		// should become executed
+		executed, err = rs.IsBlockExecuted(rootHeight+1, headerByHeight[rootHeight+1].ID())
+		require.NoError(t, err)
+		require.True(t, executed)
+
+		// block 12 is empty
+		err = rs.SaveRegisters(headerByHeight[rootHeight+2], []flow.RegisterEntry{})
+		require.NoError(t, err)
+
+		// should get same value
+		val, err = rs.GetRegister(rootHeight+1, headerByHeight[rootHeight+2].ID(), reg.Key)
+		require.NoError(t, err)
+		require.Equal(t, reg.Value, val)
+
+		// should become executed
+		executed, err = rs.IsBlockExecuted(rootHeight+1, headerByHeight[rootHeight+2].ID())
+		require.NoError(t, err)
+		require.True(t, executed)
+	})
+}
+
+// if 11 is latest finalized, then
+// 1. IsBlockExecuted should return true for finalized block 10
+// 2. IsBlockExecuted should return false for conflicting block 10
+// 4. IsBlockExecuted should return true for executed and unfinalized block 12
+// 3. IsBlockExecuted should return false for unexecuted block 13
+func TestRegisterStoreIsBlockExecuted(t *testing.T) {
+	withRegisterStore(t, func(
+		t *testing.T,
+		rs *storehouse.RegisterStore,
+		diskStore execution.OnDiskRegisterStore,
+		finalized *mockFinalizedReader,
+		headerByHeight map[uint64]*flow.Header,
+	) {
+		rootHeight := uint64(10)
+		// save block 11
+		reg := makeReg("X", "1")
+		err := rs.SaveRegisters(headerByHeight[rootHeight+1], []flow.RegisterEntry{reg})
+		require.NoError(t, err)
+
+		// save block 12
+		err = rs.SaveRegisters(headerByHeight[rootHeight+2], []flow.RegisterEntry{makeReg("X", "2")})
+		require.NoError(t, err)
+
+		require.NoError(t, finalized.MockFinal(rootHeight+1))
+
+		rs.OnBlockFinalized() // notify 11 is finalized
+
+		require.Equal(t, rootHeight+1, rs.FinalizedAndExecutedHeight())
+
+		executed, err := rs.IsBlockExecuted(rootHeight, headerByHeight[rootHeight].ID())
+		require.NoError(t, err)
+		require.True(t, executed)
+
+		executed, err = rs.IsBlockExecuted(rootHeight+1, headerByHeight[rootHeight+1].ID())
+		require.NoError(t, err)
+		require.True(t, executed)
+
+		executed, err = rs.IsBlockExecuted(rootHeight+2, headerByHeight[rootHeight+2].ID())
+		require.NoError(t, err)
+		require.True(t, executed)
+
+		executed, err = rs.IsBlockExecuted(rootHeight+3, headerByHeight[rootHeight+3].ID())
+		require.NoError(t, err)
+		require.False(t, executed)
+	})
+
+}
 
 // Execute first then finalize later
 // SaveRegisters(1), SaveRegisters(2), SaveRegisters(3), then
