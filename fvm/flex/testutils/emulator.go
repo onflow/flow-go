@@ -93,6 +93,10 @@ func RandomCommonHash() common.Hash {
 	return ret
 }
 
+func RandomFlexAddress() models.FlexAddress {
+	return models.NewFlexAddress(RandomAddress())
+}
+
 func RandomAddress() common.Address {
 	ret := common.Address{}
 	cryptoRand.Read(ret[:common.AddressLength])

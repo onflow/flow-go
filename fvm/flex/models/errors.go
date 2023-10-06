@@ -74,3 +74,11 @@ func (err FatalError) Error() string {
 func IsAFatalError(err error) bool {
 	return errors.As(err, &FatalError{})
 }
+
+func IsAInsufficientTotalSupplyError(err error) bool {
+	return errors.Is(err, ErrInsufficientTotalSupply)
+}
+
+func IsAUnAuthroizedMethodCallError(err error) bool {
+	return errors.Is(err, ErrUnAuthroizedMethodCall)
+}

@@ -113,14 +113,14 @@ func TestHandler_TransactionRun(t *testing.T) {
 					coinbase := models.NewFlexAddress(common.Address{})
 
 					// test RLP decoding (non fatal)
-					assertPanic(t, false, func() {
+					assertPanic(t, isNotFatal, func() {
 						// invalid RLP encoding
 						invalidTx := "badencoding"
 						handler.Run([]byte(invalidTx), coinbase)
 					})
 
 					// test gas limit (non fatal)
-					assertPanic(t, false, func() {
+					assertPanic(t, isNotFatal, func() {
 						gasLimit := uint64(testutils.TestComputationLimit + 1)
 						tx := eoa.PrepareSignAndEncodeTx(
 							t,
@@ -254,10 +254,7 @@ func TestHandler_OpsWithoutEmulator(t *testing.T) {
 
 func TestHandler_FOA(t *testing.T) {
 
-	// TODO add test with test emulator for unhappy cases
-
 	t.Run("test deposit/withdraw (with integrated emulator)", func(t *testing.T) {
-		// TODO update this test with gas metering, etc
 		testutils.RunWithTestBackend(t, func(backend models.Backend) {
 			testutils.RunWithTestFlexRoot(t, backend, func(flexRoot flow.Address) {
 				db, err := storage.NewDatabase(backend, flexRoot)
@@ -316,6 +313,104 @@ func TestHandler_FOA(t *testing.T) {
 				// block event
 				event = events[3]
 				assert.Equal(t, event.Type, models.EventTypeFlexBlockExecuted)
+
+				// check gas usage
+				computationUsed, err := backend.ComputationUsed()
+				require.NoError(t, err)
+				require.Equal(t, evm.TransferGasUsage*2, computationUsed)
+			})
+		})
+	})
+
+	t.Run("test withdraw (unhappy case)", func(t *testing.T) {
+		testutils.RunWithTestBackend(t, func(backend models.Backend) {
+			testutils.RunWithTestFlexRoot(t, backend, func(flexRoot flow.Address) {
+				testutils.RunWithEOATestAccount(t, backend, flexRoot, func(eoa *testutils.EOATestAccount) {
+
+					db, err := storage.NewDatabase(backend, flexRoot)
+					require.NoError(t, err)
+
+					// Withdraw calls are only possible within FOA accounts
+					assertPanic(t, models.IsAUnAuthroizedMethodCallError, func() {
+						em := &testutils.TestEmulator{}
+						handler := flex.NewFlexContractHandler(db, backend, em)
+
+						account := handler.AccountByAddress(testutils.RandomFlexAddress(), false)
+						account.Withdraw(models.Balance(1))
+					})
+
+					// test insufficient total supply
+					assertPanic(t, models.IsAInsufficientTotalSupplyError, func() {
+						em := &testutils.TestEmulator{
+							WithdrawFromFunc: func(address models.FlexAddress, amount *big.Int) (*models.Result, error) {
+								return nil, models.NewEVMExecutionError(fmt.Errorf("some sort of error"))
+							},
+						}
+						handler := flex.NewFlexContractHandler(db, backend, em)
+						account := handler.AccountByAddress(testutils.RandomFlexAddress(), true)
+						account.Withdraw(models.Balance(1))
+					})
+
+					// test non fatal error of emulator
+					assertPanic(t, models.IsEVMExecutionError, func() {
+						em := &testutils.TestEmulator{
+							WithdrawFromFunc: func(address models.FlexAddress, amount *big.Int) (*models.Result, error) {
+								return nil, models.NewEVMExecutionError(fmt.Errorf("some sort of error"))
+							},
+						}
+						handler := flex.NewFlexContractHandler(db, backend, em)
+						account := handler.AccountByAddress(testutils.RandomFlexAddress(), true)
+						account.Withdraw(models.Balance(0))
+					})
+
+					// test fatal error of emulator
+					assertPanic(t, models.IsAFatalError, func() {
+						em := &testutils.TestEmulator{
+							WithdrawFromFunc: func(address models.FlexAddress, amount *big.Int) (*models.Result, error) {
+								return nil, models.NewFatalError(fmt.Errorf("some sort of fatal error"))
+							},
+						}
+						handler := flex.NewFlexContractHandler(db, backend, em)
+						account := handler.AccountByAddress(testutils.RandomFlexAddress(), true)
+						account.Withdraw(models.Balance(0))
+					})
+				})
+			})
+		})
+	})
+
+	t.Run("test deposit (unhappy case)", func(t *testing.T) {
+		testutils.RunWithTestBackend(t, func(backend models.Backend) {
+			testutils.RunWithTestFlexRoot(t, backend, func(flexRoot flow.Address) {
+				testutils.RunWithEOATestAccount(t, backend, flexRoot, func(eoa *testutils.EOATestAccount) {
+
+					db, err := storage.NewDatabase(backend, flexRoot)
+					require.NoError(t, err)
+
+					// test non fatal error of emulator
+					assertPanic(t, models.IsEVMExecutionError, func() {
+						em := &testutils.TestEmulator{
+							MintToFunc: func(address models.FlexAddress, amount *big.Int) (*models.Result, error) {
+								return nil, models.NewEVMExecutionError(fmt.Errorf("some sort of error"))
+							},
+						}
+						handler := flex.NewFlexContractHandler(db, backend, em)
+						account := handler.AccountByAddress(testutils.RandomFlexAddress(), true)
+						account.Deposit(models.NewFlowTokenVault(1))
+					})
+
+					// test fatal error of emulator
+					assertPanic(t, models.IsAFatalError, func() {
+						em := &testutils.TestEmulator{
+							MintToFunc: func(address models.FlexAddress, amount *big.Int) (*models.Result, error) {
+								return nil, models.NewFatalError(fmt.Errorf("some sort of fatal error"))
+							},
+						}
+						handler := flex.NewFlexContractHandler(db, backend, em)
+						account := handler.AccountByAddress(testutils.RandomFlexAddress(), true)
+						account.Deposit(models.NewFlowTokenVault(1))
+					})
+				})
 			})
 		})
 	})
@@ -361,9 +456,18 @@ func TestHandler_FOA(t *testing.T) {
 			})
 		})
 	})
+
+	// TODO add test with test emulator for unhappy cases (emulator)
 }
 
-func assertPanic(t *testing.T, isFatal bool, f func()) {
+// returns true if error passes the checks
+type checkError func(error) bool
+
+var isNotFatal = func(err error) bool {
+	return !errors.IsFailure(err)
+}
+
+func assertPanic(t *testing.T, check checkError, f func()) {
 	defer func() {
 		r := recover()
 		if r == nil {
@@ -373,7 +477,7 @@ func assertPanic(t *testing.T, isFatal bool, f func()) {
 		if !ok {
 			t.Fatal("panic is not with an error type")
 		}
-		require.False(t, errors.IsFailure(err))
+		require.True(t, check(err))
 	}()
 	f()
 }

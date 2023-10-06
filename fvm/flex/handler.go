@@ -115,9 +115,7 @@ func (h FlexContractHandler) Run(rlpEncodedTx []byte, coinbase models.FlexAddres
 	gasLimit := tx.Gas()
 	h.checkGasLimit(models.GasLimit(gasLimit))
 	res, err := h.emulator.RunTransaction(&tx, coinbase)
-	if res != nil {
-		h.meterGasUsage(res.GasConsumed)
-	}
+	h.meterGasUsage(res)
 
 	// TODO: we might need to revisit returning bool
 	if models.IsEVMExecutionError(err) {
@@ -140,9 +138,11 @@ func (h FlexContractHandler) checkGasLimit(limit models.GasLimit) {
 	}
 }
 
-func (h FlexContractHandler) meterGasUsage(usage uint64) {
-	err := h.backend.MeterComputation(environment.ComputationKindEVMGasUsage, uint(usage))
-	handleError(err)
+func (h FlexContractHandler) meterGasUsage(res *models.Result) {
+	if res != nil {
+		err := h.backend.MeterComputation(environment.ComputationKindEVMGasUsage, uint(res.GasConsumed))
+		handleError(err)
+	}
 }
 
 func (h *FlexContractHandler) EmitEvent(event *models.Event) {
@@ -193,7 +193,7 @@ func (f *flexAccount) Balance() models.Balance {
 func (f *flexAccount) Deposit(v *models.FLOWTokenVault) {
 	// TODO check gas limit and meter
 	res, err := f.fch.emulator.MintTo(f.address, v.Balance().ToAttoFlow())
-	f.fch.meterGasUsage(res.GasConsumed)
+	f.fch.meterGasUsage(res)
 	handleError(err)
 	// emit event
 	f.fch.EmitEvent(models.NewFlowTokenDepositEvent(f.address, v.Balance()))
@@ -214,7 +214,7 @@ func (f *flexAccount) Withdraw(b models.Balance) *models.FLOWTokenVault {
 	}
 
 	res, err := f.fch.emulator.WithdrawFrom(f.address, b.ToAttoFlow())
-	f.fch.meterGasUsage(res.GasConsumed)
+	f.fch.meterGasUsage(res)
 	handleError(err)
 
 	// emit event
@@ -232,7 +232,7 @@ func (f *flexAccount) Deploy(code models.Code, gaslimit models.GasLimit, balance
 	f.checkAuthorized()
 	f.fch.checkGasLimit(gaslimit)
 	res, err := f.fch.emulator.Deploy(f.address, code, uint64(gaslimit), balance.ToAttoFlow())
-	f.fch.meterGasUsage(res.GasConsumed)
+	f.fch.meterGasUsage(res)
 	handleError(err)
 	f.fch.EmitLastExecutedBlockEvent()
 	f.fch.updateLastExecutedBlock(res.StateRootHash, res.LogsRootHash)
@@ -248,7 +248,7 @@ func (f *flexAccount) Call(to models.FlexAddress, data models.Data, gaslimit mod
 	f.checkAuthorized()
 	f.fch.checkGasLimit(gaslimit)
 	res, err := f.fch.emulator.Call(f.address, to, data, uint64(gaslimit), balance.ToAttoFlow())
-	f.fch.meterGasUsage(res.GasConsumed)
+	f.fch.meterGasUsage(res)
 	handleError(err)
 	f.fch.EmitLastExecutedBlockEvent()
 	f.fch.updateLastExecutedBlock(res.StateRootHash, res.LogsRootHash)
