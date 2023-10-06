@@ -19,7 +19,7 @@ type RegisterStore struct {
 	wal        execution.ExecutedFinalizedWAL
 	finalized  execution.FinalizedReader
 	log        zerolog.Logger
-	finalizing *atomic.Bool
+	finalizing *atomic.Bool // making sure only one goroutine is finalizing at a time
 }
 
 func NewRegisterStore(
@@ -95,12 +95,15 @@ func (r *RegisterStore) SaveRegisters(header *flow.Header, registers []flow.Regi
 // 3. prune the height in InMemoryRegisterStore
 func (r *RegisterStore) OnBlockFinalized() error {
 	// only one goroutine can execute OnBlockFinalized at a time
-	if !r.finalizing.CAS(false, true) {
+	if !r.finalizing.CompareAndSwap(false, true) {
 		return nil
 	}
 
 	defer r.finalizing.Store(false)
+	return r.onBlockFinalized()
+}
 
+func (r *RegisterStore) onBlockFinalized() error {
 	latest := r.diskStore.LatestHeight()
 	next := latest + 1
 	blockID, err := r.finalized.GetFinalizedBlockIDAtHeight(next)
@@ -131,7 +134,7 @@ func (r *RegisterStore) OnBlockFinalized() error {
 		return fmt.Errorf("cannot prune memStore for height %v: %w", next, err)
 	}
 
-	return nil
+	return r.onBlockFinalized() // check again until there is no more finalized block
 }
 
 // FinalizedAndExecutedHeight returns the height of the last finalized and executed block,

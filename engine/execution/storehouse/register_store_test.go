@@ -384,7 +384,7 @@ func TestRegisterStoreConcurrentFinalizeAndExecute(t *testing.T) {
 		}()
 
 		for height := rootHeight + 1; height <= endHeight; height++ {
-			if height >= 10 {
+			if height >= 50 {
 				savedHeights <- height
 			}
 
