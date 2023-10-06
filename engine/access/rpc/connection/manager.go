@@ -17,6 +17,7 @@ import (
 	"google.golang.org/grpc/keepalive"
 	"google.golang.org/grpc/status"
 
+	_ "github.com/onflow/flow-go/engine/common/grpc/compressor/deflate"
 	_ "github.com/onflow/flow-go/engine/common/grpc/compressor/lz4"
 	_ "github.com/onflow/flow-go/engine/common/grpc/compressor/snappy"
 	"github.com/onflow/flow-go/module"
