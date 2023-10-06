@@ -150,7 +150,7 @@ func TestFlexContractHandler(t *testing.T) {
 						big.NewInt(1e8), // high gas fee to test coinbase collection,
 					)
 
-					assert.PanicsWithError(t, models.ErrInsufficientComputation.Error(), func() {
+					assertPanic(t, false, func() {
 						handler.Run(tx, eoa.FlexAddress())
 					})
 				})

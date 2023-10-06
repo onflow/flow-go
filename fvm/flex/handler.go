@@ -9,7 +9,6 @@ import (
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/errors"
-	env "github.com/onflow/flow-go/fvm/flex/environment"
 	"github.com/onflow/flow-go/fvm/flex/models"
 	"github.com/onflow/flow-go/fvm/flex/storage"
 )
@@ -160,20 +159,6 @@ func (h *FlexContractHandler) EmitLastExecutedBlockEvent() {
 	h.EmitEvent(models.NewBlockExecutedEvent(block))
 }
 
-func (h *FlexContractHandler) EmitEvent(event *models.Event) {
-	// TODO add extra metering for encoding
-	encoded, err := event.Payload.RLPEncode()
-	handleError(err)
-	h.backend.EmitFlowEvent(event.Etype, encoded)
-}
-
-func (h *FlexContractHandler) EmitLastExecutedBlockEvent() {
-	// TODO: we should handle loading of blocks here and not inside db
-	block, err := h.db.GetLatestBlock()
-	handleError(err)
-	h.EmitEvent(models.NewBlockExecutedEvent(block))
-}
-
 type flexAccount struct {
 	isFOA   bool
 	address models.FlexAddress
@@ -284,16 +269,5 @@ func handleError(err error) {
 			panic(err)
 		}
 		panic(errors.NewEVMError(err))
-	}
-}
-
-func (f *flexAccount) getNewDefaultEnv() *env.Environment {
-	return f.fch.getNewDefaultEnv()
-}
-
-func (f *flexAccount) checkAuthorized() {
-	// check if account is authorized to to FOA related opeartions
-	if !f.isFOA {
-		handleError(models.ErrUnAuthroizedMethodCall)
 	}
 }
