@@ -46,6 +46,10 @@ func (m *mockInspectorSuite) AddInvalidControlMessageConsumer(consumer p2p.Gossi
 func (m *mockInspectorSuite) ActiveClustersChanged(_ flow.ChainIDList) {
 	// no-op
 }
+func (m *mockInspectorSuite) SetTopicOracle(_ func() []string) error {
+	// no-op
+	return nil
+}
 
 // newMockInspectorSuite creates a new mockInspectorSuite.
 // Args:
