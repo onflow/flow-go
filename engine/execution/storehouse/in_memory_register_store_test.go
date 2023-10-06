@@ -322,6 +322,36 @@ func TestInMemoryRegisterStoreMultiForkOK(t *testing.T) {
 	require.Equal(t, reg.Value, val)
 }
 
+//  7. Given the following tree:
+//     Pruned <- A(X:1) <- B(Y:2), B is not executed
+//     GetUpdatedRegisters(C) should return ErrNotExecuted
+func TestInMemoryRegisterGetUpdatedRegisters(t *testing.T) {
+	t.Parallel()
+	pruned := uint64(10)
+	lastID := unittest.IdentifierFixture()
+	store := NewInMemoryRegisterStore(pruned, lastID)
+
+	// 10 <- A (X: 1) <- B (Y: 2)
+	//		^- C (X: 3) <- D (Y: 4)
+	blockA := unittest.IdentifierFixture()
+	blockB := unittest.IdentifierFixture()
+
+	require.NoError(t, store.SaveRegisters(
+		pruned+1,
+		blockA,
+		lastID,
+		[]flow.RegisterEntry{makeReg("X", "1")},
+	))
+
+	reg, err := store.GetUpdatedRegisters(pruned+1, blockA)
+	require.NoError(t, err)
+	require.Equal(t, []flow.RegisterEntry{makeReg("X", "1")}, reg)
+
+	_, err = store.GetUpdatedRegisters(pruned+2, blockB)
+	require.Error(t, err)
+	require.ErrorIs(t, err, ErrNotExecuted)
+}
+
 //  8. Prune should fail if the block is unknown
 //     Prune should succeed if the block is known, and GetUpdatedRegisters should return err
 //     Prune should prune up to the pruned height.
