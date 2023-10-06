@@ -1,4 +1,4 @@
-package env
+package evm
 
 import (
 	"math"
@@ -15,7 +15,6 @@ import (
 var (
 	FlexTestnetChainID     = big.NewInt(666)
 	FlexMainnetChainID     = big.NewInt(777)
-	DefaultMaxGasLimit     = uint64(math.MaxUint64) // TODO: revisit this limit
 	TransferGasUsage       = uint64(21_000)
 	DefaultGasPrice        = big.NewInt(1)
 	BlockNumberForEVMRules = big.NewInt(18138954) // a recent block to be used as a refrence for the EVM setup
@@ -60,8 +59,8 @@ func defaultConfig() *Config {
 		BlockContext: &vm.BlockContext{
 			CanTransfer: core.CanTransfer,
 			Transfer:    core.Transfer,
-			GasLimit:    DefaultMaxGasLimit,
-			BaseFee:     big.NewInt(1), // small base fee for block
+			GasLimit:    math.MaxUint64, // block gas limit
+			BaseFee:     big.NewInt(1),  // small base fee for block
 			GetHash: func(n uint64) common.Hash {
 				return common.BytesToHash(crypto.Keccak256([]byte(new(big.Int).SetUint64(n).String())))
 			},
@@ -69,8 +68,8 @@ func defaultConfig() *Config {
 	}
 }
 
-// NewFlexConfig initializes a new flex configuration
-func NewFlexConfig(opts ...Option) *Config {
+// NewConfig initializes a new config
+func NewConfig(opts ...Option) *Config {
 	ctx := defaultConfig()
 	for _, applyOption := range opts {
 		ctx = applyOption(ctx)

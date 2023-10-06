@@ -12,7 +12,7 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/onflow/atree"
-	env "github.com/onflow/flow-go/fvm/flex/environment"
+	"github.com/onflow/flow-go/fvm/flex/evm"
 	"github.com/onflow/flow-go/fvm/flex/models"
 	"github.com/onflow/flow-go/fvm/flex/storage"
 	"github.com/onflow/flow-go/model/flow"
@@ -79,9 +79,7 @@ func (a *EOATestAccount) PrepareAndSignTx(
 func GetTestEOAAccount(t testing.TB, keyHex string) *EOATestAccount {
 	key, _ := crypto.HexToECDSA(keyHex)
 	address := crypto.PubkeyToAddress(key.PublicKey)
-	flexConf := env.NewFlexConfig()
-	signer := types.MakeSigner(flexConf.ChainConfig, env.BlockNumberForEVMRules, flexConf.BlockContext.Time)
-
+	signer := evm.GetSigner()
 	return &EOATestAccount{
 		address: address,
 		key:     key,
@@ -97,12 +95,10 @@ func RunWithEOATestAccount(t *testing.T, led atree.Ledger, flexRoot flow.Address
 	db, err := storage.NewDatabase(led, flexRoot)
 	require.NoError(t, err)
 
-	config := env.NewFlexConfig(env.WithBlockNumber(env.BlockNumberForEVMRules))
-
-	e, err := env.NewEnvironment(config, db)
+	e := evm.NewEmulator(db)
 	require.NoError(t, err)
 
-	err = e.MintTo(new(big.Int).Mul(big.NewInt(1e18), big.NewInt(1000)), account.FlexAddress().ToCommon())
+	_, err = e.MintTo(account.FlexAddress(), new(big.Int).Mul(big.NewInt(1e18), big.NewInt(1000)))
 	require.NoError(t, err)
 
 	f(account)

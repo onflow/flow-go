@@ -8,10 +8,10 @@ import (
 	"testing"
 
 	"github.com/ethereum/go-ethereum/accounts/abi"
-	"github.com/ethereum/go-ethereum/common"
 	gethCommon "github.com/ethereum/go-ethereum/common"
 	"github.com/onflow/atree"
-	env "github.com/onflow/flow-go/fvm/flex/environment"
+	"github.com/onflow/flow-go/fvm/flex/evm"
+	"github.com/onflow/flow-go/fvm/flex/models"
 	"github.com/onflow/flow-go/fvm/flex/storage"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/stretchr/testify/require"
@@ -21,7 +21,7 @@ type TestContract struct {
 	Code       string
 	ABI        string
 	ByteCode   []byte
-	DeployedAt common.Address
+	DeployedAt models.FlexAddress
 }
 
 func (tc *TestContract) MakeStoreCallData(t *testing.T, num *big.Int) []byte {
@@ -40,7 +40,7 @@ func (tc *TestContract) MakeRetrieveCallData(t *testing.T) []byte {
 	return retrieve
 }
 
-func (tc *TestContract) SetDeployedAt(deployedAt common.Address) {
+func (tc *TestContract) SetDeployedAt(deployedAt models.FlexAddress) {
 	tc.DeployedAt = deployedAt
 }
 
@@ -107,21 +107,15 @@ func RunWithDeployedContract(t *testing.T, led atree.Ledger, flexRoot flow.Addre
 	db, err := storage.NewDatabase(led, flexRoot)
 	require.NoError(t, err)
 
-	config := env.NewFlexConfig(env.WithBlockNumber(env.BlockNumberForEVMRules))
+	e := evm.NewEmulator(db)
 
-	e, err := env.NewEnvironment(config, db)
+	caller := models.NewFlexAddress(gethCommon.Address{})
+	_, err = e.MintTo(caller, new(big.Int).Mul(big.NewInt(1e18), big.NewInt(1000)))
 	require.NoError(t, err)
 
-	caller := gethCommon.Address{}
-	err = e.MintTo(new(big.Int).Mul(big.NewInt(1e18), big.NewInt(1000)), caller)
+	res, err := e.Deploy(caller, tc.ByteCode, math.MaxUint64, big.NewInt(0))
 	require.NoError(t, err)
 
-	e, err = env.NewEnvironment(config, db)
-	require.NoError(t, err)
-
-	err = e.Deploy(gethCommon.Address{}, tc.ByteCode, math.MaxUint64, big.NewInt(0))
-	require.NoError(t, err)
-
-	tc.SetDeployedAt(e.Result.DeployedContractAddress)
+	tc.SetDeployedAt(res.DeployedContractAddress)
 	f(tc)
 }

@@ -11,19 +11,28 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/fvm/flex"
+	"github.com/onflow/flow-go/fvm/flex/evm"
 	"github.com/onflow/flow-go/fvm/flex/models"
+	"github.com/onflow/flow-go/fvm/flex/storage"
 	"github.com/onflow/flow-go/fvm/flex/testutils"
 	"github.com/onflow/flow-go/model/flow"
 )
 
 // TODO add test for fatal errors
+// TODO update test to just use a test emulator
 
 func TestFlexContractHandler(t *testing.T) {
 	t.Parallel()
 	t.Run("test last executed block call", func(t *testing.T) {
 		testutils.RunWithTestBackend(t, func(backend models.Backend) {
 			testutils.RunWithTestFlexRoot(t, backend, func(flexRoot flow.Address) {
-				handler := flex.NewFlexContractHandler(backend, flexRoot)
+
+				db, err := storage.NewDatabase(backend, flexRoot)
+				require.NoError(t, err)
+
+				emulator := evm.NewEmulator(db)
+
+				handler := flex.NewFlexContractHandler(db, backend, emulator)
 				// test call last executed block without initialization
 				b := handler.LastExecutedBlock()
 				require.Equal(t, models.GenesisFlexBlock, b)
@@ -43,7 +52,12 @@ func TestFlexContractHandler(t *testing.T) {
 	t.Run("test foa creation", func(t *testing.T) {
 		testutils.RunWithTestBackend(t, func(backend models.Backend) {
 			testutils.RunWithTestFlexRoot(t, backend, func(flexRoot flow.Address) {
-				handler := flex.NewFlexContractHandler(backend, flexRoot)
+				db, err := storage.NewDatabase(backend, flexRoot)
+				require.NoError(t, err)
+
+				emulator := evm.NewEmulator(db)
+
+				handler := flex.NewFlexContractHandler(db, backend, emulator)
 				foa := handler.AllocateAddress()
 				require.NotNil(t, foa)
 
@@ -56,7 +70,12 @@ func TestFlexContractHandler(t *testing.T) {
 	t.Run("test running transaction", func(t *testing.T) {
 		testutils.RunWithTestBackend(t, func(backend models.Backend) {
 			testutils.RunWithTestFlexRoot(t, backend, func(flexRoot flow.Address) {
-				handler := flex.NewFlexContractHandler(backend, flexRoot)
+				db, err := storage.NewDatabase(backend, flexRoot)
+				require.NoError(t, err)
+
+				emulator := evm.NewEmulator(db)
+
+				handler := flex.NewFlexContractHandler(db, backend, emulator)
 
 				eoa := testutils.GetTestEOAAccount(t, testutils.EOATestAccount1KeyHex)
 
@@ -108,7 +127,12 @@ func TestFlexContractHandler(t *testing.T) {
 			testutils.RunWithTestFlexRoot(t, backend, func(flexRoot flow.Address) {
 				testutils.RunWithEOATestAccount(t, backend, flexRoot, func(eoa *testutils.EOATestAccount) {
 
-					handler := flex.NewFlexContractHandler(backend, flexRoot)
+					db, err := storage.NewDatabase(backend, flexRoot)
+					require.NoError(t, err)
+
+					emulator := evm.NewEmulator(db)
+
+					handler := flex.NewFlexContractHandler(db, backend, emulator)
 					// set tx limit above the tx limit
 
 					gasLimit := uint64(testutils.TestComputationLimit + 1)
@@ -134,7 +158,12 @@ func TestFOA(t *testing.T) {
 	t.Run("test deposit/withdraw", func(t *testing.T) {
 		testutils.RunWithTestBackend(t, func(backend models.Backend) {
 			testutils.RunWithTestFlexRoot(t, backend, func(flexRoot flow.Address) {
-				handler := flex.NewFlexContractHandler(backend, flexRoot)
+				db, err := storage.NewDatabase(backend, flexRoot)
+				require.NoError(t, err)
+
+				emulator := evm.NewEmulator(db)
+
+				handler := flex.NewFlexContractHandler(db, backend, emulator)
 				foa := handler.AccountByAddress(handler.AllocateAddress(), true)
 				require.NotNil(t, foa)
 
@@ -164,7 +193,12 @@ func TestFOA(t *testing.T) {
 	t.Run("test deploy/call", func(t *testing.T) {
 		testutils.RunWithTestBackend(t, func(backend models.Backend) {
 			testutils.RunWithTestFlexRoot(t, backend, func(flexRoot flow.Address) {
-				handler := flex.NewFlexContractHandler(backend, flexRoot)
+				db, err := storage.NewDatabase(backend, flexRoot)
+				require.NoError(t, err)
+
+				emulator := evm.NewEmulator(db)
+
+				handler := flex.NewFlexContractHandler(db, backend, emulator)
 				foa := handler.AccountByAddress(handler.AllocateAddress(), true)
 				require.NotNil(t, foa)
 
