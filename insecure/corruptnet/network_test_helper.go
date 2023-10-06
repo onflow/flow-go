@@ -5,24 +5,21 @@ package corruptnet
 import (
 	"context"
 	"fmt"
-	"github.com/onflow/flow-go/module/local"
 	"net"
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/mock"
-
 	"github.com/rs/zerolog"
-
+	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
 	grpcinsecure "google.golang.org/grpc/credentials/insecure"
 
 	"github.com/onflow/flow-go/insecure"
-	"github.com/onflow/flow-go/module/irrecoverable"
-
-	"github.com/stretchr/testify/require"
-
+	"github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/irrecoverable"
+	"github.com/onflow/flow-go/module/local"
 	"github.com/onflow/flow-go/network/mocknetwork"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -31,14 +28,14 @@ import (
 // By default, no attacker is registered on this corruptible network.
 // This function is not meant to be used by tests directly because it expects the corrupt network to be properly started and stopped.
 // Otherwise, it will throw mock expectations errors.
-func corruptNetworkFixture(t *testing.T, logger zerolog.Logger, corruptedID ...*flow.Identity) (*Network, *mocknetwork.Adapter) {
+func corruptNetworkFixture(t *testing.T, logger zerolog.Logger, corruptedID ...flow.Identifier) (*Network, *mocknetwork.Adapter, bootstrap.NodeInfo) {
 	// create corruptible network with no attacker registered
 	codec := unittest.NetworkCodec()
 
 	corruptedIdentity := unittest.PrivateNodeInfosFixture(1, unittest.WithAddress(insecure.DefaultAddress))[0]
 	// some tests will want to create corruptible network with a specific ID
 	if len(corruptedID) > 0 {
-		corruptedIdentity.NodeID = corruptedID[0].NodeID
+		corruptedIdentity.NodeID = corruptedID[0]
 	}
 
 	flowNetwork := mocknetwork.NewNetwork(t)
@@ -80,7 +77,7 @@ func corruptNetworkFixture(t *testing.T, logger zerolog.Logger, corruptedID ...*
 	require.NoError(t, err)
 
 	// return adapter so callers can set up test specific expectations
-	return corruptibleNetwork, adapter
+	return corruptibleNetwork, adapter, corruptedIdentity
 }
 
 // runCorruptNetworkTest creates and starts a corruptible network, runs the "run" function of a simulated attacker and then
@@ -92,8 +89,6 @@ func runCorruptNetworkTest(t *testing.T, logger zerolog.Logger,
 		*mocknetwork.Adapter, // mock adapter that corrupted network uses to communicate with authorized flow nodes.
 		insecure.CorruptNetwork_ProcessAttackerMessageClient, // gRPC interface that orchestrator network uses to send messages to this ccf.
 	)) {
-
-	corruptedIdentity := unittest.IdentityFixture(unittest.WithAddress(insecure.DefaultAddress))
 
 	// life-cycle management of corruptible network
 	ctx, cancel := context.WithCancel(context.Background())
@@ -107,7 +102,8 @@ func runCorruptNetworkTest(t *testing.T, logger zerolog.Logger,
 		}
 	}()
 
-	corruptibleNetwork, adapter := corruptNetworkFixture(t, logger, corruptedIdentity)
+	corruptedIdentifier := unittest.IdentifierFixture()
+	corruptibleNetwork, adapter, corruptedIdentity := corruptNetworkFixture(t, logger, corruptedIdentifier)
 
 	// start corruptible network
 	corruptibleNetwork.Start(ccfCtx)
@@ -128,7 +124,7 @@ func runCorruptNetworkTest(t *testing.T, logger zerolog.Logger,
 	stream, err := client.ProcessAttackerMessage(context.Background())
 	require.NoError(t, err)
 
-	run(*corruptedIdentity, corruptibleNetwork, adapter, stream)
+	run(*corruptedIdentity.Identity(), corruptibleNetwork, adapter, stream)
 
 	// terminates orchestratorNetwork
 	cancel()
