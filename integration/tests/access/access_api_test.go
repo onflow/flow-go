@@ -233,7 +233,7 @@ func (s *AccessAPISuite) deployContract() *sdk.TransactionResult {
 	tx, err := s.serviceClient.DeployContract(s.ctx, header.ID, lib.CounterContract)
 	s.Require().NoError(err)
 
-	result, err := s.serviceClient.WaitForStatus(s.ctx, tx.ID(), sdk.TransactionStatusExecuted)
+	_, err = s.serviceClient.WaitForStatus(s.ctx, tx.ID(), sdk.TransactionStatusExecuted)
 	s.Require().NoError(err)
 
 	// Add counter to service account

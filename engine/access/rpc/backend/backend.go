@@ -4,8 +4,6 @@ import (
 	"context"
 	"crypto/md5" //nolint:gosec
 	"fmt"
-	"net"
-	"strconv"
 	"time"
 
 	lru "github.com/hashicorp/golang-lru/v2"
@@ -529,23 +527,4 @@ func chooseExecutionNodes(state protocol.State, executorIDs flow.IdentifierList)
 
 	// If no preferred or fixed ENs have been specified, then return all executor IDs i.e. no preference at all
 	return allENs.Filter(filter.HasNodeID(executorIDs...)), nil
-}
-
-// Find ports from supplied Address
-func findPortFromAddress(address string) (uint, error) {
-	_, portStr, err := net.SplitHostPort(address)
-	if err != nil {
-		return 0, fmt.Errorf("fail to extract port from address %v: %w", address, err)
-	}
-
-	port, err := strconv.Atoi(portStr)
-	if err != nil {
-		return 0, fmt.Errorf("fail to convert port string %v to port from address %v", portStr, address)
-	}
-
-	if port < 0 {
-		return 0, fmt.Errorf("invalid port: %v in address %v", port, address)
-	}
-
-	return uint(port), nil
 }
