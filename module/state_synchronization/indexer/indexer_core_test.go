@@ -20,6 +20,7 @@ import (
 	"github.com/onflow/flow-go/ledger/complete"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
+	"github.com/onflow/flow-go/module/metrics"
 	synctest "github.com/onflow/flow-go/module/state_synchronization/requester/unittest"
 	"github.com/onflow/flow-go/storage"
 	storagemock "github.com/onflow/flow-go/storage/mock"
@@ -153,7 +154,7 @@ func (i *indexCoreTest) initIndexer() *indexCoreTest {
 		require.NoError(i.t, os.RemoveAll(dbDir))
 	})
 
-	indexer, err := New(zerolog.New(os.Stdout), db, i.registers, i.headers, i.events, i.results)
+	indexer, err := New(zerolog.New(os.Stdout), metrics.NewNoopCollector(), db, i.registers, i.headers, i.events, i.results)
 	require.NoError(i.t, err)
 	i.indexer = indexer
 	return i
@@ -548,10 +549,13 @@ func TestIndexerIntegration_StoreAndGet(t *testing.T) {
 		require.NoError(t, os.RemoveAll(dbDir))
 	})
 
+	logger := zerolog.Nop()
+	metrics := metrics.NewNoopCollector()
+
 	// this test makes sure index values for a single register are correctly updated and always last value is returned
 	t.Run("Single Index Value Changes", func(t *testing.T) {
 		pebbleStorage.RunWithRegistersStorageAtInitialHeights(t, 0, 0, func(registers *pebbleStorage.Registers) {
-			index, err := New(zerolog.Nop(), db, registers, nil, nil, nil)
+			index, err := New(logger, metrics, db, registers, nil, nil, nil)
 			require.NoError(t, err)
 
 			values := [][]byte{[]byte("1"), []byte("1"), []byte("2"), []byte("3") /*nil,*/, []byte("4")}
@@ -578,7 +582,7 @@ func TestIndexerIntegration_StoreAndGet(t *testing.T) {
 	// e.g. we index A{h(1) -> X}, A{h(2) -> Y}, when we request h(4) we get value Y
 	t.Run("Single Index Value At Later Heights", func(t *testing.T) {
 		pebbleStorage.RunWithRegistersStorageAtInitialHeights(t, 0, 0, func(registers *pebbleStorage.Registers) {
-			index, err := New(zerolog.Nop(), db, registers, nil, nil, nil)
+			index, err := New(logger, metrics, db, registers, nil, nil, nil)
 			require.NoError(t, err)
 
 			storeValues := [][]byte{[]byte("1"), []byte("2")}
@@ -609,7 +613,7 @@ func TestIndexerIntegration_StoreAndGet(t *testing.T) {
 	// this test makes sure we correctly handle weird payloads
 	t.Run("Empty and Nil Payloads", func(t *testing.T) {
 		pebbleStorage.RunWithRegistersStorageAtInitialHeights(t, 0, 0, func(registers *pebbleStorage.Registers) {
-			index, err := New(zerolog.Nop(), db, registers, nil, nil, nil)
+			index, err := New(logger, metrics, db, registers, nil, nil, nil)
 			require.NoError(t, err)
 
 			require.NoError(t, index.indexRegisters(map[ledger.Path]*ledger.Payload{}, 1))
