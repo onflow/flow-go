@@ -102,6 +102,9 @@ func (r *mockFinalizedReader) GetFinalizedBlockIDAtHeight(height uint64) (flow.I
 		return flow.Identifier{}, storage.ErrNotFound
 	}
 
+	if height < r.lowest {
+		return unknownBlock, nil
+	}
 	return r.headerByHeight[height].ID(), nil
 }
 
