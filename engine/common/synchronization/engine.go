@@ -548,7 +548,6 @@ func (e *Engine) validateBlockResponseForALSP(channel channels.Channel, id flow.
 func (e *Engine) validateRangeRequestForALSP(originID flow.Identifier, rangeRequest *messages.RangeRequest) error {
 	// Generate a random integer between 0 and spamProbabilityMultiplier (exclusive)
 	n, err := rand.Uint32n(spamProbabilityMultiplier)
-
 	if err != nil {
 		return fmt.Errorf("failed to generate random number from %x: %w", originID[:], err)
 	}
@@ -561,7 +560,6 @@ func (e *Engine) validateRangeRequestForALSP(originID flow.Identifier, rangeRequ
 			Str("reason", alsp.InvalidMessage.String()).
 			Msgf("received invalid range request from height %d is not less than the to height %d, creating ALSP report", rangeRequest.FromHeight, rangeRequest.ToHeight)
 		report, err := alsp.NewMisbehaviorReport(originID, alsp.InvalidMessage)
-
 		if err != nil {
 			// failing to create the misbehavior report is unlikely. If an error is encountered while
 			// creating the misbehavior report it indicates a bug and processing can not proceed.
@@ -594,7 +592,6 @@ func (e *Engine) validateRangeRequestForALSP(originID flow.Identifier, rangeRequ
 			Str("reason", alsp.ResourceIntensiveRequest.String()).
 			Msgf("from height %d to height %d, creating probabilistic ALSP report", rangeRequest.FromHeight, rangeRequest.ToHeight)
 		report, err := alsp.NewMisbehaviorReport(originID, alsp.ResourceIntensiveRequest)
-
 		if err != nil {
 			// failing to create the misbehavior report is unlikely. If an error is encountered while
 			// creating the misbehavior report it indicates a bug and processing can not proceed.
@@ -622,7 +619,6 @@ func (e *Engine) validateRangeRequestForALSP(originID flow.Identifier, rangeRequ
 func (e *Engine) validateSyncRequestForALSP(originID flow.Identifier) error {
 	// Generate a random integer between 0 and spamProbabilityMultiplier (exclusive)
 	n, err := rand.Uint32n(spamProbabilityMultiplier)
-
 	if err != nil {
 		return fmt.Errorf("failed to generate random number from %x: %w", originID[:], err)
 	}
@@ -639,7 +635,6 @@ func (e *Engine) validateSyncRequestForALSP(originID flow.Identifier) error {
 			Msg("creating probabilistic ALSP report")
 
 		report, err := alsp.NewMisbehaviorReport(originID, alsp.ResourceIntensiveRequest)
-
 		if err != nil {
 			// failing to create the misbehavior report is unlikely. If an error is encountered while
 			// creating the misbehavior report it indicates a bug and processing can not proceed.
