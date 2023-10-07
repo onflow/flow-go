@@ -5,8 +5,6 @@ import (
 	"sync"
 	"testing"
 
-	"go.uber.org/atomic"
-
 	"github.com/onflow/flow-go/engine/execution"
 	"github.com/onflow/flow-go/engine/execution/storehouse"
 	"github.com/onflow/flow-go/model/flow"
@@ -15,6 +13,25 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 	"github.com/stretchr/testify/require"
 )
+
+func withRegisterStore(t *testing.T, fn func(
+	t *testing.T,
+	rs *storehouse.RegisterStore,
+	diskStore execution.OnDiskRegisterStore,
+	finalized *mockFinalizedReader,
+	rootHeight uint64,
+	endHeight uint64,
+	headers map[uint64]*flow.Header,
+)) {
+	pebble.RunWithRegistersStorageAtInitialHeights(t, 10, 10, func(diskStore *pebble.Registers) {
+		log := unittest.Logger()
+		var wal execution.ExecutedFinalizedWAL
+		finalized, headerByHeight, highest := newMockFinalizedReader(10, 100)
+		rs, err := storehouse.NewRegisterStore(diskStore, wal, finalized, log)
+		require.NoError(t, err)
+		fn(t, rs, diskStore, finalized, 10, highest, headerByHeight)
+	})
+}
 
 // GetRegister should fail for
 // 1. unknown blockID
@@ -54,85 +71,6 @@ func TestRegisterStoreGetRegisterFail(t *testing.T) {
 		_, err = rs.GetRegister(rootHeight, rootBlock.ID(), unknownReg.Key)
 		require.Error(t, err)
 		require.ErrorIs(t, err, storage.ErrNotFound)
-	})
-}
-
-var unknownBlock = unittest.IdentifierFixture()
-var unknownReg = makeReg("unknown", "unknown")
-
-func makeReg(key string, value string) flow.RegisterEntry {
-	return flow.RegisterEntry{
-		Key: flow.RegisterID{
-			Owner: "owner",
-			Key:   key,
-		},
-		Value: []byte(value),
-	}
-}
-
-type mockFinalizedReader struct {
-	headerByHeight  map[uint64]*flow.Header
-	lowest          uint64
-	highest         uint64
-	finalizedHeight *atomic.Uint64
-}
-
-func newMockFinalizedReader(initHeight uint64, count int) (*mockFinalizedReader, map[uint64]*flow.Header, uint64) {
-	root := unittest.BlockHeaderFixture(unittest.WithHeaderHeight(initHeight))
-	blocks := unittest.ChainFixtureFrom(count, root)
-	headerByHeight := make(map[uint64]*flow.Header, len(blocks)+1)
-	headerByHeight[root.Height] = root
-
-	for _, b := range blocks {
-		headerByHeight[b.Header.Height] = b.Header
-	}
-
-	highest := blocks[len(blocks)-1].Header.Height
-	return &mockFinalizedReader{
-		headerByHeight:  headerByHeight,
-		lowest:          initHeight,
-		highest:         highest,
-		finalizedHeight: atomic.NewUint64(initHeight),
-	}, headerByHeight, highest
-}
-
-func (r *mockFinalizedReader) GetFinalizedBlockIDAtHeight(height uint64) (flow.Identifier, error) {
-	finalized := r.finalizedHeight.Load()
-	if height > finalized {
-		return flow.Identifier{}, storage.ErrNotFound
-	}
-
-	if height < r.lowest {
-		return unknownBlock, nil
-	}
-	return r.headerByHeight[height].ID(), nil
-}
-
-func (r *mockFinalizedReader) MockFinal(height uint64) error {
-	if height < r.lowest || height > r.highest {
-		return fmt.Errorf("height %d is out of range [%d, %d]", height, r.lowest, r.highest)
-	}
-
-	r.finalizedHeight.Store(height)
-	return nil
-}
-
-func withRegisterStore(t *testing.T, fn func(
-	t *testing.T,
-	rs *storehouse.RegisterStore,
-	diskStore execution.OnDiskRegisterStore,
-	finalized *mockFinalizedReader,
-	rootHeight uint64,
-	endHeight uint64,
-	headers map[uint64]*flow.Header,
-)) {
-	pebble.RunWithRegistersStorageAtInitialHeights(t, 10, 10, func(diskStore *pebble.Registers) {
-		log := unittest.Logger()
-		var wal execution.ExecutedFinalizedWAL
-		finalized, headerByHeight, highest := newMockFinalizedReader(10, 100)
-		rs, err := storehouse.NewRegisterStore(diskStore, wal, finalized, log)
-		require.NoError(t, err)
-		fn(t, rs, diskStore, finalized, 10, highest, headerByHeight)
 	})
 }
 
