@@ -511,7 +511,7 @@ func (e *Engine) validateBatchRequestForALSP(originID flow.Identifier, batchRequ
 	batchRequestProb := e.spamDetectionConfig.batchRequestBaseProb * (float32(len(batchRequest.BlockIDs)) + 1) / float32(synccore.DefaultConfig().MaxSize)
 	if float32(n) < batchRequestProb*spamProbabilityMultiplier {
 		// create a misbehavior report
-		e.log.Warn().
+		e.log.Debug().
 			Hex("origin_id", logging.ID(originID)).
 			Str(logging.KeyLoad, "true").
 			Str("reason", alsp.ResourceIntensiveRequest.String()).
@@ -588,7 +588,7 @@ func (e *Engine) validateRangeRequestForALSP(originID flow.Identifier, rangeRequ
 	rangeRequestProb := e.spamDetectionConfig.rangeRequestBaseProb * (float32(rangeRequest.ToHeight-rangeRequest.FromHeight) + 1) / float32(synccore.DefaultConfig().MaxSize)
 	if float32(n) < rangeRequestProb*spamProbabilityMultiplier {
 		// create a misbehavior report
-		e.log.Warn().
+		e.log.Debug().
 			Hex("origin_id", logging.ID(originID)).
 			Str(logging.KeyLoad, "true").
 			Str("reason", alsp.ResourceIntensiveRequest.String()).
@@ -632,7 +632,7 @@ func (e *Engine) validateSyncRequestForALSP(originID flow.Identifier) error {
 	if float32(n) < e.spamDetectionConfig.syncRequestProb*spamProbabilityMultiplier {
 
 		// create misbehavior report
-		e.log.Warn().
+		e.log.Debug().
 			Hex("origin_id", logging.ID(originID)).
 			Str(logging.KeyLoad, "true").
 			Str("reason", alsp.ResourceIntensiveRequest.String()).
