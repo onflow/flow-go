@@ -363,7 +363,8 @@ func executionNodesForBlockID(
 	blockID flow.Identifier,
 	executionReceipts storage.ExecutionReceipts,
 	state protocol.State,
-	log zerolog.Logger) (flow.IdentityList, error) {
+	log zerolog.Logger,
+) (flow.IdentityList, error) {
 
 	var executorIDs flow.IdentifierList
 
@@ -438,7 +439,8 @@ func executionNodesForBlockID(
 func findAllExecutionNodes(
 	blockID flow.Identifier,
 	executionReceipts storage.ExecutionReceipts,
-	log zerolog.Logger) (flow.IdentifierList, error) {
+	log zerolog.Logger,
+) (flow.IdentifierList, error) {
 
 	// lookup the receipt's storage with the block ID
 	allReceipts, err := executionReceipts.ByBlockID(blockID)

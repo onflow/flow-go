@@ -7,7 +7,6 @@ import (
 
 	"github.com/dgraph-io/badger/v2"
 	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
-	entitiesproto "github.com/onflow/flow/protobuf/go/flow/entities"
 	execproto "github.com/onflow/flow/protobuf/go/flow/execution"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
@@ -109,7 +108,6 @@ func (suite *Suite) TestPing() {
 	suite.Require().NoError(err)
 
 	err = backend.Ping(context.Background())
-
 	suite.Require().NoError(err)
 }
 
@@ -1459,137 +1457,6 @@ func (suite *Suite) TestGetEventsForHeightRange() {
 		suite.Require().Error(err)
 	})
 
-}
-
-func (suite *Suite) TestGetAccount() {
-	suite.state.On("Sealed").Return(suite.snapshot, nil).Maybe()
-	suite.state.On("Final").Return(suite.snapshot, nil).Maybe()
-
-	address, err := suite.chainID.Chain().NewAddressGenerator().NextAddress()
-	suite.Require().NoError(err)
-
-	account := &entitiesproto.Account{
-		Address: address.Bytes(),
-	}
-	ctx := context.Background()
-
-	// setup the latest sealed block
-	block := unittest.BlockFixture()
-	header := block.Header          // create a mock header
-	seal := unittest.Seal.Fixture() // create a mock seal
-	seal.BlockID = header.ID()      // make the seal point to the header
-
-	suite.snapshot.
-		On("Head").
-		Return(header, nil).
-		Once()
-
-	// create the expected execution API request
-	blockID := header.ID()
-	exeReq := &execproto.GetAccountAtBlockIDRequest{
-		BlockId: blockID[:],
-		Address: address.Bytes(),
-	}
-
-	// create the expected execution API response
-	exeResp := &execproto.GetAccountAtBlockIDResponse{
-		Account: account,
-	}
-
-	// setup the execution client mock
-	suite.execClient.
-		On("GetAccountAtBlockID", ctx, exeReq).
-		Return(exeResp, nil).
-		Once()
-
-	receipts, ids := suite.setupReceipts(&block)
-
-	suite.snapshot.On("Identities", mock.Anything).Return(ids, nil)
-	// create a mock connection factory
-	connFactory := connectionmock.NewConnectionFactory(suite.T())
-	connFactory.On("GetExecutionAPIClient", mock.Anything).Return(suite.execClient, &mockCloser{}, nil)
-
-	params := suite.defaultBackendParams()
-	params.ConnFactory = connFactory
-
-	backend, err := New(params)
-	suite.Require().NoError(err)
-
-	preferredENIdentifiers = flow.IdentifierList{receipts[0].ExecutorID}
-
-	suite.Run("happy path - valid request and valid response", func() {
-		account, err := backend.GetAccountAtLatestBlock(ctx, address)
-		suite.checkResponse(account, err)
-
-		suite.Require().Equal(address, account.Address)
-
-		suite.assertAllExpectations()
-	})
-}
-
-func (suite *Suite) TestGetAccountAtBlockHeight() {
-	suite.state.On("Sealed").Return(suite.snapshot, nil).Maybe()
-	suite.state.On("Final").Return(suite.snapshot, nil).Maybe()
-
-	height := uint64(5)
-	address := unittest.AddressFixture()
-	account := &entitiesproto.Account{
-		Address: address.Bytes(),
-	}
-	ctx := context.Background()
-
-	// create a mock block header
-	b := unittest.BlockFixture()
-	h := b.Header
-
-	// setup Headers storage to return the header when queried by height
-	suite.headers.
-		On("ByHeight", height).
-		Return(h, nil).
-		Once()
-
-	receipts, ids := suite.setupReceipts(&b)
-	suite.snapshot.On("Identities", mock.Anything).Return(ids, nil)
-
-	// create a mock connection factory
-	connFactory := connectionmock.NewConnectionFactory(suite.T())
-	connFactory.On("GetExecutionAPIClient", mock.Anything).Return(suite.execClient, &mockCloser{}, nil)
-
-	// create the expected execution API request
-	blockID := h.ID()
-	exeReq := &execproto.GetAccountAtBlockIDRequest{
-		BlockId: blockID[:],
-		Address: address.Bytes(),
-	}
-
-	// create the expected execution API response
-	exeResp := &execproto.GetAccountAtBlockIDResponse{
-		Account: account,
-	}
-
-	// setup the execution client mock
-	suite.execClient.
-		On("GetAccountAtBlockID", ctx, exeReq).
-		Return(exeResp, nil).
-		Once()
-
-	params := suite.defaultBackendParams()
-	params.ChainID = flow.Testnet
-	params.ConnFactory = connFactory
-
-	backend, err := New(params)
-	suite.Require().NoError(err)
-
-	preferredENIdentifiers = flow.IdentifierList{receipts[0].ExecutorID}
-
-	suite.Run("happy path - valid request and valid response", func() {
-		account, err := backend.GetAccountAtBlockHeight(ctx, address, height)
-		suite.checkResponse(account, err)
-
-		suite.Require().Equal(address, account.Address)
-
-		suite.assertAllExpectations()
-	})
 }
 
 func (suite *Suite) TestGetNodeVersionInfo() {

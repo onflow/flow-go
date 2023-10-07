@@ -21,11 +21,11 @@ import (
 )
 
 type backendAccounts struct {
+	log               zerolog.Logger
 	state             protocol.State
 	headers           storage.Headers
 	executionReceipts storage.ExecutionReceipts
 	connFactory       connection.ConnectionFactory
-	log               zerolog.Logger
 	nodeCommunicator  Communicator
 	scriptExecutor    execution.ScriptExecutor
 	scriptExecMode    ScriptExecutionMode
@@ -40,17 +40,17 @@ func (b *backendAccounts) GetAccount(ctx context.Context, address flow.Address) 
 // GetAccountAtLatestBlock returns the account details at the latest sealed block.
 func (b *backendAccounts) GetAccountAtLatestBlock(ctx context.Context, address flow.Address) (*flow.Account, error) {
 	// get the latest sealed header
-	latestHeader, err := b.state.Sealed().Head()
+	sealed, err := b.state.Sealed().Head()
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to get latest sealed header: %v", err)
 	}
 
 	// get the block id of the latest sealed header
-	latestBlockID := latestHeader.ID()
+	sealedBlockID := sealed.ID()
 
-	account, err := b.getAccountAtBlock(ctx, address, latestBlockID, latestHeader.Height)
+	account, err := b.getAccountAtBlock(ctx, address, sealedBlockID, sealed.Height)
 	if err != nil {
-		b.log.Debug().Err(err).Msgf("failed to get account at blockID: %v", latestBlockID)
+		b.log.Debug().Err(err).Msgf("failed to get account at blockID: %v", sealedBlockID)
 		return nil, err
 	}
 
@@ -141,7 +141,7 @@ func (b *backendAccounts) getAccountFromAnyExeNode(
 
 	execNodes, err := executionNodesForBlockID(ctx, blockID, b.executionReceipts, b.state, b.log)
 	if err != nil {
-		return nil, rpc.ConvertError(err, "failed to get account from the execution node", codes.Internal)
+		return nil, rpc.ConvertError(err, "failed to find execution node to query", codes.Internal)
 	}
 
 	var resp *execproto.GetAccountAtBlockIDResponse
@@ -174,7 +174,7 @@ func (b *backendAccounts) getAccountFromAnyExeNode(
 	)
 
 	if errToReturn != nil {
-		return nil, errToReturn
+		return nil, rpc.ConvertError(errToReturn, "failed to get account from the execution node", codes.Internal)
 	}
 
 	account, err := convert.MessageToAccount(resp.GetAccount())
