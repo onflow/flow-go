@@ -97,15 +97,15 @@ func (s *BackendAccountsSuite) setupExecutionNodes(block *flow.Block) {
 
 	s.connectionFactory.On("GetExecutionAPIClient", mock.Anything).
 		Return(s.execClient, &mockCloser{}, nil)
+}
 
-	// create the expected execution API request
-	blockID := block.ID()
+// setupENSuccessResponse configures the execution node client to return a successful response
+func (s *BackendAccountsSuite) setupENSuccessResponse(blockID flow.Identifier) {
 	expectedExecRequest := &execproto.GetAccountAtBlockIDRequest{
 		BlockId: blockID[:],
 		Address: s.account.Address.Bytes(),
 	}
 
-	// create the expected execution API response
 	convertedAccount, err := convert.AccountToMessage(s.account)
 	s.Require().NoError(err)
 
@@ -115,11 +115,23 @@ func (s *BackendAccountsSuite) setupExecutionNodes(block *flow.Block) {
 		}, nil)
 }
 
-func (s *BackendAccountsSuite) TestGetAccountFromExecutionNode() {
+// setupENFailingResponse configures the execution node client to return an error
+func (s *BackendAccountsSuite) setupENFailingResponse(blockID flow.Identifier, err error) {
+	failingRequest := &execproto.GetAccountAtBlockIDRequest{
+		BlockId: blockID[:],
+		Address: s.failingAddress.Bytes(),
+	}
+
+	s.execClient.On("GetAccountAtBlockID", mock.Anything, failingRequest).
+		Return(nil, err)
+}
+
+// TestGetAccountFromExecutionNode_HappyPath tests successfully getting accounts from execution nodes
+func (s *BackendAccountsSuite) TestGetAccountFromExecutionNode_HappyPath() {
 	ctx := context.Background()
 
-	// setup the execution client mocks
 	s.setupExecutionNodes(s.block)
+	s.setupENSuccessResponse(s.block.ID())
 
 	backend := s.defaultBackend()
 	backend.scriptExecMode = ScriptExecutionModeExecutionNodesOnly
@@ -135,20 +147,21 @@ func (s *BackendAccountsSuite) TestGetAccountFromExecutionNode() {
 	s.Run("GetAccountAtBlockHeight - happy path", func() {
 		s.testGetAccountAtBlockHeight(ctx, backend, codes.OK)
 	})
+}
 
-	// test EN errors are passed through
-	blockID := s.block.ID()
-	failingRequest := &execproto.GetAccountAtBlockIDRequest{
-		BlockId: blockID[:],
-		Address: s.failingAddress.Bytes(),
-	}
+// TestGetAccountFromExecutionNode_Fails errors received from execution nodes are returned
+func (s *BackendAccountsSuite) TestGetAccountFromExecutionNode_Fails() {
+	ctx := context.Background()
 
 	// use a status code that's not used in the API to make sure it's passed through
 	statusCode := codes.FailedPrecondition
 	errToReturn := status.Error(statusCode, "random error")
 
-	s.execClient.On("GetAccountAtBlockID", mock.Anything, failingRequest).
-		Return(nil, errToReturn).Times(6) // one set for each of the 2 ENs
+	s.setupExecutionNodes(s.block)
+	s.setupENFailingResponse(s.block.ID(), errToReturn)
+
+	backend := s.defaultBackend()
+	backend.scriptExecMode = ScriptExecutionModeExecutionNodesOnly
 
 	s.Run("GetAccount - fails with backend err", func() {
 		s.testGetAccount(ctx, backend, statusCode)
@@ -163,7 +176,8 @@ func (s *BackendAccountsSuite) TestGetAccountFromExecutionNode() {
 	})
 }
 
-func (s *BackendAccountsSuite) TestGetAccountFromStorage() {
+// TestGetAccountFromStorage_HappyPath test successfully getting accounts from local storage
+func (s *BackendAccountsSuite) TestGetAccountFromStorage_HappyPath() {
 	ctx := context.Background()
 
 	scriptExecutor := execmock.NewScriptExecutor(s.T())
@@ -185,57 +199,72 @@ func (s *BackendAccountsSuite) TestGetAccountFromStorage() {
 	s.Run("GetAccountAtBlockHeight - happy path", func() {
 		s.testGetAccountAtBlockHeight(ctx, backend, codes.OK)
 	})
+}
 
-	// run tests where the following errors are returned from the script executor and verify the
-	// expected grpc status code is returned
-	errors := []error{
-		ErrDataNotAvailable,
-		storage.ErrNotFound,
-		fmt.Errorf("random error"),
+// TestGetAccountFromStorage_Fails tests that errors received from local storage are handled
+// and converted to the appropriate status code
+func (s *BackendAccountsSuite) TestGetAccountFromStorage_Fails() {
+	ctx := context.Background()
+
+	scriptExecutor := execmock.NewScriptExecutor(s.T())
+
+	backend := s.defaultBackend()
+	backend.scriptExecMode = ScriptExecutionModeLocalOnly
+	backend.scriptExecutor = scriptExecutor
+
+	testCases := []struct {
+		err        error
+		statusCode codes.Code
+	}{
+		{
+			err:        ErrDataNotAvailable,
+			statusCode: codes.OutOfRange,
+		},
+		{
+			err:        storage.ErrNotFound,
+			statusCode: codes.NotFound,
+		},
+		{
+			err:        fmt.Errorf("system error"),
+			statusCode: codes.Internal,
+		},
 	}
-	for _, errToReturn := range errors {
-		var statusCode codes.Code
-		switch errToReturn {
-		case ErrDataNotAvailable:
-			statusCode = codes.OutOfRange
-		case storage.ErrNotFound:
-			statusCode = codes.NotFound
-		default:
-			statusCode = codes.Internal
-		}
 
+	for _, tt := range testCases {
 		scriptExecutor.On("GetAccountAtBlockHeight", mock.Anything, s.failingAddress, s.block.Header.Height).
-			Return(nil, errToReturn).Times(3)
+			Return(nil, tt.err).Times(3)
 
-		s.Run(fmt.Sprintf("GetAccount - fails with %v", errToReturn), func() {
-			s.testGetAccount(ctx, backend, statusCode)
+		s.Run(fmt.Sprintf("GetAccount - fails with %v", tt.err), func() {
+			s.testGetAccount(ctx, backend, tt.statusCode)
 		})
 
-		s.Run(fmt.Sprintf("GetAccountAtLatestBlock - fails with %v", errToReturn), func() {
-			s.testGetAccountAtLatestBlock(ctx, backend, statusCode)
+		s.Run(fmt.Sprintf("GetAccountAtLatestBlock - fails with %v", tt.err), func() {
+			s.testGetAccountAtLatestBlock(ctx, backend, tt.statusCode)
 		})
 
-		s.Run(fmt.Sprintf("GetAccountAtBlockHeight - fails with %v", errToReturn), func() {
-			s.testGetAccountAtBlockHeight(ctx, backend, statusCode)
+		s.Run(fmt.Sprintf("GetAccountAtBlockHeight - fails with %v", tt.err), func() {
+			s.testGetAccountAtBlockHeight(ctx, backend, tt.statusCode)
 		})
 	}
 }
 
-func (s *BackendAccountsSuite) TestGetAccountFromFailover() {
+// TestGetAccountFromFailover_HappyPath tests that when an error is returned getting an account
+// from local storage, the backend will attempt to get the account from an execution node
+func (s *BackendAccountsSuite) TestGetAccountFromFailover_HappyPath() {
 	ctx := context.Background()
 
+	s.setupExecutionNodes(s.block)
+	s.setupENSuccessResponse(s.block.ID())
+
+	scriptExecutor := execmock.NewScriptExecutor(s.T())
+
+	backend := s.defaultBackend()
+	backend.scriptExecMode = ScriptExecutionModeFailover
+	backend.scriptExecutor = scriptExecutor
+
 	for _, errToReturn := range []error{ErrDataNotAvailable, storage.ErrNotFound} {
-		// configure local script executor to fail
-		scriptExecutor := execmock.NewScriptExecutor(s.T())
 		scriptExecutor.On("GetAccountAtBlockHeight", mock.Anything, s.account.Address, s.block.Header.Height).
-			Return(nil, errToReturn)
-
-		// setup the execution client mocks
-		s.setupExecutionNodes(s.block)
-
-		backend := s.defaultBackend()
-		backend.scriptExecMode = ScriptExecutionModeFailover
-		backend.scriptExecutor = scriptExecutor
+			Return(nil, errToReturn).Times(3)
 
 		s.Run(fmt.Sprintf("GetAccount - happy path - recovers %v", errToReturn), func() {
 			s.testGetAccount(ctx, backend, codes.OK)
@@ -249,35 +278,27 @@ func (s *BackendAccountsSuite) TestGetAccountFromFailover() {
 			s.testGetAccountAtBlockHeight(ctx, backend, codes.OK)
 		})
 	}
+}
 
-	// Finally, test when the EN fails as well
-
-	// configure local script executor to fail
-	scriptExecutor := execmock.NewScriptExecutor(s.T())
-	scriptExecutor.On("GetAccountAtBlockHeight", mock.Anything, s.failingAddress, s.block.Header.Height).
-		Return(nil, ErrDataNotAvailable)
-
-	// setup the execution client mocks
-	s.setupExecutionNodes(s.block)
-
-	backend := s.defaultBackend()
-	backend.scriptExecMode = ScriptExecutionModeFailover
-	backend.scriptExecutor = scriptExecutor
-
-	// use a status code that's not used in the API to make sure it's passed through
-	// test EN errors are passed through
-	blockID := s.block.ID()
-	failingRequest := &execproto.GetAccountAtBlockIDRequest{
-		BlockId: blockID[:],
-		Address: s.failingAddress.Bytes(),
-	}
+// TestGetAccountFromFailover_ReturnsENErrors tests that when an error is returned from the execution
+// node during a failover, it is returned to the caller.
+func (s *BackendAccountsSuite) TestGetAccountFromFailover_ReturnsENErrors() {
+	ctx := context.Background()
 
 	// use a status code that's not used in the API to make sure it's passed through
 	statusCode := codes.FailedPrecondition
 	errToReturn := status.Error(statusCode, "random error")
 
-	s.execClient.On("GetAccountAtBlockID", mock.Anything, failingRequest).
-		Return(nil, errToReturn).Times(6) // one set for each of the 2 ENs
+	s.setupExecutionNodes(s.block)
+	s.setupENFailingResponse(s.block.ID(), errToReturn)
+
+	scriptExecutor := execmock.NewScriptExecutor(s.T())
+	scriptExecutor.On("GetAccountAtBlockHeight", mock.Anything, s.failingAddress, s.block.Header.Height).
+		Return(nil, ErrDataNotAvailable)
+
+	backend := s.defaultBackend()
+	backend.scriptExecMode = ScriptExecutionModeFailover
+	backend.scriptExecutor = scriptExecutor
 
 	s.Run("GetAccount - fails with backend err", func() {
 		s.testGetAccount(ctx, backend, statusCode)

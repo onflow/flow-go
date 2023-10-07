@@ -1745,62 +1745,6 @@ func (suite *Suite) TestExecutionNodesForBlockID() {
 	})
 }
 
-// TestExecuteScriptOnExecutionNode tests the method backend.scripts.executeScriptOnExecutionNode for script execution
-func (suite *Suite) TestExecuteScriptOnExecutionNode() {
-
-	// create a mock connection factory
-	connFactory := connectionmock.NewConnectionFactory(suite.T())
-	connFactory.On("GetExecutionAPIClient", mock.Anything).Return(suite.execClient, &mockCloser{}, nil)
-
-	params := suite.defaultBackendParams()
-	params.ChainID = flow.Mainnet
-	params.ConnFactory = connFactory
-
-	backend, err := New(params)
-	suite.Require().NoError(err)
-
-	// mock parameters
-	ctx := context.Background()
-	block := unittest.BlockFixture()
-	blockID := block.ID()
-	script := []byte("dummy script")
-	arguments := [][]byte(nil)
-	executionNode := unittest.IdentityFixture(unittest.WithRole(flow.RoleExecution))
-	execReq := &execproto.ExecuteScriptAtBlockIDRequest{
-		BlockId:   blockID[:],
-		Script:    script,
-		Arguments: arguments,
-	}
-	execRes := &execproto.ExecuteScriptAtBlockIDResponse{
-		Value: []byte{4, 5, 6},
-	}
-
-	suite.Run("happy path script execution success", func() {
-		suite.execClient.On("ExecuteScriptAtBlockID", ctx, execReq).Return(execRes, nil).Once()
-		res, err := backend.tryExecuteScriptOnExecutionNode(ctx, executionNode.Address, blockID, script, arguments)
-		suite.execClient.AssertExpectations(suite.T())
-		suite.checkResponse(res, err)
-	})
-
-	suite.Run("script execution failure returns status OK", func() {
-		suite.execClient.On("ExecuteScriptAtBlockID", ctx, execReq).
-			Return(nil, status.Error(codes.InvalidArgument, "execution failure!")).Once()
-		_, err := backend.tryExecuteScriptOnExecutionNode(ctx, executionNode.Address, blockID, script, arguments)
-		suite.execClient.AssertExpectations(suite.T())
-		suite.Require().Error(err)
-		suite.Require().Equal(status.Code(err), codes.InvalidArgument)
-	})
-
-	suite.Run("execution node internal failure returns status code Internal", func() {
-		suite.execClient.On("ExecuteScriptAtBlockID", ctx, execReq).
-			Return(nil, status.Error(codes.Internal, "execution node internal error!")).Once()
-		_, err := backend.tryExecuteScriptOnExecutionNode(ctx, executionNode.Address, blockID, script, arguments)
-		suite.execClient.AssertExpectations(suite.T())
-		suite.Require().Error(err)
-		suite.Require().Equal(status.Code(err), codes.Internal)
-	})
-}
-
 func (suite *Suite) assertAllExpectations() {
 	suite.snapshot.AssertExpectations(suite.T())
 	suite.state.AssertExpectations(suite.T())

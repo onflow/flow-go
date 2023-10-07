@@ -212,28 +212,25 @@ func (b *backendScripts) executeScriptOnAvailableExecutionNodes(
 		func(node *flow.Identity) error {
 			execStartTime := time.Now()
 			result, err = b.tryExecuteScriptOnExecutionNode(ctx, node.Address, blockID, script, arguments)
-			if err == nil {
-				if b.log.GetLevel() == zerolog.DebugLevel {
-					executionTime := time.Now()
-					if b.shouldLogScript(executionTime, insecureScriptHash) {
-						lg.Debug().
-							Str("script_executor_addr", node.Address).
-							Str("script", string(script)).
-							Msg("Successfully executed script")
-						b.loggedScripts.Add(insecureScriptHash, executionTime)
-					}
-				}
-
-				// log execution time
-				b.metrics.ScriptExecuted(
-					time.Since(execStartTime),
-					len(script),
-				)
-
-				return nil
+			if err != nil {
+				return err
 			}
 
-			return err
+			if b.log.GetLevel() == zerolog.DebugLevel {
+				executionTime := time.Now()
+				if b.shouldLogScript(executionTime, insecureScriptHash) {
+					lg.Debug().
+						Str("script_executor_addr", node.Address).
+						Str("script", string(script)).
+						Msg("Successfully executed script")
+					b.loggedScripts.Add(insecureScriptHash, executionTime)
+				}
+			}
+
+			// log execution time
+			b.metrics.ScriptExecuted(time.Since(execStartTime), len(script))
+
+			return nil
 		},
 		func(node *flow.Identity, err error) bool {
 			if status.Code(err) == codes.InvalidArgument {
