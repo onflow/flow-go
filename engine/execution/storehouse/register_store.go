@@ -61,6 +61,16 @@ func (r *RegisterStore) GetRegister(height uint64, blockID flow.Identifier, regi
 	// or the register might not be found in memStore.
 	if err != nil {
 		if errors.Is(err, ErrPruned) {
+			// TODO(leo): improve performance by getting rid of it
+			// check if the block is finalized
+			finalizedID, err := r.finalized.GetFinalizedBlockIDAtHeight(height)
+			if err != nil {
+				return nil, fmt.Errorf("cannot get finalized block ID at height %d: %w", height, err)
+			}
+			// conflicting blocks are considered as un-executed
+			if blockID != finalizedID {
+				return flow.RegisterValue{}, fmt.Errorf("getting registers from conflicting block %v at height %v: %w", blockID, height, ErrNotExecuted)
+			}
 			// TODO(leo): handle the case when height is too low
 			return r.diskStore.Get(register, height)
 		}

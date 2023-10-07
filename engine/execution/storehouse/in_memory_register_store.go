@@ -174,6 +174,7 @@ func (s *InMemoryRegisterStore) GetUpdatedRegisters(height uint64, blockID flow.
 // The pruned height must be an executed block, the caller should ensure that by calling SaveRegisters before.
 // TODO: It does not block the caller, the pruning work is done async
 func (s *InMemoryRegisterStore) Prune(height uint64, blockID flow.Identifier) error {
+	fmt.Println("====", height, blockID)
 	finalizedFork, err := s.findFinalizedFork(height, blockID)
 	if err != nil {
 		return fmt.Errorf("cannot find finalized fork: %w", err)

@@ -46,7 +46,7 @@ func TestRegisterStoreGetRegisterFail(t *testing.T) {
 		// lower than root height
 		_, err = rs.GetRegister(rootHeight-1, unknownBlock, unknownReg.Key)
 		require.Error(t, err)
-		// TODO: enable it
+		// TODO: enable it once implemented
 		// require.ErrorIs(t, err, storehouse.ErrPruned)
 
 		// known block, unknown register
@@ -259,7 +259,102 @@ func TestRegisterStoreIsBlockExecuted(t *testing.T) {
 		require.NoError(t, err)
 		require.False(t, executed)
 	})
+}
 
+// Test reading registers from finalized block
+func TestRegisterStoreReadingFromDisk(t *testing.T) {
+	t.Parallel()
+	withRegisterStore(t, func(
+		t *testing.T,
+		rs *storehouse.RegisterStore,
+		diskStore execution.OnDiskRegisterStore,
+		finalized *mockFinalizedReader,
+		rootHeight uint64,
+		endHeight uint64,
+		headerByHeight map[uint64]*flow.Header,
+	) {
+
+		// R <- 11 (X: 1, Y: 2) <- 12 (Y: 3)
+		// save block 11
+		err := rs.SaveRegisters(headerByHeight[rootHeight+1], []flow.RegisterEntry{makeReg("X", "1"), makeReg("Y", "2")})
+		require.NoError(t, err)
+
+		// save block 12
+		err = rs.SaveRegisters(headerByHeight[rootHeight+2], []flow.RegisterEntry{makeReg("Y", "3")})
+		require.NoError(t, err)
+
+		require.NoError(t, finalized.MockFinal(rootHeight+2))
+		rs.OnBlockFinalized() // notify 12 is finalized
+
+		val, err := rs.GetRegister(rootHeight+1, headerByHeight[rootHeight+1].ID(), makeReg("Y", "2").Key)
+		require.NoError(t, err)
+		// value at block 11 is now stored in OnDiskRegisterStore, which is 2
+		require.Equal(t, makeReg("Y", "2").Value, val)
+
+		val, err = rs.GetRegister(rootHeight+2, headerByHeight[rootHeight+2].ID(), makeReg("X", "1").Key)
+		require.NoError(t, err)
+		// value at block 12 is now stored in OnDiskRegisterStore, which is 1
+		require.Equal(t, makeReg("X", "1").Value, val)
+	})
+}
+
+func TestRegisterStoreReadingFromInMemStore(t *testing.T) {
+	t.Parallel()
+	withRegisterStore(t, func(
+		t *testing.T,
+		rs *storehouse.RegisterStore,
+		diskStore execution.OnDiskRegisterStore,
+		finalized *mockFinalizedReader,
+		rootHeight uint64,
+		endHeight uint64,
+		headerByHeight map[uint64]*flow.Header,
+	) {
+
+		// R <- 11 (X: 1, Y: 2) <- 12 (Y: 3)
+		//   ^- 11 (X: 4)
+
+		// save block 11
+		err := rs.SaveRegisters(headerByHeight[rootHeight+1], []flow.RegisterEntry{makeReg("X", "1"), makeReg("Y", "2")})
+		require.NoError(t, err)
+
+		// save block 12
+		err = rs.SaveRegisters(headerByHeight[rootHeight+2], []flow.RegisterEntry{makeReg("Y", "3")})
+		require.NoError(t, err)
+
+		// save block 11 fork
+		block11Fork := unittest.BlockWithParentFixture(headerByHeight[rootHeight]).Header
+		err = rs.SaveRegisters(block11Fork, []flow.RegisterEntry{makeReg("X", "4")})
+		require.NoError(t, err)
+
+		val, err := rs.GetRegister(rootHeight+1, headerByHeight[rootHeight+1].ID(), makeReg("X", "1").Key)
+		require.NoError(t, err)
+		require.Equal(t, makeReg("X", "1").Value, val)
+
+		val, err = rs.GetRegister(rootHeight+1, headerByHeight[rootHeight+1].ID(), makeReg("Y", "2").Key)
+		require.NoError(t, err)
+		require.Equal(t, makeReg("Y", "2").Value, val)
+
+		val, err = rs.GetRegister(rootHeight+2, headerByHeight[rootHeight+2].ID(), makeReg("X", "1").Key)
+		require.NoError(t, err)
+		require.Equal(t, makeReg("X", "1").Value, val)
+
+		val, err = rs.GetRegister(rootHeight+2, headerByHeight[rootHeight+2].ID(), makeReg("Y", "3").Key)
+		require.NoError(t, err)
+		require.Equal(t, makeReg("Y", "3").Value, val)
+
+		val, err = rs.GetRegister(rootHeight+1, block11Fork.ID(), makeReg("X", "4").Key)
+		require.NoError(t, err)
+		require.Equal(t, makeReg("X", "4").Value, val)
+
+		// finalizing 11 should prune block 11 fork, and won't be able to read register from block 11 fork
+		require.NoError(t, finalized.MockFinal(rootHeight+1))
+		rs.OnBlockFinalized() // notify 11 is finalized
+
+		val, err = rs.GetRegister(rootHeight+1, block11Fork.ID(), makeReg("X", "4").Key)
+		require.Error(t, err, fmt.Sprintf("%v", val))
+		// pruned conflicting forks are considered not executed
+		require.ErrorIs(t, err, storehouse.ErrNotExecuted)
+	})
 }
 
 // Execute first then finalize later
