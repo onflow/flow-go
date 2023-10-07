@@ -91,6 +91,7 @@ const (
 	subsystemExeDataProvider        = "provider"
 	subsystemExeDataPruner          = "pruner"
 	subsystemExecutionDataRequester = "execution_data_requester"
+	subsystemExecutionStateIndexer  = "execution_state_indexer"
 	subsystemExeDataBlobstore       = "blobstore"
 )
 
