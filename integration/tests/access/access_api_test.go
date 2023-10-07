@@ -14,6 +14,7 @@ import (
 	sdk "github.com/onflow/flow-go-sdk"
 	client "github.com/onflow/flow-go-sdk/access/grpc"
 
+	"github.com/onflow/flow-go/engine/access/rpc/backend"
 	"github.com/onflow/flow-go/integration/testnet"
 	"github.com/onflow/flow-go/integration/tests/lib"
 	"github.com/onflow/flow-go/integration/tests/mvp"
@@ -42,8 +43,9 @@ type AccessAPISuite struct {
 
 	net *testnet.FlowNetwork
 
-	accessNode    *testnet.Container
-	sdkClient     *client.Client
+	accessNode2   *testnet.Container
+	an1Client     *client.Client
+	an2Client     *client.Client
 	serviceClient *testnet.Client
 }
 
@@ -62,23 +64,30 @@ func (s *AccessAPISuite) SetupTest() {
 	}()
 
 	// access node
-	bridgeANConfig := testnet.NewNodeConfig(
+	defaultAccessConfig := testnet.NewNodeConfig(
+		flow.RoleAccess,
+		testnet.WithLogLevel(zerolog.FatalLevel),
+		// make sure test continues to test as expected if the default config changes
+		testnet.WithAdditionalFlagf("--script-execution-mode=%s", backend.ScriptExecutionModeExecutionNodesOnly),
+	)
+
+	indexingAccessConfig := testnet.NewNodeConfig(
 		flow.RoleAccess,
 		testnet.WithLogLevel(zerolog.DebugLevel),
 		testnet.WithAdditionalFlag("--execution-data-sync-enabled=true"),
-		testnet.WithAdditionalFlag(fmt.Sprintf("--execution-data-dir=%s", testnet.DefaultExecutionDataServiceDir)),
+		testnet.WithAdditionalFlagf("--execution-data-dir=%s", testnet.DefaultExecutionDataServiceDir),
 		testnet.WithAdditionalFlag("--execution-data-retry-delay=1s"),
 		testnet.WithAdditionalFlag("--execution-data-indexing-enabled=true"),
-		testnet.WithAdditionalFlag(fmt.Sprintf("--execution-state-dir=%s", testnet.DefaultExecutionStateDir)),
+		testnet.WithAdditionalFlagf("--execution-state-dir=%s", testnet.DefaultExecutionStateDir),
 		testnet.WithAdditionalFlag("--execution-state-checkpoint=/bootstrap/execution-state/bootstrap-checkpoint"),
 		testnet.WithAdditionalFlag("--execution-state-checkpoint-height=0"),
-		testnet.WithAdditionalFlag("--script-execution-mode=local-only"),
+		testnet.WithAdditionalFlagf("--script-execution-mode=%s", backend.ScriptExecutionModeLocalOnly),
 	)
 
 	consensusConfigs := []func(config *testnet.NodeConfig){
 		testnet.WithAdditionalFlag("--cruise-ctl-fallback-proposal-duration=100ms"),
-		testnet.WithAdditionalFlag(fmt.Sprintf("--required-verification-seal-approvals=%d", 1)),
-		testnet.WithAdditionalFlag(fmt.Sprintf("--required-construction-seal-approvals=%d", 1)),
+		testnet.WithAdditionalFlagf("--required-verification-seal-approvals=%d", 1),
+		testnet.WithAdditionalFlagf("--required-construction-seal-approvals=%d", 1),
 		testnet.WithLogLevel(zerolog.FatalLevel),
 	}
 
@@ -93,10 +102,10 @@ func (s *AccessAPISuite) SetupTest() {
 		testnet.NewNodeConfig(flow.RoleVerification, testnet.WithLogLevel(zerolog.FatalLevel)),
 
 		// AN1 should be the a vanilla node to allow other nodes to bootstrap successfully
-		testnet.NewNodeConfig(flow.RoleAccess, testnet.WithLogLevel(zerolog.FatalLevel)),
+		defaultAccessConfig,
 
 		// Tests will focus on AN2
-		bridgeANConfig,
+		indexingAccessConfig,
 	}
 
 	conf := testnet.NewNetworkConfig("access_api_test", nodeConfigs)
@@ -109,15 +118,18 @@ func (s *AccessAPISuite) SetupTest() {
 	s.net.Start(s.ctx)
 
 	var err error
-	s.accessNode = s.net.ContainerByName("access_2")
+	s.accessNode2 = s.net.ContainerByName("access_2")
 
-	s.sdkClient, err = s.accessNode.SDKClient()
+	s.an2Client, err = s.accessNode2.SDKClient()
+	s.Require().NoError(err)
+
+	s.an1Client, err = s.net.ContainerByName(testnet.PrimaryAN).SDKClient()
 	s.Require().NoError(err)
 
 	// pause until the network is progressing
 	var header *sdk.BlockHeader
 	s.Require().Eventually(func() bool {
-		header, err = s.sdkClient.GetLatestBlockHeader(s.ctx, true)
+		header, err = s.an2Client.GetLatestBlockHeader(s.ctx, true)
 		s.Require().NoError(err)
 
 		return header.Height > 0
@@ -125,102 +137,114 @@ func (s *AccessAPISuite) SetupTest() {
 
 	// the service client uses GetAccount and requires the first block to be indexed
 	s.Require().Eventually(func() bool {
-		s.serviceClient, err = s.accessNode.TestnetClient()
+		s.serviceClient, err = s.accessNode2.TestnetClient()
 		return err == nil
 	}, 10*time.Second, 1*time.Second)
 }
 
-func (s *AccessAPISuite) TestLocalExecutionState() {
-	s.testGetAccount()
-	s.testExecuteScriptWithSimpleScript()
-	s.testExecuteScriptWithSimpleContract()
+// TestScriptExecutionAndGetAccounts test the Access API endpoints for executing scripts and getting
+// accounts using both local storage and execution nodes.
+//
+// Note: combining all tests together to reduce setup/teardown time. test cases are read-only
+// and should not interfere with each other.
+func (s *AccessAPISuite) TestScriptExecutionAndGetAccounts() {
+	// deploy the test contract
+	txResult := s.deployContract()
+	targetHeight := txResult.BlockHeight + 1
+	s.waitUntilIndexed(targetHeight)
+
+	// Run tests against Access 2, which uses local storage
+	s.testGetAccount(s.an2Client)
+	s.testExecuteScriptWithSimpleScript(s.an2Client)
+	s.testExecuteScriptWithSimpleContract(s.an2Client, targetHeight)
+
+	// Run tests against Access 1, which uses the execution node
+	s.testGetAccount(s.an1Client)
+	s.testExecuteScriptWithSimpleScript(s.an1Client)
+	s.testExecuteScriptWithSimpleContract(s.an1Client, targetHeight)
 
 	// this is a specialized test that creates accounts, deposits funds, deploys contracts, etc, and
-	// uses the provided access node to handle the Access API calls
-	mvp.RunMVPTest(s.T(), s.ctx, s.net, s.accessNode)
+	// uses the provided access node to handle the Access API calls. there is an existing test that
+	// covers the default config, so we only need to test with local storage here.
+	mvp.RunMVPTest(s.T(), s.ctx, s.net, s.accessNode2)
 }
 
-func (s *AccessAPISuite) testGetAccount() {
-	header, err := s.sdkClient.GetLatestBlockHeader(s.ctx, true)
+func (s *AccessAPISuite) testGetAccount(client *client.Client) {
+	header, err := client.GetLatestBlockHeader(s.ctx, true)
 	s.Require().NoError(err)
 
 	serviceAddress := s.serviceClient.SDKServiceAddress()
 
 	s.Run("get account at latest block", func() {
-		account, err := s.sdkClient.GetAccount(s.ctx, serviceAddress)
+		account, err := client.GetAccount(s.ctx, serviceAddress)
 		s.Require().NoError(err)
 		s.Assert().Equal(serviceAddress, account.Address)
 		s.Assert().NotZero(serviceAddress, account.Balance)
 	})
 
 	s.Run("get account block ID", func() {
-		account, err := s.sdkClient.GetAccountAtLatestBlock(s.ctx, serviceAddress)
+		account, err := client.GetAccountAtLatestBlock(s.ctx, serviceAddress)
 		s.Require().NoError(err)
 		s.Assert().Equal(serviceAddress, account.Address)
 		s.Assert().NotZero(serviceAddress, account.Balance)
 	})
 
 	s.Run("get account block height", func() {
-		account, err := s.sdkClient.GetAccountAtBlockHeight(s.ctx, serviceAddress, header.Height)
+		account, err := client.GetAccountAtBlockHeight(s.ctx, serviceAddress, header.Height)
 		s.Require().NoError(err)
 		s.Assert().Equal(serviceAddress, account.Address)
 		s.Assert().NotZero(serviceAddress, account.Balance)
 	})
 }
 
-func (s *AccessAPISuite) testExecuteScriptWithSimpleScript() {
-	script := fmt.Sprintf(simpleScript, 42)
-
-	header, err := s.sdkClient.GetLatestBlockHeader(s.ctx, true)
+func (s *AccessAPISuite) testExecuteScriptWithSimpleScript(client *client.Client) {
+	header, err := client.GetLatestBlockHeader(s.ctx, true)
 	s.Require().NoError(err)
 
+	script := fmt.Sprintf(simpleScript, 42)
+
 	s.Run("execute at latest block", func() {
-		result, err := s.sdkClient.ExecuteScriptAtLatestBlock(s.ctx, []byte(script), nil)
+		result, err := client.ExecuteScriptAtLatestBlock(s.ctx, []byte(script), nil)
 		s.Require().NoError(err)
 		s.Assert().Equal(cadence.NewInt(42), result)
 	})
 
 	s.Run("execute at block height", func() {
-		result, err := s.sdkClient.ExecuteScriptAtBlockHeight(s.ctx, header.Height, []byte(script), nil)
+		result, err := client.ExecuteScriptAtBlockHeight(s.ctx, header.Height, []byte(script), nil)
 		s.Require().NoError(err)
 		s.Assert().Equal(cadence.NewInt(42), result)
 	})
 
 	s.Run("execute at block ID", func() {
-		result, err := s.sdkClient.ExecuteScriptAtBlockID(s.ctx, header.ID, []byte(script), nil)
+		result, err := client.ExecuteScriptAtBlockID(s.ctx, header.ID, []byte(script), nil)
 		s.Require().NoError(err)
 		s.Assert().Equal(cadence.NewInt(42), result)
 	})
 }
 
-func (s *AccessAPISuite) testExecuteScriptWithSimpleContract() {
-	// deploy the test contract
-	txResult := s.deployContract()
-	targetHeight := txResult.BlockHeight + 1
-	s.waitUntilIndexed(targetHeight)
-
-	header, err := s.sdkClient.GetBlockHeaderByHeight(s.ctx, targetHeight)
+func (s *AccessAPISuite) testExecuteScriptWithSimpleContract(client *client.Client, targetHeight uint64) {
+	header, err := client.GetBlockHeaderByHeight(s.ctx, targetHeight)
 	s.Require().NoError(err)
 
-	// Check that the initial value is set
+	// Check that the initialized value is set
 	serviceAccount := s.serviceClient.Account()
 	script := lib.ReadCounterScript(serviceAccount.Address, serviceAccount.Address).ToCadence()
 
 	s.Run("execute at latest block", func() {
-		result, err := s.sdkClient.ExecuteScriptAtLatestBlock(s.ctx, []byte(script), nil)
+		result, err := client.ExecuteScriptAtLatestBlock(s.ctx, []byte(script), nil)
 		s.Require().NoError(err)
 		s.Assert().Equal(lib.CounterInitializedValue, result.(cadence.Int).Int())
 	})
 
 	s.Run("execute at block height", func() {
-		result, err := s.sdkClient.ExecuteScriptAtBlockHeight(s.ctx, header.Height, []byte(script), nil)
+		result, err := client.ExecuteScriptAtBlockHeight(s.ctx, header.Height, []byte(script), nil)
 		s.Require().NoError(err)
 
 		s.Assert().Equal(lib.CounterInitializedValue, result.(cadence.Int).Int())
 	})
 
 	s.Run("execute at block ID", func() {
-		result, err := s.sdkClient.ExecuteScriptAtBlockID(s.ctx, header.ID, []byte(script), nil)
+		result, err := client.ExecuteScriptAtBlockID(s.ctx, header.ID, []byte(script), nil)
 		s.Require().NoError(err)
 		s.Assert().Equal(lib.CounterInitializedValue, result.(cadence.Int).Int())
 	})
@@ -265,7 +289,7 @@ func (s *AccessAPISuite) waitUntilIndexed(height uint64) {
 	// TODO: once the indexed height is include in the Access API's metadata response, we can get
 	// ride of this
 	s.Require().Eventually(func() bool {
-		_, err := s.sdkClient.ExecuteScriptAtBlockHeight(s.ctx, height, []byte(fmt.Sprintf(simpleScript, 42)), nil)
+		_, err := s.an2Client.ExecuteScriptAtBlockHeight(s.ctx, height, []byte(fmt.Sprintf(simpleScript, 42)), nil)
 		return err == nil
 	}, 30*time.Second, 1*time.Second)
 }

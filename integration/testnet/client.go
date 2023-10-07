@@ -3,7 +3,6 @@ package testnet
 import (
 	"context"
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/onflow/flow-go-sdk/templates"
@@ -196,39 +195,12 @@ func (c *Client) Account() *sdk.Account {
 
 // WaitForSealed waits for the transaction to be sealed, then returns the result.
 func (c *Client) WaitForSealed(ctx context.Context, id sdk.Identifier) (*sdk.TransactionResult, error) {
-
-	fmt.Printf("Waiting for transaction %s to be sealed...\n", id)
-	errCount := 0
-	var result *sdk.TransactionResult
-	var err error
-	for result == nil || (result.Status != sdk.TransactionStatusSealed) {
-		childCtx, cancel := context.WithTimeout(ctx, time.Second*5)
-		result, err = c.client.GetTransactionResult(childCtx, id)
-		cancel()
-		if err != nil {
-			fmt.Print("x")
-			errCount++
-			if errCount >= 10 {
-				return &sdk.TransactionResult{
-					Error: err,
-				}, err
-			}
-		} else {
-			fmt.Print(".")
-		}
-		time.Sleep(250 * time.Millisecond)
-	}
-
-	fmt.Println()
-	fmt.Printf("(Wait for Seal) Transaction %s sealed\n", id)
-
-	return result, err
+	return c.WaitForStatus(ctx, id, sdk.TransactionStatusSealed)
 }
 
 // WaitForStatus waits for the transaction to reach the requested status, then returns the result.
 func (c *Client) WaitForStatus(ctx context.Context, id sdk.Identifier, targetStatus sdk.TransactionStatus) (*sdk.TransactionResult, error) {
-	statusName := strings.ToLower(targetStatus.String())
-	fmt.Printf("Waiting for transaction %s to be %s...\n", id, statusName)
+	fmt.Printf("Waiting for transaction %s to be %s...\n", id, targetStatus)
 	errCount := 0
 	var result *sdk.TransactionResult
 	var err error
@@ -251,7 +223,7 @@ func (c *Client) WaitForStatus(ctx context.Context, id sdk.Identifier, targetSta
 	}
 
 	fmt.Println()
-	fmt.Printf("(Wait for Seal) Transaction %s %s\n", id, statusName)
+	fmt.Printf("(Wait for Seal) Transaction %s %s\n", id, targetStatus)
 
 	return result, err
 }
