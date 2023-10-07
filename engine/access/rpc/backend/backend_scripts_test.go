@@ -2,7 +2,7 @@ package backend
 
 import (
 	"context"
-	"crypto/md5"
+	"crypto/md5" //nolint:gosec
 	"fmt"
 	"testing"
 	"time"
@@ -14,6 +14,8 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
+	execproto "github.com/onflow/flow/protobuf/go/flow/execution"
+
 	access "github.com/onflow/flow-go/engine/access/mock"
 	connectionmock "github.com/onflow/flow-go/engine/access/rpc/connection/mock"
 	fvmerrors "github.com/onflow/flow-go/fvm/errors"
@@ -24,7 +26,6 @@ import (
 	"github.com/onflow/flow-go/storage"
 	storagemock "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/utils/unittest"
-	execproto "github.com/onflow/flow/protobuf/go/flow/execution"
 )
 
 var (
