@@ -6,6 +6,10 @@ import (
 	"github.com/dgraph-io/badger/v2"
 )
 
+type BatchBuilder interface {
+	NewWriteBatch() *badger.WriteBatch
+}
+
 type Batch struct {
 	writer *badger.WriteBatch
 
@@ -13,7 +17,7 @@ type Batch struct {
 	callbacks []func()
 }
 
-func NewBatch(db *badger.DB) *Batch {
+func NewBatch(db BatchBuilder) *Batch {
 	batch := db.NewWriteBatch()
 	return &Batch{
 		writer:    batch,
