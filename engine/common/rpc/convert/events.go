@@ -62,16 +62,16 @@ func MessagesToEvents(l []*entities.Event) []flow.Event {
 
 // EventToMessageFromVersion converts a flow.Event to a protobuf message, converting the payload
 // encoding from CCF to JSON if the input version is CCF
-func EventToMessageFromVersion(e flow.Event, version execproto.EventEncodingVersion) (*entities.Event, error) {
+func EventToMessageFromVersion(e flow.Event, version entities.EventEncodingVersion) (*entities.Event, error) {
 	message := EventToMessage(e)
 	switch version {
-	case execproto.EventEncodingVersion_CCF_V0:
+	case entities.EventEncodingVersion_CCF_V0:
 		convertedPayload, err := CcfPayloadToJsonPayload(e.Payload)
 		if err != nil {
 			return nil, fmt.Errorf("could not convert event payload from CCF to Json: %w", err)
 		}
 		message.Payload = convertedPayload
-	case execproto.EventEncodingVersion_JSON_CDC_V0:
+	case entities.EventEncodingVersion_JSON_CDC_V0:
 	default:
 		return nil, fmt.Errorf("invalid encoding format %d", version)
 	}
@@ -100,7 +100,7 @@ func MessageToEventFromVersion(m *entities.Event, inputVersion entities.EventEnc
 
 // EventsToMessagesFromVersion converts a slice of flow.Events to a slice of protobuf messages, converting
 // the payload encoding from CCF to JSON if the input version is CCF
-func EventsToMessagesFromVersion(flowEvents []flow.Event, version execproto.EventEncodingVersion) ([]*entities.Event, error) {
+func EventsToMessagesFromVersion(flowEvents []flow.Event, version entities.EventEncodingVersion) ([]*entities.Event, error) {
 	events := make([]*entities.Event, len(flowEvents))
 	for i, e := range flowEvents {
 		event, err := EventToMessageFromVersion(e, version)

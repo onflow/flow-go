@@ -4,7 +4,7 @@ import (
 	"context"
 	"sync/atomic"
 
-	"github.com/onflow/flow/protobuf/go/flow/execution"
+	"github.com/onflow/flow/protobuf/go/flow/entities"
 	access "github.com/onflow/flow/protobuf/go/flow/executiondata"
 	executiondata "github.com/onflow/flow/protobuf/go/flow/executiondata"
 	"google.golang.org/grpc/codes"
@@ -169,7 +169,7 @@ func (h *Handler) SubscribeEvents(request *access.SubscribeEventsRequest, stream
 		// BlockExecutionData contains CCF encoded events, and the Access API returns JSON-CDC events.
 		// convert event payload formats.
 		// This is a temporary solution until the Access API supports specifying the encoding in the request
-		events, err := convert.EventsToMessagesFromVersion(resp.Events, execution.EventEncodingVersion_CCF_V0)
+		events, err := convert.EventsToMessagesFromVersion(resp.Events, entities.EventEncodingVersion_CCF_V0)
 		if err != nil {
 			return status.Errorf(codes.Internal, "could not convert events to entity: %v", err)
 		}
