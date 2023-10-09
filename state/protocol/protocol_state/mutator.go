@@ -16,17 +16,27 @@ import (
 // service events sealed in candidate block. This requirement is due to the fact that protocol state
 // is indexed by block ID, and we need to maintain such index.
 type Mutator struct {
-	protocolStateDB storage.ProtocolState
 	headers         storage.Headers
 	results         storage.ExecutionResults
 	setups          storage.EpochSetups
 	commits         storage.EpochCommits
+	protocolStateDB storage.ProtocolState
 }
 
 var _ protocol.StateMutator = (*Mutator)(nil)
 
-func NewMutator(protocolStateDB storage.ProtocolState) *Mutator {
+func NewMutator(
+	headers storage.Headers,
+	results storage.ExecutionResults,
+	setups storage.EpochSetups,
+	commits storage.EpochCommits,
+	protocolStateDB storage.ProtocolState,
+) *Mutator {
 	return &Mutator{
+		headers:         headers,
+		results:         results,
+		setups:          setups,
+		commits:         commits,
 		protocolStateDB: protocolStateDB,
 	}
 }

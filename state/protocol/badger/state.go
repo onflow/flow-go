@@ -110,6 +110,7 @@ func Bootstrap(
 		return nil, fmt.Errorf("expected empty database")
 	}
 
+	protocolStateMutator := protocol_state.NewMutator(headers, results, setups, commits, protocolStateSnapshotsDB)
 	protocolState := protocol_state.NewProtocolState(protocolStateSnapshotsDB, root.Params())
 	state := newState(
 		metrics,
@@ -121,7 +122,7 @@ func Bootstrap(
 		qcs,
 		setups,
 		commits,
-		protocolStateSnapshotsDB,
+		protocolStateMutator,
 		protocolState,
 		versionBeacons,
 	)
@@ -648,6 +649,7 @@ func OpenState(
 	if err != nil {
 		return nil, fmt.Errorf("could not read global params")
 	}
+	protocolStateMutator := protocol_state.NewMutator(headers, results, setups, commits, protocolState)
 	protocolStateReader := protocol_state.NewProtocolState(protocolState, globalParams)
 	state := newState(
 		metrics,
@@ -659,7 +661,7 @@ func OpenState(
 		qcs,
 		setups,
 		commits,
-		protocolState,
+		protocolStateMutator,
 		protocolStateReader,
 		versionBeacons,
 	) // populate the protocol state cache
