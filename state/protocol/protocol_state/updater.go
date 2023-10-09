@@ -229,7 +229,7 @@ func (u *Updater) TransitionToNextEpoch() error {
 		return fmt.Errorf("invalid state transition has been attempted, no transition is allowed")
 	}
 	// Check if we are at the next epoch, only then a transition is allowed
-	if u.candidate.View < u.parentState.NextEpochSetup.FirstView {
+	if u.view < u.parentState.NextEpochSetup.FirstView {
 		return fmt.Errorf("protocol state transition is only allowed when enterring next epoch")
 	}
 	u.state = &flow.ProtocolStateEntry{
