@@ -232,6 +232,10 @@ func (m *AtreeRegisterMigrator) convertStorageDomain(
 			if err != nil {
 				return fmt.Errorf("failed to clone value for key %s: %w", key, err)
 			}
+			if isCricketMomentsShardedCollection(mr, value) {
+				// already copied
+				return nil
+			}
 
 			m.metrics.trackSaveTime(
 				func() {
