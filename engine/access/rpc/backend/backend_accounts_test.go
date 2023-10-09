@@ -91,7 +91,9 @@ func (s *BackendAccountsSuite) setupExecutionNodes(block *flow.Block) {
 	s.state.On("Final").Return(s.snapshot)
 	s.snapshot.On("Identities", mock.Anything).Return(s.executionNodes, nil)
 
-	var receipts flow.ExecutionReceiptList
+	// this line causes a S1021 lint error because receipts is explicitly declared. this is required
+	// to ensure the mock library handles the response type correctly
+	var receipts flow.ExecutionReceiptList //nolint:gosimple
 	receipts = unittest.ReceiptsForBlockFixture(block, s.executionNodes.NodeIDs())
 	s.receipts.On("ByBlockID", block.ID()).Return(receipts, nil)
 
