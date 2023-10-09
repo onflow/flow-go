@@ -323,7 +323,7 @@ func cloneCricketMomentsShardedCollection(
 		)
 
 		err = capturePanic(func() {
-			ownedNFTs.Insert(
+			ownedNFTs.UnsafeInsert(
 				mr.Interpreter,
 				interpreter.EmptyLocationRange,
 				clonedValue.nftCollectionKey,
