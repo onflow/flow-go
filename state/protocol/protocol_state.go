@@ -104,9 +104,9 @@ type StateUpdater interface {
 	// - candidate block is in the next epoch.
 	// No errors are expected during normal operations.
 	TransitionToNextEpoch() error
-	// Block returns the block header that is associated with this state updater.
-	// StateUpdater is created for a specific block where protocol state changes are incorporated.
-	Block() *flow.Header
+	// View returns the view that is associated with this state updater.
+	// StateUpdater is created for a view where protocol state changes will be applied.
+	View() uint64
 	// ParentState returns parent protocol state that is associated with this state updater.
 	ParentState() *flow.RichProtocolStateEntry
 }
@@ -120,9 +120,11 @@ type StateMutator interface {
 	// Has to be called for each block to correctly index the protocol state.
 	// Expected errors during normal operations:
 	//  * `storage.ErrNotFound` if no protocol state for parent block is known.
-	CreateUpdater(candidate *flow.Header) (StateUpdater, error)
+	CreateUpdater(candidateView uint64, parentID flow.Identifier) (StateUpdater, error)
 	// CommitProtocolState commits the protocol state to the database.
 	// Has to be called for each block to correctly index the protocol state.
 	// No errors are expected during normal operations.
 	CommitProtocolState(updater StateUpdater) func(tx *transaction.Tx) error
+
+	ApplyServiceEvents(updater StateUpdater, seals []*flow.Seal) (dbUpdates []func(*transaction.Tx) error, err error) {
 }

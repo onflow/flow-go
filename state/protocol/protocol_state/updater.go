@@ -20,7 +20,7 @@ import (
 type Updater struct {
 	parentState *flow.RichProtocolStateEntry
 	state       *flow.ProtocolStateEntry
-	candidate   *flow.Header
+	view        uint64
 
 	// nextEpochIdentitiesLookup is a map from NodeID → DynamicIdentityEntry for the _current_ epoch, containing the
 	// same identities as in the EpochStateContainer `state.CurrentEpoch.Identities`. Note that map values are pointers,
@@ -36,11 +36,11 @@ type Updater struct {
 var _ protocol.StateUpdater = (*Updater)(nil)
 
 // NewUpdater creates a new protocol state updater.
-func NewUpdater(candidate *flow.Header, parentState *flow.RichProtocolStateEntry) *Updater {
+func NewUpdater(view uint64, parentState *flow.RichProtocolStateEntry) *Updater {
 	updater := &Updater{
 		parentState: parentState,
 		state:       parentState.ProtocolStateEntry.Copy(),
-		candidate:   candidate,
+		view:        view,
 	}
 	return updater
 }
@@ -241,10 +241,10 @@ func (u *Updater) TransitionToNextEpoch() error {
 	return nil
 }
 
-// Block returns the block header that is associated with this state updater.
-// StateUpdater is created for a specific block where protocol state changes are incorporated.
-func (u *Updater) Block() *flow.Header {
-	return u.candidate
+// View returns the view that is associated with this state updater.
+// StateUpdater is created for a view where protocol state changes will be applied.
+func (u *Updater) View() uint64 {
+	return u.view
 }
 
 // ParentState returns parent protocol state that is associated with this state updater.

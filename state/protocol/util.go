@@ -123,14 +123,14 @@ func FindGuarantors(state State, guarantee *flow.CollectionGuarantee) ([]flow.Id
 //   - ErrMultipleSealsForSameHeight in case there are seals repeatedly sealing block at the same height
 //   - ErrDiscontinuousSeals in case there are height-gaps in the sealed blocks
 //   - storage.ErrNotFound if any of the seals references an unknown block
-func OrderedSeals(payload *flow.Payload, headers storage.Headers) ([]*flow.Seal, error) {
-	numSeals := uint64(len(payload.Seals))
+func OrderedSeals(blockSeals []*flow.Seal, headers storage.Headers) ([]*flow.Seal, error) {
+	numSeals := uint64(len(blockSeals))
 	if numSeals == 0 {
 		return nil, nil
 	}
 	heights := make([]uint64, numSeals)
 	minHeight := uint64(math.MaxUint64)
-	for i, seal := range payload.Seals {
+	for i, seal := range blockSeals {
 		header, err := headers.ByBlockID(seal.BlockID)
 		if err != nil {
 			return nil, fmt.Errorf("could not get block (id=%x) for seal: %w", seal.BlockID, err) // storage.ErrNotFound or exception
@@ -143,7 +143,7 @@ func OrderedSeals(payload *flow.Payload, headers storage.Headers) ([]*flow.Seal,
 	// As seals in a valid payload must have consecutive heights, we can populate
 	// the ordered output by shifting by minHeight.
 	seals := make([]*flow.Seal, numSeals)
-	for i, seal := range payload.Seals {
+	for i, seal := range blockSeals {
 		idx := heights[i] - minHeight
 		// (0) Per construction, `minHeight` is the smallest value in the `heights` slice. Hence, `idx ≥ 0`
 		// (1) But if there are gaps in the heights of the sealed blocks (byzantine inputs),

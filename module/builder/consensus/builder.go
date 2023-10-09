@@ -25,20 +25,21 @@ import (
 // Builder is the builder for consensus block payloads. Upon providing a payload
 // hash, it also memorizes which entities were included into the payload.
 type Builder struct {
-	metrics    module.MempoolMetrics
-	tracer     module.Tracer
-	db         *badger.DB
-	state      protocol.ParticipantState
-	seals      storage.Seals
-	headers    storage.Headers
-	index      storage.Index
-	blocks     storage.Blocks
-	resultsDB  storage.ExecutionResults
-	receiptsDB storage.ExecutionReceipts
-	guarPool   mempool.Guarantees
-	sealPool   mempool.IncorporatedResultSeals
-	recPool    mempool.ExecutionTree
-	cfg        Config
+	metrics              module.MempoolMetrics
+	tracer               module.Tracer
+	db                   *badger.DB
+	state                protocol.ParticipantState
+	seals                storage.Seals
+	headers              storage.Headers
+	index                storage.Index
+	blocks               storage.Blocks
+	resultsDB            storage.ExecutionResults
+	receiptsDB           storage.ExecutionReceipts
+	guarPool             mempool.Guarantees
+	sealPool             mempool.IncorporatedResultSeals
+	recPool              mempool.ExecutionTree
+	protocolStateMutator protocol.StateMutator
+	cfg                  Config
 }
 
 // NewBuilder creates a new block builder.
@@ -608,14 +609,6 @@ func (b *Builder) createProposal(parentID flow.Identifier,
 	insertableReceipts *InsertableReceipts,
 	setter func(*flow.Header) error) (*flow.Block, error) {
 
-	// build the payload so we can get the hash
-	payload := &flow.Payload{
-		Guarantees: guarantees,
-		Seals:      seals,
-		Receipts:   insertableReceipts.receipts,
-		Results:    insertableReceipts.results,
-	}
-
 	parent, err := b.headers.ByBlockID(parentID)
 	if err != nil {
 		return nil, fmt.Errorf("could not retrieve parent: %w", err)
@@ -629,8 +622,14 @@ func (b *Builder) createProposal(parentID flow.Identifier,
 		ParentID:    parentID,
 		Height:      parent.Height + 1,
 		Timestamp:   timestamp,
-		PayloadHash: payload.Hash(),
+		PayloadHash: flow.ZeroID,
 	}
+
+	updater, err := b.protocolStateMutator.CreateUpdater(header.View, header.ParentID)
+
+	_, err = b.protocolStateMutator.ApplyServiceEvents(updater, payload.Seals)
+
+	_, updatedStateID, _ := updater.Build()
 
 	// apply the custom fields setter of the consensus algorithm
 	err = setter(header)
@@ -639,9 +638,14 @@ func (b *Builder) createProposal(parentID flow.Identifier,
 	}
 
 	proposal := &flow.Block{
-		Header:  header,
-		Payload: payload,
+		Header: header,
 	}
+	proposal.SetPayload(flow.Payload{
+		Guarantees: guarantees,
+		Seals:      seals,
+		Receipts:   insertableReceipts.receipts,
+		Results:    insertableReceipts.results,
+	})
 
 	return proposal, nil
 }
