@@ -13,9 +13,8 @@ import (
 	"github.com/onflow/flow-go/network/p2p/keyutils"
 )
 
-// DefaultCompressorName When no specific compressor name provided, it defaults to the "identity" compressor,
-// which effectively means no compression.
-const DefaultCompressorName = "identity"
+// NoCompressor use when no specific compressor name provided, which effectively means no compression.
+const NoCompressor = ""
 
 // DefaultMaxMsgSize use 1 GiB as the default message size limit.
 // This enforces a sane max message size, while still allowing for reasonably large messages.

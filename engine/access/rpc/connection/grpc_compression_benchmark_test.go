@@ -21,22 +21,27 @@ import (
 	"github.com/onflow/flow/protobuf/go/flow/execution"
 )
 
+// BenchmarkWithGzipCompression benchmarks the gRPC request to execution nodes using gzip compressor.
 func BenchmarkWithGzipCompression(b *testing.B) {
 	runBenchmark(b, gzip.Name)
 }
 
+// BenchmarkWithLZ4Compression benchmarks the gRPC request to execution nodes using lz4 compressor.
 func BenchmarkWithLZ4Compression(b *testing.B) {
 	runBenchmark(b, lz4.Name)
 }
 
+// BenchmarkWithSnappyCompression benchmarks the gRPC request to execution nodes using snappy compressor.
 func BenchmarkWithSnappyCompression(b *testing.B) {
 	runBenchmark(b, snappy.Name)
 }
 
+// BenchmarkWithDeflateCompression benchmarks the gRPC request to execution nodes using deflate compressor.
 func BenchmarkWithDeflateCompression(b *testing.B) {
 	runBenchmark(b, deflate.Name)
 }
 
+// runBenchmark is a helper function that performs the benchmarking for different compressors.
 func runBenchmark(b *testing.B, compressorName string) {
 	// create an execution node
 	en := new(executionNode)
@@ -102,6 +107,7 @@ func runBenchmark(b *testing.B, compressorName string) {
 	}
 }
 
+// getEvents generates a slice of flow events with a specified length.
 func getEvents(n int) []flow.Event {
 	events := make([]flow.Event, n)
 	for i := range events {
@@ -110,6 +116,7 @@ func getEvents(n int) []flow.Event {
 	return events
 }
 
+// getHeaders generates a slice of flow headers with a specified length.
 func getHeaders(n int) []*flow.Header {
 	headers := make([]*flow.Header, n)
 	for i := range headers {

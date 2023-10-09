@@ -137,7 +137,7 @@ func DefaultObserverServiceConfig() *ObserverServiceConfig {
 				IdleTimeout:   rest.DefaultIdleTimeout,
 			},
 			MaxMsgSize:     grpcutils.DefaultMaxMsgSize,
-			CompressorName: grpcutils.DefaultCompressorName,
+			CompressorName: grpcutils.NoCompressor,
 		},
 		rpcMetricsEnabled:         false,
 		apiRatelimits:             nil,

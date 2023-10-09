@@ -179,7 +179,7 @@ func DefaultAccessNodeConfig() *AccessNodeConfig {
 				IdleTimeout:   rest.DefaultIdleTimeout,
 			},
 			MaxMsgSize:     grpcutils.DefaultMaxMsgSize,
-			CompressorName: grpcutils.DefaultCompressorName,
+			CompressorName: grpcutils.NoCompressor,
 		},
 		stateStreamConf: state_stream.Config{
 			MaxExecutionDataMsgSize: grpcutils.DefaultMaxMsgSize,

@@ -49,7 +49,7 @@ func TestProxyAccessAPI(t *testing.T) {
 		connectionFactory.AccessMetrics,
 		0,
 		CircuitBreakerConfig{},
-		grpcutils.DefaultCompressorName,
+		grpcutils.NoCompressor,
 	)
 
 	proxyConnectionFactory := ProxyConnectionFactory{
@@ -100,7 +100,7 @@ func TestProxyExecutionAPI(t *testing.T) {
 		connectionFactory.AccessMetrics,
 		0,
 		CircuitBreakerConfig{},
-		grpcutils.DefaultCompressorName,
+		grpcutils.NoCompressor,
 	)
 
 	proxyConnectionFactory := ProxyConnectionFactory{
@@ -145,7 +145,7 @@ func TestProxyAccessAPIConnectionReuse(t *testing.T) {
 		connectionFactory.AccessMetrics,
 		0,
 		CircuitBreakerConfig{},
-		grpcutils.DefaultCompressorName,
+		grpcutils.NoCompressor,
 	)
 
 	proxyConnectionFactory := ProxyConnectionFactory{
@@ -197,7 +197,7 @@ func TestProxyExecutionAPIConnectionReuse(t *testing.T) {
 		connectionFactory.AccessMetrics,
 		0,
 		CircuitBreakerConfig{},
-		grpcutils.DefaultCompressorName,
+		grpcutils.NoCompressor,
 	)
 
 	proxyConnectionFactory := ProxyConnectionFactory{
@@ -256,7 +256,7 @@ func TestExecutionNodeClientTimeout(t *testing.T) {
 		connectionFactory.AccessMetrics,
 		0,
 		CircuitBreakerConfig{},
-		grpcutils.DefaultCompressorName,
+		grpcutils.NoCompressor,
 	)
 
 	// create the execution API client
@@ -303,7 +303,7 @@ func TestCollectionNodeClientTimeout(t *testing.T) {
 		connectionFactory.AccessMetrics,
 		0,
 		CircuitBreakerConfig{},
-		grpcutils.DefaultCompressorName,
+		grpcutils.NoCompressor,
 	)
 
 	// create the collection API client
@@ -351,7 +351,7 @@ func TestConnectionPoolFull(t *testing.T) {
 		connectionFactory.AccessMetrics,
 		0,
 		CircuitBreakerConfig{},
-		grpcutils.DefaultCompressorName,
+		grpcutils.NoCompressor,
 	)
 
 	cn1Address := "foo1:123"
@@ -426,7 +426,7 @@ func TestConnectionPoolStale(t *testing.T) {
 		connectionFactory.AccessMetrics,
 		0,
 		CircuitBreakerConfig{},
-		grpcutils.DefaultCompressorName,
+		grpcutils.NoCompressor,
 	)
 
 	proxyConnectionFactory := ProxyConnectionFactory{
@@ -514,7 +514,7 @@ func TestExecutionNodeClientClosedGracefully(t *testing.T) {
 			connectionFactory.AccessMetrics,
 			0,
 			CircuitBreakerConfig{},
-			grpcutils.DefaultCompressorName,
+			grpcutils.NoCompressor,
 		)
 
 		clientAddress := en.listener.Addr().String()
@@ -597,7 +597,7 @@ func TestExecutionEvictingCacheClients(t *testing.T) {
 		connectionFactory.AccessMetrics,
 		0,
 		CircuitBreakerConfig{},
-		grpcutils.DefaultCompressorName,
+		grpcutils.NoCompressor,
 	)
 
 	clientAddress := cn.listener.Addr().String()
@@ -678,7 +678,7 @@ func TestCircuitBreakerExecutionNode(t *testing.T) {
 			MaxRequests:    1,
 			RestoreTimeout: circuitBreakerRestoreTimeout,
 		},
-		grpcutils.DefaultCompressorName,
+		grpcutils.NoCompressor,
 	)
 
 	// Set metrics reporting.
@@ -764,7 +764,7 @@ func TestCircuitBreakerCollectionNode(t *testing.T) {
 			MaxRequests:    1,
 			RestoreTimeout: circuitBreakerRestoreTimeout,
 		},
-		grpcutils.DefaultCompressorName,
+		grpcutils.NoCompressor,
 	)
 
 	// Set metrics reporting.
