@@ -718,6 +718,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 
 				indexerCore, err := indexer.New(
 					builder.Logger,
+					metrics.NewExecutionStateIndexerCollector(),
 					builder.DB,
 					builder.Storage.RegisterIndex,
 					builder.Storage.Headers,
