@@ -8,10 +8,13 @@ import (
 	"time"
 
 	lru "github.com/hashicorp/golang-lru"
+	lru2 "github.com/hashicorp/golang-lru/v2"
+	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/cmd/build"
+	"github.com/onflow/flow-go/engine/access/rpc/connection"
 	"github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/model/flow"
@@ -19,12 +22,7 @@ import (
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
-
-	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
 )
-
-// maxExecutionNodesCnt is the max number of execution nodes that will be contacted to complete an execution api request
-const maxExecutionNodesCnt = 3
 
 // minExecutionNodesCnt is the minimum number of execution nodes expected to have sent the execution receipt for a block
 const minExecutionNodesCnt = 2
@@ -75,7 +73,7 @@ type Backend struct {
 	chainID           flow.ChainID
 	collections       storage.Collections
 	executionReceipts storage.ExecutionReceipts
-	connFactory       ConnectionFactory
+	connFactory       connection.ConnectionFactory
 }
 
 // Config defines the configurable options for creating Backend
@@ -87,124 +85,146 @@ type Config struct {
 	PreferredExecutionNodeIDs []string      // preferred list of upstream execution node IDs
 	FixedExecutionNodeIDs     []string      // fixed list of execution node IDs to choose from if no node ID can be chosen from the PreferredExecutionNodeIDs
 	ArchiveAddressList        []string      // the archive node address list to send script executions. when configured, script executions will be all sent to the archive node
+	ScriptExecValidation      bool
+	CircuitBreakerConfig      connection.CircuitBreakerConfig // the configuration for circuit breaker
 }
 
-func New(
-	state protocol.State,
-	collectionRPC accessproto.AccessAPIClient,
-	historicalAccessNodes []accessproto.AccessAPIClient,
-	blocks storage.Blocks,
-	headers storage.Headers,
-	collections storage.Collections,
-	transactions storage.Transactions,
-	executionReceipts storage.ExecutionReceipts,
-	executionResults storage.ExecutionResults,
-	chainID flow.ChainID,
-	accessMetrics module.AccessMetrics,
-	connFactory ConnectionFactory,
-	retryEnabled bool,
-	maxHeightRange uint,
-	preferredExecutionNodeIDs []string,
-	fixedExecutionNodeIDs []string,
-	log zerolog.Logger,
-	snapshotHistoryLimit int,
-	archiveAddressList []string,
-) *Backend {
+type Params struct {
+	State                     protocol.State
+	CollectionRPC             accessproto.AccessAPIClient
+	HistoricalAccessNodes     []accessproto.AccessAPIClient
+	Blocks                    storage.Blocks
+	Headers                   storage.Headers
+	Collections               storage.Collections
+	Transactions              storage.Transactions
+	ExecutionReceipts         storage.ExecutionReceipts
+	ExecutionResults          storage.ExecutionResults
+	ChainID                   flow.ChainID
+	AccessMetrics             module.AccessMetrics
+	ConnFactory               connection.ConnectionFactory
+	RetryEnabled              bool
+	MaxHeightRange            uint
+	PreferredExecutionNodeIDs []string
+	FixedExecutionNodeIDs     []string
+	Log                       zerolog.Logger
+	SnapshotHistoryLimit      int
+	ArchiveAddressList        []string
+	Communicator              Communicator
+	ScriptExecValidation      bool
+	TxResultCacheSize         uint
+}
+
+// New creates backend instance
+func New(params Params) *Backend {
 	retry := newRetry()
-	if retryEnabled {
+	if params.RetryEnabled {
 		retry.Activate()
 	}
 
 	loggedScripts, err := lru.New(DefaultLoggedScriptsCacheSize)
 	if err != nil {
-		log.Fatal().Err(err).Msg("failed to initialize script logging cache")
+		params.Log.Fatal().Err(err).Msg("failed to initialize script logging cache")
 	}
 
-	archivePorts := make([]uint, len(archiveAddressList))
-	for idx, addr := range archiveAddressList {
+	archivePorts := make([]uint, len(params.ArchiveAddressList))
+	for idx, addr := range params.ArchiveAddressList {
 		port, err := findPortFromAddress(addr)
 		if err != nil {
-			log.Fatal().Err(err).Msg("failed to find archive node port")
+			params.Log.Fatal().Err(err).Msg("failed to find archive node port")
 		}
 		archivePorts[idx] = port
 	}
 
+	var txResCache *lru2.Cache[flow.Identifier, *access.TransactionResult]
+	if params.TxResultCacheSize > 0 {
+		txResCache, err = lru2.New[flow.Identifier, *access.TransactionResult](int(params.TxResultCacheSize))
+		if err != nil {
+			params.Log.Fatal().Err(err).Msg("failed to init cache for transaction results")
+		}
+	}
+
 	b := &Backend{
-		state: state,
+		state: params.State,
 		// create the sub-backends
 		backendScripts: backendScripts{
-			headers:            headers,
-			executionReceipts:  executionReceipts,
-			connFactory:        connFactory,
-			state:              state,
-			log:                log,
-			metrics:            accessMetrics,
-			loggedScripts:      loggedScripts,
-			archiveAddressList: archiveAddressList,
-			archivePorts:       archivePorts,
+			headers:              params.Headers,
+			executionReceipts:    params.ExecutionReceipts,
+			connFactory:          params.ConnFactory,
+			state:                params.State,
+			log:                  params.Log,
+			metrics:              params.AccessMetrics,
+			loggedScripts:        loggedScripts,
+			archiveAddressList:   params.ArchiveAddressList,
+			archivePorts:         archivePorts,
+			nodeCommunicator:     params.Communicator,
+			scriptExecValidation: params.ScriptExecValidation,
 		},
 		backendTransactions: backendTransactions{
-			staticCollectionRPC:  collectionRPC,
-			state:                state,
-			chainID:              chainID,
-			collections:          collections,
-			blocks:               blocks,
-			transactions:         transactions,
-			executionReceipts:    executionReceipts,
-			transactionValidator: configureTransactionValidator(state, chainID),
-			transactionMetrics:   accessMetrics,
+			staticCollectionRPC:  params.CollectionRPC,
+			state:                params.State,
+			chainID:              params.ChainID,
+			collections:          params.Collections,
+			blocks:               params.Blocks,
+			transactions:         params.Transactions,
+			executionReceipts:    params.ExecutionReceipts,
+			transactionValidator: configureTransactionValidator(params.State, params.ChainID),
+			transactionMetrics:   params.AccessMetrics,
 			retry:                retry,
-			connFactory:          connFactory,
-			previousAccessNodes:  historicalAccessNodes,
-			log:                  log,
+			connFactory:          params.ConnFactory,
+			previousAccessNodes:  params.HistoricalAccessNodes,
+			log:                  params.Log,
+			nodeCommunicator:     params.Communicator,
+			txResultCache:        txResCache,
 		},
 		backendEvents: backendEvents{
-			state:             state,
-			headers:           headers,
-			executionReceipts: executionReceipts,
-			connFactory:       connFactory,
-			log:               log,
-			maxHeightRange:    maxHeightRange,
+			state:             params.State,
+			headers:           params.Headers,
+			executionReceipts: params.ExecutionReceipts,
+			connFactory:       params.ConnFactory,
+			log:               params.Log,
+			maxHeightRange:    params.MaxHeightRange,
+			nodeCommunicator:  params.Communicator,
 		},
 		backendBlockHeaders: backendBlockHeaders{
-			headers: headers,
-			state:   state,
+			headers: params.Headers,
+			state:   params.State,
 		},
 		backendBlockDetails: backendBlockDetails{
-			blocks: blocks,
-			state:  state,
+			blocks: params.Blocks,
+			state:  params.State,
 		},
 		backendAccounts: backendAccounts{
-			state:             state,
-			headers:           headers,
-			executionReceipts: executionReceipts,
-			connFactory:       connFactory,
-			log:               log,
+			state:             params.State,
+			headers:           params.Headers,
+			executionReceipts: params.ExecutionReceipts,
+			connFactory:       params.ConnFactory,
+			log:               params.Log,
+			nodeCommunicator:  params.Communicator,
 		},
 		backendExecutionResults: backendExecutionResults{
-			executionResults: executionResults,
+			executionResults: params.ExecutionResults,
 		},
 		backendNetwork: backendNetwork{
-			state:                state,
-			chainID:              chainID,
-			snapshotHistoryLimit: snapshotHistoryLimit,
+			state:                params.State,
+			chainID:              params.ChainID,
+			snapshotHistoryLimit: params.SnapshotHistoryLimit,
 		},
-		collections:       collections,
-		executionReceipts: executionReceipts,
-		connFactory:       connFactory,
-		chainID:           chainID,
+		collections:       params.Collections,
+		executionReceipts: params.ExecutionReceipts,
+		connFactory:       params.ConnFactory,
+		chainID:           params.ChainID,
 	}
 
 	retry.SetBackend(b)
 
-	preferredENIdentifiers, err = identifierList(preferredExecutionNodeIDs)
+	preferredENIdentifiers, err = identifierList(params.PreferredExecutionNodeIDs)
 	if err != nil {
-		log.Fatal().Err(err).Msg("failed to convert node id string to Flow Identifier for preferred EN map")
+		params.Log.Fatal().Err(err).Msg("failed to convert node id string to Flow Identifier for preferred EN map")
 	}
 
-	fixedENIdentifiers, err = identifierList(fixedExecutionNodeIDs)
+	fixedENIdentifiers, err = identifierList(params.FixedExecutionNodeIDs)
 	if err != nil {
-		log.Fatal().Err(err).Msg("failed to convert node id string to Flow Identifier for fixed EN map")
+		params.Log.Fatal().Err(err).Msg("failed to convert node id string to Flow Identifier for fixed EN map")
 	}
 
 	return b
@@ -221,16 +241,9 @@ func NewCache(
 	var cache *lru.Cache
 	cacheSize := connectionPoolSize
 	if cacheSize > 0 {
-		// TODO: remove this fallback after fixing issues with evictions
-		// It was observed that evictions cause connection errors for in flight requests. This works around
-		// the issue by forcing hte pool size to be greater than the number of ENs + LNs
-		if cacheSize < DefaultConnectionPoolSize {
-			log.Warn().Msg("connection pool size below threshold, setting pool size to default value ")
-			cacheSize = DefaultConnectionPoolSize
-		}
 		var err error
 		cache, err = lru.NewWithEvict(int(cacheSize), func(_, evictedValue interface{}) {
-			store := evictedValue.(*CachedClient)
+			store := evictedValue.(*connection.CachedClient)
 			store.Close()
 			log.Debug().Str("grpc_conn_evicted", store.Address).Msg("closing grpc connection evicted from pool")
 			if accessMetrics != nil {
@@ -295,7 +308,7 @@ func (b *Backend) GetNodeVersionInfo(_ context.Context) (*access.NodeVersionInfo
 	protocolVersion := stateParams.ProtocolVersion()
 
 	return &access.NodeVersionInfo{
-		Semver:          build.Semver(),
+		Semver:          build.Version(),
 		Commit:          build.Commit(),
 		SporkId:         sporkId,
 		ProtocolVersion: uint64(protocolVersion),
@@ -335,7 +348,7 @@ func (b *Backend) GetLatestProtocolStateSnapshot(_ context.Context) ([]byte, err
 	return convert.SnapshotToBytes(validSnapshot)
 }
 
-// executionNodesForBlockID returns upto maxExecutionNodesCnt number of randomly chosen execution node identities
+// executionNodesForBlockID returns upto maxNodesCnt number of randomly chosen execution node identities
 // which have executed the given block ID.
 // If no such execution node is found, an InsufficientExecutionReceipts error is returned.
 func executionNodesForBlockID(
@@ -406,17 +419,11 @@ func executionNodesForBlockID(
 		return nil, fmt.Errorf("failed to retreive execution IDs for block ID %v: %w", blockID, err)
 	}
 
-	// randomly choose upto maxExecutionNodesCnt identities
-	executionIdentitiesRandom, err := subsetENs.Sample(maxExecutionNodesCnt)
-	if err != nil {
-		return nil, fmt.Errorf("sampling failed: %w", err)
-	}
-
-	if len(executionIdentitiesRandom) == 0 {
+	if len(subsetENs) == 0 {
 		return nil, fmt.Errorf("no matching execution node found for block ID %v", blockID)
 	}
 
-	return executionIdentitiesRandom, nil
+	return subsetENs, nil
 }
 
 // findAllExecutionNodes find all the execution nodes ids from the execution receipts that have been received for the

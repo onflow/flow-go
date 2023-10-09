@@ -43,6 +43,9 @@ type Static struct {
 	dkg          protocol.DKG
 }
 
+var _ hotstuff.Replicas = (*Static)(nil)
+var _ hotstuff.DynamicCommittee = (*Static)(nil)
+
 func (s Static) IdentitiesByBlock(_ flow.Identifier) (flow.IdentityList, error) {
 	return s.participants, nil
 }

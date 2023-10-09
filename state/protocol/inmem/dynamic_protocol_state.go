@@ -7,26 +7,23 @@ import (
 
 // DynamicProtocolStateAdapter implements protocol.DynamicProtocolState by wrapping an InitialProtocolStateAdapter.
 type DynamicProtocolStateAdapter struct {
-	*InitialProtocolStateAdapter
+	InitialProtocolStateAdapter
 	params protocol.GlobalParams
 }
 
 var _ protocol.DynamicProtocolState = (*DynamicProtocolStateAdapter)(nil)
 
 func NewDynamicProtocolStateAdapter(entry *flow.RichProtocolStateEntry, params protocol.GlobalParams) *DynamicProtocolStateAdapter {
-	adapter := NewInitialProtocolStateAdapter(entry)
 	return &DynamicProtocolStateAdapter{
-		InitialProtocolStateAdapter: adapter,
-		params:                      params,
+		InitialProtocolStateAdapter: InitialProtocolStateAdapter{
+			RichProtocolStateEntry: entry,
+		},
+		params: params,
 	}
 }
 
-func (s *DynamicProtocolStateAdapter) EpochStatus() *flow.EpochStatus {
-	return s.RichProtocolStateEntry.EpochStatus()
-}
-
 func (s *DynamicProtocolStateAdapter) Identities() flow.IdentityList {
-	return s.RichProtocolStateEntry.Identities
+	return s.RichProtocolStateEntry.CurrentEpochIdentityTable
 }
 
 func (s *DynamicProtocolStateAdapter) GlobalParams() protocol.GlobalParams {

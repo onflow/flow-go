@@ -13,21 +13,18 @@ import (
 
 type Commits struct {
 	db    *badger.DB
-	cache *Cache
+	cache *Cache[flow.Identifier, flow.StateCommitment]
 }
 
 func NewCommits(collector module.CacheMetrics, db *badger.DB) *Commits {
 
-	store := func(key interface{}, val interface{}) func(*transaction.Tx) error {
-		blockID := key.(flow.Identifier)
-		commit := val.(flow.StateCommitment)
+	store := func(blockID flow.Identifier, commit flow.StateCommitment) func(*transaction.Tx) error {
 		return transaction.WithTx(operation.SkipDuplicates(operation.IndexStateCommitment(blockID, commit)))
 	}
 
-	retrieve := func(key interface{}) func(tx *badger.Txn) (interface{}, error) {
-		blockID := key.(flow.Identifier)
-		var commit flow.StateCommitment
-		return func(tx *badger.Txn) (interface{}, error) {
+	retrieve := func(blockID flow.Identifier) func(tx *badger.Txn) (flow.StateCommitment, error) {
+		return func(tx *badger.Txn) (flow.StateCommitment, error) {
+			var commit flow.StateCommitment
 			err := operation.LookupStateCommitment(blockID, &commit)(tx)
 			return commit, err
 		}
@@ -35,8 +32,8 @@ func NewCommits(collector module.CacheMetrics, db *badger.DB) *Commits {
 
 	c := &Commits{
 		db: db,
-		cache: newCache(collector, metrics.ResourceCommit,
-			withLimit(1000),
+		cache: newCache[flow.Identifier, flow.StateCommitment](collector, metrics.ResourceCommit,
+			withLimit[flow.Identifier, flow.StateCommitment](1000),
 			withStore(store),
 			withRetrieve(retrieve),
 		),
@@ -55,7 +52,7 @@ func (c *Commits) retrieveTx(blockID flow.Identifier) func(tx *badger.Txn) (flow
 		if err != nil {
 			return flow.DummyStateCommitment, err
 		}
-		return val.(flow.StateCommitment), nil
+		return val, nil
 	}
 }
 

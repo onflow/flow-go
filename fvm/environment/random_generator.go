@@ -5,7 +5,6 @@ import (
 	"fmt"
 
 	"github.com/onflow/flow-go/crypto/random"
-	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/storage/state"
 	"github.com/onflow/flow-go/fvm/tracing"
 	"github.com/onflow/flow-go/model/flow"
@@ -142,5 +141,5 @@ func NewDummyRandomGenerator() RandomGenerator {
 // UnsafeRandom() returns an error because executing scripts
 // does not support randomness APIs.
 func (gen *dummyRandomGenerator) UnsafeRandom() (uint64, error) {
-	return 0, errors.NewOperationNotSupportedError("Random")
+	return 0, nil
 }

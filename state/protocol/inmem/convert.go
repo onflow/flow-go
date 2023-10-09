@@ -94,32 +94,13 @@ func FromSnapshot(from protocol.Snapshot) (*Snapshot, error) {
 // FromParams converts any protocol.GlobalParams to a memory-backed Params.
 // TODO error docs
 func FromParams(from protocol.GlobalParams) (*Params, error) {
-	var (
-		params EncodableParams
-		err    error
-	)
-
-	params.ChainID = from.ChainID()
-	if err != nil {
-		return nil, fmt.Errorf("could not get chain id: %w", err)
+	params := EncodableParams{
+		ChainID:                    from.ChainID(),
+		SporkID:                    from.SporkID(),
+		SporkRootBlockHeight:       from.SporkRootBlockHeight(),
+		ProtocolVersion:            from.ProtocolVersion(),
+		EpochCommitSafetyThreshold: from.EpochCommitSafetyThreshold(),
 	}
-	params.SporkID = from.SporkID()
-	if err != nil {
-		return nil, fmt.Errorf("could not get spork id: %w", err)
-	}
-	params.SporkRootBlockHeight = from.SporkRootBlockHeight()
-	if err != nil {
-		return nil, fmt.Errorf("could not get spork root block height: %w", err)
-	}
-	params.ProtocolVersion = from.ProtocolVersion()
-	if err != nil {
-		return nil, fmt.Errorf("could not get protocol version: %w", err)
-	}
-	params.EpochCommitSafetyThreshold = from.EpochCommitSafetyThreshold()
-	if err != nil {
-		return nil, fmt.Errorf("could not get protocol version: %w", err)
-	}
-
 	return &Params{params}, nil
 }
 
@@ -342,11 +323,11 @@ func SnapshotFromBootstrapStateWithParams(
 		EpochCommitSafetyThreshold: epochCommitSafetyThreshold, // see protocol.Params for details
 	}
 
+
 	rootProtocolState := ProtocolStateForBootstrapState(setup, commit)
 	if rootProtocolState.ID() != root.Payload.ProtocolStateID {
 		return nil, fmt.Errorf("incorrect protocol state ID in root block, expected (%x) but got (%x)",
 			root.Payload.ProtocolStateID, rootProtocolState.ID())
-	}
 
 	snap := SnapshotFromEncodable(EncodableSnapshot{
 		Head:         root.Header,
@@ -372,13 +353,13 @@ func SnapshotFromBootstrapStateWithParams(
 // ProtocolStateForBootstrapState generates a protocol.ProtocolStateEntry for a root protocol state which is used for bootstrapping.
 func ProtocolStateForBootstrapState(setup *flow.EpochSetup, commit *flow.EpochCommit) *flow.ProtocolStateEntry {
 	return &flow.ProtocolStateEntry{
-		CurrentEpochEventIDs: flow.EventIDs{
-			SetupID:  setup.ID(),
-			CommitID: commit.ID(),
-		},
-		PreviousEpochEventIDs:           flow.EventIDs{},
-		Identities:                      flow.DynamicIdentityEntryListFromIdentities(setup.Participants),
+		PreviousEpochEventIDs: flow.EventIDs{},
+		CurrentEpoch: flow.EpochStateContainer{
+		SetupID:          setup.ID(),
+		CommitID:         commit.ID(),
+		ActiveIdentities: flow.DynamicIdentityEntryListFromIdentities(setup.Participants),
+	},
+		NextEpoch:                       nil,
 		InvalidStateTransitionAttempted: false,
-		NextEpochProtocolState:          nil,
 	}
 }

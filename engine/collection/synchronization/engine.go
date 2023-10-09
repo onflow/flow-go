@@ -62,7 +62,7 @@ type Engine struct {
 func New(
 	log zerolog.Logger,
 	metrics module.EngineMetrics,
-	net network.Network,
+	net network.EngineRegistry,
 	me module.Local,
 	participants flow.IdentityList,
 	state cluster.State,
@@ -100,11 +100,7 @@ func New(
 	if err != nil {
 		return nil, fmt.Errorf("could not setup message handler")
 	}
-
 	chainID := state.Params().ChainID()
-	if err != nil {
-		return nil, fmt.Errorf("could not get chain ID: %w", err)
-	}
 
 	// register the engine with the network layer and store the conduit
 	con, err := net.Register(channels.SyncCluster(chainID), e)

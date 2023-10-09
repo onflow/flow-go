@@ -133,17 +133,14 @@ func TestSnapshot_Params(t *testing.T) {
 		for _, snapshot := range snapshots {
 			t.Run("should be able to get chain ID from snapshot", func(t *testing.T) {
 				chainID := snapshot.Params().ChainID()
-				require.NoError(t, err)
 				assert.Equal(t, expectedChainID, chainID)
 			})
 			t.Run("should be able to get spork ID from snapshot", func(t *testing.T) {
 				sporkID := snapshot.Params().SporkID()
-				require.NoError(t, err)
 				assert.Equal(t, expectedSporkID, sporkID)
 			})
 			t.Run("should be able to get protocol version from snapshot", func(t *testing.T) {
 				protocolVersion := snapshot.Params().ProtocolVersion()
-				require.NoError(t, err)
 				assert.Equal(t, expectedProtocolVersion, protocolVersion)
 			})
 		}

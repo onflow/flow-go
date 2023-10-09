@@ -9,12 +9,11 @@ import (
 	"regexp"
 	"strconv"
 
-	"golang.org/x/exp/slices"
-
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/fxamacker/cbor/v2"
 	"github.com/pkg/errors"
 	"github.com/vmihailenco/msgpack"
+	"golang.org/x/exp/slices"
 
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/utils/rand"
@@ -27,7 +26,7 @@ const DefaultInitialWeight = 100
 // rxid is the regex for parsing node identity entries.
 var rxid = regexp.MustCompile(`^(collection|consensus|execution|verification|access)-([0-9a-fA-F]{64})@([\w\d]+|[\w\d][\w\d\-]*[\w\d](?:\.*[\w\d][\w\d\-]*[\w\d])*|[\w\d][\w\d\-]*[\w\d])(:[\d]+)?=(\d{1,20})$`)
 
-// IdentitySkeleton represents the static part of public identity of one network participant (node).
+// IdentitySkeleton represents the static part of a network participant's (i.e. node's) public identity.
 type IdentitySkeleton struct {
 	// NodeID uniquely identifies a particular node. A node's ID is fixed for
 	// the duration of that node's participation in the network.
@@ -62,8 +61,8 @@ type DynamicIdentity struct {
 	// table with zero weight.
 	Weight uint64
 	// Ejected represents whether a node has been permanently removed from the
-	// network. A node may be ejected for either:
-	// * request self-ejection to protect its stake in case the node operator suspects
+	// network. A node may be ejected by either:
+	// * requesting self-ejection to protect its stake in case the node operator suspects
 	//   the node's keys to be compromised
 	// * committing a serious protocol violation or multiple smaller misdemeanours
 	Ejected bool
@@ -362,13 +361,17 @@ func (il IdentityList) Map(f IdentityMapFunc) IdentityList {
 	return dup
 }
 
-// Copy returns a copy of the receiver. The resulting slice uses a different
+// Copy returns a copy of IdentityList. The resulting slice uses a different
 // backing array, meaning appends and insert operations on either slice are
 // guaranteed to only affect that slice.
 //
 // Copy should be used when modifying an existing identity list by either
 // appending new elements, re-ordering, or inserting new elements in an
 // existing index.
+//
+// CAUTION:
+// All Identity fields are deep-copied, _except_ for their keys, which
+// are copied by reference.
 func (il IdentityList) Copy() IdentityList {
 	dup := make(IdentityList, 0, len(il))
 
@@ -571,6 +574,7 @@ func (il IdentityList) SamplePct(pct float64) (IdentityList, error) {
 // Union returns a new identity list containing every identity that occurs in
 // either `il`, or `other`, or both. There are no duplicates in the output,
 // where duplicates are identities with the same node ID.
+// Receiver `il` and/or method input `other` can be nil or empty.
 // The returned IdentityList is sorted in canonical order.
 func (il IdentityList) Union(other IdentityList) IdentityList {
 	maxLen := len(il) + len(other)

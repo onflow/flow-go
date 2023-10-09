@@ -69,6 +69,7 @@ type ProtocolState interface {
 
 // StateUpdater is a dedicated interface for updating protocol state.
 // It is used by the compliance layer to update protocol state when certain events that are stored in blocks are observed.
+// CAUTION: The compliance layer is responsible for validating events before passing them to StateUpdater.
 type StateUpdater interface {
 	// Build returns updated protocol state entry, state ID and a flag indicating if there were any changes.
 	Build() (updatedState *flow.ProtocolStateEntry, stateID flow.Identifier, hasChanges bool)
@@ -77,16 +78,20 @@ type StateUpdater interface {
 	// Observing an epoch setup event, transitions protocol state from staking to setup phase, we stop returning
 	// identities from previous+current epochs and start returning identities from current+next epochs.
 	// As a result of this operation protocol state for the next epoch will be created.
+	// CAUTION: Caller must validate input event.
 	// No errors are expected during normal operations.
 	ProcessEpochSetup(epochSetup *flow.EpochSetup) error
 	// ProcessEpochCommit updates current protocol state with data from epoch commit event.
 	// Observing an epoch setup commit, transitions protocol state from setup to commit phase, at this point we have
 	// finished construction of the next epoch.
 	// As a result of this operation protocol state for next epoch will be committed.
+	// CAUTION: Caller must validate input event.
 	// No errors are expected during normal operations.
 	ProcessEpochCommit(epochCommit *flow.EpochCommit) error
 	// UpdateIdentity updates identity table with new identity entry.
 	// Should pass identity which is already present in the table, otherwise an exception will be raised.
+	// TODO: This function currently modifies both current+next identities based on input.
+	//       This is incompatible with the design doc, and needs to be updated to modify current/next epoch separately
 	// No errors are expected during normal operations.
 	UpdateIdentity(updated *flow.DynamicIdentityEntry) error
 	// SetInvalidStateTransitionAttempted sets a flag indicating that invalid state transition was attempted.
@@ -109,10 +114,12 @@ type StateUpdater interface {
 // StateMutator is an interface for creating protocol state updaters and committing protocol state to the database.
 // It is used by the compliance layer to update protocol state when certain events that are stored in blocks are observed.
 // It has to be used for each block that is added to the block tree to maintain a correct protocol state on a block-by-block basis.
+// TODO: this should be a stand-alone interface to support evolving the protocol state in the compliance layer (already possible) as well as during block construction (complex with the current implementation).
 type StateMutator interface {
 	// CreateUpdater creates a protocol state updater based on previous protocol state.
 	// Has to be called for each block to correctly index the protocol state.
-	// No errors are expected during normal operations.
+	// Expected errors during normal operations:
+	//  * `storage.ErrNotFound` if no protocol state for parent block is known.
 	CreateUpdater(candidate *flow.Header) (StateUpdater, error)
 	// CommitProtocolState commits the protocol state to the database.
 	// Has to be called for each block to correctly index the protocol state.

@@ -102,7 +102,7 @@ var _ hotstuff.CommunicatorConsumer = (*MessageHub)(nil)
 // No errors are expected during normal operations.
 func NewMessageHub(log zerolog.Logger,
 	engineMetrics module.EngineMetrics,
-	net network.Network,
+	net network.EngineRegistry,
 	me module.Local,
 	compliance collection.Compliance,
 	hotstuff module.HotStuff,
@@ -157,9 +157,6 @@ func NewMessageHub(log zerolog.Logger,
 
 	// register network conduit
 	chainID := clusterState.Params().ChainID()
-	if err != nil {
-		return nil, fmt.Errorf("could not get chain ID: %w", err)
-	}
 	conduit, err := net.Register(channels.ConsensusCluster(chainID), hub)
 	if err != nil {
 		return nil, fmt.Errorf("could not register engine: %w", err)
