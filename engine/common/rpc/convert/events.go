@@ -60,6 +60,25 @@ func MessagesToEvents(l []*entities.Event) []flow.Event {
 	return events
 }
 
+// EventToMessageFromVersion converts a flow.Event to a protobuf message, converting the payload
+// encoding from CCF to JSON if the input version is CCF
+func EventToMessageFromVersion(e flow.Event, version execproto.EventEncodingVersion) (*entities.Event, error) {
+	message := EventToMessage(e)
+	switch version {
+	case execproto.EventEncodingVersion_CCF_V0:
+		convertedPayload, err := CcfPayloadToJsonPayload(e.Payload)
+		if err != nil {
+			return nil, fmt.Errorf("could not convert event payload from CCF to Json: %w", err)
+		}
+		message.Payload = convertedPayload
+	case execproto.EventEncodingVersion_JSON_CDC_V0:
+	default:
+		return nil, fmt.Errorf("invalid encoding format %d", version)
+	}
+
+	return message, nil
+}
+
 // MessageToEventFromVersion converts a protobuf message to a flow.Event, and converts the payload
 // encoding from CCF to JSON if the input version is CCF
 func MessageToEventFromVersion(m *entities.Event, inputVersion entities.EventEncodingVersion) (*flow.Event, error) {
@@ -77,6 +96,21 @@ func MessageToEventFromVersion(m *entities.Event, inputVersion entities.EventEnc
 	default:
 		return nil, fmt.Errorf("invalid encoding format %d", inputVersion)
 	}
+}
+
+// EventsToMessagesFromVersion converts a slice of flow.Events to a slice of protobuf messages, converting
+// the payload encoding from CCF to JSON if the input version is CCF
+func EventsToMessagesFromVersion(flowEvents []flow.Event, version execproto.EventEncodingVersion) ([]*entities.Event, error) {
+	events := make([]*entities.Event, len(flowEvents))
+	for i, e := range flowEvents {
+		event, err := EventToMessageFromVersion(e, version)
+		if err != nil {
+			return nil, fmt.Errorf("could not convert event at index %d from format %d: %w",
+				e.EventIndex, version, err)
+		}
+		events[i] = event
+	}
+	return events, nil
 }
 
 // MessagesToEventsFromVersion converts a slice of protobuf messages to a slice of flow.Events, converting
