@@ -6,11 +6,6 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/onflow/cadence"
-	"github.com/onflow/cadence/encoding/ccf"
-	jsoncdc "github.com/onflow/cadence/encoding/json"
-	"github.com/onflow/cadence/runtime/common"
-
 	"github.com/onflow/flow-go/utils/unittest/generator"
 
 	"github.com/dgraph-io/badger/v2"
@@ -2109,7 +2104,8 @@ func (suite *Suite) TestScriptExecutionValidationMode() {
 	})
 }
 
-// TestGetTransactionResultByIndexEventEncodingVersion
+// TestGetTransactionResultByIndexEventEncodingVersion tests the GetTransactionResultByIndex function with different
+// event encoding versions.
 func (suite *Suite) TestGetTransactionResultByIndexEventEncodingVersion() {
 	suite.state.On("Sealed").Return(suite.snapshot, nil).Maybe()
 
@@ -2146,6 +2142,7 @@ func (suite *Suite) TestGetTransactionResultByIndexEventEncodingVersion() {
 		Index:   index,
 	}
 
+	// Define a helper function to prepare the GetTransactionResultResponse with a given encoding version.
 	prepareGetTransactionResultByIndex := func(version entitiesproto.EventEncodingVersion) *execproto.GetTransactionResultResponse {
 		events := getEventsWithEncoding(1, version)
 
@@ -2161,6 +2158,7 @@ func (suite *Suite) TestGetTransactionResultByIndexEventEncodingVersion() {
 		return exeEventResp
 	}
 
+	// Define a helper function to assert the result expectations.
 	assertResultExpectations := func(
 		exeEventResp *execproto.GetTransactionResultResponse,
 		encodingVersionValue *entitiesproto.EventEncodingVersionValue,
@@ -2257,61 +2255,19 @@ func getEvents(n int) []flow.Event {
 	return events
 }
 
+// getEventsWithEncoding generates a specified number of events with a given encoding version.
 func getEventsWithEncoding(n int, version entitiesproto.EventEncodingVersion) []flow.Event {
+	var eventGenerator *generator.Events
+	switch version {
+	case entitiesproto.EventEncodingVersion_CCF_V0:
+		eventGenerator = generator.EventGenerator(generator.WithEncoding(generator.EncodingCCF))
+	case entitiesproto.EventEncodingVersion_JSON_CDC_V0:
+		eventGenerator = generator.EventGenerator(generator.WithEncoding(generator.EncodingJSON))
+	}
+
 	events := make([]flow.Event, 0, n)
-	ids := generator.IdentifierGenerator()
 	for i := 0; i < n; i++ {
-		location := common.StringLocation("test")
-		identifier := fmt.Sprintf("FooEvent%d", i)
-		typeID := location.TypeID(nil, identifier)
-
-		testEventType := &cadence.EventType{
-			Location:            location,
-			QualifiedIdentifier: identifier,
-			Fields: []cadence.Field{
-				{
-					Identifier: "a",
-					Type:       cadence.IntType{},
-				},
-				{
-					Identifier: "b",
-					Type:       cadence.StringType{},
-				},
-			},
-		}
-
-		fooString, err := cadence.NewString("foo")
-		if err != nil {
-			panic(fmt.Sprintf("unexpected error while creating cadence string: %s", err))
-		}
-
-		testEvent := cadence.NewEvent(
-			[]cadence.Value{
-				cadence.NewInt(i),
-				fooString,
-			}).WithType(testEventType)
-
-		var payload []byte
-		switch version {
-		case entitiesproto.EventEncodingVersion_CCF_V0:
-			payload, err = ccf.Encode(testEvent)
-			if err != nil {
-				panic(fmt.Sprintf("unexpected error while ccf encoding events: %s", err))
-			}
-		case entitiesproto.EventEncodingVersion_JSON_CDC_V0:
-			payload, err = jsoncdc.Encode(testEvent)
-			if err != nil {
-				panic(fmt.Sprintf("unexpected error while json encoding events: %s", err))
-			}
-		}
-
-		events = append(events, flow.Event{
-			Type:             flow.EventType(typeID),
-			TransactionID:    ids.New(),
-			TransactionIndex: uint32(i),
-			EventIndex:       uint32(i),
-			Payload:          payload,
-		})
+		events = append(events, eventGenerator.New())
 	}
 
 	return events
