@@ -46,9 +46,9 @@ func (m *Mutator) CreateUpdater(candidateView uint64, parentID flow.Identifier) 
 // CommitProtocolState commits the protocol state updater as part of DB transaction.
 // Has to be called for each block to correctly index the protocol state.
 // No errors are expected during normal operations.
-func (m *Mutator) CommitProtocolState(updater protocol.StateUpdater) func(tx *transaction.Tx) error {
+func (m *Mutator) CommitProtocolState(blockID flow.Identifier, updater protocol.StateUpdater) (func(tx *transaction.Tx) error, flow.Identifier) {
+	updatedState, updatedStateID, hasChanges := updater.Build()
 	return func(tx *transaction.Tx) error {
-		updatedState, updatedStateID, hasChanges := updater.Build()
 		if hasChanges {
 			err := m.protocolStateDB.StoreTx(updatedStateID, updatedState)(tx)
 			if err != nil && !errors.Is(err, storage.ErrAlreadyExists) {
@@ -56,13 +56,13 @@ func (m *Mutator) CommitProtocolState(updater protocol.StateUpdater) func(tx *tr
 			}
 		}
 
-		err := m.protocolStateDB.Index(updater.Block().ID(), updatedStateID)(tx)
+		err := m.protocolStateDB.Index(blockID, updatedStateID)(tx)
 		if err != nil {
 			return fmt.Errorf("could not index protocol state (%v) for block (%v): %w",
-				updatedStateID, updater.Block().ID(), err)
+				updatedStateID, blockID, err)
 		}
 		return nil
-	}
+	}, updatedStateID
 }
 
 // handleEpochServiceEvents handles applying state changes which occur as a result
@@ -96,10 +96,12 @@ func (m *Mutator) CommitProtocolState(updater protocol.StateUpdater) func(tx *tr
 //
 // No errors are expected during normal operation.
 func (m *Mutator) ApplyServiceEvents(updater protocol.StateUpdater, seals []*flow.Seal) (dbUpdates []func(*transaction.Tx) error, err error) {
-	epochFallbackTriggered, err := m.isEpochEmergencyFallbackTriggered()
-	if err != nil {
-		return nil, fmt.Errorf("could not retrieve epoch fallback status: %w", err)
-	}
+	// TODO: hook up epoch fallback mode
+	epochFallbackTriggered := false
+	//epochFallbackTriggered, err := m.isEpochEmergencyFallbackTriggered()
+	//if err != nil {
+	//	return nil, fmt.Errorf("could not retrieve epoch fallback status: %w", err)
+	//}
 
 	parentProtocolState := updater.ParentState()
 	epochStatus := parentProtocolState.EpochStatus()
@@ -152,8 +154,8 @@ func (m *Mutator) ApplyServiceEvents(updater protocol.StateUpdater, seals []*flo
 
 			switch ev := event.Event.(type) {
 			case *flow.EpochSetup:
-				// validate the service event
-				err := isValidExtendingEpochSetup(ev, activeSetup, epochStatus)
+				// TODO: validate the service event
+				//err := isValidExtendingEpochSetup(ev, activeSetup, epochStatus)
 				if err != nil {
 					if protocol.IsInvalidServiceEventError(err) {
 						// we have observed an invalid service event, which triggers epoch fallback mode
@@ -178,10 +180,10 @@ func (m *Mutator) ApplyServiceEvents(updater protocol.StateUpdater, seals []*flo
 					updater.SetInvalidStateTransitionAttempted()
 					return dbUpdates, nil
 				}
-				extendingSetup := parentProtocolState.NextEpochSetup
+				//extendingSetup := parentProtocolState.NextEpochSetup
 
-				// validate the service event
-				err = isValidExtendingEpochCommit(ev, extendingSetup, activeSetup, epochStatus)
+				// TODO: validate the service event
+				//err = isValidExtendingEpochCommit(ev, extendingSetup, activeSetup, epochStatus)
 				if err != nil {
 					if protocol.IsInvalidServiceEventError(err) {
 						// we have observed an invalid service event, which triggers epoch fallback mode

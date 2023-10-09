@@ -39,9 +39,9 @@ type State struct {
 		setups  storage.EpochSetups
 		commits storage.EpochCommits
 	}
-	protocolStateSnapshotsDB storage.ProtocolState
-	protocolState            protocol.ProtocolState
-	versionBeacons           storage.VersionBeacons
+	protocolStateMutator protocol.StateMutator
+	protocolState        protocol.ProtocolState
+	versionBeacons       storage.VersionBeacons
 
 	// rootHeight marks the cutoff of the history this node knows about. We cache it in the state
 	// because it cannot change over the lifecycle of a protocol state instance. It is frequently
@@ -769,7 +769,7 @@ func newState(
 	qcs storage.QuorumCertificates,
 	setups storage.EpochSetups,
 	commits storage.EpochCommits,
-	protocolState storage.ProtocolState,
+	protocolStateMutator protocol.StateMutator,
 	protocolStateReader protocol.ProtocolState,
 	versionBeacons storage.VersionBeacons,
 ) *State {
@@ -788,11 +788,11 @@ func newState(
 			setups:  setups,
 			commits: commits,
 		},
-		protocolStateSnapshotsDB: protocolState,
-		protocolState:            protocolStateReader,
-		versionBeacons:           versionBeacons,
-		cachedFinal:              new(atomic.Pointer[cachedHeader]),
-		cachedSealed:             new(atomic.Pointer[cachedHeader]),
+		protocolState:        protocolStateReader,
+		protocolStateMutator: protocolStateMutator,
+		versionBeacons:       versionBeacons,
+		cachedFinal:          new(atomic.Pointer[cachedHeader]),
+		cachedSealed:         new(atomic.Pointer[cachedHeader]),
 	}
 }
 

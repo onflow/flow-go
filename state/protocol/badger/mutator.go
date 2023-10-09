@@ -18,7 +18,6 @@ import (
 	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/state"
 	"github.com/onflow/flow-go/state/protocol"
-	"github.com/onflow/flow-go/state/protocol/protocol_state"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/badger/operation"
 	"github.com/onflow/flow-go/storage/badger/procedure"
@@ -476,7 +475,7 @@ func (m *FollowerState) lastSealed(candidate *flow.Block) (*flow.Seal, error) {
 		return last, nil
 	}
 
-	ordered, err := protocol.OrderedSeals(payload, m.headers)
+	ordered, err := protocol.OrderedSeals(payload.Seals, m.headers)
 	if err != nil {
 		// all errors are unexpected - differentiation is for clearer error messages
 		if errors.Is(err, storage.ErrNotFound) {
@@ -511,30 +510,20 @@ func (m *FollowerState) insert(ctx context.Context, candidate *flow.Block, certi
 		return fmt.Errorf("could not retrieve block header for %x: %w", parentID, err)
 	}
 
-	parentProtocolState, err := m.protocolStateSnapshotsDB.ByBlockID(candidate.Header.ParentID)
-	if err != nil {
-		return fmt.Errorf("could not retrieve protocol state for block (%v): %w", candidate.Header.ParentID, err)
-	}
-	protocolStateUpdater := protocol_state.NewUpdater(candidate.Header, parentProtocolState)
+	protocolStateUpdater, err := m.protocolStateMutator.CreateUpdater(candidate.Header.View, parentID)
 
 	// apply any state changes from service events sealed by this block
-	dbUpdates, err := m.handleEpochServiceEvents(candidate, protocolStateUpdater)
+	dbUpdates, err := m.protocolStateMutator.ApplyServiceEvents(protocolStateUpdater, candidate.Payload.Seals)
 	if err != nil {
 		return fmt.Errorf("could not process service events: %w", err)
 	}
 
-	updatedState, updatedStateID, hasChanges := protocolStateUpdater.Build()
+	commitStateDbUpdate, updatedStateID := m.protocolStateMutator.CommitProtocolState(blockID, protocolStateUpdater)
 	if updatedStateID != candidate.Payload.ProtocolStateID {
 		return state.NewInvalidExtensionErrorf("invalid protocol state transition detected, "+
 			"payload contains (%x) but after applying changes got %x", candidate.Payload.ProtocolStateID, updatedStateID)
 	}
-
-	if hasChanges {
-		dbUpdates = append(dbUpdates, operation.SkipDuplicatesTx(
-			m.protocolStateSnapshotsDB.StoreTx(updatedStateID, updatedState),
-		))
-	}
-	dbUpdates = append(dbUpdates, m.protocolStateSnapshotsDB.Index(blockID, updatedStateID))
+	dbUpdates = append(dbUpdates, commitStateDbUpdate)
 
 	// events is a queue of node-internal events (aka notifications) that are emitted after the database write succeeded
 	var events []func()
@@ -915,7 +904,7 @@ func (m *FollowerState) epochPhaseMetricsAndEventsOnBlockFinalized(block *flow.B
 ) {
 
 	// block payload may not specify seals in order, so order them by block height before processing
-	orderedSeals, err := protocol.OrderedSeals(block.Payload, m.headers)
+	orderedSeals, err := protocol.OrderedSeals(block.Payload.Seals, m.headers)
 	if err != nil {
 		if errors.Is(err, storage.ErrNotFound) {
 			return nil, nil, fmt.Errorf("ordering seals: parent payload contains seals for unknown block: %s", err.Error())
@@ -968,7 +957,7 @@ func (m *FollowerState) versionBeaconOnBlockFinalized(
 ) ([]*flow.SealedVersionBeacon, error) {
 	var versionBeacons []*flow.SealedVersionBeacon
 
-	seals, err := protocol.OrderedSeals(finalized.Payload, m.headers)
+	seals, err := protocol.OrderedSeals(finalized.Payload.Seals, m.headers)
 	if err != nil {
 		if errors.Is(err, storage.ErrNotFound) {
 			return nil, fmt.Errorf(
@@ -1018,147 +1007,4 @@ func (m *FollowerState) versionBeaconOnBlockFinalized(
 	}
 
 	return versionBeacons, nil
-}
-
-// handleEpochServiceEvents handles applying state changes which occur as a result
-// of service events being included in a block payload:
-//   - inserting incorporated service events
-//   - updating EpochStatus for the candidate block
-//
-// Consider a chain where a service event is emitted during execution of block A.
-// Block B contains a receipt for A. Block C contains a seal for block A.
-//
-// A <- .. <- B(RA) <- .. <- C(SA)
-//
-// Service events are included within execution results, which are stored
-// opaquely as part of the block payload in block B. We only validate and insert
-// the typed service event to storage once we process C, the block containing the
-// seal for block A. This is because we rely on the sealing subsystem to validate
-// correctness of the service event before processing it.
-// Consequently, any change to the protocol state introduced by a service event
-// emitted during execution of block A would only become visible when querying
-// C or its descendants.
-//
-// This method will only apply service-event-induced state changes when the
-// input block has the form of block C (ie. contains a seal for a block in
-// which a service event was emitted).
-//
-// Return values:
-//   - dbUpdates - If the service events are valid, or there are no service events,
-//     this method returns a slice of Badger operations to apply while storing the block.
-//     This includes an operation to index the epoch status for every block, and
-//     operations to insert service events for blocks that include them.
-//
-// No errors are expected during normal operation.
-func (m *FollowerState) handleEpochServiceEvents(candidate *flow.Block, updater protocol.StateUpdater) (dbUpdates []func(*transaction.Tx) error, err error) {
-	epochFallbackTriggered, err := m.isEpochEmergencyFallbackTriggered()
-	if err != nil {
-		return nil, fmt.Errorf("could not retrieve epoch fallback status: %w", err)
-	}
-
-	parentProtocolState := updater.ParentState()
-	epochStatus := parentProtocolState.EpochStatus()
-	activeSetup := parentProtocolState.CurrentEpochSetup
-
-	// never process service events after epoch fallback is triggered
-	if epochStatus.InvalidServiceEventIncorporated || epochFallbackTriggered {
-		return dbUpdates, nil
-	}
-
-	// perform protocol state transition to next epoch if next epoch is committed and we are at first block of epoch
-	phase, err := epochStatus.Phase()
-	if err != nil {
-		return nil, fmt.Errorf("could not determine epoch phase: %w", err)
-	}
-	if phase == flow.EpochPhaseCommitted {
-		if candidate.Header.View > activeSetup.FinalView {
-			// TODO: this is a temporary workaround to allow for the epoch transition to be triggered
-			// most likely it will be not needed when we refactor protocol state entries and define strict safety rules.
-			err = updater.TransitionToNextEpoch()
-			if err != nil {
-				return nil, fmt.Errorf("could not transition protocol state to next epoch: %w", err)
-			}
-		}
-	}
-
-	// We apply service events from blocks which are sealed by this candidate block.
-	// The block's payload might contain epoch preparation service events for the next
-	// epoch. In this case, we need to update the tentative protocol state.
-	// We need to validate whether all information is available in the protocol
-	// state to go to the next epoch when needed. In cases where there is a bug
-	// in the smart contract, it could be that this happens too late and the
-	// chain finalization should halt.
-
-	// block payload may not specify seals in order, so order them by block height before processing
-	orderedSeals, err := protocol.OrderedSeals(candidate.Payload, m.headers)
-	if err != nil {
-		if errors.Is(err, storage.ErrNotFound) {
-			return nil, fmt.Errorf("ordering seals: parent payload contains seals for unknown block: %s", err.Error())
-		}
-		return nil, fmt.Errorf("unexpected error ordering seals: %w", err)
-	}
-	for _, seal := range orderedSeals {
-		result, err := m.results.ByID(seal.ResultID)
-		if err != nil {
-			return nil, fmt.Errorf("could not get result (id=%x) for seal (id=%x): %w", seal.ResultID, seal.ID(), err)
-		}
-
-		for _, event := range result.ServiceEvents {
-
-			switch ev := event.Event.(type) {
-			case *flow.EpochSetup:
-				// validate the service event
-				err := isValidExtendingEpochSetup(ev, activeSetup, epochStatus)
-				if err != nil {
-					if protocol.IsInvalidServiceEventError(err) {
-						// we have observed an invalid service event, which triggers epoch fallback mode
-						updater.SetInvalidStateTransitionAttempted()
-						return dbUpdates, nil
-					}
-					return nil, fmt.Errorf("unexpected error validating EpochSetup service event: %w", err)
-				}
-
-				err = updater.ProcessEpochSetup(ev)
-				if err != nil {
-					return nil, irrecoverable.NewExceptionf("could not process epoch setup event: %w", err)
-				}
-
-				// we'll insert the setup event when we insert the block
-				dbUpdates = append(dbUpdates, m.epoch.setups.StoreTx(ev))
-
-			case *flow.EpochCommit:
-				// if we receive an EpochCommit event, we must have already observed an EpochSetup event
-				// => otherwise, we have observed an EpochCommit without corresponding EpochSetup, which triggers epoch fallback mode
-				if epochStatus.NextEpoch.SetupID == flow.ZeroID {
-					updater.SetInvalidStateTransitionAttempted()
-					return dbUpdates, nil
-				}
-				extendingSetup := parentProtocolState.NextEpochSetup
-
-				// validate the service event
-				err = isValidExtendingEpochCommit(ev, extendingSetup, activeSetup, epochStatus)
-				if err != nil {
-					if protocol.IsInvalidServiceEventError(err) {
-						// we have observed an invalid service event, which triggers epoch fallback mode
-						updater.SetInvalidStateTransitionAttempted()
-						return dbUpdates, nil
-					}
-					return nil, fmt.Errorf("unexpected error validating EpochCommit service event: %w", err)
-				}
-
-				err = updater.ProcessEpochCommit(ev)
-				if err != nil {
-					return nil, irrecoverable.NewExceptionf("could not process epoch commit event: %w", err)
-				}
-
-				// we'll insert the commit event when we insert the block
-				dbUpdates = append(dbUpdates, m.epoch.commits.StoreTx(ev))
-			case *flow.VersionBeacon:
-				// do nothing for now
-			default:
-				return nil, fmt.Errorf("invalid service event type (type_name=%s, go_type=%T)", event.Type, ev)
-			}
-		}
-	}
-	return
 }

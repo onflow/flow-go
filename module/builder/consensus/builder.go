@@ -626,10 +626,9 @@ func (b *Builder) createProposal(parentID flow.Identifier,
 	}
 
 	updater, err := b.protocolStateMutator.CreateUpdater(header.View, header.ParentID)
+	_, err = b.protocolStateMutator.ApplyServiceEvents(updater, seals)
 
-	_, err = b.protocolStateMutator.ApplyServiceEvents(updater, payload.Seals)
-
-	_, updatedStateID, _ := updater.Build()
+	_, protocolStateID, _ := updater.Build()
 
 	// apply the custom fields setter of the consensus algorithm
 	err = setter(header)
@@ -641,10 +640,11 @@ func (b *Builder) createProposal(parentID flow.Identifier,
 		Header: header,
 	}
 	proposal.SetPayload(flow.Payload{
-		Guarantees: guarantees,
-		Seals:      seals,
-		Receipts:   insertableReceipts.receipts,
-		Results:    insertableReceipts.results,
+		Guarantees:      guarantees,
+		Seals:           seals,
+		Receipts:        insertableReceipts.receipts,
+		Results:         insertableReceipts.results,
+		ProtocolStateID: protocolStateID,
 	})
 
 	return proposal, nil

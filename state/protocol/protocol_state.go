@@ -124,7 +124,7 @@ type StateMutator interface {
 	// CommitProtocolState commits the protocol state to the database.
 	// Has to be called for each block to correctly index the protocol state.
 	// No errors are expected during normal operations.
-	CommitProtocolState(updater StateUpdater) func(tx *transaction.Tx) error
+	CommitProtocolState(blockID flow.Identifier, updater StateUpdater) (func(tx *transaction.Tx) error, flow.Identifier)
 
-	ApplyServiceEvents(updater StateUpdater, seals []*flow.Seal) (dbUpdates []func(*transaction.Tx) error, err error) {
+	ApplyServiceEvents(updater StateUpdater, seals []*flow.Seal) (dbUpdates []func(*transaction.Tx) error, err error)
 }

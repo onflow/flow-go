@@ -323,11 +323,11 @@ func SnapshotFromBootstrapStateWithParams(
 		EpochCommitSafetyThreshold: epochCommitSafetyThreshold, // see protocol.Params for details
 	}
 
-
 	rootProtocolState := ProtocolStateForBootstrapState(setup, commit)
 	if rootProtocolState.ID() != root.Payload.ProtocolStateID {
 		return nil, fmt.Errorf("incorrect protocol state ID in root block, expected (%x) but got (%x)",
 			root.Payload.ProtocolStateID, rootProtocolState.ID())
+	}
 
 	snap := SnapshotFromEncodable(EncodableSnapshot{
 		Head:         root.Header,
@@ -355,10 +355,10 @@ func ProtocolStateForBootstrapState(setup *flow.EpochSetup, commit *flow.EpochCo
 	return &flow.ProtocolStateEntry{
 		PreviousEpochEventIDs: flow.EventIDs{},
 		CurrentEpoch: flow.EpochStateContainer{
-		SetupID:          setup.ID(),
-		CommitID:         commit.ID(),
-		ActiveIdentities: flow.DynamicIdentityEntryListFromIdentities(setup.Participants),
-	},
+			SetupID:          setup.ID(),
+			CommitID:         commit.ID(),
+			ActiveIdentities: flow.DynamicIdentityEntryListFromIdentities(setup.Participants),
+		},
 		NextEpoch:                       nil,
 		InvalidStateTransitionAttempted: false,
 	}
