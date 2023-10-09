@@ -23,6 +23,6 @@ func DeployRandomBeaconHistoryTransaction(
 ) *flow.TransactionBody {
 	return flow.NewTransactionBody().
 		SetScript([]byte(deployRandomBeaconHistoryTransactionTemplate)).
-		AddArgument(jsoncdc.MustEncode(cadence.String(hex.EncodeToString(contracts.SourceOfRandomnessHistory())))).
+		AddArgument(jsoncdc.MustEncode(cadence.String(hex.EncodeToString(contracts.RandomBeaconHistory())))).
 		AddAuthorizer(service)
 }
