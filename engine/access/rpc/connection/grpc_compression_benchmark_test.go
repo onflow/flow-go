@@ -99,7 +99,7 @@ func runBenchmark(b *testing.B, compressorName string) {
 	assert.NoError(b, err)
 
 	ctx := context.Background()
-
+	b.ResetTimer()
 	// make the call to the execution node
 	for i := 0; i < b.N; i++ {
 		_, err := client.GetEventsForBlockIDs(ctx, eventsReq)

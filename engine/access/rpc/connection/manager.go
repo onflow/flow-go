@@ -216,7 +216,7 @@ func (m *Manager) createConnection(address string, timeout time.Duration, cached
 	opts = append(opts, grpc.WithKeepaliveParams(keepaliveParams))
 	opts = append(opts, grpc.WithChainUnaryInterceptor(connInterceptors...))
 
-	if len(m.compressorName) > 0 {
+	if clientType == ExecutionClient && len(m.compressorName) > 0 {
 		opts = append(opts, grpc.WithDefaultCallOptions(grpc.UseCompressor(m.compressorName)))
 	}
 
