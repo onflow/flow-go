@@ -5,6 +5,7 @@ package badger_test
 import (
 	"context"
 	"errors"
+	"github.com/onflow/flow-go/state/protocol/protocol_state"
 	"math/rand"
 	"sync"
 	"testing"
@@ -797,6 +798,7 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 	consumer.On("BlockFinalized", mock.Anything)
 	consumer.On("BlockProcessable", mock.Anything, mock.Anything)
 	rootSnapshot := unittest.RootSnapshotFixture(participants)
+	rootProtocolStateID := getRootProtocolStateID(t, rootSnapshot)
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 
 		// set up state and mock ComplianceMetrics object
@@ -859,6 +861,20 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 		)
 		require.NoError(t, err)
 
+		stateMutator := protocol_state.NewMutator(all.Headers, all.Results, all.Setups, all.EpochCommits, all.ProtocolState)
+
+		// a utility function which makes easier to get expected protocol state ID after applying service events contained in seals.
+		calculateExpectedStateId := func(header *flow.Header, seals []*flow.Seal) flow.Identifier {
+			updater, err := stateMutator.CreateUpdater(header.View, header.ParentID)
+			require.NoError(t, err)
+
+			_, err = stateMutator.ApplyServiceEvents(updater, seals)
+			require.NoError(t, err)
+
+			_, expectedStateID, _ := updater.Build()
+			return expectedStateID
+		}
+
 		head, err := rootSnapshot.Head()
 		require.NoError(t, err)
 		result, _, err := rootSnapshot.SealedResult()
@@ -871,7 +887,7 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 
 		// add a block for the first seal to reference
 		block1 := unittest.BlockWithParentFixture(head)
-		block1.SetPayload(flow.EmptyPayload())
+		block1.SetPayload(unittest.PayloadFixture(unittest.WithProtocolStateID(rootProtocolStateID)))
 		err = state.Extend(context.Background(), block1)
 		require.NoError(t, err)
 		err = state.Finalize(context.Background(), block1.ID())
@@ -899,7 +915,7 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 
 		// add a second block with the receipt for block 1
 		block2 := unittest.BlockWithParentFixture(block1.Header)
-		block2.SetPayload(unittest.PayloadFixture(unittest.WithReceipts(receipt1)))
+		block2.SetPayload(unittest.PayloadFixture(unittest.WithReceipts(receipt1), unittest.WithProtocolStateID(block1.Payload.ProtocolStateID)))
 
 		err = state.Extend(context.Background(), block2)
 		require.NoError(t, err)
@@ -907,9 +923,11 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 		require.NoError(t, err)
 
 		// block 3 contains the seal for block 1
+		seals := []*flow.Seal{seal1}
 		block3 := unittest.BlockWithParentFixture(block2.Header)
 		block3.SetPayload(flow.Payload{
-			Seals: []*flow.Seal{seal1},
+			Seals:           seals,
+			ProtocolStateID: calculateExpectedStateId(block3.Header, seals),
 		})
 
 		// insert the block sealing the EpochSetup event
@@ -940,7 +958,7 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 		require.Error(t, err)
 
 		// insert B4
-		block4 := unittest.BlockWithParentFixture(block3.Header)
+		block4 := unittest.BlockWithParentProtocolState(block3)
 		err = state.Extend(context.Background(), block4)
 		require.NoError(t, err)
 
@@ -976,7 +994,8 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 
 		// block 5 contains the receipt for block 2
 		block5 := unittest.BlockWithParentFixture(block4.Header)
-		block5.SetPayload(unittest.PayloadFixture(unittest.WithReceipts(receipt2)))
+		block5.SetPayload(unittest.PayloadFixture(unittest.WithReceipts(receipt2),
+			unittest.WithProtocolStateID(block4.Payload.ProtocolStateID)))
 
 		err = state.Extend(context.Background(), block5)
 		require.NoError(t, err)
@@ -984,9 +1003,11 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 		require.NoError(t, err)
 
 		// block 6 contains the seal for block 2
+		seals = []*flow.Seal{seal2}
 		block6 := unittest.BlockWithParentFixture(block5.Header)
 		block6.SetPayload(flow.Payload{
-			Seals: []*flow.Seal{seal2},
+			Seals:           seals,
+			ProtocolStateID: calculateExpectedStateId(block6.Header, seals),
 		})
 
 		err = state.Extend(context.Background(), block6)
@@ -1012,8 +1033,7 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 		require.Equal(t, flow.EpochPhaseCommitted, phase)
 
 		// block 7 has the final view of the epoch, insert it, finalized after finalizing block 6
-		block7 := unittest.BlockWithParentFixture(block6.Header)
-		block7.SetPayload(flow.EmptyPayload())
+		block7 := unittest.BlockWithParentProtocolState(block6)
 		block7.Header.View = epoch1FinalView
 		err = state.Extend(context.Background(), block7)
 		require.NoError(t, err)
@@ -1046,9 +1066,12 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 
 		// block 8 has a view > final view of epoch 1, it will be considered the first block of epoch 2
 		block8 := unittest.BlockWithParentFixture(block7.Header)
-		block8.SetPayload(flow.EmptyPayload())
 		// we should handle views that aren't exactly the first valid view of the epoch
 		block8.Header.View = epoch1FinalView + uint64(1+rand.Intn(10))
+		// need to update root protocol state since we enter new epoch
+		block8.SetPayload(
+			unittest.PayloadFixture(
+				unittest.WithProtocolStateID(calculateExpectedStateId(block8.Header, nil))))
 
 		err = state.Extend(context.Background(), block8)
 		require.NoError(t, err)
