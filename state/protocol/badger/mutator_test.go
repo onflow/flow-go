@@ -1231,7 +1231,9 @@ func TestExtendConflictingEpochEvents(t *testing.T) {
 //	        \--B2<--B4(R2)<--B6(S2)<--B8
 func TestExtendDuplicateEpochEvents(t *testing.T) {
 	rootSnapshot := unittest.RootSnapshotFixture(participants)
-	util.RunWithFullProtocolState(t, rootSnapshot, func(db *badger.DB, state *protocol.ParticipantState) {
+	rootProtocolStateID := getRootProtocolStateID(t, rootSnapshot)
+	util.RunWithFullProtocolStateAndMutator(t, rootSnapshot, func(db *badger.DB, state *protocol.ParticipantState, mutator realprotocol.StateMutator) {
+		calculateExpectedStateId := calculateExpectedStateId(t, mutator)
 
 		head, err := rootSnapshot.Head()
 		require.NoError(t, err)
@@ -1240,12 +1242,12 @@ func TestExtendDuplicateEpochEvents(t *testing.T) {
 
 		// add two conflicting blocks for each service event to reference
 		block1 := unittest.BlockWithParentFixture(head)
-		block1.SetPayload(flow.EmptyPayload())
+		block1.SetPayload(unittest.PayloadFixture(unittest.WithProtocolStateID(rootProtocolStateID)))
 		err = state.Extend(context.Background(), block1)
 		require.NoError(t, err)
 
 		block2 := unittest.BlockWithParentFixture(head)
-		block2.SetPayload(flow.EmptyPayload())
+		block2.SetPayload(unittest.PayloadFixture(unittest.WithProtocolStateID(rootProtocolStateID)))
 		err = state.Extend(context.Background(), block2)
 		require.NoError(t, err)
 
@@ -1266,7 +1268,10 @@ func TestExtendDuplicateEpochEvents(t *testing.T) {
 
 		// add block 1 receipt to block 3 payload
 		block3 := unittest.BlockWithParentFixture(block1.Header)
-		block3.SetPayload(unittest.PayloadFixture(unittest.WithReceipts(block1Receipt)))
+		block3.SetPayload(unittest.PayloadFixture(
+			unittest.WithReceipts(block1Receipt),
+			unittest.WithProtocolStateID(rootProtocolStateID),
+		))
 		err = state.Extend(context.Background(), block3)
 		require.NoError(t, err)
 
@@ -1276,20 +1281,24 @@ func TestExtendDuplicateEpochEvents(t *testing.T) {
 
 		// add block 2 receipt to block 4 payload
 		block4 := unittest.BlockWithParentFixture(block2.Header)
-		block4.SetPayload(unittest.PayloadFixture(unittest.WithReceipts(block2Receipt)))
+		block4.SetPayload(unittest.PayloadFixture(
+			unittest.WithReceipts(block2Receipt),
+			unittest.WithProtocolStateID(rootProtocolStateID),
+		))
 		err = state.Extend(context.Background(), block4)
 		require.NoError(t, err)
 
 		// seal for block 1
-		seal1 := unittest.Seal.Fixture(unittest.Seal.WithResult(&block1Receipt.ExecutionResult))
+		seals1 := []*flow.Seal{unittest.Seal.Fixture(unittest.Seal.WithResult(&block1Receipt.ExecutionResult))}
 
 		// seal for block 2
-		seal2 := unittest.Seal.Fixture(unittest.Seal.WithResult(&block2Receipt.ExecutionResult))
+		seals2 := []*flow.Seal{unittest.Seal.Fixture(unittest.Seal.WithResult(&block2Receipt.ExecutionResult))}
 
 		// block 5 builds on block 3, contains seal for block 1
 		block5 := unittest.BlockWithParentFixture(block3.Header)
 		block5.SetPayload(flow.Payload{
-			Seals: []*flow.Seal{seal1},
+			Seals:           seals1,
+			ProtocolStateID: calculateExpectedStateId(block5.Header, seals1),
 		})
 		err = state.Extend(context.Background(), block5)
 		require.NoError(t, err)
@@ -1297,19 +1306,20 @@ func TestExtendDuplicateEpochEvents(t *testing.T) {
 		// block 6 builds on block 4, contains seal for block 2
 		block6 := unittest.BlockWithParentFixture(block4.Header)
 		block6.SetPayload(flow.Payload{
-			Seals: []*flow.Seal{seal2},
+			Seals:           seals2,
+			ProtocolStateID: calculateExpectedStateId(block6.Header, seals2),
 		})
 		err = state.Extend(context.Background(), block6)
 		require.NoError(t, err)
 
 		// block 7 builds on block 5, contains QC for block 7
-		block7 := unittest.BlockWithParentFixture(block5.Header)
+		block7 := unittest.BlockWithParentProtocolState(block5)
 		err = state.Extend(context.Background(), block7)
 		require.NoError(t, err)
 
 		// block 8 builds on block 6, contains QC for block 6
 		// at this point we are inserting the duplicate EpochSetup, should not error
-		block8 := unittest.BlockWithParentFixture(block6.Header)
+		block8 := unittest.BlockWithParentProtocolState(block6)
 		err = state.Extend(context.Background(), block8)
 		require.NoError(t, err)
 
@@ -1328,6 +1338,7 @@ func TestExtendDuplicateEpochEvents(t *testing.T) {
 // service event should trigger epoch fallback when the fork is finalized.
 func TestExtendEpochSetupInvalid(t *testing.T) {
 	rootSnapshot := unittest.RootSnapshotFixture(participants)
+	rootProtocolStateID := getRootProtocolStateID(t, rootSnapshot)
 
 	// setupState initializes the protocol state for a test case
 	// * creates and finalizes a new block for the first seal to reference
@@ -1344,7 +1355,7 @@ func TestExtendEpochSetupInvalid(t *testing.T) {
 
 		// add a block for the first seal to reference
 		block1 := unittest.BlockWithParentFixture(head)
-		block1.SetPayload(flow.EmptyPayload())
+		block1.SetPayload(unittest.PayloadFixture(unittest.WithProtocolStateID(rootProtocolStateID)))
 		unittest.InsertAndFinalize(t, state, block1)
 
 		epoch1Setup := result.ServiceEvents[0].Event.(*flow.EpochSetup)
@@ -1376,14 +1387,14 @@ func TestExtendEpochSetupInvalid(t *testing.T) {
 
 	// expect a setup event with wrong counter to trigger EECC without error
 	t.Run("wrong counter (EECC)", func(t *testing.T) {
-		util.RunWithFullProtocolState(t, rootSnapshot, func(db *badger.DB, state *protocol.ParticipantState) {
+		util.RunWithFullProtocolStateAndMutator(t, rootSnapshot, func(db *badger.DB, state *protocol.ParticipantState, mutator realprotocol.StateMutator) {
 			block1, createSetup := setupState(t, db, state)
 
 			_, receipt, seal := createSetup(func(setup *flow.EpochSetup) {
 				setup.Counter = rand.Uint64()
 			})
 
-			receiptBlock, sealingBlock := unittest.SealBlock(t, state, block1, receipt, seal)
+			receiptBlock, sealingBlock := unittest.SealBlock(t, state, mutator, block1, receipt, seal)
 			err := state.Finalize(context.Background(), receiptBlock.ID())
 			require.NoError(t, err)
 			// epoch fallback not triggered before finalization
@@ -1397,14 +1408,14 @@ func TestExtendEpochSetupInvalid(t *testing.T) {
 
 	// expect a setup event with wrong final view to trigger EECC without error
 	t.Run("invalid final view (EECC)", func(t *testing.T) {
-		util.RunWithFullProtocolState(t, rootSnapshot, func(db *badger.DB, state *protocol.ParticipantState) {
+		util.RunWithFullProtocolStateAndMutator(t, rootSnapshot, func(db *badger.DB, state *protocol.ParticipantState, mutator realprotocol.StateMutator) {
 			block1, createSetup := setupState(t, db, state)
 
 			_, receipt, seal := createSetup(func(setup *flow.EpochSetup) {
 				setup.FinalView = block1.Header.View
 			})
 
-			receiptBlock, sealingBlock := unittest.SealBlock(t, state, block1, receipt, seal)
+			receiptBlock, sealingBlock := unittest.SealBlock(t, state, mutator, block1, receipt, seal)
 			err := state.Finalize(context.Background(), receiptBlock.ID())
 			require.NoError(t, err)
 			// epoch fallback not triggered before finalization
@@ -1418,14 +1429,14 @@ func TestExtendEpochSetupInvalid(t *testing.T) {
 
 	// expect a setup event with empty seed to trigger EECC without error
 	t.Run("empty seed (EECC)", func(t *testing.T) {
-		util.RunWithFullProtocolState(t, rootSnapshot, func(db *badger.DB, state *protocol.ParticipantState) {
+		util.RunWithFullProtocolStateAndMutator(t, rootSnapshot, func(db *badger.DB, state *protocol.ParticipantState, mutator realprotocol.StateMutator) {
 			block1, createSetup := setupState(t, db, state)
 
 			_, receipt, seal := createSetup(func(setup *flow.EpochSetup) {
 				setup.RandomSource = nil
 			})
 
-			receiptBlock, sealingBlock := unittest.SealBlock(t, state, block1, receipt, seal)
+			receiptBlock, sealingBlock := unittest.SealBlock(t, state, mutator, block1, receipt, seal)
 			err := state.Finalize(context.Background(), receiptBlock.ID())
 			require.NoError(t, err)
 			// epoch fallback not triggered before finalization
@@ -1442,6 +1453,7 @@ func TestExtendEpochSetupInvalid(t *testing.T) {
 // service event should trigger epoch fallback when the fork is finalized.
 func TestExtendEpochCommitInvalid(t *testing.T) {
 	rootSnapshot := unittest.RootSnapshotFixture(participants)
+	rootProtocolStateID := getRootProtocolStateID(t, rootSnapshot)
 
 	// setupState initializes the protocol state for a test case
 	// * creates and finalizes a new block for the first seal to reference
@@ -1459,7 +1471,7 @@ func TestExtendEpochCommitInvalid(t *testing.T) {
 
 		// add a block for the first seal to reference
 		block1 := unittest.BlockWithParentFixture(head)
-		block1.SetPayload(flow.EmptyPayload())
+		block1.SetPayload(unittest.PayloadFixture(unittest.WithProtocolStateID(rootProtocolStateID)))
 		unittest.InsertAndFinalize(t, state, block1)
 
 		epoch1Setup := result.ServiceEvents[0].Event.(*flow.EpochSetup)
@@ -1505,12 +1517,12 @@ func TestExtendEpochCommitInvalid(t *testing.T) {
 	}
 
 	t.Run("without setup (EECC)", func(t *testing.T) {
-		util.RunWithFullProtocolState(t, rootSnapshot, func(db *badger.DB, state *protocol.ParticipantState) {
+		util.RunWithFullProtocolStateAndMutator(t, rootSnapshot, func(db *badger.DB, state *protocol.ParticipantState, mutator realprotocol.StateMutator) {
 			block1, _, createCommit := setupState(t, state)
 
 			_, receipt, seal := createCommit(block1)
 
-			receiptBlock, sealingBlock := unittest.SealBlock(t, state, block1, receipt, seal)
+			receiptBlock, sealingBlock := unittest.SealBlock(t, state, mutator, block1, receipt, seal)
 			err := state.Finalize(context.Background(), receiptBlock.ID())
 			require.NoError(t, err)
 			// epoch fallback not triggered before finalization
@@ -1524,26 +1536,26 @@ func TestExtendEpochCommitInvalid(t *testing.T) {
 
 	// expect a commit event with wrong counter to trigger EECC without error
 	t.Run("inconsistent counter (EECC)", func(t *testing.T) {
-		util.RunWithFullProtocolState(t, rootSnapshot, func(db *badger.DB, state *protocol.ParticipantState) {
+		util.RunWithFullProtocolStateAndMutator(t, rootSnapshot, func(db *badger.DB, state *protocol.ParticipantState, mutator realprotocol.StateMutator) {
 			block1, createSetup, createCommit := setupState(t, state)
 
 			// seal block 1, in which EpochSetup was emitted
 			epoch2Setup, setupReceipt, setupSeal := createSetup(block1)
-			epochSetupReceiptBlock, epochSetupSealingBlock := unittest.SealBlock(t, state, block1, setupReceipt, setupSeal)
+			epochSetupReceiptBlock, epochSetupSealingBlock := unittest.SealBlock(t, state, mutator, block1, setupReceipt, setupSeal)
 			err := state.Finalize(context.Background(), epochSetupReceiptBlock.ID())
 			require.NoError(t, err)
 			err = state.Finalize(context.Background(), epochSetupSealingBlock.ID())
 			require.NoError(t, err)
 
 			// insert a block with a QC for block 2
-			block3 := unittest.BlockWithParentFixture(epochSetupSealingBlock)
+			block3 := unittest.BlockWithParentProtocolState(epochSetupSealingBlock)
 			unittest.InsertAndFinalize(t, state, block3)
 
 			_, receipt, seal := createCommit(block3, func(commit *flow.EpochCommit) {
 				commit.Counter = epoch2Setup.Counter + 1
 			})
 
-			receiptBlock, sealingBlock := unittest.SealBlock(t, state, block3, receipt, seal)
+			receiptBlock, sealingBlock := unittest.SealBlock(t, state, mutator, block3, receipt, seal)
 			err = state.Finalize(context.Background(), receiptBlock.ID())
 			require.NoError(t, err)
 			// epoch fallback not triggered before finalization
@@ -1557,26 +1569,26 @@ func TestExtendEpochCommitInvalid(t *testing.T) {
 
 	// expect a commit event with wrong cluster QCs to trigger EECC without error
 	t.Run("inconsistent cluster QCs (EECC)", func(t *testing.T) {
-		util.RunWithFullProtocolState(t, rootSnapshot, func(db *badger.DB, state *protocol.ParticipantState) {
+		util.RunWithFullProtocolStateAndMutator(t, rootSnapshot, func(db *badger.DB, state *protocol.ParticipantState, mutator realprotocol.StateMutator) {
 			block1, createSetup, createCommit := setupState(t, state)
 
 			// seal block 1, in which EpochSetup was emitted
 			_, setupReceipt, setupSeal := createSetup(block1)
-			epochSetupReceiptBlock, epochSetupSealingBlock := unittest.SealBlock(t, state, block1, setupReceipt, setupSeal)
+			epochSetupReceiptBlock, epochSetupSealingBlock := unittest.SealBlock(t, state, mutator, block1, setupReceipt, setupSeal)
 			err := state.Finalize(context.Background(), epochSetupReceiptBlock.ID())
 			require.NoError(t, err)
 			err = state.Finalize(context.Background(), epochSetupSealingBlock.ID())
 			require.NoError(t, err)
 
 			// insert a block with a QC for block 2
-			block3 := unittest.BlockWithParentFixture(epochSetupSealingBlock)
+			block3 := unittest.BlockWithParentProtocolState(epochSetupSealingBlock)
 			unittest.InsertAndFinalize(t, state, block3)
 
 			_, receipt, seal := createCommit(block3, func(commit *flow.EpochCommit) {
 				commit.ClusterQCs = append(commit.ClusterQCs, flow.ClusterQCVoteDataFromQC(unittest.QuorumCertificateWithSignerIDsFixture()))
 			})
 
-			receiptBlock, sealingBlock := unittest.SealBlock(t, state, block3, receipt, seal)
+			receiptBlock, sealingBlock := unittest.SealBlock(t, state, mutator, block3, receipt, seal)
 			err = state.Finalize(context.Background(), receiptBlock.ID())
 			require.NoError(t, err)
 			// epoch fallback not triggered before finalization
@@ -1590,19 +1602,19 @@ func TestExtendEpochCommitInvalid(t *testing.T) {
 
 	// expect a commit event with wrong dkg participants to trigger EECC without error
 	t.Run("inconsistent DKG participants (EECC)", func(t *testing.T) {
-		util.RunWithFullProtocolState(t, rootSnapshot, func(db *badger.DB, state *protocol.ParticipantState) {
+		util.RunWithFullProtocolStateAndMutator(t, rootSnapshot, func(db *badger.DB, state *protocol.ParticipantState, mutator realprotocol.StateMutator) {
 			block1, createSetup, createCommit := setupState(t, state)
 
 			// seal block 1, in which EpochSetup was emitted
 			_, setupReceipt, setupSeal := createSetup(block1)
-			epochSetupReceiptBlock, epochSetupSealingBlock := unittest.SealBlock(t, state, block1, setupReceipt, setupSeal)
+			epochSetupReceiptBlock, epochSetupSealingBlock := unittest.SealBlock(t, state, mutator, block1, setupReceipt, setupSeal)
 			err := state.Finalize(context.Background(), epochSetupReceiptBlock.ID())
 			require.NoError(t, err)
 			err = state.Finalize(context.Background(), epochSetupSealingBlock.ID())
 			require.NoError(t, err)
 
 			// insert a block with a QC for block 2
-			block3 := unittest.BlockWithParentFixture(epochSetupSealingBlock)
+			block3 := unittest.BlockWithParentProtocolState(epochSetupSealingBlock)
 			unittest.InsertAndFinalize(t, state, block3)
 
 			_, receipt, seal := createCommit(block3, func(commit *flow.EpochCommit) {
@@ -1610,7 +1622,7 @@ func TestExtendEpochCommitInvalid(t *testing.T) {
 				commit.DKGParticipantKeys = append(commit.DKGParticipantKeys, unittest.KeyFixture(crypto.BLSBLS12381).PublicKey())
 			})
 
-			receiptBlock, sealingBlock := unittest.SealBlock(t, state, block3, receipt, seal)
+			receiptBlock, sealingBlock := unittest.SealBlock(t, state, mutator, block3, receipt, seal)
 			err = state.Finalize(context.Background(), receiptBlock.ID())
 			require.NoError(t, err)
 			// epoch fallback not triggered before finalization
