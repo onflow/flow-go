@@ -536,7 +536,7 @@ func EnoughShares(threshold int, sharesNumber int) (bool, error) {
 // threshold signature scheme with a trusted dealer.
 //
 // The function returns :
-//   - (nil, nil, nil, invalidInputsErrorf) if:
+// - (nil, nil, nil, invalidInputsErrorf) if:
 //   - seed is too short
 //   - n is not in [`ThresholdSignMinSize`, `ThresholdSignMaxSize`]
 //   - threshold value is not in interval [1, n-1]

@@ -301,7 +301,6 @@ func (a *blsBLS12381Algo) decodePrivateKey(privateKeyBytes []byte) (PrivateKey, 
 	sk := newPrKeyBLSBLS12381(nil)
 
 	err := readScalarFrStar(&sk.scalar, privateKeyBytes)
-
 	if err != nil {
 		return nil, fmt.Errorf("failed to read the private key: %w", err)
 	}
@@ -347,15 +346,14 @@ func (a *blsBLS12381Algo) decodePublicKeyCompressed(publicKeyBytes []byte) (Publ
 }
 
 // prKeyBLSBLS12381 is the private key of BLS using BLS12_381, it implements PrivateKey
-
-var _ PrivateKey = (*prKeyBLSBLS12381)(nil)
-
 type prKeyBLSBLS12381 struct {
 	// public key
 	pk *pubKeyBLSBLS12381
 	// private key data
 	scalar scalar
 }
+
+var _ PrivateKey = (*prKeyBLSBLS12381)(nil)
 
 // newPrKeyBLSBLS12381 creates a new BLS private key with the given scalar.
 // If no scalar is provided, the function allocates an
@@ -427,9 +425,6 @@ func (sk *prKeyBLSBLS12381) String() string {
 
 // pubKeyBLSBLS12381 is the public key of BLS using BLS12_381,
 // it implements PublicKey.
-
-var _ PublicKey = (*pubKeyBLSBLS12381)(nil)
-
 type pubKeyBLSBLS12381 struct {
 	// The package guarantees an instance is only created with a point
 	// on the correct G2 subgroup. No membership check is needed when the
@@ -445,6 +440,8 @@ type pubKeyBLSBLS12381 struct {
 	// G2 identity check cache
 	isIdentity bool
 }
+
+var _ PublicKey = (*pubKeyBLSBLS12381)(nil)
 
 // newPubKeyBLSBLS12381 creates a new BLS public key with the given point.
 // If no scalar is provided, the function allocates an

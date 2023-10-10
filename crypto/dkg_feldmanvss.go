@@ -395,7 +395,7 @@ func (s *feldmanVSSstate) receiveShare(origin index, data []byte) {
 	}
 }
 
-// receives the public vector from the
+// receives the public vector from the dealer
 func (s *feldmanVSSstate) receiveVerifVector(origin index, data []byte) {
 	// only accept the verification vector from the dealer.
 	if origin != s.dealerIndex {
