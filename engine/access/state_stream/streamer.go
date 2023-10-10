@@ -96,6 +96,7 @@ func (s *Streamer) sendAllAvailable(ctx context.Context) error {
 
 		response, err := s.sub.Next(ctx)
 
+
 		if err != nil {
 			if errors.Is(err, storage.ErrNotFound) || execution_data.IsBlobNotFoundError(err) {
 				// no more available
