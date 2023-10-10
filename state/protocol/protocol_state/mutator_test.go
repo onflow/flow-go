@@ -19,20 +19,29 @@ func TestProtocolStateMutator(t *testing.T) {
 type MutatorSuite struct {
 	suite.Suite
 	protocolStateDB *storagemock.ProtocolState
+	headersDB       *storagemock.Headers
+	resultsDB       *storagemock.ExecutionResults
+	setupsDB        *storagemock.EpochSetups
+	commitsDB       *storagemock.EpochCommits
 
 	mutator *Mutator
 }
 
 func (s *MutatorSuite) SetupTest() {
 	s.protocolStateDB = storagemock.NewProtocolState(s.T())
-	s.mutator = NewMutator(s.protocolStateDB)
+	s.headersDB = storagemock.NewHeaders(s.T())
+	s.resultsDB = storagemock.NewExecutionResults(s.T())
+	s.setupsDB = storagemock.NewEpochSetups(s.T())
+	s.commitsDB = storagemock.NewEpochCommits(s.T())
+
+	s.mutator = NewMutator(s.headersDB, s.resultsDB, s.setupsDB, s.commitsDB, s.protocolStateDB)
 }
 
 // TestCreateUpdaterForUnknownBlock tests that CreateUpdater returns an error if the parent protocol state is not found.
 func (s *MutatorSuite) TestCreateUpdaterForUnknownBlock() {
 	candidate := unittest.BlockHeaderFixture()
 	s.protocolStateDB.On("ByBlockID", candidate.ParentID).Return(nil, storerr.ErrNotFound)
-	updater, err := s.mutator.CreateUpdater(candidate)
+	updater, err := s.mutator.CreateUpdater(candidate.View, candidate.ParentID)
 	require.ErrorIs(s.T(), err, storerr.ErrNotFound)
 	require.Nil(s.T(), updater)
 }
@@ -42,12 +51,13 @@ func (s *MutatorSuite) TestMutatorHappyPathNoChanges() {
 	parentState := unittest.ProtocolStateFixture()
 	candidate := unittest.BlockHeaderFixture(unittest.HeaderWithView(parentState.CurrentEpochSetup.FirstView))
 	s.protocolStateDB.On("ByBlockID", candidate.ParentID).Return(parentState, nil)
-	updater, err := s.mutator.CreateUpdater(candidate)
+	updater, err := s.mutator.CreateUpdater(candidate.View, candidate.ParentID)
 	require.NoError(s.T(), err)
 
 	s.protocolStateDB.On("Index", candidate.ID(), parentState.ID()).Return(func(tx *transaction.Tx) error { return nil })
 
-	err = s.mutator.CommitProtocolState(updater)(&transaction.Tx{})
+	dbOps, _ := s.mutator.CommitProtocolState(candidate.ID(), updater)
+	err = dbOps(&transaction.Tx{})
 	require.NoError(s.T(), err)
 }
 
@@ -56,7 +66,7 @@ func (s *MutatorSuite) TestMutatorHappyPathHasChanges() {
 	parentState := unittest.ProtocolStateFixture()
 	candidate := unittest.BlockHeaderFixture(unittest.HeaderWithView(parentState.CurrentEpochSetup.FirstView))
 	s.protocolStateDB.On("ByBlockID", candidate.ParentID).Return(parentState, nil)
-	updater, err := s.mutator.CreateUpdater(candidate)
+	updater, err := s.mutator.CreateUpdater(candidate.View, candidate.ParentID)
 	require.NoError(s.T(), err)
 
 	// update protocol state so it has some changes
@@ -67,6 +77,7 @@ func (s *MutatorSuite) TestMutatorHappyPathHasChanges() {
 	s.protocolStateDB.On("StoreTx", updatedStateID, updatedState).Return(func(tx *transaction.Tx) error { return nil })
 	s.protocolStateDB.On("Index", candidate.ID(), updatedStateID).Return(func(tx *transaction.Tx) error { return nil })
 
-	err = s.mutator.CommitProtocolState(updater)(&transaction.Tx{})
+	dbOps, _ := s.mutator.CommitProtocolState(candidate.ID(), updater)
+	err = dbOps(&transaction.Tx{})
 	require.NoError(s.T(), err)
 }
