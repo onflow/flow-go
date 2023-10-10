@@ -310,7 +310,9 @@ func (builder *LibP2PNodeBuilder) Build() (p2p.LibP2PNode, error) {
 					if err != nil {
 						ctx.Throw(fmt.Errorf("could not create routing system: %w", err))
 					}
-					node.SetRouting(routingSystem)
+					if err := node.SetRouting(routingSystem); err != nil {
+						ctx.Throw(fmt.Errorf("could not set routing system: %w", err))
+					}
 					builder.gossipSubBuilder.SetRoutingSystem(routingSystem)
 					builder.logger.Debug().Msg("routing system created")
 				}
