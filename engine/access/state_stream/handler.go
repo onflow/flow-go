@@ -4,7 +4,6 @@ import (
 	"context"
 	"sync/atomic"
 
-	"github.com/onflow/flow/protobuf/go/flow/entities"
 	access "github.com/onflow/flow/protobuf/go/flow/executiondata"
 	executiondata "github.com/onflow/flow/protobuf/go/flow/executiondata"
 	"google.golang.org/grpc/codes"
@@ -52,13 +51,9 @@ func (h *Handler) GetExecutionDataByBlockID(ctx context.Context, request *access
 		return nil, status.Errorf(codes.Internal, "could not convert execution data to entity: %v", err)
 	}
 
-	eventEncodingVersion := convert.GetEventEncodingVersion(request.GetEventEncodingVersion())
-	if eventEncodingVersion == entities.EventEncodingVersion_JSON_CDC_V0 {
-		// convert event payloads from CCF to JSON-CDC
-		err = convert.BlockExecutionDataEventPayloadsToJson(message)
-		if err != nil {
-			return nil, status.Errorf(codes.Internal, "could not convert execution data event payloads to JSON: %v", err)
-		}
+	err = convert.BlockExecutionDataEventPayloadsFromVersion(message, request.GetEventEncodingVersion())
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "could not convert execution data event payloads to JSON: %v", err)
 	}
 
 	return &access.GetExecutionDataByBlockIDResponse{BlockExecutionData: message}, nil
@@ -102,13 +97,9 @@ func (h *Handler) SubscribeExecutionData(request *access.SubscribeExecutionDataR
 			return status.Errorf(codes.Internal, "could not convert execution data to entity: %v", err)
 		}
 
-		eventEncodingVersion := convert.GetEventEncodingVersion(request.GetEventEncodingVersion())
-		if eventEncodingVersion == entities.EventEncodingVersion_JSON_CDC_V0 {
-			// convert event payloads from CCF to JSON-CDC
-			err = convert.BlockExecutionDataEventPayloadsToJson(execData)
-			if err != nil {
-				return status.Errorf(codes.Internal, "could not convert execution data event payloads to JSON: %v", err)
-			}
+		err = convert.BlockExecutionDataEventPayloadsFromVersion(execData, request.GetEventEncodingVersion())
+		if err != nil {
+			return status.Errorf(codes.Internal, "could not convert execution data event payloads to JSON: %v", err)
 		}
 
 		err = stream.Send(&executiondata.SubscribeExecutionDataResponse{
@@ -170,15 +161,12 @@ func (h *Handler) SubscribeEvents(request *access.SubscribeEventsRequest, stream
 			return status.Errorf(codes.Internal, "unexpected response type: %T", v)
 		}
 
-		eventEncodingVersion := convert.GetEventEncodingVersion(request.GetEventEncodingVersion())
-		var events []*entities.Event
-		var err error
-		if eventEncodingVersion == entities.EventEncodingVersion_JSON_CDC_V0 {
-			events, err = convert.EventsToMessagesFromVersion(resp.Events, entities.EventEncodingVersion_CCF_V0)
-			if err != nil {
-				return status.Errorf(codes.Internal, "could not convert events to entity: %v", err)
-			}
+		eventEncodingVersion := convert.GetConversionEventEncodingVersion(request.GetEventEncodingVersion())
+		events, err := convert.EventsToMessagesFromVersion(resp.Events, eventEncodingVersion)
+		if err != nil {
+			return status.Errorf(codes.Internal, "could not convert events to entity: %v", err)
 		}
+
 		err = stream.Send(&executiondata.SubscribeEventsResponse{
 			BlockHeight: resp.Height,
 			BlockId:     convert.IdentifierToMessage(resp.BlockID),

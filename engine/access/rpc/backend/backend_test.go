@@ -2143,8 +2143,8 @@ func (suite *Suite) TestGetTransactionResultByIndexEventEncodingVersion() {
 	}
 
 	// Define a helper function to prepare the GetTransactionResultResponse with a given encoding version.
-	prepareGetTransactionResultByIndex := func(version entitiesproto.EventEncodingVersion) *execproto.GetTransactionResultResponse {
-		events := getEventsWithEncoding(1, version)
+	prepareGetTransactionResultByIndex := func() *execproto.GetTransactionResultResponse {
+		events := getEventsWithEncoding(1, entitiesproto.EventEncodingVersion_CCF_V0)
 
 		exeEventResp := &execproto.GetTransactionResultResponse{
 			Events: convert.EventsToMessages(events),
@@ -2163,10 +2163,7 @@ func (suite *Suite) TestGetTransactionResultByIndexEventEncodingVersion() {
 		exeEventResp *execproto.GetTransactionResultResponse,
 		encodingVersionValue *entitiesproto.EventEncodingVersionValue,
 	) {
-		encodingVersion := entitiesproto.EventEncodingVersion_JSON_CDC_V0
-		if encodingVersionValue != nil {
-			encodingVersion = encodingVersionValue.GetValue()
-		}
+		encodingVersion := convert.GetConversionEventEncodingVersion(encodingVersionValue)
 
 		result, err := backend.GetTransactionResultByIndex(ctx, blockId, index, encodingVersionValue)
 		suite.checkResponse(result, err)
@@ -2177,35 +2174,20 @@ func (suite *Suite) TestGetTransactionResultByIndexEventEncodingVersion() {
 	}
 
 	suite.Run("test default(JSON) event encoding (happy case)", func() {
-		encodingVersion := entitiesproto.EventEncodingVersion_JSON_CDC_V0
-		exeEventResp := prepareGetTransactionResultByIndex(encodingVersion)
+		exeEventResp := prepareGetTransactionResultByIndex()
 		assertResultExpectations(exeEventResp, nil)
 	})
 
 	suite.Run("test JSON event encoding (happy case)", func() {
 		encodingVersion := entitiesproto.EventEncodingVersion_JSON_CDC_V0
-		exeEventResp := prepareGetTransactionResultByIndex(encodingVersion)
+		exeEventResp := prepareGetTransactionResultByIndex()
 		assertResultExpectations(exeEventResp, &entitiesproto.EventEncodingVersionValue{Value: encodingVersion})
 	})
 
 	suite.Run("test CFF event encoding (happy case)", func() {
 		encodingVersion := entitiesproto.EventEncodingVersion_CCF_V0
-		exeEventResp := prepareGetTransactionResultByIndex(encodingVersion)
+		exeEventResp := prepareGetTransactionResultByIndex()
 		assertResultExpectations(exeEventResp, &entitiesproto.EventEncodingVersionValue{Value: encodingVersion})
-	})
-
-	suite.Run("test wrong event conversion JSON to CFF", func() {
-		encodingVersion := entitiesproto.EventEncodingVersion_JSON_CDC_V0
-		_ = prepareGetTransactionResultByIndex(encodingVersion)
-
-		result, err := backend.GetTransactionResultByIndex(
-			ctx,
-			blockId,
-			index,
-			&entitiesproto.EventEncodingVersionValue{Value: entitiesproto.EventEncodingVersion_CCF_V0},
-		)
-		suite.Require().Error(err)
-		suite.Require().Nil(result)
 	})
 }
 

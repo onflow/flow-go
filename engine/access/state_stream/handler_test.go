@@ -2,7 +2,6 @@ package state_stream_test
 
 import (
 	"context"
-	"github.com/onflow/flow/protobuf/go/flow/entities"
 	"io"
 	"sync"
 	"testing"
@@ -140,9 +139,7 @@ func TestEventStream(t *testing.T) {
 	wg.Add(1)
 	go func() {
 		wg.Done()
-		err := h.SubscribeEvents(&access.SubscribeEventsRequest{
-			EventEncodingVersion: &entities.EventEncodingVersionValue{Value: entities.EventEncodingVersion_JSON_CDC_V0},
-		}, stream)
+		err := h.SubscribeEvents(&access.SubscribeEventsRequest{}, stream)
 		require.NoError(t, err)
 		t.Log("subscription closed")
 	}()

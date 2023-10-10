@@ -53,7 +53,7 @@ func TestConvertBlockExecutionDataEventPayloads(t *testing.T) {
 	})
 
 	t.Run("converted event payloads are encoded in jsoncdc", func(t *testing.T) {
-		err = convert.BlockExecutionDataEventPayloadsToJson(execDataMessage)
+		err = convert.BlockExecutionDataEventPayloadsFromVersion(execDataMessage, nil)
 		require.NoError(t, err)
 
 		for _, chunk := range execDataMessage.GetChunkExecutionData() {
