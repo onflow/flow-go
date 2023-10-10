@@ -279,15 +279,12 @@ func TestBootstrapNonRoot(t *testing.T) {
 				unittest.WithProtocolStateID(rootProtocolStateID)))
 			buildFinalizedBlock(t, state, block2)
 
+			seals := []*flow.Seal{seal1}
 			block3 := unittest.BlockWithParentFixture(block2.Header)
-			updater, err := mutator.CreateUpdater(block3.Header.View, block3.Header.ParentID)
-			require.NoError(t, err)
-			_, err = mutator.ApplyServiceEvents(updater, []*flow.Seal{seal1})
-			require.NoError(t, err)
-			_, updatedStateId, _ := updater.Build()
-			block3.SetPayload(unittest.PayloadFixture(
-				unittest.WithSeals(seal1),
-				unittest.WithProtocolStateID(updatedStateId)))
+			block3.SetPayload(flow.Payload{
+				Seals:           seals,
+				ProtocolStateID: calculateExpectedStateId(t, mutator)(block3.Header, seals),
+			})
 			buildFinalizedBlock(t, state, block3)
 
 			child := unittest.BlockWithParentProtocolState(block3)
