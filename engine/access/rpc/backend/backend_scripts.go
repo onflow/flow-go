@@ -157,16 +157,13 @@ func (b *backendScripts) executeScriptLocally(
 	if err != nil {
 		convertedErr := convertScriptExecutionError(err, height)
 
-		switch status.Code(convertedErr) {
-		case codes.InvalidArgument:
+		if status.Code(convertedErr) == codes.InvalidArgument {
 			lg.Debug().Err(err).
 				Str("script", string(script)).
 				Msg("script failed to execute locally")
-		case codes.Internal:
-			// TODO: metrics
+		} else {
 			lg.Error().Err(err).Msg("script execution failed for internal reasons")
-		default:
-			lg.Debug().Err(err).Msg("script execution failed")
+			b.metrics.ScriptExecutionErrorLocal()
 		}
 
 		return nil, convertedErr
@@ -182,7 +179,7 @@ func (b *backendScripts) executeScriptLocally(
 	}
 
 	// log execution time
-	b.metrics.ScriptExecuted(execEndTime.Sub(execStartTime), len(script))
+	b.metrics.ScriptExecuted(execDuration, len(script))
 
 	return result, nil
 }

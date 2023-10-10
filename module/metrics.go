@@ -749,10 +749,10 @@ type BackendScriptsMetrics interface {
 	// Record the round trip time while executing a script
 	ScriptExecuted(dur time.Duration, size int)
 
-	// ScriptExecutionErrorOnExecutionNode records script execution failures on Execution Nodes
-	ScriptExecutionErrorOnArchiveNode()
+	// ScriptExecutionErrorLocal records script execution failures from local execution
+	ScriptExecutionErrorLocal()
 
-	// ScriptExecutionErrorOnArchiveNode records script execution failures in Archive Nodes
+	// ScriptExecutionErrorOnExecutionNode records script execution failures on Execution Nodes
 	ScriptExecutionErrorOnExecutionNode()
 
 	ScriptExecutionResultMismatch()

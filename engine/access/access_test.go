@@ -164,7 +164,13 @@ func (suite *Suite) RunTest(
 		})
 		require.NoError(suite.T(), err)
 
-		handler := access.NewHandler(suite.backend, suite.chainID.Chain(), suite.finalizedHeaderCache, suite.me, access.WithBlockSignerDecoder(suite.signerIndicesDecoder))
+		handler := access.NewHandler(
+			suite.backend,
+			suite.chainID.Chain(),
+			suite.finalizedHeaderCache,
+			suite.me,
+			access.WithBlockSignerDecoder(suite.signerIndicesDecoder),
+		)
 		f(handler, db, all)
 	})
 }
