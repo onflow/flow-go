@@ -418,7 +418,7 @@ func (b *backendTransactions) GetTransactionResultsByBlockID(
 		"number of transaction results returned by execution node is less than the number of transactions  in the block",
 	)
 
-	eventEncodingVersion := getEventEncodingVersion(eventEncodingVersionValue)
+	eventEncodingVersion := convert.GetEventEncodingVersion(eventEncodingVersionValue)
 
 	for _, guarantee := range block.Payload.Guarantees {
 		collection, err := b.collections.LightByID(guarantee.CollectionID)
@@ -551,7 +551,7 @@ func (b *backendTransactions) GetTransactionResultByIndex(
 		return nil, rpc.ConvertStorageError(err)
 	}
 
-	eventEncodingVersion := getEventEncodingVersion(eventEncodingVersionValue)
+	eventEncodingVersion := convert.GetEventEncodingVersion(eventEncodingVersionValue)
 
 	events, err := convert.MessagesToEventsFromVersion(resp.GetEvents(), eventEncodingVersion)
 	if err != nil {
@@ -778,7 +778,7 @@ func (b *backendTransactions) getTransactionResultFromExecutionNode(
 		return nil, 0, "", err
 	}
 
-	eventEncodingVersion := getEventEncodingVersion(eventEncodingVersionValue)
+	eventEncodingVersion := convert.GetEventEncodingVersion(eventEncodingVersionValue)
 
 	events, err := convert.MessagesToEventsFromVersion(resp.GetEvents(), eventEncodingVersion)
 	if err != nil {

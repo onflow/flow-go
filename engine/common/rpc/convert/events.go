@@ -257,3 +257,11 @@ func BlockEventsToMessage(block flow.BlockEvents) (*accessproto.EventsResponse_R
 		Events:         eventMessages,
 	}, nil
 }
+
+func GetEventEncodingVersion(eventEncodingVersionValue *entities.EventEncodingVersionValue) entities.EventEncodingVersion {
+	eventEncodingVersion := entities.EventEncodingVersion_JSON_CDC_V0
+	if requestEEV := eventEncodingVersionValue; requestEEV != nil {
+		eventEncodingVersion = requestEEV.GetValue()
+	}
+	return eventEncodingVersion
+}

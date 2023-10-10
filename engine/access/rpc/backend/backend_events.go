@@ -153,7 +153,7 @@ func (b *backendEvents) getBlockEventsFromExecutionNode(
 		Str("last_block_id", lastBlockID.String()).
 		Msg("successfully got events")
 
-	eventEncodingVersion := getEventEncodingVersion(eventEncodingVersionValue)
+	eventEncodingVersion := convert.GetEventEncodingVersion(eventEncodingVersionValue)
 
 	// convert execution node api result to access node api result
 	results, err := verifyAndConvertToAccessEvents(resp.GetResults(), blockHeaders, eventEncodingVersion)
@@ -264,12 +264,4 @@ func (b *backendEvents) tryGetEvents(ctx context.Context,
 		return nil, err
 	}
 	return resp, nil
-}
-
-func getEventEncodingVersion(eventEncodingVersionValue *entities.EventEncodingVersionValue) entities.EventEncodingVersion {
-	eventEncodingVersion := entities.EventEncodingVersion_JSON_CDC_V0
-	if requestEEV := eventEncodingVersionValue; requestEEV != nil {
-		eventEncodingVersion = requestEEV.GetValue()
-	}
-	return eventEncodingVersion
 }

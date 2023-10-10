@@ -275,7 +275,6 @@ func (h *Handler) GetTransactionResult(
 	}
 
 	eventEncodingVersion := req.GetEventEncodingVersion()
-
 	result, err := h.api.GetTransactionResult(ctx, transactionID, blockId, collectionId, eventEncodingVersion)
 	if err != nil {
 		return nil, err

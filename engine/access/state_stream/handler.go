@@ -52,7 +52,7 @@ func (h *Handler) GetExecutionDataByBlockID(ctx context.Context, request *access
 		return nil, status.Errorf(codes.Internal, "could not convert execution data to entity: %v", err)
 	}
 
-	eventEncodingVersion := getEventEncodingVersion(request.GetEventEncodingVersion())
+	eventEncodingVersion := convert.GetEventEncodingVersion(request.GetEventEncodingVersion())
 	if eventEncodingVersion == entities.EventEncodingVersion_JSON_CDC_V0 {
 		// convert event payloads from CCF to JSON-CDC
 		err = convert.BlockExecutionDataEventPayloadsToJson(message)
@@ -102,7 +102,7 @@ func (h *Handler) SubscribeExecutionData(request *access.SubscribeExecutionDataR
 			return status.Errorf(codes.Internal, "could not convert execution data to entity: %v", err)
 		}
 
-		eventEncodingVersion := getEventEncodingVersion(request.GetEventEncodingVersion())
+		eventEncodingVersion := convert.GetEventEncodingVersion(request.GetEventEncodingVersion())
 		if eventEncodingVersion == entities.EventEncodingVersion_JSON_CDC_V0 {
 			// convert event payloads from CCF to JSON-CDC
 			err = convert.BlockExecutionDataEventPayloadsToJson(execData)
@@ -170,12 +170,15 @@ func (h *Handler) SubscribeEvents(request *access.SubscribeEventsRequest, stream
 			return status.Errorf(codes.Internal, "unexpected response type: %T", v)
 		}
 
-		eventEncodingVersion := getEventEncodingVersion(request.GetEventEncodingVersion())
-		events, err := convert.EventsToMessagesFromVersion(resp.Events, eventEncodingVersion)
-		if err != nil {
-			return status.Errorf(codes.Internal, "could not convert events to entity: %v", err)
+		eventEncodingVersion := convert.GetEventEncodingVersion(request.GetEventEncodingVersion())
+		var events []*entities.Event
+		var err error
+		if eventEncodingVersion == entities.EventEncodingVersion_JSON_CDC_V0 {
+			events, err = convert.EventsToMessagesFromVersion(resp.Events, entities.EventEncodingVersion_CCF_V0)
+			if err != nil {
+				return status.Errorf(codes.Internal, "could not convert events to entity: %v", err)
+			}
 		}
-
 		err = stream.Send(&executiondata.SubscribeEventsResponse{
 			BlockHeight: resp.Height,
 			BlockId:     convert.IdentifierToMessage(resp.BlockID),
@@ -185,12 +188,4 @@ func (h *Handler) SubscribeEvents(request *access.SubscribeEventsRequest, stream
 			return rpc.ConvertError(err, "could not send response", codes.Internal)
 		}
 	}
-}
-
-func getEventEncodingVersion(eventEncodingVersionValue *entities.EventEncodingVersionValue) entities.EventEncodingVersion {
-	eventEncodingVersion := entities.EventEncodingVersion_JSON_CDC_V0
-	if requestEEV := eventEncodingVersionValue; requestEEV != nil {
-		eventEncodingVersion = requestEEV.GetValue()
-	}
-	return eventEncodingVersion
 }
