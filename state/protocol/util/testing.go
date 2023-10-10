@@ -1,6 +1,7 @@
 package util
 
 import (
+	"github.com/onflow/flow-go/state/protocol/protocol_state"
 	"testing"
 
 	"github.com/dgraph-io/badger/v2"
@@ -357,5 +358,47 @@ func RunWithFollowerProtocolStateAndHeaders(t testing.TB, rootSnapshot protocol.
 		)
 		require.NoError(t, err)
 		f(db, followerState, all.Headers, all.Index)
+	})
+}
+
+func RunWithFullProtocolStateAndMutator(t testing.TB, rootSnapshot protocol.Snapshot, f func(*badger.DB, *pbadger.ParticipantState, protocol.StateMutator)) {
+	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+		metrics := metrics.NewNoopCollector()
+		tracer := trace.NewNoopTracer()
+		log := zerolog.Nop()
+		consumer := events.NewNoop()
+		all := util.StorageLayer(t, db)
+		state, err := pbadger.Bootstrap(
+			metrics,
+			db,
+			all.Headers,
+			all.Seals,
+			all.Results,
+			all.Blocks,
+			all.QuorumCertificates,
+			all.Setups,
+			all.EpochCommits,
+			all.ProtocolState,
+			all.VersionBeacons,
+			rootSnapshot,
+		)
+		require.NoError(t, err)
+		receiptValidator := MockReceiptValidator()
+		sealValidator := MockSealValidator(all.Seals)
+		mockTimer := MockBlockTimer()
+		fullState, err := pbadger.NewFullConsensusState(
+			log,
+			tracer,
+			consumer,
+			state,
+			all.Index,
+			all.Payloads,
+			mockTimer,
+			receiptValidator,
+			sealValidator,
+		)
+		require.NoError(t, err)
+		mutator := protocol_state.NewMutator(all.Headers, all.Results, all.Setups, all.EpochCommits, all.ProtocolState)
+		f(db, fullState, mutator)
 	})
 }

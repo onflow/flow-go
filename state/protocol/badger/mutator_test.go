@@ -862,18 +862,7 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 		require.NoError(t, err)
 
 		stateMutator := protocol_state.NewMutator(all.Headers, all.Results, all.Setups, all.EpochCommits, all.ProtocolState)
-
-		// a utility function which makes easier to get expected protocol state ID after applying service events contained in seals.
-		calculateExpectedStateId := func(header *flow.Header, seals []*flow.Seal) flow.Identifier {
-			updater, err := stateMutator.CreateUpdater(header.View, header.ParentID)
-			require.NoError(t, err)
-
-			_, err = stateMutator.ApplyServiceEvents(updater, seals)
-			require.NoError(t, err)
-
-			_, expectedStateID, _ := updater.Build()
-			return expectedStateID
-		}
+		calculateExpectedStateId := calculateExpectedStateId(t, stateMutator)
 
 		head, err := rootSnapshot.Head()
 		require.NoError(t, err)
@@ -1124,7 +1113,9 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 //	         \--B2<--B4(R2)<--B6(S2)<--B8
 func TestExtendConflictingEpochEvents(t *testing.T) {
 	rootSnapshot := unittest.RootSnapshotFixture(participants)
-	util.RunWithFullProtocolState(t, rootSnapshot, func(db *badger.DB, state *protocol.ParticipantState) {
+	rootProtocolStateID := getRootProtocolStateID(t, rootSnapshot)
+	util.RunWithFullProtocolStateAndMutator(t, rootSnapshot, func(db *badger.DB, state *protocol.ParticipantState, stateMutator realprotocol.StateMutator) {
+		calculateExpectedStateId := calculateExpectedStateId(t, stateMutator)
 
 		head, err := rootSnapshot.Head()
 		require.NoError(t, err)
@@ -1133,12 +1124,12 @@ func TestExtendConflictingEpochEvents(t *testing.T) {
 
 		// add two conflicting blocks for each service event to reference
 		block1 := unittest.BlockWithParentFixture(head)
-		block1.SetPayload(flow.EmptyPayload())
+		block1.SetPayload(unittest.PayloadFixture(unittest.WithProtocolStateID(rootProtocolStateID)))
 		err = state.Extend(context.Background(), block1)
 		require.NoError(t, err)
 
 		block2 := unittest.BlockWithParentFixture(head)
-		block2.SetPayload(flow.EmptyPayload())
+		block2.SetPayload(unittest.PayloadFixture(unittest.WithProtocolStateID(rootProtocolStateID)))
 		err = state.Extend(context.Background(), block2)
 		require.NoError(t, err)
 
@@ -1166,8 +1157,9 @@ func TestExtendConflictingEpochEvents(t *testing.T) {
 		// add block 1 receipt to block 3 payload
 		block3 := unittest.BlockWithParentFixture(block1.Header)
 		block3.SetPayload(flow.Payload{
-			Receipts: []*flow.ExecutionReceiptMeta{block1Receipt.Meta()},
-			Results:  []*flow.ExecutionResult{&block1Receipt.ExecutionResult},
+			Receipts:        []*flow.ExecutionReceiptMeta{block1Receipt.Meta()},
+			Results:         []*flow.ExecutionResult{&block1Receipt.ExecutionResult},
+			ProtocolStateID: block1.Payload.ProtocolStateID,
 		})
 		err = state.Extend(context.Background(), block3)
 		require.NoError(t, err)
@@ -1179,22 +1171,24 @@ func TestExtendConflictingEpochEvents(t *testing.T) {
 		// add block 2 receipt to block 4 payload
 		block4 := unittest.BlockWithParentFixture(block2.Header)
 		block4.SetPayload(flow.Payload{
-			Receipts: []*flow.ExecutionReceiptMeta{block2Receipt.Meta()},
-			Results:  []*flow.ExecutionResult{&block2Receipt.ExecutionResult},
+			Receipts:        []*flow.ExecutionReceiptMeta{block2Receipt.Meta()},
+			Results:         []*flow.ExecutionResult{&block2Receipt.ExecutionResult},
+			ProtocolStateID: block1.Payload.ProtocolStateID,
 		})
 		err = state.Extend(context.Background(), block4)
 		require.NoError(t, err)
 
 		// seal for block 1
-		seal1 := unittest.Seal.Fixture(unittest.Seal.WithResult(&block1Receipt.ExecutionResult))
+		seals1 := []*flow.Seal{unittest.Seal.Fixture(unittest.Seal.WithResult(&block1Receipt.ExecutionResult))}
 
 		// seal for block 2
-		seal2 := unittest.Seal.Fixture(unittest.Seal.WithResult(&block2Receipt.ExecutionResult))
+		seals2 := []*flow.Seal{unittest.Seal.Fixture(unittest.Seal.WithResult(&block2Receipt.ExecutionResult))}
 
 		// block 5 builds on block 3, contains seal for block 1
 		block5 := unittest.BlockWithParentFixture(block3.Header)
 		block5.SetPayload(flow.Payload{
-			Seals: []*flow.Seal{seal1},
+			Seals:           seals1,
+			ProtocolStateID: calculateExpectedStateId(block5.Header, seals1),
 		})
 		err = state.Extend(context.Background(), block5)
 		require.NoError(t, err)
@@ -1202,18 +1196,19 @@ func TestExtendConflictingEpochEvents(t *testing.T) {
 		// block 6 builds on block 4, contains seal for block 2
 		block6 := unittest.BlockWithParentFixture(block4.Header)
 		block6.SetPayload(flow.Payload{
-			Seals: []*flow.Seal{seal2},
+			Seals:           seals2,
+			ProtocolStateID: calculateExpectedStateId(block6.Header, seals2),
 		})
 		err = state.Extend(context.Background(), block6)
 		require.NoError(t, err)
 
 		// block 7 builds on block 5, contains QC for block 7
-		block7 := unittest.BlockWithParentFixture(block5.Header)
+		block7 := unittest.BlockWithParentProtocolState(block5)
 		err = state.Extend(context.Background(), block7)
 		require.NoError(t, err)
 
 		// block 8 builds on block 6, contains QC for block 6
-		block8 := unittest.BlockWithParentFixture(block6.Header)
+		block8 := unittest.BlockWithParentProtocolState(block6)
 		err = state.Extend(context.Background(), block8)
 		require.NoError(t, err)
 
@@ -2625,4 +2620,18 @@ func getRootProtocolStateID(t *testing.T, rootSnapshot *inmem.Snapshot) flow.Ide
 	rootProtocolState, err := rootSnapshot.ProtocolState()
 	require.NoError(t, err)
 	return rootProtocolState.Entry().ID()
+}
+
+// calculateExpectedStateId is a utility function which makes easier to get expected protocol state ID after applying service events contained in seals.
+func calculateExpectedStateId(t *testing.T, stateMutator realprotocol.StateMutator) func(header *flow.Header, seals []*flow.Seal) flow.Identifier {
+	return func(header *flow.Header, seals []*flow.Seal) flow.Identifier {
+		updater, err := stateMutator.CreateUpdater(header.View, header.ParentID)
+		require.NoError(t, err)
+
+		_, err = stateMutator.ApplyServiceEvents(updater, seals)
+		require.NoError(t, err)
+
+		_, expectedStateID, _ := updater.Build()
+		return expectedStateID
+	}
 }
