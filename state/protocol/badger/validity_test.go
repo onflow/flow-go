@@ -22,7 +22,7 @@ func TestEpochSetupValidity(t *testing.T) {
 		// set an invalid final view for the first epoch
 		setup.FinalView = setup.FirstView
 
-		err := verifyEpochSetup(setup, true)
+		err := protocol.VerifyEpochSetup(setup, true)
 		require.Error(t, err)
 	})
 
@@ -33,7 +33,7 @@ func TestEpochSetupValidity(t *testing.T) {
 		var err error
 		setup.Participants, err = setup.Participants.Shuffle()
 		require.NoError(t, err)
-		err = verifyEpochSetup(setup, true)
+		err = protocol.VerifyEpochSetup(setup, true)
 		require.Error(t, err)
 	})
 
@@ -44,7 +44,7 @@ func TestEpochSetupValidity(t *testing.T) {
 		collector := participants.Filter(filter.HasRole(flow.RoleCollection))[0]
 		setup.Assignments = append(setup.Assignments, []flow.Identifier{collector.NodeID})
 
-		err := verifyEpochSetup(setup, true)
+		err := protocol.VerifyEpochSetup(setup, true)
 		require.Error(t, err)
 	})
 
@@ -53,7 +53,7 @@ func TestEpochSetupValidity(t *testing.T) {
 		setup := result.ServiceEvents[0].Event.(*flow.EpochSetup)
 		setup.RandomSource = unittest.SeedFixture(crypto.SeedMinLenDKG - 1)
 
-		err := verifyEpochSetup(setup, true)
+		err := protocol.VerifyEpochSetup(setup, true)
 		require.Error(t, err)
 	})
 }
@@ -66,7 +66,7 @@ func TestBootstrapInvalidEpochCommit(t *testing.T) {
 		// use a different counter for the commit
 		commit.Counter = setup.Counter + 1
 
-		err := isValidEpochCommit(commit, setup)
+		err := protocol.IsValidEpochCommit(commit, setup)
 		require.Error(t, err)
 	})
 
@@ -78,7 +78,7 @@ func TestBootstrapInvalidEpochCommit(t *testing.T) {
 		extraQC := unittest.QuorumCertificateWithSignerIDsFixture()
 		commit.ClusterQCs = append(commit.ClusterQCs, flow.ClusterQCVoteDataFromQC(extraQC))
 
-		err := isValidEpochCommit(commit, setup)
+		err := protocol.IsValidEpochCommit(commit, setup)
 		require.Error(t, err)
 	})
 
@@ -88,7 +88,7 @@ func TestBootstrapInvalidEpochCommit(t *testing.T) {
 		commit := result.ServiceEvents[1].Event.(*flow.EpochCommit)
 		commit.DKGGroupKey = nil
 
-		err := isValidEpochCommit(commit, setup)
+		err := protocol.IsValidEpochCommit(commit, setup)
 		require.Error(t, err)
 	})
 
@@ -99,7 +99,7 @@ func TestBootstrapInvalidEpochCommit(t *testing.T) {
 		// add an extra DKG participant key
 		commit.DKGParticipantKeys = append(commit.DKGParticipantKeys, unittest.KeyFixture(crypto.BLSBLS12381).PublicKey())
 
-		err := isValidEpochCommit(commit, setup)
+		err := protocol.IsValidEpochCommit(commit, setup)
 		require.Error(t, err)
 	})
 }

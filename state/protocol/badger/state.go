@@ -468,10 +468,10 @@ func (state *State) bootstrapEpoch(epochs protocol.EpochQuery, verifyNetworkAddr
 				return fmt.Errorf("could not get previous epoch commit event: %w", err)
 			}
 
-			if err := verifyEpochSetup(setup, verifyNetworkAddress); err != nil {
+			if err := protocol.VerifyEpochSetup(setup, verifyNetworkAddress); err != nil {
 				return fmt.Errorf("invalid setup: %w", err)
 			}
-			if err := isValidEpochCommit(commit, setup); err != nil {
+			if err := protocol.IsValidEpochCommit(commit, setup); err != nil {
 				return fmt.Errorf("invalid commit: %w", err)
 			}
 
@@ -498,10 +498,10 @@ func (state *State) bootstrapEpoch(epochs protocol.EpochQuery, verifyNetworkAddr
 			return fmt.Errorf("could not get current epoch commit event: %w", err)
 		}
 
-		if err := verifyEpochSetup(setup, verifyNetworkAddress); err != nil {
+		if err := protocol.VerifyEpochSetup(setup, verifyNetworkAddress); err != nil {
 			return fmt.Errorf("invalid setup: %w", err)
 		}
-		if err := isValidEpochCommit(commit, setup); err != nil {
+		if err := protocol.IsValidEpochCommit(commit, setup); err != nil {
 			return fmt.Errorf("invalid commit: %w", err)
 		}
 
@@ -524,7 +524,7 @@ func (state *State) bootstrapEpoch(epochs protocol.EpochQuery, verifyNetworkAddr
 				return fmt.Errorf("could not get next epoch setup event: %w", err)
 			}
 
-			if err := verifyEpochSetup(setup, verifyNetworkAddress); err != nil {
+			if err := protocol.VerifyEpochSetup(setup, verifyNetworkAddress); err != nil {
 				return fmt.Errorf("invalid setup: %w", err)
 			}
 
@@ -535,7 +535,7 @@ func (state *State) bootstrapEpoch(epochs protocol.EpochQuery, verifyNetworkAddr
 				return fmt.Errorf("could not get next epoch commit event: %w", err)
 			}
 			if err == nil {
-				if err := isValidEpochCommit(commit, setup); err != nil {
+				if err := protocol.IsValidEpochCommit(commit, setup); err != nil {
 					return fmt.Errorf("invalid commit")
 				}
 				commits = append(commits, commit)

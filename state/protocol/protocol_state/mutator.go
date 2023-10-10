@@ -164,8 +164,7 @@ func (m *Mutator) ApplyServiceEvents(updater protocol.StateUpdater, seals []*flo
 
 			switch ev := event.Event.(type) {
 			case *flow.EpochSetup:
-				// TODO: validate the service event
-				//err := isValidExtendingEpochSetup(ev, activeSetup, epochStatus)
+				err := protocol.IsValidExtendingEpochSetup(ev, activeSetup, epochStatus)
 				if err != nil {
 					if protocol.IsInvalidServiceEventError(err) {
 						// we have observed an invalid service event, which triggers epoch fallback mode
@@ -190,10 +189,9 @@ func (m *Mutator) ApplyServiceEvents(updater protocol.StateUpdater, seals []*flo
 					updater.SetInvalidStateTransitionAttempted()
 					return dbUpdates, nil
 				}
-				//extendingSetup := parentProtocolState.NextEpochSetup
+				extendingSetup := parentProtocolState.NextEpochSetup
 
-				// TODO: validate the service event
-				//err = isValidExtendingEpochCommit(ev, extendingSetup, activeSetup, epochStatus)
+				err = protocol.IsValidExtendingEpochCommit(ev, extendingSetup, activeSetup, epochStatus)
 				if err != nil {
 					if protocol.IsInvalidServiceEventError(err) {
 						// we have observed an invalid service event, which triggers epoch fallback mode
