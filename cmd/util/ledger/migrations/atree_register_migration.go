@@ -466,6 +466,13 @@ func (m *AtreeRegisterMigrator) validateChangesAndCreateNewRegisters(
 			continue
 		}
 
+		if mr.Address == cricketMomentsAddress {
+			// to be sure, copy all cricket moments keys
+			newPayloads = append(newPayloads, value)
+			m.log.Info().Msgf("copying cricket moments key %s", id)
+			continue
+		}
+
 		m.rw.Write(migrationProblem{
 			Address: mr.Address.Hex(),
 			Key:     id.String(),
