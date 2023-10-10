@@ -160,16 +160,20 @@ func TestSnapshot_Params(t *testing.T) {
 func TestSnapshot_Descendants(t *testing.T) {
 	participants := unittest.IdentityListFixture(5, unittest.WithAllRoles())
 	rootSnapshot := unittest.RootSnapshotFixture(participants)
-	//rootProtocolStateID := getRootProtocolStateID(t, rootSnapshot)
+	rootProtocolStateID := getRootProtocolStateID(t, rootSnapshot)
 	head, err := rootSnapshot.Head()
 	require.NoError(t, err)
 	util.RunWithFullProtocolState(t, rootSnapshot, func(db *badger.DB, state *bprotocol.ParticipantState) {
 		var expectedBlocks []flow.Identifier
 		for i := 5; i > 3; i-- {
-			for _, block := range unittest.ChainFixtureFrom(i, head) {
+			parent := head
+			for n := 0; n < i; n++ {
+				block := unittest.BlockWithParentFixture(parent)
+				block.SetPayload(unittest.PayloadFixture(unittest.WithProtocolStateID(rootProtocolStateID)))
 				err := state.Extend(context.Background(), block)
 				require.NoError(t, err)
 				expectedBlocks = append(expectedBlocks, block.ID())
+				parent = block.Header
 			}
 		}
 
@@ -231,6 +235,7 @@ func TestClusters(t *testing.T) {
 	clusterQCs := unittest.QuorumCertificatesFromAssignments(setup.Assignments)
 	commit.ClusterQCs = flow.ClusterQCVoteDatasFromQCs(clusterQCs)
 	seal.ResultID = result.ID()
+	root.Payload.ProtocolStateID = inmem.ProtocolStateForBootstrapState(setup, commit).ID()
 
 	rootSnapshot, err := inmem.SnapshotFromBootstrapState(root, result, seal, qc)
 	require.NoError(t, err)
