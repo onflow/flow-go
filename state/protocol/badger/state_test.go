@@ -101,8 +101,8 @@ func TestBootstrapAndOpen_EpochCommitted(t *testing.T) {
 	require.NoError(t, err)
 
 	// build an epoch on the root state and return a snapshot from the committed phase
-	committedPhaseSnapshot := snapshotAfter(t, rootSnapshot, func(state *bprotocol.FollowerState) protocol.Snapshot {
-		unittest.NewEpochBuilder(t, state).BuildEpoch().CompleteEpoch()
+	committedPhaseSnapshot := snapshotAfter(t, rootSnapshot, func(state *bprotocol.FollowerState, mutator protocol.StateMutator) protocol.Snapshot {
+		unittest.NewEpochBuilder(t, mutator, state).BuildEpoch().CompleteEpoch()
 
 		// find the point where we transition to the epoch committed phase
 		for height := rootBlock.Height + 1; ; height++ {
@@ -190,8 +190,8 @@ func TestBootstrap_EpochHeightBoundaries(t *testing.T) {
 	})
 
 	t.Run("with next epoch", func(t *testing.T) {
-		after := snapshotAfter(t, rootSnapshot, func(state *bprotocol.FollowerState) protocol.Snapshot {
-			builder := unittest.NewEpochBuilder(t, state)
+		after := snapshotAfter(t, rootSnapshot, func(state *bprotocol.FollowerState, mutator protocol.StateMutator) protocol.Snapshot {
+			builder := unittest.NewEpochBuilder(t, mutator, state)
 			builder.BuildEpoch().CompleteEpoch()
 			heights, ok := builder.EpochHeights(1)
 			require.True(t, ok)
@@ -217,8 +217,8 @@ func TestBootstrap_EpochHeightBoundaries(t *testing.T) {
 	t.Run("with previous epoch", func(t *testing.T) {
 		var epoch1FinalHeight uint64
 		var epoch2FirstHeight uint64
-		after := snapshotAfter(t, rootSnapshot, func(state *bprotocol.FollowerState) protocol.Snapshot {
-			builder := unittest.NewEpochBuilder(t, state)
+		after := snapshotAfter(t, rootSnapshot, func(state *bprotocol.FollowerState, mutator protocol.StateMutator) protocol.Snapshot {
+			builder := unittest.NewEpochBuilder(t, mutator, state)
 			builder.
 				BuildEpoch().CompleteEpoch(). // build epoch 2
 				BuildEpoch()                  // build epoch 3
@@ -260,26 +260,37 @@ func TestBootstrapNonRoot(t *testing.T) {
 	// start with a regular post-spork root snapshot
 	participants := unittest.CompleteIdentitySet()
 	rootSnapshot := unittest.RootSnapshotFixture(participants)
+	rootProtocolStateID := getRootProtocolStateID(t, rootSnapshot)
 	rootBlock, err := rootSnapshot.Head()
 	require.NoError(t, err)
 
 	// should be able to bootstrap from snapshot after sealing a non-root block
 	// ROOT <- B1 <- B2(R1) <- B3(S1) <- CHILD
 	t.Run("with sealed block", func(t *testing.T) {
-		after := snapshotAfter(t, rootSnapshot, func(state *bprotocol.FollowerState) protocol.Snapshot {
+		after := snapshotAfter(t, rootSnapshot, func(state *bprotocol.FollowerState, mutator protocol.StateMutator) protocol.Snapshot {
 			block1 := unittest.BlockWithParentFixture(rootBlock)
+			block1.SetPayload(unittest.PayloadFixture(unittest.WithProtocolStateID(rootProtocolStateID)))
 			buildFinalizedBlock(t, state, block1)
 
 			receipt1, seal1 := unittest.ReceiptAndSealForBlock(block1)
 			block2 := unittest.BlockWithParentFixture(block1.Header)
-			block2.SetPayload(unittest.PayloadFixture(unittest.WithReceipts(receipt1)))
+			block2.SetPayload(unittest.PayloadFixture(
+				unittest.WithReceipts(receipt1),
+				unittest.WithProtocolStateID(rootProtocolStateID)))
 			buildFinalizedBlock(t, state, block2)
 
 			block3 := unittest.BlockWithParentFixture(block2.Header)
-			block3.SetPayload(unittest.PayloadFixture(unittest.WithSeals(seal1)))
+			updater, err := mutator.CreateUpdater(block3.Header.View, block3.Header.ParentID)
+			require.NoError(t, err)
+			_, err = mutator.ApplyServiceEvents(updater, []*flow.Seal{seal1})
+			require.NoError(t, err)
+			_, updatedStateId, _ := updater.Build()
+			block3.SetPayload(unittest.PayloadFixture(
+				unittest.WithSeals(seal1),
+				unittest.WithProtocolStateID(updatedStateId)))
 			buildFinalizedBlock(t, state, block3)
 
-			child := unittest.BlockWithParentFixture(block3.Header)
+			child := unittest.BlockWithParentProtocolState(block3)
 			buildBlock(t, state, child)
 
 			return state.AtBlockID(block3.ID())
@@ -302,8 +313,8 @@ func TestBootstrapNonRoot(t *testing.T) {
 	})
 
 	t.Run("with setup next epoch", func(t *testing.T) {
-		after := snapshotAfter(t, rootSnapshot, func(state *bprotocol.FollowerState) protocol.Snapshot {
-			unittest.NewEpochBuilder(t, state).BuildEpoch()
+		after := snapshotAfter(t, rootSnapshot, func(state *bprotocol.FollowerState, mutator protocol.StateMutator) protocol.Snapshot {
+			unittest.NewEpochBuilder(t, mutator, state).BuildEpoch()
 
 			// find the point where we transition to the epoch setup phase
 			for height := rootBlock.Height + 1; ; height++ {
@@ -322,8 +333,8 @@ func TestBootstrapNonRoot(t *testing.T) {
 	})
 
 	t.Run("with committed next epoch", func(t *testing.T) {
-		after := snapshotAfter(t, rootSnapshot, func(state *bprotocol.FollowerState) protocol.Snapshot {
-			unittest.NewEpochBuilder(t, state).BuildEpoch().CompleteEpoch()
+		after := snapshotAfter(t, rootSnapshot, func(state *bprotocol.FollowerState, mutator protocol.StateMutator) protocol.Snapshot {
+			unittest.NewEpochBuilder(t, mutator, state).BuildEpoch().CompleteEpoch()
 
 			// find the point where we transition to the epoch committed phase
 			for height := rootBlock.Height + 1; ; height++ {
@@ -342,8 +353,8 @@ func TestBootstrapNonRoot(t *testing.T) {
 	})
 
 	t.Run("with previous and next epoch", func(t *testing.T) {
-		after := snapshotAfter(t, rootSnapshot, func(state *bprotocol.FollowerState) protocol.Snapshot {
-			unittest.NewEpochBuilder(t, state).
+		after := snapshotAfter(t, rootSnapshot, func(state *bprotocol.FollowerState, mutator protocol.StateMutator) protocol.Snapshot {
+			unittest.NewEpochBuilder(t, mutator, state).
 				BuildEpoch().CompleteEpoch(). // build epoch 2
 				BuildEpoch()                  // build epoch 3
 
@@ -554,10 +565,10 @@ func bootstrap(t *testing.T, rootSnapshot protocol.Snapshot, f func(*bprotocol.S
 //
 // This is used for generating valid snapshots to use when testing bootstrapping
 // from non-root states.
-func snapshotAfter(t *testing.T, rootSnapshot protocol.Snapshot, f func(*bprotocol.FollowerState) protocol.Snapshot) protocol.Snapshot {
+func snapshotAfter(t *testing.T, rootSnapshot protocol.Snapshot, f func(*bprotocol.FollowerState, protocol.StateMutator) protocol.Snapshot) protocol.Snapshot {
 	var after protocol.Snapshot
-	protoutil.RunWithFollowerProtocolState(t, rootSnapshot, func(_ *badger.DB, state *bprotocol.FollowerState) {
-		snap := f(state)
+	protoutil.RunWithFullProtocolStateAndMutator(t, rootSnapshot, func(_ *badger.DB, state *bprotocol.ParticipantState, mutator protocol.StateMutator) {
+		snap := f(state.FollowerState, mutator)
 		var err error
 		after, err = inmem.FromSnapshot(snap)
 		require.NoError(t, err)
