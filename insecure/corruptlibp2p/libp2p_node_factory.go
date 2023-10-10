@@ -73,7 +73,7 @@ func InitCorruptLibp2pNode(
 		Metrics:          metricsCfg,
 	}
 
-	routingSystemActivation := p2pbuilder.RoutingSystemActivationDisabled
+	routingSystemActivation := p2pbuilder.DhtSystemDisabled
 	r, err := flow.ParseRole(role)
 	if err != nil {
 		return nil, fmt.Errorf("could not parse node role: %w", err)
@@ -82,7 +82,7 @@ func InitCorruptLibp2pNode(
 		// Only access and execution nodes need to run DHT;
 		// Access nodes and execution nodes need DHT to run a blob service.
 		// Moreover, access nodes run a DHT to let un-staked (public) access nodes find each other on the public network.
-		routingSystemActivation = p2pbuilder.RoutingSystemActivationEnabled
+		routingSystemActivation = p2pbuilder.DhtSystemEnabled
 	}
 
 	builder, err := p2pbuilder.DefaultNodeBuilder(

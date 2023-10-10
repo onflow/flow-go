@@ -44,11 +44,11 @@ import (
 	"github.com/onflow/flow-go/network/p2p/utils"
 )
 
-type RoutingSystemActivation bool
+type DhtSystemActivation bool
 
 const (
-	RoutingSystemActivationEnabled  RoutingSystemActivation = true
-	RoutingSystemActivationDisabled RoutingSystemActivation = false
+	DhtSystemEnabled  DhtSystemActivation = true
+	DhtSystemDisabled DhtSystemActivation = false
 )
 
 type LibP2PNodeBuilder struct {
@@ -431,8 +431,7 @@ func DefaultNodeBuilder(
 	rCfg *p2pconf.ResourceManagerConfig,
 	uniCfg *p2pconfig.UnicastConfig,
 	connMgrConfig *netconf.ConnectionManagerConfig,
-	disallowListCacheCfg *p2p.DisallowListCacheConfig,
-	routingSystemActivation RoutingSystemActivation) (p2p.NodeBuilder, error) {
+	disallowListCacheCfg *p2p.DisallowListCacheConfig, routingSystemActivation DhtSystemActivation) (p2p.NodeBuilder, error) {
 
 	connManager, err := connection.NewConnManager(logger, metricsCfg.Metrics, connMgrConfig)
 	if err != nil {
@@ -497,7 +496,7 @@ func DefaultNodeBuilder(
 		}
 		builder.SetSubscriptionFilter(subscription.NewRoleBasedFilter(r, idProvider))
 
-		if routingSystemActivation == RoutingSystemActivationEnabled {
+		if routingSystemActivation == DhtSystemEnabled {
 			builder.SetRoutingSystem(
 				func(ctx context.Context, host host.Host) (routing.Routing, error) {
 					return dht.NewDHT(ctx, host, protocols.FlowDHTProtocolID(sporkId), logger, metricsCfg.Metrics, dht.AsServer())
