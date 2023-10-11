@@ -10,6 +10,7 @@ import (
 	"github.com/rs/zerolog"
 	corrupt "github.com/yhassanzadeh13/go-libp2p-pubsub"
 
+	"github.com/onflow/flow-go/cmd"
 	fcrypto "github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
@@ -73,18 +74,10 @@ func InitCorruptLibp2pNode(
 		Metrics:          metricsCfg,
 	}
 
-	routingSystemActivation := p2pbuilder.DhtSystemDisabled
-	r, err := flow.ParseRole(role)
+	dhtActivationStatus, err := cmd.DhtSystemActivationStatus(role)
 	if err != nil {
-		return nil, fmt.Errorf("could not parse node role: %w", err)
+		return nil, fmt.Errorf("could not get dht system activation status: %w", err)
 	}
-	if r == flow.RoleAccess || r == flow.RoleExecution {
-		// Only access and execution nodes need to run DHT;
-		// Access nodes and execution nodes need DHT to run a blob service.
-		// Moreover, access nodes run a DHT to let un-staked (public) access nodes find each other on the public network.
-		routingSystemActivation = p2pbuilder.DhtSystemEnabled
-	}
-
 	builder, err := p2pbuilder.DefaultNodeBuilder(
 		log,
 		address,
@@ -103,7 +96,7 @@ func InitCorruptLibp2pNode(
 		uniCfg,
 		&netConfig.ConnectionManagerConfig,
 		disallowListCacheCfg,
-		routingSystemActivation)
+		dhtActivationStatus)
 
 	if err != nil {
 		return nil, fmt.Errorf("could not create corrupt libp2p node builder: %w", err)
