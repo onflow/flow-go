@@ -285,7 +285,7 @@ func RunWithFullProtocolStateAndConsumer(t testing.TB, rootSnapshot protocol.Sna
 	})
 }
 
-func RunWithFullProtocolStateAndMetricsAndConsumer(t testing.TB, rootSnapshot protocol.Snapshot, metrics module.ComplianceMetrics, consumer protocol.Consumer, f func(*badger.DB, *pbadger.ParticipantState)) {
+func RunWithFullProtocolStateAndMetricsAndConsumer(t testing.TB, rootSnapshot protocol.Snapshot, metrics module.ComplianceMetrics, consumer protocol.Consumer, f func(*badger.DB, *pbadger.ParticipantState, protocol.StateMutator)) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		tracer := trace.NewNoopTracer()
 		log := zerolog.Nop()
@@ -320,7 +320,15 @@ func RunWithFullProtocolStateAndMetricsAndConsumer(t testing.TB, rootSnapshot pr
 			sealValidator,
 		)
 		require.NoError(t, err)
-		f(db, fullState)
+		mutator := protocol_state.NewMutator(
+			all.Headers,
+			all.Results,
+			all.Setups,
+			all.EpochCommits,
+			all.ProtocolState,
+			state.Params(),
+		)
+		f(db, fullState, mutator)
 	})
 }
 
@@ -398,7 +406,14 @@ func RunWithFullProtocolStateAndMutator(t testing.TB, rootSnapshot protocol.Snap
 			sealValidator,
 		)
 		require.NoError(t, err)
-		mutator := protocol_state.NewMutator(all.Headers, all.Results, all.Setups, all.EpochCommits, all.ProtocolState)
+		mutator := protocol_state.NewMutator(
+			all.Headers,
+			all.Results,
+			all.Setups,
+			all.EpochCommits,
+			all.ProtocolState,
+			state.Params(),
+		)
 		f(db, fullState, mutator)
 	})
 }

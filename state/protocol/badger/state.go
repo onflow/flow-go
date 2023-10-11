@@ -110,8 +110,6 @@ func Bootstrap(
 		return nil, fmt.Errorf("expected empty database")
 	}
 
-	protocolStateMutator := protocol_state.NewMutator(headers, results, setups, commits, protocolStateSnapshotsDB)
-	protocolState := protocol_state.NewProtocolState(protocolStateSnapshotsDB, root.Params())
 	state := newState(
 		metrics,
 		db,
@@ -122,9 +120,9 @@ func Bootstrap(
 		qcs,
 		setups,
 		commits,
-		protocolStateMutator,
-		protocolState,
+		protocolStateSnapshotsDB,
 		versionBeacons,
+		root.Params(),
 	)
 
 	if err := IsValidRootSnapshot(root, !config.SkipNetworkAddressValidation); err != nil {
@@ -649,8 +647,6 @@ func OpenState(
 	if err != nil {
 		return nil, fmt.Errorf("could not read global params")
 	}
-	protocolStateMutator := protocol_state.NewMutator(headers, results, setups, commits, protocolState)
-	protocolStateReader := protocol_state.NewProtocolState(protocolState, globalParams)
 	state := newState(
 		metrics,
 		db,
@@ -661,9 +657,9 @@ func OpenState(
 		qcs,
 		setups,
 		commits,
-		protocolStateMutator,
-		protocolStateReader,
+		protocolState,
 		versionBeacons,
+		globalParams,
 	) // populate the protocol state cache
 	err = state.populateCache()
 	if err != nil {
@@ -771,11 +767,11 @@ func newState(
 	qcs storage.QuorumCertificates,
 	setups storage.EpochSetups,
 	commits storage.EpochCommits,
-	protocolStateMutator protocol.StateMutator,
-	protocolStateReader protocol.ProtocolState,
+	protocolStateSnapshots storage.ProtocolState,
 	versionBeacons storage.VersionBeacons,
+	globalParams protocol.GlobalParams,
 ) *State {
-	return &State{
+	state := &State{
 		metrics: metrics,
 		db:      db,
 		headers: headers,
@@ -790,12 +786,23 @@ func newState(
 			setups:  setups,
 			commits: commits,
 		},
-		protocolState:        protocolStateReader,
-		protocolStateMutator: protocolStateMutator,
+		protocolState:        protocol_state.NewProtocolState(protocolStateSnapshots, globalParams),
+		protocolStateMutator: nil,
 		versionBeacons:       versionBeacons,
 		cachedFinal:          new(atomic.Pointer[cachedHeader]),
 		cachedSealed:         new(atomic.Pointer[cachedHeader]),
 	}
+
+	state.protocolStateMutator = protocol_state.NewMutator(
+		headers,
+		results,
+		setups,
+		commits,
+		protocolStateSnapshots,
+		state.Params(),
+	)
+
+	return state
 }
 
 // IsBootstrapped returns whether the database contains a bootstrapped state

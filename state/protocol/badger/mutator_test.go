@@ -861,7 +861,14 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 		)
 		require.NoError(t, err)
 
-		stateMutator := protocol_state.NewMutator(all.Headers, all.Results, all.Setups, all.EpochCommits, all.ProtocolState)
+		stateMutator := protocol_state.NewMutator(
+			all.Headers,
+			all.Results,
+			all.Setups,
+			all.EpochCommits,
+			all.ProtocolState,
+			state.Params(),
+		)
 		calculateExpectedStateId := calculateExpectedStateId(t, stateMutator)
 
 		head, err := rootSnapshot.Head()
@@ -1719,13 +1726,14 @@ func TestEmergencyEpochFallback(t *testing.T) {
 	t.Run("passed epoch commitment deadline in EpochStaking phase - should trigger EECC", func(t *testing.T) {
 
 		rootSnapshot := unittest.RootSnapshotFixture(participants)
+		rootProtocolStateID := getRootProtocolStateID(t, rootSnapshot)
 		metricsMock := mockmodule.NewComplianceMetrics(t)
 		mockMetricsForRootSnapshot(metricsMock, rootSnapshot)
 		protoEventsMock := mockprotocol.NewConsumer(t)
 		protoEventsMock.On("BlockFinalized", mock.Anything)
 		protoEventsMock.On("BlockProcessable", mock.Anything, mock.Anything)
 
-		util.RunWithFullProtocolStateAndMetricsAndConsumer(t, rootSnapshot, metricsMock, protoEventsMock, func(db *badger.DB, state *protocol.ParticipantState) {
+		util.RunWithFullProtocolStateAndMetricsAndConsumer(t, rootSnapshot, metricsMock, protoEventsMock, func(db *badger.DB, state *protocol.ParticipantState, _ realprotocol.StateMutator) {
 			head, err := rootSnapshot.Head()
 			require.NoError(t, err)
 			result, _, err := rootSnapshot.SealedResult()
@@ -1745,6 +1753,7 @@ func TestEmergencyEpochFallback(t *testing.T) {
 			// block 1 will be the first block on or past the epoch commitment deadline
 			block1 := unittest.BlockWithParentFixture(head)
 			block1.Header.View = epoch1CommitmentDeadline + rand.Uint64()%2
+			block1.SetPayload(unittest.PayloadFixture(unittest.WithProtocolStateID(rootProtocolStateID)))
 			err = state.Extend(context.Background(), block1)
 			require.NoError(t, err)
 			assertEpochEmergencyFallbackTriggered(t, state, false) // not triggered before finalization
@@ -1753,7 +1762,7 @@ func TestEmergencyEpochFallback(t *testing.T) {
 			assertEpochEmergencyFallbackTriggered(t, state, true) // triggered after finalization
 
 			// block 2 will be the first block past the first epoch boundary
-			block2 := unittest.BlockWithParentFixture(block1.Header)
+			block2 := unittest.BlockWithParentProtocolState(block1)
 			block2.Header.View = epoch1FinalView + 1
 			err = state.Extend(context.Background(), block2)
 			require.NoError(t, err)
@@ -1777,13 +1786,14 @@ func TestEmergencyEpochFallback(t *testing.T) {
 	t.Run("passed epoch commitment deadline in EpochSetup phase - should trigger EECC", func(t *testing.T) {
 
 		rootSnapshot := unittest.RootSnapshotFixture(participants)
+		rootProtocolStateID := getRootProtocolStateID(t, rootSnapshot)
 		metricsMock := mockmodule.NewComplianceMetrics(t)
 		mockMetricsForRootSnapshot(metricsMock, rootSnapshot)
 		protoEventsMock := mockprotocol.NewConsumer(t)
 		protoEventsMock.On("BlockFinalized", mock.Anything)
 		protoEventsMock.On("BlockProcessable", mock.Anything, mock.Anything)
 
-		util.RunWithFullProtocolStateAndMetricsAndConsumer(t, rootSnapshot, metricsMock, protoEventsMock, func(db *badger.DB, state *protocol.ParticipantState) {
+		util.RunWithFullProtocolStateAndMetricsAndConsumer(t, rootSnapshot, metricsMock, protoEventsMock, func(db *badger.DB, state *protocol.ParticipantState, mutator realprotocol.StateMutator) {
 			head, err := rootSnapshot.Head()
 			require.NoError(t, err)
 			result, _, err := rootSnapshot.SealedResult()
@@ -1793,7 +1803,7 @@ func TestEmergencyEpochFallback(t *testing.T) {
 
 			// add a block for the first seal to reference
 			block1 := unittest.BlockWithParentFixture(head)
-			block1.SetPayload(flow.EmptyPayload())
+			block1.SetPayload(unittest.PayloadFixture(unittest.WithProtocolStateID(rootProtocolStateID)))
 			err = state.Extend(context.Background(), block1)
 			require.NoError(t, err)
 			err = state.Finalize(context.Background(), block1.ID())
@@ -1821,7 +1831,10 @@ func TestEmergencyEpochFallback(t *testing.T) {
 
 			// add a block containing a receipt for block 1
 			block2 := unittest.BlockWithParentFixture(block1.Header)
-			block2.SetPayload(unittest.PayloadFixture(unittest.WithReceipts(receipt1)))
+			block2.SetPayload(unittest.PayloadFixture(
+				unittest.WithReceipts(receipt1),
+				unittest.WithProtocolStateID(rootProtocolStateID),
+			))
 			err = state.Extend(context.Background(), block2)
 			require.NoError(t, err)
 			err = state.Finalize(context.Background(), block2.ID())
@@ -1830,8 +1843,10 @@ func TestEmergencyEpochFallback(t *testing.T) {
 			// block 3 seals block 1 and will be the first block on or past the epoch commitment deadline
 			block3 := unittest.BlockWithParentFixture(block2.Header)
 			block3.Header.View = epoch1CommitmentDeadline + rand.Uint64()%2
+			seals := []*flow.Seal{seal1}
 			block3.SetPayload(flow.Payload{
-				Seals: []*flow.Seal{seal1},
+				Seals:           seals,
+				ProtocolStateID: calculateExpectedStateId(t, mutator)(block3.Header, seals),
 			})
 			err = state.Extend(context.Background(), block3)
 			require.NoError(t, err)
@@ -1846,7 +1861,7 @@ func TestEmergencyEpochFallback(t *testing.T) {
 			assertEpochEmergencyFallbackTriggered(t, state, true) // triggered after finalization
 
 			// block 4 will be the first block past the first epoch boundary
-			block4 := unittest.BlockWithParentFixture(block3.Header)
+			block4 := unittest.BlockWithParentProtocolState(block3)
 			block4.Header.View = epoch1FinalView + 1
 			err = state.Extend(context.Background(), block4)
 			require.NoError(t, err)
@@ -1870,13 +1885,14 @@ func TestEmergencyEpochFallback(t *testing.T) {
 	t.Run("epoch transition with invalid service event - should trigger EECC", func(t *testing.T) {
 
 		rootSnapshot := unittest.RootSnapshotFixture(participants)
+		rootProtocolStateID := getRootProtocolStateID(t, rootSnapshot)
 		metricsMock := mockmodule.NewComplianceMetrics(t)
 		mockMetricsForRootSnapshot(metricsMock, rootSnapshot)
 		protoEventsMock := mockprotocol.NewConsumer(t)
 		protoEventsMock.On("BlockFinalized", mock.Anything)
 		protoEventsMock.On("BlockProcessable", mock.Anything, mock.Anything)
 
-		util.RunWithFullProtocolStateAndMetricsAndConsumer(t, rootSnapshot, metricsMock, protoEventsMock, func(db *badger.DB, state *protocol.ParticipantState) {
+		util.RunWithFullProtocolStateAndMetricsAndConsumer(t, rootSnapshot, metricsMock, protoEventsMock, func(db *badger.DB, state *protocol.ParticipantState, mutator realprotocol.StateMutator) {
 			head, err := rootSnapshot.Head()
 			require.NoError(t, err)
 			result, _, err := rootSnapshot.SealedResult()
@@ -1884,7 +1900,7 @@ func TestEmergencyEpochFallback(t *testing.T) {
 
 			// add a block for the first seal to reference
 			block1 := unittest.BlockWithParentFixture(head)
-			block1.SetPayload(flow.EmptyPayload())
+			block1.SetPayload(unittest.PayloadFixture(unittest.WithProtocolStateID(rootProtocolStateID)))
 			err = state.Extend(context.Background(), block1)
 			require.NoError(t, err)
 			err = state.Finalize(context.Background(), block1.ID())
@@ -1912,7 +1928,10 @@ func TestEmergencyEpochFallback(t *testing.T) {
 
 			// add a block containing a receipt for block 1
 			block2 := unittest.BlockWithParentFixture(block1.Header)
-			block2.SetPayload(unittest.PayloadFixture(unittest.WithReceipts(receipt1)))
+			block2.SetPayload(unittest.PayloadFixture(
+				unittest.WithReceipts(receipt1),
+				unittest.WithProtocolStateID(rootProtocolStateID),
+			))
 			err = state.Extend(context.Background(), block2)
 			require.NoError(t, err)
 			err = state.Finalize(context.Background(), block2.ID())
@@ -1920,8 +1939,10 @@ func TestEmergencyEpochFallback(t *testing.T) {
 
 			// block 3 is where the service event state change comes into effect
 			block3 := unittest.BlockWithParentFixture(block2.Header)
+			seals := []*flow.Seal{seal1}
 			block3.SetPayload(flow.Payload{
-				Seals: []*flow.Seal{seal1},
+				Seals:           seals,
+				ProtocolStateID: calculateExpectedStateId(t, mutator)(block3.Header, seals),
 			})
 			err = state.Extend(context.Background(), block3)
 			require.NoError(t, err)
@@ -1936,7 +1957,7 @@ func TestEmergencyEpochFallback(t *testing.T) {
 			assertEpochEmergencyFallbackTriggered(t, state, true) // triggered after finalization
 
 			// block 5 is the first block past the current epoch boundary
-			block4 := unittest.BlockWithParentFixture(block3.Header)
+			block4 := unittest.BlockWithParentProtocolState(block3)
 			block4.Header.View = epoch1Setup.FinalView + 1
 			err = state.Extend(context.Background(), block4)
 			require.NoError(t, err)

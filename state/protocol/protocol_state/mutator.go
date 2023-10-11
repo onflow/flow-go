@@ -21,6 +21,7 @@ type Mutator struct {
 	setups          storage.EpochSetups
 	commits         storage.EpochCommits
 	protocolStateDB storage.ProtocolState
+	params          protocol.InstanceParams
 }
 
 var _ protocol.StateMutator = (*Mutator)(nil)
@@ -31,6 +32,7 @@ func NewMutator(
 	setups storage.EpochSetups,
 	commits storage.EpochCommits,
 	protocolStateDB storage.ProtocolState,
+	params protocol.InstanceParams,
 ) *Mutator {
 	return &Mutator{
 		headers:         headers,
@@ -38,6 +40,7 @@ func NewMutator(
 		setups:          setups,
 		commits:         commits,
 		protocolStateDB: protocolStateDB,
+		params:          params,
 	}
 }
 
@@ -106,12 +109,10 @@ func (m *Mutator) CommitProtocolState(blockID flow.Identifier, updater protocol.
 //
 // No errors are expected during normal operation.
 func (m *Mutator) ApplyServiceEvents(updater protocol.StateUpdater, seals []*flow.Seal) (dbUpdates []func(*transaction.Tx) error, err error) {
-	// TODO: hook up epoch fallback mode
-	epochFallbackTriggered := false
-	//epochFallbackTriggered, err := m.isEpochEmergencyFallbackTriggered()
-	//if err != nil {
-	//	return nil, fmt.Errorf("could not retrieve epoch fallback status: %w", err)
-	//}
+	epochFallbackTriggered, err := m.params.EpochFallbackTriggered()
+	if err != nil {
+		return nil, fmt.Errorf("could not retrieve epoch fallback status: %w", err)
+	}
 
 	parentProtocolState := updater.ParentState()
 	epochStatus := parentProtocolState.EpochStatus()
