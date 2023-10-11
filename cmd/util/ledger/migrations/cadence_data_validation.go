@@ -306,6 +306,7 @@ func (m *CadenceDataValidationMigrations) recursiveString(
 	hasher hash.Hasher,
 ) ([]byte, error) {
 	if isCricketMomentsShardedCollection(mr, value) {
+		log.Info().Msg("recursive string hash for cricket moments sharded collection")
 		return recursiveStringShardedCollection(log, m.nWorkers, mr, domain, key, value)
 	}
 
