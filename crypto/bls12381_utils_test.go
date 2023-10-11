@@ -69,7 +69,6 @@ func BenchmarkScalarMult(b *testing.B) {
 		for i := 0; i < b.N; i++ {
 			generatorScalarMultG1(&res, &expo)
 		}
-		b.StopTimer()
 	})
 
 	// E1 random point multiplication
@@ -81,7 +80,6 @@ func BenchmarkScalarMult(b *testing.B) {
 		for i := 0; i < b.N; i++ {
 			res.scalarMultE1(&res, &expo)
 		}
-		b.StopTimer()
 	})
 
 	// G2 generator multiplication
@@ -93,7 +91,6 @@ func BenchmarkScalarMult(b *testing.B) {
 		for i := 0; i < b.N; i++ {
 			generatorScalarMultG2(&res, &expo)
 		}
-		b.StopTimer()
 	})
 }
 
@@ -145,7 +142,6 @@ func BenchmarkMapToG1(b *testing.B) {
 		p = mapToG1(input)
 	}
 	require.NotNil(b, p)
-	b.StopTimer()
 }
 
 // test subgroup membership check in G1 and G2
@@ -187,7 +183,6 @@ func BenchmarkSubgroupCheck(b *testing.B) {
 		for i := 0; i < b.N; i++ {
 			_ = checkMembershipG1(&p) // G1
 		}
-		b.StopTimer()
 	})
 
 	b.Run("G2", func(b *testing.B) {
@@ -197,7 +192,6 @@ func BenchmarkSubgroupCheck(b *testing.B) {
 		for i := 0; i < b.N; i++ {
 			_ = checkMembershipG2(&p) // G2
 		}
-		b.StopTimer()
 	})
 }
 
