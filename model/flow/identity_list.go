@@ -36,30 +36,6 @@ type GenericIdentity interface {
 	GetSkeleton() IdentitySkeleton
 }
 
-func (iy IdentitySkeleton) GetNodeID() Identifier {
-	return iy.NodeID
-}
-
-func (iy IdentitySkeleton) GetRole() Role {
-	return iy.Role
-}
-
-func (iy IdentitySkeleton) GetStakingPubKey() crypto.PublicKey {
-	return iy.StakingPubKey
-}
-
-func (iy IdentitySkeleton) GetNetworkPubKey() crypto.PublicKey {
-	return iy.NetworkPubKey
-}
-
-func (iy IdentitySkeleton) GetInitialWeight() uint64 {
-	return iy.InitialWeight
-}
-
-func (iy IdentitySkeleton) GetSkeleton() IdentitySkeleton {
-	return iy
-}
-
 // IdentityFilter is a filter on identities. Mathematically, an IdentityFilter F
 // can be described as a function F: 𝓘 → 𝐼, where 𝓘 denotes the set of all identities
 // and 𝐼 ⊆ 𝓘. For an input identity i, F(i) returns true if and only if i passed the
@@ -85,14 +61,13 @@ type IdentityList = GenericIdentityList[Identity]
 type GenericIdentityList[T GenericIdentity] []*T
 
 // Filter will apply a filter to the identity list.
+// The resulting list will only contain entries that match the filtering criteria.
 func (il GenericIdentityList[T]) Filter(filter IdentityFilter[T]) GenericIdentityList[T] {
 	var dup GenericIdentityList[T]
-IDLoop:
 	for _, identity := range il {
-		if !filter(identity) {
-			continue IDLoop
+		if filter(identity) {
+			dup = append(dup, identity)
 		}
-		dup = append(dup, identity)
 	}
 	return dup
 }
@@ -146,7 +121,7 @@ func (il GenericIdentityList[T]) Selector() IdentityFilter[T] {
 // Lookup converts the identity slice to a map using the NodeIDs as keys. This
 // is useful when _repeatedly_ querying identities by their NodeIDs. The
 // conversation from slice to map incurs cost O(n), for `n` the slice length.
-// For a _single_ lookup, use method `ByNodeID(Identifier)` (avoiding conversion).  
+// For a _single_ lookup, use method `ByNodeID(Identifier)` (avoiding conversion).
 func (il GenericIdentityList[T]) Lookup() map[Identifier]*T {
 	lookup := make(map[Identifier]*T, len(il))
 	for _, identity := range il {

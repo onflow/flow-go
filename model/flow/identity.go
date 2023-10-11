@@ -126,6 +126,36 @@ func (iy Identity) Checksum() Identifier {
 	return MakeID(iy)
 }
 
+// GetNodeID returns node ID for the identity. It is needed to satisfy GenericIdentity constraint.
+func (iy IdentitySkeleton) GetNodeID() Identifier {
+	return iy.NodeID
+}
+
+// GetRole returns a node role for the identity. It is needed to satisfy GenericIdentity constraint.
+func (iy IdentitySkeleton) GetRole() Role {
+	return iy.Role
+}
+
+// GetStakingPubKey returns staking public key for the identity. It is needed to satisfy GenericIdentity constraint.
+func (iy IdentitySkeleton) GetStakingPubKey() crypto.PublicKey {
+	return iy.StakingPubKey
+}
+
+// GetNetworkPubKey returns network public key for the identity. It is needed to satisfy GenericIdentity constraint.
+func (iy IdentitySkeleton) GetNetworkPubKey() crypto.PublicKey {
+	return iy.NetworkPubKey
+}
+
+// GetInitialWeight returns initial weight for the identity. It is needed to satisfy GenericIdentity constraint.
+func (iy IdentitySkeleton) GetInitialWeight() uint64 {
+	return iy.InitialWeight
+}
+
+// GetSkeleton returns the skeleton part for the identity. It is needed to satisfy GenericIdentity constraint.
+func (iy IdentitySkeleton) GetSkeleton() IdentitySkeleton {
+	return iy
+}
+
 type encodableIdentitySkeleton struct {
 	NodeID        Identifier
 	Address       string `json:",omitempty"`
