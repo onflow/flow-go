@@ -220,7 +220,7 @@ func TestReadWriteG1(t *testing.T) {
 	t.Run("infinity", func(t *testing.T) {
 		var p, q pointE1
 		seed := make([]byte, frBytesLen)
-		unsafeMapToG1(&p, seed) // this results in the infinity point
+		unsafeMapToG1(&p, seed) // this results in the infinity point given how `unsafeMapToG1` works with an empty scalar
 		writePointE1(bytes, &p)
 		require.True(t, IsBLSSignatureIdentity(bytes)) // sanity check
 		err := readPointE1(&q, bytes)
