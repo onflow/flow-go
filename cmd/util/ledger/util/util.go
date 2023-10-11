@@ -134,6 +134,7 @@ type PayloadsReadonlyLedger struct {
 	Snapshot *PayloadSnapshot
 
 	AllocateStorageIndexFunc func(owner []byte) (atree.StorageIndex, error)
+	SetValueFunc             func(owner, key, value []byte) (err error)
 }
 
 func (p *PayloadsReadonlyLedger) GetValue(owner, key []byte) (value []byte, err error) {
@@ -144,7 +145,11 @@ func (p *PayloadsReadonlyLedger) GetValue(owner, key []byte) (value []byte, err 
 	return v, nil
 }
 
-func (p *PayloadsReadonlyLedger) SetValue(_, _, _ []byte) (err error) {
+func (p *PayloadsReadonlyLedger) SetValue(owner, key, value []byte) (err error) {
+	if p.SetValueFunc != nil {
+		return p.SetValueFunc(owner, key, value)
+	}
+
 	panic("SetValue not expected to be called")
 }
 

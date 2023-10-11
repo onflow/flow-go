@@ -168,7 +168,7 @@ func cloneCricketMomentsShardedCollection(
 	go func() {
 		defer close(keyPairChan)
 
-		inter, err := mr.ChildInterpreter()
+		inter, _, err := mr.ChildInterpreter()
 		if err != nil {
 			cancel(err)
 			return
@@ -227,12 +227,6 @@ func cloneCricketMomentsShardedCollection(
 		go func(i int) {
 			defer wg.Done()
 
-			inter, err := mr.ChildInterpreter()
-			if err != nil {
-				cancel(err)
-				return
-			}
-
 			storageMap := mr.GetReadOnlyStorage().GetStorageMap(mr.Address, domain, false)
 			storageMapValue := storageMap.ReadValue(&util.NopMemoryGauge{}, key)
 			scm, err := getShardedCollectionMap(mr, storageMapValue)
@@ -247,6 +241,12 @@ func cloneCricketMomentsShardedCollection(
 					return
 				case keyPair, ok := <-keyPairChan:
 					if !ok {
+						return
+					}
+
+					inter, commit, err := mr.ChildInterpreter()
+					if err != nil {
+						cancel(err)
 						return
 					}
 
@@ -289,6 +289,12 @@ func cloneCricketMomentsShardedCollection(
 							value:          newValue,
 						},
 					)
+
+					err = commit()
+					if err != nil {
+						cancel(err)
+						return
+					}
 
 					progressLog(1)
 				}

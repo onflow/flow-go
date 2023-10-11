@@ -333,7 +333,7 @@ func (mr *migratorRuntime) GetReadOnlyStorage() *runtime.Storage {
 	return runtime.NewStorage(util.NewPayloadsReadonlyLedger(mr.Snapshot), util.NopMemoryGauge{})
 }
 
-func (mr *migratorRuntime) ChildInterpreter() (*interpreter.Interpreter, error) {
+func (mr *migratorRuntime) ChildInterpreter() (*interpreter.Interpreter, func() error, error) {
 
 	ledger := util.NewPayloadsReadonlyLedger(mr.Snapshot)
 	ledger.AllocateStorageIndexFunc = func(owner []byte) (atree.StorageIndex, error) {
@@ -341,6 +341,12 @@ func (mr *migratorRuntime) ChildInterpreter() (*interpreter.Interpreter, error) 
 		defer mr.mu.Unlock()
 
 		return mr.Accounts.AllocateStorageIndex(owner)
+	}
+	ledger.SetValueFunc = func(owner, key, value []byte) (err error) {
+		mr.mu.Lock()
+		defer mr.mu.Unlock()
+
+		return mr.Accounts.SetValue(owner, key, value)
 	}
 
 	storage := runtime.NewStorage(ledger, util.NopMemoryGauge{})
@@ -367,10 +373,14 @@ func (mr *migratorRuntime) ChildInterpreter() (*interpreter.Interpreter, error) 
 		nil,
 		env.InterpreterConfig)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
-	return inter, nil
+	commit := func() error {
+		return storage.Commit(inter, false)
+	}
+
+	return inter, commit, nil
 }
 
 func (m *AtreeRegisterMigrator) validateChangesAndCreateNewRegisters(
