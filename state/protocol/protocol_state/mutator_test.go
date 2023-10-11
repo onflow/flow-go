@@ -1,6 +1,7 @@
 package protocol_state
 
 import (
+	"github.com/onflow/flow-go/state/protocol/mock"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -23,6 +24,7 @@ type MutatorSuite struct {
 	resultsDB       *storagemock.ExecutionResults
 	setupsDB        *storagemock.EpochSetups
 	commitsDB       *storagemock.EpochCommits
+	params          *mock.InstanceParams
 
 	mutator *Mutator
 }
@@ -33,8 +35,9 @@ func (s *MutatorSuite) SetupTest() {
 	s.resultsDB = storagemock.NewExecutionResults(s.T())
 	s.setupsDB = storagemock.NewEpochSetups(s.T())
 	s.commitsDB = storagemock.NewEpochCommits(s.T())
+	s.params = mock.NewInstanceParams(s.T())
 
-	s.mutator = NewMutator(s.headersDB, s.resultsDB, s.setupsDB, s.commitsDB, s.protocolStateDB)
+	s.mutator = NewMutator(s.headersDB, s.resultsDB, s.setupsDB, s.commitsDB, s.protocolStateDB, s.params)
 }
 
 // TestCreateUpdaterForUnknownBlock tests that CreateUpdater returns an error if the parent protocol state is not found.

@@ -3,6 +3,7 @@ package badger
 import (
 	"context"
 	"fmt"
+	"github.com/onflow/flow-go/state/protocol/protocol_state"
 	"math"
 	"math/rand"
 	"os"
@@ -42,8 +43,9 @@ type MutatorSuite struct {
 	epochCounter uint64
 
 	// protocol state for reference blocks for transactions
-	protoState   protocol.FollowerState
-	protoGenesis *flow.Block
+	protoState        protocol.FollowerState
+	protoStateMutator protocol.StateMutator
+	protoGenesis      *flow.Block
 
 	state cluster.MutableState
 }
@@ -72,6 +74,10 @@ func (suite *MutatorSuite) SetupTest() {
 
 	seal.ResultID = result.ID()
 	qc := unittest.QuorumCertificateFixture(unittest.QCWithRootBlockID(genesis.ID()))
+	genesis.Payload.ProtocolStateID = inmem.ProtocolStateForBootstrapState(
+		result.ServiceEvents[0].Event.(*flow.EpochSetup),
+		result.ServiceEvents[1].Event.(*flow.EpochCommit),
+	).ID()
 	rootSnapshot, err := inmem.SnapshotFromBootstrapState(genesis, result, seal, qc)
 	require.NoError(suite.T(), err)
 	suite.epochCounter = rootSnapshot.Encodable().Epochs.Current.Counter
@@ -94,6 +100,15 @@ func (suite *MutatorSuite) SetupTest() {
 	require.NoError(suite.T(), err)
 	suite.protoState, err = pbadger.NewFollowerState(log, tracer, events.NewNoop(), state, all.Index, all.Payloads, protocolutil.MockBlockTimer())
 	require.NoError(suite.T(), err)
+
+	suite.protoStateMutator = protocol_state.NewMutator(
+		all.Headers,
+		all.Results,
+		all.Setups,
+		all.EpochCommits,
+		all.ProtocolState,
+		state.Params(),
+	)
 
 	clusterStateRoot, err := NewStateRoot(suite.genesis, unittest.QuorumCertificateFixture(), suite.epochCounter)
 	suite.NoError(err)
@@ -398,7 +413,7 @@ func (suite *MutatorSuite) TestExtend_WithReferenceBlockFromClusterChain() {
 // using a reference block in a different epoch than the cluster's epoch.
 func (suite *MutatorSuite) TestExtend_WithReferenceBlockFromDifferentEpoch() {
 	// build and complete the current epoch, then use a reference block from next epoch
-	eb := unittest.NewEpochBuilder(suite.T(), suite.protoState)
+	eb := unittest.NewEpochBuilder(suite.T(), suite.protoStateMutator, suite.protoState)
 	eb.BuildEpoch().CompleteEpoch()
 	heights, ok := eb.EpochHeights(1)
 	require.True(suite.T(), ok)
