@@ -258,18 +258,25 @@ func BlockEventsToMessage(block flow.BlockEvents) (*accessproto.EventsResponse_R
 	}, nil
 }
 
+// GetConversionEventEncodingVersion returns the appropriate event encoding version for conversion.
+// Execution node events payloads are always encoded in CCF. If eventEncodingVersionValue is JSON-CDC,
+// CFF-encoded payloads should be converted to JSON-CDC, and CFF is returned as the format to convert from.
+// If eventEncodingVersionValue is CFF, payloads will not be converted and will be left as is. In this case,
+// JSON-CDC is returned as the format to convert from, which will be ignored in converters, and payloads
+// will be returned as-is.
 func GetConversionEventEncodingVersion(eventEncodingVersionValue *entities.EventEncodingVersionValue) entities.EventEncodingVersion {
+	// 1. Check the requested version of payloads.
 	eventEncodingVersion := entities.EventEncodingVersion_JSON_CDC_V0
 	if eventEncodingVersionValue != nil {
 		eventEncodingVersion = eventEncodingVersionValue.GetValue()
 	}
 
-	switch eventEncodingVersion {
-	case entities.EventEncodingVersion_CCF_V0:
-		return entities.EventEncodingVersion_JSON_CDC_V0
-	case entities.EventEncodingVersion_JSON_CDC_V0:
-		fallthrough
-	default:
+	// 2. If it is JSON-CDC, CFF is returned as the format to convert from.
+	if eventEncodingVersion == entities.EventEncodingVersion_JSON_CDC_V0 {
 		return entities.EventEncodingVersion_CCF_V0
 	}
+
+	// 3. In other cases, payloads should not be converted, so JSON-CDC is returned as the format to convert from.
+	// Conversion will be ignored.
+	return entities.EventEncodingVersion_JSON_CDC_V0
 }

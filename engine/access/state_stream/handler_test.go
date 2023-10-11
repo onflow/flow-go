@@ -111,25 +111,27 @@ func TestExecutionDataStream(t *testing.T) {
 	assert.Equal(t, 1, receivedCount)
 }
 
+// TestExecutionDataStreamEventEncoding tests the event encoding behavior of the execution data stream.
 func TestExecutionDataStreamEventEncoding(t *testing.T) {
 	t.Parallel()
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	// generate some events with a payload to include
-	// generators will produce identical event payloads (before encoding)
+	// Generate sample events for testing, each with a payload.
 	ccfEventGenerator := generator.EventGenerator(generator.WithEncoding(generator.EncodingCCF))
-	inputEvents := make([]flow.Event, 0, 1)
-	inputEvents = append(inputEvents, ccfEventGenerator.New())
+	ccfEvents := make([]flow.Event, 0, 1)
+	ccfEvents = append(ccfEvents, ccfEventGenerator.New())
 
 	jsonEventsGenerator := generator.EventGenerator(generator.WithEncoding(generator.EncodingJSON))
-	expectedEvents := make([]flow.Event, 0, 1)
-	expectedEvents = append(expectedEvents, jsonEventsGenerator.New())
+	jsonEvents := make([]flow.Event, 0, 1)
+	jsonEvents = append(jsonEvents, jsonEventsGenerator.New())
 
+	// Create a mock API and a mock stream for subscription.
 	api := ssmock.NewAPI(t)
 	stream := makeStreamMock[access.SubscribeExecutionDataRequest, access.SubscribeExecutionDataResponse](ctx)
 
+	// Helper function to perform a stream request and handle responses.
 	makeStreamRequest := func(request *access.SubscribeExecutionDataRequest) {
 		sub := state_stream.NewSubscription(1)
 
@@ -147,11 +149,11 @@ func TestExecutionDataStreamEventEncoding(t *testing.T) {
 		}()
 		wg.Wait()
 
-		// send a single response
+		// Send a single response.
 		blockHeight := uint64(1)
 		executionData := unittest.BlockExecutionDataFixture(
 			unittest.WithChunkExecutionDatas(
-				unittest.ChunkExecutionDataFixture(t, 1024, unittest.WithChunkEvents(inputEvents)),
+				unittest.ChunkExecutionDataFixture(t, 1024, unittest.WithChunkEvents(ccfEvents)),
 			),
 		)
 
@@ -160,10 +162,12 @@ func TestExecutionDataStreamEventEncoding(t *testing.T) {
 			ExecutionData: executionData,
 		}, 100*time.Millisecond)
 		require.NoError(t, err)
-		// notify end of data
+
+		// Notify end of data.
 		sub.Close()
 	}
 
+	// Test scenario for default (JSON) event encoding.
 	t.Run("test default(JSON)", func(t *testing.T) {
 		makeStreamRequest(&access.SubscribeExecutionDataRequest{})
 		for {
@@ -176,10 +180,10 @@ func TestExecutionDataStreamEventEncoding(t *testing.T) {
 			convertedExecData, err := convert.MessageToBlockExecutionData(resp.GetBlockExecutionData(), flow.Testnet.Chain())
 			require.NoError(t, err)
 
-			// make sure the payload is valid JSON-CDC
+			// Verify that the payload is valid JSON-CDC.
 			for _, chunk := range convertedExecData.ChunkExecutionDatas {
 				for i, e := range chunk.Events {
-					assert.Equal(t, expectedEvents[i], e)
+					assert.Equal(t, jsonEvents[i], e)
 				}
 			}
 
@@ -187,6 +191,7 @@ func TestExecutionDataStreamEventEncoding(t *testing.T) {
 		}
 	})
 
+	// Test scenario for JSON event encoding.
 	t.Run("test JSON event encoding", func(t *testing.T) {
 		makeStreamRequest(&access.SubscribeExecutionDataRequest{
 			EventEncodingVersion: &entities.EventEncodingVersionValue{Value: entities.EventEncodingVersion_JSON_CDC_V0},
@@ -201,10 +206,10 @@ func TestExecutionDataStreamEventEncoding(t *testing.T) {
 			convertedExecData, err := convert.MessageToBlockExecutionData(resp.GetBlockExecutionData(), flow.Testnet.Chain())
 			require.NoError(t, err)
 
-			// make sure the payload is valid JSON-CDC
+			// Verify that the payload is valid JSON-CDC.
 			for _, chunk := range convertedExecData.ChunkExecutionDatas {
 				for i, e := range chunk.Events {
-					assert.Equal(t, expectedEvents[i], e)
+					assert.Equal(t, jsonEvents[i], e)
 				}
 			}
 			close(stream.sentFromServer)
@@ -212,6 +217,7 @@ func TestExecutionDataStreamEventEncoding(t *testing.T) {
 
 	})
 
+	// Test scenario for CFF event encoding.
 	t.Run("test CFF event encoding", func(t *testing.T) {
 		makeStreamRequest(&access.SubscribeExecutionDataRequest{
 			EventEncodingVersion: &entities.EventEncodingVersionValue{Value: entities.EventEncodingVersion_CCF_V0},
@@ -226,10 +232,10 @@ func TestExecutionDataStreamEventEncoding(t *testing.T) {
 			convertedExecData, err := convert.MessageToBlockExecutionData(resp.GetBlockExecutionData(), flow.Testnet.Chain())
 			require.NoError(t, err)
 
-			// make sure the payload is valid JSON-CDC
+			// Verify that the payload is valid CCF-V0.
 			for _, chunk := range convertedExecData.ChunkExecutionDatas {
 				for i, e := range chunk.Events {
-					assert.Equal(t, inputEvents[i], e)
+					assert.Equal(t, ccfEvents[i], e)
 				}
 			}
 			close(stream.sentFromServer)
@@ -299,6 +305,12 @@ func TestEventStream(t *testing.T) {
 		assert.Equal(t, blockHeight, resp.GetBlockHeight())
 		assert.Equal(t, blockID, convert.MessageToIdentifier(resp.GetBlockId()))
 		assert.Equal(t, expectedEvents, convertedEvents)
+
+		// make sure the payload is valid JSON-CDC
+		for _, e := range convertedEvents {
+			_, err := jsoncdc.Decode(nil, e.Payload)
+			require.NoError(t, err)
+		}
 
 		receivedCount++
 

@@ -1084,7 +1084,7 @@ func (suite *Suite) TestGetEventsForBlockIDs() {
 		suite.Require().NoError(err)
 
 		// execute request
-		actual, err := backend.GetEventsForBlockIDs(ctx, string(flow.EventAccountCreated), blockIDs, nil)
+		actual, err := backend.GetEventsForBlockIDs(ctx, string(flow.EventAccountCreated), blockIDs, &entitiesproto.EventEncodingVersionValue{Value: entitiesproto.EventEncodingVersion_CCF_V0})
 		suite.checkResponse(actual, err)
 
 		suite.Require().Equal(expected, actual)
@@ -1386,7 +1386,7 @@ func (suite *Suite) TestGetEventsForHeightRange() {
 		suite.Require().NoError(err)
 
 		// execute request
-		actualResp, err := backend.GetEventsForHeightRange(ctx, string(flow.EventAccountCreated), minHeight, maxHeight, nil)
+		actualResp, err := backend.GetEventsForHeightRange(ctx, string(flow.EventAccountCreated), minHeight, maxHeight, &entitiesproto.EventEncodingVersionValue{Value: entitiesproto.EventEncodingVersion_CCF_V0})
 
 		// check response
 		suite.checkResponse(actualResp, err)
@@ -1414,7 +1414,7 @@ func (suite *Suite) TestGetEventsForHeightRange() {
 		backend, err := New(params)
 		suite.Require().NoError(err)
 
-		actualResp, err := backend.GetEventsForHeightRange(ctx, string(flow.EventAccountCreated), minHeight, maxHeight, nil)
+		actualResp, err := backend.GetEventsForHeightRange(ctx, string(flow.EventAccountCreated), minHeight, maxHeight, &entitiesproto.EventEncodingVersionValue{Value: entitiesproto.EventEncodingVersion_CCF_V0})
 		suite.checkResponse(actualResp, err)
 
 		suite.assertAllExpectations()
@@ -2173,18 +2173,18 @@ func (suite *Suite) TestGetTransactionResultByIndexEventEncodingVersion() {
 		suite.Assert().Equal(result.Events, expectedResultEvents)
 	}
 
-	suite.Run("test default(JSON) event encoding (happy case)", func() {
+	suite.Run("test default(JSON) event encoding", func() {
 		exeEventResp := prepareGetTransactionResultByIndex()
 		assertResultExpectations(exeEventResp, nil)
 	})
 
-	suite.Run("test JSON event encoding (happy case)", func() {
+	suite.Run("test JSON event encoding", func() {
 		encodingVersion := entitiesproto.EventEncodingVersion_JSON_CDC_V0
 		exeEventResp := prepareGetTransactionResultByIndex()
 		assertResultExpectations(exeEventResp, &entitiesproto.EventEncodingVersionValue{Value: encodingVersion})
 	})
 
-	suite.Run("test CFF event encoding (happy case)", func() {
+	suite.Run("test CFF event encoding", func() {
 		encodingVersion := entitiesproto.EventEncodingVersion_CCF_V0
 		exeEventResp := prepareGetTransactionResultByIndex()
 		assertResultExpectations(exeEventResp, &entitiesproto.EventEncodingVersionValue{Value: encodingVersion})
