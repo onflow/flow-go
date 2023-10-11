@@ -11,6 +11,7 @@ import (
 
 	"github.com/rs/zerolog"
 
+	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/complete/mtrie/flattener"
 	"github.com/onflow/flow-go/ledger/complete/mtrie/node"
 	"github.com/onflow/flow-go/ledger/complete/mtrie/trie"
@@ -629,6 +630,60 @@ func readTopLevelTries(dir string, fileName string, subtrieNodes [][]*node.Node,
 	}
 
 	return tries, nil
+}
+
+func readTriesRootHash(dir string, fileName string, logger zerolog.Logger) (
+	trieRoots []ledger.RootHash,
+	errToReturn error,
+) {
+
+	filepath, _ := filePathTopTries(dir, fileName)
+	file, err := os.Open(filepath)
+	if err != nil {
+		return nil, fmt.Errorf("could not open file %v: %w", filepath, err)
+	}
+	defer func(file *os.File) {
+		evictErr := evictFileFromLinuxPageCache(file, false, logger)
+		if evictErr != nil {
+			logger.Warn().Msgf("failed to evict top trie file %s from Linux page cache: %s", filepath, evictErr)
+			// No need to return this error because it's possible to continue normal operations.
+		}
+		errToReturn = closeAndMergeError(file, errToReturn)
+	}(file)
+
+	// read and validate magic bytes and version
+	err = validateFileHeader(MagicBytesCheckpointToptrie, VersionV6, file)
+	if err != nil {
+		return nil, err
+	}
+
+	// read subtrie Node count and validate
+	_, triesCount, _, err := readTopTriesFooter(file)
+	if err != nil {
+		return nil, fmt.Errorf("could not read top tries footer: %w", err)
+	}
+
+	footerOffset := encNodeCountSize + encTrieCountSize + crc32SumSize
+	trieRootOffset := footerOffset + flattener.EncodedTrieSize*int(triesCount)
+
+	_, err = file.Seek(int64(-trieRootOffset), io.SeekEnd)
+	if err != nil {
+		return nil, fmt.Errorf("could not seek to 0: %w", err)
+	}
+
+	reader := bufio.NewReaderSize(file, defaultBufioReadSize)
+	trieRoots = make([]ledger.RootHash, 0, triesCount)
+	scratch := make([]byte, 1024*4) // must not be less than 1024
+	for i := 0; i < int(triesCount); i++ {
+		trieRootNode, err := flattener.ReadEncodedTrie(reader, scratch)
+		if err != nil {
+			return nil, fmt.Errorf("could not read trie root node: %w", err)
+		}
+
+		trieRoots = append(trieRoots, ledger.RootHash(trieRootNode.RootHash))
+	}
+
+	return trieRoots, nil
 }
 
 func readFileHeader(reader io.Reader) (uint16, uint16, error) {

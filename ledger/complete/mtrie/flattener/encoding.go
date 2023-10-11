@@ -29,6 +29,7 @@ const (
 	encPayloadLengthSize = 4
 
 	encodedTrieSize = encNodeIndexSize + encRegCountSize + encRegSizeSize + encHashSize
+	EncodedTrieSize = encodedTrieSize
 )
 
 const payloadEncodingVersion = 1
@@ -268,6 +269,13 @@ func ReadNode(reader io.Reader, scratch []byte, getNode func(nodeIndex uint64) (
 	return n, nil
 }
 
+type EncodedTrie struct {
+	RootIndex uint64
+	RegCount  uint64
+	RegSize   uint64
+	RootHash  hash.Hash
+}
+
 // EncodeTrie encodes trie in the following format:
 // - root node index (8 byte)
 // - allocated reg count (8 byte)
@@ -391,4 +399,43 @@ func readPayloadFromReader(reader io.Reader, scratch []byte) (*ledger.Payload, e
 	}
 
 	return payload, nil
+}
+
+func ReadEncodedTrie(reader io.Reader, scratch []byte) (EncodedTrie, error) {
+	if len(scratch) < encodedTrieSize {
+		scratch = make([]byte, encodedTrieSize)
+	}
+
+	// Read encoded trie
+	_, err := io.ReadFull(reader, scratch[:encodedTrieSize])
+	if err != nil {
+		return EncodedTrie{}, fmt.Errorf("failed to read serialized trie: %w", err)
+	}
+
+	pos := 0
+
+	// Decode root node index
+	rootIndex := binary.BigEndian.Uint64(scratch)
+	pos += encNodeIndexSize
+
+	// Decode trie reg count (8 bytes)
+	regCount := binary.BigEndian.Uint64(scratch[pos:])
+	pos += encRegCountSize
+
+	// Decode trie reg size (8 bytes)
+	regSize := binary.BigEndian.Uint64(scratch[pos:])
+	pos += encRegSizeSize
+
+	// Decode root node hash
+	readRootHash, err := hash.ToHash(scratch[pos : pos+encHashSize])
+	if err != nil {
+		return EncodedTrie{}, fmt.Errorf("failed to decode hash of serialized trie: %w", err)
+	}
+
+	return EncodedTrie{
+		RootIndex: rootIndex,
+		RegCount:  regCount,
+		RegSize:   regSize,
+		RootHash:  readRootHash,
+	}, nil
 }

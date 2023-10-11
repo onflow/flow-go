@@ -590,3 +590,37 @@ func TestCopyCheckpointFileV6(t *testing.T) {
 		requireTriesEqual(t, tries, decoded)
 	})
 }
+
+func TestReadCheckpointRootHash(t *testing.T) {
+	unittest.RunWithTempDir(t, func(dir string) {
+		tries := createSimpleTrie(t)
+		fileName := "checkpoint"
+		logger := unittest.Logger()
+		require.NoErrorf(t, StoreCheckpointV6Concurrently(tries, dir, fileName, logger), "fail to store checkpoint")
+
+		trieRoots, err := readTriesRootHash(dir, fileName, logger)
+		require.NoError(t, err)
+		for i, root := range trieRoots {
+			expectedHash := tries[i].RootHash()
+			require.Equal(t, expectedHash, root)
+		}
+		require.Equal(t, len(tries), len(trieRoots))
+	})
+}
+
+func TestReadCheckpointRootHashMulti(t *testing.T) {
+	unittest.RunWithTempDir(t, func(dir string) {
+		tries := createMultipleRandomTries(t)
+		fileName := "checkpoint"
+		logger := unittest.Logger()
+		require.NoErrorf(t, StoreCheckpointV6Concurrently(tries, dir, fileName, logger), "fail to store checkpoint")
+
+		trieRoots, err := readTriesRootHash(dir, fileName, logger)
+		require.NoError(t, err)
+		for i, root := range trieRoots {
+			expectedHash := tries[i].RootHash()
+			require.Equal(t, expectedHash, root)
+		}
+		require.Equal(t, len(tries), len(trieRoots))
+	})
+}
