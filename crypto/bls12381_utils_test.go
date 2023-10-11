@@ -63,8 +63,8 @@ func BenchmarkScalarMult(b *testing.B) {
 	// G1 generator multiplication
 	// Note that generator and random point multiplications
 	// are implemented with the same algorithm
-	b.Run("G1", func(b *testing.B) {
-		var res pointE1
+	var res pointE1
+	b.Run("G1 gen", func(b *testing.B) {
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
 			generatorScalarMultG1(&res, &expo)
@@ -72,10 +72,22 @@ func BenchmarkScalarMult(b *testing.B) {
 		b.StopTimer()
 	})
 
+	// E1 random point multiplication
+	// Note that generator and random point multiplications
+	// are implemented with the same algorithm
+	b.Run("E1 rand", func(b *testing.B) {
+		var res pointE1
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			res.scalarMultE1(&res, &expo)
+		}
+		b.StopTimer()
+	})
+
 	// G2 generator multiplication
 	// Note that generator and random point multiplications
 	// are implemented with the same algorithm
-	b.Run("G2", func(b *testing.B) {
+	b.Run("G2 gen", func(b *testing.B) {
 		var res pointE2
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {

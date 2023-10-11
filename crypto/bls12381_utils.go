@@ -103,8 +103,8 @@ func (p *pointE2) String() string {
 	return fmt.Sprintf("%#x", encoding)
 }
 
-// Scalar multiplication of a generic point `p` in G1
-func (p *pointE1) scalarMultG1(res *pointE1, expo *scalar) {
+// Scalar multiplication of a generic point `p` in E1
+func (p *pointE1) scalarMultE1(res *pointE1, expo *scalar) {
 	C.E1_mult((*C.E1)(res), (*C.E1)(p), (*C.Fr)(expo))
 }
 
@@ -165,7 +165,7 @@ func randFr(x *scalar, rand random.Rand) bool {
 // and saves the random in `x`.
 func randFrStar(x *scalar, rand random.Rand) {
 	isZero := true
-	// exteremely unlikely this loop runs more than once,
+	// extremely unlikely this loop runs more than once,
 	// but force the output to be non-zero instead of propagating an error.
 	for isZero {
 		isZero = randFr(x, rand)
