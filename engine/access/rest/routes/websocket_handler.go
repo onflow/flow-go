@@ -38,6 +38,7 @@ type WebsocketController struct {
 	maxStreams        int32                          // the maximum number of streams allowed
 	activeStreamCount *atomic.Int32                  // the current number of active streams
 	readChannel       chan error                     // channel which notify closing connection by the client and provide errors to the client
+	heartbeatInterval uint64                         // the interval is calculated from the last response returned
 }
 
 // SetWebsocketConf used to set read and write deadlines for WebSocket connections and establishes a Pong handler to
@@ -111,6 +112,7 @@ func (wsController *WebsocketController) writeEvents(sub state_stream.Subscripti
 	ticker := time.NewTicker(pingPeriod)
 	defer ticker.Stop()
 
+	blocksFromLastHeartbeat := uint64(0)
 	for {
 		select {
 		case err := <-wsController.readChannel:
@@ -122,7 +124,6 @@ func (wsController *WebsocketController) writeEvents(sub state_stream.Subscripti
 				wsController.wsErrorHandler(err)
 			}
 			return
-
 		case event, ok := <-sub.Channel():
 			if !ok {
 				if sub.Err() != nil {
@@ -139,6 +140,21 @@ func (wsController *WebsocketController) writeEvents(sub state_stream.Subscripti
 				wsController.wsErrorHandler(models.NewRestError(http.StatusInternalServerError, "failed to set the initial write deadline: ", err))
 				return
 			}
+
+			resp, ok := event.(*state_stream.EventsResponse)
+			if !ok {
+				err = fmt.Errorf("unexpected response type: %s", event)
+				wsController.wsErrorHandler(err)
+				return
+			}
+			if len(resp.Events) == 0 {
+				blocksFromLastHeartbeat++
+				if blocksFromLastHeartbeat < wsController.heartbeatInterval {
+					continue
+				}
+				blocksFromLastHeartbeat = 0
+			}
+
 			// Write the response to the WebSocket connection
 			err = wsController.conn.WriteJSON(event)
 			if err != nil {

@@ -3,15 +3,18 @@ package state_stream
 import (
 	"context"
 	"fmt"
-	"github.com/onflow/flow-go/engine/common/rpc/convert"
-	"github.com/onflow/flow-go/utils/unittest"
 	"time"
 
-	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/engine/common/rpc/convert"
+	"github.com/onflow/flow-go/utils/unittest"
+
+	"testing"
+
 	access "github.com/onflow/flow/protobuf/go/flow/executiondata"
 	"github.com/stretchr/testify/require"
 	pb "google.golang.org/genproto/googleapis/bytestream"
-	"testing"
+
+	"github.com/onflow/flow-go/model/flow"
 
 	"github.com/stretchr/testify/suite"
 )
@@ -27,8 +30,7 @@ type HandlerTestSuite struct {
 
 type fakeReadServerImpl struct {
 	pb.ByteStream_ReadServer
-	ctx    context.Context
-	//sender func(*access.SubscribeEventsResponse) error
+	ctx      context.Context
 	received chan *access.SubscribeEventsResponse
 }
 
@@ -39,7 +41,6 @@ func (fake *fakeReadServerImpl) Context() context.Context {
 }
 
 func (fake *fakeReadServerImpl) Send(response *access.SubscribeEventsResponse) error {
-	//return fake.sender(response)
 	fake.received <- response
 	return nil
 }
@@ -53,25 +54,19 @@ func (s *HandlerTestSuite) SetupTest() {
 
 func (s *HandlerTestSuite) TestHeartbeatResponse() {
 	reader := &fakeReadServerImpl{
-		ctx:                   context.Background(),
-		//sender: func(data *access.SubscribeEventsResponse) error {
-		//	fmt.Printf("got block at height: %v\n", data.BlockHeight)
-		//	return nil
-		//},
+		ctx:      context.Background(),
 		received: make(chan *access.SubscribeEventsResponse, 100),
 	}
 
-	s.backend.setHighestHeight(s.blocks[len(s.blocks) - 1].Header.Height)
-
+	s.backend.setHighestHeight(s.blocks[len(s.blocks)-1].Header.Height)
 
 	s.Run("Empty event filter", func() {
 
 		filter := &access.EventFilter{}
 		req := &access.SubscribeEventsRequest{
-			//StartBlockId:         s.blocks[0].ID()[:],
-			StartBlockHeight:     0,
-			Filter:               filter,
-			HeartbeatInterval:    1,
+			StartBlockHeight:  0,
+			Filter:            filter,
+			HeartbeatInterval: 1,
 		}
 
 		go func() {
@@ -93,25 +88,23 @@ func (s *HandlerTestSuite) TestHeartbeatResponse() {
 		}
 	})
 
-	s.Run("Some events filter", func() {
+	s.Run("Event A.0x1.Foo.Bar filter with heartbeat interval 1", func() {
 		pbFilter := &access.EventFilter{
 			EventType: []string{string(testEventTypes[0])},
-			Contract: nil,
-			Address: nil,
+			Contract:  nil,
+			Address:   nil,
 		}
 
 		req := &access.SubscribeEventsRequest{
-			//StartBlockId:         s.blocks[0].ID()[:],
-			StartBlockHeight:     0,
-			Filter:               pbFilter,
-			HeartbeatInterval:    1,
+			StartBlockHeight:  0,
+			Filter:            pbFilter,
+			HeartbeatInterval: 1,
 		}
 
 		go func() {
 			err := s.handler.SubscribeEvents(req, reader)
 			require.NoError(s.T(), err)
 		}()
-
 
 		for _, b := range s.blocks {
 
@@ -124,26 +117,21 @@ func (s *HandlerTestSuite) TestHeartbeatResponse() {
 				require.NoError(s.T(), err)
 				require.Equal(s.T(), b.Header.ID(), blockID)
 				require.Equal(s.T(), b.Header.Height, resp.BlockHeight)
-				//s.T().Logf(resp.Events[0].Type)
-				//s.T().Logf("resp.Events len %d",(len(resp.Events)))
-				//require.Equal(s.T(), expectedEvents, resp.Events)
 			}, time.Second, fmt.Sprintf("timed out waiting for exec data for block %d %v", b.Header.Height, b.ID()))
 		}
 	})
 
-
-	s.Run("No events", func() {
+	s.Run("No events filter with heartbeat interval 2", func() {
 		pbFilter := &access.EventFilter{
 			EventType: []string{"A.0x1.NonExistent.Event"},
-			Contract: nil,
-			Address: nil,
+			Contract:  nil,
+			Address:   nil,
 		}
 
 		req := &access.SubscribeEventsRequest{
-			//StartBlockId:         s.blocks[0].ID()[:],
-			StartBlockHeight:     0,
-			Filter:               pbFilter,
-			HeartbeatInterval:    2,
+			StartBlockHeight:  0,
+			Filter:            pbFilter,
+			HeartbeatInterval: 2,
 		}
 
 		go func() {
@@ -153,12 +141,12 @@ func (s *HandlerTestSuite) TestHeartbeatResponse() {
 
 		expectedBlocks := make([]*flow.Block, 0)
 		for i, block := range s.blocks {
-			if (i+1) % int(req.HeartbeatInterval) == 0 {
+			if (i+1)%int(req.HeartbeatInterval) == 0 {
 				expectedBlocks = append(expectedBlocks, block)
 			}
 		}
 
-		require.Len(s.T(), expectedBlocks, len(s.blocks) / int(req.HeartbeatInterval))
+		require.Len(s.T(), expectedBlocks, len(s.blocks)/int(req.HeartbeatInterval))
 
 		for _, b := range expectedBlocks {
 			// consume execution data from subscription
@@ -174,5 +162,4 @@ func (s *HandlerTestSuite) TestHeartbeatResponse() {
 			}, time.Second, fmt.Sprintf("timed out waiting for exec data for block %d %v", b.Header.Height, b.ID()))
 		}
 	})
-
 }

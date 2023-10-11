@@ -44,36 +44,36 @@ func (s *BackendEventsSuite) TestSubscribeEvents() {
 	}
 
 	baseTests := []testType{
-		//{
-		//	name:            "happy path - all new blocks",
-		//	highestBackfill: -1, // no backfill
-		//	startBlockID:    flow.ZeroID,
-		//	startHeight:     0,
-		//},
-		//{
-		//	name:            "happy path - partial backfill",
-		//	highestBackfill: 2, // backfill the first 3 blocks
-		//	startBlockID:    flow.ZeroID,
-		//	startHeight:     s.blocks[0].Header.Height,
-		//},
+		{
+			name:            "happy path - all new blocks",
+			highestBackfill: -1, // no backfill
+			startBlockID:    flow.ZeroID,
+			startHeight:     0,
+		},
+		{
+			name:            "happy path - partial backfill",
+			highestBackfill: 2, // backfill the first 3 blocks
+			startBlockID:    flow.ZeroID,
+			startHeight:     s.blocks[0].Header.Height,
+		},
 		{
 			name:            "happy path - complete backfill",
 			highestBackfill: len(s.blocks) - 1, // backfill all blocks
 			startBlockID:    s.blocks[0].ID(),
 			startHeight:     0,
 		},
-		//{
-		//	name:            "happy path - start from root block by height",
-		//	highestBackfill: len(s.blocks) - 1, // backfill all blocks
-		//	startBlockID:    flow.ZeroID,
-		//	startHeight:     s.backend.rootBlockHeight, // start from root block
-		//},
-		//{
-		//	name:            "happy path - start from root block by id",
-		//	highestBackfill: len(s.blocks) - 1,     // backfill all blocks
-		//	startBlockID:    s.backend.rootBlockID, // start from root block
-		//	startHeight:     0,
-		//},
+		{
+			name:            "happy path - start from root block by height",
+			highestBackfill: len(s.blocks) - 1, // backfill all blocks
+			startBlockID:    flow.ZeroID,
+			startHeight:     s.backend.rootBlockHeight, // start from root block
+		},
+		{
+			name:            "happy path - start from root block by id",
+			highestBackfill: len(s.blocks) - 1,     // backfill all blocks
+			startBlockID:    s.backend.rootBlockID, // start from root block
+			startHeight:     0,
+		},
 	}
 
 	// supports simple address comparisions for testing

@@ -2,11 +2,12 @@ package state_stream
 
 import (
 	"context"
+	"sync/atomic"
+
 	access "github.com/onflow/flow/protobuf/go/flow/executiondata"
 	executiondata "github.com/onflow/flow/protobuf/go/flow/executiondata"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
-	"sync/atomic"
 
 	"github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"

@@ -30,5 +30,7 @@ func SubscribeEvents(
 		return nil, models.NewBadRequestError(err)
 	}
 
+	wsController.heartbeatInterval = req.HeartbeatInterval
+
 	return wsController.api.SubscribeEvents(ctx, req.StartBlockID, req.StartHeight, filter), nil
 }

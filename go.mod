@@ -100,7 +100,6 @@ require (
 require (
 	github.com/cockroachdb/pebble v0.0.0-20230829171545-74d4bb649d92
 	github.com/coreos/go-semver v0.3.0
-	github.com/docker/docker v1.4.2-0.20180625184442-8e610b2b55bf
 	github.com/go-playground/validator/v10 v10.14.1
 	github.com/gorilla/websocket v1.5.0
 	github.com/hashicorp/golang-lru/v2 v2.0.2
