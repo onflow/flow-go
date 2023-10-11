@@ -11,7 +11,7 @@ import (
 	"github.com/onflow/flow-go/utils/rand"
 )
 
-// Notes on using generic types:
+// Notes on runtime EFFICIENCY of GENERIC TYPES:
 // DO NOT pass an interface to a generic function (100x runtime cost as of go 1.20).
 // For example, consider the function
 //
@@ -60,7 +60,11 @@ func (iy IdentitySkeleton) GetSkeleton() IdentitySkeleton {
 	return iy
 }
 
-// IdentityFilter is a filter on identities.
+// IdentityFilter is a filter on identities. Mathematically, an IdentityFilter F
+// can be described as a function F: 𝓘 → 𝐼, where 𝓘 denotes the set of all identities
+// and 𝐼 ⊆ 𝓘. For an input identity i, F(i) returns true if and only if i passed the
+// filter, i.e. i ∈ 𝐼. Returning false means that some necessary criterion was violated
+// and identity i should be dropped, i.e. i ∉ 𝐼.
 type IdentityFilter[T GenericIdentity] func(*T) bool
 
 // IdentityOrder is a sort for identities.
@@ -118,16 +122,12 @@ func (il GenericIdentityList[T]) Map(f IdentityMapFunc[T]) GenericIdentityList[T
 //
 // CAUTION:
 // All Identity fields are deep-copied, _except_ for their keys, which
-// are copied by reference.
+// are copied by reference as they are treated as immutable by convention.
 func (il GenericIdentityList[T]) Copy() GenericIdentityList[T] {
 	dup := make(GenericIdentityList[T], 0, len(il))
-
 	lenList := len(il)
-
-	// performance tests show this is faster than 'range'
-	for i := 0; i < lenList; i++ {
-		// copy the object
-		next := *(il[i])
+	for i := 0; i < lenList; i++ { // performance tests show this is faster than 'range'
+		next := *(il[i]) // copy the object
 		dup = append(dup, &next)
 	}
 	return dup
@@ -143,6 +143,10 @@ func (il GenericIdentityList[T]) Selector() IdentityFilter[T] {
 	}
 }
 
+// Lookup converts the identity slice to a map using the NodeIDs as keys. This
+// is useful when _repeatedly_ querying identities by their NodeIDs. The
+// conversation from slice to map incurs cost O(n), for `n` the slice length.
+// For a _single_ lookup, use method `ByNodeID(Identifier)` (avoiding conversion).  
 func (il GenericIdentityList[T]) Lookup() map[Identifier]*T {
 	lookup := make(map[Identifier]*T, len(il))
 	for _, identity := range il {
@@ -165,7 +169,7 @@ func (il GenericIdentityList[T]) Sorted(less IdentityOrder[T]) bool {
 	return slices.IsSortedFunc(il, less)
 }
 
-// NodeIDs returns the NodeIDs of the nodes in the list.
+// NodeIDs returns the NodeIDs of the nodes in the list (order preserving).
 func (il GenericIdentityList[T]) NodeIDs() IdentifierList {
 	nodeIDs := make([]Identifier, 0, len(il))
 	for _, id := range il {
@@ -274,7 +278,7 @@ func (il GenericIdentityList[T]) Shuffle() (GenericIdentityList[T], error) {
 // sample contains `pct` percentage of the list. The sample is rounded up
 // if `pct>0`, so this will always select at least one identity.
 //
-// NOTE: The input must be between 0-1.
+// NOTE: The input must be between in the interval [0, 1.0]
 func (il GenericIdentityList[T]) SamplePct(pct float64) (GenericIdentityList[T], error) {
 	if pct <= 0 {
 		return GenericIdentityList[T]{}, nil
@@ -314,7 +318,6 @@ func (il GenericIdentityList[T]) Union(other GenericIdentityList[T]) GenericIden
 		lhs, rhs := (*a).GetNodeID(), (*b).GetNodeID()
 		return bytes.Compare(lhs[:], rhs[:]) < 0
 	})
-
 	return union
 }
 
@@ -336,9 +339,8 @@ func IdentitySkeletonListEqualTo(lhs, rhs IdentitySkeletonList) bool {
 	})
 }
 
-// Exists takes a previously sorted Identity list and searches it for the target value
-// This code is optimized, so the coding style will be different
-// target:  value to search for
+// Exists takes a previously sorted Identity list and searches it for the target
+// identity by its NodeID. Caution: other identity fields are not compared.
 // CAUTION:  The identity list MUST be sorted prior to calling this method
 func (il GenericIdentityList[T]) Exists(target *T) bool {
 	return il.IdentifierExists((*target).GetNodeID())
