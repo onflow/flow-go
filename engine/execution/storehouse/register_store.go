@@ -55,6 +55,11 @@ func NewRegisterStore(
 }
 
 // GetRegister first try to get the register from InMemoryRegisterStore, then OnDiskRegisterStore
+// 1. below pruned height, and is conflicting
+// 2. below pruned height, and is finalized
+// 3. above pruned height, and is not executed
+// 4. above pruned height, and is executed, and register is updated
+// 5. above pruned height, and is executed, but register is not updated since pruned height
 func (r *RegisterStore) GetRegister(height uint64, blockID flow.Identifier, register flow.RegisterID) (flow.RegisterValue, error) {
 	reg, err := r.memStore.GetRegister(height, blockID, register)
 	// the height might be lower than the lowest height in memStore,
