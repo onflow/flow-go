@@ -3,8 +3,6 @@ package blueprints
 import (
 	_ "embed"
 
-	"encoding/hex"
-
 	"github.com/onflow/cadence"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
 
@@ -23,6 +21,6 @@ func DeployRandomBeaconHistoryTransaction(
 ) *flow.TransactionBody {
 	return flow.NewTransactionBody().
 		SetScript([]byte(deployRandomBeaconHistoryTransactionTemplate)).
-		AddArgument(jsoncdc.MustEncode(cadence.String(hex.EncodeToString(contracts.RandomBeaconHistory())))).
+		AddArgument(jsoncdc.MustEncode(cadence.String(contracts.RandomBeaconHistory()))).
 		AddAuthorizer(service)
 }

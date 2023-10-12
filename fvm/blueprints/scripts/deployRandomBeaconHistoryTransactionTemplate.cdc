@@ -1,5 +1,5 @@
 transaction(code: String) {
   prepare(serviceAccount: AuthAccount) {
-	serviceAccount.contracts.add(name: "RandomBeaconHistory", code: code.decodeHex())
+	serviceAccount.contracts.add(name: "RandomBeaconHistory", code: code.utf8)
   }
 }

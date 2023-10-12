@@ -53,7 +53,6 @@ cmd/util/util:
 .PHONY: update-core-contracts-version
 update-core-contracts-version:
 	./scripts/update-core-contracts.sh $(CC_VERSION)
-	make tidy
 
 ############################################################################################
 # CAUTION: DO NOT MODIFY THESE TARGETS! DOING SO WILL BREAK THE FLAKY TEST MONITOR

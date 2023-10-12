@@ -16,7 +16,6 @@ transaction {
         let randomBeaconHistoryHeartbeat = serviceAccount.borrow<&RandomBeaconHistory.Heartbeat>(
             from: RandomBeaconHistory.HeartbeatStoragePath)
                 ?? panic("Couldn't borrow RandomBeaconHistory.Heartbeat Resource")
-        let sor = randomSourceHistory()
-        randomBeaconHistoryHeartbeat.heartbeat(randomSourceHistory: sor)
+        randomBeaconHistoryHeartbeat.heartbeat(randomSourceHistory: randomSourceHistory())
     }
 }

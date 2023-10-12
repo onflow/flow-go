@@ -39,6 +39,14 @@ func NewReusableCadenceRuntime(rt runtime.Runtime, config runtime.Config) *Reusa
 		Environment: runtime.NewBaseInterpreterEnvironment(config),
 	}
 
+	// Declare the `randomSourceHistory` function. This function is **only** used by the
+	// System transaction, to fill the `RandomBeaconHistory` contract via the heartbeat
+	// resource. This allows the `RandomBeaconHistory` contract to be a standard contract,
+	// without any special parts.
+	// Since the `randomSourceHistory` function is only used by the System transaction,
+	// it is not part of the cadence standard library, and can just be injected from here.
+	// It also doesnt need user documentation, since it is not (and should not)
+	// be called by the user. If it is called by the user it will panic.
 	blockRandomSource := stdlib.StandardLibraryValue{
 		Name: "randomSourceHistory",
 		Type: randomSourceFunctionType,
