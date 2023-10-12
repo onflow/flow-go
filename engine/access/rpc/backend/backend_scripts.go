@@ -169,8 +169,8 @@ func (b *backendScripts) executeScriptLocally(
 		return nil, convertedErr
 	}
 
-	if b.log.GetLevel() == zerolog.DebugLevel {
-		if b.shouldLogScript(execEndTime, insecureScriptHash) {
+	if b.log.GetLevel() == zerolog.DebugLevel && 
+            b.shouldLogScript(execEndTime, insecureScriptHash) {
 			lg.Debug().
 				Str("script", string(script)).
 				Msg("Successfully executed script")
