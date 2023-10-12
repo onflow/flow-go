@@ -3,6 +3,7 @@ package integration_test
 import (
 	"context"
 	"fmt"
+	"github.com/onflow/flow-go/state/protocol/protocol_state"
 	"os"
 	"sort"
 	"testing"
@@ -459,9 +460,25 @@ func createNode(
 
 	seals := stdmap.NewIncorporatedResultSeals(sealLimit)
 
+	protocolStateMutator := protocol_state.NewMutator(headersDB, resultsDB, setupsDB, commitsDB, protocolStateDB, state.Params())
+
 	// initialize the block builder
-	build, err := builder.NewBuilder(metricsCollector, db, fullState, headersDB, sealsDB, indexDB, blocksDB, resultsDB, receiptsDB,
-		guarantees, consensusMempools.NewIncorporatedResultSeals(seals, receiptsDB), receipts, tracer)
+	build, err := builder.NewBuilder(
+		metricsCollector,
+		db,
+		fullState,
+		headersDB,
+		sealsDB,
+		indexDB,
+		blocksDB,
+		resultsDB,
+		receiptsDB,
+		protocolStateMutator,
+		guarantees,
+		consensusMempools.NewIncorporatedResultSeals(seals, receiptsDB),
+		receipts,
+		tracer,
+	)
 	require.NoError(t, err)
 
 	// initialize the pending blocks cache

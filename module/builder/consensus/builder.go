@@ -109,7 +109,7 @@ func NewBuilder(
 // BuildOn creates a new block header on top of the provided parent, using the
 // given view and applying the custom setter function to allow the caller to
 // make changes to the header before storing it.
-func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) error) (*flow.Header, error) {
+func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) error, sign func(*flow.Header) error) (*flow.Header, error) {
 
 	// since we don't know the blockID when building the block we track the
 	// time indirectly and insert the span directly at the end
@@ -139,7 +139,8 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 		insertableGuarantees,
 		insertableSeals,
 		insertableReceipts,
-		setter)
+		setter,
+		sign)
 	if err != nil {
 		return nil, fmt.Errorf("could not assemble proposal: %w", err)
 	}
@@ -609,7 +610,9 @@ func (b *Builder) createProposal(parentID flow.Identifier,
 	guarantees []*flow.CollectionGuarantee,
 	seals []*flow.Seal,
 	insertableReceipts *InsertableReceipts,
-	setter func(*flow.Header) error) (*flow.Block, error) {
+	setter func(*flow.Header) error,
+	sign func(*flow.Header) error,
+) (*flow.Block, error) {
 
 	parent, err := b.headers.ByBlockID(parentID)
 	if err != nil {
@@ -627,16 +630,15 @@ func (b *Builder) createProposal(parentID flow.Identifier,
 		PayloadHash: flow.ZeroID,
 	}
 
-	updater, err := b.protoStateMutator.CreateUpdater(header.View, header.ParentID)
-	_, err = b.protoStateMutator.ApplyServiceEvents(updater, seals)
-
-	_, protocolStateID, _ := updater.Build()
-
 	// apply the custom fields setter of the consensus algorithm
 	err = setter(header)
 	if err != nil {
 		return nil, fmt.Errorf("could not apply setter: %w", err)
 	}
+
+	updater, err := b.protoStateMutator.CreateUpdater(header.View, header.ParentID)
+	_, err = b.protoStateMutator.ApplyServiceEvents(updater, seals)
+	_, protocolStateID, _ := updater.Build()
 
 	proposal := &flow.Block{
 		Header: header,
@@ -648,6 +650,12 @@ func (b *Builder) createProposal(parentID flow.Identifier,
 		Results:         insertableReceipts.results,
 		ProtocolStateID: protocolStateID,
 	})
+
+	// sign the proposal
+	err = sign(header)
+	if err != nil {
+		return nil, fmt.Errorf("could not sign the proposal: %w", err)
+	}
 
 	return proposal, nil
 }

@@ -43,7 +43,10 @@ func (bp *BlockProducer) MakeBlockProposal(view uint64, qc *flow.QuorumCertifica
 		header.ParentVoterSigData = qc.SigData
 		header.ProposerID = bp.committee.Self()
 		header.LastViewTC = lastViewTC
+		return nil
+	}
 
+	signProposal := func(header *flow.Header) error {
 		// turn the header into a block header proposal as known by hotstuff
 		block := model.Block{
 			BlockID:     header.ID(),
@@ -65,7 +68,7 @@ func (bp *BlockProducer) MakeBlockProposal(view uint64, qc *flow.QuorumCertifica
 	}
 
 	// retrieve a fully built block header from the builder
-	header, err := bp.builder.BuildOn(qc.BlockID, setHotstuffFields)
+	header, err := bp.builder.BuildOn(qc.BlockID, setHotstuffFields, signProposal)
 	if err != nil {
 		return nil, fmt.Errorf("could not build block proposal on top of %v: %w", qc.BlockID, err)
 	}
