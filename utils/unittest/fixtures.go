@@ -13,13 +13,10 @@ import (
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	pubsub_pb "github.com/libp2p/go-libp2p-pubsub/pb"
 	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/onflow/cadence"
 	"github.com/stretchr/testify/require"
 
-	"github.com/onflow/cadence"
-
 	sdk "github.com/onflow/flow-go-sdk"
-	"github.com/onflow/flow-go/network/message"
-
 	hotstuff "github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/crypto/hash"
@@ -45,6 +42,7 @@ import (
 	"github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/module/updatable_configs"
 	"github.com/onflow/flow-go/network/channels"
+	"github.com/onflow/flow-go/network/message"
 	"github.com/onflow/flow-go/network/p2p/keyutils"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/inmem"
@@ -233,6 +231,18 @@ func ProposalFromBlock(block *flow.Block) *messages.BlockProposal {
 
 func ClusterProposalFromBlock(block *cluster.Block) *messages.ClusterBlockProposal {
 	return messages.NewClusterBlockProposal(block)
+}
+
+func BlockchainFixture(length int) []*flow.Block {
+	blocks := make([]*flow.Block, length)
+
+	genesis := BlockFixture()
+	blocks[0] = &genesis
+	for i := 1; i < length; i++ {
+		blocks[i] = BlockWithParentFixture(blocks[i-1].Header)
+	}
+
+	return blocks
 }
 
 // AsSlashable returns the input message T, wrapped as a flow.Slashable instance with a random origin ID.
@@ -2363,6 +2373,18 @@ func TransactionResultsFixture(n int) []flow.TransactionResult {
 			TransactionID:   IdentifierFixture(),
 			ErrorMessage:    "whatever",
 			ComputationUsed: uint64(rand.Uint32()),
+		})
+	}
+	return results
+}
+
+func LightTransactionResultsFixture(n int) []flow.LightTransactionResult {
+	results := make([]flow.LightTransactionResult, 0, n)
+	for i := 0; i < n; i++ {
+		results = append(results, flow.LightTransactionResult{
+			TransactionID:   IdentifierFixture(),
+			Failed:          i%2 == 0,
+			ComputationUsed: Uint64InRange(1, 10_000),
 		})
 	}
 	return results

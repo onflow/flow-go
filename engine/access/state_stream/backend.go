@@ -227,6 +227,6 @@ func (b *StateStreamBackend) getStartHeight(startBlockID flow.Identifier, startH
 }
 
 // SetHighestHeight sets the highest height for which execution data is available.
-func (b *StateStreamBackend) setHighestHeight(height uint64) bool {
+func (b *StateStreamBackend) SetHighestHeight(height uint64) bool {
 	return b.highestHeight.Set(height)
 }

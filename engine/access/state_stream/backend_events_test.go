@@ -54,24 +54,24 @@ func (s *BackendEventsSuite) TestSubscribeEvents() {
 			name:            "happy path - partial backfill",
 			highestBackfill: 2, // backfill the first 3 blocks
 			startBlockID:    flow.ZeroID,
-			startHeight:     s.blocks[0].Header.Height,
+			startHeight:     s.Blocks[0].Header.Height,
 		},
 		{
 			name:            "happy path - complete backfill",
-			highestBackfill: len(s.blocks) - 1, // backfill all blocks
-			startBlockID:    s.blocks[0].ID(),
+			highestBackfill: len(s.Blocks) - 1, // backfill all blocks
+			startBlockID:    s.Blocks[0].ID(),
 			startHeight:     0,
 		},
 		{
 			name:            "happy path - start from root block by height",
-			highestBackfill: len(s.blocks) - 1, // backfill all blocks
+			highestBackfill: len(s.Blocks) - 1, // backfill all blocks
 			startBlockID:    flow.ZeroID,
-			startHeight:     s.backend.rootBlockHeight, // start from root block
+			startHeight:     s.Backend.rootBlockHeight, // start from root block
 		},
 		{
 			name:            "happy path - start from root block by id",
-			highestBackfill: len(s.blocks) - 1,     // backfill all blocks
-			startBlockID:    s.backend.rootBlockID, // start from root block
+			highestBackfill: len(s.Blocks) - 1,     // backfill all blocks
+			startBlockID:    s.Backend.rootBlockID, // start from root block
 			startHeight:     0,
 		},
 	}
@@ -89,7 +89,7 @@ func (s *BackendEventsSuite) TestSubscribeEvents() {
 
 		t2 := test
 		t2.name = fmt.Sprintf("%s - some events", test.name)
-		t2.filters, err = NewEventFilter(DefaultEventFilterConfig, chain, []string{string(testEventTypes[0])}, nil, nil)
+		t2.filters, err = NewEventFilter(DefaultEventFilterConfig, chain, []string{string(TestEventTypes[0])}, nil, nil)
 		require.NoError(s.T(), err)
 		tests = append(tests, t2)
 
@@ -108,20 +108,20 @@ func (s *BackendEventsSuite) TestSubscribeEvents() {
 			// this simulates a subscription on a past block
 			for i := 0; i <= test.highestBackfill; i++ {
 				s.T().Logf("backfilling block %d", i)
-				s.backend.setHighestHeight(s.blocks[i].Header.Height)
+				s.Backend.SetHighestHeight(s.Blocks[i].Header.Height)
 			}
 
 			subCtx, subCancel := context.WithCancel(ctx)
-			sub := s.backend.SubscribeEvents(subCtx, test.startBlockID, test.startHeight, test.filters)
+			sub := s.Backend.SubscribeEvents(subCtx, test.startBlockID, test.startHeight, test.filters)
 
 			// loop over all of the blocks
-			for i, b := range s.blocks {
+			for i, b := range s.Blocks {
 				s.T().Logf("checking block %d %v", i, b.ID())
 
 				// simulate new exec data received.
 				// exec data for all blocks with index <= highestBackfill were already received
 				if i > test.highestBackfill {
-					s.backend.setHighestHeight(b.Header.Height)
+					s.Backend.SetHighestHeight(b.Header.Height)
 					s.broadcaster.Publish()
 				}
 
@@ -173,7 +173,7 @@ func (s *BackendExecutionDataSuite) TestSubscribeEventsHandlesErrors() {
 		subCtx, subCancel := context.WithCancel(ctx)
 		defer subCancel()
 
-		sub := s.backend.SubscribeEvents(subCtx, unittest.IdentifierFixture(), 1, EventFilter{})
+		sub := s.Backend.SubscribeEvents(subCtx, unittest.IdentifierFixture(), 1, EventFilter{})
 		assert.Equal(s.T(), codes.InvalidArgument, status.Code(sub.Err()))
 	})
 
@@ -181,7 +181,7 @@ func (s *BackendExecutionDataSuite) TestSubscribeEventsHandlesErrors() {
 		subCtx, subCancel := context.WithCancel(ctx)
 		defer subCancel()
 
-		sub := s.backend.SubscribeEvents(subCtx, flow.ZeroID, s.backend.rootBlockHeight-1, EventFilter{})
+		sub := s.Backend.SubscribeEvents(subCtx, flow.ZeroID, s.Backend.rootBlockHeight-1, EventFilter{})
 		assert.Equal(s.T(), codes.InvalidArgument, status.Code(sub.Err()), "expected InvalidArgument, got %v: %v", status.Code(sub.Err()).String(), sub.Err())
 	})
 
@@ -189,7 +189,7 @@ func (s *BackendExecutionDataSuite) TestSubscribeEventsHandlesErrors() {
 		subCtx, subCancel := context.WithCancel(ctx)
 		defer subCancel()
 
-		sub := s.backend.SubscribeEvents(subCtx, unittest.IdentifierFixture(), 0, EventFilter{})
+		sub := s.Backend.SubscribeEvents(subCtx, unittest.IdentifierFixture(), 0, EventFilter{})
 		assert.Equal(s.T(), codes.NotFound, status.Code(sub.Err()), "expected NotFound, got %v: %v", status.Code(sub.Err()).String(), sub.Err())
 	})
 
@@ -200,7 +200,7 @@ func (s *BackendExecutionDataSuite) TestSubscribeEventsHandlesErrors() {
 		subCtx, subCancel := context.WithCancel(ctx)
 		defer subCancel()
 
-		sub := s.backend.SubscribeEvents(subCtx, flow.ZeroID, s.blocks[len(s.blocks)-1].Header.Height+10, EventFilter{})
+		sub := s.Backend.SubscribeEvents(subCtx, flow.ZeroID, s.Blocks[len(s.Blocks)-1].Header.Height+10, EventFilter{})
 		assert.Equal(s.T(), codes.NotFound, status.Code(sub.Err()), "expected NotFound, got %v: %v", status.Code(sub.Err()).String(), sub.Err())
 	})
 }

@@ -33,7 +33,7 @@ func NewBootstrappedRegistersWithPath(dir string) (*Registers, *pebble.DB, error
 	return registers, db, nil
 }
 
-// openRegisterPebbleDB opens the database
+// OpenRegisterPebbleDB opens the database
 func OpenRegisterPebbleDB(dir string) (*pebble.DB, error) {
 	cache := pebble.NewCache(1 << 20)
 	defer cache.Unref()

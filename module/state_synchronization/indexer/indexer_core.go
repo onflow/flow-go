@@ -2,6 +2,7 @@ package indexer
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/rs/zerolog"
 	"golang.org/x/sync/errgroup"
@@ -9,17 +10,23 @@ import (
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/convert"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	"github.com/onflow/flow-go/storage"
+	bstorage "github.com/onflow/flow-go/storage/badger"
 	"github.com/onflow/flow-go/utils/logging"
 )
 
 // IndexerCore indexes the execution state.
 type IndexerCore struct {
+	log     zerolog.Logger
+	metrics module.ExecutionStateIndexerMetrics
+
 	registers storage.RegisterIndex
 	headers   storage.Headers
 	events    storage.Events
-	log       zerolog.Logger
+	results   storage.LightTransactionResults
+	batcher   bstorage.BatchBuilder
 }
 
 // New execution state indexer used to ingest block execution data and index it by height.
@@ -27,15 +34,21 @@ type IndexerCore struct {
 // won't be initialized to ensure we have bootstrapped the storage first.
 func New(
 	log zerolog.Logger,
+	metrics module.ExecutionStateIndexerMetrics,
+	batcher bstorage.BatchBuilder,
 	registers storage.RegisterIndex,
 	headers storage.Headers,
 	events storage.Events,
+	results storage.LightTransactionResults,
 ) (*IndexerCore, error) {
 	return &IndexerCore{
+		log:       log.With().Str("component", "execution_indexer").Logger(),
+		metrics:   metrics,
+		batcher:   batcher,
 		registers: registers,
 		headers:   headers,
 		events:    events,
-		log:       log.With().Str("component", "execution_indexer").Logger(),
+		results:   results,
 	}, nil
 }
 
@@ -78,31 +91,67 @@ func (c *IndexerCore) IndexBlockData(data *execution_data.BlockExecutionDataEnti
 	// the height we are indexing must be exactly one bigger or same as the latest height indexed from the storage
 	latest := c.registers.LatestHeight()
 	if block.Height != latest+1 && block.Height != latest {
-		return fmt.Errorf("must store registers with the next height %d, but got %d", latest+1, block.Height)
+		return fmt.Errorf("must index block data with the next height %d, but got %d", latest+1, block.Height)
 	}
 	// allow rerunning the indexer for same height since we are fetching height from register storage, but there are other storages
 	// for indexing resources which might fail to update the values, so this enables rerunning and reindexing those resources
 	if block.Height == latest {
 		lg.Warn().Msg("reindexing block data")
+		c.metrics.BlockReindexed()
 	}
+
+	start := time.Now()
 
 	// concurrently process indexing of block data
 	g := errgroup.Group{}
 
+	// TODO: collections are currently indexed using the ingestion engine. In many cases, they are
+	// downloaded and indexed before the block is sealed. However, when a node is catching up, it
+	// may download the execution data first. In that case, we should index the collections here.
+
+	var eventCount, resultCount, registerCount int
 	g.Go(func() error {
+		start := time.Now()
+
 		events := make([]flow.Event, 0)
+		results := make([]flow.LightTransactionResult, 0)
 		for _, chunk := range data.ChunkExecutionDatas {
 			events = append(events, chunk.Events...)
+			results = append(results, chunk.TransactionResults...)
 		}
 
-		err := c.indexEvents(data.BlockID, events)
+		batch := bstorage.NewBatch(c.batcher)
+
+		err := c.events.BatchStore(data.BlockID, []flow.EventsList{events}, batch)
 		if err != nil {
 			return fmt.Errorf("could not index events at height %d: %w", block.Height, err)
 		}
+
+		err = c.results.BatchStore(data.BlockID, results, batch)
+		if err != nil {
+			return fmt.Errorf("could not index transaction results at height %d: %w", block.Height, err)
+		}
+
+		batch.Flush()
+		if err != nil {
+			return fmt.Errorf("batch flush error: %w", err)
+		}
+
+		eventCount = len(events)
+		resultCount = len(results)
+
+		lg.Debug().
+			Int("event_count", eventCount).
+			Int("result_count", resultCount).
+			Dur("duration_ms", time.Since(start)).
+			Msg("indexed badger data")
+
 		return nil
 	})
 
 	g.Go(func() error {
+		start := time.Now()
+
 		// we are iterating all the registers and overwrite any existing register at the same path
 		// this will make sure if we have multiple register changes only the last change will get persisted
 		// if block has two chucks:
@@ -129,8 +178,11 @@ func (c *IndexerCore) IndexBlockData(data *execution_data.BlockExecutionDataEnti
 			return fmt.Errorf("could not index register payloads at height %d: %w", block.Height, err)
 		}
 
+		registerCount = len(payloads)
+
 		lg.Debug().
-			Int("register_count", len(payloads)).
+			Int("register_count", registerCount).
+			Dur("duration_ms", time.Since(start)).
 			Msg("indexed registers")
 
 		return nil
@@ -140,13 +192,13 @@ func (c *IndexerCore) IndexBlockData(data *execution_data.BlockExecutionDataEnti
 	if err != nil {
 		return fmt.Errorf("failed to index block data at height %d: %w", block.Height, err)
 	}
-	return nil
-}
 
-func (c *IndexerCore) indexEvents(blockID flow.Identifier, events flow.EventsList) error {
-	// Note: the last chunk in an execution data is the system chunk. All events in that ChunkExecutionData are service events.
-	err := c.events.Store(blockID, []flow.EventsList{events})
-	return err
+	c.metrics.BlockIndexed(block.Height, time.Since(start), registerCount, eventCount, resultCount)
+	lg.Debug().
+		Dur("duration_ms", time.Since(start)).
+		Msg("indexed block data")
+
+	return nil
 }
 
 func (c *IndexerCore) indexRegisters(registers map[ledger.Path]*ledger.Payload, height uint64) error {
