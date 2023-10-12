@@ -198,7 +198,7 @@ func MigrateGroupConcurrently(
 	}()
 
 	// read job results
-	logAccount := moduleUtil.LogProgress("processing account group", accountGroups.Len(), log)
+	logAccount := moduleUtil.LogProgress(log, "processing account group", accountGroups.Len())
 
 	migrated := make([]*ledger.Payload, 0)
 	durations := newMigrationDurations(logTopNDurations)

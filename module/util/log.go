@@ -16,7 +16,7 @@ type LogProgressFunc func(add int)
 // comes first.
 // The returned function can be called concurrently.
 // An eta is also logged, but it assumes that the progress is linear.
-func LogProgress(msg string, total int, log zerolog.Logger) LogProgressFunc {
+func LogProgress(log zerolog.Logger, msg string, total int) LogProgressFunc {
 	nth := uint32(total / 10) // sample every 10% by default
 	if nth == 0 {
 		nth = 1

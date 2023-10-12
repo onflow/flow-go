@@ -13,7 +13,7 @@ func TestLogProgress40(t *testing.T) {
 	buf := bytes.NewBufferString("")
 	lg := zerolog.New(buf)
 	total := 40
-	logger := LogProgress("test", total, lg)
+	logger := LogProgress(lg, "test", total)
 	for i := 0; i < total; i++ {
 		logger(1)
 	}
@@ -41,7 +41,7 @@ func TestLogProgress1000(t *testing.T) {
 	for total := 11; total < 1000; total++ {
 		buf := bytes.NewBufferString("")
 		lg := zerolog.New(buf)
-		logger := LogProgress("test", total, lg)
+		logger := LogProgress(lg, "test", total)
 		for i := 0; i < total; i++ {
 			logger(1)
 		}

@@ -143,7 +143,7 @@ func cloneCricketMomentsShardedCollection(
 		return nil, err
 	}
 
-	progressLog := util2.LogProgress("cloning cricket moments", count, log)
+	progressLog := util2.LogProgress(log, "cloning cricket moments", count)
 
 	ctx, c := context.WithCancelCause(context.Background())
 	cancel := func(err error) {
@@ -222,9 +222,26 @@ func cloneCricketMomentsShardedCollection(
 		}
 	}()
 
+	type interpreterWithClose struct {
+		inter *interpreter.Interpreter
+		close func() error
+	}
+
+	interpreters := make([]interpreterWithClose, 0, nWorkers)
+
 	// workers for cloning values
 	for i := 0; i < nWorkers; i++ {
+
+		inter, c, err := mr.ChildInterpreter()
+		if err != nil {
+			return nil, err
+		}
+		interpreters = append(interpreters, interpreterWithClose{
+			inter: inter,
+			close: c,
+		})
 		go func(i int) {
+			inter := interpreters[i].inter
 			defer wg.Done()
 
 			storageMap := mr.GetReadOnlyStorage().GetStorageMap(mr.Address, domain, false)
@@ -235,11 +252,6 @@ func cloneCricketMomentsShardedCollection(
 				return
 			}
 
-			inter, commit, err := mr.ChildInterpreter()
-			if err != nil {
-				cancel(err)
-				return
-			}
 			inter.SharedState.Config.InvalidatedResourceValidationEnabled = false
 
 			for {
@@ -299,12 +311,6 @@ func cloneCricketMomentsShardedCollection(
 
 					progressLog(1)
 				}
-
-				err = commit()
-				if err != nil {
-					cancel(err)
-					return
-				}
 			}
 		}(i)
 	}
@@ -313,6 +319,16 @@ func cloneCricketMomentsShardedCollection(
 
 	if ctx.Err() != nil {
 		return nil, fmt.Errorf("context error when cloning values: %w", ctx.Err())
+	}
+
+	progressLog = util2.LogProgress(log, "closing child interpreters", len(interpreters))
+	// close all child interpreters
+	for _, i := range interpreters {
+		err := i.close()
+		if err != nil {
+			return nil, err
+		}
+		progressLog(1)
 	}
 
 	//progressLog = util2.LogProgress("removing cricket moments", len(clonedValues), log)
@@ -348,7 +364,7 @@ func cloneCricketMomentsShardedCollection(
 		return nil, err
 	}
 
-	progressLog = util2.LogProgress("setting cloned cricket moments", len(clonedValues), log)
+	progressLog = util2.LogProgress(log, "setting cloned cricket moments", len(clonedValues))
 	for _, clonedValue := range clonedValues {
 		ownedNFTs, err := getNftCollection(
 			mr.Interpreter,
@@ -430,7 +446,7 @@ func hashAllNftsInAllCollections(
 	if err != nil {
 		return nil, err
 	}
-	progressLog := util2.LogProgress("hashing cricket moments", count, log)
+	progressLog := util2.LogProgress(log, "hashing cricket moments", count)
 
 	ctx, c := context.WithCancelCause(context.Background())
 	cancel := func(err error) {
