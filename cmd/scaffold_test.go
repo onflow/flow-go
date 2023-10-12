@@ -28,6 +28,7 @@ import (
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/profiler"
+	"github.com/onflow/flow-go/network/p2p/p2pbuilder"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -728,4 +729,67 @@ type mockRoundTripper struct {
 
 func (m *mockRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 	return m.DoFunc(req)
+}
+
+// TestDhtSystemActivationStatus tests that the DHT system activation status is correctly
+// determined based on the role string.
+// This test is not exhaustive, but should cover the most common cases.
+func TestDhtSystemActivationStatus(t *testing.T) {
+	tests := []struct {
+		name      string
+		roleStr   string
+		expected  p2pbuilder.DhtSystemActivation
+		expectErr bool
+	}{
+		{
+			name:      "ghost role returns disabled",
+			roleStr:   "ghost",
+			expected:  p2pbuilder.DhtSystemDisabled,
+			expectErr: false,
+		},
+		{
+			name:      "access role returns enabled",
+			roleStr:   "access",
+			expected:  p2pbuilder.DhtSystemEnabled,
+			expectErr: false,
+		},
+		{
+			name:      "execution role returns enabled",
+			roleStr:   "execution",
+			expected:  p2pbuilder.DhtSystemEnabled,
+			expectErr: false,
+		},
+		{
+			name:      "collection role returns disabled",
+			roleStr:   "collection",
+			expected:  p2pbuilder.DhtSystemDisabled,
+			expectErr: false,
+		},
+		{
+			name:      "consensus role returns disabled",
+			roleStr:   "consensus",
+			expected:  p2pbuilder.DhtSystemDisabled,
+			expectErr: false,
+		},
+		{
+			name:      "verification nodes return disabled",
+			roleStr:   "verification",
+			expected:  p2pbuilder.DhtSystemDisabled,
+			expectErr: false,
+		},
+		{
+			name:      "invalid role returns error",
+			roleStr:   "invalidRole",
+			expected:  p2pbuilder.DhtSystemDisabled,
+			expectErr: true,
+		}, // Add more test cases for other roles, if needed.
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result, err := DhtSystemActivationStatus(tt.roleStr)
+			require.Equal(t, tt.expectErr, err != nil, "unexpected error status")
+			require.Equal(t, tt.expected, result, "unexpected activation status")
+		})
+	}
 }
