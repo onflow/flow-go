@@ -11,12 +11,12 @@
 
 // make sure flow crypto types are consistent with BLST types
 void types_sanity(void) {
-  assert(sizeof(vec256) == sizeof(Fr));
+  assert(sizeof(Fr) == sizeof(vec256));
   assert(sizeof(Fp) == sizeof(vec384));
-  assert(sizeof(vec384x) == sizeof(Fp2));
+  assert(sizeof(Fp2) == sizeof(vec384x));
   assert(sizeof(E1) == sizeof(POINTonE1));
   assert(sizeof(E2) == sizeof(POINTonE2));
-  assert(sizeof(vec384fp12) == sizeof(Fp12));
+  assert(sizeof(Fp12) == sizeof(vec384fp12));
 }
 
 // ------------------- Fr utilities
@@ -556,9 +556,9 @@ ERROR E1_read_bytes(E1 *a, const byte *in, const int in_len) {
 // https://www.ietf.org/archive/id/draft-irtf-cfrg-pairing-friendly-curves-08.html#name-zcash-serialization-format-)
 void E1_write_bytes(byte *out, const E1 *a) {
   if (E1_is_infty(a)) {
+    memset(out, 0, G1_SER_BYTES);
     // set the infinity bit
     out[0] = (G1_SERIALIZATION << 7) | (1 << 6);
-    memset(out + 1, 0, G1_SER_BYTES - 1);
     return;
   }
   E1 tmp;
@@ -620,8 +620,9 @@ int E1_sum_vector_byte(byte *out, const byte *in_bytes, const int in_len) {
   int n = in_len / G1_SER_BYTES; // number of signatures
 
   E1 *vec = (E1 *)malloc(n * sizeof(E1));
-  if (!vec)
+  if (!vec) {
     goto mem_error;
+  }
 
   // import the points from the array
   for (int i = 0; i < n; i++) {
