@@ -85,11 +85,19 @@ func (suite *BuilderSuite) SetupTest() {
 	// ensure we don't enter a new epoch for tests that build many blocks
 	result.ServiceEvents[0].Event.(*flow.EpochSetup).FinalView = root.Header.View + 100000
 	seal.ResultID = result.ID()
+	root.Payload.ProtocolStateID = inmem.ProtocolStateForBootstrapState(
+		result.ServiceEvents[0].Event.(*flow.EpochSetup),
+		result.ServiceEvents[1].Event.(*flow.EpochCommit),
+	).ID()
 	rootSnapshot, err := inmem.SnapshotFromBootstrapState(root, result, seal, unittest.QuorumCertificateFixture(unittest.QCWithRootBlockID(root.ID())))
 	require.NoError(suite.T(), err)
 	suite.epochCounter = rootSnapshot.Encodable().Epochs.Current.Counter
 
 	clusterQC := unittest.QuorumCertificateFixture(unittest.QCWithRootBlockID(suite.genesis.ID()))
+	root.Payload.ProtocolStateID = inmem.ProtocolStateForBootstrapState(
+		result.ServiceEvents[0].Event.(*flow.EpochSetup),
+		result.ServiceEvents[1].Event.(*flow.EpochCommit),
+	).ID()
 	clusterStateRoot, err := clusterkv.NewStateRoot(suite.genesis, clusterQC, suite.epochCounter)
 	suite.Require().NoError(err)
 	clusterState, err := clusterkv.Bootstrap(suite.db, clusterStateRoot)
@@ -280,8 +288,12 @@ func (suite *BuilderSuite) TestBuildOn_WithUnfinalizedReferenceBlock() {
 	// add an unfinalized block to the protocol state
 	genesis, err := suite.protoState.Final().Head()
 	suite.Require().NoError(err)
+	protocolState, err := suite.protoState.Final().ProtocolState()
+	suite.Require().NoError(err)
+	protocolStateID := protocolState.Entry().ID()
+
 	unfinalizedReferenceBlock := unittest.BlockWithParentFixture(genesis)
-	unfinalizedReferenceBlock.SetPayload(flow.EmptyPayload())
+	unfinalizedReferenceBlock.SetPayload(unittest.PayloadFixture(unittest.WithProtocolStateID(protocolStateID)))
 	err = suite.protoState.ExtendCertified(context.Background(), unfinalizedReferenceBlock,
 		unittest.CertifyBlock(unfinalizedReferenceBlock.Header))
 	suite.Require().NoError(err)
@@ -316,14 +328,18 @@ func (suite *BuilderSuite) TestBuildOn_WithOrphanedReferenceBlock() {
 	// add an orphaned block to the protocol state
 	genesis, err := suite.protoState.Final().Head()
 	suite.Require().NoError(err)
+	protocolState, err := suite.protoState.Final().ProtocolState()
+	suite.Require().NoError(err)
+	protocolStateID := protocolState.Entry().ID()
+
 	// create a block extending genesis which will be orphaned
 	orphan := unittest.BlockWithParentFixture(genesis)
-	orphan.SetPayload(flow.EmptyPayload())
+	orphan.SetPayload(unittest.PayloadFixture(unittest.WithProtocolStateID(protocolStateID)))
 	err = suite.protoState.ExtendCertified(context.Background(), orphan, unittest.CertifyBlock(orphan.Header))
 	suite.Require().NoError(err)
 	// create and finalize a block on top of genesis, orphaning `orphan`
 	block1 := unittest.BlockWithParentFixture(genesis)
-	block1.SetPayload(flow.EmptyPayload())
+	block1.SetPayload(unittest.PayloadFixture(unittest.WithProtocolStateID(protocolStateID)))
 	err = suite.protoState.ExtendCertified(context.Background(), block1, unittest.CertifyBlock(block1.Header))
 	suite.Require().NoError(err)
 	err = suite.protoState.Finalize(context.Background(), block1.ID())
@@ -626,13 +642,14 @@ func (suite *BuilderSuite) TestBuildOn_ExpiredTransaction() {
 	// create enough main-chain blocks that an expired transaction is possible
 	genesis, err := suite.protoState.Final().Head()
 	suite.Require().NoError(err)
+	protocolState, err := suite.protoState.Final().ProtocolState()
+	suite.Require().NoError(err)
+	protocolStateID := protocolState.Entry().ID()
 
 	head := genesis
 	for i := 0; i < flow.DefaultTransactionExpiry+1; i++ {
 		block := unittest.BlockWithParentFixture(head)
-		block.Payload.Guarantees = nil
-		block.Payload.Seals = nil
-		block.Header.PayloadHash = block.Payload.Hash()
+		block.SetPayload(unittest.PayloadFixture(unittest.WithProtocolStateID(protocolStateID)))
 		err = suite.protoState.ExtendCertified(context.Background(), block, unittest.CertifyBlock(block.Header))
 		suite.Require().NoError(err)
 		err = suite.protoState.Finalize(context.Background(), block.ID())

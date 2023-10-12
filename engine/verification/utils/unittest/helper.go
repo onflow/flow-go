@@ -3,6 +3,7 @@ package verificationtest
 import (
 	"context"
 	"fmt"
+	"github.com/onflow/flow-go/state/protocol/protocol_state"
 	"sync"
 	"testing"
 	"time"
@@ -487,6 +488,10 @@ func withConsumers(t *testing.T,
 	// hold any guarantees.
 	root, err := s.State.Final().Head()
 	require.NoError(t, err)
+	protocolState, err := s.State.Final().ProtocolState()
+	require.NoError(t, err)
+	protocolStateID := protocolState.Entry().ID()
+
 	chainID := root.ChainID
 	ops = append(ops, WithExecutorIDs(
 		participants.Filter(filter.HasRole(flow.RoleExecution)).NodeIDs()), func(builder *CompleteExecutionReceiptBuilder) {
@@ -498,7 +503,7 @@ func withConsumers(t *testing.T,
 	//  - root block (block[0]) is executed with sources[0] (included in QC of child block[1])
 	//  - block[i] is executed with sources[i] (included in QC of child block[i+1])
 	sources := unittest.RandomSourcesFixture(30)
-	completeERs := CompleteExecutionReceiptChainFixture(t, root, blockCount, sources, ops...)
+	completeERs := CompleteExecutionReceiptChainFixture(t, root, protocolStateID, blockCount, sources, ops...)
 	blocks := ExtendStateWithFinalizedBlocks(t, completeERs, s.State)
 
 	// chunk assignment
@@ -631,7 +636,14 @@ func bootstrapSystem(
 		verID = unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification))
 		identities = identities.Union(flow.IdentityList{verID})
 
-		epochBuilder := unittest.NewEpochBuilder(t, stateFixture.State)
+		mutator := protocol_state.NewMutator(
+			stateFixture.Storage.Headers,
+			stateFixture.Storage.Results,
+			stateFixture.Storage.Setups,
+			stateFixture.Storage.EpochCommits,
+			stateFixture.Storage.ProtocolState,
+			stateFixture.State.Params())
+		epochBuilder := unittest.NewEpochBuilder(t, mutator, stateFixture.State)
 		epochBuilder.
 			UsingSetupOpts(unittest.WithParticipants(identities)).
 			BuildEpoch()
