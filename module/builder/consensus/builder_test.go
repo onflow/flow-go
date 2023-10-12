@@ -68,13 +68,14 @@ type BuilderSuite struct {
 	setter   func(*flow.Header) error
 
 	// mocked dependencies
-	state      *protocol.ParticipantState
-	headerDB   *storage.Headers
-	sealDB     *storage.Seals
-	indexDB    *storage.Index
-	blockDB    *storage.Blocks
-	resultDB   *storage.ExecutionResults
-	receiptsDB *storage.ExecutionReceipts
+	state        *protocol.ParticipantState
+	headerDB     *storage.Headers
+	sealDB       *storage.Seals
+	indexDB      *storage.Index
+	blockDB      *storage.Blocks
+	resultDB     *storage.ExecutionResults
+	receiptsDB   *storage.ExecutionReceipts
+	stateMutator *protocol.StateMutator
 
 	guarPool *mempool.Guarantees
 	sealPool *mempool.IncorporatedResultSeals
@@ -409,6 +410,8 @@ func (bs *BuilderSuite) SetupTest() {
 		nil,
 	)
 
+	bs.stateMutator = protocol.NewStateMutator(bs.T())
+
 	// initialize the builder
 	bs.build, err = NewBuilder(
 		noopMetrics,
@@ -420,6 +423,7 @@ func (bs *BuilderSuite) SetupTest() {
 		bs.blockDB,
 		bs.resultDB,
 		bs.receiptsDB,
+		bs.stateMutator,
 		bs.guarPool,
 		bs.sealPool,
 		bs.recPool,
@@ -1431,6 +1435,7 @@ func (bs *BuilderSuite) TestIntegration_RepopulateExecutionTreeAtStartup() {
 		bs.blockDB,
 		bs.resultDB,
 		bs.receiptsDB,
+		bs.stateMutator,
 		bs.guarPool,
 		bs.sealPool,
 		recPool,

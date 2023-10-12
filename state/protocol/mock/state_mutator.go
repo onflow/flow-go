@@ -16,41 +16,79 @@ type StateMutator struct {
 	mock.Mock
 }
 
-// CommitProtocolState provides a mock function with given fields: updater
-func (_m *StateMutator) CommitProtocolState(updater protocol.StateUpdater) func(*transaction.Tx) error {
-	ret := _m.Called(updater)
+// ApplyServiceEvents provides a mock function with given fields: updater, seals
+func (_m *StateMutator) ApplyServiceEvents(updater protocol.StateUpdater, seals []*flow.Seal) ([]func(*transaction.Tx) error, error) {
+	ret := _m.Called(updater, seals)
+
+	var r0 []func(*transaction.Tx) error
+	var r1 error
+	if rf, ok := ret.Get(0).(func(protocol.StateUpdater, []*flow.Seal) ([]func(*transaction.Tx) error, error)); ok {
+		return rf(updater, seals)
+	}
+	if rf, ok := ret.Get(0).(func(protocol.StateUpdater, []*flow.Seal) []func(*transaction.Tx) error); ok {
+		r0 = rf(updater, seals)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]func(*transaction.Tx) error)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(protocol.StateUpdater, []*flow.Seal) error); ok {
+		r1 = rf(updater, seals)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// CommitProtocolState provides a mock function with given fields: blockID, updater
+func (_m *StateMutator) CommitProtocolState(blockID flow.Identifier, updater protocol.StateUpdater) (func(*transaction.Tx) error, flow.Identifier) {
+	ret := _m.Called(blockID, updater)
 
 	var r0 func(*transaction.Tx) error
-	if rf, ok := ret.Get(0).(func(protocol.StateUpdater) func(*transaction.Tx) error); ok {
-		r0 = rf(updater)
+	var r1 flow.Identifier
+	if rf, ok := ret.Get(0).(func(flow.Identifier, protocol.StateUpdater) (func(*transaction.Tx) error, flow.Identifier)); ok {
+		return rf(blockID, updater)
+	}
+	if rf, ok := ret.Get(0).(func(flow.Identifier, protocol.StateUpdater) func(*transaction.Tx) error); ok {
+		r0 = rf(blockID, updater)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(func(*transaction.Tx) error)
 		}
 	}
 
-	return r0
+	if rf, ok := ret.Get(1).(func(flow.Identifier, protocol.StateUpdater) flow.Identifier); ok {
+		r1 = rf(blockID, updater)
+	} else {
+		if ret.Get(1) != nil {
+			r1 = ret.Get(1).(flow.Identifier)
+		}
+	}
+
+	return r0, r1
 }
 
-// CreateUpdater provides a mock function with given fields: candidate
-func (_m *StateMutator) CreateUpdater(candidate *flow.Header) (protocol.StateUpdater, error) {
-	ret := _m.Called(candidate)
+// CreateUpdater provides a mock function with given fields: candidateView, parentID
+func (_m *StateMutator) CreateUpdater(candidateView uint64, parentID flow.Identifier) (protocol.StateUpdater, error) {
+	ret := _m.Called(candidateView, parentID)
 
 	var r0 protocol.StateUpdater
 	var r1 error
-	if rf, ok := ret.Get(0).(func(*flow.Header) (protocol.StateUpdater, error)); ok {
-		return rf(candidate)
+	if rf, ok := ret.Get(0).(func(uint64, flow.Identifier) (protocol.StateUpdater, error)); ok {
+		return rf(candidateView, parentID)
 	}
-	if rf, ok := ret.Get(0).(func(*flow.Header) protocol.StateUpdater); ok {
-		r0 = rf(candidate)
+	if rf, ok := ret.Get(0).(func(uint64, flow.Identifier) protocol.StateUpdater); ok {
+		r0 = rf(candidateView, parentID)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(protocol.StateUpdater)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(*flow.Header) error); ok {
-		r1 = rf(candidate)
+	if rf, ok := ret.Get(1).(func(uint64, flow.Identifier) error); ok {
+		r1 = rf(candidateView, parentID)
 	} else {
 		r1 = ret.Error(1)
 	}

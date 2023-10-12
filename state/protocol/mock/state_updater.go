@@ -12,22 +12,6 @@ type StateUpdater struct {
 	mock.Mock
 }
 
-// Block provides a mock function with given fields:
-func (_m *StateUpdater) Block() *flow.Header {
-	ret := _m.Called()
-
-	var r0 *flow.Header
-	if rf, ok := ret.Get(0).(func() *flow.Header); ok {
-		r0 = rf()
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*flow.Header)
-		}
-	}
-
-	return r0
-}
-
 // Build provides a mock function with given fields:
 func (_m *StateUpdater) Build() (*flow.ProtocolStateEntry, flow.Identifier, bool) {
 	ret := _m.Called()
@@ -135,6 +119,20 @@ func (_m *StateUpdater) UpdateIdentity(updated *flow.DynamicIdentityEntry) error
 		r0 = rf(updated)
 	} else {
 		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// View provides a mock function with given fields:
+func (_m *StateUpdater) View() uint64 {
+	ret := _m.Called()
+
+	var r0 uint64
+	if rf, ok := ret.Get(0).(func() uint64); ok {
+		r0 = rf()
+	} else {
+		r0 = ret.Get(0).(uint64)
 	}
 
 	return r0

@@ -25,21 +25,21 @@ import (
 // Builder is the builder for consensus block payloads. Upon providing a payload
 // hash, it also memorizes which entities were included into the payload.
 type Builder struct {
-	metrics              module.MempoolMetrics
-	tracer               module.Tracer
-	db                   *badger.DB
-	state                protocol.ParticipantState
-	seals                storage.Seals
-	headers              storage.Headers
-	index                storage.Index
-	blocks               storage.Blocks
-	resultsDB            storage.ExecutionResults
-	receiptsDB           storage.ExecutionReceipts
-	guarPool             mempool.Guarantees
-	sealPool             mempool.IncorporatedResultSeals
-	recPool              mempool.ExecutionTree
-	protocolStateMutator protocol.StateMutator
-	cfg                  Config
+	metrics           module.MempoolMetrics
+	tracer            module.Tracer
+	db                *badger.DB
+	state             protocol.ParticipantState
+	seals             storage.Seals
+	headers           storage.Headers
+	index             storage.Index
+	blocks            storage.Blocks
+	resultsDB         storage.ExecutionResults
+	receiptsDB        storage.ExecutionReceipts
+	guarPool          mempool.Guarantees
+	sealPool          mempool.IncorporatedResultSeals
+	recPool           mempool.ExecutionTree
+	protoStateMutator protocol.StateMutator
+	cfg               Config
 }
 
 // NewBuilder creates a new block builder.
@@ -53,6 +53,7 @@ func NewBuilder(
 	blocks storage.Blocks,
 	resultsDB storage.ExecutionResults,
 	receiptsDB storage.ExecutionReceipts,
+	protoStateMutator protocol.StateMutator,
 	guarPool mempool.Guarantees,
 	sealPool mempool.IncorporatedResultSeals,
 	recPool mempool.ExecutionTree,
@@ -80,20 +81,21 @@ func NewBuilder(
 	}
 
 	b := &Builder{
-		metrics:    metrics,
-		db:         db,
-		tracer:     tracer,
-		state:      state,
-		headers:    headers,
-		seals:      seals,
-		index:      index,
-		blocks:     blocks,
-		resultsDB:  resultsDB,
-		receiptsDB: receiptsDB,
-		guarPool:   guarPool,
-		sealPool:   sealPool,
-		recPool:    recPool,
-		cfg:        cfg,
+		metrics:           metrics,
+		db:                db,
+		tracer:            tracer,
+		state:             state,
+		headers:           headers,
+		seals:             seals,
+		index:             index,
+		blocks:            blocks,
+		resultsDB:         resultsDB,
+		receiptsDB:        receiptsDB,
+		guarPool:          guarPool,
+		sealPool:          sealPool,
+		recPool:           recPool,
+		protoStateMutator: protoStateMutator,
+		cfg:               cfg,
 	}
 
 	err = b.repopulateExecutionTree()
@@ -625,8 +627,8 @@ func (b *Builder) createProposal(parentID flow.Identifier,
 		PayloadHash: flow.ZeroID,
 	}
 
-	updater, err := b.protocolStateMutator.CreateUpdater(header.View, header.ParentID)
-	_, err = b.protocolStateMutator.ApplyServiceEvents(updater, seals)
+	updater, err := b.protoStateMutator.CreateUpdater(header.View, header.ParentID)
+	_, err = b.protoStateMutator.ApplyServiceEvents(updater, seals)
 
 	_, protocolStateID, _ := updater.Build()
 
