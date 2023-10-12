@@ -410,7 +410,18 @@ func (bs *BuilderSuite) SetupTest() {
 		nil,
 	)
 
+	// setup mock state mutator, we don't need a real once since we are using mocked participant state.
 	bs.stateMutator = protocol.NewStateMutator(bs.T())
+	bs.stateMutator.On("CreateUpdater", mock.Anything, mock.Anything).Return(
+		func(_ uint64, _ flow.Identifier) realproto.StateUpdater {
+			updater := protocol.NewStateUpdater(bs.T())
+			updater.On("Build").Return(nil, flow.Identifier{}, false)
+			return updater
+		}, func(_ uint64, _ flow.Identifier) error {
+			return nil
+		},
+	)
+	bs.stateMutator.On("ApplyServiceEvents", mock.Anything, mock.Anything).Return(nil, nil)
 
 	// initialize the builder
 	bs.build, err = NewBuilder(
