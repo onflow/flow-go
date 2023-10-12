@@ -18,6 +18,6 @@ type Builder interface {
 	// before returning it.
 	//
 	// NOTE: Since the block is stored within Builder, HotStuff MUST propose the
-	// block once BuildOn succcessfully returns.
+	// block once BuildOn successfully returns.
 	BuildOn(parentID flow.Identifier, setter func(*flow.Header) error, sign func(*flow.Header) error) (*flow.Header, error)
 }

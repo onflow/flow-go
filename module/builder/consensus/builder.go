@@ -630,7 +630,8 @@ func (b *Builder) createProposal(parentID flow.Identifier,
 		PayloadHash: flow.ZeroID,
 	}
 
-	// apply the custom fields setter of the consensus algorithm
+	// apply the custom fields setter of the consensus algorithm, we must do this before applying service events
+	// since we need to know the correct view of the block.
 	err = setter(header)
 	if err != nil {
 		return nil, fmt.Errorf("could not apply setter: %w", err)

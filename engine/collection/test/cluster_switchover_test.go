@@ -1,6 +1,7 @@
 package test
 
 import (
+	"github.com/onflow/flow-go/state/protocol/protocol_state"
 	"sync"
 	"testing"
 	"time"
@@ -96,6 +97,7 @@ func NewClusterSwitchoverTestCase(t *testing.T, conf ClusterSwitchoverTestConf) 
 	commit.ClusterQCs = rootClusterQCs
 
 	seal.ResultID = result.ID()
+	root.Payload.ProtocolStateID = inmem.ProtocolStateForBootstrapState(setup, commit).ID()
 	tc.root, err = inmem.SnapshotFromBootstrapState(root, result, seal, qc)
 	require.NoError(t, err)
 
@@ -121,9 +123,21 @@ func NewClusterSwitchoverTestCase(t *testing.T, conf ClusterSwitchoverTestConf) 
 	for _, node := range tc.nodes {
 		states = append(states, node.State)
 	}
+
+	// take first collection node and use its storage as data source for mutator
+	refNode := tc.nodes[0]
+	mutator := protocol_state.NewMutator(
+		refNode.Headers,
+		refNode.Results,
+		refNode.Setups,
+		refNode.EpochCommits,
+		refNode.ProtocolStateSnapshots,
+		refNode.State.Params(),
+	)
+
 	// when building new epoch we would like to replace fixture cluster QCs with real ones, for that we need
 	// to generate them using node infos
-	tc.builder = unittest.NewEpochBuilder(tc.T(), states...).UsingCommitOpts(func(commit *flow.EpochCommit) {
+	tc.builder = unittest.NewEpochBuilder(tc.T(), mutator, states...).UsingCommitOpts(func(commit *flow.EpochCommit) {
 		// build a lookup table for node infos
 		nodeInfoLookup := make(map[flow.Identifier]model.NodeInfo)
 		for _, nodeInfo := range nodeInfos {

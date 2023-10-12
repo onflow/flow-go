@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/onflow/flow-go/state/protocol/protocol_state"
 	"os"
 	"path/filepath"
 	"time"
@@ -722,6 +723,14 @@ func main() {
 			return ctl, nil
 		}).
 		Component("consensus participant", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+			protocolStateMutator := protocol_state.NewMutator(
+				node.Storage.Headers,
+				node.Storage.Results,
+				node.Storage.Setups,
+				node.Storage.EpochCommits,
+				node.Storage.ProtocolState,
+				node.State.Params(),
+			)
 			// initialize the block builder
 			var build module.Builder
 			build, err = builder.NewBuilder(
@@ -734,6 +743,7 @@ func main() {
 				node.Storage.Blocks,
 				node.Storage.Results,
 				node.Storage.Receipts,
+				protocolStateMutator,
 				guarantees,
 				seals,
 				receipts,
