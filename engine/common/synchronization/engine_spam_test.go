@@ -6,6 +6,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/onflow/flow-go/model/flow"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -47,11 +49,13 @@ func (ss *SyncSuite) TestLoad_Process_SyncRequest_HigherThanReceiver_OutsideTole
 		// if request height is higher than local finalized, we should not respond
 		req.Height = ss.head.Height + 1
 
-		// assert that HandleHeight, WithinTolerance are not called because misbehavior is reported
-		// also, check that response is never sent
-		ss.core.AssertNotCalled(ss.T(), "HandleHeight")
-		ss.core.AssertNotCalled(ss.T(), "WithinTolerance")
+		ss.core.On("HandleHeight", ss.head, req.Height)
+		ss.core.On("WithinTolerance", ss.head, req.Height).Return(false)
 		ss.con.AssertNotCalled(ss.T(), "Unicast", mock.Anything, mock.Anything)
+
+		// maybe function calls that might or might not occur over the course of the load test
+		ss.core.On("ScanPending", ss.head).Return([]chainsync.Range{}, []chainsync.Batch{}).Maybe()
+		ss.con.On("Multicast", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
 
 		// count misbehavior reports over the course of a load test
 		ss.con.On("ReportMisbehavior", mock.Anything).Return(mock.Anything).Run(
@@ -267,4 +271,107 @@ func (ss *SyncSuite) TestLoad_Process_RangeRequest_SometimesReportSpam() {
 
 		misbehaviorsCounter = 0 // reset counter for next subtest
 	}
+}
+
+// TestLoad_Process_BatchRequest_SometimesReportSpam is a load test that ensures that a misbehavior report is generated
+// an appropriate range of times when the base probability factor and number of block IDs are set to different values.
+func (ss *SyncSuite) TestLoad_Process_BatchRequest_SometimesReportSpam() {
+	ctx, cancel := irrecoverable.NewMockSignalerContextWithCancel(ss.T(), context.Background())
+	ss.e.Start(ctx)
+	unittest.AssertClosesBefore(ss.T(), ss.e.Ready(), time.Second)
+	defer cancel()
+
+	load := 1000
+
+	// each load test is a load group that contains a set of factors with unique values to test how many misbehavior reports are generated.
+	// Due to the probabilistic nature of how misbehavior reports are generated, we use an expected lower and
+	// upper range of expected misbehaviors to determine if the load test passed or failed. As long as the number of misbehavior reports
+	// falls within the expected range, the load test passes.
+	type loadGroup struct {
+		batchRequestBaseProb      float32
+		expectedMisbehaviorsLower int
+		expectedMisbehaviorsUpper int
+		blockIDs                  []flow.Identifier
+	}
+
+	loadGroups := []loadGroup{}
+
+	// using a very small batch request (1 block ID) with a 10% base probability factor, expect to almost never get misbehavior report, about 0.003% of the time (3 in 1000 requests)
+	// expected probability factor: 0.1 * ((10-9) + 1)/64 = 0.003125
+	loadGroups = append(loadGroups, loadGroup{0.1, 0, 15, repeatedBlockIDs(1)})
+
+	// using a small batch request (10 block IDs) with a 10% base probability factor, expect to get misbehavior report about 1.7% of the time (17 in 1000 requests)
+	// expected probability factor: 0.1 * ((11-1) + 1)/64 = 0.0171875
+	loadGroups = append(loadGroups, loadGroup{0.1, 5, 31, repeatedBlockIDs(10)})
+
+	// using a large batch request (99 block IDs) with a 10% base probability factor, expect to get misbehavior report about 15% of the time (150 in 1000 requests)
+	// expected probability factor: 0.1 * ((100-1) + 1)/64 = 0.15625
+	loadGroups = append(loadGroups, loadGroup{0.1, 110, 200, repeatedBlockIDs(99)})
+
+	// using a small batch request (10 block IDs) with a 1% base probability factor, expect to almost never get misbehavior report, about 0.17% of the time (2 in 1000 requests)
+	// expected probability factor: 0.01 * ((11-1) + 1)/64 = 0.00171875
+	loadGroups = append(loadGroups, loadGroup{0.01, 0, 7, repeatedBlockIDs(10)})
+
+	// using a very large batch request (999 block IDs) with a 1% base probability factor, expect to get misbehavior report about 15% of the time (150 in 1000 requests)
+	// expected probability factor: 0.01 * ((1000-1) + 1)/64 = 0.15625
+	loadGroups = append(loadGroups, loadGroup{0.01, 110, 200, repeatedBlockIDs(999)})
+
+	// ALWAYS REPORT SPAM FOR INVALID BATCH REQUESTS OR BATCH REQUESTS THAT ARE FAR OUTSIDE OF THE TOLERANCE
+
+	// using an empty batch request (0 block IDs) always results in a misbehavior report, no matter how small the base probability factor is
+	loadGroups = append(loadGroups, loadGroup{0.001, 1000, 1000, []flow.Identifier{}})
+
+	// using a very large batch request (999 block IDs) with a 10% base probability factor, expect to get misbehavior report 100% of the time (1000 in 1000 requests)
+	// expected probability factor: 0.1 * ((999 + 1)/64 = 1.5625
+	loadGroups = append(loadGroups, loadGroup{0.1, 1000, 1000, repeatedBlockIDs(999)})
+
+	// reset misbehavior report counter for each subtest
+	misbehaviorsCounter := 0
+
+	for _, loadGroup := range loadGroups {
+		for i := 0; i < load; i++ {
+			ss.T().Log("load iteration", i)
+
+			nonce, err := rand.Uint64()
+			require.NoError(ss.T(), err, "should generate nonce")
+
+			// generate origin and request message
+			originID := unittest.IdentifierFixture()
+			req := &messages.BatchRequest{
+				Nonce:    nonce,
+				BlockIDs: loadGroup.blockIDs,
+			}
+
+			// count misbehavior reports over the course of a load test
+			ss.con.On("ReportMisbehavior", mock.Anything).Return(mock.Anything).Maybe().Run(
+				func(args mock.Arguments) {
+					misbehaviorsCounter++
+				},
+			)
+			ss.e.spamDetectionConfig.batchRequestBaseProb = loadGroup.batchRequestBaseProb
+			require.NoError(ss.T(), ss.e.Process(channels.SyncCommittee, originID, req))
+		}
+		// check function call expectations at the end of the load test; otherwise, load test would take much longer
+		ss.core.AssertExpectations(ss.T())
+		ss.con.AssertExpectations(ss.T())
+
+		// check that correct range of misbehavior reports were generated
+		// since we're using a probabilistic approach to generate misbehavior reports, we can't guarantee the exact number,
+		// so we check that it's within an expected range
+		ss.T().Logf("misbehaviors counter after load test: %d (expected lower bound: %d expected upper bound: %d)", misbehaviorsCounter, loadGroup.expectedMisbehaviorsLower, loadGroup.expectedMisbehaviorsUpper)
+		assert.GreaterOrEqual(ss.T(), misbehaviorsCounter, loadGroup.expectedMisbehaviorsLower)
+		assert.LessOrEqual(ss.T(), misbehaviorsCounter, loadGroup.expectedMisbehaviorsUpper)
+
+		misbehaviorsCounter = 0 // reset counter for next subtest
+	}
+}
+
+func repeatedBlockIDs(n int) []flow.Identifier {
+	blockID := unittest.BlockFixture().ID()
+
+	arr := make([]flow.Identifier, n)
+	for i := 0; i < n; i++ {
+		arr[i] = blockID
+	}
+	return arr
 }
