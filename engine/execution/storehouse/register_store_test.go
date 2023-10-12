@@ -215,13 +215,17 @@ func TestRegisterStoreReadingFromDisk(t *testing.T) {
 		headerByHeight map[uint64]*flow.Header,
 	) {
 
-		// R <- 11 (X: 1, Y: 2) <- 12 (Y: 3)
+		// R <- 11 (X: 1, Y: 2) <- 12 (Y: 3) <- 13 (X: 4)
 		// save block 11
 		err := rs.SaveRegisters(headerByHeight[rootHeight+1], []flow.RegisterEntry{makeReg("X", "1"), makeReg("Y", "2")})
 		require.NoError(t, err)
 
 		// save block 12
 		err = rs.SaveRegisters(headerByHeight[rootHeight+2], []flow.RegisterEntry{makeReg("Y", "3")})
+		require.NoError(t, err)
+
+		// save block 13
+		err = rs.SaveRegisters(headerByHeight[rootHeight+3], []flow.RegisterEntry{makeReg("X", "4")})
 		require.NoError(t, err)
 
 		require.NoError(t, finalized.MockFinal(rootHeight+2))
@@ -236,6 +240,11 @@ func TestRegisterStoreReadingFromDisk(t *testing.T) {
 		require.NoError(t, err)
 		// value at block 12 is now stored in OnDiskRegisterStore, which is 1
 		require.Equal(t, makeReg("X", "1").Value, val)
+
+		val, err = rs.GetRegister(rootHeight+3, headerByHeight[rootHeight+3].ID(), makeReg("Y", "3").Key)
+		require.NoError(t, err)
+		// value at block 13 is now stored in OnDiskRegisterStore, which is 3
+		require.Equal(t, makeReg("Y", "3").Value, val)
 	})
 }
 
