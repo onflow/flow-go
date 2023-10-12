@@ -3,7 +3,6 @@ package state_stream_test
 import (
 	"context"
 	"fmt"
-	"github.com/stretchr/testify/suite"
 	"io"
 	"sync"
 	"testing"
@@ -24,6 +23,8 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
 	"github.com/onflow/flow-go/utils/unittest/generator"
+
+	"github.com/stretchr/testify/suite"
 )
 
 func TestHeartbeatResponseSuite(t *testing.T) {
