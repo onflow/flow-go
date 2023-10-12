@@ -166,7 +166,7 @@ func ServiceEventListToMessages(list flow.ServiceEventList) (
 	return entities, nil
 }
 
-// ServiceEventsToMessages converts a slice of flow.ServiceEvents to a slice of protobuf messages
+// MessagesToServiceEventList converts a slice of flow.ServiceEvents to a slice of protobuf messages
 func MessagesToServiceEventList(m []*entities.ServiceEvent) (
 	flow.ServiceEventList,
 	error,
@@ -184,6 +184,10 @@ func MessagesToServiceEventList(m []*entities.ServiceEvent) (
 
 // CcfPayloadToJsonPayload converts a CCF-encoded payload to a JSON-encoded payload
 func CcfPayloadToJsonPayload(p []byte) ([]byte, error) {
+	if len(p) == 0 {
+		return p, nil
+	}
+
 	val, err := ccf.Decode(nil, p)
 	if err != nil {
 		return nil, fmt.Errorf("unable to decode from ccf format: %w", err)

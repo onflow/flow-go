@@ -1084,7 +1084,7 @@ func (suite *Suite) TestGetEventsForBlockIDs() {
 		suite.Require().NoError(err)
 
 		// execute request
-		actual, err := backend.GetEventsForBlockIDs(ctx, string(flow.EventAccountCreated), blockIDs, &entitiesproto.EventEncodingVersionValue{Value: entitiesproto.EventEncodingVersion_CCF_V0})
+		actual, err := backend.GetEventsForBlockIDs(ctx, string(flow.EventAccountCreated), blockIDs, nil)
 		suite.checkResponse(actual, err)
 
 		suite.Require().Equal(expected, actual)
@@ -1386,7 +1386,7 @@ func (suite *Suite) TestGetEventsForHeightRange() {
 		suite.Require().NoError(err)
 
 		// execute request
-		actualResp, err := backend.GetEventsForHeightRange(ctx, string(flow.EventAccountCreated), minHeight, maxHeight, &entitiesproto.EventEncodingVersionValue{Value: entitiesproto.EventEncodingVersion_CCF_V0})
+		actualResp, err := backend.GetEventsForHeightRange(ctx, string(flow.EventAccountCreated), minHeight, maxHeight, nil)
 
 		// check response
 		suite.checkResponse(actualResp, err)
@@ -1414,7 +1414,7 @@ func (suite *Suite) TestGetEventsForHeightRange() {
 		backend, err := New(params)
 		suite.Require().NoError(err)
 
-		actualResp, err := backend.GetEventsForHeightRange(ctx, string(flow.EventAccountCreated), minHeight, maxHeight, &entitiesproto.EventEncodingVersionValue{Value: entitiesproto.EventEncodingVersion_CCF_V0})
+		actualResp, err := backend.GetEventsForHeightRange(ctx, string(flow.EventAccountCreated), minHeight, maxHeight, nil)
 		suite.checkResponse(actualResp, err)
 
 		suite.assertAllExpectations()
