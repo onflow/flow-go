@@ -25,4 +25,7 @@ var (
 	// ErrHeightNotIndexed is returned when data that is indexed sequentially is queried by a given block height
 	// and that data is unavailable.
 	ErrHeightNotIndexed = errors.New("data for block height not available")
+
+	// ErrNotBootstrapped is returned when the database has not been bootstrapped.
+	ErrNotBootstrapped = errors.New("pebble database not bootstrapped")
 )
