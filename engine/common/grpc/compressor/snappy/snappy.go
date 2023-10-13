@@ -19,15 +19,33 @@ func init() {
 	encoding.RegisterCompressor(c)
 }
 
-type writer struct {
-	*snappy.Writer
-	pool *sync.Pool
+type compressor struct {
+	poolCompressor   sync.Pool
+	poolDecompressor sync.Pool
+}
+
+func (c *compressor) Name() string {
+	return Name
 }
 
 func (c *compressor) Compress(w io.Writer) (io.WriteCloser, error) {
 	sw := c.poolCompressor.Get().(*writer)
 	sw.Reset(w)
 	return sw, nil
+}
+
+func (c *compressor) Decompress(r io.Reader) (io.Reader, error) {
+	sr, inPool := c.poolDecompressor.Get().(*reader)
+	if !inPool {
+		return snappy.NewReader(r), nil
+	}
+	sr.Reset(r)
+	return sr, nil
+}
+
+type writer struct {
+	*snappy.Writer
+	pool *sync.Pool
 }
 
 func (w *writer) Close() error {
@@ -46,22 +64,4 @@ func (r *reader) Read(p []byte) (n int, err error) {
 		r.pool.Put(r)
 	}
 	return n, err
-}
-
-func (c *compressor) Name() string {
-	return Name
-}
-
-func (c *compressor) Decompress(r io.Reader) (io.Reader, error) {
-	sr, inPool := c.poolDecompressor.Get().(*reader)
-	if !inPool {
-		return snappy.NewReader(r), nil
-	}
-	sr.Reset(r)
-	return sr, nil
-}
-
-type compressor struct {
-	poolCompressor   sync.Pool
-	poolDecompressor sync.Pool
 }

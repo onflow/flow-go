@@ -871,7 +871,7 @@ func (builder *FlowAccessNodeBuilder) extraFlags() {
 		flags.UintVar(&builder.rpcConf.BackendConfig.MaxHeightRange, "rpc-max-height-range", defaultConfig.rpcConf.BackendConfig.MaxHeightRange, "maximum size for height range requests")
 		flags.StringSliceVar(&builder.rpcConf.BackendConfig.PreferredExecutionNodeIDs, "preferred-execution-node-ids", defaultConfig.rpcConf.BackendConfig.PreferredExecutionNodeIDs, "comma separated list of execution nodes ids to choose from when making an upstream call e.g. b4a4dbdcd443d...,fb386a6a... etc.")
 		flags.StringSliceVar(&builder.rpcConf.BackendConfig.FixedExecutionNodeIDs, "fixed-execution-node-ids", defaultConfig.rpcConf.BackendConfig.FixedExecutionNodeIDs, "comma separated list of execution nodes ids to choose from when making an upstream call if no matching preferred execution id is found e.g. b4a4dbdcd443d...,fb386a6a... etc.")
-		flags.StringVar(&builder.rpcConf.CompressorName, "grpc-compressor", defaultConfig.rpcConf.CompressorName, "name of grpc compressor that will be used for requests to other nodes")
+		flags.StringVar(&builder.rpcConf.CompressorName, "grpc-compressor", defaultConfig.rpcConf.CompressorName, "name of grpc compressor that will be used for requests to other nodes. One of (gzip, snappy, deflate)")
 		flags.BoolVar(&builder.logTxTimeToFinalized, "log-tx-time-to-finalized", defaultConfig.logTxTimeToFinalized, "log transaction time to finalized")
 		flags.BoolVar(&builder.logTxTimeToExecuted, "log-tx-time-to-executed", defaultConfig.logTxTimeToExecuted, "log transaction time to executed")
 		flags.BoolVar(&builder.logTxTimeToFinalizedExecuted, "log-tx-time-to-finalized-executed", defaultConfig.logTxTimeToFinalizedExecuted, "log transaction time to finalized and executed")

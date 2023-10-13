@@ -13,14 +13,14 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/connectivity"
 	"google.golang.org/grpc/credentials/insecure"
-	_ "google.golang.org/grpc/encoding/gzip"
+	_ "google.golang.org/grpc/encoding/gzip" //required for gRPC compression
 	"google.golang.org/grpc/keepalive"
 	"google.golang.org/grpc/status"
 
-	_ "github.com/onflow/flow-go/engine/common/grpc/compressor/deflate"
-	_ "github.com/onflow/flow-go/engine/common/grpc/compressor/lz4"
-	_ "github.com/onflow/flow-go/engine/common/grpc/compressor/snappy"
+	_ "github.com/onflow/flow-go/engine/common/grpc/compressor/deflate" //required for gRPC compression
+	_ "github.com/onflow/flow-go/engine/common/grpc/compressor/snappy"  //required for gRPC compression
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/utils/grpcutils"
 )
 
 // DefaultClientTimeout is used when making a GRPC request to a collection node or an execution node.
@@ -216,7 +216,7 @@ func (m *Manager) createConnection(address string, timeout time.Duration, cached
 	opts = append(opts, grpc.WithKeepaliveParams(keepaliveParams))
 	opts = append(opts, grpc.WithChainUnaryInterceptor(connInterceptors...))
 
-	if clientType == ExecutionClient && len(m.compressorName) > 0 {
+	if m.compressorName != grpcutils.NoCompressor {
 		opts = append(opts, grpc.WithDefaultCallOptions(grpc.UseCompressor(m.compressorName)))
 	}
 
