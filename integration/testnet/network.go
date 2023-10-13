@@ -1089,24 +1089,6 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string, chainID fl
 	// generate root block
 	root := run.GenerateRootBlock(chainID, parentID, height, timestamp)
 
-	// generate QC
-	signerData, err := run.GenerateQCParticipantData(consensusNodes, consensusNodes, dkg)
-	if err != nil {
-		return nil, err
-	}
-	votes, err := run.GenerateRootBlockVotes(root, signerData)
-	if err != nil {
-		return nil, err
-	}
-	qc, invalidVotesErr, err := run.GenerateRootQC(root, votes, signerData, signerData.Identities())
-	if err != nil {
-		return nil, err
-	}
-
-	if len(invalidVotesErr) > 0 {
-		return nil, fmt.Errorf("has invalid votes: %v", invalidVotesErr)
-	}
-
 	// generate root blocks for each collector cluster
 	clusterRootBlocks, clusterAssignments, clusterQCs, err := setupClusterGenesisBlockQCs(networkConf.NClusters, epochCounter, stakedConfs)
 	if err != nil {
@@ -1156,6 +1138,8 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string, chainID fl
 		DKGGroupKey:        dkg.PubGroupKey,
 		DKGParticipantKeys: dkg.PubKeyShares,
 	}
+	root.SetPayload(unittest.PayloadFixture(unittest.WithProtocolStateID(
+		inmem.ProtocolStateForBootstrapState(epochSetup, epochCommit).ID())))
 
 	cdcRandomSource, err := cadence.NewString(hex.EncodeToString(randomSource))
 	if err != nil {
@@ -1198,6 +1182,24 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string, chainID fl
 	seal, err := run.GenerateRootSeal(result)
 	if err != nil {
 		return nil, fmt.Errorf("generating root seal failed: %w", err)
+	}
+
+	// generate QC
+	signerData, err := run.GenerateQCParticipantData(consensusNodes, consensusNodes, dkg)
+	if err != nil {
+		return nil, err
+	}
+	votes, err := run.GenerateRootBlockVotes(root, signerData)
+	if err != nil {
+		return nil, err
+	}
+	qc, invalidVotesErr, err := run.GenerateRootQC(root, votes, signerData, signerData.Identities())
+	if err != nil {
+		return nil, err
+	}
+
+	if len(invalidVotesErr) > 0 {
+		return nil, fmt.Errorf("has invalid votes: %v", invalidVotesErr)
 	}
 
 	snapshot, err := inmem.SnapshotFromBootstrapStateWithParams(root, result, seal, qc, flow.DefaultProtocolVersion, networkConf.EpochCommitSafetyThreshold)
