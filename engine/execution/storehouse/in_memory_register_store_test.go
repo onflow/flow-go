@@ -6,9 +6,10 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
-	"github.com/stretchr/testify/require"
 )
 
 // 1. SaveRegisters should fail if height is below or equal to pruned height
@@ -526,8 +527,8 @@ func TestConcurrentSaveAndGet(t *testing.T) {
 		))
 
 		// concurrently query get registers for past registers
+		wg.Add(1)
 		go func(i int) {
-			wg.Add(1)
 			defer wg.Done()
 
 			rdHeight := randBetween(pruned+1, pruned+uint64(i)+1)
@@ -538,8 +539,8 @@ func TestConcurrentSaveAndGet(t *testing.T) {
 		}(i)
 
 		// concurrently query updated registers
+		wg.Add(1)
 		go func(i int) {
-			wg.Add(1)
 			defer wg.Done()
 
 			rdHeight := randBetween(pruned+1, pruned+uint64(i)+1)
@@ -572,8 +573,8 @@ func TestConcurrentSaveAndPrune(t *testing.T) {
 	var wg sync.WaitGroup
 	savedHeights := make(chan uint64, 100)
 
+	wg.Add(1)
 	go func() {
-		wg.Add(1)
 		defer wg.Done()
 
 		lastPrunedHeight := pruned

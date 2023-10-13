@@ -5,13 +5,14 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/onflow/flow-go/engine/execution"
 	"github.com/onflow/flow-go/engine/execution/storehouse"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/pebble"
 	"github.com/onflow/flow-go/utils/unittest"
-	"github.com/stretchr/testify/require"
 )
 
 func withRegisterStore(t *testing.T, fn func(
@@ -180,7 +181,7 @@ func TestRegisterStoreIsBlockExecuted(t *testing.T) {
 
 		require.NoError(t, finalized.MockFinal(rootHeight+1))
 
-		rs.OnBlockFinalized() // notify 11 is finalized
+		require.NoError(t, rs.OnBlockFinalized()) // notify 11 is finalized
 
 		require.Equal(t, rootHeight+1, rs.FinalizedAndExecutedHeight())
 
@@ -229,7 +230,7 @@ func TestRegisterStoreReadingFromDisk(t *testing.T) {
 		require.NoError(t, err)
 
 		require.NoError(t, finalized.MockFinal(rootHeight+2))
-		rs.OnBlockFinalized() // notify 12 is finalized
+		require.NoError(t, rs.OnBlockFinalized()) // notify 12 is finalized
 
 		val, err := rs.GetRegister(rootHeight+1, headerByHeight[rootHeight+1].ID(), makeReg("Y", "2").Key)
 		require.NoError(t, err)
@@ -301,7 +302,7 @@ func TestRegisterStoreReadingFromInMemStore(t *testing.T) {
 
 		// finalizing 11 should prune block 11 fork, and won't be able to read register from block 11 fork
 		require.NoError(t, finalized.MockFinal(rootHeight+1))
-		rs.OnBlockFinalized() // notify 11 is finalized
+		require.NoError(t, rs.OnBlockFinalized()) // notify 11 is finalized
 
 		val, err = rs.GetRegister(rootHeight+1, block11Fork.ID(), makeReg("X", "4").Key)
 		require.Error(t, err, fmt.Sprintf("%v", val))
@@ -343,15 +344,15 @@ func TestRegisterStoreExecuteFirstFinalizeLater(t *testing.T) {
 		require.Equal(t, rootHeight, rs.FinalizedAndExecutedHeight())
 
 		require.NoError(t, finalized.MockFinal(rootHeight+1))
-		rs.OnBlockFinalized() // notify 11 is finalized
+		require.NoError(t, rs.OnBlockFinalized()) // notify 11 is finalized
 		require.Equal(t, rootHeight+1, rs.FinalizedAndExecutedHeight())
 
 		require.NoError(t, finalized.MockFinal(rootHeight+2))
-		rs.OnBlockFinalized() // notify 12 is finalized
+		require.NoError(t, rs.OnBlockFinalized()) // notify 12 is finalized
 		require.Equal(t, rootHeight+2, rs.FinalizedAndExecutedHeight())
 
 		require.NoError(t, finalized.MockFinal(rootHeight+3))
-		rs.OnBlockFinalized() // notify 13 is finalized
+		require.NoError(t, rs.OnBlockFinalized()) // notify 13 is finalized
 		require.Equal(t, rootHeight+3, rs.FinalizedAndExecutedHeight())
 	})
 }
@@ -374,15 +375,15 @@ func TestRegisterStoreFinalizeFirstExecuteLater(t *testing.T) {
 		headerByHeight map[uint64]*flow.Header,
 	) {
 		require.NoError(t, finalized.MockFinal(rootHeight+1))
-		rs.OnBlockFinalized() // notify 11 is finalized
+		require.NoError(t, rs.OnBlockFinalized()) // notify 11 is finalized
 		require.Equal(t, rootHeight, rs.FinalizedAndExecutedHeight(), fmt.Sprintf("FinalizedAndExecutedHeight: %d", rs.FinalizedAndExecutedHeight()))
 
 		require.NoError(t, finalized.MockFinal(rootHeight+2))
-		rs.OnBlockFinalized() // notify 12 is finalized
+		require.NoError(t, rs.OnBlockFinalized()) // notify 12 is finalized
 		require.Equal(t, rootHeight, rs.FinalizedAndExecutedHeight(), fmt.Sprintf("FinalizedAndExecutedHeight: %d", rs.FinalizedAndExecutedHeight()))
 
 		require.NoError(t, finalized.MockFinal(rootHeight+3))
-		rs.OnBlockFinalized() // notify 13 is finalized
+		require.NoError(t, rs.OnBlockFinalized()) // notify 13 is finalized
 		require.Equal(t, rootHeight, rs.FinalizedAndExecutedHeight())
 
 		// save block 11
