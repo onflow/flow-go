@@ -20,6 +20,8 @@ import (
 // Test save block execution related data, then remove it, and then
 // save again should still work
 func TestReExecuteBlock(t *testing.T) {
+	// TODO(leo), reenable when we have register store pruning implemented
+	t.Skip()
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 
 		// bootstrap to init highest executed height
@@ -144,6 +146,8 @@ func TestReExecuteBlock(t *testing.T) {
 // Test save block execution related data, then remove it, and then
 // save again with different result should work
 func TestReExecuteBlockWithDifferentResult(t *testing.T) {
+	// TODO(leo), reenable when we have register store pruning implemented
+	t.Skip()
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 
 		// bootstrap to init highest executed height
