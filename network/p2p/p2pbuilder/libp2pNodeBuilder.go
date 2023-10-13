@@ -446,6 +446,7 @@ func DefaultNodeBuilder(
 	uniCfg *p2pconfig.UnicastConfig,
 	connMgrConfig *netconf.ConnectionManagerConfig,
 	disallowListCacheCfg *p2p.DisallowListCacheConfig,
+	dhtSystemActivation DhtSystemActivation,
 ) (p2p.NodeBuilder, error) {
 
 	connManager, err := connection.NewConnManager(logger, metricsCfg.Metrics, connMgrConfig)
@@ -492,8 +493,8 @@ func DefaultNodeBuilder(
 		SetBasicResolver(resolver).
 		SetConnectionManager(connManager).
 		SetConnectionGater(connGater).
-		SetRateLimiterDistributor(uniCfg.RateLimiterDistributor)
-		SetCreateNode(DefaultCreateNodeFunc).
+		SetCreateNode(DefaultCreateNodeFunc)
+	SetRateLimiterDistributor(uniCfg.RateLimiterDistributor)
 
 	if gossipCfg.PeerScoring {
 		// In production, we never override the default scoring config.
@@ -510,7 +511,7 @@ func DefaultNodeBuilder(
 		}
 		builder.SetSubscriptionFilter(subscription.NewRoleBasedFilter(r, idProvider))
 
-		if routingSystemActivation == DhtSystemEnabled {
+		if dhtSystemActivation == DhtSystemEnabled {
 			builder.SetRoutingSystem(
 				func(ctx context.Context, host host.Host) (routing.Routing, error) {
 					return dht.NewDHT(ctx, host, protocols.FlowDHTProtocolID(sporkId), logger, metricsCfg.Metrics, dht.AsServer())
