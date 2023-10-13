@@ -26,7 +26,7 @@ import (
 
 func unicastManagerFixture(t *testing.T) (*unicast.Manager, *mockp2p.StreamFactory, *mockp2p.PeerConnections, unicast.DialConfigCache) {
 	streamFactory := mockp2p.NewStreamFactory(t)
-	streamFactory.On("SetStreamHandler", mock.Anything, mock.Anything).Return().Once()
+	streamFactory.On("SetStreamHandler", mock.AnythingOfType("protocol.ID"), mock.AnythingOfType("network.StreamHandler")).Return().Once()
 	connStatus := mockp2p.NewPeerConnections(t)
 
 	cfg, err := config.DefaultConfig()
