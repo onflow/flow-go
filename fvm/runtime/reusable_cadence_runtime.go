@@ -78,7 +78,7 @@ func NewReusableCadenceRuntime(rt runtime.Runtime, config runtime.Config) *Reusa
 		),
 	}
 
-	reusable.Declare(blockRandomSource)
+	reusable.DeclareValue(blockRandomSource)
 
 	return reusable
 }
