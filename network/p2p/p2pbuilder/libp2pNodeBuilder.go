@@ -494,7 +494,6 @@ func DefaultNodeBuilder(
 		SetConnectionManager(connManager).
 		SetConnectionGater(connGater).
 		SetCreateNode(DefaultCreateNodeFunc)
-	SetRateLimiterDistributor(uniCfg.RateLimiterDistributor)
 
 	if gossipCfg.PeerScoring {
 		// In production, we never override the default scoring config.
