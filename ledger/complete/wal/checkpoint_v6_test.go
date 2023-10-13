@@ -598,7 +598,7 @@ func TestReadCheckpointRootHash(t *testing.T) {
 		logger := unittest.Logger()
 		require.NoErrorf(t, StoreCheckpointV6Concurrently(tries, dir, fileName, logger), "fail to store checkpoint")
 
-		trieRoots, err := readTriesRootHash(dir, fileName, logger)
+		trieRoots, err := readTriesRootHash(logger, dir, fileName)
 		require.NoError(t, err)
 		for i, root := range trieRoots {
 			expectedHash := tries[i].RootHash()
@@ -615,7 +615,7 @@ func TestReadCheckpointRootHashMulti(t *testing.T) {
 		logger := unittest.Logger()
 		require.NoErrorf(t, StoreCheckpointV6Concurrently(tries, dir, fileName, logger), "fail to store checkpoint")
 
-		trieRoots, err := readTriesRootHash(dir, fileName, logger)
+		trieRoots, err := readTriesRootHash(logger, dir, fileName)
 		require.NoError(t, err)
 		for i, root := range trieRoots {
 			expectedHash := tries[i].RootHash()

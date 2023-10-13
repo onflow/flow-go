@@ -20,6 +20,8 @@ import (
 // ErrEOFNotReached for indicating end of file not reached error
 var ErrEOFNotReached = errors.New("expect to reach EOF, but actually didn't")
 
+var ReadTriesRootHash = readTriesRootHash
+
 // readCheckpointV6 reads checkpoint file from a main file and 17 file parts.
 // the main file stores:
 //   - version
@@ -632,7 +634,7 @@ func readTopLevelTries(dir string, fileName string, subtrieNodes [][]*node.Node,
 	return tries, nil
 }
 
-func readTriesRootHash(dir string, fileName string, logger zerolog.Logger) (
+func readTriesRootHash(logger zerolog.Logger, dir string, fileName string) (
 	trieRoots []ledger.RootHash,
 	errToReturn error,
 ) {
