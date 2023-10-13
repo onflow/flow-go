@@ -243,8 +243,11 @@ func TestRegisterStoreReadingFromDisk(t *testing.T) {
 
 		val, err = rs.GetRegister(rootHeight+3, headerByHeight[rootHeight+3].ID(), makeReg("Y", "3").Key)
 		require.NoError(t, err)
-		// value at block 13 is now stored in OnDiskRegisterStore, which is 3
+		// value at block 13 was stored in OnDiskRegisterStore at block 12, which is 3
 		require.Equal(t, makeReg("Y", "3").Value, val)
+
+		val, err = rs.GetRegister(rootHeight+4, headerByHeight[rootHeight+4].ID(), makeReg("Y", "3").Key)
+		require.Error(t, err)
 	})
 }
 

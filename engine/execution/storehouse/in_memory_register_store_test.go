@@ -100,7 +100,8 @@ func TestInMemoryRegisterStoreOK(t *testing.T) {
 	// unknown key
 	_, err = store.GetRegister(height, blockID, unknownKey)
 	require.Error(t, err)
-	require.ErrorIs(t, err, ErrPruned)
+	_, ok := IsErrPruned(err)
+	require.True(t, ok)
 
 	// unknown block with unknown height
 	_, err = store.GetRegister(height+1, unknownBlock, reg.Key)
@@ -115,7 +116,8 @@ func TestInMemoryRegisterStoreOK(t *testing.T) {
 	// too low height
 	_, err = store.GetRegister(height-1, unknownBlock, reg.Key)
 	require.Error(t, err)
-	require.ErrorIs(t, err, ErrPruned)
+	_, ok = IsErrPruned(err)
+	require.True(t, ok)
 }
 
 // 3. SaveRegisters should fail if the block is already saved
@@ -264,7 +266,8 @@ func TestInMemoryRegisterStoreGetLatestValueOK(t *testing.T) {
 
 	val, err = store.GetRegister(pruned+2, blockB, unknownKey)
 	require.Error(t, err)
-	require.ErrorIs(t, err, ErrPruned) // unknown key
+	_, ok := IsErrPruned(err)
+	require.True(t, ok)
 
 	val, err = store.GetRegister(pruned+3, unittest.IdentifierFixture(), regX.Key)
 	require.Error(t, err)
@@ -420,7 +423,8 @@ func TestInMemoryRegisterStorePrune(t *testing.T) {
 
 	val, err = store.GetRegister(pruned+1, blockA, reg.Key) // A is pruned
 	require.Error(t, err)
-	require.ErrorIs(t, err, ErrPruned)
+	_, ok := IsErrPruned(err)
+	require.True(t, ok)
 
 	err = store.Prune(pruned+3, blockC) // prune both B and C
 	require.NoError(t, err)
@@ -591,7 +595,14 @@ func TestConcurrentSaveAndPrune(t *testing.T) {
 	close(savedHeights)
 
 	wg.Wait()
+}
 
+func TestErrPruned(t *testing.T) {
+	e := NewErrPruned(1, 2)
+	pe, ok := IsErrPruned(e)
+	require.True(t, ok)
+	require.Equal(t, uint64(1), pe.Height)
+	require.Equal(t, uint64(2), pe.PrunedHeight)
 }
 
 func randBetween(min, max uint64) uint64 {
