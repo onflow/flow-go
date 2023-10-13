@@ -52,7 +52,17 @@ cmd/util/util:
 
 .PHONY: update-core-contracts-version
 update-core-contracts-version:
+	# updates the core-contracts version in all of the go.mod files
+	# usage example: CC_VERSION=0.16.0 make update-core-contracts-version
 	./scripts/update-core-contracts.sh $(CC_VERSION)
+	make tidy
+
+.PHONY: update-cadence-version
+update-cadence-version:
+	# updates the cadence version in all of the go.mod files
+	# usage example: CC_VERSION=0.16.0 make update-cadence-version
+	./scripts/update-cadence.sh $(CC_VERSION)
+	make tidy
 
 ############################################################################################
 # CAUTION: DO NOT MODIFY THESE TARGETS! DOING SO WILL BREAK THE FLAKY TEST MONITOR
@@ -160,7 +170,7 @@ generate-mocks: install-mock-generators
 	mockery --name 'ExecutionState' --dir=engine/execution/state --case=underscore --output="engine/execution/state/mock" --outpkg="mock"
 	mockery --name 'BlockComputer' --dir=engine/execution/computation/computer --case=underscore --output="engine/execution/computation/computer/mock" --outpkg="mock"
 	mockery --name 'ComputationManager' --dir=engine/execution/computation --case=underscore --output="engine/execution/computation/mock" --outpkg="mock"
-	mockery --name 'Executor' --dir=engine/execution/computation/query --case=underscore --output="engine/execution/computation/query/mock" --outpkg="mock"
+	mockery --name '.*' --dir=engine/execution/computation/query --case=underscore --output="engine/execution/computation/query/mock" --outpkg="mock"
 	mockery --name 'EpochComponentsFactory' --dir=engine/collection/epochmgr --case=underscore --output="engine/collection/epochmgr/mock" --outpkg="mock"
 	mockery --name 'Backend' --dir=engine/collection/rpc --case=underscore --output="engine/collection/rpc/mock" --outpkg="mock"
 	mockery --name 'ProviderEngine' --dir=engine/execution/provider --case=underscore --output="engine/execution/provider/mock" --outpkg="mock"

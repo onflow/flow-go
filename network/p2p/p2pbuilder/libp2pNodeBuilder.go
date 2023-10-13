@@ -46,6 +46,13 @@ import (
 	"github.com/onflow/flow-go/network/p2p/utils"
 )
 
+type DhtSystemActivation bool
+
+const (
+	DhtSystemEnabled  DhtSystemActivation = true
+	DhtSystemDisabled DhtSystemActivation = false
+)
+
 type LibP2PNodeBuilder struct {
 	gossipSubBuilder p2p.GossipSubBuilder
 	sporkId          flow.Identifier
@@ -184,32 +191,8 @@ func (builder *LibP2PNodeBuilder) OverrideDefaultRpcInspectorSuiteFactory(factor
 	return builder
 }
 
-// buildRouting creates a new routing system factory for a libp2p node using the provided host.
-// It returns the newly created routing system and any errors encountered during its creation.
-//
-// Arguments:
-// - ctx: a context.Context object used to manage the lifecycle of the node.
-// - h: a libp2p host.Host object used to initialize the routing system.
-//
-// Returns:
-// - routing.Routing: a routing system for the libp2p node.
-// - error: if an error occurs during the creation of the routing system, it is returned. Otherwise, nil is returned.
-// Note that on happy path, the returned error is nil. Any non-nil error indicates that the routing system could not be created
-// and is non-recoverable. In case of an error the node should be stopped.
-func (builder *LibP2PNodeBuilder) buildRouting(ctx context.Context, h host.Host) (routing.Routing, error) {
-	routingSystem, err := builder.routingFactory(ctx, h)
-	if err != nil {
-		return nil, fmt.Errorf("could not create libp2p node routing system: %w", err)
-	}
-	return routingSystem, nil
-}
-
 // Build creates a new libp2p node using the configured options.
 func (builder *LibP2PNodeBuilder) Build() (p2p.LibP2PNode, error) {
-	if builder.routingFactory == nil {
-		return nil, errors.New("routing system factory is not set")
-	}
-
 	var opts []libp2p.Option
 
 	if builder.basicResolver != nil {
@@ -281,12 +264,13 @@ func (builder *LibP2PNodeBuilder) Build() (p2p.LibP2PNode, error) {
 		if err != nil {
 			return nil, fmt.Errorf("failed to create libp2p connector: %w", err)
 		}
-		peerUpdater, err := connection.NewPeerUpdater(&connection.PeerUpdaterConfig{
-			PruneConnections: builder.peerManagerConfig.ConnectionPruning,
-			Logger:           builder.logger,
-			Host:             connection.NewConnectorHost(h),
-			Connector:        connector,
-		})
+		peerUpdater, err := connection.NewPeerUpdater(
+			&connection.PeerUpdaterConfig{
+				PruneConnections: builder.peerManagerConfig.ConnectionPruning,
+				Logger:           builder.logger,
+				Host:             connection.NewConnectorHost(h),
+				Connector:        connector,
+			})
 		if err != nil {
 			return nil, fmt.Errorf("failed to create libp2p connector: %w", err)
 		}
@@ -330,40 +314,45 @@ func (builder *LibP2PNodeBuilder) Build() (p2p.LibP2PNode, error) {
 	node.SetUnicastManager(unicastManager)
 
 	cm := component.NewComponentManagerBuilder().
-		AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
-			// routing system is created here, because it needs to be created during the node startup.
-			routingSystem, err := builder.buildRouting(ctx, h)
-			if err != nil {
-				ctx.Throw(fmt.Errorf("could not create routing system: %w", err))
-			}
-			node.SetRouting(routingSystem)
-			builder.gossipSubBuilder.SetRoutingSystem(routingSystem)
-
-			// gossipsub is created here, because it needs to be created during the node startup.
-			gossipSub, err := builder.gossipSubBuilder.Build(ctx)
-			if err != nil {
-				ctx.Throw(fmt.Errorf("could not create gossipsub: %w", err))
-			}
-			node.SetPubSub(gossipSub)
-			gossipSub.Start(ctx)
-			ready()
-
-			<-gossipSub.Done()
-		}).
-		AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
-			// encapsulates shutdown logic for the libp2p node.
-			ready()
-			<-ctx.Done()
-			// we wait till the context is done, and then we stop the libp2p node.
-
-			err = node.Stop()
-			if err != nil {
-				// ignore context cancellation errors
-				if !errors.Is(err, context.Canceled) && !errors.Is(err, context.DeadlineExceeded) {
-					ctx.Throw(fmt.Errorf("could not stop libp2p node: %w", err))
+		AddWorker(
+			func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+				if builder.routingFactory != nil {
+					routingSystem, err := builder.routingFactory(ctx, h)
+					if err != nil {
+						ctx.Throw(fmt.Errorf("could not create routing system: %w", err))
+					}
+					if err := node.SetRouting(routingSystem); err != nil {
+						ctx.Throw(fmt.Errorf("could not set routing system: %w", err))
+					}
+					builder.gossipSubBuilder.SetRoutingSystem(routingSystem)
+					builder.logger.Debug().Msg("routing system created")
 				}
-			}
-		})
+				// gossipsub is created here, because it needs to be created during the node startup.
+				gossipSub, err := builder.gossipSubBuilder.Build(ctx)
+				if err != nil {
+					ctx.Throw(fmt.Errorf("could not create gossipsub: %w", err))
+				}
+				node.SetPubSub(gossipSub)
+				gossipSub.Start(ctx)
+				ready()
+
+				<-gossipSub.Done()
+			}).
+		AddWorker(
+			func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+				// encapsulates shutdown logic for the libp2p node.
+				ready()
+				<-ctx.Done()
+				// we wait till the context is done, and then we stop the libp2p node.
+
+				err = node.Stop()
+				if err != nil {
+					// ignore context cancellation errors
+					if !errors.Is(err, context.Canceled) && !errors.Is(err, context.DeadlineExceeded) {
+						ctx.Throw(fmt.Errorf("could not stop libp2p node: %w", err))
+					}
+				}
+			})
 
 	node.SetComponentManager(cm.Build())
 
@@ -412,9 +401,10 @@ func defaultLibP2POptions(address string, key fcrypto.PrivateKey) ([]config.Opti
 	// While this sounds great, it intermittently causes a 'broken pipe' error
 	// as the 1-k discovery process and the 1-1 messaging both sometimes attempt to open connection to the same target
 	// As of now there is no requirement of client sockets to be a well-known port, so disabling port reuse all together.
-	t := libp2p.Transport(func(u transport.Upgrader) (*tcp.TcpTransport, error) {
-		return tcp.NewTCPTransport(u, nil, tcp.DisableReuseport())
-	})
+	t := libp2p.Transport(
+		func(u transport.Upgrader) (*tcp.TcpTransport, error) {
+			return tcp.NewTCPTransport(u, nil, tcp.DisableReuseport())
+		})
 
 	// gather all the options for the libp2p node
 	options := []config.Option{
@@ -467,7 +457,8 @@ func DefaultNodeBuilder(
 	peerFilter := notEjectedPeerFilter(idProvider)
 	peerFilters := []p2p.PeerFilter{peerFilter}
 
-	connGater := connection.NewConnGater(logger,
+	connGater := connection.NewConnGater(
+		logger,
 		idProvider,
 		connection.WithOnInterceptPeerDialFilters(append(peerFilters, connGaterCfg.InterceptPeerDialFilters...)),
 		connection.WithOnInterceptSecuredFilters(append(peerFilters, connGaterCfg.InterceptSecuredFilters...)))
@@ -501,10 +492,8 @@ func DefaultNodeBuilder(
 		SetBasicResolver(resolver).
 		SetConnectionManager(connManager).
 		SetConnectionGater(connGater).
-		SetRoutingSystem(func(ctx context.Context, host host.Host) (routing.Routing, error) {
-			return dht.NewDHT(ctx, host, protocols.FlowDHTProtocolID(sporkId), logger, metricsCfg.Metrics, dht.AsServer())
-		}).
-		SetCreateNode(DefaultCreateNodeFunc)
+		SetRateLimiterDistributor(uniCfg.RateLimiterDistributor)
+		SetCreateNode(DefaultCreateNodeFunc).
 
 	if gossipCfg.PeerScoring {
 		// In production, we never override the default scoring config.
@@ -515,8 +504,18 @@ func DefaultNodeBuilder(
 	builder.SetGossipSubScoreTracerInterval(gossipCfg.ScoreTracerInterval)
 
 	if role != "ghost" {
-		r, _ := flow.ParseRole(role)
+		r, err := flow.ParseRole(role)
+		if err != nil {
+			return nil, fmt.Errorf("could not parse role: %w", err)
+		}
 		builder.SetSubscriptionFilter(subscription.NewRoleBasedFilter(r, idProvider))
+
+		if routingSystemActivation == DhtSystemEnabled {
+			builder.SetRoutingSystem(
+				func(ctx context.Context, host host.Host) (routing.Routing, error) {
+					return dht.NewDHT(ctx, host, protocols.FlowDHTProtocolID(sporkId), logger, metricsCfg.Metrics, dht.AsServer())
+				})
+		}
 	}
 
 	return builder, nil

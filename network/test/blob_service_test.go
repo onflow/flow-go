@@ -83,15 +83,18 @@ func (suite *BlobServiceTestSuite) SetupTest() {
 	signalerCtx := irrecoverable.NewMockSignalerContext(suite.T(), ctx)
 
 	sporkId := unittest.IdentifierFixture()
-	ids, nodes := testutils.LibP2PNodeForNetworkFixture(suite.T(),
+	ids, nodes := testutils.LibP2PNodeForNetworkFixture(
+		suite.T(),
 		sporkId,
 		suite.numNodes,
+		p2ptest.WithRole(flow.RoleExecution),
 		p2ptest.WithDHTOptions(dht.AsServer()),
-		p2ptest.WithPeerManagerEnabled(&p2pconfig.PeerManagerConfig{
-			UpdateInterval:    1 * time.Second,
-			ConnectionPruning: true,
-			ConnectorFactory:  connection.DefaultLibp2pBackoffConnectorFactory(),
-		}, nil))
+		p2ptest.WithPeerManagerEnabled(
+			&p2pconfig.PeerManagerConfig{
+				UpdateInterval:    1 * time.Second,
+				ConnectionPruning: true,
+				ConnectorFactory:  connection.DefaultLibp2pBackoffConnectorFactory(),
+			}, nil))
 
 	suite.networks, _ = testutils.NetworksFixture(suite.T(), sporkId, ids, nodes)
 	// starts the nodes and networks
@@ -117,18 +120,19 @@ func (suite *BlobServiceTestSuite) SetupTest() {
 
 	// let nodes connect to each other only after they are all listening on Bitswap
 	topologyActive.Store(true)
-	suite.Require().Eventually(func() bool {
-		for i, libp2pNode := range nodes {
-			for j := i + 1; j < suite.numNodes; j++ {
-				connected, err := libp2pNode.IsConnected(nodes[j].ID())
-				require.NoError(suite.T(), err)
-				if !connected {
-					return false
+	suite.Require().Eventually(
+		func() bool {
+			for i, libp2pNode := range nodes {
+				for j := i + 1; j < suite.numNodes; j++ {
+					connected, err := libp2pNode.IsConnected(nodes[j].ID())
+					require.NoError(suite.T(), err)
+					if !connected {
+						return false
+					}
 				}
 			}
-		}
-		return true
-	}, 3*time.Second, 100*time.Millisecond)
+			return true
+		}, 3*time.Second, 100*time.Millisecond)
 }
 
 func (suite *BlobServiceTestSuite) TearDownTest() {
@@ -217,18 +221,19 @@ func (suite *BlobServiceTestSuite) TestHas() {
 	}
 
 	// check that blobs are not received until Has is called by the server
-	suite.Require().Never(func() bool {
-		for _, blobChan := range blobChans {
-			select {
-			case _, ok := <-blobChan:
-				if ok {
-					return true
+	suite.Require().Never(
+		func() bool {
+			for _, blobChan := range blobChans {
+				select {
+				case _, ok := <-blobChan:
+					if ok {
+						return true
+					}
+				default:
 				}
-			default:
 			}
-		}
-		return false
-	}, time.Second, 100*time.Millisecond)
+			return false
+		}, time.Second, 100*time.Millisecond)
 
 	for i, bex := range suite.blobServices {
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)

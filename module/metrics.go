@@ -571,6 +571,14 @@ type ExecutionDataRequesterMetrics interface {
 	FetchRetried()
 }
 
+type ExecutionStateIndexerMetrics interface {
+	// BlockIndexed records metrics from indexing execution data from a single block.
+	BlockIndexed(height uint64, duration time.Duration, events, registers, transactionResults int)
+
+	// BlockReindexed records that a previously indexed block was indexed again.
+	BlockReindexed()
+}
+
 type RuntimeMetrics interface {
 	// RuntimeTransactionParsed reports the time spent parsing a single transaction
 	RuntimeTransactionParsed(dur time.Duration)

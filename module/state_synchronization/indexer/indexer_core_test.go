@@ -14,14 +14,13 @@ import (
 	mocks "github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	"github.com/onflow/flow-go/fvm"
-	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/convert"
 	"github.com/onflow/flow-go/ledger/common/pathfinder"
 	"github.com/onflow/flow-go/ledger/complete"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
+	"github.com/onflow/flow-go/module/metrics"
 	synctest "github.com/onflow/flow-go/module/state_synchronization/requester/unittest"
 	"github.com/onflow/flow-go/storage"
 	storagemock "github.com/onflow/flow-go/storage/mock"
@@ -155,7 +154,7 @@ func (i *indexCoreTest) initIndexer() *indexCoreTest {
 		require.NoError(i.t, os.RemoveAll(dbDir))
 	})
 
-	indexer, err := New(zerolog.New(os.Stdout), db, i.registers, i.headers, i.events, i.results)
+	indexer, err := New(zerolog.New(os.Stdout), metrics.NewNoopCollector(), db, i.registers, i.headers, i.events, i.results)
 	require.NoError(i.t, err)
 	i.indexer = indexer
 	return i
@@ -172,7 +171,7 @@ func (i *indexCoreTest) runGetRegisters(IDs flow.RegisterIDs, height uint64) ([]
 }
 
 func TestExecutionState_IndexBlockData(t *testing.T) {
-	blocks := blocksFixture(5)
+	blocks := unittest.BlockchainFixture(5)
 	block := blocks[len(blocks)-1]
 
 	// this test makes sure the index block data is correctly calling store register with the
@@ -418,13 +417,13 @@ func TestExecutionState_IndexBlockData(t *testing.T) {
 			}).
 			runIndexBlockData()
 
-		assert.EqualError(t, err, fmt.Sprintf("must store registers with the next height %d, but got %d", latestHeight+1, last.Header.Height))
+		assert.EqualError(t, err, fmt.Sprintf("must index block data with the next height %d, but got %d", latestHeight+1, last.Header.Height))
 	})
 
 	// this test makes sure that if a block we try to index is not found in block storage
 	// we get correct error.
 	t.Run("Unknown block ID", func(t *testing.T) {
-		unknownBlock := blocksFixture(1)[0]
+		unknownBlock := unittest.BlockFixture()
 		ed := &execution_data.BlockExecutionData{
 			BlockID: unknownBlock.Header.ID(),
 		}
@@ -439,7 +438,7 @@ func TestExecutionState_IndexBlockData(t *testing.T) {
 
 func TestExecutionState_RegisterValues(t *testing.T) {
 	t.Run("Get value for single register", func(t *testing.T) {
-		blocks := blocksFixture(5)
+		blocks := unittest.BlockchainFixture(5)
 		height := blocks[1].Header.Height
 		ids := []flow.RegisterID{{
 			Owner: "1",
@@ -466,57 +465,6 @@ func newBlockHeadersStorage(blocks []*flow.Block) storage.Headers {
 	}
 
 	return synctest.MockBlockHeaderStorage(synctest.WithByID(blocksByID))
-}
-
-func blocksFixture(n int) []*flow.Block {
-	blocks := make([]*flow.Block, n)
-
-	genesis := unittest.BlockFixture()
-	blocks[0] = &genesis
-	for i := 1; i < n; i++ {
-		blocks[i] = unittest.BlockWithParentFixture(blocks[i-1].Header)
-	}
-
-	return blocks
-}
-
-func bootstrapTrieUpdates() *ledger.TrieUpdate {
-	opts := []fvm.Option{
-		fvm.WithChain(flow.Testnet.Chain()),
-	}
-	ctx := fvm.NewContext(opts...)
-	vm := fvm.NewVirtualMachine()
-
-	snapshotTree := snapshot.NewSnapshotTree(nil)
-
-	bootstrapOpts := []fvm.BootstrapProcedureOption{
-		fvm.WithInitialTokenSupply(unittest.GenesisTokenSupply),
-	}
-
-	executionSnapshot, _, _ := vm.Run(
-		ctx,
-		fvm.Bootstrap(unittest.ServiceAccountPublicKey, bootstrapOpts...),
-		snapshotTree)
-
-	payloads := make([]*ledger.Payload, 0)
-	for regID, regVal := range executionSnapshot.WriteSet {
-		key := ledger.Key{
-			KeyParts: []ledger.KeyPart{
-				{
-					Type:  convert.KeyPartOwner,
-					Value: []byte(regID.Owner),
-				},
-				{
-					Type:  convert.KeyPartKey,
-					Value: []byte(regID.Key),
-				},
-			},
-		}
-
-		payloads = append(payloads, ledger.NewPayload(key, regVal))
-	}
-
-	return trieUpdateWithPayloadsFixture(payloads)
 }
 
 func trieUpdateWithPayloadsFixture(payloads []*ledger.Payload) *ledger.TrieUpdate {
@@ -601,10 +549,13 @@ func TestIndexerIntegration_StoreAndGet(t *testing.T) {
 		require.NoError(t, os.RemoveAll(dbDir))
 	})
 
+	logger := zerolog.Nop()
+	metrics := metrics.NewNoopCollector()
+
 	// this test makes sure index values for a single register are correctly updated and always last value is returned
 	t.Run("Single Index Value Changes", func(t *testing.T) {
 		pebbleStorage.RunWithRegistersStorageAtInitialHeights(t, 0, 0, func(registers *pebbleStorage.Registers) {
-			index, err := New(zerolog.Nop(), db, registers, nil, nil, nil)
+			index, err := New(logger, metrics, db, registers, nil, nil, nil)
 			require.NoError(t, err)
 
 			values := [][]byte{[]byte("1"), []byte("1"), []byte("2"), []byte("3") /*nil,*/, []byte("4")}
@@ -631,7 +582,7 @@ func TestIndexerIntegration_StoreAndGet(t *testing.T) {
 	// e.g. we index A{h(1) -> X}, A{h(2) -> Y}, when we request h(4) we get value Y
 	t.Run("Single Index Value At Later Heights", func(t *testing.T) {
 		pebbleStorage.RunWithRegistersStorageAtInitialHeights(t, 0, 0, func(registers *pebbleStorage.Registers) {
-			index, err := New(zerolog.Nop(), db, registers, nil, nil, nil)
+			index, err := New(logger, metrics, db, registers, nil, nil, nil)
 			require.NoError(t, err)
 
 			storeValues := [][]byte{[]byte("1"), []byte("2")}
@@ -662,7 +613,7 @@ func TestIndexerIntegration_StoreAndGet(t *testing.T) {
 	// this test makes sure we correctly handle weird payloads
 	t.Run("Empty and Nil Payloads", func(t *testing.T) {
 		pebbleStorage.RunWithRegistersStorageAtInitialHeights(t, 0, 0, func(registers *pebbleStorage.Registers) {
-			index, err := New(zerolog.Nop(), db, registers, nil, nil, nil)
+			index, err := New(logger, metrics, db, registers, nil, nil, nil)
 			require.NoError(t, err)
 
 			require.NoError(t, index.indexRegisters(map[ledger.Path]*ledger.Payload{}, 1))
