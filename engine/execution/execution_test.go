@@ -71,7 +71,7 @@ func TestExecutionFlow(t *testing.T) {
 	}, 1*time.Second, "could not start execution node on time")
 	defer exeNode.Done(cancel)
 
-	genesis, err := exeNode.State.AtHeight(0).Head()
+	genesis, err := exeNode.Blocks.ByHeight(0)
 	require.NoError(t, err)
 
 	tx1 := flow.TransactionBody{
@@ -101,7 +101,7 @@ func TestExecutionFlow(t *testing.T) {
 	clusterChainID := cluster.CanonicalClusterID(1, flow.IdentityList{colID}.NodeIDs())
 
 	// signed by the only collector
-	block := unittest.BlockWithParentAndProposerFixture(t, genesis, conID.NodeID)
+	block := unittest.BlockWithParentAndProposerFixture(t, genesis.Header, conID.NodeID)
 	voterIndices, err := signature.EncodeSignersToIndices(
 		[]flow.Identifier{conID.NodeID}, []flow.Identifier{conID.NodeID})
 	require.NoError(t, err)
@@ -124,12 +124,14 @@ func TestExecutionFlow(t *testing.T) {
 				ReferenceBlockID: genesis.ID(),
 			},
 		},
+		ProtocolStateID: genesis.Payload.ProtocolStateID,
 	})
 
 	child := unittest.BlockWithParentAndProposerFixture(t, block.Header, conID.NodeID)
 	// the default signer indices is 2 bytes, but in this test cases
 	// we need 1 byte
 	child.Header.ParentVoterIndices = voterIndices
+	child.SetPayload(unittest.PayloadFixture(unittest.WithProtocolStateID(block.Payload.ProtocolStateID)))
 
 	log.Info().Msgf("child block ID: %v, indices: %x", child.Header.ID(), child.Header.ParentVoterIndices)
 
@@ -245,8 +247,16 @@ func TestExecutionFlow(t *testing.T) {
 	consensusEngine.AssertExpectations(t)
 }
 
-func deployContractBlock(t *testing.T, conID *flow.Identity, colID *flow.Identity, chain flow.Chain, seq uint64, parent *flow.Header, ref *flow.Header) (
-	*flow.TransactionBody, *flow.Collection, flow.Block, *messages.BlockProposal, uint64) {
+func deployContractBlock(
+	t *testing.T,
+	conID *flow.Identity,
+	colID *flow.Identity,
+	chain flow.Chain,
+	seq uint64,
+	parent *flow.Block,
+	ref *flow.Header,
+) (
+	*flow.TransactionBody, *flow.Collection, *flow.Block, *messages.BlockProposal, uint64) {
 	// make tx
 	tx := execTestutil.DeployCounterContractTransaction(chain.ServiceAddress(), chain)
 	err := execTestutil.SignTransactionAsServiceAccount(tx, seq, chain)
@@ -262,7 +272,7 @@ func deployContractBlock(t *testing.T, conID *flow.Identity, colID *flow.Identit
 	clusterChainID := cluster.CanonicalClusterID(1, flow.IdentityList{colID}.NodeIDs())
 
 	// make block
-	block := unittest.BlockWithParentAndProposerFixture(t, parent, conID.NodeID)
+	block := unittest.BlockWithParentAndProposerFixture(t, parent.Header, conID.NodeID)
 	voterIndices, err := signature.EncodeSignersToIndices(
 		[]flow.Identifier{conID.NodeID}, []flow.Identifier{conID.NodeID})
 	require.NoError(t, err)
@@ -276,16 +286,17 @@ func deployContractBlock(t *testing.T, conID *flow.Identity, colID *flow.Identit
 				ReferenceBlockID: ref.ID(),
 			},
 		},
+		ProtocolStateID: parent.Payload.ProtocolStateID,
 	})
 
 	// make proposal
 	proposal := unittest.ProposalFromBlock(&block)
 
-	return tx, col, block, proposal, seq + 1
+	return tx, col, &block, proposal, seq + 1
 }
 
-func makePanicBlock(t *testing.T, conID *flow.Identity, colID *flow.Identity, chain flow.Chain, seq uint64, parent *flow.Header, ref *flow.Header) (
-	*flow.TransactionBody, *flow.Collection, flow.Block, *messages.BlockProposal, uint64) {
+func makePanicBlock(t *testing.T, conID *flow.Identity, colID *flow.Identity, chain flow.Chain, seq uint64, parent *flow.Block, ref *flow.Header) (
+	*flow.TransactionBody, *flow.Collection, *flow.Block, *messages.BlockProposal, uint64) {
 	// make tx
 	tx := execTestutil.CreateCounterPanicTransaction(chain.ServiceAddress(), chain.ServiceAddress())
 	err := execTestutil.SignTransactionAsServiceAccount(tx, seq, chain)
@@ -296,7 +307,7 @@ func makePanicBlock(t *testing.T, conID *flow.Identity, colID *flow.Identity, ch
 
 	clusterChainID := cluster.CanonicalClusterID(1, flow.IdentityList{colID}.NodeIDs())
 	// make block
-	block := unittest.BlockWithParentAndProposerFixture(t, parent, conID.NodeID)
+	block := unittest.BlockWithParentAndProposerFixture(t, parent.Header, conID.NodeID)
 	voterIndices, err := signature.EncodeSignersToIndices(
 		[]flow.Identifier{conID.NodeID}, []flow.Identifier{conID.NodeID})
 	require.NoError(t, err)
@@ -310,15 +321,16 @@ func makePanicBlock(t *testing.T, conID *flow.Identity, colID *flow.Identity, ch
 		Guarantees: []*flow.CollectionGuarantee{
 			{CollectionID: col.ID(), SignerIndices: signerIndices, ChainID: clusterChainID, ReferenceBlockID: ref.ID()},
 		},
+		ProtocolStateID: parent.Payload.ProtocolStateID,
 	})
 
 	proposal := unittest.ProposalFromBlock(&block)
 
-	return tx, col, block, proposal, seq + 1
+	return tx, col, &block, proposal, seq + 1
 }
 
-func makeSuccessBlock(t *testing.T, conID *flow.Identity, colID *flow.Identity, chain flow.Chain, seq uint64, parent *flow.Header, ref *flow.Header) (
-	*flow.TransactionBody, *flow.Collection, flow.Block, *messages.BlockProposal, uint64) {
+func makeSuccessBlock(t *testing.T, conID *flow.Identity, colID *flow.Identity, chain flow.Chain, seq uint64, parent *flow.Block, ref *flow.Header) (
+	*flow.TransactionBody, *flow.Collection, *flow.Block, *messages.BlockProposal, uint64) {
 	tx := execTestutil.AddToCounterTransaction(chain.ServiceAddress(), chain.ServiceAddress())
 	err := execTestutil.SignTransactionAsServiceAccount(tx, seq, chain)
 	require.NoError(t, err)
@@ -329,7 +341,7 @@ func makeSuccessBlock(t *testing.T, conID *flow.Identity, colID *flow.Identity, 
 	clusterChainID := cluster.CanonicalClusterID(1, flow.IdentityList{colID}.NodeIDs())
 
 	col := &flow.Collection{Transactions: []*flow.TransactionBody{tx}}
-	block := unittest.BlockWithParentAndProposerFixture(t, parent, conID.NodeID)
+	block := unittest.BlockWithParentAndProposerFixture(t, parent.Header, conID.NodeID)
 	voterIndices, err := signature.EncodeSignersToIndices(
 		[]flow.Identifier{conID.NodeID}, []flow.Identifier{conID.NodeID})
 	require.NoError(t, err)
@@ -338,11 +350,12 @@ func makeSuccessBlock(t *testing.T, conID *flow.Identity, colID *flow.Identity, 
 		Guarantees: []*flow.CollectionGuarantee{
 			{CollectionID: col.ID(), SignerIndices: signerIndices, ChainID: clusterChainID, ReferenceBlockID: ref.ID()},
 		},
+		ProtocolStateID: parent.Payload.ProtocolStateID,
 	})
 
 	proposal := unittest.ProposalFromBlock(&block)
 
-	return tx, col, block, proposal, seq + 1
+	return tx, col, &block, proposal, seq + 1
 }
 
 // Test a successful tx should change the statecommitment,
@@ -381,7 +394,7 @@ func TestFailedTxWillNotChangeStateCommitment(t *testing.T) {
 	}, 1*time.Second, "could not start execution node on time")
 	defer exe1Node.Done(cancel)
 
-	genesis, err := exe1Node.State.AtHeight(0).Head()
+	genesis, err := exe1Node.Blocks.ByHeight(0)
 	require.NoError(t, err)
 
 	seq := uint64(0)
@@ -390,14 +403,14 @@ func TestFailedTxWillNotChangeStateCommitment(t *testing.T) {
 
 	// transaction that will change state and succeed, used to test that state commitment changes
 	// genesis <- block1 [tx1] <- block2 [tx2] <- block3 [tx3] <- child
-	_, col1, block1, proposal1, seq := deployContractBlock(t, conID, colID, chain, seq, genesis, genesis)
+	_, col1, block1, proposal1, seq := deployContractBlock(t, conID, colID, chain, seq, genesis, genesis.Header)
 
 	// we don't set the proper sequence number of this one
-	_, col2, block2, proposal2, _ := makePanicBlock(t, conID, colID, chain, uint64(0), block1.Header, genesis)
+	_, col2, block2, proposal2, _ := makePanicBlock(t, conID, colID, chain, uint64(0), block1, genesis.Header)
 
-	_, col3, block3, proposal3, seq := makeSuccessBlock(t, conID, colID, chain, seq, block2.Header, genesis)
+	_, col3, block3, proposal3, seq := makeSuccessBlock(t, conID, colID, chain, seq, block2, genesis.Header)
 
-	_, _, _, proposal4, _ := makeSuccessBlock(t, conID, colID, chain, seq, block3.Header, genesis)
+	_, _, _, proposal4, _ := makeSuccessBlock(t, conID, colID, chain, seq, block3, genesis.Header)
 	// seq++
 
 	// setup mocks and assertions
@@ -540,14 +553,14 @@ func TestBroadcastToMultipleVerificationNodes(t *testing.T) {
 	verification2Node := testutil.GenericNodeFromParticipants(t, hub, ver2ID, identities, chainID)
 	defer verification2Node.Done()
 
-	genesis, err := exeNode.State.AtHeight(0).Head()
+	genesis, err := exeNode.Blocks.ByHeight(0)
 	require.NoError(t, err)
 
-	block := unittest.BlockWithParentAndProposerFixture(t, genesis, conID.NodeID)
+	block := unittest.BlockWithParentAndProposerFixture(t, genesis.Header, conID.NodeID)
 	voterIndices, err := signature.EncodeSignersToIndices([]flow.Identifier{conID.NodeID}, []flow.Identifier{conID.NodeID})
 	require.NoError(t, err)
 	block.Header.ParentVoterIndices = voterIndices
-	block.SetPayload(flow.Payload{})
+	block.SetPayload(unittest.PayloadFixture(unittest.WithProtocolStateID(genesis.Payload.ProtocolStateID)))
 	proposal := unittest.ProposalFromBlock(&block)
 
 	child := unittest.BlockWithParentAndProposerFixture(t, block.Header, conID.NodeID)
