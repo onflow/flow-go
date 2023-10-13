@@ -269,7 +269,7 @@ func (m *Manager) tryCreateStream(ctx context.Context, peerID peer.ID, protocol 
 					Err(err).
 					Str("peer_id", p2plogging.PeerId(peerID)).
 					Int("attempt", attempts).
-					Uint64("max_attempts", maxRetries).
+					Uint64("max_retries", maxRetries).
 					Msg("retrying create stream, dial to peer in progress")
 				return retry.RetryableError(err)
 			}
