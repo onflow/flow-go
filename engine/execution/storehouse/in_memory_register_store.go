@@ -1,6 +1,7 @@
 package storehouse
 
 import (
+	"errors"
 	"fmt"
 	"sync"
 
@@ -10,8 +11,33 @@ import (
 
 var _ execution.InMemoryRegisterStore = (*InMemoryRegisterStore)(nil)
 
-var ErrPruned = fmt.Errorf("block is pruned")
 var ErrNotExecuted = fmt.Errorf("block is not executed")
+
+type ErrPruned struct {
+	PrunedHeight uint64
+	Height       uint64
+}
+
+func NewErrPruned(height uint64, prunedHeight uint64) error {
+	return ErrPruned{Height: height, PrunedHeight: prunedHeight}
+}
+
+func (e ErrPruned) Error() string {
+	return fmt.Sprintf("block is pruned at height %d", e.Height)
+}
+
+func IsErrPruned(err error) (ErrPruned, bool) {
+	var e ErrPruned
+	ok := errors.As(err, &e)
+	if ok {
+		pe, ok := err.(ErrPruned)
+		if !ok {
+			return ErrPruned{}, false
+		}
+		return pe, true
+	}
+	return ErrPruned{}, false
+}
 
 type InMemoryRegisterStore struct {
 	sync.RWMutex
@@ -96,7 +122,7 @@ func (s *InMemoryRegisterStore) GetRegister(height uint64, blockID flow.Identifi
 	defer s.RUnlock()
 
 	if height <= s.prunedHeight {
-		return flow.RegisterValue{}, fmt.Errorf("cannot get register at height %d, it is pruned (prunedHeight: %v): %w", height, s.prunedHeight, ErrPruned)
+		return flow.RegisterValue{}, NewErrPruned(height, s.prunedHeight)
 	}
 
 	_, ok := s.registersByBlockID[blockID]
@@ -123,7 +149,7 @@ func (s *InMemoryRegisterStore) GetRegister(height uint64, blockID flow.Identifi
 			// otherwise, it means the parent block index is not consistent, which is a bug
 			// we've reached the pruned block, so the register is not found
 			if block == s.prunedID {
-				return flow.RegisterValue{}, fmt.Errorf("cannot get register at height %d, block %v is pruned: %w", height, blockID, ErrPruned)
+				return flow.RegisterValue{}, NewErrPruned(height, s.prunedHeight)
 			}
 
 			return flow.RegisterValue{},
