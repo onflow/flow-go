@@ -8,68 +8,89 @@ import (
 	p2pmsg "github.com/onflow/flow-go/network/p2p/message"
 )
 
-// ErrHardThreshold indicates that the amount of RPC messages received exceeds hard threshold.
-type ErrHardThreshold struct {
-	// controlMsg the control message type.
-	controlMsg p2pmsg.ControlMessageType
-	// amount the amount of control messages.
-	amount uint64
-	// hardThreshold configured hard threshold.
-	hardThreshold uint64
+// IWantDuplicateMsgIDThresholdErr indicates that the amount of duplicate message ids exceeds the allowed threshold.
+type IWantDuplicateMsgIDThresholdErr struct {
+	duplicates int
+	sampleSize uint
+	threshold  float64
 }
 
-func (e ErrHardThreshold) Error() string {
-	return fmt.Sprintf("number of %s messges received exceeds the configured hard threshold: received %d hard threshold %d", e.controlMsg, e.amount, e.hardThreshold)
+func (e IWantDuplicateMsgIDThresholdErr) Error() string {
+	return fmt.Sprintf("%d/%d iWant duplicate message ids exceeds the allowed threshold: %f", e.duplicates, e.sampleSize, e.threshold)
 }
 
-// NewHardThresholdErr returns a new ErrHardThreshold.
-func NewHardThresholdErr(controlMsg p2pmsg.ControlMessageType, amount, hardThreshold uint64) ErrHardThreshold {
-	return ErrHardThreshold{controlMsg: controlMsg, amount: amount, hardThreshold: hardThreshold}
+// NewIWantDuplicateMsgIDThresholdErr returns a new IWantDuplicateMsgIDThresholdErr.
+func NewIWantDuplicateMsgIDThresholdErr(duplicates int, sampleSize uint, threshold float64) IWantDuplicateMsgIDThresholdErr {
+	return IWantDuplicateMsgIDThresholdErr{duplicates, sampleSize, threshold}
 }
 
-// IsErrHardThreshold returns true if an error is ErrHardThreshold
-func IsErrHardThreshold(err error) bool {
-	var e ErrHardThreshold
+// IsIWantDuplicateMsgIDThresholdErr returns true if an error is IWantDuplicateMsgIDThresholdErr
+func IsIWantDuplicateMsgIDThresholdErr(err error) bool {
+	var e IWantDuplicateMsgIDThresholdErr
 	return errors.As(err, &e)
 }
 
-// ErrRateLimitedControlMsg indicates the specified RPC control message is rate limited for the specified peer.
-type ErrRateLimitedControlMsg struct {
-	controlMsg p2pmsg.ControlMessageType
+// IWantCacheMissThresholdErr indicates that the amount of cache misses exceeds the allowed threshold.
+type IWantCacheMissThresholdErr struct {
+	cacheMissCount int // total iwant cache misses
+	sampleSize     uint
+	threshold      float64
 }
 
-func (e ErrRateLimitedControlMsg) Error() string {
-	return fmt.Sprintf("control message %s is rate limited for peer", e.controlMsg)
+func (e IWantCacheMissThresholdErr) Error() string {
+	return fmt.Sprintf("%d/%d iWant cache misses exceeds the allowed threshold: %f", e.cacheMissCount, e.sampleSize, e.threshold)
 }
 
-// NewRateLimitedControlMsgErr returns a new ErrValidationLimit.
-func NewRateLimitedControlMsgErr(controlMsg p2pmsg.ControlMessageType) ErrRateLimitedControlMsg {
-	return ErrRateLimitedControlMsg{controlMsg: controlMsg}
+// NewIWantCacheMissThresholdErr returns a new IWantCacheMissThresholdErr.
+func NewIWantCacheMissThresholdErr(cacheMissCount int, sampleSize uint, threshold float64) IWantCacheMissThresholdErr {
+	return IWantCacheMissThresholdErr{cacheMissCount, sampleSize, threshold}
 }
 
-// IsErrRateLimitedControlMsg returns whether an error is ErrRateLimitedControlMsg.
-func IsErrRateLimitedControlMsg(err error) bool {
-	var e ErrRateLimitedControlMsg
+// IsIWantCacheMissThresholdErr returns true if an error is IWantCacheMissThresholdErr
+func IsIWantCacheMissThresholdErr(err error) bool {
+	var e IWantCacheMissThresholdErr
 	return errors.As(err, &e)
 }
 
-// ErrDuplicateTopic error that indicates a duplicate topic in control message has been detected.
-type ErrDuplicateTopic struct {
-	topic channels.Topic
+// DuplicateTopicErr error that indicates a duplicate has been detected. This can be duplicate topic or message ID tracking.
+type DuplicateTopicErr struct {
+	topic   string
+	msgType p2pmsg.ControlMessageType
 }
 
-func (e ErrDuplicateTopic) Error() string {
-	return fmt.Errorf("duplicate topic %s", e.topic).Error()
+func (e DuplicateTopicErr) Error() string {
+	return fmt.Sprintf("duplicate topic foud in %s control message type: %s", e.msgType, e.topic)
 }
 
-// NewDuplicateTopicErr returns a new ErrDuplicateTopic.
-func NewDuplicateTopicErr(topic channels.Topic) ErrDuplicateTopic {
-	return ErrDuplicateTopic{topic: topic}
+// NewDuplicateTopicErr returns a new DuplicateTopicErr.
+func NewDuplicateTopicErr(topic string, msgType p2pmsg.ControlMessageType) DuplicateTopicErr {
+	return DuplicateTopicErr{topic, msgType}
 }
 
-// IsErrDuplicateTopic returns true if an error is ErrDuplicateTopic.
-func IsErrDuplicateTopic(err error) bool {
-	var e ErrDuplicateTopic
+// IsDuplicateTopicErr returns true if an error is DuplicateTopicErr.
+func IsDuplicateTopicErr(err error) bool {
+	var e DuplicateTopicErr
+	return errors.As(err, &e)
+}
+
+// DuplicateMessageIDErr error that indicates a duplicate message ID has been detected in a IHAVE or IWANT control message.
+type DuplicateMessageIDErr struct {
+	id      string
+	msgType p2pmsg.ControlMessageType
+}
+
+func (e DuplicateMessageIDErr) Error() string {
+	return fmt.Sprintf("duplicate message ID foud in %s control message type: %s", e.msgType, e.id)
+}
+
+// NewDuplicateMessageIDErr returns a new DuplicateMessageIDErr.
+func NewDuplicateMessageIDErr(id string, msgType p2pmsg.ControlMessageType) DuplicateMessageIDErr {
+	return DuplicateMessageIDErr{id, msgType}
+}
+
+// IsDuplicateMessageIDErr returns true if an error is DuplicateMessageIDErr.
+func IsDuplicateMessageIDErr(err error) bool {
+	var e DuplicateMessageIDErr
 	return errors.As(err, &e)
 }
 

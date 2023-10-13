@@ -70,6 +70,11 @@ func TestParseURL(t *testing.T) {
 			expected: "getAccount",
 		},
 		{
+			name:     "/v1/accounts/{address}/keys/{index}",
+			url:      "/v1/accounts/6a587be304c1224c/keys/0",
+			expected: "getAccountKeyByIndex",
+		},
+		{
 			name:     "/v1/events",
 			url:      "/v1/events",
 			expected: "getEvents",
@@ -83,6 +88,11 @@ func TestParseURL(t *testing.T) {
 			name:     "/v1/node_version_info",
 			url:      "/v1/node_version_info",
 			expected: "getNodeVersionInfo",
+		},
+		{
+			name:     "/v1/subscribe_events",
+			url:      "/v1/subscribe_events",
+			expected: "subscribeEvents",
 		},
 	}
 
@@ -157,6 +167,11 @@ func TestBenchmarkParseURL(t *testing.T) {
 			expected: "getAccount",
 		},
 		{
+			name:     "/v1/accounts/{address}/keys/{index}",
+			url:      "/v1/accounts/6a587be304c1224c/keys/0",
+			expected: "getAccountKeyByIndex",
+		},
+		{
 			name:     "/v1/events",
 			url:      "/v1/events",
 			expected: "getEvents",
@@ -170,6 +185,11 @@ func TestBenchmarkParseURL(t *testing.T) {
 			name:     "/v1/node_version_info",
 			url:      "/v1/node_version_info",
 			expected: "getNodeVersionInfo",
+		},
+		{
+			name:     "/v1/subscribe_events",
+			url:      "/v1/subscribe_events",
+			expected: "subscribeEvents",
 		},
 	}
 

@@ -121,7 +121,7 @@ verification:
 {{end}}{{end}}
 
 {{define "args"}}
-        - --bootstrapdir=/bootstrap
+        - --bootstrapdir=/data/bootstrap
         - --datadir=/data/protocol
         - --secretsdir=/data/secret
         - --bind=0.0.0.0:3569

@@ -531,12 +531,12 @@ func Test_StoringLoadingCheckpoints(t *testing.T) {
 
 		fullpath := path.Join(dir, "temp-checkpoint")
 
-		err = realWAL.StoreCheckpointV5(dir, "temp-checkpoint", &logger, updatedTrie)
+		err = realWAL.StoreCheckpointV5(dir, "temp-checkpoint", logger, updatedTrie)
 		require.NoError(t, err)
 
 		t.Run("works without data modification", func(t *testing.T) {
 			logger := unittest.Logger()
-			tries, err := realWAL.LoadCheckpoint(fullpath, &logger)
+			tries, err := realWAL.LoadCheckpoint(fullpath, logger)
 			require.NoError(t, err)
 			require.Equal(t, 1, len(tries))
 			require.Equal(t, updatedTrie, tries[0])
@@ -554,7 +554,7 @@ func Test_StoringLoadingCheckpoints(t *testing.T) {
 			require.NoError(t, err)
 
 			logger := unittest.Logger()
-			tries, err := realWAL.LoadCheckpoint(fullpath, &logger)
+			tries, err := realWAL.LoadCheckpoint(fullpath, logger)
 			require.Error(t, err)
 			require.Nil(t, tries)
 			require.Contains(t, err.Error(), "checksum")
