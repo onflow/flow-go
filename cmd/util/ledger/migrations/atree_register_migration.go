@@ -343,9 +343,6 @@ func (mr *migratorRuntime) ChildInterpreter() (*interpreter.Interpreter, func() 
 		return mr.Accounts.AllocateStorageIndex(owner)
 	}
 	ledger.SetValueFunc = func(owner, key, value []byte) (err error) {
-		mr.mu.Lock()
-		defer mr.mu.Unlock()
-
 		return mr.Accounts.SetValue(owner, key, value)
 	}
 
@@ -395,7 +392,9 @@ func (m *AtreeRegisterMigrator) validateChangesAndCreateNewRegisters(
 	// store state payload so that it can be updated
 	var statePayload *ledger.Payload
 
+	progressLog := util2.LogProgress(m.log, "applying changes", len(changes))
 	for id, value := range changes {
+		progressLog(1)
 		// delete all values that were changed from the original payloads so that we can
 		// check what remains
 		delete(originalPayloads, id)
@@ -405,35 +404,38 @@ func (m *AtreeRegisterMigrator) validateChangesAndCreateNewRegisters(
 			continue
 		}
 
-		ownerAddress, err := common.BytesToAddress([]byte(id.Owner))
-		if err != nil {
-			return nil, fmt.Errorf("failed to convert owner address: %w", err)
-		}
+		//ownerAddress, err := common.BytesToAddress([]byte(id.Owner))
+		//if err != nil {
+		//	return nil, fmt.Errorf("failed to convert owner address: %w", err)
+		//}
+		//
+		//if ownerAddress.Hex() != mr.Address.Hex() {
+		//	// something was changed that does not belong to this account. Log it.
+		//	m.log.Error().
+		//		Str("key", id.String()).
+		//		Str("owner_address", ownerAddress.Hex()).
+		//		Str("account", mr.Address.Hex()).
+		//		Msg("key is part of the change set, but is for a different account")
+		//}
 
-		if ownerAddress.Hex() != mr.Address.Hex() {
-			// something was changed that does not belong to this account. Log it.
-			m.log.Error().
-				Str("key", id.String()).
-				Str("owner_address", ownerAddress.Hex()).
-				Str("account", mr.Address.Hex()).
-				Msg("key is part of the change set, but is for a different account")
+		key := util.RegisterIDToKey(id)
 
-			return nil, fmt.Errorf("register for a different account was produced during migration")
-		}
-
-		if isAccountKey(util.RegisterIDToKey(id)) {
-			statePayload = ledger.NewPayload(util.RegisterIDToKey(id), value)
+		if statePayload != nil && isAccountKey(key) {
+			statePayload = ledger.NewPayload(key, value)
 			// we will append this later
 			continue
 		}
 
-		newPayloads = append(newPayloads, ledger.NewPayload(util.RegisterIDToKey(id), value))
+		newPayloads = append(newPayloads, ledger.NewPayload(key, value))
 	}
 
 	removedSize := uint64(0)
 
 	// add all values that were not changed
+	progressLog = util2.LogProgress(m.log, "checking unchanged registers", len(changes))
 	for id, value := range originalPayloads {
+		progressLog(1)
+
 		if len(value.Value()) == 0 {
 			// this is strange, but we don't want to add empty values. Log it.
 			m.log.Warn().Msgf("empty value for key %s", id)
