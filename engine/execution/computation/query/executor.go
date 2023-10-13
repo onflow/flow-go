@@ -71,6 +71,7 @@ type QueryExecutor struct {
 	vmCtx            fvm.Context
 	derivedChainData *derived.DerivedChainData
 	rngLock          *sync.Mutex
+	entropyPerBlock  EntropyProviderPerBlock
 }
 
 var _ Executor = &QueryExecutor{}
@@ -82,6 +83,7 @@ func NewQueryExecutor(
 	vm fvm.VM,
 	vmCtx fvm.Context,
 	derivedChainData *derived.DerivedChainData,
+	entropyPerBlock EntropyProviderPerBlock,
 ) *QueryExecutor {
 	return &QueryExecutor{
 		config:           config,
@@ -91,6 +93,7 @@ func NewQueryExecutor(
 		vmCtx:            vmCtx,
 		derivedChainData: derivedChainData,
 		rngLock:          &sync.Mutex{},
+		entropyPerBlock:  entropyPerBlock,
 	}
 }
 
@@ -162,6 +165,7 @@ func (e *QueryExecutor) ExecuteScript(
 		fvm.NewContextFromParent(
 			e.vmCtx,
 			fvm.WithBlockHeader(blockHeader),
+			fvm.WithEntropyProvider(e.entropyPerBlock.AtBlockID(blockHeader.ID())),
 			fvm.WithDerivedBlockData(
 				e.derivedChainData.NewDerivedBlockDataForScript(blockHeader.ID()))),
 		fvm.NewScriptWithContextAndArgs(script, requestCtx, arguments...),

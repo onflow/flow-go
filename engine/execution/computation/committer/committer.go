@@ -9,6 +9,7 @@ import (
 	execState "github.com/onflow/flow-go/engine/execution/state"
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/ledger"
+	"github.com/onflow/flow-go/ledger/common/convert"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 )
@@ -78,7 +79,7 @@ func (committer *LedgerViewCommitter) collectProofs(
 	allIds := snapshot.AllRegisterIDs()
 	keys := make([]ledger.Key, 0, len(allIds))
 	for _, id := range allIds {
-		keys = append(keys, execState.RegisterIDToKey(id))
+		keys = append(keys, convert.RegisterIDToLedgerKey(id))
 	}
 
 	query, err := ledger.NewQuery(ledger.State(baseState), keys)

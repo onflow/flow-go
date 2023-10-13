@@ -22,6 +22,7 @@ import (
 func Test_AsyncUploader(t *testing.T) {
 
 	computationResult := unittest.ComputationResultFixture(
+		t,
 		testutils.IdentifierFixture(),
 		nil)
 
