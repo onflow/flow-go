@@ -738,3 +738,24 @@ func closeAndMergeError(closable io.Closer, err error) error {
 
 	return merr.ErrorOrNil()
 }
+
+func withFile(logger zerolog.Logger, dir string, fileName string, f func(file *os.File) error) (
+	errToReturn error,
+) {
+
+	filepath, _ := filePathTopTries(dir, fileName)
+	file, err := os.Open(filepath)
+	if err != nil {
+		return fmt.Errorf("could not open file %v: %w", filepath, err)
+	}
+	defer func(file *os.File) {
+		evictErr := evictFileFromLinuxPageCache(file, false, logger)
+		if evictErr != nil {
+			logger.Warn().Msgf("failed to evict top trie file %s from Linux page cache: %s", filepath, evictErr)
+			// No need to return this error because it's possible to continue normal operations.
+		}
+		errToReturn = closeAndMergeError(file, errToReturn)
+	}(file)
+
+	return f(file)
+}
