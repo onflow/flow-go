@@ -269,14 +269,14 @@ func TestInMemoryRegisterStoreGetLatestValueOK(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, regY.Value, val) // Y's old value at A
 
-	val, err = store.GetRegister(pruned+2, blockB, unknownKey)
+	_, err = store.GetRegister(pruned+2, blockB, unknownKey)
 	require.Error(t, err)
 	pe, ok := IsErrPruned(err)
 	require.True(t, ok)
 	require.Equal(t, pe.PrunedHeight, pruned)
 	require.Equal(t, pe.Height, pruned+2)
 
-	val, err = store.GetRegister(pruned+3, unittest.IdentifierFixture(), regX.Key)
+	_, err = store.GetRegister(pruned+3, unittest.IdentifierFixture(), regX.Key)
 	require.Error(t, err)
 	require.ErrorIs(t, err, ErrNotExecuted) // unknown block
 }
@@ -428,7 +428,7 @@ func TestInMemoryRegisterStorePrune(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, reg.Value, val)
 
-	val, err = store.GetRegister(pruned+1, blockA, reg.Key) // A is pruned
+	_, err = store.GetRegister(pruned+1, blockA, reg.Key) // A is pruned
 	require.Error(t, err)
 	pe, ok := IsErrPruned(err)
 	require.True(t, ok)

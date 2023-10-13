@@ -247,7 +247,7 @@ func TestRegisterStoreReadingFromDisk(t *testing.T) {
 		// value at block 13 was stored in OnDiskRegisterStore at block 12, which is 3
 		require.Equal(t, makeReg("Y", "3").Value, val)
 
-		val, err = rs.GetRegister(rootHeight+4, headerByHeight[rootHeight+4].ID(), makeReg("Y", "3").Key)
+		_, err = rs.GetRegister(rootHeight+4, headerByHeight[rootHeight+4].ID(), makeReg("Y", "3").Key)
 		require.Error(t, err)
 	})
 }
@@ -421,8 +421,8 @@ func TestRegisterStoreConcurrentFinalizeAndExecute(t *testing.T) {
 		var wg sync.WaitGroup
 		savedHeights := make(chan uint64, len(headerByHeight)) // enough buffer so that producer won't be blocked
 
+		wg.Add(1)
 		go func() {
-			wg.Add(1)
 			defer wg.Done()
 
 			for savedHeight := range savedHeights {
