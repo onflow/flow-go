@@ -136,17 +136,17 @@ func (s *AccessSuite) TestSignerIndicesDecoding() {
 	client := accessproto.NewAccessAPIClient(conn)
 
 	// query latest finalized block
-	latestFinalizedBlock, err := makeApiRequest(client.GetLatestBlockHeader, ctx, &accessproto.GetLatestBlockHeaderRequest{
+	latestFinalizedBlock, err := MakeApiRequest(client.GetLatestBlockHeader, ctx, &accessproto.GetLatestBlockHeaderRequest{
 		IsSealed: false,
 	})
 	require.NoError(s.T(), err)
 
-	blockByID, err := makeApiRequest(client.GetBlockHeaderByID, ctx, &accessproto.GetBlockHeaderByIDRequest{Id: latestFinalizedBlock.Block.Id})
+	blockByID, err := MakeApiRequest(client.GetBlockHeaderByID, ctx, &accessproto.GetBlockHeaderByIDRequest{Id: latestFinalizedBlock.Block.Id})
 	require.NoError(s.T(), err)
 
 	require.Equal(s.T(), latestFinalizedBlock, blockByID, "expect to receive same block by ID")
 
-	blockByHeight, err := makeApiRequest(client.GetBlockHeaderByHeight, ctx,
+	blockByHeight, err := MakeApiRequest(client.GetBlockHeaderByHeight, ctx,
 		&accessproto.GetBlockHeaderByHeightRequest{Height: latestFinalizedBlock.Block.Height})
 	require.NoError(s.T(), err)
 
@@ -189,9 +189,9 @@ func (s *AccessSuite) TestSignerIndicesDecoding() {
 	assert.ElementsMatch(s.T(), transformed, msg.ParentVoterIds, "response must contain correctly encoded signer IDs")
 }
 
-// makeApiRequest is a helper function that encapsulates context creation for grpc client call, used to avoid repeated creation
+// MakeApiRequest is a helper function that encapsulates context creation for grpc client call, used to avoid repeated creation
 // of new context for each call.
-func makeApiRequest[Func func(context.Context, *Req, ...grpc.CallOption) (*Resp, error), Req any, Resp any](apiCall Func, ctx context.Context, req *Req) (*Resp, error) {
+func MakeApiRequest[Func func(context.Context, *Req, ...grpc.CallOption) (*Resp, error), Req any, Resp any](apiCall Func, ctx context.Context, req *Req) (*Resp, error) {
 	clientCtx, cancel := context.WithTimeout(ctx, 1*time.Second)
 	resp, err := apiCall(clientCtx, req)
 	cancel()

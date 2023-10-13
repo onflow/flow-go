@@ -46,9 +46,7 @@ import (
 )
 
 const (
-	// TODO: enable parallel execution once cadence type equivalence check issue
-	// is resolved.
-	testVerifyMaxConcurrency = 1
+	testVerifyMaxConcurrency = 2
 )
 
 var chain = flow.Emulator.Chain()
@@ -771,6 +769,9 @@ func executeBlockAndVerifyWithParameters(t *testing.T,
 	myIdentity.StakingPubKey = sk.PublicKey()
 	me := mocklocal.NewMockLocal(sk, myIdentity.ID(), t)
 
+	// used by computer to generate the prng used in the service tx
+	stateForRandomSource := testutil.ProtocolStateWithSourceFixture(nil)
+
 	blockComputer, err := computer.NewBlockComputer(
 		vm,
 		fvmContext,
@@ -781,7 +782,7 @@ func executeBlockAndVerifyWithParameters(t *testing.T,
 		me,
 		prov,
 		nil,
-		testutil.ProtocolStateWithSourceFixture(nil),
+		stateForRandomSource,
 		testVerifyMaxConcurrency)
 	require.NoError(t, err)
 
@@ -845,15 +846,17 @@ func executeBlockAndVerifyWithParameters(t *testing.T,
 			ChunkDataPack:     chdps[i],
 			EndState:          chunk.EndState,
 			TransactionOffset: offsetForChunk,
+			// returns the same RandomSource used by the computer
+			Snapshot: stateForRandomSource.AtBlockID(chunk.BlockID),
 		}
 	}
 
 	require.Len(t, vcds, len(txs)+1) // +1 for system chunk
 
 	for _, vcd := range vcds {
-		_, fault, err := verifier.Verify(vcd)
+		spockSecret, err := verifier.Verify(vcd)
 		assert.NoError(t, err)
-		assert.Nil(t, fault)
+		assert.NotNil(t, spockSecret)
 	}
 
 	return computationResult

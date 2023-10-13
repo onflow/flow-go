@@ -34,7 +34,7 @@ func NewChunkDataPacks(collector module.CacheMetrics, db *badger.DB, collections
 		}
 	}
 
-	cache := newCache[flow.Identifier, *badgermodel.StoredChunkDataPack](collector, metrics.ResourceChunkDataPack,
+	cache := newCache(collector, metrics.ResourceChunkDataPack,
 		withLimit[flow.Identifier, *badgermodel.StoredChunkDataPack](byChunkIDCacheSize),
 		withStore(store),
 		withRetrieve(retrieve),
@@ -48,22 +48,22 @@ func NewChunkDataPacks(collector module.CacheMetrics, db *badger.DB, collections
 	return &ch
 }
 
-func (ch *ChunkDataPacks) Store(c *flow.ChunkDataPack) error {
-	sc := toStoredChunkDataPack(c)
-	err := operation.RetryOnConflictTx(ch.db, transaction.Update, ch.byChunkIDCache.PutTx(sc.ChunkID, sc))
-	if err != nil {
-		return fmt.Errorf("could not store chunk datapack: %w", err)
-	}
-	return nil
-}
+// Remove removes multiple ChunkDataPacks cs keyed by their ChunkIDs in a batch.
+// No errors are expected during normal operation, even if no entries are matched.
+func (ch *ChunkDataPacks) Remove(chunkIDs []flow.Identifier) error {
+	batch := NewBatch(ch.db)
 
-func (ch *ChunkDataPacks) Remove(chunkID flow.Identifier) error {
-	err := operation.RetryOnConflict(ch.db.Update, operation.RemoveChunkDataPack(chunkID))
-	if err != nil {
-		return fmt.Errorf("could not remove chunk datapack: %w", err)
+	for _, c := range chunkIDs {
+		err := ch.BatchRemove(c, batch)
+		if err != nil {
+			return fmt.Errorf("cannot remove chunk data pack: %w", err)
+		}
 	}
-	// TODO Integrate cache removal in a similar way as storage/retrieval is
-	ch.byChunkIDCache.Remove(chunkID)
+
+	err := batch.Flush()
+	if err != nil {
+		return fmt.Errorf("cannot flush batch to remove chunk data pack: %w", err)
+	}
 	return nil
 }
 
@@ -77,6 +77,24 @@ func (ch *ChunkDataPacks) BatchStore(c *flow.ChunkDataPack, batch storage.BatchS
 		ch.byChunkIDCache.Insert(sc.ChunkID, sc)
 	})
 	return operation.BatchInsertChunkDataPack(sc)(writeBatch)
+}
+
+// Store stores multiple ChunkDataPacks cs keyed by their ChunkIDs in a batch.
+// No errors are expected during normal operation, but it may return generic error
+func (ch *ChunkDataPacks) Store(cs []*flow.ChunkDataPack) error {
+	batch := NewBatch(ch.db)
+	for _, c := range cs {
+		err := ch.BatchStore(c, batch)
+		if err != nil {
+			return fmt.Errorf("cannot store chunk data pack: %w", err)
+		}
+	}
+
+	err := batch.Flush()
+	if err != nil {
+		return fmt.Errorf("cannot flush batch: %w", err)
+	}
+	return nil
 }
 
 // BatchRemove removes ChunkDataPack c keyed by its ChunkID in provided batch
@@ -97,9 +115,10 @@ func (ch *ChunkDataPacks) ByChunkID(chunkID flow.Identifier) (*flow.ChunkDataPac
 	}
 
 	chdp := &flow.ChunkDataPack{
-		ChunkID:    schdp.ChunkID,
-		StartState: schdp.StartState,
-		Proof:      schdp.Proof,
+		ChunkID:           schdp.ChunkID,
+		StartState:        schdp.StartState,
+		Proof:             schdp.Proof,
+		ExecutionDataRoot: schdp.ExecutionDataRoot,
 	}
 
 	if !schdp.SystemChunk {
@@ -138,10 +157,11 @@ func (ch *ChunkDataPacks) retrieveCHDP(chunkID flow.Identifier) func(*badger.Txn
 
 func toStoredChunkDataPack(c *flow.ChunkDataPack) *badgermodel.StoredChunkDataPack {
 	sc := &badgermodel.StoredChunkDataPack{
-		ChunkID:     c.ChunkID,
-		StartState:  c.StartState,
-		Proof:       c.Proof,
-		SystemChunk: false,
+		ChunkID:           c.ChunkID,
+		StartState:        c.StartState,
+		Proof:             c.Proof,
+		SystemChunk:       false,
+		ExecutionDataRoot: c.ExecutionDataRoot,
 	}
 
 	if c.Collection != nil {

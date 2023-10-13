@@ -6,14 +6,16 @@ import (
 	"math/rand"
 	"os"
 	"os/exec"
+	"path"
 	"regexp"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
 	"time"
 
+	"github.com/cockroachdb/pebble"
 	"github.com/dgraph-io/badger/v2"
-	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -21,9 +23,7 @@ import (
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/util"
 	"github.com/onflow/flow-go/network"
-	"github.com/onflow/flow-go/network/channels"
 	cborcodec "github.com/onflow/flow-go/network/codec/cbor"
-	"github.com/onflow/flow-go/network/slashing"
 	"github.com/onflow/flow-go/network/topology"
 )
 
@@ -365,6 +365,18 @@ func TempBadgerDB(t testing.TB) (*badger.DB, string) {
 	return db, dir
 }
 
+func TempPebblePath(t *testing.T) string {
+	return path.Join(TempDir(t), "pebble"+strconv.Itoa(rand.Int())+".db")
+}
+
+func TempPebbleDBWithOpts(t testing.TB, opts *pebble.Options) (*pebble.DB, string) {
+	// create random path string for parallelization
+	dbpath := path.Join(TempDir(t), "pebble"+strconv.Itoa(rand.Int())+".db")
+	db, err := pebble.Open(dbpath, opts)
+	require.NoError(t, err)
+	return db, dbpath
+}
+
 func Concurrently(n int, f func(int)) {
 	var wg sync.WaitGroup
 	for i := 0; i < n; i++ {
@@ -436,21 +448,4 @@ func GenerateRandomStringWithLen(commentLen uint) string {
 		bytes[i] = letterBytes[rand.Intn(len(letterBytes))]
 	}
 	return string(bytes)
-}
-
-// NetworkSlashingViolationsConsumer returns a slashing violations consumer for network middleware
-func NetworkSlashingViolationsConsumer(logger zerolog.Logger, metrics module.NetworkSecurityMetrics, consumer network.MisbehaviorReportConsumer) network.ViolationsConsumer {
-	return slashing.NewSlashingViolationsConsumer(logger, metrics, consumer)
-}
-
-type MisbehaviorReportConsumerFixture struct {
-	network.MisbehaviorReportManager
-}
-
-func (c *MisbehaviorReportConsumerFixture) ReportMisbehaviorOnChannel(channel channels.Channel, report network.MisbehaviorReport) {
-	c.HandleMisbehaviorReport(channel, report)
-}
-
-func NewMisbehaviorReportConsumerFixture(manager network.MisbehaviorReportManager) *MisbehaviorReportConsumerFixture {
-	return &MisbehaviorReportConsumerFixture{manager}
 }

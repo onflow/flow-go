@@ -49,25 +49,25 @@ func TestDisconnectingFromDisallowListedNode(t *testing.T) {
 			// the libp2p node. So, here, we don't need to do anything except just enabling the connection gater.
 			return nil
 		})))
-	idProvider.On("ByPeerID", node1.Host().ID()).Return(&identity1, true).Maybe()
-	peerIDSlice = append(peerIDSlice, node1.Host().ID())
+	idProvider.On("ByPeerID", node1.ID()).Return(&identity1, true).Maybe()
+	peerIDSlice = append(peerIDSlice, node1.ID())
 
 	// node 2 is the node that will be disallow-listed by node 1.
 	node2, identity2 := p2ptest.NodeFixture(t, sporkID, t.Name(), idProvider)
-	idProvider.On("ByPeerID", node2.Host().ID()).Return(&identity2, true).Maybe()
-	peerIDSlice = append(peerIDSlice, node2.Host().ID())
+	idProvider.On("ByPeerID", node2.ID()).Return(&identity2, true).Maybe()
+	peerIDSlice = append(peerIDSlice, node2.ID())
 
 	// node 3 is the node that will be connected to node 1 (to ensure that node 1 is still able to connect to other nodes
 	// after disallow-listing node 2).
 	node3, identity3 := p2ptest.NodeFixture(t, sporkID, t.Name(), idProvider)
-	idProvider.On("ByPeerID", node3.Host().ID()).Return(&identity3, true).Maybe()
-	peerIDSlice = append(peerIDSlice, node3.Host().ID())
+	idProvider.On("ByPeerID", node3.ID()).Return(&identity3, true).Maybe()
+	peerIDSlice = append(peerIDSlice, node3.ID())
 
 	nodes := []p2p.LibP2PNode{node1, node2, node3}
 	ids := flow.IdentityList{&identity1, &identity2, &identity3}
 
-	p2ptest.StartNodes(t, signalerCtx, nodes, 100*time.Millisecond)
-	defer p2ptest.StopNodes(t, nodes, cancel, 100*time.Millisecond)
+	p2ptest.StartNodes(t, signalerCtx, nodes)
+	defer p2ptest.StopNodes(t, nodes, cancel)
 
 	p2ptest.LetNodesDiscoverEachOther(t, ctx, nodes, ids)
 
@@ -75,7 +75,7 @@ func TestDisconnectingFromDisallowListedNode(t *testing.T) {
 	p2ptest.RequireConnectedEventually(t, nodes, 100*time.Millisecond, 2*time.Second)
 
 	// phase-1: node 1 disallow-lists node 2.
-	node1.OnDisallowListNotification(node2.Host().ID(), network.DisallowListedCauseAlsp)
+	node1.OnDisallowListNotification(node2.ID(), network.DisallowListedCauseAlsp)
 
 	// eventually node 1 should be disconnected from node 2 while other nodes should remain connected.
 	// we choose a timeout of 2 seconds because peer manager updates peers every 1 second.
@@ -91,7 +91,7 @@ func TestDisconnectingFromDisallowListedNode(t *testing.T) {
 	p2ptest.EnsureNotConnectedBetweenGroups(t, ctx, []p2p.LibP2PNode{node1}, []p2p.LibP2PNode{node2})
 
 	// phase-2: now we allow-list node 1 back
-	node1.OnAllowListNotification(node2.Host().ID(), network.DisallowListedCauseAlsp)
+	node1.OnAllowListNotification(node2.ID(), network.DisallowListedCauseAlsp)
 
 	// eventually node 1 should be connected to node 2 again, hence all nodes should be connected to each other.
 	// we choose a timeout of 5 seconds because peer manager updates peers every 1 second and we need to wait for

@@ -157,16 +157,11 @@ type GossipSubScoringMetrics interface {
 
 // GossipSubRpcValidationInspectorMetrics encapsulates the metrics collectors for the gossipsub rpc validation control message inspectors.
 type GossipSubRpcValidationInspectorMetrics interface {
-	// BlockingPreProcessingStarted increments the metric tracking the number of messages being pre-processed by the rpc validation inspector.
-	BlockingPreProcessingStarted(msgType string, sampleSize uint)
-	// BlockingPreProcessingFinished tracks the time spent by the rpc validation inspector to pre-process a message and decrements the metric tracking
-	// the number of messages being pre-processed by the rpc validation inspector.
-	BlockingPreProcessingFinished(msgType string, sampleSize uint, duration time.Duration)
 	// AsyncProcessingStarted increments the metric tracking the number of inspect message request being processed by workers in the rpc validator worker pool.
-	AsyncProcessingStarted(msgType string)
+	AsyncProcessingStarted()
 	// AsyncProcessingFinished tracks the time spent by a rpc validation inspector worker to process an inspect message request asynchronously and decrements the metric tracking
 	// the number of inspect message requests  being processed asynchronously by the rpc validation inspector workers.
-	AsyncProcessingFinished(msgType string, duration time.Duration)
+	AsyncProcessingFinished(duration time.Duration)
 }
 
 // NetworkInboundQueueMetrics encapsulates the metrics collectors for the inbound queue of the networking layer.
@@ -562,6 +557,14 @@ type ExecutionDataRequesterMetrics interface {
 
 	// FetchRetried reports that a download retry was processed
 	FetchRetried()
+}
+
+type ExecutionStateIndexerMetrics interface {
+	// BlockIndexed records metrics from indexing execution data from a single block.
+	BlockIndexed(height uint64, duration time.Duration, events, registers, transactionResults int)
+
+	// BlockReindexed records that a previously indexed block was indexed again.
+	BlockReindexed()
 }
 
 type RuntimeMetrics interface {

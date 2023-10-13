@@ -395,6 +395,7 @@ func prepareExecutionService(container testnet.ContainerConfig, i int, n int) Se
 		fmt.Sprintf("--cadence-tracing=%t", cadenceTracing),
 		fmt.Sprintf("--extensive-tracing=%t", extesiveTracing),
 		"--execution-data-dir=/data/execution-data",
+		"--chunk-data-pack-dir=/data/chunk-data-pack",
 	)
 
 	service.Volumes = append(service.Volumes,

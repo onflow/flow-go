@@ -9,13 +9,13 @@ import (
 	"sync"
 
 	"github.com/rs/zerolog"
-
 	"google.golang.org/grpc/credentials"
 
 	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/engine/access/rest"
 	"github.com/onflow/flow-go/engine/access/rpc/backend"
+	"github.com/onflow/flow-go/engine/access/state_stream"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/component"
@@ -33,11 +33,11 @@ type Config struct {
 	SecureGRPCListenAddr   string                           // the secure GRPC server address as ip:port
 	TransportCredentials   credentials.TransportCredentials // the secure GRPC credentials
 	HTTPListenAddr         string                           // the HTTP web proxy address as ip:port
-	RESTListenAddr         string                           // the REST server address as ip:port (if empty the REST server will not be started)
 	CollectionAddr         string                           // the address of the upstream collection node
 	HistoricalAccessAddrs  string                           // the list of all access nodes from previous spork
 
 	BackendConfig backend.Config // configurable options for creating Backend
+	RestConfig    rest.Config    // the REST server configuration
 	MaxMsgSize    uint           // GRPC max message size
 }
 
@@ -65,6 +65,10 @@ type Engine struct {
 
 	addrLock       sync.RWMutex
 	restAPIAddress net.Addr
+
+	stateStreamBackend state_stream.API
+	eventFilterConfig  state_stream.EventFilterConfig
+	maxGlobalStreams   uint32
 }
 type Option func(*RPCEngineBuilder)
 
@@ -80,6 +84,9 @@ func NewBuilder(log zerolog.Logger,
 	restHandler access.API,
 	secureGrpcServer *grpcserver.GrpcServer,
 	unsecureGrpcServer *grpcserver.GrpcServer,
+	stateStreamBackend state_stream.API,
+	eventFilterConfig state_stream.EventFilterConfig,
+	maxGlobalStreams uint32,
 ) (*RPCEngineBuilder, error) {
 	log = log.With().Str("engine", "rpc").Logger()
 
@@ -103,6 +110,9 @@ func NewBuilder(log zerolog.Logger,
 		chain:                     chainID.Chain(),
 		restCollector:             accessMetrics,
 		restHandler:               restHandler,
+		stateStreamBackend:        stateStreamBackend,
+		eventFilterConfig:         eventFilterConfig,
+		maxGlobalStreams:          maxGlobalStreams,
 	}
 	backendNotifierActor, backendNotifierWorker := events.NewFinalizationActor(eng.notifyBackendOnBlockFinalized)
 	eng.backendNotifierActor = backendNotifierActor
@@ -204,15 +214,17 @@ func (e *Engine) serveGRPCWebProxyWorker(ctx irrecoverable.SignalerContext, read
 // serveREST is a worker routine which starts the HTTP REST server.
 // The ready callback is called after the server address is bound and set.
 func (e *Engine) serveREST(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
-	if e.config.RESTListenAddr == "" {
+	if e.config.RestConfig.ListenAddress == "" {
 		e.log.Debug().Msg("no REST API address specified - not starting the server")
 		ready()
 		return
 	}
 
-	e.log.Info().Str("rest_api_address", e.config.RESTListenAddr).Msg("starting REST server on address")
+	e.log.Info().Str("rest_api_address", e.config.RestConfig.ListenAddress).Msg("starting REST server on address")
 
-	r, err := rest.NewServer(e.restHandler, e.config.RESTListenAddr, e.log, e.chain, e.restCollector)
+	r, err := rest.NewServer(e.restHandler, e.config.RestConfig, e.log, e.chain, e.restCollector, e.stateStreamBackend,
+		e.eventFilterConfig,
+		e.maxGlobalStreams)
 	if err != nil {
 		e.log.Err(err).Msg("failed to initialize the REST server")
 		ctx.Throw(err)
@@ -220,7 +232,7 @@ func (e *Engine) serveREST(ctx irrecoverable.SignalerContext, ready component.Re
 	}
 	e.restServer = r
 
-	l, err := net.Listen("tcp", e.config.RESTListenAddr)
+	l, err := net.Listen("tcp", e.config.RestConfig.ListenAddress)
 	if err != nil {
 		e.log.Err(err).Msg("failed to start the REST server")
 		ctx.Throw(err)
