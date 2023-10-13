@@ -7,6 +7,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/go-playground/validator/v10"
 	"github.com/hashicorp/go-multierror"
 	libp2pnet "github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/peer"
@@ -104,26 +105,8 @@ type Manager struct {
 //   - a new unicast manager.
 //   - an error if the configuration is invalid, any error is irrecoverable.
 func NewUnicastManager(cfg *ManagerConfig) (*Manager, error) {
-	if cfg.MaxStreamCreationRetryAttemptTimes == uint64(0) {
-		return nil, fmt.Errorf("max stream creation attempt times must be greater than 0")
-	}
-	if cfg.MaxDialRetryAttemptTimes == uint64(0) {
-		return nil, fmt.Errorf("max dial attempt times must be greater than 0")
-	}
-	if cfg.DialZeroRetryResetThreshold == time.Duration(0) {
-		return nil, fmt.Errorf("dial zero backoff reset threshold must be greater than 0")
-	}
-	if cfg.StreamZeroRetryResetThreshold == uint64(0) {
-		return nil, fmt.Errorf("stream zero backoff reset threshold must be greater than 0")
-	}
-	if cfg.CreateStreamBackoffDelay == time.Duration(0) {
-		return nil, fmt.Errorf("create stream retry delay must be greater than 0")
-	}
-	if cfg.DialInProgressBackoffDelay == time.Duration(0) {
-		return nil, fmt.Errorf("dial in progress backoff delay must be greater than 0")
-	}
-	if cfg.DialBackoffDelay == time.Duration(0) {
-		return nil, fmt.Errorf("dial backoff delay must be greater than 0")
+	if err := validator.New().Struct(cfg); err != nil {
+		return nil, fmt.Errorf("invalid unicast manager config: %w", err)
 	}
 
 	m := &Manager{
