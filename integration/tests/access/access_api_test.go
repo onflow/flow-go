@@ -24,8 +24,9 @@ import (
 
 // This is a collection of tests that validate various Access API endpoints work as expected.
 
-const (
-	simpleScript = `pub fun main(): Int { return %d; }`
+var (
+	simpleScript       = `pub fun main(): Int { return 42; }`
+	simpleScriptResult = cadence.NewInt(42)
 )
 
 func TestAccessAPI(t *testing.T) {
@@ -201,24 +202,22 @@ func (s *AccessAPISuite) testExecuteScriptWithSimpleScript(client *client.Client
 	header, err := client.GetLatestBlockHeader(s.ctx, true)
 	s.Require().NoError(err)
 
-	script := fmt.Sprintf(simpleScript, 42)
-
 	s.Run("execute at latest block", func() {
-		result, err := client.ExecuteScriptAtLatestBlock(s.ctx, []byte(script), nil)
+		result, err := client.ExecuteScriptAtLatestBlock(s.ctx, []byte(simpleScript), nil)
 		s.Require().NoError(err)
-		s.Assert().Equal(cadence.NewInt(42), result)
+		s.Assert().Equal(simpleScriptResult, result)
 	})
 
 	s.Run("execute at block height", func() {
-		result, err := client.ExecuteScriptAtBlockHeight(s.ctx, header.Height, []byte(script), nil)
+		result, err := client.ExecuteScriptAtBlockHeight(s.ctx, header.Height, []byte(simpleScript), nil)
 		s.Require().NoError(err)
-		s.Assert().Equal(cadence.NewInt(42), result)
+		s.Assert().Equal(simpleScriptResult, result)
 	})
 
 	s.Run("execute at block ID", func() {
-		result, err := client.ExecuteScriptAtBlockID(s.ctx, header.ID, []byte(script), nil)
+		result, err := client.ExecuteScriptAtBlockID(s.ctx, header.ID, []byte(simpleScript), nil)
 		s.Require().NoError(err)
-		s.Assert().Equal(cadence.NewInt(42), result)
+		s.Assert().Equal(simpleScriptResult, result)
 	})
 }
 
@@ -247,6 +246,17 @@ func (s *AccessAPISuite) testExecuteScriptWithSimpleContract(client *client.Clie
 		result, err := client.ExecuteScriptAtBlockID(s.ctx, header.ID, []byte(script), nil)
 		s.Require().NoError(err)
 		s.Assert().Equal(lib.CounterInitializedValue, result.(cadence.Int).Int())
+	})
+
+	s.Run("execute at past block height", func() {
+		// targetHeight is when the counter was deployed, use a height before that to check that
+		// the contract was deployed, but the value was not yet set
+		pastHeight := targetHeight - 2
+
+		result, err := client.ExecuteScriptAtBlockHeight(s.ctx, pastHeight, []byte(script), nil)
+		s.Require().NoError(err)
+
+		s.Assert().Equal(lib.CounterDefaultValue, result.(cadence.Int).Int())
 	})
 }
 
