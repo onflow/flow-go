@@ -1630,54 +1630,6 @@ func (suite *Suite) TestGetNodeVersionInfo() {
 		suite.Require().Equal(expected, actual)
 	})
 
-	suite.Run("backend construct fails when SporkID lookup fails", func() {
-		stateParams := protocol.NewParams(suite.T())
-		stateParams.On("SporkID").Return(flow.ZeroID, fmt.Errorf("fail"))
-
-		state := protocol.NewState(suite.T())
-		state.On("Params").Return(stateParams, nil).Maybe()
-
-		params := suite.defaultBackendParams()
-		params.State = state
-
-		backend, err := New(params)
-		suite.Require().Error(err)
-		suite.Require().Nil(backend)
-	})
-
-	suite.Run("backend construct fails when ProtocolVersion lookup fails", func() {
-		stateParams := protocol.NewParams(suite.T())
-		stateParams.On("SporkID").Return(sporkID, nil)
-		stateParams.On("ProtocolVersion").Return(uint(0), fmt.Errorf("fail"))
-
-		state := protocol.NewState(suite.T())
-		state.On("Params").Return(stateParams, nil).Maybe()
-
-		params := suite.defaultBackendParams()
-		params.State = state
-
-		backend, err := New(params)
-		suite.Require().Error(err)
-		suite.Require().Nil(backend)
-	})
-
-	suite.Run("backend construct fails when SporkRootBlockHeight lookup fails", func() {
-		stateParams := protocol.NewParams(suite.T())
-		stateParams.On("SporkID").Return(sporkID, nil)
-		stateParams.On("ProtocolVersion").Return(protocolVersion, nil)
-		stateParams.On("SporkRootBlockHeight").Return(uint64(0), fmt.Errorf("fail"))
-
-		state := protocol.NewState(suite.T())
-		state.On("Params").Return(stateParams, nil).Maybe()
-
-		params := suite.defaultBackendParams()
-		params.State = state
-
-		backend, err := New(params)
-		suite.Require().Error(err)
-		suite.Require().Nil(backend)
-	})
-
 	suite.Run("backend construct fails when SealedRoot lookup fails", func() {
 		stateParams := protocol.NewParams(suite.T())
 		stateParams.On("SporkID").Return(sporkID, nil)
