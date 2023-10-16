@@ -9,22 +9,25 @@ import (
 	"gonum.org/v1/gonum/stat"
 )
 
+// this constant should be increased if tests are flakey, but it the higher the constant
+// the slower the test
+const sampleConstant = 1000
+
 // BasicDistributionTest is a test function to run a basic statistic test on `randf` output.
 // `randf` is a function that outputs random integers.
 // It partitions all outputs into `n` continuous classes and computes the distribution
 // over the partition. Each class has a width of `classWidth`: first class is [0..classWidth-1],
-// secons class is [classWidth..2*classWidth-1], etc..
+// second class is [classWidth..2*classWidth-1], etc..
 // It computes the frequency of outputs in the `n` classes and computes the
 // standard deviation of frequencies. A small standard deviation is a necessary
-// condition for a uniform distribution of `randf` (though is not a guarantee of
+// condition for a uniform distribution of `randf` (but is not a guarantee of
 // uniformity)
 func BasicDistributionTest(t *testing.T, n uint64, classWidth uint64, randf func() (uint64, error)) {
 	// sample size should ideally be a high number multiple of `n`
-	// but if `n` is too small, we could use a small sample size so that the test
-	// isn't too slow
-	sampleSize := 1000 * n
+	sampleSize := sampleConstant * n
 	if n < 100 {
-		sampleSize = (80000 / n) * n // highest multiple of n less than 80000
+		// but if `n` is too small, we use a "high enough" sample size
+		sampleSize = ((80 * sampleConstant) / n) * n // highest multiple of n less than 80000
 	}
 	distribution := make([]float64, n)
 	// populate the distribution
@@ -39,7 +42,7 @@ func BasicDistributionTest(t *testing.T, n uint64, classWidth uint64, randf func
 	EvaluateDistributionUniformity(t, distribution)
 }
 
-// EvaluateDistributionUniformity evaluates if the input distribution is close to uinform
+// EvaluateDistributionUniformity evaluates if the input distribution is close to uniform
 // through a basic quick test.
 // The test computes the standard deviation and checks it is small enough compared
 // to the distribution mean.
